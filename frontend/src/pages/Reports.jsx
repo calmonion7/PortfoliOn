@@ -46,7 +46,7 @@ function RsiTable({ dailyRsi }) {
             <td style={{ ...TD, color: '#81c784' }}>{fmt(dailyRsi.target_20)}</td>
             <td style={{ ...TD, color: '#81c784' }}>{fmt(dailyRsi.target_25)}</td>
             <td style={{ ...TD, color: '#81c784' }}>{fmt(dailyRsi.target_30)}</td>
-            <td style={TD}>{fmtN(dailyRsi.rsi)}</td>
+            <td style={{ ...TD, color: rsiColor(dailyRsi.rsi), fontWeight: 600 }}>{fmtN(dailyRsi.rsi)}</td>
             <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(dailyRsi.target_70)}</td>
             <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(dailyRsi.target_75)}</td>
             <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(dailyRsi.target_80)}</td>
