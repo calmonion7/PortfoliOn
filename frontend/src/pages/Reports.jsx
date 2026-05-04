@@ -92,7 +92,16 @@ export default function Reports() {
 
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
   const watchlistCount = Object.values(reportList).filter(v => v.category === 'watchlist').length
-  const tabEntries = Object.entries(reportList).filter(([, v]) => v.category === activeTab)
+  const tabEntries = Object.entries(reportList)
+    .filter(([, v]) => v.category === activeTab)
+    .sort(([, a], [, b]) => {
+      const rsiA = a.summary?.daily_rsi?.rsi ?? null
+      const rsiB = b.summary?.daily_rsi?.rsi ?? null
+      if (rsiA === null && rsiB === null) return 0
+      if (rsiA === null) return 1
+      if (rsiB === null) return -1
+      return activeTab === 'holdings' ? rsiB - rsiA : rsiA - rsiB
+    })
   const otherEntries = Object.entries(reportList).filter(([, v]) => v.category === 'other')
 
   const renderTickerItem = (ticker, info) => (
