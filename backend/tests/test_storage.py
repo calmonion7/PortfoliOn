@@ -4,11 +4,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 def test_get_portfolio_returns_empty_when_file_missing():
-    with patch("services.storage.DATA_DIR", Path("/nonexistent")):
-        from services import storage
-        import importlib
-        importlib.reload(storage)
-        result = storage.get_portfolio()
+    import services.storage as storage_mod
+    original = storage_mod.DATA_DIR
+    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
+    try:
+        result = storage_mod.get_portfolio()
+    finally:
+        storage_mod.DATA_DIR = original
     assert result == {"stocks": []}
 
 def test_save_and_load_portfolio_roundtrip(tmp_path):
@@ -22,11 +24,13 @@ def test_save_and_load_portfolio_roundtrip(tmp_path):
     assert loaded == portfolio
 
 def test_get_schedule_returns_default_when_file_missing():
-    with patch("services.storage.DATA_DIR", Path("/nonexistent")):
-        import importlib
-        import services.storage as storage_module
-        importlib.reload(storage_module)
-        result = storage_module.get_schedule()
+    import services.storage as storage_mod
+    original = storage_mod.DATA_DIR
+    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
+    try:
+        result = storage_mod.get_schedule()
+    finally:
+        storage_mod.DATA_DIR = original
     assert result["enabled"] is False
     assert result["time"] == "08:00"
     assert "mon" in result["days"]
