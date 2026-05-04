@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import date
+import json
 import pandas as pd
 import yfinance as yf
 
@@ -40,6 +41,22 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
 
     md_path = output_dir / f"{today}.md"
     md_path.write_text("\n\n".join(filter(None, sections)), encoding="utf-8")
+
+    summary = {
+        "ticker": ticker,
+        "name": stock.get("name", ticker),
+        "date": today,
+        "price": quote.get("price"),
+        "target_mean": analyst.get("target_mean") or finviz.get("finviz_target"),
+        "buy": analyst.get("buy", 0),
+        "hold": analyst.get("hold", 0),
+        "sell": analyst.get("sell", 0),
+        "finviz_recom": finviz.get("finviz_recom"),
+        "daily_rsi": timeframe_rsi.get("daily", {}),
+    }
+    json_path = output_dir / f"{today}.json"
+    json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+
     return str(md_path)
 
 def _header(stock: dict, quote: dict, today: str) -> str:
@@ -124,15 +141,19 @@ def _section7(timeframe_rsi: dict, sr: dict) -> str:
     lines = [
         "## ⑦ 매수/매도 타점\n",
         "### RSI 현황\n",
-        "| 시간대 | 현재 RSI | RSI 30 도달 예상가 | RSI 70 도달 예상가 |",
-        "|---|---|---|---|",
+        "| 시간대 | 현재 RSI | RSI20 | RSI25 | RSI30 | RSI70 | RSI75 | RSI80 |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for tf, label in [("daily", "일봉"), ("weekly", "주봉"), ("monthly", "월봉")]:
         d = timeframe_rsi.get(tf, {})
         rsi = f"{d['rsi']:.1f}" if d.get("rsi") else "N/A"
+        t20 = f"${d['target_20']:.2f}" if d.get("target_20") else "N/A"
+        t25 = f"${d['target_25']:.2f}" if d.get("target_25") else "N/A"
         t30 = f"${d['target_30']:.2f}" if d.get("target_30") else "N/A"
         t70 = f"${d['target_70']:.2f}" if d.get("target_70") else "N/A"
-        lines.append(f"| {label} | {rsi} | {t30} | {t70} |")
+        t75 = f"${d['target_75']:.2f}" if d.get("target_75") else "N/A"
+        t80 = f"${d['target_80']:.2f}" if d.get("target_80") else "N/A"
+        lines.append(f"| {label} | {rsi} | {t20} | {t25} | {t30} | {t70} | {t75} | {t80} |")
     lines += [
         "\n### 지지·저항 & EMA\n",
         "| 항목 | 값 |",

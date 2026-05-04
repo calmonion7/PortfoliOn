@@ -1,3 +1,4 @@
+import json
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -34,15 +35,29 @@ def _mock_all():
             "buy": 15, "hold": 5, "sell": 2,
         }),
         "services.report_generator.indicators.get_timeframe_rsi": MagicMock(return_value={
-            "daily":   {"rsi": 55.0, "target_30": 90.0,  "target_70": 130.0},
-            "weekly":  {"rsi": 60.0, "target_30": 85.0,  "target_70": 140.0},
-            "monthly": {"rsi": 50.0, "target_30": 80.0,  "target_70": 145.0},
+            "daily": {
+                "rsi": 55.0,
+                "target_20": 80.0, "target_25": 85.0, "target_30": 90.0,
+                "target_70": 130.0, "target_75": 135.0, "target_80": 140.0,
+            },
+            "weekly": {
+                "rsi": 60.0,
+                "target_20": 75.0, "target_25": 80.0, "target_30": 85.0,
+                "target_70": 140.0, "target_75": 145.0, "target_80": 150.0,
+            },
+            "monthly": {
+                "rsi": 50.0,
+                "target_20": 70.0, "target_25": 75.0, "target_30": 80.0,
+                "target_70": 145.0, "target_75": 150.0, "target_80": 155.0,
+            },
         }),
         "services.report_generator.indicators.get_support_resistance": MagicMock(return_value={
             "week52_high": 135.0, "week52_low": 90.0,
             "ema20": 118.0, "ema50": 115.0, "ema200": 110.0,
         }),
-        "services.report_generator.scraper.scrape_finviz_consensus": MagicMock(return_value={}),
+        "services.report_generator.scraper.scrape_finviz_consensus": MagicMock(return_value={
+            "finviz_recom": 1.8,
+        }),
         "services.report_generator.scraper.get_news": MagicMock(return_value=[
             {"title": "Test news", "link": "https://example.com",
              "publisher": "Reuters", "published_at": "2026-05-04 09:00"}
@@ -73,3 +88,37 @@ def test_generate_report_creates_markdown_file(tmp_path):
     assert "Expand to Asia" in content
     assert "⑥ 최근 공시" in content
     assert "⑦ 매수/매도" in content
+
+def test_generate_report_saves_json_summary(tmp_path):
+    with contextlib.ExitStack() as stack:
+        for target, mock in _mock_all().items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        md_path = report_generator.generate_report(SAMPLE_STOCK, tmp_path)
+    json_path = Path(md_path).with_suffix(".json")
+    assert json_path.exists(), "JSON summary file should be created alongside markdown"
+    summary = json.loads(json_path.read_text(encoding="utf-8"))
+    assert summary["ticker"] == "TEST"
+    assert summary["name"] == "Test Corp"
+    assert summary["target_mean"] == 150.0
+    assert summary["buy"] == 15
+    assert summary["hold"] == 5
+    assert summary["sell"] == 2
+    assert summary["finviz_recom"] == 1.8
+    assert "daily_rsi" in summary
+    assert summary["daily_rsi"]["rsi"] == 55.0
+    assert summary["daily_rsi"]["target_20"] == 80.0
+
+def test_generate_report_section7_includes_expanded_rsi_columns(tmp_path):
+    with contextlib.ExitStack() as stack:
+        for target, mock in _mock_all().items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        md_path = report_generator.generate_report(SAMPLE_STOCK, tmp_path)
+    content = Path(md_path).read_text(encoding="utf-8")
+    assert "RSI20" in content
+    assert "RSI25" in content
+    assert "RSI75" in content
+    assert "RSI80" in content
