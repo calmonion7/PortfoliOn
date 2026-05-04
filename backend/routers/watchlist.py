@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 from services import storage
 
@@ -15,8 +15,8 @@ class WatchlistStock(BaseModel):
 
 
 class PromotePayload(BaseModel):
-    quantity: float
-    avg_cost: float
+    quantity: float = Field(..., gt=0)
+    avg_cost: float = Field(..., gt=0)
 
 
 def _all_tickers(portfolio: dict) -> list[str]:

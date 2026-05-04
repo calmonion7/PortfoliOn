@@ -1,4 +1,5 @@
 import pytest
+from copy import deepcopy
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from unittest.mock import patch
@@ -20,7 +21,7 @@ SAMPLE_PORTFOLIO = {
 }
 
 def test_get_watchlist_returns_items():
-    with patch("routers.watchlist.storage.get_portfolio", return_value=SAMPLE_PORTFOLIO):
+    with patch("routers.watchlist.storage.get_portfolio", return_value=deepcopy(SAMPLE_PORTFOLIO)):
         resp = client.get("/api/watchlist")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
@@ -39,7 +40,7 @@ def test_add_watchlist_stock():
     assert saved["watchlist"][0]["ticker"] == "TSLA"
 
 def test_add_duplicate_in_stocks_returns_400():
-    with patch("routers.watchlist.storage.get_portfolio", return_value=SAMPLE_PORTFOLIO):
+    with patch("routers.watchlist.storage.get_portfolio", return_value=deepcopy(SAMPLE_PORTFOLIO)):
         resp = client.post("/api/watchlist", json={
             "ticker": "NFLX", "name": "Netflix",
             "competitors": [], "moat": "", "growth_plan": ""
@@ -47,7 +48,7 @@ def test_add_duplicate_in_stocks_returns_400():
     assert resp.status_code == 400
 
 def test_add_duplicate_in_watchlist_returns_400():
-    with patch("routers.watchlist.storage.get_portfolio", return_value=SAMPLE_PORTFOLIO):
+    with patch("routers.watchlist.storage.get_portfolio", return_value=deepcopy(SAMPLE_PORTFOLIO)):
         resp = client.post("/api/watchlist", json={
             "ticker": "NVDA", "name": "Nvidia",
             "competitors": [], "moat": "", "growth_plan": ""
