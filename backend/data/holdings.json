@@ -1,0 +1,24 @@
+{
+  "holdings": [
+    {
+      "ticker": "LLY",
+      "quantity": 3.0,
+      "avg_cost": 886.6
+    },
+    {
+      "ticker": "TSLA",
+      "quantity": 5.0,
+      "avg_cost": 379.1
+    },
+    {
+      "ticker": "LHX",
+      "quantity": 17.0,
+      "avg_cost": 331.1
+    },
+    {
+      "ticker": "PLTR",
+      "quantity": 56.0,
+      "avg_cost": 157.82
+    }
+  ]
+}
