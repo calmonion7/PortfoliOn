@@ -17,3 +17,6 @@ backend/reports/
 # Frontend build
 frontend/dist/
 frontend/node_modules/
+
+# Git worktrees
+.worktrees/
