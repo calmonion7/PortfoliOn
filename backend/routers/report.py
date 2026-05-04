@@ -24,7 +24,12 @@ def generate_one(ticker: str, background_tasks: BackgroundTasks):
         (s for s in portfolio["stocks"] if s["ticker"].upper() == ticker.upper()), None
     )
     if not stock:
-        raise HTTPException(status_code=404, detail=f"{ticker} not found in portfolio")
+        stock = next(
+            (s for s in portfolio.get("watchlist", [])
+             if s["ticker"].upper() == ticker.upper()), None
+        )
+    if not stock:
+        raise HTTPException(status_code=404, detail=f"{ticker} not found in portfolio or watchlist")
     background_tasks.add_task(_run_generation, [stock])
     return {"message": f"Generating report for {ticker.upper()}"}
 

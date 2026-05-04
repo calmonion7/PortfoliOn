@@ -5,7 +5,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 import scheduler as sched
-from routers import portfolio, report
+from routers import portfolio, report, watchlist
 
 REPORTS_DIR = Path(__file__).parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
@@ -31,6 +31,7 @@ app.mount("/reports", StaticFiles(directory=str(REPORTS_DIR)), name="reports")
 
 app.include_router(portfolio.router)
 app.include_router(report.router)
+app.include_router(watchlist.router)
 
 
 @app.get("/health")
