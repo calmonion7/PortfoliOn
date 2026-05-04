@@ -103,7 +103,7 @@ export default function Settings() {
 
       <section style={{ background: '#1e1e2e', padding: 20, borderRadius: 8 }}>
         <h2 style={{ color: '#80cbc4', marginBottom: 12, fontSize: 16 }}>즉시 리포트 생성</h2>
-        <p style={{ color: '#aaa', fontSize: 13, marginBottom: 12 }}>포트폴리오의 모든 종목에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.</p>
+        <p style={{ color: '#aaa', fontSize: 13, marginBottom: 12 }}>보유 및 관심 종목 전체에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.</p>
         <button className="btn-primary" onClick={handleGenerateNow} disabled={generating}>
           {generating ? '생성 중...' : '지금 생성'}
         </button>
