@@ -22,7 +22,7 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
     t = yf.Ticker(ticker)
     daily_df = t.history(period="1y")
     sr = indicators.get_support_resistance(daily_df) if not daily_df.empty else {}
-    vp = indicators.get_volume_profile(daily_df) if not daily_df.empty else {"poc": None, "hvn": [], "lvn": []}
+    vp = indicators.get_volume_profile(daily_df)
     finviz = scraper.scrape_finviz_consensus(ticker)
     news = scraper.get_news(ticker)
     charts.generate_revenue_chart(financials, ticker, output_dir)

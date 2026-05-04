@@ -93,6 +93,7 @@ def test_generate_report_creates_markdown_file(tmp_path):
     assert "Expand to Asia" in content
     assert "⑥ 최근 공시" in content
     assert "⑦ 매수/매도" in content
+    assert "⑧ 매물대" in content
 
 def test_generate_report_saves_json_summary(tmp_path):
     with contextlib.ExitStack() as stack:
