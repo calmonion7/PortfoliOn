@@ -72,5 +72,9 @@ def test_get_timeframe_rsi_returns_all_timeframes():
     assert "monthly" in result
     for tf in ["daily", "weekly", "monthly"]:
         assert "rsi" in result[tf]
+        assert "target_20" in result[tf]
+        assert "target_25" in result[tf]
         assert "target_30" in result[tf]
         assert "target_70" in result[tf]
+        assert "target_75" in result[tf]
+        assert "target_80" in result[tf]

@@ -49,15 +49,27 @@ def get_timeframe_rsi(ticker: str) -> dict:
         try:
             df = t.history(**params)
             if df.empty:
-                result[tf] = {"rsi": None, "target_30": None, "target_70": None}
+                result[tf] = {
+                    "rsi": None,
+                    "target_20": None, "target_25": None, "target_30": None,
+                    "target_70": None, "target_75": None, "target_80": None,
+                }
                 continue
             rsi = calc_rsi(df["Close"])
             current_rsi = round(float(rsi.iloc[-1]), 2)
             result[tf] = {
                 "rsi": current_rsi,
+                "target_20": calc_rsi_target_price(df["Close"], rsi, 20.0),
+                "target_25": calc_rsi_target_price(df["Close"], rsi, 25.0),
                 "target_30": calc_rsi_target_price(df["Close"], rsi, 30.0),
                 "target_70": calc_rsi_target_price(df["Close"], rsi, 70.0),
+                "target_75": calc_rsi_target_price(df["Close"], rsi, 75.0),
+                "target_80": calc_rsi_target_price(df["Close"], rsi, 80.0),
             }
         except Exception:
-            result[tf] = {"rsi": None, "target_30": None, "target_70": None}
+            result[tf] = {
+                "rsi": None,
+                "target_20": None, "target_25": None, "target_30": None,
+                "target_70": None, "target_75": None, "target_80": None,
+            }
     return result
