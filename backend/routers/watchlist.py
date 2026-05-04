@@ -19,69 +19,95 @@ class PromotePayload(BaseModel):
     avg_cost: float = Field(..., gt=0)
 
 
-def _all_tickers(portfolio: dict) -> list[str]:
-    return [s["ticker"].upper() for s in portfolio["stocks"]] + \
-           [s["ticker"].upper() for s in portfolio["watchlist"]]
-
-
 @router.get("")
 def get_watchlist():
-    return storage.get_portfolio()["watchlist"]
+    tickers = storage.get_watchlist_tickers()
+    stocks_by_ticker = {s["ticker"]: s for s in storage.get_stocks()}
+    return [
+        stocks_by_ticker.get(t, {"ticker": t, "name": t, "competitors": [], "moat": "", "growth_plan": ""})
+        for t in tickers
+    ]
 
 
 @router.post("", status_code=201)
 def add_watchlist_stock(stock: WatchlistStock):
-    portfolio = storage.get_portfolio()
-    if stock.ticker.upper() in _all_tickers(portfolio):
+    holdings = storage.get_holdings()
+    watchlist = storage.get_watchlist_tickers()
+    all_tickers = [h["ticker"].upper() for h in holdings] + [t.upper() for t in watchlist]
+    if stock.ticker.upper() in all_tickers:
         raise HTTPException(status_code=400, detail=f"{stock.ticker} already exists")
-    portfolio["watchlist"].append({**stock.model_dump(), "ticker": stock.ticker.upper()})
-    storage.save_portfolio(portfolio)
-    return portfolio["watchlist"][-1]
+
+    stocks = storage.get_stocks()
+    if stock.ticker.upper() not in [s["ticker"].upper() for s in stocks]:
+        stocks.append({
+            "ticker": stock.ticker.upper(), "name": stock.name,
+            "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
+        })
+        storage.save_stocks(stocks)
+
+    watchlist.append(stock.ticker.upper())
+    storage.save_watchlist_tickers(watchlist)
+
+    return {"ticker": stock.ticker.upper(), "name": stock.name,
+            "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan}
 
 
 @router.put("/{ticker}")
 def update_watchlist_stock(ticker: str, stock: WatchlistStock):
-    portfolio = storage.get_portfolio()
-    idx = next(
-        (i for i, s in enumerate(portfolio["watchlist"])
-         if s["ticker"].upper() == ticker.upper()),
-        None,
-    )
-    if idx is None:
+    watchlist = storage.get_watchlist_tickers()
+    if ticker.upper() not in [t.upper() for t in watchlist]:
         raise HTTPException(status_code=404, detail=f"{ticker} not found in watchlist")
-    portfolio["watchlist"][idx] = {**stock.model_dump(), "ticker": ticker.upper()}
-    storage.save_portfolio(portfolio)
-    return portfolio["watchlist"][idx]
+
+    stocks = storage.get_stocks()
+    idx = next((i for i, s in enumerate(stocks) if s["ticker"].upper() == ticker.upper()), None)
+    if idx is not None:
+        stocks[idx] = {
+            "ticker": ticker.upper(), "name": stock.name,
+            "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
+        }
+        storage.save_stocks(stocks)
+
+    return {"ticker": ticker.upper(), "name": stock.name,
+            "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan}
 
 
 @router.delete("/{ticker}")
 def delete_watchlist_stock(ticker: str):
-    portfolio = storage.get_portfolio()
-    original_len = len(portfolio["watchlist"])
-    portfolio["watchlist"] = [
-        s for s in portfolio["watchlist"] if s["ticker"].upper() != ticker.upper()
-    ]
-    if len(portfolio["watchlist"]) == original_len:
+    upper = ticker.upper()
+    watchlist = storage.get_watchlist_tickers()
+    if upper not in [t.upper() for t in watchlist]:
         raise HTTPException(status_code=404, detail=f"{ticker} not found in watchlist")
-    storage.save_portfolio(portfolio)
-    return {"deleted": ticker.upper()}
+
+    storage.save_watchlist_tickers([t for t in watchlist if t.upper() != upper])
+
+    holdings = storage.get_holdings()
+    if upper not in [h["ticker"].upper() for h in holdings]:
+        stocks = storage.get_stocks()
+        storage.save_stocks([s for s in stocks if s["ticker"].upper() != upper])
+
+    return {"deleted": upper}
 
 
 @router.post("/{ticker}/promote")
 def promote_to_holdings(ticker: str, payload: PromotePayload):
-    portfolio = storage.get_portfolio()
-    watch_idx = next(
-        (i for i, s in enumerate(portfolio["watchlist"])
-         if s["ticker"].upper() == ticker.upper()),
-        None,
-    )
-    if watch_idx is None:
+    upper = ticker.upper()
+    watchlist = storage.get_watchlist_tickers()
+    if upper not in [t.upper() for t in watchlist]:
         raise HTTPException(status_code=404, detail=f"{ticker} not found in watchlist")
-    stock_tickers = [s["ticker"].upper() for s in portfolio["stocks"]]
-    if ticker.upper() in stock_tickers:
+
+    holdings = storage.get_holdings()
+    if upper in [h["ticker"].upper() for h in holdings]:
         raise HTTPException(status_code=400, detail=f"{ticker} already exists in holdings")
-    watch_stock = portfolio["watchlist"].pop(watch_idx)
-    new_stock = {**watch_stock, "quantity": payload.quantity, "avg_cost": payload.avg_cost}
-    portfolio["stocks"].append(new_stock)
-    storage.save_portfolio(portfolio)
-    return new_stock
+
+    storage.save_watchlist_tickers([t for t in watchlist if t.upper() != upper])
+
+    new_holding = {"ticker": upper, "quantity": payload.quantity, "avg_cost": payload.avg_cost}
+    holdings.append(new_holding)
+    storage.save_holdings(holdings)
+
+    stocks = storage.get_stocks()
+    stock_data = next(
+        (s for s in stocks if s["ticker"].upper() == upper),
+        {"ticker": upper, "name": upper, "competitors": [], "moat": "", "growth_plan": ""}
+    )
+    return {**stock_data, "quantity": payload.quantity, "avg_cost": payload.avg_cost}
