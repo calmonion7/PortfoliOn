@@ -1,51 +1,69 @@
 import { useState, useEffect } from 'react'
 
-const EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', competitors: '', moat: '', growth_plan: '' }
+const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', competitors: '', moat: '', growth_plan: '' }
+const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '' }
 
-export default function StockModal({ stock, onSave, onClose }) {
-  const [form, setForm] = useState(EMPTY)
+export default function StockModal({ stock, onSave, onClose, mode = 'holding' }) {
+  const empty = mode === 'watchlist' ? WATCHLIST_EMPTY : HOLDING_EMPTY
+  const [form, setForm] = useState(empty)
   const isEdit = !!stock
 
   useEffect(() => {
     if (stock) {
-      setForm({ ...stock, competitors: stock.competitors?.join(', ') || '' })
+      setForm({ ...empty, ...stock, competitors: stock.competitors?.join(', ') || '' })
     } else {
-      setForm(EMPTY)
+      setForm(empty)
     }
-  }, [stock])
+  }, [stock, mode])
 
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSave({
+    const base = {
       ticker: form.ticker.trim().toUpperCase(),
       name: form.name.trim(),
-      quantity: parseFloat(form.quantity),
-      avg_cost: parseFloat(form.avg_cost),
       competitors: form.competitors.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
       moat: form.moat.trim(),
       growth_plan: form.growth_plan.trim(),
-    })
+    }
+    if (mode === 'holding') {
+      onSave({ ...base, quantity: parseFloat(form.quantity), avg_cost: parseFloat(form.avg_cost) })
+    } else {
+      onSave(base)
+    }
   }
+
+  const holdingFields = [
+    ['ticker', '티커 (예: NFLX)', 'text', !isEdit],
+    ['name', '회사명', 'text', false],
+    ['quantity', '보유 수량', 'number', false],
+    ['avg_cost', '평균 매입가 ($)', 'number', false],
+    ['competitors', '경쟁사 티커 (쉼표 구분)', 'text', false],
+  ]
+
+  const watchlistFields = [
+    ['ticker', '티커 (예: NVDA)', 'text', !isEdit],
+    ['name', '회사명', 'text', false],
+    ['competitors', '경쟁사 티커 (쉼표 구분)', 'text', false],
+  ]
+
+  const fields = mode === 'watchlist' ? watchlistFields : holdingFields
+  const title = mode === 'watchlist'
+    ? (isEdit ? '관심종목 수정' : '관심종목 추가')
+    : (isEdit ? '종목 수정' : '종목 추가')
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h2>{isEdit ? '종목 수정' : '종목 추가'}</h2>
+        <h2>{title}</h2>
         <form onSubmit={handleSubmit}>
-          {[
-            ['ticker', '티커 (예: NFLX)', 'text', !isEdit],
-            ['name', '회사명', 'text', false],
-            ['quantity', '보유 수량', 'number', false],
-            ['avg_cost', '평균 매입가 ($)', 'number', false],
-            ['competitors', '경쟁사 티커 (쉼표 구분, 예: DIS,WBD)', 'text', false],
-          ].map(([field, label, type, required]) => (
+          {fields.map(([field, label, type, required]) => (
             <div className="form-field" key={field}>
               <label>{label}</label>
               <input
                 type={type}
-                value={form[field]}
+                value={form[field] ?? ''}
                 onChange={set(field)}
                 required={required}
                 disabled={field === 'ticker' && isEdit}
