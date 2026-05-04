@@ -11,7 +11,7 @@ def test_get_portfolio_returns_empty_when_file_missing():
         result = storage_mod.get_portfolio()
     finally:
         storage_mod.DATA_DIR = original
-    assert result == {"stocks": []}
+    assert result == {"stocks": [], "watchlist": []}
 
 def test_save_and_load_portfolio_roundtrip(tmp_path):
     import importlib
@@ -21,7 +21,7 @@ def test_save_and_load_portfolio_roundtrip(tmp_path):
         portfolio = {"stocks": [{"ticker": "NFLX", "quantity": 10, "avg_cost": 85.59}]}
         storage_module.save_portfolio(portfolio)
         loaded = storage_module.get_portfolio()
-    assert loaded == portfolio
+    assert loaded == {**portfolio, "watchlist": []}
 
 def test_get_schedule_returns_default_when_file_missing():
     import services.storage as storage_mod

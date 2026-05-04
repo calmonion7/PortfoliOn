@@ -19,7 +19,11 @@ def _write_json(filename: str, data: Any) -> None:
 
 def get_portfolio() -> dict:
     data = _read_json("portfolio.json")
-    return data if data is not None else {"stocks": []}
+    if data is None:
+        return {"stocks": [], "watchlist": []}
+    if "watchlist" not in data:
+        data["watchlist"] = []
+    return data
 
 def save_portfolio(portfolio: dict) -> None:
     _write_json("portfolio.json", portfolio)
