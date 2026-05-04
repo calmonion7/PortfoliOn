@@ -60,12 +60,17 @@ export default function Portfolio() {
 
   const handleDelete = async (ticker) => {
     if (!window.confirm(`${ticker}를 삭제하시겠습니까?`)) return
-    if (activeTab === 'holdings') {
-      await axios.delete(`/api/portfolio/${ticker}`)
-    } else {
-      await axios.delete(`/api/watchlist/${ticker}`)
+    try {
+      if (activeTab === 'holdings') {
+        await axios.delete(`/api/portfolio/${ticker}`)
+      } else {
+        await axios.delete(`/api/watchlist/${ticker}`)
+      }
+      setError('')
+      fetchAll()
+    } catch (err) {
+      setError(err.response?.data?.detail || '삭제 실패')
     }
-    fetchAll()
   }
 
   const handlePromote = async ({ quantity, avg_cost }) => {
