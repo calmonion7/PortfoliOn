@@ -1,0 +1,114 @@
+import { useState, useEffect } from 'react'
+import axios from 'axios'
+
+const DAYS = [
+  { key: 'mon', label: '월' }, { key: 'tue', label: '화' },
+  { key: 'wed', label: '수' }, { key: 'thu', label: '목' },
+  { key: 'fri', label: '금' }, { key: 'sat', label: '토' },
+  { key: 'sun', label: '일' },
+]
+
+export default function Settings() {
+  const [schedule, setSchedule] = useState({ enabled: false, time: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] })
+  const [saved, setSaved] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [genMsg, setGenMsg] = useState('')
+
+  useEffect(() => {
+    axios.get('/api/schedule').then(({ data }) => setSchedule(data))
+  }, [])
+
+  const toggleDay = (day) => {
+    setSchedule(s => ({
+      ...s,
+      days: s.days.includes(day) ? s.days.filter(d => d !== day) : [...s.days, day],
+    }))
+  }
+
+  const handleSave = async () => {
+    await axios.put('/api/schedule', schedule)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const handleGenerateNow = async () => {
+    setGenerating(true)
+    setGenMsg('')
+    try {
+      const { data } = await axios.post('/api/report/generate')
+      setGenMsg(data.message)
+    } catch (err) {
+      setGenMsg(err.response?.data?.detail || '생성 실패')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div style={{ maxWidth: 480 }}>
+      <h1 style={{ color: '#90caf9', marginBottom: 24 }}>설정</h1>
+
+      <section style={{ background: '#1e1e2e', padding: 20, borderRadius: 8, marginBottom: 24 }}>
+        <h2 style={{ color: '#80cbc4', marginBottom: 16, fontSize: 16 }}>자동 리포트 스케줄</h2>
+
+        <div className="form-field" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <label style={{ marginBottom: 0, width: 'auto' }}>자동 생성</label>
+          <input
+            type="checkbox"
+            checked={schedule.enabled}
+            onChange={e => setSchedule(s => ({ ...s, enabled: e.target.checked }))}
+            style={{ width: 'auto' }}
+          />
+        </div>
+
+        <div className="form-field">
+          <label>생성 시간</label>
+          <input
+            type="time"
+            value={schedule.time}
+            onChange={e => setSchedule(s => ({ ...s, time: e.target.value }))}
+            disabled={!schedule.enabled}
+          />
+        </div>
+
+        <div className="form-field">
+          <label style={{ marginBottom: 8 }}>요일</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {DAYS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggleDay(key)}
+                disabled={!schedule.enabled}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 4,
+                  border: 'none',
+                  cursor: schedule.enabled ? 'pointer' : 'default',
+                  background: schedule.days.includes(key) ? '#1565c0' : '#333',
+                  color: schedule.days.includes(key) ? 'white' : '#888',
+                  opacity: schedule.enabled ? 1 : 0.5,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button className="btn-primary" onClick={handleSave}>
+          {saved ? '저장됨' : '저장'}
+        </button>
+      </section>
+
+      <section style={{ background: '#1e1e2e', padding: 20, borderRadius: 8 }}>
+        <h2 style={{ color: '#80cbc4', marginBottom: 12, fontSize: 16 }}>즉시 리포트 생성</h2>
+        <p style={{ color: '#aaa', fontSize: 13, marginBottom: 12 }}>포트폴리오의 모든 종목에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.</p>
+        <button className="btn-primary" onClick={handleGenerateNow} disabled={generating}>
+          {generating ? '생성 중...' : '지금 생성'}
+        </button>
+        {genMsg && <p style={{ marginTop: 8, color: '#66bb6a', fontSize: 13 }}>{genMsg}</p>}
+      </section>
+    </div>
+  )
+}
