@@ -55,6 +55,11 @@ def _mock_all():
             "week52_high": 135.0, "week52_low": 90.0,
             "ema20": 118.0, "ema50": 115.0, "ema200": 110.0,
         }),
+        "services.report_generator.indicators.get_volume_profile": MagicMock(return_value={
+            "poc": 115.0,
+            "hvn": [95.0, 115.0, 135.0],
+            "lvn": [105.0, 125.0],
+        }),
         "services.report_generator.scraper.scrape_finviz_consensus": MagicMock(return_value={
             "finviz_recom": 1.8,
         }),
@@ -122,3 +127,29 @@ def test_generate_report_section7_includes_expanded_rsi_columns(tmp_path):
     assert "RSI25" in content
     assert "RSI75" in content
     assert "RSI80" in content
+
+def test_generate_report_summary_includes_volume_profile(tmp_path):
+    with contextlib.ExitStack() as stack:
+        for target, mock in _mock_all().items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        md_path = report_generator.generate_report(SAMPLE_STOCK, tmp_path)
+    json_path = Path(md_path).with_suffix(".json")
+    summary = json.loads(json_path.read_text(encoding="utf-8"))
+    assert "volume_profile" in summary
+    assert summary["volume_profile"]["poc"] == 115.0
+    assert summary["volume_profile"]["hvn"] == [95.0, 115.0, 135.0]
+    assert summary["volume_profile"]["lvn"] == [105.0, 125.0]
+
+def test_generate_report_section8_includes_volume_profile(tmp_path):
+    with contextlib.ExitStack() as stack:
+        for target, mock in _mock_all().items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        md_path = report_generator.generate_report(SAMPLE_STOCK, tmp_path)
+    content = Path(md_path).read_text(encoding="utf-8")
+    assert "⑧ 매물대" in content
+    assert "$115.00" in content
+    assert "$95.00" in content

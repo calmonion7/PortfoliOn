@@ -22,6 +22,7 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
     t = yf.Ticker(ticker)
     daily_df = t.history(period="1y")
     sr = indicators.get_support_resistance(daily_df) if not daily_df.empty else {}
+    vp = indicators.get_volume_profile(daily_df) if not daily_df.empty else {"poc": None, "hvn": [], "lvn": []}
     finviz = scraper.scrape_finviz_consensus(ticker)
     news = scraper.get_news(ticker)
     charts.generate_revenue_chart(financials, ticker, output_dir)
@@ -37,6 +38,7 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         _section5(stock),
         _section6(quote, news),
         _section7(timeframe_rsi, sr),
+        _section8(vp),
     ]
 
     md_path = output_dir / f"{today}.md"
@@ -53,6 +55,7 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         "sell": analyst.get("sell", 0),
         "finviz_recom": finviz.get("finviz_recom"),
         "daily_rsi": timeframe_rsi.get("daily", {}),
+        "volume_profile": vp,
     }
     json_path = output_dir / f"{today}.json"
     json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -164,5 +167,19 @@ def _section7(timeframe_rsi: dict, sr: dict) -> str:
         f"| EMA(50) | ${sr['ema50']:.2f} |" if sr.get("ema50") else "| EMA(50) | N/A |",
         f"| EMA(200) | ${sr['ema200']:.2f} |" if sr.get("ema200") else "| EMA(200) | N/A |",
         "\n![RSI Chart](./rsi_chart.png)",
+    ]
+    return "\n".join(lines)
+
+def _section8(vp: dict) -> str:
+    if not vp or vp.get("poc") is None:
+        return ""
+    poc = f"${vp['poc']:.2f}"
+    hvn_str = " / ".join(f"${v:.2f}" for v in vp.get("hvn", [])) or "N/A"
+    lvn_str = " / ".join(f"${v:.2f}" for v in vp.get("lvn", [])) or "N/A"
+    lines = [
+        "## ⑧ 매물대 분석 (Volume Profile, 1년 일봉)\n",
+        "| POC | HVN (지지·저항 후보) | LVN (매물 공백) |",
+        "|---|---|---|",
+        f"| {poc} | {hvn_str} | {lvn_str} |",
     ]
     return "\n".join(lines)
