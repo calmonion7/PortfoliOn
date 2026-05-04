@@ -225,7 +225,7 @@ export default function Reports() {
                         {s?.name || ticker} <span style={{ color: '#666', fontWeight: 400 }}>({ticker})</span>
                       </td>
                       <td style={TD}>{s ? fmt(s.price) : 'N/A'}</td>
-                      <td style={TD}>{s?.volume_profile ? fmt(s.volume_profile.poc) : 'N/A'}</td>
+                      <td style={TD}>{fmt(s?.volume_profile?.poc)}</td>
                       <td style={TD}>{s ? fmt(s.target_mean) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#81c784' }}>{s ? fmtN(s.buy) : 'N/A'}</td>
                       <td style={TD}>{s ? fmtN(s.hold) : 'N/A'}</td>
