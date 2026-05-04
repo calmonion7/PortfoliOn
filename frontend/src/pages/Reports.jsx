@@ -57,6 +57,33 @@ function RsiTable({ dailyRsi }) {
   )
 }
 
+function VolumeProfileTable({ vp }) {
+  if (!vp || vp.poc == null) return null
+  const hvnStr = vp.hvn?.length ? vp.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ') : 'N/A'
+  const lvnStr = vp.lvn?.length ? vp.lvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ') : 'N/A'
+  return (
+    <div style={{ marginBottom: 16, overflowX: 'auto', background: '#111', borderRadius: 6, padding: '10px 12px' }}>
+      <div style={{ color: '#80cbc4', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>매물대 분석 (Volume Profile, 1년 일봉)</div>
+      <table style={{ borderCollapse: 'collapse', fontSize: 12, color: '#ccc' }}>
+        <thead>
+          <tr style={{ background: '#1a2a3a' }}>
+            <th style={TH}>POC</th>
+            <th style={{ ...TH, color: '#81c784' }}>HVN (지지·저항)</th>
+            <th style={{ ...TH, color: '#ffcc80' }}>LVN (매물 공백)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ ...TD, fontWeight: 600 }}>{fmt(vp.poc)}</td>
+            <td style={{ ...TD, color: '#81c784' }}>{hvnStr}</td>
+            <td style={{ ...TD, color: '#ffcc80' }}>{lvnStr}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function Reports() {
   const [reportList, setReportList] = useState({})
   const [selected, setSelected] = useState({ ticker: null, date: null })
@@ -167,6 +194,7 @@ export default function Reports() {
                 <tr style={{ background: '#1a2a3a', position: 'sticky', top: 0 }}>
                   <th style={{ ...TH, textAlign: 'left' }}>종목명 (티커)</th>
                   <th style={TH}>현재가</th>
+                  <th style={TH}>POC</th>
                   <th style={TH}>평균목표가</th>
                   <th style={{ ...TH, color: '#81c784' }}>Buy</th>
                   <th style={TH}>Hold</th>
@@ -197,6 +225,7 @@ export default function Reports() {
                         {s?.name || ticker} <span style={{ color: '#666', fontWeight: 400 }}>({ticker})</span>
                       </td>
                       <td style={TD}>{s ? fmt(s.price) : 'N/A'}</td>
+                      <td style={TD}>{s?.volume_profile ? fmt(s.volume_profile.poc) : 'N/A'}</td>
                       <td style={TD}>{s ? fmt(s.target_mean) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#81c784' }}>{s ? fmtN(s.buy) : 'N/A'}</td>
                       <td style={TD}>{s ? fmtN(s.hold) : 'N/A'}</td>
@@ -235,6 +264,7 @@ export default function Reports() {
             </div>
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
             {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} />}
+            {!loading && detail.summary?.volume_profile && <VolumeProfileTable vp={detail.summary.volume_profile} />}
             {!loading && detail.content && <MarkdownViewer content={detail.content} ticker={selected.ticker} />}
           </div>
         )}
