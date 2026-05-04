@@ -1,0 +1,63 @@
+import pandas as pd
+import numpy as np
+import yfinance as yf
+
+def calc_rsi(series: pd.Series, period: int = 14) -> pd.Series:
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(com=period - 1, min_periods=period).mean()
+    avg_loss = loss.ewm(com=period - 1, min_periods=period).mean()
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+def calc_ema(series: pd.Series, period: int) -> pd.Series:
+    return series.ewm(span=period, adjust=False).mean()
+
+def get_support_resistance(df: pd.DataFrame) -> dict:
+    close = df["Close"]
+    return {
+        "week52_high": round(float(df["High"].tail(252).max()), 2),
+        "week52_low": round(float(df["Low"].tail(252).min()), 2),
+        "ema20": round(float(calc_ema(close, 20).iloc[-1]), 2),
+        "ema50": round(float(calc_ema(close, 50).iloc[-1]), 2),
+        "ema200": round(float(calc_ema(close, 200).iloc[-1]), 2),
+    }
+
+def calc_rsi_target_price(
+    prices: pd.Series, rsi_values: pd.Series, target_rsi: float
+) -> float | None:
+    prices = prices.dropna()
+    rsi_values = rsi_values.dropna()
+    n = min(len(prices), len(rsi_values), 20)
+    if n < 5:
+        return None
+    p = prices.iloc[-n:].values
+    r = rsi_values.iloc[-n:].values
+    coeffs = np.polyfit(r, p, 1)
+    return round(float(np.polyval(coeffs, target_rsi)), 2)
+
+def get_timeframe_rsi(ticker: str) -> dict:
+    t = yf.Ticker(ticker)
+    result = {}
+    configs = [
+        ("daily",   {"period": "1y",  "interval": "1d"}),
+        ("weekly",  {"period": "5y",  "interval": "1wk"}),
+        ("monthly", {"period": "10y", "interval": "1mo"}),
+    ]
+    for tf, params in configs:
+        try:
+            df = t.history(**params)
+            if df.empty:
+                result[tf] = {"rsi": None, "target_30": None, "target_70": None}
+                continue
+            rsi = calc_rsi(df["Close"])
+            current_rsi = round(float(rsi.iloc[-1]), 2)
+            result[tf] = {
+                "rsi": current_rsi,
+                "target_30": calc_rsi_target_price(df["Close"], rsi, 30.0),
+                "target_70": calc_rsi_target_price(df["Close"], rsi, 70.0),
+            }
+        except Exception:
+            result[tf] = {"rsi": None, "target_30": None, "target_70": None}
+    return result
