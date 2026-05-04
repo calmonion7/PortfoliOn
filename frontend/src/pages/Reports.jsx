@@ -18,6 +18,11 @@ const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid #
 
 const fmt = (val) => val != null ? `$${Number(val).toFixed(2)}` : 'N/A'
 const fmtN = (val) => val != null ? val : 'N/A'
+const rsiColor = (rsi) => {
+  if (rsi == null) return '#ccc'
+  const hue = Math.round(120 - (rsi / 100) * 120)
+  return `hsl(${hue}, 60%, 60%)`
+}
 
 function RsiTable({ dailyRsi }) {
   if (!dailyRsi) return null
@@ -197,7 +202,7 @@ export default function Reports() {
                       <td style={TD}>{s ? fmtN(s.hold) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#ef9a9a' }}>{s ? fmtN(s.sell) : 'N/A'}</td>
                       <td style={TD}>{s ? fmtN(s.finviz_recom) : 'N/A'}</td>
-                      <td style={TD}>{dr ? fmtN(dr.rsi) : 'N/A'}</td>
+                      <td style={{ ...TD, color: rsiColor(dr?.rsi), fontWeight: 600 }}>{dr ? fmtN(dr.rsi) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_20) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_25) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_30) : 'N/A'}</td>
