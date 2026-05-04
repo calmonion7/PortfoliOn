@@ -1,26 +1,90 @@
-import json
 import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-def test_get_portfolio_returns_empty_when_file_missing():
+
+def test_get_stocks_returns_empty_when_file_missing():
     import services.storage as storage_mod
     original = storage_mod.DATA_DIR
     storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
     try:
-        result = storage_mod.get_portfolio()
+        result = storage_mod.get_stocks()
     finally:
         storage_mod.DATA_DIR = original
-    assert result == {"stocks": [], "watchlist": []}
+    assert result == []
 
-def test_save_and_load_portfolio_roundtrip(tmp_path):
-    import services.storage as storage_module
+
+def test_save_and_load_stocks_roundtrip(tmp_path):
+    import services.storage as storage_mod
     with patch("services.storage.DATA_DIR", tmp_path):
-        portfolio = {"stocks": [{"ticker": "NFLX", "quantity": 10, "avg_cost": 85.59}]}
-        storage_module.save_portfolio(portfolio)
-        loaded = storage_module.get_portfolio()
-    assert loaded["stocks"] == portfolio["stocks"]
-    assert loaded["watchlist"] == []
+        stocks = [{"ticker": "NFLX", "name": "Netflix", "competitors": [], "moat": "", "growth_plan": ""}]
+        storage_mod.save_stocks(stocks)
+        loaded = storage_mod.get_stocks()
+    assert loaded == stocks
+
+
+def test_get_holdings_returns_empty_when_file_missing():
+    import services.storage as storage_mod
+    original = storage_mod.DATA_DIR
+    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
+    try:
+        result = storage_mod.get_holdings()
+    finally:
+        storage_mod.DATA_DIR = original
+    assert result == []
+
+
+def test_save_and_load_holdings_roundtrip(tmp_path):
+    import services.storage as storage_mod
+    with patch("services.storage.DATA_DIR", tmp_path):
+        holdings = [{"ticker": "NFLX", "quantity": 10.0, "avg_cost": 85.59}]
+        storage_mod.save_holdings(holdings)
+        loaded = storage_mod.get_holdings()
+    assert loaded == holdings
+
+
+def test_get_watchlist_tickers_returns_empty_when_file_missing():
+    import services.storage as storage_mod
+    original = storage_mod.DATA_DIR
+    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
+    try:
+        result = storage_mod.get_watchlist_tickers()
+    finally:
+        storage_mod.DATA_DIR = original
+    assert result == []
+
+
+def test_save_and_load_watchlist_tickers_roundtrip(tmp_path):
+    import services.storage as storage_mod
+    with patch("services.storage.DATA_DIR", tmp_path):
+        tickers = ["AAPL", "GOOG"]
+        storage_mod.save_watchlist_tickers(tickers)
+        loaded = storage_mod.get_watchlist_tickers()
+    assert loaded == tickers
+
+
+def test_get_full_portfolio_joins_holdings_and_watchlist(tmp_path):
+    import services.storage as storage_mod
+    with patch("services.storage.DATA_DIR", tmp_path):
+        stocks = [
+            {"ticker": "LLY", "name": "일라이 릴리", "competitors": ["NVO"], "moat": "Brand", "growth_plan": "GLP1"},
+            {"ticker": "AVAV", "name": "에어로바이런먼트", "competitors": [], "moat": "", "growth_plan": ""},
+        ]
+        holdings = [{"ticker": "LLY", "quantity": 3.0, "avg_cost": 886.6}]
+        tickers = ["AVAV"]
+        storage_mod.save_stocks(stocks)
+        storage_mod.save_holdings(holdings)
+        storage_mod.save_watchlist_tickers(tickers)
+        result = storage_mod.get_full_portfolio()
+    assert len(result["stocks"]) == 1
+    assert result["stocks"][0]["ticker"] == "LLY"
+    assert result["stocks"][0]["quantity"] == 3.0
+    assert result["stocks"][0]["avg_cost"] == 886.6
+    assert result["stocks"][0]["moat"] == "Brand"
+    assert len(result["watchlist"]) == 1
+    assert result["watchlist"][0]["ticker"] == "AVAV"
+    assert result["watchlist"][0]["name"] == "에어로바이런먼트"
+
 
 def test_get_schedule_returns_default_when_file_missing():
     import services.storage as storage_mod
@@ -34,10 +98,11 @@ def test_get_schedule_returns_default_when_file_missing():
     assert result["time"] == "08:00"
     assert "mon" in result["days"]
 
+
 def test_save_and_load_schedule_roundtrip(tmp_path):
-    import services.storage as storage_module
+    import services.storage as storage_mod
     with patch("services.storage.DATA_DIR", tmp_path):
         schedule = {"enabled": True, "time": "09:30", "days": ["mon", "fri"]}
-        storage_module.save_schedule(schedule)
-        loaded = storage_module.get_schedule()
+        storage_mod.save_schedule(schedule)
+        loaded = storage_mod.get_schedule()
     assert loaded == schedule
