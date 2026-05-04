@@ -10,9 +10,9 @@ REPORTS_DIR = Path(__file__).parent.parent / "reports"
 @router.post("/report/generate", status_code=202)
 def generate_all(background_tasks: BackgroundTasks):
     portfolio = storage.get_portfolio()
-    stocks = portfolio.get("stocks", [])
+    stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if not stocks:
-        raise HTTPException(status_code=400, detail="No stocks in portfolio")
+        raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     background_tasks.add_task(_run_generation, stocks)
     return {"message": f"Generating reports for {len(stocks)} stock(s)"}
 
@@ -44,6 +44,10 @@ def _run_generation(stocks: list):
 
 @router.get("/report/list")
 def list_reports():
+    portfolio = storage.get_portfolio()
+    holding_tickers = {s["ticker"].upper() for s in portfolio.get("stocks", [])}
+    watchlist_tickers = {s["ticker"].upper() for s in portfolio.get("watchlist", [])}
+
     result = {}
     if not REPORTS_DIR.exists():
         return result
@@ -51,7 +55,10 @@ def list_reports():
         if ticker_dir.is_dir():
             dates = sorted([f.stem for f in ticker_dir.glob("*.md")], reverse=True)
             if dates:
-                result[ticker_dir.name] = dates
+                ticker = ticker_dir.name.upper()
+                category = "holdings" if ticker in holding_tickers else \
+                           "watchlist" if ticker in watchlist_tickers else "other"
+                result[ticker_dir.name] = {"dates": dates, "category": category}
     return result
 
 
