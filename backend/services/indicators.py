@@ -73,3 +73,47 @@ def get_timeframe_rsi(ticker: str) -> dict:
                 "target_70": None, "target_75": None, "target_80": None,
             }
     return result
+
+def get_volume_profile(df: pd.DataFrame, bins: int = 50) -> dict:
+    empty = {"poc": None, "hvn": [], "lvn": []}
+    if df.empty or "Close" not in df.columns or "Volume" not in df.columns:
+        return empty
+    data = df[["Close", "Volume"]].dropna()
+    if len(data) < 10:
+        return empty
+    prices = data["Close"].values
+    volumes = data["Volume"].values
+    min_p, max_p = prices.min(), prices.max()
+    if max_p <= min_p:
+        return empty
+
+    bin_edges = np.linspace(min_p, max_p, bins + 1)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    indices = np.clip(np.searchsorted(bin_edges[1:], prices), 0, bins - 1)
+    bin_volumes = np.zeros(bins)
+    for i, v in zip(indices, volumes):
+        bin_volumes[i] += v
+
+    poc_idx = int(np.argmax(bin_volumes))
+    poc = round(float(bin_centers[poc_idx]), 2)
+
+    hvn_indices: list[int] = []
+    for idx in np.argsort(bin_volumes)[::-1]:
+        if len(hvn_indices) >= 3:
+            break
+        if not any(abs(int(idx) - h) <= 1 for h in hvn_indices):
+            hvn_indices.append(int(idx))
+    hvn = sorted([round(float(bin_centers[i]), 2) for i in hvn_indices])
+
+    lvn: list[float] = []
+    if len(hvn) >= 2:
+        active = bin_volumes[bin_volumes > 0]
+        threshold = float(np.percentile(active, 20)) if len(active) > 0 else 0.0
+        lo, hi = min(hvn), max(hvn)
+        lvn = sorted([
+            round(float(bin_centers[i]), 2)
+            for i in range(bins)
+            if 0 < bin_volumes[i] <= threshold and lo < bin_centers[i] < hi
+        ])
+
+    return {"poc": poc, "hvn": hvn, "lvn": lvn}

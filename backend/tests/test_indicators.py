@@ -78,3 +78,32 @@ def test_get_timeframe_rsi_returns_all_timeframes():
         assert "target_70" in result[tf]
         assert "target_75" in result[tf]
         assert "target_80" in result[tf]
+
+def test_get_volume_profile_returns_poc_hvn_lvn():
+    from services.indicators import get_volume_profile
+    prices = np.concatenate([
+        np.ones(80) * 100.0,
+        np.ones(40) * 120.0,
+        np.ones(40) * 80.0,
+        np.linspace(80, 120, 40),
+    ])
+    volumes = np.concatenate([
+        np.ones(80) * 1_000_000,
+        np.ones(40) * 500_000,
+        np.ones(40) * 400_000,
+        np.ones(40) * 50_000,
+    ])
+    df = pd.DataFrame({"Close": prices, "Volume": volumes})
+    result = get_volume_profile(df, bins=50)
+    assert "poc" in result
+    assert "hvn" in result
+    assert "lvn" in result
+    assert result["poc"] is not None
+    assert abs(result["poc"] - 100.0) < 5.0
+    assert len(result["hvn"]) <= 3
+    assert isinstance(result["hvn"], list)
+    assert isinstance(result["lvn"], list)
+
+def test_get_volume_profile_returns_empty_on_insufficient_data():
+    from services.indicators import get_volume_profile
+    assert get_volume_profile(pd.DataFrame()) == {"poc": None, "hvn": [], "lvn": []}
