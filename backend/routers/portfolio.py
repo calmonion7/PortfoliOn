@@ -18,42 +18,69 @@ class Stock(BaseModel):
 
 @router.get("")
 def get_portfolio():
-    return storage.get_portfolio()
+    return storage.get_full_portfolio()
 
 
 @router.post("", status_code=201)
 def add_stock(stock: Stock):
-    portfolio = storage.get_portfolio()
-    tickers = [s["ticker"].upper() for s in portfolio["stocks"]]
-    if stock.ticker.upper() in tickers:
+    holdings = storage.get_holdings()
+    if stock.ticker.upper() in [h["ticker"].upper() for h in holdings]:
         raise HTTPException(status_code=400, detail=f"{stock.ticker} already exists")
-    portfolio["stocks"].append({**stock.model_dump(), "ticker": stock.ticker.upper()})
-    storage.save_portfolio(portfolio)
-    return portfolio["stocks"][-1]
+
+    stocks = storage.get_stocks()
+    if stock.ticker.upper() not in [s["ticker"].upper() for s in stocks]:
+        stocks.append({
+            "ticker": stock.ticker.upper(),
+            "name": stock.name,
+            "competitors": stock.competitors,
+            "moat": stock.moat,
+            "growth_plan": stock.growth_plan,
+        })
+        storage.save_stocks(stocks)
+
+    new_holding = {"ticker": stock.ticker.upper(), "quantity": stock.quantity, "avg_cost": stock.avg_cost}
+    holdings.append(new_holding)
+    storage.save_holdings(holdings)
+
+    return {**new_holding, "name": stock.name, "competitors": stock.competitors,
+            "moat": stock.moat, "growth_plan": stock.growth_plan}
 
 
 @router.put("/{ticker}")
 def update_stock(ticker: str, stock: Stock):
-    portfolio = storage.get_portfolio()
-    idx = next(
-        (i for i, s in enumerate(portfolio["stocks"]) if s["ticker"].upper() == ticker.upper()),
-        None,
-    )
-    if idx is None:
+    holdings = storage.get_holdings()
+    h_idx = next((i for i, h in enumerate(holdings) if h["ticker"].upper() == ticker.upper()), None)
+    if h_idx is None:
         raise HTTPException(status_code=404, detail=f"{ticker} not found")
-    portfolio["stocks"][idx] = {**stock.model_dump(), "ticker": ticker.upper()}
-    storage.save_portfolio(portfolio)
-    return portfolio["stocks"][idx]
+
+    holdings[h_idx] = {"ticker": ticker.upper(), "quantity": stock.quantity, "avg_cost": stock.avg_cost}
+    storage.save_holdings(holdings)
+
+    stocks = storage.get_stocks()
+    s_idx = next((i for i, s in enumerate(stocks) if s["ticker"].upper() == ticker.upper()), None)
+    if s_idx is not None:
+        stocks[s_idx] = {
+            "ticker": ticker.upper(), "name": stock.name,
+            "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
+        }
+        storage.save_stocks(stocks)
+
+    return {**holdings[h_idx], "name": stock.name, "competitors": stock.competitors,
+            "moat": stock.moat, "growth_plan": stock.growth_plan}
 
 
 @router.delete("/{ticker}")
 def delete_stock(ticker: str):
-    portfolio = storage.get_portfolio()
-    original_len = len(portfolio["stocks"])
-    portfolio["stocks"] = [
-        s for s in portfolio["stocks"] if s["ticker"].upper() != ticker.upper()
-    ]
-    if len(portfolio["stocks"]) == original_len:
+    holdings = storage.get_holdings()
+    upper = ticker.upper()
+    filtered = [h for h in holdings if h["ticker"].upper() != upper]
+    if len(filtered) == len(holdings):
         raise HTTPException(status_code=404, detail=f"{ticker} not found")
-    storage.save_portfolio(portfolio)
-    return {"deleted": ticker.upper()}
+    storage.save_holdings(filtered)
+
+    watchlist = storage.get_watchlist_tickers()
+    if upper not in [t.upper() for t in watchlist]:
+        stocks = storage.get_stocks()
+        storage.save_stocks([s for s in stocks if s["ticker"].upper() != upper])
+
+    return {"deleted": upper}
