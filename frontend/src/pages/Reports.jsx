@@ -218,12 +218,21 @@ export default function Reports() {
         ) : (
           /* 상세화면 */
           <div>
-            <button
-              onClick={() => setView('list')}
-              style={{ background: 'transparent', border: '1px solid #444', color: '#aaa', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: 'pointer', marginBottom: 16 }}
-            >
-              ← 목록으로
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              <button
+                onClick={() => setView('list')}
+                style={{ background: 'transparent', border: '1px solid #444', color: '#aaa', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}
+              >
+                ← 목록으로
+              </button>
+              <div>
+                <span style={{ color: '#90caf9', fontWeight: 700, fontSize: 16 }}>
+                  {detail.summary?.name || selected.ticker}
+                </span>
+                <span style={{ color: '#666', fontSize: 14, marginLeft: 8 }}>({selected.ticker})</span>
+                <span style={{ color: '#555', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+              </div>
+            </div>
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
             {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} />}
             {!loading && detail.content && <MarkdownViewer content={detail.content} ticker={selected.ticker} />}
