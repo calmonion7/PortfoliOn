@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pathlib import Path
 from services import storage, report_generator
@@ -42,6 +43,12 @@ def _run_generation(stocks: list):
             print(f"[Report] Failed for {stock['ticker']}: {e}")
 
 
+def _read_summary(json_path: Path) -> dict | None:
+    if json_path.exists():
+        return json.loads(json_path.read_text(encoding="utf-8"))
+    return None
+
+
 @router.get("/report/list")
 def list_reports():
     portfolio = storage.get_full_portfolio()
@@ -58,16 +65,24 @@ def list_reports():
                 ticker = ticker_dir.name.upper()
                 category = "holdings" if ticker in holding_tickers else \
                            "watchlist" if ticker in watchlist_tickers else "other"
-                result[ticker_dir.name] = {"dates": dates, "category": category}
+                summary = _read_summary(ticker_dir / f"{dates[0]}.json")
+                result[ticker_dir.name] = {"dates": dates, "category": category, "summary": summary}
     return result
 
 
 @router.get("/report/{ticker}/{date_str}")
 def get_report(ticker: str, date_str: str):
-    path = REPORTS_DIR / ticker.upper() / f"{date_str}.md"
+    upper = ticker.upper()
+    path = REPORTS_DIR / upper / f"{date_str}.md"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Report not found")
-    return {"ticker": ticker.upper(), "date": date_str, "content": path.read_text(encoding="utf-8")}
+    summary = _read_summary(REPORTS_DIR / upper / f"{date_str}.json")
+    return {
+        "ticker": upper,
+        "date": date_str,
+        "content": path.read_text(encoding="utf-8"),
+        "summary": summary,
+    }
 
 
 @router.get("/schedule")
