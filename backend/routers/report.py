@@ -9,7 +9,7 @@ REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 @router.post("/report/generate", status_code=202)
 def generate_all(background_tasks: BackgroundTasks):
-    portfolio = storage.get_portfolio()
+    portfolio = storage.get_full_portfolio()
     stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
@@ -19,7 +19,7 @@ def generate_all(background_tasks: BackgroundTasks):
 
 @router.post("/report/generate/{ticker}", status_code=202)
 def generate_one(ticker: str, background_tasks: BackgroundTasks):
-    portfolio = storage.get_portfolio()
+    portfolio = storage.get_full_portfolio()
     stock = next(
         (s for s in portfolio["stocks"] if s["ticker"].upper() == ticker.upper()), None
     )
@@ -44,7 +44,7 @@ def _run_generation(stocks: list):
 
 @router.get("/report/list")
 def list_reports():
-    portfolio = storage.get_portfolio()
+    portfolio = storage.get_full_portfolio()
     holding_tickers = {s["ticker"].upper() for s in portfolio.get("stocks", [])}
     watchlist_tickers = {s["ticker"].upper() for s in portfolio.get("watchlist", [])}
 
