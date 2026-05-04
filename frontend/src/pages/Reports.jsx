@@ -167,6 +167,7 @@ export default function Reports() {
                   <th style={TH}>Hold</th>
                   <th style={{ ...TH, color: '#ef9a9a' }}>Sell</th>
                   <th style={TH}>Finviz</th>
+                  <th style={TH}>현재RSI</th>
                   <th style={{ ...TH, color: '#81c784' }}>RSI20</th>
                   <th style={{ ...TH, color: '#81c784' }}>RSI25</th>
                   <th style={{ ...TH, color: '#81c784' }}>RSI30</th>
@@ -196,6 +197,7 @@ export default function Reports() {
                       <td style={TD}>{s ? fmtN(s.hold) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#ef9a9a' }}>{s ? fmtN(s.sell) : 'N/A'}</td>
                       <td style={TD}>{s ? fmtN(s.finviz_recom) : 'N/A'}</td>
+                      <td style={TD}>{dr ? fmtN(dr.rsi) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_20) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_25) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_30) : 'N/A'}</td>
