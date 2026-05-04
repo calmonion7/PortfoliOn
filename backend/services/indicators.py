@@ -76,6 +76,8 @@ def get_timeframe_rsi(ticker: str) -> dict:
 
 def get_volume_profile(df: pd.DataFrame, bins: int = 50) -> dict:
     empty = {"poc": None, "hvn": [], "lvn": []}
+    if bins < 2:
+        return empty
     if df.empty or "Close" not in df.columns or "Volume" not in df.columns:
         return empty
     data = df[["Close", "Volume"]].dropna()
@@ -90,9 +92,7 @@ def get_volume_profile(df: pd.DataFrame, bins: int = 50) -> dict:
     bin_edges = np.linspace(min_p, max_p, bins + 1)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     indices = np.clip(np.searchsorted(bin_edges[1:], prices), 0, bins - 1)
-    bin_volumes = np.zeros(bins)
-    for i, v in zip(indices, volumes):
-        bin_volumes[i] += v
+    bin_volumes = np.bincount(indices, weights=volumes, minlength=bins).astype(float)
 
     poc_idx = int(np.argmax(bin_volumes))
     poc = round(float(bin_centers[poc_idx]), 2)
