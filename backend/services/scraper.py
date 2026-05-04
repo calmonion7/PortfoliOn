@@ -44,16 +44,32 @@ def get_news(ticker: str) -> list[dict]:
     try:
         t = yf.Ticker(ticker)
         raw = t.news or []
-        return [
-            {
-                "title": item.get("title", ""),
-                "link": item.get("link", ""),
-                "publisher": item.get("publisher", ""),
-                "published_at": datetime.fromtimestamp(
-                    item.get("providerPublishTime", 0)
-                ).strftime("%Y-%m-%d %H:%M"),
-            }
-            for item in raw[:5]
-        ]
+        result = []
+        for item in raw[:5]:
+            content = item.get("content") or item
+            title = content.get("title") or item.get("title", "")
+            link = (
+                (content.get("canonicalUrl") or {}).get("url")
+                or (content.get("clickThroughUrl") or {}).get("url")
+                or item.get("link", "")
+            )
+            publisher = (
+                (content.get("provider") or {}).get("displayName")
+                or item.get("publisher", "")
+            )
+            pub_date = content.get("pubDate") or content.get("displayTime")
+            if pub_date:
+                try:
+                    published_at = datetime.fromisoformat(
+                        pub_date.replace("Z", "+00:00")
+                    ).strftime("%Y-%m-%d %H:%M")
+                except ValueError:
+                    published_at = pub_date[:16]
+            else:
+                ts = item.get("providerPublishTime", 0)
+                published_at = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else ""
+            if title:
+                result.append({"title": title, "link": link, "publisher": publisher, "published_at": published_at})
+        return result
     except Exception:
         return []
