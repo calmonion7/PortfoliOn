@@ -34,7 +34,7 @@ const GapCell = ({ target, price, baseColor }) => {
   const gap = fmtGap(target, price)
   return (
     <td style={{ ...TD, color: baseColor }}>
-      {target != null ? `${fmt(target)}${gap ? `(${gap.text})` : ''}` : 'N/A'}
+      {target != null ? <>{fmt(target)}{gap && <span style={{ color: gap.positive ? '#81c784' : '#ef9a9a' }}>({gap.text})</span>}</> : 'N/A'}
     </td>
   )
 }
