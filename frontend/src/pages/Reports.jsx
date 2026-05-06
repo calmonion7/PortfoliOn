@@ -34,8 +34,7 @@ const GapCell = ({ target, price, baseColor }) => {
   const gap = fmtGap(target, price)
   return (
     <td style={{ ...TD, color: baseColor }}>
-      {fmt(target)}
-      {gap && <div style={{ fontSize: 10, color: gap.positive ? '#81c784' : '#ef9a9a' }}>{gap.text}</div>}
+      {target != null ? `${fmt(target)}${gap ? `(${gap.text})` : ''}` : 'N/A'}
     </td>
   )
 }
@@ -302,36 +301,23 @@ export default function Reports() {
                         <div style={{ color: rsiColor(wr?.rsi), fontSize: 10 }}>{wr?.rsi != null ? fmtN(wr.rsi) : 'N/A'}</div>
                         <div style={{ color: rsiColor(mr?.rsi), fontSize: 10 }}>{mr?.rsi != null ? fmtN(mr.rsi) : 'N/A'}</div>
                       </td>
-                      <td style={{ ...TD, color: '#81c784' }}>
-                        <div>{dr?.target_20 != null ? fmt(dr.target_20) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{wr?.target_20 != null ? fmt(wr.target_20) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{mr?.target_20 != null ? fmt(mr.target_20) : 'N/A'}</div>
-                      </td>
-                      <td style={{ ...TD, color: '#81c784' }}>
-                        <div>{dr?.target_25 != null ? fmt(dr.target_25) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{wr?.target_25 != null ? fmt(wr.target_25) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{mr?.target_25 != null ? fmt(mr.target_25) : 'N/A'}</div>
-                      </td>
-                      <td style={{ ...TD, color: '#81c784' }}>
-                        <div>{dr?.target_30 != null ? fmt(dr.target_30) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{wr?.target_30 != null ? fmt(wr.target_30) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{mr?.target_30 != null ? fmt(mr.target_30) : 'N/A'}</div>
-                      </td>
-                      <td style={{ ...TD, color: '#ef9a9a' }}>
-                        <div>{dr?.target_70 != null ? fmt(dr.target_70) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{wr?.target_70 != null ? fmt(wr.target_70) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{mr?.target_70 != null ? fmt(mr.target_70) : 'N/A'}</div>
-                      </td>
-                      <td style={{ ...TD, color: '#ef9a9a' }}>
-                        <div>{dr?.target_75 != null ? fmt(dr.target_75) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{wr?.target_75 != null ? fmt(wr.target_75) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{mr?.target_75 != null ? fmt(mr.target_75) : 'N/A'}</div>
-                      </td>
-                      <td style={{ ...TD, color: '#ef9a9a' }}>
-                        <div>{dr?.target_80 != null ? fmt(dr.target_80) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{wr?.target_80 != null ? fmt(wr.target_80) : 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{mr?.target_80 != null ? fmt(mr.target_80) : 'N/A'}</div>
-                      </td>
+                      {[
+                        { key: 'target_20', dr: dr?.target_20, wr: wr?.target_20, mr: mr?.target_20, base: '#81c784', sub: '#4a8a5a' },
+                        { key: 'target_25', dr: dr?.target_25, wr: wr?.target_25, mr: mr?.target_25, base: '#81c784', sub: '#4a8a5a' },
+                        { key: 'target_30', dr: dr?.target_30, wr: wr?.target_30, mr: mr?.target_30, base: '#81c784', sub: '#4a8a5a' },
+                        { key: 'target_70', dr: dr?.target_70, wr: wr?.target_70, mr: mr?.target_70, base: '#ef9a9a', sub: '#8a4a4a' },
+                        { key: 'target_75', dr: dr?.target_75, wr: wr?.target_75, mr: mr?.target_75, base: '#ef9a9a', sub: '#8a4a4a' },
+                        { key: 'target_80', dr: dr?.target_80, wr: wr?.target_80, mr: mr?.target_80, base: '#ef9a9a', sub: '#8a4a4a' },
+                      ].map(({ key, dr: dv, wr: wv, mr: mv, base, sub }) => {
+                        const gap = (t) => { if (t == null || !s?.price) return ''; const p = (t - s.price) / s.price * 100; return `(${p >= 0 ? '+' : ''}${p.toFixed(1)}%)` }
+                        return (
+                          <td key={key} style={{ ...TD, color: base }}>
+                            {dv != null ? <div>{fmt(dv)}{gap(dv)}</div> : <div>N/A</div>}
+                            {wv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(wv)}{gap(wv)}</div>}
+                            {mv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(mv)}{gap(mv)}</div>}
+                          </td>
+                        )
+                      })}
                     </tr>
                   )
                 })}
