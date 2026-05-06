@@ -309,12 +309,17 @@ export default function Reports() {
                         { key: 'target_75', dr: dr?.target_75, wr: wr?.target_75, mr: mr?.target_75, base: '#ef9a9a', sub: '#8a4a4a' },
                         { key: 'target_80', dr: dr?.target_80, wr: wr?.target_80, mr: mr?.target_80, base: '#ef9a9a', sub: '#8a4a4a' },
                       ].map(({ key, dr: dv, wr: wv, mr: mv, base, sub }) => {
-                        const gap = (t) => { if (t == null || !s?.price) return ''; const p = (t - s.price) / s.price * 100; return `(${p >= 0 ? '+' : ''}${p.toFixed(1)}%)` }
+                        const gapEl = (t, sz) => {
+                          if (t == null || !s?.price) return null
+                          const p = (t - s.price) / s.price * 100
+                          const txt = `(${p >= 0 ? '+' : ''}${p.toFixed(1)}%)`
+                          return <span style={{ fontSize: sz ?? 12, color: p >= 0 ? '#81c784' : '#ef9a9a' }}>{txt}</span>
+                        }
                         return (
                           <td key={key} style={{ ...TD, color: base }}>
-                            {dv != null ? <div>{fmt(dv)}{gap(dv)}</div> : <div>N/A</div>}
-                            {wv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(wv)}{gap(wv)}</div>}
-                            {mv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(mv)}{gap(mv)}</div>}
+                            {dv != null ? <div>{fmt(dv)}{gapEl(dv)}</div> : <div>N/A</div>}
+                            {wv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(wv)}{gapEl(wv, 9)}</div>}
+                            {mv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(mv)}{gapEl(mv, 9)}</div>}
                           </td>
                         )
                       })}
