@@ -8,18 +8,22 @@ from services import market, indicators, scraper, charts
 
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
+def _yf_ticker(ticker: str) -> str:
+    return ticker.replace(".", "-")
+
 def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
     ticker = stock["ticker"]
+    yf_sym = _yf_ticker(ticker)
     today = date.today().strftime("%Y-%m-%d")
     output_dir = output_base_dir / ticker
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    quote = market.get_quote(ticker)
-    financials = market.get_financials(ticker)
-    analyst = market.get_analyst_data(ticker)
-    competitor_quotes = [market.get_quote(c) for c in stock.get("competitors", [])]
-    timeframe_rsi = indicators.get_timeframe_rsi(ticker)
-    t = yf.Ticker(ticker)
+    quote = market.get_quote(yf_sym)
+    financials = market.get_financials(yf_sym)
+    analyst = market.get_analyst_data(yf_sym)
+    competitor_quotes = [market.get_quote(_yf_ticker(c)) for c in stock.get("competitors", [])]
+    timeframe_rsi = indicators.get_timeframe_rsi(yf_sym)
+    t = yf.Ticker(yf_sym)
     daily_df = t.history(period="1y")
     sr = indicators.get_support_resistance(daily_df) if not daily_df.empty else {}
     vp = indicators.get_volume_profile(daily_df)
@@ -29,6 +33,7 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         industry = _info.get('industry', '')
     except Exception:
         sector, industry = '', ''
+    quote["ticker"] = ticker
     finviz = scraper.scrape_finviz_consensus(ticker)
     news = scraper.get_news(ticker)
     charts.generate_revenue_chart(financials, ticker, output_dir)
