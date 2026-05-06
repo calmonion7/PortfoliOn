@@ -30,10 +30,10 @@ const fmtGap = (target, price) => {
   return { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, positive: pct >= 0 }
 }
 
-const GapCell = ({ target, price, baseColor }) => {
+const GapCell = ({ target, price, baseColor, highlight }) => {
   const gap = fmtGap(target, price)
   return (
-    <td style={{ ...TD, color: baseColor }}>
+    <td style={{ ...TD, color: baseColor, background: highlight ? '#2d2a00' : undefined, border: highlight ? '2px solid #ffeb3b' : undefined, fontWeight: highlight ? 700 : undefined }}>
       {target != null ? <>{fmt(target)}{gap && <span style={{ color: gap.positive ? '#81c784' : '#ef9a9a' }}>({gap.text})</span>}</> : 'N/A'}
     </td>
   )
@@ -46,6 +46,15 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
     { label: '주봉', d: weeklyRsi },
     { label: '월봉', d: monthlyRsi },
   ]
+  const keys = ['target_20', 'target_25', 'target_30', 'target_70', 'target_75', 'target_80']
+  let closestKey = null, minDiff = Infinity
+  if (price && dailyRsi) {
+    keys.forEach(k => {
+      if (dailyRsi[k] == null) return
+      const diff = Math.abs(dailyRsi[k] - price)
+      if (diff < minDiff) { minDiff = diff; closestKey = k }
+    })
+  }
   return (
     <div style={{ marginBottom: 16, overflowX: 'auto', background: '#111', borderRadius: 6, padding: '10px 12px' }}>
       <div style={{ color: '#80cbc4', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>RSI 예상 타점</div>
@@ -66,13 +75,13 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
           {rows.map(({ label, d }) => d?.rsi != null && (
             <tr key={label}>
               <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontWeight: 600 }}>{label}</td>
-              <GapCell target={d.target_20} price={price} baseColor="#81c784" />
-              <GapCell target={d.target_25} price={price} baseColor="#81c784" />
-              <GapCell target={d.target_30} price={price} baseColor="#81c784" />
+              <GapCell target={d.target_20} price={price} baseColor="#81c784" highlight={closestKey === 'target_20'} />
+              <GapCell target={d.target_25} price={price} baseColor="#81c784" highlight={closestKey === 'target_25'} />
+              <GapCell target={d.target_30} price={price} baseColor="#81c784" highlight={closestKey === 'target_30'} />
               <td style={{ ...TD, color: rsiColor(d.rsi), fontWeight: 600 }}>{fmtN(d.rsi)}</td>
-              <GapCell target={d.target_70} price={price} baseColor="#ef9a9a" />
-              <GapCell target={d.target_75} price={price} baseColor="#ef9a9a" />
-              <GapCell target={d.target_80} price={price} baseColor="#ef9a9a" />
+              <GapCell target={d.target_70} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_70'} />
+              <GapCell target={d.target_75} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_75'} />
+              <GapCell target={d.target_80} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_80'} />
             </tr>
           ))}
         </tbody>
@@ -272,6 +281,15 @@ export default function Reports() {
                   const dr = s?.daily_rsi
                   const wr = s?.weekly_rsi
                   const mr = s?.monthly_rsi
+                  const rsiKeys = ['target_20', 'target_25', 'target_30', 'target_70', 'target_75', 'target_80']
+                  let closestKey = null; let minDiff = Infinity
+                  if (s?.price && dr) {
+                    rsiKeys.forEach(k => {
+                      if (dr[k] == null) return
+                      const diff = Math.abs(dr[k] - s.price)
+                      if (diff < minDiff) { minDiff = diff; closestKey = k }
+                    })
+                  }
                   return (
                     <tr
                       key={ticker}
@@ -315,8 +333,9 @@ export default function Reports() {
                           const txt = `(${p >= 0 ? '+' : ''}${p.toFixed(1)}%)`
                           return <span style={{ fontSize: sz ?? 12, color: p >= 0 ? '#81c784' : '#ef9a9a' }}>{txt}</span>
                         }
+                        const isClosest = closestKey === key
                         return (
-                          <td key={key} style={{ ...TD, color: base }}>
+                          <td key={key} style={{ ...TD, color: base, background: isClosest ? '#2d2a00' : undefined, border: isClosest ? '2px solid #ffeb3b' : undefined, fontWeight: isClosest ? 700 : undefined }}>
                             {dv != null ? <div>{fmt(dv)}{gapEl(dv)}</div> : <div>N/A</div>}
                             {wv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(wv)}{gapEl(wv, 9)}</div>}
                             {mv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(mv)}{gapEl(mv, 9)}</div>}
