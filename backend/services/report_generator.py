@@ -23,6 +23,12 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
     daily_df = t.history(period="1y")
     sr = indicators.get_support_resistance(daily_df) if not daily_df.empty else {}
     vp = indicators.get_volume_profile(daily_df)
+    try:
+        _info = t.info
+        sector = _info.get('sector', '')
+        industry = _info.get('industry', '')
+    except Exception:
+        sector, industry = '', ''
     finviz = scraper.scrape_finviz_consensus(ticker)
     news = scraper.get_news(ticker)
     charts.generate_revenue_chart(financials, ticker, output_dir)
@@ -55,7 +61,11 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         "sell": analyst.get("sell", 0),
         "finviz_recom": finviz.get("finviz_recom"),
         "daily_rsi": timeframe_rsi.get("daily", {}),
+        "weekly_rsi": timeframe_rsi.get("weekly", {}),
+        "monthly_rsi": timeframe_rsi.get("monthly", {}),
         "volume_profile": vp,
+        "sector": sector,
+        "industry": industry,
     }
     json_path = output_dir / f"{today}.json"
     json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")

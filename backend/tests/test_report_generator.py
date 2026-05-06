@@ -70,7 +70,10 @@ def _mock_all():
         "services.report_generator.charts.generate_revenue_chart": MagicMock(return_value=""),
         "services.report_generator.charts.generate_rsi_chart": MagicMock(return_value=""),
         "services.report_generator.yf.Ticker": MagicMock(
-            return_value=MagicMock(history=MagicMock(return_value=df))
+            return_value=MagicMock(
+                history=MagicMock(return_value=df),
+                info={"sector": "Technology", "industry": "Software—Infrastructure"},
+            )
         ),
     }
 
@@ -115,6 +118,8 @@ def test_generate_report_saves_json_summary(tmp_path):
     assert "daily_rsi" in summary
     assert summary["daily_rsi"]["rsi"] == 55.0
     assert summary["daily_rsi"]["target_20"] == 80.0
+    assert summary["sector"] == "Technology"
+    assert summary["industry"] == "Software—Infrastructure"
 
 def test_generate_report_section7_includes_expanded_rsi_columns(tmp_path):
     with contextlib.ExitStack() as stack:

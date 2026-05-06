@@ -91,7 +91,9 @@ export default function Reports() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(null)
   const [activeTab, setActiveTab] = useState('holdings')
+  const [watchlistSub, setWatchlistSub] = useState('low')
   const [view, setView] = useState('list')
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
 
   const fetchList = useCallback(() => {
     axios.get('/api/report/list').then(({ data }) => setReportList(data))
@@ -105,7 +107,7 @@ export default function Reports() {
     axios.get(`/api/report/${selected.ticker}/${selected.date}`)
       .then(({ data }) => setDetail({ content: data.content, summary: data.summary }))
       .finally(() => setLoading(false))
-  }, [selected])
+  }, [selected, detailRefreshKey])
 
   const openDetail = (ticker, date) => {
     setSelected({ ticker, date })
@@ -116,16 +118,34 @@ export default function Reports() {
     setGenerating(ticker)
     try {
       await axios.post(`/api/report/generate/${ticker}`)
-      setTimeout(() => { fetchList(); setGenerating(null) }, 2000)
+      setTimeout(() => {
+        fetchList()
+        setGenerating(null)
+        if (view === 'detail' && selected.ticker === ticker) {
+          setDetailRefreshKey(k => k + 1)
+        }
+      }, 3000)
     } catch {
       setGenerating(null)
     }
   }
 
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
-  const watchlistCount = Object.values(reportList).filter(v => v.category === 'watchlist').length
+  const watchlistAll = Object.entries(reportList).filter(([, v]) => v.category === 'watchlist')
+  const watchlistLowCount = watchlistAll.filter(([, v]) => (v.summary?.daily_rsi?.rsi ?? 999) <= 45).length
+  const watchlistHighCount = watchlistAll.filter(([, v]) => (v.summary?.daily_rsi?.rsi ?? -1) > 45).length
+  const watchlistCount = watchlistAll.length
+
   const tabEntries = Object.entries(reportList)
-    .filter(([, v]) => v.category === activeTab)
+    .filter(([, v]) => {
+      if (activeTab === 'holdings') return v.category === 'holdings'
+      if (activeTab === 'watchlist') {
+        if (v.category !== 'watchlist') return false
+        const rsi = v.summary?.daily_rsi?.rsi ?? null
+        return watchlistSub === 'low' ? (rsi === null || rsi <= 45) : (rsi !== null && rsi > 45)
+      }
+      return false
+    })
     .sort(([, a], [, b]) => {
       const rsiA = a.summary?.daily_rsi?.rsi ?? null
       const rsiB = b.summary?.daily_rsi?.rsi ?? null
@@ -165,10 +185,22 @@ export default function Reports() {
       {/* 좌측 사이드바 */}
       <div style={{ width: 210, overflowY: 'auto', borderRight: '1px solid #333', paddingRight: 16, flexShrink: 0 }}>
         <h3 style={{ color: '#90caf9', marginBottom: 8 }}>리포트 목록</h3>
-        <div style={{ display: 'flex', borderBottom: '1px solid #333', marginBottom: 12 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid #333', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
           <button style={TAB_STYLE(activeTab === 'holdings')} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
           <button style={TAB_STYLE(activeTab === 'watchlist')} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
         </div>
+        {activeTab === 'watchlist' && (
+          <div style={{ display: 'flex', borderBottom: '1px solid #222', marginBottom: 12, marginTop: 4 }}>
+            <button
+              style={{ ...TAB_STYLE(watchlistSub === 'low'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'low' ? '#81c784' : '#666', borderBottom: watchlistSub === 'low' ? '2px solid #81c784' : '2px solid transparent' }}
+              onClick={() => setWatchlistSub('low')}
+            >RSI≤45 ({watchlistLowCount})</button>
+            <button
+              style={{ ...TAB_STYLE(watchlistSub === 'high'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'high' ? '#ef9a9a' : '#666', borderBottom: watchlistSub === 'high' ? '2px solid #ef9a9a' : '2px solid transparent' }}
+              onClick={() => setWatchlistSub('high')}
+            >RSI&gt;45 ({watchlistHighCount})</button>
+          </div>
+        )}
         {tabEntries.length === 0 && <p style={{ color: '#666', fontSize: 12 }}>리포트 없음</p>}
         {tabEntries.map(([t, info]) => renderTickerItem(t, info))}
         {otherEntries.length > 0 && (
@@ -192,52 +224,89 @@ export default function Reports() {
             <table style={{ borderCollapse: 'collapse', color: '#ccc', width: '100%' }}>
               <thead>
                 <tr style={{ background: '#1a2a3a', position: 'sticky', top: 0 }}>
-                  <th style={{ ...TH, textAlign: 'left' }}>종목명 (티커)</th>
+                  <th style={{ ...TH, textAlign: 'left', position: 'sticky', left: 0, zIndex: 2, background: '#1a2a3a' }}>종목명 (티커)</th>
+                  <th style={{ ...TH, textAlign: 'left' }}>섹터</th>
                   <th style={TH}>현재가</th>
                   <th style={TH}>POC</th>
-                  <th style={TH}>평균목표가</th>
+                  <th style={TH}>평균목표가<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>(-12%)</span></th>
                   <th style={{ ...TH, color: '#81c784' }}>Buy</th>
                   <th style={TH}>Hold</th>
                   <th style={{ ...TH, color: '#ef9a9a' }}>Sell</th>
                   <th style={TH}>Finviz</th>
-                  <th style={TH}>현재RSI</th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI20</th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI25</th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI30</th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI70</th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI75</th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI80</th>
+                  <th style={{ ...TH, borderLeft: '1px solid #2a3a4a' }}>RSI<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#81c784' }}>RSI20<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#81c784' }}>RSI25<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#81c784' }}>RSI30<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI70<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI75<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI80<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
                 </tr>
               </thead>
               <tbody>
                 {tabEntries.map(([ticker, info]) => {
                   const s = info.summary
                   const dr = s?.daily_rsi
+                  const wr = s?.weekly_rsi
+                  const mr = s?.monthly_rsi
                   return (
                     <tr
                       key={ticker}
                       onClick={() => openDetail(ticker, info.dates[0])}
                       style={{ cursor: 'pointer', borderBottom: '1px solid #222' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#1a2a3a'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#1a2a3a'; e.currentTarget.querySelector('td').style.background = '#1a2a3a' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.querySelector('td').style.background = '#141414' }}
                     >
-                      <td style={{ ...TD, textAlign: 'left', color: '#80cbc4', fontWeight: 600 }}>
+                      <td style={{ ...TD, textAlign: 'left', color: '#80cbc4', fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, background: '#141414' }}>
                         {s?.name || ticker} <span style={{ color: '#666', fontWeight: 400 }}>({ticker})</span>
+                      </td>
+                      <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontSize: 11 }}>
+                        {s?.sector || '—'}{s?.industry ? <span style={{ color: '#546e7a', marginLeft: 4 }}>/ {s.industry}</span> : null}
                       </td>
                       <td style={TD}>{s ? fmt(s.price) : 'N/A'}</td>
                       <td style={TD}>{fmt(s?.volume_profile?.poc)}</td>
-                      <td style={TD}>{s ? fmt(s.target_mean) : 'N/A'}</td>
+                      <td style={TD}>
+                        {s ? fmt(s.target_mean) : 'N/A'}
+                        {s?.target_mean != null && <div style={{ color: '#78909c', fontSize: 10 }}>{fmt(s.target_mean * 0.88)}</div>}
+                      </td>
                       <td style={{ ...TD, color: '#81c784' }}>{s ? fmtN(s.buy) : 'N/A'}</td>
                       <td style={TD}>{s ? fmtN(s.hold) : 'N/A'}</td>
                       <td style={{ ...TD, color: '#ef9a9a' }}>{s ? fmtN(s.sell) : 'N/A'}</td>
                       <td style={TD}>{s ? fmtN(s.finviz_recom) : 'N/A'}</td>
-                      <td style={{ ...TD, color: rsiColor(dr?.rsi), fontWeight: 600 }}>{dr ? fmtN(dr.rsi) : 'N/A'}</td>
-                      <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_20) : 'N/A'}</td>
-                      <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_25) : 'N/A'}</td>
-                      <td style={{ ...TD, color: '#81c784' }}>{dr ? fmt(dr.target_30) : 'N/A'}</td>
-                      <td style={{ ...TD, color: '#ef9a9a' }}>{dr ? fmt(dr.target_70) : 'N/A'}</td>
-                      <td style={{ ...TD, color: '#ef9a9a' }}>{dr ? fmt(dr.target_75) : 'N/A'}</td>
-                      <td style={{ ...TD, color: '#ef9a9a' }}>{dr ? fmt(dr.target_80) : 'N/A'}</td>
+                      <td style={{ ...TD, borderLeft: '1px solid #2a3a4a' }}>
+                        <div style={{ color: rsiColor(dr?.rsi), fontWeight: 600 }}>{dr?.rsi != null ? fmtN(dr.rsi) : 'N/A'}</div>
+                        <div style={{ color: rsiColor(wr?.rsi), fontSize: 10 }}>{wr?.rsi != null ? fmtN(wr.rsi) : 'N/A'}</div>
+                        <div style={{ color: rsiColor(mr?.rsi), fontSize: 10 }}>{mr?.rsi != null ? fmtN(mr.rsi) : 'N/A'}</div>
+                      </td>
+                      <td style={{ ...TD, color: '#81c784' }}>
+                        <div>{dr?.target_20 != null ? fmt(dr.target_20) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{wr?.target_20 != null ? fmt(wr.target_20) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{mr?.target_20 != null ? fmt(mr.target_20) : 'N/A'}</div>
+                      </td>
+                      <td style={{ ...TD, color: '#81c784' }}>
+                        <div>{dr?.target_25 != null ? fmt(dr.target_25) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{wr?.target_25 != null ? fmt(wr.target_25) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{mr?.target_25 != null ? fmt(mr.target_25) : 'N/A'}</div>
+                      </td>
+                      <td style={{ ...TD, color: '#81c784' }}>
+                        <div>{dr?.target_30 != null ? fmt(dr.target_30) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{wr?.target_30 != null ? fmt(wr.target_30) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#4a8a5a' }}>{mr?.target_30 != null ? fmt(mr.target_30) : 'N/A'}</div>
+                      </td>
+                      <td style={{ ...TD, color: '#ef9a9a' }}>
+                        <div>{dr?.target_70 != null ? fmt(dr.target_70) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{wr?.target_70 != null ? fmt(wr.target_70) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{mr?.target_70 != null ? fmt(mr.target_70) : 'N/A'}</div>
+                      </td>
+                      <td style={{ ...TD, color: '#ef9a9a' }}>
+                        <div>{dr?.target_75 != null ? fmt(dr.target_75) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{wr?.target_75 != null ? fmt(wr.target_75) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{mr?.target_75 != null ? fmt(mr.target_75) : 'N/A'}</div>
+                      </td>
+                      <td style={{ ...TD, color: '#ef9a9a' }}>
+                        <div>{dr?.target_80 != null ? fmt(dr.target_80) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{wr?.target_80 != null ? fmt(wr.target_80) : 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#8a4a4a' }}>{mr?.target_80 != null ? fmt(mr.target_80) : 'N/A'}</div>
+                      </td>
                     </tr>
                   )
                 })}
@@ -260,6 +329,11 @@ export default function Reports() {
                 </span>
                 <span style={{ color: '#666', fontSize: 14, marginLeft: 8 }}>({selected.ticker})</span>
                 <span style={{ color: '#555', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+                {detail.summary?.sector && (
+                  <span style={{ color: '#4fc3f7', fontSize: 11, marginLeft: 12, background: '#0d2333', padding: '2px 7px', borderRadius: 3 }}>
+                    {detail.summary.sector}{detail.summary.industry ? ` / ${detail.summary.industry}` : ''}
+                  </span>
+                )}
               </div>
             </div>
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
