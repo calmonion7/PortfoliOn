@@ -345,6 +345,9 @@ export default function Reports() {
                 </span>
                 <span style={{ color: '#666', fontSize: 14, marginLeft: 8 }}>({selected.ticker})</span>
                 <span style={{ color: '#555', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+                {detail.summary?.price != null && (
+                  <span style={{ color: '#e0e0e0', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price)}</span>
+                )}
                 {detail.summary?.sector && (
                   <span style={{ color: '#4fc3f7', fontSize: 11, marginLeft: 12, background: '#0d2333', padding: '2px 7px', borderRadius: 3 }}>
                     {detail.summary.sector}{detail.summary.industry ? ` / ${detail.summary.industry}` : ''}
