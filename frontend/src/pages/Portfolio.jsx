@@ -59,7 +59,10 @@ export default function Portfolio() {
   }
 
   const handleDelete = async (ticker) => {
-    if (!window.confirm(`${ticker}를 삭제하시겠습니까?`)) return
+    const msg = activeTab === 'holdings'
+      ? `${ticker}를 보유종목에서 제거하고 관심종목으로 이동합니까?`
+      : `${ticker}를 완전히 삭제하시겠습니까?`
+    if (!window.confirm(msg)) return
     try {
       if (activeTab === 'holdings') {
         await axios.delete(`/api/portfolio/${ticker}`)

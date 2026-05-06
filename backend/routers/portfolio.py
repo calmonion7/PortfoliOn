@@ -80,7 +80,7 @@ def delete_stock(ticker: str):
 
     watchlist = storage.get_watchlist_tickers()
     if upper not in [t.upper() for t in watchlist]:
-        stocks = storage.get_stocks()
-        storage.save_stocks([s for s in stocks if s["ticker"].upper() != upper])
+        watchlist.append(upper)
+        storage.save_watchlist_tickers(watchlist)
 
-    return {"deleted": upper}
+    return {"moved_to_watchlist": upper}
