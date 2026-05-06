@@ -90,6 +90,41 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
   )
 }
 
+function ConsensusTable({ summary }) {
+  if (!summary) return null
+  const buy = summary.buy ?? 0
+  const hold = summary.hold ?? 0
+  const sell = summary.sell ?? 0
+  const total = buy + hold + sell
+  if (total === 0) return null
+  const pct = (n) => `${Math.round(n / total * 100)}%`
+  return (
+    <div style={{ marginBottom: 16, overflowX: 'auto', background: '#111', borderRadius: 6, padding: '10px 12px' }}>
+      <div style={{ color: '#80cbc4', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>증권사 컨센서스</div>
+      <table style={{ borderCollapse: 'collapse', fontSize: 12, color: '#ccc' }}>
+        <thead>
+          <tr style={{ background: '#1a2a3a' }}>
+            <th style={{ ...TH, color: '#81c784' }}>Buy</th>
+            <th style={TH}>Hold</th>
+            <th style={{ ...TH, color: '#ef9a9a' }}>Sell</th>
+            <th style={TH}>Finviz</th>
+            <th style={TH}>평균목표가</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ ...TD, color: '#81c784' }}>{buy}({pct(buy)})</td>
+            <td style={TD}>{hold}({pct(hold)})</td>
+            <td style={{ ...TD, color: '#ef9a9a' }}>{sell}({pct(sell)})</td>
+            <td style={TD}>{summary.finviz_recom ?? 'N/A'}</td>
+            <td style={TD}>{fmt(summary.target_mean)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function VolumeProfileTable({ vp }) {
   if (!vp || vp.poc == null) return null
   const hvnStr = vp.hvn?.length ? vp.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ') : 'N/A'
@@ -310,9 +345,16 @@ export default function Reports() {
                         {s ? fmt(s.target_mean) : 'N/A'}
                         {s?.target_mean != null && <div style={{ color: '#78909c', fontSize: 10 }}>{fmt(s.target_mean * 0.88)}</div>}
                       </td>
-                      <td style={{ ...TD, color: '#81c784' }}>{s ? fmtN(s.buy) : 'N/A'}</td>
-                      <td style={TD}>{s ? fmtN(s.hold) : 'N/A'}</td>
-                      <td style={{ ...TD, color: '#ef9a9a' }}>{s ? fmtN(s.sell) : 'N/A'}</td>
+                      {(() => {
+                        const buy = s?.buy ?? 0, hold = s?.hold ?? 0, sell = s?.sell ?? 0
+                        const total = buy + hold + sell
+                        const pct = (n) => total > 0 ? `(${Math.round(n / total * 100)}%)` : ''
+                        return (<>
+                          <td style={{ ...TD, color: '#81c784' }}>{s ? `${buy}${pct(buy)}` : 'N/A'}</td>
+                          <td style={TD}>{s ? `${hold}${pct(hold)}` : 'N/A'}</td>
+                          <td style={{ ...TD, color: '#ef9a9a' }}>{s ? `${sell}${pct(sell)}` : 'N/A'}</td>
+                        </>)
+                      })()}
                       <td style={TD}>{s ? fmtN(s.finviz_recom) : 'N/A'}</td>
                       <td style={{ ...TD, borderLeft: '1px solid #2a3a4a' }}>
                         <div style={{ color: rsiColor(dr?.rsi), fontWeight: 600 }}>{dr?.rsi != null ? fmtN(dr.rsi) : 'N/A'}</div>
@@ -375,6 +417,7 @@ export default function Reports() {
               </div>
             </div>
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
+            {!loading && detail.summary && <ConsensusTable summary={detail.summary} />}
             {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} weeklyRsi={detail.summary.weekly_rsi} monthlyRsi={detail.summary.monthly_rsi} price={detail.summary.price} />}
             {!loading && detail.summary?.volume_profile && <VolumeProfileTable vp={detail.summary.volume_profile} />}
             {!loading && detail.content && <MarkdownViewer content={detail.content} ticker={selected.ticker} />}
