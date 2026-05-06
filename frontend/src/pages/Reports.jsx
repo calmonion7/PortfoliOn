@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import MarkdownViewer from '../components/MarkdownViewer'
 
@@ -158,6 +158,8 @@ export default function Reports() {
   const [detail, setDetail] = useState({ content: '', summary: null })
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(null)
+  const [genProgress, setGenProgress] = useState({ done: 0, total: 0 })
+  const pollRef = useRef(null)
   const [activeTab, setActiveTab] = useState('holdings')
   const [watchlistSub, setWatchlistSub] = useState('low')
   const [view, setView] = useState('list')
@@ -184,19 +186,30 @@ export default function Reports() {
 
   const generateOne = async (ticker) => {
     setGenerating(ticker)
+    setGenProgress({ done: 0, total: 0 })
+    clearInterval(pollRef.current)
     try {
       await axios.post(`/api/report/generate/${ticker}`)
-      setTimeout(() => {
-        fetchList()
-        setGenerating(null)
-        if (view === 'detail' && selected.ticker === ticker) {
-          setDetailRefreshKey(k => k + 1)
-        }
-      }, 3000)
+      pollRef.current = setInterval(async () => {
+        try {
+          const { data } = await axios.get('/api/report/progress')
+          setGenProgress({ done: data.done, total: data.total })
+          if (!data.running && data.total > 0 && data.done >= data.total) {
+            clearInterval(pollRef.current)
+            fetchList()
+            setGenerating(null)
+            if (view === 'detail' && selected.ticker === ticker) {
+              setDetailRefreshKey(k => k + 1)
+            }
+          }
+        } catch {}
+      }, 1500)
     } catch {
       setGenerating(null)
     }
   }
+
+  useEffect(() => () => clearInterval(pollRef.current), [])
 
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
   const watchlistAll = Object.entries(reportList).filter(([, v]) => v.category === 'watchlist')
@@ -230,12 +243,19 @@ export default function Reports() {
         <span style={{ color: '#80cbc4', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
         <button
           onClick={() => generateOne(ticker)}
-          disabled={generating === ticker}
-          style={{ background: 'transparent', border: '1px solid #444', color: generating === ticker ? '#666' : '#aaa', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating === ticker ? 'default' : 'pointer' }}
+          disabled={!!generating}
+          style={{ background: 'transparent', border: '1px solid #444', color: generating === ticker ? '#4fc3f7' : generating ? '#555' : '#aaa', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer' }}
         >
-          {generating === ticker ? '생성중' : '생성'}
+          {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
         </button>
       </div>
+      {generating === ticker && genProgress.total > 0 && (
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ background: '#2a2a3a', borderRadius: 2, height: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: '#4fc3f7', transition: 'width 0.4s ease' }} />
+          </div>
+        </div>
+      )}
       {info.dates.map(date => (
         <div
           key={date}
