@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 
 const DAYS = [
@@ -13,10 +13,26 @@ export default function Settings() {
   const [saved, setSaved] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genMsg, setGenMsg] = useState('')
+  const [progress, setProgress] = useState({ done: 0, total: 0, current: '' })
+  const pollRef = useRef(null)
 
   useEffect(() => {
     axios.get('/api/schedule').then(({ data }) => setSchedule(data))
   }, [])
+
+  const startPolling = () => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const { data } = await axios.get('/api/report/progress')
+        setProgress({ done: data.done, total: data.total, current: data.current })
+        if (!data.running && data.total > 0 && data.done >= data.total) {
+          clearInterval(pollRef.current)
+          setGenerating(false)
+          setGenMsg(`완료: ${data.done}/${data.total} 종목 생성됨`)
+        }
+      } catch {}
+    }, 1500)
+  }
 
   const toggleDay = (day) => {
     setSchedule(s => ({
@@ -34,15 +50,19 @@ export default function Settings() {
   const handleGenerateNow = async () => {
     setGenerating(true)
     setGenMsg('')
+    setProgress({ done: 0, total: 0, current: '' })
     try {
-      const { data } = await axios.post('/api/report/generate')
-      setGenMsg(data.message)
+      await axios.post('/api/report/generate')
+      startPolling()
     } catch (err) {
       setGenMsg(err.response?.data?.detail || '생성 실패')
-    } finally {
       setGenerating(false)
     }
   }
+
+  useEffect(() => () => clearInterval(pollRef.current), [])
+
+  const pct = progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0
 
   return (
     <div style={{ maxWidth: 480 }}>
@@ -107,6 +127,18 @@ export default function Settings() {
         <button className="btn-primary" onClick={handleGenerateNow} disabled={generating}>
           {generating ? '생성 중...' : '지금 생성'}
         </button>
+        {generating && progress.total > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#aaa', marginBottom: 6 }}>
+              <span>{progress.current ? `생성 중: ${progress.current}` : '준비 중...'}</span>
+              <span style={{ color: '#4fc3f7', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
+            </div>
+            <div style={{ background: '#2a2a3a', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: '#4fc3f7', borderRadius: 4, transition: 'width 0.4s ease' }} />
+            </div>
+            <div style={{ fontSize: 11, color: '#555', marginTop: 4, textAlign: 'right' }}>{pct}%</div>
+          </div>
+        )}
         {genMsg && <p style={{ marginTop: 8, color: '#66bb6a', fontSize: 13 }}>{genMsg}</p>}
       </section>
     </div>

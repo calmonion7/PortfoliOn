@@ -7,6 +7,13 @@ router = APIRouter(prefix="/api", tags=["report"])
 
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
+_progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
+
+
+@router.get("/report/progress")
+def get_progress():
+    return _progress
+
 
 @router.post("/report/generate", status_code=202)
 def generate_all(background_tasks: BackgroundTasks):
@@ -36,11 +43,19 @@ def generate_one(ticker: str, background_tasks: BackgroundTasks):
 
 
 def _run_generation(stocks: list):
+    _progress["running"] = True
+    _progress["done"] = 0
+    _progress["total"] = len(stocks)
+    _progress["current"] = ""
     for stock in stocks:
+        _progress["current"] = stock["ticker"]
         try:
             report_generator.generate_report(stock)
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
+        _progress["done"] += 1
+    _progress["running"] = False
+    _progress["current"] = ""
 
 
 def _read_summary(json_path: Path) -> dict | None:
