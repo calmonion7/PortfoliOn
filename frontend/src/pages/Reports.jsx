@@ -24,7 +24,23 @@ const rsiColor = (rsi) => {
   return `hsl(${hue}, 60%, 60%)`
 }
 
-function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi }) {
+const fmtGap = (target, price) => {
+  if (target == null || !price) return null
+  const pct = (target - price) / price * 100
+  return { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, positive: pct >= 0 }
+}
+
+const GapCell = ({ target, price, baseColor }) => {
+  const gap = fmtGap(target, price)
+  return (
+    <td style={{ ...TD, color: baseColor }}>
+      {fmt(target)}
+      {gap && <div style={{ fontSize: 10, color: gap.positive ? '#81c784' : '#ef9a9a' }}>{gap.text}</div>}
+    </td>
+  )
+}
+
+function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
   if (!dailyRsi) return null
   const rows = [
     { label: '일봉', d: dailyRsi },
@@ -51,13 +67,13 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi }) {
           {rows.map(({ label, d }) => d?.rsi != null && (
             <tr key={label}>
               <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontWeight: 600 }}>{label}</td>
-              <td style={{ ...TD, color: '#81c784' }}>{fmt(d.target_20)}</td>
-              <td style={{ ...TD, color: '#81c784' }}>{fmt(d.target_25)}</td>
-              <td style={{ ...TD, color: '#81c784' }}>{fmt(d.target_30)}</td>
+              <GapCell target={d.target_20} price={price} baseColor="#81c784" />
+              <GapCell target={d.target_25} price={price} baseColor="#81c784" />
+              <GapCell target={d.target_30} price={price} baseColor="#81c784" />
               <td style={{ ...TD, color: rsiColor(d.rsi), fontWeight: 600 }}>{fmtN(d.rsi)}</td>
-              <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(d.target_70)}</td>
-              <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(d.target_75)}</td>
-              <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(d.target_80)}</td>
+              <GapCell target={d.target_70} price={price} baseColor="#ef9a9a" />
+              <GapCell target={d.target_75} price={price} baseColor="#ef9a9a" />
+              <GapCell target={d.target_80} price={price} baseColor="#ef9a9a" />
             </tr>
           ))}
         </tbody>
@@ -346,7 +362,7 @@ export default function Reports() {
               </div>
             </div>
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
-            {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} weeklyRsi={detail.summary.weekly_rsi} monthlyRsi={detail.summary.monthly_rsi} />}
+            {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} weeklyRsi={detail.summary.weekly_rsi} monthlyRsi={detail.summary.monthly_rsi} price={detail.summary.price} />}
             {!loading && detail.summary?.volume_profile && <VolumeProfileTable vp={detail.summary.volume_profile} />}
             {!loading && detail.content && <MarkdownViewer content={detail.content} ticker={selected.ticker} />}
           </div>
