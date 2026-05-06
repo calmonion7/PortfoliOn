@@ -24,14 +24,20 @@ const rsiColor = (rsi) => {
   return `hsl(${hue}, 60%, 60%)`
 }
 
-function RsiTable({ dailyRsi }) {
+function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi }) {
   if (!dailyRsi) return null
+  const rows = [
+    { label: '일봉', d: dailyRsi },
+    { label: '주봉', d: weeklyRsi },
+    { label: '월봉', d: monthlyRsi },
+  ]
   return (
     <div style={{ marginBottom: 16, overflowX: 'auto', background: '#111', borderRadius: 6, padding: '10px 12px' }}>
-      <div style={{ color: '#80cbc4', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>RSI 예상 타점 (일봉)</div>
+      <div style={{ color: '#80cbc4', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>RSI 예상 타점</div>
       <table style={{ borderCollapse: 'collapse', fontSize: 12, color: '#ccc' }}>
         <thead>
           <tr style={{ background: '#1a2a3a' }}>
+            <th style={{ ...TH, textAlign: 'left', color: '#aaa' }}>시간대</th>
             <th style={{ ...TH, color: '#81c784' }}>RSI20</th>
             <th style={{ ...TH, color: '#81c784' }}>RSI25</th>
             <th style={{ ...TH, color: '#81c784' }}>RSI30</th>
@@ -42,15 +48,18 @@ function RsiTable({ dailyRsi }) {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style={{ ...TD, color: '#81c784' }}>{fmt(dailyRsi.target_20)}</td>
-            <td style={{ ...TD, color: '#81c784' }}>{fmt(dailyRsi.target_25)}</td>
-            <td style={{ ...TD, color: '#81c784' }}>{fmt(dailyRsi.target_30)}</td>
-            <td style={{ ...TD, color: rsiColor(dailyRsi.rsi), fontWeight: 600 }}>{fmtN(dailyRsi.rsi)}</td>
-            <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(dailyRsi.target_70)}</td>
-            <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(dailyRsi.target_75)}</td>
-            <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(dailyRsi.target_80)}</td>
-          </tr>
+          {rows.map(({ label, d }) => d?.rsi != null && (
+            <tr key={label}>
+              <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontWeight: 600 }}>{label}</td>
+              <td style={{ ...TD, color: '#81c784' }}>{fmt(d.target_20)}</td>
+              <td style={{ ...TD, color: '#81c784' }}>{fmt(d.target_25)}</td>
+              <td style={{ ...TD, color: '#81c784' }}>{fmt(d.target_30)}</td>
+              <td style={{ ...TD, color: rsiColor(d.rsi), fontWeight: 600 }}>{fmtN(d.rsi)}</td>
+              <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(d.target_70)}</td>
+              <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(d.target_75)}</td>
+              <td style={{ ...TD, color: '#ef9a9a' }}>{fmt(d.target_80)}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -337,7 +346,7 @@ export default function Reports() {
               </div>
             </div>
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
-            {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} />}
+            {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} weeklyRsi={detail.summary.weekly_rsi} monthlyRsi={detail.summary.monthly_rsi} />}
             {!loading && detail.summary?.volume_profile && <VolumeProfileTable vp={detail.summary.volume_profile} />}
             {!loading && detail.content && <MarkdownViewer content={detail.content} ticker={selected.ticker} />}
           </div>
