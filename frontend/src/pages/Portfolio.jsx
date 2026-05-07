@@ -159,7 +159,7 @@ export default function Portfolio() {
                 </td>
               </tr>
             ))}
-            {filteredStocks.length === 0 && (
+            {stocks.length === 0 && (
               <tr><td colSpan={6} style={{ textAlign: 'center', color: '#666', padding: 32 }}>종목을 추가해 주세요</td></tr>
             )}
           </tbody>
@@ -193,7 +193,7 @@ export default function Portfolio() {
                 </td>
               </tr>
             ))}
-            {filteredWatchlist.length === 0 && (
+            {watchlist.length === 0 && (
               <tr><td colSpan={4} style={{ textAlign: 'center', color: '#666', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
             )}
           </tbody>
