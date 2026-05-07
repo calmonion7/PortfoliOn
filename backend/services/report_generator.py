@@ -31,8 +31,12 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         _info = t.info
         sector = _info.get('sector', '')
         industry = _info.get('industry', '')
+        trailing_per = _info.get('trailingPE')
+        forward_per = _info.get('forwardPE')
+        pbr = _info.get('priceToBook')
     except Exception:
         sector, industry = '', ''
+        trailing_per = forward_per = pbr = None
     quote["ticker"] = ticker
     finviz = scraper.scrape_finviz_consensus(ticker)
     news = scraper.get_news(ticker)
@@ -61,6 +65,8 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         "date": today,
         "price": quote.get("price"),
         "target_mean": analyst.get("target_mean") or finviz.get("finviz_target"),
+        "target_high": analyst.get("target_high"),
+        "target_low": analyst.get("target_low"),
         "buy": analyst.get("buy", 0),
         "hold": analyst.get("hold", 0),
         "sell": analyst.get("sell", 0),
@@ -71,6 +77,9 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         "volume_profile": vp,
         "sector": sector,
         "industry": industry,
+        "per": round(trailing_per, 2) if trailing_per else None,
+        "forward_per": round(forward_per, 2) if forward_per else None,
+        "pbr": round(pbr, 2) if pbr else None,
     }
     json_path = output_dir / f"{today}.json"
     json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")

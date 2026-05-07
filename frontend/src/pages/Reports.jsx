@@ -30,6 +30,74 @@ const fmtGap = (target, price) => {
   return { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, positive: pct >= 0 }
 }
 
+function TargetTooltip({ s }) {
+  const [visible, setVisible] = useState(false)
+  const ref = useRef(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  const total = (s?.buy ?? 0) + (s?.hold ?? 0) + (s?.sell ?? 0)
+  const pct = (n) => total > 0 ? ` (${Math.round(n / total * 100)}%)` : ''
+  const gap = s?.target_mean != null && s?.price != null
+    ? ((s.target_mean - s.price) / s.price * 100)
+    : null
+
+  const handleMouseEnter = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setPos({ top: rect.bottom + 4, left: rect.left })
+    setVisible(true)
+  }
+
+  return (
+    <div ref={ref} style={{ display: 'inline-block', position: 'relative' }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setVisible(false)}
+    >
+      {s ? fmt(s.target_mean) : 'N/A'}
+      {gap != null && <div style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', fontSize: 10 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</div>}
+      {visible && s?.target_mean != null && (
+        <div style={{
+          position: 'fixed',
+          top: pos.top,
+          left: pos.left,
+          zIndex: 9999,
+          background: '#1a1a2e',
+          border: '1px solid #3a4a6a',
+          borderRadius: 6,
+          padding: '10px 14px',
+          minWidth: 200,
+          fontSize: 12,
+          color: '#ccc',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+          pointerEvents: 'none',
+          lineHeight: 1.8,
+        }}>
+          <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 6, fontSize: 11 }}>목표가 근거</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px' }}>
+            <span style={{ color: '#78909c' }}>평균</span>
+            <span style={{ color: '#fff', fontWeight: 600 }}>{fmt(s.target_mean)}{gap != null && <span style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
+            <span style={{ color: '#78909c' }}>최고</span>
+            <span style={{ color: '#81c784' }}>{fmt(s.target_high)}</span>
+            <span style={{ color: '#78909c' }}>최저</span>
+            <span style={{ color: '#ef9a9a' }}>{fmt(s.target_low)}</span>
+            <span style={{ color: '#78909c' }}>애널리스트</span>
+            <span>{total > 0 ? `${total}명` : 'N/A'}</span>
+            <span style={{ color: '#78909c' }}>Buy</span>
+            <span style={{ color: '#81c784' }}>{s.buy ?? 0}{pct(s.buy ?? 0)}</span>
+            <span style={{ color: '#78909c' }}>Hold</span>
+            <span>{s.hold ?? 0}{pct(s.hold ?? 0)}</span>
+            <span style={{ color: '#78909c' }}>Sell</span>
+            <span style={{ color: '#ef9a9a' }}>{s.sell ?? 0}{pct(s.sell ?? 0)}</span>
+            {s.finviz_recom != null && <>
+              <span style={{ color: '#78909c' }}>Finviz</span>
+              <span>{s.finviz_recom} <span style={{ color: '#546e7a', fontSize: 10 }}>(1=강매수)</span></span>
+            </>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const GapCell = ({ target, price, baseColor, highlight }) => {
   const gap = fmtGap(target, price)
   return (
@@ -316,10 +384,12 @@ export default function Reports() {
                   <th style={{ ...TH, textAlign: 'left' }}>섹터</th>
                   <th style={TH}>현재가</th>
                   <th style={TH}>POC</th>
-                  <th style={TH}>평균목표가<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>(-12%)</span></th>
+                  <th style={TH}>평균목표가<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>vs 현재가</span></th>
                   <th style={{ ...TH, color: '#81c784' }}>Buy</th>
                   <th style={TH}>Hold</th>
                   <th style={{ ...TH, color: '#ef9a9a' }}>Sell</th>
+                  <th style={TH}>PER<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>Fwd</span></th>
+                  <th style={TH}>PBR</th>
                   <th style={TH}>Finviz</th>
                   <th style={{ ...TH, borderLeft: '1px solid #2a3a4a' }}>RSI<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
                   <th style={{ ...TH, color: '#81c784' }}>RSI20<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
@@ -357,13 +427,13 @@ export default function Reports() {
                         {s?.name || ticker} <span style={{ color: '#666', fontWeight: 400 }}>({ticker})</span>
                       </td>
                       <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontSize: 11 }}>
-                        {s?.sector || '—'}{s?.industry ? <span style={{ color: '#546e7a', marginLeft: 4 }}>/ {s.industry}</span> : null}
+                        <div>{s?.sector || '—'}</div>
+                        {s?.industry ? <div style={{ color: '#546e7a', fontSize: 10 }}>{s.industry}</div> : null}
                       </td>
                       <td style={TD}>{s ? fmt(s.price) : 'N/A'}</td>
                       <td style={TD}>{fmt(s?.volume_profile?.poc)}</td>
                       <td style={TD}>
-                        {s ? fmt(s.target_mean) : 'N/A'}
-                        {s?.target_mean != null && <div style={{ color: '#78909c', fontSize: 10 }}>{fmt(s.target_mean * 0.88)}</div>}
+                        <TargetTooltip s={s} />
                       </td>
                       {(() => {
                         const buy = s?.buy ?? 0, hold = s?.hold ?? 0, sell = s?.sell ?? 0
@@ -375,6 +445,11 @@ export default function Reports() {
                           <td style={{ ...TD, color: '#ef9a9a' }}>{s ? `${sell}${pct(sell)}` : 'N/A'}</td>
                         </>)
                       })()}
+                      <td style={TD}>
+                        {s?.per != null ? s.per.toFixed(1) : '—'}
+                        {s?.forward_per != null && <div style={{ color: '#78909c', fontSize: 10 }}>{s.forward_per.toFixed(1)}</div>}
+                      </td>
+                      <td style={TD}>{s?.pbr != null ? s.pbr.toFixed(2) : '—'}</td>
                       <td style={TD}>{s ? fmtN(s.finviz_recom) : 'N/A'}</td>
                       <td style={{ ...TD, borderLeft: '1px solid #2a3a4a' }}>
                         <div style={{ color: rsiColor(dr?.rsi), fontWeight: 600 }}>{dr?.rsi != null ? fmtN(dr.rsi) : 'N/A'}</div>
@@ -432,6 +507,17 @@ export default function Reports() {
                 {detail.summary?.sector && (
                   <span style={{ color: '#4fc3f7', fontSize: 11, marginLeft: 12, background: '#0d2333', padding: '2px 7px', borderRadius: 3 }}>
                     {detail.summary.sector}{detail.summary.industry ? ` / ${detail.summary.industry}` : ''}
+                  </span>
+                )}
+                {detail.summary?.per != null && (
+                  <span style={{ color: '#b0bec5', fontSize: 11, marginLeft: 8, background: '#1a2a1a', padding: '2px 7px', borderRadius: 3 }}>
+                    PER {detail.summary.per.toFixed(1)}
+                    {detail.summary.forward_per != null && <span style={{ color: '#546e7a', marginLeft: 4 }}>/ Fwd {detail.summary.forward_per.toFixed(1)}</span>}
+                  </span>
+                )}
+                {detail.summary?.pbr != null && (
+                  <span style={{ color: '#b0bec5', fontSize: 11, marginLeft: 4, background: '#1a2a1a', padding: '2px 7px', borderRadius: 3 }}>
+                    PBR {detail.summary.pbr.toFixed(2)}
                   </span>
                 )}
               </div>
