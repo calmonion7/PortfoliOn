@@ -73,3 +73,14 @@ def test_enrich_batch_returns_updated_and_not_found():
 def test_enrich_batch_returns_400_when_empty():
     resp = client.put("/api/stocks/enrich/batch", json=[])
     assert resp.status_code == 400
+
+
+def test_enrich_batch_item_with_no_fields_appears_in_not_found():
+    with patch("routers.stocks.storage.enrich_stock", return_value=True):
+        resp = client.put("/api/stocks/enrich/batch", json=[
+            {"ticker": "LLY"},
+        ])
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "LLY" in body["not_found"]
+    assert "LLY" not in body["updated"]

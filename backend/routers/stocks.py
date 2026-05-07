@@ -38,6 +38,7 @@ def enrich_batch(items: List[BatchEnrichItem]):
     for item in items:
         fields = {k: v for k, v in item.model_dump().items() if k != "ticker" and v is not None}
         if not fields:
+            not_found.append(item.ticker.upper())
             continue
         ok = storage.enrich_stock(item.ticker, fields)
         (updated if ok else not_found).append(item.ticker.upper())
