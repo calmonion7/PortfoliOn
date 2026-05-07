@@ -106,3 +106,55 @@ def test_save_and_load_schedule_roundtrip(tmp_path):
         storage_mod.save_schedule(schedule)
         loaded = storage_mod.get_schedule()
     assert loaded == schedule
+
+
+def test_enrich_stock_updates_existing_fields(tmp_path):
+    import services.storage as storage_mod
+    with patch("services.storage.DATA_DIR", tmp_path):
+        storage_mod.save_stocks([
+            {"ticker": "LLY", "name": "일라이 릴리", "competitors": [], "moat": "", "growth_plan": "", "recent_disclosures": ""}
+        ])
+        storage_mod.save_holdings([{"ticker": "LLY", "quantity": 3.0, "avg_cost": 886.6}])
+        storage_mod.save_watchlist_tickers([])
+        result = storage_mod.enrich_stock("LLY", {"moat": "특허 포트폴리오", "growth_plan": "GLP 확장"})
+        loaded = storage_mod.get_stocks()
+    assert result is True
+    assert loaded[0]["moat"] == "특허 포트폴리오"
+    assert loaded[0]["growth_plan"] == "GLP 확장"
+
+
+def test_enrich_stock_returns_false_when_ticker_not_in_any_list(tmp_path):
+    import services.storage as storage_mod
+    with patch("services.storage.DATA_DIR", tmp_path):
+        storage_mod.save_stocks([])
+        storage_mod.save_holdings([])
+        storage_mod.save_watchlist_tickers([])
+        result = storage_mod.enrich_stock("FAKE", {"moat": "x"})
+    assert result is False
+
+
+def test_enrich_stock_creates_entry_when_in_watchlist_but_not_in_stocks(tmp_path):
+    import services.storage as storage_mod
+    with patch("services.storage.DATA_DIR", tmp_path):
+        storage_mod.save_stocks([])
+        storage_mod.save_holdings([])
+        storage_mod.save_watchlist_tickers(["NVDA"])
+        result = storage_mod.enrich_stock("NVDA", {"recent_disclosures": "Q1 호실적"})
+        loaded = storage_mod.get_stocks()
+    assert result is True
+    assert loaded[0]["ticker"] == "NVDA"
+    assert loaded[0]["recent_disclosures"] == "Q1 호실적"
+
+
+def test_enrich_stock_case_insensitive(tmp_path):
+    import services.storage as storage_mod
+    with patch("services.storage.DATA_DIR", tmp_path):
+        storage_mod.save_stocks([
+            {"ticker": "AAPL", "name": "Apple", "competitors": [], "moat": "", "growth_plan": "", "recent_disclosures": ""}
+        ])
+        storage_mod.save_holdings([{"ticker": "AAPL", "quantity": 1, "avg_cost": 100.0}])
+        storage_mod.save_watchlist_tickers([])
+        result = storage_mod.enrich_stock("aapl", {"moat": "생태계"})
+        loaded = storage_mod.get_stocks()
+    assert result is True
+    assert loaded[0]["moat"] == "생태계"

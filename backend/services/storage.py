@@ -54,7 +54,7 @@ def get_full_portfolio() -> dict:
     stocks_by_ticker = {s["ticker"]: s for s in stocks}
 
     def _fallback(t: str) -> dict:
-        return {"ticker": t, "name": t, "competitors": [], "moat": "", "growth_plan": ""}
+        return {"ticker": t, "name": t, "competitors": [], "moat": "", "growth_plan": "", "recent_disclosures": ""}
 
     holding_stocks = [
         {**stocks_by_ticker.get(h["ticker"], _fallback(h["ticker"])),
@@ -79,3 +79,26 @@ def get_schedule() -> dict:
 
 def save_schedule(schedule: dict) -> None:
     _write_json("schedule.json", schedule)
+
+
+def enrich_stock(ticker: str, fields: dict) -> bool:
+    """moat/growth_plan/recent_disclosures를 ticker의 stocks.json 항목에 저장.
+    ticker가 holdings 또는 watchlist에 없으면 False 반환."""
+    upper = ticker.upper()
+    holdings = get_holdings()
+    watchlist = get_watchlist_tickers()
+    all_tickers = {h["ticker"].upper() for h in holdings} | {t.upper() for t in watchlist}
+    if upper not in all_tickers:
+        return False
+    stocks = get_stocks()
+    idx = next((i for i, s in enumerate(stocks) if s["ticker"].upper() == upper), None)
+    if idx is not None:
+        for k, v in fields.items():
+            stocks[idx][k] = v
+    else:
+        entry = {"ticker": upper, "name": upper, "competitors": [],
+                 "moat": "", "growth_plan": "", "recent_disclosures": ""}
+        entry.update(fields)
+        stocks.append(entry)
+    save_stocks(stocks)
+    return True
