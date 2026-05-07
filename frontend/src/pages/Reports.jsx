@@ -13,7 +13,7 @@ const TAB_STYLE = (active) => ({
   fontSize: 13,
 })
 
-const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid #333', whiteSpace: 'nowrap', fontSize: 11, color: '#aaa' }
+const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid #333', whiteSpace: 'nowrap', fontSize: 11, color: '#aaa', position: 'sticky', top: 0, background: '#1a2a3a' }
 const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid #1e1e1e', fontSize: 12 }
 
 const fmt = (val) => val != null ? `$${Number(val).toFixed(2)}` : 'N/A'
@@ -500,8 +500,8 @@ export default function Reports() {
           ) : (
             <table style={{ borderCollapse: 'collapse', color: '#ccc', width: '100%' }}>
               <thead>
-                <tr style={{ background: '#1a2a3a', position: 'sticky', top: 0 }}>
-                  <th style={{ ...TH, textAlign: 'left', position: 'sticky', left: 0, zIndex: 2, background: '#1a2a3a' }}>종목명 (티커)</th>
+                <tr style={{ background: '#1a2a3a' }}>
+                  <th style={{ ...TH, textAlign: 'left', left: 0, zIndex: 3 }}>종목명 (티커)</th>
                   <th style={{ ...TH, textAlign: 'left' }}>섹터</th>
                   <th style={TH}>현재가</th>
                   <th style={TH}>POC</th>
