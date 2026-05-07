@@ -232,6 +232,7 @@ export default function Reports() {
   const [watchlistSub, setWatchlistSub] = useState('low')
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
+  const [activeDetailTab, setActiveDetailTab] = useState('summary')
 
   const fetchList = useCallback(() => {
     axios.get('/api/report/list').then(({ data }) => setReportList(data))
@@ -250,6 +251,7 @@ export default function Reports() {
   const openDetail = (ticker, date) => {
     setSelected({ ticker, date })
     setView('detail')
+    setActiveDetailTab('summary')
   }
 
   const generateOne = async (ticker) => {
@@ -522,6 +524,33 @@ export default function Reports() {
                 )}
               </div>
             </div>
+            {/* 탭 바 */}
+            <div style={{ display: 'flex', borderBottom: '1px solid #2a3a4a', marginBottom: 16, marginTop: 4 }}>
+              {[
+                { key: 'summary', label: '📊 요약' },
+                { key: 'technical', label: '📈 기술적 분석' },
+                { key: 'report', label: '📄 리포트' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveDetailTab(key)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: activeDetailTab === key ? '2px solid #4fc3f7' : '2px solid transparent',
+                    color: activeDetailTab === key ? '#4fc3f7' : '#555',
+                    padding: '6px 16px',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    marginBottom: -1,
+                    fontWeight: activeDetailTab === key ? 600 : 400,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
             {!loading && detail.summary && <ConsensusTable summary={detail.summary} />}
             {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} weeklyRsi={detail.summary.weekly_rsi} monthlyRsi={detail.summary.monthly_rsi} price={detail.summary.price} />}
