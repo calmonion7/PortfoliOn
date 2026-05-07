@@ -497,7 +497,7 @@ export default function Reports() {
               >
                 ← 목록으로
               </button>
-              <div>
+              <div style={{ flex: 1 }}>
                 <span style={{ color: '#90caf9', fontWeight: 700, fontSize: 16 }}>
                   {detail.summary?.name || selected.ticker}
                 </span>
@@ -523,6 +523,24 @@ export default function Reports() {
                   </span>
                 )}
               </div>
+              <button
+                onClick={() => generateOne(selected.ticker)}
+                disabled={!!generating}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #444',
+                  color: generating === selected.ticker ? '#4fc3f7' : generating ? '#555' : '#aaa',
+                  borderRadius: 4,
+                  padding: '4px 12px',
+                  fontSize: 12,
+                  cursor: generating ? 'default' : 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                {generating === selected.ticker
+                  ? `${genProgress.done}/${genProgress.total || '?'}`
+                  : '생성'}
+              </button>
             </div>
             {/* 탭 바 */}
             <div style={{ display: 'flex', borderBottom: '1px solid #2a3a4a', marginBottom: 16, marginTop: 4 }}>
