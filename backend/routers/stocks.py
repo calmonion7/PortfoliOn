@@ -10,6 +10,7 @@ class EnrichBody(BaseModel):
     moat: Optional[str] = None
     growth_plan: Optional[str] = None
     recent_disclosures: Optional[str] = None
+    competitors: Optional[List[str]] = None
 
 
 class BatchEnrichItem(BaseModel):
@@ -17,6 +18,7 @@ class BatchEnrichItem(BaseModel):
     moat: Optional[str] = None
     growth_plan: Optional[str] = None
     recent_disclosures: Optional[str] = None
+    competitors: Optional[List[str]] = None
 
 
 @router.get("")

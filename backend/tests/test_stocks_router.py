@@ -84,3 +84,32 @@ def test_enrich_batch_item_with_no_fields_appears_in_not_found():
     body = resp.json()
     assert "LLY" in body["not_found"]
     assert "LLY" not in body["updated"]
+
+
+def test_enrich_single_stock_with_competitors():
+    captured = {}
+
+    def mock_enrich(ticker, fields):
+        captured.update(fields)
+        return True
+
+    with patch("routers.stocks.storage.enrich_stock", side_effect=mock_enrich):
+        resp = client.put("/api/stocks/LLY/enrich", json={"competitors": ["NVO", "AZN"]})
+    assert resp.status_code == 200
+    assert captured["competitors"] == ["NVO", "AZN"]
+
+
+def test_enrich_batch_with_competitors():
+    captured = {}
+
+    def mock_enrich(ticker, fields):
+        captured[ticker.upper()] = fields
+        return True
+
+    with patch("routers.stocks.storage.enrich_stock", side_effect=mock_enrich):
+        resp = client.put("/api/stocks/enrich/batch", json=[
+            {"ticker": "LLY", "competitors": ["NVO"]},
+        ])
+    assert resp.status_code == 200
+    assert resp.json()["updated"] == ["LLY"]
+    assert captured["LLY"]["competitors"] == ["NVO"]
