@@ -22,6 +22,7 @@ export default function Portfolio() {
   const [editing, setEditing] = useState(null)
   const [promoteTarget, setPromoteTarget] = useState(null)
   const [error, setError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const fetchAll = useCallback(async () => {
     const [portfolioRes, watchlistRes] = await Promise.all([
@@ -91,6 +92,14 @@ export default function Portfolio() {
   const openEdit = (stock) => { setEditing(stock); setModalOpen(true) }
   const openAdd = () => { setEditing(null); setModalOpen(true) }
 
+  const q = searchQuery.trim().toLowerCase()
+  const filteredStocks = stocks.filter(s =>
+    !q || s.ticker.toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q)
+  )
+  const filteredWatchlist = watchlist.filter(s =>
+    !q || s.ticker.toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q)
+  )
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -108,6 +117,24 @@ export default function Portfolio() {
         </button>
       </div>
 
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={e => setSearchQuery(e.target.value)}
+        placeholder="🔍 티커 또는 회사명 검색..."
+        style={{
+          width: '100%',
+          padding: '8px 12px',
+          marginBottom: 12,
+          background: '#0d1117',
+          border: '1px solid #2a3a4a',
+          borderRadius: 4,
+          color: '#ccc',
+          fontSize: 14,
+          boxSizing: 'border-box',
+        }}
+      />
+
       {error && <p style={{ color: '#ef5350', marginBottom: 8 }}>{error}</p>}
 
       {/* 보유종목 탭 */}
@@ -119,7 +146,7 @@ export default function Portfolio() {
             </tr>
           </thead>
           <tbody>
-            {stocks.map(stock => (
+            {filteredStocks.map(stock => (
               <tr key={stock.ticker}>
                 <td><strong>{stock.ticker}</strong></td>
                 <td>{stock.name}</td>
@@ -132,7 +159,7 @@ export default function Portfolio() {
                 </td>
               </tr>
             ))}
-            {stocks.length === 0 && (
+            {filteredStocks.length === 0 && (
               <tr><td colSpan={6} style={{ textAlign: 'center', color: '#666', padding: 32 }}>종목을 추가해 주세요</td></tr>
             )}
           </tbody>
@@ -148,7 +175,7 @@ export default function Portfolio() {
             </tr>
           </thead>
           <tbody>
-            {watchlist.map(stock => (
+            {filteredWatchlist.map(stock => (
               <tr key={stock.ticker}>
                 <td><strong>{stock.ticker}</strong></td>
                 <td>{stock.name}</td>
@@ -166,7 +193,7 @@ export default function Portfolio() {
                 </td>
               </tr>
             ))}
-            {watchlist.length === 0 && (
+            {filteredWatchlist.length === 0 && (
               <tr><td colSpan={4} style={{ textAlign: 'center', color: '#666', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
             )}
           </tbody>
