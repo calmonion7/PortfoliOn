@@ -4,14 +4,14 @@ import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 
 const TAB_STYLE = (active) => ({
-  padding: '8px 20px',
+  padding: '6px 14px',
   cursor: 'pointer',
   border: 'none',
   borderBottom: active ? '2px solid #4fc3f7' : '2px solid transparent',
   background: 'transparent',
   color: active ? '#4fc3f7' : '#888',
   fontWeight: active ? 600 : 400,
-  fontSize: 15,
+  fontSize: 13,
 })
 
 export default function Portfolio() {
@@ -130,7 +130,7 @@ export default function Portfolio() {
           border: '1px solid #2a3a4a',
           borderRadius: 4,
           color: '#ccc',
-          fontSize: 14,
+          fontSize: 13,
           boxSizing: 'border-box',
         }}
       />
@@ -139,10 +139,10 @@ export default function Portfolio() {
 
       {/* 보유종목 탭 */}
       {activeTab === 'holdings' && (
-        <table>
+        <table style={{ fontSize: 13 }}>
           <thead>
             <tr>
-              <th>티커</th><th>회사명</th><th>수량</th><th>평단가</th><th>경쟁사</th><th>관리</th>
+              <th style={{ fontSize: 11 }}>티커</th><th style={{ fontSize: 11 }}>회사명</th><th style={{ fontSize: 11 }}>수량</th><th style={{ fontSize: 11 }}>평단가</th><th style={{ fontSize: 11 }}>경쟁사</th><th style={{ fontSize: 11 }}>관리</th>
             </tr>
           </thead>
           <tbody>
@@ -168,10 +168,10 @@ export default function Portfolio() {
 
       {/* 관심종목 탭 */}
       {activeTab === 'watchlist' && (
-        <table>
+        <table style={{ fontSize: 13 }}>
           <thead>
             <tr>
-              <th>티커</th><th>회사명</th><th>경쟁사</th><th>관리</th>
+              <th style={{ fontSize: 11 }}>티커</th><th style={{ fontSize: 11 }}>회사명</th><th style={{ fontSize: 11 }}>경쟁사</th><th style={{ fontSize: 11 }}>관리</th>
             </tr>
           </thead>
           <tbody>

@@ -69,7 +69,7 @@ export default function Settings() {
       <h1 style={{ color: '#90caf9', marginBottom: 24 }}>설정</h1>
 
       <section style={{ background: '#1e1e2e', padding: 20, borderRadius: 8, marginBottom: 24 }}>
-        <h2 style={{ color: '#80cbc4', marginBottom: 16, fontSize: 16 }}>자동 리포트 스케줄</h2>
+        <h2 style={{ color: '#80cbc4', marginBottom: 16, fontSize: 14 }}>자동 리포트 스케줄</h2>
 
         <div className="form-field" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ marginBottom: 0, width: 'auto' }}>자동 생성</label>
@@ -101,13 +101,14 @@ export default function Settings() {
                 onClick={() => toggleDay(key)}
                 disabled={!schedule.enabled}
                 style={{
-                  padding: '6px 10px',
+                  padding: '4px 8px',
                   borderRadius: 4,
                   border: 'none',
                   cursor: schedule.enabled ? 'pointer' : 'default',
                   background: schedule.days.includes(key) ? '#1565c0' : '#333',
                   color: schedule.days.includes(key) ? 'white' : '#888',
                   opacity: schedule.enabled ? 1 : 0.5,
+                  fontSize: 13,
                 }}
               >
                 {label}
@@ -122,7 +123,7 @@ export default function Settings() {
       </section>
 
       <section style={{ background: '#1e1e2e', padding: 20, borderRadius: 8 }}>
-        <h2 style={{ color: '#80cbc4', marginBottom: 12, fontSize: 16 }}>즉시 리포트 생성</h2>
+        <h2 style={{ color: '#80cbc4', marginBottom: 12, fontSize: 14 }}>즉시 리포트 생성</h2>
         <p style={{ color: '#aaa', fontSize: 13, marginBottom: 12 }}>보유 및 관심 종목 전체에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.</p>
         <button className="btn-primary" onClick={handleGenerateNow} disabled={generating}>
           {generating ? '생성 중...' : '지금 생성'}
