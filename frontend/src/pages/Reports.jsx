@@ -125,7 +125,7 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
   }
   return (
     <div style={{ marginBottom: 16, overflowX: 'auto', background: '#111', borderRadius: 6, padding: '10px 12px' }}>
-      <div style={{ color: '#80cbc4', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>RSI 예상 타점</div>
+      <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>🎯 RSI 예상 타점</div>
       <table style={{ borderCollapse: 'collapse', fontSize: 12, color: '#ccc' }}>
         <thead>
           <tr style={{ background: '#1a2a3a' }}>
@@ -160,14 +160,14 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
 
 const MetricCard = ({ label, value, sub, valueColor }) => (
   <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
-    <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 3 }}>{label}</div>
-    <div style={{ fontWeight: 700, fontSize: 13, color: valueColor ?? '#ccc' }}>{value}</div>
-    {sub && <div style={{ color: '#546e7a', fontSize: 9, marginTop: 1 }}>{sub}</div>}
+    <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 4 }}>{label}</div>
+    <div style={{ fontWeight: 700, fontSize: 14, color: valueColor ?? '#ccc' }}>{value}</div>
+    {sub && <div style={{ color: '#546e7a', fontSize: 10, marginTop: 2 }}>{sub}</div>}
   </div>
 )
 
 const SectionTitle = ({ children }) => (
-  <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+  <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10 }}>
     {children}
   </div>
 )
@@ -186,75 +186,75 @@ function DetailSummaryTab({ summary }) {
 
       {/* 왼쪽: 증권사 컨센서스 */}
       <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
-        <SectionTitle>증권사 컨센서스</SectionTitle>
+        <SectionTitle>🏦 증권사 컨센서스</SectionTitle>
         {total > 0 && (
           <>
-            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
+            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 5 }}>
               <div style={{ width: `${Math.round(buy / total * 100)}%`, background: 'linear-gradient(90deg,#1b5e20,#43a047)' }} />
               <div style={{ width: `${Math.round(hold / total * 100)}%`, background: '#424242' }} />
               <div style={{ width: `${Math.round(sell / total * 100)}%`, background: '#b71c1c' }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#888', marginBottom: 12 }}>
-              <span style={{ color: '#81c784' }}>Buy {buy} ({pct(buy)})</span>
-              <span>Hold {hold} ({pct(hold)})</span>
-              <span style={{ color: '#ef9a9a' }}>Sell {sell} ({pct(sell)})</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888', marginBottom: 12 }}>
+              <span style={{ color: '#81c784' }}>🟢 Buy {buy} ({pct(buy)})</span>
+              <span>⬜ Hold {hold} ({pct(hold)})</span>
+              <span style={{ color: '#ef9a9a' }}>🔴 Sell {sell} ({pct(sell)})</span>
             </div>
           </>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <div style={{ background: '#0d1f0d', border: '1px solid #1e3a1e', borderRadius: 6, padding: '8px 10px', gridColumn: '1/-1' }}>
-            <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 3 }}>평균 목표가</div>
+            <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 4 }}>🎯 평균 목표가</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 16, color: '#fff' }}>{fmt(summary.target_mean)}</span>
+              <span style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{fmt(summary.target_mean)}</span>
               {gap != null && (
-                <span style={{ fontSize: 11, color: gap >= 0 ? '#81c784' : '#ef9a9a' }}>
+                <span style={{ fontSize: 12, color: gap >= 0 ? '#81c784' : '#ef9a9a' }}>
                   {gap >= 0 ? '+' : ''}{gap.toFixed(1)}% 상승 여력
                 </span>
               )}
             </div>
           </div>
-          <MetricCard label="최고 목표가" value={fmt(summary.target_high)} valueColor="#81c784" />
-          <MetricCard label="최저 목표가" value={fmt(summary.target_low)} valueColor="#ef9a9a" />
+          <MetricCard label="🔼 최고 목표가" value={fmt(summary.target_high)} valueColor="#81c784" />
+          <MetricCard label="🔽 최저 목표가" value={fmt(summary.target_low)} valueColor="#ef9a9a" />
           <MetricCard
-            label="Finviz 추천지수"
+            label="🌐 Finviz 추천지수"
             value={summary.finviz_recom ?? 'N/A'}
             sub="1=강매수, 5=강매도"
             valueColor={summary.finviz_recom != null && summary.finviz_recom <= 2 ? '#81c784' : '#ccc'}
           />
-          <MetricCard label="애널리스트 수" value={total > 0 ? `${total}명` : 'N/A'} />
+          <MetricCard label="👥 애널리스트 수" value={total > 0 ? `${total}명` : 'N/A'} />
         </div>
       </div>
 
       {/* 오른쪽: 밸류에이션 + 매물대·RSI 현황 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
-          <SectionTitle>밸류에이션</SectionTitle>
+          <SectionTitle>📊 밸류에이션</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
-            <MetricCard label="PER (Trailing)" value={summary.per != null ? summary.per.toFixed(1) : '—'} valueColor="#b0bec5" sub="Trailing" />
-            <MetricCard label="Fwd PER" value={summary.forward_per != null ? summary.forward_per.toFixed(1) : '—'} valueColor="#78909c" sub="Forward" />
-            <MetricCard label="PBR" value={summary.pbr != null ? summary.pbr.toFixed(2) : '—'} valueColor="#78909c" sub="Price/Book" />
+            <MetricCard label="📈 PER" value={summary.per != null ? summary.per.toFixed(1) : '—'} valueColor="#b0bec5" sub="Trailing" />
+            <MetricCard label="🔭 Fwd PER" value={summary.forward_per != null ? summary.forward_per.toFixed(1) : '—'} valueColor="#78909c" sub="Forward" />
+            <MetricCard label="📋 PBR" value={summary.pbr != null ? summary.pbr.toFixed(2) : '—'} valueColor="#78909c" sub="Price/Book" />
           </div>
         </div>
         <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
-          <SectionTitle>매물대 &amp; RSI 현황</SectionTitle>
+          <SectionTitle>📉 매물대 &amp; RSI 현황</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
-              <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 3 }}>POC (Volume Profile)</div>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#80cbc4' }}>{fmt(summary.volume_profile?.poc)}</div>
+              <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 4 }}>🎯 POC</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#80cbc4' }}>{fmt(summary.volume_profile?.poc)}</div>
               {summary.volume_profile?.hvn?.length > 0 && (
-                <div style={{ color: '#81c784', fontSize: 9, marginTop: 2 }}>
-                  HVN {summary.volume_profile.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ')}
+                <div style={{ color: '#81c784', fontSize: 10, marginTop: 3 }}>
+                  🛡 HVN {summary.volume_profile.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ')}
                 </div>
               )}
             </div>
             <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
-              <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 4 }}>RSI 현황</div>
+              <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 6 }}>📈 RSI 현황</div>
               {[
                 { label: '일봉', rsi: summary.daily_rsi?.rsi },
                 { label: '주봉', rsi: summary.weekly_rsi?.rsi },
                 { label: '월봉', rsi: summary.monthly_rsi?.rsi },
               ].map(({ label, rsi }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 1 }}>
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
                   <span style={{ color: '#546e7a' }}>{label}</span>
                   <span style={{ color: rsiColor(rsi), fontWeight: label === '일봉' ? 700 : 400 }}>
                     {rsi != null ? rsi.toFixed(1) : '—'}
@@ -275,20 +275,20 @@ function VolumeProfileCards({ vp }) {
   const lvnStr = vp.lvn?.length ? vp.lvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ') : '—'
   return (
     <div style={{ marginBottom: 14, background: '#111', borderRadius: 6, padding: '10px 12px' }}>
-      <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-        매물대 분석 (Volume Profile, 1년 일봉)
+      <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10 }}>
+        📊 매물대 분석 (Volume Profile, 1년 일봉)
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
         <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 4 }}>POC</div>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#80cbc4' }}>{fmt(vp.poc)}</div>
+          <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 4 }}>🎯 POC</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#80cbc4' }}>{fmt(vp.poc)}</div>
         </div>
         <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ color: '#81c784', fontSize: 9, marginBottom: 4 }}>HVN (지지·저항)</div>
+          <div style={{ color: '#81c784', fontSize: 11, marginBottom: 4 }}>🛡 HVN (지지·저항)</div>
           <div style={{ color: '#81c784', fontSize: 11 }}>{hvnStr}</div>
         </div>
         <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ color: '#ffcc80', fontSize: 9, marginBottom: 4 }}>LVN (매물 공백)</div>
+          <div style={{ color: '#ffcc80', fontSize: 11, marginBottom: 4 }}>⬜ LVN (매물 공백)</div>
           <div style={{ color: '#ffcc80', fontSize: 11 }}>{lvnStr}</div>
         </div>
       </div>
