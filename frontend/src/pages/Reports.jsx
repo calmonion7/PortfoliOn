@@ -158,37 +158,113 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
   )
 }
 
-function ConsensusTable({ summary }) {
+function DetailSummaryTab({ summary }) {
   if (!summary) return null
-  const buy = summary.buy ?? 0
-  const hold = summary.hold ?? 0
-  const sell = summary.sell ?? 0
+  const { buy = 0, hold = 0, sell = 0 } = summary
   const total = buy + hold + sell
-  if (total === 0) return null
-  const pct = (n) => `${Math.round(n / total * 100)}%`
+  const pct = (n) => total > 0 ? `${Math.round(n / total * 100)}%` : '—'
+  const gap = summary.target_mean != null && summary.price != null
+    ? ((summary.target_mean - summary.price) / summary.price * 100)
+    : null
+
+  const MetricCard = ({ label, value, sub, valueColor }) => (
+    <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
+      <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 3 }}>{label}</div>
+      <div style={{ fontWeight: 700, fontSize: 13, color: valueColor ?? '#ccc' }}>{value}</div>
+      {sub && <div style={{ color: '#546e7a', fontSize: 9, marginTop: 1 }}>{sub}</div>}
+    </div>
+  )
+
+  const SectionTitle = ({ children }) => (
+    <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+      {children}
+    </div>
+  )
+
   return (
-    <div style={{ marginBottom: 16, overflowX: 'auto', background: '#111', borderRadius: 6, padding: '10px 12px' }}>
-      <div style={{ color: '#80cbc4', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>증권사 컨센서스</div>
-      <table style={{ borderCollapse: 'collapse', fontSize: 12, color: '#ccc' }}>
-        <thead>
-          <tr style={{ background: '#1a2a3a' }}>
-            <th style={{ ...TH, color: '#81c784' }}>Buy</th>
-            <th style={TH}>Hold</th>
-            <th style={{ ...TH, color: '#ef9a9a' }}>Sell</th>
-            <th style={TH}>Finviz</th>
-            <th style={TH}>평균목표가</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, color: '#81c784' }}>{buy}({pct(buy)})</td>
-            <td style={TD}>{hold}({pct(hold)})</td>
-            <td style={{ ...TD, color: '#ef9a9a' }}>{sell}({pct(sell)})</td>
-            <td style={TD}>{summary.finviz_recom ?? 'N/A'}</td>
-            <td style={TD}>{fmt(summary.target_mean)}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+      {/* 왼쪽: 증권사 컨센서스 */}
+      <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
+        <SectionTitle>증권사 컨센서스</SectionTitle>
+        {total > 0 && (
+          <>
+            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
+              <div style={{ width: `${Math.round(buy / total * 100)}%`, background: 'linear-gradient(90deg,#1b5e20,#43a047)' }} />
+              <div style={{ width: `${Math.round(hold / total * 100)}%`, background: '#424242' }} />
+              <div style={{ width: `${Math.round(sell / total * 100)}%`, background: '#b71c1c' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#888', marginBottom: 12 }}>
+              <span style={{ color: '#81c784' }}>Buy {buy} ({pct(buy)})</span>
+              <span>Hold {hold} ({pct(hold)})</span>
+              <span style={{ color: '#ef9a9a' }}>Sell {sell} ({pct(sell)})</span>
+            </div>
+          </>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <div style={{ background: '#0d1f0d', border: '1px solid #1e3a1e', borderRadius: 6, padding: '8px 10px', gridColumn: '1/-1' }}>
+            <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 3 }}>평균 목표가</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 16, color: '#fff' }}>{fmt(summary.target_mean)}</span>
+              {gap != null && (
+                <span style={{ fontSize: 11, color: gap >= 0 ? '#81c784' : '#ef9a9a' }}>
+                  {gap >= 0 ? '+' : ''}{gap.toFixed(1)}% 상승 여력
+                </span>
+              )}
+            </div>
+          </div>
+          <MetricCard label="최고 목표가" value={fmt(summary.target_high)} valueColor="#81c784" />
+          <MetricCard label="최저 목표가" value={fmt(summary.target_low)} valueColor="#ef9a9a" />
+          <MetricCard
+            label="Finviz 추천지수"
+            value={summary.finviz_recom ?? 'N/A'}
+            sub="1=강매수, 5=강매도"
+            valueColor={summary.finviz_recom != null && summary.finviz_recom <= 2 ? '#81c784' : '#ccc'}
+          />
+          <MetricCard label="애널리스트 수" value={total > 0 ? `${total}명` : 'N/A'} />
+        </div>
+      </div>
+
+      {/* 오른쪽: 밸류에이션 + 매물대·RSI 현황 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
+          <SectionTitle>밸류에이션</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+            <MetricCard label="PER (Trailing)" value={summary.per != null ? summary.per.toFixed(1) : '—'} valueColor="#b0bec5" sub="Trailing" />
+            <MetricCard label="Fwd PER" value={summary.forward_per != null ? summary.forward_per.toFixed(1) : '—'} valueColor="#78909c" sub="Forward" />
+            <MetricCard label="PBR" value={summary.pbr != null ? summary.pbr.toFixed(2) : '—'} valueColor="#78909c" sub="Price/Book" />
+          </div>
+        </div>
+        <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
+          <SectionTitle>매물대 &amp; RSI 현황</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
+              <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 3 }}>POC (Volume Profile)</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#80cbc4' }}>{fmt(summary.volume_profile?.poc)}</div>
+              {summary.volume_profile?.hvn?.length > 0 && (
+                <div style={{ color: '#81c784', fontSize: 9, marginTop: 2 }}>
+                  HVN {summary.volume_profile.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ')}
+                </div>
+              )}
+            </div>
+            <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
+              <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 4 }}>RSI 현황</div>
+              {[
+                { label: '일봉', rsi: summary.daily_rsi?.rsi },
+                { label: '주봉', rsi: summary.weekly_rsi?.rsi },
+                { label: '월봉', rsi: summary.monthly_rsi?.rsi },
+              ].map(({ label, rsi }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 1 }}>
+                  <span style={{ color: '#546e7a' }}>{label}</span>
+                  <span style={{ color: rsiColor(rsi), fontWeight: label === '일봉' ? 700 : 400 }}>
+                    {rsi != null ? rsi.toFixed(1) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -570,7 +646,11 @@ export default function Reports() {
             </div>
 
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
-            {!loading && detail.summary && <ConsensusTable summary={detail.summary} />}
+            {!loading && activeDetailTab === 'summary' && (
+              detail.summary
+                ? <DetailSummaryTab summary={detail.summary} />
+                : <p style={{ color: '#666', fontSize: 13 }}>요약 데이터가 없습니다.</p>
+            )}}
             {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} weeklyRsi={detail.summary.weekly_rsi} monthlyRsi={detail.summary.monthly_rsi} price={detail.summary.price} />}
             {!loading && detail.summary?.volume_profile && <VolumeProfileTable vp={detail.summary.volume_profile} />}
             {!loading && detail.content && <MarkdownViewer content={detail.content} ticker={selected.ticker} />}
