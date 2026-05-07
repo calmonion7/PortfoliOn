@@ -88,16 +88,16 @@ def test_generate_report_creates_markdown_file(tmp_path):
     assert md_path.endswith(".md")
     content = Path(md_path).read_text(encoding="utf-8")
     assert "Test Corp" in content
-    assert "① 사업영역" in content
-    assert "② 매출" in content
-    assert "③ 증권사" in content
-    assert "④ 경제적 해자" in content
+    assert "1️⃣ 사업영역" in content
+    assert "2️⃣ 매출" in content
+    assert "3️⃣ 증권사" in content
+    assert "4️⃣ 경제적 해자" in content
     assert "Strong brand" in content
-    assert "⑤ 장기 성장 계획" in content
+    assert "5️⃣ 장기 성장 계획" in content
     assert "Expand to Asia" in content
-    assert "⑥ 최근 공시" in content
-    assert "⑦ 매수/매도" in content
-    assert "⑧ 매물대" in content
+    assert "6️⃣ 최근 공시" in content
+    assert "7️⃣ 매수/매도" in content
+    assert "8️⃣ 매물대" in content
 
 def test_generate_report_saves_json_summary(tmp_path):
     with contextlib.ExitStack() as stack:
@@ -157,7 +157,7 @@ def test_generate_report_section8_includes_volume_profile(tmp_path):
         import importlib; importlib.reload(report_generator)
         md_path = report_generator.generate_report(SAMPLE_STOCK, tmp_path)
     content = Path(md_path).read_text(encoding="utf-8")
-    assert "⑧ 매물대" in content
+    assert "8️⃣ 매물대" in content
     assert "$115.00" in content
     assert "$95.00" in content
 

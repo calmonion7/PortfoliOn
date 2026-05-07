@@ -70,16 +70,15 @@ def test_update_stock_modifies_holdings_and_stocks():
     assert saved_stocks[0]["moat"] == "Brand"
 
 
-def test_delete_stock_removes_from_holdings_and_stocks_when_not_in_watchlist():
+def test_delete_stock_removes_from_holdings_and_adds_to_watchlist():
     with patch("routers.portfolio.storage.get_holdings", return_value=list(SAMPLE_HOLDINGS)), \
          patch("routers.portfolio.storage.get_watchlist_tickers", return_value=[]), \
-         patch("routers.portfolio.storage.get_stocks", return_value=list(SAMPLE_STOCKS)), \
          patch("routers.portfolio.storage.save_holdings") as mock_save_holdings, \
-         patch("routers.portfolio.storage.save_stocks") as mock_save_stocks:
+         patch("routers.portfolio.storage.save_watchlist_tickers") as mock_save_watchlist:
         resp = client.delete("/api/portfolio/NFLX")
     assert resp.status_code == 200
     assert mock_save_holdings.call_args[0][0] == []
-    assert mock_save_stocks.call_args[0][0] == []
+    assert "NFLX" in mock_save_watchlist.call_args[0][0]
 
 
 def test_delete_stock_keeps_stock_data_when_in_watchlist():
