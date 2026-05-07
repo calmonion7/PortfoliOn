@@ -403,7 +403,12 @@ export default function Reports() {
             onClick={() => toggleTicker(ticker)}
           >
             <span style={{ color: '#546e7a', fontSize: 9, flexShrink: 0 }}>{isExpanded ? '▼' : '▶'}</span>
-            <span style={{ color: '#80cbc4', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticker}</span>
+            <div style={{ minWidth: 0 }}>
+              <span style={{ color: '#80cbc4', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
+              {info.summary?.name && (
+                <div style={{ color: '#546e7a', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
+              )}
+            </div>
           </div>
           <button
             onClick={() => generateOne(ticker)}
