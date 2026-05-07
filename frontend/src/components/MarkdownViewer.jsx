@@ -2,12 +2,11 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 export default function MarkdownViewer({ content, ticker }) {
-  const processedContent = ticker
-    ? content.replace(
-        /!\[([^\]]*)\]\(\.\/([^)]+)\)/g,
-        `![$1](http://localhost:8000/reports/${ticker}/$2)`
-      )
+  const CIRCLE_TO_EMOJI = { '①':'1️⃣','②':'2️⃣','③':'3️⃣','④':'4️⃣','⑤':'5️⃣','⑥':'6️⃣','⑦':'7️⃣','⑧':'8️⃣','⑨':'9️⃣','⑩':'🔟' }
+  const processedContent = (ticker
+    ? content.replace(/!\[([^\]]*)\]\(\.\/([^)]+)\)/g, `![$1](http://localhost:8000/reports/${ticker}/$2)`)
     : content
+  ).replace(/[①-⑩]/g, c => CIRCLE_TO_EMOJI[c] ?? c)
 
   return (
     <div style={{ lineHeight: 1.8, maxWidth: 900, fontSize: 14, color: '#ccc' }}>

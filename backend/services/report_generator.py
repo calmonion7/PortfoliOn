@@ -101,7 +101,7 @@ def _header(stock: dict, quote: dict, today: str) -> str:
 def _section1(quote: dict, competitor_quotes: list[dict]) -> str:
     rows = [quote] + competitor_quotes
     lines = [
-        "## ① 사업영역 & 시장순위\n",
+        "## 1️⃣ 사업영역 & 시장순위\n",
         "| 종목 | 티커 | 현재가 | 시가총액 | YTD 수익률 |",
         "|---|---|---|---|---|",
     ]
@@ -114,7 +114,7 @@ def _section1(quote: dict, competitor_quotes: list[dict]) -> str:
 
 def _section2(financials: list[dict]) -> str:
     lines = [
-        "## ② 매출/영업이익 추이 (최근 4분기)\n",
+        "## 2️⃣ 매출/영업이익 추이 (최근 4분기)\n",
         "| 분기 | 매출 | 영업이익 |",
         "|---|---|---|",
     ]
@@ -132,7 +132,7 @@ def _section3(analyst: dict, finviz: dict) -> str:
     target = analyst.get("target_mean") or finviz.get("finviz_target")
     total = (analyst.get("buy", 0) + analyst.get("hold", 0) + analyst.get("sell", 0)) or 1
     lines = [
-        "## ③ 증권사 컨센서스\n",
+        "## 3️⃣ 증권사 컨센서스\n",
         "| 항목 | 값 |",
         "|---|---|",
         f"| 평균 목표가 | ${target:.2f} |" if target else "| 평균 목표가 | N/A |",
@@ -147,13 +147,13 @@ def _section3(analyst: dict, finviz: dict) -> str:
     return "\n".join(lines)
 
 def _section4(stock: dict) -> str:
-    return f"## ④ 경제적 해자\n\n{stock.get('moat', '정보 없음')}"
+    return f"## 4️⃣ 경제적 해자\n\n{stock.get('moat', '정보 없음')}"
 
 def _section5(stock: dict) -> str:
-    return f"## ⑤ 장기 성장 계획\n\n{stock.get('growth_plan', '정보 없음')}"
+    return f"## 5️⃣ 장기 성장 계획\n\n{stock.get('growth_plan', '정보 없음')}"
 
 def _section6(quote: dict, news: list[dict]) -> str:
-    lines = ["## ⑥ 최근 공시 & 주가 영향\n"]
+    lines = ["## 6️⃣ 최근 공시 & 주가 영향\n"]
     if quote.get("prev_close"):
         lines.append(f"**어제 종가:** ${quote['prev_close']:.2f}  |  **전일 대비:** {quote.get('daily_change', 'N/A')}\n")
     lines.append("### 최근 뉴스\n")
@@ -166,7 +166,7 @@ def _section6(quote: dict, news: list[dict]) -> str:
 
 def _section7(timeframe_rsi: dict, sr: dict) -> str:
     lines = [
-        "## ⑦ 매수/매도 타점\n",
+        "## 7️⃣ 매수/매도 타점\n",
         "### RSI 현황\n",
         "| 시간대 | 현재 RSI | RSI20 | RSI25 | RSI30 | RSI70 | RSI75 | RSI80 |",
         "|---|---|---|---|---|---|---|---|",
@@ -201,7 +201,7 @@ def _section8(vp: dict) -> str:
     hvn_str = " / ".join(f"${v:.2f}" for v in vp.get("hvn", [])) or "N/A"
     lvn_str = " / ".join(f"${v:.2f}" for v in vp.get("lvn", [])) or "N/A"
     lines = [
-        "## ⑧ 매물대 분석 (Volume Profile, 1년 일봉)\n",
+        "## 8️⃣ 매물대 분석 (Volume Profile, 1년 일봉)\n",
         "| POC | HVN (지지·저항 후보) | LVN (매물 공백) |",
         "|---|---|---|",
         f"| {poc} | {hvn_str} | {lvn_str} |",
