@@ -51,7 +51,7 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         _section3(analyst, finviz),
         _section4(stock),
         _section5(stock),
-        _section6(quote, news),
+        _section6(quote, news, stock.get("recent_disclosures", "")),
         _section7(timeframe_rsi, sr),
         _section8(vp),
     ]
@@ -152,10 +152,12 @@ def _section4(stock: dict) -> str:
 def _section5(stock: dict) -> str:
     return f"## 5️⃣ 장기 성장 계획\n\n{stock.get('growth_plan', '정보 없음')}"
 
-def _section6(quote: dict, news: list[dict]) -> str:
+def _section6(quote: dict, news: list[dict], recent_disclosures: str = "") -> str:
     lines = ["## 6️⃣ 최근 공시 & 주가 영향\n"]
     if quote.get("prev_close"):
         lines.append(f"**어제 종가:** ${quote['prev_close']:.2f}  |  **전일 대비:** {quote.get('daily_change', 'N/A')}\n")
+    if recent_disclosures:
+        lines += ["### AI 분석\n", recent_disclosures, ""]
     lines.append("### 최근 뉴스\n")
     if not news:
         lines.append("_(뉴스 없음)_")

@@ -13,6 +13,7 @@ SAMPLE_STOCK = {
     "competitors": [],
     "moat": "Strong brand",
     "growth_plan": "Expand to Asia",
+    "recent_disclosures": "Q1 실적 호조",
 }
 
 def _mock_all():
@@ -159,3 +160,19 @@ def test_generate_report_section8_includes_volume_profile(tmp_path):
     assert "⑧ 매물대" in content
     assert "$115.00" in content
     assert "$95.00" in content
+
+def test_section6_includes_recent_disclosures_when_provided():
+    from services.report_generator import _section6
+    quote = {"prev_close": 118.0, "daily_change": "+1.69%"}
+    news = [{"title": "Test news", "link": "http://x.com", "publisher": "Reuters", "published_at": "2026-05-07"}]
+    result = _section6(quote, news, recent_disclosures="Q1 실적 호조: EPS 예상치 상회")
+    assert "AI 분석" in result
+    assert "Q1 실적 호조" in result
+    assert "Test news" in result
+
+
+def test_section6_skips_ai_section_when_empty():
+    from services.report_generator import _section6
+    quote = {}
+    result = _section6(quote, [], recent_disclosures="")
+    assert "AI 분석" not in result
