@@ -384,7 +384,18 @@ export default function Reports() {
       return false
     })
     .sort(([, a], [, b]) => {
+      const gapOf = (s) => {
+        const t = s.summary?.target_mean, p = s.summary?.price
+        return t != null && p ? (t - p) / p * 100 : null
+      }
       if (activeTab === 'holdings') {
+        // 1차 평균목표가 비율 낮은순, 2차 RSI 일봉 높은순
+        const gapA = gapOf(a), gapB = gapOf(b)
+        if (gapA !== gapB) {
+          if (gapA === null) return 1
+          if (gapB === null) return -1
+          return gapA - gapB
+        }
         const rsiA = a.summary?.daily_rsi?.rsi ?? null
         const rsiB = b.summary?.daily_rsi?.rsi ?? null
         if (rsiA === null && rsiB === null) return 0
@@ -393,10 +404,6 @@ export default function Reports() {
         return rsiB - rsiA
       }
       // 관심종목: 1차 평균목표가 비율 높은순, 2차 RSI 일봉 낮은순
-      const gapOf = (s) => {
-        const t = s.summary?.target_mean, p = s.summary?.price
-        return t != null && p ? (t - p) / p * 100 : null
-      }
       const gapA = gapOf(a), gapB = gapOf(b)
       if (gapA !== gapB) {
         if (gapA === null) return 1
