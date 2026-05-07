@@ -384,12 +384,31 @@ export default function Reports() {
       return false
     })
     .sort(([, a], [, b]) => {
+      if (activeTab === 'holdings') {
+        const rsiA = a.summary?.daily_rsi?.rsi ?? null
+        const rsiB = b.summary?.daily_rsi?.rsi ?? null
+        if (rsiA === null && rsiB === null) return 0
+        if (rsiA === null) return 1
+        if (rsiB === null) return -1
+        return rsiB - rsiA
+      }
+      // 관심종목: 1차 평균목표가 비율 높은순, 2차 RSI 일봉 낮은순
+      const gapOf = (s) => {
+        const t = s.summary?.target_mean, p = s.summary?.price
+        return t != null && p ? (t - p) / p * 100 : null
+      }
+      const gapA = gapOf(a), gapB = gapOf(b)
+      if (gapA !== gapB) {
+        if (gapA === null) return 1
+        if (gapB === null) return -1
+        return gapB - gapA
+      }
       const rsiA = a.summary?.daily_rsi?.rsi ?? null
       const rsiB = b.summary?.daily_rsi?.rsi ?? null
       if (rsiA === null && rsiB === null) return 0
       if (rsiA === null) return 1
       if (rsiB === null) return -1
-      return activeTab === 'holdings' ? rsiB - rsiA : rsiA - rsiB
+      return rsiA - rsiB
     })
   const otherEntries = Object.entries(reportList).filter(([, v]) => v.category === 'other')
 
