@@ -7,70 +7,376 @@
         "NVO"
       ],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "TSLA",
       "name": "테슬라",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "LHX",
       "name": "L3 해리스 테크놀로지스",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "PLTR",
       "name": "팔란티어 테크",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "AVAV",
       "name": "에어로바이런먼트",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "FSLR",
       "name": "퍼스트 솔라",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "RTX",
       "name": "RTX",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "FCX",
       "name": "프리포트 맥모란",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "NFLX",
       "name": "넷플릭스",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
     },
     {
       "ticker": "TEM",
       "name": "템퍼스 AI",
       "competitors": [],
       "moat": "",
-      "growth_plan": ""
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "CCJ",
+      "name": "카메코",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "BWXT",
+      "name": "BWX 테크놀로지스",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "SMR",
+      "name": "뉴스케일 파워",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "LEU",
+      "name": "센트러스 에너지",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "BE",
+      "name": "블룸 에너지",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "GEV",
+      "name": "GE베르노바",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "LNG",
+      "name": "셰니어 에너지",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "EQT",
+      "name": "EQT",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "PLUG",
+      "name": "플러그 파워",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "MOG.A",
+      "name": "무그 A",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "RKLB",
+      "name": "로켓 랩",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "ADI",
+      "name": "애널로그 디바이시스",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "QRVO",
+      "name": "코보",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "VRT",
+      "name": "버티브 홀딩스",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "GOOGL",
+      "name": "알파벳 A",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "AMZN",
+      "name": "아마존닷컴",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "AAPL",
+      "name": "애플",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "META",
+      "name": "메타 플랫폼스",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "ALNY",
+      "name": "앨나일램 파머슈티컬스",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "MSFT",
+      "name": "마이크로소프트",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "NOC",
+      "name": "노스롭 그루만",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "LMT",
+      "name": "록히드 마틴",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "AMD",
+      "name": "AMD",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "ARM",
+      "name": "에이알엠 홀딩스",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "TSM",
+      "name": "TSMC",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "INTC",
+      "name": "인텔",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "MU",
+      "name": "마이크론 테크놀로지",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "NVDA",
+      "name": "엔비디아",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "SNDK",
+      "name": "샌디스크",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "NVTS",
+      "name": "나비타스 세미컨덕터",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "RGTI",
+      "name": "리게티 컴퓨팅",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "IONQ",
+      "name": "아이온큐",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "QS",
+      "name": "퀀텀스케이프",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "SLDP",
+      "name": "솔리드 파워",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "O",
+      "name": "리얼티 인컴",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "EXPE",
+      "name": "익스피디아 그룹",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
+    },
+    {
+      "ticker": "NVO",
+      "name": "노보노디스크",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": "",
+      "recent_disclosures": ""
     }
   ]
 }
