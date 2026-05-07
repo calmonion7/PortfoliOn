@@ -158,6 +158,20 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
   )
 }
 
+const MetricCard = ({ label, value, sub, valueColor }) => (
+  <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
+    <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 3 }}>{label}</div>
+    <div style={{ fontWeight: 700, fontSize: 13, color: valueColor ?? '#ccc' }}>{value}</div>
+    {sub && <div style={{ color: '#546e7a', fontSize: 9, marginTop: 1 }}>{sub}</div>}
+  </div>
+)
+
+const SectionTitle = ({ children }) => (
+  <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+    {children}
+  </div>
+)
+
 function DetailSummaryTab({ summary }) {
   if (!summary) return null
   const { buy = 0, hold = 0, sell = 0 } = summary
@@ -166,20 +180,6 @@ function DetailSummaryTab({ summary }) {
   const gap = summary.target_mean != null && summary.price != null
     ? ((summary.target_mean - summary.price) / summary.price * 100)
     : null
-
-  const MetricCard = ({ label, value, sub, valueColor }) => (
-    <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
-      <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 3 }}>{label}</div>
-      <div style={{ fontWeight: 700, fontSize: 13, color: valueColor ?? '#ccc' }}>{value}</div>
-      {sub && <div style={{ color: '#546e7a', fontSize: 9, marginTop: 1 }}>{sub}</div>}
-    </div>
-  )
-
-  const SectionTitle = ({ children }) => (
-    <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-      {children}
-    </div>
-  )
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -650,7 +650,7 @@ export default function Reports() {
               detail.summary
                 ? <DetailSummaryTab summary={detail.summary} />
                 : <p style={{ color: '#666', fontSize: 13 }}>요약 데이터가 없습니다.</p>
-            )}}
+            )}
             {!loading && activeDetailTab === 'technical' && (
               detail.summary?.daily_rsi
                 ? (
