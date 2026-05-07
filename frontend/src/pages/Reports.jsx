@@ -309,6 +309,16 @@ export default function Reports() {
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [activeDetailTab, setActiveDetailTab] = useState('summary')
+  const [expandedTickers, setExpandedTickers] = useState(new Set())
+
+  const toggleTicker = (ticker) => {
+    setExpandedTickers(prev => {
+      const next = new Set(prev)
+      if (next.has(ticker)) next.delete(ticker)
+      else next.add(ticker)
+      return next
+    })
+  }
 
   const fetchList = useCallback(() => {
     axios.get('/api/report/list').then(({ data }) => setReportList(data))
@@ -383,36 +393,45 @@ export default function Reports() {
     })
   const otherEntries = Object.entries(reportList).filter(([, v]) => v.category === 'other')
 
-  const renderTickerItem = (ticker, info) => (
-    <div key={ticker} style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ color: '#80cbc4', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
-        <button
-          onClick={() => generateOne(ticker)}
-          disabled={!!generating}
-          style={{ background: 'transparent', border: '1px solid #444', color: generating === ticker ? '#4fc3f7' : generating ? '#555' : '#aaa', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer' }}
-        >
-          {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
-        </button>
-      </div>
-      {generating === ticker && genProgress.total > 0 && (
-        <div style={{ marginBottom: 4 }}>
-          <div style={{ background: '#2a2a3a', borderRadius: 2, height: 3, overflow: 'hidden' }}>
-            <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: '#4fc3f7', transition: 'width 0.4s ease' }} />
+  const renderTickerItem = (ticker, info) => {
+    const isExpanded = expandedTickers.has(ticker)
+    return (
+      <div key={ticker} style={{ marginBottom: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isExpanded ? 4 : 0 }}>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flex: 1, minWidth: 0 }}
+            onClick={() => toggleTicker(ticker)}
+          >
+            <span style={{ color: '#546e7a', fontSize: 9, flexShrink: 0 }}>{isExpanded ? '▼' : '▶'}</span>
+            <span style={{ color: '#80cbc4', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticker}</span>
           </div>
+          <button
+            onClick={() => generateOne(ticker)}
+            disabled={!!generating}
+            style={{ background: 'transparent', border: '1px solid #444', color: generating === ticker ? '#4fc3f7' : generating ? '#555' : '#aaa', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
+          >
+            {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+          </button>
         </div>
-      )}
-      {info.dates.map(date => (
-        <div
-          key={date}
-          onClick={() => openDetail(ticker, date)}
-          style={{ padding: '3px 8px', cursor: 'pointer', borderRadius: 4, fontSize: 12, background: selected.ticker === ticker && selected.date === date && view === 'detail' ? '#1565c0' : 'transparent', color: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'white' : '#aaa' }}
-        >
-          {date}
-        </div>
-      ))}
-    </div>
-  )
+        {generating === ticker && genProgress.total > 0 && (
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ background: '#2a2a3a', borderRadius: 2, height: 3, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: '#4fc3f7', transition: 'width 0.4s ease' }} />
+            </div>
+          </div>
+        )}
+        {isExpanded && info.dates.map(date => (
+          <div
+            key={date}
+            onClick={() => openDetail(ticker, date)}
+            style={{ padding: '3px 8px', cursor: 'pointer', borderRadius: 4, fontSize: 12, background: selected.ticker === ticker && selected.date === date && view === 'detail' ? '#1565c0' : 'transparent', color: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'white' : '#aaa' }}
+          >
+            {date}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', gap: 24, height: 'calc(100vh - 120px)' }}>
