@@ -269,29 +269,29 @@ function DetailSummaryTab({ summary }) {
   )
 }
 
-function VolumeProfileTable({ vp }) {
+function VolumeProfileCards({ vp }) {
   if (!vp || vp.poc == null) return null
-  const hvnStr = vp.hvn?.length ? vp.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ') : 'N/A'
-  const lvnStr = vp.lvn?.length ? vp.lvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ') : 'N/A'
+  const hvnStr = vp.hvn?.length ? vp.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ') : '—'
+  const lvnStr = vp.lvn?.length ? vp.lvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ') : '—'
   return (
-    <div style={{ marginBottom: 16, overflowX: 'auto', background: '#111', borderRadius: 6, padding: '10px 12px' }}>
-      <div style={{ color: '#80cbc4', fontWeight: 600, fontSize: 12, marginBottom: 8 }}>매물대 분석 (Volume Profile, 1년 일봉)</div>
-      <table style={{ borderCollapse: 'collapse', fontSize: 12, color: '#ccc' }}>
-        <thead>
-          <tr style={{ background: '#1a2a3a' }}>
-            <th style={TH}>POC</th>
-            <th style={{ ...TH, color: '#81c784' }}>HVN (지지·저항)</th>
-            <th style={{ ...TH, color: '#ffcc80' }}>LVN (매물 공백)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, fontWeight: 600 }}>{fmt(vp.poc)}</td>
-            <td style={{ ...TD, color: '#81c784' }}>{hvnStr}</td>
-            <td style={{ ...TD, color: '#ffcc80' }}>{lvnStr}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div style={{ marginBottom: 14, background: '#111', borderRadius: 6, padding: '10px 12px' }}>
+      <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+        매물대 분석 (Volume Profile, 1년 일봉)
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+        <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ color: '#546e7a', fontSize: 9, marginBottom: 4 }}>POC</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#80cbc4' }}>{fmt(vp.poc)}</div>
+        </div>
+        <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ color: '#81c784', fontSize: 9, marginBottom: 4 }}>HVN (지지·저항)</div>
+          <div style={{ color: '#81c784', fontSize: 11 }}>{hvnStr}</div>
+        </div>
+        <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ color: '#ffcc80', fontSize: 9, marginBottom: 4 }}>LVN (매물 공백)</div>
+          <div style={{ color: '#ffcc80', fontSize: 11 }}>{lvnStr}</div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -651,9 +651,26 @@ export default function Reports() {
                 ? <DetailSummaryTab summary={detail.summary} />
                 : <p style={{ color: '#666', fontSize: 13 }}>요약 데이터가 없습니다.</p>
             )}}
-            {!loading && detail.summary?.daily_rsi && <RsiTable dailyRsi={detail.summary.daily_rsi} weeklyRsi={detail.summary.weekly_rsi} monthlyRsi={detail.summary.monthly_rsi} price={detail.summary.price} />}
-            {!loading && detail.summary?.volume_profile && <VolumeProfileTable vp={detail.summary.volume_profile} />}
-            {!loading && detail.content && <MarkdownViewer content={detail.content} ticker={selected.ticker} />}
+            {!loading && activeDetailTab === 'technical' && (
+              detail.summary?.daily_rsi
+                ? (
+                  <>
+                    <RsiTable
+                      dailyRsi={detail.summary.daily_rsi}
+                      weeklyRsi={detail.summary.weekly_rsi}
+                      monthlyRsi={detail.summary.monthly_rsi}
+                      price={detail.summary.price}
+                    />
+                    <VolumeProfileCards vp={detail.summary.volume_profile} />
+                  </>
+                )
+                : <p style={{ color: '#666', fontSize: 13 }}>기술적 분석 데이터가 없습니다.</p>
+            )}
+            {!loading && activeDetailTab === 'report' && (
+              detail.content
+                ? <MarkdownViewer content={detail.content} ticker={selected.ticker} />
+                : <p style={{ color: '#666', fontSize: 13 }}>리포트 파일이 없습니다.</p>
+            )}
           </div>
         )}
       </div>
