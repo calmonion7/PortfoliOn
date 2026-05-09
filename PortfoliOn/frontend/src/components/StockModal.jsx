@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import axios from 'axios'
 
 const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
 const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
@@ -7,8 +8,101 @@ const INPUT_STYLE = {
   width: '100%', padding: '6px 10px', background: '#0d1117',
   border: '1px solid #2a3a4a', borderRadius: 4, color: '#ccc', fontSize: 13, boxSizing: 'border-box',
 }
-const SELECT_STYLE = {
-  ...INPUT_STYLE, cursor: 'pointer',
+
+function useDebounce(value, delay) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(t)
+  }, [value, delay])
+  return debounced
+}
+
+function SearchBox({ market, onSelect }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+  const debouncedQuery = useDebounce(query, 350)
+  const boxRef = useRef(null)
+
+  useEffect(() => {
+    if (!debouncedQuery.trim()) { setResults([]); setOpen(false); return }
+    setLoading(true)
+    axios.get('/api/stocks/search', { params: { q: debouncedQuery, market } })
+      .then(r => { setResults(r.data); setOpen(r.data.length > 0) })
+      .catch(() => setResults([]))
+      .finally(() => setLoading(false))
+  }, [debouncedQuery, market])
+
+  useEffect(() => {
+    const handler = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleSelect = (item) => {
+    onSelect(item)
+    setQuery(item.name)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={boxRef} style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <input
+          type="text"
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => results.length > 0 && setOpen(true)}
+          placeholder="종목명 또는 티커로 검색..."
+          style={{ ...INPUT_STYLE, paddingRight: 32 }}
+          autoComplete="off"
+        />
+        <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#546e7a', fontSize: 14, pointerEvents: 'none' }}>
+          {loading ? '⏳' : '🔍'}
+        </span>
+      </div>
+      {open && results.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9999,
+          background: '#1a1a2e', border: '1px solid #2a3a5a', borderRadius: 4,
+          maxHeight: 240, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+          marginTop: 2,
+        }}>
+          {results.map((item, i) => (
+            <div
+              key={i}
+              onMouseDown={() => handleSelect(item)}
+              style={{
+                padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #1e2a3a',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#1e2a4a'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <span style={{
+                fontSize: 9, padding: '1px 4px', borderRadius: 2, flexShrink: 0,
+                background: item.market === 'KR' ? '#1a3a2a' : '#1a2a3a',
+                color: item.market === 'KR' ? '#81c784' : '#4fc3f7',
+                border: `1px solid ${item.market === 'KR' ? '#2e5a3a' : '#2a4a6a'}`,
+              }}>
+                {item.market === 'KR' ? '🇰🇷' : '🇺🇸'}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: '#e0e0e0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.name}
+                </div>
+                <div style={{ fontSize: 10, color: '#546e7a', marginTop: 1 }}>
+                  {item.ticker}{item.exchange ? `.${item.exchange}` : ''} · {item.exchange_display}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function StockModal({ stock, onSave, onClose, mode = 'holding' }) {
@@ -29,6 +123,16 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
   const handleMarketChange = (e) => {
     const m = e.target.value
     setForm(f => ({ ...f, market: m, exchange: m === 'KR' ? (f.exchange || 'KS') : '' }))
+  }
+
+  const handleSearchSelect = (item) => {
+    setForm(f => ({
+      ...f,
+      ticker: item.ticker,
+      name: item.name,
+      market: item.market,
+      exchange: item.exchange || '',
+    }))
   }
 
   const handleSubmit = (e) => {
@@ -53,20 +157,26 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
   }
 
   const isKR = form.market === 'KR'
-  const currency = isKR ? '₩' : '$'
-  const tickerPlaceholder = isKR ? '6자리 종목코드 (예: 005930)' : '티커 (예: NFLX)'
-  const costLabel = isKR ? `평균 매입가 (${currency})` : `평균 매입가 (${currency})`
+  const title = mode === 'watchlist' ? (isEdit ? '관심종목 수정' : '관심종목 추가') : (isEdit ? '종목 수정' : '종목 추가')
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h2>{mode === 'watchlist' ? (isEdit ? '관심종목 수정' : '관심종목 추가') : (isEdit ? '종목 수정' : '종목 추가')}</h2>
+        <h2>{title}</h2>
         <form onSubmit={handleSubmit}>
+
+          {/* 종목 검색 (신규 추가 시에만) */}
+          {!isEdit && (
+            <div className="form-field">
+              <label>종목 검색</label>
+              <SearchBox market={form.market} onSelect={handleSearchSelect} />
+            </div>
+          )}
 
           {/* 시장 선택 */}
           <div className="form-field">
             <label>시장</label>
-            <select value={form.market} onChange={handleMarketChange} style={SELECT_STYLE} disabled={isEdit}>
+            <select value={form.market} onChange={handleMarketChange} style={INPUT_STYLE} disabled={isEdit}>
               <option value="US">🇺🇸 미국 주식 (US)</option>
               <option value="KR">🇰🇷 국내 주식 (KR)</option>
             </select>
@@ -76,7 +186,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
           {isKR && (
             <div className="form-field">
               <label>거래소</label>
-              <select value={form.exchange || 'KS'} onChange={set('exchange')} style={SELECT_STYLE} disabled={isEdit}>
+              <select value={form.exchange || 'KS'} onChange={set('exchange')} style={INPUT_STYLE} disabled={isEdit}>
                 <option value="KS">KOSPI (.KS)</option>
                 <option value="KQ">KOSDAQ (.KQ)</option>
               </select>
@@ -92,7 +202,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
               onChange={set('ticker')}
               required
               disabled={isEdit}
-              placeholder={tickerPlaceholder}
+              placeholder={isKR ? '6자리 종목코드 (예: 005930)' : '티커 (예: NFLX)'}
               style={INPUT_STYLE}
               maxLength={isKR ? 6 : undefined}
             />
@@ -112,7 +222,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
                 <input type="number" value={form.quantity} onChange={set('quantity')} required step="0.01" style={INPUT_STYLE} />
               </div>
               <div className="form-field">
-                <label>{costLabel}</label>
+                <label>평균 매입가 ({isKR ? '₩' : '$'})</label>
                 <input type="number" value={form.avg_cost} onChange={set('avg_cost')} required step={isKR ? '1' : '0.01'} style={INPUT_STYLE} />
               </div>
             </>
