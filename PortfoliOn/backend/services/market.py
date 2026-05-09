@@ -1,9 +1,35 @@
 import yfinance as yf
 import pandas as pd
 
-def get_quote(ticker: str) -> dict:
+
+def _yf_sym(ticker: str, market: str = "US", exchange: str = "") -> str:
+    if market == "KR":
+        suffix = exchange if exchange else "KS"
+        return f"{ticker}.{suffix}"
+    return ticker.replace(".", "-")
+
+
+def _fmt_price(price, market: str = "US") -> str:
+    if price is None:
+        return "N/A"
+    if market == "KR":
+        return f"₩{int(price):,}"
+    return f"${float(price):.2f}"
+
+
+def _fmt_market_cap(mc, market: str = "US") -> str:
+    if mc is None:
+        return "N/A"
+    if market == "KR":
+        v = mc / 1e8  # 억원
+        return f"₩{v:,.0f}억" if v < 10000 else f"₩{v/10000:,.1f}조"
+    return f"${mc/1e9:.1f}B"
+
+
+def get_quote(ticker: str, market: str = "US", exchange: str = "") -> dict:
+    yf_sym = _yf_sym(ticker, market, exchange)
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(yf_sym)
         info = t.info
         hist = t.history(period="1y")
         current = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
@@ -19,18 +45,21 @@ def get_quote(ticker: str) -> dict:
             "daily_change": f"{daily_change_pct:+.2f}%" if daily_change_pct is not None else "N/A",
             "market_cap": info.get("marketCap"),
             "ytd_return": round(ytd_return, 2) if ytd_return else None,
+            "market": market,
         }
     except Exception as e:
         return {
             "ticker": ticker, "name": ticker, "price": None,
             "prev_close": None, "daily_change": "N/A",
             "market_cap": None, "ytd_return": None,
-            "error": str(e),
+            "market": market, "error": str(e),
         }
 
-def get_financials(ticker: str) -> list[dict]:
+
+def get_financials(ticker: str, market: str = "US", exchange: str = "") -> list[dict]:
+    yf_sym = _yf_sym(ticker, market, exchange)
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(yf_sym)
         stmt = t.quarterly_income_stmt
         if stmt is None or stmt.empty:
             return []
@@ -97,9 +126,11 @@ def get_financials(ticker: str) -> list[dict]:
     except Exception:
         return []
 
-def get_analyst_data(ticker: str) -> dict:
+
+def get_analyst_data(ticker: str, market: str = "US", exchange: str = "") -> dict:
+    yf_sym = _yf_sym(ticker, market, exchange)
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(yf_sym)
         targets = t.analyst_price_targets or {}
         recs = t.recommendations_summary
         buy = hold = sell = 0

@@ -17,7 +17,11 @@ const TAB_STYLE = (active) => ({
 const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid #333', whiteSpace: 'nowrap', fontSize: 11, color: '#aaa', position: 'sticky', top: 0, zIndex: 2, background: '#1a2a3a' }
 const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid #1e1e1e', fontSize: 12 }
 
-const fmt = (val) => val != null ? `$${Number(val).toFixed(2)}` : 'N/A'
+const fmt = (val, market) => {
+  if (val == null) return 'N/A'
+  if (market === 'KR') return `₩${Number(val).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`
+  return `$${Number(val).toFixed(2)}`
+}
 const fmtN = (val) => val != null ? val : 'N/A'
 const rsiColor = (rsi) => {
   if (rsi == null) return '#ccc'
@@ -53,7 +57,7 @@ function TargetTooltip({ s }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setVisible(false)}
     >
-      {s ? fmt(s.target_mean) : 'N/A'}
+      {s ? fmt(s.target_mean, s.market) : 'N/A'}
       {gap != null && <div style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', fontSize: 10 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</div>}
       {visible && s?.target_mean != null && (
         <div style={{
@@ -75,11 +79,11 @@ function TargetTooltip({ s }) {
           <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 6, fontSize: 11 }}>목표가 근거</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px' }}>
             <span style={{ color: '#78909c' }}>평균</span>
-            <span style={{ color: '#fff', fontWeight: 600 }}>{fmt(s.target_mean)}{gap != null && <span style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
+            <span style={{ color: '#fff', fontWeight: 600 }}>{fmt(s.target_mean, s.market)}{gap != null && <span style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
             <span style={{ color: '#78909c' }}>최고</span>
-            <span style={{ color: '#81c784' }}>{fmt(s.target_high)}</span>
+            <span style={{ color: '#81c784' }}>{fmt(s.target_high, s.market)}</span>
             <span style={{ color: '#78909c' }}>최저</span>
-            <span style={{ color: '#ef9a9a' }}>{fmt(s.target_low)}</span>
+            <span style={{ color: '#ef9a9a' }}>{fmt(s.target_low, s.market)}</span>
             <span style={{ color: '#78909c' }}>애널리스트</span>
             <span>{total > 0 ? `${total}명` : 'N/A'}</span>
             <span style={{ color: '#78909c' }}>Buy</span>
@@ -99,16 +103,16 @@ function TargetTooltip({ s }) {
   )
 }
 
-const GapCell = ({ target, price, baseColor, highlight }) => {
+const GapCell = ({ target, price, baseColor, highlight, market }) => {
   const gap = fmtGap(target, price)
   return (
     <td style={{ ...TD, color: baseColor, background: highlight ? '#2d2a00' : undefined, border: highlight ? '2px solid #ffeb3b' : undefined, fontWeight: highlight ? 700 : undefined }}>
-      {target != null ? <>{fmt(target)}{gap && <span style={{ color: gap.positive ? '#81c784' : '#ef9a9a' }}>({gap.text})</span>}</> : 'N/A'}
+      {target != null ? <>{fmt(target, market)}{gap && <span style={{ color: gap.positive ? '#81c784' : '#ef9a9a' }}>({gap.text})</span>}</> : 'N/A'}
     </td>
   )
 }
 
-function PriceLevelChart({ rsiData, price, vp, target, title }) {
+function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   if (!price && !vp?.poc) return null
   const levels = [
     ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', size: 'sm' })),
@@ -155,7 +159,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title }) {
                 textAlign: 'center', whiteSpace: 'nowrap',
               }}>
                 <div style={{ fontSize: isLg ? 11 : 9, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
-                <div style={{ fontSize: 9, color: l.color, opacity: 0.85 }}>${Number(l.value).toFixed(2)}</div>
+                <div style={{ fontSize: 9, color: l.color, opacity: 0.85 }}>{fmt(l.value, market)}</div>
               </div>
             </div>
           )
@@ -165,7 +169,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title }) {
   )
 }
 
-function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target }) {
+function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, market }) {
   if (!dailyRsi) return null
   const rows = [
     { label: '일봉', d: dailyRsi },
@@ -201,13 +205,13 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target }) {
           {rows.map(({ label, d }) => d?.rsi != null && (
             <tr key={label}>
               <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontWeight: 600 }}>{label}</td>
-              <GapCell target={d.target_20} price={price} baseColor="#81c784" highlight={closestKey === 'target_20'} />
-              <GapCell target={d.target_25} price={price} baseColor="#81c784" highlight={closestKey === 'target_25'} />
-              <GapCell target={d.target_30} price={price} baseColor="#81c784" highlight={closestKey === 'target_30'} />
+              <GapCell target={d.target_20} price={price} baseColor="#81c784" highlight={closestKey === 'target_20'} market={market} />
+              <GapCell target={d.target_25} price={price} baseColor="#81c784" highlight={closestKey === 'target_25'} market={market} />
+              <GapCell target={d.target_30} price={price} baseColor="#81c784" highlight={closestKey === 'target_30'} market={market} />
               <td style={{ ...TD, color: rsiColor(d.rsi), fontWeight: 600 }}>{fmtN(d.rsi)}</td>
-              <GapCell target={d.target_70} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_70'} />
-              <GapCell target={d.target_75} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_75'} />
-              <GapCell target={d.target_80} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_80'} />
+              <GapCell target={d.target_70} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_70'} market={market} />
+              <GapCell target={d.target_75} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_75'} market={market} />
+              <GapCell target={d.target_80} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_80'} market={market} />
             </tr>
           ))}
         </tbody>
@@ -217,7 +221,7 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target }) {
           {rows.map(({ label, d }) => d?.rsi != null && (
             <div key={label}>
               <div style={{ fontSize: 11, color: '#80cbc4', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-              <PriceLevelChart rsiData={d} price={price} vp={vp} target={target} />
+              <PriceLevelChart rsiData={d} price={price} vp={vp} target={target} market={market} />
             </div>
           ))}
         </div>
@@ -260,7 +264,7 @@ function DetailSummaryTab({ summary }) {
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: '#546e7a', fontSize: 9 }}>🎯 평균목표가</span>
-            <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{fmt(summary.target_mean)}</span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{fmt(summary.target_mean, summary.market)}</span>
           </div>
           {/* 상승여력 */}
           {gap != null && (
@@ -275,11 +279,11 @@ function DetailSummaryTab({ summary }) {
           {/* 최고/최저 목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: '#546e7a', fontSize: 9 }}>최고목표가</span>
-            <span style={{ color: '#81c784', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high)}</span>
+            <span style={{ color: '#81c784', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high, summary.market)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: '#546e7a', fontSize: 9 }}>최저목표가</span>
-            <span style={{ color: '#ef9a9a', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low)}</span>
+            <span style={{ color: '#ef9a9a', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low, summary.market)}</span>
           </div>
           {summary.finviz_recom != null && (
             <>
@@ -338,6 +342,7 @@ function DetailSummaryTab({ summary }) {
             price={summary.price}
             vp={summary.volume_profile}
             target={summary.target_mean}
+            market={summary.market}
           />
         </div>
       </div>
@@ -680,6 +685,7 @@ export default function Reports() {
               <thead>
                 <tr style={{ background: '#1a2a3a' }}>
                   <th style={{ ...TH, textAlign: 'left', left: 0, zIndex: 3 }}>종목명 (티커)</th>
+                  <th style={{ ...TH, textAlign: 'left' }}>시장</th>
                   <th style={{ ...TH, textAlign: 'left' }}>섹터</th>
                   <th style={TH}>현재가</th>
                   <th style={TH}>POC</th>
@@ -726,12 +732,18 @@ export default function Reports() {
                         <div>{s?.name || ticker}</div>
                         <div style={{ color: '#666', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
                       </td>
+                      <td style={{ ...TD, textAlign: 'left' }}>
+                        {s?.market === 'KR'
+                          ? <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
+                          : <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a2a3a', color: '#4fc3f7', border: '1px solid #2a4a6a' }}>🇺🇸 US</span>
+                        }
+                      </td>
                       <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontSize: 11 }}>
                         <div>{s?.sector || '—'}</div>
                         {s?.industry ? <div style={{ color: '#546e7a', fontSize: 10 }}>{s.industry}</div> : null}
                       </td>
-                      <td style={TD}>{s ? fmt(s.price) : 'N/A'}</td>
-                      <td style={TD}>{fmt(s?.volume_profile?.poc)}</td>
+                      <td style={TD}>{s ? fmt(s.price, s.market) : 'N/A'}</td>
+                      <td style={TD}>{fmt(s?.volume_profile?.poc, s?.market)}</td>
                       <td style={TD}>
                         <TargetTooltip s={s} />
                       </td>
@@ -773,9 +785,9 @@ export default function Reports() {
                         const isClosest = closestKey === key
                         return (
                           <td key={key} style={{ ...TD, color: base, background: isClosest ? '#2d2a00' : undefined, border: isClosest ? '2px solid #ffeb3b' : undefined, fontWeight: isClosest ? 700 : undefined }}>
-                            {dv != null ? <div>{fmt(dv)}{gapEl(dv)}</div> : <div>N/A</div>}
-                            {wv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(wv)}{gapEl(wv, 9)}</div>}
-                            {mv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(mv)}{gapEl(mv, 9)}</div>}
+                            {dv != null ? <div>{fmt(dv, s?.market)}{gapEl(dv)}</div> : <div>N/A</div>}
+                            {wv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(wv, s?.market)}{gapEl(wv, 9)}</div>}
+                            {mv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(mv, s?.market)}{gapEl(mv, 9)}</div>}
                           </td>
                         )
                       })}
@@ -800,9 +812,13 @@ export default function Reports() {
                   {detail.summary?.name || selected.ticker}
                 </span>
                 <span style={{ color: '#666', fontSize: 14, marginLeft: 8 }}>({selected.ticker})</span>
+                {detail.summary?.market === 'KR'
+                  ? <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
+                  : <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: '#1a2a3a', color: '#4fc3f7', border: '1px solid #2a4a6a' }}>🇺🇸 US</span>
+                }
                 <span style={{ color: '#555', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
                 {detail.summary?.price != null && (
-                  <span style={{ color: '#e0e0e0', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price)}</span>
+                  <span style={{ color: '#e0e0e0', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price, detail.summary.market)}</span>
                 )}
                 {detail.summary?.sector && (
                   <span style={{ color: '#4fc3f7', fontSize: 11, marginLeft: 12, background: '#0d2333', padding: '2px 7px', borderRadius: 3 }}>
@@ -884,6 +900,7 @@ export default function Reports() {
                       price={detail.summary.price}
                       vp={detail.summary.volume_profile}
                       target={detail.summary.target_mean}
+                      market={detail.summary.market}
                     />
                   </>
                 )
