@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import MarkdownViewer from '../components/MarkdownViewer'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 const TAB_STYLE = (active) => ({
   padding: '6px 14px',
@@ -260,12 +260,7 @@ function DetailSummaryTab({ summary }) {
         </div>
       </div>
     </div>
-    <FinancialsChart
-      financials={summary.financials}
-      per={summary.per}
-      forward_per={summary.forward_per}
-      pbr={summary.pbr}
-    />
+    <FinancialsChart financials={summary.financials} />
     </div>
   )
 }
@@ -297,7 +292,7 @@ function VolumeProfileCards({ vp }) {
   )
 }
 
-function FinancialsChart({ financials, per, forward_per, pbr }) {
+function FinancialsChart({ financials }) {
   if (!financials?.length) return null
 
   const fmtVal = (v) => {
@@ -313,18 +308,39 @@ function FinancialsChart({ financials, per, forward_per, pbr }) {
     period: f.period,
     revenue: f.revenue,
     op_income: f.operating_income,
+    per: f.per,
+    pbr: f.pbr,
     margin: f.revenue && f.operating_income != null
       ? Math.round(f.operating_income / f.revenue * 100)
       : null,
   }))
 
-  const CustomTooltip = ({ active, payload, label }) => {
+  const hasPerPbr = data.some(d => d.per != null || d.pbr != null)
+
+  const axisStyle = { fontSize: 10, fill: '#78909c' }
+  const chartMargin = { top: 4, right: 8, left: 0, bottom: 0 }
+  const lineCfg = { type: 'monotone', strokeWidth: 2, dot: { r: 3 }, activeDot: { r: 5 }, connectNulls: true }
+
+  const Legend = ({ items }) => (
+    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#78909c', marginBottom: 4 }}>
+      {items.map(({ color, label }) => (
+        <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 16, height: 2, background: color, display: 'inline-block', borderRadius: 1 }} />
+          {label}
+        </span>
+      ))}
+    </div>
+  )
+
+  const makeTooltip = (isFinancial) => ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
     return (
       <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         {payload.map(p => (
-          <div key={p.dataKey} style={{ color: p.color, marginBottom: 2 }}>{p.name}: {fmtVal(p.value)}</div>
+          <div key={p.dataKey} style={{ color: p.stroke, marginBottom: 2 }}>
+            {p.name}: {p.value != null ? (isFinancial ? fmtVal(p.value) : p.value.toFixed(1)) : '—'}
+          </div>
         ))}
       </div>
     )
@@ -333,53 +349,60 @@ function FinancialsChart({ financials, per, forward_per, pbr }) {
   return (
     <div style={{ background: '#111827', borderRadius: 6, padding: 14, marginTop: 12 }}>
       <SectionTitle>📊 분기 실적 추이</SectionTitle>
-      <div style={{ display: 'flex', gap: 14 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: 10, fontSize: 10, color: '#78909c', marginBottom: 4 }}>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#4fc3f7', borderRadius: 2, marginRight: 4 }} />매출</span>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#81c784', borderRadius: 2, marginRight: 4 }} />영업이익</span>
-          </div>
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart data={data} margin={{ top: 2, right: 4, left: 0, bottom: 0 }} barGap={3}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" vertical={false} />
-              <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#78909c' }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={fmtVal} tick={{ fontSize: 10, fill: '#78909c' }} axisLine={false} tickLine={false} width={36} />
-              <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={0} stroke="#444" />
-              <Bar dataKey="revenue" name="매출" fill="#4fc3f7" opacity={0.75} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="op_income" name="영업이익" radius={[2, 2, 0, 0]}>
-                {data.map((d, i) => (
-                  <Cell key={i} fill={(d.op_income ?? 0) >= 0 ? '#81c784' : '#ef9a9a'} opacity={0.85} />
-                ))}
-              </Bar>
-            </BarChart>
+
+      {/* 매출 / 영업이익 */}
+      <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} />
+      <ResponsiveContainer width="100%" height={120}>
+        <LineChart data={data} margin={chartMargin}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+          <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+          <YAxis tickFormatter={fmtVal} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+          <Tooltip content={makeTooltip(true)} />
+          <ReferenceLine y={0} stroke="#444" />
+          <Line {...lineCfg} dataKey="revenue" name="매출" stroke="#4fc3f7" />
+          <Line {...lineCfg} dataKey="op_income" name="영업이익" stroke="#81c784" />
+        </LineChart>
+      </ResponsiveContainer>
+
+      {/* PER / PBR */}
+      {hasPerPbr && (
+        <div style={{ marginTop: 12 }}>
+          <Legend items={[{ color: '#ffcc80', label: 'PER (연환산)' }, { color: '#ce93d8', label: 'PBR' }]} />
+          <ResponsiveContainer width="100%" height={100}>
+            <LineChart data={data} margin={chartMargin}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+              <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+              <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+              <Tooltip content={makeTooltip(false)} />
+              <Line {...lineCfg} dataKey="per" name="PER" stroke="#ffcc80" />
+              <Line {...lineCfg} dataKey="pbr" name="PBR" stroke="#ce93d8" />
+            </LineChart>
           </ResponsiveContainer>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6, fontSize: 10 }}>
-            <thead>
-              <tr>
-                {['분기', '매출', '영업이익', '영업이익률'].map(h => (
-                  <th key={h} style={{ color: '#546e7a', textAlign: 'right', padding: '2px 6px', fontWeight: 400 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map(d => (
-                <tr key={d.period}>
-                  <td style={{ color: '#78909c', textAlign: 'right', padding: '1px 6px' }}>{d.period}</td>
-                  <td style={{ color: '#4fc3f7', textAlign: 'right', padding: '1px 6px' }}>{fmtVal(d.revenue)}</td>
-                  <td style={{ color: d.op_income != null && d.op_income >= 0 ? '#81c784' : '#ef9a9a', textAlign: 'right', padding: '1px 6px' }}>{fmtVal(d.op_income)}</td>
-                  <td style={{ color: '#b0bec5', textAlign: 'right', padding: '1px 6px' }}>{d.margin != null ? `${d.margin}%` : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 100, flexShrink: 0 }}>
-          <MetricCard label="📈 PER" value={per ?? '—'} valueColor="#b0bec5" sub="Trailing" />
-          <MetricCard label="🔭 Fwd PER" value={forward_per ?? '—'} valueColor="#78909c" sub="Forward" />
-          <MetricCard label="📋 PBR" value={pbr ?? '—'} valueColor="#78909c" sub="Price/Book" />
-        </div>
-      </div>
+      )}
+
+      {/* 수치 테이블 */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 10, fontSize: 10 }}>
+        <thead>
+          <tr>
+            {['분기', '매출', '영업이익', '영업이익률', 'PER', 'PBR'].map(h => (
+              <th key={h} style={{ color: '#546e7a', textAlign: 'right', padding: '2px 6px', fontWeight: 400 }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(d => (
+            <tr key={d.period}>
+              <td style={{ color: '#78909c', textAlign: 'right', padding: '1px 6px' }}>{d.period}</td>
+              <td style={{ color: '#4fc3f7', textAlign: 'right', padding: '1px 6px' }}>{fmtVal(d.revenue)}</td>
+              <td style={{ color: d.op_income != null && d.op_income >= 0 ? '#81c784' : '#ef9a9a', textAlign: 'right', padding: '1px 6px' }}>{fmtVal(d.op_income)}</td>
+              <td style={{ color: '#b0bec5', textAlign: 'right', padding: '1px 6px' }}>{d.margin != null ? `${d.margin}%` : '—'}</td>
+              <td style={{ color: '#ffcc80', textAlign: 'right', padding: '1px 6px' }}>{d.per ?? '—'}</td>
+              <td style={{ color: '#ce93d8', textAlign: 'right', padding: '1px 6px' }}>{d.pbr ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
