@@ -279,10 +279,14 @@ function DetailSummaryTab({ summary }) {
             const vp = summary.volume_profile
             if (!price && !vp?.poc) return null
             const target = summary.target_mean
+            const dr = summary.daily_rsi
             const levels = [
               ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', size: 'sm' })),
               vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', size: 'md' },
               target != null && { value: target, label: '평균목표가', color: '#ffcc80', size: 'md' },
+              dr?.target_70 != null && { value: dr.target_70, label: 'RSI70', color: '#ef9a9a', size: 'sm' },
+              dr?.target_75 != null && { value: dr.target_75, label: 'RSI75', color: '#ef9a9a', size: 'sm' },
+              dr?.target_80 != null && { value: dr.target_80, label: 'RSI80', color: '#ef9a9a', size: 'sm' },
               price != null && { value: price, label: '현재가', color: '#ffffff', size: 'lg' },
             ].filter(Boolean)
             const vals = levels.map(l => l.value)
