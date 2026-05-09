@@ -278,9 +278,11 @@ function DetailSummaryTab({ summary }) {
             const price = summary.price
             const vp = summary.volume_profile
             if (!price && !vp?.poc) return null
+            const target = summary.target_mean
             const levels = [
               ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', size: 'sm' })),
               vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', size: 'md' },
+              target != null && { value: target, label: '평균목표가', color: '#ffcc80', size: 'md' },
               price != null && { value: price, label: '현재가', color: '#ffffff', size: 'lg' },
             ].filter(Boolean)
             const vals = levels.map(l => l.value)
