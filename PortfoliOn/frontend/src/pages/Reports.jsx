@@ -279,28 +279,45 @@ function DetailSummaryTab({ summary }) {
             const vp = summary.volume_profile
             if (!price && !vp?.poc) return null
             const levels = [
-              ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', dash: '5 3', w: 1 })),
-              vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', dash: null, w: 2 },
-              price != null && { value: price, label: '현재가', color: '#ffffff', dash: null, w: 2 },
+              ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', size: 'sm' })),
+              vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', size: 'md' },
+              price != null && { value: price, label: '현재가', color: '#ffffff', size: 'lg' },
             ].filter(Boolean)
             const vals = levels.map(l => l.value)
             const span = Math.max(...vals) - Math.min(...vals)
-            const pad = span > 0 ? span * 0.18 : Math.max(...vals) * 0.03
-            const chartData = [{ y: Math.min(...vals) - pad }, { y: Math.max(...vals) + pad }]
+            const pad = span > 0 ? span * 0.22 : Math.max(...vals) * 0.03
+            const lo = Math.min(...vals) - pad
+            const hi = Math.max(...vals) + pad
+            const pct = v => ((v - lo) / (hi - lo)) * 100
+            const pricePct = price != null ? pct(price) : null
             return (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 10, color: '#78909c', marginBottom: 2 }}>매물대 가격 레벨</div>
-                <ResponsiveContainer width="100%" height={160}>
-                  <LineChart data={chartData} margin={{ top: 4, right: 96, left: 0, bottom: 4 }}>
-                    <YAxis dataKey="y" domain={['dataMin', 'dataMax']} tick={{ fontSize: 10, fill: '#78909c' }} width={46} tickFormatter={v => `$${Number(v).toFixed(0)}`} axisLine={false} tickLine={false} />
-                    {levels.map((l, i) => (
-                      <ReferenceLine key={i} y={l.value} stroke={l.color} strokeWidth={l.w} strokeDasharray={l.dash}
-                        label={{ value: `${l.label} $${Number(l.value).toFixed(2)}`, position: 'right', fontSize: 9, fill: l.color }}
-                      />
-                    ))}
-                    <Line dataKey="y" stroke="transparent" dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 10, color: '#78909c', marginBottom: 6 }}>매물대 가격 레벨</div>
+                <div style={{ display: 'flex', gap: 10, height: 180 }}>
+                  {/* 가격 막대 */}
+                  <div style={{ width: 10, position: 'relative', borderRadius: 5, overflow: 'hidden', flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', inset: 0, background: '#1e2a3a' }} />
+                    {pricePct != null && <>
+                      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: `${pricePct}%`, background: 'rgba(239,154,154,0.3)' }} />
+                      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: `${100 - pricePct}%`, background: 'rgba(129,199,132,0.3)' }} />
+                      <div style={{ position: 'absolute', left: 0, right: 0, top: `${100 - pricePct}%`, height: 2, background: '#ffffff' }} />
+                    </>}
+                  </div>
+                  {/* 레벨 마커 */}
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    {levels.map((l, i) => {
+                      const isLg = l.size === 'lg', isMd = l.size === 'md'
+                      return (
+                        <div key={i} style={{ position: 'absolute', top: `${100 - pct(l.value)}%`, left: 0, right: 0, transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <div style={{ width: isLg ? 20 : isMd ? 12 : 8, height: isLg ? 3 : 1.5, background: l.color, borderRadius: 2, flexShrink: 0 }} />
+                          <span style={{ fontSize: isLg ? 12 : 10, color: l.color, fontWeight: isLg ? 700 : 400, whiteSpace: 'nowrap' }}>
+                            {isLg ? '▶ ' : ''}{l.label} <span style={{ opacity: 0.85 }}>${Number(l.value).toFixed(2)}</span>
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
             )
           })()}
