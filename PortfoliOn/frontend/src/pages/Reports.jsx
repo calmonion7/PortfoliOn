@@ -231,32 +231,50 @@ function DetailSummaryTab({ summary }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
           <SectionTitle>📉 매물대 &amp; RSI 현황</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
-              <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 4 }}>🎯 POC</div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#80cbc4' }}>{fmt(summary.volume_profile?.poc)}</div>
-              {summary.volume_profile?.hvn?.length > 0 && (
-                <div style={{ color: '#81c784', fontSize: 10, marginTop: 3 }}>
-                  🛡 HVN {summary.volume_profile.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ')}
+          {(() => {
+            const rsiData = [
+              { label: '일봉', rsi: summary.daily_rsi?.rsi },
+              { label: '주봉', rsi: summary.weekly_rsi?.rsi },
+              { label: '월봉', rsi: summary.monthly_rsi?.rsi },
+            ]
+            const RsiTooltip = ({ active, payload, label }) => {
+              if (!active || !payload?.length) return null
+              const rsi = payload[0]?.value
+              return (
+                <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '6px 10px', fontSize: 11 }}>
+                  <div style={{ color: '#80cbc4', fontWeight: 700 }}>{label}</div>
+                  <div style={{ color: rsiColor(rsi) }}>RSI {rsi?.toFixed(1) ?? '—'}</div>
                 </div>
+              )
+            }
+            return (
+              <ResponsiveContainer width="100%" height={150}>
+                <LineChart data={rsiData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#78909c' }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#78909c' }} axisLine={false} tickLine={false} width={28} ticks={[0, 30, 50, 70, 100]} />
+                  <Tooltip content={<RsiTooltip />} />
+                  <ReferenceLine y={70} stroke="#ef9a9a" strokeDasharray="4 3" />
+                  <ReferenceLine y={50} stroke="#546e7a" strokeDasharray="4 3" />
+                  <ReferenceLine y={30} stroke="#81c784" strokeDasharray="4 3" />
+                  <Line type="monotone" dataKey="rsi" stroke="#4fc3f7" strokeWidth={2}
+                    dot={({ cx, cy, payload }) => (
+                      <circle key={payload.label} cx={cx} cy={cy} r={5} fill={rsiColor(payload.rsi)} stroke="#1a1a2e" strokeWidth={1} />
+                    )}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )
+          })()}
+          {summary.volume_profile?.poc != null && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11 }}>
+              <span style={{ color: '#546e7a' }}>🎯 POC <span style={{ color: '#80cbc4', fontWeight: 700 }}>{fmt(summary.volume_profile.poc)}</span></span>
+              {summary.volume_profile.hvn?.length > 0 && (
+                <span style={{ color: '#546e7a' }}>🛡 HVN <span style={{ color: '#81c784' }}>{summary.volume_profile.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ')}</span></span>
               )}
             </div>
-            <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
-              <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 6 }}>📈 RSI 현황</div>
-              {[
-                { label: '일봉', rsi: summary.daily_rsi?.rsi },
-                { label: '주봉', rsi: summary.weekly_rsi?.rsi },
-                { label: '월봉', rsi: summary.monthly_rsi?.rsi },
-              ].map(({ label, rsi }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                  <span style={{ color: '#546e7a' }}>{label}</span>
-                  <span style={{ color: rsiColor(rsi), fontWeight: label === '일봉' ? 700 : 400 }}>
-                    {rsi != null ? rsi.toFixed(1) : '—'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
