@@ -285,38 +285,46 @@ function DetailSummaryTab({ summary }) {
             ].filter(Boolean)
             const vals = levels.map(l => l.value)
             const span = Math.max(...vals) - Math.min(...vals)
-            const pad = span > 0 ? span * 0.22 : Math.max(...vals) * 0.03
+            const pad = span > 0 ? span * 0.15 : Math.max(...vals) * 0.02
             const lo = Math.min(...vals) - pad
             const hi = Math.max(...vals) + pad
             const pct = v => ((v - lo) / (hi - lo)) * 100
-            const pricePct = price != null ? pct(price) : null
+            // 가격순 정렬 후 짝수=위, 홀수=아래로 교차 배치
+            const sorted = [...levels].sort((a, b) => a.value - b.value)
+            sorted.forEach((l, i) => { l.above = i % 2 === 0 })
+            const BAR_TOP = 46
             return (
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 10, color: '#78909c', marginBottom: 6 }}>매물대 가격 레벨</div>
-                <div style={{ display: 'flex', gap: 10, height: 180 }}>
-                  {/* 가격 막대 */}
-                  <div style={{ width: 10, position: 'relative', borderRadius: 5, overflow: 'hidden', flexShrink: 0 }}>
+                <div style={{ fontSize: 10, color: '#78909c', marginBottom: 4 }}>매물대 가격 레벨</div>
+                <div style={{ position: 'relative', height: 100 }}>
+                  {/* 가로 막대 */}
+                  <div style={{ position: 'absolute', top: BAR_TOP, left: 0, right: 0, height: 8, borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', inset: 0, background: '#1e2a3a' }} />
-                    {pricePct != null && <>
-                      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: `${pricePct}%`, background: 'rgba(239,154,154,0.3)' }} />
-                      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: `${100 - pricePct}%`, background: 'rgba(129,199,132,0.3)' }} />
-                      <div style={{ position: 'absolute', left: 0, right: 0, top: `${100 - pricePct}%`, height: 2, background: '#ffffff' }} />
+                    {price != null && <>
+                      <div style={{ position: 'absolute', inset: 0, right: `${100 - pct(price)}%`, background: 'rgba(129,199,132,0.3)' }} />
+                      <div style={{ position: 'absolute', inset: 0, left: `${pct(price)}%`, background: 'rgba(239,154,154,0.3)' }} />
                     </>}
                   </div>
-                  {/* 레벨 마커 */}
-                  <div style={{ flex: 1, position: 'relative' }}>
-                    {levels.map((l, i) => {
-                      const isLg = l.size === 'lg', isMd = l.size === 'md'
-                      return (
-                        <div key={i} style={{ position: 'absolute', top: `${100 - pct(l.value)}%`, left: 0, right: 0, transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <div style={{ width: isLg ? 20 : isMd ? 12 : 8, height: isLg ? 3 : 1.5, background: l.color, borderRadius: 2, flexShrink: 0 }} />
-                          <span style={{ fontSize: isLg ? 12 : 10, color: l.color, fontWeight: isLg ? 700 : 400, whiteSpace: 'nowrap' }}>
-                            {isLg ? '▶ ' : ''}{l.label} <span style={{ opacity: 0.85 }}>${Number(l.value).toFixed(2)}</span>
-                          </span>
+                  {/* 마커 & 레이블 */}
+                  {levels.map((l, i) => {
+                    const isLg = l.size === 'lg', isMd = l.size === 'md'
+                    const tickH = isLg ? 16 : isMd ? 11 : 9
+                    return (
+                      <div key={i} style={{ position: 'absolute', left: `${pct(l.value)}%`, top: BAR_TOP + 4 - tickH / 2, transform: 'translateX(-50%)' }}>
+                        <div style={{ width: isLg ? 3 : 2, height: tickH, background: l.color, margin: '0 auto', borderRadius: 1 }} />
+                        <div style={{
+                          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                          ...(l.above ? { bottom: '100%', marginBottom: 3 } : { top: '100%', marginTop: 3 }),
+                          textAlign: 'center', whiteSpace: 'nowrap',
+                        }}>
+                          <div style={{ fontSize: isLg ? 11 : 9, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>
+                            {l.label}
+                          </div>
+                          <div style={{ fontSize: 9, color: l.color, opacity: 0.85 }}>${Number(l.value).toFixed(2)}</div>
                         </div>
-                      )
-                    })}
-                  </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )
