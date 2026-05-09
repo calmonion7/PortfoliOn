@@ -184,9 +184,9 @@ function DetailSummaryTab({ summary }) {
 
   return (
     <div>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* 왼쪽: 증권사 컨센서스 */}
+      {/* 1행: 증권사 컨센서스 */}
       <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
         <SectionTitle>🏦 증권사 컨센서스</SectionTitle>
         {total > 0 && (
@@ -227,7 +227,7 @@ function DetailSummaryTab({ summary }) {
         </div>
       </div>
 
-      {/* 오른쪽: 매물대·RSI 현황 */}
+      {/* 2행: 매물대·RSI 현황 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
           <SectionTitle>📉 매물대 &amp; RSI 현황</SectionTitle>
