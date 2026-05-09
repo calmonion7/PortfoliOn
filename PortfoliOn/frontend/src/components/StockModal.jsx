@@ -18,7 +18,7 @@ function useDebounce(value, delay) {
   return debounced
 }
 
-function SearchBox({ market, onSelect }) {
+function SearchBox({ onSelect }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -29,11 +29,12 @@ function SearchBox({ market, onSelect }) {
   useEffect(() => {
     if (!debouncedQuery.trim()) { setResults([]); setOpen(false); return }
     setLoading(true)
-    axios.get('/api/stocks/search', { params: { q: debouncedQuery, market } })
+    // 항상 ALL로 검색 — 결과 선택 시 market/exchange 자동 설정
+    axios.get('/api/stocks/search', { params: { q: debouncedQuery, market: 'ALL' } })
       .then(r => { setResults(r.data); setOpen(r.data.length > 0) })
       .catch(() => setResults([]))
       .finally(() => setLoading(false))
-  }, [debouncedQuery, market])
+  }, [debouncedQuery])
 
   useEffect(() => {
     const handler = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false) }
@@ -168,8 +169,8 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
           {/* 종목 검색 (신규 추가 시에만) */}
           {!isEdit && (
             <div className="form-field">
-              <label>종목 검색</label>
-              <SearchBox market={form.market} onSelect={handleSearchSelect} />
+              <label>종목 검색 <span style={{ color: '#546e7a', fontSize: 10, fontWeight: 400 }}>(종목명·티커·종목코드)</span></label>
+              <SearchBox onSelect={handleSearchSelect} />
             </div>
           )}
 

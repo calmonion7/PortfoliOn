@@ -50,7 +50,7 @@ def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
             "name": name,
             "market": item_market,
             "exchange": item_exchange,
-            "exchange_display": item.get("fullExchangeName", item.get("exchange", "")),
+            "exchange_display": item.get("exchDisp", item.get("exchange", "")),
         })
     return filtered
 
