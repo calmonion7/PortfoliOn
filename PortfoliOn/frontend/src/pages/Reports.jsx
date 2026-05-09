@@ -231,41 +231,6 @@ function DetailSummaryTab({ summary }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
           <SectionTitle>📉 매물대 &amp; RSI 현황</SectionTitle>
-          {(() => {
-            const rsiData = [
-              { label: '일봉', rsi: summary.daily_rsi?.rsi },
-              { label: '주봉', rsi: summary.weekly_rsi?.rsi },
-              { label: '월봉', rsi: summary.monthly_rsi?.rsi },
-            ]
-            const RsiTooltip = ({ active, payload, label }) => {
-              if (!active || !payload?.length) return null
-              const rsi = payload[0]?.value
-              return (
-                <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '6px 10px', fontSize: 11 }}>
-                  <div style={{ color: '#80cbc4', fontWeight: 700 }}>{label}</div>
-                  <div style={{ color: rsiColor(rsi) }}>RSI {rsi?.toFixed(1) ?? '—'}</div>
-                </div>
-              )
-            }
-            return (
-              <ResponsiveContainer width="100%" height={150}>
-                <BarChart data={rsiData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#78909c' }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#78909c' }} axisLine={false} tickLine={false} width={28} ticks={[0, 30, 50, 70, 100]} />
-                  <Tooltip content={<RsiTooltip />} />
-                  <ReferenceLine y={70} stroke="#ef9a9a" strokeDasharray="4 3" />
-                  <ReferenceLine y={50} stroke="#546e7a" strokeDasharray="4 3" />
-                  <ReferenceLine y={30} stroke="#81c784" strokeDasharray="4 3" />
-                  <Bar dataKey="rsi" radius={[4, 4, 0, 0]}>
-                    {rsiData.map((d, i) => (
-                      <Cell key={i} fill={rsiColor(d.rsi)} opacity={0.85} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )
-          })()}
           {summary.volume_profile?.poc != null && (
             <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11 }}>
               <span style={{ color: '#546e7a' }}>🎯 POC <span style={{ color: '#80cbc4', fontWeight: 700 }}>{fmt(summary.volume_profile.poc)}</span></span>
