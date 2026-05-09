@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import MarkdownViewer from '../components/MarkdownViewer'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 const TAB_STYLE = (active) => ({
   padding: '6px 14px',
@@ -249,21 +249,20 @@ function DetailSummaryTab({ summary }) {
             }
             return (
               <ResponsiveContainer width="100%" height={150}>
-                <LineChart data={rsiData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                <BarChart data={rsiData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#78909c' }} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#78909c' }} axisLine={false} tickLine={false} width={28} ticks={[0, 30, 50, 70, 100]} />
                   <Tooltip content={<RsiTooltip />} />
                   <ReferenceLine y={70} stroke="#ef9a9a" strokeDasharray="4 3" />
                   <ReferenceLine y={50} stroke="#546e7a" strokeDasharray="4 3" />
                   <ReferenceLine y={30} stroke="#81c784" strokeDasharray="4 3" />
-                  <Line type="monotone" dataKey="rsi" stroke="#4fc3f7" strokeWidth={2}
-                    dot={({ cx, cy, payload }) => (
-                      <circle key={payload.label} cx={cx} cy={cy} r={5} fill={rsiColor(payload.rsi)} stroke="#1a1a2e" strokeWidth={1} />
-                    )}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
+                  <Bar dataKey="rsi" radius={[4, 4, 0, 0]}>
+                    {rsiData.map((d, i) => (
+                      <Cell key={i} fill={rsiColor(d.rsi)} opacity={0.85} />
+                    ))}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             )
           })()}
