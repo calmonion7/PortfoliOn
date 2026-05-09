@@ -274,6 +274,36 @@ function DetailSummaryTab({ summary }) {
               )}
             </div>
           )}
+          {(() => {
+            const price = summary.price
+            const vp = summary.volume_profile
+            if (!price && !vp?.poc) return null
+            const levels = [
+              ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', dash: '5 3', w: 1 })),
+              vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', dash: null, w: 2 },
+              price != null && { value: price, label: '현재가', color: '#ffffff', dash: null, w: 2 },
+            ].filter(Boolean)
+            const vals = levels.map(l => l.value)
+            const span = Math.max(...vals) - Math.min(...vals)
+            const pad = span > 0 ? span * 0.18 : Math.max(...vals) * 0.03
+            const chartData = [{ y: Math.min(...vals) - pad }, { y: Math.max(...vals) + pad }]
+            return (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 10, color: '#78909c', marginBottom: 2 }}>매물대 가격 레벨</div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={chartData} margin={{ top: 4, right: 96, left: 0, bottom: 4 }}>
+                    <YAxis dataKey="y" domain={['dataMin', 'dataMax']} tick={{ fontSize: 10, fill: '#78909c' }} width={46} tickFormatter={v => `$${Number(v).toFixed(0)}`} axisLine={false} tickLine={false} />
+                    {levels.map((l, i) => (
+                      <ReferenceLine key={i} y={l.value} stroke={l.color} strokeWidth={l.w} strokeDasharray={l.dash}
+                        label={{ value: `${l.label} $${Number(l.value).toFixed(2)}`, position: 'right', fontSize: 9, fill: l.color }}
+                      />
+                    ))}
+                    <Line dataKey="y" stroke="transparent" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </div>
