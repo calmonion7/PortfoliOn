@@ -108,7 +108,64 @@ const GapCell = ({ target, price, baseColor, highlight }) => {
   )
 }
 
-function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
+function PriceLevelChart({ rsiData, price, vp, target, title }) {
+  if (!price && !vp?.poc) return null
+  const levels = [
+    ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', size: 'sm' })),
+    vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', size: 'md' },
+    target != null && { value: target, label: '평균목표가', color: '#ffcc80', size: 'md' },
+    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#81c784', size: 'sm' },
+    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#81c784', size: 'sm' },
+    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#81c784', size: 'sm' },
+    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ef9a9a', size: 'sm' },
+    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ef9a9a', size: 'sm' },
+    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ef9a9a', size: 'sm' },
+    price != null && { value: price, label: `현재가${rsiData?.rsi != null ? ` (RSI ${rsiData.rsi.toFixed(1)})` : ''}`, color: '#ffffff', size: 'lg' },
+  ].filter(Boolean)
+  if (levels.length === 0) return null
+  const vals = levels.map(l => l.value)
+  const span = Math.max(...vals) - Math.min(...vals)
+  const pad = span > 0 ? span * 0.15 : Math.max(...vals) * 0.02
+  const lo = Math.min(...vals) - pad
+  const hi = Math.max(...vals) + pad
+  const pct = v => ((v - lo) / (hi - lo)) * 100
+  const sorted = [...levels].sort((a, b) => a.value - b.value)
+  sorted.forEach((l, i) => { l.above = i % 2 === 0 })
+  const BAR_TOP = 46
+  return (
+    <div style={{ marginTop: 8 }}>
+      {title && <div style={{ fontSize: 10, color: '#78909c', marginBottom: 4 }}>{title}</div>}
+      <div style={{ position: 'relative', height: 100 }}>
+        <div style={{ position: 'absolute', top: BAR_TOP, left: 0, right: 0, height: 8, borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, background: '#1e2a3a' }} />
+          {price != null && <>
+            <div style={{ position: 'absolute', inset: 0, right: `${100 - pct(price)}%`, background: 'rgba(129,199,132,0.3)' }} />
+            <div style={{ position: 'absolute', inset: 0, left: `${pct(price)}%`, background: 'rgba(239,154,154,0.3)' }} />
+          </>}
+        </div>
+        {levels.map((l, i) => {
+          const isLg = l.size === 'lg', isMd = l.size === 'md'
+          const tickH = isLg ? 16 : isMd ? 11 : 9
+          return (
+            <div key={i} style={{ position: 'absolute', left: `${pct(l.value)}%`, top: BAR_TOP + 4 - tickH / 2, transform: 'translateX(-50%)' }}>
+              <div style={{ width: isLg ? 3 : 2, height: tickH, background: l.color, margin: '0 auto', borderRadius: 1 }} />
+              <div style={{
+                position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                ...(l.above ? { bottom: '100%', marginBottom: 3 } : { top: '100%', marginTop: 3 }),
+                textAlign: 'center', whiteSpace: 'nowrap',
+              }}>
+                <div style={{ fontSize: isLg ? 11 : 9, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
+                <div style={{ fontSize: 9, color: l.color, opacity: 0.85 }}>${Number(l.value).toFixed(2)}</div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target }) {
   if (!dailyRsi) return null
   const rows = [
     { label: '일봉', d: dailyRsi },
@@ -155,6 +212,16 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
           ))}
         </tbody>
       </table>
+      {(vp || target) && (
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {rows.map(({ label, d }) => d?.rsi != null && (
+            <div key={label}>
+              <div style={{ fontSize: 11, color: '#80cbc4', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+              <PriceLevelChart rsiData={d} price={price} vp={vp} target={target} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -266,70 +333,12 @@ function DetailSummaryTab({ summary }) {
               </div>
             ))}
           </div>
-          {(() => {
-            const price = summary.price
-            const vp = summary.volume_profile
-            if (!price && !vp?.poc) return null
-            const target = summary.target_mean
-            const dr = summary.daily_rsi
-            const levels = [
-              ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', size: 'sm' })),
-              vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', size: 'md' },
-              target != null && { value: target, label: '평균목표가', color: '#ffcc80', size: 'md' },
-              dr?.target_20 != null && { value: dr.target_20, label: 'RSI20', color: '#81c784', size: 'sm' },
-              dr?.target_25 != null && { value: dr.target_25, label: 'RSI25', color: '#81c784', size: 'sm' },
-              dr?.target_30 != null && { value: dr.target_30, label: 'RSI30', color: '#81c784', size: 'sm' },
-              dr?.target_70 != null && { value: dr.target_70, label: 'RSI70', color: '#ef9a9a', size: 'sm' },
-              dr?.target_75 != null && { value: dr.target_75, label: 'RSI75', color: '#ef9a9a', size: 'sm' },
-              dr?.target_80 != null && { value: dr.target_80, label: 'RSI80', color: '#ef9a9a', size: 'sm' },
-              price != null && { value: price, label: `현재가${dr?.rsi != null ? ` (RSI ${dr.rsi.toFixed(1)})` : ''}`, color: '#ffffff', size: 'lg' },
-            ].filter(Boolean)
-            const vals = levels.map(l => l.value)
-            const span = Math.max(...vals) - Math.min(...vals)
-            const pad = span > 0 ? span * 0.15 : Math.max(...vals) * 0.02
-            const lo = Math.min(...vals) - pad
-            const hi = Math.max(...vals) + pad
-            const pct = v => ((v - lo) / (hi - lo)) * 100
-            // 가격순 정렬 후 짝수=위, 홀수=아래로 교차 배치
-            const sorted = [...levels].sort((a, b) => a.value - b.value)
-            sorted.forEach((l, i) => { l.above = i % 2 === 0 })
-            const BAR_TOP = 46
-            return (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 10, color: '#78909c', marginBottom: 4 }}>매물대 가격 레벨</div>
-                <div style={{ position: 'relative', height: 100 }}>
-                  {/* 가로 막대 */}
-                  <div style={{ position: 'absolute', top: BAR_TOP, left: 0, right: 0, height: 8, borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', inset: 0, background: '#1e2a3a' }} />
-                    {price != null && <>
-                      <div style={{ position: 'absolute', inset: 0, right: `${100 - pct(price)}%`, background: 'rgba(129,199,132,0.3)' }} />
-                      <div style={{ position: 'absolute', inset: 0, left: `${pct(price)}%`, background: 'rgba(239,154,154,0.3)' }} />
-                    </>}
-                  </div>
-                  {/* 마커 & 레이블 */}
-                  {levels.map((l, i) => {
-                    const isLg = l.size === 'lg', isMd = l.size === 'md'
-                    const tickH = isLg ? 16 : isMd ? 11 : 9
-                    return (
-                      <div key={i} style={{ position: 'absolute', left: `${pct(l.value)}%`, top: BAR_TOP + 4 - tickH / 2, transform: 'translateX(-50%)' }}>
-                        <div style={{ width: isLg ? 3 : 2, height: tickH, background: l.color, margin: '0 auto', borderRadius: 1 }} />
-                        <div style={{
-                          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-                          ...(l.above ? { bottom: '100%', marginBottom: 3 } : { top: '100%', marginTop: 3 }),
-                          textAlign: 'center', whiteSpace: 'nowrap',
-                        }}>
-                          <div style={{ fontSize: isLg ? 11 : 9, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>
-                            {l.label}
-                          </div>
-                          <div style={{ fontSize: 9, color: l.color, opacity: 0.85 }}>${Number(l.value).toFixed(2)}</div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
+          <PriceLevelChart
+            rsiData={summary.daily_rsi}
+            price={summary.price}
+            vp={summary.volume_profile}
+            target={summary.target_mean}
+          />
         </div>
       </div>
     </div>
@@ -873,6 +882,8 @@ export default function Reports() {
                       weeklyRsi={detail.summary.weekly_rsi}
                       monthlyRsi={detail.summary.monthly_rsi}
                       price={detail.summary.price}
+                      vp={detail.summary.volume_profile}
+                      target={detail.summary.target_mean}
                     />
                   </>
                 )
