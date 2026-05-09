@@ -7,9 +7,11 @@ function splitSentencesBySection(markdown) {
   const lines = markdown.split('\n')
   let inTarget = false
   return lines.map(line => {
-    const headingMatch = line.match(/^#{1,3}\s+(.+)/)
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)/)
     if (headingMatch) {
-      inTarget = TARGET_SECTIONS.some(k => headingMatch[1].includes(k))
+      if (headingMatch[1].length <= 2) {
+        inTarget = TARGET_SECTIONS.some(k => headingMatch[2].includes(k))
+      }
       return line
     }
     if (inTarget && line.trim()) {
