@@ -350,36 +350,40 @@ function FinancialsChart({ financials }) {
     <div style={{ background: '#111827', borderRadius: 6, padding: 14, marginTop: 12 }}>
       <SectionTitle>📊 분기 실적 추이</SectionTitle>
 
-      {/* 매출 / 영업이익 */}
-      <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} />
-      <ResponsiveContainer width="100%" height={120}>
-        <LineChart data={data} margin={chartMargin}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
-          <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
-          <YAxis tickFormatter={fmtVal} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
-          <Tooltip content={makeTooltip(true)} />
-          <ReferenceLine y={0} stroke="#444" />
-          <Line {...lineCfg} dataKey="revenue" name="매출" stroke="#4fc3f7" />
-          <Line {...lineCfg} dataKey="op_income" name="영업이익" stroke="#81c784" />
-        </LineChart>
-      </ResponsiveContainer>
-
-      {/* PER / PBR */}
-      {hasPerPbr && (
-        <div style={{ marginTop: 12 }}>
-          <Legend items={[{ color: '#ffcc80', label: 'PER (연환산)' }, { color: '#ce93d8', label: 'PBR' }]} />
-          <ResponsiveContainer width="100%" height={100}>
+      <div style={{ display: 'flex', gap: 16 }}>
+        {/* 왼쪽: 매출 / 영업이익 */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} />
+          <ResponsiveContainer width="100%" height={150}>
             <LineChart data={data} margin={chartMargin}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
               <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
-              <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
-              <Tooltip content={makeTooltip(false)} />
-              <Line {...lineCfg} dataKey="per" name="PER" stroke="#ffcc80" />
-              <Line {...lineCfg} dataKey="pbr" name="PBR" stroke="#ce93d8" />
+              <YAxis tickFormatter={fmtVal} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+              <Tooltip content={makeTooltip(true)} />
+              <ReferenceLine y={0} stroke="#444" />
+              <Line {...lineCfg} dataKey="revenue" name="매출" stroke="#4fc3f7" />
+              <Line {...lineCfg} dataKey="op_income" name="영업이익" stroke="#81c784" />
             </LineChart>
           </ResponsiveContainer>
         </div>
-      )}
+
+        {/* 오른쪽: PER / PBR */}
+        {hasPerPbr && (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Legend items={[{ color: '#ffcc80', label: 'PER (연환산)' }, { color: '#ce93d8', label: 'PBR' }]} />
+            <ResponsiveContainer width="100%" height={150}>
+              <LineChart data={data} margin={chartMargin}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+                <Tooltip content={makeTooltip(false)} />
+                <Line {...lineCfg} dataKey="per" name="PER" stroke="#ffcc80" />
+                <Line {...lineCfg} dataKey="pbr" name="PBR" stroke="#ce93d8" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
 
       {/* 수치 테이블 */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 10, fontSize: 10 }}>
