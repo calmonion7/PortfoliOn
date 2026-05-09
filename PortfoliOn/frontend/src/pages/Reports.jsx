@@ -160,10 +160,10 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price }) {
 }
 
 const MetricCard = ({ label, value, sub, valueColor }) => (
-  <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 6, padding: '8px 10px' }}>
-    <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 4 }}>{label}</div>
-    <div style={{ fontWeight: 700, fontSize: 14, color: valueColor ?? '#ccc' }}>{value}</div>
-    {sub && <div style={{ color: '#546e7a', fontSize: 10, marginTop: 2 }}>{sub}</div>}
+  <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 5, padding: '5px 8px' }}>
+    <div style={{ color: '#546e7a', fontSize: 10, marginBottom: 2 }}>{label}</div>
+    <div style={{ fontWeight: 700, fontSize: 12, color: valueColor ?? '#ccc' }}>{value}</div>
+    {sub && <div style={{ color: '#546e7a', fontSize: 9, marginTop: 1 }}>{sub}</div>}
   </div>
 )
 
@@ -187,43 +187,62 @@ function DetailSummaryTab({ summary }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       {/* 1행: 증권사 컨센서스 */}
-      <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
+      <div style={{ background: '#111827', borderRadius: 6, padding: '8px 10px' }}>
         <SectionTitle>🏦 증권사 컨센서스</SectionTitle>
-        {total > 0 && (
-          <>
-            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 5 }}>
-              <div style={{ width: `${Math.round(buy / total * 100)}%`, background: 'linear-gradient(90deg,#1b5e20,#43a047)' }} />
-              <div style={{ width: `${Math.round(hold / total * 100)}%`, background: '#424242' }} />
-              <div style={{ width: `${Math.round(sell / total * 100)}%`, background: '#b71c1c' }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888', marginBottom: 12 }}>
-              <span style={{ color: '#81c784' }}>🟢 Buy {buy} ({pct(buy)})</span>
-              <span>⬜ Hold {hold} ({pct(hold)})</span>
-              <span style={{ color: '#ef9a9a' }}>🔴 Sell {sell} ({pct(sell)})</span>
-            </div>
-          </>
-        )}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          <div style={{ background: '#0d1f0d', border: '1px solid #1e3a1e', borderRadius: 6, padding: '8px 10px', gridColumn: '1/-1' }}>
-            <div style={{ color: '#546e7a', fontSize: 11, marginBottom: 4 }}>🎯 평균 목표가</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{fmt(summary.target_mean)}</span>
-              {gap != null && (
-                <span style={{ fontSize: 12, color: gap >= 0 ? '#81c784' : '#ef9a9a' }}>
-                  {gap >= 0 ? '+' : ''}{gap.toFixed(1)}% 상승 여력
-                </span>
-              )}
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* 평균목표가 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{ color: '#546e7a', fontSize: 9 }}>🎯 평균목표가</span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{fmt(summary.target_mean)}</span>
           </div>
-          <MetricCard label="🔼 최고 목표가" value={fmt(summary.target_high)} valueColor="#81c784" />
-          <MetricCard label="🔽 최저 목표가" value={fmt(summary.target_low)} valueColor="#ef9a9a" />
-          <MetricCard
-            label="🌐 Finviz 추천지수"
-            value={summary.finviz_recom ?? 'N/A'}
-            sub="1=강매수, 5=강매도"
-            valueColor={summary.finviz_recom != null && summary.finviz_recom <= 2 ? '#81c784' : '#ccc'}
-          />
-          <MetricCard label="👥 애널리스트 수" value={total > 0 ? `${total}명` : 'N/A'} />
+          {/* 상승여력 */}
+          {gap != null && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ color: '#546e7a', fontSize: 9 }}>상승여력</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? '#81c784' : '#ef9a9a' }}>
+                {gap >= 0 ? '+' : ''}{gap.toFixed(1)}%
+              </span>
+            </div>
+          )}
+          <span style={{ color: '#333', fontSize: 10 }}>|</span>
+          {/* 최고/최저 목표가 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{ color: '#546e7a', fontSize: 9 }}>최고목표가</span>
+            <span style={{ color: '#81c784', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high)}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{ color: '#546e7a', fontSize: 9 }}>최저목표가</span>
+            <span style={{ color: '#ef9a9a', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low)}</span>
+          </div>
+          {summary.finviz_recom != null && (
+            <>
+              <span style={{ color: '#333', fontSize: 10 }}>|</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span style={{ color: '#546e7a', fontSize: 9 }}>Finviz 추천</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: summary.finviz_recom <= 2 ? '#81c784' : '#ccc' }}>
+                  {summary.finviz_recom.toFixed(1)} <span style={{ fontSize: 9, color: '#546e7a' }}>/ 5</span>
+                </span>
+              </div>
+            </>
+          )}
+          {total > 0 && (
+            <>
+              <span style={{ color: '#333', fontSize: 10 }}>|</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span style={{ color: '#546e7a', fontSize: 9 }}>애널리스트 의견</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#81c784', fontSize: 11 }}>매수 {buy}</span>
+                  <span style={{ color: '#888', fontSize: 11 }}>중립 {hold}</span>
+                  <span style={{ color: '#ef9a9a', fontSize: 11 }}>매도 {sell}</span>
+                  <div style={{ display: 'flex', height: 4, borderRadius: 2, overflow: 'hidden', width: 50, flexShrink: 0 }}>
+                    <div style={{ width: `${Math.round(buy / total * 100)}%`, background: '#43a047' }} />
+                    <div style={{ width: `${Math.round(hold / total * 100)}%`, background: '#424242' }} />
+                    <div style={{ width: `${Math.round(sell / total * 100)}%`, background: '#b71c1c' }} />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -231,14 +250,22 @@ function DetailSummaryTab({ summary }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
           <SectionTitle>📉 매물대 &amp; RSI 현황</SectionTitle>
-          {summary.volume_profile?.poc != null && (
-            <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11 }}>
-              <span style={{ color: '#546e7a' }}>🎯 POC <span style={{ color: '#80cbc4', fontWeight: 700 }}>{fmt(summary.volume_profile.poc)}</span></span>
-              {summary.volume_profile.hvn?.length > 0 && (
-                <span style={{ color: '#546e7a' }}>🛡 HVN <span style={{ color: '#81c784' }}>{summary.volume_profile.hvn.map(v => `$${Number(v).toFixed(2)}`).join(' / ')}</span></span>
-              )}
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, marginTop: 4 }}>
+            {[
+              { color: '#ffffff', label: '현재가', desc: '현재 주가' },
+              { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
+              { color: '#80cbc4', label: 'POC', desc: '거래량 최대 가격대' },
+              { color: '#81c784', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
+              { color: '#81c784', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
+              { color: '#ef9a9a', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
+            ].map(({ color, label, desc }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: 10, color: '#888' }}>{label}</span>
+                <span style={{ fontSize: 9, color: '#546e7a' }}>({desc})</span>
+              </div>
+            ))}
+          </div>
           {(() => {
             const price = summary.price
             const vp = summary.volume_profile
@@ -255,7 +282,7 @@ function DetailSummaryTab({ summary }) {
               dr?.target_70 != null && { value: dr.target_70, label: 'RSI70', color: '#ef9a9a', size: 'sm' },
               dr?.target_75 != null && { value: dr.target_75, label: 'RSI75', color: '#ef9a9a', size: 'sm' },
               dr?.target_80 != null && { value: dr.target_80, label: 'RSI80', color: '#ef9a9a', size: 'sm' },
-              price != null && { value: price, label: '현재가', color: '#ffffff', size: 'lg' },
+              price != null && { value: price, label: `현재가${dr?.rsi != null ? ` (RSI ${dr.rsi.toFixed(1)})` : ''}`, color: '#ffffff', size: 'lg' },
             ].filter(Boolean)
             const vals = levels.map(l => l.value)
             const span = Math.max(...vals) - Math.min(...vals)
