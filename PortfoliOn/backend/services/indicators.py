@@ -25,11 +25,11 @@ def get_support_resistance(df: pd.DataFrame) -> dict:
     }
 
 def calc_rsi_target_price(
-    prices: pd.Series, rsi_values: pd.Series, target_rsi: float
+    prices: pd.Series, rsi_values: pd.Series, target_rsi: float, n: int = 30
 ) -> float | None:
     prices = prices.dropna()
     rsi_values = rsi_values.dropna()
-    n = min(len(prices), len(rsi_values), 20)
+    n = min(len(prices), len(rsi_values), n)
     if n < 5:
         return None
     p = prices.iloc[-n:].values
@@ -39,7 +39,10 @@ def calc_rsi_target_price(
     if coeffs[0] <= 0:
         return None
     result = round(float(np.polyval(coeffs, target_rsi)), 2)
+    # 음수 또는 현재가의 10% 미만 — 극단 외삽 무효
     current_price = float(prices.iloc[-1])
+    if result <= 0 or result < current_price * 0.1:
+        return None
     current_rsi = float(rsi_values.iloc[-1])
     # 방향 검증: RSI 목표가 현재보다 높으면 가격도 높아야 하고, 낮으면 낮아야 함
     if target_rsi > current_rsi and result < current_price:
@@ -52,11 +55,11 @@ def get_timeframe_rsi(ticker: str) -> dict:
     t = yf.Ticker(ticker)
     result = {}
     configs = [
-        ("daily",   {"period": "1y",  "interval": "1d"}),
-        ("weekly",  {"period": "5y",  "interval": "1wk"}),
-        ("monthly", {"period": "10y", "interval": "1mo"}),
+        ("daily",   {"period": "1y",  "interval": "1d"},  30),
+        ("weekly",  {"period": "5y",  "interval": "1wk"}, 60),
+        ("monthly", {"period": "10y", "interval": "1mo"}, 60),
     ]
-    for tf, params in configs:
+    for tf, params, n in configs:
         try:
             df = t.history(**params)
             if df.empty:
@@ -70,12 +73,12 @@ def get_timeframe_rsi(ticker: str) -> dict:
             current_rsi = round(float(rsi.iloc[-1]), 2)
             result[tf] = {
                 "rsi": current_rsi,
-                "target_20": calc_rsi_target_price(df["Close"], rsi, 20.0),
-                "target_25": calc_rsi_target_price(df["Close"], rsi, 25.0),
-                "target_30": calc_rsi_target_price(df["Close"], rsi, 30.0),
-                "target_70": calc_rsi_target_price(df["Close"], rsi, 70.0),
-                "target_75": calc_rsi_target_price(df["Close"], rsi, 75.0),
-                "target_80": calc_rsi_target_price(df["Close"], rsi, 80.0),
+                "target_20": calc_rsi_target_price(df["Close"], rsi, 20.0, n),
+                "target_25": calc_rsi_target_price(df["Close"], rsi, 25.0, n),
+                "target_30": calc_rsi_target_price(df["Close"], rsi, 30.0, n),
+                "target_70": calc_rsi_target_price(df["Close"], rsi, 70.0, n),
+                "target_75": calc_rsi_target_price(df["Close"], rsi, 75.0, n),
+                "target_80": calc_rsi_target_price(df["Close"], rsi, 80.0, n),
             }
         except Exception:
             result[tf] = {
