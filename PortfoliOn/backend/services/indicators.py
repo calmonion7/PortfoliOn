@@ -44,10 +44,11 @@ def calc_rsi_target_price(
     if result <= 0 or result < current_price * 0.1:
         return None
     current_rsi = float(rsi_values.iloc[-1])
-    # 방향 검증: RSI 목표가 현재보다 높으면 가격도 높아야 하고, 낮으면 낮아야 함
-    if target_rsi > current_rsi and result < current_price:
+    # 방향 검증: 5% 허용 오차 적용 (근접 RSI에서 회귀 노이즈 허용)
+    tol = current_price * 0.05
+    if target_rsi > current_rsi and result < current_price - tol:
         return None
-    if target_rsi < current_rsi and result > current_price:
+    if target_rsi < current_rsi and result > current_price + tol:
         return None
     return result
 
