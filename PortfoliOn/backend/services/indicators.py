@@ -25,48 +25,46 @@ def get_support_resistance(df: pd.DataFrame) -> dict:
     }
 
 def calc_rsi_target_price(
-    prices: pd.Series, rsi_values: pd.Series, target_rsi: float, n: int = 30
+    prices: pd.Series, rsi_values: pd.Series, target_rsi: float, n: int = 30,
+    period: int = 14,
 ) -> float | None:
+    """RSI 수식 역산: 다음 캔들이 반환값 가격이면 RSI == target_rsi.
+    EWM(com=period-1) 기준으로 정확히 계산.
+    """
     prices = prices.dropna()
-    rsi_values = rsi_values.dropna()
-    common = prices.index.intersection(rsi_values.index)
-    if len(common) < 10:
+    if len(prices) < period + 1:
         return None
-    p = prices.loc[common].values.astype(float)
-    r = rsi_values.loc[common].values.astype(float)
-    cur_price = p[-1]
-    cur_rsi = r[-1]
 
-    result = None
+    delta = prices.diff()
+    gain  = delta.clip(lower=0)
+    loss  = -delta.clip(upper=0)
+    avg_gain = gain.ewm(com=period - 1, min_periods=period).mean()
+    avg_loss = loss.ewm(com=period - 1, min_periods=period).mean()
 
-    # 1차: 과거 해당 RSI 구간 실제 가격 가중평균 (윈도우 5 → 10 → 15)
-    for window in [5, 10, 15]:
-        mask = np.abs(r - target_rsi) <= window
-        if mask.sum() >= 3:
-            indices = np.where(mask)[0]
-            weights = np.exp(0.03 * (indices - len(p)))
-            weights /= weights.sum()
-            result = round(float(np.dot(weights, p[mask])), 2)
-            break
+    AG = float(avg_gain.iloc[-1])
+    AL = float(avg_loss.iloc[-1])
+    if AL == 0 or np.isnan(AG) or np.isnan(AL):
+        return None
 
-    # 2차: 해당 RSI 구간 데이터 없으면 선형 회귀 외삽
-    if result is None:
-        nn = min(len(p), n)
-        if nn < 5:
+    cur_price  = float(prices.iloc[-1])
+    RS_target  = target_rsi / (100.0 - target_rsi)
+    factor     = period - 1          # EWM(com=13) → (1-α)/α = 13
+
+    current_rs = AG / AL
+    if RS_target > current_rs:       # 상승 목표
+        delta_p = factor * (AL * RS_target - AG)
+        if delta_p <= 0:
             return None
-        coeffs = np.polyfit(r[-nn:], p[-nn:], 1)
-        if coeffs[0] <= 0:
+    else:                            # 하락 목표
+        delta_p = factor * (AL - AG / RS_target)
+        if delta_p >= 0:
             return None
-        result = round(float(np.polyval(coeffs, target_rsi)), 2)
 
-    if result is None or result <= 0:
+    result = round(cur_price + delta_p, 2)
+    if result <= 0:
         return None
-
-    # 방향 검증: 5% 허용 오차
-    tol = cur_price * 0.05
-    if target_rsi > cur_rsi and result < cur_price - tol:
-        return None
-    if target_rsi < cur_rsi and result > cur_price + tol:
+    # Filter out targets that require unrealistic single-candle moves (> 50%)
+    if abs(result - cur_price) / cur_price > 0.5:
         return None
     return result
 
