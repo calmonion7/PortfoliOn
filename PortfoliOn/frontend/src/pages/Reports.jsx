@@ -814,7 +814,6 @@ export default function Reports() {
       if (rsiB === null) return -1
       return rsiA - rsiB
     })
-  const otherEntries = Object.entries(reportList).filter(([, v]) => v.category === 'other')
 
   const renderTickerItem = (ticker, info) => {
     const isExpanded = expandedTickers.has(ticker)
@@ -902,12 +901,6 @@ export default function Reports() {
         </div>
         {tabEntries.length === 0 && <p style={{ color: '#666', fontSize: 12 }}>리포트 없음</p>}
         {tabEntries.map(([t, info]) => renderTickerItem(t, info))}
-        {otherEntries.length > 0 && (
-          <>
-            <div style={{ color: '#555', fontSize: 11, marginTop: 12, marginBottom: 6 }}>기타</div>
-            {otherEntries.map(([t, info]) => renderTickerItem(t, info))}
-          </>
-        )}
       </div>
 
       {/* 우측 패널 */}
@@ -976,8 +969,8 @@ export default function Reports() {
                       </td>
                       <td style={{ ...TD, textAlign: 'left' }}>
                         {market === 'KR'
-                          ? <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
-                          : <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a2a3a', color: '#4fc3f7', border: '1px solid #2a4a6a' }}>🇺🇸 US</span>
+                          ? <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a', whiteSpace: 'nowrap' }}>🇰🇷 KR</span>
+                          : <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a2a3a', color: '#4fc3f7', border: '1px solid #2a4a6a', whiteSpace: 'nowrap' }}>🇺🇸 US</span>
                         }
                       </td>
                       <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontSize: 11 }}>
