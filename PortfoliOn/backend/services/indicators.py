@@ -28,13 +28,15 @@ def calc_rsi_target_price(
     prices: pd.Series, rsi_values: pd.Series, target_rsi: float, n: int = 30,
     period: int = 14,
 ) -> float | None:
-    """RSI 수식 역산: 다음 캔들이 반환값 가격이면 RSI == target_rsi.
-    EWM(com=period-1) 기준으로 정확히 계산.
+    """RSI 목표가 계산.
+    1차: EWM 수식 역산 (단일 다음 봉 기준, ±50% 이내 현실적 구간만)
+    2차: 과거 데이터에서 해당 RSI 구간 실제 가격 가중평균 (1차 불가 시)
     """
     prices = prices.dropna()
     if len(prices) < period + 1:
         return None
 
+    # 1차: 수식 역산
     delta = prices.diff()
     gain  = delta.clip(lower=0)
     loss  = -delta.clip(upper=0)
@@ -43,30 +45,46 @@ def calc_rsi_target_price(
 
     AG = float(avg_gain.iloc[-1])
     AL = float(avg_loss.iloc[-1])
-    if AL == 0 or np.isnan(AG) or np.isnan(AL):
+    cur_price = float(prices.iloc[-1])
+
+    if AL > 0 and not (np.isnan(AG) or np.isnan(AL)):
+        RS_target = target_rsi / (100.0 - target_rsi)
+        factor    = period - 1
+        current_rs = AG / AL
+        if RS_target > current_rs:
+            delta_p = factor * (AL * RS_target - AG)
+            if delta_p > 0:
+                result = round(cur_price + delta_p, 2)
+                if result > 0 and abs(result - cur_price) / cur_price <= 0.5:
+                    return result
+        else:
+            delta_p = factor * (AL - AG / RS_target)
+            if delta_p < 0:
+                result = round(cur_price + delta_p, 2)
+                if result > 0 and abs(result - cur_price) / cur_price <= 0.5:
+                    return result
+
+    # 2차: 과거 RSI 구간 가격 가중평균 (수식 역산이 ±50% 초과 또는 불가 시)
+    rsi_aligned = rsi_values.dropna().reindex(prices.index).dropna()
+    prices_aligned = prices.reindex(rsi_aligned.index)
+    if len(prices_aligned) < 5:
         return None
 
-    cur_price  = float(prices.iloc[-1])
-    RS_target  = target_rsi / (100.0 - target_rsi)
-    factor     = period - 1          # EWM(com=13) → (1-α)/α = 13
+    rsi_arr = rsi_aligned.values
+    p_arr   = prices_aligned.values
 
-    current_rs = AG / AL
-    if RS_target > current_rs:       # 상승 목표
-        delta_p = factor * (AL * RS_target - AG)
-        if delta_p <= 0:
-            return None
-    else:                            # 하락 목표
-        delta_p = factor * (AL - AG / RS_target)
-        if delta_p >= 0:
-            return None
+    for window in [5, 10, 15]:
+        mask = np.abs(rsi_arr - target_rsi) <= window
+        if mask.sum() >= 2:
+            indices = np.where(mask)[0]
+            p = p_arr[mask]
+            weights = np.exp(0.05 * (indices - len(p_arr)))
+            weights /= weights.sum()
+            result = round(float(np.dot(weights, p)), 2)
+            if result > 0:
+                return result
 
-    result = round(cur_price + delta_p, 2)
-    if result <= 0:
-        return None
-    # Filter out targets that require unrealistic single-candle moves (> 50%)
-    if abs(result - cur_price) / cur_price > 0.5:
-        return None
-    return result
+    return None
 
 def get_timeframe_rsi(ticker: str) -> dict:
     t = yf.Ticker(ticker)
