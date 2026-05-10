@@ -1026,9 +1026,9 @@ export default function Reports() {
                         const isClosest = closestKey === key
                         return (
                           <td key={key} style={{ ...TD, color: base, background: isClosest ? '#2d2a00' : undefined, border: isClosest ? '2px solid #ffeb3b' : undefined, fontWeight: isClosest ? 700 : undefined }}>
-                            {dv != null ? <div>{fmt(dv, s?.market)}{gapEl(dv)}</div> : <div>N/A</div>}
-                            {wv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(wv, s?.market)}{gapEl(wv, 9)}</div>}
-                            {mv != null && <div style={{ fontSize: 10, color: sub }}>{fmt(mv, s?.market)}{gapEl(mv, 9)}</div>}
+                            {dv != null ? <div>{fmt(dv, s?.market)}{gapEl(dv)}</div> : <div style={{ color: '#546e7a' }}>N/A</div>}
+                            <div style={{ fontSize: 10, color: wv != null ? sub : '#3a4a5a' }}>{wv != null ? <>{fmt(wv, s?.market)}{gapEl(wv, 9)}</> : 'N/A'}</div>
+                            <div style={{ fontSize: 10, color: mv != null ? sub : '#3a4a5a' }}>{mv != null ? <>{fmt(mv, s?.market)}{gapEl(mv, 9)}</> : 'N/A'}</div>
                           </td>
                         )
                       })}
