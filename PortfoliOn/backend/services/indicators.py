@@ -29,26 +29,44 @@ def calc_rsi_target_price(
 ) -> float | None:
     prices = prices.dropna()
     rsi_values = rsi_values.dropna()
-    n = min(len(prices), len(rsi_values), n)
-    if n < 5:
+    common = prices.index.intersection(rsi_values.index)
+    if len(common) < 10:
         return None
-    p = prices.iloc[-n:].values
-    r = rsi_values.iloc[-n:].values
-    coeffs = np.polyfit(r, p, 1)
-    # RSI와 가격은 양의 상관관계여야 함 — 기울기가 0 이하면 회귀 신뢰 불가
-    if coeffs[0] <= 0:
+    p = prices.loc[common].values.astype(float)
+    r = rsi_values.loc[common].values.astype(float)
+    cur_price = p[-1]
+    cur_rsi = r[-1]
+
+    result = None
+
+    # 1차: 과거 해당 RSI 구간 실제 가격 가중평균 (윈도우 5 → 10 → 15)
+    for window in [5, 10, 15]:
+        mask = np.abs(r - target_rsi) <= window
+        if mask.sum() >= 3:
+            indices = np.where(mask)[0]
+            weights = np.exp(0.03 * (indices - len(p)))
+            weights /= weights.sum()
+            result = round(float(np.dot(weights, p[mask])), 2)
+            break
+
+    # 2차: 해당 RSI 구간 데이터 없으면 선형 회귀 외삽
+    if result is None:
+        nn = min(len(p), n)
+        if nn < 5:
+            return None
+        coeffs = np.polyfit(r[-nn:], p[-nn:], 1)
+        if coeffs[0] <= 0:
+            return None
+        result = round(float(np.polyval(coeffs, target_rsi)), 2)
+
+    if result is None or result <= 0:
         return None
-    result = round(float(np.polyval(coeffs, target_rsi)), 2)
-    # 음수 또는 현재가의 10% 미만 — 극단 외삽 무효
-    current_price = float(prices.iloc[-1])
-    if result <= 0 or result < current_price * 0.1:
+
+    # 방향 검증: 5% 허용 오차
+    tol = cur_price * 0.05
+    if target_rsi > cur_rsi and result < cur_price - tol:
         return None
-    current_rsi = float(rsi_values.iloc[-1])
-    # 방향 검증: 5% 허용 오차 적용 (근접 RSI에서 회귀 노이즈 허용)
-    tol = current_price * 0.05
-    if target_rsi > current_rsi and result < current_price - tol:
-        return None
-    if target_rsi < current_rsi and result > current_price + tol:
+    if target_rsi < cur_rsi and result > cur_price + tol:
         return None
     return result
 
