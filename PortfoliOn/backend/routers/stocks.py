@@ -2,14 +2,47 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
 from services import storage
+import re
+import requests as http_requests
 import yfinance as yf
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
+
+_KR_PATTERN = re.compile(r'[가-힣]')
+
+
+def _search_naver(q: str, max_results: int = 12) -> list:
+    """Search Korean stocks via Naver Finance autocomplete (supports Korean text)."""
+    try:
+        r = http_requests.get(
+            "https://ac.stock.naver.com/ac",
+            params={"q": q, "target": "stock"},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=5,
+        )
+        items = r.json().get("items", [])
+        results = []
+        for item in items[:max_results]:
+            code = item.get("code", "")
+            name = item.get("name", "")
+            type_code = item.get("typeCode", "KOSPI")
+            exchange = "KQ" if type_code == "KOSDAQ" else "KS"
+            results.append({
+                "ticker": code,
+                "name": name,
+                "market": "KR",
+                "exchange": exchange,
+                "exchange_display": type_code,
+            })
+        return results
+    except Exception:
+        return []
 
 
 class EnrichBody(BaseModel):
     moat: Optional[str] = None
     growth_plan: Optional[str] = None
+    risks: Optional[str] = None
     recent_disclosures: Optional[str] = None
     competitors: Optional[List[str]] = None
 
@@ -18,12 +51,20 @@ class BatchEnrichItem(BaseModel):
     ticker: str
     moat: Optional[str] = None
     growth_plan: Optional[str] = None
+    risks: Optional[str] = None
     recent_disclosures: Optional[str] = None
     competitors: Optional[List[str]] = None
 
 
 @router.get("/search")
 def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
+    # Yahoo Finance doesn't support Korean text — use Naver autocomplete instead
+    if _KR_PATTERN.search(q):
+        results = _search_naver(q)
+        if market != "ALL":
+            results = [r for r in results if r["market"] == market]
+        return results
+
     try:
         results = yf.Search(q, max_results=12, enable_fuzzy_query=True)
         quotes = results.quotes or []

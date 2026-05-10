@@ -55,7 +55,7 @@ def get_full_portfolio() -> dict:
 
     def _fallback(t: str) -> dict:
         return {"ticker": t, "name": t, "competitors": [], "moat": "", "growth_plan": "",
-                "recent_disclosures": "", "market": "US", "exchange": ""}
+                "risks": "", "recent_disclosures": "", "market": "US", "exchange": ""}
 
     holding_stocks = []
     for h in holdings:
@@ -102,7 +102,7 @@ def enrich_stock(ticker: str, fields: dict) -> bool:
             stocks[idx][k] = v
     else:
         entry = {"ticker": upper, "name": upper, "competitors": [],
-                 "moat": "", "growth_plan": "", "recent_disclosures": "",
+                 "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": "",
                  "market": "US", "exchange": ""}
         entry.update(fields)
         stocks.append(entry)
