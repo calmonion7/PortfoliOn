@@ -1,15 +1,52 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 const thStyle = { padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12 }
 const tdStyle = { padding: '8px 12px', color: '#e0e0e0' }
 
+const TABS = [
+  { key: 'popularity', label: '인기순' },
+  { key: 'top3',       label: '매니저별 탑3' },
+  { key: 'weighted',   label: '가중치 통계' },
+]
+
+function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
+  const entry = stockMap[ticker]
+  if (entry === 'holding') {
+    return <span style={{ fontSize: 11, color: '#555', padding: '3px 8px' }}>보유중</span>
+  }
+  const inWatchlist = entry === 'watchlist'
+  return (
+    <button
+      onClick={() => onToggle(ticker, name, inWatchlist)}
+      style={{
+        fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none',
+        cursor: 'pointer',
+        background: inWatchlist ? '#2a1a1a' : '#1a2a1a',
+        color: inWatchlist ? '#ef9a9a' : '#a5d6a7',
+      }}
+    >
+      {inWatchlist ? '★ 삭제' : '☆ 추가'}
+    </button>
+  )
+}
+
 export default function GuruStats() {
   const [popularity, setPopularity] = useState([])
   const [top3, setTop3]             = useState([])
   const [weighted, setWeighted]     = useState([])
+  const [stockMap, setStockMap]     = useState({})  // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]       = useState(true)
+  const [tab, setTab]               = useState('popularity')
+
+  const loadStockMap = useCallback(() => {
+    axios.get('/api/stocks').then(({ data }) => {
+      const map = {}
+      data.forEach(s => { map[s.ticker] = s.type })
+      setStockMap(map)
+    })
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -21,7 +58,29 @@ export default function GuruStats() {
       setTop3(t.data)
       setWeighted(w.data)
     }).finally(() => setLoading(false))
-  }, [])
+    loadStockMap()
+  }, [loadStockMap])
+
+  const handleToggle = async (ticker, name, inWatchlist) => {
+    try {
+      if (inWatchlist) {
+        await axios.delete(`/api/watchlist/${ticker}`)
+      } else {
+        await axios.post('/api/watchlist', { ticker, name: name || ticker })
+      }
+      loadStockMap()
+    } catch (err) {
+      alert(err.response?.data?.detail || '오류가 발생했습니다')
+    }
+  }
+
+  const tabStyle = (active) => ({
+    padding: '6px 14px', borderRadius: 16,
+    border: `1px solid ${active ? '#4fc3f7' : '#444'}`,
+    background: active ? '#1565c0' : 'transparent',
+    color: active ? 'white' : '#888',
+    cursor: 'pointer', fontSize: 13,
+  })
 
   if (loading) return <p style={{ color: '#aaa' }}>로딩 중...</p>
   if (!popularity.length) return (
@@ -29,11 +88,16 @@ export default function GuruStats() {
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {TABS.map(t => (
+          <button key={t.key} style={tabStyle(tab === t.key)} onClick={() => setTab(t.key)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {/* ① 전체 인기순 */}
-      <section>
-        <h3 style={{ color: '#80cbc4', fontSize: 14, marginBottom: 12 }}>① 전체 종목 인기순 (카운트)</h3>
+      {tab === 'popularity' && (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
@@ -42,6 +106,7 @@ export default function GuruStats() {
               <th style={thStyle}>영문명</th>
               <th style={thStyle}>한글명</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>매니저 수</th>
+              <th style={thStyle}></th>
             </tr>
           </thead>
           <tbody>
@@ -52,15 +117,21 @@ export default function GuruStats() {
                 <td style={{ ...tdStyle, color: '#aaa' }}>{row.name}</td>
                 <td style={tdStyle}>{row.name_kr || '-'}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{row.count}명</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                  <WatchlistBtn
+                    ticker={row.ticker}
+                    name={row.name_kr || row.name}
+                    stockMap={stockMap}
+                    onToggle={handleToggle}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </section>
+      )}
 
-      {/* ② 매니저별 탑3 */}
-      <section>
-        <h3 style={{ color: '#80cbc4', fontSize: 14, marginBottom: 12 }}>② 매니저별 탑3 인기순</h3>
+      {tab === 'top3' && (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
@@ -90,40 +161,48 @@ export default function GuruStats() {
             ))}
           </tbody>
         </table>
-      </section>
+      )}
 
-      {/* ③ 가중치 통계 */}
-      <section>
-        <h3 style={{ color: '#80cbc4', fontSize: 14, marginBottom: 8 }}>③ 전체 종목 가중치 통계 (역수 합산)</h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-          {WEIGHT_LEGEND.map(({ rank, score }) => (
-            <span key={rank} style={{ fontSize: 11, color: '#666', background: '#1e1e2e', padding: '2px 6px', borderRadius: 3 }}>
-              {rank}위={score}
-            </span>
-          ))}
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
-              <th style={thStyle}>#</th>
-              <th style={thStyle}>티커</th>
-              <th style={thStyle}>한글명</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>가중치 합계</th>
-            </tr>
-          </thead>
-          <tbody>
-            {weighted.map((row, i) => (
-              <tr key={row.ticker} style={{ borderBottom: '1px solid #222' }}>
-                <td style={tdStyle}>{i + 1}</td>
-                <td style={{ ...tdStyle, fontWeight: 600, color: '#4fc3f7' }}>{row.ticker}</td>
-                <td style={tdStyle}>{row.name_kr || row.name || '-'}</td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.score.toFixed(3)}</td>
-              </tr>
+      {tab === 'weighted' && (
+        <div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+            {WEIGHT_LEGEND.map(({ rank, score }) => (
+              <span key={rank} style={{ fontSize: 11, color: '#666', background: '#1e1e2e', padding: '2px 6px', borderRadius: 3 }}>
+                {rank}위={score}
+              </span>
             ))}
-          </tbody>
-        </table>
-      </section>
-
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
+                <th style={thStyle}>#</th>
+                <th style={thStyle}>티커</th>
+                <th style={thStyle}>한글명</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>가중치 합계</th>
+                <th style={thStyle}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {weighted.map((row, i) => (
+                <tr key={row.ticker} style={{ borderBottom: '1px solid #222' }}>
+                  <td style={tdStyle}>{i + 1}</td>
+                  <td style={{ ...tdStyle, fontWeight: 600, color: '#4fc3f7' }}>{row.ticker}</td>
+                  <td style={tdStyle}>{row.name_kr || row.name || '-'}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.score.toFixed(3)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <WatchlistBtn
+                      ticker={row.ticker}
+                      name={row.name_kr || row.name}
+                      stockMap={stockMap}
+                      onToggle={handleToggle}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
