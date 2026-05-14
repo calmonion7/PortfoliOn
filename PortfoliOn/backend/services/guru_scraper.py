@@ -94,18 +94,21 @@ def scrape_holdings(manager_id: str) -> dict:
     num_stocks = 0
     table = soup.select_one("table#grid")
     if table:
-        all_data_rows = [row for row in table.select("tr") if row.select("td")]
-        num_stocks = len(all_data_rows)
-        for row in all_data_rows[:10]:
+        # cells[1] 형식: "AAPL- Apple Inc." — 헤더 행(Stock)은 대시가 없으므로 제외
+        data_rows = []
+        for row in table.select("tr"):
             cells = row.select("td")
             if len(cells) < 3:
                 continue
-            # 컬럼: [0]=# [1]=Stock(ticker+name) [2]=%Port [3]=Shares [4]=Value ...
-            stock_cell = cells[1]
-            ticker_link = stock_cell.select_one("a")
-            raw = (ticker_link or stock_cell).get_text(strip=True)
-            ticker = raw.split()[0].upper() if raw else ""
-            name = raw[len(ticker):].strip() if ticker and raw.startswith(ticker) else ""
+            raw = cells[1].get_text(strip=True)
+            if "-" not in raw:
+                continue  # 헤더 행 스킵
+            data_rows.append((cells, raw))
+        num_stocks = len(data_rows)
+        for cells, raw in data_rows[:10]:
+            parts = raw.split("-", 1)
+            ticker = parts[0].strip().upper()
+            name = parts[1].strip() if len(parts) > 1 else ""
             try:
                 weight_pct = float(cells[2].get_text(strip=True).replace("%", "").strip())
             except ValueError:
