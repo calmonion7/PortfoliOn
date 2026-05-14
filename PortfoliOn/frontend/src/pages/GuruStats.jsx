@@ -39,6 +39,7 @@ export default function GuruStats() {
   const [stockMap, setStockMap]     = useState({})  // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]       = useState(true)
   const [tab, setTab]               = useState('popularity')
+  const [query, setQuery]           = useState('')
 
   const loadStockMap = useCallback(() => {
     axios.get('/api/stocks').then(({ data }) => {
@@ -82,6 +83,23 @@ export default function GuruStats() {
     cursor: 'pointer', fontSize: 13,
   })
 
+  const q = query.trim().toLowerCase()
+
+  const filteredPopularity = q
+    ? popularity.filter(r => r.ticker.toLowerCase().includes(q) || (r.name_kr || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q))
+    : popularity
+
+  const filteredWeighted = q
+    ? weighted.filter(r => r.ticker.toLowerCase().includes(q) || (r.name_kr || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q))
+    : weighted
+
+  const filteredTop3 = q
+    ? top3.filter(m =>
+        m.manager_name.toLowerCase().includes(q) ||
+        m.top3.some(h => h && (h.ticker.toLowerCase().includes(q) || (h.name_kr || '').toLowerCase().includes(q)))
+      )
+    : top3
+
   if (loading) return <p style={{ color: '#aaa' }}>로딩 중...</p>
   if (!popularity.length) return (
     <p style={{ color: '#888', fontSize: 14 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
@@ -89,12 +107,24 @@ export default function GuruStats() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {TABS.map(t => (
           <button key={t.key} style={tabStyle(tab === t.key)} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}
+      </div>
+
+      <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="티커 / 종목명 / 매니저명 검색..."
+          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid #444', background: '#1e1e2e', color: '#e0e0e0', fontSize: 13, width: 260 }}
+        />
+        {query && tab === 'popularity' && <span style={{ color: '#666', fontSize: 12 }}>{filteredPopularity.length}개</span>}
+        {query && tab === 'weighted'   && <span style={{ color: '#666', fontSize: 12 }}>{filteredWeighted.length}개</span>}
+        {query && tab === 'top3'       && <span style={{ color: '#666', fontSize: 12 }}>{filteredTop3.length}명</span>}
       </div>
 
       {tab === 'popularity' && (
@@ -110,7 +140,7 @@ export default function GuruStats() {
             </tr>
           </thead>
           <tbody>
-            {popularity.map((row, i) => (
+            {filteredPopularity.map((row, i) => (
               <tr key={row.ticker} style={{ borderBottom: '1px solid #222' }}>
                 <td style={tdStyle}>{i + 1}</td>
                 <td style={{ ...tdStyle, fontWeight: 600, color: '#4fc3f7' }}>{row.ticker}</td>
@@ -140,7 +170,7 @@ export default function GuruStats() {
             </tr>
           </thead>
           <tbody>
-            {top3.map(m => (
+            {filteredTop3.map(m => (
               <tr key={m.manager_name} style={{ borderBottom: '1px solid #222' }}>
                 <td style={tdStyle}>{m.manager_name}</td>
                 {[0, 1, 2].map(i => {
@@ -183,7 +213,7 @@ export default function GuruStats() {
               </tr>
             </thead>
             <tbody>
-              {weighted.map((row, i) => (
+              {filteredWeighted.map((row, i) => (
                 <tr key={row.ticker} style={{ borderBottom: '1px solid #222' }}>
                   <td style={tdStyle}>{i + 1}</td>
                   <td style={{ ...tdStyle, fontWeight: 600, color: '#4fc3f7' }}>{row.ticker}</td>

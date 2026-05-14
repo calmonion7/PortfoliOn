@@ -79,16 +79,18 @@ def scrape_holdings(manager_id: str) -> dict:
     soup = BeautifulSoup(r.text, "html.parser")
 
     firm = ""
-    header = soup.select_one("div#port_header")
-    if header:
-        firm_el = header.select_one("span.man, h1, h2")
-        if firm_el:
-            firm = firm_el.get_text(strip=True)
+    firm_el = soup.select_one("div#f_name")
+    if firm_el:
+        firm = firm_el.get_text(strip=True)
 
     portfolio_value = 0
-    val_el = soup.select_one("span#portValue, td#portValue")
-    if val_el:
-        portfolio_value = _parse_portfolio_value(val_el.get_text(strip=True))
+    p2 = soup.select_one("p#p2")
+    if p2:
+        for span in p2.select("span"):
+            text = span.get_text(strip=True)
+            if text.startswith("$"):
+                portfolio_value = _parse_portfolio_value(text)
+                break
 
     top10 = []
     num_stocks = 0

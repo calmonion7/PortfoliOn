@@ -9,13 +9,23 @@ function formatValue(val) {
   return `$${val.toLocaleString()}`
 }
 
-const thStyle = { padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12 }
 const tdStyle = { padding: '8px 12px', color: '#e0e0e0' }
 
+const COLUMNS = [
+  { key: '#',     label: '#',               sortKey: null },
+  { key: 'name',  label: 'Manager',         sortKey: 'name' },
+  { key: 'firm',  label: 'Firm',            sortKey: 'firm' },
+  { key: 'pval',  label: 'Portfolio Value', sortKey: 'portfolio_value' },
+  { key: 'stocks',label: 'Stocks',          sortKey: 'num_stocks' },
+  { key: 'top10', label: 'Top 10',          sortKey: null },
+]
+
 export default function GuruManagers() {
-  const [data, setData]       = useState({ last_updated: null, managers: [] })
-  const [stockMap, setStockMap] = useState({})  // ticker -> 'holding'|'watchlist'
-  const [loading, setLoading] = useState(true)
+  const [data, setData]         = useState({ last_updated: null, managers: [] })
+  const [stockMap, setStockMap] = useState({})
+  const [loading, setLoading]   = useState(true)
+  const [sort, setSort]         = useState({ key: 'num_stocks', dir: 1 })
+  const [query, setQuery]       = useState('')
 
   const loadStockMap = useCallback(() => {
     axios.get('/api/stocks').then(({ data }) => {
@@ -54,6 +64,32 @@ export default function GuruManagers() {
     return { background: '#1e3a5f', color: '#4fc3f7' }
   }
 
+  const handleSort = (col) => {
+    if (!col.sortKey) return
+    setSort(prev =>
+      prev.key === col.sortKey
+        ? { key: col.sortKey, dir: -prev.dir }
+        : { key: col.sortKey, dir: col.sortKey === 'num_stocks' ? 1 : -1 }
+    )
+  }
+
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? data.managers.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.firm || '').toLowerCase().includes(q) ||
+        (m.top10 || []).some(h => h.ticker.toLowerCase().includes(q) || (h.name_kr || '').toLowerCase().includes(q))
+      )
+    : data.managers
+
+  const sorted = [...filtered].sort((a, b) => {
+    const av = a[sort.key] ?? ''
+    const bv = b[sort.key] ?? ''
+    if (av < bv) return -sort.dir
+    if (av > bv) return sort.dir
+    return 0
+  })
+
   if (loading) return <p style={{ color: '#aaa' }}>로딩 중...</p>
   if (!data.managers.length) return (
     <p style={{ color: '#888', fontSize: 14 }}>
@@ -64,19 +100,44 @@ export default function GuruManagers() {
   return (
     <div>
       {data.last_updated && (
-        <p style={{ color: '#666', fontSize: 12, marginBottom: 12 }}>마지막 갱신: {data.last_updated}</p>
+        <p style={{ color: '#666', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated}</p>
       )}
+      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="매니저명 / 펌 / 티커 검색..."
+          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid #444', background: '#1e1e2e', color: '#e0e0e0', fontSize: 13, width: 260 }}
+        />
+        {query && (
+          <span style={{ color: '#666', fontSize: 12 }}>{sorted.length} / {data.managers.length}명</span>
+        )}
+      </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
-              {['#', 'Manager', 'Firm', 'Portfolio Value', 'Stocks', 'Top 10'].map(h => (
-                <th key={h} style={thStyle}>{h}</th>
+              {COLUMNS.map(col => (
+                <th
+                  key={col.key}
+                  onClick={() => handleSort(col)}
+                  style={{
+                    padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12,
+                    cursor: col.sortKey ? 'pointer' : 'default',
+                    userSelect: 'none',
+                    color: sort.key === col.sortKey ? '#4fc3f7' : '#80cbc4',
+                  }}
+                >
+                  {col.label}
+                  {col.sortKey && sort.key === col.sortKey && (
+                    <span style={{ marginLeft: 4 }}>{sort.dir === 1 ? '▲' : '▼'}</span>
+                  )}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {data.managers.map((m, i) => (
+            {sorted.map((m, i) => (
               <tr key={m.id} style={{ borderBottom: '1px solid #222' }}>
                 <td style={tdStyle}>{i + 1}</td>
                 <td style={tdStyle}>{m.name}</td>
