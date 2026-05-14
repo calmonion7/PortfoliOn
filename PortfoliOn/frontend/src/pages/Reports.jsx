@@ -695,6 +695,17 @@ export default function Reports() {
   const [activeDetailTab, setActiveDetailTab] = useState('summary')
   const [expandedTickers, setExpandedTickers] = useState(new Set())
   const [marketFilter, setMarketFilter] = useState('ALL')
+  const [guruMap, setGuruMap] = useState({})  // ticker -> count
+
+  useEffect(() => {
+    axios.get('/api/guru/stats/popularity')
+      .then(({ data }) => {
+        const map = {}
+        data.forEach(r => { if (r.count > 0) map[r.ticker] = r.count })
+        setGuruMap(map)
+      })
+      .catch(() => {})
+  }, [])
 
   const toggleTicker = (ticker) => {
     setExpandedTickers(prev => {
@@ -830,6 +841,9 @@ export default function Reports() {
               {info.summary?.name && (
                 <div style={{ color: '#546e7a', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
               )}
+              {guruMap[ticker] && (
+                <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
+              )}
             </div>
           </div>
           <button
@@ -920,6 +934,7 @@ export default function Reports() {
                   <th style={{ ...TH, textAlign: 'left' }}>시장</th>
                   <th style={{ ...TH, textAlign: 'left' }}>섹터</th>
                   <th style={TH}>현재가</th>
+                  <th style={{ ...TH, color: '#ffb74d' }}>20일고점대비</th>
                   <th style={TH}>POC</th>
                   <th style={TH}>평균목표가<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>vs 현재가</span></th>
                   <th style={{ ...TH, color: '#81c784' }}>Buy</th>
@@ -965,6 +980,7 @@ export default function Reports() {
                       <td style={{ ...TD, textAlign: 'left', color: '#80cbc4', fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, background: '#141414' }}>
                         <div>{s?.name || ticker}</div>
                         <div style={{ color: '#666', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
+                        {guruMap[ticker] && <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>}
                         {!hasReport && <div style={{ color: '#546e7a', fontSize: 10 }}>리포트 없음 — 클릭하여 생성</div>}
                       </td>
                       <td style={{ ...TD, textAlign: 'left' }}>
@@ -978,6 +994,14 @@ export default function Reports() {
                         {s?.industry ? <div style={{ color: '#546e7a', fontSize: 10 }}>{s.industry}</div> : null}
                       </td>
                       <td style={TD}>{s ? fmt(s.price, s.market) : 'N/A'}</td>
+                      <td style={TD}>
+                        {s?.drop_from_high_20d != null ? (
+                          <span style={{ color: s.drop_from_high_20d >= 0 ? '#81c784' : '#ef9a9a', fontWeight: 600 }}>
+                            {s.drop_from_high_20d < -10 && <span title="20일 고점 대비 -10% 초과 하락">⚠ </span>}
+                            {s.drop_from_high_20d >= 0 ? '+' : ''}{s.drop_from_high_20d.toFixed(1)}%
+                          </span>
+                        ) : '—'}
+                      </td>
                       <td style={TD}>{fmt(s?.volume_profile?.poc, s?.market)}</td>
                       <td style={TD}>
                         <TargetTooltip s={s} />
@@ -1057,6 +1081,11 @@ export default function Reports() {
                   ? <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
                   : <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: '#1a2a3a', color: '#4fc3f7', border: '1px solid #2a4a6a' }}>🇺🇸 US</span>
                 }
+                {guruMap[selected.ticker] && (
+                  <span style={{ color: '#ffb74d', fontSize: 11, marginLeft: 8, background: '#2a1a00', padding: '2px 7px', borderRadius: 3 }}>
+                    구루 {guruMap[selected.ticker]}명
+                  </span>
+                )}
                 <span style={{ color: '#555', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
                 {detail.summary?.price != null && (
                   <span style={{ color: '#e0e0e0', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price, detail.summary.market)}</span>
@@ -1064,6 +1093,16 @@ export default function Reports() {
                 {detail.summary?.sector && (
                   <span style={{ color: '#4fc3f7', fontSize: 11, marginLeft: 12, background: '#0d2333', padding: '2px 7px', borderRadius: 3 }}>
                     {detail.summary.sector}{detail.summary.industry ? ` / ${detail.summary.industry}` : ''}
+                  </span>
+                )}
+                {detail.summary?.drop_from_high_20d != null && (
+                  <span style={{
+                    fontSize: 11, marginLeft: 8, padding: '2px 7px', borderRadius: 3,
+                    background: detail.summary.drop_from_high_20d >= 0 ? '#1a3a1a' : '#2a1000',
+                    color: detail.summary.drop_from_high_20d >= 0 ? '#81c784' : '#ffb74d',
+                  }}>
+                    {detail.summary.drop_from_high_20d < -10 && <span title="20일 고점 대비 -10% 초과 하락">⚠ </span>}
+                    20일고점 {detail.summary.drop_from_high_20d >= 0 ? '+' : ''}{detail.summary.drop_from_high_20d.toFixed(1)}%
                   </span>
                 )}
                 {detail.summary?.per != null && (

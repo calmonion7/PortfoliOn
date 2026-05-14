@@ -48,6 +48,10 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
     t = yf.Ticker(yf_sym)
     daily_df = t.history(period="1y")
     vp = indicators.get_volume_profile(daily_df)
+
+    high_20d = round(float(daily_df["High"].tail(20).max()), 2) if not daily_df.empty else None
+    _cur = quote.get("price")
+    drop_from_high_20d = round((_cur - high_20d) / high_20d * 100, 2) if high_20d and _cur else None
     if market == "KR":
         sector   = quote.get("sector", "")
         industry = quote.get("industry", "")
@@ -118,6 +122,8 @@ def generate_report(stock: dict, output_base_dir: Path = REPORTS_DIR) -> str:
         "per": round(trailing_per, 2) if trailing_per else None,
         "forward_per": round(forward_per, 2) if forward_per else None,
         "pbr": round(pbr, 2) if pbr else None,
+        "high_20d": high_20d,
+        "drop_from_high_20d": drop_from_high_20d,
     }
     json_path = output_dir / f"{today}.json"
     json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
