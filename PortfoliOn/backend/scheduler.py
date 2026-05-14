@@ -42,6 +42,7 @@ def _reschedule():
 
 def start():
     _reschedule()
+    _reschedule_guru()
     _scheduler.start()
 
 
@@ -54,5 +55,39 @@ def reload():
     _reschedule()
 
 
+_GURU_JOB_ID = "guru_crawl"
+
+
+def _run_guru_crawl():
+    from services.guru_scraper import scrape_all_managers
+    from datetime import datetime
+    try:
+        managers = scrape_all_managers()
+        storage.save_guru_managers({
+            "last_updated": datetime.now().isoformat(timespec="seconds"),
+            "managers": managers,
+        })
+        print("[Scheduler] Guru crawl completed")
+    except Exception as e:
+        print(f"[Scheduler] Guru crawl failed: {e}")
+
+
+def _reschedule_guru():
+    cfg = storage.get_guru_schedule()
+    if _scheduler.get_job(_GURU_JOB_ID):
+        _scheduler.remove_job(_GURU_JOB_ID)
+    if not cfg.get("enabled"):
+        return
+    time_parts = cfg["time"].split(":")
+    hour, minute = int(time_parts[0]), int(time_parts[1])
+    day = _DAY_MAP.get(cfg.get("day", "sun"), "sun")
+    _scheduler.add_job(
+        _run_guru_crawl,
+        CronTrigger(day_of_week=day, hour=hour, minute=minute),
+        id=_GURU_JOB_ID,
+    )
+    print(f"[Scheduler] Guru crawl scheduled at {cfg['time']} on {day}")
+
+
 def reload_guru():
-    pass  # placeholder — full implementation in Task 5
+    _reschedule_guru()
