@@ -10,6 +10,8 @@ def compute_popularity(managers: list[dict]) -> list[dict]:
                     "name_kr": h.get("name_kr", ""),
                     "count": 0,
                 }
+            elif h.get("name_kr") and not counts[ticker]["name_kr"]:
+                counts[ticker]["name_kr"] = h["name_kr"]
             counts[ticker]["count"] += 1
     return sorted(counts.values(), key=lambda x: -x["count"])
 
@@ -53,6 +55,8 @@ def compute_weighted(managers: list[dict]) -> list[dict]:
                     "name_kr": h.get("name_kr", ""),
                     "score": 0.0,
                 }
+            elif h.get("name_kr") and not scores[ticker]["name_kr"]:
+                scores[ticker]["name_kr"] = h["name_kr"]
             scores[ticker]["score"] += score
     for v in scores.values():
         v["score"] = round(v["score"], 3)

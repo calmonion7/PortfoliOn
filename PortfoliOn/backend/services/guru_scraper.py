@@ -9,23 +9,29 @@ _HEADERS = {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
-    )
+    ),
+    "Referer": "https://m.stock.naver.com/",
+    "Accept": "application/json, text/plain, */*",
 }
 
 
 def get_name_kr(ticker: str) -> str:
-    """Naver Finance US 주식 API로 한글명 조회. 실패 시 빈 문자열."""
-    try:
-        r = requests.get(
-            f"{_NAVER_US_BASE}/{ticker}/basic",
-            headers=_HEADERS,
-            timeout=5,
-        )
-        r.raise_for_status()
-        data = r.json()
-        return data.get("stockName") or data.get("name") or ""
-    except Exception:
-        return ""
+    """Naver Finance US 주식 API로 한글명 조회. 실패 시 빈 문자열.
+
+    NYSE 종목은 suffix 없이, NASDAQ 종목은 .O suffix로 조회.
+    """
+    for code in [ticker, f"{ticker}.O"]:
+        try:
+            r = requests.get(
+                f"{_NAVER_US_BASE}/{code}/basic",
+                headers=_HEADERS,
+                timeout=5,
+            )
+            if r.status_code == 200:
+                return r.json().get("stockName") or ""
+        except Exception:
+            pass
+    return ""
 
 
 def _parse_portfolio_value(text: str) -> int:
