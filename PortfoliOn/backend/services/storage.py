@@ -108,3 +108,21 @@ def enrich_stock(ticker: str, fields: dict) -> bool:
         stocks.append(entry)
     save_stocks(stocks)
     return True
+
+
+def get_guru_managers() -> dict:
+    data = _read_json("guru_managers.json")
+    return data if data is not None else {"last_updated": None, "managers": []}
+
+
+def save_guru_managers(data: dict) -> None:
+    _write_json("guru_managers.json", data)
+
+
+def get_guru_schedule() -> dict:
+    data = _read_json("guru_schedule.json")
+    return data if data is not None else {"enabled": False, "day": "sun", "time": "03:00"}
+
+
+def save_guru_schedule(schedule: dict) -> None:
+    _write_json("guru_schedule.json", schedule)
