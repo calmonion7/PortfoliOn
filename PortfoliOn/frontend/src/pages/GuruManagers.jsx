@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 
 function formatValue(val) {
@@ -14,13 +14,45 @@ const tdStyle = { padding: '8px 12px', color: '#e0e0e0' }
 
 export default function GuruManagers() {
   const [data, setData]       = useState({ last_updated: null, managers: [] })
+  const [stockMap, setStockMap] = useState({})  // ticker -> 'holding'|'watchlist'
   const [loading, setLoading] = useState(true)
+
+  const loadStockMap = useCallback(() => {
+    axios.get('/api/stocks').then(({ data }) => {
+      const map = {}
+      data.forEach(s => { map[s.ticker] = s.type })
+      setStockMap(map)
+    })
+  }, [])
 
   useEffect(() => {
     axios.get('/api/guru/managers')
       .then(({ data }) => setData(data))
       .finally(() => setLoading(false))
-  }, [])
+    loadStockMap()
+  }, [loadStockMap])
+
+  const handleBadgeClick = async (h) => {
+    const type = stockMap[h.ticker]
+    if (type === 'holding') return
+    try {
+      if (type === 'watchlist') {
+        await axios.delete(`/api/watchlist/${h.ticker}`)
+      } else {
+        await axios.post('/api/watchlist', { ticker: h.ticker, name: h.name_kr || h.name || h.ticker })
+      }
+      loadStockMap()
+    } catch (err) {
+      alert(err.response?.data?.detail || '오류가 발생했습니다')
+    }
+  }
+
+  const badgeStyle = (ticker) => {
+    const type = stockMap[ticker]
+    if (type === 'holding')   return { background: '#1a3a1a', color: '#81c784' }
+    if (type === 'watchlist') return { background: '#3a1a1a', color: '#ef9a9a' }
+    return { background: '#1e3a5f', color: '#4fc3f7' }
+  }
 
   if (loading) return <p style={{ color: '#aaa' }}>로딩 중...</p>
   if (!data.managers.length) return (
@@ -53,19 +85,26 @@ export default function GuruManagers() {
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{m.num_stocks}</td>
                 <td style={tdStyle}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {(m.top10 || []).map(h => (
-                      <span
-                        key={h.rank}
-                        title={`#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`}
-                        style={{
-                          background: '#1e3a5f', color: '#4fc3f7',
-                          borderRadius: 3, padding: '2px 6px',
-                          fontSize: 11, fontWeight: 600, cursor: 'default',
-                        }}
-                      >
-                        {h.ticker}
-                      </span>
-                    ))}
+                    {(m.top10 || []).map(h => {
+                      const type = stockMap[h.ticker]
+                      const tooltip = `#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`
+                        + (type === 'holding' ? '\n[보유중]' : type === 'watchlist' ? '\n[관심 — 클릭하여 삭제]' : '\n[클릭하여 관심종목 추가]')
+                      return (
+                        <span
+                          key={h.rank}
+                          title={tooltip}
+                          onClick={() => handleBadgeClick(h)}
+                          style={{
+                            ...badgeStyle(h.ticker),
+                            borderRadius: 3, padding: '2px 6px',
+                            fontSize: 11, fontWeight: 600,
+                            cursor: type === 'holding' ? 'default' : 'pointer',
+                          }}
+                        >
+                          {h.ticker}
+                        </span>
+                      )
+                    })}
                   </div>
                 </td>
               </tr>
