@@ -1,0 +1,6017 @@
+{
+  "last_updated": "2026-05-15T00:35:44",
+  "managers": [
+    {
+      "id": "AKO",
+      "name": "AKO Capital",
+      "firm": "AKO Capital",
+      "portfolio_value": 6568399000,
+      "num_stocks": 22,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "FLUT",
+          "name": "Flutter Entertainment Plc",
+          "name_kr": "",
+          "weight_pct": 10.2
+        },
+        {
+          "rank": 2,
+          "ticker": "ALC",
+          "name": "Alcon Inc.",
+          "name_kr": "알콘",
+          "weight_pct": 9.28
+        },
+        {
+          "rank": 3,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 7.68
+        },
+        {
+          "rank": 4,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 7.52
+        },
+        {
+          "rank": 5,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 6.11
+        },
+        {
+          "rank": 6,
+          "ticker": "MCO",
+          "name": "Moody's Corp.",
+          "name_kr": "무디스",
+          "weight_pct": 5.73
+        },
+        {
+          "rank": 7,
+          "ticker": "RACE",
+          "name": "Ferrari NV",
+          "name_kr": "",
+          "weight_pct": 5.35
+        },
+        {
+          "rank": 8,
+          "ticker": "GE",
+          "name": "GE Aerospace",
+          "name_kr": "GE 에어로스페이스",
+          "weight_pct": 5.2
+        },
+        {
+          "rank": 9,
+          "ticker": "ADI",
+          "name": "Analog Devices",
+          "name_kr": "애널로그 디바이시스",
+          "weight_pct": 5.15
+        },
+        {
+          "rank": 10,
+          "ticker": "ICE",
+          "name": "Intercontinental Exchange Inc.",
+          "name_kr": "인터컨티넨털 익스체인지",
+          "weight_pct": 5.14
+        }
+      ]
+    },
+    {
+      "id": "AIM",
+      "name": "Alex Roepers - Atlantic Investment Management",
+      "firm": "Alex Roepers - Atlantic Investment Management",
+      "portfolio_value": 177625000,
+      "num_stocks": 10,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "AXTA",
+          "name": "Axalta Coating Systems Ltd.",
+          "name_kr": "",
+          "weight_pct": 18.63
+        },
+        {
+          "rank": 2,
+          "ticker": "KEX",
+          "name": "Kirby Corp.",
+          "name_kr": "커비",
+          "weight_pct": 13.83
+        },
+        {
+          "rank": 3,
+          "ticker": "FLS",
+          "name": "Flowserve Corp.",
+          "name_kr": "플로우서브",
+          "weight_pct": 12.26
+        },
+        {
+          "rank": 4,
+          "ticker": "APTV",
+          "name": "Aptiv PLC",
+          "name_kr": "",
+          "weight_pct": 11.82
+        },
+        {
+          "rank": 5,
+          "ticker": "OSK",
+          "name": "Oshkosh Corp.",
+          "name_kr": "오시코시",
+          "weight_pct": 10.93
+        },
+        {
+          "rank": 6,
+          "ticker": "WFRD",
+          "name": "Weatherford International plc",
+          "name_kr": "웨더포드 인터네셔널",
+          "weight_pct": 10.13
+        },
+        {
+          "rank": 7,
+          "ticker": "ASH",
+          "name": "Ashland Global Holdings Inc.",
+          "name_kr": "애쉬랜드",
+          "weight_pct": 7.03
+        },
+        {
+          "rank": 8,
+          "ticker": "DCH",
+          "name": "Dauch Corp.",
+          "name_kr": "다우치",
+          "weight_pct": 6.8
+        },
+        {
+          "rank": 9,
+          "ticker": "ABM",
+          "name": "ABM Industries",
+          "name_kr": "ABM 인더스트리즈",
+          "weight_pct": 4.76
+        },
+        {
+          "rank": 10,
+          "ticker": "NOMD",
+          "name": "Nomad Foods Ltd",
+          "name_kr": "",
+          "weight_pct": 3.79
+        }
+      ]
+    },
+    {
+      "id": "AP",
+      "name": "AltaRock Partners",
+      "firm": "AltaRock Partners",
+      "portfolio_value": 5100068000,
+      "num_stocks": 8,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 33.1
+        },
+        {
+          "rank": 2,
+          "ticker": "TDG",
+          "name": "TransDigm Group Inc.",
+          "name_kr": "트랜스다임 그룹",
+          "weight_pct": 25.28
+        },
+        {
+          "rank": 3,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 19.75
+        },
+        {
+          "rank": 4,
+          "ticker": "MCO",
+          "name": "Moody's Corp.",
+          "name_kr": "무디스",
+          "weight_pct": 8.16
+        },
+        {
+          "rank": 5,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 6.07
+        },
+        {
+          "rank": 6,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 3.55
+        },
+        {
+          "rank": 7,
+          "ticker": "HLT",
+          "name": "Hilton Worldwide Holdings",
+          "name_kr": "힐튼 월드와이드 홀딩스",
+          "weight_pct": 3.06
+        },
+        {
+          "rank": 8,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 1.04
+        }
+      ]
+    },
+    {
+      "id": "GFT",
+      "name": "Bill & Melinda Gates Foundation Trust",
+      "firm": "Bill & Melinda Gates Foundation Trust",
+      "portfolio_value": 35360094000,
+      "num_stocks": 23,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 27.59
+        },
+        {
+          "rank": 2,
+          "ticker": "WM",
+          "name": "Waste Management Inc.",
+          "name_kr": "웨이스트 매니지먼트",
+          "weight_pct": 17.98
+        },
+        {
+          "rank": 3,
+          "ticker": "CNI",
+          "name": "Canadian Natl Railway Co.",
+          "name_kr": "커네디언 내셔널 레일웨이",
+          "weight_pct": 14.49
+        },
+        {
+          "rank": 4,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 10.52
+        },
+        {
+          "rank": 5,
+          "ticker": "CAT",
+          "name": "Caterpillar Inc.",
+          "name_kr": "캐터필러",
+          "weight_pct": 10.29
+        },
+        {
+          "rank": 6,
+          "ticker": "DE",
+          "name": "Deere & Co.",
+          "name_kr": "디어",
+          "weight_pct": 4.68
+        },
+        {
+          "rank": 7,
+          "ticker": "ECL",
+          "name": "Ecolab Inc.",
+          "name_kr": "이콜랩",
+          "weight_pct": 3.87
+        },
+        {
+          "rank": 8,
+          "ticker": "WMT",
+          "name": "Walmart Inc.",
+          "name_kr": "월마트",
+          "weight_pct": 2.64
+        },
+        {
+          "rank": 9,
+          "ticker": "FDX",
+          "name": "FedEx Corp.",
+          "name_kr": "페덱스",
+          "weight_pct": 1.95
+        },
+        {
+          "rank": 10,
+          "ticker": "KOF",
+          "name": "Coca-Cola FEMSA S A CV",
+          "name_kr": "코카콜라 펨사 ADR",
+          "weight_pct": 1.66
+        }
+      ]
+    },
+    {
+      "id": "psc",
+      "name": "Bill Ackman - Pershing Square Capital Management",
+      "firm": "Bill Ackman - Pershing Square Capital Management",
+      "portfolio_value": 15526738000,
+      "num_stocks": 11,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BN",
+          "name": "Brookfield Corp.",
+          "name_kr": "브룩필드",
+          "weight_pct": 18.15
+        },
+        {
+          "rank": 2,
+          "ticker": "UBER",
+          "name": "Uber Technologies Inc.",
+          "name_kr": "",
+          "weight_pct": 15.9
+        },
+        {
+          "rank": 3,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 14.28
+        },
+        {
+          "rank": 4,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 12.46
+        },
+        {
+          "rank": 5,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 11.37
+        },
+        {
+          "rank": 6,
+          "ticker": "QSR",
+          "name": "Restaurant Brands International",
+          "name_kr": "레스토랑 브랜즈 인터내셔널",
+          "weight_pct": 10.05
+        },
+        {
+          "rank": 7,
+          "ticker": "HHH",
+          "name": "Howard Hughes Holdings Inc.",
+          "name_kr": "하워드 휴스 홀딩스",
+          "weight_pct": 9.69
+        },
+        {
+          "rank": 8,
+          "ticker": "HLT",
+          "name": "Hilton Worldwide Holdings",
+          "name_kr": "힐튼 월드와이드 홀딩스",
+          "weight_pct": 5.6
+        },
+        {
+          "rank": 9,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 1.37
+        },
+        {
+          "rank": 10,
+          "ticker": "SEG",
+          "name": "Seaport Entertainment Group",
+          "name_kr": "씨포트 엔터테인먼트 그룹",
+          "weight_pct": 0.64
+        }
+      ]
+    },
+    {
+      "id": "LMM",
+      "name": "Bill Miller - Miller Value Partners",
+      "firm": "Bill Miller - Miller Value Partners",
+      "portfolio_value": 283836000,
+      "num_stocks": 34,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "NBR",
+          "name": "Nabors Industries Ltd.",
+          "name_kr": "네이보스 인더스트리스",
+          "weight_pct": 11.53
+        },
+        {
+          "rank": 2,
+          "ticker": "LNC",
+          "name": "Lincoln National",
+          "name_kr": "링컨 내셔널",
+          "weight_pct": 7.92
+        },
+        {
+          "rank": 3,
+          "ticker": "GTN",
+          "name": "Gray Television Inc.",
+          "name_kr": "그레이 미디어",
+          "weight_pct": 6.8
+        },
+        {
+          "rank": 4,
+          "ticker": "TDAY",
+          "name": "Gannett Co.",
+          "name_kr": "",
+          "weight_pct": 6.18
+        },
+        {
+          "rank": 5,
+          "ticker": "QUAD",
+          "name": "Quad/Graphics Inc.",
+          "name_kr": "",
+          "weight_pct": 6.05
+        },
+        {
+          "rank": 6,
+          "ticker": "BFH",
+          "name": "Bread Financial Holdings Inc.",
+          "name_kr": "브레드 파이낸셜 홀딩스",
+          "weight_pct": 5.25
+        },
+        {
+          "rank": 7,
+          "ticker": "FOSL",
+          "name": "Fossil Inc.",
+          "name_kr": "파슬 그룹",
+          "weight_pct": 4.22
+        },
+        {
+          "rank": 8,
+          "ticker": "DCH",
+          "name": "Dauch Corp.",
+          "name_kr": "다우치",
+          "weight_pct": 3.92
+        },
+        {
+          "rank": 9,
+          "ticker": "CNDT",
+          "name": "Conduent Inc.",
+          "name_kr": "컨듀언트",
+          "weight_pct": 3.78
+        },
+        {
+          "rank": 10,
+          "ticker": "JELD",
+          "name": "JELD-WEN Holding Inc.",
+          "name_kr": "",
+          "weight_pct": 3.58
+        }
+      ]
+    },
+    {
+      "id": "HA",
+      "name": "Bill Nygren - Oakmark Funds",
+      "firm": "Bill Nygren - Oakmark Funds",
+      "portfolio_value": 78812397000,
+      "num_stocks": 167,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 3.54
+        },
+        {
+          "rank": 2,
+          "ticker": "COF",
+          "name": "Capital One Financial",
+          "name_kr": "캐피털 원 파이낸셜",
+          "weight_pct": 3.33
+        },
+        {
+          "rank": 3,
+          "ticker": "CRM",
+          "name": "Salesforce.com",
+          "name_kr": "세일즈포스",
+          "weight_pct": 3.29
+        },
+        {
+          "rank": 4,
+          "ticker": "IQV",
+          "name": "IQVIA Holdings Inc.",
+          "name_kr": "아이큐비아 홀딩스",
+          "weight_pct": 3.24
+        },
+        {
+          "rank": 5,
+          "ticker": "ABNB",
+          "name": "Airbnb Inc.",
+          "name_kr": "에어비앤비",
+          "weight_pct": 3.22
+        },
+        {
+          "rank": 6,
+          "ticker": "ICE",
+          "name": "Intercontinental Exchange Inc.",
+          "name_kr": "인터컨티넨털 익스체인지",
+          "weight_pct": 3.2
+        },
+        {
+          "rank": 7,
+          "ticker": "KDP",
+          "name": "Keurig Dr Pepper Inc.",
+          "name_kr": "큐리그 닥터 페퍼",
+          "weight_pct": 3.07
+        },
+        {
+          "rank": 8,
+          "ticker": "WBD",
+          "name": "Warner Bros. Discovery Inc.",
+          "name_kr": "워너 브로스 디스커버리",
+          "weight_pct": 2.88
+        },
+        {
+          "rank": 9,
+          "ticker": "COP",
+          "name": "ConocoPhillips",
+          "name_kr": "코노코필립스",
+          "weight_pct": 2.85
+        },
+        {
+          "rank": 10,
+          "ticker": "SCHW",
+          "name": "Charles Schwab Corp.",
+          "name_kr": "",
+          "weight_pct": 2.79
+        }
+      ]
+    },
+    {
+      "id": "fairx",
+      "name": "Bruce Berkowitz - Fairholme Capital",
+      "firm": "Bruce Berkowitz - Fairholme CapitaliInvestment ObjectiveThe Fairholme Fund seeks long-term growth of its shareholders’ capital by investing in equity securities of public companies and by holding a focused portfolio. The Fund’s preferred investment strategy is to silently partner with exceptional owner-managers who have demonstrated success, honesty, and integrity. The Fund buys when it finds such companies generating or holding significant cash when compared to market values. Purchases are made without regard to categorization. The Fund also intends to invest in special situations, including, but not limited to, Chapter 11 reorganizations.The Manager uses fundamental analysis to identify certain attractive characteristics of companies. Such characteristics may include, but are not limited to: high free cash flow yields in relation to market values and risk-free rates; sensible capital allocation policies; strong competitive positions; solid balance sheets; stress-tested owner/managers; participation in stressed industries having reasonable prospects for recovery; potential for long-term growth; significant tangible assets in relation to enterprise values; high returns on invested equity and capital; and the production of essential services and products. The Manager defines free cash flow as the cash a company would generate annually from operations after all cash outlays necessary to maintain the business in its current condition.",
+      "portfolio_value": 1433640000,
+      "num_stocks": 15,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "JOE",
+          "name": "St. Joe Co.",
+          "name_kr": "세인트 조",
+          "weight_pct": 80.43
+        },
+        {
+          "rank": 2,
+          "ticker": "EPD",
+          "name": "Enterprise Products Partners LP",
+          "name_kr": "Enterprise Products Partners Units",
+          "weight_pct": 12.19
+        },
+        {
+          "rank": 3,
+          "ticker": "OZK",
+          "name": "Bank OZK",
+          "name_kr": "뱅크 오즈크",
+          "weight_pct": 2.93
+        },
+        {
+          "rank": 4,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 1.68
+        },
+        {
+          "rank": 5,
+          "ticker": "WRB",
+          "name": "W.R. Berkley Corp.",
+          "name_kr": "W. R. 버클리",
+          "weight_pct": 1.27
+        },
+        {
+          "rank": 6,
+          "ticker": "PGR",
+          "name": "Progressive Corp.",
+          "name_kr": "프로그레시브",
+          "weight_pct": 0.41
+        },
+        {
+          "rank": 7,
+          "ticker": "CF",
+          "name": "CF Industries Holdings Inc.",
+          "name_kr": "CF 인더스트리스 홀딩스",
+          "weight_pct": 0.3
+        },
+        {
+          "rank": 8,
+          "ticker": "OXY",
+          "name": "Occidental Petroleum",
+          "name_kr": "옥시덴털 페트롤리움",
+          "weight_pct": 0.2
+        },
+        {
+          "rank": 9,
+          "ticker": "ET",
+          "name": "Energy Transfer LP",
+          "name_kr": "Energy Transfer Units",
+          "weight_pct": 0.19
+        },
+        {
+          "rank": 10,
+          "ticker": "TGT",
+          "name": "Target Corp.",
+          "name_kr": "타겟",
+          "weight_pct": 0.16
+        }
+      ]
+    },
+    {
+      "id": "OCL",
+      "name": "Bryan Lawrence - Oakcliff Capital",
+      "firm": "Bryan Lawrence - Oakcliff Capital",
+      "portfolio_value": 233247000,
+      "num_stocks": 8,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "IBKR",
+          "name": "Interactive Brokers Group Inc.",
+          "name_kr": "인터랙티브 브로커스 그룹",
+          "weight_pct": 28.42
+        },
+        {
+          "rank": 2,
+          "ticker": "GIL",
+          "name": "Gildan Activewear Inc.",
+          "name_kr": "질단 액티브웨어",
+          "weight_pct": 18.25
+        },
+        {
+          "rank": 3,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 15.9
+        },
+        {
+          "rank": 4,
+          "ticker": "TDG",
+          "name": "TransDigm Group Inc.",
+          "name_kr": "트랜스다임 그룹",
+          "weight_pct": 13.78
+        },
+        {
+          "rank": 5,
+          "ticker": "GWRE",
+          "name": "Guidewire Software Inc.",
+          "name_kr": "",
+          "weight_pct": 7.17
+        },
+        {
+          "rank": 6,
+          "ticker": "NRP",
+          "name": "Natural Resource Partners",
+          "name_kr": "Natural Resource Partners Units",
+          "weight_pct": 5.7
+        },
+        {
+          "rank": 7,
+          "ticker": "SGU",
+          "name": "Star Gas Partners LP",
+          "name_kr": "Star Group Units",
+          "weight_pct": 5.58
+        },
+        {
+          "rank": 8,
+          "ticker": "LEN",
+          "name": "Lennar Corp.",
+          "name_kr": "레나 Class A",
+          "weight_pct": 5.2
+        }
+      ]
+    },
+    {
+      "id": "ic",
+      "name": "Carl Icahn - Icahn Capital Management",
+      "firm": "Carl Icahn - Icahn Capital Management",
+      "portfolio_value": 8445168000,
+      "num_stocks": 13,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "IEP",
+          "name": "Icahn Enterprises",
+          "name_kr": "Icahn Enterprises Units",
+          "weight_pct": 49.12
+        },
+        {
+          "rank": 2,
+          "ticker": "CVI",
+          "name": "CVR Energy Inc.",
+          "name_kr": "CVR 에너지",
+          "weight_pct": 21.21
+        },
+        {
+          "rank": 3,
+          "ticker": "SWX",
+          "name": "Southwest Gas Holdings Inc.",
+          "name_kr": "사우스웨스트 가스 홀딩스",
+          "weight_pct": 5.72
+        },
+        {
+          "rank": 4,
+          "ticker": "UAN",
+          "name": "CVR Partners LP",
+          "name_kr": "CVR Partners Units",
+          "weight_pct": 5.05
+        },
+        {
+          "rank": 5,
+          "ticker": "SATS",
+          "name": "EchoStar Corp.",
+          "name_kr": "에코스타",
+          "weight_pct": 4.32
+        },
+        {
+          "rank": 6,
+          "ticker": "CTRI",
+          "name": "Centuri Holdings Inc",
+          "name_kr": "",
+          "weight_pct": 4.29
+        },
+        {
+          "rank": 7,
+          "ticker": "IFF",
+          "name": "International Flavors & Fragrances Inc.",
+          "name_kr": "인터내셔널 플레이버스 & 프레그런스",
+          "weight_pct": 3.41
+        },
+        {
+          "rank": 8,
+          "ticker": "JBLU",
+          "name": "JetBlue Airways Corp.",
+          "name_kr": "제트블루 에어웨이스",
+          "weight_pct": 1.81
+        },
+        {
+          "rank": 9,
+          "ticker": "AEP",
+          "name": "American Electric Power",
+          "name_kr": "아메리칸 일렉트릭 파워 컴퍼니",
+          "weight_pct": 1.65
+        },
+        {
+          "rank": 10,
+          "ticker": "MNRO",
+          "name": "Monro Inc.",
+          "name_kr": "먼로",
+          "weight_pct": 1.21
+        }
+      ]
+    },
+    {
+      "id": "TGM",
+      "name": "Chase Coleman - Tiger Global Management",
+      "firm": "Chase Coleman - Tiger Global Management",
+      "portfolio_value": 29714312000,
+      "num_stocks": 54,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 11.2
+        },
+        {
+          "rank": 2,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 8.92
+        },
+        {
+          "rank": 3,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 7.78
+        },
+        {
+          "rank": 4,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 6.91
+        },
+        {
+          "rank": 5,
+          "ticker": "SE",
+          "name": "Sea Ltd",
+          "name_kr": "씨 ADR",
+          "weight_pct": 6.62
+        },
+        {
+          "rank": 6,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 6.11
+        },
+        {
+          "rank": 7,
+          "ticker": "TTWO",
+          "name": "Take-Two Interactive Software",
+          "name_kr": "테이크-투 인터랙티브 소프트웨어",
+          "weight_pct": 5.03
+        },
+        {
+          "rank": 8,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 3.81
+        },
+        {
+          "rank": 9,
+          "ticker": "AVGO",
+          "name": "Broadcom Inc.",
+          "name_kr": "브로드컴",
+          "weight_pct": 3.35
+        },
+        {
+          "rank": 10,
+          "ticker": "APO",
+          "name": "Apollo Global Management",
+          "name_kr": "아폴로 글로벌 매니지먼트",
+          "weight_pct": 3.03
+        }
+      ]
+    },
+    {
+      "id": "tci",
+      "name": "Chris Hohn - TCI Fund Management",
+      "firm": "Chris Hohn - TCI Fund Management",
+      "portfolio_value": 53648816000,
+      "num_stocks": 9,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GE",
+          "name": "GE Aerospace",
+          "name_kr": "GE 에어로스페이스",
+          "weight_pct": 27.28
+        },
+        {
+          "rank": 2,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 18.12
+        },
+        {
+          "rank": 3,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 15.13
+        },
+        {
+          "rank": 4,
+          "ticker": "MCO",
+          "name": "Moody's Corp.",
+          "name_kr": "무디스",
+          "weight_pct": 12.67
+        },
+        {
+          "rank": 5,
+          "ticker": "SPGI",
+          "name": "S&P Global Inc.",
+          "name_kr": "",
+          "weight_pct": 11.48
+        },
+        {
+          "rank": 6,
+          "ticker": "CP",
+          "name": "Canadian Pacific Kansas City",
+          "name_kr": "캐나디안 퍼시픽 캔자스 시티",
+          "weight_pct": 6.54
+        },
+        {
+          "rank": 7,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 4.44
+        },
+        {
+          "rank": 8,
+          "ticker": "FER",
+          "name": "Ferrovial Se",
+          "name_kr": "페로비알",
+          "weight_pct": 2.51
+        },
+        {
+          "rank": 9,
+          "ticker": "CNI",
+          "name": "Canadian Natl Railway Co.",
+          "name_kr": "커네디언 내셔널 레일웨이",
+          "weight_pct": 1.82
+        }
+      ]
+    },
+    {
+      "id": "SA",
+      "name": "Christopher Bloomstran - Semper Augustus",
+      "firm": "Christopher Bloomstran - Semper Augustus",
+      "portfolio_value": 869556000,
+      "num_stocks": 39,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 14.41
+        },
+        {
+          "rank": 2,
+          "ticker": "DG",
+          "name": "Dollar General",
+          "name_kr": "달러 제너럴",
+          "weight_pct": 14.14
+        },
+        {
+          "rank": 3,
+          "ticker": "BRK.A",
+          "name": "Berkshire Hathaway CL A",
+          "name_kr": "",
+          "weight_pct": 10.07
+        },
+        {
+          "rank": 4,
+          "ticker": "DECK",
+          "name": "Deckers Outdoor",
+          "name_kr": "",
+          "weight_pct": 7.63
+        },
+        {
+          "rank": 5,
+          "ticker": "NEM",
+          "name": "Newmont Corp.",
+          "name_kr": "뉴몬트",
+          "weight_pct": 7.62
+        },
+        {
+          "rank": 6,
+          "ticker": "DLTR",
+          "name": "Dollar Tree Inc.",
+          "name_kr": "달러 트리",
+          "weight_pct": 7.25
+        },
+        {
+          "rank": 7,
+          "ticker": "KGC",
+          "name": "Kinross Gold Corp.",
+          "name_kr": "킨로스 골드",
+          "weight_pct": 6.84
+        },
+        {
+          "rank": 8,
+          "ticker": "FIVE",
+          "name": "Five Below Inc.",
+          "name_kr": "파이브 빌로우",
+          "weight_pct": 5.75
+        },
+        {
+          "rank": 9,
+          "ticker": "OLN",
+          "name": "Olin Corp.",
+          "name_kr": "올린",
+          "weight_pct": 4.66
+        },
+        {
+          "rank": 10,
+          "ticker": "VLO",
+          "name": "Valero Energy",
+          "name_kr": "발레로 에너지",
+          "weight_pct": 3.72
+        }
+      ]
+    },
+    {
+      "id": "DAV",
+      "name": "Christopher Davis - Davis Advisors",
+      "firm": "Christopher Davis - Davis Advisors",
+      "portfolio_value": 21781442000,
+      "num_stocks": 112,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "COF",
+          "name": "Capital One Financial",
+          "name_kr": "캐피털 원 파이낸셜",
+          "weight_pct": 7.15
+        },
+        {
+          "rank": 2,
+          "ticker": "CTRA",
+          "name": "OLD- Coterra Energy Inc.",
+          "name_kr": "",
+          "weight_pct": 5.99
+        },
+        {
+          "rank": 3,
+          "ticker": "USB",
+          "name": "U.S. Bancorp",
+          "name_kr": "US 뱅코프",
+          "weight_pct": 5.31
+        },
+        {
+          "rank": 4,
+          "ticker": "VTRS",
+          "name": "Viatris Inc.",
+          "name_kr": "비아트리스",
+          "weight_pct": 4.85
+        },
+        {
+          "rank": 5,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 4.52
+        },
+        {
+          "rank": 6,
+          "ticker": "MGM",
+          "name": "MGM Resorts International",
+          "name_kr": "MGM 리조트 인터내셔널",
+          "weight_pct": 4.13
+        },
+        {
+          "rank": 7,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 4.09
+        },
+        {
+          "rank": 8,
+          "ticker": "CVS",
+          "name": "CVS Health Corp.",
+          "name_kr": "CVS 헬스",
+          "weight_pct": 4.04
+        },
+        {
+          "rank": 9,
+          "ticker": "TSN",
+          "name": "Tyson Foods",
+          "name_kr": "타이슨 푸드",
+          "weight_pct": 3.85
+        },
+        {
+          "rank": 10,
+          "ticker": "MKL",
+          "name": "Markel Group Inc.",
+          "name_kr": "마켈",
+          "weight_pct": 3.37
+        }
+      ]
+    },
+    {
+      "id": "AC",
+      "name": "Chuck Akre - Akre Capital Management",
+      "firm": "Chuck Akre - Akre Capital ManagementiInvestment Philosophy:11.   A strong business model demonstrating consistent earnings growth, high returnon equity or high compound growth rate in book value per share2.   High quality management who:Have demonstrated a predisposition toward protecting shareholder value in decision makingAct with principle and integrityAre highly skilled at managing the business3.   The reasonable certainty of opportunity to reinvest profits at a high compound rate of return4.   A market valuation allowing purchase at reasonable cost",
+      "portfolio_value": 9120743000,
+      "num_stocks": 18,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 18.81
+        },
+        {
+          "rank": 2,
+          "ticker": "BN",
+          "name": "Brookfield Corp.",
+          "name_kr": "브룩필드",
+          "weight_pct": 13.51
+        },
+        {
+          "rank": 3,
+          "ticker": "KKR",
+          "name": "KKR & Co. L.P.",
+          "name_kr": "KKR & Co",
+          "weight_pct": 11.33
+        },
+        {
+          "rank": 4,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 10.29
+        },
+        {
+          "rank": 5,
+          "ticker": "MCO",
+          "name": "Moody's Corp.",
+          "name_kr": "무디스",
+          "weight_pct": 9.72
+        },
+        {
+          "rank": 6,
+          "ticker": "CSGP",
+          "name": "CoStar Group Inc.",
+          "name_kr": "코스타 그룹",
+          "weight_pct": 7.09
+        },
+        {
+          "rank": 7,
+          "ticker": "ORLY",
+          "name": "O'Reilly Automotive",
+          "name_kr": "오레일리 오토모티브",
+          "weight_pct": 6.72
+        },
+        {
+          "rank": 8,
+          "ticker": "ROP",
+          "name": "Roper Technologies Inc.",
+          "name_kr": "로퍼 테크놀로지스",
+          "weight_pct": 5.39
+        },
+        {
+          "rank": 9,
+          "ticker": "ABNB",
+          "name": "Airbnb Inc.",
+          "name_kr": "에어비앤비",
+          "weight_pct": 5.17
+        },
+        {
+          "rank": 10,
+          "ticker": "FICO",
+          "name": "Fair Isaac Corp.",
+          "name_kr": "",
+          "weight_pct": 5.14
+        }
+      ]
+    },
+    {
+      "id": "CAS",
+      "name": "Clifford Sosin - CAS Investment Partners",
+      "firm": "Clifford Sosin - CAS Investment Partners",
+      "portfolio_value": 2337081000,
+      "num_stocks": 5,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "CVNA",
+          "name": "Carvana Co.",
+          "name_kr": "",
+          "weight_pct": 83.25
+        },
+        {
+          "rank": 2,
+          "ticker": "HGV",
+          "name": "Hilton Grand Vacations Inc.",
+          "name_kr": "힐튼 그랜드 베케이션스",
+          "weight_pct": 10.18
+        },
+        {
+          "rank": 3,
+          "ticker": "COF",
+          "name": "Capital One Financial",
+          "name_kr": "캐피털 원 파이낸셜",
+          "weight_pct": 6.06
+        },
+        {
+          "rank": 4,
+          "ticker": "CDLX",
+          "name": "Cardlytics Inc.",
+          "name_kr": "카들리틱스",
+          "weight_pct": 0.26
+        },
+        {
+          "rank": 5,
+          "ticker": "SWIM",
+          "name": "Latham Group Inc",
+          "name_kr": "라탐 그룹",
+          "weight_pct": 0.26
+        }
+      ]
+    },
+    {
+      "id": "tp",
+      "name": "Daniel Loeb - Third Point",
+      "firm": "Daniel Loeb - Third PointiInvestment ApproachThird Point LLC is an SEC-registered investment adviser based in New York City. The firm was founded in 1995 by Daniel S. Loeb, who serves as CEO and oversees all investment activity. Daniel Loeb has more than 27 years of experience in the financial markets, with particular emphasis on special situation equities, distressed debt and risk arbitrage.Third Point employs an event-driven, value-oriented investment style. The Firm seeks to identify situations where we anticipate a catalyst will unlock value.We focus on delivering exceptional risk adjusted returns with limited market exposure.",
+      "portfolio_value": 7258600000,
+      "num_stocks": 42,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "PCG",
+          "name": "PG&E Corp.",
+          "name_kr": "퍼시픽 가스 & 일렉트릭",
+          "weight_pct": 7.59
+        },
+        {
+          "rank": 2,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 7.58
+        },
+        {
+          "rank": 3,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 6.88
+        },
+        {
+          "rank": 4,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 6.16
+        },
+        {
+          "rank": 5,
+          "ticker": "UNP",
+          "name": "Union Pacific",
+          "name_kr": "유니온 퍼시픽",
+          "weight_pct": 5.77
+        },
+        {
+          "rank": 6,
+          "ticker": "CRH",
+          "name": "CRH plc",
+          "name_kr": "CRH",
+          "weight_pct": 4.47
+        },
+        {
+          "rank": 7,
+          "ticker": "SGI",
+          "name": "Somnigroup International Inc.",
+          "name_kr": "솜니그룹 인터내셔널",
+          "weight_pct": 4.18
+        },
+        {
+          "rank": 8,
+          "ticker": "BN",
+          "name": "Brookfield Corp.",
+          "name_kr": "브룩필드",
+          "weight_pct": 3.92
+        },
+        {
+          "rank": 9,
+          "ticker": "NSC",
+          "name": "Norfolk Southern Corp.",
+          "name_kr": "노퍽서던",
+          "weight_pct": 3.88
+        },
+        {
+          "rank": 10,
+          "ticker": "TDS",
+          "name": "Telephone & Data Systems",
+          "name_kr": "텔레폰 앤 데이터 시스템즈",
+          "weight_pct": 3.77
+        }
+      ]
+    },
+    {
+      "id": "abc",
+      "name": "David Abrams - Abrams Capital Management",
+      "firm": "David Abrams - Abrams Capital Management",
+      "portfolio_value": 5673787000,
+      "num_stocks": 12,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "LOAR",
+          "name": "Loar Holdings Inc",
+          "name_kr": "",
+          "weight_pct": 38.41
+        },
+        {
+          "rank": 2,
+          "ticker": "LAD",
+          "name": "Lithia Motors Inc.",
+          "name_kr": "리시아 모터스",
+          "weight_pct": 14.59
+        },
+        {
+          "rank": 3,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 10.57
+        },
+        {
+          "rank": 4,
+          "ticker": "SGI",
+          "name": "Somnigroup International Inc.",
+          "name_kr": "솜니그룹 인터내셔널",
+          "weight_pct": 9.13
+        },
+        {
+          "rank": 5,
+          "ticker": "ABG",
+          "name": "Asbury Automotive Group Inc.",
+          "name_kr": "애즈버리 오토모티브 그룹",
+          "weight_pct": 8.83
+        },
+        {
+          "rank": 6,
+          "ticker": "CPNG",
+          "name": "Coupang Inc.",
+          "name_kr": "",
+          "weight_pct": 5.41
+        },
+        {
+          "rank": 7,
+          "ticker": "WTW",
+          "name": "Willis Towers Watson plc",
+          "name_kr": "윌리스 타워스 왓슨",
+          "weight_pct": 4.17
+        },
+        {
+          "rank": 8,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 3.78
+        },
+        {
+          "rank": 9,
+          "ticker": "UHAL.B",
+          "name": "U Haul Holding Co Non Voting",
+          "name_kr": "",
+          "weight_pct": 2.68
+        },
+        {
+          "rank": 10,
+          "ticker": "ET",
+          "name": "Energy Transfer LP",
+          "name_kr": "Energy Transfer Units",
+          "weight_pct": 1.78
+        }
+      ]
+    },
+    {
+      "id": "GLRE",
+      "name": "David Einhorn - Greenlight Capital",
+      "firm": "David Einhorn - Greenlight Capital",
+      "portfolio_value": 2849314000,
+      "num_stocks": 41,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GRBK",
+          "name": "Green Brick Partners",
+          "name_kr": "",
+          "weight_pct": 20.82
+        },
+        {
+          "rank": 2,
+          "ticker": "FLR",
+          "name": "Fluor Corp.",
+          "name_kr": "플루오르",
+          "weight_pct": 7.73
+        },
+        {
+          "rank": 3,
+          "ticker": "CNR",
+          "name": "Core Natural Resources Inc.",
+          "name_kr": "코어 내추럴 리소시스",
+          "weight_pct": 6.52
+        },
+        {
+          "rank": 4,
+          "ticker": "BHF",
+          "name": "Brighthouse Financial Inc.",
+          "name_kr": "브라이트하우스 파이낸셜",
+          "weight_pct": 6.35
+        },
+        {
+          "rank": 5,
+          "ticker": "GPK",
+          "name": "Graphic Packaging Hldg Co.",
+          "name_kr": "그래픽 패키징 홀딩",
+          "weight_pct": 4.45
+        },
+        {
+          "rank": 6,
+          "ticker": "PCG",
+          "name": "PG&E Corp.",
+          "name_kr": "퍼시픽 가스 & 일렉트릭",
+          "weight_pct": 4.39
+        },
+        {
+          "rank": 7,
+          "ticker": "CPRI",
+          "name": "Capri Holdings Ltd",
+          "name_kr": "",
+          "weight_pct": 4.08
+        },
+        {
+          "rank": 8,
+          "ticker": "CNC",
+          "name": "Centene Corp.",
+          "name_kr": "센틴",
+          "weight_pct": 3.81
+        },
+        {
+          "rank": 9,
+          "ticker": "KD",
+          "name": "Kyndryl Holdings Inc",
+          "name_kr": "킨드릴 홀딩스",
+          "weight_pct": 3.56
+        },
+        {
+          "rank": 10,
+          "ticker": "TEVA",
+          "name": "Teva Pharmaceutical Industries Ltd.",
+          "name_kr": "",
+          "weight_pct": 3.35
+        }
+      ]
+    },
+    {
+      "id": "MAVFX",
+      "name": "David Katz - Matrix Asset Advisors",
+      "firm": "David Katz - Matrix Asset AdvisorsiOur Investment ProcessMatrix employs Benjamin Graham’s value investment precepts as the predominant guide in our investment process. Our primary objective is to identify a diversified group of financially strong companies, each of whose stock we feel is traded at a substantial discount to its intrinsic value; i.e., the price an astute entrepreneur would pay to acquire a business outright.We call ourselves “Opportunistic Value Investors” because we are willing to scan the entire economic spectrum for potential investment candidates. Unlike some of our peers, we believe that value can be found in all sectors and industries. We therefore do not a priori rule out any sector; conversely we do not feel the need to have a presence in any particular sector.The core effort in our research process is to determine a realistic intrinsic value for a company’s stock and then, if fundamentally attractive, to purchase the stock at a substantial discount to this intrinsic value.Our focus is on large capitalization stocks, and our expectation is that we will typically hold them for one to three years.",
+      "portfolio_value": 1090208000,
+      "num_stocks": 105,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 5.82
+        },
+        {
+          "rank": 2,
+          "ticker": "MAVF",
+          "name": "Matrix Advisors Value ETF",
+          "name_kr": "",
+          "weight_pct": 4.43
+        },
+        {
+          "rank": 3,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 3.79
+        },
+        {
+          "rank": 4,
+          "ticker": "PNC",
+          "name": "PNC Financial Services",
+          "name_kr": "PNC 파이낸셜 서비스",
+          "weight_pct": 3.65
+        },
+        {
+          "rank": 5,
+          "ticker": "JPM",
+          "name": "JPMorgan Chase & Co.",
+          "name_kr": "제이피모간체이스",
+          "weight_pct": 3.63
+        },
+        {
+          "rank": 6,
+          "ticker": "MS",
+          "name": "Morgan Stanley",
+          "name_kr": "모간스탠리",
+          "weight_pct": 3.59
+        },
+        {
+          "rank": 7,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 3.57
+        },
+        {
+          "rank": 8,
+          "ticker": "PEP",
+          "name": "PepsiCo Inc.",
+          "name_kr": "펩시코",
+          "weight_pct": 3.44
+        },
+        {
+          "rank": 9,
+          "ticker": "QCOM",
+          "name": "QUALCOMM Inc.",
+          "name_kr": "퀄컴",
+          "weight_pct": 3.39
+        },
+        {
+          "rank": 10,
+          "ticker": "USB",
+          "name": "U.S. Bancorp",
+          "name_kr": "US 뱅코프",
+          "weight_pct": 3.38
+        }
+      ]
+    },
+    {
+      "id": "WP",
+      "name": "David Rolfe - Wedgewood Partners",
+      "firm": "David Rolfe - Wedgewood PartnersiInvestment PhilosophyThe investment management business is unlike most businesses in that the “average” product (in this case, investment returns) is unsatisfactory from the consumers point of view. Managers who even outperform their respective peer groups could well be an unsatisfactory experience as well for the client if returns are less than the market index.Our respect for index investing and investing as business owners has led us to two aspects of our approach that are quite different than our competitors. To outperform an index, we believe that our portfolios must be constructed as different from an index as possible. Thinking and acting like business owners reduces our interest to those few businesses which are superior. Both of these views lead to our focused (concentrated) approach.To outperform our peers, we believe that we must emulate the most powerful attributes of index investing. By definition, index investing is “buy and hold” investing. This leads us to our history of minimum turnover of our portfolios. As a corollary, this also affects our stock selection. If we expect to invest in companies for many years, we must then focus on those select companies with the brightest multi-year prospects for growth. In addition, our view on risk is contrary to the typical manager as well. We do not view risk via individual security price volatility (beta), rather all of our risk analysis is centered on the individual business.Wedgewood’s underlying equity investment philosophy is predicated on a strong belief that significant long-term wealth will be created by investing as “owners” in companies. In our “Invest as Business Owners” approach, we seek companies that the following characteristics:A dominant product or service that is practically irreplaceable or lacks substitutes.A sustainable and consistent level of growing revenues, earnings and dividends.A high level of profitability, measured by return on equity without the use of excessive debt.A strong management team that is shareholder oriented.Once we have validated company performance against this set of criteria, we then analyze prospective companies with an eye toward those organizations who have reasonable, if not cheap, valuations.ProcessSuccessful business owners and executive managers look beyond the next quarter, taking a long-term perspective on maximizing the value in their business and enhancing the sustainability of their business model and market position. This belief is at the core of our “Invest as Owners” process.Search for past excellence- Return on equity >25%- Return on capital >20%- Cash Flow ROI >15%- EPS growth >15%- Revenue growth >12%Quest for future excellence- Barriers to entry- Threat of substitutes- Buying power- Supplier power- Degree of internal rivalryPortfolio construction- Priced below intrinsic value- Projected growth rates- Conservative valuations multiples- Risk reductionThe process begins with a focus on up to six hundred of the largest companies as measured by market capitalization. We conduct a detailed quantitative analysis to assess each companies past excellence and to identify those organizations with exceptionally high profitability. Candidate firms are then qualitatively screened to their prospects for future excellence. During this portion of our review, we evaluate a company’s business model by comparing them to Porter’s “Five Forces of Competitive Advantage:”1. Barriers to entry2. Threat of substitutes3. Buying power4. Supplier power5.Degree of internal rivalryDeveloped by Michael Porter of the Harvard Business School in 1979, this framework draws upon industrial organization economics to determine the competitive intensity and therefore the overall profitability of a market. Once we complete this stage of our review, approximately ten-percent of the companies analyzed meet our criteria as prospective investment candidates. For these sixty or so companies, our Chief Investment Officer and Team of Advisory Managers analyze the candidates to determine which companies are trading at steep discounts relative to their intrinsic value based upon their historical and relative growth rates, conservative consensus estimates and compressed value multiples.In the end, our “Invest as Owners” process yields eighteen to twenty-four growth companies that we can hold in our client portfolios for the long-term.",
+      "portfolio_value": 535492000,
+      "num_stocks": 21,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 10.48
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 9.58
+        },
+        {
+          "rank": 3,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 8.52
+        },
+        {
+          "rank": 4,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 7.26
+        },
+        {
+          "rank": 5,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 7.0
+        },
+        {
+          "rank": 6,
+          "ticker": "BKNG",
+          "name": "Booking Holdings Inc.",
+          "name_kr": "부킹 홀딩스",
+          "weight_pct": 5.82
+        },
+        {
+          "rank": 7,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 5.71
+        },
+        {
+          "rank": 8,
+          "ticker": "MSI",
+          "name": "Motorola Solutions Inc.",
+          "name_kr": "모토로라 솔루션스",
+          "weight_pct": 5.13
+        },
+        {
+          "rank": 9,
+          "ticker": "TSCO",
+          "name": "Tractor Supply",
+          "name_kr": "트랙터 서플라이",
+          "weight_pct": 4.49
+        },
+        {
+          "rank": 10,
+          "ticker": "URI",
+          "name": "United Rentals",
+          "name_kr": "유나이티드 렌탈스",
+          "weight_pct": 4.01
+        }
+      ]
+    },
+    {
+      "id": "AM",
+      "name": "David Tepper - Appaloosa Management",
+      "firm": "David Tepper - Appaloosa Management",
+      "portfolio_value": 6853672000,
+      "num_stocks": 38,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BABA",
+          "name": "Alibaba Group Holdings",
+          "name_kr": "",
+          "weight_pct": 10.99
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 8.18
+        },
+        {
+          "rank": 3,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 7.34
+        },
+        {
+          "rank": 4,
+          "ticker": "MU",
+          "name": "Micron Technology Inc.",
+          "name_kr": "마이크론 테크놀로지",
+          "weight_pct": 6.25
+        },
+        {
+          "rank": 5,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 5.78
+        },
+        {
+          "rank": 6,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 5.01
+        },
+        {
+          "rank": 7,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 4.63
+        },
+        {
+          "rank": 8,
+          "ticker": "WHR",
+          "name": "Whirlpool Corp.",
+          "name_kr": "월풀",
+          "weight_pct": 4.12
+        },
+        {
+          "rank": 9,
+          "ticker": "NRG",
+          "name": "NRG Energy Inc.",
+          "name_kr": "NRG 에너지",
+          "weight_pct": 3.81
+        },
+        {
+          "rank": 10,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 3.53
+        }
+      ]
+    },
+    {
+      "id": "SP",
+      "name": "Dennis Hong - ShawSpring Partners",
+      "firm": "Dennis Hong - ShawSpring Partners",
+      "portfolio_value": 531108000,
+      "num_stocks": 11,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "OKTA",
+          "name": "Okta Inc.",
+          "name_kr": "옥타",
+          "weight_pct": 14.38
+        },
+        {
+          "rank": 2,
+          "ticker": "FOUR",
+          "name": "Shift4 Payments Inc. CL A",
+          "name_kr": "",
+          "weight_pct": 13.62
+        },
+        {
+          "rank": 3,
+          "ticker": "CSGP",
+          "name": "CoStar Group Inc.",
+          "name_kr": "코스타 그룹",
+          "weight_pct": 12.12
+        },
+        {
+          "rank": 4,
+          "ticker": "BABA",
+          "name": "Alibaba Group Holdings",
+          "name_kr": "",
+          "weight_pct": 10.44
+        },
+        {
+          "rank": 5,
+          "ticker": "BRZE",
+          "name": "Braze Inc A",
+          "name_kr": "브레이즈",
+          "weight_pct": 9.51
+        },
+        {
+          "rank": 6,
+          "ticker": "PCOR",
+          "name": "Procore Technologies Inc.",
+          "name_kr": "",
+          "weight_pct": 9.33
+        },
+        {
+          "rank": 7,
+          "ticker": "MNDY",
+          "name": "monday.com Ltd.",
+          "name_kr": "먼데이닷컴",
+          "weight_pct": 7.06
+        },
+        {
+          "rank": 8,
+          "ticker": "FWONK",
+          "name": "Liberty Media Corp Formula One Series C",
+          "name_kr": "포뮬러 원 그룹 Series C",
+          "weight_pct": 6.9
+        },
+        {
+          "rank": 9,
+          "ticker": "INTU",
+          "name": "Intuit Inc.",
+          "name_kr": "인튜이트",
+          "weight_pct": 6.33
+        },
+        {
+          "rank": 10,
+          "ticker": "BLND",
+          "name": "Blend Labs Inc.",
+          "name_kr": "",
+          "weight_pct": 5.17
+        }
+      ]
+    },
+    {
+      "id": "DAC",
+      "name": "Dodge & Cox Funds",
+      "firm": "Dodge & Cox Funds",
+      "portfolio_value": 185118723000,
+      "num_stocks": 200,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "SCHW",
+          "name": "Charles Schwab Corp.",
+          "name_kr": "",
+          "weight_pct": 4.13
+        },
+        {
+          "rank": 2,
+          "ticker": "JCI",
+          "name": "Johnson Controls Intl. plc",
+          "name_kr": "존슨 컨트롤스 인터내셔널",
+          "weight_pct": 3.91
+        },
+        {
+          "rank": 3,
+          "ticker": "RTX",
+          "name": "RTX Corp.",
+          "name_kr": "RTX",
+          "weight_pct": 3.72
+        },
+        {
+          "rank": 4,
+          "ticker": "CVS",
+          "name": "CVS Health Corp.",
+          "name_kr": "CVS 헬스",
+          "weight_pct": 2.68
+        },
+        {
+          "rank": 5,
+          "ticker": "FDX",
+          "name": "FedEx Corp.",
+          "name_kr": "페덱스",
+          "weight_pct": 2.43
+        },
+        {
+          "rank": 6,
+          "ticker": "MET",
+          "name": "MetLife Inc.",
+          "name_kr": "메트라이프",
+          "weight_pct": 2.23
+        },
+        {
+          "rank": 7,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 2.18
+        },
+        {
+          "rank": 8,
+          "ticker": "BKNG",
+          "name": "Booking Holdings Inc.",
+          "name_kr": "부킹 홀딩스",
+          "weight_pct": 2.12
+        },
+        {
+          "rank": 9,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 1.94
+        },
+        {
+          "rank": 10,
+          "ticker": "REGN",
+          "name": "Regeneron Pharmaceuticals",
+          "name_kr": "리제네론 파마슈티컬스",
+          "weight_pct": 1.92
+        }
+      ]
+    },
+    {
+      "id": "HH",
+      "name": "Duan Yongping - H&H International Investment",
+      "firm": "Duan Yongping - H&H International Investment",
+      "portfolio_value": 17488572000,
+      "num_stocks": 14,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 50.3
+        },
+        {
+          "rank": 2,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 20.63
+        },
+        {
+          "rank": 3,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 7.72
+        },
+        {
+          "rank": 4,
+          "ticker": "PDD",
+          "name": "Pinduoduo Inc.",
+          "name_kr": "핀둬둬 ADR",
+          "weight_pct": 7.48
+        },
+        {
+          "rank": 5,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 3.33
+        },
+        {
+          "rank": 6,
+          "ticker": "OXY",
+          "name": "Occidental Petroleum",
+          "name_kr": "옥시덴털 페트롤리움",
+          "weight_pct": 3.1
+        },
+        {
+          "rank": 7,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 2.38
+        },
+        {
+          "rank": 8,
+          "ticker": "BABA",
+          "name": "Alibaba Group Holdings",
+          "name_kr": "",
+          "weight_pct": 2.15
+        },
+        {
+          "rank": 9,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 2.13
+        },
+        {
+          "rank": 10,
+          "ticker": "DIS",
+          "name": "Walt Disney Co.",
+          "name_kr": "월트 디즈니",
+          "weight_pct": 0.46
+        }
+      ]
+    },
+    {
+      "id": "FE",
+      "name": "First Eagle Investment Management",
+      "firm": "First Eagle Investment Management",
+      "portfolio_value": 58890541000,
+      "num_stocks": 200,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 3.61
+        },
+        {
+          "rank": 2,
+          "ticker": "BDX",
+          "name": "Becton Dickinson",
+          "name_kr": "벡톤 디킨슨 앤 코",
+          "weight_pct": 3.18
+        },
+        {
+          "rank": 3,
+          "ticker": "WPM",
+          "name": "Wheaton Precious Metals Corp.",
+          "name_kr": "휘턴 프레셔스 메탈스",
+          "weight_pct": 3.15
+        },
+        {
+          "rank": 4,
+          "ticker": "IMO",
+          "name": "Imperial Oil Ltd.",
+          "name_kr": "임페리얼 오일",
+          "weight_pct": 3.11
+        },
+        {
+          "rank": 5,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 3.1
+        },
+        {
+          "rank": 6,
+          "ticker": "HCA",
+          "name": "HCA Healthcare Inc.",
+          "name_kr": "HCA 헬스케어",
+          "weight_pct": 2.62
+        },
+        {
+          "rank": 7,
+          "ticker": "SLB",
+          "name": "Schlumberger Ltd.",
+          "name_kr": "Slb NV",
+          "weight_pct": 2.48
+        },
+        {
+          "rank": 8,
+          "ticker": "FMX",
+          "name": "Fomento Economico Mexicano",
+          "name_kr": "포멘토 에코노미코 멕시카노 ADR",
+          "weight_pct": 2.43
+        },
+        {
+          "rank": 9,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 2.24
+        },
+        {
+          "rank": 10,
+          "ticker": "FNV",
+          "name": "Franco Nevada Corp.",
+          "name_kr": "프랑코-네바다",
+          "weight_pct": 2.22
+        }
+      ]
+    },
+    {
+      "id": "FPA",
+      "name": "First Pacific Advisors",
+      "firm": "First Pacific Advisors",
+      "portfolio_value": 6998756000,
+      "num_stocks": 83,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "ADI",
+          "name": "Analog Devices",
+          "name_kr": "애널로그 디바이시스",
+          "weight_pct": 7.83
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 6.92
+        },
+        {
+          "rank": 3,
+          "ticker": "IFF",
+          "name": "International Flavors & Fragrances Inc.",
+          "name_kr": "인터내셔널 플레이버스 & 프레그런스",
+          "weight_pct": 5.61
+        },
+        {
+          "rank": 4,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 5.56
+        },
+        {
+          "rank": 5,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 5.46
+        },
+        {
+          "rank": 6,
+          "ticker": "C",
+          "name": "Citigroup Inc.",
+          "name_kr": "씨티그룹",
+          "weight_pct": 5.15
+        },
+        {
+          "rank": 7,
+          "ticker": "TEL",
+          "name": "TE Connectivity plc",
+          "name_kr": "TE 커넥티비티",
+          "weight_pct": 4.93
+        },
+        {
+          "rank": 8,
+          "ticker": "BDX",
+          "name": "Becton Dickinson",
+          "name_kr": "벡톤 디킨슨 앤 코",
+          "weight_pct": 4.45
+        },
+        {
+          "rank": 9,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 4.21
+        },
+        {
+          "rank": 10,
+          "ticker": "CMCSA",
+          "name": "Comcast Corp.",
+          "name_kr": "컴캐스트",
+          "weight_pct": 3.52
+        }
+      ]
+    },
+    {
+      "id": "ca",
+      "name": "Francis Chou - Chou Associates",
+      "firm": "Francis Chou - Chou Associates",
+      "portfolio_value": 201554000,
+      "num_stocks": 28,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.A",
+          "name": "Berkshire Hathaway CL A",
+          "name_kr": "",
+          "weight_pct": 32.21
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 11.27
+        },
+        {
+          "rank": 3,
+          "ticker": "SYF",
+          "name": "Synchrony Financial",
+          "name_kr": "싱크로니 파이낸셜",
+          "weight_pct": 8.93
+        },
+        {
+          "rank": 4,
+          "ticker": "STLA",
+          "name": "Stellantis N.V.",
+          "name_kr": "",
+          "weight_pct": 7.53
+        },
+        {
+          "rank": 5,
+          "ticker": "OXY",
+          "name": "Occidental Petroleum",
+          "name_kr": "옥시덴털 페트롤리움",
+          "weight_pct": 6.39
+        },
+        {
+          "rank": 6,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 5.93
+        },
+        {
+          "rank": 7,
+          "ticker": "ALLY",
+          "name": "Ally Financial Inc.",
+          "name_kr": "",
+          "weight_pct": 5.07
+        },
+        {
+          "rank": 8,
+          "ticker": "SIRI",
+          "name": "SiriusXM Holdings Inc",
+          "name_kr": "시리우스 XM 홀딩스",
+          "weight_pct": 4.06
+        },
+        {
+          "rank": 9,
+          "ticker": "BABA",
+          "name": "Alibaba Group Holdings",
+          "name_kr": "",
+          "weight_pct": 3.05
+        },
+        {
+          "rank": 10,
+          "ticker": "WFC",
+          "name": "Wells Fargo",
+          "name_kr": "웰스파고",
+          "weight_pct": 2.75
+        }
+      ]
+    },
+    {
+      "id": "GC",
+      "name": "Francois Rochon - Giverny Capital",
+      "firm": "Francois Rochon - Giverny Capital",
+      "portfolio_value": 2997771000,
+      "num_stocks": 50,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 8.48
+        },
+        {
+          "rank": 2,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 6.9
+        },
+        {
+          "rank": 3,
+          "ticker": "AME",
+          "name": "Ametek Inc.",
+          "name_kr": "아메텍",
+          "weight_pct": 6.71
+        },
+        {
+          "rank": 4,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 6.69
+        },
+        {
+          "rank": 5,
+          "ticker": "HEI.A",
+          "name": "HEICO Corp. CL A",
+          "name_kr": "",
+          "weight_pct": 6.35
+        },
+        {
+          "rank": 6,
+          "ticker": "SCHW",
+          "name": "Charles Schwab Corp.",
+          "name_kr": "",
+          "weight_pct": 5.28
+        },
+        {
+          "rank": 7,
+          "ticker": "MEDP",
+          "name": "Medpace Holdings Inc.",
+          "name_kr": "메드페이스 홀딩스",
+          "weight_pct": 4.93
+        },
+        {
+          "rank": 8,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 4.77
+        },
+        {
+          "rank": 9,
+          "ticker": "IBP",
+          "name": "Installed Building Products",
+          "name_kr": "인스톨드 빌딩 프로덕츠",
+          "weight_pct": 4.49
+        },
+        {
+          "rank": 10,
+          "ticker": "PGR",
+          "name": "Progressive Corp.",
+          "name_kr": "프로그레시브",
+          "weight_pct": 4.08
+        }
+      ]
+    },
+    {
+      "id": "CCM",
+      "name": "Glenn Greenberg - Brave Warrior Advisors",
+      "firm": "Glenn Greenberg - Brave Warrior Advisors",
+      "portfolio_value": 4268782000,
+      "num_stocks": 33,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "OMF",
+          "name": "OneMain Holdings",
+          "name_kr": "원메인 홀딩스",
+          "weight_pct": 12.25
+        },
+        {
+          "rank": 2,
+          "ticker": "SNX",
+          "name": "SYNNEX Corp.",
+          "name_kr": "TD 시넥스",
+          "weight_pct": 11.13
+        },
+        {
+          "rank": 3,
+          "ticker": "ELV",
+          "name": "Elevance Health Inc.",
+          "name_kr": "엘레반스 헬스",
+          "weight_pct": 10.28
+        },
+        {
+          "rank": 4,
+          "ticker": "SLM",
+          "name": "SLM Corp.",
+          "name_kr": "SLM",
+          "weight_pct": 8.13
+        },
+        {
+          "rank": 5,
+          "ticker": "AN",
+          "name": "AutoNation Inc.",
+          "name_kr": "오토네이션",
+          "weight_pct": 7.51
+        },
+        {
+          "rank": 6,
+          "ticker": "MRP",
+          "name": "Millrose Properties",
+          "name_kr": "밀로즈 프로퍼티스",
+          "weight_pct": 6.02
+        },
+        {
+          "rank": 7,
+          "ticker": "LEN",
+          "name": "Lennar Corp.",
+          "name_kr": "레나 Class A",
+          "weight_pct": 5.81
+        },
+        {
+          "rank": 8,
+          "ticker": "BLDR",
+          "name": "Builders FirstSource Inc.",
+          "name_kr": "",
+          "weight_pct": 5.73
+        },
+        {
+          "rank": 9,
+          "ticker": "COF",
+          "name": "Capital One Financial",
+          "name_kr": "캐피털 원 파이낸셜",
+          "weight_pct": 5.73
+        },
+        {
+          "rank": 10,
+          "ticker": "MPLX",
+          "name": "MPLX LP",
+          "name_kr": "",
+          "weight_pct": 5.59
+        }
+      ]
+    },
+    {
+      "id": "ENG",
+      "name": "Glenn Welling - Engaged Capital",
+      "firm": "Glenn Welling - Engaged Capital",
+      "portfolio_value": 392021000,
+      "num_stocks": 9,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "VFC",
+          "name": "V.F. Corp.",
+          "name_kr": "VF",
+          "weight_pct": 24.47
+        },
+        {
+          "rank": 2,
+          "ticker": "YETI",
+          "name": "YETI Holdings Inc.",
+          "name_kr": "",
+          "weight_pct": 22.9
+        },
+        {
+          "rank": 3,
+          "ticker": "BL",
+          "name": "BlackLine Inc.",
+          "name_kr": "블랙라인",
+          "weight_pct": 15.28
+        },
+        {
+          "rank": 4,
+          "ticker": "GXO",
+          "name": "Gxo Logistics Inc.",
+          "name_kr": "GXO 로지스틱스",
+          "weight_pct": 11.14
+        },
+        {
+          "rank": 5,
+          "ticker": "CGNX",
+          "name": "Cognex Corp.",
+          "name_kr": "코그넥스",
+          "weight_pct": 8.56
+        },
+        {
+          "rank": 6,
+          "ticker": "FRPT",
+          "name": "Freshpet Inc.",
+          "name_kr": "프레시펫",
+          "weight_pct": 6.23
+        },
+        {
+          "rank": 7,
+          "ticker": "EVH",
+          "name": "Evolent Health Inc.",
+          "name_kr": "에볼런트 헬스",
+          "weight_pct": 5.68
+        },
+        {
+          "rank": 8,
+          "ticker": "BRCC",
+          "name": "BRC Inc.",
+          "name_kr": "",
+          "weight_pct": 3.95
+        },
+        {
+          "rank": 9,
+          "ticker": "PTLO",
+          "name": "Portillo's Inc Cl A",
+          "name_kr": "포틸로스",
+          "weight_pct": 1.78
+        }
+      ]
+    },
+    {
+      "id": "GA",
+      "name": "Greenhaven Associates",
+      "firm": "Greenhaven Associates",
+      "portfolio_value": 6071581000,
+      "num_stocks": 27,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GM",
+          "name": "General Motors",
+          "name_kr": "제너럴 모터스",
+          "weight_pct": 15.37
+        },
+        {
+          "rank": 2,
+          "ticker": "LEN",
+          "name": "Lennar Corp.",
+          "name_kr": "레나 Class A",
+          "weight_pct": 15.21
+        },
+        {
+          "rank": 3,
+          "ticker": "TOL",
+          "name": "Toll Brothers",
+          "name_kr": "톨 브라더스",
+          "weight_pct": 12.69
+        },
+        {
+          "rank": 4,
+          "ticker": "PHM",
+          "name": "PulteGroup Inc.",
+          "name_kr": "풀티 그룹",
+          "weight_pct": 10.65
+        },
+        {
+          "rank": 5,
+          "ticker": "DHI",
+          "name": "D.R. Horton",
+          "name_kr": "D.R. 호턴",
+          "weight_pct": 7.84
+        },
+        {
+          "rank": 6,
+          "ticker": "OSK",
+          "name": "Oshkosh Corp.",
+          "name_kr": "오시코시",
+          "weight_pct": 6.14
+        },
+        {
+          "rank": 7,
+          "ticker": "ARW",
+          "name": "Arrow Electronics",
+          "name_kr": "애로우 일렉트로닉스",
+          "weight_pct": 4.48
+        },
+        {
+          "rank": 8,
+          "ticker": "AVT",
+          "name": "Avnet Inc.",
+          "name_kr": "에이브이넷",
+          "weight_pct": 3.98
+        },
+        {
+          "rank": 9,
+          "ticker": "BAX",
+          "name": "Baxter International Inc.",
+          "name_kr": "박스터 인터내셔널",
+          "weight_pct": 3.96
+        },
+        {
+          "rank": 10,
+          "ticker": "SLB",
+          "name": "Schlumberger Ltd.",
+          "name_kr": "Slb NV",
+          "weight_pct": 3.95
+        }
+      ]
+    },
+    {
+      "id": "CM",
+      "name": "Greg Alexander - Conifer Management",
+      "firm": "Greg Alexander - Conifer Management",
+      "portfolio_value": 603603000,
+      "num_stocks": 5,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GPI",
+          "name": "Group 1 Automotive",
+          "name_kr": "그룹 원 오토모티브",
+          "weight_pct": 37.04
+        },
+        {
+          "rank": 2,
+          "ticker": "EQH",
+          "name": "Equitable Holdings Inc.",
+          "name_kr": "에퀴터블 홀딩스",
+          "weight_pct": 33.16
+        },
+        {
+          "rank": 3,
+          "ticker": "LAD",
+          "name": "Lithia Motors Inc.",
+          "name_kr": "리시아 모터스",
+          "weight_pct": 22.02
+        },
+        {
+          "rank": 4,
+          "ticker": "SDHC",
+          "name": "Smith Douglas Homes Corp",
+          "name_kr": "",
+          "weight_pct": 3.98
+        },
+        {
+          "rank": 5,
+          "ticker": "RMNI",
+          "name": "Rimini Street Inc.",
+          "name_kr": "리미니스트리트",
+          "weight_pct": 3.8
+        }
+      ]
+    },
+    {
+      "id": "aq",
+      "name": "Guy Spier - Aquamarine Capital",
+      "firm": "Guy Spier - Aquamarine Capital",
+      "portfolio_value": 135303000,
+      "num_stocks": 7,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 34.57
+        },
+        {
+          "rank": 2,
+          "ticker": "BRK.A",
+          "name": "Berkshire Hathaway CL A",
+          "name_kr": "",
+          "weight_pct": 15.92
+        },
+        {
+          "rank": 3,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 14.77
+        },
+        {
+          "rank": 4,
+          "ticker": "AXP",
+          "name": "American Express",
+          "name_kr": "아메리칸 익스프레스",
+          "weight_pct": 14.53
+        },
+        {
+          "rank": 5,
+          "ticker": "MCO",
+          "name": "Moody's Corp.",
+          "name_kr": "무디스",
+          "weight_pct": 8.71
+        },
+        {
+          "rank": 6,
+          "ticker": "RACE",
+          "name": "Ferrari NV",
+          "name_kr": "",
+          "weight_pct": 7.4
+        },
+        {
+          "rank": 7,
+          "ticker": "DJCO",
+          "name": "Daily Journal Corp.",
+          "name_kr": "데일리 저널",
+          "weight_pct": 4.1
+        }
+      ]
+    },
+    {
+      "id": "SSHFX",
+      "name": "Harry Burn - Sound Shore",
+      "firm": "Harry Burn - Sound ShoreiInvestment ProcessInvestments are based on fundamental and detailed research and analysis, with particular emphasis on stocks with low absolute and relative P/E ratios:- From a starting universe of the 1,250 largest U.S. equities, we methodically identify the least expensive based upon absolute P/E and P/E versus a company’s historic norms.- The opportunity set of approximately 250 are subjected to our “value check” process which confirms valuation attractiveness.- We then conduct thorough fundamental research on the resulting list of 80-100 companies, which typically includes visits and conversations with company management, competitors, customers, analysts, etc.- We develop our own earnings, cash flow, and balance sheet models and cross check our own normalized estimates with company management and also with Wall Street analysts.- We prepare detailed valuation models to develop price objectives.We sell a stock if the company fails to meet our fundamental performance objectives or when it reaches our price target.",
+      "portfolio_value": 2984057000,
+      "num_stocks": 40,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "TEVA",
+          "name": "Teva Pharmaceutical Industries Ltd.",
+          "name_kr": "",
+          "weight_pct": 3.92
+        },
+        {
+          "rank": 2,
+          "ticker": "REGN",
+          "name": "Regeneron Pharmaceuticals",
+          "name_kr": "리제네론 파마슈티컬스",
+          "weight_pct": 3.91
+        },
+        {
+          "rank": 3,
+          "ticker": "MRVL",
+          "name": "Marvell Technology Inc.",
+          "name_kr": "마벨 테크놀로지 그룹",
+          "weight_pct": 3.81
+        },
+        {
+          "rank": 4,
+          "ticker": "BAC",
+          "name": "Bank of America Corp.",
+          "name_kr": "뱅크오브아메리카",
+          "weight_pct": 3.37
+        },
+        {
+          "rank": 5,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 3.2
+        },
+        {
+          "rank": 6,
+          "ticker": "ZBH",
+          "name": "Zimmer Biomet Holdings",
+          "name_kr": "짐머 바이오멧 홀딩스",
+          "weight_pct": 3.19
+        },
+        {
+          "rank": 7,
+          "ticker": "DIS",
+          "name": "Walt Disney Co.",
+          "name_kr": "월트 디즈니",
+          "weight_pct": 3.13
+        },
+        {
+          "rank": 8,
+          "ticker": "C",
+          "name": "Citigroup Inc.",
+          "name_kr": "씨티그룹",
+          "weight_pct": 2.94
+        },
+        {
+          "rank": 9,
+          "ticker": "GEHC",
+          "name": "GE HealthCare Technologies Inc.",
+          "name_kr": "GE 헬스케어",
+          "weight_pct": 2.85
+        },
+        {
+          "rank": 10,
+          "ticker": "CSX",
+          "name": "CSX Corp.",
+          "name_kr": "CSX",
+          "weight_pct": 2.75
+        }
+      ]
+    },
+    {
+      "id": "DCP",
+      "name": "Henry Ellenbogen - Durable Capital Partners",
+      "firm": "Henry Ellenbogen - Durable Capital Partners",
+      "portfolio_value": 10568040000,
+      "num_stocks": 40,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "RBC",
+          "name": "RBC Bearings Inc.",
+          "name_kr": "리갈 벨로이트",
+          "weight_pct": 9.95
+        },
+        {
+          "rank": 2,
+          "ticker": "DASH",
+          "name": "DoorDash Inc.",
+          "name_kr": "도어대시",
+          "weight_pct": 7.67
+        },
+        {
+          "rank": 3,
+          "ticker": "MELI",
+          "name": "Mercadolibre Inc.",
+          "name_kr": "메르카도리브레",
+          "weight_pct": 5.87
+        },
+        {
+          "rank": 4,
+          "ticker": "CPNG",
+          "name": "Coupang Inc.",
+          "name_kr": "",
+          "weight_pct": 5.46
+        },
+        {
+          "rank": 5,
+          "ticker": "APG",
+          "name": "APi Group Corp.",
+          "name_kr": "APi 그룹",
+          "weight_pct": 5.44
+        },
+        {
+          "rank": 6,
+          "ticker": "XPO",
+          "name": "XPO Logistics",
+          "name_kr": "엑스포",
+          "weight_pct": 5.08
+        },
+        {
+          "rank": 7,
+          "ticker": "CIGI",
+          "name": "Colliers International Group Inc.",
+          "name_kr": "콜리어스 인터내셔널 그룹",
+          "weight_pct": 4.69
+        },
+        {
+          "rank": 8,
+          "ticker": "FOUR",
+          "name": "Shift4 Payments Inc. CL A",
+          "name_kr": "",
+          "weight_pct": 3.94
+        },
+        {
+          "rank": 9,
+          "ticker": "CVNA",
+          "name": "Carvana Co.",
+          "name_kr": "",
+          "weight_pct": 3.69
+        },
+        {
+          "rank": 10,
+          "ticker": "FERG",
+          "name": "Ferguson Enterprises Inc.",
+          "name_kr": "",
+          "weight_pct": 3.29
+        }
+      ]
+    },
+    {
+      "id": "HCM",
+      "name": "Hillman Capital Management",
+      "firm": "Hillman Capital Management",
+      "portfolio_value": 158912000,
+      "num_stocks": 56,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "WBD",
+          "name": "Warner Bros. Discovery Inc.",
+          "name_kr": "워너 브로스 디스커버리",
+          "weight_pct": 3.89
+        },
+        {
+          "rank": 2,
+          "ticker": "ASML",
+          "name": "ASML Holding NV",
+          "name_kr": "ASML 홀딩 ADR",
+          "weight_pct": 3.71
+        },
+        {
+          "rank": 3,
+          "ticker": "EL",
+          "name": "Estee Lauder Cos.",
+          "name_kr": "에스티 로더",
+          "weight_pct": 3.61
+        },
+        {
+          "rank": 4,
+          "ticker": "CVS",
+          "name": "CVS Health Corp.",
+          "name_kr": "CVS 헬스",
+          "weight_pct": 3.58
+        },
+        {
+          "rank": 5,
+          "ticker": "GSK",
+          "name": "GSK plc",
+          "name_kr": "GSK",
+          "weight_pct": 3.53
+        },
+        {
+          "rank": 6,
+          "ticker": "BA",
+          "name": "Boeing Co.",
+          "name_kr": "보잉",
+          "weight_pct": 3.47
+        },
+        {
+          "rank": 7,
+          "ticker": "BIIB",
+          "name": "Biogen Inc.",
+          "name_kr": "바이오젠",
+          "weight_pct": 3.38
+        },
+        {
+          "rank": 8,
+          "ticker": "DD",
+          "name": "DuPont de Nemours Inc.",
+          "name_kr": "듀폰",
+          "weight_pct": 3.37
+        },
+        {
+          "rank": 9,
+          "ticker": "BUD",
+          "name": "Anheuser-Busch InBev",
+          "name_kr": "안호이저부시 인베브 ADR",
+          "weight_pct": 3.33
+        },
+        {
+          "rank": 10,
+          "ticker": "IFF",
+          "name": "International Flavors & Fragrances Inc.",
+          "name_kr": "인터내셔널 플레이버스 & 프레그런스",
+          "weight_pct": 3.22
+        }
+      ]
+    },
+    {
+      "id": "oc",
+      "name": "Howard Marks - Oaktree Capital Management",
+      "firm": "Howard Marks - Oaktree Capital Management",
+      "portfolio_value": 4538129000,
+      "num_stocks": 53,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "EXE",
+          "name": "Expand Energy Corp.",
+          "name_kr": "익스팬드 에너지",
+          "weight_pct": 12.31
+        },
+        {
+          "rank": 2,
+          "ticker": "TRMD",
+          "name": "Torm Plc",
+          "name_kr": "톰",
+          "weight_pct": 11.62
+        },
+        {
+          "rank": 3,
+          "ticker": "AU",
+          "name": "AngloGold Ashanti Ltd.",
+          "name_kr": "앵글로골드 아샨티",
+          "weight_pct": 7.23
+        },
+        {
+          "rank": 4,
+          "ticker": "GTX",
+          "name": "Garrett Motion Inc.",
+          "name_kr": "가렛 모션",
+          "weight_pct": 6.57
+        },
+        {
+          "rank": 5,
+          "ticker": "INDV",
+          "name": "Indivior Pharmaceuticals Inc.",
+          "name_kr": "인디비어 파마슈티컬스",
+          "weight_pct": 5.62
+        },
+        {
+          "rank": 6,
+          "ticker": "VNOM",
+          "name": "Viper Energy Inc.",
+          "name_kr": "바이퍼 에너지",
+          "weight_pct": 5.35
+        },
+        {
+          "rank": 7,
+          "ticker": "TDS",
+          "name": "Telephone & Data Systems",
+          "name_kr": "텔레폰 앤 데이터 시스템즈",
+          "weight_pct": 3.33
+        },
+        {
+          "rank": 8,
+          "ticker": "B",
+          "name": "Barrick Mining Corp.",
+          "name_kr": "바릭 마이닝",
+          "weight_pct": 2.86
+        },
+        {
+          "rank": 9,
+          "ticker": "TLN",
+          "name": "Talen Energy Corp",
+          "name_kr": "탈렌 에너지",
+          "weight_pct": 2.73
+        },
+        {
+          "rank": 10,
+          "ticker": "CORZ",
+          "name": "Core Scientific Inc",
+          "name_kr": "코어 사이언티픽",
+          "weight_pct": 2.68
+        }
+      ]
+    },
+    {
+      "id": "JIM",
+      "name": "Jensen Investment Management",
+      "firm": "Jensen Investment Management",
+      "portfolio_value": 5071981000,
+      "num_stocks": 83,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 8.55
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 8.22
+        },
+        {
+          "rank": 3,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 7.99
+        },
+        {
+          "rank": 4,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 5.61
+        },
+        {
+          "rank": 5,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 5.01
+        },
+        {
+          "rank": 6,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 4.84
+        },
+        {
+          "rank": 7,
+          "ticker": "KLAC",
+          "name": "KLA Corp.",
+          "name_kr": "KLA",
+          "weight_pct": 4.81
+        },
+        {
+          "rank": 8,
+          "ticker": "SYK",
+          "name": "Stryker Corp.",
+          "name_kr": "스트라이커",
+          "weight_pct": 4.51
+        },
+        {
+          "rank": 9,
+          "ticker": "LLY",
+          "name": "Eli Lilly & Co.",
+          "name_kr": "일라이 릴리",
+          "weight_pct": 4.18
+        },
+        {
+          "rank": 10,
+          "ticker": "SHW",
+          "name": "Sherwin-Williams",
+          "name_kr": "셔윈-윌리엄즈",
+          "weight_pct": 3.96
+        }
+      ]
+    },
+    {
+      "id": "EC",
+      "name": "John Armitage - Egerton Capital",
+      "firm": "John Armitage - Egerton Capital",
+      "portfolio_value": 9010197000,
+      "num_stocks": 24,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 13.79
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 11.01
+        },
+        {
+          "rank": 3,
+          "ticker": "MCO",
+          "name": "Moody's Corp.",
+          "name_kr": "무디스",
+          "weight_pct": 7.48
+        },
+        {
+          "rank": 4,
+          "ticker": "LIN",
+          "name": "Linde plc",
+          "name_kr": "린드",
+          "weight_pct": 5.88
+        },
+        {
+          "rank": 5,
+          "ticker": "CRS",
+          "name": "Carpenter Technology",
+          "name_kr": "카펜터 테크놀로지",
+          "weight_pct": 5.82
+        },
+        {
+          "rank": 6,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 5.46
+        },
+        {
+          "rank": 7,
+          "ticker": "VMC",
+          "name": "Vulcan Materials",
+          "name_kr": "벌칸 머티리얼스",
+          "weight_pct": 5.35
+        },
+        {
+          "rank": 8,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 5.18
+        },
+        {
+          "rank": 9,
+          "ticker": "IBKR",
+          "name": "Interactive Brokers Group Inc.",
+          "name_kr": "인터랙티브 브로커스 그룹",
+          "weight_pct": 4.67
+        },
+        {
+          "rank": 10,
+          "ticker": "APH",
+          "name": "Amphenol Corp.",
+          "name_kr": "암페놀",
+          "weight_pct": 4.03
+        }
+      ]
+    },
+    {
+      "id": "AI",
+      "name": "John Rogers - Ariel Investments",
+      "firm": "John Rogers - Ariel Investments",
+      "portfolio_value": 9258591000,
+      "num_stocks": 108,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MSGE",
+          "name": "Madison Square Garden Entertainment Corp.",
+          "name_kr": "",
+          "weight_pct": 4.01
+        },
+        {
+          "rank": 2,
+          "ticker": "AMG",
+          "name": "Affiliated Managers Group",
+          "name_kr": "어필리에이티드 매니저스 그룹",
+          "weight_pct": 3.68
+        },
+        {
+          "rank": 3,
+          "ticker": "NCLH",
+          "name": "Norwegian Cruise Line Hlgs Ltd.",
+          "name_kr": "",
+          "weight_pct": 3.46
+        },
+        {
+          "rank": 4,
+          "ticker": "JLL",
+          "name": "Jones Lang Lasalle Inc.",
+          "name_kr": "존스 랭 라살",
+          "weight_pct": 3.25
+        },
+        {
+          "rank": 5,
+          "ticker": "SPHR",
+          "name": "Sphere Entertainment Co.",
+          "name_kr": "",
+          "weight_pct": 3.25
+        },
+        {
+          "rank": 6,
+          "ticker": "OSW",
+          "name": "OneSpaWorld Holdings Ltd",
+          "name_kr": "원스파월드 홀딩스",
+          "weight_pct": 3.14
+        },
+        {
+          "rank": 7,
+          "ticker": "CRL",
+          "name": "Charles River Labs",
+          "name_kr": "찰스 리버 래보라토리스 인터내셔널",
+          "weight_pct": 3.08
+        },
+        {
+          "rank": 8,
+          "ticker": "NVST",
+          "name": "Envista Holdings Corp.",
+          "name_kr": "",
+          "weight_pct": 2.81
+        },
+        {
+          "rank": 9,
+          "ticker": "LAZ",
+          "name": "Lazard Inc.",
+          "name_kr": "라자드",
+          "weight_pct": 2.78
+        },
+        {
+          "rank": 10,
+          "ticker": "PBH",
+          "name": "Prestige Consumer Healthcare",
+          "name_kr": "프레스티지 컨슈머 헬스케어",
+          "weight_pct": 2.73
+        }
+      ]
+    },
+    {
+      "id": "GLC",
+      "name": "Josh Tarasoff - Greenlea Lane Capital",
+      "firm": "Josh Tarasoff - Greenlea Lane Capital",
+      "portfolio_value": 344295000,
+      "num_stocks": 9,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 18.91
+        },
+        {
+          "rank": 2,
+          "ticker": "BN",
+          "name": "Brookfield Corp.",
+          "name_kr": "브룩필드",
+          "weight_pct": 16.37
+        },
+        {
+          "rank": 3,
+          "ticker": "BRK.A",
+          "name": "Berkshire Hathaway CL A",
+          "name_kr": "",
+          "weight_pct": 13.14
+        },
+        {
+          "rank": 4,
+          "ticker": "MKL",
+          "name": "Markel Group Inc.",
+          "name_kr": "마켈",
+          "weight_pct": 12.54
+        },
+        {
+          "rank": 5,
+          "ticker": "SGOV",
+          "name": "Ishares 0 3 Month Treasury B",
+          "name_kr": "",
+          "weight_pct": 11.2
+        },
+        {
+          "rank": 6,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 8.36
+        },
+        {
+          "rank": 7,
+          "ticker": "NFLX",
+          "name": "Netflix Inc.",
+          "name_kr": "넷플릭스",
+          "weight_pct": 7.8
+        },
+        {
+          "rank": 8,
+          "ticker": "TSLA",
+          "name": "Tesla Inc.",
+          "name_kr": "테슬라",
+          "weight_pct": 5.91
+        },
+        {
+          "rank": 9,
+          "ticker": "TRUP",
+          "name": "Trupanion Inc.",
+          "name_kr": "트루패니언",
+          "weight_pct": 5.78
+        }
+      ]
+    },
+    {
+      "id": "KB",
+      "name": "Kahn Brothers Group",
+      "firm": "Kahn Brothers GroupiInvestment PhilosophyWhat is Value Investing?\"An investment operation is one which, upon thorough analysis promises safety of principal and an adequate return. Operations not meeting these requirements are speculative.\"-Benjamin Graham, \"The Intelligent Investor\"The \"value investing\" model, developed by Benjamin Graham in his texts, Security Analysis and The Intelligent Investor, is highly dependent on price. Security selection is therefore a process of identifying situations where companies trade at a significant discount to their liquidation or long-term going-concern value. This discount, defined as the \"margin of safety,\" is critical in two respects. A large margin of safety component not only reduces the risk of a permanent loss of capital but also serves as the platform for significant future gain. Superior returns on investment often result when the marketplace ultimately recognizes the true value of the enterprise.Value investing incorporates principles that have produced extraordinary returns for money managers through several market cycles over many decades. Kahn Brothers has the experience required to successfully apply these principles to the selection of securities. We do not attempt to time broad directional swings in market levels, interest rates or exchange rates. We are not interested in annual benchmark comparisons. A study of the performance of successful value-oriented investment managers over long periods of time found they under-performed market indices 30% - 40% of the time. In other words, out-performing an index 60% - 70% of the time produced highly satisfactory risk-adjusted rates of returns for these successful managers. Furthermore, investors appreciate that value investing generates tax efficient returns resulting from both long holding periods and favorable tax rates.Kahn Brothers employs a bottom-up stock selection approach, and invests in undervalued equity securities that are usually out-of-favor in the market. We select securities, one at a time, based on asset valuations, operating performance metrics and long-term fundamental business prospects. Unlike many investment managers, we spend a considerable amount of effort evaluating the downside risk of every investment.If there are very few values to be found in a given period, we are comfortable holding cash, rather than placing money in speculative, overpriced issues. We will not invest in an overpriced market simply to become fully invested but will patiently wait for attractive situations to present themselves.Kahn Brothers thinks of a portfolio as an orchard of fruit trees. One cannot expect fruit every year from each species of tree. Investments can and often do have varied and unpredictable timetables to maturity. We believe a suitable time horizon for investment fruit to ripen for harvest can be three to five years or longer. Indeed, a key factor in realizing outstanding performance is having the discipline and patience to maintain time-tested principles and not abandon the orchard before the fruit has ripened.Kahn Brothers views the investment process as a combination of art and science. Each investment decision has both quantitative and qualitative aspects. While a novice can readily duplicate the former, the latter can only be acquired after decades of analyzing investment opportunities. A key element to outstanding investment performance is bringing these two factors together.Value investing incorporates only one methodology for securities selection. While many consider it to entail less risk than some other approaches, it can produce returns below popular indices for multiple annual intervals. Value investing may result in concentrated portfolios and will not produce portfolios diversified by investment style. These potential risks must be considered by any investor utilizing the services of Kahn Brothers Advisors LLC.The following views summarize our methodology for evaluating each specific equity investment:\"We study companies and try to find undervalued securities... We're absolute value investors focusing on asset values, book value discounts and low price to earnings ratios to normalized earnings. And we aren't interested in so-called relative values -- you know, something selling at 20 times earnings in an industry group with a 35 multiple.\"-Thomas Graham Kahn, \"Outstanding Investor Digest\"I. Broad Investment CriteriaINDUSTRY - We invest in industries and businesses that we understand, focusing on depressed economic sectors, rather than the popular industries of the day. Significant capital gains can be achieved through investment in well-established industries. We therefore prefer seasoned businesses less likely to experience major structural change.COMPANY SIZE - We often concentrate on small and medium capitalization stocks. Such securities may be traded in the less liquid over-the counter market. These companies frequently have a lesser following among security analysts and institutional investors. Small institutional ownership increases the likelihood of inefficient pricing, which helps create bargain opportunities.MANAGEMENT - We prefer a company whose management holds a meaningful stake in the growth of the business and will protect their own, as well as the shareholders interests. We are less comfortable with situations in which management has aggressive compensation packages, little financial risk and nominal ownership interest.FINANCIAL PERFORMANCE - We search for companies with solid balance sheets, strong working capital positions and minimal leverage. We analyze the balance sheet, not the income statement, first. Consequently, many of our investments have strong financial positions and weak short-term earnings. Companies with depressed earnings are more likely to be under-priced in the market.II. Typical Investment MetricsNET WORKING CAPITAL DISCOUNTS are stocks selling below net working capital per share after subtracting all long-term liabilities. In other words, if you subtract all current liabilities from all current assets, then further subtract all long-term liabilities and, finally, divide the remaining figure by the number of shares outstanding, you derive the net working capital per share. If a stock sells for less than this figure, you have an attractive price that always warrants a thorough investigation.BOOK VALUE DISCOUNTS are securities that sell for less than the adjusted per share book value (stated net worth) on their balance sheet. Book value per share is calculated by subtracting total liabilities from total assets and then dividing the remaining balance by the number of outstanding shares. Intangible assets are typically excluded from our definition of book value, and assets and liabilities often require some fair market value adjustments.LOW P/E RATIO STOCKS are securities that sell at low price to normalized earnings multiples or price to normalized cash flow. They may sell at high multiples of current earnings or cash flow.SPECIAL SITUATIONS include companies potentially impacted by catalysts that are likely to trigger the unlocking of value that will result in significant capital gains.FALLEN ANGELS are quality companies with strong market and financial positions that suffer from short-term but resolvable issues, while still possessing the capacity for materially improved long-term earnings. These are rarely book value discounts.",
+      "portfolio_value": 564067000,
+      "num_stocks": 47,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "C",
+          "name": "Citigroup Inc.",
+          "name_kr": "씨티그룹",
+          "weight_pct": 16.91
+        },
+        {
+          "rank": 2,
+          "ticker": "BAYRY",
+          "name": "Bayer Ag Sponsored ADR",
+          "name_kr": "",
+          "weight_pct": 13.26
+        },
+        {
+          "rank": 3,
+          "ticker": "FLG",
+          "name": "Flagstar Financial Inc.",
+          "name_kr": "플래그스타 파이낸셜",
+          "weight_pct": 9.53
+        },
+        {
+          "rank": 4,
+          "ticker": "DIS",
+          "name": "Walt Disney Co.",
+          "name_kr": "월트 디즈니",
+          "weight_pct": 6.47
+        },
+        {
+          "rank": 5,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 6.21
+        },
+        {
+          "rank": 6,
+          "ticker": "OGN",
+          "name": "Organon & Co.",
+          "name_kr": "오가논 & 코",
+          "weight_pct": 5.88
+        },
+        {
+          "rank": 7,
+          "ticker": "SEB",
+          "name": "Seaboard Corp.",
+          "name_kr": "씨보드",
+          "weight_pct": 5.88
+        },
+        {
+          "rank": 8,
+          "ticker": "BP",
+          "name": "BP plc",
+          "name_kr": "BP ADR",
+          "weight_pct": 5.18
+        },
+        {
+          "rank": 9,
+          "ticker": "MRK",
+          "name": "Merck & Co.",
+          "name_kr": "머크 앤 코",
+          "weight_pct": 4.85
+        },
+        {
+          "rank": 10,
+          "ticker": "Z",
+          "name": "Zillow Group Inc.",
+          "name_kr": "질로우 그룹 Class C",
+          "weight_pct": 4.0
+        }
+      ]
+    },
+    {
+      "id": "mc",
+      "name": "Lee Ainslie - Maverick Capital",
+      "firm": "Lee Ainslie - Maverick Capital",
+      "portfolio_value": 9309559000,
+      "num_stocks": 178,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 5.98
+        },
+        {
+          "rank": 2,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 5.98
+        },
+        {
+          "rank": 3,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 5.91
+        },
+        {
+          "rank": 4,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 5.41
+        },
+        {
+          "rank": 5,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 3.85
+        },
+        {
+          "rank": 6,
+          "ticker": "PM",
+          "name": "Philip Morris Intl.",
+          "name_kr": "필립 모리스 인터내셔널",
+          "weight_pct": 3.75
+        },
+        {
+          "rank": 7,
+          "ticker": "COF",
+          "name": "Capital One Financial",
+          "name_kr": "캐피털 원 파이낸셜",
+          "weight_pct": 3.37
+        },
+        {
+          "rank": 8,
+          "ticker": "UNP",
+          "name": "Union Pacific",
+          "name_kr": "유니온 퍼시픽",
+          "weight_pct": 3.26
+        },
+        {
+          "rank": 9,
+          "ticker": "AMAT",
+          "name": "Applied Materials",
+          "name_kr": "어플라이드 머티어리얼즈",
+          "weight_pct": 3.12
+        },
+        {
+          "rank": 10,
+          "ticker": "BSX",
+          "name": "Boston Scientific",
+          "name_kr": "보스턴 사이언티픽",
+          "weight_pct": 3.02
+        }
+      ]
+    },
+    {
+      "id": "oa",
+      "name": "Leon Cooperman",
+      "firm": "Leon Cooperman",
+      "portfolio_value": 3014011000,
+      "num_stocks": 40,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "RKT",
+          "name": "Rocket Companies Inc.",
+          "name_kr": "로켓 컴퍼니스",
+          "weight_pct": 13.5
+        },
+        {
+          "rank": 2,
+          "ticker": "VRT",
+          "name": "Vertiv Holdings Co.",
+          "name_kr": "버티브 홀딩스",
+          "weight_pct": 11.6
+        },
+        {
+          "rank": 3,
+          "ticker": "ET",
+          "name": "Energy Transfer LP",
+          "name_kr": "Energy Transfer Units",
+          "weight_pct": 7.29
+        },
+        {
+          "rank": 4,
+          "ticker": "MIR",
+          "name": "Mirion Technologies Inc",
+          "name_kr": "미리온 테크놀로지스",
+          "weight_pct": 6.51
+        },
+        {
+          "rank": 5,
+          "ticker": "APO",
+          "name": "Apollo Global Management",
+          "name_kr": "아폴로 글로벌 매니지먼트",
+          "weight_pct": 6.42
+        },
+        {
+          "rank": 6,
+          "ticker": "MP",
+          "name": "MP Materials Corp.",
+          "name_kr": "엠피 머터리얼즈",
+          "weight_pct": 5.03
+        },
+        {
+          "rank": 7,
+          "ticker": "PLGO",
+          "name": "Pelagos Insurance Capital",
+          "name_kr": "",
+          "weight_pct": 4.57
+        },
+        {
+          "rank": 8,
+          "ticker": "ELV",
+          "name": "Elevance Health Inc.",
+          "name_kr": "엘레반스 헬스",
+          "weight_pct": 3.96
+        },
+        {
+          "rank": 9,
+          "ticker": "LAD",
+          "name": "Lithia Motors Inc.",
+          "name_kr": "리시아 모터스",
+          "weight_pct": 3.5
+        },
+        {
+          "rank": 10,
+          "ticker": "ASH",
+          "name": "Ashland Global Holdings Inc.",
+          "name_kr": "애쉬랜드",
+          "weight_pct": 3.31
+        }
+      ]
+    },
+    {
+      "id": "HC",
+      "name": "Li Lu - Himalaya Capital Management",
+      "firm": "Li Lu - Himalaya Capital Management",
+      "portfolio_value": 3568876000,
+      "num_stocks": 9,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 22.31
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 21.55
+        },
+        {
+          "rank": 3,
+          "ticker": "BAC",
+          "name": "Bank of America Corp.",
+          "name_kr": "뱅크오브아메리카",
+          "weight_pct": 16.08
+        },
+        {
+          "rank": 4,
+          "ticker": "PDD",
+          "name": "Pinduoduo Inc.",
+          "name_kr": "핀둬둬 ADR",
+          "weight_pct": 14.64
+        },
+        {
+          "rank": 5,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 12.64
+        },
+        {
+          "rank": 6,
+          "ticker": "EWBC",
+          "name": "East West Bancorp",
+          "name_kr": "이스트 웨스트 뱅코프",
+          "weight_pct": 8.74
+        },
+        {
+          "rank": 7,
+          "ticker": "OXY",
+          "name": "Occidental Petroleum",
+          "name_kr": "옥시덴털 페트롤리움",
+          "weight_pct": 1.69
+        },
+        {
+          "rank": 8,
+          "ticker": "CROX",
+          "name": "Crocs Inc.",
+          "name_kr": "크록스",
+          "weight_pct": 1.51
+        },
+        {
+          "rank": 9,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 0.84
+        }
+      ]
+    },
+    {
+      "id": "LT",
+      "name": "Lindsell Train",
+      "firm": "Lindsell Train",
+      "portfolio_value": 3136815000,
+      "num_stocks": 27,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "TKO",
+          "name": "TKO Group Holdings Inc.",
+          "name_kr": "TKO 그룹 홀딩스",
+          "weight_pct": 15.75
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 15.63
+        },
+        {
+          "rank": 3,
+          "ticker": "INTU",
+          "name": "Intuit Inc.",
+          "name_kr": "인튜이트",
+          "weight_pct": 10.11
+        },
+        {
+          "rank": 4,
+          "ticker": "DIS",
+          "name": "Walt Disney Co.",
+          "name_kr": "월트 디즈니",
+          "weight_pct": 9.85
+        },
+        {
+          "rank": 5,
+          "ticker": "TMO",
+          "name": "Thermo Fisher Scientific",
+          "name_kr": "써모 피셔 사이언티픽",
+          "weight_pct": 9.67
+        },
+        {
+          "rank": 6,
+          "ticker": "FICO",
+          "name": "Fair Isaac Corp.",
+          "name_kr": "",
+          "weight_pct": 8.49
+        },
+        {
+          "rank": 7,
+          "ticker": "MDLZ",
+          "name": "Mondelez International",
+          "name_kr": "몬덜리즈 인터내셔널",
+          "weight_pct": 6.55
+        },
+        {
+          "rank": 8,
+          "ticker": "PEP",
+          "name": "PepsiCo Inc.",
+          "name_kr": "펩시코",
+          "weight_pct": 6.32
+        },
+        {
+          "rank": 9,
+          "ticker": "PYPL",
+          "name": "PayPal Holdings Inc.",
+          "name_kr": "페이팔 홀딩스",
+          "weight_pct": 6.03
+        },
+        {
+          "rank": 10,
+          "ticker": "EBAY",
+          "name": "eBay Inc.",
+          "name_kr": "이베이",
+          "weight_pct": 5.59
+        }
+      ]
+    },
+    {
+      "id": "MPF",
+      "name": "Mairs & Power Funds",
+      "firm": "Mairs & Power Funds",
+      "portfolio_value": 9786099000,
+      "num_stocks": 200,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 8.49
+        },
+        {
+          "rank": 2,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 7.35
+        },
+        {
+          "rank": 3,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 5.54
+        },
+        {
+          "rank": 4,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 4.72
+        },
+        {
+          "rank": 5,
+          "ticker": "GGG",
+          "name": "Graco Inc.",
+          "name_kr": "그라코",
+          "weight_pct": 3.3
+        },
+        {
+          "rank": 6,
+          "ticker": "JPM",
+          "name": "JPMorgan Chase & Co.",
+          "name_kr": "제이피모간체이스",
+          "weight_pct": 3.17
+        },
+        {
+          "rank": 7,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 3.13
+        },
+        {
+          "rank": 8,
+          "ticker": "LLY",
+          "name": "Eli Lilly & Co.",
+          "name_kr": "일라이 릴리",
+          "weight_pct": 3.07
+        },
+        {
+          "rank": 9,
+          "ticker": "TTC",
+          "name": "Toro Co.",
+          "name_kr": "토로",
+          "weight_pct": 2.6
+        },
+        {
+          "rank": 10,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 2.6
+        }
+      ]
+    },
+    {
+      "id": "SE",
+      "name": "Mason Hawkins - Southeastern Asset Management",
+      "firm": "Mason Hawkins - Southeastern Asset Management",
+      "portfolio_value": 2245170000,
+      "num_stocks": 53,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "CNX",
+          "name": "CNX Resources Corp.",
+          "name_kr": "CNX 리소스",
+          "weight_pct": 7.76
+        },
+        {
+          "rank": 2,
+          "ticker": "MAT",
+          "name": "Mattel Inc.",
+          "name_kr": "마텔",
+          "weight_pct": 7.57
+        },
+        {
+          "rank": 3,
+          "ticker": "IAC",
+          "name": "IAC Inc.",
+          "name_kr": "IAC",
+          "weight_pct": 6.95
+        },
+        {
+          "rank": 4,
+          "ticker": "REGN",
+          "name": "Regeneron Pharmaceuticals",
+          "name_kr": "리제네론 파마슈티컬스",
+          "weight_pct": 5.7
+        },
+        {
+          "rank": 5,
+          "ticker": "PCH",
+          "name": "OLD- PotlatchDeltic Corp.",
+          "name_kr": "",
+          "weight_pct": 5.6
+        },
+        {
+          "rank": 6,
+          "ticker": "RYN",
+          "name": "Rayonier Inc.",
+          "name_kr": "레이어니어",
+          "weight_pct": 5.48
+        },
+        {
+          "rank": 7,
+          "ticker": "KHC",
+          "name": "Kraft Heinz Co.",
+          "name_kr": "크래프트 하인즈",
+          "weight_pct": 4.85
+        },
+        {
+          "rank": 8,
+          "ticker": "ACI",
+          "name": "Albertsons Co Inc.",
+          "name_kr": "앨버트슨 컴퍼니",
+          "weight_pct": 4.72
+        },
+        {
+          "rank": 9,
+          "ticker": "FDX",
+          "name": "FedEx Corp.",
+          "name_kr": "페덱스",
+          "weight_pct": 4.62
+        },
+        {
+          "rank": 10,
+          "ticker": "MGM",
+          "name": "MGM Resorts International",
+          "name_kr": "MGM 리조트 인터내셔널",
+          "weight_pct": 3.3
+        }
+      ]
+    },
+    {
+      "id": "SAM",
+      "name": "Michael Burry - Scion Asset Management",
+      "firm": "Michael Burry - Scion Asset Management",
+      "portfolio_value": 55001000,
+      "num_stocks": 3,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MOH",
+          "name": "Molina Healthcare Inc.",
+          "name_kr": "몰리나 헬스케어",
+          "weight_pct": 43.49
+        },
+        {
+          "rank": 2,
+          "ticker": "LULU",
+          "name": "Lululemon Athletica Inc.",
+          "name_kr": "룰루레몬 애슬레티카",
+          "weight_pct": 32.35
+        },
+        {
+          "rank": 3,
+          "ticker": "SLM",
+          "name": "SLM Corp.",
+          "name_kr": "SLM",
+          "weight_pct": 24.16
+        }
+      ]
+    },
+    {
+      "id": "PI",
+      "name": "Mohnish Pabrai - Pabrai Investments",
+      "firm": "Mohnish Pabrai - Pabrai Investments",
+      "portfolio_value": 422885000,
+      "num_stocks": 3,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "HCC",
+          "name": "Warrior Met Coal Inc.",
+          "name_kr": "워리어 멧 콜",
+          "weight_pct": 39.89
+        },
+        {
+          "rank": 2,
+          "ticker": "RIG",
+          "name": "Transocean Ltd.",
+          "name_kr": "트랜스오션",
+          "weight_pct": 31.97
+        },
+        {
+          "rank": 3,
+          "ticker": "AMR",
+          "name": "Alpha Metallurgical Resources Inc.",
+          "name_kr": "알파 메탈러지컬 리소시스",
+          "weight_pct": 28.14
+        }
+      ]
+    },
+    {
+      "id": "TF",
+      "name": "Nelson Peltz - Trian Fund Management",
+      "firm": "Nelson Peltz - Trian Fund Management",
+      "portfolio_value": 3984031000,
+      "num_stocks": 7,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "JHG",
+          "name": "Janus Henderson Group",
+          "name_kr": "재너스 헨더슨 그룹",
+          "weight_pct": 38.05
+        },
+        {
+          "rank": 2,
+          "ticker": "GE",
+          "name": "GE Aerospace",
+          "name_kr": "GE 에어로스페이스",
+          "weight_pct": 31.16
+        },
+        {
+          "rank": 3,
+          "ticker": "SOLV",
+          "name": "Solventum Corp",
+          "name_kr": "",
+          "weight_pct": 16.38
+        },
+        {
+          "rank": 4,
+          "ticker": "WEN",
+          "name": "Wendy's Co.",
+          "name_kr": "웬디스",
+          "weight_pct": 6.36
+        },
+        {
+          "rank": 5,
+          "ticker": "FERG",
+          "name": "Ferguson Enterprises Inc.",
+          "name_kr": "",
+          "weight_pct": 6.07
+        },
+        {
+          "rank": 6,
+          "ticker": "IVZ",
+          "name": "Invesco Ltd",
+          "name_kr": "인베스코",
+          "weight_pct": 1.96
+        },
+        {
+          "rank": 7,
+          "ticker": "GEHC",
+          "name": "GE HealthCare Technologies Inc.",
+          "name_kr": "GE 헬스케어",
+          "weight_pct": 0.01
+        }
+      ]
+    },
+    {
+      "id": "PC",
+      "name": "Norbert Lou - Punch Card Management",
+      "firm": "Norbert Lou - Punch Card Management",
+      "portfolio_value": 300882000,
+      "num_stocks": 5,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.A",
+          "name": "Berkshire Hathaway CL A",
+          "name_kr": "",
+          "weight_pct": 36.38
+        },
+        {
+          "rank": 2,
+          "ticker": "SGOV",
+          "name": "Ishares 0 3 Month Treasury B",
+          "name_kr": "",
+          "weight_pct": 18.88
+        },
+        {
+          "rank": 3,
+          "ticker": "CROX",
+          "name": "Crocs Inc.",
+          "name_kr": "크록스",
+          "weight_pct": 16.9
+        },
+        {
+          "rank": 4,
+          "ticker": "PDD",
+          "name": "Pinduoduo Inc.",
+          "name_kr": "핀둬둬 ADR",
+          "weight_pct": 15.64
+        },
+        {
+          "rank": 5,
+          "ticker": "PYPL",
+          "name": "PayPal Holdings Inc.",
+          "name_kr": "페이팔 홀딩스",
+          "weight_pct": 12.2
+        }
+      ]
+    },
+    {
+      "id": "DA",
+      "name": "Pat Dorsey - Dorsey Asset Management",
+      "firm": "Pat Dorsey - Dorsey Asset ManagementiFrom 2000 to 2011, Pat was Director of Equity Research for Morningstar, where he led the growth of Morningstar’s equity research group from 20 to 90 analysts. Pat was instrumental in the development of Morningstar’s economic moat ratings, as well as the methodology behind Morningstar’s framework for analyzing competitive advantage. Pat is also the author of two books — The Five Rules for Successful Stock Investing and The Little Book that Builds Wealth.We manage a single long-only equity strategy, concentrating our clients’ capital in 10-15 competitively advantaged businesses with the potential to compound shareholder value at above-average rates.We purchase these businesses at what we believe to be reasonable discounts to a rational assessment of intrinsic value, and we seek to invest in companies with corporate managers who we believe can allocate capital in ways that benefit long-term minority shareholders.",
+      "portfolio_value": 1150398000,
+      "num_stocks": 10,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "ASML",
+          "name": "ASML Holding NV",
+          "name_kr": "ASML 홀딩 ADR",
+          "weight_pct": 17.89
+        },
+        {
+          "rank": 2,
+          "ticker": "DHR",
+          "name": "Danaher Corp.",
+          "name_kr": "다나허",
+          "weight_pct": 16.47
+        },
+        {
+          "rank": 3,
+          "ticker": "AER",
+          "name": "AerCap Holdings N.V.",
+          "name_kr": "에어캡 홀딩스",
+          "weight_pct": 15.18
+        },
+        {
+          "rank": 4,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 9.21
+        },
+        {
+          "rank": 5,
+          "ticker": "BKNG",
+          "name": "Booking Holdings Inc.",
+          "name_kr": "부킹 홀딩스",
+          "weight_pct": 7.6
+        },
+        {
+          "rank": 6,
+          "ticker": "RPRX",
+          "name": "Royalty Pharma plc",
+          "name_kr": "로열티 파마",
+          "weight_pct": 7.59
+        },
+        {
+          "rank": 7,
+          "ticker": "LYV",
+          "name": "Live Nation Inc.",
+          "name_kr": "라이브 네이션 엔터테인먼트",
+          "weight_pct": 7.47
+        },
+        {
+          "rank": 8,
+          "ticker": "AZO",
+          "name": "AutoZone Inc.",
+          "name_kr": "오토존",
+          "weight_pct": 7.41
+        },
+        {
+          "rank": 9,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 5.92
+        },
+        {
+          "rank": 10,
+          "ticker": "ENOV",
+          "name": "Enovis Corp.",
+          "name_kr": "",
+          "weight_pct": 5.28
+        }
+      ]
+    },
+    {
+      "id": "pcm",
+      "name": "Polen Capital Management",
+      "firm": "Polen Capital Management",
+      "portfolio_value": 23415747000,
+      "num_stocks": 200,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 8.53
+        },
+        {
+          "rank": 2,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 8.08
+        },
+        {
+          "rank": 3,
+          "ticker": "ORCL",
+          "name": "Oracle Corp.",
+          "name_kr": "",
+          "weight_pct": 5.98
+        },
+        {
+          "rank": 4,
+          "ticker": "LLY",
+          "name": "Eli Lilly & Co.",
+          "name_kr": "일라이 릴리",
+          "weight_pct": 5.72
+        },
+        {
+          "rank": 5,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 5.38
+        },
+        {
+          "rank": 6,
+          "ticker": "AVGO",
+          "name": "Broadcom Inc.",
+          "name_kr": "브로드컴",
+          "weight_pct": 5.22
+        },
+        {
+          "rank": 7,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 5.2
+        },
+        {
+          "rank": 8,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 5.06
+        },
+        {
+          "rank": 9,
+          "ticker": "SHOP",
+          "name": "Shopify Inc.",
+          "name_kr": "쇼피파이",
+          "weight_pct": 4.95
+        },
+        {
+          "rank": 10,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 4.24
+        }
+      ]
+    },
+    {
+      "id": "FFH",
+      "name": "Prem Watsa - Fairfax Financial Holdings",
+      "firm": "Prem Watsa - Fairfax Financial HoldingsiPrem Watsa is the founder, chairman, and chief executive of Fairfax Financial Holdings, based in Toronto, Ontario. He has been called the \"Canadian Warren Buffett\".Fairfax Financial Holdings Limited is a financial services holding company whose corporate objective is to achieve a high rate of return on invested capital and build long term shareholder value.",
+      "portfolio_value": 2083409000,
+      "num_stocks": 29,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "ORLA",
+          "name": "Orla Mining Ltd",
+          "name_kr": "",
+          "weight_pct": 20.33
+        },
+        {
+          "rank": 2,
+          "ticker": "OXY",
+          "name": "Occidental Petroleum",
+          "name_kr": "옥시덴털 페트롤리움",
+          "weight_pct": 11.94
+        },
+        {
+          "rank": 3,
+          "ticker": "CVS",
+          "name": "CVS Health Corp.",
+          "name_kr": "CVS 헬스",
+          "weight_pct": 10.33
+        },
+        {
+          "rank": 4,
+          "ticker": "UAA",
+          "name": "Under Armour Inc.",
+          "name_kr": "언더 아머 Class A",
+          "weight_pct": 10.01
+        },
+        {
+          "rank": 5,
+          "ticker": "CLF",
+          "name": "Cleveland-Cliffs Inc.",
+          "name_kr": "클리블랜드-클리프스",
+          "weight_pct": 9.49
+        },
+        {
+          "rank": 6,
+          "ticker": "BB",
+          "name": "BlackBerry Ltd.",
+          "name_kr": "블랙베리",
+          "weight_pct": 6.35
+        },
+        {
+          "rank": 7,
+          "ticker": "KW",
+          "name": "Kennedy-Wilson Holdings Inc.",
+          "name_kr": "케네디-윌슨 홀딩스",
+          "weight_pct": 6.18
+        },
+        {
+          "rank": 8,
+          "ticker": "KHC",
+          "name": "Kraft Heinz Co.",
+          "name_kr": "크래프트 하인즈",
+          "weight_pct": 5.96
+        },
+        {
+          "rank": 9,
+          "ticker": "ATS",
+          "name": "Ats Corp",
+          "name_kr": "ATS",
+          "weight_pct": 3.28
+        },
+        {
+          "rank": 10,
+          "ticker": "TAP",
+          "name": "Molson Coors Beverage Co.",
+          "name_kr": "몰슨 쿠어스 베버리지 Class B",
+          "weight_pct": 3.0
+        }
+      ]
+    },
+    {
+      "id": "PIM",
+      "name": "Richard Pzena - Pzena Investment Management",
+      "firm": "Richard Pzena - Pzena Investment Management",
+      "portfolio_value": 30791977000,
+      "num_stocks": 156,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MGA",
+          "name": "Magna International Inc.",
+          "name_kr": "마그나 인터내셔널",
+          "weight_pct": 6.39
+        },
+        {
+          "rank": 2,
+          "ticker": "CTSH",
+          "name": "Cognizant Technology Solutions",
+          "name_kr": "코그니전트 테크놀로지 솔루션",
+          "weight_pct": 4.04
+        },
+        {
+          "rank": 3,
+          "ticker": "TSN",
+          "name": "Tyson Foods",
+          "name_kr": "타이슨 푸드",
+          "weight_pct": 3.57
+        },
+        {
+          "rank": 4,
+          "ticker": "BAX",
+          "name": "Baxter International Inc.",
+          "name_kr": "박스터 인터내셔널",
+          "weight_pct": 3.52
+        },
+        {
+          "rank": 5,
+          "ticker": "BMY",
+          "name": "Bristol-Myers Squibb",
+          "name_kr": "브리스톨-마이어스 스큅",
+          "weight_pct": 3.37
+        },
+        {
+          "rank": 6,
+          "ticker": "CVS",
+          "name": "CVS Health Corp.",
+          "name_kr": "CVS 헬스",
+          "weight_pct": 3.21
+        },
+        {
+          "rank": 7,
+          "ticker": "HUM",
+          "name": "Humana Inc.",
+          "name_kr": "휴마나",
+          "weight_pct": 3.08
+        },
+        {
+          "rank": 8,
+          "ticker": "C",
+          "name": "Citigroup Inc.",
+          "name_kr": "씨티그룹",
+          "weight_pct": 3.01
+        },
+        {
+          "rank": 9,
+          "ticker": "SWKS",
+          "name": "Skyworks Solutions Inc.",
+          "name_kr": "스카이웍스 솔루션스",
+          "weight_pct": 2.8
+        },
+        {
+          "rank": 10,
+          "ticker": "COF",
+          "name": "Capital One Financial",
+          "name_kr": "캐피털 원 파이낸셜",
+          "weight_pct": 2.71
+        }
+      ]
+    },
+    {
+      "id": "OFALX",
+      "name": "Robert Olstein - Olstein Capital Management",
+      "firm": "Robert Olstein - Olstein Capital ManagementiPhilosophyThere is a strong correlation between above-average investment performance and error avoidance. To achieve long-term success, an investor must first consider downside risk before considering the potential for appreciation.A company’s stock price often falls below its private market value due to temporary problems such as missed earnings estimates, over-reaction to short-term results or overall negative market psychology. These short-term deviations may present viable opportunities for the patient, long-term investor.Excess cash flow is the lifeblood of a business and is the primary determinant of a company's private market value. Companies that generate excess cash flow have the potential to enhance shareholder by increasing dividend payments, repurchasing company shares, reducing outstanding debt, engaging in strategic acquisitions, on withstanding economic downturns without adopting harmful short-term strategies.Forensic analysis of financial statements reveals the Quality of a company’s Earnings, the success of its strategy, sustainability of its performance and impact of management decisions on future cash flow. Forensic analysis of financial statements is more useful to an investor than management forecasts or earnings guidance.Emphasizes investments in undervalued equity securities of companies with discernible financial strength, unique business fundamentals, competitive edge and ability to generate free cash flowAnalysis focuses on how a company’s operations generate sustainable free cash flow; how much of that cash is available to investors and the level of ongoing investment required to maintain and grow free cash flowValuations based on free cash flow. Reliable valuations require determining if a company’s accounting policies reflect business reality; assessing a company’s Quality of Earnings; accounting adjustments to eliminate management bias, and identifying positive or negative factors that may affect future free cash flow",
+      "portfolio_value": 458067000,
+      "num_stocks": 99,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "DIS",
+          "name": "Walt Disney Co.",
+          "name_kr": "월트 디즈니",
+          "weight_pct": 2.19
+        },
+        {
+          "rank": 2,
+          "ticker": "ST",
+          "name": "Sensata Technologies Holding",
+          "name_kr": "센사타 테크놀로지스 홀딩",
+          "weight_pct": 2.14
+        },
+        {
+          "rank": 3,
+          "ticker": "AVTR",
+          "name": "Avantor Inc.",
+          "name_kr": "",
+          "weight_pct": 2.07
+        },
+        {
+          "rank": 4,
+          "ticker": "LKQ",
+          "name": "LKQ Corp.",
+          "name_kr": "LKQ",
+          "weight_pct": 2.02
+        },
+        {
+          "rank": 5,
+          "ticker": "OMC",
+          "name": "Omnicom Group",
+          "name_kr": "옴니콤 그룹",
+          "weight_pct": 1.94
+        },
+        {
+          "rank": 6,
+          "ticker": "IFF",
+          "name": "International Flavors & Fragrances Inc.",
+          "name_kr": "인터내셔널 플레이버스 & 프레그런스",
+          "weight_pct": 1.88
+        },
+        {
+          "rank": 7,
+          "ticker": "VNT",
+          "name": "Vontier Corp.",
+          "name_kr": "본티어",
+          "weight_pct": 1.85
+        },
+        {
+          "rank": 8,
+          "ticker": "ABM",
+          "name": "ABM Industries",
+          "name_kr": "ABM 인더스트리즈",
+          "weight_pct": 1.78
+        },
+        {
+          "rank": 9,
+          "ticker": "FIS",
+          "name": "Fidelity National Information Services",
+          "name_kr": "피델리티 내셔널 인포메이션 서비스",
+          "weight_pct": 1.78
+        },
+        {
+          "rank": 10,
+          "ticker": "NDAQ",
+          "name": "Nasdaq Inc.",
+          "name_kr": "나스닥",
+          "weight_pct": 1.78
+        }
+      ]
+    },
+    {
+      "id": "RVC",
+      "name": "Robert Vinall - RV Capital GmbH",
+      "firm": "Robert Vinall - RV Capital GmbH",
+      "portfolio_value": 382627000,
+      "num_stocks": 13,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "CVNA",
+          "name": "Carvana Co.",
+          "name_kr": "",
+          "weight_pct": 31.05
+        },
+        {
+          "rank": 2,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 21.77
+        },
+        {
+          "rank": 3,
+          "ticker": "CACC",
+          "name": "Credit Acceptance Corp.",
+          "name_kr": "크레디트 억셉턴스",
+          "weight_pct": 13.77
+        },
+        {
+          "rank": 4,
+          "ticker": "IBKR",
+          "name": "Interactive Brokers Group Inc.",
+          "name_kr": "인터랙티브 브로커스 그룹",
+          "weight_pct": 13.36
+        },
+        {
+          "rank": 5,
+          "ticker": "HTHT",
+          "name": "H World Group Ltd ADR",
+          "name_kr": "화주 그룹",
+          "weight_pct": 7.34
+        },
+        {
+          "rank": 6,
+          "ticker": "YUMC",
+          "name": "Yum China Holdings Inc.",
+          "name_kr": "",
+          "weight_pct": 5.37
+        },
+        {
+          "rank": 7,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 2.46
+        },
+        {
+          "rank": 8,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 2.44
+        },
+        {
+          "rank": 9,
+          "ticker": "CRM",
+          "name": "Salesforce.com",
+          "name_kr": "세일즈포스",
+          "weight_pct": 0.76
+        },
+        {
+          "rank": 10,
+          "ticker": "DE",
+          "name": "Deere & Co.",
+          "name_kr": "디어",
+          "weight_pct": 0.74
+        }
+      ]
+    },
+    {
+      "id": "RC",
+      "name": "Ruane Cunniff LP",
+      "firm": "Ruane Cunniff LP",
+      "portfolio_value": 6402460000,
+      "num_stocks": 48,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 10.63
+        },
+        {
+          "rank": 2,
+          "ticker": "SCHW",
+          "name": "Charles Schwab Corp.",
+          "name_kr": "",
+          "weight_pct": 8.73
+        },
+        {
+          "rank": 3,
+          "ticker": "FWONK",
+          "name": "Liberty Media Corp Formula One Series C",
+          "name_kr": "포뮬러 원 그룹 Series C",
+          "weight_pct": 8.45
+        },
+        {
+          "rank": 4,
+          "ticker": "COF",
+          "name": "Capital One Financial",
+          "name_kr": "캐피털 원 파이낸셜",
+          "weight_pct": 7.83
+        },
+        {
+          "rank": 5,
+          "ticker": "ELV",
+          "name": "Elevance Health Inc.",
+          "name_kr": "엘레반스 헬스",
+          "weight_pct": 7.79
+        },
+        {
+          "rank": 6,
+          "ticker": "ICE",
+          "name": "Intercontinental Exchange Inc.",
+          "name_kr": "인터컨티넨털 익스체인지",
+          "weight_pct": 6.84
+        },
+        {
+          "rank": 7,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 6.75
+        },
+        {
+          "rank": 8,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 5.6
+        },
+        {
+          "rank": 9,
+          "ticker": "ICLR",
+          "name": "ICON plc",
+          "name_kr": "아이콘",
+          "weight_pct": 4.78
+        },
+        {
+          "rank": 10,
+          "ticker": "MSA",
+          "name": "MSA Safety Inc.",
+          "name_kr": "MSA 세이프티",
+          "weight_pct": 4.53
+        }
+      ]
+    },
+    {
+      "id": "PTNT",
+      "name": "Samantha McLemore - Patient Capital Management",
+      "firm": "Samantha McLemore - Patient Capital Management",
+      "portfolio_value": 2590708000,
+      "num_stocks": 40,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 7.03
+        },
+        {
+          "rank": 2,
+          "ticker": "C",
+          "name": "Citigroup Inc.",
+          "name_kr": "씨티그룹",
+          "weight_pct": 5.82
+        },
+        {
+          "rank": 3,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 5.01
+        },
+        {
+          "rank": 4,
+          "ticker": "RPRX",
+          "name": "Royalty Pharma plc",
+          "name_kr": "로열티 파마",
+          "weight_pct": 4.97
+        },
+        {
+          "rank": 5,
+          "ticker": "QXO",
+          "name": "Qxo Inc",
+          "name_kr": "QXO",
+          "weight_pct": 4.82
+        },
+        {
+          "rank": 6,
+          "ticker": "UNH",
+          "name": "United Health Group Inc.",
+          "name_kr": "유나이티드헬스 그룹",
+          "weight_pct": 4.69
+        },
+        {
+          "rank": 7,
+          "ticker": "NVDA",
+          "name": "NVIDIA Corp.",
+          "name_kr": "엔비디아",
+          "weight_pct": 4.6
+        },
+        {
+          "rank": 8,
+          "ticker": "NCLH",
+          "name": "Norwegian Cruise Line Hlgs Ltd.",
+          "name_kr": "",
+          "weight_pct": 4.57
+        },
+        {
+          "rank": 9,
+          "ticker": "BIIB",
+          "name": "Biogen Inc.",
+          "name_kr": "바이오젠",
+          "weight_pct": 3.92
+        },
+        {
+          "rank": 10,
+          "ticker": "CVS",
+          "name": "CVS Health Corp.",
+          "name_kr": "CVS 헬스",
+          "weight_pct": 3.77
+        }
+      ]
+    },
+    {
+      "id": "CAU",
+      "name": "Sarah Ketterer - Causeway Capital Management",
+      "firm": "Sarah Ketterer - Causeway Capital Management",
+      "portfolio_value": 7241381000,
+      "num_stocks": 107,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "CCL",
+          "name": "Carnival Corp.",
+          "name_kr": "카니발",
+          "weight_pct": 14.32
+        },
+        {
+          "rank": 2,
+          "ticker": "CP",
+          "name": "Canadian Pacific Kansas City",
+          "name_kr": "캐나디안 퍼시픽 캔자스 시티",
+          "weight_pct": 12.82
+        },
+        {
+          "rank": 3,
+          "ticker": "SW",
+          "name": "Smurfit Westrock Plc",
+          "name_kr": "스머핏 웨스트락",
+          "weight_pct": 10.22
+        },
+        {
+          "rank": 4,
+          "ticker": "DB",
+          "name": "Deutsche Bank AG",
+          "name_kr": "도이치은행",
+          "weight_pct": 7.62
+        },
+        {
+          "rank": 5,
+          "ticker": "B",
+          "name": "Barrick Mining Corp.",
+          "name_kr": "바릭 마이닝",
+          "weight_pct": 3.65
+        },
+        {
+          "rank": 6,
+          "ticker": "BABA",
+          "name": "Alibaba Group Holdings",
+          "name_kr": "",
+          "weight_pct": 2.44
+        },
+        {
+          "rank": 7,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 2.15
+        },
+        {
+          "rank": 8,
+          "ticker": "CTSH",
+          "name": "Cognizant Technology Solutions",
+          "name_kr": "코그니전트 테크놀로지 솔루션",
+          "weight_pct": 1.78
+        },
+        {
+          "rank": 9,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 1.6
+        },
+        {
+          "rank": 10,
+          "ticker": "MRK",
+          "name": "Merck & Co.",
+          "name_kr": "머크 앤 코",
+          "weight_pct": 1.52
+        }
+      ]
+    },
+    {
+      "id": "BAUPOST",
+      "name": "Seth Klarman - Baupost Group",
+      "firm": "Seth Klarman - Baupost Group",
+      "portfolio_value": 5278590000,
+      "num_stocks": 22,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "QSR",
+          "name": "Restaurant Brands International",
+          "name_kr": "레스토랑 브랜즈 인터내셔널",
+          "weight_pct": 10.44
+        },
+        {
+          "rank": 2,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 9.28
+        },
+        {
+          "rank": 3,
+          "ticker": "WTW",
+          "name": "Willis Towers Watson plc",
+          "name_kr": "윌리스 타워스 왓슨",
+          "weight_pct": 8.45
+        },
+        {
+          "rank": 4,
+          "ticker": "ELV",
+          "name": "Elevance Health Inc.",
+          "name_kr": "엘레반스 헬스",
+          "weight_pct": 8.43
+        },
+        {
+          "rank": 5,
+          "ticker": "UNP",
+          "name": "Union Pacific",
+          "name_kr": "유니온 퍼시픽",
+          "weight_pct": 7.13
+        },
+        {
+          "rank": 6,
+          "ticker": "WCC",
+          "name": "WESCO International Inc.",
+          "name_kr": "웨스코 인터내셔널",
+          "weight_pct": 6.58
+        },
+        {
+          "rank": 7,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 6.46
+        },
+        {
+          "rank": 8,
+          "ticker": "FIS",
+          "name": "Fidelity National Information Services",
+          "name_kr": "피델리티 내셔널 인포메이션 서비스",
+          "weight_pct": 5.67
+        },
+        {
+          "rank": 9,
+          "ticker": "DG",
+          "name": "Dollar General",
+          "name_kr": "달러 제너럴",
+          "weight_pct": 5.19
+        },
+        {
+          "rank": 10,
+          "ticker": "FERG",
+          "name": "Ferguson Enterprises Inc.",
+          "name_kr": "",
+          "weight_pct": 4.8
+        }
+      ]
+    },
+    {
+      "id": "LPC",
+      "name": "Stephen Mandel - Lone Pine Capital",
+      "firm": "Stephen Mandel - Lone Pine Capital",
+      "portfolio_value": 13611137000,
+      "num_stocks": 32,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 6.81
+        },
+        {
+          "rank": 2,
+          "ticker": "VST",
+          "name": "Vistra Corp.",
+          "name_kr": "비스트라 에너지",
+          "weight_pct": 6.18
+        },
+        {
+          "rank": 3,
+          "ticker": "CVNA",
+          "name": "Carvana Co.",
+          "name_kr": "",
+          "weight_pct": 5.52
+        },
+        {
+          "rank": 4,
+          "ticker": "LPLA",
+          "name": "LPL Financial Holdings Inc.",
+          "name_kr": "LPL 파이낸셜 홀딩스",
+          "weight_pct": 5.44
+        },
+        {
+          "rank": 5,
+          "ticker": "BN",
+          "name": "Brookfield Corp.",
+          "name_kr": "브룩필드",
+          "weight_pct": 5.37
+        },
+        {
+          "rank": 6,
+          "ticker": "ASML",
+          "name": "ASML Holding NV",
+          "name_kr": "ASML 홀딩 ADR",
+          "weight_pct": 4.76
+        },
+        {
+          "rank": 7,
+          "ticker": "KKR",
+          "name": "KKR & Co. L.P.",
+          "name_kr": "KKR & Co",
+          "weight_pct": 4.68
+        },
+        {
+          "rank": 8,
+          "ticker": "AVGO",
+          "name": "Broadcom Inc.",
+          "name_kr": "브로드컴",
+          "weight_pct": 4.4
+        },
+        {
+          "rank": 9,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 4.38
+        },
+        {
+          "rank": 10,
+          "ticker": "DASH",
+          "name": "DoorDash Inc.",
+          "name_kr": "도어대시",
+          "weight_pct": 4.21
+        }
+      ]
+    },
+    {
+      "id": "FS",
+      "name": "Terry Smith - Fundsmith",
+      "firm": "Terry Smith - Fundsmith",
+      "portfolio_value": 17116089000,
+      "num_stocks": 37,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "WAT",
+          "name": "Waters Corp.",
+          "name_kr": "워터스",
+          "weight_pct": 7.9
+        },
+        {
+          "rank": 2,
+          "ticker": "SYK",
+          "name": "Stryker Corp.",
+          "name_kr": "스트라이커",
+          "weight_pct": 7.57
+        },
+        {
+          "rank": 3,
+          "ticker": "IDXX",
+          "name": "IDEXX Laboratories",
+          "name_kr": "아이덱스 래보라토리스",
+          "weight_pct": 7.42
+        },
+        {
+          "rank": 4,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 7.24
+        },
+        {
+          "rank": 5,
+          "ticker": "MAR",
+          "name": "Marriott Int'l.",
+          "name_kr": "메리어트 인터내셔널",
+          "weight_pct": 7.21
+        },
+        {
+          "rank": 6,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 6.4
+        },
+        {
+          "rank": 7,
+          "ticker": "ADP",
+          "name": "Automatic Data Processing Inc.",
+          "name_kr": "오토매틱 데이터 프로세싱",
+          "weight_pct": 6.28
+        },
+        {
+          "rank": 8,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 5.88
+        },
+        {
+          "rank": 9,
+          "ticker": "PM",
+          "name": "Philip Morris Intl.",
+          "name_kr": "필립 모리스 인터내셔널",
+          "weight_pct": 5.74
+        },
+        {
+          "rank": 10,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 5.26
+        }
+      ]
+    },
+    {
+      "id": "TA",
+      "name": "Third Avenue Management",
+      "firm": "Third Avenue Management",
+      "portfolio_value": 616039000,
+      "num_stocks": 53,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "TDW",
+          "name": "Tidewater Inc.",
+          "name_kr": "타이드워터",
+          "weight_pct": 12.49
+        },
+        {
+          "rank": 2,
+          "ticker": "VAL",
+          "name": "Valaris plc",
+          "name_kr": "밸라리스",
+          "weight_pct": 8.09
+        },
+        {
+          "rank": 3,
+          "ticker": "BCC",
+          "name": "Boise Cascade Company",
+          "name_kr": "보이시 캐스케이드",
+          "weight_pct": 6.92
+        },
+        {
+          "rank": 4,
+          "ticker": "HCC",
+          "name": "Warrior Met Coal Inc.",
+          "name_kr": "워리어 멧 콜",
+          "weight_pct": 5.5
+        },
+        {
+          "rank": 5,
+          "ticker": "HOG",
+          "name": "Harley-Davidson",
+          "name_kr": "할리-데이비슨",
+          "weight_pct": 4.8
+        },
+        {
+          "rank": 6,
+          "ticker": "RHI",
+          "name": "Robert Half International",
+          "name_kr": "로버트 하프 인터내셔널",
+          "weight_pct": 3.73
+        },
+        {
+          "rank": 7,
+          "ticker": "BN",
+          "name": "Brookfield Corp.",
+          "name_kr": "브룩필드",
+          "weight_pct": 3.16
+        },
+        {
+          "rank": 8,
+          "ticker": "FPH",
+          "name": "Five Point Holdings LLC",
+          "name_kr": "파이브 포인트 홀딩스",
+          "weight_pct": 3.03
+        },
+        {
+          "rank": 9,
+          "ticker": "CBRE",
+          "name": "CBRE Group",
+          "name_kr": "",
+          "weight_pct": 3.0
+        },
+        {
+          "rank": 10,
+          "ticker": "PLD",
+          "name": "Prologis Inc.",
+          "name_kr": "프로로지스",
+          "weight_pct": 2.7
+        }
+      ]
+    },
+    {
+      "id": "MKL",
+      "name": "Thomas Gayner - Markel Group",
+      "firm": "Thomas Gayner - Markel Group",
+      "portfolio_value": 11938877000,
+      "num_stocks": 129,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.A",
+          "name": "Berkshire Hathaway CL A",
+          "name_kr": "",
+          "weight_pct": 6.7
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 6.61
+        },
+        {
+          "rank": 3,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 6.15
+        },
+        {
+          "rank": 4,
+          "ticker": "BN",
+          "name": "Brookfield Corp.",
+          "name_kr": "브룩필드",
+          "weight_pct": 4.43
+        },
+        {
+          "rank": 5,
+          "ticker": "DE",
+          "name": "Deere & Co.",
+          "name_kr": "디어",
+          "weight_pct": 4.14
+        },
+        {
+          "rank": 6,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 3.54
+        },
+        {
+          "rank": 7,
+          "ticker": "ADI",
+          "name": "Analog Devices",
+          "name_kr": "애널로그 디바이시스",
+          "weight_pct": 2.73
+        },
+        {
+          "rank": 8,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 2.61
+        },
+        {
+          "rank": 9,
+          "ticker": "GS",
+          "name": "Goldman Sachs Group",
+          "name_kr": "골드만삭스",
+          "weight_pct": 2.55
+        },
+        {
+          "rank": 10,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 2.54
+        }
+      ]
+    },
+    {
+      "id": "GR",
+      "name": "Thomas Russo - Gardner Russo & Quinn",
+      "firm": "Thomas Russo - Gardner Russo & Quinn",
+      "portfolio_value": 8496284000,
+      "num_stocks": 85,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.A",
+          "name": "Berkshire Hathaway CL A",
+          "name_kr": "",
+          "weight_pct": 12.34
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 11.31
+        },
+        {
+          "rank": 3,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 9.15
+        },
+        {
+          "rank": 4,
+          "ticker": "PM",
+          "name": "Philip Morris Intl.",
+          "name_kr": "필립 모리스 인터내셔널",
+          "weight_pct": 8.96
+        },
+        {
+          "rank": 5,
+          "ticker": "HKHHF",
+          "name": "Heineken Holding NV",
+          "name_kr": "",
+          "weight_pct": 7.57
+        },
+        {
+          "rank": 6,
+          "ticker": "CFRHF",
+          "name": "Compagnie Financiere Richemont SA",
+          "name_kr": "",
+          "weight_pct": 7.0
+        },
+        {
+          "rank": 7,
+          "ticker": "NSRGY",
+          "name": "Nestle",
+          "name_kr": "",
+          "weight_pct": 6.39
+        },
+        {
+          "rank": 8,
+          "ticker": "NFLX",
+          "name": "Netflix Inc.",
+          "name_kr": "넷플릭스",
+          "weight_pct": 6.35
+        },
+        {
+          "rank": 9,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 6.26
+        },
+        {
+          "rank": 10,
+          "ticker": "MLM",
+          "name": "Martin Marietta",
+          "name_kr": "마틴 마리에타 머터리얼스",
+          "weight_pct": 4.96
+        }
+      ]
+    },
+    {
+      "id": "MP",
+      "name": "Tom Bancroft - Makaira Partners",
+      "firm": "Tom Bancroft - Makaira Partners",
+      "portfolio_value": 127897000,
+      "num_stocks": 11,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "CHTR",
+          "name": "Charter Communications",
+          "name_kr": "차터 커뮤니케이션",
+          "weight_pct": 26.77
+        },
+        {
+          "rank": 2,
+          "ticker": "DPZ",
+          "name": "Dominos Pizza Inc.",
+          "name_kr": "도미노피자",
+          "weight_pct": 12.06
+        },
+        {
+          "rank": 3,
+          "ticker": "LAMR",
+          "name": "Lamar Advertising Co.",
+          "name_kr": "라마 애드버타이징",
+          "weight_pct": 11.88
+        },
+        {
+          "rank": 4,
+          "ticker": "BBWI",
+          "name": "Bath & Body Works Inc.",
+          "name_kr": "",
+          "weight_pct": 11.53
+        },
+        {
+          "rank": 5,
+          "ticker": "CDW",
+          "name": "CDW Corp.",
+          "name_kr": "CDW",
+          "weight_pct": 10.65
+        },
+        {
+          "rank": 6,
+          "ticker": "BELFB",
+          "name": "Bel Fuse Inc. CL B",
+          "name_kr": "벨 퓨즈 Class B",
+          "weight_pct": 7.29
+        },
+        {
+          "rank": 7,
+          "ticker": "FLUT",
+          "name": "Flutter Entertainment Plc",
+          "name_kr": "",
+          "weight_pct": 6.96
+        },
+        {
+          "rank": 8,
+          "ticker": "LMB",
+          "name": "Limbach Holdings Inc.",
+          "name_kr": "림바흐 홀딩스",
+          "weight_pct": 6.22
+        },
+        {
+          "rank": 9,
+          "ticker": "WHD",
+          "name": "Cactus Inc.",
+          "name_kr": "캑터스",
+          "weight_pct": 5.05
+        },
+        {
+          "rank": 10,
+          "ticker": "SVV",
+          "name": "Savers Value Village Inc",
+          "name_kr": "세이버스 밸류 빌리지",
+          "weight_pct": 1.16
+        }
+      ]
+    },
+    {
+      "id": "T",
+      "name": "Torray Funds",
+      "firm": "Torray Funds",
+      "portfolio_value": 638142000,
+      "num_stocks": 86,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "RPRX",
+          "name": "Royalty Pharma plc",
+          "name_kr": "로열티 파마",
+          "weight_pct": 4.85
+        },
+        {
+          "rank": 2,
+          "ticker": "AVGO",
+          "name": "Broadcom Inc.",
+          "name_kr": "브로드컴",
+          "weight_pct": 4.82
+        },
+        {
+          "rank": 3,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 4.51
+        },
+        {
+          "rank": 4,
+          "ticker": "CVX",
+          "name": "Chevron Corp.",
+          "name_kr": "셰브론",
+          "weight_pct": 4.38
+        },
+        {
+          "rank": 5,
+          "ticker": "CEG",
+          "name": "Constellation Energy Corp.",
+          "name_kr": "콘스텔레이션 에너지",
+          "weight_pct": 4.03
+        },
+        {
+          "rank": 6,
+          "ticker": "PSX",
+          "name": "Phillips 66",
+          "name_kr": "필립스 66",
+          "weight_pct": 4.03
+        },
+        {
+          "rank": 7,
+          "ticker": "TXN",
+          "name": "Texas Instruments",
+          "name_kr": "텍사스 인스트루먼트",
+          "weight_pct": 3.69
+        },
+        {
+          "rank": 8,
+          "ticker": "PFE",
+          "name": "Pfizer Inc.",
+          "name_kr": "화이자",
+          "weight_pct": 3.42
+        },
+        {
+          "rank": 9,
+          "ticker": "CNA",
+          "name": "CNA Financial Corp.",
+          "name_kr": "CNA 파이낸셜",
+          "weight_pct": 3.38
+        },
+        {
+          "rank": 10,
+          "ticker": "OKE",
+          "name": "ONEOK Inc.",
+          "name_kr": "원오케이",
+          "weight_pct": 3.38
+        }
+      ]
+    },
+    {
+      "id": "TFP",
+      "name": "Triple Frond Partners",
+      "firm": "Triple Frond Partners",
+      "portfolio_value": 962175000,
+      "num_stocks": 12,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 17.72
+        },
+        {
+          "rank": 2,
+          "ticker": "TDG",
+          "name": "TransDigm Group Inc.",
+          "name_kr": "트랜스다임 그룹",
+          "weight_pct": 14.36
+        },
+        {
+          "rank": 3,
+          "ticker": "ASML",
+          "name": "ASML Holding NV",
+          "name_kr": "ASML 홀딩 ADR",
+          "weight_pct": 11.87
+        },
+        {
+          "rank": 4,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 11.53
+        },
+        {
+          "rank": 5,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 11.48
+        },
+        {
+          "rank": 6,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 6.68
+        },
+        {
+          "rank": 7,
+          "ticker": "LRCX",
+          "name": "Lam Research",
+          "name_kr": "램 리서치",
+          "weight_pct": 5.26
+        },
+        {
+          "rank": 8,
+          "ticker": "ILMN",
+          "name": "Illumina Inc.",
+          "name_kr": "일루미나",
+          "weight_pct": 5.1
+        },
+        {
+          "rank": 9,
+          "ticker": "TRU",
+          "name": "TransUnion",
+          "name_kr": "트랜스유니온",
+          "weight_pct": 4.91
+        },
+        {
+          "rank": 10,
+          "ticker": "CCC",
+          "name": "CCC Intelligent Solutions Hldgs Inc.",
+          "name_kr": "CCC 인텔리전트",
+          "weight_pct": 3.97
+        }
+      ]
+    },
+    {
+      "id": "TB",
+      "name": "Tweedy Browne",
+      "firm": "Tweedy Browne",
+      "portfolio_value": 1258817000,
+      "num_stocks": 93,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "CNH",
+          "name": "CNH Industrial NV",
+          "name_kr": "CNH 인더스트리얼",
+          "weight_pct": 17.61
+        },
+        {
+          "rank": 2,
+          "ticker": "IONS",
+          "name": "Ionis Pharmaceuticals Inc.",
+          "name_kr": "아이오니스 파마슈티컬스",
+          "weight_pct": 13.57
+        },
+        {
+          "rank": 3,
+          "ticker": "KOF",
+          "name": "Coca-Cola FEMSA S A CV",
+          "name_kr": "코카콜라 펨사 ADR",
+          "weight_pct": 9.07
+        },
+        {
+          "rank": 4,
+          "ticker": "BRK.A",
+          "name": "Berkshire Hathaway CL A",
+          "name_kr": "",
+          "weight_pct": 8.22
+        },
+        {
+          "rank": 5,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 4.53
+        },
+        {
+          "rank": 6,
+          "ticker": "JNJ",
+          "name": "Johnson & Johnson",
+          "name_kr": "존슨앤드존슨",
+          "weight_pct": 4.26
+        },
+        {
+          "rank": 7,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 3.71
+        },
+        {
+          "rank": 8,
+          "ticker": "WFC",
+          "name": "Wells Fargo",
+          "name_kr": "웰스파고",
+          "weight_pct": 3.26
+        },
+        {
+          "rank": 9,
+          "ticker": "ALV",
+          "name": "Autoliv Inc.",
+          "name_kr": "오토리브",
+          "weight_pct": 3.2
+        },
+        {
+          "rank": 10,
+          "ticker": "NVST",
+          "name": "Envista Holdings Corp.",
+          "name_kr": "",
+          "weight_pct": 2.9
+        }
+      ]
+    },
+    {
+      "id": "VFC",
+      "name": "Valley Forge Capital Management",
+      "firm": "Valley Forge Capital Management",
+      "portfolio_value": 4411309000,
+      "num_stocks": 9,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "FICO",
+          "name": "Fair Isaac Corp.",
+          "name_kr": "",
+          "weight_pct": 29.49
+        },
+        {
+          "rank": 2,
+          "ticker": "SPGI",
+          "name": "S&P Global Inc.",
+          "name_kr": "",
+          "weight_pct": 20.83
+        },
+        {
+          "rank": 3,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 19.25
+        },
+        {
+          "rank": 4,
+          "ticker": "MCO",
+          "name": "Moody's Corp.",
+          "name_kr": "무디스",
+          "weight_pct": 15.25
+        },
+        {
+          "rank": 5,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 7.29
+        },
+        {
+          "rank": 6,
+          "ticker": "INTU",
+          "name": "Intuit Inc.",
+          "name_kr": "인튜이트",
+          "weight_pct": 3.32
+        },
+        {
+          "rank": 7,
+          "ticker": "ASML",
+          "name": "ASML Holding NV",
+          "name_kr": "ASML 홀딩 ADR",
+          "weight_pct": 3.06
+        },
+        {
+          "rank": 8,
+          "ticker": "MSCI",
+          "name": "MSCI Inc.",
+          "name_kr": "",
+          "weight_pct": 0.79
+        },
+        {
+          "rank": 9,
+          "ticker": "EFX",
+          "name": "Equifax Inc.",
+          "name_kr": "에퀴팩스",
+          "weight_pct": 0.72
+        }
+      ]
+    },
+    {
+      "id": "VA",
+      "name": "ValueAct Capital",
+      "firm": "ValueAct CapitaliStrategyValueAct Capital concentrates on acquiring significant ownership stakes in a limited number of companies that it believes are fundamentally undervalued. The investment team seeks to identify companies that are out of favor, or may be undergoing significant transition. Such companies may be temporarily mispriced for a variety of reasons, including perceived unfavorable industry conditions, poor business performance, changes in management or ownership, reorganizations, or other external factors. These conditions can often result in fundamentally \"good\" businesses that are available at depressed valuations. The goal in each investment is to work productively with management and/or the company's board to implement a strategy or strategies that maximize returns for all shareholders.ValueAct Capital is typically one of the largest independent shareholders at each of its core company investments and works in a constructive manner with management and/or the company's board to successfully implement strategies that generate superior returns on invested capital. The seven investment partners have extensive experience working effectively with portfolio companies as long-term large shareholders, and oftentimes as members of the companies' boards. At any given time, the portfolio consists of ten to eighteen core company investments, as well as a small \"farm team\" of additional investments in development.",
+      "portfolio_value": 7025027000,
+      "num_stocks": 16,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "CRM",
+          "name": "Salesforce.com",
+          "name_kr": "세일즈포스",
+          "weight_pct": 11.29
+        },
+        {
+          "rank": 2,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 11.15
+        },
+        {
+          "rank": 3,
+          "ticker": "RKT",
+          "name": "Rocket Companies Inc.",
+          "name_kr": "로켓 컴퍼니스",
+          "weight_pct": 10.85
+        },
+        {
+          "rank": 4,
+          "ticker": "BLK",
+          "name": "BlackRock Inc.",
+          "name_kr": "블랙록",
+          "weight_pct": 10.59
+        },
+        {
+          "rank": 5,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 9.85
+        },
+        {
+          "rank": 6,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 8.58
+        },
+        {
+          "rank": 7,
+          "ticker": "MDB",
+          "name": "MongoDB Inc.",
+          "name_kr": "몽고DB",
+          "weight_pct": 8.4
+        },
+        {
+          "rank": 8,
+          "ticker": "RBLX",
+          "name": "Roblox Corp.",
+          "name_kr": "",
+          "weight_pct": 6.89
+        },
+        {
+          "rank": 9,
+          "ticker": "DIS",
+          "name": "Walt Disney Co.",
+          "name_kr": "월트 디즈니",
+          "weight_pct": 4.98
+        },
+        {
+          "rank": 10,
+          "ticker": "LLYVK",
+          "name": "Liberty Media Corp. Series C Live",
+          "name_kr": "리버티 라이브 Series C",
+          "weight_pct": 4.27
+        }
+      ]
+    },
+    {
+      "id": "vg",
+      "name": "Viking Global Investors",
+      "firm": "Viking Global Investors",
+      "portfolio_value": 37474534000,
+      "num_stocks": 75,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 4.15
+        },
+        {
+          "rank": 2,
+          "ticker": "PNC",
+          "name": "PNC Financial Services",
+          "name_kr": "PNC 파이낸셜 서비스",
+          "weight_pct": 4.06
+        },
+        {
+          "rank": 3,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 3.99
+        },
+        {
+          "rank": 4,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 3.73
+        },
+        {
+          "rank": 5,
+          "ticker": "SCHW",
+          "name": "Charles Schwab Corp.",
+          "name_kr": "",
+          "weight_pct": 3.7
+        },
+        {
+          "rank": 6,
+          "ticker": "DIS",
+          "name": "Walt Disney Co.",
+          "name_kr": "월트 디즈니",
+          "weight_pct": 3.4
+        },
+        {
+          "rank": 7,
+          "ticker": "APD",
+          "name": "Air Products & Chemicals",
+          "name_kr": "에어 프로덕츠 앤 케미컬스",
+          "weight_pct": 3.15
+        },
+        {
+          "rank": 8,
+          "ticker": "MCD",
+          "name": "McDonald's Corp.",
+          "name_kr": "맥도날드",
+          "weight_pct": 2.95
+        },
+        {
+          "rank": 9,
+          "ticker": "BBIO",
+          "name": "BridgeBio Pharma Inc.",
+          "name_kr": "브릿지바이오 파머",
+          "weight_pct": 2.94
+        },
+        {
+          "rank": 10,
+          "ticker": "FTV",
+          "name": "Fortive Corp.",
+          "name_kr": "포티브",
+          "weight_pct": 2.83
+        }
+      ]
+    },
+    {
+      "id": "VVP",
+      "name": "Vulcan Value Partners",
+      "firm": "Vulcan Value Partners",
+      "portfolio_value": 3772296000,
+      "num_stocks": 33,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "EG",
+          "name": "Everest Group Ltd",
+          "name_kr": "에베레스트 그룹",
+          "weight_pct": 11.8
+        },
+        {
+          "rank": 2,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 10.88
+        },
+        {
+          "rank": 3,
+          "ticker": "AMZN",
+          "name": "Amazon.com Inc.",
+          "name_kr": "아마존닷컴",
+          "weight_pct": 8.81
+        },
+        {
+          "rank": 4,
+          "ticker": "UNH",
+          "name": "United Health Group Inc.",
+          "name_kr": "유나이티드헬스 그룹",
+          "weight_pct": 6.55
+        },
+        {
+          "rank": 5,
+          "ticker": "RYAN",
+          "name": "Ryan Specialty Holdings Inc",
+          "name_kr": "",
+          "weight_pct": 5.9
+        },
+        {
+          "rank": 6,
+          "ticker": "TRU",
+          "name": "TransUnion",
+          "name_kr": "트랜스유니온",
+          "weight_pct": 5.88
+        },
+        {
+          "rank": 7,
+          "ticker": "TDG",
+          "name": "TransDigm Group Inc.",
+          "name_kr": "트랜스다임 그룹",
+          "weight_pct": 5.66
+        },
+        {
+          "rank": 8,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 5.14
+        },
+        {
+          "rank": 9,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 5.12
+        },
+        {
+          "rank": 10,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 5.08
+        }
+      ]
+    },
+    {
+      "id": "WIM",
+      "name": "Wallace Weitz - Weitz Investment Management",
+      "firm": "Wallace Weitz - Weitz Investment Management",
+      "portfolio_value": 1686582000,
+      "num_stocks": 44,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "BRK.B",
+          "name": "Berkshire Hathaway CL B",
+          "name_kr": "",
+          "weight_pct": 8.55
+        },
+        {
+          "rank": 2,
+          "ticker": "DHR",
+          "name": "Danaher Corp.",
+          "name_kr": "다나허",
+          "weight_pct": 6.98
+        },
+        {
+          "rank": 3,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 6.47
+        },
+        {
+          "rank": 4,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 5.63
+        },
+        {
+          "rank": 5,
+          "ticker": "MA",
+          "name": "Mastercard Inc.",
+          "name_kr": "마스터카드",
+          "weight_pct": 5.28
+        },
+        {
+          "rank": 6,
+          "ticker": "TMO",
+          "name": "Thermo Fisher Scientific",
+          "name_kr": "써모 피셔 사이언티픽",
+          "weight_pct": 4.64
+        },
+        {
+          "rank": 7,
+          "ticker": "AON",
+          "name": "Aon Plc",
+          "name_kr": "에이온",
+          "weight_pct": 4.58
+        },
+        {
+          "rank": 8,
+          "ticker": "META",
+          "name": "Meta Platforms Inc.",
+          "name_kr": "메타",
+          "weight_pct": 4.25
+        },
+        {
+          "rank": 9,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 4.19
+        },
+        {
+          "rank": 10,
+          "ticker": "IEX",
+          "name": "IDEX Corp.",
+          "name_kr": "아이덱스",
+          "weight_pct": 4.13
+        }
+      ]
+    },
+    {
+      "id": "BRK",
+      "name": "Warren Buffett - Berkshire Hathaway",
+      "firm": "Warren Buffett - Berkshire Hathaway",
+      "portfolio_value": 274160088000,
+      "num_stocks": 42,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "AAPL",
+          "name": "Apple Inc.",
+          "name_kr": "애플",
+          "weight_pct": 22.6
+        },
+        {
+          "rank": 2,
+          "ticker": "AXP",
+          "name": "American Express",
+          "name_kr": "아메리칸 익스프레스",
+          "weight_pct": 20.46
+        },
+        {
+          "rank": 3,
+          "ticker": "BAC",
+          "name": "Bank of America Corp.",
+          "name_kr": "뱅크오브아메리카",
+          "weight_pct": 10.38
+        },
+        {
+          "rank": 4,
+          "ticker": "KO",
+          "name": "Coca Cola Co.",
+          "name_kr": "코카콜라",
+          "weight_pct": 10.2
+        },
+        {
+          "rank": 5,
+          "ticker": "CVX",
+          "name": "Chevron Corp.",
+          "name_kr": "셰브론",
+          "weight_pct": 7.24
+        },
+        {
+          "rank": 6,
+          "ticker": "MCO",
+          "name": "Moody's Corp.",
+          "name_kr": "무디스",
+          "weight_pct": 4.6
+        },
+        {
+          "rank": 7,
+          "ticker": "OXY",
+          "name": "Occidental Petroleum",
+          "name_kr": "옥시덴털 페트롤리움",
+          "weight_pct": 3.97
+        },
+        {
+          "rank": 8,
+          "ticker": "CB",
+          "name": "Chubb Limited",
+          "name_kr": "처브",
+          "weight_pct": 3.9
+        },
+        {
+          "rank": 9,
+          "ticker": "KHC",
+          "name": "Kraft Heinz Co.",
+          "name_kr": "크래프트 하인즈",
+          "weight_pct": 2.88
+        },
+        {
+          "rank": 10,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 2.04
+        }
+      ]
+    },
+    {
+      "id": "cc",
+      "name": "William Von Mueffling - Cantillon Capital Management",
+      "firm": "William Von Mueffling - Cantillon Capital ManagementiInvestment Philosophy:Emphasis on businesses with sustainably above average return on equity, trading at a low price relative to their stream of earnings.Von Mueffling is a Columbia Business School alumni and the advisory board chairman at the Heilbrunn Center for Graham & Dodd Investing.",
+      "portfolio_value": 15050975000,
+      "num_stocks": 38,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "AVGO",
+          "name": "Broadcom Inc.",
+          "name_kr": "브로드컴",
+          "weight_pct": 8.34
+        },
+        {
+          "rank": 2,
+          "ticker": "GOOGL",
+          "name": "Alphabet Inc.",
+          "name_kr": "알파벳 Class A",
+          "weight_pct": 7.1
+        },
+        {
+          "rank": 3,
+          "ticker": "TSM",
+          "name": "Taiwan Semiconductor S.A.",
+          "name_kr": "TSMC(타이완반도체제조) ADR",
+          "weight_pct": 5.6
+        },
+        {
+          "rank": 4,
+          "ticker": "IBKR",
+          "name": "Interactive Brokers Group Inc.",
+          "name_kr": "인터랙티브 브로커스 그룹",
+          "weight_pct": 5.01
+        },
+        {
+          "rank": 5,
+          "ticker": "SPGI",
+          "name": "S&P Global Inc.",
+          "name_kr": "",
+          "weight_pct": 4.37
+        },
+        {
+          "rank": 6,
+          "ticker": "ADI",
+          "name": "Analog Devices",
+          "name_kr": "애널로그 디바이시스",
+          "weight_pct": 4.04
+        },
+        {
+          "rank": 7,
+          "ticker": "CBRE",
+          "name": "CBRE Group",
+          "name_kr": "",
+          "weight_pct": 3.54
+        },
+        {
+          "rank": 8,
+          "ticker": "AMAT",
+          "name": "Applied Materials",
+          "name_kr": "어플라이드 머티어리얼즈",
+          "weight_pct": 3.46
+        },
+        {
+          "rank": 9,
+          "ticker": "V",
+          "name": "Visa Inc.",
+          "name_kr": "비자",
+          "weight_pct": 3.45
+        },
+        {
+          "rank": 10,
+          "ticker": "ICE",
+          "name": "Intercontinental Exchange Inc.",
+          "name_kr": "인터컨티넨털 익스체인지",
+          "weight_pct": 3.07
+        }
+      ]
+    },
+    {
+      "id": "YAM",
+      "name": "Yacktman Asset Management",
+      "firm": "Yacktman Asset ManagementiLOW PURCHASE PRICEYacktman looks for a security that sells at a price that offers an attractive rate of return given uncertainties the business might face.We are extremely disciplined about the valuation and believe it is often the most important characteristic in a successful investment. At our firm we often say, “It is almost all about the price.” Low price can help to manage risk and create the opportunity for solid returns.GOOD BUSINESSWe seek to invest in higher quality businesses at value prices.A good business may contain one or more of the following:- High market share in principal product and/or service lines- High cash return on tangible assets- Relatively low capital requirements, allowing a business to generate cash while growing- Short customer repurchase cycles and long product cycles- Unique franchise characteristicsSHAREHOLDER-ORIENTED MANAGEMENTYacktman believes a shareholder-oriented management manages its business intelligently and allocates capital wisely.We consider management’s results at the company and in previous business endeavors when assessing skill.",
+      "portfolio_value": 7499158000,
+      "num_stocks": 76,
+      "top10": [
+        {
+          "rank": 1,
+          "ticker": "CNQ",
+          "name": "Canadian Natural Resources",
+          "name_kr": "캐나다 내추럴 리소시스",
+          "weight_pct": 10.75
+        },
+        {
+          "rank": 2,
+          "ticker": "MSFT",
+          "name": "Microsoft Corp.",
+          "name_kr": "마이크로소프트",
+          "weight_pct": 4.9
+        },
+        {
+          "rank": 3,
+          "ticker": "SCHW",
+          "name": "Charles Schwab Corp.",
+          "name_kr": "",
+          "weight_pct": 4.89
+        },
+        {
+          "rank": 4,
+          "ticker": "GOOG",
+          "name": "Alphabet Inc. CL C",
+          "name_kr": "알파벳 Class C",
+          "weight_pct": 4.31
+        },
+        {
+          "rank": 5,
+          "ticker": "PEP",
+          "name": "PepsiCo Inc.",
+          "name_kr": "펩시코",
+          "weight_pct": 4.2
+        },
+        {
+          "rank": 6,
+          "ticker": "JNJ",
+          "name": "Johnson & Johnson",
+          "name_kr": "존슨앤드존슨",
+          "weight_pct": 4.07
+        },
+        {
+          "rank": 7,
+          "ticker": "FOX",
+          "name": "Fox Corporation CL B",
+          "name_kr": "폭스 Class B",
+          "weight_pct": 3.94
+        },
+        {
+          "rank": 8,
+          "ticker": "PG",
+          "name": "Procter & Gamble",
+          "name_kr": "P&G(프록터 & 갬블)",
+          "weight_pct": 3.72
+        },
+        {
+          "rank": 9,
+          "ticker": "UHAL.B",
+          "name": "U Haul Holding Co Non Voting",
+          "name_kr": "",
+          "weight_pct": 3.6
+        },
+        {
+          "rank": 10,
+          "ticker": "RS",
+          "name": "Reliance Steel & Aluminum",
+          "name_kr": "릴라이언스",
+          "weight_pct": 2.81
+        }
+      ]
+    }
+  ]
+}

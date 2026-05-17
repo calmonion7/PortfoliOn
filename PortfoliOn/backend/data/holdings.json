@@ -1,0 +1,52 @@
+{
+  "holdings": [
+    {
+      "ticker": "LLY",
+      "quantity": 3.0,
+      "avg_cost": 886.6
+    },
+    {
+      "ticker": "LHX",
+      "quantity": 17.0,
+      "avg_cost": 331.1
+    },
+    {
+      "ticker": "PLTR",
+      "quantity": 56.0,
+      "avg_cost": 157.82
+    },
+    {
+      "ticker": "AVAV",
+      "quantity": 20.0,
+      "avg_cost": 172.0
+    },
+    {
+      "ticker": "005930",
+      "quantity": 14.0,
+      "avg_cost": 218626.0,
+      "market": "KR",
+      "exchange": "KS"
+    },
+    {
+      "ticker": "000720",
+      "quantity": 20.0,
+      "avg_cost": 163882.0,
+      "market": "KR",
+      "exchange": "KS"
+    },
+    {
+      "ticker": "207940",
+      "quantity": 2.0,
+      "avg_cost": 161637.0,
+      "market": "KR",
+      "exchange": "KS"
+    },
+    {
+      "ticker": "475150",
+      "quantity": 69.0,
+      "avg_cost": 54913.0,
+      "market": "KR",
+      "exchange": "KS"
+    }
+  ]
+}

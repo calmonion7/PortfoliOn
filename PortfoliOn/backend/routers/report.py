@@ -67,21 +67,35 @@ def _read_summary(json_path: Path) -> dict | None:
 @router.get("/report/list")
 def list_reports():
     portfolio = storage.get_full_portfolio()
-    holding_tickers = {s["ticker"].upper() for s in portfolio.get("stocks", [])}
-    watchlist_tickers = {s["ticker"].upper() for s in portfolio.get("watchlist", [])}
+    portfolio_stocks = {s["ticker"].upper(): s for s in portfolio.get("stocks", [])}
+    portfolio_watchlist = {s["ticker"].upper(): s for s in portfolio.get("watchlist", [])}
+    holding_tickers = set(portfolio_stocks.keys())
+    watchlist_tickers = set(portfolio_watchlist.keys())
 
     result = {}
-    if not REPORTS_DIR.exists():
-        return result
-    for ticker_dir in sorted(REPORTS_DIR.iterdir()):
-        if ticker_dir.is_dir():
-            dates = sorted([f.stem for f in ticker_dir.glob("*.md")], reverse=True)
-            if dates:
-                ticker = ticker_dir.name.upper()
-                category = "holdings" if ticker in holding_tickers else \
-                           "watchlist" if ticker in watchlist_tickers else "other"
-                summary = _read_summary(ticker_dir / f"{dates[0]}.json")
-                result[ticker_dir.name] = {"dates": dates, "category": category, "summary": summary}
+    if REPORTS_DIR.exists():
+        for ticker_dir in sorted(REPORTS_DIR.iterdir()):
+            if ticker_dir.is_dir():
+                dates = sorted([f.stem for f in ticker_dir.glob("*.md")], reverse=True)
+                if dates:
+                    ticker = ticker_dir.name.upper()
+                    category = "holdings" if ticker in holding_tickers else \
+                               "watchlist" if ticker in watchlist_tickers else "other"
+                    summary = _read_summary(ticker_dir / f"{dates[0]}.json")
+                    stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
+                    market = stock_info.get("market") or (summary or {}).get("market", "US")
+                    result[ticker_dir.name] = {"dates": dates, "category": category, "summary": summary, "market": market}
+
+    # 포트폴리오에 있지만 아직 리포트가 없는 종목도 표시 (생성 버튼 노출)
+    for ticker, stock in portfolio_stocks.items():
+        if ticker not in result:
+            result[ticker] = {"dates": [], "category": "holdings", "summary": None,
+                              "market": stock.get("market", "US")}
+    for ticker, stock in portfolio_watchlist.items():
+        if ticker not in result:
+            result[ticker] = {"dates": [], "category": "watchlist", "summary": None,
+                              "market": stock.get("market", "US")}
+
     return result
 
 

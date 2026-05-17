@@ -39,8 +39,47 @@ def scrape_finviz_consensus(ticker: str) -> dict:
     except Exception:
         return {}
 
-def get_news(ticker: str) -> list[dict]:
-    """Fetch recent news via yfinance (sourced from Yahoo Finance)."""
+def get_news_kr(ticker: str) -> list[dict]:
+    """Naver Finance 뉴스 조회 (국내주식)"""
+    try:
+        r = requests.get(
+            f"https://m.stock.naver.com/api/stock/{ticker}/news",
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://m.stock.naver.com/",
+                "Accept": "application/json, text/plain, */*",
+            },
+            timeout=8,
+        )
+        r.raise_for_status()
+        data = r.json()
+
+        items = data if isinstance(data, list) else (
+            data.get("items") or data.get("newsList") or data.get("list") or []
+        )
+        result = []
+        for item in items[:5]:
+            title     = item.get("title") or item.get("headline") or ""
+            link      = item.get("link") or item.get("url") or item.get("naverUrl") or ""
+            publisher = item.get("officeName") or item.get("source") or item.get("publisher") or ""
+            pub_date  = item.get("wdate") or item.get("publishedAt") or item.get("date") or ""
+            if title:
+                result.append({
+                    "title": title,
+                    "link": link,
+                    "publisher": publisher,
+                    "published_at": str(pub_date)[:16],
+                })
+        return result
+    except Exception:
+        return []
+
+
+def get_news(ticker: str, market: str = "US") -> list[dict]:
+    """뉴스 조회 — KR은 Naver Finance, US는 Yahoo Finance"""
+    if market == "KR":
+        return get_news_kr(ticker)
+
     try:
         t = yf.Ticker(ticker)
         raw = t.news or []
