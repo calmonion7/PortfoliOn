@@ -175,6 +175,75 @@ git remote set-url origin git@github.com:calmonion7/PortfoliOn.git
 
 이후 `git push` 시 토큰 없이 동작합니다.
 
+## 개발 스펙
+
+### 개발 환경 요구사항
+
+| 항목 | 최소 버전 |
+|------|-----------|
+| Python | 3.9+ |
+| Node.js | 18+ |
+| npm | 9+ |
+
+### 기술 스택
+
+**백엔드**
+
+| 라이브러리 | 버전 | 용도 |
+|-----------|------|------|
+| Python | 3.9+ | 런타임 |
+| FastAPI | 0.104+ | REST API 프레임워크 |
+| uvicorn | 0.24+ | ASGI 서버 |
+| APScheduler | 3.10+ | 리포트/크롤링 자동 스케줄 |
+| yfinance | 0.2.40+ | 주가 데이터 (미국 주식) |
+| pandas | 2.1+ | 데이터 처리 |
+| numpy | 1.26+ | 수치 연산 |
+| matplotlib | 3.8+ | 차트 이미지 생성 |
+| requests / httpx | 2.31+ / 0.25+ | HTTP 클라이언트 |
+| beautifulsoup4 | 4.12+ | HTML 파싱 (Naver, dataroma) |
+| pytest | 7.4+ | 테스트 |
+
+**프론트엔드**
+
+| 라이브러리 | 버전 | 용도 |
+|-----------|------|------|
+| React | 19 | UI 프레임워크 |
+| Vite | 8 | 빌드 도구 |
+| react-router-dom | 7 | 클라이언트 라우팅 |
+| axios | 1.16+ | HTTP 클라이언트 |
+| recharts | 3.8+ | 주가·RSI 차트 |
+| react-markdown + remark-gfm | 10 / 4 | Markdown 리포트 렌더링 |
+
+### 아키텍처 개요
+
+```
+Browser (React/Vite :5173)
+        │  REST API
+        ▼
+FastAPI (:8000)
+ ├─ routers/        # portfolio, watchlist, stocks, report, guru
+ ├─ services/       # market(yfinance+Naver), charts, indicators,
+ │                  # report_generator(Claude AI), scraper, scheduler
+ └─ data/           # JSON 파일 저장소 (DB 없음)
+        │
+        ├─ holdings.json / watchlist.json / stocks.json / schedule.json
+        └─ reports/  ← 생성된 Markdown 리포트 (정적 파일 서빙)
+```
+
+**데이터 흐름**
+
+- 주가 데이터: yfinance(미국) / Naver Finance API(한국) → JSON 캐시
+- 리포트 생성: Claude AI API(`ANTHROPIC_API_KEY` 필요) → `backend/reports/*.md`
+- 구루 데이터: dataroma 크롤링 → JSON 저장
+
+**API 설계 원칙**
+
+- RESTful JSON API, 전체 스펙은 `API_SPEC.md` 참조
+- Claude AI 연동용 외부 API는 `CLAUDE_COWORK_API.md` 참조
+- CORS 허용 출처: `localhost:3000`, `localhost:5173`
+
+---
+
 ## 프로젝트 구조
 
 ```
