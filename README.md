@@ -4,13 +4,29 @@
 
 ## 빠른 시작
 
+### Windows
+
+```bat
+start.bat
+```
+
+### macOS / Linux
+
 ```bash
 ./start.sh
 ```
 
-서버 두 개를 실행하고 브라우저를 자동으로 엽니다.
+백엔드(8000)와 프론트엔드(5173) 서버를 백그라운드로 실행합니다.
 
 ## 서버 종료
+
+### Windows
+
+```bat
+stop.bat
+```
+
+### macOS / Linux
 
 ```bash
 ./stop.sh
@@ -18,20 +34,36 @@
 
 ## 수동 실행
 
-### 백엔드 (FastAPI · 포트 8000)
+### Windows
+
+```bat
+cd backend
+venv\Scripts\python -m uvicorn main:app --reload --port 8000
+```
+
+```bat
+cd frontend
+npm run dev
+```
+
+### macOS / Linux
 
 ```bash
 cd backend
-source .venv/bin/activate
+source venv/bin/activate
 uvicorn main:app --reload --port 8000
 ```
-
-### 프론트엔드 (Vite · 포트 5173)
 
 ```bash
 cd frontend
 npm run dev
 ```
+
+## 로그
+
+**Windows**: `%TEMP%\portfolion-backend.log`, `%TEMP%\portfolion-frontend.log`
+
+**macOS / Linux**: `/tmp/portfolion-backend.log`, `/tmp/portfolion-frontend.log`
 
 ## 접속 주소
 
@@ -40,15 +72,6 @@ npm run dev
 | 프론트엔드 | http://localhost:5173 |
 | 백엔드 API | http://localhost:8000 |
 | API 문서 | http://localhost:8000/docs |
-
-## 로그
-
-실행 중 로그는 `/tmp/` 에 저장됩니다.
-
-```
-/tmp/portfolion-backend.log
-/tmp/portfolion-frontend.log
-```
 
 ## GitHub SSH 설정
 
@@ -62,6 +85,12 @@ ssh-keygen -t ed25519 -C "your@email.com" -f ~/.ssh/id_ed25519 -N ""
 
 ### 2. 공개키 복사
 
+**Windows (PowerShell)**
+```powershell
+Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
+```
+
+**macOS / Linux**
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
@@ -89,16 +118,18 @@ git remote set-url origin git@github.com:calmonion7/PortfoliOn.git
 
 ```
 PortfoliOn/
-├── start.sh              # 서버 실행 + 브라우저 오픈
-├── stop.sh               # 서버 종료
+├── start.bat / start.sh  # 서버 실행
+├── stop.bat  / stop.sh   # 서버 종료
 ├── backend/
 │   ├── main.py
-│   ├── routers/          # portfolio, report, watchlist, stocks
-│   ├── services/         # indicators, market, charts, scraper, storage, report_generator
-│   ├── scheduler.py      # 자동 리포트 스케줄러
-│   └── tests/
+│   ├── routers/          # portfolio, watchlist, stocks, report, guru
+│   ├── services/         # storage, market, charts, indicators
+│   │                     # report_generator, scraper, guru_scraper, guru_stats
+│   ├── data/             # JSON 파일 저장소 (holdings, watchlist, stocks, schedule)
+│   └── reports/          # 생성된 Markdown 리포트 (정적 파일 제공)
 └── frontend/
     └── src/
         ├── pages/        # Portfolio, Reports, Settings
+        │                 # Guru, GuruCrawlSettings, ReportSchedule
         └── components/   # StockModal, PromoteModal, MarkdownViewer
 ```
