@@ -274,15 +274,12 @@ function ConsensusChart({ ticker, market }) {
 
   const backfill = async () => {
     setBackfilling(true)
+    setError(null)
     try {
-      const res = await fetch(`/api/consensus/${ticker}/backfill`, { method: 'POST' })
-      const data = await res.json()
-      if (res.ok) {
-        alert(`${data.added}개 추가됨`)
-        if (data.added > 0) fetchData()
-      } else {
-        alert(data.detail || '백필 실패')
-      }
+      const { data: result } = await axios.post(`/api/consensus/${ticker}/backfill`)
+      if (result.added > 0) fetchData()
+    } catch (e) {
+      setError(e.response?.data?.detail || '백필 실패')
     } finally {
       setBackfilling(false)
     }
@@ -336,8 +333,17 @@ function ConsensusChart({ ticker, market }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px' }}>📈 컨센서스 추이</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={backfill} disabled={backfilling} style={{ fontSize: 12, padding: '2px 8px', background: 'transparent', border: '1px solid #444', color: backfilling ? '#4fc3f7' : '#aaa', borderRadius: 3, cursor: backfilling ? 'default' : 'pointer' }}>
-            {backfilling ? '로딩...' : '히스토리'}
+          <button
+            onClick={backfill}
+            disabled={backfilling}
+            style={{
+              background: 'transparent', border: '1px solid #444',
+              color: backfilling ? '#4fc3f7' : '#aaa',
+              borderRadius: 3, padding: '2px 8px', fontSize: 11,
+              cursor: backfilling ? 'default' : 'pointer',
+            }}
+          >
+            {backfilling ? '백필 중...' : '백필'}
           </button>
           <button
             onClick={collect}
