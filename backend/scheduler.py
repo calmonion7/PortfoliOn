@@ -1,6 +1,6 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from services import storage, report_generator
+from services import storage, report_generator, consensus as consensus_svc
 
 _scheduler = AsyncIOScheduler()
 _JOB_ID = "daily_report"
@@ -19,6 +19,11 @@ def _generate_all():
             print(f"[Scheduler] Report generated for {stock['ticker']}")
         except Exception as e:
             print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
+        try:
+            consensus_svc.collect(stock["ticker"])
+            print(f"[Scheduler] Consensus collected for {stock['ticker']}")
+        except Exception as e:
+            print(f"[Scheduler] Consensus collection failed for {stock['ticker']}: {e}")
 
 
 def _reschedule():
