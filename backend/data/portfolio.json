@@ -1,0 +1,86 @@
+{
+  "stocks": [
+    {
+      "ticker": "LLY",
+      "name": "일라이 릴리",
+      "quantity": 3.0,
+      "avg_cost": 886.6,
+      "competitors": [
+        "NVO"
+      ],
+      "moat": "",
+      "growth_plan": ""
+    },
+    {
+      "ticker": "TSLA",
+      "name": "테슬라",
+      "quantity": 5.0,
+      "avg_cost": 379.1,
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    },
+    {
+      "ticker": "LHX",
+      "name": "L3 해리스 테크놀로지스",
+      "quantity": 17.0,
+      "avg_cost": 331.1,
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    },
+    {
+      "ticker": "PLTR",
+      "name": "팔란티어 테크",
+      "quantity": 56.0,
+      "avg_cost": 157.82,
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    }
+  ],
+  "watchlist": [
+    {
+      "ticker": "AVAV",
+      "name": "에어로바이런먼트",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    },
+    {
+      "ticker": "FSLR",
+      "name": "퍼스트 솔라",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    },
+    {
+      "ticker": "RTX",
+      "name": "RTX",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    },
+    {
+      "ticker": "FCX",
+      "name": "프리포트 맥모란",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    },
+    {
+      "ticker": "NFLX",
+      "name": "넷플릭스",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    },
+    {
+      "ticker": "TEM",
+      "name": "템퍼스 AI",
+      "competitors": [],
+      "moat": "",
+      "growth_plan": ""
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "time": "21:30",
+  "days": [
+    "mon",
+    "fri",
+    "tue",
+    "wed",
+    "thu"
+  ]
+}

@@ -1,0 +1,776 @@
+{
+  "stocks": [
+    {
+      "ticker": "LLY",
+      "name": "일라이 릴리",
+      "competitors": [
+        "NVO",
+        "PFE",
+        "AZN",
+        "MRK"
+      ],
+      "moat": "GLP-1·GLP-2 특허 포트폴리오와 비만 치료제 양산 능력, 글로벌 처방 인프라와 보험 등재 실적이 결합된 진입 장벽. 2030년까지 누적 100억 달러+ 제조 capex로 공급 우위 강화, 경구 GLP-1과 알츠하이머·심혈관 적응증 확장으로 멀티 프랜차이즈화",
+      "growth_plan": "비만 치료제 글로벌 확장과 경구 GLP-1(Foundayo) 처방 확대, donanemab 알츠하이머 적응증 후속 임상, Retatrutide/Tirzepatide 후속 적응증, 인도·중남미 신흥국 공급 확대, GLP-2·Bimagrumab 등 차세대 파이프라인 임상 진척",
+      "recent_disclosures": "2026-05 Foundayo(경구 GLP-1) 미국 첫 처방 데이터 공개, Mounjaro·Zepbound 분기 매출 연속 사상 최대 갱신. 노스캐롤라이나·인디애나 비만 치료제 증설 부지 추가 발표, Verve 인수 후 첫 심혈관 RNA 후보 임상 1상 진입",
+      "risks": "GLP-1/GLP-2 경쟁 심화(NVO CagriSema·Amycretin·복제약), IRA 약가 협상 대상 추가 가능성, 비만 치료제 보험 급여 제한, 신규 적응증 임상 실패, 제조 capacity 확보 지연으로 인한 공급 부족, 환율 및 미국 외 가격 통제 리스크"
+    },
+    {
+      "ticker": "TSLA",
+      "name": "테슬라",
+      "competitors": [
+        "BYD",
+        "GM",
+        "F",
+        "RIVN"
+      ],
+      "moat": "수직통합 EV 제조와 슈퍼차저 네트워크, FSD 학습 데이터 우위, 에너지 저장(Megapack) 솔루션, 기가팩토리 스케일과 자체 4680 셀 양산",
+      "growth_plan": "Cybercab 로보택시 출시와 FSD v14 확산, Optimus 휴머노이드 양산 시도, 4680 배터리 내재화 확대, 에너지·태양광 사업 가속, 인도·동남아 신규 시장 진입",
+      "recent_disclosures": "2026-05 오스틴 로보택시 시범 운영 운영 차량 1,000대 돌파 및 베이 에어리어 확대 발표, Megapack 상하이 공장 가동률 상향. 사이버트럭 분기 인도 회복, FSD v14 OTA 배포 시작",
+      "risks": "EV 가격 경쟁 심화(중국 BYD·Xiaomi), FSD/로보택시 규제 지연, 자동차 마진 압박, 일론 머스크 정치 활동에 따른 브랜드 리스크, 사이버트럭 수요 부진, 에너지 사업 외 성장 동력 불확실성"
+    },
+    {
+      "ticker": "LHX",
+      "name": "L3 해리스 테크놀로지스",
+      "competitors": [
+        "RTX",
+        "NOC",
+        "LMT",
+        "GD"
+      ],
+      "moat": "전술 통신·전자전·우주 시스템에 걸친 미 국방부 인증 포트폴리오와 Aerojet Rocketdyne 인수로 확보한 고체 로켓 모터 독점적 지위, 동맹국 FMS(해외판매) 채널 다각화",
+      "growth_plan": "Aerojet Rocketdyne 통합 시너지 본격화, 우주·미사일 방어 분야 백로그 활용 매출 성장, 통신·전자전 신규 프로그램 수주 확대, FMS·MDA 미사일 재고 보충 사이클 수혜",
+      "recent_disclosures": "2026-05 우크라이나·이스라엘향 고체 로켓 모터 다년 IDIQ 추가 수주 발표, Aerojet 본부 부지 확장 완료. 백로그 410억 달러 돌파, 우주 사업 매출 가이던스 추가 상향",
+      "risks": "미 국방 예산 시퀘스터 가능성과 회계연도 CR 장기화, Aerojet Rocketdyne 통합 비용 초과, 통신·전자전 프로그램 일정 지연, 상업·민간항공 매출 비중 축소에 따른 다각화 리스크, 부품 공급망 인플레이션"
+    },
+    {
+      "ticker": "PLTR",
+      "name": "팔란티어 테크",
+      "competitors": [
+        "SNOW",
+        "MSFT",
+        "NOW",
+        "IBM"
+      ],
+      "moat": "Foundry·Gotham 데이터 통합 OS 플랫폼, 정부·국방 보안 인증, AIP의 LLM 통합 운영 노하우, 도입 후 고객 락인 효과와 산업·정부 동시 침투 가능한 듀얼-마켓 구조",
+      "growth_plan": "AIP 기반 미국 상업 시장 침투 가속, 국방·정보기관 글로벌 정부 계약 확대(NATO·일·한), 의료·금융·제조 산업 수직 확장, AI 부트캠프 영업 모델로 신규 로고 확보 가속",
+      "recent_disclosures": "2026 Q1 매출 +85% YoY, 미국 상업 +104% 발표(2026-05 어닝). NATO·NHS 신규 다년 계약 체결, 헬스케어 수직 매출 +130%. 시간외 +15% 급등 후 가이던스 FY26 추가 상향",
+      "risks": "정부 계약 매출 비중과 입찰 변동성, 높은 멀티플(P/E)에 따른 밸류에이션 조정, 미 정부 IT 예산 삭감 가능성, AIP에 대한 MS·Google·SNOW 등 LLM 통합 솔루션 경쟁 심화, 핵심 인력 의존"
+    },
+    {
+      "ticker": "AVAV",
+      "name": "에어로바이런먼트",
+      "competitors": [
+        "KTOS",
+        "RTX",
+        "LMT",
+        "NOC"
+      ],
+      "moat": "무인기·자율비행 운영 데이터와 미 국방부 인증, BlueHalo 인수로 확보한 우주·EW·반(反)드론 통합 솔루션, 동맹국 수출 채널과 Switchblade 운용 노하우",
+      "growth_plan": "BlueHalo 통합으로 사업 영역 확장, Switchblade·JUMP·Puma 자율비행 시스템 동맹국 수출, 민간·상업 자율비행 시장 침투, 우주 광통신·EW 신규 수주",
+      "recent_disclosures": "2026-05 Switchblade IDIQ 9.9억 달러 사상 최대 수주 후속으로 폴란드·대만 수출 계약 추가 발표, BlueHalo 통합 1년차 시너지 가이던스 상향. Switchblade 차세대 모델 시제 인도",
+      "risks": "단일 미 국방부 고객 의존도, IDIQ 발주 시점 변동성, 수출 통제 강화, BlueHalo 통합 비용·시너지 미실현, 우크라이나 종전 시 단기 수요 감소 가능성, 부품 공급망 인플레이션"
+    },
+    {
+      "ticker": "FSLR",
+      "name": "퍼스트 솔라",
+      "competitors": [
+        "ENPH",
+        "JKS",
+        "SEDG",
+        "MAXN"
+      ],
+      "moat": "박막(CdTe) 기술 독자성, 미국 내 양산 능력으로 IRA 45X 세액공제 수혜, 100GW+ 누적 출하와 다년 계약 백로그",
+      "growth_plan": "미국 신규 팹 가동(앨라배마·루이지애나), 2030년까지 25GW 생산능력, 인도·EU 등 글로벌 신규 시장, CuRe 차세대 모듈 양산",
+      "recent_disclosures": "2026-05 Q1 ASP 안정화, 백로그 82GW로 사상 최대. 앨라배마 팹 본격 가동, FY26 가이던스 유지. 미 무역위(ITC) 추가 반덤핑 판정으로 가격 환경 개선",
+      "risks": "중국산 모듈 가격 압력, IRA 45X 정책 변동, 모듈 가격 약세, ASP 둔화, 환율, 신규 팹 가동 지연"
+    },
+    {
+      "ticker": "RTX",
+      "name": "RTX",
+      "competitors": [
+        "GE",
+        "BA",
+        "LMT",
+        "NOC"
+      ],
+      "moat": "Pratt & Whitney 항공 엔진, Collins 항공전자, Raytheon 미사일·레이더 통합 포트폴리오, GTF 애프터마켓 베이스와 미사일 IP",
+      "growth_plan": "GTF 엔진 분진 결함 수정 완료 후 애프터마켓 회복, 미사일 재고 보충 사이클, Collins 첨단 항공전자 매출 확대, GMD 차세대 미사일방어 매출",
+      "recent_disclosures": "2026-05 Q1 매출 +10%, 백로그 2,150억 달러 사상 최대 재확인. GTF 분진 결함 비용 가이던스 안정, NATO 미사일 다년 IDIQ 다수 수주",
+      "risks": "GTF 분진 결함 추가 비용, 보잉/에어버스 공급망 지연, 미 국방 예산 변동, 환율, 통합 비용"
+    },
+    {
+      "ticker": "FCX",
+      "name": "프리포트 맥모란",
+      "competitors": [
+        "SCCO",
+        "BHP",
+        "RIO",
+        "GLEN"
+      ],
+      "moat": "그라스버그(Grasberg) 인도네시아 광산과 미국 내 구리 자산, 사르수도(PT-FI) 운영권 2041년까지 장기화, 저비용 광산 운영 노하우",
+      "growth_plan": "구리 가격 상승 사이클 수혜, 인도네시아 제련소(Manyar) 가동, 미국 애리조나 자산 확장, 신규 광산 부지 탐사",
+      "recent_disclosures": "2026-05 구리 ASP +25% YoY, 그라스버그 분기 생산량 가이던스 일치. 인도네시아 제련소 Manyar 가동률 70% 도달, FY26 가이던스 상향",
+      "risks": "구리 가격 변동성, 인도네시아 자원 민족주의·환경 규제, 광산 사고, 환율, 인플레이션"
+    },
+    {
+      "ticker": "NFLX",
+      "name": "넷플릭스",
+      "competitors": [
+        "DIS",
+        "WBD",
+        "AMZN",
+        "AAPL"
+      ],
+      "moat": "글로벌 가입자 2.7억+ 규모, 콘텐츠 IP 라이브러리, 추천 알고리즘, 자체 제작 스튜디오, 광고·게임 신사업 옵션과 글로벌 결제·로컬화 인프라",
+      "growth_plan": "광고 요금제 가입자 확대와 광고 ARM 개선, 라이브 스포츠·이벤트 권리 확보(FIFA·NFL), 게임 사업 본격 매출화, 비밀번호 공유 단속 효과 지속, 광고 자체 애드테크 구축",
+      "recent_disclosures": "2026-05 2026 슈퍼 이벤트(권투 빅매치) 단독 중계 발표로 광고 셀아웃 가속, 광고 ARPM 가이던스 추가 상향. 자사주 매입 200억 달러 추가 승인 및 게임 매출 첫 분기 공시",
+      "risks": "콘텐츠 제작비 인플레이션, 광고 ARM 성장 둔화 가능성, 디즈니+·HBO Max 등 스트리밍 경쟁 격화, 비밀번호 공유 단속 효과 감소, 스포츠 라이선스 비용 부담, 환율"
+    },
+    {
+      "ticker": "TEM",
+      "name": "템퍼스 AI",
+      "competitors": [
+        "NTRA",
+        "EXAS",
+        "GH",
+        "ILMN"
+      ],
+      "moat": "방대한 종양 데이터 라이브러리와 임상 네트워크, AI 기반 진단·신약 개발 통합 플랫폼, 다중 오믹스 데이터의 진입 장벽",
+      "growth_plan": "AI 진단 알고리즘 적응증 확대, 신약 개발 파트너십 매출화, 보험 환급 코드 확보, xT NGS·xR RNA 패널 채택 확대",
+      "recent_disclosures": "2026-05 Q1 매출 +65% YoY, AstraZeneca·Boehringer 후속 파트너십 매출 가속. xT NGS Medicare 환급 코드 확대 발표",
+      "risks": "보험 환급 변동성, FDA LDT 규제 변화, 경쟁(NTRA·EXAS), 자금 조달 부담, 환자 데이터 보안 리스크"
+    },
+    {
+      "ticker": "CCJ",
+      "name": "카메코",
+      "competitors": [
+        "KAP",
+        "DNN",
+        "UEC",
+        "URG"
+      ],
+      "moat": "우라늄 매장량 1위급 자산(McArthur River·Cigar Lake), Westinghouse 인수로 핵연료 풀체인 보유, 캐나다 산지 자산의 정치적 안정성",
+      "growth_plan": "우라늄 가격 상승 사이클과 SMR 수요 발현, Westinghouse 매출 가속, 글로벌 핵연료 장기 계약 확대, 카자흐스탄 JV 매출 회복",
+      "recent_disclosures": "2026-05 Q1 우라늄 ASP +35% YoY 재확인, McArthur River 가동률 90%+. Westinghouse 백로그 사상 최대, 폴란드·체코 SMR 후속 계약 발표",
+      "risks": "우라늄 가격 변동성, 카자흐스탄 지정학 리스크(Kazatomprom JV), 광산 운영 사고, 환율, Westinghouse 통합 비용"
+    },
+    {
+      "ticker": "BWXT",
+      "name": "BWX 테크놀로지스",
+      "competitors": [
+        "LDOS",
+        "SAIC",
+        "CCJ",
+        "GE"
+      ],
+      "moat": "미 해군 원자로·NASA 우주 핵추진의 단일 공급자, NRC 인증과 보안 클리어런스, 의료용 동위원소 사업의 진입 장벽",
+      "growth_plan": "SMR·마이크로원전(Project Pele), 의료용 동위원소 사업, 캐나다·영국 SMR 공급, 우주 핵추진 신규 NASA 계약",
+      "recent_disclosures": "2026-05 Q1 백로그 50억 달러 돌파, 동위원소 매출 +25%. Project Pele 첫 인도 일정 2026 4Q 유지, 캐나다 SMR 공급 추가 계약",
+      "risks": "해군 함정 건조 일정 지연, 동위원소 사업 규제 리스크, 인력 부족, SMR 수요 발현 지연"
+    },
+    {
+      "ticker": "SMR",
+      "name": "뉴스케일 파워",
+      "competitors": [
+        "BWXT",
+        "CCJ",
+        "GEV",
+        "CEG"
+      ],
+      "moat": "NRC 설계 인증 SMR 1호(NuScale Power Module), 풀스케일 시제 모듈 보유, DOE 검증 데이터의 진입 장벽",
+      "growth_plan": "체코 RoPower·루마니아 SMR 첫 상용 프로젝트 진척, 미국 내 부지 신규 확보, 국방부 마이크로원전 시장, AI 데이터센터향 직접 공급 모델",
+      "recent_disclosures": "2026-05 RoPower 부지 인허가 진척, 미국 빅테크 데이터센터향 LOI 1건 추가 발표. 국방부 마이크로원전 RFP 응찰 진행, 1Q 매출 첫 발생",
+      "risks": "프로젝트 자본비용 상승, 첫 상업 SMR 가동 지연, 자금 조달 부담, 경쟁사(GEV BWRX-300·Holtec) 진입, 정책 의존도"
+    },
+    {
+      "ticker": "LEU",
+      "name": "센트러스 에너지",
+      "competitors": [
+        "BWXT",
+        "CCJ",
+        "KAP",
+        "DNN"
+      ],
+      "moat": "유일한 미국 내 HALEU 생산 라이선스(오하이오 파이크튼), DOE 자금 지원과 원심분리기 자체 제작 능력",
+      "growth_plan": "HALEU 캐스케이드 확장과 Advanced Reactor 공급, LEU 사업 정상화 및 자체 제작 원심분리기 양산, 차세대 원전 연료 매출 확대",
+      "recent_disclosures": "2026-05 HALEU 2차 인도 일정 발표, DOE 추가 자금 지원 1.5억 달러 집행. 1Q 매출 +55% YoY, 가이던스 추가 상향",
+      "risks": "Tenex(러시아) 의존도 잔존, HALEU 수요 시점 지연, 자본조달 부담, 정책 변동, 단일 부지 운영 리스크"
+    },
+    {
+      "ticker": "BE",
+      "name": "블룸 에너지",
+      "competitors": [
+        "PLUG",
+        "FCEL",
+        "BLDP",
+        "GEV"
+      ],
+      "moat": "고체산화물 연료전지(SOFC) 기술과 AI 데이터센터향 분산전원 솔루션, 한국·일본 등 아시아 레퍼런스",
+      "growth_plan": "AI 데이터센터 전력 공급 솔루션 확대, 한국·대만·일본 시장 가속, 그린 수소 전해조 시장 진입, 영업이익률 흑자 전환",
+      "recent_disclosures": "2026-05 AEP와 추가 다년 SOFC 공급 계약 발표, Q1 매출 +35% YoY. 영업이익 흑자 첫 분기, FY26 가이던스 상향",
+      "risks": "현금 소진과 자금 조달, 천연가스 가격 변동, 한국 정책 변동, 데이터센터 직접 공급 모델 채택 지연"
+    },
+    {
+      "ticker": "GEV",
+      "name": "GE베르노바",
+      "competitors": [
+        "SIEGY",
+        "ABB",
+        "MHI",
+        "SMR"
+      ],
+      "moat": "글로벌 1위 가스터빈 점유율과 풍력·원전(BWRX-300) 포트폴리오, 그리드 사업의 설치 기반과 서비스 매출",
+      "growth_plan": "AI 데이터센터 가스터빈 백로그 확대, BWRX-300 SMR 첫 상용화 추진(캐나다), 풍력 손실 정상화 및 그리드 capex 사이클",
+      "recent_disclosures": "2026-05 Q1 가스 사업 매출 +28%, 풍력 손실 추가 축소. 가스터빈 백로그 1,600억 달러 돌파, AI 데이터센터향 추가 다년 계약 다수 발표",
+      "risks": "풍력 사업 손실 지속, 가스터빈 공급 capacity 병목, BWRX-300 일정 지연, 환율, 원자재 비용 상승"
+    },
+    {
+      "ticker": "LNG",
+      "name": "셰니어 에너지",
+      "competitors": [
+        "VG",
+        "NFE",
+        "SHEL",
+        "XOM"
+      ],
+      "moat": "미국 LNG 수출 1위(Sabine Pass·Corpus Christi), 장기 SPA 계약 잠금된 안정적 현금흐름과 기존 인프라 활용 capex 효율",
+      "growth_plan": "Corpus Christi Stage 3·CCL Mid-Scale 추가 액화 능력, 장기 SPA 갱신과 신규 계약 체결, EU·아시아 수출 확대, 자사주 매입과 배당 확대",
+      "recent_disclosures": "2026-05 CCL Stage 3 Train 4 가동 시작, FY26 EBITDA 가이던스 추가 상향. 유럽 가스기업과 추가 20년 SPA 체결, Mid-Scale Trains 8·9 FID 임박",
+      "risks": "LNG 가격 변동, 신규 프로젝트 승인 지연(FERC), 환경 규제, 환율, 캐나다·카타르 등 경쟁 수출 capacity 증가"
+    },
+    {
+      "ticker": "EQT",
+      "name": "EQT",
+      "competitors": [
+        "AR",
+        "RRC",
+        "CHK",
+        "COP"
+      ],
+      "moat": "미국 최대 천연가스 생산자(Marcellus·Utica), Equitrans 인수로 채산성 높은 미드스트림 통합, 저원가 자산과 환경 인증",
+      "growth_plan": "AR(Antero Resources) 통합 시너지, LNG 수출용 가스 공급 계약 확대, AI 데이터센터향 가스 발전 수요, 헨리허브 가격 상승 사이클 수혜",
+      "recent_disclosures": "2026-05 Q1 가스 가격 상승 효과 본격화, AR 통합 시너지 가이던스 상향. MVP 풀가동 재확인, AI 데이터센터향 가스 공급 LOI 1건 발표",
+      "risks": "천연가스 가격 변동성, 환경 규제(메탄), 통합 비용, 환율, 유가 동조성"
+    },
+    {
+      "ticker": "PLUG",
+      "name": "플러그 파워",
+      "competitors": [
+        "BE",
+        "BLDP",
+        "FCEL",
+        "NEL"
+      ],
+      "moat": "액화수소 인프라(조지아·테네시·루이지애나)와 전해조 공급망, Amazon·Walmart 물류 레퍼런스와 DOE 대출 보증",
+      "growth_plan": "DOE 대출 보증 활용한 그린수소 플랜트 확장, 전해조 매출 확대, 비용 구조 개선과 영업이익률 회복, 데이터센터향 백업 수소 공급",
+      "recent_disclosures": "2026-05 DOE 대출 보증 2차 집행 5억 달러 발표, Q1 매출 둔화 vs. 비용 구조 개선 진척. 루이지애나 그린수소 플랜트 가동 일정 4Q 유지",
+      "risks": "현금 소진과 추가 희석 가능성, 그린수소 PTC 정책 변동, 전해조 경쟁(NEL·BE), 영업이익 흑자 전환 지연"
+    },
+    {
+      "ticker": "MOG.A",
+      "name": "무그 A",
+      "competitors": [
+        "HEI",
+        "WWD",
+        "TDG",
+        "KAMN"
+      ],
+      "moat": "항공·방산·산업 정밀 액추에이터·서보 IP, F-35·미사일 등 핵심 플랫폼 단일 공급자, 군용·민항 듀얼 노출",
+      "growth_plan": "F-35 양산 확대와 미사일 프로그램 매출 가속, 민항기(보잉·에어버스) 사이클 회복, 산업 자동화 매출 확대",
+      "recent_disclosures": "2026-05 FY26 2Q 실적 — 매출 +11%, 가이던스 추가 상향. 미사일 부문 백로그 +35%, F-35 다년 계약 옵션 추가 수주",
+      "risks": "보잉·에어버스 공급망 지연, 노동력 부족, 환율, 인플레이션, 국방 예산 변동"
+    },
+    {
+      "ticker": "RKLB",
+      "name": "로켓 랩",
+      "competitors": [
+        "ASTS",
+        "LHX",
+        "NOC",
+        "BA"
+      ],
+      "moat": "Electron 소형 발사체 운영 노하우(상업 로켓 2위), Photon 위성 버스 수직 통합, 호주·NZ·미국 다중 발사장",
+      "growth_plan": "Neutron 중형 발사체 첫 발사(2026 4Q)와 상업 운영, Space Systems(위성 버스·솔라셀) 사업 확장, MDA 미사일 시험용 발사 매출",
+      "recent_disclosures": "2026-05 Neutron 첫 발사 일정 2026 4Q 재확인, NASA 추가 위성 계약 수주. Q1 매출 +32% YoY, 백로그 사상 최대",
+      "risks": "Neutron 첫 발사 실패 가능성, SpaceX 우위, 현금 소진과 자본 조달, 발사 일정 지연, 제조 capacity 확보"
+    },
+    {
+      "ticker": "ADI",
+      "name": "애널로그 디바이시스",
+      "competitors": [
+        "TXN",
+        "MCHP",
+        "ON",
+        "NXPI"
+      ],
+      "moat": "아날로그·믹스드시그널 IP 포트폴리오와 산업·자동차 디자인인 락인, Maxim 인수 후 통합 시너지, BMS·5G 등 고부가 영역의 진입 장벽",
+      "growth_plan": "산업 자동화·EV·5G 회복 사이클, 첨단 패키징과 헬스케어 솔루션 매출 확대, 데이터센터 전력 솔루션, 동남아 신규 팹 가동",
+      "recent_disclosures": "2026-05 FY26 2Q 실적 발표 — 산업 회복 본격화, 매출 가이던스 추가 상향. 자동차 BMS 신규 수주와 데이터센터 전력 IC 채택 사례 공개",
+      "risks": "산업·자동차 사이클 둔화, 중국 매출 둔화 및 로컬 경쟁, EV 수요 둔화, Maxim 통합 비용, 환율, 재고 정상화 지연"
+    },
+    {
+      "ticker": "QRVO",
+      "name": "코보",
+      "competitors": [
+        "SWKS",
+        "AVGO",
+        "QCOM",
+        "MRVL"
+      ],
+      "moat": "5G RF 프론트엔드 IP, BAW 필터 기술, 다중 대역 통합 모듈 설계 노하우, 방산·우주 RF 사업의 인증 진입 장벽",
+      "growth_plan": "모바일 외 5G 인프라·방산·자동차 RF 사업 다각화, 비용 구조 개선과 마진 회복, 위성통신(NTN) RF 솔루션 신규 채택",
+      "recent_disclosures": "2026-05 FY26 4Q 실적에서 모바일 매출 가이던스 하향 vs. 방산·인프라 매출 +25% YoY. 비용 절감 2단계와 자사주 매입 가속, 위성 RF 신규 디자인인 발표",
+      "risks": "스마트폰 수요 둔화 및 중국 점유율 상승, 단일 고객(Apple) 매출 비중, BAW 경쟁 심화, 모바일 비중 축소에 따른 다각화 실패 리스크"
+    },
+    {
+      "ticker": "VRT",
+      "name": "버티브 홀딩스",
+      "competitors": [
+        "SU",
+        "ETN",
+        "JCI",
+        "ABB"
+      ],
+      "moat": "데이터센터 전력·냉각 솔루션 글로벌 1위, 글로벌 서비스 네트워크와 Tier-1 하이퍼스케일러 레퍼런스, 액체냉각·고전압 DC 솔루션 IP",
+      "growth_plan": "AI 데이터센터 액체냉각·고전력 솔루션 확장, 수주 잔고 활용한 매출 성장, 신흥국 데이터센터 capex 수혜, 모듈러 데이터센터 솔루션 매출 확대",
+      "recent_disclosures": "2026-05 Q1 수주 +42% YoY, 백로그 75억 달러 돌파. AI 액체냉각 신규 하이퍼스케일러 다년 계약 발표, FY26 가이던스 추가 상향",
+      "risks": "하이퍼스케일러 자체 설계·OEM화 가능성, AI capex 사이클 둔화, 부품·구리 인플레이션, 환율, 경쟁사(SU·ETN) 액체냉각 진입 가속"
+    },
+    {
+      "ticker": "GOOGL",
+      "name": "알파벳 A",
+      "competitors": [
+        "MSFT",
+        "META",
+        "AMZN",
+        "AAPL"
+      ],
+      "moat": "검색 시장 90%+ 점유율, YouTube·Android·GCP 플랫폼 네트워크, Gemini AI·Waymo·DeepMind 풀스택 AI 자산, 광고 ID·인텐트 데이터의 압도적 폭",
+      "growth_plan": "Gemini 통합으로 검색·워크스페이스 AI 매출화, 클라우드(GCP) 매출 가속, Waymo 자율주행 도시 확장(LA·마이애미·DC), AI 광고 효율 개선, TPU 자체 가속기 매출 옵션",
+      "recent_disclosures": "2026-05 Gemini 2.5 Pro·Flash 출시와 AI Overview 광고 매출화 본격 시작 발표, Waymo 마이애미·DC 상용 서비스 개시. Q1 검색·유튜브·클라우드 모두 두 자릿수 성장 재확인",
+      "risks": "DOJ 반독점 소송 결과(Search·Ad 분리 가능성), AI 검색(ChatGPT·Perplexity)에 의한 트래픽 잠식, 광고 경기 민감도, AI 자본지출 급증에 따른 마진 압박, 안드로이드 수수료 규제"
+    },
+    {
+      "ticker": "AMZN",
+      "name": "아마존닷컴",
+      "competitors": [
+        "WMT",
+        "MSFT",
+        "GOOGL",
+        "ORCL"
+      ],
+      "moat": "AWS 클라우드 1위, Prime 멤버십과 글로벌 물류 인프라, 광고 사업 3강, Anthropic 등 AI 파트너십, Trainium 자체 가속기 옵션",
+      "growth_plan": "AWS Trainium·Bedrock 기반 AI 인프라 매출 가속, 헬스케어(One Medical·Pharmacy) 확장, 광고 매출 두 자릿수 성장 지속, Project Kuiper 첫 매출, 풀필먼트 자동화로 단가 인하",
+      "recent_disclosures": "2026-05 Trainium2 본격 양산 후 Anthropic·Adobe·SAP 채택 사례 추가 공개, AWS re:Inforce 2026에서 Bedrock 신규 모델 카탈로그 발표. Kuiper 첫 대량 발사 일정 6월 확정",
+      "risks": "AWS 성장 둔화 및 클라우드 가격 경쟁, 물류·인건비 인플레이션, FTC 반독점 소송, 광고 사업 둔화, 중국 셀러 의존도, AI 자본지출 부담, 노조 활동 확대"
+    },
+    {
+      "ticker": "AAPL",
+      "name": "애플",
+      "competitors": [
+        "MSFT",
+        "GOOGL",
+        "005930",
+        "1810"
+      ],
+      "moat": "iOS·watchOS·visionOS 생태계와 자체 실리콘(M·A 시리즈), 서비스 매출(앱스토어·iCloud·광고), 강력한 브랜드와 충성 고객 기반, 자체 모뎀·LLM 자산",
+      "growth_plan": "Apple Intelligence 확산과 Vision Pro 2세대 보급, 서비스 매출 두 자릿수 성장, 인도·동남아 신흥국 침투 확대, 자체 LLM·검색 옵션, 자체 모뎀 채택 확대",
+      "recent_disclosures": "2026-05 WWDC 2026 사전 티저로 Apple Intelligence 2.0와 자체 검색 기능 예고, 인도 분기 매출 사상 최대. EU DMA 후속 명령 일부 항소 승소, 자사주 매입 1,200억 달러 추가 승인",
+      "risks": "중국 매출(아이폰) 둔화 및 화웨이 점유율 확대, 서비스 매출 관련 EU·DOJ 규제(앱스토어 수수료), Apple Intelligence 차별화 부족, 환율, 인도 등 신흥국 의존 확대, 관세 리스크"
+    },
+    {
+      "ticker": "META",
+      "name": "메타 플랫폼스",
+      "competitors": [
+        "GOOGL",
+        "SNAP",
+        "PINS",
+        "TTD"
+      ],
+      "moat": "Facebook·Instagram·WhatsApp·Threads 30억+ 사용자 네트워크 효과, 광고 타겟팅 데이터, Llama 오픈소스 AI 생태계, MTIA 자체 가속기",
+      "growth_plan": "AI 광고 효율 강화로 ROAS 개선, Llama 4 멀티모달 모델 활용, AI 글래스(Ray-Ban Meta) 보급, Reality Labs 메타버스 단계적 매출화, 비즈니스 메시징 매출",
+      "recent_disclosures": "2026-05 Llama 4 멀티모달 풀버전 공개와 Ray-Ban Meta 차세대 글래스 사전 공개, 광고 AI Andromeda 도입 후 ROAS +9%. FY26 capex 가이던스 $85B로 추가 상향",
+      "risks": "AI·메타버스(Reality Labs) 자본지출 누적 적자, EU DSA·DMA 규제 벌금, 광고 ATT(애플 추적 정책) 지속 영향, 틱톡·유튜브 쇼츠 경쟁, AI 매출화 시점 불확실성"
+    },
+    {
+      "ticker": "ALNY",
+      "name": "앨나일램 파머슈티컬스",
+      "competitors": [
+        "IONS",
+        "ARWR",
+        "MRNA",
+        "REGN"
+      ],
+      "moat": "RNAi 기술 플랫폼 1위, GalNAc 전달체 IP, 4개 상업 제품 상용화 실적, Sanofi·Regeneron·Pfizer 파트너십",
+      "growth_plan": "Amvuttra ATTR-CM 적응증 확장, 신규 RNAi 파이프라인(zilebesiran 등) 임상 진척, Pfizer·Regeneron 협력, EU·아시아 매출 확대",
+      "recent_disclosures": "2026-05 Amvuttra ATTR-CM 처방 +50% QoQ, FY26 매출 가이던스 상향. zilebesiran Phase 3 추가 데이터 발표, ALN-KHK·ALN-PNP 파이프라인 임상 진척",
+      "risks": "ATTR 시장 경쟁(BridgeBio Acoramidis·Pfizer Tafamidis), 임상 실패, 약가 협상, 환율"
+    },
+    {
+      "ticker": "MSFT",
+      "name": "마이크로소프트",
+      "competitors": [
+        "GOOGL",
+        "AMZN",
+        "ORCL",
+        "CRM"
+      ],
+      "moat": "Office 365·Windows·Azure·GitHub·게임에 걸친 SaaS 포트폴리오, OpenAI 협력으로 확보한 AI 우위, Maia·Cobalt 자체 가속기와 데이터센터 자본력",
+      "growth_plan": "Copilot/365 AI 매출화 확산, Azure AI 인프라 확장, OpenAI 협력 모델 차별화, 게임(Activision) 통합 시너지, Fabric·Power Platform AI 매출",
+      "recent_disclosures": "2026-05 Build 2026에서 Copilot Studio·Agents·Foundry 신규 기능 발표, Azure +33% YoY로 컨센서스 상회. UAE·말레이시아 데이터센터 추가 투자 발표, OpenAI 협력 갱신 협상 진행",
+      "risks": "AI 데이터센터 자본지출 회수 시점 불확실, OpenAI 의존도 및 협력 구조 변화, FTC·EU 클라우드 반독점 조사, Azure 성장 둔화, 게임(Activision) 통합 효과 미흡"
+    },
+    {
+      "ticker": "NOC",
+      "name": "노스롭 그루만",
+      "competitors": [
+        "LMT",
+        "RTX",
+        "BA",
+        "GD"
+      ],
+      "moat": "B-21 폭격기·Sentinel ICBM·우주 시스템 등 미군 핵심 프로그램의 단일 공급자 지위와 우주 사업의 지속 성장",
+      "growth_plan": "B-21 양산 단계 진입과 Sentinel ICBM 본격 매출화, 우주 사업(Space) 두 자릿수 성장 지속, GBSD 미사일 매출 확대",
+      "recent_disclosures": "2026-05 Q1 백로그 사상 최대, B-21 양산 1단계(LRIP) 추가 옵션 행사 발표. Sentinel 비용 통제 진척, 우주 매출 +28%",
+      "risks": "Sentinel 비용 초과(EAC 추가 손실), B-21 양산 일정 지연, 미 국방 예산 시퀘스터 가능성, 인플레이션과 인력 부족"
+    },
+    {
+      "ticker": "LMT",
+      "name": "록히드 마틴",
+      "competitors": [
+        "NOC",
+        "RTX",
+        "BA",
+        "GD"
+      ],
+      "moat": "F-35 라이프사이클 매출, 미사일 방어(THAAD·PAC-3), 우주(Skunk Works) 등 차별화된 방산 프로그램과 다년 IDIQ 백로그",
+      "growth_plan": "F-35 후속 모델·NGAD 후보 경쟁, 미사일 재고 보충 사이클, 우주 사업 확대 및 AI·자율 시스템 통합, 동맹국 FMS 매출 확대",
+      "recent_disclosures": "2026-05 Q1 백로그 사상 최대 재확인, F-35 인도 156기 가이던스 유지. CCA(자율 항공기) 시제 첫 비행 성공, NGAD 경쟁 진행 단계 업데이트",
+      "risks": "F-35 TR-3 일정 추가 지연, NGAD 경쟁 탈락 리스크, 미 국방 예산 시퀘스터, 환율, 미사일 부품 공급 병목"
+    },
+    {
+      "ticker": "AMD",
+      "name": "AMD",
+      "competitors": [
+        "NVDA",
+        "INTC",
+        "AVGO",
+        "MRVL"
+      ],
+      "moat": "x86 CPU + 데이터센터 GPU + Xilinx FPGA 풀스택, 칩렛 기반 첨단 패키징 노하우, EPYC 서버 점유율 확대와 ROCm 생태계 투자",
+      "growth_plan": "MI300/MI350/MI400 데이터센터 GPU 매출 확대, EPYC 서버 점유율 35%+ 목표, AI PC와 임베디드(Xilinx) 동반 성장, 자체 네트워킹(Pensando) 통합",
+      "recent_disclosures": "2026-05 MI350 시리즈 양산 출하 시작 발표, MS·Meta·Oracle 추가 채택. FY26 데이터센터 GPU 매출 가이던스 100억 달러+로 상향",
+      "risks": "NVDA와의 격차 유지(CUDA 생태계), 하이퍼스케일러 자체 ASIC 우선 채택, 게임·임베디드 사이클 둔화, 공급망 집중(TSMC) 리스크, 높은 밸류에이션"
+    },
+    {
+      "ticker": "ARM",
+      "name": "에이알엠 홀딩스",
+      "competitors": [
+        "AAPL",
+        "INTC",
+        "NVDA",
+        "QCOM"
+      ],
+      "moat": "모바일·서버 CPU IP 사실상 표준, 광범위한 라이선시 생태계와 누적 출하 2,800억 칩, v9·SVE2 차별화와 자체 컴퓨트 서브시스템(CSS) 옵션",
+      "growth_plan": "데이터센터 ARM 서버(AWS Graviton·MS Cobalt·NVDA Grace) 점유율 확대, AI PC, 자동차·IoT 매출, 라이선스 요율 인상과 컴퓨트 서브시스템(CSS) 매출화",
+      "recent_disclosures": "2026-05 FY26 4Q 실적 — 로열티 매출 +35% YoY, v9 비중 30% 돌파. CSS 매출 첫 분기 공시, AI 서버·AI PC 라이선스 다수 추가 체결",
+      "risks": "스마트폰 출하 둔화, 퀄컴·중국 라이선시와의 분쟁(Nuvia 등), 데이터센터 매출 비중 확대 지연, 모회사 SoftBank 지분 매각 가능성"
+    },
+    {
+      "ticker": "TSM",
+      "name": "TSMC",
+      "competitors": [
+        "005930",
+        "INTC",
+        "GFS",
+        "UMC"
+      ],
+      "moat": "첨단공정(2nm·3nm) 독점적 수율과 R&D, 미국·일본 팹 분산으로 지정학 리스크 완화, 패키징(CoWoS·SoIC) 일체화와 주요 고객(AAPL·NVDA·AMD) 우선 배정",
+      "growth_plan": "AI 칩(NVDA·AMD·AAPL·MS·META) 수주 확대, CoWoS·SoIC 첨단 패키징 capex 두 배 확충, 2nm 양산 본격화와 미국 애리조나 팹 2단계 가동",
+      "recent_disclosures": "2026-05 4월 매출 +35% YoY로 컨센서스 상회, 2nm 첫 양산 웨이퍼 인도 발표(애플 추정). CoWoS capacity 추가 증설 발표, 일본 구마모토 2공장 본격 가동",
+      "risks": "대만 해협 지정학 리스크, 미·중 반도체 수출 통제 강화, 첨단 공정 capex 부담, 환율, 고객사 자체 ASIC 매출 분리 가능성"
+    },
+    {
+      "ticker": "INTC",
+      "name": "인텔",
+      "competitors": [
+        "AMD",
+        "TSM",
+        "NVDA",
+        "005930"
+      ],
+      "moat": "x86 데이터센터·PC CPU 점유율, 미국 내 첨단 팹 보유로 정부 지원(CHIPS Act) 수혜, IFS 외부 파운드리 옵션과 자체 패키징(Foveros)",
+      "growth_plan": "18A 공정 양산 시작과 외부 파운드리 고객 확보, AI 가속기 Gaudi 3·Falcon Shores 채택 확대, 분사·파트너십을 통한 자본 효율 개선, AI PC 시장 침투",
+      "recent_disclosures": "2026-05 Foundry Day에서 18A 첫 외부 고객(MS·국방) 본격 양산 일정 공개, Panther Lake AI PC 출하 시작. 자산 매각(Mobileye 일부)으로 현금 확보 발표",
+      "risks": "파운드리 적자 지속, 18A 수율·신뢰성 검증 실패 가능성, AMD·ARM 서버 점유율 확대, 자본지출 부담과 자금 조달 압박, 미·중 통제 리스크"
+    },
+    {
+      "ticker": "MU",
+      "name": "마이크론 테크놀로지",
+      "competitors": [
+        "000660",
+        "005930",
+        "WDC",
+        "SNDK"
+      ],
+      "moat": "HBM·DDR·NAND IDM 3강, 첨단 D램 공정 1γ·1δ 기술 리더십, 보이시·대만·일본·인도 글로벌 제조 분산",
+      "growth_plan": "HBM3E·HBM4 NVDA·AMD 공급 확대, 데이터센터 SSD 점유율 상승, 아이다호 보이시 신규 팹 가동(2026 후반), 인도 사난드 패키징 가동",
+      "recent_disclosures": "2026-05 보이시 팹 1단계 부지 개공 후 장비 반입 시작, HBM3E 12단 NVDA 추가 공급 발표. FY26 EPS 컨센서스 추가 상향, 자사주 매입 첫 승인",
+      "risks": "메모리 사이클 변동성, HBM 경쟁(SK하이닉스·삼성), 중국 매출 통제, capex 부담, 환율, NAND 가격 약세 리스크"
+    },
+    {
+      "ticker": "NVDA",
+      "name": "엔비디아",
+      "competitors": [
+        "AMD",
+        "AVGO",
+        "INTC",
+        "TSM"
+      ],
+      "moat": "CUDA 소프트웨어 생태계와 데이터센터 GPU 시장 80%+ 점유, NVLink·InfiniBand·DGX 풀스택, 추론·학습 양 시장 우위, Mellanox 네트워킹과 CoWoS 우선 배정",
+      "growth_plan": "Blackwell Ultra 양산과 Rubin·Rubin Ultra 차세대 GPU 출시(2026 후반~2027), 자동차(DRIVE Thor)·로봇(Isaac) AI 확대, 소버린 AI 매출, 추론 전용 SKU 확대",
+      "recent_disclosures": "2026-05 GTC 후속 Rubin Ultra 아키텍처 일부 공개, 사우디·UAE 소버린 AI 추가 수주. Blackwell Ultra 출하량 가이던스 상향, FY27 데이터센터 매출 컨센서스 상향 조정",
+      "risks": "미 정부의 대중국 AI 칩 수출 규제 강화, 하이퍼스케일러 자체 ASIC(Trainium·MTIA·TPU) 확산, AI 자본지출 사이클 둔화 가능성, 공급망(TSMC·HBM) 집중 리스크, 높은 밸류에이션"
+    },
+    {
+      "ticker": "SNDK",
+      "name": "샌디스크",
+      "competitors": [
+        "MU",
+        "005930",
+        "000660",
+        "WDC"
+      ],
+      "moat": "NAND 플래시 IDM(키오시아 합작), 컨슈머 스토리지 브랜드 점유율, 분사 후 NAND 전문화로 자본 효율 개선",
+      "growth_plan": "AI·엔터프라이즈 SSD 비중 확대, 분사 후 비용 효율화와 자본 배분 개선, BiCS9 차세대 NAND 양산, AI 데이터센터향 QLC 매출 확대",
+      "recent_disclosures": "2026-05 분사 후 두 번째 실적 발표 — 엔터프라이즈 SSD +35% YoY, FY26 매출 가이던스 일치. AI 데이터센터향 QLC SSD 신규 채택 사례 공개",
+      "risks": "NAND 가격 약세, 키오시아와의 협업 구조 변동, 분사 직후 운영 비용 부담, 환율, 엔터프라이즈 SSD 경쟁(삼성·SK하이닉스 우위)"
+    },
+    {
+      "ticker": "NVTS",
+      "name": "나비타스 세미컨덕터",
+      "competitors": [
+        "EPC",
+        "IFNNY",
+        "STM",
+        "ON"
+      ],
+      "moat": "GaN 파워 IC 선도 기술, 모바일 충전기 표준 채택, AC-DC 통합 솔루션 IP, 800V·고전압 EV/데이터센터 솔루션 진입",
+      "growth_plan": "데이터센터·EV향 800V GaN 솔루션 확대, 솔라 인버터·전력공급장치 신규 시장 진입, 차세대 GaN-IC 통합 양산",
+      "recent_disclosures": "2026-05 Q1 매출 +55% YoY로 컨센서스 상회, 데이터센터향 GaN 추가 수주 공개. 800V 양산 라인 인증 완료, FY26 가이던스 유지",
+      "risks": "현금 소진 속도와 추가 자금 조달 필요성, EV 둔화, GaN 양산 경쟁(EPC·Infineon), 단일 응용처(모바일) 의존도 축소 지연"
+    },
+    {
+      "ticker": "RGTI",
+      "name": "리게티 컴퓨팅",
+      "competitors": [
+        "IONQ",
+        "IBM",
+        "GOOGL",
+        "QUBT"
+      ],
+      "moat": "슈퍼컨덕팅 큐비트 풀스택과 자체 칩 팹(Fab-1), 정부·연구소 레퍼런스와 다중 큐비트 칩 통합 노하우",
+      "growth_plan": "84큐비트 Ankaa-3 시스템 출시와 클라우드 양자 서비스 매출화, 정부·국방 큐비트 솔루션, 100큐비트+ 차세대 로드맵",
+      "recent_disclosures": "2026-05 84큐비트 시스템 추가 정부 계약 수주, Q1 매출 +35% YoY. DARPA·DOE 후속 다년 계약 발표, 36큐비트 칩 신뢰성 데이터 공개",
+      "risks": "현금 소진과 추가 자금 조달, 양자 기술 상용화 지연, IBM·GOOGL 등 빅테크 자체 양자에 의한 경쟁, 정부 예산 의존도"
+    },
+    {
+      "ticker": "IONQ",
+      "name": "아이온큐",
+      "competitors": [
+        "RGTI",
+        "IBM",
+        "GOOGL",
+        "QUBT"
+      ],
+      "moat": "트랩드 이온 큐비트 기술 선도, AWS Braket·Azure Quantum 통합 채널, 큐넷(Quantum Networking) 자산",
+      "growth_plan": "Tempo 시스템 상용 출시와 데이터센터 운영, 큐넷(Quantum Networking), Forte Enterprise 확산, 한국·일본 신규 데이터센터 거점",
+      "recent_disclosures": "2026-05 Tempo 첫 상용 가동 발표, 미 공군 후속 계약 추가 수주. Q1 매출 +95% YoY, 한국 신규 데이터센터 거점 LOI 체결",
+      "risks": "양자 기술 상용화 일정 지연, 현금 소진과 자본 조달, 경쟁사 큐비트 수 증가 속도, 정부 예산 의존도"
+    },
+    {
+      "ticker": "QS",
+      "name": "퀀텀스케이프",
+      "competitors": [
+        "SLDP",
+        "TM",
+        "006400",
+        "373220"
+      ],
+      "moat": "전고체전지 다층 셀 기술과 산화물(LLZO) 분리막 IP, VW PowerCo 합작 양산 파일럿과 다수 OEM B-샘플 검증",
+      "growth_plan": "B-샘플 OEM 검증 확대, PowerCo 양산 파일럿 라인 가동, 2027~2028년 상업 출시 목표, 라이선스 모델 매출화",
+      "recent_disclosures": "2026-05 B-샘플 추가 OEM 인도 발표, PowerCo 파일럿 라인 가동 일정 4Q 재확인. 라이선스 계약 1건 추가, 현금 잔고 가이던스 유지",
+      "risks": "현금 소진 및 자본 조달 필요성, 양산 일정 지연, 경쟁 기술(황화물·CATL 등) 우위, OEM 채택 일정 변동"
+    },
+    {
+      "ticker": "SLDP",
+      "name": "솔리드 파워",
+      "competitors": [
+        "QS",
+        "TM",
+        "006400",
+        "373220"
+      ],
+      "moat": "황화물 전고체전지 기술과 BMW·SK온 OEM 파트너십, 시제 라인 운영 경험과 황화물 전해질 자체 합성 능력",
+      "growth_plan": "BMW A-샘플 인도 확대와 SK온 양산 라인 구축, 황화물 전해질 외부 판매, 차세대 셀 디자인 라이선스",
+      "recent_disclosures": "2026-05 BMW A-샘플 추가 인도 완료, SK온 양산 라인 시제 운영 시작. 매출 가이던스 유지, 황화물 전해질 외부 공급 LOI 1건 추가",
+      "risks": "현금 소진 및 자본 조달, 양산 일정 지연, BMW 단일 OEM 의존도, 경쟁사(QS·CATL) 기술 우위"
+    },
+    {
+      "ticker": "EXPE",
+      "name": "익스피디아 그룹",
+      "competitors": [
+        "BKNG",
+        "ABNB",
+        "TRIP",
+        "MMYT"
+      ],
+      "moat": "OTA 멀티브랜드(Expedia·Hotels.com·VRBO) 포트폴리오와 광고·B2B 사업, 데이터·로열티 자산과 글로벌 결제 인프라",
+      "growth_plan": "AI 검색 통합과 개인화, B2B(Expedia for Business) 매출 두 자릿수 성장, VRBO 휴가 임대 회복, 광고 사업 매출 확대",
+      "recent_disclosures": "2026-05 Q1 GBV +13%, B2B 매출 +28%로 컨센서스 상회. AI 트립 플래너 신규 기능 출시, FY26 가이던스 유지 및 자사주 매입 확대",
+      "risks": "여행 수요 둔화, 호텔·항공 직판 강화, 구글·AI 검색 채널의 광고 비용 상승, 환율, FX 변동"
+    },
+    {
+      "ticker": "NVO",
+      "name": "노보노디스크",
+      "competitors": [
+        "LLY",
+        "PFE",
+        "SNY",
+        "AMGN"
+      ],
+      "moat": "GLP-1 양산 능력(Wegovy·Ozempic)과 글로벌 처방 인프라, 인슐린 글로벌 1위 지위, 덴마크·미국 다중 생산 거점",
+      "growth_plan": "차세대 비만 치료제(CagriSema·Amycretin) 임상, 경구 GLP-1(Rybelsus), 비만 외 적응증(심혈관·신장·MASH) 확대",
+      "recent_disclosures": "2026-05 Q1 실적 — Wegovy 매출 둔화 지속, CagriSema Phase 3 톱라인 데이터 임박 알림. 미국 비만 약 가격 인하 발표, FY26 가이던스 추가 하향",
+      "risks": "GLP-1 시장 LLY에 점유율 잠식, CagriSema 임상 데이터 실망 가능성, 약가 규제(IRA·EU 가격 통제), 복제약 출시 리스크"
+    },
+    {
+      "ticker": "005930",
+      "name": "삼성전자",
+      "competitors": [
+        "000660",
+        "TSM",
+        "MU",
+        "AAPL"
+      ],
+      "moat": "메모리·파운드리·디스플레이·세트(스마트폰·가전) 수직계열화와 글로벌 R&D·자본 규모. IDM의 원가 경쟁력과 첨단 패키징 내재화, 갤럭시 디바이스 출하 베이스",
+      "growth_plan": "HBM4 양산과 NVIDIA·AMD향 AI 가속기 메모리 공급 회복, 2nm GAA 파운드리 첫 외부 고객 확보, 갤럭시 AI 생태계 확대 및 폴더블·XR 디바이스 출시, 자체 엑시노스 AP 확대",
+      "market": "KR",
+      "exchange": "KS",
+      "risks": "HBM 경쟁(SK하이닉스 우위), 2nm 수율·신뢰성 검증 지연, 파운드리 적자 지속, 미·중 반도체 통제, 메모리 사이클 둔화 시 실적 변동성 확대, 환율 및 한국 세제 변동",
+      "recent_disclosures": "2026-05 HBM3E 12단 NVIDIA 퀄 통과 후 첫 본격 양산 분기 진입, 2nm 첫 외부 고객(엔비디아 일부 제품) 공식 발표. Q1 영업이익 메모리 가격 정상화로 컨센서스 상회"
+    },
+    {
+      "ticker": "000720",
+      "name": "현대건설",
+      "competitors": [
+        "000210",
+        "047040",
+        "375500",
+        "028260"
+      ],
+      "moat": "국내 1군 건설사 브랜드(힐스테이트)와 토목·플랜트·원전 EPC 종합 역량, 현대차그룹 캡티브 수주(공장·연구소·물류센터) 베이스, 사우디·이라크 등 중동 EPC 트랙 레코드",
+      "growth_plan": "국내 도시정비(재건축·재개발) 수주 확대, 사우디 NEOM·아미랄 등 대형 EPC 수주, 차세대 원전·SMR EPC 시장 진입, 데이터센터·반도체 팹 등 산업 건설 매출 가속",
+      "market": "KR",
+      "exchange": "KS",
+      "risks": "국내 부동산 PF 노출과 미분양 리스크, 원자재·인건비 인플레이션, 해외 EPC 손실 가능성, 환율, 중동 지정학 리스크",
+      "recent_disclosures": "2026 1Q 영업이익 회복(국내 주택 마진 정상화), 사우디 EPC 추가 수주 발표. 원전·SMR EPC 컨소시엄 참여 공시, FY26 수주 가이던스 상향"
+    },
+    {
+      "ticker": "207940",
+      "name": "삼성바이오로직스",
+      "competitors": [
+        "LONN",
+        "WX",
+        "CTLT",
+        "BIIB"
+      ],
+      "moat": "세계 1위 항체 바이오의약품 CDMO capacity(인천 송도 1~4공장 60.4만L)와 GMP 인증·트랙레코드, 자회사 삼성바이오에피스의 바이오시밀러 파이프라인",
+      "growth_plan": "5공장(18만L) 가동 본격화로 capacity 1위 지위 강화, ADC·mRNA 등 차세대 모달리티 CDMO 진입, 바이오에피스 미국 직판과 신규 바이오시밀러 출시 확대",
+      "market": "KR",
+      "exchange": "KS",
+      "risks": "환율, 핵심 고객 의존도, 미·중 BIOSECURE Act 등 규제 환경 변화, 신규 모달리티 CDMO 수율 검증, 바이오시밀러 가격 경쟁 심화",
+      "recent_disclosures": "2026 1Q 매출 +25% YoY로 컨센서스 상회, 5공장 가동률 빠른 상승. ADC CDMO 신규 수주 발표, 글로벌 빅파마 다년 위탁 계약 추가 체결"
+    },
+    {
+      "ticker": "475150",
+      "name": "SK이터닉스",
+      "competitors": [
+        "009830",
+        "267260",
+        "112610",
+        "298040"
+      ],
+      "moat": "SK그룹 인프라(SK디스커버리·SK가스 등) 기반 신재생에너지 사업 노하우, 태양광 EPC 트랙 레코드와 ESS·연료전지 사업 포트폴리오",
+      "growth_plan": "국내·해외 태양광 EPC 매출 확대, ESS·연료전지 사업 가속, AI 데이터센터향 분산전원 솔루션, 그린수소 사업 진입",
+      "market": "KR",
+      "exchange": "KS",
+      "risks": "태양광 모듈 가격 변동, 정책 변경(REC·RPS), 자회사 SK디앤디·SK가스와의 사업 영역 정리, 원자재 인플레이션, 환율",
+      "recent_disclosures": "2026 1Q 신재생 EPC 매출 +30% YoY, 신규 ESS 프로젝트 수주 발표. 데이터센터향 SOFC 공급 LOI 1건 체결, FY26 가이던스 유지"
+    },
+    {
+      "ticker": "COHR",
+      "name": "코히어런트",
+      "competitors": [
+        "LITE",
+        "AAOI",
+        "FN",
+        "AVGO"
+      ],
+      "moat": "광통신·산업용 레이저 풀스택(전 II-VI 합병)과 데이터센터 트랜시버 InP·VCSEL 수직 통합, AI 인프라향 800G·1.6T 광모듈 양산 IP",
+      "growth_plan": "AI 데이터센터향 800G·1.6T 트랜시버 매출 가속, 차세대 1.6T·실리콘 포토닉스 양산, 비핵심 자산 매각으로 부채 축소, 디스플레이·산업 레이저 사이클 회복",
+      "market": "US",
+      "exchange": "",
+      "risks": "AI capex 둔화 시 수요 변동, NVDA·하이퍼스케일러 자체 광모듈 채택 가능성, 부채 부담, 환율, 통합 시너지 미실현",
+      "recent_disclosures": "2026 FY26 3Q(2026-05 발표) 광통신 매출 +60% YoY, AI 트랜시버 백로그 사상 최대. 1.6T 출하 시작 발표, FY26 가이던스 추가 상향"
+    },
+    {
+      "ticker": "AAOI",
+      "name": "어플라이드 옵토일렉트로닉스",
+      "competitors": [
+        "COHR",
+        "LITE",
+        "FN",
+        "MRVL"
+      ],
+      "moat": "데이터센터 광 트랜시버 자체 칩(레이저·디텍터)과 모듈 통합 양산 능력, 마이크로소프트·아마존 등 하이퍼스케일러 검증 트랙",
+      "growth_plan": "AI 데이터센터향 800G·1.6T 트랜시버 매출 가속, 멕시코·대만 공장 증설로 capacity 확보, CATV 사업 비중 축소 후 데이터센터 집중화",
+      "market": "US",
+      "exchange": "",
+      "risks": "단일 고객(MS·AMZN) 매출 비중, 광 트랜시버 가격 경쟁, 양산 수율 변동성, 현금 소진과 추가 자금 조달 가능성",
+      "recent_disclosures": "2026 1Q 데이터센터 매출 +120% YoY, 800G 본격 출하. 멕시코 공장 확장 발표, FY26 매출 가이던스 추가 상향"
+    },
+    {
+      "ticker": "LITE",
+      "name": "루멘텀 홀딩스",
+      "competitors": [
+        "COHR",
+        "AAOI",
+        "FN",
+        "AVGO"
+      ],
+      "moat": "광통신 부품(레이저·트랜시버·DCO)과 산업·항공 레이저 포트폴리오, 클라우드라이트 인수로 데이터센터 광모듈 매출 확대",
+      "growth_plan": "AI 데이터센터향 800G·1.6T 트랜시버와 EML·레이저 매출 가속, 차세대 CW 레이저 양산, 산업 레이저 사이클 회복, 디스플레이용 LiDAR 신규 시장",
+      "market": "US",
+      "exchange": "",
+      "risks": "AI capex 둔화, 하이퍼스케일러 자체 광모듈 채택, 산업·소비자 레이저 사이클 변동, 환율, 통합 시너지 미실현",
+      "recent_disclosures": "2026 FY26 3Q 데이터센터 매출 +50% YoY, AI 광부품 백로그 사상 최대. EML 레이저 공급 다년 계약 발표, FY26 가이던스 상향"
+    },
+    {
+      "ticker": "MRVL",
+      "name": "마블 테크놀로지 그룹",
+      "competitors": [
+        "AVGO",
+        "NVDA",
+        "AMD",
+        "QCOM"
+      ],
+      "moat": "데이터센터 네트워킹(이더넷 스위치·DSP·옵티컬)과 ASIC 설계 풀스택, 하이퍼스케일러 커스텀 ASIC(트레이니엄·MAIA 추정) 수주 베이스",
+      "growth_plan": "AI 커스텀 ASIC 매출 본격화(연 25억$+ 목표), 800G·1.6T 옵티컬 DSP·PAM4 매출 가속, 데이터센터 이더넷 스위치 매출 확대, Inphi 자산 시너지",
+      "market": "US",
+      "exchange": "",
+      "risks": "단일 고객(AMZN·MS·META) 의존도, 커스텀 ASIC 수주 시점 변동, NVDA 자체 네트워킹 진입 가능성, 환율, 통합 비용",
+      "recent_disclosures": "2026 1Q AI 부문 매출 +85% YoY, 커스텀 ASIC 백로그 사상 최대. 1.6T DSP 양산 시작 발표, FY26 데이터센터 매출 가이던스 추가 상향"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.env
+*.egg-info/
+
+# Generated reports (runtime output)
+backend/reports/
+
+# Local config
+.claude/settings.local.json
+.vscode/
+.idea/
+
+# Frontend build
+frontend/dist/
+frontend/node_modules/
+
+# Git worktrees
+.worktrees/
+
+# Windows shortcuts
+*.lnk
