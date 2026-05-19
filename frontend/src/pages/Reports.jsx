@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import axios from 'axios'
 import MarkdownViewer from '../components/MarkdownViewer'
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts'
@@ -244,7 +244,141 @@ const SectionTitle = ({ children }) => (
   </div>
 )
 
-function DetailSummaryTab({ summary }) {
+function ConsensusChart({ ticker, market }) {
+  const [data, setData] = useState([])
+  const [collecting, setCollecting] = useState(false)
+  const [error, setError] = useState(null)
+
+  const fetchData = useCallback(() => {
+    if (!ticker) return
+    axios.get(`/api/consensus/${ticker}`)
+      .then(({ data }) => setData(data))
+      .catch(() => {})
+  }, [ticker])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  const collect = async () => {
+    setCollecting(true)
+    setError(null)
+    try {
+      await axios.post(`/api/consensus/${ticker}`)
+      fetchData()
+    } catch (e) {
+      setError(e.response?.data?.detail || '수집 실패')
+    } finally {
+      setCollecting(false)
+    }
+  }
+
+  const deduped = useMemo(() => {
+    if (!data.length) return []
+    const asc = [...data].reverse()
+    return asc.filter((item, i) => {
+      if (i === 0) return true
+      const prev = asc[i - 1]
+      return !(
+        item.target_mean === prev.target_mean &&
+        item.buy === prev.buy &&
+        item.hold === prev.hold &&
+        item.sell === prev.sell
+      )
+    })
+  }, [data])
+
+  const axisStyle = { fontSize: 10, fill: '#78909c' }
+  const chartMargin = { top: 4, right: 8, left: 0, bottom: 0 }
+
+  const targetTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null
+    return (
+      <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+        <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+        <div style={{ color: '#ffcc80' }}>평균목표가: {fmt(payload[0].value, market)}</div>
+      </div>
+    )
+  }
+
+  const opinionTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null
+    const total = payload.reduce((s, p) => s + (p.value ?? 0), 0)
+    return (
+      <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+        <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+        {payload.map(p => (
+          <div key={p.dataKey} style={{ color: p.fill, marginBottom: 2 }}>
+            {p.name}: {p.value ?? 0}{total > 0 ? ` (${Math.round((p.value ?? 0) / total * 100)}%)` : ''}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background: '#111827', borderRadius: 6, padding: '8px 10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px' }}>📈 컨센서스 추이</div>
+        <button
+          onClick={collect}
+          disabled={collecting}
+          style={{
+            background: 'transparent', border: '1px solid #444',
+            color: collecting ? '#4fc3f7' : '#aaa',
+            borderRadius: 3, padding: '2px 8px', fontSize: 11,
+            cursor: collecting ? 'default' : 'pointer',
+          }}
+        >
+          {collecting ? '수집 중...' : '수집'}
+        </button>
+      </div>
+      {error && <div style={{ color: '#ef9a9a', fontSize: 11, marginBottom: 6 }}>{error}</div>}
+      {deduped.length === 0 ? (
+        <div style={{ color: '#546e7a', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
+          아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요.
+        </div>
+      ) : (
+        <>
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ fontSize: 10, color: '#ffcc80', marginBottom: 2 }}>평균목표가</div>
+            <ResponsiveContainer width="100%" height={120}>
+              <LineChart data={deduped} margin={chartMargin}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
+                <Tooltip content={targetTooltip} />
+                <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="#ffcc80" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>애널리스트 의견</div>
+            <ResponsiveContainer width="100%" height={120}>
+              <BarChart data={deduped} margin={chartMargin}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
+                <Tooltip content={opinionTooltip} />
+                <Bar dataKey="buy" name="매수" stackId="a" fill="#43a047" />
+                <Bar dataKey="hold" name="중립" stackId="a" fill="#616161" />
+                <Bar dataKey="sell" name="매도" stackId="a" fill="#b71c1c" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#78909c', marginTop: 4 }}>
+            {[['#43a047', '매수'], ['#616161', '중립'], ['#b71c1c', '매도']].map(([color, label]) => (
+              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, background: color, display: 'inline-block', borderRadius: 2 }} />
+                {label}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function DetailSummaryTab({ summary, ticker }) {
   if (!summary) return null
   const { buy = 0, hold = 0, sell = 0 } = summary
   const total = buy + hold + sell
@@ -316,6 +450,9 @@ function DetailSummaryTab({ summary }) {
           )}
         </div>
       </div>
+
+      {/* 컨센서스 추이 */}
+      <ConsensusChart ticker={ticker} market={summary.market} />
 
       {/* 2행: 매물대·RSI 현황 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1166,7 +1303,7 @@ export default function Reports() {
             {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
             {!loading && activeDetailTab === 'summary' && (
               detail.summary
-                ? <DetailSummaryTab summary={detail.summary} />
+                ? <DetailSummaryTab summary={detail.summary} ticker={selected.ticker} />
                 : <p style={{ color: '#666', fontSize: 13 }}>요약 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'technical' && (
