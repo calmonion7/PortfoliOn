@@ -129,6 +129,21 @@ def collect_consensus(ticker: str):
     return entry
 
 
+@router.post("/consensus/{ticker}/backfill")
+def backfill_consensus(ticker: str):
+    upper = ticker.upper()
+    ticker_dir = REPORTS_DIR / upper
+    if not ticker_dir.exists():
+        raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
+    json_files = sorted(ticker_dir.glob("*.json"), reverse=True)
+    if not json_files:
+        raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
+    summary = json.loads(json_files[0].read_text(encoding="utf-8"))
+    market = summary.get("market", "US")
+    added = consensus_svc.backfill(upper, market)
+    return {"added": len(added), "entries": added}
+
+
 @router.get("/schedule")
 def get_schedule():
     return storage.get_schedule()
