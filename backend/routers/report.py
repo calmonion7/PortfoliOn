@@ -3,6 +3,7 @@ import json
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pathlib import Path
 from services import storage, report_generator
+from services import consensus as consensus_svc
 
 router = APIRouter(prefix="/api", tags=["report"])
 
@@ -113,6 +114,19 @@ def get_report(ticker: str, date_str: str):
         "content": path.read_text(encoding="utf-8"),
         "summary": summary,
     }
+
+
+@router.get("/consensus/{ticker}")
+def get_consensus(ticker: str):
+    return consensus_svc.get_history(ticker)
+
+
+@router.post("/consensus/{ticker}")
+def collect_consensus(ticker: str):
+    entry = consensus_svc.collect(ticker)
+    if entry is None:
+        raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
+    return entry
 
 
 @router.get("/schedule")
