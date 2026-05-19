@@ -247,6 +247,7 @@ const SectionTitle = ({ children }) => (
 function ConsensusChart({ ticker, market }) {
   const [data, setData] = useState([])
   const [collecting, setCollecting] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState(null)
 
   const fetchData = useCallback(() => {
@@ -268,6 +269,22 @@ function ConsensusChart({ ticker, market }) {
       setError(e.response?.data?.detail || '수집 실패')
     } finally {
       setCollecting(false)
+    }
+  }
+
+  const backfill = async () => {
+    setBackfilling(true)
+    try {
+      const res = await fetch(`/api/consensus/${ticker}/backfill`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        alert(`${data.added}개 추가됨`)
+        if (data.added > 0) fetchData()
+      } else {
+        alert(data.detail || '백필 실패')
+      }
+    } finally {
+      setBackfilling(false)
     }
   }
 
@@ -318,18 +335,23 @@ function ConsensusChart({ ticker, market }) {
     <div style={{ background: '#111827', borderRadius: 6, padding: '8px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px' }}>📈 컨센서스 추이</div>
-        <button
-          onClick={collect}
-          disabled={collecting}
-          style={{
-            background: 'transparent', border: '1px solid #444',
-            color: collecting ? '#4fc3f7' : '#aaa',
-            borderRadius: 3, padding: '2px 8px', fontSize: 11,
-            cursor: collecting ? 'default' : 'pointer',
-          }}
-        >
-          {collecting ? '수집 중...' : '수집'}
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={backfill} disabled={backfilling} style={{ fontSize: 12, padding: '2px 8px', background: 'transparent', border: '1px solid #444', color: backfilling ? '#4fc3f7' : '#aaa', borderRadius: 3, cursor: backfilling ? 'default' : 'pointer' }}>
+            {backfilling ? '로딩...' : '히스토리'}
+          </button>
+          <button
+            onClick={collect}
+            disabled={collecting}
+            style={{
+              background: 'transparent', border: '1px solid #444',
+              color: collecting ? '#4fc3f7' : '#aaa',
+              borderRadius: 3, padding: '2px 8px', fontSize: 11,
+              cursor: collecting ? 'default' : 'pointer',
+            }}
+          >
+            {collecting ? '수집 중...' : '수집'}
+          </button>
+        </div>
       </div>
       {error && <div style={{ color: '#ef9a9a', fontSize: 11, marginBottom: 6 }}>{error}</div>}
       {deduped.length === 0 ? (
