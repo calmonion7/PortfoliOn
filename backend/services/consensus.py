@@ -119,31 +119,36 @@ def _fetch_us(ticker: str) -> list[dict]:
         recs = yf.Ticker(ticker).recommendations
         if recs is None or recs.empty:
             return []
+
+        result = []
+        for _, row in recs.iterrows():
+            period = str(row.get("period", ""))
+            if not period.endswith("m"):
+                continue
+            offset_str = period.rstrip("m")
+            try:
+                offset = int(offset_str)
+            except ValueError:
+                continue
+            if offset > 0:
+                continue
+            result.append({
+                "date": _period_to_date(period),
+                "target_mean": None,
+                "buy":  int(row.get("strongBuy", 0)) + int(row.get("buy", 0)),
+                "hold": int(row.get("hold", 0)),
+                "sell": int(row.get("sell", 0)) + int(row.get("strongSell", 0)),
+            })
+        return result
     except Exception:
         return []
-
-    result = []
-    for _, row in recs.iterrows():
-        period = str(row.get("period", ""))
-        if not period.endswith("m"):
-            continue
-        result.append({
-            "date": _period_to_date(period),
-            "target_mean": None,
-            "buy":  int(row.get("strongBuy", 0)) + int(row.get("buy", 0)),
-            "hold": int(row.get("hold", 0)),
-            "sell": int(row.get("sell", 0)) + int(row.get("strongSell", 0)),
-        })
-    return result
 
 
 def _period_to_date(period: str) -> str:
     """yfinance period 문자열('0m', '-1m' 등)을 해당 월 1일 ISO 날짜로 변환."""
     offset = int(period.replace("m", ""))
     today = date.today()
-    month = today.month + offset
-    year = today.year
-    while month <= 0:
-        month += 12
-        year -= 1
+    total_months = today.year * 12 + (today.month - 1) + offset
+    year = total_months // 12
+    month = total_months % 12 + 1
     return date(year, month, 1).isoformat()
