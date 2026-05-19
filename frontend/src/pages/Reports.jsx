@@ -253,7 +253,7 @@ function ConsensusChart({ ticker, market }) {
     if (!ticker) return
     axios.get(`/api/consensus/${ticker}`)
       .then(({ data }) => setData(data))
-      .catch(() => {})
+      .catch(() => setError('데이터 조회 실패'))
   }, [ticker])
 
   useEffect(() => { fetchData() }, [fetchData])

@@ -59,6 +59,8 @@ def test_collect_consensus_no_report(tmp_path):
 
 
 def test_collect_consensus_upsert_same_date(tmp_path):
+    from datetime import date
+    fixed_date = "2026-05-19"
     reports_tmp = tmp_path / "reports"
     reports_tmp.mkdir()
     consensus_tmp = tmp_path / "consensus"
@@ -67,13 +69,15 @@ def test_collect_consensus_upsert_same_date(tmp_path):
     ticker_dir.mkdir()
     (ticker_dir / "2026-05-19.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
     (consensus_tmp / "005930.json").write_text(
-        json.dumps([{"date": "2026-05-19", "target_mean": 300000, "buy": 20, "hold": 2, "sell": 1}]),
+        json.dumps([{"date": fixed_date, "target_mean": 300000, "buy": 20, "hold": 2, "sell": 1}]),
         encoding="utf-8",
     )
-    with patch("services.consensus.REPORTS_DIR", reports_tmp), \
-         patch("services.consensus.CONSENSUS_DIR", consensus_tmp):
+    with patch("services.consensus.CONSENSUS_DIR", consensus_tmp), \
+         patch("services.consensus.REPORTS_DIR", reports_tmp), \
+         patch("services.consensus.date") as mock_date:
+        mock_date.today.return_value = date.fromisoformat(fixed_date)
         client.post("/api/consensus/005930")
     saved = json.loads((consensus_tmp / "005930.json").read_text())
-    same_date = [e for e in saved if e["date"] == "2026-05-19"]
+    same_date = [e for e in saved if e["date"] == fixed_date]
     assert len(same_date) == 1
     assert same_date[0]["target_mean"] == 352000.0
