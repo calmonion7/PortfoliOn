@@ -24,7 +24,7 @@ const fmt = (val, market) => {
 }
 const fmtN = (val) => val != null ? val : 'N/A'
 const rsiColor = (rsi) => {
-  if (rsi == null) return '#ccc'
+  if (rsi == null) return 'var(--text-muted)'
   const hue = Math.round(120 - (rsi / 100) * 120)
   return `hsl(${hue}, 60%, 60%)`
 }
@@ -141,7 +141,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
       {title && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{title}</div>}
       <div style={{ position: 'relative', height: 100 }}>
         <div style={{ position: 'absolute', top: BAR_TOP, left: 0, right: 0, height: 8, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, background: '#1e2a3a' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--chart-grid)' }} />
           {price != null && <>
             <div style={{ position: 'absolute', inset: 0, right: `${100 - pct(price)}%`, background: 'rgba(129,199,132,0.3)' }} />
             <div style={{ position: 'absolute', inset: 0, left: `${pct(price)}%`, background: 'rgba(239,154,154,0.3)' }} />
