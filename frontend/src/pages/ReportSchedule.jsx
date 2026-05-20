@@ -66,8 +66,8 @@ export default function ReportSchedule() {
 
   return (
     <div style={{ maxWidth: 480 }}>
-      <section style={{ background: '#1e1e2e', padding: 20, borderRadius: 8, marginBottom: 24 }}>
-        <h2 style={{ color: '#80cbc4', marginBottom: 16, fontSize: 14 }}>자동 리포트 스케줄</h2>
+      <section style={{ background: 'var(--bg-surface)', padding: 20, borderRadius: 8, marginBottom: 24 }}>
+        <h2 style={{ color: 'var(--text-heading)', marginBottom: 16, fontSize: 14 }}>자동 리포트 스케줄</h2>
         <div className="form-field" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ marginBottom: 0, width: 'auto' }}>자동 생성</label>
           <input type="checkbox" checked={schedule.enabled}
@@ -89,8 +89,8 @@ export default function ReportSchedule() {
                 style={{
                   padding: '4px 8px', borderRadius: 4, border: 'none',
                   cursor: schedule.enabled ? 'pointer' : 'default',
-                  background: schedule.days.includes(key) ? '#1565c0' : '#333',
-                  color: schedule.days.includes(key) ? 'white' : '#888',
+                  background: schedule.days.includes(key) ? 'var(--accent-btn)' : 'var(--bg-hover)',
+                  color: schedule.days.includes(key) ? 'white' : 'var(--text-muted)',
                   opacity: schedule.enabled ? 1 : 0.5, fontSize: 13,
                 }}>
                 {label}
@@ -101,25 +101,25 @@ export default function ReportSchedule() {
         <button className="btn-primary" onClick={handleSave}>{saved ? '저장됨' : '저장'}</button>
       </section>
 
-      <section style={{ background: '#1e1e2e', padding: 20, borderRadius: 8 }}>
-        <h2 style={{ color: '#80cbc4', marginBottom: 12, fontSize: 14 }}>즉시 리포트 생성</h2>
-        <p style={{ color: '#aaa', fontSize: 13, marginBottom: 12 }}>보유 및 관심 종목 전체에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.</p>
+      <section style={{ background: 'var(--bg-surface)', padding: 20, borderRadius: 8 }}>
+        <h2 style={{ color: 'var(--text-heading)', marginBottom: 12, fontSize: 14 }}>즉시 리포트 생성</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>보유 및 관심 종목 전체에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.</p>
         <button className="btn-primary" onClick={handleGenerateNow} disabled={generating}>
           {generating ? '생성 중...' : '지금 생성'}
         </button>
         {generating && progress.total > 0 && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#aaa', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
               <span>{progress.current ? `생성 중: ${progress.current}` : '준비 중...'}</span>
-              <span style={{ color: '#4fc3f7', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
             </div>
-            <div style={{ background: '#2a2a3a', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--bg-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', background: '#4fc3f7', borderRadius: 4, transition: 'width 0.4s ease' }} />
             </div>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 4, textAlign: 'right' }}>{pct}%</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>{pct}%</div>
           </div>
         )}
-        {genMsg && <p style={{ marginTop: 8, color: '#66bb6a', fontSize: 13 }}>{genMsg}</p>}
+        {genMsg && <p style={{ marginTop: 8, color: 'var(--positive)', fontSize: 13 }}>{genMsg}</p>}
       </section>
     </div>
   )
