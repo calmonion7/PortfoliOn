@@ -3,7 +3,7 @@ import axios from 'axios'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 const thStyle = { padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12 }
-const tdStyle = { padding: '8px 12px', color: '#e0e0e0' }
+const tdStyle = { padding: '8px 12px', color: 'var(--text)' }
 
 const TABS = [
   { key: 'popularity', label: '인기순' },
@@ -23,8 +23,8 @@ function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
       style={{
         fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none',
         cursor: 'pointer',
-        background: inWatchlist ? '#2a1a1a' : '#1a2a1a',
-        color: inWatchlist ? '#ef9a9a' : '#a5d6a7',
+        background: inWatchlist ? 'var(--bg-hover)' : 'var(--bg-surface)',
+        color: inWatchlist ? 'var(--negative)' : 'var(--positive)',
       }}
     >
       {inWatchlist ? '★ 삭제' : '☆ 추가'}
@@ -77,9 +77,9 @@ export default function GuruStats() {
 
   const tabStyle = (active) => ({
     padding: '6px 14px', borderRadius: 16,
-    border: `1px solid ${active ? '#4fc3f7' : '#444'}`,
-    background: active ? '#1565c0' : 'transparent',
-    color: active ? 'white' : '#888',
+    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+    background: active ? 'var(--accent-btn)' : 'transparent',
+    color: active ? 'white' : 'var(--text-muted)',
     cursor: 'pointer', fontSize: 13,
   })
 
@@ -100,9 +100,9 @@ export default function GuruStats() {
       )
     : top3
 
-  if (loading) return <p style={{ color: '#aaa' }}>로딩 중...</p>
+  if (loading) return <p style={{ color: 'var(--text-muted)' }}>로딩 중...</p>
   if (!popularity.length) return (
-    <p style={{ color: '#888', fontSize: 14 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
+    <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
   )
 
   return (
@@ -120,17 +120,17 @@ export default function GuruStats() {
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="티커 / 종목명 / 매니저명 검색..."
-          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid #444', background: '#1e1e2e', color: '#e0e0e0', fontSize: 13, width: 260 }}
+          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 13, width: 260 }}
         />
-        {query && tab === 'popularity' && <span style={{ color: '#666', fontSize: 12 }}>{filteredPopularity.length}개</span>}
-        {query && tab === 'weighted'   && <span style={{ color: '#666', fontSize: 12 }}>{filteredWeighted.length}개</span>}
-        {query && tab === 'top3'       && <span style={{ color: '#666', fontSize: 12 }}>{filteredTop3.length}명</span>}
+        {query && tab === 'popularity' && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{filteredPopularity.length}개</span>}
+        {query && tab === 'weighted'   && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{filteredWeighted.length}개</span>}
+        {query && tab === 'top3'       && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{filteredTop3.length}명</span>}
       </div>
 
       {tab === 'popularity' && (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
               <th style={thStyle}>#</th>
               <th style={thStyle}>티커</th>
               <th style={thStyle}>영문명</th>
@@ -141,10 +141,10 @@ export default function GuruStats() {
           </thead>
           <tbody>
             {filteredPopularity.map((row, i) => (
-              <tr key={row.ticker} style={{ borderBottom: '1px solid #222' }}>
+              <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={tdStyle}>{i + 1}</td>
-                <td style={{ ...tdStyle, fontWeight: 600, color: '#4fc3f7' }}>{row.ticker}</td>
-                <td style={{ ...tdStyle, color: '#aaa' }}>{row.name}</td>
+                <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--accent)' }}>{row.ticker}</td>
+                <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{row.name}</td>
                 <td style={tdStyle}>{row.name_kr || '-'}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{row.count}명</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -164,14 +164,14 @@ export default function GuruStats() {
       {tab === 'top3' && (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
               <th style={thStyle}>Manager</th>
               {[1, 2, 3].map(r => <th key={r} style={thStyle}>{r}위 (전체보유)</th>)}
             </tr>
           </thead>
           <tbody>
             {filteredTop3.map(m => (
-              <tr key={m.manager_name} style={{ borderBottom: '1px solid #222' }}>
+              <tr key={m.manager_name} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={tdStyle}>{m.manager_name}</td>
                 {[0, 1, 2].map(i => {
                   const h = m.top3[i]
@@ -179,9 +179,9 @@ export default function GuruStats() {
                     <td key={i} style={tdStyle}>
                       {h ? (
                         <>
-                          <span style={{ color: '#4fc3f7', fontWeight: 600 }}>{h.ticker}</span>
-                          {h.name_kr && <span style={{ color: '#aaa', fontSize: 11 }}> {h.name_kr}</span>}
-                          <span style={{ color: '#666', fontSize: 11 }}> ({h.count}명)</span>
+                          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{h.ticker}</span>
+                          {h.name_kr && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> {h.name_kr}</span>}
+                          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> ({h.count}명)</span>
                         </>
                       ) : '-'}
                     </td>
@@ -197,14 +197,14 @@ export default function GuruStats() {
         <div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
             {WEIGHT_LEGEND.map(({ rank, score }) => (
-              <span key={rank} style={{ fontSize: 11, color: '#666', background: '#1e1e2e', padding: '2px 6px', borderRadius: 3 }}>
+              <span key={rank} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-surface)', padding: '2px 6px', borderRadius: 3 }}>
                 {rank}위={score}
               </span>
             ))}
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
                 <th style={thStyle}>#</th>
                 <th style={thStyle}>티커</th>
                 <th style={thStyle}>한글명</th>
@@ -214,9 +214,9 @@ export default function GuruStats() {
             </thead>
             <tbody>
               {filteredWeighted.map((row, i) => (
-                <tr key={row.ticker} style={{ borderBottom: '1px solid #222' }}>
+                <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={tdStyle}>{i + 1}</td>
-                  <td style={{ ...tdStyle, fontWeight: 600, color: '#4fc3f7' }}>{row.ticker}</td>
+                  <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--accent)' }}>{row.ticker}</td>
                   <td style={tdStyle}>{row.name_kr || row.name || '-'}</td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.score.toFixed(3)}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>

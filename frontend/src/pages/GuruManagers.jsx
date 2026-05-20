@@ -9,7 +9,7 @@ function formatValue(val) {
   return `$${val.toLocaleString()}`
 }
 
-const tdStyle = { padding: '8px 12px', color: '#e0e0e0' }
+const tdStyle = { padding: '8px 12px', color: 'var(--text)' }
 
 const COLUMNS = [
   { key: '#',     label: '#',               sortKey: null },
@@ -90,9 +90,9 @@ export default function GuruManagers() {
     return 0
   })
 
-  if (loading) return <p style={{ color: '#aaa' }}>로딩 중...</p>
+  if (loading) return <p style={{ color: 'var(--text-muted)' }}>로딩 중...</p>
   if (!data.managers.length) return (
-    <p style={{ color: '#888', fontSize: 14 }}>
+    <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
       데이터 없음 — "크롤링 설정" 탭에서 데이터를 가져오세요.
     </p>
   )
@@ -100,23 +100,23 @@ export default function GuruManagers() {
   return (
     <div>
       {data.last_updated && (
-        <p style={{ color: '#666', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated}</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated}</p>
       )}
       <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
         <input
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="매니저명 / 펌 / 티커 검색..."
-          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid #444', background: '#1e1e2e', color: '#e0e0e0', fontSize: 13, width: 260 }}
+          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 13, width: 260 }}
         />
         {query && (
-          <span style={{ color: '#666', fontSize: 12 }}>{sorted.length} / {data.managers.length}명</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{sorted.length} / {data.managers.length}명</span>
         )}
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #333', color: '#80cbc4' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
               {COLUMNS.map(col => (
                 <th
                   key={col.key}
@@ -125,7 +125,7 @@ export default function GuruManagers() {
                     padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12,
                     cursor: col.sortKey ? 'pointer' : 'default',
                     userSelect: 'none',
-                    color: sort.key === col.sortKey ? '#4fc3f7' : '#80cbc4',
+                    color: sort.key === col.sortKey ? 'var(--accent)' : 'var(--text-heading)',
                   }}
                 >
                   {col.label}
@@ -138,10 +138,10 @@ export default function GuruManagers() {
           </thead>
           <tbody>
             {sorted.map((m, i) => (
-              <tr key={m.id} style={{ borderBottom: '1px solid #222' }}>
+              <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={tdStyle}>{i + 1}</td>
                 <td style={tdStyle}>{m.name}</td>
-                <td style={{ ...tdStyle, color: '#aaa' }}>{m.firm}</td>
+                <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{m.firm}</td>
                 <td style={tdStyle}>{formatValue(m.portfolio_value)}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{m.num_stocks}</td>
                 <td style={tdStyle}>
