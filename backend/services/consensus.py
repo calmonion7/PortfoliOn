@@ -68,87 +68,128 @@ def backfill(ticker: str, market: str) -> list[dict]:
     return to_add
 
 
+_KR_BUY = {"매수", "적극매수", "강력매수"}
+_KR_SELL = {"매도", "강력매도"}
+_US_BUY = {"Buy", "Outperform", "Overweight", "Strong Buy", "Positive", "Add", "Accumulate", "Top Pick"}
+_US_SELL = {"Sell", "Underperform", "Underweight", "Strong Sell", "Negative", "Reduce"}
+
+
 def _fetch_kr(ticker: str) -> list[dict]:
-    """FnGuide에서 최근 ~6주 날짜별 컨센서스 수집."""
+    """Naver Research API로 최근 60일 날짜별 컨센서스 수집."""
     import requests
-    url = f"https://comp.fnguide.com/SVO2/json/data/01_06/03_A{ticker}.json"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://comp.fnguide.com/",
-    }
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import timedelta
+
+    cutoff = (date.today() - timedelta(days=60)).isoformat()
+    headers = {"User-Agent": "Mozilla/5.0"}
+
     try:
-        r = requests.get(url, headers=headers, timeout=8)
+        r = requests.get(
+            f"https://m.stock.naver.com/api/research/stock/{ticker}?pageSize=200",
+            headers=headers, timeout=8,
+        )
         r.raise_for_status()
-        data = json.loads(r.content.decode("utf-8-sig"))
+        items = r.json()
     except Exception:
         return []
 
-    by_date: dict[str, list] = defaultdict(list)
-    for item in data.get("comp", []):
-        est_dt = item.get("EST_DT", "")
-        if est_dt:
-            by_date[est_dt].append(item)
+    recent = [i for i in items if i.get("writeDate", "") >= cutoff]
+    if not recent:
+        return []
 
-    result = []
-    for est_dt, items in sorted(by_date.items()):
-        avg_prc_str = items[0].get("AVG_PRC", "")
+    def fetch_detail(item):
+        rid = item["researchId"]
+        write_date = item["writeDate"]
         try:
-            target_mean = float(avg_prc_str.replace(",", "")) if avg_prc_str else None
-        except ValueError:
-            target_mean = None
-        recom_codes = []
-        for item in items:
+            dr = requests.get(
+                f"https://m.stock.naver.com/api/research/stock/{ticker}/{rid}",
+                headers=headers, timeout=8,
+            )
+            dr.raise_for_status()
+            content = dr.json().get("researchContent", {})
+            opinion = content.get("opinion", "").strip()
+            price_str = content.get("goalPrice", "")
             try:
-                recom_codes.append(float(item["RECOM_CD"]))
-            except (ValueError, KeyError):
-                pass
-        result.append({
-            "date": est_dt.replace("/", "-"),
-            "target_mean": target_mean,
-            "buy":  sum(1 for c in recom_codes if c >= 3.5),
-            "hold": sum(1 for c in recom_codes if 2.5 <= c < 3.5),
-            "sell": sum(1 for c in recom_codes if c < 2.5),
+                goal_price = float(price_str.replace(",", "")) if price_str else None
+            except ValueError:
+                goal_price = None
+            return write_date, opinion, goal_price
+        except Exception:
+            return write_date, "", None
+
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        results = list(ex.map(fetch_detail, recent))
+
+    by_date: dict[str, dict] = defaultdict(lambda: {"buy": 0, "hold": 0, "sell": 0, "prices": []})
+    for write_date, opinion, goal_price in results:
+        d = by_date[write_date]
+        if opinion in _KR_BUY:
+            d["buy"] += 1
+        elif opinion in _KR_SELL:
+            d["sell"] += 1
+        else:
+            d["hold"] += 1
+        if goal_price is not None:
+            d["prices"].append(goal_price)
+
+    output = []
+    for dt, d in sorted(by_date.items()):
+        prices = d["prices"]
+        output.append({
+            "date": dt,
+            "target_mean": round(sum(prices) / len(prices)) if prices else None,
+            "buy": d["buy"],
+            "hold": d["hold"],
+            "sell": d["sell"],
         })
-    return result
+    return output
 
 
 def _fetch_us(ticker: str) -> list[dict]:
-    """yfinance recommendations에서 최근 4개월 월별 컨센서스 수집."""
+    """yfinance upgrades_downgrades로 최근 60일 날짜별 컨센서스 수집."""
+    from datetime import timedelta
     try:
         import yfinance as yf
-        recs = yf.Ticker(ticker).recommendations
-        if recs is None or recs.empty:
+        import pandas as pd
+        ud = yf.Ticker(ticker).upgrades_downgrades
+        if ud is None or ud.empty:
             return []
 
-        result = []
-        for _, row in recs.iterrows():
-            period = str(row.get("period", ""))
-            if not period.endswith("m"):
-                continue
-            offset_str = period.rstrip("m")
+        cutoff = date.today() - timedelta(days=60)
+        grade_dates = pd.to_datetime(ud.index)
+        if grade_dates.tz is not None:
+            grade_dates = grade_dates.tz_convert(None)
+        ud = ud.copy()
+        ud.index = grade_dates.date
+        ud = ud[ud.index >= cutoff]
+
+        by_date: dict[str, dict] = defaultdict(lambda: {"buy": 0, "hold": 0, "sell": 0, "prices": []})
+        for grade_date, row in ud.iterrows():
+            dt = str(grade_date)
+            grade = str(row.get("ToGrade", ""))
+            d = by_date[dt]
+            if grade in _US_BUY:
+                d["buy"] += 1
+            elif grade in _US_SELL:
+                d["sell"] += 1
+            else:
+                d["hold"] += 1
             try:
-                offset = int(offset_str)
-            except ValueError:
-                continue
-            if offset > 0:
-                continue
-            result.append({
-                "date": _period_to_date(period),
-                "target_mean": None,
-                "buy":  int(row.get("strongBuy", 0)) + int(row.get("buy", 0)),
-                "hold": int(row.get("hold", 0)),
-                "sell": int(row.get("sell", 0)) + int(row.get("strongSell", 0)),
-            })
-        return result
+                price = float(row.get("currentPriceTarget", 0) or 0)
+                if price > 0:
+                    d["prices"].append(price)
+            except (ValueError, TypeError):
+                pass
+
+        return [
+            {
+                "date": dt,
+                "target_mean": round(sum(d["prices"]) / len(d["prices"]), 2) if d["prices"] else None,
+                "buy": d["buy"],
+                "hold": d["hold"],
+                "sell": d["sell"],
+            }
+            for dt, d in sorted(by_date.items())
+        ]
     except Exception:
         return []
-
-
-def _period_to_date(period: str) -> str:
-    """yfinance period 문자열('0m', '-1m' 등)을 해당 월 1일 ISO 날짜로 변환."""
-    offset = int(period.replace("m", ""))
-    today = date.today()
-    total_months = today.year * 12 + (today.month - 1) + offset
-    year = total_months // 12
-    month = total_months % 12 + 1
-    return date(year, month, 1).isoformat()

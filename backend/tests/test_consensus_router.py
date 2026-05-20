@@ -90,27 +90,38 @@ def test_backfill_no_report(tmp_path, monkeypatch):
 
 
 def test_backfill_kr(tmp_path, monkeypatch):
-    import pandas as pd
+    from datetime import date, timedelta
     upper = "005930"
+    today = date.today()
+    d1 = (today - timedelta(days=30)).isoformat()
+    d2 = (today - timedelta(days=10)).isoformat()
+
     ticker_dir = tmp_path / upper
     ticker_dir.mkdir()
     summary = {"market": "KR", "target_mean": 80000, "buy": 10, "hold": 2, "sell": 0}
-    (ticker_dir / "2026-05-01.json").write_text(json.dumps(summary), encoding="utf-8")
+    (ticker_dir / f"{today.isoformat()}.json").write_text(json.dumps(summary), encoding="utf-8")
     monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
 
-    fnguide_payload = {
-        "comp": [
-            {"EST_DT": "2026/04/01", "AVG_PRC": "80,000", "RECOM_CD": "4"},
-            {"EST_DT": "2026/04/01", "AVG_PRC": "80,000", "RECOM_CD": "3"},
-            {"EST_DT": "2026/03/15", "AVG_PRC": "78,000", "RECOM_CD": "4"},
-        ]
+    list_payload = [
+        {"researchId": "101", "writeDate": d1, "brokerName": "NH"},
+        {"researchId": "102", "writeDate": d1, "brokerName": "KB"},
+        {"researchId": "103", "writeDate": d2, "brokerName": "KI"},
+    ]
+    details = {
+        "101": {"researchContent": {"opinion": "매수", "goalPrice": "80,000"}},
+        "102": {"researchContent": {"opinion": "중립", "goalPrice": "78,000"}},
+        "103": {"researchContent": {"opinion": "매수", "goalPrice": "82,000"}},
     }
+
+    def mock_get(url, **kwargs):
+        m = MagicMock()
+        m.raise_for_status = lambda: None
+        last = url.split("?")[0].rstrip("/").split("/")[-1]
+        m.json.return_value = details[last] if last in details else list_payload
+        return m
+
     with patch("services.consensus.CONSENSUS_DIR", tmp_path / "consensus"), \
-         patch("requests.get") as mock_get:
-        mock_response = MagicMock()
-        mock_response.content = json.dumps(fnguide_payload).encode("utf-8")
-        mock_response.raise_for_status = lambda: None
-        mock_get.return_value = mock_response
+         patch("requests.get", side_effect=mock_get):
         r = client.post(f"/api/consensus/{upper}/backfill")
 
     assert r.status_code == 200
@@ -120,19 +131,30 @@ def test_backfill_kr(tmp_path, monkeypatch):
 
 def test_backfill_us(tmp_path, monkeypatch):
     import pandas as pd
+    from datetime import date, timedelta
     upper = "AAPL"
+    today = date.today()
+    d1 = (today - timedelta(days=10)).isoformat()
+    d2 = (today - timedelta(days=20)).isoformat()
+
     ticker_dir = tmp_path / upper
     ticker_dir.mkdir()
     summary = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
-    (ticker_dir / "2026-05-01.json").write_text(json.dumps(summary), encoding="utf-8")
+    (ticker_dir / f"{today.isoformat()}.json").write_text(json.dumps(summary), encoding="utf-8")
     monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
 
-    df = pd.DataFrame([
-        {"period": "0m",  "strongBuy": 10, "buy": 20, "hold": 5, "sell": 2, "strongSell": 1},
-        {"period": "-1m", "strongBuy": 8,  "buy": 18, "hold": 6, "sell": 3, "strongSell": 0},
-    ])
+    df = pd.DataFrame(
+        {
+            "ToGrade": ["Buy", "Outperform", "Hold"],
+            "Firm": ["MS", "GS", "JPM"],
+            "FromGrade": ["", "", ""],
+            "Action": ["up", "up", "main"],
+            "currentPriceTarget": [210.0, 220.0, 190.0],
+        },
+        index=pd.DatetimeIndex([d1, d1, d2], name="GradeDate"),
+    )
     mock_ticker = MagicMock()
-    mock_ticker.recommendations = df
+    mock_ticker.upgrades_downgrades = df
 
     with patch("services.consensus.CONSENSUS_DIR", tmp_path / "consensus"), \
          patch("yfinance.Ticker", return_value=mock_ticker):
@@ -141,33 +163,36 @@ def test_backfill_us(tmp_path, monkeypatch):
     assert r.status_code == 200
     body = r.json()
     assert body["added"] == 2
-    buy_counts = {e["date"]: e["buy"] for e in body["entries"]}
-    assert 30 in buy_counts.values()  # 10+20 for "0m"
+    by_date = {e["date"]: e for e in body["entries"]}
+    assert by_date[d1]["buy"] == 2           # Buy + Outperform
+    assert by_date[d1]["target_mean"] == 215.0  # (210+220)/2
+    assert by_date[d2]["target_mean"] == 190.0
 
 
 def test_backfill_skips_existing_dates(tmp_path, monkeypatch):
     import pandas as pd
-    from datetime import date
+    from datetime import date, timedelta
     upper = "AAPL"
+    today = date.today()
+    existing_date = (today - timedelta(days=10)).isoformat()
+
     ticker_dir = tmp_path / upper
     ticker_dir.mkdir()
     summary = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
-    (ticker_dir / "2026-05-01.json").write_text(json.dumps(summary), encoding="utf-8")
+    (ticker_dir / f"{today.isoformat()}.json").write_text(json.dumps(summary), encoding="utf-8")
     monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
 
-    # Pre-populate consensus with current month's entry
-    today = date.today()
-    existing_date = date(today.year, today.month, 1).isoformat()
     consensus_dir = tmp_path / "consensus"
     consensus_dir.mkdir()
     existing = [{"date": existing_date, "target_mean": None, "buy": 5, "hold": 2, "sell": 1}]
     (consensus_dir / f"{upper}.json").write_text(json.dumps(existing), encoding="utf-8")
 
-    df = pd.DataFrame([
-        {"period": "0m", "strongBuy": 10, "buy": 20, "hold": 5, "sell": 2, "strongSell": 1},
-    ])
+    df = pd.DataFrame(
+        {"ToGrade": ["Buy"], "Firm": ["MS"], "FromGrade": [""], "Action": ["up"]},
+        index=pd.DatetimeIndex([existing_date], name="GradeDate"),
+    )
     mock_ticker = MagicMock()
-    mock_ticker.recommendations = df
+    mock_ticker.upgrades_downgrades = df
 
     with patch("services.consensus.CONSENSUS_DIR", consensus_dir), \
          patch("yfinance.Ticker", return_value=mock_ticker):
