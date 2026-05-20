@@ -53,6 +53,7 @@ def _run_generation(stocks: list):
         _progress["current"] = stock["ticker"]
         try:
             report_generator.generate_report(stock)
+            consensus_svc.collect(stock["ticker"])
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
         _progress["done"] += 1
