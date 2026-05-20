@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import axios from 'axios'
-import MarkdownViewer from '../components/MarkdownViewer'
+
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts'
 
 const TAB_STYLE = (active) => ({
@@ -845,10 +845,85 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
   )
 }
 
+function ReportSectionText({ title, text }) {
+  if (!text) return null
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{title}</div>
+      <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}>{text}</p>
+    </div>
+  )
+}
+
+function ReportSectionCompetitors({ competitors, market }) {
+  if (!competitors?.length) return null
+  const fmtMC = (mc) => {
+    if (mc == null) return 'N/A'
+    if (mc >= 1e12) return `${(mc / 1e12).toFixed(1)}T`
+    if (mc >= 1e9) return `${(mc / 1e9).toFixed(1)}B`
+    return `${(mc / 1e6).toFixed(0)}M`
+  }
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>1️⃣ 사업영역 & 시장순위</div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr>
+              {['종목', '티커', '현재가', '시가총액', 'YTD'].map(h => (
+                <th key={h} style={{ ...TH }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {competitors.map((c, i) => (
+              <tr key={i}>
+                <td style={{ ...TD, textAlign: 'left' }}>{c.name || c.ticker}</td>
+                <td style={TD}>{c.ticker}</td>
+                <td style={TD}>{fmt(c.price, market)}</td>
+                <td style={TD}>{c.market_cap ? (market === 'KR' ? `₩${fmtMC(c.market_cap)}` : `$${fmtMC(c.market_cap)}`) : 'N/A'}</td>
+                <td style={{ ...TD, color: c.ytd_return >= 0 ? '#81c784' : '#ef9a9a' }}>
+                  {c.ytd_return != null ? `${c.ytd_return >= 0 ? '+' : ''}${c.ytd_return.toFixed(1)}%` : 'N/A'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function ReportSectionNews({ disclosures, news }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>5️⃣ 최근 공시 & 뉴스</div>
+      {disclosures && (
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, margin: '0 0 10px' }}>{disclosures}</p>
+      )}
+      {news?.length > 0 ? (
+        <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: 12, lineHeight: 1.8 }}>
+          {news.map((item, i) => (
+            <li key={i}>
+              <a href={item.link} target="_blank" rel="noreferrer"
+                 style={{ color: 'var(--accent)', textDecoration: 'none' }}>{item.title}</a>
+              <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>
+                — {item.publisher} ({item.published_at})
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>_(뉴스 없음)_</p>
+      )}
+    </div>
+  )
+}
+
 export default function Reports() {
   const [reportList, setReportList] = useState({})
   const [selected, setSelected] = useState({ ticker: null, date: null })
-  const [detail, setDetail] = useState({ content: '', summary: null })
+  const [detail, setDetail] = useState({ summary: null })
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(null)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0 })
@@ -891,7 +966,7 @@ export default function Reports() {
     if (!selected.ticker || !selected.date) return
     setLoading(true)
     axios.get(`/api/report/${selected.ticker}/${selected.date}`)
-      .then(({ data }) => setDetail({ content: data.content, summary: data.summary }))
+      .then(({ data }) => setDetail({ summary: data.summary }))
       .finally(() => setLoading(false))
   }, [selected, detailRefreshKey])
 
@@ -1352,9 +1427,23 @@ export default function Reports() {
                 : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>기술적 분석 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'report' && (
-              detail.content
-                ? <MarkdownViewer content={detail.content} ticker={selected.ticker} />
-                : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>리포트 파일이 없습니다.</p>
+              detail.summary
+                ? (
+                  <div style={{ padding: '0 4px' }}>
+                    <ReportSectionCompetitors
+                      competitors={detail.summary.competitors_data}
+                      market={detail.summary.market}
+                    />
+                    <ReportSectionText title="2️⃣ 리스크" text={detail.summary.risks} />
+                    <ReportSectionText title="3️⃣ 경제적 해자" text={detail.summary.moat} />
+                    <ReportSectionText title="4️⃣ 장기 성장 계획" text={detail.summary.growth_plan} />
+                    <ReportSectionNews
+                      disclosures={detail.summary.recent_disclosures}
+                      news={detail.summary.news}
+                    />
+                  </div>
+                )
+                : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>리포트 데이터가 없습니다.</p>
             )}
           </div>
         )}
