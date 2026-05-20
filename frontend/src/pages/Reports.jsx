@@ -7,15 +7,15 @@ const TAB_STYLE = (active) => ({
   padding: '6px 14px',
   cursor: 'pointer',
   border: 'none',
-  borderBottom: active ? '2px solid #4fc3f7' : '2px solid transparent',
+  borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
   background: 'transparent',
-  color: active ? '#4fc3f7' : '#888',
+  color: active ? 'var(--accent)' : 'var(--text-muted)',
   fontWeight: active ? 600 : 400,
   fontSize: 13,
 })
 
-const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid #333', whiteSpace: 'nowrap', fontSize: 11, color: '#aaa', position: 'sticky', top: 0, zIndex: 2, background: '#1a2a3a' }
-const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid #1e1e1e', fontSize: 12 }
+const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--text-muted)', position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-surface)' }
+const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12 }
 
 const fmt = (val, market) => {
   if (val == null) return 'N/A'
@@ -65,36 +65,36 @@ function TargetTooltip({ s }) {
           top: pos.top,
           left: pos.left,
           zIndex: 9999,
-          background: '#1a1a2e',
-          border: '1px solid #3a4a6a',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
           borderRadius: 6,
           padding: '10px 14px',
           minWidth: 200,
           fontSize: 12,
-          color: '#ccc',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+          color: 'var(--text)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
           pointerEvents: 'none',
           lineHeight: 1.8,
         }}>
-          <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 6, fontSize: 11 }}>목표가 근거</div>
+          <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 6, fontSize: 11 }}>목표가 근거</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px' }}>
-            <span style={{ color: '#78909c' }}>평균</span>
+            <span style={{ color: 'var(--text-muted)' }}>평균</span>
             <span style={{ color: '#fff', fontWeight: 600 }}>{fmt(s.target_mean, s.market)}{gap != null && <span style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
-            <span style={{ color: '#78909c' }}>최고</span>
+            <span style={{ color: 'var(--text-muted)' }}>최고</span>
             <span style={{ color: '#81c784' }}>{fmt(s.target_high, s.market)}</span>
-            <span style={{ color: '#78909c' }}>최저</span>
+            <span style={{ color: 'var(--text-muted)' }}>최저</span>
             <span style={{ color: '#ef9a9a' }}>{fmt(s.target_low, s.market)}</span>
-            <span style={{ color: '#78909c' }}>애널리스트</span>
+            <span style={{ color: 'var(--text-muted)' }}>애널리스트</span>
             <span>{total > 0 ? `${total}명` : 'N/A'}</span>
-            <span style={{ color: '#78909c' }}>Buy</span>
+            <span style={{ color: 'var(--text-muted)' }}>Buy</span>
             <span style={{ color: '#81c784' }}>{s.buy ?? 0}{pct(s.buy ?? 0)}</span>
-            <span style={{ color: '#78909c' }}>Hold</span>
+            <span style={{ color: 'var(--text-muted)' }}>Hold</span>
             <span>{s.hold ?? 0}{pct(s.hold ?? 0)}</span>
-            <span style={{ color: '#78909c' }}>Sell</span>
+            <span style={{ color: 'var(--text-muted)' }}>Sell</span>
             <span style={{ color: '#ef9a9a' }}>{s.sell ?? 0}{pct(s.sell ?? 0)}</span>
             {s.finviz_recom != null && <>
-              <span style={{ color: '#78909c' }}>Finviz</span>
-              <span>{s.finviz_recom} <span style={{ color: '#546e7a', fontSize: 10 }}>(1=강매수)</span></span>
+              <span style={{ color: 'var(--text-muted)' }}>Finviz</span>
+              <span>{s.finviz_recom} <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>(1=강매수)</span></span>
             </>}
           </div>
         </div>
@@ -106,7 +106,7 @@ function TargetTooltip({ s }) {
 const GapCell = ({ target, price, baseColor, highlight, market }) => {
   const gap = fmtGap(target, price)
   return (
-    <td style={{ ...TD, color: baseColor, background: highlight ? '#2d2a00' : undefined, border: highlight ? '2px solid #ffeb3b' : undefined, fontWeight: highlight ? 700 : undefined }}>
+    <td style={{ ...TD, color: baseColor, background: highlight ? 'var(--bg-hover)' : undefined, border: highlight ? '2px solid var(--accent)' : undefined, fontWeight: highlight ? 700 : undefined }}>
       {target != null ? <>{fmt(target, market)}{gap && <span style={{ color: gap.positive ? '#81c784' : '#ef9a9a' }}>({gap.text})</span>}</> : 'N/A'}
     </td>
   )
@@ -138,7 +138,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const BAR_TOP = 46
   return (
     <div style={{ marginTop: 8 }}>
-      {title && <div style={{ fontSize: 10, color: '#78909c', marginBottom: 4 }}>{title}</div>}
+      {title && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{title}</div>}
       <div style={{ position: 'relative', height: 100 }}>
         <div style={{ position: 'absolute', top: BAR_TOP, left: 0, right: 0, height: 8, borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ position: 'absolute', inset: 0, background: '#1e2a3a' }} />
@@ -186,16 +186,16 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, market }
     })
   }
   return (
-    <div style={{ marginBottom: 16, overflowX: 'auto', background: '#111', borderRadius: 6, padding: '10px 12px' }}>
-      <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>🎯 RSI 예상 타점</div>
-      <table style={{ borderCollapse: 'collapse', fontSize: 12, color: '#ccc' }}>
+    <div style={{ marginBottom: 16, overflowX: 'auto', background: 'var(--bg-card)', borderRadius: 6, padding: '10px 12px' }}>
+      <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>🎯 RSI 예상 타점</div>
+      <table style={{ borderCollapse: 'collapse', fontSize: 12, color: 'var(--text)' }}>
         <thead>
-          <tr style={{ background: '#1a2a3a' }}>
-            <th style={{ ...TH, textAlign: 'left', color: '#aaa' }}>시간대</th>
+          <tr style={{ background: 'var(--bg-surface)' }}>
+            <th style={{ ...TH, textAlign: 'left', color: 'var(--text-muted)' }}>시간대</th>
             <th style={{ ...TH, color: '#81c784' }}>RSI20</th>
             <th style={{ ...TH, color: '#81c784' }}>RSI25</th>
             <th style={{ ...TH, color: '#81c784' }}>RSI30</th>
-            <th style={{ ...TH, color: '#aaa' }}>현재RSI</th>
+            <th style={{ ...TH, color: 'var(--text-muted)' }}>현재RSI</th>
             <th style={{ ...TH, color: '#ef9a9a' }}>RSI70</th>
             <th style={{ ...TH, color: '#ef9a9a' }}>RSI75</th>
             <th style={{ ...TH, color: '#ef9a9a' }}>RSI80</th>
@@ -204,7 +204,7 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, market }
         <tbody>
           {rows.map(({ label, d }) => d?.rsi != null && (
             <tr key={label}>
-              <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontWeight: 600 }}>{label}</td>
+              <td style={{ ...TD, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</td>
               <GapCell target={d.target_20} price={price} baseColor="#81c784" highlight={closestKey === 'target_20'} market={market} />
               <GapCell target={d.target_25} price={price} baseColor="#81c784" highlight={closestKey === 'target_25'} market={market} />
               <GapCell target={d.target_30} price={price} baseColor="#81c784" highlight={closestKey === 'target_30'} market={market} />
@@ -220,7 +220,7 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, market }
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
           {rows.map(({ label, d }) => d?.rsi != null && (
             <div key={label}>
-              <div style={{ fontSize: 11, color: '#80cbc4', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
               <PriceLevelChart rsiData={d} price={price} vp={vp} target={target} market={market} />
             </div>
           ))}
@@ -231,15 +231,15 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, market }
 }
 
 const MetricCard = ({ label, value, sub, valueColor }) => (
-  <div style={{ background: '#111827', border: '1px solid #1e2a3a', borderRadius: 5, padding: '5px 8px' }}>
-    <div style={{ color: '#546e7a', fontSize: 10, marginBottom: 2 }}>{label}</div>
-    <div style={{ fontWeight: 700, fontSize: 12, color: valueColor ?? '#ccc' }}>{value}</div>
-    {sub && <div style={{ color: '#546e7a', fontSize: 9, marginTop: 1 }}>{sub}</div>}
+  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px' }}>
+    <div style={{ color: 'var(--text-muted)', fontSize: 10, marginBottom: 2 }}>{label}</div>
+    <div style={{ fontWeight: 700, fontSize: 12, color: valueColor ?? 'var(--text)' }}>{value}</div>
+    {sub && <div style={{ color: 'var(--text-muted)', fontSize: 9, marginTop: 1 }}>{sub}</div>}
   </div>
 )
 
 const SectionTitle = ({ children }) => (
-  <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10 }}>
+  <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10 }}>
     {children}
   </div>
 )
@@ -300,14 +300,14 @@ function ConsensusChart({ ticker, market }) {
     })
   }, [data])
 
-  const axisStyle = { fontSize: 10, fill: '#78909c' }
+  const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
   const chartMargin = { top: 4, right: 8, left: 0, bottom: 0 }
 
   const targetTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
     return (
-      <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
-        <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+        <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         <div style={{ color: '#ffcc80' }}>평균목표가: {fmt(payload[0].value, market)}</div>
       </div>
     )
@@ -317,8 +317,8 @@ function ConsensusChart({ ticker, market }) {
     if (!active || !payload?.length) return null
     const total = payload.reduce((s, p) => s + (p.value ?? 0), 0)
     return (
-      <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
-        <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+        <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         {payload.map(p => (
           <div key={p.dataKey} style={{ color: p.fill, marginBottom: 2 }}>
             {p.name}: {p.value ?? 0}{total > 0 ? ` (${Math.round((p.value ?? 0) / total * 100)}%)` : ''}
@@ -329,16 +329,16 @@ function ConsensusChart({ ticker, market }) {
   }
 
   return (
-    <div style={{ background: '#111827', borderRadius: 6, padding: '8px 10px' }}>
+    <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: '8px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ color: '#80cbc4', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px' }}>📈 컨센서스 추이</div>
+        <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px' }}>📈 컨센서스 추이</div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={backfill}
             disabled={backfilling}
             style={{
-              background: 'transparent', border: '1px solid #444',
-              color: backfilling ? '#4fc3f7' : '#aaa',
+              background: 'transparent', border: '1px solid var(--border)',
+              color: backfilling ? 'var(--accent)' : 'var(--text-muted)',
               borderRadius: 3, padding: '2px 8px', fontSize: 11,
               cursor: backfilling ? 'default' : 'pointer',
             }}
@@ -349,8 +349,8 @@ function ConsensusChart({ ticker, market }) {
             onClick={collect}
             disabled={collecting}
             style={{
-              background: 'transparent', border: '1px solid #444',
-              color: collecting ? '#4fc3f7' : '#aaa',
+              background: 'transparent', border: '1px solid var(--border)',
+              color: collecting ? 'var(--accent)' : 'var(--text-muted)',
               borderRadius: 3, padding: '2px 8px', fontSize: 11,
               cursor: collecting ? 'default' : 'pointer',
             }}
@@ -361,7 +361,7 @@ function ConsensusChart({ ticker, market }) {
       </div>
       {error && <div style={{ color: '#ef9a9a', fontSize: 11, marginBottom: 6 }}>{error}</div>}
       {deduped.length === 0 ? (
-        <div style={{ color: '#546e7a', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
           아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요.
         </div>
       ) : (
@@ -370,7 +370,7 @@ function ConsensusChart({ ticker, market }) {
             <div style={{ fontSize: 10, color: '#ffcc80', marginBottom: 2 }}>평균목표가</div>
             <ResponsiveContainer width="100%" height={120}>
               <LineChart data={deduped} margin={chartMargin}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
                 <Tooltip content={targetTooltip} />
@@ -379,10 +379,10 @@ function ConsensusChart({ ticker, market }) {
             </ResponsiveContainer>
           </div>
           <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>애널리스트 의견</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>애널리스트 의견</div>
             <ResponsiveContainer width="100%" height={120}>
               <BarChart data={deduped} margin={chartMargin}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
                 <Tooltip content={opinionTooltip} />
@@ -392,7 +392,7 @@ function ConsensusChart({ ticker, market }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#78909c', marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
             {[['#43a047', '매수'], ['#616161', '중립'], ['#b71c1c', '매도']].map(([color, label]) => (
               <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 8, height: 8, background: color, display: 'inline-block', borderRadius: 2 }} />
@@ -420,52 +420,52 @@ function DetailSummaryTab({ summary, ticker }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       {/* 1행: 증권사 컨센서스 */}
-      <div style={{ background: '#111827', borderRadius: 6, padding: '8px 10px' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: '8px 10px' }}>
         <SectionTitle>🏦 증권사 컨센서스</SectionTitle>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ color: '#546e7a', fontSize: 9 }}>🎯 평균목표가</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>🎯 평균목표가</span>
             <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{fmt(summary.target_mean, summary.market)}</span>
           </div>
           {/* 상승여력 */}
           {gap != null && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ color: '#546e7a', fontSize: 9 }}>상승여력</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>상승여력</span>
               <span style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? '#81c784' : '#ef9a9a' }}>
                 {gap >= 0 ? '+' : ''}{gap.toFixed(1)}%
               </span>
             </div>
           )}
-          <span style={{ color: '#333', fontSize: 10 }}>|</span>
+          <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
           {/* 최고/최저 목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ color: '#546e7a', fontSize: 9 }}>최고목표가</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>최고목표가</span>
             <span style={{ color: '#81c784', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high, summary.market)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ color: '#546e7a', fontSize: 9 }}>최저목표가</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>최저목표가</span>
             <span style={{ color: '#ef9a9a', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low, summary.market)}</span>
           </div>
           {summary.finviz_recom != null && (
             <>
-              <span style={{ color: '#333', fontSize: 10 }}>|</span>
+              <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ color: '#546e7a', fontSize: 9 }}>Finviz 추천</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: summary.finviz_recom <= 2 ? '#81c784' : '#ccc' }}>
-                  {summary.finviz_recom.toFixed(1)} <span style={{ fontSize: 9, color: '#546e7a' }}>/ 5</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>Finviz 추천</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: summary.finviz_recom <= 2 ? '#81c784' : 'var(--text)' }}>
+                  {summary.finviz_recom.toFixed(1)} <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>/ 5</span>
                 </span>
               </div>
             </>
           )}
           {total > 0 && (
             <>
-              <span style={{ color: '#333', fontSize: 10 }}>|</span>
+              <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ color: '#546e7a', fontSize: 9 }}>애널리스트 의견</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>애널리스트 의견</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: '#81c784', fontSize: 11 }}>매수 {buy}</span>
-                  <span style={{ color: '#888', fontSize: 11 }}>중립 {hold}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>중립 {hold}</span>
                   <span style={{ color: '#ef9a9a', fontSize: 11 }}>매도 {sell}</span>
                   <div style={{ display: 'flex', height: 4, borderRadius: 2, overflow: 'hidden', width: 50, flexShrink: 0 }}>
                     <div style={{ width: `${Math.round(buy / total * 100)}%`, background: '#43a047' }} />
@@ -484,7 +484,7 @@ function DetailSummaryTab({ summary, ticker }) {
 
       {/* 2행: 매물대·RSI 현황 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ background: '#111827', borderRadius: 6, padding: 14 }}>
+        <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: 14 }}>
           <SectionTitle>📉 매물대 &amp; RSI 현황</SectionTitle>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, marginTop: 4 }}>
             {[
@@ -497,8 +497,8 @@ function DetailSummaryTab({ summary, ticker }) {
             ].map(({ color, label, desc }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: '#888' }}>{label}</span>
-                <span style={{ fontSize: 9, color: '#546e7a' }}>({desc})</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{label}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>({desc})</span>
               </div>
             ))}
           </div>
@@ -617,7 +617,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
   }
 
   const Legend = ({ items }) => (
-    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#78909c', marginBottom: 4 }}>
+    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
       {items.map(({ color, label }) => {
         const desc = DESCS[label]
         return (
@@ -632,7 +632,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
             {hoveredLegend === label && (
               <div style={{
                 position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
-                background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 4,
+                background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4,
                 padding: '5px 9px', fontSize: 10, color: '#b0bec5', whiteSpace: 'nowrap',
                 zIndex: 50, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
               }}>
@@ -645,7 +645,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     </div>
   )
 
-  const axisStyle = { fontSize: 10, fill: '#78909c' }
+  const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
   const chartMargin = { top: 4, right: 8, left: 0, bottom: 0 }
   const lineCfg = { type: 'monotone', strokeWidth: 2, dot: { r: 3 }, activeDot: { r: 5 }, connectNulls: true }
 
@@ -672,8 +672,8 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     if (!active || !payload?.length) return null
     const row = payload[0]?.payload
     return (
-      <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
-        <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+        <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         {payload.map(p => {
           const ck = CHG_KEYS[p.dataKey]
           return (
@@ -691,8 +691,8 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     if (!active || !payload?.length) return null
     const row = payload[0]?.payload
     return (
-      <div style={{ background: '#1a1a2e', border: '1px solid #3a4a6a', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
-        <div style={{ color: '#80cbc4', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+        <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         {payload.map(p => {
           const ck = CHG_KEYS[p.dataKey]
           return (
@@ -719,7 +719,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
   }
 
   const TH = ({ children, color }) => (
-    <th style={{ color: color || '#546e7a', textAlign: 'right', padding: '2px 6px', fontWeight: 400 }}>{children}</th>
+    <th style={{ color: color || 'var(--text-muted)', textAlign: 'right', padding: '2px 6px', fontWeight: 400 }}>{children}</th>
   )
   const TD = ({ children, color }) => (
     <td style={{ color: color || '#b0bec5', textAlign: 'right', padding: '1px 6px' }}>{children}</td>
@@ -729,7 +729,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     const hasEpsBps = data.some(d => d.eps != null || d.bps != null)
     const hasPerPbr = data.some(d => d.per != null || d.pbr != null)
     return (
-      <div style={{ background: '#111827', borderRadius: 6, padding: 14, marginTop: 12 }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: 14, marginTop: 12 }}>
         <SectionTitle>{title}</SectionTitle>
 
         {/* 매출 / 영업이익 */}
@@ -737,11 +737,11 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
           <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} />
           <ResponsiveContainer width="100%" height={165}>
             <LineChart data={data} margin={{ ...chartMargin, top: 18 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
               <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={fmtVal} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
               <Tooltip content={makeTooltip(true)} />
-              <ReferenceLine y={0} stroke="#444" />
+              <ReferenceLine y={0} stroke="var(--border)" />
               <Line {...lineCfg} dataKey="revenue"   name="매출"    stroke="#4fc3f7">
                 <LabelList dataKey="rev_chg_pct" content={PctLabel()} />
               </Line>
@@ -760,7 +760,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
                 <Legend items={[{ color: '#80cbc4', label: 'EPS' }, { color: '#f48fb1', label: 'BPS' }]} />
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={data} margin={chartMargin}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                     <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={fmtShareAxis} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
                     <Tooltip content={makeShareTooltip()} />
@@ -775,7 +775,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
                 <Legend items={[{ color: '#ffcc80', label: 'PER' }, { color: '#ce93d8', label: 'PBR' }]} />
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={data} margin={chartMargin}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                     <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
                     <Tooltip content={makeTooltip(false)} />
@@ -810,15 +810,15 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
               const opPos  = d.op_chg_abs  == null ? null : d.op_chg_abs  >= 0
               return (
                 <tr key={d.period} style={d.is_consensus ? { opacity: 0.75, fontStyle: 'italic' } : {}}>
-                  <TD color={d.is_consensus ? '#ffcc80' : '#78909c'}>{d.period}</TD>
+                  <TD color={d.is_consensus ? '#ffcc80' : 'var(--text-muted)'}>{d.period}</TD>
                   <TD color="#4fc3f7">{fmtValFull(d.revenue)}</TD>
-                  <td style={{ textAlign: 'right', padding: '1px 6px', color: revPos === true ? '#81c784' : revPos === false ? '#ef9a9a' : '#546e7a' }}>
+                  <td style={{ textAlign: 'right', padding: '1px 6px', color: revPos === true ? '#81c784' : revPos === false ? '#ef9a9a' : 'var(--text-muted)' }}>
                     {d.rev_chg_abs != null
                       ? <>{revPos ? '▲' : '▼'} {fmtValFull(Math.abs(d.rev_chg_abs))}<br /><span style={{ fontSize: 9 }}>({d.rev_chg_pct >= 0 ? '+' : ''}{d.rev_chg_pct}%)</span></>
                       : '—'}
                   </td>
                   <TD color={d.op_income != null && d.op_income >= 0 ? '#81c784' : '#ef9a9a'}>{fmtValFull(d.op_income)}</TD>
-                  <td style={{ textAlign: 'right', padding: '1px 6px', color: opPos === true ? '#81c784' : opPos === false ? '#ef9a9a' : '#546e7a' }}>
+                  <td style={{ textAlign: 'right', padding: '1px 6px', color: opPos === true ? '#81c784' : opPos === false ? '#ef9a9a' : 'var(--text-muted)' }}>
                     {d.op_chg_abs != null
                       ? <>{opPos ? '▲' : '▼'} {fmtValFull(Math.abs(d.op_chg_abs))}<br /><span style={{ fontSize: 9 }}>({d.op_chg_pct >= 0 ? '+' : ''}{d.op_chg_pct}%)</span></>
                       : '—'}
@@ -1000,11 +1000,11 @@ export default function Reports() {
             style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flex: 1, minWidth: 0 }}
             onClick={() => toggleTicker(ticker)}
           >
-            <span style={{ color: '#546e7a', fontSize: 9, flexShrink: 0 }}>{isExpanded ? '▼' : '▶'}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 9, flexShrink: 0 }}>{isExpanded ? '▼' : '▶'}</span>
             <div style={{ minWidth: 0 }}>
-              <span style={{ color: '#80cbc4', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
               {info.summary?.name && (
-                <div style={{ color: '#546e7a', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
               )}
               {guruMap[ticker] && (
                 <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
@@ -1014,15 +1014,15 @@ export default function Reports() {
           <button
             onClick={() => generateOne(ticker)}
             disabled={!!generating}
-            style={{ background: 'transparent', border: '1px solid #444', color: generating === ticker ? '#4fc3f7' : generating ? '#555' : '#aaa', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
+            style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : generating ? 'var(--text-muted)' : 'var(--text-muted)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
           >
             {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
           </button>
         </div>
         {generating === ticker && genProgress.total > 0 && (
           <div style={{ marginBottom: 4 }}>
-            <div style={{ background: '#2a2a3a', borderRadius: 2, height: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: '#4fc3f7', transition: 'width 0.4s ease' }} />
+            <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.4s ease' }} />
             </div>
           </div>
         )}
@@ -1030,7 +1030,7 @@ export default function Reports() {
           <div
             key={date}
             onClick={() => openDetail(ticker, date)}
-            style={{ padding: '3px 8px', cursor: 'pointer', borderRadius: 4, fontSize: 12, background: selected.ticker === ticker && selected.date === date && view === 'detail' ? '#1565c0' : 'transparent', color: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'white' : '#aaa' }}
+            style={{ padding: '3px 8px', cursor: 'pointer', borderRadius: 4, fontSize: 12, background: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'var(--accent)' : 'transparent', color: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'white' : 'var(--text-muted)' }}
           >
             {date}
           </div>
@@ -1042,20 +1042,20 @@ export default function Reports() {
   return (
     <div style={{ display: 'flex', gap: 24, height: 'calc(100vh - 120px)' }}>
       {/* 좌측 사이드바 */}
-      <div style={{ width: 210, overflowY: 'auto', borderRight: '1px solid #333', paddingRight: 16, flexShrink: 0 }}>
-        <h3 style={{ color: '#90caf9', marginBottom: 8 }}>리포트 목록</h3>
-        <div style={{ display: 'flex', borderBottom: '1px solid #333', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
+      <div style={{ width: 210, overflowY: 'auto', borderRight: '1px solid var(--border)', paddingRight: 16, flexShrink: 0 }}>
+        <h3 style={{ color: 'var(--text-heading)', marginBottom: 8 }}>리포트 목록</h3>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
           <button style={TAB_STYLE(activeTab === 'holdings')} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
           <button style={TAB_STYLE(activeTab === 'watchlist')} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
         </div>
         {activeTab === 'watchlist' && (
-          <div style={{ display: 'flex', borderBottom: '1px solid #222', marginBottom: 8, marginTop: 4 }}>
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 8, marginTop: 4 }}>
             <button
-              style={{ ...TAB_STYLE(watchlistSub === 'low'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'low' ? '#81c784' : '#666', borderBottom: watchlistSub === 'low' ? '2px solid #81c784' : '2px solid transparent' }}
+              style={{ ...TAB_STYLE(watchlistSub === 'low'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'low' ? '#81c784' : 'var(--text-muted)', borderBottom: watchlistSub === 'low' ? '2px solid #81c784' : '2px solid transparent' }}
               onClick={() => setWatchlistSub('low')}
             >RSI≤45 ({watchlistLowCount})</button>
             <button
-              style={{ ...TAB_STYLE(watchlistSub === 'high'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'high' ? '#ef9a9a' : '#666', borderBottom: watchlistSub === 'high' ? '2px solid #ef9a9a' : '2px solid transparent' }}
+              style={{ ...TAB_STYLE(watchlistSub === 'high'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-muted)', borderBottom: watchlistSub === 'high' ? '2px solid #ef9a9a' : '2px solid transparent' }}
               onClick={() => setWatchlistSub('high')}
             >RSI&gt;45 ({watchlistHighCount})</button>
           </div>
@@ -1067,9 +1067,9 @@ export default function Reports() {
               onClick={() => setMarketFilter(val)}
               style={{
                 flex: 1, padding: '3px 0', fontSize: 10,
-                background: marketFilter === val ? '#1a2a4a' : 'transparent',
-                border: `1px solid ${marketFilter === val ? '#4fc3f7' : '#2a3a4a'}`,
-                color: marketFilter === val ? '#4fc3f7' : '#555',
+                background: marketFilter === val ? 'var(--bg-hover)' : 'transparent',
+                border: `1px solid ${marketFilter === val ? 'var(--accent)' : 'var(--border)'}`,
+                color: marketFilter === val ? 'var(--accent)' : 'var(--text-muted)',
                 borderRadius: 3, cursor: 'pointer', lineHeight: 1.6,
               }}
             >
@@ -1078,7 +1078,7 @@ export default function Reports() {
             </button>
           ))}
         </div>
-        {tabEntries.length === 0 && <p style={{ color: '#666', fontSize: 12 }}>리포트 없음</p>}
+        {tabEntries.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>리포트 없음</p>}
         {tabEntries.map(([t, info]) => renderTickerItem(t, info))}
       </div>
 
@@ -1087,34 +1087,34 @@ export default function Reports() {
         {view === 'list' ? (
           /* 목록화면 */
           tabEntries.length === 0 ? (
-            <div style={{ textAlign: 'center', marginTop: 80, color: '#666' }}>
+            <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-muted)' }}>
               <p>리포트가 없습니다.</p>
               <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>
             </div>
           ) : (
-            <table style={{ borderCollapse: 'collapse', color: '#ccc', width: '100%' }}>
+            <table style={{ borderCollapse: 'collapse', color: 'var(--text)', width: '100%' }}>
               <thead>
-                <tr style={{ background: '#1a2a3a' }}>
+                <tr style={{ background: 'var(--bg-surface)' }}>
                   <th style={{ ...TH, textAlign: 'left', left: 0, zIndex: 3 }}>종목명 (티커)</th>
                   <th style={{ ...TH, textAlign: 'left' }}>시장</th>
                   <th style={{ ...TH, textAlign: 'left' }}>섹터</th>
                   <th style={TH}>현재가</th>
                   <th style={{ ...TH, color: '#ffb74d' }}>20일고점대비</th>
                   <th style={TH}>POC</th>
-                  <th style={TH}>평균목표가<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>vs 현재가</span></th>
+                  <th style={TH}>평균목표가<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>vs 현재가</span></th>
                   <th style={{ ...TH, color: '#81c784' }}>Buy</th>
                   <th style={TH}>Hold</th>
                   <th style={{ ...TH, color: '#ef9a9a' }}>Sell</th>
-                  <th style={TH}>PER<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>Fwd</span></th>
+                  <th style={TH}>PER<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Fwd</span></th>
                   <th style={TH}>PBR</th>
                   <th style={TH}>Finviz</th>
-                  <th style={{ ...TH, borderLeft: '1px solid #2a3a4a' }}>RSI<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI20<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI25<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI30<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI70<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI75<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI80<br/><span style={{ color: '#546e7a', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, borderLeft: '1px solid var(--border)' }}>RSI<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#81c784' }}>RSI20<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#81c784' }}>RSI25<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#81c784' }}>RSI30<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI70<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI75<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI80<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -1138,25 +1138,25 @@ export default function Reports() {
                     <tr
                       key={ticker}
                       onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
-                      style={{ cursor: 'pointer', borderBottom: '1px solid #222', opacity: hasReport ? 1 : 0.6 }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#1a2a3a'; e.currentTarget.querySelector('td').style.background = '#1a2a3a' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.querySelector('td').style.background = '#141414' }}
+                      style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)', opacity: hasReport ? 1 : 0.6 }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.querySelector('td').style.background = 'var(--bg-hover)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.querySelector('td').style.background = 'var(--bg)' }}
                     >
-                      <td style={{ ...TD, textAlign: 'left', color: '#80cbc4', fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, background: '#141414' }}>
+                      <td style={{ ...TD, textAlign: 'left', color: 'var(--accent)', fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, background: 'var(--bg)' }}>
                         <div>{s?.name || ticker}</div>
-                        <div style={{ color: '#666', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
+                        <div style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
                         {guruMap[ticker] && <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>}
-                        {!hasReport && <div style={{ color: '#546e7a', fontSize: 10 }}>리포트 없음 — 클릭하여 생성</div>}
+                        {!hasReport && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>리포트 없음 — 클릭하여 생성</div>}
                       </td>
                       <td style={{ ...TD, textAlign: 'left' }}>
                         {market === 'KR'
                           ? <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a', whiteSpace: 'nowrap' }}>🇰🇷 KR</span>
-                          : <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a2a3a', color: '#4fc3f7', border: '1px solid #2a4a6a', whiteSpace: 'nowrap' }}>🇺🇸 US</span>
+                          : <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-surface)', color: '#4fc3f7', border: '1px solid var(--border)', whiteSpace: 'nowrap' }}>🇺🇸 US</span>
                         }
                       </td>
-                      <td style={{ ...TD, textAlign: 'left', color: '#78909c', fontSize: 11 }}>
+                      <td style={{ ...TD, textAlign: 'left', color: 'var(--text-muted)', fontSize: 11 }}>
                         <div>{s?.sector || '—'}</div>
-                        {s?.industry ? <div style={{ color: '#546e7a', fontSize: 10 }}>{s.industry}</div> : null}
+                        {s?.industry ? <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{s.industry}</div> : null}
                       </td>
                       <td style={TD}>{s ? fmt(s.price, s.market) : 'N/A'}</td>
                       <td style={TD}>
@@ -1189,11 +1189,11 @@ export default function Reports() {
                       })()}
                       <td style={TD}>
                         {s?.per != null ? s.per.toFixed(1) : '—'}
-                        {s?.forward_per != null && <div style={{ color: '#78909c', fontSize: 10 }}>{s.forward_per.toFixed(1)}</div>}
+                        {s?.forward_per != null && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{s.forward_per.toFixed(1)}</div>}
                       </td>
                       <td style={TD}>{s?.pbr != null ? s.pbr.toFixed(2) : '—'}</td>
                       <td style={TD}>{s ? fmtN(s.finviz_recom) : 'N/A'}</td>
-                      <td style={{ ...TD, borderLeft: '1px solid #2a3a4a' }}>
+                      <td style={{ ...TD, borderLeft: '1px solid var(--border)' }}>
                         <div style={{ color: rsiColor(dr?.rsi), fontWeight: 600 }}>{dr?.rsi != null ? fmtN(dr.rsi) : 'N/A'}</div>
                         <div style={{ color: rsiColor(wr?.rsi), fontSize: 10 }}>{wr?.rsi != null ? fmtN(wr.rsi) : 'N/A'}</div>
                         <div style={{ color: rsiColor(mr?.rsi), fontSize: 10 }}>{mr?.rsi != null ? fmtN(mr.rsi) : 'N/A'}</div>
@@ -1214,10 +1214,10 @@ export default function Reports() {
                         }
                         const isClosest = closestKey === key
                         return (
-                          <td key={key} style={{ ...TD, color: base, background: isClosest ? '#2d2a00' : undefined, border: isClosest ? '2px solid #ffeb3b' : undefined, fontWeight: isClosest ? 700 : undefined }}>
-                            {dv != null ? <div>{fmt(dv, s?.market)}{gapEl(dv)}</div> : <div style={{ color: '#546e7a' }}>N/A</div>}
-                            <div style={{ fontSize: 10, color: wv != null ? sub : '#3a4a5a' }}>{wv != null ? <>{fmt(wv, s?.market)}{gapEl(wv, 9)}</> : 'N/A'}</div>
-                            <div style={{ fontSize: 10, color: mv != null ? sub : '#3a4a5a' }}>{mv != null ? <>{fmt(mv, s?.market)}{gapEl(mv, 9)}</> : 'N/A'}</div>
+                          <td key={key} style={{ ...TD, color: base, background: isClosest ? 'var(--bg-hover)' : undefined, border: isClosest ? '2px solid var(--accent)' : undefined, fontWeight: isClosest ? 700 : undefined }}>
+                            {dv != null ? <div>{fmt(dv, s?.market)}{gapEl(dv)}</div> : <div style={{ color: 'var(--text-muted)' }}>N/A</div>}
+                            <div style={{ fontSize: 10, color: wv != null ? sub : 'var(--text-muted)' }}>{wv != null ? <>{fmt(wv, s?.market)}{gapEl(wv, 9)}</> : 'N/A'}</div>
+                            <div style={{ fontSize: 10, color: mv != null ? sub : 'var(--text-muted)' }}>{mv != null ? <>{fmt(mv, s?.market)}{gapEl(mv, 9)}</> : 'N/A'}</div>
                           </td>
                         )
                       })}
@@ -1233,30 +1233,30 @@ export default function Reports() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
               <button
                 onClick={() => setView('list')}
-                style={{ background: 'transparent', border: '1px solid #444', color: '#aaa', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}
+                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}
               >
                 ← 목록으로
               </button>
               <div style={{ flex: 1 }}>
-                <span style={{ color: '#90caf9', fontWeight: 700, fontSize: 16 }}>
+                <span style={{ color: 'var(--text-heading)', fontWeight: 700, fontSize: 16 }}>
                   {detail.summary?.name || selected.ticker}
                 </span>
-                <span style={{ color: '#666', fontSize: 14, marginLeft: 8 }}>({selected.ticker})</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 14, marginLeft: 8 }}>({selected.ticker})</span>
                 {detail.summary?.market === 'KR'
                   ? <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
-                  : <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: '#1a2a3a', color: '#4fc3f7', border: '1px solid #2a4a6a' }}>🇺🇸 US</span>
+                  : <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-surface)', color: '#4fc3f7', border: '1px solid var(--border)' }}>🇺🇸 US</span>
                 }
                 {guruMap[selected.ticker] && (
                   <span style={{ color: '#ffb74d', fontSize: 11, marginLeft: 8, background: '#2a1a00', padding: '2px 7px', borderRadius: 3 }}>
                     구루 {guruMap[selected.ticker]}명
                   </span>
                 )}
-                <span style={{ color: '#555', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
                 {detail.summary?.price != null && (
-                  <span style={{ color: '#e0e0e0', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price, detail.summary.market)}</span>
+                  <span style={{ color: 'var(--text)', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price, detail.summary.market)}</span>
                 )}
                 {detail.summary?.sector && (
-                  <span style={{ color: '#4fc3f7', fontSize: 11, marginLeft: 12, background: '#0d2333', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: 'var(--accent)', fontSize: 11, marginLeft: 12, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
                     {detail.summary.sector}{detail.summary.industry ? ` / ${detail.summary.industry}` : ''}
                   </span>
                 )}
@@ -1271,13 +1271,13 @@ export default function Reports() {
                   </span>
                 )}
                 {detail.summary?.per != null && (
-                  <span style={{ color: '#b0bec5', fontSize: 11, marginLeft: 8, background: '#1a2a1a', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: '#b0bec5', fontSize: 11, marginLeft: 8, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
                     PER {detail.summary.per.toFixed(1)}
-                    {detail.summary.forward_per != null && <span style={{ color: '#546e7a', marginLeft: 4 }}>/ Fwd {detail.summary.forward_per.toFixed(1)}</span>}
+                    {detail.summary.forward_per != null && <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>/ Fwd {detail.summary.forward_per.toFixed(1)}</span>}
                   </span>
                 )}
                 {detail.summary?.pbr != null && (
-                  <span style={{ color: '#b0bec5', fontSize: 11, marginLeft: 4, background: '#1a2a1a', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: '#b0bec5', fontSize: 11, marginLeft: 4, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
                     PBR {detail.summary.pbr.toFixed(2)}
                   </span>
                 )}
@@ -1287,8 +1287,8 @@ export default function Reports() {
                 disabled={!!generating}
                 style={{
                   background: 'transparent',
-                  border: '1px solid #444',
-                  color: generating === selected.ticker ? '#4fc3f7' : generating ? '#555' : '#aaa',
+                  border: '1px solid var(--border)',
+                  color: generating === selected.ticker ? 'var(--accent)' : generating ? 'var(--text-muted)' : 'var(--text-muted)',
                   borderRadius: 4,
                   padding: '4px 12px',
                   fontSize: 12,
@@ -1302,7 +1302,7 @@ export default function Reports() {
               </button>
             </div>
             {/* 탭 바 */}
-            <div style={{ display: 'flex', borderBottom: '1px solid #2a3a4a', marginBottom: 16, marginTop: 4 }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 16, marginTop: 4 }}>
               {[
                 { key: 'summary', label: '📊 요약' },
                 { key: 'technical', label: '📈 기술적 분석' },
@@ -1314,8 +1314,8 @@ export default function Reports() {
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    borderBottom: activeDetailTab === key ? '2px solid #4fc3f7' : '2px solid transparent',
-                    color: activeDetailTab === key ? '#4fc3f7' : '#555',
+                    borderBottom: activeDetailTab === key ? '2px solid var(--accent)' : '2px solid transparent',
+                    color: activeDetailTab === key ? 'var(--accent)' : 'var(--text-muted)',
                     padding: '6px 16px',
                     fontSize: 12,
                     cursor: 'pointer',
@@ -1328,11 +1328,11 @@ export default function Reports() {
               ))}
             </div>
 
-            {loading && <p style={{ color: '#aaa' }}>로딩 중...</p>}
+            {loading && <p style={{ color: 'var(--text-muted)' }}>로딩 중...</p>}
             {!loading && activeDetailTab === 'summary' && (
               detail.summary
                 ? <DetailSummaryTab summary={detail.summary} ticker={selected.ticker} />
-                : <p style={{ color: '#666', fontSize: 13 }}>요약 데이터가 없습니다.</p>
+                : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>요약 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'technical' && (
               detail.summary?.daily_rsi
@@ -1349,12 +1349,12 @@ export default function Reports() {
                     />
                   </>
                 )
-                : <p style={{ color: '#666', fontSize: 13 }}>기술적 분석 데이터가 없습니다.</p>
+                : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>기술적 분석 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'report' && (
               detail.content
                 ? <MarkdownViewer content={detail.content} ticker={selected.ticker} />
-                : <p style={{ color: '#666', fontSize: 13 }}>리포트 파일이 없습니다.</p>
+                : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>리포트 파일이 없습니다.</p>
             )}
           </div>
         )}
