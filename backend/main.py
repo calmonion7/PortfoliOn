@@ -1,14 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from contextlib import asynccontextmanager
 
 import scheduler as sched
 from routers import portfolio, report, watchlist, stocks, guru
 
-REPORTS_DIR = Path(__file__).parent / "reports"
-REPORTS_DIR.mkdir(exist_ok=True)
+SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
+SNAPSHOTS_DIR.mkdir(exist_ok=True)
 
 
 @asynccontextmanager
@@ -27,8 +26,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/reports", StaticFiles(directory=str(REPORTS_DIR)), name="reports")
-
 app.include_router(portfolio.router)
 app.include_router(report.router)
 app.include_router(watchlist.router)
@@ -39,5 +36,3 @@ app.include_router(guru.router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-

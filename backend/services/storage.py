@@ -4,6 +4,8 @@ from typing import Any
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 
+_ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures"})
+
 
 def _read_json(filename: str) -> Any:
     path = DATA_DIR / filename
@@ -20,66 +22,110 @@ def _write_json(filename: str, data: Any) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def get_stocks() -> list[dict]:
+def _get_unified() -> list[dict]:
     data = _read_json("stocks.json")
     return data.get("stocks", []) if data else []
 
 
-def save_stocks(stocks: list[dict]) -> None:
+def _save_unified(stocks: list[dict]) -> None:
     _write_json("stocks.json", {"stocks": stocks})
 
 
+def get_stocks() -> list[dict]:
+    return [
+        {k: s[k] for k in (*_ANALYST_KEYS, "ticker", "market", "exchange") if k in s}
+        for s in _get_unified()
+    ]
+
+
+def save_stocks(stocks: list[dict]) -> None:
+    by_ticker = {s["ticker"]: s for s in _get_unified()}
+    incoming = {s["ticker"].upper(): s for s in stocks}
+    # Remove non-holdings not in new list
+    for t in list(by_ticker):
+        if t not in incoming and by_ticker[t].get("type") != "holding":
+            del by_ticker[t]
+    # Update / insert analyst fields
+    for t, s in incoming.items():
+        if t in by_ticker:
+            by_ticker[t].update({k: v for k, v in s.items() if k in _ANALYST_KEYS})
+        else:
+            by_ticker[t] = {
+                "ticker": t, "type": "watchlist", "quantity": None, "avg_cost": None,
+                "market": s.get("market", "US"), "exchange": s.get("exchange", ""),
+                **{k: s.get(k, "") for k in _ANALYST_KEYS},
+            }
+    _save_unified(list(by_ticker.values()))
+
+
 def get_holdings() -> list[dict]:
-    data = _read_json("holdings.json")
-    return data.get("holdings", []) if data else []
+    return [
+        {"ticker": s["ticker"], "quantity": s["quantity"], "avg_cost": s["avg_cost"],
+         "market": s.get("market", "US"), "exchange": s.get("exchange", "")}
+        for s in _get_unified() if s.get("type") == "holding"
+    ]
 
 
 def save_holdings(holdings: list[dict]) -> None:
-    _write_json("holdings.json", {"holdings": holdings})
+    by_ticker = {s["ticker"]: s for s in _get_unified()}
+    holding_tickers = {h["ticker"].upper() for h in holdings}
+    # Demote removed holdings to watchlist
+    for s in by_ticker.values():
+        if s.get("type") == "holding" and s["ticker"] not in holding_tickers:
+            s["type"] = "watchlist"
+            s["quantity"] = None
+            s["avg_cost"] = None
+    # Update / insert
+    for h in holdings:
+        t = h["ticker"].upper()
+        if t in by_ticker:
+            by_ticker[t]["type"] = "holding"
+            by_ticker[t]["quantity"] = h["quantity"]
+            by_ticker[t]["avg_cost"] = h["avg_cost"]
+            by_ticker[t]["market"] = h.get("market", by_ticker[t].get("market", "US"))
+            by_ticker[t]["exchange"] = h.get("exchange", by_ticker[t].get("exchange", ""))
+        else:
+            by_ticker[t] = {
+                "ticker": t, "type": "holding", "name": t, "quantity": h["quantity"],
+                "avg_cost": h["avg_cost"], "market": h.get("market", "US"),
+                "exchange": h.get("exchange", ""), "competitors": [], "moat": "",
+                "growth_plan": "", "risks": "", "recent_disclosures": "",
+            }
+    _save_unified(list(by_ticker.values()))
 
 
 def get_watchlist_tickers() -> list[str]:
-    data = _read_json("watchlist.json")
-    return data.get("watchlist", []) if data else []
+    return [s["ticker"] for s in _get_unified() if s.get("type") == "watchlist"]
 
 
 def save_watchlist_tickers(tickers: list[str]) -> None:
-    _write_json("watchlist.json", {"watchlist": tickers})
+    by_ticker = {s["ticker"]: s for s in _get_unified()}
+    for t in [t.upper() for t in tickers]:
+        if t in by_ticker:
+            if by_ticker[t].get("type") != "holding":
+                by_ticker[t]["type"] = "watchlist"
+        else:
+            by_ticker[t] = {
+                "ticker": t, "type": "watchlist", "name": t, "quantity": None,
+                "avg_cost": None, "market": "US", "exchange": "",
+                "competitors": [], "moat": "", "growth_plan": "",
+                "risks": "", "recent_disclosures": "",
+            }
+    _save_unified(list(by_ticker.values()))
 
 
 def get_full_portfolio() -> dict:
-    stocks = get_stocks()
-    holdings = get_holdings()
-    watchlist_tickers = get_watchlist_tickers()
-    stocks_by_ticker = {s["ticker"]: s for s in stocks}
-
-    def _fallback(t: str) -> dict:
-        return {"ticker": t, "name": t, "competitors": [], "moat": "", "growth_plan": "",
-                "risks": "", "recent_disclosures": "", "market": "US", "exchange": ""}
-
-    holding_stocks = []
-    for h in holdings:
-        meta = stocks_by_ticker.get(h["ticker"], _fallback(h["ticker"]))
-        holding_stocks.append({
-            **meta,
-            "quantity": h["quantity"],
-            "avg_cost": h["avg_cost"],
-            "market": h.get("market", meta.get("market", "US")),
-            "exchange": h.get("exchange", meta.get("exchange", "")),
-        })
-
-    watchlist_stocks = [
-        stocks_by_ticker.get(t, _fallback(t))
-        for t in watchlist_tickers
-    ]
-    return {"stocks": holding_stocks, "watchlist": watchlist_stocks}
+    unified = _get_unified()
+    return {
+        "stocks": [s for s in unified if s.get("type") == "holding"],
+        "watchlist": [s for s in unified if s.get("type") == "watchlist"],
+    }
 
 
 def get_schedule() -> dict:
     data = _read_json("schedule.json")
     return data if data is not None else {
-        "enabled": False,
-        "time": "08:00",
+        "enabled": False, "time": "08:00",
         "days": ["mon", "tue", "wed", "thu", "fri"],
     }
 
@@ -90,23 +136,13 @@ def save_schedule(schedule: dict) -> None:
 
 def enrich_stock(ticker: str, fields: dict) -> bool:
     upper = ticker.upper()
-    holdings = get_holdings()
-    watchlist = get_watchlist_tickers()
-    all_tickers = {h["ticker"].upper() for h in holdings} | {t.upper() for t in watchlist}
-    if upper not in all_tickers:
+    unified = _get_unified()
+    by_ticker = {s["ticker"]: s for s in unified}
+    if upper not in by_ticker:
         return False
-    stocks = get_stocks()
-    idx = next((i for i, s in enumerate(stocks) if s["ticker"].upper() == upper), None)
-    if idx is not None:
-        for k, v in fields.items():
-            stocks[idx][k] = v
-    else:
-        entry = {"ticker": upper, "name": upper, "competitors": [],
-                 "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": "",
-                 "market": "US", "exchange": ""}
-        entry.update(fields)
-        stocks.append(entry)
-    save_stocks(stocks)
+    for k, v in fields.items():
+        by_ticker[upper][k] = v
+    _save_unified(list(by_ticker.values()))
     return True
 
 

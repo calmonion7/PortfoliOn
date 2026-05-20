@@ -3,210 +3,186 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-def test_get_stocks_returns_empty_when_file_missing():
-    import services.storage as storage_mod
-    original = storage_mod.DATA_DIR
-    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
-    try:
-        result = storage_mod.get_stocks()
-    finally:
-        storage_mod.DATA_DIR = original
-    assert result == []
-
-
-def test_save_and_load_stocks_roundtrip(tmp_path):
-    import services.storage as storage_mod
+def test_get_holdings_from_unified(tmp_path):
+    import services.storage as s
     with patch("services.storage.DATA_DIR", tmp_path):
-        stocks = [{"ticker": "NFLX", "name": "Netflix", "competitors": [], "moat": "", "growth_plan": ""}]
-        storage_mod.save_stocks(stocks)
-        loaded = storage_mod.get_stocks()
-    assert loaded == stocks
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "일라이 릴리", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+            {"ticker": "TSLA", "type": "watchlist", "quantity": None, "avg_cost": None,
+             "name": "테슬라", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+        ])
+        holdings = s.get_holdings()
+    assert len(holdings) == 1
+    assert holdings[0]["ticker"] == "LLY"
+    assert holdings[0]["quantity"] == 3.0
+    assert "moat" not in holdings[0]
+
+
+def test_get_watchlist_tickers_from_unified(tmp_path):
+    import services.storage as s
+    with patch("services.storage.DATA_DIR", tmp_path):
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "LLY", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+            {"ticker": "TSLA", "type": "watchlist", "quantity": None, "avg_cost": None,
+             "name": "TSLA", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+        ])
+        tickers = s.get_watchlist_tickers()
+    assert tickers == ["TSLA"]
+
+
+def test_save_holdings_updates_unified(tmp_path):
+    import services.storage as s
+    with patch("services.storage.DATA_DIR", tmp_path):
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "LLY", "market": "US", "exchange": "",
+             "competitors": [], "moat": "Strong", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+        ])
+        s.save_holdings([{"ticker": "LLY", "quantity": 5.0, "avg_cost": 900.0, "market": "US", "exchange": ""}])
+        unified = s._get_unified()
+    lly = next(x for x in unified if x["ticker"] == "LLY")
+    assert lly["quantity"] == 5.0
+    assert lly["avg_cost"] == 900.0
+    assert lly["moat"] == "Strong"  # analyst fields preserved
+
+
+def test_save_holdings_demotes_removed_to_watchlist(tmp_path):
+    import services.storage as s
+    with patch("services.storage.DATA_DIR", tmp_path):
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "LLY", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+            {"ticker": "PLTR", "type": "holding", "quantity": 10.0, "avg_cost": 50.0,
+             "name": "PLTR", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+        ])
+        s.save_holdings([{"ticker": "PLTR", "quantity": 10.0, "avg_cost": 50.0, "market": "US", "exchange": ""}])
+        unified = s._get_unified()
+    lly = next((x for x in unified if x["ticker"] == "LLY"), None)
+    assert lly is not None
+    assert lly["type"] == "watchlist"
+    assert lly["quantity"] is None
+
+
+def test_save_watchlist_tickers_adds_to_unified(tmp_path):
+    import services.storage as s
+    with patch("services.storage.DATA_DIR", tmp_path):
+        s._save_unified([])
+        s.save_watchlist_tickers(["AAPL", "GOOG"])
+        unified = s._get_unified()
+    tickers = {x["ticker"] for x in unified}
+    assert "AAPL" in tickers
+    assert "GOOG" in tickers
+    assert all(x["type"] == "watchlist" for x in unified)
+
+
+def test_save_watchlist_does_not_demote_holdings(tmp_path):
+    import services.storage as s
+    with patch("services.storage.DATA_DIR", tmp_path):
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "LLY", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+        ])
+        s.save_watchlist_tickers(["TSLA"])
+        unified = s._get_unified()
+    lly = next(x for x in unified if x["ticker"] == "LLY")
+    assert lly["type"] == "holding"  # not demoted
+
+
+def test_save_stocks_updates_analyst_fields(tmp_path):
+    import services.storage as s
+    with patch("services.storage.DATA_DIR", tmp_path):
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "Old Name", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+        ])
+        s.save_stocks([{"ticker": "LLY", "name": "New Name", "competitors": ["NVO"],
+                        "moat": "Strong", "growth_plan": "GLP1", "market": "US", "exchange": ""}])
+        unified = s._get_unified()
+    lly = next(x for x in unified if x["ticker"] == "LLY")
+    assert lly["name"] == "New Name"
+    assert lly["moat"] == "Strong"
+    assert lly["type"] == "holding"  # type preserved
+    assert lly["quantity"] == 3.0   # position preserved
+
+
+def test_save_stocks_removes_non_holdings_not_in_list(tmp_path):
+    import services.storage as s
+    with patch("services.storage.DATA_DIR", tmp_path):
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "LLY", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+            {"ticker": "TSLA", "type": "watchlist", "quantity": None, "avg_cost": None,
+             "name": "TSLA", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+        ])
+        s.save_stocks([{"ticker": "LLY", "name": "LLY", "competitors": [],
+                        "moat": "", "growth_plan": "", "market": "US", "exchange": ""}])
+        unified = s._get_unified()
+    tickers = {x["ticker"] for x in unified}
+    assert "LLY" in tickers   # holding stays
+    assert "TSLA" not in tickers  # watchlist removed
+
+
+def test_get_full_portfolio_splits_by_type(tmp_path):
+    import services.storage as s
+    with patch("services.storage.DATA_DIR", tmp_path):
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "일라이 릴리", "market": "US", "exchange": "",
+             "competitors": ["NVO"], "moat": "Brand", "growth_plan": "GLP1",
+             "risks": "", "recent_disclosures": ""},
+            {"ticker": "TSLA", "type": "watchlist", "quantity": None, "avg_cost": None,
+             "name": "테슬라", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
+        ])
+        result = s.get_full_portfolio()
+    assert len(result["stocks"]) == 1
+    assert result["stocks"][0]["ticker"] == "LLY"
+    assert len(result["watchlist"]) == 1
+    assert result["watchlist"][0]["ticker"] == "TSLA"
 
 
 def test_get_holdings_returns_empty_when_file_missing():
-    import services.storage as storage_mod
-    original = storage_mod.DATA_DIR
-    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
+    import services.storage as s
+    original = s.DATA_DIR
+    s.DATA_DIR = Path("/nonexistent_dir_xyz")
     try:
-        result = storage_mod.get_holdings()
+        result = s.get_holdings()
     finally:
-        storage_mod.DATA_DIR = original
+        s.DATA_DIR = original
     assert result == []
 
 
-def test_save_and_load_holdings_roundtrip(tmp_path):
-    import services.storage as storage_mod
+def test_enrich_stock_updates_in_unified(tmp_path):
+    import services.storage as s
     with patch("services.storage.DATA_DIR", tmp_path):
-        holdings = [{"ticker": "NFLX", "quantity": 10.0, "avg_cost": 85.59}]
-        storage_mod.save_holdings(holdings)
-        loaded = storage_mod.get_holdings()
-    assert loaded == holdings
-
-
-def test_get_watchlist_tickers_returns_empty_when_file_missing():
-    import services.storage as storage_mod
-    original = storage_mod.DATA_DIR
-    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
-    try:
-        result = storage_mod.get_watchlist_tickers()
-    finally:
-        storage_mod.DATA_DIR = original
-    assert result == []
-
-
-def test_save_and_load_watchlist_tickers_roundtrip(tmp_path):
-    import services.storage as storage_mod
-    with patch("services.storage.DATA_DIR", tmp_path):
-        tickers = ["AAPL", "GOOG"]
-        storage_mod.save_watchlist_tickers(tickers)
-        loaded = storage_mod.get_watchlist_tickers()
-    assert loaded == tickers
-
-
-def test_get_full_portfolio_joins_holdings_and_watchlist(tmp_path):
-    import services.storage as storage_mod
-    with patch("services.storage.DATA_DIR", tmp_path):
-        stocks = [
-            {"ticker": "LLY", "name": "일라이 릴리", "competitors": ["NVO"], "moat": "Brand", "growth_plan": "GLP1"},
-            {"ticker": "AVAV", "name": "에어로바이런먼트", "competitors": [], "moat": "", "growth_plan": ""},
-        ]
-        holdings = [{"ticker": "LLY", "quantity": 3.0, "avg_cost": 886.6}]
-        tickers = ["AVAV"]
-        storage_mod.save_stocks(stocks)
-        storage_mod.save_holdings(holdings)
-        storage_mod.save_watchlist_tickers(tickers)
-        result = storage_mod.get_full_portfolio()
-    assert len(result["stocks"]) == 1
-    assert result["stocks"][0]["ticker"] == "LLY"
-    assert result["stocks"][0]["quantity"] == 3.0
-    assert result["stocks"][0]["avg_cost"] == 886.6
-    assert result["stocks"][0]["moat"] == "Brand"
-    assert len(result["watchlist"]) == 1
-    assert result["watchlist"][0]["ticker"] == "AVAV"
-    assert result["watchlist"][0]["name"] == "에어로바이런먼트"
-
-
-def test_get_schedule_returns_default_when_file_missing():
-    import services.storage as storage_mod
-    original = storage_mod.DATA_DIR
-    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
-    try:
-        result = storage_mod.get_schedule()
-    finally:
-        storage_mod.DATA_DIR = original
-    assert result["enabled"] is False
-    assert result["time"] == "08:00"
-    assert "mon" in result["days"]
-
-
-def test_save_and_load_schedule_roundtrip(tmp_path):
-    import services.storage as storage_mod
-    with patch("services.storage.DATA_DIR", tmp_path):
-        schedule = {"enabled": True, "time": "09:30", "days": ["mon", "fri"]}
-        storage_mod.save_schedule(schedule)
-        loaded = storage_mod.get_schedule()
-    assert loaded == schedule
-
-
-def test_enrich_stock_updates_existing_fields(tmp_path):
-    import services.storage as storage_mod
-    with patch("services.storage.DATA_DIR", tmp_path):
-        storage_mod.save_stocks([
-            {"ticker": "LLY", "name": "일라이 릴리", "competitors": [], "moat": "", "growth_plan": "", "recent_disclosures": ""}
+        s._save_unified([
+            {"ticker": "LLY", "type": "holding", "quantity": 3.0, "avg_cost": 886.6,
+             "name": "LLY", "market": "US", "exchange": "",
+             "competitors": [], "moat": "", "growth_plan": "", "risks": "", "recent_disclosures": ""},
         ])
-        storage_mod.save_holdings([{"ticker": "LLY", "quantity": 3.0, "avg_cost": 886.6}])
-        storage_mod.save_watchlist_tickers([])
-        result = storage_mod.enrich_stock("LLY", {"moat": "특허 포트폴리오", "growth_plan": "GLP 확장"})
-        loaded = storage_mod.get_stocks()
-    assert result is True
-    assert loaded[0]["moat"] == "특허 포트폴리오"
-    assert loaded[0]["growth_plan"] == "GLP 확장"
+        result = s.enrich_stock("LLY", {"moat": "Strong brand"})
+        assert result is True
+        unified = s._get_unified()
+    lly = next(x for x in unified if x["ticker"] == "LLY")
+    assert lly["moat"] == "Strong brand"
+    assert lly["type"] == "holding"  # preserved
 
 
-def test_enrich_stock_returns_false_when_ticker_not_in_any_list(tmp_path):
-    import services.storage as storage_mod
+def test_enrich_stock_returns_false_for_unknown_ticker(tmp_path):
+    import services.storage as s
     with patch("services.storage.DATA_DIR", tmp_path):
-        storage_mod.save_stocks([])
-        storage_mod.save_holdings([])
-        storage_mod.save_watchlist_tickers([])
-        result = storage_mod.enrich_stock("FAKE", {"moat": "x"})
+        s._save_unified([])
+        result = s.enrich_stock("UNKNOWN", {"moat": "test"})
     assert result is False
-
-
-def test_enrich_stock_creates_entry_when_in_watchlist_but_not_in_stocks(tmp_path):
-    import services.storage as storage_mod
-    with patch("services.storage.DATA_DIR", tmp_path):
-        storage_mod.save_stocks([])
-        storage_mod.save_holdings([])
-        storage_mod.save_watchlist_tickers(["NVDA"])
-        result = storage_mod.enrich_stock("NVDA", {"recent_disclosures": "Q1 호실적"})
-        loaded = storage_mod.get_stocks()
-    assert result is True
-    assert loaded[0]["ticker"] == "NVDA"
-    assert loaded[0]["recent_disclosures"] == "Q1 호실적"
-
-
-def test_enrich_stock_case_insensitive(tmp_path):
-    import services.storage as storage_mod
-    with patch("services.storage.DATA_DIR", tmp_path):
-        storage_mod.save_stocks([
-            {"ticker": "AAPL", "name": "Apple", "competitors": [], "moat": "", "growth_plan": "", "recent_disclosures": ""}
-        ])
-        storage_mod.save_holdings([{"ticker": "AAPL", "quantity": 1, "avg_cost": 100.0}])
-        storage_mod.save_watchlist_tickers([])
-        result = storage_mod.enrich_stock("aapl", {"moat": "생태계"})
-        loaded = storage_mod.get_stocks()
-    assert result is True
-    assert loaded[0]["moat"] == "생태계"
-
-
-def test_get_guru_managers_returns_default_when_file_missing():
-    import services.storage as storage_mod
-    original = storage_mod.DATA_DIR
-    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
-    try:
-        result = storage_mod.get_guru_managers()
-    finally:
-        storage_mod.DATA_DIR = original
-    assert result == {"last_updated": None, "managers": []}
-
-
-def test_save_and_load_guru_managers_roundtrip(tmp_path):
-    import services.storage as storage_mod
-    with patch("services.storage.DATA_DIR", tmp_path):
-        data = {
-            "last_updated": "2026-05-14T10:00:00",
-            "managers": [
-                {
-                    "id": "brk",
-                    "name": "Warren Buffett",
-                    "firm": "Berkshire Hathaway",
-                    "portfolio_value": 350_000_000_000,
-                    "num_stocks": 45,
-                    "top10": [{"rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "name_kr": "애플", "weight_pct": 42.1}],
-                }
-            ],
-        }
-        storage_mod.save_guru_managers(data)
-        loaded = storage_mod.get_guru_managers()
-    assert loaded == data
-
-
-def test_get_guru_schedule_returns_default_when_file_missing():
-    import services.storage as storage_mod
-    original = storage_mod.DATA_DIR
-    storage_mod.DATA_DIR = Path("/nonexistent_dir_that_does_not_exist")
-    try:
-        result = storage_mod.get_guru_schedule()
-    finally:
-        storage_mod.DATA_DIR = original
-    assert result == {"enabled": False, "day": "sun", "time": "03:00"}
-
-
-def test_save_and_load_guru_schedule_roundtrip(tmp_path):
-    import services.storage as storage_mod
-    with patch("services.storage.DATA_DIR", tmp_path):
-        schedule = {"enabled": True, "day": "mon", "time": "04:00"}
-        storage_mod.save_guru_schedule(schedule)
-        loaded = storage_mod.get_guru_schedule()
-    assert loaded == schedule

@@ -1,13 +1,16 @@
 from __future__ import annotations
 import json
+from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pathlib import Path
 from services import storage, report_generator
 from services import consensus as consensus_svc
+from services import cache as cache_svc
 
 router = APIRouter(prefix="/api", tags=["report"])
 
-REPORTS_DIR = Path(__file__).parent.parent / "reports"
+SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
+REPORTS_DIR = Path(__file__).parent.parent / "reports"  # legacy fallback
 
 _progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
 
@@ -53,6 +56,7 @@ def _run_generation(stocks: list):
         _progress["current"] = stock["ticker"]
         try:
             report_generator.generate_report(stock)
+            cache_svc.invalidate(stock["ticker"])
             consensus_svc.collect(stock["ticker"])
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
@@ -61,60 +65,63 @@ def _run_generation(stocks: list):
     _progress["current"] = ""
 
 
-def _read_summary(json_path: Path) -> dict | None:
-    if json_path.exists():
-        return json.loads(json_path.read_text(encoding="utf-8"))
+def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
+    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
+        path = base / ticker / f"{date_str}.json"
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
     return None
 
 
 @router.get("/report/list")
 def list_reports():
-    portfolio = storage.get_full_portfolio()
-    portfolio_stocks = {s["ticker"].upper(): s for s in portfolio.get("stocks", [])}
-    portfolio_watchlist = {s["ticker"].upper(): s for s in portfolio.get("watchlist", [])}
-    holding_tickers = set(portfolio_stocks.keys())
-    watchlist_tickers = set(portfolio_watchlist.keys())
+    def _build():
+        portfolio = storage.get_full_portfolio()
+        portfolio_stocks = {s["ticker"].upper(): s for s in portfolio.get("stocks", [])}
+        portfolio_watchlist = {s["ticker"].upper(): s for s in portfolio.get("watchlist", [])}
+        holding_tickers = set(portfolio_stocks.keys())
+        watchlist_tickers = set(portfolio_watchlist.keys())
 
-    result = {}
-    if REPORTS_DIR.exists():
-        for ticker_dir in sorted(REPORTS_DIR.iterdir()):
-            if ticker_dir.is_dir():
-                dates = sorted([f.stem for f in ticker_dir.glob("*.md")], reverse=True)
-                if dates:
-                    ticker = ticker_dir.name.upper()
-                    category = "holdings" if ticker in holding_tickers else \
-                               "watchlist" if ticker in watchlist_tickers else "other"
-                    summary = _read_summary(ticker_dir / f"{dates[0]}.json")
-                    stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
-                    market = stock_info.get("market") or (summary or {}).get("market", "US")
-                    result[ticker_dir.name] = {"dates": dates, "category": category, "summary": summary, "market": market}
+        result = {}
+        for base in (SNAPSHOTS_DIR, REPORTS_DIR):
+            if not base.exists():
+                continue
+            for ticker_dir in sorted(base.iterdir()):
+                if not ticker_dir.is_dir():
+                    continue
+                ticker = ticker_dir.name.upper()
+                if ticker in result:
+                    continue
+                dates = sorted([f.stem for f in ticker_dir.glob("*.json")], reverse=True)
+                if not dates:
+                    continue
+                category = "holdings" if ticker in holding_tickers else \
+                           "watchlist" if ticker in watchlist_tickers else "other"
+                summary = _read_snapshot(ticker, dates[0])
+                stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
+                market = stock_info.get("market") or (summary or {}).get("market", "US")
+                result[ticker] = {"dates": dates, "category": category, "summary": summary, "market": market}
 
-    # 포트폴리오에 있지만 아직 리포트가 없는 종목도 표시 (생성 버튼 노출)
-    for ticker, stock in portfolio_stocks.items():
-        if ticker not in result:
-            result[ticker] = {"dates": [], "category": "holdings", "summary": None,
-                              "market": stock.get("market", "US")}
-    for ticker, stock in portfolio_watchlist.items():
-        if ticker not in result:
-            result[ticker] = {"dates": [], "category": "watchlist", "summary": None,
-                              "market": stock.get("market", "US")}
+        for ticker, stock in portfolio_stocks.items():
+            if ticker not in result:
+                result[ticker] = {"dates": [], "category": "holdings", "summary": None,
+                                  "market": stock.get("market", "US")}
+        for ticker, stock in portfolio_watchlist.items():
+            if ticker not in result:
+                result[ticker] = {"dates": [], "category": "watchlist", "summary": None,
+                                  "market": stock.get("market", "US")}
+        return result
 
-    return result
+    return cache_svc.get_list(_build)
 
 
 @router.get("/report/{ticker}/{date_str}")
 def get_report(ticker: str, date_str: str):
     upper = ticker.upper()
-    path = REPORTS_DIR / upper / f"{date_str}.md"
-    if not path.exists():
+    summary = cache_svc.get_snapshot(upper, date_str, lambda: _read_snapshot(upper, date_str))
+    if summary is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    summary = _read_summary(REPORTS_DIR / upper / f"{date_str}.json")
-    return {
-        "ticker": upper,
-        "date": date_str,
-        "content": path.read_text(encoding="utf-8"),
-        "summary": summary,
-    }
+    return {"ticker": upper, "date": date_str, "summary": summary}
 
 
 @router.get("/consensus/{ticker}")
@@ -133,8 +140,13 @@ def collect_consensus(ticker: str):
 @router.post("/consensus/{ticker}/backfill")
 def backfill_consensus(ticker: str):
     upper = ticker.upper()
-    ticker_dir = REPORTS_DIR / upper
-    if not ticker_dir.exists():
+    ticker_dir = None
+    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
+        d = base / upper
+        if d.exists():
+            ticker_dir = d
+            break
+    if not ticker_dir:
         raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
     json_files = sorted(ticker_dir.glob("*.json"), reverse=True)
     if not json_files:

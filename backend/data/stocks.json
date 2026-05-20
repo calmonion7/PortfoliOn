@@ -3,6 +3,11 @@
     {
       "ticker": "LLY",
       "name": "일라이 릴리",
+      "market": "US",
+      "exchange": "",
+      "type": "holding",
+      "quantity": 3.0,
+      "avg_cost": 886.6,
       "competitors": [
         "NVO",
         "PFE",
@@ -15,22 +20,13 @@
       "risks": "GLP-1/GLP-2 경쟁 심화(NVO CagriSema·Amycretin·복제약), IRA 약가 협상 대상 추가 가능성, 비만 치료제 보험 급여 제한, 신규 적응증 임상 실패, 제조 capacity 확보 지연으로 인한 공급 부족, 환율 및 미국 외 가격 통제 리스크"
     },
     {
-      "ticker": "TSLA",
-      "name": "테슬라",
-      "competitors": [
-        "BYD",
-        "GM",
-        "F",
-        "RIVN"
-      ],
-      "moat": "수직통합 EV 제조와 슈퍼차저 네트워크, FSD 학습 데이터 우위, 에너지 저장(Megapack) 솔루션, 기가팩토리 스케일과 자체 4680 셀 양산",
-      "growth_plan": "Cybercab 로보택시 출시와 FSD v14 확산, Optimus 휴머노이드 양산 시도, 4680 배터리 내재화 확대, 에너지·태양광 사업 가속, 인도·동남아 신규 시장 진입",
-      "recent_disclosures": "2026-05 오스틴 로보택시 시범 운영 운영 차량 1,000대 돌파 및 베이 에어리어 확대 발표, Megapack 상하이 공장 가동률 상향. 사이버트럭 분기 인도 회복, FSD v14 OTA 배포 시작",
-      "risks": "EV 가격 경쟁 심화(중국 BYD·Xiaomi), FSD/로보택시 규제 지연, 자동차 마진 압박, 일론 머스크 정치 활동에 따른 브랜드 리스크, 사이버트럭 수요 부진, 에너지 사업 외 성장 동력 불확실성"
-    },
-    {
       "ticker": "LHX",
       "name": "L3 해리스 테크놀로지스",
+      "market": "US",
+      "exchange": "",
+      "type": "holding",
+      "quantity": 17.0,
+      "avg_cost": 331.1,
       "competitors": [
         "RTX",
         "NOC",
@@ -45,6 +41,11 @@
     {
       "ticker": "PLTR",
       "name": "팔란티어 테크",
+      "market": "US",
+      "exchange": "",
+      "type": "holding",
+      "quantity": 56.0,
+      "avg_cost": 157.82,
       "competitors": [
         "SNOW",
         "MSFT",
@@ -59,6 +60,11 @@
     {
       "ticker": "AVAV",
       "name": "에어로바이런먼트",
+      "market": "US",
+      "exchange": "",
+      "type": "holding",
+      "quantity": 20.0,
+      "avg_cost": 172.0,
       "competitors": [
         "KTOS",
         "RTX",
@@ -71,8 +77,108 @@
       "risks": "단일 미 국방부 고객 의존도, IDIQ 발주 시점 변동성, 수출 통제 강화, BlueHalo 통합 비용·시너지 미실현, 우크라이나 종전 시 단기 수요 감소 가능성, 부품 공급망 인플레이션"
     },
     {
+      "ticker": "005930",
+      "name": "삼성전자",
+      "market": "KR",
+      "exchange": "KS",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
+      "competitors": [
+        "000660",
+        "TSM",
+        "MU",
+        "AAPL"
+      ],
+      "moat": "메모리·파운드리·디스플레이·세트(스마트폰·가전) 수직계열화와 글로벌 R&D·자본 규모. IDM의 원가 경쟁력과 첨단 패키징 내재화, 갤럭시 디바이스 출하 베이스",
+      "growth_plan": "HBM4 양산과 NVIDIA·AMD향 AI 가속기 메모리 공급 회복, 2nm GAA 파운드리 첫 외부 고객 확보, 갤럭시 AI 생태계 확대 및 폴더블·XR 디바이스 출시, 자체 엑시노스 AP 확대",
+      "recent_disclosures": "2026-05 HBM3E 12단 NVIDIA 퀄 통과 후 첫 본격 양산 분기 진입, 2nm 첫 외부 고객(엔비디아 일부 제품) 공식 발표. Q1 영업이익 메모리 가격 정상화로 컨센서스 상회",
+      "risks": "HBM 경쟁(SK하이닉스 우위), 2nm 수율·신뢰성 검증 지연, 파운드리 적자 지속, 미·중 반도체 통제, 메모리 사이클 둔화 시 실적 변동성 확대, 환율 및 한국 세제 변동"
+    },
+    {
+      "ticker": "000720",
+      "name": "현대건설",
+      "market": "KR",
+      "exchange": "KS",
+      "type": "holding",
+      "quantity": 20.0,
+      "avg_cost": 163882.0,
+      "competitors": [
+        "000210",
+        "047040",
+        "375500",
+        "028260"
+      ],
+      "moat": "국내 1군 건설사 브랜드(힐스테이트)와 토목·플랜트·원전 EPC 종합 역량, 현대차그룹 캡티브 수주(공장·연구소·물류센터) 베이스, 사우디·이라크 등 중동 EPC 트랙 레코드",
+      "growth_plan": "국내 도시정비(재건축·재개발) 수주 확대, 사우디 NEOM·아미랄 등 대형 EPC 수주, 차세대 원전·SMR EPC 시장 진입, 데이터센터·반도체 팹 등 산업 건설 매출 가속",
+      "recent_disclosures": "2026 1Q 영업이익 회복(국내 주택 마진 정상화), 사우디 EPC 추가 수주 발표. 원전·SMR EPC 컨소시엄 참여 공시, FY26 수주 가이던스 상향",
+      "risks": "국내 부동산 PF 노출과 미분양 리스크, 원자재·인건비 인플레이션, 해외 EPC 손실 가능성, 환율, 중동 지정학 리스크"
+    },
+    {
+      "ticker": "207940",
+      "name": "삼성바이오로직스",
+      "market": "KR",
+      "exchange": "KS",
+      "type": "holding",
+      "quantity": 2.0,
+      "avg_cost": 161637.0,
+      "competitors": [
+        "LONN",
+        "WX",
+        "CTLT",
+        "BIIB"
+      ],
+      "moat": "세계 1위 항체 바이오의약품 CDMO capacity(인천 송도 1~4공장 60.4만L)와 GMP 인증·트랙레코드, 자회사 삼성바이오에피스의 바이오시밀러 파이프라인",
+      "growth_plan": "5공장(18만L) 가동 본격화로 capacity 1위 지위 강화, ADC·mRNA 등 차세대 모달리티 CDMO 진입, 바이오에피스 미국 직판과 신규 바이오시밀러 출시 확대",
+      "recent_disclosures": "2026 1Q 매출 +25% YoY로 컨센서스 상회, 5공장 가동률 빠른 상승. ADC CDMO 신규 수주 발표, 글로벌 빅파마 다년 위탁 계약 추가 체결",
+      "risks": "환율, 핵심 고객 의존도, 미·중 BIOSECURE Act 등 규제 환경 변화, 신규 모달리티 CDMO 수율 검증, 바이오시밀러 가격 경쟁 심화"
+    },
+    {
+      "ticker": "475150",
+      "name": "SK이터닉스",
+      "market": "KR",
+      "exchange": "KS",
+      "type": "holding",
+      "quantity": 69.0,
+      "avg_cost": 54913.0,
+      "competitors": [
+        "009830",
+        "267260",
+        "112610",
+        "298040"
+      ],
+      "moat": "SK그룹 인프라(SK디스커버리·SK가스 등) 기반 신재생에너지 사업 노하우, 태양광 EPC 트랙 레코드와 ESS·연료전지 사업 포트폴리오",
+      "growth_plan": "국내·해외 태양광 EPC 매출 확대, ESS·연료전지 사업 가속, AI 데이터센터향 분산전원 솔루션, 그린수소 사업 진입",
+      "recent_disclosures": "2026 1Q 신재생 EPC 매출 +30% YoY, 신규 ESS 프로젝트 수주 발표. 데이터센터향 SOFC 공급 LOI 1건 체결, FY26 가이던스 유지",
+      "risks": "태양광 모듈 가격 변동, 정책 변경(REC·RPS), 자회사 SK디앤디·SK가스와의 사업 영역 정리, 원자재 인플레이션, 환율"
+    },
+    {
+      "ticker": "TSLA",
+      "name": "테슬라",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
+      "competitors": [
+        "BYD",
+        "GM",
+        "F",
+        "RIVN"
+      ],
+      "moat": "수직통합 EV 제조와 슈퍼차저 네트워크, FSD 학습 데이터 우위, 에너지 저장(Megapack) 솔루션, 기가팩토리 스케일과 자체 4680 셀 양산",
+      "growth_plan": "Cybercab 로보택시 출시와 FSD v14 확산, Optimus 휴머노이드 양산 시도, 4680 배터리 내재화 확대, 에너지·태양광 사업 가속, 인도·동남아 신규 시장 진입",
+      "recent_disclosures": "2026-05 오스틴 로보택시 시범 운영 운영 차량 1,000대 돌파 및 베이 에어리어 확대 발표, Megapack 상하이 공장 가동률 상향. 사이버트럭 분기 인도 회복, FSD v14 OTA 배포 시작",
+      "risks": "EV 가격 경쟁 심화(중국 BYD·Xiaomi), FSD/로보택시 규제 지연, 자동차 마진 압박, 일론 머스크 정치 활동에 따른 브랜드 리스크, 사이버트럭 수요 부진, 에너지 사업 외 성장 동력 불확실성"
+    },
+    {
       "ticker": "FSLR",
       "name": "퍼스트 솔라",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "ENPH",
         "JKS",
@@ -87,6 +193,11 @@
     {
       "ticker": "RTX",
       "name": "RTX",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "GE",
         "BA",
@@ -101,6 +212,11 @@
     {
       "ticker": "FCX",
       "name": "프리포트 맥모란",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "SCCO",
         "BHP",
@@ -115,6 +231,11 @@
     {
       "ticker": "NFLX",
       "name": "넷플릭스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "DIS",
         "WBD",
@@ -129,6 +250,11 @@
     {
       "ticker": "TEM",
       "name": "템퍼스 AI",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "NTRA",
         "EXAS",
@@ -143,6 +269,11 @@
     {
       "ticker": "CCJ",
       "name": "카메코",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "KAP",
         "DNN",
@@ -157,6 +288,11 @@
     {
       "ticker": "BWXT",
       "name": "BWX 테크놀로지스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "LDOS",
         "SAIC",
@@ -171,6 +307,11 @@
     {
       "ticker": "SMR",
       "name": "뉴스케일 파워",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "BWXT",
         "CCJ",
@@ -185,6 +326,11 @@
     {
       "ticker": "LEU",
       "name": "센트러스 에너지",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "BWXT",
         "CCJ",
@@ -199,6 +345,11 @@
     {
       "ticker": "BE",
       "name": "블룸 에너지",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "PLUG",
         "FCEL",
@@ -213,6 +364,11 @@
     {
       "ticker": "GEV",
       "name": "GE베르노바",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "SIEGY",
         "ABB",
@@ -227,6 +383,11 @@
     {
       "ticker": "LNG",
       "name": "셰니어 에너지",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "VG",
         "NFE",
@@ -241,6 +402,11 @@
     {
       "ticker": "EQT",
       "name": "EQT",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "AR",
         "RRC",
@@ -255,6 +421,11 @@
     {
       "ticker": "PLUG",
       "name": "플러그 파워",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "BE",
         "BLDP",
@@ -269,6 +440,11 @@
     {
       "ticker": "MOG.A",
       "name": "무그 A",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "HEI",
         "WWD",
@@ -283,6 +459,11 @@
     {
       "ticker": "RKLB",
       "name": "로켓 랩",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "ASTS",
         "LHX",
@@ -297,6 +478,11 @@
     {
       "ticker": "ADI",
       "name": "애널로그 디바이시스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "TXN",
         "MCHP",
@@ -311,6 +497,11 @@
     {
       "ticker": "QRVO",
       "name": "코보",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "SWKS",
         "AVGO",
@@ -325,6 +516,11 @@
     {
       "ticker": "VRT",
       "name": "버티브 홀딩스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "SU",
         "ETN",
@@ -339,6 +535,11 @@
     {
       "ticker": "GOOGL",
       "name": "알파벳 A",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "MSFT",
         "META",
@@ -353,6 +554,11 @@
     {
       "ticker": "AMZN",
       "name": "아마존닷컴",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "WMT",
         "MSFT",
@@ -367,6 +573,11 @@
     {
       "ticker": "AAPL",
       "name": "애플",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "MSFT",
         "GOOGL",
@@ -381,6 +592,11 @@
     {
       "ticker": "META",
       "name": "메타 플랫폼스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "GOOGL",
         "SNAP",
@@ -395,6 +611,11 @@
     {
       "ticker": "ALNY",
       "name": "앨나일램 파머슈티컬스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "IONS",
         "ARWR",
@@ -409,6 +630,11 @@
     {
       "ticker": "MSFT",
       "name": "마이크로소프트",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "GOOGL",
         "AMZN",
@@ -423,6 +649,11 @@
     {
       "ticker": "NOC",
       "name": "노스롭 그루만",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "LMT",
         "RTX",
@@ -437,6 +668,11 @@
     {
       "ticker": "LMT",
       "name": "록히드 마틴",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "NOC",
         "RTX",
@@ -451,6 +687,11 @@
     {
       "ticker": "AMD",
       "name": "AMD",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "NVDA",
         "INTC",
@@ -465,6 +706,11 @@
     {
       "ticker": "ARM",
       "name": "에이알엠 홀딩스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "AAPL",
         "INTC",
@@ -479,6 +725,11 @@
     {
       "ticker": "TSM",
       "name": "TSMC",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "005930",
         "INTC",
@@ -493,6 +744,11 @@
     {
       "ticker": "INTC",
       "name": "인텔",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "AMD",
         "TSM",
@@ -507,6 +763,11 @@
     {
       "ticker": "MU",
       "name": "마이크론 테크놀로지",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "000660",
         "005930",
@@ -521,6 +782,11 @@
     {
       "ticker": "NVDA",
       "name": "엔비디아",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "AMD",
         "AVGO",
@@ -535,6 +801,11 @@
     {
       "ticker": "SNDK",
       "name": "샌디스크",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "MU",
         "005930",
@@ -549,6 +820,11 @@
     {
       "ticker": "NVTS",
       "name": "나비타스 세미컨덕터",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "EPC",
         "IFNNY",
@@ -563,6 +839,11 @@
     {
       "ticker": "RGTI",
       "name": "리게티 컴퓨팅",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "IONQ",
         "IBM",
@@ -577,6 +858,11 @@
     {
       "ticker": "IONQ",
       "name": "아이온큐",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "RGTI",
         "IBM",
@@ -591,6 +877,11 @@
     {
       "ticker": "QS",
       "name": "퀀텀스케이프",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "SLDP",
         "TM",
@@ -605,6 +896,11 @@
     {
       "ticker": "SLDP",
       "name": "솔리드 파워",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "QS",
         "TM",
@@ -619,6 +915,11 @@
     {
       "ticker": "EXPE",
       "name": "익스피디아 그룹",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "BKNG",
         "ABNB",
@@ -633,6 +934,11 @@
     {
       "ticker": "NVO",
       "name": "노보노디스크",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "LLY",
         "PFE",
@@ -645,72 +951,13 @@
       "risks": "GLP-1 시장 LLY에 점유율 잠식, CagriSema 임상 데이터 실망 가능성, 약가 규제(IRA·EU 가격 통제), 복제약 출시 리스크"
     },
     {
-      "ticker": "005930",
-      "name": "삼성전자",
-      "competitors": [
-        "000660",
-        "TSM",
-        "MU",
-        "AAPL"
-      ],
-      "moat": "메모리·파운드리·디스플레이·세트(스마트폰·가전) 수직계열화와 글로벌 R&D·자본 규모. IDM의 원가 경쟁력과 첨단 패키징 내재화, 갤럭시 디바이스 출하 베이스",
-      "growth_plan": "HBM4 양산과 NVIDIA·AMD향 AI 가속기 메모리 공급 회복, 2nm GAA 파운드리 첫 외부 고객 확보, 갤럭시 AI 생태계 확대 및 폴더블·XR 디바이스 출시, 자체 엑시노스 AP 확대",
-      "market": "KR",
-      "exchange": "KS",
-      "risks": "HBM 경쟁(SK하이닉스 우위), 2nm 수율·신뢰성 검증 지연, 파운드리 적자 지속, 미·중 반도체 통제, 메모리 사이클 둔화 시 실적 변동성 확대, 환율 및 한국 세제 변동",
-      "recent_disclosures": "2026-05 HBM3E 12단 NVIDIA 퀄 통과 후 첫 본격 양산 분기 진입, 2nm 첫 외부 고객(엔비디아 일부 제품) 공식 발표. Q1 영업이익 메모리 가격 정상화로 컨센서스 상회"
-    },
-    {
-      "ticker": "000720",
-      "name": "현대건설",
-      "competitors": [
-        "000210",
-        "047040",
-        "375500",
-        "028260"
-      ],
-      "moat": "국내 1군 건설사 브랜드(힐스테이트)와 토목·플랜트·원전 EPC 종합 역량, 현대차그룹 캡티브 수주(공장·연구소·물류센터) 베이스, 사우디·이라크 등 중동 EPC 트랙 레코드",
-      "growth_plan": "국내 도시정비(재건축·재개발) 수주 확대, 사우디 NEOM·아미랄 등 대형 EPC 수주, 차세대 원전·SMR EPC 시장 진입, 데이터센터·반도체 팹 등 산업 건설 매출 가속",
-      "market": "KR",
-      "exchange": "KS",
-      "risks": "국내 부동산 PF 노출과 미분양 리스크, 원자재·인건비 인플레이션, 해외 EPC 손실 가능성, 환율, 중동 지정학 리스크",
-      "recent_disclosures": "2026 1Q 영업이익 회복(국내 주택 마진 정상화), 사우디 EPC 추가 수주 발표. 원전·SMR EPC 컨소시엄 참여 공시, FY26 수주 가이던스 상향"
-    },
-    {
-      "ticker": "207940",
-      "name": "삼성바이오로직스",
-      "competitors": [
-        "LONN",
-        "WX",
-        "CTLT",
-        "BIIB"
-      ],
-      "moat": "세계 1위 항체 바이오의약품 CDMO capacity(인천 송도 1~4공장 60.4만L)와 GMP 인증·트랙레코드, 자회사 삼성바이오에피스의 바이오시밀러 파이프라인",
-      "growth_plan": "5공장(18만L) 가동 본격화로 capacity 1위 지위 강화, ADC·mRNA 등 차세대 모달리티 CDMO 진입, 바이오에피스 미국 직판과 신규 바이오시밀러 출시 확대",
-      "market": "KR",
-      "exchange": "KS",
-      "risks": "환율, 핵심 고객 의존도, 미·중 BIOSECURE Act 등 규제 환경 변화, 신규 모달리티 CDMO 수율 검증, 바이오시밀러 가격 경쟁 심화",
-      "recent_disclosures": "2026 1Q 매출 +25% YoY로 컨센서스 상회, 5공장 가동률 빠른 상승. ADC CDMO 신규 수주 발표, 글로벌 빅파마 다년 위탁 계약 추가 체결"
-    },
-    {
-      "ticker": "475150",
-      "name": "SK이터닉스",
-      "competitors": [
-        "009830",
-        "267260",
-        "112610",
-        "298040"
-      ],
-      "moat": "SK그룹 인프라(SK디스커버리·SK가스 등) 기반 신재생에너지 사업 노하우, 태양광 EPC 트랙 레코드와 ESS·연료전지 사업 포트폴리오",
-      "growth_plan": "국내·해외 태양광 EPC 매출 확대, ESS·연료전지 사업 가속, AI 데이터센터향 분산전원 솔루션, 그린수소 사업 진입",
-      "market": "KR",
-      "exchange": "KS",
-      "risks": "태양광 모듈 가격 변동, 정책 변경(REC·RPS), 자회사 SK디앤디·SK가스와의 사업 영역 정리, 원자재 인플레이션, 환율",
-      "recent_disclosures": "2026 1Q 신재생 EPC 매출 +30% YoY, 신규 ESS 프로젝트 수주 발표. 데이터센터향 SOFC 공급 LOI 1건 체결, FY26 가이던스 유지"
-    },
-    {
       "ticker": "COHR",
       "name": "코히어런트",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "LITE",
         "AAOI",
@@ -719,14 +966,17 @@
       ],
       "moat": "광통신·산업용 레이저 풀스택(전 II-VI 합병)과 데이터센터 트랜시버 InP·VCSEL 수직 통합, AI 인프라향 800G·1.6T 광모듈 양산 IP",
       "growth_plan": "AI 데이터센터향 800G·1.6T 트랜시버 매출 가속, 차세대 1.6T·실리콘 포토닉스 양산, 비핵심 자산 매각으로 부채 축소, 디스플레이·산업 레이저 사이클 회복",
-      "market": "US",
-      "exchange": "",
-      "risks": "AI capex 둔화 시 수요 변동, NVDA·하이퍼스케일러 자체 광모듈 채택 가능성, 부채 부담, 환율, 통합 시너지 미실현",
-      "recent_disclosures": "2026 FY26 3Q(2026-05 발표) 광통신 매출 +60% YoY, AI 트랜시버 백로그 사상 최대. 1.6T 출하 시작 발표, FY26 가이던스 추가 상향"
+      "recent_disclosures": "2026 FY26 3Q(2026-05 발표) 광통신 매출 +60% YoY, AI 트랜시버 백로그 사상 최대. 1.6T 출하 시작 발표, FY26 가이던스 추가 상향",
+      "risks": "AI capex 둔화 시 수요 변동, NVDA·하이퍼스케일러 자체 광모듈 채택 가능성, 부채 부담, 환율, 통합 시너지 미실현"
     },
     {
       "ticker": "AAOI",
       "name": "어플라이드 옵토일렉트로닉스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "COHR",
         "LITE",
@@ -735,14 +985,17 @@
       ],
       "moat": "데이터센터 광 트랜시버 자체 칩(레이저·디텍터)과 모듈 통합 양산 능력, 마이크로소프트·아마존 등 하이퍼스케일러 검증 트랙",
       "growth_plan": "AI 데이터센터향 800G·1.6T 트랜시버 매출 가속, 멕시코·대만 공장 증설로 capacity 확보, CATV 사업 비중 축소 후 데이터센터 집중화",
-      "market": "US",
-      "exchange": "",
-      "risks": "단일 고객(MS·AMZN) 매출 비중, 광 트랜시버 가격 경쟁, 양산 수율 변동성, 현금 소진과 추가 자금 조달 가능성",
-      "recent_disclosures": "2026 1Q 데이터센터 매출 +120% YoY, 800G 본격 출하. 멕시코 공장 확장 발표, FY26 매출 가이던스 추가 상향"
+      "recent_disclosures": "2026 1Q 데이터센터 매출 +120% YoY, 800G 본격 출하. 멕시코 공장 확장 발표, FY26 매출 가이던스 추가 상향",
+      "risks": "단일 고객(MS·AMZN) 매출 비중, 광 트랜시버 가격 경쟁, 양산 수율 변동성, 현금 소진과 추가 자금 조달 가능성"
     },
     {
       "ticker": "LITE",
       "name": "루멘텀 홀딩스",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "COHR",
         "AAOI",
@@ -751,14 +1004,17 @@
       ],
       "moat": "광통신 부품(레이저·트랜시버·DCO)과 산업·항공 레이저 포트폴리오, 클라우드라이트 인수로 데이터센터 광모듈 매출 확대",
       "growth_plan": "AI 데이터센터향 800G·1.6T 트랜시버와 EML·레이저 매출 가속, 차세대 CW 레이저 양산, 산업 레이저 사이클 회복, 디스플레이용 LiDAR 신규 시장",
-      "market": "US",
-      "exchange": "",
-      "risks": "AI capex 둔화, 하이퍼스케일러 자체 광모듈 채택, 산업·소비자 레이저 사이클 변동, 환율, 통합 시너지 미실현",
-      "recent_disclosures": "2026 FY26 3Q 데이터센터 매출 +50% YoY, AI 광부품 백로그 사상 최대. EML 레이저 공급 다년 계약 발표, FY26 가이던스 상향"
+      "recent_disclosures": "2026 FY26 3Q 데이터센터 매출 +50% YoY, AI 광부품 백로그 사상 최대. EML 레이저 공급 다년 계약 발표, FY26 가이던스 상향",
+      "risks": "AI capex 둔화, 하이퍼스케일러 자체 광모듈 채택, 산업·소비자 레이저 사이클 변동, 환율, 통합 시너지 미실현"
     },
     {
       "ticker": "MRVL",
       "name": "마블 테크놀로지 그룹",
+      "market": "US",
+      "exchange": "",
+      "type": "watchlist",
+      "quantity": null,
+      "avg_cost": null,
       "competitors": [
         "AVGO",
         "NVDA",
@@ -767,10 +1023,8 @@
       ],
       "moat": "데이터센터 네트워킹(이더넷 스위치·DSP·옵티컬)과 ASIC 설계 풀스택, 하이퍼스케일러 커스텀 ASIC(트레이니엄·MAIA 추정) 수주 베이스",
       "growth_plan": "AI 커스텀 ASIC 매출 본격화(연 25억$+ 목표), 800G·1.6T 옵티컬 DSP·PAM4 매출 가속, 데이터센터 이더넷 스위치 매출 확대, Inphi 자산 시너지",
-      "market": "US",
-      "exchange": "",
-      "risks": "단일 고객(AMZN·MS·META) 의존도, 커스텀 ASIC 수주 시점 변동, NVDA 자체 네트워킹 진입 가능성, 환율, 통합 비용",
-      "recent_disclosures": "2026 1Q AI 부문 매출 +85% YoY, 커스텀 ASIC 백로그 사상 최대. 1.6T DSP 양산 시작 발표, FY26 데이터센터 매출 가이던스 추가 상향"
+      "recent_disclosures": "2026 1Q AI 부문 매출 +85% YoY, 커스텀 ASIC 백로그 사상 최대. 1.6T DSP 양산 시작 발표, FY26 데이터센터 매출 가이던스 추가 상향",
+      "risks": "단일 고객(AMZN·MS·META) 의존도, 커스텀 ASIC 수주 시점 변동, NVDA 자체 네트워킹 진입 가능성, 환율, 통합 비용"
     }
   ]
 }
