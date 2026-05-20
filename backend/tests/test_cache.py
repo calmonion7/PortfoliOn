@@ -82,7 +82,7 @@ def test_get_list_refreshes_after_ttl(monkeypatch):
         calls.append(1)
         return {"data": "list"}
     c.get_list(loader)
-    monkeypatch.setattr(c, "_list_cache", {"data": {"data": "list"}, "ts": time.time() - c._LIST_TTL - 1})
+    monkeypatch.setattr(c, "_list_cache", {"data": {"data": "list"}, "ts": 0.0})
     c.get_list(loader)
     assert len(calls) == 2
 
@@ -108,3 +108,13 @@ def test_get_snapshot_none_loader_not_cached():
     r2 = c.get_snapshot("MISS", "2026-05-20", loader)
     assert r1 is None
     assert len(calls) == 2  # None is not cached
+
+
+def test_invalidate_normalizes_ticker_case():
+    import services.cache as c
+    _clear()
+    c.get_snapshot("aapl", "2026-05-20", lambda: {"v": 1})
+    c.invalidate("AAPL")  # uppercase invalidate should clear lowercase-inserted entry
+    calls = []
+    c.get_snapshot("aapl", "2026-05-20", lambda: (calls.append(1), {"v": 99})[1])
+    assert len(calls) == 1  # was evicted

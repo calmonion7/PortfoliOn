@@ -9,7 +9,7 @@ _LIST_TTL = 5.0
 
 
 def get_snapshot(ticker: str, date: str, loader) -> Optional[dict]:
-    key = f"{ticker}/{date}"
+    key = f"{ticker.upper()}/{date}"
     if key in _snapshots:
         _snapshots.move_to_end(key)
         return _snapshots[key]
