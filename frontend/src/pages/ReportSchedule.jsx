@@ -114,7 +114,7 @@ export default function ReportSchedule() {
               <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
             </div>
             <div style={{ background: 'var(--bg-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-              <div style={{ width: `${pct}%`, height: '100%', background: '#4fc3f7', borderRadius: 4, transition: 'width 0.4s ease' }} />
+              <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.4s ease' }} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>{pct}%</div>
           </div>
