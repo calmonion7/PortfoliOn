@@ -72,7 +72,7 @@ function TargetTooltip({ s }) {
           minWidth: 200,
           fontSize: 12,
           color: 'var(--text)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
           pointerEvents: 'none',
           lineHeight: 1.8,
         }}>
@@ -1014,7 +1014,7 @@ export default function Reports() {
           <button
             onClick={() => generateOne(ticker)}
             disabled={!!generating}
-            style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : generating ? 'var(--text-muted)' : 'var(--text-muted)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
+            style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
           >
             {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
           </button>
@@ -1288,7 +1288,7 @@ export default function Reports() {
                 style={{
                   background: 'transparent',
                   border: '1px solid var(--border)',
-                  color: generating === selected.ticker ? 'var(--accent)' : generating ? 'var(--text-muted)' : 'var(--text-muted)',
+                  color: generating === selected.ticker ? 'var(--accent)' : 'var(--text-muted)',
                   borderRadius: 4,
                   padding: '4px 12px',
                   fontSize: 12,
