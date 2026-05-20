@@ -79,7 +79,7 @@ function TargetTooltip({ s }) {
           <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 6, fontSize: 11 }}>목표가 근거</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px' }}>
             <span style={{ color: 'var(--text-muted)' }}>평균</span>
-            <span style={{ color: '#fff', fontWeight: 600 }}>{fmt(s.target_mean, s.market)}{gap != null && <span style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
+            <span style={{ color: 'var(--text)', fontWeight: 600 }}>{fmt(s.target_mean, s.market)}{gap != null && <span style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
             <span style={{ color: 'var(--text-muted)' }}>최고</span>
             <span style={{ color: '#81c784' }}>{fmt(s.target_high, s.market)}</span>
             <span style={{ color: 'var(--text-muted)' }}>최저</span>
@@ -426,7 +426,7 @@ function DetailSummaryTab({ summary, ticker }) {
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>🎯 평균목표가</span>
-            <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{fmt(summary.target_mean, summary.market)}</span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{fmt(summary.target_mean, summary.market)}</span>
           </div>
           {/* 상승여력 */}
           {gap != null && (
@@ -633,7 +633,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
               <div style={{
                 position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
                 background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4,
-                padding: '5px 9px', fontSize: 10, color: '#b0bec5', whiteSpace: 'nowrap',
+                padding: '5px 9px', fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap',
                 zIndex: 50, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
               }}>
                 {desc}
@@ -722,7 +722,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     <th style={{ color: color || 'var(--text-muted)', textAlign: 'right', padding: '2px 6px', fontWeight: 400 }}>{children}</th>
   )
   const TD = ({ children, color }) => (
-    <td style={{ color: color || '#b0bec5', textAlign: 'right', padding: '1px 6px' }}>{children}</td>
+    <td style={{ color: color || 'var(--text-muted)', textAlign: 'right', padding: '1px 6px' }}>{children}</td>
   )
 
   const Section = ({ data, title }) => {
@@ -1271,13 +1271,13 @@ export default function Reports() {
                   </span>
                 )}
                 {detail.summary?.per != null && (
-                  <span style={{ color: '#b0bec5', fontSize: 11, marginLeft: 8, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 8, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
                     PER {detail.summary.per.toFixed(1)}
                     {detail.summary.forward_per != null && <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>/ Fwd {detail.summary.forward_per.toFixed(1)}</span>}
                   </span>
                 )}
                 {detail.summary?.pbr != null && (
-                  <span style={{ color: '#b0bec5', fontSize: 11, marginLeft: 4, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 4, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
                     PBR {detail.summary.pbr.toFixed(2)}
                   </span>
                 )}
