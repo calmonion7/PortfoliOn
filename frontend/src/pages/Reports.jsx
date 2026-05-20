@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import axios from 'axios'
 import MarkdownViewer from '../components/MarkdownViewer'
-import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts'
+import { LineChart, Line, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts'
 
 const TAB_STYLE = (active) => ({
   padding: '6px 14px',
@@ -285,18 +285,22 @@ function ConsensusChart({ ticker, market }) {
     }
   }
 
-  const deduped = useMemo(() => {
+  const dedupedTarget = useMemo(() => {
+    if (!data.length) return []
+    const asc = [...data].reverse()
+    return asc.filter((item, i) => {
+      if (i === 0) return true
+      return item.target_mean !== asc[i - 1].target_mean
+    })
+  }, [data])
+
+  const dedupedOpinion = useMemo(() => {
     if (!data.length) return []
     const asc = [...data].reverse()
     return asc.filter((item, i) => {
       if (i === 0) return true
       const prev = asc[i - 1]
-      return !(
-        item.target_mean === prev.target_mean &&
-        item.buy === prev.buy &&
-        item.hold === prev.hold &&
-        item.sell === prev.sell
-      )
+      return !(item.buy === prev.buy && item.hold === prev.hold && item.sell === prev.sell)
     })
   }, [data])
 
@@ -360,7 +364,7 @@ function ConsensusChart({ ticker, market }) {
         </div>
       </div>
       {error && <div style={{ color: '#ef9a9a', fontSize: 11, marginBottom: 6 }}>{error}</div>}
-      {deduped.length === 0 ? (
+      {dedupedTarget.length === 0 && dedupedOpinion.length === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
           아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요.
         </div>
@@ -369,7 +373,7 @@ function ConsensusChart({ ticker, market }) {
           <div style={{ marginBottom: 4 }}>
             <div style={{ fontSize: 10, color: '#ffcc80', marginBottom: 2 }}>평균목표가</div>
             <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={deduped} margin={chartMargin}>
+              <LineChart data={dedupedTarget} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
@@ -381,15 +385,15 @@ function ConsensusChart({ ticker, market }) {
           <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>애널리스트 의견</div>
             <ResponsiveContainer width="100%" height={120}>
-              <BarChart data={deduped} margin={chartMargin}>
+              <LineChart data={dedupedOpinion} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
                 <Tooltip content={opinionTooltip} />
-                <Bar dataKey="buy" name="매수" stackId="a" fill="#43a047" />
-                <Bar dataKey="hold" name="중립" stackId="a" fill="#616161" />
-                <Bar dataKey="sell" name="매도" stackId="a" fill="#b71c1c" />
-              </BarChart>
+                <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+                <Line type="monotone" dataKey="hold" name="중립" stroke="#616161" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+                <Line type="monotone" dataKey="sell" name="매도" stroke="#ef9a9a" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+              </LineChart>
             </ResponsiveContainer>
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
