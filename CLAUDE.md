@@ -22,18 +22,24 @@ cd backend && pytest
 - `backend/main.py` — app entry, mounts routers + scheduler
 - `backend/routers/` — portfolio, watchlist, stocks, report
 - `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, scheduler
-- `backend/data/` — JSON file storage (holdings.json, watchlist.json, stocks.json, schedule.json)
-- `backend/reports/` — generated Markdown reports (served as static files at `/reports/`)
+- `backend/data/` — JSON file storage (stocks.json — unified holdings+watchlist+analyst data, schedule.json)
+- `backend/snapshots/` — generated JSON snapshots (per-ticker/date, e.g. `LLY/2026-05-20.json`)
+- `backend/reports/` — legacy report directory (read-only, JSON fallback for old snapshots)
 
 **Frontend** — React 18 + Vite (port 5173), plain CSS (no TailwindCSS)
 - `frontend/src/pages/` — Portfolio, Reports, Settings
-- `frontend/src/components/` — StockModal, PromoteModal, MarkdownViewer
+- `frontend/src/components/` — StockModal, PromoteModal
 
 ## Key Files
 
 - `API_SPEC.md` — full REST API reference (source of truth for endpoints)
 - `CLAUDE_COWORK_API.md` — external API for Claude AI to read/write stock analysis
 - `backend/venv/` — Python virtual environment (use `backend/venv/Scripts/python` on Windows)
+
+## Data Model
+
+- `holdings.json` and `watchlist.json` are merged into `stocks.json` (use `type: "holding"|"watchlist"` field to distinguish)
+- New snapshots write to `backend/snapshots/`, old `reports/` is kept as read-only fallback
 
 ## Gotchas
 
