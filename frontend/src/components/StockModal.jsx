@@ -5,8 +5,8 @@ const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', compet
 const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
 
 const INPUT_STYLE = {
-  width: '100%', padding: '6px 10px', background: '#0d1117',
-  border: '1px solid #2a3a4a', borderRadius: 4, color: '#ccc', fontSize: 13, boxSizing: 'border-box',
+  width: '100%', padding: '6px 10px', background: 'var(--input-bg)',
+  border: '1px solid var(--input-border)', borderRadius: 4, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box',
 }
 
 function useDebounce(value, delay) {
@@ -60,15 +60,15 @@ function SearchBox({ onSelect }) {
           style={{ ...INPUT_STYLE, paddingRight: 32 }}
           autoComplete="off"
         />
-        <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#546e7a', fontSize: 14, pointerEvents: 'none' }}>
+        <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 14, pointerEvents: 'none' }}>
           {loading ? '⏳' : '🔍'}
         </span>
       </div>
       {open && results.length > 0 && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9999,
-          background: '#1a1a2e', border: '1px solid #2a3a5a', borderRadius: 4,
-          maxHeight: 240, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+          background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4,
+          maxHeight: 240, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
           marginTop: 2,
         }}>
           {results.map((item, i) => (
@@ -76,10 +76,10 @@ function SearchBox({ onSelect }) {
               key={i}
               onMouseDown={() => handleSelect(item)}
               style={{
-                padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #1e2a3a',
+                padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
                 display: 'flex', alignItems: 'center', gap: 8,
               }}
-              onMouseEnter={e => e.currentTarget.style.background = '#1e2a4a'}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <span style={{
@@ -91,10 +91,10 @@ function SearchBox({ onSelect }) {
                 {item.market === 'KR' ? '🇰🇷' : '🇺🇸'}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: '#e0e0e0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.name}
                 </div>
-                <div style={{ fontSize: 10, color: '#546e7a', marginTop: 1 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
                   {item.ticker}{item.exchange ? `.${item.exchange}` : ''} · {item.exchange_display}
                 </div>
               </div>
@@ -169,7 +169,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
           {/* 종목 검색 (신규 추가 시에만) */}
           {!isEdit && (
             <div className="form-field">
-              <label>종목 검색 <span style={{ color: '#546e7a', fontSize: 10, fontWeight: 400 }}>(종목명·티커·종목코드)</span></label>
+              <label>종목 검색 <span style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>(종목명·티커·종목코드)</span></label>
               <SearchBox onSelect={handleSearchSelect} />
             </div>
           )}

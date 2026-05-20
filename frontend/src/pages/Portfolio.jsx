@@ -7,9 +7,9 @@ const TAB_STYLE = (active) => ({
   padding: '6px 14px',
   cursor: 'pointer',
   border: 'none',
-  borderBottom: active ? '2px solid #4fc3f7' : '2px solid transparent',
+  borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
   background: 'transparent',
-  color: active ? '#4fc3f7' : '#888',
+  color: active ? 'var(--accent)' : 'var(--text-muted)',
   fontWeight: active ? 600 : 400,
   fontSize: 13,
 })
@@ -128,12 +128,12 @@ export default function Portfolio() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <h1 style={{ color: '#90caf9' }}>내 포트폴리오</h1>
+        <h1 style={{ color: 'var(--text-heading)' }}>내 포트폴리오</h1>
         <button className="btn-primary" onClick={openAdd}>+ 종목 추가</button>
       </div>
 
       {/* 탭 */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #333', marginBottom: 12 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
         <button style={TAB_STYLE(activeTab === 'holdings')} onClick={() => setActiveTab('holdings')}>
           보유종목 ({stocks.length})
         </button>
@@ -150,9 +150,9 @@ export default function Portfolio() {
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="🔍 티커 또는 회사명 검색..."
           style={{
-            flex: 1, padding: '7px 12px', background: '#0d1117',
-            border: '1px solid #2a3a4a', borderRadius: 4,
-            color: '#ccc', fontSize: 13,
+            flex: 1, padding: '7px 12px', background: 'var(--input-bg)',
+            border: '1px solid var(--input-border)', borderRadius: 4,
+            color: 'var(--text)', fontSize: 13,
           }}
         />
         {['ALL', 'US', 'KR'].map(m => (
@@ -160,10 +160,9 @@ export default function Portfolio() {
             key={m}
             onClick={() => setMarketFilter(m)}
             style={{
-              padding: '6px 12px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12,
-              background: marketFilter === m ? (m === 'KR' ? '#1a3a2a' : m === 'US' ? '#1a2a3a' : '#2a2a3a') : '#111',
-              color: marketFilter === m ? (m === 'KR' ? '#81c784' : m === 'US' ? '#4fc3f7' : '#ccc') : '#666',
-              border: `1px solid ${marketFilter === m ? (m === 'KR' ? '#2e6b4a' : m === 'US' ? '#2a4a6a' : '#444') : '#2a2a2a'}`,
+              padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+              background: marketFilter === m ? 'var(--bg-surface)' : 'var(--bg-card)',
+              color: marketFilter === m ? 'var(--accent)' : 'var(--text-muted)',
             }}
           >
             {m === 'ALL' ? `전체 (${activeTab === 'holdings' ? stocks.length : watchlist.length})`
@@ -173,7 +172,7 @@ export default function Portfolio() {
         ))}
       </div>
 
-      {error && <p style={{ color: '#ef5350', marginBottom: 8 }}>{error}</p>}
+      {error && <p style={{ color: 'var(--negative)', marginBottom: 8 }}>{error}</p>}
 
       {/* 보유종목 탭 */}
       {activeTab === 'holdings' && (
@@ -197,7 +196,7 @@ export default function Portfolio() {
                 <td>{stock.name}</td>
                 <td>{stock.quantity}</td>
                 <td>{fmtCost(stock.avg_cost, stock.market)}</td>
-                <td style={{ fontSize: 12, color: '#aaa' }}>{stock.competitors?.join(', ') || '-'}</td>
+                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{stock.competitors?.join(', ') || '-'}</td>
                 <td>
                   <button className="btn-secondary" style={{ marginRight: 6 }} onClick={() => openEdit(stock)}>수정</button>
                   <button className="btn-danger" onClick={() => handleDelete(stock.ticker)}>삭제</button>
@@ -205,7 +204,7 @@ export default function Portfolio() {
               </tr>
             ))}
             {filteredStocks.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: '#666', padding: 32 }}>종목을 추가해 주세요</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>종목을 추가해 주세요</td></tr>
             )}
           </tbody>
         </table>
@@ -229,7 +228,7 @@ export default function Portfolio() {
                 <td><MarketBadge market={stock.market || 'US'} /></td>
                 <td><strong>{stock.ticker}</strong></td>
                 <td>{stock.name}</td>
-                <td style={{ fontSize: 12, color: '#aaa' }}>{stock.competitors?.join(', ') || '-'}</td>
+                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{stock.competitors?.join(', ') || '-'}</td>
                 <td>
                   <button className="btn-secondary" style={{ marginRight: 6 }} onClick={() => openEdit(stock)}>수정</button>
                   <button
@@ -244,7 +243,7 @@ export default function Portfolio() {
               </tr>
             ))}
             {filteredWatchlist.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: 'center', color: '#666', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
+              <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
             )}
           </tbody>
         </table>
