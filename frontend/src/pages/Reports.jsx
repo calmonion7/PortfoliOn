@@ -294,7 +294,48 @@ function ConsensusChart({ ticker, market }) {
   }, [ascData])
 
   const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
-  const chartMargin = { top: 4, right: 8, left: 0, bottom: 0 }
+  const chartMargin = { top: 22, right: 16, left: 0, bottom: 0 }
+
+  const targetDot = (props) => {
+    const { cx, cy, index, value } = props
+    if (value == null) return <g key={index} />
+    const prev = ascData.slice(0, index).reverse().find(d => d.target_mean != null)
+    const delta = prev != null ? value - prev.target_mean : null
+    const pct = delta != null ? (delta / prev.target_mean * 100) : null
+    const up = delta >= 0
+    const color = delta === null ? '#ffcc80' : up ? '#81c784' : '#ef9a9a'
+    const label = delta != null
+      ? `${up ? '↑' : '↓'} ${fmt(Math.abs(delta), market)} (${Math.abs(pct).toFixed(1)}%)`
+      : null
+    return (
+      <g key={index}>
+        <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
+        {label && (
+          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor="middle" fontSize={8} fill={color}>{label}</text>
+        )}
+      </g>
+    )
+  }
+
+  const makeDot = (color, dataKey) => (props) => {
+    const { cx, cy, index, value } = props
+    if (value == null) return <g key={index} />
+    const prev = opinionData[index - 1]
+    const delta = prev != null ? value - prev[dataKey] : null
+    const up = delta > 0
+    const labelColor = delta == null || delta === 0 ? color : up ? '#81c784' : '#ef9a9a'
+    const label = delta != null && delta !== 0
+      ? `${up ? '↑' : '↓'} ${up ? '+' : ''}${delta} (${Math.abs((delta / prev[dataKey]) * 100).toFixed(0)}%)`
+      : null
+    return (
+      <g key={index}>
+        <circle cx={cx} cy={cy} r={3} fill={color} />
+        {label && (
+          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor="middle" fontSize={8} fill={labelColor}>{label}</text>
+        )}
+      </g>
+    )
+  }
 
   const targetTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
@@ -367,7 +408,7 @@ function ConsensusChart({ ticker, market }) {
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
                 <Tooltip content={targetTooltip} />
-                <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="#ffcc80" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+                <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="#ffcc80" strokeWidth={2} dot={targetDot} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -384,9 +425,9 @@ function ConsensusChart({ ticker, market }) {
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
                 <Tooltip content={opinionTooltip} />
-                <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
-                <Line type="monotone" dataKey="hold" name="중립" stroke="#616161" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
-                <Line type="monotone" dataKey="sell" name="매도" stroke="#ef9a9a" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+                <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={makeDot('#43a047', 'buy')} activeDot={{ r: 5 }} connectNulls />
+                <Line type="monotone" dataKey="hold" name="중립" stroke="#616161" strokeWidth={2} dot={makeDot('#616161', 'hold')} activeDot={{ r: 5 }} connectNulls />
+                <Line type="monotone" dataKey="sell" name="매도" stroke="#ef9a9a" strokeWidth={2} dot={makeDot('#ef9a9a', 'sell')} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </div>
