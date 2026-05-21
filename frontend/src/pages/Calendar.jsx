@@ -39,6 +39,7 @@ function MonthGrid({ year, month, events }) {
             {dayEvents.map((e, j) => (
               <div
                 key={j}
+                title={e.name ? `${e.name} (${e.ticker})` : e.ticker}
                 style={{
                   fontSize: 10,
                   padding: '1px 4px',
@@ -50,6 +51,7 @@ function MonthGrid({ year, month, events }) {
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
+                  cursor: 'default',
                 }}
               >
                 {e.ticker} {e.type === 'earnings' ? '실적' : '배당락'}

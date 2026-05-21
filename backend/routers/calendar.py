@@ -31,16 +31,16 @@ def _get_events(month: str) -> list[dict]:
 
     portfolio = storage.get_full_portfolio()
     all_stocks = (
-        [{"ticker": s["ticker"], "stock_type": "holding"} for s in portfolio["stocks"]]
-        + [{"ticker": s["ticker"], "stock_type": "watchlist"} for s in portfolio["watchlist"]]
+        [{"ticker": s["ticker"], "stock_type": "holding", "name": s.get("name", s["ticker"])} for s in portfolio["stocks"]]
+        + [{"ticker": s["ticker"], "stock_type": "watchlist", "name": s.get("name", s["ticker"])} for s in portfolio["watchlist"]]
     )
 
     events: list[dict] = []
     for stock in all_stocks:
         try:
             t = yf.Ticker(stock["ticker"])
-            _collect_earnings(t, stock["ticker"], stock["stock_type"], month_start, month_end, events)
-            _collect_dividend(t, stock["ticker"], stock["stock_type"], month_start, month_end, events)
+            _collect_earnings(t, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, events)
+            _collect_dividend(t, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, events)
         except Exception as e:
             print(f"calendar: skip {stock['ticker']}: {e}", file=sys.stderr)
             continue
@@ -49,7 +49,7 @@ def _get_events(month: str) -> list[dict]:
     return events
 
 
-def _collect_earnings(t, ticker, stock_type, start, end, events):
+def _collect_earnings(t, ticker, stock_type, name, start, end, events):
     cal = t.calendar
     if not cal or "Earnings Date" not in cal:
         return
@@ -63,12 +63,13 @@ def _collect_earnings(t, ticker, stock_type, start, end, events):
             events.append({
                 "date": d.isoformat(),
                 "ticker": ticker,
+                "name": name,
                 "type": "earnings",
                 "stock_type": stock_type,
             })
 
 
-def _collect_dividend(t, ticker, stock_type, start, end, events):
+def _collect_dividend(t, ticker, stock_type, name, start, end, events):
     divs = t.dividends
     if divs is None or len(divs) < 2:
         return
@@ -82,6 +83,7 @@ def _collect_dividend(t, ticker, stock_type, start, end, events):
         events.append({
             "date": next_div.isoformat(),
             "ticker": ticker,
+            "name": name,
             "type": "dividend",
             "stock_type": stock_type,
         })
