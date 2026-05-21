@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 import time
 import calendar as cal_lib
 from datetime import date, timedelta
@@ -40,7 +41,8 @@ def _get_events(month: str) -> list[dict]:
             t = yf.Ticker(stock["ticker"])
             _collect_earnings(t, stock["ticker"], stock["stock_type"], month_start, month_end, events)
             _collect_dividend(t, stock["ticker"], stock["stock_type"], month_start, month_end, events)
-        except Exception:
+        except Exception as e:
+            print(f"calendar: skip {stock['ticker']}: {e}", file=sys.stderr)
             continue
 
     _cache[month] = (events, now)

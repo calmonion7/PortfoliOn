@@ -40,7 +40,8 @@ def _mock_ticker(ticker):
 
 def test_calendar_returns_earnings_event():
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker):
+         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
+         patch("routers.calendar._cache", {}):
         resp = client.get("/api/calendar?month=2026-05")
     assert resp.status_code == 200
     events = resp.json()["events"]
@@ -54,7 +55,8 @@ def test_calendar_returns_earnings_event():
 def test_calendar_returns_dividend_event():
     # AAPL: last div 2026-02-07, avg interval ~91 days → next ~2026-05-09 (in May)
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker):
+         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
+         patch("routers.calendar._cache", {}):
         resp = client.get("/api/calendar?month=2026-05")
     events = resp.json()["events"]
     divs = [e for e in events if e["type"] == "dividend"]
