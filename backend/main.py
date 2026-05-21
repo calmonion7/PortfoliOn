@@ -4,7 +4,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 import scheduler as sched
-from routers import portfolio, report, watchlist, stocks, guru
+from routers import portfolio, report, watchlist, stocks, guru, calendar
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
 SNAPSHOTS_DIR.mkdir(exist_ok=True)
@@ -31,6 +31,7 @@ app.include_router(report.router)
 app.include_router(watchlist.router)
 app.include_router(stocks.router)
 app.include_router(guru.router)
+app.include_router(calendar.router)
 
 
 @app.get("/health")
