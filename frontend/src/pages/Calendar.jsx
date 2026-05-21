@@ -69,12 +69,15 @@ export default function Calendar() {
   const [stockType, setStockType] = useState('holding')
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     setLoading(true)
+    setError('')
     const m = `${year}-${String(month).padStart(2, '0')}`
     axios.get(`/api/calendar?month=${m}`)
       .then(r => setEvents(r.data.events))
+      .catch(() => setError('이벤트 불러오기 실패'))
       .finally(() => setLoading(false))
   }, [year, month])
 
@@ -116,6 +119,8 @@ export default function Calendar() {
 
       {loading
         ? <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>불러오는 중...</div>
+        : error
+        ? <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>{error}</div>
         : <MonthGrid year={year} month={month} events={filtered} />
       }
 
