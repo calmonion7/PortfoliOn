@@ -1,51 +1,30 @@
 [
   {
-    "date": "2026-05-04",
+    "date": "2026-05-21",
+    "target_mean": 67.47143,
+    "buy": 18,
+    "hold": 3,
+    "sell": 1
+  },
+  {
+    "date": "2026-04-01",
+    "target_mean": 72.0,
+    "buy": 18,
+    "hold": 3,
+    "sell": 1
+  },
+  {
+    "date": "2026-03-01",
     "target_mean": 66.0,
-    "buy": 1,
-    "hold": 0,
-    "sell": 0
+    "buy": 18,
+    "hold": 2,
+    "sell": 1
   },
   {
-    "date": "2026-04-24",
-    "target_mean": 66.0,
-    "buy": 0,
-    "hold": 1,
-    "sell": 0
-  },
-  {
-    "date": "2026-04-15",
-    "target_mean": 77.0,
-    "buy": 1,
-    "hold": 0,
-    "sell": 0
-  },
-  {
-    "date": "2026-04-14",
-    "target_mean": 71.0,
-    "buy": 0,
-    "hold": 1,
-    "sell": 0
-  },
-  {
-    "date": "2026-04-09",
-    "target_mean": 76.0,
-    "buy": 1,
-    "hold": 0,
-    "sell": 0
-  },
-  {
-    "date": "2026-04-02",
-    "target_mean": 70.0,
-    "buy": 1,
-    "hold": 0,
-    "sell": 0
-  },
-  {
-    "date": "2026-03-27",
-    "target_mean": 66.0,
-    "buy": 1,
-    "hold": 0,
-    "sell": 0
+    "date": "2026-02-01",
+    "target_mean": 74.0,
+    "buy": 18,
+    "hold": 2,
+    "sell": 1
   }
 ]

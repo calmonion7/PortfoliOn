@@ -1,0 +1,16 @@
+[
+  {
+    "date": "2026-05-21",
+    "target_mean": 7.1625,
+    "buy": 0,
+    "hold": 7,
+    "sell": 2
+  },
+  {
+    "date": "2026-04-01",
+    "target_mean": null,
+    "buy": 0,
+    "hold": 7,
+    "sell": 2
+  }
+]
