@@ -1,28 +1,17 @@
 from __future__ import annotations
 import json
-import math
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pathlib import Path
 from services import storage, report_generator
 from services import consensus as consensus_svc
 from services import cache as cache_svc
-
-
-def _sanitize(obj):
-    """NaN/Inf float을 None으로 치환해 JSON 직렬화 오류 방지."""
-    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
-        return None
-    if isinstance(obj, dict):
-        return {k: _sanitize(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_sanitize(v) for v in obj]
-    return obj
+from services.utils import sanitize as _sanitize
 
 router = APIRouter(prefix="/api", tags=["report"])
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
-REPORTS_DIR = Path(__file__).parent.parent / "reports"  # legacy fallback
+REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 _progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
 _backfill_progress: dict = {"running": False, "done": 0, "total": 0, "current": "", "created": 0}

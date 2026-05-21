@@ -226,14 +226,14 @@ FastAPI (:8000)
  │                  # report_generator(Claude AI), scraper, scheduler
  └─ data/           # JSON 파일 저장소 (DB 없음)
         │
-        ├─ holdings.json / watchlist.json / stocks.json / schedule.json
-        └─ reports/  ← 생성된 Markdown 리포트 (정적 파일 서빙)
+        ├─ stocks.json (holdings+watchlist 통합), schedule.json
+        └─ snapshots/  ← 생성된 JSON 스냅샷 (per-ticker/date)
 ```
 
 **데이터 흐름**
 
-- 주가 데이터: yfinance(미국) / Naver Finance API(한국) → JSON 캐시
-- 리포트 생성: Claude AI API(`ANTHROPIC_API_KEY` 필요) → `backend/reports/*.md`
+- 주가 데이터: yfinance(미국) / Naver Finance API(한국) → JSON 스냅샷
+- 리포트 생성: Claude AI API(`ANTHROPIC_API_KEY` 필요) → `backend/snapshots/<ticker>/<date>.json`
 - 구루 데이터: dataroma 크롤링 → JSON 저장
 
 **API 설계 원칙**
@@ -253,13 +253,14 @@ PortfoliOn/
 ├── backend/
 │   ├── main.py
 │   ├── routers/          # portfolio, watchlist, stocks, report, guru
-│   ├── services/         # storage, market, charts, indicators
-│   │                     # report_generator, scraper, guru_scraper, guru_stats
-│   ├── data/             # JSON 파일 저장소 (holdings, watchlist, stocks, schedule)
-│   └── reports/          # 생성된 Markdown 리포트 (정적 파일 제공)
+│   ├── services/         # storage, market, charts, indicators,
+│   │                     # report_generator, scraper, guru_scraper, guru_stats, utils
+│   ├── data/             # JSON 파일 저장소 (stocks.json, schedule.json, consensus/)
+│   └── snapshots/        # 생성된 JSON 스냅샷 (per-ticker/date)
 └── frontend/
     └── src/
         ├── pages/        # Portfolio, Reports, Settings
-        │                 # Guru, GuruCrawlSettings, ReportSchedule
-        └── components/   # StockModal, PromoteModal, MarkdownViewer
+        │                 # Guru, GuruCrawlSettings, GuruStats, ReportSchedule
+        ├── components/   # StockModal, PromoteModal
+        └── utils.js      # 공통 유틸리티 (TAB_STYLE, fmtPrice)
 ```

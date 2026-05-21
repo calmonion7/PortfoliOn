@@ -8,7 +8,6 @@ from pathlib import Path
 from services.indicators import calc_rsi
 
 def generate_revenue_chart(quarters: list[dict], ticker: str, output_dir: Path) -> str:
-    """Bar chart of quarterly revenue + operating income. Returns saved PNG path or empty string."""
     if not quarters:
         return ""
     periods = [q["period"] for q in quarters]
@@ -34,7 +33,6 @@ def generate_revenue_chart(quarters: list[dict], ticker: str, output_dir: Path) 
     return str(path)
 
 def generate_rsi_chart(daily_close: pd.Series, ticker: str, output_dir: Path) -> str:
-    """RSI(14) line chart for last 90 trading days. Returns saved PNG path or empty string."""
     if daily_close.empty:
         return ""
     rsi = calc_rsi(daily_close).tail(90)

@@ -4,15 +4,12 @@ from services import storage, report_generator, consensus as consensus_svc
 
 _scheduler = AsyncIOScheduler()
 _JOB_ID = "daily_report"
-
-_DAY_MAP = {
-    "mon": "mon", "tue": "tue", "wed": "wed",
-    "thu": "thu", "fri": "fri", "sat": "sat", "sun": "sun",
-}
+_GURU_JOB_ID = "guru_crawl"
+_VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
 
 def _generate_all():
-    portfolio = storage.get_portfolio()
+    portfolio = storage.get_full_portfolio()
     for stock in portfolio.get("stocks", []):
         try:
             report_generator.generate_report(stock)
@@ -34,7 +31,7 @@ def _reschedule():
         return
     time_parts = cfg["time"].split(":")
     hour, minute = int(time_parts[0]), int(time_parts[1])
-    days_str = ",".join(_DAY_MAP[d] for d in cfg.get("days", []) if d in _DAY_MAP)
+    days_str = ",".join(d for d in cfg.get("days", []) if d in _VALID_DAYS)
     if not days_str:
         return
     _scheduler.add_job(
@@ -43,24 +40,6 @@ def _reschedule():
         id=_JOB_ID,
     )
     print(f"[Scheduler] Scheduled daily report at {cfg['time']} on {days_str}")
-
-
-def start():
-    _reschedule()
-    _reschedule_guru()
-    _scheduler.start()
-
-
-def stop():
-    if _scheduler.running:
-        _scheduler.shutdown(wait=False)
-
-
-def reload():
-    _reschedule()
-
-
-_GURU_JOB_ID = "guru_crawl"
 
 
 def _run_guru_crawl():
@@ -85,13 +64,30 @@ def _reschedule_guru():
         return
     time_parts = cfg["time"].split(":")
     hour, minute = int(time_parts[0]), int(time_parts[1])
-    day = _DAY_MAP.get(cfg.get("day", "sun"), "sun")
+    day = cfg.get("day", "sun")
+    if day not in _VALID_DAYS:
+        day = "sun"
     _scheduler.add_job(
         _run_guru_crawl,
         CronTrigger(day_of_week=day, hour=hour, minute=minute),
         id=_GURU_JOB_ID,
     )
     print(f"[Scheduler] Guru crawl scheduled at {cfg['time']} on {day}")
+
+
+def start():
+    _reschedule()
+    _reschedule_guru()
+    _scheduler.start()
+
+
+def stop():
+    if _scheduler.running:
+        _scheduler.shutdown(wait=False)
+
+
+def reload():
+    _reschedule()
 
 
 def reload_guru():

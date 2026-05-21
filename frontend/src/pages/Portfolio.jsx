@@ -2,23 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
-
-const TAB_STYLE = (active) => ({
-  padding: '6px 14px',
-  cursor: 'pointer',
-  border: 'none',
-  borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
-  background: 'transparent',
-  color: active ? 'var(--accent)' : 'var(--text-muted)',
-  fontWeight: active ? 600 : 400,
-  fontSize: 13,
-})
-
-const fmtCost = (val, market) => {
-  if (val == null) return 'N/A'
-  if (market === 'KR') return `₩${Number(val).toLocaleString('ko-KR')}`
-  return `$${Number(val).toFixed(2)}`
-}
+import { TAB_STYLE, fmtPrice } from '../utils'
 
 const MarketBadge = ({ market }) => (
   <span style={{
@@ -195,7 +179,7 @@ export default function Portfolio() {
                 <td><strong>{stock.ticker}</strong></td>
                 <td>{stock.name}</td>
                 <td>{stock.quantity}</td>
-                <td>{fmtCost(stock.avg_cost, stock.market)}</td>
+                <td>{fmtPrice(stock.avg_cost, stock.market)}</td>
                 <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{stock.competitors?.join(', ') || '-'}</td>
                 <td>
                   <button className="btn-secondary" style={{ marginRight: 6 }} onClick={() => openEdit(stock)}>수정</button>

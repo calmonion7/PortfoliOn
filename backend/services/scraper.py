@@ -12,7 +12,6 @@ _HEADERS = {
 }
 
 def scrape_finviz_consensus(ticker: str) -> dict:
-    """Scrape Finviz for analyst recommendation score and target price."""
     try:
         url = f"https://finviz.com/quote.ashx?t={ticker}"
         resp = requests.get(url, headers=_HEADERS, timeout=10)
@@ -40,7 +39,6 @@ def scrape_finviz_consensus(ticker: str) -> dict:
         return {}
 
 def get_news_kr(ticker: str) -> list[dict]:
-    """Naver Finance 뉴스 조회 (국내주식)"""
     try:
         r = requests.get(
             f"https://m.stock.naver.com/api/stock/{ticker}/news",
@@ -76,7 +74,6 @@ def get_news_kr(ticker: str) -> list[dict]:
 
 
 def get_news(ticker: str, market: str = "US") -> list[dict]:
-    """뉴스 조회 — KR은 Naver Finance, US는 Yahoo Finance"""
     if market == "KR":
         return get_news_kr(ticker)
 

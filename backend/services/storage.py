@@ -41,11 +41,9 @@ def get_stocks() -> list[dict]:
 def save_stocks(stocks: list[dict]) -> None:
     by_ticker = {s["ticker"]: s for s in _get_unified()}
     incoming = {s["ticker"].upper(): s for s in stocks}
-    # Remove non-holdings not in new list
     for t in list(by_ticker):
         if t not in incoming and by_ticker[t].get("type") != "holding":
             del by_ticker[t]
-    # Update / insert analyst fields
     for t, s in incoming.items():
         if t in by_ticker:
             by_ticker[t].update({k: v for k, v in s.items() if k in _ANALYST_KEYS})
@@ -69,13 +67,11 @@ def get_holdings() -> list[dict]:
 def save_holdings(holdings: list[dict]) -> None:
     by_ticker = {s["ticker"]: s for s in _get_unified()}
     holding_tickers = {h["ticker"].upper() for h in holdings}
-    # Demote removed holdings to watchlist
     for s in by_ticker.values():
         if s.get("type") == "holding" and s["ticker"] not in holding_tickers:
             s["type"] = "watchlist"
             s["quantity"] = None
             s["avg_cost"] = None
-    # Update / insert
     for h in holdings:
         t = h["ticker"].upper()
         if t in by_ticker:

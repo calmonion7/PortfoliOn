@@ -29,15 +29,10 @@ def calc_rsi_target_price(
     prices: pd.Series, rsi_values: pd.Series, target_rsi: float, n: int = 30,
     period: int = 14,
 ) -> float | None:
-    """RSI 목표가 계산.
-    1차: EWM 수식 역산 (단일 다음 봉 기준, ±50% 이내 현실적 구간만)
-    2차: 과거 데이터에서 해당 RSI 구간 실제 가격 가중평균 (1차 불가 시)
-    """
     prices = prices.dropna()
     if len(prices) < period + 1:
         return None
 
-    # 1차: 수식 역산
     delta = prices.diff()
     gain  = delta.clip(lower=0)
     loss  = -delta.clip(upper=0)
@@ -65,7 +60,6 @@ def calc_rsi_target_price(
                 if result > 0 and abs(result - cur_price) / cur_price <= 0.5:
                     return result
 
-    # 2차: 과거 RSI 구간 가격 가중평균 (수식 역산이 ±50% 초과 또는 불가 시)
     rsi_aligned = rsi_values.dropna().reindex(prices.index).dropna()
     prices_aligned = prices.reindex(rsi_aligned.index)
     if len(prices_aligned) < 5:
@@ -147,6 +141,25 @@ def get_volume_profile(df: pd.DataFrame, bins: int = 50) -> dict:
     poc_idx = int(np.argmax(bin_volumes))
     poc = round(float(bin_centers[poc_idx]), 2)
 
+    target_vol = float(bin_volumes.sum()) * 0.70
+    area_vol = float(bin_volumes[poc_idx])
+    lo_idx, hi_idx = poc_idx, poc_idx
+    while area_vol < target_vol:
+        can_up = hi_idx + 1 < bins
+        can_dn = lo_idx - 1 >= 0
+        if not can_up and not can_dn:
+            break
+        up_vol = float(bin_volumes[hi_idx + 1]) if can_up else -1.0
+        dn_vol = float(bin_volumes[lo_idx - 1]) if can_dn else -1.0
+        if up_vol >= dn_vol:
+            hi_idx += 1
+            area_vol += up_vol
+        else:
+            lo_idx -= 1
+            area_vol += dn_vol
+    vah = round(float(bin_edges[hi_idx + 1]), 2)
+    val = round(float(bin_edges[lo_idx]), 2)
+
     hvn_indices: list[int] = []
     for idx in np.argsort(bin_volumes)[::-1]:
         if len(hvn_indices) >= 3:
@@ -166,4 +179,4 @@ def get_volume_profile(df: pd.DataFrame, bins: int = 50) -> dict:
             if 0 < bin_volumes[i] <= threshold and lo < bin_centers[i] < hi
         ])
 
-    return {"poc": poc, "hvn": hvn, "lvn": lvn}
+    return {"poc": poc, "vah": vah, "val": val, "hvn": hvn, "lvn": lvn}

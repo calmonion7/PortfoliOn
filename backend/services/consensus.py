@@ -1,12 +1,21 @@
 from __future__ import annotations
 import json
-from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
 CONSENSUS_DIR = Path(__file__).parent.parent / "data" / "consensus"
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
+
+
+def _month_start(n: int) -> date:
+    today = date.today()
+    month = today.month - n
+    year = today.year
+    while month <= 0:
+        month += 12
+        year -= 1
+    return date(year, month, 1)
 
 
 def get_history(ticker: str) -> list[dict]:
@@ -17,9 +26,7 @@ def get_history(ticker: str) -> list[dict]:
 
 
 def collect(ticker: str) -> dict | None:
-    """최신 리포트 JSON에서 컨센서스를 읽어 날짜별 파일에 누적한다. 데이터 없으면 None 반환."""
     upper = ticker.upper()
-    # snapshots/ 우선, 없으면 reports/ fallback
     json_files = []
     for base in (SNAPSHOTS_DIR, REPORTS_DIR):
         d = base / upper
@@ -54,7 +61,6 @@ def collect(ticker: str) -> dict | None:
 
 
 def backfill(ticker: str, market: str) -> list[dict]:
-    """외부 소스에서 과거 컨센서스를 가져와 기존에 없는 날짜만 추가한다."""
     upper = ticker.upper()
     existing = get_history(upper)
     existing_dates = {e["date"] for e in existing}
@@ -80,17 +86,11 @@ _US_SELL = {"Sell", "Underperform", "Underweight", "Strong Sell", "Negative", "R
 
 
 def _fetch_kr(ticker: str) -> list[dict]:
-    """Naver Research API로 과거 3개월 월별 누적 컨센서스 수집 (collect()와 동일 기준).
-
-    collect()는 FnGuide에서 최근 ~90일 활성 리포트를 누적 집계한다.
-    백필도 각 기준월로부터 90일 이내 활성 리포트를 누적 집계하여 동일 기준을 맞춘다.
-    """
     import requests
     from concurrent.futures import ThreadPoolExecutor
     from datetime import timedelta
 
     today = date.today()
-    # 최대 6개월치 리포트를 가져와서 각 기준월에 맞게 재집계
     cutoff = (today - timedelta(days=180)).isoformat()
     headers = {"User-Agent": "Mozilla/5.0"}
 
@@ -131,14 +131,6 @@ def _fetch_kr(ticker: str) -> list[dict]:
     with ThreadPoolExecutor(max_workers=5) as ex:
         all_reports = list(ex.map(fetch_detail, recent))
 
-    def _month_start(n: int) -> date:
-        month = today.month - n
-        year = today.year
-        while month <= 0:
-            month += 12
-            year -= 1
-        return date(year, month, 1)
-
     output = []
     for n_months in [3, 2, 1]:
         ref = _month_start(n_months)
@@ -174,17 +166,6 @@ def _fetch_us(ticker: str) -> list[dict]:
         if "period" in recs.columns:
             recs = recs.set_index("period")
 
-        today = date.today()
-
-        def _month_start(n: int) -> date:
-            month = today.month - n
-            year = today.year
-            while month <= 0:
-                month += 12
-                year -= 1
-            return date(year, month, 1)
-
-        # upgrades_downgrades에서 월별 평균 목표주가 계산
         target_by_month: dict[str, float] = {}
         try:
             ud = t.upgrades_downgrades
@@ -205,7 +186,6 @@ def _fetch_us(ticker: str) -> list[dict]:
         except Exception:
             pass
 
-        # "0m"은 collect()가 오늘 날짜로 저장하므로 제외, -1m~-3m만 백필
         period_map = {"-1m": _month_start(1), "-2m": _month_start(2), "-3m": _month_start(3)}
 
         result = []

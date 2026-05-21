@@ -1,27 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import axios from 'axios'
 
-import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts'
-
-const TAB_STYLE = (active) => ({
-  padding: '6px 14px',
-  cursor: 'pointer',
-  border: 'none',
-  borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
-  background: 'transparent',
-  color: active ? 'var(--accent)' : 'var(--text-muted)',
-  fontWeight: active ? 600 : 400,
-  fontSize: 13,
-})
+import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList, Legend } from 'recharts'
+import { TAB_STYLE, fmtPrice as fmt } from '../utils'
 
 const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--text-muted)', position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-surface)' }
 const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12 }
-
-const fmt = (val, market) => {
-  if (val == null) return 'N/A'
-  if (market === 'KR') return `₩${Number(val).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`
-  return `$${Number(val).toFixed(2)}`
-}
 const fmtN = (val) => val != null ? val : 'N/A'
 const rsiColor = (rsi) => {
   if (rsi == null) return 'var(--text-muted)'
@@ -117,6 +101,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const levels = [
     ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', size: 'sm' })),
     vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', size: 'md' },
+    vp?.vah != null && { value: vp.vah, label: 'VAH', color: '#4fc3f7', size: 'md' },
+    vp?.val != null && { value: vp.val, label: 'VAL', color: '#4fc3f7', size: 'md' },
     target != null && { value: target, label: '평균목표가', color: '#ffcc80', size: 'md' },
     rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#81c784', size: 'sm' },
     rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#81c784', size: 'sm' },
@@ -134,12 +120,32 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const hi = Math.max(...vals) + pad
   const pct = v => ((v - lo) / (hi - lo)) * 100
   const sorted = [...levels].sort((a, b) => a.value - b.value)
-  sorted.forEach((l, i) => { l.above = i % 2 === 0 })
+  // 가로 폭 추정(%) 기준으로 겹치면 행(row)을 올려 쌓음
+  const LABEL_W = 13 // 레이블 추정 폭 (% 단위)
+  const aboveEdges = [], belowEdges = []
+  sorted.forEach((l, i) => {
+    l.above = i % 2 === 0
+    const edges = l.above ? aboveEdges : belowEdges
+    const cx = pct(l.value)
+    let row = 0
+    while (row < edges.length && edges[row] > cx - LABEL_W) row++
+    if (row >= edges.length) edges.push(-Infinity)
+    edges[row] = cx + LABEL_W
+    l.row = row
+  })
+  const ROW_H = 20 // 행 간격 px
   const BAR_TOP = 46
   return (
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{title}</div>}
-      <div style={{ position: 'relative', height: 100 }}>
+      <div style={{ position: 'relative', height: Math.max(100, BAR_TOP + 8 + (Math.max(...sorted.map(l => l.above ? 0 : l.row + 1)) * ROW_H) + 20) }}>
+        {vp?.val != null && vp?.vah != null && (
+          <div style={{
+            position: 'absolute', top: BAR_TOP - 4, height: 16, borderRadius: 3,
+            left: `${pct(vp.val)}%`, width: `${pct(vp.vah) - pct(vp.val)}%`,
+            background: 'rgba(79,195,247,0.18)', border: '1px solid rgba(79,195,247,0.5)',
+          }} />
+        )}
         <div style={{ position: 'absolute', top: BAR_TOP, left: 0, right: 0, height: 8, borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--chart-grid)' }} />
           {price != null && <>
@@ -155,7 +161,9 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               <div style={{ width: isLg ? 3 : 2, height: tickH, background: l.color, margin: '0 auto', borderRadius: 1 }} />
               <div style={{
                 position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-                ...(l.above ? { bottom: '100%', marginBottom: 3 } : { top: '100%', marginTop: 3 }),
+                ...(l.above
+                  ? { bottom: '100%', marginBottom: 3 + l.row * ROW_H }
+                  : { top: '100%', marginTop: 3 + l.row * ROW_H }),
                 textAlign: 'center', whiteSpace: 'nowrap',
               }}>
                 <div style={{ fontSize: isLg ? 11 : 9, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
@@ -249,6 +257,7 @@ function ConsensusChart({ ticker, market }) {
   const [collecting, setCollecting] = useState(false)
   const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState(null)
+  const [tab, setTab] = useState(0)
 
   const fetchData = useCallback(() => {
     if (!ticker) return
@@ -321,7 +330,7 @@ function ConsensusChart({ ticker, market }) {
     const up = delta >= 0
     const color = delta === null ? '#ffcc80' : up ? '#81c784' : '#ef9a9a'
     const label = delta != null
-      ? `${up ? '↑' : '↓'} ${fmt(Math.abs(delta), market)} (${Math.abs(pct).toFixed(1)}%)`
+      ? `${fmt(value, market)} ${up ? '↑' : '↓'}${Math.abs(pct).toFixed(1)}%`
       : fmt(value, market)
     return (
       <g key={index}>
@@ -329,6 +338,56 @@ function ConsensusChart({ ticker, market }) {
         {label && (
           <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, targetData.length)} fontSize={8} fill={color}>{label}</text>
         )}
+      </g>
+    )
+  }
+
+  const bgLabel = (cx, cy, label, color, ta, yOff) => {
+    const w = label.length * 5 + 4
+    const xOff = ta === 'start' ? 0 : ta === 'end' ? -w : -w / 2
+    return (
+      <g>
+        <rect x={cx + xOff} y={cy + yOff - 9} width={w} height={11} fill="var(--bg-card)" opacity={0.85} rx={2} />
+        <text x={cx} y={cy + yOff} textAnchor={ta} fontSize={8} fill={color}>{label}</text>
+      </g>
+    )
+  }
+
+  const overlayTargetDot = (props) => {
+    const { cx, cy, index, value } = props
+    if (value == null) return <g key={index} />
+    const prev = ascData.slice(0, index).reverse().find(d => d.target_mean != null)
+    const delta = prev != null ? value - prev.target_mean : null
+    const pct = delta != null ? (delta / prev.target_mean * 100) : null
+    const up = delta >= 0
+    const color = delta === null ? '#ffcc80' : up ? '#81c784' : '#ef9a9a'
+    const label = delta != null
+      ? `${fmt(value, market)} ${up ? '↑' : '↓'}${Math.abs(pct).toFixed(1)}%`
+      : fmt(value, market)
+    return (
+      <g key={index}>
+        <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
+        {bgLabel(cx, cy, label, color, anchor(index, ascData.length), -10)}
+      </g>
+    )
+  }
+
+  const overlayBuyDot = (props) => {
+    const { cx, cy, index, value } = props
+    if (value == null) return <g key={index} />
+    const prev = ascData[index - 1]
+    const delta = prev != null ? value - prev.buy : null
+    const up = delta > 0
+    const labelColor = delta == null || delta === 0 ? '#43a047' : up ? '#81c784' : '#ef9a9a'
+    const label = delta == null
+      ? String(value)
+      : delta !== 0
+        ? `${value} ${up ? '↑' : '↓'}${Math.abs((delta / prev.buy) * 100).toFixed(0)}%`
+        : null
+    return (
+      <g key={index}>
+        <circle cx={cx} cy={cy} r={3} fill="#43a047" />
+        {label && bgLabel(cx, cy, label, labelColor, anchor(index, ascData.length), 14)}
       </g>
     )
   }
@@ -343,7 +402,7 @@ function ConsensusChart({ ticker, market }) {
     const label = delta == null
       ? String(value)
       : delta !== 0
-        ? `${up ? '↑' : '↓'} ${up ? '+' : ''}${delta} (${Math.abs((delta / prev[dataKey]) * 100).toFixed(0)}%)`
+        ? `${value} ${up ? '↑' : '↓'}${Math.abs((delta / prev[dataKey]) * 100).toFixed(0)}%`
         : null
     return (
       <g key={index}>
@@ -355,12 +414,22 @@ function ConsensusChart({ ticker, market }) {
     )
   }
 
+  const deltaStr = (delta, pct, isPrice) =>
+    delta == null ? '' : ` ${delta >= 0 ? '▲' : '▼'} ${isPrice ? fmt(Math.abs(delta), market) : Math.abs(delta)} (${Math.abs(pct).toFixed(1)}%)`
+
   const targetTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
+    const value = payload[0].value
+    const idx = targetData.findIndex(d => d.date === label)
+    const prev = idx > 0 ? targetData.slice(0, idx).reverse().find(d => d.target_mean != null) : null
+    const delta = prev != null && value != null ? value - prev.target_mean : null
+    const pct = delta != null ? delta / prev.target_mean * 100 : null
+    const dColor = delta == null ? '#ffcc80' : delta >= 0 ? '#81c784' : '#ef9a9a'
     return (
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
-        <div style={{ color: '#ffcc80' }}>평균목표가: {fmt(payload[0].value, market)}</div>
+        <div style={{ color: '#ffcc80' }}>평균목표가: {fmt(value, market)}</div>
+        {delta != null && <div style={{ color: dColor, fontSize: 10 }}>{deltaStr(delta, pct, true)}</div>}
       </div>
     )
   }
@@ -368,14 +437,22 @@ function ConsensusChart({ ticker, market }) {
   const opinionTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
     const total = payload.reduce((s, p) => s + (p.value ?? 0), 0)
+    const idx = opinionData.findIndex(d => d.date === label)
+    const prev = idx > 0 ? opinionData[idx - 1] : null
     return (
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
-        {payload.map(p => (
-          <div key={p.dataKey} style={{ color: p.fill, marginBottom: 2 }}>
-            {p.name}: {p.value ?? 0}{total > 0 ? ` (${Math.round((p.value ?? 0) / total * 100)}%)` : ''}
-          </div>
-        ))}
+        {payload.map(p => {
+          const delta = prev != null ? (p.value ?? 0) - prev[p.dataKey] : null
+          const pct = delta != null && prev[p.dataKey] !== 0 ? delta / prev[p.dataKey] * 100 : null
+          const dColor = delta == null || delta === 0 ? p.fill : delta > 0 ? '#81c784' : '#ef9a9a'
+          return (
+            <div key={p.dataKey} style={{ color: p.fill, marginBottom: 2 }}>
+              {p.name}: {p.value ?? 0}{total > 0 ? ` (${Math.round((p.value ?? 0) / total * 100)}%)` : ''}
+              {delta != null && delta !== 0 && pct != null && <span style={{ color: dColor, fontSize: 10 }}>{deltaStr(delta, pct, false)}</span>}
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -418,9 +495,19 @@ function ConsensusChart({ ticker, market }) {
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ fontSize: 10, color: '#ffcc80', marginBottom: 2 }}>평균목표가</div>
-            <ResponsiveContainer width="100%" height={120}>
+          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
+            {['평균목표가', '애널리스트 의견', '추이 비교'].map((t, i) => (
+              <button key={i} onClick={() => setTab(i)} style={{
+                background: 'transparent', border: 'none',
+                borderBottom: tab === i ? '2px solid var(--accent)' : '2px solid transparent',
+                color: tab === i ? 'var(--accent)' : 'var(--text-muted)',
+                fontWeight: tab === i ? 600 : 400,
+                fontSize: 11, padding: '4px 10px', cursor: 'pointer',
+              }}>{t}</button>
+            ))}
+          </div>
+          {tab === 0 && (
+            <ResponsiveContainer width="100%" height={140}>
               <LineChart data={targetData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
@@ -429,34 +516,71 @@ function ConsensusChart({ ticker, market }) {
                 <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="#ffcc80" strokeWidth={2} dot={targetDot} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>애널리스트 의견</div>
-              {opinionAllSame && (
-                <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 3, padding: '0 5px', lineHeight: '16px' }}>변동 없음</span>
-              )}
-            </div>
-            <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={opinionData} margin={chartMargin}>
+          )}
+          {tab === 1 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                {opinionAllSame && (
+                  <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 3, padding: '0 5px', lineHeight: '16px' }}>변동 없음</span>
+                )}
+              </div>
+              <ResponsiveContainer width="100%" height={140}>
+                <LineChart data={opinionData} margin={chartMargin}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
+                  <Tooltip content={opinionTooltip} />
+                  <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={makeDot('#43a047', 'buy')} activeDot={{ r: 5 }} connectNulls />
+                  <Line type="monotone" dataKey="hold" name="중립" stroke="#616161" strokeWidth={2} dot={makeDot('#616161', 'hold')} activeDot={{ r: 5 }} connectNulls />
+                  <Line type="monotone" dataKey="sell" name="매도" stroke="#ef9a9a" strokeWidth={2} dot={makeDot('#ef9a9a', 'sell')} activeDot={{ r: 5 }} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+              <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                {[['#43a047', '매수'], ['#616161', '중립'], ['#ef9a9a', '매도']].map(([color, label]) => (
+                  <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 8, height: 8, background: color, display: 'inline-block', borderRadius: 2 }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+          {tab === 2 && (
+            <ResponsiveContainer width="100%" height={140}>
+              <LineChart data={ascData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
-                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
-                <Tooltip content={opinionTooltip} />
-                <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={makeDot('#43a047', 'buy')} activeDot={{ r: 5 }} connectNulls />
-                <Line type="monotone" dataKey="hold" name="중립" stroke="#616161" strokeWidth={2} dot={makeDot('#616161', 'hold')} activeDot={{ r: 5 }} connectNulls />
-                <Line type="monotone" dataKey="sell" name="매도" stroke="#ef9a9a" strokeWidth={2} dot={makeDot('#ef9a9a', 'sell')} activeDot={{ r: 5 }} connectNulls />
+                <YAxis yAxisId="left" tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
+                <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
+                <Tooltip content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null
+                  const idx = ascData.findIndex(d => d.date === label)
+                  const prev = idx > 0 ? ascData[idx - 1] : null
+                  return (
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+                      <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+                      {payload.map(p => {
+                        const val = p.value
+                        const prevVal = prev?.[p.dataKey]
+                        const delta = prevVal != null && val != null ? val - prevVal : null
+                        const pct = delta != null && prevVal !== 0 ? delta / prevVal * 100 : null
+                        const isPrice = p.dataKey === 'target_mean'
+                        const dColor = delta == null || delta === 0 ? p.stroke : delta > 0 ? '#81c784' : '#ef9a9a'
+                        return (
+                          <div key={p.dataKey} style={{ color: p.stroke, marginBottom: 2 }}>
+                            {p.name}: {val ?? 'N/A'}
+                            {delta != null && delta !== 0 && pct != null && <span style={{ color: dColor, fontSize: 10 }}>{deltaStr(delta, pct, isPrice)}</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                }} />
+                <Line yAxisId="left" type="monotone" dataKey="target_mean" name="목표가" stroke="#ffcc80" strokeWidth={2} dot={overlayTargetDot} activeDot={{ r: 5 }} connectNulls />
+                <Line yAxisId="right" type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={overlayBuyDot} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
-          </div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-            {[['#43a047', '매수'], ['#616161', '중립'], ['#b71c1c', '매도']].map(([color, label]) => (
-              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 8, height: 8, background: color, display: 'inline-block', borderRadius: 2 }} />
-                {label}
-              </span>
-            ))}
-          </div>
+          )}
         </>
       )}
     </div>
