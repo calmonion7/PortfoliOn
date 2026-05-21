@@ -94,3 +94,89 @@ def test_get_report_404_when_not_found(tmp_path):
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2000-01-01")
     assert resp.status_code == 404
+
+
+SAMPLE_SUMMARY_WITH_RSI = {
+    "ticker": "LLY", "name": "일라이 릴리", "date": "2026-05-05",
+    "price": 890.0, "target_mean": 980.0, "target_high": 1100.0, "target_low": 850.0,
+    "buy": 15, "hold": 3, "sell": 1,
+    "daily_rsi": {"rsi": 45.2, "target_20": 800.0},
+    "weekly_rsi": {"rsi": 55.1, "target_20": 780.0},
+    "monthly_rsi": {"rsi": 62.3, "target_20": 760.0},
+}
+
+SAMPLE_SUMMARY_2 = {
+    "ticker": "LLY", "name": "일라이 릴리", "date": "2026-05-06",
+    "price": 900.0, "target_mean": 990.0, "target_high": 1110.0, "target_low": 860.0,
+    "buy": 16, "hold": 3, "sell": 1,
+    "daily_rsi": {"rsi": 47.0, "target_20": 810.0},
+    "weekly_rsi": {"rsi": 56.0, "target_20": 790.0},
+    "monthly_rsi": None,
+}
+
+
+def test_get_history_returns_sorted_lean_array(tmp_path):
+    ticker_dir = tmp_path / "LLY"
+    ticker_dir.mkdir()
+    (ticker_dir / "2026-05-05.json").write_text(
+        json.dumps(SAMPLE_SUMMARY_WITH_RSI), encoding="utf-8"
+    )
+    (ticker_dir / "2026-05-06.json").write_text(
+        json.dumps(SAMPLE_SUMMARY_2), encoding="utf-8"
+    )
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"):
+        resp = client.get("/api/report/LLY/history")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+    assert data[0]["date"] == "2026-05-05"
+    assert data[1]["date"] == "2026-05-06"
+    assert data[0]["price"] == 890.0
+    assert data[0]["target_mean"] == 980.0
+    assert data[0]["target_high"] == 1100.0
+    assert data[0]["target_low"] == 850.0
+    assert data[0]["buy"] == 15
+    assert data[0]["hold"] == 3
+    assert data[0]["sell"] == 1
+    assert data[0]["rsi_daily"] == 45.2
+    assert data[0]["rsi_weekly"] == 55.1
+    assert data[0]["rsi_monthly"] == 62.3
+
+
+def test_get_history_handles_null_rsi(tmp_path):
+    ticker_dir = tmp_path / "LLY"
+    ticker_dir.mkdir()
+    (ticker_dir / "2026-05-06.json").write_text(
+        json.dumps(SAMPLE_SUMMARY_2), encoding="utf-8"
+    )
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"):
+        resp = client.get("/api/report/LLY/history")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data[0]["rsi_monthly"] is None
+
+
+def test_get_history_empty_when_no_snapshots(tmp_path):
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"):
+        resp = client.get("/api/report/LLY/history")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_get_history_fallback_to_reports_dir(tmp_path):
+    legacy_dir = tmp_path / "legacy"
+    legacy_ticker = legacy_dir / "LLY"
+    legacy_ticker.mkdir(parents=True)
+    (legacy_ticker / "2026-05-01.json").write_text(
+        json.dumps(SAMPLE_SUMMARY_WITH_RSI), encoding="utf-8"
+    )
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    with patch("routers.report.SNAPSHOTS_DIR", snapshots_dir), \
+         patch("routers.report.REPORTS_DIR", legacy_dir):
+        resp = client.get("/api/report/LLY/history")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1

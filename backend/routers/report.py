@@ -148,6 +148,33 @@ def list_reports():
     return cache_svc.get_list(_build)
 
 
+@router.get("/report/{ticker}/history")
+def get_history(ticker: str):
+    upper = ticker.upper()
+    result = []
+    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
+        ticker_dir = base / upper
+        if not ticker_dir.exists():
+            continue
+        for f in sorted(ticker_dir.glob("*.json")):
+            raw = json.loads(f.read_text(encoding="utf-8"))
+            result.append({
+                "date": f.stem,
+                "price": raw.get("price"),
+                "target_mean": raw.get("target_mean"),
+                "target_high": raw.get("target_high"),
+                "target_low": raw.get("target_low"),
+                "buy": raw.get("buy"),
+                "hold": raw.get("hold"),
+                "sell": raw.get("sell"),
+                "rsi_daily": (raw.get("daily_rsi") or {}).get("rsi"),
+                "rsi_weekly": (raw.get("weekly_rsi") or {}).get("rsi"),
+                "rsi_monthly": (raw.get("monthly_rsi") or {}).get("rsi"),
+            })
+        break
+    return sorted(result, key=lambda x: x["date"])
+
+
 @router.get("/report/{ticker}/{date_str}")
 def get_report(ticker: str, date_str: str):
     upper = ticker.upper()
