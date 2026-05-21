@@ -1213,7 +1213,7 @@ function HistoryTab({ ticker, dates, market }) {
           </select>
         </div>
 
-        {dates.length < 2
+        {history.length < 2
           ? <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>비교할 날짜가 없습니다.</p>
           : (
             <>
