@@ -287,31 +287,47 @@ function ConsensusChart({ ticker, market }) {
 
   const ascData = useMemo(() => [...data].reverse(), [data])
 
+  // 평균목표가: 연속 동일 구간은 첫 날짜만 유지 → 오른쪽 끝 = 현재값이 처음 시작된 날짜
+  const targetData = useMemo(() => {
+    if (ascData.length === 0) return []
+    const result = [ascData[0]]
+    for (let i = 1; i < ascData.length; i++) {
+      const curr = ascData[i], prev = result[result.length - 1]
+      if (curr.target_mean !== prev.target_mean) result.push(curr)
+    }
+    return result
+  }, [ascData])
+
   const opinionData = useMemo(() => {
     if (ascData.length <= 2) return ascData
     const allSame = ascData.every(d => d.buy === ascData[0].buy && d.hold === ascData[0].hold && d.sell === ascData[0].sell)
     return allSame ? [ascData[0], ascData[ascData.length - 1]] : ascData
   }, [ascData])
 
+  const opinionAllSame = opinionData.length < ascData.length
+
   const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
   const chartMargin = { top: 22, right: 16, left: 0, bottom: 0 }
+
+  const anchor = (index, total) =>
+    index === 0 ? 'start' : index === total - 1 ? 'end' : 'middle'
 
   const targetDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = ascData.slice(0, index).reverse().find(d => d.target_mean != null)
+    const prev = targetData.slice(0, index).reverse().find(d => d.target_mean != null)
     const delta = prev != null ? value - prev.target_mean : null
     const pct = delta != null ? (delta / prev.target_mean * 100) : null
     const up = delta >= 0
     const color = delta === null ? '#ffcc80' : up ? '#81c784' : '#ef9a9a'
     const label = delta != null
       ? `${up ? '↑' : '↓'} ${fmt(Math.abs(delta), market)} (${Math.abs(pct).toFixed(1)}%)`
-      : null
+      : fmt(value, market)
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
         {label && (
-          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor="middle" fontSize={8} fill={color}>{label}</text>
+          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, targetData.length)} fontSize={8} fill={color}>{label}</text>
         )}
       </g>
     )
@@ -324,14 +340,16 @@ function ConsensusChart({ ticker, market }) {
     const delta = prev != null ? value - prev[dataKey] : null
     const up = delta > 0
     const labelColor = delta == null || delta === 0 ? color : up ? '#81c784' : '#ef9a9a'
-    const label = delta != null && delta !== 0
-      ? `${up ? '↑' : '↓'} ${up ? '+' : ''}${delta} (${Math.abs((delta / prev[dataKey]) * 100).toFixed(0)}%)`
-      : null
+    const label = delta == null
+      ? String(value)
+      : delta !== 0
+        ? `${up ? '↑' : '↓'} ${up ? '+' : ''}${delta} (${Math.abs((delta / prev[dataKey]) * 100).toFixed(0)}%)`
+        : null
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill={color} />
         {label && (
-          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor="middle" fontSize={8} fill={labelColor}>{label}</text>
+          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, opinionData.length)} fontSize={8} fill={labelColor}>{label}</text>
         )}
       </g>
     )
@@ -403,7 +421,7 @@ function ConsensusChart({ ticker, market }) {
           <div style={{ marginBottom: 4 }}>
             <div style={{ fontSize: 10, color: '#ffcc80', marginBottom: 2 }}>평균목표가</div>
             <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={ascData} margin={chartMargin}>
+              <LineChart data={targetData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
@@ -415,7 +433,7 @@ function ConsensusChart({ ticker, market }) {
           <div style={{ marginTop: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
               <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>애널리스트 의견</div>
-              {opinionData.length < ascData.length && (
+              {opinionAllSame && (
                 <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 3, padding: '0 5px', lineHeight: '16px' }}>변동 없음</span>
               )}
             </div>
