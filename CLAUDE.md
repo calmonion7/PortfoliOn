@@ -75,9 +75,12 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Commands
 
-```bat
+```bash
 # Start both servers (Windows)
 start.bat
+
+# Start both servers (macOS/Linux)
+./start.sh
 
 # Backend only (from project root)
 cd backend && python -m uvicorn main:app --reload --port 8000
@@ -94,26 +97,29 @@ cd backend && pytest
 **Backend** — Python/FastAPI (port 8000)
 
 - `backend/main.py` — app entry, mounts routers + scheduler
-- `backend/routers/` — portfolio, watchlist, stocks, report
-- `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, scheduler
+- `backend/routers/` — portfolio, watchlist, stocks, report, guru
+- `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, consensus, cache, guru_scraper, guru_stats
+- `backend/scheduler.py` — APScheduler 설정 (services 아님, 루트 레벨)
 - `backend/data/` — JSON file storage (stocks.json — unified holdings+watchlist+analyst data, schedule.json)
 - `backend/snapshots/` — generated JSON snapshots (per-ticker/date, e.g. `LLY/2026-05-20.json`)
 - `backend/reports/` — legacy report directory (read-only, JSON fallback for old snapshots)
 
 **Frontend** — React 18 + Vite (port 5173), plain CSS (no TailwindCSS)
 
-- `frontend/src/pages/` — Portfolio, Reports, Settings
+- `frontend/src/pages/` — Portfolio, Reports, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule)
 - `frontend/src/components/` — StockModal, PromoteModal
 
 ## Key Files
 
 - `API_SPEC.md` — full REST API reference (source of truth for endpoints)
 - `CLAUDE_COWORK_API.md` — external API for Claude AI to read/write stock analysis
-- `backend/venv/` — Python virtual environment (use `backend/venv/Scripts/python` on Windows)
+- `backend/.venv/` — Python virtual environment (macOS: `backend/.venv/bin/python`, Windows: `backend/.venv/Scripts/python`)
 
 ## Data Model
 
 - `holdings.json` and `watchlist.json` are merged into `stocks.json` (use `type: "holding"|"watchlist"` field to distinguish)
+- `portfolio.json` — 포트폴리오 요약/집계 데이터
+- `guru_managers.json` — Guru 운용역 데이터 캐시
 - New snapshots write to `backend/snapshots/`, old `reports/` is kept as read-only fallback
 
 ## Gotchas
