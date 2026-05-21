@@ -162,9 +162,10 @@ def _fetch_kr(ticker: str) -> list[dict]:
 
 
 def _fetch_us(ticker: str) -> list[dict]:
-    """yfinance recommendations_summary로 과거 3개월 월별 누적 컨센서스 수집 (collect()와 동일 소스)."""
+    """yfinance recommendations_summary + upgrades_downgrades로 과거 3개월 월별 컨센서스 수집."""
     try:
         import yfinance as yf
+        import pandas as pd
         t = yf.Ticker(ticker.replace(".", "-"))
         recs = t.recommendations_summary
         if recs is None or recs.empty:
@@ -175,26 +176,53 @@ def _fetch_us(ticker: str) -> list[dict]:
 
         today = date.today()
 
-        def _month_start(n: int) -> str:
+        def _month_start(n: int) -> date:
             month = today.month - n
             year = today.year
             while month <= 0:
                 month += 12
                 year -= 1
-            return date(year, month, 1).isoformat()
+            return date(year, month, 1)
+
+        # upgrades_downgrades에서 월별 평균 목표주가 계산
+        target_by_month: dict[str, float] = {}
+        try:
+            ud = t.upgrades_downgrades
+            if ud is not None and not ud.empty:
+                idx = pd.to_datetime(ud.index)
+                if idx.tz is not None:
+                    idx = idx.tz_convert(None)
+                ud = ud.copy()
+                ud.index = idx.date
+                for n in [1, 2, 3]:
+                    start = _month_start(n)
+                    end = _month_start(n - 1)
+                    mask = (ud.index >= start) & (ud.index < end)
+                    prices = ud.loc[mask, "currentPriceTarget"].dropna()
+                    prices = prices[prices > 0]
+                    if len(prices) > 0:
+                        target_by_month[start.isoformat()] = round(float(prices.mean()), 2)
+        except Exception:
+            pass
 
         # "0m"은 collect()가 오늘 날짜로 저장하므로 제외, -1m~-3m만 백필
-        period_dates = {"-1m": _month_start(1), "-2m": _month_start(2), "-3m": _month_start(3)}
+        period_map = {"-1m": _month_start(1), "-2m": _month_start(2), "-3m": _month_start(3)}
 
         result = []
-        for period, dt in period_dates.items():
+        for period, dt in period_map.items():
             if period not in recs.index:
                 continue
             row = recs.loc[period]
             buy = int(row.get("strongBuy", 0)) + int(row.get("buy", 0))
             hold = int(row.get("hold", 0))
             sell = int(row.get("sell", 0)) + int(row.get("strongSell", 0))
-            result.append({"date": dt, "target_mean": None, "buy": buy, "hold": hold, "sell": sell})
+            result.append({
+                "date": dt.isoformat(),
+                "target_mean": target_by_month.get(dt.isoformat()),
+                "buy": buy,
+                "hold": hold,
+                "sell": sell,
+            })
         return result
     except Exception:
         return []
