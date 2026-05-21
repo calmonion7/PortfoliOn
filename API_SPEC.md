@@ -14,6 +14,7 @@
 - [Stocks (종목 정보)](#stocks-종목-정보)
 - [Report (리포트)](#report-리포트)
 - [Schedule (자동 스케줄)](#schedule-자동-스케줄)
+- [Calendar (이벤트 캘린더)](#calendar-이벤트-캘린더)
 - [공통 스키마](#공통-스키마)
 - [공통 에러 응답](#공통-에러-응답)
 
@@ -515,6 +516,56 @@
 **Response `200`** — 저장된 스케줄 객체 그대로 반환
 
 **Error `400`** — `enabled`, `time`, `days` 중 하나라도 누락 시
+
+---
+
+## Calendar (이벤트 캘린더)
+
+### `GET /api/calendar`
+
+보유종목·관심종목의 실적 발표일·배당락일 조회. 데이터는 yfinance에서 수집하며 6시간 인메모리 캐시.
+
+**Query Parameter**
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|---------|------|------|------|
+| `month` | string | ✅ | 조회할 월 (`YYYY-MM` 형식, 예: `2026-05`) |
+
+**Response `200`**
+```json
+{
+  "events": [
+    {
+      "date": "2026-05-20",
+      "ticker": "AAPL",
+      "name": "애플",
+      "type": "earnings",
+      "stock_type": "holding"
+    },
+    {
+      "date": "2026-05-09",
+      "ticker": "MSFT",
+      "name": "마이크로소프트",
+      "type": "dividend",
+      "stock_type": "watchlist"
+    }
+  ]
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `date` | string | 이벤트 날짜 (`YYYY-MM-DD`) |
+| `ticker` | string | 종목 코드 |
+| `name` | string | 종목명 (없으면 ticker와 동일) |
+| `type` | string | `"earnings"` (실적 발표일) \| `"dividend"` (배당락일 추정) |
+| `stock_type` | string | `"holding"` (보유종목) \| `"watchlist"` (관심종목) |
+
+> **배당락일 추정:** yfinance 배당 이력에서 최근 4회 지급 간격의 평균으로 다음 배당락일을 예측합니다. 배당 이력이 2회 미만인 종목은 생략됩니다.
+
+> **캐시:** 월별로 6시간 캐시. 개발 중 캐시 초기화가 필요하면 백엔드를 재시작하세요.
+
+**Error `422`** — `month` 파라미터가 `YYYY-MM` 형식이 아닌 경우
 
 ---
 
