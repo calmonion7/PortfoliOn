@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import math
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pathlib import Path
@@ -7,17 +8,60 @@ from services import storage, report_generator
 from services import consensus as consensus_svc
 from services import cache as cache_svc
 
+
+def _sanitize(obj):
+    """NaN/Inf float을 None으로 치환해 JSON 직렬화 오류 방지."""
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return obj
+
 router = APIRouter(prefix="/api", tags=["report"])
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"  # legacy fallback
 
 _progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
+_backfill_progress: dict = {"running": False, "done": 0, "total": 0, "current": "", "created": 0}
 
 
 @router.get("/report/progress")
 def get_progress():
     return _progress
+
+
+@router.get("/report/backfill/progress")
+def get_backfill_progress():
+    return _backfill_progress
+
+
+@router.post("/report/backfill", status_code=202)
+def backfill_all(background_tasks: BackgroundTasks, days: int = 60):
+    portfolio = storage.get_full_portfolio()
+    stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+    if not stocks:
+        raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
+    background_tasks.add_task(_run_backfill, stocks, days)
+    return {"message": f"과거 {days}일 스냅샷 백필 시작: {len(stocks)}개 종목"}
+
+
+def _run_backfill(stocks: list, days: int):
+    _backfill_progress.update({"running": True, "done": 0, "total": len(stocks), "current": "", "created": 0})
+    total_created = 0
+    for stock in stocks:
+        _backfill_progress["current"] = stock["ticker"]
+        try:
+            n = report_generator.backfill_ticker(stock, days=days)
+            total_created += n
+            cache_svc.invalidate(stock["ticker"])
+        except Exception as e:
+            print(f"[Backfill] Failed for {stock['ticker']}: {e}")
+        _backfill_progress["done"] += 1
+        _backfill_progress["created"] = total_created
+    _backfill_progress.update({"running": False, "current": ""})
 
 
 @router.post("/report/generate", status_code=202)
@@ -69,7 +113,7 @@ def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
     for base in (SNAPSHOTS_DIR, REPORTS_DIR):
         path = base / ticker / f"{date_str}.json"
         if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
+            return _sanitize(json.loads(path.read_text(encoding="utf-8")))
     return None
 
 
@@ -122,6 +166,46 @@ def get_report(ticker: str, date_str: str):
     if summary is None:
         raise HTTPException(status_code=404, detail="Report not found")
     return {"ticker": upper, "date": date_str, "summary": summary}
+
+
+_consensus_progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
+
+
+@router.get("/consensus/batch/progress")
+def get_consensus_batch_progress():
+    return _consensus_progress
+
+
+@router.post("/consensus/batch", status_code=202)
+def batch_consensus(background_tasks: BackgroundTasks):
+    portfolio = storage.get_full_portfolio()
+    stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+    if not stocks:
+        raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
+    background_tasks.add_task(_run_consensus_batch, stocks)
+    return {"message": f"컨센서스 수집/백필 시작: {len(stocks)}개 종목"}
+
+
+def _run_consensus_batch(stocks: list):
+    _consensus_progress["running"] = True
+    _consensus_progress["done"] = 0
+    _consensus_progress["total"] = len(stocks)
+    _consensus_progress["current"] = ""
+    for stock in stocks:
+        ticker = stock["ticker"]
+        market = stock.get("market", "US")
+        _consensus_progress["current"] = ticker
+        try:
+            consensus_svc.collect(ticker)
+        except Exception as e:
+            print(f"[Consensus] collect failed for {ticker}: {e}")
+        try:
+            consensus_svc.backfill(ticker, market)
+        except Exception as e:
+            print(f"[Consensus] backfill failed for {ticker}: {e}")
+        _consensus_progress["done"] += 1
+    _consensus_progress["running"] = False
+    _consensus_progress["current"] = ""
 
 
 @router.get("/consensus/{ticker}")

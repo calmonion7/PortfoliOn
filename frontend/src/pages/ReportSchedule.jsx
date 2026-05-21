@@ -15,6 +15,11 @@ export default function ReportSchedule() {
   const [genMsg, setGenMsg] = useState('')
   const [progress, setProgress] = useState({ done: 0, total: 0, current: '' })
   const pollRef = useRef(null)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillMsg, setBackfillMsg] = useState('')
+  const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0, current: '', created: 0 })
+  const backfillPollRef = useRef(null)
+  const [backfillDays, setBackfillDays] = useState(60)
 
   useEffect(() => {
     axios.get('/api/schedule').then(({ data }) => setSchedule(data))
@@ -61,6 +66,32 @@ export default function ReportSchedule() {
   }
 
   useEffect(() => () => clearInterval(pollRef.current), [])
+
+  const handleBackfill = async () => {
+    setBackfilling(true)
+    setBackfillMsg('')
+    setBackfillProgress({ done: 0, total: 0, current: '', created: 0 })
+    clearInterval(backfillPollRef.current)
+    try {
+      await axios.post(`/api/report/backfill?days=${backfillDays}`)
+      backfillPollRef.current = setInterval(async () => {
+        try {
+          const { data } = await axios.get('/api/report/backfill/progress')
+          setBackfillProgress(data)
+          if (!data.running && data.total > 0 && data.done >= data.total) {
+            clearInterval(backfillPollRef.current)
+            setBackfilling(false)
+            setBackfillMsg(`완료: ${data.created}개 스냅샷 생성`)
+          }
+        } catch {}
+      }, 1500)
+    } catch (err) {
+      setBackfillMsg(err.response?.data?.detail || '백필 실패')
+      setBackfilling(false)
+    }
+  }
+
+  useEffect(() => () => clearInterval(backfillPollRef.current), [])
 
   const pct = progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0
 
@@ -120,6 +151,49 @@ export default function ReportSchedule() {
           </div>
         )}
         {genMsg && <p style={{ marginTop: 8, color: 'var(--positive)', fontSize: 13 }}>{genMsg}</p>}
+      </section>
+
+      <section style={{ background: 'var(--bg-surface)', padding: 20, borderRadius: 8, marginTop: 24 }}>
+        <h2 style={{ color: 'var(--text-heading)', marginBottom: 8, fontSize: 14 }}>과거 스냅샷 백필</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>
+          지정한 기간만큼 과거 거래일의 스냅샷을 생성합니다. 이미 있는 날짜는 건너뜁니다.<br />
+          <span style={{ fontSize: 12 }}>가격·RSI·볼륨프로파일은 실제 이력 데이터, 재무/컨센서스는 현재 데이터를 사용합니다.</span>
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <label style={{ color: 'var(--text-muted)', fontSize: 13, whiteSpace: 'nowrap' }}>기간</label>
+          {[30, 60, 90].map(d => (
+            <button key={d} type="button" onClick={() => setBackfillDays(d)}
+              style={{
+                padding: '4px 12px', borderRadius: 4, fontSize: 13,
+                background: backfillDays === d ? 'var(--accent-btn)' : 'var(--bg-hover)',
+                color: backfillDays === d ? 'white' : 'var(--text-muted)',
+                border: 'none', cursor: 'pointer',
+              }}>
+              {d}일
+            </button>
+          ))}
+        </div>
+        <button className="btn-primary" onClick={handleBackfill} disabled={backfilling}>
+          {backfilling ? '백필 중...' : '과거 스냅샷 생성'}
+        </button>
+        {backfilling && backfillProgress.total > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
+              <span>{backfillProgress.current ? `처리 중: ${backfillProgress.current}` : '준비 중...'}</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                {backfillProgress.done} / {backfillProgress.total} 종목
+                {backfillProgress.created > 0 && ` (+${backfillProgress.created}개)`}
+              </span>
+            </div>
+            <div style={{ background: 'var(--bg-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+              <div style={{
+                width: `${Math.round(backfillProgress.done / backfillProgress.total * 100)}%`,
+                height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.4s ease'
+              }} />
+            </div>
+          </div>
+        )}
+        {backfillMsg && <p style={{ marginTop: 8, color: 'var(--positive)', fontSize: 13 }}>{backfillMsg}</p>}
       </section>
     </div>
   )
