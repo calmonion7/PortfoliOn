@@ -372,7 +372,12 @@ function ConsensusChart({ ticker, market }) {
             </ResponsiveContainer>
           </div>
           <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>애널리스트 의견</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>애널리스트 의견</div>
+              {opinionData.length < ascData.length && (
+                <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 3, padding: '0 5px', lineHeight: '16px' }}>변동 없음</span>
+              )}
+            </div>
             <ResponsiveContainer width="100%" height={120}>
               <LineChart data={opinionData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
