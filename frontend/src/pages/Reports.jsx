@@ -285,24 +285,13 @@ function ConsensusChart({ ticker, market }) {
     }
   }
 
-  const dedupedTarget = useMemo(() => {
-    if (!data.length) return []
-    const asc = [...data].reverse()
-    return asc.filter((item, i) => {
-      if (i === 0) return true
-      return item.target_mean !== asc[i - 1].target_mean
-    })
-  }, [data])
+  const ascData = useMemo(() => [...data].reverse(), [data])
 
-  const dedupedOpinion = useMemo(() => {
-    if (!data.length) return []
-    const asc = [...data].reverse()
-    return asc.filter((item, i) => {
-      if (i === 0) return true
-      const prev = asc[i - 1]
-      return !(item.buy === prev.buy && item.hold === prev.hold && item.sell === prev.sell)
-    })
-  }, [data])
+  const opinionData = useMemo(() => {
+    if (ascData.length <= 2) return ascData
+    const allSame = ascData.every(d => d.buy === ascData[0].buy && d.hold === ascData[0].hold && d.sell === ascData[0].sell)
+    return allSame ? [ascData[0], ascData[ascData.length - 1]] : ascData
+  }, [ascData])
 
   const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
   const chartMargin = { top: 4, right: 8, left: 0, bottom: 0 }
@@ -364,7 +353,7 @@ function ConsensusChart({ ticker, market }) {
         </div>
       </div>
       {error && <div style={{ color: '#ef9a9a', fontSize: 11, marginBottom: 6 }}>{error}</div>}
-      {dedupedTarget.length === 0 && dedupedOpinion.length === 0 ? (
+      {ascData.length === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
           아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요.
         </div>
@@ -373,7 +362,7 @@ function ConsensusChart({ ticker, market }) {
           <div style={{ marginBottom: 4 }}>
             <div style={{ fontSize: 10, color: '#ffcc80', marginBottom: 2 }}>평균목표가</div>
             <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={dedupedTarget} margin={chartMargin}>
+              <LineChart data={ascData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
@@ -385,7 +374,7 @@ function ConsensusChart({ ticker, market }) {
           <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>애널리스트 의견</div>
             <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={dedupedOpinion} margin={chartMargin}>
+              <LineChart data={opinionData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
@@ -932,6 +921,8 @@ export default function Reports() {
   const [generating, setGenerating] = useState(null)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0 })
   const pollRef = useRef(null)
+  const [consensusBatch, setConsensusBatch] = useState({ running: false, done: 0, total: 0, current: '' })
+  const consensusPollRef = useRef(null)
   const [activeTab, setActiveTab] = useState('holdings')
   const [watchlistSub, setWatchlistSub] = useState('low')
   const [view, setView] = useState('list')
@@ -1006,6 +997,27 @@ export default function Reports() {
   }
 
   useEffect(() => () => clearInterval(pollRef.current), [])
+
+  const runConsensusBatch = async () => {
+    setConsensusBatch({ running: true, done: 0, total: 0, current: '' })
+    clearInterval(consensusPollRef.current)
+    try {
+      await axios.post('/api/consensus/batch')
+      consensusPollRef.current = setInterval(async () => {
+        try {
+          const { data } = await axios.get('/api/consensus/batch/progress')
+          setConsensusBatch({ running: data.running, done: data.done, total: data.total, current: data.current })
+          if (!data.running && data.total > 0 && data.done >= data.total) {
+            clearInterval(consensusPollRef.current)
+          }
+        } catch {}
+      }, 1500)
+    } catch {
+      setConsensusBatch(p => ({ ...p, running: false }))
+    }
+  }
+
+  useEffect(() => () => clearInterval(consensusPollRef.current), [])
 
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
   const watchlistAll = Object.entries(reportList).filter(([, v]) => v.category === 'watchlist')
@@ -1122,7 +1134,31 @@ export default function Reports() {
     <div style={{ display: 'flex', gap: 24, height: 'calc(100vh - 120px)' }}>
       {/* 좌측 사이드바 */}
       <div style={{ width: 210, overflowY: 'auto', borderRight: '1px solid var(--border)', paddingRight: 16, flexShrink: 0 }}>
-        <h3 style={{ color: 'var(--text-heading)', marginBottom: 8 }}>리포트 목록</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <h3 style={{ color: 'var(--text-heading)', margin: 0 }}>리포트 목록</h3>
+          <button
+            onClick={runConsensusBatch}
+            disabled={consensusBatch.running}
+            title="전체 종목 수집 → 백필"
+            style={{
+              background: 'transparent', border: '1px solid var(--border)',
+              color: consensusBatch.running ? 'var(--accent)' : 'var(--text-muted)',
+              borderRadius: 3, padding: '2px 7px', fontSize: 10,
+              cursor: consensusBatch.running ? 'default' : 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            {consensusBatch.running
+              ? `${consensusBatch.current || '...'} (${consensusBatch.done}/${consensusBatch.total})`
+              : '전체 수집/백필'}
+          </button>
+        </div>
+        {consensusBatch.running && consensusBatch.total > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.round(consensusBatch.done / consensusBatch.total * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.4s ease' }} />
+            </div>
+          </div>
+        )}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
           <button style={TAB_STYLE(activeTab === 'holdings')} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
           <button style={TAB_STYLE(activeTab === 'watchlist')} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
