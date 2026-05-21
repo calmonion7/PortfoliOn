@@ -50,8 +50,7 @@ npm run dev
 
 ```bash
 cd backend
-source venv/bin/activate
-uvicorn main:app --reload --port 8000
+.venv/bin/python -m uvicorn main:app --reload --port 8000
 ```
 
 ```bash
@@ -86,6 +85,16 @@ npm run dev
 | 주가 · RSI 차트 | 최근 주가 추이 및 RSI 지표 시각화 |
 | 목표주가 분석 | 증권사 컨센서스 목표가 및 괴리율 표시 |
 | 즉시 생성 | 전체 종목 리포트 즉시 생성, 진행률 표시 |
+
+### 이벤트 캘린더
+보유·관심종목의 실적 발표일과 배당락일을 월간 달력으로 확인합니다.
+
+| 기능 | 설명 |
+|------|------|
+| 월간 그리드 | 날짜 셀에 이벤트 뱃지 표시 (실적=파란색, 배당락=초록색) |
+| 보유/관심 전환 | 탭으로 보유종목 ↔ 관심종목 이벤트 전환 |
+| 월 이동 | ‹ › 버튼으로 이전·다음 달 탐색 |
+| 종목명 툴팁 | 뱃지에 마우스 오버 시 한글 종목명 표시 |
 
 ### 구루 매니저
 [dataroma](https://www.dataroma.com) 기반으로 유명 가치투자자(구루)들의 포트폴리오를 분석합니다.
@@ -221,7 +230,7 @@ Browser (React/Vite :5173)
         │  REST API
         ▼
 FastAPI (:8000)
- ├─ routers/        # portfolio, watchlist, stocks, report, guru
+ ├─ routers/        # portfolio, watchlist, stocks, report, guru, calendar
  ├─ services/       # market(yfinance+Naver), charts, indicators,
  │                  # report_generator(Claude AI), scraper, scheduler
  └─ data/           # JSON 파일 저장소 (DB 없음)
@@ -252,14 +261,14 @@ PortfoliOn/
 ├── stop.bat  / stop.sh   # 서버 종료
 ├── backend/
 │   ├── main.py
-│   ├── routers/          # portfolio, watchlist, stocks, report, guru
+│   ├── routers/          # portfolio, watchlist, stocks, report, guru, calendar
 │   ├── services/         # storage, market, charts, indicators,
 │   │                     # report_generator, scraper, guru_scraper, guru_stats, utils
 │   ├── data/             # JSON 파일 저장소 (stocks.json, schedule.json, consensus/)
 │   └── snapshots/        # 생성된 JSON 스냅샷 (per-ticker/date)
 └── frontend/
     └── src/
-        ├── pages/        # Portfolio, Reports, Settings
+        ├── pages/        # Portfolio, Reports, Calendar, Settings
         │                 # Guru, GuruCrawlSettings, GuruStats, ReportSchedule
         ├── components/   # StockModal, PromoteModal
         └── utils.js      # 공통 유틸리티 (TAB_STYLE, fmtPrice)
