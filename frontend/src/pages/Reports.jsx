@@ -1204,20 +1204,19 @@ function HistoryTab({ ticker, dates, market }) {
         <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
           <select value={compareA ?? ''} onChange={e => setCompareA(e.target.value)}
             style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
-            {dates.map(d => <option key={d} value={d}>{d}</option>)}
+            {history.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
           </select>
           <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>vs</span>
           <select value={compareB ?? ''} onChange={e => setCompareB(e.target.value)}
             style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
-            {dates.map(d => <option key={d} value={d}>{d}</option>)}
+            {history.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
           </select>
         </div>
 
         {history.length < 2
           ? <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>비교할 날짜가 없습니다.</p>
           : (
-            <>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
                     <th style={{ ...TH, textAlign: 'left' }}>항목</th>
@@ -1255,7 +1254,6 @@ function HistoryTab({ ticker, dates, market }) {
                   })}
                 </tbody>
               </table>
-            </>
           )
         }
       </div>
