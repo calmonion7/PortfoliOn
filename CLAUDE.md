@@ -89,7 +89,7 @@ cd backend && python -m uvicorn main:app --reload --port 8000
 cd frontend && npm run dev
 
 # Backend tests
-cd backend && pytest
+cd backend && .venv/bin/python -m pytest
 ```
 
 ## Architecture
@@ -97,7 +97,7 @@ cd backend && pytest
 **Backend** — Python/FastAPI (port 8000)
 
 - `backend/main.py` — app entry, mounts routers + scheduler
-- `backend/routers/` — portfolio, watchlist, stocks, report, guru
+- `backend/routers/` — portfolio, watchlist, stocks, report, guru, calendar
 - `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, consensus, cache, guru_scraper, guru_stats
 - `backend/scheduler.py` — APScheduler 설정 (services 아님, 루트 레벨)
 - `backend/data/` — JSON file storage (stocks.json — unified holdings+watchlist+analyst data, schedule.json)
@@ -106,7 +106,7 @@ cd backend && pytest
 
 **Frontend** — React 18 + Vite (port 5173), plain CSS (no TailwindCSS)
 
-- `frontend/src/pages/` — Portfolio, Reports, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule)
+- `frontend/src/pages/` — Portfolio, Reports, Calendar, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule)
 - `frontend/src/components/` — StockModal, PromoteModal
 
 ## Key Files
@@ -118,7 +118,6 @@ cd backend && pytest
 ## Data Model
 
 - `holdings.json` and `watchlist.json` are merged into `stocks.json` (use `type: "holding"|"watchlist"` field to distinguish)
-- `portfolio.json` — 포트폴리오 요약/집계 데이터
 - `guru_managers.json` — Guru 운용역 데이터 캐시
 - New snapshots write to `backend/snapshots/`, old `reports/` is kept as read-only fallback
 
@@ -129,3 +128,5 @@ cd backend && pytest
 - Frontend CORS origins are hardcoded in `backend/main.py`: `localhost:3000` and `localhost:5173`.
 - `start.bat` runs both servers in hidden PowerShell windows; use `stop.bat` to kill them.
 - `ANTHROPIC_API_KEY` must be set in the environment for report generation to work.
+- Vite proxies `/api/*` to `http://localhost:8000` — frontend axios calls don't need a base URL.
+- `backend/routers/calendar.py` has a 6-hour in-memory cache keyed by month. Restart the backend to clear it during development.
