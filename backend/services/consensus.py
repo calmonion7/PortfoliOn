@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 CONSENSUS_DIR = Path(__file__).parent.parent / "data" / "consensus"
+SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 
@@ -18,10 +19,14 @@ def get_history(ticker: str) -> list[dict]:
 def collect(ticker: str) -> dict | None:
     """최신 리포트 JSON에서 컨센서스를 읽어 날짜별 파일에 누적한다. 데이터 없으면 None 반환."""
     upper = ticker.upper()
-    ticker_dir = REPORTS_DIR / upper
-    if not ticker_dir.exists():
-        return None
-    json_files = sorted(ticker_dir.glob("*.json"), reverse=True)
+    # snapshots/ 우선, 없으면 reports/ fallback
+    json_files = []
+    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
+        d = base / upper
+        if d.exists():
+            json_files = sorted(d.glob("*.json"), reverse=True)
+            if json_files:
+                break
     if not json_files:
         return None
     summary = json.loads(json_files[0].read_text(encoding="utf-8"))
@@ -75,12 +80,18 @@ _US_SELL = {"Sell", "Underperform", "Underweight", "Strong Sell", "Negative", "R
 
 
 def _fetch_kr(ticker: str) -> list[dict]:
-    """Naver Research API로 최근 60일 날짜별 컨센서스 수집."""
+    """Naver Research API로 과거 3개월 월별 누적 컨센서스 수집 (collect()와 동일 기준).
+
+    collect()는 FnGuide에서 최근 ~90일 활성 리포트를 누적 집계한다.
+    백필도 각 기준월로부터 90일 이내 활성 리포트를 누적 집계하여 동일 기준을 맞춘다.
+    """
     import requests
     from concurrent.futures import ThreadPoolExecutor
     from datetime import timedelta
 
-    cutoff = (date.today() - timedelta(days=60)).isoformat()
+    today = date.today()
+    # 최대 6개월치 리포트를 가져와서 각 기준월에 맞게 재집계
+    cutoff = (today - timedelta(days=180)).isoformat()
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
@@ -118,78 +129,72 @@ def _fetch_kr(ticker: str) -> list[dict]:
             return write_date, "", None
 
     with ThreadPoolExecutor(max_workers=5) as ex:
-        results = list(ex.map(fetch_detail, recent))
+        all_reports = list(ex.map(fetch_detail, recent))
 
-    by_date: dict[str, dict] = defaultdict(lambda: {"buy": 0, "hold": 0, "sell": 0, "prices": []})
-    for write_date, opinion, goal_price in results:
-        d = by_date[write_date]
-        if opinion in _KR_BUY:
-            d["buy"] += 1
-        elif opinion in _KR_SELL:
-            d["sell"] += 1
-        else:
-            d["hold"] += 1
-        if goal_price is not None:
-            d["prices"].append(goal_price)
+    def _month_start(n: int) -> date:
+        month = today.month - n
+        year = today.year
+        while month <= 0:
+            month += 12
+            year -= 1
+        return date(year, month, 1)
 
     output = []
-    for dt, d in sorted(by_date.items()):
-        prices = d["prices"]
+    for n_months in [3, 2, 1]:
+        ref = _month_start(n_months)
+        window_start = (ref - timedelta(days=90)).isoformat()
+        ref_str = ref.isoformat()
+        active = [(d, op, gp) for d, op, gp in all_reports if window_start <= d <= ref_str]
+        if not active:
+            continue
+        buy  = sum(1 for _, op, _ in active if op in _KR_BUY)
+        sell = sum(1 for _, op, _ in active if op in _KR_SELL)
+        hold = len(active) - buy - sell
+        prices = [gp for _, _, gp in active if gp is not None]
         output.append({
-            "date": dt,
+            "date": ref_str,
             "target_mean": round(sum(prices) / len(prices)) if prices else None,
-            "buy": d["buy"],
-            "hold": d["hold"],
-            "sell": d["sell"],
+            "buy": buy,
+            "hold": hold,
+            "sell": sell,
         })
     return output
 
 
 def _fetch_us(ticker: str) -> list[dict]:
-    """yfinance upgrades_downgrades로 최근 60일 날짜별 컨센서스 수집."""
-    from datetime import timedelta
+    """yfinance recommendations_summary로 과거 3개월 월별 누적 컨센서스 수집 (collect()와 동일 소스)."""
     try:
         import yfinance as yf
-        import pandas as pd
-        ud = yf.Ticker(ticker).upgrades_downgrades
-        if ud is None or ud.empty:
+        t = yf.Ticker(ticker.replace(".", "-"))
+        recs = t.recommendations_summary
+        if recs is None or recs.empty:
             return []
 
-        cutoff = date.today() - timedelta(days=60)
-        grade_dates = pd.to_datetime(ud.index)
-        if grade_dates.tz is not None:
-            grade_dates = grade_dates.tz_convert(None)
-        ud = ud.copy()
-        ud.index = grade_dates.date
-        ud = ud[ud.index >= cutoff]
+        if "period" in recs.columns:
+            recs = recs.set_index("period")
 
-        by_date: dict[str, dict] = defaultdict(lambda: {"buy": 0, "hold": 0, "sell": 0, "prices": []})
-        for grade_date, row in ud.iterrows():
-            dt = str(grade_date)
-            grade = str(row.get("ToGrade", ""))
-            d = by_date[dt]
-            if grade in _US_BUY:
-                d["buy"] += 1
-            elif grade in _US_SELL:
-                d["sell"] += 1
-            else:
-                d["hold"] += 1
-            try:
-                price = float(row.get("currentPriceTarget", 0) or 0)
-                if price > 0:
-                    d["prices"].append(price)
-            except (ValueError, TypeError):
-                pass
+        today = date.today()
 
-        return [
-            {
-                "date": dt,
-                "target_mean": round(sum(d["prices"]) / len(d["prices"]), 2) if d["prices"] else None,
-                "buy": d["buy"],
-                "hold": d["hold"],
-                "sell": d["sell"],
-            }
-            for dt, d in sorted(by_date.items())
-        ]
+        def _month_start(n: int) -> str:
+            month = today.month - n
+            year = today.year
+            while month <= 0:
+                month += 12
+                year -= 1
+            return date(year, month, 1).isoformat()
+
+        # "0m"은 collect()가 오늘 날짜로 저장하므로 제외, -1m~-3m만 백필
+        period_dates = {"-1m": _month_start(1), "-2m": _month_start(2), "-3m": _month_start(3)}
+
+        result = []
+        for period, dt in period_dates.items():
+            if period not in recs.index:
+                continue
+            row = recs.loc[period]
+            buy = int(row.get("strongBuy", 0)) + int(row.get("buy", 0))
+            hold = int(row.get("hold", 0))
+            sell = int(row.get("sell", 0)) + int(row.get("strongSell", 0))
+            result.append({"date": dt, "target_mean": None, "buy": buy, "hold": hold, "sell": sell})
+        return result
     except Exception:
         return []
