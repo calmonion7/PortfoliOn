@@ -253,6 +253,29 @@ const _weather = (score) => {
   return { icon: '🌧️', label: '비' }
 }
 
+const overallWeather = (summary) => {
+  if (!summary) return null
+  const scores = []
+  if (summary.price && summary.target_mean) {
+    const gap = (summary.target_mean - summary.price) / summary.price * 100
+    const total = (summary.buy ?? 0) + (summary.hold ?? 0) + (summary.sell ?? 0)
+    const buyPct = total > 0 ? (summary.buy ?? 0) / total * 100 : 50
+    if (gap >= 15 && buyPct >= 60) scores.push(0)
+    else if (gap >= 5 && buyPct >= 45) scores.push(1)
+    else if (gap >= -5) scores.push(2)
+    else scores.push(3)
+  }
+  const rsi = summary.daily_rsi?.rsi
+  if (rsi != null) {
+    if (rsi < 30) scores.push(0)
+    else if (rsi < 45) scores.push(1)
+    else if (rsi < 65) scores.push(2)
+    else scores.push(3)
+  }
+  if (!scores.length) return null
+  return _weather(Math.round(scores.reduce((a, b) => a + b, 0) / scores.length))
+}
+
 const SectionTitle = ({ children, weather }) => (
   <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
     <span>{children}</span>
@@ -1521,7 +1544,10 @@ const fetchList = useCallback(() => {
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--bg-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
+            {(() => { const w = overallWeather(info.summary); return w ? <span title={w.label} style={{ fontSize: 12, lineHeight: 1 }}>{w.icon}</span> : null })()}
+          </span>
           {info.summary?.name && (
             <div style={{ color: 'var(--text-muted)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
           )}
@@ -1676,7 +1702,10 @@ const fetchList = useCallback(() => {
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.querySelector('td').style.background = 'var(--bg)' }}
                     >
                       <td style={{ ...TD, textAlign: 'left', color: 'var(--accent)', fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, background: 'var(--bg)' }}>
-                        <div>{s?.name || ticker}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          {s?.name || ticker}
+                          {(() => { const w = overallWeather(s); return w ? <span title={w.label} style={{ fontSize: 13, lineHeight: 1, fontWeight: 400 }}>{w.icon}</span> : null })()}
+                        </div>
                         <div style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
                         {guruMap[ticker] && <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>}
                         {!hasReport && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>리포트 없음 — 클릭하여 생성</div>}
