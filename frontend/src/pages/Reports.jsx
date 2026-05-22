@@ -104,12 +104,12 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     vp?.vah != null && { value: vp.vah, label: 'VAH', color: '#4fc3f7', size: 'md' },
     vp?.val != null && { value: vp.val, label: 'VAL', color: '#4fc3f7', size: 'md' },
     target != null && { value: target, label: '평균목표가', color: '#ffcc80', size: 'md' },
-    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#81c784', size: 'sm' },
-    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#81c784', size: 'sm' },
-    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#81c784', size: 'sm' },
-    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ef9a9a', size: 'sm' },
-    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ef9a9a', size: 'sm' },
-    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ef9a9a', size: 'sm' },
+    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#4db6ac', size: 'sm' },
+    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#4db6ac', size: 'sm' },
+    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#4db6ac', size: 'sm' },
+    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ff8a65', size: 'sm' },
+    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ff8a65', size: 'sm' },
+    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ff8a65', size: 'sm' },
     price != null && { value: price, label: `현재가${rsiData?.rsi != null ? ` (RSI ${rsiData.rsi.toFixed(1)})` : ''}`, color: '#ffffff', size: 'lg' },
   ].filter(Boolean)
   if (levels.length === 0) return null
@@ -120,17 +120,17 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const hi = Math.max(...vals) + pad
   const pct = v => ((v - lo) / (hi - lo)) * 100
   const sorted = [...levels].sort((a, b) => a.value - b.value)
-  // 가로 폭 추정(%) 기준으로 겹치면 행(row)을 올려 쌓음
-  const LABEL_W = 13 // 레이블 추정 폭 (% 단위)
+  const labelW = (l) => Math.max(5, Math.max(l.label.length, fmt(l.value, market).length) * 1.1)
   const aboveEdges = [], belowEdges = []
   sorted.forEach((l, i) => {
     l.above = i % 2 === 0
     const edges = l.above ? aboveEdges : belowEdges
     const cx = pct(l.value)
+    const hw = labelW(l)
     let row = 0
-    while (row < edges.length && edges[row] > cx - LABEL_W) row++
+    while (row < edges.length && edges[row] > cx - hw) row++
     if (row >= edges.length) edges.push(-Infinity)
-    edges[row] = cx + LABEL_W
+    edges[row] = cx + hw
     l.row = row
   })
   const ROW_H = 20 // 행 간격 px
@@ -200,22 +200,22 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, market }
         <thead>
           <tr style={{ background: 'var(--bg-surface)' }}>
             <th style={{ ...TH, textAlign: 'left', color: 'var(--text-muted)' }}>시간대</th>
-            <th style={{ ...TH, color: '#81c784' }}>RSI20</th>
-            <th style={{ ...TH, color: '#81c784' }}>RSI25</th>
-            <th style={{ ...TH, color: '#81c784' }}>RSI30</th>
+            <th style={{ ...TH, color: '#4db6ac' }}>RSI20</th>
+            <th style={{ ...TH, color: '#4db6ac' }}>RSI25</th>
+            <th style={{ ...TH, color: '#4db6ac' }}>RSI30</th>
             <th style={{ ...TH, color: 'var(--text-muted)' }}>현재RSI</th>
-            <th style={{ ...TH, color: '#ef9a9a' }}>RSI70</th>
-            <th style={{ ...TH, color: '#ef9a9a' }}>RSI75</th>
-            <th style={{ ...TH, color: '#ef9a9a' }}>RSI80</th>
+            <th style={{ ...TH, color: '#ff8a65' }}>RSI70</th>
+            <th style={{ ...TH, color: '#ff8a65' }}>RSI75</th>
+            <th style={{ ...TH, color: '#ff8a65' }}>RSI80</th>
           </tr>
         </thead>
         <tbody>
           {rows.map(({ label, d }) => d?.rsi != null && (
             <tr key={label}>
               <td style={{ ...TD, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</td>
-              <GapCell target={d.target_20} price={price} baseColor="#81c784" highlight={closestKey === 'target_20'} market={market} />
-              <GapCell target={d.target_25} price={price} baseColor="#81c784" highlight={closestKey === 'target_25'} market={market} />
-              <GapCell target={d.target_30} price={price} baseColor="#81c784" highlight={closestKey === 'target_30'} market={market} />
+              <GapCell target={d.target_20} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_20'} market={market} />
+              <GapCell target={d.target_25} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_25'} market={market} />
+              <GapCell target={d.target_30} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_30'} market={market} />
               <td style={{ ...TD, color: rsiColor(d.rsi), fontWeight: 600 }}>{fmtN(d.rsi)}</td>
               <GapCell target={d.target_70} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_70'} market={market} />
               <GapCell target={d.target_75} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_75'} market={market} />
@@ -756,8 +756,8 @@ function DetailSummaryTab({ summary, ticker }) {
               { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
               { color: '#80cbc4', label: 'POC', desc: '거래량 최대 가격대' },
               { color: '#81c784', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
-              { color: '#81c784', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
-              { color: '#ef9a9a', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
+              { color: '#4db6ac', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
+              { color: '#ff8a65', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
             ].map(({ color, label, desc }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
@@ -1686,12 +1686,12 @@ const fetchList = useCallback(() => {
                   <th style={TH}>PBR</th>
                   <th style={TH}>Finviz</th>
                   <th style={{ ...TH, borderLeft: '1px solid var(--border)' }}>RSI<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI20<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI25<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI30<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI70<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI75<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI80<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI20<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI25<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI30<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI70<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI75<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI80<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
                 </tr>
               </thead>
               <tbody>
