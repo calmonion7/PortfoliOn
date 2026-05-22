@@ -246,9 +246,17 @@ const MetricCard = ({ label, value, sub, valueColor }) => (
   </div>
 )
 
-const SectionTitle = ({ children }) => (
-  <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10 }}>
-    {children}
+const _weather = (score) => {
+  if (score <= 0) return { icon: '☀️', label: '맑음' }
+  if (score <= 1) return { icon: '⛅', label: '구름 조금' }
+  if (score <= 2) return { icon: '☁️', label: '흐림' }
+  return { icon: '🌧️', label: '비' }
+}
+
+const SectionTitle = ({ children, weather }) => (
+  <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+    <span>{children}</span>
+    {weather && <span title={weather.label} style={{ fontSize: 14, lineHeight: 1 }}>{weather.icon}</span>}
   </div>
 )
 
@@ -295,6 +303,17 @@ function ConsensusChart({ ticker, market }) {
   }
 
   const ascData = useMemo(() => [...data].reverse(), [data])
+
+  const trendWeather = useMemo(() => {
+    const pts = ascData.filter(d => d.target_mean != null)
+    if (pts.length < 2) return null
+    const recent = pts.slice(-5)
+    const pct = (recent[recent.length - 1].target_mean - recent[0].target_mean) / Math.abs(recent[0].target_mean) * 100
+    if (pct > 2) return _weather(0)
+    if (pct > 0) return _weather(1)
+    if (pct > -2) return _weather(2)
+    return _weather(3)
+  }, [ascData])
 
   // 평균목표가: 연속 동일 구간은 첫 날짜만 유지 → 오른쪽 끝 = 현재값이 처음 시작된 날짜
   const targetData = useMemo(() => {
@@ -460,7 +479,10 @@ function ConsensusChart({ ticker, market }) {
   return (
     <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: '8px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px' }}>📈 컨센서스 추이</div>
+        <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>📈 컨센서스 추이</span>
+          {trendWeather && <span title={trendWeather.label} style={{ fontSize: 14, lineHeight: 1 }}>{trendWeather.icon}</span>}
+        </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={backfill}
@@ -596,13 +618,33 @@ function DetailSummaryTab({ summary, ticker }) {
     ? ((summary.target_mean - summary.price) / summary.price * 100)
     : null
 
+  const consensusWeather = (() => {
+    if (!summary.price || !summary.target_mean) return null
+    const gap = (summary.target_mean - summary.price) / summary.price * 100
+    const total = (summary.buy ?? 0) + (summary.hold ?? 0) + (summary.sell ?? 0)
+    const buyPct = total > 0 ? (summary.buy ?? 0) / total * 100 : 50
+    if (gap >= 15 && buyPct >= 60) return _weather(0)
+    if (gap >= 5 && buyPct >= 45) return _weather(1)
+    if (gap >= -5) return _weather(2)
+    return _weather(3)
+  })()
+
+  const rsiWeather = (() => {
+    const rsi = summary.daily_rsi?.rsi
+    if (rsi == null) return null
+    if (rsi < 30) return _weather(0)
+    if (rsi < 45) return _weather(1)
+    if (rsi < 65) return _weather(2)
+    return _weather(3)
+  })()
+
   return (
     <div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       {/* 1행: 증권사 컨센서스 */}
       <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: '8px 10px' }}>
-        <SectionTitle>🏦 증권사 컨센서스</SectionTitle>
+        <SectionTitle weather={consensusWeather}>🏦 증권사 컨센서스</SectionTitle>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -666,7 +708,7 @@ function DetailSummaryTab({ summary, ticker }) {
       {/* 2행: 매물대·RSI 현황 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: 14 }}>
-          <SectionTitle>📉 매물대 &amp; RSI 현황</SectionTitle>
+          <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, marginTop: 4 }}>
             {[
               { color: '#ffffff', label: '현재가', desc: '현재 주가' },
@@ -797,8 +839,8 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     PBR: '주가순자산비율 — 주가 ÷ BPS (낮을수록 저평가)',
   }
 
-  const Legend = ({ items }) => (
-    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
+  const Legend = ({ items, weather }) => (
+    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, alignItems: 'center' }}>
       {items.map(({ color, label }) => {
         const desc = DESCS[label]
         return (
@@ -823,6 +865,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
           </span>
         )
       })}
+      {weather && <span title={weather.label} style={{ marginLeft: 4, fontSize: 13, lineHeight: 1 }}>{weather.icon}</span>}
     </div>
   )
 
@@ -906,16 +949,64 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     <td style={{ color: color || 'var(--text-muted)', textAlign: 'right', padding: '1px 6px' }}>{children}</td>
   )
 
+  const calcFinancialsWeather = (data) => {
+    const real = data.filter(d => !d.is_consensus)
+    if (real.length < 2) return null
+    const recent = real.slice(-3)
+    const revPcts = recent.slice(1).map(d => d.rev_chg_pct).filter(v => v != null)
+    const opPcts  = recent.slice(1).map(d => d.op_chg_pct).filter(v => v != null)
+    if (!revPcts.length && !opPcts.length) return null
+    const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length
+    const avgRev = revPcts.length ? avg(revPcts) : 0
+    const avgOp  = opPcts.length  ? avg(opPcts)  : avgRev
+    if (avgRev > 5 && avgOp > 5) return _weather(0)
+    if (avgRev > 0 && avgOp > 0) return _weather(1)
+    if (avgRev > -5 || avgOp > -5) return _weather(2)
+    return _weather(3)
+  }
+
+  const pctWeather = (pcts) => {
+    if (!pcts.length) return null
+    const avg = pcts.reduce((a, b) => a + b, 0) / pcts.length
+    if (avg > 5) return _weather(0)
+    if (avg > 0) return _weather(1)
+    if (avg > -5) return _weather(2)
+    return _weather(3)
+  }
+
   const Section = ({ data, title }) => {
     const hasEpsBps = data.some(d => d.eps != null || d.bps != null)
     const hasPerPbr = data.some(d => d.per != null || d.pbr != null)
+    const weather = calcFinancialsWeather(data)
+
+    const real = data.filter(d => !d.is_consensus)
+    const recent = real.slice(-3)
+
+    const revOpWeather = pctWeather([
+      ...recent.slice(1).map(d => d.rev_chg_pct).filter(v => v != null),
+      ...recent.slice(1).map(d => d.op_chg_pct).filter(v => v != null),
+    ])
+    const epsWeather = pctWeather(
+      recent.slice(1).map(d => d.eps_chg_pct).filter(v => v != null)
+    )
+    const perWeather = (() => {
+      const pers = recent.filter(d => d.per != null).map(d => d.per)
+      if (pers.length < 2) return null
+      const diff = pers[pers.length - 1] - pers[0]
+      // PER 하락 = 저평가되거나 이익 증가 = 긍정
+      if (diff < -3) return _weather(0)
+      if (diff < 0)  return _weather(1)
+      if (diff < 3)  return _weather(2)
+      return _weather(3)
+    })()
+
     return (
       <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: 14, marginTop: 12 }}>
-        <SectionTitle>{title}</SectionTitle>
+        <SectionTitle weather={weather}>{title}</SectionTitle>
 
         {/* 매출 / 영업이익 */}
         <div style={{ marginTop: 8 }}>
-          <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} />
+          <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} weather={revOpWeather} />
           <ResponsiveContainer width="100%" height={165}>
             <LineChart data={data} margin={{ ...chartMargin, top: 18 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
@@ -938,7 +1029,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
           <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
             {hasEpsBps && (
               <div style={{ flex: 1, minWidth: 0 }}>
-                <Legend items={[{ color: '#80cbc4', label: 'EPS' }, { color: '#f48fb1', label: 'BPS' }]} />
+                <Legend items={[{ color: '#80cbc4', label: 'EPS' }, { color: '#f48fb1', label: 'BPS' }]} weather={epsWeather} />
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={data} margin={chartMargin}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
@@ -953,7 +1044,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
             )}
             {hasPerPbr && (
               <div style={{ flex: 1, minWidth: 0 }}>
-                <Legend items={[{ color: '#ffcc80', label: 'PER' }, { color: '#ce93d8', label: 'PBR' }]} />
+                <Legend items={[{ color: '#ffcc80', label: 'PER' }, { color: '#ce93d8', label: 'PBR' }]} weather={perWeather} />
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={data} margin={chartMargin}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
