@@ -80,11 +80,22 @@ export default function Calendar() {
 
   const monthStr = `${year}-${String(month).padStart(2, '0')}`
 
+  const adjacentMonths = () => {
+    const prev = new Date(year, month - 2, 1)
+    const next = new Date(year, month, 1)
+    return [prev, next].map(d =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    )
+  }
+
   useEffect(() => {
     setLoading(true)
     setError('')
     axios.get(`/api/calendar?month=${monthStr}`)
-      .then(r => setEvents(r.data.events))
+      .then(r => {
+        setEvents(r.data.events)
+        adjacentMonths().forEach(m => axios.get(`/api/calendar?month=${m}`).catch(() => {}))
+      })
       .catch(() => setError('이벤트 불러오기 실패'))
       .finally(() => setLoading(false))
   }, [year, month, fetchKey])
