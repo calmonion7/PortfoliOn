@@ -120,7 +120,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const hi = Math.max(...vals) + pad
   const pct = v => ((v - lo) / (hi - lo)) * 100
   const sorted = [...levels].sort((a, b) => a.value - b.value)
-  const labelW = (l) => Math.max(5, Math.max(l.label.length, fmt(l.value, market).length) * 1.1)
+  const labelW = (l) => Math.max(5, Math.max(l.label.length, fmt(l.value, market).length) * 0.95)
   const aboveEdges = [], belowEdges = []
   sorted.forEach((l, i) => {
     l.above = i % 2 === 0
@@ -133,12 +133,15 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     edges[row] = cx + hw
     l.row = row
   })
-  const ROW_H = 20 // 행 간격 px
-  const BAR_TOP = 46
+  const ROW_H = 20
+  const maxAboveRow = sorted.reduce((m, l) => l.above ? Math.max(m, l.row) : m, -1)
+  const maxBelowRow = sorted.reduce((m, l) => !l.above ? Math.max(m, l.row) : m, -1)
+  const BAR_TOP = Math.max(46, 40 + maxAboveRow * ROW_H)
+  const totalH = Math.max(100, BAR_TOP + 8 + (maxBelowRow >= 0 ? (maxBelowRow + 1) * ROW_H : 0) + 20)
   return (
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{title}</div>}
-      <div style={{ position: 'relative', height: Math.max(100, BAR_TOP + 8 + (Math.max(...sorted.map(l => l.above ? 0 : l.row + 1)) * ROW_H) + 20) }}>
+      <div style={{ position: 'relative', height: totalH }}>
         {vp?.val != null && vp?.vah != null && (
           <div style={{
             position: 'absolute', top: BAR_TOP - 4, height: 16, borderRadius: 3,
@@ -166,8 +169,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                   : { top: '100%', marginTop: 3 + l.row * ROW_H }),
                 textAlign: 'center', whiteSpace: 'nowrap',
               }}>
-                <div style={{ fontSize: isLg ? 11 : 9, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
-                <div style={{ fontSize: 9, color: l.color, opacity: 0.85 }}>{fmt(l.value, market)}</div>
+                <div style={{ fontSize: isLg ? 10 : 8, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
+                <div style={{ fontSize: 8, color: l.color, opacity: 0.85 }}>{fmt(l.value, market)}</div>
               </div>
             </div>
           )
