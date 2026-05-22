@@ -9,6 +9,9 @@ __pycache__/
 # Generated reports (runtime output)
 backend/reports/
 
+# Calendar file cache
+backend/data/calendar/
+
 # Local config
 .claude/settings.local.json
 .vscode/
