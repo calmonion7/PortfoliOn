@@ -285,6 +285,32 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                 "per": per, "pbr": pbr,
                 "is_consensus": False,
             })
+
+        # Append forward estimates (0y, +1y) from analyst consensus
+        try:
+            ee = t.earnings_estimate
+            re = t.revenue_estimate
+            if ee is not None and not ee.empty and re is not None and not re.empty:
+                latest_col = stmt.columns[0]
+                base_year = latest_col.year if hasattr(latest_col, "year") else int(str(latest_col)[:4])
+                forward = []
+                for i, period_key in enumerate(["0y", "+1y"]):
+                    if period_key in ee.index and period_key in re.index:
+                        eps_est = ee.loc[period_key, "avg"] if "avg" in ee.columns else None
+                        rev_est = re.loc[period_key, "avg"] if "avg" in re.columns else None
+                        forward.append({
+                            "period": str(base_year + i + 1),
+                            "revenue": int(rev_est) if rev_est is not None and not pd.isna(rev_est) else None,
+                            "operating_income": None,
+                            "eps": round(float(eps_est), 4) if eps_est is not None and not pd.isna(eps_est) else None,
+                            "bps": None, "per": None, "pbr": None,
+                            "is_consensus": True,
+                        })
+                # Prepend reversed so that after frontend .reverse() they appear at the right (most future)
+                results = list(reversed(forward)) + results
+        except Exception:
+            pass
+
         return results
     except Exception:
         return []

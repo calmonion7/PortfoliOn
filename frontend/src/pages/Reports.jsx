@@ -1020,7 +1020,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
 
   return (
     <>
-      {annualData.length > 0 && <Section data={annualData} title="📈 연간 실적 추이 (4년)" />}
+      {annualData.length > 0 && <Section data={annualData} title="📈 연간 실적 추이" />}
       <Section data={quarterData} title="📊 분기 실적 추이" />
     </>
   )
