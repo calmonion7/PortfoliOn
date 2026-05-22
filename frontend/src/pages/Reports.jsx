@@ -350,12 +350,30 @@ function ConsensusChart({ ticker, market }) {
   }, [ascData])
 
   const opinionData = useMemo(() => {
-    if (ascData.length <= 2) return ascData
-    const allSame = ascData.every(d => d.buy === ascData[0].buy && d.hold === ascData[0].hold && d.sell === ascData[0].sell)
-    return allSame ? [ascData[0], ascData[ascData.length - 1]] : ascData
+    if (ascData.length === 0) return []
+    const result = [ascData[0]]
+    for (let i = 1; i < ascData.length; i++) {
+      const curr = ascData[i], prev = result[result.length - 1]
+      if (curr.buy !== prev.buy || curr.hold !== prev.hold || curr.sell !== prev.sell)
+        result.push(curr)
+    }
+    return result
   }, [ascData])
 
-  const opinionAllSame = opinionData.length < ascData.length
+  const overlayData = useMemo(() => {
+    if (ascData.length === 0) return []
+    const result = [ascData[0]]
+    for (let i = 1; i < ascData.length; i++) {
+      const curr = ascData[i], prev = result[result.length - 1]
+      if (
+        curr.target_mean !== prev.target_mean ||
+        curr.buy !== prev.buy || curr.hold !== prev.hold || curr.sell !== prev.sell
+      ) result.push(curr)
+    }
+    return result
+  }, [ascData])
+
+  const opinionAllSame = opinionData.length === 1
 
   const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
   const chartMargin = { top: 22, right: 16, left: 0, bottom: 0 }
@@ -398,7 +416,7 @@ function ConsensusChart({ ticker, market }) {
   const overlayTargetDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = ascData.slice(0, index).reverse().find(d => d.target_mean != null)
+    const prev = overlayData.slice(0, index).reverse().find(d => d.target_mean != null)
     const delta = prev != null ? value - prev.target_mean : null
     const pct = delta != null ? (delta / prev.target_mean * 100) : null
     const up = delta >= 0
@@ -409,7 +427,7 @@ function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {bgLabel(cx, cy, label, color, anchor(index, ascData.length), -10)}
+        {bgLabel(cx, cy, label, color, anchor(index, overlayData.length), -10)}
       </g>
     )
   }
@@ -417,7 +435,7 @@ function ConsensusChart({ ticker, market }) {
   const overlayBuyDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = ascData[index - 1]
+    const prev = overlayData[index - 1]
     const delta = prev != null ? value - prev.buy : null
     const up = delta > 0
     const labelColor = delta == null || delta === 0 ? '#43a047' : up ? '#81c784' : '#ef9a9a'
@@ -429,7 +447,7 @@ function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#43a047" />
-        {label && bgLabel(cx, cy, label, labelColor, anchor(index, ascData.length), 14)}
+        {label && bgLabel(cx, cy, label, labelColor, anchor(index, overlayData.length), 14)}
       </g>
     )
   }
@@ -592,15 +610,15 @@ function ConsensusChart({ ticker, market }) {
           )}
           {tab === 2 && (
             <ResponsiveContainer width="100%" height={140}>
-              <LineChart data={ascData} margin={chartMargin}>
+              <LineChart data={overlayData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
                 <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
                 <Tooltip content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null
-                  const idx = ascData.findIndex(d => d.date === label)
-                  const prev = idx > 0 ? ascData[idx - 1] : null
+                  const idx = overlayData.findIndex(d => d.date === label)
+                  const prev = idx > 0 ? overlayData[idx - 1] : null
                   return (
                     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
                       <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
