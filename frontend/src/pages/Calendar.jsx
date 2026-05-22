@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { TAB_STYLE } from '../utils'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
+
+const EVENT_STYLE = {
+  holding_earnings:  { background: '#1a2a4a', color: '#4fc3f7', border: '1px solid #2a4a6a' },
+  holding_dividend:  { background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' },
+  watchlist_earnings: { background: 'transparent', color: '#3a8aaa', border: '1px dashed #2a4a6a' },
+  watchlist_dividend: { background: 'transparent', color: '#4a7a5a', border: '1px dashed #2e6b4a' },
+}
 
 function MonthGrid({ year, month, events }) {
   const today = new Date()
@@ -40,27 +46,29 @@ function MonthGrid({ year, month, events }) {
             {day && (
               <div style={{ fontSize: 11, marginBottom: 4, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent, #4fc3f7)' : 'var(--text-muted)' }}>{day}</div>
             )}
-            {dayEvents.map((e, j) => (
-              <div
-                key={j}
-                title={e.name ? `${e.name} (${e.ticker})` : e.ticker}
-                style={{
-                  fontSize: 10,
-                  padding: '1px 4px',
-                  borderRadius: 3,
-                  marginBottom: 2,
-                  background: e.type === 'earnings' ? '#1a2a4a' : '#1a3a2a',
-                  color: e.type === 'earnings' ? '#4fc3f7' : '#81c784',
-                  border: `1px solid ${e.type === 'earnings' ? '#2a4a6a' : '#2e6b4a'}`,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  cursor: 'default',
-                }}
-              >
-                {e.ticker} {e.type === 'earnings' ? '실적' : '배당락'}
-              </div>
-            ))}
+            {dayEvents.map((e, j) => {
+              const styleKey = `${e.stock_type}_${e.type}`
+              const s = EVENT_STYLE[styleKey] || EVENT_STYLE.holding_earnings
+              return (
+                <div
+                  key={j}
+                  title={e.name ? `${e.name} (${e.ticker})` : e.ticker}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 4px',
+                    borderRadius: 3,
+                    marginBottom: 2,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    cursor: 'default',
+                    ...s,
+                  }}
+                >
+                  {e.ticker} {e.type === 'earnings' ? '실적' : '배당락'}
+                </div>
+              )
+            })}
           </div>
         )
       })}
@@ -72,7 +80,6 @@ export default function Calendar() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [stockType, setStockType] = useState('holding')
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -114,18 +121,9 @@ export default function Calendar() {
     else setMonth(m => m + 1)
   }
 
-  const filtered = events.filter(e => e.stock_type === stockType)
-
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-          {[['holding', '보유종목'], ['watchlist', '관심종목']].map(([key, label]) => (
-            <button key={key} onClick={() => setStockType(key)} style={TAB_STYLE(stockType === key)}>
-              {label}
-            </button>
-          ))}
-        </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             onClick={refresh}
@@ -151,12 +149,14 @@ export default function Calendar() {
         ? <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>불러오는 중...</div>
         : error
         ? <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>{error}</div>
-        : <MonthGrid year={year} month={month} events={filtered} />
+        : <MonthGrid year={year} month={month} events={events} />
       }
 
-      <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-muted)' }}>
-        <span style={{ background: '#1a2a4a', color: '#4fc3f7', padding: '1px 6px', borderRadius: 3, border: '1px solid #2a4a6a' }}>실적</span>
-        <span style={{ background: '#1a3a2a', color: '#81c784', padding: '1px 6px', borderRadius: 3, border: '1px solid #2e6b4a' }}>배당락</span>
+      <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+        <span style={{ ...EVENT_STYLE.holding_earnings, padding: '1px 6px', borderRadius: 3 }}>보유 실적</span>
+        <span style={{ ...EVENT_STYLE.holding_dividend, padding: '1px 6px', borderRadius: 3 }}>보유 배당락</span>
+        <span style={{ ...EVENT_STYLE.watchlist_earnings, padding: '1px 6px', borderRadius: 3 }}>관심 실적</span>
+        <span style={{ ...EVENT_STYLE.watchlist_dividend, padding: '1px 6px', borderRadius: 3 }}>관심 배당락</span>
       </div>
     </div>
   )
