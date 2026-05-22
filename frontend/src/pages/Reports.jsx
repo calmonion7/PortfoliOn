@@ -1276,7 +1276,6 @@ export default function Reports() {
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [activeDetailTab, setActiveDetailTab] = useState('summary')
-  const [expandedTickers, setExpandedTickers] = useState(new Set())
   const [marketFilter, setMarketFilter] = useState('ALL')
   const [guruMap, setGuruMap] = useState({})  // ticker -> count
 
@@ -1290,16 +1289,7 @@ export default function Reports() {
       .catch(() => {})
   }, [])
 
-  const toggleTicker = (ticker) => {
-    setExpandedTickers(prev => {
-      const next = new Set(prev)
-      if (next.has(ticker)) next.delete(ticker)
-      else next.add(ticker)
-      return next
-    })
-  }
-
-  const fetchList = useCallback(() => {
+const fetchList = useCallback(() => {
     axios.get('/api/report/list').then(({ data }) => setReportList(data))
   }, [])
 
@@ -1431,49 +1421,38 @@ export default function Reports() {
     })
 
   const renderTickerItem = (ticker, info) => {
-    const isExpanded = expandedTickers.has(ticker)
+    const isSelected = selected.ticker === ticker && view === 'detail'
+    const hasReport = info.dates.length > 0
     return (
-      <div key={ticker} style={{ marginBottom: 4 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isExpanded ? 4 : 0 }}>
-          <div
-            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flex: 1, minWidth: 0 }}
-            onClick={() => toggleTicker(ticker)}
-          >
-            <span style={{ color: 'var(--text-muted)', fontSize: 9, flexShrink: 0 }}>{isExpanded ? '▼' : '▶'}</span>
-            <div style={{ minWidth: 0 }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
-              {info.summary?.name && (
-                <div style={{ color: 'var(--text-muted)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
-              )}
-              {guruMap[ticker] && (
-                <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
-              )}
+      <div
+        key={ticker}
+        onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--bg-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
+          {info.summary?.name && (
+            <div style={{ color: 'var(--text-muted)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
+          )}
+          {guruMap[ticker] && (
+            <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
+          )}
+          {!hasReport && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>클릭하여 생성</div>}
+          {generating === ticker && genProgress.total > 0 && (
+            <div style={{ marginTop: 3 }}>
+              <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.4s ease' }} />
+              </div>
             </div>
-          </div>
-          <button
-            onClick={() => generateOne(ticker)}
-            disabled={!!generating}
-            style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
-          >
-            {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
-          </button>
+          )}
         </div>
-        {generating === ticker && genProgress.total > 0 && (
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.4s ease' }} />
-            </div>
-          </div>
-        )}
-        {isExpanded && info.dates.map(date => (
-          <div
-            key={date}
-            onClick={() => openDetail(ticker, date)}
-            style={{ padding: '3px 8px', cursor: 'pointer', borderRadius: 4, fontSize: 12, background: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'var(--accent)' : 'transparent', color: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'white' : 'var(--text-muted)' }}
-          >
-            {date}
-          </div>
-        ))}
+        <button
+          onClick={e => { e.stopPropagation(); generateOne(ticker) }}
+          disabled={!!generating}
+          style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
+        >
+          {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+        </button>
       </div>
     )
   }
@@ -1714,7 +1693,19 @@ export default function Reports() {
                     구루 {guruMap[selected.ticker]}명
                   </span>
                 )}
-                <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+                {reportList[selected.ticker]?.dates?.length > 1 ? (
+                  <select
+                    value={selected.date}
+                    onChange={e => setSelected({ ticker: selected.ticker, date: e.target.value })}
+                    style={{ marginLeft: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', fontSize: 12, cursor: 'pointer' }}
+                  >
+                    {reportList[selected.ticker].dates.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+                )}
                 {detail.summary?.price != null && (
                   <span style={{ color: 'var(--text)', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price, detail.summary.market)}</span>
                 )}
