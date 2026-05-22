@@ -101,6 +101,7 @@ cd backend && .venv/bin/python -m pytest
 - `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, consensus, cache, guru_scraper, guru_stats
 - `backend/scheduler.py` — APScheduler 설정 (services 아님, 루트 레벨)
 - `backend/data/` — JSON file storage (stocks.json — unified holdings+watchlist+analyst data, schedule.json)
+- `backend/data/calendar/` — calendar file cache (YYYY-MM.json, gitignored, auto-invalidated on stock mutations)
 - `backend/snapshots/` — generated JSON snapshots (per-ticker/date, e.g. `LLY/2026-05-20.json`)
 - `backend/reports/` — legacy report directory (read-only, JSON fallback for old snapshots)
 
@@ -129,4 +130,4 @@ cd backend && .venv/bin/python -m pytest
 - `start.bat` runs both servers in hidden PowerShell windows; use `stop.bat` to kill them.
 - `ANTHROPIC_API_KEY` must be set in the environment for report generation to work.
 - Vite proxies `/api/*` to `http://localhost:8000` — frontend axios calls don't need a base URL.
-- `backend/routers/calendar.py` has a 6-hour in-memory cache keyed by month. Restart the backend to clear it during development.
+- `backend/routers/calendar.py` uses file-based cache (`backend/data/calendar/YYYY-MM.json`). Cache is auto-cleared on stock add/remove/promote. To manually clear: use `DELETE /api/calendar/cache?month=YYYY-MM` or click ↺ in the UI. yfinance calls are parallelized (ThreadPoolExecutor, max 10).
