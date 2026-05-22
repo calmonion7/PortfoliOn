@@ -9,6 +9,21 @@ __pycache__/
 # Generated reports (runtime output)
 backend/reports/
 
+# Calendar file cache
+backend/data/calendar/
+
+# Runtime-generated data
+backend/data/holdings.json
+backend/data/watchlist.json
+backend/data/guru_schedule.json
+backend/snapshots/
+
+# Python virtual environment
+backend/.venv/
+
+# Vite cache
+frontend/.vite/
+
 # Local config
 .claude/settings.local.json
 .vscode/

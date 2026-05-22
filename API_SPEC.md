@@ -523,7 +523,7 @@
 
 ### `GET /api/calendar`
 
-보유종목·관심종목의 실적 발표일·배당락일 조회. 데이터는 yfinance에서 수집하며 6시간 인메모리 캐시.
+보유종목·관심종목의 실적 발표일·배당락일 조회. 데이터는 yfinance에서 수집하며 `backend/data/calendar/YYYY-MM.json`으로 파일 캐시.
 
 **Query Parameter**
 
@@ -563,7 +563,26 @@
 
 > **배당락일 추정:** yfinance 배당 이력에서 최근 4회 지급 간격의 평균으로 다음 배당락일을 예측합니다. 배당 이력이 2회 미만인 종목은 생략됩니다.
 
-> **캐시:** 월별로 6시간 캐시. 개발 중 캐시 초기화가 필요하면 백엔드를 재시작하세요.
+> **캐시:** 월별 파일 캐시 (`backend/data/calendar/YYYY-MM.json`). 종목 추가·삭제·이동 시 자동 전체 삭제. 수동 초기화는 `DELETE /api/calendar/cache` 사용.
+
+**Error `422`** — `month` 파라미터가 `YYYY-MM` 형식이 아닌 경우
+
+---
+
+### `DELETE /api/calendar/cache`
+
+특정 월의 캘린더 캐시 파일을 삭제합니다. 다음 `GET /api/calendar` 요청 시 yfinance에서 재수집합니다.
+
+**Query Parameter**
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|---------|------|------|------|
+| `month` | string | ✅ | 초기화할 월 (`YYYY-MM` 형식) |
+
+**Response `200`**
+```json
+{ "cleared": "2026-05" }
+```
 
 **Error `422`** — `month` 파라미터가 `YYYY-MM` 형식이 아닌 경우
 

@@ -104,12 +104,12 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     vp?.vah != null && { value: vp.vah, label: 'VAH', color: '#4fc3f7', size: 'md' },
     vp?.val != null && { value: vp.val, label: 'VAL', color: '#4fc3f7', size: 'md' },
     target != null && { value: target, label: '평균목표가', color: '#ffcc80', size: 'md' },
-    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#81c784', size: 'sm' },
-    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#81c784', size: 'sm' },
-    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#81c784', size: 'sm' },
-    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ef9a9a', size: 'sm' },
-    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ef9a9a', size: 'sm' },
-    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ef9a9a', size: 'sm' },
+    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#4db6ac', size: 'sm' },
+    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#4db6ac', size: 'sm' },
+    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#4db6ac', size: 'sm' },
+    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ff8a65', size: 'sm' },
+    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ff8a65', size: 'sm' },
+    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ff8a65', size: 'sm' },
     price != null && { value: price, label: `현재가${rsiData?.rsi != null ? ` (RSI ${rsiData.rsi.toFixed(1)})` : ''}`, color: '#ffffff', size: 'lg' },
   ].filter(Boolean)
   if (levels.length === 0) return null
@@ -120,25 +120,28 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const hi = Math.max(...vals) + pad
   const pct = v => ((v - lo) / (hi - lo)) * 100
   const sorted = [...levels].sort((a, b) => a.value - b.value)
-  // 가로 폭 추정(%) 기준으로 겹치면 행(row)을 올려 쌓음
-  const LABEL_W = 13 // 레이블 추정 폭 (% 단위)
+  const labelW = (l) => Math.max(5, Math.max(l.label.length, fmt(l.value, market).length) * 0.95)
   const aboveEdges = [], belowEdges = []
   sorted.forEach((l, i) => {
     l.above = i % 2 === 0
     const edges = l.above ? aboveEdges : belowEdges
     const cx = pct(l.value)
+    const hw = labelW(l)
     let row = 0
-    while (row < edges.length && edges[row] > cx - LABEL_W) row++
+    while (row < edges.length && edges[row] > cx - hw) row++
     if (row >= edges.length) edges.push(-Infinity)
-    edges[row] = cx + LABEL_W
+    edges[row] = cx + hw
     l.row = row
   })
-  const ROW_H = 20 // 행 간격 px
-  const BAR_TOP = 46
+  const ROW_H = 20
+  const maxAboveRow = sorted.reduce((m, l) => l.above ? Math.max(m, l.row) : m, -1)
+  const maxBelowRow = sorted.reduce((m, l) => !l.above ? Math.max(m, l.row) : m, -1)
+  const BAR_TOP = Math.max(46, 40 + maxAboveRow * ROW_H)
+  const totalH = Math.max(100, BAR_TOP + 8 + (maxBelowRow >= 0 ? (maxBelowRow + 1) * ROW_H : 0) + 20)
   return (
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{title}</div>}
-      <div style={{ position: 'relative', height: Math.max(100, BAR_TOP + 8 + (Math.max(...sorted.map(l => l.above ? 0 : l.row + 1)) * ROW_H) + 20) }}>
+      <div style={{ position: 'relative', height: totalH }}>
         {vp?.val != null && vp?.vah != null && (
           <div style={{
             position: 'absolute', top: BAR_TOP - 4, height: 16, borderRadius: 3,
@@ -166,8 +169,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                   : { top: '100%', marginTop: 3 + l.row * ROW_H }),
                 textAlign: 'center', whiteSpace: 'nowrap',
               }}>
-                <div style={{ fontSize: isLg ? 11 : 9, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
-                <div style={{ fontSize: 9, color: l.color, opacity: 0.85 }}>{fmt(l.value, market)}</div>
+                <div style={{ fontSize: isLg ? 10 : 8, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
+                <div style={{ fontSize: 8, color: l.color, opacity: 0.85 }}>{fmt(l.value, market)}</div>
               </div>
             </div>
           )
@@ -200,22 +203,22 @@ function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, market }
         <thead>
           <tr style={{ background: 'var(--bg-surface)' }}>
             <th style={{ ...TH, textAlign: 'left', color: 'var(--text-muted)' }}>시간대</th>
-            <th style={{ ...TH, color: '#81c784' }}>RSI20</th>
-            <th style={{ ...TH, color: '#81c784' }}>RSI25</th>
-            <th style={{ ...TH, color: '#81c784' }}>RSI30</th>
+            <th style={{ ...TH, color: '#4db6ac' }}>RSI20</th>
+            <th style={{ ...TH, color: '#4db6ac' }}>RSI25</th>
+            <th style={{ ...TH, color: '#4db6ac' }}>RSI30</th>
             <th style={{ ...TH, color: 'var(--text-muted)' }}>현재RSI</th>
-            <th style={{ ...TH, color: '#ef9a9a' }}>RSI70</th>
-            <th style={{ ...TH, color: '#ef9a9a' }}>RSI75</th>
-            <th style={{ ...TH, color: '#ef9a9a' }}>RSI80</th>
+            <th style={{ ...TH, color: '#ff8a65' }}>RSI70</th>
+            <th style={{ ...TH, color: '#ff8a65' }}>RSI75</th>
+            <th style={{ ...TH, color: '#ff8a65' }}>RSI80</th>
           </tr>
         </thead>
         <tbody>
           {rows.map(({ label, d }) => d?.rsi != null && (
             <tr key={label}>
               <td style={{ ...TD, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</td>
-              <GapCell target={d.target_20} price={price} baseColor="#81c784" highlight={closestKey === 'target_20'} market={market} />
-              <GapCell target={d.target_25} price={price} baseColor="#81c784" highlight={closestKey === 'target_25'} market={market} />
-              <GapCell target={d.target_30} price={price} baseColor="#81c784" highlight={closestKey === 'target_30'} market={market} />
+              <GapCell target={d.target_20} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_20'} market={market} />
+              <GapCell target={d.target_25} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_25'} market={market} />
+              <GapCell target={d.target_30} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_30'} market={market} />
               <td style={{ ...TD, color: rsiColor(d.rsi), fontWeight: 600 }}>{fmtN(d.rsi)}</td>
               <GapCell target={d.target_70} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_70'} market={market} />
               <GapCell target={d.target_75} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_75'} market={market} />
@@ -246,9 +249,40 @@ const MetricCard = ({ label, value, sub, valueColor }) => (
   </div>
 )
 
-const SectionTitle = ({ children }) => (
-  <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10 }}>
-    {children}
+const _weather = (score) => {
+  if (score <= 0) return { icon: '☀️', label: '맑음' }
+  if (score <= 1) return { icon: '⛅', label: '구름 조금' }
+  if (score <= 2) return { icon: '☁️', label: '흐림' }
+  return { icon: '🌧️', label: '비' }
+}
+
+const overallWeather = (summary) => {
+  if (!summary) return null
+  const scores = []
+  if (summary.price && summary.target_mean) {
+    const gap = (summary.target_mean - summary.price) / summary.price * 100
+    const total = (summary.buy ?? 0) + (summary.hold ?? 0) + (summary.sell ?? 0)
+    const buyPct = total > 0 ? (summary.buy ?? 0) / total * 100 : 50
+    if (gap >= 15 && buyPct >= 60) scores.push(0)
+    else if (gap >= 5 && buyPct >= 45) scores.push(1)
+    else if (gap >= -5) scores.push(2)
+    else scores.push(3)
+  }
+  const rsi = summary.daily_rsi?.rsi
+  if (rsi != null) {
+    if (rsi < 30) scores.push(0)
+    else if (rsi < 45) scores.push(1)
+    else if (rsi < 65) scores.push(2)
+    else scores.push(3)
+  }
+  if (!scores.length) return null
+  return _weather(Math.round(scores.reduce((a, b) => a + b, 0) / scores.length))
+}
+
+const SectionTitle = ({ children, weather }) => (
+  <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+    <span>{children}</span>
+    {weather && <span title={weather.label} style={{ fontSize: 14, lineHeight: 1 }}>{weather.icon}</span>}
   </div>
 )
 
@@ -296,6 +330,17 @@ function ConsensusChart({ ticker, market }) {
 
   const ascData = useMemo(() => [...data].reverse(), [data])
 
+  const trendWeather = useMemo(() => {
+    const pts = ascData.filter(d => d.target_mean != null)
+    if (pts.length < 2) return null
+    const recent = pts.slice(-5)
+    const pct = (recent[recent.length - 1].target_mean - recent[0].target_mean) / Math.abs(recent[0].target_mean) * 100
+    if (pct > 2) return _weather(0)
+    if (pct > 0) return _weather(1)
+    if (pct > -2) return _weather(2)
+    return _weather(3)
+  }, [ascData])
+
   // 평균목표가: 연속 동일 구간은 첫 날짜만 유지 → 오른쪽 끝 = 현재값이 처음 시작된 날짜
   const targetData = useMemo(() => {
     if (ascData.length === 0) return []
@@ -308,12 +353,30 @@ function ConsensusChart({ ticker, market }) {
   }, [ascData])
 
   const opinionData = useMemo(() => {
-    if (ascData.length <= 2) return ascData
-    const allSame = ascData.every(d => d.buy === ascData[0].buy && d.hold === ascData[0].hold && d.sell === ascData[0].sell)
-    return allSame ? [ascData[0], ascData[ascData.length - 1]] : ascData
+    if (ascData.length === 0) return []
+    const result = [ascData[0]]
+    for (let i = 1; i < ascData.length; i++) {
+      const curr = ascData[i], prev = result[result.length - 1]
+      if (curr.buy !== prev.buy || curr.hold !== prev.hold || curr.sell !== prev.sell)
+        result.push(curr)
+    }
+    return result
   }, [ascData])
 
-  const opinionAllSame = opinionData.length < ascData.length
+  const overlayData = useMemo(() => {
+    if (ascData.length === 0) return []
+    const result = [ascData[0]]
+    for (let i = 1; i < ascData.length; i++) {
+      const curr = ascData[i], prev = result[result.length - 1]
+      if (
+        curr.target_mean !== prev.target_mean ||
+        curr.buy !== prev.buy || curr.hold !== prev.hold || curr.sell !== prev.sell
+      ) result.push(curr)
+    }
+    return result
+  }, [ascData])
+
+  const opinionAllSame = opinionData.length === 1
 
   const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
   const chartMargin = { top: 22, right: 16, left: 0, bottom: 0 }
@@ -356,7 +419,7 @@ function ConsensusChart({ ticker, market }) {
   const overlayTargetDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = ascData.slice(0, index).reverse().find(d => d.target_mean != null)
+    const prev = overlayData.slice(0, index).reverse().find(d => d.target_mean != null)
     const delta = prev != null ? value - prev.target_mean : null
     const pct = delta != null ? (delta / prev.target_mean * 100) : null
     const up = delta >= 0
@@ -367,7 +430,7 @@ function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {bgLabel(cx, cy, label, color, anchor(index, ascData.length), -10)}
+        {bgLabel(cx, cy, label, color, anchor(index, overlayData.length), -10)}
       </g>
     )
   }
@@ -375,7 +438,7 @@ function ConsensusChart({ ticker, market }) {
   const overlayBuyDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = ascData[index - 1]
+    const prev = overlayData[index - 1]
     const delta = prev != null ? value - prev.buy : null
     const up = delta > 0
     const labelColor = delta == null || delta === 0 ? '#43a047' : up ? '#81c784' : '#ef9a9a'
@@ -387,7 +450,7 @@ function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#43a047" />
-        {label && bgLabel(cx, cy, label, labelColor, anchor(index, ascData.length), 14)}
+        {label && bgLabel(cx, cy, label, labelColor, anchor(index, overlayData.length), 14)}
       </g>
     )
   }
@@ -460,7 +523,10 @@ function ConsensusChart({ ticker, market }) {
   return (
     <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: '8px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px' }}>📈 컨센서스 추이</div>
+        <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>📈 컨센서스 추이</span>
+          {trendWeather && <span title={trendWeather.label} style={{ fontSize: 14, lineHeight: 1 }}>{trendWeather.icon}</span>}
+        </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={backfill}
@@ -547,15 +613,15 @@ function ConsensusChart({ ticker, market }) {
           )}
           {tab === 2 && (
             <ResponsiveContainer width="100%" height={140}>
-              <LineChart data={ascData} margin={chartMargin}>
+              <LineChart data={overlayData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
                 <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
                 <Tooltip content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null
-                  const idx = ascData.findIndex(d => d.date === label)
-                  const prev = idx > 0 ? ascData[idx - 1] : null
+                  const idx = overlayData.findIndex(d => d.date === label)
+                  const prev = idx > 0 ? overlayData[idx - 1] : null
                   return (
                     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
                       <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
@@ -596,13 +662,33 @@ function DetailSummaryTab({ summary, ticker }) {
     ? ((summary.target_mean - summary.price) / summary.price * 100)
     : null
 
+  const consensusWeather = (() => {
+    if (!summary.price || !summary.target_mean) return null
+    const gap = (summary.target_mean - summary.price) / summary.price * 100
+    const total = (summary.buy ?? 0) + (summary.hold ?? 0) + (summary.sell ?? 0)
+    const buyPct = total > 0 ? (summary.buy ?? 0) / total * 100 : 50
+    if (gap >= 15 && buyPct >= 60) return _weather(0)
+    if (gap >= 5 && buyPct >= 45) return _weather(1)
+    if (gap >= -5) return _weather(2)
+    return _weather(3)
+  })()
+
+  const rsiWeather = (() => {
+    const rsi = summary.daily_rsi?.rsi
+    if (rsi == null) return null
+    if (rsi < 30) return _weather(0)
+    if (rsi < 45) return _weather(1)
+    if (rsi < 65) return _weather(2)
+    return _weather(3)
+  })()
+
   return (
     <div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       {/* 1행: 증권사 컨센서스 */}
       <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: '8px 10px' }}>
-        <SectionTitle>🏦 증권사 컨센서스</SectionTitle>
+        <SectionTitle weather={consensusWeather}>🏦 증권사 컨센서스</SectionTitle>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -666,15 +752,15 @@ function DetailSummaryTab({ summary, ticker }) {
       {/* 2행: 매물대·RSI 현황 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: 14 }}>
-          <SectionTitle>📉 매물대 &amp; RSI 현황</SectionTitle>
+          <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, marginTop: 4 }}>
             {[
               { color: '#ffffff', label: '현재가', desc: '현재 주가' },
               { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
               { color: '#80cbc4', label: 'POC', desc: '거래량 최대 가격대' },
               { color: '#81c784', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
-              { color: '#81c784', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
-              { color: '#ef9a9a', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
+              { color: '#4db6ac', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
+              { color: '#ff8a65', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
             ].map(({ color, label, desc }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
@@ -797,8 +883,8 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     PBR: '주가순자산비율 — 주가 ÷ BPS (낮을수록 저평가)',
   }
 
-  const Legend = ({ items }) => (
-    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
+  const Legend = ({ items, weather }) => (
+    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, alignItems: 'center' }}>
       {items.map(({ color, label }) => {
         const desc = DESCS[label]
         return (
@@ -823,6 +909,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
           </span>
         )
       })}
+      {weather && <span title={weather.label} style={{ marginLeft: 4, fontSize: 13, lineHeight: 1 }}>{weather.icon}</span>}
     </div>
   )
 
@@ -906,16 +993,64 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
     <td style={{ color: color || 'var(--text-muted)', textAlign: 'right', padding: '1px 6px' }}>{children}</td>
   )
 
+  const calcFinancialsWeather = (data) => {
+    const real = data.filter(d => !d.is_consensus)
+    if (real.length < 2) return null
+    const recent = real.slice(-3)
+    const revPcts = recent.slice(1).map(d => d.rev_chg_pct).filter(v => v != null)
+    const opPcts  = recent.slice(1).map(d => d.op_chg_pct).filter(v => v != null)
+    if (!revPcts.length && !opPcts.length) return null
+    const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length
+    const avgRev = revPcts.length ? avg(revPcts) : 0
+    const avgOp  = opPcts.length  ? avg(opPcts)  : avgRev
+    if (avgRev > 5 && avgOp > 5) return _weather(0)
+    if (avgRev > 0 && avgOp > 0) return _weather(1)
+    if (avgRev > -5 || avgOp > -5) return _weather(2)
+    return _weather(3)
+  }
+
+  const pctWeather = (pcts) => {
+    if (!pcts.length) return null
+    const avg = pcts.reduce((a, b) => a + b, 0) / pcts.length
+    if (avg > 5) return _weather(0)
+    if (avg > 0) return _weather(1)
+    if (avg > -5) return _weather(2)
+    return _weather(3)
+  }
+
   const Section = ({ data, title }) => {
     const hasEpsBps = data.some(d => d.eps != null || d.bps != null)
     const hasPerPbr = data.some(d => d.per != null || d.pbr != null)
+    const weather = calcFinancialsWeather(data)
+
+    const real = data.filter(d => !d.is_consensus)
+    const recent = real.slice(-3)
+
+    const revOpWeather = pctWeather([
+      ...recent.slice(1).map(d => d.rev_chg_pct).filter(v => v != null),
+      ...recent.slice(1).map(d => d.op_chg_pct).filter(v => v != null),
+    ])
+    const epsWeather = pctWeather(
+      recent.slice(1).map(d => d.eps_chg_pct).filter(v => v != null)
+    )
+    const perWeather = (() => {
+      const pers = recent.filter(d => d.per != null).map(d => d.per)
+      if (pers.length < 2) return null
+      const diff = pers[pers.length - 1] - pers[0]
+      // PER 하락 = 저평가되거나 이익 증가 = 긍정
+      if (diff < -3) return _weather(0)
+      if (diff < 0)  return _weather(1)
+      if (diff < 3)  return _weather(2)
+      return _weather(3)
+    })()
+
     return (
       <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: 14, marginTop: 12 }}>
-        <SectionTitle>{title}</SectionTitle>
+        <SectionTitle weather={weather}>{title}</SectionTitle>
 
         {/* 매출 / 영업이익 */}
         <div style={{ marginTop: 8 }}>
-          <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} />
+          <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} weather={revOpWeather} />
           <ResponsiveContainer width="100%" height={165}>
             <LineChart data={data} margin={{ ...chartMargin, top: 18 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
@@ -938,7 +1073,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
           <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
             {hasEpsBps && (
               <div style={{ flex: 1, minWidth: 0 }}>
-                <Legend items={[{ color: '#80cbc4', label: 'EPS' }, { color: '#f48fb1', label: 'BPS' }]} />
+                <Legend items={[{ color: '#80cbc4', label: 'EPS' }, { color: '#f48fb1', label: 'BPS' }]} weather={epsWeather} />
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={data} margin={chartMargin}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
@@ -953,7 +1088,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
             )}
             {hasPerPbr && (
               <div style={{ flex: 1, minWidth: 0 }}>
-                <Legend items={[{ color: '#ffcc80', label: 'PER' }, { color: '#ce93d8', label: 'PBR' }]} />
+                <Legend items={[{ color: '#ffcc80', label: 'PER' }, { color: '#ce93d8', label: 'PBR' }]} weather={perWeather} />
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={data} margin={chartMargin}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
@@ -1020,7 +1155,7 @@ function FinancialsChart({ financials, financialsAnnual, market }) {
 
   return (
     <>
-      {annualData.length > 0 && <Section data={annualData} title="📈 연간 실적 추이 (4년)" />}
+      {annualData.length > 0 && <Section data={annualData} title="📈 연간 실적 추이" />}
       <Section data={quarterData} title="📊 분기 실적 추이" />
     </>
   )
@@ -1276,7 +1411,6 @@ export default function Reports() {
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [activeDetailTab, setActiveDetailTab] = useState('summary')
-  const [expandedTickers, setExpandedTickers] = useState(new Set())
   const [marketFilter, setMarketFilter] = useState('ALL')
   const [guruMap, setGuruMap] = useState({})  // ticker -> count
 
@@ -1290,16 +1424,7 @@ export default function Reports() {
       .catch(() => {})
   }, [])
 
-  const toggleTicker = (ticker) => {
-    setExpandedTickers(prev => {
-      const next = new Set(prev)
-      if (next.has(ticker)) next.delete(ticker)
-      else next.add(ticker)
-      return next
-    })
-  }
-
-  const fetchList = useCallback(() => {
+const fetchList = useCallback(() => {
     axios.get('/api/report/list').then(({ data }) => setReportList(data))
   }, [])
 
@@ -1431,49 +1556,41 @@ export default function Reports() {
     })
 
   const renderTickerItem = (ticker, info) => {
-    const isExpanded = expandedTickers.has(ticker)
+    const isSelected = selected.ticker === ticker && view === 'detail'
+    const hasReport = info.dates.length > 0
     return (
-      <div key={ticker} style={{ marginBottom: 4 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isExpanded ? 4 : 0 }}>
-          <div
-            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flex: 1, minWidth: 0 }}
-            onClick={() => toggleTicker(ticker)}
-          >
-            <span style={{ color: 'var(--text-muted)', fontSize: 9, flexShrink: 0 }}>{isExpanded ? '▼' : '▶'}</span>
-            <div style={{ minWidth: 0 }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
-              {info.summary?.name && (
-                <div style={{ color: 'var(--text-muted)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
-              )}
-              {guruMap[ticker] && (
-                <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
-              )}
+      <div
+        key={ticker}
+        onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--bg-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
+            {(() => { const w = overallWeather(info.summary); return w ? <span title={w.label} style={{ fontSize: 12, lineHeight: 1 }}>{w.icon}</span> : null })()}
+          </span>
+          {info.summary?.name && (
+            <div style={{ color: 'var(--text-muted)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
+          )}
+          {guruMap[ticker] && (
+            <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
+          )}
+          {!hasReport && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>클릭하여 생성</div>}
+          {generating === ticker && genProgress.total > 0 && (
+            <div style={{ marginTop: 3 }}>
+              <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.4s ease' }} />
+              </div>
             </div>
-          </div>
-          <button
-            onClick={() => generateOne(ticker)}
-            disabled={!!generating}
-            style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
-          >
-            {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
-          </button>
+          )}
         </div>
-        {generating === ticker && genProgress.total > 0 && (
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.4s ease' }} />
-            </div>
-          </div>
-        )}
-        {isExpanded && info.dates.map(date => (
-          <div
-            key={date}
-            onClick={() => openDetail(ticker, date)}
-            style={{ padding: '3px 8px', cursor: 'pointer', borderRadius: 4, fontSize: 12, background: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'var(--accent)' : 'transparent', color: selected.ticker === ticker && selected.date === date && view === 'detail' ? 'white' : 'var(--text-muted)' }}
-          >
-            {date}
-          </div>
-        ))}
+        <button
+          onClick={e => { e.stopPropagation(); generateOne(ticker) }}
+          disabled={!!generating}
+          style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
+        >
+          {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+        </button>
       </div>
     )
   }
@@ -1572,12 +1689,12 @@ export default function Reports() {
                   <th style={TH}>PBR</th>
                   <th style={TH}>Finviz</th>
                   <th style={{ ...TH, borderLeft: '1px solid var(--border)' }}>RSI<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI20<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI25<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>RSI30<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI70<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI75<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>RSI80<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI20<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI25<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI30<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI70<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI75<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI80<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -1606,7 +1723,10 @@ export default function Reports() {
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.querySelector('td').style.background = 'var(--bg)' }}
                     >
                       <td style={{ ...TD, textAlign: 'left', color: 'var(--accent)', fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, background: 'var(--bg)' }}>
-                        <div>{s?.name || ticker}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          {s?.name || ticker}
+                          {(() => { const w = overallWeather(s); return w ? <span title={w.label} style={{ fontSize: 13, lineHeight: 1, fontWeight: 400 }}>{w.icon}</span> : null })()}
+                        </div>
                         <div style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
                         {guruMap[ticker] && <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>}
                         {!hasReport && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>리포트 없음 — 클릭하여 생성</div>}
@@ -1714,7 +1834,19 @@ export default function Reports() {
                     구루 {guruMap[selected.ticker]}명
                   </span>
                 )}
-                <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+                {reportList[selected.ticker]?.dates?.length > 1 ? (
+                  <select
+                    value={selected.date}
+                    onChange={e => setSelected({ ticker: selected.ticker, date: e.target.value })}
+                    style={{ marginLeft: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', fontSize: 12, cursor: 'pointer', width: 'fit-content' }}
+                  >
+                    {reportList[selected.ticker].dates.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+                )}
                 {detail.summary?.price != null && (
                   <span style={{ color: 'var(--text)', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price, detail.summary.market)}</span>
                 )}

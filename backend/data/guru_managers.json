@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-05-20T21:50:02",
+  "last_updated": "2026-05-22T23:52:58",
   "managers": [
     {
       "id": "AKO",
@@ -2802,78 +2802,78 @@
       "id": "oc",
       "name": "Howard Marks - Oaktree Capital Management",
       "firm": "Howard Marks - Oaktree Capital Management",
-      "portfolio_value": 4252021000,
-      "num_stocks": 48,
+      "portfolio_value": 4306744000,
+      "num_stocks": 52,
       "top10": [
         {
           "rank": 1,
           "ticker": "TRMD",
           "name": "Torm Plc",
           "name_kr": "톰",
-          "weight_pct": 15.88
+          "weight_pct": 15.67
         },
         {
           "rank": 2,
           "ticker": "EXE",
           "name": "Expand Energy Corp.",
           "name_kr": "익스팬드 에너지",
-          "weight_pct": 13.52
+          "weight_pct": 13.35
         },
         {
           "rank": 3,
           "ticker": "AU",
           "name": "AngloGold Ashanti Ltd.",
           "name_kr": "앵글로골드 아샨티",
-          "weight_pct": 7.38
+          "weight_pct": 7.29
         },
         {
           "rank": 4,
           "ticker": "GTX",
           "name": "Garrett Motion Inc.",
           "name_kr": "가렛 모션",
-          "weight_pct": 6.24
+          "weight_pct": 6.16
         },
         {
           "rank": 5,
           "ticker": "INDV",
           "name": "Indivior Pharmaceuticals Inc.",
           "name_kr": "인디비어 파마슈티컬스",
-          "weight_pct": 5.01
+          "weight_pct": 4.94
         },
         {
           "rank": 6,
           "ticker": "TDS",
           "name": "Telephone & Data Systems",
           "name_kr": "텔레폰 앤 데이터 시스템즈",
-          "weight_pct": 4.25
+          "weight_pct": 4.2
         },
         {
           "rank": 7,
           "ticker": "VNOM",
           "name": "Viper Energy Inc.",
           "name_kr": "바이퍼 에너지",
-          "weight_pct": 4.19
+          "weight_pct": 4.14
         },
         {
           "rank": 8,
           "ticker": "CORZ",
           "name": "Core Scientific Inc",
           "name_kr": "코어 사이언티픽",
-          "weight_pct": 3.29
+          "weight_pct": 3.25
         },
         {
           "rank": 9,
           "ticker": "STKL",
           "name": "OLD- SunOpta Inc.",
           "name_kr": "",
-          "weight_pct": 3.16
+          "weight_pct": 3.12
         },
         {
           "rank": 10,
           "ticker": "PBR",
           "name": "Petroleo Brasileiro",
           "name_kr": "페트로브라스 ADR",
-          "weight_pct": 2.97
+          "weight_pct": 2.93
         }
       ]
     },

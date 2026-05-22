@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List
 from services import storage
+from routers import calendar as calendar_router
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
@@ -50,6 +51,7 @@ def add_watchlist_stock(stock: WatchlistStock):
 
     watchlist.append(stock.ticker.upper())
     storage.save_watchlist_tickers(watchlist)
+    calendar_router.clear_cache()
 
     return {"ticker": stock.ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
@@ -85,6 +87,7 @@ def delete_watchlist_stock(ticker: str):
         raise HTTPException(status_code=404, detail=f"{ticker} not found in watchlist")
 
     storage.save_watchlist_tickers([t for t in watchlist if t.upper() != upper])
+    calendar_router.clear_cache()
 
     holdings = storage.get_holdings()
     if upper not in [h["ticker"].upper() for h in holdings]:
@@ -121,5 +124,6 @@ def promote_to_holdings(ticker: str, payload: PromotePayload):
     }
     holdings.append(new_holding)
     storage.save_holdings(holdings)
+    calendar_router.clear_cache()
 
     return {**stock_data, "quantity": payload.quantity, "avg_cost": payload.avg_cost}
