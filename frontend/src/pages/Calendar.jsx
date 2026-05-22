@@ -5,6 +5,9 @@ import { TAB_STYLE } from '../utils'
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
 function MonthGrid({ year, month, events }) {
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
   const firstDay = new Date(year, month - 1, 1).getDay()
   const daysInMonth = new Date(year, month, 0).getDate()
   const cells = [
@@ -31,10 +34,11 @@ function MonthGrid({ year, month, events }) {
           ? `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
           : null
         const dayEvents = dateStr ? (byDate[dateStr] || []) : []
+        const isToday = dateStr === todayStr
         return (
-          <div key={i} style={{ background: day ? 'var(--bg-card)' : 'var(--bg)', minHeight: 72, padding: 4 }}>
+          <div key={i} style={{ background: day ? 'var(--bg-card)' : 'var(--bg)', minHeight: 72, padding: 4, outline: isToday ? '2px solid var(--accent, #4fc3f7)' : 'none', outlineOffset: -2 }}>
             {day && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{day}</div>
+              <div style={{ fontSize: 11, marginBottom: 4, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent, #4fc3f7)' : 'var(--text-muted)' }}>{day}</div>
             )}
             {dayEvents.map((e, j) => (
               <div
@@ -72,16 +76,23 @@ export default function Calendar() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [fetchKey, setFetchKey] = useState(0)
+
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`
 
   useEffect(() => {
     setLoading(true)
     setError('')
-    const m = `${year}-${String(month).padStart(2, '0')}`
-    axios.get(`/api/calendar?month=${m}`)
+    axios.get(`/api/calendar?month=${monthStr}`)
       .then(r => setEvents(r.data.events))
       .catch(() => setError('이벤트 불러오기 실패'))
       .finally(() => setLoading(false))
-  }, [year, month])
+  }, [year, month, fetchKey])
+
+  const refresh = () => {
+    axios.delete(`/api/calendar/cache?month=${monthStr}`)
+      .finally(() => setFetchKey(k => k + 1))
+  }
 
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12) }
@@ -105,6 +116,12 @@ export default function Calendar() {
           ))}
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={refresh}
+            disabled={loading}
+            title="캐시 삭제 후 새로고침"
+            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: loading ? 'default' : 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 13 }}
+          >↺</button>
           <button
             onClick={prevMonth}
             style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '2px 10px', borderRadius: 4, fontSize: 16 }}
