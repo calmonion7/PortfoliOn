@@ -1697,7 +1697,7 @@ const fetchList = useCallback(() => {
                   <select
                     value={selected.date}
                     onChange={e => setSelected({ ticker: selected.ticker, date: e.target.value })}
-                    style={{ marginLeft: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', fontSize: 12, cursor: 'pointer' }}
+                    style={{ marginLeft: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', fontSize: 12, cursor: 'pointer', width: 'fit-content' }}
                   >
                     {reportList[selected.ticker].dates.map(d => (
                       <option key={d} value={d}>{d}</option>
