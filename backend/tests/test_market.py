@@ -72,3 +72,14 @@ def test_get_quote_handles_exception_gracefully():
     assert result["ticker"] == "FAIL"
     assert result["price"] is None
     assert "error" in result
+
+def test_get_quote_includes_weekly_monthly_change_fields():
+    with patch("services.market.yf.Ticker", return_value=_make_mock_ticker()):
+        from services import market
+        import importlib; importlib.reload(market)
+        result = market.get_quote("TEST")
+    assert "daily_change_pct" in result
+    assert "weekly_change_pct" in result
+    assert "monthly_change_pct" in result
+    for key in ("daily_change_pct", "weekly_change_pct", "monthly_change_pct"):
+        assert result[key] is None or isinstance(result[key], float)
