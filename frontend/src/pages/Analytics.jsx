@@ -184,7 +184,7 @@ export default function Analytics() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/dashboard')
+    axios.get('/api/stocks/dashboard')
       .then(r => { setCards(r.data); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
