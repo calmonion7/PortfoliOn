@@ -17,7 +17,8 @@ def _make_hist(values: list[float]) -> pd.DataFrame:
 # ── get_treasury ──────────────────────────────────────────────────────────────
 
 def test_get_treasury_returns_four_rates():
-    from services.market_indicators_service import get_treasury
+    from services.market_indicators_service import get_treasury, _cache
+    _cache.clear()
     with patch("services.market_indicators_service.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([4.50, 4.55])
         result = get_treasury()
@@ -25,7 +26,8 @@ def test_get_treasury_returns_four_rates():
 
 
 def test_get_treasury_change_bp():
-    from services.market_indicators_service import get_treasury
+    from services.market_indicators_service import get_treasury, _cache
+    _cache.clear()
     with patch("services.market_indicators_service.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([4.50, 4.55])
         result = get_treasury()
