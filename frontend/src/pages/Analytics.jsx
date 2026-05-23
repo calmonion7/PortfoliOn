@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, ReferenceLine, Label,
 } from 'recharts'
 
 const SECTOR_COLORS = [
@@ -85,8 +86,96 @@ function SectorAllocation({ cards }) {
   )
 }
 
-function OpportunityBubble() {
-  return null
+const CustomDot = (props) => {
+  const { cx, cy, payload } = props
+  const r = Math.max(6, Math.sqrt(payload.weight) * 4)
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill={payload.fill} fillOpacity={0.75} stroke={payload.fill} />
+      <text x={cx} y={cy - r - 4} textAnchor="middle" fontSize={10} fill="var(--text)">
+        {payload.ticker}
+      </text>
+    </g>
+  )
+}
+
+function OpportunityBubble({ cards }) {
+  const totalVal = cards.reduce((s, c) => s + (c.quantity ?? 0) * (c.current_price ?? 0), 0)
+
+  const included = []
+  const excluded = []
+
+  for (const c of cards) {
+    const price = c.current_price
+    const avgCost = c.avg_cost
+    const target = c.target_mean
+    if (!price || !avgCost || !target) {
+      excluded.push(c.ticker)
+      continue
+    }
+    const upside = parseFloat(((target - price) / price * 100).toFixed(1))
+    const returnPct = parseFloat(((price - avgCost) / avgCost * 100).toFixed(1))
+    const weight = totalVal ? c.quantity * price / totalVal * 100 : 1
+    included.push({
+      ticker: c.ticker,
+      upside,
+      returnPct,
+      weight,
+      fill: upside > 0 ? '#81c784' : '#ef9a9a',
+    })
+  }
+
+  return (
+    <div>
+      <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>기회 버블 차트</h3>
+      <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
+        X: 컨센서스 업사이드% &nbsp;·&nbsp; Y: 평단가 대비 수익률% &nbsp;·&nbsp; 버블 크기: 포트폴리오 비중
+      </p>
+      <ResponsiveContainer width="100%" height={420}>
+        <ScatterChart margin={{ top: 24, right: 32, bottom: 32, left: 24 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+          <XAxis type="number" dataKey="upside" name="업사이드" unit="%" stroke="var(--text-muted)" tick={{ fontSize: 11 }}>
+            <Label value="업사이드 %" position="insideBottom" offset={-16} fill="var(--text-muted)" fontSize={11} />
+          </XAxis>
+          <YAxis type="number" dataKey="returnPct" name="수익률" unit="%" stroke="var(--text-muted)" tick={{ fontSize: 11 }}>
+            <Label value="수익률 %" angle={-90} position="insideLeft" offset={10} fill="var(--text-muted)" fontSize={11} />
+          </YAxis>
+          <ReferenceLine x={0} stroke="var(--text-muted)" strokeDasharray="4 2" />
+          <ReferenceLine y={0} stroke="var(--text-muted)" strokeDasharray="4 2" />
+          <Tooltip
+            cursor={{ strokeDasharray: '3 3' }}
+            content={({ payload }) => {
+              if (!payload?.length) return null
+              const d = payload[0].payload
+              return (
+                <div style={{
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  padding: '8px 12px', borderRadius: 6, fontSize: 12,
+                }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{d.ticker}</div>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    업사이드: <span style={{ color: 'var(--text)' }}>{d.upside}%</span>
+                  </div>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    수익률: <span style={{ color: 'var(--text)' }}>{d.returnPct}%</span>
+                  </div>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    비중: <span style={{ color: 'var(--text)' }}>{d.weight.toFixed(1)}%</span>
+                  </div>
+                </div>
+              )
+            }}
+          />
+          <Scatter data={included} shape={<CustomDot />} />
+        </ScatterChart>
+      </ResponsiveContainer>
+      {excluded.length > 0 && (
+        <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8 }}>
+          컨센서스 목표가 없어 제외: {excluded.join(', ')}
+        </p>
+      )}
+    </div>
+  )
 }
 
 export default function Analytics() {
