@@ -5,6 +5,7 @@ import Reports from './pages/Reports'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import Calendar from './pages/Calendar'
+import Digest from './pages/Digest'
 import './App.css'
 
 const THEMES = [
@@ -33,7 +34,7 @@ export default function App() {
         borderBottom: '1px solid var(--border)',
       }}>
         <span style={{ color: 'var(--text)', fontWeight: 'bold', marginRight: 16 }}>Portfolio Manager</span>
-        {[['/', '종목 관리'], ['/reports', '리포트'], ['/calendar', '캘린더'], ['/guru', '구루'], ['/settings', '설정']].map(([to, label]) => (
+        {[['/', '종목 관리'], ['/reports', '리포트'], ['/calendar', '캘린더'], ['/digest', '다이제스트'], ['/guru', '구루'], ['/settings', '설정']].map(([to, label]) => (
           <NavLink
             key={to}
             to={to}
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/" element={<Portfolio />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/calendar" element={<Calendar />} />
+          <Route path="/digest" element={<Digest />} />
           <Route path="/guru" element={<Guru />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
