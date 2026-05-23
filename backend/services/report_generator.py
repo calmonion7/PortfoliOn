@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import date, timedelta
+from concurrent.futures import ThreadPoolExecutor
 import json
 import pandas as pd
 import yfinance as yf
@@ -19,17 +20,30 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
     output_dir = output_base_dir / ticker
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    quote = mkt.get_quote(ticker, market, exchange)
-    financials = mkt.get_financials(ticker, market, exchange)
-    financials_annual = mkt.get_annual_financials(ticker, market, exchange)
-    analyst = mkt.get_analyst_data(ticker, market, exchange)
-    competitor_quotes = [
-        mkt.get_quote(c, market, exchange)
-        for c in stock.get("competitors", [])
-    ]
-    timeframe_rsi = indicators.get_timeframe_rsi(yf_sym)
-    t = yf.Ticker(yf_sym)
-    daily_df = t.history(period="1y")
+    competitors = stock.get("competitors", [])
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange)
+        f_fin       = ex.submit(mkt.get_financials, ticker, market, exchange)
+        f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
+        f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange)
+        f_rsi       = ex.submit(indicators.get_timeframe_rsi, yf_sym)
+        f_history   = ex.submit(yf.Ticker(yf_sym).history, period="1y")
+        f_info      = ex.submit(lambda: yf.Ticker(yf_sym).info) if market == "US" else None
+        f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
+        f_news      = ex.submit(scraper.get_news, ticker, market)
+        f_comps     = [ex.submit(mkt.get_quote, c, market, exchange) for c in competitors]
+
+    quote             = f_quote.result()
+    financials        = f_fin.result()
+    financials_annual = f_fin_ann.result()
+    analyst           = f_analyst.result()
+    timeframe_rsi     = f_rsi.result()
+    daily_df          = f_history.result()
+    finviz            = f_finviz.result() if f_finviz else {}
+    news              = f_news.result()
+    competitor_quotes = [f.result() for f in f_comps]
+
     vp = indicators.get_volume_profile(daily_df)
 
     high_20d = round(float(daily_df["High"].tail(20).max()), 2) if not daily_df.empty else None
@@ -50,7 +64,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         pbr = round(current_price / actual_bps, 2) if current_price and actual_bps else None
     else:
         try:
-            _info = t.info
+            _info = f_info.result()
             sector = _info.get("sector", "")
             industry = _info.get("industry", "")
             trailing_per = _info.get("trailingPE")
@@ -59,9 +73,6 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         except Exception:
             sector, industry = "", ""
             trailing_per = forward_per = pbr = None
-
-    finviz = scraper.scrape_finviz_consensus(ticker) if market == "US" else {}
-    news = scraper.get_news(ticker, market)
 
     summary = {
         "ticker": ticker,
@@ -102,7 +113,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
                 "ytd_return": q.get("ytd_return"),
             }
             for c, q in zip(
-                [ticker] + list(stock.get("competitors", [])),
+                [ticker] + list(competitors),
                 [quote] + competitor_quotes,
             )
         ],

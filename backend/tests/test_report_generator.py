@@ -132,3 +132,19 @@ def test_generate_report_json_has_news(tmp_path):
     assert "news" in summary
     assert summary["news"][0]["title"] == "Test news"
     assert summary["news"][0]["publisher"] == "Reuters"
+
+
+def test_generate_report_calls_all_io_functions(tmp_path):
+    mocks = _mock_all()
+    with contextlib.ExitStack() as stack:
+        patched = {target: stack.enter_context(patch(target, mock)) for target, mock in mocks.items()}
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        report_generator.generate_report(SAMPLE_STOCK, tmp_path)
+
+    patched["services.report_generator.mkt.get_quote"].assert_called()
+    patched["services.report_generator.mkt.get_financials"].assert_called_once()
+    patched["services.report_generator.mkt.get_annual_financials"].assert_called_once()
+    patched["services.report_generator.mkt.get_analyst_data"].assert_called_once()
+    patched["services.report_generator.indicators.get_timeframe_rsi"].assert_called_once()
+    patched["services.report_generator.scraper.get_news"].assert_called_once()
