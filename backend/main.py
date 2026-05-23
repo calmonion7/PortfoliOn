@@ -7,6 +7,7 @@ import threading
 
 import scheduler as sched
 from routers import portfolio, report, watchlist, stocks, guru, calendar, digest
+from routers.market_indicators import router as market_indicators_router
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
 SNAPSHOTS_DIR.mkdir(exist_ok=True)
@@ -50,6 +51,7 @@ app.include_router(stocks.router)
 app.include_router(guru.router)
 app.include_router(calendar.router)
 app.include_router(digest.router)
+app.include_router(market_indicators_router)
 
 
 @app.get("/health")
