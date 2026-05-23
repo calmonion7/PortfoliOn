@@ -135,9 +135,10 @@ export default function Portfolio() {
     setWatchlist(watchlistRes.data || [])
   }, [])
 
-  const fetchDashboard = useCallback(async () => {
+  const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
     setDashboardLoading(true)
     try {
+      if (invalidate) await axios.delete('/api/stocks/dashboard/cache').catch(() => {})
       const res = await axios.get('/api/stocks/dashboard')
       setDashboardCards(res.data || [])
     } catch {
@@ -281,7 +282,7 @@ export default function Portfolio() {
       {activeTab === 'dashboard' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            <button className="btn-secondary" onClick={fetchDashboard} disabled={dashboardLoading}>
+            <button className="btn-secondary" onClick={() => fetchDashboard({ invalidate: true })} disabled={dashboardLoading}>
               ↺ 새로고침
             </button>
           </div>

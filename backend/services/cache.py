@@ -4,8 +4,10 @@ from typing import Optional
 
 _snapshots: OrderedDict[str, dict] = OrderedDict()
 _list_cache: dict = {"data": None, "ts": 0.0}
+_dashboard_cache: dict = {"data": None, "ts": 0.0}
 _MAX = 200
 _LIST_TTL = 5.0
+_DASHBOARD_TTL = 300.0
 
 
 def get_snapshot(ticker: str, date: str, loader) -> Optional[dict]:
@@ -26,6 +28,22 @@ def invalidate(ticker: str) -> None:
     for k in [k for k in _snapshots if k.startswith(prefix)]:
         del _snapshots[k]
     invalidate_list()
+    invalidate_dashboard()
+
+
+def invalidate_dashboard() -> None:
+    _dashboard_cache["data"] = None
+    _dashboard_cache["ts"] = 0.0
+
+
+def get_dashboard(loader) -> list:
+    now = time.time()
+    if _dashboard_cache["data"] is not None and now - _dashboard_cache["ts"] < _DASHBOARD_TTL:
+        return _dashboard_cache["data"]
+    data = loader()
+    _dashboard_cache["data"] = data
+    _dashboard_cache["ts"] = now
+    return data
 
 
 def invalidate_list() -> None:

@@ -9,6 +9,7 @@ import yfinance as yf
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from services import market
+from services import cache as cache_svc
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
@@ -140,6 +141,12 @@ def enrich_single(ticker: str, body: EnrichBody):
     return {"ticker": ticker.upper(), "updated": list(fields.keys())}
 
 
+@router.delete("/dashboard/cache")
+def clear_dashboard_cache():
+    cache_svc.invalidate_dashboard()
+    return {"cleared": True}
+
+
 @router.get("/dashboard")
 def get_dashboard():
     portfolio = storage.get_full_portfolio()
@@ -193,7 +200,8 @@ def get_dashboard():
             "snapshot_date": snapshot_date,
         }
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(_build_card, holdings))
+    def _build_all():
+        with ThreadPoolExecutor(max_workers=30) as executor:
+            return list(executor.map(_build_card, holdings))
 
-    return results
+    return cache_svc.get_dashboard(_build_all)
