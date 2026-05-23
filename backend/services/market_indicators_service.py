@@ -327,12 +327,11 @@ def get_vix() -> dict:
             {"date": str(d.date()), "value": round(float(v), 2)}
             for d, v in zip(close.index, close.values)
         ]
-        data: dict = {"current": current, "change": change, "history": history}
+        data = {"current": current, "change": change, "history": history}
+        _set_cache("vix", data, ttl=3600)
+        return data
     except Exception:
-        data = {"current": None, "change": None, "history": []}
-
-    _set_cache("vix", data, ttl=3600)
-    return data
+        return {"current": None, "change": None, "history": []}
 
 
 # ── Korean Export Data ────────────────────────────────────────────────────────
