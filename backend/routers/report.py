@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
@@ -15,6 +16,7 @@ SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 _progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
+_progress_lock = threading.Lock()
 _backfill_progress: dict = {"running": False, "done": 0, "total": 0, "current": "", "created": 0}
 
 
@@ -85,14 +87,17 @@ def _run_generation(stocks: list):
     _progress.update({"running": True, "done": 0, "total": len(stocks), "current": ""})
 
     def _process_one(stock):
-        _progress["current"] = stock["ticker"]
+        with _progress_lock:
+            _progress["current"] = stock["ticker"]
         try:
             report_generator.generate_report(stock)
             cache_svc.invalidate(stock["ticker"])
             consensus_svc.collect(stock["ticker"])
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
-        _progress["done"] += 1
+        finally:
+            with _progress_lock:
+                _progress["done"] += 1
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         list(executor.map(_process_one, stocks))
