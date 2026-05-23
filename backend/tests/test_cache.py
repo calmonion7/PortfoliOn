@@ -5,8 +5,8 @@ import pytest
 def _clear():
     import services.cache as c
     c._snapshots.clear()
-    c._list_cache["data"] = None
-    c._list_cache["ts"] = 0.0
+    c.invalidate_list()
+    c.invalidate_dashboard()
 
 
 def test_get_snapshot_calls_loader_once():
@@ -82,7 +82,8 @@ def test_get_list_refreshes_after_ttl(monkeypatch):
         calls.append(1)
         return {"data": "list"}
     c.get_list(loader)
-    monkeypatch.setattr(c, "_list_cache", {"data": {"data": "list"}, "ts": 0.0})
+    # ts를 0으로 만들어 TTL 만료 시뮬레이션
+    c._list_cache._ts = 0.0
     c.get_list(loader)
     assert len(calls) == 2
 
