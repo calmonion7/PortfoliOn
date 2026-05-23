@@ -102,6 +102,64 @@ function FxSection() {
   )
 }
 
+function VixSection() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    axios.get('/api/market/vix')
+      .then(r => setData(r.data))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>공포탐욕지수 (VIX)</h3><LoadingBox /></div>
+  if (error || !data) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>공포탐욕지수 (VIX)</h3><ErrorBox /></div>
+
+  const vix = data.current
+  const vixColor = vix >= 30 ? '#e57373' : vix >= 20 ? '#ffb74d' : '#81c784'
+  const vixLabel = vix >= 30 ? '공포' : vix >= 20 ? '주의' : '탐욕'
+  const history = (data.history || []).slice(-252)
+
+  return (
+    <div style={SECTION_STYLE}>
+      <h3 style={SECTION_HEADER_STYLE}>공포탐욕지수 (VIX)</h3>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        <div style={{ ...CARD_STYLE, minWidth: 140 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>VIX 현재값</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: vixColor }}>
+            {vix != null ? vix.toFixed(1) : '-'}
+          </div>
+          <div style={{ fontSize: 12, color: vixColor, marginTop: 2 }}>{vixLabel}</div>
+          {data.change != null && (
+            <div style={{ fontSize: 12, color: data.change > 0 ? '#e57373' : '#81c784', marginTop: 4 }}>
+              {data.change > 0 ? '▲' : '▼'} {Math.abs(data.change).toFixed(2)}
+            </div>
+          )}
+        </div>
+      </div>
+      {history.length > 0 && (
+        <div style={CARD_STYLE}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>VIX 추이 (1년)</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={history} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                     tickFormatter={v => v.slice(5)} interval={Math.floor(history.length / 6)} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} domain={[0, 'auto']} />
+              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
+                       labelStyle={{ color: 'var(--text-muted)' }} />
+              <ReferenceLine y={30} stroke="#e57373" strokeDasharray="4 2" label={{ value: '30', fill: '#e57373', fontSize: 10 }} />
+              <Line type="monotone" dataKey="value" name="VIX" stroke="#ffb74d" dot={false} strokeWidth={1.5} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TreasurySection() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -318,6 +376,7 @@ export default function Market() {
       <h2 style={{ color: 'var(--text)', marginBottom: 24 }}>시장지표</h2>
       <TreasurySection />
       <FxSection />
+      <VixSection />
       <M7EarningsSection />
       <KrTop2Section />
       <KrExportsSection />
