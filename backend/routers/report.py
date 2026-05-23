@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pathlib import Path
@@ -81,11 +82,9 @@ def generate_one(ticker: str, background_tasks: BackgroundTasks):
 
 
 def _run_generation(stocks: list):
-    _progress["running"] = True
-    _progress["done"] = 0
-    _progress["total"] = len(stocks)
-    _progress["current"] = ""
-    for stock in stocks:
+    _progress.update({"running": True, "done": 0, "total": len(stocks), "current": ""})
+
+    def _process_one(stock):
         _progress["current"] = stock["ticker"]
         try:
             report_generator.generate_report(stock)
@@ -94,8 +93,11 @@ def _run_generation(stocks: list):
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
         _progress["done"] += 1
-    _progress["running"] = False
-    _progress["current"] = ""
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        list(executor.map(_process_one, stocks))
+
+    _progress.update({"running": False, "current": ""})
 
 
 def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
