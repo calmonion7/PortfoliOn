@@ -334,6 +334,54 @@ def get_vix() -> dict:
         return {"current": None, "change": None, "history": []}
 
 
+# ── Commodities ───────────────────────────────────────────────────────────────
+
+_COMMODITY_SYMBOLS: dict[str, tuple[str, str]] = {
+    "gold":   ("GC=F", "USD/oz"),
+    "oil":    ("CL=F", "USD/bbl"),
+    "copper": ("HG=F", "USD/lb"),
+}
+
+
+def _fetch_commodity(args: tuple[str, tuple[str, str]]) -> tuple[str, dict | None]:
+    key, (sym, unit) = args
+    try:
+        hist = yf.Ticker(sym).history(period="1y", interval="1d")
+        if hist.empty:
+            return key, None
+        close = hist["Close"].dropna()
+        current = round(float(close.iloc[-1]), 2)
+        prev = round(float(close.iloc[-2]), 2) if len(close) > 1 else current
+        change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
+        history = [
+            {"date": str(d.date()), "value": round(float(v), 2)}
+            for d, v in zip(close.index, close.values)
+        ]
+        return key, {"current": current, "change_pct": change_pct, "unit": unit, "history": history}
+    except Exception:
+        return key, None
+
+
+def get_commodities() -> dict:
+    cached = _get_cache("commodities")
+    if cached:
+        return cached
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        results = dict(ex.map(_fetch_commodity, _COMMODITY_SYMBOLS.items()))
+
+    prices = {
+        k: {"current": v["current"], "change_pct": v["change_pct"], "unit": v["unit"]}
+        for k, v in results.items()
+        if v
+    }
+    history = {k: v["history"] for k, v in results.items() if v}
+
+    data = {"prices": prices, "history": history}
+    _set_cache("commodities", data, ttl=3600)
+    return data
+
+
 # ── Korean Export Data ────────────────────────────────────────────────────────
 
 _EXPORTS_CACHE = os.path.join(_DATA_DIR, "kr_exports.json")

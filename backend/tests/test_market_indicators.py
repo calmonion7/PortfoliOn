@@ -350,3 +350,56 @@ def test_get_vix_caches_result():
         get_vix()
         count2 = mock_t.call_count
     assert count1 == count2
+
+
+# ── get_commodities ───────────────────────────────────────────────────────────
+
+def test_get_commodities_returns_three_prices():
+    from services.market_indicators_service import get_commodities, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([2300.0, 2350.0])
+        result = get_commodities()
+    assert set(result["prices"].keys()) == {"gold", "oil", "copper"}
+
+
+def test_get_commodities_change_pct():
+    from services.market_indicators_service import get_commodities, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([2000.0, 2100.0])
+        result = get_commodities()
+    # change = (2100 - 2000) / 2000 * 100 = 5.0%
+    assert result["prices"]["gold"]["change_pct"] == pytest.approx(5.0, abs=0.01)
+
+
+def test_get_commodities_has_history_for_all():
+    from services.market_indicators_service import get_commodities, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([100.0, 101.0])
+        result = get_commodities()
+    assert set(result["history"].keys()) == {"gold", "oil", "copper"}
+
+
+def test_get_commodities_unit_labels():
+    from services.market_indicators_service import get_commodities, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([100.0, 101.0])
+        result = get_commodities()
+    assert result["prices"]["gold"]["unit"] == "USD/oz"
+    assert result["prices"]["oil"]["unit"] == "USD/bbl"
+    assert result["prices"]["copper"]["unit"] == "USD/lb"
+
+
+def test_get_commodities_caches_result():
+    from services.market_indicators_service import get_commodities, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([100.0, 101.0])
+        get_commodities()
+        count1 = mock_t.call_count
+        get_commodities()
+        count2 = mock_t.call_count
+    assert count1 == count2
