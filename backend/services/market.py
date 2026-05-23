@@ -410,13 +410,16 @@ def get_quote(ticker: str, market: str = "US", exchange: str = "") -> dict:
             "market_cap": info.get("marketCap"),
             "ytd_return": round(ytd_return, 2) if ytd_return else None,
             "market": market,
+            "sector": info.get("sector", "") or "",
+            "industry": info.get("industry", "") or "",
         }
     except Exception as e:
         return {
             "ticker": ticker, "name": ticker, "price": None,
             "prev_close": None, "daily_change": "N/A",
             "daily_change_pct": None, "weekly_change_pct": None, "monthly_change_pct": None,
-            "market_cap": None, "ytd_return": None, "market": market, "error": str(e),
+            "market_cap": None, "ytd_return": None, "market": market,
+            "sector": "", "industry": "", "error": str(e),
         }
 
 

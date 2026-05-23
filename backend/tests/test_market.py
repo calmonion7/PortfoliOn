@@ -83,3 +83,37 @@ def test_get_quote_includes_weekly_monthly_change_fields():
     assert "monthly_change_pct" in result
     for key in ("daily_change_pct", "weekly_change_pct", "monthly_change_pct"):
         assert result[key] is None or isinstance(result[key], float)
+
+def test_get_quote_includes_sector():
+    mock = _make_mock_ticker()
+    mock.info["sector"] = "Technology"
+    mock.info["industry"] = "Consumer Electronics"
+    with patch("services.market.yf.Ticker", return_value=mock):
+        from services import market
+        import importlib; importlib.reload(market)
+        result = market.get_quote("AAPL")
+    assert result["sector"] == "Technology"
+    assert result["industry"] == "Consumer Electronics"
+
+def test_get_quote_kr_sector_from_yfinance_fallback():
+    naver_basic = {
+        "closePrice": "75000",
+        "compareToPreviousClosePrice": "500",
+        "fluctuationsRatio": "0.67",
+        "marketValue": "447000000000000",
+        "stockName": "삼성전자",
+    }
+    mock_yf = MagicMock()
+    mock_yf.info = {"sector": "Technology", "industry": "Semiconductors"}
+    dates = pd.date_range("2026-01-02", periods=100, freq="B")
+    mock_yf.history.return_value = pd.DataFrame(
+        {"Close": [74000.0] + [75000.0] * 99},
+        index=dates,
+    )
+    with patch("services.market._naver_get", return_value=naver_basic), \
+         patch("services.market.yf.Ticker", return_value=mock_yf):
+        from services import market
+        import importlib; importlib.reload(market)
+        result = market.get_quote_kr("005930")
+    assert result["sector"] == "Technology"
+    assert "industry" in result
