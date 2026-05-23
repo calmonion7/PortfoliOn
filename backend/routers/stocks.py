@@ -14,6 +14,23 @@ from services import cache as cache_svc
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
+
+def _latest_snapshot(ticker: str) -> tuple:
+    """Find and load the latest snapshot for a ticker from snapshots or reports directory."""
+    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
+        ticker_dir = base / ticker
+        if ticker_dir.exists():
+            dates = sorted([f.stem for f in ticker_dir.glob("*.json")], reverse=True)
+            if dates:
+                path = ticker_dir / f"{dates[0]}.json"
+                try:
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                    return data, dates[0]
+                except Exception:
+                    pass
+    return None, None
+
+
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
 _KR_PATTERN = re.compile(r'[가-힣]')
@@ -153,20 +170,6 @@ def get_dashboard():
     holdings = portfolio.get("stocks", [])
     if not holdings:
         return []
-
-    def _latest_snapshot(ticker: str) -> tuple:
-        for base in (SNAPSHOTS_DIR, REPORTS_DIR):
-            ticker_dir = base / ticker
-            if ticker_dir.exists():
-                dates = sorted([f.stem for f in ticker_dir.glob("*.json")], reverse=True)
-                if dates:
-                    path = ticker_dir / f"{dates[0]}.json"
-                    try:
-                        data = json.loads(path.read_text(encoding="utf-8"))
-                        return data, dates[0]
-                    except Exception:
-                        pass
-        return None, None
 
     def _build_card(stock: dict) -> dict:
         ticker = stock["ticker"].upper()
