@@ -7,7 +7,7 @@ import json
 import requests as http_requests
 import yfinance as yf
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from services import market
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
@@ -194,7 +194,6 @@ def get_dashboard():
         }
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(_build_card, s): s for s in holdings}
-        results = [f.result() for f in as_completed(futures)]
+        results = list(executor.map(_build_card, holdings))
 
     return results
