@@ -5,6 +5,7 @@ from services import storage, report_generator, consensus as consensus_svc
 _scheduler = AsyncIOScheduler()
 _JOB_ID = "daily_report"
 _GURU_JOB_ID = "guru_crawl"
+_DIGEST_JOB_ID = "daily_digest"
 _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
 
@@ -56,6 +57,16 @@ def _run_guru_crawl():
         print(f"[Scheduler] Guru crawl failed: {e}")
 
 
+def _run_digest():
+    from services import digest_service
+    try:
+        d = digest_service.generate()
+        digest_service.send_telegram(d)
+        print("[Scheduler] Daily digest generated")
+    except Exception as e:
+        print(f"[Scheduler] Daily digest failed: {e}")
+
+
 def _reschedule_guru():
     cfg = storage.get_guru_schedule()
     if _scheduler.get_job(_GURU_JOB_ID):
@@ -78,6 +89,12 @@ def _reschedule_guru():
 def start():
     _reschedule()
     _reschedule_guru()
+    _scheduler.add_job(
+        _run_digest,
+        CronTrigger(hour=8, minute=0, timezone="Asia/Seoul"),
+        id=_DIGEST_JOB_ID,
+        replace_existing=True,
+    )
     _scheduler.start()
 
 
