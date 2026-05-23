@@ -15,6 +15,10 @@
 - [Report (리포트)](#report-리포트)
 - [Schedule (자동 스케줄)](#schedule-자동-스케줄)
 - [Calendar (이벤트 캘린더)](#calendar-이벤트-캘린더)
+- [Digest (일일 다이제스트)](#digest-일일-다이제스트)
+- [Market (시장 지표)](#market-시장-지표)
+- [Guru (구루 분석)](#guru-구루-분석)
+- [Analytics (분석)](#analytics-분석)
 - [공통 스키마](#공통-스키마)
 - [공통 에러 응답](#공통-에러-응답)
 
@@ -359,6 +363,82 @@
 
 ---
 
+### `GET /api/stocks/search`
+
+종목 검색 (한글 → Naver, 영문 → yfinance).
+
+**Query Parameters**
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|---------|------|------|------|
+| `q` | string | ✅ | 검색어 (최소 1자) |
+| `market` | string | ❌ | `"KR"` \| `"US"` \| `"ALL"` (기본값: `"ALL"`) |
+
+**Response `200`**
+```json
+[
+  {
+    "ticker": "005930",
+    "name": "삼성전자",
+    "market": "KR",
+    "exchange": "KS",
+    "exchange_display": "KSE"
+  },
+  {
+    "ticker": "AAPL",
+    "name": "Apple Inc.",
+    "market": "US",
+    "exchange": "",
+    "exchange_display": "NasdaqGS"
+  }
+]
+```
+
+---
+
+### `GET /api/stocks/dashboard`
+
+보유종목 대시보드 카드 목록 (현재가, 수익률, RSI, 컨센서스). TTL 300s 캐시.
+
+**Response `200`**
+```json
+[
+  {
+    "ticker": "AAPL",
+    "name": "Apple Inc.",
+    "market": "US",
+    "avg_cost": 150.0,
+    "quantity": 10,
+    "current_price": 175.5,
+    "daily_change_pct": 1.2,
+    "weekly_change_pct": 3.4,
+    "monthly_change_pct": 8.1,
+    "rsi": 62.3,
+    "target_mean": 210.0,
+    "buy": 15,
+    "hold": 8,
+    "sell": 2,
+    "snapshot_date": "2026-05-20",
+    "sector": "Technology"
+  }
+]
+```
+
+보유종목이 없으면 빈 배열 `[]` 반환.
+
+---
+
+### `DELETE /api/stocks/dashboard/cache`
+
+대시보드 인메모리 캐시 강제 초기화.
+
+**Response `200`**
+```json
+{ "cleared": true }
+```
+
+---
+
 ## Report (리포트)
 
 ### `GET /api/report/progress`
@@ -585,6 +665,258 @@
 ```
 
 **Error `422`** — `month` 파라미터가 `YYYY-MM` 형식이 아닌 경우
+
+---
+
+## Digest (일일 다이제스트)
+
+### `GET /api/digest/latest`
+
+가장 최근 생성된 다이제스트 조회.
+
+**Response `200`**
+```json
+{
+  "date": "2026-05-23",
+  "generated_at": "2026-05-23T08:00:00",
+  "content": "## 오늘의 포트폴리오 요약\n..."
+}
+```
+
+**Error `404`** — 아직 생성된 다이제스트 없음
+
+---
+
+### `POST /api/digest/generate`
+
+다이제스트 즉시 생성 (동기).
+
+**Response `200`**
+```json
+{
+  "date": "2026-05-23",
+  "generated_at": "2026-05-23T12:00:00",
+  "content": "## 오늘의 포트폴리오 요약\n..."
+}
+```
+
+---
+
+## Market (시장 지표)
+
+### `GET /api/market/treasury`
+
+미국 국채 금리 (2년, 10년).
+
+**Response `200`**
+```json
+{ "us2y": 4.85, "us10y": 4.42 }
+```
+
+---
+
+### `GET /api/market/fx`
+
+주요 환율 (yfinance).
+
+**Response `200`**
+```json
+{ "usd_krw": 1380.5, "usd_jpy": 156.2, "eur_usd": 1.082 }
+```
+
+---
+
+### `GET /api/market/vix`
+
+VIX 공포지수.
+
+**Response `200`**
+```json
+{ "value": 18.4, "label": "보통" }
+```
+
+---
+
+### `GET /api/market/commodities`
+
+주요 원자재 가격.
+
+**Response `200`**
+```json
+{ "gold": 2345.6, "wti": 78.3, "copper": 4.52 }
+```
+
+---
+
+### `GET /api/market/econ-indicators`
+
+경제지표 (FRED API). `FRED_API_KEY` 환경변수 필요.
+
+**Response `200`**
+```json
+{ "cpi_yoy": 3.2, "unemployment": 3.9 }
+```
+
+---
+
+### `GET /api/market/m7-earnings`
+
+M7 빅테크 최근 실적 요약.
+
+**Response `200`** — 종목 배열 (각 항목: ticker, eps_actual, eps_estimate, surprise_pct 등)
+
+---
+
+### `GET /api/market/kr-top2-earnings`
+
+삼성전자·SK하이닉스 최근 실적 요약.
+
+**Response `200`** — 종목 배열
+
+---
+
+### `GET /api/market/kr-exports`
+
+한국 수출 지표.
+
+**Response `200`** — 월별 수출 데이터 객체
+
+---
+
+## Guru (구루 분석)
+
+### `GET /api/guru/managers`
+
+dataroma 기반 구루 매니저 전체 목록.
+
+**Response `200`**
+```json
+{
+  "last_updated": "2026-05-23T08:00:00",
+  "managers": [
+    {
+      "name": "Warren Buffett",
+      "firm": "Berkshire Hathaway",
+      "portfolio_value": 350000000000,
+      "num_stocks": 45,
+      "top10": ["AAPL", "BAC", "AXP"]
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/guru/stats/popularity`
+
+여러 구루가 보유한 종목을 보유자 수 기준으로 랭킹.
+
+**Response `200`** — `[{ "ticker": "AAPL", "count": 12 }, ...]`
+
+---
+
+### `GET /api/guru/stats/manager-top3`
+
+각 구루의 포트폴리오 상위 3개 종목.
+
+**Response `200`** — `[{ "manager": "...", "top3": ["AAPL", "MSFT", "BRK.B"] }, ...]`
+
+---
+
+### `GET /api/guru/stats/weighted`
+
+포트폴리오 내 순위 기반 가중치(1/rank) 합산 추천 점수.
+
+**Response `200`** — `[{ "ticker": "AAPL", "score": 5.23 }, ...]`
+
+---
+
+### `GET /api/guru/crawl/progress`
+
+구루 크롤링 진행 상황 조회.
+
+**Response `200`**
+```json
+{ "running": true, "done": 3, "total": 20, "current": "Warren Buffett" }
+```
+
+---
+
+### `POST /api/guru/crawl`
+
+dataroma 전체 매니저 크롤링 시작 (비동기).
+
+**Response `202`**
+```json
+{ "message": "Crawl started" }
+```
+
+**Error `409`** — 크롤링 이미 진행 중
+
+---
+
+### `GET /api/guru/schedule`
+
+구루 크롤링 자동 스케줄 조회.
+
+**Response `200`**
+```json
+{ "enabled": true, "day": "sun", "time": "07:00" }
+```
+
+---
+
+### `PUT /api/guru/schedule`
+
+구루 크롤링 자동 스케줄 업데이트.
+
+**Request Body**
+```json
+{ "enabled": true, "day": "sun", "time": "07:00" }
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `enabled` | boolean | ✅ | 스케줄 활성화 여부 |
+| `day` | string | ✅ | 요일 (`"mon"` ~ `"sun"`) |
+| `time` | string | ✅ | 실행 시간 (`"HH:MM"` 형식) |
+
+**Response `200`** — 저장된 스케줄 그대로 반환
+
+**Error `400`** — `enabled`, `day`, `time` 중 누락 시
+
+---
+
+## Analytics (분석)
+
+### `GET /api/analytics/correlation`
+
+보유 종목 간 90일 수익률 상관관계 행렬. TTL 300s 캐시.
+
+- 종목이 2개 미만이거나, 데이터 20일 미만인 종목은 제외됨
+- KR 종목은 `.KS` 또는 `.KQ` 심볼로 조회
+
+**Response `200`**
+```json
+{
+  "tickers": ["AAPL", "MSFT", "NVDA"],
+  "matrix": [
+    [1.0,   0.823, 0.741],
+    [0.823, 1.0,   0.689],
+    [0.741, 0.689, 1.0  ]
+  ]
+}
+```
+
+종목 수 부족 시:
+```json
+{ "tickers": [], "matrix": [] }
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `tickers` | string[] | 상관관계 계산에 포함된 종목 코드 목록 |
+| `matrix` | number[][] | `tickers[i]`와 `tickers[j]`의 상관계수 (`matrix[i][j]`) |
 
 ---
 

@@ -138,6 +138,15 @@ FX, VIX, 원자재, 경제지표를 한 화면에서 확인합니다.
 | 가중치 통계 | 포트폴리오 내 순위 기반 가중치(1/rank)를 합산한 추천 점수 |
 | 관심종목 추가/삭제 | 통계 목록에서 바로 관심종목 등록·해제 |
 
+### 애널리틱스
+
+보유 종목 간 상관관계를 히트맵으로 시각화합니다.
+
+| 기능 | 설명 |
+|------|------|
+| 상관관계 히트맵 | 보유 종목 90일 수익률 기반 상관계수 SVG 히트맵 |
+| 자동 캐시 | TTL 300s 캐시, 종목 변경 시 자동 무효화 |
+
 ### 설정
 
 **리포트 설정**
@@ -252,10 +261,10 @@ Browser (React/Vite :5173)
         ▼
 FastAPI (:8000)
  ├─ routers/        # portfolio, watchlist, stocks, report, guru,
- │                  # calendar, digest, market_indicators
+ │                  # calendar, digest, market_indicators, analytics
  ├─ services/       # market(yfinance+Naver), charts, indicators,
  │                  # report_generator(Claude AI), scraper,
- │                  # digest_service, market_indicators_service, cache
+ │                  # digest_service, market_indicators_service, cache, utils
  └─ data/           # JSON 파일 저장소 (DB 없음)
         │
         ├─ stocks.json (holdings+watchlist 통합), schedule.json
@@ -285,17 +294,17 @@ PortfoliOn/
 ├── backend/
 │   ├── main.py
 │   ├── routers/          # portfolio, watchlist, stocks, report, guru,
-│   │                     # calendar, digest, market_indicators
+│   │                     # calendar, digest, market_indicators, analytics
 │   ├── services/         # storage, market, charts, indicators,
 │   │                     # report_generator, scraper, guru_scraper, guru_stats,
-│   │                     # digest_service, market_indicators_service, cache
+│   │                     # digest_service, market_indicators_service, cache, utils
 │   ├── data/             # JSON 파일 저장소 (stocks.json, schedule.json, consensus/)
 │   └── snapshots/        # 생성된 JSON 스냅샷 (per-ticker/date)
 └── frontend/
     └── src/
         ├── pages/        # Portfolio, Reports, Calendar, Settings,
         │                 # Guru, GuruCrawlSettings, GuruStats, ReportSchedule,
-        │                 # Market, Digest
-        ├── components/   # StockModal, PromoteModal
+        │                 # Market, Digest, Analytics
+        ├── components/   # StockModal, PromoteModal, reports/
         └── utils.js      # 공통 유틸리티 (TAB_STYLE, fmtPrice)
 ```
