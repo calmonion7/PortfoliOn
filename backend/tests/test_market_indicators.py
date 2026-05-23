@@ -316,3 +316,37 @@ def test_get_fx_caches_result():
         get_fx()
         count2 = mock_t.call_count
     assert count1 == count2
+
+
+# ── get_vix ───────────────────────────────────────────────────────────────────
+
+def test_get_vix_returns_current_and_change():
+    from services.market_indicators_service import get_vix, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([19.5, 18.2])
+        result = get_vix()
+    assert result["current"] == pytest.approx(18.2, abs=0.01)
+    assert result["change"] == pytest.approx(-1.3, abs=0.01)
+
+
+def test_get_vix_has_history():
+    from services.market_indicators_service import get_vix, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([18.0, 19.0, 20.0])
+        result = get_vix()
+    assert len(result["history"]) == 3
+    assert result["history"][0]["value"] == pytest.approx(18.0, abs=0.01)
+
+
+def test_get_vix_caches_result():
+    from services.market_indicators_service import get_vix, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([18.0, 19.0])
+        get_vix()
+        count1 = mock_t.call_count
+        get_vix()
+        count2 = mock_t.call_count
+    assert count1 == count2

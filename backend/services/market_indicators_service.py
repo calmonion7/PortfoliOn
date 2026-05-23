@@ -310,6 +310,31 @@ def get_fx() -> dict:
     return data
 
 
+# ── VIX ───────────────────────────────────────────────────────────────────────
+
+def get_vix() -> dict:
+    cached = _get_cache("vix")
+    if cached:
+        return cached
+
+    try:
+        hist = yf.Ticker("^VIX").history(period="1y", interval="1d")
+        close = hist["Close"].dropna()
+        current = round(float(close.iloc[-1]), 2)
+        prev = round(float(close.iloc[-2]), 2) if len(close) > 1 else current
+        change = round(current - prev, 2)
+        history = [
+            {"date": str(d.date()), "value": round(float(v), 2)}
+            for d, v in zip(close.index, close.values)
+        ]
+        data: dict = {"current": current, "change": change, "history": history}
+    except Exception:
+        data = {"current": None, "change": None, "history": []}
+
+    _set_cache("vix", data, ttl=3600)
+    return data
+
+
 # ── Korean Export Data ────────────────────────────────────────────────────────
 
 _EXPORTS_CACHE = os.path.join(_DATA_DIR, "kr_exports.json")
