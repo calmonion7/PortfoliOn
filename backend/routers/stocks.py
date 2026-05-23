@@ -201,6 +201,7 @@ def get_dashboard():
             "hold": hold,
             "sell": sell,
             "snapshot_date": snapshot_date,
+            "sector": quote.get("sector") or "기타",
         }
 
     def _build_all():

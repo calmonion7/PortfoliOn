@@ -157,3 +157,30 @@ def test_dashboard_returns_empty_list_when_no_holdings():
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+def test_dashboard_card_includes_sector():
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    portfolio = {
+        "stocks": [
+            {"ticker": "AAPL", "name": "Apple Inc.", "market": "US",
+             "avg_cost": 150.0, "quantity": 10, "exchange": ""},
+        ],
+        "watchlist": []
+    }
+    quote = {
+        "ticker": "AAPL", "price": 185.2,
+        "daily_change_pct": 1.4, "weekly_change_pct": 2.1, "monthly_change_pct": 5.8,
+        "name": "Apple Inc.", "market": "US",
+        "sector": "Technology", "industry": "Consumer Electronics",
+    }
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.stocks.market.get_quote", return_value=quote), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")):
+        resp = client.get("/api/stocks/dashboard")
+    assert resp.status_code == 200
+    card = resp.json()[0]
+    assert card["sector"] == "Technology"
