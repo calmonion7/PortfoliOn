@@ -60,3 +60,71 @@ def test_get_treasury_caches_result():
         get_treasury()
         call_count_2 = mock_t.call_count
     assert call_count_1 == call_count_2  # second call hits cache, no new yf calls
+
+
+# ── _get_sp500_tickers ────────────────────────────────────────────────────────
+
+def test_get_sp500_tickers_parses_wikipedia(tmp_path, monkeypatch):
+    from services.market_indicators_service import _get_sp500_tickers
+    monkeypatch.setattr(
+        "services.market_indicators_service._SP500_CACHE",
+        str(tmp_path / "sp500.json"),
+    )
+    fake_html = """
+    <table id="constituents"><tbody>
+      <tr><th>Symbol</th></tr>
+      <tr><td>AAPL</td><td>Apple</td></tr>
+      <tr><td>BRK.B</td><td>Berkshire</td></tr>
+    </tbody></table>
+    """
+    with patch("services.market_indicators_service.requests.get") as mock_get:
+        mock_get.return_value.text = fake_html
+        tickers = _get_sp500_tickers()
+    assert "AAPL" in tickers
+    assert "BRK-B" in tickers  # dot converted to dash
+
+
+def test_get_sp500_tickers_uses_file_cache(tmp_path, monkeypatch):
+    from services.market_indicators_service import _get_sp500_tickers
+    cache_file = tmp_path / "sp500.json"
+    cache_file.write_text('["AAPL", "MSFT"]')
+    import os as _os; _os.utime(cache_file, None)  # touch (recent mtime)
+    monkeypatch.setattr(
+        "services.market_indicators_service._SP500_CACHE", str(cache_file)
+    )
+    with patch("services.market_indicators_service.requests.get") as mock_get:
+        tickers = _get_sp500_tickers()
+        assert not mock_get.called  # should NOT hit network
+    assert tickers == ["AAPL", "MSFT"]
+
+
+# ── get_m7_earnings ───────────────────────────────────────────────────────────
+
+def test_get_m7_earnings_structure():
+    from services.market_indicators_service import get_m7_earnings, _cache
+    _cache.clear()
+    fake_ni = {"2025Q1": 25.0, "2025Q2": 28.0}
+    with patch("services.market_indicators_service._get_sp500_tickers", return_value=["AAPL", "MSFT", "JPM"]), \
+         patch("services.market_indicators_service._get_yf_quarterly_net_income", return_value=fake_ni):
+        result = get_m7_earnings()
+    assert "quarters" in result
+    assert "unit" in result
+    assert all({"q", "m7", "rest"} <= set(q.keys()) for q in result["quarters"])
+
+
+def test_get_m7_earnings_rest_excludes_m7():
+    from services.market_indicators_service import get_m7_earnings, M7, _cache
+    _cache.clear()
+    called_tickers: list[str] = []
+
+    def capture_ni(ticker):
+        called_tickers.append(ticker)
+        return {"2025Q1": 10.0}
+
+    with patch("services.market_indicators_service._get_sp500_tickers", return_value=["AAPL", "JPM", "V"]), \
+         patch("services.market_indicators_service._get_yf_quarterly_net_income", side_effect=capture_ni):
+        get_m7_earnings()
+    # JPM and V should be in rest (not M7), AAPL is in M7
+    rest_tickers = [t for t in called_tickers if t not in M7]
+    assert "JPM" in rest_tickers
+    assert "V" in rest_tickers
