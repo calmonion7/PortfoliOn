@@ -128,3 +128,92 @@ def test_get_m7_earnings_rest_excludes_m7():
     rest_tickers = [t for t in called_tickers if t not in M7]
     assert "JPM" in rest_tickers
     assert "V" in rest_tickers
+
+
+# ── _get_kospi200_tickers ─────────────────────────────────────────────────────
+
+def test_get_kospi200_tickers_parses_krx(tmp_path, monkeypatch):
+    from services.market_indicators_service import _get_kospi200_tickers
+    monkeypatch.setattr(
+        "services.market_indicators_service._KOSPI200_CACHE",
+        str(tmp_path / "kospi200.json"),
+    )
+    fake_response = {"output": [{"ISU_SRT_CD": "005930"}, {"ISU_SRT_CD": "000660"}]}
+    with patch("services.market_indicators_service.requests.post") as mock_post:
+        mock_post.return_value.json.return_value = fake_response
+        tickers = _get_kospi200_tickers()
+    assert "005930" in tickers
+    assert "000660" in tickers
+
+
+def test_get_kospi200_tickers_uses_file_cache(tmp_path, monkeypatch):
+    from services.market_indicators_service import _get_kospi200_tickers
+    cache_file = tmp_path / "kospi200.json"
+    cache_file.write_text('["005930","000660","005380"]')
+    import os as _os; _os.utime(cache_file, None)
+    monkeypatch.setattr(
+        "services.market_indicators_service._KOSPI200_CACHE", str(cache_file)
+    )
+    with patch("services.market_indicators_service.requests.post") as mock_post:
+        tickers = _get_kospi200_tickers()
+        assert not mock_post.called
+    assert "005380" in tickers
+
+
+# ── _get_naver_quarterly_net_income ──────────────────────────────────────────
+
+def test_get_naver_quarterly_net_income_parses_row():
+    from services.market_indicators_service import _get_naver_quarterly_net_income
+    fake_resp = {
+        "financeInfo": {
+            "rowList": [
+                {"title": "매출액", "columns": {"202503": {"value": "100,000"}}},
+                {"title": "영업이익", "columns": {"202503": {"value": "20,000"}}},
+                {"title": "당기순이익", "columns": {
+                    "202503": {"value": "122,257"},
+                    "202506": {"value": "150,000"},
+                }},
+            ]
+        }
+    }
+    with patch("services.market_indicators_service.requests.get") as mock_get:
+        mock_get.return_value.json.return_value = fake_resp
+        mock_get.return_value.raise_for_status = lambda: None
+        result = _get_naver_quarterly_net_income("005930")
+    assert "2025Q1" in result
+    assert result["2025Q1"] == pytest.approx(122257.0, rel=0.01)
+    assert "2025Q2" in result
+
+
+# ── get_kr_top2_earnings ──────────────────────────────────────────────────────
+
+def test_get_kr_top2_earnings_structure():
+    from services.market_indicators_service import get_kr_top2_earnings, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service._get_kospi200_tickers",
+               return_value=["005930", "000660", "005380"]), \
+         patch("services.market_indicators_service._get_naver_quarterly_net_income",
+               return_value={"2025Q1": 100000.0, "2025Q2": 120000.0}):
+        result = get_kr_top2_earnings()
+    assert "quarters" in result
+    assert result["unit"] == "억원"
+    assert all({"q", "top2", "rest"} <= set(q.keys()) for q in result["quarters"])
+
+
+def test_get_kr_top2_earnings_rest_excludes_top2():
+    from services.market_indicators_service import get_kr_top2_earnings, KR_TOP2, _cache
+    _cache.clear()
+    called: list[str] = []
+
+    def capture(ticker):
+        called.append(ticker)
+        return {"2025Q1": 50000.0}
+
+    with patch("services.market_indicators_service._get_kospi200_tickers",
+               return_value=["005930", "000660", "005380"]), \
+         patch("services.market_indicators_service._get_naver_quarterly_net_income",
+               side_effect=capture):
+        get_kr_top2_earnings()
+    rest_tickers = [t for t in called if t not in KR_TOP2]
+    assert "005380" in rest_tickers
+    assert "005930" not in rest_tickers

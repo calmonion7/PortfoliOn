@@ -169,3 +169,98 @@ def get_m7_earnings() -> dict:
     }
     _set_cache("m7_earnings", data, ttl=86400)
     return data
+
+
+# ── KR Top2 Earnings ──────────────────────────────────────────────────────────
+
+KR_TOP2 = ["005930", "000660"]
+_KOSPI200_CACHE = os.path.join(_DATA_DIR, "kospi200_tickers.json")
+
+
+def _get_kospi200_tickers() -> list[str]:
+    if os.path.exists(_KOSPI200_CACHE):
+        if time.time() - os.path.getmtime(_KOSPI200_CACHE) < 86400 * 7:
+            with open(_KOSPI200_CACHE) as f:
+                return json.load(f)
+
+    from datetime import date
+    today = date.today().strftime("%Y%m%d")
+    url = "http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
+    headers = {
+        "Referer": "http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd",
+        "User-Agent": "Mozilla/5.0",
+    }
+    payload = {
+        "bld": "dbms/MDC/STAT/standard/MDCSTAT00601",
+        "mktId": "STK",
+        "indTpCd": "2",
+        "indTpCd2": "103",
+        "strtDd": today,
+        "endDd": today,
+        "share": "1",
+        "money": "1",
+        "csvxls_isNo": "false",
+    }
+    r = requests.post(url, data=payload, headers=headers, timeout=15)
+    tickers = [item["ISU_SRT_CD"] for item in r.json().get("output", []) if "ISU_SRT_CD" in item]
+
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    with open(_KOSPI200_CACHE, "w") as f:
+        json.dump(tickers, f)
+    return tickers
+
+
+def _get_naver_quarterly_net_income(ticker: str) -> dict[str, float]:
+    """ticker: 6자리 KRX 코드. Returns {quarter_label: value_in_억원}"""
+    try:
+        r = requests.get(
+            f"{_NAVER_BASE}/{ticker}/finance/quarter",
+            headers=_NAVER_HEADERS,
+            timeout=8,
+        )
+        r.raise_for_status()
+        rows = r.json().get("financeInfo", {}).get("rowList", [])
+        ni_row = next((row for row in rows if row.get("title") == "당기순이익"), None)
+        if ni_row is None:
+            return {}
+        result: dict[str, float] = {}
+        for col_key, col_data in ni_row.get("columns", {}).items():
+            val = col_data.get("value", "")
+            if val and val != "-":
+                try:
+                    v = float(val.replace(",", ""))
+                    year, month = int(col_key[:4]), int(col_key[4:])
+                    q = (month - 1) // 3 + 1
+                    result[f"{year}Q{q}"] = v
+                except (ValueError, IndexError):
+                    pass
+        return result
+    except Exception:
+        return {}
+
+
+def get_kr_top2_earnings() -> dict:
+    cached = _get_cache("kr_top2_earnings")
+    if cached:
+        return cached
+
+    kospi200 = _get_kospi200_tickers()
+    rest = [t for t in kospi200 if t not in KR_TOP2]
+
+    with ThreadPoolExecutor(max_workers=20) as ex:
+        top2_data = list(ex.map(_get_naver_quarterly_net_income, KR_TOP2))
+        rest_data = list(ex.map(_get_naver_quarterly_net_income, rest))
+
+    top2_by_q = _merge_quarters(top2_data)
+    rest_by_q = _merge_quarters(rest_data)
+    quarters = sorted(set(top2_by_q) | set(rest_by_q))[-8:]
+
+    data = {
+        "quarters": [
+            {"q": q, "top2": top2_by_q.get(q, 0), "rest": rest_by_q.get(q, 0)}
+            for q in quarters
+        ],
+        "unit": "억원",
+    }
+    _set_cache("kr_top2_earnings", data, ttl=86400)
+    return data
