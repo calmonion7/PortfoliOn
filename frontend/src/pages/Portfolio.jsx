@@ -4,6 +4,18 @@ import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 import { TAB_STYLE, fmtPrice } from '../utils'
 
+const MarketBadge = ({ market }) => (
+  <span style={{
+    fontSize: 10, padding: '1px 5px', borderRadius: 3,
+    background: market === 'KR' ? '#1a3a2a' : '#1a2a3a',
+    color: market === 'KR' ? '#81c784' : '#4fc3f7',
+    border: `1px solid ${market === 'KR' ? '#2e6b4a' : '#2a4a6a'}`,
+    whiteSpace: 'nowrap',
+  }}>
+    {market === 'KR' ? '🇰🇷 KR' : '🇺🇸 US'}
+  </span>
+)
+
 const _weather = (score) => {
   if (score <= 0) return { icon: '☀️', label: '맑음' }
   if (score <= 1) return { icon: '⛅', label: '구름 조금' }
@@ -100,18 +112,6 @@ const DashboardGrid = ({ cards, loading }) => {
     </div>
   )
 }
-
-const MarketBadge = ({ market }) => (
-  <span style={{
-    fontSize: 10, padding: '1px 5px', borderRadius: 3,
-    background: market === 'KR' ? '#1a3a2a' : '#1a2a3a',
-    color: market === 'KR' ? '#81c784' : '#4fc3f7',
-    border: `1px solid ${market === 'KR' ? '#2e6b4a' : '#2a4a6a'}`,
-    whiteSpace: 'nowrap',
-  }}>
-    {market === 'KR' ? '🇰🇷 KR' : '🇺🇸 US'}
-  </span>
-)
 
 export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('holdings')
