@@ -264,3 +264,70 @@ def get_kr_top2_earnings() -> dict:
     }
     _set_cache("kr_top2_earnings", data, ttl=86400)
     return data
+
+
+# ── Korean Export Data ────────────────────────────────────────────────────────
+
+_EXPORTS_CACHE = os.path.join(_DATA_DIR, "kr_exports.json")
+
+
+def _months_ago(n: int) -> str:
+    from datetime import date
+    today = date.today()
+    month = today.month - n
+    year = today.year + (month - 1) // 12
+    month = ((month - 1) % 12) + 1
+    return f"{year}{month:02d}"
+
+
+def get_kr_exports() -> dict:
+    # 파일 캐시 (30일)
+    if os.path.exists(_EXPORTS_CACHE):
+        if time.time() - os.path.getmtime(_EXPORTS_CACHE) < 86400 * 30:
+            with open(_EXPORTS_CACHE) as f:
+                return json.load(f)
+
+    api_key = os.environ.get("KITA_API_KEY")
+    if not api_key:
+        # 만료된 캐시라도 있으면 반환
+        if os.path.exists(_EXPORTS_CACHE):
+            with open(_EXPORTS_CACHE) as f:
+                return json.load(f)
+        return {"months": [], "error": "KITA_API_KEY 환경변수가 필요합니다. https://www.kita.net 에서 발급 후 설정하세요."}
+
+    # KITA Open API 조회
+    url = "https://api.kita.net/openApi/service/ItemTradeService/getItemExpImpList"
+    params = {
+        "serviceKey": api_key,
+        "startDate": _months_ago(12),
+        "endDate": _months_ago(0),
+        "type": "json",
+    }
+    r = requests.get(url, params=params, timeout=15)
+    items = r.json().get("items", {}).get("item", [])
+
+    months_semi: dict[str, float] = {}
+    months_rest: dict[str, float] = {}
+    for item in items:
+        ym = item.get("period", "")
+        amt = float(str(item.get("expAmt", "0")).replace(",", ""))
+        if "반도체" in item.get("itmNm", ""):
+            months_semi[ym] = months_semi.get(ym, 0) + amt
+        else:
+            months_rest[ym] = months_rest.get(ym, 0) + amt
+
+    all_months = sorted(set(months_semi) | set(months_rest))
+    data = {
+        "months": [
+            {
+                "month": m,
+                "semiconductor": round(months_semi.get(m, 0) / 1e8, 1),
+                "non_semiconductor": round(months_rest.get(m, 0) / 1e8, 1),
+            }
+            for m in all_months
+        ]
+    }
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    with open(_EXPORTS_CACHE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    return data
