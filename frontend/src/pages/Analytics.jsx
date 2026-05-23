@@ -178,6 +178,65 @@ function OpportunityBubble({ cards }) {
   )
 }
 
+function corrColor(v) {
+  const neutral = [69, 90, 100]
+  const pos = [79, 195, 247]
+  const neg = [239, 154, 154]
+  const t = Math.abs(v)
+  const to = v >= 0 ? pos : neg
+  return `rgb(${Math.round(neutral[0] + t * (to[0] - neutral[0]))},${Math.round(neutral[1] + t * (to[1] - neutral[1]))},${Math.round(neutral[2] + t * (to[2] - neutral[2]))})`
+}
+
+function CorrelationHeatmap() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    axios.get('/api/analytics/correlation')
+      .then(r => { setData(r.data); setLoading(false) })
+      .catch(e => { setError(e.message); setLoading(false) })
+  }, [])
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', marginTop: 48 }}>상관관계 계산 중...</div>
+  if (error) return <div style={{ color: '#ef9a9a', marginTop: 48 }}>오류: {error}</div>
+  if (!data || !data.tickers.length) return (
+    <div style={{ color: 'var(--text-muted)', marginTop: 48 }}>보유종목 2개 이상 필요</div>
+  )
+
+  const { tickers, matrix } = data
+  const n = tickers.length
+  const CELL = 48
+  const LABEL = 64
+
+  return (
+    <div style={{ marginTop: 48 }}>
+      <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>상관관계 히트맵</h3>
+      <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
+        90일 종가 기준 Pearson 상관계수 · 1.0=완전 양의 상관 · -1.0=완전 음의 상관
+      </p>
+      <svg width={LABEL + n * CELL} height={LABEL + n * CELL}>
+        {tickers.map((t, j) => (
+          <text key={`col-${j}`} x={LABEL + j * CELL + CELL / 2} y={LABEL - 8}
+            textAnchor="middle" fontSize={11} fill="var(--text-muted)">{t}</text>
+        ))}
+        {tickers.map((t, i) => (
+          <text key={`row-${i}`} x={LABEL - 8} y={LABEL + i * CELL + CELL / 2 + 4}
+            textAnchor="end" fontSize={11} fill="var(--text-muted)">{t}</text>
+        ))}
+        {matrix.map((row, i) => row.map((v, j) => (
+          <g key={`${i}-${j}`}>
+            <rect x={LABEL + j * CELL} y={LABEL + i * CELL}
+              width={CELL} height={CELL} fill={corrColor(v)} rx={2} />
+            <text x={LABEL + j * CELL + CELL / 2} y={LABEL + i * CELL + CELL / 2 + 4}
+              textAnchor="middle" fontSize={10} fill="white">{v.toFixed(2)}</text>
+          </g>
+        )))}
+      </svg>
+    </div>
+  )
+}
+
 export default function Analytics() {
   const [cards, setCards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -198,6 +257,7 @@ export default function Analytics() {
       <h2 style={{ color: 'var(--text)', marginBottom: 32 }}>포트폴리오 분석</h2>
       <SectorAllocation cards={cards} />
       <OpportunityBubble cards={cards} />
+      <CorrelationHeatmap />
     </div>
   )
 }
