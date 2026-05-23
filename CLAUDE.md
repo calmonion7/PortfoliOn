@@ -97,8 +97,8 @@ cd backend && .venv/bin/python -m pytest
 **Backend** — Python/FastAPI (port 8000)
 
 - `backend/main.py` — app entry, mounts routers + scheduler
-- `backend/routers/` — portfolio, watchlist, stocks, report, guru, calendar
-- `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, consensus, cache, guru_scraper, guru_stats
+- `backend/routers/` — portfolio, watchlist, stocks, report, guru, calendar, digest, market_indicators
+- `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, consensus, cache, guru_scraper, guru_stats, digest_service, market_indicators_service
 - `backend/scheduler.py` — APScheduler 설정 (services 아님, 루트 레벨)
 - `backend/data/` — JSON file storage (stocks.json — unified holdings+watchlist+analyst data, schedule.json)
 - `backend/data/calendar/` — calendar file cache (YYYY-MM.json, gitignored, auto-invalidated on stock mutations)
@@ -107,7 +107,7 @@ cd backend && .venv/bin/python -m pytest
 
 **Frontend** — React 18 + Vite (port 5173), plain CSS (no TailwindCSS)
 
-- `frontend/src/pages/` — Portfolio, Reports, Calendar, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule)
+- `frontend/src/pages/` — Portfolio, Reports, Calendar, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule), Market, Digest
 - `frontend/src/components/` — StockModal, PromoteModal
 
 ## Key Files
@@ -130,4 +130,7 @@ cd backend && .venv/bin/python -m pytest
 - `start.bat` runs both servers in hidden PowerShell windows; use `stop.bat` to kill them.
 - `ANTHROPIC_API_KEY` must be set in the environment for report generation to work.
 - Vite proxies `/api/*` to `http://localhost:8000` — frontend axios calls don't need a base URL.
-- `backend/routers/calendar.py` uses file-based cache (`backend/data/calendar/YYYY-MM.json`). Cache is auto-cleared on stock add/remove/promote. To manually clear: use `DELETE /api/calendar/cache?month=YYYY-MM` or click ↺ in the UI. yfinance calls are parallelized (ThreadPoolExecutor, max 10).
+- `backend/routers/calendar.py` uses file-based cache (`backend/data/calendar/YYYY-MM.json`). Cache is auto-cleared on stock add/remove/promote. To manually clear: use `DELETE /api/calendar/cache?month=YYYY-MM` or click ↺ in the UI. yfinance calls are parallelized (ThreadPoolExecutor, max 30).
+- `backend/services/cache.py` — 인메모리 캐시 3종: snapshot (LRU 200), list (TTL 5s), dashboard (TTL 300s). 종목 추가/수정/삭제 시 dashboard 캐시 자동 무효화. 수동 무효화: `DELETE /api/stocks/dashboard/cache`.
+- `backend/routers/digest.py` + `backend/services/digest_service.py` — 일일 다이제스트 생성/조회. 매일 08:00 KST 자동 생성 (`scheduler.py`).
+- `backend/routers/market_indicators.py` + `backend/services/market_indicators_service.py` — 시장 지표: FX (yfinance), VIX, 원자재 (금/WTI/구리), 경제지표 (FRED API). `FRED_API_KEY` 환경변수 필요.

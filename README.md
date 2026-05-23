@@ -96,6 +96,27 @@ npm run dev
 | 월 이동 | ‹ › 버튼으로 이전·다음 달 탐색 |
 | 종목명 툴팁 | 뱃지에 마우스 오버 시 한글 종목명 표시 |
 
+### 시장 지표
+
+FX, VIX, 원자재, 경제지표를 한 화면에서 확인합니다.
+
+| 기능 | 설명 |
+|------|------|
+| FX | USD/KRW, USD/JPY, EUR/USD 실시간 환율 (yfinance) |
+| VIX | 공포지수, 공포/탐욕 색상 코딩 |
+| 원자재 | 금, WTI 원유, 구리 가격 |
+| 경제지표 | CPI, 실업률 (FRED API, `FRED_API_KEY` 필요) |
+
+### 일일 다이제스트
+
+보유·관심종목 요약을 매일 자동 생성합니다.
+
+| 기능 | 설명 |
+|------|------|
+| 자동 생성 | 매일 08:00 KST 스케줄 |
+| 즉시 생성 | `POST /api/digest/generate` |
+| 최신 조회 | `GET /api/digest/latest` |
+
 ### 구루 매니저
 [dataroma](https://www.dataroma.com) 기반으로 유명 가치투자자(구루)들의 포트폴리오를 분석합니다.
 
@@ -230,9 +251,11 @@ Browser (React/Vite :5173)
         │  REST API
         ▼
 FastAPI (:8000)
- ├─ routers/        # portfolio, watchlist, stocks, report, guru, calendar
+ ├─ routers/        # portfolio, watchlist, stocks, report, guru,
+ │                  # calendar, digest, market_indicators
  ├─ services/       # market(yfinance+Naver), charts, indicators,
- │                  # report_generator(Claude AI), scraper, scheduler
+ │                  # report_generator(Claude AI), scraper,
+ │                  # digest_service, market_indicators_service, cache
  └─ data/           # JSON 파일 저장소 (DB 없음)
         │
         ├─ stocks.json (holdings+watchlist 통합), schedule.json
@@ -261,15 +284,18 @@ PortfoliOn/
 ├── stop.bat  / stop.sh   # 서버 종료
 ├── backend/
 │   ├── main.py
-│   ├── routers/          # portfolio, watchlist, stocks, report, guru, calendar
+│   ├── routers/          # portfolio, watchlist, stocks, report, guru,
+│   │                     # calendar, digest, market_indicators
 │   ├── services/         # storage, market, charts, indicators,
-│   │                     # report_generator, scraper, guru_scraper, guru_stats, utils
+│   │                     # report_generator, scraper, guru_scraper, guru_stats,
+│   │                     # digest_service, market_indicators_service, cache
 │   ├── data/             # JSON 파일 저장소 (stocks.json, schedule.json, consensus/)
 │   └── snapshots/        # 생성된 JSON 스냅샷 (per-ticker/date)
 └── frontend/
     └── src/
-        ├── pages/        # Portfolio, Reports, Calendar, Settings
-        │                 # Guru, GuruCrawlSettings, GuruStats, ReportSchedule
+        ├── pages/        # Portfolio, Reports, Calendar, Settings,
+        │                 # Guru, GuruCrawlSettings, GuruStats, ReportSchedule,
+        │                 # Market, Digest
         ├── components/   # StockModal, PromoteModal
         └── utils.js      # 공통 유틸리티 (TAB_STYLE, fmtPrice)
 ```
