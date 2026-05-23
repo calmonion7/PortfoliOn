@@ -305,6 +305,8 @@ def get_fx() -> dict:
     }
     history = {"usdkrw": results["usdkrw"]["history"]} if results.get("usdkrw") else {}
 
+    if not rates:
+        return {"rates": {}, "history": {}}
     data = {"rates": rates, "history": history}
     _set_cache("fx", data, ttl=3600)
     return data
@@ -377,6 +379,8 @@ def get_commodities() -> dict:
     }
     history = {k: v["history"] for k, v in results.items() if v}
 
+    if not prices:
+        return {"prices": {}, "history": {}}
     data = {"prices": prices, "history": history}
     _set_cache("commodities", data, ttl=3600)
     return data
