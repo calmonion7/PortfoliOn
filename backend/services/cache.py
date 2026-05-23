@@ -25,6 +25,7 @@ class TTLCache:
 _snapshots: OrderedDict[str, dict] = OrderedDict()
 _list_cache = TTLCache(5.0)
 _dashboard_cache = TTLCache(300.0)
+_correlation_cache = TTLCache(300.0)
 _MAX = 200
 
 
@@ -47,6 +48,7 @@ def invalidate(ticker: str) -> None:
         del _snapshots[k]
     invalidate_list()
     invalidate_dashboard()
+    invalidate_correlation()
 
 
 def invalidate_dashboard() -> None:
@@ -55,6 +57,14 @@ def invalidate_dashboard() -> None:
 
 def get_dashboard(loader) -> list:
     return _dashboard_cache.get(loader)
+
+
+def invalidate_correlation() -> None:
+    _correlation_cache.invalidate()
+
+
+def get_correlation(loader) -> dict:
+    return _correlation_cache.get(loader)
 
 
 def invalidate_list() -> None:
