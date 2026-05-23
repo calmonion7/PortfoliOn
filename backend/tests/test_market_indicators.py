@@ -273,3 +273,46 @@ def test_get_kr_exports_with_api_key(tmp_path, monkeypatch):
     assert "202501" in months
     assert months["202501"]["semiconductor"] > 0
     assert months["202501"]["non_semiconductor"] > 0
+
+
+# ── get_fx ────────────────────────────────────────────────────────────────────
+
+def test_get_fx_returns_three_rates():
+    from services.market_indicators_service import get_fx, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([1350.0, 1370.5])
+        result = get_fx()
+    assert set(result["rates"].keys()) == {"usdkrw", "usdjpy", "eurusd"}
+
+
+def test_get_fx_change_pct():
+    from services.market_indicators_service import get_fx, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([1000.0, 1010.0])
+        result = get_fx()
+    # change = (1010 - 1000) / 1000 * 100 = 1.0%
+    assert result["rates"]["usdkrw"]["change_pct"] == pytest.approx(1.0, abs=0.01)
+
+
+def test_get_fx_history_usdkrw_only():
+    from services.market_indicators_service import get_fx, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([1350.0, 1370.5])
+        result = get_fx()
+    assert "usdkrw" in result["history"]
+    assert "usdjpy" not in result["history"]
+
+
+def test_get_fx_caches_result():
+    from services.market_indicators_service import get_fx, _cache
+    _cache.clear()
+    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist([1350.0, 1370.5])
+        get_fx()
+        count1 = mock_t.call_count
+        get_fx()
+        count2 = mock_t.call_count
+    assert count1 == count2

@@ -266,6 +266,50 @@ def get_kr_top2_earnings() -> dict:
     return data
 
 
+# ── FX ────────────────────────────────────────────────────────────────────────
+
+_FX_SYMBOLS = {"usdkrw": "USDKRW=X", "usdjpy": "USDJPY=X", "eurusd": "EURUSD=X"}
+
+
+def _fetch_fx(args: tuple[str, str]) -> tuple[str, dict | None]:
+    key, sym = args
+    try:
+        hist = yf.Ticker(sym).history(period="1y", interval="1d")
+        if hist.empty:
+            return key, None
+        close = hist["Close"].dropna()
+        current = round(float(close.iloc[-1]), 4)
+        prev = round(float(close.iloc[-2]), 4) if len(close) > 1 else current
+        change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
+        history = [
+            {"date": str(d.date()), "value": round(float(v), 4)}
+            for d, v in zip(close.index, close.values)
+        ]
+        return key, {"current": current, "change_pct": change_pct, "history": history}
+    except Exception:
+        return key, None
+
+
+def get_fx() -> dict:
+    cached = _get_cache("fx")
+    if cached:
+        return cached
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        results = dict(ex.map(_fetch_fx, _FX_SYMBOLS.items()))
+
+    rates = {
+        k: {"current": v["current"], "change_pct": v["change_pct"]}
+        for k, v in results.items()
+        if v
+    }
+    history = {"usdkrw": results["usdkrw"]["history"]} if results.get("usdkrw") else {}
+
+    data = {"rates": rates, "history": history}
+    _set_cache("fx", data, ttl=3600)
+    return data
+
+
 # ── Korean Export Data ────────────────────────────────────────────────────────
 
 _EXPORTS_CACHE = os.path.join(_DATA_DIR, "kr_exports.json")
