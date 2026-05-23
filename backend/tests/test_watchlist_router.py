@@ -143,3 +143,18 @@ def test_promote_already_in_holdings_returns_400():
         resp = client.post("/api/watchlist/NVDA/promote",
                            json={"quantity": 5, "avg_cost": 200.0})
     assert resp.status_code == 400
+
+
+def test_promote_invalidates_dashboard_cache():
+    with patch("routers.watchlist.cache_svc") as mock_cache, \
+         patch("routers.watchlist.storage.get_watchlist_tickers", return_value=["NVDA"]), \
+         patch("routers.watchlist.storage.get_holdings", return_value=[]), \
+         patch("routers.watchlist.storage.get_stocks", return_value=[
+             {"ticker": "NVDA", "name": "Nvidia", "market": "US", "exchange": ""}
+         ]), \
+         patch("routers.watchlist.storage.save_watchlist_tickers"), \
+         patch("routers.watchlist.storage.save_holdings"), \
+         patch("routers.watchlist.calendar_router.clear_cache"):
+        resp = client.post("/api/watchlist/NVDA/promote", json={"quantity": 10, "avg_cost": 500.0})
+    assert resp.status_code == 200
+    mock_cache.invalidate_dashboard.assert_called_once()
