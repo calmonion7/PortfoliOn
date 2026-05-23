@@ -8,16 +8,6 @@ SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 
-def _month_start(n: int) -> date:
-    today = date.today()
-    month = today.month - n
-    year = today.year
-    while month <= 0:
-        month += 12
-        year -= 1
-    return date(year, month, 1)
-
-
 def get_history(ticker: str) -> list[dict]:
     path = CONSENSUS_DIR / f"{ticker.upper()}.json"
     if not path.exists():
@@ -87,6 +77,7 @@ _US_SELL = {"Sell", "Underperform", "Underweight", "Strong Sell", "Negative", "R
 
 def _fetch_kr(ticker: str) -> list[dict]:
     import requests
+    from collections import defaultdict
     from concurrent.futures import ThreadPoolExecutor
     from datetime import timedelta
 
@@ -131,20 +122,18 @@ def _fetch_kr(ticker: str) -> list[dict]:
     with ThreadPoolExecutor(max_workers=5) as ex:
         all_reports = list(ex.map(fetch_detail, recent))
 
+    by_date: dict = defaultdict(list)
+    for d, op, gp in all_reports:
+        by_date[d].append((op, gp))
+
     output = []
-    for n_months in [3, 2, 1]:
-        ref = _month_start(n_months)
-        window_start = (ref - timedelta(days=90)).isoformat()
-        ref_str = ref.isoformat()
-        active = [(d, op, gp) for d, op, gp in all_reports if window_start <= d <= ref_str]
-        if not active:
-            continue
-        buy  = sum(1 for _, op, _ in active if op in _KR_BUY)
-        sell = sum(1 for _, op, _ in active if op in _KR_SELL)
-        hold = len(active) - buy - sell
-        prices = [gp for _, _, gp in active if gp is not None]
+    for d, reports in sorted(by_date.items()):
+        buy  = sum(1 for op, _ in reports if op in _KR_BUY)
+        sell = sum(1 for op, _ in reports if op in _KR_SELL)
+        hold = len(reports) - buy - sell
+        prices = [gp for _, gp in reports if gp is not None]
         output.append({
-            "date": ref_str,
+            "date": d,
             "target_mean": round(sum(prices) / len(prices)) if prices else None,
             "buy": buy,
             "hold": hold,
@@ -154,55 +143,40 @@ def _fetch_kr(ticker: str) -> list[dict]:
 
 
 def _fetch_us(ticker: str) -> list[dict]:
-    """yfinance recommendations_summary + upgrades_downgrades로 과거 3개월 월별 컨센서스 수집."""
     try:
         import yfinance as yf
         import pandas as pd
+        from collections import defaultdict
         t = yf.Ticker(ticker.replace(".", "-"))
-        recs = t.recommendations_summary
-        if recs is None or recs.empty:
+        ud = t.upgrades_downgrades
+        if ud is None or ud.empty:
             return []
 
-        if "period" in recs.columns:
-            recs = recs.set_index("period")
+        idx = pd.to_datetime(ud.index)
+        if idx.tz is not None:
+            idx = idx.tz_convert(None)
+        ud = ud.copy()
+        ud.index = idx.date
 
-        target_by_month: dict[str, float] = {}
-        try:
-            ud = t.upgrades_downgrades
-            if ud is not None and not ud.empty:
-                idx = pd.to_datetime(ud.index)
-                if idx.tz is not None:
-                    idx = idx.tz_convert(None)
-                ud = ud.copy()
-                ud.index = idx.date
-                for n in [1, 2, 3]:
-                    start = _month_start(n)
-                    end = _month_start(n - 1)
-                    mask = (ud.index >= start) & (ud.index < end)
-                    prices = ud.loc[mask, "currentPriceTarget"].dropna()
-                    prices = prices[prices > 0]
-                    if len(prices) > 0:
-                        target_by_month[start.isoformat()] = round(float(prices.mean()), 2)
-        except Exception:
-            pass
+        by_date: dict = defaultdict(list)
+        for d, row in ud.iterrows():
+            by_date[d].append(row)
 
-        period_map = {"-1m": _month_start(1), "-2m": _month_start(2), "-3m": _month_start(3)}
-
-        result = []
-        for period, dt in period_map.items():
-            if period not in recs.index:
-                continue
-            row = recs.loc[period]
-            buy = int(row.get("strongBuy", 0)) + int(row.get("buy", 0))
-            hold = int(row.get("hold", 0))
-            sell = int(row.get("sell", 0)) + int(row.get("strongSell", 0))
-            result.append({
-                "date": dt.isoformat(),
-                "target_mean": target_by_month.get(dt.isoformat()),
+        output = []
+        for d, rows in sorted(by_date.items()):
+            buy  = sum(1 for row in rows if row.get("ToGrade", "") in _US_BUY)
+            sell = sum(1 for row in rows if row.get("ToGrade", "") in _US_SELL)
+            hold = len(rows) - buy - sell
+            prices = [row.get("currentPriceTarget") for row in rows
+                      if row.get("currentPriceTarget") is not None
+                      and float(row.get("currentPriceTarget")) > 0]
+            output.append({
+                "date": d.isoformat(),
+                "target_mean": round(sum(prices) / len(prices), 2) if prices else None,
                 "buy": buy,
                 "hold": hold,
                 "sell": sell,
             })
-        return result
+        return output
     except Exception:
         return []

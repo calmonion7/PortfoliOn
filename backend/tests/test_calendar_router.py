@@ -38,10 +38,10 @@ def _mock_ticker(ticker):
     return m
 
 
-def test_calendar_returns_earnings_event():
+def test_calendar_returns_earnings_event(tmp_path):
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
-         patch("routers.calendar._cache", {}):
+         patch("routers.calendar._CACHE_DIR", tmp_path):
         resp = client.get("/api/calendar?month=2026-05")
     assert resp.status_code == 200
     events = resp.json()["events"]
@@ -52,11 +52,11 @@ def test_calendar_returns_earnings_event():
     assert earnings[0]["stock_type"] == "holding"
 
 
-def test_calendar_returns_dividend_event():
+def test_calendar_returns_dividend_event(tmp_path):
     # AAPL: last div 2026-02-07, avg interval ~91 days → next ~2026-05-09 (in May)
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
-         patch("routers.calendar._cache", {}):
+         patch("routers.calendar._CACHE_DIR", tmp_path):
         resp = client.get("/api/calendar?month=2026-05")
     events = resp.json()["events"]
     divs = [e for e in events if e["type"] == "dividend"]
@@ -78,7 +78,7 @@ def test_calendar_invalid_month_returns_422():
     assert resp.status_code == 422
 
 
-def test_calendar_tsla_watchlist_stock_type():
+def test_calendar_tsla_watchlist_stock_type(tmp_path):
     portfolio = {
         "stocks": [],
         "watchlist": [{"ticker": "TSLA", "type": "watchlist", "name": "Tesla"}],
@@ -86,7 +86,7 @@ def test_calendar_tsla_watchlist_stock_type():
     mock = MagicMock()
     mock.calendar = {"Earnings Date": [date(2026, 5, 15)]}
     mock.dividends = pd.Series([], dtype=float)
-    with patch("routers.calendar._cache", {}), \
+    with patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.calendar.yf.Ticker", return_value=mock):
         resp = client.get("/api/calendar?month=2026-05")
