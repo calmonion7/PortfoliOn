@@ -88,7 +88,7 @@ def generate(today: date = None) -> dict:
     month_str = today.strftime("%Y-%m")
     next_month_str = (today.replace(day=1) + timedelta(days=32)).strftime("%Y-%m")
     all_events = _get_events(month_str)
-    if next_month_str != month_str:
+    if end_date.month != today.month or end_date.year != today.year:
         all_events = all_events + _get_events(next_month_str)
 
     events_7d = sorted(

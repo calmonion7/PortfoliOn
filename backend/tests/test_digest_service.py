@@ -116,3 +116,47 @@ def test_send_telegram_posts_when_env_set(monkeypatch):
     mock_post.assert_called_once()
     _, kwargs = mock_post.call_args
     assert kwargs["json"]["chat_id"] == "12345"
+
+
+def test_generate_skips_stock_on_yfinance_failure(tmp_path):
+    import services.digest_service as ds
+    def _failing_ticker(symbol):
+        m = MagicMock()
+        m.history.side_effect = Exception("network error")
+        return m
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.yf.Ticker", side_effect=_failing_ticker), \
+         patch("services.digest_service._get_events", return_value=[]):
+        result = ds.generate(today=date(2026, 5, 23))
+    assert result["stocks"] == []
+    assert result["portfolio_summary"]["total_value_usd"] == 0.0
+
+
+def test_generate_portfolio_summary(tmp_path):
+    import services.digest_service as ds
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service._get_events", return_value=[]):
+        result = ds.generate(today=date(2026, 5, 23))
+    # AAPL: 10 shares, prev_close=100.0, current=102.0
+    assert result["portfolio_summary"]["total_value_usd"] == 1020.0
+    assert result["portfolio_summary"]["daily_change_usd"] == 20.0
+    assert result["portfolio_summary"]["daily_change_pct"] == 2.0
+
+
+def test_generate_events_7d_filter(tmp_path):
+    import services.digest_service as ds
+    events = [
+        {"ticker": "AAPL", "type": "earnings", "date": "2026-05-24", "stock_type": "holding", "name": "Apple"},
+        {"ticker": "AAPL", "type": "earnings", "date": "2026-06-01", "stock_type": "holding", "name": "Apple"},  # outside 7 days
+    ]
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service._get_events", return_value=events):
+        result = ds.generate(today=date(2026, 5, 23))
+    assert len(result["events_7d"]) == 1
+    assert result["events_7d"][0]["ticker"] == "AAPL"
+    assert result["events_7d"][0]["days_until"] == 1
