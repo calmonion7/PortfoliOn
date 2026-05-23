@@ -403,3 +403,71 @@ def test_get_commodities_caches_result():
         get_commodities()
         count2 = mock_t.call_count
     assert count1 == count2
+
+
+# ── get_econ_indicators ───────────────────────────────────────────────────────
+
+def test_get_econ_indicators_no_api_key_returns_error(monkeypatch):
+    from services.market_indicators_service import get_econ_indicators, _cache
+    _cache.clear()
+    monkeypatch.delenv("FRED_API_KEY", raising=False)
+    result = get_econ_indicators()
+    assert "error" in result
+
+
+def test_get_econ_indicators_returns_cpi_and_unemployment(monkeypatch):
+    from services.market_indicators_service import get_econ_indicators, _cache
+    _cache.clear()
+    monkeypatch.setenv("FRED_API_KEY", "test-key")
+
+    fake_obs = [
+        {"date": "2024-01-01", "value": "308.5"},
+        {"date": "2024-02-01", "value": "309.0"},
+    ]
+    fake_response = MagicMock()
+    fake_response.json.return_value = {"observations": fake_obs}
+    fake_response.raise_for_status = lambda: None
+
+    with patch("services.market_indicators_service.requests.get", return_value=fake_response):
+        result = get_econ_indicators()
+
+    assert "cpi" in result
+    assert "unemployment" in result
+    assert len(result["cpi"]) == 2
+    assert result["cpi"][0]["value"] == pytest.approx(308.5, abs=0.01)
+
+
+def test_get_econ_indicators_skips_missing_values(monkeypatch):
+    from services.market_indicators_service import get_econ_indicators, _cache
+    _cache.clear()
+    monkeypatch.setenv("FRED_API_KEY", "test-key")
+
+    fake_obs = [
+        {"date": "2024-01-01", "value": "308.5"},
+        {"date": "2024-02-01", "value": "."},   # FRED 결측값
+    ]
+    fake_response = MagicMock()
+    fake_response.json.return_value = {"observations": fake_obs}
+    fake_response.raise_for_status = lambda: None
+
+    with patch("services.market_indicators_service.requests.get", return_value=fake_response):
+        result = get_econ_indicators()
+
+    assert len(result["cpi"]) == 1
+
+
+def test_get_econ_indicators_caches_result(monkeypatch):
+    from services.market_indicators_service import get_econ_indicators, _cache
+    _cache.clear()
+    monkeypatch.setenv("FRED_API_KEY", "test-key")
+
+    fake_response = MagicMock()
+    fake_response.json.return_value = {"observations": [{"date": "2024-01-01", "value": "3.7"}]}
+    fake_response.raise_for_status = lambda: None
+
+    with patch("services.market_indicators_service.requests.get", return_value=fake_response) as mock_get:
+        get_econ_indicators()
+        count1 = mock_get.call_count
+        get_econ_indicators()
+        count2 = mock_get.call_count
+    assert count1 == count2

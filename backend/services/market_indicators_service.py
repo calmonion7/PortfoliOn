@@ -382,6 +382,49 @@ def get_commodities() -> dict:
     return data
 
 
+# ── Economic Indicators (FRED) ─────────────────────────────────────────────────
+
+def get_econ_indicators() -> dict:
+    cached = _get_cache("econ_indicators")
+    if cached:
+        return cached
+
+    api_key = os.environ.get("FRED_API_KEY")
+    if not api_key:
+        return {"error": "FRED_API_KEY 환경변수가 필요합니다. https://fred.stlouisfed.org/docs/api/api_key.html 에서 무료 발급 후 설정하세요."}
+
+    from datetime import date as _date
+    start = _date(_date.today().year - 3, 1, 1).isoformat()
+
+    def _fetch_series(series_id: str) -> list[dict]:
+        r = requests.get(
+            "https://api.stlouisfed.org/fred/series/observations",
+            params={
+                "series_id": series_id,
+                "api_key": api_key,
+                "file_type": "json",
+                "observation_start": start,
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        return [
+            {"date": obs["date"], "value": float(obs["value"])}
+            for obs in r.json().get("observations", [])
+            if obs.get("value") not in (".", None, "")
+        ]
+
+    try:
+        cpi = _fetch_series("CPIAUCSL")
+        unemployment = _fetch_series("UNRATE")
+    except Exception:
+        return {"cpi": [], "unemployment": []}
+
+    data = {"cpi": cpi, "unemployment": unemployment}
+    _set_cache("econ_indicators", data, ttl=86400)
+    return data
+
+
 # ── Korean Export Data ────────────────────────────────────────────────────────
 
 _EXPORTS_CACHE = os.path.join(_DATA_DIR, "kr_exports.json")
