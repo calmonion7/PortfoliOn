@@ -12,8 +12,9 @@ def get_stocks(user_id: str) -> list[dict]:
         return []
     tickers = [r["ticker"] for r in user_rows]
     ticker_rows = db.table("tickers").select("*").in_("ticker", tickers).execute().data
+    list_fields = frozenset({"competitors"})
     return [
-        {k: (t.get(k) or "") for k in (*_ANALYST_KEYS, "ticker", "market", "exchange")}
+        {k: (t.get(k) or ([] if k in list_fields else "")) for k in (*_ANALYST_KEYS, "ticker", "market", "exchange")}
         for t in ticker_rows
     ]
 
@@ -210,7 +211,7 @@ def get_schedule() -> dict:
 
 def save_schedule(schedule: dict) -> None:
     db = get_db()
-    db.table("schedules").update({"data": schedule}).eq("id", 1).execute()
+    db.table("schedules").upsert({"id": 1, "data": schedule}, on_conflict="id").execute()
 
 
 def get_guru_managers() -> dict:
@@ -223,7 +224,7 @@ def get_guru_managers() -> dict:
 
 def save_guru_managers(data: dict) -> None:
     db = get_db()
-    db.table("guru_managers").update({"data": data}).eq("id", 1).execute()
+    db.table("guru_managers").upsert({"id": 1, "data": data}, on_conflict="id").execute()
 
 
 def get_guru_schedule() -> dict:
@@ -236,4 +237,4 @@ def get_guru_schedule() -> dict:
 
 def save_guru_schedule(schedule: dict) -> None:
     db = get_db()
-    db.table("guru_schedules").update({"data": schedule}).eq("id", 1).execute()
+    db.table("guru_schedules").upsert({"id": 1, "data": schedule}, on_conflict="id").execute()
