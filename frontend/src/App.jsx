@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import Portfolio from './pages/Portfolio'
 import Research from './pages/Research'
 import MarketHub from './pages/MarketHub'
+import AnalysisHub from './pages/AnalysisHub'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import './App.css'
@@ -33,7 +34,7 @@ export default function App() {
         borderBottom: '1px solid var(--border)',
       }}>
         <span style={{ color: 'var(--text)', fontWeight: 'bold', marginRight: 16 }}>Portfolio Manager</span>
-        {[['/', '종목관리'], ['/research', '리서치'], ['/market', '시장'], ['/guru', '구루'], ['/settings', '설정']].map(([to, label]) => (
+        {[['/', '종목관리'], ['/research', '리서치'], ['/market', '시장'], ['/analysis', '분석'], ['/guru', '구루'], ['/settings', '설정']].map(([to, label]) => (
           <NavLink
             key={to}
             to={to}
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/" element={<Portfolio />} />
           <Route path="/research" element={<Research />} />
           <Route path="/market" element={<MarketHub />} />
+          <Route path="/analysis" element={<AnalysisHub />} />
           <Route path="/guru" element={<Guru />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
