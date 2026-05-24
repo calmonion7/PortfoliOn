@@ -8,6 +8,8 @@ const EVENT_STYLE = {
   holding_dividend:  { background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' },
   watchlist_earnings: { background: 'transparent', color: '#3a8aaa', border: '1px dashed #2a4a6a' },
   watchlist_dividend: { background: 'transparent', color: '#4a7a5a', border: '1px dashed #2e6b4a' },
+  holiday_us: { background: '#2a1a1a', color: '#ef9a9a', border: '1px solid #5a2a2a' },
+  holiday_kr: { background: '#1a1a2a', color: '#90caf9', border: '1px solid #2a2a5a' },
 }
 
 function MonthGrid({ year, month, events }) {
@@ -65,7 +67,9 @@ function MonthGrid({ year, month, events }) {
                     ...s,
                   }}
                 >
-                  {e.ticker} {e.type === 'earnings' ? '실적' : '배당락'}
+                  {e.type === 'holiday_us' || e.type === 'holiday_kr'
+                    ? e.name
+                    : `${e.ticker} ${e.type === 'earnings' ? '실적' : '배당락'}`}
                 </div>
               )
             })}
@@ -157,6 +161,8 @@ export default function Calendar() {
         <span style={{ ...EVENT_STYLE.holding_dividend, padding: '1px 6px', borderRadius: 3 }}>보유 배당락</span>
         <span style={{ ...EVENT_STYLE.watchlist_earnings, padding: '1px 6px', borderRadius: 3 }}>관심 실적</span>
         <span style={{ ...EVENT_STYLE.watchlist_dividend, padding: '1px 6px', borderRadius: 3 }}>관심 배당락</span>
+        <span style={{ ...EVENT_STYLE.holiday_us, padding: '1px 6px', borderRadius: 3 }}>NYSE 휴장</span>
+        <span style={{ ...EVENT_STYLE.holiday_kr, padding: '1px 6px', borderRadius: 3 }}>KRX 휴장</span>
       </div>
     </div>
   )
