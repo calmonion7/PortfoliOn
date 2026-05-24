@@ -70,13 +70,11 @@ export default function MacroTab() {
               onClick={() => setSelected(c.ticker)}
               style={{
                 cursor: 'pointer',
-                background: selected === c.ticker ? 'var(--bg-card)' : 'transparent',
-                borderRadius: 4,
               }}
             >
-              <td style={{ padding: '7px 20px 7px 0', color: 'var(--text)' }}>{c.indicator}</td>
-              <td style={{ padding: '7px 16px', color: 'var(--text-muted)', textAlign: 'center', fontSize: 11 }}>{c.ticker}</td>
-              <td style={{ padding: '7px 0', textAlign: 'right' }}>
+              <td style={{ padding: '7px 20px 7px 0', color: 'var(--text)', background: selected === c.ticker ? 'var(--bg-card)' : 'transparent' }}>{c.indicator}</td>
+              <td style={{ padding: '7px 16px', color: 'var(--text-muted)', textAlign: 'center', fontSize: 11, background: selected === c.ticker ? 'var(--bg-card)' : 'transparent' }}>{c.ticker}</td>
+              <td style={{ padding: '7px 0', textAlign: 'right', background: selected === c.ticker ? 'var(--bg-card)' : 'transparent' }}>
                 <span style={{
                   color: corrColor(c.corr_90d),
                   fontVariantNumeric: 'tabular-nums',
