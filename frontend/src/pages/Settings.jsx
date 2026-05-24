@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import ReportSchedule from './ReportSchedule'
 import GuruCrawlSettings from './GuruCrawlSettings'
+import ConsensusSettings from './ConsensusSettings'
 
 const TABS = [
-  { key: 'report', label: '리포트 설정' },
-  { key: 'guru',   label: '구루 설정' },
+  { key: 'report',    label: '리포트 설정' },
+  { key: 'consensus', label: '컨센서스 수집' },
+  { key: 'guru',      label: '구루 설정' },
 ]
 
 export default function Settings() {
@@ -29,8 +31,9 @@ export default function Settings() {
         ))}
       </div>
 
-      {tab === 'report' && <ReportSchedule />}
-      {tab === 'guru'   && <GuruCrawlSettings />}
+      {tab === 'report'    && <ReportSchedule />}
+      {tab === 'consensus' && <ConsensusSettings />}
+      {tab === 'guru'      && <GuruCrawlSettings />}
     </div>
   )
 }

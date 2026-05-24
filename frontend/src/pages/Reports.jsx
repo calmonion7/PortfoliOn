@@ -21,8 +21,6 @@ export default function Reports() {
   const [generating, setGenerating] = useState(null)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0 })
   const pollRef = useRef(null)
-  const [consensusBatch, setConsensusBatch] = useState({ running: false, done: 0, total: 0, current: '' })
-  const consensusPollRef = useRef(null)
   const [activeTab, setActiveTab] = useState('holdings')
   const [watchlistSub, setWatchlistSub] = useState('low')
   const [view, setView] = useState('list')
@@ -87,27 +85,6 @@ const fetchList = useCallback(() => {
   }
 
   useEffect(() => () => clearInterval(pollRef.current), [])
-
-  const runConsensusBatch = async () => {
-    setConsensusBatch({ running: true, done: 0, total: 0, current: '' })
-    clearInterval(consensusPollRef.current)
-    try {
-      await axios.post('/api/consensus/batch')
-      consensusPollRef.current = setInterval(async () => {
-        try {
-          const { data } = await axios.get('/api/consensus/batch/progress')
-          setConsensusBatch({ running: data.running, done: data.done, total: data.total, current: data.current })
-          if (!data.running && data.total > 0 && data.done >= data.total) {
-            clearInterval(consensusPollRef.current)
-          }
-        } catch {}
-      }, 1500)
-    } catch {
-      setConsensusBatch(p => ({ ...p, running: false }))
-    }
-  }
-
-  useEffect(() => () => clearInterval(consensusPollRef.current), [])
 
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
   const watchlistAll = Object.entries(reportList).filter(([, v]) => v.category === 'watchlist')
@@ -218,29 +195,7 @@ const fetchList = useCallback(() => {
       <div style={{ width: 210, overflowY: 'auto', borderRight: '1px solid var(--border)', paddingRight: 16, flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ color: 'var(--text-heading)', margin: 0 }}>리포트 목록</h3>
-          <button
-            onClick={runConsensusBatch}
-            disabled={consensusBatch.running}
-            title="전체 종목 수집 → 백필"
-            style={{
-              background: 'transparent', border: '1px solid var(--border)',
-              color: consensusBatch.running ? 'var(--accent)' : 'var(--text-muted)',
-              borderRadius: 3, padding: '2px 7px', fontSize: 10,
-              cursor: consensusBatch.running ? 'default' : 'pointer', whiteSpace: 'nowrap',
-            }}
-          >
-            {consensusBatch.running
-              ? `${consensusBatch.current || '...'} (${consensusBatch.done}/${consensusBatch.total})`
-              : '전체 수집/백필'}
-          </button>
         </div>
-        {consensusBatch.running && consensusBatch.total > 0 && (
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${Math.round(consensusBatch.done / consensusBatch.total * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.4s ease' }} />
-            </div>
-          </div>
-        )}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
           <button style={TAB_STYLE(activeTab === 'holdings')} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
           <button style={TAB_STYLE(activeTab === 'watchlist')} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
