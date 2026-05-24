@@ -12,6 +12,13 @@ const krFmt = v => {
   return `${Math.round(v).toLocaleString()}억`
 }
 
+const isEstimated = q => {
+  if (!q) return false
+  const [y, qn] = q.split('Q')
+  const endMonth = parseInt(qn) * 3
+  return new Date(parseInt(y), endMonth, 0) > new Date()
+}
+
 const CARD_STYLE = {
   background: 'var(--bg-card)',
   border: '1px solid var(--border)',
@@ -466,7 +473,7 @@ function M7EarningsSection() {
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={qs} margin={{ top: 16, right: 40, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="q" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+            <XAxis dataKey="q" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={v => isEstimated(v) ? `${v}(E)` : v} />
             <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} />
             <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
@@ -559,7 +566,7 @@ function KrTop2Section() {
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={qs} margin={{ top: 16, right: 40, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="q" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+            <XAxis dataKey="q" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={v => isEstimated(v) ? `${v}(E)` : v} />
             <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} tickFormatter={krFmt} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} />
             <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
