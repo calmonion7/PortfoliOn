@@ -42,6 +42,7 @@ def test_collect_consensus_saves_entry(tmp_path):
     ticker_dir.mkdir()
     (ticker_dir / "2026-05-19.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
     with patch("services.consensus.REPORTS_DIR", reports_tmp), \
+         patch("services.consensus.SNAPSHOTS_DIR", reports_tmp), \
          patch("services.consensus.CONSENSUS_DIR", consensus_tmp):
         resp = client.post("/api/consensus/005930")
     assert resp.status_code == 200
@@ -74,6 +75,7 @@ def test_collect_consensus_upsert_same_date(tmp_path):
     )
     with patch("services.consensus.CONSENSUS_DIR", consensus_tmp), \
          patch("services.consensus.REPORTS_DIR", reports_tmp), \
+         patch("services.consensus.SNAPSHOTS_DIR", reports_tmp), \
          patch("services.consensus.date") as mock_date:
         mock_date.today.return_value = date.fromisoformat(fixed_date)
         client.post("/api/consensus/005930")
@@ -85,6 +87,7 @@ def test_collect_consensus_upsert_same_date(tmp_path):
 
 def test_backfill_no_report(tmp_path, monkeypatch):
     monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
+    monkeypatch.setattr("routers.report.SNAPSHOTS_DIR", tmp_path)
     r = client.post("/api/consensus/AAPL/backfill")
     assert r.status_code == 400
 
@@ -101,6 +104,7 @@ def test_backfill_kr(tmp_path, monkeypatch):
     summary = {"market": "KR", "target_mean": 80000, "buy": 10, "hold": 2, "sell": 0}
     (ticker_dir / f"{today.isoformat()}.json").write_text(json.dumps(summary), encoding="utf-8")
     monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
+    monkeypatch.setattr("routers.report.SNAPSHOTS_DIR", tmp_path)
 
     list_payload = [
         {"researchId": "101", "writeDate": d1, "brokerName": "NH"},
@@ -121,6 +125,8 @@ def test_backfill_kr(tmp_path, monkeypatch):
         return m
 
     with patch("services.consensus.CONSENSUS_DIR", tmp_path / "consensus"), \
+         patch("services.consensus.REPORTS_DIR", tmp_path), \
+         patch("services.consensus.SNAPSHOTS_DIR", tmp_path), \
          patch("requests.get", side_effect=mock_get):
         r = client.post(f"/api/consensus/{upper}/backfill")
 
@@ -142,6 +148,7 @@ def test_backfill_us(tmp_path, monkeypatch):
     summary = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
     (ticker_dir / f"{today.isoformat()}.json").write_text(json.dumps(summary), encoding="utf-8")
     monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
+    monkeypatch.setattr("routers.report.SNAPSHOTS_DIR", tmp_path)
 
     df = pd.DataFrame(
         {
@@ -157,6 +164,8 @@ def test_backfill_us(tmp_path, monkeypatch):
     mock_ticker.upgrades_downgrades = df
 
     with patch("services.consensus.CONSENSUS_DIR", tmp_path / "consensus"), \
+         patch("services.consensus.REPORTS_DIR", tmp_path), \
+         patch("services.consensus.SNAPSHOTS_DIR", tmp_path), \
          patch("yfinance.Ticker", return_value=mock_ticker):
         r = client.post(f"/api/consensus/{upper}/backfill")
 

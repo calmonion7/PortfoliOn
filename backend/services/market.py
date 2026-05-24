@@ -97,12 +97,20 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
         industry = ""
 
         ytd_return = None
+        weekly_change_pct = None
+        monthly_change_pct = None
         try:
             yf_t = yf.Ticker(f"{ticker}.{exchange or 'KS'}")
             hist = yf_t.history(period="1y")
             if not hist.empty and price:
                 start = float(hist["Close"].iloc[0])
                 ytd_return = round((price - start) / start * 100, 2)
+                if len(hist) >= 6:
+                    week_ago = float(hist["Close"].iloc[-6])
+                    weekly_change_pct = round((price - week_ago) / week_ago * 100, 2)
+                if len(hist) >= 23:
+                    month_ago = float(hist["Close"].iloc[-23])
+                    monthly_change_pct = round((price - month_ago) / month_ago * 100, 2)
             yf_info = yf_t.info
             sector = yf_info.get("sector", "") or ""
             industry = yf_info.get("industry", "") or ""
@@ -115,6 +123,9 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
             "price": price,
             "prev_close": round(prev_close, 0) if prev_close is not None else None,
             "daily_change": daily_change,
+            "daily_change_pct": ratio,
+            "weekly_change_pct": weekly_change_pct,
+            "monthly_change_pct": monthly_change_pct,
             "market_cap": int(mc) if mc else None,
             "ytd_return": ytd_return,
             "market": "KR",
@@ -124,7 +135,9 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
     except Exception as e:
         return {
             "ticker": ticker, "name": ticker, "price": None, "prev_close": None,
-            "daily_change": "N/A", "market_cap": None, "ytd_return": None,
+            "daily_change": "N/A",
+            "daily_change_pct": None, "weekly_change_pct": None, "monthly_change_pct": None,
+            "market_cap": None, "ytd_return": None,
             "market": "KR", "sector": "", "industry": "", "error": str(e),
         }
 
@@ -378,8 +391,12 @@ def get_quote(ticker: str, market: str = "US", exchange: str = "") -> dict:
         hist = t.history(period="1y")
         current = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
         prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else None
+        week_ago = float(hist["Close"].iloc[-6]) if len(hist) >= 6 else None
+        month_ago = float(hist["Close"].iloc[-23]) if len(hist) >= 23 else None
         ytd_start = float(hist["Close"].iloc[0]) if not hist.empty else None
-        daily_change_pct = ((current - prev_close) / prev_close * 100) if prev_close else None
+        daily_change_pct = round((current - prev_close) / prev_close * 100, 2) if prev_close else None
+        weekly_change_pct = round((current - week_ago) / week_ago * 100, 2) if week_ago else None
+        monthly_change_pct = round((current - month_ago) / month_ago * 100, 2) if month_ago else None
         ytd_return = ((current - ytd_start) / ytd_start * 100) if ytd_start else None
         return {
             "ticker": ticker,
@@ -387,15 +404,22 @@ def get_quote(ticker: str, market: str = "US", exchange: str = "") -> dict:
             "price": float(current),
             "prev_close": round(prev_close, 2) if prev_close else None,
             "daily_change": f"{daily_change_pct:+.2f}%" if daily_change_pct is not None else "N/A",
+            "daily_change_pct": daily_change_pct,
+            "weekly_change_pct": weekly_change_pct,
+            "monthly_change_pct": monthly_change_pct,
             "market_cap": info.get("marketCap"),
             "ytd_return": round(ytd_return, 2) if ytd_return else None,
             "market": market,
+            "sector": info.get("sector", "") or "",
+            "industry": info.get("industry", "") or "",
         }
     except Exception as e:
         return {
             "ticker": ticker, "name": ticker, "price": None,
             "prev_close": None, "daily_change": "N/A",
-            "market_cap": None, "ytd_return": None, "market": market, "error": str(e),
+            "daily_change_pct": None, "weekly_change_pct": None, "monthly_change_pct": None,
+            "market_cap": None, "ytd_return": None, "market": market,
+            "sector": "", "industry": "", "error": str(e),
         }
 
 

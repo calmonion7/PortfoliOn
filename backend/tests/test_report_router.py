@@ -180,3 +180,49 @@ def test_get_history_fallback_to_reports_dir(tmp_path):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
+
+
+def test_generate_all_runs_all_stocks():
+    two_stocks = {
+        "stocks": [
+            {"ticker": "AAPL", "quantity": 1.0, "avg_cost": 150.0, "name": "Apple", "competitors": [], "moat": "", "growth_plan": ""},
+            {"ticker": "MSFT", "quantity": 1.0, "avg_cost": 300.0, "name": "Microsoft", "competitors": [], "moat": "", "growth_plan": ""},
+        ],
+        "watchlist": [],
+    }
+    generated = []
+
+    def _fake_generate(stock):
+        generated.append(stock["ticker"])
+
+    with patch("routers.report.storage.get_full_portfolio", return_value=two_stocks), \
+         patch("routers.report.report_generator.generate_report", side_effect=_fake_generate), \
+         patch("routers.report.cache_svc.invalidate"), \
+         patch("routers.report.consensus_svc.collect"):
+        resp = client.post("/api/report/generate")
+    assert resp.status_code == 202
+    assert set(generated) == {"AAPL", "MSFT"}
+
+
+def test_generate_all_continues_on_one_failure():
+    two_stocks = {
+        "stocks": [
+            {"ticker": "AAPL", "quantity": 1.0, "avg_cost": 150.0, "name": "Apple", "competitors": [], "moat": "", "growth_plan": ""},
+            {"ticker": "MSFT", "quantity": 1.0, "avg_cost": 300.0, "name": "Microsoft", "competitors": [], "moat": "", "growth_plan": ""},
+        ],
+        "watchlist": [],
+    }
+    generated = []
+
+    def _fake_generate(stock):
+        if stock["ticker"] == "AAPL":
+            raise RuntimeError("api down")
+        generated.append(stock["ticker"])
+
+    with patch("routers.report.storage.get_full_portfolio", return_value=two_stocks), \
+         patch("routers.report.report_generator.generate_report", side_effect=_fake_generate), \
+         patch("routers.report.cache_svc.invalidate"), \
+         patch("routers.report.consensus_svc.collect"):
+        resp = client.post("/api/report/generate")
+    assert resp.status_code == 202
+    assert "MSFT" in generated

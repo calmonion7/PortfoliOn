@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List
-from services import storage
+from services import storage, cache as cache_svc
 from routers import calendar as calendar_router
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
@@ -125,5 +125,6 @@ def promote_to_holdings(ticker: str, payload: PromotePayload):
     holdings.append(new_holding)
     storage.save_holdings(holdings)
     calendar_router.clear_cache()
+    cache_svc.invalidate_dashboard()
 
     return {**stock_data, "quantity": payload.quantity, "avg_cost": payload.avg_cost}

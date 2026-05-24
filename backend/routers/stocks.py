@@ -3,8 +3,33 @@ from pydantic import BaseModel
 from typing import Optional, List
 from services import storage
 import re
+import json
 import requests as http_requests
 import yfinance as yf
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from services import market
+from services import cache as cache_svc
+
+SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
+REPORTS_DIR = Path(__file__).parent.parent / "reports"
+
+
+def _latest_snapshot(ticker: str) -> tuple:
+    """Find and load the latest snapshot for a ticker from snapshots or reports directory."""
+    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
+        ticker_dir = base / ticker
+        if ticker_dir.exists():
+            dates = sorted([f.stem for f in ticker_dir.glob("*.json")], reverse=True)
+            if dates:
+                path = ticker_dir / f"{dates[0]}.json"
+                try:
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                    return data, dates[0]
+                except Exception:
+                    pass
+    return None, None
+
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
@@ -131,3 +156,56 @@ def enrich_single(ticker: str, body: EnrichBody):
     if not ok:
         raise HTTPException(status_code=404, detail="Ticker not found")
     return {"ticker": ticker.upper(), "updated": list(fields.keys())}
+
+
+@router.delete("/dashboard/cache")
+def clear_dashboard_cache():
+    cache_svc.invalidate_dashboard()
+    return {"cleared": True}
+
+
+@router.get("/dashboard")
+def get_dashboard():
+    portfolio = storage.get_full_portfolio()
+    holdings = portfolio.get("stocks", [])
+    if not holdings:
+        return []
+
+    def _build_card(stock: dict) -> dict:
+        ticker = stock["ticker"].upper()
+        snapshot, snapshot_date = _latest_snapshot(ticker)
+        quote = market.get_quote(ticker, stock.get("market", "US"), stock.get("exchange", ""))
+
+        rsi = None
+        target_mean = buy = hold = sell = None
+        if snapshot:
+            rsi = (snapshot.get("daily_rsi") or {}).get("rsi")
+            target_mean = snapshot.get("target_mean")
+            buy = snapshot.get("buy")
+            hold = snapshot.get("hold")
+            sell = snapshot.get("sell")
+
+        return {
+            "ticker": ticker,
+            "name": stock.get("name", ticker),
+            "market": stock.get("market", "US"),
+            "avg_cost": stock.get("avg_cost"),
+            "quantity": stock.get("quantity"),
+            "current_price": quote.get("price"),
+            "daily_change_pct": quote.get("daily_change_pct"),
+            "weekly_change_pct": quote.get("weekly_change_pct"),
+            "monthly_change_pct": quote.get("monthly_change_pct"),
+            "rsi": rsi,
+            "target_mean": target_mean,
+            "buy": buy,
+            "hold": hold,
+            "sell": sell,
+            "snapshot_date": snapshot_date,
+            "sector": quote.get("sector") or "기타",
+        }
+
+    def _build_all():
+        with ThreadPoolExecutor(max_workers=30) as executor:
+            return list(executor.map(_build_card, holdings))
+
+    return cache_svc.get_dashboard(_build_all)

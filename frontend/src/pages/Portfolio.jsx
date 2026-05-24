@@ -16,6 +16,103 @@ const MarketBadge = ({ market }) => (
   </span>
 )
 
+const _weather = (score) => {
+  if (score <= 0) return { icon: '☀️', label: '맑음' }
+  if (score <= 1) return { icon: '⛅', label: '구름 조금' }
+  if (score <= 2) return { icon: '☁️', label: '흐림' }
+  return { icon: '🌧️', label: '비' }
+}
+
+const overallWeather = (item) => {
+  const scores = []
+  if (item.current_price && item.target_mean) {
+    const gap = (item.target_mean - item.current_price) / item.current_price * 100
+    const total = (item.buy ?? 0) + (item.hold ?? 0) + (item.sell ?? 0)
+    const buyPct = total > 0 ? (item.buy ?? 0) / total * 100 : 50
+    if (gap >= 15 && buyPct >= 60) scores.push(0)
+    else if (gap >= 5 && buyPct >= 45) scores.push(1)
+    else if (gap >= -5) scores.push(2)
+    else scores.push(3)
+  }
+  if (item.rsi != null) {
+    if (item.rsi < 30) scores.push(0)
+    else if (item.rsi < 45) scores.push(1)
+    else if (item.rsi < 65) scores.push(2)
+    else scores.push(3)
+  }
+  if (!scores.length) return null
+  return _weather(Math.round(scores.reduce((a, b) => a + b, 0) / scores.length))
+}
+
+const DashboardCard = ({ item }) => {
+  const weather = overallWeather(item)
+  const pnlPct = item.current_price != null && item.avg_cost != null
+    ? (item.current_price - item.avg_cost) / item.avg_cost * 100
+    : null
+  const consPct = item.current_price && item.target_mean
+    ? (item.target_mean - item.current_price) / item.current_price * 100
+    : null
+
+  const fmtPct = (v) => v == null ? '—' : `${v >= 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(1)}%`
+  const pctColor = (v) => v == null ? 'var(--text-muted)' : v >= 0 ? 'var(--positive)' : 'var(--negative)'
+
+  return (
+    <div style={{
+      background: 'var(--bg-card)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      padding: '14px 16px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+        {weather && <span style={{ fontSize: 16 }} title={weather.label}>{weather.icon}</span>}
+        <strong style={{ fontSize: 14 }}>{item.ticker}</strong>
+        <MarketBadge market={item.market || 'US'} />
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{item.name}</div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+        <span style={{ fontSize: 15, fontWeight: 600 }}>
+          {item.current_price == null ? '—' : fmtPrice(item.current_price, item.market)}
+        </span>
+        <span style={{ fontSize: 12, color: pctColor(item.daily_change_pct) }}>
+          {fmtPct(item.daily_change_pct)} 오늘
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 12, fontSize: 12, marginBottom: 10 }}>
+        <span style={{ color: pctColor(item.weekly_change_pct) }}>주간 {fmtPct(item.weekly_change_pct)}</span>
+        <span style={{ color: pctColor(item.monthly_change_pct) }}>월간 {fmtPct(item.monthly_change_pct)}</span>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+        <span style={{ color: 'var(--text-muted)' }}>수익률</span>
+        <span style={{ color: pctColor(pnlPct), fontWeight: 600 }}>{fmtPct(pnlPct)}</span>
+      </div>
+
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', fontSize: 12,
+        borderTop: '1px solid var(--border)', paddingTop: 6,
+      }}>
+        <span style={{ color: 'var(--text-muted)' }}>
+          RSI <strong style={{ color: 'var(--text)' }}>{item.rsi != null ? item.rsi.toFixed(1) : '—'}</strong>
+        </span>
+        <span style={{ color: pctColor(consPct) }}>
+          컨센서스 {consPct != null ? `${consPct >= 0 ? '+' : ''}${consPct.toFixed(0)}%` : '—'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+const DashboardGrid = ({ cards, loading }) => {
+  if (loading) return <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 40 }}>불러오는 중...</p>
+  if (!cards.length) return <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 40 }}>보유종목이 없습니다.</p>
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+      {cards.map(item => <DashboardCard key={item.ticker} item={item} />)}
+    </div>
+  )
+}
+
 export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('holdings')
   const [stocks, setStocks] = useState([])
@@ -26,6 +123,8 @@ export default function Portfolio() {
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [marketFilter, setMarketFilter] = useState('ALL')
+  const [dashboardCards, setDashboardCards] = useState([])
+  const [dashboardLoading, setDashboardLoading] = useState(false)
 
   const fetchAll = useCallback(async () => {
     const [portfolioRes, watchlistRes] = await Promise.all([
@@ -34,6 +133,19 @@ export default function Portfolio() {
     ])
     setStocks(portfolioRes.data.stocks || [])
     setWatchlist(watchlistRes.data || [])
+  }, [])
+
+  const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
+    setDashboardLoading(true)
+    try {
+      if (invalidate) await axios.delete('/api/stocks/dashboard/cache').catch(() => {})
+      const res = await axios.get('/api/stocks/dashboard')
+      setDashboardCards(res.data || [])
+    } catch {
+      // silent — keep empty array on error
+    } finally {
+      setDashboardLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
@@ -124,39 +236,59 @@ export default function Portfolio() {
         <button style={TAB_STYLE(activeTab === 'watchlist')} onClick={() => setActiveTab('watchlist')}>
           관심종목 ({watchlist.length})
         </button>
+        <button
+          style={TAB_STYLE(activeTab === 'dashboard')}
+          onClick={() => { setActiveTab('dashboard'); fetchDashboard() }}
+        >
+          대시보드
+        </button>
       </div>
 
       {/* 검색 + 시장 필터 */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="🔍 티커 또는 회사명 검색..."
-          style={{
-            flex: 1, padding: '7px 12px', background: 'var(--input-bg)',
-            border: '1px solid var(--input-border)', borderRadius: 4,
-            color: 'var(--text)', fontSize: 13,
-          }}
-        />
-        {['ALL', 'US', 'KR'].map(m => (
-          <button
-            key={m}
-            onClick={() => setMarketFilter(m)}
+      {activeTab !== 'dashboard' && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="🔍 티커 또는 회사명 검색..."
             style={{
-              padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: 12,
-              background: marketFilter === m ? 'var(--bg-surface)' : 'var(--bg-card)',
-              color: marketFilter === m ? 'var(--accent)' : 'var(--text-muted)',
+              flex: 1, padding: '7px 12px', background: 'var(--input-bg)',
+              border: '1px solid var(--input-border)', borderRadius: 4,
+              color: 'var(--text)', fontSize: 13,
             }}
-          >
-            {m === 'ALL' ? `전체 (${activeTab === 'holdings' ? stocks.length : watchlist.length})`
-              : m === 'US' ? `🇺🇸 US (${activeTab === 'holdings' ? usHoldings : usWatch})`
-              : `🇰🇷 KR (${activeTab === 'holdings' ? krHoldings : krWatch})`}
-          </button>
-        ))}
-      </div>
+          />
+          {['ALL', 'US', 'KR'].map(m => (
+            <button
+              key={m}
+              onClick={() => setMarketFilter(m)}
+              style={{
+                padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                background: marketFilter === m ? 'var(--bg-surface)' : 'var(--bg-card)',
+                color: marketFilter === m ? 'var(--accent)' : 'var(--text-muted)',
+              }}
+            >
+              {m === 'ALL' ? `전체 (${activeTab === 'holdings' ? stocks.length : watchlist.length})`
+                : m === 'US' ? `🇺🇸 US (${activeTab === 'holdings' ? usHoldings : usWatch})`
+                : `🇰🇷 KR (${activeTab === 'holdings' ? krHoldings : krWatch})`}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && <p style={{ color: 'var(--negative)', marginBottom: 8 }}>{error}</p>}
+
+      {/* 대시보드 탭 */}
+      {activeTab === 'dashboard' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <button className="btn-secondary" onClick={() => fetchDashboard({ invalidate: true })} disabled={dashboardLoading}>
+              ↺ 새로고침
+            </button>
+          </div>
+          <DashboardGrid cards={dashboardCards} loading={dashboardLoading} />
+        </>
+      )}
 
       {/* 보유종목 탭 */}
       {activeTab === 'holdings' && (
