@@ -49,6 +49,9 @@ def test_sector_includes_return_fields():
     assert "return_1w" in s
     assert "return_1mo" in s
     assert "return_3mo" in s
+    assert s["return_1w"] is not None
+    assert s["return_1mo"] is not None
+    assert s["return_3mo"] is not None
 
 
 def test_sector_portfolio_overlay():

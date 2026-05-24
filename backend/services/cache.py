@@ -49,6 +49,8 @@ def invalidate(ticker: str) -> None:
     invalidate_list()
     invalidate_dashboard()
     invalidate_correlation()
+    invalidate_sector()
+    invalidate_macro()
 
 
 def invalidate_dashboard() -> None:
@@ -85,3 +87,11 @@ def get_sector(loader) -> dict:
 
 def get_macro(loader) -> dict:
     return _macro_cache.get(loader)
+
+
+def invalidate_sector() -> None:
+    _sector_cache.invalidate()
+
+
+def invalidate_macro() -> None:
+    _macro_cache.invalidate()

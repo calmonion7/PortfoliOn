@@ -34,7 +34,7 @@ def _calc_return(closes: pd.Series, days: int):
 
 def _fetch_etf(entry: dict) -> dict:
     try:
-        hist = yf.Ticker(entry["etf"]).history(period="90d")["Close"].dropna()
+        hist = yf.Ticker(entry["etf"]).history(period="100d")["Close"].dropna()
         return {
             "name": entry["name"],
             "etf": entry["etf"],
