@@ -35,8 +35,8 @@ def get_calendar(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), user_id: str
 
 
 @router.delete("/calendar/cache")
-def delete_calendar_cache(month: str = Query(..., pattern=r"^\d{4}-\d{2}$")):
-    _cache_path(month).unlink(missing_ok=True)
+def delete_calendar_cache(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), user_id: str = Depends(get_current_user)):
+    _cache_path(month, user_id).unlink(missing_ok=True)
     return {"cleared": month}
 
 
