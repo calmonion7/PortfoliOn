@@ -83,7 +83,9 @@ def get_macro_correlation(holdings: list) -> dict:
     ret_series = {}
     raw_weights = {}
     for i, (closes, qty) in enumerate(results):
-        ret_series[i] = closes.pct_change().dropna()
+        ret = closes.pct_change().dropna()
+        ret.index = pd.DatetimeIndex(ret.index.date)
+        ret_series[i] = ret
         raw_weights[i] = qty * float(closes.iloc[-1])
 
     df = pd.DataFrame(ret_series).dropna()
@@ -104,6 +106,7 @@ def get_macro_correlation(holdings: list) -> dict:
         try:
             macro_hist = yf.Ticker(m["ticker"]).history(period="90d")["Close"].dropna()
             macro_delta = macro_hist.pct_change().dropna()
+            macro_delta.index = pd.DatetimeIndex(macro_delta.index.date)
             idx = portfolio_ret.index.intersection(macro_delta.index)
             if len(idx) < 10:
                 correlations.append({"indicator": m["label"], "ticker": m["ticker"], "corr_90d": None})
