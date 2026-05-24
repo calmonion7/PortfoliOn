@@ -65,9 +65,15 @@ def test_calendar_returns_dividend_event(tmp_path):
     assert divs[0]["stock_type"] == "holding"
 
 
-def test_calendar_empty_for_ticker_with_no_data():
+def test_calendar_empty_for_ticker_with_no_data(tmp_path):
+    mock_cal = MagicMock()
+    mock_cal.sessions_in_range.return_value = pd.DatetimeIndex(
+        pd.date_range("2026-07-01", "2026-07-31", freq="B")
+    )
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker):
+         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
+         patch("routers.calendar._CACHE_DIR", tmp_path), \
+         patch("routers.calendar.xcals.get_calendar", return_value=mock_cal):
         resp = client.get("/api/calendar?month=2026-07")
     assert resp.status_code == 200
     assert resp.json()["events"] == []
@@ -92,3 +98,41 @@ def test_calendar_tsla_watchlist_stock_type(tmp_path):
         resp = client.get("/api/calendar?month=2026-05")
     events = resp.json()["events"]
     assert events[0]["stock_type"] == "watchlist"
+
+
+def test_calendar_includes_nyse_holiday(tmp_path):
+    import exchange_calendars as xcals
+    import pandas as pd
+
+    mock_cal = MagicMock()
+    mock_cal.sessions_in_range.return_value = pd.DatetimeIndex([])  # no sessions → all weekdays are holidays
+    # Only one weekday in range: 2026-05-25 is a Monday (Memorial Day)
+    with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
+         patch("routers.calendar._CACHE_DIR", tmp_path), \
+         patch("routers.calendar.xcals.get_calendar", return_value=mock_cal):
+        resp = client.get("/api/calendar?month=2026-05")
+
+    assert resp.status_code == 200
+    events = resp.json()["events"]
+    us_holidays = [e for e in events if e["type"] == "holiday_us"]
+    assert len(us_holidays) > 0
+    assert all(e["ticker"] == "NYSE" for e in us_holidays)
+    assert all(e["stock_type"] == "market" for e in us_holidays)
+
+
+def test_calendar_includes_krx_holiday(tmp_path):
+    import pandas as pd
+
+    mock_cal = MagicMock()
+    mock_cal.sessions_in_range.return_value = pd.DatetimeIndex([])
+    with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
+         patch("routers.calendar._CACHE_DIR", tmp_path), \
+         patch("routers.calendar.xcals.get_calendar", return_value=mock_cal):
+        resp = client.get("/api/calendar?month=2026-05")
+
+    assert resp.status_code == 200
+    events = resp.json()["events"]
+    kr_holidays = [e for e in events if e["type"] == "holiday_kr"]
+    assert len(kr_holidays) > 0
+    assert all(e["ticker"] == "KRX" for e in kr_holidays)
+    assert all(e["stock_type"] == "market" for e in kr_holidays)

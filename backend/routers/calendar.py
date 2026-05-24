@@ -6,7 +6,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from pathlib import Path
 from fastapi import APIRouter, Query
+import pandas as pd
 import yfinance as yf
+import exchange_calendars as xcals
 from services import storage
 
 router = APIRouter(prefix="/api", tags=["calendar"])
@@ -66,6 +68,7 @@ def _get_events(month: str) -> list[dict]:
         for future in as_completed(futures):
             events.extend(future.result())
 
+    events.extend(_get_holidays(month_start, month_end))
     path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
     return events
 
@@ -108,3 +111,29 @@ def _collect_dividend(t, ticker, stock_type, name, start, end, events):
             "type": "dividend",
             "stock_type": stock_type,
         })
+
+
+def _get_holidays(month_start: date, month_end: date) -> list[dict]:
+    start_str = month_start.isoformat()
+    end_str = month_end.isoformat()
+    results = []
+    for exchange, label, holiday_type in [
+        ("XNYS", "NYSE", "holiday_us"),
+        ("XKRX", "KRX",  "holiday_kr"),
+    ]:
+        try:
+            cal = xcals.get_calendar(exchange)
+            sessions = cal.sessions_in_range(start_str, end_str)
+            all_weekdays = pd.date_range(start_str, end_str, freq="B")
+            holidays = all_weekdays.difference(sessions)
+            for h in holidays:
+                results.append({
+                    "date": h.date().isoformat(),
+                    "ticker": label,
+                    "name": f"{label} 휴장",
+                    "type": holiday_type,
+                    "stock_type": "market",
+                })
+        except Exception as e:
+            print(f"calendar: holiday fetch failed {exchange}: {e}", file=sys.stderr)
+    return results
