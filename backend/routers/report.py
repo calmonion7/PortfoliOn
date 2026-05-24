@@ -3,12 +3,13 @@ import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pathlib import Path
 from services import storage, report_generator
 from services import consensus as consensus_svc
 from services import cache as cache_svc
 from services.utils import sanitize as _sanitize
+from auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["report"])
 
@@ -31,8 +32,8 @@ def get_backfill_progress():
 
 
 @router.post("/report/backfill", status_code=202)
-def backfill_all(background_tasks: BackgroundTasks, days: int = 60):
-    portfolio = storage.get_full_portfolio()
+def backfill_all(background_tasks: BackgroundTasks, days: int = 60, user_id: str = Depends(get_current_user)):
+    portfolio = storage.get_full_portfolio(user_id)
     stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
@@ -57,8 +58,8 @@ def _run_backfill(stocks: list, days: int):
 
 
 @router.post("/report/generate", status_code=202)
-def generate_all(background_tasks: BackgroundTasks):
-    portfolio = storage.get_full_portfolio()
+def generate_all(background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+    portfolio = storage.get_full_portfolio(user_id)
     stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
@@ -67,8 +68,8 @@ def generate_all(background_tasks: BackgroundTasks):
 
 
 @router.post("/report/generate/{ticker}", status_code=202)
-def generate_one(ticker: str, background_tasks: BackgroundTasks):
-    portfolio = storage.get_full_portfolio()
+def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+    portfolio = storage.get_full_portfolio(user_id)
     stock = next(
         (s for s in portfolio["stocks"] if s["ticker"].upper() == ticker.upper()), None
     )
@@ -114,9 +115,9 @@ def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
 
 
 @router.get("/report/list")
-def list_reports():
+def list_reports(user_id: str = Depends(get_current_user)):
     def _build():
-        portfolio = storage.get_full_portfolio()
+        portfolio = storage.get_full_portfolio(user_id)
         portfolio_stocks = {s["ticker"].upper(): s for s in portfolio.get("stocks", [])}
         portfolio_watchlist = {s["ticker"].upper(): s for s in portfolio.get("watchlist", [])}
         holding_tickers = set(portfolio_stocks.keys())
@@ -200,8 +201,8 @@ def get_consensus_batch_progress():
 
 
 @router.post("/consensus/batch", status_code=202)
-def batch_consensus(background_tasks: BackgroundTasks):
-    portfolio = storage.get_full_portfolio()
+def batch_consensus(background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+    portfolio = storage.get_full_portfolio(user_id)
     stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")

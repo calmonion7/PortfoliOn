@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from services import storage
+from services.db import get_db
 import re
 import json
 import requests as http_requests
@@ -10,13 +11,30 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from services import market
 from services import cache as cache_svc
+from auth import get_current_user
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 
 def _latest_snapshot(ticker: str) -> tuple:
-    """Find and load the latest snapshot for a ticker from snapshots or reports directory."""
+    """Find and load the latest snapshot for a ticker. Tries Supabase first, falls back to filesystem."""
+    try:
+        db = get_db()
+        rows = (
+            db.table("snapshots")
+            .select("date, data")
+            .eq("ticker", ticker.upper())
+            .order("date", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if rows:
+            return rows[0]["data"], rows[0]["date"]
+    except Exception:
+        pass
+    # Filesystem fallback (pre-migration)
     for base in (SNAPSHOTS_DIR, REPORTS_DIR):
         ticker_dir = base / ticker
         if ticker_dir.exists():
@@ -122,8 +140,8 @@ def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
 
 
 @router.get("")
-def get_stocks():
-    portfolio = storage.get_full_portfolio()
+def get_stocks(user_id: str = Depends(get_current_user)):
+    portfolio = storage.get_full_portfolio(user_id)
     result = []
     for s in portfolio["stocks"]:
         result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "holding"})
@@ -133,7 +151,7 @@ def get_stocks():
 
 
 @router.put("/enrich/batch")
-def enrich_batch(items: List[BatchEnrichItem]):
+def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(get_current_user)):
     if not items:
         raise HTTPException(status_code=400, detail="No items provided")
     updated, not_found = [], []
@@ -148,7 +166,7 @@ def enrich_batch(items: List[BatchEnrichItem]):
 
 
 @router.put("/{ticker}/enrich")
-def enrich_single(ticker: str, body: EnrichBody):
+def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(get_current_user)):
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
     if not fields:
         raise HTTPException(status_code=400, detail="No fields provided")
@@ -165,8 +183,8 @@ def clear_dashboard_cache():
 
 
 @router.get("/dashboard")
-def get_dashboard():
-    portfolio = storage.get_full_portfolio()
+def get_dashboard(user_id: str = Depends(get_current_user)):
+    portfolio = storage.get_full_portfolio(user_id)
     holdings = portfolio.get("stocks", [])
     if not holdings:
         return []

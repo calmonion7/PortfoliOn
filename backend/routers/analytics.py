@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from concurrent.futures import ThreadPoolExecutor
 
 import yfinance as yf
 import pandas as pd
 
 from services import storage, cache as cache_svc
+from auth import get_current_user
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
@@ -24,9 +25,9 @@ def _fetch_closes(item: dict) -> tuple:
 
 
 @router.get("/correlation")
-def get_correlation():
+def get_correlation(user_id: str = Depends(get_current_user)):
     def _build() -> dict:
-        holdings = storage.get_full_portfolio().get("stocks", [])
+        holdings = storage.get_full_portfolio(user_id).get("stocks", [])
         if len(holdings) < 2:
             return {"tickers": [], "matrix": []}
 

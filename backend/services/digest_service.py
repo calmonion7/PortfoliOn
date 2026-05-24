@@ -9,6 +9,7 @@ import requests
 import yfinance as yf
 
 from services import storage
+from services.db import get_db
 from services.market import _yf_sym
 from routers.calendar import _get_events
 
@@ -17,11 +18,11 @@ DIGEST_DIR.mkdir(exist_ok=True)
 ANOMALY_THRESHOLD = 5.0
 
 
-def generate(today: date = None) -> dict:
+def generate(user_id: str, today: date = None) -> dict:
     if today is None:
         today = date.today()
 
-    portfolio = storage.get_full_portfolio()
+    portfolio = storage.get_full_portfolio(user_id)
     holdings = portfolio.get("stocks", [])
     watchlist = portfolio.get("watchlist", [])
     all_stocks = holdings + watchlist
@@ -87,9 +88,9 @@ def generate(today: date = None) -> dict:
     end_date = today + timedelta(days=7)
     month_str = today.strftime("%Y-%m")
     next_month_str = (today.replace(day=1) + timedelta(days=32)).strftime("%Y-%m")
-    all_events = _get_events(month_str)
+    all_events = _get_events(month_str, user_id)
     if end_date.month != today.month or end_date.year != today.year:
-        all_events = all_events + _get_events(next_month_str)
+        all_events = all_events + _get_events(next_month_str, user_id)
 
     events_7d = sorted(
         [
@@ -119,12 +120,37 @@ def generate(today: date = None) -> dict:
         "anomalies": anomalies,
     }
 
-    path = DIGEST_DIR / f"{today.isoformat()}.json"
-    path.write_text(json.dumps(digest, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        db = get_db()
+        db.table("digests").upsert({
+            "user_id": user_id,
+            "date": today.isoformat(),
+            "data": digest,
+        }, on_conflict="user_id,date").execute()
+    except Exception as e:
+        print(f"[Digest] DB save failed, falling back to file: {e}")
+        path = DIGEST_DIR / f"{today.isoformat()}.json"
+        path.write_text(json.dumps(digest, ensure_ascii=False, indent=2), encoding="utf-8")
     return digest
 
 
-def get_latest() -> dict | None:
+def get_latest(user_id: str) -> dict | None:
+    try:
+        db = get_db()
+        rows = (
+            db.table("digests")
+            .select("data")
+            .eq("user_id", user_id)
+            .order("date", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if rows:
+            return rows[0]["data"]
+    except Exception as e:
+        print(f"[Digest] DB read failed, falling back to file: {e}")
+    # Filesystem fallback
     files = sorted(DIGEST_DIR.glob("*.json"), reverse=True)
     if not files:
         return None

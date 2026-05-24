@@ -3,9 +3,11 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch
 
 from routers.stocks import router
+from auth import get_current_user
 
 app = FastAPI()
 app.include_router(router)
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 client = TestClient(app)
 
 SAMPLE_PORTFOLIO = {

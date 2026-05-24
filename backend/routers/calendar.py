@@ -5,11 +5,12 @@ import calendar as cal_lib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from pathlib import Path
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 import pandas as pd
 import yfinance as yf
 import exchange_calendars as xcals
 from services import storage
+from auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["calendar"])
 
@@ -18,8 +19,9 @@ _CACHE_DIR.mkdir(exist_ok=True)
 _CACHE_VERSION = 2
 
 
-def _cache_path(month: str) -> Path:
-    return _CACHE_DIR / f"{month}.json"
+def _cache_path(month: str, user_id: str = "") -> Path:
+    prefix = f"{user_id}-" if user_id else ""
+    return _CACHE_DIR / f"{prefix}{month}.json"
 
 
 def clear_cache() -> None:
@@ -28,8 +30,8 @@ def clear_cache() -> None:
 
 
 @router.get("/calendar")
-def get_calendar(month: str = Query(..., pattern=r"^\d{4}-\d{2}$")):
-    return {"events": _get_events(month)}
+def get_calendar(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), user_id: str = Depends(get_current_user)):
+    return {"events": _get_events(month, user_id)}
 
 
 @router.delete("/calendar/cache")
@@ -38,8 +40,8 @@ def delete_calendar_cache(month: str = Query(..., pattern=r"^\d{4}-\d{2}$")):
     return {"cleared": month}
 
 
-def _get_events(month: str) -> list[dict]:
-    path = _cache_path(month)
+def _get_events(month: str, user_id: str = "") -> list[dict]:
+    path = _cache_path(month, user_id)
     if path.exists():
         cached = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(cached, dict) and cached.get("v") == _CACHE_VERSION:
@@ -50,7 +52,7 @@ def _get_events(month: str) -> list[dict]:
     month_start = date(year, mon, 1)
     month_end = date(year, mon, cal_lib.monthrange(year, mon)[1])
 
-    portfolio = storage.get_full_portfolio()
+    portfolio = storage.get_full_portfolio(user_id) if user_id else {"stocks": [], "watchlist": []}
     all_stocks = (
         [{"ticker": s["ticker"], "stock_type": "holding", "name": s.get("name", s["ticker"])} for s in portfolio["stocks"]]
         + [{"ticker": s["ticker"], "stock_type": "watchlist", "name": s.get("name", s["ticker"])} for s in portfolio["watchlist"]]

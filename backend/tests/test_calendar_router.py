@@ -9,9 +9,11 @@ from datetime import date
 import pandas as pd
 
 from routers.calendar import router
+from auth import get_current_user
 
 app = FastAPI()
 app.include_router(router)
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 client = TestClient(app)
 
 SAMPLE_PORTFOLIO = {
@@ -102,7 +104,8 @@ def test_calendar_tsla_watchlist_stock_type(tmp_path):
 
 def test_stale_cache_is_regenerated(tmp_path):
     # Old-format cache (plain array, no version) → must be discarded and regenerated
-    stale = tmp_path / "2026-05.json"
+    # The cache file uses user_id prefix (test-user-id from dependency override)
+    stale = tmp_path / "test-user-id-2026-05.json"
     stale.write_text("[]", encoding="utf-8")
 
     mock_cal = MagicMock()

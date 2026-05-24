@@ -44,13 +44,20 @@ def _big_drop_ticker(symbol):
     return m
 
 
+def _mock_db_failure():
+    m = MagicMock()
+    m.table.side_effect = Exception("no db")
+    return m
+
+
 def test_generate_stocks_list(tmp_path):
     import services.digest_service as ds
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
-         patch("services.digest_service._get_events", return_value=[]):
-        result = ds.generate(today=date(2026, 5, 23))
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.get_db", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert len(result["stocks"]) == 2
     assert result["stocks"][0]["ticker"] == "AAPL"
     assert result["stocks"][0]["is_holding"] is True
@@ -67,8 +74,9 @@ def test_generate_detects_anomaly(tmp_path):
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=portfolio), \
          patch("services.digest_service.yf.Ticker", side_effect=_big_drop_ticker), \
-         patch("services.digest_service._get_events", return_value=[]):
-        result = ds.generate(today=date(2026, 5, 23))
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.get_db", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert result["stocks"][0]["is_anomaly"] is True
     assert len(result["anomalies"]) == 1
     assert result["anomalies"][0]["ticker"] == "AAPL"
@@ -79,23 +87,26 @@ def test_generate_saves_snapshot(tmp_path):
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
-         patch("services.digest_service._get_events", return_value=[]):
-        ds.generate(today=date(2026, 5, 23))
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.get_db", side_effect=Exception("no db")):
+        ds.generate("test-user-id", today=date(2026, 5, 23))
     assert (tmp_path / "2026-05-23.json").exists()
 
 
 def test_get_latest_returns_none_when_empty(tmp_path):
     import services.digest_service as ds
-    with patch.object(ds, "DIGEST_DIR", tmp_path):
-        assert ds.get_latest() is None
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.get_db", side_effect=Exception("no db")):
+        assert ds.get_latest("test-user-id") is None
 
 
 def test_get_latest_returns_most_recent(tmp_path):
     import services.digest_service as ds
     (tmp_path / "2026-05-22.json").write_text(json.dumps({"date": "2026-05-22"}), encoding="utf-8")
     (tmp_path / "2026-05-23.json").write_text(json.dumps({"date": "2026-05-23"}), encoding="utf-8")
-    with patch.object(ds, "DIGEST_DIR", tmp_path):
-        result = ds.get_latest()
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.get_db", side_effect=Exception("no db")):
+        result = ds.get_latest("test-user-id")
     assert result["date"] == "2026-05-23"
 
 
@@ -127,8 +138,9 @@ def test_generate_skips_stock_on_yfinance_failure(tmp_path):
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_failing_ticker), \
-         patch("services.digest_service._get_events", return_value=[]):
-        result = ds.generate(today=date(2026, 5, 23))
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.get_db", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert result["stocks"] == []
     assert result["portfolio_summary"]["total_value_usd"] == 0.0
 
@@ -138,8 +150,9 @@ def test_generate_portfolio_summary(tmp_path):
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
-         patch("services.digest_service._get_events", return_value=[]):
-        result = ds.generate(today=date(2026, 5, 23))
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.get_db", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
     # AAPL: 10 shares, prev_close=100.0, current=102.0
     assert result["portfolio_summary"]["total_value_usd"] == 1020.0
     assert result["portfolio_summary"]["daily_change_usd"] == 20.0
@@ -155,8 +168,9 @@ def test_generate_events_7d_filter(tmp_path):
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
-         patch("services.digest_service._get_events", return_value=events):
-        result = ds.generate(today=date(2026, 5, 23))
+         patch("services.digest_service._get_events", return_value=events), \
+         patch("services.digest_service.get_db", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert len(result["events_7d"]) == 1
     assert result["events_7d"][0]["ticker"] == "AAPL"
     assert result["events_7d"][0]["days_until"] == 1

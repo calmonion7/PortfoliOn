@@ -10,9 +10,11 @@ import pandas as pd
 import numpy as np
 
 from routers.analysis import router
+from auth import get_current_user
 
 app = FastAPI()
 app.include_router(router)
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 client = TestClient(app)
 
 

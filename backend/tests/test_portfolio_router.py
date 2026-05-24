@@ -3,9 +3,11 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch
 
 from routers.portfolio import router
+from auth import get_current_user
 
 app = FastAPI()
 app.include_router(router)
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 client = TestClient(app)
 
 SAMPLE_STOCKS = [
@@ -38,10 +40,10 @@ def test_add_stock_saves_to_holdings_and_stocks():
             "competitors": [], "moat": "", "growth_plan": ""
         })
     assert resp.status_code == 201
-    saved_holdings = mock_save_holdings.call_args[0][0]
+    saved_holdings = mock_save_holdings.call_args[0][1]
     assert saved_holdings[0]["ticker"] == "NVDA"
     assert saved_holdings[0]["quantity"] == 5
-    saved_stocks = mock_save_stocks.call_args[0][0]
+    saved_stocks = mock_save_stocks.call_args[0][1]
     assert saved_stocks[0]["ticker"] == "NVDA"
 
 
@@ -64,9 +66,9 @@ def test_update_stock_modifies_holdings_and_stocks():
             "competitors": ["DIS"], "moat": "Brand", "growth_plan": "Gaming"
         })
     assert resp.status_code == 200
-    saved_holdings = mock_save_holdings.call_args[0][0]
+    saved_holdings = mock_save_holdings.call_args[0][1]
     assert saved_holdings[0]["quantity"] == 20
-    saved_stocks = mock_save_stocks.call_args[0][0]
+    saved_stocks = mock_save_stocks.call_args[0][1]
     assert saved_stocks[0]["moat"] == "Brand"
 
 
@@ -77,8 +79,8 @@ def test_delete_stock_removes_from_holdings_and_adds_to_watchlist():
          patch("routers.portfolio.storage.save_watchlist_tickers") as mock_save_watchlist:
         resp = client.delete("/api/portfolio/NFLX")
     assert resp.status_code == 200
-    assert mock_save_holdings.call_args[0][0] == []
-    assert "NFLX" in mock_save_watchlist.call_args[0][0]
+    assert mock_save_holdings.call_args[0][1] == []
+    assert "NFLX" in mock_save_watchlist.call_args[0][1]
 
 
 def test_delete_stock_keeps_stock_data_when_in_watchlist():

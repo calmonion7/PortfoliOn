@@ -4,9 +4,11 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch
 
 from routers.watchlist import router
+from auth import get_current_user
 
 app = FastAPI()
 app.include_router(router)
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 client = TestClient(app)
 
 SAMPLE_STOCKS = [
@@ -37,9 +39,9 @@ def test_add_watchlist_stock_saves_ticker_and_stock_data():
             "competitors": [], "moat": "", "growth_plan": ""
         })
     assert resp.status_code == 201
-    saved_tickers = mock_save_watchlist.call_args[0][0]
+    saved_tickers = mock_save_watchlist.call_args[0][1]
     assert "TSLA" in saved_tickers
-    saved_stocks = mock_save_stocks.call_args[0][0]
+    saved_stocks = mock_save_stocks.call_args[0][1]
     assert saved_stocks[0]["ticker"] == "TSLA"
 
 
@@ -74,22 +76,17 @@ def test_update_watchlist_stock_updates_stocks_json():
             "competitors": ["AMD"], "moat": "GPU dominance", "growth_plan": "AI chips"
         })
     assert resp.status_code == 200
-    saved = mock_save_stocks.call_args[0][0]
+    saved = mock_save_stocks.call_args[0][1]
     assert saved[0]["moat"] == "GPU dominance"
 
 
 def test_delete_watchlist_removes_from_watchlist_and_stocks():
     with patch("routers.watchlist.storage.get_watchlist_tickers", return_value=["NVDA"]), \
          patch("routers.watchlist.storage.get_holdings", return_value=[]), \
-         patch("routers.watchlist.storage.get_stocks", return_value=[
-             {"ticker": "NVDA", "name": "Nvidia", "competitors": [], "moat": "", "growth_plan": ""}
-         ]), \
-         patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist, \
-         patch("routers.watchlist.storage.save_stocks") as mock_save_stocks:
+         patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist:
         resp = client.delete("/api/watchlist/NVDA")
     assert resp.status_code == 200
-    assert mock_save_watchlist.call_args[0][0] == []
-    assert mock_save_stocks.call_args[0][0] == []
+    assert mock_save_watchlist.call_args[0][1] == []
 
 
 def test_delete_watchlist_keeps_stock_data_when_in_holdings():
@@ -119,9 +116,9 @@ def test_promote_moves_ticker_to_holdings():
         resp = client.post("/api/watchlist/NVDA/promote",
                            json={"quantity": 5, "avg_cost": 200.0})
     assert resp.status_code == 200
-    saved_watchlist = mock_save_watchlist.call_args[0][0]
+    saved_watchlist = mock_save_watchlist.call_args[0][1]
     assert "NVDA" not in saved_watchlist
-    saved_holdings = mock_save_holdings.call_args[0][0]
+    saved_holdings = mock_save_holdings.call_args[0][1]
     assert saved_holdings[0]["ticker"] == "NVDA"
     assert saved_holdings[0]["quantity"] == 5
     assert saved_holdings[0]["avg_cost"] == 200.0

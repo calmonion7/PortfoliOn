@@ -10,18 +10,22 @@ _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
 
 def _generate_all():
-    portfolio = storage.get_full_portfolio()
-    for stock in portfolio.get("stocks", []):
-        try:
-            report_generator.generate_report(stock)
-            print(f"[Scheduler] Report generated for {stock['ticker']}")
-        except Exception as e:
-            print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
-        try:
-            consensus_svc.collect(stock["ticker"])
-            print(f"[Scheduler] Consensus collected for {stock['ticker']}")
-        except Exception as e:
-            print(f"[Scheduler] Consensus collection failed for {stock['ticker']}: {e}")
+    from services.db import get_db
+    db = get_db()
+    user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").eq("type", "holding").execute().data})
+    for user_id in user_ids:
+        portfolio = storage.get_full_portfolio(user_id)
+        for stock in portfolio.get("stocks", []):
+            try:
+                report_generator.generate_report(stock)
+                print(f"[Scheduler] Report generated for {stock['ticker']}")
+            except Exception as e:
+                print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
+            try:
+                consensus_svc.collect(stock["ticker"])
+                print(f"[Scheduler] Consensus collected for {stock['ticker']}")
+            except Exception as e:
+                print(f"[Scheduler] Consensus collection failed for {stock['ticker']}: {e}")
 
 
 def _reschedule():
@@ -59,12 +63,20 @@ def _run_guru_crawl():
 
 def _run_digest():
     from services import digest_service
+    from services.db import get_db
     try:
-        d = digest_service.generate()
-        digest_service.send_telegram(d)
-        print("[Scheduler] Daily digest generated")
+        db = get_db()
+        user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").execute().data})
     except Exception as e:
-        print(f"[Scheduler] Daily digest failed: {e}")
+        print(f"[Scheduler] Digest: failed to fetch user list: {e}")
+        return
+    for user_id in user_ids:
+        try:
+            d = digest_service.generate(user_id)
+            digest_service.send_telegram(d)
+            print(f"[Scheduler] Daily digest generated for {user_id}")
+        except Exception as e:
+            print(f"[Scheduler] Daily digest failed for {user_id}: {e}")
 
 
 def _reschedule_guru():
