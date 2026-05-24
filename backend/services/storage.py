@@ -1,160 +1,239 @@
-import json
-from pathlib import Path
-from typing import Any
-
-DATA_DIR = Path(__file__).parent.parent / "data"
+from services.db import get_db
 
 _ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures"})
 
 
-def _read_json(filename: str) -> Any:
-    path = DATA_DIR / filename
-    if not path.exists():
-        return None
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+# ── 종목 마스터 (user-specific) ──────────────────────────────────────────────
 
-
-def _write_json(filename: str, data: Any) -> None:
-    path = DATA_DIR / filename
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def _get_unified() -> list[dict]:
-    data = _read_json("stocks.json")
-    return data.get("stocks", []) if data else []
-
-
-def _save_unified(stocks: list[dict]) -> None:
-    _write_json("stocks.json", {"stocks": stocks})
-
-
-def get_stocks() -> list[dict]:
+def get_stocks(user_id: str) -> list[dict]:
+    db = get_db()
+    user_rows = db.table("user_stocks").select("ticker").eq("user_id", user_id).execute().data
+    if not user_rows:
+        return []
+    tickers = [r["ticker"] for r in user_rows]
+    ticker_rows = db.table("tickers").select("*").in_("ticker", tickers).execute().data
     return [
-        {k: s[k] for k in (*_ANALYST_KEYS, "ticker", "market", "exchange") if k in s}
-        for s in _get_unified()
+        {k: (t.get(k) or "") for k in (*_ANALYST_KEYS, "ticker", "market", "exchange")}
+        for t in ticker_rows
     ]
 
 
-def save_stocks(stocks: list[dict]) -> None:
-    by_ticker = {s["ticker"]: s for s in _get_unified()}
-    incoming = {s["ticker"].upper(): s for s in stocks}
-    for t in list(by_ticker):
-        if t not in incoming and by_ticker[t].get("type") != "holding":
-            del by_ticker[t]
-    for t, s in incoming.items():
-        if t in by_ticker:
-            by_ticker[t].update({k: v for k, v in s.items() if k in _ANALYST_KEYS})
-        else:
-            by_ticker[t] = {
-                "ticker": t, "type": "watchlist", "quantity": None, "avg_cost": None,
-                "market": s.get("market", "US"), "exchange": s.get("exchange", ""),
-                **{k: s.get(k, "") for k in _ANALYST_KEYS},
-            }
-    _save_unified(list(by_ticker.values()))
+def save_stocks(user_id: str, stocks: list[dict]) -> None:
+    db = get_db()
+    for s in stocks:
+        ticker = s["ticker"].upper()
+        db.table("tickers").upsert(
+            {
+                "ticker": ticker,
+                "name": s.get("name") or ticker,
+                "market": s.get("market") or "US",
+                "exchange": s.get("exchange") or "",
+                **{k: (s.get(k) or "") for k in _ANALYST_KEYS if k != "name"},
+            },
+            on_conflict="ticker",
+        ).execute()
+        existing = (
+            db.table("user_stocks")
+            .select("ticker")
+            .eq("user_id", user_id)
+            .eq("ticker", ticker)
+            .execute()
+            .data
+        )
+        if not existing:
+            db.table("user_stocks").insert(
+                {"user_id": user_id, "ticker": ticker, "type": "watchlist"}
+            ).execute()
 
 
-def get_holdings() -> list[dict]:
+def get_holdings(user_id: str) -> list[dict]:
+    db = get_db()
+    rows = (
+        db.table("user_stocks")
+        .select("ticker, quantity, avg_cost")
+        .eq("user_id", user_id)
+        .eq("type", "holding")
+        .execute()
+        .data
+    )
+    if not rows:
+        return []
+    tickers = [r["ticker"] for r in rows]
+    ticker_info = {
+        t["ticker"]: t
+        for t in db.table("tickers").select("ticker, market, exchange, name").in_("ticker", tickers).execute().data
+    }
     return [
-        {"ticker": s["ticker"], "quantity": s["quantity"], "avg_cost": s["avg_cost"],
-         "market": s.get("market", "US"), "exchange": s.get("exchange", "")}
-        for s in _get_unified() if s.get("type") == "holding"
+        {
+            "ticker": r["ticker"],
+            "name": ticker_info.get(r["ticker"], {}).get("name", r["ticker"]),
+            "quantity": r["quantity"],
+            "avg_cost": r["avg_cost"],
+            "market": ticker_info.get(r["ticker"], {}).get("market", "US"),
+            "exchange": ticker_info.get(r["ticker"], {}).get("exchange", ""),
+        }
+        for r in rows
     ]
 
 
-def save_holdings(holdings: list[dict]) -> None:
-    by_ticker = {s["ticker"]: s for s in _get_unified()}
-    holding_tickers = {h["ticker"].upper() for h in holdings}
-    for s in by_ticker.values():
-        if s.get("type") == "holding" and s["ticker"] not in holding_tickers:
-            s["type"] = "watchlist"
-            s["quantity"] = None
-            s["avg_cost"] = None
+def save_holdings(user_id: str, holdings: list[dict]) -> None:
+    db = get_db()
+    current = (
+        db.table("user_stocks")
+        .select("ticker")
+        .eq("user_id", user_id)
+        .eq("type", "holding")
+        .execute()
+        .data
+    )
+    current_tickers = {r["ticker"] for r in current}
+    new_tickers = {h["ticker"].upper() for h in holdings}
+
+    for t in current_tickers - new_tickers:
+        db.table("user_stocks").update(
+            {"type": "watchlist", "quantity": None, "avg_cost": None}
+        ).eq("user_id", user_id).eq("ticker", t).execute()
+
     for h in holdings:
-        t = h["ticker"].upper()
-        if t in by_ticker:
-            by_ticker[t]["type"] = "holding"
-            by_ticker[t]["quantity"] = h["quantity"]
-            by_ticker[t]["avg_cost"] = h["avg_cost"]
-            by_ticker[t]["market"] = h.get("market", by_ticker[t].get("market", "US"))
-            by_ticker[t]["exchange"] = h.get("exchange", by_ticker[t].get("exchange", ""))
+        ticker = h["ticker"].upper()
+        db.table("tickers").upsert(
+            {
+                "ticker": ticker,
+                "name": h.get("name") or ticker,
+                "market": h.get("market") or "US",
+                "exchange": h.get("exchange") or "",
+            },
+            on_conflict="ticker",
+        ).execute()
+        db.table("user_stocks").upsert(
+            {
+                "user_id": user_id,
+                "ticker": ticker,
+                "type": "holding",
+                "quantity": h["quantity"],
+                "avg_cost": h["avg_cost"],
+            },
+            on_conflict="user_id,ticker",
+        ).execute()
+
+
+def get_watchlist_tickers(user_id: str) -> list[str]:
+    db = get_db()
+    rows = (
+        db.table("user_stocks")
+        .select("ticker")
+        .eq("user_id", user_id)
+        .eq("type", "watchlist")
+        .execute()
+        .data
+    )
+    return [r["ticker"] for r in rows]
+
+
+def save_watchlist_tickers(user_id: str, tickers: list[str]) -> None:
+    db = get_db()
+    current = (
+        db.table("user_stocks")
+        .select("ticker")
+        .eq("user_id", user_id)
+        .eq("type", "watchlist")
+        .execute()
+        .data
+    )
+    current_set = {r["ticker"] for r in current}
+    new_set = {t.upper() for t in tickers}
+
+    for t in current_set - new_set:
+        db.table("user_stocks").delete().eq("user_id", user_id).eq("ticker", t).eq("type", "watchlist").execute()
+
+    for t in new_set - current_set:
+        db.table("tickers").upsert(
+            {"ticker": t, "name": t, "market": "US", "exchange": ""},
+            on_conflict="ticker",
+        ).execute()
+        db.table("user_stocks").upsert(
+            {"user_id": user_id, "ticker": t, "type": "watchlist"},
+            on_conflict="user_id,ticker",
+        ).execute()
+
+
+def get_full_portfolio(user_id: str) -> dict:
+    db = get_db()
+    rows = (
+        db.table("user_stocks")
+        .select("*, tickers(*)")
+        .eq("user_id", user_id)
+        .execute()
+        .data
+    )
+    holdings, watchlist = [], []
+    for r in rows:
+        t = r.get("tickers") or {}
+        entry = {
+            "ticker": r["ticker"],
+            "name": t.get("name") or r["ticker"],
+            "market": t.get("market") or "US",
+            "exchange": t.get("exchange") or "",
+            "competitors": t.get("competitors") or [],
+            "moat": t.get("moat") or "",
+            "growth_plan": t.get("growth_plan") or "",
+            "risks": t.get("risks") or "",
+            "recent_disclosures": t.get("recent_disclosures") or "",
+        }
+        if r["type"] == "holding":
+            entry.update({"quantity": r["quantity"], "avg_cost": r["avg_cost"]})
+            holdings.append(entry)
         else:
-            by_ticker[t] = {
-                "ticker": t, "type": "holding", "name": t, "quantity": h["quantity"],
-                "avg_cost": h["avg_cost"], "market": h.get("market", "US"),
-                "exchange": h.get("exchange", ""), "competitors": [], "moat": "",
-                "growth_plan": "", "risks": "", "recent_disclosures": "",
-            }
-    _save_unified(list(by_ticker.values()))
-
-
-def get_watchlist_tickers() -> list[str]:
-    return [s["ticker"] for s in _get_unified() if s.get("type") == "watchlist"]
-
-
-def save_watchlist_tickers(tickers: list[str]) -> None:
-    by_ticker = {s["ticker"]: s for s in _get_unified()}
-    for t in [t.upper() for t in tickers]:
-        if t in by_ticker:
-            if by_ticker[t].get("type") != "holding":
-                by_ticker[t]["type"] = "watchlist"
-        else:
-            by_ticker[t] = {
-                "ticker": t, "type": "watchlist", "name": t, "quantity": None,
-                "avg_cost": None, "market": "US", "exchange": "",
-                "competitors": [], "moat": "", "growth_plan": "",
-                "risks": "", "recent_disclosures": "",
-            }
-    _save_unified(list(by_ticker.values()))
-
-
-def get_full_portfolio() -> dict:
-    unified = _get_unified()
-    return {
-        "stocks": [s for s in unified if s.get("type") == "holding"],
-        "watchlist": [s for s in unified if s.get("type") == "watchlist"],
-    }
-
-
-def get_schedule() -> dict:
-    data = _read_json("schedule.json")
-    return data if data is not None else {
-        "enabled": False, "time": "08:00",
-        "days": ["mon", "tue", "wed", "thu", "fri"],
-    }
-
-
-def save_schedule(schedule: dict) -> None:
-    _write_json("schedule.json", schedule)
+            watchlist.append(entry)
+    return {"stocks": holdings, "watchlist": watchlist}
 
 
 def enrich_stock(ticker: str, fields: dict) -> bool:
+    db = get_db()
     upper = ticker.upper()
-    unified = _get_unified()
-    by_ticker = {s["ticker"]: s for s in unified}
-    if upper not in by_ticker:
+    existing = db.table("tickers").select("ticker").eq("ticker", upper).execute().data
+    if not existing:
         return False
-    for k, v in fields.items():
-        by_ticker[upper][k] = v
-    _save_unified(list(by_ticker.values()))
+    db.table("tickers").update(fields).eq("ticker", upper).execute()
     return True
 
 
+# ── 전역 함수 (user_id 없음, 시그니처 유지) ───────────────────────────────────
+
+def get_schedule() -> dict:
+    db = get_db()
+    rows = db.table("schedules").select("data").eq("id", 1).execute().data
+    if rows:
+        return rows[0]["data"]
+    return {"enabled": False, "time": "08:00", "days": ["mon", "tue", "wed", "thu", "fri"]}
+
+
+def save_schedule(schedule: dict) -> None:
+    db = get_db()
+    db.table("schedules").update({"data": schedule}).eq("id", 1).execute()
+
+
 def get_guru_managers() -> dict:
-    data = _read_json("guru_managers.json")
-    return data if data is not None else {"last_updated": None, "managers": []}
+    db = get_db()
+    rows = db.table("guru_managers").select("data").eq("id", 1).execute().data
+    if rows:
+        return rows[0]["data"]
+    return {"last_updated": None, "managers": []}
 
 
 def save_guru_managers(data: dict) -> None:
-    _write_json("guru_managers.json", data)
+    db = get_db()
+    db.table("guru_managers").update({"data": data}).eq("id", 1).execute()
 
 
 def get_guru_schedule() -> dict:
-    data = _read_json("guru_schedule.json")
-    return data if data is not None else {"enabled": False, "day": "sun", "time": "03:00"}
+    db = get_db()
+    rows = db.table("guru_schedules").select("data").eq("id", 1).execute().data
+    if rows:
+        return rows[0]["data"]
+    return {"enabled": False, "day": "sun", "time": "03:00"}
 
 
 def save_guru_schedule(schedule: dict) -> None:
-    _write_json("guru_schedule.json", schedule)
+    db = get_db()
+    db.table("guru_schedules").update({"data": schedule}).eq("id", 1).execute()
