@@ -73,3 +73,15 @@ def invalidate_list() -> None:
 
 def get_list(loader) -> dict:
     return _list_cache.get(loader)
+
+
+_sector_cache = TTLCache(300.0)
+_macro_cache = TTLCache(300.0)
+
+
+def get_sector(loader) -> dict:
+    return _sector_cache.get(loader)
+
+
+def get_macro(loader) -> dict:
+    return _macro_cache.get(loader)
