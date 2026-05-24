@@ -49,7 +49,9 @@ function MonthGrid({ year, month, events }) {
               <div style={{ fontSize: 11, marginBottom: 4, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent, #4fc3f7)' : 'var(--text-muted)' }}>{day}</div>
             )}
             {dayEvents.map((e, j) => {
-              const styleKey = `${e.stock_type}_${e.type}`
+              const styleKey = e.type === 'holiday_us' || e.type === 'holiday_kr'
+                ? e.type
+                : `${e.stock_type}_${e.type}`
               const s = EVENT_STYLE[styleKey] || EVENT_STYLE.holding_earnings
               return (
                 <div
