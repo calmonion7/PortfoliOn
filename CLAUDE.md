@@ -136,3 +136,6 @@ cd backend && .venv/bin/python -m pytest
 - `backend/routers/analytics.py` + `GET /api/analytics/correlation` — 보유 종목 간 90일 수익률 상관관계 계산. correlation 캐시에 저장, 종목 변경 시 자동 무효화.
 - `backend/routers/digest.py` + `backend/services/digest_service.py` — 일일 다이제스트 생성/조회. 매일 08:00 KST 자동 생성 (`scheduler.py`).
 - `backend/routers/market_indicators.py` + `backend/services/market_indicators_service.py` — 시장 지표: FX (yfinance), VIX, 원자재 (금/WTI/구리), 경제지표 (FRED API). `FRED_API_KEY` 환경변수 필요.
+- `KITA_API_KEY` 환경변수는 실제로 **관세청(Korea Customs Service)** API 키임 (`apis.data.go.kr/1220000/Itemtrade`). 원래 KITA API 도메인(`api.kita.net`)은 존재하지 않음. `market_indicators_service.py`의 `_fetch_customs_exports()`에서 한국 수출 데이터 수집에 사용. 키 미설정 시 UN Comtrade 공개 API로 자동 폴백.
+- `market_indicators_service.py` 추가 데이터 섹션 3종: `get_m7_earnings()` (Magnificent 7 분기 순이익, `backend/data/sp500_tickers.json` 사용), `get_kr_top2_earnings()` (KOSPI Top2 실적 — 삼성+하이닉스 vs KOSPI 나머지, `backend/data/kospi_tickers.json` 사용), `get_kr_exports()` (한국 수출 — 반도체 vs 비반도체, `backend/data/kr_exports.json` 파일 캐시 사용).
+- `frontend/src/pages/Market.jsx` 의 3개 수익/수출 차트(`M7EarningsSection`, `KrTop2Section`, `KrExportsSection`)는 모두 dual Y-axis 구조: 좌측(`yAxisId="left"`) — 억/조 원 또는 십억달러, 우측(`yAxisId="right"`) — 비중 %. `krFmt` 헬퍼는 억/조 단위 포매팅 (임계값: 10,000억 = 1조).

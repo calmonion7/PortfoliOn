@@ -106,6 +106,9 @@ FX, VIX, 원자재, 경제지표를 한 화면에서 확인합니다.
 | VIX | 공포지수, 공포/탐욕 색상 코딩 |
 | 원자재 | 금, WTI 원유, 구리 가격 |
 | 경제지표 | CPI, 실업률 (FRED API, `FRED_API_KEY` 필요) |
+| M7 실적 | AAPL·MSFT·GOOGL·AMZN·NVDA·META·TSLA 분기 순이익 vs 나머지 S&P 500, 비중(%) 꺾은선 |
+| 한국 KOSPI Top2 실적 | 삼성전자+SK하이닉스 분기 순이익 vs KOSPI 나머지 전체, 비중(%) 꺾은선 |
+| 한국 수출 | 반도체(HS 8542) vs 비반도체 월별 수출액, 반도체 비중(%) 꺾은선 (관세청 API, `KITA_API_KEY` 미설정 시 UN Comtrade 폴백) |
 
 ### 일일 다이제스트
 
