@@ -516,7 +516,7 @@ function KrTop2Section() {
   return (
     <div style={SECTION_STYLE}>
       <h3 style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</h3>
-      <p style={DESC_STYLE}>삼성전자·SK하이닉스 두 반도체 대장주의 분기 순이익과 KOSPI 200 나머지 종목 전체를 비교합니다. 비중이 높을수록 한국 증시가 반도체 업황에 구조적으로 집중되어 있음을 나타냅니다.</p>
+      <p style={DESC_STYLE}>삼성전자·SK하이닉스 두 반도체 대장주의 분기 순이익과 KOSPI 전체 나머지 종목을 비교합니다. 비중이 높을수록 한국 증시가 반도체 업황에 구조적으로 집중되어 있음을 나타냅니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
           { label: '삼성+하이닉스', value: latest?.top2, qoq: chg2(latest?.top2, prev?.top2), yoy: chg2(latest?.top2, yoy2?.top2), color: '#4fc3f7' },
@@ -549,12 +549,12 @@ function KrTop2Section() {
               {top2Share > top2SharePrev ? '▲' : '▼'} {Math.abs(top2Share - top2SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-muted)' }}>YoY</span>
             </div>
           )}
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>삼성+하이닉스 / 전체 KOSPI 200</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>삼성+하이닉스 / KOSPI 전체</div>
         </div>
       </div>
       <div style={CARD_STYLE}>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-          분기별 순이익 추이 — 삼성전자(005930) + SK하이닉스(000660) vs KOSPI 200 나머지
+          분기별 순이익 추이 — 삼성전자(005930) + SK하이닉스(000660) vs KOSPI 나머지 전체
         </div>
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={qs} margin={{ top: 16, right: 40, left: 0, bottom: 0 }}>
