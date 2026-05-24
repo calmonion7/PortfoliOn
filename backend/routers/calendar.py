@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api", tags=["calendar"])
 
 _CACHE_DIR = Path(__file__).parent.parent / "data" / "calendar"
 _CACHE_DIR.mkdir(exist_ok=True)
+_CACHE_VERSION = 2
 
 
 def _cache_path(month: str) -> Path:
@@ -40,7 +41,10 @@ def delete_calendar_cache(month: str = Query(..., pattern=r"^\d{4}-\d{2}$")):
 def _get_events(month: str) -> list[dict]:
     path = _cache_path(month)
     if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
+        cached = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(cached, dict) and cached.get("v") == _CACHE_VERSION:
+            return cached["events"]
+        path.unlink(missing_ok=True)  # stale format → regenerate
 
     year, mon = map(int, month.split("-"))
     month_start = date(year, mon, 1)
@@ -69,7 +73,7 @@ def _get_events(month: str) -> list[dict]:
             events.extend(future.result())
 
     events.extend(_get_holidays(month_start, month_end))
-    path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(json.dumps({"v": _CACHE_VERSION, "events": events}, ensure_ascii=False, indent=2), encoding="utf-8")
     return events
 
 

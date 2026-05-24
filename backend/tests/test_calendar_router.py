@@ -100,6 +100,28 @@ def test_calendar_tsla_watchlist_stock_type(tmp_path):
     assert events[0]["stock_type"] == "watchlist"
 
 
+def test_stale_cache_is_regenerated(tmp_path):
+    # Old-format cache (plain array, no version) → must be discarded and regenerated
+    stale = tmp_path / "2026-05.json"
+    stale.write_text("[]", encoding="utf-8")
+
+    mock_cal = MagicMock()
+    mock_cal.sessions_in_range.return_value = pd.DatetimeIndex([])
+    with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
+         patch("routers.calendar._CACHE_DIR", tmp_path), \
+         patch("routers.calendar.xcals.get_calendar", return_value=mock_cal):
+        resp = client.get("/api/calendar?month=2026-05")
+
+    assert resp.status_code == 200
+    # Should have holiday events (not the empty stale result)
+    events = resp.json()["events"]
+    assert any(e["type"] in ("holiday_us", "holiday_kr") for e in events)
+    # New cache must use versioned format
+    import json as _json
+    new_cache = _json.loads(stale.read_text())
+    assert new_cache.get("v") == 2
+
+
 def test_calendar_includes_nyse_holiday(tmp_path):
     import exchange_calendars as xcals
     import pandas as pd
