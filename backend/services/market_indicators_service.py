@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import re
 import json
 import time
 import pandas as pd
@@ -174,38 +175,32 @@ def get_m7_earnings() -> dict:
 # ── KR Top2 Earnings ──────────────────────────────────────────────────────────
 
 KR_TOP2 = ["005930", "000660"]
-_KOSPI200_CACHE = os.path.join(_DATA_DIR, "kospi200_tickers.json")
+_KOSPI_CACHE = os.path.join(_DATA_DIR, "kospi_tickers.json")
 
 
-def _get_kospi200_tickers() -> list[str]:
-    if os.path.exists(_KOSPI200_CACHE):
-        if time.time() - os.path.getmtime(_KOSPI200_CACHE) < 86400 * 7:
-            with open(_KOSPI200_CACHE) as f:
+def _get_kospi_tickers() -> list[str]:
+    if os.path.exists(_KOSPI_CACHE):
+        if time.time() - os.path.getmtime(_KOSPI_CACHE) < 86400 * 7:
+            with open(_KOSPI_CACHE) as f:
                 return json.load(f)
 
-    from datetime import date
-    today = date.today().strftime("%Y%m%d")
-    url = "http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
-    headers = {
-        "Referer": "http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd",
-        "User-Agent": "Mozilla/5.0",
-    }
-    payload = {
-        "bld": "dbms/MDC/STAT/standard/MDCSTAT00601",
-        "mktId": "STK",
-        "indTpCd": "2",
-        "indTpCd2": "103",
-        "strtDd": today,
-        "endDd": today,
-        "share": "1",
-        "money": "1",
-        "csvxls_isNo": "false",
-    }
-    r = requests.post(url, data=payload, headers=headers, timeout=15)
-    tickers = [item["ISU_SRT_CD"] for item in r.json().get("output", []) if "ISU_SRT_CD" in item]
+    tickers: list[str] = []
+    for page in range(1, 50):
+        r = requests.get(
+            "https://finance.naver.com/sise/sise_market_sum.naver",
+            params={"sosok": "0", "page": page},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10,
+        )
+        codes = list(dict.fromkeys(
+            re.findall(r"code=([0-9]{6})", r.content.decode("euc-kr", errors="ignore"))
+        ))
+        if not codes:
+            break
+        tickers.extend(c for c in codes if c not in tickers)
 
     os.makedirs(_DATA_DIR, exist_ok=True)
-    with open(_KOSPI200_CACHE, "w") as f:
+    with open(_KOSPI_CACHE, "w") as f:
         json.dump(tickers, f)
     return tickers
 
@@ -244,10 +239,10 @@ def get_kr_top2_earnings() -> dict:
     if cached:
         return cached
 
-    kospi200 = _get_kospi200_tickers()
-    rest = [t for t in kospi200 if t not in KR_TOP2]
+    kospi = _get_kospi_tickers()
+    rest = [t for t in kospi if t not in KR_TOP2]
 
-    with ThreadPoolExecutor(max_workers=20) as ex:
+    with ThreadPoolExecutor(max_workers=50) as ex:
         top2_data = list(ex.map(_get_naver_quarterly_net_income, KR_TOP2))
         rest_data = list(ex.map(_get_naver_quarterly_net_income, rest))
 
@@ -432,6 +427,21 @@ def get_econ_indicators() -> dict:
 # ── Korean Export Data ────────────────────────────────────────────────────────
 
 _EXPORTS_CACHE = os.path.join(_DATA_DIR, "kr_exports.json")
+_COMTRADE_URL = "https://comtradeapi.un.org/public/v1/preview/C/M/HS"
+
+
+def _last_n_month_codes(n: int) -> list[str]:
+    from datetime import date
+    today = date.today()
+    y, m = today.year, today.month
+    codes = []
+    for _ in range(n):
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+        codes.append(f"{y}{m:02d}")
+    return codes
 
 
 def _months_ago(n: int) -> str:
@@ -443,53 +453,109 @@ def _months_ago(n: int) -> str:
     return f"{year}{month:02d}"
 
 
-def get_kr_exports() -> dict:
-    # 파일 캐시 (30일)
-    if os.path.exists(_EXPORTS_CACHE):
-        if time.time() - os.path.getmtime(_EXPORTS_CACHE) < 86400 * 30:
-            with open(_EXPORTS_CACHE) as f:
-                return json.load(f)
+def _fetch_customs_exports(api_key: str) -> dict:
+    from xml.etree import ElementTree as ET
+    from concurrent.futures import ThreadPoolExecutor
+    from collections import defaultdict
 
-    api_key = os.environ.get("KITA_API_KEY")
-    if not api_key:
-        # 만료된 캐시라도 있으면 반환
-        if os.path.exists(_EXPORTS_CACHE):
-            with open(_EXPORTS_CACHE) as f:
-                return json.load(f)
-        return {"months": [], "error": "KITA_API_KEY 환경변수가 필요합니다. https://www.kita.net 에서 발급 후 설정하세요."}
+    base = "https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList"
+    start = _last_n_month_codes(12)[-1]
+    end = _last_n_month_codes(1)[0]
 
-    # KITA Open API 조회
-    url = "https://api.kita.net/openApi/service/ItemTradeService/getItemExpImpList"
-    params = {
-        "serviceKey": api_key,
-        "startDate": _months_ago(12),
-        "endDate": _months_ago(0),
-        "type": "json",
-    }
-    r = requests.get(url, params=params, timeout=15)
-    items = r.json().get("items", {}).get("item", [])
+    # HS 8542 (반도체) 전체 기간 한 번에 조회
+    r_semi = requests.get(base, params={
+        "serviceKey": api_key, "strtYymm": start, "endYymm": end,
+        "numOfRows": 1000, "pageNo": 1, "hsSgn": "8542",
+    }, timeout=15)
+    r_semi.raise_for_status()
+    semi_by_month: dict[str, int] = defaultdict(int)
+    for item in ET.fromstring(r_semi.text).findall(".//item"):
+        yr = item.findtext("year", "")
+        if yr and yr != "총계":
+            ym = yr.replace(".", "")
+            semi_by_month[ym] += int(item.findtext("expDlr", "0") or 0)
 
-    months_semi: dict[str, float] = {}
-    months_rest: dict[str, float] = {}
-    for item in items:
-        ym = item.get("period", "")
-        amt = float(str(item.get("expAmt", "0")).replace(",", ""))
-        if "반도체" in item.get("itmNm", ""):
-            months_semi[ym] = months_semi.get(ym, 0) + amt
-        else:
-            months_rest[ym] = months_rest.get(ym, 0) + amt
+    # 월별 전체 수출 합계 (병렬)
+    months = _last_n_month_codes(12)
 
-    all_months = sorted(set(months_semi) | set(months_rest))
-    data = {
+    def _fetch_month_total(ym: str) -> tuple[str, int]:
+        r = requests.get(base, params={
+            "serviceKey": api_key, "strtYymm": ym, "endYymm": ym,
+            "numOfRows": 9999, "pageNo": 1,
+        }, timeout=30)
+        total = sum(
+            int(i.findtext("expDlr", "0") or 0)
+            for i in ET.fromstring(r.text).findall(".//item")
+            if i.findtext("year", "") != "총계"
+        )
+        return ym, total
+
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        total_by_month = dict(ex.map(_fetch_month_total, months))
+
+    all_months = sorted(m for m in months if total_by_month.get(m, 0) > 0)
+    return {
         "months": [
             {
                 "month": m,
-                "semiconductor": round(months_semi.get(m, 0) / 1e8, 1),
-                "non_semiconductor": round(months_rest.get(m, 0) / 1e8, 1),
+                "semiconductor": round(semi_by_month.get(m, 0) / 1e8, 1),
+                "non_semiconductor": round((total_by_month.get(m, 0) - semi_by_month.get(m, 0)) / 1e8, 1),
             }
             for m in all_months
         ]
     }
+
+
+def _fetch_comtrade_exports() -> dict:
+    periods = ",".join(_last_n_month_codes(12))
+    r_total = requests.get(
+        _COMTRADE_URL,
+        params={"reporterCode": "410", "period": periods, "partnerCode": "0",
+                "cmdCode": "TOTAL", "flowCode": "X"},
+        timeout=15,
+    )
+    r_semi = requests.get(
+        _COMTRADE_URL,
+        params={"reporterCode": "410", "period": periods, "partnerCode": "0",
+                "cmdCode": "8542", "flowCode": "X"},
+        timeout=15,
+    )
+    total_by_month = {
+        row["period"]: row.get("fobvalue", 0) or 0
+        for row in r_total.json().get("data", [])
+    }
+    semi_by_month = {
+        row["period"]: row.get("fobvalue", 0) or 0
+        for row in r_semi.json().get("data", [])
+    }
+    all_months = sorted(m for m in total_by_month if m in semi_by_month)
+    return {
+        "months": [
+            {
+                "month": m,
+                "semiconductor": round(semi_by_month[m] / 1e8, 1),
+                "non_semiconductor": round((total_by_month[m] - semi_by_month[m]) / 1e8, 1),
+            }
+            for m in all_months
+        ]
+    }
+
+
+def get_kr_exports() -> dict:
+    if os.path.exists(_EXPORTS_CACHE):
+        if time.time() - os.path.getmtime(_EXPORTS_CACHE) < 86400 * 3:
+            with open(_EXPORTS_CACHE) as f:
+                return json.load(f)
+
+    api_key = os.environ.get("KITA_API_KEY")
+    try:
+        data = _fetch_customs_exports(api_key) if api_key else _fetch_comtrade_exports()
+    except Exception:
+        try:
+            data = _fetch_comtrade_exports()
+        except Exception as e:
+            return {"months": [], "error": str(e)}
+
     os.makedirs(_DATA_DIR, exist_ok=True)
     with open(_EXPORTS_CACHE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
