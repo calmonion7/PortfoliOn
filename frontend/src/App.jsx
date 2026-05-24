@@ -6,6 +6,8 @@ import MarketHub from './pages/MarketHub'
 import AnalysisHub from './pages/AnalysisHub'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
+import { supabase } from './supabase'
+import LoginPage from './pages/LoginPage'
 import './App.css'
 
 const THEMES = [
@@ -17,11 +19,27 @@ const THEMES = [
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') ?? 'dark')
+  const [session, setSession] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setAuthLoading(false)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setSession(session)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (authLoading) return null
+  if (!session) return <LoginPage />
 
   return (
     <BrowserRouter>
@@ -49,6 +67,12 @@ export default function App() {
           </NavLink>
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{ cursor: 'pointer', color: 'var(--text-muted)', background: 'none', border: 'none', fontSize: 13, marginRight: 8 }}
+          >
+            로그아웃
+          </button>
           {THEMES.map(t => (
             <button
               key={t.key}
