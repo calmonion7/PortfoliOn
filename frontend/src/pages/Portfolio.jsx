@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import api from '../api'
 import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 import { TAB_STYLE, fmtPrice } from '../utils'
@@ -128,8 +128,8 @@ export default function Portfolio() {
 
   const fetchAll = useCallback(async () => {
     const [portfolioRes, watchlistRes] = await Promise.all([
-      axios.get('/api/portfolio'),
-      axios.get('/api/watchlist'),
+      api.get('/api/portfolio'),
+      api.get('/api/watchlist'),
     ])
     setStocks(portfolioRes.data.stocks || [])
     setWatchlist(watchlistRes.data || [])
@@ -138,8 +138,8 @@ export default function Portfolio() {
   const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
     setDashboardLoading(true)
     try {
-      if (invalidate) await axios.delete('/api/stocks/dashboard/cache').catch(() => {})
-      const res = await axios.get('/api/stocks/dashboard')
+      if (invalidate) await api.delete('/api/stocks/dashboard/cache').catch(() => {})
+      const res = await api.get('/api/stocks/dashboard')
       setDashboardCards(res.data || [])
     } catch {
       // silent — keep empty array on error
@@ -154,15 +154,15 @@ export default function Portfolio() {
     try {
       if (activeTab === 'holdings') {
         if (editing) {
-          await axios.put(`/api/portfolio/${editing.ticker}`, stockData)
+          await api.put(`/api/portfolio/${editing.ticker}`, stockData)
         } else {
-          await axios.post('/api/portfolio', stockData)
+          await api.post('/api/portfolio', stockData)
         }
       } else {
         if (editing) {
-          await axios.put(`/api/watchlist/${editing.ticker}`, stockData)
+          await api.put(`/api/watchlist/${editing.ticker}`, stockData)
         } else {
-          await axios.post('/api/watchlist', stockData)
+          await api.post('/api/watchlist', stockData)
         }
       }
       setModalOpen(false)
@@ -181,9 +181,9 @@ export default function Portfolio() {
     if (!window.confirm(msg)) return
     try {
       if (activeTab === 'holdings') {
-        await axios.delete(`/api/portfolio/${ticker}`)
+        await api.delete(`/api/portfolio/${ticker}`)
       } else {
-        await axios.delete(`/api/watchlist/${ticker}`)
+        await api.delete(`/api/watchlist/${ticker}`)
       }
       setError('')
       fetchAll()
@@ -194,7 +194,7 @@ export default function Portfolio() {
 
   const handlePromote = async ({ quantity, avg_cost }) => {
     try {
-      await axios.post(`/api/watchlist/${promoteTarget}/promote`, { quantity, avg_cost })
+      await api.post(`/api/watchlist/${promoteTarget}/promote`, { quantity, avg_cost })
       setPromoteTarget(null)
       setActiveTab('holdings')
       fetchAll()

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 const thStyle = { padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12 }
@@ -42,7 +42,7 @@ export default function GuruStats() {
   const [query, setQuery]           = useState('')
 
   const loadStockMap = useCallback(() => {
-    axios.get('/api/stocks').then(({ data }) => {
+    api.get('/api/stocks').then(({ data }) => {
       const map = {}
       data.forEach(s => { map[s.ticker] = s.type })
       setStockMap(map)
@@ -51,9 +51,9 @@ export default function GuruStats() {
 
   useEffect(() => {
     Promise.all([
-      axios.get('/api/guru/stats/popularity'),
-      axios.get('/api/guru/stats/manager-top3'),
-      axios.get('/api/guru/stats/weighted'),
+      api.get('/api/guru/stats/popularity'),
+      api.get('/api/guru/stats/manager-top3'),
+      api.get('/api/guru/stats/weighted'),
     ]).then(([p, t, w]) => {
       setPopularity(p.data)
       setTop3(t.data)
@@ -65,9 +65,9 @@ export default function GuruStats() {
   const handleToggle = async (ticker, name, inWatchlist) => {
     try {
       if (inWatchlist) {
-        await axios.delete(`/api/watchlist/${ticker}`)
+        await api.delete(`/api/watchlist/${ticker}`)
       } else {
-        await axios.post('/api/watchlist', { ticker, name: name || ticker })
+        await api.post('/api/watchlist', { ticker, name: name || ticker })
       }
       loadStockMap()
     } catch (err) {

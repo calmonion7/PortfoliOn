@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import axios from 'axios'
+import api from '../api'
 import { TAB_STYLE, fmtPrice as fmt } from '../utils'
 import { TH, TD, fmtN, rsiColor, TargetTooltip, overallWeather } from '../components/reports/reportUtils.jsx'
 import ConsensusChart from '../components/reports/ConsensusChart'
@@ -30,7 +30,7 @@ export default function Reports() {
   const [guruMap, setGuruMap] = useState({})  // ticker -> count
 
   useEffect(() => {
-    axios.get('/api/guru/stats/popularity')
+    api.get('/api/guru/stats/popularity')
       .then(({ data }) => {
         const map = {}
         data.forEach(r => { if (r.count > 0) map[r.ticker] = r.count })
@@ -40,7 +40,7 @@ export default function Reports() {
   }, [])
 
 const fetchList = useCallback(() => {
-    axios.get('/api/report/list').then(({ data }) => setReportList(data))
+    api.get('/api/report/list').then(({ data }) => setReportList(data))
   }, [])
 
   useEffect(() => { fetchList() }, [])
@@ -48,7 +48,7 @@ const fetchList = useCallback(() => {
   useEffect(() => {
     if (!selected.ticker || !selected.date) return
     setLoading(true)
-    axios.get(`/api/report/${selected.ticker}/${selected.date}`)
+    api.get(`/api/report/${selected.ticker}/${selected.date}`)
       .then(({ data }) => setDetail({ summary: data.summary }))
       .finally(() => setLoading(false))
   }, [selected, detailRefreshKey])
@@ -64,10 +64,10 @@ const fetchList = useCallback(() => {
     setGenProgress({ done: 0, total: 0 })
     clearInterval(pollRef.current)
     try {
-      await axios.post(`/api/report/generate/${ticker}`)
+      await api.post(`/api/report/generate/${ticker}`)
       pollRef.current = setInterval(async () => {
         try {
-          const { data } = await axios.get('/api/report/progress')
+          const { data } = await api.get('/api/report/progress')
           setGenProgress({ done: data.done, total: data.total })
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)

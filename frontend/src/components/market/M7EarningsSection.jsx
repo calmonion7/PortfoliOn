@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox, isEstimated } from './marketUtils.jsx'
 
@@ -9,7 +9,7 @@ export default function M7EarningsSection() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/market/m7-earnings')
+    api.get('/api/market/m7-earnings')
       .then(r => setData(r.data))
       .catch(() => setError(true))
       .finally(() => setLoading(false))

@@ -1,6 +1,6 @@
 // frontend/src/pages/MacroTab.jsx
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../api'
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
   ReferenceLine, Tooltip, ResponsiveContainer, Label,
@@ -30,7 +30,7 @@ export default function MacroTab() {
   const [selected, setSelected] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/analysis/macro-correlation')
+    api.get('/api/analysis/macro-correlation')
       .then(r => {
         setData(r.data)
         setLoading(false)

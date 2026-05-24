@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import axios from 'axios'
+import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { fmtPrice as fmt } from '../../utils'
 import { _weather } from './reportUtils.jsx'
@@ -13,7 +13,7 @@ export default function ConsensusChart({ ticker, market }) {
 
   const fetchData = useCallback(() => {
     if (!ticker) return
-    axios.get(`/api/consensus/${ticker}`)
+    api.get(`/api/consensus/${ticker}`)
       .then(({ data }) => setData(data))
       .catch(() => setError('데이터 조회 실패'))
   }, [ticker])
@@ -24,7 +24,7 @@ export default function ConsensusChart({ ticker, market }) {
     setCollecting(true)
     setError(null)
     try {
-      await axios.post(`/api/consensus/${ticker}`)
+      await api.post(`/api/consensus/${ticker}`)
       fetchData()
     } catch (e) {
       setError(e.response?.data?.detail || '수집 실패')
@@ -37,7 +37,7 @@ export default function ConsensusChart({ ticker, market }) {
     setBackfilling(true)
     setError(null)
     try {
-      const { data: result } = await axios.post(`/api/consensus/${ticker}/backfill`)
+      const { data: result } = await api.post(`/api/consensus/${ticker}/backfill`)
       if (result.added > 0) fetchData()
     } catch (e) {
       setError(e.response?.data?.detail || '백필 실패')

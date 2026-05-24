@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox } from './marketUtils.jsx'
 
@@ -9,7 +9,7 @@ export default function CommoditiesSection() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/market/commodities')
+    api.get('/api/market/commodities')
       .then(r => setData(r.data))
       .catch(() => setError(true))
       .finally(() => setLoading(false))

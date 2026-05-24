@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 export default function Digest() {
   const [digest, setDigest] = useState(null)
@@ -13,7 +13,7 @@ export default function Digest() {
     setLoading(true)
     setError(null)
     try {
-      const r = await axios.get('/api/digest/latest')
+      const r = await api.get('/api/digest/latest')
       setDigest(r.data)
     } catch (e) {
       if (e.response?.status !== 404) setError('데이터를 불러오지 못했습니다.')
@@ -26,7 +26,7 @@ export default function Digest() {
     setRefreshing(true)
     setError(null)
     try {
-      const r = await axios.post('/api/digest/generate')
+      const r = await api.post('/api/digest/generate')
       setDigest(r.data)
     } catch {
       setError('생성에 실패했습니다.')

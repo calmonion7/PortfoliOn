@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 const DAYS = [
   { key: 'mon', label: '월' }, { key: 'tue', label: '화' },
@@ -18,20 +18,20 @@ export default function GuruCrawlSettings() {
   const pollRef = useRef(null)
 
   useEffect(() => {
-    axios.get('/api/guru/schedule').then(({ data }) => setSchedule(data))
-    axios.get('/api/guru/managers').then(({ data }) => setLastUpdated(data.last_updated))
+    api.get('/api/guru/schedule').then(({ data }) => setSchedule(data))
+    api.get('/api/guru/managers').then(({ data }) => setLastUpdated(data.last_updated))
   }, [])
 
   const startPolling = () => {
     pollRef.current = setInterval(async () => {
       try {
-        const { data } = await axios.get('/api/guru/crawl/progress')
+        const { data } = await api.get('/api/guru/crawl/progress')
         setProgress({ done: data.done, total: data.total, current: data.current })
         if (!data.running && data.total > 0 && data.done >= data.total) {
           clearInterval(pollRef.current)
           setCrawling(false)
           setCrawlMsg(`완료: ${data.done}명 매니저 데이터 수집됨`)
-          axios.get('/api/guru/managers').then(({ data }) => setLastUpdated(data.last_updated))
+          api.get('/api/guru/managers').then(({ data }) => setLastUpdated(data.last_updated))
         }
       } catch {}
     }, 2000)
@@ -42,7 +42,7 @@ export default function GuruCrawlSettings() {
     setCrawlMsg('')
     setProgress({ done: 0, total: 0, current: '' })
     try {
-      await axios.post('/api/guru/crawl')
+      await api.post('/api/guru/crawl')
       startPolling()
     } catch (err) {
       setCrawlMsg(err.response?.data?.detail || '크롤링 실패')
@@ -51,7 +51,7 @@ export default function GuruCrawlSettings() {
   }
 
   const handleSave = async () => {
-    await axios.put('/api/guru/schedule', schedule)
+    await api.put('/api/guru/schedule', schedule)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

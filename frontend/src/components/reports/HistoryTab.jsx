@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts'
 import { fmtPrice as fmt } from '../../utils'
 import { TH, TD } from './reportUtils.jsx'
@@ -18,7 +18,7 @@ export default function HistoryTab({ ticker, dates, market }) {
     if (!ticker) return
     setHistLoading(true)
     setHistError(null)
-    axios.get(`/api/report/${ticker}/history`)
+    api.get(`/api/report/${ticker}/history`)
       .then(({ data }) => {
         setHistory(data)
         if (data.length > 0) setCompareA(data[data.length - 1].date)
@@ -30,14 +30,14 @@ export default function HistoryTab({ ticker, dates, market }) {
 
   useEffect(() => {
     if (!ticker || !compareA) return
-    axios.get(`/api/report/${ticker}/${compareA}`)
+    api.get(`/api/report/${ticker}/${compareA}`)
       .then(({ data }) => setSnapshotA(data.summary))
       .catch(() => setSnapshotA(null))
   }, [ticker, compareA])
 
   useEffect(() => {
     if (!ticker || !compareB) return
-    axios.get(`/api/report/${ticker}/${compareB}`)
+    api.get(`/api/report/${ticker}/${compareB}`)
       .then(({ data }) => setSnapshotB(data.summary))
       .catch(() => setSnapshotB(null))
   }, [ticker, compareB])

@@ -1,6 +1,6 @@
 // frontend/src/pages/SectorTab.jsx
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 const PERIODS = ['return_1w', 'return_1mo', 'return_3mo']
 const PERIOD_LABELS = { return_1w: '1주', return_1mo: '1개월', return_3mo: '3개월' }
@@ -21,7 +21,7 @@ export default function SectorTab() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/analysis/sector')
+    api.get('/api/analysis/sector')
       .then(r => { setData(r.data); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])

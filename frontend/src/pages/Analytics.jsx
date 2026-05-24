@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../api'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, ReferenceLine, Label,
@@ -193,7 +193,7 @@ function CorrelationHeatmap() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/analytics/correlation')
+    api.get('/api/analytics/correlation')
       .then(r => { setData(r.data); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
@@ -243,7 +243,7 @@ export default function Analytics() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/stocks/dashboard')
+    api.get('/api/stocks/dashboard')
       .then(r => { setCards(r.data); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])

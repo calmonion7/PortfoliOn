@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 export default function ConsensusSettings() {
   const [batch, setBatch] = useState({ running: false, done: 0, total: 0, current: '' })
@@ -11,10 +11,10 @@ export default function ConsensusSettings() {
     setBatch({ running: true, done: 0, total: 0, current: '' })
     clearInterval(pollRef.current)
     try {
-      await axios.post('/api/consensus/batch')
+      await api.post('/api/consensus/batch')
       pollRef.current = setInterval(async () => {
         try {
-          const { data } = await axios.get('/api/consensus/batch/progress')
+          const { data } = await api.get('/api/consensus/batch/progress')
           setBatch({ running: data.running, done: data.done, total: data.total, current: data.current })
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)

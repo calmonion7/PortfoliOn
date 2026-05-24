@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 function formatValue(val) {
   if (!val) return '-'
@@ -28,7 +28,7 @@ export default function GuruManagers() {
   const [query, setQuery]       = useState('')
 
   const loadStockMap = useCallback(() => {
-    axios.get('/api/stocks').then(({ data }) => {
+    api.get('/api/stocks').then(({ data }) => {
       const map = {}
       data.forEach(s => { map[s.ticker] = s.type })
       setStockMap(map)
@@ -36,7 +36,7 @@ export default function GuruManagers() {
   }, [])
 
   useEffect(() => {
-    axios.get('/api/guru/managers')
+    api.get('/api/guru/managers')
       .then(({ data }) => setData(data))
       .finally(() => setLoading(false))
     loadStockMap()
@@ -47,9 +47,9 @@ export default function GuruManagers() {
     if (type === 'holding') return
     try {
       if (type === 'watchlist') {
-        await axios.delete(`/api/watchlist/${h.ticker}`)
+        await api.delete(`/api/watchlist/${h.ticker}`)
       } else {
-        await axios.post('/api/watchlist', { ticker: h.ticker, name: h.name_kr || h.name || h.ticker })
+        await api.post('/api/watchlist', { ticker: h.ticker, name: h.name_kr || h.name || h.ticker })
       }
       loadStockMap()
     } catch (err) {

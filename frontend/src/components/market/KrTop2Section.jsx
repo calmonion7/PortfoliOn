@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox, krFmt, isEstimated } from './marketUtils.jsx'
 
@@ -9,7 +9,7 @@ export default function KrTop2Section() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/market/kr-top2-earnings')
+    api.get('/api/market/kr-top2-earnings')
       .then(r => setData(r.data))
       .catch(() => setError(true))
       .finally(() => setLoading(false))

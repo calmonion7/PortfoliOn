@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 const DAYS = [
   { key: 'mon', label: '월' }, { key: 'tue', label: '화' },
@@ -22,13 +22,13 @@ export default function ReportSchedule() {
   const [backfillDays, setBackfillDays] = useState(60)
 
   useEffect(() => {
-    axios.get('/api/schedule').then(({ data }) => setSchedule(data))
+    api.get('/api/schedule').then(({ data }) => setSchedule(data))
   }, [])
 
   const startPolling = () => {
     pollRef.current = setInterval(async () => {
       try {
-        const { data } = await axios.get('/api/report/progress')
+        const { data } = await api.get('/api/report/progress')
         setProgress({ done: data.done, total: data.total, current: data.current })
         if (!data.running && data.total > 0 && data.done >= data.total) {
           clearInterval(pollRef.current)
@@ -47,7 +47,7 @@ export default function ReportSchedule() {
   }
 
   const handleSave = async () => {
-    await axios.put('/api/schedule', schedule)
+    await api.put('/api/schedule', schedule)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -57,7 +57,7 @@ export default function ReportSchedule() {
     setGenMsg('')
     setProgress({ done: 0, total: 0, current: '' })
     try {
-      await axios.post('/api/report/generate')
+      await api.post('/api/report/generate')
       startPolling()
     } catch (err) {
       setGenMsg(err.response?.data?.detail || '생성 실패')
@@ -73,10 +73,10 @@ export default function ReportSchedule() {
     setBackfillProgress({ done: 0, total: 0, current: '', created: 0 })
     clearInterval(backfillPollRef.current)
     try {
-      await axios.post(`/api/report/backfill?days=${backfillDays}`)
+      await api.post(`/api/report/backfill?days=${backfillDays}`)
       backfillPollRef.current = setInterval(async () => {
         try {
-          const { data } = await axios.get('/api/report/backfill/progress')
+          const { data } = await api.get('/api/report/backfill/progress')
           setBackfillProgress(data)
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(backfillPollRef.current)

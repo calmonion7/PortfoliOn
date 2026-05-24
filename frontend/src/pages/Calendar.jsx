@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -104,17 +104,17 @@ export default function Calendar() {
   useEffect(() => {
     setLoading(true)
     setError('')
-    axios.get(`/api/calendar?month=${monthStr}`)
+    api.get(`/api/calendar?month=${monthStr}`)
       .then(r => {
         setEvents(r.data.events)
-        adjacentMonths().forEach(m => axios.get(`/api/calendar?month=${m}`).catch(() => {}))
+        adjacentMonths().forEach(m => api.get(`/api/calendar?month=${m}`).catch(() => {}))
       })
       .catch(() => setError('이벤트 불러오기 실패'))
       .finally(() => setLoading(false))
   }, [year, month, fetchKey])
 
   const refresh = () => {
-    axios.delete(`/api/calendar/cache?month=${monthStr}`)
+    api.delete(`/api/calendar/cache?month=${monthStr}`)
       .finally(() => setFetchKey(k => k + 1))
   }
 

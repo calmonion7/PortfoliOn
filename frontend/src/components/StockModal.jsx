@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
 const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
@@ -30,7 +30,7 @@ function SearchBox({ onSelect }) {
     if (!debouncedQuery.trim()) { setResults([]); setOpen(false); return }
     setLoading(true)
     // 항상 ALL로 검색 — 결과 선택 시 market/exchange 자동 설정
-    axios.get('/api/stocks/search', { params: { q: debouncedQuery, market: 'ALL' } })
+    api.get('/api/stocks/search', { params: { q: debouncedQuery, market: 'ALL' } })
       .then(r => { setResults(r.data); setOpen(r.data.length > 0) })
       .catch(() => setResults([]))
       .finally(() => setLoading(false))
