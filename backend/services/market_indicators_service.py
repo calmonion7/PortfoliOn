@@ -145,12 +145,12 @@ def _quarter_ended(q: str) -> bool:
     return _date(year, end_month, last_day) <= _date.today()
 
 
-def _merge_quarters(results: list[dict[str, float]], n: int = 8) -> dict[str, float]:
+def _merge_quarters(results: list[dict[str, float]], n: int = 8, ended_only: bool = True) -> dict[str, float]:
     from collections import defaultdict
     total: dict[str, float] = defaultdict(float)
     for r in results:
         for q, v in r.items():
-            if _quarter_ended(q):
+            if not ended_only or _quarter_ended(q):
                 total[q] += v
     quarters = sorted(total.keys())[-n:]
     return {q: round(total[q], 2) for q in quarters}
@@ -257,14 +257,22 @@ def get_kr_top2_earnings() -> dict:
         top2_data = list(ex.map(_get_naver_quarterly_net_income, KR_TOP2))
         rest_data = list(ex.map(_get_naver_quarterly_net_income, rest))
 
-    top2_by_q = _merge_quarters(top2_data)
-    rest_by_q = _merge_quarters(rest_data)
-    quarters = sorted(set(top2_by_q) | set(rest_by_q))[-8:]
+    top2_by_q = _merge_quarters(top2_data, ended_only=False)  # includes Naver consensus
+    rest_by_q = _merge_quarters(rest_data, ended_only=True)   # actual only
+
+    ended_qs = sorted(q for q in (set(top2_by_q) | set(rest_by_q)) if _quarter_ended(q))[-8:]
+    est_qs = sorted(q for q in top2_by_q if not _quarter_ended(q))
+    all_qs = ended_qs + est_qs
 
     data = {
         "quarters": [
-            {"q": q, "top2": top2_by_q.get(q, 0), "rest": rest_by_q.get(q, 0)}
-            for q in quarters
+            {
+                "q": q,
+                "top2": top2_by_q.get(q, 0),
+                "rest": rest_by_q.get(q, 0) if _quarter_ended(q) else None,
+                "estimated": not _quarter_ended(q),
+            }
+            for q in all_qs
         ],
         "unit": "억원",
     }
