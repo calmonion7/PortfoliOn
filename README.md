@@ -294,14 +294,18 @@ FastAPI (:8000)
 PortfoliOn/
 ├── start.bat / start.sh  # 서버 실행
 ├── stop.bat  / stop.sh   # 서버 종료
+├── docs/                 # ARCHITECTURE, CONFIGURATION, DEVELOPMENT,
+│                         # GETTING-STARTED, TESTING, API.md
 ├── backend/
 │   ├── main.py
+│   ├── scheduler.py      # APScheduler 설정
 │   ├── routers/          # portfolio, watchlist, stocks, report, guru,
 │   │                     # calendar, digest, market_indicators, analytics
 │   ├── services/         # storage, market, charts, indicators,
 │   │                     # report_generator, scraper, guru_scraper, guru_stats,
 │   │                     # digest_service, market_indicators_service, cache, utils
-│   ├── data/             # JSON 파일 저장소 (stocks.json, schedule.json, consensus/)
+│   ├── data/             # stocks.json, schedule.json, consensus/,
+│   │                     # sp500_tickers.json, kospi_tickers.json, kr_exports.json
 │   └── snapshots/        # 생성된 JSON 스냅샷 (per-ticker/date)
 └── frontend/
     └── src/
