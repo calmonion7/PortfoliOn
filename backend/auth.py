@@ -17,7 +17,7 @@ def get_current_user(
             audience="authenticated",
         )
         return payload["sub"]
-    except jwt.PyJWTError:
+    except (jwt.PyJWTError, KeyError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
