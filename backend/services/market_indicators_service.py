@@ -135,12 +135,23 @@ def _get_yf_quarterly_net_income(ticker: str) -> dict[str, float]:
         return {}
 
 
+def _quarter_ended(q: str) -> bool:
+    """Return True if the calendar quarter end date has passed."""
+    import calendar as _cal
+    from datetime import date as _date
+    year, qn = int(q[:4]), int(q[5])
+    end_month = qn * 3
+    last_day = _cal.monthrange(year, end_month)[1]
+    return _date(year, end_month, last_day) <= _date.today()
+
+
 def _merge_quarters(results: list[dict[str, float]], n: int = 8) -> dict[str, float]:
     from collections import defaultdict
     total: dict[str, float] = defaultdict(float)
     for r in results:
         for q, v in r.items():
-            total[q] += v
+            if _quarter_ended(q):
+                total[q] += v
     quarters = sorted(total.keys())[-n:]
     return {q: round(total[q], 2) for q in quarters}
 
