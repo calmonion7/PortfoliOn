@@ -42,13 +42,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Stock Portfolio Manager", lifespan=lifespan)
 
+_frontend_url = os.getenv("FRONTEND_URL", "")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        os.getenv("FRONTEND_URL", ""),
-    ],
+    allow_origins=[o for o in ["http://localhost:3000", "http://localhost:5173", _frontend_url] if o],
     allow_methods=["*"],
     allow_headers=["*"],
 )

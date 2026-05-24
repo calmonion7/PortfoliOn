@@ -129,7 +129,7 @@ def generate(user_id: str, today: date = None) -> dict:
         }, on_conflict="user_id,date").execute()
     except Exception as e:
         print(f"[Digest] DB save failed, falling back to file: {e}")
-        path = DIGEST_DIR / f"{today.isoformat()}.json"
+        path = DIGEST_DIR / f"{user_id}-{today.isoformat()}.json"
         path.write_text(json.dumps(digest, ensure_ascii=False, indent=2), encoding="utf-8")
     return digest
 
@@ -151,7 +151,7 @@ def get_latest(user_id: str) -> dict | None:
     except Exception as e:
         print(f"[Digest] DB read failed, falling back to file: {e}")
     # Filesystem fallback
-    files = sorted(DIGEST_DIR.glob("*.json"), reverse=True)
+    files = sorted(DIGEST_DIR.glob(f"{user_id}-*.json"), reverse=True)
     if not files:
         return None
     return json.loads(files[0].read_text(encoding="utf-8"))

@@ -31,7 +31,7 @@ def test_sector_returns_11_etfs():
     portfolio = {"stocks": [], "watchlist": []}
     with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda loader: loader()):
+         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analysis/sector")
     assert resp.status_code == 200
     data = resp.json()
@@ -45,7 +45,7 @@ def test_sector_includes_return_fields():
     portfolio = {"stocks": [], "watchlist": []}
     with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda loader: loader()):
+         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analysis/sector")
     s = resp.json()["sectors"][0]
     assert "return_1w" in s
@@ -63,7 +63,7 @@ def test_sector_portfolio_overlay():
     }
     with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda loader: loader()):
+         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analysis/sector")
     assert resp.json()["portfolio_sectors"]["AAPL"] == "Technology"
 
@@ -80,7 +80,7 @@ def test_macro_returns_four_correlations():
         return _make_hist(abs(hash(sym)) % 97)
     with patch("services.analysis_service.yf.Ticker", side_effect=mock_ticker), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analysis.cache_svc.get_macro", side_effect=lambda loader: loader()):
+         patch("routers.analysis.cache_svc.get_macro", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analysis/macro-correlation")
     assert resp.status_code == 200
     data = resp.json()
@@ -93,7 +93,7 @@ def test_macro_returns_four_correlations():
 def test_macro_empty_for_no_holdings():
     portfolio = {"stocks": [], "watchlist": []}
     with patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analysis.cache_svc.get_macro", side_effect=lambda loader: loader()):
+         patch("routers.analysis.cache_svc.get_macro", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analysis/macro-correlation")
     assert resp.status_code == 200
     assert resp.json() == {"correlations": [], "scatter": []}
@@ -108,7 +108,7 @@ def test_macro_scatter_contains_indicator_field():
         return _make_hist(abs(hash(sym)) % 97)
     with patch("services.analysis_service.yf.Ticker", side_effect=mock_ticker), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analysis.cache_svc.get_macro", side_effect=lambda loader: loader()):
+         patch("routers.analysis.cache_svc.get_macro", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analysis/macro-correlation")
     scatter = resp.json()["scatter"]
     if scatter:

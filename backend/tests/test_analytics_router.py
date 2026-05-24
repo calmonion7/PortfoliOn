@@ -39,7 +39,7 @@ def test_correlation_returns_matrix_for_two_holdings():
 
     with patch("routers.analytics.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.analytics.yf.Ticker", side_effect=mock_ticker), \
-         patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda loader: loader()):
+         patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analytics/correlation")
 
     assert resp.status_code == 200
@@ -57,7 +57,7 @@ def test_correlation_returns_empty_for_single_holding():
         "watchlist": [],
     }
     with patch("routers.analytics.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda loader: loader()):
+         patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analytics/correlation")
     assert resp.status_code == 200
     assert resp.json() == {"tickers": [], "matrix": []}
@@ -66,7 +66,7 @@ def test_correlation_returns_empty_for_single_holding():
 def test_correlation_returns_empty_for_no_holdings():
     portfolio = {"stocks": [], "watchlist": []}
     with patch("routers.analytics.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda loader: loader()):
+         patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analytics/correlation")
     assert resp.status_code == 200
     assert resp.json() == {"tickers": [], "matrix": []}
@@ -93,7 +93,7 @@ def test_correlation_excludes_ticker_with_insufficient_data():
 
     with patch("routers.analytics.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.analytics.yf.Ticker", side_effect=mock_ticker), \
-         patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda loader: loader()):
+         patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analytics/correlation")
 
     assert resp.status_code == 200

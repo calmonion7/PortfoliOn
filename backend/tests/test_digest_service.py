@@ -90,7 +90,7 @@ def test_generate_saves_snapshot(tmp_path):
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.digest_service.get_db", side_effect=Exception("no db")):
         ds.generate("test-user-id", today=date(2026, 5, 23))
-    assert (tmp_path / "2026-05-23.json").exists()
+    assert (tmp_path / "test-user-id-2026-05-23.json").exists()
 
 
 def test_get_latest_returns_none_when_empty(tmp_path):
@@ -102,8 +102,8 @@ def test_get_latest_returns_none_when_empty(tmp_path):
 
 def test_get_latest_returns_most_recent(tmp_path):
     import services.digest_service as ds
-    (tmp_path / "2026-05-22.json").write_text(json.dumps({"date": "2026-05-22"}), encoding="utf-8")
-    (tmp_path / "2026-05-23.json").write_text(json.dumps({"date": "2026-05-23"}), encoding="utf-8")
+    (tmp_path / "test-user-id-2026-05-22.json").write_text(json.dumps({"date": "2026-05-22"}), encoding="utf-8")
+    (tmp_path / "test-user-id-2026-05-23.json").write_text(json.dumps({"date": "2026-05-23"}), encoding="utf-8")
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.get_db", side_effect=Exception("no db")):
         result = ds.get_latest("test-user-id")

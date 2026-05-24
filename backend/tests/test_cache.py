@@ -84,7 +84,7 @@ def test_get_list_refreshes_after_ttl(monkeypatch):
         return {"data": "list"}
     c.get_list(loader)
     # ts를 0으로 만들어 TTL 만료 시뮬레이션
-    c._list_cache._ts = 0.0
+    c._list_cache._store["__global__"] = (c._list_cache._store["__global__"][0], 0.0)
     c.get_list(loader)
     assert len(calls) == 2
 
@@ -129,8 +129,8 @@ def test_get_correlation_caches_result():
     def loader():
         calls.append(1)
         return {"tickers": ["AAPL"], "matrix": [[1.0]]}
-    c.get_correlation(loader)
-    c.get_correlation(loader)
+    c.get_correlation("test-user", loader)
+    c.get_correlation("test-user", loader)
     assert len(calls) == 1
 
 
@@ -138,9 +138,9 @@ def test_invalidate_correlation_clears_cache():
     import services.cache as c
     _clear()
     calls = []
-    c.get_correlation(lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
+    c.get_correlation("test-user", lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
     c.invalidate_correlation()
-    c.get_correlation(lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
+    c.get_correlation("test-user", lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
     assert len(calls) == 2
 
 
@@ -148,7 +148,7 @@ def test_invalidate_also_clears_correlation():
     import services.cache as c
     _clear()
     calls = []
-    c.get_correlation(lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
+    c.get_correlation("test-user", lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
     c.invalidate("AAPL")
-    c.get_correlation(lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
+    c.get_correlation("test-user", lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
     assert len(calls) == 2

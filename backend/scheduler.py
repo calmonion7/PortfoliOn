@@ -66,7 +66,7 @@ def _run_digest():
     from services.db import get_db
     try:
         db = get_db()
-        user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").execute().data})
+        user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").eq("type", "holding").execute().data})
     except Exception as e:
         print(f"[Scheduler] Digest: failed to fetch user list: {e}")
         return
