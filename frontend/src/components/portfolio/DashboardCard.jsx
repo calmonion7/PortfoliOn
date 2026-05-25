@@ -1,7 +1,6 @@
 import Card from '../ui/Card'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
 import { fmtPrice } from '../../utils'
-import './DashboardCard.css'
 
 const _weather = (score) => {
   if (score <= 0) return { icon: '☀️', label: '맑음' }
@@ -39,7 +38,7 @@ export default function DashboardCard({ item }) {
   const consPct = item.current_price && item.target_mean
     ? (item.target_mean - item.current_price) / item.current_price * 100
     : null
-  const consClass = consPct == null ? '' : consPct >= 0 ? 'dashcard__cons--positive' : 'dashcard__cons--negative'
+  const consClass = consPct == null ? '' : consPct >= 0 ? 'up' : 'down'
 
   return (
     <Card>
@@ -50,7 +49,7 @@ export default function DashboardCard({ item }) {
       </div>
       <div className="dashcard__name">{item.name}</div>
       <div className="dashcard__price-row">
-        <span className="dashcard__price tabular">
+        <span className="dashcard__price tnum">
           {item.current_price == null ? '—' : fmtPrice(item.current_price, item.market)}
         </span>
         <ChangeBadge value={item.daily_change_pct} />
@@ -68,13 +67,13 @@ export default function DashboardCard({ item }) {
         </div>
         <div className="dashcard__stat">
           <span className="dashcard__stat-label">RSI</span>
-          <span className="dashcard__stat-value tabular">
+          <span className="dashcard__stat-value tnum">
             {item.rsi != null ? item.rsi.toFixed(1) : '—'}
           </span>
         </div>
         <div className="dashcard__stat dashcard__stat--full">
           <span className="dashcard__stat-label">컨센서스</span>
-          <span className={`dashcard__stat-value tabular ${consClass}`}>
+          <span className={`dashcard__stat-value tnum ${consClass}`}>
             {consPct != null ? `${consPct >= 0 ? '+' : ''}${consPct.toFixed(0)}%` : '—'}
           </span>
         </div>
