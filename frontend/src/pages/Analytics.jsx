@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
+import LoadingSpinner from '../components/LoadingSpinner'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, ReferenceLine, Label,
@@ -199,7 +200,7 @@ function CorrelationHeatmap() {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
-  if (loading) return <div style={{ color: 'var(--text-muted)', marginTop: 48 }}>상관관계 계산 중...</div>
+  if (loading) return <LoadingSpinner label="상관관계 불러오는 중입니다." style={{ marginTop: 48 }} />
   if (error) return <div style={{ color: '#ef9a9a', marginTop: 48 }}>오류: {error}</div>
   if (!data || !data.tickers.length) return (
     <div style={{ color: 'var(--text-muted)', marginTop: 48 }}>보유종목 2개 이상 필요</div>
@@ -249,7 +250,7 @@ export default function Analytics() {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
-  if (loading) return <div style={{ color: 'var(--text-muted)' }}>불러오는 중...</div>
+  if (loading) return <LoadingSpinner label="분석 데이터 불러오는 중입니다." />
   if (error) return <div style={{ color: '#ef9a9a' }}>오류: {error}</div>
   if (!cards.length) return <div style={{ color: 'var(--text-muted)' }}>보유종목 없음</div>
 

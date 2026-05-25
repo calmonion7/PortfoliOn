@@ -101,7 +101,7 @@ export default function GuruStats() {
       )
     : top3
 
-  if (loading) return <LoadingSpinner label="구루 통계 불러오는 중..." />
+  if (loading) return <LoadingSpinner label="구루 통계 불러오는 중입니다." />
   if (!popularity.length) return (
     <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
   )

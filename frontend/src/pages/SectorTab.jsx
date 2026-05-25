@@ -1,6 +1,7 @@
 // frontend/src/pages/SectorTab.jsx
 import { useState, useEffect } from 'react'
 import api from '../api'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 const PERIODS = ['return_1w', 'return_1mo', 'return_3mo']
 const PERIOD_LABELS = { return_1w: '1주', return_1mo: '1개월', return_3mo: '3개월' }
@@ -26,7 +27,7 @@ export default function SectorTab() {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
-  if (loading) return <div style={{ color: 'var(--text-muted)' }}>섹터 데이터 불러오는 중...</div>
+  if (loading) return <LoadingSpinner label="섹터 데이터 불러오는 중입니다." />
   if (error) return <div style={{ color: '#ef9a9a' }}>오류: {error}</div>
   if (!data) return null
 

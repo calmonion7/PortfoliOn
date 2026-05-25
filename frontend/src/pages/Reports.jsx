@@ -250,7 +250,7 @@ const fetchList = useCallback(() => {
         {view === 'list' ? (
           /* 목록화면 */
           listLoading ? (
-            <LoadingSpinner label="리포트 목록 불러오는 중..." style={{ marginTop: 80 }} />
+            <LoadingSpinner label="리포트 불러오는 중입니다." style={{ marginTop: 80 }} />
           ) : (hasFetched && tabEntries.length === 0) ? (
             <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-muted)' }}>
               <p>리포트가 없습니다.</p>

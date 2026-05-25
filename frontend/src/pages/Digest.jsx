@@ -36,7 +36,7 @@ export default function Digest() {
     }
   }
 
-  if (loading) return <LoadingSpinner label="Daily Digest 불러오는 중..." />
+  if (loading) return <LoadingSpinner label="다이제스트 불러오는 중입니다." />
 
   return (
     <div style={{ maxWidth: 600 }}>

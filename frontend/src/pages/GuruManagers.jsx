@@ -91,7 +91,7 @@ export default function GuruManagers() {
     return 0
   })
 
-  if (loading) return <LoadingSpinner label="구루 운용역 불러오는 중..." />
+  if (loading) return <LoadingSpinner label="구루 운용역 불러오는 중입니다." />
   if (!data.managers.length) return (
     <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
       데이터 없음 — "크롤링 설정" 탭에서 데이터를 가져오세요.

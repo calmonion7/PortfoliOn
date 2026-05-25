@@ -105,7 +105,7 @@ const DashboardCard = ({ item }) => {
 }
 
 const DashboardGrid = ({ cards, loading }) => {
-  if (loading) return <LoadingSpinner label="포트폴리오 불러오는 중..." />
+  if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
   if (!cards.length) return <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 40 }}>보유종목이 없습니다.</p>
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
@@ -118,6 +118,8 @@ export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('holdings')
   const [stocks, setStocks] = useState([])
   const [watchlist, setWatchlist] = useState([])
+  const [listLoading, setListLoading] = useState(true)
+  const [hasFetched, setHasFetched] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [promoteTarget, setPromoteTarget] = useState(null)
@@ -128,12 +130,15 @@ export default function Portfolio() {
   const [dashboardLoading, setDashboardLoading] = useState(false)
 
   const fetchAll = useCallback(async () => {
+    setListLoading(true)
     const [portfolioRes, watchlistRes] = await Promise.all([
       api.get('/api/portfolio'),
       api.get('/api/watchlist'),
     ])
     setStocks(portfolioRes.data.stocks || [])
     setWatchlist(watchlistRes.data || [])
+    setListLoading(false)
+    setHasFetched(true)
   }, [])
 
   const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
@@ -320,7 +325,10 @@ export default function Portfolio() {
                 </td>
               </tr>
             ))}
-            {filteredStocks.length === 0 && (
+            {listLoading && (
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}><LoadingSpinner label="보유종목 불러오는 중입니다." /></td></tr>
+            )}
+            {!listLoading && hasFetched && filteredStocks.length === 0 && (
               <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>종목을 추가해 주세요</td></tr>
             )}
           </tbody>
@@ -359,7 +367,10 @@ export default function Portfolio() {
                 </td>
               </tr>
             ))}
-            {filteredWatchlist.length === 0 && (
+            {listLoading && (
+              <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}><LoadingSpinner label="관심종목 불러오는 중입니다." /></td></tr>
+            )}
+            {!listLoading && hasFetched && filteredWatchlist.length === 0 && (
               <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
             )}
           </tbody>

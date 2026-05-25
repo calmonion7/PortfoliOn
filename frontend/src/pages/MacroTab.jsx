@@ -1,6 +1,7 @@
 // frontend/src/pages/MacroTab.jsx
 import { useState, useEffect } from 'react'
 import api from '../api'
+import LoadingSpinner from '../components/LoadingSpinner'
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
   ReferenceLine, Tooltip, ResponsiveContainer, Label,
@@ -39,7 +40,7 @@ export default function MacroTab() {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
-  if (loading) return <div style={{ color: 'var(--text-muted)' }}>매크로 데이터 불러오는 중...</div>
+  if (loading) return <LoadingSpinner label="매크로 데이터 불러오는 중입니다." />
   if (error) return <div style={{ color: '#ef9a9a' }}>오류: {error}</div>
   if (!data || !data.correlations.length) return (
     <div style={{ color: 'var(--text-muted)' }}>보유종목 없음 또는 데이터 부족</div>

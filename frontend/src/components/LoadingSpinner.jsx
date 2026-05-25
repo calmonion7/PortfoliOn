@@ -1,4 +1,4 @@
-export default function LoadingSpinner({ label = '로딩 중...', size = 28, style = {} }) {
+export default function LoadingSpinner({ label = '불러오는 중입니다.', size = 28, style = {} }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 40, ...style }}>
       <div style={{

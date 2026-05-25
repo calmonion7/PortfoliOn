@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -152,7 +153,7 @@ export default function Calendar() {
       </div>
 
       {loading
-        ? <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>불러오는 중...</div>
+        ? <LoadingSpinner label="캘린더 불러오는 중입니다." />
         : error
         ? <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>{error}</div>
         : <MonthGrid year={year} month={month} events={events} />
