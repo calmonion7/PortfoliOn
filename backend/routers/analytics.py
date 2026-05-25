@@ -32,7 +32,7 @@ def get_correlation(user_id: str = Depends(get_current_user)):
         if len(holdings) < 2:
             return {"tickers": [], "matrix": []}
 
-        with ThreadPoolExecutor(max_workers=30) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             results = list(executor.map(_fetch_closes, holdings))
 
         closes_map = {t: s for t, s in results if t is not None}
