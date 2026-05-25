@@ -8,6 +8,7 @@ import yfinance as yf
 import requests
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
+from services.db import get_db
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DATA_DIR = os.path.join(_BASE_DIR, "data")
@@ -32,6 +33,25 @@ def _get_cache(key: str) -> dict | None:
 
 def _set_cache(key: str, data: dict, ttl: int) -> None:
     _cache[key] = {"data": data, "expires": time.time() + ttl}
+
+
+def _mc_load(key: str) -> dict | None:
+    """Supabase market_cache에서 로드. {'data': ..., 'fetched_at': ...} 반환"""
+    try:
+        rows = get_db().table("market_cache").select("data, fetched_at").eq("key", key).execute().data
+        if rows:
+            return {"data": rows[0]["data"], "fetched_at": rows[0]["fetched_at"]}
+    except Exception:
+        pass
+    return None
+
+
+def _mc_save(key: str, data: dict) -> None:
+    """Supabase market_cache에 저장."""
+    try:
+        get_db().table("market_cache").upsert({"key": key, "data": data, "fetched_at": "now()"}).execute()
+    except Exception:
+        pass
 
 
 # ── Treasury ──────────────────────────────────────────────────────────────────

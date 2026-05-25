@@ -471,3 +471,50 @@ def test_get_econ_indicators_caches_result(monkeypatch):
         get_econ_indicators()
         count2 = mock_get.call_count
     assert count1 == count2
+
+
+# ── _mc_save / _mc_load ───────────────────────────────────────────────────────
+
+def test_mc_save_and_load(monkeypatch):
+    saved = {}
+
+    class FakeResult:
+        data = []
+
+    class FakeQuery:
+        def select(self, *a): return self
+        def eq(self, *a): return self
+        def execute(self):
+            r = FakeResult()
+            r.data = list(saved.values())
+            return r
+        def upsert(self, row):
+            saved[row["key"]] = row
+            return self
+
+    class FakeDB:
+        def table(self, name): return FakeQuery()
+
+    import services.market_indicators_service as svc
+    monkeypatch.setattr(svc, "get_db", lambda: FakeDB())
+
+    svc._mc_save("test_key", {"hello": "world"})
+    result = svc._mc_load("test_key")
+    assert result is not None
+    assert result["data"]["hello"] == "world"
+
+
+def test_mc_load_returns_none_on_missing(monkeypatch):
+    class FakeResult:
+        data = []
+    class FakeQuery:
+        def select(self, *a): return self
+        def eq(self, *a): return self
+        def execute(self): return FakeResult()
+    class FakeDB:
+        def table(self, name): return FakeQuery()
+
+    import services.market_indicators_service as svc
+    monkeypatch.setattr(svc, "get_db", lambda: FakeDB())
+
+    assert svc._mc_load("nonexistent") is None
