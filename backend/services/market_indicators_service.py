@@ -725,8 +725,13 @@ def _fetch_and_save_kr_exports() -> dict:
 
 
 def get_kr_exports() -> dict:
+    cached = _get_cache("kr_exports")
+    if cached:
+        return cached
+
     stored = _mc_load("kr_exports")
     if stored:
+        _set_cache("kr_exports", stored["data"], ttl=86400)
         return stored["data"]
 
     # file cache fallback

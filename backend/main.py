@@ -32,10 +32,20 @@ def _warm_calendar_cache():
                 pass
 
 
+def _warm_market_cache():
+    try:
+        from services.market_indicators_service import get_econ_indicators, get_kr_exports
+        get_econ_indicators()
+        get_kr_exports()
+    except Exception:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     sched.start()
     threading.Thread(target=_warm_calendar_cache, daemon=True).start()
+    threading.Thread(target=_warm_market_cache, daemon=True).start()
     yield
     sched.stop()
 
