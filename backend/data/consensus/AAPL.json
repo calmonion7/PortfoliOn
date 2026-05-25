@@ -21,11 +21,95 @@
     "sell": 2
   },
   {
+    "date": "2026-05-14",
+    "target_mean": 370.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-05-08",
+    "target_mean": 400.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-05-01",
+    "target_mean": 302.5,
+    "buy": 4,
+    "hold": 4,
+    "sell": 1
+  },
+  {
+    "date": "2026-04-28",
+    "target_mean": 287.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2026-04-21",
+    "target_mean": 309.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2026-04-17",
+    "target_mean": 300.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-04-14",
+    "target_mean": 325.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
     "date": "2026-04-01",
     "target_mean": 306.0,
     "buy": 32,
     "hold": 14,
     "sell": 2
+  },
+  {
+    "date": "2026-03-31",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-03-27",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-03-23",
+    "target_mean": 317.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-03-05",
+    "target_mean": 309.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2026-03-03",
+    "target_mean": 248.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
   },
   {
     "date": "2026-03-01",
@@ -35,10 +119,3629 @@
     "sell": 2
   },
   {
+    "date": "2026-02-17",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
     "date": "2026-02-01",
     "target_mean": 350.0,
     "buy": 30,
     "hold": 16,
     "sell": 2
+  },
+  {
+    "date": "2026-01-30",
+    "target_mean": 295.32,
+    "buy": 4,
+    "hold": 4,
+    "sell": 1
+  },
+  {
+    "date": "2026-01-26",
+    "target_mean": 295.74,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2026-01-20",
+    "target_mean": 322.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-01-13",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-01-12",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2026-01-09",
+    "target_mean": 330.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-12-17",
+    "target_mean": 315.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-12-09",
+    "target_mean": 330.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-12-08",
+    "target_mean": 337.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-12-05",
+    "target_mean": 330.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-12-02",
+    "target_mean": 325.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-11-04",
+    "target_mean": 250.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-10-31",
+    "target_mean": 292.64,
+    "buy": 9,
+    "hold": 4,
+    "sell": 1
+  },
+  {
+    "date": "2025-10-29",
+    "target_mean": 320.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-10-28",
+    "target_mean": 280.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-10-27",
+    "target_mean": 290.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-10-21",
+    "target_mean": 284.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-10-20",
+    "target_mean": 315.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-10-03",
+    "target_mean": 205.16,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2025-10-02",
+    "target_mean": 298.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-10-01",
+    "target_mean": 310.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-26",
+    "target_mean": 290.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-22",
+    "target_mean": 310.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-17",
+    "target_mean": 305.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-16",
+    "target_mean": 290.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-11",
+    "target_mean": 225.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 1
+  },
+  {
+    "date": "2025-09-10",
+    "target_mean": 265.25,
+    "buy": 3,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-09",
+    "target_mean": 270.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-08",
+    "target_mean": 205.82,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-04",
+    "target_mean": 225.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-09-03",
+    "target_mean": 265.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-08-27",
+    "target_mean": 266.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-08-25",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-08-21",
+    "target_mean": 226.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-08-14",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-08-13",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-08-08",
+    "target_mean": 260.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-08-07",
+    "target_mean": 255.0,
+    "buy": 3,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-08-01",
+    "target_mean": 236.3,
+    "buy": 7,
+    "hold": 2,
+    "sell": 1
+  },
+  {
+    "date": "2025-07-30",
+    "target_mean": 270.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-07-29",
+    "target_mean": 217.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-07-25",
+    "target_mean": null,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-07-17",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-07-09",
+    "target_mean": 270.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-07-01",
+    "target_mean": 188.32,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-06-26",
+    "target_mean": 230.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-06-10",
+    "target_mean": 246.67,
+    "buy": 3,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-06-05",
+    "target_mean": 235.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-06-04",
+    "target_mean": 225.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-05-16",
+    "target_mean": 270.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-05-03",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-05-02",
+    "target_mean": 228.23,
+    "buy": 5,
+    "hold": 1,
+    "sell": 1
+  },
+  {
+    "date": "2025-05-01",
+    "target_mean": 256.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-04-30",
+    "target_mean": 206.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 1
+  },
+  {
+    "date": "2025-04-29",
+    "target_mean": 235.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-04-24",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-04-23",
+    "target_mean": 233.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-04-14",
+    "target_mean": 240.8,
+    "buy": 5,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-04-09",
+    "target_mean": 167.88,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-04-08",
+    "target_mean": 210.67,
+    "buy": 2,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2025-04-07",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-04-04",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-04-03",
+    "target_mean": 253.83,
+    "buy": 3,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2025-03-31",
+    "target_mean": 294.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-03-18",
+    "target_mean": 275.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-03-14",
+    "target_mean": 325.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-03-12",
+    "target_mean": 252.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-03-03",
+    "target_mean": 325.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-02-19",
+    "target_mean": 294.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-01-31",
+    "target_mean": 258.83,
+    "buy": 8,
+    "hold": 0,
+    "sell": 2
+  },
+  {
+    "date": "2025-01-30",
+    "target_mean": 290.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-01-29",
+    "target_mean": null,
+    "buy": 0,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2025-01-28",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-01-27",
+    "target_mean": 262.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-01-24",
+    "target_mean": 253.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-01-23",
+    "target_mean": 302.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2025-01-22",
+    "target_mean": 183.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2025-01-21",
+    "target_mean": 237.69,
+    "buy": 2,
+    "hold": 1,
+    "sell": 1
+  },
+  {
+    "date": "2025-01-07",
+    "target_mean": 188.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2025-01-03",
+    "target_mean": 258.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-12-26",
+    "target_mean": 325.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-12-18",
+    "target_mean": 275.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-12-13",
+    "target_mean": 273.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-12-10",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-12-03",
+    "target_mean": 160.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-12-02",
+    "target_mean": 211.84,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-11-29",
+    "target_mean": 300.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-11-25",
+    "target_mean": 273.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-11-20",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-11-15",
+    "target_mean": 211.84,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-11-04",
+    "target_mean": 275.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-11-01",
+    "target_mean": 231.57,
+    "buy": 4,
+    "hold": 2,
+    "sell": 1
+  },
+  {
+    "date": "2024-10-25",
+    "target_mean": 200.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2024-10-21",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-10-03",
+    "target_mean": 256.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-10-01",
+    "target_mean": 186.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2024-09-25",
+    "target_mean": 225.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-09-24",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-09-19",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-09-16",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-09-10",
+    "target_mean": 258.5,
+    "buy": 7,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-09-09",
+    "target_mean": 285.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-09-05",
+    "target_mean": 256.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-09-04",
+    "target_mean": 236.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-08-28",
+    "target_mean": 295.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-08-27",
+    "target_mean": 259.8,
+    "buy": 5,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-08-19",
+    "target_mean": 211.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-08-06",
+    "target_mean": 273.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-08-05",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-08-02",
+    "target_mean": 244.17,
+    "buy": 4,
+    "hold": 1,
+    "sell": 1
+  },
+  {
+    "date": "2024-07-29",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-26",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-25",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-24",
+    "target_mean": 226.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2024-07-18",
+    "target_mean": 265.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-17",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-15",
+    "target_mean": 286.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-11",
+    "target_mean": 265.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-10",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-09",
+    "target_mean": 230.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-07-01",
+    "target_mean": 205.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-28",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-26",
+    "target_mean": 245.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-25",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-24",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-21",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-18",
+    "target_mean": 245.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-14",
+    "target_mean": null,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-12",
+    "target_mean": 230.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-06-11",
+    "target_mean": 205.86,
+    "buy": 4,
+    "hold": 2,
+    "sell": 1
+  },
+  {
+    "date": "2024-06-04",
+    "target_mean": 216.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-05-30",
+    "target_mean": 245.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-05-29",
+    "target_mean": 230.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-05-24",
+    "target_mean": 275.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-05-13",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-05-03",
+    "target_mean": 211.56,
+    "buy": 6,
+    "hold": 2,
+    "sell": 1
+  },
+  {
+    "date": "2024-04-29",
+    "target_mean": 202.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-04-22",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-04-17",
+    "target_mean": 178.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-04-16",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-04-11",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-04-09",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-04-01",
+    "target_mean": 170.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-03-28",
+    "target_mean": 180.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-03-25",
+    "target_mean": 190.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-03-22",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-03-21",
+    "target_mean": 235.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-03-12",
+    "target_mean": 225.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-03-08",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-03-05",
+    "target_mean": 189.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-02-28",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-02-12",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-02-07",
+    "target_mean": 200.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-02-05",
+    "target_mean": 185.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-02-02",
+    "target_mean": 211.33,
+    "buy": 5,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2024-01-31",
+    "target_mean": 219.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-01-30",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-01-18",
+    "target_mean": 225.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2024-01-10",
+    "target_mean": 200.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-01-04",
+    "target_mean": 205.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-01-03",
+    "target_mean": 166.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2024-01-02",
+    "target_mean": 160.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2023-12-20",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-12-11",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-12-08",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-11-24",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-11-16",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-11-03",
+    "target_mean": 213.0,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-11-01",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-10-31",
+    "target_mean": 195.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-10-30",
+    "target_mean": 183.0,
+    "buy": 1,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2023-10-24",
+    "target_mean": 173.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-10-16",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-10-09",
+    "target_mean": 181.0,
+    "buy": 0,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2023-10-04",
+    "target_mean": null,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-28",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-27",
+    "target_mean": 190.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-26",
+    "target_mean": 208.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-25",
+    "target_mean": 215.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-22",
+    "target_mean": 208.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-21",
+    "target_mean": null,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-19",
+    "target_mean": 188.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-18",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-15",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-14",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-13",
+    "target_mean": 214.33,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-12",
+    "target_mean": 214.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-08",
+    "target_mean": 230.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-09-07",
+    "target_mean": 212.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-08-17",
+    "target_mean": 230.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-08-04",
+    "target_mean": 202.86,
+    "buy": 5,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2023-08-02",
+    "target_mean": 235.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-08-01",
+    "target_mean": 212.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-31",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-27",
+    "target_mean": 195.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-25",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-24",
+    "target_mean": 217.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-20",
+    "target_mean": 230.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-19",
+    "target_mean": 210.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-17",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-11",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-07-05",
+    "target_mean": 190.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-06-30",
+    "target_mean": 240.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-06-23",
+    "target_mean": 225.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-06-14",
+    "target_mean": 175.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-06-13",
+    "target_mean": 190.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-06-07",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-06-06",
+    "target_mean": 197.17,
+    "buy": 5,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-06-05",
+    "target_mean": 201.67,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-06-02",
+    "target_mean": 200.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-05-31",
+    "target_mean": 205.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-05-22",
+    "target_mean": 177.5,
+    "buy": 0,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2023-05-12",
+    "target_mean": 175.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-05-05",
+    "target_mean": 186.0,
+    "buy": 10,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2023-05-04",
+    "target_mean": 179.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-05-02",
+    "target_mean": 180.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-05-01",
+    "target_mean": 173.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-04-30",
+    "target_mean": 174.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-04-28",
+    "target_mean": 173.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-04-27",
+    "target_mean": 125.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-04-26",
+    "target_mean": 159.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-04-19",
+    "target_mean": 190.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-04-17",
+    "target_mean": 205.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-04-13",
+    "target_mean": 184.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-04-05",
+    "target_mean": 181.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-03-30",
+    "target_mean": 170.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-03-10",
+    "target_mean": 145.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2023-03-08",
+    "target_mean": 190.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-03-06",
+    "target_mean": 199.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-03-02",
+    "target_mean": 195.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-02-06",
+    "target_mean": 190.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-02-03",
+    "target_mean": 167.54,
+    "buy": 9,
+    "hold": 4,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-27",
+    "target_mean": 153.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-23",
+    "target_mean": 160.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-19",
+    "target_mean": 180.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-18",
+    "target_mean": 172.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-13",
+    "target_mean": 165.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-11",
+    "target_mean": 133.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-09",
+    "target_mean": 125.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-04",
+    "target_mean": 192.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2023-01-03",
+    "target_mean": 140.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-12-20",
+    "target_mean": 190.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-12-12",
+    "target_mean": 170.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-11-08",
+    "target_mean": 177.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-11-07",
+    "target_mean": 149.0,
+    "buy": 0,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2022-10-28",
+    "target_mean": 175.38,
+    "buy": 7,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-10-21",
+    "target_mean": 174.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-10-17",
+    "target_mean": 177.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-10-13",
+    "target_mean": 190.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-10-11",
+    "target_mean": 155.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-09-29",
+    "target_mean": 174.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-09-20",
+    "target_mean": 190.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-09-06",
+    "target_mean": 172.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-08-22",
+    "target_mean": 185.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-08-19",
+    "target_mean": 185.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-08-17",
+    "target_mean": 210.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-08-15",
+    "target_mean": 170.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-08-02",
+    "target_mean": 177.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-07-29",
+    "target_mean": 174.71,
+    "buy": 4,
+    "hold": 3,
+    "sell": 0
+  },
+  {
+    "date": "2022-07-26",
+    "target_mean": 185.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-07-20",
+    "target_mean": 182.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-07-19",
+    "target_mean": 130.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-07-13",
+    "target_mean": 170.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-07-12",
+    "target_mean": 186.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-07-10",
+    "target_mean": 174.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-06-30",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-06-28",
+    "target_mean": 180.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-06-15",
+    "target_mean": 185.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-06-14",
+    "target_mean": 175.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-06-07",
+    "target_mean": 199.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-05-19",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-05-17",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-05-10",
+    "target_mean": 160.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-05-02",
+    "target_mean": 168.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-04-29",
+    "target_mean": 191.8,
+    "buy": 4,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-04-24",
+    "target_mean": 205.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-04-19",
+    "target_mean": 184.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-03-31",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-03-24",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-03-11",
+    "target_mean": 170.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-03-09",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-02-15",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-31",
+    "target_mean": 168.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-28",
+    "target_mean": 192.64,
+    "buy": 9,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-24",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-21",
+    "target_mean": 205.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-19",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-18",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-14",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-07",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2022-01-05",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-12-22",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-12-14",
+    "target_mean": 205.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-12-13",
+    "target_mean": 210.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-12-07",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-12-06",
+    "target_mean": 191.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-12-03",
+    "target_mean": 160.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-12-02",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-11-23",
+    "target_mean": 180.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-11-17",
+    "target_mean": 90.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2021-11-09",
+    "target_mean": 198.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-10-29",
+    "target_mean": 159.67,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-10-28",
+    "target_mean": 180.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-10-27",
+    "target_mean": 166.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-10-11",
+    "target_mean": 175.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-09-22",
+    "target_mean": 198.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-09-09",
+    "target_mean": 175.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-09-08",
+    "target_mean": 170.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-09-01",
+    "target_mean": 155.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-08-13",
+    "target_mean": 160.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-07-28",
+    "target_mean": 165.0,
+    "buy": 8,
+    "hold": 1,
+    "sell": 1
+  },
+  {
+    "date": "2021-07-22",
+    "target_mean": 175.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-07-20",
+    "target_mean": 166.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-07-15",
+    "target_mean": 166.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-07-14",
+    "target_mean": 175.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-07-06",
+    "target_mean": 170.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-06-30",
+    "target_mean": 155.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-06-24",
+    "target_mean": 162.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-05-28",
+    "target_mean": 90.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2021-05-19",
+    "target_mean": 134.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-04-29",
+    "target_mean": 159.93,
+    "buy": 10,
+    "hold": 3,
+    "sell": 1
+  },
+  {
+    "date": "2021-04-27",
+    "target_mean": 150.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-04-21",
+    "target_mean": 136.5,
+    "buy": 1,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2021-04-16",
+    "target_mean": 157.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-04-08",
+    "target_mean": 142.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-04-06",
+    "target_mean": 156.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-03-31",
+    "target_mean": 142.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-03-24",
+    "target_mean": 155.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-03-16",
+    "target_mean": 175.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-03-10",
+    "target_mean": 175.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-28",
+    "target_mean": 155.36,
+    "buy": 10,
+    "hold": 4,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-26",
+    "target_mean": 155.0,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-25",
+    "target_mean": 161.67,
+    "buy": 3,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-22",
+    "target_mean": 153.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-21",
+    "target_mean": 152.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-15",
+    "target_mean": 155.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-14",
+    "target_mean": 116.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-12",
+    "target_mean": 155.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-11",
+    "target_mean": 90.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2021-01-06",
+    "target_mean": 120.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2021-01-05",
+    "target_mean": 135.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-12-16",
+    "target_mean": 144.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-12-15",
+    "target_mean": 140.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-12-14",
+    "target_mean": 140.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-12-09",
+    "target_mean": 160.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-11-30",
+    "target_mean": null,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-10-30",
+    "target_mean": 136.0,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-10-26",
+    "target_mean": 115.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-10-22",
+    "target_mean": 135.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-10-21",
+    "target_mean": 140.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-10-14",
+    "target_mean": 127.33,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-10-13",
+    "target_mean": 130.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-10-12",
+    "target_mean": 132.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-09-22",
+    "target_mean": 120.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-09-21",
+    "target_mean": 125.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-09-17",
+    "target_mean": 135.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-09-16",
+    "target_mean": 140.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-09-10",
+    "target_mean": 133.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-09-01",
+    "target_mean": 143.33,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-08-31",
+    "target_mean": 148.0,
+    "buy": 3,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-08-25",
+    "target_mean": 366.25,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-08-24",
+    "target_mean": 130.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-08-14",
+    "target_mean": 400.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-08-10",
+    "target_mean": 515.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-08-05",
+    "target_mean": 330.42,
+    "buy": 1,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2020-07-31",
+    "target_mean": 320.34,
+    "buy": 13,
+    "hold": 4,
+    "sell": 0
+  },
+  {
+    "date": "2020-07-29",
+    "target_mean": 340.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-07-28",
+    "target_mean": 370.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-07-24",
+    "target_mean": 289.58,
+    "buy": 1,
+    "hold": 1,
+    "sell": 1
+  },
+  {
+    "date": "2020-07-16",
+    "target_mean": 444.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-07-15",
+    "target_mean": 261.25,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-07-13",
+    "target_mean": 434.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-07-08",
+    "target_mean": 400.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-07-07",
+    "target_mean": 380.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-06-25",
+    "target_mean": 375.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-06-23",
+    "target_mean": 213.0,
+    "buy": 3,
+    "hold": 2,
+    "sell": 1
+  },
+  {
+    "date": "2020-06-22",
+    "target_mean": 400.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-06-17",
+    "target_mean": 97.5,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-06-16",
+    "target_mean": 400.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-06-11",
+    "target_mean": 282.92,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-06-10",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-06-05",
+    "target_mean": 335.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-06-03",
+    "target_mean": 340.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-05-27",
+    "target_mean": 330.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-05-12",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-05-07",
+    "target_mean": 285.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-05-06",
+    "target_mean": 320.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-05-01",
+    "target_mean": 259.06,
+    "buy": 10,
+    "hold": 3,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-27",
+    "target_mean": 310.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-23",
+    "target_mean": 74.25,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-21",
+    "target_mean": 240.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-17",
+    "target_mean": 58.25,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2020-04-16",
+    "target_mean": 300.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-13",
+    "target_mean": 295.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-09",
+    "target_mean": 150.0,
+    "buy": 0,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-08",
+    "target_mean": 335.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-03",
+    "target_mean": 279.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-04-01",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-30",
+    "target_mean": 290.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-26",
+    "target_mean": 300.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-25",
+    "target_mean": 270.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-24",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-23",
+    "target_mean": 225.0,
+    "buy": 0,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-20",
+    "target_mean": 300.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-19",
+    "target_mean": 300.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-18",
+    "target_mean": 292.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-17",
+    "target_mean": 224.33,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-13",
+    "target_mean": 315.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-11",
+    "target_mean": 320.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-10",
+    "target_mean": 335.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-08",
+    "target_mean": 400.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-06",
+    "target_mean": 322.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-04",
+    "target_mean": 295.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-03",
+    "target_mean": 400.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-03-02",
+    "target_mean": 215.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-02-18",
+    "target_mean": 277.85,
+    "buy": 2,
+    "hold": 3,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-30",
+    "target_mean": 355.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-29",
+    "target_mean": 312.62,
+    "buy": 12,
+    "hold": 8,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-27",
+    "target_mean": 290.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-24",
+    "target_mean": 278.12,
+    "buy": 3,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2020-01-23",
+    "target_mean": 340.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-17",
+    "target_mean": 309.33,
+    "buy": 1,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-15",
+    "target_mean": 355.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-14",
+    "target_mean": 355.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2020-01-13",
+    "target_mean": 335.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-10",
+    "target_mean": 325.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-09",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-06",
+    "target_mean": 350.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2020-01-03",
+    "target_mean": 330.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-12-23",
+    "target_mean": 350.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-12-20",
+    "target_mean": 76.25,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-12-17",
+    "target_mean": 325.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-12-11",
+    "target_mean": 305.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-12-09",
+    "target_mean": 85.5,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-12-02",
+    "target_mean": 296.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-11-26",
+    "target_mean": 290.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-11-15",
+    "target_mean": 229.17,
+    "buy": 3,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-11-14",
+    "target_mean": 190.0,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2019-11-13",
+    "target_mean": 295.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-31",
+    "target_mean": 272.45,
+    "buy": 8,
+    "hold": 3,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-28",
+    "target_mean": 260.25,
+    "buy": 3,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-25",
+    "target_mean": 270.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-24",
+    "target_mean": 275.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-23",
+    "target_mean": 289.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-22",
+    "target_mean": 230.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-21",
+    "target_mean": 280.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-17",
+    "target_mean": 224.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-11",
+    "target_mean": 265.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-10",
+    "target_mean": 65.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-09",
+    "target_mean": 260.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-10-07",
+    "target_mean": 205.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-09-30",
+    "target_mean": 265.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-09-20",
+    "target_mean": 270.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-09-13",
+    "target_mean": 165.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-09-11",
+    "target_mean": 235.67,
+    "buy": 2,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-08-08",
+    "target_mean": 192.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-07-31",
+    "target_mean": 232.88,
+    "buy": 6,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2019-07-29",
+    "target_mean": 235.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-07-22",
+    "target_mean": 247.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-07-19",
+    "target_mean": 180.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-07-18",
+    "target_mean": null,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-07-17",
+    "target_mean": 187.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-07-09",
+    "target_mean": 239.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-07-08",
+    "target_mean": null,
+    "buy": 0,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2019-06-20",
+    "target_mean": 205.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-06-06",
+    "target_mean": 205.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-06-04",
+    "target_mean": 202.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-05-30",
+    "target_mean": 231.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-05-28",
+    "target_mean": 51.25,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-05-23",
+    "target_mean": 225.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-05-17",
+    "target_mean": 175.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-05-01",
+    "target_mean": 233.0,
+    "buy": 4,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-04-25",
+    "target_mean": 235.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-04-24",
+    "target_mean": 234.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-04-11",
+    "target_mean": 209.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2019-04-10",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 1
+  },
+  {
+    "date": "2019-03-26",
+    "target_mean": 216.25,
+    "buy": 4,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-03-21",
+    "target_mean": 220.0,
+    "buy": 3,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-03-14",
+    "target_mean": 220.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-03-11",
+    "target_mean": null,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-01-30",
+    "target_mean": 160.75,
+    "buy": 4,
+    "hold": 3,
+    "sell": 0
+  },
+  {
+    "date": "2019-01-04",
+    "target_mean": 170.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2019-01-03",
+    "target_mean": 185.88,
+    "buy": 5,
+    "hold": 4,
+    "sell": 0
+  },
+  {
+    "date": "2018-12-14",
+    "target_mean": 280.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-12-10",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-12-07",
+    "target_mean": 236.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-12-06",
+    "target_mean": 165.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-12-04",
+    "target_mean": 200.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-11-29",
+    "target_mean": 225.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-11-20",
+    "target_mean": 182.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-11-14",
+    "target_mean": 225.0,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-11-08",
+    "target_mean": 253.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-11-02",
+    "target_mean": 226.33,
+    "buy": 3,
+    "hold": 3,
+    "sell": 0
+  },
+  {
+    "date": "2018-10-29",
+    "target_mean": 265.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-10-19",
+    "target_mean": 310.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-09-28",
+    "target_mean": 215.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-09-27",
+    "target_mean": 272.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-09-13",
+    "target_mean": 251.5,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-09-05",
+    "target_mean": 255.0,
+    "buy": 2,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-09-04",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-08-31",
+    "target_mean": 210.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-08-21",
+    "target_mean": 250.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-08-02",
+    "target_mean": 230.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-08-01",
+    "target_mean": 198.0,
+    "buy": 1,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2018-07-24",
+    "target_mean": 232.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-07-23",
+    "target_mean": 184.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-06-08",
+    "target_mean": 56.25,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-05-30",
+    "target_mean": null,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-05-24",
+    "target_mean": 214.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-05-02",
+    "target_mean": 166.0,
+    "buy": 0,
+    "hold": 2,
+    "sell": 0
+  },
+  {
+    "date": "2018-04-30",
+    "target_mean": 188.5,
+    "buy": 1,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-04-20",
+    "target_mean": 200.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-04-11",
+    "target_mean": 235.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
+  },
+  {
+    "date": "2018-03-16",
+    "target_mean": 168.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2018-02-07",
+    "target_mean": 161.0,
+    "buy": 0,
+    "hold": 1,
+    "sell": 0
+  },
+  {
+    "date": "2012-09-12",
+    "target_mean": 900.0,
+    "buy": 1,
+    "hold": 0,
+    "sell": 0
   }
 ]

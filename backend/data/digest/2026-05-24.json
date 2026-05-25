@@ -1,0 +1,429 @@
+{
+  "date": "2026-05-24",
+  "generated_at": "2026-05-24T08:00:02+09:00",
+  "portfolio_summary": {
+    "total_value_usd": 5869648.54,
+    "daily_change_pct": -2.32,
+    "daily_change_usd": -139641.06
+  },
+  "stocks": [
+    {
+      "ticker": "LLY",
+      "name": "일라이 릴리",
+      "change_pct": 2.24,
+      "is_holding": true,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "LHX",
+      "name": "L3 해리스 테크놀로지스",
+      "change_pct": 1.84,
+      "is_holding": true,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "PLTR",
+      "name": "팔란티어 테크",
+      "change_pct": -0.39,
+      "is_holding": true,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "AVAV",
+      "name": "에어로바이런먼트",
+      "change_pct": 6.83,
+      "is_holding": true,
+      "is_anomaly": true
+    },
+    {
+      "ticker": "005930",
+      "name": "삼성전자",
+      "change_pct": -2.34,
+      "is_holding": true,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "000720",
+      "name": "현대건설",
+      "change_pct": 2.18,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "207940",
+      "name": "삼성바이오로직스",
+      "change_pct": 1.43,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "475150",
+      "name": "SK이터닉스",
+      "change_pct": 3.79,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "TSLA",
+      "name": "테슬라",
+      "change_pct": 1.95,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "FSLR",
+      "name": "퍼스트 솔라",
+      "change_pct": 3.6,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "RTX",
+      "name": "RTX",
+      "change_pct": 1.0,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "FCX",
+      "name": "프리포트 맥모란",
+      "change_pct": -0.51,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "NFLX",
+      "name": "넷플릭스",
+      "change_pct": -0.78,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "TEM",
+      "name": "템퍼스 AI",
+      "change_pct": -0.67,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "CCJ",
+      "name": "카메코",
+      "change_pct": -0.55,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "BWXT",
+      "name": "BWX 테크놀로지스",
+      "change_pct": 0.19,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "SMR",
+      "name": "뉴스케일 파워",
+      "change_pct": 0.62,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "LEU",
+      "name": "센트러스 에너지",
+      "change_pct": 1.25,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "BE",
+      "name": "블룸 에너지",
+      "change_pct": -1.75,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "GEV",
+      "name": "GE베르노바",
+      "change_pct": -0.49,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "LNG",
+      "name": "셰니어 에너지",
+      "change_pct": 0.17,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "EQT",
+      "name": "EQT",
+      "change_pct": 0.31,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "PLUG",
+      "name": "플러그 파워",
+      "change_pct": 0.0,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "MOG.A",
+      "name": "무그 A",
+      "change_pct": 1.27,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "RKLB",
+      "name": "로켓 랩",
+      "change_pct": 8.22,
+      "is_holding": false,
+      "is_anomaly": true
+    },
+    {
+      "ticker": "ADI",
+      "name": "애널로그 디바이시스",
+      "change_pct": 3.35,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "QRVO",
+      "name": "코보",
+      "change_pct": 8.89,
+      "is_holding": false,
+      "is_anomaly": true
+    },
+    {
+      "ticker": "VRT",
+      "name": "버티브 홀딩스",
+      "change_pct": 1.26,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "GOOGL",
+      "name": "알파벳 A",
+      "change_pct": -1.21,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "AMZN",
+      "name": "아마존닷컴",
+      "change_pct": -0.8,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "AAPL",
+      "name": "애플",
+      "change_pct": 1.26,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "META",
+      "name": "메타 플랫폼스",
+      "change_pct": 0.47,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "ALNY",
+      "name": "앨나일램 파머슈티컬스",
+      "change_pct": -1.02,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "MSFT",
+      "name": "마이크로소프트",
+      "change_pct": -0.12,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "NOC",
+      "name": "노스롭 그루만",
+      "change_pct": 0.73,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "LMT",
+      "name": "록히드 마틴",
+      "change_pct": 2.0,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "AMD",
+      "name": "AMD",
+      "change_pct": 3.99,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "ARM",
+      "name": "에이알엠 홀딩스",
+      "change_pct": 2.78,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "TSM",
+      "name": "TSMC",
+      "change_pct": -0.65,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "INTC",
+      "name": "인텔",
+      "change_pct": 1.13,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "MU",
+      "name": "마이크론 테크놀로지",
+      "change_pct": -1.46,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "NVDA",
+      "name": "엔비디아",
+      "change_pct": -1.9,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "SNDK",
+      "name": "샌디스크",
+      "change_pct": -4.12,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "NVTS",
+      "name": "나비타스 세미컨덕터",
+      "change_pct": 19.98,
+      "is_holding": false,
+      "is_anomaly": true
+    },
+    {
+      "ticker": "RGTI",
+      "name": "리게티 컴퓨팅",
+      "change_pct": 19.87,
+      "is_holding": false,
+      "is_anomaly": true
+    },
+    {
+      "ticker": "IONQ",
+      "name": "아이온큐",
+      "change_pct": 8.07,
+      "is_holding": false,
+      "is_anomaly": true
+    },
+    {
+      "ticker": "QS",
+      "name": "퀀텀스케이프",
+      "change_pct": -2.15,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "SLDP",
+      "name": "솔리드 파워",
+      "change_pct": 3.03,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "EXPE",
+      "name": "익스피디아 그룹",
+      "change_pct": -1.59,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "NVO",
+      "name": "노보노디스크",
+      "change_pct": 1.28,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "COHR",
+      "name": "코히어런트",
+      "change_pct": -0.11,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "AAOI",
+      "name": "어플라이드 옵토일렉트로닉스",
+      "change_pct": 2.65,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "LITE",
+      "name": "루멘텀 홀딩스",
+      "change_pct": -1.82,
+      "is_holding": false,
+      "is_anomaly": false
+    },
+    {
+      "ticker": "MRVL",
+      "name": "마블 테크놀로지 그룹",
+      "change_pct": 2.96,
+      "is_holding": false,
+      "is_anomaly": false
+    }
+  ],
+  "events_7d": [
+    {
+      "ticker": "MRVL",
+      "event_type": "earnings",
+      "date": "2026-05-28",
+      "days_until": 4
+    }
+  ],
+  "anomalies": [
+    {
+      "ticker": "AVAV",
+      "change_pct": 6.83,
+      "reason": "상승 6.8%"
+    },
+    {
+      "ticker": "RKLB",
+      "change_pct": 8.22,
+      "reason": "상승 8.2%"
+    },
+    {
+      "ticker": "QRVO",
+      "change_pct": 8.89,
+      "reason": "상승 8.9%"
+    },
+    {
+      "ticker": "NVTS",
+      "change_pct": 19.98,
+      "reason": "상승 20.0%"
+    },
+    {
+      "ticker": "RGTI",
+      "change_pct": 19.87,
+      "reason": "상승 19.9%"
+    },
+    {
+      "ticker": "IONQ",
+      "change_pct": 8.07,
+      "reason": "상승 8.1%"
+    }
+  ]
+}
