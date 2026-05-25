@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import useIsMobile from '../hooks/useIsMobile'
 
 const PERIODS = ['return_1w', 'return_1mo', 'return_3mo']
 const PERIOD_LABELS = { return_1w: '1주', return_1mo: '1개월', return_3mo: '3개월' }
@@ -17,6 +18,8 @@ function returnColor(v) {
 }
 
 export default function SectorTab() {
+  const isMobile = useIsMobile()
+  const [open, setOpen] = useState(true)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -36,7 +39,16 @@ export default function SectorTab() {
 
   return (
     <div>
-      <h2 style={{ color: 'var(--text)', marginBottom: 8 }}>섹터 모멘텀</h2>
+      {isMobile ? (
+        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
+          <span style={{ color: 'var(--text)', fontWeight: 600 }}>섹터 모멘텀</span>
+          <span>{open ? '▲' : '▼'}</span>
+        </button>
+      ) : (
+        <h2 style={{ color: 'var(--text)', marginBottom: 8 }}>섹터 모멘텀</h2>
+      )}
+      {(!isMobile || open) && (
+        <>
       <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 24 }}>
         S&P500 섹터 ETF 기준 수익률 · ★ 보유 종목이 있는 섹터
       </p>
@@ -79,6 +91,8 @@ export default function SectorTab() {
         <p style={{ marginTop: 20, fontSize: 12, color: 'var(--text-muted)' }}>
           보유 종목: {Object.entries(portfolio_sectors).map(([t, s]) => `${t}(${s})`).join(' · ')}
         </p>
+      )}
+        </>
       )}
     </div>
   )

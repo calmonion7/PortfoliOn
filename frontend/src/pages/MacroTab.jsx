@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import useIsMobile from '../hooks/useIsMobile'
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
   ReferenceLine, Tooltip, ResponsiveContainer, Label,
@@ -25,6 +26,8 @@ function corrColor(v) {
 }
 
 export default function MacroTab() {
+  const isMobile = useIsMobile()
+  const [open, setOpen] = useState(true)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -51,7 +54,16 @@ export default function MacroTab() {
 
   return (
     <div>
-      <h2 style={{ color: 'var(--text)', marginBottom: 8 }}>매크로 상관관계</h2>
+      {isMobile ? (
+        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
+          <span style={{ color: 'var(--text)', fontWeight: 600 }}>매크로 상관관계</span>
+          <span>{open ? '▲' : '▼'}</span>
+        </button>
+      ) : (
+        <h2 style={{ color: 'var(--text)', marginBottom: 8 }}>매크로 상관관계</h2>
+      )}
+      {(!isMobile || open) && (
+        <>
       <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 24 }}>
         매크로 지표 일별 변동률 vs 포트폴리오 가중평균 수익률 · 90일 Pearson 상관계수 · 행 클릭 시 산점도 표시
       </p>
@@ -129,6 +141,8 @@ export default function MacroTab() {
             </ScatterChart>
           </ResponsiveContainer>
         </div>
+      )}
+        </>
       )}
     </div>
   )
