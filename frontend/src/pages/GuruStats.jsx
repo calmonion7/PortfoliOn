@@ -129,10 +129,11 @@ export default function GuruStats() {
       </div>
 
       {tab === 'popularity' && (
+        <div className="table-mobile-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
-              <th style={thStyle}>#</th>
+              <th className="col-sticky" style={thStyle}>#</th>
               <th style={thStyle}>티커</th>
               <th style={thStyle}>영문명</th>
               <th style={thStyle}>한글명</th>
@@ -143,7 +144,7 @@ export default function GuruStats() {
           <tbody>
             {filteredPopularity.map((row, i) => (
               <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={tdStyle}>{i + 1}</td>
+                <td className="col-sticky" style={tdStyle}>{i + 1}</td>
                 <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--accent)' }}>{row.ticker}</td>
                 <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{row.name}</td>
                 <td style={tdStyle}>{row.name_kr || '-'}</td>
@@ -160,20 +161,22 @@ export default function GuruStats() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {tab === 'top3' && (
+        <div className="table-mobile-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
-              <th style={thStyle}>Manager</th>
+              <th className="col-sticky" style={thStyle}>Manager</th>
               {[1, 2, 3].map(r => <th key={r} style={thStyle}>{r}위 (전체보유)</th>)}
             </tr>
           </thead>
           <tbody>
             {filteredTop3.map(m => (
               <tr key={m.manager_name} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={tdStyle}>{m.manager_name}</td>
+                <td className="col-sticky" style={tdStyle}>{m.manager_name}</td>
                 {[0, 1, 2].map(i => {
                   const h = m.top3[i]
                   return (
@@ -192,6 +195,7 @@ export default function GuruStats() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {tab === 'weighted' && (
@@ -203,10 +207,11 @@ export default function GuruStats() {
               </span>
             ))}
           </div>
+          <div className="table-mobile-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
-                <th style={thStyle}>#</th>
+                <th className="col-sticky" style={thStyle}>#</th>
                 <th style={thStyle}>티커</th>
                 <th style={thStyle}>한글명</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>가중치 합계</th>
@@ -216,7 +221,7 @@ export default function GuruStats() {
             <tbody>
               {filteredWeighted.map((row, i) => (
                 <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={tdStyle}>{i + 1}</td>
+                  <td className="col-sticky" style={tdStyle}>{i + 1}</td>
                   <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--accent)' }}>{row.ticker}</td>
                   <td style={tdStyle}>{row.name_kr || row.name || '-'}</td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.score.toFixed(3)}</td>
@@ -232,6 +237,7 @@ export default function GuruStats() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

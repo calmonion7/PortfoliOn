@@ -22,7 +22,7 @@ export default function Guru() {
     <div style={{ maxWidth: 900 }}>
       <h3 style={{ color: 'var(--text-heading)', marginBottom: 8 }}>구루 매니저</h3>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div className="tab-scroll" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {TABS.map(t => (
           <button key={t.key} style={tabStyle(tab === t.key)} onClick={() => setTab(t.key)}>
             {t.label}
