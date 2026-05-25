@@ -18,8 +18,10 @@ export default function AnalysisHub() {
           <button className={tab === 'macro' ? 'is-active' : ''} onClick={() => setTab('macro')}>매크로</button>
         </div>
       </div>
-      {tab === 'sector' && <SectorTab />}
-      {tab === 'macro'  && <MacroTab />}
+      <div className="m-page">
+        {tab === 'sector' && <SectorTab />}
+        {tab === 'macro'  && <MacroTab />}
+      </div>
     </>
   )
 

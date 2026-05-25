@@ -18,8 +18,10 @@ export default function MarketHub() {
           <button className={tab === 'analytics' ? 'is-active' : ''} onClick={() => setTab('analytics')}>포트폴리오 분석</button>
         </div>
       </div>
-      {tab === 'indicators' && <Market />}
-      {tab === 'analytics'  && <Analytics />}
+      <div className="m-page">
+        {tab === 'indicators' && <Market />}
+        {tab === 'analytics'  && <Analytics />}
+      </div>
     </>
   )
 

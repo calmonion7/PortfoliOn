@@ -20,9 +20,11 @@ export default function Research() {
           <button className={tab === 'calendar' ? 'is-active' : ''} onClick={() => setTab('calendar')}>캘린더</button>
         </div>
       </div>
-      {tab === 'digest'   && <Digest />}
-      {tab === 'reports'  && <Reports />}
-      {tab === 'calendar' && <Calendar />}
+      <div className="m-page">
+        {tab === 'digest'   && <Digest />}
+        {tab === 'reports'  && <Reports />}
+        {tab === 'calendar' && <Calendar />}
+      </div>
     </>
   )
 

@@ -23,8 +23,10 @@ export default function Guru() {
           <button className={tab === 'stats' ? 'is-active' : ''} onClick={() => setTab('stats')}>추천 통계</button>
         </div>
       </div>
-      {tab === 'managers' && <GuruManagers />}
-      {tab === 'stats'    && <GuruStats />}
+      <div className="m-page">
+        {tab === 'managers' && <GuruManagers />}
+        {tab === 'stats'    && <GuruStats />}
+      </div>
     </>
   )
 
@@ -37,7 +39,7 @@ export default function Guru() {
   })
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div className="page">
       <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>구루 매니저</h3>
 
       <div className="tab-scroll" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>

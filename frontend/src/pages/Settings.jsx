@@ -52,7 +52,7 @@ export default function Settings() {
   })
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div className="page">
       <h1 style={{ color: 'var(--text)', marginBottom: 20 }}>설정</h1>
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
