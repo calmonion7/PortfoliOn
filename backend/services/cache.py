@@ -4,8 +4,9 @@ from typing import Optional
 
 
 class TTLCache:
-    def __init__(self, ttl: float):
+    def __init__(self, ttl: float, maxsize: int = 200):
         self._ttl = ttl
+        self._maxsize = maxsize
         self._store: dict = {}  # key -> (data, timestamp)
 
     def get(self, key: str, loader):
@@ -14,6 +15,9 @@ class TTLCache:
             data, ts = self._store[key]
             if now - ts < self._ttl:
                 return data
+        # 만료 항목 정리 (maxsize 초과 시)
+        if len(self._store) >= self._maxsize:
+            self._store = {k: v for k, v in self._store.items() if now - v[1] < self._ttl}
         data = loader()
         self._store[key] = (data, now)
         return data
@@ -29,7 +33,7 @@ _snapshots: OrderedDict[str, dict] = OrderedDict()
 _list_cache = TTLCache(60.0)
 _dashboard_cache = TTLCache(300.0)
 _correlation_cache = TTLCache(300.0)
-_MAX = 200
+_MAX = 50
 
 
 def get_snapshot(ticker: str, date: str, loader) -> Optional[dict]:

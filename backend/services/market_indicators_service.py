@@ -32,7 +32,12 @@ def _get_cache(key: str) -> dict | None:
 
 
 def _set_cache(key: str, data: dict, ttl: int) -> None:
-    _cache[key] = {"data": data, "expires": time.time() + ttl}
+    # 만료 항목 정리
+    now = time.time()
+    expired = [k for k, v in _cache.items() if now >= v["expires"]]
+    for k in expired:
+        del _cache[k]
+    _cache[key] = {"data": data, "expires": now + ttl}
 
 
 def _mc_load(key: str) -> dict | None:
