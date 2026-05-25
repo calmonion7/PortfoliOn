@@ -179,6 +179,7 @@ function OpportunityBubble({ cards }) {
 }
 
 function corrColor(v) {
+  if (v === null || v === undefined) return 'var(--bg-surface)'
   const neutral = [69, 90, 100]
   const pos = [79, 195, 247]
   const neg = [239, 154, 154]
@@ -229,7 +230,7 @@ function CorrelationHeatmap() {
             <rect x={LABEL + j * CELL} y={LABEL + i * CELL}
               width={CELL} height={CELL} fill={corrColor(v)} rx={2} />
             <text x={LABEL + j * CELL + CELL / 2} y={LABEL + i * CELL + CELL / 2 + 4}
-              textAnchor="middle" fontSize={10} fill="white">{v.toFixed(2)}</text>
+              textAnchor="middle" fontSize={10} fill="white">{v !== null ? v.toFixed(2) : '—'}</text>
           </g>
         )))}
       </svg>

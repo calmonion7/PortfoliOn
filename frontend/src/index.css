@@ -86,3 +86,7 @@ body {
   color: var(--text);
   font-family: system-ui, sans-serif;
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

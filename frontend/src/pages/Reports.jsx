@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../api'
 import { TAB_STYLE, fmtPrice as fmt } from '../utils'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { TH, TD, fmtN, rsiColor, TargetTooltip, overallWeather } from '../components/reports/reportUtils.jsx'
 import ConsensusChart from '../components/reports/ConsensusChart'
 import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
@@ -18,6 +19,8 @@ export default function Reports() {
   const [selected, setSelected] = useState({ ticker: null, date: null })
   const [detail, setDetail] = useState({ summary: null })
   const [loading, setLoading] = useState(false)
+  const [listLoading, setListLoading] = useState(true)
+  const [hasFetched, setHasFetched] = useState(false)
   const [generating, setGenerating] = useState(null)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0 })
   const pollRef = useRef(null)
@@ -40,7 +43,10 @@ export default function Reports() {
   }, [])
 
 const fetchList = useCallback(() => {
-    api.get('/api/report/list').then(({ data }) => setReportList(data))
+    setListLoading(true)
+    api.get('/api/report/list')
+      .then(({ data }) => setReportList(data))
+      .finally(() => { setListLoading(false); setHasFetched(true) })
   }, [])
 
   useEffect(() => { fetchList() }, [])
@@ -230,15 +236,22 @@ const fetchList = useCallback(() => {
             </button>
           ))}
         </div>
-        {tabEntries.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>리포트 없음</p>}
-        {tabEntries.map(([t, info]) => renderTickerItem(t, info))}
+        {listLoading
+          ? <LoadingSpinner label="" size={20} style={{ padding: 20 }} />
+          : (hasFetched && tabEntries.length === 0)
+            ? <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>리포트 없음</p>
+            : null
+        }
+        {!listLoading && tabEntries.map(([t, info]) => renderTickerItem(t, info))}
       </div>
 
       {/* 우측 패널 */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: view === 'list' ? 'auto' : 'hidden' }}>
         {view === 'list' ? (
           /* 목록화면 */
-          tabEntries.length === 0 ? (
+          listLoading ? (
+            <LoadingSpinner label="리포트 목록 불러오는 중..." style={{ marginTop: 80 }} />
+          ) : (hasFetched && tabEntries.length === 0) ? (
             <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-muted)' }}>
               <p>리포트가 없습니다.</p>
               <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>
@@ -496,7 +509,7 @@ const fetchList = useCallback(() => {
               ))}
             </div>
 
-            {loading && <p style={{ color: 'var(--text-muted)' }}>로딩 중...</p>}
+            {loading && <LoadingSpinner />}
             {!loading && activeDetailTab === 'summary' && (
               detail.summary
                 ? <DetailSummaryTab summary={detail.summary} ticker={selected.ticker} />

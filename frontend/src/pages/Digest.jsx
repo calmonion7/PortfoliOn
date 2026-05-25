@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function Digest() {
   const [digest, setDigest] = useState(null)
@@ -35,7 +36,7 @@ export default function Digest() {
     }
   }
 
-  if (loading) return <div style={{ color: 'var(--text-muted)', padding: 16 }}>로딩 중...</div>
+  if (loading) return <LoadingSpinner label="Daily Digest 불러오는 중..." />
 
   return (
     <div style={{ maxWidth: 600 }}>

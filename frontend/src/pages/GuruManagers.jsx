@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 function formatValue(val) {
   if (!val) return '-'
@@ -90,7 +91,7 @@ export default function GuruManagers() {
     return 0
   })
 
-  if (loading) return <p style={{ color: 'var(--text-muted)' }}>로딩 중...</p>
+  if (loading) return <LoadingSpinner label="구루 운용역 불러오는 중..." />
   if (!data.managers.length) return (
     <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
       데이터 없음 — "크롤링 설정" 탭에서 데이터를 가져오세요.

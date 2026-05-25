@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from concurrent.futures import ThreadPoolExecutor
+import math
 
 import yfinance as yf
 import pandas as pd
@@ -40,8 +41,11 @@ def get_correlation(user_id: str = Depends(get_current_user)):
 
         corr = pd.DataFrame(closes_map).corr()
         tickers = list(corr.columns)
+        def _safe(v):
+            f = float(v)
+            return None if (math.isnan(f) or math.isinf(f)) else round(f, 3)
         matrix = [
-            [round(float(corr.loc[t1, t2]), 3) for t2 in tickers]
+            [_safe(corr.loc[t1, t2]) for t2 in tickers]
             for t1 in tickers
         ]
         return {"tickers": tickers, "matrix": matrix}

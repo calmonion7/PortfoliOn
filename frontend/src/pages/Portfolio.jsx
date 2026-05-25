@@ -3,6 +3,7 @@ import api from '../api'
 import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 import { TAB_STYLE, fmtPrice } from '../utils'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 const MarketBadge = ({ market }) => (
   <span style={{
@@ -104,7 +105,7 @@ const DashboardCard = ({ item }) => {
 }
 
 const DashboardGrid = ({ cards, loading }) => {
-  if (loading) return <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 40 }}>불러오는 중...</p>
+  if (loading) return <LoadingSpinner label="포트폴리오 불러오는 중..." />
   if (!cards.length) return <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 40 }}>보유종목이 없습니다.</p>
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
