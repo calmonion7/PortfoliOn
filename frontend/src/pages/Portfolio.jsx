@@ -108,7 +108,7 @@ const DashboardGrid = ({ cards, loading }) => {
   if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
   if (!cards.length) return <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 40 }}>보유종목이 없습니다.</p>
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+    <div className="dashboard-grid">
       {cards.map(item => <DashboardCard key={item.ticker} item={item} />)}
     </div>
   )
@@ -298,10 +298,11 @@ export default function Portfolio() {
 
       {/* 보유종목 탭 */}
       {activeTab === 'holdings' && (
+        <div className="table-mobile-wrap">
         <table style={{ fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ fontSize: 11 }}>시장</th>
+              <th className="col-sticky" style={{ fontSize: 11 }}>시장</th>
               <th style={{ fontSize: 11 }}>티커</th>
               <th style={{ fontSize: 11 }}>회사명</th>
               <th style={{ fontSize: 11 }}>수량</th>
@@ -313,7 +314,7 @@ export default function Portfolio() {
           <tbody>
             {filteredStocks.map(stock => (
               <tr key={stock.ticker}>
-                <td><MarketBadge market={stock.market || 'US'} /></td>
+                <td className="col-sticky"><MarketBadge market={stock.market || 'US'} /></td>
                 <td><strong>{stock.ticker}</strong></td>
                 <td>{stock.name}</td>
                 <td>{stock.quantity}</td>
@@ -333,14 +334,16 @@ export default function Portfolio() {
             )}
           </tbody>
         </table>
+        </div>
       )}
 
       {/* 관심종목 탭 */}
       {activeTab === 'watchlist' && (
+        <div className="table-mobile-wrap">
         <table style={{ fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ fontSize: 11 }}>시장</th>
+              <th className="col-sticky" style={{ fontSize: 11 }}>시장</th>
               <th style={{ fontSize: 11 }}>티커</th>
               <th style={{ fontSize: 11 }}>회사명</th>
               <th style={{ fontSize: 11 }}>경쟁사</th>
@@ -350,7 +353,7 @@ export default function Portfolio() {
           <tbody>
             {filteredWatchlist.map(stock => (
               <tr key={stock.ticker}>
-                <td><MarketBadge market={stock.market || 'US'} /></td>
+                <td className="col-sticky"><MarketBadge market={stock.market || 'US'} /></td>
                 <td><strong>{stock.ticker}</strong></td>
                 <td>{stock.name}</td>
                 <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{stock.competitors?.join(', ') || '-'}</td>
@@ -375,6 +378,7 @@ export default function Portfolio() {
             )}
           </tbody>
         </table>
+        </div>
       )}
 
       {modalOpen && (
