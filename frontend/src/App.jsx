@@ -8,6 +8,7 @@ import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import { supabase } from './supabase'
 import LoginPage from './pages/LoginPage'
+import MobileNav from './components/MobileNav'
 import './App.css'
 
 const THEMES = [
@@ -54,20 +55,22 @@ export default function App() {
         borderBottom: '1px solid var(--border)',
       }}>
         <span style={{ color: 'var(--text)', fontWeight: 'bold', marginRight: 16 }}>Portfolio Manager</span>
-        {[['/', '종목관리'], ['/research', '리서치'], ['/market', '시장'], ['/analysis', '분석'], ['/guru', '구루'], ['/settings', '설정']].map(([to, label]) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            style={({ isActive }) => ({
-              color: isActive ? 'var(--accent)' : 'var(--text-muted)',
-              textDecoration: 'none',
-              fontWeight: isActive ? 600 : 400,
-            })}
-          >
-            {label}
-          </NavLink>
-        ))}
+        <div className="desktop-only" style={{ gap: 24, alignItems: 'center' }}>
+          {[['/', '종목관리'], ['/research', '리서치'], ['/market', '시장'], ['/analysis', '분석'], ['/guru', '구루'], ['/settings', '설정']].map(([to, label]) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              style={({ isActive }) => ({
+                color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                textDecoration: 'none',
+                fontWeight: isActive ? 600 : 400,
+              })}
+            >
+              {label}
+            </NavLink>
+          ))}
+        </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
           <button
             onClick={() => supabase.auth.signOut()}
@@ -95,7 +98,7 @@ export default function App() {
           ))}
         </div>
       </nav>
-      <main style={{ padding: 24, background: 'var(--bg)', minHeight: 'calc(100vh - 49px)' }}>
+      <main style={{ padding: 24, background: 'var(--bg)', minHeight: 'calc(100vh - 49px)', paddingBottom: 'max(24px, calc(24px + 56px))' }}>
         <Routes>
           <Route path="/" element={<Portfolio />} />
           <Route path="/research" element={<Research />} />
@@ -105,6 +108,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
+      <MobileNav />
     </BrowserRouter>
   )
 }

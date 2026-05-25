@@ -23,9 +23,9 @@ export default function MobileNav() {
   return (
     <>
       {/* 하단 탭 바 */}
-      <nav style={{
+      <nav className="mobile-only" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
-        display: 'flex', background: 'var(--bg-nav)',
+        background: 'var(--bg-nav)',
         borderTop: '2px solid var(--accent)', height: 56,
       }}>
         {TABS.map(({ to, label, icon }) => (
