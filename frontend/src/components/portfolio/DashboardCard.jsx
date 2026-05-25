@@ -1,4 +1,5 @@
 import Card from '../ui/Card'
+import './DashboardCard.css'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
 import { fmtPrice } from '../../utils'
 
