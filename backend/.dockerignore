@@ -1,0 +1,12 @@
+.venv
+__pycache__
+*.pyc
+.env
+data/calendar/
+data/consensus/
+data/holdings.json
+data/watchlist.json
+data/guru_schedule.json
+snapshots/
+reports/
+tests/
