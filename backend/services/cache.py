@@ -6,20 +6,23 @@ from typing import Optional
 class TTLCache:
     def __init__(self, ttl: float):
         self._ttl = ttl
-        self._data = None
-        self._ts = 0.0
+        self._store: dict = {}  # key -> (data, timestamp)
 
-    def get(self, loader):
+    def get(self, key: str, loader):
         now = time.time()
-        if self._data is not None and now - self._ts < self._ttl:
-            return self._data
-        self._data = loader()
-        self._ts = now
-        return self._data
+        if key in self._store:
+            data, ts = self._store[key]
+            if now - ts < self._ttl:
+                return data
+        data = loader()
+        self._store[key] = (data, now)
+        return data
 
-    def invalidate(self):
-        self._data = None
-        self._ts = 0.0
+    def invalidate(self, key: str = None):
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
 
 
 _snapshots: OrderedDict[str, dict] = OrderedDict()
@@ -47,26 +50,26 @@ def invalidate(ticker: str) -> None:
     for k in [k for k in _snapshots if k.startswith(prefix)]:
         del _snapshots[k]
     invalidate_list()
-    invalidate_dashboard()
+    invalidate_dashboard()  # clear all users' dashboards
     invalidate_correlation()
     invalidate_sector()
     invalidate_macro()
 
 
-def invalidate_dashboard() -> None:
-    _dashboard_cache.invalidate()
+def invalidate_dashboard(user_id: str = None) -> None:
+    _dashboard_cache.invalidate(user_id)
 
 
-def get_dashboard(loader) -> list:
-    return _dashboard_cache.get(loader)
+def get_dashboard(user_id: str, loader) -> list:
+    return _dashboard_cache.get(user_id, loader)
 
 
-def invalidate_correlation() -> None:
-    _correlation_cache.invalidate()
+def invalidate_correlation(user_id: str = None) -> None:
+    _correlation_cache.invalidate(user_id)
 
 
-def get_correlation(loader) -> dict:
-    return _correlation_cache.get(loader)
+def get_correlation(user_id: str, loader) -> dict:
+    return _correlation_cache.get(user_id, loader)
 
 
 def invalidate_list() -> None:
@@ -74,24 +77,24 @@ def invalidate_list() -> None:
 
 
 def get_list(loader) -> dict:
-    return _list_cache.get(loader)
+    return _list_cache.get("__global__", loader)
 
 
 _sector_cache = TTLCache(300.0)
 _macro_cache = TTLCache(300.0)
 
 
-def get_sector(loader) -> dict:
-    return _sector_cache.get(loader)
+def get_sector(user_id: str, loader) -> dict:
+    return _sector_cache.get(user_id, loader)
 
 
-def get_macro(loader) -> dict:
-    return _macro_cache.get(loader)
+def get_macro(user_id: str, loader) -> dict:
+    return _macro_cache.get(user_id, loader)
 
 
-def invalidate_sector() -> None:
-    _sector_cache.invalidate()
+def invalidate_sector(user_id: str = None) -> None:
+    _sector_cache.invalidate(user_id)
 
 
-def invalidate_macro() -> None:
-    _macro_cache.invalidate()
+def invalidate_macro(user_id: str = None) -> None:
+    _macro_cache.invalidate(user_id)

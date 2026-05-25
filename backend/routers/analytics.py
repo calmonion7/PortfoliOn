@@ -46,4 +46,4 @@ def get_correlation(user_id: str = Depends(get_current_user)):
         ]
         return {"tickers": tickers, "matrix": matrix}
 
-    return cache_svc.get_correlation(_build)
+    return cache_svc.get_correlation(user_id, _build)
