@@ -518,3 +518,28 @@ def test_mc_load_returns_none_on_missing(monkeypatch):
     monkeypatch.setattr(svc, "get_db", lambda: FakeDB())
 
     assert svc._mc_load("nonexistent") is None
+
+
+# ── _merge_history / _yf_close_history ───────────────────────────────────────
+
+def test_yf_merge_history_appends_new_points():
+    from services.market_indicators_service import _merge_history
+    stored = [
+        {"date": "2026-01-01", "value": 1.0},
+        {"date": "2026-01-02", "value": 2.0},
+    ]
+    new_pts = [
+        {"date": "2026-01-02", "value": 2.1},
+        {"date": "2026-01-03", "value": 3.0},
+    ]
+    result = _merge_history(stored, new_pts)
+    dates = [p["date"] for p in result]
+    assert dates == ["2026-01-01", "2026-01-02", "2026-01-03"]
+    assert next(p["value"] for p in result if p["date"] == "2026-01-02") == 2.1
+
+
+def test_yf_merge_history_empty_new():
+    from services.market_indicators_service import _merge_history
+    stored = [{"date": "2026-01-01", "value": 1.0}]
+    result = _merge_history(stored, [])
+    assert result == stored

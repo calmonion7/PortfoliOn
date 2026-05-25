@@ -54,6 +54,40 @@ def _mc_save(key: str, data: dict) -> None:
         pass
 
 
+def _merge_history(stored: list[dict], new_pts: list[dict]) -> list[dict]:
+    """stored + new_pts 병합. 중복 날짜는 new_pts 우선. 날짜순 정렬."""
+    merged = {p["date"]: p for p in stored}
+    merged.update({p["date"]: p for p in new_pts})
+    return sorted(merged.values(), key=lambda p: p["date"])
+
+
+def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[dict]:
+    """yfinance Close 히스토리 incremental fetch.
+    stored가 있으면 마지막 날짜 다음부터만 조회, 없으면 1년치 조회."""
+    from datetime import date, timedelta
+    if stored:
+        last = stored[-1]["date"]
+        start = (date.fromisoformat(last) + timedelta(days=1)).isoformat()
+        if start > date.today().isoformat():
+            return stored  # 이미 최신
+        hist = yf.Ticker(sym).history(start=start, interval="1d")
+    else:
+        hist = yf.Ticker(sym).history(period="1y", interval="1d")
+
+    if hist.empty:
+        return stored
+
+    close = hist["Close"].dropna()
+    new_pts = [
+        {"date": str(d.date()), "value": round(float(v), precision)}
+        for d, v in zip(close.index, close.values)
+    ]
+    combined = _merge_history(stored, new_pts)
+    # 1년치만 유지
+    cutoff = (date.today() - timedelta(days=366)).isoformat()
+    return [p for p in combined if p["date"] >= cutoff]
+
+
 # ── Treasury ──────────────────────────────────────────────────────────────────
 
 _TREASURY_SYMBOLS = {"3m": "^IRX", "5y": "^FVX", "10y": "^TNX", "30y": "^TYX"}
