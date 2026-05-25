@@ -21,7 +21,7 @@ export default function Research() {
 
   return (
     <div>
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
+      <div className="tab-scroll" style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
         {TABS.map(t => (
           <button key={t.key} style={tabStyle(tab === t.key)} onClick={() => setTab(t.key)}>
             {t.label}

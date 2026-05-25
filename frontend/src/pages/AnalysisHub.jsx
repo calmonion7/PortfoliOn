@@ -21,7 +21,7 @@ export default function AnalysisHub() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+      <div className="tab-scroll" style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         {TABS.map(t => (
           <button key={t.key} style={tabStyle(tab === t.key)} onClick={() => setTab(t.key)}>
             {t.label}
