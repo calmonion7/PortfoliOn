@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { Spark, Sig, sparkFor } from '../components/ui/icons'
 
 export default function Digest() {
   const [digest, setDigest] = useState(null)
@@ -11,8 +12,7 @@ export default function Digest() {
   useEffect(() => { fetchLatest() }, [])
 
   async function fetchLatest() {
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const r = await api.get('/api/digest/latest')
       setDigest(r.data)
@@ -24,8 +24,7 @@ export default function Digest() {
   }
 
   async function handleRefresh() {
-    setRefreshing(true)
-    setError(null)
+    setRefreshing(true); setError(null)
     try {
       const r = await api.post('/api/digest/generate')
       setDigest(r.data)
@@ -39,119 +38,67 @@ export default function Digest() {
   if (loading) return <LoadingSpinner label="다이제스트 불러오는 중입니다." />
 
   return (
-    <div style={{ maxWidth: 600 }}>
+    <div style={{ maxWidth: 640 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: 'var(--text)' }}>Daily Digest</h2>
-        {digest && <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{digest.date}</span>}
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          style={{
-            marginLeft: 'auto',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            color: 'var(--text)',
-            borderRadius: 4,
-            padding: '4px 10px',
-            cursor: refreshing ? 'wait' : 'pointer',
-          }}
-        >
-          {refreshing ? '생성 중...' : '↺ 새로고침'}
+        <span className="muted" style={{ fontSize: 13 }}>Daily Digest {digest?.date && `· ${digest.date}`}</span>
+        <button className="btn" onClick={handleRefresh} disabled={refreshing} style={{ marginLeft: 'auto' }}>
+          {refreshing ? '생성 중…' : '↺ 새로고침'}
         </button>
       </div>
 
-      {error && <div style={{ color: '#e57373', marginBottom: 12 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--down)', marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
       {!digest ? (
-        <div style={{ color: 'var(--text-muted)' }}>
-          아직 생성된 Digest가 없습니다. 새로고침 버튼을 눌러 생성하세요.
-        </div>
+        <div className="muted">아직 생성된 Digest가 없습니다. 새로고침 버튼을 눌러 생성하세요.</div>
       ) : (
         <>
           {digest.anomalies.length > 0 && (
-            <div style={{
-              background: 'rgba(229,115,115,0.1)',
-              border: '1px solid rgba(229,115,115,0.3)',
-              borderRadius: 6,
-              padding: '10px 14px',
-              marginBottom: 12,
-            }}>
-              <div style={{ color: '#e57373', fontWeight: 600, marginBottom: 6 }}>⚠ 이상신호</div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {digest.anomalies.map(a => (
-                  <span key={a.ticker} style={{ color: a.change_pct >= 0 ? '#81c784' : '#e57373', fontSize: 13 }}>
-                    {a.ticker} {a.change_pct >= 0 ? '+' : ''}{a.change_pct.toFixed(1)}%
-                  </span>
-                ))}
-              </div>
+            <div className="digest-banner">
+              <span>⚠ 이상신호 </span>
+              {digest.anomalies.map(a => (
+                <span key={a.ticker} className={a.change_pct >= 0 ? 'up tnum' : 'down tnum'} style={{ marginLeft: 8 }}>
+                  {a.ticker} {a.change_pct >= 0 ? '+' : ''}{a.change_pct.toFixed(1)}%
+                </span>
+              ))}
             </div>
           )}
 
-          <div style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            padding: '12px 16px',
-            marginBottom: 12,
-          }}>
-            <div style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 6 }}>포트폴리오 요약</div>
+          {/* 포트폴리오 요약 */}
+          <div className="card" style={{ marginBottom: 12, padding: '12px 16px' }}>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>포트폴리오 요약</div>
             <div style={{ display: 'flex', gap: 20, alignItems: 'baseline' }}>
-              <span style={{ color: 'var(--text)', fontSize: 18, fontWeight: 600 }}>
+              <span className="tnum" style={{ fontSize: 18, fontWeight: 600 }}>
                 ${digest.portfolio_summary.total_value_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </span>
-              <span style={{
-                color: digest.portfolio_summary.daily_change_pct >= 0 ? '#81c784' : '#e57373',
-                fontSize: 13,
-              }}>
-                {digest.portfolio_summary.daily_change_pct >= 0 ? '+' : ''}
-                {digest.portfolio_summary.daily_change_pct.toFixed(1)}%
-                &nbsp;({digest.portfolio_summary.daily_change_usd >= 0 ? '+' : ''}$
-                {Math.abs(digest.portfolio_summary.daily_change_usd).toLocaleString(undefined, { maximumFractionDigits: 0 })})
-              </span>
+              <Sig v={digest.portfolio_summary.daily_change_pct} />
             </div>
           </div>
 
-          <div style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            padding: '12px 16px',
-            marginBottom: 12,
-          }}>
-            <div style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>종목별 등락</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {digest.stocks.map(s => (
-                <div key={s.ticker} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text)', fontSize: 13 }}>
-                    {s.ticker}
-                    {!s.is_holding && (
-                      <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 6 }}>관심</span>
-                    )}
-                  </span>
-                  <span style={{ color: s.change_pct >= 0 ? '#81c784' : '#e57373', fontSize: 13 }}>
-                    {s.change_pct >= 0 ? '+' : ''}{s.change_pct.toFixed(1)}%
-                  </span>
+          {/* 종목별 등락 */}
+          <div className="digest-list">
+            {digest.stocks.map(s => (
+              <div key={s.ticker} className="digest-row">
+                <div>
+                  <span className="tick">{s.ticker}</span>
+                  {!s.is_holding && <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>관심</span>}
                 </div>
-              ))}
-            </div>
+                <Spark data={sparkFor(s.ticker, 30, s.change_pct >= 0 ? 0.3 : -0.3)} w={60} h={20}
+                  color={s.change_pct >= 0 ? 'var(--up)' : 'var(--down)'} />
+                <Sig v={s.change_pct} />
+              </div>
+            ))}
           </div>
 
+          {/* 향후 7일 이벤트 */}
           {digest.events_7d.length > 0 && (
-            <div style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              padding: '12px 16px',
-            }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>향후 7일 이벤트</div>
+            <div className="card" style={{ marginTop: 12, padding: '12px 16px' }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>향후 7일 이벤트</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {digest.events_7d.map((ev, i) => (
                   <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
-                    <span style={{ color: 'var(--accent)', minWidth: 36 }}>D-{ev.days_until}</span>
-                    <span style={{ color: 'var(--text)' }}>{ev.ticker}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>
-                      {ev.event_type === 'earnings' ? '실적발표' : '배당락일'}
-                    </span>
+                    <span className="tnum" style={{ color: 'var(--accent)', minWidth: 36 }}>D-{ev.days_until}</span>
+                    <span>{ev.ticker}</span>
+                    <span className="muted">{ev.event_type === 'earnings' ? '실적발표' : '배당락일'}</span>
                   </div>
                 ))}
               </div>

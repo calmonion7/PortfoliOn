@@ -34,7 +34,7 @@ function MonthGrid({ year, month, events }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--border)' }}>
       {DAY_LABELS.map(d => (
-        <div key={d} style={{ background: 'var(--bg-surface)', padding: '6px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+        <div key={d} style={{ background: 'var(--bg-elev-2)', padding: '6px', textAlign: 'center', fontSize: 11, color: 'var(--text-3)' }}>
           {d}
         </div>
       ))}
@@ -45,9 +45,9 @@ function MonthGrid({ year, month, events }) {
         const dayEvents = dateStr ? (byDate[dateStr] || []) : []
         const isToday = dateStr === todayStr
         return (
-          <div key={i} style={{ background: day ? 'var(--bg-card)' : 'var(--bg)', minHeight: 72, padding: 4, outline: isToday ? '2px solid var(--accent, #4fc3f7)' : 'none', outlineOffset: -2 }}>
+          <div key={i} style={{ background: day ? 'var(--bg-elev)' : 'var(--bg)', minHeight: 72, padding: 4, outline: isToday ? '2px solid var(--accent)' : 'none', outlineOffset: -2 }}>
             {day && (
-              <div style={{ fontSize: 11, marginBottom: 4, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent, #4fc3f7)' : 'var(--text-muted)' }}>{day}</div>
+              <div style={{ fontSize: 11, marginBottom: 4, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent)' : 'var(--text-3)' }}>{day}</div>
             )}
             {dayEvents.map((e, j) => {
               const styleKey = e.type === 'holiday_us' || e.type === 'holiday_kr'
@@ -136,7 +136,7 @@ export default function Calendar() {
             onClick={refresh}
             disabled={loading}
             title="캐시 삭제 후 새로고침"
-            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: loading ? 'default' : 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 13 }}
+            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: loading ? 'default' : 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 13 }}
           >↺</button>
           <button
             onClick={prevMonth}
@@ -155,11 +155,11 @@ export default function Calendar() {
       {loading
         ? <LoadingSpinner label="캘린더 불러오는 중입니다." />
         : error
-        ? <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>{error}</div>
+        ? <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: 48 }}>{error}</div>
         : <MonthGrid year={year} month={month} events={events} />
       }
 
-      <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+      <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-3)', flexWrap: 'wrap' }}>
         <span style={{ ...EVENT_STYLE.holding_earnings, padding: '1px 6px', borderRadius: 3 }}>보유 실적</span>
         <span style={{ ...EVENT_STYLE.holding_dividend, padding: '1px 6px', borderRadius: 3 }}>보유 배당락</span>
         <span style={{ ...EVENT_STYLE.watchlist_earnings, padding: '1px 6px', borderRadius: 3 }}>관심 실적</span>

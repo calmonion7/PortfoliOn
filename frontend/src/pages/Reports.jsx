@@ -162,7 +162,7 @@ const fetchList = useCallback(() => {
       <div
         key={ticker}
         onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--bg-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--surface-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -170,15 +170,15 @@ const fetchList = useCallback(() => {
             {(() => { const w = overallWeather(info.summary); return w ? <span title={w.label} style={{ fontSize: 12, lineHeight: 1 }}>{w.icon}</span> : null })()}
           </span>
           {info.summary?.name && (
-            <div style={{ color: 'var(--text-muted)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
+            <div style={{ color: 'var(--text-3)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
           )}
           {guruMap[ticker] && (
             <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
           )}
-          {!hasReport && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>클릭하여 생성</div>}
+          {!hasReport && <div style={{ color: 'var(--text-3)', fontSize: 10 }}>클릭하여 생성</div>}
           {generating === ticker && genProgress.total > 0 && (
             <div style={{ marginTop: 3 }}>
-              <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
+              <div style={{ background: 'var(--surface-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
                 <div style={{ width: `${Math.round(genProgress.done / genProgress.total * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.4s ease' }} />
               </div>
             </div>
@@ -187,7 +187,7 @@ const fetchList = useCallback(() => {
         <button
           onClick={e => { e.stopPropagation(); generateOne(ticker) }}
           disabled={!!generating}
-          style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
+          style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
         >
           {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
         </button>
@@ -200,7 +200,7 @@ const fetchList = useCallback(() => {
       {/* 좌측 사이드바 */}
       <div style={{ width: 210, overflowY: 'auto', borderRight: '1px solid var(--border)', paddingRight: 16, flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h3 style={{ color: 'var(--text-heading)', margin: 0 }}>리포트 목록</h3>
+          <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
           <button style={TAB_STYLE(activeTab === 'holdings')} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
@@ -209,11 +209,11 @@ const fetchList = useCallback(() => {
         {activeTab === 'watchlist' && (
           <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 8, marginTop: 4 }}>
             <button
-              style={{ ...TAB_STYLE(watchlistSub === 'low'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'low' ? '#81c784' : 'var(--text-muted)', borderBottom: watchlistSub === 'low' ? '2px solid #81c784' : '2px solid transparent' }}
+              style={{ ...TAB_STYLE(watchlistSub === 'low'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'low' ? '#81c784' : 'var(--text-3)', borderBottom: watchlistSub === 'low' ? '2px solid #81c784' : '2px solid transparent' }}
               onClick={() => setWatchlistSub('low')}
             >RSI≤45 ({watchlistLowCount})</button>
             <button
-              style={{ ...TAB_STYLE(watchlistSub === 'high'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-muted)', borderBottom: watchlistSub === 'high' ? '2px solid #ef9a9a' : '2px solid transparent' }}
+              style={{ ...TAB_STYLE(watchlistSub === 'high'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottom: watchlistSub === 'high' ? '2px solid #ef9a9a' : '2px solid transparent' }}
               onClick={() => setWatchlistSub('high')}
             >RSI&gt;45 ({watchlistHighCount})</button>
           </div>
@@ -225,9 +225,9 @@ const fetchList = useCallback(() => {
               onClick={() => setMarketFilter(val)}
               style={{
                 flex: 1, padding: '3px 0', fontSize: 10,
-                background: marketFilter === val ? 'var(--bg-hover)' : 'transparent',
+                background: marketFilter === val ? 'var(--surface-hover)' : 'transparent',
                 border: `1px solid ${marketFilter === val ? 'var(--accent)' : 'var(--border)'}`,
-                color: marketFilter === val ? 'var(--accent)' : 'var(--text-muted)',
+                color: marketFilter === val ? 'var(--accent)' : 'var(--text-3)',
                 borderRadius: 3, cursor: 'pointer', lineHeight: 1.6,
               }}
             >
@@ -239,7 +239,7 @@ const fetchList = useCallback(() => {
         {listLoading
           ? <LoadingSpinner label="" size={20} style={{ padding: 20 }} />
           : (hasFetched && tabEntries.length === 0)
-            ? <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>리포트 없음</p>
+            ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>리포트 없음</p>
             : null
         }
         {!listLoading && tabEntries.map(([t, info]) => renderTickerItem(t, info))}
@@ -252,34 +252,34 @@ const fetchList = useCallback(() => {
           listLoading ? (
             <LoadingSpinner label="리포트 불러오는 중입니다." style={{ marginTop: 80 }} />
           ) : (hasFetched && tabEntries.length === 0) ? (
-            <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-muted)' }}>
+            <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-3)' }}>
               <p>리포트가 없습니다.</p>
               <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>
             </div>
           ) : (
             <table style={{ borderCollapse: 'collapse', color: 'var(--text)', width: '100%' }}>
               <thead>
-                <tr style={{ background: 'var(--bg-surface)' }}>
+                <tr style={{ background: 'var(--bg-elev-2)' }}>
                   <th style={{ ...TH, textAlign: 'left', left: 0, zIndex: 3 }}>종목명 (티커)</th>
                   <th style={{ ...TH, textAlign: 'left' }}>시장</th>
                   <th style={{ ...TH, textAlign: 'left' }}>섹터</th>
                   <th style={TH}>현재가</th>
                   <th style={{ ...TH, color: '#ffb74d' }}>20일고점대비</th>
                   <th style={TH}>POC</th>
-                  <th style={TH}>평균목표가<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>vs 현재가</span></th>
+                  <th style={TH}>평균목표가<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>vs 현재가</span></th>
                   <th style={{ ...TH, color: '#81c784' }}>Buy</th>
                   <th style={TH}>Hold</th>
                   <th style={{ ...TH, color: '#ef9a9a' }}>Sell</th>
-                  <th style={TH}>PER<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Fwd</span></th>
+                  <th style={TH}>PER<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>Fwd</span></th>
                   <th style={TH}>PBR</th>
                   <th style={TH}>Finviz</th>
-                  <th style={{ ...TH, borderLeft: '1px solid var(--border)' }}>RSI<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#4db6ac' }}>RSI20<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#4db6ac' }}>RSI25<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#4db6ac' }}>RSI30<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ff8a65' }}>RSI70<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ff8a65' }}>RSI75<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ff8a65' }}>RSI80<br/><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, borderLeft: '1px solid var(--border)' }}>RSI<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI20<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI25<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#4db6ac' }}>RSI30<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI70<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI75<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
+                  <th style={{ ...TH, color: '#ff8a65' }}>RSI80<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -304,7 +304,7 @@ const fetchList = useCallback(() => {
                       key={ticker}
                       onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
                       style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)', opacity: hasReport ? 1 : 0.6 }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.querySelector('td').style.background = 'var(--bg-hover)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-hover)'; e.currentTarget.querySelector('td').style.background = 'var(--surface-hover)' }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.querySelector('td').style.background = 'var(--bg)' }}
                     >
                       <td style={{ ...TD, textAlign: 'left', color: 'var(--accent)', fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, background: 'var(--bg)' }}>
@@ -312,19 +312,19 @@ const fetchList = useCallback(() => {
                           {s?.name || ticker}
                           {(() => { const w = overallWeather(s); return w ? <span title={w.label} style={{ fontSize: 13, lineHeight: 1, fontWeight: 400 }}>{w.icon}</span> : null })()}
                         </div>
-                        <div style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
+                        <div style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
                         {guruMap[ticker] && <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>}
-                        {!hasReport && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>리포트 없음 — 클릭하여 생성</div>}
+                        {!hasReport && <div style={{ color: 'var(--text-3)', fontSize: 10 }}>리포트 없음 — 클릭하여 생성</div>}
                       </td>
                       <td style={{ ...TD, textAlign: 'left' }}>
                         {market === 'KR'
                           ? <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a', whiteSpace: 'nowrap' }}>🇰🇷 KR</span>
-                          : <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-surface)', color: '#4fc3f7', border: '1px solid var(--border)', whiteSpace: 'nowrap' }}>🇺🇸 US</span>
+                          : <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#4fc3f7', border: '1px solid var(--border)', whiteSpace: 'nowrap' }}>🇺🇸 US</span>
                         }
                       </td>
-                      <td style={{ ...TD, textAlign: 'left', color: 'var(--text-muted)', fontSize: 11 }}>
+                      <td style={{ ...TD, textAlign: 'left', color: 'var(--text-3)', fontSize: 11 }}>
                         <div>{s?.sector || '—'}</div>
-                        {s?.industry ? <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{s.industry}</div> : null}
+                        {s?.industry ? <div style={{ color: 'var(--text-3)', fontSize: 10 }}>{s.industry}</div> : null}
                       </td>
                       <td style={TD}>{s ? fmt(s.price, s.market) : 'N/A'}</td>
                       <td style={TD}>
@@ -357,7 +357,7 @@ const fetchList = useCallback(() => {
                       })()}
                       <td style={TD}>
                         {s?.per != null ? s.per.toFixed(1) : '—'}
-                        {s?.forward_per != null && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{s.forward_per.toFixed(1)}</div>}
+                        {s?.forward_per != null && <div style={{ color: 'var(--text-3)', fontSize: 10 }}>{s.forward_per.toFixed(1)}</div>}
                       </td>
                       <td style={TD}>{s?.pbr != null ? s.pbr.toFixed(2) : '—'}</td>
                       <td style={TD}>{s ? fmtN(s.finviz_recom) : 'N/A'}</td>
@@ -382,10 +382,10 @@ const fetchList = useCallback(() => {
                         }
                         const isClosest = closestKey === key
                         return (
-                          <td key={key} style={{ ...TD, color: base, background: isClosest ? 'var(--bg-hover)' : undefined, border: isClosest ? '2px solid var(--accent)' : undefined, fontWeight: isClosest ? 700 : undefined }}>
-                            {dv != null ? <div>{fmt(dv, s?.market)}{gapEl(dv)}</div> : <div style={{ color: 'var(--text-muted)' }}>N/A</div>}
-                            <div style={{ fontSize: 10, color: wv != null ? sub : 'var(--text-muted)' }}>{wv != null ? <>{fmt(wv, s?.market)}{gapEl(wv, 9)}</> : 'N/A'}</div>
-                            <div style={{ fontSize: 10, color: mv != null ? sub : 'var(--text-muted)' }}>{mv != null ? <>{fmt(mv, s?.market)}{gapEl(mv, 9)}</> : 'N/A'}</div>
+                          <td key={key} style={{ ...TD, color: base, background: isClosest ? 'var(--surface-hover)' : undefined, border: isClosest ? '2px solid var(--accent)' : undefined, fontWeight: isClosest ? 700 : undefined }}>
+                            {dv != null ? <div>{fmt(dv, s?.market)}{gapEl(dv)}</div> : <div style={{ color: 'var(--text-3)' }}>N/A</div>}
+                            <div style={{ fontSize: 10, color: wv != null ? sub : 'var(--text-3)' }}>{wv != null ? <>{fmt(wv, s?.market)}{gapEl(wv, 9)}</> : 'N/A'}</div>
+                            <div style={{ fontSize: 10, color: mv != null ? sub : 'var(--text-3)' }}>{mv != null ? <>{fmt(mv, s?.market)}{gapEl(mv, 9)}</> : 'N/A'}</div>
                           </td>
                         )
                       })}
@@ -401,18 +401,18 @@ const fetchList = useCallback(() => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
               <button
                 onClick={() => setView('list')}
-                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}
+                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}
               >
                 ← 목록으로
               </button>
               <div style={{ flex: 1 }}>
-                <span style={{ color: 'var(--text-heading)', fontWeight: 700, fontSize: 16 }}>
+                <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16 }}>
                   {detail.summary?.name || selected.ticker}
                 </span>
-                <span style={{ color: 'var(--text-muted)', fontSize: 14, marginLeft: 8 }}>({selected.ticker})</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 14, marginLeft: 8 }}>({selected.ticker})</span>
                 {detail.summary?.market === 'KR'
                   ? <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
-                  : <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-surface)', color: '#4fc3f7', border: '1px solid var(--border)' }}>🇺🇸 US</span>
+                  : <span style={{ fontSize: 10, marginLeft: 8, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#4fc3f7', border: '1px solid var(--border)' }}>🇺🇸 US</span>
                 }
                 {guruMap[selected.ticker] && (
                   <span style={{ color: '#ffb74d', fontSize: 11, marginLeft: 8, background: '#2a1a00', padding: '2px 7px', borderRadius: 3 }}>
@@ -423,20 +423,20 @@ const fetchList = useCallback(() => {
                   <select
                     value={selected.date}
                     onChange={e => setSelected({ ticker: selected.ticker, date: e.target.value })}
-                    style={{ marginLeft: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', fontSize: 12, cursor: 'pointer', width: 'fit-content' }}
+                    style={{ marginLeft: 12, background: 'var(--bg-elev-2)', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 4, padding: '2px 6px', fontSize: 12, cursor: 'pointer', width: 'fit-content' }}
                   >
                     {reportList[selected.ticker].dates.map(d => (
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
                 ) : (
-                  <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
+                  <span style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 12 }}>{selected.date}</span>
                 )}
                 {detail.summary?.price != null && (
                   <span style={{ color: 'var(--text)', fontSize: 14, marginLeft: 12, fontWeight: 600 }}>{fmt(detail.summary.price, detail.summary.market)}</span>
                 )}
                 {detail.summary?.sector && (
-                  <span style={{ color: 'var(--accent)', fontSize: 11, marginLeft: 12, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: 'var(--accent)', fontSize: 11, marginLeft: 12, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
                     {detail.summary.sector}{detail.summary.industry ? ` / ${detail.summary.industry}` : ''}
                   </span>
                 )}
@@ -451,13 +451,13 @@ const fetchList = useCallback(() => {
                   </span>
                 )}
                 {detail.summary?.per != null && (
-                  <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 8, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 8, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
                     PER {detail.summary.per.toFixed(1)}
-                    {detail.summary.forward_per != null && <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>/ Fwd {detail.summary.forward_per.toFixed(1)}</span>}
+                    {detail.summary.forward_per != null && <span style={{ color: 'var(--text-3)', marginLeft: 4 }}>/ Fwd {detail.summary.forward_per.toFixed(1)}</span>}
                   </span>
                 )}
                 {detail.summary?.pbr != null && (
-                  <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 4, background: 'var(--bg-surface)', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 4, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
                     PBR {detail.summary.pbr.toFixed(2)}
                   </span>
                 )}
@@ -468,7 +468,7 @@ const fetchList = useCallback(() => {
                 style={{
                   background: 'transparent',
                   border: '1px solid var(--border)',
-                  color: generating === selected.ticker ? 'var(--accent)' : 'var(--text-muted)',
+                  color: generating === selected.ticker ? 'var(--accent)' : 'var(--text-3)',
                   borderRadius: 4,
                   padding: '4px 12px',
                   fontSize: 12,
@@ -496,7 +496,7 @@ const fetchList = useCallback(() => {
                     background: 'transparent',
                     border: 'none',
                     borderBottom: activeDetailTab === key ? '2px solid var(--accent)' : '2px solid transparent',
-                    color: activeDetailTab === key ? 'var(--accent)' : 'var(--text-muted)',
+                    color: activeDetailTab === key ? 'var(--accent)' : 'var(--text-3)',
                     padding: '6px 16px',
                     fontSize: 12,
                     cursor: 'pointer',
@@ -513,7 +513,7 @@ const fetchList = useCallback(() => {
             {!loading && activeDetailTab === 'summary' && (
               detail.summary
                 ? <DetailSummaryTab summary={detail.summary} ticker={selected.ticker} />
-                : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>요약 데이터가 없습니다.</p>
+                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>요약 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'technical' && (
               detail.summary?.daily_rsi
@@ -530,7 +530,7 @@ const fetchList = useCallback(() => {
                     />
                   </>
                 )
-                : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>기술적 분석 데이터가 없습니다.</p>
+                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술적 분석 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'report' && (
               detail.summary
@@ -549,7 +549,7 @@ const fetchList = useCallback(() => {
                     />
                   </div>
                 )
-                : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>리포트 데이터가 없습니다.</p>
+                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>리포트 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'history' && (
               <HistoryTab

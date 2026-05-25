@@ -48,7 +48,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const totalH = Math.max(100, BAR_TOP + 8 + (maxBelowRow >= 0 ? (maxBelowRow + 1) * ROW_H : 0) + 20)
   return (
     <div style={{ marginTop: 8 }}>
-      {title && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{title}</div>}
+      {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
       <div style={{ position: 'relative', height: totalH }}>
         {vp?.val != null && vp?.vah != null && (
           <div style={{
@@ -105,16 +105,16 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
     })
   }
   return (
-    <div style={{ marginBottom: 16, overflowX: 'auto', background: 'var(--bg-card)', borderRadius: 6, padding: '10px 12px' }}>
+    <div style={{ marginBottom: 16, overflowX: 'auto', background: 'var(--bg-elev)', borderRadius: 6, padding: '10px 12px' }}>
       <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>🎯 RSI 예상 타점</div>
       <table style={{ borderCollapse: 'collapse', fontSize: 12, color: 'var(--text)' }}>
         <thead>
-          <tr style={{ background: 'var(--bg-surface)' }}>
-            <th style={{ ...TH, textAlign: 'left', color: 'var(--text-muted)' }}>시간대</th>
+          <tr style={{ background: 'var(--bg-elev-2)' }}>
+            <th style={{ ...TH, textAlign: 'left', color: 'var(--text-3)' }}>시간대</th>
             <th style={{ ...TH, color: '#4db6ac' }}>RSI20</th>
             <th style={{ ...TH, color: '#4db6ac' }}>RSI25</th>
             <th style={{ ...TH, color: '#4db6ac' }}>RSI30</th>
-            <th style={{ ...TH, color: 'var(--text-muted)' }}>현재RSI</th>
+            <th style={{ ...TH, color: 'var(--text-3)' }}>현재RSI</th>
             <th style={{ ...TH, color: '#ff8a65' }}>RSI70</th>
             <th style={{ ...TH, color: '#ff8a65' }}>RSI75</th>
             <th style={{ ...TH, color: '#ff8a65' }}>RSI80</th>
@@ -123,7 +123,7 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
         <tbody>
           {rows.map(({ label, d }) => d?.rsi != null && (
             <tr key={label}>
-              <td style={{ ...TD, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</td>
+              <td style={{ ...TD, textAlign: 'left', color: 'var(--text-3)', fontWeight: 600 }}>{label}</td>
               <GapCell target={d.target_20} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_20'} market={market} />
               <GapCell target={d.target_25} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_25'} market={market} />
               <GapCell target={d.target_30} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_30'} market={market} />
@@ -183,18 +183,18 @@ export default function DetailSummaryTab({ summary, ticker }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       {/* 1행: 증권사 컨센서스 */}
-      <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: '8px 10px' }}>
+      <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '8px 10px' }}>
         <SectionTitle weather={consensusWeather}>🏦 증권사 컨센서스</SectionTitle>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>🎯 평균목표가</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 9 }}>🎯 평균목표가</span>
             <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{fmt(summary.target_mean, summary.market)}</span>
           </div>
           {/* 상승여력 */}
           {gap != null && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>상승여력</span>
+              <span style={{ color: 'var(--text-3)', fontSize: 9 }}>상승여력</span>
               <span style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? '#81c784' : '#ef9a9a' }}>
                 {gap >= 0 ? '+' : ''}{gap.toFixed(1)}%
               </span>
@@ -203,20 +203,20 @@ export default function DetailSummaryTab({ summary, ticker }) {
           <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
           {/* 최고/최저 목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>최고목표가</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 9 }}>최고목표가</span>
             <span style={{ color: '#81c784', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high, summary.market)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>최저목표가</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 9 }}>최저목표가</span>
             <span style={{ color: '#ef9a9a', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low, summary.market)}</span>
           </div>
           {summary.finviz_recom != null && (
             <>
               <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>Finviz 추천</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 9 }}>Finviz 추천</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: summary.finviz_recom <= 2 ? '#81c784' : 'var(--text)' }}>
-                  {summary.finviz_recom.toFixed(1)} <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>/ 5</span>
+                  {summary.finviz_recom.toFixed(1)} <span style={{ fontSize: 9, color: 'var(--text-3)' }}>/ 5</span>
                 </span>
               </div>
             </>
@@ -225,10 +225,10 @@ export default function DetailSummaryTab({ summary, ticker }) {
             <>
               <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>애널리스트 의견</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 9 }}>애널리스트 의견</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: '#81c784', fontSize: 11 }}>매수 {buy}</span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>중립 {hold}</span>
+                  <span style={{ color: 'var(--text-3)', fontSize: 11 }}>중립 {hold}</span>
                   <span style={{ color: '#ef9a9a', fontSize: 11 }}>매도 {sell}</span>
                   <div style={{ display: 'flex', height: 4, borderRadius: 2, overflow: 'hidden', width: 50, flexShrink: 0 }}>
                     <div style={{ width: `${Math.round(buy / total * 100)}%`, background: '#43a047' }} />
@@ -247,7 +247,7 @@ export default function DetailSummaryTab({ summary, ticker }) {
 
       {/* 2행: 매물대·RSI 현황 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: 14 }}>
+        <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: 14 }}>
           <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, marginTop: 4 }}>
             {[
@@ -260,8 +260,8 @@ export default function DetailSummaryTab({ summary, ticker }) {
             ].map(({ color, label, desc }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{label}</span>
-                <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>({desc})</span>
+                <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{label}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-3)' }}>({desc})</span>
               </div>
             ))}
           </div>

@@ -1,12 +1,12 @@
 import { useState, useRef } from 'react'
 import { fmtPrice as fmt } from '../../utils'
 
-export const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--text-muted)', position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-surface)' }
+export const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--text-3)', position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-elev-2)' }
 export const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12 }
 
 export const fmtN = (val) => val != null ? val : 'N/A'
 export const rsiColor = (rsi) => {
-  if (rsi == null) return 'var(--text-muted)'
+  if (rsi == null) return 'var(--text-3)'
   const hue = Math.round(120 - (rsi / 100) * 120)
   return `hsl(${hue}, 60%, 60%)`
 }
@@ -48,10 +48,10 @@ export const overallWeather = (summary) => {
 }
 
 export const MetricCard = ({ label, value, sub, valueColor }) => (
-  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px' }}>
-    <div style={{ color: 'var(--text-muted)', fontSize: 10, marginBottom: 2 }}>{label}</div>
+  <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px' }}>
+    <div style={{ color: 'var(--text-3)', fontSize: 10, marginBottom: 2 }}>{label}</div>
     <div style={{ fontWeight: 700, fontSize: 12, color: valueColor ?? 'var(--text)' }}>{value}</div>
-    {sub && <div style={{ color: 'var(--text-muted)', fontSize: 9, marginTop: 1 }}>{sub}</div>}
+    {sub && <div style={{ color: 'var(--text-3)', fontSize: 9, marginTop: 1 }}>{sub}</div>}
   </div>
 )
 
@@ -65,7 +65,7 @@ export const SectionTitle = ({ children, weather }) => (
 export const GapCell = ({ target, price, baseColor, highlight, market }) => {
   const gap = fmtGap(target, price)
   return (
-    <td style={{ ...TD, color: baseColor, background: highlight ? 'var(--bg-hover)' : undefined, border: highlight ? '2px solid var(--accent)' : undefined, fontWeight: highlight ? 700 : undefined }}>
+    <td style={{ ...TD, color: baseColor, background: highlight ? 'var(--surface-hover)' : undefined, border: highlight ? '2px solid var(--accent)' : undefined, fontWeight: highlight ? 700 : undefined }}>
       {target != null ? <>{fmt(target, market)}{gap && <span style={{ color: gap.positive ? '#81c784' : '#ef9a9a' }}>({gap.text})</span>}</> : 'N/A'}
     </td>
   )
@@ -101,7 +101,7 @@ export function TargetTooltip({ s }) {
           top: pos.top,
           left: pos.left,
           zIndex: 9999,
-          background: 'var(--bg-card)',
+          background: 'var(--bg-elev)',
           border: '1px solid var(--border)',
           borderRadius: 6,
           padding: '10px 14px',
@@ -114,23 +114,23 @@ export function TargetTooltip({ s }) {
         }}>
           <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 6, fontSize: 11 }}>목표가 근거</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>평균</span>
+            <span style={{ color: 'var(--text-3)' }}>평균</span>
             <span style={{ color: 'var(--text)', fontWeight: 600 }}>{fmt(s.target_mean, s.market)}{gap != null && <span style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
-            <span style={{ color: 'var(--text-muted)' }}>최고</span>
+            <span style={{ color: 'var(--text-3)' }}>최고</span>
             <span style={{ color: '#81c784' }}>{fmt(s.target_high, s.market)}</span>
-            <span style={{ color: 'var(--text-muted)' }}>최저</span>
+            <span style={{ color: 'var(--text-3)' }}>최저</span>
             <span style={{ color: '#ef9a9a' }}>{fmt(s.target_low, s.market)}</span>
-            <span style={{ color: 'var(--text-muted)' }}>애널리스트</span>
+            <span style={{ color: 'var(--text-3)' }}>애널리스트</span>
             <span>{total > 0 ? `${total}명` : 'N/A'}</span>
-            <span style={{ color: 'var(--text-muted)' }}>Buy</span>
+            <span style={{ color: 'var(--text-3)' }}>Buy</span>
             <span style={{ color: '#81c784' }}>{s.buy ?? 0}{pct(s.buy ?? 0)}</span>
-            <span style={{ color: 'var(--text-muted)' }}>Hold</span>
+            <span style={{ color: 'var(--text-3)' }}>Hold</span>
             <span>{s.hold ?? 0}{pct(s.hold ?? 0)}</span>
-            <span style={{ color: 'var(--text-muted)' }}>Sell</span>
+            <span style={{ color: 'var(--text-3)' }}>Sell</span>
             <span style={{ color: '#ef9a9a' }}>{s.sell ?? 0}{pct(s.sell ?? 0)}</span>
             {s.finviz_recom != null && <>
-              <span style={{ color: 'var(--text-muted)' }}>Finviz</span>
-              <span>{s.finviz_recom} <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>(1=강매수)</span></span>
+              <span style={{ color: 'var(--text-3)' }}>Finviz</span>
+              <span>{s.finviz_recom} <span style={{ color: 'var(--text-3)', fontSize: 10 }}>(1=강매수)</span></span>
             </>}
           </div>
         </div>

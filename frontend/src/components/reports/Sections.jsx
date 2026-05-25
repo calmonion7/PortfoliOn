@@ -63,14 +63,14 @@ export function ReportSectionNews({ disclosures, news }) {
             <li key={i}>
               <a href={item.link} target="_blank" rel="noreferrer"
                  style={{ color: 'var(--accent)', textDecoration: 'none' }}>{item.title}</a>
-              <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>
+              <span style={{ color: 'var(--text-3)', marginLeft: 6 }}>
                 — {item.publisher} ({item.published_at})
               </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>_(뉴스 없음)_</p>
+        <p style={{ color: 'var(--text-3)', fontSize: 12 }}>_(뉴스 없음)_</p>
       )}
     </div>
   )

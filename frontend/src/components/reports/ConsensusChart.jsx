@@ -96,7 +96,7 @@ export default function ConsensusChart({ ticker, market }) {
 
   const opinionAllSame = opinionData.length === 1
 
-  const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
+  const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
   const chartMargin = { top: 22, right: 16, left: 0, bottom: 0 }
 
   const anchor = (index, total) =>
@@ -128,7 +128,7 @@ export default function ConsensusChart({ ticker, market }) {
     const xOff = ta === 'start' ? 0 : ta === 'end' ? -w : -w / 2
     return (
       <g>
-        <rect x={cx + xOff} y={cy + yOff - 9} width={w} height={11} fill="var(--bg-card)" opacity={0.85} rx={2} />
+        <rect x={cx + xOff} y={cy + yOff - 9} width={w} height={11} fill="var(--bg-elev)" opacity={0.85} rx={2} />
         <text x={cx} y={cy + yOff} textAnchor={ta} fontSize={8} fill={color}>{label}</text>
       </g>
     )
@@ -207,7 +207,7 @@ export default function ConsensusChart({ ticker, market }) {
     const pct = delta != null ? delta / prev.target_mean * 100 : null
     const dColor = delta == null ? '#ffcc80' : delta >= 0 ? '#81c784' : '#ef9a9a'
     return (
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         <div style={{ color: '#ffcc80' }}>평균목표가: {fmt(value, market)}</div>
         {delta != null && <div style={{ color: dColor, fontSize: 10 }}>{deltaStr(delta, pct, true)}</div>}
@@ -221,7 +221,7 @@ export default function ConsensusChart({ ticker, market }) {
     const idx = opinionData.findIndex(d => d.date === label)
     const prev = idx > 0 ? opinionData[idx - 1] : null
     return (
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         {payload.map(p => {
           const delta = prev != null ? (p.value ?? 0) - prev[p.dataKey] : null
@@ -239,7 +239,7 @@ export default function ConsensusChart({ ticker, market }) {
   }
 
   return (
-    <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: '8px 10px' }}>
+    <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '8px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>📈 컨센서스 추이</span>
@@ -251,7 +251,7 @@ export default function ConsensusChart({ ticker, market }) {
             disabled={backfilling}
             style={{
               background: 'transparent', border: '1px solid var(--border)',
-              color: backfilling ? 'var(--accent)' : 'var(--text-muted)',
+              color: backfilling ? 'var(--accent)' : 'var(--text-3)',
               borderRadius: 3, padding: '2px 8px', fontSize: 11,
               cursor: backfilling ? 'default' : 'pointer',
             }}
@@ -263,7 +263,7 @@ export default function ConsensusChart({ ticker, market }) {
             disabled={collecting}
             style={{
               background: 'transparent', border: '1px solid var(--border)',
-              color: collecting ? 'var(--accent)' : 'var(--text-muted)',
+              color: collecting ? 'var(--accent)' : 'var(--text-3)',
               borderRadius: 3, padding: '2px 8px', fontSize: 11,
               cursor: collecting ? 'default' : 'pointer',
             }}
@@ -274,7 +274,7 @@ export default function ConsensusChart({ ticker, market }) {
       </div>
       {error && <div style={{ color: '#ef9a9a', fontSize: 11, marginBottom: 6 }}>{error}</div>}
       {ascData.length === 0 ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
+        <div style={{ color: 'var(--text-3)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
           아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요.
         </div>
       ) : (
@@ -284,7 +284,7 @@ export default function ConsensusChart({ ticker, market }) {
               <button key={i} onClick={() => setTab(i)} style={{
                 background: 'transparent', border: 'none',
                 borderBottom: tab === i ? '2px solid var(--accent)' : '2px solid transparent',
-                color: tab === i ? 'var(--accent)' : 'var(--text-muted)',
+                color: tab === i ? 'var(--accent)' : 'var(--text-3)',
                 fontWeight: tab === i ? 600 : 400,
                 fontSize: 11, padding: '4px 10px', cursor: 'pointer',
               }}>{t}</button>
@@ -305,7 +305,7 @@ export default function ConsensusChart({ ticker, market }) {
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 {opinionAllSame && (
-                  <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 3, padding: '0 5px', lineHeight: '16px' }}>변동 없음</span>
+                  <span style={{ fontSize: 9, color: 'var(--text-3)', background: 'var(--bg-elev-2)', border: '1px solid var(--border)', borderRadius: 3, padding: '0 5px', lineHeight: '16px' }}>변동 없음</span>
                 )}
               </div>
               <ResponsiveContainer width="100%" height={140}>
@@ -319,7 +319,7 @@ export default function ConsensusChart({ ticker, market }) {
                   <Line type="monotone" dataKey="sell" name="매도" stroke="#ef9a9a" strokeWidth={2} dot={makeDot('#ef9a9a', 'sell')} activeDot={{ r: 5 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
-              <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>
                 {[['#43a047', '매수'], ['#616161', '중립'], ['#ef9a9a', '매도']].map(([color, label]) => (
                   <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 8, height: 8, background: color, display: 'inline-block', borderRadius: 2 }} />
@@ -341,7 +341,7 @@ export default function ConsensusChart({ ticker, market }) {
                   const idx = overlayData.findIndex(d => d.date === label)
                   const prev = idx > 0 ? overlayData[idx - 1] : null
                   return (
-                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+                    <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
                       <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
                       {payload.map(p => {
                         const val = p.value

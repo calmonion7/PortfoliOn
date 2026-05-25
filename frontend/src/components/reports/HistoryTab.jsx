@@ -42,9 +42,9 @@ export default function HistoryTab({ ticker, dates, market }) {
       .catch(() => setSnapshotB(null))
   }, [ticker, compareB])
 
-  if (histLoading) return <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>로딩 중...</p>
+  if (histLoading) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>로딩 중...</p>
   if (histError) return <p style={{ color: '#ef9a9a', fontSize: 13 }}>{histError}</p>
-  if (history.length === 0) return <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>히스토리 데이터가 없습니다.</p>
+  if (history.length === 0) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>히스토리 데이터가 없습니다.</p>
 
   const xTickFormatter = (date) => date?.slice(5) ?? ''
 
@@ -58,7 +58,7 @@ export default function HistoryTab({ ticker, dates, market }) {
               background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12,
               padding: '4px 14px',
               borderBottom: trendTab === key ? '2px solid var(--accent)' : '2px solid transparent',
-              color: trendTab === key ? 'var(--accent)' : 'var(--text-muted)',
+              color: trendTab === key ? 'var(--accent)' : 'var(--text-3)',
               fontWeight: trendTab === key ? 600 : 400,
               marginBottom: -1,
             }}>{label}</button>
@@ -69,10 +69,10 @@ export default function HistoryTab({ ticker, dates, market }) {
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={history} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="date" tickFormatter={xTickFormatter} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} width={60} tickFormatter={(v) => v != null ? fmt(v, market) : ''} />
+              <XAxis dataKey="date" tickFormatter={xTickFormatter} tick={{ fontSize: 10, fill: 'var(--text-3)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} width={60} tickFormatter={(v) => v != null ? fmt(v, market) : ''} />
               <Tooltip
-                contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 11 }}
+                contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 11 }}
                 formatter={(v, name) => [v != null ? fmt(v, market) : 'N/A', name]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -88,9 +88,9 @@ export default function HistoryTab({ ticker, dates, market }) {
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={history} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="date" tickFormatter={xTickFormatter} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} width={30} />
-              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 11 }} />
+              <XAxis dataKey="date" tickFormatter={xTickFormatter} tick={{ fontSize: 10, fill: 'var(--text-3)' }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-3)' }} width={30} />
+              <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 11 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <ReferenceLine y={70} stroke="#ef9a9a" strokeDasharray="4 2" label={{ value: '과매수', fill: '#ef9a9a', fontSize: 10 }} />
               <ReferenceLine y={30} stroke="#81c784" strokeDasharray="4 2" label={{ value: '과매도', fill: '#81c784', fontSize: 10 }} />
@@ -106,18 +106,18 @@ export default function HistoryTab({ ticker, dates, market }) {
       <div>
         <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
           <select value={compareA ?? ''} onChange={e => setCompareA(e.target.value)}
-            style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
+            style={{ background: 'var(--bg-elev)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
             {history.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
           </select>
-          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>vs</span>
+          <span style={{ color: 'var(--text-3)', fontSize: 12 }}>vs</span>
           <select value={compareB ?? ''} onChange={e => setCompareB(e.target.value)}
-            style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
+            style={{ background: 'var(--bg-elev)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
             {history.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
           </select>
         </div>
 
         {history.length < 2
-          ? <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>비교할 날짜가 없습니다.</p>
+          ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>비교할 날짜가 없습니다.</p>
           : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
@@ -146,10 +146,10 @@ export default function HistoryTab({ ticker, dates, market }) {
                       : null
                     return (
                       <tr key={label}>
-                        <td style={{ ...TD, textAlign: 'left', color: 'var(--text-muted)' }}>{label}</td>
+                        <td style={{ ...TD, textAlign: 'left', color: 'var(--text-3)' }}>{label}</td>
                         <td style={TD}>{fmtFn(keyA)}</td>
                         <td style={TD}>{fmtFn(keyB)}</td>
-                        <td style={{ ...TD, color: delta == null ? 'var(--text-muted)' : delta >= 0 ? '#81c784' : '#ef9a9a' }}>
+                        <td style={{ ...TD, color: delta == null ? 'var(--text-3)' : delta >= 0 ? '#81c784' : '#ef9a9a' }}>
                           {delta != null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%` : '—'}
                         </td>
                       </tr>

@@ -102,7 +102,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
   }
 
   const Legend = ({ items, weather }) => (
-    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-3)', marginBottom: 4, alignItems: 'center' }}>
       {items.map(({ color, label }) => {
         const desc = DESCS[label]
         return (
@@ -117,8 +117,8 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
             {hoveredLegend === label && (
               <div style={{
                 position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
-                background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4,
-                padding: '5px 9px', fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap',
+                background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 4,
+                padding: '5px 9px', fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap',
                 zIndex: 50, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
               }}>
                 {desc}
@@ -131,7 +131,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     </div>
   )
 
-  const axisStyle = { fontSize: 10, fill: 'var(--text-muted)' }
+  const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
   const chartMargin = { top: 4, right: 8, left: 0, bottom: 0 }
   const lineCfg = { type: 'monotone', strokeWidth: 2, dot: { r: 3 }, activeDot: { r: 5 }, connectNulls: true }
 
@@ -158,7 +158,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     if (!active || !payload?.length) return null
     const row = payload[0]?.payload
     return (
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         {payload.map(p => {
           const ck = CHG_KEYS[p.dataKey]
@@ -177,7 +177,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     if (!active || !payload?.length) return null
     const row = payload[0]?.payload
     return (
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
         {payload.map(p => {
           const ck = CHG_KEYS[p.dataKey]
@@ -205,10 +205,10 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
   }
 
   const TH = ({ children, color }) => (
-    <th style={{ color: color || 'var(--text-muted)', textAlign: 'right', padding: '2px 6px', fontWeight: 400 }}>{children}</th>
+    <th style={{ color: color || 'var(--text-3)', textAlign: 'right', padding: '2px 6px', fontWeight: 400 }}>{children}</th>
   )
   const TD = ({ children, color }) => (
-    <td style={{ color: color || 'var(--text-muted)', textAlign: 'right', padding: '1px 6px' }}>{children}</td>
+    <td style={{ color: color || 'var(--text-3)', textAlign: 'right', padding: '1px 6px' }}>{children}</td>
   )
 
   const calcFinancialsWeather = (data) => {
@@ -263,7 +263,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     })()
 
     return (
-      <div style={{ background: 'var(--bg-card)', borderRadius: 6, padding: 14, marginTop: 12 }}>
+      <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: 14, marginTop: 12 }}>
         <SectionTitle weather={weather}>{title}</SectionTitle>
 
         {/* 매출 / 영업이익 */}
@@ -344,15 +344,15 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
               const opPos  = d.op_chg_abs  == null ? null : d.op_chg_abs  >= 0
               return (
                 <tr key={d.period} style={d.is_consensus ? { opacity: 0.75, fontStyle: 'italic' } : {}}>
-                  <TD color={d.is_consensus ? '#ffcc80' : 'var(--text-muted)'}>{d.period}</TD>
+                  <TD color={d.is_consensus ? '#ffcc80' : 'var(--text-3)'}>{d.period}</TD>
                   <TD color="#4fc3f7">{fmtValFull(d.revenue)}</TD>
-                  <td style={{ textAlign: 'right', padding: '1px 6px', color: revPos === true ? '#81c784' : revPos === false ? '#ef9a9a' : 'var(--text-muted)' }}>
+                  <td style={{ textAlign: 'right', padding: '1px 6px', color: revPos === true ? '#81c784' : revPos === false ? '#ef9a9a' : 'var(--text-3)' }}>
                     {d.rev_chg_abs != null
                       ? <>{revPos ? '▲' : '▼'} {fmtValFull(Math.abs(d.rev_chg_abs))}<br /><span style={{ fontSize: 9 }}>({d.rev_chg_pct >= 0 ? '+' : ''}{d.rev_chg_pct}%)</span></>
                       : '—'}
                   </td>
                   <TD color={d.op_income != null && d.op_income >= 0 ? '#81c784' : '#ef9a9a'}>{fmtValFull(d.op_income)}</TD>
-                  <td style={{ textAlign: 'right', padding: '1px 6px', color: opPos === true ? '#81c784' : opPos === false ? '#ef9a9a' : 'var(--text-muted)' }}>
+                  <td style={{ textAlign: 'right', padding: '1px 6px', color: opPos === true ? '#81c784' : opPos === false ? '#ef9a9a' : 'var(--text-3)' }}>
                     {d.op_chg_abs != null
                       ? <>{opPos ? '▲' : '▼'} {fmtValFull(Math.abs(d.op_chg_abs))}<br /><span style={{ fontSize: 9 }}>({d.op_chg_pct >= 0 ? '+' : ''}{d.op_chg_pct}%)</span></>
                       : '—'}
