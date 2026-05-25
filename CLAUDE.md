@@ -98,12 +98,12 @@ cd backend && .venv/bin/python -m pytest
 
 - `backend/main.py` — app entry, mounts routers + scheduler
 - `backend/routers/` — portfolio, watchlist, stocks, report, guru, calendar, digest, market_indicators, analytics, analysis
-- `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, consensus, cache, guru_scraper, guru_stats, digest_service, market_indicators_service, analysis_service, utils (NaN/Inf sanitize)
+- `backend/services/` — storage, market (yfinance+Naver API), charts, indicators, report_generator, scraper, consensus, cache, guru_scraper, guru_stats, digest_service, market_indicators_service, analysis_service, utils (NaN/Inf sanitize), db (Supabase client)
 - `backend/scheduler.py` — APScheduler 설정 (services 아님, 루트 레벨)
-- `backend/data/` — JSON file storage (stocks.json — unified holdings+watchlist+analyst data, schedule.json)
+- `backend/data/` — 정적 참조 데이터만 (sp500_tickers.json, kospi_tickers.json); 런타임 데이터는 Supabase
 - `backend/data/calendar/` — calendar file cache (YYYY-MM.json, gitignored, auto-invalidated on stock mutations)
-- `backend/data/consensus/` — per-ticker 컨센서스 JSON 캐시 (gitignored)
-- `backend/snapshots/` — generated JSON snapshots (per-ticker/date, e.g. `LLY/2026-05-20.json`)
+- `backend/data/consensus/` — per-ticker 컨센서스 JSON 캐시 (gitignored, 로컬 파일 기반)
+- `backend/snapshots/` — generated JSON snapshots (gitignored, per-ticker/date)
 - `backend/reports/` — legacy report directory (read-only, JSON fallback for old snapshots)
 
 **Frontend** — React 18 + Vite (port 5173), plain CSS (no TailwindCSS)
@@ -111,32 +111,54 @@ cd backend && .venv/bin/python -m pytest
 - `frontend/src/pages/` — Portfolio, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule), ConsensusSettings; 허브 3종: Research (리포트·캘린더·다이제스트), MarketHub (시장지표·분석), AnalysisHub (섹터·매크로); 탭 컴포넌트: SectorTab, MacroTab; 개별 페이지(허브 내 탭용): Reports, Calendar, Digest, Market, Analytics
 - `frontend/src/components/` — StockModal, PromoteModal, reports/ (ConsensusChart, DetailTab, FinancialsChart, HistoryTab, Sections), market/ (FxSection, VixSection, CommoditiesSection, TreasurySection, EconIndicatorsSection, M7EarningsSection, KrTop2Section, KrExportsSection, marketUtils.js)
 
+## Deployment
+
+- **Backend**: Render (https://portfolion-7zpa.onrender.com) — `main` 브랜치 자동 배포
+- **Frontend**: Vercel (https://portfoli-on.vercel.app) — `main` 브랜치, Root Directory=`frontend`
+- **DB**: Supabase PostgreSQL (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 환경변수)
+- **슬립 방지**: UptimeRobot (5분 간격 HEAD /health → Render 무료 슬립 방지)
+- 프론트엔드는 `VITE_API_BASE_URL=https://portfolion-7zpa.onrender.com` 직접 호출 (Vercel rewrites 불안정)
+
 ## Key Files
 
 - `API_SPEC.md` — full REST API reference (source of truth for endpoints)
 - `CLAUDE_COWORK_API.md` — external API for Claude AI to read/write stock analysis
+- `backend/supabase_schema.sql` — Supabase 테이블 DDL (stocks, snapshots, schedules, guru_schedules, guru_managers, calendar_cache, market_cache)
 - `backend/.venv/` — Python virtual environment (macOS: `backend/.venv/bin/python`, Windows: `backend/.venv/Scripts/python`)
 
 ## Data Model
 
-- `holdings.json` and `watchlist.json` are merged into `stocks.json` (use `type: "holding"|"watchlist"` field to distinguish)
-- `guru_managers.json` — Guru 운용역 데이터 캐시
-- New snapshots write to `backend/snapshots/`, old `reports/` is kept as read-only fallback
+Supabase PostgreSQL이 기본 저장소. 로컬 JSON 파일은 런타임 캐시 용도.
+
+| 테이블 | 내용 |
+|--------|------|
+| `stocks` | user_id별 보유/관심 종목 (`type: "holding"\|"watchlist"`) |
+| `snapshots` | per-user, per-ticker, per-date 리포트 JSON |
+| `schedules` | 리포트 자동 생성 스케줄 |
+| `guru_schedules` | 구루 크롤링 스케줄 |
+| `guru_managers` | 구루 운용역 데이터 캐시 |
+| `calendar_cache` | user_id+month 기준 캘린더 이벤트 캐시 |
+| `market_cache` | 시장지표 Supabase 영구 캐시 (fx/vix/commodities/treasury/econ/m7/krtop2/krexports) |
+
+로컬 파일 캐시 (gitignored):
+- `backend/data/consensus/` — per-ticker 컨센서스 (Naver/yfinance, 로컬 파일 기반)
+- `backend/data/calendar/` — 월별 캘린더 이벤트
 
 ## Gotchas
 
-- Data is JSON files in `backend/data/`, not a database. No migrations needed; just edit JSON.
+- **Supabase RLS**: 스키마 실행 후에도 RLS 활성화 상태일 수 있음 → SQL Editor에서 수동 `ALTER TABLE ... DISABLE ROW LEVEL SECURITY`
+- **ES256 JWT**: 신규 Supabase는 HS256 아닌 ES256 → `auth.py`에서 `PyJWKClient`로 JWKS 검증
 - `PUT /api/stocks/enrich/batch` must be registered **before** `PUT /api/stocks/{ticker}/enrich` in the router to avoid FastAPI routing `enrich` as a ticker value.
-- Frontend CORS origins are hardcoded in `backend/main.py`: `localhost:3000` and `localhost:5173`.
+- Frontend CORS origins are hardcoded in `backend/main.py`: `localhost:3000` and `localhost:5173`. 배포 도메인(`portfoli-on.vercel.app`)도 추가되어 있음.
 - `start.bat` runs both servers in hidden PowerShell windows; use `stop.bat` to kill them.
 - `ANTHROPIC_API_KEY` must be set in the environment for report generation to work.
-- Vite proxies `/api/*` to `http://localhost:8000` — frontend axios calls don't need a base URL.
+- Vite proxies `/api/*` to `http://localhost:8000` (로컬). 배포 환경에서는 `VITE_API_BASE_URL`로 Render 직접 호출.
 - `backend/routers/calendar.py` uses file-based cache (`backend/data/calendar/YYYY-MM.json`). Cache is auto-cleared on stock add/remove/promote. To manually clear: use `DELETE /api/calendar/cache?month=YYYY-MM` or click ↺ in the UI. yfinance calls are parallelized (ThreadPoolExecutor, max 30).
 - `backend/services/cache.py` — 인메모리 캐시 6종: snapshot (LRU 200), list (TTL 5s), dashboard (TTL 300s), correlation (TTL 300s), sector (TTL 300s), macro (TTL 300s). 종목 추가/수정/삭제 시 dashboard·correlation·sector·macro 캐시 자동 무효화. 수동 무효화: `DELETE /api/stocks/dashboard/cache`.
 - `backend/routers/analytics.py` + `GET /api/analytics/correlation` — 보유 종목 간 90일 수익률 상관관계 계산. correlation 캐시에 저장, 종목 변경 시 자동 무효화.
 - `backend/routers/digest.py` + `backend/services/digest_service.py` — 일일 다이제스트 생성/조회. 매일 08:00 KST 자동 생성 (`scheduler.py`).
-- `backend/routers/market_indicators.py` + `backend/services/market_indicators_service.py` — 시장 지표: FX (yfinance), VIX, 원자재 (금/WTI/구리), 경제지표 (FRED API). `FRED_API_KEY` 환경변수 필요.
-- `KITA_API_KEY` 환경변수는 실제로 **관세청(Korea Customs Service)** API 키임 (`apis.data.go.kr/1220000/Itemtrade`). 원래 KITA API 도메인(`api.kita.net`)은 존재하지 않음. `market_indicators_service.py`의 `_fetch_customs_exports()`에서 한국 수출 데이터 수집에 사용. 키 미설정 시 UN Comtrade 공개 API로 자동 폴백.
-- `market_indicators_service.py` 추가 데이터 섹션 3종: `get_m7_earnings()` (Magnificent 7 분기 순이익, `backend/data/sp500_tickers.json` 사용), `get_kr_top2_earnings()` (KOSPI Top2 실적 — 삼성+하이닉스 vs KOSPI 나머지, `backend/data/kospi_tickers.json` 사용), `get_kr_exports()` (한국 수출 — 반도체 vs 비반도체, `backend/data/kr_exports.json` 파일 캐시 사용).
-- `frontend/src/components/market/` 의 수익/수출 차트(`M7EarningsSection`, `KrTop2Section`, `KrExportsSection`)는 모두 dual Y-axis 구조: 좌측(`yAxisId="left"`) — 억/조 원 또는 십억달러, 우측(`yAxisId="right"`) — 비중 %. `krFmt` 헬퍼(`marketUtils.js`)는 억/조 단위 포매팅 (임계값: 10,000억 = 1조). `Market.jsx`는 이 섹션들의 조합 셸.
+- `backend/routers/market_indicators.py` + `backend/services/market_indicators_service.py` — 시장 지표: FX/VIX/원자재/국채 (yfinance incremental fetch + Supabase `market_cache` 영구 저장), 경제지표 (FRED API, `FRED_API_KEY` 필요), M7/KR Top2 earnings (주 1회 갱신), KR Exports (월 1회 갱신).
+- `KITA_API_KEY` 환경변수는 실제로 **관세청(Korea Customs Service)** API 키임 (`apis.data.go.kr/1220000/Itemtrade`). 키 미설정 시 UN Comtrade 공개 API로 자동 폴백.
+- `market_indicators_service.py` — `_mc_load`/`_mc_save`로 Supabase `market_cache` 읽기/쓰기. `_merge_history`/`_yf_close_history`로 yfinance incremental fetch (마지막 날짜 이후만 조회).
+- `frontend/src/components/market/` 의 수익/수출 차트(`M7EarningsSection`, `KrTop2Section`, `KrExportsSection`)는 모두 dual Y-axis 구조: 좌측(`yAxisId="left"`) — 억/조 원 또는 십억달러, 우측(`yAxisId="right"`) — 비중 %. `krFmt` 헬퍼(`marketUtils.js`)는 억/조 단위 포매팅 (임계값: 10,000억 = 1조).
 - `backend/routers/analysis.py` + `GET /api/analysis/sector` (섹터 모멘텀), `GET /api/analysis/macro-correlation` (보유 종목-매크로 상관관계). `analysis_service.py`에서 SECTOR_ETFs(XLK 등 11종), MACRO_TICKERS(TLT/UUP/USO/^VIX) 사용.

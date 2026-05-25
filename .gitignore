@@ -12,11 +12,21 @@ backend/reports/
 # Calendar file cache
 backend/data/calendar/
 
-# Runtime-generated data
+# Runtime-generated data (Supabase is source of truth)
 backend/data/holdings.json
 backend/data/watchlist.json
 backend/data/guru_schedule.json
+backend/data/stocks.json
+backend/data/schedule.json
+backend/data/guru_managers.json
+backend/data/kr_exports.json
+backend/data/consensus/
 backend/snapshots/
+
+# Superpowers/planning artifacts
+docs/superpowers/
+.superpowers/
+.planning/
 
 # Python virtual environment
 backend/.venv/

@@ -150,6 +150,15 @@ FX, VIX, 원자재, 경제지표를 한 화면에서 확인합니다.
 | 상관관계 히트맵 | 보유 종목 90일 수익률 기반 상관계수 SVG 히트맵 |
 | 자동 캐시 | TTL 300s 캐시, 종목 변경 시 자동 무효화 |
 
+### 분석 허브 (AnalysisHub)
+
+섹터 모멘텀과 매크로 상관관계를 분석합니다.
+
+| 기능 | 설명 |
+|------|------|
+| 섹터 모멘텀 | 11개 섹터 ETF(XLK 등) 기준 최근 1개월 수익률 비교 |
+| 매크로 상관관계 | 보유 종목 vs TLT/UUP/USO/VIX 90일 상관관계 히트맵 |
+
 ### 설정
 
 **리포트 설정**
@@ -170,52 +179,20 @@ FX, VIX, 원자재, 경제지표를 한 화면에서 확인합니다.
 
 ## 접속 주소
 
+### 로컬
+
 | 서비스 | 주소 |
 |--------|------|
 | 프론트엔드 | http://localhost:5173 |
 | 백엔드 API | http://localhost:8000 |
 | API 문서 | http://localhost:8000/docs |
 
-## GitHub SSH 설정
+### 배포
 
-처음 clone하거나 새 머신에서 작업할 때 SSH 키를 등록해야 합니다.
-
-### 1. SSH 키 생성
-
-```bash
-ssh-keygen -t ed25519 -C "your@email.com" -f ~/.ssh/id_ed25519 -N ""
-```
-
-### 2. 공개키 복사
-
-**Windows (PowerShell)**
-```powershell
-Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
-```
-
-**macOS / Linux**
-```bash
-cat ~/.ssh/id_ed25519.pub
-```
-
-### 3. GitHub에 등록
-
-→ https://github.com/settings/ssh/new 에서 공개키 붙여넣기
-
-### 4. 연결 테스트
-
-```bash
-ssh -T git@github.com
-# Hi calmonion7! You've successfully authenticated...
-```
-
-### 5. Remote URL을 SSH로 전환
-
-```bash
-git remote set-url origin git@github.com:calmonion7/PortfoliOn.git
-```
-
-이후 `git push` 시 토큰 없이 동작합니다.
+| 서비스 | 주소 |
+|--------|------|
+| 프론트엔드 | https://portfoli-on.vercel.app |
+| 백엔드 API | https://portfolion-7zpa.onrender.com |
 
 ## 개발 스펙
 
@@ -259,32 +236,32 @@ git remote set-url origin git@github.com:calmonion7/PortfoliOn.git
 ### 아키텍처 개요
 
 ```
-Browser (React/Vite :5173)
+Browser (React/Vite :5173 / Vercel)
         │  REST API
         ▼
-FastAPI (:8000)
+FastAPI (:8000 / Render)
  ├─ routers/        # portfolio, watchlist, stocks, report, guru,
- │                  # calendar, digest, market_indicators, analytics
+ │                  # calendar, digest, market_indicators, analytics, analysis
  ├─ services/       # market(yfinance+Naver), charts, indicators,
- │                  # report_generator(Claude AI), scraper,
+ │                  # report_generator(Claude AI), scraper, consensus,
  │                  # digest_service, market_indicators_service, cache, utils
- └─ data/           # JSON 파일 저장소 (DB 없음)
-        │
-        ├─ stocks.json (holdings+watchlist 통합), schedule.json
-        └─ snapshots/  ← 생성된 JSON 스냅샷 (per-ticker/date)
+ │
+ ├─ Supabase PostgreSQL  ← 종목/스냅샷/스케줄/캘린더/시장지표 캐시
+ └─ data/           # 정적 참조 데이터 (sp500_tickers.json, kospi_tickers.json)
 ```
 
 **데이터 흐름**
 
-- 주가 데이터: yfinance(미국) / Naver Finance API(한국) → JSON 스냅샷
-- 리포트 생성: Claude AI API(`ANTHROPIC_API_KEY` 필요) → `backend/snapshots/<ticker>/<date>.json`
-- 구루 데이터: dataroma 크롤링 → JSON 저장
+- 주가 데이터: yfinance(미국) / Naver Finance API(한국) → Supabase snapshots
+- 리포트 생성: Claude AI API(`ANTHROPIC_API_KEY` 필요) → Supabase snapshots 테이블
+- 시장 지표: yfinance incremental fetch → Supabase market_cache 영구 저장
+- 구루 데이터: dataroma 크롤링 → Supabase guru_managers 테이블
 
 **API 설계 원칙**
 
 - RESTful JSON API, 전체 스펙은 `API_SPEC.md` 참조
 - Claude AI 연동용 외부 API는 `CLAUDE_COWORK_API.md` 참조
-- CORS 허용 출처: `localhost:3000`, `localhost:5173`
+- CORS 허용 출처: `localhost:3000`, `localhost:5173`, `portfoli-on.vercel.app`
 
 ---
 
@@ -292,26 +269,26 @@ FastAPI (:8000)
 
 ```
 PortfoliOn/
-├── start.bat / start.sh  # 서버 실행
-├── stop.bat  / stop.sh   # 서버 종료
-├── docs/                 # ARCHITECTURE, CONFIGURATION, DEVELOPMENT,
-│                         # GETTING-STARTED, TESTING, API.md
+├── start.bat / start.sh   # 로컬 서버 실행
+├── stop.bat  / stop.sh    # 로컬 서버 종료
+├── docs/                  # ARCHITECTURE, CONFIGURATION, DEVELOPMENT,
+│                          # GETTING-STARTED, TESTING, API.md
 ├── backend/
 │   ├── main.py
-│   ├── scheduler.py      # APScheduler 설정
-│   ├── routers/          # portfolio, watchlist, stocks, report, guru,
-│   │                     # calendar, digest, market_indicators, analytics
-│   ├── services/         # storage, market, charts, indicators,
-│   │                     # report_generator, scraper, guru_scraper, guru_stats,
-│   │                     # digest_service, market_indicators_service, cache, utils
-│   ├── data/             # stocks.json, schedule.json, consensus/,
-│   │                     # sp500_tickers.json, kospi_tickers.json, kr_exports.json
-│   └── snapshots/        # 생성된 JSON 스냅샷 (per-ticker/date)
+│   ├── scheduler.py       # APScheduler 설정
+│   ├── auth.py            # Supabase JWT 검증 (ES256/JWKS)
+│   ├── supabase_schema.sql # Supabase 테이블 DDL
+│   ├── routers/           # portfolio, watchlist, stocks, report, guru,
+│   │                      # calendar, digest, market_indicators, analytics, analysis
+│   ├── services/          # storage(Supabase), market, charts, indicators,
+│   │                      # report_generator, scraper, consensus, guru_scraper,
+│   │                      # digest_service, market_indicators_service, cache, utils, db
+│   └── data/              # sp500_tickers.json, kospi_tickers.json (정적 참조)
 └── frontend/
     └── src/
-        ├── pages/        # Portfolio, Reports, Calendar, Settings,
-        │                 # Guru, GuruCrawlSettings, GuruStats, ReportSchedule,
-        │                 # Market, Digest, Analytics
-        ├── components/   # StockModal, PromoteModal, reports/
-        └── utils.js      # 공통 유틸리티 (TAB_STYLE, fmtPrice)
+        ├── pages/         # Portfolio, Research(허브), MarketHub(허브), AnalysisHub(허브),
+        │                  # Guru, Settings, Digest, Market, Analytics, Calendar
+        ├── components/    # StockModal, PromoteModal, reports/, market/
+        ├── supabase.js    # Supabase 클라이언트 + 로그인
+        └── utils.js       # 공통 유틸리티 (TAB_STYLE, fmtPrice)
 ```
