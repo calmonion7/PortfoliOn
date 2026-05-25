@@ -28,10 +28,12 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setAuthLoading(false)
-    })
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session)
+      })
+      .catch(() => {})
+      .finally(() => setAuthLoading(false))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setSession(session)
     })

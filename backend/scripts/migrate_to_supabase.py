@@ -10,10 +10,21 @@
   cd backend && .venv/bin/python scripts/migrate_to_supabase.py
 """
 import json
+import math
 import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
+
+
+def _sanitize(obj):
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return obj
 
 load_dotenv()
 
@@ -88,7 +99,7 @@ def migrate_snapshots():
             except Exception:
                 continue
             supabase_client.table("snapshots").upsert(
-                {"ticker": ticker, "date": date, "data": snap_data},
+                {"ticker": ticker, "date": date, "data": _sanitize(snap_data)},
                 on_conflict="ticker,date",
             ).execute()
             count += 1
