@@ -1,0 +1,64 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.badge--sm {
+  font-size: var(--font-size-xs);
+  padding: 2px 6px;
+}
+
+.badge--md {
+  font-size: var(--font-size-sm);
+  padding: 4px 8px;
+}
+
+/* Variant styles */
+.badge--neutral {
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.badge--success {
+  background: var(--positive-tint);
+  color: var(--positive);
+}
+
+.badge--danger {
+  background: var(--negative-tint);
+  color: var(--negative);
+}
+
+.badge--warning {
+  background: var(--warning-tint);
+  color: var(--color-warning);
+}
+
+.badge--info {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.badge--market-kr {
+  background: rgba(76, 175, 80, 0.12);
+  color: #4caf50;
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.badge--market-us {
+  background: rgba(79, 195, 247, 0.12);
+  color: #4fc3f7;
+  border-color: rgba(79, 195, 247, 0.3);
+}
+
+.badge__icon {
+  display: inline-flex;
+  font-size: 0.9em;
+}
