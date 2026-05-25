@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://<railway-url>/api/:path*"
+      "destination": "https://portfolion-7zpa.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
