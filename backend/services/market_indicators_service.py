@@ -48,8 +48,13 @@ def _mc_load(key: str) -> dict | None:
 
 def _mc_save(key: str, data: dict) -> None:
     """Supabase market_cache에 저장."""
+    from datetime import datetime, timezone
     try:
-        get_db().table("market_cache").upsert({"key": key, "data": data, "fetched_at": "now()"}).execute()
+        get_db().table("market_cache").upsert({
+            "key": key,
+            "data": data,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
     except Exception:
         pass
 
@@ -362,18 +367,43 @@ def get_kr_top2_earnings() -> dict:
 _FX_SYMBOLS = {"usdkrw": "USDKRW=X", "usdjpy": "USDJPY=X", "eurusd": "EURUSD=X"}
 
 
+def _fetch_usdkrw_current() -> float | None:
+    """open.er-api.com에서 USDKRW 현재 환율만 가져오는 fallback."""
+    try:
+        r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5)
+        r.raise_for_status()
+        krw = r.json().get("rates", {}).get("KRW")
+        return round(float(krw), 2) if krw else None
+    except Exception:
+        return None
+
+
 def _fetch_fx(args: tuple) -> tuple:
     key, sym, stored_history = args
     try:
         history = _yf_close_history(sym, stored_history, precision=4)
-        if not history:
-            return key, None
-        current = round(history[-1]["value"], 4)
-        prev = round(history[-2]["value"], 4) if len(history) > 1 else current
-        change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
-        return key, {"current": current, "change_pct": change_pct, "history": history}
+        if history:
+            current = round(history[-1]["value"], 4)
+            prev = round(history[-2]["value"], 4) if len(history) > 1 else current
+            change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
+            return key, {"current": current, "change_pct": change_pct, "history": history}
     except Exception:
-        return key, None
+        pass
+
+    # yfinance 실패 시 저장된 히스토리로 fallback
+    if stored_history:
+        current = round(stored_history[-1]["value"], 4)
+        prev = round(stored_history[-2]["value"], 4) if len(stored_history) > 1 else current
+        change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
+        return key, {"current": current, "change_pct": change_pct, "history": stored_history}
+
+    # USDKRW 전용 현재 환율 fallback
+    if key == "usdkrw":
+        current = _fetch_usdkrw_current()
+        if current:
+            return key, {"current": current, "change_pct": 0.0, "history": []}
+
+    return key, None
 
 
 def get_fx() -> dict:
