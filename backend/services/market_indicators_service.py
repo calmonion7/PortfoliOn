@@ -93,19 +93,14 @@ def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[
 _TREASURY_SYMBOLS = {"3m": "^IRX", "5y": "^FVX", "10y": "^TNX", "30y": "^TYX"}
 
 
-def _fetch_treasury(args: tuple[str, str]) -> tuple[str, dict | None]:
-    key, sym = args
+def _fetch_treasury(args: tuple) -> tuple:
+    key, sym, stored_history = args
     try:
-        hist = yf.Ticker(sym).history(period="1y", interval="1d")
-        if hist.empty:
+        history = _yf_close_history(sym, stored_history, precision=3)
+        if not history:
             return key, None
-        close = hist["Close"].dropna()
-        current = round(float(close.iloc[-1]), 3)
-        prev = round(float(close.iloc[-2]), 3) if len(close) > 1 else current
-        history = [
-            {"date": str(d.date()), "value": round(float(v), 3)}
-            for d, v in zip(close.index, close.values)
-        ]
+        current = round(history[-1]["value"], 3)
+        prev = round(history[-2]["value"], 3) if len(history) > 1 else current
         return key, {
             "current": current,
             "change_bp": round((current - prev) * 100, 1),
@@ -120,8 +115,14 @@ def get_treasury() -> dict:
     if cached:
         return cached
 
+    stored = _mc_load("treasury")
+    stored_raw = (stored["data"].get("_raw_histories") or {}) if stored else {}
+
     with ThreadPoolExecutor(max_workers=4) as ex:
-        results = dict(ex.map(_fetch_treasury, _TREASURY_SYMBOLS.items()))
+        results = dict(ex.map(
+            _fetch_treasury,
+            [(k, sym, stored_raw.get(k, [])) for k, sym in _TREASURY_SYMBOLS.items()]
+        ))
 
     rates = {
         k: {"current": v["current"], "change_bp": v["change_bp"]}
@@ -129,7 +130,7 @@ def get_treasury() -> dict:
     }
     history = {k: v["history"] for k, v in results.items() if v and k in ("3m", "10y")}
 
-    spread: list[dict] = []
+    spread: list = []
     if results.get("10y") and results.get("3m"):
         h10 = {d["date"]: d["value"] for d in results["10y"]["history"]}
         h3m = {d["date"]: d["value"] for d in results["3m"]["history"]}
@@ -138,7 +139,9 @@ def get_treasury() -> dict:
             for dt in sorted(set(h10) & set(h3m))
         ]
 
-    data = {"rates": rates, "history": history, "spread": spread}
+    raw_histories = {k: v["history"] for k, v in results.items() if v}
+    data = {"rates": rates, "history": history, "spread": spread, "_raw_histories": raw_histories}
+    _mc_save("treasury", data)
     _set_cache("treasury", data, ttl=3600)
     return data
 
@@ -215,6 +218,15 @@ def get_m7_earnings() -> dict:
     if cached:
         return cached
 
+    stored = _mc_load("m7_earnings")
+    if stored and stored.get("fetched_at"):
+        from datetime import datetime, timezone
+        fetched = datetime.fromisoformat(stored["fetched_at"].replace("Z", "+00:00"))
+        age_hours = (datetime.now(timezone.utc) - fetched).total_seconds() / 3600
+        if age_hours < 24:
+            _set_cache("m7_earnings", stored["data"], ttl=86400)
+            return stored["data"]
+
     sp500 = _get_sp500_tickers()
     rest = [t for t in sp500 if t not in M7]
 
@@ -233,6 +245,7 @@ def get_m7_earnings() -> dict:
         ],
         "unit": "십억달러",
     }
+    _mc_save("m7_earnings", data)
     _set_cache("m7_earnings", data, ttl=86400)
     return data
 
@@ -304,6 +317,15 @@ def get_kr_top2_earnings() -> dict:
     if cached:
         return cached
 
+    stored = _mc_load("kr_top2_earnings")
+    if stored and stored.get("fetched_at"):
+        from datetime import datetime, timezone
+        fetched = datetime.fromisoformat(stored["fetched_at"].replace("Z", "+00:00"))
+        age_hours = (datetime.now(timezone.utc) - fetched).total_seconds() / 3600
+        if age_hours < 24:
+            _set_cache("kr_top2_earnings", stored["data"], ttl=86400)
+            return stored["data"]
+
     kospi = _get_kospi_tickers()
     rest = [t for t in kospi if t not in KR_TOP2]
 
@@ -311,8 +333,8 @@ def get_kr_top2_earnings() -> dict:
         top2_data = list(ex.map(_get_naver_quarterly_net_income, KR_TOP2))
         rest_data = list(ex.map(_get_naver_quarterly_net_income, rest))
 
-    top2_by_q = _merge_quarters(top2_data, ended_only=False)  # includes Naver consensus
-    rest_by_q = _merge_quarters(rest_data, ended_only=True)   # actual only
+    top2_by_q = _merge_quarters(top2_data, ended_only=False)
+    rest_by_q = _merge_quarters(rest_data, ended_only=True)
 
     ended_qs = sorted(q for q in (set(top2_by_q) | set(rest_by_q)) if _quarter_ended(q))[-8:]
     est_qs = sorted(q for q in top2_by_q if not _quarter_ended(q))
@@ -330,6 +352,7 @@ def get_kr_top2_earnings() -> dict:
         ],
         "unit": "억원",
     }
+    _mc_save("kr_top2_earnings", data)
     _set_cache("kr_top2_earnings", data, ttl=86400)
     return data
 
@@ -339,20 +362,15 @@ def get_kr_top2_earnings() -> dict:
 _FX_SYMBOLS = {"usdkrw": "USDKRW=X", "usdjpy": "USDJPY=X", "eurusd": "EURUSD=X"}
 
 
-def _fetch_fx(args: tuple[str, str]) -> tuple[str, dict | None]:
-    key, sym = args
+def _fetch_fx(args: tuple) -> tuple:
+    key, sym, stored_history = args
     try:
-        hist = yf.Ticker(sym).history(period="1y", interval="1d")
-        if hist.empty:
+        history = _yf_close_history(sym, stored_history, precision=4)
+        if not history:
             return key, None
-        close = hist["Close"].dropna()
-        current = round(float(close.iloc[-1]), 4)
-        prev = round(float(close.iloc[-2]), 4) if len(close) > 1 else current
+        current = round(history[-1]["value"], 4)
+        prev = round(history[-2]["value"], 4) if len(history) > 1 else current
         change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
-        history = [
-            {"date": str(d.date()), "value": round(float(v), 4)}
-            for d, v in zip(close.index, close.values)
-        ]
         return key, {"current": current, "change_pct": change_pct, "history": history}
     except Exception:
         return key, None
@@ -363,19 +381,29 @@ def get_fx() -> dict:
     if cached:
         return cached
 
+    stored = _mc_load("fx")
+    stored_histories = {}
+    if stored:
+        for k in _FX_SYMBOLS:
+            stored_histories[k] = (stored["data"].get("history") or {}).get(k, [])
+
     with ThreadPoolExecutor(max_workers=3) as ex:
-        results = dict(ex.map(_fetch_fx, _FX_SYMBOLS.items()))
+        results = dict(ex.map(
+            _fetch_fx,
+            [(k, sym, stored_histories.get(k, [])) for k, sym in _FX_SYMBOLS.items()]
+        ))
 
     rates = {
         k: {"current": v["current"], "change_pct": v["change_pct"]}
-        for k, v in results.items()
-        if v
+        for k, v in results.items() if v
     }
     history = {"usdkrw": results["usdkrw"]["history"]} if results.get("usdkrw") else {}
 
     if not rates:
         return {"rates": {}, "history": {}}
+
     data = {"rates": rates, "history": history}
+    _mc_save("fx", data)
     _set_cache("fx", data, ttl=3600)
     return data
 
@@ -387,17 +415,18 @@ def get_vix() -> dict:
     if cached:
         return cached
 
+    stored = _mc_load("vix")
+    stored_history = (stored["data"].get("history") or []) if stored else []
+
     try:
-        hist = yf.Ticker("^VIX").history(period="1y", interval="1d")
-        close = hist["Close"].dropna()
-        current = round(float(close.iloc[-1]), 2)
-        prev = round(float(close.iloc[-2]), 2) if len(close) > 1 else current
+        history = _yf_close_history("^VIX", stored_history, precision=2)
+        if not history:
+            return {"current": None, "change": None, "history": []}
+        current = round(history[-1]["value"], 2)
+        prev = round(history[-2]["value"], 2) if len(history) > 1 else current
         change = round(current - prev, 2)
-        history = [
-            {"date": str(d.date()), "value": round(float(v), 2)}
-            for d, v in zip(close.index, close.values)
-        ]
         data = {"current": current, "change": change, "history": history}
+        _mc_save("vix", data)
         _set_cache("vix", data, ttl=3600)
         return data
     except Exception:
@@ -413,20 +442,16 @@ _COMMODITY_SYMBOLS: dict[str, tuple[str, str]] = {
 }
 
 
-def _fetch_commodity(args: tuple[str, tuple[str, str]]) -> tuple[str, dict | None]:
-    key, (sym, unit) = args
+def _fetch_commodity(args: tuple) -> tuple:
+    key, sym_unit, stored_history = args
+    sym, unit = sym_unit
     try:
-        hist = yf.Ticker(sym).history(period="1y", interval="1d")
-        if hist.empty:
+        history = _yf_close_history(sym, stored_history, precision=2)
+        if not history:
             return key, None
-        close = hist["Close"].dropna()
-        current = round(float(close.iloc[-1]), 2)
-        prev = round(float(close.iloc[-2]), 2) if len(close) > 1 else current
+        current = round(history[-1]["value"], 2)
+        prev = round(history[-2]["value"], 2) if len(history) > 1 else current
         change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
-        history = [
-            {"date": str(d.date()), "value": round(float(v), 2)}
-            for d, v in zip(close.index, close.values)
-        ]
         return key, {"current": current, "change_pct": change_pct, "unit": unit, "history": history}
     except Exception:
         return key, None
@@ -437,19 +462,29 @@ def get_commodities() -> dict:
     if cached:
         return cached
 
+    stored = _mc_load("commodities")
+    stored_histories = {}
+    if stored:
+        for k in _COMMODITY_SYMBOLS:
+            stored_histories[k] = (stored["data"].get("history") or {}).get(k, [])
+
     with ThreadPoolExecutor(max_workers=3) as ex:
-        results = dict(ex.map(_fetch_commodity, _COMMODITY_SYMBOLS.items()))
+        results = dict(ex.map(
+            _fetch_commodity,
+            [(k, sym_unit, stored_histories.get(k, [])) for k, sym_unit in _COMMODITY_SYMBOLS.items()]
+        ))
 
     prices = {
         k: {"current": v["current"], "change_pct": v["change_pct"], "unit": v["unit"]}
-        for k, v in results.items()
-        if v
+        for k, v in results.items() if v
     }
     history = {k: v["history"] for k, v in results.items() if v}
 
     if not prices:
         return {"prices": {}, "history": {}}
+
     data = {"prices": prices, "history": history}
+    _mc_save("commodities", data)
     _set_cache("commodities", data, ttl=3600)
     return data
 
@@ -465,18 +500,27 @@ def get_econ_indicators() -> dict:
     if not api_key:
         return {"error": "FRED_API_KEY 환경변수가 필요합니다. https://fred.stlouisfed.org/docs/api/api_key.html 에서 무료 발급 후 설정하세요."}
 
-    from datetime import date as _date
-    start = _date(_date.today().year - 3, 1, 1).isoformat()
+    stored = _mc_load("econ_indicators")
+    stored_data = stored["data"] if stored else None
 
-    def _fetch_series(series_id: str) -> list[dict]:
+    if stored_data and stored.get("fetched_at"):
+        from datetime import datetime, timezone
+        fetched = datetime.fromisoformat(stored["fetched_at"].replace("Z", "+00:00"))
+        age_days = (datetime.now(timezone.utc) - fetched).days
+        if age_days < 7:
+            _set_cache("econ_indicators", stored_data, ttl=86400)
+            return stored_data
+
+    from datetime import date as _date
+    cpi_stored = (stored_data or {}).get("cpi", [])
+    unemp_stored = (stored_data or {}).get("unemployment", [])
+    cpi_start = cpi_stored[-1]["date"] if cpi_stored else _date(_date.today().year - 3, 1, 1).isoformat()
+    unemp_start = unemp_stored[-1]["date"] if unemp_stored else _date(_date.today().year - 3, 1, 1).isoformat()
+
+    def _fetch_series(series_id: str, start: str) -> list:
         r = requests.get(
             "https://api.stlouisfed.org/fred/series/observations",
-            params={
-                "series_id": series_id,
-                "api_key": api_key,
-                "file_type": "json",
-                "observation_start": start,
-            },
+            params={"series_id": series_id, "api_key": api_key, "file_type": "json", "observation_start": start},
             timeout=10,
         )
         r.raise_for_status()
@@ -487,12 +531,18 @@ def get_econ_indicators() -> dict:
         ]
 
     try:
-        cpi = _fetch_series("CPIAUCSL")
-        unemployment = _fetch_series("UNRATE")
+        new_cpi = _fetch_series("CPIAUCSL", cpi_start)
+        new_unemp = _fetch_series("UNRATE", unemp_start)
     except Exception:
+        if stored_data:
+            _set_cache("econ_indicators", stored_data, ttl=3600)
+            return stored_data
         return {"cpi": [], "unemployment": []}
 
+    cpi = _merge_history(cpi_stored, new_cpi)
+    unemployment = _merge_history(unemp_stored, new_unemp)
     data = {"cpi": cpi, "unemployment": unemployment}
+    _mc_save("econ_indicators", data)
     _set_cache("econ_indicators", data, ttl=86400)
     return data
 
@@ -615,6 +665,15 @@ def _fetch_comtrade_exports() -> dict:
 
 
 def get_kr_exports() -> dict:
+    stored = _mc_load("kr_exports")
+    if stored and stored.get("fetched_at"):
+        from datetime import datetime, timezone
+        fetched = datetime.fromisoformat(stored["fetched_at"].replace("Z", "+00:00"))
+        age_days = (datetime.now(timezone.utc) - fetched).days
+        if age_days < 3:
+            return stored["data"]
+
+    # file cache fallback (used when Supabase unavailable)
     if os.path.exists(_EXPORTS_CACHE):
         if time.time() - os.path.getmtime(_EXPORTS_CACHE) < 86400 * 3:
             with open(_EXPORTS_CACHE) as f:
@@ -627,8 +686,11 @@ def get_kr_exports() -> dict:
         try:
             data = _fetch_comtrade_exports()
         except Exception as e:
+            if stored:
+                return stored["data"]
             return {"months": [], "error": str(e)}
 
+    _mc_save("kr_exports", data)
     os.makedirs(_DATA_DIR, exist_ok=True)
     with open(_EXPORTS_CACHE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
