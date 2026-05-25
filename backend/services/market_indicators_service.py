@@ -218,20 +218,8 @@ def _merge_quarters(results: list[dict[str, float]], n: int = 8, ended_only: boo
     return {q: round(total[q], 2) for q in quarters}
 
 
-def get_m7_earnings() -> dict:
-    cached = _get_cache("m7_earnings")
-    if cached:
-        return cached
-
-    stored = _mc_load("m7_earnings")
-    if stored and stored.get("fetched_at"):
-        from datetime import datetime, timezone
-        fetched = datetime.fromisoformat(stored["fetched_at"].replace("Z", "+00:00"))
-        age_hours = (datetime.now(timezone.utc) - fetched).total_seconds() / 3600
-        if age_hours < 24:
-            _set_cache("m7_earnings", stored["data"], ttl=86400)
-            return stored["data"]
-
+def _fetch_and_save_m7_earnings() -> dict:
+    """yfinance에서 직접 fetch 후 Supabase 저장. 스케줄러 및 최초 로드용."""
     sp500 = _get_sp500_tickers()
     rest = [t for t in sp500 if t not in M7]
 
@@ -251,8 +239,22 @@ def get_m7_earnings() -> dict:
         "unit": "십억달러",
     }
     _mc_save("m7_earnings", data)
-    _set_cache("m7_earnings", data, ttl=86400)
+    _cache.pop("m7_earnings", None)
     return data
+
+
+def get_m7_earnings() -> dict:
+    cached = _get_cache("m7_earnings")
+    if cached:
+        return cached
+
+    stored = _mc_load("m7_earnings")
+    if stored:
+        _set_cache("m7_earnings", stored["data"], ttl=86400)
+        return stored["data"]
+
+    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
+    return _fetch_and_save_m7_earnings()
 
 
 # ── KR Top2 Earnings ──────────────────────────────────────────────────────────
@@ -317,20 +319,8 @@ def _get_naver_quarterly_net_income(ticker: str) -> dict[str, float]:
         return {}
 
 
-def get_kr_top2_earnings() -> dict:
-    cached = _get_cache("kr_top2_earnings")
-    if cached:
-        return cached
-
-    stored = _mc_load("kr_top2_earnings")
-    if stored and stored.get("fetched_at"):
-        from datetime import datetime, timezone
-        fetched = datetime.fromisoformat(stored["fetched_at"].replace("Z", "+00:00"))
-        age_hours = (datetime.now(timezone.utc) - fetched).total_seconds() / 3600
-        if age_hours < 24:
-            _set_cache("kr_top2_earnings", stored["data"], ttl=86400)
-            return stored["data"]
-
+def _fetch_and_save_kr_top2_earnings() -> dict:
+    """Naver에서 직접 fetch 후 Supabase 저장. 스케줄러 및 최초 로드용."""
     kospi = _get_kospi_tickers()
     rest = [t for t in kospi if t not in KR_TOP2]
 
@@ -358,8 +348,22 @@ def get_kr_top2_earnings() -> dict:
         "unit": "억원",
     }
     _mc_save("kr_top2_earnings", data)
-    _set_cache("kr_top2_earnings", data, ttl=86400)
+    _cache.pop("kr_top2_earnings", None)
     return data
+
+
+def get_kr_top2_earnings() -> dict:
+    cached = _get_cache("kr_top2_earnings")
+    if cached:
+        return cached
+
+    stored = _mc_load("kr_top2_earnings")
+    if stored:
+        _set_cache("kr_top2_earnings", stored["data"], ttl=86400)
+        return stored["data"]
+
+    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
+    return _fetch_and_save_kr_top2_earnings()
 
 
 # ── FX ────────────────────────────────────────────────────────────────────────

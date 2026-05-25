@@ -61,6 +61,20 @@ def _run_guru_crawl():
         print(f"[Scheduler] Guru crawl failed: {e}")
 
 
+def _refresh_earnings():
+    from services.market_indicators_service import _fetch_and_save_m7_earnings, _fetch_and_save_kr_top2_earnings
+    try:
+        _fetch_and_save_m7_earnings()
+        print("[Scheduler] M7 earnings refreshed")
+    except Exception as e:
+        print(f"[Scheduler] M7 earnings refresh failed: {e}")
+    try:
+        _fetch_and_save_kr_top2_earnings()
+        print("[Scheduler] KR Top2 earnings refreshed")
+    except Exception as e:
+        print(f"[Scheduler] KR Top2 earnings refresh failed: {e}")
+
+
 def _run_digest():
     from services import digest_service
     from services.db import get_db
@@ -105,6 +119,12 @@ def start():
         _run_digest,
         CronTrigger(hour=8, minute=0, timezone="Asia/Seoul"),
         id=_DIGEST_JOB_ID,
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _refresh_earnings,
+        CronTrigger(day_of_week="sun", hour=3, minute=0, timezone="Asia/Seoul"),
+        id="earnings_refresh",
         replace_existing=True,
     )
     _scheduler.start()

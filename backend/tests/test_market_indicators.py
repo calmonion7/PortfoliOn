@@ -28,7 +28,8 @@ def test_get_treasury_returns_four_rates():
 def test_get_treasury_change_bp():
     from services.market_indicators_service import get_treasury, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([4.50, 4.55])
         result = get_treasury()
     # change = (4.55 - 4.50) * 100 = 5 bp
@@ -43,7 +44,8 @@ def test_get_treasury_spread_is_10y_minus_3m():
         val = 4.55 if sym == "^TNX" else 5.00 if sym == "^TYX" else 4.00 if sym == "^FVX" else 3.50
         mock.history.return_value = _make_hist([val - 0.05, val])
         return mock
-    with patch("services.market_indicators_service.yf.Ticker", side_effect=mock_hist_by_sym):
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service.yf.Ticker", side_effect=mock_hist_by_sym):
         result = get_treasury()
     # spread = 10y(4.55) - 3m(3.50) = 1.05
     assert len(result["spread"]) > 0
@@ -121,7 +123,8 @@ def test_get_m7_earnings_rest_excludes_m7():
         called_tickers.append(ticker)
         return {"2025Q1": 10.0}
 
-    with patch("services.market_indicators_service._get_sp500_tickers", return_value=["AAPL", "JPM", "V"]), \
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service._get_sp500_tickers", return_value=["AAPL", "JPM", "V"]), \
          patch("services.market_indicators_service._get_yf_quarterly_net_income", side_effect=capture_ni):
         get_m7_earnings()
     # JPM and V should be in rest (not M7), AAPL is in M7
@@ -244,6 +247,7 @@ def test_get_kr_exports_uses_file_cache(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "services.market_indicators_service._EXPORTS_CACHE", str(cache_file)
     )
+    monkeypatch.setattr("services.market_indicators_service._mc_load", lambda key: None)
     with patch("services.market_indicators_service.requests.get") as mock_get:
         result = get_kr_exports()
         assert not mock_get.called
@@ -289,7 +293,8 @@ def test_get_fx_returns_three_rates():
 def test_get_fx_change_pct():
     from services.market_indicators_service import get_fx, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([1000.0, 1010.0])
         result = get_fx()
     # change = (1010 - 1000) / 1000 * 100 = 1.0%
@@ -323,7 +328,8 @@ def test_get_fx_caches_result():
 def test_get_vix_returns_current_and_change():
     from services.market_indicators_service import get_vix, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([19.5, 18.2])
         result = get_vix()
     assert result["current"] == pytest.approx(18.2, abs=0.01)
@@ -333,7 +339,8 @@ def test_get_vix_returns_current_and_change():
 def test_get_vix_has_history():
     from services.market_indicators_service import get_vix, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([18.0, 19.0, 20.0])
         result = get_vix()
     assert len(result["history"]) == 3
@@ -366,7 +373,8 @@ def test_get_commodities_returns_three_prices():
 def test_get_commodities_change_pct():
     from services.market_indicators_service import get_commodities, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([2000.0, 2100.0])
         result = get_commodities()
     # change = (2100 - 2000) / 2000 * 100 = 5.0%
@@ -419,6 +427,7 @@ def test_get_econ_indicators_returns_cpi_and_unemployment(monkeypatch):
     from services.market_indicators_service import get_econ_indicators, _cache
     _cache.clear()
     monkeypatch.setenv("FRED_API_KEY", "test-key")
+    monkeypatch.setattr("services.market_indicators_service._mc_load", lambda key: None)
 
     fake_obs = [
         {"date": "2024-01-01", "value": "308.5"},
@@ -441,6 +450,7 @@ def test_get_econ_indicators_skips_missing_values(monkeypatch):
     from services.market_indicators_service import get_econ_indicators, _cache
     _cache.clear()
     monkeypatch.setenv("FRED_API_KEY", "test-key")
+    monkeypatch.setattr("services.market_indicators_service._mc_load", lambda key: None)
 
     fake_obs = [
         {"date": "2024-01-01", "value": "308.5"},
