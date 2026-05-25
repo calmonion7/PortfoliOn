@@ -2,9 +2,29 @@ import { useState } from 'react'
 import Reports from './Reports'
 import Calendar from './Calendar'
 import Digest from './Digest'
+import useIsMobile from '../hooks/useIsMobile'
 
 export default function Research() {
-  const [tab, setTab] = useState('reports')
+  const isMobile = useIsMobile()
+  const [tab, setTab] = useState('digest')
+
+  if (isMobile) return (
+    <>
+      <header className="appbar">
+        <h1>리서치</h1>
+      </header>
+      <div className="seg-pad">
+        <div className="seg">
+          <button className={tab === 'digest' ? 'is-active' : ''} onClick={() => setTab('digest')}>다이제스트</button>
+          <button className={tab === 'reports' ? 'is-active' : ''} onClick={() => setTab('reports')}>리포트</button>
+          <button className={tab === 'calendar' ? 'is-active' : ''} onClick={() => setTab('calendar')}>캘린더</button>
+        </div>
+      </div>
+      {tab === 'digest'   && <Digest />}
+      {tab === 'reports'  && <Reports />}
+      {tab === 'calendar' && <Calendar />}
+    </>
+  )
 
   return (
     <div className="page">

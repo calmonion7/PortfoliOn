@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import GuruManagers from './GuruManagers'
 import GuruStats from './GuruStats'
+import useIsMobile from '../hooks/useIsMobile'
 
 const TABS = [
   { key: 'managers', label: '매니저 목록' },
@@ -8,7 +9,24 @@ const TABS = [
 ]
 
 export default function Guru() {
+  const isMobile = useIsMobile()
   const [tab, setTab] = useState('managers')
+
+  if (isMobile) return (
+    <>
+      <header className="appbar">
+        <h1>구루</h1>
+      </header>
+      <div className="seg-pad">
+        <div className="seg">
+          <button className={tab === 'managers' ? 'is-active' : ''} onClick={() => setTab('managers')}>매니저</button>
+          <button className={tab === 'stats' ? 'is-active' : ''} onClick={() => setTab('stats')}>추천 통계</button>
+        </div>
+      </div>
+      {tab === 'managers' && <GuruManagers />}
+      {tab === 'stats'    && <GuruStats />}
+    </>
+  )
 
   const tabStyle = (active) => ({
     padding: '6px 14px', borderRadius: 16,

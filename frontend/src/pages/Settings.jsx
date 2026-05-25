@@ -2,6 +2,8 @@ import { useState } from 'react'
 import ReportSchedule from './ReportSchedule'
 import GuruCrawlSettings from './GuruCrawlSettings'
 import ConsensusSettings from './ConsensusSettings'
+import useIsMobile from '../hooks/useIsMobile'
+import { supabase } from '../supabase'
 
 const TABS = [
   { key: 'report',    label: '리포트 설정' },
@@ -10,7 +12,37 @@ const TABS = [
 ]
 
 export default function Settings() {
+  const isMobile = useIsMobile()
   const [tab, setTab] = useState('report')
+
+  if (isMobile) return (
+    <>
+      <header className="appbar">
+        <h1>설정</h1>
+      </header>
+
+      <div className="seg-pad">
+        <div className="seg">
+          <button className={tab === 'report' ? 'is-active' : ''} onClick={() => setTab('report')}>리포트</button>
+          <button className={tab === 'consensus' ? 'is-active' : ''} onClick={() => setTab('consensus')}>컨센서스</button>
+          <button className={tab === 'guru' ? 'is-active' : ''} onClick={() => setTab('guru')}>구루</button>
+        </div>
+      </div>
+
+      <div style={{ padding: '0 20px 20px' }}>
+        {tab === 'report'    && <ReportSchedule />}
+        {tab === 'consensus' && <ConsensusSettings />}
+        {tab === 'guru'      && <GuruCrawlSettings />}
+      </div>
+
+      <div style={{ padding: '0 20px 32px' }}>
+        <button className="btn" style={{ width: '100%', justifyContent: 'center', color: 'var(--down)' }}
+          onClick={() => supabase.auth.signOut()}>
+          로그아웃
+        </button>
+      </div>
+    </>
+  )
 
   const tabStyle = (active) => ({
     padding: '8px 16px', border: 'none',

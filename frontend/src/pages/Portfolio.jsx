@@ -5,6 +5,7 @@ import PromoteModal from '../components/PromoteModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import DashboardCard from '../components/portfolio/DashboardCard'
 import { Search, Plus, Spark, MarketBadge, Sig, fmt, sparkFor } from '../components/ui/icons'
+import useIsMobile from '../hooks/useIsMobile'
 
 const DashboardGrid = ({ cards, loading }) => {
   if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
@@ -17,6 +18,7 @@ const DashboardGrid = ({ cards, loading }) => {
 }
 
 export default function Portfolio() {
+  const isMobile = useIsMobile()
   const [tab, setTab] = useState('holdings')
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -111,6 +113,124 @@ export default function Portfolio() {
     const v = (h.avg_cost || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : 1380)
     return sum + v
   }, 0)
+
+  if (isMobile) return (
+    <>
+      <header className="appbar">
+        <h1>포트폴리오</h1>
+        <div className="actions">
+          <button className="icon-btn" onClick={openAdd}><Plus /></button>
+        </div>
+      </header>
+
+      <div className="hero">
+        <div className="label">투자 원가 · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>
+        <div className="val tnum">₩{fmt(totalCost, 0)}</div>
+        <div className="delta muted tnum">{stocks.length}개 보유 · 관심 {watchlist.length}</div>
+      </div>
+
+      <div className="seg-pad">
+        <div className="seg">
+          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => setTab('holdings')}>
+            보유 <span className="count">{stocks.length}</span>
+          </button>
+          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => setTab('watch')}>
+            관심 <span className="count">{watchlist.length}</span>
+          </button>
+          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard() }}>
+            대시보드
+          </button>
+        </div>
+      </div>
+
+      {error && <p style={{ color: 'var(--down)', fontSize: 13, padding: '0 20px 8px' }}>{error}</p>}
+
+      {tab === 'holdings' && (
+        <div className="list-card holdings-list" style={{ margin: '0 20px 12px' }}>
+          {filteredStocks.map(h => {
+            const ccy = (h.market || 'US') === 'KR' ? '₩' : '$'
+            const dec = (h.market || 'US') === 'KR' ? 0 : 2
+            const pnl = h.current_price != null ? (h.current_price - h.avg_cost) * h.quantity : null
+            const pnlPct = h.current_price != null && h.avg_cost ? (h.current_price - h.avg_cost) / h.avg_cost * 100 : null
+            const isUp = pnl != null && pnl >= 0
+            return (
+              <div key={h.ticker} className="h-row" onClick={() => openEdit(h)} style={{ cursor: 'pointer' }}>
+                <div className="logo">{h.ticker.slice(0, 3)}</div>
+                <div className="meta">
+                  <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
+                  <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : '🇰🇷'} {h.quantity}주 · 평단 {ccy}{fmt(h.avg_cost || 0, dec)}</div>
+                </div>
+                <div className="price">
+                  {pnl != null ? (
+                    <>
+                      <div className={`v tnum ${isUp ? 'up' : 'down'}`}>{isUp ? '+' : '-'}{ccy}{fmt(Math.abs(pnl), dec)}</div>
+                      <div className={`d tnum ${isUp ? 'up' : 'down'}`}>{pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%</div>
+                    </>
+                  ) : (
+                    <div className="v tnum muted">—</div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {listLoading && <div style={{ textAlign: 'center', padding: 24 }}><LoadingSpinner label="불러오는 중…" /></div>}
+          {!listLoading && hasFetched && filteredStocks.length === 0 && (
+            <div className="muted" style={{ textAlign: 'center', padding: 24, fontSize: 13 }}>종목을 추가해 주세요</div>
+          )}
+        </div>
+      )}
+
+      {tab === 'watch' && (
+        <div className="list-card" style={{ margin: '0 20px 12px' }}>
+          {filteredWatchlist.map(h => {
+            const ccy = (h.market || 'US') === 'KR' ? '₩' : '$'
+            const dec = (h.market || 'US') === 'KR' ? 0 : 2
+            return (
+              <div key={h.ticker} className="h-row" onClick={() => setPromoteTarget(h.ticker)} style={{ cursor: 'pointer' }}>
+                <div className="logo">{h.ticker.slice(0, 3)}</div>
+                <div className="meta">
+                  <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
+                  <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : '🇰🇷'} 관심종목</div>
+                </div>
+                <div className="price">
+                  {h.current_price != null ? (
+                    <>
+                      <div className="v tnum">{ccy}{fmt(h.current_price, dec)}</div>
+                      {h.change_pct != null && <Sig v={h.change_pct} />}
+                    </>
+                  ) : (
+                    <div className="v tnum muted">—</div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {listLoading && <div style={{ textAlign: 'center', padding: 24 }}><LoadingSpinner label="불러오는 중…" /></div>}
+          {!listLoading && hasFetched && filteredWatchlist.length === 0 && (
+            <div className="muted" style={{ textAlign: 'center', padding: 24, fontSize: 13 }}>관심종목을 추가해 주세요</div>
+          )}
+        </div>
+      )}
+
+      {tab === 'dash' && (
+        <div style={{ padding: '0 20px' }}>
+          <DashboardGrid cards={dashboardCards} loading={dashboardLoading} />
+        </div>
+      )}
+
+      <button className="fab" onClick={openAdd}>
+        <Plus />
+      </button>
+
+      {modalOpen && (
+        <StockModal stock={editing} mode={tab === 'watch' ? 'watchlist' : 'holding'}
+          onSave={handleSave} onClose={() => { setModalOpen(false); setEditing(null) }} />
+      )}
+      {promoteTarget && (
+        <PromoteModal ticker={promoteTarget} onConfirm={handlePromote} onClose={() => setPromoteTarget(null)} />
+      )}
+    </>
+  )
 
   return (
     <div className="page">

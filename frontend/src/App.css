@@ -12,10 +12,35 @@
 
 @media (max-width: 768px) {
   .topnav { display: none; }
-  .page-wrap { padding-bottom: 80px; }
+  .page-wrap { padding-bottom: 80px; min-height: 100vh; }
   .login-wrap { grid-template-columns: 1fr; }
   .login-art { display: none; }
   .login-form { padding: 60px 28px; }
+
+  /* Tables get horizontal scroll */
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* KPI row → 2×2 */
+  .kpi-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* Multi-col grids collapse */
+  .grid-2, .grid-2-3 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+
+  /* Settings */
+  .settings-grid { grid-template-columns: 1fr; }
+  .settings-nav { flex-direction: row; flex-wrap: wrap; position: static; }
+
+  /* Yield curve */
+  .yield-row { grid-template-columns: repeat(3, 1fr); }
+
+  /* Page padding for mobile non-hub content */
+  .page { padding: 16px 16px 100px; }
+}
+
+/* PC에서 탭바 숨김 */
+@media (min-width: 769px) {
+  .tabbar { display: none !important; }
 }
 
 /* 모바일 탭바 — NavLink는 <a>이므로 버튼 스타일 리셋 */

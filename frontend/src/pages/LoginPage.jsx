@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
+import useIsMobile from '../hooks/useIsMobile'
 
 export default function LoginPage() {
+  const isMobile = useIsMobile()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,6 +19,28 @@ export default function LoginPage() {
 
   const handleGoogle = () => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
   const handleGithub = () => supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: window.location.origin } })
+
+  if (isMobile) return (
+    <div className="m-login">
+      <div className="brand-big">
+        <div className="brand-mark"><div className="brand-dot"/><div className="brand-dot brand-dot--2"/></div>
+        PortfoliOn
+      </div>
+      <h1>당신의 자산을<br/>한 화면에서.</h1>
+      <p className="lead">보유 종목, 시장 지표, 매니저 추천을 매일 아침 정리해드려요.</p>
+      <form onSubmit={handleLogin}>
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="이메일" required/>
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="비밀번호" required/>
+        {error && <p style={{color:'var(--down)', fontSize:13, marginBottom:8}}>{error}</p>}
+        <button className="btn btn-primary submit" type="submit" disabled={loading}>
+          {loading ? '로그인 중…' : '로그인'}
+        </button>
+      </form>
+      <div className="divider">또는</div>
+      <button className="btn" style={{width:'100%', justifyContent:'center', marginBottom: 8}} onClick={handleGoogle}>Google로 계속</button>
+      <button className="btn" style={{width:'100%', justifyContent:'center'}} onClick={handleGithub}>GitHub로 계속</button>
+    </div>
+  )
 
   return (
     <div className="login-wrap">
