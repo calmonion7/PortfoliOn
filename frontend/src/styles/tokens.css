@@ -1,316 +1,118 @@
-/* ============================================================
-   PortfoliOn Design Tokens
-   적용 위치: src/styles/tokens.css
-   main.jsx 또는 index.css 최상단에서 import
-   ============================================================ */
+/* =========================================================
+   Design tokens — Apple Stocks / Wealthfront inspired
+   Korean coloring: 상승=red, 하락=blue
+   ========================================================= */
 
-/* ---------- 공통 토큰 (테마 무관) ---------- */
 :root {
-  /* Spacing - 4px grid */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
+  --font-sans: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace;
 
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-full: 9999px;
+  /* Light theme — refined off-whites, Apple Stocks calm */
+  --bg:           #f6f6f4;
+  --bg-elev:     #ffffff;
+  --bg-elev-2:   #fbfbfa;
+  --surface-hover: #f0f0ee;
+  --border:      rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --text:        #0e0e0d;
+  --text-2:      #4a4a47;
+  --text-3:      #88887f;
+  --text-faint:  #b4b4ad;
 
-  /* Typography - sizes */
-  --font-size-xs: 11px;
-  --font-size-sm: 13px;
-  --font-size-base: 14px;
-  --font-size-md: 16px;
-  --font-size-lg: 18px;
-  --font-size-xl: 22px;
-  --font-size-2xl: 28px;
-  --font-size-3xl: 36px;
+  --accent:      #0e0e0d;   /* premium near-black accent */
+  --accent-soft: rgba(14, 14, 13, 0.06);
 
-  /* Typography - weights */
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  /* Korean market coloring */
+  --up:          #d83a3a;   /* red = 상승 */
+  --up-soft:     rgba(216, 58, 58, 0.12);
+  --down:        #2864e8;   /* blue = 하락 */
+  --down-soft:   rgba(40, 100, 232, 0.12);
+  --neutral:     #88887f;
 
-  /* Typography - line height */
-  --line-height-tight: 1.25;
-  --line-height-normal: 1.5;
-  --line-height-loose: 1.7;
+  /* Data palette (calm, Wealthfront-ish) */
+  --data-1:      #0e0e0d;
+  --data-2:      #6b8c9e;
+  --data-3:      #c39a55;
+  --data-4:      #88887f;
+  --data-5:      #4a6b58;
 
-  /* Font family */
-  --font-family-base: -apple-system, BlinkMacSystemFont, 'Inter',
-    'Pretendard Variable', 'Pretendard', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --font-family-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --warn:        #c97a29;
+  --warn-soft:   rgba(201, 122, 41, 0.12);
 
-  /* Transition */
-  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
 
-  /* Z-index scale */
-  --z-dropdown: 100;
-  --z-modal-backdrop: 200;
-  --z-modal: 201;
-  --z-toast: 300;
-  --z-tooltip: 400;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.04);
+  --shadow:    0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-lg: 0 6px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
 }
 
-/* ============================================================
-   Theme: Dark (default)
-   ============================================================ */
-:root,
-[data-theme='dark'] {
-  /* Surfaces */
-  --bg: #0f1014;
-  --bg-nav: #14151c;
-  --bg-card: #181a23;
-  --bg-surface: #1e2030;
-  --bg-elevated: #252839;
-  --bg-hover: #1e2030;
+[data-theme="dark"] {
+  --bg:           #0b0b0c;
+  --bg-elev:     #141416;
+  --bg-elev-2:   #1a1a1d;
+  --surface-hover: #1f1f23;
+  --border:      rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text:        #f3f3f1;
+  --text-2:      #b8b8b3;
+  --text-3:      #8a8a85;
+  --text-faint:  #5a5a55;
 
-  /* Text */
-  --text: #e4e6f0;
-  --text-muted: #8b8fa3;
-  --text-heading: #6fb6ff;
-  --text-inverse: #0f1014;
+  --accent:      #f3f3f1;
+  --accent-soft: rgba(243, 243, 241, 0.08);
 
-  /* Border */
-  --border: #2a2d3f;
-  --border-strong: #3a3e54;
+  --up:          #ff4d4d;
+  --up-soft:     rgba(255, 77, 77, 0.18);
+  --down:        #4d8bff;
+  --down-soft:   rgba(77, 139, 255, 0.18);
+  --neutral:     #8a8a85;
 
-  /* Brand & accent */
-  --accent: #4fc3f7;
-  --accent-hover: #6fd3ff;
-  --accent-btn: #1976d2;
-  --accent-btn-hover: #1f86e6;
+  --data-1:      #f3f3f1;
+  --data-2:      #9fb8c8;
+  --data-3:      #e0b56b;
+  --data-4:      #8a8a85;
+  --data-5:      #7ea08d;
 
-  /* Semantic */
-  --positive: #4caf50;
-  --negative: #ef5350;
-  --color-success: var(--positive);
-  --color-danger: var(--negative);
-  --color-warning: #ff9800;
-  --color-info: var(--accent);
+  --warn:        #e29957;
+  --warn-soft:   rgba(226, 153, 87, 0.16);
 
-  /* Tints (10% alpha for badges, hover states) */
-  --positive-tint: rgba(76, 175, 80, 0.15);
-  --negative-tint: rgba(239, 83, 80, 0.15);
-  --warning-tint: rgba(255, 152, 0, 0.15);
-  --accent-tint: rgba(79, 195, 247, 0.15);
-
-  /* Overlay & misc */
-  --overlay: rgba(0, 0, 0, 0.7);
-  --chart-grid: #232636;
-  --input-bg: #1e2030;
-  --input-border: #3a3e54;
-  --focus-ring: rgba(79, 195, 247, 0.4);
-
-  /* Shadows - 다크에서는 미세하게 */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
+  --shadow:    0 1px 3px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
+  --shadow-lg: 0 6px 24px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3);
 }
 
-/* ============================================================
-   Theme: Beige
-   ============================================================ */
-[data-theme='beige'] {
-  --bg: #f5f0e8;
-  --bg-nav: #ede5d8;
-  --bg-card: #ede8de;
-  --bg-surface: #e4ddd0;
-  --bg-elevated: #fdf8f0;
-  --bg-hover: #ddd6c8;
-
-  --text: #3d3530;
-  --text-muted: #7a6f68;
-  --text-heading: #6b4226;
-  --text-inverse: #f5f0e8;
-
-  --border: #d4cfc6;
-  --border-strong: #b8b2a7;
-
-  --accent: #b85c2a;
-  --accent-hover: #cc6b35;
-  --accent-btn: #8b4513;
-  --accent-btn-hover: #a0521b;
-
-  --positive: #3d7a45;
-  --negative: #c0392b;
-  --color-success: var(--positive);
-  --color-danger: var(--negative);
-  --color-warning: #d68a1a;
-  --color-info: #1976d2;
-
-  --positive-tint: rgba(61, 122, 69, 0.12);
-  --negative-tint: rgba(192, 57, 43, 0.12);
-  --warning-tint: rgba(214, 138, 26, 0.12);
-  --accent-tint: rgba(184, 92, 42, 0.12);
-
-  --overlay: rgba(0, 0, 0, 0.4);
-  --chart-grid: #ddd8ce;
-  --input-bg: #fdf8f0;
-  --input-border: #c8c2b8;
-  --focus-ring: rgba(184, 92, 42, 0.4);
-
-  --shadow-sm: 0 1px 2px rgba(74, 60, 40, 0.06);
-  --shadow-md: 0 4px 12px rgba(74, 60, 40, 0.1);
-  --shadow-lg: 0 12px 32px rgba(74, 60, 40, 0.14);
-}
-
-/* ============================================================
-   Theme: White
-   ============================================================ */
-[data-theme='white'] {
-  --bg: #ffffff;
-  --bg-nav: #fafbfc;
-  --bg-card: #ffffff;
-  --bg-surface: #f4f6f9;
-  --bg-elevated: #ffffff;
-  --bg-hover: #eef1f5;
-
-  --text: #1a1f2e;
-  --text-muted: #6b7280;
-  --text-heading: #1d4ed8;
-  --text-inverse: #ffffff;
-
-  --border: #e5e7eb;
-  --border-strong: #cbd2dc;
-
-  --accent: #2563eb;
-  --accent-hover: #3b73ee;
-  --accent-btn: #2563eb;
-  --accent-btn-hover: #1d4ed8;
-
-  --positive: #16a34a;
-  --negative: #dc2626;
-  --color-success: var(--positive);
-  --color-danger: var(--negative);
-  --color-warning: #d97706;
-  --color-info: #2563eb;
-
-  --positive-tint: rgba(22, 163, 74, 0.1);
-  --negative-tint: rgba(220, 38, 38, 0.1);
-  --warning-tint: rgba(217, 119, 6, 0.1);
-  --accent-tint: rgba(37, 99, 235, 0.1);
-
-  --overlay: rgba(15, 23, 42, 0.4);
-  --chart-grid: #eef1f5;
-  --input-bg: #ffffff;
-  --input-border: #d1d5db;
-  --focus-ring: rgba(37, 99, 235, 0.35);
-
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
-}
-
-/* ============================================================
-   Theme: Pastel
-   ============================================================ */
-[data-theme='pastel'] {
-  --bg: #f0f4ff;
-  --bg-nav: #dde4ff;
-  --bg-card: #e8eeff;
-  --bg-surface: #d8e0ff;
-  --bg-elevated: #f8f9ff;
-  --bg-hover: #ccd5ff;
-
-  --text: #2d3561;
-  --text-muted: #6b75a8;
-  --text-heading: #3949ab;
-  --text-inverse: #f0f4ff;
-
-  --border: #c5cae9;
-  --border-strong: #9fa8da;
-
-  --accent: #5c6bc0;
-  --accent-hover: #6e7dd0;
-  --accent-btn: #3f51b5;
-  --accent-btn-hover: #4f61c5;
-
-  --positive: #388e3c;
-  --negative: #d32f2f;
-  --color-success: var(--positive);
-  --color-danger: var(--negative);
-  --color-warning: #ed8a1a;
-  --color-info: var(--accent);
-
-  --positive-tint: rgba(56, 142, 60, 0.12);
-  --negative-tint: rgba(211, 47, 47, 0.12);
-  --warning-tint: rgba(237, 138, 26, 0.12);
-  --accent-tint: rgba(92, 107, 192, 0.12);
-
-  --overlay: rgba(45, 53, 97, 0.3);
-  --chart-grid: #dde3f8;
-  --input-bg: #f8f9ff;
-  --input-border: #9fa8da;
-  --focus-ring: rgba(92, 107, 192, 0.4);
-
-  --shadow-sm: 0 1px 2px rgba(45, 53, 97, 0.05);
-  --shadow-md: 0 4px 12px rgba(45, 53, 97, 0.08);
-  --shadow-lg: 0 12px 32px rgba(45, 53, 97, 0.12);
-}
-
-/* ============================================================
-   Base styles
-   ============================================================ */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+/* Base reset */
+*, *::before, *::after { box-sizing: border-box; }
 
 html {
-  font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01';
 }
 
 body {
-  margin: 0;
-  background: var(--bg);
+  margin: 0; padding: 0;
+  font-family: var(--font-sans);
   color: var(--text);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-normal);
-  font-variant-numeric: tabular-nums;
-  transition: background var(--transition-base), color var(--transition-base);
+  background: var(--bg);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-/* 숫자가 많이 나오는 영역에 적용 */
-.tabular {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
-}
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; color: inherit; }
 
-/* Focus outline 통일 */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.mono { font-family: var(--font-mono); font-feature-settings: 'tnum', 'zero'; }
+.up   { color: var(--up); }
+.down { color: var(--down); }
+.muted { color: var(--text-3); }
 
-/* 스크롤바 (선택) */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: var(--radius-full);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
