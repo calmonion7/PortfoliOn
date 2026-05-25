@@ -90,3 +90,19 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── Mobile layout ── */
+@media (max-width: 768px) {
+  main {
+    padding: 12px !important;
+  }
+
+  /* 서브탭 (Research, AnalysisHub 등) 가로 스크롤 */
+  .tab-scroll {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tab-scroll::-webkit-scrollbar { display: none; }
+}
