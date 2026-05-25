@@ -9,6 +9,7 @@ from services import storage, report_generator
 from services import consensus as consensus_svc
 from services import cache as cache_svc
 from services.utils import sanitize as _sanitize
+from services.db import get_db
 from auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["report"])
@@ -107,6 +108,11 @@ def _run_generation(stocks: list):
 
 
 def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
+    db = get_db()
+    rows = db.table("snapshots").select("data").eq("ticker", ticker.upper()).eq("date", date_str).execute().data
+    if rows:
+        return _sanitize(rows[0]["data"])
+    # 로컬 파일 폴백
     for base in (SNAPSHOTS_DIR, REPORTS_DIR):
         path = base / ticker / f"{date_str}.json"
         if path.exists():
@@ -123,25 +129,23 @@ def list_reports(user_id: str = Depends(get_current_user)):
         holding_tickers = set(portfolio_stocks.keys())
         watchlist_tickers = set(portfolio_watchlist.keys())
 
+        db = get_db()
+        snap_rows = db.table("snapshots").select("ticker, date").order("date", desc=True).execute().data
+        ticker_dates: dict = {}
+        for r in snap_rows:
+            t = r["ticker"].upper()
+            if t not in ticker_dates:
+                ticker_dates[t] = []
+            ticker_dates[t].append(r["date"])
+
         result = {}
-        for base in (SNAPSHOTS_DIR, REPORTS_DIR):
-            if not base.exists():
-                continue
-            for ticker_dir in sorted(base.iterdir()):
-                if not ticker_dir.is_dir():
-                    continue
-                ticker = ticker_dir.name.upper()
-                if ticker in result:
-                    continue
-                dates = sorted([f.stem for f in ticker_dir.glob("*.json")], reverse=True)
-                if not dates:
-                    continue
-                category = "holdings" if ticker in holding_tickers else \
-                           "watchlist" if ticker in watchlist_tickers else "other"
-                summary = _read_snapshot(ticker, dates[0])
-                stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
-                market = stock_info.get("market") or (summary or {}).get("market", "US")
-                result[ticker] = {"dates": dates, "category": category, "summary": summary, "market": market}
+        for ticker, dates in ticker_dates.items():
+            category = "holdings" if ticker in holding_tickers else \
+                       "watchlist" if ticker in watchlist_tickers else "other"
+            summary = _read_snapshot(ticker, dates[0]) if dates else None
+            stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
+            market = stock_info.get("market") or (summary or {}).get("market", "US")
+            result[ticker] = {"dates": dates, "category": category, "summary": summary, "market": market}
 
         for ticker, stock in portfolio_stocks.items():
             if ticker not in result:
@@ -159,28 +163,25 @@ def list_reports(user_id: str = Depends(get_current_user)):
 @router.get("/report/{ticker}/history")
 def get_history(ticker: str):
     upper = ticker.upper()
+    db = get_db()
+    rows = db.table("snapshots").select("date, data").eq("ticker", upper).order("date").execute().data
     result = []
-    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
-        ticker_dir = base / upper
-        if not ticker_dir.exists():
-            continue
-        for f in sorted(ticker_dir.glob("*.json")):
-            raw = json.loads(f.read_text(encoding="utf-8"))
-            result.append({
-                "date": f.stem,
-                "price": raw.get("price"),
-                "target_mean": raw.get("target_mean"),
-                "target_high": raw.get("target_high"),
-                "target_low": raw.get("target_low"),
-                "buy": raw.get("buy"),
-                "hold": raw.get("hold"),
-                "sell": raw.get("sell"),
-                "rsi_daily": (raw.get("daily_rsi") or {}).get("rsi"),
-                "rsi_weekly": (raw.get("weekly_rsi") or {}).get("rsi"),
-                "rsi_monthly": (raw.get("monthly_rsi") or {}).get("rsi"),
-            })
-        break
-    return sorted(result, key=lambda x: x["date"])
+    for r in rows:
+        raw = r["data"] or {}
+        result.append({
+            "date": r["date"],
+            "price": raw.get("price"),
+            "target_mean": raw.get("target_mean"),
+            "target_high": raw.get("target_high"),
+            "target_low": raw.get("target_low"),
+            "buy": raw.get("buy"),
+            "hold": raw.get("hold"),
+            "sell": raw.get("sell"),
+            "rsi_daily": (raw.get("daily_rsi") or {}).get("rsi"),
+            "rsi_weekly": (raw.get("weekly_rsi") or {}).get("rsi"),
+            "rsi_monthly": (raw.get("monthly_rsi") or {}).get("rsi"),
+        })
+    return result
 
 
 @router.get("/report/{ticker}/{date_str}")
@@ -248,18 +249,11 @@ def collect_consensus(ticker: str):
 @router.post("/consensus/{ticker}/backfill")
 def backfill_consensus(ticker: str):
     upper = ticker.upper()
-    ticker_dir = None
-    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
-        d = base / upper
-        if d.exists():
-            ticker_dir = d
-            break
-    if not ticker_dir:
+    db = get_db()
+    rows = db.table("snapshots").select("date, data").eq("ticker", upper).order("date", desc=True).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
-    json_files = sorted(ticker_dir.glob("*.json"), reverse=True)
-    if not json_files:
-        raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
-    summary = json.loads(json_files[0].read_text(encoding="utf-8"))
+    summary = rows[0]["data"] or {}
     market = summary.get("market", "US")
     added = consensus_svc.backfill(upper, market)
     return {"added": len(added), "entries": added}
