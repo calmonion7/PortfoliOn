@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox, krFmt, isEstimated } from './marketUtils.jsx'
+import useIsMobile from '../../hooks/useIsMobile'
 
 export default function KrTop2Section() {
+  const isMobile = useIsMobile()
+  const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -35,7 +38,16 @@ export default function KrTop2Section() {
 
   return (
     <div style={SECTION_STYLE}>
-      <h3 style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</h3>
+      {isMobile ? (
+        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
+          <span style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</span>
+          <span>{open ? '▲' : '▼'}</span>
+        </button>
+      ) : (
+        <h3 style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</h3>
+      )}
+      {(!isMobile || open) && (
+        <>
       <p style={DESC_STYLE}>삼성전자·SK하이닉스 두 반도체 대장주의 분기 순이익과 KOSPI 전체 나머지 종목을 비교합니다. 비중이 높을수록 한국 증시가 반도체 업황에 구조적으로 집중되어 있음을 나타냅니다. <span style={{ opacity: 0.7 }}>(E) = 네이버 컨센서스 추정치</span></p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
@@ -96,6 +108,8 @@ export default function KrTop2Section() {
           </LineChart>
         </ResponsiveContainer>
       </div>
+        </>
+      )}
     </div>
   )
 }

@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox } from './marketUtils.jsx'
+import useIsMobile from '../../hooks/useIsMobile'
 
 export default function KrExportsSection() {
+  const isMobile = useIsMobile()
+  const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -45,7 +48,16 @@ export default function KrExportsSection() {
 
   return (
     <div style={SECTION_STYLE}>
-      <h3 style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</h3>
+      {isMobile ? (
+        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
+          <span style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</span>
+          <span>{open ? '▲' : '▼'}</span>
+        </button>
+      ) : (
+        <h3 style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</h3>
+      )}
+      {(!isMobile || open) && (
+        <>
       <p style={DESC_STYLE}>관세청 월별 수출 통계 기준입니다. 반도체(HS 8542)는 한국 무역수지와 원화 가치의 핵심 동력으로, 수출 비중 상승은 업황 호조를 의미합니다. 비반도체 비중은 수출 다각화 정도를 나타냅니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
@@ -107,6 +119,8 @@ export default function KrExportsSection() {
           </LineChart>
         </ResponsiveContainer>
       </div>
+        </>
+      )}
     </div>
   )
 }

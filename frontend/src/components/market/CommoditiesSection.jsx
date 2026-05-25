@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox } from './marketUtils.jsx'
+import useIsMobile from '../../hooks/useIsMobile'
 
 export default function CommoditiesSection() {
+  const isMobile = useIsMobile()
+  const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -24,7 +27,16 @@ export default function CommoditiesSection() {
 
   return (
     <div style={SECTION_STYLE}>
-      <h3 style={SECTION_HEADER_STYLE}>원자재</h3>
+      {isMobile ? (
+        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
+          <span style={SECTION_HEADER_STYLE}>원자재</span>
+          <span>{open ? '▲' : '▼'}</span>
+        </button>
+      ) : (
+        <h3 style={SECTION_HEADER_STYLE}>원자재</h3>
+      )}
+      {(!isMobile || open) && (
+        <>
       <p style={DESC_STYLE}>금은 안전자산 수요와 실질금리를 반영합니다. WTI 원유는 경기 및 물가의 선행지표입니다. 구리는 '닥터 코퍼'로 불리며 산업 수요를 통해 경기 방향성을 선행 진단합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         {['gold', 'oil', 'copper'].map(key => {
@@ -73,6 +85,8 @@ export default function CommoditiesSection() {
           )
         })}
       </div>
+        </>
+      )}
     </div>
   )
 }

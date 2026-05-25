@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox } from './marketUtils.jsx'
+import useIsMobile from '../../hooks/useIsMobile'
 
 export default function TreasurySection() {
+  const isMobile = useIsMobile()
+  const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -33,7 +36,16 @@ export default function TreasurySection() {
 
   return (
     <div style={SECTION_STYLE}>
-      <h3 style={SECTION_HEADER_STYLE}>미국 국채금리</h3>
+      {isMobile ? (
+        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
+          <span style={SECTION_HEADER_STYLE}>미국 국채금리</span>
+          <span>{open ? '▲' : '▼'}</span>
+        </button>
+      ) : (
+        <h3 style={SECTION_HEADER_STYLE}>미국 국채금리</h3>
+      )}
+      {(!isMobile || open) && (
+        <>
       <p style={DESC_STYLE}>연준 통화정책 방향의 핵심 지표입니다. 단기(2년)는 금리 기대를, 장기(10년·30년)는 경기 및 인플레이션 전망을 반영합니다. 2년물이 10년물을 상회하는 장단기 역전은 역사적으로 경기 침체의 선행 신호입니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         {['3m', '5y', '10y', '30y'].map(key => {
@@ -76,6 +88,8 @@ export default function TreasurySection() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+      )}
+        </>
       )}
     </div>
   )
