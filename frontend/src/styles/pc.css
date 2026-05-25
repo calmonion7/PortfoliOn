@@ -2,11 +2,10 @@
    PC-specific styles (consumes tokens.css)
    =========================================================== */
 
-body { font-size: 14px; line-height: 1.5; }
-
 /* ----- TOP NAV ----- */
 .topnav {
   position: sticky; top: 0; z-index: 30;
+  background: var(--bg-elev);
   background: color-mix(in oklab, var(--bg) 92%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
   -webkit-backdrop-filter: saturate(160%) blur(14px);

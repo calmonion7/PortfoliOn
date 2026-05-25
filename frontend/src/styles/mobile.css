@@ -2,11 +2,6 @@
    Mobile-specific styles (consumes tokens.css)
    ================================================================= */
 
-body {
-  font-size: 14px; line-height: 1.45;
-  -webkit-tap-highlight-color: transparent;
-}
-
 .app-mobile {
   background: var(--bg);
 }
@@ -24,6 +19,7 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 20px 14px;
   position: sticky; top: 0; z-index: 20;
+  background: var(--bg-elev);
   background: color-mix(in oklab, var(--bg) 92%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
   -webkit-backdrop-filter: saturate(160%) blur(14px);
@@ -45,6 +41,7 @@ body {
   position: fixed; left: 0; bottom: 0;
   width: 100%;
   padding: 8px 10px env(safe-area-inset-bottom, 16px);
+  background: var(--bg-elev);
   background: color-mix(in oklab, var(--bg-elev) 92%, transparent);
   backdrop-filter: saturate(160%) blur(20px);
   -webkit-backdrop-filter: saturate(160%) blur(20px);
@@ -165,7 +162,8 @@ body {
 /* Login screen */
 .m-login {
   display: flex; flex-direction: column; padding: 60px 28px 40px;
-  height: 844px;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 .m-login .brand-big { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
 .m-login .brand-big .brand-mark { width: 22px; height: 22px; }
