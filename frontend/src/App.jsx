@@ -6,6 +6,7 @@ import MarketHub from './pages/MarketHub'
 import AnalysisHub from './pages/AnalysisHub'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
+import Showcase from './pages/Showcase'
 import { supabase } from './supabase'
 import LoginPage from './pages/LoginPage'
 import MobileNav from './components/MobileNav'
@@ -106,6 +107,7 @@ export default function App() {
           <Route path="/analysis" element={<AnalysisHub />} />
           <Route path="/guru" element={<Guru />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/dev/showcase" element={<Showcase />} />
         </Routes>
       </main>
       <MobileNav />
