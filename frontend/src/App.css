@@ -24,3 +24,35 @@ input, select, textarea {
 .form-field label { display: block; margin-bottom: 4px; font-size: 13px; color: var(--text-muted); }
 .positive { color: var(--positive); }
 .negative { color: var(--negative); }
+
+/* ── Mobile utilities ── */
+.desktop-only { display: flex; }
+.mobile-only  { display: none; }
+
+.table-mobile-wrap { width: 100%; }
+
+.accordion-header {
+  width: 100%; text-align: left; background: none; border: none;
+  border-bottom: 1px solid var(--border); padding: 10px 0;
+  color: var(--text-heading); font-size: 15px; font-weight: 600;
+  cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .desktop-only { display: none !important; }
+  .mobile-only  { display: flex !important; }
+
+  .table-mobile-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .col-sticky {
+    position: sticky; left: 0; z-index: 1;
+    background: var(--bg-surface);
+  }
+
+  .dashboard-grid { grid-template-columns: 1fr; }
+}
