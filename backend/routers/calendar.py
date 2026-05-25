@@ -10,21 +10,17 @@ import pandas as pd
 import yfinance as yf
 import exchange_calendars as xcals
 from services import storage
+from services.db import get_db
 from auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["calendar"])
 
 _CACHE_DIR = Path(__file__).parent.parent / "data" / "calendar"
 _CACHE_DIR.mkdir(exist_ok=True)
-_CACHE_VERSION = 2
-
-
-def _cache_path(month: str, user_id: str = "") -> Path:
-    prefix = f"{user_id}-" if user_id else ""
-    return _CACHE_DIR / f"{prefix}{month}.json"
 
 
 def clear_cache() -> None:
+    # 로컬 파일 + Supabase 캐시 모두 삭제 (user_id 불명이므로 로컬만)
     for f in _CACHE_DIR.glob("*.json"):
         f.unlink(missing_ok=True)
 
@@ -36,17 +32,16 @@ def get_calendar(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), user_id: str
 
 @router.delete("/calendar/cache")
 def delete_calendar_cache(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), user_id: str = Depends(get_current_user)):
-    _cache_path(month, user_id).unlink(missing_ok=True)
+    get_db().table("calendar_cache").delete().eq("user_id", user_id).eq("month", month).execute()
     return {"cleared": month}
 
 
 def _get_events(month: str, user_id: str = "") -> list[dict]:
-    path = _cache_path(month, user_id)
-    if path.exists():
-        cached = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(cached, dict) and cached.get("v") == _CACHE_VERSION:
-            return cached["events"]
-        path.unlink(missing_ok=True)  # stale format → regenerate
+    if user_id:
+        db = get_db()
+        rows = db.table("calendar_cache").select("events").eq("user_id", user_id).eq("month", month).execute().data
+        if rows:
+            return rows[0]["events"]
 
     year, mon = map(int, month.split("-"))
     month_start = date(year, mon, 1)
@@ -75,7 +70,13 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
             events.extend(future.result())
 
     events.extend(_get_holidays(month_start, month_end))
-    path.write_text(json.dumps({"v": _CACHE_VERSION, "events": events}, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if user_id:
+        get_db().table("calendar_cache").upsert(
+            {"user_id": user_id, "month": month, "events": events},
+            on_conflict="user_id,month",
+        ).execute()
+
     return events
 
 
