@@ -93,7 +93,7 @@ export default function GuruManagers() {
 
   if (loading) return <LoadingSpinner label="구루 운용역 불러오는 중입니다." />
   if (!data.managers.length) return (
-    <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+    <p style={{ color: 'var(--text-3)', fontSize: 14 }}>
       데이터 없음 — "크롤링 설정" 탭에서 데이터를 가져오세요.
     </p>
   )
@@ -101,23 +101,23 @@ export default function GuruManagers() {
   return (
     <div>
       {data.last_updated && (
-        <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated}</p>
+        <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated}</p>
       )}
       <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
         <input
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="매니저명 / 펌 / 티커 검색..."
-          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 13, width: 260 }}
+          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-elev)', color: 'var(--text)', fontSize: 13, width: 260 }}
         />
         {query && (
-          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{sorted.length} / {data.managers.length}명</span>
+          <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{sorted.length} / {data.managers.length}명</span>
         )}
       </div>
       <div className="table-mobile-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
               {COLUMNS.map((col, ci) => (
                 <th
                   key={col.key}
@@ -127,7 +127,7 @@ export default function GuruManagers() {
                     padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12,
                     cursor: col.sortKey ? 'pointer' : 'default',
                     userSelect: 'none',
-                    color: sort.key === col.sortKey ? 'var(--accent)' : 'var(--text-heading)',
+                    color: sort.key === col.sortKey ? 'var(--accent)' : 'var(--text)',
                   }}
                 >
                   {col.label}
@@ -143,7 +143,7 @@ export default function GuruManagers() {
               <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td className="col-sticky" style={tdStyle}>{i + 1}</td>
                 <td style={tdStyle}>{m.name}</td>
-                <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{m.firm}</td>
+                <td style={{ ...tdStyle, color: 'var(--text-3)' }}>{m.firm}</td>
                 <td style={tdStyle}>{formatValue(m.portfolio_value)}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{m.num_stocks}</td>
                 <td style={tdStyle}>

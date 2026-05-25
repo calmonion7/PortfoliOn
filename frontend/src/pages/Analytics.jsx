@@ -49,16 +49,16 @@ function SectorAllocation({ cards }) {
             </Pie>
             <Tooltip
               formatter={(v, n, p) => [`${p.payload.pct}%`, n]}
-              contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
+              contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
             />
           </PieChart>
         </ResponsiveContainer>
         <table style={{ borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', paddingRight: 16, color: 'var(--text-muted)', fontWeight: 400 }}>섹터</th>
-              <th style={{ textAlign: 'right', paddingRight: 12, color: 'var(--text-muted)', fontWeight: 400 }}>비중</th>
-              <th style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 400 }}>시가</th>
+              <th style={{ textAlign: 'left', paddingRight: 16, color: 'var(--text-3)', fontWeight: 400 }}>섹터</th>
+              <th style={{ textAlign: 'right', paddingRight: 12, color: 'var(--text-3)', fontWeight: 400 }}>비중</th>
+              <th style={{ textAlign: 'right', color: 'var(--text-3)', fontWeight: 400 }}>시가</th>
             </tr>
           </thead>
           <tbody>
@@ -75,7 +75,7 @@ function SectorAllocation({ cards }) {
                 <td style={{ textAlign: 'right', paddingRight: 12, paddingTop: 4, color: 'var(--text)' }}>
                   {d.pct}%
                 </td>
-                <td style={{ textAlign: 'right', paddingTop: 4, color: 'var(--text-muted)' }}>
+                <td style={{ textAlign: 'right', paddingTop: 4, color: 'var(--text-3)' }}>
                   {fmt(d.value)}
                 </td>
               </tr>
@@ -129,20 +129,20 @@ function OpportunityBubble({ cards }) {
   return (
     <div>
       <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>기회 버블 차트</h3>
-      <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
+      <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 16 }}>
         X: 컨센서스 업사이드% &nbsp;·&nbsp; Y: 평단가 대비 수익률% &nbsp;·&nbsp; 버블 크기: 포트폴리오 비중
       </p>
       <ResponsiveContainer width="100%" height={420}>
         <ScatterChart margin={{ top: 24, right: 32, bottom: 32, left: 24 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-          <XAxis type="number" dataKey="upside" name="업사이드" unit="%" stroke="var(--text-muted)" tick={{ fontSize: 11 }}>
-            <Label value="업사이드 %" position="insideBottom" offset={-16} fill="var(--text-muted)" fontSize={11} />
+          <XAxis type="number" dataKey="upside" name="업사이드" unit="%" stroke="var(--text-3)" tick={{ fontSize: 11 }}>
+            <Label value="업사이드 %" position="insideBottom" offset={-16} fill="var(--text-3)" fontSize={11} />
           </XAxis>
-          <YAxis type="number" dataKey="returnPct" name="수익률" unit="%" stroke="var(--text-muted)" tick={{ fontSize: 11 }}>
-            <Label value="수익률 %" angle={-90} position="insideLeft" offset={10} fill="var(--text-muted)" fontSize={11} />
+          <YAxis type="number" dataKey="returnPct" name="수익률" unit="%" stroke="var(--text-3)" tick={{ fontSize: 11 }}>
+            <Label value="수익률 %" angle={-90} position="insideLeft" offset={10} fill="var(--text-3)" fontSize={11} />
           </YAxis>
-          <ReferenceLine x={0} stroke="var(--text-muted)" strokeDasharray="4 2" />
-          <ReferenceLine y={0} stroke="var(--text-muted)" strokeDasharray="4 2" />
+          <ReferenceLine x={0} stroke="var(--text-3)" strokeDasharray="4 2" />
+          <ReferenceLine y={0} stroke="var(--text-3)" strokeDasharray="4 2" />
           <Tooltip
             cursor={{ strokeDasharray: '3 3' }}
             content={({ payload }) => {
@@ -150,17 +150,17 @@ function OpportunityBubble({ cards }) {
               const d = payload[0].payload
               return (
                 <div style={{
-                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  background: 'var(--bg-elev)', border: '1px solid var(--border)',
                   padding: '8px 12px', borderRadius: 6, fontSize: 12,
                 }}>
                   <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{d.ticker}</div>
-                  <div style={{ color: 'var(--text-muted)' }}>
+                  <div style={{ color: 'var(--text-3)' }}>
                     업사이드: <span style={{ color: 'var(--text)' }}>{d.upside}%</span>
                   </div>
-                  <div style={{ color: 'var(--text-muted)' }}>
+                  <div style={{ color: 'var(--text-3)' }}>
                     수익률: <span style={{ color: 'var(--text)' }}>{d.returnPct}%</span>
                   </div>
-                  <div style={{ color: 'var(--text-muted)' }}>
+                  <div style={{ color: 'var(--text-3)' }}>
                     비중: <span style={{ color: 'var(--text)' }}>{d.weight.toFixed(1)}%</span>
                   </div>
                 </div>
@@ -171,7 +171,7 @@ function OpportunityBubble({ cards }) {
         </ScatterChart>
       </ResponsiveContainer>
       {excluded.length > 0 && (
-        <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8 }}>
+        <p style={{ color: 'var(--text-3)', fontSize: 11, marginTop: 8 }}>
           컨센서스 목표가 없어 제외: {excluded.join(', ')}
         </p>
       )}
@@ -180,7 +180,7 @@ function OpportunityBubble({ cards }) {
 }
 
 function corrColor(v) {
-  if (v === null || v === undefined) return 'var(--bg-surface)'
+  if (v === null || v === undefined) return 'var(--bg-elev-2)'
   const neutral = [69, 90, 100]
   const pos = [79, 195, 247]
   const neg = [239, 154, 154]
@@ -203,7 +203,7 @@ function CorrelationHeatmap() {
   if (loading) return <LoadingSpinner label="상관관계 불러오는 중입니다." style={{ marginTop: 48 }} />
   if (error) return <div style={{ color: '#ef9a9a', marginTop: 48 }}>오류: {error}</div>
   if (!data || !data.tickers.length) return (
-    <div style={{ color: 'var(--text-muted)', marginTop: 48 }}>보유종목 2개 이상 필요</div>
+    <div style={{ color: 'var(--text-3)', marginTop: 48 }}>보유종목 2개 이상 필요</div>
   )
 
   const { tickers, matrix } = data
@@ -214,17 +214,17 @@ function CorrelationHeatmap() {
   return (
     <div style={{ marginTop: 48 }}>
       <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>상관관계 히트맵</h3>
-      <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
+      <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 16 }}>
         90일 종가 기준 Pearson 상관계수 · 1.0=완전 양의 상관 · -1.0=완전 음의 상관
       </p>
       <svg width={LABEL + n * CELL} height={LABEL + n * CELL}>
         {tickers.map((t, j) => (
           <text key={`col-${j}`} x={LABEL + j * CELL + CELL / 2} y={LABEL - 8}
-            textAnchor="middle" fontSize={11} fill="var(--text-muted)">{t}</text>
+            textAnchor="middle" fontSize={11} fill="var(--text-3)">{t}</text>
         ))}
         {tickers.map((t, i) => (
           <text key={`row-${i}`} x={LABEL - 8} y={LABEL + i * CELL + CELL / 2 + 4}
-            textAnchor="end" fontSize={11} fill="var(--text-muted)">{t}</text>
+            textAnchor="end" fontSize={11} fill="var(--text-3)">{t}</text>
         ))}
         {matrix.map((row, i) => row.map((v, j) => (
           <g key={`${i}-${j}`}>
@@ -252,7 +252,7 @@ export default function Analytics() {
 
   if (loading) return <LoadingSpinner label="분석 데이터 불러오는 중입니다." />
   if (error) return <div style={{ color: '#ef9a9a' }}>오류: {error}</div>
-  if (!cards.length) return <div style={{ color: 'var(--text-muted)' }}>보유종목 없음</div>
+  if (!cards.length) return <div style={{ color: 'var(--text-3)' }}>보유종목 없음</div>
 
   return (
     <div>

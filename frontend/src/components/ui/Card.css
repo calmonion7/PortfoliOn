@@ -1,5 +1,5 @@
 .card {
-  background: var(--bg-card);
+  background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   transition:
@@ -17,7 +17,7 @@
 .card--hover { cursor: pointer; }
 .card--hover:hover {
   border-color: var(--border-strong);
-  background: var(--bg-hover);
+  background: var(--surface-hover);
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
@@ -43,7 +43,7 @@
 .card__subtitle {
   margin: var(--space-1) 0 0;
   font-size: var(--font-size-sm);
-  color: var(--text-muted);
+  color: var(--text-3);
 }
 
 .card__action { flex-shrink: 0; }

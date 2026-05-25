@@ -25,7 +25,7 @@ export default function EconIndicatorsSection() {
     return (
       <div style={SECTION_STYLE}>
         <h3 style={SECTION_HEADER_STYLE}>경제지표 (미국)</h3>
-        <div style={{ ...CARD_STYLE, fontSize: 13, color: 'var(--text-muted)' }}>
+        <div style={{ ...CARD_STYLE, fontSize: 13, color: 'var(--text-3)' }}>
           <p>{data.error}</p>
         </div>
       </div>
@@ -55,16 +55,16 @@ export default function EconIndicatorsSection() {
               const h = data[key] || []
               return (
                 <div key={key} style={{ ...CARD_STYLE, flex: 1, minWidth: 280 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{label} (3년)</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{label} (3년)</div>
                   <ResponsiveContainer width="100%" height={180}>
                     <LineChart data={h} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-muted)' }}
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-3)' }}
                              tickFormatter={v => v.slice(0, 7)} interval={Math.floor(h.length / 5)} />
-                      <YAxis tick={{ fontSize: 9, fill: 'var(--text-muted)' }} domain={['auto', 'auto']}
+                      <YAxis tick={{ fontSize: 9, fill: 'var(--text-3)' }} domain={['auto', 'auto']}
                              tickFormatter={v => `${v}${unit}`} />
-                      <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 11 }}
-                               labelStyle={{ color: 'var(--text-muted)' }}
+                      <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 11 }}
+                               labelStyle={{ color: 'var(--text-3)' }}
                                formatter={v => [`${v}${unit}`, label]} />
                       <Line type="monotone" dataKey="value" name={label} stroke={color} dot={false} strokeWidth={1.5} />
                     </LineChart>

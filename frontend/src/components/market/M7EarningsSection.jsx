@@ -52,46 +52,46 @@ export default function M7EarningsSection() {
           { label: '나머지 S&P 500', value: latest?.rest, qoq: chg(latest?.rest, prev?.rest), yoy: chg(latest?.rest, yoy?.rest), color: '#80cbc4' },
         ].map(({ label, value, qoq, yoy: yoyChg, color }) => (
           <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{label} 순이익 ({latest?.q})</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 순이익 ({latest?.q})</div>
             <div style={{ fontSize: 20, fontWeight: 700, color }}>
               {value != null ? value.toLocaleString() : '-'} <span style={{ fontSize: 11, fontWeight: 400 }}>{data.unit}</span>
             </div>
             {qoq != null && (
               <div style={{ fontSize: 12, color: qoq > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
-                {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-muted)' }}>QoQ</span>
+                {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
               </div>
             )}
             {yoyChg != null && (
               <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
-                {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-muted)' }}>YoY</span>
+                {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
               </div>
             )}
           </div>
         ))}
         <div style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>M7 순이익 비중</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>M7 순이익 비중</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#ffb74d' }}>
             {m7Share != null ? m7Share.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {m7Share != null && m7SharePrev != null && (
             <div style={{ fontSize: 12, color: m7Share > m7SharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
-              {m7Share > m7SharePrev ? '▲' : '▼'} {Math.abs(m7Share - m7SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-muted)' }}>YoY</span>
+              {m7Share > m7SharePrev ? '▲' : '▼'} {Math.abs(m7Share - m7SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
             </div>
           )}
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>M7 / 전체 S&P 500</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>M7 / 전체 S&P 500</div>
         </div>
       </div>
       <div style={CARD_STYLE}>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
           분기별 순이익 추이 ({data.unit}) — AAPL·MSFT·GOOGL·AMZN·NVDA·META·TSLA vs S&P 500 ex-M7
         </div>
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={qs} margin={{ top: 16, right: 40, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="q" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={v => isEstimated(v) ? `${v}(E)` : v} />
-            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} />
+            <XAxis dataKey="q" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickFormatter={v => isEstimated(v) ? `${v}(E)` : v} />
+            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} />
-            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
+            <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                      formatter={(v, n) => n === 'M7 비중' ? [`${v?.toFixed(1)}%`, n] : v != null ? [v.toLocaleString() + ' ' + data.unit, n] : ['-', n]} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Line yAxisId="left" type="monotone" dataKey="m7" name="M7" stroke="#4fc3f7" dot={{ r: 3 }} strokeWidth={2}>

@@ -28,9 +28,9 @@ export default function ConsensusSettings() {
 
   return (
     <div style={{ maxWidth: 600 }}>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '16px 20px', marginBottom: 16 }}>
-        <h2 style={{ color: 'var(--text-heading)', marginBottom: 8, fontSize: 14 }}>컨센서스 수집/백필</h2>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '16px 20px', marginBottom: 16 }}>
+        <h2 style={{ color: 'var(--text)', marginBottom: 8, fontSize: 14 }}>컨센서스 수집/백필</h2>
+        <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>
           전체 종목의 네이버 컨센서스 데이터를 수집하고 60일 백필을 실행합니다. 수 분 소요됩니다.
         </p>
         <button className="btn-primary" onClick={runBatch} disabled={batch.running}>
@@ -40,7 +40,7 @@ export default function ConsensusSettings() {
         </button>
         {batch.running && batch.total > 0 && (
           <div style={{ marginTop: 12 }}>
-            <div style={{ background: 'var(--bg-hover)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface-hover)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
               <div style={{
                 width: `${Math.round(batch.done / batch.total * 100)}%`,
                 height: '100%',
@@ -51,7 +51,7 @@ export default function ConsensusSettings() {
           </div>
         )}
         {!batch.running && batch.total > 0 && batch.done >= batch.total && (
-          <p style={{ marginTop: 8, color: 'var(--positive)', fontSize: 13 }}>
+          <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>
             완료: {batch.done}개 종목 수집됨
           </p>
         )}

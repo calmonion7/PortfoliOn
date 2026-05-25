@@ -25,7 +25,7 @@ export default function KrExportsSection() {
     return (
       <div style={SECTION_STYLE}>
         <h3 style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</h3>
-        <div style={{ ...CARD_STYLE, fontSize: 13, color: 'var(--text-muted)' }}>
+        <div style={{ ...CARD_STYLE, fontSize: 13, color: 'var(--text-3)' }}>
           <p>{data.error}</p>
         </div>
       </div>
@@ -65,47 +65,47 @@ export default function KrExportsSection() {
           { label: '비반도체', value: latest?.non_semiconductor, mom: chg3(latest?.non_semiconductor, prev?.non_semiconductor), yoy: chg3(latest?.non_semiconductor, yoy3?.non_semiconductor), color: '#80cbc4' },
         ].map(({ label, value, mom, yoy: yoyChg, color }) => (
           <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{label} 수출액 ({latestLabel})</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 수출액 ({latestLabel})</div>
             <div style={{ fontSize: 20, fontWeight: 700, color }}>
               {value != null ? value.toLocaleString() : '-'} <span style={{ fontSize: 11, fontWeight: 400 }}>억달러</span>
             </div>
             {mom != null && (
               <div style={{ fontSize: 12, color: mom > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
-                {mom > 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% <span style={{ color: 'var(--text-muted)' }}>MoM</span>
+                {mom > 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>MoM</span>
               </div>
             )}
             {yoyChg != null && (
               <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
-                {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-muted)' }}>YoY</span>
+                {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
               </div>
             )}
           </div>
         ))}
         <div style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>반도체 수출 비중</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>반도체 수출 비중</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#ffb74d' }}>
             {semiShare != null ? semiShare.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {semiShare != null && semiSharePrev != null && (
             <div style={{ fontSize: 12, color: semiShare > semiSharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
-              {semiShare > semiSharePrev ? '▲' : '▼'} {Math.abs(semiShare - semiSharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-muted)' }}>YoY</span>
+              {semiShare > semiSharePrev ? '▲' : '▼'} {Math.abs(semiShare - semiSharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
             </div>
           )}
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>반도체 / 전체 수출</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>반도체 / 전체 수출</div>
         </div>
       </div>
       <div style={CARD_STYLE}>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
           월별 수출액 추이 (억달러) — 반도체 vs 비반도체
         </div>
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={months} margin={{ top: 16, right: 40, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+            <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                    tickFormatter={v => v.slice(2)} />
-            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} />
+            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} />
-            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
+            <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                      labelFormatter={v => v.replace(/(\d{4})(\d{2})/, '$1-$2')}
                      formatter={(v, n) => n === '반도체 비중' ? [`${v?.toFixed(1)}%`, n] : [v.toLocaleString() + ' 억달러', n]} />
             <Legend wrapperStyle={{ fontSize: 12 }} />

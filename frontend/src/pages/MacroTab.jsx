@@ -16,7 +16,7 @@ const INDICATOR_LABELS = {
 }
 
 function corrColor(v) {
-  if (v === null || v === undefined) return 'var(--text-muted)'
+  if (v === null || v === undefined) return 'var(--text-3)'
   const neutral = [69, 90, 100]
   const pos = [79, 195, 247]
   const neg = [239, 154, 154]
@@ -46,7 +46,7 @@ export default function MacroTab() {
   if (loading) return <LoadingSpinner label="매크로 데이터 불러오는 중입니다." />
   if (error) return <div style={{ color: '#ef9a9a' }}>오류: {error}</div>
   if (!data || !data.correlations.length) return (
-    <div style={{ color: 'var(--text-muted)' }}>보유종목 없음 또는 데이터 부족</div>
+    <div style={{ color: 'var(--text-3)' }}>보유종목 없음 또는 데이터 부족</div>
   )
 
   const { correlations, scatter } = data
@@ -64,16 +64,16 @@ export default function MacroTab() {
       )}
       {(!isMobile || open) && (
         <>
-      <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 24 }}>
+      <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 24 }}>
         매크로 지표 일별 변동률 vs 포트폴리오 가중평균 수익률 · 90일 Pearson 상관계수 · 행 클릭 시 산점도 표시
       </p>
 
       <table style={{ borderCollapse: 'collapse', fontSize: 13, marginBottom: 32 }}>
         <thead>
           <tr>
-            <th style={{ textAlign: 'left', padding: '4px 20px 8px 0', color: 'var(--text-muted)', fontWeight: 400 }}>지표</th>
-            <th style={{ textAlign: 'center', padding: '4px 16px 8px', color: 'var(--text-muted)', fontWeight: 400 }}>티커</th>
-            <th style={{ textAlign: 'right', padding: '4px 0 8px', color: 'var(--text-muted)', fontWeight: 400 }}>상관계수</th>
+            <th style={{ textAlign: 'left', padding: '4px 20px 8px 0', color: 'var(--text-3)', fontWeight: 400 }}>지표</th>
+            <th style={{ textAlign: 'center', padding: '4px 16px 8px', color: 'var(--text-3)', fontWeight: 400 }}>티커</th>
+            <th style={{ textAlign: 'right', padding: '4px 0 8px', color: 'var(--text-3)', fontWeight: 400 }}>상관계수</th>
           </tr>
         </thead>
         <tbody>
@@ -85,9 +85,9 @@ export default function MacroTab() {
                 cursor: 'pointer',
               }}
             >
-              <td style={{ padding: '7px 20px 7px 0', color: 'var(--text)', background: selected === c.ticker ? 'var(--bg-card)' : 'transparent' }}>{c.indicator}</td>
-              <td style={{ padding: '7px 16px', color: 'var(--text-muted)', textAlign: 'center', fontSize: 11, background: selected === c.ticker ? 'var(--bg-card)' : 'transparent' }}>{c.ticker}</td>
-              <td style={{ padding: '7px 0', textAlign: 'right', background: selected === c.ticker ? 'var(--bg-card)' : 'transparent' }}>
+              <td style={{ padding: '7px 20px 7px 0', color: 'var(--text)', background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.indicator}</td>
+              <td style={{ padding: '7px 16px', color: 'var(--text-3)', textAlign: 'center', fontSize: 11, background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.ticker}</td>
+              <td style={{ padding: '7px 0', textAlign: 'right', background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>
                 <span style={{
                   color: corrColor(c.corr_90d),
                   fontVariantNumeric: 'tabular-nums',
@@ -109,28 +109,28 @@ export default function MacroTab() {
           <ResponsiveContainer width="100%" height={360}>
             <ScatterChart margin={{ top: 16, right: 24, bottom: 32, left: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis type="number" dataKey="macro_delta" name="매크로 변동" unit="%" stroke="var(--text-muted)" tick={{ fontSize: 11 }}>
-                <Label value="매크로 변동 %" position="insideBottom" offset={-16} fill="var(--text-muted)" fontSize={11} />
+              <XAxis type="number" dataKey="macro_delta" name="매크로 변동" unit="%" stroke="var(--text-3)" tick={{ fontSize: 11 }}>
+                <Label value="매크로 변동 %" position="insideBottom" offset={-16} fill="var(--text-3)" fontSize={11} />
               </XAxis>
-              <YAxis type="number" dataKey="portfolio_return" name="포트폴리오 수익률" unit="%" stroke="var(--text-muted)" tick={{ fontSize: 11 }}>
-                <Label value="수익률 %" angle={-90} position="insideLeft" offset={10} fill="var(--text-muted)" fontSize={11} />
+              <YAxis type="number" dataKey="portfolio_return" name="포트폴리오 수익률" unit="%" stroke="var(--text-3)" tick={{ fontSize: 11 }}>
+                <Label value="수익률 %" angle={-90} position="insideLeft" offset={10} fill="var(--text-3)" fontSize={11} />
               </YAxis>
-              <ReferenceLine x={0} stroke="var(--text-muted)" strokeDasharray="4 2" />
-              <ReferenceLine y={0} stroke="var(--text-muted)" strokeDasharray="4 2" />
+              <ReferenceLine x={0} stroke="var(--text-3)" strokeDasharray="4 2" />
+              <ReferenceLine y={0} stroke="var(--text-3)" strokeDasharray="4 2" />
               <Tooltip
                 content={({ payload }) => {
                   if (!payload?.length) return null
                   const d = payload[0].payload
                   return (
                     <div style={{
-                      background: 'var(--bg-card)', border: '1px solid var(--border)',
+                      background: 'var(--bg-elev)', border: '1px solid var(--border)',
                       padding: '8px 12px', borderRadius: 6, fontSize: 12,
                     }}>
-                      <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>{d.date}</div>
-                      <div style={{ color: 'var(--text-muted)' }}>
+                      <div style={{ color: 'var(--text-3)', marginBottom: 4 }}>{d.date}</div>
+                      <div style={{ color: 'var(--text-3)' }}>
                         매크로: <span style={{ color: 'var(--text)' }}>{d.macro_delta}%</span>
                       </div>
-                      <div style={{ color: 'var(--text-muted)' }}>
+                      <div style={{ color: 'var(--text-3)' }}>
                         수익률: <span style={{ color: 'var(--text)' }}>{d.portfolio_return}%</span>
                       </div>
                     </div>

@@ -64,37 +64,37 @@ export default function GuruCrawlSettings() {
     <div style={{ maxWidth: 480 }}>
 
       {/* 즉시 크롤링 */}
-      <section style={{ background: 'var(--bg-surface)', padding: 20, borderRadius: 8, marginBottom: 20 }}>
-        <h2 style={{ color: 'var(--text-heading)', marginBottom: 8, fontSize: 14 }}>즉시 크롤링</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>
+      <section style={{ background: 'var(--bg-elev-2)', padding: 20, borderRadius: 8, marginBottom: 20 }}>
+        <h2 style={{ color: 'var(--text)', marginBottom: 8, fontSize: 14 }}>즉시 크롤링</h2>
+        <p style={{ color: 'var(--text-3)', fontSize: 13, marginBottom: 12 }}>
           dataroma 전체 매니저 데이터를 지금 수집합니다. 수 분 소요됩니다.
         </p>
         {lastUpdated && (
-          <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 10 }}>마지막 갱신: {lastUpdated}</p>
+          <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 10 }}>마지막 갱신: {lastUpdated}</p>
         )}
         <button className="btn-primary" onClick={handleCrawlNow} disabled={crawling}>
           {crawling ? '수집 중...' : '지금 갱신'}
         </button>
         {crawling && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-3)', marginBottom: 6 }}>
               <span>{progress.current ? `수집 중: ${progress.current}` : '준비 중...'}</span>
               <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
                 {progress.done} / {progress.total || '?'}
               </span>
             </div>
-            <div style={{ background: 'var(--bg-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.4s ease' }} />
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>{pct}%</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, textAlign: 'right' }}>{pct}%</div>
           </div>
         )}
-        {crawlMsg && <p style={{ marginTop: 8, color: 'var(--positive)', fontSize: 13 }}>{crawlMsg}</p>}
+        {crawlMsg && <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>{crawlMsg}</p>}
       </section>
 
       {/* 자동 스케줄 */}
-      <section style={{ background: 'var(--bg-surface)', padding: 20, borderRadius: 8 }}>
-        <h2 style={{ color: 'var(--text-heading)', marginBottom: 16, fontSize: 14 }}>자동 갱신 스케줄</h2>
+      <section style={{ background: 'var(--bg-elev-2)', padding: 20, borderRadius: 8 }}>
+        <h2 style={{ color: 'var(--text)', marginBottom: 16, fontSize: 14 }}>자동 갱신 스케줄</h2>
         <div className="form-field" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ marginBottom: 0, width: 'auto' }}>자동 갱신</label>
           <input type="checkbox" checked={schedule.enabled}
@@ -111,8 +111,8 @@ export default function GuruCrawlSettings() {
                 style={{
                   padding: '4px 8px', borderRadius: 4, border: 'none',
                   cursor: schedule.enabled ? 'pointer' : 'default',
-                  background: schedule.day === key ? 'var(--accent-btn)' : 'var(--bg-hover)',
-                  color: schedule.day === key ? 'white' : 'var(--text-muted)',
+                  background: schedule.day === key ? 'var(--accent)' : 'var(--surface-hover)',
+                  color: schedule.day === key ? 'white' : 'var(--text-3)',
                   opacity: schedule.enabled ? 1 : 0.5, fontSize: 13,
                 }}>
                 {label}

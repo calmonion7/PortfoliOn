@@ -15,13 +15,13 @@ export default function Settings() {
   const tabStyle = (active) => ({
     padding: '8px 16px', border: 'none',
     borderBottom: active ? `2px solid var(--accent)` : '2px solid transparent',
-    background: 'none', color: active ? 'var(--accent)' : 'var(--text-muted)',
+    background: 'none', color: active ? 'var(--accent)' : 'var(--text-3)',
     cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: 14,
   })
 
   return (
     <div style={{ maxWidth: 900 }}>
-      <h1 style={{ color: 'var(--text-heading)', marginBottom: 20 }}>설정</h1>
+      <h1 style={{ color: 'var(--text)', marginBottom: 20 }}>설정</h1>
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
         {TABS.map(t => (

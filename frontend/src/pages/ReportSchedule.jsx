@@ -97,8 +97,8 @@ export default function ReportSchedule() {
 
   return (
     <div style={{ maxWidth: 480 }}>
-      <section style={{ background: 'var(--bg-surface)', padding: 20, borderRadius: 8, marginBottom: 24 }}>
-        <h2 style={{ color: 'var(--text-heading)', marginBottom: 16, fontSize: 14 }}>자동 리포트 스케줄</h2>
+      <section style={{ background: 'var(--bg-elev-2)', padding: 20, borderRadius: 8, marginBottom: 24 }}>
+        <h2 style={{ color: 'var(--text)', marginBottom: 16, fontSize: 14 }}>자동 리포트 스케줄</h2>
         <div className="form-field" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ marginBottom: 0, width: 'auto' }}>자동 생성</label>
           <input type="checkbox" checked={schedule.enabled}
@@ -120,8 +120,8 @@ export default function ReportSchedule() {
                 style={{
                   padding: '4px 8px', borderRadius: 4, border: 'none',
                   cursor: schedule.enabled ? 'pointer' : 'default',
-                  background: schedule.days.includes(key) ? 'var(--accent-btn)' : 'var(--bg-hover)',
-                  color: schedule.days.includes(key) ? 'white' : 'var(--text-muted)',
+                  background: schedule.days.includes(key) ? 'var(--accent)' : 'var(--surface-hover)',
+                  color: schedule.days.includes(key) ? 'white' : 'var(--text-3)',
                   opacity: schedule.enabled ? 1 : 0.5, fontSize: 13,
                 }}>
                 {label}
@@ -132,41 +132,41 @@ export default function ReportSchedule() {
         <button className="btn-primary" onClick={handleSave}>{saved ? '저장됨' : '저장'}</button>
       </section>
 
-      <section style={{ background: 'var(--bg-surface)', padding: 20, borderRadius: 8 }}>
-        <h2 style={{ color: 'var(--text-heading)', marginBottom: 12, fontSize: 14 }}>즉시 리포트 생성</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>보유 및 관심 종목 전체에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.</p>
+      <section style={{ background: 'var(--bg-elev-2)', padding: 20, borderRadius: 8 }}>
+        <h2 style={{ color: 'var(--text)', marginBottom: 12, fontSize: 14 }}>즉시 리포트 생성</h2>
+        <p style={{ color: 'var(--text-3)', fontSize: 13, marginBottom: 12 }}>보유 및 관심 종목 전체에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.</p>
         <button className="btn-primary" onClick={handleGenerateNow} disabled={generating}>
           {generating ? '생성 중...' : '지금 생성'}
         </button>
         {generating && progress.total > 0 && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-3)', marginBottom: 6 }}>
               <span>{progress.current ? `생성 중: ${progress.current}` : '준비 중...'}</span>
               <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
             </div>
-            <div style={{ background: 'var(--bg-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.4s ease' }} />
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>{pct}%</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, textAlign: 'right' }}>{pct}%</div>
           </div>
         )}
-        {genMsg && <p style={{ marginTop: 8, color: 'var(--positive)', fontSize: 13 }}>{genMsg}</p>}
+        {genMsg && <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>{genMsg}</p>}
       </section>
 
-      <section style={{ background: 'var(--bg-surface)', padding: 20, borderRadius: 8, marginTop: 24 }}>
-        <h2 style={{ color: 'var(--text-heading)', marginBottom: 8, fontSize: 14 }}>과거 스냅샷 백필</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>
+      <section style={{ background: 'var(--bg-elev-2)', padding: 20, borderRadius: 8, marginTop: 24 }}>
+        <h2 style={{ color: 'var(--text)', marginBottom: 8, fontSize: 14 }}>과거 스냅샷 백필</h2>
+        <p style={{ color: 'var(--text-3)', fontSize: 13, marginBottom: 12 }}>
           지정한 기간만큼 과거 거래일의 스냅샷을 생성합니다. 이미 있는 날짜는 건너뜁니다.<br />
           <span style={{ fontSize: 12 }}>가격·RSI·볼륨프로파일은 실제 이력 데이터, 재무/컨센서스는 현재 데이터를 사용합니다.</span>
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <label style={{ color: 'var(--text-muted)', fontSize: 13, whiteSpace: 'nowrap' }}>기간</label>
+          <label style={{ color: 'var(--text-3)', fontSize: 13, whiteSpace: 'nowrap' }}>기간</label>
           {[30, 60, 90].map(d => (
             <button key={d} type="button" onClick={() => setBackfillDays(d)}
               style={{
                 padding: '4px 12px', borderRadius: 4, fontSize: 13,
-                background: backfillDays === d ? 'var(--accent-btn)' : 'var(--bg-hover)',
-                color: backfillDays === d ? 'white' : 'var(--text-muted)',
+                background: backfillDays === d ? 'var(--accent)' : 'var(--surface-hover)',
+                color: backfillDays === d ? 'white' : 'var(--text-3)',
                 border: 'none', cursor: 'pointer',
               }}>
               {d}일
@@ -178,14 +178,14 @@ export default function ReportSchedule() {
         </button>
         {backfilling && backfillProgress.total > 0 && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-3)', marginBottom: 6 }}>
               <span>{backfillProgress.current ? `처리 중: ${backfillProgress.current}` : '준비 중...'}</span>
               <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
                 {backfillProgress.done} / {backfillProgress.total} 종목
                 {backfillProgress.created > 0 && ` (+${backfillProgress.created}개)`}
               </span>
             </div>
-            <div style={{ background: 'var(--bg-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface-hover)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
               <div style={{
                 width: `${Math.round(backfillProgress.done / backfillProgress.total * 100)}%`,
                 height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.4s ease'
@@ -193,7 +193,7 @@ export default function ReportSchedule() {
             </div>
           </div>
         )}
-        {backfillMsg && <p style={{ marginTop: 8, color: 'var(--positive)', fontSize: 13 }}>{backfillMsg}</p>}
+        {backfillMsg && <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>{backfillMsg}</p>}
       </section>
     </div>
   )

@@ -41,7 +41,7 @@ export default function VixSection() {
           <p style={DESC_STYLE}>S&P 500 옵션 내재변동성을 기반으로 시장 심리를 수치화한 지수입니다. 20 이하는 안정, 20~30은 주의, 30 이상은 공포 구간으로 해석합니다. 급등 시 단기 과매도 신호로 활용되기도 합니다.</p>
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
             <div style={{ ...CARD_STYLE, minWidth: 140 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>VIX 현재값</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>VIX 현재값</div>
               <div style={{ fontSize: 28, fontWeight: 700, color: vixColor }}>
                 {vix != null ? vix.toFixed(1) : '-'}
               </div>
@@ -55,15 +55,15 @@ export default function VixSection() {
           </div>
           {history.length > 0 && (
             <div style={CARD_STYLE}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>VIX 추이 (1년)</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>VIX 추이 (1년)</div>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={history} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                          tickFormatter={v => v.slice(5)} interval={Math.floor(history.length / 6)} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} domain={[0, 'auto']} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
-                           labelStyle={{ color: 'var(--text-muted)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={[0, 'auto']} />
+                  <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
+                           labelStyle={{ color: 'var(--text-3)' }} />
                   <ReferenceLine y={30} stroke="#e57373" strokeDasharray="4 2" label={{ value: '30', fill: '#e57373', fontSize: 10 }} />
                   <Line type="monotone" dataKey="value" name="VIX" stroke="#ffb74d" dot={false} strokeWidth={1.5} />
                 </LineChart>

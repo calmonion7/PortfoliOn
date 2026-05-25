@@ -54,12 +54,12 @@ export default function TreasurySection() {
           const down = r?.change_bp < 0
           return (
             <div key={key} style={{ ...CARD_STYLE, minWidth: 110, flex: 1 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{LABELS[key]}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{LABELS[key]}</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
                 {r ? `${r.current.toFixed(2)}%` : '-'}
               </div>
               {r && (
-                <div style={{ fontSize: 12, color: up ? '#81c784' : down ? '#e57373' : 'var(--text-muted)', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: up ? '#81c784' : down ? '#e57373' : 'var(--text-3)', marginTop: 2 }}>
                   {up ? '▲' : down ? '▼' : '─'} {Math.abs(r.change_bp).toFixed(1)}bp
                 </div>
               )}
@@ -69,17 +69,17 @@ export default function TreasurySection() {
       </div>
       {chartData.length > 0 && (
         <div style={CARD_STYLE}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
             3개월 / 10년 금리 추이 (1년) + 스프레드(10Y-3M)
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                      interval={Math.floor(chartData.length / 6)} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} />
-              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
-                       labelStyle={{ color: 'var(--text-muted)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
+              <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
+                       labelStyle={{ color: 'var(--text-3)' }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <ReferenceLine y={0} stroke="var(--border)" />
               <Line type="monotone" dataKey="10년" stroke="#4fc3f7" dot={false} strokeWidth={1.5} />

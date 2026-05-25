@@ -24,8 +24,8 @@ function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
       style={{
         fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none',
         cursor: 'pointer',
-        background: inWatchlist ? 'var(--bg-hover)' : 'var(--bg-surface)',
-        color: inWatchlist ? 'var(--negative)' : 'var(--positive)',
+        background: inWatchlist ? 'var(--surface-hover)' : 'var(--bg-elev-2)',
+        color: inWatchlist ? 'var(--down)' : 'var(--up)',
       }}
     >
       {inWatchlist ? '★ 삭제' : '☆ 추가'}
@@ -79,8 +79,8 @@ export default function GuruStats() {
   const tabStyle = (active) => ({
     padding: '6px 14px', borderRadius: 16,
     border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-    background: active ? 'var(--accent-btn)' : 'transparent',
-    color: active ? 'white' : 'var(--text-muted)',
+    background: active ? 'var(--accent)' : 'transparent',
+    color: active ? 'white' : 'var(--text-3)',
     cursor: 'pointer', fontSize: 13,
   })
 
@@ -103,7 +103,7 @@ export default function GuruStats() {
 
   if (loading) return <LoadingSpinner label="구루 통계 불러오는 중입니다." />
   if (!popularity.length) return (
-    <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
+    <p style={{ color: 'var(--text-3)', fontSize: 14 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
   )
 
   return (
@@ -121,18 +121,18 @@ export default function GuruStats() {
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="티커 / 종목명 / 매니저명 검색..."
-          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 13, width: 260 }}
+          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-elev)', color: 'var(--text)', fontSize: 13, width: 260 }}
         />
-        {query && tab === 'popularity' && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{filteredPopularity.length}개</span>}
-        {query && tab === 'weighted'   && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{filteredWeighted.length}개</span>}
-        {query && tab === 'top3'       && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{filteredTop3.length}명</span>}
+        {query && tab === 'popularity' && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredPopularity.length}개</span>}
+        {query && tab === 'weighted'   && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredWeighted.length}개</span>}
+        {query && tab === 'top3'       && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredTop3.length}명</span>}
       </div>
 
       {tab === 'popularity' && (
         <div className="table-mobile-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
               <th className="col-sticky" style={thStyle}>#</th>
               <th style={thStyle}>티커</th>
               <th style={thStyle}>영문명</th>
@@ -146,7 +146,7 @@ export default function GuruStats() {
               <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td className="col-sticky" style={tdStyle}>{i + 1}</td>
                 <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--accent)' }}>{row.ticker}</td>
-                <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{row.name}</td>
+                <td style={{ ...tdStyle, color: 'var(--text-3)' }}>{row.name}</td>
                 <td style={tdStyle}>{row.name_kr || '-'}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{row.count}명</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -168,7 +168,7 @@ export default function GuruStats() {
         <div className="table-mobile-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
               <th className="col-sticky" style={thStyle}>Manager</th>
               {[1, 2, 3].map(r => <th key={r} style={thStyle}>{r}위 (전체보유)</th>)}
             </tr>
@@ -184,8 +184,8 @@ export default function GuruStats() {
                       {h ? (
                         <>
                           <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{h.ticker}</span>
-                          {h.name_kr && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> {h.name_kr}</span>}
-                          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> ({h.count}명)</span>
+                          {h.name_kr && <span style={{ color: 'var(--text-3)', fontSize: 11 }}> {h.name_kr}</span>}
+                          <span style={{ color: 'var(--text-3)', fontSize: 11 }}> ({h.count}명)</span>
                         </>
                       ) : '-'}
                     </td>
@@ -202,7 +202,7 @@ export default function GuruStats() {
         <div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
             {WEIGHT_LEGEND.map(({ rank, score }) => (
-              <span key={rank} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-surface)', padding: '2px 6px', borderRadius: 3 }}>
+              <span key={rank} style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg-elev-2)', padding: '2px 6px', borderRadius: 3 }}>
                 {rank}위={score}
               </span>
             ))}
@@ -210,7 +210,7 @@ export default function GuruStats() {
           <div className="table-mobile-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-heading)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
                 <th className="col-sticky" style={thStyle}>#</th>
                 <th style={thStyle}>티커</th>
                 <th style={thStyle}>한글명</th>

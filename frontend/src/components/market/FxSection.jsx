@@ -45,12 +45,12 @@ export default function FxSection() {
               const down = r?.change_pct < 0
               return (
                 <div key={key} style={{ ...CARD_STYLE, minWidth: 110, flex: 1 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{FX_LABELS[key]}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{FX_LABELS[key]}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
                     {r ? r.current.toLocaleString() : '-'}
                   </div>
                   {r && (
-                    <div style={{ fontSize: 12, color: up ? '#81c784' : down ? '#e57373' : 'var(--text-muted)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: up ? '#81c784' : down ? '#e57373' : 'var(--text-3)', marginTop: 2 }}>
                       {up ? '▲' : down ? '▼' : '─'} {Math.abs(r.change_pct).toFixed(2)}%
                     </div>
                   )}
@@ -60,15 +60,15 @@ export default function FxSection() {
           </div>
           {usdkrwHistory.length > 0 && (
             <div style={CARD_STYLE}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>USD/KRW 추이 (1년)</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>USD/KRW 추이 (1년)</div>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={usdkrwHistory} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                          tickFormatter={v => v.slice(5)} interval={Math.floor(usdkrwHistory.length / 6)} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}
-                           labelStyle={{ color: 'var(--text-muted)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
+                  <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
+                           labelStyle={{ color: 'var(--text-3)' }} />
                   <Line type="monotone" dataKey="value" name="USD/KRW" stroke="#4fc3f7" dot={false} strokeWidth={1.5} />
                 </LineChart>
               </ResponsiveContainer>

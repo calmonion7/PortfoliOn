@@ -32,14 +32,14 @@
 .btn--lg { height: 44px; padding: 0 var(--space-6); font-size: var(--font-size-md); }
 
 /* Variants */
-.btn--primary { background: var(--accent-btn); color: #ffffff; }
+.btn--primary { background: var(--accent); color: #ffffff; }
 .btn--primary:hover:not(:disabled) { background: var(--accent-btn-hover); }
 
-.btn--secondary { background: var(--bg-surface); color: var(--text); border-color: var(--border); }
-.btn--secondary:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border-strong); }
+.btn--secondary { background: var(--bg-elev-2); color: var(--text); border-color: var(--border); }
+.btn--secondary:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
 
 .btn--ghost { background: transparent; color: var(--text); }
-.btn--ghost:hover:not(:disabled) { background: var(--bg-hover); }
+.btn--ghost:hover:not(:disabled) { background: var(--surface-hover); }
 
 .btn--danger { background: var(--color-danger); color: #ffffff; }
 .btn--danger:hover:not(:disabled) { filter: brightness(1.1); }

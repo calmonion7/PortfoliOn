@@ -21,19 +21,19 @@
 
 /* Variant styles */
 .badge--neutral {
-  background: var(--bg-surface);
-  color: var(--text-muted);
+  background: var(--bg-elev-2);
+  color: var(--text-3);
   border-color: var(--border);
 }
 
 .badge--success {
-  background: var(--positive-tint);
-  color: var(--positive);
+  background: var(--up-soft);
+  color: var(--up);
 }
 
 .badge--danger {
-  background: var(--negative-tint);
-  color: var(--negative);
+  background: var(--down-soft);
+  color: var(--down);
 }
 
 .badge--warning {

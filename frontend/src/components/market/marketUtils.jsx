@@ -12,7 +12,7 @@ export const isEstimated = q => {
 }
 
 export const CARD_STYLE = {
-  background: 'var(--bg-card)',
+  background: 'var(--bg-elev)',
   border: '1px solid var(--border)',
   borderRadius: 6,
   padding: '12px 16px',
@@ -31,14 +31,14 @@ export const SECTION_HEADER_STYLE = {
 
 export const DESC_STYLE = {
   fontSize: 12,
-  color: 'var(--text-muted)',
+  color: 'var(--text-3)',
   marginBottom: 16,
   lineHeight: 1.6,
 }
 
 export function LoadingBox() {
   return (
-    <div style={{ ...CARD_STYLE, color: 'var(--text-muted)', fontSize: 13, padding: 24 }}>
+    <div style={{ ...CARD_STYLE, color: 'var(--text-3)', fontSize: 13, padding: 24 }}>
       데이터 수집 중입니다. 처음 로드 시 수분 소요될 수 있습니다...
     </div>
   )
