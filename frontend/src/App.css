@@ -1,58 +1,21 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-th { background: var(--bg-surface); color: var(--text-heading); font-weight: 600; }
-tr:hover td { background: var(--bg-hover); }
-button { cursor: pointer; padding: 6px 14px; border-radius: 4px; border: none; font-size: 14px; }
-.btn-primary { background: var(--accent-btn); color: white; }
-.btn-primary:hover { filter: brightness(1.15); }
-.btn-danger { background: #c62828; color: white; }
-.btn-danger:hover { background: #d32f2f; }
-.btn-secondary { background: var(--bg-surface); color: var(--text); border: 1px solid var(--border); }
-input, select, textarea {
-  background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border);
-  padding: 6px 10px; border-radius: 4px; font-size: 14px; width: 100%;
-}
-.modal-overlay {
-  position: fixed; inset: 0; background: var(--overlay);
-  display: flex; align-items: center; justify-content: center; z-index: 100;
-}
-.modal { background: var(--bg-surface); padding: 24px; border-radius: 8px; width: 480px; max-width: 95vw; }
-.modal h2 { margin-bottom: 16px; color: var(--text-heading); }
-.form-field { margin-bottom: 12px; }
-.form-field label { display: block; margin-bottom: 4px; font-size: 13px; color: var(--text-muted); }
-.positive { color: var(--positive); }
-.negative { color: var(--negative); }
-
-/* ── Mobile utilities ── */
-.desktop-only { display: flex; }
-.mobile-only  { display: none; }
-
-.table-mobile-wrap { width: 100%; }
-
-.accordion-header {
-  width: 100%; text-align: left; background: none; border: none;
-  border-bottom: 1px solid var(--border); padding: 10px 0;
-  color: var(--text-heading); font-size: 15px; font-weight: 600;
-  cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+/* NavLink는 <a>이므로 topnav-tab 스타일에 맞게 리셋 */
+.topnav-tabs a.topnav-tab {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
+/* 페이지 콘텐츠 최소 높이 (탭바 회피) */
+.page-wrap {
+  min-height: calc(100vh - 60px);
 }
 
 @media (max-width: 768px) {
-  .desktop-only { display: none !important; }
-  .mobile-only  { display: flex !important; }
+  .topnav { display: none; }
+  .page-wrap { padding-bottom: 80px; }
+}
 
-  .table-mobile-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .col-sticky {
-    position: sticky; left: 0; z-index: 1;
-    background: var(--bg-surface);
-  }
-
-  .dashboard-grid { grid-template-columns: 1fr; }
+/* PC에서 모바일 전용 요소 숨김 */
+@media (min-width: 769px) {
+  .mobile-only { display: none !important; }
 }

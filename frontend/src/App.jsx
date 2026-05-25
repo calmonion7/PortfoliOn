@@ -10,35 +10,69 @@ import Showcase from './pages/Showcase'
 import { supabase } from './supabase'
 import LoginPage from './pages/LoginPage'
 import MobileNav from './components/MobileNav'
+import { Sun, Moon, Bell, Refresh } from './components/ui/icons'
 import './App.css'
 
-const THEMES = [
-  { key: 'dark',   swatch: '#1a1a2e', label: '다크' },
-  { key: 'beige',  swatch: '#d4b896', label: '베이지' },
-  { key: 'white',  swatch: '#e8e8e8', label: '화이트' },
-  { key: 'pastel', swatch: '#9fa8da', label: '파스텔' },
-]
+function TopNav({ theme, setTheme }) {
+  const navItems = [
+    { to: '/',         label: '종목관리', end: true },
+    { to: '/research', label: '리서치' },
+    { to: '/market',   label: '시장' },
+    { to: '/analysis', label: '분석' },
+    { to: '/guru',     label: '구루' },
+    { to: '/settings', label: '설정' },
+  ]
+  return (
+    <header className="topnav">
+      <div className="topnav-inner">
+        <div className="brand">
+          <div className="brand-mark">
+            <div className="brand-dot" />
+            <div className="brand-dot brand-dot--2" />
+          </div>
+          <span>PortfoliOn</span>
+        </div>
+        <nav className="topnav-tabs">
+          {navItems.map(({ to, label, end }) => (
+            <NavLink key={to} to={to} end={end}
+              className={({ isActive }) => 'topnav-tab' + (isActive ? ' is-active' : '')}>
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="topnav-tools">
+          <button className="icon-btn" title="알림"><Bell /><span className="dot-indic" /></button>
+          <button className="icon-btn" title="새로고침" onClick={() => window.location.reload()}><Refresh /></button>
+          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
+            {theme === 'dark' ? <Sun /> : <Moon />}
+          </button>
+          <button className="ghost-btn" onClick={() => supabase.auth.signOut()}>로그아웃</button>
+        </div>
+      </div>
+    </header>
+  )
+}
 
 export default function App() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') ?? 'dark')
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') ?? 'light')
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark')
+    } else {
+      document.documentElement.removeAttribute('data-theme')
+    }
     localStorage.setItem('theme', theme)
   }, [theme])
 
   useEffect(() => {
     supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        setSession(session)
-      })
+      .then(({ data: { session } }) => setSession(session))
       .catch(() => {})
       .finally(() => setAuthLoading(false))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setSession(session)
-    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => setSession(session))
     return () => subscription.unsubscribe()
   }, [])
 
@@ -47,70 +81,21 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <nav style={{
-        padding: '12px 24px',
-        background: 'var(--bg-nav)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 24,
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <span style={{ color: 'var(--text)', fontWeight: 'bold', marginRight: 16 }}>Portfolio Manager</span>
-        <div className="desktop-only" style={{ gap: 24, alignItems: 'center' }}>
-          {[['/', '종목관리'], ['/research', '리서치'], ['/market', '시장'], ['/analysis', '분석'], ['/guru', '구루'], ['/settings', '설정']].map(([to, label]) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              style={({ isActive }) => ({
-                color: isActive ? 'var(--accent)' : 'var(--text-muted)',
-                textDecoration: 'none',
-                fontWeight: isActive ? 600 : 400,
-              })}
-            >
-              {label}
-            </NavLink>
-          ))}
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            style={{ cursor: 'pointer', color: 'var(--text-muted)', background: 'none', border: 'none', fontSize: 13, marginRight: 8 }}
-          >
-            로그아웃
-          </button>
-          {THEMES.map(t => (
-            <button
-              key={t.key}
-              title={t.label}
-              onClick={() => setTheme(t.key)}
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: '50%',
-                background: t.swatch,
-                border: theme === t.key ? '2px solid white' : '2px solid transparent',
-                outline: theme === t.key ? '1px solid #888' : 'none',
-                cursor: 'pointer',
-                padding: 0,
-                flexShrink: 0,
-              }}
-            />
-          ))}
-        </div>
-      </nav>
-      <main style={{ padding: 24, background: 'var(--bg)', minHeight: 'calc(100vh - 49px)', paddingBottom: 'max(24px, calc(24px + 56px))' }}>
-        <Routes>
-          <Route path="/" element={<Portfolio />} />
-          <Route path="/research" element={<Research />} />
-          <Route path="/market" element={<MarketHub />} />
-          <Route path="/analysis" element={<AnalysisHub />} />
-          <Route path="/guru" element={<Guru />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/dev/showcase" element={<Showcase />} />
-        </Routes>
-      </main>
-      <MobileNav />
+      <div className="app-pc">
+        <TopNav theme={theme} setTheme={setTheme} />
+        <main className="page-wrap">
+          <Routes>
+            <Route path="/" element={<Portfolio />} />
+            <Route path="/research" element={<Research />} />
+            <Route path="/market" element={<MarketHub />} />
+            <Route path="/analysis" element={<AnalysisHub />} />
+            <Route path="/guru" element={<Guru />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/dev/showcase" element={<Showcase />} />
+          </Routes>
+        </main>
+        <MobileNav />
+      </div>
     </BrowserRouter>
   )
 }
