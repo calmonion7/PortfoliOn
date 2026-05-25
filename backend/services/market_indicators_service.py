@@ -525,25 +525,14 @@ def get_commodities() -> dict:
 
 # ── Economic Indicators (FRED) ─────────────────────────────────────────────────
 
-def get_econ_indicators() -> dict:
-    cached = _get_cache("econ_indicators")
-    if cached:
-        return cached
-
+def _fetch_and_save_econ_indicators() -> dict:
+    """FRED에서 incremental fetch 후 Supabase 저장. 스케줄러 및 최초 로드용."""
     api_key = os.environ.get("FRED_API_KEY")
     if not api_key:
-        return {"error": "FRED_API_KEY 환경변수가 필요합니다. https://fred.stlouisfed.org/docs/api/api_key.html 에서 무료 발급 후 설정하세요."}
+        return {"error": "FRED_API_KEY 환경변수가 필요합니다."}
 
     stored = _mc_load("econ_indicators")
     stored_data = stored["data"] if stored else None
-
-    if stored_data and stored.get("fetched_at"):
-        from datetime import datetime, timezone
-        fetched = datetime.fromisoformat(stored["fetched_at"].replace("Z", "+00:00"))
-        age_days = (datetime.now(timezone.utc) - fetched).days
-        if age_days < 7:
-            _set_cache("econ_indicators", stored_data, ttl=86400)
-            return stored_data
 
     from datetime import date as _date
     cpi_stored = (stored_data or {}).get("cpi", [])
@@ -568,17 +557,32 @@ def get_econ_indicators() -> dict:
         new_cpi = _fetch_series("CPIAUCSL", cpi_start)
         new_unemp = _fetch_series("UNRATE", unemp_start)
     except Exception:
-        if stored_data:
-            _set_cache("econ_indicators", stored_data, ttl=3600)
-            return stored_data
-        return {"cpi": [], "unemployment": []}
+        return stored_data or {"cpi": [], "unemployment": []}
 
     cpi = _merge_history(cpi_stored, new_cpi)
     unemployment = _merge_history(unemp_stored, new_unemp)
     data = {"cpi": cpi, "unemployment": unemployment}
     _mc_save("econ_indicators", data)
-    _set_cache("econ_indicators", data, ttl=86400)
+    _cache.pop("econ_indicators", None)
     return data
+
+
+def get_econ_indicators() -> dict:
+    cached = _get_cache("econ_indicators")
+    if cached:
+        return cached
+
+    api_key = os.environ.get("FRED_API_KEY")
+    if not api_key:
+        return {"error": "FRED_API_KEY 환경변수가 필요합니다. https://fred.stlouisfed.org/docs/api/api_key.html 에서 무료 발급 후 설정하세요."}
+
+    stored = _mc_load("econ_indicators")
+    if stored:
+        _set_cache("econ_indicators", stored["data"], ttl=86400)
+        return stored["data"]
+
+    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
+    return _fetch_and_save_econ_indicators()
 
 
 # ── Korean Export Data ────────────────────────────────────────────────────────
@@ -698,21 +702,9 @@ def _fetch_comtrade_exports() -> dict:
     }
 
 
-def get_kr_exports() -> dict:
+def _fetch_and_save_kr_exports() -> dict:
+    """관세청/Comtrade에서 fetch 후 Supabase 저장. 스케줄러 및 최초 로드용."""
     stored = _mc_load("kr_exports")
-    if stored and stored.get("fetched_at"):
-        from datetime import datetime, timezone
-        fetched = datetime.fromisoformat(stored["fetched_at"].replace("Z", "+00:00"))
-        age_days = (datetime.now(timezone.utc) - fetched).days
-        if age_days < 3:
-            return stored["data"]
-
-    # file cache fallback (used when Supabase unavailable)
-    if os.path.exists(_EXPORTS_CACHE):
-        if time.time() - os.path.getmtime(_EXPORTS_CACHE) < 86400 * 3:
-            with open(_EXPORTS_CACHE) as f:
-                return json.load(f)
-
     api_key = os.environ.get("KITA_API_KEY")
     try:
         data = _fetch_customs_exports(api_key) if api_key else _fetch_comtrade_exports()
@@ -725,7 +717,22 @@ def get_kr_exports() -> dict:
             return {"months": [], "error": str(e)}
 
     _mc_save("kr_exports", data)
+    _cache.pop("kr_exports", None)
     os.makedirs(_DATA_DIR, exist_ok=True)
     with open(_EXPORTS_CACHE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
     return data
+
+
+def get_kr_exports() -> dict:
+    stored = _mc_load("kr_exports")
+    if stored:
+        return stored["data"]
+
+    # file cache fallback
+    if os.path.exists(_EXPORTS_CACHE):
+        with open(_EXPORTS_CACHE) as f:
+            return json.load(f)
+
+    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
+    return _fetch_and_save_kr_exports()

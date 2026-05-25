@@ -61,6 +61,20 @@ def _run_guru_crawl():
         print(f"[Scheduler] Guru crawl failed: {e}")
 
 
+def _refresh_monthly():
+    from services.market_indicators_service import _fetch_and_save_econ_indicators, _fetch_and_save_kr_exports
+    try:
+        _fetch_and_save_econ_indicators()
+        print("[Scheduler] Econ indicators refreshed")
+    except Exception as e:
+        print(f"[Scheduler] Econ indicators refresh failed: {e}")
+    try:
+        _fetch_and_save_kr_exports()
+        print("[Scheduler] KR exports refreshed")
+    except Exception as e:
+        print(f"[Scheduler] KR exports refresh failed: {e}")
+
+
 def _refresh_earnings():
     from services.market_indicators_service import _fetch_and_save_m7_earnings, _fetch_and_save_kr_top2_earnings
     try:
@@ -125,6 +139,12 @@ def start():
         _refresh_earnings,
         CronTrigger(day_of_week="sun", hour=3, minute=0, timezone="Asia/Seoul"),
         id="earnings_refresh",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _refresh_monthly,
+        CronTrigger(day=1, hour=2, minute=0, timezone="Asia/Seoul"),
+        id="monthly_refresh",
         replace_existing=True,
     )
     _scheduler.start()
