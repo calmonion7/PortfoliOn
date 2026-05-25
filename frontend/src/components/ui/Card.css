@@ -10,9 +10,9 @@
 }
 
 .card--p-none { padding: 0; }
-.card--p-sm   { padding: var(--space-3); }
-.card--p-md   { padding: var(--space-4); }
-.card--p-lg   { padding: var(--space-6); }
+.card--p-sm   { padding: 12px; }
+.card--p-md   { padding: 16px; }
+.card--p-lg   { padding: 24px; }
 
 .card--hover { cursor: pointer; }
 .card--hover:hover {
