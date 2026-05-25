@@ -33,11 +33,11 @@ export default function Showcase() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <Card>
           <CardHeader title="기본 카드" subtitle="padding md" />
-          <p style={{ margin: 0, color: 'var(--text-muted)' }}>카드 본문 내용</p>
+          <p style={{ margin: 0, color: 'var(--text-3)' }}>카드 본문 내용</p>
         </Card>
         <Card elevated>
           <CardHeader title="Elevated" />
-          <p style={{ margin: 0, color: 'var(--text-muted)' }}>그림자 있는 카드</p>
+          <p style={{ margin: 0, color: 'var(--text-3)' }}>그림자 있는 카드</p>
         </Card>
       </div>
 

@@ -9,7 +9,7 @@ export default function LoadingSpinner({ label = '불러오는 중입니다.', s
         animation: 'spin 0.8s linear infinite',
         flexShrink: 0,
       }} />
-      {label && <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{label}</span>}
+      {label && <span style={{ color: 'var(--text-3)', fontSize: 13 }}>{label}</span>}
     </div>
   )
 }

@@ -4,7 +4,7 @@ export const TAB_STYLE = (active) => ({
   border: 'none',
   borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
   background: 'transparent',
-  color: active ? 'var(--accent)' : 'var(--text-muted)',
+  color: active ? 'var(--accent)' : 'var(--text-3)',
   fontWeight: active ? 600 : 400,
   fontSize: 13,
 })
