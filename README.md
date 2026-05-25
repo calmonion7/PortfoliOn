@@ -192,7 +192,7 @@ FX, VIX, 원자재, 경제지표를 한 화면에서 확인합니다.
 | 서비스 | 주소 |
 |--------|------|
 | 프론트엔드 | https://portfoli-on.vercel.app |
-| 백엔드 API | https://portfolion-7zpa.onrender.com |
+| 백엔드 API | https://portfolion-1.onrender.com |
 
 ## 개발 스펙
 

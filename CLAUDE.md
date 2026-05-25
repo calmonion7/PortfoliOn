@@ -113,11 +113,11 @@ cd backend && .venv/bin/python -m pytest
 
 ## Deployment
 
-- **Backend**: Render (https://portfolion-7zpa.onrender.com) — `main` 브랜치 자동 배포
+- **Backend**: Render (https://portfolion-1.onrender.com) — `main` 브랜치 자동 배포
 - **Frontend**: Vercel (https://portfoli-on.vercel.app) — `main` 브랜치, Root Directory=`frontend`
 - **DB**: Supabase PostgreSQL (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 환경변수)
 - **슬립 방지**: UptimeRobot (5분 간격 HEAD /health → Render 무료 슬립 방지)
-- 프론트엔드는 `VITE_API_BASE_URL=https://portfolion-7zpa.onrender.com` 직접 호출 (Vercel rewrites 불안정)
+- 프론트엔드는 `VITE_API_BASE_URL=https://portfolion-1.onrender.com` 직접 호출 (Vercel rewrites 불안정)
 
 ## Key Files
 
