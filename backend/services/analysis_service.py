@@ -73,7 +73,7 @@ def _fetch_holding_closes(item: dict):
 
 
 def get_macro_correlation(holdings: list) -> dict:
-    with ThreadPoolExecutor(max_workers=30) as ex:
+    with ThreadPoolExecutor(max_workers=min(len(holdings), 10)) as ex:
         results = list(ex.map(_fetch_holding_closes, holdings))
     results = [r for r in results if r is not None]
 

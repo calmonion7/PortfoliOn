@@ -223,7 +223,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
         }
 
     def _build_all():
-        with ThreadPoolExecutor(max_workers=30) as executor:
+        with ThreadPoolExecutor(max_workers=min(len(holdings), 10)) as executor:
             return list(executor.map(_build_card, holdings))
 
     return cache_svc.get_dashboard(user_id, _build_all)

@@ -43,6 +43,7 @@ def _reschedule():
         _generate_all,
         CronTrigger(day_of_week=days_str, hour=hour, minute=minute),
         id=_JOB_ID,
+        replace_existing=True,
     )
     print(f"[Scheduler] Scheduled daily report at {cfg['time']} on {days_str}")
 
@@ -122,6 +123,7 @@ def _reschedule_guru():
         _run_guru_crawl,
         CronTrigger(day_of_week=day, hour=hour, minute=minute),
         id=_GURU_JOB_ID,
+        replace_existing=True,
     )
     print(f"[Scheduler] Guru crawl scheduled at {cfg['time']} on {day}")
 

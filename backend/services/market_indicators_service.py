@@ -329,7 +329,7 @@ def _fetch_and_save_kr_top2_earnings() -> dict:
     kospi = _get_kospi_tickers()
     rest = [t for t in kospi if t not in KR_TOP2]
 
-    with ThreadPoolExecutor(max_workers=50) as ex:
+    with ThreadPoolExecutor(max_workers=20) as ex:
         top2_data = list(ex.map(_get_naver_quarterly_net_income, KR_TOP2))
         rest_data = list(ex.map(_get_naver_quarterly_net_income, rest))
 

@@ -64,7 +64,7 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
         return result
 
     events: list[dict] = []
-    with ThreadPoolExecutor(max_workers=30) as executor:
+    with ThreadPoolExecutor(max_workers=min(len(all_stocks), 15)) as executor:
         futures = {executor.submit(_fetch_stock, s): s for s in all_stocks}
         for future in as_completed(futures):
             events.extend(future.result())
