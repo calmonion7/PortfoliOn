@@ -26,7 +26,7 @@ class TTLCache:
 
 
 _snapshots: OrderedDict[str, dict] = OrderedDict()
-_list_cache = TTLCache(5.0)
+_list_cache = TTLCache(60.0)
 _dashboard_cache = TTLCache(300.0)
 _correlation_cache = TTLCache(300.0)
 _MAX = 200

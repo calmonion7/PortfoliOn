@@ -130,19 +130,21 @@ def list_reports(user_id: str = Depends(get_current_user)):
         watchlist_tickers = set(portfolio_watchlist.keys())
 
         db = get_db()
-        snap_rows = db.table("snapshots").select("ticker, date").order("date", desc=True).execute().data
+        snap_rows = db.table("snapshots").select("ticker, date, data").order("date", desc=True).execute().data
         ticker_dates: dict = {}
+        ticker_summary: dict = {}
         for r in snap_rows:
             t = r["ticker"].upper()
             if t not in ticker_dates:
                 ticker_dates[t] = []
+                ticker_summary[t] = _sanitize(r["data"]) if r["data"] else None
             ticker_dates[t].append(r["date"])
 
         result = {}
         for ticker, dates in ticker_dates.items():
             category = "holdings" if ticker in holding_tickers else \
                        "watchlist" if ticker in watchlist_tickers else "other"
-            summary = _read_snapshot(ticker, dates[0]) if dates else None
+            summary = ticker_summary.get(ticker)
             stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
             market = stock_info.get("market") or (summary or {}).get("market", "US")
             result[ticker] = {"dates": dates, "category": category, "summary": summary, "market": market}
