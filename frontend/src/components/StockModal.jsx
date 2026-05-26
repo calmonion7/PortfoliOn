@@ -110,6 +110,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
   const empty = mode === 'watchlist' ? WATCHLIST_EMPTY : HOLDING_EMPTY
   const [form, setForm] = useState(empty)
   const isEdit = !!stock
+  const mouseDownOnOverlay = useRef(false)
 
   useEffect(() => {
     if (stock) {
@@ -161,7 +162,10 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
   const title = mode === 'watchlist' ? (isEdit ? '관심종목 수정' : '관심종목 추가') : (isEdit ? '종목 수정' : '종목 추가')
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay"
+      onMouseDown={e => { mouseDownOnOverlay.current = e.target === e.currentTarget }}
+      onClick={() => { if (mouseDownOnOverlay.current) onClose() }}
+    >
       <div className="modal" onClick={e => e.stopPropagation()}>
         <h2>{title}</h2>
         <form onSubmit={handleSubmit}>
@@ -248,8 +252,8 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="submit" className="btn-primary">저장</button>
-            <button type="button" className="btn-secondary" onClick={onClose}>취소</button>
+            <button type="submit" className="btn btn-primary">저장</button>
+            <button type="button" className="btn" onClick={onClose}>취소</button>
           </div>
         </form>
       </div>

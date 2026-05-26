@@ -272,3 +272,9 @@
 
 /* Asset row spacing on holdings */
 .holdings-list { padding-bottom: 8px; }
+
+/* Modal — mobile: 화면 하단 시트 스타일 */
+@media (max-width: 768px) {
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal { border-radius: 16px 16px 0 0; max-width: 100%; max-height: 85vh; padding: 20px 20px 36px; }
+}

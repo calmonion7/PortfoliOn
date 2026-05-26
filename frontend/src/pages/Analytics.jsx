@@ -100,8 +100,14 @@ const CustomDot = (props) => {
   )
 }
 
+const KRW_TO_USD = 1380
+const toUSD = (price, market) => market === 'KR' ? price / KRW_TO_USD : price
+
 function OpportunityBubble({ cards }) {
-  const totalVal = cards.reduce((s, c) => s + (c.quantity ?? 0) * (c.current_price ?? 0), 0)
+  const totalVal = cards.reduce(
+    (s, c) => s + (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market),
+    0,
+  )
 
   const included = []
   const excluded = []
@@ -116,9 +122,10 @@ function OpportunityBubble({ cards }) {
     }
     const upside = parseFloat(((target - price) / price * 100).toFixed(1))
     const returnPct = parseFloat(((price - avgCost) / avgCost * 100).toFixed(1))
-    const weight = totalVal ? c.quantity * price / totalVal * 100 : 1
+    const weight = totalVal ? c.quantity * toUSD(price, c.market) / totalVal * 100 : 1
     included.push({
       ticker: c.ticker,
+      market: c.market || 'US',
       upside,
       returnPct,
       weight,
@@ -153,7 +160,9 @@ function OpportunityBubble({ cards }) {
                   background: 'var(--bg-elev)', border: '1px solid var(--border)',
                   padding: '8px 12px', borderRadius: 6, fontSize: 12,
                 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{d.ticker}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                    {d.ticker} <span style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 400 }}>{d.market === 'KR' ? '🇰🇷 KRW' : '🇺🇸 USD'}</span>
+                  </div>
                   <div style={{ color: 'var(--text-3)' }}>
                     업사이드: <span style={{ color: 'var(--text)' }}>{d.upside}%</span>
                   </div>
