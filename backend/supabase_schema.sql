@@ -59,6 +59,17 @@ CREATE TABLE digests (
   PRIMARY KEY (user_id, date)
 );
 
+-- 컨센서스 히스토리 (티커별 날짜별 목표가/의견)
+CREATE TABLE consensus_history (
+  ticker      text NOT NULL,
+  date        date NOT NULL,
+  target_mean numeric,
+  buy         integer,
+  hold        integer,
+  sell        integer,
+  PRIMARY KEY (ticker, date)
+);
+
 -- RLS 비활성화 (백엔드가 service role key로 직접 필터링)
 ALTER TABLE tickers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE snapshots DISABLE ROW LEVEL SECURITY;

@@ -1,32 +1,34 @@
 from __future__ import annotations
-import json
 from datetime import date
-from pathlib import Path
-
-CONSENSUS_DIR = Path(__file__).parent.parent / "data" / "consensus"
-SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
-REPORTS_DIR = Path(__file__).parent.parent / "reports"
+from services.db import get_db
 
 
 def get_history(ticker: str) -> list[dict]:
-    path = CONSENSUS_DIR / f"{ticker.upper()}.json"
-    if not path.exists():
-        return []
-    return json.loads(path.read_text(encoding="utf-8"))
+    db = get_db()
+    rows = db.table("consensus_history") \
+        .select("date, target_mean, buy, hold, sell") \
+        .eq("ticker", ticker.upper()) \
+        .order("date", desc=True) \
+        .execute().data
+    return [
+        {
+            "date": str(r["date"]),
+            "target_mean": r.get("target_mean"),
+            "buy": r.get("buy"),
+            "hold": r.get("hold"),
+            "sell": r.get("sell"),
+        }
+        for r in rows
+    ]
 
 
 def collect(ticker: str) -> dict | None:
     upper = ticker.upper()
-    json_files = []
-    for base in (SNAPSHOTS_DIR, REPORTS_DIR):
-        d = base / upper
-        if d.exists():
-            json_files = sorted(d.glob("*.json"), reverse=True)
-            if json_files:
-                break
-    if not json_files:
+    db = get_db()
+    rows = db.table("snapshots").select("data").eq("ticker", upper).order("date", desc=True).limit(1).execute().data
+    if not rows:
         return None
-    summary = json.loads(json_files[0].read_text(encoding="utf-8"))
+    summary = rows[0]["data"] or {}
     target_mean = summary.get("target_mean")
     buy = summary.get("buy")
     hold = summary.get("hold")
@@ -34,26 +36,22 @@ def collect(ticker: str) -> dict | None:
     if all(v is None for v in [target_mean, buy, hold, sell]):
         return None
     entry = {
+        "ticker": upper,
         "date": str(date.today()),
         "target_mean": target_mean,
         "buy": buy,
         "hold": hold,
         "sell": sell,
     }
-    CONSENSUS_DIR.mkdir(parents=True, exist_ok=True)
-    path = CONSENSUS_DIR / f"{upper}.json"
-    existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
-    existing = [e for e in existing if e["date"] != entry["date"]]
-    existing.append(entry)
-    existing.sort(key=lambda e: e["date"], reverse=True)
-    path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
-    return entry
+    db.table("consensus_history").upsert(entry).execute()
+    return {k: v for k, v in entry.items() if k != "ticker"}
 
 
 def backfill(ticker: str, market: str) -> list[dict]:
     upper = ticker.upper()
-    existing = get_history(upper)
-    existing_dates = {e["date"] for e in existing}
+    db = get_db()
+    existing_rows = db.table("consensus_history").select("date").eq("ticker", upper).execute().data
+    existing_dates = {str(r["date"]) for r in existing_rows}
 
     fetched = _fetch_kr(upper) if market == "KR" else _fetch_us(upper)
     to_add = [e for e in fetched if e["date"] not in existing_dates]
@@ -61,11 +59,7 @@ def backfill(ticker: str, market: str) -> list[dict]:
     if not to_add:
         return []
 
-    CONSENSUS_DIR.mkdir(parents=True, exist_ok=True)
-    path = CONSENSUS_DIR / f"{upper}.json"
-    merged = existing + to_add
-    merged.sort(key=lambda e: e["date"], reverse=True)
-    path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+    db.table("consensus_history").upsert([{"ticker": upper, **e} for e in to_add]).execute()
     return to_add
 
 
