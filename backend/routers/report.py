@@ -130,15 +130,27 @@ def list_reports(user_id: str = Depends(get_current_user)):
         watchlist_tickers = set(portfolio_watchlist.keys())
 
         db = get_db()
-        snap_rows = db.table("snapshots").select("ticker, date, data").order("date", desc=True).execute().data
+        # ticker+date만 fetch (data 블롭 제외) — 전체 row 수가 많아도 빠름
+        date_rows = db.table("snapshots").select("ticker, date") \
+            .order("date", desc=True).execute().data
         ticker_dates: dict = {}
-        ticker_summary: dict = {}
-        for r in snap_rows:
+        for r in date_rows:
             t = r["ticker"].upper()
             if t not in ticker_dates:
                 ticker_dates[t] = []
-                ticker_summary[t] = _sanitize(r["data"]) if r["data"] else None
             ticker_dates[t].append(r["date"])
+
+        # ticker별 최신 날짜 목록으로 data를 한 번에 fetch
+        ticker_summary: dict = {}
+        if ticker_dates:
+            latest_dates = list({dates[0] for dates in ticker_dates.values()})
+            summary_rows = db.table("snapshots").select("ticker, date, data") \
+                .in_("date", latest_dates).execute().data
+            for r in summary_rows:
+                t = r["ticker"].upper()
+                if t in ticker_dates and t not in ticker_summary \
+                        and r["date"] == ticker_dates[t][0] and r.get("data"):
+                    ticker_summary[t] = _sanitize(r["data"])
 
         result = {}
         for ticker, dates in ticker_dates.items():
