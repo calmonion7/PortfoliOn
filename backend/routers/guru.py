@@ -3,11 +3,12 @@ from datetime import datetime
 from services import storage
 from services.guru_scraper import scrape_all_managers
 from services.guru_stats import compute_popularity, compute_manager_top3, compute_weighted
+from services.progress import ProgressTracker
 import scheduler as sched
 
 router = APIRouter(prefix="/api/guru", tags=["guru"])
 
-_progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
+_progress = ProgressTracker()
 
 
 @router.get("/managers")
@@ -35,12 +36,12 @@ def stats_weighted():
 
 @router.get("/crawl/progress")
 def crawl_progress():
-    return _progress
+    return _progress.get()
 
 
 @router.post("/crawl", status_code=202)
 def start_crawl(background_tasks: BackgroundTasks):
-    if _progress["running"]:
+    if _progress.get()["running"]:
         raise HTTPException(status_code=409, detail="Crawl already running")
     background_tasks.add_task(_run_crawl)
     return {"message": "Crawl started"}
@@ -48,9 +49,9 @@ def start_crawl(background_tasks: BackgroundTasks):
 
 def _run_crawl():
     def on_progress(done: int, total: int, current: str):
-        _progress.update({"running": True, "done": done, "total": total, "current": current})
+        _progress.set(running=True, done=done, total=total, current=current)
 
-    _progress["running"] = True
+    _progress.set(running=True)
     try:
         managers = scrape_all_managers(on_progress=on_progress)
         storage.save_guru_managers({
@@ -60,7 +61,7 @@ def _run_crawl():
     except Exception as e:
         print(f"[Guru] Crawl failed: {e}")
     finally:
-        _progress.update({"running": False, "current": ""})
+        _progress.finish()
 
 
 @router.get("/schedule")

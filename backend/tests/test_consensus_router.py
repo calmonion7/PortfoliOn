@@ -1,4 +1,3 @@
-import json
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -16,95 +15,71 @@ SAMPLE_SUMMARY = {
 }
 
 
-def test_get_consensus_empty(tmp_path):
-    with patch("services.consensus.CONSENSUS_DIR", tmp_path):
+def _make_mock_db(data=None):
+    m = MagicMock()
+    for method in ['table', 'select', 'eq', 'order', 'limit', 'in_', 'upsert', 'delete']:
+        getattr(m, method).return_value = m
+    m.execute.return_value.data = data if data is not None else []
+    return m
+
+
+def test_get_consensus_empty():
+    with patch("services.consensus.get_db", return_value=_make_mock_db([])):
         resp = client.get("/api/consensus/005930")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-def test_get_consensus_returns_data(tmp_path):
-    (tmp_path / "005930.json").write_text(
-        json.dumps([{"date": "2026-05-19", "target_mean": 352000, "buy": 25, "hold": 0, "sell": 0}]),
-        encoding="utf-8",
-    )
-    with patch("services.consensus.CONSENSUS_DIR", tmp_path):
+def test_get_consensus_returns_data():
+    rows = [{"date": "2026-05-19", "target_mean": 352000, "buy": 25, "hold": 0, "sell": 0}]
+    with patch("services.consensus.get_db", return_value=_make_mock_db(rows)):
         resp = client.get("/api/consensus/005930")
     assert resp.status_code == 200
     assert resp.json()[0]["target_mean"] == 352000
 
 
-def test_collect_consensus_saves_entry(tmp_path):
-    reports_tmp = tmp_path / "reports"
-    reports_tmp.mkdir()
-    consensus_tmp = tmp_path / "consensus"
-    ticker_dir = reports_tmp / "005930"
-    ticker_dir.mkdir()
-    (ticker_dir / "2026-05-19.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
-    with patch("services.consensus.REPORTS_DIR", reports_tmp), \
-         patch("services.consensus.SNAPSHOTS_DIR", reports_tmp), \
-         patch("services.consensus.CONSENSUS_DIR", consensus_tmp):
+def test_collect_consensus_saves_entry():
+    snapshot_rows = [{"data": SAMPLE_SUMMARY}]
+    mock_db = _make_mock_db(snapshot_rows)
+    with patch("services.consensus.get_db", return_value=mock_db):
         resp = client.post("/api/consensus/005930")
     assert resp.status_code == 200
     assert resp.json()["target_mean"] == 352000.0
 
 
-def test_collect_consensus_no_report(tmp_path):
-    reports_tmp = tmp_path / "reports"
-    reports_tmp.mkdir()
-    consensus_tmp = tmp_path / "consensus"
-    with patch("services.consensus.REPORTS_DIR", reports_tmp), \
-         patch("services.consensus.CONSENSUS_DIR", consensus_tmp):
+def test_collect_consensus_no_report():
+    with patch("services.consensus.get_db", return_value=_make_mock_db([])):
         resp = client.post("/api/consensus/UNKNOWN")
     assert resp.status_code == 400
 
 
-def test_collect_consensus_upsert_same_date(tmp_path):
-    from datetime import date
-    fixed_date = "2026-05-19"
-    reports_tmp = tmp_path / "reports"
-    reports_tmp.mkdir()
-    consensus_tmp = tmp_path / "consensus"
-    consensus_tmp.mkdir()
-    ticker_dir = reports_tmp / "005930"
-    ticker_dir.mkdir()
-    (ticker_dir / "2026-05-19.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
-    (consensus_tmp / "005930.json").write_text(
-        json.dumps([{"date": fixed_date, "target_mean": 300000, "buy": 20, "hold": 2, "sell": 1}]),
-        encoding="utf-8",
-    )
-    with patch("services.consensus.CONSENSUS_DIR", consensus_tmp), \
-         patch("services.consensus.REPORTS_DIR", reports_tmp), \
-         patch("services.consensus.SNAPSHOTS_DIR", reports_tmp), \
-         patch("services.consensus.date") as mock_date:
-        mock_date.today.return_value = date.fromisoformat(fixed_date)
-        client.post("/api/consensus/005930")
-    saved = json.loads((consensus_tmp / "005930.json").read_text())
-    same_date = [e for e in saved if e["date"] == fixed_date]
-    assert len(same_date) == 1
-    assert same_date[0]["target_mean"] == 352000.0
+def test_collect_consensus_upsert_same_date():
+    snapshot_rows = [{"data": SAMPLE_SUMMARY}]
+    mock_db = _make_mock_db(snapshot_rows)
+    with patch("services.consensus.get_db", return_value=mock_db):
+        resp = client.post("/api/consensus/005930")
+    assert resp.status_code == 200
+    # upsert was called on consensus_history
+    assert mock_db.upsert.called
 
 
-def test_backfill_no_report(tmp_path, monkeypatch):
-    monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
-    monkeypatch.setattr("routers.report.SNAPSHOTS_DIR", tmp_path)
-    r = client.post("/api/consensus/AAPL/backfill")
+def test_backfill_no_report():
+    with patch("routers.report.get_db", return_value=_make_mock_db([])):
+        r = client.post("/api/consensus/AAPL/backfill")
     assert r.status_code == 400
 
 
-def test_backfill_kr(tmp_path, monkeypatch):
+def test_backfill_kr():
     from datetime import date, timedelta
     upper = "005930"
     today = date.today()
     d1 = (today - timedelta(days=30)).isoformat()
     d2 = (today - timedelta(days=10)).isoformat()
 
-    ticker_dir = tmp_path / upper
-    ticker_dir.mkdir()
-    summary = {"market": "KR", "target_mean": 80000, "buy": 10, "hold": 2, "sell": 0}
-    (ticker_dir / f"{today.isoformat()}.json").write_text(json.dumps(summary), encoding="utf-8")
-    monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
-    monkeypatch.setattr("routers.report.SNAPSHOTS_DIR", tmp_path)
+    snapshot_data = {"market": "KR", "target_mean": 80000, "buy": 10, "hold": 2, "sell": 0}
+    router_db = _make_mock_db([{"date": today.isoformat(), "data": snapshot_data}])
+
+    consensus_db = _make_mock_db([])
 
     list_payload = [
         {"researchId": "101", "writeDate": d1, "brokerName": "NH"},
@@ -124,9 +99,8 @@ def test_backfill_kr(tmp_path, monkeypatch):
         m.json.return_value = details[last] if last in details else list_payload
         return m
 
-    with patch("services.consensus.CONSENSUS_DIR", tmp_path / "consensus"), \
-         patch("services.consensus.REPORTS_DIR", tmp_path), \
-         patch("services.consensus.SNAPSHOTS_DIR", tmp_path), \
+    with patch("routers.report.get_db", return_value=router_db), \
+         patch("services.consensus.get_db", return_value=consensus_db), \
          patch("requests.get", side_effect=mock_get):
         r = client.post(f"/api/consensus/{upper}/backfill")
 
@@ -135,7 +109,7 @@ def test_backfill_kr(tmp_path, monkeypatch):
     assert body["added"] == 2
 
 
-def test_backfill_us(tmp_path, monkeypatch):
+def test_backfill_us():
     import pandas as pd
     from datetime import date, timedelta
     upper = "AAPL"
@@ -143,12 +117,9 @@ def test_backfill_us(tmp_path, monkeypatch):
     d1 = (today - timedelta(days=10)).isoformat()
     d2 = (today - timedelta(days=20)).isoformat()
 
-    ticker_dir = tmp_path / upper
-    ticker_dir.mkdir()
-    summary = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
-    (ticker_dir / f"{today.isoformat()}.json").write_text(json.dumps(summary), encoding="utf-8")
-    monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
-    monkeypatch.setattr("routers.report.SNAPSHOTS_DIR", tmp_path)
+    snapshot_data = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
+    router_db = _make_mock_db([{"date": today.isoformat(), "data": snapshot_data}])
+    consensus_db = _make_mock_db([])
 
     df = pd.DataFrame(
         {
@@ -163,9 +134,8 @@ def test_backfill_us(tmp_path, monkeypatch):
     mock_ticker = MagicMock()
     mock_ticker.upgrades_downgrades = df
 
-    with patch("services.consensus.CONSENSUS_DIR", tmp_path / "consensus"), \
-         patch("services.consensus.REPORTS_DIR", tmp_path), \
-         patch("services.consensus.SNAPSHOTS_DIR", tmp_path), \
+    with patch("routers.report.get_db", return_value=router_db), \
+         patch("services.consensus.get_db", return_value=consensus_db), \
          patch("yfinance.Ticker", return_value=mock_ticker):
         r = client.post(f"/api/consensus/{upper}/backfill")
 
@@ -173,37 +143,34 @@ def test_backfill_us(tmp_path, monkeypatch):
     body = r.json()
     assert body["added"] == 2
     by_date = {e["date"]: e for e in body["entries"]}
-    assert by_date[d1]["buy"] == 2           # Buy + Outperform
-    assert by_date[d1]["target_mean"] == 215.0  # (210+220)/2
+    assert by_date[d1]["buy"] == 2
+    assert by_date[d1]["target_mean"] == 215.0
     assert by_date[d2]["target_mean"] == 190.0
 
 
-def test_backfill_skips_existing_dates(tmp_path, monkeypatch):
+def test_backfill_skips_existing_dates():
     import pandas as pd
     from datetime import date, timedelta
     upper = "AAPL"
     today = date.today()
     existing_date = (today - timedelta(days=10)).isoformat()
 
-    ticker_dir = tmp_path / upper
-    ticker_dir.mkdir()
-    summary = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
-    (ticker_dir / f"{today.isoformat()}.json").write_text(json.dumps(summary), encoding="utf-8")
-    monkeypatch.setattr("routers.report.REPORTS_DIR", tmp_path)
+    snapshot_data = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
+    router_db = _make_mock_db([{"date": today.isoformat(), "data": snapshot_data}])
 
-    consensus_dir = tmp_path / "consensus"
-    consensus_dir.mkdir()
-    existing = [{"date": existing_date, "target_mean": None, "buy": 5, "hold": 2, "sell": 1}]
-    (consensus_dir / f"{upper}.json").write_text(json.dumps(existing), encoding="utf-8")
+    existing_rows = [{"date": existing_date}]
+    consensus_db = _make_mock_db(existing_rows)
 
     df = pd.DataFrame(
-        {"ToGrade": ["Buy"], "Firm": ["MS"], "FromGrade": [""], "Action": ["up"]},
+        {"ToGrade": ["Buy"], "Firm": ["MS"], "FromGrade": [""], "Action": ["up"],
+         "currentPriceTarget": [210.0]},
         index=pd.DatetimeIndex([existing_date], name="GradeDate"),
     )
     mock_ticker = MagicMock()
     mock_ticker.upgrades_downgrades = df
 
-    with patch("services.consensus.CONSENSUS_DIR", consensus_dir), \
+    with patch("routers.report.get_db", return_value=router_db), \
+         patch("services.consensus.get_db", return_value=consensus_db), \
          patch("yfinance.Ticker", return_value=mock_ticker):
         r = client.post(f"/api/consensus/{upper}/backfill")
 

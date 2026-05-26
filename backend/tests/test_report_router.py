@@ -2,10 +2,18 @@ import json
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from routers.report import router
 from auth import get_current_user
+
+
+def _make_mock_db(data=None):
+    m = MagicMock()
+    for method in ['table', 'select', 'eq', 'order', 'limit', 'in_', 'upsert', 'delete']:
+        getattr(m, method).return_value = m
+    m.execute.return_value.data = data if data is not None else []
+    return m
 
 app = FastAPI()
 app.include_router(router)
@@ -29,13 +37,17 @@ SAMPLE_SUMMARY = {
 }
 
 
-def test_list_reports_detects_json_snapshots(tmp_path):
-    ticker_dir = tmp_path / "LLY"
-    ticker_dir.mkdir()
-    (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
-    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
-         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
-         patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO):
+def test_list_reports_detects_json_snapshots():
+    date_rows = [{"ticker": "LLY", "date": "2026-05-05"}]
+    summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]
+    mock_db = _make_mock_db()
+    mock_db.execute.side_effect = [
+        MagicMock(data=date_rows),
+        MagicMock(data=summary_rows),
+    ]
+    with patch("routers.report.get_db", return_value=mock_db), \
+         patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
+         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
         resp = client.get("/api/report/list")
     assert resp.status_code == 200
     data = resp.json()
@@ -44,13 +56,17 @@ def test_list_reports_detects_json_snapshots(tmp_path):
     assert "2026-05-05" in data["LLY"]["dates"]
 
 
-def test_list_reports_no_markdown_in_dates(tmp_path):
-    ticker_dir = tmp_path / "LLY"
-    ticker_dir.mkdir()
-    (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
-    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
-         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
-         patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO):
+def test_list_reports_no_markdown_in_dates():
+    date_rows = [{"ticker": "LLY", "date": "2026-05-05"}]
+    summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]
+    mock_db = _make_mock_db()
+    mock_db.execute.side_effect = [
+        MagicMock(data=date_rows),
+        MagicMock(data=summary_rows),
+    ]
+    with patch("routers.report.get_db", return_value=mock_db), \
+         patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
+         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
         resp = client.get("/api/report/list")
     dates = resp.json()["LLY"]["dates"]
     assert all(not d.endswith(".md") for d in dates)
@@ -62,6 +78,7 @@ def test_get_report_returns_summary_no_content(tmp_path):
     (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("routers.report.get_db", return_value=_make_mock_db([])), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-05")
@@ -82,6 +99,7 @@ def test_get_report_fallback_to_reports_dir(tmp_path):
     snapshots_dir.mkdir()
     with patch("routers.report.SNAPSHOTS_DIR", snapshots_dir), \
          patch("routers.report.REPORTS_DIR", legacy_dir), \
+         patch("routers.report.get_db", return_value=_make_mock_db([])), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-01")
@@ -117,17 +135,12 @@ SAMPLE_SUMMARY_2 = {
 }
 
 
-def test_get_history_returns_sorted_lean_array(tmp_path):
-    ticker_dir = tmp_path / "LLY"
-    ticker_dir.mkdir()
-    (ticker_dir / "2026-05-05.json").write_text(
-        json.dumps(SAMPLE_SUMMARY_WITH_RSI), encoding="utf-8"
-    )
-    (ticker_dir / "2026-05-06.json").write_text(
-        json.dumps(SAMPLE_SUMMARY_2), encoding="utf-8"
-    )
-    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
-         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"):
+def test_get_history_returns_sorted_lean_array():
+    rows = [
+        {"date": "2026-05-05", "data": SAMPLE_SUMMARY_WITH_RSI},
+        {"date": "2026-05-06", "data": SAMPLE_SUMMARY_2},
+    ]
+    with patch("routers.report.get_db", return_value=_make_mock_db(rows)):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     data = resp.json()
@@ -146,39 +159,25 @@ def test_get_history_returns_sorted_lean_array(tmp_path):
     assert data[0]["rsi_monthly"] == 62.3
 
 
-def test_get_history_handles_null_rsi(tmp_path):
-    ticker_dir = tmp_path / "LLY"
-    ticker_dir.mkdir()
-    (ticker_dir / "2026-05-06.json").write_text(
-        json.dumps(SAMPLE_SUMMARY_2), encoding="utf-8"
-    )
-    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
-         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"):
+def test_get_history_handles_null_rsi():
+    rows = [{"date": "2026-05-06", "data": SAMPLE_SUMMARY_2}]
+    with patch("routers.report.get_db", return_value=_make_mock_db(rows)):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     data = resp.json()
     assert data[0]["rsi_monthly"] is None
 
 
-def test_get_history_empty_when_no_snapshots(tmp_path):
-    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
-         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"):
+def test_get_history_empty_when_no_snapshots():
+    with patch("routers.report.get_db", return_value=_make_mock_db([])):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-def test_get_history_fallback_to_reports_dir(tmp_path):
-    legacy_dir = tmp_path / "legacy"
-    legacy_ticker = legacy_dir / "LLY"
-    legacy_ticker.mkdir(parents=True)
-    (legacy_ticker / "2026-05-01.json").write_text(
-        json.dumps(SAMPLE_SUMMARY_WITH_RSI), encoding="utf-8"
-    )
-    snapshots_dir = tmp_path / "snapshots"
-    snapshots_dir.mkdir()
-    with patch("routers.report.SNAPSHOTS_DIR", snapshots_dir), \
-         patch("routers.report.REPORTS_DIR", legacy_dir):
+def test_get_history_fallback_to_reports_dir():
+    rows = [{"date": "2026-05-01", "data": SAMPLE_SUMMARY_WITH_RSI}]
+    with patch("routers.report.get_db", return_value=_make_mock_db(rows)):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     assert len(resp.json()) == 1

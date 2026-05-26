@@ -37,7 +37,7 @@ def test_correlation_returns_matrix_for_two_holdings():
     def mock_ticker(sym):
         return _make_hist(0) if "AAPL" in sym else _make_hist(1)
 
-    with patch("routers.analytics.storage.get_full_portfolio", return_value=portfolio), \
+    with patch("routers.analytics.storage.get_holdings", return_value=portfolio["stocks"]), \
          patch("routers.analytics.yf.Ticker", side_effect=mock_ticker), \
          patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analytics/correlation")
@@ -56,7 +56,7 @@ def test_correlation_returns_empty_for_single_holding():
         "stocks": [{"ticker": "AAPL", "market": "US", "exchange": ""}],
         "watchlist": [],
     }
-    with patch("routers.analytics.storage.get_full_portfolio", return_value=portfolio), \
+    with patch("routers.analytics.storage.get_holdings", return_value=portfolio["stocks"]), \
          patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analytics/correlation")
     assert resp.status_code == 200
@@ -65,7 +65,7 @@ def test_correlation_returns_empty_for_single_holding():
 
 def test_correlation_returns_empty_for_no_holdings():
     portfolio = {"stocks": [], "watchlist": []}
-    with patch("routers.analytics.storage.get_full_portfolio", return_value=portfolio), \
+    with patch("routers.analytics.storage.get_holdings", return_value=portfolio["stocks"]), \
          patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analytics/correlation")
     assert resp.status_code == 200
@@ -91,7 +91,7 @@ def test_correlation_excludes_ticker_with_insufficient_data():
             return _make_hist(1)
         return bad_mock
 
-    with patch("routers.analytics.storage.get_full_portfolio", return_value=portfolio), \
+    with patch("routers.analytics.storage.get_holdings", return_value=portfolio["stocks"]), \
          patch("routers.analytics.yf.Ticker", side_effect=mock_ticker), \
          patch("routers.analytics.cache_svc.get_correlation", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analytics/correlation")

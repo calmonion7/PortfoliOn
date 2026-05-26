@@ -189,6 +189,11 @@ def get_full_portfolio(user_id: str) -> dict:
     return {"stocks": holdings, "watchlist": watchlist}
 
 
+def get_all_stocks(user_id: str) -> list[dict]:
+    portfolio = get_full_portfolio(user_id)
+    return portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+
+
 def enrich_stock(ticker: str, fields: dict) -> bool:
     db = get_db()
     upper = ticker.upper()

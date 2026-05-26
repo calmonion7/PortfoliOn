@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends
-from concurrent.futures import ThreadPoolExecutor
 import math
 
 import yfinance as yf
 import pandas as pd
 
 from services import storage, cache as cache_svc
+from services.market import _yf_sym
+from services.parallel import parallel_map
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
@@ -13,9 +14,7 @@ router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 def _fetch_closes(item: dict) -> tuple:
     ticker = item["ticker"].upper()
-    market = item.get("market", "US")
-    exchange = item.get("exchange", "")
-    sym = f"{ticker}.{exchange or 'KS'}" if market == "KR" else ticker
+    sym = _yf_sym(ticker, item.get("market", "US"), item.get("exchange", ""))
     try:
         closes = yf.Ticker(sym).history(period="90d")["Close"].dropna()
         if len(closes) < 20:
@@ -28,12 +27,11 @@ def _fetch_closes(item: dict) -> tuple:
 @router.get("/correlation")
 def get_correlation(user_id: str = Depends(get_current_user)):
     def _build() -> dict:
-        holdings = storage.get_full_portfolio(user_id).get("stocks", [])
+        holdings = storage.get_holdings(user_id)
         if len(holdings) < 2:
             return {"tickers": [], "matrix": []}
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            results = list(executor.map(_fetch_closes, holdings))
+        results = parallel_map(_fetch_closes, holdings, max_workers=10)
 
         closes_map = {t: s for t, s in results if t is not None}
         if len(closes_map) < 2:

@@ -1,7 +1,5 @@
 from __future__ import annotations
 import json
-import threading
-from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pathlib import Path
@@ -9,6 +7,8 @@ from services import storage, report_generator
 from services import consensus as consensus_svc
 from services import cache as cache_svc
 from services.utils import sanitize as _sanitize
+from services.progress import ProgressTracker
+from services.parallel import parallel_map
 from services.db import get_db
 from auth import get_current_user
 
@@ -17,25 +17,23 @@ router = APIRouter(prefix="/api", tags=["report"])
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
-_progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
-_progress_lock = threading.Lock()
-_backfill_progress: dict = {"running": False, "done": 0, "total": 0, "current": "", "created": 0}
+_progress = ProgressTracker()
+_backfill_progress = ProgressTracker(created=0)
 
 
 @router.get("/report/progress")
 def get_progress():
-    return _progress
+    return _progress.get()
 
 
 @router.get("/report/backfill/progress")
 def get_backfill_progress():
-    return _backfill_progress
+    return _backfill_progress.get()
 
 
 @router.post("/report/backfill", status_code=202)
 def backfill_all(background_tasks: BackgroundTasks, days: int = 60, user_id: str = Depends(get_current_user)):
-    portfolio = storage.get_full_portfolio(user_id)
-    stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+    stocks = storage.get_all_stocks(user_id)
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     background_tasks.add_task(_run_backfill, stocks, days)
@@ -43,25 +41,25 @@ def backfill_all(background_tasks: BackgroundTasks, days: int = 60, user_id: str
 
 
 def _run_backfill(stocks: list, days: int):
-    _backfill_progress.update({"running": True, "done": 0, "total": len(stocks), "current": "", "created": 0})
+    _backfill_progress.start(len(stocks))
+    _backfill_progress.set(created=0)
     total_created = 0
     for stock in stocks:
-        _backfill_progress["current"] = stock["ticker"]
+        _backfill_progress.set(current=stock["ticker"])
         try:
             n = report_generator.backfill_ticker(stock, days=days)
             total_created += n
             cache_svc.invalidate(stock["ticker"])
         except Exception as e:
             print(f"[Backfill] Failed for {stock['ticker']}: {e}")
-        _backfill_progress["done"] += 1
-        _backfill_progress["created"] = total_created
-    _backfill_progress.update({"running": False, "current": ""})
+        _backfill_progress.increment()
+        _backfill_progress.set(created=total_created)
+    _backfill_progress.finish()
 
 
 @router.post("/report/generate", status_code=202)
 def generate_all(background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
-    portfolio = storage.get_full_portfolio(user_id)
-    stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+    stocks = storage.get_all_stocks(user_id)
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     background_tasks.add_task(_run_generation, stocks)
@@ -70,15 +68,8 @@ def generate_all(background_tasks: BackgroundTasks, user_id: str = Depends(get_c
 
 @router.post("/report/generate/{ticker}", status_code=202)
 def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
-    portfolio = storage.get_full_portfolio(user_id)
-    stock = next(
-        (s for s in portfolio["stocks"] if s["ticker"].upper() == ticker.upper()), None
-    )
-    if not stock:
-        stock = next(
-            (s for s in portfolio.get("watchlist", [])
-             if s["ticker"].upper() == ticker.upper()), None
-        )
+    from services.utils import find_ticker
+    stock = find_ticker(storage.get_all_stocks(user_id), ticker)
     if not stock:
         raise HTTPException(status_code=404, detail=f"{ticker} not found in portfolio or watchlist")
     background_tasks.add_task(_run_generation, [stock])
@@ -86,11 +77,10 @@ def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = 
 
 
 def _run_generation(stocks: list):
-    _progress.update({"running": True, "done": 0, "total": len(stocks), "current": ""})
+    _progress.start(len(stocks))
 
     def _process_one(stock):
-        with _progress_lock:
-            _progress["current"] = stock["ticker"]
+        _progress.set(current=stock["ticker"])
         try:
             report_generator.generate_report(stock)
             cache_svc.invalidate(stock["ticker"])
@@ -98,13 +88,10 @@ def _run_generation(stocks: list):
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
         finally:
-            with _progress_lock:
-                _progress["done"] += 1
+            _progress.increment()
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        list(executor.map(_process_one, stocks))
-
-    _progress.update({"running": False, "current": ""})
+    parallel_map(_process_one, stocks, max_workers=5)
+    _progress.finish()
 
 
 def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
@@ -207,18 +194,17 @@ def get_report(ticker: str, date_str: str):
     return {"ticker": upper, "date": date_str, "summary": summary}
 
 
-_consensus_progress: dict = {"running": False, "done": 0, "total": 0, "current": ""}
+_consensus_progress = ProgressTracker()
 
 
 @router.get("/consensus/batch/progress")
 def get_consensus_batch_progress():
-    return _consensus_progress
+    return _consensus_progress.get()
 
 
 @router.post("/consensus/batch", status_code=202)
 def batch_consensus(background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
-    portfolio = storage.get_full_portfolio(user_id)
-    stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+    stocks = storage.get_all_stocks(user_id)
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     background_tasks.add_task(_run_consensus_batch, stocks)
@@ -226,14 +212,11 @@ def batch_consensus(background_tasks: BackgroundTasks, user_id: str = Depends(ge
 
 
 def _run_consensus_batch(stocks: list):
-    _consensus_progress["running"] = True
-    _consensus_progress["done"] = 0
-    _consensus_progress["total"] = len(stocks)
-    _consensus_progress["current"] = ""
+    _consensus_progress.start(len(stocks))
     for stock in stocks:
         ticker = stock["ticker"]
         market = stock.get("market", "US")
-        _consensus_progress["current"] = ticker
+        _consensus_progress.set(current=ticker)
         try:
             consensus_svc.collect(ticker)
         except Exception as e:
@@ -242,9 +225,8 @@ def _run_consensus_batch(stocks: list):
             consensus_svc.backfill(ticker, market)
         except Exception as e:
             print(f"[Consensus] backfill failed for {ticker}: {e}")
-        _consensus_progress["done"] += 1
-    _consensus_progress["running"] = False
-    _consensus_progress["current"] = ""
+        _consensus_progress.increment()
+    _consensus_progress.finish()
 
 
 @router.get("/consensus/{ticker}")

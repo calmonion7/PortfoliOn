@@ -1,8 +1,8 @@
-# backend/services/analysis_service.py
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from concurrent.futures import ThreadPoolExecutor
+from services.market import _yf_sym
+from services.parallel import parallel_map
 
 SECTOR_ETFS = [
     {"name": "Technology",             "etf": "XLK"},
@@ -48,8 +48,7 @@ def _fetch_etf(entry: dict) -> dict:
 
 
 def get_sector_momentum(holdings: list) -> dict:
-    with ThreadPoolExecutor(max_workers=11) as ex:
-        sectors = list(ex.map(_fetch_etf, SECTOR_ETFS))
+    sectors = parallel_map(_fetch_etf, SECTOR_ETFS, max_workers=11)
     portfolio_sectors = {
         h["ticker"].upper(): h.get("sector") or "기타"
         for h in holdings
@@ -59,10 +58,8 @@ def get_sector_momentum(holdings: list) -> dict:
 
 def _fetch_holding_closes(item: dict):
     ticker = item["ticker"].upper()
-    market = item.get("market", "US")
-    exchange = item.get("exchange", "")
     qty = item.get("quantity", 0)
-    sym = f"{ticker}.{exchange or 'KS'}" if market == "KR" else ticker
+    sym = _yf_sym(ticker, item.get("market", "US"), item.get("exchange", ""))
     try:
         closes = yf.Ticker(sym).history(period="90d")["Close"].dropna()
         if len(closes) < 20 or not qty:
@@ -73,8 +70,7 @@ def _fetch_holding_closes(item: dict):
 
 
 def get_macro_correlation(holdings: list) -> dict:
-    with ThreadPoolExecutor(max_workers=min(len(holdings), 10)) as ex:
-        results = list(ex.map(_fetch_holding_closes, holdings))
+    results = parallel_map(_fetch_holding_closes, holdings, max_workers=10)
     results = [r for r in results if r is not None]
 
     if not results:

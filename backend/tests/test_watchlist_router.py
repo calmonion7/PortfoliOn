@@ -154,4 +154,4 @@ def test_promote_invalidates_dashboard_cache():
          patch("routers.watchlist.calendar_router.clear_cache"):
         resp = client.post("/api/watchlist/NVDA/promote", json={"quantity": 10, "avg_cost": 500.0})
     assert resp.status_code == 200
-    mock_cache.invalidate_dashboard.assert_called_once()
+    mock_cache.invalidate_portfolio_caches.assert_called_once()

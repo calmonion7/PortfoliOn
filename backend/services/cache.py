@@ -102,3 +102,9 @@ def invalidate_sector(user_id: str = None) -> None:
 
 def invalidate_macro(user_id: str = None) -> None:
     _macro_cache.invalidate(user_id)
+
+
+def invalidate_portfolio_caches() -> None:
+    from routers import calendar as calendar_router
+    calendar_router.clear_cache()
+    invalidate_dashboard()

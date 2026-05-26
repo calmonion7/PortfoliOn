@@ -133,33 +133,41 @@ def test_get_m7_earnings_rest_excludes_m7():
     assert "V" in rest_tickers
 
 
-# ── _get_kospi200_tickers ─────────────────────────────────────────────────────
+# ── _get_kospi_tickers ────────────────────────────────────────────────────────
 
 def test_get_kospi200_tickers_parses_krx(tmp_path, monkeypatch):
-    from services.market_indicators_service import _get_kospi200_tickers
+    from services.market_indicators_service import _get_kospi_tickers
     monkeypatch.setattr(
-        "services.market_indicators_service._KOSPI200_CACHE",
-        str(tmp_path / "kospi200.json"),
+        "services.market_indicators_service._KOSPI_CACHE",
+        str(tmp_path / "kospi_tickers.json"),
     )
-    fake_response = {"output": [{"ISU_SRT_CD": "005930"}, {"ISU_SRT_CD": "000660"}]}
-    with patch("services.market_indicators_service.requests.post") as mock_post:
-        mock_post.return_value.json.return_value = fake_response
-        tickers = _get_kospi200_tickers()
+    # current impl: GET requests to naver with regex code=([0-9]{6})
+    call_count = [0]
+    def mock_get(url, **kwargs):
+        m = MagicMock()
+        if call_count[0] == 0:
+            m.content = b"code=005930 code=000660"
+        else:
+            m.content = b""  # no codes → stop pagination
+        call_count[0] += 1
+        return m
+    with patch("services.market_indicators_service.requests.get", side_effect=mock_get):
+        tickers = _get_kospi_tickers()
     assert "005930" in tickers
     assert "000660" in tickers
 
 
 def test_get_kospi200_tickers_uses_file_cache(tmp_path, monkeypatch):
-    from services.market_indicators_service import _get_kospi200_tickers
-    cache_file = tmp_path / "kospi200.json"
+    from services.market_indicators_service import _get_kospi_tickers
+    cache_file = tmp_path / "kospi_tickers.json"
     cache_file.write_text('["005930","000660","005380"]')
     import os as _os; _os.utime(cache_file, None)
     monkeypatch.setattr(
-        "services.market_indicators_service._KOSPI200_CACHE", str(cache_file)
+        "services.market_indicators_service._KOSPI_CACHE", str(cache_file)
     )
-    with patch("services.market_indicators_service.requests.post") as mock_post:
-        tickers = _get_kospi200_tickers()
-        assert not mock_post.called
+    with patch("services.market_indicators_service.requests.get") as mock_get:
+        tickers = _get_kospi_tickers()
+        assert not mock_get.called
     assert "005380" in tickers
 
 
@@ -193,7 +201,9 @@ def test_get_naver_quarterly_net_income_parses_row():
 def test_get_kr_top2_earnings_structure():
     from services.market_indicators_service import get_kr_top2_earnings, _cache
     _cache.clear()
-    with patch("services.market_indicators_service._get_kospi200_tickers",
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service._mc_save"), \
+         patch("services.market_indicators_service._get_kospi_tickers",
                return_value=["005930", "000660", "005380"]), \
          patch("services.market_indicators_service._get_naver_quarterly_net_income",
                return_value={"2025Q1": 100000.0, "2025Q2": 120000.0}):
@@ -212,7 +222,9 @@ def test_get_kr_top2_earnings_rest_excludes_top2():
         called.append(ticker)
         return {"2025Q1": 50000.0}
 
-    with patch("services.market_indicators_service._get_kospi200_tickers",
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service._mc_save"), \
+         patch("services.market_indicators_service._get_kospi_tickers",
                return_value=["005930", "000660", "005380"]), \
          patch("services.market_indicators_service._get_naver_quarterly_net_income",
                side_effect=capture):
@@ -227,19 +239,24 @@ def test_get_kr_top2_earnings_rest_excludes_top2():
 import json as _json
 
 def test_get_kr_exports_no_api_key_returns_error(tmp_path, monkeypatch):
-    from services.market_indicators_service import get_kr_exports
+    from services.market_indicators_service import get_kr_exports, _cache
+    _cache.clear()
     monkeypatch.setattr(
         "services.market_indicators_service._EXPORTS_CACHE",
         str(tmp_path / "kr_exports.json"),
     )
     monkeypatch.delenv("KITA_API_KEY", raising=False)
-    result = get_kr_exports()
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service._fetch_comtrade_exports",
+               side_effect=Exception("network error")):
+        result = get_kr_exports()
     assert result["months"] == []
     assert "error" in result
 
 
 def test_get_kr_exports_uses_file_cache(tmp_path, monkeypatch):
-    from services.market_indicators_service import get_kr_exports
+    from services.market_indicators_service import get_kr_exports, _cache
+    _cache.clear()
     cache_file = tmp_path / "kr_exports.json"
     cached_data = {"months": [{"month": "202501", "semiconductor": 100.0, "non_semiconductor": 200.0}]}
     cache_file.write_text(_json.dumps(cached_data))
@@ -255,23 +272,20 @@ def test_get_kr_exports_uses_file_cache(tmp_path, monkeypatch):
 
 
 def test_get_kr_exports_with_api_key(tmp_path, monkeypatch):
-    from services.market_indicators_service import get_kr_exports
+    from services.market_indicators_service import get_kr_exports, _cache
+    _cache.clear()
     monkeypatch.setattr(
         "services.market_indicators_service._EXPORTS_CACHE",
         str(tmp_path / "kr_exports.json"),
     )
     monkeypatch.setenv("KITA_API_KEY", "test-key-123")
-    fake_response = {
-        "items": {
-            "item": [
-                {"period": "202501", "itmNm": "반도체", "expAmt": "10000000000"},
-                {"period": "202501", "itmNm": "자동차", "expAmt": "5000000000"},
-                {"period": "202502", "itmNm": "반도체", "expAmt": "11000000000"},
-            ]
-        }
-    }
-    with patch("services.market_indicators_service.requests.get") as mock_get:
-        mock_get.return_value.json.return_value = fake_response
+    fake_data = {"months": [
+        {"month": "202501", "semiconductor": 50.0, "non_semiconductor": 100.0},
+        {"month": "202502", "semiconductor": 55.0, "non_semiconductor": 105.0},
+    ]}
+    with patch("services.market_indicators_service._mc_load", return_value=None), \
+         patch("services.market_indicators_service._mc_save"), \
+         patch("services.market_indicators_service._fetch_customs_exports", return_value=fake_data):
         result = get_kr_exports()
     months = {m["month"]: m for m in result["months"]}
     assert "202501" in months

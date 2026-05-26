@@ -1,9 +1,17 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from routers.stocks import router
 from auth import get_current_user
+
+
+def _make_mock_db(data=None):
+    m = MagicMock()
+    for method in ['table', 'select', 'eq', 'order', 'limit', 'in_', 'upsert', 'delete']:
+        getattr(m, method).return_value = m
+    m.execute.return_value.data = data if data is not None else []
+    return m
 
 app = FastAPI()
 app.include_router(router)
@@ -137,7 +145,8 @@ def test_dashboard_returns_cards_for_holdings():
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.stocks.market.get_quote", return_value=quote), \
          patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
-         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")):
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.get_db", return_value=_make_mock_db([])):
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
     data = resp.json()

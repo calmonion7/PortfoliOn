@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from typing import List
-from services import storage, cache as cache_svc
+from services import storage, errors, cache as cache_svc
+from services.utils import find_ticker_index, ticker_exists_in, find_ticker
 from routers import calendar as calendar_router
 from auth import get_current_user
 
@@ -39,10 +40,10 @@ def add_watchlist_stock(stock: WatchlistStock, user_id: str = Depends(get_curren
     watchlist = storage.get_watchlist_tickers(user_id)
     all_tickers = [h["ticker"].upper() for h in holdings] + [t.upper() for t in watchlist]
     if stock.ticker.upper() in all_tickers:
-        raise HTTPException(status_code=400, detail=f"{stock.ticker} already exists")
+        raise errors.already_exists(stock.ticker)
 
     stocks = storage.get_stocks(user_id)
-    if stock.ticker.upper() not in [s["ticker"].upper() for s in stocks]:
+    if not ticker_exists_in(stocks, stock.ticker):
         stocks.append({
             "ticker": stock.ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
@@ -63,10 +64,10 @@ def add_watchlist_stock(stock: WatchlistStock, user_id: str = Depends(get_curren
 def update_watchlist_stock(ticker: str, stock: WatchlistStock, user_id: str = Depends(get_current_user)):
     watchlist = storage.get_watchlist_tickers(user_id)
     if ticker.upper() not in [t.upper() for t in watchlist]:
-        raise HTTPException(status_code=404, detail=f"{ticker} not found in watchlist")
+        raise errors.not_found(ticker, "watchlist")
 
     stocks = storage.get_stocks(user_id)
-    idx = next((i for i, s in enumerate(stocks) if s["ticker"].upper() == ticker.upper()), None)
+    idx = find_ticker_index(stocks, ticker)
     if idx is not None:
         stocks[idx] = {
             "ticker": ticker.upper(), "name": stock.name,
@@ -85,14 +86,10 @@ def delete_watchlist_stock(ticker: str, user_id: str = Depends(get_current_user)
     upper = ticker.upper()
     watchlist = storage.get_watchlist_tickers(user_id)
     if upper not in [t.upper() for t in watchlist]:
-        raise HTTPException(status_code=404, detail=f"{ticker} not found in watchlist")
+        raise errors.not_found(ticker, "watchlist")
 
     storage.save_watchlist_tickers(user_id, [t for t in watchlist if t.upper() != upper])
     calendar_router.clear_cache()
-
-    holdings = storage.get_holdings(user_id)
-    if upper not in [h["ticker"].upper() for h in holdings]:
-        pass  # user_stocks row was deleted by save_watchlist_tickers
 
     return {"deleted": upper}
 
@@ -102,19 +99,17 @@ def promote_to_holdings(ticker: str, payload: PromotePayload, user_id: str = Dep
     upper = ticker.upper()
     watchlist = storage.get_watchlist_tickers(user_id)
     if upper not in [t.upper() for t in watchlist]:
-        raise HTTPException(status_code=404, detail=f"{ticker} not found in watchlist")
+        raise errors.not_found(ticker, "watchlist")
 
     holdings = storage.get_holdings(user_id)
-    if upper in [h["ticker"].upper() for h in holdings]:
-        raise HTTPException(status_code=400, detail=f"{ticker} already exists in holdings")
+    if ticker_exists_in(holdings, upper):
+        raise errors.already_exists(ticker, "holdings")
 
     storage.save_watchlist_tickers(user_id, [t for t in watchlist if t.upper() != upper])
 
     stocks = storage.get_stocks(user_id)
-    stock_data = next(
-        (s for s in stocks if s["ticker"].upper() == upper),
+    stock_data = find_ticker(stocks, upper) or \
         {"ticker": upper, "name": upper, "competitors": [], "moat": "", "growth_plan": "", "market": "US", "exchange": ""}
-    )
     new_holding = {
         "ticker": upper,
         "quantity": payload.quantity,
@@ -124,7 +119,6 @@ def promote_to_holdings(ticker: str, payload: PromotePayload, user_id: str = Dep
     }
     holdings.append(new_holding)
     storage.save_holdings(user_id, holdings)
-    calendar_router.clear_cache()
-    cache_svc.invalidate_dashboard()
+    cache_svc.invalidate_portfolio_caches()
 
     return {**stock_data, "quantity": payload.quantity, "avg_cost": payload.avg_cost}

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
-from services import storage
+from services import storage, errors
 from services import cache as cache_svc
-from routers import calendar as calendar_router
+from services.utils import find_ticker_index, ticker_exists_in
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
@@ -29,11 +29,11 @@ def get_portfolio(user_id: str = Depends(get_current_user)):
 @router.post("", status_code=201)
 def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
     holdings = storage.get_holdings(user_id)
-    if stock.ticker.upper() in [h["ticker"].upper() for h in holdings]:
-        raise HTTPException(status_code=400, detail=f"{stock.ticker} already exists")
+    if ticker_exists_in(holdings, stock.ticker):
+        raise errors.already_exists(stock.ticker)
 
     stocks = storage.get_stocks(user_id)
-    if stock.ticker.upper() not in [s["ticker"].upper() for s in stocks]:
+    if not ticker_exists_in(stocks, stock.ticker):
         stocks.append({
             "ticker": stock.ticker.upper(),
             "name": stock.name,
@@ -54,8 +54,7 @@ def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
     }
     holdings.append(new_holding)
     storage.save_holdings(user_id, holdings)
-    calendar_router.clear_cache()
-    cache_svc.invalidate_dashboard()
+    cache_svc.invalidate_portfolio_caches()
 
     return {**new_holding, "name": stock.name, "competitors": stock.competitors,
             "moat": stock.moat, "growth_plan": stock.growth_plan}
@@ -64,9 +63,9 @@ def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
 @router.put("/{ticker}")
 def update_stock(ticker: str, stock: Stock, user_id: str = Depends(get_current_user)):
     holdings = storage.get_holdings(user_id)
-    h_idx = next((i for i, h in enumerate(holdings) if h["ticker"].upper() == ticker.upper()), None)
+    h_idx = find_ticker_index(holdings, ticker)
     if h_idx is None:
-        raise HTTPException(status_code=404, detail=f"{ticker} not found")
+        raise errors.not_found(ticker)
 
     holdings[h_idx] = {
         "ticker": ticker.upper(),
@@ -78,7 +77,7 @@ def update_stock(ticker: str, stock: Stock, user_id: str = Depends(get_current_u
     storage.save_holdings(user_id, holdings)
 
     stocks = storage.get_stocks(user_id)
-    s_idx = next((i for i, s in enumerate(stocks) if s["ticker"].upper() == ticker.upper()), None)
+    s_idx = find_ticker_index(stocks, ticker)
     if s_idx is not None:
         stocks[s_idx] = {
             "ticker": ticker.upper(), "name": stock.name,
@@ -87,8 +86,7 @@ def update_stock(ticker: str, stock: Stock, user_id: str = Depends(get_current_u
         }
         storage.save_stocks(user_id, stocks)
 
-    calendar_router.clear_cache()
-    cache_svc.invalidate_dashboard()
+    cache_svc.invalidate_portfolio_caches()
     return {**holdings[h_idx], "name": stock.name, "competitors": stock.competitors,
             "moat": stock.moat, "growth_plan": stock.growth_plan}
 
@@ -101,8 +99,7 @@ def delete_stock(ticker: str, user_id: str = Depends(get_current_user)):
     if len(filtered) == len(holdings):
         raise HTTPException(status_code=404, detail=f"{ticker} not found")
     storage.save_holdings(user_id, filtered)
-    calendar_router.clear_cache()
-    cache_svc.invalidate_dashboard()
+    cache_svc.invalidate_portfolio_caches()
 
     watchlist = storage.get_watchlist_tickers(user_id)
     if upper not in [t.upper() for t in watchlist]:
