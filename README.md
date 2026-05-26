@@ -287,8 +287,9 @@ PortfoliOn/
 └── frontend/
     └── src/
         ├── pages/         # Portfolio, Research(허브), MarketHub(허브), AnalysisHub(허브),
-        │                  # Guru, Settings, Digest, Market, Analytics, Calendar
+        │                  # Guru, Settings, Digest, Market, Analytics, Calendar,
+        │                  # LoginPage, Showcase
         ├── components/    # StockModal, PromoteModal, reports/, market/
         ├── supabase.js    # Supabase 클라이언트 + 로그인
-        └── utils.js       # 공통 유틸리티 (TAB_STYLE, fmtPrice)
+        └── utils.js       # 공통 유틸리티 (fmtPrice)
 ```

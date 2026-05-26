@@ -108,7 +108,7 @@ cd backend && .venv/bin/python -m pytest
 
 **Frontend** — React 18 + Vite (port 5173), plain CSS (no TailwindCSS)
 
-- `frontend/src/pages/` — Portfolio, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule), ConsensusSettings; 허브 3종: Research (리포트·캘린더·다이제스트), MarketHub (시장지표·분석), AnalysisHub (섹터·매크로); 탭 컴포넌트: SectorTab, MacroTab; 개별 페이지(허브 내 탭용): Reports, Calendar, Digest, Market, Analytics
+- `frontend/src/pages/` — Portfolio, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule), ConsensusSettings, LoginPage, Showcase; 허브 3종: Research (리포트·캘린더·다이제스트), MarketHub (시장지표·분석), AnalysisHub (섹터·매크로); 탭 컴포넌트: SectorTab, MacroTab; 개별 페이지(허브 내 탭용): Reports, Calendar, Digest, Market, Analytics
 - `frontend/src/components/` — StockModal, PromoteModal, reports/ (ConsensusChart, DetailTab, FinancialsChart, HistoryTab, Sections), market/ (FxSection, VixSection, CommoditiesSection, TreasurySection, EconIndicatorsSection, M7EarningsSection, KrTop2Section, KrExportsSection, marketUtils.js)
 
 ## Deployment
