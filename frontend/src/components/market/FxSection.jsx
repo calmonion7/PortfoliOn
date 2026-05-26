@@ -6,7 +6,7 @@ import useIsMobile from '../../hooks/useIsMobile'
 
 export default function FxSection() {
   const isMobile = useIsMobile()
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
