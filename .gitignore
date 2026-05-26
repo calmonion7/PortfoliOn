@@ -48,3 +48,10 @@ frontend/node_modules/
 
 # Windows shortcuts
 *.lnk
+
+# macOS
+.DS_Store
+
+# Screenshots and local scripts
+screenshots/
+scripts/node_modules/
