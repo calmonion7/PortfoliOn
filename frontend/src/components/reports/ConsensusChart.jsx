@@ -59,42 +59,10 @@ export default function ConsensusChart({ ticker, market }) {
     return _weather(3)
   }, [ascData])
 
-  // 평균목표가: 연속 동일 구간은 첫 날짜만 유지 → 오른쪽 끝 = 현재값이 처음 시작된 날짜
-  const targetData = useMemo(() => {
-    if (ascData.length === 0) return []
-    const result = [ascData[0]]
-    for (let i = 1; i < ascData.length; i++) {
-      const curr = ascData[i], prev = result[result.length - 1]
-      if (curr.target_mean !== prev.target_mean) result.push(curr)
-    }
-    return result
+  const opinionAllSame = useMemo(() => {
+    if (ascData.length < 2) return true
+    return ascData.every(d => d.buy === ascData[0].buy && d.hold === ascData[0].hold && d.sell === ascData[0].sell)
   }, [ascData])
-
-  const opinionData = useMemo(() => {
-    if (ascData.length === 0) return []
-    const result = [ascData[0]]
-    for (let i = 1; i < ascData.length; i++) {
-      const curr = ascData[i], prev = result[result.length - 1]
-      if (curr.buy !== prev.buy || curr.hold !== prev.hold || curr.sell !== prev.sell)
-        result.push(curr)
-    }
-    return result
-  }, [ascData])
-
-  const overlayData = useMemo(() => {
-    if (ascData.length === 0) return []
-    const result = [ascData[0]]
-    for (let i = 1; i < ascData.length; i++) {
-      const curr = ascData[i], prev = result[result.length - 1]
-      if (
-        curr.target_mean !== prev.target_mean ||
-        curr.buy !== prev.buy || curr.hold !== prev.hold || curr.sell !== prev.sell
-      ) result.push(curr)
-    }
-    return result
-  }, [ascData])
-
-  const opinionAllSame = opinionData.length === 1
 
   const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
   const chartMargin = { top: 22, right: 16, left: 0, bottom: 0 }
@@ -102,13 +70,16 @@ export default function ConsensusChart({ ticker, market }) {
   const anchor = (index, total) =>
     index === 0 ? 'start' : index === total - 1 ? 'end' : 'middle'
 
+  // 값이 바뀐 지점에서만 도트+레이블 렌더링
   const targetDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = targetData.slice(0, index).reverse().find(d => d.target_mean != null)
-    const delta = prev != null ? value - prev.target_mean : null
-    const pct = delta != null ? (delta / prev.target_mean * 100) : null
-    const up = delta >= 0
+    const prevEntry = index > 0 ? ascData.slice(0, index).reverse().find(d => d.target_mean != null) : null
+    const prevValue = prevEntry?.target_mean ?? null
+    if (prevValue === value) return <g key={index} />
+    const delta = prevValue != null ? value - prevValue : null
+    const pct = delta != null ? (delta / Math.abs(prevValue) * 100) : null
+    const up = delta == null || delta >= 0
     const color = delta === null ? '#ffcc80' : up ? '#81c784' : '#ef9a9a'
     const label = delta != null
       ? `${fmt(value, market)} ${up ? '↑' : '↓'}${Math.abs(pct).toFixed(1)}%`
@@ -117,7 +88,7 @@ export default function ConsensusChart({ ticker, market }) {
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
         {label && (
-          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, targetData.length)} fontSize={8} fill={color}>{label}</text>
+          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, ascData.length)} fontSize={8} fill={color}>{label}</text>
         )}
       </g>
     )
@@ -137,10 +108,12 @@ export default function ConsensusChart({ ticker, market }) {
   const overlayTargetDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = overlayData.slice(0, index).reverse().find(d => d.target_mean != null)
-    const delta = prev != null ? value - prev.target_mean : null
-    const pct = delta != null ? (delta / prev.target_mean * 100) : null
-    const up = delta >= 0
+    const prevEntry = index > 0 ? ascData.slice(0, index).reverse().find(d => d.target_mean != null) : null
+    const prevValue = prevEntry?.target_mean ?? null
+    if (prevValue === value) return <g key={index} />
+    const delta = prevValue != null ? value - prevValue : null
+    const pct = delta != null ? (delta / Math.abs(prevValue) * 100) : null
+    const up = delta == null || delta >= 0
     const color = delta === null ? '#ffcc80' : up ? '#81c784' : '#ef9a9a'
     const label = delta != null
       ? `${fmt(value, market)} ${up ? '↑' : '↓'}${Math.abs(pct).toFixed(1)}%`
@@ -148,7 +121,7 @@ export default function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {bgLabel(cx, cy, label, color, anchor(index, overlayData.length), -10)}
+        {bgLabel(cx, cy, label, color, anchor(index, ascData.length), -10)}
       </g>
     )
   }
@@ -156,19 +129,21 @@ export default function ConsensusChart({ ticker, market }) {
   const overlayBuyDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = overlayData[index - 1]
-    const delta = prev != null ? value - prev.buy : null
+    const prev = index > 0 ? ascData[index - 1] : null
+    const prevVal = prev?.buy ?? null
+    if (prevVal === value) return <g key={index} />
+    const delta = prevVal != null ? value - prevVal : null
     const up = delta > 0
     const labelColor = delta == null || delta === 0 ? '#43a047' : up ? '#81c784' : '#ef9a9a'
     const label = delta == null
       ? String(value)
       : delta !== 0
-        ? `${value} ${up ? '↑' : '↓'}${Math.abs((delta / prev.buy) * 100).toFixed(0)}%`
+        ? `${value} ${up ? '↑' : '↓'}${Math.abs((delta / prevVal) * 100).toFixed(0)}%`
         : null
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#43a047" />
-        {label && bgLabel(cx, cy, label, labelColor, anchor(index, overlayData.length), 14)}
+        {label && bgLabel(cx, cy, label, labelColor, anchor(index, ascData.length), 14)}
       </g>
     )
   }
@@ -176,20 +151,22 @@ export default function ConsensusChart({ ticker, market }) {
   const makeDot = (color, dataKey) => (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = opinionData[index - 1]
-    const delta = prev != null ? value - prev[dataKey] : null
+    const prev = index > 0 ? ascData[index - 1] : null
+    const prevVal = prev?.[dataKey] ?? null
+    if (prevVal === value) return <g key={index} />
+    const delta = prevVal != null ? value - prevVal : null
     const up = delta > 0
     const labelColor = delta == null || delta === 0 ? color : up ? '#81c784' : '#ef9a9a'
     const label = delta == null
       ? String(value)
       : delta !== 0
-        ? `${value} ${up ? '↑' : '↓'}${Math.abs((delta / prev[dataKey]) * 100).toFixed(0)}%`
+        ? `${value} ${up ? '↑' : '↓'}${Math.abs((delta / prevVal) * 100).toFixed(0)}%`
         : null
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill={color} />
         {label && (
-          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, opinionData.length)} fontSize={8} fill={labelColor}>{label}</text>
+          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, ascData.length)} fontSize={8} fill={labelColor}>{label}</text>
         )}
       </g>
     )
@@ -201,8 +178,8 @@ export default function ConsensusChart({ ticker, market }) {
   const targetTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
     const value = payload[0].value
-    const idx = targetData.findIndex(d => d.date === label)
-    const prev = idx > 0 ? targetData.slice(0, idx).reverse().find(d => d.target_mean != null) : null
+    const idx = ascData.findIndex(d => d.date === label)
+    const prev = idx > 0 ? ascData.slice(0, idx).reverse().find(d => d.target_mean != null && d.target_mean !== value) : null
     const delta = prev != null && value != null ? value - prev.target_mean : null
     const pct = delta != null ? delta / prev.target_mean * 100 : null
     const dColor = delta == null ? '#ffcc80' : delta >= 0 ? '#81c784' : '#ef9a9a'
@@ -218,8 +195,8 @@ export default function ConsensusChart({ ticker, market }) {
   const opinionTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
     const total = payload.reduce((s, p) => s + (p.value ?? 0), 0)
-    const idx = opinionData.findIndex(d => d.date === label)
-    const prev = idx > 0 ? opinionData[idx - 1] : null
+    const idx = ascData.findIndex(d => d.date === label)
+    const prev = idx > 0 ? ascData[idx - 1] : null
     return (
       <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
@@ -292,7 +269,7 @@ export default function ConsensusChart({ ticker, market }) {
           </div>
           {tab === 0 && (
             <ResponsiveContainer width="100%" height={140}>
-              <LineChart data={targetData} margin={chartMargin}>
+              <LineChart data={ascData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
@@ -309,7 +286,7 @@ export default function ConsensusChart({ ticker, market }) {
                 )}
               </div>
               <ResponsiveContainer width="100%" height={140}>
-                <LineChart data={opinionData} margin={chartMargin}>
+                <LineChart data={ascData} margin={chartMargin}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                   <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                   <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
@@ -331,15 +308,15 @@ export default function ConsensusChart({ ticker, market }) {
           )}
           {tab === 2 && (
             <ResponsiveContainer width="100%" height={140}>
-              <LineChart data={overlayData} margin={chartMargin}>
+              <LineChart data={ascData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
                 <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
                 <Tooltip content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null
-                  const idx = overlayData.findIndex(d => d.date === label)
-                  const prev = idx > 0 ? overlayData[idx - 1] : null
+                  const idx = ascData.findIndex(d => d.date === label)
+                  const prev = idx > 0 ? ascData[idx - 1] : null
                   return (
                     <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
                       <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
