@@ -30,21 +30,13 @@ export default function Guru() {
     </>
   )
 
-  const tabStyle = (active) => ({
-    padding: '6px 14px', borderRadius: 16,
-    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-    background: active ? 'var(--accent)' : 'transparent',
-    color: active ? 'white' : 'var(--text-3)',
-    cursor: 'pointer', fontSize: 13,
-  })
-
   return (
     <div className="page">
       <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>구루 매니저</h3>
 
-      <div className="tab-scroll" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div className="tabs" style={{ marginBottom: 18 }}>
         {TABS.map(t => (
-          <button key={t.key} style={tabStyle(tab === t.key)} onClick={() => setTab(t.key)}>
+          <button key={t.key} className={tab === t.key ? 'is-active' : ''} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}

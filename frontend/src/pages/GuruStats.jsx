@@ -76,14 +76,6 @@ export default function GuruStats() {
     }
   }
 
-  const tabStyle = (active) => ({
-    padding: '6px 14px', borderRadius: 16,
-    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-    background: active ? 'var(--accent)' : 'transparent',
-    color: active ? 'white' : 'var(--text-3)',
-    cursor: 'pointer', fontSize: 13,
-  })
-
   const q = query.trim().toLowerCase()
 
   const filteredPopularity = q
@@ -108,9 +100,9 @@ export default function GuruStats() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div className="tabs" style={{ marginBottom: 14 }}>
         {TABS.map(t => (
-          <button key={t.key} style={tabStyle(tab === t.key)} onClick={() => setTab(t.key)}>
+          <button key={t.key} className={tab === t.key ? 'is-active' : ''} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}

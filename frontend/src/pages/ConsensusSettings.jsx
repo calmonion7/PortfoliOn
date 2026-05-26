@@ -26,35 +26,45 @@ export default function ConsensusSettings() {
     }
   }
 
+  const pct = batch.total > 0 ? Math.round(batch.done / batch.total * 100) : 0
+
   return (
-    <div style={{ maxWidth: 600 }}>
-      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '16px 20px', marginBottom: 16 }}>
-        <h2 style={{ color: 'var(--text)', marginBottom: 8, fontSize: 14 }}>컨센서스 수집/백필</h2>
-        <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>
-          전체 종목의 네이버 컨센서스 데이터를 수집하고 60일 백필을 실행합니다. 수 분 소요됩니다.
-        </p>
-        <button className="btn-primary" onClick={runBatch} disabled={batch.running}>
-          {batch.running
-            ? `${batch.current || '...'} (${batch.done}/${batch.total})`
-            : '지금 수집/백필'}
-        </button>
-        {batch.running && batch.total > 0 && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ background: 'var(--surface-hover)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
-              <div style={{
-                width: `${Math.round(batch.done / batch.total * 100)}%`,
-                height: '100%',
-                background: 'var(--accent)',
-                transition: 'width 0.4s ease',
-              }} />
-            </div>
-          </div>
-        )}
-        {!batch.running && batch.total > 0 && batch.done >= batch.total && (
-          <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>
-            완료: {batch.done}개 종목 수집됨
+    <div style={{ maxWidth: 480 }}>
+      <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0, paddingTop: 8 }}>컨센서스 수집/백필</div>
+      <div className="list-card" style={{ margin: '0 0 6px' }}>
+        <div style={{ padding: '14px 16px' }}>
+          <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 14px', lineHeight: 1.6 }}>
+            전체 종목의 네이버 컨센서스 데이터를 수집하고 60일 백필을 실행합니다. 수 분 소요됩니다.
           </p>
-        )}
+          <button className="btn btn-primary" onClick={runBatch} disabled={batch.running}
+            style={{ width: '100%', justifyContent: 'center' }}>
+            {batch.running
+              ? `${batch.current || '...'} (${batch.done}/${batch.total})`
+              : '지금 수집/백필'}
+          </button>
+          {batch.running && batch.total > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
+                <span>{batch.current || '준비 중...'}</span>
+                <span style={{ color: 'var(--text)', fontWeight: 600 }}>{batch.done} / {batch.total}</span>
+              </div>
+              <div style={{ background: 'var(--accent-soft)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
+                <div style={{
+                  width: `${pct}%`,
+                  height: '100%',
+                  background: 'var(--text)',
+                  borderRadius: 999,
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
+            </div>
+          )}
+          {!batch.running && batch.total > 0 && batch.done >= batch.total && (
+            <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>
+              완료: {batch.done}개 종목 수집됨
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
