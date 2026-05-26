@@ -90,6 +90,18 @@ export default function DashboardCard({ item }) {
             {item.vah != null ? fmtPrice(item.vah, item.market) : '—'}
           </span>
         </div>
+        <div className="dashcard__stat">
+          <span className="dashcard__stat-label">VAL</span>
+          <span className="dashcard__stat-value tnum">
+            {item.val != null ? fmtPrice(item.val, item.market) : '—'}
+          </span>
+        </div>
+        <div className="dashcard__stat dashcard__stat--full">
+          <span className="dashcard__stat-label">HVN</span>
+          <span className="dashcard__stat-value tnum">
+            {item.hvn?.length ? item.hvn.map(p => fmtPrice(p, item.market)).join(' · ') : '—'}
+          </span>
+        </div>
       </div>
     </Card>
   )
