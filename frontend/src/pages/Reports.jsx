@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../api'
-import { TAB_STYLE, fmtPrice as fmt } from '../utils'
+import { fmtPrice as fmt } from '../utils'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { TH, TD, fmtN, rsiColor, TargetTooltip, overallWeather } from '../components/reports/reportUtils.jsx'
 import ConsensusChart from '../components/reports/ConsensusChart'
@@ -242,17 +242,19 @@ const fetchList = useCallback(() => {
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
-          <button style={TAB_STYLE(activeTab === 'holdings')} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
-          <button style={TAB_STYLE(activeTab === 'watchlist')} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
+          <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
+          <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
         </div>
         {activeTab === 'watchlist' && (
           <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 8, marginTop: 4 }}>
             <button
-              style={{ ...TAB_STYLE(watchlistSub === 'low'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'low' ? '#81c784' : 'var(--text-3)', borderBottom: watchlistSub === 'low' ? '2px solid #81c784' : '2px solid transparent' }}
+              className="tab-btn sm"
+              style={{ color: watchlistSub === 'low' ? '#81c784' : 'var(--text-3)', borderBottomColor: watchlistSub === 'low' ? '#81c784' : 'transparent', fontWeight: watchlistSub === 'low' ? 600 : 400 }}
               onClick={() => setWatchlistSub('low')}
             >RSI≤45 ({watchlistLowCount})</button>
             <button
-              style={{ ...TAB_STYLE(watchlistSub === 'high'), fontSize: 11, padding: '4px 10px', color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottom: watchlistSub === 'high' ? '2px solid #ef9a9a' : '2px solid transparent' }}
+              className="tab-btn sm"
+              style={{ color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottomColor: watchlistSub === 'high' ? '#ef9a9a' : 'transparent', fontWeight: watchlistSub === 'high' ? 600 : 400 }}
               onClick={() => setWatchlistSub('high')}
             >RSI&gt;45 ({watchlistHighCount})</button>
           </div>
@@ -532,17 +534,8 @@ const fetchList = useCallback(() => {
                 <button
                   key={key}
                   onClick={() => setActiveDetailTab(key)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: activeDetailTab === key ? '2px solid var(--accent)' : '2px solid transparent',
-                    color: activeDetailTab === key ? 'var(--accent)' : 'var(--text-3)',
-                    padding: '6px 16px',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    marginBottom: -1,
-                    fontWeight: activeDetailTab === key ? 600 : 400,
-                  }}
+                  className={`tab-btn${activeDetailTab === key ? ' active' : ''}`}
+                  style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}
                 >
                   {label}
                 </button>

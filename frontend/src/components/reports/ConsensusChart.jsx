@@ -258,13 +258,7 @@ export default function ConsensusChart({ ticker, market }) {
         <>
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
             {['평균목표가', '애널리스트 의견', '추이 비교'].map((t, i) => (
-              <button key={i} onClick={() => setTab(i)} style={{
-                background: 'transparent', border: 'none',
-                borderBottom: tab === i ? '2px solid var(--accent)' : '2px solid transparent',
-                color: tab === i ? 'var(--accent)' : 'var(--text-3)',
-                fontWeight: tab === i ? 600 : 400,
-                fontSize: 11, padding: '4px 10px', cursor: 'pointer',
-              }}>{t}</button>
+              <button key={i} onClick={() => setTab(i)} className={`tab-btn sm${tab === i ? ' active' : ''}`}>{t}</button>
             ))}
           </div>
           {tab === 0 && (

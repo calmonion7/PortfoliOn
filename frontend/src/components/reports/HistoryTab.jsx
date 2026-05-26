@@ -54,14 +54,10 @@ export default function HistoryTab({ ticker, dates, market }) {
       <div>
         <div style={{ display: 'flex', gap: 0, marginBottom: 12 }}>
           {[{ key: 'target', label: '목표가' }, { key: 'rsi', label: 'RSI' }].map(({ key, label }) => (
-            <button key={key} onClick={() => setTrendTab(key)} style={{
-              background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12,
-              padding: '4px 14px',
-              borderBottom: trendTab === key ? '2px solid var(--accent)' : '2px solid transparent',
-              color: trendTab === key ? 'var(--accent)' : 'var(--text-3)',
-              fontWeight: trendTab === key ? 600 : 400,
-              marginBottom: -1,
-            }}>{label}</button>
+            <button key={key} onClick={() => setTrendTab(key)}
+              className={`tab-btn sm${trendTab === key ? ' active' : ''}`}
+              style={{ marginBottom: -1, padding: '4px 14px' }}
+            >{label}</button>
           ))}
         </div>
 
