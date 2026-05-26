@@ -306,9 +306,10 @@
 .digest-banner {
   background: var(--up-soft); color: var(--up);
   padding: 14px 18px; border-radius: var(--radius-lg);
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   border: 1px solid color-mix(in oklab, var(--up) 24%, transparent);
 }
+.digest-banner > span:first-child { flex-shrink: 0; }
 .digest-list { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 .digest-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; padding: 11px 18px; border-bottom: 1px solid var(--border); gap: 12px; }
 .digest-row:last-child { border-bottom: 0; }
