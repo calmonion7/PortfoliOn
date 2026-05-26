@@ -158,25 +158,63 @@ const fetchList = useCallback(() => {
   const renderTickerItem = (ticker, info) => {
     const isSelected = selected.ticker === ticker && view === 'detail'
     const hasReport = info.dates.length > 0
+    const s = info.summary
+    const market = s?.market || info.market
+    const rsi = s?.daily_rsi?.rsi
+    const targetGap = s?.target_mean && s?.price ? (s.target_mean - s.price) / s.price * 100 : null
+    const buy = s?.buy ?? 0, hold = s?.hold ?? 0, sell = s?.sell ?? 0
+    const total = buy + hold + sell
     return (
       <div
         key={ticker}
         onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
         className="report-item"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--surface-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--surface-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
             <span style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
-            {(() => { const w = overallWeather(info.summary); return w ? <span title={w.label} style={{ fontSize: 12, lineHeight: 1 }}>{w.icon}</span> : null })()}
+            {(() => { const w = overallWeather(s); return w ? <span title={w.label} style={{ fontSize: 12, lineHeight: 1 }}>{w.icon}</span> : null })()}
+            {market && (
+              <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 2, background: market === 'KR' ? '#1a3a2a' : 'var(--bg-elev-2)', color: market === 'KR' ? '#81c784' : '#4fc3f7', border: `1px solid ${market === 'KR' ? '#2e6b4a' : 'var(--border)'}` }}>
+                {market === 'KR' ? '🇰🇷 KR' : '🇺🇸 US'}
+              </span>
+            )}
           </span>
-          {info.summary?.name && (
-            <div style={{ color: 'var(--text-3)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.summary.name}</div>
+          {s?.name && (
+            <div style={{ color: 'var(--text-3)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
           )}
           {guruMap[ticker] && (
             <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
           )}
           {!hasReport && <div style={{ color: 'var(--text-3)', fontSize: 10 }}>클릭하여 생성</div>}
+          {hasReport && s && (
+            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
+              {s.price != null && (
+                <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmt(s.price, market)}</span>
+              )}
+              {s.drop_from_high_20d != null && (
+                <span style={{ fontSize: 11, color: s.drop_from_high_20d >= 0 ? '#81c784' : '#ef9a9a' }}>
+                  고점 {s.drop_from_high_20d >= 0 ? '+' : ''}{s.drop_from_high_20d.toFixed(1)}%
+                </span>
+              )}
+              {targetGap != null && (
+                <span style={{ fontSize: 11, color: targetGap >= 0 ? '#81c784' : '#ef9a9a' }}>
+                  목표 {targetGap >= 0 ? '+' : ''}{targetGap.toFixed(1)}%
+                </span>
+              )}
+              {rsi != null && (
+                <span style={{ fontSize: 11, color: rsiColor(rsi) }}>RSI {fmtN(rsi)}</span>
+              )}
+              {total > 0 && (
+                <span style={{ fontSize: 11 }}>
+                  <span style={{ color: '#81c784' }}>B{buy}</span>
+                  <span style={{ color: 'var(--text-3)' }}>/H{hold}</span>
+                  <span style={{ color: '#ef9a9a' }}>/S{sell}</span>
+                </span>
+              )}
+            </div>
+          )}
           {generating === ticker && genProgress.total > 0 && (
             <div style={{ marginTop: 3 }}>
               <div style={{ background: 'var(--surface-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
@@ -188,7 +226,7 @@ const fetchList = useCallback(() => {
         <button
           onClick={e => { e.stopPropagation(); generateOne(ticker) }}
           disabled={!!generating}
-          style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0 }}
+          style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0, marginTop: 2 }}
         >
           {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
         </button>
