@@ -38,7 +38,7 @@ export default function M7EarningsSection() {
       {isMobile ? (
         <button className="accordion-header" onClick={() => setOpen(o => !o)}>
           <span style={SECTION_HEADER_STYLE}>M7 vs 나머지 S&P 500 순이익</span>
-          <span>{open ? '▲' : '▼'}</span>
+          <span>{open ? '∧' : '∨'}</span>
         </button>
       ) : (
         <h3 style={SECTION_HEADER_STYLE}>M7 vs 나머지 S&P 500 순이익</h3>

@@ -51,7 +51,7 @@ export default function KrExportsSection() {
       {isMobile ? (
         <button className="accordion-header" onClick={() => setOpen(o => !o)}>
           <span style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</span>
-          <span>{open ? '▲' : '▼'}</span>
+          <span>{open ? '∧' : '∨'}</span>
         </button>
       ) : (
         <h3 style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</h3>

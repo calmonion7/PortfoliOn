@@ -31,7 +31,7 @@ export default function VixSection() {
       {isMobile ? (
         <button className="accordion-header" onClick={() => setOpen(o => !o)}>
           <span style={SECTION_HEADER_STYLE}>공포탐욕지수 (VIX)</span>
-          <span>{open ? '▲' : '▼'}</span>
+          <span>{open ? '∧' : '∨'}</span>
         </button>
       ) : (
         <h3 style={SECTION_HEADER_STYLE}>공포탐욕지수 (VIX)</h3>

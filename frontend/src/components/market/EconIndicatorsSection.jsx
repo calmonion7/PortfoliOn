@@ -42,7 +42,7 @@ export default function EconIndicatorsSection() {
       {isMobile ? (
         <button className="accordion-header" onClick={() => setOpen(o => !o)}>
           <span style={SECTION_HEADER_STYLE}>경제지표 (미국)</span>
-          <span>{open ? '▲' : '▼'}</span>
+          <span>{open ? '∧' : '∨'}</span>
         </button>
       ) : (
         <h3 style={SECTION_HEADER_STYLE}>경제지표 (미국)</h3>

@@ -41,7 +41,7 @@ export default function KrTop2Section() {
       {isMobile ? (
         <button className="accordion-header" onClick={() => setOpen(o => !o)}>
           <span style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</span>
-          <span>{open ? '▲' : '▼'}</span>
+          <span>{open ? '∧' : '∨'}</span>
         </button>
       ) : (
         <h3 style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</h3>

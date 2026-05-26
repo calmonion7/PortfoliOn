@@ -39,7 +39,7 @@ export default function SectorTab() {
       {isMobile ? (
         <button className="accordion-header" onClick={() => setOpen(o => !o)}>
           <span style={{ color: 'var(--text)', fontWeight: 600 }}>섹터 모멘텀</span>
-          <span>{open ? '▲' : '▼'}</span>
+          <span>{open ? '∧' : '∨'}</span>
         </button>
       ) : (
         <h2 style={{ color: 'var(--text)', marginBottom: 8 }}>섹터 모멘텀</h2>

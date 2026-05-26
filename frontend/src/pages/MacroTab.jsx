@@ -57,7 +57,7 @@ export default function MacroTab() {
       {isMobile ? (
         <button className="accordion-header" onClick={() => setOpen(o => !o)}>
           <span style={{ color: 'var(--text)', fontWeight: 600 }}>매크로 상관관계</span>
-          <span>{open ? '▲' : '▼'}</span>
+          <span>{open ? '∧' : '∨'}</span>
         </button>
       ) : (
         <h2 style={{ color: 'var(--text)', marginBottom: 8 }}>매크로 상관관계</h2>
