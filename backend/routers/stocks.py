@@ -196,12 +196,16 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
 
         rsi = None
         target_mean = buy = hold = sell = None
+        poc = vah = None
         if snapshot:
             rsi = (snapshot.get("daily_rsi") or {}).get("rsi")
             target_mean = snapshot.get("target_mean")
             buy = snapshot.get("buy")
             hold = snapshot.get("hold")
             sell = snapshot.get("sell")
+            vp = snapshot.get("volume_profile") or {}
+            poc = vp.get("poc")
+            vah = vp.get("vah")
 
         return {
             "ticker": ticker,
@@ -214,6 +218,8 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "weekly_change_pct": quote.get("weekly_change_pct"),
             "monthly_change_pct": quote.get("monthly_change_pct"),
             "rsi": rsi,
+            "poc": poc,
+            "vah": vah,
             "target_mean": target_mean,
             "buy": buy,
             "hold": hold,

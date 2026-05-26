@@ -78,6 +78,18 @@ export default function DashboardCard({ item }) {
             {consPct != null ? `${consPct >= 0 ? '+' : ''}${consPct.toFixed(0)}%` : '—'}
           </span>
         </div>
+        <div className="dashcard__stat">
+          <span className="dashcard__stat-label">POC</span>
+          <span className="dashcard__stat-value tnum">
+            {item.poc != null ? fmtPrice(item.poc, item.market) : '—'}
+          </span>
+        </div>
+        <div className="dashcard__stat">
+          <span className="dashcard__stat-label">VAH</span>
+          <span className="dashcard__stat-value tnum">
+            {item.vah != null ? fmtPrice(item.vah, item.market) : '—'}
+          </span>
+        </div>
       </div>
     </Card>
   )
