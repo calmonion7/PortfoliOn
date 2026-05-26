@@ -162,6 +162,7 @@ const fetchList = useCallback(() => {
       <div
         key={ticker}
         onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
+        className="report-item"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--surface-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -196,9 +197,9 @@ const fetchList = useCallback(() => {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 24, height: 'calc(100vh - 120px)' }}>
+    <div className="reports-layout" data-view={view}>
       {/* 좌측 사이드바 */}
-      <div style={{ width: 210, overflowY: 'auto', borderRight: '1px solid var(--border)', paddingRight: 16, flexShrink: 0 }}>
+      <div className="reports-sidebar">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
@@ -246,7 +247,7 @@ const fetchList = useCallback(() => {
       </div>
 
       {/* 우측 패널 */}
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: view === 'list' ? 'auto' : 'hidden' }}>
+      <div className="reports-main">
         {view === 'list' ? (
           /* 목록화면 */
           listLoading ? (
