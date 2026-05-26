@@ -7,6 +7,7 @@ import yfinance as yf
 
 from services import market as mkt, indicators, scraper
 from services.utils import sanitize as _sanitize
+from services.db import get_db
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 
@@ -121,8 +122,13 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         "news": news,
     }
 
+    sanitized = _sanitize(summary)
     json_path = output_dir / f"{today}.json"
-    json_path.write_text(json.dumps(_sanitize(summary), ensure_ascii=False, indent=2), encoding="utf-8")
+    json_path.write_text(json.dumps(sanitized, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        get_db().table("snapshots").upsert({"ticker": ticker, "date": today, "data": sanitized}).execute()
+    except Exception as e:
+        print(f"[Report] Supabase save failed for {ticker}: {e}")
     return str(json_path)
 
 
@@ -163,7 +169,11 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
     output_dir = output_base_dir / ticker
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    existing = {f.stem for f in output_dir.glob("*.json")}
+    try:
+        rows = get_db().table("snapshots").select("date").eq("ticker", ticker.upper()).execute().data
+        existing = {str(r["date"]) for r in rows}
+    except Exception:
+        existing = {f.stem for f in output_dir.glob("*.json")}
 
     try:
         t = yf.Ticker(yf_sym)
@@ -264,8 +274,13 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
             "news": [],
         }
 
+        sanitized = _sanitize(summary)
         out_path = output_dir / f"{date_str}.json"
-        out_path.write_text(json.dumps(_sanitize(summary), ensure_ascii=False, indent=2), encoding="utf-8")
+        out_path.write_text(json.dumps(sanitized, ensure_ascii=False, indent=2), encoding="utf-8")
+        try:
+            get_db().table("snapshots").upsert({"ticker": ticker, "date": date_str, "data": sanitized}).execute()
+        except Exception as e:
+            print(f"[Backfill] Supabase save failed for {ticker} {date_str}: {e}")
         created += 1
 
     return created
