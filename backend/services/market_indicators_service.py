@@ -134,6 +134,13 @@ def get_treasury() -> dict:
             [(k, sym, stored_raw.get(k, [])) for k, sym in _TREASURY_SYMBOLS.items()]
         ))
 
+    # fetch 실패 시 기존 stored 데이터로 폴백 (데이터 유실 방지)
+    for k, stored_h in stored_raw.items():
+        if results.get(k) is None and stored_h:
+            last = stored_h[-1]["value"]
+            prev = stored_h[-2]["value"] if len(stored_h) > 1 else last
+            results[k] = {"current": last, "change_bp": round((last - prev) * 100, 1), "history": stored_h}
+
     rates = {
         k: {"current": v["current"], "change_bp": v["change_bp"]}
         for k, v in results.items() if v
