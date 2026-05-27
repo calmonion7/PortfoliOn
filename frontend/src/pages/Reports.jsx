@@ -77,11 +77,18 @@ const fetchList = useCallback(() => {
           setGenProgress({ done: data.done, total: data.total })
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)
-            fetchList()
             setGenerating(null)
-            if (view === 'detail' && selected.ticker === ticker) {
-              setDetailRefreshKey(k => k + 1)
-            }
+            api.get('/api/report/list').then(({ data: list }) => {
+              setReportList(list)
+              if (view === 'detail' && selected.ticker === ticker) {
+                const dates = list[ticker]?.dates || []
+                if (dates.length > 0 && dates[0] !== selected.date) {
+                  setSelected(prev => ({ ...prev, date: dates[0] }))
+                } else {
+                  setDetailRefreshKey(k => k + 1)
+                }
+              }
+            })
           }
         } catch {}
       }, 1500)
