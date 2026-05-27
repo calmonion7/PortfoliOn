@@ -380,13 +380,13 @@ def get_analyst_data_kr(ticker: str) -> dict:
         return _empty
 
 
-def get_quote(ticker: str, market: str = "US", exchange: str = "") -> dict:
+def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
     if market == "KR":
         return get_quote_kr(ticker, exchange)
 
     yf_sym = _yf_sym(ticker, market, exchange)
     try:
-        t = yf.Ticker(yf_sym)
+        t = _t if _t is not None else yf.Ticker(yf_sym)
         info = t.info
         hist = t.history(period="1y")
         current = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
@@ -496,13 +496,13 @@ def get_financials(ticker: str, market: str = "US", exchange: str = "") -> list[
         return []
 
 
-def get_analyst_data(ticker: str, market: str = "US", exchange: str = "") -> dict:
+def get_analyst_data(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
     if market == "KR":
         return get_analyst_data_kr(ticker)
 
     yf_sym = _yf_sym(ticker, market, exchange)
     try:
-        t = yf.Ticker(yf_sym)
+        t = _t if _t is not None else yf.Ticker(yf_sym)
         targets = t.analyst_price_targets or {}
         recs = t.recommendations_summary
         buy = hold = sell = 0

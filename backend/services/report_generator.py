@@ -23,15 +23,22 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
 
     competitors = stock.get("competitors", [])
 
+    # US 티커는 단일 yf.Ticker 객체 공유 — 동일 티커에 대한 동시 요청 방지
+    _t = yf.Ticker(yf_sym) if market != "KR" else None
+    if _t is not None:
+        try:
+            _ = _t.info  # info 사전 캐싱 (이후 호출은 캐시 반환)
+        except Exception:
+            pass
+
     with ThreadPoolExecutor(max_workers=8) as ex:
-        f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange)
+        f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange, _t)
         f_fin       = ex.submit(mkt.get_financials, ticker, market, exchange)
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
-        f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange)
+        f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
         f_rsi       = ex.submit(indicators.get_timeframe_rsi, yf_sym)
-        _ticker_obj = yf.Ticker(yf_sym)
-        f_history   = ex.submit(_ticker_obj.history, period="1y")
-        f_info      = ex.submit(lambda: _ticker_obj.info) if market != "KR" else None
+        f_history   = ex.submit(_t.history, period="1y") if _t is not None else ex.submit(mkt.get_quote, ticker, market, exchange)
+        f_info      = ex.submit(lambda: _t.info) if _t is not None else None
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
         f_comps     = [ex.submit(mkt.get_quote, c, market, exchange) for c in competitors]
