@@ -10,6 +10,7 @@ export default function ConsensusChart({ ticker, market }) {
   const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState(0)
+  const [period, setPeriod] = useState('1Y')
 
   const fetchData = useCallback(() => {
     if (!ticker) return
@@ -48,6 +49,15 @@ export default function ConsensusChart({ ticker, market }) {
 
   const ascData = useMemo(() => [...data].reverse(), [data])
 
+  const filteredData = useMemo(() => {
+    if (period === 'ALL') return ascData
+    const days = period === '3M' ? 90 : period === '6M' ? 180 : 365
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - days)
+    const cutStr = cutoff.toISOString().slice(0, 10)
+    return ascData.filter(d => d.date >= cutStr)
+  }, [ascData, period])
+
   const trendWeather = useMemo(() => {
     const pts = ascData.filter(d => d.target_mean != null)
     if (pts.length < 2) return null
@@ -74,7 +84,7 @@ export default function ConsensusChart({ ticker, market }) {
   const targetDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prevEntry = index > 0 ? ascData.slice(0, index).reverse().find(d => d.target_mean != null) : null
+    const prevEntry = index > 0 ? filteredData.slice(0, index).reverse().find(d => d.target_mean != null) : null
     const prevValue = prevEntry?.target_mean ?? null
     if (prevValue === value) return <g key={index} />
     const delta = prevValue != null ? value - prevValue : null
@@ -88,7 +98,7 @@ export default function ConsensusChart({ ticker, market }) {
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
         {label && (
-          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, ascData.length)} fontSize={8} fill={color}>{label}</text>
+          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, filteredData.length)} fontSize={8} fill={color}>{label}</text>
         )}
       </g>
     )
@@ -108,7 +118,7 @@ export default function ConsensusChart({ ticker, market }) {
   const overlayTargetDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prevEntry = index > 0 ? ascData.slice(0, index).reverse().find(d => d.target_mean != null) : null
+    const prevEntry = index > 0 ? filteredData.slice(0, index).reverse().find(d => d.target_mean != null) : null
     const prevValue = prevEntry?.target_mean ?? null
     if (prevValue === value) return <g key={index} />
     const delta = prevValue != null ? value - prevValue : null
@@ -121,7 +131,7 @@ export default function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {bgLabel(cx, cy, label, color, anchor(index, ascData.length), -10)}
+        {bgLabel(cx, cy, label, color, anchor(index, filteredData.length), -10)}
       </g>
     )
   }
@@ -129,7 +139,7 @@ export default function ConsensusChart({ ticker, market }) {
   const overlayBuyDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = index > 0 ? ascData[index - 1] : null
+    const prev = index > 0 ? filteredData[index - 1] : null
     const prevVal = prev?.buy ?? null
     if (prevVal === value) return <g key={index} />
     const delta = prevVal != null ? value - prevVal : null
@@ -143,7 +153,7 @@ export default function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#43a047" />
-        {label && bgLabel(cx, cy, label, labelColor, anchor(index, ascData.length), 14)}
+        {label && bgLabel(cx, cy, label, labelColor, anchor(index, filteredData.length), 14)}
       </g>
     )
   }
@@ -151,7 +161,7 @@ export default function ConsensusChart({ ticker, market }) {
   const makeDot = (color, dataKey) => (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
-    const prev = index > 0 ? ascData[index - 1] : null
+    const prev = index > 0 ? filteredData[index - 1] : null
     const prevVal = prev?.[dataKey] ?? null
     if (prevVal === value) return <g key={index} />
     const delta = prevVal != null ? value - prevVal : null
@@ -166,7 +176,7 @@ export default function ConsensusChart({ ticker, market }) {
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill={color} />
         {label && (
-          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, ascData.length)} fontSize={8} fill={labelColor}>{label}</text>
+          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, filteredData.length)} fontSize={8} fill={labelColor}>{label}</text>
         )}
       </g>
     )
@@ -178,8 +188,8 @@ export default function ConsensusChart({ ticker, market }) {
   const targetTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
     const value = payload[0].value
-    const idx = ascData.findIndex(d => d.date === label)
-    const prev = idx > 0 ? ascData.slice(0, idx).reverse().find(d => d.target_mean != null && d.target_mean !== value) : null
+    const idx = filteredData.findIndex(d => d.date === label)
+    const prev = idx > 0 ? filteredData.slice(0, idx).reverse().find(d => d.target_mean != null && d.target_mean !== value) : null
     const delta = prev != null && value != null ? value - prev.target_mean : null
     const pct = delta != null ? delta / prev.target_mean * 100 : null
     const dColor = delta == null ? '#ffcc80' : delta >= 0 ? '#81c784' : '#ef9a9a'
@@ -195,8 +205,8 @@ export default function ConsensusChart({ ticker, market }) {
   const opinionTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
     const total = payload.reduce((s, p) => s + (p.value ?? 0), 0)
-    const idx = ascData.findIndex(d => d.date === label)
-    const prev = idx > 0 ? ascData[idx - 1] : null
+    const idx = filteredData.findIndex(d => d.date === label)
+    const prev = idx > 0 ? filteredData[idx - 1] : null
     return (
       <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
@@ -256,14 +266,27 @@ export default function ConsensusChart({ ticker, market }) {
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
-            {['평균목표가', '애널리스트 의견', '추이 비교'].map((t, i) => (
-              <button key={i} onClick={() => setTab(i)} className={`tab-btn sm${tab === i ? ' active' : ''}`}>{t}</button>
-            ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 0 }}>
+              {['평균목표가', '애널리스트 의견', '추이 비교'].map((t, i) => (
+                <button key={i} onClick={() => setTab(i)} className={`tab-btn sm${tab === i ? ' active' : ''}`}>{t}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 2, paddingBottom: 2 }}>
+              {['3M', '6M', '1Y', 'ALL'].map(p => (
+                <button key={p} onClick={() => setPeriod(p)} style={{
+                  background: period === p ? 'var(--accent)' : 'transparent',
+                  border: '1px solid var(--border)',
+                  color: period === p ? 'var(--bg)' : 'var(--text-3)',
+                  borderRadius: 3, padding: '1px 6px', fontSize: 10,
+                  cursor: 'pointer',
+                }}>{p}</button>
+              ))}
+            </div>
           </div>
           {tab === 0 && (
             <ResponsiveContainer width="100%" height={140}>
-              <LineChart data={ascData} margin={chartMargin}>
+              <LineChart data={filteredData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
@@ -280,7 +303,7 @@ export default function ConsensusChart({ ticker, market }) {
                 )}
               </div>
               <ResponsiveContainer width="100%" height={140}>
-                <LineChart data={ascData} margin={chartMargin}>
+                <LineChart data={filteredData} margin={chartMargin}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                   <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                   <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
@@ -302,15 +325,15 @@ export default function ConsensusChart({ ticker, market }) {
           )}
           {tab === 2 && (
             <ResponsiveContainer width="100%" height={140}>
-              <LineChart data={ascData} margin={chartMargin}>
+              <LineChart data={filteredData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
                 <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
                 <Tooltip content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null
-                  const idx = ascData.findIndex(d => d.date === label)
-                  const prev = idx > 0 ? ascData[idx - 1] : null
+                  const idx = filteredData.findIndex(d => d.date === label)
+                  const prev = idx > 0 ? filteredData[idx - 1] : null
                   return (
                     <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
                       <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
