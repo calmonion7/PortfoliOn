@@ -6,7 +6,7 @@ import useIsMobile from '../hooks/useIsMobile'
 
 export default function Research() {
   const isMobile = useIsMobile()
-  const [tab, setTab] = useState('digest')
+  const [tab, setTab] = useState('reports')
 
   if (isMobile) return (
     <>
@@ -15,8 +15,8 @@ export default function Research() {
       </header>
       <div className="seg-pad">
         <div className="seg">
-          <button className={tab === 'digest' ? 'is-active' : ''} onClick={() => setTab('digest')}>다이제스트</button>
           <button className={tab === 'reports' ? 'is-active' : ''} onClick={() => setTab('reports')}>리포트</button>
+          <button className={tab === 'digest' ? 'is-active' : ''} onClick={() => setTab('digest')}>다이제스트</button>
           <button className={tab === 'calendar' ? 'is-active' : ''} onClick={() => setTab('calendar')}>캘린더</button>
         </div>
       </div>
