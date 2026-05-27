@@ -302,6 +302,7 @@ def refresh_analyst(ticker: str):
     if not patched:
         raise HTTPException(status_code=502, detail="데이터를 가져올 수 없습니다")
     db.table("snapshots").update({"data": summary}).eq("ticker", upper).eq("date", snap_date).execute()
+    cache_svc.invalidate(upper)
     return patched
 
 
