@@ -34,7 +34,7 @@ def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
 
     stocks = storage.get_stocks(user_id)
     if not ticker_exists_in(stocks, stock.ticker):
-        stocks.append({
+        storage.save_stocks(user_id, [{
             "ticker": stock.ticker.upper(),
             "name": stock.name,
             "competitors": stock.competitors,
@@ -42,8 +42,7 @@ def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
             "growth_plan": stock.growth_plan,
             "market": stock.market,
             "exchange": stock.exchange,
-        })
-        storage.save_stocks(user_id, stocks)
+        }])
 
     new_holding = {
         "ticker": stock.ticker.upper(),
@@ -77,14 +76,12 @@ def update_stock(ticker: str, stock: Stock, user_id: str = Depends(get_current_u
     storage.save_holdings(user_id, holdings)
 
     stocks = storage.get_stocks(user_id)
-    s_idx = find_ticker_index(stocks, ticker)
-    if s_idx is not None:
-        stocks[s_idx] = {
+    if ticker_exists_in(stocks, ticker):
+        storage.save_stocks(user_id, [{
             "ticker": ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
             "market": stock.market, "exchange": stock.exchange,
-        }
-        storage.save_stocks(user_id, stocks)
+        }])
 
     cache_svc.invalidate_portfolio_caches()
     return {**holdings[h_idx], "name": stock.name, "competitors": stock.competitors,

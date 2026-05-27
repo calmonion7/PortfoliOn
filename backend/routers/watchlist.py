@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from typing import List
 from services import storage, errors, cache as cache_svc
-from services.utils import find_ticker_index, ticker_exists_in, find_ticker
+from services.utils import ticker_exists_in, find_ticker
 from routers import calendar as calendar_router
 from auth import get_current_user
 
@@ -44,12 +44,11 @@ def add_watchlist_stock(stock: WatchlistStock, user_id: str = Depends(get_curren
 
     stocks = storage.get_stocks(user_id)
     if not ticker_exists_in(stocks, stock.ticker):
-        stocks.append({
+        storage.save_stocks(user_id, [{
             "ticker": stock.ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
             "market": stock.market, "exchange": stock.exchange,
-        })
-        storage.save_stocks(user_id, stocks)
+        }])
 
     watchlist.append(stock.ticker.upper())
     storage.save_watchlist_tickers(user_id, watchlist)
@@ -67,14 +66,12 @@ def update_watchlist_stock(ticker: str, stock: WatchlistStock, user_id: str = De
         raise errors.not_found(ticker, "watchlist")
 
     stocks = storage.get_stocks(user_id)
-    idx = find_ticker_index(stocks, ticker)
-    if idx is not None:
-        stocks[idx] = {
+    if ticker_exists_in(stocks, ticker):
+        storage.save_stocks(user_id, [{
             "ticker": ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
             "market": stock.market, "exchange": stock.exchange,
-        }
-        storage.save_stocks(user_id, stocks)
+        }])
 
     return {"ticker": ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
