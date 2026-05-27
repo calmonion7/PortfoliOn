@@ -94,8 +94,9 @@ const fetchList = useCallback(() => {
 
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
   const watchlistAll = Object.entries(reportList).filter(([, v]) => v.category === 'watchlist')
-  const watchlistLowCount = watchlistAll.filter(([, v]) => (v.summary?.daily_rsi?.rsi ?? 999) <= 45).length
-  const watchlistHighCount = watchlistAll.filter(([, v]) => (v.summary?.daily_rsi?.rsi ?? -1) > 45).length
+  const _targetPct = (s) => { const t = s?.target_mean, p = s?.price; return (t != null && p) ? (t - p) / p * 100 : null }
+  const watchlistLowCount = watchlistAll.filter(([, v]) => { const g = _targetPct(v.summary); return g === null || g >= 20 }).length
+  const watchlistHighCount = watchlistAll.filter(([, v]) => { const g = _targetPct(v.summary); return g !== null && g < 20 }).length
   const watchlistCount = watchlistAll.length
 
   const currentTabBaseEntries = Object.entries(reportList).filter(([, v]) =>
@@ -110,8 +111,8 @@ const fetchList = useCallback(() => {
       if (activeTab === 'holdings') return v.category === 'holdings'
       if (activeTab === 'watchlist') {
         if (v.category !== 'watchlist') return false
-        const rsi = v.summary?.daily_rsi?.rsi ?? null
-        return watchlistSub === 'low' ? (rsi === null || rsi <= 45) : (rsi !== null && rsi > 45)
+        const g = _targetPct(v.summary)
+        return watchlistSub === 'low' ? (g === null || g >= 20) : (g !== null && g < 20)
       }
       return false
     })
@@ -254,12 +255,12 @@ const fetchList = useCallback(() => {
               className="tab-btn sm"
               style={{ color: watchlistSub === 'low' ? '#81c784' : 'var(--text-3)', borderBottomColor: watchlistSub === 'low' ? '#81c784' : 'transparent', fontWeight: watchlistSub === 'low' ? 600 : 400 }}
               onClick={() => setWatchlistSub('low')}
-            >RSI≤45 ({watchlistLowCount})</button>
+            >목표≥20% ({watchlistLowCount})</button>
             <button
               className="tab-btn sm"
               style={{ color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottomColor: watchlistSub === 'high' ? '#ef9a9a' : 'transparent', fontWeight: watchlistSub === 'high' ? 600 : 400 }}
               onClick={() => setWatchlistSub('high')}
-            >RSI&gt;45 ({watchlistHighCount})</button>
+            >목표&lt;20% ({watchlistHighCount})</button>
           </div>
         )}
         <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
