@@ -102,29 +102,25 @@ const fetchList = useCallback(() => {
     if (s.drop_from_high_20d != null && s.drop_from_high_20d < -10) return true
     return false
   }
-  const watchlistLowCount = watchlistAll.filter(([, v]) => { const g = _targetPct(v.summary); return g === null || g >= 40 }).length
-  const watchlistHighCount = watchlistAll.filter(([, v]) => { const g = _targetPct(v.summary); return g !== null && g < 40 }).length
   const watchlistWarnCount = watchlistAll.filter(([, v]) => _hasWarning(v.summary)).length
+  const watchlistLowCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g === null || g >= 40 }).length
+  const watchlistHighCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g !== null && g < 40 }).length
   const watchlistCount = watchlistAll.length
 
-  const currentTabBaseEntries = Object.entries(reportList).filter(([, v]) =>
-    activeTab === 'holdings' ? v.category === 'holdings' : v.category === 'watchlist'
-  )
-  const mCountKR = currentTabBaseEntries.filter(([, v]) => (v.summary?.market || v.market) === 'KR').length
-  const mCountUS = currentTabBaseEntries.filter(([, v]) => (v.summary?.market || v.market) === 'US').length
-  const mCountAll = currentTabBaseEntries.length
+  const _matchSubTab = ([, v]) => {
+    if (activeTab === 'holdings') return v.category === 'holdings'
+    if (v.category !== 'watchlist') return false
+    if (watchlistSub === 'warn') return _hasWarning(v.summary)
+    const g = _targetPct(v.summary)
+    if (watchlistSub === 'low') return !_hasWarning(v.summary) && (g === null || g >= 40)
+    return !_hasWarning(v.summary) && (g !== null && g < 40)
+  }
+  const subTabEntries = Object.entries(reportList).filter(_matchSubTab)
+  const mCountAll = subTabEntries.length
+  const mCountKR = subTabEntries.filter(([, v]) => (v.summary?.market || v.market) === 'KR').length
+  const mCountUS = subTabEntries.filter(([, v]) => (v.summary?.market || v.market) === 'US').length
 
-  const tabEntries = Object.entries(reportList)
-    .filter(([, v]) => {
-      if (activeTab === 'holdings') return v.category === 'holdings'
-      if (activeTab === 'watchlist') {
-        if (v.category !== 'watchlist') return false
-        if (watchlistSub === 'warn') return _hasWarning(v.summary)
-        const g = _targetPct(v.summary)
-        return watchlistSub === 'low' ? (g === null || g >= 40) : (g !== null && g < 40)
-      }
-      return false
-    })
+  const tabEntries = subTabEntries
     .filter(([, v]) => {
       if (marketFilter === 'ALL') return true
       const m = v.summary?.market || v.market
