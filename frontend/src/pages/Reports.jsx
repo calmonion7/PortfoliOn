@@ -89,8 +89,6 @@ const fetchList = useCallback(() => {
                 } else {
                   setDetailRefreshKey(k => k + 1)
                 }
-              } else {
-                openDetail(ticker, newDate)
               }
             })
           }
