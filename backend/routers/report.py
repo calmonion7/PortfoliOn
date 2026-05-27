@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pathlib import Path
 from services import storage, report_generator
+from services import market as market_svc
 from services import consensus as consensus_svc
 from services import cache as cache_svc
 from services.utils import sanitize as _sanitize
@@ -258,6 +259,28 @@ def collect_consensus(ticker: str):
     if entry is None:
         raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
     return entry
+
+
+@router.post("/report/{ticker}/refresh-analyst")
+def refresh_analyst(ticker: str):
+    upper = ticker.upper()
+    db = get_db()
+    rows = db.table("snapshots").select("date, data").eq("ticker", upper).order("date", desc=True).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="리포트를 먼저 생성하세요")
+    row = rows[0]
+    snap_date = row["date"]
+    summary = row["data"] or {}
+    market = summary.get("market", "US")
+    exchange = summary.get("exchange")
+    analyst = market_svc.get_analyst_data(upper, market, exchange)
+    if all(analyst.get(k) in (None, 0) for k in ("target_mean", "target_high", "target_low", "buy", "hold", "sell")):
+        raise HTTPException(status_code=502, detail="애널리스트 데이터를 가져올 수 없습니다")
+    for k in ("target_mean", "target_high", "target_low", "buy", "hold", "sell"):
+        if analyst.get(k) is not None:
+            summary[k] = analyst[k]
+    db.table("snapshots").update({"data": summary}).eq("ticker", upper).eq("date", snap_date).execute()
+    return {k: analyst[k] for k in ("target_mean", "target_high", "target_low", "buy", "hold", "sell")}
 
 
 @router.post("/consensus/{ticker}/backfill")
