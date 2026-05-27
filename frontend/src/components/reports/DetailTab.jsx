@@ -160,7 +160,7 @@ export default function DetailSummaryTab({ summary, ticker }) {
 
   const analystData = analystOverride ?? summary
   const { buy = 0, hold = 0, sell = 0 } = analystData
-  const needsRefresh = summary.target_high == null && summary.target_low == null && buy + hold + sell === 0
+  const needsRefresh = summary.price == null || (summary.target_high == null && summary.target_low == null && buy + hold + sell === 0)
 
   const handleRefresh = async () => {
     setRefreshing(true)

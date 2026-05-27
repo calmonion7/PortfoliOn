@@ -263,6 +263,7 @@ def collect_consensus(ticker: str):
 
 @router.post("/report/{ticker}/refresh-analyst")
 def refresh_analyst(ticker: str):
+    import yfinance as yf
     upper = ticker.upper()
     db = get_db()
     rows = db.table("snapshots").select("date, data").eq("ticker", upper).order("date", desc=True).limit(1).execute().data
@@ -273,14 +274,35 @@ def refresh_analyst(ticker: str):
     summary = row["data"] or {}
     market = summary.get("market", "US")
     exchange = summary.get("exchange")
+
     analyst = market_svc.get_analyst_data(upper, market, exchange)
-    if all(analyst.get(k) in (None, 0) for k in ("target_mean", "target_high", "target_low", "buy", "hold", "sell")):
-        raise HTTPException(status_code=502, detail="애널리스트 데이터를 가져올 수 없습니다")
+    quote = market_svc.get_quote(upper, market, exchange or "")
+    price = quote.get("price") or None
+
+    patched: dict = {}
     for k in ("target_mean", "target_high", "target_low", "buy", "hold", "sell"):
         if analyst.get(k) is not None:
             summary[k] = analyst[k]
+            patched[k] = analyst[k]
+    if price:
+        summary["price"] = price
+        patched["price"] = price
+        try:
+            from services import market as _mkt
+            yf_sym = _mkt._yf_sym(upper, market, exchange or "")
+            hist = yf.Ticker(yf_sym).history(period="1mo")
+            if not hist.empty:
+                high_20d = round(float(hist["High"].tail(20).max()), 2)
+                drop = round((price - high_20d) / high_20d * 100, 2)
+                summary["drop_from_high_20d"] = drop
+                patched["drop_from_high_20d"] = drop
+        except Exception:
+            pass
+
+    if not patched:
+        raise HTTPException(status_code=502, detail="데이터를 가져올 수 없습니다")
     db.table("snapshots").update({"data": summary}).eq("ticker", upper).eq("date", snap_date).execute()
-    return {k: analyst[k] for k in ("target_mean", "target_high", "target_low", "buy", "hold", "sell")}
+    return patched
 
 
 @router.post("/consensus/{ticker}/backfill")
