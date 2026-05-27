@@ -151,15 +151,13 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
   )
 }
 
-export default function DetailSummaryTab({ summary, ticker }) {
-  const [analystOverride, setAnalystOverride] = useState(null)
+export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState(null)
 
   if (!summary) return null
 
-  const analystData = analystOverride ?? summary
-  const { buy = 0, hold = 0, sell = 0 } = analystData
+  const { buy = 0, hold = 0, sell = 0 } = summary
   const needsRefresh = summary.price == null || (summary.target_high == null && summary.target_low == null && buy + hold + sell === 0)
 
   const handleRefresh = async () => {
@@ -167,7 +165,7 @@ export default function DetailSummaryTab({ summary, ticker }) {
     setRefreshError(null)
     try {
       const { data } = await api.post(`/api/report/${ticker}/refresh-analyst`)
-      setAnalystOverride({ ...summary, ...data })
+      onRefreshSuccess?.(data)
     } catch (e) {
       setRefreshError(e.response?.data?.detail || '갱신 실패')
     } finally {
@@ -176,14 +174,13 @@ export default function DetailSummaryTab({ summary, ticker }) {
   }
   const total = buy + hold + sell
   const pct = (n) => total > 0 ? `${Math.round(n / total * 100)}%` : '—'
-  const displayTarget = analystData.target_mean
-  const gap = displayTarget != null && summary.price != null
-    ? ((displayTarget - summary.price) / summary.price * 100)
+  const gap = summary.target_mean != null && summary.price != null
+    ? ((summary.target_mean - summary.price) / summary.price * 100)
     : null
 
   const consensusWeather = (() => {
-    if (!summary.price || !displayTarget) return null
-    const gap = (displayTarget - summary.price) / summary.price * 100
+    if (!summary.price || !summary.target_mean) return null
+    const gap = (summary.target_mean - summary.price) / summary.price * 100
     const buyPct = total > 0 ? buy / total * 100 : 50
     if (gap >= 15 && buyPct >= 60) return _weather(0)
     if (gap >= 5 && buyPct >= 45) return _weather(1)
@@ -221,7 +218,7 @@ export default function DetailSummaryTab({ summary, ticker }) {
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-3)', fontSize: 9 }}>🎯 평균목표가</span>
-            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{fmt(displayTarget, summary.market)}</span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{fmt(summary.target_mean, summary.market)}</span>
           </div>
           {/* 상승여력 */}
           {gap != null && (
@@ -236,11 +233,11 @@ export default function DetailSummaryTab({ summary, ticker }) {
           {/* 최고/최저 목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-3)', fontSize: 9 }}>최고목표가</span>
-            <span style={{ color: '#81c784', fontSize: 12, fontWeight: 600 }}>{fmt(analystData.target_high, summary.market)}</span>
+            <span style={{ color: '#81c784', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high, summary.market)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-3)', fontSize: 9 }}>최저목표가</span>
-            <span style={{ color: '#ef9a9a', fontSize: 12, fontWeight: 600 }}>{fmt(analystData.target_low, summary.market)}</span>
+            <span style={{ color: '#ef9a9a', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low, summary.market)}</span>
           </div>
           {summary.finviz_recom != null && (
             <>

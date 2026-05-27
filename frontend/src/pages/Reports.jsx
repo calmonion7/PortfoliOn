@@ -558,7 +558,14 @@ const fetchList = useCallback(() => {
             {loading && <LoadingSpinner />}
             {!loading && activeDetailTab === 'summary' && (
               detail.summary
-                ? <DetailSummaryTab summary={detail.summary} ticker={selected.ticker} />
+                ? <DetailSummaryTab
+                    summary={detail.summary}
+                    ticker={selected.ticker}
+                    onRefreshSuccess={(patched) => {
+                      setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
+                      fetchList()
+                    }}
+                  />
                 : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>요약 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'technical' && (
