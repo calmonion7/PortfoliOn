@@ -21,7 +21,7 @@ export function ReportSectionCompetitors({ competitors, market }) {
   }
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>1️⃣ 사업영역 & 시장순위</div>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🏢 사업영역 & 시장순위</div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
@@ -53,7 +53,7 @@ export function ReportSectionCompetitors({ competitors, market }) {
 export function ReportSectionNews({ disclosures, news }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>5️⃣ 최근 공시 & 뉴스</div>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>📰 최근 공시 & 뉴스</div>
       {disclosures && (
         <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, margin: '0 0 10px' }}>{disclosures}</p>
       )}

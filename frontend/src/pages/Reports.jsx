@@ -602,9 +602,9 @@ const fetchList = useCallback(() => {
                       competitors={detail.summary.competitors_data}
                       market={detail.summary.market}
                     />
-                    <ReportSectionText title="2️⃣ 리스크" text={detail.summary.risks} />
-                    <ReportSectionText title="3️⃣ 경제적 해자" text={detail.summary.moat} />
-                    <ReportSectionText title="4️⃣ 장기 성장 계획" text={detail.summary.growth_plan} />
+                    <ReportSectionText title="⚠️ 리스크" text={detail.summary.risks} />
+                    <ReportSectionText title="🏰 경제적 해자" text={detail.summary.moat} />
+                    <ReportSectionText title="🌱 장기 성장 계획" text={detail.summary.growth_plan} />
                     <ReportSectionNews
                       disclosures={detail.summary.recent_disclosures}
                       news={detail.summary.news}
