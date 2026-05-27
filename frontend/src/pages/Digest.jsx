@@ -81,6 +81,9 @@ export default function Digest() {
                 <div>
                   <span className="tick">{s.ticker}</span>
                   {!s.is_holding && <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>관심</span>}
+                  {s.name && s.name !== s.ticker && (
+                    <div className="muted" style={{ fontSize: 11, marginTop: 1 }}>{s.name}</div>
+                  )}
                 </div>
                 <Spark data={sparkFor(s.ticker, 30, s.change_pct >= 0 ? 0.3 : -0.3)} w={60} h={20}
                   color={s.change_pct >= 0 ? 'var(--up)' : 'var(--down)'} />
