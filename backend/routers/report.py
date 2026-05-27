@@ -17,6 +17,24 @@ router = APIRouter(prefix="/api", tags=["report"])
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
+_RSI_KEYS = ("rsi", "target_20", "target_25", "target_30", "target_70", "target_75", "target_80")
+_SLIM_KEYS = (
+    "name", "market", "price", "sector", "industry",
+    "drop_from_high_20d", "target_mean", "target_high", "target_low",
+    "buy", "hold", "sell", "per", "forward_per", "pbr", "finviz_recom",
+)
+
+
+def _slim_summary(data: dict) -> dict:
+    """list_reports용 — financials/news/competitors_data 등 무거운 필드 제외."""
+    s = {k: data.get(k) for k in _SLIM_KEYS}
+    for rsi_field in ("daily_rsi", "weekly_rsi", "monthly_rsi"):
+        rsi = data.get(rsi_field) or {}
+        s[rsi_field] = {k: rsi[k] for k in _RSI_KEYS if k in rsi} if rsi else None
+    vp = data.get("volume_profile") or {}
+    s["volume_profile"] = {"poc": vp["poc"]} if vp.get("poc") is not None else None
+    return _sanitize(s)
+
 _progress = ProgressTracker()
 _backfill_progress = ProgressTracker(created=0)
 
@@ -137,7 +155,7 @@ def list_reports(user_id: str = Depends(get_current_user)):
                 t = r["ticker"].upper()
                 if t in ticker_dates and t not in ticker_summary \
                         and r["date"] == ticker_dates[t][0] and r.get("data"):
-                    ticker_summary[t] = _sanitize(r["data"])
+                    ticker_summary[t] = _slim_summary(r["data"])
 
         result = {}
         for ticker, dates in ticker_dates.items():
