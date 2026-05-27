@@ -211,6 +211,9 @@ const fetchList = useCallback(() => {
                   <span style={{ color: '#81c784' }}>B{buy}</span>
                   <span style={{ color: 'var(--text-3)' }}>/H{hold}</span>
                   <span style={{ color: '#ef9a9a' }}>/S{sell}</span>
+                  {total <= 10 && (
+                    <span title={`애널리스트 ${total}명 — 의견 수가 적어 신뢰도가 낮을 수 있습니다`} style={{ color: '#ffb74d', marginLeft: 3, cursor: 'help' }}>⚠{total}</span>
+                  )}
                 </span>
               )}
             </div>
