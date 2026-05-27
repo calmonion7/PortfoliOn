@@ -81,6 +81,7 @@ def generate_all(background_tasks: BackgroundTasks, user_id: str = Depends(get_c
     stocks = storage.get_all_stocks(user_id)
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
+    _progress.start(len(stocks))
     background_tasks.add_task(_run_generation, stocks)
     return {"message": f"Generating reports for {len(stocks)} stock(s)"}
 
@@ -91,6 +92,7 @@ def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = 
     stock = find_ticker(storage.get_all_stocks(user_id), ticker)
     if not stock:
         raise HTTPException(status_code=404, detail=f"{ticker} not found in portfolio or watchlist")
+    _progress.start(1)
     background_tasks.add_task(_run_generation, [stock])
     return {"message": f"Generating report for {ticker.upper()}"}
 
