@@ -80,13 +80,17 @@ const fetchList = useCallback(() => {
             setGenerating(null)
             api.get('/api/report/list').then(({ data: list }) => {
               setReportList(list)
+              const dates = list[ticker]?.dates || []
+              const newDate = dates[0]
+              if (!newDate) return
               if (view === 'detail' && selected.ticker === ticker) {
-                const dates = list[ticker]?.dates || []
-                if (dates.length > 0 && dates[0] !== selected.date) {
-                  setSelected(prev => ({ ...prev, date: dates[0] }))
+                if (newDate !== selected.date) {
+                  setSelected(prev => ({ ...prev, date: newDate }))
                 } else {
                   setDetailRefreshKey(k => k + 1)
                 }
+              } else {
+                openDetail(ticker, newDate)
               }
             })
           }
