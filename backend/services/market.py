@@ -389,19 +389,19 @@ def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None) -> d
         t = _t if _t is not None else yf.Ticker(yf_sym)
         info = t.info
         hist = t.history(period="1y")
-        current = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
+        current = info.get("currentPrice") or info.get("regularMarketPrice") or None
         prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else None
         week_ago = float(hist["Close"].iloc[-6]) if len(hist) >= 6 else None
         month_ago = float(hist["Close"].iloc[-23]) if len(hist) >= 23 else None
         ytd_start = float(hist["Close"].iloc[0]) if not hist.empty else None
-        daily_change_pct = round((current - prev_close) / prev_close * 100, 2) if prev_close else None
-        weekly_change_pct = round((current - week_ago) / week_ago * 100, 2) if week_ago else None
-        monthly_change_pct = round((current - month_ago) / month_ago * 100, 2) if month_ago else None
-        ytd_return = ((current - ytd_start) / ytd_start * 100) if ytd_start else None
+        daily_change_pct = round((current - prev_close) / prev_close * 100, 2) if current and prev_close else None
+        weekly_change_pct = round((current - week_ago) / week_ago * 100, 2) if current and week_ago else None
+        monthly_change_pct = round((current - month_ago) / month_ago * 100, 2) if current and month_ago else None
+        ytd_return = ((current - ytd_start) / ytd_start * 100) if current and ytd_start else None
         return {
             "ticker": ticker,
             "name": info.get("shortName", ticker),
-            "price": float(current),
+            "price": float(current) if current else None,
             "prev_close": round(prev_close, 2) if prev_close else None,
             "daily_change": f"{daily_change_pct:+.2f}%" if daily_change_pct is not None else "N/A",
             "daily_change_pct": daily_change_pct,
