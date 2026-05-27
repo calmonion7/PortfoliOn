@@ -35,12 +35,9 @@ export default function Portfolio() {
 
   const fetchAll = useCallback(async () => {
     setListLoading(true)
-    const [portfolioRes, watchlistRes] = await Promise.all([
-      api.get('/api/portfolio'),
-      api.get('/api/watchlist'),
-    ])
-    setStocks(portfolioRes.data.stocks || [])
-    setWatchlist(watchlistRes.data || [])
+    const { data } = await api.get('/api/portfolio')
+    setStocks(data.stocks || [])
+    setWatchlist(data.watchlist || [])
     setListLoading(false)
     setHasFetched(true)
   }, [])
