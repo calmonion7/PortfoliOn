@@ -95,8 +95,16 @@ const fetchList = useCallback(() => {
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
   const watchlistAll = Object.entries(reportList).filter(([, v]) => v.category === 'watchlist')
   const _targetPct = (s) => { const t = s?.target_mean, p = s?.price; return (t != null && p) ? (t - p) / p * 100 : null }
+  const _hasWarning = (s) => {
+    if (!s) return false
+    const total = (s.buy ?? 0) + (s.hold ?? 0) + (s.sell ?? 0)
+    if (total > 0 && total <= 10) return true
+    if (s.drop_from_high_20d != null && s.drop_from_high_20d < -10) return true
+    return false
+  }
   const watchlistLowCount = watchlistAll.filter(([, v]) => { const g = _targetPct(v.summary); return g === null || g >= 40 }).length
   const watchlistHighCount = watchlistAll.filter(([, v]) => { const g = _targetPct(v.summary); return g !== null && g < 40 }).length
+  const watchlistWarnCount = watchlistAll.filter(([, v]) => _hasWarning(v.summary)).length
   const watchlistCount = watchlistAll.length
 
   const currentTabBaseEntries = Object.entries(reportList).filter(([, v]) =>
@@ -111,6 +119,7 @@ const fetchList = useCallback(() => {
       if (activeTab === 'holdings') return v.category === 'holdings'
       if (activeTab === 'watchlist') {
         if (v.category !== 'watchlist') return false
+        if (watchlistSub === 'warn') return _hasWarning(v.summary)
         const g = _targetPct(v.summary)
         return watchlistSub === 'low' ? (g === null || g >= 40) : (g !== null && g < 40)
       }
@@ -261,6 +270,11 @@ const fetchList = useCallback(() => {
               style={{ color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottomColor: watchlistSub === 'high' ? '#ef9a9a' : 'transparent', fontWeight: watchlistSub === 'high' ? 600 : 400 }}
               onClick={() => setWatchlistSub('high')}
             >목표&lt;40% ({watchlistHighCount})</button>
+            <button
+              className="tab-btn sm"
+              style={{ color: watchlistSub === 'warn' ? '#ffb74d' : 'var(--text-3)', borderBottomColor: watchlistSub === 'warn' ? '#ffb74d' : 'transparent', fontWeight: watchlistSub === 'warn' ? 600 : 400 }}
+              onClick={() => setWatchlistSub('warn')}
+            >⚠ 경고 ({watchlistWarnCount})</button>
           </div>
         )}
         <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
