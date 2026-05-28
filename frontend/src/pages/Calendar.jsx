@@ -5,15 +5,30 @@ import LoadingSpinner from '../components/LoadingSpinner'
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
 const EVENT_STYLE = {
-  holding_earnings:  { background: 'var(--cal-earn-hold-bg)', color: 'var(--cal-earn-hold-color)', border: '1px solid var(--cal-earn-hold-border)' },
-  holding_dividend:  { background: 'var(--cal-div-hold-bg)',  color: 'var(--cal-div-hold-color)',  border: '1px solid var(--cal-div-hold-border)' },
-  watchlist_earnings: { background: 'transparent', color: 'var(--cal-earn-wl-color)', border: '1px dashed var(--cal-earn-wl-border)' },
-  watchlist_dividend: { background: 'transparent', color: 'var(--cal-div-wl-color)',  border: '1px dashed var(--cal-div-wl-border)' },
-  holiday_us: { background: 'var(--cal-hol-us-bg)', color: 'var(--cal-hol-us-color)', border: '1px solid var(--cal-hol-us-border)' },
-  holiday_kr: { background: 'var(--cal-hol-kr-bg)', color: 'var(--cal-hol-kr-color)', border: '1px solid var(--cal-hol-kr-border)' },
+  holding_earnings:   { background: 'var(--cal-earn-hold-bg)',  color: 'var(--cal-earn-hold-color)',  border: '1px solid var(--cal-earn-hold-border)' },
+  holding_dividend:   { background: 'var(--cal-div-hold-bg)',   color: 'var(--cal-div-hold-color)',   border: '1px solid var(--cal-div-hold-border)' },
+  watchlist_earnings: { background: 'transparent',              color: 'var(--cal-earn-wl-color)',    border: '1px dashed var(--cal-earn-wl-border)' },
+  watchlist_dividend: { background: 'transparent',              color: 'var(--cal-div-wl-color)',     border: '1px dashed var(--cal-div-wl-border)' },
+  holiday_us:         { background: 'var(--cal-hol-us-bg)',     color: 'var(--cal-hol-us-color)',     border: '1px solid var(--cal-hol-us-border)' },
+  holiday_kr:         { background: 'var(--cal-hol-kr-bg)',     color: 'var(--cal-hol-kr-color)',     border: '1px solid var(--cal-hol-kr-border)' },
+}
+
+const DOT_COLOR = {
+  holding_earnings:   'var(--cal-earn-hold-border)',
+  holding_dividend:   'var(--cal-div-hold-border)',
+  watchlist_earnings: 'var(--cal-earn-wl-border)',
+  watchlist_dividend: 'var(--cal-div-wl-border)',
+  holiday_us:         'var(--cal-hol-us-border)',
+  holiday_kr:         'var(--cal-hol-kr-border)',
+}
+
+function eventKey(e) {
+  return e.type === 'holiday_us' || e.type === 'holiday_kr' ? e.type : `${e.stock_type}_${e.type}`
 }
 
 function MonthGrid({ year, month, events }) {
+  const [selectedDate, setSelectedDate] = useState(null)
+
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
@@ -31,55 +46,107 @@ function MonthGrid({ year, month, events }) {
     byDate[e.date].push(e)
   }
 
+  const selectedEvents = selectedDate ? (byDate[selectedDate] || []) : []
+
+  const fmtDate = (dateStr) => {
+    if (!dateStr) return ''
+    const [, m, d] = dateStr.split('-')
+    const dow = DAY_LABELS[new Date(dateStr).getDay()]
+    return `${parseInt(m)}월 ${parseInt(d)}일 (${dow})`
+  }
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--border)' }}>
-      {DAY_LABELS.map(d => (
-        <div key={d} style={{ background: 'var(--bg-elev-2)', padding: '6px', textAlign: 'center', fontSize: 11, color: 'var(--text-3)' }}>
-          {d}
-        </div>
-      ))}
-      {cells.map((day, i) => {
-        const dateStr = day
-          ? `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-          : null
-        const dayEvents = dateStr ? (byDate[dateStr] || []) : []
-        const isToday = dateStr === todayStr
-        return (
-          <div key={i} style={{ background: day ? 'var(--bg-elev)' : 'var(--bg)', aspectRatio: '1 / 1', padding: 4, overflow: 'hidden', outline: isToday ? '2px solid var(--accent)' : 'none', outlineOffset: -2 }}>
-            {day && (
-              <div style={{ fontSize: 11, marginBottom: 4, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent)' : 'var(--text-3)' }}>{day}</div>
-            )}
-            {dayEvents.map((e, j) => {
-              const styleKey = e.type === 'holiday_us' || e.type === 'holiday_kr'
-                ? e.type
-                : `${e.stock_type}_${e.type}`
-              const s = EVENT_STYLE[styleKey] || EVENT_STYLE.holding_earnings
-              return (
-                <div
-                  key={j}
-                  title={e.name ? `${e.name} (${e.ticker})` : e.ticker}
-                  style={{
-                    fontSize: 10,
-                    padding: '1px 4px',
-                    borderRadius: 3,
-                    marginBottom: 2,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    cursor: 'default',
-                    ...s,
-                  }}
-                >
-                  {e.type === 'holiday_us' || e.type === 'holiday_kr'
-                    ? e.name
-                    : `${e.ticker} ${e.type === 'earnings' ? '실적' : '배당락'}`}
-                </div>
-              )
-            })}
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--border)' }}>
+        {DAY_LABELS.map(d => (
+          <div key={d} style={{ background: 'var(--bg-elev-2)', padding: '6px', textAlign: 'center', fontSize: 11, color: 'var(--text-3)' }}>
+            {d}
           </div>
-        )
-      })}
-    </div>
+        ))}
+        {cells.map((day, i) => {
+          const dateStr = day
+            ? `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+            : null
+          const dayEvents = dateStr ? (byDate[dateStr] || []) : []
+          const isToday = dateStr === todayStr
+          const isSelected = dateStr === selectedDate
+          return (
+            <div
+              key={i}
+              onClick={() => {
+                if (!day || dayEvents.length === 0) return
+                setSelectedDate(isSelected ? null : dateStr)
+              }}
+              style={{
+                background: day ? 'var(--bg-elev)' : 'var(--bg)',
+                aspectRatio: '1 / 1',
+                padding: 4,
+                overflow: 'hidden',
+                cursor: day && dayEvents.length > 0 ? 'pointer' : 'default',
+                outline: isToday ? '2px solid var(--accent)' : isSelected ? '2px solid var(--text)' : 'none',
+                outlineOffset: -2,
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              {day && (
+                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent)' : 'var(--text-3)' }}>
+                  {day}
+                </div>
+              )}
+              {dayEvents.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 'auto' }}>
+                  {dayEvents.slice(0, 5).map((e, j) => (
+                    <span key={j} style={{
+                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                      background: DOT_COLOR[eventKey(e)] || 'var(--text-3)',
+                    }} />
+                  ))}
+                  {dayEvents.length > 5 && (
+                    <span style={{ fontSize: 8, color: 'var(--text-3)', lineHeight: '6px' }}>+{dayEvents.length - 5}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {selectedDate && selectedEvents.length > 0 && (
+        <div style={{
+          marginTop: 8,
+          background: 'var(--bg-elev)', border: '1px solid var(--border)',
+          borderRadius: 12, overflow: 'hidden',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate(selectedDate)}</span>
+            <button onClick={() => setSelectedDate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>×</button>
+          </div>
+          {selectedEvents.map((e, i) => {
+            const key = eventKey(e)
+            const s = EVENT_STYLE[key] || EVENT_STYLE.holding_earnings
+            const isHoliday = e.type === 'holiday_us' || e.type === 'holiday_kr'
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 14px',
+                borderBottom: i < selectedEvents.length - 1 ? '1px solid var(--border)' : 'none',
+              }}>
+                <span style={{ ...s, padding: '2px 8px', borderRadius: 4, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {isHoliday ? (e.type === 'holiday_us' ? 'NYSE 휴장' : 'KRX 휴장') : e.type === 'earnings' ? '실적' : '배당락'}
+                </span>
+                {!isHoliday && e.ticker && (
+                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{e.ticker}</span>
+                )}
+                <span style={{ fontSize: 12, color: 'var(--text-3)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {e.name || ''}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -132,23 +199,15 @@ export default function Calendar() {
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={refresh}
-            disabled={loading}
-            title="캐시 삭제 후 새로고침"
-            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: loading ? 'default' : 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 13 }}
-          >↺</button>
-          <button
-            onClick={prevMonth}
-            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '2px 10px', borderRadius: 4, fontSize: 16 }}
-          >‹</button>
+          <button onClick={refresh} disabled={loading} title="캐시 삭제 후 새로고침"
+            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: loading ? 'default' : 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 13 }}>↺</button>
+          <button onClick={prevMonth}
+            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '2px 10px', borderRadius: 4, fontSize: 16 }}>‹</button>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', minWidth: 90, textAlign: 'center' }}>
             {year}년 {month}월
           </span>
-          <button
-            onClick={nextMonth}
-            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '2px 10px', borderRadius: 4, fontSize: 16 }}
-          >›</button>
+          <button onClick={nextMonth}
+            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '2px 10px', borderRadius: 4, fontSize: 16 }}>›</button>
         </div>
       </div>
 
@@ -160,12 +219,12 @@ export default function Calendar() {
       }
 
       <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-3)', flexWrap: 'wrap' }}>
-        <span style={{ ...EVENT_STYLE.holding_earnings, padding: '1px 6px', borderRadius: 3 }}>보유 실적</span>
-        <span style={{ ...EVENT_STYLE.holding_dividend, padding: '1px 6px', borderRadius: 3 }}>보유 배당락</span>
+        <span style={{ ...EVENT_STYLE.holding_earnings,   padding: '1px 6px', borderRadius: 3 }}>보유 실적</span>
+        <span style={{ ...EVENT_STYLE.holding_dividend,   padding: '1px 6px', borderRadius: 3 }}>보유 배당락</span>
         <span style={{ ...EVENT_STYLE.watchlist_earnings, padding: '1px 6px', borderRadius: 3 }}>관심 실적</span>
         <span style={{ ...EVENT_STYLE.watchlist_dividend, padding: '1px 6px', borderRadius: 3 }}>관심 배당락</span>
-        <span style={{ ...EVENT_STYLE.holiday_us, padding: '1px 6px', borderRadius: 3 }}>NYSE 휴장</span>
-        <span style={{ ...EVENT_STYLE.holiday_kr, padding: '1px 6px', borderRadius: 3 }}>KRX 휴장</span>
+        <span style={{ ...EVENT_STYLE.holiday_us,         padding: '1px 6px', borderRadius: 3 }}>NYSE 휴장</span>
+        <span style={{ ...EVENT_STYLE.holiday_kr,         padding: '1px 6px', borderRadius: 3 }}>KRX 휴장</span>
       </div>
     </div>
   )
