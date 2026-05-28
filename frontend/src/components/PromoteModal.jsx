@@ -41,9 +41,9 @@ export default function PromoteModal({ ticker, market = 'US', onConfirm, onClose
               min="0.01"
             />
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="submit" className="btn-primary">전환</button>
-            <button type="button" className="btn" onClick={onClose}>취소</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px' }}>보유종목으로 전환</button>
+            <button type="button" className="btn" style={{ width: '100%', justifyContent: 'center', padding: '12px', background: 'transparent', borderColor: 'transparent', color: 'var(--text-3)' }} onClick={onClose}>취소</button>
           </div>
         </form>
       </div>
