@@ -159,36 +159,46 @@ export default function GuruStats() {
       )}
 
       {tab === 'top3' && (
-        <div className="table-mobile-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
-              <th className="col-sticky" style={thStyle}>Manager</th>
-              {[1, 2, 3].map(r => <th key={r} style={thStyle}>{r}위</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTop3.map(m => (
-              <tr key={m.manager_name} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td className="col-sticky" style={{ ...tdStyle, maxWidth: isMobile ? 100 : 180, wordBreak: 'break-word' }}>{m.manager_name}</td>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {filteredTop3.map(m => (
+            <div key={m.manager_name} style={{
+              background: 'var(--bg-elev)', border: '1px solid var(--border)',
+              borderRadius: 12, overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '10px 14px', borderBottom: '1px solid var(--border)',
+                fontWeight: 700, fontSize: 13, color: 'var(--text)',
+              }}>
+                {m.manager_name}
+              </div>
+              <div>
                 {[0, 1, 2].map(i => {
                   const h = m.top3[i]
                   return (
-                    <td key={i} style={tdStyle}>
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 14px',
+                      borderBottom: i < 2 ? '1px solid var(--border)' : 'none',
+                    }}>
+                      <span style={{
+                        minWidth: 24, fontSize: 11, fontWeight: 700,
+                        color: i === 0 ? '#f6c90e' : i === 1 ? 'var(--text-3)' : '#cd7f32',
+                      }}>{i + 1}위</span>
                       {h ? (
                         <>
-                          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{h.ticker}</span>
-                          {h.name_kr && <span style={{ color: 'var(--text-3)', fontSize: 11 }}> {h.name_kr}</span>}
-                          <span style={{ color: 'var(--text-3)', fontSize: 11 }}> ({h.count}명)</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)', minWidth: 52 }}>{h.ticker}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-2)', flex: 1 }}>{h.name_kr || h.name || ''}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{h.count}명</span>
                         </>
-                      ) : '-'}
-                    </td>
+                      ) : (
+                        <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>-</span>
+                      )}
+                    </div>
                   )
                 })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
