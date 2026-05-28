@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import useTheme from './hooks/useTheme'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import Portfolio from './pages/Portfolio'
 import Research from './pages/Research'
@@ -54,18 +55,9 @@ function TopNav({ theme, setTheme }) {
 }
 
 export default function App() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') ?? 'light')
+  const [theme, setTheme] = useTheme()
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
-
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark')
-    } else {
-      document.documentElement.removeAttribute('data-theme')
-    }
-    localStorage.setItem('theme', theme)
-  }, [theme])
 
   useEffect(() => {
     supabase.auth.getSession()
