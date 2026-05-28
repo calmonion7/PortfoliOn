@@ -10,7 +10,7 @@ export default function ConsensusChart({ ticker, market }) {
   const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState(0)
-  const [period, setPeriod] = useState('1Y')
+  const [period, setPeriod] = useState('3M')
 
   const fetchData = useCallback(() => {
     if (!ticker) return
@@ -51,7 +51,7 @@ export default function ConsensusChart({ ticker, market }) {
 
   const filteredData = useMemo(() => {
     if (period === 'ALL') return ascData
-    const days = period === '3M' ? 90 : period === '6M' ? 180 : 365
+    const days = period === '1M' ? 30 : period === '3M' ? 90 : period === '6M' ? 180 : 365
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - days)
     const cutStr = cutoff.toISOString().slice(0, 10)
@@ -273,7 +273,7 @@ export default function ConsensusChart({ ticker, market }) {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 2, paddingBottom: 2 }}>
-              {['3M', '6M', '1Y', 'ALL'].map(p => (
+              {['1M', '3M', '6M', '1Y', 'ALL'].map(p => (
                 <button key={p} onClick={() => setPeriod(p)} style={{
                   background: period === p ? 'var(--accent)' : 'transparent',
                   border: '1px solid var(--border)',
