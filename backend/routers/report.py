@@ -111,6 +111,7 @@ def _run_generation(stocks: list):
             report_generator.generate_report(stock)
             cache_svc.invalidate(stock["ticker"])
             consensus_svc.collect(stock["ticker"])
+            consensus_svc.backfill(stock["ticker"], stock.get("market", "US"))
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
             _progress.add_failed(stock["ticker"])
