@@ -278,6 +278,20 @@
 /* Asset row spacing on holdings */
 .holdings-list { padding-bottom: 8px; }
 
+/* List search + filter chips */
+.m-list-search {
+  width: 100%; padding: 10px 14px;
+  background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: 10px;
+  font-size: 14px; color: var(--text); margin-bottom: 8px;
+}
+.m-list-search::placeholder { color: var(--text-faint); }
+.filter-chips { display: flex; gap: 6px; }
+.filter-chips button {
+  padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--bg-elev); font-size: 12.5px; color: var(--text-2); cursor: pointer;
+}
+.filter-chips button.is-active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
 /* Modal — mobile: 화면 하단 시트 스타일 */
 @media (max-width: 768px) {
   .modal-overlay { align-items: flex-end; padding: 0; }
