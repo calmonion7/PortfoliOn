@@ -4,7 +4,7 @@ import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import DashboardCard from '../components/portfolio/DashboardCard'
-import { Search, Plus, Spark, MarketBadge, Sig, fmt, sparkFor } from '../components/ui/icons'
+import { Search, Plus, Spark, MarketBadge, Sig, fmt, sparkFor, Pencil } from '../components/ui/icons'
 import useIsMobile from '../hooks/useIsMobile'
 
 const DashboardGrid = ({ cards, loading }) => {
@@ -167,7 +167,7 @@ export default function Portfolio() {
             const pnlPct = h.current_price != null && h.avg_cost ? (h.current_price - h.avg_cost) / h.avg_cost * 100 : null
             const isUp = pnl != null && pnl >= 0
             return (
-              <div key={h.ticker} className="h-row" onClick={() => openEdit(h)} style={{ cursor: 'pointer' }}>
+              <div key={h.ticker} className="h-row">
                 <div className="logo">{h.ticker.slice(0, 3)}</div>
                 <div className="meta">
                   <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
@@ -179,11 +179,10 @@ export default function Portfolio() {
                       <div className={`v tnum ${isUp ? 'up' : 'down'}`}>{isUp ? '+' : '-'}{ccy}{fmt(Math.abs(pnl), dec)}</div>
                       <div className={`d tnum ${isUp ? 'up' : 'down'}`}>{pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%</div>
                     </>
-                  ) : (
-                    <div className="v tnum muted">—</div>
-                  )}
+                  ) : null}
                 </div>
-                <button className="row-del" onClick={e => { e.stopPropagation(); handleDelete(h.ticker) }}>×</button>
+                <button className="row-edit" onClick={() => openEdit(h)}><Pencil /></button>
+                <button className="row-del" onClick={() => handleDelete(h.ticker)}>×</button>
               </div>
             )
           })}
