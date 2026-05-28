@@ -37,7 +37,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
         f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
         f_rsi       = ex.submit(indicators.get_timeframe_rsi, yf_sym)
-        f_history   = ex.submit(_t.history, period="1y") if _t is not None else ex.submit(mkt.get_quote, ticker, market, exchange)
+        _hist_fn    = _t.history if _t is not None else yf.Ticker(yf_sym).history
+        f_history   = ex.submit(_hist_fn, period="1y")
         f_info      = ex.submit(lambda: _t.info) if _t is not None else None
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
