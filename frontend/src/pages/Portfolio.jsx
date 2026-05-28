@@ -85,7 +85,7 @@ export default function Portfolio() {
 
   const handlePromote = async ({ quantity, avg_cost }) => {
     try {
-      await api.post(`/api/watchlist/${promoteTarget}/promote`, { quantity, avg_cost })
+      await api.post(`/api/watchlist/${promoteTarget.ticker}/promote`, { quantity, avg_cost })
       setPromoteTarget(null); setTab('holdings'); fetchAll()
     } catch (err) {
       setError(err.response?.data?.detail || '전환 실패'); setPromoteTarget(null)
@@ -184,7 +184,7 @@ export default function Portfolio() {
             const ccy = (h.market || 'US') === 'KR' ? '₩' : '$'
             const dec = (h.market || 'US') === 'KR' ? 0 : 2
             return (
-              <div key={h.ticker} className="h-row" onClick={() => setPromoteTarget(h.ticker)} style={{ cursor: 'pointer' }}>
+              <div key={h.ticker} className="h-row" onClick={() => setPromoteTarget({ ticker: h.ticker, market: h.market || 'US' })} style={{ cursor: 'pointer' }}>
                 <div className="logo">{h.ticker.slice(0, 3)}</div>
                 <div className="meta">
                   <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
@@ -226,7 +226,7 @@ export default function Portfolio() {
           onSave={handleSave} onClose={() => { setModalOpen(false); setEditing(null) }} />
       )}
       {promoteTarget && (
-        <PromoteModal ticker={promoteTarget} onConfirm={handlePromote} onClose={() => setPromoteTarget(null)} />
+        <PromoteModal ticker={promoteTarget.ticker} market={promoteTarget.market} onConfirm={handlePromote} onClose={() => setPromoteTarget(null)} />
       )}
     </>
   )
@@ -414,7 +414,8 @@ export default function Portfolio() {
 
       {promoteTarget && (
         <PromoteModal
-          ticker={promoteTarget}
+          ticker={promoteTarget.ticker}
+          market={promoteTarget.market}
           onConfirm={handlePromote}
           onClose={() => setPromoteTarget(null)}
         />

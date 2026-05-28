@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 
-export default function PromoteModal({ ticker, onConfirm, onClose }) {
+export default function PromoteModal({ ticker, market = 'US', onConfirm, onClose }) {
   const [quantity, setQuantity] = useState('')
   const [avgCost, setAvgCost] = useState('')
   const mouseDownOnOverlay = useRef(false)
@@ -31,7 +31,7 @@ export default function PromoteModal({ ticker, onConfirm, onClose }) {
             />
           </div>
           <div className="form-field">
-            <label>평균 매입가 ($)</label>
+            <label>평균 매입가 ({market === 'KR' ? '₩' : '$'})</label>
             <input
               type="number"
               value={avgCost}
