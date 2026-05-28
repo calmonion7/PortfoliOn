@@ -75,7 +75,9 @@ export default function DashboardCard({ item }) {
         <div className="dashcard__stat dashcard__stat--full">
           <span className="dashcard__stat-label">컨센서스</span>
           <span className={`dashcard__stat-value tnum ${consClass}`}>
-            {consPct != null ? `${consPct >= 0 ? '+' : ''}${consPct.toFixed(0)}%` : '—'}
+            {consPct != null
+              ? `${consPct >= 0 ? '+' : ''}${consPct.toFixed(0)}% · ${fmtPrice(item.target_mean, item.market)}`
+              : '—'}
           </span>
         </div>
         <div className="dashcard__stat">
