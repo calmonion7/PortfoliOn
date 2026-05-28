@@ -83,7 +83,7 @@ function MonthGrid({ year, month, events }) {
                 padding: 4,
                 overflow: 'hidden',
                 cursor: day && dayEvents.length > 0 ? 'pointer' : 'default',
-                outline: isToday ? '2px solid var(--accent)' : isSelected ? '2px solid var(--text)' : 'none',
+                outline: isToday ? '2px solid var(--accent)' : 'none',
                 outlineOffset: -2,
                 display: 'flex',
                 flexDirection: 'column',
