@@ -139,8 +139,7 @@ export default function GuruStats() {
                 <td style={{ ...tdStyle, color: 'var(--text-3)', fontSize: 12 }}>{i + 1}</td>
                 <td style={tdStyle}>
                   <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>{row.ticker}</div>
-                  {row.name && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.name}</div>}
-                  {row.name_kr && <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{row.name_kr}</div>}
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.name_kr || row.name || '-'}</div>
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.count}명</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -227,8 +226,7 @@ export default function GuruStats() {
                   <td style={{ ...tdStyle, color: 'var(--text-3)', fontSize: 12 }}>{i + 1}</td>
                   <td style={tdStyle}>
                     <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>{row.ticker}</div>
-                    {row.name && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.name}</div>}
-                    {row.name_kr && <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{row.name_kr}</div>}
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.name_kr || row.name || '-'}</div>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.score.toFixed(3)}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
