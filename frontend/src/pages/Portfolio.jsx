@@ -167,6 +167,7 @@ export default function Portfolio() {
                     <div className="v tnum muted">—</div>
                   )}
                 </div>
+                <button className="row-del" onClick={e => { e.stopPropagation(); handleDelete(h.ticker) }}>×</button>
               </div>
             )
           })}
@@ -199,6 +200,7 @@ export default function Portfolio() {
                     <div className="v tnum muted">—</div>
                   )}
                 </div>
+                <button className="row-del" onClick={e => { e.stopPropagation(); handleDelete(h.ticker) }}>×</button>
               </div>
             )
           })}
