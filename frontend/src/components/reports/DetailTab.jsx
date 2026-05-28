@@ -20,7 +20,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ff8a65', size: 'sm' },
     rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ff8a65', size: 'sm' },
     rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ff8a65', size: 'sm' },
-    price != null && { value: price, label: `현재가${rsiData?.rsi != null ? ` (RSI ${rsiData.rsi.toFixed(1)})` : ''}`, color: '#ffffff', size: 'lg' },
+    price != null && { value: price, label: `현재가${rsiData?.rsi != null ? ` (RSI ${rsiData.rsi.toFixed(1)})` : ''}`, color: 'var(--text)', size: 'lg' },
   ].filter(Boolean)
   if (levels.length === 0) return null
   const vals = levels.map(l => l.value)
@@ -255,7 +255,7 @@ export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) 
           <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, marginTop: 4 }}>
             {[
-              { color: '#ffffff', label: '현재가', desc: '현재 주가' },
+              { color: 'var(--text)', label: '현재가', desc: '현재 주가' },
               { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
               { color: '#80cbc4', label: 'POC', desc: '거래량 최대 가격대' },
               { color: '#81c784', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
