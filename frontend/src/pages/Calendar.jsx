@@ -13,13 +13,13 @@ const EVENT_STYLE = {
   holiday_kr:         { background: 'var(--cal-hol-kr-bg)',     color: 'var(--cal-hol-kr-color)',     border: '1px solid var(--cal-hol-kr-border)' },
 }
 
-const DOT_COLOR = {
-  holding_earnings:   'var(--cal-earn-hold-border)',
-  holding_dividend:   'var(--cal-div-hold-border)',
-  watchlist_earnings: 'var(--cal-earn-wl-border)',
-  watchlist_dividend: 'var(--cal-div-wl-border)',
-  holiday_us:         'var(--cal-hol-us-border)',
-  holiday_kr:         'var(--cal-hol-kr-border)',
+const EVENT_ICON = {
+  holding_earnings:   '📈',
+  holding_dividend:   '💰',
+  watchlist_earnings: '📊',
+  watchlist_dividend: '💵',
+  holiday_us:         '🇺🇸',
+  holiday_kr:         '🇰🇷',
 }
 
 function eventKey(e) {
@@ -95,15 +95,14 @@ function MonthGrid({ year, month, events }) {
                 </div>
               )}
               {dayEvents.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 'auto' }}>
-                  {dayEvents.slice(0, 5).map((e, j) => (
-                    <span key={j} style={{
-                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                      background: DOT_COLOR[eventKey(e)] || 'var(--text-3)',
-                    }} />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1, marginTop: 'auto' }}>
+                  {dayEvents.slice(0, 4).map((e, j) => (
+                    <span key={j} style={{ fontSize: 11, lineHeight: 1 }}>
+                      {EVENT_ICON[eventKey(e)] || '●'}
+                    </span>
                   ))}
-                  {dayEvents.length > 5 && (
-                    <span style={{ fontSize: 8, color: 'var(--text-3)', lineHeight: '6px' }}>+{dayEvents.length - 5}</span>
+                  {dayEvents.length > 4 && (
+                    <span style={{ fontSize: 8, color: 'var(--text-3)', lineHeight: '12px' }}>+{dayEvents.length - 4}</span>
                   )}
                 </div>
               )}
@@ -113,37 +112,52 @@ function MonthGrid({ year, month, events }) {
       </div>
 
       {selectedDate && selectedEvents.length > 0 && (
-        <div style={{
-          marginTop: 8,
-          background: 'var(--bg-elev)', border: '1px solid var(--border)',
-          borderRadius: 12, overflow: 'hidden',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate(selectedDate)}</span>
-            <button onClick={() => setSelectedDate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>×</button>
+        <div
+          onClick={() => setSelectedDate(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--bg-elev)', border: '1px solid var(--border)',
+              borderRadius: 12, overflow: 'hidden', minWidth: 280, maxWidth: 400, width: '90%',
+              maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate(selectedDate)}</span>
+              <button onClick={() => setSelectedDate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>×</button>
+            </div>
+            <div style={{ overflowY: 'auto' }}>
+              {selectedEvents.map((e, i) => {
+                const key = eventKey(e)
+                const s = EVENT_STYLE[key] || EVENT_STYLE.holding_earnings
+                const isHoliday = e.type === 'holiday_us' || e.type === 'holiday_kr'
+                return (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 14px',
+                    borderBottom: i < selectedEvents.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    <span style={{ fontSize: 18, flexShrink: 0 }}>{EVENT_ICON[key] || '●'}</span>
+                    <span style={{ ...s, padding: '2px 8px', borderRadius: 4, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {isHoliday ? (e.type === 'holiday_us' ? 'NYSE 휴장' : 'KRX 휴장') : e.type === 'earnings' ? '실적' : '배당락'}
+                    </span>
+                    {!isHoliday && e.ticker && (
+                      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{e.ticker}</span>
+                    )}
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {e.name || ''}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-          {selectedEvents.map((e, i) => {
-            const key = eventKey(e)
-            const s = EVENT_STYLE[key] || EVENT_STYLE.holding_earnings
-            const isHoliday = e.type === 'holiday_us' || e.type === 'holiday_kr'
-            return (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 14px',
-                borderBottom: i < selectedEvents.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <span style={{ ...s, padding: '2px 8px', borderRadius: 4, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {isHoliday ? (e.type === 'holiday_us' ? 'NYSE 휴장' : 'KRX 휴장') : e.type === 'earnings' ? '실적' : '배당락'}
-                </span>
-                {!isHoliday && e.ticker && (
-                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{e.ticker}</span>
-                )}
-                <span style={{ fontSize: 12, color: 'var(--text-3)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {e.name || ''}
-                </span>
-              </div>
-            )
-          })}
         </div>
       )}
     </>
