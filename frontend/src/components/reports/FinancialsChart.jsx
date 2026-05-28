@@ -204,13 +204,6 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     )
   }
 
-  const TH = ({ children, color }) => (
-    <th style={{ color: color || 'var(--text-3)', textAlign: 'right', padding: '2px 6px', fontWeight: 400 }}>{children}</th>
-  )
-  const TD = ({ children, color }) => (
-    <td style={{ color: color || 'var(--text-3)', textAlign: 'right', padding: '1px 6px' }}>{children}</td>
-  )
-
   const calcFinancialsWeather = (data) => {
     const real = data.filter(d => !d.is_consensus)
     if (real.length < 2) return null
@@ -286,87 +279,39 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
           </ResponsiveContainer>
         </div>
 
-        {/* EPS / BPS + PER / PBR (2열) */}
-        {(hasEpsBps || hasPerPbr) && (
-          <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-            {hasEpsBps && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <Legend items={[{ color: '#80cbc4', label: 'EPS' }, { color: '#f48fb1', label: 'BPS' }]} weather={epsWeather} />
-                <ResponsiveContainer width="100%" height={120}>
-                  <LineChart data={data} margin={chartMargin}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                    <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={fmtShareAxis} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
-                    <Tooltip content={makeShareTooltip()} />
-                    <Line {...lineCfg} dataKey="eps" name="EPS" stroke="#80cbc4" />
-                    <Line {...lineCfg} dataKey="bps" name="BPS" stroke="#f48fb1" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-            {hasPerPbr && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <Legend items={[{ color: '#ffcc80', label: 'PER' }, { color: '#ce93d8', label: 'PBR' }]} weather={perWeather} />
-                <ResponsiveContainer width="100%" height={120}>
-                  <LineChart data={data} margin={chartMargin}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                    <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
-                    <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
-                    <Tooltip content={makeTooltip(false)} />
-                    <Line {...lineCfg} dataKey="per" name="PER" stroke="#ffcc80" />
-                    <Line {...lineCfg} dataKey="pbr" name="PBR" stroke="#ce93d8" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+        {/* EPS / BPS */}
+        {hasEpsBps && (
+          <div style={{ marginTop: 12 }}>
+            <Legend items={[{ color: '#80cbc4', label: 'EPS' }, { color: '#f48fb1', label: 'BPS' }]} weather={epsWeather} />
+            <ResponsiveContainer width="100%" height={140}>
+              <LineChart data={data} margin={chartMargin}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtShareAxis} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+                <Tooltip content={makeShareTooltip()} />
+                <Line {...lineCfg} dataKey="eps" name="EPS" stroke="#80cbc4" />
+                <Line {...lineCfg} dataKey="bps" name="BPS" stroke="#f48fb1" />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         )}
 
-        {/* 테이블 */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 10, fontSize: 10 }}>
-          <thead>
-            <tr>
-              <TH>기간</TH>
-              <TH color="#4fc3f7">매출</TH>
-              <TH color="#4fc3f7">매출 증감</TH>
-              <TH color="#81c784">영업이익</TH>
-              <TH color="#81c784">영업이익 증감</TH>
-              <TH>영업이익률</TH>
-              {hasEpsBps && <TH color="#80cbc4">EPS</TH>}
-              {hasEpsBps && <TH color="#f48fb1">BPS</TH>}
-              {hasPerPbr && <TH color="#ffcc80">PER</TH>}
-              {hasPerPbr && <TH color="#ce93d8">PBR</TH>}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map(d => {
-              const revPos = d.rev_chg_abs == null ? null : d.rev_chg_abs >= 0
-              const opPos  = d.op_chg_abs  == null ? null : d.op_chg_abs  >= 0
-              return (
-                <tr key={d.period} style={d.is_consensus ? { opacity: 0.75, fontStyle: 'italic' } : {}}>
-                  <TD color={d.is_consensus ? '#ffcc80' : 'var(--text-3)'}>{d.period}</TD>
-                  <TD color="#4fc3f7">{fmtValFull(d.revenue)}</TD>
-                  <td style={{ textAlign: 'right', padding: '1px 6px', color: revPos === true ? '#81c784' : revPos === false ? '#ef9a9a' : 'var(--text-3)' }}>
-                    {d.rev_chg_abs != null
-                      ? <>{revPos ? '▲' : '▼'} {fmtValFull(Math.abs(d.rev_chg_abs))}<br /><span style={{ fontSize: 9 }}>({d.rev_chg_pct >= 0 ? '+' : ''}{d.rev_chg_pct}%)</span></>
-                      : '—'}
-                  </td>
-                  <TD color={d.op_income != null && d.op_income >= 0 ? '#81c784' : '#ef9a9a'}>{fmtValFull(d.op_income)}</TD>
-                  <td style={{ textAlign: 'right', padding: '1px 6px', color: opPos === true ? '#81c784' : opPos === false ? '#ef9a9a' : 'var(--text-3)' }}>
-                    {d.op_chg_abs != null
-                      ? <>{opPos ? '▲' : '▼'} {fmtValFull(Math.abs(d.op_chg_abs))}<br /><span style={{ fontSize: 9 }}>({d.op_chg_pct >= 0 ? '+' : ''}{d.op_chg_pct}%)</span></>
-                      : '—'}
-                  </td>
-                  <TD>{d.margin != null ? `${d.margin}%` : '—'}</TD>
-                  {hasEpsBps && <TD color="#80cbc4">{fmtShare(d.eps)}</TD>}
-                  {hasEpsBps && <TD color="#f48fb1">{fmtShare(d.bps)}</TD>}
-                  {hasPerPbr && <TD color="#ffcc80">{d.per ?? '—'}</TD>}
-                  {hasPerPbr && <TD color="#ce93d8">{d.pbr ?? '—'}</TD>}
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        {/* PER / PBR */}
+        {hasPerPbr && (
+          <div style={{ marginTop: 12 }}>
+            <Legend items={[{ color: '#ffcc80', label: 'PER' }, { color: '#ce93d8', label: 'PBR' }]} weather={perWeather} />
+            <ResponsiveContainer width="100%" height={140}>
+              <LineChart data={data} margin={chartMargin}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+                <Tooltip content={makeTooltip(false)} />
+                <Line {...lineCfg} dataKey="per" name="PER" stroke="#ffcc80" />
+                <Line {...lineCfg} dataKey="pbr" name="PBR" stroke="#ce93d8" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
     )
   }
