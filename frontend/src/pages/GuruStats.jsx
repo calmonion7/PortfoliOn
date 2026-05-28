@@ -4,8 +4,6 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import useIsMobile from '../hooks/useIsMobile'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
-const thStyle = { padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }
-const tdStyle = { padding: '8px 10px', color: 'var(--text)' }
 
 const TABS = [
   { key: 'popularity', label: '인기순' },
@@ -123,37 +121,22 @@ export default function GuruStats() {
       </div>
 
       {tab === 'popularity' && (
-        <div className="table-mobile-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
-              <th style={{ ...thStyle, width: 28 }}>#</th>
-              <th style={thStyle}>종목</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>매니저수</th>
-              <th style={thStyle}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPopularity.map((row, i) => (
-              <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ ...tdStyle, color: 'var(--text-3)', fontSize: 12 }}>{i + 1}</td>
-                <td style={tdStyle}>
-                  <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>{row.ticker}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.name_kr || row.name || '-'}</div>
-                </td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.count}명</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  <WatchlistBtn
-                    ticker={row.ticker}
-                    name={row.name_kr || row.name}
-                    stockMap={stockMap}
-                    onToggle={handleToggle}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filteredPopularity.map((row, i) => (
+            <div key={row.ticker} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              background: 'var(--bg-elev)', border: '1px solid var(--border)',
+              borderRadius: 12, padding: '12px 14px',
+            }}>
+              <span style={{ minWidth: 22, fontSize: 12, color: 'var(--text-3)', fontWeight: 600, textAlign: 'right' }}>{i + 1}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--accent)' }}>{row.ticker}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{row.name_kr || row.name || '-'}</div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap' }}>{row.count}명</div>
+              <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={handleToggle} />
+            </div>
+          ))}
         </div>
       )}
 
@@ -210,37 +193,22 @@ export default function GuruStats() {
               </span>
             ))}
           </div>
-          <div className="table-mobile-wrap">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
-                <th style={{ ...thStyle, width: 28 }}>#</th>
-                <th style={thStyle}>종목</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>가중치합계</th>
-                <th style={thStyle}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredWeighted.map((row, i) => (
-                <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ ...tdStyle, color: 'var(--text-3)', fontSize: 12 }}>{i + 1}</td>
-                  <td style={tdStyle}>
-                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>{row.ticker}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.name_kr || row.name || '-'}</div>
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.score.toFixed(3)}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    <WatchlistBtn
-                      ticker={row.ticker}
-                      name={row.name_kr || row.name}
-                      stockMap={stockMap}
-                      onToggle={handleToggle}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {filteredWeighted.map((row, i) => (
+              <div key={row.ticker} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                background: 'var(--bg-elev)', border: '1px solid var(--border)',
+                borderRadius: 12, padding: '12px 14px',
+              }}>
+                <span style={{ minWidth: 22, fontSize: 12, color: 'var(--text-3)', fontWeight: 600, textAlign: 'right' }}>{i + 1}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--accent)' }}>{row.ticker}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{row.name_kr || row.name || '-'}</div>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap' }}>{row.score.toFixed(3)}</div>
+                <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={handleToggle} />
+              </div>
+            ))}
           </div>
         </div>
       )}
