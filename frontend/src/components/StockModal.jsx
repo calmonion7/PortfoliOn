@@ -113,6 +113,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
   const empty = mode === 'watchlist' ? WATCHLIST_EMPTY : HOLDING_EMPTY
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const isEdit = !!stock
   const mouseDownOnOverlay = useRef(false)
 
@@ -156,14 +157,16 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
       exchange: form.market === 'KR' ? (form.exchange || 'KS') : '',
     }
     setSaving(true)
+    setSaveError('')
     try {
       if (mode === 'holding') {
         await onSave({ ...base, quantity: parseFloat(form.quantity), avg_cost: parseFloat(form.avg_cost) })
       } else {
         await onSave(base)
       }
-    } catch {
+    } catch (err) {
       setSaving(false)
+      setSaveError(err?.response?.data?.detail || '저장에 실패했습니다. 다시 시도해 주세요.')
     }
   }
 
@@ -260,7 +263,10 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
             <textarea rows={2} value={form.growth_plan} onChange={set('growth_plan')} style={{ ...INPUT_STYLE, resize: 'vertical' }} />
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          {saveError && (
+            <p style={{ color: 'var(--down)', fontSize: 13, marginTop: 12, marginBottom: 0 }}>{saveError}</p>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? '저장 중…' : '저장'}
             </button>
