@@ -156,7 +156,7 @@ export default function Portfolio() {
       {error && <p style={{ color: 'var(--down)', fontSize: 13, padding: '0 20px 8px' }}>{error}</p>}
 
       {tab === 'holdings' && (
-        <div className="list-card holdings-list" style={{ margin: '0 20px', paddingBottom: 80 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 20px', paddingBottom: 80 }}>
           {filteredStocks.map(h => {
             const ccy = (h.market || 'US') === 'KR' ? '₩' : '$'
             const dec = (h.market || 'US') === 'KR' ? 0 : 2
@@ -191,7 +191,7 @@ export default function Portfolio() {
       )}
 
       {tab === 'watch' && (
-        <div className="list-card" style={{ margin: '0 20px', paddingBottom: 80 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 20px', paddingBottom: 80 }}>
           {filteredWatchlist.map(h => {
             const ccy = (h.market || 'US') === 'KR' ? '₩' : '$'
             const dec = (h.market || 'US') === 'KR' ? 0 : 2

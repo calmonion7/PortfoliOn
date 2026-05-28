@@ -215,7 +215,7 @@ const fetchList = useCallback(() => {
         key={ticker}
         onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
         className="report-item"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--surface-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', background: isSelected ? 'var(--surface-hover)' : undefined, outline: isSelected ? '2px solid var(--accent)' : undefined, outlineOffset: -1 }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
@@ -356,7 +356,9 @@ const fetchList = useCallback(() => {
             ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>리포트 없음</p>
             : null
         }
-        {!listLoading && tabEntries.map(([t, info]) => renderTickerItem(t, info))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {!listLoading && tabEntries.map(([t, info]) => renderTickerItem(t, info))}
+        </div>
       </div>
 
       {/* 우측 패널 */}

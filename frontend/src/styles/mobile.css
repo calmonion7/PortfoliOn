@@ -88,10 +88,11 @@
 .seg-pad { padding: 0 20px; margin-bottom: 14px; }
 .seg .count { color: var(--text-faint); font-size: 11px; }
 
-/* Holding row */
+/* Holding row — individual card */
 .h-row {
   display: grid; grid-template-columns: 36px 1fr auto auto auto; gap: 8px; align-items: center;
   padding: 12px 16px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px;
 }
 .row-edit {
   background: none; border: none; padding: 4px 6px; cursor: pointer;
@@ -103,7 +104,6 @@
   color: var(--text-faint); font-size: 18px; line-height: 1;
 }
 .row-del:hover { color: var(--down); }
-.h-row + .h-row { border-top: 1px solid var(--border); }
 .h-row .logo {
   width: 36px; height: 36px; border-radius: 10px;
   background: var(--accent-soft); color: var(--text-2);
@@ -314,5 +314,7 @@ thead .col-sticky { background: var(--bg-elev-2); }
 /* ── 시장지표 아코디언: 헤더 하단선 + 카드 상단선 이중선 제거 ── */
 .accordion-header + * { margin-top: -1px; }
 
-/* ── 리포트 목록 항목 경계선 ─────────────────────────────────── */
-.report-item { border-bottom: 1px solid var(--border); }
+/* ── 리포트 목록 항목 카드 ─────────────────────────────────── */
+.report-item {
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px;
+}
