@@ -14,6 +14,7 @@ const TABS = [
 
 function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
   const [loading, setLoading] = useState(false)
+  const [errMsg, setErrMsg] = useState('')
   const entry = stockMap[ticker]
   if (entry === 'holding') {
     return <span style={{ fontSize: 11, color: 'var(--text-3)', padding: '3px 8px' }}>보유중</span>
@@ -22,28 +23,37 @@ function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
 
   const handleClick = async () => {
     setLoading(true)
-    try { await onToggle(ticker, name, inWatchlist) }
-    finally { setLoading(false) }
+    setErrMsg('')
+    try {
+      await onToggle(ticker, name, inWatchlist)
+    } catch (err) {
+      setErrMsg(err?.response?.data?.detail || '오류')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={loading}
-      style={{
-        fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none',
-        cursor: loading ? 'progress' : 'pointer',
-        background: inWatchlist ? 'var(--surface-hover)' : 'var(--bg-elev-2)',
-        color: inWatchlist ? 'var(--down)' : 'var(--up)',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        minWidth: 48, opacity: loading ? 0.7 : 1, transition: 'opacity .15s',
-      }}
-    >
-      {loading
-        ? <span className="btn__spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} aria-hidden />
-        : (inWatchlist ? '★ 삭제' : '☆ 추가')
-      }
-    </button>
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        style={{
+          fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none',
+          cursor: loading ? 'progress' : 'pointer',
+          background: inWatchlist ? 'var(--surface-hover)' : 'var(--bg-elev-2)',
+          color: inWatchlist ? 'var(--down)' : 'var(--up)',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          minWidth: 48, opacity: loading ? 0.7 : 1, transition: 'opacity .15s',
+        }}
+      >
+        {loading
+          ? <span className="btn__spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} aria-hidden />
+          : (inWatchlist ? '★ 삭제' : '☆ 추가')
+        }
+      </button>
+      {errMsg && <span style={{ fontSize: 10, color: 'var(--down)' }}>{errMsg}</span>}
+    </span>
   )
 }
 
@@ -78,16 +88,12 @@ export default function GuruStats() {
   }, [loadStockMap])
 
   const handleToggle = async (ticker, name, inWatchlist) => {
-    try {
-      if (inWatchlist) {
-        await api.delete(`/api/watchlist/${ticker}`)
-      } else {
-        await api.post('/api/watchlist', { ticker, name: name || ticker })
-      }
-      await loadStockMap()
-    } catch (err) {
-      alert(err.response?.data?.detail || '오류가 발생했습니다')
+    if (inWatchlist) {
+      await api.delete(`/api/watchlist/${ticker}`)
+    } else {
+      await api.post('/api/watchlist', { ticker, name: name || ticker })
     }
+    await loadStockMap()
   }
 
   const q = query.trim().toLowerCase()

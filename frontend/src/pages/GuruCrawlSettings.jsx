@@ -50,10 +50,17 @@ export default function GuruCrawlSettings() {
     }
   }
 
+  const [saveErr, setSaveErr] = useState('')
+
   const handleSave = async () => {
-    await api.put('/api/guru/schedule', schedule)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaveErr('')
+    try {
+      await api.put('/api/guru/schedule', schedule)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      setSaveErr(err?.response?.data?.detail || '저장에 실패했습니다.')
+    }
   }
 
   useEffect(() => () => clearInterval(pollRef.current), [])
@@ -135,6 +142,7 @@ export default function GuruCrawlSettings() {
           <button className="btn btn-primary" onClick={handleSave} style={{ width: '100%', justifyContent: 'center' }}>
             {saved ? '저장됨 ✓' : '저장'}
           </button>
+          {saveErr && <p style={{ color: 'var(--down)', fontSize: 13, marginTop: 6 }}>{saveErr}</p>}
         </div>
       </div>
 

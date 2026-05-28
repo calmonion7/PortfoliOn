@@ -89,7 +89,7 @@ export default function Portfolio() {
       await api.post(`/api/watchlist/${promoteTarget.ticker}/promote`, { quantity, avg_cost })
       setPromoteTarget(null); setTab('holdings'); fetchAll()
     } catch (err) {
-      setError(err.response?.data?.detail || '전환 실패'); setPromoteTarget(null)
+      throw err
     }
   }
 

@@ -3,12 +3,14 @@ import api from '../api'
 
 export default function ConsensusSettings() {
   const [batch, setBatch] = useState({ running: false, done: 0, total: 0, current: '' })
+  const [batchErr, setBatchErr] = useState('')
   const pollRef = useRef(null)
 
   useEffect(() => () => clearInterval(pollRef.current), [])
 
   const runBatch = async () => {
     setBatch({ running: true, done: 0, total: 0, current: '' })
+    setBatchErr('')
     clearInterval(pollRef.current)
     try {
       await api.post('/api/consensus/batch')
@@ -21,8 +23,9 @@ export default function ConsensusSettings() {
           }
         } catch {}
       }, 1500)
-    } catch {
+    } catch (err) {
       setBatch(p => ({ ...p, running: false }))
+      setBatchErr(err?.response?.data?.detail || '실행에 실패했습니다.')
     }
   }
 
@@ -64,6 +67,7 @@ export default function ConsensusSettings() {
               완료: {batch.done}개 종목 수집됨
             </p>
           )}
+          {batchErr && <p style={{ marginTop: 8, color: 'var(--down)', fontSize: 13 }}>{batchErr}</p>}
         </div>
       </div>
     </div>

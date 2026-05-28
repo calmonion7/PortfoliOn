@@ -39,6 +39,7 @@ export default function GuruManagers() {
   const [loading, setLoading]   = useState(true)
   const [sort, setSort]         = useState({ key: 'num_stocks', dir: 1 })
   const [query, setQuery]       = useState('')
+  const [badgeErr, setBadgeErr] = useState('')
 
   const loadStockMap = useCallback(() => {
     api.get('/api/stocks').then(({ data }) => {
@@ -58,6 +59,7 @@ export default function GuruManagers() {
   const handleBadgeClick = async (h) => {
     const type = stockMap[h.ticker]
     if (type === 'holding') return
+    setBadgeErr('')
     try {
       if (type === 'watchlist') {
         await api.delete(`/api/watchlist/${h.ticker}`)
@@ -66,7 +68,7 @@ export default function GuruManagers() {
       }
       loadStockMap()
     } catch (err) {
-      alert(err.response?.data?.detail || '오류가 발생했습니다')
+      setBadgeErr(err.response?.data?.detail || '관심종목 변경에 실패했습니다.')
     }
   }
 
