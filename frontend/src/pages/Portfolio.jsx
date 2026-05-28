@@ -211,10 +211,9 @@ export default function Portfolio() {
                       <div className="v tnum">{ccy}{fmt(h.current_price, dec)}</div>
                       {h.change_pct != null && <Sig v={h.change_pct} />}
                     </>
-                  ) : (
-                    <div className="v tnum muted">—</div>
-                  )}
+                  ) : null}
                 </div>
+                <button className="row-edit" onClick={e => { e.stopPropagation(); openEdit(h) }}><Pencil /></button>
                 <button className="row-del" onClick={e => { e.stopPropagation(); handleDelete(h.ticker) }}>×</button>
               </div>
             )
