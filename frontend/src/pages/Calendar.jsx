@@ -45,7 +45,7 @@ function MonthGrid({ year, month, events }) {
         const dayEvents = dateStr ? (byDate[dateStr] || []) : []
         const isToday = dateStr === todayStr
         return (
-          <div key={i} style={{ background: day ? 'var(--bg-elev)' : 'var(--bg)', minHeight: 72, padding: 4, outline: isToday ? '2px solid var(--accent)' : 'none', outlineOffset: -2 }}>
+          <div key={i} style={{ background: day ? 'var(--bg-elev)' : 'var(--bg)', aspectRatio: '1 / 1', padding: 4, overflow: 'hidden', outline: isToday ? '2px solid var(--accent)' : 'none', outlineOffset: -2 }}>
             {day && (
               <div style={{ fontSize: 11, marginBottom: 4, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent)' : 'var(--text-3)' }}>{day}</div>
             )}
