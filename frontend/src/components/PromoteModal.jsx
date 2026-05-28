@@ -17,7 +17,7 @@ export default function PromoteModal({ ticker, market = 'US', onConfirm, onClose
     >
       <div className="modal" style={{ width: 320 }} onClick={e => e.stopPropagation()}>
         <h2 style={{ marginBottom: 4 }}>보유종목으로 전환</h2>
-        <p style={{ color: '#80cbc4', fontSize: 14, marginBottom: 16 }}>{ticker}</p>
+        <p style={{ color: 'var(--tag-track-color)', fontSize: 14, marginBottom: 16 }}>{ticker}</p>
         <form onSubmit={handleSubmit}>
           <div className="form-field">
             <label>수량</label>

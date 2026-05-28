@@ -5,12 +5,12 @@ import LoadingSpinner from '../components/LoadingSpinner'
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
 const EVENT_STYLE = {
-  holding_earnings:  { background: '#1a2a4a', color: '#4fc3f7', border: '1px solid #2a4a6a' },
-  holding_dividend:  { background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' },
-  watchlist_earnings: { background: 'transparent', color: '#3a8aaa', border: '1px dashed #2a4a6a' },
-  watchlist_dividend: { background: 'transparent', color: '#4a7a5a', border: '1px dashed #2e6b4a' },
-  holiday_us: { background: '#2a1a1a', color: '#ef9a9a', border: '1px solid #5a2a2a' },
-  holiday_kr: { background: '#1a1a2a', color: '#90caf9', border: '1px solid #2a2a5a' },
+  holding_earnings:  { background: 'var(--cal-earn-hold-bg)', color: 'var(--cal-earn-hold-color)', border: '1px solid var(--cal-earn-hold-border)' },
+  holding_dividend:  { background: 'var(--cal-div-hold-bg)',  color: 'var(--cal-div-hold-color)',  border: '1px solid var(--cal-div-hold-border)' },
+  watchlist_earnings: { background: 'transparent', color: 'var(--cal-earn-wl-color)', border: '1px dashed var(--cal-earn-wl-border)' },
+  watchlist_dividend: { background: 'transparent', color: 'var(--cal-div-wl-color)',  border: '1px dashed var(--cal-div-wl-border)' },
+  holiday_us: { background: 'var(--cal-hol-us-bg)', color: 'var(--cal-hol-us-color)', border: '1px solid var(--cal-hol-us-border)' },
+  holiday_kr: { background: 'var(--cal-hol-kr-bg)', color: 'var(--cal-hol-kr-color)', border: '1px solid var(--cal-hol-kr-border)' },
 }
 
 function MonthGrid({ year, month, events }) {

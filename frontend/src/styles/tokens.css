@@ -55,6 +55,19 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.04);
   --shadow:    0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
   --shadow-lg: 0 6px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+
+  /* Semantic badge colors — adapts light/dark */
+  --tag-hold-bg:    #e8f5e9; --tag-hold-color:  #2e7d32; --tag-hold-border: #a5d6a7;
+  --tag-watch-bg:   #fce4ec; --tag-watch-color: #c62828; --tag-watch-border: #f48fb1;
+  --tag-track-bg:   #e3f2fd; --tag-track-color: #1565c0; --tag-track-border: #90caf9;
+
+  /* Calendar event colors */
+  --cal-earn-hold-bg: #e3f2fd; --cal-earn-hold-color: #1565c0; --cal-earn-hold-border: #90caf9;
+  --cal-div-hold-bg:  #e8f5e9; --cal-div-hold-color:  #2e7d32; --cal-div-hold-border:  #a5d6a7;
+  --cal-earn-wl-color: #1976d2; --cal-earn-wl-border: #90caf9;
+  --cal-div-wl-color:  #388e3c; --cal-div-wl-border:  #a5d6a7;
+  --cal-hol-us-bg:    #fce4ec; --cal-hol-us-color:   #c62828; --cal-hol-us-border: #f48fb1;
+  --cal-hol-kr-bg:    #ede7f6; --cal-hol-kr-color:   #4527a0; --cal-hol-kr-border: #ce93d8;
 }
 
 [data-theme="dark"] {
@@ -90,6 +103,17 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
   --shadow:    0 1px 3px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
   --shadow-lg: 0 6px 24px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3);
+
+  --tag-hold-bg:    #1a3a1a; --tag-hold-color:  #81c784; --tag-hold-border: #2e6b4a;
+  --tag-watch-bg:   #3a1a1a; --tag-watch-color: #ef9a9a; --tag-watch-border: #6a2a2a;
+  --tag-track-bg:   #1e3a5f; --tag-track-color: #4fc3f7; --tag-track-border: #2a4a6a;
+
+  --cal-earn-hold-bg: #1a2a4a; --cal-earn-hold-color: #4fc3f7; --cal-earn-hold-border: #2a4a6a;
+  --cal-div-hold-bg:  #1a3a2a; --cal-div-hold-color:  #81c784; --cal-div-hold-border:  #2e6b4a;
+  --cal-earn-wl-color: #3a8aaa; --cal-earn-wl-border: #2a4a6a;
+  --cal-div-wl-color:  #4a7a5a; --cal-div-wl-border:  #2e6b4a;
+  --cal-hol-us-bg:    #2a1a1a; --cal-hol-us-color:   #ef9a9a; --cal-hol-us-border: #5a2a2a;
+  --cal-hol-kr-bg:    #1a1a2a; --cal-hol-kr-color:   #90caf9; --cal-hol-kr-border: #2a2a5a;
 }
 
 /* Base reset */

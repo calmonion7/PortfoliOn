@@ -72,9 +72,9 @@ export default function GuruManagers() {
 
   const badgeStyle = (ticker) => {
     const type = stockMap[ticker]
-    if (type === 'holding')   return { background: '#1a3a1a', color: '#81c784' }
-    if (type === 'watchlist') return { background: '#3a1a1a', color: '#ef9a9a' }
-    return { background: '#1e3a5f', color: '#4fc3f7' }
+    if (type === 'holding')   return { background: 'var(--tag-hold-bg)',  color: 'var(--tag-hold-color)',  border: '1px solid var(--tag-hold-border)' }
+    if (type === 'watchlist') return { background: 'var(--tag-watch-bg)', color: 'var(--tag-watch-color)', border: '1px solid var(--tag-watch-border)' }
+    return { background: 'var(--tag-track-bg)', color: 'var(--tag-track-color)', border: '1px solid var(--tag-track-border)' }
   }
 
   const handleSort = (col) => {

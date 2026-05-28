@@ -84,9 +84,9 @@ function SearchBox({ onSelect }) {
             >
               <span style={{
                 fontSize: 9, padding: '1px 4px', borderRadius: 2, flexShrink: 0,
-                background: item.market === 'KR' ? '#1a3a2a' : '#1a2a3a',
-                color: item.market === 'KR' ? '#81c784' : '#4fc3f7',
-                border: `1px solid ${item.market === 'KR' ? '#2e5a3a' : '#2a4a6a'}`,
+                background: item.market === 'KR' ? 'var(--tag-hold-bg)'  : 'var(--tag-track-bg)',
+                color:      item.market === 'KR' ? 'var(--tag-hold-color)' : 'var(--tag-track-color)',
+                border: `1px solid ${item.market === 'KR' ? 'var(--tag-hold-border)' : 'var(--tag-track-border)'}`,
               }}>
                 {item.market === 'KR' ? '🇰🇷' : '🇺🇸'}
               </span>
