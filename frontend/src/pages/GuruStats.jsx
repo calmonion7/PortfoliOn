@@ -127,10 +127,8 @@ export default function GuruStats() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
-              <th className="col-sticky" style={thStyle}>#</th>
-              <th style={thStyle}>티커</th>
-              {!isMobile && <th style={thStyle}>영문명</th>}
-              <th style={thStyle}>한글명</th>
+              <th style={{ ...thStyle, width: 28 }}>#</th>
+              <th style={thStyle}>종목</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>매니저수</th>
               <th style={thStyle}></th>
             </tr>
@@ -138,11 +136,13 @@ export default function GuruStats() {
           <tbody>
             {filteredPopularity.map((row, i) => (
               <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td className="col-sticky" style={tdStyle}>{i + 1}</td>
-                <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--accent)' }}>{row.ticker}</td>
-                {!isMobile && <td style={{ ...tdStyle, color: 'var(--text-3)' }}>{row.name}</td>}
-                <td style={tdStyle}>{row.name_kr || '-'}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{row.count}명</td>
+                <td style={{ ...tdStyle, color: 'var(--text-3)', fontSize: 12 }}>{i + 1}</td>
+                <td style={tdStyle}>
+                  <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>{row.ticker}</div>
+                  {row.name && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.name}</div>}
+                  {row.name_kr && <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{row.name_kr}</div>}
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.count}명</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
                   <WatchlistBtn
                     ticker={row.ticker}
@@ -205,19 +205,21 @@ export default function GuruStats() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
-                <th className="col-sticky" style={thStyle}>#</th>
-                <th style={thStyle}>티커</th>
-                <th style={thStyle}>한글명</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>가중치 합계</th>
+                <th style={{ ...thStyle, width: 28 }}>#</th>
+                <th style={thStyle}>종목</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>가중치합계</th>
                 <th style={thStyle}></th>
               </tr>
             </thead>
             <tbody>
               {filteredWeighted.map((row, i) => (
                 <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td className="col-sticky" style={tdStyle}>{i + 1}</td>
-                  <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--accent)' }}>{row.ticker}</td>
-                  <td style={tdStyle}>{row.name_kr || row.name || '-'}</td>
+                  <td style={{ ...tdStyle, color: 'var(--text-3)', fontSize: 12 }}>{i + 1}</td>
+                  <td style={tdStyle}>
+                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>{row.ticker}</div>
+                    {row.name && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.name}</div>}
+                    {row.name_kr && <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{row.name_kr}</div>}
+                  </td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.score.toFixed(3)}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     <WatchlistBtn
