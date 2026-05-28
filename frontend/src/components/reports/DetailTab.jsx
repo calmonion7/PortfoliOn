@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
 import { fmtPrice as fmt } from '../../utils'
-import { TH, TD, fmtN, rsiColor, GapCell, SectionTitle, _weather } from './reportUtils.jsx'
+import { fmtN, SectionTitle, _weather } from './reportUtils.jsx'
 import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
 import api from '../../api'
@@ -81,6 +81,11 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               }}>
                 <div style={{ fontSize: isLg ? 10 : 8, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
                 <div style={{ fontSize: 8, color: l.color, opacity: 0.85 }}>{fmt(l.value, market)}</div>
+                {!isLg && price != null && (
+                  <div style={{ fontSize: 8, color: l.color, opacity: 0.7 }}>
+                    {(() => { const p = (l.value - price) / price * 100; return `${p >= 0 ? '+' : ''}${p.toFixed(1)}%` })()}
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -107,46 +112,16 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
     })
   }
   return (
-    <div style={{ marginBottom: 16, overflowX: 'auto', background: 'var(--bg-elev)', borderRadius: 6, padding: '10px 12px' }}>
+    <div style={{ marginBottom: 16, background: 'var(--bg-elev)', borderRadius: 6, padding: '10px 12px' }}>
       <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>🎯 RSI 예상 타점</div>
-      <table style={{ borderCollapse: 'collapse', fontSize: 12, color: 'var(--text)' }}>
-        <thead>
-          <tr style={{ background: 'var(--bg-elev-2)' }}>
-            <th style={{ ...TH, textAlign: 'left', color: 'var(--text-3)' }}>시간대</th>
-            <th style={{ ...TH, color: '#4db6ac' }}>RSI20</th>
-            <th style={{ ...TH, color: '#4db6ac' }}>RSI25</th>
-            <th style={{ ...TH, color: '#4db6ac' }}>RSI30</th>
-            <th style={{ ...TH, color: 'var(--text-3)' }}>현재RSI</th>
-            <th style={{ ...TH, color: '#ff8a65' }}>RSI70</th>
-            <th style={{ ...TH, color: '#ff8a65' }}>RSI75</th>
-            <th style={{ ...TH, color: '#ff8a65' }}>RSI80</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(({ label, d }) => d?.rsi != null && (
-            <tr key={label}>
-              <td style={{ ...TD, textAlign: 'left', color: 'var(--text-3)', fontWeight: 600 }}>{label}</td>
-              <GapCell target={d.target_20} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_20'} market={market} />
-              <GapCell target={d.target_25} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_25'} market={market} />
-              <GapCell target={d.target_30} price={price} baseColor="#4db6ac" highlight={closestKey === 'target_30'} market={market} />
-              <td style={{ ...TD, color: rsiColor(d.rsi), fontWeight: 600 }}>{fmtN(d.rsi)}</td>
-              <GapCell target={d.target_70} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_70'} market={market} />
-              <GapCell target={d.target_75} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_75'} market={market} />
-              <GapCell target={d.target_80} price={price} baseColor="#ef9a9a" highlight={closestKey === 'target_80'} market={market} />
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {(vp || target) && (
-        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {rows.map(({ label, d }) => d?.rsi != null && (
-            <div key={label}>
-              <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-              <PriceLevelChart rsiData={d} price={price} vp={vp} target={target} market={market} />
-            </div>
-          ))}
-        </div>
-      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {rows.map(({ label, d }) => d?.rsi != null && (
+          <div key={label}>
+            <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+            <PriceLevelChart rsiData={d} price={price} vp={vp} target={target} market={market} />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
