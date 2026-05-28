@@ -102,11 +102,12 @@ def promote_to_holdings(ticker: str, payload: PromotePayload, user_id: str = Dep
     if ticker_exists_in(holdings, upper):
         raise errors.already_exists(ticker, "holdings")
 
-    storage.save_watchlist_tickers(user_id, [t for t in watchlist if t.upper() != upper])
-
     stocks = storage.get_stocks(user_id)
     stock_data = find_ticker(stocks, upper) or \
         {"ticker": upper, "name": upper, "competitors": [], "moat": "", "growth_plan": "", "market": "US", "exchange": ""}
+
+    storage.save_watchlist_tickers(user_id, [t for t in watchlist if t.upper() != upper])
+
     new_holding = {
         "ticker": upper,
         "quantity": payload.quantity,
