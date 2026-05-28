@@ -77,8 +77,13 @@ def _run_backfill(stocks: list, days: int):
 
 
 @router.post("/report/generate", status_code=202)
-def generate_all(background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
-    stocks = storage.get_all_stocks(user_id)
+def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = None, user_id: str = Depends(get_current_user)):
+    all_stocks = storage.get_all_stocks(user_id)
+    if tickers:
+        ticker_set = {t.strip().upper() for t in tickers.split(',')}
+        stocks = [s for s in all_stocks if s['ticker'].upper() in ticker_set]
+    else:
+        stocks = all_stocks
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     _progress.start(len(stocks))

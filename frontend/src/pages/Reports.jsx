@@ -99,6 +99,29 @@ const fetchList = useCallback(() => {
     }
   }
 
+  const generateBatch = async (tickers) => {
+    if (!tickers.length) return
+    setGenerating('__batch__')
+    setGenProgress({ done: 0, total: 0 })
+    clearInterval(pollRef.current)
+    try {
+      await api.post(`/api/report/generate?tickers=${tickers.join(',')}`)
+      pollRef.current = setInterval(async () => {
+        try {
+          const { data } = await api.get('/api/report/progress')
+          setGenProgress({ done: data.done, total: data.total })
+          if (!data.running && data.total > 0 && data.done >= data.total) {
+            clearInterval(pollRef.current)
+            setGenerating(null)
+            api.get('/api/report/list').then(({ data: list }) => setReportList(list))
+          }
+        } catch {}
+      }, 1500)
+    } catch {
+      setGenerating(null)
+    }
+  }
+
   useEffect(() => () => clearInterval(pollRef.current), [])
 
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
@@ -114,8 +137,15 @@ const fetchList = useCallback(() => {
   const watchlistLowCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g === null || g >= 40 }).length
   const watchlistHighCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g !== null && g < 40 }).length
   const watchlistCount = watchlistAll.length
+  const ungeneratedTickers = Object.entries(reportList).filter(([, v]) => v.dates.length === 0).map(([t]) => t)
+  const ungeneratedCount = ungeneratedTickers.length
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (activeTab === 'ungenerated' && ungeneratedCount === 0) setActiveTab('holdings')
+  }, [ungeneratedCount, activeTab])
 
   const _matchSubTab = ([, v]) => {
+    if (activeTab === 'ungenerated') return v.dates.length === 0
     if (activeTab === 'holdings') return v.category === 'holdings'
     if (v.category !== 'watchlist') return false
     if (watchlistSub === 'warn') return _hasWarning(v.summary)
@@ -258,9 +288,12 @@ const fetchList = useCallback(() => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: (activeTab === 'watchlist' || activeTab === 'ungenerated') ? 0 : 12 }}>
           <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
           <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
+          {ungeneratedCount > 0 && (
+            <button className={`tab-btn${activeTab === 'ungenerated' ? ' active' : ''}`} onClick={() => setActiveTab('ungenerated')} style={{ color: activeTab === 'ungenerated' ? 'var(--accent)' : '#ffb74d' }}>미생성 ({ungeneratedCount})</button>
+          )}
         </div>
         {activeTab === 'watchlist' && (
           <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 8, marginTop: 4 }}>
@@ -299,6 +332,22 @@ const fetchList = useCallback(() => {
             </button>
           ))}
         </div>
+        {activeTab === 'ungenerated' && !listLoading && ungeneratedCount > 0 && (
+          <button
+            onClick={() => generateBatch(ungeneratedTickers.filter(t => { const m = reportList[t]?.market; return marketFilter === 'ALL' || m === marketFilter }))}
+            disabled={!!generating}
+            style={{
+              width: '100%', marginBottom: 8, padding: '5px 0', fontSize: 12,
+              background: generating === '__batch__' ? 'var(--bg-elev)' : 'var(--accent)',
+              color: generating === '__batch__' ? 'var(--accent)' : 'var(--bg)',
+              border: '1px solid var(--accent)', borderRadius: 4, cursor: generating ? 'default' : 'pointer',
+            }}
+          >
+            {generating === '__batch__'
+              ? `생성 중 ${genProgress.done}/${genProgress.total || '?'}`
+              : `모두 생성 (${tabEntries.length}개)`}
+          </button>
+        )}
         {listLoading
           ? <LoadingSpinner label="" size={20} style={{ padding: 20 }} />
           : (hasFetched && tabEntries.length === 0)
