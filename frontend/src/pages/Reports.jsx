@@ -22,7 +22,7 @@ export default function Reports() {
   const [listLoading, setListLoading] = useState(true)
   const [hasFetched, setHasFetched] = useState(false)
   const [generating, setGenerating] = useState(null)
-  const [genProgress, setGenProgress] = useState({ done: 0, total: 0 })
+  const [genProgress, setGenProgress] = useState({ done: 0, total: 0, failed: [] })
   const pollRef = useRef(null)
   const [activeTab, setActiveTab] = useState('holdings')
   const [watchlistSub, setWatchlistSub] = useState('low')
@@ -74,7 +74,7 @@ const fetchList = useCallback(() => {
       pollRef.current = setInterval(async () => {
         try {
           const { data } = await api.get('/api/report/progress')
-          setGenProgress({ done: data.done, total: data.total })
+          setGenProgress({ done: data.done, total: data.total, failed: data.failed || [] })
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)
             setGenerating(null)
@@ -109,7 +109,7 @@ const fetchList = useCallback(() => {
       pollRef.current = setInterval(async () => {
         try {
           const { data } = await api.get('/api/report/progress')
-          setGenProgress({ done: data.done, total: data.total })
+          setGenProgress({ done: data.done, total: data.total, failed: data.failed || [] })
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)
             setGenerating(null)
@@ -137,7 +137,8 @@ const fetchList = useCallback(() => {
   const watchlistLowCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g === null || g >= 40 }).length
   const watchlistHighCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g !== null && g < 40 }).length
   const watchlistCount = watchlistAll.length
-  const ungeneratedTickers = Object.entries(reportList).filter(([, v]) => v.dates.length === 0).map(([t]) => t)
+  const _isUngenerated = ([, v]) => v.dates.length === 0 || v.summary?.price == null
+  const ungeneratedTickers = Object.entries(reportList).filter(_isUngenerated).map(([t]) => t)
   const ungeneratedCount = ungeneratedTickers.length
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -145,7 +146,7 @@ const fetchList = useCallback(() => {
   }, [ungeneratedCount, activeTab])
 
   const _matchSubTab = ([, v]) => {
-    if (activeTab === 'ungenerated') return v.dates.length === 0
+    if (activeTab === 'ungenerated') return _isUngenerated([, v])
     if (activeTab === 'holdings') return v.category === 'holdings'
     if (v.category !== 'watchlist') return false
     if (watchlistSub === 'warn') return _hasWarning(v.summary)
@@ -202,6 +203,7 @@ const fetchList = useCallback(() => {
   const renderTickerItem = (ticker, info) => {
     const isSelected = selected.ticker === ticker && view === 'detail'
     const hasReport = info.dates.length > 0
+    const isBroken = hasReport && info.summary?.price == null
     const s = info.summary
     const market = s?.market || info.market
     const rsi = s?.daily_rsi?.rsi
@@ -211,7 +213,7 @@ const fetchList = useCallback(() => {
     return (
       <div
         key={ticker}
-        onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
+        onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
         className="report-item"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', background: isSelected ? 'var(--surface-hover)' : 'transparent', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}
       >
@@ -231,7 +233,7 @@ const fetchList = useCallback(() => {
           {guruMap[ticker] && (
             <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
           )}
-          {!hasReport && <div style={{ color: 'var(--text-3)', fontSize: 10 }}>클릭하여 생성</div>}
+          {(!hasReport || isBroken) && <div style={{ color: isBroken ? '#ef9a9a' : 'var(--text-3)', fontSize: 10 }}>{isBroken ? '데이터 오류 — 클릭하여 재생성' : '클릭하여 생성'}</div>}
           {hasReport && s && (
             <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
               {s.price != null && (
@@ -414,7 +416,7 @@ const fetchList = useCallback(() => {
                   return (
                     <tr
                       key={ticker}
-                      onClick={() => hasReport ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
+                      onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
                       style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)', opacity: hasReport ? 1 : 0.6 }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-hover)'; e.currentTarget.querySelector('td').style.background = 'var(--surface-hover)' }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.querySelector('td').style.background = 'var(--bg)' }}

@@ -389,7 +389,11 @@ def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None) -> d
         t = _t if _t is not None else yf.Ticker(yf_sym)
         info = t.info
         hist = t.history(period="1y")
-        current = info.get("currentPrice") or info.get("regularMarketPrice") or None
+        current = info.get("currentPrice") or info.get("regularMarketPrice")
+        # info 실패 시 history 마지막 종가로 폴백
+        if not current and not hist.empty:
+            current = float(hist["Close"].iloc[-1])
+        current = current or None
         prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else None
         week_ago = float(hist["Close"].iloc[-6]) if len(hist) >= 6 else None
         month_ago = float(hist["Close"].iloc[-23]) if len(hist) >= 23 else None

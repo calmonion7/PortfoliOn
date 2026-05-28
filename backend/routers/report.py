@@ -103,7 +103,7 @@ def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = 
 
 
 def _run_generation(stocks: list):
-    _progress.start(len(stocks))
+    # start()는 호출한 엔드포인트에서 이미 호출함 — 여기서 이중 호출 금지
 
     def _process_one(stock):
         _progress.set(current=stock["ticker"])
@@ -113,6 +113,7 @@ def _run_generation(stocks: list):
             consensus_svc.collect(stock["ticker"])
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
+            _progress.add_failed(stock["ticker"])
         finally:
             _progress.increment()
 
