@@ -150,9 +150,11 @@ function MonthGrid({ year, month, events }) {
                     {!isHoliday && e.ticker && (
                       <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{e.ticker}</span>
                     )}
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {e.name || ''}
-                    </span>
+                    {!isHoliday && (
+                      <span style={{ fontSize: 12, color: 'var(--text-3)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {e.name || ''}
+                      </span>
+                    )}
                   </div>
                 )
               })}
