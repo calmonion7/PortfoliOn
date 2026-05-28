@@ -136,6 +136,11 @@ export default function ConsensusChart({ ticker, market }) {
     )
   }
 
+  const pctLabel = (delta, prevVal, up) => {
+    if (delta == null || prevVal == null || prevVal === 0) return ''
+    return ` ${up ? '↑' : '↓'}${Math.abs((delta / prevVal) * 100).toFixed(0)}%`
+  }
+
   const overlayBuyDot = (props) => {
     const { cx, cy, index, value } = props
     if (value == null) return <g key={index} />
@@ -147,9 +152,7 @@ export default function ConsensusChart({ ticker, market }) {
     const labelColor = delta == null || delta === 0 ? '#43a047' : up ? '#81c784' : '#ef9a9a'
     const label = delta == null
       ? String(value)
-      : delta !== 0
-        ? `${value} ${up ? '↑' : '↓'}${Math.abs((delta / prevVal) * 100).toFixed(0)}%`
-        : null
+      : delta !== 0 ? `${value}${pctLabel(delta, prevVal, up)}` : null
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#43a047" />
@@ -169,15 +172,11 @@ export default function ConsensusChart({ ticker, market }) {
     const labelColor = delta == null || delta === 0 ? color : up ? '#81c784' : '#ef9a9a'
     const label = delta == null
       ? String(value)
-      : delta !== 0
-        ? `${value} ${up ? '↑' : '↓'}${Math.abs((delta / prevVal) * 100).toFixed(0)}%`
-        : null
+      : delta !== 0 ? `${value}${pctLabel(delta, prevVal, up)}` : null
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill={color} />
-        {label && (
-          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, filteredData.length)} fontSize={8} fill={labelColor}>{label}</text>
-        )}
+        {label && bgLabel(cx, cy, label, labelColor, anchor(index, filteredData.length), up ? -10 : 14)}
       </g>
     )
   }
