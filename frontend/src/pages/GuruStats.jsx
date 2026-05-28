@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import useIsMobile from '../hooks/useIsMobile'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
-const thStyle = { padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12 }
-const tdStyle = { padding: '8px 12px', color: 'var(--text)' }
+const thStyle = { padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }
+const tdStyle = { padding: '8px 10px', color: 'var(--text)' }
 
 const TABS = [
   { key: 'popularity', label: '인기순' },
@@ -34,6 +35,7 @@ function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
 }
 
 export default function GuruStats() {
+  const isMobile = useIsMobile()
   const [popularity, setPopularity] = useState([])
   const [top3, setTop3]             = useState([])
   const [weighted, setWeighted]     = useState([])
@@ -113,7 +115,7 @@ export default function GuruStats() {
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="티커 / 종목명 / 매니저명 검색..."
-          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-elev)', color: 'var(--text)', fontSize: 13, width: 260 }}
+          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-elev)', color: 'var(--text)', fontSize: 13, flex: 1, minWidth: 0 }}
         />
         {query && tab === 'popularity' && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredPopularity.length}개</span>}
         {query && tab === 'weighted'   && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredWeighted.length}개</span>}
@@ -127,9 +129,9 @@ export default function GuruStats() {
             <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
               <th className="col-sticky" style={thStyle}>#</th>
               <th style={thStyle}>티커</th>
-              <th style={thStyle}>영문명</th>
+              {!isMobile && <th style={thStyle}>영문명</th>}
               <th style={thStyle}>한글명</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>매니저 수</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>매니저수</th>
               <th style={thStyle}></th>
             </tr>
           </thead>
@@ -138,7 +140,7 @@ export default function GuruStats() {
               <tr key={row.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td className="col-sticky" style={tdStyle}>{i + 1}</td>
                 <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--accent)' }}>{row.ticker}</td>
-                <td style={{ ...tdStyle, color: 'var(--text-3)' }}>{row.name}</td>
+                {!isMobile && <td style={{ ...tdStyle, color: 'var(--text-3)' }}>{row.name}</td>}
                 <td style={tdStyle}>{row.name_kr || '-'}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{row.count}명</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -162,13 +164,13 @@ export default function GuruStats() {
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
               <th className="col-sticky" style={thStyle}>Manager</th>
-              {[1, 2, 3].map(r => <th key={r} style={thStyle}>{r}위 (전체보유)</th>)}
+              {[1, 2, 3].map(r => <th key={r} style={thStyle}>{r}위</th>)}
             </tr>
           </thead>
           <tbody>
             {filteredTop3.map(m => (
               <tr key={m.manager_name} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td className="col-sticky" style={tdStyle}>{m.manager_name}</td>
+                <td className="col-sticky" style={{ ...tdStyle, maxWidth: isMobile ? 100 : 180, wordBreak: 'break-word' }}>{m.manager_name}</td>
                 {[0, 1, 2].map(i => {
                   const h = m.top3[i]
                   return (
