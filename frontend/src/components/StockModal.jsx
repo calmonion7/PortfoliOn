@@ -25,8 +25,10 @@ function SearchBox({ onSelect }) {
   const [open, setOpen] = useState(false)
   const debouncedQuery = useDebounce(query, 350)
   const boxRef = useRef(null)
+  const justSelected = useRef(false)
 
   useEffect(() => {
+    if (justSelected.current) { justSelected.current = false; return }
     if (!debouncedQuery.trim()) { setResults([]); setOpen(false); return }
     setLoading(true)
     // 항상 ALL로 검색 — 결과 선택 시 market/exchange 자동 설정
@@ -43,6 +45,7 @@ function SearchBox({ onSelect }) {
   }, [])
 
   const handleSelect = (item) => {
+    justSelected.current = true
     onSelect(item)
     setQuery(item.name)
     setOpen(false)
