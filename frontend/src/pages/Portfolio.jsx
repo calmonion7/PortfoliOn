@@ -115,9 +115,6 @@ export default function Portfolio() {
     <>
       <header className="appbar">
         <h1>포트폴리오</h1>
-        <div className="actions">
-          <button className="icon-btn" onClick={openAdd}><Plus /></button>
-        </div>
       </header>
 
       <div className="hero">
