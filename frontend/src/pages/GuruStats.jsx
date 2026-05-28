@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import useIsMobile from '../hooks/useIsMobile'
+import '../components/ui/Button.css'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 
@@ -12,22 +13,36 @@ const TABS = [
 ]
 
 function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
+  const [loading, setLoading] = useState(false)
   const entry = stockMap[ticker]
   if (entry === 'holding') {
-    return <span style={{ fontSize: 11, color: '#555', padding: '3px 8px' }}>보유중</span>
+    return <span style={{ fontSize: 11, color: 'var(--text-3)', padding: '3px 8px' }}>보유중</span>
   }
   const inWatchlist = entry === 'watchlist'
+
+  const handleClick = async () => {
+    setLoading(true)
+    try { await onToggle(ticker, name, inWatchlist) }
+    finally { setLoading(false) }
+  }
+
   return (
     <button
-      onClick={() => onToggle(ticker, name, inWatchlist)}
+      onClick={handleClick}
+      disabled={loading}
       style={{
         fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none',
-        cursor: 'pointer',
+        cursor: loading ? 'progress' : 'pointer',
         background: inWatchlist ? 'var(--surface-hover)' : 'var(--bg-elev-2)',
         color: inWatchlist ? 'var(--down)' : 'var(--up)',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        minWidth: 48, opacity: loading ? 0.7 : 1, transition: 'opacity .15s',
       }}
     >
-      {inWatchlist ? '★ 삭제' : '☆ 추가'}
+      {loading
+        ? <span className="btn__spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} aria-hidden />
+        : (inWatchlist ? '★ 삭제' : '☆ 추가')
+      }
     </button>
   )
 }
@@ -42,12 +57,11 @@ export default function GuruStats() {
   const [tab, setTab]               = useState('popularity')
   const [query, setQuery]           = useState('')
 
-  const loadStockMap = useCallback(() => {
-    api.get('/api/stocks').then(({ data }) => {
-      const map = {}
-      data.forEach(s => { map[s.ticker] = s.type })
-      setStockMap(map)
-    })
+  const loadStockMap = useCallback(async () => {
+    const { data } = await api.get('/api/stocks')
+    const map = {}
+    data.forEach(s => { map[s.ticker] = s.type })
+    setStockMap(map)
   }, [])
 
   useEffect(() => {
@@ -70,7 +84,7 @@ export default function GuruStats() {
       } else {
         await api.post('/api/watchlist', { ticker, name: name || ticker })
       }
-      loadStockMap()
+      await loadStockMap()
     } catch (err) {
       alert(err.response?.data?.detail || '오류가 발생했습니다')
     }
