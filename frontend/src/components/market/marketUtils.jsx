@@ -36,6 +36,72 @@ export const DESC_STYLE = {
   lineHeight: 1.6,
 }
 
+export const SECTION_CONTENT_STYLE = {
+  padding: 16,
+  background: 'var(--bg)',
+}
+
+const SECTION_CARD_OUTER = {
+  border: '1px solid var(--border)',
+  borderRadius: 12,
+  overflow: 'hidden',
+  marginBottom: 12,
+  background: 'var(--bg-elev)',
+}
+
+export function SectionCard({ title, summary, open, onToggle, children }) {
+  return (
+    <div style={SECTION_CARD_OUTER}>
+      <button
+        onClick={onToggle}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '14px 16px',
+          background: 'none',
+          border: 'none',
+          borderBottom: open ? '1px solid var(--border)' : 'none',
+          cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {summary && <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{summary}</span>}
+          <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{open ? '∧' : '∨'}</span>
+        </div>
+      </button>
+      {open && <div style={SECTION_CONTENT_STYLE}>{children}</div>}
+    </div>
+  )
+}
+
+export function SectionCardLoading({ title }) {
+  return (
+    <div style={SECTION_CARD_OUTER}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>…</span>
+      </div>
+      <div style={SECTION_CONTENT_STYLE}><LoadingBox /></div>
+    </div>
+  )
+}
+
+export function SectionCardError({ title }) {
+  return (
+    <div style={SECTION_CARD_OUTER}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+        <span style={{ fontSize: 12, color: '#e57373' }}>오류</span>
+      </div>
+      <div style={SECTION_CONTENT_STYLE}><ErrorBox /></div>
+    </div>
+  )
+}
+
 export function LoadingBox() {
   return (
     <div style={{ ...CARD_STYLE, color: 'var(--text-3)', fontSize: 13, padding: 24 }}>

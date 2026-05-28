@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox } from './marketUtils.jsx'
-import useIsMobile from '../../hooks/useIsMobile'
+import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function KrExportsSection() {
-  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -18,17 +16,16 @@ export default function KrExportsSection() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</h3><LoadingBox /></div>
-  if (error || !data) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</h3><ErrorBox /></div>
+  if (loading) return <SectionCardLoading title="한국 수출: 반도체 vs 비반도체" />
+  if (error || !data) return <SectionCardError title="한국 수출: 반도체 vs 비반도체" />
 
   if (data.error) {
     return (
-      <div style={SECTION_STYLE}>
-        <h3 style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</h3>
+      <SectionCard title="한국 수출: 반도체 vs 비반도체" summary="" open={open} onToggle={() => setOpen(o => !o)}>
         <div style={{ ...CARD_STYLE, fontSize: 13, color: 'var(--text-3)' }}>
           <p>{data.error}</p>
         </div>
-      </div>
+      </SectionCard>
     )
   }
 
@@ -46,18 +43,10 @@ export default function KrExportsSection() {
   const semiSharePrev = yoy3 ? (yoy3.semiconductor / (yoy3.semiconductor + yoy3.non_semiconductor) * 100) : null
   const latestLabel = latest?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')
 
+  const summary = semiShare != null ? `반도체 ${semiShare.toFixed(1)}%` : ''
+
   return (
-    <div style={SECTION_STYLE}>
-      {isMobile ? (
-        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
-          <span style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</span>
-          <span>{open ? '∧' : '∨'}</span>
-        </button>
-      ) : (
-        <h3 style={SECTION_HEADER_STYLE}>한국 수출: 반도체 vs 비반도체</h3>
-      )}
-      {(!isMobile || open) && (
-        <>
+    <SectionCard title="한국 수출: 반도체 vs 비반도체" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>관세청 월별 수출 통계 기준입니다. 반도체(HS 8542)는 한국 무역수지와 원화 가치의 핵심 동력으로, 수출 비중 상승은 업황 호조를 의미합니다. 비반도체 비중은 수출 다각화 정도를 나타냅니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
@@ -119,8 +108,6 @@ export default function KrExportsSection() {
           </LineChart>
         </ResponsiveContainer>
       </div>
-        </>
-      )}
-    </div>
+    </SectionCard>
   )
 }

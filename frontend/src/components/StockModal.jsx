@@ -109,6 +109,7 @@ function SearchBox({ onSelect }) {
 export default function StockModal({ stock, onSave, onClose, mode = 'holding' }) {
   const empty = mode === 'watchlist' ? WATCHLIST_EMPTY : HOLDING_EMPTY
   const [form, setForm] = useState(empty)
+  const [saving, setSaving] = useState(false)
   const isEdit = !!stock
   const mouseDownOnOverlay = useRef(false)
 
@@ -137,7 +138,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
     }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const ticker = form.market === 'KR'
       ? form.ticker.trim().replace(/\D/g, '').padStart(6, '0')
@@ -151,10 +152,15 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
       market: form.market,
       exchange: form.market === 'KR' ? (form.exchange || 'KS') : '',
     }
-    if (mode === 'holding') {
-      onSave({ ...base, quantity: parseFloat(form.quantity), avg_cost: parseFloat(form.avg_cost) })
-    } else {
-      onSave(base)
+    setSaving(true)
+    try {
+      if (mode === 'holding') {
+        await onSave({ ...base, quantity: parseFloat(form.quantity), avg_cost: parseFloat(form.avg_cost) })
+      } else {
+        await onSave(base)
+      }
+    } catch {
+      setSaving(false)
     }
   }
 
@@ -252,8 +258,10 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="submit" className="btn btn-primary">저장</button>
-            <button type="button" className="btn" onClick={onClose}>취소</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? '저장 중…' : '저장'}
+            </button>
+            <button type="button" className="btn" onClick={onClose} disabled={saving}>취소</button>
           </div>
         </form>
       </div>

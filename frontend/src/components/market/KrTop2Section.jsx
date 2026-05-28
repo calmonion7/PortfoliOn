@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox, krFmt, isEstimated } from './marketUtils.jsx'
-import useIsMobile from '../../hooks/useIsMobile'
+import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, krFmt, isEstimated } from './marketUtils.jsx'
 
 export default function KrTop2Section() {
-  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -18,8 +16,8 @@ export default function KrTop2Section() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</h3><LoadingBox /></div>
-  if (error || !data) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</h3><ErrorBox /></div>
+  if (loading) return <SectionCardLoading title="삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익" />
+  if (error || !data) return <SectionCardError title="삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익" />
 
   const lastActIdx = data.quarters.reduce((acc, q, i) => (!q.estimated ? i : acc), -1)
   const qs = data.quarters.map((q, i) => ({
@@ -36,18 +34,10 @@ export default function KrTop2Section() {
   const top2Share = latest ? (latest.top2 / (latest.top2 + latest.rest) * 100) : null
   const top2SharePrev = yoy2 ? (yoy2.top2 / (yoy2.top2 + yoy2.rest) * 100) : null
 
+  const summary = top2Share != null ? `Top2 ${top2Share.toFixed(1)}%` : ''
+
   return (
-    <div style={SECTION_STYLE}>
-      {isMobile ? (
-        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
-          <span style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</span>
-          <span>{open ? '∧' : '∨'}</span>
-        </button>
-      ) : (
-        <h3 style={SECTION_HEADER_STYLE}>삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익</h3>
-      )}
-      {(!isMobile || open) && (
-        <>
+    <SectionCard title="삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>삼성전자·SK하이닉스 두 반도체 대장주의 분기 순이익과 KOSPI 전체 나머지 종목을 비교합니다. 비중이 높을수록 한국 증시가 반도체 업황에 구조적으로 집중되어 있음을 나타냅니다. <span style={{ opacity: 0.7 }}>(E) = 네이버 컨센서스 추정치</span></p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
@@ -108,8 +98,6 @@ export default function KrTop2Section() {
           </LineChart>
         </ResponsiveContainer>
       </div>
-        </>
-      )}
-    </div>
+    </SectionCard>
   )
 }

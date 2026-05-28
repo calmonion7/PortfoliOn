@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox, isEstimated } from './marketUtils.jsx'
-import useIsMobile from '../../hooks/useIsMobile'
+import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, isEstimated } from './marketUtils.jsx'
 
 export default function M7EarningsSection() {
-  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -18,8 +16,8 @@ export default function M7EarningsSection() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>M7 vs 나머지 S&P 500 순이익</h3><LoadingBox /></div>
-  if (error || !data) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>M7 vs 나머지 S&P 500 순이익</h3><ErrorBox /></div>
+  if (loading) return <SectionCardLoading title="M7 vs 나머지 S&P 500 순이익" />
+  if (error || !data) return <SectionCardError title="M7 vs 나머지 S&P 500 순이익" />
 
   const qs = data.quarters.map(q => ({
     ...q,
@@ -33,18 +31,10 @@ export default function M7EarningsSection() {
   const m7Share = latest ? (latest.m7 / (latest.m7 + latest.rest) * 100) : null
   const m7SharePrev = yoy ? (yoy.m7 / (yoy.m7 + yoy.rest) * 100) : null
 
+  const summary = m7Share != null ? `M7 ${m7Share.toFixed(1)}%` : ''
+
   return (
-    <div style={SECTION_STYLE}>
-      {isMobile ? (
-        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
-          <span style={SECTION_HEADER_STYLE}>M7 vs 나머지 S&P 500 순이익</span>
-          <span>{open ? '∧' : '∨'}</span>
-        </button>
-      ) : (
-        <h3 style={SECTION_HEADER_STYLE}>M7 vs 나머지 S&P 500 순이익</h3>
-      )}
-      {(!isMobile || open) && (
-        <>
+    <SectionCard title="M7 vs 나머지 S&P 500 순이익" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>애플·마이크로소프트·구글·아마존·엔비디아·메타·테슬라 7개 빅테크의 분기 순이익과 S&P 500 나머지 493종목을 비교합니다. M7 비중이 높을수록 지수 수익률이 소수 종목에 집중되어 있음을 의미합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
@@ -104,8 +94,6 @@ export default function M7EarningsSection() {
           </LineChart>
         </ResponsiveContainer>
       </div>
-        </>
-      )}
-    </div>
+    </SectionCard>
   )
 }

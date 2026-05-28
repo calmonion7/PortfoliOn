@@ -10,7 +10,7 @@ import KrExportsSection from '../components/market/KrExportsSection'
 export default function Market() {
   return (
     <div style={{ maxWidth: 900 }}>
-      <h2 style={{ color: 'var(--text)', marginBottom: 24 }}>시장지표</h2>
+      <h2 style={{ color: 'var(--text)', marginBottom: 16 }}>시장지표</h2>
       <TreasurySection />
       <FxSection />
       <VixSection />

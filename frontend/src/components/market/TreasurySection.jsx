@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox } from './marketUtils.jsx'
+import { CARD_STYLE, DESC_STYLE, LoadingBox, ErrorBox, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 import useIsMobile from '../../hooks/useIsMobile'
 
 export default function TreasurySection() {
@@ -18,8 +18,8 @@ export default function TreasurySection() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>미국 국채금리</h3><LoadingBox /></div>
-  if (error || !data) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>미국 국채금리</h3><ErrorBox /></div>
+  if (loading) return <SectionCardLoading title="미국 국채금리" />
+  if (error || !data) return <SectionCardError title="미국 국채금리" />
 
   const LABELS = { '3m': '3개월', '5y': '5년', '10y': '10년', '30y': '30년' }
   const rates = data.rates || {}
@@ -34,18 +34,11 @@ export default function TreasurySection() {
       : null,
   }))
 
+  const r10y = rates['10y']
+  const summary = r10y ? `10Y ${r10y.current.toFixed(2)}%` : ''
+
   return (
-    <div style={SECTION_STYLE}>
-      {isMobile ? (
-        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
-          <span style={SECTION_HEADER_STYLE}>미국 국채금리</span>
-          <span>{open ? '∧' : '∨'}</span>
-        </button>
-      ) : (
-        <h3 style={SECTION_HEADER_STYLE}>미국 국채금리</h3>
-      )}
-      {(!isMobile || open) && (
-        <>
+    <SectionCard title="미국 국채금리" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>연준 통화정책 방향의 핵심 지표입니다. 단기(2년)는 금리 기대를, 장기(10년·30년)는 경기 및 인플레이션 전망을 반영합니다. 2년물이 10년물을 상회하는 장단기 역전은 역사적으로 경기 침체의 선행 신호입니다.</p>
       <div style={isMobile
         ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }
@@ -91,8 +84,6 @@ export default function TreasurySection() {
           </ResponsiveContainer>
         </div>
       )}
-        </>
-      )}
-    </div>
+    </SectionCard>
   )
 }

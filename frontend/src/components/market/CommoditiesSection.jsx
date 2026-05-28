@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, SECTION_STYLE, SECTION_HEADER_STYLE, DESC_STYLE, LoadingBox, ErrorBox } from './marketUtils.jsx'
-import useIsMobile from '../../hooks/useIsMobile'
+import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function CommoditiesSection() {
-  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -18,25 +16,18 @@ export default function CommoditiesSection() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>원자재</h3><LoadingBox /></div>
-  if (error || !data) return <div style={SECTION_STYLE}><h3 style={SECTION_HEADER_STYLE}>원자재</h3><ErrorBox /></div>
+  if (loading) return <SectionCardLoading title="원자재" />
+  if (error || !data) return <SectionCardError title="원자재" />
 
   const LABELS = { gold: '금 (Gold)', oil: 'WTI 원유', copper: '구리 (Copper)' }
   const prices = data.prices || {}
   const history = data.history || {}
 
+  const oil = prices.oil
+  const summary = oil ? `WTI $${oil.current.toFixed(1)}` : ''
+
   return (
-    <div style={SECTION_STYLE}>
-      {isMobile ? (
-        <button className="accordion-header" onClick={() => setOpen(o => !o)}>
-          <span style={SECTION_HEADER_STYLE}>원자재</span>
-          <span>{open ? '∧' : '∨'}</span>
-        </button>
-      ) : (
-        <h3 style={SECTION_HEADER_STYLE}>원자재</h3>
-      )}
-      {(!isMobile || open) && (
-        <>
+    <SectionCard title="원자재" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>금은 안전자산 수요와 실질금리를 반영합니다. WTI 원유는 경기 및 물가의 선행지표입니다. 구리는 '닥터 코퍼'로 불리며 산업 수요를 통해 경기 방향성을 선행 진단합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         {['gold', 'oil', 'copper'].map(key => {
@@ -85,8 +76,6 @@ export default function CommoditiesSection() {
           )
         })}
       </div>
-        </>
-      )}
-    </div>
+    </SectionCard>
   )
 }

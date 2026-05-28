@@ -68,6 +68,7 @@ export default function Portfolio() {
       setModalOpen(false); setEditing(null); setError(''); fetchAll()
     } catch (err) {
       setError(err.response?.data?.detail || '저장 실패')
+      throw err
     }
   }
 
