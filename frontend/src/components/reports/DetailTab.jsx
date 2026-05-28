@@ -30,7 +30,12 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const hi = Math.max(...vals) + pad
   const pct = v => ((v - lo) / (hi - lo)) * 100
   const sorted = [...levels].sort((a, b) => a.value - b.value)
-  const labelW = (l) => Math.max(5, Math.max(l.label.length, fmt(l.value, market).length) * 0.95)
+  const labelW = (l) => {
+    const priceStr = fmt(l.value, market)
+    const pctStr = l.size !== 'lg' && price != null
+      ? ` ${((l.value - price) / price * 100).toFixed(1)}%` : ''
+    return Math.max(6, Math.max(l.label.length, priceStr.length + pctStr.length) * 1.5)
+  }
   const aboveEdges = [], belowEdges = []
   sorted.forEach((l, i) => {
     l.above = i % 2 === 0
@@ -80,12 +85,14 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                 textAlign: 'center', whiteSpace: 'nowrap',
               }}>
                 <div style={{ fontSize: isLg ? 10 : 8, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
-                <div style={{ fontSize: 8, color: l.color, opacity: 0.85 }}>{fmt(l.value, market)}</div>
-                {!isLg && price != null && (
-                  <div style={{ fontSize: 8, color: l.color, opacity: 0.7 }}>
-                    {(() => { const p = (l.value - price) / price * 100; return `${p >= 0 ? '+' : ''}${p.toFixed(1)}%` })()}
-                  </div>
-                )}
+                <div style={{ fontSize: 8, color: l.color, opacity: 0.85 }}>
+                  {fmt(l.value, market)}
+                  {!isLg && price != null && (
+                    <span style={{ marginLeft: 3, opacity: 0.85 }}>
+                      {(() => { const p = (l.value - price) / price * 100; return `${p >= 0 ? '+' : ''}${p.toFixed(1)}%` })()}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )

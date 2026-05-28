@@ -97,9 +97,7 @@ export default function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {label && (
-          <text x={cx} y={up ? cy - 8 : cy + 14} textAnchor={anchor(index, filteredData.length)} fontSize={8} fill={color}>{label}</text>
-        )}
+        {label && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), up ? -10 : 14)}
       </g>
     )
   }
