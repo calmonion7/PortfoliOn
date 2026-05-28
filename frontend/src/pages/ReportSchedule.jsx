@@ -118,12 +118,12 @@ export default function ReportSchedule() {
         </div>
         <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)', opacity: schedule.enabled ? 1 : 0.4 }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500, marginBottom: 10 }}>요일</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             {DAYS.map(({ key, label }) => (
               <button key={key} type="button"
                 onClick={() => schedule.enabled && toggleDay(key)}
                 style={{
-                  width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0,
+                  flex: 1, height: 36, borderRadius: '50%', border: 'none',
                   background: schedule.days.includes(key) ? 'var(--text)' : 'var(--accent-soft)',
                   color: schedule.days.includes(key) ? 'var(--bg)' : 'var(--text-3)',
                   fontSize: 13, fontWeight: 500, cursor: schedule.enabled ? 'pointer' : 'default',
@@ -179,9 +179,16 @@ export default function ReportSchedule() {
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
             <span style={{ fontSize: 13, color: 'var(--text-3)', flexShrink: 0 }}>기간</span>
-            <div className="tabs">
+            <div style={{ flex: 1, display: 'flex', gap: 2, padding: 3, background: 'var(--accent-soft)', borderRadius: 10 }}>
               {[30, 60, 90].map(d => (
-                <button key={d} className={backfillDays === d ? 'is-active' : ''} onClick={() => setBackfillDays(d)}>
+                <button key={d} onClick={() => setBackfillDays(d)} style={{
+                  flex: 1, border: 0, padding: '7px 0', fontSize: 13, fontWeight: 500,
+                  borderRadius: 8, letterSpacing: '-0.01em',
+                  background: backfillDays === d ? 'var(--bg-elev)' : 'transparent',
+                  color: backfillDays === d ? 'var(--text)' : 'var(--text-3)',
+                  boxShadow: backfillDays === d ? 'var(--shadow-sm)' : 'none',
+                  cursor: 'pointer',
+                }}>
                   {d}일
                 </button>
               ))}

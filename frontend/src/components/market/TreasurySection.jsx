@@ -47,13 +47,15 @@ export default function TreasurySection() {
       {(!isMobile || open) && (
         <>
       <p style={DESC_STYLE}>연준 통화정책 방향의 핵심 지표입니다. 단기(2년)는 금리 기대를, 장기(10년·30년)는 경기 및 인플레이션 전망을 반영합니다. 2년물이 10년물을 상회하는 장단기 역전은 역사적으로 경기 침체의 선행 신호입니다.</p>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={isMobile
+        ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }
+        : { display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         {['3m', '5y', '10y', '30y'].map(key => {
           const r = rates[key]
           const up = r?.change_bp > 0
           const down = r?.change_bp < 0
           return (
-            <div key={key} style={{ ...CARD_STYLE, minWidth: 110, flex: 1 }}>
+            <div key={key} style={{ ...CARD_STYLE, ...(isMobile ? {} : { minWidth: 110, flex: 1 }) }}>
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{LABELS[key]}</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
                 {r ? `${r.current.toFixed(2)}%` : '-'}

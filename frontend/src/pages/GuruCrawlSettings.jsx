@@ -108,12 +108,12 @@ export default function GuruCrawlSettings() {
         </div>
         <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)', opacity: schedule.enabled ? 1 : 0.4 }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500, marginBottom: 10 }}>요일 (주 1회)</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             {DAYS.map(({ key, label }) => (
               <button key={key} type="button"
                 onClick={() => schedule.enabled && setSchedule(s => ({ ...s, day: key }))}
                 style={{
-                  width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0,
+                  flex: 1, height: 36, borderRadius: '50%', border: 'none',
                   background: schedule.day === key ? 'var(--text)' : 'var(--accent-soft)',
                   color: schedule.day === key ? 'var(--bg)' : 'var(--text-3)',
                   fontSize: 13, fontWeight: 500, cursor: schedule.enabled ? 'pointer' : 'default',
