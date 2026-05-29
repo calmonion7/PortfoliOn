@@ -677,6 +677,7 @@ const fetchList = useCallback(() => {
                     <ReportSectionCompetitors
                       competitors={detail.summary.competitors_data}
                       market={detail.summary.market}
+                      ticker={selected.ticker}
                     />
                     <ReportSectionText title="⚠️ 리스크" text={detail.summary.risks} />
                     <ReportSectionText title="🏰 경제적 해자" text={detail.summary.moat} />

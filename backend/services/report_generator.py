@@ -125,10 +125,13 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         "competitors_data": [
             {
                 "ticker": q.get("ticker") or c,
-                "name": q.get("name", ""),
-                "price": q.get("price"),
+                "name": q.get("name", "") or (stock.get("name", ticker) if c == ticker else ""),
+                "price": (
+                    q.get("price") or (round(float(daily_df["Close"].iloc[-1]), 2) if c == ticker and not daily_df.empty else None)
+                ),
                 "market_cap": q.get("market_cap"),
                 "ytd_return": q.get("ytd_return"),
+                "is_self": c == ticker,
             }
             for c, q in zip(
                 [ticker] + list(competitors),
