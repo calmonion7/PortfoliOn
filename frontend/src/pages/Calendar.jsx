@@ -174,6 +174,7 @@ export default function Calendar() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [fetchKey, setFetchKey] = useState(0)
+  const [refreshErr, setRefreshErr] = useState('')
 
   const monthStr = `${year}-${String(month).padStart(2, '0')}`
 
@@ -198,8 +199,10 @@ export default function Calendar() {
   }, [year, month, fetchKey])
 
   const refresh = () => {
+    setRefreshErr('')
     api.delete(`/api/calendar/cache?month=${monthStr}`)
-      .finally(() => setFetchKey(k => k + 1))
+      .then(() => setFetchKey(k => k + 1))
+      .catch(() => setRefreshErr('새로고침 실패'))
   }
 
   const prevMonth = () => {
@@ -217,6 +220,7 @@ export default function Calendar() {
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={refresh} disabled={loading} title="캐시 삭제 후 새로고침"
             style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: loading ? 'default' : 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 13 }}>↺</button>
+          {refreshErr && <span style={{ fontSize: 11, color: 'var(--error, #ef5350)' }}>{refreshErr}</span>}
           <button onClick={prevMonth}
             style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '2px 10px', borderRadius: 4, fontSize: 16 }}>‹</button>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', minWidth: 90, textAlign: 'center' }}>
