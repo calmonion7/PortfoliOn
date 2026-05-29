@@ -10,6 +10,7 @@ from services.market_indicators_service import (
     get_econ_indicators,
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
+    _fetch_and_save_econ_indicators,
 )
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -85,5 +86,14 @@ def refresh_earnings():
         m7 = _fetch_and_save_m7_earnings()
         kr = _fetch_and_save_kr_top2_earnings()
         return {"ok": True, "m7_quarters": len(m7.get("quarters", [])), "kr_quarters": len(kr.get("quarters", []))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-econ")
+def refresh_econ():
+    try:
+        data = _fetch_and_save_econ_indicators()
+        return {"ok": True, "cpi_points": len(data.get("cpi", [])), "unemp_points": len(data.get("unemployment", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
