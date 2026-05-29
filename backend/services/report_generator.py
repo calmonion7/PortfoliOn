@@ -12,6 +12,16 @@ from services.db import get_db
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 
 
+def _fin_num(v):
+    """yfinance info 값을 유한 float으로 변환. 'Infinity'/NaN/None → None."""
+    import math
+    try:
+        f = float(v)
+        return f if math.isfinite(f) else None
+    except (TypeError, ValueError):
+        return None
+
+
 def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
     ticker = stock["ticker"]
     market = stock.get("market", "US")
@@ -23,13 +33,15 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
 
     competitors = stock.get("competitors", [])
 
-    # US 티커는 단일 yf.Ticker 객체 공유 — 동일 티커에 대한 동시 요청 방지
+    # _t.history / _t.info는 thread-safe하지 않으므로 executor 외부에서 직렬 호출
     _t = yf.Ticker(yf_sym) if market != "KR" else None
     if _t is not None:
         try:
-            _ = _t.info  # info 사전 캐싱 (이후 호출은 캐시 반환)
+            _ = _t.info  # info 사전 캐싱
         except Exception:
             pass
+    _hist_fn = _t.history if _t is not None else yf.Ticker(yf_sym).history
+    daily_df = _hist_fn(period="1y")
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange, _t)
@@ -37,9 +49,6 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
         f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
         f_rsi       = ex.submit(indicators.get_timeframe_rsi, yf_sym)
-        _hist_fn    = _t.history if _t is not None else yf.Ticker(yf_sym).history
-        f_history   = ex.submit(_hist_fn, period="1y")
-        f_info      = ex.submit(lambda: _t.info) if _t is not None else None
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
         f_comps     = [ex.submit(mkt.get_quote, c, market, exchange) for c in competitors]
@@ -49,7 +58,6 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
     financials_annual = f_fin_ann.result()
     analyst           = f_analyst.result()
     timeframe_rsi     = f_rsi.result()
-    daily_df          = f_history.result()
     finviz            = f_finviz.result() if f_finviz is not None else {}
     news              = f_news.result()
     competitor_quotes = [f.result() for f in f_comps]
@@ -74,12 +82,12 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         pbr = round(current_price / actual_bps, 2) if current_price and actual_bps else None
     else:
         try:
-            _info = f_info.result() if f_info is not None else {}
+            _info = (_t.info if _t is not None else {}) or {}
             sector = _info.get("sector", "")
             industry = _info.get("industry", "")
-            trailing_per = _info.get("trailingPE")
-            forward_per = _info.get("forwardPE")
-            pbr = _info.get("priceToBook")
+            trailing_per = _fin_num(_info.get("trailingPE"))
+            forward_per = _fin_num(_info.get("forwardPE"))
+            pbr = _fin_num(_info.get("priceToBook"))
         except Exception:
             sector, industry = "", ""
             trailing_per = forward_per = pbr = None
