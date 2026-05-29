@@ -263,22 +263,24 @@ export default function ConsensusChart({ ticker, market }) {
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
-            <div style={{ display: 'flex', gap: 0 }}>
-              {['평균목표가', '애널리스트 의견', '추이 비교'].map((t, i) => (
-                <button key={i} onClick={() => setTab(i)} className={`tab-btn sm${tab === i ? ' active' : ''}`}>{t}</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 2, paddingBottom: 2 }}>
-              {['1M', '3M', '6M', '1Y', 'ALL'].map(p => (
-                <button key={p} onClick={() => setPeriod(p)} style={{
-                  background: period === p ? 'var(--accent)' : 'transparent',
-                  border: '1px solid var(--border)',
-                  color: period === p ? 'var(--bg)' : 'var(--text-3)',
-                  borderRadius: 3, padding: '1px 6px', fontSize: 10,
-                  cursor: 'pointer',
-                }}>{p}</button>
-              ))}
+          <div style={{ borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 0 }}>
+                {['목표가', '의견', '비교'].map((t, i) => (
+                  <button key={i} onClick={() => setTab(i)} className={`tab-btn sm${tab === i ? ' active' : ''}`}>{t}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 2, paddingBottom: 2 }}>
+                {['1M', '3M', '6M', '1Y', 'ALL'].map(p => (
+                  <button key={p} onClick={() => setPeriod(p)} style={{
+                    background: period === p ? 'var(--accent)' : 'transparent',
+                    border: '1px solid var(--border)',
+                    color: period === p ? 'var(--bg)' : 'var(--text-3)',
+                    borderRadius: 3, padding: '1px 6px', fontSize: 10,
+                    cursor: 'pointer',
+                  }}>{p}</button>
+                ))}
+              </div>
             </div>
           </div>
           {tab === 0 && (
