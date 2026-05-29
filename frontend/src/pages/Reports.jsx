@@ -80,8 +80,12 @@ const fetchList = useCallback(() => {
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)
             setGenerating(null)
-            if (data.failed?.length) showToast(`생성 실패: ${data.failed.join(', ')}`, 'error')
-            else showToast(`${ticker} 리포트 생성 완료`)
+            if (data.failed?.length) {
+              const f = data.failed[0]
+              const errStr = f.error?.length > 80 ? f.error.slice(0, 80) + '…' : f.error
+              const msg = errStr ? `생성 실패: ${f.ticker} — ${errStr}` : `생성 실패: ${f.ticker}`
+              showToast(msg, 'error')
+            } else showToast(`${ticker} 리포트 생성 완료`)
             api.get('/api/report/list').then(({ data: list }) => {
               setReportList(list)
               const dates = list[ticker]?.dates || []
@@ -118,8 +122,15 @@ const fetchList = useCallback(() => {
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)
             setGenerating(null)
-            if (data.failed?.length) showToast(`생성 실패: ${data.failed.join(', ')}`, 'error')
-            else showToast(`리포트 ${data.done}개 생성 완료`)
+            if (data.failed?.length) {
+              const names = data.failed.map(f => f.ticker).join(', ')
+              const firstErr = data.failed[0]?.error
+              const errStr = firstErr?.length > 80 ? firstErr.slice(0, 80) + '…' : firstErr
+              const msg = data.failed.length === 1 && errStr
+                ? `생성 실패: ${data.failed[0].ticker} — ${errStr}`
+                : `생성 실패: ${names}`
+              showToast(msg, 'error')
+            } else showToast(`리포트 ${data.done}개 생성 완료`)
             api.get('/api/report/list').then(({ data: list }) => setReportList(list))
           }
         } catch {}

@@ -22,9 +22,9 @@ class ProgressTracker:
         with self._lock:
             self._state["done"] += 1
 
-    def add_failed(self, ticker: str) -> None:
+    def add_failed(self, ticker: str, error: str = "") -> None:
         with self._lock:
-            self._state["failed"].append(ticker)
+            self._state["failed"].append({"ticker": ticker, "error": error})
 
     def finish(self) -> None:
         with self._lock:

@@ -114,7 +114,7 @@ def _run_generation(stocks: list):
             consensus_svc.backfill(stock["ticker"], stock.get("market", "US"))
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
-            _progress.add_failed(stock["ticker"])
+            _progress.add_failed(stock["ticker"], str(e))
         finally:
             _progress.increment()
 
