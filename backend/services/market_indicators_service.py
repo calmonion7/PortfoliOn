@@ -71,6 +71,17 @@ def _merge_history(stored: list[dict], new_pts: list[dict]) -> list[dict]:
     return sorted(merged.values(), key=lambda p: p["date"])
 
 
+def _filter_outliers(pts: list[dict], max_ratio: float = 5.0) -> list[dict]:
+    """중앙값 대비 max_ratio 배 초과/미만 이상값 제거."""
+    if len(pts) < 5:
+        return pts
+    vals = sorted(p["value"] for p in pts)
+    median = vals[len(vals) // 2]
+    if median <= 0:
+        return pts
+    return [p for p in pts if (1 / max_ratio) <= (p["value"] / median) <= max_ratio]
+
+
 def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[dict]:
     """yfinance Close 히스토리 incremental fetch.
     stored가 있으면 마지막 날짜 다음부터만 조회, 없으면 1년치 조회."""
@@ -95,7 +106,8 @@ def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[
     combined = _merge_history(stored, new_pts)
     # 1년치만 유지
     cutoff = (date.today() - timedelta(days=366)).isoformat()
-    return [p for p in combined if p["date"] >= cutoff]
+    trimmed = [p for p in combined if p["date"] >= cutoff]
+    return _filter_outliers(trimmed)
 
 
 # ── Treasury ──────────────────────────────────────────────────────────────────
