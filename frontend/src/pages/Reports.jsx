@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../api'
 import { fmtPrice as fmt } from '../utils'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { useToast } from '../components/Toast'
 import { TH, TD, fmtN, rsiColor, TargetTooltip, overallWeather } from '../components/reports/reportUtils.jsx'
 import ConsensusChart from '../components/reports/ConsensusChart'
 import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
@@ -21,9 +22,9 @@ export default function Reports() {
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
   const [hasFetched, setHasFetched] = useState(false)
+  const { showToast } = useToast()
   const [generating, setGenerating] = useState(null)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0, failed: [] })
-  const [genErr, setGenErr] = useState('')
   const pollRef = useRef(null)
   const [activeTab, setActiveTab] = useState('holdings')
   const [watchlistSub, setWatchlistSub] = useState('low')
@@ -69,7 +70,6 @@ const fetchList = useCallback(() => {
   const generateOne = async (ticker) => {
     setGenerating(ticker)
     setGenProgress({ done: 0, total: 0 })
-    setGenErr('')
     clearInterval(pollRef.current)
     try {
       await api.post(`/api/report/generate/${ticker}`)
@@ -80,7 +80,8 @@ const fetchList = useCallback(() => {
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)
             setGenerating(null)
-            if (data.failed?.length) setGenErr(`생성 실패: ${data.failed.join(', ')}`)
+            if (data.failed?.length) showToast(`생성 실패: ${data.failed.join(', ')}`, 'error')
+            else showToast(`${ticker} 리포트 생성 완료`)
             api.get('/api/report/list').then(({ data: list }) => {
               setReportList(list)
               const dates = list[ticker]?.dates || []
@@ -99,7 +100,7 @@ const fetchList = useCallback(() => {
       }, 1500)
     } catch {
       setGenerating(null)
-      setGenErr('리포트 생성 실패')
+      showToast('리포트 생성 실패', 'error')
     }
   }
 
@@ -107,7 +108,6 @@ const fetchList = useCallback(() => {
     if (!tickers.length) return
     setGenerating('__batch__')
     setGenProgress({ done: 0, total: 0 })
-    setGenErr('')
     clearInterval(pollRef.current)
     try {
       await api.post(`/api/report/generate?tickers=${tickers.join(',')}`)
@@ -118,14 +118,15 @@ const fetchList = useCallback(() => {
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)
             setGenerating(null)
-            if (data.failed?.length) setGenErr(`생성 실패: ${data.failed.join(', ')}`)
+            if (data.failed?.length) showToast(`생성 실패: ${data.failed.join(', ')}`, 'error')
+            else showToast(`리포트 ${data.done}개 생성 완료`)
             api.get('/api/report/list').then(({ data: list }) => setReportList(list))
           }
         } catch {}
       }, 1500)
     } catch {
       setGenerating(null)
-      setGenErr('리포트 생성 실패')
+      showToast('리포트 생성 실패', 'error')
     }
   }
 
@@ -297,7 +298,6 @@ const fetchList = useCallback(() => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
-        {genErr && <div style={{ fontSize: 11, color: 'var(--error, #ef5350)', marginBottom: 6 }}>{genErr}</div>}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: (activeTab === 'watchlist' || activeTab === 'ungenerated') ? 0 : 12 }}>
           <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
           <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
@@ -538,7 +538,6 @@ const fetchList = useCallback(() => {
                 >
                   {generating === selected.ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
                 </button>
-                {genErr && <span style={{ fontSize: 11, color: 'var(--error, #ef5350)' }}>{genErr}</span>}
               </div>
               {/* 행2: 종목명 + 뱃지 */}
               <div className="detail-header-title">

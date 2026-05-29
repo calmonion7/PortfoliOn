@@ -3,8 +3,10 @@ import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { fmtPrice as fmt } from '../../utils'
 import { _weather } from './reportUtils.jsx'
+import { useToast } from '../Toast'
 
 export default function ConsensusChart({ ticker, market }) {
+  const { showToast } = useToast()
   const [data, setData] = useState([])
   const [collecting, setCollecting] = useState(false)
   const [backfilling, setBackfilling] = useState(false)
@@ -27,8 +29,10 @@ export default function ConsensusChart({ ticker, market }) {
     try {
       await api.post(`/api/consensus/${ticker}`)
       fetchData()
+      showToast('수집 완료')
     } catch (e) {
-      setError(e.response?.data?.detail || '수집 실패')
+      const msg = e.response?.data?.detail || '수집 실패'
+      setError(msg); showToast(msg, 'error')
     } finally {
       setCollecting(false)
     }
@@ -39,9 +43,11 @@ export default function ConsensusChart({ ticker, market }) {
     setError(null)
     try {
       const { data: result } = await api.post(`/api/consensus/${ticker}/backfill`)
-      if (result.added > 0) fetchData()
+      if (result.added > 0) { fetchData(); showToast(`백필 완료 (+${result.added}건)`) }
+      else showToast('추가할 데이터 없음')
     } catch (e) {
-      setError(e.response?.data?.detail || '백필 실패')
+      const msg = e.response?.data?.detail || '백필 실패'
+      setError(msg); showToast(msg, 'error')
     } finally {
       setBackfilling(false)
     }

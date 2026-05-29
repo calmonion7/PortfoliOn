@@ -12,6 +12,7 @@ import { supabase } from './supabase'
 import LoginPage from './pages/LoginPage'
 import MobileNav from './components/MobileNav'
 import { Sun, Moon, Bell, Refresh } from './components/ui/icons'
+import { ToastProvider } from './components/Toast'
 import './App.css'
 
 function TopNav({ theme, setTheme }) {
@@ -72,6 +73,7 @@ export default function App() {
   if (!session) return <LoginPage />
 
   return (
+    <ToastProvider>
     <BrowserRouter>
       <div className="app-pc">
         <TopNav theme={theme} setTheme={setTheme} />
@@ -89,5 +91,6 @@ export default function App() {
         <MobileNav />
       </div>
     </BrowserRouter>
+    </ToastProvider>
   )
 }

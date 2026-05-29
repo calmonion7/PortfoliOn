@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import DashboardCard from '../components/portfolio/DashboardCard'
 import { Search, Plus, Spark, MarketBadge, Sig, fmt, sparkFor, Pencil } from '../components/ui/icons'
 import useIsMobile from '../hooks/useIsMobile'
+import { useToast } from '../components/Toast'
 
 const DashboardGrid = ({ cards, loading }) => {
   if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
@@ -19,6 +20,7 @@ const DashboardGrid = ({ cards, loading }) => {
 
 export default function Portfolio() {
   const isMobile = useIsMobile()
+  const { showToast } = useToast()
   const [tab, setTab] = useState('holdings')
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -62,12 +64,15 @@ export default function Portfolio() {
       const isWatch = tab === 'watch'
       if (editing) {
         await api.put(`/api/${isWatch ? 'watchlist' : 'portfolio'}/${editing.ticker}`, stockData)
+        showToast(`${editing.ticker} 수정됐습니다`)
       } else {
         await api.post(`/api/${isWatch ? 'watchlist' : 'portfolio'}`, stockData)
+        showToast(`${stockData.ticker} 추가됐습니다`)
       }
       setModalOpen(false); setEditing(null); setError(''); fetchAll()
     } catch (err) {
-      setError(err.response?.data?.detail || '저장 실패')
+      const msg = err.response?.data?.detail || '저장 실패'
+      setError(msg); showToast(msg, 'error')
       throw err
     }
   }
@@ -79,16 +84,20 @@ export default function Portfolio() {
     try {
       await api.delete(`/api/${isWatch ? 'watchlist' : 'portfolio'}/${ticker}`)
       setError(''); fetchAll()
+      showToast(`${ticker} 삭제됐습니다`)
     } catch (err) {
-      setError(err.response?.data?.detail || '삭제 실패')
+      const errMsg = err.response?.data?.detail || '삭제 실패'
+      setError(errMsg); showToast(errMsg, 'error')
     }
   }
 
   const handlePromote = async ({ quantity, avg_cost }) => {
     try {
       await api.post(`/api/watchlist/${promoteTarget.ticker}/promote`, { quantity, avg_cost })
+      showToast(`${promoteTarget.ticker} 보유종목으로 이동됐습니다`)
       setPromoteTarget(null); setTab('holdings'); fetchAll()
     } catch (err) {
+      showToast('이동 실패', 'error')
       throw err
     }
   }

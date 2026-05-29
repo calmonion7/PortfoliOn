@@ -1,3 +1,8 @@
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* NavLink는 <a>이므로 topnav-tab 스타일에 맞게 리셋 */
 .topnav-tabs a.topnav-tab {
   text-decoration: none;
