@@ -736,6 +736,19 @@ def _fetch_and_save_kr_exports() -> dict:
     return data
 
 
+def _exports_is_stale(data: dict) -> bool:
+    """캐시된 데이터의 마지막 월이 2개월 이상 뒤처지면 stale."""
+    from datetime import date
+    months = data.get("months", [])
+    if not months:
+        return True
+    last = months[-1]["month"]  # e.g. "202512"
+    today = date.today()
+    last_y, last_m = int(last[:4]), int(last[4:])
+    diff = (today.year - last_y) * 12 + (today.month - last_m)
+    return diff >= 2
+
+
 def get_kr_exports() -> dict:
     cached = _get_cache("kr_exports")
     if cached:
@@ -743,13 +756,15 @@ def get_kr_exports() -> dict:
 
     stored = _mc_load("kr_exports")
     if stored:
-        _set_cache("kr_exports", stored["data"], ttl=86400)
-        return stored["data"]
+        data = stored["data"]
+        if _exports_is_stale(data):
+            return _fetch_and_save_kr_exports()
+        _set_cache("kr_exports", data, ttl=86400)
+        return data
 
     # file cache fallback
     if os.path.exists(_EXPORTS_CACHE):
         with open(_EXPORTS_CACHE) as f:
             return json.load(f)
 
-    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
     return _fetch_and_save_kr_exports()
