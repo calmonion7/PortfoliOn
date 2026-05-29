@@ -12,10 +12,10 @@ _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 def _generate_all():
     from services.db import get_db
     db = get_db()
-    user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").eq("type", "holding").execute().data})
+    user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").execute().data})
     for user_id in user_ids:
-        portfolio = storage.get_full_portfolio(user_id)
-        for stock in portfolio.get("stocks", []):
+        stocks = storage.get_all_stocks(user_id)
+        for stock in stocks:
             try:
                 report_generator.generate_report(stock)
                 print(f"[Scheduler] Report generated for {stock['ticker']}")

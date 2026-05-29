@@ -8,14 +8,24 @@ const DAYS = [
   { key: 'sun', label: '일' },
 ]
 
+function getToday() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export default function ReportSchedule() {
   const [schedule, setSchedule] = useState({ enabled: false, time: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] })
   const [saved, setSaved] = useState(false)
   const [saveErr, setSaveErr] = useState('')
+
   const [generating, setGenerating] = useState(false)
   const [genMsg, setGenMsg] = useState('')
   const [progress, setProgress] = useState({ done: 0, total: 0, current: '' })
   const pollRef = useRef(null)
+
+  const [stockList, setStockList] = useState(null)
+  const [listLoading, setListLoading] = useState(true)
+  const [genTab, setGenTab] = useState('pending')
+
   const [backfilling, setBackfilling] = useState(false)
   const [backfillMsg, setBackfillMsg] = useState('')
   const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0, current: '', created: 0 })
@@ -24,9 +34,39 @@ export default function ReportSchedule() {
 
   useEffect(() => {
     api.get('/api/schedule').then(({ data }) => setSchedule(data))
+    loadStockList()
   }, [])
 
-  const startPolling = () => {
+  const loadStockList = async () => {
+    setListLoading(true)
+    try {
+      const { data } = await api.get('/api/report/list')
+      setStockList(data)
+    } catch {}
+    setListLoading(false)
+  }
+
+  const today = getToday()
+
+  const { pendingStocks, doneStocks } = (() => {
+    if (!stockList) return { pendingStocks: [], doneStocks: [] }
+    const pending = []
+    const done = []
+    for (const [ticker, info] of Object.entries(stockList)) {
+      const name = info.summary?.name || ''
+      const entry = { ticker, name }
+      if (info.dates?.length > 0 && info.dates[0] === today) {
+        done.push(entry)
+      } else {
+        pending.push(entry)
+      }
+    }
+    pending.sort((a, b) => a.ticker.localeCompare(b.ticker))
+    done.sort((a, b) => a.ticker.localeCompare(b.ticker))
+    return { pendingStocks: pending, doneStocks: done }
+  })()
+
+  const startPolling = (onDone) => {
     pollRef.current = setInterval(async () => {
       try {
         const { data } = await api.get('/api/report/progress')
@@ -35,6 +75,7 @@ export default function ReportSchedule() {
           clearInterval(pollRef.current)
           setGenerating(false)
           setGenMsg(`완료: ${data.done}/${data.total} 종목 생성됨`)
+          onDone?.()
         }
       } catch {}
     }, 1500)
@@ -58,13 +99,15 @@ export default function ReportSchedule() {
     }
   }
 
-  const handleGenerateNow = async () => {
+  const handleGeneratePending = async () => {
+    if (pendingStocks.length === 0) return
     setGenerating(true)
     setGenMsg('')
     setProgress({ done: 0, total: 0, current: '' })
+    const tickerParam = pendingStocks.map(s => s.ticker).join(',')
     try {
-      await api.post('/api/report/generate')
-      startPolling()
+      await api.post(`/api/report/generate?tickers=${encodeURIComponent(tickerParam)}`)
+      startPolling(loadStockList)
     } catch (err) {
       setGenMsg(err.response?.data?.detail || '생성 실패')
       setGenerating(false)
@@ -100,6 +143,7 @@ export default function ReportSchedule() {
   useEffect(() => () => clearInterval(backfillPollRef.current), [])
 
   const pct = progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0
+  const currentTabStocks = genTab === 'pending' ? pendingStocks : doneStocks
 
   return (
     <div style={{ maxWidth: 480 }}>
@@ -151,26 +195,70 @@ export default function ReportSchedule() {
       {/* 즉시 리포트 생성 */}
       <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0 }}>즉시 리포트 생성</div>
       <div className="list-card" style={{ margin: '0 0 6px' }}>
-        <div style={{ padding: '14px 16px' }}>
-          <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 14px', lineHeight: 1.6 }}>
-            보유 및 관심 종목 전체에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.
-          </p>
-          <button className="btn btn-primary" onClick={handleGenerateNow} disabled={generating}
-            style={{ width: '100%', justifyContent: 'center' }}>
-            {generating ? '생성 중...' : '지금 생성'}
-          </button>
-          {generating && progress.total > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
-                <span>{progress.current || '준비 중...'}</span>
-                <span style={{ color: 'var(--text)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
+        <div style={{ padding: '10px 12px 0', display: 'flex', gap: 4 }}>
+          {[
+            { key: 'pending', label: `미생성 (${listLoading ? '…' : pendingStocks.length})` },
+            { key: 'done',    label: `생성됨 (${listLoading ? '…' : doneStocks.length})` },
+          ].map(({ key, label }) => (
+            <button key={key}
+              onClick={() => setGenTab(key)}
+              style={{
+                padding: '6px 14px', border: 'none', borderRadius: 8,
+                fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                background: genTab === key ? 'var(--text)' : 'var(--accent-soft)',
+                color: genTab === key ? 'var(--bg)' : 'var(--text-3)',
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {listLoading ? (
+          <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</div>
+        ) : currentTabStocks.length === 0 ? (
+          <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+            {genTab === 'pending' ? '모든 종목의 오늘 리포트가 생성되었습니다.' : '오늘 생성된 리포트가 없습니다.'}
+          </div>
+        ) : (
+          <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--border)', marginTop: 8 }}>
+            {currentTabStocks.map(({ ticker, name }) => (
+              <div key={ticker} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '7px 16px', borderBottom: '1px solid var(--border)', fontSize: 13,
+              }}>
+                <span style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12, flexShrink: 0 }}>{ticker}</span>
+                {name && <span style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>}
               </div>
-              <div style={{ background: 'var(--accent-soft)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: 'var(--text)', borderRadius: 999, transition: 'width 0.4s ease' }} />
-              </div>
-            </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+          {genTab === 'pending' ? (
+            <>
+              <button className="btn btn-primary" onClick={handleGeneratePending}
+                disabled={generating || pendingStocks.length === 0}
+                style={{ width: '100%', justifyContent: 'center' }}>
+                {generating ? '생성 중...' : pendingStocks.length > 0 ? `지금 생성 (${pendingStocks.length}개)` : '생성할 종목 없음'}
+              </button>
+              {generating && progress.total > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
+                    <span>{progress.current || '준비 중...'}</span>
+                    <span style={{ color: 'var(--text)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
+                  </div>
+                  <div style={{ background: 'var(--accent-soft)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: 'var(--text)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+              )}
+              {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
+            </>
+          ) : (
+            <p style={{ color: 'var(--text-3)', fontSize: 12, margin: 0, textAlign: 'center' }}>
+              오늘 이미 생성된 종목 목록입니다.
+            </p>
           )}
-          {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
         </div>
       </div>
 
