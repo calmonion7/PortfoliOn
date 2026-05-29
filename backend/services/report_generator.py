@@ -97,7 +97,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         "name": stock.get("name", ticker),
         "date": today,
         "market": market,
-        "price": quote.get("price"),
+        "price": quote.get("price") or (round(float(daily_df["Close"].iloc[-1]), 2) if not daily_df.empty else None),
         "target_mean": analyst.get("target_mean") or finviz.get("finviz_target"),
         "target_high": analyst.get("target_high"),
         "target_low": analyst.get("target_low"),
@@ -139,7 +139,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
     }
 
     if summary["price"] is None:
-        raise ValueError("주가 데이터 없음 (시장 데이터 조회 실패)")
+        detail = quote.get("error", "")
+        raise ValueError(f"주가 데이터 없음{': ' + detail if detail else ''}")
 
     sanitized = _sanitize(summary)
     json_path = output_dir / f"{today}.json"
