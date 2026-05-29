@@ -130,6 +130,9 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         "news": news,
     }
 
+    if summary["price"] is None:
+        raise ValueError("주가 데이터 없음 (시장 데이터 조회 실패)")
+
     sanitized = _sanitize(summary)
     json_path = output_dir / f"{today}.json"
     json_path.write_text(json.dumps(sanitized, ensure_ascii=False, indent=2), encoding="utf-8")
