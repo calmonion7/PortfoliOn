@@ -82,8 +82,10 @@ const fetchList = useCallback(() => {
             setGenerating(null)
             if (data.failed?.length) {
               const f = data.failed[0]
-              const errStr = f.error?.length > 80 ? f.error.slice(0, 80) + '…' : f.error
-              const msg = errStr ? `생성 실패: ${f.ticker} — ${errStr}` : `생성 실패: ${f.ticker}`
+              const tickerName = typeof f === 'string' ? f : (f?.ticker || ticker)
+              const rawErr = typeof f === 'object' ? f?.error : ''
+              const errStr = rawErr?.length > 80 ? rawErr.slice(0, 80) + '…' : rawErr
+              const msg = errStr ? `생성 실패: ${tickerName} — ${errStr}` : `생성 실패: ${tickerName}`
               showToast(msg, 'error')
             } else showToast(`${ticker} 리포트 생성 완료`)
             api.get('/api/report/list').then(({ data: list }) => {
@@ -123,11 +125,13 @@ const fetchList = useCallback(() => {
             clearInterval(pollRef.current)
             setGenerating(null)
             if (data.failed?.length) {
-              const names = data.failed.map(f => f.ticker).join(', ')
-              const firstErr = data.failed[0]?.error
-              const errStr = firstErr?.length > 80 ? firstErr.slice(0, 80) + '…' : firstErr
+              const toName = f => typeof f === 'string' ? f : (f?.ticker || '?')
+              const names = data.failed.map(toName).join(', ')
+              const first = data.failed[0]
+              const rawErr = typeof first === 'object' ? first?.error : ''
+              const errStr = rawErr?.length > 80 ? rawErr.slice(0, 80) + '…' : rawErr
               const msg = data.failed.length === 1 && errStr
-                ? `생성 실패: ${data.failed[0].ticker} — ${errStr}`
+                ? `생성 실패: ${toName(first)} — ${errStr}`
                 : `생성 실패: ${names}`
               showToast(msg, 'error')
             } else showToast(`리포트 ${data.done}개 생성 완료`)
