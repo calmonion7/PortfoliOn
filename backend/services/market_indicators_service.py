@@ -90,13 +90,13 @@ def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[
         last = stored[-1]["date"]
         start = (date.fromisoformat(last) + timedelta(days=1)).isoformat()
         if start > date.today().isoformat():
-            return stored  # 이미 최신
+            return _filter_outliers(stored)
         hist = yf.Ticker(sym).history(start=start, interval="1d")
     else:
         hist = yf.Ticker(sym).history(period="1y", interval="1d")
 
     if hist.empty:
-        return stored
+        return _filter_outliers(stored) if stored else []
 
     close = hist["Close"].dropna()
     new_pts = [
