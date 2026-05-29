@@ -269,7 +269,7 @@ const fetchList = useCallback(() => {
               )}
               {targetGap != null && (
                 <span style={{ fontSize: 11, color: targetGap >= 0 ? '#81c784' : '#ef9a9a' }}>
-                  목표 {targetGap >= 0 ? '+' : ''}{targetGap.toFixed(1)}%
+                  목표 {fmt(s.target_mean, market)} ({targetGap >= 0 ? '+' : ''}{targetGap.toFixed(1)}%)
                 </span>
               )}
               {rsi != null && (
