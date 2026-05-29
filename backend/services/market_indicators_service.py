@@ -267,17 +267,17 @@ def _fetch_and_save_m7_earnings() -> dict:
     return data
 
 
-def get_m7_earnings() -> dict:
-    cached = _get_cache("m7_earnings")
-    if cached:
-        return cached
+def get_m7_earnings(force: bool = False) -> dict:
+    if not force:
+        cached = _get_cache("m7_earnings")
+        if cached:
+            return cached
 
-    stored = _mc_load("m7_earnings")
-    if stored:
-        _set_cache("m7_earnings", stored["data"], ttl=86400)
-        return stored["data"]
+        stored = _mc_load("m7_earnings")
+        if stored:
+            _set_cache("m7_earnings", stored["data"], ttl=86400)
+            return stored["data"]
 
-    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
     return _fetch_and_save_m7_earnings()
 
 

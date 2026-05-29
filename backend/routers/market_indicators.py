@@ -8,6 +8,8 @@ from services.market_indicators_service import (
     get_vix,
     get_commodities,
     get_econ_indicators,
+    _fetch_and_save_m7_earnings,
+    _fetch_and_save_kr_top2_earnings,
 )
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -73,5 +75,15 @@ def commodities():
 def econ_indicators():
     try:
         return get_econ_indicators()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-earnings")
+def refresh_earnings():
+    try:
+        m7 = _fetch_and_save_m7_earnings()
+        kr = _fetch_and_save_kr_top2_earnings()
+        return {"ok": True, "m7_quarters": len(m7.get("quarters", [])), "kr_quarters": len(kr.get("quarters", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
