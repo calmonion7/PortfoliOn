@@ -153,8 +153,7 @@ const fetchList = useCallback(() => {
   const _hasWarning = (s) => {
     if (!s) return false
     const total = (s.buy ?? 0) + (s.hold ?? 0) + (s.sell ?? 0)
-    if (total > 0 && total <= 10) return true
-    return false
+    return total <= 10  // 의견 0개 포함
   }
   const watchlistWarnCount = watchlistAll.filter(([, v]) => _hasWarning(v.summary)).length
   const watchlistLowCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g === null || g >= 40 }).length
