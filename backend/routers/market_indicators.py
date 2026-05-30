@@ -11,6 +11,8 @@ from services.market_indicators_service import (
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
+    _mc_delete,
+    _cache,
 )
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -95,5 +97,27 @@ def refresh_econ():
     try:
         data = _fetch_and_save_econ_indicators()
         return {"ok": True, "cpi_points": len(data.get("cpi", [])), "unemp_points": len(data.get("unemployment", []))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-market")
+def refresh_market():
+    """FX/VIX/Treasury/Commodities Supabase 캐시 초기화 후 1년치 재조회."""
+    try:
+        for key in ("fx", "vix", "treasury", "commodities"):
+            _mc_delete(key)
+            _cache.pop(key, None)
+        fx = get_fx()
+        vix = get_vix()
+        treasury = get_treasury()
+        commodities = get_commodities()
+        return {
+            "ok": True,
+            "fx_points": len((fx.get("history") or {}).get("usdkrw", [])),
+            "vix_points": len(vix.get("history", [])),
+            "treasury_points": len((treasury.get("history") or {}).get("10y", [])),
+            "commodities_gold_points": len((commodities.get("history") or {}).get("gold", [])),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

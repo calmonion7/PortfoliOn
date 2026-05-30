@@ -64,6 +64,13 @@ def _mc_save(key: str, data: dict) -> None:
         pass
 
 
+def _mc_delete(key: str) -> None:
+    try:
+        get_db().table("market_cache").delete().eq("key", key).execute()
+    except Exception:
+        pass
+
+
 def _merge_history(stored: list[dict], new_pts: list[dict]) -> list[dict]:
     """stored + new_pts 병합. 중복 날짜는 new_pts 우선. 날짜순 정렬."""
     merged = {p["date"]: p for p in stored}
