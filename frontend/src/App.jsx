@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import useTheme from './hooks/useTheme'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Portfolio from './pages/Portfolio'
 import Research from './pages/Research'
 import MarketHub from './pages/MarketHub'
@@ -29,14 +30,16 @@ async function doLogout(setSession) {
 }
 
 function TopNav({ theme, setTheme, setSession }) {
-  const navItems = [
-    { to: '/',         label: '종목관리', end: true },
-    { to: '/research', label: '리서치' },
-    { to: '/market',   label: '시장' },
-    { to: '/analysis', label: '분석' },
-    { to: '/guru',     label: '구루' },
-    { to: '/settings', label: '설정' },
+  const { menuPermissions } = useAuth() || { menuPermissions: [] }
+  const allItems = [
+    { to: '/',         label: '종목관리', key: 'portfolio', end: true },
+    { to: '/research', label: '리서치',   key: 'research' },
+    { to: '/market',   label: '시장',     key: 'market' },
+    { to: '/analysis', label: '분석',     key: 'analysis' },
+    { to: '/guru',     label: '구루',     key: 'guru' },
+    { to: '/settings', label: '설정',     key: 'settings' },
   ]
+  const navItems = allItems.filter(item => menuPermissions.includes(item.key))
   return (
     <header className="topnav">
       <div className="topnav-inner">
@@ -93,6 +96,7 @@ export default function App() {
 
   return (
     <ToastProvider>
+    <AuthProvider isLoggedIn={!!session}>
     <BrowserRouter>
       <div className="app-pc">
         <TopNav theme={theme} setTheme={setTheme} setSession={setSession} />
@@ -125,6 +129,7 @@ export default function App() {
         <MobileNav />
       </div>
     </BrowserRouter>
+    </AuthProvider>
     </ToastProvider>
   )
 }
