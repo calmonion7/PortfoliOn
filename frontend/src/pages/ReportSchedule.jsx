@@ -76,7 +76,7 @@ export default function ReportSchedule() {
         if (latestDate === today) done.push(entry)
         else pending.push(entry)
       } else if (referenceDate) {
-        if (latestDate === referenceDate) notInPeriod.push(entry)
+        if (latestDate === referenceDate) done.push(entry)
         else pending.push(entry)
       } else {
         notInPeriod.push(entry)
@@ -165,8 +165,8 @@ export default function ReportSchedule() {
   useEffect(() => () => clearInterval(backfillPollRef.current), [])
 
   const pct = progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0
-  const secondTabStocks = isScheduleDay ? doneStocks : notInPeriodStocks
-  const secondTabLabel = isScheduleDay ? '생성됨' : '수집기간아님'
+  const secondTabStocks = referenceDate || isScheduleDay ? doneStocks : notInPeriodStocks
+  const secondTabLabel = referenceDate || isScheduleDay ? '생성됨' : '수집기간아님'
   const currentTabStocks = genTab === 'pending' ? pendingStocks : secondTabStocks
 
   return (
