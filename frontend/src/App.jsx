@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import useTheme from './hooks/useTheme'
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Portfolio from './pages/Portfolio'
 import Research from './pages/Research'
 import MarketHub from './pages/MarketHub'
-import AnalysisHub from './pages/AnalysisHub'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
@@ -35,7 +34,6 @@ function TopNav({ theme, setTheme, setSession }) {
     { to: '/',         label: '종목관리', key: 'portfolio', end: true },
     { to: '/research', label: '리서치',   key: 'research' },
     { to: '/market',   label: '시장',     key: 'market' },
-    { to: '/analysis', label: '분석',     key: 'analysis' },
     { to: '/guru',     label: '구루',     key: 'guru' },
     { to: '/settings', label: '설정',     key: 'settings' },
   ]
@@ -120,7 +118,7 @@ export default function App() {
             <Route path="/" element={<Portfolio />} />
             <Route path="/research" element={<Research />} />
             <Route path="/market" element={<MarketHub />} />
-            <Route path="/analysis" element={<AnalysisHub />} />
+            <Route path="/analysis" element={<Navigate to="/" replace />} />
             <Route path="/guru" element={<Guru />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/dev/showcase" element={<Showcase />} />
