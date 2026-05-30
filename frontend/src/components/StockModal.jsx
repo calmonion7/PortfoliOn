@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../api'
+import { useAuth } from '../contexts/AuthContext'
 
 const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
 const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
@@ -110,6 +111,8 @@ function SearchBox({ onSelect }) {
 }
 
 export default function StockModal({ stock, onSave, onClose, mode = 'holding' }) {
+  const { role } = useAuth()
+  const isAdmin = role === 'admin'
   const empty = mode === 'watchlist' ? WATCHLIST_EMPTY : HOLDING_EMPTY
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
@@ -147,12 +150,18 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
     const ticker = form.market === 'KR'
       ? form.ticker.trim().replace(/\D/g, '').padStart(6, '0')
       : form.ticker.trim().toUpperCase()
+    // 일반 사용자: 숨겨진 필드는 기존 값 유지 (없으면 빈 값)
+    const competitors = isAdmin
+      ? form.competitors.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+      : (isEdit ? stock.competitors ?? [] : [])
+    const moat = isAdmin ? form.moat.trim() : (isEdit ? stock.moat ?? '' : '')
+    const growth_plan = isAdmin ? form.growth_plan.trim() : (isEdit ? stock.growth_plan ?? '' : '')
     const base = {
       ticker,
       name: form.name.trim(),
-      competitors: form.competitors.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
-      moat: form.moat.trim(),
-      growth_plan: form.growth_plan.trim(),
+      competitors,
+      moat,
+      growth_plan,
       market: form.market,
       exchange: form.market === 'KR' ? (form.exchange || 'KS') : '',
     }
@@ -245,23 +254,23 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
             </>
           )}
 
-          {/* 경쟁사 */}
-          <div className="form-field">
-            <label>경쟁사 {isKR ? '(종목코드, 쉼표 구분)' : '(티커, 쉼표 구분)'}</label>
-            <input type="text" value={form.competitors} onChange={set('competitors')} style={INPUT_STYLE} />
-          </div>
-
-          {/* 경제적 해자 */}
-          <div className="form-field">
-            <label>경제적 해자</label>
-            <textarea rows={2} value={form.moat} onChange={set('moat')} style={{ ...INPUT_STYLE, resize: 'vertical' }} />
-          </div>
-
-          {/* 장기 성장 계획 */}
-          <div className="form-field">
-            <label>장기 성장 계획</label>
-            <textarea rows={2} value={form.growth_plan} onChange={set('growth_plan')} style={{ ...INPUT_STYLE, resize: 'vertical' }} />
-          </div>
+          {/* 경쟁사 / 경제적 해자 / 장기 성장 계획 — admin 전용 */}
+          {isAdmin && (
+            <>
+              <div className="form-field">
+                <label>경쟁사 {isKR ? '(종목코드, 쉼표 구분)' : '(티커, 쉼표 구분)'}</label>
+                <input type="text" value={form.competitors} onChange={set('competitors')} style={INPUT_STYLE} />
+              </div>
+              <div className="form-field">
+                <label>경제적 해자</label>
+                <textarea rows={2} value={form.moat} onChange={set('moat')} style={{ ...INPUT_STYLE, resize: 'vertical' }} />
+              </div>
+              <div className="form-field">
+                <label>장기 성장 계획</label>
+                <textarea rows={2} value={form.growth_plan} onChange={set('growth_plan')} style={{ ...INPUT_STYLE, resize: 'vertical' }} />
+              </div>
+            </>
+          )}
 
           {saveError && (
             <p style={{ color: 'var(--down)', fontSize: 13, marginTop: 12, marginBottom: 0 }}>{saveError}</p>
