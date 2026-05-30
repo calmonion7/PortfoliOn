@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List
-from services import storage, errors
+from services import storage, errors, report_generator
 from services import cache as cache_svc
 from services.utils import find_ticker_index, ticker_exists_in
+from services.db import query as db_query
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
@@ -27,7 +28,7 @@ def get_portfolio(user_id: str = Depends(get_current_user)):
 
 
 @router.post("", status_code=201)
-def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
+def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
     holdings = storage.get_holdings(user_id)
     if ticker_exists_in(holdings, stock.ticker):
         raise errors.already_exists(stock.ticker)
@@ -54,6 +55,21 @@ def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
     holdings.append(new_holding)
     storage.save_holdings(user_id, holdings)
     cache_svc.invalidate_portfolio_caches()
+
+    existing = db_query(
+        "SELECT 1 FROM snapshots WHERE ticker = %s LIMIT 1", (stock.ticker.upper(),)
+    )
+    if not existing:
+        stock_dict = {
+            "ticker": stock.ticker.upper(),
+            "name": stock.name,
+            "market": stock.market,
+            "exchange": stock.exchange,
+            "competitors": stock.competitors,
+            "moat": stock.moat,
+            "growth_plan": stock.growth_plan,
+        }
+        background_tasks.add_task(report_generator.generate_report, stock_dict)
 
     return {**new_holding, "name": stock.name, "competitors": stock.competitors,
             "moat": stock.moat, "growth_plan": stock.growth_plan}

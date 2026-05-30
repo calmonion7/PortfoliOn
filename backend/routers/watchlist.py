@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import List
-from services import storage, errors, cache as cache_svc
+from services import storage, errors, cache as cache_svc, report_generator
 from services.utils import ticker_exists_in, find_ticker
+from services.db import query as db_query
 from routers import calendar as calendar_router
 from auth import get_current_user
 
@@ -35,7 +36,7 @@ def get_watchlist(user_id: str = Depends(get_current_user)):
 
 
 @router.post("", status_code=201)
-def add_watchlist_stock(stock: WatchlistStock, user_id: str = Depends(get_current_user)):
+def add_watchlist_stock(stock: WatchlistStock, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
     holdings = storage.get_holdings(user_id)
     watchlist = storage.get_watchlist_tickers(user_id)
     all_tickers = [h["ticker"].upper() for h in holdings] + [t.upper() for t in watchlist]
@@ -53,6 +54,21 @@ def add_watchlist_stock(stock: WatchlistStock, user_id: str = Depends(get_curren
     watchlist.append(stock.ticker.upper())
     storage.save_watchlist_tickers(user_id, watchlist)
     calendar_router.clear_cache()
+
+    existing = db_query(
+        "SELECT 1 FROM snapshots WHERE ticker = %s LIMIT 1", (stock.ticker.upper(),)
+    )
+    if not existing:
+        stock_dict = {
+            "ticker": stock.ticker.upper(),
+            "name": stock.name,
+            "market": stock.market,
+            "exchange": stock.exchange,
+            "competitors": stock.competitors,
+            "moat": stock.moat,
+            "growth_plan": stock.growth_plan,
+        }
+        background_tasks.add_task(report_generator.generate_report, stock_dict)
 
     return {"ticker": stock.ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,

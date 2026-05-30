@@ -33,7 +33,8 @@ def test_add_watchlist_stock_saves_ticker_and_stock_data():
          patch("routers.watchlist.storage.get_watchlist_tickers", return_value=[]), \
          patch("routers.watchlist.storage.get_stocks", return_value=[]), \
          patch("routers.watchlist.storage.save_stocks") as mock_save_stocks, \
-         patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist:
+         patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist, \
+         patch("routers.watchlist.db_query", return_value=[]):
         resp = client.post("/api/watchlist", json={
             "ticker": "TSLA", "name": "Tesla",
             "competitors": [], "moat": "", "growth_plan": ""
@@ -155,3 +156,40 @@ def test_promote_invalidates_dashboard_cache():
         resp = client.post("/api/watchlist/NVDA/promote", json={"quantity": 10, "avg_cost": 500.0})
     assert resp.status_code == 200
     mock_cache.invalidate_portfolio_caches.assert_called_once()
+
+
+def test_add_watchlist_stock_triggers_report_when_no_snapshot():
+    with patch("routers.watchlist.storage.get_holdings", return_value=[]), \
+         patch("routers.watchlist.storage.get_watchlist_tickers", return_value=[]), \
+         patch("routers.watchlist.storage.get_stocks", return_value=[]), \
+         patch("routers.watchlist.storage.save_stocks"), \
+         patch("routers.watchlist.storage.save_watchlist_tickers"), \
+         patch("routers.watchlist.calendar_router.clear_cache"), \
+         patch("routers.watchlist.db_query", return_value=[]) as mock_query, \
+         patch("routers.watchlist.report_generator.generate_report") as mock_gen:
+        resp = client.post("/api/watchlist", json={
+            "ticker": "TSLA", "name": "Tesla",
+            "competitors": [], "moat": "", "growth_plan": ""
+        })
+    assert resp.status_code == 201
+    mock_query.assert_called_once_with(
+        "SELECT 1 FROM snapshots WHERE ticker = %s LIMIT 1", ("TSLA",)
+    )
+    mock_gen.assert_called_once()
+
+
+def test_add_watchlist_stock_skips_report_when_snapshot_exists():
+    with patch("routers.watchlist.storage.get_holdings", return_value=[]), \
+         patch("routers.watchlist.storage.get_watchlist_tickers", return_value=[]), \
+         patch("routers.watchlist.storage.get_stocks", return_value=[]), \
+         patch("routers.watchlist.storage.save_stocks"), \
+         patch("routers.watchlist.storage.save_watchlist_tickers"), \
+         patch("routers.watchlist.calendar_router.clear_cache"), \
+         patch("routers.watchlist.db_query", return_value=[{"ticker": "TSLA", "date": "2026-05-01"}]), \
+         patch("routers.watchlist.report_generator.generate_report") as mock_gen:
+        resp = client.post("/api/watchlist", json={
+            "ticker": "TSLA", "name": "Tesla",
+            "competitors": [], "moat": "", "growth_plan": ""
+        })
+    assert resp.status_code == 201
+    mock_gen.assert_not_called()
