@@ -7,6 +7,9 @@ import DashboardCard from '../components/portfolio/DashboardCard'
 import { Search, Plus, Spark, MarketBadge, Sig, fmt, sparkFor, Pencil } from '../components/ui/icons'
 import useIsMobile from '../hooks/useIsMobile'
 import { useToast } from '../components/Toast'
+import SectorTab from './SectorTab'
+import MacroTab from './MacroTab'
+import Analytics from './Analytics'
 
 const DashboardGrid = ({ cards, loading }) => {
   if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
@@ -34,6 +37,7 @@ export default function Portfolio() {
   const [error, setError] = useState('')
   const [dashboardCards, setDashboardCards] = useState([])
   const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [analysisTab, setAnalysisTab] = useState('sector')
 
   const fetchAll = useCallback(async () => {
     setListLoading(true)
@@ -144,10 +148,13 @@ export default function Portfolio() {
           <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard() }}>
             대시보드
           </button>
+          <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => setTab('analysis')}>
+            분석
+          </button>
         </div>
       </div>
 
-      {tab !== 'dash' && (
+      {tab !== 'dash' && tab !== 'analysis' && (
         <div style={{ padding: '0 20px 10px' }}>
           <input
             className="m-list-search"
@@ -238,6 +245,23 @@ export default function Portfolio() {
         </div>
       )}
 
+      {tab === 'analysis' && (
+        <>
+          <div className="seg-pad">
+            <div className="seg">
+              <button className={analysisTab === 'sector' ? 'is-active' : ''} onClick={() => setAnalysisTab('sector')}>섹터</button>
+              <button className={analysisTab === 'macro' ? 'is-active' : ''} onClick={() => setAnalysisTab('macro')}>매크로</button>
+              <button className={analysisTab === 'correlation' ? 'is-active' : ''} onClick={() => setAnalysisTab('correlation')}>상관관계</button>
+            </div>
+          </div>
+          <div className="m-page">
+            {analysisTab === 'sector' && <SectorTab />}
+            {analysisTab === 'macro' && <MacroTab />}
+            {analysisTab === 'correlation' && <Analytics />}
+          </div>
+        </>
+      )}
+
       <button className="fab" onClick={openAdd}>
         <Plus />
       </button>
@@ -295,6 +319,7 @@ export default function Portfolio() {
             관심종목 <span className="count">{watchlist.length}</span>
           </button>
           <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard() }}>대시보드</button>
+          <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => setTab('analysis')}>분석</button>
         </div>
         {tab === 'dash' && (
           <button className="btn" onClick={() => fetchDashboard({ invalidate: true })} disabled={dashboardLoading}>↺ 새로고침</button>
@@ -302,7 +327,7 @@ export default function Portfolio() {
       </div>
 
       {/* 검색 + 필터 칩 */}
-      {tab !== 'dash' && (
+      {tab !== 'dash' && tab !== 'analysis' && (
         <div className="search-row">
           <div className="search-input">
             <span className="ico"><Search /></span>
@@ -423,6 +448,19 @@ export default function Portfolio() {
 
       {/* 대시보드 탭 */}
       {tab === 'dash' && <DashboardGrid cards={dashboardCards} loading={dashboardLoading} />}
+
+      {tab === 'analysis' && (
+        <div>
+          <div className="tabs" style={{ marginBottom: 20 }}>
+            <button className={analysisTab === 'sector' ? 'is-active' : ''} onClick={() => setAnalysisTab('sector')}>섹터</button>
+            <button className={analysisTab === 'macro' ? 'is-active' : ''} onClick={() => setAnalysisTab('macro')}>매크로</button>
+            <button className={analysisTab === 'correlation' ? 'is-active' : ''} onClick={() => setAnalysisTab('correlation')}>상관관계</button>
+          </div>
+          {analysisTab === 'sector' && <SectorTab />}
+          {analysisTab === 'macro' && <MacroTab />}
+          {analysisTab === 'correlation' && <Analytics />}
+        </div>
+      )}
 
       {modalOpen && (
         <StockModal
