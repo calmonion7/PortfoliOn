@@ -76,7 +76,7 @@ export default function ReportSchedule() {
         if (latestDate === today) done.push(entry)
         else pending.push(entry)
       } else if (referenceDate) {
-        if (latestDate === referenceDate) done.push(entry)
+        if (latestDate >= referenceDate) done.push(entry)
         else pending.push(entry)
       } else {
         notInPeriod.push(entry)

@@ -40,11 +40,11 @@ def _reschedule():
         return
     _scheduler.add_job(
         _generate_all,
-        CronTrigger(day_of_week=days_str, hour=hour, minute=minute),
+        CronTrigger(day_of_week=days_str, hour=hour, minute=minute, timezone="Asia/Seoul"),
         id=_JOB_ID,
         replace_existing=True,
     )
-    print(f"[Scheduler] Scheduled daily report at {cfg['time']} on {days_str}")
+    print(f"[Scheduler] Scheduled daily report at {cfg['time']} KST on {days_str}")
 
 
 def _run_guru_crawl():
