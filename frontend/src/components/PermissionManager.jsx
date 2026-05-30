@@ -1,10 +1,26 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 
-const ALL_MENUS = ['portfolio', 'research', 'market', 'analysis', 'guru', 'settings']
+const ALL_MENUS = ['portfolio', 'research', 'market', 'guru', 'settings']
 const MENU_LABELS = {
   portfolio: '종목관리', research: '리서치', market: '시장',
-  analysis: '분석', guru: '구루', settings: '설정',
+  guru: '구루', settings: '설정',
+}
+
+function ToggleBtn({ on, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '3px 14px', borderRadius: 20, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+        background: on ? 'var(--accent)' : 'transparent',
+        color: on ? '#fff' : 'var(--text-secondary, #aaa)',
+        border: on ? 'none' : '1px solid var(--border, #555)',
+      }}
+    >
+      {on ? 'ON' : 'OFF'}
+    </button>
+  )
 }
 
 export default function PermissionManager() {
@@ -13,6 +29,7 @@ export default function PermissionManager() {
   const [bulkPerms, setBulkPerms] = useState(
     Object.fromEntries(ALL_MENUS.map(m => [m, false]))
   )
+  const [pendingPerms, setPendingPerms] = useState(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -32,17 +49,29 @@ export default function PermissionManager() {
     )
   }
 
-  async function toggleSinglePerm(userId, menu, currentVal) {
-    const user = users.find(u => u.id === userId)
-    const newPerms = { ...user.permissions, [menu]: !currentVal }
+  const singleUser = selected.length === 1 ? users.find(u => u.id === selected[0]) : null
+
+  useEffect(() => {
+    if (singleUser) {
+      setPendingPerms({ ...singleUser.permissions })
+    } else {
+      setPendingPerms(null)
+    }
+  }, [singleUser?.id])
+
+  async function saveSinglePerms() {
+    if (!singleUser || !pendingPerms) return
+    setSaving(true)
     try {
-      await api.put(`/api/admin/users/${userId}/permissions`, { permissions: newPerms })
-      setUsers(prev => prev.map(u => u.id === userId
-        ? { ...u, permissions: newPerms }
+      await api.put(`/api/admin/users/${singleUser.id}/permissions`, { permissions: pendingPerms })
+      setUsers(prev => prev.map(u => u.id === singleUser.id
+        ? { ...u, permissions: pendingPerms }
         : u
       ))
     } catch {
       alert('권한 변경에 실패했습니다.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -61,8 +90,6 @@ export default function PermissionManager() {
       setSaving(false)
     }
   }
-
-  const singleUser = selected.length === 1 ? users.find(u => u.id === selected[0]) : null
 
   return (
     <div style={{ display: 'flex', gap: 16, minHeight: 400 }}>
@@ -113,7 +140,7 @@ export default function PermissionManager() {
           <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>왼쪽에서 사용자를 선택하세요</p>
         )}
 
-        {selected.length === 1 && singleUser && (
+        {selected.length === 1 && singleUser && pendingPerms && (
           <>
             <div style={{ fontWeight: 600, marginBottom: 12 }}>{singleUser.email}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -123,19 +150,20 @@ export default function PermissionManager() {
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 6, background: 'var(--surface-2)' }}
                 >
                   <span>{MENU_LABELS[menu]}</span>
-                  <button
-                    onClick={() => toggleSinglePerm(singleUser.id, menu, singleUser.permissions[menu])}
-                    style={{
-                      padding: '3px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                      background: singleUser.permissions[menu] ? 'var(--accent)' : 'var(--surface-3)',
-                      color: singleUser.permissions[menu] ? '#fff' : 'var(--text-muted)',
-                    }}
-                  >
-                    {singleUser.permissions[menu] ? 'ON' : 'OFF'}
-                  </button>
+                  <ToggleBtn
+                    on={pendingPerms[menu]}
+                    onClick={() => setPendingPerms(p => ({ ...p, [menu]: !p[menu] }))}
+                  />
                 </div>
               ))}
             </div>
+            <button
+              onClick={saveSinglePerms}
+              disabled={saving}
+              style={{ marginTop: 16, width: '100%', padding: '10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 14 }}
+            >
+              {saving ? '저장 중...' : '저장'}
+            </button>
           </>
         )}
 
@@ -150,16 +178,10 @@ export default function PermissionManager() {
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 6, background: 'var(--surface-2)' }}
                 >
                   <span>{MENU_LABELS[menu]}</span>
-                  <button
+                  <ToggleBtn
+                    on={bulkPerms[menu]}
                     onClick={() => setBulkPerms(p => ({ ...p, [menu]: !p[menu] }))}
-                    style={{
-                      padding: '3px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                      background: bulkPerms[menu] ? 'var(--accent)' : 'var(--surface-3)',
-                      color: bulkPerms[menu] ? '#fff' : 'var(--text-muted)',
-                    }}
-                  >
-                    {bulkPerms[menu] ? 'ON' : 'OFF'}
-                  </button>
+                  />
                 </div>
               ))}
             </div>
