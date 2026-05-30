@@ -4,7 +4,6 @@ import GuruCrawlSettings from './GuruCrawlSettings'
 import ConsensusSettings from './ConsensusSettings'
 import useIsMobile from '../hooks/useIsMobile'
 import useTheme from '../hooks/useTheme'
-import { supabase } from '../supabase'
 
 const TABS = [
   { key: 'report',    label: '리포트 설정' },
@@ -72,7 +71,19 @@ export default function Settings() {
 
       <div style={{ padding: '0 20px 32px' }}>
         <button className="btn" style={{ width: '100%', justifyContent: 'center', color: 'var(--down)' }}
-          onClick={() => supabase.auth.signOut()}>
+          onClick={async () => {
+            const refresh = localStorage.getItem('refresh_token')
+            if (refresh) {
+              await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refresh }),
+              }).catch(() => {})
+            }
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('refresh_token')
+            window.location.href = '/'
+          }}>
           로그아웃
         </button>
       </div>

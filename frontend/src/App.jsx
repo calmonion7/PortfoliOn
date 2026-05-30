@@ -8,14 +8,13 @@ import AnalysisHub from './pages/AnalysisHub'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
-import { supabase } from './supabase'
 import LoginPage from './pages/LoginPage'
 import MobileNav from './components/MobileNav'
 import { Sun, Moon, Bell, Refresh } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
 
-function TopNav({ theme, setTheme }) {
+function TopNav({ theme, setTheme, setSession }) {
   const navItems = [
     { to: '/',         label: '종목관리', end: true },
     { to: '/research', label: '리서치' },
@@ -48,7 +47,19 @@ function TopNav({ theme, setTheme }) {
           <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
             {theme === 'dark' ? <Sun /> : <Moon />}
           </button>
-          <button className="ghost-btn" onClick={() => supabase.auth.signOut()}>로그아웃</button>
+          <button className="ghost-btn" onClick={async () => {
+            const refresh = localStorage.getItem('refresh_token')
+            if (refresh) {
+              await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refresh }),
+              }).catch(() => {})
+            }
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('refresh_token')
+            setSession(null)
+          }}>로그아웃</button>
         </div>
       </div>
     </header>
@@ -61,12 +72,19 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => setSession(session))
-      .catch(() => {})
-      .finally(() => setAuthLoading(false))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => setSession(session))
-    return () => subscription.unsubscribe()
+    // OAuth 콜백에서 URL 파라미터로 token 전달
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    const refresh = params.get('refresh')
+    if (token && refresh) {
+      localStorage.setItem('access_token', token)
+      localStorage.setItem('refresh_token', refresh)
+      window.history.replaceState({}, '', '/')
+    }
+
+    const stored = localStorage.getItem('access_token')
+    setSession(stored ? { access_token: stored } : null)
+    setAuthLoading(false)
   }, [])
 
   if (authLoading) return null
@@ -76,7 +94,7 @@ export default function App() {
     <ToastProvider>
     <BrowserRouter>
       <div className="app-pc">
-        <TopNav theme={theme} setTheme={setTheme} />
+        <TopNav theme={theme} setTheme={setTheme} setSession={setSession} />
         <main className="page-wrap">
           <Routes>
             <Route path="/" element={<Portfolio />} />
