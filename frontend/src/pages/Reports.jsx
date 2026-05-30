@@ -383,12 +383,17 @@ const fetchList = useCallback(() => {
           /* 목록화면 */
           listLoading ? (
             <LoadingSpinner label="리포트 불러오는 중입니다." style={{ marginTop: 80 }} />
-          ) : (hasFetched && tabEntries.length === 0) ? (
-            <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-3)' }}>
-              <p>리포트가 없습니다.</p>
-              <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>
-            </div>
           ) : (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                {renderFilters()}
+              </div>
+              {(hasFetched && tabEntries.length === 0) ? (
+                <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-3)' }}>
+                  <p>리포트가 없습니다.</p>
+                  <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>
+                </div>
+              ) : (
             <table style={{ borderCollapse: 'collapse', color: 'var(--text)', width: '100%' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-elev-2)' }}>
@@ -526,6 +531,8 @@ const fetchList = useCallback(() => {
                 })}
               </tbody>
             </table>
+              )}
+            </>
           )
         ) : (
           /* 상세화면 */
