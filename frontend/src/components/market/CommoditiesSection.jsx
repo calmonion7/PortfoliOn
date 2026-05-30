@@ -27,7 +27,7 @@ export default function CommoditiesSection() {
   const summary = oil ? `WTI $${oil.current.toFixed(1)}` : ''
 
   return (
-    <SectionCard title="원자재" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="원자재" summary={summary} change={oil?.change_pct ?? null} changeSuffix="%" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>금은 안전자산 수요와 실질금리를 반영합니다. WTI 원유는 경기 및 물가의 선행지표입니다. 구리는 '닥터 코퍼'로 불리며 산업 수요를 통해 경기 방향성을 선행 진단합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         {['gold', 'oil', 'copper'].map(key => {
