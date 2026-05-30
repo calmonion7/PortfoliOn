@@ -7,6 +7,16 @@ const MENU_LABELS = {
   guru: '구루', settings: '설정',
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return isMobile
+}
+
 function ToggleBtn({ on, onClick }) {
   return (
     <button
@@ -25,7 +35,21 @@ function ToggleBtn({ on, onClick }) {
   )
 }
 
+function PermRow({ label, on, onClick, zebra }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '11px 14px', borderRadius: 6,
+      background: zebra ? 'var(--surface-2)' : 'transparent',
+    }}>
+      <span style={{ fontSize: 13 }}>{label}</span>
+      <ToggleBtn on={on} onClick={onClick} />
+    </div>
+  )
+}
+
 export default function PermissionManager() {
+  const isMobile = useIsMobile()
   const [users, setUsers] = useState([])
   const [selected, setSelected] = useState([])
   const [bulkPerms, setBulkPerms] = useState(
@@ -93,180 +117,154 @@ export default function PermissionManager() {
     }
   }
 
-  return (
+  /* ── 공통 패널 조각들 ── */
+  const UserList = (
     <div style={{
-      display: 'flex',
-      border: '1px solid var(--border)',
-      borderRadius: 10,
-      overflow: 'hidden',
-      minHeight: 360,
-    }}>
-      {/* Left panel */}
-      <div style={{
-        width: 240,
-        flexShrink: 0,
+      display: 'flex', flexDirection: 'column', gap: 4,
+      ...(isMobile ? {} : {
+        width: 240, flexShrink: 0,
         borderRight: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
         padding: '16px 12px',
-        gap: 4,
+      }),
+      ...(isMobile ? { padding: '14px 0 10px' } : {}),
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
+        ...(isMobile ? { paddingBottom: 10, borderBottom: '1px solid var(--border)' } : {}),
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>사용자</span>
-          <button
-            className="link-btn"
-            onClick={toggleSelectAll}
-            style={{ fontSize: 11, color: 'var(--accent)' }}
-          >
-            {allSelected ? '전체해제' : '전체선택'}
-          </button>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>사용자</span>
+        <button className="link-btn" onClick={toggleSelectAll} style={{ fontSize: 11, color: 'var(--accent)' }}>
+          {allSelected ? '전체해제' : '전체선택'}
+        </button>
+      </div>
+
+      {users.filter(u => u.role === 'admin').map(u => (
+        <div key={u.id} style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13 }}>👑</span>
+          <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{u.email}</span>
         </div>
+      ))}
 
-        {users.filter(u => u.role === 'admin').map(u => (
-          <div key={u.id} style={{
-            padding: '7px 10px',
-            borderRadius: 6,
-            background: 'var(--surface-2)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
+      {normalUsers.map(u => (
+        <div
+          key={u.id}
+          onClick={() => toggleUser(u.id)}
+          style={{
+            padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+            background: selected.includes(u.id) ? 'var(--accent-subtle)' : 'transparent',
+            border: `1px solid ${selected.includes(u.id) ? 'var(--accent)' : 'transparent'}`,
+            display: 'flex', alignItems: 'center', gap: 8,
+            transition: 'all 0.12s',
+          }}
+        >
+          <div style={{
+            width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+            background: selected.includes(u.id) ? 'var(--accent)' : 'transparent',
+            border: `1.5px solid ${selected.includes(u.id) ? 'var(--accent)' : 'var(--border)'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span style={{ fontSize: 13 }}>👑</span>
-            <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{u.email}</span>
+            {selected.includes(u.id) && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>✓</span>}
           </div>
-        ))}
+          <span style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</span>
+        </div>
+      ))}
 
-        {normalUsers.map(u => (
-          <div
-            key={u.id}
-            onClick={() => toggleUser(u.id)}
-            style={{
-              padding: '7px 10px',
-              borderRadius: 6,
-              cursor: 'pointer',
-              background: selected.includes(u.id) ? 'var(--accent-subtle)' : 'transparent',
-              border: `1px solid ${selected.includes(u.id) ? 'var(--accent)' : 'transparent'}`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              transition: 'all 0.12s',
-            }}
-          >
-            <div style={{
-              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-              background: selected.includes(u.id) ? 'var(--accent)' : 'transparent',
-              border: `1.5px solid ${selected.includes(u.id) ? 'var(--accent)' : 'var(--border)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {selected.includes(u.id) && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1 }}>✓</span>}
-            </div>
-            <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</span>
+      {selected.length > 1 && (
+        <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, paddingLeft: 2 }}>{selected.length}명 선택됨</div>
+      )}
+    </div>
+  )
+
+  const PermPanel = (
+    <div style={{
+      flex: 1, display: 'flex', flexDirection: 'column',
+      ...(isMobile ? { paddingTop: 16 } : { padding: '16px 20px' }),
+    }}>
+      {selected.length === 0 && !isMobile && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>왼쪽에서 사용자를 선택하세요</p>
+        </div>
+      )}
+
+      {selected.length === 1 && singleUser && pendingPerms && (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--border)', color: 'var(--accent)' }}>
+            {singleUser.email}
           </div>
-        ))}
-
-        {selected.length > 1 && (
-          <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 6, paddingLeft: 2 }}>{selected.length}명 선택됨</div>
-        )}
-      </div>
-
-      {/* Right panel */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px 20px' }}>
-        {selected.length === 0 && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>왼쪽에서 사용자를 선택하세요</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {ALL_MENUS.map((menu, i) => (
+              <PermRow
+                key={menu}
+                label={MENU_LABELS[menu]}
+                on={pendingPerms[menu]}
+                onClick={() => setPendingPerms(p => ({ ...p, [menu]: !p[menu] }))}
+                zebra={i % 2 === 0}
+              />
+            ))}
           </div>
-        )}
-
-        {selected.length === 1 && singleUser && pendingPerms && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-              {singleUser.email}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-              {ALL_MENUS.map((menu, i) => (
-                <div
-                  key={menu}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 14px',
-                    borderRadius: 6,
-                    background: i % 2 === 0 ? 'var(--surface-2)' : 'transparent',
-                  }}
-                >
-                  <span style={{ fontSize: 13 }}>{MENU_LABELS[menu]}</span>
-                  <ToggleBtn
-                    on={pendingPerms[menu]}
-                    onClick={() => setPendingPerms(p => ({ ...p, [menu]: !p[menu] }))}
-                  />
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-              <button
-                onClick={saveSinglePerms}
-                disabled={saving}
-                style={{
-                  width: '100%', padding: '10px',
-                  borderRadius: 6, border: 'none', cursor: saving ? 'default' : 'pointer',
-                  background: 'var(--text)', color: 'var(--bg)',
-                  fontWeight: 600, fontSize: 13,
-                  opacity: saving ? 0.6 : 1,
-                  transition: 'opacity 0.15s',
-                }}
-              >
-                {saving ? '저장 중...' : '저장'}
-              </button>
-            </div>
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            <button
+              onClick={saveSinglePerms}
+              disabled={saving}
+              style={{ width: '100%', padding: '11px', borderRadius: 8, border: 'none', cursor: saving ? 'default' : 'pointer', background: 'var(--text)', color: 'var(--bg)', fontWeight: 600, fontSize: 13, opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? '저장 중...' : '저장'}
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {selected.length > 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>{selected.length}명에게 일괄 적용</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>선택한 사용자 전체에 동일하게 적용됩니다</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-              {ALL_MENUS.map((menu, i) => (
-                <div
-                  key={menu}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 14px',
-                    borderRadius: 6,
-                    background: i % 2 === 0 ? 'var(--surface-2)' : 'transparent',
-                  }}
-                >
-                  <span style={{ fontSize: 13 }}>{MENU_LABELS[menu]}</span>
-                  <ToggleBtn
-                    on={bulkPerms[menu]}
-                    onClick={() => setBulkPerms(p => ({ ...p, [menu]: !p[menu] }))}
-                  />
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-              <button
-                onClick={applyBulk}
-                disabled={saving}
-                style={{
-                  width: '100%', padding: '10px',
-                  borderRadius: 6, border: 'none', cursor: saving ? 'default' : 'pointer',
-                  background: 'var(--text)', color: 'var(--bg)',
-                  fontWeight: 600, fontSize: 13,
-                  opacity: saving ? 0.6 : 1,
-                }}
-              >
-                {saving ? '적용 중...' : `${selected.length}명에게 적용`}
-              </button>
-            </div>
+      {selected.length > 1 && (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>{selected.length}명에게 일괄 적용</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>선택한 사용자 전체에 동일하게 적용됩니다</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {ALL_MENUS.map((menu, i) => (
+              <PermRow
+                key={menu}
+                label={MENU_LABELS[menu]}
+                on={bulkPerms[menu]}
+                onClick={() => setBulkPerms(p => ({ ...p, [menu]: !p[menu] }))}
+                zebra={i % 2 === 0}
+              />
+            ))}
+          </div>
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            <button
+              onClick={applyBulk}
+              disabled={saving}
+              style={{ width: '100%', padding: '11px', borderRadius: 8, border: 'none', cursor: saving ? 'default' : 'pointer', background: 'var(--text)', color: 'var(--bg)', fontWeight: 600, fontSize: 13, opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? '적용 중...' : `${selected.length}명에게 적용`}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {/* 사용자 목록 */}
+        <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '0 14px', marginBottom: 12 }}>
+          {UserList}
+        </div>
+        {/* 권한 패널 - 선택 시에만 표시 */}
+        {selected.length > 0 && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '14px' }}>
+            {PermPanel}
           </div>
         )}
       </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', minHeight: 360 }}>
+      {UserList}
+      {PermPanel}
     </div>
   )
 }
