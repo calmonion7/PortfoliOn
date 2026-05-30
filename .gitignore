@@ -55,3 +55,6 @@ frontend/node_modules/
 # Screenshots and local scripts
 screenshots/
 scripts/node_modules/
+
+# Docker environment
+backend/.env.docker
