@@ -41,7 +41,7 @@ def crawl_progress():
 
 
 @router.post("/crawl", status_code=202)
-def start_crawl(background_tasks: BackgroundTasks, admin_id: str = Depends(require_admin)):
+def start_crawl(background_tasks: BackgroundTasks, _: str = Depends(require_admin)):
     if _progress.get()["running"]:
         raise HTTPException(status_code=409, detail="Crawl already running")
     background_tasks.add_task(_run_crawl)

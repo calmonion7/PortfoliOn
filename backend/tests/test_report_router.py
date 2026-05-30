@@ -234,3 +234,9 @@ def test_generate_batch_blocked_for_non_admin():
     with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
         resp = _nonadmin_client.post("/api/report/generate?tickers=AAPL")
     assert resp.status_code == 403
+
+
+def test_backfill_blocked_for_non_admin():
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        resp = _nonadmin_client.post("/api/report/backfill")
+    assert resp.status_code == 403
