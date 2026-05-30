@@ -222,6 +222,59 @@ const fetchList = useCallback(() => {
       return rsiA - rsiB
     })
 
+  const renderFilters = () => (
+    <>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: (activeTab === 'watchlist' || activeTab === 'ungenerated') ? 0 : 12 }}>
+        <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
+        <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
+        {ungeneratedCount > 0 && (
+          <button className={`tab-btn${activeTab === 'ungenerated' ? ' active' : ''}`} onClick={() => setActiveTab('ungenerated')} style={{ color: activeTab === 'ungenerated' ? 'var(--accent)' : '#ffb74d' }}>미생성 ({ungeneratedCount})</button>
+        )}
+      </div>
+      {activeTab === 'watchlist' && (
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 8, marginTop: 4 }}>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'low' ? '#81c784' : 'var(--text-3)', borderBottomColor: watchlistSub === 'low' ? '#81c784' : 'transparent', fontWeight: watchlistSub === 'low' ? 600 : 400 }} onClick={() => setWatchlistSub('low')}>목표≥40% ({watchlistLowCount})</button>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottomColor: watchlistSub === 'high' ? '#ef9a9a' : 'transparent', fontWeight: watchlistSub === 'high' ? 600 : 400 }} onClick={() => setWatchlistSub('high')}>목표&lt;40% ({watchlistHighCount})</button>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'warn' ? '#ffb74d' : 'var(--text-3)', borderBottomColor: watchlistSub === 'warn' ? '#ffb74d' : 'transparent', fontWeight: watchlistSub === 'warn' ? 600 : 400 }} onClick={() => setWatchlistSub('warn')}>⚠ 경고 ({watchlistWarnCount})</button>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+        {[['ALL', '전체', mCountAll], ['KR', '🇰🇷 국내', mCountKR], ['US', '🇺🇸 해외', mCountUS]].map(([val, label, cnt]) => (
+          <button
+            key={val}
+            onClick={() => setMarketFilter(val)}
+            style={{
+              flex: 1, padding: '3px 0', fontSize: 10,
+              background: marketFilter === val ? 'var(--surface-hover)' : 'transparent',
+              border: `1px solid ${marketFilter === val ? 'var(--accent)' : 'var(--border)'}`,
+              color: marketFilter === val ? 'var(--accent)' : 'var(--text-3)',
+              borderRadius: 3, cursor: 'pointer', lineHeight: 1.6,
+            }}
+          >
+            {label}<br />
+            <span style={{ fontSize: 9, opacity: 0.8 }}>({cnt})</span>
+          </button>
+        ))}
+      </div>
+      {activeTab === 'ungenerated' && !listLoading && ungeneratedCount > 0 && (
+        <button
+          onClick={() => generateBatch(ungeneratedTickers.filter(t => { const m = reportList[t]?.market; return marketFilter === 'ALL' || m === marketFilter }))}
+          disabled={!!generating}
+          style={{
+            width: '100%', marginBottom: 8, padding: '5px 0', fontSize: 12,
+            background: generating === '__batch__' ? 'var(--bg-elev)' : 'var(--accent)',
+            color: generating === '__batch__' ? 'var(--accent)' : 'var(--bg)',
+            border: '1px solid var(--accent)', borderRadius: 4, cursor: generating ? 'default' : 'pointer',
+          }}
+        >
+          {generating === '__batch__'
+            ? `생성 중 ${genProgress.done}/${genProgress.total || '?'}`
+            : `모두 생성 (${tabEntries.length}개)`}
+        </button>
+      )}
+    </>
+  )
+
   const renderTickerItem = (ticker, info) => {
     const isSelected = selected.ticker === ticker && view === 'detail'
     const hasReport = info.dates.length > 0
