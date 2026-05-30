@@ -19,12 +19,15 @@ REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 def _latest_snapshot(ticker: str) -> tuple:
     """Find and load the latest snapshot for a ticker. Tries DB first, falls back to filesystem."""
-    rows = query(
-        "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
-        (ticker.upper(),),
-    )
-    if rows:
-        return rows[0]["data"], rows[0]["date"]
+    try:
+        rows = query(
+            "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
+            (ticker.upper(),),
+        )
+        if rows:
+            return rows[0]["data"], rows[0]["date"]
+    except Exception:
+        pass
     # Filesystem fallback (pre-migration)
     for base in (SNAPSHOTS_DIR, REPORTS_DIR):
         ticker_dir = base / ticker
