@@ -2,12 +2,14 @@
 import os
 
 from authlib.integrations.starlette_client import OAuth
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from starlette.requests import Request
 
+from auth import get_current_user
 from services import auth_service
+from services import db as db_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -74,6 +76,30 @@ def refresh(req: RefreshRequest):
 def logout(req: RefreshRequest):
     auth_service.revoke_refresh_token(req.refresh_token)
     return {"message": "Logged out"}
+
+
+ALL_MENUS = ["portfolio", "research", "market", "analysis", "guru", "settings"]
+
+
+@router.get("/me")
+def me(user_id: str = Depends(get_current_user)):
+    user = auth_service.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    if user["role"] == "admin":
+        menu_permissions = ALL_MENUS
+    else:
+        rows = db_service.query(
+            "SELECT menu FROM user_menu_permissions WHERE user_id = %s AND enabled = true",
+            (user_id,),
+        )
+        menu_permissions = [r["menu"] for r in rows if r.get("enabled", True)]
+    return {
+        "user_id": user_id,
+        "email": user["email"],
+        "role": user["role"],
+        "menu_permissions": menu_permissions,
+    }
 
 
 @router.get("/oauth/google")
