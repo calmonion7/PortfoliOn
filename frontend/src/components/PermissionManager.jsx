@@ -35,11 +35,15 @@ export default function PermissionManager() {
   async function toggleSinglePerm(userId, menu, currentVal) {
     const user = users.find(u => u.id === userId)
     const newPerms = { ...user.permissions, [menu]: !currentVal }
-    await api.put(`/api/admin/users/${userId}/permissions`, { permissions: newPerms })
-    setUsers(prev => prev.map(u => u.id === userId
-      ? { ...u, permissions: newPerms }
-      : u
-    ))
+    try {
+      await api.put(`/api/admin/users/${userId}/permissions`, { permissions: newPerms })
+      setUsers(prev => prev.map(u => u.id === userId
+        ? { ...u, permissions: newPerms }
+        : u
+      ))
+    } catch {
+      alert('권한 변경에 실패했습니다.')
+    }
   }
 
   async function applyBulk() {
@@ -52,6 +56,7 @@ export default function PermissionManager() {
       const updated = await api.get('/api/admin/users')
       setUsers(updated.data)
       setSelected([])
+      setBulkPerms(Object.fromEntries(ALL_MENUS.map(m => [m, false])))
     } finally {
       setSaving(false)
     }
