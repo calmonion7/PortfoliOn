@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/ddns_update.sh
-# Cloudflare DDNS auto-update for taebro.com
+# Cloudflare DDNS auto-update for portfolion.taebro.com
 #
 # Usage:
 #   export CF_ZONE_ID="your_cloudflare_zone_id"
@@ -11,7 +11,7 @@
 # Setup:
 #   1. Get ZONE_ID from Cloudflare dashboard (Zone Overview, right panel)
 #   2. Get RECORD_ID: curl -s -X GET https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records \
-#      -H "Authorization: Bearer $CF_API_TOKEN" | jq '.result[] | select(.name=="taebro.com") | .id'
+#      -H "Authorization: Bearer $CF_API_TOKEN" | jq '.result[] | select(.name=="portfolion.taebro.com") | .id'
 #   3. Cron (every 5 min): */5 * * * * /path/to/ddns_update.sh
 
 set -euo pipefail
@@ -19,7 +19,7 @@ set -euo pipefail
 ZONE_ID="${CF_ZONE_ID:-}"
 RECORD_ID="${CF_RECORD_ID:-}"
 API_TOKEN="${CF_API_TOKEN:-}"
-DOMAIN="taebro.com"
+DOMAIN="portfolion.taebro.com"
 IP_CACHE="/tmp/ddns_last_ip"
 
 if [ -z "$ZONE_ID" ] || [ -z "$RECORD_ID" ] || [ -z "$API_TOKEN" ]; then
