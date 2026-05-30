@@ -6,7 +6,7 @@ from typing import Dict, List
 from auth import require_admin
 from services.db import query, execute
 
-ALL_MENUS = ["portfolio", "research", "market", "analysis", "guru", "settings"]
+ALL_MENUS = ["portfolio", "research", "market", "guru", "settings"]
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
