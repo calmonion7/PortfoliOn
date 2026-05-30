@@ -10,6 +10,11 @@ PROJECT_DIR="$(pwd)"
 
 echo "=== PortfoliOn Deploy ==="
 
+# Docker 키체인 우회 (CI 환경에서 macOS keychain 접근 불가 시)
+TMP_DOCKER_CONFIG=$(mktemp -d)
+echo '{"auths":{}}' > "$TMP_DOCKER_CONFIG/config.json"
+export DOCKER_CONFIG="$TMP_DOCKER_CONFIG"
+
 # 1. 프론트엔드 빌드
 echo "[1/4] Building frontend..."
 npm run build --prefix frontend --silent
