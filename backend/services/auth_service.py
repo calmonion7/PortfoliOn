@@ -38,6 +38,11 @@ def get_user_by_email(email: str) -> dict | None:
     return rows[0] if rows else None
 
 
+def get_user_by_id(user_id: str) -> dict | None:
+    rows = query("SELECT * FROM users WHERE id = %s", (user_id,))
+    return rows[0] if rows else None
+
+
 def create_user(email: str, password: str | None = None) -> dict:
     rows = query(
         "INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING *",
