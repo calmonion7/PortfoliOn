@@ -5,13 +5,11 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
+import bcrypt as _bcrypt
 from jose import jwt
-from passlib.context import CryptContext
 from psycopg2.extras import RealDictCursor
 
 from services.db import get_connection, query, execute
-
-_pwd = CryptContext(schemes=["bcrypt"])
 
 _ACCESS_EXPIRE = timedelta(hours=1)
 _REFRESH_EXPIRE = timedelta(days=30)
@@ -24,11 +22,11 @@ def _secret() -> str:
 # ── 비밀번호 ──────────────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:
-    return _pwd.hash(plain)
+    return _bcrypt.hashpw(plain.encode(), _bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _pwd.verify(plain, hashed)
+    return _bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 # ── 사용자 조회/생성 ───────────────────────────────────────────────────────────
