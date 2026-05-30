@@ -44,6 +44,8 @@ class BulkPermissionsBody(BaseModel):
 @router.put("/users/{user_id}/permissions")
 def set_permissions(user_id: str, body: PermissionsBody, admin_id: str = Depends(require_admin)):
     for menu, enabled in body.permissions.items():
+        if menu not in ALL_MENUS:
+            continue
         execute(
             """INSERT INTO user_menu_permissions (user_id, menu, enabled)
                VALUES (%s, %s, %s)
@@ -57,6 +59,8 @@ def set_permissions(user_id: str, body: PermissionsBody, admin_id: str = Depends
 def bulk_permissions(body: BulkPermissionsBody, admin_id: str = Depends(require_admin)):
     for uid in body.user_ids:
         for menu, enabled in body.permissions.items():
+            if menu not in ALL_MENUS:
+                continue
             execute(
                 """INSERT INTO user_menu_permissions (user_id, menu, enabled)
                    VALUES (%s, %s, %s)

@@ -14,7 +14,6 @@ USERS = [
     {"id": "admin-id", "email": "admin@test.com", "role": "admin"},
     {"id": "user-1",   "email": "user1@test.com", "role": "user"},
 ]
-PERMS = [{"menu": "portfolio", "enabled": True}, {"menu": "research", "enabled": True}]
 
 
 def test_get_users_returns_list():
