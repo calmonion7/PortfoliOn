@@ -65,7 +65,7 @@ CREATE TABLE digests (
 
 -- 컨센서스 히스토리
 CREATE TABLE consensus_history (
-  ticker      text NOT NULL,
+  ticker      text NOT NULL REFERENCES tickers(ticker) ON DELETE CASCADE,
   date        date NOT NULL,
   target_mean numeric,
   buy         integer,
@@ -88,3 +88,7 @@ CREATE TABLE market_cache (
   data       jsonb NOT NULL,
   fetched_at timestamptz NOT NULL
 );
+
+-- 성능 인덱스
+CREATE INDEX idx_user_stocks_ticker ON user_stocks(ticker);
+CREATE INDEX idx_consensus_history_ticker ON consensus_history(ticker);
