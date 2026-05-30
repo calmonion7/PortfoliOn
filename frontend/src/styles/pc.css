@@ -170,7 +170,7 @@
 /* ----- SEARCH ----- */
 .search-row { display: flex; gap: 10px; align-items: center; margin: 14px 0 16px; }
 .search-input {
-  position: relative; flex: 1;
+  position: relative; flex: 0 0 280px;
 }
 .search-input input {
   width: 100%; padding: 10px 14px 10px 36px;
