@@ -30,7 +30,7 @@ async function doLogout(setSession) {
 }
 
 function TopNav({ theme, setTheme, setSession }) {
-  const { menuPermissions } = useAuth() || { menuPermissions: [] }
+  const { menuPermissions, loading } = useAuth() || { menuPermissions: [], loading: true }
   const allItems = [
     { to: '/',         label: '종목관리', key: 'portfolio', end: true },
     { to: '/research', label: '리서치',   key: 'research' },
@@ -39,7 +39,7 @@ function TopNav({ theme, setTheme, setSession }) {
     { to: '/guru',     label: '구루',     key: 'guru' },
     { to: '/settings', label: '설정',     key: 'settings' },
   ]
-  const navItems = allItems.filter(item => menuPermissions.includes(item.key))
+  const navItems = loading ? [] : allItems.filter(item => menuPermissions.includes(item.key))
   return (
     <header className="topnav">
       <div className="topnav-inner">

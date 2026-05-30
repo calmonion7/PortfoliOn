@@ -12,8 +12,8 @@ const ALL_TABS = [
 ]
 
 export default function MobileNav() {
-  const { menuPermissions } = useAuth() || { menuPermissions: [] }
-  const tabs = ALL_TABS.filter(t => menuPermissions.includes(t.key))
+  const { menuPermissions, loading } = useAuth() || { menuPermissions: [], loading: true }
+  const tabs = loading ? [] : ALL_TABS.filter(t => menuPermissions.includes(t.key))
   return (
     <nav className="tabbar">
       {tabs.map(({ to, label, Icon, end }) => (
