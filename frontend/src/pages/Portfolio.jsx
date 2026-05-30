@@ -283,7 +283,6 @@ export default function Portfolio() {
           <h1 className="page-title">내 포트폴리오</h1>
           <p className="page-sub">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} · 실시간</p>
         </div>
-        <button className="btn btn-primary" onClick={openAdd}><Plus /> 종목 추가</button>
       </div>
 
       {/* KPI 4종 */}
@@ -321,9 +320,14 @@ export default function Portfolio() {
           <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard() }}>대시보드</button>
           <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => setTab('analysis')}>분석</button>
         </div>
-        {tab === 'dash' && (
-          <button className="btn" onClick={() => fetchDashboard({ invalidate: true })} disabled={dashboardLoading}>↺ 새로고침</button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {tab === 'dash' && (
+            <button className="btn" onClick={() => fetchDashboard({ invalidate: true })} disabled={dashboardLoading}>↺ 새로고침</button>
+          )}
+          {(tab === 'holdings' || tab === 'watch') && (
+            <button className="btn btn-primary" onClick={openAdd}><Plus /> 종목 추가</button>
+          )}
+        </div>
       </div>
 
       {/* 검색 + 필터 칩 */}
