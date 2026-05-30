@@ -17,6 +17,7 @@ import { ReportSectionText, ReportSectionCompetitors, ReportSectionNews } from '
 
 export default function Reports() {
   const [reportList, setReportList] = useState({})
+  const [lastScheduledDate, setLastScheduledDate] = useState(null)
   const [selected, setSelected] = useState({ ticker: null, date: null })
   const [detail, setDetail] = useState({ summary: null })
   const [loading, setLoading] = useState(false)
@@ -44,10 +45,15 @@ export default function Reports() {
       .catch(() => {})
   }, [])
 
-const fetchList = useCallback(() => {
+const _applyList = (data) => {
+    setReportList(data.stocks ?? data)
+    if (data.last_scheduled_date) setLastScheduledDate(data.last_scheduled_date)
+  }
+
+  const fetchList = useCallback(() => {
     setListLoading(true)
     api.get('/api/report/list')
-      .then(({ data }) => setReportList(data))
+      .then(({ data }) => _applyList(data))
       .finally(() => { setListLoading(false); setHasFetched(true) })
   }, [])
 
@@ -89,8 +95,8 @@ const fetchList = useCallback(() => {
               showToast(msg, 'error')
             } else showToast(`${ticker} 리포트 생성 완료`)
             api.get('/api/report/list').then(({ data: list }) => {
-              setReportList(list)
-              const dates = list[ticker]?.dates || []
+              _applyList(list)
+              const dates = (list.stocks ?? list)[ticker]?.dates || []
               const newDate = dates[0]
               if (!newDate) return
               if (view === 'detail' && selected.ticker === ticker) {
@@ -116,7 +122,8 @@ const fetchList = useCallback(() => {
     setGenProgress({ done: 0, total: 0 })
     clearInterval(pollRef.current)
     try {
-      await api.post(`/api/report/generate?tickers=${tickers.join(',')}`)
+      const dateParam = lastScheduledDate ? `&date=${lastScheduledDate}` : ''
+      await api.post(`/api/report/generate?tickers=${tickers.join(',')}${dateParam}`)
       pollRef.current = setInterval(async () => {
         try {
           const { data } = await api.get('/api/report/progress')
@@ -135,7 +142,7 @@ const fetchList = useCallback(() => {
                 : `생성 실패: ${names}`
               showToast(msg, 'error')
             } else showToast(`리포트 ${data.done}개 생성 완료`)
-            api.get('/api/report/list').then(({ data: list }) => setReportList(list))
+            api.get('/api/report/list').then(({ data: list }) => _applyList(list))
           }
         } catch {}
       }, 1500)
@@ -159,7 +166,9 @@ const fetchList = useCallback(() => {
   const watchlistLowCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g === null || g >= 40 }).length
   const watchlistHighCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g !== null && g < 40 }).length
   const watchlistCount = watchlistAll.length
-  const _isUngenerated = ([, v]) => v.dates.length === 0 || v.summary?.price == null
+  const _isUngenerated = ([, v]) => !lastScheduledDate
+    ? (v.dates.length === 0 || v.summary?.price == null)
+    : !v.dates.map(String).includes(lastScheduledDate)
   const ungeneratedTickers = Object.entries(reportList).filter(_isUngenerated).map(([t]) => t)
   const ungeneratedCount = ungeneratedTickers.length
   // eslint-disable-next-line react-hooks/exhaustive-deps

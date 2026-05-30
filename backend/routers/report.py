@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+from datetime import date as _date, timedelta
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pathlib import Path
@@ -17,6 +18,20 @@ router = APIRouter(prefix="/api", tags=["report"])
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
+
+_DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+
+def _last_scheduled_date(schedule: dict) -> str:
+    """Return the most recent date matching the schedule's days of week."""
+    enabled_days = {_DAY_MAP[d] for d in schedule.get("days", []) if d in _DAY_MAP}
+    today = _date.today()
+    if not schedule.get("enabled") or not enabled_days:
+        return today.strftime("%Y-%m-%d")
+    for i in range(7):
+        d = today - timedelta(days=i)
+        if d.weekday() in enabled_days:
+            return d.strftime("%Y-%m-%d")
+    return today.strftime("%Y-%m-%d")
 
 _RSI_KEYS = ("rsi", "target_20", "target_25", "target_30", "target_70", "target_75", "target_80")
 _SLIM_KEYS = (
@@ -86,6 +101,8 @@ def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = Non
         stocks = all_stocks
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
+    if not date:
+        date = _last_scheduled_date(storage.get_schedule())
     _progress.start(len(stocks))
     background_tasks.add_task(_run_generation, stocks, date)
     return {"message": f"Generating reports for {len(stocks)} stock(s)"}
@@ -185,7 +202,8 @@ def list_reports(user_id: str = Depends(get_current_user)):
             if ticker not in result:
                 result[ticker] = {"dates": [], "category": "watchlist", "summary": None,
                                   "market": stock.get("market", "US")}
-        return result
+        schedule = storage.get_schedule()
+        return {"stocks": result, "last_scheduled_date": _last_scheduled_date(schedule)}
 
     return cache_svc.get_list(_build)
 
