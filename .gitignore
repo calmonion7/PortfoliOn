@@ -23,6 +23,9 @@ backend/data/kr_exports.json
 backend/data/consensus/
 backend/snapshots/
 
+# Let's Encrypt certificates and account keys (sensitive)
+certbot/conf/
+
 # Superpowers/planning artifacts
 docs/superpowers/
 .superpowers/
@@ -55,3 +58,6 @@ frontend/node_modules/
 # Screenshots and local scripts
 screenshots/
 scripts/node_modules/
+
+# Docker environment
+backend/.env.docker

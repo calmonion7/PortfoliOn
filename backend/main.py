@@ -4,6 +4,7 @@ load_dotenv()
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import date
@@ -13,6 +14,7 @@ import scheduler as sched
 from routers import portfolio, report, watchlist, stocks, guru, calendar, digest, analytics
 from routers.market_indicators import router as market_indicators_router
 from routers.analysis import router as analysis_router
+from routers.auth import router as auth_router
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
 SNAPSHOTS_DIR.mkdir(exist_ok=True)
@@ -52,6 +54,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Stock Portfolio Manager", lifespan=lifespan)
 
+app.add_middleware(SessionMiddleware, secret_key=os.environ["SESSION_SECRET"])
+
 _frontend_url = os.getenv("FRONTEND_URL", "")
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +64,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(portfolio.router)
 app.include_router(report.router)
 app.include_router(watchlist.router)

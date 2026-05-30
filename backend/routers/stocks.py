@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from services import storage
-from services.db import get_db
+from services.db import query
 import re
 import json
 import requests as http_requests
@@ -18,17 +18,11 @@ REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 
 def _latest_snapshot(ticker: str) -> tuple:
-    """Find and load the latest snapshot for a ticker. Tries Supabase first, falls back to filesystem."""
+    """Find and load the latest snapshot for a ticker. Tries DB first, falls back to filesystem."""
     try:
-        db = get_db()
-        rows = (
-            db.table("snapshots")
-            .select("date, data")
-            .eq("ticker", ticker.upper())
-            .order("date", desc=True)
-            .limit(1)
-            .execute()
-            .data
+        rows = query(
+            "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
+            (ticker.upper(),),
         )
         if rows:
             return rows[0]["data"], rows[0]["date"]

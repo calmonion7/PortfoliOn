@@ -12,13 +12,6 @@ from routers.calendar import router
 from auth import get_current_user
 
 
-def _make_mock_db(data=None):
-    m = MagicMock()
-    for method in ['table', 'select', 'eq', 'order', 'limit', 'upsert', 'delete']:
-        getattr(m, method).return_value = m
-    m.execute.return_value.data = data if data is not None else []
-    return m
-
 app = FastAPI()
 app.include_router(router)
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
@@ -52,7 +45,8 @@ def test_calendar_returns_earnings_event(tmp_path):
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
          patch("routers.calendar._CACHE_DIR", tmp_path), \
-         patch("routers.calendar.get_db", return_value=_make_mock_db([])):
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-05")
     assert resp.status_code == 200
     events = resp.json()["events"]
@@ -68,7 +62,8 @@ def test_calendar_returns_dividend_event(tmp_path):
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
          patch("routers.calendar._CACHE_DIR", tmp_path), \
-         patch("routers.calendar.get_db", return_value=_make_mock_db([])):
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-05")
     events = resp.json()["events"]
     divs = [e for e in events if e["type"] == "dividend"]
@@ -86,7 +81,8 @@ def test_calendar_empty_for_ticker_with_no_data(tmp_path):
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
          patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.xcals.get_calendar", return_value=mock_cal), \
-         patch("routers.calendar.get_db", return_value=_make_mock_db([])):
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-07")
     assert resp.status_code == 200
     assert resp.json()["events"] == []
@@ -108,29 +104,31 @@ def test_calendar_tsla_watchlist_stock_type(tmp_path):
     with patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.calendar.yf.Ticker", return_value=mock), \
-         patch("routers.calendar.get_db", return_value=_make_mock_db([])):
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-05")
     events = resp.json()["events"]
     assert events[0]["stock_type"] == "watchlist"
 
 
 def test_stale_cache_is_regenerated(tmp_path):
-    # Empty Supabase cache → forces recomputation and upsert with fresh events
+    # Empty cache → forces recomputation and upsert with fresh events
     mock_cal = MagicMock()
     mock_cal.sessions_in_range.return_value = pd.DatetimeIndex([])
-    mock_db = _make_mock_db([])
+    mock_execute = MagicMock(return_value=1)
     with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
          patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.xcals.get_calendar", return_value=mock_cal), \
-         patch("routers.calendar.get_db", return_value=mock_db):
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", mock_execute):
         resp = client.get("/api/calendar?month=2026-05")
 
     assert resp.status_code == 200
     # Should have holiday events (computed fresh, not empty stale result)
     events = resp.json()["events"]
     assert any(e["type"] in ("holiday_us", "holiday_kr") for e in events)
-    # Supabase upsert was called to save the new events
-    assert mock_db.upsert.called
+    # execute was called to save the new events
+    assert mock_execute.called
 
 
 def test_calendar_includes_nyse_holiday(tmp_path):
@@ -143,7 +141,8 @@ def test_calendar_includes_nyse_holiday(tmp_path):
     with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
          patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.xcals.get_calendar", return_value=mock_cal), \
-         patch("routers.calendar.get_db", return_value=_make_mock_db([])):
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-05")
 
     assert resp.status_code == 200
@@ -162,7 +161,8 @@ def test_calendar_includes_krx_holiday(tmp_path):
     with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
          patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.xcals.get_calendar", return_value=mock_cal), \
-         patch("routers.calendar.get_db", return_value=_make_mock_db([])):
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-05")
 
     assert resp.status_code == 200

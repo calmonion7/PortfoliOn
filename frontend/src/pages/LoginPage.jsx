@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { supabase } from '../supabase'
 import useIsMobile from '../hooks/useIsMobile'
+
+const API = import.meta.env.VITE_API_BASE_URL || ''
 
 export default function LoginPage() {
   const isMobile = useIsMobile()
@@ -12,13 +13,30 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true); setError(null)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError(error.message)
-    setLoading(false)
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.detail || '로그인 실패')
+        return
+      }
+      const { access_token, refresh_token } = await res.json()
+      localStorage.setItem('access_token', access_token)
+      localStorage.setItem('refresh_token', refresh_token)
+      window.location.href = '/'
+    } catch {
+      setError('네트워크 오류')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleGoogle = () => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
-  const handleGithub = () => supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: window.location.origin } })
+  const handleGoogle = () => { window.location.href = `${API}/api/auth/oauth/google` }
+  const handleGithub = () => { window.location.href = `${API}/api/auth/oauth/github` }
 
   if (isMobile) return (
     <div className="m-login">

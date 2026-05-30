@@ -8,7 +8,7 @@ import yfinance as yf
 import requests
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
-from services.db import get_db
+from services.db import query, execute
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DATA_DIR = os.path.join(_BASE_DIR, "data")
@@ -41,9 +41,9 @@ def _set_cache(key: str, data: dict, ttl: int) -> None:
 
 
 def _mc_load(key: str) -> dict | None:
-    """Supabase market_cache에서 로드. {'data': ..., 'fetched_at': ...} 반환"""
+    """market_cache에서 로드. {'data': ..., 'fetched_at': ...} 반환"""
     try:
-        rows = get_db().table("market_cache").select("data, fetched_at").eq("key", key).execute().data
+        rows = query("SELECT data, fetched_at FROM market_cache WHERE key = %s", (key,))
         if rows:
             return {"data": rows[0]["data"], "fetched_at": rows[0]["fetched_at"]}
     except Exception:
@@ -52,21 +52,21 @@ def _mc_load(key: str) -> dict | None:
 
 
 def _mc_save(key: str, data: dict) -> None:
-    """Supabase market_cache에 저장."""
+    """market_cache에 저장."""
     from datetime import datetime, timezone
     try:
-        get_db().table("market_cache").upsert({
-            "key": key,
-            "data": data,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-        }).execute()
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        execute(
+            "INSERT INTO market_cache (key, data, fetched_at) VALUES (%s, %s, %s) ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, fetched_at=EXCLUDED.fetched_at",
+            (key, json.dumps(data), fetched_at),
+        )
     except Exception:
         pass
 
 
 def _mc_delete(key: str) -> None:
     try:
-        get_db().table("market_cache").delete().eq("key", key).execute()
+        execute("DELETE FROM market_cache WHERE key = %s", (key,))
     except Exception:
         pass
 
@@ -612,8 +612,11 @@ def get_econ_indicators() -> dict:
         _set_cache("econ_indicators", stored["data"], ttl=86400)
         return stored["data"]
 
-    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
-    return _fetch_and_save_econ_indicators()
+    # DB 캐시 없을 때만 직접 fetch (최초 1회)
+    data = _fetch_and_save_econ_indicators()
+    if isinstance(data, dict) and "error" not in data:
+        _set_cache("econ_indicators", data, ttl=86400)
+    return data
 
 
 # ── Korean Export Data ────────────────────────────────────────────────────────

@@ -1,15 +1,14 @@
 from __future__ import annotations
 from datetime import date
-from services.db import get_db
+from services.db import execute, query
 
 
 def get_history(ticker: str) -> list[dict]:
-    db = get_db()
-    rows = db.table("consensus_history") \
-        .select("date, target_mean, buy, hold, sell") \
-        .eq("ticker", ticker.upper()) \
-        .order("date", desc=True) \
-        .execute().data
+    rows = query(
+        "SELECT date, target_mean, buy, hold, sell FROM consensus_history"
+        " WHERE ticker = %s ORDER BY date DESC",
+        (ticker.upper(),),
+    )
     return [
         {
             "date": str(r["date"]),
@@ -24,8 +23,10 @@ def get_history(ticker: str) -> list[dict]:
 
 def collect(ticker: str) -> dict | None:
     upper = ticker.upper()
-    db = get_db()
-    rows = db.table("snapshots").select("data").eq("ticker", upper).order("date", desc=True).limit(1).execute().data
+    rows = query(
+        "SELECT data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
+        (upper,),
+    )
     if not rows:
         return None
     summary = rows[0]["data"] or {}
@@ -43,14 +44,23 @@ def collect(ticker: str) -> dict | None:
         "hold": hold,
         "sell": sell,
     }
-    db.table("consensus_history").upsert(entry).execute()
+    execute(
+        "INSERT INTO consensus_history (ticker, date, target_mean, buy, hold, sell)"
+        " VALUES (%s, %s, %s, %s, %s, %s)"
+        " ON CONFLICT (ticker, date) DO UPDATE SET"
+        "  target_mean=EXCLUDED.target_mean, buy=EXCLUDED.buy,"
+        "  hold=EXCLUDED.hold, sell=EXCLUDED.sell",
+        (upper, entry["date"], entry["target_mean"], entry["buy"], entry["hold"], entry["sell"]),
+    )
     return {k: v for k, v in entry.items() if k != "ticker"}
 
 
 def backfill(ticker: str, market: str) -> list[dict]:
     upper = ticker.upper()
-    db = get_db()
-    existing_rows = db.table("consensus_history").select("date").eq("ticker", upper).execute().data
+    existing_rows = query(
+        "SELECT date FROM consensus_history WHERE ticker = %s",
+        (upper,),
+    )
     existing_dates = {str(r["date"]) for r in existing_rows}
 
     fetched = _fetch_kr(upper) if market == "KR" else _fetch_us(upper)
@@ -59,7 +69,15 @@ def backfill(ticker: str, market: str) -> list[dict]:
     if not to_add:
         return []
 
-    db.table("consensus_history").upsert([{"ticker": upper, **e} for e in to_add]).execute()
+    for e in to_add:
+        execute(
+            "INSERT INTO consensus_history (ticker, date, target_mean, buy, hold, sell)"
+            " VALUES (%s, %s, %s, %s, %s, %s)"
+            " ON CONFLICT (ticker, date) DO UPDATE SET"
+            "  target_mean=EXCLUDED.target_mean, buy=EXCLUDED.buy,"
+            "  hold=EXCLUDED.hold, sell=EXCLUDED.sell",
+            (upper, e["date"], e.get("target_mean"), e.get("buy"), e.get("hold"), e.get("sell")),
+        )
     return to_add
 
 

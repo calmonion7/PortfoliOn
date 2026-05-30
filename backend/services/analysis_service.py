@@ -82,7 +82,7 @@ def get_macro_correlation(holdings: list) -> dict:
         ret = closes.pct_change().dropna()
         ret.index = pd.DatetimeIndex(ret.index.date)
         ret_series[i] = ret
-        raw_weights[i] = qty * float(closes.iloc[-1])
+        raw_weights[i] = float(qty) * float(closes.iloc[-1])
 
     df = pd.DataFrame(ret_series).dropna()
     if df.empty or len(df) < 10:
