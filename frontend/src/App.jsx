@@ -102,9 +102,24 @@ export default function App() {
             </div>
             <span>PortfoliOn</span>
           </div>
-          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
-            {theme === 'dark' ? <Sun /> : <Moon />}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
+              {theme === 'dark' ? <Sun /> : <Moon />}
+            </button>
+            <button className="ghost-btn" style={{ color: 'var(--down)', fontSize: 13 }} onClick={async () => {
+              const refresh = localStorage.getItem('refresh_token')
+              if (refresh) {
+                await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/logout`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ refresh_token: refresh }),
+                }).catch(() => {})
+              }
+              localStorage.removeItem('access_token')
+              localStorage.removeItem('refresh_token')
+              setSession(null)
+            }}>로그아웃</button>
+          </div>
         </header>
         <main className="page-wrap">
           <Routes>
