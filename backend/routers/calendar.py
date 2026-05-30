@@ -19,6 +19,10 @@ _CACHE_DIR = Path(__file__).parent.parent / "data" / "calendar"
 _CACHE_DIR.mkdir(exist_ok=True)
 
 
+def _cache_path(month: str) -> Path:
+    return _CACHE_DIR / f"{month}.json"
+
+
 def clear_cache() -> None:
     # 로컬 파일 + Supabase 캐시 모두 삭제 (user_id 불명이므로 로컬만)
     for f in _CACHE_DIR.glob("*.json"):

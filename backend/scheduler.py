@@ -10,9 +10,8 @@ _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
 
 def _generate_all():
-    from services.db import get_db
-    db = get_db()
-    user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").execute().data})
+    from services.db import query
+    user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks")})
     for user_id in user_ids:
         stocks = storage.get_all_stocks(user_id)
         for stock in stocks:
@@ -92,10 +91,9 @@ def _refresh_earnings():
 
 def _run_digest():
     from services import digest_service
-    from services.db import get_db
+    from services.db import query
     try:
-        db = get_db()
-        user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").eq("type", "holding").execute().data})
+        user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks WHERE type = 'holding'")})
     except Exception as e:
         print(f"[Scheduler] Digest: failed to fetch user list: {e}")
         return

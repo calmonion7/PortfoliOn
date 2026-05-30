@@ -612,8 +612,11 @@ def get_econ_indicators() -> dict:
         _set_cache("econ_indicators", stored["data"], ttl=86400)
         return stored["data"]
 
-    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
-    return _fetch_and_save_econ_indicators()
+    # DB 캐시 없을 때만 직접 fetch (최초 1회)
+    data = _fetch_and_save_econ_indicators()
+    if isinstance(data, dict) and "error" not in data:
+        _set_cache("econ_indicators", data, ttl=86400)
+    return data
 
 
 # ── Korean Export Data ────────────────────────────────────────────────────────

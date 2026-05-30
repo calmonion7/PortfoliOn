@@ -500,27 +500,21 @@ def test_get_econ_indicators_caches_result(monkeypatch):
 # ── _mc_save / _mc_load ───────────────────────────────────────────────────────
 
 def test_mc_save_and_load(monkeypatch):
-    saved = {}
-
-    class FakeResult:
-        data = []
-
-    class FakeQuery:
-        def select(self, *a): return self
-        def eq(self, *a): return self
-        def execute(self):
-            r = FakeResult()
-            r.data = list(saved.values())
-            return r
-        def upsert(self, row):
-            saved[row["key"]] = row
-            return self
-
-    class FakeDB:
-        def table(self, name): return FakeQuery()
-
+    import json
     import services.market_indicators_service as svc
-    monkeypatch.setattr(svc, "get_db", lambda: FakeDB())
+    store = {}
+
+    def fake_query(sql, params=None):
+        key = params[0] if params else None
+        return [store[key]] if key in store else []
+
+    def fake_execute(sql, params=None):
+        if params and "INSERT INTO market_cache" in sql:
+            store[params[0]] = {"data": json.loads(params[1]), "fetched_at": params[2]}
+        return 1
+
+    monkeypatch.setattr(svc, "query", fake_query)
+    monkeypatch.setattr(svc, "execute", fake_execute)
 
     svc._mc_save("test_key", {"hello": "world"})
     result = svc._mc_load("test_key")
@@ -529,18 +523,8 @@ def test_mc_save_and_load(monkeypatch):
 
 
 def test_mc_load_returns_none_on_missing(monkeypatch):
-    class FakeResult:
-        data = []
-    class FakeQuery:
-        def select(self, *a): return self
-        def eq(self, *a): return self
-        def execute(self): return FakeResult()
-    class FakeDB:
-        def table(self, name): return FakeQuery()
-
     import services.market_indicators_service as svc
-    monkeypatch.setattr(svc, "get_db", lambda: FakeDB())
-
+    monkeypatch.setattr(svc, "query", lambda sql, params=None: [])
     assert svc._mc_load("nonexistent") is None
 
 
