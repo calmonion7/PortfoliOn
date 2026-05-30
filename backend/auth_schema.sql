@@ -8,6 +8,7 @@ CREATE TABLE users (
     password_hash TEXT,
     oauth_provider TEXT,
     oauth_sub     TEXT,
+    role          TEXT NOT NULL DEFAULT 'user',
     created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
