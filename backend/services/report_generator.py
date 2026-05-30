@@ -22,12 +22,12 @@ def _fin_num(v):
         return None
 
 
-def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
+def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_date: str = None) -> str:
     ticker = stock["ticker"]
     market = stock.get("market", "US")
     exchange = stock.get("exchange", "")
     yf_sym = mkt._yf_sym(ticker, market, exchange)
-    today = date.today().strftime("%Y-%m-%d")
+    today = target_date or date.today().strftime("%Y-%m-%d")
     output_dir = output_base_dir / ticker
     output_dir.mkdir(parents=True, exist_ok=True)
 

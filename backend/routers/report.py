@@ -77,7 +77,7 @@ def _run_backfill(stocks: list, days: int):
 
 
 @router.post("/report/generate", status_code=202)
-def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = None, user_id: str = Depends(get_current_user)):
+def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = None, date: Optional[str] = None, user_id: str = Depends(get_current_user)):
     all_stocks = storage.get_all_stocks(user_id)
     if tickers:
         ticker_set = {t.strip().upper() for t in tickers.split(',')}
@@ -87,7 +87,7 @@ def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = Non
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     _progress.start(len(stocks))
-    background_tasks.add_task(_run_generation, stocks)
+    background_tasks.add_task(_run_generation, stocks, date)
     return {"message": f"Generating reports for {len(stocks)} stock(s)"}
 
 
@@ -102,13 +102,13 @@ def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = 
     return {"message": f"Generating report for {ticker.upper()}"}
 
 
-def _run_generation(stocks: list):
+def _run_generation(stocks: list, target_date: str = None):
     # start()는 호출한 엔드포인트에서 이미 호출함 — 여기서 이중 호출 금지
 
     def _process_one(stock):
         _progress.set(current=stock["ticker"])
         try:
-            report_generator.generate_report(stock)
+            report_generator.generate_report(stock, target_date=target_date)
             cache_svc.invalidate(stock["ticker"])
             consensus_svc.collect(stock["ticker"])
             consensus_svc.backfill(stock["ticker"], stock.get("market", "US"))

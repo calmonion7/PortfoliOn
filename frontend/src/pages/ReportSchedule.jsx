@@ -7,9 +7,21 @@ const DAYS = [
   { key: 'fri', label: '금' }, { key: 'sat', label: '토' },
   { key: 'sun', label: '일' },
 ]
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 function getToday() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function getLastScheduleDay(scheduleDays) {
+  const d = new Date()
+  for (let i = 1; i <= 7; i++) {
+    d.setDate(d.getDate() - 1)
+    if (scheduleDays.includes(DAY_KEYS[d.getDay()])) {
+      return d.toISOString().slice(0, 10)
+    }
+  }
+  return null
 }
 
 export default function ReportSchedule() {
@@ -47,23 +59,32 @@ export default function ReportSchedule() {
   }
 
   const today = getToday()
+  const todayKey = DAY_KEYS[new Date().getDay()]
+  const isScheduleDay = schedule.enabled && schedule.days.includes(todayKey)
+  const lastScheduleDay = (!isScheduleDay && schedule.enabled && schedule.days.length > 0)
+    ? getLastScheduleDay(schedule.days) : null
+  const referenceDate = isScheduleDay ? today : lastScheduleDay
 
-  const { pendingStocks, doneStocks } = (() => {
-    if (!stockList) return { pendingStocks: [], doneStocks: [] }
-    const pending = []
-    const done = []
+  const { pendingStocks, doneStocks, notInPeriodStocks } = (() => {
+    if (!stockList) return { pendingStocks: [], doneStocks: [], notInPeriodStocks: [] }
+    const pending = [], done = [], notInPeriod = []
     for (const [ticker, info] of Object.entries(stockList)) {
       const name = info.summary?.name || ''
       const entry = { ticker, name }
-      if (info.dates?.length > 0 && info.dates[0] === today) {
-        done.push(entry)
+      const latestDate = info.dates?.[0]
+      if (isScheduleDay) {
+        if (latestDate === today) done.push(entry)
+        else pending.push(entry)
+      } else if (referenceDate) {
+        if (latestDate === referenceDate) notInPeriod.push(entry)
+        else pending.push(entry)
       } else {
-        pending.push(entry)
+        notInPeriod.push(entry)
       }
     }
-    pending.sort((a, b) => a.ticker.localeCompare(b.ticker))
-    done.sort((a, b) => a.ticker.localeCompare(b.ticker))
-    return { pendingStocks: pending, doneStocks: done }
+    const byTicker = (a, b) => a.ticker.localeCompare(b.ticker)
+    pending.sort(byTicker); done.sort(byTicker); notInPeriod.sort(byTicker)
+    return { pendingStocks: pending, doneStocks: done, notInPeriodStocks: notInPeriod }
   })()
 
   const startPolling = (onDone) => {
@@ -105,8 +126,9 @@ export default function ReportSchedule() {
     setGenMsg('')
     setProgress({ done: 0, total: 0, current: '' })
     const tickerParam = pendingStocks.map(s => s.ticker).join(',')
+    const dateParam = referenceDate && !isScheduleDay ? `&date=${referenceDate}` : ''
     try {
-      await api.post(`/api/report/generate?tickers=${encodeURIComponent(tickerParam)}`)
+      await api.post(`/api/report/generate?tickers=${encodeURIComponent(tickerParam)}${dateParam}`)
       startPolling(loadStockList)
     } catch (err) {
       setGenMsg(err.response?.data?.detail || '생성 실패')
@@ -143,7 +165,9 @@ export default function ReportSchedule() {
   useEffect(() => () => clearInterval(backfillPollRef.current), [])
 
   const pct = progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0
-  const currentTabStocks = genTab === 'pending' ? pendingStocks : doneStocks
+  const secondTabStocks = isScheduleDay ? doneStocks : notInPeriodStocks
+  const secondTabLabel = isScheduleDay ? '생성됨' : '수집기간아님'
+  const currentTabStocks = genTab === 'pending' ? pendingStocks : secondTabStocks
 
   return (
     <div style={{ maxWidth: 480 }}>
@@ -198,7 +222,7 @@ export default function ReportSchedule() {
         <div style={{ padding: '10px 12px 0', display: 'flex', gap: 4 }}>
           {[
             { key: 'pending', label: `미생성 (${listLoading ? '…' : pendingStocks.length})` },
-            { key: 'done',    label: `생성됨 (${listLoading ? '…' : doneStocks.length})` },
+            { key: 'done',    label: `${secondTabLabel} (${listLoading ? '…' : secondTabStocks.length})` },
           ].map(({ key, label }) => (
             <button key={key}
               onClick={() => setGenTab(key)}
@@ -217,7 +241,7 @@ export default function ReportSchedule() {
           <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</div>
         ) : currentTabStocks.length === 0 ? (
           <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
-            {genTab === 'pending' ? '모든 종목의 오늘 리포트가 생성되었습니다.' : '오늘 생성된 리포트가 없습니다.'}
+            {genTab === 'pending' ? `모든 종목의 ${referenceDate || '오늘'} 리포트가 생성되었습니다.` : `${secondTabLabel} 종목이 없습니다.`}
           </div>
         ) : (
           <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--border)', marginTop: 8 }}>
