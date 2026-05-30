@@ -238,21 +238,20 @@ const fetchList = useCallback(() => {
           <button className="tab-btn sm" style={{ color: watchlistSub === 'warn' ? '#ffb74d' : 'var(--text-3)', borderBottomColor: watchlistSub === 'warn' ? '#ffb74d' : 'transparent', fontWeight: watchlistSub === 'warn' ? 600 : 400 }} onClick={() => setWatchlistSub('warn')}>⚠ 경고 ({watchlistWarnCount})</button>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10, justifyContent: 'flex-start' }}>
         {[['ALL', '전체', mCountAll], ['KR', '🇰🇷 국내', mCountKR], ['US', '🇺🇸 해외', mCountUS]].map(([val, label, cnt]) => (
           <button
             key={val}
             onClick={() => setMarketFilter(val)}
             style={{
-              flex: 1, padding: '3px 0', fontSize: 10,
+              padding: '3px 10px', fontSize: 10,
               background: marketFilter === val ? 'var(--surface-hover)' : 'transparent',
               border: `1px solid ${marketFilter === val ? 'var(--accent)' : 'var(--border)'}`,
               color: marketFilter === val ? 'var(--accent)' : 'var(--text-3)',
-              borderRadius: 3, cursor: 'pointer', lineHeight: 1.6,
+              borderRadius: 3, cursor: 'pointer', lineHeight: 1.6, whiteSpace: 'nowrap',
             }}
           >
-            {label}<br />
-            <span style={{ fontSize: 9, opacity: 0.8 }}>({cnt})</span>
+            {label} <span style={{ fontSize: 9, opacity: 0.8 }}>({cnt})</span>
           </button>
         ))}
       </div>
