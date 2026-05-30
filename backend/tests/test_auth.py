@@ -1,7 +1,7 @@
 import os
 import pytest
 import jwt
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
@@ -49,7 +49,7 @@ def test_get_user_by_id_returns_none_when_not_found():
     assert result is None
 
 
-def _make_app(role: str):
+def _make_app():
     _app = FastAPI()
     _app.dependency_overrides[get_current_user] = lambda: "user-123"
 
@@ -61,7 +61,7 @@ def _make_app(role: str):
 
 
 def test_require_admin_allows_admin():
-    _app = _make_app("admin")
+    _app = _make_app()
     with patch("auth.auth_service.get_user_by_id", return_value={"role": "admin"}):
         c = TestClient(_app)
         resp = c.get("/test-admin")
@@ -70,7 +70,7 @@ def test_require_admin_allows_admin():
 
 
 def test_require_admin_blocks_user():
-    _app = _make_app("user")
+    _app = _make_app()
     with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
         c = TestClient(_app)
         resp = c.get("/test-admin")
