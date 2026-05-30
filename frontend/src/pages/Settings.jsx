@@ -3,7 +3,6 @@ import ReportSchedule from './ReportSchedule'
 import GuruCrawlSettings from './GuruCrawlSettings'
 import ConsensusSettings from './ConsensusSettings'
 import useIsMobile from '../hooks/useIsMobile'
-import useTheme from '../hooks/useTheme'
 
 const TABS = [
   { key: 'report',    label: '리포트 설정' },
@@ -14,7 +13,6 @@ const TABS = [
 export default function Settings() {
   const isMobile = useIsMobile()
   const [tab, setTab] = useState('report')
-  const [theme, setTheme] = useTheme()
 
   if (isMobile) return (
     <>
@@ -34,39 +32,6 @@ export default function Settings() {
         {tab === 'report'    && <ReportSchedule />}
         {tab === 'consensus' && <ConsensusSettings />}
         {tab === 'guru'      && <GuruCrawlSettings />}
-      </div>
-
-      {/* 테마 토글 */}
-      <div style={{ padding: '0 20px 16px' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'var(--bg-elev)', border: '1px solid var(--border)',
-          borderRadius: 12, padding: '14px 16px',
-        }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>화면 테마</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{theme === 'dark' ? '다크 모드' : '라이트 모드'}</div>
-          </div>
-          <button
-            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-            style={{
-              display: 'flex', gap: 2, padding: 3,
-              background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
-              borderRadius: 10, cursor: 'pointer',
-            }}
-          >
-            {['light', 'dark'].map(t => (
-              <span key={t} style={{
-                padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                background: theme === t ? 'var(--text)' : 'transparent',
-                color: theme === t ? 'var(--bg)' : 'var(--text-3)',
-                transition: 'background .15s, color .15s',
-              }}>
-                {t === 'light' ? '☀️ 라이트' : '🌙 다크'}
-              </span>
-            ))}
-          </button>
-        </div>
       </div>
 
       <div style={{ padding: '0 20px 32px' }}>

@@ -94,6 +94,18 @@ export default function App() {
     <BrowserRouter>
       <div className="app-pc">
         <TopNav theme={theme} setTheme={setTheme} setSession={setSession} />
+        <header className="mobile-header">
+          <div className="brand">
+            <div className="brand-mark">
+              <div className="brand-dot" />
+              <div className="brand-dot brand-dot--2" />
+            </div>
+            <span>PortfoliOn</span>
+          </div>
+          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
+            {theme === 'dark' ? <Sun /> : <Moon />}
+          </button>
+        </header>
         <main className="page-wrap">
           <Routes>
             <Route path="/" element={<Portfolio />} />
