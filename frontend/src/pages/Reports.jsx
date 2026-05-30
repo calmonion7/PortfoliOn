@@ -3,7 +3,7 @@ import api from '../api'
 import { fmtPrice as fmt } from '../utils'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useToast } from '../components/Toast'
-import { TH, TD, fmtN, rsiColor, TargetTooltip, overallWeather } from '../components/reports/reportUtils.jsx'
+import { fmtN, rsiColor, overallWeather } from '../components/reports/reportUtils.jsx'
 import ConsensusChart from '../components/reports/ConsensusChart'
 import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
 import FinancialsChart from '../components/reports/FinancialsChart'
@@ -275,6 +275,167 @@ const fetchList = useCallback(() => {
     </>
   )
 
+  const renderStockCard = (ticker, info) => {
+    const s = info.summary
+    const market = s?.market || info.market
+    const dr = s?.daily_rsi
+    const wr = s?.weekly_rsi
+    const mr = s?.monthly_rsi
+    const hasReport = info.dates.length > 0
+    const isBroken = hasReport && s?.price == null
+    const weather = overallWeather(s)
+    const weatherAccent = !weather ? 'var(--border)'
+      : weather.icon === '☀️' ? '#4caf50'
+      : weather.icon === '⛅' ? '#8bc34a'
+      : weather.icon === '☁️' ? '#78909c'
+      : '#ef5350'
+    const buy = s?.buy ?? 0, hold = s?.hold ?? 0, sell = s?.sell ?? 0
+    const total = buy + hold + sell
+    const targetGap = s?.target_mean && s?.price ? (s.target_mean - s.price) / s.price * 100 : null
+
+    const priceGap = (t) => {
+      if (t == null || !s?.price) return null
+      const p = (t - s.price) / s.price * 100
+      return <span style={{ fontSize: 9, color: p >= 0 ? '#81c784' : '#ef9a9a' }}>({p >= 0 ? '+' : ''}{p.toFixed(1)}%)</span>
+    }
+
+    const rsiTargetBlock = (key, color) => {
+      const num = key.replace('target_', '')
+      const dv = dr?.[key]
+      const barWidth = (t) => {
+        if (t == null || !s?.price) return 0
+        return Math.min(Math.abs((t - s.price) / s.price * 100), 50) / 50 * 100
+      }
+      return (
+        <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 6 }}>
+          {/* 레벨 배지 */}
+          <span style={{
+            fontSize: 9, fontWeight: 700, color,
+            background: `${color}1a`, border: `1px solid ${color}44`,
+            borderRadius: 3, padding: '1px 4px',
+            minWidth: 22, textAlign: 'center', flexShrink: 0, marginTop: 1,
+          }}>{num}</span>
+          {/* 일봉 + 게이지 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {dv != null ? <>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text)' }}>{fmt(dv, market)}</span>
+                {priceGap(dv)}
+              </div>
+              <div style={{ height: 2, background: 'var(--bg-elev-2)', borderRadius: 1, overflow: 'hidden', marginTop: 3, marginBottom: 2 }}>
+                <div style={{ height: '100%', width: `${barWidth(dv)}%`, background: color, borderRadius: 1, opacity: 0.55 }} />
+              </div>
+            </> : <span style={{ fontSize: 9, color: 'var(--text-3)' }}>N/A</span>}
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div
+        key={ticker}
+        onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
+        className="stock-card"
+        style={{ borderLeft: `3px solid ${weatherAccent}` }}
+      >
+        {/* 종목 */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s?.name || ticker}</span>
+            {weather && <span title={weather.label} style={{ fontSize: 12, flexShrink: 0 }}>{weather.icon}</span>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{ticker}</span>
+            {market && <span className={`sc-market ${market === 'KR' ? 'kr' : 'us'}`}>{market === 'KR' ? '🇰🇷 KR' : '🇺🇸 US'}</span>}
+            {guruMap[ticker] && <span style={{ fontSize: 9, color: '#ffb74d' }}>구루{guruMap[ticker]}명</span>}
+          </div>
+          {s?.sector && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sector}</div>}
+          {s?.industry && <div style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.industry}</div>}
+          {(!hasReport || isBroken) && <div style={{ fontSize: 10, color: isBroken ? '#ef9a9a' : 'var(--text-3)', marginTop: 2 }}>{isBroken ? '데이터 오류' : '클릭하여 생성'}</div>}
+        </div>
+
+        {/* 가격 / POC */}
+        <div>
+          {s?.price != null ? <>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{fmt(s.price, market)}</div>
+            {s.drop_from_high_20d != null && (
+              <div style={{ fontSize: 11, color: s.drop_from_high_20d >= 0 ? '#81c784' : '#ef9a9a', marginTop: 2 }}>
+                {s.drop_from_high_20d < -10 && '⚠ '}{s.drop_from_high_20d >= 0 ? '+' : ''}{s.drop_from_high_20d.toFixed(1)}%
+              </div>
+            )}
+            {s.volume_profile?.poc != null && (
+              <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>POC {fmt(s.volume_profile.poc, market)}</div>
+            )}
+          </> : <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
+        </div>
+
+        {/* 목표가 / 컨센서스 */}
+        <div>
+          {targetGap != null && (
+            <div style={{ fontSize: 12, color: targetGap >= 0 ? '#81c784' : '#ef9a9a', fontWeight: 600 }}>
+              {fmt(s.target_mean, market)} {targetGap >= 0 ? '▲' : '▼'}{Math.abs(targetGap).toFixed(1)}%
+            </div>
+          )}
+          {total > 0 && <>
+            <div style={{ display: 'flex', borderRadius: 2, overflow: 'hidden', height: 4, margin: '4px 0 3px', background: 'var(--bg-elev-2)' }}>
+              <div style={{ width: `${buy / total * 100}%`, background: '#4caf50' }} />
+              <div style={{ width: `${hold / total * 100}%`, background: '#777' }} />
+              <div style={{ width: `${sell / total * 100}%`, background: '#ef5350' }} />
+            </div>
+            <div style={{ fontSize: 10, display: 'flex', gap: 5 }}>
+              <span style={{ color: '#81c784' }}>B{buy}</span>
+              <span style={{ color: 'var(--text-3)' }}>H{hold}</span>
+              <span style={{ color: '#ef9a9a' }}>S{sell}</span>
+              {total <= 10 && <span style={{ color: '#ffb74d' }}>⚠{total}명</span>}
+            </div>
+          </>}
+          {s?.finviz_recom != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Finviz {fmtN(s.finviz_recom)}</div>}
+        </div>
+
+        {/* 밸류에이션 */}
+        <div style={{ fontSize: 11 }}>
+          <div>{s?.per != null ? `PER ${s.per.toFixed(1)}` : '—'}</div>
+          {s?.forward_per != null && <div style={{ fontSize: 10, color: 'var(--text-3)' }}>Fwd {s.forward_per.toFixed(1)}</div>}
+          {s?.pbr != null && <div style={{ marginTop: 2 }}>PBR {s.pbr.toFixed(2)}</div>}
+        </div>
+
+        {/* RSI 일/주/월 */}
+        <div>
+          {[{ label: '일', rsi: dr?.rsi, bold: true }, { label: '주', rsi: wr?.rsi }, { label: '월', rsi: mr?.rsi }]
+            .filter(({ rsi }) => rsi != null)
+            .map(({ label, rsi, bold }) => (
+              <div key={label} style={{ marginBottom: 5 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                  <span style={{ fontSize: 8, color: 'var(--text-3)', letterSpacing: '0.3px' }}>{label}</span>
+                  <span style={{ fontSize: bold ? 12 : 10, fontWeight: bold ? 700 : 400, color: rsiColor(rsi) }}>{fmtN(rsi)}</span>
+                </div>
+                <div style={{ height: 3, background: 'var(--bg-elev-2)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${rsi}%`, background: rsiColor(rsi), borderRadius: 2, opacity: bold ? 1 : 0.6 }} />
+                </div>
+              </div>
+            ))}
+        </div>
+
+        {/* RSI 매수구간 20/25/30 */}
+        <div>{['target_20', 'target_25', 'target_30'].map(k => rsiTargetBlock(k, '#81c784'))}</div>
+
+        {/* RSI 매도구간 70/75/80 */}
+        <div>{['target_70', 'target_75', 'target_80'].map(k => rsiTargetBlock(k, '#ef9a9a'))}</div>
+
+        {/* 생성 버튼 */}
+        <div>
+          <button
+            onClick={e => { e.stopPropagation(); generateOne(ticker) }}
+            disabled={!!generating}
+            className="sc-gen-btn"
+          >
+            {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const renderTickerItem = (ticker, info) => {
     const isSelected = selected.ticker === ticker && view === 'detail'
     const hasReport = info.dates.length > 0
@@ -394,143 +555,19 @@ const fetchList = useCallback(() => {
                   <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>
                 </div>
               ) : (
-            <table style={{ borderCollapse: 'collapse', color: 'var(--text)', width: '100%' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-elev-2)' }}>
-                  <th style={{ ...TH, textAlign: 'left', left: 0, zIndex: 3 }}>종목명 (티커)</th>
-                  <th style={{ ...TH, textAlign: 'left' }}>시장</th>
-                  <th style={{ ...TH, textAlign: 'left' }}>섹터</th>
-                  <th style={TH}>현재가</th>
-                  <th style={{ ...TH, color: '#ffb74d' }}>20일고점대비</th>
-                  <th style={TH}>POC</th>
-                  <th style={TH}>평균목표가<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>vs 현재가</span></th>
-                  <th style={{ ...TH, color: '#81c784' }}>Buy</th>
-                  <th style={TH}>Hold</th>
-                  <th style={{ ...TH, color: '#ef9a9a' }}>Sell</th>
-                  <th style={TH}>PER<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>Fwd</span></th>
-                  <th style={TH}>PBR</th>
-                  <th style={TH}>Finviz</th>
-                  <th style={{ ...TH, borderLeft: '1px solid var(--border)' }}>RSI<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#4db6ac' }}>RSI20<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#4db6ac' }}>RSI25<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#4db6ac' }}>RSI30<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ff8a65' }}>RSI70<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ff8a65' }}>RSI75<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
-                  <th style={{ ...TH, color: '#ff8a65' }}>RSI80<br/><span style={{ color: 'var(--text-3)', fontWeight: 400 }}>일/주/월</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tabEntries.map(([ticker, info]) => {
-                  const s = info.summary
-                  const dr = s?.daily_rsi
-                  const wr = s?.weekly_rsi
-                  const mr = s?.monthly_rsi
-                  const rsiKeys = ['target_20', 'target_25', 'target_30', 'target_70', 'target_75', 'target_80']
-                  let closestKey = null; let minDiff = Infinity
-                  if (s?.price && dr) {
-                    rsiKeys.forEach(k => {
-                      if (dr[k] == null) return
-                      const diff = Math.abs(dr[k] - s.price)
-                      if (diff < minDiff) { minDiff = diff; closestKey = k }
-                    })
-                  }
-                  const hasReport = info.dates.length > 0
-                  const market = s?.market || info.market
-                  return (
-                    <tr
-                      key={ticker}
-                      onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
-                      style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)', opacity: hasReport ? 1 : 0.6 }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-hover)'; e.currentTarget.querySelector('td').style.background = 'var(--surface-hover)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.querySelector('td').style.background = 'var(--bg)' }}
-                    >
-                      <td style={{ ...TD, textAlign: 'left', color: 'var(--accent)', fontWeight: 600, position: 'sticky', left: 0, zIndex: 1, background: 'var(--bg)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          {s?.name || ticker}
-                          {(() => { const w = overallWeather(s); return w ? <span title={w.label} style={{ fontSize: 13, lineHeight: 1, fontWeight: 400 }}>{w.icon}</span> : null })()}
-                        </div>
-                        <div style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 11 }}>{ticker}</div>
-                        {guruMap[ticker] && <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>}
-                        {!hasReport && <div style={{ color: 'var(--text-3)', fontSize: 10 }}>리포트 없음 — 클릭하여 생성</div>}
-                      </td>
-                      <td style={{ ...TD, textAlign: 'left' }}>
-                        {market === 'KR'
-                          ? <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a', whiteSpace: 'nowrap' }}>🇰🇷 KR</span>
-                          : <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#4fc3f7', border: '1px solid var(--border)', whiteSpace: 'nowrap' }}>🇺🇸 US</span>
-                        }
-                      </td>
-                      <td style={{ ...TD, textAlign: 'left', color: 'var(--text-3)', fontSize: 11 }}>
-                        <div>{s?.sector || '—'}</div>
-                        {s?.industry ? <div style={{ color: 'var(--text-3)', fontSize: 10 }}>{s.industry}</div> : null}
-                      </td>
-                      <td style={TD}>{s ? fmt(s.price, s.market) : 'N/A'}</td>
-                      <td style={TD}>
-                        {s?.drop_from_high_20d != null ? (
-                          <span style={{ color: s.drop_from_high_20d >= 0 ? '#81c784' : '#ef9a9a', fontWeight: 600 }}>
-                            {s.drop_from_high_20d < -10 && <span title="20일 고점 대비 -10% 초과 하락">⚠ </span>}
-                            {s.drop_from_high_20d >= 0 ? '+' : ''}{s.drop_from_high_20d.toFixed(1)}%
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td style={TD}>{fmt(s?.volume_profile?.poc, s?.market)}</td>
-                      <td style={TD}>
-                        <TargetTooltip s={s} />
-                      </td>
-                      {(() => {
-                        const buy = s?.buy ?? 0, hold = s?.hold ?? 0, sell = s?.sell ?? 0
-                        const total = buy + hold + sell
-                        const pct = (n) => total > 0 ? `(${Math.round(n / total * 100)}%)` : ''
-                        const lowAnalysts = s && total > 0 && total <= 10
-                        return (<>
-                          <td style={{ ...TD, color: '#81c784' }}>
-                            {s ? `${buy}${pct(buy)}` : 'N/A'}
-                            {lowAnalysts && (
-                              <div title={`애널리스트 ${total}명 — 의견 수가 적어 신뢰도가 낮을 수 있습니다`} style={{ color: '#ffb74d', fontSize: 9, marginTop: 1, cursor: 'help' }}>⚠ 총 {total}명</div>
-                            )}
-                          </td>
-                          <td style={TD}>{s ? `${hold}${pct(hold)}` : 'N/A'}</td>
-                          <td style={{ ...TD, color: '#ef9a9a' }}>{s ? `${sell}${pct(sell)}` : 'N/A'}</td>
-                        </>)
-                      })()}
-                      <td style={TD}>
-                        {s?.per != null ? s.per.toFixed(1) : '—'}
-                        {s?.forward_per != null && <div style={{ color: 'var(--text-3)', fontSize: 10 }}>{s.forward_per.toFixed(1)}</div>}
-                      </td>
-                      <td style={TD}>{s?.pbr != null ? s.pbr.toFixed(2) : '—'}</td>
-                      <td style={TD}>{s ? fmtN(s.finviz_recom) : 'N/A'}</td>
-                      <td style={{ ...TD, borderLeft: '1px solid var(--border)' }}>
-                        <div style={{ color: rsiColor(dr?.rsi), fontWeight: 600 }}>{dr?.rsi != null ? fmtN(dr.rsi) : 'N/A'}</div>
-                        <div style={{ color: rsiColor(wr?.rsi), fontSize: 10 }}>{wr?.rsi != null ? fmtN(wr.rsi) : 'N/A'}</div>
-                        <div style={{ color: rsiColor(mr?.rsi), fontSize: 10 }}>{mr?.rsi != null ? fmtN(mr.rsi) : 'N/A'}</div>
-                      </td>
-                      {[
-                        { key: 'target_20', dr: dr?.target_20, wr: wr?.target_20, mr: mr?.target_20, base: '#81c784', sub: '#4a8a5a' },
-                        { key: 'target_25', dr: dr?.target_25, wr: wr?.target_25, mr: mr?.target_25, base: '#81c784', sub: '#4a8a5a' },
-                        { key: 'target_30', dr: dr?.target_30, wr: wr?.target_30, mr: mr?.target_30, base: '#81c784', sub: '#4a8a5a' },
-                        { key: 'target_70', dr: dr?.target_70, wr: wr?.target_70, mr: mr?.target_70, base: '#ef9a9a', sub: '#8a4a4a' },
-                        { key: 'target_75', dr: dr?.target_75, wr: wr?.target_75, mr: mr?.target_75, base: '#ef9a9a', sub: '#8a4a4a' },
-                        { key: 'target_80', dr: dr?.target_80, wr: wr?.target_80, mr: mr?.target_80, base: '#ef9a9a', sub: '#8a4a4a' },
-                      ].map(({ key, dr: dv, wr: wv, mr: mv, base, sub }) => {
-                        const gapEl = (t, sz) => {
-                          if (t == null || !s?.price) return null
-                          const p = (t - s.price) / s.price * 100
-                          const txt = `(${p >= 0 ? '+' : ''}${p.toFixed(1)}%)`
-                          return <span style={{ fontSize: sz ?? 12, color: p >= 0 ? '#81c784' : '#ef9a9a' }}>{txt}</span>
-                        }
-                        const isClosest = closestKey === key
-                        return (
-                          <td key={key} style={{ ...TD, color: base, background: isClosest ? 'var(--surface-hover)' : undefined, border: isClosest ? '2px solid var(--accent)' : undefined, fontWeight: isClosest ? 700 : undefined }}>
-                            {dv != null ? <div>{fmt(dv, s?.market)}{gapEl(dv)}</div> : <div style={{ color: 'var(--text-3)' }}>N/A</div>}
-                            <div style={{ fontSize: 10, color: wv != null ? sub : 'var(--text-3)' }}>{wv != null ? <>{fmt(wv, s?.market)}{gapEl(wv, 9)}</> : 'N/A'}</div>
-                            <div style={{ fontSize: 10, color: mv != null ? sub : 'var(--text-3)' }}>{mv != null ? <>{fmt(mv, s?.market)}{gapEl(mv, 9)}</> : 'N/A'}</div>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                <div className="stock-card-grid">
+                  <div className="card-list-header">
+                    <span>종목</span>
+                    <span>현재가 / 고점</span>
+                    <span>목표가 / 컨센서스</span>
+                    <span>밸류</span>
+                    <span>RSI<br/><small>일/주/월</small></span>
+                    <span style={{ color: '#81c784' }}>RSI 매수<br/><small>일봉 20 / 25 / 30</small></span>
+                    <span style={{ color: '#ef9a9a' }}>RSI 매도<br/><small>일봉 70 / 75 / 80</small></span>
+                    <span></span>
+                  </div>
+                  {tabEntries.map(([t, info]) => renderStockCard(t, info))}
+                </div>
               )}
             </>
           )
