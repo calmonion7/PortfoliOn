@@ -1,6 +1,5 @@
 # backend/services/storage.py
 import json
-from psycopg2.extras import RealDictCursor
 from services.db import get_connection, query, execute
 
 _ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures"})
@@ -187,8 +186,13 @@ def get_all_stocks(user_id: str) -> list[dict]:
     return portfolio.get("stocks", []) + portfolio.get("watchlist", [])
 
 
+_ENRICH_KEYS = frozenset({"name", "market", "exchange"}) | _ANALYST_KEYS
+
+
 def enrich_stock(ticker: str, fields: dict) -> bool:
     upper = ticker.upper()
+    if not fields.keys() <= _ENRICH_KEYS:
+        raise ValueError(f"invalid field(s): {fields.keys() - _ENRICH_KEYS}")
     exists = query("SELECT ticker FROM tickers WHERE ticker = %s", (upper,))
     if not exists:
         return False
@@ -207,7 +211,6 @@ def get_schedule() -> dict:
 
 
 def save_schedule(schedule: dict) -> None:
-    import json
     execute(
         "INSERT INTO schedules (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
         (json.dumps(schedule),),
@@ -222,7 +225,6 @@ def get_guru_managers() -> dict:
 
 
 def save_guru_managers(data: dict) -> None:
-    import json
     execute(
         "INSERT INTO guru_managers (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
         (json.dumps(data),),
@@ -237,7 +239,6 @@ def get_guru_schedule() -> dict:
 
 
 def save_guru_schedule(schedule: dict) -> None:
-    import json
     execute(
         "INSERT INTO guru_schedules (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
         (json.dumps(schedule),),
