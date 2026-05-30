@@ -10,7 +10,7 @@ import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
 import LoginPage from './pages/LoginPage'
 import MobileNav from './components/MobileNav'
-import { Sun, Moon, Bell, Refresh } from './components/ui/icons'
+import { Sun, Moon, Refresh } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
 
@@ -42,7 +42,6 @@ function TopNav({ theme, setTheme, setSession }) {
           ))}
         </nav>
         <div className="topnav-tools">
-          <button className="icon-btn" title="알림"><Bell /><span className="dot-indic" /></button>
           <button className="icon-btn" title="새로고침" onClick={() => window.location.reload()}><Refresh /></button>
           <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
             {theme === 'dark' ? <Sun /> : <Moon />}
