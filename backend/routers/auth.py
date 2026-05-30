@@ -93,7 +93,7 @@ def me(user_id: str = Depends(get_current_user)):
             "SELECT menu FROM user_menu_permissions WHERE user_id = %s AND enabled = true",
             (user_id,),
         )
-        menu_permissions = [r["menu"] for r in rows if r.get("enabled", True)]
+        menu_permissions = [r["menu"] for r in rows]
     return {
         "user_id": user_id,
         "email": user["email"],

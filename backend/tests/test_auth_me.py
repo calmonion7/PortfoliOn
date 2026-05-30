@@ -24,9 +24,8 @@ def test_me_admin_returns_all_menus():
 
 def test_me_user_returns_enabled_menus():
     perm_rows = [
-        {"menu": "portfolio", "enabled": True},
-        {"menu": "research", "enabled": True},
-        {"menu": "market", "enabled": False},
+        {"menu": "portfolio"},
+        {"menu": "research"},
     ]
     with patch("services.auth_service.get_user_by_id", return_value=NORMAL_USER), \
          patch("services.db.query", return_value=perm_rows):
