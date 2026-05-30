@@ -321,7 +321,6 @@
 .reports-sidebar { width: 210px; overflow-y: auto; border-right: 1px solid var(--border); padding-right: 16px; flex-shrink: 0; }
 .reports-main { flex: 1; overflow-y: auto; overflow-x: auto; }
 .reports-layout[data-view="detail"] .reports-main { overflow-x: hidden; }
-.reports-layout[data-view="list"] .reports-sidebar { display: none; }
 
 @media (max-width: 640px) {
   .reports-layout { display: block; height: auto; }
@@ -330,6 +329,10 @@
   .reports-layout[data-view="detail"] .reports-sidebar { display: none; }
   .reports-layout[data-view="list"] .reports-main { display: none; }
   .report-item { padding: 10px 8px !important; min-height: 44px; align-items: center; }
+}
+
+@media (min-width: 641px) {
+  .reports-layout[data-view="list"] .reports-sidebar { display: none; }
 }
 
 /* ----- DETAIL HEADER ----- */
