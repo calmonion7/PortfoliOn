@@ -2,10 +2,10 @@
 set -e
 cd "$(dirname "$0")"
 
-BACKEND_CONTAINER=docker-infra-migration-backend-1
-NGINX_CONTAINER=docker-infra-migration-nginx-1
-NETWORK=docker-infra-migration_default
-BACKEND_IMAGE=docker-infra-migration-backend
+BACKEND_CONTAINER=portfolion-backend-1
+NGINX_CONTAINER=portfolion-nginx-1
+NETWORK=portfolion_default
+BACKEND_IMAGE=portfolion-backend
 PROJECT_DIR="$(pwd)"
 
 echo "=== PortfoliOn Deploy ==="
