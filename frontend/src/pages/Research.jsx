@@ -33,7 +33,7 @@ export default function Research() {
       <div className="page-head">
         <h1 className="page-title">리서치</h1>
       </div>
-      <div className="tabs" style={{ marginBottom: 18 }}>
+      <div className="tabs" style={{ marginBottom: 18, width: 'fit-content' }}>
         <button className={tab === 'reports' ? 'is-active' : ''} onClick={() => setTab('reports')}>리포트</button>
         <button className={tab === 'calendar' ? 'is-active' : ''} onClick={() => setTab('calendar')}>캘린더</button>
         <button className={tab === 'digest' ? 'is-active' : ''} onClick={() => setTab('digest')}>다이제스트</button>

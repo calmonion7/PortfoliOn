@@ -187,7 +187,11 @@ export default function ReportSchedule() {
             type="time" value={schedule.time}
             onChange={e => setSchedule(s => ({ ...s, time: e.target.value }))}
             disabled={!schedule.enabled}
-            style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+            style={{
+              background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+              color: 'var(--text)', fontSize: 14, fontFamily: 'inherit',
+              borderRadius: 8, padding: '4px 10px', cursor: schedule.enabled ? 'pointer' : 'default',
+            }}
           />
         </div>
         <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)', opacity: schedule.enabled ? 1 : 0.4 }}>
