@@ -18,3 +18,7 @@ CREATE TABLE refresh_tokens (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Role column added 2026-05-30
+-- ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
+-- UPDATE users SET role = 'admin' WHERE email = 'calmonion@gmail.com';

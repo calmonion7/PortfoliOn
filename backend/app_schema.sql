@@ -89,6 +89,14 @@ CREATE TABLE market_cache (
   fetched_at timestamptz NOT NULL
 );
 
+-- 사용자별 메뉴 접근 권한
+CREATE TABLE user_menu_permissions (
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    menu    TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    PRIMARY KEY (user_id, menu)
+);
+
 -- 성능 인덱스
 CREATE INDEX idx_user_stocks_ticker ON user_stocks(ticker);
 CREATE INDEX idx_consensus_history_ticker ON consensus_history(ticker);
