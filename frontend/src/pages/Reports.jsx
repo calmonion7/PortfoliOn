@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../api'
+import { useAuth } from '../contexts/AuthContext'
 import { fmtPrice as fmt } from '../utils'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useToast } from '../components/Toast'
@@ -16,6 +17,8 @@ import { ReportSectionText, ReportSectionCompetitors, ReportSectionNews } from '
 
 
 export default function Reports() {
+  const { role } = useAuth() || { role: 'user' }
+  const isAdmin = role === 'admin'
   const [reportList, setReportList] = useState({})
   const [lastScheduledDate, setLastScheduledDate] = useState(null)
   const [selected, setSelected] = useState({ ticker: null, date: null })
@@ -264,7 +267,7 @@ const _applyList = (data) => {
           </button>
         ))}
       </div>
-      {activeTab === 'ungenerated' && !listLoading && ungeneratedCount > 0 && (
+      {activeTab === 'ungenerated' && !listLoading && ungeneratedCount > 0 && isAdmin && (
         <button
           onClick={() => generateBatch(ungeneratedTickers.filter(t => { const m = reportList[t]?.market; return marketFilter === 'ALL' || m === marketFilter }))}
           disabled={!!generating}
@@ -432,13 +435,15 @@ const _applyList = (data) => {
 
         {/* 생성 버튼 */}
         <div>
-          <button
-            onClick={e => { e.stopPropagation(); generateOne(ticker) }}
-            disabled={!!generating}
-            className="sc-gen-btn"
-          >
-            {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={e => { e.stopPropagation(); generateOne(ticker) }}
+              disabled={!!generating}
+              className="sc-gen-btn"
+            >
+              {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+            </button>
+          )}
         </div>
       </div>
     )
@@ -516,13 +521,15 @@ const _applyList = (data) => {
             </div>
           )}
         </div>
-        <button
-          onClick={e => { e.stopPropagation(); generateOne(ticker) }}
-          disabled={!!generating}
-          style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0, marginTop: 2 }}
-        >
-          {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={e => { e.stopPropagation(); generateOne(ticker) }}
+            disabled={!!generating}
+            style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0, marginTop: 2 }}
+          >
+            {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+          </button>
+        )}
       </div>
     )
   }
@@ -591,13 +598,15 @@ const _applyList = (data) => {
                 >
                   ← 목록으로
                 </button>
-                <button
-                  onClick={() => generateOne(selected.ticker)}
-                  disabled={!!generating}
-                  style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === selected.ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: generating ? 'default' : 'pointer' }}
-                >
-                  {generating === selected.ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => generateOne(selected.ticker)}
+                    disabled={!!generating}
+                    style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === selected.ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: generating ? 'default' : 'pointer' }}
+                  >
+                    {generating === selected.ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+                  </button>
+                )}
               </div>
               {/* 행2: 종목명 + 뱃지 */}
               <div className="detail-header-title">

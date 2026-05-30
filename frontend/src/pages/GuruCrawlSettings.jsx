@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../api'
+import { useAuth } from '../contexts/AuthContext'
 
 const DAYS = [
   { key: 'mon', label: '월' }, { key: 'tue', label: '화' },
@@ -9,6 +10,7 @@ const DAYS = [
 ]
 
 export default function GuruCrawlSettings() {
+  const { role } = useAuth() || { role: 'user' }
   const [schedule, setSchedule]   = useState({ enabled: false, day: 'sun', time: '03:00' })
   const [saved, setSaved]         = useState(false)
   const [crawling, setCrawling]   = useState(false)
@@ -82,10 +84,12 @@ export default function GuruCrawlSettings() {
               마지막 갱신: {lastUpdated}
             </p>
           )}
-          <button className="btn btn-primary" onClick={handleCrawlNow} disabled={crawling}
-            style={{ width: '100%', justifyContent: 'center', marginTop: lastUpdated ? 0 : 14 }}>
-            {crawling ? '수집 중...' : '지금 갱신'}
-          </button>
+          {role === 'admin' && (
+            <button className="btn btn-primary" onClick={handleCrawlNow} disabled={crawling}
+              style={{ width: '100%', justifyContent: 'center', marginTop: lastUpdated ? 0 : 14 }}>
+              {crawling ? '수집 중...' : '지금 갱신'}
+            </button>
+          )}
           {crawling && (
             <div style={{ marginTop: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
