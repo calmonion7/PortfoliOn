@@ -72,7 +72,8 @@ def add_watchlist_stock(stock: WatchlistStock, background_tasks: BackgroundTasks
 
     return {"ticker": stock.ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
-            "market": stock.market, "exchange": stock.exchange}
+            "market": stock.market, "exchange": stock.exchange,
+            "report_queued": not bool(existing)}
 
 
 @router.put("/{ticker}")

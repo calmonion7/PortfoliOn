@@ -63,6 +63,28 @@ export default function Portfolio() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
+  const pollReportGeneration = (ticker) => {
+    let attempts = 0
+    const maxAttempts = 6
+    const id = setInterval(async () => {
+      attempts++
+      try {
+        const { data } = await api.get(`/api/report/${ticker}/history`)
+        if (data && data.length > 0) {
+          clearInterval(id)
+        } else if (attempts >= maxAttempts) {
+          clearInterval(id)
+          showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
+        }
+      } catch {
+        if (attempts >= maxAttempts) {
+          clearInterval(id)
+          showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
+        }
+      }
+    }, 15000)
+  }
+
   const handleSave = async (stockData) => {
     try {
       const isWatch = tab === 'watch'
@@ -70,8 +92,11 @@ export default function Portfolio() {
         await api.put(`/api/${isWatch ? 'watchlist' : 'portfolio'}/${editing.ticker}`, stockData)
         showToast(`${editing.ticker} 수정됐습니다`)
       } else {
-        await api.post(`/api/${isWatch ? 'watchlist' : 'portfolio'}`, stockData)
+        const res = await api.post(`/api/${isWatch ? 'watchlist' : 'portfolio'}`, stockData)
         showToast(`${stockData.ticker} 추가됐습니다`)
+        if (res.data?.report_queued) {
+          pollReportGeneration(stockData.ticker.toUpperCase())
+        }
       }
       setModalOpen(false); setEditing(null); setError(''); fetchAll()
     } catch (err) {

@@ -72,7 +72,8 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
         background_tasks.add_task(report_generator.generate_report, stock_dict)
 
     return {**new_holding, "name": stock.name, "competitors": stock.competitors,
-            "moat": stock.moat, "growth_plan": stock.growth_plan}
+            "moat": stock.moat, "growth_plan": stock.growth_plan,
+            "report_queued": not bool(existing)}
 
 
 @router.put("/{ticker}")
