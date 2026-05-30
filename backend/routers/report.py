@@ -163,21 +163,27 @@ def list_reports(user_id: str = Depends(get_current_user)):
         holding_tickers = set(portfolio_stocks.keys())
         watchlist_tickers = set(portfolio_watchlist.keys())
 
-        date_rows = query("SELECT ticker, date FROM snapshots ORDER BY date DESC")
+        user_tickers = holding_tickers | watchlist_tickers
+
         ticker_dates: dict = {}
-        for r in date_rows:
-            t = r["ticker"].upper()
-            if t not in ticker_dates:
-                ticker_dates[t] = []
-            ticker_dates[t].append(r["date"])
+        if user_tickers:
+            date_rows = query(
+                "SELECT ticker, date FROM snapshots WHERE ticker = ANY(%s) ORDER BY date DESC",
+                (list(user_tickers),),
+            )
+            for r in date_rows:
+                t = r["ticker"].upper()
+                if t not in ticker_dates:
+                    ticker_dates[t] = []
+                ticker_dates[t].append(r["date"])
 
         # ticker별 최신 날짜 목록으로 data를 한 번에 fetch
         ticker_summary: dict = {}
         if ticker_dates:
             latest_dates = list({dates[0] for dates in ticker_dates.values()})
             summary_rows = query(
-                "SELECT ticker, date, data FROM snapshots WHERE date = ANY(%s)",
-                (latest_dates,),
+                "SELECT ticker, date, data FROM snapshots WHERE ticker = ANY(%s) AND date = ANY(%s)",
+                (list(user_tickers), latest_dates),
             )
             for r in summary_rows:
                 t = r["ticker"].upper()
@@ -187,8 +193,7 @@ def list_reports(user_id: str = Depends(get_current_user)):
 
         result = {}
         for ticker, dates in ticker_dates.items():
-            category = "holdings" if ticker in holding_tickers else \
-                       "watchlist" if ticker in watchlist_tickers else "other"
+            category = "holdings" if ticker in holding_tickers else "watchlist"
             summary = ticker_summary.get(ticker)
             stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
             market = stock_info.get("market") or (summary or {}).get("market", "US")
