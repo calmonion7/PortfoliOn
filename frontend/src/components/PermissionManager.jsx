@@ -13,9 +13,9 @@ function ToggleBtn({ on, onClick }) {
       onClick={onClick}
       style={{
         padding: '3px 14px', borderRadius: 20, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-        background: on ? 'var(--accent)' : 'transparent',
-        color: on ? '#fff' : 'var(--text-secondary, #aaa)',
-        border: on ? 'none' : '1px solid var(--border, #555)',
+        background: on ? 'var(--text)' : 'transparent',
+        color: on ? 'var(--bg)' : 'var(--text-3)',
+        border: on ? 'none' : '1px solid var(--text-3)',
       }}
     >
       {on ? 'ON' : 'OFF'}
@@ -160,7 +160,7 @@ export default function PermissionManager() {
             <button
               onClick={saveSinglePerms}
               disabled={saving}
-              style={{ marginTop: 16, width: '100%', padding: '10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 14 }}
+              style={{ marginTop: 16, width: '100%', padding: '10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--text)', color: 'var(--bg)', fontWeight: 600, fontSize: 14, opacity: saving ? 0.6 : 1 }}
             >
               {saving ? '저장 중...' : '저장'}
             </button>
@@ -188,7 +188,7 @@ export default function PermissionManager() {
             <button
               onClick={applyBulk}
               disabled={saving}
-              style={{ marginTop: 16, width: '100%', padding: '10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 14 }}
+              style={{ marginTop: 16, width: '100%', padding: '10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--text)', color: 'var(--bg)', fontWeight: 600, fontSize: 14, opacity: saving ? 0.6 : 1 }}
             >
               {saving ? '적용 중...' : `${selected.length}명에게 적용`}
             </button>
