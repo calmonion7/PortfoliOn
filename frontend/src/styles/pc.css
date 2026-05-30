@@ -321,6 +321,7 @@
 .reports-sidebar { width: 210px; overflow-y: auto; border-right: 1px solid var(--border); padding-right: 16px; flex-shrink: 0; }
 .reports-main { flex: 1; overflow-y: auto; overflow-x: auto; }
 .reports-layout[data-view="detail"] .reports-main { overflow-x: hidden; }
+.reports-layout[data-view="list"] .reports-sidebar { display: none; }
 
 @media (max-width: 640px) {
   .reports-layout { display: block; height: auto; }
