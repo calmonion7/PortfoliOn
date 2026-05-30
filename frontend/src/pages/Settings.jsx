@@ -3,6 +3,8 @@ import ReportSchedule from './ReportSchedule'
 import GuruCrawlSettings from './GuruCrawlSettings'
 import ConsensusSettings from './ConsensusSettings'
 import useIsMobile from '../hooks/useIsMobile'
+import { useAuth } from '../contexts/AuthContext'
+import PermissionManager from '../components/PermissionManager'
 
 const TABS = [
   { key: 'report',    label: '리포트 설정' },
@@ -13,6 +15,7 @@ const TABS = [
 export default function Settings() {
   const isMobile = useIsMobile()
   const [tab, setTab] = useState('report')
+  const { role } = useAuth() || { role: 'user' }
 
   if (isMobile) return (
     <>
@@ -25,6 +28,9 @@ export default function Settings() {
           <button className={tab === 'report' ? 'is-active' : ''} onClick={() => setTab('report')}>리포트</button>
           <button className={tab === 'consensus' ? 'is-active' : ''} onClick={() => setTab('consensus')}>컨센서스</button>
           <button className={tab === 'guru' ? 'is-active' : ''} onClick={() => setTab('guru')}>구루</button>
+          {role === 'admin' && (
+            <button className={tab === 'permissions' ? 'is-active' : ''} onClick={() => setTab('permissions')}>권한관리</button>
+          )}
         </div>
       </div>
 
@@ -32,6 +38,7 @@ export default function Settings() {
         {tab === 'report'    && <ReportSchedule />}
         {tab === 'consensus' && <ConsensusSettings />}
         {tab === 'guru'      && <GuruCrawlSettings />}
+        {tab === 'permissions' && role === 'admin' && <PermissionManager />}
       </div>
 
     </>
@@ -47,11 +54,15 @@ export default function Settings() {
             {t.label}
           </button>
         ))}
+        {role === 'admin' && (
+          <button className={`tab-btn${tab === 'permissions' ? ' active' : ''}`} onClick={() => setTab('permissions')}>권한관리</button>
+        )}
       </div>
 
       {tab === 'report'    && <ReportSchedule />}
       {tab === 'consensus' && <ConsensusSettings />}
       {tab === 'guru'      && <GuruCrawlSettings />}
+      {tab === 'permissions' && role === 'admin' && <PermissionManager />}
     </div>
   )
 }
