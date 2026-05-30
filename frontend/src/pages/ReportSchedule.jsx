@@ -53,7 +53,7 @@ export default function ReportSchedule() {
     setListLoading(true)
     try {
       const { data } = await api.get('/api/report/list')
-      setStockList(data)
+      setStockList(data.stocks ?? data)
     } catch {}
     setListLoading(false)
   }
