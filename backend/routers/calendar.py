@@ -10,7 +10,7 @@ import pandas as pd
 import yfinance as yf
 import exchange_calendars as xcals
 from services import storage
-from services.db import get_db
+from services.db import query, execute
 from auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["calendar"])
@@ -32,14 +32,13 @@ def get_calendar(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), user_id: str
 
 @router.delete("/calendar/cache")
 def delete_calendar_cache(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), user_id: str = Depends(get_current_user)):
-    get_db().table("calendar_cache").delete().eq("user_id", user_id).eq("month", month).execute()
+    execute("DELETE FROM calendar_cache WHERE user_id = %s AND month = %s", (user_id, month))
     return {"cleared": month}
 
 
 def _get_events(month: str, user_id: str = "") -> list[dict]:
     if user_id:
-        db = get_db()
-        rows = db.table("calendar_cache").select("events").eq("user_id", user_id).eq("month", month).execute().data
+        rows = query("SELECT events FROM calendar_cache WHERE user_id = %s AND month = %s", (user_id, month))
         if rows:
             return rows[0]["events"]
 
@@ -72,10 +71,13 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
     events.extend(_get_holidays(month_start, month_end))
 
     if user_id:
-        get_db().table("calendar_cache").upsert(
-            {"user_id": user_id, "month": month, "events": events},
-            on_conflict="user_id,month",
-        ).execute()
+        execute(
+            """
+            INSERT INTO calendar_cache (user_id, month, events) VALUES (%s, %s, %s)
+            ON CONFLICT (user_id, month) DO UPDATE SET events = EXCLUDED.events
+            """,
+            (user_id, month, json.dumps(events)),
+        )
 
     return events
 

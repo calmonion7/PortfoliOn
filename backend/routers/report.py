@@ -10,7 +10,7 @@ from services import cache as cache_svc
 from services.utils import sanitize as _sanitize
 from services.progress import ProgressTracker
 from services.parallel import parallel_map
-from services.db import get_db
+from services.db import query, execute
 from auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["report"])
@@ -123,8 +123,10 @@ def _run_generation(stocks: list, target_date: str = None):
 
 
 def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
-    db = get_db()
-    rows = db.table("snapshots").select("data").eq("ticker", ticker.upper()).eq("date", date_str).execute().data
+    rows = query(
+        "SELECT data FROM snapshots WHERE ticker = %s AND date = %s",
+        (ticker.upper(), date_str),
+    )
     if rows:
         return _sanitize(rows[0]["data"])
     # 로컬 파일 폴백
@@ -144,10 +146,7 @@ def list_reports(user_id: str = Depends(get_current_user)):
         holding_tickers = set(portfolio_stocks.keys())
         watchlist_tickers = set(portfolio_watchlist.keys())
 
-        db = get_db()
-        # ticker+date만 fetch (data 블롭 제외) — 전체 row 수가 많아도 빠름
-        date_rows = db.table("snapshots").select("ticker, date") \
-            .order("date", desc=True).execute().data
+        date_rows = query("SELECT ticker, date FROM snapshots ORDER BY date DESC")
         ticker_dates: dict = {}
         for r in date_rows:
             t = r["ticker"].upper()
@@ -159,8 +158,10 @@ def list_reports(user_id: str = Depends(get_current_user)):
         ticker_summary: dict = {}
         if ticker_dates:
             latest_dates = list({dates[0] for dates in ticker_dates.values()})
-            summary_rows = db.table("snapshots").select("ticker, date, data") \
-                .in_("date", latest_dates).execute().data
+            summary_rows = query(
+                "SELECT ticker, date, data FROM snapshots WHERE date = ANY(%s)",
+                (latest_dates,),
+            )
             for r in summary_rows:
                 t = r["ticker"].upper()
                 if t in ticker_dates and t not in ticker_summary \
@@ -192,8 +193,7 @@ def list_reports(user_id: str = Depends(get_current_user)):
 @router.get("/report/{ticker}/history")
 def get_history(ticker: str):
     upper = ticker.upper()
-    db = get_db()
-    rows = db.table("snapshots").select("date, data").eq("ticker", upper).order("date").execute().data
+    rows = query("SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date", (upper,))
     result = []
     for r in rows:
         raw = r["data"] or {}
@@ -274,8 +274,10 @@ def collect_consensus(ticker: str):
 def refresh_analyst(ticker: str):
     import yfinance as yf
     upper = ticker.upper()
-    db = get_db()
-    rows = db.table("snapshots").select("date, data").eq("ticker", upper).order("date", desc=True).limit(1).execute().data
+    rows = query(
+        "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
+        (upper,),
+    )
     if not rows:
         raise HTTPException(status_code=404, detail="리포트를 먼저 생성하세요")
     row = rows[0]
@@ -310,7 +312,10 @@ def refresh_analyst(ticker: str):
 
     if not patched:
         raise HTTPException(status_code=502, detail="데이터를 가져올 수 없습니다")
-    db.table("snapshots").update({"data": summary}).eq("ticker", upper).eq("date", snap_date).execute()
+    execute(
+        "UPDATE snapshots SET data = %s WHERE ticker = %s AND date = %s",
+        (json.dumps(summary), upper, snap_date),
+    )
     cache_svc.invalidate(upper)
     return patched
 
@@ -318,8 +323,10 @@ def refresh_analyst(ticker: str):
 @router.post("/consensus/{ticker}/backfill")
 def backfill_consensus(ticker: str):
     upper = ticker.upper()
-    db = get_db()
-    rows = db.table("snapshots").select("date, data").eq("ticker", upper).order("date", desc=True).limit(1).execute().data
+    rows = query(
+        "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
+        (upper,),
+    )
     if not rows:
         raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
     summary = rows[0]["data"] or {}

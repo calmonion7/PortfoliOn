@@ -9,7 +9,7 @@ import requests
 import yfinance as yf
 
 from services import storage
-from services.db import get_db
+from services.db import query, execute
 from services.market import _yf_sym
 from routers.calendar import _get_events
 
@@ -121,12 +121,10 @@ def generate(user_id: str, today: date = None) -> dict:
     }
 
     try:
-        db = get_db()
-        db.table("digests").upsert({
-            "user_id": user_id,
-            "date": today.isoformat(),
-            "data": digest,
-        }, on_conflict="user_id,date").execute()
+        execute(
+            "INSERT INTO digests (user_id, date, data) VALUES (%s, %s, %s) ON CONFLICT (user_id, date) DO UPDATE SET data=EXCLUDED.data",
+            (user_id, today.isoformat(), json.dumps(digest)),
+        )
     except Exception as e:
         print(f"[Digest] DB save failed, falling back to file: {e}")
         path = DIGEST_DIR / f"{user_id}-{today.isoformat()}.json"
@@ -136,15 +134,9 @@ def generate(user_id: str, today: date = None) -> dict:
 
 def get_latest(user_id: str) -> dict | None:
     try:
-        db = get_db()
-        rows = (
-            db.table("digests")
-            .select("data")
-            .eq("user_id", user_id)
-            .order("date", desc=True)
-            .limit(1)
-            .execute()
-            .data
+        rows = query(
+            "SELECT data FROM digests WHERE user_id = %s ORDER BY date DESC LIMIT 1",
+            (user_id,),
         )
         if rows:
             return rows[0]["data"]
