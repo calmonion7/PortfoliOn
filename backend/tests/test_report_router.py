@@ -5,12 +5,13 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
 from routers.report import router
-from auth import get_current_user
+from auth import get_current_user, require_admin
 
 
 app = FastAPI()
 app.include_router(router)
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+app.dependency_overrides[require_admin] = lambda: "test-user-id"
 client = TestClient(app)
 
 FULL_PORTFOLIO = {
@@ -213,3 +214,23 @@ def test_generate_all_continues_on_one_failure():
         resp = client.post("/api/report/generate")
     assert resp.status_code == 202
     assert "MSFT" in generated
+
+
+# --- 403 tests: use a separate app without require_admin override ---
+
+_nonadmin_app = FastAPI()
+_nonadmin_app.include_router(router)
+_nonadmin_app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+_nonadmin_client = TestClient(_nonadmin_app)
+
+
+def test_generate_one_blocked_for_non_admin():
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        resp = _nonadmin_client.post("/api/report/generate/AAPL")
+    assert resp.status_code == 403
+
+
+def test_generate_batch_blocked_for_non_admin():
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        resp = _nonadmin_client.post("/api/report/generate?tickers=AAPL")
+    assert resp.status_code == 403

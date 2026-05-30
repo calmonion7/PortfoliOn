@@ -9,8 +9,10 @@ from unittest.mock import patch, MagicMock
 
 # guru router만 독립적으로 테스트하는 앱
 from routers.guru import router
+from auth import require_admin
 test_app = FastAPI()
 test_app.include_router(router)
+test_app.dependency_overrides[require_admin] = lambda: "test-user-id"
 client = TestClient(test_app)
 
 SAMPLE_DATA = {

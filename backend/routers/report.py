@@ -12,7 +12,7 @@ from services.utils import sanitize as _sanitize
 from services.progress import ProgressTracker
 from services.parallel import parallel_map
 from services.db import query, execute
-from auth import get_current_user
+from auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api", tags=["report"])
 
@@ -66,7 +66,7 @@ def get_backfill_progress():
 
 
 @router.post("/report/backfill", status_code=202)
-def backfill_all(background_tasks: BackgroundTasks, days: int = 60, user_id: str = Depends(get_current_user)):
+def backfill_all(background_tasks: BackgroundTasks, days: int = 60, user_id: str = Depends(require_admin)):
     stocks = storage.get_all_stocks(user_id)
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
@@ -92,7 +92,7 @@ def _run_backfill(stocks: list, days: int):
 
 
 @router.post("/report/generate", status_code=202)
-def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = None, date: Optional[str] = None, user_id: str = Depends(get_current_user)):
+def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = None, date: Optional[str] = None, user_id: str = Depends(require_admin)):
     all_stocks = storage.get_all_stocks(user_id)
     if tickers:
         ticker_set = {t.strip().upper() for t in tickers.split(',')}
@@ -109,7 +109,7 @@ def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = Non
 
 
 @router.post("/report/generate/{ticker}", status_code=202)
-def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
     from services.utils import find_ticker
     stock = find_ticker(storage.get_all_stocks(user_id), ticker)
     if not stock:
