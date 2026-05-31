@@ -120,6 +120,7 @@ cd backend && .venv/bin/python -m pytest
 - **Cloudflare Tunnel**: portfolion.taebro.com → localhost:80
 - **launchd 자동실행**: cloudflared + docker compose
 - **환경변수**: `backend/.env.docker` (POSTGRES_PASSWORD, JWT_SECRET, SESSION_SECRET, OAuth, FRED_API_KEY), `.env` (루트, docker-compose 보간용)
+- **배포**: `git push origin main` 시 자동 배포됨. `docker compose build` / `docker compose up` 수동 재빌드 절대 하지 말 것.
 
 ## Key Files
 
