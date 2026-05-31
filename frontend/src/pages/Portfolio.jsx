@@ -38,6 +38,7 @@ export default function Portfolio() {
   const [dashboardCards, setDashboardCards] = useState([])
   const [dashboardLoading, setDashboardLoading] = useState(false)
   const [analysisTab, setAnalysisTab] = useState('sector')
+  const [fx, setFx] = useState(1380)
 
   const fetchAll = useCallback(async () => {
     setListLoading(true)
@@ -66,6 +67,12 @@ export default function Portfolio() {
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => {
+    api.get('/api/market/fx').then(({ data }) => {
+      const rate = data?.rates?.usdkrw?.current
+      if (rate) setFx(rate)
+    }).catch(() => {})
+  }, [])
 
   const pollReportGeneration = (ticker) => {
     let attempts = 0
@@ -149,8 +156,7 @@ export default function Portfolio() {
   const filteredWatchlist = applyFilter(watchlist)
 
   // KPI 계산
-  const FX = 1380
-  const toKrw = (h, price) => (price || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : FX)
+  const toKrw = (h, price) => (price || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : fx)
   const totalCost = stocks.reduce((sum, h) => sum + toKrw(h, h.avg_cost || 0), 0)
   const hasPrice = stocks.some(h => h.current_price != null)
   const totalValue = hasPrice ? stocks.reduce((sum, h) => sum + toKrw(h, h.current_price ?? h.avg_cost ?? 0), 0) : null
