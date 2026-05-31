@@ -91,29 +91,25 @@ export default function Digest() {
             const totalKrw = ps.total_value_krw ?? ps.total_value_usd
             const changeKrw = ps.daily_change_krw ?? null
             const changePct = ps.daily_change_pct
-            const changeRow = changeKrw != null ? (
-              <>
-                {changeKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(changeKrw), 0)}
-                <span style={{ marginLeft: 6 }}>({changePct >= 0 ? '+' : ''}{changePct.toFixed(1)}%)</span>
-                <span className="muted" style={{ marginLeft: 6, fontWeight: 400 }}>전일대비</span>
-              </>
-            ) : <><Sig v={changePct} /><span className="muted" style={{ marginLeft: 6, fontWeight: 400 }}>전일대비</span></>
-            return isMobile ? (
-              <div className="hero" style={{ padding: '8px 0 14px' }}>
-                <div className="label">보유종목 평가금액 · {digest.date}</div>
-                <div className="val tnum">₩{fmt(totalKrw, 0)}</div>
-                <div className={`delta tnum ${(changeKrw ?? changePct ?? 0) >= 0 ? 'up' : 'down'}`}>
-                  {changeRow}
+            const isUp = (changeKrw ?? changePct ?? 0) >= 0
+            return (
+              <div className="card" style={{ marginBottom: 12, padding: '14px 18px' }}>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                  보유종목 평가금액 · {digest.date}
                 </div>
-              </div>
-            ) : (
-              <div className="card" style={{ marginBottom: 12, padding: '12px 16px' }}>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>보유종목 평가금액</div>
-                <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }} className="tnum">
+                <div className="tnum" style={{ fontSize: isMobile ? 28 : 22, fontWeight: 700, letterSpacing: '-0.03em' }}>
                   ₩{fmt(totalKrw, 0)}
                 </div>
-                <div className={`tnum ${(changeKrw ?? changePct ?? 0) >= 0 ? 'up' : 'down'}`} style={{ fontSize: 13, marginTop: 4 }}>
-                  {changeRow}
+                <div className={`tnum ${isUp ? 'up' : 'down'}`} style={{ fontSize: 13, marginTop: 5 }}>
+                  {changeKrw != null ? (
+                    <>
+                      {changeKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(changeKrw), 0)}
+                      <span style={{ marginLeft: 6 }}>({changePct >= 0 ? '+' : ''}{changePct.toFixed(1)}%)</span>
+                    </>
+                  ) : (
+                    <Sig v={changePct} />
+                  )}
+                  <span className="muted" style={{ marginLeft: 6, fontWeight: 400 }}>전일대비</span>
                 </div>
               </div>
             )
