@@ -108,3 +108,6 @@ def invalidate_portfolio_caches() -> None:
     from routers import calendar as calendar_router
     calendar_router.clear_cache()
     invalidate_dashboard()
+    invalidate_sector()
+    invalidate_macro()
+    invalidate_correlation()
