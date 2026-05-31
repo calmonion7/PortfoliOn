@@ -46,6 +46,11 @@ export default function Portfolio() {
     setWatchlist(data.watchlist || [])
     setListLoading(false)
     setHasFetched(true)
+    // 시세는 목록 렌더 후 별도 로드
+    api.get('/api/portfolio/prices').then(({ data: prices }) => {
+      setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
+      setWatchlist(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
+    }).catch(() => {})
   }, [])
 
   const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {

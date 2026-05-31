@@ -54,22 +54,26 @@ class Stock(BaseModel):
     exchange: str = ""
 
 
-def _with_price(s: dict) -> dict:
-    try:
-        quote = market_svc.get_quote(s["ticker"], s.get("market", "US"), s.get("exchange", ""))
-        if quote:
-            return {**s, "current_price": quote.get("price"), "change_pct": quote.get("daily_change_pct")}
-    except Exception:
-        pass
-    return s
-
-
 @router.get("")
 def get_portfolio(user_id: str = Depends(get_current_user)):
+    return storage.get_full_portfolio(user_id)
+
+
+@router.get("/prices")
+def get_portfolio_prices(user_id: str = Depends(get_current_user)):
     portfolio = storage.get_full_portfolio(user_id)
-    portfolio["stocks"] = parallel_map(_with_price, portfolio.get("stocks", []))
-    portfolio["watchlist"] = parallel_map(_with_price, portfolio.get("watchlist", []))
-    return portfolio
+    all_stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+
+    def _fetch(s):
+        try:
+            quote = market_svc.get_quote(s["ticker"], s.get("market", "US"), s.get("exchange", ""))
+            if quote:
+                return s["ticker"], {"current_price": quote.get("price"), "change_pct": quote.get("daily_change_pct")}
+        except Exception:
+            pass
+        return s["ticker"], {}
+
+    return dict(parallel_map(_fetch, all_stocks))
 
 
 @router.post("", status_code=201)
