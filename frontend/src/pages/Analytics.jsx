@@ -13,11 +13,11 @@ const SECTOR_COLORS = [
 ]
 
 function SectorAllocation({ cards }) {
-  const total = cards.reduce((s, c) => s + (c.quantity ?? 0) * (c.current_price ?? 0), 0)
+  const total = cards.reduce((s, c) => s + (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market), 0)
 
   const sectorMap = {}
   for (const c of cards) {
-    const val = (c.quantity ?? 0) * (c.current_price ?? 0)
+    const val = (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market)
     if (!val) continue
     const key = c.sector || '기타'
     sectorMap[key] = (sectorMap[key] ?? 0) + val
