@@ -65,7 +65,7 @@ export default function MacroTab() {
       {(!isMobile || open) && (
         <>
       <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 24 }}>
-        매크로 지표 일별 변동률 vs 포트폴리오 가중평균 수익률 · 90일 Pearson 상관계수 · 행 클릭 시 산점도 표시
+        매크로 지표 일별 변동률 vs 포트폴리오 가중평균 수익률 · 90일 Pearson 상관계수
       </p>
 
       <table style={{ borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
@@ -101,6 +101,9 @@ export default function MacroTab() {
         </tbody>
       </table>
 
+      <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 16 }}>
+        👆 지표를 클릭하면 산점도를 확인할 수 있습니다.
+      </p>
       <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 32, lineHeight: 1.7 }}>
         상관계수는 −1 ~ +1 범위로, 두 지표가 얼마나 같은 방향으로 움직이는지를 나타냅니다.<br />
         <span style={{ color: 'var(--text-2)' }}>양수(+)</span>: 매크로 지표가 오를 때 포트폴리오도 오르는 경향 &nbsp;·&nbsp;
