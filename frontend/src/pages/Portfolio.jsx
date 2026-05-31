@@ -162,6 +162,9 @@ export default function Portfolio() {
   const totalValue = hasPrice ? stocks.reduce((sum, h) => sum + toKrw(h, h.current_price ?? h.avg_cost ?? 0), 0) : null
   const totalPnl = totalValue != null ? totalValue - totalCost : null
   const totalPnlPct = totalPnl != null && totalCost > 0 ? totalPnl / totalCost * 100 : null
+  const usStocks = stocks.filter(h => (h.market || 'US') === 'US')
+  const totalValueUsd = usStocks.length > 0 ? usStocks.reduce((sum, h) => sum + (h.current_price ?? h.avg_cost ?? 0) * (h.quantity || 0), 0) : null
+  const totalCostUsd = usStocks.length > 0 ? usStocks.reduce((sum, h) => sum + (h.avg_cost || 0) * (h.quantity || 0), 0) : null
 
   if (isMobile) return (
     <>
@@ -182,6 +185,9 @@ export default function Portfolio() {
         )}
         {totalPnl != null && (
           <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 2 }}>{stocks.length}개 보유 · 원가 ₩{fmt(totalCost, 0)}</div>
+        )}
+        {totalValueUsd != null && (
+          <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 1 }}>${fmt(totalValue != null ? totalValueUsd : totalCostUsd, 2)}</div>
         )}
       </div>
 
@@ -334,6 +340,9 @@ export default function Portfolio() {
           )}
           {totalValue != null && (
             <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 2 }}>원가 ₩{fmt(totalCost, 0)}</div>
+          )}
+          {totalValueUsd != null && (
+            <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 1 }}>${fmt(totalValue != null ? totalValueUsd : totalCostUsd, 2)}</div>
           )}
         </div>
         <div className="kpi">
