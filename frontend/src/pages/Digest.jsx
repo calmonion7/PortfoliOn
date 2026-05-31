@@ -68,7 +68,7 @@ export default function Digest() {
             <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>포트폴리오 요약</div>
             <div style={{ display: 'flex', gap: 20, alignItems: 'baseline' }}>
               <span className="tnum" style={{ fontSize: 18, fontWeight: 600 }}>
-                ${digest.portfolio_summary.total_value_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                ₩{(digest.portfolio_summary.total_value_krw ?? digest.portfolio_summary.total_value_usd).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </span>
               <Sig v={digest.portfolio_summary.daily_change_pct} />
             </div>
