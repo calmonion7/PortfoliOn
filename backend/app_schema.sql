@@ -97,6 +97,16 @@ CREATE TABLE user_menu_permissions (
     PRIMARY KEY (user_id, menu)
 );
 
+-- 신규 가입 사용자 기본 권한
+CREATE TABLE default_menu_permissions (
+    menu    TEXT PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT false
+);
+INSERT INTO default_menu_permissions (menu, enabled) VALUES
+  ('portfolio', false), ('research', false), ('market', false),
+  ('guru', false), ('settings', false)
+ON CONFLICT DO NOTHING;
+
 -- 성능 인덱스
 CREATE INDEX idx_user_stocks_ticker ON user_stocks(ticker);
 CREATE INDEX idx_consensus_history_ticker ON consensus_history(ticker);

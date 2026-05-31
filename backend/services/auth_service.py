@@ -41,6 +41,18 @@ def get_user_by_id(user_id: str) -> dict | None:
     return rows[0] if rows else None
 
 
+def apply_default_permissions(user_id: str) -> None:
+    """신규 사용자에게 default_menu_permissions 설정을 적용한다. 이미 권한이 있으면 스킵."""
+    if query("SELECT 1 FROM user_menu_permissions WHERE user_id = %s LIMIT 1", (user_id,)):
+        return
+    defaults = query("SELECT menu, enabled FROM default_menu_permissions")
+    for row in defaults:
+        execute(
+            "INSERT INTO user_menu_permissions (user_id, menu, enabled) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+            (user_id, row["menu"], row["enabled"]),
+        )
+
+
 def create_user(email: str, password: str | None = None) -> dict:
     rows = query(
         "INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING *",

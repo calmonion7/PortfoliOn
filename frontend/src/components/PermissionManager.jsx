@@ -48,6 +48,62 @@ function PermRow({ label, on, onClick, zebra }) {
   )
 }
 
+function DefaultPermissionsSection() {
+  const [defaults, setDefaults] = useState(Object.fromEntries(ALL_MENUS.map(m => [m, false])))
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    api.get('/api/admin/default-permissions').then(r => setDefaults(r.data))
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    try {
+      await api.put('/api/admin/default-permissions', { permissions: defaults })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>신규 가입 기본 권한</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>새로 가입하는 사용자에게 자동으로 적용됩니다</div>
+        </div>
+        <button
+          onClick={save}
+          disabled={saving}
+          style={{ padding: '6px 16px', borderRadius: 6, border: 'none', cursor: saving ? 'default' : 'pointer', background: saved ? 'var(--accent)' : 'var(--text)', color: 'var(--bg)', fontWeight: 600, fontSize: 12, opacity: saving ? 0.6 : 1, transition: 'background 0.2s' }}
+        >
+          {saved ? '저장됨' : saving ? '저장 중...' : '저장'}
+        </button>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {ALL_MENUS.map(menu => (
+          <button
+            key={menu}
+            onClick={() => setDefaults(p => ({ ...p, [menu]: !p[menu] }))}
+            style={{
+              padding: '5px 14px', borderRadius: 20, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              background: defaults[menu] ? 'var(--text)' : 'transparent',
+              color: defaults[menu] ? 'var(--bg)' : 'var(--text-3)',
+              border: defaults[menu] ? '1px solid var(--text)' : '1px solid var(--border)',
+              transition: 'all 0.15s',
+            }}
+          >
+            {MENU_LABELS[menu]}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function PermissionManager() {
   const isMobile = useIsMobile()
   const [users, setUsers] = useState([])
@@ -247,11 +303,10 @@ export default function PermissionManager() {
   if (isMobile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {/* 사용자 목록 */}
+        <DefaultPermissionsSection />
         <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '0 14px', marginBottom: 12 }}>
           {UserList}
         </div>
-        {/* 권한 패널 - 선택 시에만 표시 */}
         {selected.length > 0 && (
           <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '14px' }}>
             {PermPanel}
@@ -262,9 +317,12 @@ export default function PermissionManager() {
   }
 
   return (
-    <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', minHeight: 360 }}>
-      {UserList}
-      {PermPanel}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <DefaultPermissionsSection />
+      <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', minHeight: 360 }}>
+        {UserList}
+        {PermPanel}
+      </div>
     </div>
   )
 }

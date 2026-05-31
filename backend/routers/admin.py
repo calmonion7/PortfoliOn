@@ -68,3 +68,28 @@ def bulk_permissions(body: BulkPermissionsBody, admin_id: str = Depends(require_
                 (uid, menu, enabled),
             )
     return {"ok": True, "updated": len(body.user_ids)}
+
+
+@router.get("/default-permissions")
+def get_default_permissions(admin_id: str = Depends(require_admin)):
+    rows = query("SELECT menu, enabled FROM default_menu_permissions")
+    base = {m: False for m in ALL_MENUS}
+    for r in rows:
+        base[r["menu"]] = r["enabled"]
+    return base
+
+
+@router.put("/default-permissions")
+def set_default_permissions(body: PermissionsBody, admin_id: str = Depends(require_admin)):
+    for menu, enabled in body.permissions.items():
+        if menu not in ALL_MENUS:
+            continue
+        execute(
+            """INSERT INTO default_menu_permissions (menu, enabled)
+               VALUES (%s, %s)
+               ON CONFLICT (menu) DO UPDATE SET enabled = EXCLUDED.enabled""",
+            (menu, enabled),
+        )
+    base = {m: False for m in ALL_MENUS}
+    base.update({m: v for m, v in body.permissions.items() if m in ALL_MENUS})
+    return base

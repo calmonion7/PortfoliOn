@@ -50,7 +50,8 @@ class RefreshRequest(BaseModel):
 def register(req: RegisterRequest):
     if auth_service.get_user_by_email(req.email):
         raise HTTPException(400, "Email already registered")
-    auth_service.create_user(req.email, req.password)
+    user = auth_service.create_user(req.email, req.password)
+    auth_service.apply_default_permissions(str(user["id"]))
     return {"message": "Registered successfully"}
 
 
@@ -113,6 +114,7 @@ async def oauth_google_callback(request: Request):
     token = await _oauth.google.authorize_access_token(request)
     userinfo = token.get("userinfo")
     user = auth_service.upsert_oauth_user(userinfo["email"], "google", userinfo["sub"])
+    auth_service.apply_default_permissions(str(user["id"]))
     tokens = auth_service.issue_tokens(str(user["id"]))
     frontend = os.environ["FRONTEND_URL"]
     return RedirectResponse(
@@ -138,6 +140,7 @@ async def oauth_github_callback(request: Request):
         profile.get("email"),
     )
     user = auth_service.upsert_oauth_user(email, "github", str(profile["id"]))
+    auth_service.apply_default_permissions(str(user["id"]))
     tokens = auth_service.issue_tokens(str(user["id"]))
     frontend = os.environ["FRONTEND_URL"]
     return RedirectResponse(
