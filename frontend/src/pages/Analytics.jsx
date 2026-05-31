@@ -34,7 +34,7 @@ function SectorAllocation({ cards }) {
   const fmt = (v) =>
     v >= 1e9 ? `$${(v / 1e9).toFixed(1)}B`
     : v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M`
-    : `$${v.toFixed(0)}`
+    : `$${Math.round(v).toLocaleString()}`
 
   return (
     <div style={{ marginBottom: 48 }}>
