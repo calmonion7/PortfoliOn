@@ -2,7 +2,7 @@
 
 > Claude Cowork가 종목 목록을 조회하고, AI가 생성한 분석 정보를 PortfoliOn 백엔드에 저장하기 위한 API입니다.
 
-**Base URL:** `http://localhost:8000`  
+**Base URL:** `https://portfolion.taebro.com`  
 **Content-Type:** `application/json`
 
 ---
