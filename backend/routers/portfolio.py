@@ -1,3 +1,4 @@
+from datetime import date as _date
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List
@@ -14,6 +15,7 @@ def _generate_with_consensus(stock_dict: dict):
     report_generator.generate_report(stock_dict)
     ticker = stock_dict["ticker"]
     market = stock_dict.get("market", "US")
+    cache_svc.invalidate(ticker)
     try:
         consensus_svc.collect(ticker)
     except Exception as e:
@@ -70,8 +72,10 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
     storage.save_holdings(user_id, holdings)
     cache_svc.invalidate_portfolio_caches()
 
+    today = _date.today().isoformat()
     existing = db_query(
-        "SELECT 1 FROM snapshots WHERE ticker = %s LIMIT 1", (stock.ticker.upper(),)
+        "SELECT 1 FROM snapshots WHERE ticker = %s AND date = %s LIMIT 1",
+        (stock.ticker.upper(), today),
     )
     if not existing:
         stock_dict = {
