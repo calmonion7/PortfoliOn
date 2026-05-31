@@ -39,6 +39,7 @@ export default function Portfolio() {
   const [dashboardLoading, setDashboardLoading] = useState(false)
   const [analysisTab, setAnalysisTab] = useState('sector')
   const [fx, setFx] = useState(1380)
+  const [events7d, setEvents7d] = useState([])
 
   const fetchAll = useCallback(async () => {
     setListLoading(true)
@@ -71,6 +72,11 @@ export default function Portfolio() {
     api.get('/api/market/fx').then(({ data }) => {
       const rate = data?.rates?.usdkrw?.current
       if (rate) setFx(rate)
+    }).catch(() => {})
+  }, [])
+  useEffect(() => {
+    api.get('/api/digest/latest').then(({ data }) => {
+      setEvents7d(data?.events_7d || [])
     }).catch(() => {})
   }, [])
 
@@ -257,6 +263,20 @@ export default function Portfolio() {
           {listLoading && <div style={{ textAlign: 'center', padding: 24 }}><LoadingSpinner label="불러오는 중…" /></div>}
           {!listLoading && hasFetched && filteredStocks.length === 0 && (
             <div className="muted" style={{ textAlign: 'center', padding: 24, fontSize: 13 }}>종목을 추가해 주세요</div>
+          )}
+          {events7d.length > 0 && (
+            <div className="card" style={{ marginTop: 8, padding: '12px 16px' }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>향후 7일 이벤트</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {events7d.map((ev, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
+                    <span className="tnum" style={{ color: 'var(--accent)', minWidth: 36 }}>D-{ev.days_until}</span>
+                    <span>{ev.ticker}</span>
+                    <span className="muted">{ev.event_type === 'earnings' ? '실적발표' : '배당락일'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}
