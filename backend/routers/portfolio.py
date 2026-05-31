@@ -3,8 +3,9 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List
 from services import storage, errors, report_generator, consensus as consensus_svc
-from services import cache as cache_svc
+from services import cache as cache_svc, market as market_svc
 from services.utils import find_ticker_index, ticker_exists_in
+from services.parallel import parallel_map
 from services.db import query as db_query
 from auth import get_current_user
 
@@ -53,9 +54,22 @@ class Stock(BaseModel):
     exchange: str = ""
 
 
+def _with_price(s: dict) -> dict:
+    try:
+        quote = market_svc.get_quote(s["ticker"], s.get("market", "US"), s.get("exchange", ""))
+        if quote:
+            return {**s, "current_price": quote.get("price"), "change_pct": quote.get("daily_change_pct")}
+    except Exception:
+        pass
+    return s
+
+
 @router.get("")
 def get_portfolio(user_id: str = Depends(get_current_user)):
-    return storage.get_full_portfolio(user_id)
+    portfolio = storage.get_full_portfolio(user_id)
+    portfolio["stocks"] = parallel_map(_with_price, portfolio.get("stocks", []))
+    portfolio["watchlist"] = parallel_map(_with_price, portfolio.get("watchlist", []))
+    return portfolio
 
 
 @router.post("", status_code=201)
