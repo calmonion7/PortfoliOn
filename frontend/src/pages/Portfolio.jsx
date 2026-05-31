@@ -178,7 +178,7 @@ export default function Portfolio() {
       </header>
 
       <div className="hero">
-        <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>
+        <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} · 15분 지연</div>
         <div className="val tnum">₩{fmt(totalValue ?? totalCost, 0)}</div>
         {totalPnl != null ? (
           <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`}>
