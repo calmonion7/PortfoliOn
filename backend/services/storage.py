@@ -218,7 +218,8 @@ def enrich_stock(ticker: str, fields: dict) -> bool:
     if not exists:
         return False
     set_clause = ", ".join(f"{k}=%s" for k in fields)
-    execute(f"UPDATE tickers SET {set_clause} WHERE ticker=%s", (*fields.values(), upper))
+    values = [json.dumps(v) if isinstance(v, list) else v for v in fields.values()]
+    execute(f"UPDATE tickers SET {set_clause} WHERE ticker=%s", (*values, upper))
     return True
 
 
