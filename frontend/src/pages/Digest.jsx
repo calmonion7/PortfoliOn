@@ -75,13 +75,24 @@ export default function Digest() {
       ) : (
         <>
           {digest.anomalies.length > 0 && (
-            <div className="digest-banner" style={{ marginBottom: 12 }}>
-              <span>⚠ 이상신호 </span>
-              {digest.anomalies.map(a => (
-                <span key={a.ticker} className={a.change_pct >= 0 ? 'up tnum' : 'down tnum'} style={{ marginLeft: 8 }}>
-                  {a.ticker} {a.change_pct >= 0 ? '+' : ''}{a.change_pct.toFixed(1)}%
-                </span>
-              ))}
+            <div className="digest-banner" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
+              <span style={{ paddingTop: 2 }}>⚠ 이상신호</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+                {digest.anomalies.map(a => (
+                  <span key={a.ticker} className={a.change_pct >= 0 ? 'up' : 'down'}
+                    style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                    <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                      <strong className="tnum" style={{ fontSize: 13, fontWeight: 600 }}>{a.ticker}</strong>
+                      <span className="tnum" style={{ fontSize: 13 }}>
+                        {a.change_pct >= 0 ? '+' : ''}{a.change_pct.toFixed(1)}%
+                      </span>
+                    </span>
+                    {nameMap[a.ticker] && nameMap[a.ticker] !== a.ticker && (
+                      <span style={{ fontSize: 10, opacity: 0.75, fontWeight: 400 }}>{nameMap[a.ticker]}</span>
+                    )}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
