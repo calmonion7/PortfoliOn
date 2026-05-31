@@ -32,6 +32,8 @@ export default function Reports() {
   const pollRef = useRef(null)
   const [activeTab, setActiveTab] = useState('holdings')
   const [watchlistSub, setWatchlistSub] = useState('low')
+  const [othersData, setOthersData] = useState(null) // null = not yet fetched
+  const [othersLoading, setOthersLoading] = useState(false)
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [activeDetailTab, setActiveDetailTab] = useState('summary')
@@ -61,6 +63,17 @@ const _applyList = (data) => {
   }, [])
 
   useEffect(() => { fetchList() }, [])
+
+  useEffect(() => {
+    if (activeTab !== 'others' || !isAdmin || othersData !== null) return
+    setOthersLoading(true)
+    api.get('/api/report/list?scope=all')
+      .then(({ data }) => {
+        const all = data.stocks ?? data
+        setOthersData(Object.fromEntries(Object.entries(all).filter(([, v]) => !v.is_mine)))
+      })
+      .finally(() => setOthersLoading(false))
+  }, [activeTab, isAdmin, othersData])
 
   useEffect(() => {
     if (!selected.ticker || !selected.date) return
@@ -180,6 +193,7 @@ const _applyList = (data) => {
   }, [ungeneratedCount, activeTab])
 
   const _matchSubTab = ([, v]) => {
+    if (activeTab === 'others') return false
     if (activeTab === 'ungenerated') return _isUngenerated([, v])
     if (activeTab === 'holdings') return v.category === 'holdings'
     if (v.category !== 'watchlist') return false
@@ -234,13 +248,25 @@ const _applyList = (data) => {
       return rsiA - rsiB
     })
 
+  const othersEntries = othersData
+    ? Object.entries(othersData)
+        .filter(([, v]) => marketFilter === 'ALL' || (v.summary?.market || v.market) === marketFilter)
+        .sort(([a], [b]) => a.localeCompare(b))
+    : []
+  const activeEntries = activeTab === 'others' ? othersEntries : tabEntries
+
   const renderFilters = () => (
     <>
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: (activeTab === 'watchlist' || activeTab === 'ungenerated') ? 0 : 12 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: (['watchlist', 'ungenerated', 'others'].includes(activeTab)) ? 0 : 12 }}>
         <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
         <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
         {ungeneratedCount > 0 && (
           <button className={`tab-btn${activeTab === 'ungenerated' ? ' active' : ''}`} onClick={() => setActiveTab('ungenerated')} style={{ color: activeTab === 'ungenerated' ? 'var(--accent)' : '#ffb74d' }}>미생성 ({ungeneratedCount})</button>
+        )}
+        {isAdmin && (
+          <button className={`tab-btn${activeTab === 'others' ? ' active' : ''}`} onClick={() => setActiveTab('others')}>
+            그외{othersData !== null ? ` (${Object.keys(othersData).length})` : ''}
+          </button>
         )}
       </div>
       {activeTab === 'watchlist' && (
@@ -542,14 +568,14 @@ const _applyList = (data) => {
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
         {renderFilters()}
-        {listLoading
+        {(activeTab === 'others' ? othersLoading : listLoading)
           ? <LoadingSpinner label="" size={20} style={{ padding: 20 }} />
-          : (hasFetched && tabEntries.length === 0)
+          : (activeEntries.length === 0)
             ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>리포트 없음</p>
             : null
         }
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {!listLoading && tabEntries.map(([t, info]) => renderTickerItem(t, info))}
+          {!(activeTab === 'others' ? othersLoading : listLoading) && activeEntries.map(([t, info]) => renderTickerItem(t, info))}
         </div>
       </div>
 
@@ -557,17 +583,17 @@ const _applyList = (data) => {
       <div className="reports-main">
         {view === 'list' ? (
           /* 목록화면 */
-          listLoading ? (
+          (activeTab === 'others' ? othersLoading : listLoading) ? (
             <LoadingSpinner label="리포트 불러오는 중입니다." style={{ marginTop: 80 }} />
           ) : (
             <>
               <div style={{ marginBottom: 16 }}>
                 {renderFilters()}
               </div>
-              {(hasFetched && tabEntries.length === 0) ? (
+              {activeEntries.length === 0 ? (
                 <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-3)' }}>
                   <p>리포트가 없습니다.</p>
-                  <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>
+                  {activeTab !== 'others' && <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>}
                 </div>
               ) : (
                 <div className="stock-card-grid">
@@ -581,7 +607,7 @@ const _applyList = (data) => {
                     <span style={{ color: '#ef9a9a' }}>RSI 매도<br/><small>일봉 70 / 75 / 80</small></span>
                     <span></span>
                   </div>
-                  {tabEntries.map(([t, info]) => renderStockCard(t, info))}
+                  {activeEntries.map(([t, info]) => renderStockCard(t, info))}
                 </div>
               )}
             </>
