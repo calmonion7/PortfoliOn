@@ -10,11 +10,67 @@
 ## 워크플로우
 
 ```
-1. GET /api/stocks          → 분석 대상 종목 목록 조회
-2. (AI가 각 종목 분석 수행)
-3. PUT /api/stocks/enrich/batch  → 분석 결과 일괄 저장
+1. POST /api/auth/login          → access_token 획득
+2. GET /api/stocks               → 분석 대상 종목 목록 조회
+3. (선택) GET /api/report/list   → 기존 리포트 날짜 확인
+4. (선택) GET /api/report/{ticker}/{date_str}  → 기존 리포트 내용 참조
+5. (AI가 각 종목 분석 수행)
+6. PUT /api/stocks/enrich/batch  → 분석 결과 일괄 저장
    또는
    PUT /api/stocks/{ticker}/enrich  → 종목 1개 저장
+```
+
+---
+
+## 인증
+
+모든 API는 Bearer token 인증이 필요합니다.
+
+### 로그인
+
+```
+POST /api/auth/login
+```
+
+**Request Body**
+```json
+{
+  "email": "user@example.com",
+  "password": "secret"
+}
+```
+
+**Response `200`**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ..."
+}
+```
+
+이후 모든 요청에 아래 헤더를 포함합니다.
+
+```
+Authorization: Bearer {access_token}
+```
+
+### Access token 갱신
+
+```
+POST /api/auth/refresh
+```
+
+**Request Body**
+```json
+{ "refresh_token": "eyJ..." }
+```
+
+**Response `200`**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ..."
+}
 ```
 
 ---
@@ -24,6 +80,8 @@
 ### `GET /api/stocks`
 
 보유종목과 관심종목 전체 목록을 반환합니다.
+
+**Auth:** `Authorization: Bearer {token}` 필요
 
 **Response `200`**
 ```json
@@ -41,9 +99,67 @@
 
 ---
 
+### `GET /api/report/list`
+
+생성된 리포트 목록과 날짜를 조회합니다. 기존 리포트가 있으면 참조해 중복 분석을 피할 수 있습니다.
+
+**Auth:** `Authorization: Bearer {token}` 필요
+
+**Response `200`**
+```json
+{
+  "LLY": {
+    "dates": ["2026-05-20", "2026-05-01"],
+    "category": "holdings",
+    "summary": {
+      "score": 85,
+      "recommendation": "매수",
+      "one_liner": "GLP-1 시장 선점, 파이프라인 풍부"
+    }
+  },
+  "AVAV": {
+    "dates": ["2026-05-15"],
+    "category": "watchlist",
+    "summary": null
+  }
+}
+```
+
+---
+
+### `GET /api/report/{ticker}/{date_str}`
+
+특정 날짜의 리포트 전체 내용을 조회합니다. 기존 분석을 참조할 때 사용합니다.
+
+**Auth:** 불필요
+
+**Path Parameters**
+- `ticker` — 종목 코드 (예: `LLY`)
+- `date_str` — 날짜 (`YYYY-MM-DD`, `GET /api/report/list` 의 `dates` 값)
+
+**Response `200`**
+```json
+{
+  "ticker": "LLY",
+  "date": "2026-05-20",
+  "content": "# LLY 분석 리포트\n\n...",
+  "summary": {
+    "score": 85,
+    "recommendation": "매수",
+    "one_liner": "GLP-1 시장 선점, 파이프라인 풍부"
+  }
+}
+```
+
+**Error `404`** — 해당 날짜의 리포트 없음
+
+---
+
 ### `PUT /api/stocks/{ticker}/enrich`
 
 단일 종목의 AI 분석 정보를 저장합니다. 포함된 필드만 덮어쓰고 나머지는 기존 값을 유지합니다.
+
+**Auth:** `Authorization: Bearer {token}` 필요
 
 **Path Parameter:** `ticker` — 종목 코드 (예: `LLY`)
 
@@ -81,6 +197,7 @@
 | 상태 | 설명 |
 |------|------|
 | `400` | 업데이트할 필드가 없음 |
+| `401` | 인증 필요 |
 | `404` | 보유종목 또는 관심종목에 없는 ticker |
 
 ---
@@ -88,6 +205,8 @@
 ### `PUT /api/stocks/enrich/batch`
 
 여러 종목의 AI 분석 정보를 한 번에 저장합니다.
+
+**Auth:** `Authorization: Bearer {token}` 필요
 
 **Request Body** — 종목 배열 (각 항목은 `ticker` 필수, 나머지는 선택)
 ```json
@@ -127,6 +246,7 @@
 | 상태 | 설명 |
 |------|------|
 | `400` | 배열이 비어 있음 |
+| `401` | 인증 필요 |
 
 ---
 
