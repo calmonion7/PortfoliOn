@@ -49,7 +49,6 @@ export default function Portfolio() {
     // 시세는 목록 렌더 후 별도 로드
     api.get('/api/portfolio/prices').then(({ data: prices }) => {
       setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
-      setWatchlist(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
     }).catch(() => {})
   }, [])
 
@@ -252,29 +251,17 @@ export default function Portfolio() {
 
       {tab === 'watch' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 20px', paddingBottom: 80 }}>
-          {filteredWatchlist.map(h => {
-            const ccy = (h.market || 'US') === 'KR' ? '₩' : '$'
-            const dec = (h.market || 'US') === 'KR' ? 0 : 2
-            return (
+          {filteredWatchlist.map(h => (
               <div key={h.ticker} className="h-row" onClick={() => setPromoteTarget({ ticker: h.ticker, market: h.market || 'US' })} style={{ cursor: 'pointer' }}>
                 <div className="logo">{h.ticker.slice(0, 3)}</div>
                 <div className="meta">
                   <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
                   <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : '🇰🇷'} 관심종목</div>
                 </div>
-                <div className="price">
-                  {h.current_price != null ? (
-                    <>
-                      <div className="v tnum">{ccy}{fmt(h.current_price, dec)}</div>
-                      {h.change_pct != null && <Sig v={h.change_pct} />}
-                    </>
-                  ) : null}
-                </div>
                 <button className="row-edit" onClick={e => { e.stopPropagation(); openEdit(h) }}><Pencil /></button>
                 <button className="row-del" onClick={e => { e.stopPropagation(); handleDelete(h.ticker) }}>×</button>
               </div>
-            )
-          })}
+          ))}
           {listLoading && <div style={{ textAlign: 'center', padding: 24 }}><LoadingSpinner label="불러오는 중…" /></div>}
           {!listLoading && hasFetched && filteredWatchlist.length === 0 && (
             <div className="muted" style={{ textAlign: 'center', padding: 24, fontSize: 13 }}>관심종목을 추가해 주세요</div>
@@ -456,8 +443,6 @@ export default function Portfolio() {
                 <th style={{ width: 60 }}>시장</th>
                 <th>티커</th>
                 <th>회사명</th>
-                <th className="num">현재가</th>
-                <th className="num">변동</th>
                 <th>추세</th>
                 <th className="actions" />
               </tr>
@@ -468,10 +453,6 @@ export default function Portfolio() {
                   <td><MarketBadge mkt={h.market || 'US'} /></td>
                   <td className="ticker-cell">{h.ticker}</td>
                   <td>{h.name}</td>
-                  <td className="num tnum">
-                    {h.current_price ? `${(h.market || 'US') === 'KR' ? '₩' : '$'}${fmt(h.current_price, (h.market || 'US') === 'KR' ? 0 : 2)}` : <span className="muted">—</span>}
-                  </td>
-                  <td className="num">{h.change_pct != null ? <Sig v={h.change_pct} /> : <span className="muted">—</span>}</td>
                   <td><Spark data={sparkFor(h.ticker)} w={80} h={22} color="var(--text-2)" /></td>
                   <td className="actions">
                     <button className="btn btn-sm" onClick={() => setPromoteTarget(h.ticker)}>보유로 이동</button>
@@ -481,10 +462,10 @@ export default function Portfolio() {
                 </tr>
               ))}
               {listLoading && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32 }}><LoadingSpinner label="불러오는 중…" /></td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32 }}><LoadingSpinner label="불러오는 중…" /></td></tr>
               )}
               {!listLoading && hasFetched && filteredWatchlist.length === 0 && (
-                <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
+                <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
               )}
             </tbody>
           </table>

@@ -62,7 +62,7 @@ def get_portfolio(user_id: str = Depends(get_current_user)):
 @router.get("/prices")
 def get_portfolio_prices(user_id: str = Depends(get_current_user)):
     portfolio = storage.get_full_portfolio(user_id)
-    all_stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+    all_stocks = portfolio.get("stocks", [])
 
     def _fetch(s):
         try:
