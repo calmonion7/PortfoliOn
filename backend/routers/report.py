@@ -13,6 +13,7 @@ from services.progress import ProgressTracker
 from services.parallel import parallel_map
 from services.db import query, execute
 from auth import get_current_user, require_admin, get_current_user_or_api_key, _API_KEY_USER_ID
+from services import auth_service as _auth_svc
 
 router = APIRouter(prefix="/api", tags=["report"])
 
@@ -155,9 +156,21 @@ def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
 
 
 @router.get("/report/list")
-def list_reports(user_id: str = Depends(get_current_user_or_api_key)):
+def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or_api_key)):
+    all_scope = scope == "all" and user_id != _API_KEY_USER_ID
+    if all_scope:
+        caller = _auth_svc.get_user_by_id(user_id)
+        if not caller or caller.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Admin only")
+
     def _build():
-        portfolio = storage.get_global_portfolio() if user_id == _API_KEY_USER_ID else storage.get_full_portfolio(user_id)
+        if all_scope:
+            portfolio = storage.get_global_portfolio()
+            my_tickers = {s["ticker"].upper() for s in storage.get_all_stocks(user_id)}
+        else:
+            portfolio = storage.get_global_portfolio() if user_id == _API_KEY_USER_ID else storage.get_full_portfolio(user_id)
+            my_tickers = None
+
         portfolio_stocks = {s["ticker"].upper(): s for s in portfolio.get("stocks", [])}
         portfolio_watchlist = {s["ticker"].upper(): s for s in portfolio.get("watchlist", [])}
         holding_tickers = set(portfolio_stocks.keys())
@@ -191,25 +204,32 @@ def list_reports(user_id: str = Depends(get_current_user_or_api_key)):
                         and r["date"] == ticker_dates[t][0] and r.get("data"):
                     ticker_summary[t] = _slim_summary(r["data"])
 
+        def _mk_entry(ticker, dates, category, stock_info, summary):
+            market = stock_info.get("market") or (summary or {}).get("market", "US")
+            e = {"dates": dates, "category": category, "summary": summary, "market": market}
+            if my_tickers is not None:
+                e["is_mine"] = ticker in my_tickers
+            return e
+
         result = {}
         for ticker, dates in ticker_dates.items():
             category = "holdings" if ticker in holding_tickers else "watchlist"
             summary = ticker_summary.get(ticker)
             stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
-            market = stock_info.get("market") or (summary or {}).get("market", "US")
-            result[ticker] = {"dates": dates, "category": category, "summary": summary, "market": market}
+            result[ticker] = _mk_entry(ticker, dates, category, stock_info, summary)
 
         for ticker, stock in portfolio_stocks.items():
             if ticker not in result:
-                result[ticker] = {"dates": [], "category": "holdings", "summary": None,
-                                  "market": stock.get("market", "US")}
+                result[ticker] = _mk_entry(ticker, [], "holdings", stock, None)
         for ticker, stock in portfolio_watchlist.items():
             if ticker not in result:
-                result[ticker] = {"dates": [], "category": "watchlist", "summary": None,
-                                  "market": stock.get("market", "US")}
+                result[ticker] = _mk_entry(ticker, [], "watchlist", stock, None)
+
         schedule = storage.get_schedule()
         return {"stocks": result, "last_scheduled_date": _last_scheduled_date(schedule)}
 
+    if all_scope:
+        return _build()
     return cache_svc.get_list(_build)
 
 

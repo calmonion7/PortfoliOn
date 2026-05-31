@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../api'
+import { useAuth } from '../contexts/AuthContext'
 
 const DAYS = [
   { key: 'mon', label: '월' }, { key: 'tue', label: '화' },
@@ -25,6 +26,9 @@ function getLastScheduleDay(scheduleDays) {
 }
 
 export default function ReportSchedule() {
+  const { role } = useAuth() || { role: null }
+  const isAdmin = role === 'admin'
+
   const [schedule, setSchedule] = useState({ enabled: false, time: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] })
   const [saved, setSaved] = useState(false)
   const [saveErr, setSaveErr] = useState('')
@@ -37,6 +41,7 @@ export default function ReportSchedule() {
   const [stockList, setStockList] = useState(null)
   const [listLoading, setListLoading] = useState(true)
   const [genTab, setGenTab] = useState('pending')
+  const [ownerFilter, setOwnerFilter] = useState('all') // 'all' | 'mine' | 'others'
 
   const [backfilling, setBackfilling] = useState(false)
   const [backfillMsg, setBackfillMsg] = useState('')
@@ -46,13 +51,17 @@ export default function ReportSchedule() {
 
   useEffect(() => {
     api.get('/api/schedule').then(({ data }) => setSchedule(data))
-    loadStockList()
   }, [])
+
+  useEffect(() => {
+    if (role !== null) loadStockList()
+  }, [role]) // eslint-disable-line
 
   const loadStockList = async () => {
     setListLoading(true)
     try {
-      const { data } = await api.get('/api/report/list')
+      const scopeParam = role === 'admin' ? '?scope=all' : ''
+      const { data } = await api.get(`/api/report/list${scopeParam}`)
       setStockList(data.stocks ?? data)
     } catch {}
     setListLoading(false)
@@ -70,7 +79,7 @@ export default function ReportSchedule() {
     const pending = [], done = [], notInPeriod = []
     for (const [ticker, info] of Object.entries(stockList)) {
       const name = info.summary?.name || ''
-      const entry = { ticker, name }
+      const entry = { ticker, name, is_mine: info.is_mine }
       const latestDate = info.dates?.[0]
       if (isScheduleDay) {
         if (latestDate === today) done.push(entry)
@@ -86,6 +95,12 @@ export default function ReportSchedule() {
     pending.sort(byTicker); done.sort(byTicker); notInPeriod.sort(byTicker)
     return { pendingStocks: pending, doneStocks: done, notInPeriodStocks: notInPeriod }
   })()
+
+  const applyOwnerFilter = (stocks) => {
+    if (!isAdmin || ownerFilter === 'all') return stocks
+    if (ownerFilter === 'mine') return stocks.filter(s => s.is_mine)
+    return stocks.filter(s => !s.is_mine)
+  }
 
   const startPolling = (onDone) => {
     pollRef.current = setInterval(async () => {
@@ -121,11 +136,12 @@ export default function ReportSchedule() {
   }
 
   const handleGeneratePending = async () => {
-    if (pendingStocks.length === 0) return
+    const targets = applyOwnerFilter(pendingStocks)
+    if (targets.length === 0) return
     setGenerating(true)
     setGenMsg('')
     setProgress({ done: 0, total: 0, current: '' })
-    const tickerParam = pendingStocks.map(s => s.ticker).join(',')
+    const tickerParam = targets.map(s => s.ticker).join(',')
     const dateParam = referenceDate && !isScheduleDay ? `&date=${referenceDate}` : ''
     try {
       await api.post(`/api/report/generate?tickers=${encodeURIComponent(tickerParam)}${dateParam}`)
@@ -167,7 +183,9 @@ export default function ReportSchedule() {
   const pct = progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0
   const secondTabStocks = referenceDate || isScheduleDay ? doneStocks : notInPeriodStocks
   const secondTabLabel = referenceDate || isScheduleDay ? '생성됨' : '수집기간아님'
-  const currentTabStocks = genTab === 'pending' ? pendingStocks : secondTabStocks
+  const rawTabStocks = genTab === 'pending' ? pendingStocks : secondTabStocks
+  const currentTabStocks = applyOwnerFilter(rawTabStocks)
+  const filteredPending = applyOwnerFilter(pendingStocks)
 
   return (
     <div style={{ maxWidth: 480 }}>
@@ -241,6 +259,25 @@ export default function ReportSchedule() {
           ))}
         </div>
 
+        {isAdmin && (
+          <div style={{ padding: '8px 12px 0', display: 'flex', gap: 4 }}>
+            {[
+              { key: 'all', label: '전체' },
+              { key: 'mine', label: '내꺼' },
+              { key: 'others', label: '그외' },
+            ].map(({ key, label }) => (
+              <button key={key} onClick={() => setOwnerFilter(key)} style={{
+                padding: '3px 10px', border: 'none', borderRadius: 6,
+                fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                background: ownerFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
+                color: ownerFilter === key ? '#fff' : 'var(--text-3)',
+              }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {listLoading ? (
           <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</div>
         ) : currentTabStocks.length === 0 ? (
@@ -249,13 +286,25 @@ export default function ReportSchedule() {
           </div>
         ) : (
           <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--border)', marginTop: 8 }}>
-            {currentTabStocks.map(({ ticker, name }) => (
+            {currentTabStocks.map(({ ticker, name, is_mine }) => (
               <div key={ticker} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '7px 16px', borderBottom: '1px solid var(--border)', fontSize: 13,
               }}>
-                <span style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12, flexShrink: 0 }}>{ticker}</span>
-                {name && <span style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <span style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12, flexShrink: 0 }}>{ticker}</span>
+                  {name && <span style={{ color: 'var(--text-3)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>}
+                </div>
+                {isAdmin && ownerFilter === 'all' && (
+                  <span style={{
+                    flexShrink: 0, marginLeft: 8, fontSize: 10, fontWeight: 600,
+                    padding: '1px 6px', borderRadius: 4,
+                    background: is_mine ? 'var(--down-soft)' : 'var(--bg-elev-2)',
+                    color: is_mine ? 'var(--down)' : 'var(--text-faint)',
+                  }}>
+                    {is_mine ? '나' : '그외'}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -265,9 +314,9 @@ export default function ReportSchedule() {
           {genTab === 'pending' ? (
             <>
               <button className="btn btn-primary" onClick={handleGeneratePending}
-                disabled={generating || pendingStocks.length === 0}
+                disabled={generating || filteredPending.length === 0}
                 style={{ width: '100%', justifyContent: 'center' }}>
-                {generating ? '생성 중...' : pendingStocks.length > 0 ? `지금 생성 (${pendingStocks.length}개)` : '생성할 종목 없음'}
+                {generating ? '생성 중...' : filteredPending.length > 0 ? `지금 생성 (${filteredPending.length}개)` : '생성할 종목 없음'}
               </button>
               {generating && progress.total > 0 && (
                 <div style={{ marginTop: 14 }}>
