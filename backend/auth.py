@@ -63,3 +63,16 @@ def require_admin(user_id: str = Depends(get_current_user)) -> str:
     if not user or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     return user_id
+
+
+def require_admin_or_api_key(
+    request: Request,
+    user_id: str = Depends(get_current_user_or_api_key),
+) -> str:
+    """API 키 또는 어드민 JWT 중 하나로 인증."""
+    if user_id == _API_KEY_USER_ID:
+        return user_id
+    user = auth_service.get_user_by_id(user_id)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user_id

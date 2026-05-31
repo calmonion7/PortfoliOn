@@ -191,7 +191,8 @@ def get_global_portfolio() -> dict:
     rows = query(
         """
         SELECT DISTINCT ON (us.ticker)
-               us.ticker, us.type, t.name, t.market
+               us.ticker, us.type, t.name, t.market, t.exchange,
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures
         FROM user_stocks us
         LEFT JOIN tickers t ON t.ticker = us.ticker
         ORDER BY us.ticker, CASE us.type WHEN 'holding' THEN 0 ELSE 1 END
@@ -199,7 +200,17 @@ def get_global_portfolio() -> dict:
     )
     holdings, watchlist = [], []
     for r in rows:
-        entry = {"ticker": r["ticker"], "name": r.get("name") or r["ticker"], "market": r.get("market") or "US"}
+        entry = {
+            "ticker": r["ticker"],
+            "name": r.get("name") or r["ticker"],
+            "market": r.get("market") or "US",
+            "exchange": r.get("exchange") or "",
+            "competitors": r.get("competitors") or [],
+            "moat": r.get("moat") or "",
+            "growth_plan": r.get("growth_plan") or "",
+            "risks": r.get("risks") or "",
+            "recent_disclosures": r.get("recent_disclosures") or "",
+        }
         if r["type"] == "holding":
             holdings.append(entry)
         else:

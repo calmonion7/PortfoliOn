@@ -12,7 +12,7 @@ from services.utils import sanitize as _sanitize
 from services.progress import ProgressTracker
 from services.parallel import parallel_map
 from services.db import query, execute
-from auth import get_current_user, require_admin, get_current_user_or_api_key, _API_KEY_USER_ID
+from auth import get_current_user, require_admin, get_current_user_or_api_key, require_admin_or_api_key, _API_KEY_USER_ID
 from services import auth_service as _auth_svc
 
 router = APIRouter(prefix="/api", tags=["report"])
@@ -93,8 +93,12 @@ def _run_backfill(stocks: list, days: int):
 
 
 @router.post("/report/generate", status_code=202)
-def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = None, date: Optional[str] = None, user_id: str = Depends(require_admin)):
-    all_stocks = storage.get_all_stocks(user_id)
+def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = None, date: Optional[str] = None, user_id: str = Depends(require_admin_or_api_key)):
+    if user_id == _API_KEY_USER_ID:
+        portfolio = storage.get_global_portfolio()
+        all_stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+    else:
+        all_stocks = storage.get_all_stocks(user_id)
     if tickers:
         ticker_set = {t.strip().upper() for t in tickers.split(',')}
         stocks = [s for s in all_stocks if s['ticker'].upper() in ticker_set]

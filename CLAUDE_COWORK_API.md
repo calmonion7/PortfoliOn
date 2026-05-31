@@ -17,6 +17,7 @@
 5. PUT /api/stocks/enrich/batch  → 분석 결과 일괄 저장
    또는
    PUT /api/stocks/{ticker}/enrich  → 종목 1개 저장
+6. POST /api/report/generate     → 전체 리포트 재생성 (enrich 후 반드시 실행)
 ```
 
 ---
@@ -235,6 +236,28 @@ X-API-Key: {COWORK_API_KEY}
 |------|------|
 | `400` | 배열이 비어 있음 |
 | `401` | 인증 필요 |
+
+---
+
+### `POST /api/report/generate`
+
+enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. 백그라운드에서 실행되며 즉시 202를 반환합니다.
+
+**Auth:** `X-API-Key` 헤더
+
+**Query Parameters** (모두 선택)
+
+| 파라미터 | 설명 |
+|----------|------|
+| `tickers` | 쉼표 구분 티커 목록 (생략 시 전체 종목) |
+| `date` | 스냅샷 날짜 `YYYY-MM-DD` (생략 시 오늘) |
+
+**Response `202`**
+```json
+{ "message": "Generating reports for 92 stock(s)" }
+```
+
+> 생성 완료까지 수 분 소요. 완료 여부는 `GET /api/report/progress`로 확인 가능.
 
 ---
 
