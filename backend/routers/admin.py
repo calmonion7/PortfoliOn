@@ -24,11 +24,11 @@ def _get_user_permissions(user_id: str) -> Dict[str, bool]:
 
 @router.get("/users")
 def list_users(admin_id: str = Depends(require_admin)):
-    users = query("SELECT id, email, role FROM users ORDER BY created_at")
+    users = query("SELECT id, email, role, oauth_provider FROM users ORDER BY created_at")
     result = []
     for u in users:
         perms = _get_user_permissions(str(u["id"])) if u["role"] != "admin" else {m: True for m in ALL_MENUS}
-        result.append({"id": str(u["id"]), "email": u["email"], "role": u["role"], "permissions": perms})
+        result.append({"id": str(u["id"]), "email": u["email"], "role": u["role"], "oauth_provider": u["oauth_provider"], "permissions": perms})
     return result
 
 
@@ -81,11 +81,13 @@ def get_default_permissions(admin_id: str = Depends(require_admin)):
 
 @router.delete("/users/{user_id}")
 def delete_user(user_id: str, admin_id: str = Depends(require_admin)):
-    rows = query("SELECT role FROM users WHERE id = %s", (user_id,))
+    rows = query("SELECT role, oauth_provider FROM users WHERE id = %s", (user_id,))
     if not rows:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
     if rows[0]["role"] == "admin":
         raise HTTPException(status_code=403, detail="어드민 계정은 삭제할 수 없습니다")
+    if rows[0]["oauth_provider"] == "google":
+        raise HTTPException(status_code=403, detail="Google 계정은 삭제할 수 없습니다")
     for table, col in [
         ("user_stocks", "user_id"),
         ("user_menu_permissions", "user_id"),

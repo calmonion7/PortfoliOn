@@ -228,11 +228,13 @@ export default function PermissionManager() {
             {selected.includes(u.id) && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>✓</span>}
           </div>
           <span style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</span>
-          <button
-            onClick={e => { e.stopPropagation(); deleteUser(u) }}
-            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--down)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
-            title="사용자 삭제"
-          >×</button>
+          {u.oauth_provider !== 'google' && (
+            <button
+              onClick={e => { e.stopPropagation(); deleteUser(u) }}
+              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--down)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+              title="사용자 삭제"
+            >×</button>
+          )}
         </div>
       ))}
 
