@@ -125,6 +125,13 @@ export default function PermissionManager() {
     setSelected(allSelected ? [] : normalUsers.map(u => u.id))
   }
 
+  async function deleteUser(user) {
+    if (!window.confirm(`${user.email} 계정을 삭제하시겠습니까?\n보유종목, 관심종목 등 모든 데이터가 삭제됩니다.`)) return
+    await api.delete(`/api/admin/users/${user.id}`)
+    setUsers(prev => prev.filter(u => u.id !== user.id))
+    setSelected(prev => prev.filter(id => id !== user.id))
+  }
+
   function toggleUser(id) {
     setSelected(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -221,6 +228,11 @@ export default function PermissionManager() {
             {selected.includes(u.id) && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>✓</span>}
           </div>
           <span style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</span>
+          <button
+            onClick={e => { e.stopPropagation(); deleteUser(u) }}
+            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--down)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+            title="사용자 삭제"
+          >×</button>
         </div>
       ))}
 

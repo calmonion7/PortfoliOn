@@ -1,5 +1,5 @@
 # backend/routers/admin.py
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List
 
@@ -77,6 +77,25 @@ def get_default_permissions(admin_id: str = Depends(require_admin)):
     for r in rows:
         base[r["menu"]] = r["enabled"]
     return base
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: str, admin_id: str = Depends(require_admin)):
+    rows = query("SELECT role FROM users WHERE id = %s", (user_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    if rows[0]["role"] == "admin":
+        raise HTTPException(status_code=403, detail="어드민 계정은 삭제할 수 없습니다")
+    for table, col in [
+        ("user_stocks", "user_id"),
+        ("user_menu_permissions", "user_id"),
+        ("refresh_tokens", "user_id"),
+        ("digests", "user_id"),
+        ("calendar_cache", "user_id"),
+    ]:
+        execute(f"DELETE FROM {table} WHERE {col} = %s", (user_id,))
+    execute("DELETE FROM users WHERE id = %s", (user_id,))
+    return {"ok": True}
 
 
 @router.put("/default-permissions")
