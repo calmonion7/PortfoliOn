@@ -10,12 +10,11 @@
 ## 워크플로우
 
 ```
-1. POST /api/auth/login          → access_token 획득
-2. GET /api/stocks               → 분석 대상 종목 목록 조회
-3. (선택) GET /api/report/list   → 기존 리포트 날짜 확인
-4. (선택) GET /api/report/{ticker}/{date_str}  → 기존 리포트 내용 참조
-5. (AI가 각 종목 분석 수행)
-6. PUT /api/stocks/enrich/batch  → 분석 결과 일괄 저장
+1. GET /api/stocks               → 분석 대상 종목 목록 조회
+2. (선택) GET /api/report/list   → 기존 리포트 날짜 확인
+3. (선택) GET /api/report/{ticker}/{date_str}  → 기존 리포트 내용 참조
+4. (AI가 각 종목 분석 수행)
+5. PUT /api/stocks/enrich/batch  → 분석 결과 일괄 저장
    또는
    PUT /api/stocks/{ticker}/enrich  → 종목 1개 저장
 ```
@@ -24,54 +23,17 @@
 
 ## 인증
 
-모든 API는 Bearer token 인증이 필요합니다.
+외부 API(Claude Cowork)는 API Key 방식으로 인증합니다.
 
-### 로그인
-
-```
-POST /api/auth/login
-```
-
-**Request Body**
-```json
-{
-  "email": "user@example.com",
-  "password": "secret"
-}
-```
-
-**Response `200`**
-```json
-{
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ..."
-}
-```
-
-이후 모든 요청에 아래 헤더를 포함합니다.
+모든 요청에 아래 헤더를 포함합니다.
 
 ```
-Authorization: Bearer {access_token}
+X-API-Key: {COWORK_API_KEY}
 ```
 
-### Access token 갱신
+`COWORK_API_KEY`는 서버의 `backend/.env.docker`에 설정된 값입니다.
 
-```
-POST /api/auth/refresh
-```
-
-**Request Body**
-```json
-{ "refresh_token": "eyJ..." }
-```
-
-**Response `200`**
-```json
-{
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ..."
-}
-```
+**Error `401`** — API Key 누락 또는 불일치
 
 ---
 

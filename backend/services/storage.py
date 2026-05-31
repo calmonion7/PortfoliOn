@@ -186,6 +186,27 @@ def get_all_stocks(user_id: str) -> list[dict]:
     return portfolio.get("stocks", []) + portfolio.get("watchlist", [])
 
 
+def get_global_portfolio() -> dict:
+    """API key 인증용 — 전 유저 종목을 합산해 반환. holding 우선."""
+    rows = query(
+        """
+        SELECT DISTINCT ON (us.ticker)
+               us.ticker, us.type, t.name, t.market
+        FROM user_stocks us
+        LEFT JOIN tickers t ON t.ticker = us.ticker
+        ORDER BY us.ticker, CASE us.type WHEN 'holding' THEN 0 ELSE 1 END
+        """
+    )
+    holdings, watchlist = [], []
+    for r in rows:
+        entry = {"ticker": r["ticker"], "name": r.get("name") or r["ticker"], "market": r.get("market") or "US"}
+        if r["type"] == "holding":
+            holdings.append(entry)
+        else:
+            watchlist.append(entry)
+    return {"stocks": holdings, "watchlist": watchlist}
+
+
 _ENRICH_KEYS = frozenset({"name", "market", "exchange"}) | _ANALYST_KEYS
 
 

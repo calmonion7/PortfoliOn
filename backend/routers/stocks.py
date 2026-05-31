@@ -11,7 +11,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from services import market
 from services import cache as cache_svc
-from auth import get_current_user
+from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
@@ -134,8 +134,8 @@ def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
 
 
 @router.get("")
-def get_stocks(user_id: str = Depends(get_current_user)):
-    portfolio = storage.get_full_portfolio(user_id)
+def get_stocks(user_id: str = Depends(get_current_user_or_api_key)):
+    portfolio = storage.get_global_portfolio() if user_id == _API_KEY_USER_ID else storage.get_full_portfolio(user_id)
     result = []
     for s in portfolio["stocks"]:
         result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "holding"})
@@ -145,7 +145,7 @@ def get_stocks(user_id: str = Depends(get_current_user)):
 
 
 @router.put("/enrich/batch")
-def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(get_current_user)):
+def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(get_current_user_or_api_key)):
     if not items:
         raise HTTPException(status_code=400, detail="No items provided")
     updated, not_found = [], []
@@ -160,7 +160,7 @@ def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(get_curren
 
 
 @router.put("/{ticker}/enrich")
-def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(get_current_user)):
+def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(get_current_user_or_api_key)):
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
     if not fields:
         raise HTTPException(status_code=400, detail="No fields provided")

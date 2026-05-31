@@ -12,7 +12,7 @@ from services.utils import sanitize as _sanitize
 from services.progress import ProgressTracker
 from services.parallel import parallel_map
 from services.db import query, execute
-from auth import get_current_user, require_admin
+from auth import get_current_user, require_admin, get_current_user_or_api_key, _API_KEY_USER_ID
 
 router = APIRouter(prefix="/api", tags=["report"])
 
@@ -155,9 +155,9 @@ def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
 
 
 @router.get("/report/list")
-def list_reports(user_id: str = Depends(get_current_user)):
+def list_reports(user_id: str = Depends(get_current_user_or_api_key)):
     def _build():
-        portfolio = storage.get_full_portfolio(user_id)
+        portfolio = storage.get_global_portfolio() if user_id == _API_KEY_USER_ID else storage.get_full_portfolio(user_id)
         portfolio_stocks = {s["ticker"].upper(): s for s in portfolio.get("stocks", [])}
         portfolio_watchlist = {s["ticker"].upper(): s for s in portfolio.get("watchlist", [])}
         holding_tickers = set(portfolio_stocks.keys())
