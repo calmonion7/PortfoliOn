@@ -145,10 +145,13 @@ export default function Portfolio() {
   const filteredWatchlist = applyFilter(watchlist)
 
   // KPI 계산
-  const totalCost = stocks.reduce((sum, h) => {
-    const v = (h.avg_cost || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : 1380)
-    return sum + v
-  }, 0)
+  const FX = 1380
+  const toKrw = (h, price) => (price || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : FX)
+  const totalCost = stocks.reduce((sum, h) => sum + toKrw(h, h.avg_cost || 0), 0)
+  const hasPrice = stocks.some(h => h.current_price != null)
+  const totalValue = hasPrice ? stocks.reduce((sum, h) => sum + toKrw(h, h.current_price ?? h.avg_cost ?? 0), 0) : null
+  const totalPnl = totalValue != null ? totalValue - totalCost : null
+  const totalPnlPct = totalPnl != null && totalCost > 0 ? totalPnl / totalCost * 100 : null
 
   if (isMobile) return (
     <>
@@ -157,9 +160,19 @@ export default function Portfolio() {
       </header>
 
       <div className="hero">
-        <div className="label">투자 원가 · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>
-        <div className="val tnum">₩{fmt(totalCost, 0)}</div>
-        <div className="delta muted tnum">{stocks.length}개 보유 · 관심 {watchlist.length}</div>
+        <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>
+        <div className="val tnum">₩{fmt(totalValue ?? totalCost, 0)}</div>
+        {totalPnl != null ? (
+          <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`}>
+            {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
+            {totalPnlPct != null && <span style={{ marginLeft: 6, fontSize: 13 }}>({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>}
+          </div>
+        ) : (
+          <div className="delta muted tnum">{stocks.length}개 보유 · 관심 {watchlist.length}</div>
+        )}
+        {totalPnl != null && (
+          <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 2 }}>{stocks.length}개 보유 · 원가 ₩{fmt(totalCost, 0)}</div>
+        )}
       </div>
 
       <div className="seg-pad">
