@@ -10,6 +10,17 @@ _NAVER_HEADERS = {
 }
 _NAVER_BASE = "https://m.stock.naver.com/api/stock"
 
+_SECTOR_NORM = {
+    "Healthcare":            "Health Care",
+    "Financial Services":    "Financials",
+    "Consumer Cyclical":     "Consumer Discretionary",
+    "Consumer Defensive":    "Consumer Staples",
+    "Basic Materials":       "Materials",
+}
+
+def _norm_sector(s: str) -> str:
+    return _SECTOR_NORM.get(s, s) if s else ""
+
 
 def _naver_get(ticker: str, path: str) -> dict | list:
     r = requests.get(f"{_NAVER_BASE}/{ticker}/{path}", headers=_NAVER_HEADERS, timeout=8)
@@ -112,7 +123,7 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
                     month_ago = float(hist["Close"].iloc[-23])
                     monthly_change_pct = round((price - month_ago) / month_ago * 100, 2)
             yf_info = yf_t.info
-            sector = yf_info.get("sector", "") or ""
+            sector = _norm_sector(yf_info.get("sector", "") or "")
             industry = yf_info.get("industry", "") or ""
         except Exception:
             pass
@@ -414,7 +425,7 @@ def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None) -> d
             "market_cap": info.get("marketCap"),
             "ytd_return": round(ytd_return, 2) if ytd_return else None,
             "market": market,
-            "sector": info.get("sector", "") or "",
+            "sector": _norm_sector(info.get("sector", "") or ""),
             "industry": info.get("industry", "") or "",
         }
     except Exception as e:

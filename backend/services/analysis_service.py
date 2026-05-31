@@ -47,21 +47,10 @@ def _fetch_etf(entry: dict) -> dict:
                 "return_1w": None, "return_1mo": None, "return_3mo": None}
 
 
-_SECTOR_NORM = {
-    "Healthcare":            "Health Care",
-    "Financial Services":    "Financials",
-    "Consumer Cyclical":     "Consumer Discretionary",
-    "Consumer Defensive":    "Consumer Staples",
-    "Basic Materials":       "Materials",
-}
-
-def _norm_sector(s: str) -> str:
-    return _SECTOR_NORM.get(s, s) if s else "기타"
-
 def get_sector_momentum(holdings: list) -> dict:
     sectors = parallel_map(_fetch_etf, SECTOR_ETFS, max_workers=11)
     portfolio_sectors = {
-        h["ticker"].upper(): _norm_sector(h.get("sector") or "")
+        h["ticker"].upper(): h.get("sector") or "기타"
         for h in holdings
     }
     return {"sectors": sectors, "portfolio_sectors": portfolio_sectors}
