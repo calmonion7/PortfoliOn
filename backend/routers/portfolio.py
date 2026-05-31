@@ -1,13 +1,27 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List
-from services import storage, errors, report_generator
+from services import storage, errors, report_generator, consensus as consensus_svc
 from services import cache as cache_svc
 from services.utils import find_ticker_index, ticker_exists_in
 from services.db import query as db_query
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
+
+
+def _generate_with_consensus(stock_dict: dict):
+    report_generator.generate_report(stock_dict)
+    ticker = stock_dict["ticker"]
+    market = stock_dict.get("market", "US")
+    try:
+        consensus_svc.collect(ticker)
+    except Exception as e:
+        print(f"[AutoReport] consensus collect failed for {ticker}: {e}")
+    try:
+        consensus_svc.backfill(ticker, market)
+    except Exception as e:
+        print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
 
 
 class Stock(BaseModel):
@@ -69,7 +83,7 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
             "moat": stock.moat,
             "growth_plan": stock.growth_plan,
         }
-        background_tasks.add_task(report_generator.generate_report, stock_dict)
+        background_tasks.add_task(_generate_with_consensus, stock_dict)
 
     return {**new_holding, "name": stock.name, "competitors": stock.competitors,
             "moat": stock.moat, "growth_plan": stock.growth_plan,

@@ -1,13 +1,27 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import List
-from services import storage, errors, cache as cache_svc, report_generator
+from services import storage, errors, cache as cache_svc, report_generator, consensus as consensus_svc
 from services.utils import ticker_exists_in, find_ticker
 from services.db import query as db_query
 from routers import calendar as calendar_router
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
+
+
+def _generate_with_consensus(stock_dict: dict):
+    report_generator.generate_report(stock_dict)
+    ticker = stock_dict["ticker"]
+    market = stock_dict.get("market", "US")
+    try:
+        consensus_svc.collect(ticker)
+    except Exception as e:
+        print(f"[AutoReport] consensus collect failed for {ticker}: {e}")
+    try:
+        consensus_svc.backfill(ticker, market)
+    except Exception as e:
+        print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
 
 
 class WatchlistStock(BaseModel):
@@ -68,7 +82,7 @@ def add_watchlist_stock(stock: WatchlistStock, background_tasks: BackgroundTasks
             "moat": stock.moat,
             "growth_plan": stock.growth_plan,
         }
-        background_tasks.add_task(report_generator.generate_report, stock_dict)
+        background_tasks.add_task(_generate_with_consensus, stock_dict)
 
     return {"ticker": stock.ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
