@@ -58,7 +58,7 @@ def generate(user_id: str, today: date = None) -> dict:
         if ticker not in quotes or not h.get("quantity"):
             return 0
         price = quotes[ticker][price_key]
-        qty = h.get("quantity", 0)
+        qty = float(h.get("quantity", 0))
         return price * qty * (1 if h.get("market") == "KR" else usdkrw)
 
     total_value = sum(_to_krw(h, "current") for h in holdings)
