@@ -152,9 +152,9 @@ export default function Digest() {
           {/* 보유종목 */}
           {holdings.length > 0 && (
             <>
-              {watchlist.length > 0 && (
-                <div className="muted" style={{ fontSize: 11, marginBottom: 6, paddingLeft: 2 }}>보유종목</div>
-              )}
+              <div className="muted" style={{ fontSize: 11, marginBottom: 6, paddingLeft: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <span>보유종목</span><span>전일대비</span>
+              </div>
               <div className="digest-list" style={{ marginBottom: watchlist.length > 0 ? 16 : 0 }}>
                 {holdings.map(s => <StockRow key={s.ticker} s={s} />)}
               </div>
@@ -164,7 +164,9 @@ export default function Digest() {
           {/* 관심종목 */}
           {watchlist.length > 0 && (
             <>
-              <div className="muted" style={{ fontSize: 11, marginBottom: 6, paddingLeft: 2 }}>관심종목</div>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 6, paddingLeft: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <span>관심종목</span><span>전일대비</span>
+              </div>
               <div className="digest-list">
                 {watchlist.map(s => <StockRow key={s.ticker} s={s} />)}
               </div>
