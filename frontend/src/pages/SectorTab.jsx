@@ -51,7 +51,7 @@ export default function SectorTab() {
       </p>
       <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 24, lineHeight: 1.7 }}>
         미국 S&P500의 11개 섹터별 ETF 수익률로 어느 섹터가 강한지 한눈에 파악합니다.<br />
-        색상: <span style={{ color: 'var(--up)' }}>초록</span> — 상승 &nbsp;·&nbsp; <span style={{ color: 'var(--down)' }}>빨강</span> — 하락 &nbsp;·&nbsp; 짙을수록 변화 폭이 큼<br />
+        색상: <span style={{ color: 'var(--up)' }}>빨강</span> — 상승 &nbsp;·&nbsp; <span style={{ color: 'var(--down)' }}>파랑</span> — 하락 &nbsp;·&nbsp; 짙을수록 변화 폭이 큼<br />
         ★ 표시된 섹터에 내 보유 종목이 속합니다. 해당 섹터가 강하면 순풍, 약하면 역풍.
       </p>
       <table style={{ borderCollapse: 'separate', borderSpacing: '0 3px', fontSize: 13, width: '100%', maxWidth: 620 }}>
