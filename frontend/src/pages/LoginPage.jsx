@@ -41,7 +41,7 @@ export default function LoginPage() {
   if (isMobile) return (
     <div className="m-login">
       <div className="brand-big">
-        <div className="brand-mark"><div className="brand-dot"/><div className="brand-dot brand-dot--2"/></div>
+        <img src="/favicon.svg" className="brand-mark" alt="" />
         PortfoliOn
       </div>
       <h1>당신의 자산을<br/>한 화면에서.</h1>
@@ -65,7 +65,7 @@ export default function LoginPage() {
       {/* 좌측 브랜드 */}
       <div className="login-art">
         <div className="brand-big">
-          <div className="brand-mark"><div className="brand-dot"/><div className="brand-dot brand-dot--2"/></div>
+          <img src="/favicon.svg" className="brand-mark" alt="" />
           PortfoliOn
         </div>
         <div className="login-quote">

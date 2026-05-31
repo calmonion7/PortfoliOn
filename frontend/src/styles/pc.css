@@ -17,13 +17,7 @@
   padding: 14px 32px; height: 60px;
 }
 .brand { display:flex; align-items:center; gap: 10px; font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; }
-.brand-mark { position: relative; width: 22px; height: 22px; }
-.brand-dot {
-  position: absolute; width: 14px; height: 14px; border-radius: 50%;
-  background: var(--text); top: 4px; left: 0;
-}
-.brand-dot--2 { background: var(--up); left: 8px; top: 4px; mix-blend-mode: multiply; }
-[data-theme="dark"] .brand-dot--2 { mix-blend-mode: screen; }
+.brand-mark { width: 22px; height: 22px; flex-shrink: 0; }
 
 .topnav-tabs { display:flex; gap: 2px; flex: 1; }
 .topnav-tab {
@@ -222,8 +216,7 @@
 }
 .login-art .brand-big { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 600; }
 .login-art .brand-big .brand-mark { width: 28px; height: 28px; }
-.login-art .brand-big .brand-dot { width: 18px; height: 18px; top: 5px; }
-.login-art .brand-big .brand-dot--2 { left: 10px; }
+
 .login-quote { max-width: 480px; }
 .login-quote h1 { font-size: 38px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; margin: 0 0 14px; }
 .login-quote p { font-size: 14px; color: var(--text-3); line-height: 1.6; }

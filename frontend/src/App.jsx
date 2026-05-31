@@ -42,10 +42,7 @@ function TopNav({ theme, setTheme, setSession }) {
     <header className="topnav">
       <div className="topnav-inner">
         <div className="brand">
-          <div className="brand-mark">
-            <div className="brand-dot" />
-            <div className="brand-dot brand-dot--2" />
-          </div>
+          <img src="/favicon.svg" className="brand-mark" alt="" />
           <span>PortfoliOn</span>
         </div>
         <nav className="topnav-tabs">
@@ -100,10 +97,7 @@ export default function App() {
         <TopNav theme={theme} setTheme={setTheme} setSession={setSession} />
         <header className="mobile-header">
           <div className="brand">
-            <div className="brand-mark">
-              <div className="brand-dot" />
-              <div className="brand-dot brand-dot--2" />
-            </div>
+            <img src="/favicon.svg" className="brand-mark" alt="" />
             <span>PortfoliOn</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
