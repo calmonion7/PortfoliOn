@@ -108,28 +108,43 @@ POST /api/auth/refresh
 **Response `200`**
 ```json
 {
-  "LLY": {
-    "dates": ["2026-05-20", "2026-05-01"],
-    "category": "holdings",
-    "summary": {
-      "score": 85,
-      "recommendation": "매수",
-      "one_liner": "GLP-1 시장 선점, 파이프라인 풍부"
+  "stocks": {
+    "LLY": {
+      "dates": ["2026-05-20", "2026-05-01"],
+      "category": "holdings",
+      "market": "US",
+      "summary": {
+        "name": "Eli Lilly and Company",
+        "price": 823.45,
+        "sector": "Healthcare",
+        "target_mean": 950.0,
+        "buy": 18,
+        "hold": 4,
+        "sell": 0,
+        "daily_rsi": { "rsi": 58.3 },
+        "weekly_rsi": { "rsi": 62.1 },
+        "monthly_rsi": null,
+        "volume_profile": { "poc": 810.0 }
+      }
+    },
+    "AVAV": {
+      "dates": ["2026-05-15"],
+      "category": "watchlist",
+      "market": "US",
+      "summary": null
     }
   },
-  "AVAV": {
-    "dates": ["2026-05-15"],
-    "category": "watchlist",
-    "summary": null
-  }
+  "last_scheduled_date": "2026-05-20"
 }
 ```
+
+> 종목 데이터는 `response["stocks"]` 아래에 있습니다. `summary`는 리포트가 없으면 `null`.
 
 ---
 
 ### `GET /api/report/{ticker}/{date_str}`
 
-특정 날짜의 리포트 전체 내용을 조회합니다. 기존 분석을 참조할 때 사용합니다.
+특정 날짜의 리포트 스냅샷 데이터를 조회합니다. 기존 분석을 참조할 때 사용합니다.
 
 **Auth:** 불필요
 
@@ -142,14 +157,25 @@ POST /api/auth/refresh
 {
   "ticker": "LLY",
   "date": "2026-05-20",
-  "content": "# LLY 분석 리포트\n\n...",
   "summary": {
-    "score": 85,
-    "recommendation": "매수",
-    "one_liner": "GLP-1 시장 선점, 파이프라인 풍부"
+    "name": "Eli Lilly and Company",
+    "price": 823.45,
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers",
+    "target_mean": 950.0,
+    "target_high": 1100.0,
+    "target_low": 750.0,
+    "buy": 18,
+    "hold": 4,
+    "sell": 0,
+    "moat": "특허 포트폴리오와 제조 규모의 경제",
+    "growth_plan": "GLP-2 파이프라인 확장",
+    "risks": "GLP-1 경쟁 심화, 약가 규제 리스크"
   }
 }
 ```
+
+> `summary`는 DB에 저장된 스냅샷 전체 데이터입니다. `content`(마크다운) 필드는 없습니다.
 
 **Error `404`** — 해당 날짜의 리포트 없음
 
@@ -239,7 +265,7 @@ POST /api/auth/refresh
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `updated` | string[] | 정상 저장된 ticker 목록 |
-| `not_found` | string[] | 포트폴리오에 없어서 건너뛴 ticker 목록 |
+| `not_found` | string[] | 전역 tickers 테이블에 없거나 업데이트 필드가 없어서 건너뛴 ticker 목록 |
 
 **Errors**
 
