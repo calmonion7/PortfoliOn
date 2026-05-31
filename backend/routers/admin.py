@@ -86,8 +86,8 @@ def delete_user(user_id: str, admin_id: str = Depends(require_admin)):
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
     if rows[0]["role"] == "admin":
         raise HTTPException(status_code=403, detail="어드민 계정은 삭제할 수 없습니다")
-    if rows[0]["oauth_provider"] == "google":
-        raise HTTPException(status_code=403, detail="Google 계정은 삭제할 수 없습니다")
+    if rows[0]["oauth_provider"]:
+        raise HTTPException(status_code=403, detail="소셜 로그인 계정은 삭제할 수 없습니다")
     for table, col in [
         ("user_stocks", "user_id"),
         ("user_menu_permissions", "user_id"),
