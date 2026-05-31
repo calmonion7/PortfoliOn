@@ -109,7 +109,7 @@ def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = Non
 
 
 @router.post("/report/generate/{ticker}", status_code=202)
-def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
     from services.utils import find_ticker
     stock = find_ticker(storage.get_all_stocks(user_id), ticker)
     if not stock:
