@@ -60,7 +60,7 @@ export default function LoginPage() {
         PortfoliOn
       </div>
       <h1>당신의 자산을<br/>한 화면에서.</h1>
-      <p className="lead">보유 종목, 시장 지표, 매니저 추천을 매일 아침 정리해드려요.</p>
+      <p className="lead">보유 종목, 시장 지표, 구루 동향까지 — 흩어진 데이터를 한 곳에서.</p>
       <form onSubmit={isLogin ? doLogin : doRegister}>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="이메일" required/>
         <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="비밀번호" required/>
@@ -92,7 +92,7 @@ export default function LoginPage() {
         </div>
         <div className="login-quote">
           <h1>당신의 자산을<br/>한 화면에서.</h1>
-          <p>보유 종목, 시장 지표, 매니저 추천까지 — 흩어진 데이터를 한 곳에서.<br/>매일 아침 9시 30분, 정리된 리포트가 메일로 도착합니다.</p>
+          <p>보유 종목, 시장 지표, 구루 동향까지 — 흩어진 데이터를 한 곳에서.<br/>매일 아침, 정리된 다이제스트로 시장을 한눈에 확인하세요.</p>
         </div>
         <div className="login-ticker-strip">
           {[['S&P 500','+0.42%',true],['NASDAQ','+0.61%',true],['KOSPI','−0.18%',false],['USD/KRW','+0.55%',true],['VIX','−0.12',false]].map(([label, val, up]) => (
