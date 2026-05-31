@@ -25,17 +25,16 @@ echo "[2/4] Building backend image..."
 docker build -t $BACKEND_IMAGE ./backend --quiet
 echo "      Done: $BACKEND_IMAGE"
 
-# 3. 백엔드 컨테이너 교체 (env 유지)
+# 3. 백엔드 컨테이너 교체 (.env.docker에서 env 로드)
 echo "[3/4] Restarting backend..."
-ENV_FLAGS=$(docker inspect $BACKEND_CONTAINER --format '{{range .Config.Env}}--env "{{.}}" {{end}}' 2>/dev/null)
 docker stop $BACKEND_CONTAINER 2>/dev/null || true
 docker rm   $BACKEND_CONTAINER 2>/dev/null || true
-eval docker run -d \
+docker run -d \
   --name $BACKEND_CONTAINER \
   --network $NETWORK \
   --network-alias backend \
   --restart unless-stopped \
-  $ENV_FLAGS \
+  --env-file ./backend/.env.docker \
   $BACKEND_IMAGE > /dev/null
 echo "      Done"
 
