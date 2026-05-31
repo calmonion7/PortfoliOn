@@ -318,13 +318,16 @@ export default function Portfolio() {
       {/* KPI 4종 */}
       <div className="kpi-row">
         <div className="kpi">
-          <div className="label">투자 원가</div>
-          <div className="val tnum">₩{fmt(totalCost, 0)}</div>
+          <div className="label">{totalValue != null ? '평가금액' : '투자 원가'}</div>
+          <div className="val tnum">₩{fmt(totalValue ?? totalCost, 0)}</div>
           {totalPnl != null && (
             <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`} style={{ marginTop: 4 }}>
               {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
               {totalPnlPct != null && <span style={{ marginLeft: 5, fontSize: 12 }}>({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>}
             </div>
+          )}
+          {totalValue != null && (
+            <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 2 }}>원가 ₩{fmt(totalCost, 0)}</div>
           )}
         </div>
         <div className="kpi">
