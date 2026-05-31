@@ -344,7 +344,7 @@ export default function Portfolio() {
       <div className="page-head">
         <div>
           <h1 className="page-title">내 포트폴리오</h1>
-          <p className="page-sub">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} · 실시간</p>
+          <p className="page-sub">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} · 15분 지연</p>
         </div>
       </div>
 
