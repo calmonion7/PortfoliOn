@@ -38,7 +38,10 @@ function SectorAllocation({ cards }) {
 
   return (
     <div style={{ marginBottom: 48 }}>
-      <h3 style={{ color: 'var(--text)', marginBottom: 16 }}>섹터 배분</h3>
+      <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>섹터 배분</h3>
+      <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 16, lineHeight: 1.7 }}>
+        보유 종목의 현재가 기준 섹터별 자산 비중. 특정 섹터에 집중되어 있는지 분산 현황을 확인합니다.
+      </p>
       <div style={{ display: 'flex', gap: 32, alignItems: 'center', flexWrap: 'wrap' }}>
         <ResponsiveContainer width={260} height={260}>
           <PieChart>
@@ -136,8 +139,13 @@ function OpportunityBubble({ cards }) {
   return (
     <div>
       <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>기회 버블 차트</h3>
-      <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 16 }}>
+      <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 4 }}>
         X: 컨센서스 업사이드% &nbsp;·&nbsp; Y: 평단가 대비 수익률% &nbsp;·&nbsp; 버블 크기: 포트폴리오 비중
+      </p>
+      <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 16, lineHeight: 1.7 }}>
+        우상단(업사이드↑, 수익률↑): 목표가 여력이 있고 수익 중인 종목 &nbsp;·&nbsp;
+        좌하단: 하락 중이면서 목표가 하회 — 점검 필요<br />
+        버블이 클수록 포트폴리오에서 차지하는 비중이 높습니다. 컨센서스 목표가가 없는 종목은 제외됩니다.
       </p>
       <ResponsiveContainer width="100%" height={420}>
         <ScatterChart margin={{ top: 24, right: 32, bottom: 32, left: 24 }}>
@@ -223,8 +231,12 @@ function CorrelationHeatmap() {
   return (
     <div style={{ marginTop: 48 }}>
       <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>상관관계 히트맵</h3>
-      <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 16 }}>
-        90일 종가 기준 Pearson 상관계수 · 1.0=완전 양의 상관 · -1.0=완전 음의 상관
+      <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 4 }}>
+        90일 종가 기준 Pearson 상관계수 &nbsp;·&nbsp; 1.0=완전 양의 상관 &nbsp;·&nbsp; -1.0=완전 음의 상관
+      </p>
+      <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 16, lineHeight: 1.7 }}>
+        값이 1에 가까울수록 두 종목이 같은 방향으로 움직임. 파란색 계열이 많으면 분산 효과가 낮아<br />
+        시장 충격 시 포트폴리오 전체가 동반 하락할 위험이 있습니다. 보유종목 2개 이상 필요.
       </p>
       <svg width={LABEL + n * CELL} height={LABEL + n * CELL}>
         {tickers.map((t, j) => (
