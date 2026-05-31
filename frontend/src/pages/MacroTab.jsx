@@ -68,7 +68,7 @@ export default function MacroTab() {
         매크로 지표 일별 변동률 vs 포트폴리오 가중평균 수익률 · 90일 Pearson 상관계수 · 행 클릭 시 산점도 표시
       </p>
 
-      <table style={{ borderCollapse: 'collapse', fontSize: 13, marginBottom: 32 }}>
+      <table style={{ borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
         <thead>
           <tr>
             <th style={{ textAlign: 'left', padding: '4px 20px 8px 0', color: 'var(--text-3)', fontWeight: 400 }}>지표</th>
@@ -101,11 +101,22 @@ export default function MacroTab() {
         </tbody>
       </table>
 
+      <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 32, lineHeight: 1.7 }}>
+        상관계수는 −1 ~ +1 범위로, 두 지표가 얼마나 같은 방향으로 움직이는지를 나타냅니다.<br />
+        <span style={{ color: 'var(--text-2)' }}>양수(+)</span>: 매크로 지표가 오를 때 포트폴리오도 오르는 경향 &nbsp;·&nbsp;
+        <span style={{ color: 'var(--text-2)' }}>음수(−)</span>: 반대 방향으로 움직이는 경향<br />
+        절댓값 기준: 0.2 미만 — 거의 무관 &nbsp;·&nbsp; 0.2 ~ 0.5 — 약한 상관 &nbsp;·&nbsp; 0.5 이상 — 강한 상관
+      </p>
+
       {scatterData.length > 0 && (
         <div>
-          <h3 style={{ color: 'var(--text)', marginBottom: 8, fontSize: 14 }}>
+          <h3 style={{ color: 'var(--text)', marginBottom: 4, fontSize: 14 }}>
             {INDICATOR_LABELS[selected] || selected} vs 포트폴리오 수익률 (90일)
           </h3>
+          <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 12 }}>
+            각 점 = 하루의 데이터. X축: 해당 매크로 지표의 일별 변동%, Y축: 내 포트폴리오의 가중평균 수익률%.
+            점이 우상향으로 기울면 양의 상관, 우하향이면 음의 상관을 의미합니다.
+          </p>
           <ResponsiveContainer width="100%" height={360}>
             <ScatterChart margin={{ top: 16, right: 24, bottom: 32, left: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
