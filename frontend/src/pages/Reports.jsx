@@ -203,9 +203,10 @@ const _applyList = (data) => {
     return !_hasWarning(v.summary) && (g !== null && g < 40)
   }
   const subTabEntries = Object.entries(reportList).filter(_matchSubTab)
-  const mCountAll = subTabEntries.length
-  const mCountKR = subTabEntries.filter(([, v]) => (v.summary?.market || v.market) === 'KR').length
-  const mCountUS = subTabEntries.filter(([, v]) => (v.summary?.market || v.market) === 'US').length
+  const _mktBase = activeTab === 'others' ? Object.entries(othersData || {}) : subTabEntries
+  const mCountAll = _mktBase.length
+  const mCountKR = _mktBase.filter(([, v]) => (v.summary?.market || v.market) === 'KR').length
+  const mCountUS = _mktBase.filter(([, v]) => (v.summary?.market || v.market) === 'US').length
 
   const tabEntries = subTabEntries
     .filter(([, v]) => {
