@@ -41,10 +41,11 @@ export default function KrExportsSection() {
   const chg3 = (cur, base) => base ? ((cur - base) / Math.abs(base) * 100) : null
   const semiShare = latest ? (latest.semiconductor / (latest.semiconductor + latest.non_semiconductor) * 100) : null
   const semiSharePrev = yoy3 ? (yoy3.semiconductor / (yoy3.semiconductor + yoy3.non_semiconductor) * 100) : null
+  const semiShareMom = prev ? (prev.semiconductor / (prev.semiconductor + prev.non_semiconductor) * 100) : null
   const latestLabel = latest?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')
 
   const summary = semiShare != null ? `반도체 ${semiShare.toFixed(1)}%` : ''
-  const shareChg = (semiShare != null && semiSharePrev != null) ? (semiShare - semiSharePrev) : null
+  const shareChg = semiShare != null ? ((semiSharePrev ?? semiShareMom) != null ? (semiShare - (semiSharePrev ?? semiShareMom)) : null) : null
 
   return (
     <SectionCard title="한국 수출: 반도체 vs 비반도체" summary={summary} change={shareChg} changeSuffix="%p" open={open} onToggle={() => setOpen(o => !o)}>
