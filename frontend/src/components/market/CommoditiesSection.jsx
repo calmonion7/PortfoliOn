@@ -66,7 +66,7 @@ export default function CommoditiesSection() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-3)' }}
                          tickFormatter={v => v.slice(5)} interval={Math.floor(h.length / 4)} />
-                  <YAxis tick={{ fontSize: 9, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
+                  <YAxis tick={{ fontSize: 9, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={40} />
                   <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 11 }}
                            labelStyle={{ color: 'var(--text-3)' }} />
                   <Line type="monotone" dataKey="value" name={label} stroke={color} dot={false} strokeWidth={1.5} />

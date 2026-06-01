@@ -88,12 +88,12 @@ export default function KrExportsSection() {
           월별 수출액 추이 (억달러) — 반도체 vs 비반도체
         </div>
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={months} margin={{ top: 16, right: 40, left: 0, bottom: 0 }}>
+          <LineChart data={months} margin={{ top: 16, right: 4, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                    tickFormatter={v => v.slice(2)} />
-            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
-            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} />
+            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={40} />
+            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} width={36} />
             <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                      labelFormatter={v => v.replace(/(\d{4})(\d{2})/, '$1-$2')}
                      formatter={(v, n) => n === '반도체 비중' ? [`${v?.toFixed(1)}%`, n] : [v.toLocaleString() + ' 억달러', n]} />

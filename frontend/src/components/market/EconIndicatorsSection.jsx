@@ -52,7 +52,7 @@ export default function EconIndicatorsSection() {
                   <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-3)' }}
                          tickFormatter={v => v.slice(0, 7)} interval={Math.floor(h.length / 5)} />
                   <YAxis tick={{ fontSize: 9, fill: 'var(--text-3)' }} domain={['auto', 'auto']}
-                         tickFormatter={v => `${v}${unit}`} />
+                         tickFormatter={v => `${v}${unit}`} width={36} />
                   <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 11 }}
                            labelStyle={{ color: 'var(--text-3)' }}
                            formatter={v => [`${v}${unit}`, label]} />
