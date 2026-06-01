@@ -39,23 +39,29 @@ export default function M7EarningsSection() {
       <p style={DESC_STYLE}>애플·마이크로소프트·구글·아마존·엔비디아·메타·테슬라 7개 빅테크의 분기 순이익과 S&P 500 나머지 493종목을 비교합니다. M7 비중이 높을수록 지수 수익률이 소수 종목에 집중되어 있음을 의미합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: 'M7', value: latest?.m7, qoq: chg(latest?.m7, prev?.m7), yoy: chg(latest?.m7, yoy?.m7), color: '#4fc3f7' },
-          { label: '나머지 S&P 500', value: latest?.rest, qoq: chg(latest?.rest, prev?.rest), yoy: chg(latest?.rest, yoy?.rest), color: '#80cbc4' },
-        ].map(({ label, value, qoq, yoy: yoyChg, color }) => (
+          { label: 'M7', value: latest?.m7, qoq: chg(latest?.m7, prev?.m7), yoy: chg(latest?.m7, yoy?.m7), prevVal: prev?.m7, prevQ: prev?.q, yoyVal: yoy?.m7, yoyQ: yoy?.q, color: '#4fc3f7' },
+          { label: '나머지 S&P 500', value: latest?.rest, qoq: chg(latest?.rest, prev?.rest), yoy: chg(latest?.rest, yoy?.rest), prevVal: prev?.rest, prevQ: prev?.q, yoyVal: yoy?.rest, yoyQ: yoy?.q, color: '#80cbc4' },
+        ].map(({ label, value, qoq, yoy: yoyChg, prevVal, prevQ, yoyVal, yoyQ, color }) => (
           <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 순이익 ({latest?.q})</div>
             <div style={{ fontSize: 20, fontWeight: 700, color }}>
               {value != null ? value.toLocaleString() : '-'} <span style={{ fontSize: 11, fontWeight: 400 }}>{data.unit}</span>
             </div>
             {qoq != null && (
-              <div style={{ fontSize: 12, color: qoq > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
-                {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: qoq > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
+                  {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
+                </div>
+                {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전분기 {prevVal.toLocaleString()} {data.unit} ({prevQ})</div>}
+              </>
             )}
             {yoyChg != null && (
-              <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
-                {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
+                  {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
+                </div>
+                {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {yoyVal.toLocaleString()} {data.unit} ({yoyQ})</div>}
+              </>
             )}
           </div>
         ))}

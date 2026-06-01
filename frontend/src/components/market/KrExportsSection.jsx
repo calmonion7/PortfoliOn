@@ -52,23 +52,29 @@ export default function KrExportsSection() {
       <p style={DESC_STYLE}>관세청 월별 수출 통계 기준입니다. 반도체(HS 8542)는 한국 무역수지와 원화 가치의 핵심 동력으로, 수출 비중 상승은 업황 호조를 의미합니다. 비반도체 비중은 수출 다각화 정도를 나타냅니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: '반도체', value: latest?.semiconductor, mom: chg3(latest?.semiconductor, prev?.semiconductor), yoy: chg3(latest?.semiconductor, yoy3?.semiconductor), color: '#4fc3f7' },
-          { label: '비반도체', value: latest?.non_semiconductor, mom: chg3(latest?.non_semiconductor, prev?.non_semiconductor), yoy: chg3(latest?.non_semiconductor, yoy3?.non_semiconductor), color: '#80cbc4' },
-        ].map(({ label, value, mom, yoy: yoyChg, color }) => (
+          { label: '반도체', value: latest?.semiconductor, mom: chg3(latest?.semiconductor, prev?.semiconductor), yoy: chg3(latest?.semiconductor, yoy3?.semiconductor), prevVal: prev?.semiconductor, yoyVal: yoy3?.semiconductor, color: '#4fc3f7' },
+          { label: '비반도체', value: latest?.non_semiconductor, mom: chg3(latest?.non_semiconductor, prev?.non_semiconductor), yoy: chg3(latest?.non_semiconductor, yoy3?.non_semiconductor), prevVal: prev?.non_semiconductor, yoyVal: yoy3?.non_semiconductor, color: '#80cbc4' },
+        ].map(({ label, value, mom, yoy: yoyChg, prevVal, yoyVal, color }) => (
           <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 수출액 ({latestLabel})</div>
             <div style={{ fontSize: 20, fontWeight: 700, color }}>
               {value != null ? value.toLocaleString() : '-'} <span style={{ fontSize: 11, fontWeight: 400 }}>억달러</span>
             </div>
             {mom != null && (
-              <div style={{ fontSize: 12, color: mom > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
-                {mom > 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>MoM</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: mom > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
+                  {mom > 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>MoM</span>
+                </div>
+                {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전월 {prevVal.toLocaleString()} 억달러 ({prev?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})</div>}
+              </>
             )}
             {yoyChg != null && (
-              <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
-                {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
+                  {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
+                </div>
+                {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {yoyVal.toLocaleString()} 억달러 ({yoy3?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})</div>}
+              </>
             )}
           </div>
         ))}

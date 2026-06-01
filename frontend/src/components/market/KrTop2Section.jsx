@@ -42,23 +42,29 @@ export default function KrTop2Section() {
       <p style={DESC_STYLE}>삼성전자·SK하이닉스 두 반도체 대장주의 분기 순이익과 KOSPI 전체 나머지 종목을 비교합니다. 비중이 높을수록 한국 증시가 반도체 업황에 구조적으로 집중되어 있음을 나타냅니다. <span style={{ opacity: 0.7 }}>(E) = 네이버 컨센서스 추정치</span></p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: '삼성+하이닉스', value: latest?.top2, qoq: chg2(latest?.top2, prev?.top2), yoy: chg2(latest?.top2, yoy2?.top2), color: '#4fc3f7' },
-          { label: 'KOSPI 나머지 전체', value: latest?.rest, qoq: chg2(latest?.rest, prev?.rest), yoy: chg2(latest?.rest, yoy2?.rest), color: '#80cbc4' },
-        ].map(({ label, value, qoq, yoy: yoyChg, color }) => (
+          { label: '삼성+하이닉스', value: latest?.top2, qoq: chg2(latest?.top2, prev?.top2), yoy: chg2(latest?.top2, yoy2?.top2), prevVal: prev?.top2, prevQ: prev?.q, yoyVal: yoy2?.top2, yoyQ: yoy2?.q, color: '#4fc3f7' },
+          { label: 'KOSPI 나머지 전체', value: latest?.rest, qoq: chg2(latest?.rest, prev?.rest), yoy: chg2(latest?.rest, yoy2?.rest), prevVal: prev?.rest, prevQ: prev?.q, yoyVal: yoy2?.rest, yoyQ: yoy2?.q, color: '#80cbc4' },
+        ].map(({ label, value, qoq, yoy: yoyChg, prevVal, prevQ, yoyVal, yoyQ, color }) => (
           <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 순이익 ({latest?.q})</div>
             <div style={{ fontSize: 20, fontWeight: 700, color }}>
               {krFmt(value)} <span style={{ fontSize: 11, fontWeight: 400 }}>원</span>
             </div>
             {qoq != null && (
-              <div style={{ fontSize: 12, color: qoq > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
-                {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: qoq > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
+                  {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
+                </div>
+                {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전분기 {krFmt(prevVal)}원 ({prevQ})</div>}
+              </>
             )}
             {yoyChg != null && (
-              <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
-                {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
+                  {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
+                </div>
+                {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {krFmt(yoyVal)}원 ({yoyQ})</div>}
+              </>
             )}
           </div>
         ))}
