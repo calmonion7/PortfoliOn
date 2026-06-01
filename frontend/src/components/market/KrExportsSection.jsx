@@ -79,11 +79,18 @@ export default function KrExportsSection() {
           </div>
           {semiShare != null && (semiSharePrev ?? semiShareMom) != null && (() => {
             const base = semiSharePrev ?? semiShareMom
-            const label = semiSharePrev != null ? 'YoY' : 'MoM'
+            const isYoy = semiSharePrev != null
+            const label = isYoy ? 'YoY' : 'MoM'
+            const baseLabel = isYoy
+              ? `전년동기 ${base.toFixed(1)}% (${yoyMonth?.replace(/(\d{4})(\d{2})/, '$1-$2')})`
+              : `전월 ${base.toFixed(1)}% (${prev?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})`
             return (
-              <div style={{ fontSize: 12, color: semiShare > base ? '#81c784' : '#e57373', marginTop: 3 }}>
-                {semiShare > base ? '▲' : '▼'} {Math.abs(semiShare - base).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>{label}</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: semiShare > base ? '#81c784' : '#e57373', marginTop: 3 }}>
+                  {semiShare > base ? '▲' : '▼'} {Math.abs(semiShare - base).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>{label}</span>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>{baseLabel}</div>
+              </>
             )
           })()}
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>반도체 / 전체 수출</div>

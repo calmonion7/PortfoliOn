@@ -68,9 +68,12 @@ export default function KrTop2Section() {
             {top2Share != null ? top2Share.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {top2Share != null && top2SharePrev != null && (
-            <div style={{ fontSize: 12, color: top2Share > top2SharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
-              {top2Share > top2SharePrev ? '▲' : '▼'} {Math.abs(top2Share - top2SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
-            </div>
+            <>
+              <div style={{ fontSize: 12, color: top2Share > top2SharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
+                {top2Share > top2SharePrev ? '▲' : '▼'} {Math.abs(top2Share - top2SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {top2SharePrev.toFixed(1)}% ({yoy2?.q})</div>
+            </>
           )}
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>삼성+하이닉스 / KOSPI 전체</div>
         </div>

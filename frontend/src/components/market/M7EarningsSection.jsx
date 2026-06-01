@@ -65,9 +65,12 @@ export default function M7EarningsSection() {
             {m7Share != null ? m7Share.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {m7Share != null && m7SharePrev != null && (
-            <div style={{ fontSize: 12, color: m7Share > m7SharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
-              {m7Share > m7SharePrev ? '▲' : '▼'} {Math.abs(m7Share - m7SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
-            </div>
+            <>
+              <div style={{ fontSize: 12, color: m7Share > m7SharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
+                {m7Share > m7SharePrev ? '▲' : '▼'} {Math.abs(m7Share - m7SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {m7SharePrev.toFixed(1)}% ({yoy?.q})</div>
+            </>
           )}
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>M7 / 전체 S&P 500</div>
         </div>
