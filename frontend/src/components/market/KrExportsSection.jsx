@@ -77,11 +77,15 @@ export default function KrExportsSection() {
           <div style={{ fontSize: 20, fontWeight: 700, color: '#ffb74d' }}>
             {semiShare != null ? semiShare.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
-          {semiShare != null && semiSharePrev != null && (
-            <div style={{ fontSize: 12, color: semiShare > semiSharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
-              {semiShare > semiSharePrev ? '▲' : '▼'} {Math.abs(semiShare - semiSharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
-            </div>
-          )}
+          {semiShare != null && (semiSharePrev ?? semiShareMom) != null && (() => {
+            const base = semiSharePrev ?? semiShareMom
+            const label = semiSharePrev != null ? 'YoY' : 'MoM'
+            return (
+              <div style={{ fontSize: 12, color: semiShare > base ? '#81c784' : '#e57373', marginTop: 3 }}>
+                {semiShare > base ? '▲' : '▼'} {Math.abs(semiShare - base).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>{label}</span>
+              </div>
+            )
+          })()}
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>반도체 / 전체 수출</div>
         </div>
       </div>
