@@ -35,9 +35,10 @@ export default function KrTop2Section() {
   const top2SharePrev = yoy2 ? (yoy2.top2 / (yoy2.top2 + yoy2.rest) * 100) : null
 
   const summary = top2Share != null ? `Top2 ${top2Share.toFixed(1)}%` : ''
+  const shareChg = (top2Share != null && top2SharePrev != null) ? (top2Share - top2SharePrev) : null
 
   return (
-    <SectionCard title="삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="삼성전자+SK하이닉스 vs KOSPI 나머지 전체 순이익" summary={summary} change={shareChg} changeSuffix="%p" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>삼성전자·SK하이닉스 두 반도체 대장주의 분기 순이익과 KOSPI 전체 나머지 종목을 비교합니다. 비중이 높을수록 한국 증시가 반도체 업황에 구조적으로 집중되어 있음을 나타냅니다. <span style={{ opacity: 0.7 }}>(E) = 네이버 컨센서스 추정치</span></p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[

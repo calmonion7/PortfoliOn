@@ -32,9 +32,10 @@ export default function M7EarningsSection() {
   const m7SharePrev = yoy ? (yoy.m7 / (yoy.m7 + yoy.rest) * 100) : null
 
   const summary = m7Share != null ? `M7 ${m7Share.toFixed(1)}%` : ''
+  const shareChg = (m7Share != null && m7SharePrev != null) ? (m7Share - m7SharePrev) : null
 
   return (
-    <SectionCard title="M7 vs 나머지 S&P 500 순이익" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="M7 vs 나머지 S&P 500 순이익" summary={summary} change={shareChg} changeSuffix="%p" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>애플·마이크로소프트·구글·아마존·엔비디아·메타·테슬라 7개 빅테크의 분기 순이익과 S&P 500 나머지 493종목을 비교합니다. M7 비중이 높을수록 지수 수익률이 소수 종목에 집중되어 있음을 의미합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[

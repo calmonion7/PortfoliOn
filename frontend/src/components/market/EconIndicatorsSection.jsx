@@ -35,10 +35,12 @@ export default function EconIndicatorsSection() {
   ]
 
   const lastCpi = data.cpi?.slice(-1)[0]
+  const prevCpi = data.cpi?.slice(-2, -1)[0]
+  const cpiChange = (lastCpi && prevCpi) ? ((lastCpi.value - prevCpi.value) / prevCpi.value * 100) : null
   const summary = lastCpi ? `CPI ${lastCpi.value.toFixed(1)}` : ''
 
   return (
-    <SectionCard title="경제지표 (미국)" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="경제지표 (미국)" summary={summary} change={cpiChange} changeSuffix="%" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>CPI는 소비자물가지수로 인플레이션 수준을 나타냅니다. 실업률은 노동시장 건강도를 측정합니다. 두 지표 모두 연준(Fed)의 금리 결정 핵심 근거로, 이중 책무(물가 안정·완전고용) 달성 여부를 판단합니다.</p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {charts.map(({ key, label, color, unit }) => {

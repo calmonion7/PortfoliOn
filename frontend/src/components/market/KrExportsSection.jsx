@@ -44,9 +44,10 @@ export default function KrExportsSection() {
   const latestLabel = latest?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')
 
   const summary = semiShare != null ? `반도체 ${semiShare.toFixed(1)}%` : ''
+  const shareChg = (semiShare != null && semiSharePrev != null) ? (semiShare - semiSharePrev) : null
 
   return (
-    <SectionCard title="한국 수출: 반도체 vs 비반도체" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="한국 수출: 반도체 vs 비반도체" summary={summary} change={shareChg} changeSuffix="%p" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>관세청 월별 수출 통계 기준입니다. 반도체(HS 8542)는 한국 무역수지와 원화 가치의 핵심 동력으로, 수출 비중 상승은 업황 호조를 의미합니다. 비반도체 비중은 수출 다각화 정도를 나타냅니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
