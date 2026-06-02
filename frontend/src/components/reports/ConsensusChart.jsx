@@ -80,6 +80,30 @@ export default function ConsensusChart({ ticker, market }) {
     return ascData.every(d => d.buy === ascData[0].buy && d.hold === ascData[0].hold && d.sell === ascData[0].sell)
   }, [ascData])
 
+  // 겹침 방지: 처음·끝·최대·최소 + 충분히 이격된 변화 포인트만 레이블 표시
+  const targetLabelSet = useMemo(() => {
+    const changed = []
+    let prevVal = null
+    for (let i = 0; i < filteredData.length; i++) {
+      const val = filteredData[i].target_mean
+      if (val == null) continue
+      if (val !== prevVal) { changed.push(i); prevVal = val }
+    }
+    if (changed.length <= 4) return new Set(changed)
+
+    const allVals = filteredData.map((d, i) => ({ i, val: d.target_mean })).filter(p => p.val != null)
+    const maxI = allVals.reduce((a, b) => b.val > a.val ? b : a).i
+    const minI = allVals.reduce((a, b) => b.val < a.val ? b : a).i
+    const show = new Set([changed[0], changed[changed.length - 1], maxI, minI])
+
+    const minGap = Math.max(4, Math.floor(filteredData.length / 6))
+    for (const idx of changed) {
+      if (show.has(idx)) continue
+      if (![...show].some(s => Math.abs(s - idx) < minGap)) show.add(idx)
+    }
+    return show
+  }, [filteredData])
+
   const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
   const chartMargin = { top: 22, right: 16, left: 0, bottom: 4 }
 
@@ -132,7 +156,7 @@ export default function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {label && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), up ? -10 : 14)}
+        {targetLabelSet.has(index) && label && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), up ? -10 : 14)}
       </g>
     )
   }
@@ -164,7 +188,7 @@ export default function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {bgLabel(cx, cy, label, color, anchor(index, filteredData.length), -10)}
+        {targetLabelSet.has(index) && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), -10)}
       </g>
     )
   }
