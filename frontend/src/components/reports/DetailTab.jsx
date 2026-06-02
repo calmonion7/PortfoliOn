@@ -122,8 +122,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
       <div style={{ marginTop: 8 }}>
         {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
         {togglesJSX}
-        <div style={{ display: 'flex', height: BAR_H }}>
-          {/* 왼쪽: 금액 + 갭 ··· */}
+        <div style={{ display: 'flex', height: BAR_H, position: 'relative' }}>
+          {/* 왼쪽: 금액 */}
           <div style={{ flex: 1, position: 'relative' }}>
             {positioned.map((l, i) => (
               <div key={i} style={{
@@ -158,28 +158,13 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                 background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
               }} />
             ))}
-            {/* 갭 구간: 지그재그 axis-break 효과 */}
-            {gapSegs.map((seg, i) => {
-              const y = priceToY(seg.hi)
-              return (
-                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5 }}>
-                  {/* 바 마스킹 */}
-                  <rect x="0" y="0" width="16" height={GAP_H} fill="var(--bg-elev)" />
-                  {/* 위쪽 지그재그 선 */}
-                  <polyline
-                    points="3,3 5,1 7,3 9,1 11,3 13,1"
-                    fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2"
-                    strokeLinecap="round" strokeLinejoin="round"
-                  />
-                  {/* 아래쪽 지그재그 선 */}
-                  <polyline
-                    points={`3,${GAP_H-3} 5,${GAP_H-1} 7,${GAP_H-3} 9,${GAP_H-1} 11,${GAP_H-3} 13,${GAP_H-1}`}
-                    fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2"
-                    strokeLinecap="round" strokeLinejoin="round"
-                  />
-                </svg>
-              )
-            })}
+            {/* 중앙 바 갭 마스킹 (바를 시각적으로 끊음) */}
+            {gapSegs.map((seg, i) => (
+              <div key={i} style={{
+                position: 'absolute', left: 0, right: 0, top: priceToY(seg.hi), height: GAP_H,
+                background: 'var(--bg-elev)', zIndex: 3,
+              }} />
+            ))}
           </div>
 
           {/* 오른쪽: 수치명 + % */}
@@ -203,6 +188,32 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               )
             })}
           </div>
+
+          {/* 전체 폭 지그재그 — 플렉스 컨테이너 기준 절대 위치 */}
+          {gapSegs.map((seg, i) => {
+            const y = priceToY(seg.hi)
+            return (
+              <svg
+                key={`gz-${i}`}
+                style={{ position: 'absolute', left: 0, right: 0, top: y, width: '100%', height: GAP_H, zIndex: 4, pointerEvents: 'none' }}
+                viewBox={`0 0 300 ${GAP_H}`}
+                preserveAspectRatio="none"
+              >
+                <polyline
+                  points={`0,3 30,1 60,3 90,1 120,3 150,1 180,3 210,1 240,3 270,1 300,3`}
+                  fill="none" stroke="rgba(150,150,150,0.55)" strokeWidth="1.5"
+                  vectorEffect="non-scaling-stroke"
+                  strokeLinecap="round" strokeLinejoin="round"
+                />
+                <polyline
+                  points={`0,${GAP_H-3} 30,${GAP_H-1} 60,${GAP_H-3} 90,${GAP_H-1} 120,${GAP_H-3} 150,${GAP_H-1} 180,${GAP_H-3} 210,${GAP_H-1} 240,${GAP_H-3} 270,${GAP_H-1} 300,${GAP_H-3}`}
+                  fill="none" stroke="rgba(150,150,150,0.55)" strokeWidth="1.5"
+                  vectorEffect="non-scaling-stroke"
+                  strokeLinecap="round" strokeLinejoin="round"
+                />
+              </svg>
+            )
+          })}
         </div>
       </div>
     )
