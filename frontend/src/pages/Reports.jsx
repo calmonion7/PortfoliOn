@@ -616,6 +616,18 @@ const _applyList = (data) => {
         ) : (
           /* 상세화면 */
           <div>
+            <button
+              onClick={() => setView('list')}
+              style={{
+                position: 'fixed', bottom: 24, right: 16, zIndex: 100,
+                background: 'var(--text)', color: 'var(--bg)',
+                border: 'none', borderRadius: 24, padding: '10px 18px',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.25)',
+              }}
+            >
+              ← 목록으로
+            </button>
             <div className="detail-header" style={{ marginBottom: 16 }}>
               {/* 행1: 네비 버튼 */}
               <div className="detail-header-nav">
