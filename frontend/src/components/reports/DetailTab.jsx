@@ -404,7 +404,7 @@ export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: 14 }}>
           <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 2, marginTop: 2 }}>
             {[
               { color: 'var(--text)', label: '현재가', desc: '현재 주가' },
               { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
