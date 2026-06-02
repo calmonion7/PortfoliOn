@@ -7,6 +7,7 @@ from pathlib import Path
 from services import storage, report_generator
 from services import market as market_svc
 from services import consensus as consensus_svc
+from services import consensus_pipeline as _pipeline
 from services import cache as cache_svc
 from services.utils import sanitize as _sanitize
 from services.progress import ProgressTracker
@@ -130,8 +131,7 @@ def _run_generation(stocks: list, target_date: str = None):
         try:
             report_generator.generate_report(stock, target_date=target_date)
             cache_svc.invalidate(stock["ticker"])
-            consensus_svc.collect(stock["ticker"])
-            consensus_svc.backfill(stock["ticker"], stock.get("market", "US"))
+            _pipeline.run_daily([stock])
         except Exception as e:
             print(f"[Report] Failed for {stock['ticker']}: {e}")
             _progress.add_failed(stock["ticker"], str(e))
@@ -303,9 +303,15 @@ def get_report(ticker: str, date_str: str):
     if summary is None:
         raise HTTPException(status_code=404, detail="Report not found")
     rows = query(
-        "SELECT buy, hold, sell FROM consensus_history WHERE ticker = %s ORDER BY date DESC LIMIT 1",
+        "SELECT buy_count AS buy, hold_count AS hold, sell_count AS sell"
+        " FROM daily_consensus_mart WHERE ticker = %s ORDER BY base_date DESC LIMIT 1",
         (upper,),
     )
+    if not rows:
+        rows = query(
+            "SELECT buy, hold, sell FROM consensus_history WHERE ticker = %s ORDER BY date DESC LIMIT 1",
+            (upper,),
+        )
     if rows:
         summary = dict(summary)
         summary["buy"] = rows[0]["buy"]
@@ -335,13 +341,11 @@ def batch_consensus(background_tasks: BackgroundTasks, days: int = 180, force: b
 def _run_consensus_batch(stocks: list, days: int = 180, force: bool = False):
     _consensus_progress.start(len(stocks))
     for stock in stocks:
-        ticker = stock["ticker"]
-        market = stock.get("market", "US")
-        _consensus_progress.set(current=ticker)
+        _consensus_progress.set(current=stock["ticker"])
         try:
-            consensus_svc.backfill(ticker, market, days, force)
+            _pipeline.backfill([stock], days, force)
         except Exception as e:
-            print(f"[Consensus] backfill failed for {ticker}: {e}")
+            print(f"[Consensus] backfill failed for {stock['ticker']}: {e}")
         _consensus_progress.increment()
     _consensus_progress.finish()
 

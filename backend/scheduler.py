@@ -1,6 +1,6 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from services import storage, report_generator, consensus as consensus_svc
+from services import storage, report_generator, consensus_pipeline as _pipeline
 
 _scheduler = AsyncIOScheduler()
 _JOB_ID = "daily_report"
@@ -12,6 +12,7 @@ _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 def _generate_all():
     from services.db import query
     user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks")})
+    all_stocks: dict = {}
     for user_id in user_ids:
         stocks = storage.get_all_stocks(user_id)
         for stock in stocks:
@@ -20,11 +21,12 @@ def _generate_all():
                 print(f"[Scheduler] Report generated for {stock['ticker']}")
             except Exception as e:
                 print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
-            try:
-                consensus_svc.backfill(stock["ticker"], stock.get("market", "US"), days=7, force=True)
-                print(f"[Scheduler] Consensus collected for {stock['ticker']}")
-            except Exception as e:
-                print(f"[Scheduler] Consensus collection failed for {stock['ticker']}: {e}")
+            all_stocks[stock["ticker"]] = stock
+    try:
+        _pipeline.run_daily(list(all_stocks.values()))
+        print(f"[Scheduler] Pipeline run_daily completed for {len(all_stocks)} stocks")
+    except Exception as e:
+        print(f"[Scheduler] Pipeline run_daily failed: {e}")
 
 
 def _reschedule():

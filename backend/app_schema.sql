@@ -109,6 +109,36 @@ INSERT INTO default_menu_permissions (menu, enabled) VALUES
   ('guru', false), ('settings', false)
 ON CONFLICT DO NOTHING;
 
+-- 컨센서스 원본 리포트 (raw)
+CREATE TABLE raw_reports (
+  report_date    date          NOT NULL,
+  ticker         text          NOT NULL REFERENCES tickers(ticker) ON DELETE CASCADE,
+  brokerage_code varchar(100)  NOT NULL,
+  target_price   numeric(12,2),
+  raw_opinion    varchar(100),
+  opinion_score  numeric(3,1)  NOT NULL DEFAULT 3.0,
+  created_at     timestamptz   NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (report_date, ticker, brokerage_code)
+);
+
+-- 컨센서스 일별 집계 마트 (90일 롤링 윈도우)
+CREATE TABLE daily_consensus_mart (
+  base_date          date         NOT NULL,
+  ticker             text         NOT NULL REFERENCES tickers(ticker) ON DELETE CASCADE,
+  avg_target_price   numeric(12,2),
+  avg_target_high    numeric(12,2),
+  avg_target_low     numeric(12,2),
+  avg_opinion_score  numeric(4,2),
+  analyst_count      integer,
+  buy_count          integer,
+  hold_count         integer,
+  sell_count         integer,
+  updated_at         timestamptz  NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (base_date, ticker)
+);
+
 -- 성능 인덱스
 CREATE INDEX idx_user_stocks_ticker ON user_stocks(ticker);
 CREATE INDEX idx_consensus_history_ticker ON consensus_history(ticker);
+CREATE INDEX idx_raw_reports_ticker_date ON raw_reports (ticker, report_date DESC);
+CREATE INDEX idx_mart_ticker_date ON daily_consensus_mart (ticker, base_date DESC);
