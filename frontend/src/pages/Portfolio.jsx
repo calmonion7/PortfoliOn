@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { trackEvent } from '../utils/analytics'
 import api from '../api'
 import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
@@ -200,16 +201,16 @@ export default function Portfolio() {
 
       <div className="seg-pad">
         <div className="seg">
-          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => setTab('holdings')}>
+          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => { setTab('holdings'); trackEvent('tab_holdings') }}>
             보유 <span className="count">{stocks.length}</span>
           </button>
-          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => setTab('watch')}>
+          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => { setTab('watch'); trackEvent('tab_watch') }}>
             관심 <span className="count">{watchlist.length}</span>
           </button>
-          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard() }}>
+          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard(); trackEvent('tab_dash') }}>
             대시보드
           </button>
-          <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => setTab('analysis')}>
+          <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => { setTab('analysis'); trackEvent('tab_analysis') }}>
             분석
           </button>
         </div>
@@ -222,6 +223,7 @@ export default function Portfolio() {
             placeholder="종목 검색..."
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onBlur={e => { if (e.target.value.trim()) trackEvent('stock_search', { query: e.target.value.trim() }) }}
           />
           <div className="filter-chips">
             <button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>전체</button>
@@ -388,14 +390,14 @@ export default function Portfolio() {
       {/* 세그먼트 탭 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <div className="tabs">
-          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => setTab('holdings')}>
+          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => { setTab('holdings'); trackEvent('tab_holdings') }}>
             보유종목 <span className="count">{stocks.length}</span>
           </button>
-          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => setTab('watch')}>
+          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => { setTab('watch'); trackEvent('tab_watch') }}>
             관심종목 <span className="count">{watchlist.length}</span>
           </button>
-          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard() }}>대시보드</button>
-          <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => setTab('analysis')}>분석</button>
+          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard(); trackEvent('tab_dash') }}>대시보드</button>
+          <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => { setTab('analysis'); trackEvent('tab_analysis') }}>분석</button>
         </div>
         {tab === 'dash' && (
           <button className="btn" onClick={() => fetchDashboard({ invalidate: true })} disabled={dashboardLoading}>↺ 새로고침</button>
