@@ -43,13 +43,19 @@ export default function ConsensusSettings() {
             전체 종목의 네이버 컨센서스 데이터를 수집하고 백필을 실행합니다. 수 분 소요됩니다.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <span style={{ fontSize: 13, color: 'var(--text-3)' }}>기간</span>
-            {DAYS_OPTIONS.map(d => (
-              <button key={d} onClick={() => setDays(d)}
-                className={`tab-btn sm${days === d ? ' active' : ''}`}
-                style={{ padding: '4px 14px' }}
-              >{d}일</button>
-            ))}
+            <span style={{ fontSize: 13, color: 'var(--text-3)', flexShrink: 0 }}>기간</span>
+            <div style={{ flex: 1, display: 'flex', gap: 2, padding: 3, background: 'var(--accent-soft)', borderRadius: 10 }}>
+              {DAYS_OPTIONS.map(d => (
+                <button key={d} onClick={() => setDays(d)} style={{
+                  flex: 1, border: 0, padding: '7px 0', fontSize: 13, fontWeight: 500,
+                  borderRadius: 8, letterSpacing: '-0.01em',
+                  background: days === d ? 'var(--bg-elev)' : 'transparent',
+                  color: days === d ? 'var(--text)' : 'var(--text-3)',
+                  boxShadow: days === d ? 'var(--shadow-sm)' : 'none',
+                  cursor: 'pointer',
+                }}>{d}일</button>
+              ))}
+            </div>
           </div>
           <button className="btn btn-primary" onClick={runBatch} disabled={batch.running}
             style={{ width: '100%', justifyContent: 'center' }}>
