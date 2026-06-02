@@ -302,6 +302,15 @@ def get_report(ticker: str, date_str: str):
     summary = cache_svc.get_snapshot(upper, date_str, lambda: _read_snapshot(upper, date_str))
     if summary is None:
         raise HTTPException(status_code=404, detail="Report not found")
+    rows = query(
+        "SELECT buy, hold, sell FROM consensus_history WHERE ticker = %s ORDER BY date DESC LIMIT 1",
+        (upper,),
+    )
+    if rows:
+        summary = dict(summary)
+        summary["buy"] = rows[0]["buy"]
+        summary["hold"] = rows[0]["hold"]
+        summary["sell"] = rows[0]["sell"]
     return {"ticker": upper, "date": date_str, "summary": summary}
 
 
@@ -329,10 +338,6 @@ def _run_consensus_batch(stocks: list, days: int = 180, force: bool = False):
         ticker = stock["ticker"]
         market = stock.get("market", "US")
         _consensus_progress.set(current=ticker)
-        try:
-            consensus_svc.collect(ticker)
-        except Exception as e:
-            print(f"[Consensus] collect failed for {ticker}: {e}")
         try:
             consensus_svc.backfill(ticker, market, days, force)
         except Exception as e:
