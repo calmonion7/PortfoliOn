@@ -131,12 +131,14 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             </div>
             {allRows.map((l, i) => {
               const isKey = l.isCurrent || l.label === 'VAH' || l.label === 'VAL' || l.label === '목표가'
+              const isVahVal = l.label === 'VAH' || l.label === 'VAL'
               return (
                 <div key={i} style={{
                   position: 'absolute',
                   left: isKey ? 8 : 20, right: isKey ? 8 : 20,
-                  height: l.isCurrent ? 2.5 : 1.5,
-                  background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
+                  height: l.isCurrent ? 2.5 : isVahVal ? 2 : 1.5,
+                  background: l.color, top: priceToY(l.value), borderRadius: 1,
+                  zIndex: l.isCurrent ? 8 : isVahVal ? 7 : 1,
                 }} />
               )
             })}
