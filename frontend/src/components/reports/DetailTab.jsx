@@ -176,15 +176,15 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                   <rect x="11" y="0" width="5" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
                   {/* 중간 끊김 구간 바 컬럼도 마스킹 */}
                   <rect x="5" y="7" width="6" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
-                  {/* 위 물결 */}
+                  {/* 위 물결 — 바 컬럼(x=5~11) 내부에 정렬 */}
                   <polyline
-                    points="2,9 4.7,7 7.3,9 10,7 12.7,9"
+                    points="5,9 6.5,7 8,9 9.5,7 11,9"
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
                   {/* 아래 물결 */}
                   <polyline
-                    points={`2,${GAP_H-9} 4.7,${GAP_H-7} 7.3,${GAP_H-9} 10,${GAP_H-7} 12.7,${GAP_H-9}`}
+                    points={`5,${GAP_H-9} 6.5,${GAP_H-7} 8,${GAP_H-9} 9.5,${GAP_H-7} 11,${GAP_H-9}`}
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
