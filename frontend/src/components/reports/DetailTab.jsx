@@ -126,12 +126,17 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: priceToY(price), background: 'rgba(239,154,154,0.3)' }} />}
               {price != null && <div style={{ position: 'absolute', top: priceToY(price), left: 0, right: 0, bottom: 0, background: 'rgba(129,199,132,0.3)' }} />}
             </div>
-            {allRows.map((l, i) => (
-              <div key={i} style={{
-                position: 'absolute', left: 4, right: 4, height: l.isCurrent ? 2.5 : 1.5,
-                background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
-              }} />
-            ))}
+            {allRows.map((l, i) => {
+              const isKey = l.isCurrent || l.label === 'VAH' || l.label === 'VAL' || l.label === '목표가'
+              return (
+                <div key={i} style={{
+                  position: 'absolute',
+                  left: isKey ? 4 : 10, right: isKey ? 4 : 10,
+                  height: l.isCurrent ? 2.5 : 1.5,
+                  background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
+                }} />
+              )
+            })}
             {/* 갭 구간: 바 마스킹 + 지그재그 */}
             {gapSegs.map((seg, i) => {
               const y = priceToY(seg.hi)
