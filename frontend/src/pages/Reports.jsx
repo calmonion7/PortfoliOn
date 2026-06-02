@@ -619,7 +619,7 @@ const _applyList = (data) => {
             <button
               onClick={() => setView('list')}
               style={{
-                position: 'fixed', bottom: 24, right: 16, zIndex: 100,
+                position: 'fixed', bottom: 80, right: 16, zIndex: 100,
                 background: 'var(--text)', color: 'var(--bg)',
                 border: 'none', borderRadius: 24, padding: '10px 18px',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
