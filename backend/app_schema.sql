@@ -143,3 +143,18 @@ CREATE INDEX idx_user_stocks_ticker ON user_stocks(ticker);
 CREATE INDEX idx_consensus_history_ticker ON consensus_history(ticker);
 CREATE INDEX idx_raw_reports_ticker_date ON raw_reports (ticker, report_date DESC);
 CREATE INDEX idx_mart_ticker_date ON daily_consensus_mart (ticker, base_date DESC);
+
+-- 레버리지 지표 (신용잔고, 미수금, 고객예탁금)
+CREATE TABLE market_leverage_indicators (
+    base_date             DATE PRIMARY KEY,
+    kospi_credit_balance  NUMERIC(20, 2),
+    kosdaq_credit_balance NUMERIC(20, 2),
+    kospi_market_cap      NUMERIC(20, 2),
+    kosdaq_market_cap     NUMERIC(20, 2),
+    total_misu_amt        NUMERIC(20, 2),
+    liquidated_amt        NUMERIC(20, 2),
+    liquidation_ratio     NUMERIC(5, 2),
+    customer_deposit      NUMERIC(20, 2),
+    created_at            TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_leverage_base_date ON market_leverage_indicators(base_date DESC);
