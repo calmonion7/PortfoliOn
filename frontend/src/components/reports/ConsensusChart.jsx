@@ -130,7 +130,11 @@ export default function ConsensusChart({ ticker, market }) {
       <g transform={`translate(${x},${y})`}>
         <text textAnchor="middle" fontSize={10} fill="var(--text-3)" dy={12}>{mmdd}</text>
         {showYear && (
-          <text textAnchor="middle" fontSize={9} fill="var(--text-3)" dy={25}>[ {year} ]</text>
+          <g>
+            <rect x={-16} y={16} width={32} height={13} rx={6.5}
+              fill="var(--bg-elev)" stroke="var(--border)" strokeWidth={0.8} />
+            <text textAnchor="middle" fontSize={8.5} fontWeight={500} fill="var(--text-2)" dy={27}>{year}</text>
+          </g>
         )}
       </g>
     )
