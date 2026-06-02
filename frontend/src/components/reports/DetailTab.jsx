@@ -158,13 +158,25 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                 background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
               }} />
             ))}
-            {/* 중앙 바 갭 마스킹 (바를 시각적으로 끊음) */}
-            {gapSegs.map((seg, i) => (
-              <div key={i} style={{
-                position: 'absolute', left: 0, right: 0, top: priceToY(seg.hi), height: GAP_H,
-                background: 'var(--bg-elev)', zIndex: 3,
-              }} />
-            ))}
+            {/* 갭 구간: 바 마스킹 + 지그재그 */}
+            {gapSegs.map((seg, i) => {
+              const y = priceToY(seg.hi)
+              return (
+                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5 }}>
+                  <rect width="16" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  <polyline
+                    points="2,3 4.7,1 7.3,3 10,1 12.7,3"
+                    fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.7 }} strokeWidth="1.3"
+                    strokeLinecap="round" strokeLinejoin="round"
+                  />
+                  <polyline
+                    points={`2,${GAP_H-3} 4.7,${GAP_H-1} 7.3,${GAP_H-3} 10,${GAP_H-1} 12.7,${GAP_H-3}`}
+                    fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.7 }} strokeWidth="1.3"
+                    strokeLinecap="round" strokeLinejoin="round"
+                  />
+                </svg>
+              )
+            })}
           </div>
 
           {/* 오른쪽: 수치명 + % */}
@@ -189,31 +201,6 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             })}
           </div>
 
-          {/* 전체 폭 지그재그 — 플렉스 컨테이너 기준 절대 위치 */}
-          {gapSegs.map((seg, i) => {
-            const y = priceToY(seg.hi)
-            return (
-              <svg
-                key={`gz-${i}`}
-                style={{ position: 'absolute', left: 0, right: 0, top: y, width: '100%', height: GAP_H, zIndex: 4, pointerEvents: 'none' }}
-                viewBox={`0 0 300 ${GAP_H}`}
-                preserveAspectRatio="none"
-              >
-                <polyline
-                  points={`0,3 30,1 60,3 90,1 120,3 150,1 180,3 210,1 240,3 270,1 300,3`}
-                  fill="none" stroke="rgba(150,150,150,0.55)" strokeWidth="1.5"
-                  vectorEffect="non-scaling-stroke"
-                  strokeLinecap="round" strokeLinejoin="round"
-                />
-                <polyline
-                  points={`0,${GAP_H-3} 30,${GAP_H-1} 60,${GAP_H-3} 90,${GAP_H-1} 120,${GAP_H-3} 150,${GAP_H-1} 180,${GAP_H-3} 210,${GAP_H-1} 240,${GAP_H-3} 270,${GAP_H-1} 300,${GAP_H-3}`}
-                  fill="none" stroke="rgba(150,150,150,0.55)" strokeWidth="1.5"
-                  vectorEffect="non-scaling-stroke"
-                  strokeLinecap="round" strokeLinejoin="round"
-                />
-              </svg>
-            )
-          })}
         </div>
       </div>
     )
