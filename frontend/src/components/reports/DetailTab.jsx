@@ -107,26 +107,21 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
       return y
     }
 
-    // 극단적으로 붙은 쌍만 overlap avoidance
-    const positioned = allRows
-      .map(l => ({ ...l, y: priceToY(l.value) }))
-      .sort((a, b) => a.y - b.y)
-    for (let i = 1; i < positioned.length; i++) {
-      if (positioned[i].y < positioned[i-1].y + LABEL_H)
-        positioned[i].y = positioned[i-1].y + LABEL_H
-    }
-
-    // 같은 가격(=같은 %) 항목 그룹핑 — 왼쪽/오른쪽 레이블용
-    const groupedPositioned = []
+    // 같은 가격 항목을 먼저 그룹핑한 뒤 overlap avoidance — 중복 슬롯으로 인한 빈 공간 방지
     const seenVals = new Map()
-    for (const l of positioned) {
+    for (const l of allRows) {
       if (seenVals.has(l.value)) {
         seenVals.get(l.value).mergedLabels.push({ label: l.label, color: l.color })
       } else {
-        const g = { ...l, mergedLabels: [{ label: l.label, color: l.color }] }
-        seenVals.set(l.value, g)
-        groupedPositioned.push(g)
+        seenVals.set(l.value, { ...l, mergedLabels: [{ label: l.label, color: l.color }] })
       }
+    }
+    const groupedPositioned = [...seenVals.values()]
+      .map(l => ({ ...l, y: priceToY(l.value) }))
+      .sort((a, b) => a.y - b.y)
+    for (let i = 1; i < groupedPositioned.length; i++) {
+      if (groupedPositioned[i].y < groupedPositioned[i-1].y + LABEL_H)
+        groupedPositioned[i].y = groupedPositioned[i-1].y + LABEL_H
     }
 
     const gapSegs = segments.filter(s => s.isGap)
