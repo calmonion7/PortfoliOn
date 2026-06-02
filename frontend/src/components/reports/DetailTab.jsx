@@ -118,7 +118,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               const height = Math.max(2, priceToY(vp.val) - priceToY(vp.vah))
               return <>
                 {/* 배경 fill */}
-                <div style={{ position: 'absolute', left: 8, width: 48, top, height, background: 'rgba(79,195,247,0.08)', zIndex: 0 }} />
+                <div style={{ position: 'absolute', left: 8, width: 48, top, height, background: 'rgba(79,195,247,0.08)', zIndex: 6 }} />
                 {/* 좌우 테두리 — 갭 SVG(zIndex:5) 위에 */}
                 <div style={{ position: 'absolute', left: 8, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
                 <div style={{ position: 'absolute', left: 55, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
