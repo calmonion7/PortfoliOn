@@ -81,7 +81,36 @@ export default function ConsensusChart({ ticker, market }) {
   }, [ascData])
 
   const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
-  const chartMargin = { top: 22, right: 16, left: 0, bottom: 0 }
+  const chartMargin = { top: 22, right: 16, left: 0, bottom: 4 }
+
+  const fmtYAxis = (v) => {
+    if (v == null) return ''
+    if (market === 'KR') {
+      if (Math.abs(v) >= 100000000) return `₩${(v / 100000000).toFixed(0)}억`
+      if (Math.abs(v) >= 10000) return `₩${Math.round(v / 10000)}만`
+      return `₩${v}`
+    }
+    if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(0)}K`
+    return `$${v}`
+  }
+
+  const xTick = ({ x, y, payload }) => {
+    const date = payload.value
+    if (!date) return null
+    const mmdd = date.slice(5)
+    const year = date.slice(0, 4)
+    const dataIdx = filteredData.findIndex(d => d.date === date)
+    const prevYear = dataIdx > 0 ? filteredData[dataIdx - 1]?.date?.slice(0, 4) : null
+    const showYear = !prevYear || year !== prevYear
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text textAnchor="middle" fontSize={10} fill="var(--text-3)" dy={12}>{mmdd}</text>
+        {showYear && (
+          <text textAnchor="middle" fontSize={9} fill="var(--text-3)" dy={25}>[ {year} ]</text>
+        )}
+      </g>
+    )
+  }
 
   const anchor = (index, total) =>
     index === 0 ? 'start' : index === total - 1 ? 'end' : 'middle'
@@ -290,11 +319,11 @@ export default function ConsensusChart({ ticker, market }) {
             </div>
           </div>
           {tab === 0 && (
-            <ResponsiveContainer width="100%" height={140}>
+            <ResponsiveContainer width="100%" height={155}>
               <LineChart data={filteredData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
+                <XAxis dataKey="date" tick={xTick} height={36} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <Tooltip content={targetTooltip} />
                 <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="#ffcc80" strokeWidth={2} dot={targetDot} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
@@ -307,10 +336,10 @@ export default function ConsensusChart({ ticker, market }) {
                   <span style={{ fontSize: 9, color: 'var(--text-3)', background: 'var(--bg-elev-2)', border: '1px solid var(--border)', borderRadius: 3, padding: '0 5px', lineHeight: '16px' }}>변동 없음</span>
                 )}
               </div>
-              <ResponsiveContainer width="100%" height={140}>
+              <ResponsiveContainer width="100%" height={155}>
                 <LineChart data={filteredData} margin={chartMargin}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="date" tick={xTick} height={36} axisLine={false} tickLine={false} />
                   <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
                   <Tooltip content={opinionTooltip} />
                   <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={makeDot('#43a047', 'buy')} activeDot={{ r: 5 }} connectNulls />
@@ -329,11 +358,11 @@ export default function ConsensusChart({ ticker, market }) {
             </>
           )}
           {tab === 2 && (
-            <ResponsiveContainer width="100%" height={140}>
+            <ResponsiveContainer width="100%" height={155}>
               <LineChart data={filteredData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="left" tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
+                <XAxis dataKey="date" tick={xTick} height={36} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="left" tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
                 <Tooltip content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null
