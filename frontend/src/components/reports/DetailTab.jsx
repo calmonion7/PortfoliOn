@@ -83,27 +83,16 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const vals = allRows.map(l => l.value)
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
     const LABEL_H = 14
-    const GAP_H = 14        // 빈 구간 압축 높이
-    const GAP_THR = 0.12    // 전체 범위의 12% 이상 → 갭으로 처리
-
-    // 연속 가격 쌍을 세그먼트로 분류 (밀집 vs 갭)
+    const GAP_H = 16  // 지그재그 효과 공간 확보
+    // naturalH > LABEL_H (전체 대비 ~7% 이상) → 갭 마커 표시
     const uniquePrices = [...new Set(vals)].sort((a, b) => b - a)
-    const rawSegs = []
+    const segments = []
     for (let i = 0; i < uniquePrices.length - 1; i++) {
-      rawSegs.push({
-        hi: uniquePrices[i], lo: uniquePrices[i + 1],
-        isGap: (uniquePrices[i] - uniquePrices[i + 1]) / span > GAP_THR,
-      })
+      const segHi = uniquePrices[i], segLo = uniquePrices[i + 1]
+      const naturalH = (segHi - segLo) / span * 200
+      const isGap = naturalH > LABEL_H
+      segments.push({ hi: segHi, lo: segLo, isGap, h: isGap ? GAP_H : LABEL_H })
     }
-
-    // 밀집 세그먼트 높이: 비율 기반, 최소 LABEL_H 보장
-    const denseSegs = rawSegs.filter(s => !s.isGap)
-    const denseSpan = denseSegs.reduce((s, seg) => s + seg.hi - seg.lo, 0)
-    const denseScale = denseSpan > 0
-      ? Math.max(200, denseSegs.length * LABEL_H * 2) / denseSpan : 1
-    const segments = rawSegs.map(s => ({
-      ...s, h: s.isGap ? GAP_H : Math.max(LABEL_H, (s.hi - s.lo) * denseScale),
-    }))
     const BAR_H = segments.reduce((s, seg) => s + seg.h, 0) + 14
 
     // 압축 포함 가격 → y 변환
@@ -169,15 +158,24 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                 background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
               }} />
             ))}
-            {/* 갭 구간: 물결선 2개 + 사이 공백 */}
+            {/* 갭 구간: 지그재그 axis-break 효과 */}
             {gapSegs.map((seg, i) => {
               const y = priceToY(seg.hi)
+              // 16×16px SVG: 위 섹션(지그재그 하단) + 빈 공간 + 아래 섹션(지그재그 상단)
               return (
-                <div key={i} style={{ position: 'absolute', left: 2, width: 12, zIndex: 4, top: y, height: GAP_H }}>
-                  <div style={{ position: 'absolute', top: 2, bottom: 2, left: 1, right: 1, background: 'var(--bg-elev)' }} />
-                  <div style={{ position: 'absolute', top: 1, left: 0, right: 0, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.28)' }} />
-                  <div style={{ position: 'absolute', bottom: 1, left: 0, right: 0, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.28)' }} />
-                </div>
+                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5, overflow: 'visible' }}>
+                  <rect x="0" y="0" width="16" height={GAP_H} fill="var(--bg-elev)" />
+                  {/* 위쪽 바 + 지그재그 하단 엣지 */}
+                  <polygon
+                    points="0,0 16,0 16,5 14.4,2.5 12.8,5 11.2,2.5 9.6,5 8,2.5 6.4,5 4.8,2.5 3.2,5 1.6,2.5 0,5"
+                    fill="rgba(255,255,255,0.15)"
+                  />
+                  {/* 아래쪽 바 + 지그재그 상단 엣지 */}
+                  <polygon
+                    points={`0,11 1.6,13.5 3.2,11 4.8,13.5 6.4,11 8,13.5 9.6,11 11.2,13.5 12.8,11 14.4,13.5 16,11 16,${GAP_H} 0,${GAP_H}`}
+                    fill="rgba(255,255,255,0.15)"
+                  />
+                </svg>
               )
             })}
           </div>
