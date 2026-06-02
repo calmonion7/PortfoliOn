@@ -320,7 +320,11 @@ def get_report(ticker: str, date_str: str):
         summary["buy"] = rows[0]["buy"]
         summary["hold"] = rows[0]["hold"]
         summary["sell"] = rows[0]["sell"]
-    return {"ticker": upper, "date": date_str, "summary": summary}
+    enriched_at = None
+    ea_rows = query("SELECT enriched_at FROM tickers WHERE ticker = %s", (upper,))
+    if ea_rows and ea_rows[0].get("enriched_at"):
+        enriched_at = ea_rows[0]["enriched_at"].isoformat()
+    return {"ticker": upper, "date": date_str, "summary": summary, "enriched_at": enriched_at}
 
 
 _consensus_progress = ProgressTracker()

@@ -228,7 +228,7 @@ def enrich_stock(ticker: str, fields: dict) -> bool:
     exists = query("SELECT ticker FROM tickers WHERE ticker = %s", (upper,))
     if not exists:
         return False
-    set_clause = ", ".join(f"{k}=%s" for k in fields)
+    set_clause = ", ".join(f"{k}=%s" for k in fields) + ", enriched_at=NOW()"
     values = [json.dumps(v) if isinstance(v, list) else v for v in fields.values()]
     execute(f"UPDATE tickers SET {set_clause} WHERE ticker=%s", (*values, upper))
     return True

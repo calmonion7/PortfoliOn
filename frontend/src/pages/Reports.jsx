@@ -22,7 +22,7 @@ export default function Reports() {
   const [reportList, setReportList] = useState({})
   const [lastScheduledDate, setLastScheduledDate] = useState(null)
   const [selected, setSelected] = useState({ ticker: null, date: null })
-  const [detail, setDetail] = useState({ summary: null })
+  const [detail, setDetail] = useState({ summary: null, enriched_at: null })
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
   const [hasFetched, setHasFetched] = useState(false)
@@ -79,7 +79,7 @@ const _applyList = (data) => {
     if (!selected.ticker || !selected.date) return
     setLoading(true)
     api.get(`/api/report/${selected.ticker}/${selected.date}`)
-      .then(({ data }) => setDetail({ summary: data.summary }))
+      .then(({ data }) => setDetail({ summary: data.summary, enriched_at: data.enriched_at || null }))
       .finally(() => setLoading(false))
   }, [selected, detailRefreshKey])
 
@@ -767,6 +767,17 @@ const _applyList = (data) => {
               detail.summary
                 ? (
                   <div style={{ padding: '0 4px' }}>
+                    {detail.enriched_at && (
+                      <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: '#81c784', fontWeight: 600 }}>✓</span>
+                        AI 분석 업데이트: {new Date(detail.enriched_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                    {!detail.enriched_at && (
+                      <div style={{ marginBottom: 14, fontSize: 11, color: '#ffb74d', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>⚠</span> AI 분석 미업데이트 (enrich API 미실행)
+                      </div>
+                    )}
                     <ReportSectionCompetitors
                       competitors={detail.summary.competitors_data}
                       market={detail.summary.market}

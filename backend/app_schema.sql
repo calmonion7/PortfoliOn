@@ -12,7 +12,8 @@ CREATE TABLE tickers (
   moat                text NOT NULL DEFAULT '',
   growth_plan         text NOT NULL DEFAULT '',
   risks               text NOT NULL DEFAULT '',
-  recent_disclosures  text NOT NULL DEFAULT ''
+  recent_disclosures  text NOT NULL DEFAULT '',
+  enriched_at         timestamptz
 );
 
 -- 스냅샷/리포트 (공유, 티커별)
