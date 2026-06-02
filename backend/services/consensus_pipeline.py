@@ -54,11 +54,12 @@ def _fetch_kr_raw(ticker: str, days: int = 7) -> list[dict]:
         r.raise_for_status()
         items = r.json()
     except Exception:
-        return []
+        return _fetch_kr_fnguide(ticker)
 
     recent = [i for i in items if i.get("writeDate", "") >= cutoff]
     if not recent:
-        return []
+        # Naver 데이터 없으면 FnGuide fallback
+        return _fetch_kr_fnguide(ticker)
 
     def fetch_detail(item):
         rid = item["researchId"]
@@ -93,6 +94,52 @@ def _fetch_kr_raw(ticker: str, days: int = 7) -> list[dict]:
 
     with ThreadPoolExecutor(max_workers=5) as ex:
         return list(ex.map(fetch_detail, recent))
+
+
+# ---------------------------------------------------------------------------
+# 원천 수집: KR fallback (FnGuide — Naver 데이터 없을 때)
+# ---------------------------------------------------------------------------
+_RECOM_TO_OPINION = {
+    5.0: "강력매수", 4.0: "매수", 3.0: "중립", 2.0: "비중축소", 1.0: "매도",
+}
+
+def _fetch_kr_fnguide(ticker: str) -> list[dict]:
+    import requests, json as _json
+
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://comp.fnguide.com/",
+    }
+    url = f"https://comp.fnguide.com/SVO2/json/data/01_06/03_A{ticker}.json"
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+        data = _json.loads(r.content.decode("utf-8-sig"))
+    except Exception:
+        return []
+
+    results = []
+    for row in data.get("comp", []):
+        est_dt = row.get("EST_DT", "")
+        if not est_dt:
+            continue
+        report_date = est_dt.replace("/", "-")  # "2026/06/01" → "2026-06-01"
+        try:
+            tp = float(row["TARGET_PRC"].replace(",", "")) if row.get("TARGET_PRC") else None
+        except (ValueError, AttributeError):
+            tp = None
+        try:
+            recom = round(float(row.get("RECOM_CD", 3)))
+        except (ValueError, TypeError):
+            recom = 3
+        opinion = _RECOM_TO_OPINION.get(float(recom), "중립")
+        results.append({
+            "report_date": report_date,
+            "brokerage_code": row.get("INST_NM", "unknown"),
+            "target_price": tp,
+            "raw_opinion": opinion,
+        })
+    return results
 
 
 # ---------------------------------------------------------------------------
