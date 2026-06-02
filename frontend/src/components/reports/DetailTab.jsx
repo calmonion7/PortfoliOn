@@ -161,19 +161,21 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             {/* 갭 구간: 지그재그 axis-break 효과 */}
             {gapSegs.map((seg, i) => {
               const y = priceToY(seg.hi)
-              // 16×16px SVG: 위 섹션(지그재그 하단) + 빈 공간 + 아래 섹션(지그재그 상단)
               return (
-                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5, overflow: 'visible' }}>
+                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5 }}>
+                  {/* 바 마스킹 */}
                   <rect x="0" y="0" width="16" height={GAP_H} fill="var(--bg-elev)" />
-                  {/* 위쪽 바 + 지그재그 하단 엣지 */}
-                  <polygon
-                    points="0,0 16,0 16,5 14.4,2.5 12.8,5 11.2,2.5 9.6,5 8,2.5 6.4,5 4.8,2.5 3.2,5 1.6,2.5 0,5"
-                    fill="rgba(255,255,255,0.15)"
+                  {/* 위쪽 지그재그 선 */}
+                  <polyline
+                    points="3,3 5,1 7,3 9,1 11,3 13,1"
+                    fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2"
+                    strokeLinecap="round" strokeLinejoin="round"
                   />
-                  {/* 아래쪽 바 + 지그재그 상단 엣지 */}
-                  <polygon
-                    points={`0,11 1.6,13.5 3.2,11 4.8,13.5 6.4,11 8,13.5 9.6,11 11.2,13.5 12.8,11 14.4,13.5 16,11 16,${GAP_H} 0,${GAP_H}`}
-                    fill="rgba(255,255,255,0.15)"
+                  {/* 아래쪽 지그재그 선 */}
+                  <polyline
+                    points={`3,${GAP_H-3} 5,${GAP_H-1} 7,${GAP_H-3} 9,${GAP_H-1} 11,${GAP_H-3} 13,${GAP_H-1}`}
+                    fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2"
+                    strokeLinecap="round" strokeLinejoin="round"
                   />
                 </svg>
               )
