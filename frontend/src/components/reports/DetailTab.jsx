@@ -128,7 +128,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             </div>
             {allRows.map((l, i) => (
               <div key={i} style={{
-                position: 'absolute', left: 4, right: 0, height: l.isCurrent ? 2.5 : 1.5,
+                position: 'absolute', left: 4, right: 4, height: l.isCurrent ? 2.5 : 1.5,
                 background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
               }} />
             ))}
