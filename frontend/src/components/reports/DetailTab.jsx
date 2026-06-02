@@ -171,13 +171,11 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               const y = priceToY(seg.hi)
               return (
                 <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5 }}>
-                  <rect width="16" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
-                  {/* 위 스텁: 바 좌우 테두리 선이 갭 안으로 이어짐 */}
-                  <line x1="5" y1="0" x2="5" y2="7" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                  <line x1="11" y1="0" x2="11" y2="7" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                  {/* 아래 스텁 */}
-                  <line x1="5" y1={GAP_H - 7} x2="5" y2={GAP_H} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                  <line x1="11" y1={GAP_H - 7} x2="11" y2={GAP_H} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                  {/* 바 컬럼(x=5~11) 바깥만 마스킹 → 실제 바 div가 스텁으로 보임 */}
+                  <rect x="0" y="0" width="5" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  <rect x="11" y="0" width="5" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  {/* 중간 끊김 구간 바 컬럼도 마스킹 */}
+                  <rect x="5" y="7" width="6" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
                   {/* 위 물결 */}
                   <polyline
                     points="2,9 4.7,7 7.3,9 10,7 12.7,9"
