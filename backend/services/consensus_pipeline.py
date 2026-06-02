@@ -130,6 +130,20 @@ def _fetch_us_raw(ticker: str, days: int = 7) -> list[dict]:
                 "target_price": tp,
                 "raw_opinion": opinion,
             })
+
+        if not results:
+            # upgrades_downgrades 데이터 없을 때 analyst_price_targets로 오늘 컨센서스 1행 보완
+            apt = t.analyst_price_targets
+            if apt and apt.get("mean"):
+                rec_key = (t.info.get("recommendationKey") or "hold")
+                opinion = rec_key.replace("_", " ").title()
+                results.append({
+                    "report_date": date.today().isoformat(),
+                    "brokerage_code": "__consensus__",
+                    "target_price": float(apt["mean"]),
+                    "raw_opinion": opinion,
+                })
+
         return results
     except Exception:
         return []
