@@ -172,20 +172,22 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               return (
                 <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5 }}>
                   <rect width="16" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
-                  {/* 위 스텁: 바가 갭 안으로 조금 이어짐 */}
-                  <rect x="5" y="0" width="6" height="5" fill="rgba(255,255,255,0.1)" rx="1" />
+                  {/* 위 스텁: 바 좌우 테두리 선이 갭 안으로 이어짐 */}
+                  <line x1="5" y1="0" x2="5" y2="7" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                  <line x1="11" y1="0" x2="11" y2="7" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                   {/* 아래 스텁 */}
-                  <rect x="5" y={GAP_H - 5} width="6" height="5" fill="rgba(255,255,255,0.1)" rx="1" />
+                  <line x1="5" y1={GAP_H - 7} x2="5" y2={GAP_H} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                  <line x1="11" y1={GAP_H - 7} x2="11" y2={GAP_H} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                   {/* 위 물결 */}
                   <polyline
-                    points="2,8 4.7,6 7.3,8 10,6 12.7,8"
-                    fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.7 }} strokeWidth="1.3"
+                    points="2,9 4.7,7 7.3,9 10,7 12.7,9"
+                    fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
                   {/* 아래 물결 */}
                   <polyline
-                    points={`2,${GAP_H-8} 4.7,${GAP_H-6} 7.3,${GAP_H-8} 10,${GAP_H-6} 12.7,${GAP_H-8}`}
-                    fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.7 }} strokeWidth="1.3"
+                    points={`2,${GAP_H-9} 4.7,${GAP_H-7} 7.3,${GAP_H-9} 10,${GAP_H-7} 12.7,${GAP_H-9}`}
+                    fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
                 </svg>
