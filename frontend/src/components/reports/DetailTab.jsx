@@ -169,6 +169,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             {/* 갭 구간: 바 마스킹 + 지그재그 */}
             {gapSegs.map((seg, i) => {
               const y = priceToY(seg.hi)
+              const inVahVal = vp?.vah != null && vp?.val != null && seg.hi <= vp.vah && seg.lo >= vp.val
               return (
                 <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5 }}>
                   {/* 바 컬럼(x=5~11) 바깥만 마스킹 → 실제 바 div가 스텁으로 보임 */}
@@ -176,15 +177,21 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                   <rect x="11" y="0" width="5" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
                   {/* 중간 끊김 구간 바 컬럼도 마스킹 */}
                   <rect x="5" y="7" width="6" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
-                  {/* 위 물결 — 바 컬럼(x=5~11) 내부에 정렬 */}
+                  {/* VAH/VAL 범위 내: 박스 배경 + 테두리 선 유지 */}
+                  {inVahVal && <>
+                    <rect x="2" y="0" width="12" height={GAP_H} fill="rgba(79,195,247,0.06)" />
+                    <line x1="2.5" y1="0" x2="2.5" y2={GAP_H} stroke="rgba(79,195,247,0.4)" strokeWidth="1" />
+                    <line x1="13.5" y1="0" x2="13.5" y2={GAP_H} stroke="rgba(79,195,247,0.4)" strokeWidth="1" />
+                  </>}
+                  {/* 위 물결 — 바보다 약간 넓게(x=4~12) */}
                   <polyline
-                    points="5,9 6.5,7 8,9 9.5,7 11,9"
+                    points="4,9 5.5,7 8,9 10.5,7 12,9"
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
                   {/* 아래 물결 */}
                   <polyline
-                    points={`5,${GAP_H-9} 6.5,${GAP_H-7} 8,${GAP_H-9} 9.5,${GAP_H-7} 11,${GAP_H-9}`}
+                    points={`4,${GAP_H-9} 5.5,${GAP_H-7} 8,${GAP_H-9} 10.5,${GAP_H-7} 12,${GAP_H-9}`}
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
