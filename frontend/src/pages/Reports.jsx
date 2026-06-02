@@ -10,6 +10,7 @@ import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
 import FinancialsChart from '../components/reports/FinancialsChart'
 import HistoryTab from '../components/reports/HistoryTab'
 import { ReportSectionText, ReportSectionCompetitors, ReportSectionNews } from '../components/reports/Sections'
+import { trackEvent } from '../utils/analytics'
 
 
 
@@ -86,6 +87,7 @@ const _applyList = (data) => {
   const openDetail = (ticker, date) => {
     setSelected({ ticker, date })
     setView('detail')
+    trackEvent('report_view_open', { ticker })
     setActiveDetailTab('summary')
   }
 
@@ -724,7 +726,7 @@ const _applyList = (data) => {
               ].map(({ key, label }) => (
                 <button
                   key={key}
-                  onClick={() => setActiveDetailTab(key)}
+                  onClick={() => { setActiveDetailTab(key); trackEvent('report_tab_switch', { tab: key }) }}
                   className={`tab-btn${activeDetailTab === key ? ' active' : ''}`}
                   style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}
                 >
