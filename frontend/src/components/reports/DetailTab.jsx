@@ -83,10 +83,20 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const vals = allRows.map(l => l.value)
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
     const LABEL_H = 14
-    const BAR_H = Math.max(200, allRows.length * LABEL_H + 20)
+    const MAX_BAR_H = 600
+
+    // 가격 간격이 좁은 레벨 쌍에서 필요한 최소 높이를 계산 → 비율 위치 유지
+    const uniquePrices = [...new Set(vals)].sort((a, b) => b - a)
+    let BAR_H = Math.max(200, allRows.length * LABEL_H + 20)
+    for (let i = 0; i < uniquePrices.length - 1; i++) {
+      const diff = uniquePrices[i] - uniquePrices[i + 1]
+      if (diff > 0) BAR_H = Math.max(BAR_H, Math.ceil(LABEL_H * span / diff) + 14)
+    }
+    BAR_H = Math.min(MAX_BAR_H, BAR_H)
+
     const rawY = v => ((hi - v) / span) * (BAR_H - 14) + 7
 
-    // 겹치는 라벨 아래로 밀기
+    // 여전히 겹치는 경우(가격이 극단적으로 붙은 쌍)만 아래로 밀기
     const positioned = allRows
       .map(l => ({ ...l, y: rawY(l.value) }))
       .sort((a, b) => a.y - b.y)
