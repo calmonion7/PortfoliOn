@@ -140,9 +140,9 @@ export default function ConsensusChart({ ticker, market }) {
         <text textAnchor="middle" fontSize={10} fill="var(--text-3)" dy={12}>{mmdd}</text>
         {showYear && (
           <g>
-            <rect x={-16} y={16} width={32} height={13} rx={6.5}
-              fill="none" stroke="var(--border)" strokeWidth={1} />
-            <text textAnchor="middle" fontSize={8.5} fill="var(--text-3)" dy={27}>{year}</text>
+            <rect x={-19} y={18} width={38} height={14} rx={7}
+              fill="none" stroke="var(--border)" strokeWidth={0.8} />
+            <text textAnchor="middle" fontSize={8.5} fill="var(--text-3)" dy={29}>{year}</text>
           </g>
         )}
       </g>
@@ -359,7 +359,7 @@ export default function ConsensusChart({ ticker, market }) {
             <ResponsiveContainer width="100%" height={155}>
               <LineChart data={filteredData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="date" tick={xTick} height={36} axisLine={false} tickLine={false} />
+                <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <Tooltip content={targetTooltip} />
                 <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="#ffcc80" strokeWidth={2} dot={targetDot} activeDot={{ r: 5 }} connectNulls />
@@ -376,7 +376,7 @@ export default function ConsensusChart({ ticker, market }) {
               <ResponsiveContainer width="100%" height={155}>
                 <LineChart data={filteredData} margin={chartMargin}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="date" tick={xTick} height={36} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                   <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
                   <Tooltip content={opinionTooltip} />
                   <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={makeDot('#43a047', 'buy')} activeDot={{ r: 5 }} connectNulls />
@@ -398,7 +398,7 @@ export default function ConsensusChart({ ticker, market }) {
             <ResponsiveContainer width="100%" height={155}>
               <LineChart data={filteredData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="date" tick={xTick} height={36} axisLine={false} tickLine={false} />
+                <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
                 <Tooltip content={({ active, payload, label }) => {
