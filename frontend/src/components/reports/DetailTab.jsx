@@ -91,7 +91,15 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
         {togglesJSX}
         <div style={{ display: 'flex', gap: 10 }}>
           <div style={{ position: 'relative', width: 16, height: BAR_H, flexShrink: 0 }}>
-            <div style={{ position: 'absolute', left: 5, top: 0, bottom: 0, width: 6, borderRadius: 3, overflow: 'hidden' }}>
+            {vp?.vah != null && vp?.val != null && (
+              <div style={{
+                position: 'absolute', left: 2, width: 12,
+                top: yTop(vp.vah), height: Math.max(2, yTop(vp.val) - yTop(vp.vah)),
+                background: 'rgba(79,195,247,0.12)', border: '1px solid rgba(79,195,247,0.4)',
+                borderRadius: 2, zIndex: 0,
+              }} />
+            )}
+            <div style={{ position: 'absolute', left: 5, top: 0, bottom: 0, width: 6, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.1)' }} />
               {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${((hi - price) / span) * 100}%`, background: 'rgba(239,154,154,0.3)' }} />}
               {price != null && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${((price - lo) / span) * 100}%`, background: 'rgba(129,199,132,0.3)' }} />}
