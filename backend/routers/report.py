@@ -67,23 +67,23 @@ def get_backfill_progress():
 
 
 @router.post("/report/backfill", status_code=202)
-def backfill_all(background_tasks: BackgroundTasks, days: int = 60, user_id: str = Depends(require_admin)):
+def backfill_all(background_tasks: BackgroundTasks, days: int = 60, force: bool = False, user_id: str = Depends(require_admin)):
     portfolio = storage.get_global_portfolio()
     stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
-    background_tasks.add_task(_run_backfill, stocks, days)
-    return {"message": f"과거 {days}일 스냅샷 백필 시작: {len(stocks)}개 종목"}
+    background_tasks.add_task(_run_backfill, stocks, days, force)
+    return {"message": f"과거 {days}일 스냅샷 백필 시작: {len(stocks)}개 종목 (force={force})"}
 
 
-def _run_backfill(stocks: list, days: int):
+def _run_backfill(stocks: list, days: int, force: bool = False):
     _backfill_progress.start(len(stocks))
     _backfill_progress.set(created=0)
     total_created = 0
     for stock in stocks:
         _backfill_progress.set(current=stock["ticker"])
         try:
-            n = report_generator.backfill_ticker(stock, days=days)
+            n = report_generator.backfill_ticker(stock, days=days, force=force)
             total_created += n
             cache_svc.invalidate(stock["ticker"])
         except Exception as e:

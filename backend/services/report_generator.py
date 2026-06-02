@@ -187,7 +187,7 @@ def _normalize_index(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHOTS_DIR) -> int:
+def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHOTS_DIR, force: bool = False) -> int:
     ticker = stock["ticker"]
     market = stock.get("market", "US")
     exchange = stock.get("exchange", "")
@@ -245,7 +245,7 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
     created = 0
     for ts in trade_dates:
         date_str = ts.strftime("%Y-%m-%d")
-        if date_str in existing:
+        if not force and date_str in existing:
             continue
 
         d_trim = daily_df[daily_df.index <= ts]

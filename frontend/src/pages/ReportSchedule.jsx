@@ -48,6 +48,7 @@ export default function ReportSchedule() {
   const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0, current: '', created: 0 })
   const backfillPollRef = useRef(null)
   const [backfillDays, setBackfillDays] = useState(60)
+  const [backfillForce, setBackfillForce] = useState(false)
 
   useEffect(() => {
     api.get('/api/schedule').then(({ data }) => setSchedule(data))
@@ -160,7 +161,7 @@ export default function ReportSchedule() {
     setBackfillProgress({ done: 0, total: 0, current: '', created: 0 })
     clearInterval(backfillPollRef.current)
     try {
-      await api.post(`/api/report/backfill?days=${backfillDays}`)
+      await api.post(`/api/report/backfill?days=${backfillDays}&force=${backfillForce}`)
       backfillPollRef.current = setInterval(async () => {
         try {
           const { data } = await api.get('/api/report/backfill/progress')
@@ -366,6 +367,10 @@ export default function ReportSchedule() {
               ))}
             </div>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}>
+            <input type="checkbox" checked={backfillForce} onChange={e => setBackfillForce(e.target.checked)} />
+            기존 데이터 덮어쓰기 (잘못 생성된 날짜 재생성)
+          </label>
           <button className="btn btn-primary" onClick={handleBackfill} disabled={backfilling}
             style={{ width: '100%', justifyContent: 'center' }}>
             {backfilling ? '백필 중...' : '과거 스냅샷 생성'}
