@@ -83,34 +83,58 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const vals = allRows.map(l => l.value)
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
     const LABEL_H = 14
-    const MAX_BAR_H = 600
+    const GAP_H = 20        // 빈 구간 압축 높이
+    const GAP_THR = 0.12    // 전체 범위의 12% 이상 → 갭으로 처리
 
-    // 가격 간격이 좁은 레벨 쌍에서 필요한 최소 높이를 계산 → 비율 위치 유지
+    // 연속 가격 쌍을 세그먼트로 분류 (밀집 vs 갭)
     const uniquePrices = [...new Set(vals)].sort((a, b) => b - a)
-    let BAR_H = Math.max(200, allRows.length * LABEL_H + 20)
+    const rawSegs = []
     for (let i = 0; i < uniquePrices.length - 1; i++) {
-      const diff = uniquePrices[i] - uniquePrices[i + 1]
-      if (diff > 0) BAR_H = Math.max(BAR_H, Math.ceil(LABEL_H * span / diff) + 14)
+      rawSegs.push({
+        hi: uniquePrices[i], lo: uniquePrices[i + 1],
+        isGap: (uniquePrices[i] - uniquePrices[i + 1]) / span > GAP_THR,
+      })
     }
-    BAR_H = Math.min(MAX_BAR_H, BAR_H)
 
-    const rawY = v => ((hi - v) / span) * (BAR_H - 14) + 7
+    // 밀집 세그먼트 높이: 비율 기반, 최소 LABEL_H 보장
+    const denseSegs = rawSegs.filter(s => !s.isGap)
+    const denseSpan = denseSegs.reduce((s, seg) => s + seg.hi - seg.lo, 0)
+    const denseScale = denseSpan > 0
+      ? Math.max(200, denseSegs.length * LABEL_H * 2) / denseSpan : 1
+    const segments = rawSegs.map(s => ({
+      ...s, h: s.isGap ? GAP_H : Math.max(LABEL_H, (s.hi - s.lo) * denseScale),
+    }))
+    const BAR_H = segments.reduce((s, seg) => s + seg.h, 0) + 14
 
-    // 여전히 겹치는 경우(가격이 극단적으로 붙은 쌍)만 아래로 밀기
+    // 압축 포함 가격 → y 변환
+    const priceToY = v => {
+      let y = 7
+      for (const seg of segments) {
+        if (v > seg.hi) break
+        if (v < seg.lo) { y += seg.h; continue }
+        y += ((seg.hi - v) / (seg.hi - seg.lo)) * seg.h
+        break
+      }
+      return y
+    }
+
+    // 극단적으로 붙은 쌍만 overlap avoidance
     const positioned = allRows
-      .map(l => ({ ...l, y: rawY(l.value) }))
+      .map(l => ({ ...l, y: priceToY(l.value) }))
       .sort((a, b) => a.y - b.y)
     for (let i = 1; i < positioned.length; i++) {
       if (positioned[i].y < positioned[i-1].y + LABEL_H)
         positioned[i].y = positioned[i-1].y + LABEL_H
     }
 
+    const gapSegs = segments.filter(s => s.isGap)
+
     return (
       <div style={{ marginTop: 8 }}>
         {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
         {togglesJSX}
         <div style={{ display: 'flex', height: BAR_H }}>
-          {/* 왼쪽: 금액 */}
+          {/* 왼쪽: 금액 + 갭 ··· */}
           <div style={{ flex: 1, position: 'relative' }}>
             {positioned.map((l, i) => (
               <div key={i} style={{
@@ -122,6 +146,12 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                 {fmt(l.value, market)}
               </div>
             ))}
+            {gapSegs.map((seg, i) => (
+              <div key={i} style={{
+                position: 'absolute', right: 6, top: priceToY(seg.hi) + GAP_H / 2 - 5,
+                fontSize: 9, color: 'var(--text-3)', textAlign: 'right',
+              }}>···</div>
+            ))}
           </div>
 
           {/* 중앙 바 */}
@@ -129,21 +159,32 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             {vp?.vah != null && vp?.val != null && (
               <div style={{
                 position: 'absolute', left: 2, width: 12,
-                top: rawY(vp.vah), height: Math.max(2, rawY(vp.val) - rawY(vp.vah)),
+                top: priceToY(vp.vah), height: Math.max(2, priceToY(vp.val) - priceToY(vp.vah)),
                 background: 'rgba(79,195,247,0.12)', border: '1px solid rgba(79,195,247,0.4)',
                 borderRadius: 2, zIndex: 0,
               }} />
             )}
             <div style={{ position: 'absolute', left: 5, top: 0, bottom: 0, width: 6, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.1)' }} />
-              {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${((hi - price) / span) * 100}%`, background: 'rgba(239,154,154,0.3)' }} />}
-              {price != null && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${((price - lo) / span) * 100}%`, background: 'rgba(129,199,132,0.3)' }} />}
+              {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: priceToY(price), background: 'rgba(239,154,154,0.3)' }} />}
+              {price != null && <div style={{ position: 'absolute', top: priceToY(price), left: 0, right: 0, bottom: 0, background: 'rgba(129,199,132,0.3)' }} />}
             </div>
             {allRows.map((l, i) => (
               <div key={i} style={{
                 position: 'absolute', left: 2, right: 0, height: l.isCurrent ? 2.5 : 1.5,
-                background: l.color, top: rawY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
+                background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
               }} />
+            ))}
+            {/* 갭 구간: 바에 파선 표시 */}
+            {gapSegs.map((seg, i) => (
+              <div key={i} style={{
+                position: 'absolute', left: 0, right: 0, zIndex: 4,
+                top: priceToY(seg.hi), height: GAP_H,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+              }}>
+                <div style={{ width: 10, height: 1, background: 'rgba(255,255,255,0.3)' }} />
+                <div style={{ width: 10, height: 1, background: 'rgba(255,255,255,0.3)' }} />
+              </div>
             ))}
           </div>
 
