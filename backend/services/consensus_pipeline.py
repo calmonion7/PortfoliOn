@@ -37,15 +37,22 @@ def _score(opinion: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# 원천 수집: KR (Naver Research)
+# 원천 수집: KR (FnGuide 우선, Naver Research fallback)
 # ---------------------------------------------------------------------------
 def _fetch_kr_raw(ticker: str, days: int = 7) -> list[dict]:
     import requests
     from concurrent.futures import ThreadPoolExecutor
 
     cutoff = (date.today() - timedelta(days=days)).isoformat()
-    headers = {"User-Agent": "Mozilla/5.0"}
 
+    # FnGuide 우선
+    fg_results = _fetch_kr_fnguide(ticker)
+    fg_filtered = [r for r in fg_results if r["report_date"] >= cutoff]
+    if fg_filtered:
+        return fg_filtered
+
+    # fallback: Naver Research
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         r = requests.get(
             f"https://m.stock.naver.com/api/research/stock/{ticker}?pageSize=200",
@@ -54,12 +61,11 @@ def _fetch_kr_raw(ticker: str, days: int = 7) -> list[dict]:
         r.raise_for_status()
         items = r.json()
     except Exception:
-        return _fetch_kr_fnguide(ticker)
+        return []
 
     recent = [i for i in items if i.get("writeDate", "") >= cutoff]
     if not recent:
-        # Naver 데이터 없으면 FnGuide fallback
-        return _fetch_kr_fnguide(ticker)
+        return []
 
     def fetch_detail(item):
         rid = item["researchId"]
@@ -291,6 +297,18 @@ def run_daily(stocks: list) -> None:
             refresh_mart(ticker, today)
         except Exception as e:
             print(f"[Pipeline] mart refresh failed {ticker}: {e}")
+        if market == "KR":
+            try:
+                from services.market import get_analyst_data_kr
+                kr = get_analyst_data_kr(ticker)
+                if kr.get("target_mean"):
+                    execute(
+                        "UPDATE daily_consensus_mart SET avg_target_price = %s "
+                        "WHERE ticker = %s AND base_date = %s",
+                        (kr["target_mean"], ticker.upper(), today),
+                    )
+            except Exception as e:
+                print(f"[Pipeline] AVG_PRC override failed {ticker}: {e}")
 
 
 # ---------------------------------------------------------------------------

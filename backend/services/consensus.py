@@ -117,11 +117,37 @@ def _fetch_kr(ticker: str, days: int = 180) -> list[dict]:
     from collections import defaultdict
     from concurrent.futures import ThreadPoolExecutor
     from datetime import timedelta
+    from services.consensus_pipeline import _fetch_kr_fnguide
 
     today = date.today()
     cutoff = (today - timedelta(days=days)).isoformat()
-    headers = {"User-Agent": "Mozilla/5.0"}
 
+    # FnGuide 우선
+    fg_raw = _fetch_kr_fnguide(ticker)
+    fg_recent = [r for r in fg_raw if r["report_date"] >= cutoff]
+    if fg_recent:
+        by_date: dict = defaultdict(list)
+        for r in fg_recent:
+            by_date[r["report_date"]].append((r.get("raw_opinion", ""), r.get("target_price")))
+        output = []
+        for d, reports in sorted(by_date.items()):
+            buy  = sum(1 for op, _ in reports if op in _KR_BUY)
+            sell = sum(1 for op, _ in reports if op in _KR_SELL)
+            hold = len(reports) - buy - sell
+            prices = [gp for _, gp in reports if gp is not None]
+            output.append({
+                "date": d,
+                "target_high": round(max(prices)) if prices else None,
+                "target_mean": round(sum(prices) / len(prices)) if prices else None,
+                "target_low": round(min(prices)) if prices else None,
+                "buy": buy,
+                "hold": hold,
+                "sell": sell,
+            })
+        return output
+
+    # fallback: Naver Research
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         r = requests.get(
             f"https://m.stock.naver.com/api/research/stock/{ticker}?pageSize=200",
@@ -159,12 +185,12 @@ def _fetch_kr(ticker: str, days: int = 180) -> list[dict]:
     with ThreadPoolExecutor(max_workers=5) as ex:
         all_reports = list(ex.map(fetch_detail, recent))
 
-    by_date: dict = defaultdict(list)
+    by_date2: dict = defaultdict(list)
     for d, op, gp in all_reports:
-        by_date[d[:10]].append((op, gp))
+        by_date2[d[:10]].append((op, gp))
 
     output = []
-    for d, reports in sorted(by_date.items()):
+    for d, reports in sorted(by_date2.items()):
         buy  = sum(1 for op, _ in reports if op in _KR_BUY)
         sell = sum(1 for op, _ in reports if op in _KR_SELL)
         hold = len(reports) - buy - sell
