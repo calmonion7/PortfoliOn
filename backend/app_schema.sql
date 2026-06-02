@@ -137,8 +137,20 @@ CREATE TABLE daily_consensus_mart (
   PRIMARY KEY (base_date, ticker)
 );
 
+-- 사용자 행동 이벤트
+CREATE TABLE user_events (
+  id          bigserial PRIMARY KEY,
+  user_id     uuid REFERENCES users(id) ON DELETE CASCADE,
+  event_name  text NOT NULL,
+  properties  jsonb NOT NULL DEFAULT '{}',
+  created_at  timestamptz NOT NULL DEFAULT NOW()
+);
+
 -- 성능 인덱스
 CREATE INDEX idx_user_stocks_ticker ON user_stocks(ticker);
 CREATE INDEX idx_consensus_history_ticker ON consensus_history(ticker);
 CREATE INDEX idx_raw_reports_ticker_date ON raw_reports (ticker, report_date DESC);
 CREATE INDEX idx_mart_ticker_date ON daily_consensus_mart (ticker, base_date DESC);
+CREATE INDEX idx_user_events_user_id    ON user_events(user_id);
+CREATE INDEX idx_user_events_created_at ON user_events(created_at DESC);
+CREATE INDEX idx_user_events_name       ON user_events(event_name);
