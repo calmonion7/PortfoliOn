@@ -54,3 +54,55 @@ def test_non_admin_blocked():
     with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
         resp = c.get("/api/admin/users")
     assert resp.status_code == 403
+
+
+# --- Analytics endpoints ---
+
+SUMMARY_ROWS = [
+    {"event_name": "nav_portfolio", "cnt": 5},
+    {"event_name": "nav_research",  "cnt": 3},
+]
+DAU_ROWS = [{"dau": 2}]
+TOTAL_ROWS = [{"total": 8}]
+
+USERS_ROWS_ANALYTICS = [
+    {"user_id": "user-1", "email": "a@test.com", "total_events": 8, "last_active": None},
+]
+
+HISTORY_ROWS = [
+    {"event_name": "nav_portfolio", "properties": {}, "created_at": None},
+]
+
+
+def test_analytics_summary_returns_data():
+    with patch("routers.admin.query", side_effect=[DAU_ROWS, TOTAL_ROWS, SUMMARY_ROWS]):
+        resp = client.get("/api/admin/analytics/summary?days=7")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "dau" in data
+    assert "total_events" in data
+    assert "top_events" in data
+
+
+def test_analytics_events_timeline():
+    timeline_rows = [{"date": "2026-06-03", "event_name": "nav_portfolio", "count": 3}]
+    with patch("routers.admin.query", return_value=timeline_rows):
+        resp = client.get("/api/admin/analytics/events?days=7")
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), list)
+
+
+def test_analytics_users_list():
+    with patch("routers.admin.query", return_value=USERS_ROWS_ANALYTICS):
+        resp = client.get("/api/admin/analytics/users")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["email"] == "a@test.com"
+
+
+def test_analytics_user_history():
+    with patch("routers.admin.query", return_value=HISTORY_ROWS):
+        resp = client.get("/api/admin/analytics/users/user-1")
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), list)

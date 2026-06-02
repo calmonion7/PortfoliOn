@@ -114,3 +114,83 @@ def set_default_permissions(body: PermissionsBody, admin_id: str = Depends(requi
     base = {m: False for m in ALL_MENUS}
     base.update({m: v for m, v in body.permissions.items() if m in ALL_MENUS})
     return base
+
+
+# --- Analytics (admin only) ---
+from datetime import datetime, timedelta, timezone as _tz
+
+
+def _cutoff(days: int):
+    if days >= 9999:
+        return datetime(2000, 1, 1, tzinfo=_tz.utc)
+    return datetime.now(_tz.utc) - timedelta(days=days)
+
+
+@router.get("/analytics/summary")
+def analytics_summary(days: int = 7, admin_id: str = Depends(require_admin)):
+    cut = _cutoff(days)
+    dau_rows = query(
+        "SELECT COUNT(DISTINCT user_id) AS dau FROM user_events WHERE created_at >= %s",
+        (cut,),
+    )
+    total_rows = query(
+        "SELECT COUNT(*) AS total FROM user_events WHERE created_at >= %s",
+        (cut,),
+    )
+    top_rows = query(
+        "SELECT event_name, COUNT(*) AS cnt FROM user_events "
+        "WHERE created_at >= %s GROUP BY event_name ORDER BY cnt DESC LIMIT 10",
+        (cut,),
+    )
+    return {
+        "dau":          dau_rows[0]["dau"] if dau_rows else 0,
+        "total_events": total_rows[0]["total"] if total_rows else 0,
+        "top_events":   [{"name": r["event_name"], "count": r["cnt"]} for r in top_rows],
+    }
+
+
+@router.get("/analytics/events")
+def analytics_events(days: int = 7, admin_id: str = Depends(require_admin)):
+    cut = _cutoff(days)
+    rows = query(
+        "SELECT DATE(created_at) AS date, event_name, COUNT(*) AS count "
+        "FROM user_events WHERE created_at >= %s "
+        "GROUP BY DATE(created_at), event_name ORDER BY date DESC",
+        (cut,),
+    )
+    return [{"date": str(r["date"]), "event_name": r["event_name"], "count": r["count"]} for r in rows]
+
+
+@router.get("/analytics/users")
+def analytics_users(admin_id: str = Depends(require_admin)):
+    rows = query(
+        "SELECT e.user_id, u.email, COUNT(*) AS total_events, MAX(e.created_at) AS last_active "
+        "FROM user_events e JOIN users u ON u.id = e.user_id "
+        "GROUP BY e.user_id, u.email ORDER BY total_events DESC"
+    )
+    return [
+        {
+            "user_id":      str(r["user_id"]),
+            "email":        r["email"],
+            "total_events": r["total_events"],
+            "last_active":  r["last_active"].isoformat() if r["last_active"] else None,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/analytics/users/{user_id}")
+def analytics_user_history(user_id: str, limit: int = 200, admin_id: str = Depends(require_admin)):
+    rows = query(
+        "SELECT event_name, properties, created_at FROM user_events "
+        "WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
+        (user_id, limit),
+    )
+    return [
+        {
+            "event_name": r["event_name"],
+            "properties": r["properties"],
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+        }
+        for r in rows
+    ]

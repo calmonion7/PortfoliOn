@@ -13,6 +13,8 @@ import MobileNav from './components/MobileNav'
 import { Sun, Moon, Refresh, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
+import { trackEvent } from './utils/analytics'
+import AdminAnalytics from './pages/AdminAnalytics'
 
 async function doLogout(setSession) {
   const refresh = localStorage.getItem('refresh_token')
@@ -29,7 +31,7 @@ async function doLogout(setSession) {
 }
 
 function TopNav({ theme, setTheme, setSession }) {
-  const { menuPermissions, loading } = useAuth() || { menuPermissions: [], loading: true }
+  const { menuPermissions, role, loading } = useAuth() || { menuPermissions: [], role: null, loading: true }
   const allItems = [
     { to: '/',         label: '종목관리', key: 'portfolio', end: true },
     { to: '/research', label: '리서치',   key: 'research' },
@@ -37,7 +39,11 @@ function TopNav({ theme, setTheme, setSession }) {
     { to: '/guru',     label: '구루',     key: 'guru' },
     { to: '/settings', label: '설정',     key: 'settings' },
   ]
-  const navItems = loading ? [] : allItems.filter(item => menuPermissions.includes(item.key))
+  const adminItem = role === 'admin' ? [{ to: '/admin-analytics', label: '애널리틱스', key: 'analytics' }] : []
+  const navItems = loading ? [] : [
+    ...allItems.filter(item => menuPermissions.includes(item.key)),
+    ...adminItem,
+  ]
   return (
     <header className="topnav">
       <div className="topnav-inner">
@@ -46,8 +52,9 @@ function TopNav({ theme, setTheme, setSession }) {
           <span>PortfoliOn</span>
         </div>
         <nav className="topnav-tabs">
-          {navItems.map(({ to, label, end }) => (
+          {navItems.map(({ to, label, end, key }) => (
             <NavLink key={to} to={to} end={end}
+              onClick={() => trackEvent('nav_' + key)}
               className={({ isActive }) => 'topnav-tab' + (isActive ? ' is-active' : '')}>
               {label}
             </NavLink>
@@ -115,6 +122,7 @@ export default function App() {
             <Route path="/analysis" element={<Navigate to="/" replace />} />
             <Route path="/guru" element={<Guru />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin-analytics" element={<AdminAnalytics />} />
             <Route path="/dev/showcase" element={<Showcase />} />
           </Routes>
         </main>
