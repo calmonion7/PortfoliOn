@@ -5,14 +5,16 @@ from services.db import execute, query
 
 def get_history(ticker: str) -> list[dict]:
     rows = query(
-        "SELECT date, target_mean, buy, hold, sell FROM consensus_history"
+        "SELECT date, target_high, target_mean, target_low, buy, hold, sell FROM consensus_history"
         " WHERE ticker = %s ORDER BY date DESC",
         (ticker.upper(),),
     )
     return [
         {
             "date": str(r["date"]),
+            "target_high": r.get("target_high"),
             "target_mean": r.get("target_mean"),
+            "target_low": r.get("target_low"),
             "buy": r.get("buy"),
             "hold": r.get("hold"),
             "sell": r.get("sell"),
@@ -30,7 +32,9 @@ def collect(ticker: str) -> dict | None:
     if not rows:
         return None
     summary = rows[0]["data"] or {}
+    target_high = summary.get("target_high")
     target_mean = summary.get("target_mean")
+    target_low = summary.get("target_low")
     buy = summary.get("buy")
     hold = summary.get("hold")
     sell = summary.get("sell")
@@ -39,18 +43,22 @@ def collect(ticker: str) -> dict | None:
     entry = {
         "ticker": upper,
         "date": str(date.today()),
+        "target_high": target_high,
         "target_mean": target_mean,
+        "target_low": target_low,
         "buy": buy,
         "hold": hold,
         "sell": sell,
     }
     execute(
-        "INSERT INTO consensus_history (ticker, date, target_mean, buy, hold, sell)"
-        " VALUES (%s, %s, %s, %s, %s, %s)"
+        "INSERT INTO consensus_history (ticker, date, target_high, target_mean, target_low, buy, hold, sell)"
+        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         " ON CONFLICT (ticker, date) DO UPDATE SET"
-        "  target_mean=EXCLUDED.target_mean, buy=EXCLUDED.buy,"
+        "  target_high=EXCLUDED.target_high, target_mean=EXCLUDED.target_mean,"
+        "  target_low=EXCLUDED.target_low, buy=EXCLUDED.buy,"
         "  hold=EXCLUDED.hold, sell=EXCLUDED.sell",
-        (upper, entry["date"], entry["target_mean"], entry["buy"], entry["hold"], entry["sell"]),
+        (upper, entry["date"], entry["target_high"], entry["target_mean"], entry["target_low"],
+         entry["buy"], entry["hold"], entry["sell"]),
     )
     return {k: v for k, v in entry.items() if k != "ticker"}
 
@@ -71,12 +79,14 @@ def backfill(ticker: str, market: str) -> list[dict]:
 
     for e in to_add:
         execute(
-            "INSERT INTO consensus_history (ticker, date, target_mean, buy, hold, sell)"
-            " VALUES (%s, %s, %s, %s, %s, %s)"
+            "INSERT INTO consensus_history (ticker, date, target_high, target_mean, target_low, buy, hold, sell)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
             " ON CONFLICT (ticker, date) DO UPDATE SET"
-            "  target_mean=EXCLUDED.target_mean, buy=EXCLUDED.buy,"
+            "  target_high=EXCLUDED.target_high, target_mean=EXCLUDED.target_mean,"
+            "  target_low=EXCLUDED.target_low, buy=EXCLUDED.buy,"
             "  hold=EXCLUDED.hold, sell=EXCLUDED.sell",
-            (upper, e["date"], e.get("target_mean"), e.get("buy"), e.get("hold"), e.get("sell")),
+            (upper, e["date"], e.get("target_high"), e.get("target_mean"), e.get("target_low"),
+             e.get("buy"), e.get("hold"), e.get("sell")),
         )
     return to_add
 
@@ -146,7 +156,9 @@ def _fetch_kr(ticker: str) -> list[dict]:
         prices = [gp for _, gp in reports if gp is not None]
         output.append({
             "date": d,
+            "target_high": round(max(prices)) if prices else None,
             "target_mean": round(sum(prices) / len(prices)) if prices else None,
+            "target_low": round(min(prices)) if prices else None,
             "buy": buy,
             "hold": hold,
             "sell": sell,
@@ -184,7 +196,9 @@ def _fetch_us(ticker: str) -> list[dict]:
                       and float(row.get("currentPriceTarget")) > 0]
             output.append({
                 "date": d.isoformat(),
+                "target_high": round(max(prices), 2) if prices else None,
                 "target_mean": round(sum(prices) / len(prices), 2) if prices else None,
+                "target_low": round(min(prices), 2) if prices else None,
                 "buy": buy,
                 "hold": hold,
                 "sell": sell,

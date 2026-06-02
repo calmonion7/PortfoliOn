@@ -21,8 +21,9 @@ export default function HistoryTab({ ticker, dates, market }) {
     api.get(`/api/report/${ticker}/history`)
       .then(({ data }) => {
         setHistory(data)
-        if (data.length > 0) setCompareA(data[data.length - 1].date)
-        if (data.length > 1) setCompareB(data[data.length - 2].date)
+        const snapDates = data.filter(h => h.has_snapshot)
+        if (snapDates.length > 0) setCompareA(snapDates[snapDates.length - 1].date)
+        if (snapDates.length > 1) setCompareB(snapDates[snapDates.length - 2].date)
       })
       .catch(() => setHistError('히스토리 데이터를 불러올 수 없습니다.'))
       .finally(() => setHistLoading(false))
@@ -47,6 +48,7 @@ export default function HistoryTab({ ticker, dates, market }) {
   if (history.length === 0) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>히스토리 데이터가 없습니다.</p>
 
   const xTickFormatter = (date) => date?.slice(5) ?? ''
+  const snapDates = history.filter(h => h.has_snapshot)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -103,16 +105,16 @@ export default function HistoryTab({ ticker, dates, market }) {
         <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
           <select value={compareA ?? ''} onChange={e => setCompareA(e.target.value)}
             style={{ background: 'var(--bg-elev)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
-            {history.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
+            {snapDates.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
           </select>
           <span style={{ color: 'var(--text-3)', fontSize: 12 }}>vs</span>
           <select value={compareB ?? ''} onChange={e => setCompareB(e.target.value)}
             style={{ background: 'var(--bg-elev)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
-            {history.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
+            {snapDates.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
           </select>
         </div>
 
-        {history.length < 2
+        {snapDates.length < 2
           ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>비교할 날짜가 없습니다.</p>
           : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>

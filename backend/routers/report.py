@@ -238,15 +238,52 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
 @router.get("/report/{ticker}/history")
 def get_history(ticker: str):
     upper = ticker.upper()
-    rows = query("SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date", (upper,))
+    crows = query(
+        "SELECT date, target_high, target_mean, target_low, buy, hold, sell"
+        " FROM consensus_history WHERE ticker = %s ORDER BY date",
+        (upper,),
+    )
+    srows = query("SELECT date, data FROM snapshots WHERE ticker = %s", (upper,))
+    snap_by_date = {}
+    for r in srows:
+        raw = r["data"] or {}
+        snap_by_date[str(r["date"])] = {
+            "price": raw.get("price"),
+            "rsi_daily": (raw.get("daily_rsi") or {}).get("rsi"),
+            "rsi_weekly": (raw.get("weekly_rsi") or {}).get("rsi"),
+            "rsi_monthly": (raw.get("monthly_rsi") or {}).get("rsi"),
+        }
+
+    if crows:
+        result = []
+        for r in crows:
+            d = str(r["date"])
+            snap = snap_by_date.get(d, {})
+            result.append({
+                "date": d,
+                "price": snap.get("price"),
+                "target_high": r.get("target_high"),
+                "target_mean": r.get("target_mean"),
+                "target_low": r.get("target_low"),
+                "buy": r.get("buy"),
+                "hold": r.get("hold"),
+                "sell": r.get("sell"),
+                "rsi_daily": snap.get("rsi_daily"),
+                "rsi_weekly": snap.get("rsi_weekly"),
+                "rsi_monthly": snap.get("rsi_monthly"),
+                "has_snapshot": d in snap_by_date,
+            })
+        return result
+
+    # consensus 데이터 없으면 snapshots fallback
     result = []
-    for r in rows:
+    for r in sorted(srows, key=lambda x: x["date"]):
         raw = r["data"] or {}
         result.append({
-            "date": r["date"],
+            "date": str(r["date"]),
             "price": raw.get("price"),
-            "target_mean": raw.get("target_mean"),
             "target_high": raw.get("target_high"),
+            "target_mean": raw.get("target_mean"),
             "target_low": raw.get("target_low"),
             "buy": raw.get("buy"),
             "hold": raw.get("hold"),
@@ -254,6 +291,7 @@ def get_history(ticker: str):
             "rsi_daily": (raw.get("daily_rsi") or {}).get("rsi"),
             "rsi_weekly": (raw.get("weekly_rsi") or {}).get("rsi"),
             "rsi_monthly": (raw.get("monthly_rsi") or {}).get("rsi"),
+            "has_snapshot": True,
         })
     return result
 

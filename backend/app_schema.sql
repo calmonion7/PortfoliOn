@@ -67,7 +67,9 @@ CREATE TABLE digests (
 CREATE TABLE consensus_history (
   ticker      text NOT NULL REFERENCES tickers(ticker) ON DELETE CASCADE,
   date        date NOT NULL,
+  target_high numeric,
   target_mean numeric,
+  target_low  numeric,
   buy         integer,
   hold        integer,
   sell        integer,
