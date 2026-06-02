@@ -5,6 +5,7 @@ const DAYS_OPTIONS = [30, 60, 90, 180]
 
 export default function ConsensusSettings() {
   const [days, setDays] = useState(180)
+  const [force, setForce] = useState(false)
   const [batch, setBatch] = useState({ running: false, done: 0, total: 0, current: '' })
   const [batchErr, setBatchErr] = useState('')
   const pollRef = useRef(null)
@@ -16,7 +17,7 @@ export default function ConsensusSettings() {
     setBatchErr('')
     clearInterval(pollRef.current)
     try {
-      await api.post(`/api/consensus/batch?days=${days}`)
+      await api.post(`/api/consensus/batch?days=${days}&force=${force}`)
       pollRef.current = setInterval(async () => {
         try {
           const { data } = await api.get('/api/consensus/batch/progress')
@@ -57,6 +58,10 @@ export default function ConsensusSettings() {
               ))}
             </div>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}>
+            <input type="checkbox" checked={force} onChange={e => setForce(e.target.checked)} />
+            기존 데이터 덮어쓰기 (잘못된 날짜 재수집)
+          </label>
           <button className="btn btn-primary" onClick={runBatch} disabled={batch.running}
             style={{ width: '100%', justifyContent: 'center' }}>
             {batch.running
