@@ -68,7 +68,8 @@ def get_backfill_progress():
 
 @router.post("/report/backfill", status_code=202)
 def backfill_all(background_tasks: BackgroundTasks, days: int = 60, user_id: str = Depends(require_admin)):
-    stocks = storage.get_all_stocks(user_id)
+    portfolio = storage.get_global_portfolio()
+    stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     background_tasks.add_task(_run_backfill, stocks, days)
@@ -94,11 +95,8 @@ def _run_backfill(stocks: list, days: int):
 
 @router.post("/report/generate", status_code=202)
 def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = None, date: Optional[str] = None, user_id: str = Depends(require_admin_or_api_key)):
-    if user_id == _API_KEY_USER_ID:
-        portfolio = storage.get_global_portfolio()
-        all_stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
-    else:
-        all_stocks = storage.get_all_stocks(user_id)
+    portfolio = storage.get_global_portfolio()
+    all_stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if tickers:
         ticker_set = {t.strip().upper() for t in tickers.split(',')}
         stocks = [s for s in all_stocks if s['ticker'].upper() in ticker_set]
