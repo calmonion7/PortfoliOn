@@ -83,7 +83,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const vals = allRows.map(l => l.value)
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
     const LABEL_H = 14
-    const GAP_H = 16  // 지그재그 효과 공간 확보
+    const GAP_H = 22  // 지그재그 효과 공간 확보
     // naturalH > LABEL_H (전체 대비 ~7% 이상) → 갭 마커 표시
     const uniquePrices = [...new Set(vals)].sort((a, b) => b - a)
     const segments = []
@@ -172,13 +172,19 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               return (
                 <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 16, height: GAP_H, zIndex: 5 }}>
                   <rect width="16" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  {/* 위 스텁: 바가 갭 안으로 조금 이어짐 */}
+                  <rect x="5" y="0" width="6" height="5" fill="rgba(255,255,255,0.1)" rx="1" />
+                  {/* 아래 스텁 */}
+                  <rect x="5" y={GAP_H - 5} width="6" height="5" fill="rgba(255,255,255,0.1)" rx="1" />
+                  {/* 위 물결 */}
                   <polyline
-                    points="2,3 4.7,1 7.3,3 10,1 12.7,3"
+                    points="2,8 4.7,6 7.3,8 10,6 12.7,8"
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.7 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
+                  {/* 아래 물결 */}
                   <polyline
-                    points={`2,${GAP_H-3} 4.7,${GAP_H-1} 7.3,${GAP_H-3} 10,${GAP_H-1} 12.7,${GAP_H-3}`}
+                    points={`2,${GAP_H-8} 4.7,${GAP_H-6} 7.3,${GAP_H-8} 10,${GAP_H-6} 12.7,${GAP_H-8}`}
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.7 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
