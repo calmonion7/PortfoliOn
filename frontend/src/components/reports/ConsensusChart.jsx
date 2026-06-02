@@ -118,14 +118,23 @@ export default function ConsensusChart({ ticker, market }) {
     return `$${v}`
   }
 
-  const xTick = ({ x, y, payload }) => {
+  // recharts가 틱을 서브샘플링하므로 index=0(첫 번째 렌더 틱) 기준으로 연도 표시
+  const yearChangeDates = useMemo(() => {
+    const s = new Set()
+    let prev = null
+    for (const d of filteredData) {
+      const y = d.date.slice(0, 4)
+      if (y !== prev) { s.add(d.date); prev = y }
+    }
+    return s
+  }, [filteredData])
+
+  const xTick = ({ x, y, payload, index }) => {
     const date = payload.value
     if (!date) return null
     const mmdd = date.slice(5)
     const year = date.slice(0, 4)
-    const dataIdx = filteredData.findIndex(d => d.date === date)
-    const prevYear = dataIdx > 0 ? filteredData[dataIdx - 1]?.date?.slice(0, 4) : null
-    const showYear = !prevYear || year !== prevYear
+    const showYear = index === 0 || yearChangeDates.has(date)
     return (
       <g transform={`translate(${x},${y})`}>
         <text textAnchor="middle" fontSize={10} fill="var(--text-3)" dy={12}>{mmdd}</text>
@@ -133,7 +142,7 @@ export default function ConsensusChart({ ticker, market }) {
           <g>
             <rect x={-16} y={16} width={32} height={13} rx={6.5}
               fill="none" stroke="var(--border)" strokeWidth={1} />
-            <text textAnchor="middle" fontSize={8.5} fontWeight={500} fill="var(--text-3)" dy={27}>{year}</text>
+            <text textAnchor="middle" fontSize={8.5} fill="var(--text-3)" dy={27}>{year}</text>
           </g>
         )}
       </g>
