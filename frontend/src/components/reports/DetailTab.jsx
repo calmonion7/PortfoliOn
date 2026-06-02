@@ -7,7 +7,7 @@ import FinancialsChart from './FinancialsChart'
 import api from '../../api'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
-  const [view, setView] = useState('A')
+  const [view, setView] = useState('B')
   if (!price && !vp?.poc) return null
 
   const levels = [
@@ -35,7 +35,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
 
   const togglesJSX = (
     <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
-      {[['A', '리스트'], ['B', '바+리스트'], ['C', '지지/저항']].map(([v, lbl]) => (
+      {[['B', '바+리스트'], ['C', '지지/저항']].map(([v, lbl]) => (
         <button key={v} onClick={() => setView(v)} style={{
           padding: '2px 8px', fontSize: 9, borderRadius: 3, border: 'none', cursor: 'pointer',
           background: view === v ? '#5b8dee' : 'rgba(255,255,255,0.08)',
@@ -44,40 +44,6 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
       ))}
     </div>
   )
-
-  const renderRow = (l, i) => {
-    const p = l.isCurrent ? null : pctFrom(l.value)
-    return (
-      <div key={i} style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: l.isCurrent ? '5px 8px' : '2px 8px',
-        background: l.isCurrent ? 'rgba(255,255,255,0.06)' : 'transparent',
-        borderRadius: 4, borderLeft: `3px solid ${l.color}`, marginBottom: 1,
-      }}>
-        <span style={{ fontSize: l.isCurrent ? 10 : 9, color: l.color, fontWeight: l.isCurrent ? 700 : 500, minWidth: 60 }}>
-          {l.label}
-        </span>
-        <span style={{ flex: 1, fontSize: l.isCurrent ? 11 : 9, color: l.isCurrent ? 'var(--text)' : 'var(--text-2)', fontVariantNumeric: 'tabular-nums', fontWeight: l.isCurrent ? 700 : 400 }}>
-          {fmt(l.value, market)}
-        </span>
-        {p != null && (
-          <span style={{ fontSize: 9, color: p > 0 ? '#ef9a9a' : '#81c784', fontVariantNumeric: 'tabular-nums' }}>
-            {p >= 0 ? '+' : ''}{p.toFixed(1)}%
-          </span>
-        )}
-      </div>
-    )
-  }
-
-  if (view === 'A') {
-    return (
-      <div style={{ marginTop: 8 }}>
-        {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
-        {togglesJSX}
-        {allRows.map(renderRow)}
-      </div>
-    )
-  }
 
   if (view === 'B') {
     const vals = allRows.map(l => l.value)
