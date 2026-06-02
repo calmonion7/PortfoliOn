@@ -22,6 +22,7 @@ def _generate_all():
                 print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
             try:
                 consensus_svc.collect(stock["ticker"])
+                consensus_svc.backfill(stock["ticker"], stock.get("market", "US"), days=7)
                 print(f"[Scheduler] Consensus collected for {stock['ticker']}")
             except Exception as e:
                 print(f"[Scheduler] Consensus collection failed for {stock['ticker']}: {e}")
