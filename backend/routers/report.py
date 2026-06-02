@@ -314,15 +314,15 @@ def get_consensus_batch_progress():
 
 
 @router.post("/consensus/batch", status_code=202)
-def batch_consensus(background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+def batch_consensus(background_tasks: BackgroundTasks, days: int = 180, user_id: str = Depends(get_current_user)):
     stocks = storage.get_all_stocks(user_id)
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
-    background_tasks.add_task(_run_consensus_batch, stocks)
+    background_tasks.add_task(_run_consensus_batch, stocks, days)
     return {"message": f"컨센서스 수집/백필 시작: {len(stocks)}개 종목"}
 
 
-def _run_consensus_batch(stocks: list):
+def _run_consensus_batch(stocks: list, days: int = 180):
     _consensus_progress.start(len(stocks))
     for stock in stocks:
         ticker = stock["ticker"]
@@ -333,7 +333,7 @@ def _run_consensus_batch(stocks: list):
         except Exception as e:
             print(f"[Consensus] collect failed for {ticker}: {e}")
         try:
-            consensus_svc.backfill(ticker, market)
+            consensus_svc.backfill(ticker, market, days)
         except Exception as e:
             print(f"[Consensus] backfill failed for {ticker}: {e}")
         _consensus_progress.increment()

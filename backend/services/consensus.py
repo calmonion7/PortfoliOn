@@ -63,7 +63,7 @@ def collect(ticker: str) -> dict | None:
     return {k: v for k, v in entry.items() if k != "ticker"}
 
 
-def backfill(ticker: str, market: str) -> list[dict]:
+def backfill(ticker: str, market: str, days: int = 180) -> list[dict]:
     upper = ticker.upper()
     existing_rows = query(
         "SELECT date FROM consensus_history WHERE ticker = %s",
@@ -71,7 +71,7 @@ def backfill(ticker: str, market: str) -> list[dict]:
     )
     existing_dates = {str(r["date"]) for r in existing_rows}
 
-    fetched = _fetch_kr(upper) if market == "KR" else _fetch_us(upper)
+    fetched = _fetch_kr(upper, days) if market == "KR" else _fetch_us(upper, days)
     to_add = [e for e in fetched if e["date"] not in existing_dates]
 
     if not to_add:
@@ -97,14 +97,14 @@ _US_BUY = {"Buy", "Outperform", "Overweight", "Strong Buy", "Positive", "Add", "
 _US_SELL = {"Sell", "Underperform", "Underweight", "Strong Sell", "Negative", "Reduce"}
 
 
-def _fetch_kr(ticker: str) -> list[dict]:
+def _fetch_kr(ticker: str, days: int = 180) -> list[dict]:
     import requests
     from collections import defaultdict
     from concurrent.futures import ThreadPoolExecutor
     from datetime import timedelta
 
     today = date.today()
-    cutoff = (today - timedelta(days=180)).isoformat()
+    cutoff = (today - timedelta(days=days)).isoformat()
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
@@ -166,11 +166,12 @@ def _fetch_kr(ticker: str) -> list[dict]:
     return output
 
 
-def _fetch_us(ticker: str) -> list[dict]:
+def _fetch_us(ticker: str, days: int = 180) -> list[dict]:
     try:
         import yfinance as yf
         import pandas as pd
         from collections import defaultdict
+        from datetime import timedelta
         t = yf.Ticker(ticker.replace(".", "-"))
         ud = t.upgrades_downgrades
         if ud is None or ud.empty:
@@ -182,9 +183,11 @@ def _fetch_us(ticker: str) -> list[dict]:
         ud = ud.copy()
         ud.index = idx.date
 
+        cutoff = (date.today() - timedelta(days=days))
         by_date: dict = defaultdict(list)
         for d, row in ud.iterrows():
-            by_date[d].append(row)
+            if d >= cutoff:
+                by_date[d].append(row)
 
         output = []
         for d, rows in sorted(by_date.items()):
