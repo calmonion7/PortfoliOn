@@ -112,16 +112,16 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           </div>
 
           {/* 중앙 바 */}
-          <div style={{ width: 32, flexShrink: 0, position: 'relative' }}>
+          <div style={{ width: 64, flexShrink: 0, position: 'relative' }}>
             {vp?.vah != null && vp?.val != null && (
               <div style={{
-                position: 'absolute', left: 4, width: 24,
+                position: 'absolute', left: 8, width: 48,
                 top: priceToY(vp.vah), height: Math.max(2, priceToY(vp.val) - priceToY(vp.vah)),
                 background: 'rgba(79,195,247,0.12)', border: '1px solid rgba(79,195,247,0.4)',
                 borderRadius: 2, zIndex: 0,
               }} />
             )}
-            <div style={{ position: 'absolute', left: 10, top: 0, bottom: 0, width: 12, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
+            <div style={{ position: 'absolute', left: 20, top: 0, bottom: 0, width: 24, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.1)' }} />
               {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: priceToY(price), background: 'rgba(239,154,154,0.3)' }} />}
               {price != null && <div style={{ position: 'absolute', top: priceToY(price), left: 0, right: 0, bottom: 0, background: 'rgba(129,199,132,0.3)' }} />}
@@ -131,7 +131,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               return (
                 <div key={i} style={{
                   position: 'absolute',
-                  left: isKey ? 4 : 10, right: isKey ? 4 : 10,
+                  left: isKey ? 8 : 20, right: isKey ? 8 : 20,
                   height: l.isCurrent ? 2.5 : 1.5,
                   background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
                 }} />
@@ -142,27 +142,27 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               const y = priceToY(seg.hi)
               const inVahVal = vp?.vah != null && vp?.val != null && seg.hi <= vp.vah && seg.lo >= vp.val
               return (
-                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 32, height: GAP_H, zIndex: 5 }}>
-                  {/* 바 컬럼(x=10~22) 바깥만 마스킹 */}
-                  <rect x="0" y="0" width="10" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
-                  <rect x="22" y="0" width="10" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 64, height: GAP_H, zIndex: 5 }}>
+                  {/* 바 컬럼(x=20~44) 바깥만 마스킹 */}
+                  <rect x="0" y="0" width="20" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  <rect x="44" y="0" width="20" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
                   {/* 중간 끊김 구간 바 컬럼도 마스킹 */}
-                  <rect x="10" y="7" width="12" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
+                  <rect x="20" y="7" width="24" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
                   {/* VAH/VAL 범위 내: 박스 배경 + 테두리 선 유지 */}
                   {inVahVal && <>
-                    <rect x="4" y="0" width="24" height={GAP_H} fill="rgba(79,195,247,0.06)" />
-                    <line x1="5" y1="0" x2="5" y2={GAP_H} stroke="rgba(79,195,247,0.4)" strokeWidth="1" />
-                    <line x1="27" y1="0" x2="27" y2={GAP_H} stroke="rgba(79,195,247,0.4)" strokeWidth="1" />
+                    <rect x="8" y="0" width="48" height={GAP_H} fill="rgba(79,195,247,0.06)" />
+                    <line x1="10" y1="0" x2="10" y2={GAP_H} stroke="rgba(79,195,247,0.4)" strokeWidth="1" />
+                    <line x1="54" y1="0" x2="54" y2={GAP_H} stroke="rgba(79,195,247,0.4)" strokeWidth="1" />
                   </>}
                   {/* 위 물결 */}
                   <polyline
-                    points="8,9 11,7 16,9 21,7 24,9"
+                    points="16,9 22,7 32,9 42,7 48,9"
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
                   {/* 아래 물결 */}
                   <polyline
-                    points={`8,${GAP_H-9} 11,${GAP_H-7} 16,${GAP_H-9} 21,${GAP_H-7} 24,${GAP_H-9}`}
+                    points={`16,${GAP_H-9} 22,${GAP_H-7} 32,${GAP_H-9} 42,${GAP_H-7} 48,${GAP_H-9}`}
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
