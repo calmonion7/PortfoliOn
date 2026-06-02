@@ -82,19 +82,44 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   if (view === 'B') {
     const vals = allRows.map(l => l.value)
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
-    const BAR_H = Math.max(140, allRows.length * 22)
-    const yTop = v => ((hi - v) / span) * (BAR_H - 10) + 5
+    const LABEL_H = 14
+    const BAR_H = Math.max(200, allRows.length * LABEL_H + 20)
+    const rawY = v => ((hi - v) / span) * (BAR_H - 14) + 7
+
+    // 겹치는 라벨 아래로 밀기
+    const positioned = allRows
+      .map(l => ({ ...l, y: rawY(l.value) }))
+      .sort((a, b) => a.y - b.y)
+    for (let i = 1; i < positioned.length; i++) {
+      if (positioned[i].y < positioned[i-1].y + LABEL_H)
+        positioned[i].y = positioned[i-1].y + LABEL_H
+    }
 
     return (
       <div style={{ marginTop: 8 }}>
         {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
         {togglesJSX}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ position: 'relative', width: 16, height: BAR_H, flexShrink: 0 }}>
+        <div style={{ display: 'flex', height: BAR_H }}>
+          {/* 왼쪽: 금액 */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            {positioned.map((l, i) => (
+              <div key={i} style={{
+                position: 'absolute', right: 6, top: l.y - 7,
+                fontSize: l.isCurrent ? 10 : 9, textAlign: 'right', whiteSpace: 'nowrap',
+                color: l.isCurrent ? 'var(--text)' : 'var(--text-2)',
+                fontWeight: l.isCurrent ? 700 : 400, fontVariantNumeric: 'tabular-nums',
+              }}>
+                {fmt(l.value, market)}
+              </div>
+            ))}
+          </div>
+
+          {/* 중앙 바 */}
+          <div style={{ width: 16, flexShrink: 0, position: 'relative' }}>
             {vp?.vah != null && vp?.val != null && (
               <div style={{
                 position: 'absolute', left: 2, width: 12,
-                top: yTop(vp.vah), height: Math.max(2, yTop(vp.val) - yTop(vp.vah)),
+                top: rawY(vp.vah), height: Math.max(2, rawY(vp.val) - rawY(vp.vah)),
                 background: 'rgba(79,195,247,0.12)', border: '1px solid rgba(79,195,247,0.4)',
                 borderRadius: 2, zIndex: 0,
               }} />
@@ -107,11 +132,32 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             {allRows.map((l, i) => (
               <div key={i} style={{
                 position: 'absolute', left: 2, right: 0, height: l.isCurrent ? 2.5 : 1.5,
-                background: l.color, top: yTop(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
+                background: l.color, top: rawY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
               }} />
             ))}
           </div>
-          <div style={{ flex: 1 }}>{allRows.map(renderRow)}</div>
+
+          {/* 오른쪽: 수치명 + % */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            {positioned.map((l, i) => {
+              const p = l.isCurrent ? null : pctFrom(l.value)
+              return (
+                <div key={i} style={{
+                  position: 'absolute', left: 6, top: l.y - 7,
+                  display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap',
+                }}>
+                  <span style={{ fontSize: l.isCurrent ? 10 : 9, color: l.color, fontWeight: l.isCurrent ? 700 : 500 }}>
+                    {l.label}
+                  </span>
+                  {p != null && (
+                    <span style={{ fontSize: 9, color: p > 0 ? '#ef9a9a' : '#81c784', fontVariantNumeric: 'tabular-nums' }}>
+                      {p >= 0 ? '+' : ''}{p.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     )
