@@ -142,7 +142,7 @@ export default function ConsensusChart({ ticker, market }) {
           <g>
             <rect x={-19} y={18} width={38} height={14} rx={7}
               fill="none" stroke="var(--border)" strokeWidth={0.8} />
-            <text textAnchor="middle" fontSize={8.5} fill="var(--text-3)" dy={29}>{year}</text>
+            <text textAnchor="middle" dominantBaseline="central" fontSize={8.5} fill="var(--text-3)" y={25}>{year}</text>
           </g>
         )}
       </g>
