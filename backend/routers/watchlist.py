@@ -32,10 +32,6 @@ def _generate_with_consensus(stock_dict: dict):
     market = stock_dict.get("market", "US")
     cache_svc.invalidate(ticker)
     try:
-        consensus_svc.collect(ticker)
-    except Exception as e:
-        print(f"[AutoReport] consensus collect failed for {ticker}: {e}")
-    try:
         consensus_svc.backfill(ticker, market)
     except Exception as e:
         print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
