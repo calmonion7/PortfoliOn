@@ -11,7 +11,7 @@ const DAYS = [
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 function getToday() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
 }
 
 function getLastScheduleDay(scheduleDays) {
@@ -19,7 +19,7 @@ function getLastScheduleDay(scheduleDays) {
   for (let i = 1; i <= 7; i++) {
     d.setDate(d.getDate() - 1)
     if (scheduleDays.includes(DAY_KEYS[d.getDay()])) {
-      return d.toISOString().slice(0, 10)
+      return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
     }
   }
   return null

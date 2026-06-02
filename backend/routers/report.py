@@ -1,6 +1,9 @@
 from __future__ import annotations
 import json
-from datetime import date as _date, timedelta
+from datetime import date as _date, timedelta, datetime as _datetime
+from zoneinfo import ZoneInfo as _ZoneInfo
+
+_KST = _ZoneInfo("Asia/Seoul")
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pathlib import Path
@@ -26,7 +29,7 @@ _DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6
 def _last_scheduled_date(schedule: dict) -> str:
     """Return the most recent date matching the schedule's days of week."""
     enabled_days = {_DAY_MAP[d] for d in schedule.get("days", []) if d in _DAY_MAP}
-    today = _date.today()
+    today = _datetime.now(tz=_KST).date()
     if not schedule.get("enabled") or not enabled_days:
         return today.strftime("%Y-%m-%d")
     for i in range(7):

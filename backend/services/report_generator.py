@@ -1,5 +1,8 @@
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
+from zoneinfo import ZoneInfo as _ZoneInfo
+
+_KST = _ZoneInfo("Asia/Seoul")
 from concurrent.futures import ThreadPoolExecutor
 import json
 import pandas as pd
@@ -27,7 +30,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
     market = stock.get("market", "US")
     exchange = stock.get("exchange", "")
     yf_sym = mkt._yf_sym(ticker, market, exchange)
-    today = target_date or date.today().strftime("%Y-%m-%d")
+    today = target_date or datetime.now(tz=_KST).date().strftime("%Y-%m-%d")
     output_dir = output_base_dir / ticker
     output_dir.mkdir(parents=True, exist_ok=True)
 

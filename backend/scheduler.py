@@ -45,6 +45,8 @@ def _reschedule():
         CronTrigger(day_of_week=days_str, hour=hour, minute=minute, timezone="Asia/Seoul"),
         id=_JOB_ID,
         replace_existing=True,
+        misfire_grace_time=82800,
+        coalesce=True,
     )
     print(f"[Scheduler] Scheduled daily report at {cfg['time']} KST on {days_str}")
 
@@ -146,7 +148,7 @@ def _check_missed_report():
     sched_hour, sched_minute = int(time_parts[0]), int(time_parts[1])
     if now.hour < sched_hour or (now.hour == sched_hour and now.minute < sched_minute):
         return
-    today = date.today().strftime("%Y-%m-%d")
+    today = now.date().strftime("%Y-%m-%d")
     rows = db_query("SELECT 1 FROM snapshots WHERE date = %s LIMIT 1", (today,))
     if rows:
         return
