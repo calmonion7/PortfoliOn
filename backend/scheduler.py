@@ -128,9 +128,36 @@ def _reschedule_guru():
     print(f"[Scheduler] Guru crawl scheduled at {cfg['time']} on {day}")
 
 
+_DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+
+
+def _check_missed_report():
+    """기동 시 당일 스케줄이 이미 지났는데 리포트가 없으면 즉시 실행."""
+    from datetime import datetime, date
+    from services.db import query as db_query
+    cfg = storage.get_schedule()
+    if not cfg.get("enabled"):
+        return
+    now = datetime.now(tz=__import__("zoneinfo").ZoneInfo("Asia/Seoul"))
+    day_abbr = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
+    if day_abbr not in cfg.get("days", []):
+        return
+    time_parts = cfg["time"].split(":")
+    sched_hour, sched_minute = int(time_parts[0]), int(time_parts[1])
+    if now.hour < sched_hour or (now.hour == sched_hour and now.minute < sched_minute):
+        return
+    today = date.today().strftime("%Y-%m-%d")
+    rows = db_query("SELECT 1 FROM snapshots WHERE date = %s LIMIT 1", (today,))
+    if rows:
+        return
+    print(f"[Scheduler] Missed job detected for {today}, running now...")
+    _generate_all()
+
+
 def start():
     _reschedule()
     _reschedule_guru()
+    _check_missed_report()
     _scheduler.add_job(
         _run_digest,
         CronTrigger(hour=8, minute=0, timezone="Asia/Seoul"),
