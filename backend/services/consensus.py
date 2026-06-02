@@ -156,7 +156,7 @@ def _fetch_kr(ticker: str, days: int = 180) -> list[dict]:
 
     by_date: dict = defaultdict(list)
     for d, op, gp in all_reports:
-        by_date[d].append((op, gp))
+        by_date[d[:10]].append((op, gp))
 
     output = []
     for d, reports in sorted(by_date.items()):
