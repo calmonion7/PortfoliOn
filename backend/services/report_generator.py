@@ -312,6 +312,8 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
             )
         except Exception as e:
             print(f"[Backfill] Supabase save failed for {ticker} {date_str}: {e}")
+            out_path.unlink(missing_ok=True)
+            continue
         created += 1
 
     return created
