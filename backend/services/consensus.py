@@ -64,18 +64,25 @@ def collect(ticker: str) -> dict | None:
 
 
 def backfill(ticker: str, market: str, days: int = 180, force: bool = False) -> list[dict]:
+    from datetime import timedelta
     upper = ticker.upper()
-    if not force:
+
+    fetched = _fetch_kr(upper, days) if market == "KR" else _fetch_us(upper, days)
+
+    if force:
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        execute(
+            "DELETE FROM consensus_history WHERE ticker = %s AND date >= %s",
+            (upper, cutoff),
+        )
+        to_add = fetched
+    else:
         existing_rows = query(
             "SELECT date FROM consensus_history WHERE ticker = %s",
             (upper,),
         )
         existing_dates = {str(r["date"]) for r in existing_rows}
-    else:
-        existing_dates = set()
-
-    fetched = _fetch_kr(upper, days) if market == "KR" else _fetch_us(upper, days)
-    to_add = [e for e in fetched if e["date"] not in existing_dates]
+        to_add = [e for e in fetched if e["date"] not in existing_dates]
 
     if not to_add:
         return []
