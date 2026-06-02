@@ -116,6 +116,19 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
         positioned[i].y = positioned[i-1].y + LABEL_H
     }
 
+    // 같은 가격(=같은 %) 항목 그룹핑 — 왼쪽/오른쪽 레이블용
+    const groupedPositioned = []
+    const seenVals = new Map()
+    for (const l of positioned) {
+      if (seenVals.has(l.value)) {
+        seenVals.get(l.value).mergedLabels.push({ label: l.label, color: l.color })
+      } else {
+        const g = { ...l, mergedLabels: [{ label: l.label, color: l.color }] }
+        seenVals.set(l.value, g)
+        groupedPositioned.push(g)
+      }
+    }
+
     const gapSegs = segments.filter(s => s.isGap)
 
     return (
@@ -125,7 +138,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
         <div style={{ display: 'flex', height: BAR_H, position: 'relative' }}>
           {/* 왼쪽: 금액 */}
           <div style={{ flex: 1, position: 'relative' }}>
-            {positioned.map((l, i) => (
+            {groupedPositioned.map((l, i) => (
               <div key={i} style={{
                 position: 'absolute', right: 6, top: l.y - 7,
                 fontSize: l.isCurrent ? 10 : 9, textAlign: 'right', whiteSpace: 'nowrap',
@@ -179,23 +192,28 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             })}
           </div>
 
-          {/* 오른쪽: 수치명 + % */}
+          {/* 오른쪽: % + 수치명 (같은 가격은 합산) */}
           <div style={{ flex: 1, position: 'relative' }}>
-            {positioned.map((l, i) => {
+            {groupedPositioned.map((l, i) => {
               const p = l.isCurrent ? null : pctFrom(l.value)
               return (
                 <div key={i} style={{
                   position: 'absolute', left: 6, top: l.y - 7,
                   display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap',
                 }}>
-                  <span style={{ fontSize: l.isCurrent ? 10 : 9, color: l.color, fontWeight: l.isCurrent ? 700 : 500 }}>
-                    {l.label}
-                  </span>
                   {p != null && (
                     <span style={{ fontSize: 9, color: p > 0 ? '#ef9a9a' : '#81c784', fontVariantNumeric: 'tabular-nums' }}>
                       {p >= 0 ? '+' : ''}{p.toFixed(1)}%
                     </span>
                   )}
+                  <span style={{ fontSize: l.isCurrent ? 10 : 9, fontWeight: l.isCurrent ? 700 : 500 }}>
+                    {l.mergedLabels.map((lb, j) => (
+                      <span key={j} style={{ color: lb.color }}>
+                        {j > 0 && <span style={{ color: 'var(--text-3)' }}>, </span>}
+                        {lb.label}
+                      </span>
+                    ))}
+                  </span>
                 </div>
               )
             })}
