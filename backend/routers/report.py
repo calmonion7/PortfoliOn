@@ -314,8 +314,9 @@ def get_consensus_batch_progress():
 
 
 @router.post("/consensus/batch", status_code=202)
-def batch_consensus(background_tasks: BackgroundTasks, days: int = 180, user_id: str = Depends(get_current_user)):
-    stocks = storage.get_all_stocks(user_id)
+def batch_consensus(background_tasks: BackgroundTasks, days: int = 180, user_id: str = Depends(require_admin)):
+    portfolio = storage.get_global_portfolio()
+    stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     background_tasks.add_task(_run_consensus_batch, stocks, days)
