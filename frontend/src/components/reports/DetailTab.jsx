@@ -83,7 +83,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const vals = allRows.map(l => l.value)
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
     const LABEL_H = 14
-    const GAP_H = 20        // 빈 구간 압축 높이
+    const GAP_H = 14        // 빈 구간 압축 높이
     const GAP_THR = 0.12    // 전체 범위의 12% 이상 → 갭으로 처리
 
     // 연속 가격 쌍을 세그먼트로 분류 (밀집 vs 갭)
@@ -169,18 +169,17 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                 background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
               }} />
             ))}
-            {/* 갭 구간: 바 가림 + 사선 생략 표시 */}
-            {gapSegs.map((seg, i) => (
-              <div key={i} style={{
-                position: 'absolute', left: 3, width: 10, zIndex: 4,
-                top: priceToY(seg.hi), height: GAP_H,
-                background: 'var(--bg-elev)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
-              }}>
-                <div style={{ width: 8, height: 2, background: 'rgba(255,255,255,0.22)', borderRadius: 1, transform: 'rotate(-20deg)' }} />
-                <div style={{ width: 8, height: 2, background: 'rgba(255,255,255,0.22)', borderRadius: 1, transform: 'rotate(-20deg)' }} />
-              </div>
-            ))}
+            {/* 갭 구간: 물결선 2개 + 사이 공백 */}
+            {gapSegs.map((seg, i) => {
+              const y = priceToY(seg.hi)
+              return (
+                <div key={i} style={{ position: 'absolute', left: 2, width: 12, zIndex: 4, top: y, height: GAP_H }}>
+                  <div style={{ position: 'absolute', top: 2, bottom: 2, left: 1, right: 1, background: 'var(--bg-elev)' }} />
+                  <div style={{ position: 'absolute', top: 1, left: 0, right: 0, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.28)' }} />
+                  <div style={{ position: 'absolute', bottom: 1, left: 0, right: 0, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.28)' }} />
+                </div>
+              )
+            })}
           </div>
 
           {/* 오른쪽: 수치명 + % */}
