@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { HomeIcon, SearchIcon, ChartIcon, GuruIcon, GearIcon } from './ui/icons'
 import { useAuth } from '../contexts/AuthContext'
+import { trackEvent } from '../utils/analytics'
 
 const ALL_TABS = [
   { to: '/',         label: '종목관리', key: 'portfolio', Icon: HomeIcon,   end: true },
@@ -15,8 +16,9 @@ export default function MobileNav() {
   const tabs = loading ? [] : ALL_TABS.filter(t => menuPermissions.includes(t.key))
   return (
     <nav className="tabbar">
-      {tabs.map(({ to, label, Icon, end }) => (
+      {tabs.map(({ to, label, Icon, end, key }) => (
         <NavLink key={to} to={to} end={end}
+          onClick={() => trackEvent('nav_' + key)}
           className={({ isActive }) => isActive ? 'is-active' : ''}>
           <Icon />
           <span>{label}</span>
