@@ -113,14 +113,17 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
 
           {/* 중앙 바 */}
           <div style={{ width: 64, flexShrink: 0, position: 'relative' }}>
-            {vp?.vah != null && vp?.val != null && (
-              <div style={{
-                position: 'absolute', left: 8, width: 48,
-                top: priceToY(vp.vah), height: Math.max(2, priceToY(vp.val) - priceToY(vp.vah)),
-                background: 'rgba(79,195,247,0.12)', border: '1px solid rgba(79,195,247,0.4)',
-                borderRadius: 2, zIndex: 0,
-              }} />
-            )}
+            {vp?.vah != null && vp?.val != null && (() => {
+              const top = priceToY(vp.vah)
+              const height = Math.max(2, priceToY(vp.val) - priceToY(vp.vah))
+              return <>
+                {/* 배경 fill */}
+                <div style={{ position: 'absolute', left: 8, width: 48, top, height, background: 'rgba(79,195,247,0.08)', zIndex: 0 }} />
+                {/* 좌우 테두리 — 갭 SVG(zIndex:5) 위에 */}
+                <div style={{ position: 'absolute', left: 8, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
+                <div style={{ position: 'absolute', left: 55, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
+              </>
+            })()}
             <div style={{ position: 'absolute', left: 20, top: 0, bottom: 0, width: 24, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.1)' }} />
               {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: priceToY(price), background: 'rgba(239,154,154,0.3)' }} />}
@@ -140,7 +143,6 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             {/* 갭 구간: 바 마스킹 + 지그재그 */}
             {gapSegs.map((seg, i) => {
               const y = priceToY(seg.hi)
-              const inVahVal = vp?.vah != null && vp?.val != null && seg.hi <= vp.vah && seg.lo >= vp.val
               return (
                 <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 64, height: GAP_H, zIndex: 5 }}>
                   {/* 바 컬럼(x=20~44) 바깥만 마스킹 */}
@@ -148,12 +150,6 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                   <rect x="44" y="0" width="20" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
                   {/* 중간 끊김 구간 바 컬럼도 마스킹 */}
                   <rect x="20" y="7" width="24" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
-                  {/* VAH/VAL 범위 내: 박스 배경 + 테두리 선 유지 */}
-                  {inVahVal && <>
-                    <rect x="8" y="0" width="48" height={GAP_H} fill="rgba(79,195,247,0.06)" />
-                    <line x1="10" y1="0" x2="10" y2={GAP_H} stroke="rgba(79,195,247,0.4)" strokeWidth="1" />
-                    <line x1="54" y1="0" x2="54" y2={GAP_H} stroke="rgba(79,195,247,0.4)" strokeWidth="1" />
-                  </>}
                   {/* 위 물결 */}
                   <polyline
                     points="16,9 22,7 32,9 42,7 48,9"
