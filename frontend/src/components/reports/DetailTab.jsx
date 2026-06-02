@@ -206,14 +206,15 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const p = pctFrom(l.value)
     return (
       <div key={l.label} style={{
-        padding: '3px 6px', borderRadius: 3, marginBottom: 2,
+        padding: '2px 6px', borderRadius: 3, marginBottom: 2,
+        display: 'flex', alignItems: 'center', gap: 4,
         ...(isBelow
-          ? { borderRight: `2px solid ${l.color}`, textAlign: 'right' }
+          ? { borderRight: `2px solid ${l.color}`, flexDirection: 'row-reverse' }
           : { borderLeft: `2px solid ${l.color}` }),
       }}>
-        <div style={{ fontSize: 9, color: l.color, fontWeight: 500 }}>{l.label}</div>
-        <div style={{ fontSize: 9, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{fmt(l.value, market)}</div>
-        {p != null && <div style={{ fontSize: 9, fontVariantNumeric: 'tabular-nums', color: isBelow ? '#81c784' : '#ef9a9a' }}>{p >= 0 ? '+' : ''}{p.toFixed(1)}%</div>}
+        <span style={{ fontSize: 9, color: l.color, fontWeight: 600, flexShrink: 0 }}>{l.label}</span>
+        <span style={{ fontSize: 9, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', flex: 1, textAlign: isBelow ? 'right' : 'left' }}>{fmt(l.value, market)}</span>
+        {p != null && <span style={{ fontSize: 9, fontVariantNumeric: 'tabular-nums', color: isBelow ? '#81c784' : '#ef9a9a', flexShrink: 0 }}>{p >= 0 ? '+' : ''}{p.toFixed(1)}%</span>}
       </div>
     )
   }
