@@ -146,12 +146,6 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                 {fmt(l.value, market)}
               </div>
             ))}
-            {gapSegs.map((seg, i) => (
-              <div key={i} style={{
-                position: 'absolute', right: 6, top: priceToY(seg.hi) + GAP_H / 2 - 5,
-                fontSize: 9, color: 'var(--text-3)', textAlign: 'right',
-              }}>···</div>
-            ))}
           </div>
 
           {/* 중앙 바 */}
@@ -175,15 +169,16 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                 background: l.color, top: priceToY(l.value), borderRadius: 1, zIndex: l.isCurrent ? 2 : 1,
               }} />
             ))}
-            {/* 갭 구간: 바에 파선 표시 */}
+            {/* 갭 구간: 바 가림 + 사선 생략 표시 */}
             {gapSegs.map((seg, i) => (
               <div key={i} style={{
-                position: 'absolute', left: 0, right: 0, zIndex: 4,
+                position: 'absolute', left: 3, width: 10, zIndex: 4,
                 top: priceToY(seg.hi), height: GAP_H,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                background: 'var(--bg-elev)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
               }}>
-                <div style={{ width: 10, height: 1, background: 'rgba(255,255,255,0.3)' }} />
-                <div style={{ width: 10, height: 1, background: 'rgba(255,255,255,0.3)' }} />
+                <div style={{ width: 8, height: 2, background: 'rgba(255,255,255,0.22)', borderRadius: 1, transform: 'rotate(-20deg)' }} />
+                <div style={{ width: 8, height: 2, background: 'rgba(255,255,255,0.22)', borderRadius: 1, transform: 'rotate(-20deg)' }} />
               </div>
             ))}
           </div>
