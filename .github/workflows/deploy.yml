@@ -1,0 +1,15 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull & Deploy
+        run: |
+          cd /Users/calmonion/Project/PortfoliOn
+          git pull origin main
+          bash deploy.sh

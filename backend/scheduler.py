@@ -1,6 +1,6 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from services import storage, report_generator, consensus as consensus_svc
+from services import storage, report_generator, consensus_pipeline as _pipeline
 
 _scheduler = AsyncIOScheduler()
 _JOB_ID = "daily_report"
@@ -10,22 +10,23 @@ _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
 
 def _generate_all():
-    from services.db import get_db
-    db = get_db()
-    user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").eq("type", "holding").execute().data})
+    from services.db import query
+    user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks")})
+    all_stocks: dict = {}
     for user_id in user_ids:
-        portfolio = storage.get_full_portfolio(user_id)
-        for stock in portfolio.get("stocks", []):
+        stocks = storage.get_all_stocks(user_id)
+        for stock in stocks:
             try:
                 report_generator.generate_report(stock)
                 print(f"[Scheduler] Report generated for {stock['ticker']}")
             except Exception as e:
                 print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
-            try:
-                consensus_svc.collect(stock["ticker"])
-                print(f"[Scheduler] Consensus collected for {stock['ticker']}")
-            except Exception as e:
-                print(f"[Scheduler] Consensus collection failed for {stock['ticker']}: {e}")
+            all_stocks[stock["ticker"]] = stock
+    try:
+        _pipeline.run_daily(list(all_stocks.values()))
+        print(f"[Scheduler] Pipeline run_daily completed for {len(all_stocks)} stocks")
+    except Exception as e:
+        print(f"[Scheduler] Pipeline run_daily failed: {e}")
 
 
 def _reschedule():
@@ -41,11 +42,13 @@ def _reschedule():
         return
     _scheduler.add_job(
         _generate_all,
-        CronTrigger(day_of_week=days_str, hour=hour, minute=minute),
+        CronTrigger(day_of_week=days_str, hour=hour, minute=minute, timezone="Asia/Seoul"),
         id=_JOB_ID,
         replace_existing=True,
+        misfire_grace_time=82800,
+        coalesce=True,
     )
-    print(f"[Scheduler] Scheduled daily report at {cfg['time']} on {days_str}")
+    print(f"[Scheduler] Scheduled daily report at {cfg['time']} KST on {days_str}")
 
 
 def _run_guru_crawl():
@@ -92,10 +95,9 @@ def _refresh_earnings():
 
 def _run_digest():
     from services import digest_service
-    from services.db import get_db
+    from services.db import query
     try:
-        db = get_db()
-        user_ids = list({r["user_id"] for r in db.table("user_stocks").select("user_id").eq("type", "holding").execute().data})
+        user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks WHERE type = 'holding'")})
     except Exception as e:
         print(f"[Scheduler] Digest: failed to fetch user list: {e}")
         return
@@ -128,9 +130,36 @@ def _reschedule_guru():
     print(f"[Scheduler] Guru crawl scheduled at {cfg['time']} on {day}")
 
 
+_DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+
+
+def _check_missed_report():
+    """기동 시 당일 스케줄이 이미 지났는데 리포트가 없으면 즉시 실행."""
+    from datetime import datetime, date
+    from services.db import query as db_query
+    cfg = storage.get_schedule()
+    if not cfg.get("enabled"):
+        return
+    now = datetime.now(tz=__import__("zoneinfo").ZoneInfo("Asia/Seoul"))
+    day_abbr = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
+    if day_abbr not in cfg.get("days", []):
+        return
+    time_parts = cfg["time"].split(":")
+    sched_hour, sched_minute = int(time_parts[0]), int(time_parts[1])
+    if now.hour < sched_hour or (now.hour == sched_hour and now.minute < sched_minute):
+        return
+    today = now.date().strftime("%Y-%m-%d")
+    rows = db_query("SELECT 1 FROM snapshots WHERE date = %s LIMIT 1", (today,))
+    if rows:
+        return
+    print(f"[Scheduler] Missed job detected for {today}, running now...")
+    _generate_all()
+
+
 def start():
     _reschedule()
     _reschedule_guru()
+    _check_missed_report()
     _scheduler.add_job(
         _run_digest,
         CronTrigger(hour=8, minute=0, timezone="Asia/Seoul"),

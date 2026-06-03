@@ -219,13 +219,13 @@ export default function GuruManagers() {
     </div>
   )
 
-  // ── 데스크탑 테이블 뷰 (기존 유지) ───────────────────────
+  // ── 데스크탑 카드 뷰 ─────────────────────────────────────
   return (
     <div>
       {data.last_updated && (
         <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated}</p>
       )}
-      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
         <input
           value={query}
           onChange={e => setQuery(e.target.value)}
@@ -235,67 +235,89 @@ export default function GuruManagers() {
         {query && (
           <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{sorted.length} / {data.managers.length}명</span>
         )}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          {SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setSort(prev =>
+                prev.key === opt.key ? { key: opt.key, dir: -prev.dir } : { key: opt.key, dir: opt.dir }
+              )}
+              style={{
+                padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                border: '1px solid var(--border)', cursor: 'pointer',
+                background: sort.key === opt.key ? 'var(--accent-soft)' : 'var(--bg-elev)',
+                color: sort.key === opt.key ? 'var(--accent)' : 'var(--text-3)',
+              }}
+            >
+              {opt.label}{sort.key === opt.key ? (sort.dir === 1 ? ' ↑' : ' ↓') : ''}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="table-mobile-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
-              {COLUMNS.map((col, ci) => (
-                <th
-                  key={col.key}
-                  onClick={() => handleSort(col)}
-                  className={ci === 0 ? 'col-sticky' : undefined}
-                  style={{
-                    padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12,
-                    cursor: col.sortKey ? 'pointer' : 'default',
-                    userSelect: 'none',
-                    color: sort.key === col.sortKey ? 'var(--accent)' : 'var(--text)',
-                  }}
-                >
-                  {col.label}
-                  {col.sortKey && sort.key === col.sortKey && (
-                    <span style={{ marginLeft: 4 }}>{sort.dir === 1 ? '▲' : '▼'}</span>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((m, i) => (
-              <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td className="col-sticky" style={tdStyle}>{i + 1}</td>
-                <td style={tdStyle}>{m.name}</td>
-                <td style={{ ...tdStyle, color: 'var(--text-3)' }}>{m.firm}</td>
-                <td style={tdStyle}>{formatValue(m.portfolio_value)}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{m.num_stocks}</td>
-                <td style={tdStyle}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {(m.top10 || []).map(h => {
-                      const type = stockMap[h.ticker]
-                      const tooltip = `#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`
-                        + (type === 'holding' ? '\n[보유중]' : type === 'watchlist' ? '\n[관심 — 클릭하여 삭제]' : '\n[클릭하여 관심종목 추가]')
-                      return (
-                        <span
-                          key={h.rank}
-                          title={tooltip}
-                          onClick={() => handleBadgeClick(h)}
-                          style={{
-                            ...badgeStyle(h.ticker),
-                            borderRadius: 3, padding: '2px 6px',
-                            fontSize: 11, fontWeight: 600,
-                            cursor: type === 'holding' ? 'default' : 'pointer',
-                          }}
-                        >
-                          {h.ticker}
-                        </span>
-                      )
-                    })}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+        {sorted.map((m, i) => (
+          <div key={m.id} style={{
+            background: 'var(--bg-elev)', border: '1px solid var(--border)',
+            borderRadius: 14, padding: '16px 18px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <div style={{
+                width: 42, height: 42, borderRadius: 12,
+                background: 'var(--accent-soft)', color: 'var(--text-2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 13, flexShrink: 0,
+              }}>
+                {initials(m.name)}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {m.name.split(' - ')[0]}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {m.firm || m.name}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', flexShrink: 0 }}>#{i + 1}</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>포트폴리오</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{formatValue(m.portfolio_value)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>종목수</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{m.num_stocks ?? '-'}</div>
+              </div>
+            </div>
+
+            {(m.top10 || []).length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {(m.top10 || []).map(h => {
+                  const type = stockMap[h.ticker]
+                  const tooltip = `#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`
+                    + (type === 'holding' ? '\n[보유중]' : type === 'watchlist' ? '\n[관심 — 클릭하여 삭제]' : '\n[클릭하여 관심종목 추가]')
+                  return (
+                    <span
+                      key={h.rank}
+                      title={tooltip}
+                      onClick={() => handleBadgeClick(h)}
+                      style={{
+                        ...badgeStyle(h.ticker),
+                        borderRadius: 6, padding: '3px 8px',
+                        fontSize: 11, fontWeight: 600,
+                        cursor: type === 'holding' ? 'default' : 'pointer',
+                      }}
+                    >
+                      {h.ticker}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )

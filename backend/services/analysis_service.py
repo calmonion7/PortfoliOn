@@ -48,9 +48,10 @@ def _fetch_etf(entry: dict) -> dict:
 
 
 def get_sector_momentum(holdings: list) -> dict:
+    from services.market import _norm_sector
     sectors = parallel_map(_fetch_etf, SECTOR_ETFS, max_workers=11)
     portfolio_sectors = {
-        h["ticker"].upper(): h.get("sector") or "기타"
+        h["ticker"].upper(): _norm_sector(h.get("sector") or "") or "기타"
         for h in holdings
     }
     return {"sectors": sectors, "portfolio_sectors": portfolio_sectors}
@@ -82,7 +83,7 @@ def get_macro_correlation(holdings: list) -> dict:
         ret = closes.pct_change().dropna()
         ret.index = pd.DatetimeIndex(ret.index.date)
         ret_series[i] = ret
-        raw_weights[i] = qty * float(closes.iloc[-1])
+        raw_weights[i] = float(qty) * float(closes.iloc[-1])
 
     df = pd.DataFrame(ret_series).dropna()
     if df.empty or len(df) < 10:

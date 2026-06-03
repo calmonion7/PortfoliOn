@@ -101,14 +101,25 @@ def get_timeframe_rsi(ticker: str) -> dict:
                 continue
             rsi = calc_rsi(df["Close"])
             current_rsi = round(float(rsi.iloc[-1]), 2)
+            t20 = calc_rsi_target_price(df["Close"], rsi, 20.0, n)
+            t25 = calc_rsi_target_price(df["Close"], rsi, 25.0, n)
+            t30 = calc_rsi_target_price(df["Close"], rsi, 30.0, n)
+            t70 = calc_rsi_target_price(df["Close"], rsi, 70.0, n)
+            t75 = calc_rsi_target_price(df["Close"], rsi, 75.0, n)
+            t80 = calc_rsi_target_price(df["Close"], rsi, 80.0, n)
+            # 단조성 검증: t20 <= t25 <= t30, t70 <= t75 <= t80
+            if t20 is not None and t25 is not None and t20 > t25:
+                t20 = None
+            if t25 is not None and t30 is not None and t25 > t30:
+                t25 = None
+            if t70 is not None and t75 is not None and t70 > t75:
+                t75 = None
+            if t75 is not None and t80 is not None and t75 > t80:
+                t80 = None
             result[tf] = {
                 "rsi": current_rsi,
-                "target_20": calc_rsi_target_price(df["Close"], rsi, 20.0, n),
-                "target_25": calc_rsi_target_price(df["Close"], rsi, 25.0, n),
-                "target_30": calc_rsi_target_price(df["Close"], rsi, 30.0, n),
-                "target_70": calc_rsi_target_price(df["Close"], rsi, 70.0, n),
-                "target_75": calc_rsi_target_price(df["Close"], rsi, 75.0, n),
-                "target_80": calc_rsi_target_price(df["Close"], rsi, 80.0, n),
+                "target_20": t20, "target_25": t25, "target_30": t30,
+                "target_70": t70, "target_75": t75, "target_80": t80,
             }
         except Exception:
             result[tf] = {

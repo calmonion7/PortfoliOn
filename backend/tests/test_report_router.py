@@ -5,19 +5,13 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
 from routers.report import router
-from auth import get_current_user
+from auth import get_current_user, require_admin
 
-
-def _make_mock_db(data=None):
-    m = MagicMock()
-    for method in ['table', 'select', 'eq', 'order', 'limit', 'in_', 'upsert', 'delete']:
-        getattr(m, method).return_value = m
-    m.execute.return_value.data = data if data is not None else []
-    return m
 
 app = FastAPI()
 app.include_router(router)
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+app.dependency_overrides[require_admin] = lambda: "test-user-id"
 client = TestClient(app)
 
 FULL_PORTFOLIO = {
@@ -40,12 +34,7 @@ SAMPLE_SUMMARY = {
 def test_list_reports_detects_json_snapshots():
     date_rows = [{"ticker": "LLY", "date": "2026-05-05"}]
     summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]
-    mock_db = _make_mock_db()
-    mock_db.execute.side_effect = [
-        MagicMock(data=date_rows),
-        MagicMock(data=summary_rows),
-    ]
-    with patch("routers.report.get_db", return_value=mock_db), \
+    with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
          patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
         resp = client.get("/api/report/list")
@@ -59,12 +48,7 @@ def test_list_reports_detects_json_snapshots():
 def test_list_reports_no_markdown_in_dates():
     date_rows = [{"ticker": "LLY", "date": "2026-05-05"}]
     summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]
-    mock_db = _make_mock_db()
-    mock_db.execute.side_effect = [
-        MagicMock(data=date_rows),
-        MagicMock(data=summary_rows),
-    ]
-    with patch("routers.report.get_db", return_value=mock_db), \
+    with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
          patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
         resp = client.get("/api/report/list")
@@ -78,7 +62,7 @@ def test_get_report_returns_summary_no_content(tmp_path):
     (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
-         patch("routers.report.get_db", return_value=_make_mock_db([])), \
+         patch("routers.report.query", return_value=[]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-05")
@@ -99,7 +83,7 @@ def test_get_report_fallback_to_reports_dir(tmp_path):
     snapshots_dir.mkdir()
     with patch("routers.report.SNAPSHOTS_DIR", snapshots_dir), \
          patch("routers.report.REPORTS_DIR", legacy_dir), \
-         patch("routers.report.get_db", return_value=_make_mock_db([])), \
+         patch("routers.report.query", return_value=[]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-01")
@@ -110,6 +94,7 @@ def test_get_report_fallback_to_reports_dir(tmp_path):
 def test_get_report_404_when_not_found(tmp_path):
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("routers.report.query", return_value=[]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2000-01-01")
@@ -140,7 +125,7 @@ def test_get_history_returns_sorted_lean_array():
         {"date": "2026-05-05", "data": SAMPLE_SUMMARY_WITH_RSI},
         {"date": "2026-05-06", "data": SAMPLE_SUMMARY_2},
     ]
-    with patch("routers.report.get_db", return_value=_make_mock_db(rows)):
+    with patch("routers.report.query", return_value=rows):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     data = resp.json()
@@ -161,7 +146,7 @@ def test_get_history_returns_sorted_lean_array():
 
 def test_get_history_handles_null_rsi():
     rows = [{"date": "2026-05-06", "data": SAMPLE_SUMMARY_2}]
-    with patch("routers.report.get_db", return_value=_make_mock_db(rows)):
+    with patch("routers.report.query", return_value=rows):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     data = resp.json()
@@ -169,7 +154,7 @@ def test_get_history_handles_null_rsi():
 
 
 def test_get_history_empty_when_no_snapshots():
-    with patch("routers.report.get_db", return_value=_make_mock_db([])):
+    with patch("routers.report.query", return_value=[]):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     assert resp.json() == []
@@ -177,7 +162,7 @@ def test_get_history_empty_when_no_snapshots():
 
 def test_get_history_fallback_to_reports_dir():
     rows = [{"date": "2026-05-01", "data": SAMPLE_SUMMARY_WITH_RSI}]
-    with patch("routers.report.get_db", return_value=_make_mock_db(rows)):
+    with patch("routers.report.query", return_value=rows):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
@@ -193,13 +178,14 @@ def test_generate_all_runs_all_stocks():
     }
     generated = []
 
-    def _fake_generate(stock):
+    def _fake_generate(stock, target_date=None):
         generated.append(stock["ticker"])
 
     with patch("routers.report.storage.get_full_portfolio", return_value=two_stocks), \
          patch("routers.report.report_generator.generate_report", side_effect=_fake_generate), \
          patch("routers.report.cache_svc.invalidate"), \
-         patch("routers.report.consensus_svc.collect"):
+         patch("routers.report.consensus_svc.collect"), \
+         patch("routers.report.consensus_svc.backfill"):
         resp = client.post("/api/report/generate")
     assert resp.status_code == 202
     assert set(generated) == {"AAPL", "MSFT"}
@@ -215,7 +201,7 @@ def test_generate_all_continues_on_one_failure():
     }
     generated = []
 
-    def _fake_generate(stock):
+    def _fake_generate(stock, target_date=None):
         if stock["ticker"] == "AAPL":
             raise RuntimeError("api down")
         generated.append(stock["ticker"])
@@ -223,7 +209,34 @@ def test_generate_all_continues_on_one_failure():
     with patch("routers.report.storage.get_full_portfolio", return_value=two_stocks), \
          patch("routers.report.report_generator.generate_report", side_effect=_fake_generate), \
          patch("routers.report.cache_svc.invalidate"), \
-         patch("routers.report.consensus_svc.collect"):
+         patch("routers.report.consensus_svc.collect"), \
+         patch("routers.report.consensus_svc.backfill"):
         resp = client.post("/api/report/generate")
     assert resp.status_code == 202
     assert "MSFT" in generated
+
+
+# --- 403 tests: use a separate app without require_admin override ---
+
+_nonadmin_app = FastAPI()
+_nonadmin_app.include_router(router)
+_nonadmin_app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+_nonadmin_client = TestClient(_nonadmin_app)
+
+
+def test_generate_one_blocked_for_non_admin():
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        resp = _nonadmin_client.post("/api/report/generate/AAPL")
+    assert resp.status_code == 403
+
+
+def test_generate_batch_blocked_for_non_admin():
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        resp = _nonadmin_client.post("/api/report/generate?tickers=AAPL")
+    assert resp.status_code == 403
+
+
+def test_backfill_blocked_for_non_admin():
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        resp = _nonadmin_client.post("/api/report/backfill")
+    assert resp.status_code == 403

@@ -49,7 +49,13 @@ const SECTION_CARD_OUTER = {
   background: 'var(--bg-elev)',
 }
 
-export function SectionCard({ title, summary, open, onToggle, children }) {
+export function SectionCard({ title, summary, change, changeSuffix = '', changeInverted = false, open, onToggle, children }) {
+  const changeColor = change == null ? null
+    : change === 0 ? 'var(--text-3)'
+    : (change > 0) !== changeInverted ? '#81c784' : '#e57373'
+  const changeArrow = change > 0 ? '▲' : change < 0 ? '▼' : '─'
+  const decimals = changeSuffix === 'bp' ? 1 : 2
+
   return (
     <div style={SECTION_CARD_OUTER}>
       <button
@@ -68,8 +74,13 @@ export function SectionCard({ title, summary, open, onToggle, children }) {
         }}
       >
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {summary && <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{summary}</span>}
+          {change != null && (
+            <span style={{ fontSize: 11, color: changeColor, fontVariantNumeric: 'tabular-nums' }}>
+              {changeArrow} {Math.abs(change).toFixed(decimals)}{changeSuffix}
+            </span>
+          )}
           <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{open ? '∧' : '∨'}</span>
         </div>
       </button>

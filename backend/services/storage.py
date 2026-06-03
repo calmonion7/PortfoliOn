@@ -1,4 +1,6 @@
-from services.db import get_db
+# backend/services/storage.py
+import json
+from services.db import get_connection, query, execute
 
 _ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures"})
 
@@ -6,180 +8,170 @@ _ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks"
 # ── 종목 마스터 (user-specific) ──────────────────────────────────────────────
 
 def get_stocks(user_id: str) -> list[dict]:
-    db = get_db()
-    user_rows = db.table("user_stocks").select("ticker").eq("user_id", user_id).execute().data
-    if not user_rows:
-        return []
-    tickers = [r["ticker"] for r in user_rows]
-    ticker_rows = db.table("tickers").select("*").in_("ticker", tickers).execute().data
+    rows = query(
+        """
+        SELECT t.ticker, t.name, t.market, t.exchange,
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures
+        FROM user_stocks us
+        JOIN tickers t ON t.ticker = us.ticker
+        WHERE us.user_id = %s
+        """,
+        (user_id,),
+    )
     list_fields = frozenset({"competitors"})
     return [
-        {k: (t.get(k) or ([] if k in list_fields else "")) for k in (*_ANALYST_KEYS, "ticker", "market", "exchange")}
-        for t in ticker_rows
-    ]
-
-
-def save_stocks(user_id: str, stocks: list[dict]) -> None:
-    db = get_db()
-    for s in stocks:
-        ticker = s["ticker"].upper()
-        db.table("tickers").upsert(
-            {
-                "ticker": ticker,
-                "name": s.get("name") or ticker,
-                "market": s.get("market") or "US",
-                "exchange": s.get("exchange") or "",
-                **{k: (s.get(k) or "") for k in _ANALYST_KEYS if k != "name"},
-            },
-            on_conflict="ticker",
-        ).execute()
-        existing = (
-            db.table("user_stocks")
-            .select("ticker")
-            .eq("user_id", user_id)
-            .eq("ticker", ticker)
-            .execute()
-            .data
-        )
-        if not existing:
-            db.table("user_stocks").insert(
-                {"user_id": user_id, "ticker": ticker, "type": "watchlist"}
-            ).execute()
-
-
-def get_holdings(user_id: str) -> list[dict]:
-    db = get_db()
-    rows = (
-        db.table("user_stocks")
-        .select("ticker, quantity, avg_cost")
-        .eq("user_id", user_id)
-        .eq("type", "holding")
-        .execute()
-        .data
-    )
-    if not rows:
-        return []
-    tickers = [r["ticker"] for r in rows]
-    ticker_info = {
-        t["ticker"]: t
-        for t in db.table("tickers").select("ticker, market, exchange, name").in_("ticker", tickers).execute().data
-    }
-    return [
-        {
-            "ticker": r["ticker"],
-            "name": ticker_info.get(r["ticker"], {}).get("name", r["ticker"]),
-            "quantity": r["quantity"],
-            "avg_cost": r["avg_cost"],
-            "market": ticker_info.get(r["ticker"], {}).get("market", "US"),
-            "exchange": ticker_info.get(r["ticker"], {}).get("exchange", ""),
-        }
+        {k: (r.get(k) or ([] if k in list_fields else "")) for k in (*_ANALYST_KEYS, "ticker", "market", "exchange")}
         for r in rows
     ]
 
 
-def save_holdings(user_id: str, holdings: list[dict]) -> None:
-    db = get_db()
-    current = (
-        db.table("user_stocks")
-        .select("ticker")
-        .eq("user_id", user_id)
-        .eq("type", "holding")
-        .execute()
-        .data
+def save_stocks(user_id: str, stocks: list[dict]) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for s in stocks:
+                ticker = s["ticker"].upper()
+                cur.execute(
+                    """
+                    INSERT INTO tickers (ticker, name, market, exchange, competitors, moat, growth_plan, risks, recent_disclosures)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (ticker) DO UPDATE SET
+                        name=EXCLUDED.name, market=EXCLUDED.market, exchange=EXCLUDED.exchange,
+                        competitors=EXCLUDED.competitors, moat=EXCLUDED.moat,
+                        growth_plan=EXCLUDED.growth_plan, risks=EXCLUDED.risks,
+                        recent_disclosures=EXCLUDED.recent_disclosures
+                    """,
+                    (
+                        ticker,
+                        s.get("name") or ticker,
+                        s.get("market") or "US",
+                        s.get("exchange") or "",
+                        json.dumps(s.get("competitors") or []),
+                        s.get("moat") or "",
+                        s.get("growth_plan") or "",
+                        s.get("risks") or "",
+                        s.get("recent_disclosures") or "",
+                    ),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO user_stocks (user_id, ticker, type)
+                    VALUES (%s, %s, 'watchlist')
+                    ON CONFLICT (user_id, ticker) DO NOTHING
+                    """,
+                    (user_id, ticker),
+                )
+
+
+def get_holdings(user_id: str) -> list[dict]:
+    return query(
+        """
+        SELECT us.ticker, us.quantity, us.avg_cost,
+               t.name, t.market, t.exchange
+        FROM user_stocks us
+        JOIN tickers t ON t.ticker = us.ticker
+        WHERE us.user_id = %s AND us.type = 'holding'
+        """,
+        (user_id,),
     )
-    current_tickers = {r["ticker"] for r in current}
-    new_tickers = {h["ticker"].upper() for h in holdings}
 
-    for t in current_tickers - new_tickers:
-        db.table("user_stocks").update(
-            {"type": "watchlist", "quantity": None, "avg_cost": None}
-        ).eq("user_id", user_id).eq("ticker", t).execute()
 
-    for h in holdings:
-        ticker = h["ticker"].upper()
-        db.table("tickers").upsert(
-            {
-                "ticker": ticker,
-                "name": h.get("name") or ticker,
-                "market": h.get("market") or "US",
-                "exchange": h.get("exchange") or "",
-            },
-            on_conflict="ticker",
-        ).execute()
-        db.table("user_stocks").upsert(
-            {
-                "user_id": user_id,
-                "ticker": ticker,
-                "type": "holding",
-                "quantity": h["quantity"],
-                "avg_cost": h["avg_cost"],
-            },
-            on_conflict="user_id,ticker",
-        ).execute()
+def save_holdings(user_id: str, holdings: list[dict]) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ticker FROM user_stocks WHERE user_id = %s AND type = 'holding'",
+                (user_id,),
+            )
+            current_tickers = {r[0] for r in cur.fetchall()}
+            new_tickers = {h["ticker"].upper() for h in holdings}
+
+            for t in current_tickers - new_tickers:
+                cur.execute(
+                    "UPDATE user_stocks SET type='watchlist', quantity=NULL, avg_cost=NULL WHERE user_id=%s AND ticker=%s",
+                    (user_id, t),
+                )
+
+            for h in holdings:
+                ticker = h["ticker"].upper()
+                cur.execute(
+                    """
+                    INSERT INTO tickers (ticker, name, market, exchange)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (ticker) DO UPDATE SET
+                        name=EXCLUDED.name, market=EXCLUDED.market, exchange=EXCLUDED.exchange
+                    """,
+                    (ticker, h.get("name") or ticker, h.get("market") or "US", h.get("exchange") or ""),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO user_stocks (user_id, ticker, type, quantity, avg_cost)
+                    VALUES (%s, %s, 'holding', %s, %s)
+                    ON CONFLICT (user_id, ticker) DO UPDATE SET
+                        type='holding', quantity=EXCLUDED.quantity, avg_cost=EXCLUDED.avg_cost
+                    """,
+                    (user_id, ticker, h["quantity"], h["avg_cost"]),
+                )
 
 
 def get_watchlist_tickers(user_id: str) -> list[str]:
-    db = get_db()
-    rows = (
-        db.table("user_stocks")
-        .select("ticker")
-        .eq("user_id", user_id)
-        .eq("type", "watchlist")
-        .execute()
-        .data
+    rows = query(
+        "SELECT ticker FROM user_stocks WHERE user_id = %s AND type = 'watchlist'",
+        (user_id,),
     )
     return [r["ticker"] for r in rows]
 
 
 def save_watchlist_tickers(user_id: str, tickers: list[str]) -> None:
-    db = get_db()
-    current = (
-        db.table("user_stocks")
-        .select("ticker")
-        .eq("user_id", user_id)
-        .eq("type", "watchlist")
-        .execute()
-        .data
-    )
-    current_set = {r["ticker"] for r in current}
-    new_set = {t.upper() for t in tickers}
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ticker FROM user_stocks WHERE user_id = %s AND type = 'watchlist'",
+                (user_id,),
+            )
+            current_set = {r[0] for r in cur.fetchall()}
+            new_set = {t.upper() for t in tickers}
 
-    for t in current_set - new_set:
-        db.table("user_stocks").delete().eq("user_id", user_id).eq("ticker", t).eq("type", "watchlist").execute()
+            for t in current_set - new_set:
+                cur.execute(
+                    "DELETE FROM user_stocks WHERE user_id=%s AND ticker=%s AND type='watchlist'",
+                    (user_id, t),
+                )
 
-    for t in new_set - current_set:
-        db.table("tickers").upsert(
-            {"ticker": t, "name": t, "market": "US", "exchange": ""},
-            on_conflict="ticker",
-        ).execute()
-        db.table("user_stocks").upsert(
-            {"user_id": user_id, "ticker": t, "type": "watchlist"},
-            on_conflict="user_id,ticker",
-        ).execute()
+            for t in new_set - current_set:
+                cur.execute(
+                    "INSERT INTO tickers (ticker, name, market, exchange) VALUES (%s, %s, 'US', '') ON CONFLICT (ticker) DO NOTHING",
+                    (t, t),
+                )
+                cur.execute(
+                    "INSERT INTO user_stocks (user_id, ticker, type) VALUES (%s, %s, 'watchlist') ON CONFLICT (user_id, ticker) DO NOTHING",
+                    (user_id, t),
+                )
 
 
 def get_full_portfolio(user_id: str) -> dict:
-    db = get_db()
-    rows = (
-        db.table("user_stocks")
-        .select("*, tickers(*)")
-        .eq("user_id", user_id)
-        .execute()
-        .data
+    rows = query(
+        """
+        SELECT us.ticker, us.type, us.quantity, us.avg_cost,
+               t.name, t.market, t.exchange,
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures
+        FROM user_stocks us
+        LEFT JOIN tickers t ON t.ticker = us.ticker
+        WHERE us.user_id = %s
+        """,
+        (user_id,),
     )
     holdings, watchlist = [], []
     for r in rows:
-        t = r.get("tickers") or {}
         entry = {
             "ticker": r["ticker"],
-            "name": t.get("name") or r["ticker"],
-            "market": t.get("market") or "US",
-            "exchange": t.get("exchange") or "",
-            "competitors": t.get("competitors") or [],
-            "moat": t.get("moat") or "",
-            "growth_plan": t.get("growth_plan") or "",
-            "risks": t.get("risks") or "",
-            "recent_disclosures": t.get("recent_disclosures") or "",
+            "name": r.get("name") or r["ticker"],
+            "market": r.get("market") or "US",
+            "exchange": r.get("exchange") or "",
+            "competitors": r.get("competitors") or [],
+            "moat": r.get("moat") or "",
+            "growth_plan": r.get("growth_plan") or "",
+            "risks": r.get("risks") or "",
+            "recent_disclosures": r.get("recent_disclosures") or "",
         }
         if r["type"] == "holding":
             entry.update({"quantity": r["quantity"], "avg_cost": r["avg_cost"]})
@@ -194,52 +186,93 @@ def get_all_stocks(user_id: str) -> list[dict]:
     return portfolio.get("stocks", []) + portfolio.get("watchlist", [])
 
 
+def get_global_portfolio() -> dict:
+    """API key 인증용 — 전 유저 종목을 합산해 반환. holding 우선."""
+    rows = query(
+        """
+        SELECT DISTINCT ON (us.ticker)
+               us.ticker, us.type, t.name, t.market, t.exchange,
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures
+        FROM user_stocks us
+        LEFT JOIN tickers t ON t.ticker = us.ticker
+        ORDER BY us.ticker, CASE us.type WHEN 'holding' THEN 0 ELSE 1 END
+        """
+    )
+    holdings, watchlist = [], []
+    for r in rows:
+        entry = {
+            "ticker": r["ticker"],
+            "name": r.get("name") or r["ticker"],
+            "market": r.get("market") or "US",
+            "exchange": r.get("exchange") or "",
+            "competitors": r.get("competitors") or [],
+            "moat": r.get("moat") or "",
+            "growth_plan": r.get("growth_plan") or "",
+            "risks": r.get("risks") or "",
+            "recent_disclosures": r.get("recent_disclosures") or "",
+        }
+        if r["type"] == "holding":
+            holdings.append(entry)
+        else:
+            watchlist.append(entry)
+    return {"stocks": holdings, "watchlist": watchlist}
+
+
+_ENRICH_KEYS = frozenset({"name", "market", "exchange"}) | _ANALYST_KEYS
+
+
 def enrich_stock(ticker: str, fields: dict) -> bool:
-    db = get_db()
     upper = ticker.upper()
-    existing = db.table("tickers").select("ticker").eq("ticker", upper).execute().data
-    if not existing:
+    if not fields.keys() <= _ENRICH_KEYS:
+        raise ValueError(f"invalid field(s): {fields.keys() - _ENRICH_KEYS}")
+    exists = query("SELECT ticker FROM tickers WHERE ticker = %s", (upper,))
+    if not exists:
         return False
-    db.table("tickers").update(fields).eq("ticker", upper).execute()
+    set_clause = ", ".join(f"{k}=%s" for k in fields) + ", enriched_at=NOW()"
+    values = [json.dumps(v) if isinstance(v, list) else v for v in fields.values()]
+    execute(f"UPDATE tickers SET {set_clause} WHERE ticker=%s", (*values, upper))
     return True
 
 
-# ── 전역 함수 (user_id 없음, 시그니처 유지) ───────────────────────────────────
+# ── 전역 함수 ─────────────────────────────────────────────────────────────────
 
 def get_schedule() -> dict:
-    db = get_db()
-    rows = db.table("schedules").select("data").eq("id", 1).execute().data
+    rows = query("SELECT data FROM schedules WHERE id = 1")
     if rows:
         return rows[0]["data"]
     return {"enabled": False, "time": "08:00", "days": ["mon", "tue", "wed", "thu", "fri"]}
 
 
 def save_schedule(schedule: dict) -> None:
-    db = get_db()
-    db.table("schedules").upsert({"id": 1, "data": schedule}, on_conflict="id").execute()
+    execute(
+        "INSERT INTO schedules (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
+        (json.dumps(schedule),),
+    )
 
 
 def get_guru_managers() -> dict:
-    db = get_db()
-    rows = db.table("guru_managers").select("data").eq("id", 1).execute().data
+    rows = query("SELECT data FROM guru_managers WHERE id = 1")
     if rows:
         return rows[0]["data"]
     return {"last_updated": None, "managers": []}
 
 
 def save_guru_managers(data: dict) -> None:
-    db = get_db()
-    db.table("guru_managers").upsert({"id": 1, "data": data}, on_conflict="id").execute()
+    execute(
+        "INSERT INTO guru_managers (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
+        (json.dumps(data),),
+    )
 
 
 def get_guru_schedule() -> dict:
-    db = get_db()
-    rows = db.table("guru_schedules").select("data").eq("id", 1).execute().data
+    rows = query("SELECT data FROM guru_schedules WHERE id = 1")
     if rows:
         return rows[0]["data"]
     return {"enabled": False, "day": "sun", "time": "03:00"}
 
 
 def save_guru_schedule(schedule: dict) -> None:
-    db = get_db()
-    db.table("guru_schedules").upsert({"id": 1, "data": schedule}, on_conflict="id").execute()
+    execute(
+        "INSERT INTO guru_schedules (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
+        (json.dumps(schedule),),
+    )

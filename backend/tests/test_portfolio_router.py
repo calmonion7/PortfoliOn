@@ -34,7 +34,8 @@ def test_add_stock_saves_to_holdings_and_stocks():
     with patch("routers.portfolio.storage.get_holdings", return_value=[]), \
          patch("routers.portfolio.storage.get_stocks", return_value=[]), \
          patch("routers.portfolio.storage.save_stocks") as mock_save_stocks, \
-         patch("routers.portfolio.storage.save_holdings") as mock_save_holdings:
+         patch("routers.portfolio.storage.save_holdings") as mock_save_holdings, \
+         patch("routers.portfolio.db_query", return_value=[]):
         resp = client.post("/api/portfolio", json={
             "ticker": "NVDA", "name": "Nvidia", "quantity": 5, "avg_cost": 200.0,
             "competitors": [], "moat": "", "growth_plan": ""
@@ -97,3 +98,38 @@ def test_delete_nonexistent_ticker_returns_404():
     with patch("routers.portfolio.storage.get_holdings", return_value=[]):
         resp = client.delete("/api/portfolio/FAKE")
     assert resp.status_code == 404
+
+
+def test_add_stock_triggers_report_when_no_snapshot():
+    with patch("routers.portfolio.storage.get_holdings", return_value=[]), \
+         patch("routers.portfolio.storage.get_stocks", return_value=[]), \
+         patch("routers.portfolio.storage.save_stocks"), \
+         patch("routers.portfolio.storage.save_holdings"), \
+         patch("routers.portfolio.cache_svc.invalidate_portfolio_caches"), \
+         patch("routers.portfolio.db_query", return_value=[]) as mock_query, \
+         patch("routers.portfolio.report_generator.generate_report") as mock_gen:
+        resp = client.post("/api/portfolio", json={
+            "ticker": "TSLA", "name": "Tesla", "quantity": 5,
+            "avg_cost": 200.0, "market": "US", "exchange": ""
+        })
+    assert resp.status_code == 201
+    mock_query.assert_called_once_with(
+        "SELECT 1 FROM snapshots WHERE ticker = %s LIMIT 1", ("TSLA",)
+    )
+    mock_gen.assert_called_once()
+
+
+def test_add_stock_skips_report_when_snapshot_exists():
+    with patch("routers.portfolio.storage.get_holdings", return_value=[]), \
+         patch("routers.portfolio.storage.get_stocks", return_value=[]), \
+         patch("routers.portfolio.storage.save_stocks"), \
+         patch("routers.portfolio.storage.save_holdings"), \
+         patch("routers.portfolio.cache_svc.invalidate_portfolio_caches"), \
+         patch("routers.portfolio.db_query", return_value=[{"ticker": "TSLA", "date": "2026-05-01"}]), \
+         patch("routers.portfolio.report_generator.generate_report") as mock_gen:
+        resp = client.post("/api/portfolio", json={
+            "ticker": "TSLA", "name": "Tesla", "quantity": 5,
+            "avg_cost": 200.0, "market": "US", "exchange": ""
+        })
+    assert resp.status_code == 201
+    mock_gen.assert_not_called()

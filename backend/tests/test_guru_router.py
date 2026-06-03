@@ -9,8 +9,10 @@ from unittest.mock import patch, MagicMock
 
 # guru router만 독립적으로 테스트하는 앱
 from routers.guru import router
+from auth import require_admin
 test_app = FastAPI()
 test_app.include_router(router)
+test_app.dependency_overrides[require_admin] = lambda: "test-user-id"
 client = TestClient(test_app)
 
 SAMPLE_DATA = {
@@ -99,3 +101,19 @@ def test_update_guru_schedule_valid():
 def test_update_guru_schedule_missing_field():
     r = client.put("/api/guru/schedule", json={"enabled": True, "time": "04:00"})
     assert r.status_code == 400
+
+
+# --- 403 test: crawl blocked for non-admin ---
+
+from auth import get_current_user as _get_current_user
+
+_nonadmin_guru_app = FastAPI()
+_nonadmin_guru_app.include_router(router)
+_nonadmin_guru_app.dependency_overrides[_get_current_user] = lambda: "user-id"
+_nonadmin_guru_client = TestClient(_nonadmin_guru_app)
+
+
+def test_crawl_blocked_for_non_admin():
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        r = _nonadmin_guru_client.post("/api/guru/crawl")
+    assert r.status_code == 403

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../api'
+import { useAuth } from '../contexts/AuthContext'
 
 const DAYS = [
   { key: 'mon', label: '월' }, { key: 'tue', label: '화' },
@@ -7,26 +8,102 @@ const DAYS = [
   { key: 'fri', label: '금' }, { key: 'sat', label: '토' },
   { key: 'sun', label: '일' },
 ]
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+function getToday() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
+}
+
+function getLastScheduleDay(scheduleDays) {
+  const d = new Date()
+  for (let i = 1; i <= 7; i++) {
+    d.setDate(d.getDate() - 1)
+    if (scheduleDays.includes(DAY_KEYS[d.getDay()])) {
+      return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
+    }
+  }
+  return null
+}
 
 export default function ReportSchedule() {
+  const { role } = useAuth() || { role: null }
+  const isAdmin = role === 'admin'
+
   const [schedule, setSchedule] = useState({ enabled: false, time: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] })
   const [saved, setSaved] = useState(false)
   const [saveErr, setSaveErr] = useState('')
+
   const [generating, setGenerating] = useState(false)
   const [genMsg, setGenMsg] = useState('')
   const [progress, setProgress] = useState({ done: 0, total: 0, current: '' })
   const pollRef = useRef(null)
+
+  const [stockList, setStockList] = useState(null)
+  const [listLoading, setListLoading] = useState(true)
+  const [genTab, setGenTab] = useState('pending')
+  const [ownerFilter, setOwnerFilter] = useState('all') // 'all' | 'mine' | 'others'
+
   const [backfilling, setBackfilling] = useState(false)
   const [backfillMsg, setBackfillMsg] = useState('')
   const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0, current: '', created: 0 })
   const backfillPollRef = useRef(null)
   const [backfillDays, setBackfillDays] = useState(60)
+  const [backfillForce, setBackfillForce] = useState(false)
 
   useEffect(() => {
     api.get('/api/schedule').then(({ data }) => setSchedule(data))
   }, [])
 
-  const startPolling = () => {
+  useEffect(() => {
+    if (role !== null) loadStockList()
+  }, [role]) // eslint-disable-line
+
+  const loadStockList = async () => {
+    setListLoading(true)
+    try {
+      const scopeParam = role === 'admin' ? '?scope=all' : ''
+      const { data } = await api.get(`/api/report/list${scopeParam}`)
+      setStockList(data.stocks ?? data)
+    } catch {}
+    setListLoading(false)
+  }
+
+  const today = getToday()
+  const todayKey = DAY_KEYS[new Date().getDay()]
+  const isScheduleDay = schedule.enabled && schedule.days.includes(todayKey)
+  const lastScheduleDay = (!isScheduleDay && schedule.enabled && schedule.days.length > 0)
+    ? getLastScheduleDay(schedule.days) : null
+  const referenceDate = isScheduleDay ? today : lastScheduleDay
+
+  const { pendingStocks, doneStocks, notInPeriodStocks } = (() => {
+    if (!stockList) return { pendingStocks: [], doneStocks: [], notInPeriodStocks: [] }
+    const pending = [], done = [], notInPeriod = []
+    for (const [ticker, info] of Object.entries(stockList)) {
+      const name = info.summary?.name || ''
+      const entry = { ticker, name, is_mine: info.is_mine }
+      const latestDate = info.dates?.[0]
+      if (isScheduleDay) {
+        if (latestDate === today) done.push(entry)
+        else pending.push(entry)
+      } else if (referenceDate) {
+        if (latestDate >= referenceDate) done.push(entry)
+        else pending.push(entry)
+      } else {
+        notInPeriod.push(entry)
+      }
+    }
+    const byTicker = (a, b) => a.ticker.localeCompare(b.ticker)
+    pending.sort(byTicker); done.sort(byTicker); notInPeriod.sort(byTicker)
+    return { pendingStocks: pending, doneStocks: done, notInPeriodStocks: notInPeriod }
+  })()
+
+  const applyOwnerFilter = (stocks) => {
+    if (!isAdmin || ownerFilter === 'all') return stocks
+    if (ownerFilter === 'mine') return stocks.filter(s => s.is_mine)
+    return stocks.filter(s => !s.is_mine)
+  }
+
+  const startPolling = (onDone) => {
     pollRef.current = setInterval(async () => {
       try {
         const { data } = await api.get('/api/report/progress')
@@ -35,6 +112,7 @@ export default function ReportSchedule() {
           clearInterval(pollRef.current)
           setGenerating(false)
           setGenMsg(`완료: ${data.done}/${data.total} 종목 생성됨`)
+          onDone?.()
         }
       } catch {}
     }, 1500)
@@ -58,13 +136,17 @@ export default function ReportSchedule() {
     }
   }
 
-  const handleGenerateNow = async () => {
+  const handleGeneratePending = async () => {
+    const targets = applyOwnerFilter(pendingStocks)
+    if (targets.length === 0) return
     setGenerating(true)
     setGenMsg('')
     setProgress({ done: 0, total: 0, current: '' })
+    const tickerParam = targets.map(s => s.ticker).join(',')
+    const dateParam = referenceDate && !isScheduleDay ? `&date=${referenceDate}` : ''
     try {
-      await api.post('/api/report/generate')
-      startPolling()
+      await api.post(`/api/report/generate?tickers=${encodeURIComponent(tickerParam)}${dateParam}`)
+      startPolling(loadStockList)
     } catch (err) {
       setGenMsg(err.response?.data?.detail || '생성 실패')
       setGenerating(false)
@@ -79,7 +161,7 @@ export default function ReportSchedule() {
     setBackfillProgress({ done: 0, total: 0, current: '', created: 0 })
     clearInterval(backfillPollRef.current)
     try {
-      await api.post(`/api/report/backfill?days=${backfillDays}`)
+      await api.post(`/api/report/backfill?days=${backfillDays}&force=${backfillForce}`)
       backfillPollRef.current = setInterval(async () => {
         try {
           const { data } = await api.get('/api/report/backfill/progress')
@@ -100,6 +182,11 @@ export default function ReportSchedule() {
   useEffect(() => () => clearInterval(backfillPollRef.current), [])
 
   const pct = progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0
+  const secondTabStocks = referenceDate || isScheduleDay ? doneStocks : notInPeriodStocks
+  const secondTabLabel = referenceDate || isScheduleDay ? '생성됨' : '수집기간아님'
+  const rawTabStocks = genTab === 'pending' ? pendingStocks : secondTabStocks
+  const currentTabStocks = applyOwnerFilter(rawTabStocks)
+  const filteredPending = applyOwnerFilter(pendingStocks)
 
   return (
     <div style={{ maxWidth: 480 }}>
@@ -119,7 +206,11 @@ export default function ReportSchedule() {
             type="time" value={schedule.time}
             onChange={e => setSchedule(s => ({ ...s, time: e.target.value }))}
             disabled={!schedule.enabled}
-            style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+            style={{
+              background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+              color: 'var(--text)', fontSize: 14, fontFamily: 'inherit',
+              borderRadius: 8, padding: '4px 10px', cursor: schedule.enabled ? 'pointer' : 'default',
+            }}
           />
         </div>
         <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)', opacity: schedule.enabled ? 1 : 0.4 }}>
@@ -151,26 +242,101 @@ export default function ReportSchedule() {
       {/* 즉시 리포트 생성 */}
       <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0 }}>즉시 리포트 생성</div>
       <div className="list-card" style={{ margin: '0 0 6px' }}>
-        <div style={{ padding: '14px 16px' }}>
-          <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 14px', lineHeight: 1.6 }}>
-            보유 및 관심 종목 전체에 대해 즉시 리포트를 생성합니다. 종목당 30초~1분 소요됩니다.
-          </p>
-          <button className="btn btn-primary" onClick={handleGenerateNow} disabled={generating}
-            style={{ width: '100%', justifyContent: 'center' }}>
-            {generating ? '생성 중...' : '지금 생성'}
-          </button>
-          {generating && progress.total > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
-                <span>{progress.current || '준비 중...'}</span>
-                <span style={{ color: 'var(--text)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
+        <div style={{ padding: '10px 12px 0', display: 'flex', gap: 4 }}>
+          {[
+            { key: 'pending', label: `미생성 (${listLoading ? '…' : pendingStocks.length})` },
+            { key: 'done',    label: `${secondTabLabel} (${listLoading ? '…' : secondTabStocks.length})` },
+          ].map(({ key, label }) => (
+            <button key={key}
+              onClick={() => setGenTab(key)}
+              style={{
+                padding: '6px 14px', border: 'none', borderRadius: 8,
+                fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                background: genTab === key ? 'var(--text)' : 'var(--accent-soft)',
+                color: genTab === key ? 'var(--bg)' : 'var(--text-3)',
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {isAdmin && (
+          <div style={{ padding: '8px 12px 0', display: 'flex', gap: 4 }}>
+            {[
+              { key: 'all', label: '전체' },
+              { key: 'mine', label: '내꺼' },
+              { key: 'others', label: '그외' },
+            ].map(({ key, label }) => (
+              <button key={key} onClick={() => setOwnerFilter(key)} style={{
+                padding: '3px 10px', border: 'none', borderRadius: 6,
+                fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                background: ownerFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
+                color: ownerFilter === key ? '#fff' : 'var(--text-3)',
+              }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {listLoading ? (
+          <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</div>
+        ) : currentTabStocks.length === 0 ? (
+          <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+            {genTab === 'pending' ? `모든 종목의 ${referenceDate || '오늘'} 리포트가 생성되었습니다.` : `${secondTabLabel} 종목이 없습니다.`}
+          </div>
+        ) : (
+          <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--border)', marginTop: 8 }}>
+            {currentTabStocks.map(({ ticker, name, is_mine }) => (
+              <div key={ticker} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '7px 16px', borderBottom: '1px solid var(--border)', fontSize: 13,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <span style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12, flexShrink: 0 }}>{ticker}</span>
+                  {name && <span style={{ color: 'var(--text-3)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>}
+                </div>
+                {isAdmin && ownerFilter === 'all' && (
+                  <span style={{
+                    flexShrink: 0, marginLeft: 8, fontSize: 10, fontWeight: 600,
+                    padding: '1px 6px', borderRadius: 4,
+                    background: is_mine ? 'var(--down-soft)' : 'var(--bg-elev-2)',
+                    color: is_mine ? 'var(--down)' : 'var(--text-faint)',
+                  }}>
+                    {is_mine ? '나' : '그외'}
+                  </span>
+                )}
               </div>
-              <div style={{ background: 'var(--accent-soft)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: 'var(--text)', borderRadius: 999, transition: 'width 0.4s ease' }} />
-              </div>
-            </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+          {genTab === 'pending' ? (
+            <>
+              <button className="btn btn-primary" onClick={handleGeneratePending}
+                disabled={generating || filteredPending.length === 0}
+                style={{ width: '100%', justifyContent: 'center' }}>
+                {generating ? '생성 중...' : filteredPending.length > 0 ? `지금 생성 (${filteredPending.length}개)` : '생성할 종목 없음'}
+              </button>
+              {generating && progress.total > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
+                    <span>{progress.current || '준비 중...'}</span>
+                    <span style={{ color: 'var(--text)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
+                  </div>
+                  <div style={{ background: 'var(--accent-soft)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: 'var(--text)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+              )}
+              {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
+            </>
+          ) : (
+            <p style={{ color: 'var(--text-3)', fontSize: 12, margin: 0, textAlign: 'center' }}>
+              오늘 이미 생성된 종목 목록입니다.
+            </p>
           )}
-          {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
         </div>
       </div>
 
@@ -201,6 +367,10 @@ export default function ReportSchedule() {
               ))}
             </div>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}>
+            <input type="checkbox" checked={backfillForce} onChange={e => setBackfillForce(e.target.checked)} />
+            기존 데이터 덮어쓰기 (잘못 생성된 날짜 재생성)
+          </label>
           <button className="btn btn-primary" onClick={handleBackfill} disabled={backfilling}
             style={{ width: '100%', justifyContent: 'center' }}>
             {backfilling ? '백필 중...' : '과거 스냅샷 생성'}

@@ -1,54 +1,71 @@
 import { useState, useEffect } from 'react'
 import useTheme from './hooks/useTheme'
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Portfolio from './pages/Portfolio'
 import Research from './pages/Research'
 import MarketHub from './pages/MarketHub'
-import AnalysisHub from './pages/AnalysisHub'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
-import { supabase } from './supabase'
 import LoginPage from './pages/LoginPage'
 import MobileNav from './components/MobileNav'
-import { Sun, Moon, Bell, Refresh } from './components/ui/icons'
+import { Sun, Moon, Refresh, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
+import { trackEvent } from './utils/analytics'
+import AdminAnalytics from './pages/AdminAnalytics'
 
-function TopNav({ theme, setTheme }) {
-  const navItems = [
-    { to: '/',         label: '종목관리', end: true },
-    { to: '/research', label: '리서치' },
-    { to: '/market',   label: '시장' },
-    { to: '/analysis', label: '분석' },
-    { to: '/guru',     label: '구루' },
-    { to: '/settings', label: '설정' },
+async function doLogout(setSession) {
+  const refresh = localStorage.getItem('refresh_token')
+  if (refresh) {
+    await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refresh }),
+    }).catch(() => {})
+  }
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+  setSession(null)
+}
+
+function TopNav({ theme, setTheme, setSession }) {
+  const { menuPermissions, role, loading } = useAuth() || { menuPermissions: [], role: null, loading: true }
+  const allItems = [
+    { to: '/',         label: '종목관리', key: 'portfolio', end: true },
+    { to: '/research', label: '리서치',   key: 'research' },
+    { to: '/market',   label: '시장',     key: 'market' },
+    { to: '/guru',     label: '구루',     key: 'guru' },
+    { to: '/settings', label: '설정',     key: 'settings' },
+  ]
+  const adminItem = role === 'admin' ? [{ to: '/admin-analytics', label: '애널리틱스', key: 'analytics' }] : []
+  const navItems = loading ? [] : [
+    ...allItems.filter(item => menuPermissions.includes(item.key)),
+    ...adminItem,
   ]
   return (
     <header className="topnav">
       <div className="topnav-inner">
         <div className="brand">
-          <div className="brand-mark">
-            <div className="brand-dot" />
-            <div className="brand-dot brand-dot--2" />
-          </div>
+          <img src="/favicon.svg" className="brand-mark" alt="" />
           <span>PortfoliOn</span>
         </div>
         <nav className="topnav-tabs">
-          {navItems.map(({ to, label, end }) => (
+          {navItems.map(({ to, label, end, key }) => (
             <NavLink key={to} to={to} end={end}
+              onClick={() => trackEvent('nav_' + key)}
               className={({ isActive }) => 'topnav-tab' + (isActive ? ' is-active' : '')}>
               {label}
             </NavLink>
           ))}
         </nav>
         <div className="topnav-tools">
-          <button className="icon-btn" title="알림"><Bell /><span className="dot-indic" /></button>
           <button className="icon-btn" title="새로고침" onClick={() => window.location.reload()}><Refresh /></button>
           <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
             {theme === 'dark' ? <Sun /> : <Moon />}
           </button>
-          <button className="ghost-btn" onClick={() => supabase.auth.signOut()}>로그아웃</button>
+          <button className="icon-btn" title="로그아웃" onClick={() => doLogout(setSession)}><LogOut /></button>
         </div>
       </div>
     </header>
@@ -61,12 +78,19 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => setSession(session))
-      .catch(() => {})
-      .finally(() => setAuthLoading(false))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => setSession(session))
-    return () => subscription.unsubscribe()
+    // OAuth 콜백에서 URL 파라미터로 token 전달
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    const refresh = params.get('refresh')
+    if (token && refresh) {
+      localStorage.setItem('access_token', token)
+      localStorage.setItem('refresh_token', refresh)
+      window.history.replaceState({}, '', '/')
+    }
+
+    const stored = localStorage.getItem('access_token')
+    setSession(stored ? { access_token: stored } : null)
+    setAuthLoading(false)
   }, [])
 
   if (authLoading) return null
@@ -74,23 +98,38 @@ export default function App() {
 
   return (
     <ToastProvider>
+    <AuthProvider isLoggedIn={!!session}>
     <BrowserRouter>
       <div className="app-pc">
-        <TopNav theme={theme} setTheme={setTheme} />
+        <TopNav theme={theme} setTheme={setTheme} setSession={setSession} />
+        <header className="mobile-header">
+          <div className="brand">
+            <img src="/favicon.svg" className="brand-mark" alt="" />
+            <span>PortfoliOn</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
+              {theme === 'dark' ? <Sun /> : <Moon />}
+            </button>
+            <button className="icon-btn" title="로그아웃" onClick={() => doLogout(setSession)}><LogOut /></button>
+          </div>
+        </header>
         <main className="page-wrap">
           <Routes>
             <Route path="/" element={<Portfolio />} />
             <Route path="/research" element={<Research />} />
             <Route path="/market" element={<MarketHub />} />
-            <Route path="/analysis" element={<AnalysisHub />} />
+            <Route path="/analysis" element={<Navigate to="/" replace />} />
             <Route path="/guru" element={<Guru />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin-analytics" element={<AdminAnalytics />} />
             <Route path="/dev/showcase" element={<Showcase />} />
           </Routes>
         </main>
         <MobileNav />
       </div>
     </BrowserRouter>
+    </AuthProvider>
     </ToastProvider>
   )
 }

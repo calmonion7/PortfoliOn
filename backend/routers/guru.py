@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from datetime import datetime
 from services import storage
 from services.guru_scraper import scrape_all_managers
 from services.guru_stats import compute_popularity, compute_manager_top3, compute_weighted
 from services.progress import ProgressTracker
+from auth import require_admin
 import scheduler as sched
 
 router = APIRouter(prefix="/api/guru", tags=["guru"])
@@ -40,7 +41,7 @@ def crawl_progress():
 
 
 @router.post("/crawl", status_code=202)
-def start_crawl(background_tasks: BackgroundTasks):
+def start_crawl(background_tasks: BackgroundTasks, _: str = Depends(require_admin)):
     if _progress.get()["running"]:
         raise HTTPException(status_code=409, detail="Crawl already running")
     background_tasks.add_task(_run_crawl)

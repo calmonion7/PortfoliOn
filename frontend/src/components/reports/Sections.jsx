@@ -11,7 +11,7 @@ export function ReportSectionText({ title, text }) {
   )
 }
 
-export function ReportSectionCompetitors({ competitors, market }) {
+export function ReportSectionCompetitors({ competitors, market, ticker }) {
   if (!competitors?.length) return null
   const fmtMC = (mc) => {
     if (mc == null) return 'N/A'
@@ -32,17 +32,23 @@ export function ReportSectionCompetitors({ competitors, market }) {
             </tr>
           </thead>
           <tbody>
-            {competitors.map((c, i) => (
-              <tr key={i}>
-                <td style={{ ...TD, textAlign: 'left' }}>{c.name || c.ticker}</td>
-                <td style={TD}>{c.ticker}</td>
-                <td style={TD}>{fmt(c.price, market)}</td>
-                <td style={TD}>{c.market_cap ? (market === 'KR' ? `₩${fmtMC(c.market_cap)}` : `$${fmtMC(c.market_cap)}`) : 'N/A'}</td>
-                <td style={{ ...TD, color: c.ytd_return >= 0 ? '#81c784' : '#ef9a9a' }}>
-                  {c.ytd_return != null ? `${c.ytd_return >= 0 ? '+' : ''}${c.ytd_return.toFixed(1)}%` : 'N/A'}
-                </td>
-              </tr>
-            ))}
+            {competitors.map((c, i) => {
+              const isSelf = c.is_self || c.ticker === ticker
+              return (
+                <tr key={i} style={{ background: isSelf ? 'var(--bg-elev-2)' : undefined }}>
+                  <td style={{ ...TD, textAlign: 'left', fontWeight: isSelf ? 700 : undefined }}>
+                    {c.name || c.ticker}
+                    {isSelf && <span style={{ marginLeft: 5, fontSize: 10, color: 'var(--accent)', background: 'var(--bg-elev)', padding: '1px 5px', borderRadius: 3 }}>기준</span>}
+                  </td>
+                  <td style={{ ...TD, fontWeight: isSelf ? 700 : undefined }}>{c.ticker}</td>
+                  <td style={TD}>{fmt(c.price, market)}</td>
+                  <td style={TD}>{c.market_cap ? (market === 'KR' ? `₩${fmtMC(c.market_cap)}` : `$${fmtMC(c.market_cap)}`) : 'N/A'}</td>
+                  <td style={{ ...TD, color: c.ytd_return != null ? (c.ytd_return >= 0 ? '#81c784' : '#ef9a9a') : undefined }}>
+                    {c.ytd_return != null ? `${c.ytd_return >= 0 ? '+' : ''}${c.ytd_return.toFixed(1)}%` : 'N/A'}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

@@ -7,96 +7,244 @@ import FinancialsChart from './FinancialsChart'
 import api from '../../api'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
+  const [view, setView] = useState('B')
   if (!price && !vp?.poc) return null
+
   const levels = [
-    ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i + 1}`, color: '#81c784', size: 'sm' })),
-    vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4', size: 'md' },
-    vp?.vah != null && { value: vp.vah, label: 'VAH', color: '#4fc3f7', size: 'md' },
-    vp?.val != null && { value: vp.val, label: 'VAL', color: '#4fc3f7', size: 'md' },
-    target != null && { value: target, label: '평균목표가', color: '#ffcc80', size: 'md' },
-    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#4db6ac', size: 'sm' },
-    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#4db6ac', size: 'sm' },
-    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#4db6ac', size: 'sm' },
-    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ff8a65', size: 'sm' },
-    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ff8a65', size: 'sm' },
-    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ff8a65', size: 'sm' },
-    price != null && { value: price, label: `현재가${rsiData?.rsi != null ? ` (RSI ${rsiData.rsi.toFixed(1)})` : ''}`, color: 'var(--text)', size: 'lg' },
+    ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i+1}`, color: '#81c784' })),
+    vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4' },
+    vp?.vah != null && { value: vp.vah, label: 'VAH', color: '#4fc3f7' },
+    vp?.val != null && { value: vp.val, label: 'VAL', color: '#4fc3f7' },
+    target != null && { value: target, label: '목표가', color: '#ffcc80' },
+    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#4db6ac' },
+    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#4db6ac' },
+    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#4db6ac' },
+    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ff8a65' },
+    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ff8a65' },
+    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ff8a65' },
   ].filter(Boolean)
-  if (levels.length === 0) return null
-  const vals = levels.map(l => l.value)
-  const span = Math.max(...vals) - Math.min(...vals)
-  const pad = span > 0 ? span * 0.15 : Math.max(...vals) * 0.02
-  const lo = Math.min(...vals) - pad
-  const hi = Math.max(...vals) + pad
-  const pct = v => ((v - lo) / (hi - lo)) * 100
-  const sorted = [...levels].sort((a, b) => a.value - b.value)
-  const labelW = (l) => {
-    const priceStr = fmt(l.value, market)
-    const pctStr = l.size !== 'lg' && price != null
-      ? ` ${((l.value - price) / price * 100).toFixed(1)}%` : ''
-    return Math.max(6, Math.max(l.label.length, priceStr.length + pctStr.length) * 1.5)
+
+  const currentEntry = price != null ? {
+    value: price,
+    label: `현재가${rsiData?.rsi != null ? ` (RSI ${rsiData.rsi.toFixed(1)})` : ''}`,
+    color: 'var(--text)', isCurrent: true,
+  } : null
+
+  const allRows = [...levels, ...(currentEntry ? [currentEntry] : [])].sort((a, b) => b.value - a.value)
+  const pctFrom = v => price != null ? ((v - price) / price * 100) : null
+
+  const togglesJSX = (
+    <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+      {[['B', '바+리스트'], ['C', '지지/저항']].map(([v, lbl]) => (
+        <button key={v} onClick={() => setView(v)} style={{
+          padding: '2px 8px', fontSize: 9, borderRadius: 3, border: 'none', cursor: 'pointer',
+          background: view === v ? '#5b8dee' : 'rgba(255,255,255,0.08)',
+          color: view === v ? '#fff' : 'var(--text-3)',
+        }}>{lbl}</button>
+      ))}
+    </div>
+  )
+
+  if (view === 'B') {
+    const vals = allRows.map(l => l.value)
+    const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
+    const LABEL_H = 14
+    const GAP_H = 26  // 지그재그 효과 공간 확보
+    // naturalH > LABEL_H (전체 대비 ~7% 이상) → 갭 마커 표시
+    const uniquePrices = [...new Set(vals)].sort((a, b) => b - a)
+    const segments = []
+    for (let i = 0; i < uniquePrices.length - 1; i++) {
+      const segHi = uniquePrices[i], segLo = uniquePrices[i + 1]
+      const naturalH = (segHi - segLo) / span * 200
+      const isGap = naturalH > LABEL_H
+      segments.push({ hi: segHi, lo: segLo, isGap, h: isGap ? GAP_H : LABEL_H })
+    }
+    const BAR_H = segments.reduce((s, seg) => s + seg.h, 0) + 14
+
+    // 압축 포함 가격 → y 변환
+    const priceToY = v => {
+      let y = 7
+      for (const seg of segments) {
+        if (v > seg.hi) break
+        if (v < seg.lo) { y += seg.h; continue }
+        y += ((seg.hi - v) / (seg.hi - seg.lo)) * seg.h
+        break
+      }
+      return y
+    }
+
+    // 같은 가격 항목을 먼저 그룹핑한 뒤 overlap avoidance — 중복 슬롯으로 인한 빈 공간 방지
+    const seenVals = new Map()
+    for (const l of allRows) {
+      if (seenVals.has(l.value)) {
+        seenVals.get(l.value).mergedLabels.push({ label: l.label, color: l.color })
+      } else {
+        seenVals.set(l.value, { ...l, mergedLabels: [{ label: l.label, color: l.color }] })
+      }
+    }
+    const groupedPositioned = [...seenVals.values()]
+      .map(l => ({ ...l, y: priceToY(l.value) }))
+      .sort((a, b) => a.y - b.y)
+    for (let i = 1; i < groupedPositioned.length; i++) {
+      if (groupedPositioned[i].y < groupedPositioned[i-1].y + LABEL_H)
+        groupedPositioned[i].y = groupedPositioned[i-1].y + LABEL_H
+    }
+
+    const gapSegs = segments.filter(s => s.isGap)
+
+    return (
+      <div style={{ marginTop: 8 }}>
+        {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
+        {togglesJSX}
+        <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: '100%' }}>
+          {/* 왼쪽: 금액 */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            {groupedPositioned.map((l, i) => (
+              <div key={i} style={{
+                position: 'absolute', right: 6, top: l.y - 7,
+                fontSize: l.isCurrent ? 10 : 9, textAlign: 'right', whiteSpace: 'nowrap',
+                color: l.isCurrent ? 'var(--text)' : 'var(--text-2)',
+                fontWeight: l.isCurrent ? 700 : 400, fontVariantNumeric: 'tabular-nums',
+              }}>
+                {fmt(l.value, market)}
+              </div>
+            ))}
+          </div>
+
+          {/* 중앙 바 */}
+          <div style={{ width: 64, flexShrink: 0, position: 'relative' }}>
+            {vp?.vah != null && vp?.val != null && (() => {
+              const top = priceToY(vp.vah)
+              const height = Math.max(2, priceToY(vp.val) - priceToY(vp.vah))
+              return <>
+                {/* 배경 fill */}
+                <div style={{ position: 'absolute', left: 8, width: 48, top, height, background: 'rgba(79,195,247,0.08)', zIndex: 6 }} />
+                {/* 좌우 테두리 — 갭 SVG(zIndex:5) 위에 */}
+                <div style={{ position: 'absolute', left: 8, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
+                <div style={{ position: 'absolute', left: 55, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
+              </>
+            })()}
+            <div style={{ position: 'absolute', left: 20, top: 0, bottom: 0, width: 24, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.1)' }} />
+              {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: priceToY(price), background: 'rgba(239,154,154,0.3)' }} />}
+              {price != null && <div style={{ position: 'absolute', top: priceToY(price), left: 0, right: 0, bottom: 0, background: 'rgba(129,199,132,0.3)' }} />}
+            </div>
+            {allRows.map((l, i) => {
+              const isKey = l.isCurrent || l.label === 'VAH' || l.label === 'VAL' || l.label === '목표가'
+              const isVahVal = l.label === 'VAH' || l.label === 'VAL'
+              const isTarget = l.label === '목표가'
+              return (
+                <div key={i} style={{
+                  position: 'absolute',
+                  left: isKey ? 8 : 20, right: isKey ? 8 : 20,
+                  height: l.isCurrent ? 2.5 : isVahVal ? 2 : isTarget ? 2 : 1.5,
+                  background: l.color, top: priceToY(l.value), borderRadius: 1,
+                  zIndex: l.isCurrent ? 8 : (isVahVal || isTarget) ? 7 : 1,
+                }} />
+              )
+            })}
+            {/* 갭 구간: 바 마스킹 + 지그재그 */}
+            {gapSegs.map((seg, i) => {
+              const y = priceToY(seg.hi)
+              return (
+                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 64, height: GAP_H, zIndex: 5 }}>
+                  {/* 바 컬럼(x=20~44) 바깥만 마스킹 */}
+                  <rect x="0" y="0" width="20" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  <rect x="44" y="0" width="20" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  {/* 중간 끊김 구간 바 컬럼도 마스킹 */}
+                  <rect x="20" y="7" width="24" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
+                  {/* 위 물결 */}
+                  <polyline
+                    points="18,9 22,7 32,9 42,7 46,9"
+                    fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
+                    strokeLinecap="round" strokeLinejoin="round"
+                  />
+                  {/* 아래 물결 */}
+                  <polyline
+                    points={`18,${GAP_H-9} 22,${GAP_H-7} 32,${GAP_H-9} 42,${GAP_H-7} 46,${GAP_H-9}`}
+                    fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
+                    strokeLinecap="round" strokeLinejoin="round"
+                  />
+                </svg>
+              )
+            })}
+          </div>
+
+          {/* 오른쪽: % + 수치명 (같은 가격은 합산) */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            {groupedPositioned.map((l, i) => {
+              const p = l.isCurrent ? null : pctFrom(l.value)
+              return (
+                <div key={i} style={{
+                  position: 'absolute', left: 6, top: l.y - 7,
+                  display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap',
+                }}>
+                  {p != null && (
+                    <span style={{ fontSize: 9, color: p > 0 ? '#ef9a9a' : '#81c784', fontVariantNumeric: 'tabular-nums' }}>
+                      {p >= 0 ? '+' : ''}{p.toFixed(1)}%
+                    </span>
+                  )}
+                  <span style={{ fontSize: l.isCurrent ? 10 : 9, fontWeight: l.isCurrent ? 700 : 500 }}>
+                    {l.mergedLabels.map((lb, j) => (
+                      <span key={j} style={{ color: lb.color }}>
+                        {j > 0 && <span style={{ color: 'var(--text-3)' }}>, </span>}
+                        {lb.label}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+        </div>
+      </div>
+    )
   }
-  const aboveEdges = [], belowEdges = []
-  sorted.forEach((l, i) => {
-    l.above = i % 2 === 0
-    const edges = l.above ? aboveEdges : belowEdges
-    const cx = pct(l.value)
-    const hw = labelW(l)
-    let row = 0
-    while (row < edges.length && edges[row] > cx - hw) row++
-    if (row >= edges.length) edges.push(-Infinity)
-    edges[row] = cx + hw
-    l.row = row
-  })
-  const ROW_H = 20
-  const maxAboveRow = sorted.reduce((m, l) => l.above ? Math.max(m, l.row) : m, -1)
-  const maxBelowRow = sorted.reduce((m, l) => !l.above ? Math.max(m, l.row) : m, -1)
-  const BAR_TOP = Math.max(46, 40 + maxAboveRow * ROW_H)
-  const totalH = Math.max(100, BAR_TOP + 8 + (maxBelowRow >= 0 ? (maxBelowRow + 1) * ROW_H : 0) + 20)
+
+  // View C — 지지/저항 분할
+  const below = levels.filter(l => price == null || l.value <= price).sort((a, b) => b.value - a.value)
+  const above = levels.filter(l => price != null && l.value > price).sort((a, b) => a.value - b.value)
+
+  const renderCell = (l, isBelow) => {
+    const p = pctFrom(l.value)
+    return (
+      <div key={l.label} style={{
+        padding: '2px 6px', borderRadius: 3, marginBottom: 2,
+        display: 'flex', alignItems: 'center', gap: 4,
+        ...(isBelow
+          ? { borderRight: `2px solid ${l.color}`, flexDirection: 'row-reverse' }
+          : { borderLeft: `2px solid ${l.color}` }),
+      }}>
+        <span style={{ fontSize: 9, color: l.color, fontWeight: 600, flexShrink: 0 }}>{l.label}</span>
+        <span style={{ fontSize: 9, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', flex: 1, textAlign: isBelow ? 'right' : 'left' }}>{fmt(l.value, market)}</span>
+        {p != null && <span style={{ fontSize: 9, fontVariantNumeric: 'tabular-nums', color: isBelow ? '#81c784' : '#ef9a9a', flexShrink: 0 }}>{p >= 0 ? '+' : ''}{p.toFixed(1)}%</span>}
+      </div>
+    )
+  }
+
   return (
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
-      <div style={{ position: 'relative', height: totalH }}>
-        {vp?.val != null && vp?.vah != null && (
-          <div style={{
-            position: 'absolute', top: BAR_TOP - 4, height: 16, borderRadius: 3,
-            left: `${pct(vp.val)}%`, width: `${pct(vp.vah) - pct(vp.val)}%`,
-            background: 'rgba(79,195,247,0.18)', border: '1px solid rgba(79,195,247,0.5)',
-          }} />
-        )}
-        <div style={{ position: 'absolute', top: BAR_TOP, left: 0, right: 0, height: 8, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--chart-grid)' }} />
-          {price != null && <>
-            <div style={{ position: 'absolute', inset: 0, right: `${100 - pct(price)}%`, background: 'rgba(129,199,132,0.3)' }} />
-            <div style={{ position: 'absolute', inset: 0, left: `${pct(price)}%`, background: 'rgba(239,154,154,0.3)' }} />
-          </>}
+      {togglesJSX}
+      <div style={{ padding: '5px 10px', textAlign: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 6 }}>
+        {price != null && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{fmt(price, market)}</span>}
+        {rsiData?.rsi != null && <span style={{ fontSize: 9, color: 'var(--text-3)', marginLeft: 8 }}>RSI {rsiData.rsi.toFixed(1)}</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 9, color: '#81c784', fontWeight: 600, textAlign: 'right', marginBottom: 3 }}>지지 구간 ▼</div>
+          {below.length > 0
+            ? below.map(l => renderCell(l, true))
+            : <div style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'right', padding: '4px 6px' }}>없음</div>}
         </div>
-        {levels.map((l, i) => {
-          const isLg = l.size === 'lg', isMd = l.size === 'md'
-          const tickH = isLg ? 16 : isMd ? 11 : 9
-          return (
-            <div key={i} style={{ position: 'absolute', left: `${pct(l.value)}%`, top: BAR_TOP + 4 - tickH / 2, transform: 'translateX(-50%)' }}>
-              <div style={{ width: isLg ? 3 : 2, height: tickH, background: l.color, margin: '0 auto', borderRadius: 1 }} />
-              <div style={{
-                position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-                ...(l.above
-                  ? { bottom: '100%', marginBottom: 3 + l.row * ROW_H }
-                  : { top: '100%', marginTop: 3 + l.row * ROW_H }),
-                textAlign: 'center', whiteSpace: 'nowrap',
-              }}>
-                <div style={{ fontSize: isLg ? 10 : 8, color: l.color, fontWeight: isLg ? 700 : 400, lineHeight: 1.4 }}>{l.label}</div>
-                <div style={{ fontSize: 8, color: l.color, opacity: 0.85 }}>
-                  {fmt(l.value, market)}
-                  {!isLg && price != null && (
-                    <span style={{ marginLeft: 3, opacity: 0.85 }}>
-                      {(() => { const p = (l.value - price) / price * 100; return `${p >= 0 ? '+' : ''}${p.toFixed(1)}%` })()}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', alignSelf: 'stretch' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 9, color: '#ef9a9a', fontWeight: 600, marginBottom: 3 }}>저항 구간 ▲</div>
+          {above.length > 0
+            ? above.map(l => renderCell(l, false))
+            : <div style={{ fontSize: 9, color: 'var(--text-3)', padding: '4px 6px' }}>없음</div>}
+        </div>
       </div>
     </div>
   )
@@ -260,7 +408,7 @@ export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: 14 }}>
           <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 2, marginTop: 2 }}>
             {[
               { color: 'var(--text)', label: '현재가', desc: '현재 주가' },
               { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },

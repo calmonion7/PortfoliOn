@@ -62,3 +62,15 @@
 @media (min-width: 769px) {
   .mobile-only { display: none !important; }
 }
+
+/* 모바일 상단 헤더 */
+.mobile-header { display: none; }
+@media (max-width: 768px) {
+  .mobile-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 10;
+  }
+}

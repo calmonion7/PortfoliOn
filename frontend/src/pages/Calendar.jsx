@@ -215,7 +215,7 @@ export default function Calendar() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ maxWidth: 700, margin: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={refresh} disabled={loading} title="캐시 삭제 후 새로고침"

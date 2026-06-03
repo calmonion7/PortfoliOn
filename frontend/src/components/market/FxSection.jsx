@@ -27,7 +27,7 @@ export default function FxSection() {
   const summary = r ? r.current.toLocaleString() : ''
 
   return (
-    <SectionCard title="환율" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="환율" summary={summary} change={r?.change_pct ?? null} changeSuffix="%" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>원/달러 환율은 수출 기업 수익성과 외국인 자금 흐름에 직접 영향을 미칩니다. 달러 강세(원화 약세)는 수출 채산성 개선 요인이지만 수입 물가 상승을 유발합니다. 엔화·위안화는 경쟁국 통화 동향 파악에 활용합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         {['usdkrw', 'usdjpy', 'eurusd'].map(key => {
@@ -57,7 +57,7 @@ export default function FxSection() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                      tickFormatter={v => v.slice(5)} interval={Math.floor(usdkrwHistory.length / 6)} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={48} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                        labelStyle={{ color: 'var(--text-3)' }} />
               <Line type="monotone" dataKey="value" name="USD/KRW" stroke="#4fc3f7" dot={false} strokeWidth={1.5} />

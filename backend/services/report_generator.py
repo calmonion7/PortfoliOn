@@ -1,5 +1,8 @@
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
+from zoneinfo import ZoneInfo as _ZoneInfo
+
+_KST = _ZoneInfo("Asia/Seoul")
 from concurrent.futures import ThreadPoolExecutor
 import json
 import pandas as pd
@@ -7,29 +10,41 @@ import yfinance as yf
 
 from services import market as mkt, indicators, scraper
 from services.utils import sanitize as _sanitize
-from services.db import get_db
+from services.db import execute, query
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 
 
-def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
+def _fin_num(v):
+    """yfinance info 값을 유한 float으로 변환. 'Infinity'/NaN/None → None."""
+    import math
+    try:
+        f = float(v)
+        return f if math.isfinite(f) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_date: str = None) -> str:
     ticker = stock["ticker"]
     market = stock.get("market", "US")
     exchange = stock.get("exchange", "")
     yf_sym = mkt._yf_sym(ticker, market, exchange)
-    today = date.today().strftime("%Y-%m-%d")
+    today = target_date or datetime.now(tz=_KST).date().strftime("%Y-%m-%d")
     output_dir = output_base_dir / ticker
     output_dir.mkdir(parents=True, exist_ok=True)
 
     competitors = stock.get("competitors", [])
 
-    # US 티커는 단일 yf.Ticker 객체 공유 — 동일 티커에 대한 동시 요청 방지
+    # _t.history / _t.info는 thread-safe하지 않으므로 executor 외부에서 직렬 호출
     _t = yf.Ticker(yf_sym) if market != "KR" else None
     if _t is not None:
         try:
-            _ = _t.info  # info 사전 캐싱 (이후 호출은 캐시 반환)
+            _ = _t.info  # info 사전 캐싱
         except Exception:
             pass
+    _hist_fn = _t.history if _t is not None else yf.Ticker(yf_sym).history
+    daily_df = _hist_fn(period="1y")
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange, _t)
@@ -37,9 +52,6 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
         f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
         f_rsi       = ex.submit(indicators.get_timeframe_rsi, yf_sym)
-        _hist_fn    = _t.history if _t is not None else yf.Ticker(yf_sym).history
-        f_history   = ex.submit(_hist_fn, period="1y")
-        f_info      = ex.submit(lambda: _t.info) if _t is not None else None
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
         f_comps     = [ex.submit(mkt.get_quote, c, market, exchange) for c in competitors]
@@ -49,7 +61,6 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
     financials_annual = f_fin_ann.result()
     analyst           = f_analyst.result()
     timeframe_rsi     = f_rsi.result()
-    daily_df          = f_history.result()
     finviz            = f_finviz.result() if f_finviz is not None else {}
     news              = f_news.result()
     competitor_quotes = [f.result() for f in f_comps]
@@ -74,12 +85,12 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         pbr = round(current_price / actual_bps, 2) if current_price and actual_bps else None
     else:
         try:
-            _info = f_info.result() if f_info is not None else {}
+            _info = (_t.info if _t is not None else {}) or {}
             sector = _info.get("sector", "")
             industry = _info.get("industry", "")
-            trailing_per = _info.get("trailingPE")
-            forward_per = _info.get("forwardPE")
-            pbr = _info.get("priceToBook")
+            trailing_per = _fin_num(_info.get("trailingPE"))
+            forward_per = _fin_num(_info.get("forwardPE"))
+            pbr = _fin_num(_info.get("priceToBook"))
         except Exception:
             sector, industry = "", ""
             trailing_per = forward_per = pbr = None
@@ -89,7 +100,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         "name": stock.get("name", ticker),
         "date": today,
         "market": market,
-        "price": quote.get("price"),
+        "price": quote.get("price") or (round(float(daily_df["Close"].iloc[-1]), 2) if not daily_df.empty else None),
         "target_mean": analyst.get("target_mean") or finviz.get("finviz_target"),
         "target_high": analyst.get("target_high"),
         "target_low": analyst.get("target_low"),
@@ -117,10 +128,13 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
         "competitors_data": [
             {
                 "ticker": q.get("ticker") or c,
-                "name": q.get("name", ""),
-                "price": q.get("price"),
+                "name": q.get("name", "") or (stock.get("name", ticker) if c == ticker else ""),
+                "price": (
+                    q.get("price") or (round(float(daily_df["Close"].iloc[-1]), 2) if c == ticker and not daily_df.empty else None)
+                ),
                 "market_cap": q.get("market_cap"),
                 "ytd_return": q.get("ytd_return"),
+                "is_self": c == ticker,
             }
             for c, q in zip(
                 [ticker] + list(competitors),
@@ -131,13 +145,18 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR) -> str:
     }
 
     if summary["price"] is None:
-        raise ValueError("주가 데이터 없음 (시장 데이터 조회 실패)")
+        detail = quote.get("error", "")
+        raise ValueError(f"주가 데이터 없음{': ' + detail if detail else ''}")
 
     sanitized = _sanitize(summary)
     json_path = output_dir / f"{today}.json"
     json_path.write_text(json.dumps(sanitized, ensure_ascii=False, indent=2), encoding="utf-8")
     try:
-        get_db().table("snapshots").upsert({"ticker": ticker, "date": today, "data": sanitized}).execute()
+        execute(
+            "INSERT INTO snapshots (ticker, date, data) VALUES (%s, %s, %s)"
+            " ON CONFLICT (ticker, date) DO UPDATE SET data = EXCLUDED.data",
+            (ticker, today, json.dumps(sanitized)),
+        )
     except Exception as e:
         print(f"[Report] Supabase save failed for {ticker}: {e}")
     return str(json_path)
@@ -171,7 +190,7 @@ def _normalize_index(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHOTS_DIR) -> int:
+def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHOTS_DIR, force: bool = False) -> int:
     ticker = stock["ticker"]
     market = stock.get("market", "US")
     exchange = stock.get("exchange", "")
@@ -181,7 +200,7 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        rows = get_db().table("snapshots").select("date").eq("ticker", ticker.upper()).execute().data
+        rows = query("SELECT date FROM snapshots WHERE ticker = %s", (ticker.upper(),))
         existing = {str(r["date"]) for r in rows}
     except Exception:
         existing = {f.stem for f in output_dir.glob("*.json")}
@@ -229,7 +248,7 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
     created = 0
     for ts in trade_dates:
         date_str = ts.strftime("%Y-%m-%d")
-        if date_str in existing:
+        if not force and date_str in existing:
             continue
 
         d_trim = daily_df[daily_df.index <= ts]
@@ -289,9 +308,15 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
         out_path = output_dir / f"{date_str}.json"
         out_path.write_text(json.dumps(sanitized, ensure_ascii=False, indent=2), encoding="utf-8")
         try:
-            get_db().table("snapshots").upsert({"ticker": ticker, "date": date_str, "data": sanitized}).execute()
+            execute(
+                "INSERT INTO snapshots (ticker, date, data) VALUES (%s, %s, %s)"
+                " ON CONFLICT (ticker, date) DO UPDATE SET data = EXCLUDED.data",
+                (ticker, date_str, json.dumps(sanitized)),
+            )
         except Exception as e:
             print(f"[Backfill] Supabase save failed for {ticker} {date_str}: {e}")
+            out_path.unlink(missing_ok=True)
+            continue
         created += 1
 
     return created

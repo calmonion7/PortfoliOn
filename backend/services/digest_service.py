@@ -9,8 +9,9 @@ import requests
 import yfinance as yf
 
 from services import storage
-from services.db import get_db
+from services.db import query, execute
 from services.market import _yf_sym
+from services.market_indicators_service import _fetch_usdkrw_current
 from routers.calendar import _get_events
 
 DIGEST_DIR = Path(__file__).parent.parent / "data" / "digest"
@@ -50,18 +51,20 @@ def generate(user_id: str, today: date = None) -> dict:
             if data:
                 quotes[ticker] = data
 
-    total_value = sum(
-        h.get("quantity", 0) * quotes[h["ticker"].upper()]["current"]
-        for h in holdings
-        if h["ticker"].upper() in quotes and h.get("quantity")
-    )
-    total_prev = sum(
-        h.get("quantity", 0) * quotes[h["ticker"].upper()]["prev_close"]
-        for h in holdings
-        if h["ticker"].upper() in quotes and h.get("quantity")
-    )
-    daily_change_usd = round(total_value - total_prev, 2)
-    daily_change_pct = round(daily_change_usd / total_prev * 100, 2) if total_prev > 0 else 0.0
+    usdkrw = _fetch_usdkrw_current() or 1380
+
+    def _to_krw(h, price_key):
+        ticker = h["ticker"].upper()
+        if ticker not in quotes or not h.get("quantity"):
+            return 0
+        price = quotes[ticker][price_key]
+        qty = float(h.get("quantity", 0))
+        return price * qty * (1 if h.get("market") == "KR" else usdkrw)
+
+    total_value = sum(_to_krw(h, "current") for h in holdings)
+    total_prev = sum(_to_krw(h, "prev_close") for h in holdings)
+    daily_change_krw = round(total_value - total_prev, 0)
+    daily_change_pct = round(daily_change_krw / total_prev * 100, 2) if total_prev > 0 else 0.0
 
     stocks_list = []
     anomalies = []
@@ -111,9 +114,9 @@ def generate(user_id: str, today: date = None) -> dict:
         "date": today.isoformat(),
         "generated_at": datetime.now(kst).isoformat(timespec="seconds"),
         "portfolio_summary": {
-            "total_value_usd": round(total_value, 2),
+            "total_value_krw": round(total_value, 0),
             "daily_change_pct": daily_change_pct,
-            "daily_change_usd": daily_change_usd,
+            "daily_change_krw": daily_change_krw,
         },
         "stocks": stocks_list,
         "events_7d": events_7d,
@@ -121,12 +124,10 @@ def generate(user_id: str, today: date = None) -> dict:
     }
 
     try:
-        db = get_db()
-        db.table("digests").upsert({
-            "user_id": user_id,
-            "date": today.isoformat(),
-            "data": digest,
-        }, on_conflict="user_id,date").execute()
+        execute(
+            "INSERT INTO digests (user_id, date, data) VALUES (%s, %s, %s) ON CONFLICT (user_id, date) DO UPDATE SET data=EXCLUDED.data",
+            (user_id, today.isoformat(), json.dumps(digest)),
+        )
     except Exception as e:
         print(f"[Digest] DB save failed, falling back to file: {e}")
         path = DIGEST_DIR / f"{user_id}-{today.isoformat()}.json"
@@ -136,15 +137,9 @@ def generate(user_id: str, today: date = None) -> dict:
 
 def get_latest(user_id: str) -> dict | None:
     try:
-        db = get_db()
-        rows = (
-            db.table("digests")
-            .select("data")
-            .eq("user_id", user_id)
-            .order("date", desc=True)
-            .limit(1)
-            .execute()
-            .data
+        rows = query(
+            "SELECT data FROM digests WHERE user_id = %s ORDER BY date DESC LIMIT 1",
+            (user_id,),
         )
         if rows:
             return rows[0]["data"]
@@ -167,8 +162,8 @@ def send_telegram(digest: dict) -> None:
     sign = "+" if summary["daily_change_pct"] >= 0 else ""
     lines = [
         f"📊 Daily Digest — {digest['date']}",
-        f"포트폴리오: ${summary['total_value_usd']:,.0f}  "
-        f"{sign}{summary['daily_change_pct']:.1f}% ({sign}${summary['daily_change_usd']:,.0f})",
+        f"포트폴리오: ₩{summary['total_value_krw']:,.0f}  "
+        f"{sign}{summary['daily_change_pct']:.1f}% ({sign}₩{summary['daily_change_krw']:,.0f})",
     ]
 
     if digest["anomalies"]:

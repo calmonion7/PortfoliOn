@@ -9,16 +9,20 @@
 ## 목차
 
 - [Health](#health)
+- [Auth (인증)](#auth-인증)
+- [Admin (관리자)](#admin-관리자)
 - [Portfolio (보유종목)](#portfolio-보유종목)
 - [Watchlist (관심종목)](#watchlist-관심종목)
 - [Stocks (종목 정보)](#stocks-종목-정보)
 - [Report (리포트)](#report-리포트)
+- [Consensus (컨센서스)](#consensus-컨센서스)
 - [Schedule (자동 스케줄)](#schedule-자동-스케줄)
 - [Calendar (이벤트 캘린더)](#calendar-이벤트-캘린더)
 - [Digest (일일 다이제스트)](#digest-일일-다이제스트)
 - [Market (시장 지표)](#market-시장-지표)
 - [Guru (구루 분석)](#guru-구루-분석)
 - [Analytics (분석)](#analytics-분석)
+- [Analysis (포트폴리오 분석)](#analysis-포트폴리오-분석)
 - [공통 스키마](#공통-스키마)
 - [공통 에러 응답](#공통-에러-응답)
 
@@ -37,11 +41,224 @@
 
 ---
 
+## Auth (인증)
+
+> **Prefix:** `/api/auth`
+
+### `POST /api/auth/register`
+
+이메일/비밀번호로 신규 회원가입.
+
+**Request Body**
+```json
+{
+  "email": "user@example.com",
+  "password": "secret"
+}
+```
+
+**Response `201`**
+```json
+{ "message": "registered" }
+```
+
+**Error `400`** — 이미 존재하는 이메일
+
+---
+
+### `POST /api/auth/login`
+
+이메일/비밀번호 로그인.
+
+**Request Body**
+```json
+{
+  "email": "user@example.com",
+  "password": "secret"
+}
+```
+
+**Response `200`**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ..."
+}
+```
+
+**Error `401`** — 잘못된 이메일/비밀번호
+
+---
+
+### `POST /api/auth/refresh`
+
+Access token 갱신.
+
+**Request Body**
+```json
+{ "refresh_token": "eyJ..." }
+```
+
+**Response `200`**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ..."
+}
+```
+
+**Error `401`** — 유효하지 않거나 만료된 refresh token
+
+---
+
+### `POST /api/auth/logout`
+
+로그아웃 (refresh token 무효화).
+
+**Request Body**
+```json
+{ "refresh_token": "eyJ..." }
+```
+
+**Response `200`**
+```json
+{ "message": "logged out" }
+```
+
+---
+
+### `GET /api/auth/me`
+
+현재 로그인 사용자 정보 조회.
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "user_id": "uuid",
+  "email": "user@example.com",
+  "role": "user",
+  "menu_permissions": ["portfolio", "research", "market"]
+}
+```
+
+**Error `401`** — 인증 필요
+
+---
+
+### `GET /api/auth/oauth/google`
+
+Google OAuth 로그인 시작. Google 로그인 페이지로 리다이렉트.
+
+---
+
+### `GET /api/auth/oauth/google/callback`
+
+Google OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트.
+
+---
+
+### `GET /api/auth/oauth/github`
+
+GitHub OAuth 로그인 시작. GitHub 로그인 페이지로 리다이렉트.
+
+---
+
+### `GET /api/auth/oauth/github/callback`
+
+GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트.
+
+---
+
+## Admin (관리자)
+
+> **Prefix:** `/api/admin`  
+> **Auth:** 모든 엔드포인트에 admin role 필요
+
+허용 메뉴 목록: `portfolio`, `research`, `market`, `analysis`, `guru`, `settings`
+
+### `GET /api/admin/users`
+
+전체 사용자 목록 및 권한 조회.
+
+**Response `200`**
+```json
+[
+  {
+    "id": "uuid",
+    "email": "user@example.com",
+    "role": "user",
+    "permissions": {
+      "portfolio": true,
+      "research": false,
+      "market": true,
+      "analysis": false,
+      "guru": false,
+      "settings": false
+    }
+  }
+]
+```
+
+---
+
+### `PUT /api/admin/users/{user_id}/permissions`
+
+특정 사용자의 메뉴 권한 수정.
+
+**Path Parameter:** `user_id` — 사용자 UUID
+
+**Request Body**
+```json
+{
+  "permissions": {
+    "portfolio": true,
+    "research": true,
+    "market": true,
+    "analysis": false,
+    "guru": false,
+    "settings": false
+  }
+}
+```
+
+**Response `200`**
+```json
+{ "ok": true }
+```
+
+---
+
+### `POST /api/admin/users/bulk-permissions`
+
+여러 사용자의 권한 일괄 수정.
+
+**Request Body**
+```json
+{
+  "user_ids": ["uuid1", "uuid2"],
+  "permissions": {
+    "portfolio": true,
+    "research": true
+  }
+}
+```
+
+**Response `200`**
+```json
+{ "ok": true, "updated": 2 }
+```
+
+---
+
 ## Portfolio (보유종목)
 
 ### `GET /api/portfolio`
 
 전체 포트폴리오 조회. 보유종목(`stocks`)과 관심종목(`watchlist`) 모두 반환.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -78,6 +295,8 @@
 ### `POST /api/portfolio`
 
 보유종목 추가.
+
+**Auth:** Bearer token 필요
 
 **Request Body**
 ```json
@@ -123,6 +342,8 @@
 
 보유종목 수정.
 
+**Auth:** Bearer token 필요
+
 **Path Parameter:** `ticker` — 종목 코드
 
 **Request Body** — `POST /api/portfolio`와 동일한 스키마
@@ -136,6 +357,8 @@
 ### `DELETE /api/portfolio/{ticker}`
 
 보유종목 삭제. 삭제 후 해당 종목이 관심종목에 없으면 자동으로 관심종목으로 이동.
+
+**Auth:** Bearer token 필요
 
 **Path Parameter:** `ticker` — 종목 코드
 
@@ -153,6 +376,8 @@
 ### `GET /api/watchlist`
 
 관심종목 목록 조회.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -172,6 +397,8 @@
 ### `POST /api/watchlist`
 
 관심종목 추가.
+
+**Auth:** Bearer token 필요
 
 **Request Body**
 ```json
@@ -202,6 +429,8 @@
 
 관심종목 정보 수정.
 
+**Auth:** Bearer token 필요
+
 **Path Parameter:** `ticker` — 종목 코드
 
 **Request Body** — `POST /api/watchlist`와 동일한 스키마
@@ -215,6 +444,8 @@
 ### `DELETE /api/watchlist/{ticker}`
 
 관심종목 삭제.
+
+**Auth:** Bearer token 필요
 
 **Path Parameter:** `ticker` — 종목 코드
 
@@ -230,6 +461,8 @@
 ### `POST /api/watchlist/{ticker}/promote`
 
 관심종목 → 보유종목으로 승격.
+
+**Auth:** Bearer token 필요
 
 **Path Parameter:** `ticker` — 종목 코드
 
@@ -270,6 +503,8 @@
 
 보유종목 + 관심종목 전체 목록 (ticker, name, type만 반환).
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 [
@@ -288,6 +523,8 @@
 ### `PUT /api/stocks/{ticker}/enrich`
 
 단일 종목의 분석 정보 업데이트. 제공된 필드만 덮어씀.
+
+**Auth:** Bearer token 필요
 
 **Path Parameter:** `ticker` — 종목 코드
 
@@ -330,6 +567,8 @@
 여러 종목 분석 정보 일괄 업데이트.
 
 > ⚠️ **주의:** 이 엔드포인트는 `PUT /api/stocks/{ticker}/enrich`보다 먼저 라우팅됩니다. `{ticker}` 자리에 `enrich`를 사용하지 마세요.
+
+**Auth:** Bearer token 필요
 
 **Request Body**
 ```json
@@ -400,6 +639,8 @@
 
 보유종목 대시보드 카드 목록 (현재가, 수익률, RSI, 컨센서스). TTL 300s 캐시.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 [
@@ -464,9 +705,46 @@
 
 ---
 
+### `GET /api/report/backfill/progress`
+
+리포트 백필 진행 상황 조회.
+
+**Response `200`**
+```json
+{
+  "running": true,
+  "done": 10,
+  "total": 60,
+  "current": "AAPL (2026-03-15)"
+}
+```
+
+---
+
+### `POST /api/report/backfill`
+
+과거 `days`일치 리포트 일괄 생성 (비동기, admin 전용).
+
+**Auth:** admin role 필요
+
+**Query Parameters**
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|---------|------|------|------|
+| `days` | integer | ❌ | 백필 일수 (기본값: `60`) |
+
+**Response `202`**
+```json
+{ "message": "Backfill started for 60 days" }
+```
+
+---
+
 ### `POST /api/report/generate`
 
-전체 포트폴리오 + 관심종목 리포트 생성 (비동기).
+전체 포트폴리오 + 관심종목 리포트 생성 (비동기, admin 전용).
+
+**Auth:** admin role 필요
 
 **Response `202`**
 ```json
@@ -480,6 +758,8 @@
 ### `POST /api/report/generate/{ticker}`
 
 특정 종목 리포트 생성 (비동기).
+
+**Auth:** Bearer token 필요
 
 **Path Parameter:** `ticker` — 종목 코드
 
@@ -495,6 +775,8 @@
 ### `GET /api/report/list`
 
 생성된 리포트 목록 조회.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -521,6 +803,33 @@
 | `"holdings"` | 보유종목 |
 | `"watchlist"` | 관심종목 |
 | `"other"` | 포트폴리오에서 제거된 종목 |
+
+---
+
+### `GET /api/report/{ticker}/history`
+
+종목의 가격·애널리스트 데이터 히스토리 조회. 차트 표시용.
+
+**Path Parameter:** `ticker` — 종목 코드
+
+**Response `200`**
+```json
+[
+  {
+    "date": "2026-05-20",
+    "price": 175.5,
+    "target_mean": 210.0,
+    "target_high": 240.0,
+    "target_low": 180.0,
+    "buy": 15,
+    "hold": 8,
+    "sell": 2,
+    "rsi_daily": 62.3,
+    "rsi_weekly": 58.1,
+    "rsi_monthly": 55.0
+  }
+]
+```
 
 ---
 
@@ -552,6 +861,108 @@
 | `summary` | object \| null | 요약 JSON (없으면 `null`) |
 
 **Error `404`** — 해당 날짜의 리포트 없음
+
+---
+
+### `POST /api/report/{ticker}/refresh-analyst`
+
+특정 종목의 최신 애널리스트 데이터를 yfinance에서 즉시 갱신.
+
+**Path Parameter:** `ticker` — 종목 코드
+
+**Response `200`**
+```json
+{
+  "target_mean": 210.0,
+  "target_high": 240.0,
+  "target_low": 180.0,
+  "buy": 15,
+  "hold": 8,
+  "sell": 2,
+  "price": 175.5,
+  "drop_from_high_20d": -3.2
+}
+```
+
+---
+
+## Consensus (컨센서스)
+
+### `GET /api/consensus/batch/progress`
+
+컨센서스 일괄 수집 진행 상황 조회.
+
+**Response `200`**
+```json
+{
+  "running": true,
+  "done": 3,
+  "total": 10,
+  "current": "AAPL"
+}
+```
+
+---
+
+### `POST /api/consensus/batch`
+
+전체 포트폴리오·관심종목 컨센서스 일괄 수집 (비동기).
+
+**Auth:** Bearer token 필요
+
+**Response `202`**
+```json
+{ "message": "Consensus batch started for 10 tickers" }
+```
+
+---
+
+### `GET /api/consensus/{ticker}`
+
+특정 종목의 컨센서스 히스토리 조회.
+
+**Path Parameter:** `ticker` — 종목 코드
+
+**Response `200`**
+```json
+[
+  {
+    "date": "2026-05-20",
+    "target_mean": 210.0,
+    "target_high": 240.0,
+    "target_low": 180.0,
+    "buy": 15,
+    "hold": 8,
+    "sell": 2
+  }
+]
+```
+
+---
+
+### `POST /api/consensus/{ticker}`
+
+특정 종목의 최신 컨센서스 수집 (동기).
+
+**Path Parameter:** `ticker` — 종목 코드
+
+**Response `200`** — 수집된 컨센서스 항목
+
+---
+
+### `POST /api/consensus/{ticker}/backfill`
+
+특정 종목의 컨센서스 데이터 백필 (snapshot DB 기반).
+
+**Path Parameter:** `ticker` — 종목 코드
+
+**Response `200`**
+```json
+{
+  "added": 12,
+  "entries": [...]
+}
+```
 
 ---
 
@@ -603,7 +1014,9 @@
 
 ### `GET /api/calendar`
 
-보유종목·관심종목의 실적 발표일·배당락일 조회. 데이터는 yfinance에서 수집하며 `backend/data/calendar/YYYY-MM.json`으로 파일 캐시.
+보유종목·관심종목의 실적 발표일·배당락일 조회. 데이터는 yfinance에서 수집하며 DB(`calendar_cache`)에 캐싱.
+
+**Auth:** Bearer token 필요
 
 **Query Parameter**
 
@@ -628,6 +1041,13 @@
       "name": "마이크로소프트",
       "type": "dividend",
       "stock_type": "watchlist"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "MARKET",
+      "name": "Memorial Day",
+      "type": "holiday_us",
+      "stock_type": "market"
     }
   ]
 }
@@ -637,13 +1057,11 @@
 |------|------|------|
 | `date` | string | 이벤트 날짜 (`YYYY-MM-DD`) |
 | `ticker` | string | 종목 코드 |
-| `name` | string | 종목명 (없으면 ticker와 동일) |
-| `type` | string | `"earnings"` (실적 발표일) \| `"dividend"` (배당락일 추정) |
-| `stock_type` | string | `"holding"` (보유종목) \| `"watchlist"` (관심종목) |
+| `name` | string | 종목명 또는 공휴일명 |
+| `type` | string | `"earnings"` \| `"dividend"` \| `"holiday_us"` \| `"holiday_kr"` |
+| `stock_type` | string | `"holding"` \| `"watchlist"` \| `"market"` |
 
 > **배당락일 추정:** yfinance 배당 이력에서 최근 4회 지급 간격의 평균으로 다음 배당락일을 예측합니다. 배당 이력이 2회 미만인 종목은 생략됩니다.
-
-> **캐시:** 월별 파일 캐시 (`backend/data/calendar/YYYY-MM.json`). 종목 추가·삭제·이동 시 자동 전체 삭제. 수동 초기화는 `DELETE /api/calendar/cache` 사용.
 
 **Error `422`** — `month` 파라미터가 `YYYY-MM` 형식이 아닌 경우
 
@@ -651,7 +1069,9 @@
 
 ### `DELETE /api/calendar/cache`
 
-특정 월의 캘린더 캐시 파일을 삭제합니다. 다음 `GET /api/calendar` 요청 시 yfinance에서 재수집합니다.
+특정 월의 캘린더 캐시를 삭제합니다. 다음 `GET /api/calendar` 요청 시 yfinance에서 재수집합니다.
+
+**Auth:** Bearer token 필요
 
 **Query Parameter**
 
@@ -674,6 +1094,8 @@
 
 가장 최근 생성된 다이제스트 조회.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 {
@@ -691,6 +1113,8 @@
 
 다이제스트 즉시 생성 (동기).
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 {
@@ -706,7 +1130,7 @@
 
 ### `GET /api/market/treasury`
 
-미국 국채 금리 (2년, 10년).
+미국 국채 금리 (2년, 10년). Supabase `market_cache`에서 읽고 없으면 yfinance 조회.
 
 **Response `200`**
 ```json
@@ -777,9 +1201,56 @@ M7 빅테크 최근 실적 요약.
 
 ### `GET /api/market/kr-exports`
 
-한국 수출 지표.
+한국 수출 지표. `KITA_API_KEY`(관세청 API) 미설정 시 UN Comtrade 공개 API 폴백.
 
 **Response `200`** — 월별 수출 데이터 객체
+
+---
+
+### `POST /api/market/refresh-earnings`
+
+M7·KR Top2 실적 데이터 캐시 초기화 후 재수집.
+
+**Response `200`**
+```json
+{
+  "ok": true,
+  "m7_quarters": 20,
+  "kr_quarters": 16
+}
+```
+
+---
+
+### `POST /api/market/refresh-econ`
+
+경제지표(CPI, 실업률) 캐시 초기화 후 FRED API 재수집.
+
+**Response `200`**
+```json
+{
+  "ok": true,
+  "cpi_points": 36,
+  "unemp_points": 36
+}
+```
+
+---
+
+### `POST /api/market/refresh-market`
+
+FX·VIX·국채·원자재 캐시 초기화 후 yfinance 1년치 재수집.
+
+**Response `200`**
+```json
+{
+  "ok": true,
+  "fx_points": 252,
+  "vix_points": 252,
+  "treasury_points": 252,
+  "commodities_gold_points": 252
+}
+```
 
 ---
 
@@ -844,7 +1315,9 @@ dataroma 기반 구루 매니저 전체 목록.
 
 ### `POST /api/guru/crawl`
 
-dataroma 전체 매니저 크롤링 시작 (비동기).
+dataroma 전체 매니저 크롤링 시작 (비동기, admin 전용).
+
+**Auth:** admin role 필요
 
 **Response `202`**
 ```json
@@ -893,6 +1366,8 @@ dataroma 전체 매니저 크롤링 시작 (비동기).
 
 보유 종목 간 90일 수익률 상관관계 행렬. TTL 300s 캐시.
 
+**Auth:** Bearer token 필요
+
 - 종목이 2개 미만이거나, 데이터 20일 미만인 종목은 제외됨
 - KR 종목은 `.KS` 또는 `.KQ` 심볼로 조회
 
@@ -917,6 +1392,60 @@ dataroma 전체 매니저 크롤링 시작 (비동기).
 |------|------|------|
 | `tickers` | string[] | 상관관계 계산에 포함된 종목 코드 목록 |
 | `matrix` | number[][] | `tickers[i]`와 `tickers[j]`의 상관계수 (`matrix[i][j]`) |
+
+---
+
+## Analysis (포트폴리오 분석)
+
+> **Prefix:** `/api/analysis`  
+> **Auth:** Bearer token 필요
+
+### `GET /api/analysis/sector`
+
+보유종목 섹터 모멘텀 분석. 섹터 ETF(XLK, XLV 등 11종) 기반 모멘텀 데이터와 보유종목의 섹터 배분을 결합. TTL 300s 캐시.
+
+**Response `200`**
+```json
+{
+  "sector_momentum": [
+    {
+      "sector": "Technology",
+      "etf": "XLK",
+      "momentum_1m": 3.2,
+      "momentum_3m": 8.1,
+      "momentum_6m": 15.4
+    }
+  ],
+  "holdings_by_sector": {
+    "Technology": ["AAPL", "MSFT"],
+    "Healthcare": ["JNJ"]
+  }
+}
+```
+
+---
+
+### `GET /api/analysis/macro-correlation`
+
+보유종목과 매크로 지표(TLT·UUP·USO·^VIX) 간 상관관계 분석. TTL 300s 캐시.
+
+**Response `200`**
+```json
+{
+  "tickers": ["AAPL", "MSFT"],
+  "macro": ["TLT", "UUP", "USO", "^VIX"],
+  "matrix": [
+    [-0.32, 0.12, 0.45, -0.67],
+    [-0.28, 0.09, 0.38, -0.71]
+  ]
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `tickers` | string[] | 보유종목 코드 목록 |
+| `macro` | string[] | 매크로 지표 티커 목록 |
+| `matrix` | number[][] | `matrix[i][j]` = `tickers[i]`와 `macro[j]`의 상관계수 |
 
 ---
 
@@ -965,5 +1494,8 @@ dataroma 전체 매니저 크롤링 시작 (비동기).
 | HTTP 상태 | 의미 |
 |-----------|------|
 | `400` | 잘못된 요청 (중복, 필드 누락 등) |
+| `401` | 인증 필요 (토큰 없음 또는 만료) |
+| `403` | 권한 없음 (admin 전용 엔드포인트) |
 | `404` | 리소스 없음 |
+| `409` | 충돌 (이미 진행 중인 작업 등) |
 | `422` | 요청 바디 유효성 검사 실패 (FastAPI 기본) |

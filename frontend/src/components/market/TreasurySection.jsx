@@ -38,7 +38,7 @@ export default function TreasurySection() {
   const summary = r10y ? `10Y ${r10y.current.toFixed(2)}%` : ''
 
   return (
-    <SectionCard title="미국 국채금리" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="미국 국채금리" summary={summary} change={r10y?.change_bp ?? null} changeSuffix="bp" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>연준 통화정책 방향의 핵심 지표입니다. 단기(2년)는 금리 기대를, 장기(10년·30년)는 경기 및 인플레이션 전망을 반영합니다. 2년물이 10년물을 상회하는 장단기 역전은 역사적으로 경기 침체의 선행 신호입니다.</p>
       <div style={isMobile
         ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }
@@ -72,7 +72,7 @@ export default function TreasurySection() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                      interval={Math.floor(chartData.length / 6)} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={36} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                        labelStyle={{ color: 'var(--text-3)' }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />

@@ -80,8 +80,74 @@ export default function ConsensusChart({ ticker, market }) {
     return ascData.every(d => d.buy === ascData[0].buy && d.hold === ascData[0].hold && d.sell === ascData[0].sell)
   }, [ascData])
 
+  // 겹침 방지: 처음·끝·최대·최소 + 충분히 이격된 변화 포인트만 레이블 표시
+  const targetLabelSet = useMemo(() => {
+    const changed = []
+    let prevVal = null
+    for (let i = 0; i < filteredData.length; i++) {
+      const val = filteredData[i].target_mean
+      if (val == null) continue
+      if (val !== prevVal) { changed.push(i); prevVal = val }
+    }
+    if (changed.length <= 4) return new Set(changed)
+
+    const allVals = filteredData.map((d, i) => ({ i, val: d.target_mean })).filter(p => p.val != null)
+    const maxI = allVals.reduce((a, b) => b.val > a.val ? b : a).i
+    const minI = allVals.reduce((a, b) => b.val < a.val ? b : a).i
+    const show = new Set([changed[0], changed[changed.length - 1], maxI, minI])
+
+    const minGap = Math.max(4, Math.floor(filteredData.length / 6))
+    for (const idx of changed) {
+      if (show.has(idx)) continue
+      if (![...show].some(s => Math.abs(s - idx) < minGap)) show.add(idx)
+    }
+    return show
+  }, [filteredData])
+
   const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
-  const chartMargin = { top: 22, right: 16, left: 0, bottom: 0 }
+  const chartMargin = { top: 22, right: 16, left: 0, bottom: 4 }
+
+  const fmtYAxis = (v) => {
+    if (v == null) return ''
+    if (market === 'KR') {
+      if (Math.abs(v) >= 100000000) return `₩${(v / 100000000).toFixed(0)}억`
+      if (Math.abs(v) >= 10000) return `₩${Math.round(v / 10000)}만`
+      return `₩${v}`
+    }
+    if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(0)}K`
+    return `$${v}`
+  }
+
+  // recharts가 틱을 서브샘플링하므로 index=0(첫 번째 렌더 틱) 기준으로 연도 표시
+  const yearChangeDates = useMemo(() => {
+    const s = new Set()
+    let prev = null
+    for (const d of filteredData) {
+      const y = d.date.slice(0, 4)
+      if (y !== prev) { s.add(d.date); prev = y }
+    }
+    return s
+  }, [filteredData])
+
+  const xTick = ({ x, y, payload, index }) => {
+    const date = payload.value
+    if (!date) return null
+    const mmdd = date.slice(5)
+    const year = date.slice(0, 4)
+    const showYear = index === 0 || yearChangeDates.has(date)
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text textAnchor="middle" fontSize={10} fill="var(--text-3)" dy={12}>{mmdd}</text>
+        {showYear && (
+          <g>
+            <rect x={-19} y={18} width={38} height={14} rx={7}
+              fill="none" stroke="var(--border)" strokeWidth={0.8} />
+            <text textAnchor="middle" dominantBaseline="central" fontSize={8.5} fill="var(--text-3)" y={25}>{year}</text>
+          </g>
+        )}
+      </g>
+    )
+  }
 
   const anchor = (index, total) =>
     index === 0 ? 'start' : index === total - 1 ? 'end' : 'middle'
@@ -103,7 +169,7 @@ export default function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {label && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), up ? -10 : 14)}
+        {targetLabelSet.has(index) && label && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), up ? -10 : 14)}
       </g>
     )
   }
@@ -135,7 +201,7 @@ export default function ConsensusChart({ ticker, market }) {
     return (
       <g key={index}>
         <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
-        {bgLabel(cx, cy, label, color, anchor(index, filteredData.length), -10)}
+        {targetLabelSet.has(index) && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), -10)}
       </g>
     )
   }
@@ -290,11 +356,11 @@ export default function ConsensusChart({ ticker, market }) {
             </div>
           </div>
           {tab === 0 && (
-            <ResponsiveContainer width="100%" height={140}>
+            <ResponsiveContainer width="100%" height={155}>
               <LineChart data={filteredData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
+                <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <Tooltip content={targetTooltip} />
                 <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="#ffcc80" strokeWidth={2} dot={targetDot} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
@@ -307,10 +373,10 @@ export default function ConsensusChart({ ticker, market }) {
                   <span style={{ fontSize: 9, color: 'var(--text-3)', background: 'var(--bg-elev-2)', border: '1px solid var(--border)', borderRadius: 3, padding: '0 5px', lineHeight: '16px' }}>변동 없음</span>
                 )}
               </div>
-              <ResponsiveContainer width="100%" height={140}>
+              <ResponsiveContainer width="100%" height={155}>
                 <LineChart data={filteredData} margin={chartMargin}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                   <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
                   <Tooltip content={opinionTooltip} />
                   <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={makeDot('#43a047', 'buy')} activeDot={{ r: 5 }} connectNulls />
@@ -329,11 +395,11 @@ export default function ConsensusChart({ ticker, market }) {
             </>
           )}
           {tab === 2 && (
-            <ResponsiveContainer width="100%" height={140}>
+            <ResponsiveContainer width="100%" height={155}>
               <LineChart data={filteredData} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="left" tickFormatter={(v) => fmt(v, market)} tick={axisStyle} axisLine={false} tickLine={false} width={60} />
+                <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="left" tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
                 <Tooltip content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null

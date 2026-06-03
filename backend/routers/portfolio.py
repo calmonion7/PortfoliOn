@@ -1,12 +1,41 @@
-from fastapi import APIRouter, HTTPException, Depends
+from datetime import date as _date, timedelta as _timedelta
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List
-from services import storage, errors
-from services import cache as cache_svc
+from services import storage, errors, report_generator, consensus as consensus_svc
+from services import cache as cache_svc, market as market_svc
 from services.utils import find_ticker_index, ticker_exists_in
+from services.parallel import parallel_map
+from services.db import query as db_query
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
+
+_DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+
+
+def _last_scheduled_date() -> str:
+    schedule = storage.get_schedule()
+    enabled = {_DAY_MAP[d] for d in schedule.get("days", []) if d in _DAY_MAP}
+    today = _date.today()
+    if not schedule.get("enabled") or not enabled:
+        return today.isoformat()
+    for i in range(7):
+        d = today - _timedelta(days=i)
+        if d.weekday() in enabled:
+            return d.isoformat()
+    return today.isoformat()
+
+
+def _generate_with_consensus(stock_dict: dict):
+    report_generator.generate_report(stock_dict, target_date=stock_dict.get("_target_date"))
+    ticker = stock_dict["ticker"]
+    market = stock_dict.get("market", "US")
+    cache_svc.invalidate(ticker)
+    try:
+        consensus_svc.backfill(ticker, market)
+    except Exception as e:
+        print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
 
 
 class Stock(BaseModel):
@@ -26,8 +55,25 @@ def get_portfolio(user_id: str = Depends(get_current_user)):
     return storage.get_full_portfolio(user_id)
 
 
+@router.get("/prices")
+def get_portfolio_prices(user_id: str = Depends(get_current_user)):
+    portfolio = storage.get_full_portfolio(user_id)
+    all_stocks = portfolio.get("stocks", [])
+
+    def _fetch(s):
+        try:
+            quote = market_svc.get_quote(s["ticker"], s.get("market", "US"), s.get("exchange", ""))
+            if quote:
+                return s["ticker"], {"current_price": quote.get("price"), "change_pct": quote.get("daily_change_pct")}
+        except Exception:
+            pass
+        return s["ticker"], {}
+
+    return dict(parallel_map(_fetch, all_stocks))
+
+
 @router.post("", status_code=201)
-def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
+def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
     holdings = storage.get_holdings(user_id)
     if ticker_exists_in(holdings, stock.ticker):
         raise errors.already_exists(stock.ticker)
@@ -55,8 +101,27 @@ def add_stock(stock: Stock, user_id: str = Depends(get_current_user)):
     storage.save_holdings(user_id, holdings)
     cache_svc.invalidate_portfolio_caches()
 
+    target_date = _last_scheduled_date()
+    existing = db_query(
+        "SELECT 1 FROM snapshots WHERE ticker = %s AND date = %s LIMIT 1",
+        (stock.ticker.upper(), target_date),
+    )
+    if not existing:
+        stock_dict = {
+            "ticker": stock.ticker.upper(),
+            "name": stock.name,
+            "market": stock.market,
+            "exchange": stock.exchange,
+            "competitors": stock.competitors,
+            "moat": stock.moat,
+            "growth_plan": stock.growth_plan,
+            "_target_date": target_date,
+        }
+        background_tasks.add_task(_generate_with_consensus, stock_dict)
+
     return {**new_holding, "name": stock.name, "competitors": stock.competitors,
-            "moat": stock.moat, "growth_plan": stock.growth_plan}
+            "moat": stock.moat, "growth_plan": stock.growth_plan,
+            "report_queued": not bool(existing)}
 
 
 @router.put("/{ticker}")

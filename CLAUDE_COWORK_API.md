@@ -2,7 +2,7 @@
 
 > Claude Cowork가 종목 목록을 조회하고, AI가 생성한 분석 정보를 PortfoliOn 백엔드에 저장하기 위한 API입니다.
 
-**Base URL:** `http://localhost:8000`  
+**Base URL:** `https://portfolion.taebro.com`  
 **Content-Type:** `application/json`
 
 ---
@@ -10,12 +10,31 @@
 ## 워크플로우
 
 ```
-1. GET /api/stocks          → 분석 대상 종목 목록 조회
-2. (AI가 각 종목 분석 수행)
-3. PUT /api/stocks/enrich/batch  → 분석 결과 일괄 저장
+1. GET /api/stocks               → 분석 대상 종목 목록 조회
+2. (선택) GET /api/report/list   → 기존 리포트 날짜 확인
+3. (선택) GET /api/report/{ticker}/{date_str}  → 기존 리포트 내용 참조
+4. (AI가 각 종목 분석 수행)
+5. PUT /api/stocks/enrich/batch  → 분석 결과 일괄 저장
    또는
    PUT /api/stocks/{ticker}/enrich  → 종목 1개 저장
+6. POST /api/report/generate     → 전체 리포트 재생성 (enrich 후 반드시 실행)
 ```
+
+---
+
+## 인증
+
+외부 API(Claude Cowork)는 API Key 방식으로 인증합니다.
+
+모든 요청에 아래 헤더를 포함합니다.
+
+```
+X-API-Key: {COWORK_API_KEY}
+```
+
+`COWORK_API_KEY`는 서버의 `backend/.env.docker`에 설정된 값입니다.
+
+**Error `401`** — API Key 누락 또는 불일치
 
 ---
 
@@ -24,6 +43,8 @@
 ### `GET /api/stocks`
 
 보유종목과 관심종목 전체 목록을 반환합니다.
+
+**Auth:** `Authorization: Bearer {token}` 필요
 
 **Response `200`**
 ```json
@@ -41,9 +62,93 @@
 
 ---
 
+### `GET /api/report/list`
+
+생성된 리포트 목록과 날짜를 조회합니다. 기존 리포트가 있으면 참조해 중복 분석을 피할 수 있습니다.
+
+**Auth:** `Authorization: Bearer {token}` 필요
+
+**Response `200`**
+```json
+{
+  "stocks": {
+    "LLY": {
+      "dates": ["2026-05-20", "2026-05-01"],
+      "category": "holdings",
+      "market": "US",
+      "summary": {
+        "name": "Eli Lilly and Company",
+        "price": 823.45,
+        "sector": "Healthcare",
+        "target_mean": 950.0,
+        "buy": 18,
+        "hold": 4,
+        "sell": 0,
+        "daily_rsi": { "rsi": 58.3 },
+        "weekly_rsi": { "rsi": 62.1 },
+        "monthly_rsi": null,
+        "volume_profile": { "poc": 810.0 }
+      }
+    },
+    "AVAV": {
+      "dates": ["2026-05-15"],
+      "category": "watchlist",
+      "market": "US",
+      "summary": null
+    }
+  },
+  "last_scheduled_date": "2026-05-20"
+}
+```
+
+> 종목 데이터는 `response["stocks"]` 아래에 있습니다. `summary`는 리포트가 없으면 `null`.
+
+---
+
+### `GET /api/report/{ticker}/{date_str}`
+
+특정 날짜의 리포트 스냅샷 데이터를 조회합니다. 기존 분석을 참조할 때 사용합니다.
+
+**Auth:** 불필요
+
+**Path Parameters**
+- `ticker` — 종목 코드 (예: `LLY`)
+- `date_str` — 날짜 (`YYYY-MM-DD`, `GET /api/report/list` 의 `dates` 값)
+
+**Response `200`**
+```json
+{
+  "ticker": "LLY",
+  "date": "2026-05-20",
+  "summary": {
+    "name": "Eli Lilly and Company",
+    "price": 823.45,
+    "sector": "Healthcare",
+    "industry": "Drug Manufacturers",
+    "target_mean": 950.0,
+    "target_high": 1100.0,
+    "target_low": 750.0,
+    "buy": 18,
+    "hold": 4,
+    "sell": 0,
+    "moat": "특허 포트폴리오와 제조 규모의 경제",
+    "growth_plan": "GLP-2 파이프라인 확장",
+    "risks": "GLP-1 경쟁 심화, 약가 규제 리스크"
+  }
+}
+```
+
+> `summary`는 DB에 저장된 스냅샷 전체 데이터입니다. `content`(마크다운) 필드는 없습니다.
+
+**Error `404`** — 해당 날짜의 리포트 없음
+
+---
+
 ### `PUT /api/stocks/{ticker}/enrich`
 
 단일 종목의 AI 분석 정보를 저장합니다. 포함된 필드만 덮어쓰고 나머지는 기존 값을 유지합니다.
+
+**Auth:** `Authorization: Bearer {token}` 필요
 
 **Path Parameter:** `ticker` — 종목 코드 (예: `LLY`)
 
@@ -81,6 +186,7 @@
 | 상태 | 설명 |
 |------|------|
 | `400` | 업데이트할 필드가 없음 |
+| `401` | 인증 필요 |
 | `404` | 보유종목 또는 관심종목에 없는 ticker |
 
 ---
@@ -88,6 +194,8 @@
 ### `PUT /api/stocks/enrich/batch`
 
 여러 종목의 AI 분석 정보를 한 번에 저장합니다.
+
+**Auth:** `Authorization: Bearer {token}` 필요
 
 **Request Body** — 종목 배열 (각 항목은 `ticker` 필수, 나머지는 선택)
 ```json
@@ -120,13 +228,36 @@
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `updated` | string[] | 정상 저장된 ticker 목록 |
-| `not_found` | string[] | 포트폴리오에 없어서 건너뛴 ticker 목록 |
+| `not_found` | string[] | 전역 tickers 테이블에 없거나 업데이트 필드가 없어서 건너뛴 ticker 목록 |
 
 **Errors**
 
 | 상태 | 설명 |
 |------|------|
 | `400` | 배열이 비어 있음 |
+| `401` | 인증 필요 |
+
+---
+
+### `POST /api/report/generate`
+
+enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. 백그라운드에서 실행되며 즉시 202를 반환합니다.
+
+**Auth:** `X-API-Key` 헤더
+
+**Query Parameters** (모두 선택)
+
+| 파라미터 | 설명 |
+|----------|------|
+| `tickers` | 쉼표 구분 티커 목록 (생략 시 전체 종목) |
+| `date` | 스냅샷 날짜 `YYYY-MM-DD` (생략 시 오늘) |
+
+**Response `202`**
+```json
+{ "message": "Generating reports for 92 stock(s)" }
+```
+
+> 생성 완료까지 수 분 소요. 완료 여부는 `GET /api/report/progress`로 확인 가능.
 
 ---
 

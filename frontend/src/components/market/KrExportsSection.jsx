@@ -41,32 +41,40 @@ export default function KrExportsSection() {
   const chg3 = (cur, base) => base ? ((cur - base) / Math.abs(base) * 100) : null
   const semiShare = latest ? (latest.semiconductor / (latest.semiconductor + latest.non_semiconductor) * 100) : null
   const semiSharePrev = yoy3 ? (yoy3.semiconductor / (yoy3.semiconductor + yoy3.non_semiconductor) * 100) : null
+  const semiShareMom = prev ? (prev.semiconductor / (prev.semiconductor + prev.non_semiconductor) * 100) : null
   const latestLabel = latest?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')
 
   const summary = semiShare != null ? `반도체 ${semiShare.toFixed(1)}%` : ''
+  const shareChg = semiShare != null ? ((semiSharePrev ?? semiShareMom) != null ? (semiShare - (semiSharePrev ?? semiShareMom)) : null) : null
 
   return (
-    <SectionCard title="한국 수출: 반도체 vs 비반도체" summary={summary} open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="한국 수출: 반도체 vs 비반도체" summary={summary} change={shareChg} changeSuffix="%p" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>관세청 월별 수출 통계 기준입니다. 반도체(HS 8542)는 한국 무역수지와 원화 가치의 핵심 동력으로, 수출 비중 상승은 업황 호조를 의미합니다. 비반도체 비중은 수출 다각화 정도를 나타냅니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: '반도체', value: latest?.semiconductor, mom: chg3(latest?.semiconductor, prev?.semiconductor), yoy: chg3(latest?.semiconductor, yoy3?.semiconductor), color: '#4fc3f7' },
-          { label: '비반도체', value: latest?.non_semiconductor, mom: chg3(latest?.non_semiconductor, prev?.non_semiconductor), yoy: chg3(latest?.non_semiconductor, yoy3?.non_semiconductor), color: '#80cbc4' },
-        ].map(({ label, value, mom, yoy: yoyChg, color }) => (
+          { label: '반도체', value: latest?.semiconductor, mom: chg3(latest?.semiconductor, prev?.semiconductor), yoy: chg3(latest?.semiconductor, yoy3?.semiconductor), prevVal: prev?.semiconductor, yoyVal: yoy3?.semiconductor, color: '#4fc3f7' },
+          { label: '비반도체', value: latest?.non_semiconductor, mom: chg3(latest?.non_semiconductor, prev?.non_semiconductor), yoy: chg3(latest?.non_semiconductor, yoy3?.non_semiconductor), prevVal: prev?.non_semiconductor, yoyVal: yoy3?.non_semiconductor, color: '#80cbc4' },
+        ].map(({ label, value, mom, yoy: yoyChg, prevVal, yoyVal, color }) => (
           <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 수출액 ({latestLabel})</div>
             <div style={{ fontSize: 20, fontWeight: 700, color }}>
               {value != null ? value.toLocaleString() : '-'} <span style={{ fontSize: 11, fontWeight: 400 }}>억달러</span>
             </div>
             {mom != null && (
-              <div style={{ fontSize: 12, color: mom > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
-                {mom > 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>MoM</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: mom > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
+                  {mom > 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>MoM</span>
+                </div>
+                {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전월 {prevVal.toLocaleString()} 억달러 ({prev?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})</div>}
+              </>
             )}
             {yoyChg != null && (
-              <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
-                {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
-              </div>
+              <>
+                <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
+                  {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
+                </div>
+                {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {yoyVal.toLocaleString()} 억달러 ({yoy3?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})</div>}
+              </>
             )}
           </div>
         ))}
@@ -75,11 +83,22 @@ export default function KrExportsSection() {
           <div style={{ fontSize: 20, fontWeight: 700, color: '#ffb74d' }}>
             {semiShare != null ? semiShare.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
-          {semiShare != null && semiSharePrev != null && (
-            <div style={{ fontSize: 12, color: semiShare > semiSharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
-              {semiShare > semiSharePrev ? '▲' : '▼'} {Math.abs(semiShare - semiSharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
-            </div>
-          )}
+          {semiShare != null && (semiSharePrev ?? semiShareMom) != null && (() => {
+            const base = semiSharePrev ?? semiShareMom
+            const isYoy = semiSharePrev != null
+            const label = isYoy ? 'YoY' : 'MoM'
+            const baseLabel = isYoy
+              ? `전년동기 ${base.toFixed(1)}% (${yoyMonth?.replace(/(\d{4})(\d{2})/, '$1-$2')})`
+              : `전월 ${base.toFixed(1)}% (${prev?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})`
+            return (
+              <>
+                <div style={{ fontSize: 12, color: semiShare > base ? '#81c784' : '#e57373', marginTop: 3 }}>
+                  {semiShare > base ? '▲' : '▼'} {Math.abs(semiShare - base).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>{label}</span>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>{baseLabel}</div>
+              </>
+            )
+          })()}
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>반도체 / 전체 수출</div>
         </div>
       </div>
@@ -88,12 +107,12 @@ export default function KrExportsSection() {
           월별 수출액 추이 (억달러) — 반도체 vs 비반도체
         </div>
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={months} margin={{ top: 16, right: 40, left: 0, bottom: 0 }}>
+          <LineChart data={months} margin={{ top: 16, right: 4, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                    tickFormatter={v => v.slice(2)} />
-            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} />
-            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} />
+            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={40} />
+            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} width={36} />
             <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                      labelFormatter={v => v.replace(/(\d{4})(\d{2})/, '$1-$2')}
                      formatter={(v, n) => n === '반도체 비중' ? [`${v?.toFixed(1)}%`, n] : [v.toLocaleString() + ' 억달러', n]} />

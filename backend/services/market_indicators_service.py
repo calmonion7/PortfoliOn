@@ -8,7 +8,7 @@ import yfinance as yf
 import requests
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
-from services.db import get_db
+from services.db import query, execute
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DATA_DIR = os.path.join(_BASE_DIR, "data")
@@ -41,9 +41,9 @@ def _set_cache(key: str, data: dict, ttl: int) -> None:
 
 
 def _mc_load(key: str) -> dict | None:
-    """Supabase market_cache에서 로드. {'data': ..., 'fetched_at': ...} 반환"""
+    """market_cache에서 로드. {'data': ..., 'fetched_at': ...} 반환"""
     try:
-        rows = get_db().table("market_cache").select("data, fetched_at").eq("key", key).execute().data
+        rows = query("SELECT data, fetched_at FROM market_cache WHERE key = %s", (key,))
         if rows:
             return {"data": rows[0]["data"], "fetched_at": rows[0]["fetched_at"]}
     except Exception:
@@ -52,14 +52,21 @@ def _mc_load(key: str) -> dict | None:
 
 
 def _mc_save(key: str, data: dict) -> None:
-    """Supabase market_cache에 저장."""
+    """market_cache에 저장."""
     from datetime import datetime, timezone
     try:
-        get_db().table("market_cache").upsert({
-            "key": key,
-            "data": data,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-        }).execute()
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        execute(
+            "INSERT INTO market_cache (key, data, fetched_at) VALUES (%s, %s, %s) ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, fetched_at=EXCLUDED.fetched_at",
+            (key, json.dumps(data), fetched_at),
+        )
+    except Exception:
+        pass
+
+
+def _mc_delete(key: str) -> None:
+    try:
+        execute("DELETE FROM market_cache WHERE key = %s", (key,))
     except Exception:
         pass
 
@@ -71,6 +78,17 @@ def _merge_history(stored: list[dict], new_pts: list[dict]) -> list[dict]:
     return sorted(merged.values(), key=lambda p: p["date"])
 
 
+def _filter_outliers(pts: list[dict], max_ratio: float = 5.0) -> list[dict]:
+    """중앙값 대비 max_ratio 배 초과/미만 이상값 제거."""
+    if len(pts) < 5:
+        return pts
+    vals = sorted(p["value"] for p in pts)
+    median = vals[len(vals) // 2]
+    if median <= 0:
+        return pts
+    return [p for p in pts if (1 / max_ratio) <= (p["value"] / median) <= max_ratio]
+
+
 def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[dict]:
     """yfinance Close 히스토리 incremental fetch.
     stored가 있으면 마지막 날짜 다음부터만 조회, 없으면 1년치 조회."""
@@ -79,13 +97,13 @@ def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[
         last = stored[-1]["date"]
         start = (date.fromisoformat(last) + timedelta(days=1)).isoformat()
         if start > date.today().isoformat():
-            return stored  # 이미 최신
+            return _filter_outliers(stored)
         hist = yf.Ticker(sym).history(start=start, interval="1d")
     else:
         hist = yf.Ticker(sym).history(period="1y", interval="1d")
 
     if hist.empty:
-        return stored
+        return _filter_outliers(stored) if stored else []
 
     close = hist["Close"].dropna()
     new_pts = [
@@ -95,7 +113,8 @@ def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[
     combined = _merge_history(stored, new_pts)
     # 1년치만 유지
     cutoff = (date.today() - timedelta(days=366)).isoformat()
-    return [p for p in combined if p["date"] >= cutoff]
+    trimmed = [p for p in combined if p["date"] >= cutoff]
+    return _filter_outliers(trimmed)
 
 
 # ── Treasury ──────────────────────────────────────────────────────────────────
@@ -255,17 +274,17 @@ def _fetch_and_save_m7_earnings() -> dict:
     return data
 
 
-def get_m7_earnings() -> dict:
-    cached = _get_cache("m7_earnings")
-    if cached:
-        return cached
+def get_m7_earnings(force: bool = False) -> dict:
+    if not force:
+        cached = _get_cache("m7_earnings")
+        if cached:
+            return cached
 
-    stored = _mc_load("m7_earnings")
-    if stored:
-        _set_cache("m7_earnings", stored["data"], ttl=86400)
-        return stored["data"]
+        stored = _mc_load("m7_earnings")
+        if stored:
+            _set_cache("m7_earnings", stored["data"], ttl=86400)
+            return stored["data"]
 
-    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
     return _fetch_and_save_m7_earnings()
 
 
@@ -593,8 +612,11 @@ def get_econ_indicators() -> dict:
         _set_cache("econ_indicators", stored["data"], ttl=86400)
         return stored["data"]
 
-    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
-    return _fetch_and_save_econ_indicators()
+    # DB 캐시 없을 때만 직접 fetch (최초 1회)
+    data = _fetch_and_save_econ_indicators()
+    if isinstance(data, dict) and "error" not in data:
+        _set_cache("econ_indicators", data, ttl=86400)
+    return data
 
 
 # ── Korean Export Data ────────────────────────────────────────────────────────
@@ -736,6 +758,19 @@ def _fetch_and_save_kr_exports() -> dict:
     return data
 
 
+def _exports_is_stale(data: dict) -> bool:
+    """캐시된 데이터의 마지막 월이 2개월 이상 뒤처지면 stale."""
+    from datetime import date
+    months = data.get("months", [])
+    if not months:
+        return True
+    last = months[-1]["month"]  # e.g. "202512"
+    today = date.today()
+    last_y, last_m = int(last[:4]), int(last[4:])
+    diff = (today.year - last_y) * 12 + (today.month - last_m)
+    return diff >= 2
+
+
 def get_kr_exports() -> dict:
     cached = _get_cache("kr_exports")
     if cached:
@@ -743,13 +778,15 @@ def get_kr_exports() -> dict:
 
     stored = _mc_load("kr_exports")
     if stored:
-        _set_cache("kr_exports", stored["data"], ttl=86400)
-        return stored["data"]
+        data = stored["data"]
+        if _exports_is_stale(data):
+            return _fetch_and_save_kr_exports()
+        _set_cache("kr_exports", data, ttl=86400)
+        return data
 
     # file cache fallback
     if os.path.exists(_EXPORTS_CACHE):
         with open(_EXPORTS_CACHE) as f:
             return json.load(f)
 
-    # Supabase 캐시 없을 때만 직접 fetch (최초 1회)
     return _fetch_and_save_kr_exports()

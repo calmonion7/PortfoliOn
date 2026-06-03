@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { trackEvent } from '../utils/analytics'
 import api from '../api'
 import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
@@ -7,6 +8,9 @@ import DashboardCard from '../components/portfolio/DashboardCard'
 import { Search, Plus, Spark, MarketBadge, Sig, fmt, sparkFor, Pencil } from '../components/ui/icons'
 import useIsMobile from '../hooks/useIsMobile'
 import { useToast } from '../components/Toast'
+import SectorTab from './SectorTab'
+import MacroTab from './MacroTab'
+import Analytics from './Analytics'
 
 const DashboardGrid = ({ cards, loading }) => {
   if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
@@ -34,6 +38,9 @@ export default function Portfolio() {
   const [error, setError] = useState('')
   const [dashboardCards, setDashboardCards] = useState([])
   const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [analysisTab, setAnalysisTab] = useState('sector')
+  const [fx, setFx] = useState(1380)
+  const [events7d, setEvents7d] = useState([])
 
   const fetchAll = useCallback(async () => {
     setListLoading(true)
@@ -42,6 +49,10 @@ export default function Portfolio() {
     setWatchlist(data.watchlist || [])
     setListLoading(false)
     setHasFetched(true)
+    // 시세는 목록 렌더 후 별도 로드
+    api.get('/api/portfolio/prices').then(({ data: prices }) => {
+      setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
+    }).catch(() => {})
   }, [])
 
   const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
@@ -58,6 +69,39 @@ export default function Portfolio() {
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => {
+    api.get('/api/market/fx').then(({ data }) => {
+      const rate = data?.rates?.usdkrw?.current
+      if (rate) setFx(rate)
+    }).catch(() => {})
+  }, [])
+  useEffect(() => {
+    api.get('/api/digest/latest').then(({ data }) => {
+      setEvents7d(data?.events_7d || [])
+    }).catch(() => {})
+  }, [])
+
+  const pollReportGeneration = (ticker) => {
+    let attempts = 0
+    const maxAttempts = 6
+    const id = setInterval(async () => {
+      attempts++
+      try {
+        const { data } = await api.get(`/api/report/${ticker}/history`)
+        if (data && data.length > 0) {
+          clearInterval(id)
+        } else if (attempts >= maxAttempts) {
+          clearInterval(id)
+          showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
+        }
+      } catch {
+        if (attempts >= maxAttempts) {
+          clearInterval(id)
+          showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
+        }
+      }
+    }, 15000)
+  }
 
   const handleSave = async (stockData) => {
     try {
@@ -66,8 +110,11 @@ export default function Portfolio() {
         await api.put(`/api/${isWatch ? 'watchlist' : 'portfolio'}/${editing.ticker}`, stockData)
         showToast(`${editing.ticker} 수정됐습니다`)
       } else {
-        await api.post(`/api/${isWatch ? 'watchlist' : 'portfolio'}`, stockData)
+        const res = await api.post(`/api/${isWatch ? 'watchlist' : 'portfolio'}`, stockData)
         showToast(`${stockData.ticker} 추가됐습니다`)
+        if (res.data?.report_queued) {
+          pollReportGeneration(stockData.ticker.toUpperCase())
+        }
       }
       setModalOpen(false); setEditing(null); setError(''); fetchAll()
     } catch (err) {
@@ -116,10 +163,14 @@ export default function Portfolio() {
   const filteredWatchlist = applyFilter(watchlist)
 
   // KPI 계산
-  const totalCost = stocks.reduce((sum, h) => {
-    const v = (h.avg_cost || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : 1380)
-    return sum + v
-  }, 0)
+  const toKrw = (h, price) => (price || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : fx)
+  const totalCost = stocks.reduce((sum, h) => sum + toKrw(h, h.avg_cost || 0), 0)
+  const hasPrice = stocks.some(h => h.current_price != null)
+  const totalValue = hasPrice ? stocks.reduce((sum, h) => sum + toKrw(h, h.current_price ?? h.avg_cost ?? 0), 0) : null
+  const totalPnl = totalValue != null ? totalValue - totalCost : null
+  const totalPnlPct = totalPnl != null && totalCost > 0 ? totalPnl / totalCost * 100 : null
+  const totalValueUsd = stocks.length > 0 ? (totalValue ?? totalCost) / fx : null
+  const totalCostUsd = stocks.length > 0 ? totalCost / fx : null
 
   if (isMobile) return (
     <>
@@ -128,32 +179,51 @@ export default function Portfolio() {
       </header>
 
       <div className="hero">
-        <div className="label">투자 원가 · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</div>
-        <div className="val tnum">₩{fmt(totalCost, 0)}</div>
-        <div className="delta muted tnum">{stocks.length}개 보유 · 관심 {watchlist.length}</div>
+        <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} · 15분 지연</div>
+        <div className="val tnum">₩{fmt(totalValue ?? totalCost, 0)}</div>
+        {totalPnl != null ? (
+          <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`}>
+            {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
+            {totalPnlPct != null && <span style={{ marginLeft: 6, fontSize: 13 }}>({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>}
+          </div>
+        ) : (
+          <div className="delta muted tnum">{stocks.length}개 보유 · 관심 {watchlist.length}</div>
+        )}
+        {totalPnl != null && (
+          <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 2 }}>{stocks.length}개 보유 · 원가 ₩{fmt(totalCost, 0)}</div>
+        )}
+        {totalValueUsd != null && (
+          <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 1 }}>
+            ${fmt(totalValueUsd, 2)} · 기준환율 ₩{fmt(fx, 0)}
+          </div>
+        )}
       </div>
 
       <div className="seg-pad">
         <div className="seg">
-          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => setTab('holdings')}>
+          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => { setTab('holdings'); trackEvent('tab_holdings') }}>
             보유 <span className="count">{stocks.length}</span>
           </button>
-          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => setTab('watch')}>
+          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => { setTab('watch'); trackEvent('tab_watch') }}>
             관심 <span className="count">{watchlist.length}</span>
           </button>
-          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard() }}>
+          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard(); trackEvent('tab_dash') }}>
             대시보드
+          </button>
+          <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => { setTab('analysis'); trackEvent('tab_analysis') }}>
+            분석
           </button>
         </div>
       </div>
 
-      {tab !== 'dash' && (
+      {tab !== 'dash' && tab !== 'analysis' && (
         <div style={{ padding: '0 20px 10px' }}>
           <input
             className="m-list-search"
             placeholder="종목 검색..."
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onBlur={e => { if (e.target.value.trim()) trackEvent('stock_search', { query: e.target.value.trim() }) }}
           />
           <div className="filter-chips">
             <button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>전체</button>
@@ -197,34 +267,36 @@ export default function Portfolio() {
           {!listLoading && hasFetched && filteredStocks.length === 0 && (
             <div className="muted" style={{ textAlign: 'center', padding: 24, fontSize: 13 }}>종목을 추가해 주세요</div>
           )}
+          {events7d.length > 0 && (
+            <div className="card" style={{ marginTop: 8, padding: '12px 16px' }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>향후 7일 이벤트</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {events7d.map((ev, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
+                    <span className="tnum" style={{ color: 'var(--accent)', minWidth: 36 }}>D-{ev.days_until}</span>
+                    <span>{ev.ticker}</span>
+                    <span className="muted">{ev.event_type === 'earnings' ? '실적발표' : '배당락일'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {tab === 'watch' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 20px', paddingBottom: 80 }}>
-          {filteredWatchlist.map(h => {
-            const ccy = (h.market || 'US') === 'KR' ? '₩' : '$'
-            const dec = (h.market || 'US') === 'KR' ? 0 : 2
-            return (
+          {filteredWatchlist.map(h => (
               <div key={h.ticker} className="h-row" onClick={() => setPromoteTarget({ ticker: h.ticker, market: h.market || 'US' })} style={{ cursor: 'pointer' }}>
                 <div className="logo">{h.ticker.slice(0, 3)}</div>
                 <div className="meta">
                   <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
                   <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : '🇰🇷'} 관심종목</div>
                 </div>
-                <div className="price">
-                  {h.current_price != null ? (
-                    <>
-                      <div className="v tnum">{ccy}{fmt(h.current_price, dec)}</div>
-                      {h.change_pct != null && <Sig v={h.change_pct} />}
-                    </>
-                  ) : null}
-                </div>
                 <button className="row-edit" onClick={e => { e.stopPropagation(); openEdit(h) }}><Pencil /></button>
                 <button className="row-del" onClick={e => { e.stopPropagation(); handleDelete(h.ticker) }}>×</button>
               </div>
-            )
-          })}
+          ))}
           {listLoading && <div style={{ textAlign: 'center', padding: 24 }}><LoadingSpinner label="불러오는 중…" /></div>}
           {!listLoading && hasFetched && filteredWatchlist.length === 0 && (
             <div className="muted" style={{ textAlign: 'center', padding: 24, fontSize: 13 }}>관심종목을 추가해 주세요</div>
@@ -236,6 +308,23 @@ export default function Portfolio() {
         <div style={{ padding: '0 20px' }}>
           <DashboardGrid cards={dashboardCards} loading={dashboardLoading} />
         </div>
+      )}
+
+      {tab === 'analysis' && (
+        <>
+          <div className="seg-pad">
+            <div className="seg">
+              <button className={analysisTab === 'sector' ? 'is-active' : ''} onClick={() => setAnalysisTab('sector')}>섹터</button>
+              <button className={analysisTab === 'macro' ? 'is-active' : ''} onClick={() => setAnalysisTab('macro')}>매크로</button>
+              <button className={analysisTab === 'correlation' ? 'is-active' : ''} onClick={() => setAnalysisTab('correlation')}>상관관계</button>
+            </div>
+          </div>
+          <div className="m-page">
+            {analysisTab === 'sector' && <SectorTab />}
+            {analysisTab === 'macro' && <MacroTab />}
+            {analysisTab === 'correlation' && <Analytics />}
+          </div>
+        </>
       )}
 
       <button className="fab" onClick={openAdd}>
@@ -257,16 +346,29 @@ export default function Portfolio() {
       <div className="page-head">
         <div>
           <h1 className="page-title">내 포트폴리오</h1>
-          <p className="page-sub">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} · 실시간</p>
+          <p className="page-sub">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} · 15분 지연</p>
         </div>
-        <button className="btn btn-primary" onClick={openAdd}><Plus /> 종목 추가</button>
       </div>
 
       {/* KPI 4종 */}
       <div className="kpi-row">
         <div className="kpi">
-          <div className="label">투자 원가</div>
-          <div className="val tnum">₩{fmt(totalCost, 0)}</div>
+          <div className="label">{totalValue != null ? '평가금액' : '투자 원가'}</div>
+          <div className="val tnum">₩{fmt(totalValue ?? totalCost, 0)}</div>
+          {totalPnl != null && (
+            <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`} style={{ marginTop: 4 }}>
+              {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
+              {totalPnlPct != null && <span style={{ marginLeft: 5, fontSize: 12 }}>({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>}
+            </div>
+          )}
+          {totalValue != null && (
+            <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 2 }}>원가 ₩{fmt(totalCost, 0)}</div>
+          )}
+          {totalValueUsd != null && (
+            <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 1 }}>
+              ${fmt(totalValueUsd, 2)} · 기준환율 ₩{fmt(fx, 0)}
+            </div>
+          )}
         </div>
         <div className="kpi">
           <div className="label">보유 종목</div>
@@ -286,23 +388,27 @@ export default function Portfolio() {
       </div>
 
       {/* 세그먼트 탭 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <div className="tabs">
-          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => setTab('holdings')}>
+          <button className={tab === 'holdings' ? 'is-active' : ''} onClick={() => { setTab('holdings'); trackEvent('tab_holdings') }}>
             보유종목 <span className="count">{stocks.length}</span>
           </button>
-          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => setTab('watch')}>
+          <button className={tab === 'watch' ? 'is-active' : ''} onClick={() => { setTab('watch'); trackEvent('tab_watch') }}>
             관심종목 <span className="count">{watchlist.length}</span>
           </button>
-          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard() }}>대시보드</button>
+          <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard(); trackEvent('tab_dash') }}>대시보드</button>
+          <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => { setTab('analysis'); trackEvent('tab_analysis') }}>분석</button>
         </div>
         {tab === 'dash' && (
           <button className="btn" onClick={() => fetchDashboard({ invalidate: true })} disabled={dashboardLoading}>↺ 새로고침</button>
         )}
+        {(tab === 'holdings' || tab === 'watch') && (
+          <button className="btn btn-primary" onClick={openAdd}><Plus /> 종목 추가</button>
+        )}
       </div>
 
       {/* 검색 + 필터 칩 */}
-      {tab !== 'dash' && (
+      {tab !== 'dash' && tab !== 'analysis' && (
         <div className="search-row">
           <div className="search-input">
             <span className="ico"><Search /></span>
@@ -386,8 +492,6 @@ export default function Portfolio() {
                 <th style={{ width: 60 }}>시장</th>
                 <th>티커</th>
                 <th>회사명</th>
-                <th className="num">현재가</th>
-                <th className="num">변동</th>
                 <th>추세</th>
                 <th className="actions" />
               </tr>
@@ -398,10 +502,6 @@ export default function Portfolio() {
                   <td><MarketBadge mkt={h.market || 'US'} /></td>
                   <td className="ticker-cell">{h.ticker}</td>
                   <td>{h.name}</td>
-                  <td className="num tnum">
-                    {h.current_price ? `${(h.market || 'US') === 'KR' ? '₩' : '$'}${fmt(h.current_price, (h.market || 'US') === 'KR' ? 0 : 2)}` : <span className="muted">—</span>}
-                  </td>
-                  <td className="num">{h.change_pct != null ? <Sig v={h.change_pct} /> : <span className="muted">—</span>}</td>
                   <td><Spark data={sparkFor(h.ticker)} w={80} h={22} color="var(--text-2)" /></td>
                   <td className="actions">
                     <button className="btn btn-sm" onClick={() => setPromoteTarget(h.ticker)}>보유로 이동</button>
@@ -411,10 +511,10 @@ export default function Portfolio() {
                 </tr>
               ))}
               {listLoading && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32 }}><LoadingSpinner label="불러오는 중…" /></td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32 }}><LoadingSpinner label="불러오는 중…" /></td></tr>
               )}
               {!listLoading && hasFetched && filteredWatchlist.length === 0 && (
-                <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
+                <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 32 }}>관심종목을 추가해 주세요</td></tr>
               )}
             </tbody>
           </table>
@@ -423,6 +523,19 @@ export default function Portfolio() {
 
       {/* 대시보드 탭 */}
       {tab === 'dash' && <DashboardGrid cards={dashboardCards} loading={dashboardLoading} />}
+
+      {tab === 'analysis' && (
+        <div>
+          <div className="tabs" style={{ marginBottom: 20 }}>
+            <button className={analysisTab === 'sector' ? 'is-active' : ''} onClick={() => setAnalysisTab('sector')}>섹터</button>
+            <button className={analysisTab === 'macro' ? 'is-active' : ''} onClick={() => setAnalysisTab('macro')}>매크로</button>
+            <button className={analysisTab === 'correlation' ? 'is-active' : ''} onClick={() => setAnalysisTab('correlation')}>상관관계</button>
+          </div>
+          {analysisTab === 'sector' && <SectorTab />}
+          {analysisTab === 'macro' && <MacroTab />}
+          {analysisTab === 'correlation' && <Analytics />}
+        </div>
+      )}
 
       {modalOpen && (
         <StockModal

@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 
+const DAYS_OPTIONS = [30, 60, 90, 180]
+
 export default function ConsensusSettings() {
+  const [days, setDays] = useState(180)
+  const [force, setForce] = useState(false)
   const [batch, setBatch] = useState({ running: false, done: 0, total: 0, current: '' })
   const [batchErr, setBatchErr] = useState('')
   const pollRef = useRef(null)
@@ -13,7 +17,7 @@ export default function ConsensusSettings() {
     setBatchErr('')
     clearInterval(pollRef.current)
     try {
-      await api.post('/api/consensus/batch')
+      await api.post(`/api/consensus/batch?days=${days}&force=${force}`)
       pollRef.current = setInterval(async () => {
         try {
           const { data } = await api.get('/api/consensus/batch/progress')
@@ -37,8 +41,27 @@ export default function ConsensusSettings() {
       <div className="list-card" style={{ margin: '0 0 6px' }}>
         <div style={{ padding: '14px 16px' }}>
           <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 14px', lineHeight: 1.6 }}>
-            전체 종목의 네이버 컨센서스 데이터를 수집하고 60일 백필을 실행합니다. 수 분 소요됩니다.
+            전체 종목의 네이버 컨센서스 데이터를 수집하고 백필을 실행합니다. 수 분 소요됩니다.
           </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-3)', flexShrink: 0 }}>기간</span>
+            <div style={{ flex: 1, display: 'flex', gap: 2, padding: 3, background: 'var(--accent-soft)', borderRadius: 10 }}>
+              {DAYS_OPTIONS.map(d => (
+                <button key={d} onClick={() => setDays(d)} style={{
+                  flex: 1, border: 0, padding: '7px 0', fontSize: 13, fontWeight: 500,
+                  borderRadius: 8, letterSpacing: '-0.01em',
+                  background: days === d ? 'var(--bg-elev)' : 'transparent',
+                  color: days === d ? 'var(--text)' : 'var(--text-3)',
+                  boxShadow: days === d ? 'var(--shadow-sm)' : 'none',
+                  cursor: 'pointer',
+                }}>{d}일</button>
+              ))}
+            </div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}>
+            <input type="checkbox" checked={force} onChange={e => setForce(e.target.checked)} />
+            기존 데이터 덮어쓰기 (잘못된 날짜 재수집)
+          </label>
           <button className="btn btn-primary" onClick={runBatch} disabled={batch.running}
             style={{ width: '100%', justifyContent: 'center' }}>
             {batch.running
