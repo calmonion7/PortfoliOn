@@ -161,6 +161,64 @@ function EditPanel({ editingUser, pendingPerms, setPendingPerms, onSave, onClose
   )
 }
 
+function BottomSheet({ user, perms, setPerms, onSave, onClose, saving, savedMsg }) {
+  if (!user) return null
+  return (
+    <>
+      {/* 딤 배경 */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100,
+        }}
+      />
+      {/* 시트 */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 101,
+        background: 'var(--bg)', borderRadius: '16px 16px 0 0',
+        padding: '20px 20px 32px',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+        display: 'flex', flexDirection: 'column', gap: 16,
+      }}>
+        {/* 핸들 */}
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto -8px' }} />
+
+        {/* 이메일 */}
+        <div style={{ fontSize: 13, fontWeight: 600, wordBreak: 'break-all', textAlign: 'center' }}>
+          {user.email}
+        </div>
+
+        {/* 권한 칩 */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+          {ALL_MENUS.map(menu => (
+            <PermChip
+              key={menu}
+              label={MENU_LABELS[menu]}
+              on={perms[menu]}
+              onClick={() => setPerms(p => ({ ...p, [menu]: !p[menu] }))}
+            />
+          ))}
+        </div>
+
+        {/* 저장 버튼 */}
+        <button
+          onClick={onSave}
+          disabled={saving}
+          style={{
+            width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+            background: savedMsg ? 'var(--accent-soft)' : 'var(--text)',
+            color: savedMsg ? 'var(--text)' : 'var(--bg)',
+            fontWeight: 600, fontSize: 14,
+            cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {savedMsg ? '저장됨 ✓' : saving ? '저장 중...' : '저장'}
+        </button>
+      </div>
+    </>
+  )
+}
+
 export default function PermissionManager() {
   const isMobile = useIsMobile()
   const [users, setUsers] = useState([])
@@ -418,7 +476,66 @@ export default function PermissionManager() {
         </div>
       )}
 
-      {isMobile && <div>모바일 TODO</div>}
+      {isMobile && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* 검색창 */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="이메일로 검색..."
+              style={{
+                width: '100%', padding: '7px 10px', borderRadius: 6, fontSize: 13,
+                border: '1px solid var(--border)', background: 'var(--surface-2)',
+                color: 'var(--text)', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* 카드 리스트 */}
+          {displayed.map(u => {
+            const isAdmin = u.role === 'admin'
+            return (
+              <div
+                key={u.id}
+                onClick={() => { if (!isAdmin) openEdit(u) }}
+                style={{
+                  border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px',
+                  cursor: isAdmin ? 'default' : 'pointer',
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {isAdmin && <span style={{ fontSize: 14 }}>👑</span>}
+                  <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {u.email}
+                  </span>
+                </div>
+                <div>
+                  {isAdmin
+                    ? <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>전체 허용</span>
+                    : <PermBadges permissions={u.permissions} />
+                  }
+                </div>
+              </div>
+            )
+          })}
+
+          {/* 무한스크롤 sentinel (모바일) */}
+          <div ref={sentinelRef} style={{ height: 1 }} />
+
+          {/* 바텀 시트 */}
+          <BottomSheet
+            user={editingUser !== 'bulk' ? editingUser : null}
+            perms={pendingPerms}
+            setPerms={setPendingPerms}
+            onSave={saveSingle}
+            onClose={closePanel}
+            saving={saving}
+            savedMsg={savedMsg}
+          />
+        </div>
+      )}
     </div>
   )
 }
