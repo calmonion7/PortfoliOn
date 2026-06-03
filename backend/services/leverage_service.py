@@ -21,16 +21,27 @@ _F_MKT_CAP     = "lstgMrktTotAmt"
 
 
 def _kofia_get(endpoint: str, extra_params: str = "") -> list[dict]:
-    """KOFIA 공공데이터포털 API 조회. URL에 직접 serviceKey 삽입 (이중인코딩 방지)."""
+    """KOFIA 공공데이터포털 API 조회. 전체 페이지를 순환하여 반환."""
     key = os.environ.get("KOFIA_API_KEY", "")
-    url = f"{endpoint}?serviceKey={key}&resultType=json&numOfRows=1000&pageNo=1{extra_params}"
-    r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
-    if not r.ok:
-        ep = endpoint.split("/")[-1]
-        raise Exception(f"HTTP {r.status_code} [{ep}]: {r.text[:300]}")
-    body = r.json()["response"]["body"]
-    raw = body["items"].get("item", [])
-    return raw if isinstance(raw, list) else [raw]
+    page_size = 1000
+    all_items: list[dict] = []
+    page = 1
+    while True:
+        url = f"{endpoint}?serviceKey={key}&resultType=json&numOfRows={page_size}&pageNo={page}{extra_params}"
+        r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+        if not r.ok:
+            ep = endpoint.split("/")[-1]
+            raise Exception(f"HTTP {r.status_code} [{ep}]: {r.text[:300]}")
+        body = r.json()["response"]["body"]
+        raw = body["items"].get("item", [])
+        items = raw if isinstance(raw, list) else [raw]
+        all_items.extend(items)
+        total = int(body.get("totalCount", 0))
+        if len(all_items) >= total or len(items) < page_size:
+            break
+        page += 1
+        time.sleep(0.5)
+    return all_items
 
 
 def _fmt_date(yyyymmdd: str) -> str:
