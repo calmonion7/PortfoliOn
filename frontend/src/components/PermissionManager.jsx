@@ -37,7 +37,7 @@ function PermChip({ label, on, onClick }) {
 
 // 읽기 전용 뱃지: 테이블 행 + 모바일 카드에서 공유
 function PermBadges({ permissions }) {
-  const active = ALL_MENUS.filter(m => permissions[m])
+  const active = ALL_MENUS.filter(m => permissions?.[m])
   if (active.length === 0)
     return <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>권한 없음</span>
   return (
@@ -58,6 +58,7 @@ function DefaultPermissionsSection() {
   const [defaults, setDefaults] = useState(Object.fromEntries(ALL_MENUS.map(m => [m, false])))
   const [saved, setSaved] = useState(false)
   const timerRef = useRef(null)
+  const savedTimerRef = useRef(null)
 
   useEffect(() => {
     api.get('/api/admin/default-permissions').then(r => setDefaults(r.data))
@@ -71,12 +72,20 @@ function DefaultPermissionsSection() {
       try {
         await api.put('/api/admin/default-permissions', { permissions: next })
         setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
+        clearTimeout(savedTimerRef.current)
+        savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
       } catch (e) {
         console.error('기본 권한 저장 실패', e)
       }
     }, 500)
   }
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(timerRef.current)
+      clearTimeout(savedTimerRef.current)
+    }
+  }, [])
 
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', marginBottom: 16 }}>
@@ -231,6 +240,7 @@ export default function PermissionManager() {
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
   const sentinelRef = useRef(null)
+  const savedMsgTimerRef = useRef(null)
 
   useEffect(() => {
     api.get('/api/admin/users').then(r => setUsers(r.data))
@@ -242,8 +252,15 @@ export default function PermissionManager() {
     u.email.toLowerCase().includes(search.toLowerCase())
   )
   const displayed = filtered.slice(0, renderCount)
+  const filteredNormalUsers = normalUsers.filter(u =>
+    u.email.toLowerCase().includes(search.toLowerCase())
+  )
 
   useEffect(() => { setRenderCount(20) }, [search])
+
+  useEffect(() => {
+    return () => clearTimeout(savedMsgTimerRef.current)
+  }, [])
 
   useEffect(() => {
     if (!sentinelRef.current) return
@@ -252,7 +269,7 @@ export default function PermissionManager() {
     })
     obs.observe(sentinelRef.current)
     return () => obs.disconnect()
-  }, [])
+  }, [isMobile])
 
   function openEdit(user) {
     setEditingUser(user)
@@ -277,7 +294,8 @@ export default function PermissionManager() {
       await api.put(`/api/admin/users/${editingUser.id}/permissions`, { permissions: pendingPerms })
       setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, permissions: pendingPerms } : u))
       setSavedMsg(true)
-      setTimeout(() => setSavedMsg(false), 2000)
+      clearTimeout(savedMsgTimerRef.current)
+      savedMsgTimerRef.current = setTimeout(() => setSavedMsg(false), 2000)
     } catch {
       alert('권한 변경에 실패했습니다.')
     } finally {
@@ -302,13 +320,17 @@ export default function PermissionManager() {
 
   async function deleteUser(user) {
     if (!window.confirm(`${user.email} 계정을 삭제하시겠습니까?\n모든 데이터가 삭제됩니다.`)) return
-    await api.delete(`/api/admin/users/${user.id}`)
-    setUsers(prev => prev.filter(u => u.id !== user.id))
-    setSelectedIds(prev => prev.filter(id => id !== user.id))
-    if (editingUser?.id === user.id) closePanel()
+    try {
+      await api.delete(`/api/admin/users/${user.id}`)
+      setUsers(prev => prev.filter(u => u.id !== user.id))
+      setSelectedIds(prev => prev.filter(id => id !== user.id))
+      if (editingUser?.id === user.id) closePanel()
+    } catch {
+      alert('사용자 삭제에 실패했습니다.')
+    }
   }
 
-  const allNormalSelected = normalUsers.length > 0 && normalUsers.every(u => selectedIds.includes(u.id))
+  const allNormalSelected = filteredNormalUsers.length > 0 && filteredNormalUsers.every(u => selectedIds.includes(u.id))
 
   const SearchAndTable = (
     <div>
@@ -334,7 +356,7 @@ export default function PermissionManager() {
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
           <span style={{ fontSize: 12, fontWeight: 600 }}>{selectedIds.length}명 선택됨</span>
-          <button className="link-btn" onClick={() => setSelectedIds(normalUsers.map(u => u.id))} style={{ fontSize: 12 }}>전체선택</button>
+          <button className="link-btn" onClick={() => setSelectedIds(filteredNormalUsers.map(u => u.id))} style={{ fontSize: 12 }}>전체선택</button>
           <button className="link-btn" onClick={() => setSelectedIds([])} style={{ fontSize: 12 }}>선택해제</button>
           <button
             onClick={openBulk}
@@ -358,7 +380,7 @@ export default function PermissionManager() {
           <input
             type="checkbox"
             checked={allNormalSelected}
-            onChange={() => setSelectedIds(allNormalSelected ? [] : normalUsers.map(u => u.id))}
+            onChange={() => setSelectedIds(allNormalSelected ? [] : filteredNormalUsers.map(u => u.id))}
             style={{ cursor: 'pointer' }}
           />
         </div>
