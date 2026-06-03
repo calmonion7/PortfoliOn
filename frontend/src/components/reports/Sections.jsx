@@ -15,6 +15,11 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
   if (!competitors?.length) return null
   const fmtMC = (mc) => {
     if (mc == null) return 'N/A'
+    if (market === 'KR') {
+      if (mc >= 1e12) return `${(mc / 1e12).toFixed(1)}조`
+      if (mc >= 1e8) return `${(mc / 1e8).toFixed(0)}억`
+      return `${(mc / 1e4).toFixed(0)}만`
+    }
     if (mc >= 1e12) return `${(mc / 1e12).toFixed(1)}T`
     if (mc >= 1e9) return `${(mc / 1e9).toFixed(1)}B`
     return `${(mc / 1e6).toFixed(0)}M`
