@@ -98,7 +98,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
         {togglesJSX}
         <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: '100%' }}>
           {/* 왼쪽: 금액 */}
-          <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ flex: '0 0 88px', position: 'relative' }}>
             {groupedPositioned.map((l, i) => (
               <div key={i} style={{
                 position: 'absolute', right: 6, top: l.y - 7,
