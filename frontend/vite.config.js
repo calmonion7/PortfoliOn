@@ -7,6 +7,12 @@ const BUILD_DATE = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
 export default defineConfig({
   plugins: [
     react(),
+    {
+      name: 'sw-cache-bust',
+      transformIndexHtml(html) {
+        return html.replace(/(registerSW\.js)/g, `$1?${BUILD_DATE}`)
+      },
+    },
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
