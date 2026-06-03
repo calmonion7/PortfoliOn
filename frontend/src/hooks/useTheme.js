@@ -1,21 +1,28 @@
 import { useState, useCallback } from 'react'
 
+const THEME_COLORS = { dark: '#0b0b0c', light: '#f6f6f4' }
+
+function applyTheme(value) {
+  if (value === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark')
+  } else {
+    document.documentElement.removeAttribute('data-theme')
+  }
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', THEME_COLORS[value] ?? THEME_COLORS.light)
+}
+
 export default function useTheme() {
   const [theme, setThemeState] = useState(() => {
     const saved = localStorage.getItem('theme') ?? 'light'
-    if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark')
-    else document.documentElement.removeAttribute('data-theme')
+    applyTheme(saved)
     return saved
   })
 
   const setTheme = useCallback((next) => {
     const value = typeof next === 'function' ? next(localStorage.getItem('theme') ?? 'light') : next
     localStorage.setItem('theme', value)
-    if (value === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark')
-    } else {
-      document.documentElement.removeAttribute('data-theme')
-    }
+    applyTheme(value)
     setThemeState(value)
   }, [])
 
