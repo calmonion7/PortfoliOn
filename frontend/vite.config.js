@@ -24,16 +24,6 @@ export default defineConfig({
         navigateFallback: null,
         runtimeCaching: [
           {
-            // index.html은 항상 네트워크에서 fetch (SW 캐시 금지)
-            // /api/ 경로는 SW navigate 인터셉트 제외 (OAuth callback redirect 보호)
-            urlPattern: ({ request, url }) => request.mode === 'navigate' && !/\/api\//i.test(url.pathname),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'navigate-cache',
-              networkTimeoutSeconds: 3,
-            },
-          },
-          {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
