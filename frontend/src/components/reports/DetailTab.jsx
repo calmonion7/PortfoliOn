@@ -228,28 +228,46 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const renderCard = (group, isBelow) => {
     const { value, items } = group
     const p = pctFrom(value)
-    const firstColor = items[0].color
+    const accentColor = items[0].color
+    const isMulti = items.length > 1
     return (
       <div key={value} style={{
-        padding: '5px 8px', borderRadius: 6, marginBottom: 4,
-        background: hexToRgba(firstColor, 0.10),
-        border: `1px solid ${hexToRgba(firstColor, 0.45)}`,
+        padding: '4px 7px',
+        borderRadius: 5,
+        marginBottom: 3,
+        background: hexToRgba(accentColor, 0.13),
+        border: `1px solid ${hexToRgba(accentColor, 0.45)}`,
+        ...(isBelow
+          ? { borderRight: `3px solid ${accentColor}` }
+          : { borderLeft: `3px solid ${accentColor}` }),
         textAlign: isBelow ? 'right' : 'left',
       }}>
-        <div style={{ display: 'flex', justifyContent: isBelow ? 'flex-end' : 'flex-start', alignItems: 'center', gap: 4, marginBottom: 2, flexWrap: 'wrap' }}>
-          {items.map((item, idx) => (
-            <span key={idx} style={{ fontSize: 9, fontWeight: 700 }}>
-              {items.length > 1 && <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>{String.fromCharCode(97 + idx)}. </span>}
-              <span style={{ color: item.color }}>{item.label}</span>
-            </span>
-          ))}
+        <div style={{
+          display: 'flex',
+          justifyContent: isBelow ? 'flex-end' : 'flex-start',
+          alignItems: 'center',
+          gap: 4,
+          marginBottom: 1,
+          flexWrap: 'wrap',
+        }}>
+          {isMulti ? (
+            // 동일 가격: a. Label  b. Label 나란히
+            items.map((item, idx) => (
+              <span key={idx} style={{ fontSize: 9, whiteSpace: 'nowrap' }}>
+                <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>{String.fromCharCode(97 + idx)}.</span>
+                <span style={{ color: item.color, fontWeight: 700, marginLeft: 2 }}>{item.label}</span>
+              </span>
+            ))
+          ) : (
+            <span style={{ fontSize: 9, color: accentColor, fontWeight: 700 }}>{items[0].label}</span>
+          )}
           {p != null && (
             <span style={{ fontSize: 9, color: isBelow ? '#81c784' : '#ef9a9a', fontVariantNumeric: 'tabular-nums' }}>
               {p >= 0 ? '+' : ''}{p.toFixed(1)}%
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
           {fmt(value, market)}
         </div>
       </div>
