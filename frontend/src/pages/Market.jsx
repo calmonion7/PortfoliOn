@@ -20,6 +20,7 @@ export default function Market() {
       <M7EarningsSection />
       <KrTop2Section />
       <KrExportsSection />
+      <h2 style={{ color: 'var(--text)', margin: '32px 0 16px' }}>수급지표</h2>
       <LeverageSection />
     </div>
   )
