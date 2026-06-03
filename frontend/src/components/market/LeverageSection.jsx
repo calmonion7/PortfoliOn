@@ -31,8 +31,8 @@ export default function LeverageSection() {
   if (loading) return <SectionCardLoading title="한국 레버리지: 신용잔고·반대매매" />
   if (error || !data) return <SectionCardError title="한국 레버리지: 신용잔고·반대매매" />
 
-  const { history = [], signals = {}, latest } = data
-  const { credit_ratio_alert, credit_ratio_p90, margin_call_signal, credit_momentum } = signals
+  const { history = [], signals, latest } = data
+  const { credit_ratio_alert, credit_ratio_p90, margin_call_signal, credit_momentum } = signals || {}
 
   const latestCredit = latest?.total_credit
   const latestRatio  = latest?.liquidation_ratio
