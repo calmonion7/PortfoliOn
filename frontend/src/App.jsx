@@ -78,10 +78,27 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
-    // OAuth 콜백에서 URL 파라미터로 token 전달
     const params = new URLSearchParams(window.location.search)
+    const oauthCode = params.get('oauth')
     const token = params.get('token')
     const refresh = params.get('refresh')
+
+    if (oauthCode) {
+      window.history.replaceState({}, '', '/')
+      const API = import.meta.env.VITE_API_BASE_URL || ''
+      fetch(`${API}/api/auth/oauth/token?code=${oauthCode}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.access_token) {
+            localStorage.setItem('access_token', data.access_token)
+            localStorage.setItem('refresh_token', data.refresh_token)
+          }
+          setSession(data?.access_token ? { access_token: data.access_token } : null)
+          setAuthLoading(false)
+        })
+      return
+    }
+
     if (token && refresh) {
       localStorage.setItem('access_token', token)
       localStorage.setItem('refresh_token', refresh)

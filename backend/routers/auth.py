@@ -15,7 +15,26 @@ from auth import get_current_user
 from services import auth_service
 from services import db as db_service
 
+import time
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# Temp codes for OAuth token exchange (code -> (tokens, expiry))
+_oauth_codes: dict = {}
+
+def _store_oauth_tokens(tokens: dict) -> str:
+    code = secrets.token_urlsafe(24)
+    _oauth_codes[code] = (tokens, time.time() + 120)
+    return code
+
+def _pop_oauth_tokens(code: str) -> dict | None:
+    entry = _oauth_codes.pop(code, None)
+    if entry is None:
+        return None
+    tokens, expiry = entry
+    if time.time() > expiry:
+        return None
+    return tokens
 
 _HMAC_SECRET = os.environ.get("SESSION_SECRET", "dev-secret").encode()
 
@@ -139,10 +158,9 @@ async def oauth_google_callback(request: Request):
     user = auth_service.upsert_oauth_user(userinfo["email"], "google", userinfo["sub"])
     auth_service.apply_default_permissions(str(user["id"]))
     tokens = auth_service.issue_tokens(str(user["id"]))
+    code = _store_oauth_tokens(tokens)
     frontend = os.environ["FRONTEND_URL"]
-    return RedirectResponse(
-        f"{frontend}/?token={tokens['access_token']}&refresh={tokens['refresh_token']}"
-    )
+    return RedirectResponse(f"{frontend}/?oauth={code}")
 
 
 @router.get("/oauth/github")
@@ -187,7 +205,13 @@ async def oauth_github_callback(request: Request):
     user = auth_service.upsert_oauth_user(email, "github", str(profile["id"]))
     auth_service.apply_default_permissions(str(user["id"]))
     tokens = auth_service.issue_tokens(str(user["id"]))
+    code = _store_oauth_tokens(tokens)
     frontend = os.environ["FRONTEND_URL"]
-    return RedirectResponse(
-        f"{frontend}/?token={tokens['access_token']}&refresh={tokens['refresh_token']}"
-    )
+    return RedirectResponse(f"{frontend}/?oauth={code}")
+
+@router.get("/oauth/token")
+def oauth_token_exchange(code: str):
+    tokens = _pop_oauth_tokens(code)
+    if not tokens:
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth code")
+    return tokens
