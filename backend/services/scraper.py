@@ -52,21 +52,40 @@ def get_news_kr(ticker: str) -> list[dict]:
         r.raise_for_status()
         data = r.json()
 
-        items = data if isinstance(data, list) else (
-            data.get("items") or data.get("newsList") or data.get("list") or []
-        )
+        # 응답: [{total, items: [...]}, ...] 형태
+        raw_items = []
+        if isinstance(data, list):
+            for group in data:
+                if isinstance(group, dict):
+                    raw_items.extend(group.get("items") or [])
+                elif isinstance(group, list):
+                    raw_items.extend(group)
+        elif isinstance(data, dict):
+            raw_items = data.get("items") or data.get("newsList") or data.get("list") or []
+
         result = []
-        for item in items[:5]:
-            title     = item.get("title") or item.get("headline") or ""
-            link      = item.get("link") or item.get("url") or item.get("naverUrl") or ""
+        for item in raw_items[:5]:
+            title      = item.get("title") or item.get("headline") or ""
+            office_id  = item.get("officeId", "")
+            article_id = item.get("articleId", "")
+            link = (
+                f"https://n.news.naver.com/mnews/article/{office_id}/{article_id}"
+                if office_id and article_id
+                else item.get("link") or item.get("url") or ""
+            )
             publisher = item.get("officeName") or item.get("source") or item.get("publisher") or ""
-            pub_date  = item.get("wdate") or item.get("publishedAt") or item.get("date") or ""
+            raw_dt = item.get("datetime") or item.get("wdate") or item.get("publishedAt") or item.get("date") or ""
+            # datetime 형식: "202606030922" → "2026-06-03 09:22"
+            if raw_dt and len(raw_dt) >= 12 and raw_dt.isdigit():
+                pub_date = f"{raw_dt[:4]}-{raw_dt[4:6]}-{raw_dt[6:8]} {raw_dt[8:10]}:{raw_dt[10:12]}"
+            else:
+                pub_date = str(raw_dt)[:16]
             if title:
                 result.append({
                     "title": title,
                     "link": link,
                     "publisher": publisher,
-                    "published_at": str(pub_date)[:16],
+                    "published_at": pub_date,
                 })
         return result
     except Exception:
