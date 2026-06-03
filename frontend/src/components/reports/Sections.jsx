@@ -48,7 +48,15 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: isSelf ? 'var(--accent)' : 'var(--text-3)', flexShrink: 0, minWidth: 16, textAlign: 'right' }}>#{i + 1}</span>
+                  <span style={{
+                    flexShrink: 0,
+                    width: 20, height: 20,
+                    borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 800,
+                    background: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--bg-elev-3)',
+                    color: i < 3 ? '#1a1a1a' : 'var(--text-3)',
+                  }}>{i + 1}</span>
                   <span style={{ fontWeight: isSelf ? 700 : 500, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {c.name || c.ticker}
                   </span>
