@@ -194,3 +194,89 @@ def backfill(years: int = 5) -> None:
             print(f"[leverage_service] backfill {s}-{e}: {len(new_rows)} rows inserted")
 
         chunk_start = chunk_end + timedelta(days=1)
+
+
+def _compute_signals(df) -> dict:
+    import pandas as pd
+
+    total_credit = df["kospi_credit_balance"].fillna(0) + df["kosdaq_credit_balance"].fillna(0)
+    total_cap    = df["kospi_market_cap"].fillna(0) + df["kosdaq_market_cap"].fillna(0)
+    lqdt_ratio   = df["liquidation_ratio"].fillna(0)
+
+    # ① 신용잔고 시총 비율 + 90백분위수 과열 시그널
+    credit_ratio = (total_credit / total_cap.replace(0, float("nan")) * 100).fillna(0)
+    p90 = float(credit_ratio.quantile(0.90)) if len(credit_ratio) >= 20 else None
+    latest_ratio = float(credit_ratio.iloc[-1]) if len(credit_ratio) else None
+    credit_ratio_alert = bool(latest_ratio > p90) if (latest_ratio and p90) else False
+
+    # ② 반대매매 급증 시그널 (rolling 20일 mean + 2σ)
+    mean20 = lqdt_ratio.rolling(20, min_periods=10).mean()
+    std20  = lqdt_ratio.rolling(20, min_periods=10).std()
+    threshold = mean20.iloc[-1] + 2 * std20.iloc[-1] if len(lqdt_ratio) >= 10 else None
+    margin_call_signal = "ALERT" if (threshold and lqdt_ratio.iloc[-1] > threshold) else None
+
+    # ③ 신용잔고 모멘텀 (5일 MA vs 20일 MA)
+    ma5  = total_credit.rolling(5, min_periods=3).mean()
+    ma20 = total_credit.rolling(20, min_periods=10).mean()
+    if len(total_credit) >= 10:
+        r5, r20 = float(ma5.iloc[-1]), float(ma20.iloc[-1])
+        if r20 > 0 and r5 > r20 * 1.01:
+            credit_momentum = "ACCELERATING"
+        elif r20 > 0 and r5 < r20 * 0.99:
+            credit_momentum = "DECELERATING"
+        else:
+            credit_momentum = "NEUTRAL"
+    else:
+        credit_momentum = "NEUTRAL"
+
+    return {
+        "credit_ratio_alert": credit_ratio_alert,
+        "credit_ratio_p90": round(p90, 4) if p90 else None,
+        "margin_call_signal": margin_call_signal,
+        "credit_momentum": credit_momentum,
+    }
+
+
+def get_leverage_data(days: int = 90) -> dict:
+    """DB에서 데이터를 읽어 시그널 계산 후 JSON 반환.
+    시그널은 전체 기간 기준, history는 최근 days일만 반환."""
+    import pandas as pd
+
+    all_rows = _query_rows()
+    if not all_rows:
+        return {"history": [], "signals": {
+            "credit_ratio_alert": False, "credit_ratio_p90": None,
+            "margin_call_signal": None, "credit_momentum": "NEUTRAL",
+        }, "latest": None}
+
+    df = pd.DataFrame(all_rows)
+    df["base_date"] = pd.to_datetime(df["base_date"])
+    df = df.sort_values("base_date").reset_index(drop=True)
+
+    for col in ["kospi_credit_balance", "kosdaq_credit_balance", "kospi_market_cap",
+                "kosdaq_market_cap", "total_misu_amt", "liquidated_amt",
+                "liquidation_ratio", "customer_deposit"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    signals = _compute_signals(df)
+
+    total_credit = df["kospi_credit_balance"].fillna(0) + df["kosdaq_credit_balance"].fillna(0)
+    total_cap    = df["kospi_market_cap"].fillna(0) + df["kosdaq_market_cap"].fillna(0)
+    df["credit_ratio"] = (total_credit / total_cap.replace(0, float("nan")) * 100).round(4)
+
+    recent = df.tail(days)
+    history = []
+    for _, row in recent.iterrows():
+        history.append({
+            "date": row["base_date"].strftime("%Y-%m-%d"),
+            "kospi_credit": round(float(row["kospi_credit_balance"] or 0) / 1e8, 2),
+            "kosdaq_credit": round(float(row["kosdaq_credit_balance"] or 0) / 1e8, 2),
+            "total_credit": round(float((row["kospi_credit_balance"] or 0) + (row["kosdaq_credit_balance"] or 0)) / 1e8, 2),
+            "credit_ratio": round(float(row["credit_ratio"] or 0), 4),
+            "liquidation_ratio": float(row["liquidation_ratio"] or 0),
+            "misu_amt": round(float(row["total_misu_amt"] or 0) / 1e4, 1),
+            "customer_deposit": round(float(row["customer_deposit"] or 0) / 1e4, 0),
+        })
+
+    latest = history[-1] if history else None
+    return {"history": history, "signals": signals, "latest": latest}

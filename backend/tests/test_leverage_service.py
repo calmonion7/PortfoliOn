@@ -144,3 +144,68 @@ def test_fetch_and_store_merges_three_apis(monkeypatch):
     assert row["kospi_credit_balance"] == 1.0
     assert row["kospi_market_cap"] == 7.0
     assert row["liquidation_ratio"] == 6.0
+
+
+def _make_df_rows(n: int, lqdt_ratio_override=None):
+    rows = []
+    for i in range(n):
+        rows.append({
+            "base_date": f"2026-{(i // 28 + 1):02d}-{(i % 28 + 1):02d}",
+            "kospi_credit_balance": float(100_000 + i * 100),
+            "kosdaq_credit_balance": float(60_000 + i * 60),
+            "kospi_market_cap": float(2_100_000_000),
+            "kosdaq_market_cap": float(420_000_000),
+            "total_misu_amt": float(8_000_000),
+            "liquidated_amt": float(500_000),
+            "liquidation_ratio": lqdt_ratio_override if lqdt_ratio_override is not None else 6.5,
+            "customer_deposit": float(580_000_000),
+        })
+    return rows
+
+
+def test_get_leverage_data_structure(monkeypatch):
+    import services.leverage_service as svc
+    monkeypatch.setattr(svc, "_query_rows", lambda days=None: _make_df_rows(60))
+    result = svc.get_leverage_data(days=30)
+    assert "history" in result
+    assert "signals" in result
+    assert "latest" in result
+    assert len(result["history"]) <= 30
+    assert "credit_ratio_alert" in result["signals"]
+    assert "margin_call_signal" in result["signals"]
+    assert "credit_momentum" in result["signals"]
+
+
+def test_margin_call_signal_triggers_on_spike(monkeypatch):
+    import services.leverage_service as svc
+    rows = _make_df_rows(25)
+    rows[-1]["liquidation_ratio"] = 50.0  # 극단적 스파이크
+    monkeypatch.setattr(svc, "_query_rows", lambda days=None: rows)
+    result = svc.get_leverage_data()
+    assert result["signals"]["margin_call_signal"] == "ALERT"
+
+
+def test_margin_call_signal_null_when_normal(monkeypatch):
+    import services.leverage_service as svc
+    monkeypatch.setattr(svc, "_query_rows", lambda days=None: _make_df_rows(60))
+    result = svc.get_leverage_data()
+    assert result["signals"]["margin_call_signal"] is None
+
+
+def test_credit_momentum_accelerating(monkeypatch):
+    import services.leverage_service as svc
+    rows = _make_df_rows(30)
+    for i in range(20, 30):
+        rows[i]["kospi_credit_balance"] = float(200_000 + (i - 20) * 5_000)
+        rows[i]["kosdaq_credit_balance"] = float(120_000 + (i - 20) * 3_000)
+    monkeypatch.setattr(svc, "_query_rows", lambda days=None: rows)
+    result = svc.get_leverage_data()
+    assert result["signals"]["credit_momentum"] == "ACCELERATING"
+
+
+def test_credit_ratio_history_field(monkeypatch):
+    import services.leverage_service as svc
+    monkeypatch.setattr(svc, "_query_rows", lambda days=None: _make_df_rows(30))
+    result = svc.get_leverage_data(days=30)
+    assert all("credit_ratio" in h for h in result["history"])
+    assert all(h["credit_ratio"] is not None for h in result["history"])
