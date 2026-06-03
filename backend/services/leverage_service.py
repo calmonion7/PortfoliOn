@@ -330,9 +330,9 @@ def get_leverage_data(days: int = 90) -> dict:
     for _, row in recent.iterrows():
         history.append({
             "date": row["base_date"].strftime("%Y-%m-%d"),
-            "kospi_credit": round(float(row["kospi_credit_balance"] or 0) / 1e8, 2),
-            "kosdaq_credit": round(float(row["kosdaq_credit_balance"] or 0) / 1e8, 2),
-            "total_credit": round(float((row["kospi_credit_balance"] or 0) + (row["kosdaq_credit_balance"] or 0)) / 1e8, 2),
+            "kospi_credit": round(float(row["kospi_credit_balance"] or 0) / 1e12, 2),
+            "kosdaq_credit": round(float(row["kosdaq_credit_balance"] or 0) / 1e12, 2),
+            "total_credit": round(float((row["kospi_credit_balance"] or 0) + (row["kosdaq_credit_balance"] or 0)) / 1e12, 2),
             "credit_ratio": round(float(row["credit_ratio"] or 0), 4),
             "liquidation_ratio": float(row["liquidation_ratio"] or 0),
             "misu_amt": round(float(row["total_misu_amt"] or 0) / 1e4, 1),
