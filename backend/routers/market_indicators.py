@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from services.leverage_service import get_leverage_data, get_coverage, backfill_with_progress, _backfill_progress
 from auth import require_admin
-from services.market_indicators_service import (
+from services.market_indicators import (
     get_treasury,
     get_m7_earnings,
     get_kr_top2_earnings,

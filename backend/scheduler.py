@@ -66,7 +66,7 @@ def _run_guru_crawl():
 
 
 def _refresh_monthly():
-    from services.market_indicators_service import _fetch_and_save_econ_indicators, _fetch_and_save_kr_exports
+    from services.market_indicators import _fetch_and_save_econ_indicators, _fetch_and_save_kr_exports
     try:
         _fetch_and_save_econ_indicators()
         print("[Scheduler] Econ indicators refreshed")
@@ -80,7 +80,7 @@ def _refresh_monthly():
 
 
 def _refresh_earnings():
-    from services.market_indicators_service import _fetch_and_save_m7_earnings, _fetch_and_save_kr_top2_earnings
+    from services.market_indicators import _fetch_and_save_m7_earnings, _fetch_and_save_kr_top2_earnings
     try:
         _fetch_and_save_m7_earnings()
         print("[Scheduler] M7 earnings refreshed")

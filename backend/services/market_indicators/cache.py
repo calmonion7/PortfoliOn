@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import yfinance as yf
 from services.db import query, execute
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -78,7 +79,6 @@ def _filter_outliers(pts: list[dict], max_ratio: float = 5.0) -> list[dict]:
 
 
 def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[dict]:
-    import yfinance as yf
     from datetime import date, timedelta
     if stored:
         last = stored[-1]["date"]

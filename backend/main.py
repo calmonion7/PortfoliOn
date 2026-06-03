@@ -39,7 +39,7 @@ def _warm_calendar_cache():
 
 def _warm_market_cache():
     try:
-        from services.market_indicators_service import get_econ_indicators, get_kr_exports
+        from services.market_indicators import get_econ_indicators, get_kr_exports
         get_econ_indicators()
         get_kr_exports()
     except Exception:

@@ -11,7 +11,7 @@ import yfinance as yf
 from services import storage
 from services.db import query, execute
 from services.market import _yf_sym
-from services.market_indicators_service import _fetch_usdkrw_current
+from services.market_indicators.fx import _fetch_usdkrw_current
 from routers.calendar import _get_events
 
 DIGEST_DIR = Path(__file__).parent.parent / "data" / "digest"
