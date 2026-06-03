@@ -101,6 +101,66 @@ function DefaultPermissionsSection() {
   )
 }
 
+function EditPanel({ editingUser, pendingPerms, setPendingPerms, onSave, onClose, saving, savedMsg }) {
+  const isBulk = editingUser === 'bulk'
+  const title = isBulk
+    ? `${pendingPerms._count ?? ''}명에게 일괄 적용`
+    : editingUser?.email ?? ''
+
+  return (
+    <div style={{
+      borderLeft: '1px solid var(--border)',
+      padding: '16px 20px',
+      display: 'flex', flexDirection: 'column', gap: 16,
+      minWidth: 0,
+    }}>
+      {/* 헤더 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, wordBreak: 'break-all' }}>{title}</div>
+          {isBulk && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+              선택한 사용자 전체에 동일하게 적용됩니다
+            </div>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-3)', lineHeight: 1, flexShrink: 0, marginLeft: 8 }}
+        >×</button>
+      </div>
+
+      {/* 권한 칩 */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {ALL_MENUS.map(menu => (
+          <PermChip
+            key={menu}
+            label={MENU_LABELS[menu]}
+            on={pendingPerms[menu]}
+            onClick={() => setPendingPerms(p => ({ ...p, [menu]: !p[menu] }))}
+          />
+        ))}
+      </div>
+
+      {/* 저장 버튼 */}
+      <button
+        onClick={onSave}
+        disabled={saving}
+        style={{
+          width: '100%', padding: '10px', borderRadius: 8, border: 'none',
+          background: savedMsg ? 'var(--accent-soft)' : 'var(--text)',
+          color: savedMsg ? 'var(--text)' : 'var(--bg)',
+          fontWeight: 600, fontSize: 13,
+          cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1,
+          transition: 'all 0.2s',
+        }}
+      >
+        {savedMsg ? '저장됨 ✓' : saving ? '저장 중...' : isBulk ? '적용' : '저장'}
+      </button>
+    </div>
+  )
+}
+
 export default function PermissionManager() {
   const isMobile = useIsMobile()
   const [users, setUsers] = useState([])
@@ -323,14 +383,41 @@ export default function PermissionManager() {
     </div>
   )
 
+  const panelOpen = editingUser !== null
+
+  // 일괄 모드일 때 selectedIds.length 를 pendingPerms에 임시 첨부 (EditPanel 타이틀용)
+  const panelPerms = editingUser === 'bulk'
+    ? { ...pendingPerms, _count: selectedIds.length }
+    : pendingPerms
+
   return (
     <div>
       <DefaultPermissionsSection />
+
       {!isMobile && (
-        <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-          {SearchAndTable}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: panelOpen ? '60% 40%' : '100%',
+          transition: 'grid-template-columns 0.2s ease',
+          border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden',
+        }}>
+          <div style={{ minWidth: 0 }}>
+            {SearchAndTable}
+          </div>
+          {panelOpen && (
+            <EditPanel
+              editingUser={editingUser}
+              pendingPerms={panelPerms}
+              setPendingPerms={setPendingPerms}
+              onSave={editingUser === 'bulk' ? saveBulk : saveSingle}
+              onClose={closePanel}
+              saving={saving}
+              savedMsg={savedMsg}
+            />
+          )}
         </div>
       )}
+
       {isMobile && <div>모바일 TODO</div>}
     </div>
   )
