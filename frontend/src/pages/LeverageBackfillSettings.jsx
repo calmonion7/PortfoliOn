@@ -6,6 +6,7 @@ const YEARS = Array.from({ length: THIS_YEAR - 2019 }, (_, i) => 2020 + i)
 
 export default function LeverageBackfillSettings() {
   const [coverage, setCoverage] = useState(null)
+  const [coverageErr, setCoverageErr] = useState('')
   const [startYear, setStartYear] = useState(2021)
   const [endYear, setEndYear] = useState(THIS_YEAR)
   const [progress, setProgress] = useState({ running: false, done: 0, total: 0, current: '', error: '' })
@@ -16,7 +17,10 @@ export default function LeverageBackfillSettings() {
     try {
       const { data } = await api.get('/api/market/leverage/coverage')
       setCoverage(data)
-    } catch {}
+      setCoverageErr('')
+    } catch (e) {
+      setCoverageErr(e?.response?.data?.detail || '데이터 현황을 불러오지 못했습니다.')
+    }
   }
 
   useEffect(() => {
@@ -38,7 +42,11 @@ export default function LeverageBackfillSettings() {
             clearInterval(pollRef.current)
             loadCoverage()
           }
-        } catch {}
+        } catch (e) {
+          setErr(e?.response?.data?.detail || '진행 상황을 불러오지 못했습니다.')
+          clearInterval(pollRef.current)
+          setProgress(p => ({ ...p, running: false }))
+        }
       }, 2000)
     } catch (e) {
       setProgress(p => ({ ...p, running: false }))
@@ -89,6 +97,8 @@ export default function LeverageBackfillSettings() {
             )}
           </div>
         </div>
+      ) : coverageErr ? (
+        <div style={{ color: 'var(--down)', fontSize: 13, padding: '8px 0' }}>{coverageErr}</div>
       ) : (
         <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '8px 0' }}>로딩 중...</div>
       )}
