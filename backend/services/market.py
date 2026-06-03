@@ -144,6 +144,8 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
             yf_info = yf_t.info
             sector = _norm_sector(yf_info.get("sector", "") or "")
             industry = yf_info.get("industry", "") or ""
+            if not mc:
+                mc = _n(yf_info.get("marketCap"))
         except Exception:
             pass
 
