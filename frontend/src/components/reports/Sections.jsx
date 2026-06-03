@@ -34,7 +34,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🏢 사업영역 & 시장순위</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 6 }}>
         {competitors.map((c, i) => {
           const isSelf = c.is_self || c.ticker === ticker
           const ytdColor = c.ytd_return != null ? (c.ytd_return >= 0 ? '#81c784' : '#ef9a9a') : 'var(--text-3)'
