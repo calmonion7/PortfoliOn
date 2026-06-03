@@ -79,3 +79,68 @@ def test_fetch_market_cap_returns_kospi_and_kosdaq():
     assert result[0]["date"] == "2026-06-02"
     assert result[0]["kospi_market_cap"] == pytest.approx(2100000000.0)
     assert result[0]["kosdaq_market_cap"] == pytest.approx(420000000.0)
+
+
+def test_upsert_and_query_rows(monkeypatch):
+    import services.leverage_service as svc
+    store: dict[str, dict] = {}
+
+    def fake_execute(sql, params=None):
+        if params and len(params) >= 9:
+            store[str(params[0])] = {
+                "base_date": params[0],
+                "kospi_credit_balance": params[1],
+                "kosdaq_credit_balance": params[2],
+                "kospi_market_cap": params[3],
+                "kosdaq_market_cap": params[4],
+                "total_misu_amt": params[5],
+                "liquidated_amt": params[6],
+                "liquidation_ratio": params[7],
+                "customer_deposit": params[8],
+            }
+        return 1
+
+    def fake_query(sql, params=None):
+        return list(store.values())
+
+    monkeypatch.setattr(svc, "execute", fake_execute)
+    monkeypatch.setattr(svc, "query", fake_query)
+
+    svc._upsert_rows([{
+        "date": "2026-06-02",
+        "kospi_credit_balance": 152000000.0,
+        "kosdaq_credit_balance": 91000000.0,
+        "kospi_market_cap": 2100000000.0,
+        "kosdaq_market_cap": 420000000.0,
+        "total_misu_amt": 8200000.0,
+        "liquidated_amt": 52000000.0,
+        "liquidation_ratio": 6.34,
+        "customer_deposit": 580000000.0,
+    }])
+    rows = svc._query_rows()
+    assert len(rows) == 1
+    assert rows[0]["kospi_credit_balance"] == pytest.approx(152000000.0)
+
+
+def test_fetch_and_store_merges_three_apis(monkeypatch):
+    import services.leverage_service as svc
+
+    credit_data = [{"date": "2026-06-02", "kospi_credit_balance": 1.0, "kosdaq_credit_balance": 2.0}]
+    fund_data = [{"date": "2026-06-02", "customer_deposit": 3.0, "total_misu_amt": 4.0,
+                  "liquidated_amt": 5.0, "liquidation_ratio": 6.0}]
+    cap_data  = [{"date": "2026-06-02", "kospi_market_cap": 7.0, "kosdaq_market_cap": 8.0}]
+
+    monkeypatch.setattr(svc, "_fetch_credit_balance", lambda s, e: credit_data)
+    monkeypatch.setattr(svc, "_fetch_market_fund", lambda s, e: fund_data)
+    monkeypatch.setattr(svc, "_fetch_market_cap", lambda s, e: cap_data)
+
+    upserted = []
+    monkeypatch.setattr(svc, "_upsert_rows", lambda rows: upserted.extend(rows))
+
+    svc.fetch_and_store("2026-06-02")
+
+    assert len(upserted) == 1
+    row = upserted[0]
+    assert row["kospi_credit_balance"] == 1.0
+    assert row["kospi_market_cap"] == 7.0
+    assert row["liquidation_ratio"] == 6.0

@@ -1,6 +1,8 @@
 from __future__ import annotations
 import os
 import requests
+from datetime import date, timedelta
+from services.db import execute, query
 
 _KOFIA_BASE = "https://apis.data.go.kr/1160100/service/GetKofiaStatisticsInfoService"
 _INDEX_BASE  = "https://apis.data.go.kr/1160100/service/GetMarketIndexInfoService"
@@ -98,3 +100,97 @@ def _fetch_market_cap(start_dt: str, end_dt: str) -> list[dict]:
         elif "코스닥" in name and "150" not in name:
             by_date[fmt]["kosdaq_market_cap"] = cap
     return list(by_date.values())
+
+
+def _upsert_rows(rows: list[dict]) -> None:
+    sql = """
+        INSERT INTO market_leverage_indicators
+            (base_date, kospi_credit_balance, kosdaq_credit_balance,
+             kospi_market_cap, kosdaq_market_cap,
+             total_misu_amt, liquidated_amt, liquidation_ratio, customer_deposit)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (base_date) DO UPDATE SET
+            kospi_credit_balance  = EXCLUDED.kospi_credit_balance,
+            kosdaq_credit_balance = EXCLUDED.kosdaq_credit_balance,
+            kospi_market_cap      = EXCLUDED.kospi_market_cap,
+            kosdaq_market_cap     = EXCLUDED.kosdaq_market_cap,
+            total_misu_amt        = EXCLUDED.total_misu_amt,
+            liquidated_amt        = EXCLUDED.liquidated_amt,
+            liquidation_ratio     = EXCLUDED.liquidation_ratio,
+            customer_deposit      = EXCLUDED.customer_deposit
+    """
+    for row in rows:
+        execute(sql, (
+            row["date"],
+            row.get("kospi_credit_balance"),
+            row.get("kosdaq_credit_balance"),
+            row.get("kospi_market_cap"),
+            row.get("kosdaq_market_cap"),
+            row.get("total_misu_amt"),
+            row.get("liquidated_amt"),
+            row.get("liquidation_ratio"),
+            row.get("customer_deposit"),
+        ))
+
+
+def _query_rows() -> list[dict]:
+    return query("SELECT * FROM market_leverage_indicators ORDER BY base_date ASC")
+
+
+def fetch_and_store(target_date: str | None = None) -> None:
+    """전일(또는 지정일) 데이터를 KOFIA API에서 가져와 DB에 저장."""
+    if target_date is None:
+        d = date.today() - timedelta(days=1)
+        target_date = d.strftime("%Y-%m-%d")
+    dt_compact = target_date.replace("-", "")  # YYYYMMDD
+
+    credit_rows = _fetch_credit_balance(dt_compact, dt_compact)
+    fund_rows   = _fetch_market_fund(dt_compact, dt_compact)
+    cap_rows    = _fetch_market_cap(dt_compact, dt_compact)
+
+    by_date: dict[str, dict] = {}
+    for row in credit_rows:
+        by_date.setdefault(row["date"], {}).update(row)
+    for row in fund_rows:
+        by_date.setdefault(row["date"], {}).update(row)
+    for row in cap_rows:
+        by_date.setdefault(row["date"], {}).update(row)
+
+    if by_date:
+        _upsert_rows(list(by_date.values()))
+
+
+def backfill(years: int = 5) -> None:
+    """과거 데이터 적재. 이미 DB에 있는 날짜는 건너뜀."""
+    existing = {str(r["base_date"]) for r in query(
+        "SELECT base_date FROM market_leverage_indicators"
+    )}
+    end = date.today() - timedelta(days=1)
+    start = end.replace(year=end.year - years)
+
+    chunk_start = start
+    while chunk_start <= end:
+        chunk_end = min(chunk_start.replace(year=chunk_start.year + 1) - timedelta(days=1), end)
+        s = chunk_start.strftime("%Y%m%d")
+        e = chunk_end.strftime("%Y%m%d")
+
+        try:
+            credit_rows = _fetch_credit_balance(s, e)
+            fund_rows   = _fetch_market_fund(s, e)
+            cap_rows    = _fetch_market_cap(s, e)
+        except Exception as exc:
+            print(f"[leverage_service] backfill chunk {s}-{e} failed: {exc}")
+            chunk_start = chunk_end + timedelta(days=1)
+            continue
+
+        by_date: dict[str, dict] = {}
+        for row in credit_rows + fund_rows + cap_rows:
+            by_date.setdefault(row["date"], {}).update(row)
+
+        new_rows = [r for d_str, r in by_date.items() if d_str not in existing]
+        if new_rows:
+            _upsert_rows(new_rows)
+            existing.update(r["date"] for r in new_rows)
+            print(f"[leverage_service] backfill {s}-{e}: {len(new_rows)} rows inserted")
+
+        chunk_start = chunk_end + timedelta(days=1)
