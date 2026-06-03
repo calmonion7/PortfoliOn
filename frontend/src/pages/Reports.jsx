@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
+import useReportList from '../hooks/useReportList'
+import useReportGeneration from '../hooks/useReportGeneration'
 import { fmtPrice as fmt } from '../utils'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useToast } from '../components/Toast'
@@ -20,50 +22,30 @@ import { trackEvent } from '../utils/analytics'
 export default function Reports() {
   const { role } = useAuth() || { role: 'user' }
   const isAdmin = role === 'admin'
-  const [reportList, setReportList] = useState({})
-  const [lastScheduledDate, setLastScheduledDate] = useState(null)
+  const { showToast } = useToast()
+
+  const {
+    reportList, lastScheduledDate, listLoading, hasFetched,
+    guruMap, fetchList, applyList,
+    holdingsCount, watchlistAll, watchlistCount,
+    watchlistWarnCount, watchlistLowCount, watchlistHighCount,
+    _targetPct, _hasWarning, _isUngenerated,
+    ungeneratedTickers, ungeneratedCount,
+  } = useReportList()
+
+  const { generating, genProgress, generateOne, generateBatch, cleanup } = useReportGeneration({ onApplyList: applyList, lastScheduledDate })
+
   const [selected, setSelected] = useState({ ticker: null, date: null })
   const [detail, setDetail] = useState({ summary: null, enriched_at: null })
   const [loading, setLoading] = useState(false)
-  const [listLoading, setListLoading] = useState(true)
-  const [hasFetched, setHasFetched] = useState(false)
-  const { showToast } = useToast()
-  const [generating, setGenerating] = useState(null)
-  const [genProgress, setGenProgress] = useState({ done: 0, total: 0, failed: [] })
-  const pollRef = useRef(null)
   const [activeTab, setActiveTab] = useState('holdings')
   const [watchlistSub, setWatchlistSub] = useState('low')
-  const [othersData, setOthersData] = useState(null) // null = not yet fetched
+  const [othersData, setOthersData] = useState(null)
   const [othersLoading, setOthersLoading] = useState(false)
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [activeDetailTab, setActiveDetailTab] = useState('summary')
   const [marketFilter, setMarketFilter] = useState('ALL')
-  const [guruMap, setGuruMap] = useState({})  // ticker -> count
-
-  useEffect(() => {
-    api.get('/api/guru/stats/popularity')
-      .then(({ data }) => {
-        const map = {}
-        data.forEach(r => { if (r.count > 0) map[r.ticker] = r.count })
-        setGuruMap(map)
-      })
-      .catch(() => {})
-  }, [])
-
-const _applyList = (data) => {
-    setReportList(data.stocks ?? data)
-    if (data.last_scheduled_date) setLastScheduledDate(data.last_scheduled_date)
-  }
-
-  const fetchList = useCallback(() => {
-    setListLoading(true)
-    api.get('/api/report/list')
-      .then(({ data }) => _applyList(data))
-      .finally(() => { setListLoading(false); setHasFetched(true) })
-  }, [])
-
-  useEffect(() => { fetchList() }, [])
 
   useEffect(() => {
     if (activeTab !== 'others' || !isAdmin || othersData !== null) return
@@ -91,104 +73,8 @@ const _applyList = (data) => {
     setActiveDetailTab('summary')
   }
 
-  const generateOne = async (ticker) => {
-    setGenerating(ticker)
-    setGenProgress({ done: 0, total: 0 })
-    clearInterval(pollRef.current)
-    try {
-      await api.post(`/api/report/generate/${ticker}`)
-      pollRef.current = setInterval(async () => {
-        try {
-          const { data } = await api.get('/api/report/progress')
-          setGenProgress({ done: data.done, total: data.total, failed: data.failed || [] })
-          if (!data.running && data.total > 0 && data.done >= data.total) {
-            clearInterval(pollRef.current)
-            setGenerating(null)
-            if (data.failed?.length) {
-              const f = data.failed[0]
-              const tickerName = typeof f === 'string' ? f : (f?.ticker || ticker)
-              const rawErr = typeof f === 'object' ? f?.error : ''
-              const errStr = rawErr?.length > 80 ? rawErr.slice(0, 80) + '…' : rawErr
-              const msg = errStr ? `생성 실패: ${tickerName} — ${errStr}` : `생성 실패: ${tickerName}`
-              showToast(msg, 'error')
-            } else showToast(`${ticker} 리포트 생성 완료`)
-            api.get('/api/report/list').then(({ data: list }) => {
-              _applyList(list)
-              const dates = (list.stocks ?? list)[ticker]?.dates || []
-              const newDate = dates[0]
-              if (!newDate) return
-              if (view === 'detail' && selected.ticker === ticker) {
-                if (newDate !== selected.date) {
-                  setSelected(prev => ({ ...prev, date: newDate }))
-                } else {
-                  setDetailRefreshKey(k => k + 1)
-                }
-              }
-            })
-          }
-        } catch {}
-      }, 1500)
-    } catch {
-      setGenerating(null)
-      showToast('리포트 생성 실패', 'error')
-    }
-  }
+  useEffect(() => cleanup, [cleanup])
 
-  const generateBatch = async (tickers) => {
-    if (!tickers.length) return
-    setGenerating('__batch__')
-    setGenProgress({ done: 0, total: 0 })
-    clearInterval(pollRef.current)
-    try {
-      const dateParam = lastScheduledDate ? `&date=${lastScheduledDate}` : ''
-      await api.post(`/api/report/generate?tickers=${tickers.join(',')}${dateParam}`)
-      pollRef.current = setInterval(async () => {
-        try {
-          const { data } = await api.get('/api/report/progress')
-          setGenProgress({ done: data.done, total: data.total, failed: data.failed || [] })
-          if (!data.running && data.total > 0 && data.done >= data.total) {
-            clearInterval(pollRef.current)
-            setGenerating(null)
-            if (data.failed?.length) {
-              const toName = f => typeof f === 'string' ? f : (f?.ticker || '?')
-              const names = data.failed.map(toName).join(', ')
-              const first = data.failed[0]
-              const rawErr = typeof first === 'object' ? first?.error : ''
-              const errStr = rawErr?.length > 80 ? rawErr.slice(0, 80) + '…' : rawErr
-              const msg = data.failed.length === 1 && errStr
-                ? `생성 실패: ${toName(first)} — ${errStr}`
-                : `생성 실패: ${names}`
-              showToast(msg, 'error')
-            } else showToast(`리포트 ${data.done}개 생성 완료`)
-            api.get('/api/report/list').then(({ data: list }) => _applyList(list))
-          }
-        } catch {}
-      }, 1500)
-    } catch {
-      setGenerating(null)
-      showToast('리포트 생성 실패', 'error')
-    }
-  }
-
-  useEffect(() => () => clearInterval(pollRef.current), [])
-
-  const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
-  const watchlistAll = Object.entries(reportList).filter(([, v]) => v.category === 'watchlist')
-  const _targetPct = (s) => { const t = s?.target_mean, p = s?.price; return (t != null && p) ? (t - p) / p * 100 : null }
-  const _hasWarning = (s) => {
-    if (!s) return false
-    const total = (s.buy ?? 0) + (s.hold ?? 0) + (s.sell ?? 0)
-    return total <= 10  // 의견 0개 포함
-  }
-  const watchlistWarnCount = watchlistAll.filter(([, v]) => _hasWarning(v.summary)).length
-  const watchlistLowCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g === null || g >= 40 }).length
-  const watchlistHighCount = watchlistAll.filter(([, v]) => { if (_hasWarning(v.summary)) return false; const g = _targetPct(v.summary); return g !== null && g < 40 }).length
-  const watchlistCount = watchlistAll.length
-  const _isUngenerated = ([, v]) => !lastScheduledDate
-    ? (v.dates.length === 0 || v.summary?.price == null)
-    : !v.dates.map(String).includes(lastScheduledDate)
-  const ungeneratedTickers = Object.entries(reportList).filter(_isUngenerated).map(([t]) => t)
-  const ungeneratedCount = ungeneratedTickers.length
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (activeTab === 'ungenerated' && ungeneratedCount === 0) setActiveTab('holdings')
