@@ -4,6 +4,7 @@ import time
 import requests
 from datetime import date, timedelta
 from services.db import execute, query
+from services.utils import sanitize
 
 _KOFIA_BASE = "https://apis.data.go.kr/1160100/service/GetKofiaStatisticsInfoService"
 _INDEX_BASE  = "https://apis.data.go.kr/1160100/service/GetMarketIndexInfoService"
@@ -328,4 +329,4 @@ def get_leverage_data(days: int = 90) -> dict:
         })
 
     latest = history[-1] if history else None
-    return {"history": history, "signals": signals, "latest": latest}
+    return sanitize({"history": history, "signals": signals, "latest": latest})
