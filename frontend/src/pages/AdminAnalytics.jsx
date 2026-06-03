@@ -69,7 +69,7 @@ export default function AdminAnalytics() {
   return (
     <div style={{ padding: '24px 16px', maxWidth: 960, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h2 style={{ color: 'var(--text)', margin: 0 }}>사용자 Analytics</h2>
+        <h2 style={{ color: 'var(--text)', margin: 0 }}>사용자 행동</h2>
         <div className="tabs">
           {DAYS_OPTIONS.map(o => (
             <button key={o.value}
