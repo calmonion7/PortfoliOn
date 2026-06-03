@@ -2,6 +2,11 @@
 set -e
 cd "$(dirname "$0")"
 
+# Prevent concurrent deploys (poller + Actions runner)
+LOCK="/tmp/portfolion-deploy.lock"
+if [ -f "$LOCK" ]; then echo "Deploy already in progress."; exit 1; fi
+touch "$LOCK"; trap 'rm -f "$LOCK"' EXIT
+
 BACKEND_CONTAINER=portfolion-backend-1
 NGINX_CONTAINER=portfolion-nginx-1
 NETWORK=portfolion_default
