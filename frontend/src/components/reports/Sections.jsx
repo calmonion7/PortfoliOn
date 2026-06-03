@@ -1,6 +1,13 @@
 import { fmtPrice as fmt } from '../../utils'
 import { TH, TD } from './reportUtils.jsx'
 
+function decodeHtml(str) {
+  if (!str) return str
+  const txt = document.createElement('textarea')
+  txt.innerHTML = str
+  return txt.value
+}
+
 export function ReportSectionText({ title, text }) {
   if (!text) return null
   return (
@@ -73,7 +80,7 @@ export function ReportSectionNews({ disclosures, news }) {
           {news.map((item, i) => (
             <li key={i}>
               <a href={item.link} target="_blank" rel="noreferrer"
-                 style={{ color: 'var(--accent)', textDecoration: 'none' }}>{item.title}</a>
+                 style={{ color: 'var(--accent)', textDecoration: 'none' }}>{decodeHtml(item.title)}</a>
               <span style={{ color: 'var(--text-3)', marginLeft: 6 }}>
                 — {item.publisher} ({item.published_at})
               </span>
