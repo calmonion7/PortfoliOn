@@ -278,7 +278,7 @@ export default function ReportSchedule() {
                   padding: '3px 10px', border: 'none', borderRadius: 6,
                   fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   background: ownerFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
-                  color: ownerFilter === key ? '#fff' : 'var(--text-3)',
+                  color: ownerFilter === key ? 'var(--bg)' : 'var(--text-3)',
                 }}>
                   {label}
                 </button>
@@ -295,7 +295,7 @@ export default function ReportSchedule() {
               padding: '3px 10px', border: 'none', borderRadius: 6,
               fontSize: 12, fontWeight: 500, cursor: 'pointer',
               background: marketFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
-              color: marketFilter === key ? '#fff' : 'var(--text-3)',
+              color: marketFilter === key ? 'var(--bg)' : 'var(--text-3)',
             }}>
               {label}
             </button>
