@@ -54,6 +54,57 @@ function PermBadges({ permissions }) {
   )
 }
 
+function DefaultPermissionsSection() {
+  const [defaults, setDefaults] = useState(Object.fromEntries(ALL_MENUS.map(m => [m, false])))
+  const [saved, setSaved] = useState(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    api.get('/api/admin/default-permissions').then(r => setDefaults(r.data))
+  }, [])
+
+  function toggle(menu) {
+    const next = { ...defaults, [menu]: !defaults[menu] }
+    setDefaults(next)
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(async () => {
+      try {
+        await api.put('/api/admin/default-permissions', { permissions: next })
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+      } catch (e) {
+        console.error('기본 권한 저장 실패', e)
+      }
+    }, 500)
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>신규 가입 기본 권한</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>새로 가입하는 사용자에게 자동으로 적용됩니다</div>
+        </div>
+        {saved && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>저장됨 ✓</span>}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {ALL_MENUS.map(menu => (
+          <PermChip
+            key={menu}
+            label={MENU_LABELS[menu]}
+            on={defaults[menu]}
+            onClick={() => toggle(menu)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function PermissionManager() {
-  return <div>TODO</div>
+  return (
+    <div>
+      <DefaultPermissionsSection />
+    </div>
+  )
 }
