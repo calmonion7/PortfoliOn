@@ -123,6 +123,13 @@ def me(user_id: str = Depends(get_current_user)):
     }
 
 
+def _no_cache_redirect(url: str) -> RedirectResponse:
+    r = RedirectResponse(url)
+    r.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    r.headers["Pragma"] = "no-cache"
+    return r
+
+
 @router.get("/oauth/google")
 async def oauth_google(request: Request):
     state = _make_state()
@@ -134,14 +141,14 @@ async def oauth_google(request: Request):
         "scope": "openid email profile",
         "state": state,
     })
-    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+    return _no_cache_redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
 
 
 @router.get("/oauth/google/callback")
 async def oauth_google_callback(request: Request):
     if request.query_params.get("error"):
         frontend = os.environ.get("FRONTEND_URL", "")
-        return RedirectResponse(f"{frontend}/?error=oauth_denied")
+        return _no_cache_redirect(f"{frontend}/?error=oauth_denied")
     state = request.query_params.get("state", "")
     if not _verify_state(state):
         raise HTTPException(status_code=400, detail="Invalid state")
@@ -158,7 +165,7 @@ async def oauth_google_callback(request: Request):
     id_token = token_data.get("id_token", "")
     if not id_token or id_token.count(".") < 2:
         frontend = os.environ.get("FRONTEND_URL", "")
-        return RedirectResponse(f"{frontend}/?error=oauth_failed")
+        return _no_cache_redirect(f"{frontend}/?error=oauth_failed")
     import base64 as _b64, json as _json
     _payload = id_token.split(".")[1] + "=="
     userinfo = _json.loads(_b64.urlsafe_b64decode(_payload))
@@ -167,7 +174,7 @@ async def oauth_google_callback(request: Request):
     tokens = auth_service.issue_tokens(str(user["id"]))
     code = _store_oauth_tokens(tokens)
     frontend = os.environ["FRONTEND_URL"]
-    return RedirectResponse(f"{frontend}/?oauth={code}")
+    return _no_cache_redirect(f"{frontend}/?oauth={code}")
 
 
 @router.get("/oauth/github")
@@ -180,7 +187,7 @@ async def oauth_github(request: Request):
         "scope": "user:email",
         "state": state,
     })
-    return RedirectResponse(f"https://github.com/login/oauth/authorize?{params}")
+    return _no_cache_redirect(f"https://github.com/login/oauth/authorize?{params}")
 
 
 @router.get("/oauth/github/callback")
@@ -214,7 +221,7 @@ async def oauth_github_callback(request: Request):
     tokens = auth_service.issue_tokens(str(user["id"]))
     code = _store_oauth_tokens(tokens)
     frontend = os.environ["FRONTEND_URL"]
-    return RedirectResponse(f"{frontend}/?oauth={code}")
+    return _no_cache_redirect(f"{frontend}/?oauth={code}")
 
 @router.get("/oauth/token")
 def oauth_token_exchange(code: str):
