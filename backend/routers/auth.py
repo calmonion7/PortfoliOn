@@ -135,7 +135,7 @@ async def oauth_google_callback(request: Request):
     token_data = token_resp.json()
     id_token = token_data.get("id_token", "")
     from jose import jwt as jose_jwt
-    userinfo = jose_jwt.decode(id_token, options={"verify_signature": False})
+    userinfo = jose_jwt.decode(id_token, key="", options={"verify_signature": False})
     user = auth_service.upsert_oauth_user(userinfo["email"], "google", userinfo["sub"])
     auth_service.apply_default_permissions(str(user["id"]))
     tokens = auth_service.issue_tokens(str(user["id"]))
