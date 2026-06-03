@@ -272,29 +272,72 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     )
   }
 
+  // 전체 레벨을 가격 내림차순 정렬 후 현재가 위치에 divider 삽입
+  const allSorted = [
+    ...aboveGroups.map(g => ({ group: g, isAbove: true })),
+    ...belowGroups.map(g => ({ group: g, isAbove: false })),
+  ].sort((a, b) => b.group.value - a.group.value)
+
+  const rows = []
+  let priceInserted = price == null
+  for (const item of allSorted) {
+    if (!priceInserted && item.group.value < price) {
+      rows.push({ type: 'current' })
+      priceInserted = true
+    }
+    rows.push({ type: 'level', ...item })
+  }
+  if (!priceInserted) rows.push({ type: 'current' })
+
   return (
     <div style={{ marginTop: 8, maxWidth: 360 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
       {togglesJSX}
-      <div style={{ padding: '5px 10px', textAlign: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 6 }}>
-        {price != null && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{fmt(price, market)}</span>}
-        {rsiData?.rsi != null && <span style={{ fontSize: 9, color: 'var(--text-3)', marginLeft: 8 }}>RSI {rsiData.rsi.toFixed(1)}</span>}
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 9, color: '#81c784', fontWeight: 600, textAlign: 'right', marginBottom: 4 }}>지지 구간 ▼</div>
-          {belowGroups.length > 0
-            ? belowGroups.map(g => renderCard(g, true))
-            : <div style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'right', padding: '4px 6px' }}>없음</div>}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+        <div style={{ flex: 1, textAlign: 'right' }}>
+          <span style={{ fontSize: 9, color: '#81c784', fontWeight: 600 }}>지지 구간 ▼</span>
         </div>
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', alignSelf: 'stretch' }} />
+        <div style={{ width: 1 }} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 9, color: '#ef9a9a', fontWeight: 600, marginBottom: 4 }}>저항 구간 ▲</div>
-          {aboveGroups.length > 0
-            ? aboveGroups.map(g => renderCard(g, false))
-            : <div style={{ fontSize: 9, color: 'var(--text-3)', padding: '4px 6px' }}>없음</div>}
+          <span style={{ fontSize: 9, color: '#ef9a9a', fontWeight: 600 }}>저항 구간 ▲</span>
         </div>
       </div>
+      {rows.map((row, i) => {
+        if (row.type === 'current') {
+          return (
+            <div key="__current__" style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '5px 0' }}>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.2)' }} />
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '3px 10px', borderRadius: 20,
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.25)',
+              }}>
+                {price != null && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                    {fmt(price, market)}
+                  </span>
+                )}
+                {rsiData?.rsi != null && (
+                  <span style={{ fontSize: 9, color: 'var(--text-3)' }}>RSI {rsiData.rsi.toFixed(1)}</span>
+                )}
+              </div>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.2)' }} />
+            </div>
+          )
+        }
+        return (
+          <div key={row.group.value} style={{ display: 'flex', gap: 6 }}>
+            <div style={{ flex: 1 }}>
+              {!row.isAbove && renderCard(row.group, true)}
+            </div>
+            <div style={{ width: 1 }} />
+            <div style={{ flex: 1 }}>
+              {row.isAbove && renderCard(row.group, false)}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
