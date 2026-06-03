@@ -31,10 +31,11 @@ def test_get_latest_returns_digest():
     assert resp.json()["date"] == "2026-05-23"
 
 
-def test_get_latest_returns_404_when_none():
+def test_get_latest_returns_null_when_none():
     with patch("routers.digest.digest_service.get_latest", return_value=None):
         resp = client.get("/api/digest/latest")
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert resp.json() is None
 
 
 def test_post_generate_returns_digest():
