@@ -41,7 +41,7 @@ def scrape_finviz_consensus(ticker: str) -> dict:
 def get_news_kr(ticker: str) -> list[dict]:
     try:
         r = requests.get(
-            f"https://m.stock.naver.com/api/stock/{ticker}/news",
+            f"https://m.stock.naver.com/api/news/stock/{ticker}",
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Referer": "https://m.stock.naver.com/",
