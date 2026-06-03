@@ -17,7 +17,7 @@ export DOCKER_CONFIG="$TMP_DOCKER_CONFIG"
 
 # 1. 프론트엔드 빌드
 echo "[1/4] Building frontend..."
-npm ci --prefix frontend --silent
+npm ci --prefix frontend
 npm run build --prefix frontend --silent
 echo "      Done: frontend/dist/"
 
