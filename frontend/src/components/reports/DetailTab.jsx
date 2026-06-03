@@ -251,12 +251,9 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           flexWrap: 'wrap',
         }}>
           {isMulti ? (
-            // 동일 가격: a. Label  b. Label 나란히
+            // 동일 가격: Label  Label 나란히
             items.map((item, idx) => (
-              <span key={idx} style={{ fontSize: 9, whiteSpace: 'nowrap' }}>
-                <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>{String.fromCharCode(97 + idx)}.</span>
-                <span style={{ color: item.color, fontWeight: 700, marginLeft: 2 }}>{item.label}</span>
-              </span>
+              <span key={idx} style={{ fontSize: 9, color: item.color, fontWeight: 700 }}>{item.label}</span>
             ))
           ) : (
             <span style={{ fontSize: 9, color: accentColor, fontWeight: 700 }}>{items[0].label}</span>
