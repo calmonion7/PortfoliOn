@@ -305,16 +305,18 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
       {rows.map((row, i) => {
         if (row.type === 'current') {
           return (
-            <div key="__current__" style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '5px 0' }}>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.2)' }} />
+            <div key="__current__" style={{ margin: '4px 0' }}>
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '3px 10px', borderRadius: 20,
-                background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '6px 12px', borderRadius: 6,
+                background: 'rgba(91,141,238,0.18)',
+                border: '1px solid rgba(91,141,238,0.45)',
+                borderLeft: '3px solid #5b8dee',
+                borderRight: '3px solid #5b8dee',
               }}>
+                <span style={{ fontSize: 9, color: '#5b8dee', fontWeight: 600 }}>현재가</span>
                 {price != null && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
                     {fmt(price, market)}
                   </span>
                 )}
@@ -322,7 +324,6 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                   <span style={{ fontSize: 9, color: 'var(--text-3)' }}>RSI {rsiData.rsi.toFixed(1)}</span>
                 )}
               </div>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.2)' }} />
             </div>
           )
         }
