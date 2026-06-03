@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import time
 import requests
 from datetime import date, timedelta
 from services.db import execute, query
@@ -23,7 +24,7 @@ def _kofia_get(endpoint: str, extra_params: str = "") -> list[dict]:
     """KOFIA 공공데이터포털 API 조회. URL에 직접 serviceKey 삽입 (이중인코딩 방지)."""
     key = os.environ.get("KOFIA_API_KEY", "")
     url = f"{endpoint}?serviceKey={key}&resultType=json&numOfRows=1000&pageNo=1{extra_params}"
-    r = requests.get(url, timeout=15)
+    r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
     r.raise_for_status()
     body = r.json()["response"]["body"]
     raw = body["items"].get("item", [])
@@ -176,8 +177,11 @@ def backfill(years: int = 5) -> None:
 
         try:
             credit_rows = _fetch_credit_balance(s, e)
+            time.sleep(1)
             fund_rows   = _fetch_market_fund(s, e)
+            time.sleep(1)
             cap_rows    = _fetch_market_cap(s, e)
+            time.sleep(1)
         except Exception as exc:
             print(f"[leverage_service] backfill chunk {s}-{e} failed: {exc}")
             chunk_start = chunk_end + timedelta(days=1)
