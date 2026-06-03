@@ -153,6 +153,9 @@ async def oauth_google_callback(request: Request):
         )
     token_data = token_resp.json()
     id_token = token_data.get("id_token", "")
+    if not id_token or id_token.count(".") < 2:
+        frontend = os.environ.get("FRONTEND_URL", "")
+        return RedirectResponse(f"{frontend}/?error=oauth_failed")
     import base64 as _b64, json as _json
     _payload = id_token.split(".")[1] + "=="
     userinfo = _json.loads(_b64.urlsafe_b64decode(_payload))
