@@ -207,13 +207,13 @@ def _compute_signals(df) -> dict:
     credit_ratio = (total_credit / total_cap.replace(0, float("nan")) * 100).fillna(0)
     p90 = float(credit_ratio.quantile(0.90)) if len(credit_ratio) >= 20 else None
     latest_ratio = float(credit_ratio.iloc[-1]) if len(credit_ratio) else None
-    credit_ratio_alert = bool(latest_ratio > p90) if (latest_ratio and p90) else False
+    credit_ratio_alert = bool(latest_ratio > p90) if (latest_ratio is not None and p90 is not None) else False
 
     # ② 반대매매 급증 시그널 (rolling 20일 mean + 2σ)
     mean20 = lqdt_ratio.rolling(20, min_periods=10).mean()
     std20  = lqdt_ratio.rolling(20, min_periods=10).std()
     threshold = mean20.iloc[-1] + 2 * std20.iloc[-1] if len(lqdt_ratio) >= 10 else None
-    margin_call_signal = "ALERT" if (threshold and lqdt_ratio.iloc[-1] > threshold) else None
+    margin_call_signal = "ALERT" if (threshold is not None and not pd.isna(threshold) and lqdt_ratio.iloc[-1] > threshold) else None
 
     # ③ 신용잔고 모멘텀 (5일 MA vs 20일 MA)
     ma5  = total_credit.rolling(5, min_periods=3).mean()
@@ -231,7 +231,7 @@ def _compute_signals(df) -> dict:
 
     return {
         "credit_ratio_alert": credit_ratio_alert,
-        "credit_ratio_p90": round(p90, 4) if p90 else None,
+        "credit_ratio_p90": round(p90, 4) if p90 is not None else None,
         "margin_call_signal": margin_call_signal,
         "credit_momentum": credit_momentum,
     }
