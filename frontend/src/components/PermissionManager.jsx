@@ -102,9 +102,99 @@ function DefaultPermissionsSection() {
 }
 
 export default function PermissionManager() {
+  const isMobile = useIsMobile()
+  const [users, setUsers] = useState([])
+  const [search, setSearch] = useState('')
+  const [renderCount, setRenderCount] = useState(20)
+  const [selectedIds, setSelectedIds] = useState([])
+  // null=패널닫힘 | User객체=단일편집 | 'bulk'=일괄
+  const [editingUser, setEditingUser] = useState(null)
+  const [pendingPerms, setPendingPerms] = useState({})
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState(false)
+  const sentinelRef = useRef(null)
+
+  useEffect(() => {
+    api.get('/api/admin/users').then(r => setUsers(r.data))
+  }, [])
+
+  const normalUsers = users.filter(u => u.role !== 'admin')
+  const adminUsers = users.filter(u => u.role === 'admin')
+  const filtered = [...adminUsers, ...normalUsers].filter(u =>
+    u.email.toLowerCase().includes(search.toLowerCase())
+  )
+  const displayed = filtered.slice(0, renderCount)
+
+  useEffect(() => { setRenderCount(20) }, [search])
+
+  useEffect(() => {
+    if (!sentinelRef.current) return
+    const obs = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) setRenderCount(c => c + 20)
+    })
+    obs.observe(sentinelRef.current)
+    return () => obs.disconnect()
+  }, [])
+
+  function openEdit(user) {
+    setEditingUser(user)
+    setPendingPerms({ ...user.permissions })
+    setSavedMsg(false)
+  }
+
+  function openBulk() {
+    setEditingUser('bulk')
+    setPendingPerms(Object.fromEntries(ALL_MENUS.map(m => [m, false])))
+    setSavedMsg(false)
+  }
+
+  function closePanel() {
+    setEditingUser(null)
+    setPendingPerms({})
+  }
+
+  async function saveSingle() {
+    setSaving(true)
+    try {
+      await api.put(`/api/admin/users/${editingUser.id}/permissions`, { permissions: pendingPerms })
+      setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, permissions: pendingPerms } : u))
+      setSavedMsg(true)
+      setTimeout(() => setSavedMsg(false), 2000)
+    } catch {
+      alert('권한 변경에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveBulk() {
+    setSaving(true)
+    try {
+      await api.post('/api/admin/users/bulk-permissions', { user_ids: selectedIds, permissions: pendingPerms })
+      const updated = await api.get('/api/admin/users')
+      setUsers(updated.data)
+      setSelectedIds([])
+      closePanel()
+    } catch {
+      alert('일괄 권한 적용에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteUser(user) {
+    if (!window.confirm(`${user.email} 계정을 삭제하시겠습니까?\n모든 데이터가 삭제됩니다.`)) return
+    await api.delete(`/api/admin/users/${user.id}`)
+    setUsers(prev => prev.filter(u => u.id !== user.id))
+    setSelectedIds(prev => prev.filter(id => id !== user.id))
+    if (editingUser?.id === user.id) closePanel()
+  }
+
   return (
     <div>
       <DefaultPermissionsSection />
+      <div>검색+테이블 TODO</div>
+      <div ref={sentinelRef} />
     </div>
   )
 }
