@@ -7,12 +7,6 @@ const BUILD_DATE = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
 export default defineConfig({
   plugins: [
     react(),
-    {
-      name: 'sw-cache-bust',
-      transformIndexHtml(html) {
-        return html.replace(/(registerSW\.js)/g, `$1?${BUILD_DATE}`)
-      },
-    },
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
@@ -71,6 +65,22 @@ export default defineConfig({
         lang: 'ko',
       },
     }),
+    {
+      name: 'sw-cache-bust',
+      apply: 'build',
+      closeBundle: {
+        sequential: true,
+        order: 'post',
+        async handler() {
+          const fs = await import('fs')
+          const path = await import('path')
+          const indexPath = path.resolve('dist/index.html')
+          let html = fs.readFileSync(indexPath, 'utf-8')
+          html = html.replace(/(registerSW\.js)/g, `$1?${BUILD_DATE}`)
+          fs.writeFileSync(indexPath, html)
+        },
+      },
+    },
   ],
   server: {
     port: 5173,
