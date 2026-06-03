@@ -38,7 +38,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
       {[['B', '바+리스트'], ['C', '지지/저항']].map(([v, lbl]) => (
         <button key={v} onClick={() => setView(v)} style={{
           padding: '2px 8px', fontSize: 9, borderRadius: 3, border: 'none', cursor: 'pointer',
-          background: view === v ? '#5b8dee' : 'rgba(255,255,255,0.08)',
+          background: view === v ? '#5b8dee' : 'transparent',
+          border: view === v ? '1px solid transparent' : '1px solid var(--border)',
           color: view === v ? '#fff' : 'var(--text-3)',
         }}>{lbl}</button>
       ))}
