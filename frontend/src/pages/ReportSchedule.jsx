@@ -42,6 +42,7 @@ export default function ReportSchedule() {
   const [listLoading, setListLoading] = useState(true)
   const [genTab, setGenTab] = useState('pending')
   const [ownerFilter, setOwnerFilter] = useState('all') // 'all' | 'mine' | 'others'
+  const [marketFilter, setMarketFilter] = useState('all') // 'all' | 'kr' | 'us'
 
   const [backfilling, setBackfilling] = useState(false)
   const [backfillMsg, setBackfillMsg] = useState('')
@@ -80,7 +81,7 @@ export default function ReportSchedule() {
     const pending = [], done = [], notInPeriod = []
     for (const [ticker, info] of Object.entries(stockList)) {
       const name = info.summary?.name || ''
-      const entry = { ticker, name, is_mine: info.is_mine }
+      const entry = { ticker, name, is_mine: info.is_mine, market: info.market || '' }
       const latestDate = info.dates?.[0]
       if (isScheduleDay) {
         if (latestDate === today) done.push(entry)
@@ -101,6 +102,12 @@ export default function ReportSchedule() {
     if (!isAdmin || ownerFilter === 'all') return stocks
     if (ownerFilter === 'mine') return stocks.filter(s => s.is_mine)
     return stocks.filter(s => !s.is_mine)
+  }
+
+  const applyMarketFilter = (stocks) => {
+    if (marketFilter === 'all') return stocks
+    if (marketFilter === 'kr') return stocks.filter(s => (s.market || '').toUpperCase() === 'KR')
+    return stocks.filter(s => (s.market || '').toUpperCase() !== 'KR')
   }
 
   const startPolling = (onDone) => {
@@ -185,8 +192,8 @@ export default function ReportSchedule() {
   const secondTabStocks = referenceDate || isScheduleDay ? doneStocks : notInPeriodStocks
   const secondTabLabel = referenceDate || isScheduleDay ? '생성됨' : '수집기간아님'
   const rawTabStocks = genTab === 'pending' ? pendingStocks : secondTabStocks
-  const currentTabStocks = applyOwnerFilter(rawTabStocks)
-  const filteredPending = applyOwnerFilter(pendingStocks)
+  const currentTabStocks = applyMarketFilter(applyOwnerFilter(rawTabStocks))
+  const filteredPending = applyMarketFilter(applyOwnerFilter(pendingStocks))
 
   return (
     <div style={{ maxWidth: 480 }}>
@@ -278,6 +285,23 @@ export default function ReportSchedule() {
             ))}
           </div>
         )}
+
+        <div style={{ padding: '8px 12px 0', display: 'flex', gap: 4 }}>
+          {[
+            { key: 'all', label: '전체' },
+            { key: 'kr', label: '국내' },
+            { key: 'us', label: '해외' },
+          ].map(({ key, label }) => (
+            <button key={key} onClick={() => setMarketFilter(key)} style={{
+              padding: '3px 10px', border: 'none', borderRadius: 6,
+              fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              background: marketFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
+              color: marketFilter === key ? '#fff' : 'var(--text-3)',
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
 
         {listLoading ? (
           <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</div>
