@@ -198,9 +198,10 @@ Browser (React/Vite :5173)
 FastAPI (:8000)
  ├─ routers/    portfolio, watchlist, stocks, report, guru,
  │              calendar, digest, market_indicators, analytics,
- │              analysis, auth, admin
+ │              analysis, auth, admin, events
  ├─ services/   market(yfinance+Naver), charts, report_generator(Claude AI),
- │              consensus, digest_service, market_indicators_service,
+ │              consensus, digest_service, market_indicators/(fx/vix/commodities/
+ │              earnings/econ/exports), leverage_service,
  │              auth_service, cache, db, errors, parallel, progress
  │
  └─ PostgreSQL 16
@@ -210,7 +211,9 @@ FastAPI (:8000)
      ├─ schedules / guru_*       (스케줄)
      ├─ digests / consensus_history
      ├─ calendar_cache / market_cache
-     └─ user_menu_permissions    (권한)
+     ├─ user_menu_permissions / default_menu_permissions    (권한)
+     ├─ user_events / market_leverage_indicators
+     └─ raw_reports / daily_consensus_mart
 ```
 
 ## 프로젝트 구조
