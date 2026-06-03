@@ -143,8 +143,7 @@ export default function ReportSchedule() {
     }
   }
 
-  const handleGeneratePending = async () => {
-    const targets = applyOwnerFilter(pendingStocks)
+  const handleGenerate = async (targets) => {
     if (targets.length === 0) return
     setGenerating(true)
     setGenMsg('')
@@ -338,7 +337,7 @@ export default function ReportSchedule() {
         <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
           {genTab === 'pending' ? (
             <>
-              <button className="btn btn-primary" onClick={handleGeneratePending}
+              <button className="btn btn-primary" onClick={() => handleGenerate(filteredPending)}
                 disabled={generating || filteredPending.length === 0}
                 style={{ width: '100%', justifyContent: 'center' }}>
                 {generating ? '생성 중...' : filteredPending.length > 0 ? `지금 생성 (${filteredPending.length}개)` : '생성할 종목 없음'}
@@ -357,9 +356,25 @@ export default function ReportSchedule() {
               {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
             </>
           ) : (
-            <p style={{ color: 'var(--text-3)', fontSize: 12, margin: 0, textAlign: 'center' }}>
-              오늘 이미 생성된 종목 목록입니다.
-            </p>
+            <>
+              <button className="btn btn-primary" onClick={() => handleGenerate(currentTabStocks)}
+                disabled={generating || currentTabStocks.length === 0}
+                style={{ width: '100%', justifyContent: 'center' }}>
+                {generating ? '생성 중...' : currentTabStocks.length > 0 ? `재생성 (${currentTabStocks.length}개)` : '종목 없음'}
+              </button>
+              {generating && progress.total > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
+                    <span>{progress.current || '준비 중...'}</span>
+                    <span style={{ color: 'var(--text)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
+                  </div>
+                  <div style={{ background: 'var(--accent-soft)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: 'var(--text)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+              )}
+              {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
+            </>
           )}
         </div>
       </div>
