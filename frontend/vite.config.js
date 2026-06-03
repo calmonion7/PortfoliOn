@@ -18,11 +18,20 @@ export default defineConfig({
       },
       workbox: {
         cacheId: `portfolion-${BUILD_DATE}`,
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{js,css,svg,png,woff2}'],
         skipWaiting: true,
         clientsClaim: true,
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallback: null,
         runtimeCaching: [
+          {
+            // index.html은 항상 네트워크에서 fetch (SW 캐시 금지)
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'navigate-cache',
+              networkTimeoutSeconds: 3,
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
             handler: 'CacheFirst',
