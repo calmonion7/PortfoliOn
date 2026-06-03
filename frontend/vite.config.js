@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const BUILD_DATE = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+
 export default defineConfig({
   plugins: [
     react(),
@@ -15,6 +17,7 @@ export default defineConfig({
         overrideManifestIcons: true,
       },
       workbox: {
+        cacheId: `portfolion-${BUILD_DATE}`,
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         skipWaiting: true,
         clientsClaim: true,
