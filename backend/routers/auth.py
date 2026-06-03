@@ -139,6 +139,9 @@ async def oauth_google(request: Request):
 
 @router.get("/oauth/google/callback")
 async def oauth_google_callback(request: Request):
+    if request.query_params.get("error"):
+        frontend = os.environ.get("FRONTEND_URL", "")
+        return RedirectResponse(f"{frontend}/?error=oauth_denied")
     state = request.query_params.get("state", "")
     if not _verify_state(state):
         raise HTTPException(status_code=400, detail="Invalid state")

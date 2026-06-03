@@ -80,8 +80,16 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const oauthCode = params.get('oauth')
+    const oauthError = params.get('error')
     const token = params.get('token')
     const refresh = params.get('refresh')
+
+    if (oauthError) {
+      window.history.replaceState({}, '', '/')
+      setSession(null)
+      setAuthLoading(false)
+      return
+    }
 
     if (oauthCode) {
       window.history.replaceState({}, '', '/')
@@ -94,6 +102,10 @@ export default function App() {
             localStorage.setItem('refresh_token', data.refresh_token)
           }
           setSession(data?.access_token ? { access_token: data.access_token } : null)
+          setAuthLoading(false)
+        })
+        .catch(() => {
+          setSession(null)
           setAuthLoading(false)
         })
       return
