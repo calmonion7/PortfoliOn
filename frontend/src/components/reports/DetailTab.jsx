@@ -202,23 +202,46 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     )
   }
 
-  // View C — 지지/저항 분할
+  // View C — 지지/저항 카드형
   const below = levels.filter(l => price == null || l.value <= price).sort((a, b) => b.value - a.value)
   const above = levels.filter(l => price != null && l.value > price).sort((a, b) => a.value - b.value)
 
-  const renderCell = (l, isBelow) => {
+  // 같은 가격이 여러 항목에 있으면 a, b, c... 접미사 부여
+  const tagDuplicates = (arr) => {
+    const priceGroups = {}
+    arr.forEach((l, i) => { priceGroups[l.value] = [...(priceGroups[l.value] || []), i] })
+    return arr.map((l, i) => {
+      const group = priceGroups[l.value]
+      if (group.length <= 1) return { ...l, displayLabel: l.label }
+      const suffix = String.fromCharCode(97 + group.indexOf(i))
+      return { ...l, displayLabel: `${l.label}(${suffix})` }
+    })
+  }
+
+  const belowTagged = tagDuplicates(below)
+  const aboveTagged = tagDuplicates(above)
+
+  const renderCard = (l, isBelow) => {
     const p = pctFrom(l.value)
     return (
       <div key={l.label} style={{
-        padding: '2px 6px', borderRadius: 3, marginBottom: 2,
-        display: 'flex', alignItems: 'center', gap: 4,
+        padding: '5px 8px', borderRadius: 5, marginBottom: 4,
+        background: 'rgba(255,255,255,0.04)',
         ...(isBelow
-          ? { borderRight: `2px solid ${l.color}`, flexDirection: 'row-reverse' }
-          : { borderLeft: `2px solid ${l.color}` }),
+          ? { borderRight: `3px solid ${l.color}`, textAlign: 'right' }
+          : { borderLeft: `3px solid ${l.color}`, textAlign: 'left' }),
       }}>
-        <span style={{ fontSize: 9, color: l.color, fontWeight: 600, flexShrink: 0 }}>{l.label}</span>
-        <span style={{ fontSize: 9, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmt(l.value, market)}</span>
-        {p != null && <span style={{ fontSize: 9, fontVariantNumeric: 'tabular-nums', color: isBelow ? '#81c784' : '#ef9a9a', flexShrink: 0 }}>{p >= 0 ? '+' : ''}{p.toFixed(1)}%</span>}
+        <div style={{ display: 'flex', justifyContent: isBelow ? 'flex-end' : 'flex-start', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+          <span style={{ fontSize: 9, color: l.color, fontWeight: 700 }}>{l.displayLabel}</span>
+          {p != null && (
+            <span style={{ fontSize: 9, color: isBelow ? '#81c784' : '#ef9a9a', fontVariantNumeric: 'tabular-nums' }}>
+              {p >= 0 ? '+' : ''}{p.toFixed(1)}%
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+          {fmt(l.value, market)}
+        </div>
       </div>
     )
   }
@@ -233,16 +256,16 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 9, color: '#81c784', fontWeight: 600, textAlign: 'right', marginBottom: 3 }}>지지 구간 ▼</div>
-          {below.length > 0
-            ? below.map(l => renderCell(l, true))
+          <div style={{ fontSize: 9, color: '#81c784', fontWeight: 600, textAlign: 'right', marginBottom: 4 }}>지지 구간 ▼</div>
+          {belowTagged.length > 0
+            ? belowTagged.map(l => renderCard(l, true))
             : <div style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'right', padding: '4px 6px' }}>없음</div>}
         </div>
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', alignSelf: 'stretch' }} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 9, color: '#ef9a9a', fontWeight: 600, marginBottom: 3 }}>저항 구간 ▲</div>
-          {above.length > 0
-            ? above.map(l => renderCell(l, false))
+          <div style={{ fontSize: 9, color: '#ef9a9a', fontWeight: 600, marginBottom: 4 }}>저항 구간 ▲</div>
+          {aboveTagged.length > 0
+            ? aboveTagged.map(l => renderCard(l, false))
             : <div style={{ fontSize: 9, color: 'var(--text-3)', padding: '4px 6px' }}>없음</div>}
         </div>
       </div>

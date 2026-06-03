@@ -110,6 +110,15 @@ def _run_digest():
             print(f"[Scheduler] Daily digest failed for {user_id}: {e}")
 
 
+def _fetch_leverage():
+    from services.leverage_service import fetch_and_store
+    try:
+        fetch_and_store()
+        print("[Scheduler] Leverage indicators fetched")
+    except Exception as e:
+        print(f"[Scheduler] Leverage fetch failed: {e}")
+
+
 def _reschedule_guru():
     cfg = storage.get_guru_schedule()
     if _scheduler.get_job(_GURU_JOB_ID):
@@ -176,6 +185,12 @@ def start():
         _refresh_monthly,
         CronTrigger(day=1, hour=2, minute=0, timezone="Asia/Seoul"),
         id="monthly_refresh",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _fetch_leverage,
+        CronTrigger(hour=7, minute=0, timezone="Asia/Seoul"),
+        id="leverage_fetch",
         replace_existing=True,
     )
     _scheduler.start()
