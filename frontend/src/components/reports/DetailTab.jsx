@@ -7,7 +7,7 @@ import FinancialsChart from './FinancialsChart'
 import api from '../../api'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
-  const [view, setView] = useState('C')
+  const [view, setView] = useState('B')
   if (!price && !vp?.poc) return null
 
   const levels = [
