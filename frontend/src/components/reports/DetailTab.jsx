@@ -94,7 +94,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const gapSegs = segments.filter(s => s.isGap)
 
     return (
-      <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: 8, maxWidth: 360 }}>
         {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
         {togglesJSX}
         <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: '100%' }}>
@@ -273,7 +273,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   }
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div style={{ marginTop: 8, maxWidth: 360 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
       {togglesJSX}
       <div style={{ padding: '5px 10px', textAlign: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 6 }}>
