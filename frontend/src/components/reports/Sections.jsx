@@ -34,41 +34,38 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🏢 사업영역 & 시장순위</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
         {competitors.map((c, i) => {
           const isSelf = c.is_self || c.ticker === ticker
-          const ytdColor = c.ytd_return != null ? (c.ytd_return >= 0 ? '#81c784' : '#ef9a9a') : 'var(--text-3)'
+          const ytdPos = c.ytd_return != null && c.ytd_return >= 0
+          const ytdColor = c.ytd_return != null ? (ytdPos ? '#81c784' : '#ef9a9a') : 'var(--text-3)'
           const mcStr = c.market_cap ? (market === 'KR' ? `₩${fmtMC(c.market_cap)}` : `$${fmtMC(c.market_cap)}`) : 'N/A'
+          const rankColor = i === 0 ? '#F59E0B' : i === 1 ? '#94A3B8' : i === 2 ? '#C07842' : 'var(--border)'
           return (
             <div key={i} style={{
               background: isSelf ? 'var(--bg-elev-2)' : 'var(--bg-elev)',
-              borderRadius: 8,
-              padding: '8px 12px',
-              border: isSelf ? '1px solid var(--accent)' : '1px solid transparent',
+              borderRadius: 10,
+              padding: '10px 14px',
+              borderLeft: `3px solid ${rankColor}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                  <span style={{
-                    flexShrink: 0,
-                    width: 20, height: 20,
-                    borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, fontWeight: 800,
-                    background: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--bg-elev-3)',
-                    color: i < 3 ? '#1a1a1a' : 'var(--text-3)',
-                  }}>{i + 1}</span>
-                  <span style={{ fontWeight: isSelf ? 700 : 500, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: rankColor, flexShrink: 0, minWidth: 12 }}>{i + 1}</span>
+                  <span style={{ fontWeight: isSelf ? 700 : 600, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {c.name || c.ticker}
                   </span>
-                  {isSelf && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'var(--bg-elev-3)', padding: '1px 5px', borderRadius: 3, flexShrink: 0 }}>기준</span>}
+                  {isSelf && <span style={{ fontSize: 9, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 15%, transparent)', padding: '2px 6px', borderRadius: 4, flexShrink: 0, fontWeight: 700, letterSpacing: '0.02em' }}>기준</span>}
                 </div>
-                <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0, marginLeft: 8 }}>{c.ticker}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontWeight: 500 }}>{c.ticker}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--text-2)' }}>{fmt(c.price, market)}</span>
-                <span style={{ color: 'var(--text-2)' }}>{mcStr}</span>
-                <span style={{ color: ytdColor, fontWeight: 600 }}>
-                  {c.ytd_return != null ? `${c.ytd_return >= 0 ? '+' : ''}${c.ytd_return.toFixed(1)}%` : 'N/A'}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 19 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{fmt(c.price, market)}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{mcStr}</span>
+                <span style={{ fontSize: 12, color: ytdColor, fontWeight: 700 }}>
+                  {c.ytd_return != null ? `${ytdPos ? '+' : ''}${c.ytd_return.toFixed(1)}%` : '—'}
                 </span>
               </div>
             </div>
