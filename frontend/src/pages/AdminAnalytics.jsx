@@ -5,6 +5,30 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 
+const EVENT_LABELS = {
+  nav_portfolio:    '종목관리',
+  nav_research:     '리서치',
+  nav_market:       '시장',
+  nav_guru:         '구루',
+  nav_settings:     '설정',
+  tab_holdings:     '보유 탭',
+  tab_watch:        '관심 탭',
+  tab_dash:         '대시보드 탭',
+  tab_analysis:     '분석 탭',
+  tab_reports:      '리포트 탭',
+  tab_digest:       '다이제스트 탭',
+  tab_calendar:     '캘린더 탭',
+  report_view_open: '리포트 열기',
+  report_tab_switch:'리포트 탭전환',
+  stock_search:     '종목 검색',
+  stock_add:        '종목 추가',
+  stock_delete:     '종목 삭제',
+  stock_promote:    '보유 전환',
+  report_generate:  '리포트 생성',
+  guru_crawl:       '구루 크롤',
+}
+const eName = (key) => EVENT_LABELS[key] || key
+
 const DAYS_OPTIONS = [
   { label: '7일', value: 7 },
   { label: '30일', value: 30 },
@@ -63,7 +87,7 @@ export default function AdminAnalytics() {
           {[
             { label: '오늘 DAU',       value: summary.dau },
             { label: `${days}일 총 이벤트`, value: summary.total_events },
-            { label: 'Top 기능',        value: summary.top_events[0]?.name ?? '—' },
+            { label: 'Top 기능',        value: eName(summary.top_events[0]?.name) ?? '—' },
           ].map(({ label, value }) => (
             <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px' }}>
               <div style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 4 }}>{label}</div>
@@ -78,7 +102,7 @@ export default function AdminAnalytics() {
         <div style={{ marginBottom: 40 }}>
           <h3 style={{ color: 'var(--text)', marginBottom: 12, fontSize: 14 }}>기능별 사용 랭킹 (상위 10개)</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={summary.top_events} margin={{ top: 0, right: 0, bottom: 40, left: 0 }}>
+            <BarChart data={summary.top_events.map(e => ({ ...e, name: eName(e.name) }))} margin={{ top: 0, right: 0, bottom: 40, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="name" tick={{ fill: 'var(--text-3)', fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
               <YAxis tick={{ fill: 'var(--text-3)', fontSize: 11 }} />
@@ -108,7 +132,7 @@ export default function AdminAnalytics() {
               <tbody>
                 {history.map((row, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', fontFamily: 'monospace' }}>{row.event_name}</td>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)' }}>{eName(row.event_name)}</td>
                     <td style={{ padding: '8px 12px', color: 'var(--text-3)', fontFamily: 'monospace' }}>{JSON.stringify(row.properties)}</td>
                     <td style={{ padding: '8px 12px', color: 'var(--text-3)' }}>{row.created_at ? new Date(row.created_at).toLocaleString('ko-KR') : '—'}</td>
                   </tr>
