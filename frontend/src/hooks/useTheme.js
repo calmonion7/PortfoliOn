@@ -8,8 +8,13 @@ function applyTheme(value) {
   } else {
     document.documentElement.removeAttribute('data-theme')
   }
-  const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', THEME_COLORS[value] ?? THEME_COLORS.light)
+  let meta = document.querySelector('meta[name="theme-color"]')
+  if (!meta) {
+    meta = document.createElement('meta')
+    meta.name = 'theme-color'
+    document.head.appendChild(meta)
+  }
+  meta.setAttribute('content', THEME_COLORS[value] ?? THEME_COLORS.light)
 }
 
 export default function useTheme() {
