@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { trackEvent } from '../utils/analytics'
 import api from '../api'
+import usePortfolioData from '../hooks/usePortfolioData'
 import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -28,58 +29,13 @@ export default function Portfolio() {
   const [tab, setTab] = useState('holdings')
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [stocks, setStocks] = useState([])
-  const [watchlist, setWatchlist] = useState([])
-  const [listLoading, setListLoading] = useState(true)
-  const [hasFetched, setHasFetched] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [promoteTarget, setPromoteTarget] = useState(null)
   const [error, setError] = useState('')
-  const [dashboardCards, setDashboardCards] = useState([])
-  const [dashboardLoading, setDashboardLoading] = useState(false)
   const [analysisTab, setAnalysisTab] = useState('sector')
-  const [fx, setFx] = useState(1380)
-  const [events7d, setEvents7d] = useState([])
 
-  const fetchAll = useCallback(async () => {
-    setListLoading(true)
-    const { data } = await api.get('/api/portfolio')
-    setStocks(data.stocks || [])
-    setWatchlist(data.watchlist || [])
-    setListLoading(false)
-    setHasFetched(true)
-    // 시세는 목록 렌더 후 별도 로드
-    api.get('/api/portfolio/prices').then(({ data: prices }) => {
-      setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
-    }).catch(() => {})
-  }, [])
-
-  const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
-    setDashboardLoading(true)
-    try {
-      if (invalidate) await api.delete('/api/stocks/dashboard/cache').catch(() => {})
-      const res = await api.get('/api/stocks/dashboard')
-      setDashboardCards(res.data || [])
-    } catch {
-      // silent
-    } finally {
-      setDashboardLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchAll() }, [fetchAll])
-  useEffect(() => {
-    api.get('/api/market/fx').then(({ data }) => {
-      const rate = data?.rates?.usdkrw?.current
-      if (rate) setFx(rate)
-    }).catch(() => {})
-  }, [])
-  useEffect(() => {
-    api.get('/api/digest/latest').then(({ data }) => {
-      setEvents7d(data?.events_7d || [])
-    }).catch(() => {})
-  }, [])
+  const { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, fetchAll, fetchDashboard } = usePortfolioData()
 
   const pollReportGeneration = (ticker) => {
     let attempts = 0
