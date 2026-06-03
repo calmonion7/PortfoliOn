@@ -36,7 +36,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/api\/.*/i,
+            urlPattern: ({ url }) => /\/api\//i.test(url.pathname) && !/\/api\/auth\/oauth/i.test(url.pathname),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
