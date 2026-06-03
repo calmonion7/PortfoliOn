@@ -217,7 +217,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           : { borderLeft: `2px solid ${l.color}` }),
       }}>
         <span style={{ fontSize: 9, color: l.color, fontWeight: 600, flexShrink: 0 }}>{l.label}</span>
-        <span style={{ fontSize: 9, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', flex: 1, textAlign: isBelow ? 'right' : 'left' }}>{fmt(l.value, market)}</span>
+        <span style={{ fontSize: 9, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmt(l.value, market)}</span>
         {p != null && <span style={{ fontSize: 9, fontVariantNumeric: 'tabular-nums', color: isBelow ? '#81c784' : '#ef9a9a', flexShrink: 0 }}>{p >= 0 ? '+' : ''}{p.toFixed(1)}%</span>}
       </div>
     )
