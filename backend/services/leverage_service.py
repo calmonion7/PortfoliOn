@@ -25,7 +25,9 @@ def _kofia_get(endpoint: str, extra_params: str = "") -> list[dict]:
     key = os.environ.get("KOFIA_API_KEY", "")
     url = f"{endpoint}?serviceKey={key}&resultType=json&numOfRows=1000&pageNo=1{extra_params}"
     r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
-    r.raise_for_status()
+    if not r.ok:
+        ep = endpoint.split("/")[-1]
+        raise Exception(f"HTTP {r.status_code} [{ep}]: {r.text[:300]}")
     body = r.json()["response"]["body"]
     raw = body["items"].get("item", [])
     return raw if isinstance(raw, list) else [raw]
