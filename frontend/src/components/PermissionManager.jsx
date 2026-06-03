@@ -190,11 +190,148 @@ export default function PermissionManager() {
     if (editingUser?.id === user.id) closePanel()
   }
 
+  const allNormalSelected = normalUsers.length > 0 && normalUsers.every(u => selectedIds.includes(u.id))
+
+  const SearchAndTable = (
+    <div>
+      {/* 검색창 */}
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="이메일로 검색..."
+          style={{
+            width: '100%', padding: '7px 10px', borderRadius: 6, fontSize: 13,
+            border: '1px solid var(--border)', background: 'var(--surface-2)',
+            color: 'var(--text)', boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
+      {/* 다중선택 액션바 */}
+      {selectedIds.length > 0 && (
+        <div style={{
+          padding: '8px 14px', background: 'var(--accent-soft)',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>{selectedIds.length}명 선택됨</span>
+          <button className="link-btn" onClick={() => setSelectedIds(normalUsers.map(u => u.id))} style={{ fontSize: 12 }}>전체선택</button>
+          <button className="link-btn" onClick={() => setSelectedIds([])} style={{ fontSize: 12 }}>선택해제</button>
+          <button
+            onClick={openBulk}
+            style={{
+              marginLeft: 'auto', padding: '5px 14px', borderRadius: 6, border: 'none',
+              background: 'var(--text)', color: 'var(--bg)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            일괄 권한 적용 →
+          </button>
+        </div>
+      )}
+
+      {/* 테이블 헤더 */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '36px 1fr auto 60px',
+        padding: '8px 14px', borderBottom: '1px solid var(--border)',
+        fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em',
+      }}>
+        <div>
+          <input
+            type="checkbox"
+            checked={allNormalSelected}
+            onChange={() => setSelectedIds(allNormalSelected ? [] : normalUsers.map(u => u.id))}
+            style={{ cursor: 'pointer' }}
+          />
+        </div>
+        <div>이메일</div>
+        <div>권한</div>
+        <div />
+      </div>
+
+      {/* 테이블 행 */}
+      {displayed.map((u, i) => {
+        const isAdmin = u.role === 'admin'
+        const isSelected = selectedIds.includes(u.id)
+        return (
+          <div
+            key={u.id}
+            style={{
+              display: 'grid', gridTemplateColumns: '36px 1fr auto 60px',
+              padding: '10px 14px', alignItems: 'center',
+              background: isSelected ? 'var(--accent-soft)' : i % 2 === 1 ? 'var(--surface-2)' : 'transparent',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            {/* 체크박스 */}
+            <div>
+              {!isAdmin && (
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => setSelectedIds(prev =>
+                    prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id]
+                  )}
+                  style={{ cursor: 'pointer' }}
+                />
+              )}
+              {isAdmin && <span style={{ fontSize: 14 }}>👑</span>}
+            </div>
+
+            {/* 이메일 */}
+            <div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {u.email}
+            </div>
+
+            {/* 권한 뱃지 */}
+            <div style={{ paddingRight: 12 }}>
+              {isAdmin
+                ? <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>전체 허용</span>
+                : <PermBadges permissions={u.permissions} />
+              }
+            </div>
+
+            {/* 편집/삭제 */}
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+              {!isAdmin && (
+                <>
+                  <button
+                    onClick={() => openEdit(u)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 5, border: '1px solid var(--border)',
+                      background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--text)',
+                    }}
+                  >
+                    편집
+                  </button>
+                  {!u.oauth_provider && (
+                    <button
+                      onClick={() => deleteUser(u)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--down)', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
+                      title="삭제"
+                    >×</button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* 무한스크롤 sentinel */}
+      <div ref={sentinelRef} style={{ height: 1 }} />
+    </div>
+  )
+
   return (
     <div>
       <DefaultPermissionsSection />
-      <div>검색+테이블 TODO</div>
-      <div ref={sentinelRef} />
+      {!isMobile && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+          {SearchAndTable}
+        </div>
+      )}
+      {isMobile && <div>모바일 TODO</div>}
     </div>
   )
 }
