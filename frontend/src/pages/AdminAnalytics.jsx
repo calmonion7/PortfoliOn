@@ -102,10 +102,11 @@ export default function AdminAnalytics() {
         <div style={{ marginBottom: 40 }}>
           <h3 style={{ color: 'var(--text)', marginBottom: 12, fontSize: 14 }}>기능별 사용 랭킹 (상위 10개)</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={summary.top_events.map(e => ({ ...e, name: eName(e.name) }))} margin={{ top: 0, right: 0, bottom: 40, left: 0 }}>
+            <BarChart data={summary.top_events.map(e => ({ ...e, name: eName(e.name) }))} margin={{ top: 0, right: 4, bottom: 40, left: -16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="name" tick={{ fill: 'var(--text-3)', fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
-              <YAxis tick={{ fill: 'var(--text-3)', fontSize: 11 }} />
+              <YAxis tick={{ fill: 'var(--text-3)', fontSize: 11 }} width={36}
+                tickFormatter={v => v >= 10000 ? `${(v / 10000).toFixed(v % 10000 === 0 ? 0 : 1)}만` : v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}천` : v} />
               <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6 }} />
               <Bar dataKey="count" fill="var(--accent)" radius={[3, 3, 0, 0]} />
             </BarChart>
