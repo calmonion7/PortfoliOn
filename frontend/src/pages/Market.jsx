@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import TreasurySection from '../components/market/TreasurySection'
 import FxSection from '../components/market/FxSection'
 import VixSection from '../components/market/VixSection'
@@ -9,19 +10,27 @@ import KrExportsSection from '../components/market/KrExportsSection'
 import LeverageSection from '../components/market/LeverageSection'
 
 export default function Market() {
+  const [tab, setTab] = useState('market')
+
   return (
     <div style={{ maxWidth: 900 }}>
-      <h2 style={{ color: 'var(--text)', marginBottom: 16 }}>시장지표</h2>
-      <TreasurySection />
-      <FxSection />
-      <VixSection />
-      <CommoditiesSection />
-      <EconIndicatorsSection />
-      <M7EarningsSection />
-      <KrTop2Section />
-      <KrExportsSection />
-      <h2 style={{ color: 'var(--text)', margin: '32px 0 16px' }}>수급지표</h2>
-      <LeverageSection />
+      <div className="tabs" style={{ marginBottom: 18, width: 'fit-content' }}>
+        <button className={tab === 'market' ? 'is-active' : ''} onClick={() => setTab('market')}>시장지표</button>
+        <button className={tab === 'supply' ? 'is-active' : ''} onClick={() => setTab('supply')}>수급지표</button>
+      </div>
+      {tab === 'market' && (
+        <>
+          <TreasurySection />
+          <FxSection />
+          <VixSection />
+          <CommoditiesSection />
+          <EconIndicatorsSection />
+          <M7EarningsSection />
+          <KrTop2Section />
+          <KrExportsSection />
+        </>
+      )}
+      {tab === 'supply' && <LeverageSection />}
     </div>
   )
 }
