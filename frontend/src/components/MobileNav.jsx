@@ -13,7 +13,7 @@ const ALL_TABS = [
 
 export default function MobileNav() {
   const { menuPermissions, role, loading } = useAuth() || { menuPermissions: [], role: null, loading: true }
-  const adminTabs = role === 'admin' ? [{ to: '/admin-analytics', label: '애널리틱스', key: 'analytics', Icon: GridIcon }] : []
+  const adminTabs = role === 'admin' ? [{ to: '/admin-analytics', label: '행동', key: 'analytics', Icon: GridIcon }] : []
   const tabs = loading ? [] : [...ALL_TABS.filter(t => menuPermissions.includes(t.key)), ...adminTabs]
   return (
     <nav className="tabbar">
