@@ -3,12 +3,13 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
 from routers.stocks import router
-from auth import get_current_user
+from auth import get_current_user, get_current_user_or_api_key
 
 
 app = FastAPI()
 app.include_router(router)
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
 client = TestClient(app)
 
 SAMPLE_PORTFOLIO = {

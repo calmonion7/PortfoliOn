@@ -5,13 +5,15 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
 from routers.report import router
-from auth import get_current_user, require_admin
+from auth import get_current_user, require_admin, get_current_user_or_api_key, require_admin_or_api_key
 
 
 app = FastAPI()
 app.include_router(router)
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 app.dependency_overrides[require_admin] = lambda: "test-user-id"
+app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
+app.dependency_overrides[require_admin_or_api_key] = lambda: "test-user-id"
 client = TestClient(app)
 
 FULL_PORTFOLIO = {
@@ -36,10 +38,11 @@ def test_list_reports_detects_json_snapshots():
     summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]
     with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
+         patch("routers.report.storage.get_schedule", return_value={}), \
          patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
         resp = client.get("/api/report/list")
     assert resp.status_code == 200
-    data = resp.json()
+    data = resp.json()["stocks"]
     assert "LLY" in data
     assert data["LLY"]["summary"]["target_mean"] == 980.0
     assert "2026-05-05" in data["LLY"]["dates"]
@@ -50,9 +53,10 @@ def test_list_reports_no_markdown_in_dates():
     summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]
     with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
+         patch("routers.report.storage.get_schedule", return_value={}), \
          patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
         resp = client.get("/api/report/list")
-    dates = resp.json()["LLY"]["dates"]
+    dates = resp.json()["stocks"]["LLY"]["dates"]
     assert all(not d.endswith(".md") for d in dates)
 
 
@@ -125,7 +129,7 @@ def test_get_history_returns_sorted_lean_array():
         {"date": "2026-05-05", "data": SAMPLE_SUMMARY_WITH_RSI},
         {"date": "2026-05-06", "data": SAMPLE_SUMMARY_2},
     ]
-    with patch("routers.report.query", return_value=rows):
+    with patch("routers.report.query", side_effect=[[], rows]):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     data = resp.json()
@@ -146,7 +150,7 @@ def test_get_history_returns_sorted_lean_array():
 
 def test_get_history_handles_null_rsi():
     rows = [{"date": "2026-05-06", "data": SAMPLE_SUMMARY_2}]
-    with patch("routers.report.query", return_value=rows):
+    with patch("routers.report.query", side_effect=[[], rows]):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     data = resp.json()
@@ -171,8 +175,8 @@ def test_get_history_fallback_to_reports_dir():
 def test_generate_all_runs_all_stocks():
     two_stocks = {
         "stocks": [
-            {"ticker": "AAPL", "quantity": 1.0, "avg_cost": 150.0, "name": "Apple", "competitors": [], "moat": "", "growth_plan": ""},
-            {"ticker": "MSFT", "quantity": 1.0, "avg_cost": 300.0, "name": "Microsoft", "competitors": [], "moat": "", "growth_plan": ""},
+            {"ticker": "AAPL", "quantity": 1.0, "avg_cost": 150.0, "name": "Apple", "competitors": [], "moat": "", "growth_plan": "", "market": "US", "exchange": ""},
+            {"ticker": "MSFT", "quantity": 1.0, "avg_cost": 300.0, "name": "Microsoft", "competitors": [], "moat": "", "growth_plan": "", "market": "US", "exchange": ""},
         ],
         "watchlist": [],
     }
@@ -181,11 +185,11 @@ def test_generate_all_runs_all_stocks():
     def _fake_generate(stock, target_date=None):
         generated.append(stock["ticker"])
 
-    with patch("routers.report.storage.get_full_portfolio", return_value=two_stocks), \
+    with patch("routers.report.storage.get_global_portfolio", return_value=two_stocks), \
+         patch("routers.report.storage.get_schedule", return_value={}), \
          patch("routers.report.report_generator.generate_report", side_effect=_fake_generate), \
          patch("routers.report.cache_svc.invalidate"), \
-         patch("routers.report.consensus_svc.collect"), \
-         patch("routers.report.consensus_svc.backfill"):
+         patch("routers.report._pipeline.run_daily"):
         resp = client.post("/api/report/generate")
     assert resp.status_code == 202
     assert set(generated) == {"AAPL", "MSFT"}
@@ -194,8 +198,8 @@ def test_generate_all_runs_all_stocks():
 def test_generate_all_continues_on_one_failure():
     two_stocks = {
         "stocks": [
-            {"ticker": "AAPL", "quantity": 1.0, "avg_cost": 150.0, "name": "Apple", "competitors": [], "moat": "", "growth_plan": ""},
-            {"ticker": "MSFT", "quantity": 1.0, "avg_cost": 300.0, "name": "Microsoft", "competitors": [], "moat": "", "growth_plan": ""},
+            {"ticker": "AAPL", "quantity": 1.0, "avg_cost": 150.0, "name": "Apple", "competitors": [], "moat": "", "growth_plan": "", "market": "US", "exchange": ""},
+            {"ticker": "MSFT", "quantity": 1.0, "avg_cost": 300.0, "name": "Microsoft", "competitors": [], "moat": "", "growth_plan": "", "market": "US", "exchange": ""},
         ],
         "watchlist": [],
     }
@@ -206,11 +210,11 @@ def test_generate_all_continues_on_one_failure():
             raise RuntimeError("api down")
         generated.append(stock["ticker"])
 
-    with patch("routers.report.storage.get_full_portfolio", return_value=two_stocks), \
+    with patch("routers.report.storage.get_global_portfolio", return_value=two_stocks), \
+         patch("routers.report.storage.get_schedule", return_value={}), \
          patch("routers.report.report_generator.generate_report", side_effect=_fake_generate), \
          patch("routers.report.cache_svc.invalidate"), \
-         patch("routers.report.consensus_svc.collect"), \
-         patch("routers.report.consensus_svc.backfill"):
+         patch("routers.report._pipeline.run_daily"):
         resp = client.post("/api/report/generate")
     assert resp.status_code == 202
     assert "MSFT" in generated
@@ -221,13 +225,18 @@ def test_generate_all_continues_on_one_failure():
 _nonadmin_app = FastAPI()
 _nonadmin_app.include_router(router)
 _nonadmin_app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+_nonadmin_app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
 _nonadmin_client = TestClient(_nonadmin_app)
 
 
-def test_generate_one_blocked_for_non_admin():
-    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+def test_generate_one_allowed_for_user():
+    stock = {"ticker": "AAPL", "name": "Apple", "competitors": [], "moat": "", "growth_plan": "", "market": "US", "exchange": ""}
+    with patch("routers.report.storage.get_all_stocks", return_value=[stock]), \
+         patch("routers.report.report_generator.generate_report"), \
+         patch("routers.report.cache_svc.invalidate"), \
+         patch("routers.report._pipeline.run_daily"):
         resp = _nonadmin_client.post("/api/report/generate/AAPL")
-    assert resp.status_code == 403
+    assert resp.status_code == 202
 
 
 def test_generate_batch_blocked_for_non_admin():

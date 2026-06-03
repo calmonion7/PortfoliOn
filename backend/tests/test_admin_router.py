@@ -11,8 +11,8 @@ app.dependency_overrides[require_admin] = lambda: "admin-id"
 client = TestClient(app)
 
 USERS = [
-    {"id": "admin-id", "email": "admin@test.com", "role": "admin"},
-    {"id": "user-1",   "email": "user1@test.com", "role": "user"},
+    {"id": "admin-id", "email": "admin@test.com", "role": "admin", "oauth_provider": None},
+    {"id": "user-1",   "email": "user1@test.com", "role": "user",  "oauth_provider": None},
 ]
 
 
@@ -27,23 +27,23 @@ def test_get_users_returns_list():
 
 def test_put_permissions_updates_user():
     body = {"permissions": {"portfolio": True, "research": False, "market": False,
-                            "analysis": False, "guru": True, "settings": False}}
+                            "guru": True, "settings": False}}
     with patch("routers.admin.execute") as mock_exec:
         resp = client.put("/api/admin/users/user-1/permissions", json=body)
     assert resp.status_code == 200
-    assert mock_exec.call_count == 6  # one upsert per menu key
+    assert mock_exec.call_count == 5  # one upsert per menu key
 
 
 def test_bulk_permissions_updates_multiple_users():
     body = {
         "user_ids": ["user-1", "user-2"],
         "permissions": {"portfolio": True, "research": True, "market": False,
-                        "analysis": False, "guru": False, "settings": False},
+                        "guru": False, "settings": False},
     }
     with patch("routers.admin.execute") as mock_exec:
         resp = client.post("/api/admin/users/bulk-permissions", json=body)
     assert resp.status_code == 200
-    assert mock_exec.call_count == 12  # 2 users × 6 menus
+    assert mock_exec.call_count == 10  # 2 users × 5 menus
 
 
 def test_non_admin_blocked():
