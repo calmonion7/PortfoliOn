@@ -39,7 +39,7 @@ function TopNav({ theme, setTheme, setSession }) {
     { to: '/guru',     label: '구루',     key: 'guru' },
     { to: '/settings', label: '설정',     key: 'settings' },
   ]
-  const adminItem = role === 'admin' ? [{ to: '/admin-analytics', label: '애널리틱스', key: 'analytics' }] : []
+  const adminItem = role === 'admin' ? [{ to: '/admin-analytics', label: '행동', key: 'analytics' }] : []
   const navItems = loading ? [] : [
     ...allItems.filter(item => menuPermissions.includes(item.key)),
     ...adminItem,

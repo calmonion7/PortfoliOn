@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { HomeIcon, SearchIcon, ChartIcon, GuruIcon, GearIcon } from './ui/icons'
+import { HomeIcon, SearchIcon, ChartIcon, GuruIcon, GearIcon, GridIcon } from './ui/icons'
 import { useAuth } from '../contexts/AuthContext'
 import { trackEvent } from '../utils/analytics'
 
@@ -12,8 +12,9 @@ const ALL_TABS = [
 ]
 
 export default function MobileNav() {
-  const { menuPermissions, loading } = useAuth() || { menuPermissions: [], loading: true }
-  const tabs = loading ? [] : ALL_TABS.filter(t => menuPermissions.includes(t.key))
+  const { menuPermissions, role, loading } = useAuth() || { menuPermissions: [], role: null, loading: true }
+  const adminTabs = role === 'admin' ? [{ to: '/admin-analytics', label: '행동', key: 'analytics', Icon: GridIcon }] : []
+  const tabs = loading ? [] : [...ALL_TABS.filter(t => menuPermissions.includes(t.key)), ...adminTabs]
   return (
     <nav className="tabbar">
       {tabs.map(({ to, label, Icon, end, key }) => (
