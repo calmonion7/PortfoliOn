@@ -514,48 +514,73 @@ export default function PermissionManager() {
             />
           </div>
 
-          {/* 카드 리스트 */}
+          {/* 아코디언 카드 리스트 */}
           {displayed.map(u => {
             const isAdmin = u.role === 'admin'
+            const isExpanded = editingUser?.id === u.id
             return (
-              <div
-                key={u.id}
-                onClick={() => { if (!isAdmin) openEdit(u) }}
-                style={{
-                  border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px',
-                  cursor: isAdmin ? 'default' : 'pointer',
-                  display: 'flex', flexDirection: 'column', gap: 6,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {isAdmin && <span style={{ fontSize: 14 }}>👑</span>}
-                  <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {u.email}
-                  </span>
+              <div key={u.id} style={{ border: `1px solid ${isExpanded ? 'var(--text)' : 'var(--border)'}`, borderRadius: 10, overflow: 'hidden', transition: 'border-color 0.15s' }}>
+                {/* 카드 헤더 */}
+                <div
+                  onClick={() => { if (!isAdmin) isExpanded ? closePanel() : openEdit(u) }}
+                  style={{
+                    padding: '12px 14px', cursor: isAdmin ? 'default' : 'pointer',
+                    background: isExpanded ? 'var(--accent-soft)' : 'transparent',
+                    display: 'flex', flexDirection: 'column', gap: 6,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {isAdmin && <span style={{ fontSize: 14 }}>👑</span>}
+                    <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {u.email}
+                    </span>
+                    {!isAdmin && <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>}
+                  </div>
+                  {!isExpanded && (
+                    <div>
+                      {isAdmin
+                        ? <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>전체 허용</span>
+                        : <PermBadges permissions={u.permissions} />
+                      }
+                    </div>
+                  )}
                 </div>
-                <div>
-                  {isAdmin
-                    ? <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>전체 허용</span>
-                    : <PermBadges permissions={u.permissions} />
-                  }
-                </div>
+
+                {/* 아코디언 확장 영역 */}
+                {isExpanded && (
+                  <div style={{ padding: '14px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {ALL_MENUS.map(menu => (
+                        <PermChip
+                          key={menu}
+                          label={MENU_LABELS[menu]}
+                          on={pendingPerms[menu]}
+                          onClick={() => setPendingPerms(p => ({ ...p, [menu]: !p[menu] }))}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      onClick={saveSingle}
+                      disabled={saving}
+                      style={{
+                        width: '100%', padding: '11px', borderRadius: 8, border: 'none',
+                        background: savedMsg ? 'var(--accent-soft)' : 'var(--text)',
+                        color: savedMsg ? 'var(--text)' : 'var(--bg)',
+                        fontWeight: 600, fontSize: 13,
+                        cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1,
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {savedMsg ? '저장됨 ✓' : saving ? '저장 중...' : '저장'}
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
 
           {/* 무한스크롤 sentinel (모바일) */}
           <div ref={sentinelRef} style={{ height: 1 }} />
-
-          {/* 바텀 시트 */}
-          <BottomSheet
-            user={editingUser !== 'bulk' ? editingUser : null}
-            perms={pendingPerms}
-            setPerms={setPendingPerms}
-            onSave={saveSingle}
-            onClose={closePanel}
-            saving={saving}
-            savedMsg={savedMsg}
-          />
         </div>
       )}
     </div>
