@@ -41,44 +41,23 @@ def calc_rsi_target_price(
 
     AG = float(avg_gain.iloc[-1])
     AL = float(avg_loss.iloc[-1])
-    cur_price = float(prices.iloc[-1])
 
-    if AL > 0 and not (np.isnan(AG) or np.isnan(AL)):
-        RS_target = target_rsi / (100.0 - target_rsi)
-        factor    = period - 1
-        current_rs = AG / AL
-        if RS_target > current_rs:
-            delta_p = factor * (AL * RS_target - AG)
-            if delta_p > 0:
-                result = round(cur_price + delta_p, 2)
-                if result > 0 and abs(result - cur_price) / cur_price <= 0.5:
-                    return result
-        else:
-            delta_p = factor * (AL - AG / RS_target)
-            if delta_p < 0:
-                result = round(cur_price + delta_p, 2)
-                if result > 0 and abs(result - cur_price) / cur_price <= 0.5:
-                    return result
-
-    rsi_aligned = rsi_values.dropna().reindex(prices.index).dropna()
-    prices_aligned = prices.reindex(rsi_aligned.index)
-    if len(prices_aligned) < 5:
+    if np.isnan(AG) or np.isnan(AL):
         return None
 
-    rsi_arr = rsi_aligned.values
-    p_arr   = prices_aligned.values
+    cur_price = float(prices.iloc[-1])
+    RS_target = target_rsi / (100.0 - target_rsi)
+    factor = period - 1
+    current_rs = AG / AL if AL > 0 else float("inf")
 
-    for window in [5, 10, 15]:
-        mask = np.abs(rsi_arr - target_rsi) <= window
-        if mask.sum() >= 2:
-            indices = np.where(mask)[0]
-            p = p_arr[mask]
-            weights = np.exp(0.05 * (indices - len(p_arr)))
-            weights /= weights.sum()
-            result = round(float(np.dot(weights, p)), 2)
-            if result > 0:
-                return result
+    if RS_target >= current_rs:
+        delta_p = factor * (AL * RS_target - AG)
+    else:
+        delta_p = factor * (AL - AG / RS_target)
 
+    result = cur_price + delta_p
+    if result > 0:
+        return round(result, 2)
     return None
 
 def get_timeframe_rsi(ticker: str) -> dict:
