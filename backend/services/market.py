@@ -28,6 +28,25 @@ def _naver_get(ticker: str, path: str) -> dict | list:
     return r.json()
 
 
+_FNGUIDE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer": "https://comp.fnguide.com/",
+}
+
+def _fnguide_market_cap(ticker: str) -> float | None:
+    import re
+    try:
+        url = f"https://comp.fnguide.com/SVO2/asp/SVD_main.asp?gicode=A{ticker}"
+        r = requests.get(url, headers=_FNGUIDE_HEADERS, timeout=8)
+        clean = re.sub(r"<[^>]+>", " ", r.text)
+        m = re.search(r"시가총액\s*\(보통주,억원\)\s*([\d,]+)", clean)
+        if m:
+            return int(m.group(1).replace(",", "")) * 100_000_000
+    except Exception:
+        pass
+    return None
+
+
 def _n(val) -> float | None:
     if val is None:
         return None
@@ -95,7 +114,7 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
         price = _n(d.get("closePrice"))
         change = _n(d.get("compareToPreviousClosePrice"))
         ratio = _n(d.get("fluctuationsRatio"))
-        mc = _n(d.get("marketValue"))
+        mc = _n(d.get("marketValue")) or _fnguide_market_cap(ticker)
         name = d.get("stockName", ticker)
 
         if ratio is not None and change is not None and ratio > 0 and change < 0:
