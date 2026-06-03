@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from services.leverage_service import get_leverage_data
 from services.market_indicators_service import (
     get_treasury,
     get_m7_earnings,
@@ -97,6 +98,14 @@ def refresh_econ():
     try:
         data = _fetch_and_save_econ_indicators()
         return {"ok": True, "cpi_points": len(data.get("cpi", [])), "unemp_points": len(data.get("unemployment", []))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/leverage")
+def leverage():
+    try:
+        return get_leverage_data()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
