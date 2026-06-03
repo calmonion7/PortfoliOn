@@ -25,6 +25,15 @@ def _fin_num(v):
         return None
 
 
+def _infer_comp_market(ticker: str, parent_market: str, parent_exchange: str):
+    """티커 형식으로 마켓을 추론. 6자리 숫자 → KR, 그 외 → US."""
+    clean = ticker.upper().split('.')[0]
+    if clean.isdigit() and len(clean) == 6:
+        exchange = parent_exchange if parent_market == "KR" else "KS"
+        return "KR", exchange
+    return "US", ""
+
+
 def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_date: str = None) -> str:
     ticker = stock["ticker"]
     market = stock.get("market", "US")
@@ -54,7 +63,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         f_rsi       = ex.submit(indicators.get_timeframe_rsi, yf_sym)
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
-        f_comps     = [ex.submit(mkt.get_quote, c, market, exchange) for c in competitors]
+        f_comps     = [ex.submit(mkt.get_quote, c, *_infer_comp_market(c, market, exchange)) for c in competitors]
 
     quote             = f_quote.result()
     financials        = f_fin.result()
