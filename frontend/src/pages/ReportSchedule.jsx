@@ -266,26 +266,26 @@ export default function ReportSchedule() {
           ))}
         </div>
 
-        {isAdmin && (
-          <div style={{ padding: '8px 12px 0', display: 'flex', gap: 4 }}>
-            {[
-              { key: 'all', label: '전체' },
-              { key: 'mine', label: '내꺼' },
-              { key: 'others', label: '그외' },
-            ].map(({ key, label }) => (
-              <button key={key} onClick={() => setOwnerFilter(key)} style={{
-                padding: '3px 10px', border: 'none', borderRadius: 6,
-                fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                background: ownerFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
-                color: ownerFilter === key ? '#fff' : 'var(--text-3)',
-              }}>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div style={{ padding: '8px 12px 0', display: 'flex', gap: 4 }}>
+        <div style={{ padding: '8px 12px 0', display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+          {isAdmin && (
+            <>
+              {[
+                { key: 'all', label: '전체' },
+                { key: 'mine', label: '내꺼' },
+                { key: 'others', label: '그외' },
+              ].map(({ key, label }) => (
+                <button key={key} onClick={() => setOwnerFilter(key)} style={{
+                  padding: '3px 10px', border: 'none', borderRadius: 6,
+                  fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  background: ownerFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
+                  color: ownerFilter === key ? '#fff' : 'var(--text-3)',
+                }}>
+                  {label}
+                </button>
+              ))}
+              <span style={{ width: 1, height: 14, background: 'var(--border)', margin: '0 2px', flexShrink: 0 }} />
+            </>
+          )}
           {[
             { key: 'all', label: '전체' },
             { key: 'kr', label: '국내' },
