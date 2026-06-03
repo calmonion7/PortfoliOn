@@ -7,7 +7,7 @@ import FinancialsChart from './FinancialsChart'
 import api from '../../api'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
-  const [view, setView] = useState('B')
+  const [view, setView] = useState('C')
   if (!price && !vp?.poc) return null
 
   const levels = [
@@ -16,12 +16,12 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     vp?.vah != null && { value: vp.vah, label: 'VAH', color: '#4fc3f7' },
     vp?.val != null && { value: vp.val, label: 'VAL', color: '#4fc3f7' },
     target != null && { value: target, label: '목표가', color: '#ffcc80' },
-    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#4db6ac' },
-    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#4db6ac' },
-    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#4db6ac' },
-    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ff8a65' },
-    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ff8a65' },
-    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ff8a65' },
+    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#4db6ac', side: 'below' },
+    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#4db6ac', side: 'below' },
+    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#4db6ac', side: 'below' },
+    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ff8a65', side: 'above' },
+    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ff8a65', side: 'above' },
+    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ff8a65', side: 'above' },
   ].filter(Boolean)
 
   const currentEntry = price != null ? {
@@ -203,8 +203,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   }
 
   // View C — 지지/저항 카드형
-  const below = levels.filter(l => price == null || l.value <= price).sort((a, b) => b.value - a.value)
-  const above = levels.filter(l => price != null && l.value > price).sort((a, b) => a.value - b.value)
+  const below = levels.filter(l => l.side === 'below' || (l.side == null && (price == null || l.value <= price))).sort((a, b) => b.value - a.value)
+  const above = levels.filter(l => l.side === 'above' || (l.side == null && price != null && l.value > price)).sort((a, b) => a.value - b.value)
 
   // 같은 가격끼리 그룹핑: [{ value, items: [...] }, ...]
   const groupByPrice = (arr) => {
