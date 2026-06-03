@@ -74,10 +74,19 @@ export default defineConfig({
         async handler() {
           const fs = await import('fs')
           const path = await import('path')
+
+          // index.html: registerSW.js + manifest.webmanifest 캐시 버스팅
           const indexPath = path.resolve('dist/index.html')
           let html = fs.readFileSync(indexPath, 'utf-8')
           html = html.replace(/(registerSW\.js)/g, `$1?${BUILD_DATE}`)
+          html = html.replace(/(manifest\.webmanifest)/g, `$1?${BUILD_DATE}`)
           fs.writeFileSync(indexPath, html)
+
+          // registerSW.js: sw.js 캐시 버스팅
+          const swRegPath = path.resolve('dist/registerSW.js')
+          let swReg = fs.readFileSync(swRegPath, 'utf-8')
+          swReg = swReg.replace(/(\/sw\.js)/g, `$1?${BUILD_DATE}`)
+          fs.writeFileSync(swRegPath, swReg)
         },
       },
     },
