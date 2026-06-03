@@ -1,7 +1,11 @@
 # backend/routers/auth.py
+import hashlib
+import hmac
 import os
+import secrets
+from urllib.parse import urlencode
 
-from authlib.integrations.starlette_client import OAuth
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -13,23 +17,20 @@ from services import db as db_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-_oauth = OAuth()
-_oauth.register(
-    name="google",
-    client_id=os.environ.get("GOOGLE_CLIENT_ID"),
-    client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
-)
-_oauth.register(
-    name="github",
-    client_id=os.environ.get("GITHUB_CLIENT_ID"),
-    client_secret=os.environ.get("GITHUB_CLIENT_SECRET"),
-    access_token_url="https://github.com/login/oauth/access_token",
-    authorize_url="https://github.com/login/oauth/authorize",
-    api_base_url="https://api.github.com/",
-    client_kwargs={"scope": "user:email"},
-)
+_HMAC_SECRET = os.environ.get("SESSION_SECRET", "dev-secret").encode()
+
+def _make_state() -> str:
+    nonce = secrets.token_urlsafe(16)
+    sig = hmac.new(_HMAC_SECRET, nonce.encode(), hashlib.sha256).hexdigest()[:20]
+    return f"{nonce}.{sig}"
+
+def _verify_state(state: str) -> bool:
+    parts = state.rsplit(".", 1)
+    if len(parts) != 2:
+        return False
+    nonce, sig = parts
+    expected = hmac.new(_HMAC_SECRET, nonce.encode(), hashlib.sha256).hexdigest()[:20]
+    return hmac.compare_digest(sig, expected)
 
 
 class LoginRequest(BaseModel):
@@ -105,14 +106,36 @@ def me(user_id: str = Depends(get_current_user)):
 
 @router.get("/oauth/google")
 async def oauth_google(request: Request):
+    state = _make_state()
     redirect_uri = os.environ["FRONTEND_URL"] + "/api/auth/oauth/google/callback"
-    return await _oauth.google.authorize_redirect(request, redirect_uri)
+    params = urlencode({
+        "response_type": "code",
+        "client_id": os.environ["GOOGLE_CLIENT_ID"],
+        "redirect_uri": redirect_uri,
+        "scope": "openid email profile",
+        "state": state,
+    })
+    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
 
 
 @router.get("/oauth/google/callback")
 async def oauth_google_callback(request: Request):
-    token = await _oauth.google.authorize_access_token(request)
-    userinfo = token.get("userinfo")
+    state = request.query_params.get("state", "")
+    if not _verify_state(state):
+        raise HTTPException(status_code=400, detail="Invalid state")
+    code = request.query_params.get("code")
+    redirect_uri = os.environ["FRONTEND_URL"] + "/api/auth/oauth/google/callback"
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={"code": code, "client_id": os.environ["GOOGLE_CLIENT_ID"],
+                  "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
+                  "redirect_uri": redirect_uri, "grant_type": "authorization_code"},
+        )
+    token_data = token_resp.json()
+    id_token = token_data.get("id_token", "")
+    from jose import jwt as jose_jwt
+    userinfo = jose_jwt.decode(id_token, key="", options={"verify_signature": False})
     user = auth_service.upsert_oauth_user(userinfo["email"], "google", userinfo["sub"])
     auth_service.apply_default_permissions(str(user["id"]))
     tokens = auth_service.issue_tokens(str(user["id"]))
@@ -124,16 +147,38 @@ async def oauth_google_callback(request: Request):
 
 @router.get("/oauth/github")
 async def oauth_github(request: Request):
+    state = _make_state()
     redirect_uri = os.environ["FRONTEND_URL"] + "/api/auth/oauth/github/callback"
-    return await _oauth.github.authorize_redirect(request, redirect_uri)
+    params = urlencode({
+        "client_id": os.environ["GITHUB_CLIENT_ID"],
+        "redirect_uri": redirect_uri,
+        "scope": "user:email",
+        "state": state,
+    })
+    return RedirectResponse(f"https://github.com/login/oauth/authorize?{params}")
 
 
 @router.get("/oauth/github/callback")
 async def oauth_github_callback(request: Request):
-    token = await _oauth.github.authorize_access_token(request)
-    resp = await _oauth.github.get("user", token=token)
-    profile = resp.json()
-    emails_resp = await _oauth.github.get("user/emails", token=token)
+    state = request.query_params.get("state", "")
+    if not _verify_state(state):
+        raise HTTPException(status_code=400, detail="Invalid state")
+    code = request.query_params.get("code")
+    redirect_uri = os.environ["FRONTEND_URL"] + "/api/auth/oauth/github/callback"
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            "https://github.com/login/oauth/access_token",
+            headers={"Accept": "application/json"},
+            data={"code": code, "client_id": os.environ["GITHUB_CLIENT_ID"],
+                  "client_secret": os.environ["GITHUB_CLIENT_SECRET"],
+                  "redirect_uri": redirect_uri},
+        )
+        token_data = token_resp.json()
+        access_token = token_data.get("access_token")
+        headers = {"Authorization": f"token {access_token}", "Accept": "application/json"}
+        profile_resp = await client.get("https://api.github.com/user", headers=headers)
+        emails_resp = await client.get("https://api.github.com/user/emails", headers=headers)
+    profile = profile_resp.json()
     emails = emails_resp.json()
     email = next(
         (e["email"] for e in emails if e.get("primary") and e.get("verified")),

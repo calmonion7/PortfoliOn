@@ -42,6 +42,7 @@ export default function ReportSchedule() {
   const [listLoading, setListLoading] = useState(true)
   const [genTab, setGenTab] = useState('pending')
   const [ownerFilter, setOwnerFilter] = useState('all') // 'all' | 'mine' | 'others'
+  const [marketFilter, setMarketFilter] = useState('all') // 'all' | 'kr' | 'us'
 
   const [backfilling, setBackfilling] = useState(false)
   const [backfillMsg, setBackfillMsg] = useState('')
@@ -80,7 +81,7 @@ export default function ReportSchedule() {
     const pending = [], done = [], notInPeriod = []
     for (const [ticker, info] of Object.entries(stockList)) {
       const name = info.summary?.name || ''
-      const entry = { ticker, name, is_mine: info.is_mine }
+      const entry = { ticker, name, is_mine: info.is_mine, market: info.market || '' }
       const latestDate = info.dates?.[0]
       if (isScheduleDay) {
         if (latestDate === today) done.push(entry)
@@ -101,6 +102,12 @@ export default function ReportSchedule() {
     if (!isAdmin || ownerFilter === 'all') return stocks
     if (ownerFilter === 'mine') return stocks.filter(s => s.is_mine)
     return stocks.filter(s => !s.is_mine)
+  }
+
+  const applyMarketFilter = (stocks) => {
+    if (marketFilter === 'all') return stocks
+    if (marketFilter === 'kr') return stocks.filter(s => (s.market || '').toUpperCase() === 'KR')
+    return stocks.filter(s => (s.market || '').toUpperCase() !== 'KR')
   }
 
   const startPolling = (onDone) => {
@@ -136,8 +143,7 @@ export default function ReportSchedule() {
     }
   }
 
-  const handleGeneratePending = async () => {
-    const targets = applyOwnerFilter(pendingStocks)
+  const handleGenerate = async (targets) => {
     if (targets.length === 0) return
     setGenerating(true)
     setGenMsg('')
@@ -185,8 +191,8 @@ export default function ReportSchedule() {
   const secondTabStocks = referenceDate || isScheduleDay ? doneStocks : notInPeriodStocks
   const secondTabLabel = referenceDate || isScheduleDay ? '생성됨' : '수집기간아님'
   const rawTabStocks = genTab === 'pending' ? pendingStocks : secondTabStocks
-  const currentTabStocks = applyOwnerFilter(rawTabStocks)
-  const filteredPending = applyOwnerFilter(pendingStocks)
+  const currentTabStocks = applyMarketFilter(applyOwnerFilter(rawTabStocks))
+  const filteredPending = applyMarketFilter(applyOwnerFilter(pendingStocks))
 
   return (
     <div style={{ maxWidth: 480 }}>
@@ -279,6 +285,23 @@ export default function ReportSchedule() {
           </div>
         )}
 
+        <div style={{ padding: '8px 12px 0', display: 'flex', gap: 4 }}>
+          {[
+            { key: 'all', label: '전체' },
+            { key: 'kr', label: '국내' },
+            { key: 'us', label: '해외' },
+          ].map(({ key, label }) => (
+            <button key={key} onClick={() => setMarketFilter(key)} style={{
+              padding: '3px 10px', border: 'none', borderRadius: 6,
+              fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              background: marketFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
+              color: marketFilter === key ? '#fff' : 'var(--text-3)',
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         {listLoading ? (
           <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</div>
         ) : currentTabStocks.length === 0 ? (
@@ -314,7 +337,7 @@ export default function ReportSchedule() {
         <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
           {genTab === 'pending' ? (
             <>
-              <button className="btn btn-primary" onClick={handleGeneratePending}
+              <button className="btn btn-primary" onClick={() => handleGenerate(filteredPending)}
                 disabled={generating || filteredPending.length === 0}
                 style={{ width: '100%', justifyContent: 'center' }}>
                 {generating ? '생성 중...' : filteredPending.length > 0 ? `지금 생성 (${filteredPending.length}개)` : '생성할 종목 없음'}
@@ -333,9 +356,25 @@ export default function ReportSchedule() {
               {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
             </>
           ) : (
-            <p style={{ color: 'var(--text-3)', fontSize: 12, margin: 0, textAlign: 'center' }}>
-              오늘 이미 생성된 종목 목록입니다.
-            </p>
+            <>
+              <button className="btn btn-primary" onClick={() => handleGenerate(currentTabStocks)}
+                disabled={generating || currentTabStocks.length === 0}
+                style={{ width: '100%', justifyContent: 'center' }}>
+                {generating ? '생성 중...' : currentTabStocks.length > 0 ? `재생성 (${currentTabStocks.length}개)` : '종목 없음'}
+              </button>
+              {generating && progress.total > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
+                    <span>{progress.current || '준비 중...'}</span>
+                    <span style={{ color: 'var(--text)', fontWeight: 600 }}>{progress.done} / {progress.total}</span>
+                  </div>
+                  <div style={{ background: 'var(--accent-soft)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: 'var(--text)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+              )}
+              {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
+            </>
           )}
         </div>
       </div>
