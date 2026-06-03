@@ -63,6 +63,7 @@ def test_sector_portfolio_overlay():
     }
     with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.analysis.db_query", return_value=[{"ticker": "AAPL", "sector": "Technology"}]), \
          patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/analysis/sector")
     assert resp.json()["portfolio_sectors"]["AAPL"] == "Technology"

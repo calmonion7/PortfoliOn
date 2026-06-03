@@ -19,7 +19,7 @@ SAMPLE_PORTFOLIO = {
 SAMPLE_DIGEST = {
     "date": "2026-05-23",
     "generated_at": "2026-05-23T08:00:00+09:00",
-    "portfolio_summary": {"total_value_usd": 1020.0, "daily_change_pct": 2.0, "daily_change_usd": 20.0},
+    "portfolio_summary": {"total_value_krw": 1407600.0, "daily_change_pct": 2.0, "daily_change_krw": 27600.0},
     "stocks": [{"ticker": "AAPL", "name": "Apple", "change_pct": 2.0, "is_holding": True, "is_anomaly": False}],
     "events_7d": [],
     "anomalies": [],
@@ -136,7 +136,7 @@ def test_generate_skips_stock_on_yfinance_failure(tmp_path):
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert result["stocks"] == []
-    assert result["portfolio_summary"]["total_value_usd"] == 0.0
+    assert result["portfolio_summary"]["total_value_krw"] == 0.0
 
 
 def test_generate_portfolio_summary(tmp_path):
@@ -145,11 +145,12 @@ def test_generate_portfolio_summary(tmp_path):
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
          patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service._fetch_usdkrw_current", return_value=1380), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
-    # AAPL: 10 shares, prev_close=100.0, current=102.0
-    assert result["portfolio_summary"]["total_value_usd"] == 1020.0
-    assert result["portfolio_summary"]["daily_change_usd"] == 20.0
+    # AAPL: 10 shares, prev_close=100.0, current=102.0, usdkrw=1380
+    assert result["portfolio_summary"]["total_value_krw"] == 1407600.0
+    assert result["portfolio_summary"]["daily_change_krw"] == 27600.0
     assert result["portfolio_summary"]["daily_change_pct"] == 2.0
 
 

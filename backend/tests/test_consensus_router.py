@@ -16,7 +16,8 @@ SAMPLE_SUMMARY = {
 
 
 def test_get_consensus_empty():
-    with patch("services.consensus.query", return_value=[]):
+    with patch("services.consensus_pipeline.get_mart_history", return_value=None), \
+         patch("services.consensus.query", return_value=[]):
         resp = client.get("/api/consensus/005930")
     assert resp.status_code == 200
     assert resp.json() == []
@@ -24,7 +25,8 @@ def test_get_consensus_empty():
 
 def test_get_consensus_returns_data():
     rows = [{"date": "2026-05-19", "target_mean": 352000, "buy": 25, "hold": 0, "sell": 0}]
-    with patch("services.consensus.query", return_value=rows):
+    with patch("services.consensus_pipeline.get_mart_history", return_value=None), \
+         patch("services.consensus.query", return_value=rows):
         resp = client.get("/api/consensus/005930")
     assert resp.status_code == 200
     assert resp.json()[0]["target_mean"] == 352000

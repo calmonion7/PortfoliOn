@@ -17,19 +17,19 @@ def _make_hist(values: list[float]) -> pd.DataFrame:
 # ── get_treasury ──────────────────────────────────────────────────────────────
 
 def test_get_treasury_returns_four_rates():
-    from services.market_indicators_service import get_treasury, _cache
+    from services.market_indicators import get_treasury, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([4.50, 4.55])
         result = get_treasury()
     assert set(result["rates"].keys()) == {"3m", "5y", "10y", "30y"}
 
 
 def test_get_treasury_change_bp():
-    from services.market_indicators_service import get_treasury, _cache
+    from services.market_indicators import get_treasury, _cache
     _cache.clear()
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.commodities._mc_load", return_value=None), \
+         patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([4.50, 4.55])
         result = get_treasury()
     # change = (4.55 - 4.50) * 100 = 5 bp
@@ -37,15 +37,15 @@ def test_get_treasury_change_bp():
 
 
 def test_get_treasury_spread_is_10y_minus_3m():
-    from services.market_indicators_service import get_treasury, _cache
+    from services.market_indicators import get_treasury, _cache
     _cache.clear()
     def mock_hist_by_sym(sym):
         mock = MagicMock()
         val = 4.55 if sym == "^TNX" else 5.00 if sym == "^TYX" else 4.00 if sym == "^FVX" else 3.50
         mock.history.return_value = _make_hist([val - 0.05, val])
         return mock
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service.yf.Ticker", side_effect=mock_hist_by_sym):
+    with patch("services.market_indicators.commodities._mc_load", return_value=None), \
+         patch("services.market_indicators.cache.yf.Ticker", side_effect=mock_hist_by_sym):
         result = get_treasury()
     # spread = 10y(4.55) - 3m(3.50) = 1.05
     assert len(result["spread"]) > 0
@@ -53,9 +53,9 @@ def test_get_treasury_spread_is_10y_minus_3m():
 
 
 def test_get_treasury_caches_result():
-    from services.market_indicators_service import get_treasury, _cache
+    from services.market_indicators import get_treasury, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([4.50, 4.55])
         get_treasury()
         call_count_1 = mock_t.call_count
@@ -67,9 +67,9 @@ def test_get_treasury_caches_result():
 # ── _get_sp500_tickers ────────────────────────────────────────────────────────
 
 def test_get_sp500_tickers_parses_wikipedia(tmp_path, monkeypatch):
-    from services.market_indicators_service import _get_sp500_tickers
+    from services.market_indicators.earnings import _get_sp500_tickers
     monkeypatch.setattr(
-        "services.market_indicators_service._SP500_CACHE",
+        "services.market_indicators.earnings._SP500_CACHE",
         str(tmp_path / "sp500.json"),
     )
     fake_html = """
@@ -79,7 +79,7 @@ def test_get_sp500_tickers_parses_wikipedia(tmp_path, monkeypatch):
       <tr><td>BRK.B</td><td>Berkshire</td></tr>
     </tbody></table>
     """
-    with patch("services.market_indicators_service.requests.get") as mock_get:
+    with patch("services.market_indicators.earnings.requests.get") as mock_get:
         mock_get.return_value.text = fake_html
         tickers = _get_sp500_tickers()
     assert "AAPL" in tickers
@@ -87,14 +87,14 @@ def test_get_sp500_tickers_parses_wikipedia(tmp_path, monkeypatch):
 
 
 def test_get_sp500_tickers_uses_file_cache(tmp_path, monkeypatch):
-    from services.market_indicators_service import _get_sp500_tickers
+    from services.market_indicators.earnings import _get_sp500_tickers
     cache_file = tmp_path / "sp500.json"
     cache_file.write_text('["AAPL", "MSFT"]')
     import os as _os; _os.utime(cache_file, None)  # touch (recent mtime)
     monkeypatch.setattr(
-        "services.market_indicators_service._SP500_CACHE", str(cache_file)
+        "services.market_indicators.earnings._SP500_CACHE", str(cache_file)
     )
-    with patch("services.market_indicators_service.requests.get") as mock_get:
+    with patch("services.market_indicators.earnings.requests.get") as mock_get:
         tickers = _get_sp500_tickers()
         assert not mock_get.called  # should NOT hit network
     assert tickers == ["AAPL", "MSFT"]
@@ -103,11 +103,11 @@ def test_get_sp500_tickers_uses_file_cache(tmp_path, monkeypatch):
 # ── get_m7_earnings ───────────────────────────────────────────────────────────
 
 def test_get_m7_earnings_structure():
-    from services.market_indicators_service import get_m7_earnings, _cache
+    from services.market_indicators import get_m7_earnings, _cache
     _cache.clear()
     fake_ni = {"2025Q1": 25.0, "2025Q2": 28.0}
-    with patch("services.market_indicators_service._get_sp500_tickers", return_value=["AAPL", "MSFT", "JPM"]), \
-         patch("services.market_indicators_service._get_yf_quarterly_net_income", return_value=fake_ni):
+    with patch("services.market_indicators.earnings._get_sp500_tickers", return_value=["AAPL", "MSFT", "JPM"]), \
+         patch("services.market_indicators.earnings._get_yf_quarterly_net_income", return_value=fake_ni):
         result = get_m7_earnings()
     assert "quarters" in result
     assert "unit" in result
@@ -115,7 +115,8 @@ def test_get_m7_earnings_structure():
 
 
 def test_get_m7_earnings_rest_excludes_m7():
-    from services.market_indicators_service import get_m7_earnings, M7, _cache
+    from services.market_indicators import get_m7_earnings, _cache
+    from services.market_indicators.earnings import M7
     _cache.clear()
     called_tickers: list[str] = []
 
@@ -123,9 +124,9 @@ def test_get_m7_earnings_rest_excludes_m7():
         called_tickers.append(ticker)
         return {"2025Q1": 10.0}
 
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service._get_sp500_tickers", return_value=["AAPL", "JPM", "V"]), \
-         patch("services.market_indicators_service._get_yf_quarterly_net_income", side_effect=capture_ni):
+    with patch("services.market_indicators.cache._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._get_sp500_tickers", return_value=["AAPL", "JPM", "V"]), \
+         patch("services.market_indicators.earnings._get_yf_quarterly_net_income", side_effect=capture_ni):
         get_m7_earnings()
     # JPM and V should be in rest (not M7), AAPL is in M7
     rest_tickers = [t for t in called_tickers if t not in M7]
@@ -136,9 +137,9 @@ def test_get_m7_earnings_rest_excludes_m7():
 # ── _get_kospi_tickers ────────────────────────────────────────────────────────
 
 def test_get_kospi200_tickers_parses_krx(tmp_path, monkeypatch):
-    from services.market_indicators_service import _get_kospi_tickers
+    from services.market_indicators.earnings import _get_kospi_tickers
     monkeypatch.setattr(
-        "services.market_indicators_service._KOSPI_CACHE",
+        "services.market_indicators.earnings._KOSPI_CACHE",
         str(tmp_path / "kospi_tickers.json"),
     )
     # current impl: GET requests to naver with regex code=([0-9]{6})
@@ -151,21 +152,21 @@ def test_get_kospi200_tickers_parses_krx(tmp_path, monkeypatch):
             m.content = b""  # no codes → stop pagination
         call_count[0] += 1
         return m
-    with patch("services.market_indicators_service.requests.get", side_effect=mock_get):
+    with patch("services.market_indicators.earnings.requests.get", side_effect=mock_get):
         tickers = _get_kospi_tickers()
     assert "005930" in tickers
     assert "000660" in tickers
 
 
 def test_get_kospi200_tickers_uses_file_cache(tmp_path, monkeypatch):
-    from services.market_indicators_service import _get_kospi_tickers
+    from services.market_indicators.earnings import _get_kospi_tickers
     cache_file = tmp_path / "kospi_tickers.json"
     cache_file.write_text('["005930","000660","005380"]')
     import os as _os; _os.utime(cache_file, None)
     monkeypatch.setattr(
-        "services.market_indicators_service._KOSPI_CACHE", str(cache_file)
+        "services.market_indicators.earnings._KOSPI_CACHE", str(cache_file)
     )
-    with patch("services.market_indicators_service.requests.get") as mock_get:
+    with patch("services.market_indicators.earnings.requests.get") as mock_get:
         tickers = _get_kospi_tickers()
         assert not mock_get.called
     assert "005380" in tickers
@@ -174,7 +175,7 @@ def test_get_kospi200_tickers_uses_file_cache(tmp_path, monkeypatch):
 # ── _get_naver_quarterly_net_income ──────────────────────────────────────────
 
 def test_get_naver_quarterly_net_income_parses_row():
-    from services.market_indicators_service import _get_naver_quarterly_net_income
+    from services.market_indicators.earnings import _get_naver_quarterly_net_income
     fake_resp = {
         "financeInfo": {
             "rowList": [
@@ -187,7 +188,7 @@ def test_get_naver_quarterly_net_income_parses_row():
             ]
         }
     }
-    with patch("services.market_indicators_service.requests.get") as mock_get:
+    with patch("services.market_indicators.earnings.requests.get") as mock_get:
         mock_get.return_value.json.return_value = fake_resp
         mock_get.return_value.raise_for_status = lambda: None
         result = _get_naver_quarterly_net_income("005930")
@@ -199,13 +200,13 @@ def test_get_naver_quarterly_net_income_parses_row():
 # ── get_kr_top2_earnings ──────────────────────────────────────────────────────
 
 def test_get_kr_top2_earnings_structure():
-    from services.market_indicators_service import get_kr_top2_earnings, _cache
+    from services.market_indicators import get_kr_top2_earnings, _cache
     _cache.clear()
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service._mc_save"), \
-         patch("services.market_indicators_service._get_kospi_tickers",
+    with patch("services.market_indicators.cache._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._mc_save"), \
+         patch("services.market_indicators.earnings._get_kospi_tickers",
                return_value=["005930", "000660", "005380"]), \
-         patch("services.market_indicators_service._get_naver_quarterly_net_income",
+         patch("services.market_indicators.earnings._get_naver_quarterly_net_income",
                return_value={"2025Q1": 100000.0, "2025Q2": 120000.0}):
         result = get_kr_top2_earnings()
     assert "quarters" in result
@@ -214,7 +215,8 @@ def test_get_kr_top2_earnings_structure():
 
 
 def test_get_kr_top2_earnings_rest_excludes_top2():
-    from services.market_indicators_service import get_kr_top2_earnings, KR_TOP2, _cache
+    from services.market_indicators import get_kr_top2_earnings, _cache
+    from services.market_indicators.earnings import KR_TOP2
     _cache.clear()
     called: list[str] = []
 
@@ -222,11 +224,11 @@ def test_get_kr_top2_earnings_rest_excludes_top2():
         called.append(ticker)
         return {"2025Q1": 50000.0}
 
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service._mc_save"), \
-         patch("services.market_indicators_service._get_kospi_tickers",
+    with patch("services.market_indicators.cache._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._mc_save"), \
+         patch("services.market_indicators.earnings._get_kospi_tickers",
                return_value=["005930", "000660", "005380"]), \
-         patch("services.market_indicators_service._get_naver_quarterly_net_income",
+         patch("services.market_indicators.earnings._get_naver_quarterly_net_income",
                side_effect=capture):
         get_kr_top2_earnings()
     rest_tickers = [t for t in called if t not in KR_TOP2]
@@ -239,15 +241,15 @@ def test_get_kr_top2_earnings_rest_excludes_top2():
 import json as _json
 
 def test_get_kr_exports_no_api_key_returns_error(tmp_path, monkeypatch):
-    from services.market_indicators_service import get_kr_exports, _cache
+    from services.market_indicators import get_kr_exports, _cache
     _cache.clear()
     monkeypatch.setattr(
-        "services.market_indicators_service._EXPORTS_CACHE",
+        "services.market_indicators.exports._EXPORTS_CACHE",
         str(tmp_path / "kr_exports.json"),
     )
     monkeypatch.delenv("KITA_API_KEY", raising=False)
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service._fetch_comtrade_exports",
+    with patch("services.market_indicators.exports._mc_load", return_value=None), \
+         patch("services.market_indicators.exports._fetch_comtrade_exports",
                side_effect=Exception("network error")):
         result = get_kr_exports()
     assert result["months"] == []
@@ -255,27 +257,27 @@ def test_get_kr_exports_no_api_key_returns_error(tmp_path, monkeypatch):
 
 
 def test_get_kr_exports_uses_file_cache(tmp_path, monkeypatch):
-    from services.market_indicators_service import get_kr_exports, _cache
+    from services.market_indicators import get_kr_exports, _cache
     _cache.clear()
     cache_file = tmp_path / "kr_exports.json"
     cached_data = {"months": [{"month": "202501", "semiconductor": 100.0, "non_semiconductor": 200.0}]}
     cache_file.write_text(_json.dumps(cached_data))
     import os as _os; _os.utime(cache_file, None)
     monkeypatch.setattr(
-        "services.market_indicators_service._EXPORTS_CACHE", str(cache_file)
+        "services.market_indicators.exports._EXPORTS_CACHE", str(cache_file)
     )
-    monkeypatch.setattr("services.market_indicators_service._mc_load", lambda key: None)
-    with patch("services.market_indicators_service.requests.get") as mock_get:
+    monkeypatch.setattr("services.market_indicators.exports._mc_load", lambda key: None)
+    with patch("services.market_indicators.exports.requests.get") as mock_get:
         result = get_kr_exports()
         assert not mock_get.called
     assert result["months"][0]["semiconductor"] == 100.0
 
 
 def test_get_kr_exports_with_api_key(tmp_path, monkeypatch):
-    from services.market_indicators_service import get_kr_exports, _cache
+    from services.market_indicators import get_kr_exports, _cache
     _cache.clear()
     monkeypatch.setattr(
-        "services.market_indicators_service._EXPORTS_CACHE",
+        "services.market_indicators.exports._EXPORTS_CACHE",
         str(tmp_path / "kr_exports.json"),
     )
     monkeypatch.setenv("KITA_API_KEY", "test-key-123")
@@ -283,9 +285,9 @@ def test_get_kr_exports_with_api_key(tmp_path, monkeypatch):
         {"month": "202501", "semiconductor": 50.0, "non_semiconductor": 100.0},
         {"month": "202502", "semiconductor": 55.0, "non_semiconductor": 105.0},
     ]}
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service._mc_save"), \
-         patch("services.market_indicators_service._fetch_customs_exports", return_value=fake_data):
+    with patch("services.market_indicators.exports._mc_load", return_value=None), \
+         patch("services.market_indicators.exports._mc_save"), \
+         patch("services.market_indicators.exports._fetch_customs_exports", return_value=fake_data):
         result = get_kr_exports()
     months = {m["month"]: m for m in result["months"]}
     assert "202501" in months
@@ -296,19 +298,19 @@ def test_get_kr_exports_with_api_key(tmp_path, monkeypatch):
 # ── get_fx ────────────────────────────────────────────────────────────────────
 
 def test_get_fx_returns_three_rates():
-    from services.market_indicators_service import get_fx, _cache
+    from services.market_indicators import get_fx, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([1350.0, 1370.5])
         result = get_fx()
     assert set(result["rates"].keys()) == {"usdkrw", "usdjpy", "eurusd"}
 
 
 def test_get_fx_change_pct():
-    from services.market_indicators_service import get_fx, _cache
+    from services.market_indicators import get_fx, _cache
     _cache.clear()
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.fx._mc_load", return_value=None), \
+         patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([1000.0, 1010.0])
         result = get_fx()
     # change = (1010 - 1000) / 1000 * 100 = 1.0%
@@ -316,9 +318,9 @@ def test_get_fx_change_pct():
 
 
 def test_get_fx_history_usdkrw_only():
-    from services.market_indicators_service import get_fx, _cache
+    from services.market_indicators import get_fx, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([1350.0, 1370.5])
         result = get_fx()
     assert "usdkrw" in result["history"]
@@ -326,9 +328,9 @@ def test_get_fx_history_usdkrw_only():
 
 
 def test_get_fx_caches_result():
-    from services.market_indicators_service import get_fx, _cache
+    from services.market_indicators import get_fx, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([1350.0, 1370.5])
         get_fx()
         count1 = mock_t.call_count
@@ -340,10 +342,10 @@ def test_get_fx_caches_result():
 # ── get_vix ───────────────────────────────────────────────────────────────────
 
 def test_get_vix_returns_current_and_change():
-    from services.market_indicators_service import get_vix, _cache
+    from services.market_indicators import get_vix, _cache
     _cache.clear()
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.fx._mc_load", return_value=None), \
+         patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([19.5, 18.2])
         result = get_vix()
     assert result["current"] == pytest.approx(18.2, abs=0.01)
@@ -351,10 +353,10 @@ def test_get_vix_returns_current_and_change():
 
 
 def test_get_vix_has_history():
-    from services.market_indicators_service import get_vix, _cache
+    from services.market_indicators import get_vix, _cache
     _cache.clear()
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.fx._mc_load", return_value=None), \
+         patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([18.0, 19.0, 20.0])
         result = get_vix()
     assert len(result["history"]) == 3
@@ -362,9 +364,9 @@ def test_get_vix_has_history():
 
 
 def test_get_vix_caches_result():
-    from services.market_indicators_service import get_vix, _cache
+    from services.market_indicators import get_vix, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([18.0, 19.0])
         get_vix()
         count1 = mock_t.call_count
@@ -376,19 +378,19 @@ def test_get_vix_caches_result():
 # ── get_commodities ───────────────────────────────────────────────────────────
 
 def test_get_commodities_returns_three_prices():
-    from services.market_indicators_service import get_commodities, _cache
+    from services.market_indicators import get_commodities, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([2300.0, 2350.0])
         result = get_commodities()
     assert set(result["prices"].keys()) == {"gold", "oil", "copper"}
 
 
 def test_get_commodities_change_pct():
-    from services.market_indicators_service import get_commodities, _cache
+    from services.market_indicators import get_commodities, _cache
     _cache.clear()
-    with patch("services.market_indicators_service._mc_load", return_value=None), \
-         patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.commodities._mc_load", return_value=None), \
+         patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([2000.0, 2100.0])
         result = get_commodities()
     # change = (2100 - 2000) / 2000 * 100 = 5.0%
@@ -396,18 +398,18 @@ def test_get_commodities_change_pct():
 
 
 def test_get_commodities_has_history_for_all():
-    from services.market_indicators_service import get_commodities, _cache
+    from services.market_indicators import get_commodities, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([100.0, 101.0])
         result = get_commodities()
     assert set(result["history"].keys()) == {"gold", "oil", "copper"}
 
 
 def test_get_commodities_unit_labels():
-    from services.market_indicators_service import get_commodities, _cache
+    from services.market_indicators import get_commodities, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([100.0, 101.0])
         result = get_commodities()
     assert result["prices"]["gold"]["unit"] == "USD/oz"
@@ -416,9 +418,9 @@ def test_get_commodities_unit_labels():
 
 
 def test_get_commodities_caches_result():
-    from services.market_indicators_service import get_commodities, _cache
+    from services.market_indicators import get_commodities, _cache
     _cache.clear()
-    with patch("services.market_indicators_service.yf.Ticker") as mock_t:
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
         mock_t.return_value.history.return_value = _make_hist([100.0, 101.0])
         get_commodities()
         count1 = mock_t.call_count
@@ -430,7 +432,7 @@ def test_get_commodities_caches_result():
 # ── get_econ_indicators ───────────────────────────────────────────────────────
 
 def test_get_econ_indicators_no_api_key_returns_error(monkeypatch):
-    from services.market_indicators_service import get_econ_indicators, _cache
+    from services.market_indicators import get_econ_indicators, _cache
     _cache.clear()
     monkeypatch.delenv("FRED_API_KEY", raising=False)
     result = get_econ_indicators()
@@ -438,10 +440,10 @@ def test_get_econ_indicators_no_api_key_returns_error(monkeypatch):
 
 
 def test_get_econ_indicators_returns_cpi_and_unemployment(monkeypatch):
-    from services.market_indicators_service import get_econ_indicators, _cache
+    from services.market_indicators import get_econ_indicators, _cache
     _cache.clear()
     monkeypatch.setenv("FRED_API_KEY", "test-key")
-    monkeypatch.setattr("services.market_indicators_service._mc_load", lambda key: None)
+    monkeypatch.setattr("services.market_indicators.econ._mc_load", lambda key: None)
 
     fake_obs = [
         {"date": "2024-01-01", "value": "308.5"},
@@ -451,7 +453,7 @@ def test_get_econ_indicators_returns_cpi_and_unemployment(monkeypatch):
     fake_response.json.return_value = {"observations": fake_obs}
     fake_response.raise_for_status = lambda: None
 
-    with patch("services.market_indicators_service.requests.get", return_value=fake_response):
+    with patch("services.market_indicators.econ.requests.get", return_value=fake_response):
         result = get_econ_indicators()
 
     assert "cpi" in result
@@ -461,10 +463,10 @@ def test_get_econ_indicators_returns_cpi_and_unemployment(monkeypatch):
 
 
 def test_get_econ_indicators_skips_missing_values(monkeypatch):
-    from services.market_indicators_service import get_econ_indicators, _cache
+    from services.market_indicators import get_econ_indicators, _cache
     _cache.clear()
     monkeypatch.setenv("FRED_API_KEY", "test-key")
-    monkeypatch.setattr("services.market_indicators_service._mc_load", lambda key: None)
+    monkeypatch.setattr("services.market_indicators.econ._mc_load", lambda key: None)
 
     fake_obs = [
         {"date": "2024-01-01", "value": "308.5"},
@@ -474,14 +476,14 @@ def test_get_econ_indicators_skips_missing_values(monkeypatch):
     fake_response.json.return_value = {"observations": fake_obs}
     fake_response.raise_for_status = lambda: None
 
-    with patch("services.market_indicators_service.requests.get", return_value=fake_response):
+    with patch("services.market_indicators.econ.requests.get", return_value=fake_response):
         result = get_econ_indicators()
 
     assert len(result["cpi"]) == 1
 
 
 def test_get_econ_indicators_caches_result(monkeypatch):
-    from services.market_indicators_service import get_econ_indicators, _cache
+    from services.market_indicators import get_econ_indicators, _cache
     _cache.clear()
     monkeypatch.setenv("FRED_API_KEY", "test-key")
 
@@ -489,7 +491,7 @@ def test_get_econ_indicators_caches_result(monkeypatch):
     fake_response.json.return_value = {"observations": [{"date": "2024-01-01", "value": "3.7"}]}
     fake_response.raise_for_status = lambda: None
 
-    with patch("services.market_indicators_service.requests.get", return_value=fake_response) as mock_get:
+    with patch("services.market_indicators.econ.requests.get", return_value=fake_response) as mock_get:
         get_econ_indicators()
         count1 = mock_get.call_count
         get_econ_indicators()
@@ -501,7 +503,7 @@ def test_get_econ_indicators_caches_result(monkeypatch):
 
 def test_mc_save_and_load(monkeypatch):
     import json
-    import services.market_indicators_service as svc
+    import services.market_indicators.cache as svc
     store = {}
 
     def fake_query(sql, params=None):
@@ -523,7 +525,7 @@ def test_mc_save_and_load(monkeypatch):
 
 
 def test_mc_load_returns_none_on_missing(monkeypatch):
-    import services.market_indicators_service as svc
+    import services.market_indicators.cache as svc
     monkeypatch.setattr(svc, "query", lambda sql, params=None: [])
     assert svc._mc_load("nonexistent") is None
 
@@ -531,7 +533,7 @@ def test_mc_load_returns_none_on_missing(monkeypatch):
 # ── _merge_history / _yf_close_history ───────────────────────────────────────
 
 def test_yf_merge_history_appends_new_points():
-    from services.market_indicators_service import _merge_history
+    from services.market_indicators.cache import _merge_history
     stored = [
         {"date": "2026-01-01", "value": 1.0},
         {"date": "2026-01-02", "value": 2.0},
@@ -547,7 +549,7 @@ def test_yf_merge_history_appends_new_points():
 
 
 def test_yf_merge_history_empty_new():
-    from services.market_indicators_service import _merge_history
+    from services.market_indicators.cache import _merge_history
     stored = [{"date": "2026-01-01", "value": 1.0}]
     result = _merge_history(stored, [])
     assert result == stored
