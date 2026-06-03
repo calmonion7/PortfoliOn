@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-const BUILD_DATE = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+const BUILD_DATE = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
 
 export default defineConfig({
   plugins: [
