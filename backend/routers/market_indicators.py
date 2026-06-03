@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
-from services.leverage_service import get_leverage_data
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from services.leverage_service import get_leverage_data, get_coverage, backfill_with_progress, _backfill_progress
+from auth import require_admin
 from services.market_indicators_service import (
     get_treasury,
     get_m7_earnings,
@@ -108,6 +109,34 @@ def leverage():
         return get_leverage_data()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/leverage/coverage")
+def leverage_coverage():
+    try:
+        return get_coverage()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/leverage/backfill")
+def leverage_backfill(
+    background_tasks: BackgroundTasks,
+    start_year: int = 2021,
+    end_year: int = 2026,
+    user_id: str = Depends(require_admin),
+):
+    import services.leverage_service as svc
+    if svc._backfill_progress.get("running"):
+        raise HTTPException(status_code=409, detail="이미 백필이 실행 중입니다.")
+    background_tasks.add_task(backfill_with_progress, start_year, end_year)
+    return {"ok": True, "start_year": start_year, "end_year": end_year}
+
+
+@router.get("/leverage/backfill/progress")
+def leverage_backfill_progress():
+    import services.leverage_service as svc
+    return svc._backfill_progress
 
 
 @router.post("/refresh-market")

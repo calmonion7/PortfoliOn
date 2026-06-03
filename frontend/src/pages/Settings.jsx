@@ -2,6 +2,7 @@ import { useState } from 'react'
 import ReportSchedule from './ReportSchedule'
 import GuruCrawlSettings from './GuruCrawlSettings'
 import ConsensusSettings from './ConsensusSettings'
+import LeverageBackfillSettings from './LeverageBackfillSettings'
 import useIsMobile from '../hooks/useIsMobile'
 import { useAuth } from '../contexts/AuthContext'
 import PermissionManager from '../components/PermissionManager'
@@ -29,6 +30,9 @@ export default function Settings() {
           <button className={tab === 'consensus' ? 'is-active' : ''} onClick={() => setTab('consensus')}>컨센서스</button>
           <button className={tab === 'guru' ? 'is-active' : ''} onClick={() => setTab('guru')}>구루</button>
           {role === 'admin' && (
+            <button className={tab === 'leverage' ? 'is-active' : ''} onClick={() => setTab('leverage')}>레버리지</button>
+          )}
+          {role === 'admin' && (
             <button className={tab === 'permissions' ? 'is-active' : ''} onClick={() => setTab('permissions')}>권한관리</button>
           )}
         </div>
@@ -38,6 +42,7 @@ export default function Settings() {
         {tab === 'report'    && <ReportSchedule />}
         {tab === 'consensus' && <ConsensusSettings />}
         {tab === 'guru'      && <GuruCrawlSettings />}
+        {tab === 'leverage'  && role === 'admin' && <LeverageBackfillSettings />}
         {tab === 'permissions' && role === 'admin' && <PermissionManager />}
       </div>
 
@@ -55,6 +60,9 @@ export default function Settings() {
           </button>
         ))}
         {role === 'admin' && (
+          <button className={`tab-btn${tab === 'leverage' ? ' active' : ''}`} onClick={() => setTab('leverage')}>레버리지</button>
+        )}
+        {role === 'admin' && (
           <button className={`tab-btn${tab === 'permissions' ? ' active' : ''}`} onClick={() => setTab('permissions')}>권한관리</button>
         )}
       </div>
@@ -62,6 +70,7 @@ export default function Settings() {
       {tab === 'report'    && <ReportSchedule />}
       {tab === 'consensus' && <ConsensusSettings />}
       {tab === 'guru'      && <GuruCrawlSettings />}
+      {tab === 'leverage'  && role === 'admin' && <LeverageBackfillSettings />}
       {tab === 'permissions' && role === 'admin' && <PermissionManager />}
     </div>
   )
