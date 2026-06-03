@@ -6,6 +6,7 @@ import EconIndicatorsSection from '../components/market/EconIndicatorsSection'
 import M7EarningsSection from '../components/market/M7EarningsSection'
 import KrTop2Section from '../components/market/KrTop2Section'
 import KrExportsSection from '../components/market/KrExportsSection'
+import LeverageSection from '../components/market/LeverageSection'
 
 export default function Market() {
   return (
@@ -19,6 +20,7 @@ export default function Market() {
       <M7EarningsSection />
       <KrTop2Section />
       <KrExportsSection />
+      <LeverageSection />
     </div>
   )
 }
