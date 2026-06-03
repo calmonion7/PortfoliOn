@@ -25,8 +25,8 @@ def _kofia_get(endpoint: str, extra_params: str = "") -> list[dict]:
     key = os.environ.get("KOFIA_API_KEY", "")
     url = f"{endpoint}?serviceKey={key}&resultType=json&numOfRows=1000&pageNo=1{extra_params}"
     r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
-    if r.status_code == 422:
-        return []  # 해당 기간 데이터 없음 (KOFIA 미공표)
+    if 400 <= r.status_code < 500:
+        return []  # 해당 기간 데이터 없음 (KOFIA 미공표 또는 조회 불가)
     r.raise_for_status()
     body = r.json()["response"]["body"]
     raw = body["items"].get("item", [])
