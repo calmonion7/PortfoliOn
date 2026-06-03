@@ -134,15 +134,17 @@ def _upsert_rows(conn, rows: list[dict]) -> None:
     conn.commit()
 
 
-def backfill(years: int = 5) -> None:
+def backfill(start: date | None = None, end: date | None = None, years: int = 5) -> None:
     conn = psycopg2.connect(DB_DSN)
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT base_date FROM market_leverage_indicators")
             existing = {str(row[0]) for row in cur.fetchall()}
 
-        end = date.today() - timedelta(days=1)
-        start = end.replace(year=end.year - years)
+        if end is None:
+            end = date.today() - timedelta(days=1)
+        if start is None:
+            start = end.replace(year=end.year - years)
 
         chunk_start = start
         while chunk_start <= end:
@@ -188,7 +190,19 @@ def backfill(years: int = 5) -> None:
 
 
 if __name__ == "__main__":
+    import argparse
+    from datetime import date as _date
+
+    parser = argparse.ArgumentParser(description="Backfill market_leverage_indicators")
+    parser.add_argument("--from", dest="from_date", metavar="YYYY-MM-DD", help="Start date (inclusive)")
+    parser.add_argument("--to",   dest="to_date",   metavar="YYYY-MM-DD", help="End date (inclusive, default: yesterday)")
+    parser.add_argument("--years", type=int, default=5, help="Years to go back from --to (default 5, ignored if --from given)")
+    args = parser.parse_args()
+
     if not KOFIA_KEY:
         print("ERROR: KOFIA_API_KEY not set")
         exit(1)
-    backfill(years=5)
+
+    start_d = _date.fromisoformat(args.from_date) if args.from_date else None
+    end_d   = _date.fromisoformat(args.to_date)   if args.to_date   else None
+    backfill(start=start_d, end=end_d, years=args.years)
