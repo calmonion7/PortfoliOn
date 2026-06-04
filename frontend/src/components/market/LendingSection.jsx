@@ -52,21 +52,21 @@ export default function LendingSection() {
       {history.length > 0 ? (
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={history} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis
               dataKey="date"
               tickFormatter={xFmt}
-              tick={{ fontSize: 11, fill: '#888' }}
+              tick={{ fontSize: 10, fill: 'var(--text-3)' }}
               interval={5}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#888' }}
+              tick={{ fontSize: 10, fill: 'var(--text-3)' }}
               tickFormatter={v => `${v.toFixed(0)}조`}
               width={48}
             />
             <Tooltip
-              contentStyle={{ background: '#1a1a1a', border: '1px solid #333', fontSize: 12 }}
-              labelStyle={{ color: '#ccc' }}
+              contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
+              labelStyle={{ color: 'var(--text-3)' }}
               formatter={(v, name) => [`${Number(v).toFixed(1)}조원`, name]}
               labelFormatter={tooltipLabel}
             />
