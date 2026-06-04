@@ -119,6 +119,15 @@ def _fetch_leverage():
         print(f"[Scheduler] Leverage fetch failed: {e}")
 
 
+def _fetch_lending():
+    from services.lending_service import fetch_and_store
+    try:
+        n = fetch_and_store()
+        print(f"[Scheduler] Lending balance fetched: {n} rows")
+    except Exception as e:
+        print(f"[Scheduler] Lending fetch failed: {e}")
+
+
 def _reschedule_guru():
     cfg = storage.get_guru_schedule()
     if _scheduler.get_job(_GURU_JOB_ID):
@@ -191,6 +200,12 @@ def start():
         _fetch_leverage,
         CronTrigger(hour=7, minute=0, timezone="Asia/Seoul"),
         id="leverage_fetch",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _fetch_lending,
+        CronTrigger(day=5, hour=8, minute=0, timezone="Asia/Seoul"),
+        id="lending_fetch",
         replace_existing=True,
     )
     _scheduler.start()

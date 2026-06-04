@@ -170,3 +170,15 @@ CREATE TABLE market_leverage_indicators (
     created_at            TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX idx_leverage_base_date ON market_leverage_indicators(base_date DESC);
+
+CREATE TABLE IF NOT EXISTS market_lending_balance (
+    base_date            DATE PRIMARY KEY,
+    domestic_borrow_bal  BIGINT,
+    foreign_borrow_bal   BIGINT,
+    domestic_lend_bal    BIGINT,
+    foreign_lend_bal     BIGINT,
+    borrow_foreign_ratio NUMERIC(5, 2),
+    lend_foreign_ratio   NUMERIC(5, 2),
+    created_at           TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_lending_base_date ON market_lending_balance(base_date DESC);

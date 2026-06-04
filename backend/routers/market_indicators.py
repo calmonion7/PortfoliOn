@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from services.leverage_service import get_leverage_data, get_coverage, backfill_with_progress, _backfill_progress
+from services.lending_service import get_lending_data, fetch_and_store as lending_fetch_and_store
 from auth import require_admin
 from services.market_indicators import (
     get_treasury,
@@ -137,6 +138,23 @@ def leverage_backfill(
 def leverage_backfill_progress():
     import services.leverage_service as svc
     return svc._backfill_progress
+
+
+@router.get("/lending")
+def lending():
+    try:
+        return get_lending_data()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/lending/sync")
+def lending_sync(user_id: str = Depends(require_admin)):
+    try:
+        n = lending_fetch_and_store()
+        return {"ok": True, "rows": n}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/refresh-market")
