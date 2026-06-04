@@ -66,6 +66,7 @@ export default function LendingSection() {
             />
             <Tooltip
               contentStyle={{ background: '#1a1a1a', border: '1px solid #333', fontSize: 12 }}
+              labelStyle={{ color: '#ccc' }}
               formatter={(v, name) => [`${Number(v).toFixed(1)}조원`, name]}
               labelFormatter={tooltipLabel}
             />
