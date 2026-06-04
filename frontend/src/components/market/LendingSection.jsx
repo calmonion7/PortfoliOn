@@ -25,7 +25,12 @@ export default function LendingSection() {
   const history = data?.history ?? []
   const latest  = data?.latest
 
-  const xFmt = (d) => d ? d.slice(0, 7) : ''
+  const xFmt = (d) => {
+    if (!d) return ''
+    const [y, m] = d.split('-')
+    return `${y}.${m}`
+  }
+  const tooltipLabel = (d) => d ? `${d.slice(0, 4)}년 ${d.slice(5, 7)}월` : ''
 
   return (
     <SectionCard
@@ -52,7 +57,7 @@ export default function LendingSection() {
               dataKey="date"
               tickFormatter={xFmt}
               tick={{ fontSize: 11, fill: '#888' }}
-              interval="preserveStartEnd"
+              interval={5}
             />
             <YAxis
               tick={{ fontSize: 11, fill: '#888' }}
@@ -62,7 +67,7 @@ export default function LendingSection() {
             <Tooltip
               contentStyle={{ background: '#1a1a1a', border: '1px solid #333', fontSize: 12 }}
               formatter={(v, name) => [`${Number(v).toFixed(1)}조원`, name]}
-              labelFormatter={xFmt}
+              labelFormatter={tooltipLabel}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Line type="monotone" dataKey="foreign_borrow" name="외국인 차입" stroke="#ef4444" dot={false} strokeWidth={2} />
