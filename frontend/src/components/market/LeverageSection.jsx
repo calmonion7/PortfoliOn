@@ -110,6 +110,9 @@ export default function LeverageSection() {
           />
           <Tooltip
             contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: 12 }}
+            labelStyle={{ color: 'var(--text-3)' }}
+            labelFormatter={d => d ? `${d.slice(0,4)}년 ${d.slice(5,7)}월 ${d.slice(8,10)}일` : ''}
+            cursor={{ fill: 'transparent' }}
             formatter={(v, name) => {
               if (name === '반대매매 비중') return [`${v}%`, name]
               return [`${v}조`, name]
