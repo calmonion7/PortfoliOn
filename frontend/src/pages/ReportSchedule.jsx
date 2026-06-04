@@ -259,7 +259,7 @@ export default function ReportSchedule() {
                 padding: '6px 14px', border: 'none', borderRadius: 8,
                 fontSize: 13, fontWeight: 500, cursor: 'pointer',
                 background: genTab === key ? 'var(--text)' : 'var(--accent-soft)',
-                color: genTab === key ? 'var(--bg)' : 'var(--text-3)',
+                color: genTab === key ? 'var(--bg)' : 'var(--text-2)',
               }}>
               {label}
             </button>
@@ -278,7 +278,7 @@ export default function ReportSchedule() {
                   padding: '3px 10px', border: 'none', borderRadius: 6,
                   fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   background: ownerFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
-                  color: ownerFilter === key ? 'var(--bg)' : 'var(--text-3)',
+                  color: ownerFilter === key ? 'var(--bg)' : 'var(--text-2)',
                 }}>
                   {label}
                 </button>
@@ -295,7 +295,7 @@ export default function ReportSchedule() {
               padding: '3px 10px', border: 'none', borderRadius: 6,
               fontSize: 12, fontWeight: 500, cursor: 'pointer',
               background: marketFilter === key ? 'var(--accent)' : 'var(--accent-soft)',
-              color: marketFilter === key ? 'var(--bg)' : 'var(--text-3)',
+              color: marketFilter === key ? 'var(--bg)' : 'var(--text-2)',
             }}>
               {label}
             </button>
