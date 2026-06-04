@@ -50,6 +50,7 @@ export default function LendingSection() {
       </p>
 
       {history.length > 0 ? (
+        <div style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={history} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -77,6 +78,7 @@ export default function LendingSection() {
             <Line type="monotone" dataKey="domestic_lend" name="내국인 대여" stroke="#6366f1" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
           </LineChart>
         </ResponsiveContainer>
+        </div>
       ) : (
         <p style={{ color: '#666', fontSize: 13 }}>데이터 없음 — 관리자 메뉴에서 동기화하세요.</p>
       )}

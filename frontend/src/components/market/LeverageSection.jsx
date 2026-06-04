@@ -86,6 +86,7 @@ export default function LeverageSection() {
         </div>
       )}
 
+      <div style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={history} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -109,7 +110,7 @@ export default function LeverageSection() {
             width={36}
           />
           <Tooltip
-            contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: 12 }}
+            contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
             labelStyle={{ color: 'var(--text-3)' }}
             labelFormatter={d => d ? `${d.slice(0,4)}년 ${d.slice(5,7)}월 ${d.slice(8,10)}일` : ''}
             cursor={{ fill: 'transparent' }}
@@ -140,6 +141,7 @@ export default function LeverageSection() {
           />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </SectionCard>
   )
 }
