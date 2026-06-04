@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 import requests
-from .cache import _mc_save, _cache, _mc_load, _get_cache, _set_cache, _merge_history
+from .cache import _mc_save, _cache, _mc_load, _get_cache, _set_cache, _merge_history, _mc_delete
 
 
 def _fetch_and_save_econ_indicators() -> dict:
@@ -46,20 +46,31 @@ def _fetch_and_save_econ_indicators() -> dict:
     return data
 
 
+def _is_valid_econ_data(data: dict) -> bool:
+    """실업률이 CPI 값으로 오염됐는지 체크 (실업률은 정상 0~30% 범위)."""
+    unemp = data.get("unemployment", [])
+    if unemp and unemp[-1].get("value", 0) > 50:
+        return False
+    return True
+
+
 def get_econ_indicators() -> dict:
     api_key = os.environ.get("FRED_API_KEY")
     if not api_key:
         return {"error": "FRED_API_KEY 환경변수가 필요합니다. https://fred.stlouisfed.org/docs/api/api_key.html 에서 무료 발급 후 설정하세요."}
 
     cached = _get_cache("econ_indicators")
-    if cached:
+    if cached and _is_valid_econ_data(cached):
         return cached
 
     stored = _mc_load("econ_indicators")
-    if stored:
+    if stored and _is_valid_econ_data(stored["data"]):
         _set_cache("econ_indicators", stored["data"], ttl=86400)
         return stored["data"]
 
+    # 캐시 없거나 데이터 오염 → 강제 재fetch
+    _mc_delete("econ_indicators")
+    _cache.pop("econ_indicators", None)
     data = _fetch_and_save_econ_indicators()
     if isinstance(data, dict) and "error" not in data:
         _set_cache("econ_indicators", data, ttl=86400)
