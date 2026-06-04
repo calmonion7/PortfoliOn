@@ -2,7 +2,9 @@
 @import './styles/pc.css';
 @import './styles/mobile.css';
 
-.recharts-wrapper {
-  outline: none;
-  -webkit-tap-highlight-color: transparent;
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
