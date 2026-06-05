@@ -165,12 +165,16 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
             "industry": industry,
         }
     except Exception as e:
+        import requests as _req
+        delisted = isinstance(e, _req.exceptions.HTTPError) and getattr(e.response, "status_code", None) == 409
         return {
             "ticker": ticker, "name": ticker, "price": None, "prev_close": None,
             "daily_change": "N/A",
             "daily_change_pct": None, "weekly_change_pct": None, "monthly_change_pct": None,
             "market_cap": None, "ytd_return": None,
-            "market": "KR", "sector": "", "industry": "", "error": str(e),
+            "market": "KR", "sector": "", "industry": "",
+            "delisted": delisted,
+            "error": "상장폐지 종목입니다." if delisted else str(e),
         }
 
 

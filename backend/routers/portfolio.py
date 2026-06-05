@@ -74,6 +74,11 @@ def get_portfolio_prices(user_id: str = Depends(get_current_user)):
 
 @router.post("", status_code=201)
 def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+    if stock.market == "KR":
+        quote = market_svc.get_quote(stock.ticker, "KR", stock.exchange)
+        if quote.get("delisted"):
+            raise HTTPException(status_code=422, detail="상장폐지 종목입니다. 등록할 수 없습니다.")
+
     holdings = storage.get_holdings(user_id)
     if ticker_exists_in(holdings, stock.ticker):
         raise errors.already_exists(stock.ticker)

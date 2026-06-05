@@ -1,8 +1,9 @@
 from datetime import date as _date, timedelta as _timedelta
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 from typing import List
 from services import storage, errors, cache as cache_svc, report_generator, consensus as consensus_svc
+from services import market as market_svc
 from services.utils import ticker_exists_in, find_ticker
 from services.db import query as db_query
 from routers import calendar as calendar_router
@@ -64,6 +65,11 @@ def get_watchlist(user_id: str = Depends(get_current_user)):
 
 @router.post("", status_code=201)
 def add_watchlist_stock(stock: WatchlistStock, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+    if stock.market == "KR":
+        quote = market_svc.get_quote(stock.ticker, "KR", stock.exchange)
+        if quote.get("delisted"):
+            raise HTTPException(status_code=422, detail="상장폐지 종목입니다. 등록할 수 없습니다.")
+
     holdings = storage.get_holdings(user_id)
     watchlist = storage.get_watchlist_tickers(user_id)
     all_tickers = [h["ticker"].upper() for h in holdings] + [t.upper() for t in watchlist]
