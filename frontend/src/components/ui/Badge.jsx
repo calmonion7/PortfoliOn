@@ -20,11 +20,12 @@ export default function Badge({ variant = 'neutral', size = 'sm', icon = null, c
   )
 }
 
-export function MarketBadge({ market }) {
+export function MarketBadge({ market, exchange = '' }) {
   const isKR = market === 'KR'
+  const krLabel = exchange === 'KS' ? 'KOSPI' : exchange === 'KQ' ? 'KOSDAQ' : 'KR'
   return (
     <Badge variant={isKR ? 'market-kr' : 'market-us'}>
-      {isKR ? '🇰🇷 KR' : '🇺🇸 US'}
+      {isKR ? `🇰🇷 ${krLabel}` : '🇺🇸 US'}
     </Badge>
   )
 }

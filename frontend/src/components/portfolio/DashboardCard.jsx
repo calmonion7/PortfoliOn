@@ -46,7 +46,7 @@ export default function DashboardCard({ item }) {
       <div className="dashcard__header">
         {weather && <span className="dashcard__weather" title={weather.label}>{weather.icon}</span>}
         <strong className="dashcard__ticker">{item.ticker}</strong>
-        <MarketBadge market={item.market || 'US'} />
+        <MarketBadge market={item.market || 'US'} exchange={item.exchange || ''} />
       </div>
       <div className="dashcard__name">{item.name}</div>
       <div className="dashcard__price-row">

@@ -208,6 +208,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "ticker": ticker,
             "name": stock.get("name", ticker),
             "market": stock.get("market", "US"),
+            "exchange": stock.get("exchange", ""),
             "avg_cost": stock.get("avg_cost"),
             "quantity": stock.get("quantity"),
             "current_price": quote.get("price"),
