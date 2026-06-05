@@ -182,3 +182,14 @@ CREATE TABLE IF NOT EXISTS market_lending_balance (
     created_at           TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_lending_base_date ON market_lending_balance(base_date DESC);
+
+CREATE TABLE IF NOT EXISTS backlog_history (
+  ticker     TEXT NOT NULL,
+  quarter    TEXT NOT NULL,
+  amount     NUMERIC,
+  unit       TEXT DEFAULT '억원',
+  source     TEXT DEFAULT 'dart',
+  raw_text   TEXT,
+  fetched_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (ticker, quarter)
+);

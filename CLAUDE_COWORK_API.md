@@ -332,7 +332,7 @@ DART에서 수주잔고 섹션 텍스트를 가져왔으나 자동 파싱에 실
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `ticker` | string | 종목 코드 (KR 6자리) |
-| `quarter` | string | 분기 (`YYYY Q[1-4]`) |
+| `quarter` | string | 분기 (예: `"2024Q3"`, 형식 `YYYYQn`) |
 | `raw_text` | string | DART 보고서 섹션 원문 텍스트 (최대 8000자) |
 | `unit` | string | 금액 단위 (항상 `"억원"`) |
 

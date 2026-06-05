@@ -299,6 +299,12 @@ def get_history(ticker: str):
     return result
 
 
+@router.get("/report/backlog/pending")
+def get_pending_backlog(user_id: str = Depends(get_current_user_or_api_key)):
+    from services.backlog import get_pending_backlog as _get_pending
+    return _get_pending()
+
+
 @router.get("/report/{ticker}/{date_str}")
 def get_report(ticker: str, date_str: str):
     upper = ticker.upper()
@@ -433,12 +439,6 @@ def backfill_consensus(ticker: str):
     market = summary.get("market", "US")
     added = consensus_svc.backfill(upper, market)
     return {"added": len(added), "entries": added}
-
-
-@router.get("/report/backlog/pending")
-def get_pending_backlog(user_id: str = Depends(get_current_user_or_api_key)):
-    from services.backlog import get_pending_backlog as _get_pending
-    return _get_pending()
 
 
 @router.get("/report/{ticker}/backlog")
