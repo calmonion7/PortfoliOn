@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo as _ZoneInfo
 
 _KST = _ZoneInfo("Asia/Seoul")
 from typing import Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Body
 from pathlib import Path
 from services import storage, report_generator
 from services import market as market_svc
@@ -448,7 +448,7 @@ def get_backlog(ticker: str):
 
 
 @router.put("/report/{ticker}/backlog")
-def put_backlog(ticker: str, entries: list, user_id: str = Depends(get_current_user_or_api_key)):
+def put_backlog(ticker: str, entries: list = Body(...), user_id: str = Depends(get_current_user_or_api_key)):
     from services.backlog import save_llm_backlog
     save_llm_backlog(ticker, entries)
     return {"ticker": ticker.upper(), "saved": len(entries)}
