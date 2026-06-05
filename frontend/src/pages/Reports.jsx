@@ -13,7 +13,6 @@ import FinancialsChart from '../components/reports/FinancialsChart'
 import HistoryTab from '../components/reports/HistoryTab'
 import { ReportSectionText, ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection } from '../components/reports/Sections'
 import { trackEvent } from '../utils/analytics'
-import { MarketBadge } from '../components/ui/Badge'
 
 
 
@@ -273,7 +272,7 @@ export default function Reports() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{ticker}</span>
-            {market && <MarketBadge market={market} exchange={info.exchange || ''} />}
+            {market && <span className={`sc-market ${market === 'KR' ? 'kr' : 'us'}`}>{market === 'KR' ? `🇰🇷 ${info.exchange === 'KS' ? 'KOSPI' : info.exchange === 'KQ' ? 'KOSDAQ' : 'KR'}` : '🇺🇸 US'}</span>}
             {guruMap[ticker] && <span style={{ fontSize: 9, color: '#ffb74d' }}>구루{guruMap[ticker]}명</span>}
           </div>
           {s?.sector && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sector}</div>}

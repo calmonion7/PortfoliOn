@@ -204,7 +204,7 @@ export default function Portfolio() {
                 <div className="logo">{h.ticker.slice(0, 3)}</div>
                 <div className="meta">
                   <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
-                  <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : '🇰🇷'} {h.quantity}주 · 평단 {ccy}{fmt(h.avg_cost || 0, dec)}</div>
+                  <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : h.exchange === 'KS' ? '🇰🇷 KOSPI' : h.exchange === 'KQ' ? '🇰🇷 KOSDAQ' : '🇰🇷'} {h.quantity}주 · 평단 {ccy}{fmt(h.avg_cost || 0, dec)}</div>
                 </div>
                 <div className="price">
                   {pnl != null ? (
@@ -247,7 +247,7 @@ export default function Portfolio() {
                 <div className="logo">{h.ticker.slice(0, 3)}</div>
                 <div className="meta">
                   <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
-                  <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : '🇰🇷'} 관심종목</div>
+                  <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : h.exchange === 'KS' ? '🇰🇷 KOSPI' : h.exchange === 'KQ' ? '🇰🇷 KOSDAQ' : '🇰🇷'} 관심종목</div>
                 </div>
                 <button className="row-edit" onClick={e => { e.stopPropagation(); openEdit(h) }}><Pencil /></button>
                 <button className="row-del" onClick={e => { e.stopPropagation(); handleDelete(h.ticker) }}>×</button>
@@ -402,7 +402,7 @@ export default function Portfolio() {
                 const pnlPct = h.current_price != null && h.avg_cost ? (h.current_price - h.avg_cost) / h.avg_cost * 100 : null
                 return (
                   <tr key={h.ticker}>
-                    <td><MarketBadge mkt={h.market || 'US'} /></td>
+                    <td><MarketBadge mkt={h.market || 'US'} exchange={h.exchange || ''} /></td>
                     <td className="ticker-cell">{h.ticker}</td>
                     <td>{h.name}</td>
                     <td className="num tnum">{h.quantity}</td>

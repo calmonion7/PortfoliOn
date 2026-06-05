@@ -99,11 +99,12 @@ export function sparkFor(seed, len = 40, drift = 0) {
 }
 
 // ── 마켓 배지 ─────────────────────────────────────────────────
-export function MarketBadge({ mkt }) {
+export function MarketBadge({ mkt, exchange = '' }) {
+  const label = mkt === 'US' ? 'US' : exchange === 'KS' ? 'KOSPI' : exchange === 'KQ' ? 'KOSDAQ' : 'KR'
   return (
     <span className="mkt-badge">
       <span className="mkt-flag" aria-hidden>{mkt === 'US' ? '🇺🇸' : '🇰🇷'}</span>
-      <span>{mkt}</span>
+      <span>{label}</span>
     </span>
   )
 }
