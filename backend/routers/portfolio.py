@@ -38,6 +38,11 @@ def _generate_with_consensus(stock_dict: dict):
         print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
 
 
+def _generate_etf_report(stock_dict: dict):
+    report_generator.generate_report(stock_dict, target_date=stock_dict.get("_target_date"))
+    cache_svc.invalidate(stock_dict["ticker"])
+
+
 class Stock(BaseModel):
     ticker: str
     name: str
@@ -48,6 +53,7 @@ class Stock(BaseModel):
     growth_plan: str = ""
     market: str = "US"
     exchange: str = ""
+    security_type: str = "EQUITY"
 
 
 @router.get("")
@@ -93,6 +99,7 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
             "growth_plan": stock.growth_plan,
             "market": stock.market,
             "exchange": stock.exchange,
+            "security_type": stock.security_type,
         }])
 
     new_holding = {
@@ -120,9 +127,13 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
             "competitors": stock.competitors,
             "moat": stock.moat,
             "growth_plan": stock.growth_plan,
+            "security_type": stock.security_type,
             "_target_date": target_date,
         }
-        background_tasks.add_task(_generate_with_consensus, stock_dict)
+        if stock.security_type == "ETF":
+            background_tasks.add_task(_generate_etf_report, stock_dict)
+        else:
+            background_tasks.add_task(_generate_with_consensus, stock_dict)
 
     return {**new_holding, "name": stock.name, "competitors": stock.competitors,
             "moat": stock.moat, "growth_plan": stock.growth_plan,

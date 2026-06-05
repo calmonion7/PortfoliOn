@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
-const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
-const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '' }
+const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '', security_type: 'EQUITY' }
+const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '', security_type: 'EQUITY' }
 
 const INPUT_STYLE = {
   width: '100%', padding: '6px 10px', background: 'var(--bg-elev)',
@@ -142,6 +142,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
       name: item.name,
       market: item.market,
       exchange: item.exchange || '',
+      security_type: item.security_type || 'EQUITY',
     }))
   }
 
@@ -164,6 +165,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
       growth_plan,
       market: form.market,
       exchange: form.market === 'KR' ? (form.exchange || 'KS') : '',
+      security_type: form.security_type || 'EQUITY',
     }
     setSaving(true)
     setSaveError('')

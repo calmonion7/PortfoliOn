@@ -38,6 +38,11 @@ def _generate_with_consensus(stock_dict: dict):
         print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
 
 
+def _generate_etf_report(stock_dict: dict):
+    report_generator.generate_report(stock_dict, target_date=stock_dict.get("_target_date"))
+    cache_svc.invalidate(stock_dict["ticker"])
+
+
 class WatchlistStock(BaseModel):
     ticker: str
     name: str
@@ -46,6 +51,7 @@ class WatchlistStock(BaseModel):
     growth_plan: str = ""
     market: str = "US"
     exchange: str = ""
+    security_type: str = "EQUITY"
 
 
 class PromotePayload(BaseModel):
@@ -82,6 +88,7 @@ def add_watchlist_stock(stock: WatchlistStock, background_tasks: BackgroundTasks
             "ticker": stock.ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
             "market": stock.market, "exchange": stock.exchange,
+            "security_type": stock.security_type,
         }])
 
     watchlist.append(stock.ticker.upper())
@@ -102,13 +109,17 @@ def add_watchlist_stock(stock: WatchlistStock, background_tasks: BackgroundTasks
             "competitors": stock.competitors,
             "moat": stock.moat,
             "growth_plan": stock.growth_plan,
+            "security_type": stock.security_type,
             "_target_date": target_date,
         }
-        background_tasks.add_task(_generate_with_consensus, stock_dict)
+        if stock.security_type == "ETF":
+            background_tasks.add_task(_generate_etf_report, stock_dict)
+        else:
+            background_tasks.add_task(_generate_with_consensus, stock_dict)
 
     return {"ticker": stock.ticker.upper(), "name": stock.name,
             "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
-            "market": stock.market, "exchange": stock.exchange,
+            "market": stock.market, "exchange": stock.exchange, "security_type": stock.security_type,
             "report_queued": not bool(existing)}
 
 
