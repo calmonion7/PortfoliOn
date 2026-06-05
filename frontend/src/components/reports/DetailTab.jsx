@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
 import { fmtPrice as fmt } from '../../utils'
 import { fmtN, SectionTitle, _weather } from './reportUtils.jsx'
 import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
+import BacklogChart from './BacklogChart'
 import api from '../../api'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
@@ -377,6 +378,14 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
 export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState(null)
+  const [backlogData, setBacklogData] = useState(null)
+
+  useEffect(() => {
+    if (!ticker || summary?.market !== 'KR') return
+    api.get(`/api/report/${ticker}/backlog`)
+      .then(({ data }) => setBacklogData(data))
+      .catch(() => setBacklogData([]))
+  }, [ticker, summary?.market])
 
   if (!summary) return null
 
@@ -528,6 +537,7 @@ export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) 
       </div>
     </div>
     <FinancialsChart financials={summary.financials} financialsAnnual={summary.financials_annual} market={summary.market} />
+    {summary.market === 'KR' && backlogData?.length > 0 && <BacklogChart data={backlogData} />}
     </div>
   )
 }

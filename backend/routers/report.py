@@ -435,6 +435,19 @@ def backfill_consensus(ticker: str):
     return {"added": len(added), "entries": added}
 
 
+@router.get("/report/{ticker}/backlog")
+def get_backlog(ticker: str):
+    from services.backlog import get_backlog as _get_backlog
+    return _get_backlog(ticker)
+
+
+@router.post("/report/{ticker}/backlog/refresh", status_code=202)
+def refresh_backlog(ticker: str, user_id: str = Depends(require_admin)):
+    from services.backlog import fetch_and_save_backlog
+    result = fetch_and_save_backlog(ticker)
+    return {"ticker": ticker.upper(), "count": len(result), "entries": result}
+
+
 @router.get("/schedule")
 def get_schedule():
     return storage.get_schedule()
