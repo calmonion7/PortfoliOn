@@ -50,15 +50,15 @@ X-API-Key: {COWORK_API_KEY}
 
 ### `GET /api/stocks`
 
-보유종목과 관심종목 전체 목록을 반환합니다.
+전체 유저의 보유종목과 관심종목 목록을 반환합니다 (전 유저 합산, ticker 중복 제거).
 
-**Auth:** `Authorization: Bearer {token}` 필요
+**Auth:** `X-API-Key` 헤더
 
 **Response `200`**
 ```json
 [
-  { "ticker": "LLY",  "name": "일라이 릴리", "type": "holding" },
-  { "ticker": "AVAV", "name": "AVAV",        "type": "watchlist" }
+  { "ticker": "LLY",    "name": "일라이 릴리",      "type": "holding",   "market": "US" },
+  { "ticker": "012450", "name": "한화에어로스페이스", "type": "watchlist", "market": "KR" }
 ]
 ```
 
@@ -67,6 +67,7 @@ X-API-Key: {COWORK_API_KEY}
 | `ticker` | string | 종목 코드 |
 | `name` | string | 종목명 (없으면 ticker 값) |
 | `type` | string | `"holding"` (보유종목) \| `"watchlist"` (관심종목) |
+| `market` | string | `"US"` \| `"KR"` |
 
 ---
 
@@ -74,7 +75,7 @@ X-API-Key: {COWORK_API_KEY}
 
 생성된 리포트 목록과 날짜를 조회합니다. 기존 리포트가 있으면 참조해 중복 분석을 피할 수 있습니다.
 
-**Auth:** `Authorization: Bearer {token}` 필요
+**Auth:** `X-API-Key` 헤더
 
 **Response `200`**
 ```json
@@ -267,7 +268,7 @@ X-API-Key: {COWORK_API_KEY}
 
 여러 종목의 AI 분석 정보를 한 번에 저장합니다.
 
-**Auth:** `Authorization: Bearer {token}` 필요
+**Auth:** `X-API-Key` 헤더
 
 **Request Body** — 종목 배열 (`ticker` 필수, 나머지 선택. 각 필드 스키마는 단건 enrich와 동일)
 ```json

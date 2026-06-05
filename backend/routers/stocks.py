@@ -138,9 +138,9 @@ def get_stocks(user_id: str = Depends(get_current_user_or_api_key)):
     portfolio = storage.get_global_portfolio() if user_id == _API_KEY_USER_ID else storage.get_full_portfolio(user_id)
     result = []
     for s in portfolio["stocks"]:
-        result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "holding"})
+        result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "holding", "market": s.get("market", "US")})
     for s in portfolio["watchlist"]:
-        result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "watchlist"})
+        result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "watchlist", "market": s.get("market", "US")})
     return result
 
 
