@@ -333,7 +333,7 @@
 }
 .card-list-header > span { padding: 0 12px; }
 .card-list-header small { font-size: 9px; opacity: 0.7; }
-.sort-col { cursor: pointer; user-select: none; }
+.sort-col { cursor: pointer; user-select: none; color: var(--text-3); }
 .sort-col:hover { color: var(--text); }
 .sort-col.active { color: var(--accent); }
 

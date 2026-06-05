@@ -117,7 +117,7 @@ export default function Reports() {
       }
       if (sortCol === 'gap') return cmp(gapOf(a), gapOf(b), sortDir)
       if (sortCol === 'rsi') return cmp(a.summary?.daily_rsi?.rsi ?? null, b.summary?.daily_rsi?.rsi ?? null, sortDir)
-      if (sortCol === 'chg') return cmp(a.summary?.daily_change_pct ?? null, b.summary?.daily_change_pct ?? null, sortDir)
+      if (sortCol === 'chg') return cmp(a.summary?.drop_from_high_20d ?? null, b.summary?.drop_from_high_20d ?? null, sortDir)
       // 기본 정렬
       if (activeTab === 'holdings') {
         const gapA = gapOf(a), gapB = gapOf(b)
@@ -142,7 +142,7 @@ export default function Reports() {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortCol(col); setSortDir('asc') }
   }
-  const sortArrow = (col) => sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
+  const sortArrow = (col) => sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕'
 
   const renderFilters = () => (
     <>
