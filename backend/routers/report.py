@@ -435,10 +435,23 @@ def backfill_consensus(ticker: str):
     return {"added": len(added), "entries": added}
 
 
+@router.get("/report/backlog/pending")
+def get_pending_backlog(user_id: str = Depends(get_current_user_or_api_key)):
+    from services.backlog import get_pending_backlog as _get_pending
+    return _get_pending()
+
+
 @router.get("/report/{ticker}/backlog")
 def get_backlog(ticker: str):
     from services.backlog import get_backlog as _get_backlog
     return _get_backlog(ticker)
+
+
+@router.put("/report/{ticker}/backlog")
+def put_backlog(ticker: str, entries: list, user_id: str = Depends(get_current_user_or_api_key)):
+    from services.backlog import save_llm_backlog
+    save_llm_backlog(ticker, entries)
+    return {"ticker": ticker.upper(), "saved": len(entries)}
 
 
 @router.post("/report/{ticker}/backlog/refresh", status_code=202)

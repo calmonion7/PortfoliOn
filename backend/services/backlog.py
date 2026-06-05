@@ -6,13 +6,12 @@ DART 수주잔고(Order Backlog) 수집 서비스.
 2. list.json → 최근 4개 사업/반기/분기보고서 rcept_no
 3. index.json → "수주" 포함 섹션 찾기
 4. 섹션 HTML → BeautifulSoup 테이블 파싱
-5. 파싱 실패 시 → Claude API (claude-haiku-4-5-20251001) 로 추출
+5. 파싱 실패 시 → source='pending', raw_text DB 저장 (Claude Cowork 방식)
 6. backlog_history 테이블에 upsert
 """
 from __future__ import annotations
 
 import io
-import json
 import logging
 import os
 import re
@@ -193,53 +192,6 @@ def _parse_backlog_from_html(html: str, quarter: str) -> Optional[dict]:
     return None
 
 
-def _parse_backlog_via_claude(html: str, quarter: str) -> list[dict]:
-    """Claude API로 수주잔고 수치 추출. [{quarter, amount}] 반환."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return []
-
-    soup = BeautifulSoup(html, "lxml")
-    text = soup.get_text(separator="\n", strip=True)[:8000]
-
-    prompt = (
-        f"다음 텍스트에서 수주잔고 분기별 수치를 JSON으로 추출해줘. "
-        f"[{{\"quarter\": \"2024Q1\", \"amount\": 숫자(억원)}}] 형식으로. 없으면 []\n\n{text}"
-    )
-
-    try:
-        resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 512,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=30,
-        )
-        content = resp.json().get("content", [])
-        raw = content[0].get("text", "") if content else ""
-        # JSON 배열 추출
-        match = re.search(r"\[.*?\]", raw, re.DOTALL)
-        if match:
-            entries = json.loads(match.group())
-            result = []
-            for e in entries:
-                q = e.get("quarter")
-                a = e.get("amount")
-                if q and a is not None:
-                    result.append({"quarter": q, "amount": float(a), "source": "llm", "raw_text": raw[:300]})
-            return result
-    except Exception as e:
-        logger.warning(f"[Backlog] Claude API 호출 실패: {e}")
-    return []
-
-
 def _upsert(ticker: str, entries: list[dict]):
     for e in entries:
         execute(
@@ -271,6 +223,27 @@ def get_backlog(ticker: str) -> list[dict]:
         (ticker.upper(),),
     )
     return [dict(r) for r in rows]
+
+
+def get_pending_backlog() -> list[dict]:
+    """분석 대기 중인 수주잔고 목록. [{ticker, quarter, raw_text, unit}]"""
+    rows = query(
+        "SELECT ticker, quarter, raw_text, unit FROM backlog_history WHERE source = 'pending' ORDER BY ticker, quarter",
+    )
+    return [dict(r) for r in rows]
+
+
+def save_llm_backlog(ticker: str, entries: list[dict]):
+    """Claude Code 분석 결과 저장. entries: [{quarter, amount}]"""
+    for e in entries:
+        execute(
+            """
+            UPDATE backlog_history
+            SET amount = %s, source = 'llm', fetched_at = NOW()
+            WHERE ticker = %s AND quarter = %s AND source = 'pending'
+            """,
+            (float(e["amount"]), ticker.upper(), e["quarter"]),
+        )
 
 
 def fetch_and_save_backlog(ticker: str) -> list[dict]:
@@ -317,14 +290,13 @@ def fetch_and_save_backlog(ticker: str) -> list[dict]:
                 saved.append(entry)
                 break
 
-            # 2차: Claude API
-            llm_entries = _parse_backlog_via_claude(html, quarter)
-            if llm_entries:
-                _upsert(ticker, llm_entries)
-                for e in llm_entries:
-                    seen_quarters.add(e["quarter"])
-                saved.extend(llm_entries)
-                break
+            # 파싱 실패 시: raw_text 저장 후 Claude Cowork 분석 대기
+            soup = BeautifulSoup(html, "lxml")
+            raw_text = soup.get_text(separator="\n", strip=True)[:8000]
+            pending_entry = {"quarter": quarter, "amount": None, "source": "pending", "raw_text": raw_text}
+            _upsert(ticker, [pending_entry])
+            seen_quarters.add(quarter)
+            break
 
         # DART API 레이트 리밋 방지
         time.sleep(0.3)
