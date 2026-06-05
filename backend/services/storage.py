@@ -3,6 +3,22 @@ import json
 from services.db import get_connection, query, execute
 
 _ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures"})
+_JSON_TEXT_FIELDS = frozenset({"moat", "growth_plan", "risks", "recent_disclosures"})
+
+
+def _parse_json_field(val):
+    """text 컬럼에서 JSON 객체로 저장된 값을 역파싱. 일반 문자열이면 그대로 반환."""
+    if not val:
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    try:
+        parsed = json.loads(val)
+        if isinstance(parsed, (dict, list)):
+            return parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return val
 
 
 # ── 종목 마스터 (user-specific) ──────────────────────────────────────────────
@@ -19,8 +35,12 @@ def get_stocks(user_id: str) -> list[dict]:
         (user_id,),
     )
     list_fields = frozenset({"competitors"})
+    def _fmt(k, v):
+        if k in _JSON_TEXT_FIELDS:
+            return _parse_json_field(v)
+        return v or ([] if k in list_fields else "")
     return [
-        {k: (r.get(k) or ([] if k in list_fields else "")) for k in (*_ANALYST_KEYS, "ticker", "market", "exchange")}
+        {k: _fmt(k, r.get(k)) for k in (*_ANALYST_KEYS, "ticker", "market", "exchange")}
         for r in rows
     ]
 
@@ -168,10 +188,10 @@ def get_full_portfolio(user_id: str) -> dict:
             "market": r.get("market") or "US",
             "exchange": r.get("exchange") or "",
             "competitors": r.get("competitors") or [],
-            "moat": r.get("moat") or "",
-            "growth_plan": r.get("growth_plan") or "",
-            "risks": r.get("risks") or "",
-            "recent_disclosures": r.get("recent_disclosures") or "",
+            "moat": _parse_json_field(r.get("moat")),
+            "growth_plan": _parse_json_field(r.get("growth_plan")),
+            "risks": _parse_json_field(r.get("risks")),
+            "recent_disclosures": _parse_json_field(r.get("recent_disclosures")),
         }
         if r["type"] == "holding":
             entry.update({"quantity": r["quantity"], "avg_cost": r["avg_cost"]})
@@ -206,10 +226,10 @@ def get_global_portfolio() -> dict:
             "market": r.get("market") or "US",
             "exchange": r.get("exchange") or "",
             "competitors": r.get("competitors") or [],
-            "moat": r.get("moat") or "",
-            "growth_plan": r.get("growth_plan") or "",
-            "risks": r.get("risks") or "",
-            "recent_disclosures": r.get("recent_disclosures") or "",
+            "moat": _parse_json_field(r.get("moat")),
+            "growth_plan": _parse_json_field(r.get("growth_plan")),
+            "risks": _parse_json_field(r.get("risks")),
+            "recent_disclosures": _parse_json_field(r.get("recent_disclosures")),
         }
         if r["type"] == "holding":
             holdings.append(entry)
@@ -229,7 +249,7 @@ def enrich_stock(ticker: str, fields: dict) -> bool:
     if not exists:
         return False
     set_clause = ", ".join(f"{k}=%s" for k in fields) + ", enriched_at=NOW()"
-    values = [json.dumps(v) if isinstance(v, list) else v for v in fields.values()]
+    values = [json.dumps(v) if isinstance(v, (list, dict)) else v for v in fields.values()]
     execute(f"UPDATE tickers SET {set_clause} WHERE ticker=%s", (*values, upper))
     return True
 

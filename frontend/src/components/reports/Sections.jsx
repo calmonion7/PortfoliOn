@@ -101,3 +101,189 @@ export function ReportSectionNews({ disclosures, news }) {
     </div>
   )
 }
+
+// ── 구조화 데이터 섹션 (신규 스키마, 레거시 string 폴백 포함) ──────────────────
+
+const _FACTOR_LINE = { paddingLeft: 12, borderLeft: '2px solid var(--border)', marginBottom: 0 }
+const _FACTOR_TITLE = { fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }
+const _FACTOR_DESC = { fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }
+const _CHIP = (color) => ({ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: 'var(--bg-elev-2)', color })
+
+export function MoatSection({ moat }) {
+  if (!moat) return null
+  if (typeof moat === 'string') return <ReportSectionText title="🏰 경제적 해자" text={moat} />
+
+  const RATING = {
+    wide:   { label: 'Wide Moat',   color: '#81c784' },
+    narrow: { label: 'Narrow Moat', color: '#ffb74d' },
+    none:   { label: 'No Moat',     color: '#ef9a9a' },
+  }
+  const rc = RATING[moat.rating] || { label: moat.rating || '', color: 'var(--text-3)' }
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>🏰 경제적 해자</span>
+        {moat.rating && <span style={_CHIP(rc.color)}>{rc.label}</span>}
+        {moat.rating_source && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>by {moat.rating_source}</span>}
+      </div>
+      {moat.summary && <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{moat.summary}</p>}
+      {moat.factors?.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {moat.factors.map((f, i) => (
+            <div key={i} style={_FACTOR_LINE}>
+              <div style={_FACTOR_TITLE}>{f.title}</div>
+              <div style={_FACTOR_DESC}>{f.description}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const STATUS_CFG = {
+  launched:  { label: '출시',    color: '#81c784' },
+  phase3:    { label: '임상3상', color: '#64b5f6' },
+  phase2:    { label: '임상2상', color: '#9575cd' },
+  announced: { label: '발표',    color: '#ffb74d' },
+  completed: { label: '완료',    color: 'var(--text-3)' },
+}
+
+export function GrowthPlanSection({ growth_plan }) {
+  if (!growth_plan) return null
+  if (typeof growth_plan === 'string') return <ReportSectionText title="🌱 장기 성장 계획" text={growth_plan} />
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🌱 장기 성장 계획</div>
+      {growth_plan.strategy && (
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{growth_plan.strategy}</p>
+      )}
+      {growth_plan.initiatives?.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {growth_plan.initiatives.map((item, i) => {
+            const sc = STATUS_CFG[item.status] || {}
+            return (
+              <div key={i} style={_FACTOR_LINE}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <span style={_FACTOR_TITLE}>{item.title}</span>
+                  {item.status && <span style={_CHIP(sc.color || 'var(--text-3)')}>{sc.label || item.status}</span>}
+                  {item.timeline && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{item.timeline}</span>}
+                </div>
+                <div style={_FACTOR_DESC}>{item.description}</div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const SEVERITY_CFG = {
+  high:   '#ef9a9a',
+  medium: '#ffb74d',
+  low:    '#fff176',
+}
+
+export function RisksSection({ risks }) {
+  if (!risks) return null
+  if (typeof risks === 'string') return <ReportSectionText title="⚠️ 리스크" text={risks} />
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>⚠️ 리스크</div>
+      {risks.factors?.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {risks.factors.map((f, i) => {
+            const borderColor = SEVERITY_CFG[f.severity] || 'var(--border)'
+            return (
+              <div key={i} style={{ ...(_FACTOR_LINE), borderLeft: `2px solid ${borderColor}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  {f.category && <span style={_CHIP(borderColor)}>{f.category}</span>}
+                  <span style={_FACTOR_TITLE}>{f.title}</span>
+                </div>
+                <div style={_FACTOR_DESC}>{f.description}</div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const IMPACT_COLOR = { positive: '#81c784', negative: '#ef9a9a', neutral: 'var(--text-3)' }
+
+export function RecentDisclosuresSection({ disclosures, news }) {
+  if (!disclosures || typeof disclosures === 'string') {
+    return <ReportSectionNews disclosures={disclosures} news={news} />
+  }
+
+  const vsColor = (s) => !s ? 'var(--text-3)' : s.startsWith('+') ? '#81c784' : s.startsWith('-') ? '#ef9a9a' : 'var(--text-3)'
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>📰 최근 공시 & 뉴스</span>
+        {disclosures.period && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--bg-elev-2)', color: 'var(--text-2)' }}>{disclosures.period}</span>}
+      </div>
+      {disclosures.headline && (
+        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.6, margin: '0 0 10px' }}>{disclosures.headline}</p>
+      )}
+      {disclosures.metrics?.length > 0 && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+              {['항목', '발표치', '예상치', 'vs 예상', '비고'].map(h => (
+                <th key={h} style={{ padding: '5px 8px', color: 'var(--text-3)', fontWeight: 600, textAlign: h === '항목' || h === '비고' ? 'left' : 'right' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {disclosures.metrics.map((m, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '6px 8px', color: 'var(--text)' }}>{m.label}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text)', fontWeight: 700 }}>{m.actual}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-2)' }}>{m.consensus}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', color: vsColor(m.vs_consensus), fontWeight: 700 }}>{m.vs_consensus}</td>
+                <td style={{ padding: '6px 8px', color: 'var(--text-3)' }}>{m.note || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {disclosures.events?.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+          {disclosures.events.map((e, i) => (
+            <div key={i} style={{ ...(_FACTOR_LINE), borderLeft: `2px solid ${IMPACT_COLOR[e.impact] || 'var(--border)'}` }}>
+              <div style={_FACTOR_TITLE}>{e.title}</div>
+              <div style={_FACTOR_DESC}>{e.description}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {disclosures.price_impact && (
+        <div style={{ fontSize: 12, color: 'var(--text-2)', padding: '6px 10px', background: 'var(--bg-elev)', borderRadius: 6, marginBottom: 8 }}>
+          📈 {disclosures.price_impact}
+        </div>
+      )}
+      {disclosures.one_liner && (
+        <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.7, padding: '8px 12px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid var(--accent)', marginBottom: 10 }}>
+          💡 {disclosures.one_liner}
+        </div>
+      )}
+      {news?.length > 0 && (
+        <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: 12, lineHeight: 1.8 }}>
+          {news.map((item, i) => (
+            <li key={i}>
+              <a href={item.link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{decodeHtml(item.title)}</a>
+              <span style={{ color: 'var(--text-3)', marginLeft: 6 }}>— {item.publisher} ({item.published_at})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}

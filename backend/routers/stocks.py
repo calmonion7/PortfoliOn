@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 from services import storage
 from services.db import query
 import re
@@ -77,19 +77,19 @@ def _search_naver(q: str, max_results: int = 12) -> list:
 
 
 class EnrichBody(BaseModel):
-    moat: Optional[str] = None
-    growth_plan: Optional[str] = None
-    risks: Optional[str] = None
-    recent_disclosures: Optional[str] = None
+    moat: Optional[Any] = None
+    growth_plan: Optional[Any] = None
+    risks: Optional[Any] = None
+    recent_disclosures: Optional[Any] = None
     competitors: Optional[List[str]] = None
 
 
 class BatchEnrichItem(BaseModel):
     ticker: str
-    moat: Optional[str] = None
-    growth_plan: Optional[str] = None
-    risks: Optional[str] = None
-    recent_disclosures: Optional[str] = None
+    moat: Optional[Any] = None
+    growth_plan: Optional[Any] = None
+    risks: Optional[Any] = None
+    recent_disclosures: Optional[Any] = None
     competitors: Optional[List[str]] = None
 
 

@@ -156,30 +156,94 @@ X-API-Key: {COWORK_API_KEY}
 
 단일 종목의 AI 분석 정보를 저장합니다. 포함된 필드만 덮어쓰고 나머지는 기존 값을 유지합니다.
 
-**Auth:** `Authorization: Bearer {token}` 필요
+**Auth:** `X-API-Key` 헤더
 
 **Path Parameter:** `ticker` — 종목 코드 (예: `LLY`)
 
 **Request Body**
 ```json
 {
-  "moat": "특허 포트폴리오와 제조 규모의 경제로 진입 장벽 형성",
-  "growth_plan": "2027년까지 GLP-2 파이프라인 확장 및 비만 치료제 시장 선점",
-  "risks": "GLP-1 경쟁 심화, 약가 규제 리스크, 임상 실패 가능성",
-  "recent_disclosures": "2026-05 Q1 실적: EPS $4.82 (예상치 상회), 연간 가이던스 상향",
-  "competitors": ["NVO", "AZN"]
+  "moat": {
+    "rating": "wide",
+    "rating_source": "Morningstar",
+    "summary": "특허·브랜드·R&D 인프라 기반의 최상급 경쟁 우위",
+    "factors": [
+      { "title": "독점적 특허 기반의 가격 결정력", "description": "티르제파티드 기반 제품은 2036년까지 특허 보호." },
+      { "title": "고객 전환 비용 및 브랜드 충성도", "description": "장기 투약 특성으로 이탈률이 매우 낮음." }
+    ]
+  },
+  "growth_plan": {
+    "strategy": "비만 시장 독점 확대 + 차세대 치료 영역 선점",
+    "initiatives": [
+      { "title": "경구용 비만 치료제 파운다요 FDA 승인", "description": "2026-04 세계 최초 경구용 비만 치료제 FDA 승인.", "status": "launched", "timeline": "2026-04" },
+      { "title": "레타트루티드 임상 3상", "description": "삼중 작용제, 압도적 임상 데이터 확보 중.", "status": "phase3", "timeline": null }
+    ]
+  },
+  "risks": {
+    "factors": [
+      { "category": "경쟁", "title": "후발 주자 맹추격", "description": "노보 노디스크·암젠 등이 더 저렴한 비만약 개발 중.", "severity": "high" },
+      { "category": "가격", "title": "약가 인하 압박", "description": "보험·정부 협상으로 실질 단가 하락. 최근 분기 미국 -7%.", "severity": "medium" }
+    ]
+  },
+  "recent_disclosures": {
+    "period": "2026Q1",
+    "headline": "1분기 어닝 서프라이즈 + 연간 가이던스 대폭 상향",
+    "metrics": [
+      { "label": "매출액", "actual": "$19.8B", "consensus": "$17.6B", "vs_consensus": "+12.5%", "note": "YoY +56%" },
+      { "label": "Non-GAAP EPS", "actual": "$8.55", "consensus": "$6.97", "vs_consensus": "+22.6%", "note": null }
+    ],
+    "events": [
+      { "title": "연간 매출 가이던스 상향", "description": "820~850억 달러로 20억 달러 상향.", "impact": "positive" }
+    ],
+    "price_impact": "실적 발표 당일 +6~10% 급등",
+    "one_liner": "비만 치료제 독점 해자로 매출 56% 폭증. 약가 인하·후발 추격은 모니터링 필요."
+  },
+  "competitors": ["NVO", "AMGN"]
 }
 ```
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `moat` | string | ❌ | 경제적 해자 분석 |
-| `growth_plan` | string | ❌ | 장기 성장 계획 분석 |
-| `risks` | string | ❌ | 리스크 요인 분석 |
-| `recent_disclosures` | string | ❌ | 최근 공시 및 주가 영향 요약 |
-| `competitors` | string[] | ❌ | 경쟁사 티커 목록 |
+**`moat` 객체 필드**
 
-> 최소 1개 이상의 필드를 포함해야 합니다.
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `rating` | string | `"wide"` \| `"narrow"` \| `"none"` |
+| `rating_source` | string | 출처 (예: `"Morningstar"`) |
+| `summary` | string | 한 줄 요약 |
+| `factors` | `{title, description}[]` | 해자 구성 요소 목록 |
+
+**`growth_plan` 객체 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `strategy` | string | 전략 개요 |
+| `initiatives` | `{title, description, status, timeline}[]` | 성장 이니셔티브 목록 |
+| `initiatives[].status` | string | `"launched"` \| `"phase3"` \| `"phase2"` \| `"announced"` \| `"completed"` |
+| `initiatives[].timeline` | string\|null | 타임라인 (예: `"2026-04"`) |
+
+**`risks` 객체 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `factors` | `{category, title, description, severity}[]` | 리스크 목록 |
+| `factors[].category` | string | 분류 (예: `"경쟁"`, `"가격"`, `"공급"`, `"법적"`) |
+| `factors[].severity` | string | `"high"` \| `"medium"` \| `"low"` |
+
+**`recent_disclosures` 객체 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `period` | string | 기준 분기 (예: `"2026Q1"`) |
+| `headline` | string | 핵심 이벤트 요약 |
+| `metrics` | `{label, actual, consensus, vs_consensus, note}[]` | 실적 지표 테이블 |
+| `metrics[].vs_consensus` | string | `+/-XX.X%` 형식 (색상 분기용) |
+| `events` | `{title, description, impact}[]` | 주요 이벤트 목록 |
+| `events[].impact` | string | `"positive"` \| `"negative"` \| `"neutral"` |
+| `price_impact` | string | 주가 반응 요약 |
+| `one_liner` | string | 종합 한 줄 요약 |
+
+> 모든 객체 필드는 선택적입니다. 최소 1개 이상의 최상위 필드를 포함해야 합니다.
+>
+> **레거시 호환:** 기존 string 값도 그대로 저장/표시됩니다.
 
 **Response `200`**
 ```json
@@ -205,22 +269,21 @@ X-API-Key: {COWORK_API_KEY}
 
 **Auth:** `Authorization: Bearer {token}` 필요
 
-**Request Body** — 종목 배열 (각 항목은 `ticker` 필수, 나머지는 선택)
+**Request Body** — 종목 배열 (`ticker` 필수, 나머지 선택. 각 필드 스키마는 단건 enrich와 동일)
 ```json
 [
   {
     "ticker": "LLY",
-    "moat": "특허 포트폴리오와 제조 규모의 경제",
-    "growth_plan": "GLP-2 파이프라인 확장",
-    "risks": "GLP-1 경쟁 심화, 약가 규제 리스크",
-    "recent_disclosures": "Q1 EPS $4.82 예상치 상회",
+    "moat": { "rating": "wide", "summary": "특허·R&D 인프라 기반 최상급 경쟁 우위", "factors": [...] },
+    "growth_plan": { "strategy": "비만 시장 독점 확대", "initiatives": [...] },
+    "risks": { "factors": [...] },
+    "recent_disclosures": { "period": "2026Q1", "headline": "어닝 서프라이즈", "metrics": [...], "events": [...], "one_liner": "..." },
     "competitors": ["NVO", "AZN"]
   },
   {
     "ticker": "AVAV",
-    "moat": "방위산업 규제 장벽과 운용 노하우",
-    "growth_plan": "자율비행 시스템 민간 시장 확대",
-    "risks": "방산 예산 삭감, 기술 유출 위험"
+    "moat": { "rating": "narrow", "summary": "방위산업 규제 장벽과 운용 노하우", "factors": [...] },
+    "risks": { "factors": [...] }
   }
 ]
 ```

@@ -11,7 +11,7 @@ import ConsensusChart from '../components/reports/ConsensusChart'
 import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
 import FinancialsChart from '../components/reports/FinancialsChart'
 import HistoryTab from '../components/reports/HistoryTab'
-import { ReportSectionText, ReportSectionCompetitors, ReportSectionNews } from '../components/reports/Sections'
+import { ReportSectionText, ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection } from '../components/reports/Sections'
 import { trackEvent } from '../utils/analytics'
 
 
@@ -671,10 +671,10 @@ export default function Reports() {
                       market={detail.summary.market}
                       ticker={selected.ticker}
                     />
-                    <ReportSectionText title="⚠️ 리스크" text={detail.summary.risks} />
-                    <ReportSectionText title="🏰 경제적 해자" text={detail.summary.moat} />
-                    <ReportSectionText title="🌱 장기 성장 계획" text={detail.summary.growth_plan} />
-                    <ReportSectionNews
+                    <RisksSection risks={detail.summary.risks} />
+                    <MoatSection moat={detail.summary.moat} />
+                    <GrowthPlanSection growth_plan={detail.summary.growth_plan} />
+                    <RecentDisclosuresSection
                       disclosures={detail.summary.recent_disclosures}
                       news={detail.summary.news}
                     />
