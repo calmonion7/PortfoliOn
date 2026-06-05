@@ -9,6 +9,7 @@
 
 ## 워크플로우
 
+### 종목 분석 (enrich)
 ```
 1. GET /api/stocks               → 분석 대상 종목 목록 조회
 2. (선택) GET /api/report/list   → 기존 리포트 날짜 확인
@@ -18,6 +19,13 @@
    또는
    PUT /api/stocks/{ticker}/enrich  → 종목 1개 저장
 6. POST /api/report/generate     → 전체 리포트 재생성 (enrich 후 반드시 실행)
+```
+
+### 수주잔고 분석 (backlog)
+```
+1. GET /api/report/backlog/pending   → 분석 대기 중인 수주잔고 목록 조회
+2. (AI가 각 항목의 raw_text에서 수주잔고 수치를 분기별로 추출)
+3. PUT /api/report/{ticker}/backlog  → 분석 결과 저장 (ticker별 반복)
 ```
 
 ---
@@ -235,6 +243,69 @@ X-API-Key: {COWORK_API_KEY}
 | 상태 | 설명 |
 |------|------|
 | `400` | 배열이 비어 있음 |
+| `401` | 인증 필요 |
+
+---
+
+### `GET /api/report/backlog/pending`
+
+DART에서 수주잔고 섹션 텍스트를 가져왔으나 자동 파싱에 실패한 항목 목록입니다. Claude Cowork가 `raw_text`를 읽어 수치를 추출한 뒤 PUT으로 저장합니다.
+
+**Auth:** `X-API-Key` 헤더
+
+**Response `200`**
+```json
+[
+  {
+    "ticker": "012450",
+    "quarter": "2024Q3",
+    "raw_text": "수주잔고\n당기말\n전기말\n...",
+    "unit": "억원"
+  }
+]
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `ticker` | string | 종목 코드 (KR 6자리) |
+| `quarter` | string | 분기 (`YYYY Q[1-4]`) |
+| `raw_text` | string | DART 보고서 섹션 원문 텍스트 (최대 8000자) |
+| `unit` | string | 금액 단위 (항상 `"억원"`) |
+
+> 빈 배열이면 분석 대기 항목 없음.
+
+---
+
+### `PUT /api/report/{ticker}/backlog`
+
+Claude Cowork가 `raw_text`에서 추출한 수주잔고 수치를 저장합니다. 해당 ticker·quarter의 `source`가 `'pending'`인 행만 업데이트됩니다.
+
+**Auth:** `X-API-Key` 헤더
+
+**Path Parameter:** `ticker` — 종목 코드 (예: `012450`)
+
+**Request Body** — 분기별 수치 배열
+```json
+[
+  { "quarter": "2024Q3", "amount": 85432.0 },
+  { "quarter": "2024Q2", "amount": 79210.5 }
+]
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `quarter` | string | ✅ | 분기 (`YYYY Q[1-4]`) |
+| `amount` | number | ✅ | 수주잔고 금액 (억원) |
+
+**Response `200`**
+```json
+{ "ticker": "012450", "saved": 2 }
+```
+
+**Errors**
+
+| 상태 | 설명 |
+|------|------|
 | `401` | 인증 필요 |
 
 ---
