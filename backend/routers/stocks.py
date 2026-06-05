@@ -46,6 +46,8 @@ def _latest_snapshot(ticker: str) -> tuple:
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
 _KR_PATTERN = re.compile(r'[가-힣]')
+# Matches exchange suffixes for non-US/KR markets (e.g. .T .L .HK .PA .DE .AX)
+_INTL_SUFFIX = re.compile(r'\.[A-Z]{1,4}$')
 
 
 def _search_naver(q: str, max_results: int = 12) -> list:
@@ -63,13 +65,19 @@ def _search_naver(q: str, max_results: int = 12) -> list:
             code = item.get("code", "")
             name = item.get("name", "")
             type_code = item.get("typeCode", "KOSPI")
-            exchange = "KQ" if type_code == "KOSDAQ" else "KS"
+            if type_code == "KOSDAQ":
+                exchange, security_type = "KQ", "EQUITY"
+            elif type_code in ("ETF", "KOSPI ETF", "KOSDAQ ETF"):
+                exchange, security_type = "KS", "ETF"
+            else:
+                exchange, security_type = "KS", "EQUITY"
             results.append({
                 "ticker": code,
                 "name": name,
                 "market": "KR",
                 "exchange": exchange,
                 "exchange_display": type_code,
+                "security_type": security_type,
             })
         return results
     except Exception:
@@ -111,24 +119,28 @@ def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
     filtered = []
     for item in quotes:
         symbol = item.get("symbol", "")
-        if item.get("quoteType") not in ("EQUITY",):
+        if item.get("quoteType") not in ("EQUITY", "ETF"):
             continue
         if symbol.endswith(".KS"):
             item_market, item_exchange, item_ticker = "KR", "KS", symbol[:-3]
         elif symbol.endswith(".KQ"):
             item_market, item_exchange, item_ticker = "KR", "KQ", symbol[:-3]
+        elif _INTL_SUFFIX.search(symbol):
+            continue  # unsupported international market (e.g. .T .L .HK)
         else:
             item_market, item_exchange = "US", ""
             item_ticker = symbol.replace("-", ".")
         if market != "ALL" and item_market != market:
             continue
         name = item.get("shortname") or item.get("longname") or item_ticker
+        security_type = "ETF" if item.get("quoteType") == "ETF" else "EQUITY"
         filtered.append({
             "ticker": item_ticker,
             "name": name,
             "market": item_market,
             "exchange": item_exchange,
             "exchange_display": item.get("exchDisp", item.get("exchange", "")),
+            "security_type": security_type,
         })
     return filtered
 
