@@ -329,9 +329,13 @@
   padding-bottom: 6px;
   margin-bottom: 4px;
   align-items: center;
+  position: sticky; top: 0; z-index: 10; background: var(--bg);
 }
 .card-list-header > span { padding: 0 12px; }
 .card-list-header small { font-size: 9px; opacity: 0.7; }
+.sort-col { cursor: pointer; user-select: none; }
+.sort-col:hover { color: var(--text); }
+.sort-col.active { color: var(--accent); }
 
 .stock-card {
   display: grid;

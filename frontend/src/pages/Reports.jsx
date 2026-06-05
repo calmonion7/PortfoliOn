@@ -40,6 +40,8 @@ export default function Reports() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('holdings')
   const [watchlistSub, setWatchlistSub] = useState('low')
+  const [sortCol, setSortCol] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
   const [othersData, setOthersData] = useState(null)
   const [othersLoading, setOthersLoading] = useState(false)
   const [view, setView] = useState('list')
@@ -103,38 +105,30 @@ export default function Reports() {
       return m === marketFilter
     })
     .sort(([, a], [, b]) => {
+      const cmp = (va, vb, dir) => {
+        if (va === null && vb === null) return 0
+        if (va === null) return 1
+        if (vb === null) return -1
+        return dir === 'asc' ? va - vb : vb - va
+      }
       const gapOf = (s) => {
         const t = s.summary?.target_mean, p = s.summary?.price
         return t != null && p ? (t - p) / p * 100 : null
       }
+      if (sortCol === 'gap') return cmp(gapOf(a), gapOf(b), sortDir)
+      if (sortCol === 'rsi') return cmp(a.summary?.daily_rsi?.rsi ?? null, b.summary?.daily_rsi?.rsi ?? null, sortDir)
+      if (sortCol === 'chg') return cmp(a.summary?.daily_change_pct ?? null, b.summary?.daily_change_pct ?? null, sortDir)
+      // 기본 정렬
       if (activeTab === 'holdings') {
-        // 1차 평균목표가 비율 낮은순, 2차 RSI 일봉 높은순
         const gapA = gapOf(a), gapB = gapOf(b)
-        if (gapA !== gapB) {
-          if (gapA === null) return 1
-          if (gapB === null) return -1
-          return gapA - gapB
-        }
-        const rsiA = a.summary?.daily_rsi?.rsi ?? null
-        const rsiB = b.summary?.daily_rsi?.rsi ?? null
-        if (rsiA === null && rsiB === null) return 0
-        if (rsiA === null) return 1
-        if (rsiB === null) return -1
-        return rsiB - rsiA
+        if (gapA !== gapB) { if (gapA === null) return 1; if (gapB === null) return -1; return gapA - gapB }
+        const rA = a.summary?.daily_rsi?.rsi ?? null, rB = b.summary?.daily_rsi?.rsi ?? null
+        if (rA === null && rB === null) return 0; if (rA === null) return 1; if (rB === null) return -1; return rB - rA
       }
-      // 관심종목: 1차 평균목표가 비율 높은순, 2차 RSI 일봉 낮은순
       const gapA = gapOf(a), gapB = gapOf(b)
-      if (gapA !== gapB) {
-        if (gapA === null) return 1
-        if (gapB === null) return -1
-        return gapB - gapA
-      }
-      const rsiA = a.summary?.daily_rsi?.rsi ?? null
-      const rsiB = b.summary?.daily_rsi?.rsi ?? null
-      if (rsiA === null && rsiB === null) return 0
-      if (rsiA === null) return 1
-      if (rsiB === null) return -1
-      return rsiA - rsiB
+      if (gapA !== gapB) { if (gapA === null) return 1; if (gapB === null) return -1; return gapB - gapA }
+      const rA = a.summary?.daily_rsi?.rsi ?? null, rB = b.summary?.daily_rsi?.rsi ?? null
+      if (rA === null && rB === null) return 0; if (rA === null) return 1; if (rB === null) return -1; return rA - rB
     })
 
   const othersEntries = othersData
@@ -143,6 +137,12 @@ export default function Reports() {
         .sort(([a], [b]) => a.localeCompare(b))
     : []
   const activeEntries = activeTab === 'others' ? othersEntries : tabEntries
+
+  const handleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  const sortArrow = (col) => sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
 
   const renderFilters = () => (
     <>
@@ -488,10 +488,10 @@ export default function Reports() {
                 <div className="stock-card-grid">
                   <div className="card-list-header">
                     <span>종목</span>
-                    <span>현재가 / 고점</span>
-                    <span>목표가 / 컨센서스</span>
+                    <span className={`sort-col${sortCol === 'chg' ? ' active' : ''}`} onClick={() => handleSort('chg')}>현재가 / 고점{sortArrow('chg')}</span>
+                    <span className={`sort-col${sortCol === 'gap' ? ' active' : ''}`} onClick={() => handleSort('gap')}>목표가 / 컨센서스{sortArrow('gap')}</span>
                     <span>밸류</span>
-                    <span>RSI<br/><small>일/주/월</small></span>
+                    <span className={`sort-col${sortCol === 'rsi' ? ' active' : ''}`} onClick={() => handleSort('rsi')}>RSI{sortArrow('rsi')}<br/><small>일/주/월</small></span>
                     <span style={{ color: '#81c784' }}>RSI 매수<br/><small>일봉 20 / 25 / 30</small></span>
                     <span style={{ color: '#ef9a9a' }}>RSI 매도<br/><small>일봉 70 / 75 / 80</small></span>
                     <span></span>
