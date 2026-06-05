@@ -121,7 +121,7 @@ export default function ReportSchedule() {
           const failed = data.failed || []
           const ok = data.done - failed.length
           if (failed.length > 0) {
-            setGenMsg(`완료: ${ok}/${data.total} 생성됨 | 실패 ${failed.length}개: ${failed.map(f => f.ticker).join(', ')}`)
+            setGenMsg(`완료: ${ok}/${data.total} 생성됨 | 실패 ${failed.length}개: ${failed.map(f => f.error ? `${f.ticker} (${f.error})` : f.ticker).join(', ')}`)
           } else {
             setGenMsg(`완료: ${data.done}/${data.total} 종목 생성됨`)
           }
