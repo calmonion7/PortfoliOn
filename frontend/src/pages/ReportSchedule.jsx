@@ -118,7 +118,13 @@ export default function ReportSchedule() {
         if (!data.running && data.total > 0 && data.done >= data.total) {
           clearInterval(pollRef.current)
           setGenerating(false)
-          setGenMsg(`완료: ${data.done}/${data.total} 종목 생성됨`)
+          const failed = data.failed || []
+          const ok = data.done - failed.length
+          if (failed.length > 0) {
+            setGenMsg(`완료: ${ok}/${data.total} 생성됨 | 실패 ${failed.length}개: ${failed.map(f => f.ticker).join(', ')}`)
+          } else {
+            setGenMsg(`완료: ${data.done}/${data.total} 종목 생성됨`)
+          }
           onDone?.()
         }
       } catch {}
