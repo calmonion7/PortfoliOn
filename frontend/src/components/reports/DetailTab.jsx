@@ -84,7 +84,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const gapSegs = segments.filter(s => s.isGap)
 
     return (
-        <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', height: BAR_H, position: 'relative', width: '100%' }}>
           {/* 왼쪽: 금액 */}
           <div style={{ flex: '0 0 120px', position: 'relative' }}>
             {groupedPositioned.map((l, i) => (
@@ -159,7 +159,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           </div>
 
           {/* 오른쪽: % + 수치명 (같은 가격은 합산) */}
-          <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ flex: '0 0 150px', position: 'relative' }}>
             {groupedPositioned.map((l, i) => {
               const p = l.isCurrent ? null : pctFrom(l.value)
               return (
