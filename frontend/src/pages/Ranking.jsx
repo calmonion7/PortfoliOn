@@ -6,11 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import { krFmt } from '../components/market/marketUtils.jsx'
 import { useToast } from '../components/Toast'
 import { trackEvent } from '../utils/analytics'
-import { RsiTable, ConsensusSummary, VolumeRsiSnapshot, BacklogSection } from '../components/reports/DetailTab'
-import ConsensusChart from '../components/reports/ConsensusChart'
-import FinancialsChart from '../components/reports/FinancialsChart'
-import HistoryTab from '../components/reports/HistoryTab'
-import { ReportSectionCompetitors, RisksSection, MoatSection, GrowthPlanSection, RecentDisclosuresSection, InsightsSection } from '../components/reports/Sections'
+import ReportDetailTabs from '../components/reports/ReportDetailTabs'
 
 const LIMIT = 20
 
@@ -385,13 +381,7 @@ export default function Ranking() {
 
 // 스냅샷 보유 종목: 기존 리포트 표시 컴포넌트 재사용 (Reports.jsx 상세화면 구성과 동일)
 function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
-  const [tab, setTab] = useState('summary')
-  const [analysisSubTab, setAnalysisSubTab] = useState('consensus')
   const market = summary.market
-  // ETF는 리포트 상세와 동일 조건: 요약·심층분석 탭과 컨센서스/재무 서브탭 숨김(지표 기술·수급 + 히스토리만)
-  const isEtf = !!summary.is_etf
-  const analysisSub = isEtf ? 'technical' : analysisSubTab
-  const detailTab = isEtf && tab === 'summary' ? 'analysis' : tab
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -437,108 +427,14 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
         <button onClick={onClose} className="btn" style={{ flexShrink: 0 }}>닫기</button>
       </div>
 
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 14 }}>
-        {[
-          { key: 'summary', label: '📊 요약' },
-          { key: 'analysis', label: '📈 지표' },
-          { key: 'report', label: '📝 심층분석' },
-          { key: 'history', label: '📅 히스토리' },
-        ].filter(({ key }) => !(isEtf && (key === 'report' || key === 'summary'))).map(({ key, label }) => (
-          <button key={key} onClick={() => setTab(key)} className={`tab-btn${detailTab === key ? ' active' : ''}`} style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-        {detailTab === 'summary' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <InsightsSection insights={summary.insights} />
-            <ConsensusSummary summary={summary} ticker={ticker} onRefreshSuccess={() => {}} />
-            <VolumeRsiSnapshot summary={summary} />
-          </div>
-        )}
-        {detailTab === 'analysis' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) — ETF는 기술·수급만이라 숨김 */}
-            {!isEtf && (
-            <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-start' }}>
-              {[
-                { key: 'consensus', label: '컨센서스' },
-                { key: 'financials', label: '재무·수주' },
-                { key: 'technical', label: '기술·수급' },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setAnalysisSubTab(key)}
-                  style={{
-                    padding: '5px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
-                    background: analysisSubTab === key ? 'var(--accent-soft)' : 'transparent',
-                    color: analysisSubTab === key ? 'var(--accent)' : 'var(--text-3)',
-                    border: `1px solid ${analysisSubTab === key ? 'var(--accent)' : 'var(--border)'}`,
-                    fontWeight: analysisSubTab === key ? 600 : 400,
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            )}
-            {analysisSub === 'consensus' && (
-              <ConsensusChart ticker={ticker} market={market} />
-            )}
-            {analysisSub === 'financials' && (
-              <>
-                <FinancialsChart financials={summary.financials} financialsAnnual={summary.financials_annual} market={market} />
-                <BacklogSection ticker={ticker} market={market} />
-              </>
-            )}
-            {analysisSub === 'technical' && (
-              (summary.daily_rsi || market === 'KR')
-                ? (
-                  <>
-                    {summary.daily_rsi && (
-                      <RsiTable
-                        dailyRsi={summary.daily_rsi}
-                        weeklyRsi={summary.weekly_rsi}
-                        monthlyRsi={summary.monthly_rsi}
-                        price={summary.price}
-                        vp={summary.volume_profile}
-                        target={summary.target_mean}
-                        market={market}
-                      />
-                    )}
-                    {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
-                  </>
-                )
-                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술·수급 데이터가 없습니다.</p>
-            )}
-          </div>
-        )}
-        {detailTab === 'report' && (
-          <div style={{ padding: '0 4px' }}>
-            {enriched_at && (
-              <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#81c784', fontWeight: 600 }}>✓</span>
-                AI 분석 업데이트: {new Date(enriched_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-              </div>
-            )}
-            {!enriched_at && (
-              <div style={{ marginBottom: 14, fontSize: 11, color: '#ffb74d', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>⚠</span> AI 분석 미업데이트 (enrich API 미실행)
-              </div>
-            )}
-            <ReportSectionCompetitors competitors={summary.competitors_data} market={market} ticker={ticker} />
-            <MoatSection moat={summary.moat} />
-            <GrowthPlanSection growth_plan={summary.growth_plan} />
-            <RisksSection risks={summary.risks} />
-            <RecentDisclosuresSection disclosures={summary.recent_disclosures} news={summary.news} />
-          </div>
-        )}
-        {detailTab === 'history' && (
-          <HistoryTab ticker={ticker} dates={[]} market={market} />
-        )}
-      </div>
+      <ReportDetailTabs
+        key={ticker}
+        summary={summary}
+        ticker={ticker}
+        enrichedAt={enriched_at}
+        historyDates={[]}
+        contentMaxHeight="60vh"
+      />
     </div>
   )
 }

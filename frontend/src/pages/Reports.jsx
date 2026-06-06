@@ -7,12 +7,7 @@ import { fmtPrice as fmt } from '../utils'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useToast } from '../components/Toast'
 import { fmtN, rsiColor, overallWeather } from '../components/reports/reportUtils.jsx'
-import ConsensusChart from '../components/reports/ConsensusChart'
-import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable } from '../components/reports/DetailTab'
-import FinancialsChart from '../components/reports/FinancialsChart'
-import HistoryTab from '../components/reports/HistoryTab'
-import { ReportSectionText, ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from '../components/reports/Sections'
-import InvestorTrendSection from '../components/reports/InvestorTrendSection'
+import ReportDetailTabs from '../components/reports/ReportDetailTabs'
 import { trackEvent } from '../utils/analytics'
 
 
@@ -47,8 +42,6 @@ export default function Reports() {
   const [othersLoading, setOthersLoading] = useState(false)
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
-  const [activeDetailTab, setActiveDetailTab] = useState('summary')
-  const [analysisSubTab, setAnalysisSubTab] = useState('consensus')
   const [marketFilter, setMarketFilter] = useState('ALL')
 
   useEffect(() => {
@@ -74,8 +67,6 @@ export default function Reports() {
     setSelected({ ticker, date })
     setView('detail')
     trackEvent('report_view_open', { ticker })
-    setActiveDetailTab('summary')
-    setAnalysisSubTab('consensus')
   }
 
   useEffect(() => cleanup, [cleanup])
@@ -452,12 +443,6 @@ export default function Reports() {
     )
   }
 
-  // ETF는 보여줄 수 있는 데이터만: 요약·심층분석 탭과 컨센서스/재무 서브탭 숨김(지표 기술·수급 + 히스토리만)
-  // 요약은 지표 기술·수급(RsiTable)과 중복(둘 다 PriceLevelChart)이라 ETF에선 제거
-  const isEtf = !!detail.summary?.is_etf
-  const analysisSub = isEtf ? 'technical' : analysisSubTab
-  const detailTab = isEtf && activeDetailTab === 'summary' ? 'analysis' : activeDetailTab
-
   return (
     <div className="reports-layout" data-view={view}>
       {/* 좌측 사이드바 */}
@@ -611,147 +596,20 @@ export default function Reports() {
                 )}
               </div>
             </div>
-            {/* 탭 바 */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 16, marginTop: 4 }}>
-              {[
-                { key: 'summary', label: '📊 요약' },
-                { key: 'analysis', label: '📈 지표' },
-                { key: 'report', label: '📝 심층분석' },
-                { key: 'history', label: '📅 히스토리' },
-              ].filter(({ key }) => !(isEtf && (key === 'report' || key === 'summary'))).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => { setActiveDetailTab(key); trackEvent('report_tab_switch', { tab: key }) }}
-                  className={`tab-btn${detailTab === key ? ' active' : ''}`}
-                  style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {loading && <LoadingSpinner />}
-            {!loading && detailTab === 'summary' && (
-              detail.summary
-                ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <InsightsSection insights={detail.summary.insights} />
-                    <ConsensusSummary
-                      summary={detail.summary}
-                      ticker={selected.ticker}
-                      onRefreshSuccess={(patched) => {
-                        setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
-                        fetchList()
-                      }}
-                    />
-                    <VolumeRsiSnapshot summary={detail.summary} />
-                  </div>
-                )
-                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>요약 데이터가 없습니다.</p>
-            )}
-            {!loading && detailTab === 'analysis' && (
-              detail.summary
-                ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) — ETF는 기술·수급만이라 숨김 */}
-                    {!isEtf && (
-                    <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-start' }}>
-                      {[
-                        { key: 'consensus', label: '컨센서스' },
-                        { key: 'financials', label: '재무·수주' },
-                        { key: 'technical', label: '기술·수급' },
-                      ].map(({ key, label }) => (
-                        <button
-                          key={key}
-                          onClick={() => setAnalysisSubTab(key)}
-                          style={{
-                            padding: '5px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
-                            background: analysisSubTab === key ? 'var(--accent-soft)' : 'transparent',
-                            color: analysisSubTab === key ? 'var(--accent)' : 'var(--text-3)',
-                            border: `1px solid ${analysisSubTab === key ? 'var(--accent)' : 'var(--border)'}`,
-                            fontWeight: analysisSubTab === key ? 600 : 400,
-                          }}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    )}
-                    {analysisSub === 'consensus' && (
-                      <ConsensusChart ticker={selected.ticker} market={detail.summary.market} />
-                    )}
-                    {analysisSub === 'financials' && (
-                      <>
-                        <FinancialsChart
-                          financials={detail.summary.financials}
-                          financialsAnnual={detail.summary.financials_annual}
-                          market={detail.summary.market}
-                        />
-                        <BacklogSection ticker={selected.ticker} market={detail.summary.market} />
-                      </>
-                    )}
-                    {analysisSub === 'technical' && (
-                      (detail.summary.daily_rsi || detail.summary.market === 'KR')
-                        ? (
-                          <>
-                            {detail.summary.daily_rsi && (
-                              <RsiTable
-                                dailyRsi={detail.summary.daily_rsi}
-                                weeklyRsi={detail.summary.weekly_rsi}
-                                monthlyRsi={detail.summary.monthly_rsi}
-                                price={detail.summary.price}
-                                vp={detail.summary.volume_profile}
-                                target={detail.summary.target_mean}
-                                market={detail.summary.market}
-                              />
-                            )}
-                            {detail.summary.market === 'KR' && <InvestorTrendSection ticker={selected.ticker} />}
-                          </>
-                        )
-                        : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술·수급 데이터가 없습니다.</p>
-                    )}
-                  </div>
-                )
-                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>지표 데이터가 없습니다.</p>
-            )}
-            {!loading && detailTab === 'report' && (
-              detail.summary
-                ? (
-                  <div style={{ padding: '0 4px' }}>
-                    {detail.enriched_at && (
-                      <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: '#81c784', fontWeight: 600 }}>✓</span>
-                        AI 분석 업데이트: {new Date(detail.enriched_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    )}
-                    {!detail.enriched_at && (
-                      <div style={{ marginBottom: 14, fontSize: 11, color: '#ffb74d', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>⚠</span> AI 분석 미업데이트 (enrich API 미실행)
-                      </div>
-                    )}
-                    <ReportSectionCompetitors
-                      competitors={detail.summary.competitors_data}
-                      market={detail.summary.market}
-                      ticker={selected.ticker}
-                    />
-                    <MoatSection moat={detail.summary.moat} />
-                    <GrowthPlanSection growth_plan={detail.summary.growth_plan} />
-                    <RisksSection risks={detail.summary.risks} />
-                    <RecentDisclosuresSection
-                      disclosures={detail.summary.recent_disclosures}
-                      news={detail.summary.news}
-                    />
-                  </div>
-                )
-                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>심층분석 데이터가 없습니다.</p>
-            )}
-            {!loading && detailTab === 'history' && (
-              <HistoryTab
-                ticker={selected.ticker}
-                dates={reportList[selected.ticker]?.dates ?? []}
-                market={reportList[selected.ticker]?.market ?? 'US'}
-              />
-            )}
+            <ReportDetailTabs
+              key={selected.ticker}
+              summary={detail.summary}
+              ticker={selected.ticker}
+              enrichedAt={detail.enriched_at}
+              loading={loading}
+              historyDates={reportList[selected.ticker]?.dates ?? []}
+              historyMarket={reportList[selected.ticker]?.market ?? 'US'}
+              onConsensusRefresh={(patched) => {
+                setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
+                fetchList()
+              }}
+              onTabChange={(t) => trackEvent('report_tab_switch', { tab: t })}
+            />
           </div>
         )}
       </div>
