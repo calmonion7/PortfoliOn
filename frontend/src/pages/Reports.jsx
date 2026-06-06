@@ -609,7 +609,7 @@ export default function Reports() {
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 16, marginTop: 4 }}>
               {[
                 { key: 'summary', label: '📊 요약' },
-                { key: 'analysis', label: '📈 분석' },
+                { key: 'analysis', label: '📈 지표' },
                 { key: 'report', label: '📝 심층분석' },
                 { key: 'history', label: '📅 히스토리' },
               ].map(({ key, label }) => (
@@ -704,7 +704,7 @@ export default function Reports() {
                     )}
                   </div>
                 )
-                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>분석 데이터가 없습니다.</p>
+                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>지표 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'report' && (
               detail.summary
