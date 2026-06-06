@@ -121,7 +121,7 @@ function BatchCard({ batch, isAdmin }) {
 
       {open && (
         <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
-          {Embed
+          {Embed && isAdmin
             ? <Embed />
             : (
               <>
