@@ -48,6 +48,7 @@ export default function Reports() {
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [activeDetailTab, setActiveDetailTab] = useState('summary')
+  const [analysisSubTab, setAnalysisSubTab] = useState('consensus')
   const [marketFilter, setMarketFilter] = useState('ALL')
 
   useEffect(() => {
@@ -74,6 +75,7 @@ export default function Reports() {
     setView('detail')
     trackEvent('report_view_open', { ticker })
     setActiveDetailTab('summary')
+    setAnalysisSubTab('consensus')
   }
 
   useEffect(() => cleanup, [cleanup])
@@ -645,25 +647,61 @@ export default function Reports() {
               detail.summary
                 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <ConsensusChart ticker={selected.ticker} market={detail.summary.market} />
-                    <FinancialsChart
-                      financials={detail.summary.financials}
-                      financialsAnnual={detail.summary.financials_annual}
-                      market={detail.summary.market}
-                    />
-                    <BacklogSection ticker={selected.ticker} market={detail.summary.market} />
-                    {detail.summary.daily_rsi && (
-                      <RsiTable
-                        dailyRsi={detail.summary.daily_rsi}
-                        weeklyRsi={detail.summary.weekly_rsi}
-                        monthlyRsi={detail.summary.monthly_rsi}
-                        price={detail.summary.price}
-                        vp={detail.summary.volume_profile}
-                        target={detail.summary.target_mean}
-                        market={detail.summary.market}
-                      />
+                    {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) */}
+                    <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-start' }}>
+                      {[
+                        { key: 'consensus', label: '컨센서스' },
+                        { key: 'financials', label: '재무·수주' },
+                        { key: 'technical', label: '기술·수급' },
+                      ].map(({ key, label }) => (
+                        <button
+                          key={key}
+                          onClick={() => setAnalysisSubTab(key)}
+                          style={{
+                            padding: '5px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
+                            background: analysisSubTab === key ? 'var(--accent-soft)' : 'transparent',
+                            color: analysisSubTab === key ? 'var(--accent)' : 'var(--text-3)',
+                            border: `1px solid ${analysisSubTab === key ? 'var(--accent)' : 'var(--border)'}`,
+                            fontWeight: analysisSubTab === key ? 600 : 400,
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {analysisSubTab === 'consensus' && (
+                      <ConsensusChart ticker={selected.ticker} market={detail.summary.market} />
                     )}
-                    {detail.summary.market === 'KR' && <InvestorTrendSection ticker={selected.ticker} />}
+                    {analysisSubTab === 'financials' && (
+                      <>
+                        <FinancialsChart
+                          financials={detail.summary.financials}
+                          financialsAnnual={detail.summary.financials_annual}
+                          market={detail.summary.market}
+                        />
+                        <BacklogSection ticker={selected.ticker} market={detail.summary.market} />
+                      </>
+                    )}
+                    {analysisSubTab === 'technical' && (
+                      (detail.summary.daily_rsi || detail.summary.market === 'KR')
+                        ? (
+                          <>
+                            {detail.summary.daily_rsi && (
+                              <RsiTable
+                                dailyRsi={detail.summary.daily_rsi}
+                                weeklyRsi={detail.summary.weekly_rsi}
+                                monthlyRsi={detail.summary.monthly_rsi}
+                                price={detail.summary.price}
+                                vp={detail.summary.volume_profile}
+                                target={detail.summary.target_mean}
+                                market={detail.summary.market}
+                              />
+                            )}
+                            {detail.summary.market === 'KR' && <InvestorTrendSection ticker={selected.ticker} />}
+                          </>
+                        )
+                        : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술·수급 데이터가 없습니다.</p>
+                    )}
                   </div>
                 )
                 : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>분석 데이터가 없습니다.</p>
