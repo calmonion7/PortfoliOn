@@ -48,7 +48,7 @@ function StatusIcon({ status }) {
 }
 
 function RecentRun({ run }) {
-  if (!run) return <span style={{ color: 'var(--text-faint)' }}>이력 없음</span>
+  if (!run) return <span style={{ color: 'var(--text-faint)' }}>실행 이력 없음</span>
   const ts = fmtKst(run.finished_at || run.started_at)
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -112,7 +112,7 @@ function BatchCard({ batch, isAdmin }) {
             {batch.usage?.length > 0 && <> · {batch.usage.join(', ')}</>}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-            <span>다음 {nextRun || '-'}</span>
+            <span>다음 {nextRun || '예정 없음'}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>최근 <RecentRun run={recent} /></span>
           </div>
         </div>
@@ -152,6 +152,7 @@ function BatchHub({ isAdmin }) {
 
   if (err) return <p style={{ color: 'var(--down)', fontSize: 13 }}>{err}</p>
   if (!batches) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</p>
+  if (batches.length === 0) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>등록된 배치가 없습니다.</p>
 
   return (
     <>
