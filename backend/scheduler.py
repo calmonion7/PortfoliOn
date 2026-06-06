@@ -135,6 +135,16 @@ def _fetch_lending():
             print(f"[Scheduler] Lending fetch failed: {e}")
 
 
+def _fetch_backlog():
+    from services.backlog import fetch_all_backlog
+    with job_runs.record("backlog_fetch", "auto"):
+        try:
+            r = fetch_all_backlog()
+            print(f"[Scheduler] Backlog fetched: {r}")
+        except Exception as e:
+            print(f"[Scheduler] Backlog fetch failed: {e}")
+
+
 def _fetch_kr_rankings():
     from services import ranking_service
     with job_runs.record("kr_rankings_fetch", "auto"):
@@ -319,6 +329,12 @@ def start():
         _fetch_investor_trend,
         CronTrigger(hour=18, minute=0, timezone="Asia/Seoul"),
         id="investor_trend_fetch",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _fetch_backlog,
+        CronTrigger(day_of_week="sun", hour=4, minute=0, timezone="Asia/Seoul"),
+        id="backlog_fetch",
         replace_existing=True,
     )
     _seed_rankings_if_empty()

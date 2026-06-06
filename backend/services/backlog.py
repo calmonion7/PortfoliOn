@@ -305,3 +305,21 @@ def fetch_and_save_backlog(ticker: str) -> list[dict]:
             break
 
     return get_backlog(ticker)
+
+
+def fetch_all_backlog() -> dict:
+    """user_stocks ∩ tickers의 KR 종목 전체에 대해 직렬로 수주잔고 수집."""
+    tickers = [r["ticker"] for r in query(
+        "SELECT DISTINCT us.ticker FROM user_stocks us "
+        "JOIN tickers t ON us.ticker = t.ticker WHERE t.market = 'KR'")]
+    ok = 0
+    failed = 0
+    for t in tickers:
+        try:
+            fetch_and_save_backlog(t)
+            ok += 1
+        except Exception as e:
+            failed += 1
+            logger.warning(f"[Backlog] fetch_all failed for {t}: {e}")
+    logger.info(f"[Backlog] fetch_all: {ok}/{len(tickers)} ok, {failed} failed")
+    return {"total": len(tickers), "ok": ok, "failed": failed}

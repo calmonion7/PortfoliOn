@@ -308,6 +308,18 @@ def get_pending_backlog(user_id: str = Depends(get_current_user_or_api_key)):
     return _get_pending()
 
 
+@router.post("/report/backlog/refresh-all", status_code=202)
+def refresh_all_backlog(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+    background_tasks.add_task(_run_backlog_all)
+    return {"message": "수주잔고 전 종목 수집 시작"}
+
+
+def _run_backlog_all():
+    from services.backlog import fetch_all_backlog
+    with job_runs.record("backlog_fetch", "manual"):
+        fetch_all_backlog()
+
+
 @router.get("/report/{ticker}/{date_str}")
 def get_report(ticker: str, date_str: str):
     upper = ticker.upper()

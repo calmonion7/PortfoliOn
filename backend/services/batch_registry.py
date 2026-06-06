@@ -1,5 +1,5 @@
 # backend/services/batch_registry.py
-"""배치 레지스트리 — 현황 허브가 노출하는 11개 배치의 정적 메타데이터.
+"""배치 레지스트리 — 현황 허브가 노출하는 12개 배치의 정적 메타데이터.
 
 job_id는 스케줄러 잡 id 및 services.job_runs.record 호출 id와 반드시 일치한다.
 consensus는 자체 스케줄러 잡이 없고(daily_report에 내장) next_run이 null이다.
@@ -39,6 +39,17 @@ BATCHES = [
         "trigger_kinds": ["auto", "manual"],
         "manual_endpoint": "/api/digest/generate-all",
         "scheduler_job_id": "daily_digest",
+    },
+    {
+        "id": "backlog_fetch",
+        "label": "수주잔고 수집",
+        "category": "report",
+        "schedule_desc": "매주 일 04:00",
+        "usage": ["리포트 상세(수주잔고)"],
+        "editable": False,
+        "trigger_kinds": ["auto", "manual"],
+        "manual_endpoint": "/api/report/backlog/refresh-all",
+        "scheduler_job_id": "backlog_fetch",
     },
     {
         "id": "earnings_refresh",

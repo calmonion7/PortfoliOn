@@ -103,6 +103,13 @@ def test_fetch_investor_trend_records(spy, monkeypatch):
     assert ("investor_trend_fetch", "auto") in spy
 
 
+def test_fetch_backlog_records(spy, monkeypatch):
+    import scheduler
+    monkeypatch.setattr("services.backlog.fetch_all_backlog", lambda *a, **k: {})
+    scheduler._fetch_backlog()
+    assert ("backlog_fetch", "auto") in spy
+
+
 # ---------------------------------------------------------------------------
 # 기존 수동 엔드포인트 워커 — trigger="manual"
 # ---------------------------------------------------------------------------
@@ -197,3 +204,35 @@ def test_refresh_econ_endpoint_records(spy, monkeypatch):
     resp = TestClient(app).post("/api/market/refresh-econ")
     assert resp.status_code == 200
     assert ("monthly_refresh", "manual") in spy
+
+
+def test_refresh_all_backlog_rejects_non_admin():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.report import router
+
+    app = FastAPI()
+    app.include_router(router)
+    resp = TestClient(app).post("/api/report/backlog/refresh-all")
+    assert resp.status_code in (401, 403)
+
+
+def test_refresh_all_backlog_endpoint_accepts_admin(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.report import router
+    from auth import require_admin
+
+    monkeypatch.setattr("services.backlog.fetch_all_backlog", lambda *a, **k: {})
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[require_admin] = lambda: "admin-id"
+    resp = TestClient(app).post("/api/report/backlog/refresh-all")
+    assert resp.status_code == 202
+
+
+def test_refresh_all_backlog_worker_records(spy, monkeypatch):
+    import routers.report as report
+    monkeypatch.setattr("services.backlog.fetch_all_backlog", lambda *a, **k: {})
+    report._run_backlog_all()
+    assert ("backlog_fetch", "manual") in spy
