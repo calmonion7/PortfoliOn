@@ -45,6 +45,13 @@ const fmtTs = (ts) => {
   }
 }
 
+const decodeHtml = (str) => {
+  if (!str) return str
+  const txt = document.createElement('textarea')
+  txt.innerHTML = str
+  return txt.value
+}
+
 export default function Ranking() {
   const { showToast } = useToast()
   const [market, setMarket] = useState('KR')
@@ -339,6 +346,16 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
 
 // 스냅샷 미보유 종목: 랭킹 행 데이터로 구성한 기본정보 + 관심추가 CTA
 function BasicInfo({ row, market, adding, onAdd, onClose }) {
+  const [news, setNews] = useState(null)  // null=로딩 중, []=없음
+  useEffect(() => {
+    let cancelled = false
+    setNews(null)
+    api.get(`/api/stocks/${row.ticker}/news`, { params: { market: row.market || market || 'US' } })
+      .then(({ data }) => { if (!cancelled) setNews(data.news || []) })
+      .catch(() => { if (!cancelled) setNews([]) })
+    return () => { cancelled = true }
+  }, [row.ticker, row.market, market])
+
   const rows = [
     ['현재가', fmtPrice(row.price, market)],
     ['등락률', fmtChange(row.change_pct)],
@@ -368,6 +385,24 @@ function BasicInfo({ row, market, adding, onAdd, onClose }) {
             <span style={{ color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{val}</span>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>뉴스</div>
+        {news === null ? (
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>뉴스 불러오는 중…</p>
+        ) : news.length === 0 ? (
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>관련 뉴스가 없습니다.</p>
+        ) : (
+          <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: 12, lineHeight: 1.8 }}>
+            {news.map((item, i) => (
+              <li key={i}>
+                <a href={item.link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{decodeHtml(item.title)}</a>
+                <span style={{ color: 'var(--text-3)', marginLeft: 6 }}>— {item.publisher} ({item.published_at})</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <button className="btn btn-primary" onClick={onAdd} disabled={adding} style={{ width: '100%' }}>

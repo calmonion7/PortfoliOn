@@ -10,6 +10,7 @@ import yfinance as yf
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from services import market
+from services import scraper
 from services import cache as cache_svc
 from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID
 
@@ -143,6 +144,18 @@ def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
             "security_type": security_type,
         })
     return filtered
+
+
+@router.get("/{ticker}/news")
+def get_stock_news(ticker: str, market: str = "US"):
+    """종목 최근 뉴스 (랭킹 등 리포트 없는 종목용 on-demand 조회). scraper.get_news 재사용, 공개 read."""
+    if market not in ("KR", "US"):
+        raise HTTPException(status_code=400, detail="market must be KR or US")
+    try:
+        news = scraper.get_news(ticker, market)
+    except Exception:
+        news = []
+    return {"news": news}
 
 
 @router.get("")

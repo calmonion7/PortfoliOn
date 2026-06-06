@@ -189,3 +189,35 @@ def test_dashboard_card_includes_sector():
     assert resp.status_code == 200
     card = resp.json()[0]
     assert card["sector"] == "Technology"
+
+
+def test_get_stock_news_returns_list_and_calls_scraper():
+    sample = [
+        {"title": "삼성전자 신고가", "link": "https://x/1", "publisher": "한국경제", "published_at": "2026-06-06 09:00"},
+        {"title": "반도체 업황 개선", "link": "https://x/2", "publisher": "매일경제", "published_at": "2026-06-05 18:00"},
+    ]
+    with patch("routers.stocks.scraper.get_news", return_value=sample) as mock_news:
+        resp = client.get("/api/stocks/005930/news?market=KR")
+    assert resp.status_code == 200
+    assert resp.json() == {"news": sample}
+    mock_news.assert_called_once_with("005930", "KR")
+
+
+def test_get_stock_news_defaults_market_us():
+    with patch("routers.stocks.scraper.get_news", return_value=[]) as mock_news:
+        resp = client.get("/api/stocks/AAPL/news")
+    assert resp.status_code == 200
+    assert resp.json() == {"news": []}
+    mock_news.assert_called_once_with("AAPL", "US")
+
+
+def test_get_stock_news_invalid_market_400():
+    resp = client.get("/api/stocks/AAPL/news?market=JP")
+    assert resp.status_code == 400
+
+
+def test_get_stock_news_scraper_error_returns_empty():
+    with patch("routers.stocks.scraper.get_news", side_effect=RuntimeError("network")):
+        resp = client.get("/api/stocks/AAPL/news?market=US")
+    assert resp.status_code == 200
+    assert resp.json() == {"news": []}
