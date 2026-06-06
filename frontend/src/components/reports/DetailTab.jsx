@@ -82,9 +82,9 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const gapSegs = segments.filter(s => s.isGap)
 
     return (
-        <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: '100%' }}>
+        <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: 'fit-content' }}>
           {/* 왼쪽: 금액 */}
-          <div style={{ flex: '0 0 88px', position: 'relative' }}>
+          <div style={{ flex: '0 0 96px', position: 'relative' }}>
             {groupedPositioned.map((l, i) => (
               <div key={i} style={{
                 position: 'absolute', right: 6, top: l.y - 7,
@@ -98,19 +98,19 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           </div>
 
           {/* 중앙 바 */}
-          <div style={{ width: 64, flexShrink: 0, position: 'relative' }}>
+          <div style={{ width: 80, flexShrink: 0, position: 'relative' }}>
             {vp?.vah != null && vp?.val != null && (() => {
               const top = priceToY(vp.vah)
               const height = Math.max(2, priceToY(vp.val) - priceToY(vp.vah))
               return <>
                 {/* 배경 fill */}
-                <div style={{ position: 'absolute', left: 8, width: 48, top, height, background: 'rgba(79,195,247,0.08)', zIndex: 6 }} />
+                <div style={{ position: 'absolute', left: 13, width: 54, top, height, background: 'rgba(79,195,247,0.08)', zIndex: 6 }} />
                 {/* 좌우 테두리 — 갭 SVG(zIndex:5) 위에 */}
-                <div style={{ position: 'absolute', left: 8, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
-                <div style={{ position: 'absolute', left: 55, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
+                <div style={{ position: 'absolute', left: 13, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
+                <div style={{ position: 'absolute', left: 66, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
               </>
             })()}
-            <div style={{ position: 'absolute', left: 20, top: 0, bottom: 0, width: 24, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
+            <div style={{ position: 'absolute', left: 25, top: 0, bottom: 0, width: 30, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.1)' }} />
               {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: priceToY(price), background: 'rgba(239,154,154,0.3)' }} />}
               {price != null && <div style={{ position: 'absolute', top: priceToY(price), left: 0, right: 0, bottom: 0, background: 'rgba(129,199,132,0.3)' }} />}
@@ -122,7 +122,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               return (
                 <div key={i} style={{
                   position: 'absolute',
-                  left: isKey ? 8 : 20, right: isKey ? 8 : 20,
+                  left: isKey ? 13 : 25, right: isKey ? 13 : 25,
                   height: l.isCurrent ? 2.5 : isVahVal ? 2 : isTarget ? 2 : 1.5,
                   background: l.color, top: priceToY(l.value), borderRadius: 1,
                   zIndex: l.isCurrent ? 8 : (isVahVal || isTarget) ? 7 : 1,
@@ -133,21 +133,21 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             {gapSegs.map((seg, i) => {
               const y = priceToY(seg.hi)
               return (
-                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 64, height: GAP_H, zIndex: 5 }}>
-                  {/* 바 컬럼(x=20~44) 바깥만 마스킹 */}
-                  <rect x="0" y="0" width="20" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
-                  <rect x="44" y="0" width="20" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 80, height: GAP_H, zIndex: 5 }}>
+                  {/* 바 컬럼(x=25~55) 바깥만 마스킹 */}
+                  <rect x="0" y="0" width="25" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  <rect x="55" y="0" width="25" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
                   {/* 중간 끊김 구간 바 컬럼도 마스킹 */}
-                  <rect x="20" y="7" width="24" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
+                  <rect x="25" y="7" width="30" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
                   {/* 위 물결 */}
                   <polyline
-                    points="18,9 22,7 32,9 42,7 46,9"
+                    points="23,9 28,7 40,9 52,7 57,9"
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
                   {/* 아래 물결 */}
                   <polyline
-                    points={`18,${GAP_H-9} 22,${GAP_H-7} 32,${GAP_H-9} 42,${GAP_H-7} 46,${GAP_H-9}`}
+                    points={`23,${GAP_H-9} 28,${GAP_H-7} 40,${GAP_H-9} 52,${GAP_H-7} 57,${GAP_H-9}`}
                     fill="none" style={{ stroke: 'var(--text-3)', strokeOpacity: 0.8 }} strokeWidth="1.3"
                     strokeLinecap="round" strokeLinejoin="round"
                   />
@@ -157,7 +157,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           </div>
 
           {/* 오른쪽: % + 수치명 (같은 가격은 합산) */}
-          <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ flex: '0 0 180px', position: 'relative' }}>
             {groupedPositioned.map((l, i) => {
               const p = l.isCurrent ? null : pctFrom(l.value)
               return (
@@ -324,8 +324,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   return (
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-        <div style={{ flex: '0 1 360px', minWidth: 0 }}>{barListJSX}</div>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ flex: '0 1 auto', minWidth: 0 }}>{barListJSX}</div>
         <div style={{ flex: '0 1 440px', minWidth: 0 }}>{srCardsJSX}</div>
       </div>
     </div>
