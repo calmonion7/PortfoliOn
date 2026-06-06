@@ -8,7 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import { useToast } from '../components/Toast'
 import { fmtN, rsiColor, overallWeather } from '../components/reports/reportUtils.jsx'
 import ConsensusChart from '../components/reports/ConsensusChart'
-import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
+import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable } from '../components/reports/DetailTab'
 import FinancialsChart from '../components/reports/FinancialsChart'
 import HistoryTab from '../components/reports/HistoryTab'
 import { ReportSectionText, ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from '../components/reports/Sections'
@@ -607,7 +607,7 @@ export default function Reports() {
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 16, marginTop: 4 }}>
               {[
                 { key: 'summary', label: '📊 요약' },
-                { key: 'technical', label: '📈 기술적 분석' },
+                { key: 'analysis', label: '📈 분석' },
                 { key: 'report', label: '📄 리포트' },
                 { key: 'history', label: '📅 히스토리' },
               ].map(({ key, label }) => (
@@ -625,32 +625,48 @@ export default function Reports() {
             {loading && <LoadingSpinner />}
             {!loading && activeDetailTab === 'summary' && (
               detail.summary
-                ? <DetailSummaryTab
-                    summary={detail.summary}
-                    ticker={selected.ticker}
-                    onRefreshSuccess={(patched) => {
-                      setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
-                      fetchList()
-                    }}
-                  />
+                ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <InsightsSection insights={detail.summary.insights} />
+                    <ConsensusSummary
+                      summary={detail.summary}
+                      ticker={selected.ticker}
+                      onRefreshSuccess={(patched) => {
+                        setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
+                        fetchList()
+                      }}
+                    />
+                    <VolumeRsiSnapshot summary={detail.summary} />
+                  </div>
+                )
                 : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>요약 데이터가 없습니다.</p>
             )}
-            {!loading && activeDetailTab === 'technical' && (
-              detail.summary?.daily_rsi
+            {!loading && activeDetailTab === 'analysis' && (
+              detail.summary
                 ? (
-                  <>
-                    <RsiTable
-                      dailyRsi={detail.summary.daily_rsi}
-                      weeklyRsi={detail.summary.weekly_rsi}
-                      monthlyRsi={detail.summary.monthly_rsi}
-                      price={detail.summary.price}
-                      vp={detail.summary.volume_profile}
-                      target={detail.summary.target_mean}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <ConsensusChart ticker={selected.ticker} market={detail.summary.market} />
+                    <FinancialsChart
+                      financials={detail.summary.financials}
+                      financialsAnnual={detail.summary.financials_annual}
                       market={detail.summary.market}
                     />
-                  </>
+                    <BacklogSection ticker={selected.ticker} market={detail.summary.market} />
+                    {detail.summary.daily_rsi && (
+                      <RsiTable
+                        dailyRsi={detail.summary.daily_rsi}
+                        weeklyRsi={detail.summary.weekly_rsi}
+                        monthlyRsi={detail.summary.monthly_rsi}
+                        price={detail.summary.price}
+                        vp={detail.summary.volume_profile}
+                        target={detail.summary.target_mean}
+                        market={detail.summary.market}
+                      />
+                    )}
+                    {detail.summary.market === 'KR' && <InvestorTrendSection ticker={selected.ticker} />}
+                  </div>
                 )
-                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술적 분석 데이터가 없습니다.</p>
+                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>분석 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'report' && (
               detail.summary
@@ -672,15 +688,13 @@ export default function Reports() {
                       market={detail.summary.market}
                       ticker={selected.ticker}
                     />
-                    <RisksSection risks={detail.summary.risks} />
                     <MoatSection moat={detail.summary.moat} />
                     <GrowthPlanSection growth_plan={detail.summary.growth_plan} />
+                    <RisksSection risks={detail.summary.risks} />
                     <RecentDisclosuresSection
                       disclosures={detail.summary.recent_disclosures}
                       news={detail.summary.news}
                     />
-                    <InsightsSection insights={detail.summary.insights} />
-                    {detail.summary.market === 'KR' && <InvestorTrendSection ticker={selected.ticker} />}
                   </div>
                 )
                 : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>리포트 데이터가 없습니다.</p>
