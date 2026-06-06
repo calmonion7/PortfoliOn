@@ -10,8 +10,8 @@ import { ReportSectionCompetitors, RisksSection, MoatSection, GrowthPlanSection,
 
 const LIMIT = 20
 
-const GRID_COLS = '32px minmax(0, 1fr) 84px 64px 90px 92px'
-const SUPPLY_GRID_COLS = '32px minmax(0, 1fr) 72px 76px 76px 76px'
+const GRID_COLS = '32px minmax(0, 1fr) 84px 64px 90px 92px 26px'
+const SUPPLY_GRID_COLS = '32px minmax(0, 1fr) 72px 76px 76px 76px 26px'
 
 const MARKETS = [['KR', '🇰🇷 국내'], ['US', '🇺🇸 해외']]
 const METRICS = [['value', '거래대금'], ['volume', '거래량'], ['supply', '수급']]
@@ -84,6 +84,10 @@ export default function Ranking() {
   const [modalLoading, setModalLoading] = useState(false)
   const [adding, setAdding] = useState(false)
 
+  // 관심종목 토글: watched=등록된 ticker(대문자) Set, pending=요청 중 ticker Set(더블클릭 방지)
+  const [watched, setWatched] = useState(() => new Set())
+  const [pending, setPending] = useState(() => new Set())
+
   const isSupply = metric === 'supply'
 
   const fetchPage = useCallback((off, reset) => {
@@ -146,6 +150,13 @@ export default function Ranking() {
     return () => { document.body.style.overflow = prev }
   }, [modalOpen])
 
+  // 진입 시 관심종목 목록 1회 로드 → 행 별표 상태 표시
+  useEffect(() => {
+    api.get('/api/watchlist')
+      .then(({ data }) => setWatched(new Set((data || []).map(s => s.ticker.toUpperCase()))))
+      .catch(() => {})
+  }, [])
+
   // 클릭 시 스냅샷 가용 여부로 분기: 있으면 리서치 리포트 모달, 없으면 기본정보 모달 + 관심추가 CTA.
   const onRowClick = (row) => {
     trackEvent('ranking_row_click', { ticker: row.ticker, market })
@@ -171,17 +182,21 @@ export default function Ranking() {
 
   const closeModal = () => { setModal(null); setModalLoading(false) }
 
+  // watchlist 추가 payload (모달 추가 · 행 토글 공유)
+  const watchPayload = (row) => ({
+    ticker: row.ticker,
+    name: row.name || row.ticker,
+    market,
+    exchange: market === 'KR' ? (row.exchange || 'KS') : '',
+    security_type: row.is_etf ? 'ETF' : 'EQUITY',
+  })
+
   // 기본정보 모달의 '관심종목 추가' — 기존 watchlist 추가 흐름 재사용
   const addToWatchlist = (row) => {
     setAdding(true)
-    api.post('/api/watchlist', {
-      ticker: row.ticker,
-      name: row.name || row.ticker,
-      market,
-      exchange: market === 'KR' ? (row.exchange || 'KS') : '',
-      security_type: row.is_etf ? 'ETF' : 'EQUITY',
-    })
+    api.post('/api/watchlist', watchPayload(row))
       .then(() => {
+        setWatched(prev => new Set(prev).add(row.ticker.toUpperCase()))
         showToast(`${row.ticker} 관심종목에 추가됐습니다.\n리포트는 새벽 자동 생성 파이프라인이 만듭니다.`)
         closeModal()
       })
@@ -189,6 +204,52 @@ export default function Ranking() {
         showToast(err?.response?.data?.detail || '관심종목 추가에 실패했습니다.', 'error')
       })
       .finally(() => setAdding(false))
+  }
+
+  // 행 별표 토글 — 등록 시 DELETE, 미등록 시 POST. 행 클릭(모달)과 분리.
+  const toggleWatch = (row, e) => {
+    e.stopPropagation()
+    const t = row.ticker.toUpperCase()
+    if (pending.has(t)) return
+    const isWatched = watched.has(t)
+    setPending(prev => new Set(prev).add(t))
+    const req = isWatched
+      ? api.delete(`/api/watchlist/${row.ticker}`)
+      : api.post('/api/watchlist', watchPayload(row))
+    req
+      .then(() => {
+        setWatched(prev => {
+          const n = new Set(prev)
+          if (isWatched) n.delete(t); else n.add(t)
+          return n
+        })
+        trackEvent('ranking_watch_toggle', { ticker: row.ticker, market, action: isWatched ? 'remove' : 'add' })
+        showToast(isWatched ? `${row.ticker} 관심종목에서 제거됐습니다.` : `${row.ticker} 관심종목에 추가됐습니다.`)
+      })
+      .catch((err) => {
+        showToast(err?.response?.data?.detail || (isWatched ? '관심종목 제거에 실패했습니다.' : '관심종목 추가에 실패했습니다.'), 'error')
+      })
+      .finally(() => setPending(prev => { const n = new Set(prev); n.delete(t); return n }))
+  }
+
+  // 행 끝 별표 버튼 — ★ 등록 / ☆ 미등록
+  const renderStar = (row) => {
+    const t = row.ticker.toUpperCase()
+    const on = watched.has(t)
+    const busy = pending.has(t)
+    return (
+      <button
+        onClick={(e) => toggleWatch(row, e)}
+        disabled={busy}
+        title={on ? '관심종목에서 제거' : '관심종목 추가'}
+        aria-label={on ? '관심종목에서 제거' : '관심종목 추가'}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          fontSize: 16, lineHeight: 1, justifySelf: 'center',
+          color: on ? 'var(--accent)' : 'var(--text-3)', opacity: busy ? 0.4 : 1,
+        }}
+      >{on ? '★' : '☆'}</button>
+    )
   }
 
   // 수급 baseTs는 ISO 날짜(latest_date)라 날짜만, 그 외는 기존 datetime 라벨.
@@ -228,6 +289,7 @@ export default function Ranking() {
           <span style={{ textAlign: 'right' }}>외국인</span>
           <span style={{ textAlign: 'right' }}>기관</span>
           <span style={{ textAlign: 'right' }}>개인</span>
+          <span />
         </div>
       ) : (
         <div style={{
@@ -241,6 +303,7 @@ export default function Ranking() {
           <span style={{ textAlign: 'right' }}>등락률</span>
           <span style={{ textAlign: 'right' }}>거래대금</span>
           <span style={{ textAlign: 'right' }}>거래량</span>
+          <span />
         </div>
       )}
 
@@ -265,6 +328,7 @@ export default function Ranking() {
             <span style={{ textAlign: 'right' }}>{fmtNet(row.foreign_net)}</span>
             <span style={{ textAlign: 'right' }}>{fmtNet(row.organ_net)}</span>
             <span style={{ textAlign: 'right' }}>{fmtNet(row.individual_net)}</span>
+            {renderStar(row)}
           </div>
         )) : items.map((row) => (
           <div
@@ -291,6 +355,7 @@ export default function Ranking() {
             <span style={{ textAlign: 'right' }}>{fmtChange(row.change_pct)}</span>
             <span style={{ textAlign: 'right', color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{fmtTradingValue(row.trading_value, market)}</span>
             <span style={{ textAlign: 'right', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{fmtVolume(row.trading_volume)}</span>
+            {renderStar(row)}
           </div>
         ))}
       </div>
