@@ -128,6 +128,40 @@ def _fetch_lending():
         print(f"[Scheduler] Lending fetch failed: {e}")
 
 
+def _fetch_kr_rankings():
+    from services import ranking_service
+    try:
+        ranking_service.replace_market_rankings("KR", ranking_service.get_kr_rankings())
+        print("[Scheduler] KR rankings refreshed")
+    except Exception as e:
+        print(f"[Scheduler] KR rankings refresh failed: {e}")
+
+
+def _fetch_us_rankings():
+    from services import ranking_service
+    try:
+        ranking_service.replace_market_rankings("US", ranking_service.get_us_rankings())
+        print("[Scheduler] US rankings refreshed")
+    except Exception as e:
+        print(f"[Scheduler] US rankings refresh failed: {e}")
+
+
+def _seed_rankings_if_empty():
+    """기동 시 market_rankings가 비어 있으면(예: 장외 시간 배포) 즉시 1회 적재.
+    장중 cron이 돌기 전까지 랭킹 탭이 빈 상태로 남는 것을 방지(_check_missed_report와 동일 취지)."""
+    from services.db import query as db_query
+    try:
+        rows = db_query("SELECT 1 FROM market_rankings LIMIT 1")
+    except Exception as e:
+        print(f"[Scheduler] Rankings seed check failed: {e}")
+        return
+    if rows:
+        return
+    print("[Scheduler] market_rankings empty, seeding now...")
+    _fetch_kr_rankings()
+    _fetch_us_rankings()
+
+
 def _reschedule_guru():
     cfg = storage.get_guru_schedule()
     if _scheduler.get_job(_GURU_JOB_ID):
@@ -208,6 +242,19 @@ def start():
         id="lending_fetch",
         replace_existing=True,
     )
+    _scheduler.add_job(
+        _fetch_kr_rankings,
+        CronTrigger(hour="9-15", minute="*/10", timezone="Asia/Seoul"),
+        id="kr_rankings_fetch",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _fetch_us_rankings,
+        CronTrigger(hour="9-16", minute="*/10", timezone="America/New_York"),
+        id="us_rankings_fetch",
+        replace_existing=True,
+    )
+    _seed_rankings_if_empty()
     _scheduler.start()
 
 

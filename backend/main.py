@@ -17,6 +17,7 @@ from routers.analysis import router as analysis_router
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router
 from routers.events import router as events_router
+from routers.rankings import router as rankings_router
 from middleware.event_tracker import EventTrackerMiddleware
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
@@ -80,6 +81,7 @@ app.include_router(market_indicators_router)
 app.include_router(analytics.router)
 app.include_router(analysis_router)
 app.include_router(events_router)
+app.include_router(rankings_router)
 app.include_router(admin_router)
 
 

@@ -193,3 +193,22 @@ CREATE TABLE IF NOT EXISTS backlog_history (
   fetched_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (ticker, quarter)
 );
+
+-- 거래대금/거래량 상위 랭킹 (KR/US, 10분 주기 스냅샷)
+CREATE TABLE IF NOT EXISTS market_rankings (
+    market         TEXT NOT NULL,            -- KR | US
+    metric         TEXT NOT NULL,            -- value | volume
+    rank           INT  NOT NULL,
+    ticker         TEXT NOT NULL,
+    name           TEXT,
+    price          NUMERIC,
+    change_pct     NUMERIC,
+    trading_value  NUMERIC(20, 2),
+    trading_volume NUMERIC(20, 0),
+    market_cap     NUMERIC(20, 2),
+    is_etf         BOOLEAN,
+    exchange       TEXT,
+    base_ts        TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (market, metric, rank)
+);
+CREATE INDEX IF NOT EXISTS idx_market_rankings_read ON market_rankings(market, metric, rank);
