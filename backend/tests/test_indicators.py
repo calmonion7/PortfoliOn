@@ -104,32 +104,6 @@ def test_get_volume_profile_returns_poc_hvn_lvn():
     assert isinstance(result["hvn"], list)
     assert isinstance(result["lvn"], list)
 
-
-def test_get_volume_profile_support_zones_below_current():
-    from services.indicators import get_volume_profile
-    # 80(최대 거래량)·90(두번째)에 매물대, 마지막 종가=현재가 110 → 둘 다 현재가 아래 지지
-    prices = np.concatenate([
-        np.ones(60) * 80.0,
-        np.ones(50) * 90.0,
-        np.ones(20) * 110.0,
-        np.linspace(80, 110, 20),
-        np.array([110.0]),   # 마지막 종가 = 현재가
-    ])
-    volumes = np.concatenate([
-        np.ones(60) * 1_000_000,
-        np.ones(50) * 800_000,
-        np.ones(20) * 100_000,
-        np.ones(20) * 50_000,
-        np.array([100_000.0]),
-    ])
-    df = pd.DataFrame({"Close": prices, "Volume": volumes})
-    sz = get_volume_profile(df, bins=50)["support_zones"]
-    assert 1 <= len(sz) <= 2
-    assert all(z["price"] < 110.0 for z in sz)          # 모두 현재가 아래
-    assert all(z["pct_below"] > 0 for z in sz)           # 하락률 양수
-    assert abs(sz[0]["price"] - 80.0) < 6.0              # 강도순 1위 = 80 매물대
-
-
 def test_get_volume_profile_returns_empty_on_insufficient_data():
     from services.indicators import get_volume_profile
     assert get_volume_profile(pd.DataFrame()) == {"poc": None, "hvn": [], "lvn": []}

@@ -34,31 +34,17 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const allRows = [...levels, ...(currentEntry ? [currentEntry] : [])].sort((a, b) => b.value - a.value)
   const pctFrom = v => price != null ? ((v - price) / price * 100) : null
 
-  const supportZones = vp?.support_zones || []
   const togglesJSX = (
-    <>
-      <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
-        {[['B', '바+리스트'], ['C', '지지/저항']].map(([v, lbl]) => (
-          <button key={v} onClick={() => setView(v)} style={{
-            padding: '2px 8px', fontSize: 9, borderRadius: 3, border: 'none', cursor: 'pointer',
-            background: view === v ? '#5b8dee' : 'transparent',
-            border: view === v ? '1px solid transparent' : '1px solid var(--border)',
-            color: view === v ? '#fff' : 'var(--text-3)',
-          }}>{lbl}</button>
-        ))}
-      </div>
-      {supportZones.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8, padding: '6px 10px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid #81c784' }}>
-          <span style={{ fontSize: 10, color: '#81c784', fontWeight: 700 }}>눌림대(지지)</span>
-          {supportZones.map((z, i) => (
-            <span key={i} style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
-              {i + 1}. {market === 'KR' ? `₩${Number(z.price).toLocaleString('ko-KR')}` : `$${Number(z.price).toLocaleString('en-US')}`}
-              <span style={{ color: '#ef9a9a', marginLeft: 4 }}>-{z.pct_below}%</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </>
+    <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+      {[['B', '바+리스트'], ['C', '지지/저항']].map(([v, lbl]) => (
+        <button key={v} onClick={() => setView(v)} style={{
+          padding: '2px 8px', fontSize: 9, borderRadius: 3, border: 'none', cursor: 'pointer',
+          background: view === v ? '#5b8dee' : 'transparent',
+          border: view === v ? '1px solid transparent' : '1px solid var(--border)',
+          color: view === v ? '#fff' : 'var(--text-3)',
+        }}>{lbl}</button>
+      ))}
+    </div>
   )
 
   if (view === 'B') {
