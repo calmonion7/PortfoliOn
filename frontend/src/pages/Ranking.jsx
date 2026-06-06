@@ -399,9 +399,8 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
             <RecentDisclosuresSection disclosures={summary.recent_disclosures} news={summary.news} />
           </div>
         )}
+        {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
       </div>
-
-      {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
     </div>
   )
 }
