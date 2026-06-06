@@ -8,7 +8,6 @@ import BacklogChart from './BacklogChart'
 import api from '../../api'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
-  const [view, setView] = useState('C')
   if (!price && !vp?.poc) return null
 
   const levels = [
@@ -34,20 +33,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const allRows = [...levels, ...(currentEntry ? [currentEntry] : [])].sort((a, b) => b.value - a.value)
   const pctFrom = v => price != null ? ((v - price) / price * 100) : null
 
-  const togglesJSX = (
-    <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
-      {[['B', '바+리스트'], ['C', '지지/저항']].map(([v, lbl]) => (
-        <button key={v} onClick={() => setView(v)} style={{
-          padding: '2px 8px', fontSize: 9, borderRadius: 3, border: 'none', cursor: 'pointer',
-          background: view === v ? '#5b8dee' : 'transparent',
-          border: view === v ? '1px solid transparent' : '1px solid var(--border)',
-          color: view === v ? '#fff' : 'var(--text-3)',
-        }}>{lbl}</button>
-      ))}
-    </div>
-  )
-
-  if (view === 'B') {
+  // ── 좌측: 바 + 리스트 ──
+  const barListJSX = (() => {
     const vals = allRows.map(l => l.value)
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
     const LABEL_H = 14
@@ -95,9 +82,6 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const gapSegs = segments.filter(s => s.isGap)
 
     return (
-      <div style={{ marginTop: 8, maxWidth: 360 }}>
-        {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
-        {togglesJSX}
         <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: '100%' }}>
           {/* 왼쪽: 금액 */}
           <div style={{ flex: '0 0 88px', position: 'relative' }}>
@@ -200,11 +184,10 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           </div>
 
         </div>
-      </div>
     )
-  }
+  })()
 
-  // View C — 지지/저항 카드형
+  // ── 우측: 지지/저항 카드 ──
   const below = levels.filter(l => l.side === 'below' || (l.side == null && (price == null || l.value <= price))).sort((a, b) => b.value - a.value)
   const above = levels.filter(l => l.side === 'above' || (l.side == null && price != null && l.value > price)).sort((a, b) => a.value - b.value)
 
@@ -242,32 +225,29 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
         ...(isBelow
           ? { borderRight: `3px solid ${accentColor}` }
           : { borderLeft: `3px solid ${accentColor}` }),
-        textAlign: isBelow ? 'right' : 'left',
       }}>
         <div style={{
           display: 'flex',
           justifyContent: isBelow ? 'flex-end' : 'flex-start',
           alignItems: 'center',
-          gap: 4,
-          marginBottom: 1,
+          gap: 5,
           flexWrap: 'wrap',
         }}>
           {isMulti ? (
-            // 동일 가격: Label  Label 나란히
             items.map((item, idx) => (
               <span key={idx} style={{ fontSize: 9, color: item.color, fontWeight: 700 }}>{item.label}</span>
             ))
           ) : (
             <span style={{ fontSize: 9, color: accentColor, fontWeight: 700 }}>{items[0].label}</span>
           )}
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+            {fmt(value, market)}
+          </span>
           {p != null && (
             <span style={{ fontSize: 9, color: isBelow ? '#81c784' : '#ef9a9a', fontVariantNumeric: 'tabular-nums' }}>
               {p >= 0 ? '+' : ''}{p.toFixed(1)}%
             </span>
           )}
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-          {fmt(value, market)}
         </div>
       </div>
     )
@@ -290,10 +270,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   }
   if (!priceInserted) rows.push({ type: 'current' })
 
-  return (
-    <div style={{ marginTop: 8, maxWidth: 360 }}>
-      {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
-      {togglesJSX}
+  const srCardsJSX = (
+    <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
         <div style={{ flex: 1, textAlign: 'right' }}>
           <span style={{ fontSize: 9, color: '#81c784', fontWeight: 600 }}>지지 구간 ▼</span>
@@ -340,6 +318,16 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           </div>
         )
       })}
+    </div>
+  )
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 300px', minWidth: 0 }}>{barListJSX}</div>
+        <div style={{ flex: '1 1 280px', minWidth: 0 }}>{srCardsJSX}</div>
+      </div>
     </div>
   )
 }
