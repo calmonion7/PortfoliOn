@@ -375,22 +375,15 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
   )
 }
 
-export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) {
+export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState(null)
-  const [backlogData, setBacklogData] = useState(null)
-
-  useEffect(() => {
-    if (!ticker || summary?.market !== 'KR') return
-    api.get(`/api/report/${ticker}/backlog`)
-      .then(({ data }) => setBacklogData(data))
-      .catch(() => setBacklogData([]))
-  }, [ticker, summary?.market])
 
   if (!summary) return null
 
   const { buy = 0, hold = 0, sell = 0 } = summary
-  const needsRefresh = summary.price == null || (summary.target_high == null && summary.target_low == null && buy + hold + sell === 0)
+  const total = buy + hold + sell
+  const needsRefresh = summary.price == null || (summary.target_high == null && summary.target_low == null && total === 0)
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -404,36 +397,21 @@ export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) 
       setRefreshing(false)
     }
   }
-  const total = buy + hold + sell
-  const pct = (n) => total > 0 ? `${Math.round(n / total * 100)}%` : '—'
   const gap = summary.target_mean != null && summary.price != null
     ? ((summary.target_mean - summary.price) / summary.price * 100)
     : null
 
   const consensusWeather = (() => {
     if (!summary.price || !summary.target_mean) return null
-    const gap = (summary.target_mean - summary.price) / summary.price * 100
+    const g = (summary.target_mean - summary.price) / summary.price * 100
     const buyPct = total > 0 ? buy / total * 100 : 50
-    if (gap >= 15 && buyPct >= 60) return _weather(0)
-    if (gap >= 5 && buyPct >= 45) return _weather(1)
-    if (gap >= -5) return _weather(2)
-    return _weather(3)
-  })()
-
-  const rsiWeather = (() => {
-    const rsi = summary.daily_rsi?.rsi
-    if (rsi == null) return null
-    if (rsi < 30) return _weather(0)
-    if (rsi < 45) return _weather(1)
-    if (rsi < 65) return _weather(2)
+    if (g >= 15 && buyPct >= 60) return _weather(0)
+    if (g >= 5 && buyPct >= 45) return _weather(1)
+    if (g >= -5) return _weather(2)
     return _weather(3)
   })()
 
   return (
-    <div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-      {/* 1행: 증권사 컨센서스 */}
       <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '8px 10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <SectionTitle weather={consensusWeather}>🏦 증권사 컨센서스</SectionTitle>
@@ -502,42 +480,80 @@ export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) 
           )}
         </div>
       </div>
+  )
+}
 
-      {/* 컨센서스 추이 */}
-      <ConsensusChart ticker={ticker} market={summary.market} />
+export function VolumeRsiSnapshot({ summary }) {
+  if (!summary) return null
 
-      {/* 2행: 매물대·RSI 현황 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: 14 }}>
-          <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 2, marginTop: 2 }}>
-            {[
-              { color: 'var(--text)', label: '현재가', desc: '현재 주가' },
-              { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
-              { color: '#80cbc4', label: 'POC', desc: '거래량 최대 가격대' },
-              { color: '#81c784', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
-              { color: '#4db6ac', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
-              { color: '#ff8a65', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
-            ].map(({ color, label, desc }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{label}</span>
-                <span style={{ fontSize: 9, color: 'var(--text-3)' }}>({desc})</span>
-              </div>
-            ))}
+  const rsiWeather = (() => {
+    const rsi = summary.daily_rsi?.rsi
+    if (rsi == null) return null
+    if (rsi < 30) return _weather(0)
+    if (rsi < 45) return _weather(1)
+    if (rsi < 65) return _weather(2)
+    return _weather(3)
+  })()
+
+  return (
+    <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: 14 }}>
+      <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 2, marginTop: 2 }}>
+        {[
+          { color: 'var(--text)', label: '현재가', desc: '현재 주가' },
+          { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
+          { color: '#80cbc4', label: 'POC', desc: '거래량 최대 가격대' },
+          { color: '#81c784', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
+          { color: '#4db6ac', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
+          { color: '#ff8a65', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
+        ].map(({ color, label, desc }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{label}</span>
+            <span style={{ fontSize: 9, color: 'var(--text-3)' }}>({desc})</span>
           </div>
-          <PriceLevelChart
-            rsiData={summary.daily_rsi}
-            price={summary.price}
-            vp={summary.volume_profile}
-            target={summary.target_mean}
-            market={summary.market}
-          />
+        ))}
+      </div>
+      <PriceLevelChart
+        rsiData={summary.daily_rsi}
+        price={summary.price}
+        vp={summary.volume_profile}
+        target={summary.target_mean}
+        market={summary.market}
+      />
+    </div>
+  )
+}
+
+export function BacklogSection({ ticker, market }) {
+  const [backlogData, setBacklogData] = useState(null)
+
+  useEffect(() => {
+    if (!ticker || market !== 'KR') return
+    api.get(`/api/report/${ticker}/backlog`)
+      .then(({ data }) => setBacklogData(data))
+      .catch(() => setBacklogData([]))
+  }, [ticker, market])
+
+  if (market !== 'KR' || !backlogData?.length) return null
+  return <BacklogChart data={backlogData} />
+}
+
+// 랭킹 페이지(Ranking.jsx)에서 재사용하는 기존 요약 레이아웃. 리포트 상세는
+// 위 조각들을 탭별로 직접 조합하므로 이 래퍼를 쓰지 않는다.
+export default function DetailSummaryTab({ summary, ticker, onRefreshSuccess }) {
+  if (!summary) return null
+  return (
+    <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <ConsensusSummary summary={summary} ticker={ticker} onRefreshSuccess={onRefreshSuccess} />
+        <ConsensusChart ticker={ticker} market={summary.market} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <VolumeRsiSnapshot summary={summary} />
         </div>
       </div>
-    </div>
-    <FinancialsChart financials={summary.financials} financialsAnnual={summary.financials_annual} market={summary.market} />
-    {summary.market === 'KR' && backlogData?.length > 0 && <BacklogChart data={backlogData} />}
+      <FinancialsChart financials={summary.financials} financialsAnnual={summary.financials_annual} market={summary.market} />
+      <BacklogSection ticker={ticker} market={summary.market} />
     </div>
   )
 }
