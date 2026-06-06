@@ -152,17 +152,14 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
       ? form.ticker.trim().replace(/\D/g, '').padStart(6, '0')
       : form.ticker.trim().toUpperCase()
     // 일반 사용자: 숨겨진 필드는 기존 값 유지 (없으면 빈 값)
+    // moat/growth_plan(구조화 분석)은 모달에서 편집하지 않으며 서버가 기존 값을 보존한다.
     const competitors = isAdmin
       ? form.competitors.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
-      : (isEdit ? stock.competitors ?? [] : [])
-    const moat = isAdmin ? form.moat.trim() : (isEdit ? stock.moat ?? '' : '')
-    const growth_plan = isAdmin ? form.growth_plan.trim() : (isEdit ? stock.growth_plan ?? '' : '')
+      : (isEdit && Array.isArray(stock.competitors) ? stock.competitors : [])
     const base = {
       ticker,
       name: form.name.trim(),
       competitors,
-      moat,
-      growth_plan,
       market: form.market,
       exchange: form.market === 'KR' ? (form.exchange || 'KS') : '',
       security_type: form.security_type || 'EQUITY',
@@ -256,22 +253,12 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
             </>
           )}
 
-          {/* 경쟁사 / 경제적 해자 / 장기 성장 계획 — admin 전용 */}
+          {/* 경쟁사 — admin 전용. 해자/성장계획 등 구조화 분석은 리포트·Claude Cowork에서 관리 */}
           {isAdmin && (
-            <>
-              <div className="form-field">
-                <label>경쟁사 {isKR ? '(종목코드, 쉼표 구분)' : '(티커, 쉼표 구분)'}</label>
-                <input type="text" value={form.competitors} onChange={set('competitors')} style={INPUT_STYLE} />
-              </div>
-              <div className="form-field">
-                <label>경제적 해자</label>
-                <textarea rows={2} value={form.moat} onChange={set('moat')} style={{ ...INPUT_STYLE, resize: 'vertical' }} />
-              </div>
-              <div className="form-field">
-                <label>장기 성장 계획</label>
-                <textarea rows={2} value={form.growth_plan} onChange={set('growth_plan')} style={{ ...INPUT_STYLE, resize: 'vertical' }} />
-              </div>
-            </>
+            <div className="form-field">
+              <label>경쟁사 {isKR ? '(종목코드, 쉼표 구분)' : '(티커, 쉼표 구분)'}</label>
+              <input type="text" value={form.competitors} onChange={set('competitors')} style={INPUT_STYLE} />
+            </div>
           )}
 
           {saveError && (

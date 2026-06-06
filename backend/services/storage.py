@@ -254,6 +254,15 @@ def enrich_stock(ticker: str, fields: dict) -> bool:
     return True
 
 
+def update_ticker_meta(ticker: str, name: str, competitors: list) -> None:
+    """수정 모달에서 편집 가능한 필드(name, competitors)만 갱신.
+    구조화 분석(moat/growth_plan/risks/recent_disclosures)은 건드리지 않고 보존."""
+    execute(
+        "UPDATE tickers SET name = %s, competitors = %s WHERE ticker = %s",
+        (name, json.dumps(competitors or []), ticker.upper()),
+    )
+
+
 # ── 전역 함수 ─────────────────────────────────────────────────────────────────
 
 def get_schedule() -> dict:

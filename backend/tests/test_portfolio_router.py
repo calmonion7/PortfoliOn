@@ -58,20 +58,30 @@ def test_add_duplicate_ticker_returns_400():
     assert resp.status_code == 400
 
 
-def test_update_stock_modifies_holdings_and_stocks():
+def test_update_stock_updates_holdings_and_preserves_structured_analysis():
+    """수정 시 수량/평단은 갱신하고 name·competitors만 마스터에 반영하되,
+    구조화된 moat/growth_plan 등은 덮어쓰지 않고 보존해야 한다."""
+    structured = [{
+        "ticker": "NFLX", "name": "Netflix", "competitors": ["DIS"],
+        "moat": {"summary": "Content moat", "factors": []},
+        "growth_plan": {"initiatives": []},
+    }]
     with patch("routers.portfolio.storage.get_holdings", return_value=list(SAMPLE_HOLDINGS)), \
-         patch("routers.portfolio.storage.get_stocks", return_value=list(SAMPLE_STOCKS)), \
+         patch("routers.portfolio.storage.get_stocks", return_value=structured), \
          patch("routers.portfolio.storage.save_holdings") as mock_save_holdings, \
+         patch("routers.portfolio.storage.update_ticker_meta") as mock_update_meta, \
          patch("routers.portfolio.storage.save_stocks") as mock_save_stocks:
         resp = client.put("/api/portfolio/NFLX", json={
-            "ticker": "NFLX", "name": "Netflix", "quantity": 20, "avg_cost": 90.0,
-            "competitors": ["DIS"], "moat": "Brand", "growth_plan": "Gaming"
+            "ticker": "NFLX", "name": "Netflix Inc", "quantity": 20, "avg_cost": 90.0,
+            "competitors": ["DIS", "WBD"]
         })
     assert resp.status_code == 200
-    saved_holdings = mock_save_holdings.call_args[0][1]
-    assert saved_holdings[0]["quantity"] == 20
-    saved_stocks = mock_save_stocks.call_args[0][1]
-    assert saved_stocks[0]["moat"] == "Brand"
+    # 보유 수량 갱신
+    assert mock_save_holdings.call_args[0][1][0]["quantity"] == 20
+    # 편집 가능 필드만 갱신 (ticker, name, competitors)
+    mock_update_meta.assert_called_once_with("NFLX", "Netflix Inc", ["DIS", "WBD"])
+    # 구조화 분석을 덮어쓰는 save_stocks 경로는 호출되지 않아야 함
+    mock_save_stocks.assert_not_called()
 
 
 def test_delete_stock_removes_from_holdings_and_adds_to_watchlist():

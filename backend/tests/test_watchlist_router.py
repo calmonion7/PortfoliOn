@@ -67,19 +67,21 @@ def test_add_duplicate_in_watchlist_returns_400():
     assert resp.status_code == 400
 
 
-def test_update_watchlist_stock_updates_stocks_json():
+def test_update_watchlist_stock_preserves_structured_analysis():
+    """관심종목 수정도 name·competitors만 갱신하고 구조화 분석은 보존해야 한다."""
     with patch("routers.watchlist.storage.get_watchlist_tickers", return_value=["NVDA"]), \
          patch("routers.watchlist.storage.get_stocks", return_value=[
-             {"ticker": "NVDA", "name": "Nvidia", "competitors": [], "moat": "", "growth_plan": ""}
+             {"ticker": "NVDA", "name": "Nvidia", "competitors": [],
+              "moat": {"summary": "GPU dominance", "factors": []}, "growth_plan": {"initiatives": []}}
          ]), \
+         patch("routers.watchlist.storage.update_ticker_meta") as mock_update_meta, \
          patch("routers.watchlist.storage.save_stocks") as mock_save_stocks:
         resp = client.put("/api/watchlist/NVDA", json={
-            "ticker": "NVDA", "name": "Nvidia",
-            "competitors": ["AMD"], "moat": "GPU dominance", "growth_plan": "AI chips"
+            "ticker": "NVDA", "name": "NVIDIA Corp", "competitors": ["AMD"]
         })
     assert resp.status_code == 200
-    saved = mock_save_stocks.call_args[0][1]
-    assert saved[0]["moat"] == "GPU dominance"
+    mock_update_meta.assert_called_once_with("NVDA", "NVIDIA Corp", ["AMD"])
+    mock_save_stocks.assert_not_called()
 
 
 def test_delete_watchlist_removes_from_watchlist_and_stocks():

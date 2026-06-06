@@ -131,14 +131,12 @@ def update_watchlist_stock(ticker: str, stock: WatchlistStock, user_id: str = De
 
     stocks = storage.get_stocks(user_id)
     if ticker_exists_in(stocks, ticker):
-        storage.save_stocks(user_id, [{
-            "ticker": ticker.upper(), "name": stock.name,
-            "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
-            "market": stock.market, "exchange": stock.exchange,
-        }])
+        # 편집 가능 필드(name, competitors)만 갱신 — 구조화 분석(moat/growth_plan 등)은 보존
+        storage.update_ticker_meta(ticker, stock.name, stock.competitors)
 
+    cache_svc.invalidate_portfolio_caches()
     return {"ticker": ticker.upper(), "name": stock.name,
-            "competitors": stock.competitors, "moat": stock.moat, "growth_plan": stock.growth_plan,
+            "competitors": stock.competitors,
             "market": stock.market, "exchange": stock.exchange}
 
 
