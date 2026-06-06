@@ -608,7 +608,7 @@ export default function Reports() {
               {[
                 { key: 'summary', label: '📊 요약' },
                 { key: 'analysis', label: '📈 분석' },
-                { key: 'report', label: '📄 리포트' },
+                { key: 'report', label: '📝 심층분석' },
                 { key: 'history', label: '📅 히스토리' },
               ].map(({ key, label }) => (
                 <button
@@ -697,7 +697,7 @@ export default function Reports() {
                     />
                   </div>
                 )
-                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>리포트 데이터가 없습니다.</p>
+                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>심층분석 데이터가 없습니다.</p>
             )}
             {!loading && activeDetailTab === 'history' && (
               <HistoryTab

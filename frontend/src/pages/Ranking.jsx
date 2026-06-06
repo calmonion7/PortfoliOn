@@ -424,7 +424,7 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
         {[
           { key: 'summary', label: '📊 요약' },
           { key: 'technical', label: '📈 기술적 분석' },
-          { key: 'report', label: '📄 리포트' },
+          { key: 'report', label: '📝 심층분석' },
         ].map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)} className={`tab-btn${tab === key ? ' active' : ''}`} style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}>
             {label}
