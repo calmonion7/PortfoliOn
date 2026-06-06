@@ -324,9 +324,9 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   return (
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 300px', minWidth: 0 }}>{barListJSX}</div>
-        <div style={{ flex: '1 1 280px', minWidth: 0 }}>{srCardsJSX}</div>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+        <div style={{ flex: '0 1 360px', minWidth: 0 }}>{barListJSX}</div>
+        <div style={{ flex: '0 1 440px', minWidth: 0 }}>{srCardsJSX}</div>
       </div>
     </div>
   )
