@@ -6,7 +6,7 @@ import { krFmt } from '../components/market/marketUtils.jsx'
 import { useToast } from '../components/Toast'
 import { trackEvent } from '../utils/analytics'
 import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
-import { ReportSectionCompetitors, RisksSection, MoatSection, GrowthPlanSection, RecentDisclosuresSection } from '../components/reports/Sections'
+import { ReportSectionCompetitors, RisksSection, MoatSection, GrowthPlanSection, RecentDisclosuresSection, InsightsSection } from '../components/reports/Sections'
 
 const LIMIT = 20
 
@@ -397,6 +397,7 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
             <MoatSection moat={summary.moat} />
             <GrowthPlanSection growth_plan={summary.growth_plan} />
             <RecentDisclosuresSection disclosures={summary.recent_disclosures} news={summary.news} />
+            <InsightsSection insights={summary.insights} />
           </div>
         )}
         {market === 'KR' && <InvestorTrendSection ticker={ticker} />}

@@ -11,7 +11,7 @@ import ConsensusChart from '../components/reports/ConsensusChart'
 import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
 import FinancialsChart from '../components/reports/FinancialsChart'
 import HistoryTab from '../components/reports/HistoryTab'
-import { ReportSectionText, ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection } from '../components/reports/Sections'
+import { ReportSectionText, ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from '../components/reports/Sections'
 import InvestorTrendSection from '../components/reports/InvestorTrendSection'
 import { trackEvent } from '../utils/analytics'
 
@@ -679,6 +679,7 @@ export default function Reports() {
                       disclosures={detail.summary.recent_disclosures}
                       news={detail.summary.news}
                     />
+                    <InsightsSection insights={detail.summary.insights} />
                     {detail.summary.market === 'KR' && <InvestorTrendSection ticker={selected.ticker} />}
                   </div>
                 )

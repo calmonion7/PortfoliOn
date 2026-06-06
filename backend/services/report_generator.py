@@ -134,6 +134,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         "growth_plan": stock.get("growth_plan", ""),
         "recent_disclosures": stock.get("recent_disclosures", ""),
         "risks": stock.get("risks", ""),
+        "insights": stock.get("insights", ""),
         "competitors_data": sorted(
             [
                 {
@@ -313,6 +314,7 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
             "growth_plan": stock.get("growth_plan", ""),
             "recent_disclosures": stock.get("recent_disclosures", ""),
             "risks": stock.get("risks", ""),
+            "insights": stock.get("insights", ""),
             "competitors_data": [],
             "news": [],
         }

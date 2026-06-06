@@ -13,6 +13,7 @@ CREATE TABLE tickers (
   growth_plan         text NOT NULL DEFAULT '',
   risks               text NOT NULL DEFAULT '',
   recent_disclosures  text NOT NULL DEFAULT '',
+  insights            text NOT NULL DEFAULT '',
   enriched_at         timestamptz
 );
 

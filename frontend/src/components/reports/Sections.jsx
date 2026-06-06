@@ -287,3 +287,55 @@ export function RecentDisclosuresSection({ disclosures, news }) {
     </div>
   )
 }
+
+const STANCE_CFG = {
+  진입: { label: '진입', color: '#81c784' },
+  관망: { label: '관망', color: 'var(--text-3)' },
+  회피: { label: '회피', color: '#ef9a9a' },
+}
+
+function _insightLines(value) {
+  const items = Array.isArray(value) ? value : [value]
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {items.filter(Boolean).map((t, i) => (
+        <div key={i} style={_FACTOR_DESC}>{t}</div>
+      ))}
+    </div>
+  )
+}
+
+export function InsightsSection({ insights }) {
+  if (!insights) return null
+  if (typeof insights === 'string') return <ReportSectionText title="🎯 권고 인사이트" text={insights} />
+
+  const hasEntry = insights.entry && (!Array.isArray(insights.entry) || insights.entry.length > 0)
+  const hasAvoid = insights.avoid && (!Array.isArray(insights.avoid) || insights.avoid.length > 0)
+  if (!insights.stance && !hasEntry && !hasAvoid && !insights.one_liner) return null
+
+  const sc = STANCE_CFG[insights.stance] || { label: insights.stance || '', color: 'var(--text-3)' }
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>🎯 권고 인사이트</span>
+        {insights.stance && <span style={_CHIP(sc.color)}>{sc.label}</span>}
+      </div>
+      {insights.one_liner && (
+        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{insights.one_liner}</p>
+      )}
+      {hasEntry && (
+        <div style={{ ...(_FACTOR_LINE), borderLeft: '2px solid #81c784', marginBottom: 8 }}>
+          <div style={{ ..._FACTOR_TITLE, color: '#81c784' }}>📈 진입 조건</div>
+          {_insightLines(insights.entry)}
+        </div>
+      )}
+      {hasAvoid && (
+        <div style={{ ...(_FACTOR_LINE), borderLeft: '2px solid #ef9a9a' }}>
+          <div style={{ ..._FACTOR_TITLE, color: '#ef9a9a' }}>🚫 회피 조건</div>
+          {_insightLines(insights.avoid)}
+        </div>
+      )}
+    </div>
+  )
+}

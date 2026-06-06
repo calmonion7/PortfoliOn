@@ -90,6 +90,7 @@ class EnrichBody(BaseModel):
     growth_plan: Optional[Any] = None
     risks: Optional[Any] = None
     recent_disclosures: Optional[Any] = None
+    insights: Optional[Any] = None
     competitors: Optional[List[str]] = None
 
 
@@ -99,6 +100,7 @@ class BatchEnrichItem(BaseModel):
     growth_plan: Optional[Any] = None
     risks: Optional[Any] = None
     recent_disclosures: Optional[Any] = None
+    insights: Optional[Any] = None
     competitors: Optional[List[str]] = None
 
 

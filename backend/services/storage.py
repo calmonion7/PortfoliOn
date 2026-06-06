@@ -2,8 +2,8 @@
 import json
 from services.db import get_connection, query, execute
 
-_ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures"})
-_JSON_TEXT_FIELDS = frozenset({"moat", "growth_plan", "risks", "recent_disclosures"})
+_ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures", "insights"})
+_JSON_TEXT_FIELDS = frozenset({"moat", "growth_plan", "risks", "recent_disclosures", "insights"})
 
 
 def _parse_json_field(val):
@@ -27,7 +27,7 @@ def get_stocks(user_id: str) -> list[dict]:
     rows = query(
         """
         SELECT t.ticker, t.name, t.market, t.exchange,
-               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights
         FROM user_stocks us
         JOIN tickers t ON t.ticker = us.ticker
         WHERE us.user_id = %s
@@ -173,7 +173,7 @@ def get_full_portfolio(user_id: str) -> dict:
         """
         SELECT us.ticker, us.type, us.quantity, us.avg_cost,
                t.name, t.market, t.exchange,
-               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights
         FROM user_stocks us
         LEFT JOIN tickers t ON t.ticker = us.ticker
         WHERE us.user_id = %s
@@ -192,6 +192,7 @@ def get_full_portfolio(user_id: str) -> dict:
             "growth_plan": _parse_json_field(r.get("growth_plan")),
             "risks": _parse_json_field(r.get("risks")),
             "recent_disclosures": _parse_json_field(r.get("recent_disclosures")),
+            "insights": _parse_json_field(r.get("insights")),
         }
         if r["type"] == "holding":
             entry.update({"quantity": r["quantity"], "avg_cost": r["avg_cost"]})
@@ -212,7 +213,7 @@ def get_global_portfolio() -> dict:
         """
         SELECT DISTINCT ON (us.ticker)
                us.ticker, us.type, t.name, t.market, t.exchange,
-               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights
         FROM user_stocks us
         LEFT JOIN tickers t ON t.ticker = us.ticker
         ORDER BY us.ticker, CASE us.type WHEN 'holding' THEN 0 ELSE 1 END
@@ -230,6 +231,7 @@ def get_global_portfolio() -> dict:
             "growth_plan": _parse_json_field(r.get("growth_plan")),
             "risks": _parse_json_field(r.get("risks")),
             "recent_disclosures": _parse_json_field(r.get("recent_disclosures")),
+            "insights": _parse_json_field(r.get("insights")),
         }
         if r["type"] == "holding":
             holdings.append(entry)
