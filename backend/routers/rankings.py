@@ -5,7 +5,7 @@ from auth import require_admin
 router = APIRouter(prefix="/api", tags=["rankings"])
 
 _MARKETS = {"KR", "US"}
-_METRICS = {"value", "volume"}
+_METRICS = {"value", "volume", "change"}
 _TYPES = {"all", "stock", "etf"}
 _REFRESH_JOB = {"KR": "kr_rankings_fetch", "US": "us_rankings_fetch"}
 
@@ -55,7 +55,7 @@ def rankings(
     if market not in _MARKETS:
         raise HTTPException(status_code=400, detail="market must be KR or US")
     if metric not in _METRICS:
-        raise HTTPException(status_code=400, detail="metric must be value or volume")
+        raise HTTPException(status_code=400, detail="metric must be value, volume, or change")
     if type not in _TYPES:
         raise HTTPException(status_code=400, detail="type must be all, stock, or etf")
     try:

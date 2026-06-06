@@ -131,6 +131,7 @@ def get_kr_rankings(n: int = _TOP_N) -> dict:
     return {
         "value": _top_n_by(rows, "trading_value", n),
         "volume": _top_n_by(rows, "trading_volume", n),
+        "change": _top_n_by(rows, "change_pct", n),
     }
 
 
@@ -142,6 +143,7 @@ def get_us_rankings(n: int = _TOP_N) -> dict:
     return {
         "value": _top_n_by(rows, "trading_value", n),
         "volume": _top_n_by(rows, "trading_volume", n),
+        "change": _top_n_by(rows, "change_pct", n),
     }
 
 
@@ -154,7 +156,7 @@ def replace_market_rankings(market: str, rankings: dict) -> None:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM market_rankings WHERE market = %s", (market,))
-            for metric in ("value", "volume"):
+            for metric in ("value", "volume", "change"):
                 for row in rankings.get(metric, []):
                     cur.execute(
                         """

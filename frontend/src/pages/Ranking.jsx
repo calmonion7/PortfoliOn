@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import InvestorTrendSection from '../components/reports/InvestorTrendSection'
 import api from '../api'
+import Card from '../components/ui/Card'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { krFmt } from '../components/market/marketUtils.jsx'
 import { useToast } from '../components/Toast'
@@ -13,11 +14,8 @@ import { ReportSectionCompetitors, RisksSection, MoatSection, GrowthPlanSection,
 
 const LIMIT = 20
 
-const GRID_COLS = '32px minmax(0, 1fr) 84px 64px 90px 92px 26px'
-const SUPPLY_GRID_COLS = '32px minmax(0, 1fr) 72px 76px 76px 76px 26px'
-
 const MARKETS = [['KR', '🇰🇷 국내'], ['US', '🇺🇸 해외']]
-const METRICS = [['value', '거래대금'], ['volume', '거래량'], ['supply', '수급']]
+const METRICS = [['value', '거래대금'], ['volume', '거래량'], ['change', '등락률'], ['supply', '수급']]
 const TYPES = [['all', '전체'], ['stock', '주식만'], ['etf', 'ETF']]
 
 const fmtPrice = (v, market) => {
@@ -268,6 +266,45 @@ export default function Ranking() {
     </div>
   )
 
+  // 종목 카드 셸 — 순위 뱃지 + 종목명/ticker + 별표. 본문은 모드별 children.
+  // 클릭 시 onRowClick(모달). 기존 Card(ui) 재사용으로 hover·서피스 통일.
+  const RankCard = ({ rank, row, children }) => (
+    <Card
+      hover
+      padding="sm"
+      onClick={() => onRowClick(row)}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <span style={{
+          flexShrink: 0, minWidth: 22, height: 22, padding: '0 6px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 6, background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+          color: 'var(--text-3)', fontWeight: 700, fontSize: 12, fontVariantNumeric: 'tabular-nums',
+        }}>{rank}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || row.ticker}</span>
+            {row.is_etf && (
+              <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#ce93d8', border: '1px solid var(--border)' }}>ETF</span>
+            )}
+          </div>
+          <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)' }}>{row.ticker}</span>
+        </div>
+        {renderStar(row)}
+      </div>
+      {children}
+    </Card>
+  )
+
+  // 카드 본문 라벨/값 한 줄
+  const statRow = (label, val) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+      <span style={{ color: 'var(--text-3)' }}>{label}</span>
+      <span style={{ color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{val}</span>
+    </div>
+  )
+
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 12 }}>
@@ -279,87 +316,28 @@ export default function Ranking() {
         )}
       </div>
 
-      {/* 헤더 */}
-      {isSupply ? (
-        <div style={{
-          display: 'grid', gridTemplateColumns: SUPPLY_GRID_COLS,
-          gap: 6, padding: '6px 8px', fontSize: 11, color: 'var(--text-3)',
-          borderBottom: '1px solid var(--border)', fontWeight: 600,
-        }}>
-          <span>순위</span>
-          <span>종목</span>
-          <span style={{ textAlign: 'right' }}>외국인 보유율</span>
-          <span style={{ textAlign: 'right' }}>외국인</span>
-          <span style={{ textAlign: 'right' }}>기관</span>
-          <span style={{ textAlign: 'right' }}>개인</span>
-          <span />
-        </div>
-      ) : (
-        <div style={{
-          display: 'grid', gridTemplateColumns: GRID_COLS,
-          gap: 6, padding: '6px 8px', fontSize: 11, color: 'var(--text-3)',
-          borderBottom: '1px solid var(--border)', fontWeight: 600,
-        }}>
-          <span>순위</span>
-          <span>종목</span>
-          <span style={{ textAlign: 'right' }}>현재가</span>
-          <span style={{ textAlign: 'right' }}>등락률</span>
-          <span style={{ textAlign: 'right' }}>거래대금</span>
-          <span style={{ textAlign: 'right' }}>거래량</span>
-          <span />
-        </div>
-      )}
-
-      <div>
+      {/* 카드 그리드 — PC 멀티컬럼/모바일 1~2열 자동 줄바꿈, 모든 카드 동일 크기 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
         {isSupply ? items.map((row, i) => (
-          <div
-            key={`${row.ticker}-${i}`}
-            onClick={() => onRowClick(row)}
-            style={{
-              display: 'grid', gridTemplateColumns: SUPPLY_GRID_COLS,
-              gap: 6, padding: '8px 8px', alignItems: 'center', cursor: 'pointer',
-              borderBottom: '1px solid var(--border)', fontSize: 12,
-            }}
-            className="ranking-row"
-          >
-            <span style={{ color: 'var(--text-3)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ color: 'var(--text)', fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || row.ticker}</span>
-              <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)' }}>{row.ticker}</span>
-            </span>
-            <span style={{ textAlign: 'right', color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{row.foreign_hold_ratio == null ? '-' : `${row.foreign_hold_ratio.toFixed(2)}%`}</span>
-            <span style={{ textAlign: 'right' }}>{fmtNet(row.foreign_net)}</span>
-            <span style={{ textAlign: 'right' }}>{fmtNet(row.organ_net)}</span>
-            <span style={{ textAlign: 'right' }}>{fmtNet(row.individual_net)}</span>
-            {renderStar(row)}
-          </div>
+          <RankCard key={`${row.ticker}-${i}`} rank={i + 1} row={row}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+              {statRow('외국인 보유율', row.foreign_hold_ratio == null ? '-' : `${row.foreign_hold_ratio.toFixed(2)}%`)}
+              {statRow('외국인', fmtNet(row.foreign_net))}
+              {statRow('기관', fmtNet(row.organ_net))}
+              {statRow('개인', fmtNet(row.individual_net))}
+            </div>
+          </RankCard>
         )) : items.map((row) => (
-          <div
-            key={`${row.ticker}-${row.rank}`}
-            onClick={() => onRowClick(row)}
-            style={{
-              display: 'grid', gridTemplateColumns: GRID_COLS,
-              gap: 6, padding: '8px 8px', alignItems: 'center', cursor: 'pointer',
-              borderBottom: '1px solid var(--border)', fontSize: 12,
-            }}
-            className="ranking-row"
-          >
-            <span style={{ color: 'var(--text-3)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{row.rank}</span>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || row.ticker}</span>
-                {row.is_etf && (
-                  <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#ce93d8', border: '1px solid var(--border)' }}>ETF</span>
-                )}
-              </span>
-              <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)' }}>{row.ticker}</span>
-            </span>
-            <span style={{ textAlign: 'right', color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{fmtPrice(row.price, market)}</span>
-            <span style={{ textAlign: 'right' }}>{fmtChange(row.change_pct)}</span>
-            <span style={{ textAlign: 'right', color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{fmtTradingValue(row.trading_value, market)}</span>
-            <span style={{ textAlign: 'right', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{fmtVolume(row.trading_volume)}</span>
-            {renderStar(row)}
-          </div>
+          <RankCard key={`${row.ticker}-${row.rank}`} rank={row.rank} row={row}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>{fmtPrice(row.price, market)}</span>
+              <span style={{ fontSize: 13 }}>{fmtChange(row.change_pct)}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+              {statRow('거래대금', fmtTradingValue(row.trading_value, market))}
+              {statRow('거래량', fmtVolume(row.trading_volume))}
+            </div>
+          </RankCard>
         ))}
       </div>
 

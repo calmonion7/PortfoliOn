@@ -74,6 +74,18 @@ def test_top_n_by_value_sorts_desc_and_ranks():
     assert [r["rank"] for r in top] == [1, 2, 3]
 
 
+def test_top_n_by_change_sorts_desc_and_ranks():
+    from services.ranking_service import _kr_row, _top_n_by
+    rows = [
+        _kr_row(_kr_stock("A", "A", value="100", volume="5", ratio="5.0")),
+        _kr_row(_kr_stock("B", "B", value="300", volume="1", ratio="-2.0")),
+        _kr_row(_kr_stock("C", "C", value="200", volume="9", ratio="1.0")),
+    ]
+    top = _top_n_by(rows, "change_pct")
+    assert [r["ticker"] for r in top] == ["A", "C", "B"]   # 상승률 내림차순
+    assert [r["rank"] for r in top] == [1, 2, 3]
+
+
 def test_top_n_by_volume_differs_from_value():
     from services.ranking_service import _kr_row, _top_n_by
     rows = [
@@ -153,6 +165,23 @@ def test_get_kr_rankings_returns_sorted_value_and_volume(monkeypatch):
     assert etf_row["is_etf"] is True
 
 
+def test_get_kr_rankings_includes_change_sorted_desc(monkeypatch):
+    import services.ranking_service as svc
+
+    def fake_market(market):
+        if market == "KOSPI":
+            return [
+                _kr_stock("005930", "삼성전자", value="300", volume="2", ratio="0.5"),
+                _kr_stock("069500", "KODEX200", value="50", volume="9", end_type="etf", ratio="3.0"),
+            ]
+        return [_kr_stock("035720", "카카오", value="200", volume="5", ratio="-1.0")]
+
+    monkeypatch.setattr(svc, "_fetch_naver_market", fake_market)
+    result = svc.get_kr_rankings(n=10)
+    assert "change" in result
+    assert [r["ticker"] for r in result["change"]] == ["069500", "005930", "035720"]
+
+
 def test_get_us_rankings_returns_sorted(monkeypatch):
     import services.ranking_service as svc
     fake = {"quotes": [
@@ -166,6 +195,17 @@ def test_get_us_rankings_returns_sorted(monkeypatch):
     # volume: F=50, AAPL=3 -> F first
     assert [r["ticker"] for r in result["volume"]] == ["F", "AAPL"]
     assert all(r["is_etf"] is False for r in result["value"])
+
+
+def test_get_us_rankings_includes_change_sorted_desc(monkeypatch):
+    import services.ranking_service as svc
+    fake = {"quotes": [
+        {"symbol": "AAPL", "shortName": "Apple", "regularMarketPrice": 100.0, "regularMarketVolume": 3, "regularMarketChangePercent": 1.0},
+        {"symbol": "F", "shortName": "Ford", "regularMarketPrice": 10.0, "regularMarketVolume": 50, "regularMarketChangePercent": 4.0},
+    ]}
+    monkeypatch.setattr(svc.yf, "screen", lambda *a, **k: fake)
+    result = svc.get_us_rankings(n=10)
+    assert [r["ticker"] for r in result["change"]] == ["F", "AAPL"]
 
 
 def test_fetch_naver_market_raises_on_partial_page_failure(monkeypatch):
@@ -263,6 +303,35 @@ def test_replace_market_rankings_deletes_then_inserts_both_metrics(monkeypatch):
     assert value_insert[1][0] == "KR"        # market
     assert value_insert[1][3] == "005930"    # ticker
     assert value_insert[1][10] is False      # is_etf
+
+
+def test_replace_market_rankings_inserts_change_metric(monkeypatch):
+    import services.ranking_service as svc
+    log: list = []
+    monkeypatch.setattr(svc, "get_connection", _fake_get_connection(log))
+
+    rankings = {
+        "value": [
+            {"rank": 1, "ticker": "V", "name": "v", "price": 1, "change_pct": 0.1,
+             "trading_value": 3, "trading_volume": 1, "market_cap": 9, "is_etf": False, "exchange": "KS"},
+        ],
+        "volume": [
+            {"rank": 1, "ticker": "VOL", "name": "vol", "price": 1, "change_pct": 0.2,
+             "trading_value": 1, "trading_volume": 9, "market_cap": 9, "is_etf": False, "exchange": "KS"},
+        ],
+        "change": [
+            {"rank": 1, "ticker": "CHG", "name": "chg", "price": 1, "change_pct": 5.0,
+             "trading_value": 2, "trading_volume": 2, "market_cap": 9, "is_etf": False, "exchange": "KS"},
+        ],
+    }
+    svc.replace_market_rankings("KR", rankings)
+
+    inserts = [s for s in log[1:] if "INSERT INTO market_rankings" in s[0]]
+    assert len(inserts) == 3
+    metrics_inserted = {s[1][1] for s in inserts}
+    assert metrics_inserted == {"value", "volume", "change"}
+    change_insert = next(s for s in inserts if s[1][1] == "change")
+    assert change_insert[1][3] == "CHG"     # ticker
 
 
 def test_read_rankings_returns_rows_and_iso_base_ts(monkeypatch):

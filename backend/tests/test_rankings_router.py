@@ -74,6 +74,15 @@ def test_rankings_empty_table_graceful():
     assert data["metric"] == "volume"
 
 
+def test_rankings_accepts_change_metric():
+    payload = {"rows": [], "base_ts": None}
+    with patch("routers.rankings.ranking_service.read_rankings", return_value=payload) as mock_read:
+        resp = client.get("/api/rankings?market=KR&metric=change")
+    assert resp.status_code == 200
+    assert resp.json()["metric"] == "change"
+    mock_read.assert_called_once_with("KR", "change", "all", 20, 0)
+
+
 def test_rankings_rejects_invalid_market():
     resp = client.get("/api/rankings?market=JP")
     assert resp.status_code == 400
