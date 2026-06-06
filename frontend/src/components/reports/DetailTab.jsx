@@ -345,11 +345,12 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
 }
 
 export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, market }) {
+  const [tf, setTf] = useState('daily')
   if (!dailyRsi) return null
   const rows = [
-    { label: '일봉', d: dailyRsi },
-    { label: '주봉', d: weeklyRsi },
-    { label: '월봉', d: monthlyRsi },
+    { key: 'daily', label: '일봉', d: dailyRsi },
+    { key: 'weekly', label: '주봉', d: weeklyRsi },
+    { key: 'monthly', label: '월봉', d: monthlyRsi },
   ]
   const keys = ['target_20', 'target_25', 'target_30', 'target_70', 'target_75', 'target_80']
   let closestKey = null, minDiff = Infinity
@@ -360,17 +361,34 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
       if (diff < minDiff) { minDiff = diff; closestKey = k }
     })
   }
+  const available = rows.filter(r => r.d?.rsi != null)
+  const activeTf = available.some(r => r.key === tf) ? tf : available[0]?.key
+  const activeRow = available.find(r => r.key === activeTf)
   return (
     <div style={{ marginBottom: 16, background: 'var(--bg-elev)', borderRadius: 6, padding: '10px 12px' }}>
       <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>🎯 RSI 예상 타점</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {rows.map(({ label, d }) => d?.rsi != null && (
-          <div key={label}>
-            <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-            <PriceLevelChart rsiData={d} price={price} vp={vp} target={target} market={market} />
-          </div>
-        ))}
-      </div>
+      {available.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {available.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setTf(key)}
+              style={{
+                padding: '4px 12px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
+                background: activeTf === key ? 'var(--accent-soft)' : 'transparent',
+                color: activeTf === key ? 'var(--accent)' : 'var(--text-3)',
+                border: `1px solid ${activeTf === key ? 'var(--accent)' : 'var(--border)'}`,
+                fontWeight: activeTf === key ? 600 : 400,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeRow && (
+        <PriceLevelChart rsiData={activeRow.d} price={price} vp={vp} target={target} market={market} />
+      )}
     </div>
   )
 }
