@@ -410,6 +410,10 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
   const [tab, setTab] = useState('summary')
   const [analysisSubTab, setAnalysisSubTab] = useState('consensus')
   const market = summary.market
+  // ETF는 리포트 상세와 동일 조건: 요약·심층분석 탭과 컨센서스/재무 서브탭 숨김(지표 기술·수급 + 히스토리만)
+  const isEtf = !!summary.is_etf
+  const analysisSub = isEtf ? 'technical' : analysisSubTab
+  const detailTab = isEtf && tab === 'summary' ? 'analysis' : tab
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -461,24 +465,25 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
           { key: 'analysis', label: '📈 지표' },
           { key: 'report', label: '📝 심층분석' },
           { key: 'history', label: '📅 히스토리' },
-        ].map(({ key, label }) => (
-          <button key={key} onClick={() => setTab(key)} className={`tab-btn${tab === key ? ' active' : ''}`} style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}>
+        ].filter(({ key }) => !(isEtf && (key === 'report' || key === 'summary'))).map(({ key, label }) => (
+          <button key={key} onClick={() => setTab(key)} className={`tab-btn${detailTab === key ? ' active' : ''}`} style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}>
             {label}
           </button>
         ))}
       </div>
 
       <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-        {tab === 'summary' && (
+        {detailTab === 'summary' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <InsightsSection insights={summary.insights} />
             <ConsensusSummary summary={summary} ticker={ticker} onRefreshSuccess={() => {}} />
             <VolumeRsiSnapshot summary={summary} />
           </div>
         )}
-        {tab === 'analysis' && (
+        {detailTab === 'analysis' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) */}
+            {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) — ETF는 기술·수급만이라 숨김 */}
+            {!isEtf && (
             <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-start' }}>
               {[
                 { key: 'consensus', label: '컨센서스' },
@@ -500,16 +505,17 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
                 </button>
               ))}
             </div>
-            {analysisSubTab === 'consensus' && (
+            )}
+            {analysisSub === 'consensus' && (
               <ConsensusChart ticker={ticker} market={market} />
             )}
-            {analysisSubTab === 'financials' && (
+            {analysisSub === 'financials' && (
               <>
                 <FinancialsChart financials={summary.financials} financialsAnnual={summary.financials_annual} market={market} />
                 <BacklogSection ticker={ticker} market={market} />
               </>
             )}
-            {analysisSubTab === 'technical' && (
+            {analysisSub === 'technical' && (
               (summary.daily_rsi || market === 'KR')
                 ? (
                   <>
@@ -531,7 +537,7 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
             )}
           </div>
         )}
-        {tab === 'report' && (
+        {detailTab === 'report' && (
           <div style={{ padding: '0 4px' }}>
             {enriched_at && (
               <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -551,7 +557,7 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
             <RecentDisclosuresSection disclosures={summary.recent_disclosures} news={summary.news} />
           </div>
         )}
-        {tab === 'history' && (
+        {detailTab === 'history' && (
           <HistoryTab ticker={ticker} dates={[]} market={market} />
         )}
       </div>
