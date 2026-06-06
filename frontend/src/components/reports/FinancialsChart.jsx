@@ -5,6 +5,7 @@ import { _weather, SectionTitle } from './reportUtils.jsx'
 
 export default function FinancialsChart({ financials, financialsAnnual, market }) {
   const [hoveredLegend, setHoveredLegend] = useState(null)
+  const [finTab, setFinTab] = useState('annual')
   if (!financials?.length) return null
 
   const isKR = market === 'KR'
@@ -316,10 +317,36 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     )
   }
 
+  const hasAnnual = annualData.length > 0
+  const activeFin = (hasAnnual && finTab === 'annual') ? 'annual' : 'quarter'
+
   return (
     <>
-      {annualData.length > 0 && <Section data={annualData} title="📈 연간 실적 추이" />}
-      <Section data={quarterData} title="📊 분기 실적 추이" />
+      {hasAnnual && (
+        <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-start', marginTop: 12 }}>
+          {[
+            { key: 'annual', label: '📈 연간' },
+            { key: 'quarter', label: '📊 분기' },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFinTab(key)}
+              style={{
+                padding: '4px 12px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
+                background: activeFin === key ? 'var(--accent-soft)' : 'transparent',
+                color: activeFin === key ? 'var(--accent)' : 'var(--text-3)',
+                border: `1px solid ${activeFin === key ? 'var(--accent)' : 'var(--border)'}`,
+                fontWeight: activeFin === key ? 600 : 400,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeFin === 'annual'
+        ? <Section data={annualData} title="📈 연간 실적 추이" />
+        : <Section data={quarterData} title="📊 분기 실적 추이" />}
     </>
   )
 }
