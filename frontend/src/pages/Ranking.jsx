@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { krFmt } from '../components/market/marketUtils.jsx'
@@ -10,9 +11,10 @@ import { ReportSectionCompetitors, RisksSection, MoatSection, GrowthPlanSection,
 const LIMIT = 20
 
 const GRID_COLS = '32px minmax(0, 1fr) 84px 64px 90px 92px'
+const SUPPLY_GRID_COLS = '32px minmax(0, 1fr) 72px 76px 76px 76px'
 
 const MARKETS = [['KR', '🇰🇷 국내'], ['US', '🇺🇸 해외']]
-const METRICS = [['value', '거래대금'], ['volume', '거래량']]
+const METRICS = [['value', '거래대금'], ['volume', '거래량'], ['supply', '수급']]
 const TYPES = [['all', '전체'], ['stock', '주식만'], ['etf', 'ETF']]
 
 const fmtPrice = (v, market) => {
@@ -29,6 +31,14 @@ const fmtChange = (v) => {
 }
 
 const fmtVolume = (v) => (v == null ? '-' : Number(v).toLocaleString('ko-KR'))
+
+// 순매수(수량, 부호 정수) — +/- 색상. 외국인/기관/개인 컬럼 공용.
+const fmtNet = (v) => {
+  if (v == null) return <span style={{ color: 'var(--text-3)' }}>-</span>
+  const color = v > 0 ? '#81c784' : v < 0 ? '#ef9a9a' : 'var(--text-3)'
+  const sign = v > 0 ? '+' : ''
+  return <span style={{ color, fontVariantNumeric: 'tabular-nums' }}>{sign}{Number(v).toLocaleString('ko-KR')}</span>
+}
 
 const fmtTradingValue = (v, market) => {
   if (v == null) return '-'
@@ -74,14 +84,20 @@ export default function Ranking() {
   const [modalLoading, setModalLoading] = useState(false)
   const [adding, setAdding] = useState(false)
 
+  const isSupply = metric === 'supply'
+
   const fetchPage = useCallback((off, reset) => {
     if (loadingRef.current) return
     loadingRef.current = true
     setLoading(true)
-    api.get('/api/rankings', { params: { market, metric, type, limit: LIMIT, offset: off } })
+    // 수급 뷰: 스크리닝 엔드포인트(외국인 보유율 desc, 서버 정렬). 그 외: 기존 랭킹.
+    const req = metric === 'supply'
+      ? api.get('/api/investor/screening', { params: { limit: LIMIT, offset: off } })
+      : api.get('/api/rankings', { params: { market, metric, type, limit: LIMIT, offset: off } })
+    req
       .then(({ data }) => {
         const rows = data.items || []
-        setBaseTs(data.base_ts ?? null)
+        setBaseTs(metric === 'supply' ? (data.latest_date ?? null) : (data.base_ts ?? null))
         setItems(prev => reset ? rows : [...prev, ...rows])
         setOffset(off + rows.length)
         setHasMore(rows.length === LIMIT)
@@ -93,6 +109,11 @@ export default function Ranking() {
         setLoading(false)
       })
   }, [market, metric, type])
+
+  // 수급은 KR 전용 — US로 전환 시 거래대금으로 폴백
+  useEffect(() => {
+    if (market === 'US' && metric === 'supply') setMetric('value')
+  }, [market, metric])
 
   // 토글 변경 시 리셋 후 첫 페이지 로드
   useEffect(() => {
@@ -170,7 +191,10 @@ export default function Ranking() {
       .finally(() => setAdding(false))
   }
 
-  const tsLabel = fmtTs(baseTs)
+  // 수급 baseTs는 ISO 날짜(latest_date)라 날짜만, 그 외는 기존 datetime 라벨.
+  const tsLabel = isSupply ? baseTs : fmtTs(baseTs)
+  // 수급은 KR 전용이라 US에서는 metric 토글에서 숨김.
+  const metricOptions = market === 'US' ? METRICS.filter(([v]) => v !== 'supply') : METRICS
 
   const Toggle = ({ options, value, onChange }) => (
     <div className="tabs" style={{ width: 'fit-content' }}>
@@ -184,29 +208,65 @@ export default function Ranking() {
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 12 }}>
         <Toggle options={MARKETS} value={market} onChange={setMarket} />
-        <Toggle options={METRICS} value={metric} onChange={setMetric} />
-        <Toggle options={TYPES} value={type} onChange={setType} />
+        <Toggle options={metricOptions} value={metric} onChange={setMetric} />
+        {!isSupply && <Toggle options={TYPES} value={type} onChange={setType} />}
         {tsLabel && (
           <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 'auto' }}>기준 {tsLabel}</span>
         )}
       </div>
 
       {/* 헤더 */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: GRID_COLS,
-        gap: 6, padding: '6px 8px', fontSize: 11, color: 'var(--text-3)',
-        borderBottom: '1px solid var(--border)', fontWeight: 600,
-      }}>
-        <span>순위</span>
-        <span>종목</span>
-        <span style={{ textAlign: 'right' }}>현재가</span>
-        <span style={{ textAlign: 'right' }}>등락률</span>
-        <span style={{ textAlign: 'right' }}>거래대금</span>
-        <span style={{ textAlign: 'right' }}>거래량</span>
-      </div>
+      {isSupply ? (
+        <div style={{
+          display: 'grid', gridTemplateColumns: SUPPLY_GRID_COLS,
+          gap: 6, padding: '6px 8px', fontSize: 11, color: 'var(--text-3)',
+          borderBottom: '1px solid var(--border)', fontWeight: 600,
+        }}>
+          <span>순위</span>
+          <span>종목</span>
+          <span style={{ textAlign: 'right' }}>외국인 보유율</span>
+          <span style={{ textAlign: 'right' }}>외국인</span>
+          <span style={{ textAlign: 'right' }}>기관</span>
+          <span style={{ textAlign: 'right' }}>개인</span>
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid', gridTemplateColumns: GRID_COLS,
+          gap: 6, padding: '6px 8px', fontSize: 11, color: 'var(--text-3)',
+          borderBottom: '1px solid var(--border)', fontWeight: 600,
+        }}>
+          <span>순위</span>
+          <span>종목</span>
+          <span style={{ textAlign: 'right' }}>현재가</span>
+          <span style={{ textAlign: 'right' }}>등락률</span>
+          <span style={{ textAlign: 'right' }}>거래대금</span>
+          <span style={{ textAlign: 'right' }}>거래량</span>
+        </div>
+      )}
 
       <div>
-        {items.map((row) => (
+        {isSupply ? items.map((row, i) => (
+          <div
+            key={`${row.ticker}-${i}`}
+            onClick={() => onRowClick(row)}
+            style={{
+              display: 'grid', gridTemplateColumns: SUPPLY_GRID_COLS,
+              gap: 6, padding: '8px 8px', alignItems: 'center', cursor: 'pointer',
+              borderBottom: '1px solid var(--border)', fontSize: 12,
+            }}
+            className="ranking-row"
+          >
+            <span style={{ color: 'var(--text-3)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ color: 'var(--text)', fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || row.ticker}</span>
+              <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)' }}>{row.ticker}</span>
+            </span>
+            <span style={{ textAlign: 'right', color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{row.foreign_hold_ratio == null ? '-' : `${row.foreign_hold_ratio.toFixed(2)}%`}</span>
+            <span style={{ textAlign: 'right' }}>{fmtNet(row.foreign_net)}</span>
+            <span style={{ textAlign: 'right' }}>{fmtNet(row.organ_net)}</span>
+            <span style={{ textAlign: 'right' }}>{fmtNet(row.individual_net)}</span>
+          </div>
+        )) : items.map((row) => (
           <div
             key={`${row.ticker}-${row.rank}`}
             onClick={() => onRowClick(row)}
@@ -340,6 +400,8 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
           </div>
         )}
       </div>
+
+      {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
     </div>
   )
 }
@@ -408,6 +470,74 @@ function BasicInfo({ row, market, adding, onAdd, onClose }) {
       <button className="btn btn-primary" onClick={onAdd} disabled={adding} style={{ width: '100%' }}>
         {adding ? '추가 중…' : '관심종목 추가'}
       </button>
+
+      {(row.market || market) === 'KR' && <InvestorTrendSection ticker={row.ticker} />}
+    </div>
+  )
+}
+
+// 수급 추이 차트 (KR 전용): 외국인/기관/개인 누적 순매수(좌축) + 외국인 보유율(우축) dual-axis.
+// 종목 클릭 모달(ResearchDetail·BasicInfo) 하단에 렌더. US 종목은 호출부에서 미렌더.
+function InvestorTrendSection({ ticker }) {
+  const [data, setData] = useState(null)   // null=로딩, []=없음
+  const [error, setError] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    setData(null)
+    setError(false)
+    api.get(`/api/stocks/${ticker}/investor-trend`, { params: { days: 252 } })
+      .then(({ data }) => { if (!cancelled) setData(data.items || []) })
+      .catch(() => { if (!cancelled) setError(true) })
+    return () => { cancelled = true }
+  }, [ticker])
+
+  // 누적 순매수 계산 (base_date 오름차순 시계열).
+  let chart = []
+  if (Array.isArray(data)) {
+    let f = 0, o = 0, ind = 0
+    chart = data.map(r => {
+      f += r.foreign_net || 0
+      o += r.organ_net || 0
+      ind += r.individual_net || 0
+      return {
+        date: r.base_date ? r.base_date.slice(5) : r.base_date,  // MM-DD
+        foreign: f, organ: o, individual: ind,
+        hold: r.foreign_hold_ratio,
+      }
+    })
+  }
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>수급 추이</div>
+      {error ? (
+        <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>수급 추이를 불러오지 못했습니다.</p>
+      ) : data === null ? (
+        <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>수급 추이 불러오는 중…</p>
+      ) : chart.length === 0 ? (
+        <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>수급 데이터가 없습니다.</p>
+      ) : (
+        <>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6 }}>누적 순매수(수량) 외국인·기관·개인 + 외국인 보유율(%)</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={chart} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }} minTickGap={24} />
+              <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={52}
+                     tickFormatter={v => krFmt(v)} />
+              <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#ffb74d' }}
+                     tickFormatter={v => `${v}%`} width={40} />
+              <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
+                       formatter={(v, n) => n === '외국인 보유율' ? [`${v?.toFixed(2)}%`, n] : [Number(v).toLocaleString('ko-KR'), n]} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line yAxisId="left" type="monotone" dataKey="foreign" name="외국인" stroke="#4fc3f7" dot={false} strokeWidth={2} />
+              <Line yAxisId="left" type="monotone" dataKey="organ" name="기관" stroke="#81c784" dot={false} strokeWidth={2} />
+              <Line yAxisId="left" type="monotone" dataKey="individual" name="개인" stroke="#ef9a9a" dot={false} strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="hold" name="외국인 보유율" stroke="#ffb74d" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
+            </LineChart>
+          </ResponsiveContainer>
+        </>
+      )}
     </div>
   )
 }

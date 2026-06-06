@@ -212,3 +212,17 @@ CREATE TABLE IF NOT EXISTS market_rankings (
     PRIMARY KEY (market, metric, rank)
 );
 CREATE INDEX IF NOT EXISTS idx_market_rankings_read ON market_rankings(market, metric, rank);
+
+-- 투자자별 수급 (외국인/기관/개인 순매수 + 외국인 보유율, 일별 종목 단위, KR 전용)
+CREATE TABLE IF NOT EXISTS market_investor_trend (
+    ticker             TEXT NOT NULL,
+    base_date          DATE NOT NULL,
+    foreign_net        NUMERIC(20, 0),
+    organ_net          NUMERIC(20, 0),
+    individual_net     NUMERIC(20, 0),
+    foreign_hold_ratio NUMERIC(6, 2),
+    close_price        NUMERIC,
+    created_at         TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (ticker, base_date)
+);
+CREATE INDEX IF NOT EXISTS idx_investor_trend_read ON market_investor_trend(ticker, base_date DESC);

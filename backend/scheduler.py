@@ -146,6 +146,53 @@ def _fetch_us_rankings():
         print(f"[Scheduler] US rankings refresh failed: {e}")
 
 
+def _fetch_investor_trend():
+    """KR 랭킹 종목 일일 수급 배치: 전진 적립 + 종목당 1청크 후진 백필.
+
+    전진: 최신 /trend → upsert (빈 테이블이면 ~10일 시드).
+    후진: oldest_date가 ~1년(약 365일) 이내면 그 날짜 이전 10일을 1청크 fetch.
+    종목당 ~2 호출/회, ThreadPoolExecutor 병렬(정중한 동시성)."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from datetime import date, timedelta
+    from services import investor_service as svc
+    from services.db import query as db_query
+
+    try:
+        tickers = [r["ticker"] for r in db_query(
+            "SELECT DISTINCT ticker FROM market_rankings WHERE market = 'KR'")]
+    except Exception as e:
+        print(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
+        return
+
+    backfill_floor = date.today() - timedelta(days=365)
+
+    def _fetch_one(ticker):
+        # 전진
+        try:
+            svc.upsert_trend(ticker, svc.fetch_trend(ticker))
+        except Exception as e:
+            print(f"[Scheduler] Investor trend forward failed for {ticker}: {e}")
+        # 후진 (1청크) — oldest가 1년 캡 이내일 때만
+        try:
+            oldest = svc.oldest_date(ticker)
+            if oldest is not None and oldest > backfill_floor:
+                older = svc.fetch_trend(ticker, bizdate=oldest.strftime("%Y%m%d"))
+                if older:
+                    svc.upsert_trend(ticker, older)
+        except Exception as e:
+            print(f"[Scheduler] Investor trend backfill failed for {ticker}: {e}")
+
+    if not tickers:
+        print("[Scheduler] Investor trend: no KR tickers")
+        return
+    # max_workers ≤ 8: 워커가 DB 풀(maxconn=10)에서 커넥션을 점유하므로 풀 초과(PoolError) 방지
+    with ThreadPoolExecutor(max_workers=max(1, min(len(tickers), 8))) as executor:
+        futures = [executor.submit(_fetch_one, t) for t in tickers]
+        for future in as_completed(futures):
+            future.result()
+    print(f"[Scheduler] Investor trend fetched for {len(tickers)} KR tickers")
+
+
 def _seed_rankings_if_empty():
     """기동 시 market_rankings가 비어 있으면(예: 장외 시간 배포) 즉시 1회 적재.
     장중 cron이 돌기 전까지 랭킹 탭이 빈 상태로 남는 것을 방지(_check_missed_report와 동일 취지)."""
@@ -252,6 +299,12 @@ def start():
         _fetch_us_rankings,
         CronTrigger(hour="9-16", minute="*/10", timezone="America/New_York"),
         id="us_rankings_fetch",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _fetch_investor_trend,
+        CronTrigger(hour=18, minute=0, timezone="Asia/Seoul"),
+        id="investor_trend_fetch",
         replace_existing=True,
     )
     _seed_rankings_if_empty()
