@@ -122,6 +122,7 @@ cd backend && .venv/bin/python -m pytest
 - **launchd 자동실행**: cloudflared + docker compose
 - **환경변수**: `backend/.env.docker` (POSTGRES_PASSWORD, JWT_SECRET, SESSION_SECRET, OAuth, FRED_API_KEY, KOFIA_API_KEY), `.env` (루트, docker-compose 보간용)
 - **배포**: `git push origin main` 시 자동 배포됨. `docker compose build` / `docker compose up` 수동 재빌드 절대 하지 말 것.
+- **⚠️ 자동 배포 폴러 (작업 시 주의)**: launchd `com.portfolion.auto-deploy-poll`이 2분마다 `scripts/auto-deploy-poll.sh`를 돌려 `origin/main`이 로컬 HEAD보다 앞서면 `git reset --hard origin/main` 후 배포한다. → 메인 체크아웃에서 **커밋 안 한(또는 push 안 해 로컬이 origin보다 앞선) tracked 편집은 다음 폴(≤2분)에 소실**된다. 코드 변경은 **commit과 `git push origin main`을 묶어 즉시** 반영할 것. `.forge/` 등 untracked 파일은 `reset --hard` 대상이 아니라 안전.
 
 ## Key Files
 
