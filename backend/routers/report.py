@@ -330,7 +330,9 @@ def get_report(ticker: str, date_str: str):
         summary["hold"] = rows[0]["hold"]
         summary["sell"] = rows[0]["sell"]
     enriched_at = None
-    ea_rows = query("SELECT enriched_at FROM tickers WHERE ticker = %s", (upper,))
+    ea_rows = query("SELECT enriched_at, is_etf FROM tickers WHERE ticker = %s", (upper,))
+    summary = dict(summary)
+    summary["is_etf"] = bool(ea_rows[0].get("is_etf")) if ea_rows else False
     if ea_rows and ea_rows[0].get("enriched_at"):
         enriched_at = ea_rows[0]["enriched_at"].isoformat()
     return {"ticker": upper, "date": date_str, "summary": summary, "enriched_at": enriched_at}

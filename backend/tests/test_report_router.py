@@ -262,3 +262,35 @@ def test_backfill_blocked_for_non_admin():
     with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
         resp = _nonadmin_client.post("/api/report/backfill")
     assert resp.status_code == 403
+
+
+# ── get_report: ETF 플래그(is_etf) 노출 ──────────────────────────────────────
+# detail 응답의 summary.is_etf는 tickers.is_etf에서 읽어 주입한다(스냅샷 재생성 불필요).
+# query 호출 순서: ① _read_snapshot ② consensus mart ③ consensus_history ④ tickers(enriched_at,is_etf)
+
+def test_get_report_surfaces_is_etf_true(tmp_path):
+    ticker_dir = tmp_path / "SPY"
+    ticker_dir.mkdir()
+    (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("routers.report.query", side_effect=[[], [], [], [{"enriched_at": None, "is_etf": True}]]), \
+         patch("routers.report.cache_svc._snapshots", {}), \
+         patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
+        resp = client.get("/api/report/SPY/2026-05-05")
+    assert resp.status_code == 200
+    assert resp.json()["summary"]["is_etf"] is True
+
+
+def test_get_report_is_etf_false_for_equity(tmp_path):
+    ticker_dir = tmp_path / "LLY"
+    ticker_dir.mkdir()
+    (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("routers.report.query", side_effect=[[], [], [], [{"enriched_at": None, "is_etf": False}]]), \
+         patch("routers.report.cache_svc._snapshots", {}), \
+         patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
+        resp = client.get("/api/report/LLY/2026-05-05")
+    assert resp.status_code == 200
+    assert resp.json()["summary"]["is_etf"] is False

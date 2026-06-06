@@ -14,7 +14,8 @@ CREATE TABLE tickers (
   risks               text NOT NULL DEFAULT '',
   recent_disclosures  text NOT NULL DEFAULT '',
   insights            text NOT NULL DEFAULT '',
-  enriched_at         timestamptz
+  enriched_at         timestamptz,
+  is_etf              boolean NOT NULL DEFAULT false
 );
 
 -- 스냅샷/리포트 (공유, 티커별)

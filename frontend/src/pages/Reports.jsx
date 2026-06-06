@@ -452,6 +452,10 @@ export default function Reports() {
     )
   }
 
+  // ETF는 보여줄 수 있는 데이터만: 심층분석 탭·컨센서스/재무 서브탭 숨김(기술·수급만)
+  const isEtf = !!detail.summary?.is_etf
+  const analysisSub = isEtf ? 'technical' : analysisSubTab
+
   return (
     <div className="reports-layout" data-view={view}>
       {/* 좌측 사이드바 */}
@@ -612,7 +616,7 @@ export default function Reports() {
                 { key: 'analysis', label: '📈 지표' },
                 { key: 'report', label: '📝 심층분석' },
                 { key: 'history', label: '📅 히스토리' },
-              ].map(({ key, label }) => (
+              ].filter(({ key }) => !(isEtf && key === 'report')).map(({ key, label }) => (
                 <button
                   key={key}
                   onClick={() => { setActiveDetailTab(key); trackEvent('report_tab_switch', { tab: key }) }}
@@ -630,14 +634,16 @@ export default function Reports() {
                 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <InsightsSection insights={detail.summary.insights} />
-                    <ConsensusSummary
-                      summary={detail.summary}
-                      ticker={selected.ticker}
-                      onRefreshSuccess={(patched) => {
-                        setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
-                        fetchList()
-                      }}
-                    />
+                    {!isEtf && (
+                      <ConsensusSummary
+                        summary={detail.summary}
+                        ticker={selected.ticker}
+                        onRefreshSuccess={(patched) => {
+                          setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
+                          fetchList()
+                        }}
+                      />
+                    )}
                     <VolumeRsiSnapshot summary={detail.summary} />
                   </div>
                 )
@@ -647,7 +653,8 @@ export default function Reports() {
               detail.summary
                 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) */}
+                    {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) — ETF는 기술·수급만이라 숨김 */}
+                    {!isEtf && (
                     <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-start' }}>
                       {[
                         { key: 'consensus', label: '컨센서스' },
@@ -669,10 +676,11 @@ export default function Reports() {
                         </button>
                       ))}
                     </div>
-                    {analysisSubTab === 'consensus' && (
+                    )}
+                    {analysisSub === 'consensus' && (
                       <ConsensusChart ticker={selected.ticker} market={detail.summary.market} />
                     )}
-                    {analysisSubTab === 'financials' && (
+                    {analysisSub === 'financials' && (
                       <>
                         <FinancialsChart
                           financials={detail.summary.financials}
@@ -682,7 +690,7 @@ export default function Reports() {
                         <BacklogSection ticker={selected.ticker} market={detail.summary.market} />
                       </>
                     )}
-                    {analysisSubTab === 'technical' && (
+                    {analysisSub === 'technical' && (
                       (detail.summary.daily_rsi || detail.summary.market === 'KR')
                         ? (
                           <>

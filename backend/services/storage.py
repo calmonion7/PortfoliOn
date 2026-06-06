@@ -52,13 +52,14 @@ def save_stocks(user_id: str, stocks: list[dict]) -> None:
                 ticker = s["ticker"].upper()
                 cur.execute(
                     """
-                    INSERT INTO tickers (ticker, name, market, exchange, competitors, moat, growth_plan, risks, recent_disclosures)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO tickers (ticker, name, market, exchange, competitors, moat, growth_plan, risks, recent_disclosures, is_etf)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (ticker) DO UPDATE SET
                         name=EXCLUDED.name, market=EXCLUDED.market, exchange=EXCLUDED.exchange,
                         competitors=EXCLUDED.competitors, moat=EXCLUDED.moat,
                         growth_plan=EXCLUDED.growth_plan, risks=EXCLUDED.risks,
-                        recent_disclosures=EXCLUDED.recent_disclosures
+                        recent_disclosures=EXCLUDED.recent_disclosures,
+                        is_etf=tickers.is_etf OR EXCLUDED.is_etf
                     """,
                     (
                         ticker,
@@ -70,6 +71,7 @@ def save_stocks(user_id: str, stocks: list[dict]) -> None:
                         s.get("growth_plan") or "",
                         s.get("risks") or "",
                         s.get("recent_disclosures") or "",
+                        s.get("security_type") == "ETF" or bool(s.get("is_etf")),
                     ),
                 )
                 cur.execute(
