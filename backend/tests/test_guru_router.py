@@ -1,4 +1,5 @@
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -14,6 +15,18 @@ test_app = FastAPI()
 test_app.include_router(router)
 test_app.dependency_overrides[require_admin] = lambda: "test-user-id"
 client = TestClient(test_app)
+
+
+@pytest.fixture(autouse=True)
+def _stub_job_runs(monkeypatch):
+    """백그라운드 크롤 워커에 추가된 job_runs.record 계측이 테스트 DB를 건드리지 않도록 no-op로 대체."""
+    import services.job_runs as job_runs
+
+    @contextmanager
+    def _noop(job_id, trigger):
+        yield 1
+
+    monkeypatch.setattr(job_runs, "record", _noop)
 
 SAMPLE_DATA = {
     "last_updated": "2026-05-14T10:00:00",

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from services.leverage_service import get_leverage_data, get_coverage, backfill_with_progress, _backfill_progress
 from services.lending_service import get_lending_data, fetch_and_store as lending_fetch_and_store
+from services import job_runs
 from auth import require_admin
 from services.market_indicators import (
     get_treasury,
@@ -88,8 +89,9 @@ def econ_indicators():
 @router.post("/refresh-earnings")
 def refresh_earnings():
     try:
-        m7 = _fetch_and_save_m7_earnings()
-        kr = _fetch_and_save_kr_top2_earnings()
+        with job_runs.record("earnings_refresh", "manual"):
+            m7 = _fetch_and_save_m7_earnings()
+            kr = _fetch_and_save_kr_top2_earnings()
         return {"ok": True, "m7_quarters": len(m7.get("quarters", [])), "kr_quarters": len(kr.get("quarters", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -98,7 +100,8 @@ def refresh_earnings():
 @router.post("/refresh-econ")
 def refresh_econ():
     try:
-        data = _fetch_and_save_econ_indicators()
+        with job_runs.record("monthly_refresh", "manual"):
+            data = _fetch_and_save_econ_indicators()
         return {"ok": True, "cpi_points": len(data.get("cpi", [])), "unemp_points": len(data.get("unemployment", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -151,7 +154,8 @@ def lending():
 @router.post("/lending/sync")
 def lending_sync(user_id: str = Depends(require_admin)):
     try:
-        n = lending_fetch_and_store()
+        with job_runs.record("lending_fetch", "manual"):
+            n = lending_fetch_and_store()
         return {"ok": True, "rows": n}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

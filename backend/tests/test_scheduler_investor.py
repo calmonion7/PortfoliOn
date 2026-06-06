@@ -1,10 +1,25 @@
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from datetime import date, timedelta
 
+import pytest
+
 import scheduler
+
+
+@pytest.fixture(autouse=True)
+def _stub_job_runs(monkeypatch):
+    """잡 함수에 추가된 job_runs.record 계측이 테스트 DB를 건드리지 않도록 no-op로 대체."""
+    import services.job_runs as job_runs
+
+    @contextmanager
+    def _noop(job_id, trigger):
+        yield 1
+
+    monkeypatch.setattr(job_runs, "record", _noop)
 
 
 def test_investor_job_forward_and_backward(monkeypatch):

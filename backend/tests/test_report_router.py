@@ -1,4 +1,5 @@
 import json
+from contextlib import contextmanager
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -6,6 +7,18 @@ from unittest.mock import patch, MagicMock
 
 from routers.report import router
 from auth import get_current_user, require_admin, get_current_user_or_api_key, require_admin_or_api_key
+
+
+@pytest.fixture(autouse=True)
+def _stub_job_runs(monkeypatch):
+    """백그라운드 워커에 추가된 job_runs.record 계측이 테스트 DB를 건드리지 않도록 no-op로 대체."""
+    import services.job_runs as job_runs
+
+    @contextmanager
+    def _noop(job_id, trigger):
+        yield 1
+
+    monkeypatch.setattr(job_runs, "record", _noop)
 
 
 app = FastAPI()

@@ -12,6 +12,7 @@ from services import market as market_svc
 from services import consensus as consensus_svc
 from services import consensus_pipeline as _pipeline
 from services import cache as cache_svc
+from services import job_runs
 from services.utils import sanitize as _sanitize
 from services.progress import ProgressTracker
 from services.parallel import parallel_map
@@ -81,20 +82,21 @@ def backfill_all(background_tasks: BackgroundTasks, days: int = 60, force: bool 
 
 
 def _run_backfill(stocks: list, days: int, force: bool = False):
-    _backfill_progress.start(len(stocks))
-    _backfill_progress.set(created=0)
-    total_created = 0
-    for stock in stocks:
-        _backfill_progress.set(current=stock["ticker"])
-        try:
-            n = report_generator.backfill_ticker(stock, days=days, force=force)
-            total_created += n
-            cache_svc.invalidate(stock["ticker"])
-        except Exception as e:
-            print(f"[Backfill] Failed for {stock['ticker']}: {e}")
-        _backfill_progress.increment()
-        _backfill_progress.set(created=total_created)
-    _backfill_progress.finish()
+    with job_runs.record("daily_report", "manual"):
+        _backfill_progress.start(len(stocks))
+        _backfill_progress.set(created=0)
+        total_created = 0
+        for stock in stocks:
+            _backfill_progress.set(current=stock["ticker"])
+            try:
+                n = report_generator.backfill_ticker(stock, days=days, force=force)
+                total_created += n
+                cache_svc.invalidate(stock["ticker"])
+            except Exception as e:
+                print(f"[Backfill] Failed for {stock['ticker']}: {e}")
+            _backfill_progress.increment()
+            _backfill_progress.set(created=total_created)
+        _backfill_progress.finish()
 
 
 @router.post("/report/generate", status_code=202)
@@ -141,8 +143,9 @@ def _run_generation(stocks: list, target_date: str = None):
         finally:
             _progress.increment()
 
-    parallel_map(_process_one, stocks, max_workers=5)
-    _progress.finish()
+    with job_runs.record("daily_report", "manual"):
+        parallel_map(_process_one, stocks, max_workers=5)
+        _progress.finish()
 
 
 def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:
@@ -352,15 +355,16 @@ def batch_consensus(background_tasks: BackgroundTasks, days: int = 180, force: b
 
 
 def _run_consensus_batch(stocks: list, days: int = 180, force: bool = False):
-    _consensus_progress.start(len(stocks))
-    for stock in stocks:
-        _consensus_progress.set(current=stock["ticker"])
-        try:
-            _pipeline.backfill([stock], days, force)
-        except Exception as e:
-            print(f"[Consensus] backfill failed for {stock['ticker']}: {e}")
-        _consensus_progress.increment()
-    _consensus_progress.finish()
+    with job_runs.record("consensus", "manual"):
+        _consensus_progress.start(len(stocks))
+        for stock in stocks:
+            _consensus_progress.set(current=stock["ticker"])
+            try:
+                _pipeline.backfill([stock], days, force)
+            except Exception as e:
+                print(f"[Consensus] backfill failed for {stock['ticker']}: {e}")
+            _consensus_progress.increment()
+        _consensus_progress.finish()
 
 
 @router.get("/consensus/{ticker}")

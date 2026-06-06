@@ -5,6 +5,7 @@ import requests
 from datetime import date, timedelta
 from services.db import execute, query
 from services.utils import sanitize
+from services import job_runs
 
 _KOFIA_BASE = "https://apis.data.go.kr/1160100/service/GetKofiaStatisticsInfoService"
 _INDEX_BASE  = "https://apis.data.go.kr/1160100/service/GetMarketIndexInfoService"
@@ -202,53 +203,54 @@ def get_coverage() -> dict:
 def backfill_with_progress(start_year: int, end_year: int) -> None:
     """백필 실행 (백그라운드). _backfill_progress로 진행상황 추적."""
     global _backfill_progress
-    _backfill_progress = {"running": True, "done": 0, "total": 0, "current": "", "error": ""}
+    with job_runs.record("leverage_fetch", "manual"):
+        _backfill_progress = {"running": True, "done": 0, "total": 0, "current": "", "error": ""}
 
-    existing = {str(r["base_date"]) for r in query(
-        "SELECT base_date FROM market_leverage_indicators"
-    )}
-    start = date(start_year, 1, 1)
-    end = min(date(end_year, 12, 31), date.today() - timedelta(days=1))
+        existing = {str(r["base_date"]) for r in query(
+            "SELECT base_date FROM market_leverage_indicators"
+        )}
+        start = date(start_year, 1, 1)
+        end = min(date(end_year, 12, 31), date.today() - timedelta(days=1))
 
-    chunks = []
-    chunk_start = start
-    while chunk_start <= end:
-        chunk_end = min(date(chunk_start.year, 12, 31), end)
-        chunks.append((chunk_start, chunk_end))
-        chunk_start = date(chunk_start.year + 1, 1, 1)
+        chunks = []
+        chunk_start = start
+        while chunk_start <= end:
+            chunk_end = min(date(chunk_start.year, 12, 31), end)
+            chunks.append((chunk_start, chunk_end))
+            chunk_start = date(chunk_start.year + 1, 1, 1)
 
-    _backfill_progress["total"] = len(chunks)
+        _backfill_progress["total"] = len(chunks)
 
-    for i, (cs, ce) in enumerate(chunks):
-        s = cs.strftime("%Y%m%d")
-        e = ce.strftime("%Y%m%d")
-        _backfill_progress["current"] = f"{cs.year}년"
-        try:
-            credit_rows = _fetch_credit_balance(s, e)
-            time.sleep(2)
-            fund_rows   = _fetch_market_fund(s, e)
-            time.sleep(2)
-            cap_rows    = _fetch_market_cap(s, e)
-            time.sleep(2)
-        except Exception as exc:
-            _backfill_progress["error"] = f"{cs.year}: {exc}"
+        for i, (cs, ce) in enumerate(chunks):
+            s = cs.strftime("%Y%m%d")
+            e = ce.strftime("%Y%m%d")
+            _backfill_progress["current"] = f"{cs.year}년"
+            try:
+                credit_rows = _fetch_credit_balance(s, e)
+                time.sleep(2)
+                fund_rows   = _fetch_market_fund(s, e)
+                time.sleep(2)
+                cap_rows    = _fetch_market_cap(s, e)
+                time.sleep(2)
+            except Exception as exc:
+                _backfill_progress["error"] = f"{cs.year}: {exc}"
+                _backfill_progress["done"] = i + 1
+                continue
+
+            by_date: dict[str, dict] = {}
+            for row in credit_rows + fund_rows + cap_rows:
+                by_date.setdefault(row["date"], {}).update(row)
+
+            new_rows = [r for d_str, r in by_date.items() if d_str not in existing]
+            if new_rows:
+                _upsert_rows(new_rows)
+                existing.update(r["date"] for r in new_rows)
+                print(f"[leverage_service] backfill {s}-{e}: {len(new_rows)} rows inserted")
+
             _backfill_progress["done"] = i + 1
-            continue
 
-        by_date: dict[str, dict] = {}
-        for row in credit_rows + fund_rows + cap_rows:
-            by_date.setdefault(row["date"], {}).update(row)
-
-        new_rows = [r for d_str, r in by_date.items() if d_str not in existing]
-        if new_rows:
-            _upsert_rows(new_rows)
-            existing.update(r["date"] for r in new_rows)
-            print(f"[leverage_service] backfill {s}-{e}: {len(new_rows)} rows inserted")
-
-        _backfill_progress["done"] = i + 1
-
-    _backfill_progress["running"] = False
-    _backfill_progress["current"] = "완료"
+        _backfill_progress["running"] = False
+        _backfill_progress["current"] = "완료"
 
 
 def backfill(years: int = 5) -> None:

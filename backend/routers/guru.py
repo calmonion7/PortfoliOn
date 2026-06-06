@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from datetime import datetime
 from services import storage
+from services import job_runs
 from services.guru_scraper import scrape_all_managers
 from services.guru_stats import compute_popularity, compute_manager_top3, compute_weighted
 from services.progress import ProgressTracker
@@ -52,17 +53,18 @@ def _run_crawl():
     def on_progress(done: int, total: int, current: str):
         _progress.set(running=True, done=done, total=total, current=current)
 
-    _progress.set(running=True)
-    try:
-        managers = scrape_all_managers(on_progress=on_progress)
-        storage.save_guru_managers({
-            "last_updated": datetime.now().isoformat(timespec="seconds"),
-            "managers": managers,
-        })
-    except Exception as e:
-        print(f"[Guru] Crawl failed: {e}")
-    finally:
-        _progress.finish()
+    with job_runs.record("guru_crawl", "manual"):
+        _progress.set(running=True)
+        try:
+            managers = scrape_all_managers(on_progress=on_progress)
+            storage.save_guru_managers({
+                "last_updated": datetime.now().isoformat(timespec="seconds"),
+                "managers": managers,
+            })
+        except Exception as e:
+            print(f"[Guru] Crawl failed: {e}")
+        finally:
+            _progress.finish()
 
 
 @router.get("/schedule")

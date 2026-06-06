@@ -1,6 +1,6 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from services import storage, report_generator, consensus_pipeline as _pipeline
+from services import storage, report_generator, consensus_pipeline as _pipeline, job_runs
 
 _scheduler = AsyncIOScheduler()
 _JOB_ID = "daily_report"
@@ -11,22 +11,23 @@ _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
 def _generate_all():
     from services.db import query
-    user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks")})
-    all_stocks: dict = {}
-    for user_id in user_ids:
-        stocks = storage.get_all_stocks(user_id)
-        for stock in stocks:
-            try:
-                report_generator.generate_report(stock)
-                print(f"[Scheduler] Report generated for {stock['ticker']}")
-            except Exception as e:
-                print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
-            all_stocks[stock["ticker"]] = stock
-    try:
-        _pipeline.run_daily(list(all_stocks.values()))
-        print(f"[Scheduler] Pipeline run_daily completed for {len(all_stocks)} stocks")
-    except Exception as e:
-        print(f"[Scheduler] Pipeline run_daily failed: {e}")
+    with job_runs.record("daily_report", "auto"):
+        user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks")})
+        all_stocks: dict = {}
+        for user_id in user_ids:
+            stocks = storage.get_all_stocks(user_id)
+            for stock in stocks:
+                try:
+                    report_generator.generate_report(stock)
+                    print(f"[Scheduler] Report generated for {stock['ticker']}")
+                except Exception as e:
+                    print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
+                all_stocks[stock["ticker"]] = stock
+        try:
+            _pipeline.run_daily(list(all_stocks.values()))
+            print(f"[Scheduler] Pipeline run_daily completed for {len(all_stocks)} stocks")
+        except Exception as e:
+            print(f"[Scheduler] Pipeline run_daily failed: {e}")
 
 
 def _reschedule():
@@ -54,96 +55,104 @@ def _reschedule():
 def _run_guru_crawl():
     from services.guru_scraper import scrape_all_managers
     from datetime import datetime
-    try:
-        managers = scrape_all_managers()
-        storage.save_guru_managers({
-            "last_updated": datetime.now().isoformat(timespec="seconds"),
-            "managers": managers,
-        })
-        print("[Scheduler] Guru crawl completed")
-    except Exception as e:
-        print(f"[Scheduler] Guru crawl failed: {e}")
+    with job_runs.record("guru_crawl", "auto"):
+        try:
+            managers = scrape_all_managers()
+            storage.save_guru_managers({
+                "last_updated": datetime.now().isoformat(timespec="seconds"),
+                "managers": managers,
+            })
+            print("[Scheduler] Guru crawl completed")
+        except Exception as e:
+            print(f"[Scheduler] Guru crawl failed: {e}")
 
 
 def _refresh_monthly():
     from services.market_indicators import _fetch_and_save_econ_indicators, _fetch_and_save_kr_exports
-    try:
-        _fetch_and_save_econ_indicators()
-        print("[Scheduler] Econ indicators refreshed")
-    except Exception as e:
-        print(f"[Scheduler] Econ indicators refresh failed: {e}")
-    try:
-        _fetch_and_save_kr_exports()
-        print("[Scheduler] KR exports refreshed")
-    except Exception as e:
-        print(f"[Scheduler] KR exports refresh failed: {e}")
+    with job_runs.record("monthly_refresh", "auto"):
+        try:
+            _fetch_and_save_econ_indicators()
+            print("[Scheduler] Econ indicators refreshed")
+        except Exception as e:
+            print(f"[Scheduler] Econ indicators refresh failed: {e}")
+        try:
+            _fetch_and_save_kr_exports()
+            print("[Scheduler] KR exports refreshed")
+        except Exception as e:
+            print(f"[Scheduler] KR exports refresh failed: {e}")
 
 
 def _refresh_earnings():
     from services.market_indicators import _fetch_and_save_m7_earnings, _fetch_and_save_kr_top2_earnings
-    try:
-        _fetch_and_save_m7_earnings()
-        print("[Scheduler] M7 earnings refreshed")
-    except Exception as e:
-        print(f"[Scheduler] M7 earnings refresh failed: {e}")
-    try:
-        _fetch_and_save_kr_top2_earnings()
-        print("[Scheduler] KR Top2 earnings refreshed")
-    except Exception as e:
-        print(f"[Scheduler] KR Top2 earnings refresh failed: {e}")
+    with job_runs.record("earnings_refresh", "auto"):
+        try:
+            _fetch_and_save_m7_earnings()
+            print("[Scheduler] M7 earnings refreshed")
+        except Exception as e:
+            print(f"[Scheduler] M7 earnings refresh failed: {e}")
+        try:
+            _fetch_and_save_kr_top2_earnings()
+            print("[Scheduler] KR Top2 earnings refreshed")
+        except Exception as e:
+            print(f"[Scheduler] KR Top2 earnings refresh failed: {e}")
 
 
 def _run_digest():
     from services import digest_service
     from services.db import query
-    try:
-        user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks WHERE type = 'holding'")})
-    except Exception as e:
-        print(f"[Scheduler] Digest: failed to fetch user list: {e}")
-        return
-    for user_id in user_ids:
+    with job_runs.record("daily_digest", "auto"):
         try:
-            d = digest_service.generate(user_id)
-            digest_service.send_telegram(d)
-            print(f"[Scheduler] Daily digest generated for {user_id}")
+            user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks WHERE type = 'holding'")})
         except Exception as e:
-            print(f"[Scheduler] Daily digest failed for {user_id}: {e}")
+            print(f"[Scheduler] Digest: failed to fetch user list: {e}")
+            return
+        for user_id in user_ids:
+            try:
+                d = digest_service.generate(user_id)
+                digest_service.send_telegram(d)
+                print(f"[Scheduler] Daily digest generated for {user_id}")
+            except Exception as e:
+                print(f"[Scheduler] Daily digest failed for {user_id}: {e}")
 
 
 def _fetch_leverage():
     from services.leverage_service import fetch_and_store
-    try:
-        fetch_and_store()
-        print("[Scheduler] Leverage indicators fetched")
-    except Exception as e:
-        print(f"[Scheduler] Leverage fetch failed: {e}")
+    with job_runs.record("leverage_fetch", "auto"):
+        try:
+            fetch_and_store()
+            print("[Scheduler] Leverage indicators fetched")
+        except Exception as e:
+            print(f"[Scheduler] Leverage fetch failed: {e}")
 
 
 def _fetch_lending():
     from services.lending_service import fetch_and_store
-    try:
-        n = fetch_and_store()
-        print(f"[Scheduler] Lending balance fetched: {n} rows")
-    except Exception as e:
-        print(f"[Scheduler] Lending fetch failed: {e}")
+    with job_runs.record("lending_fetch", "auto"):
+        try:
+            n = fetch_and_store()
+            print(f"[Scheduler] Lending balance fetched: {n} rows")
+        except Exception as e:
+            print(f"[Scheduler] Lending fetch failed: {e}")
 
 
 def _fetch_kr_rankings():
     from services import ranking_service
-    try:
-        ranking_service.replace_market_rankings("KR", ranking_service.get_kr_rankings())
-        print("[Scheduler] KR rankings refreshed")
-    except Exception as e:
-        print(f"[Scheduler] KR rankings refresh failed: {e}")
+    with job_runs.record("kr_rankings_fetch", "auto"):
+        try:
+            ranking_service.replace_market_rankings("KR", ranking_service.get_kr_rankings())
+            print("[Scheduler] KR rankings refreshed")
+        except Exception as e:
+            print(f"[Scheduler] KR rankings refresh failed: {e}")
 
 
 def _fetch_us_rankings():
     from services import ranking_service
-    try:
-        ranking_service.replace_market_rankings("US", ranking_service.get_us_rankings())
-        print("[Scheduler] US rankings refreshed")
-    except Exception as e:
-        print(f"[Scheduler] US rankings refresh failed: {e}")
+    with job_runs.record("us_rankings_fetch", "auto"):
+        try:
+            ranking_service.replace_market_rankings("US", ranking_service.get_us_rankings())
+            print("[Scheduler] US rankings refreshed")
+        except Exception as e:
+            print(f"[Scheduler] US rankings refresh failed: {e}")
 
 
 def _fetch_investor_trend():
@@ -157,40 +166,41 @@ def _fetch_investor_trend():
     from services import investor_service as svc
     from services.db import query as db_query
 
-    try:
-        tickers = [r["ticker"] for r in db_query(
-            "SELECT DISTINCT ticker FROM market_rankings WHERE market = 'KR'")]
-    except Exception as e:
-        print(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
-        return
-
-    backfill_floor = date.today() - timedelta(days=365)
-
-    def _fetch_one(ticker):
-        # 전진
+    with job_runs.record("investor_trend_fetch", "auto"):
         try:
-            svc.upsert_trend(ticker, svc.fetch_trend(ticker))
+            tickers = [r["ticker"] for r in db_query(
+                "SELECT DISTINCT ticker FROM market_rankings WHERE market = 'KR'")]
         except Exception as e:
-            print(f"[Scheduler] Investor trend forward failed for {ticker}: {e}")
-        # 후진 (1청크) — oldest가 1년 캡 이내일 때만
-        try:
-            oldest = svc.oldest_date(ticker)
-            if oldest is not None and oldest > backfill_floor:
-                older = svc.fetch_trend(ticker, bizdate=oldest.strftime("%Y%m%d"))
-                if older:
-                    svc.upsert_trend(ticker, older)
-        except Exception as e:
-            print(f"[Scheduler] Investor trend backfill failed for {ticker}: {e}")
+            print(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
+            return
 
-    if not tickers:
-        print("[Scheduler] Investor trend: no KR tickers")
-        return
-    # max_workers ≤ 8: 워커가 DB 풀(maxconn=10)에서 커넥션을 점유하므로 풀 초과(PoolError) 방지
-    with ThreadPoolExecutor(max_workers=max(1, min(len(tickers), 8))) as executor:
-        futures = [executor.submit(_fetch_one, t) for t in tickers]
-        for future in as_completed(futures):
-            future.result()
-    print(f"[Scheduler] Investor trend fetched for {len(tickers)} KR tickers")
+        backfill_floor = date.today() - timedelta(days=365)
+
+        def _fetch_one(ticker):
+            # 전진
+            try:
+                svc.upsert_trend(ticker, svc.fetch_trend(ticker))
+            except Exception as e:
+                print(f"[Scheduler] Investor trend forward failed for {ticker}: {e}")
+            # 후진 (1청크) — oldest가 1년 캡 이내일 때만
+            try:
+                oldest = svc.oldest_date(ticker)
+                if oldest is not None and oldest > backfill_floor:
+                    older = svc.fetch_trend(ticker, bizdate=oldest.strftime("%Y%m%d"))
+                    if older:
+                        svc.upsert_trend(ticker, older)
+            except Exception as e:
+                print(f"[Scheduler] Investor trend backfill failed for {ticker}: {e}")
+
+        if not tickers:
+            print("[Scheduler] Investor trend: no KR tickers")
+            return
+        # max_workers ≤ 8: 워커가 DB 풀(maxconn=10)에서 커넥션을 점유하므로 풀 초과(PoolError) 방지
+        with ThreadPoolExecutor(max_workers=max(1, min(len(tickers), 8))) as executor:
+            futures = [executor.submit(_fetch_one, t) for t in tickers]
+            for future in as_completed(futures):
+                future.result()
+        print(f"[Scheduler] Investor trend fetched for {len(tickers)} KR tickers")
 
 
 def _seed_rankings_if_empty():
