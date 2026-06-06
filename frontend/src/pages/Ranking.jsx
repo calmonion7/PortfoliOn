@@ -109,6 +109,15 @@ export default function Ranking() {
     return () => obs.disconnect()
   }, [hasMore, items.length, offset, fetchPage])
 
+  // 모달 오픈 동안 배경(body) 스크롤 잠금 — 레이어 스크롤이 바닥 페이지로 전파되는 현상 방지, 닫히면 원복
+  const modalOpen = modal != null
+  useEffect(() => {
+    if (!modalOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [modalOpen])
+
   // 클릭 시 스냅샷 가용 여부로 분기: 있으면 리서치 리포트 모달, 없으면 기본정보 모달 + 관심추가 CTA.
   const onRowClick = (row) => {
     trackEvent('ranking_row_click', { ticker: row.ticker, market })
