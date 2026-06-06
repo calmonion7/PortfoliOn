@@ -62,6 +62,72 @@ def test_record_prune_keeps_20():
     assert params == ("daily_report", "daily_report")
 
 
+def test_record_insert_failure_still_runs_body_no_reraise():
+    """INSERT(query) 실패시(테이블 부재 등) 본문은 그대로 실행되고, 계측 실패는 삼킨다."""
+    from services import job_runs
+
+    ran = []
+    with patch.object(job_runs, "query", side_effect=Exception("relation does not exist")), \
+         patch.object(job_runs, "execute", return_value=1) as ex:
+        with job_runs.record("daily_report", "auto") as run_id:
+            ran.append(run_id)
+
+    # 본문 실행됨, 센티넬 run_id=None
+    assert ran == [None]
+    # run_id 없으면 종료 UPDATE는 no-op
+    assert not any("UPDATE job_runs" in c[0][0] for c in ex.call_args_list)
+
+
+def test_record_insert_failure_reraises_genuine_body_exception():
+    """INSERT 실패 + 본문 예외시: 계측은 삼키되 본문 예외는 그대로 전파."""
+    from services import job_runs
+
+    with patch.object(job_runs, "query", side_effect=Exception("relation does not exist")), \
+         patch.object(job_runs, "execute", return_value=1) as ex:
+        with pytest.raises(ValueError, match="boom"):
+            with job_runs.record("daily_report", "auto"):
+                raise ValueError("boom")
+
+    # run_id 없으면 failed UPDATE도 no-op
+    assert not any("UPDATE job_runs" in c[0][0] for c in ex.call_args_list)
+
+
+def test_record_prune_failure_still_runs_body():
+    """prune DELETE 실패해도 본문은 실행되고 success UPDATE는 정상 진행."""
+    from services import job_runs
+
+    ran = []
+
+    def _exec(sql, *a, **k):
+        if "DELETE FROM job_runs" in sql:
+            raise Exception("transient")
+        return 1
+
+    with patch.object(job_runs, "query", return_value=[{"id": 5}]), \
+         patch.object(job_runs, "execute", side_effect=_exec) as ex:
+        with job_runs.record("daily_report", "auto") as run_id:
+            ran.append(run_id)
+
+    assert ran == [5]
+    success = [c for c in ex.call_args_list if "UPDATE job_runs" in c[0][0] and "success" in c[0][0]]
+    assert len(success) == 1
+
+
+def test_record_exit_update_failure_swallowed():
+    """종료 UPDATE 실패해도 record()가 예외를 내지 않는다(본문은 이미 끝남)."""
+    from services import job_runs
+
+    def _exec(sql, *a, **k):
+        if "UPDATE job_runs" in sql:
+            raise Exception("transient")
+        return 1
+
+    with patch.object(job_runs, "query", return_value=[{"id": 5}]), \
+         patch.object(job_runs, "execute", side_effect=_exec):
+        with job_runs.record("daily_report", "auto"):
+            pass  # 예외 없이 통과해야 함
+
+
 def test_recent_returns_latest_first():
     from services import job_runs
 

@@ -229,6 +229,11 @@ CREATE TABLE IF NOT EXISTS market_investor_trend (
 CREATE INDEX IF NOT EXISTS idx_investor_trend_read ON market_investor_trend(ticker, base_date DESC);
 
 -- 배치 실행로그 (job_id별 최근 20건만 보관)
+-- 배포 주의: 이 파일은 빈 pgdata 최초 init 때만 자동 적용된다(docker-compose의 initdb 마운트).
+--   기존 운영 DB는 pgdata가 이미 채워져 있으므로 git push 자동배포로는 아래 두 문장이 적용되지 않는다.
+--   배포와 함께 라이브 DB에 수동 적용 필요(이전 additive 슬라이스와 동일):
+--   psql -f app_schema.sql  또는 아래 CREATE TABLE/INDEX 두 문장만 직접 실행.
+--   (테이블 부재 윈도우에도 job_runs.record()는 graceful degrade하여 배치 본문은 깨지지 않음)
 CREATE TABLE IF NOT EXISTS job_runs (
     id          BIGSERIAL PRIMARY KEY,
     job_id      TEXT NOT NULL,                 -- daily_report | guru_crawl | ...
