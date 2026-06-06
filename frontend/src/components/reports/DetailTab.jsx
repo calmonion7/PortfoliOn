@@ -327,7 +327,11 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
-        <div style={{ flex: '0 1 380px', minWidth: 0 }}>{barListJSX}</div>
+        <div style={{ flex: '0 1 380px', minWidth: 0 }}>
+          {/* 우측 카드 헤더(지지/저항 구간) 높이만큼 상단 여백 — 두 차트 상단 정렬 */}
+          <div aria-hidden style={{ fontSize: 9, fontWeight: 600, marginBottom: 4, visibility: 'hidden' }}>여백</div>
+          {barListJSX}
+        </div>
         <div style={{ flex: '0 1 440px', minWidth: 0 }}>{srCardsJSX}</div>
       </div>
     </div>
