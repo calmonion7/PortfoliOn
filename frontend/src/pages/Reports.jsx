@@ -150,22 +150,22 @@ export default function Reports() {
   const renderFilters = () => (
     <>
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: (['watchlist', 'ungenerated', 'others'].includes(activeTab)) ? 0 : 12 }}>
-        <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유 ({holdingsCount})</button>
-        <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심 ({watchlistCount})</button>
+        <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유<span className="tab-cnt">{holdingsCount}</span></button>
+        <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심<span className="tab-cnt">{watchlistCount}</span></button>
         {ungeneratedCount > 0 && (
-          <button className={`tab-btn${activeTab === 'ungenerated' ? ' active' : ''}`} onClick={() => setActiveTab('ungenerated')} style={{ color: activeTab === 'ungenerated' ? 'var(--accent)' : '#ffb74d' }}>미생성 ({ungeneratedCount})</button>
+          <button className={`tab-btn${activeTab === 'ungenerated' ? ' active' : ''}`} onClick={() => setActiveTab('ungenerated')} style={{ color: activeTab === 'ungenerated' ? 'var(--accent)' : '#ffb74d' }}>미생성<span className="tab-cnt">{ungeneratedCount}</span></button>
         )}
         {isAdmin && (
           <button className={`tab-btn${activeTab === 'others' ? ' active' : ''}`} onClick={() => setActiveTab('others')}>
-            그외{othersData !== null ? ` (${Object.keys(othersData).length})` : ''}
+            그외{othersData !== null ? <span className="tab-cnt">{Object.keys(othersData).length}</span> : ''}
           </button>
         )}
       </div>
       {activeTab === 'watchlist' && (
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 8, marginTop: 4 }}>
-          <button className="tab-btn sm" style={{ color: watchlistSub === 'low' ? '#81c784' : 'var(--text-3)', borderBottomColor: watchlistSub === 'low' ? '#81c784' : 'transparent', fontWeight: watchlistSub === 'low' ? 600 : 400 }} onClick={() => setWatchlistSub('low')}>목표≥40% ({watchlistLowCount})</button>
-          <button className="tab-btn sm" style={{ color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottomColor: watchlistSub === 'high' ? '#ef9a9a' : 'transparent', fontWeight: watchlistSub === 'high' ? 600 : 400 }} onClick={() => setWatchlistSub('high')}>목표&lt;40% ({watchlistHighCount})</button>
-          <button className="tab-btn sm" style={{ color: watchlistSub === 'warn' ? '#ffb74d' : 'var(--text-3)', borderBottomColor: watchlistSub === 'warn' ? '#ffb74d' : 'transparent', fontWeight: watchlistSub === 'warn' ? 600 : 400 }} onClick={() => setWatchlistSub('warn')}>⚠ 경고 ({watchlistWarnCount})</button>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'low' ? '#81c784' : 'var(--text-3)', borderBottomColor: watchlistSub === 'low' ? '#81c784' : 'transparent', fontWeight: watchlistSub === 'low' ? 600 : 400 }} onClick={() => setWatchlistSub('low')}>목표≥40%<span className="tab-cnt">{watchlistLowCount}</span></button>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottomColor: watchlistSub === 'high' ? '#ef9a9a' : 'transparent', fontWeight: watchlistSub === 'high' ? 600 : 400 }} onClick={() => setWatchlistSub('high')}>목표&lt;40%<span className="tab-cnt">{watchlistHighCount}</span></button>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'warn' ? '#ffb74d' : 'var(--text-3)', borderBottomColor: watchlistSub === 'warn' ? '#ffb74d' : 'transparent', fontWeight: watchlistSub === 'warn' ? 600 : 400 }} onClick={() => setWatchlistSub('warn')}>⚠ 경고<span className="tab-cnt">{watchlistWarnCount}</span></button>
         </div>
       )}
       <div style={{ display: 'flex', gap: 4, marginBottom: 10, justifyContent: 'flex-start' }}>

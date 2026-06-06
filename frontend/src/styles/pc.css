@@ -316,6 +316,11 @@
 .reports-main { flex: 1; overflow-x: clip; }
 .reports-layout[data-view="detail"] .reports-main { overflow-x: hidden; }
 
+/* 좁은 사이드바(210px)용 컴팩트 탭: 한 줄 고정 + 카운트 보조표기 (전역 .tab-btn 불변) */
+.reports-sidebar .tab-btn { padding: 6px 4px; font-size: 12px; white-space: nowrap; }
+.reports-sidebar .tab-btn.sm { padding: 4px 4px; font-size: 11px; }
+.reports-sidebar .tab-cnt { font-size: 10px; opacity: 0.55; margin-left: 3px; }
+
 /* ----- STOCK CARD GRID ----- */
 .stock-card-grid { display: flex; flex-direction: column; gap: 5px; padding-right: 10px; }
 
