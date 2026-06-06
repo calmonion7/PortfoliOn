@@ -6,8 +6,10 @@ import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
 import BacklogChart from './BacklogChart'
 import api from '../../api'
+import useIsMobile from '../../hooks/useIsMobile'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
+  const isMobile = useIsMobile()
   if (!price && !vp?.poc) return null
 
   const levels = [
@@ -37,18 +39,18 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const barListJSX = (() => {
     const vals = allRows.map(l => l.value)
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1
-    const LABEL_H = 14
-    const GAP_H = 26  // 지그재그 효과 공간 확보
+    const LABEL_H = 20
+    const GAP_H = 34  // 지그재그 효과 공간 확보
     // naturalH > LABEL_H (전체 대비 ~7% 이상) → 갭 마커 표시
     const uniquePrices = [...new Set(vals)].sort((a, b) => b - a)
     const segments = []
     for (let i = 0; i < uniquePrices.length - 1; i++) {
       const segHi = uniquePrices[i], segLo = uniquePrices[i + 1]
-      const naturalH = (segHi - segLo) / span * 200
+      const naturalH = (segHi - segLo) / span * 280
       const isGap = naturalH > LABEL_H
       segments.push({ hi: segHi, lo: segLo, isGap, h: isGap ? GAP_H : LABEL_H })
     }
-    const BAR_H = segments.reduce((s, seg) => s + seg.h, 0) + 14
+    const BAR_H = segments.reduce((s, seg) => s + seg.h, 0) + 20
 
     // 압축 포함 가격 → y 변환
     const priceToY = v => {
@@ -82,13 +84,13 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     const gapSegs = segments.filter(s => s.isGap)
 
     return (
-        <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: 'fit-content' }}>
+        <div style={{ display: 'flex', height: BAR_H, position: 'relative', width: '100%' }}>
           {/* 왼쪽: 금액 */}
-          <div style={{ flex: '0 0 96px', position: 'relative' }}>
+          <div style={{ flex: '0 0 110px', position: 'relative' }}>
             {groupedPositioned.map((l, i) => (
               <div key={i} style={{
-                position: 'absolute', right: 6, top: l.y - 7,
-                fontSize: l.isCurrent ? 10 : 9, textAlign: 'right', whiteSpace: 'nowrap',
+                position: 'absolute', right: 6, top: l.y - 9,
+                fontSize: l.isCurrent ? 14 : 12, textAlign: 'right', whiteSpace: 'nowrap',
                 color: l.isCurrent ? 'var(--text)' : 'var(--text-2)',
                 fontWeight: l.isCurrent ? 700 : 400, fontVariantNumeric: 'tabular-nums',
               }}>
@@ -157,20 +159,20 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           </div>
 
           {/* 오른쪽: % + 수치명 (같은 가격은 합산) */}
-          <div style={{ flex: '0 0 180px', position: 'relative' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
             {groupedPositioned.map((l, i) => {
               const p = l.isCurrent ? null : pctFrom(l.value)
               return (
                 <div key={i} style={{
-                  position: 'absolute', left: 6, top: l.y - 7,
+                  position: 'absolute', left: 6, top: l.y - 9,
                   display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap',
                 }}>
                   {p != null && (
-                    <span style={{ fontSize: 9, color: p > 0 ? '#ef9a9a' : '#81c784', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontSize: 12, color: p > 0 ? '#ef9a9a' : '#81c784', fontVariantNumeric: 'tabular-nums' }}>
                       {p >= 0 ? '+' : ''}{p.toFixed(1)}%
                     </span>
                   )}
-                  <span style={{ fontSize: l.isCurrent ? 10 : 9, fontWeight: l.isCurrent ? 700 : 500 }}>
+                  <span style={{ fontSize: l.isCurrent ? 14 : 12, fontWeight: l.isCurrent ? 700 : 500 }}>
                     {l.mergedLabels.map((lb, j) => (
                       <span key={j} style={{ color: lb.color }}>
                         {j > 0 && <span style={{ color: 'var(--text-3)' }}>, </span>}
@@ -324,8 +326,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   return (
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <div style={{ flex: '0 1 auto', minWidth: 0 }}>{barListJSX}</div>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
+        <div style={{ flex: '0 1 350px', minWidth: 0 }}>{barListJSX}</div>
         <div style={{ flex: '0 1 440px', minWidth: 0 }}>{srCardsJSX}</div>
       </div>
     </div>
