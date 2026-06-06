@@ -12,6 +12,7 @@ import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
 import FinancialsChart from '../components/reports/FinancialsChart'
 import HistoryTab from '../components/reports/HistoryTab'
 import { ReportSectionText, ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection } from '../components/reports/Sections'
+import InvestorTrendSection from '../components/reports/InvestorTrendSection'
 import { trackEvent } from '../utils/analytics'
 
 
@@ -678,6 +679,7 @@ export default function Reports() {
                       disclosures={detail.summary.recent_disclosures}
                       news={detail.summary.news}
                     />
+                    {detail.summary.market === 'KR' && <InvestorTrendSection ticker={selected.ticker} />}
                   </div>
                 )
                 : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>리포트 데이터가 없습니다.</p>
