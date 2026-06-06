@@ -5,7 +5,10 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import { krFmt } from '../components/market/marketUtils.jsx'
 import { useToast } from '../components/Toast'
 import { trackEvent } from '../utils/analytics'
-import DetailSummaryTab, { RsiTable } from '../components/reports/DetailTab'
+import { RsiTable, ConsensusSummary, VolumeRsiSnapshot, BacklogSection } from '../components/reports/DetailTab'
+import ConsensusChart from '../components/reports/ConsensusChart'
+import FinancialsChart from '../components/reports/FinancialsChart'
+import HistoryTab from '../components/reports/HistoryTab'
 import { ReportSectionCompetitors, RisksSection, MoatSection, GrowthPlanSection, RecentDisclosuresSection, InsightsSection } from '../components/reports/Sections'
 
 const LIMIT = 20
@@ -402,20 +405,52 @@ export default function Ranking() {
   )
 }
 
-// 스냅샷 보유 종목: 기존 리포트 표시 컴포넌트 재사용 (Reports.jsx 상세화면 패턴)
+// 스냅샷 보유 종목: 기존 리포트 표시 컴포넌트 재사용 (Reports.jsx 상세화면 구성과 동일)
 function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
   const [tab, setTab] = useState('summary')
+  const [analysisSubTab, setAnalysisSubTab] = useState('consensus')
   const market = summary.market
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <div>
-          <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 17 }}>{summary.name || ticker}</span>
-          <span style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 6 }}>({ticker})</span>
-          {market === 'KR'
-            ? <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
-            : <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#4fc3f7', border: '1px solid var(--border)' }}>🇺🇸 US</span>}
-          {date && <span style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 8 }}>{date}</span>}
+          <div>
+            <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 17 }}>{summary.name || ticker}</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 6 }}>({ticker})</span>
+            {market === 'KR'
+              ? <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
+              : <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#4fc3f7', border: '1px solid var(--border)' }}>🇺🇸 US</span>}
+            {date && <span style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 8 }}>{date}</span>}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 6 }}>
+            {summary.price != null && (
+              <span style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700 }}>{fmtPrice(summary.price, market)}</span>
+            )}
+            {summary.drop_from_high_20d != null && (
+              <span style={{
+                fontSize: 11, padding: '2px 7px', borderRadius: 3,
+                background: summary.drop_from_high_20d >= 0 ? '#1a3a1a' : '#2a1000',
+                color: summary.drop_from_high_20d >= 0 ? '#81c784' : '#ffb74d',
+              }}>
+                {summary.drop_from_high_20d < -10 && '⚠ '}
+                20일고점 {summary.drop_from_high_20d >= 0 ? '+' : ''}{summary.drop_from_high_20d.toFixed(1)}%
+              </span>
+            )}
+            {summary.sector && (
+              <span style={{ color: 'var(--accent)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
+                {summary.sector}{summary.industry ? ` / ${summary.industry}` : ''}
+              </span>
+            )}
+            {summary.per != null && (
+              <span style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
+                PER {summary.per.toFixed(1)}
+                {summary.forward_per != null && <span style={{ marginLeft: 4 }}>/ Fwd {summary.forward_per.toFixed(1)}</span>}
+              </span>
+            )}
+            {summary.pbr != null && (
+              <span style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>PBR {summary.pbr.toFixed(2)}</span>
+            )}
+          </div>
         </div>
         <button onClick={onClose} className="btn" style={{ flexShrink: 0 }}>닫기</button>
       </div>
@@ -423,8 +458,9 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 14 }}>
         {[
           { key: 'summary', label: '📊 요약' },
-          { key: 'technical', label: '📈 기술적 분석' },
+          { key: 'analysis', label: '📈 지표' },
           { key: 'report', label: '📝 심층분석' },
+          { key: 'history', label: '📅 히스토리' },
         ].map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)} className={`tab-btn${tab === key ? ' active' : ''}`} style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}>
             {label}
@@ -434,20 +470,66 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
 
       <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
         {tab === 'summary' && (
-          <DetailSummaryTab summary={summary} ticker={ticker} onRefreshSuccess={() => {}} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <InsightsSection insights={summary.insights} />
+            <ConsensusSummary summary={summary} ticker={ticker} onRefreshSuccess={() => {}} />
+            <VolumeRsiSnapshot summary={summary} />
+          </div>
         )}
-        {tab === 'technical' && (
-          summary.daily_rsi
-            ? <RsiTable
-                dailyRsi={summary.daily_rsi}
-                weeklyRsi={summary.weekly_rsi}
-                monthlyRsi={summary.monthly_rsi}
-                price={summary.price}
-                vp={summary.volume_profile}
-                target={summary.target_mean}
-                market={market}
-              />
-            : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술적 분석 데이터가 없습니다.</p>
+        {tab === 'analysis' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) */}
+            <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-start' }}>
+              {[
+                { key: 'consensus', label: '컨센서스' },
+                { key: 'financials', label: '재무·수주' },
+                { key: 'technical', label: '기술·수급' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setAnalysisSubTab(key)}
+                  style={{
+                    padding: '5px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
+                    background: analysisSubTab === key ? 'var(--accent-soft)' : 'transparent',
+                    color: analysisSubTab === key ? 'var(--accent)' : 'var(--text-3)',
+                    border: `1px solid ${analysisSubTab === key ? 'var(--accent)' : 'var(--border)'}`,
+                    fontWeight: analysisSubTab === key ? 600 : 400,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {analysisSubTab === 'consensus' && (
+              <ConsensusChart ticker={ticker} market={market} />
+            )}
+            {analysisSubTab === 'financials' && (
+              <>
+                <FinancialsChart financials={summary.financials} financialsAnnual={summary.financials_annual} market={market} />
+                <BacklogSection ticker={ticker} market={market} />
+              </>
+            )}
+            {analysisSubTab === 'technical' && (
+              (summary.daily_rsi || market === 'KR')
+                ? (
+                  <>
+                    {summary.daily_rsi && (
+                      <RsiTable
+                        dailyRsi={summary.daily_rsi}
+                        weeklyRsi={summary.weekly_rsi}
+                        monthlyRsi={summary.monthly_rsi}
+                        price={summary.price}
+                        vp={summary.volume_profile}
+                        target={summary.target_mean}
+                        market={market}
+                      />
+                    )}
+                    {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
+                  </>
+                )
+                : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술·수급 데이터가 없습니다.</p>
+            )}
+          </div>
         )}
         {tab === 'report' && (
           <div style={{ padding: '0 4px' }}>
@@ -457,15 +539,21 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
                 AI 분석 업데이트: {new Date(enriched_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
               </div>
             )}
+            {!enriched_at && (
+              <div style={{ marginBottom: 14, fontSize: 11, color: '#ffb74d', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>⚠</span> AI 분석 미업데이트 (enrich API 미실행)
+              </div>
+            )}
             <ReportSectionCompetitors competitors={summary.competitors_data} market={market} ticker={ticker} />
-            <RisksSection risks={summary.risks} />
             <MoatSection moat={summary.moat} />
             <GrowthPlanSection growth_plan={summary.growth_plan} />
+            <RisksSection risks={summary.risks} />
             <RecentDisclosuresSection disclosures={summary.recent_disclosures} news={summary.news} />
-            <InsightsSection insights={summary.insights} />
           </div>
         )}
-        {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
+        {tab === 'history' && (
+          <HistoryTab ticker={ticker} dates={[]} market={market} />
+        )}
       </div>
     </div>
   )
