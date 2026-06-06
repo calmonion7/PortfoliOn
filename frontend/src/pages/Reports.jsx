@@ -452,9 +452,11 @@ export default function Reports() {
     )
   }
 
-  // ETF는 보여줄 수 있는 데이터만: 심층분석 탭·컨센서스/재무 서브탭 숨김(기술·수급만)
+  // ETF는 보여줄 수 있는 데이터만: 요약·심층분석 탭과 컨센서스/재무 서브탭 숨김(지표 기술·수급 + 히스토리만)
+  // 요약은 지표 기술·수급(RsiTable)과 중복(둘 다 PriceLevelChart)이라 ETF에선 제거
   const isEtf = !!detail.summary?.is_etf
   const analysisSub = isEtf ? 'technical' : analysisSubTab
+  const detailTab = isEtf && activeDetailTab === 'summary' ? 'analysis' : activeDetailTab
 
   return (
     <div className="reports-layout" data-view={view}>
@@ -616,11 +618,11 @@ export default function Reports() {
                 { key: 'analysis', label: '📈 지표' },
                 { key: 'report', label: '📝 심층분석' },
                 { key: 'history', label: '📅 히스토리' },
-              ].filter(({ key }) => !(isEtf && key === 'report')).map(({ key, label }) => (
+              ].filter(({ key }) => !(isEtf && (key === 'report' || key === 'summary'))).map(({ key, label }) => (
                 <button
                   key={key}
                   onClick={() => { setActiveDetailTab(key); trackEvent('report_tab_switch', { tab: key }) }}
-                  className={`tab-btn${activeDetailTab === key ? ' active' : ''}`}
+                  className={`tab-btn${detailTab === key ? ' active' : ''}`}
                   style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}
                 >
                   {label}
@@ -629,27 +631,25 @@ export default function Reports() {
             </div>
 
             {loading && <LoadingSpinner />}
-            {!loading && activeDetailTab === 'summary' && (
+            {!loading && detailTab === 'summary' && (
               detail.summary
                 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <InsightsSection insights={detail.summary.insights} />
-                    {!isEtf && (
-                      <ConsensusSummary
-                        summary={detail.summary}
-                        ticker={selected.ticker}
-                        onRefreshSuccess={(patched) => {
-                          setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
-                          fetchList()
-                        }}
-                      />
-                    )}
+                    <ConsensusSummary
+                      summary={detail.summary}
+                      ticker={selected.ticker}
+                      onRefreshSuccess={(patched) => {
+                        setDetail(prev => ({ ...prev, summary: { ...prev.summary, ...patched } }))
+                        fetchList()
+                      }}
+                    />
                     <VolumeRsiSnapshot summary={detail.summary} />
                   </div>
                 )
                 : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>요약 데이터가 없습니다.</p>
             )}
-            {!loading && activeDetailTab === 'analysis' && (
+            {!loading && detailTab === 'analysis' && (
               detail.summary
                 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -714,7 +714,7 @@ export default function Reports() {
                 )
                 : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>지표 데이터가 없습니다.</p>
             )}
-            {!loading && activeDetailTab === 'report' && (
+            {!loading && detailTab === 'report' && (
               detail.summary
                 ? (
                   <div style={{ padding: '0 4px' }}>
@@ -745,7 +745,7 @@ export default function Reports() {
                 )
                 : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>심층분석 데이터가 없습니다.</p>
             )}
-            {!loading && activeDetailTab === 'history' && (
+            {!loading && detailTab === 'history' && (
               <HistoryTab
                 ticker={selected.ticker}
                 dates={reportList[selected.ticker]?.dates ?? []}
