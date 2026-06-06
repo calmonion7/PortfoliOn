@@ -169,4 +169,25 @@ def get_volume_profile(df: pd.DataFrame, bins: int = 50) -> dict:
             if 0 < bin_volumes[i] <= threshold and lo < bin_centers[i] < hi
         ])
 
-    return {"poc": poc, "vah": vah, "val": val, "hvn": hvn, "lvn": lvn}
+    # 눌림대(지지): 현재가(마지막 종가) 아래 고거래량 노드 상위 2개(거래량 강도순, 비인접)
+    current = float(prices[-1])
+    support_zones: list[dict] = []
+    picked: list[int] = []
+    for idx in np.argsort(bin_volumes)[::-1]:
+        if len(picked) >= 2:
+            break
+        i = int(idx)
+        if bin_volumes[i] <= 0 or bin_centers[i] >= current:
+            continue
+        if any(abs(i - p) <= 1 for p in picked):
+            continue
+        picked.append(i)
+    for i in picked:
+        price = round(float(bin_centers[i]), 2)
+        support_zones.append({
+            "price": price,
+            "pct_below": round((current - price) / current * 100, 2),
+        })
+
+    return {"poc": poc, "vah": vah, "val": val, "hvn": hvn, "lvn": lvn,
+            "support_zones": support_zones}
