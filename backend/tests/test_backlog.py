@@ -88,6 +88,42 @@ def test_extract_backlog_blocks_caps_length():
     assert len(raw_text) <= 8000
 
 
+def test_extract_backlog_blocks_excludes_noise():
+    from services import backlog as svc
+
+    # 수주잔고(정탐) 블록 + 수주추진비(급여표)·수주산업전문가(감사표) 노이즈
+    html = (
+        "<P>2025년 12월 31일 현재, 회사의 건설계약 수주잔고는 "
+        "69,402,839백만원(전기말: 60,316,685백만원)입니다.</P>"
+        "<TABLE><TR><TD>수주추진비 등</TD><TD>118,558</TD></TR></TABLE>"
+        "<TABLE><TR><TD>건설계약 등수주산업전문가</TD><TD>12</TD></TR></TABLE>"
+    )
+    raw_text, unit = svc._extract_backlog_blocks(html)
+    assert "수주잔고는 69,402,839백만원" in raw_text
+    assert "수주추진비" not in raw_text
+    assert "수주산업전문가" not in raw_text
+    assert unit == "백만원"
+
+
+def test_extract_backlog_blocks_recognizes_keyword_variants():
+    from services import backlog as svc
+
+    for kw in ("수주총액", "수주잔량", "수주잔액"):
+        html = f"<p>당기말 {kw}은 1,234억원입니다.</p>"
+        raw_text, unit = svc._extract_backlog_blocks(html)
+        assert kw in raw_text
+        assert unit == "억원"
+
+
+def test_extract_backlog_blocks_bare_susu_excluded():
+    from services import backlog as svc
+
+    # 정탐 키워드 없이 "수주"만(수주계약/수주산업/수주현황) → 추출 안 함
+    html = "<p>수주계약 현황 및 수주산업 관련 일반 서술입니다.</p>"
+    raw_text, _ = svc._extract_backlog_blocks(html)
+    assert raw_text == ""
+
+
 # ── _quarter_from_report (괄호 (YYYY.MM) 우선, 명칭 휴리스틱 폴백) ──
 
 def test_quarter_from_report_bracket_parsing():

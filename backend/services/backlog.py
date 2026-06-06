@@ -15,15 +15,20 @@ import logging
 import os
 import re
 import time
+import warnings
 import zipfile
 from datetime import datetime, timedelta
 from typing import Optional
 from xml.etree import ElementTree as ET
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 from services.db import execute, query
+
+# document.xml 원문은 XML이지만 html.parser로 파싱하므로(lxml 로컬 미설치) 경고가
+# 배치 로그를 오염시킨다. 파싱은 정상 동작하므로 경고만 억제한다.
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -165,17 +170,20 @@ def _quarter_from_report(report_nm: str, rcept_dt: str) -> Optional[str]:
 
 _DEFAULT_UNIT = "억원"
 _UNIT_KEYWORDS = ("백만원", "조원", "억원")
+# 백로그 지표 정탐 키워드. 바 "수주" 매칭은 수주추진비(비용)·수주산업전문가(감사)·
+# 수주계약/수주현황 등 노이즈까지 잡으므로, 실제 잔고/총액 용어로만 좁힌다.
+_BACKLOG_KEYWORDS = ("수주잔고", "수주총액", "수주잔량", "수주잔액")
 _RAW_TEXT_CAP = 8000
 
 
 def _extract_backlog_blocks(html: str) -> tuple[str, str]:
-    """원문 HTML에서 "수주" 포함 표/문단을 추출해 (raw_text, unit) 반환.
+    """원문 HTML에서 수주잔고 지표 표/문단을 추출해 (raw_text, unit) 반환.
 
-    BeautifulSoup(html.parser)으로 "수주"가 들어간 <table>·<p> 블록만 골라 태그를
-    제거하고 공백을 정규화·중복 제거한 뒤 총 길이를 ~8000자로 캡한다.
-    블록 내 단위 키워드(백만원/억원/조원)를 감지해 함께 반환하며, 감지
-    실패 시 기본값('억원')을 쓴다. "수주"가 없으면 ('', 기본단위)를 반환해
-    저장하지 않음을 알린다."""
+    BeautifulSoup(html.parser)으로 정탐 키워드(수주잔고/수주총액/수주잔량/수주잔액)가
+    들어간 <table>·<p> 블록만 골라 태그를 제거하고 공백을 정규화·중복 제거한 뒤
+    총 길이를 ~8000자로 캡한다. 블록 내 단위 키워드(백만원/억원/조원)를 감지해
+    함께 반환하며, 감지 실패 시 기본값('억원')을 쓴다. 정탐 키워드가 없으면
+    ('', 기본단위)를 반환해 저장하지 않음을 알린다."""
     if not html:
         return "", _DEFAULT_UNIT
     soup = BeautifulSoup(html, "html.parser")
@@ -183,7 +191,7 @@ def _extract_backlog_blocks(html: str) -> tuple[str, str]:
     seen: set[str] = set()
     for el in soup.find_all(["table", "p"]):
         text = re.sub(r"\s+", " ", el.get_text(separator=" ", strip=True)).strip()
-        if not text or "수주" not in text:
+        if not text or not any(kw in text for kw in _BACKLOG_KEYWORDS):
             continue
         if text in seen:
             continue
