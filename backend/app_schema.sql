@@ -227,3 +227,15 @@ CREATE TABLE IF NOT EXISTS market_investor_trend (
     PRIMARY KEY (ticker, base_date)
 );
 CREATE INDEX IF NOT EXISTS idx_investor_trend_read ON market_investor_trend(ticker, base_date DESC);
+
+-- 배치 실행로그 (job_id별 최근 20건만 보관)
+CREATE TABLE IF NOT EXISTS job_runs (
+    id          BIGSERIAL PRIMARY KEY,
+    job_id      TEXT NOT NULL,                 -- daily_report | guru_crawl | ...
+    trigger     TEXT NOT NULL,                 -- auto | manual
+    status      TEXT NOT NULL,                 -- running | success | failed
+    started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ,
+    error       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_job_runs_read ON job_runs(job_id, started_at DESC);
