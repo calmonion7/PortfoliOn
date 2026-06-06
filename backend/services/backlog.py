@@ -3,11 +3,10 @@ DART 수주잔고(Order Backlog) 수집 서비스.
 
 흐름:
 1. corpCode.xml → {stock_code: corp_code} 매핑 (메모리 캐시, 1주일)
-2. list.json → 최근 4개 사업/반기/분기보고서 rcept_no
-3. index.json → "수주" 포함 섹션 찾기
-4. 섹션 HTML → BeautifulSoup 테이블 파싱
-5. 파싱 실패 시 → source='pending', raw_text DB 저장 (Claude Cowork 방식)
-6. backlog_history 테이블에 upsert
+2. list.json → 최근 사업/반기/분기보고서 rcept_no
+3. document.xml(ZIP) → 전 멤버 디코드·결합 원문 텍스트
+4. "수주" 포함 표/문단 추출 → source='pending', raw_text DB 저장 (Claude Cowork 방식)
+5. backlog_history 테이블에 upsert (수치는 Cowork가 채움)
 """
 from __future__ import annotations
 
@@ -98,51 +97,58 @@ def _get_recent_reports(corp_code: str) -> list[dict]:
         return []
 
 
-def _get_report_index(rcept_no: str) -> list[dict]:
-    """보고서 섹션 목록."""
+def _get_document_text(rcept_no: str) -> str:
+    """document.xml(ZIP)을 받아 전 멤버를 디코드·결합한 원문 텍스트 반환.
+
+    DART /api/document.xml은 ZIP을 반환하며 내부에 메인+서브 문서 XML 멤버가
+    여러 개 들어 있다. "수주" 텍스트가 서브문서에 있을 수 있으므로 전 멤버를
+    디코드(UTF-8, 실패 시 euc-kr→cp949 폴백)해 결합한다. 비-ZIP/HTTP실패/예외
+    시 빈 문자열을 반환한다(graceful)."""
     try:
         resp = requests.get(
-            f"{_DART_BASE}/index.json",
+            f"{_DART_BASE}/document.xml",
             params={"crtfc_key": _dart_key(), "rcept_no": rcept_no},
-            timeout=15,
-        )
-        data = resp.json()
-        if data.get("status") != "000":
-            return []
-        return data.get("list", [])
-    except Exception as e:
-        logger.warning(f"[Backlog] index.json 조회 실패 (rcept_no={rcept_no}): {e}")
-        return []
-
-
-def _get_section_html(rcept_no: str, dcm_no: str, ele_id: str) -> str:
-    """섹션 HTML 다운로드."""
-    try:
-        resp = requests.get(
-            f"{_DART_BASE}/document.json",
-            params={
-                "crtfc_key": _dart_key(),
-                "rcept_no": rcept_no,
-                "dcm_no": dcm_no,
-                "ele_id": ele_id,
-                "offset": 0,
-                "length": 50000,
-                "traverse": "Y",
-            },
             timeout=20,
         )
-        data = resp.json()
-        if data.get("status") != "000":
+        if getattr(resp, "status_code", 200) != 200:
             return ""
-        return data.get("text") or ""
+        content = resp.content
+        if not content or content[:2] != b"PK":
+            return ""
+        parts: list[str] = []
+        with zipfile.ZipFile(io.BytesIO(content)) as zf:
+            for name in zf.namelist():
+                raw = zf.read(name)
+                text = ""
+                for enc in ("utf-8", "euc-kr", "cp949"):
+                    try:
+                        text = raw.decode(enc)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                if not text:
+                    text = raw.decode("utf-8", errors="ignore")
+                parts.append(text)
+        return "\n".join(parts)
     except Exception as e:
-        logger.warning(f"[Backlog] document.json 조회 실패: {e}")
+        logger.warning(f"[Backlog] document.xml 조회 실패 (rcept_no={rcept_no}): {e}")
         return ""
 
 
+_MONTH_TO_QUARTER = {"03": "Q1", "06": "Q2", "09": "Q3", "12": "Q4"}
+
+
 def _quarter_from_report(report_nm: str, rcept_dt: str) -> Optional[str]:
-    """보고서명/접수일로부터 분기 문자열 추정. e.g. '2024Q1'"""
+    """보고서명/접수일로부터 분기 문자열 추정. e.g. '2024Q1'
+
+    보고서명의 (YYYY.MM) 괄호를 우선 파싱(연도=괄호값). 괄호가 없거나
+    월이 03/06/09/12가 아니면 명칭 휴리스틱으로 폴백."""
     nm = report_nm or ""
+    m = re.search(r"\((\d{4})\.(\d{2})\)", nm)
+    if m:
+        q = _MONTH_TO_QUARTER.get(m.group(2))
+        if q:
+            return f"{m.group(1)}{q}"
     year = rcept_dt[:4] if rcept_dt else ""
     if not year:
         return None
@@ -157,39 +163,41 @@ def _quarter_from_report(report_nm: str, rcept_dt: str) -> Optional[str]:
     return None
 
 
-def _parse_amount_from_text(text: str) -> Optional[float]:
-    """텍스트에서 억원 단위 금액 추출."""
-    # 숫자(콤마 포함) 패턴
-    nums = re.findall(r"[\d,]+(?:\.\d+)?", text.replace(" ", ""))
-    if not nums:
-        return None
-    # 가장 큰 수치 선택 (수주잔고는 보통 큰 숫자)
-    candidates = []
-    for n in nums:
-        try:
-            candidates.append(float(n.replace(",", "")))
-        except ValueError:
-            pass
-    return max(candidates) if candidates else None
+_DEFAULT_UNIT = "억원"
+_UNIT_KEYWORDS = ("백만원", "조원", "억원")
+_RAW_TEXT_CAP = 8000
 
 
-def _parse_backlog_from_html(html: str, quarter: str) -> Optional[dict]:
-    """BeautifulSoup으로 수주잔고 파싱. 성공 시 {quarter, amount, raw_text} 반환."""
+def _extract_backlog_blocks(html: str) -> tuple[str, str]:
+    """원문 HTML에서 "수주" 포함 표/문단을 추출해 (raw_text, unit) 반환.
+
+    BeautifulSoup(html.parser)으로 "수주"가 들어간 <table>·<p> 블록만 골라 태그를
+    제거하고 공백을 정규화·중복 제거한 뒤 총 길이를 ~8000자로 캡한다.
+    블록 내 단위 키워드(백만원/억원/조원)를 감지해 함께 반환하며, 감지
+    실패 시 기본값('억원')을 쓴다. "수주"가 없으면 ('', 기본단위)를 반환해
+    저장하지 않음을 알린다."""
     if not html:
-        return None
-    soup = BeautifulSoup(html, "lxml")
-    for table in soup.find_all("table"):
-        rows = table.find_all("tr")
-        for row in rows:
-            cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
-            row_text = " ".join(cells)
-            if "수주잔고" in row_text or "수주 잔고" in row_text:
-                # 같은 행에서 숫자 추출
-                for cell in cells:
-                    amt = _parse_amount_from_text(cell)
-                    if amt and amt > 0:
-                        return {"quarter": quarter, "amount": amt, "raw_text": row_text[:500]}
-    return None
+        return "", _DEFAULT_UNIT
+    soup = BeautifulSoup(html, "html.parser")
+    blocks: list[str] = []
+    seen: set[str] = set()
+    for el in soup.find_all(["table", "p"]):
+        text = re.sub(r"\s+", " ", el.get_text(separator=" ", strip=True)).strip()
+        if not text or "수주" not in text:
+            continue
+        if text in seen:
+            continue
+        seen.add(text)
+        blocks.append(text)
+    raw_text = "\n".join(blocks)[:_RAW_TEXT_CAP]
+    if not raw_text:
+        return "", _DEFAULT_UNIT
+    unit = _DEFAULT_UNIT
+    for kw in _UNIT_KEYWORDS:
+        if kw in raw_text:
+            unit = kw
+            break
+    return raw_text, unit
 
 
 def _upsert(ticker: str, entries: list[dict]):
@@ -247,17 +255,17 @@ def save_llm_backlog(ticker: str, entries: list[dict]):
 
 
 def fetch_and_save_backlog(ticker: str) -> list[dict]:
-    """DART에서 파싱해서 DB 저장 후 반환."""
+    """DART document.xml 원문에서 "수주" 블록을 추출해 pending으로 적재 후 반환.
+
+    최근 정기보고서(최대 8개 distinct quarter)를 순회하며 document.xml 원문을
+    받아 "수주" 블록이 있으면 source='pending'·amount=None·raw_text로 저장하고
+    없으면 skip한다. 수치는 Claude Cowork(PUT /report/{ticker}/backlog)가 채운다."""
     corp_code = _get_corp_code(ticker)
     if not corp_code:
         logger.info(f"[Backlog] corp_code 없음: {ticker}")
-        return []
+        return get_backlog(ticker)
 
     reports = _get_recent_reports(corp_code)
-    if not reports:
-        return []
-
-    saved: list[dict] = []
     seen_quarters: set[str] = set()
 
     for report in reports:
@@ -268,35 +276,17 @@ def fetch_and_save_backlog(ticker: str) -> list[dict]:
         if not quarter or quarter in seen_quarters:
             continue
 
-        sections = _get_report_index(rcept_no)
-        # "수주" 포함 섹션 탐색
-        target_sections = [s for s in sections if "수주" in (s.get("section_nm") or "")]
-        if not target_sections:
-            continue
-
-        for sec in target_sections:
-            dcm_no = sec.get("dcm_no", "")
-            ele_id = sec.get("ele_id", "0")
-            html = _get_section_html(rcept_no, dcm_no, ele_id)
-            if not html:
-                continue
-
-            # 1차: BeautifulSoup 파싱
-            parsed = _parse_backlog_from_html(html, quarter)
-            if parsed:
-                entry = {**parsed, "source": "dart"}
-                _upsert(ticker, [entry])
-                seen_quarters.add(quarter)
-                saved.append(entry)
-                break
-
-            # 파싱 실패 시: raw_text 저장 후 Claude Cowork 분석 대기
-            soup = BeautifulSoup(html, "lxml")
-            raw_text = soup.get_text(separator="\n", strip=True)[:8000]
-            pending_entry = {"quarter": quarter, "amount": None, "source": "pending", "raw_text": raw_text}
-            _upsert(ticker, [pending_entry])
+        text = _get_document_text(rcept_no)
+        raw_text, unit = _extract_backlog_blocks(text)
+        if raw_text:
+            _upsert(ticker, [{
+                "quarter": quarter,
+                "amount": None,
+                "unit": unit,
+                "source": "pending",
+                "raw_text": raw_text,
+            }])
             seen_quarters.add(quarter)
-            break
 
         # DART API 레이트 리밋 방지
         time.sleep(0.3)
