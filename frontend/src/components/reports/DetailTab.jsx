@@ -137,10 +137,10 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               return (
                 <svg key={i} style={{ position: 'absolute', left: 0, top: y, width: 80, height: GAP_H, zIndex: 5 }}>
                   {/* 바 컬럼(x=25~55) 바깥만 마스킹 */}
-                  <rect x="0" y="0" width="25" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
-                  <rect x="55" y="0" width="25" height={GAP_H} style={{ fill: 'var(--bg-elev)' }} />
+                  <rect x="0" y="0" width="25" height={GAP_H} style={{ fill: 'var(--bg)' }} />
+                  <rect x="55" y="0" width="25" height={GAP_H} style={{ fill: 'var(--bg)' }} />
                   {/* 중간 끊김 구간 바 컬럼도 마스킹 */}
-                  <rect x="25" y="7" width="30" height={GAP_H - 14} style={{ fill: 'var(--bg-elev)' }} />
+                  <rect x="25" y="7" width="30" height={GAP_H - 14} style={{ fill: 'var(--bg)' }} />
                   {/* 위 물결 */}
                   <polyline
                     points="23,9 28,7 40,9 52,7 57,9"
@@ -327,12 +327,12 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
-        <div style={{ flex: '0 1 380px', minWidth: 0 }}>
+        <div style={{ flex: '0 1 406px', minWidth: 0, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', padding: 12 }}>
           {/* 우측 카드 헤더(지지/저항 구간) 높이만큼 상단 여백 — 두 차트 상단 정렬 */}
           <div aria-hidden style={{ fontSize: 9, fontWeight: 600, marginBottom: 4, visibility: 'hidden' }}>여백</div>
           {barListJSX}
         </div>
-        <div style={{ flex: '0 1 440px', minWidth: 0 }}>{srCardsJSX}</div>
+        <div style={{ flex: '0 1 466px', minWidth: 0, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', padding: 12 }}>{srCardsJSX}</div>
       </div>
     </div>
   )
