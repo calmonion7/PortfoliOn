@@ -471,7 +471,7 @@ def get_schedule():
 
 
 @router.put("/schedule")
-def update_schedule(schedule: dict):
+def update_schedule(schedule: dict, user_id: str = Depends(require_admin)):
     required = {"enabled", "time", "days"}
     if not required.issubset(schedule.keys()):
         raise HTTPException(

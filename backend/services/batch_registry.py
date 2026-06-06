@@ -48,7 +48,7 @@ BATCHES = [
         "usage": ["Market Hub M7/KR Top2"],
         "editable": False,
         "trigger_kinds": ["auto", "manual"],
-        "manual_endpoint": "/api/market-indicators/refresh-earnings",
+        "manual_endpoint": "/api/market/refresh-earnings",
         "scheduler_job_id": "earnings_refresh",
     },
     {
@@ -59,7 +59,7 @@ BATCHES = [
         "usage": ["Market Hub 경제지표", "KR 수출"],
         "editable": False,
         "trigger_kinds": ["auto", "manual"],
-        "manual_endpoint": "/api/market-indicators/refresh-monthly",
+        "manual_endpoint": "/api/market/refresh-monthly",
         "scheduler_job_id": "monthly_refresh",
     },
     {

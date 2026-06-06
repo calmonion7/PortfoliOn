@@ -15,6 +15,7 @@ from services.market_indicators import (
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
+    _fetch_and_save_kr_exports,
     _mc_delete,
     _cache,
 )
@@ -87,7 +88,7 @@ def econ_indicators():
 
 
 @router.post("/refresh-earnings")
-def refresh_earnings():
+def refresh_earnings(_: str = Depends(require_admin)):
     try:
         with job_runs.record("earnings_refresh", "manual"):
             m7 = _fetch_and_save_m7_earnings()
@@ -98,11 +99,23 @@ def refresh_earnings():
 
 
 @router.post("/refresh-econ")
-def refresh_econ():
+def refresh_econ(_: str = Depends(require_admin)):
     try:
         with job_runs.record("monthly_refresh", "manual"):
             data = _fetch_and_save_econ_indicators()
         return {"ok": True, "cpi_points": len(data.get("cpi", [])), "unemp_points": len(data.get("unemployment", []))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-monthly")
+def refresh_monthly(_: str = Depends(require_admin)):
+    """월간 지표 갱신: 경제지표 + KR 수출 (스케줄러 _refresh_monthly와 동일)."""
+    try:
+        with job_runs.record("monthly_refresh", "manual"):
+            econ = _fetch_and_save_econ_indicators()
+            _fetch_and_save_kr_exports()
+        return {"ok": True, "cpi_points": len(econ.get("cpi", [])), "unemp_points": len(econ.get("unemployment", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

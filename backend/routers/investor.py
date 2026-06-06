@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query
-from services import investor_service
+from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
+from services import investor_service, job_runs
+from auth import require_admin
+import scheduler
 
 router = APIRouter(prefix="/api", tags=["investor"])
 
@@ -53,6 +55,16 @@ def investor_screening(
     items = [_serialize_screening(r) for r in rows]
     latest_date = max((it["base_date"] for it in items if it["base_date"]), default=None)
     return {"items": items, "latest_date": latest_date}
+
+
+@router.post("/investor/refresh", status_code=202)
+def refresh_investor(background_tasks: BackgroundTasks, _: str = Depends(require_admin)):
+    """KR 랭킹 종목 수급 추이 갱신 (스케줄러 _fetch_investor_trend 로직)."""
+    def _run():
+        with job_runs.record("investor_trend_fetch", "manual"):
+            scheduler._investor_trend_work()
+    background_tasks.add_task(_run)
+    return {"ok": True}
 
 
 @router.get("/stocks/{ticker}/investor-trend")

@@ -156,6 +156,11 @@ def _fetch_us_rankings():
 
 
 def _fetch_investor_trend():
+    with job_runs.record("investor_trend_fetch", "auto"):
+        _investor_trend_work()
+
+
+def _investor_trend_work():
     """KR 랭킹 종목 일일 수급 배치: 전진 적립 + 종목당 1청크 후진 백필.
 
     전진: 최신 /trend → upsert (빈 테이블이면 ~10일 시드).
@@ -166,41 +171,40 @@ def _fetch_investor_trend():
     from services import investor_service as svc
     from services.db import query as db_query
 
-    with job_runs.record("investor_trend_fetch", "auto"):
+    try:
+        tickers = [r["ticker"] for r in db_query(
+            "SELECT DISTINCT ticker FROM market_rankings WHERE market = 'KR'")]
+    except Exception as e:
+        print(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
+        return
+
+    backfill_floor = date.today() - timedelta(days=365)
+
+    def _fetch_one(ticker):
+        # 전진
         try:
-            tickers = [r["ticker"] for r in db_query(
-                "SELECT DISTINCT ticker FROM market_rankings WHERE market = 'KR'")]
+            svc.upsert_trend(ticker, svc.fetch_trend(ticker))
         except Exception as e:
-            print(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
-            return
+            print(f"[Scheduler] Investor trend forward failed for {ticker}: {e}")
+        # 후진 (1청크) — oldest가 1년 캡 이내일 때만
+        try:
+            oldest = svc.oldest_date(ticker)
+            if oldest is not None and oldest > backfill_floor:
+                older = svc.fetch_trend(ticker, bizdate=oldest.strftime("%Y%m%d"))
+                if older:
+                    svc.upsert_trend(ticker, older)
+        except Exception as e:
+            print(f"[Scheduler] Investor trend backfill failed for {ticker}: {e}")
 
-        backfill_floor = date.today() - timedelta(days=365)
-
-        def _fetch_one(ticker):
-            # 전진
-            try:
-                svc.upsert_trend(ticker, svc.fetch_trend(ticker))
-            except Exception as e:
-                print(f"[Scheduler] Investor trend forward failed for {ticker}: {e}")
-            # 후진 (1청크) — oldest가 1년 캡 이내일 때만
-            try:
-                oldest = svc.oldest_date(ticker)
-                if oldest is not None and oldest > backfill_floor:
-                    older = svc.fetch_trend(ticker, bizdate=oldest.strftime("%Y%m%d"))
-                    if older:
-                        svc.upsert_trend(ticker, older)
-            except Exception as e:
-                print(f"[Scheduler] Investor trend backfill failed for {ticker}: {e}")
-
-        if not tickers:
-            print("[Scheduler] Investor trend: no KR tickers")
-            return
-        # max_workers ≤ 8: 워커가 DB 풀(maxconn=10)에서 커넥션을 점유하므로 풀 초과(PoolError) 방지
-        with ThreadPoolExecutor(max_workers=max(1, min(len(tickers), 8))) as executor:
-            futures = [executor.submit(_fetch_one, t) for t in tickers]
-            for future in as_completed(futures):
-                future.result()
-        print(f"[Scheduler] Investor trend fetched for {len(tickers)} KR tickers")
+    if not tickers:
+        print("[Scheduler] Investor trend: no KR tickers")
+        return
+    # max_workers ≤ 8: 워커가 DB 풀(maxconn=10)에서 커넥션을 점유하므로 풀 초과(PoolError) 방지
+    with ThreadPoolExecutor(max_workers=max(1, min(len(tickers), 8))) as executor:
+        futures = [executor.submit(_fetch_one, t) for t in tickers]
+        for future in as_completed(futures):
+            future.result()
+    print(f"[Scheduler] Investor trend fetched for {len(tickers)} KR tickers")
 
 
 def _seed_rankings_if_empty():

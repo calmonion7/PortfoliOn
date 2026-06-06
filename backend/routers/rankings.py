@@ -1,11 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query
-from services import ranking_service
+from fastapi import APIRouter, HTTPException, Query, Depends
+from services import ranking_service, job_runs
+from auth import require_admin
 
 router = APIRouter(prefix="/api", tags=["rankings"])
 
 _MARKETS = {"KR", "US"}
 _METRICS = {"value", "volume"}
 _TYPES = {"all", "stock", "etf"}
+_REFRESH_JOB = {"KR": "kr_rankings_fetch", "US": "us_rankings_fetch"}
 
 
 def _to_float(val):
@@ -30,6 +32,16 @@ def _serialize(row: dict) -> dict:
         "is_etf": row["is_etf"],
         "exchange": row["exchange"],
     }
+
+
+@router.post("/rankings/refresh")
+def refresh_rankings(market: str = Query("KR"), _: str = Depends(require_admin)):
+    if market not in _MARKETS:
+        raise HTTPException(status_code=400, detail="market must be KR or US")
+    fetch = ranking_service.get_kr_rankings if market == "KR" else ranking_service.get_us_rankings
+    with job_runs.record(_REFRESH_JOB[market], "manual"):
+        ranking_service.replace_market_rankings(market, fetch())
+    return {"ok": True, "market": market}
 
 
 @router.get("/rankings")

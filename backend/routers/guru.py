@@ -73,7 +73,7 @@ def get_schedule():
 
 
 @router.put("/schedule")
-def update_schedule(schedule: dict):
+def update_schedule(schedule: dict, _: str = Depends(require_admin)):
     missing = {"enabled", "day", "time"} - schedule.keys()
     if missing:
         raise HTTPException(status_code=400, detail=f"Missing fields: {missing}")
