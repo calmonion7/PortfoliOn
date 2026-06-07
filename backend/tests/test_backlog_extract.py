@@ -115,3 +115,42 @@ def test_auto_backlog_picks_susu_table_with_caption():
     # 다중엔티티 문서 → None
     han = (FIX / "012450.html").read_text().split("-->", 1)[1]
     assert svc._auto_backlog(f"<p>(단위 : 백만원)</p>{han}") is None
+
+
+# ── 회귀: UAT가 잡아낸 오저장 (외화 USD천·회사컬럼 다중엔티티) ──
+
+def _doc(tk, caption):
+    html = (FIX / f"{tk}.html").read_text().split("-->", 1)[1]
+    return f"<p>{caption}</p>{html}"
+
+
+def test_table_unit_foreign_or_missing_is_not_krw():
+    # 캡션은 있으나 KRW 통화 토큰 없음 → 비KRW(기타), 억원 폴백 금지(×100 오저장 방지)
+    from services import backlog as svc
+    for cap in ("(단위 : USD천)", "(단위 : 백만 달러)", "(단위 :", "(단위 : 천달러)"):
+        soup = BeautifulSoup(f"<p>{cap}</p><table><tr><td>x</td></tr></table>", "html.parser")
+        assert not svc._is_krw(svc._table_unit(soup.find("table"))), cap
+    # KRW는 정상 검출
+    soup = BeautifulSoup("<p>(단위 : 백만원)</p><table><tr><td>x</td></tr></table>", "html.parser")
+    assert svc._table_unit(soup.find("table")) == "백만원"
+
+
+def test_auto_backlog_none_foreign_usd_thousand():
+    # 454910: (단위 : USD천) → 외화 → None (1.35조 오저장 회귀 방지)
+    from services import backlog as svc
+    assert svc._auto_backlog(_doc("454910", "(단위 : USD천)")) is None
+
+
+def test_is_multi_entity_company_column():
+    # 한화 2024Q3: 종속회사 문구 없어도 '회사' 컬럼 → 다중엔티티
+    from services import backlog as svc
+    assert svc._is_multi_entity(_load("012450_2024q3")[0]) is True
+    assert svc._is_multi_entity(_load("010140")[0]) is False
+    assert svc._is_multi_entity(_load("329180")[0]) is False
+    assert svc._is_multi_entity(_load("034020")[0]) is False  # 발주처 ≠ 회사
+
+
+def test_auto_backlog_none_company_column_multi_entity():
+    # 한화 2024Q3 문서(회사컬럼 합계 68조) → None (검산 통과해도 다중엔티티)
+    from services import backlog as svc
+    assert svc._auto_backlog(_doc("012450_2024q3", "(단위 : 백만원)")) is None

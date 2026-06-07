@@ -291,21 +291,36 @@ def _classify_table(table) -> Optional[str]:
     return None
 
 
+def _is_multi_entity(table) -> bool:
+    """다중엔티티(지주사 연결) 수주상황 표인가.
+
+    신호: ① 헤더에 '회사' 컬럼(여러 법인을 행으로 나열) ② '종속회사'가 2개 이상
+    데이터행에 등장. 한화에어로형(연결 합계)을 모회사 기준 아님으로 보고 차단한다.
+    (2024년처럼 연결 전이라 종속회사 문구가 없어도 '회사' 컬럼으로 잡는다.)"""
+    grid = _expand_grid(table)
+    if not grid:
+        return False
+    hrs = _header_rows(grid)
+    ncol = max((len(r) for r in grid), default=0)
+    if any("회사" in _col_label(grid, hrs, c) for c in range(ncol)):
+        return True
+    ent = sum(1 for i in range(len(grid)) if i not in hrs and "종속회사" in " ".join(grid[i]))
+    return ent >= 2
+
+
 def _parse_susu_table(table, unit: str) -> Optional[float]:
     """수주상황 표에서 수주잔고를 추출·검산하고 억원으로 정규화. 실패 시 None.
 
-    가드: 외화(비KRW) / 다중엔티티(종속회사 2그룹+) / 빈셀 / 검산불일치(상대1%) / 모호(무합계 다중행).
+    가드: 외화(비KRW) / 다중엔티티(회사컬럼·종속회사) / 빈셀 / 검산불일치(상대1%) / 모호(무합계 다중행).
     """
     if not _is_krw(unit):
+        return None
+    if _is_multi_entity(table):
         return None
     grid = _expand_grid(table)
     if not grid:
         return None
     hrs = _header_rows(grid)
-    # 다중엔티티 가드: '종속회사'가 2개 이상 데이터행에 등장(한화형 연결 합계 차단)
-    ent = sum(1 for i in range(len(grid)) if i not in hrs and "종속회사" in " ".join(grid[i]))
-    if ent >= 2:
-        return None
     bcol = _find_col(grid, hrs, "기말수주잔고") or _find_col(grid, hrs, "수주잔고")
     if bcol is None:
         return None
@@ -344,24 +359,33 @@ def _reconcile(grid: list[list[str]], hrs: list[int], row: int, amount: float) -
 
 
 def _table_unit(table) -> str:
-    """표 직전의 '(단위 ... )' 캡션에서 금액 통화 단위만 추출(수량 단위 무시)."""
+    """표 직전의 '(단위 ... )' 캡션에서 KRW 통화 단위만 추출.
+
+    캡션이 있으나 KRW 토큰이 없으면(USD천·백만달러·줄바꿈 분리 등) '기타'(비KRW)를
+    반환해 자동추출을 막는다 — 'wrong < missing'. 수량 단위(천배럴/톤)는 무시한다."""
     node = table.find_previous(string=re.compile("단위"))
     if node:
-        m = re.search(r"단위[^)]*?(조원|억원|백만원|천원|달러|위안|엔|원)", str(node))
-        if m:
-            return m.group(1)
+        m = re.search(r"단위[^)]*?(조원|억원|백만원|천원|원)", str(node))
+        return m.group(1) if m else "기타"
     return _DEFAULT_UNIT
 
 
 def _auto_backlog(html: str) -> Optional[float]:
-    """문서에서 수주상황 표를 골라 수주잔고(억원)를 자동 추출. 실패 시 None."""
+    """문서에서 수주상황 표를 골라 수주잔고(억원)를 자동 추출. 실패 시 None.
+
+    문서 내 어떤 수주상황 표든 다중엔티티(회사컬럼·종속회사)면 그 문서 전체를
+    pending 처리한다 — 한화처럼 한 문서에 다중엔티티 합계표(68조)와 단일처럼 보이는
+    표가 공존해 엉뚱한 표가 채택되는 것을 막는다."""
     if not html:
         return None
     soup = BeautifulSoup(html, "html.parser")
-    for table in soup.find_all("table"):
-        if _classify_table(table) != "susu":
-            continue
-        amt = _parse_susu_table(table, _table_unit(table))
+    susu = [t for t in soup.find_all("table") if _classify_table(t) == "susu"]
+    if not susu:
+        return None
+    if any(_is_multi_entity(t) for t in susu):
+        return None
+    for t in susu:
+        amt = _parse_susu_table(t, _table_unit(t))
         if amt is not None:
             return amt
     return None
