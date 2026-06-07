@@ -54,7 +54,7 @@ export default function useReportList() {
   const watchlistCount = watchlistAll.length
   const _isUngenerated = ([, v]) => !lastScheduledDate
     ? (v.dates.length === 0 || v.summary?.price == null)
-    : !v.dates.map(String).includes(lastScheduledDate)
+    : (v.dates.length === 0 || String(v.dates[0]) < lastScheduledDate)
   const ungeneratedTickers = Object.entries(reportList).filter(_isUngenerated).map(([t]) => t)
   const ungeneratedCount = ungeneratedTickers.length
 

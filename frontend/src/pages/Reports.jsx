@@ -140,7 +140,7 @@ export default function Reports() {
 
   const renderFilters = () => (
     <>
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: (['watchlist', 'ungenerated', 'others'].includes(activeTab)) ? 0 : 12 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: activeTab === 'watchlist' ? 0 : 12 }}>
         <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유<span className="tab-cnt">{holdingsCount}</span></button>
         <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심<span className="tab-cnt">{watchlistCount}</span></button>
         {ungeneratedCount > 0 && (
@@ -181,7 +181,7 @@ export default function Reports() {
           onClick={() => generateBatch(ungeneratedTickers.filter(t => { const m = reportList[t]?.market; return marketFilter === 'ALL' || m === marketFilter }))}
           disabled={!!generating}
           style={{
-            width: '100%', marginBottom: 8, padding: '5px 0', fontSize: 12,
+            width: '100%', marginBottom: 10, padding: '5px 0', fontSize: 12,
             background: generating === '__batch__' ? 'var(--bg-elev)' : 'var(--accent)',
             color: generating === '__batch__' ? 'var(--accent)' : 'var(--bg)',
             border: '1px solid var(--accent)', borderRadius: 4, cursor: generating ? 'default' : 'pointer',
