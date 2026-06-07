@@ -175,37 +175,243 @@ _UNIT_KEYWORDS = ("백만원", "조원", "억원")
 _BACKLOG_KEYWORDS = ("수주잔고", "수주총액", "수주잔량", "수주잔액")
 _RAW_TEXT_CAP = 8000
 
+# 모든 금액을 억원으로 정규화(프론트 BacklogChart는 amount를 억원으로 가정).
+_EOK_FACTOR = {"조원": 10000.0, "억원": 1.0, "백만원": 0.01, "천원": 1e-5, "원": 1e-8}
+_TOTAL_ROW_RE = re.compile(r"합\s*계|총\s*계")
+_RECONCILE_TOL = 0.01  # 상대 1%
+
+
+def _num(s: str) -> Optional[float]:
+    """셀 텍스트 → 숫자. 콤마 제거, 괄호(123)는 음수, '-'/빈칸/비수치는 None."""
+    s = (s or "").strip()
+    if not s or s in ("-", "—", "–"):
+        return None
+    neg = s.startswith("(") and s.endswith(")")
+    s = s.strip("()").replace(",", "").replace(" ", "")
+    if not re.fullmatch(r"-?\d+(\.\d+)?", s):
+        return None
+    v = float(s)
+    return -v if neg else v
+
+
+def _is_krw(unit: Optional[str]) -> bool:
+    return unit in _EOK_FACTOR
+
+
+def _to_eok(v: float, unit: str) -> float:
+    """원 단위 금액을 억원으로 정규화."""
+    return v * _EOK_FACTOR.get(unit, 1.0)
+
+
+def _expand_grid(table) -> list[list[str]]:
+    """rowspan/colspan을 전개한 직사각 셀 그리드(텍스트). 2행 헤더 정렬에 필요."""
+    grid: dict[tuple[int, int], str] = {}
+    occ: set[tuple[int, int]] = set()
+    for r, tr in enumerate(table.find_all("tr")):
+        c = 0
+        for cell in tr.find_all(["td", "th"], recursive=False):
+            while (r, c) in occ:
+                c += 1
+            text = re.sub(r"\s+", " ", cell.get_text(" ", strip=True)).strip()
+            try:
+                cs = int(cell.get("colspan") or 1)
+                rs = int(cell.get("rowspan") or 1)
+            except ValueError:
+                cs = rs = 1
+            for dr in range(rs):
+                for dc in range(cs):
+                    grid[(r + dr, c + dc)] = text
+                    occ.add((r + dr, c + dc))
+            c += cs
+    if not grid:
+        return []
+    maxr = max(k[0] for k in grid)
+    maxc = max(k[1] for k in grid)
+    return [[grid.get((r, c), "") for c in range(maxc + 1)] for r in range(maxr + 1)]
+
+
+def _is_data_row(row: list[str]) -> bool:
+    return sum(1 for c in row if _num(c) is not None) >= 2
+
+
+def _header_rows(grid: list[list[str]]) -> list[int]:
+    """선두의 라벨-only 행들을 헤더로 본다(숫자 데이터 등장 직전까지)."""
+    hrs = []
+    for i, row in enumerate(grid):
+        if _is_data_row(row):
+            break
+        hrs.append(i)
+    return hrs or [0]
+
+
+def _col_label(grid: list[list[str]], hrs: list[int], c: int) -> str:
+    parts: list[str] = []
+    for r in hrs:
+        t = grid[r][c] if c < len(grid[r]) else ""
+        if t and (not parts or parts[-1] != t):
+            parts.append(t)
+    return " ".join(parts)
+
+
+def _find_col(grid: list[list[str]], hrs: list[int], *kw: str) -> Optional[int]:
+    """헤더 라벨이 kw를 모두 포함하는 컬럼(우측 우선, 금액 컬럼 우선)."""
+    ncol = max((len(r) for r in grid), default=0)
+    cands = [c for c in range(ncol) if all(k in _col_label(grid, hrs, c) for k in kw)]
+    if not cands:
+        return None
+    amt = [c for c in cands if "금액" in _col_label(grid, hrs, c)]
+    pool = amt or [c for c in cands if "수량" not in _col_label(grid, hrs, c)] or cands
+    return pool[-1]
+
+
+def _total_or_single_row(grid: list[list[str]], hrs: list[int]) -> Optional[int]:
+    """합계행 인덱스. 없으면 데이터행이 정확히 1개일 때 그 행, 아니면 None(모호)."""
+    data_rows = [i for i in range(len(grid)) if i not in hrs and _is_data_row(grid[i])]
+    for i in data_rows:
+        if _TOTAL_ROW_RE.search(" ".join(grid[i])):
+            return i
+    non_total = [i for i in data_rows if not _TOTAL_ROW_RE.search(" ".join(grid[i]))]
+    return non_total[0] if len(non_total) == 1 else None
+
+
+def _classify_table(table) -> Optional[str]:
+    """'susu'(수주상황: 기납품+수주잔고)·'progress'(공사진행: 수주총액+진행률)·None."""
+    grid = _expand_grid(table)
+    if not grid:
+        return None
+    hrs = _header_rows(grid)
+    if not any(i not in hrs and _is_data_row(grid[i]) for i in range(len(grid))):
+        return None  # 데이터행 없음(면책문구 등)
+    hdr = " ".join(grid[r][c] for r in hrs for c in range(len(grid[r])))
+    has_jango = ("수주잔고" in hdr) or ("기말수주잔고" in hdr)
+    if has_jango and "기납품" in hdr:
+        return "susu"
+    if "수주총액" in hdr and "진행률" in hdr:
+        return "progress"
+    return None
+
+
+def _parse_susu_table(table, unit: str) -> Optional[float]:
+    """수주상황 표에서 수주잔고를 추출·검산하고 억원으로 정규화. 실패 시 None.
+
+    가드: 외화(비KRW) / 다중엔티티(종속회사 2그룹+) / 빈셀 / 검산불일치(상대1%) / 모호(무합계 다중행).
+    """
+    if not _is_krw(unit):
+        return None
+    grid = _expand_grid(table)
+    if not grid:
+        return None
+    hrs = _header_rows(grid)
+    # 다중엔티티 가드: '종속회사'가 2개 이상 데이터행에 등장(한화형 연결 합계 차단)
+    ent = sum(1 for i in range(len(grid)) if i not in hrs and "종속회사" in " ".join(grid[i]))
+    if ent >= 2:
+        return None
+    bcol = _find_col(grid, hrs, "기말수주잔고") or _find_col(grid, hrs, "수주잔고")
+    if bcol is None:
+        return None
+    row = _total_or_single_row(grid, hrs)
+    if row is None:
+        return None
+    amount = _num(grid[row][bcol]) if bcol < len(grid[row]) else None
+    if amount is None:
+        return None
+    if not _reconcile(grid, hrs, row, amount):
+        return None
+    return _to_eok(amount, unit)
+
+
+def _reconcile(grid: list[list[str]], hrs: list[int], row: int, amount: float) -> bool:
+    """수주총액−기납품≈잔고(변종A) 또는 기초+신규−기납품≈기말(변종B), 상대 1%."""
+    def colval(*kw):
+        c = _find_col(grid, hrs, *kw)
+        if c is None or c >= len(grid[row]):
+            return None
+        return _num(grid[row][c])
+
+    total = colval("수주총액")
+    deliv = colval("기납품")
+    base = colval("기초수주잔")
+    delta = colval("신규")
+    expected = None
+    if total is not None and deliv is not None:
+        expected = total - abs(deliv)
+    elif base is not None and delta is not None and deliv is not None:
+        expected = base + delta - abs(deliv)
+    if expected is None:
+        return False
+    tol = _RECONCILE_TOL * max(abs(amount), abs(expected), 1.0)
+    return abs(expected - amount) <= tol
+
+
+def _table_unit(table) -> str:
+    """표 직전의 '(단위 ... )' 캡션에서 금액 통화 단위만 추출(수량 단위 무시)."""
+    node = table.find_previous(string=re.compile("단위"))
+    if node:
+        m = re.search(r"단위[^)]*?(조원|억원|백만원|천원|달러|위안|엔|원)", str(node))
+        if m:
+            return m.group(1)
+    return _DEFAULT_UNIT
+
+
+def _auto_backlog(html: str) -> Optional[float]:
+    """문서에서 수주상황 표를 골라 수주잔고(억원)를 자동 추출. 실패 시 None."""
+    if not html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    for table in soup.find_all("table"):
+        if _classify_table(table) != "susu":
+            continue
+        amt = _parse_susu_table(table, _table_unit(table))
+        if amt is not None:
+            return amt
+    return None
+
 
 def _extract_backlog_blocks(html: str) -> tuple[str, str]:
-    """원문 HTML에서 수주잔고 지표 표/문단을 추출해 (raw_text, unit) 반환.
+    """원문 HTML에서 수주 관련 블록을 추출해 (raw_text, unit) 반환.
 
-    BeautifulSoup(html.parser)으로 정탐 키워드(수주잔고/수주총액/수주잔량/수주잔액)가
-    들어간 <table>·<p> 블록만 골라 태그를 제거하고 공백을 정규화·중복 제거한 뒤
-    총 길이를 ~8000자로 캡한다. 블록 내 단위 키워드(백만원/억원/조원)를 감지해
-    함께 반환하며, 감지 실패 시 기본값('억원')을 쓴다. 정탐 키워드가 없으면
-    ('', 기본단위)를 반환해 저장하지 않음을 알린다."""
+    표(수주상황/공사진행)는 행=라인·셀 ' | ' 결합으로 **구조를 보존**하고(컬럼↔숫자
+    정렬 유지 → 다운스트림 자동추출이 헤더 매핑 가능), 정탐 키워드(수주잔고/수주총액/
+    수주잔량/수주잔액) 문단(<p>)도 함께 담는다. 면책문구('생략')는 제외한다(삼성전자형).
+    단위는 수주상황 표 캡션('(단위 ... )')을 우선하고, 없으면 텍스트에서 통화 키워드를
+    찾는다. 수주 블록이 없으면 ('', 기본단위)를 반환해 저장하지 않음을 알린다."""
     if not html:
         return "", _DEFAULT_UNIT
     soup = BeautifulSoup(html, "html.parser")
     blocks: list[str] = []
     seen: set[str] = set()
-    for el in soup.find_all(["table", "p"]):
-        text = re.sub(r"\s+", " ", el.get_text(separator=" ", strip=True)).strip()
-        if not text or not any(kw in text for kw in _BACKLOG_KEYWORDS):
+    unit: Optional[str] = None
+    for table in soup.find_all("table"):
+        kind = _classify_table(table)
+        if kind is None:
             continue
-        if text in seen:
+        rows = [" | ".join(row) for row in _expand_grid(table)]
+        text = "\n".join(r for r in rows if r.strip()).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        blocks.append(text)
+        if unit is None and kind == "susu":
+            u = _table_unit(table)
+            if _is_krw(u):
+                unit = u
+    for p in soup.find_all("p"):
+        text = re.sub(r"\s+", " ", p.get_text(separator=" ", strip=True)).strip()
+        if not text or text in seen:
+            continue
+        if not any(kw in text for kw in _BACKLOG_KEYWORDS) or "생략" in text:
             continue
         seen.add(text)
         blocks.append(text)
     raw_text = "\n".join(blocks)[:_RAW_TEXT_CAP]
     if not raw_text:
         return "", _DEFAULT_UNIT
-    unit = _DEFAULT_UNIT
-    for kw in _UNIT_KEYWORDS:
-        if kw in raw_text:
-            unit = kw
-            break
-    return raw_text, unit
+    if unit is None:
+        for kw in _UNIT_KEYWORDS:
+            if kw in raw_text:
+                unit = kw
+                break
+    return raw_text, unit or _DEFAULT_UNIT
 
 
 def _upsert(ticker: str, entries: list[dict]):
@@ -263,11 +469,13 @@ def save_llm_backlog(ticker: str, entries: list[dict]):
 
 
 def fetch_and_save_backlog(ticker: str) -> list[dict]:
-    """DART document.xml 원문에서 "수주" 블록을 추출해 pending으로 적재 후 반환.
+    """DART document.xml 원문에서 수주잔고를 수집해 저장 후 반환.
 
-    최근 정기보고서(최대 8개 distinct quarter)를 순회하며 document.xml 원문을
-    받아 "수주" 블록이 있으면 source='pending'·amount=None·raw_text로 저장하고
-    없으면 skip한다. 수치는 Claude Cowork(PUT /report/{ticker}/backlog)가 채운다."""
+    최근 정기보고서(최대 8개 distinct quarter)를 순회하며 document.xml 원문을 받아:
+    - 수주상황 표(유형1)가 검산을 통과하면 자동 추출값을 source='dart'·amount(억원)로 저장,
+    - 추출 실패(다중엔티티·외화·무합계·검산불일치)지만 수주 블록은 있으면 source='pending'·
+      amount=None으로 저장(수치는 Cowork가 채움),
+    - 수주 정보가 없으면 skip(행 미생성, 유형3)."""
     corp_code = _get_corp_code(ticker)
     if not corp_code:
         logger.info(f"[Backlog] corp_code 없음: {ticker}")
@@ -287,13 +495,17 @@ def fetch_and_save_backlog(ticker: str) -> list[dict]:
         text = _get_document_text(rcept_no)
         raw_text, unit = _extract_backlog_blocks(text)
         if raw_text:
-            _upsert(ticker, [{
-                "quarter": quarter,
-                "amount": None,
-                "unit": unit,
-                "source": "pending",
-                "raw_text": raw_text,
-            }])
+            amount = _auto_backlog(text)
+            if amount is not None:
+                _upsert(ticker, [{
+                    "quarter": quarter, "amount": amount, "unit": "억원",
+                    "source": "dart", "raw_text": raw_text,
+                }])
+            else:
+                _upsert(ticker, [{
+                    "quarter": quarter, "amount": None, "unit": unit,
+                    "source": "pending", "raw_text": raw_text,
+                }])
             seen_quarters.add(quarter)
 
         # DART API 레이트 리밋 방지
