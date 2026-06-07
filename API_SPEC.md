@@ -16,11 +16,11 @@
 - [Stocks (종목 정보)](#stocks-종목-정보)
 - [Report (리포트)](#report-리포트)
 - [Consensus (컨센서스)](#consensus-컨센서스)
-- [Schedule (자동 스케줄)](#schedule-자동-스케줄)
 - [Calendar (이벤트 캘린더)](#calendar-이벤트-캘린더)
 - [Digest (일일 다이제스트)](#digest-일일-다이제스트)
 - [Market (시장 지표)](#market-시장-지표)
 - [Guru (구루 분석)](#guru-구루-분석)
+- [Batches (자동 배치 현황·스케줄)](#batches-자동-배치-현황스케줄)
 - [Analytics (분석)](#analytics-분석)
 - [Analysis (포트폴리오 분석)](#analysis-포트폴리오-분석)
 - [공통 스키마](#공통-스키마)
@@ -1053,47 +1053,86 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
-## Schedule (자동 스케줄)
+## Batches (자동 배치 현황·스케줄)
 
-### `GET /api/schedule`
+### `GET /api/batches`
 
-리포트 자동 생성 스케줄 조회.
+자동 배치(12종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
 
-**Response `200`**
+**Auth:** Bearer token 필요
+
+**Response `200`** — 배치 객체 배열
 ```json
-{
-  "enabled": true,
-  "time": "08:00",
-  "days": ["mon", "tue", "wed", "thu", "fri"]
-}
+[
+  {
+    "id": "daily_digest",
+    "label": "일일 다이제스트",
+    "category": "report",
+    "editable": true,
+    "timezone": "Asia/Seoul",
+    "scheduler_job_id": "daily_digest",
+    "manual_endpoint": "/api/digest/generate-all",
+    "trigger_kinds": ["auto", "manual"],
+    "next_run": "2026-06-08T08:00:00+09:00",
+    "recent_runs": [],
+    "schedule": { "enabled": true, "type": "daily", "time": "08:00" }
+  }
+]
 ```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `editable` | boolean | 스케줄 편집 가능 여부 |
+| `timezone` | string | 잡 타임존(편집 불가 고정값). 편집 가능 배치에만 존재 |
+| `schedule` | object \| null | 현재 스케줄 스펙(저장값 없으면 기본 스펙). 편집 불가 배치(`consensus`)는 `null` |
+
+> 편집 불가 배치 `consensus`에는 `editable`/`timezone`/`schedule` 관련 필드가 없거나 `schedule: null`이다.
 
 ---
 
-### `PUT /api/schedule`
+### `GET /api/batches/{job_id}/schedule`
 
-리포트 자동 생성 스케줄 업데이트.
+편집 가능한 배치의 스케줄 스펙 조회. 저장값이 없으면 해당 배치의 기본 스펙을 반환한다.
 
-**Request Body**
-```json
-{
-  "enabled": true,
-  "time": "08:00",
-  "days": ["mon", "tue", "wed", "thu", "fri"]
-}
-```
+**Auth:** Bearer token 필요
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `enabled` | boolean | ✅ | 스케줄 활성화 여부 |
-| `time` | string | ✅ | 실행 시간 (`"HH:MM"` 형식) |
-| `days` | string[] | ✅ | 실행 요일 목록 |
+**Response `200`** — 스케줄 스펙(아래 PUT의 스펙 스키마와 동일)
 
-**`days` 허용 값:** `"mon"`, `"tue"`, `"wed"`, `"thu"`, `"fri"`, `"sat"`, `"sun"`
+**Error `404`** — 알 수 없는 `job_id` 또는 편집 불가 배치(`consensus`)
 
-**Response `200`** — 저장된 스케줄 객체 그대로 반환
+---
 
-**Error `400`** — `enabled`, `time`, `days` 중 하나라도 누락 시
+### `PUT /api/batches/{job_id}/schedule`
+
+편집 가능한 배치의 스케줄 스펙 저장 후 즉시 리스케줄.
+
+**Auth:** admin 권한 필요
+
+**Request Body** — 스케줄 스펙. `type`에 따라 필드가 달라진다.
+
+| `type` | 추가 필드 | 예시 |
+|--------|-----------|------|
+| `"daily"` | `time` | `{"enabled": true, "type": "daily", "time": "08:00"}` |
+| `"weekly"` | `days`, `time` | `{"enabled": true, "type": "weekly", "days": ["mon","fri"], "time": "08:00"}` |
+| `"monthly"` | `day_of_month`, `time` | `{"enabled": true, "type": "monthly", "day_of_month": 1, "time": "02:00"}` |
+| `"interval"` | `every_minutes`, `start_hour`, `end_hour` | `{"enabled": true, "type": "interval", "every_minutes": 10, "start_hour": 9, "end_hour": 15}` |
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `enabled` | boolean | 스케줄 활성화 여부(필수) |
+| `type` | string | `"daily"` \| `"weekly"` \| `"monthly"` \| `"interval"` |
+| `time` | string | `"HH:MM"` (daily/weekly/monthly) |
+| `days` | string[] | weekly: `mon`~`sun`의 비공집 부분집합 |
+| `day_of_month` | int | monthly: 1~31 |
+| `every_minutes` | int | interval: ≥ 5 |
+| `start_hour` / `end_hour` | int | interval: 0~23, `start_hour ≤ end_hour` |
+
+> 타임존은 배치별 고정값(편집 불가). `us_rankings_fetch`만 `America/New_York`, 나머지는 `Asia/Seoul`.
+
+**Response `200`** — 저장된 스케줄 스펙 그대로 반환
+
+**Error `400`** — 스펙 검증 실패(잘못된 `type`/`time`/`days`/`day_of_month`/`every_minutes`/시간 범위 등)
+**Error `404`** — 알 수 없는 `job_id` 또는 편집 불가 배치(`consensus`)
 
 ---
 
@@ -1412,38 +1451,6 @@ dataroma 전체 매니저 크롤링 시작 (비동기, admin 전용).
 ```
 
 **Error `409`** — 크롤링 이미 진행 중
-
----
-
-### `GET /api/guru/schedule`
-
-구루 크롤링 자동 스케줄 조회.
-
-**Response `200`**
-```json
-{ "enabled": true, "day": "sun", "time": "07:00" }
-```
-
----
-
-### `PUT /api/guru/schedule`
-
-구루 크롤링 자동 스케줄 업데이트.
-
-**Request Body**
-```json
-{ "enabled": true, "day": "sun", "time": "07:00" }
-```
-
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `enabled` | boolean | ✅ | 스케줄 활성화 여부 |
-| `day` | string | ✅ | 요일 (`"mon"` ~ `"sun"`) |
-| `time` | string | ✅ | 실행 시간 (`"HH:MM"` 형식) |
-
-**Response `200`** — 저장된 스케줄 그대로 반환
-
-**Error `400`** — `enabled`, `day`, `time` 중 누락 시
 
 ---
 

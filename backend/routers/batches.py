@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Body
 
 import scheduler
-from auth import get_current_user
-from services import job_runs
-from services.batch_registry import BATCHES
+from auth import get_current_user, require_admin
+from services import job_runs, storage
+from services.batch_registry import BATCHES, get_batch
+from services.schedule_spec import validate_schedule_spec
 
 router = APIRouter(prefix="/api", tags=["batches"])
 
@@ -21,14 +22,50 @@ def _next_run(scheduler_job_id):
         return None
 
 
+def _schedule_for(entry):
+    """편집 가능한 배치의 현재 스케줄 스펙(없으면 default_schedule). 비편집이면 None."""
+    if not entry.get("editable"):
+        return None
+    return storage.get_batch_schedule(entry["id"]) or entry["default_schedule"]
+
+
 @router.get("/batches")
 def list_batches(user_id: str = Depends(get_current_user)):
-    """배치 현황: 레지스트리 + 다음 실행 시각 + 최근 실행로그."""
+    """배치 현황: 레지스트리 + 다음 실행 시각 + 최근 실행로그 + (편집가능 시) 스케줄."""
     return [
         {
             **b,
             "next_run": _next_run(b["scheduler_job_id"]),
             "recent_runs": job_runs.recent(b["id"]),
+            "schedule": _schedule_for(b),
         }
         for b in BATCHES
     ]
+
+
+@router.get("/batches/{job_id}/schedule")
+def get_batch_schedule(job_id: str, user_id: str = Depends(get_current_user)):
+    """편집 가능한 배치의 스케줄 스펙(저장값 없으면 default_schedule)."""
+    entry = get_batch(job_id)
+    if entry is None or not entry.get("editable"):
+        raise HTTPException(status_code=404, detail=f"Unknown or non-editable batch: {job_id}")
+    return storage.get_batch_schedule(job_id) or entry["default_schedule"]
+
+
+@router.put("/batches/{job_id}/schedule")
+def update_batch_schedule(
+    job_id: str,
+    schedule: dict = Body(...),
+    user_id: str = Depends(require_admin),
+):
+    """편집 가능한 배치의 스케줄 스펙 저장 후 즉시 리스케줄."""
+    entry = get_batch(job_id)
+    if entry is None or not entry.get("editable"):
+        raise HTTPException(status_code=404, detail=f"Unknown or non-editable batch: {job_id}")
+    try:
+        validate_schedule_spec(schedule)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    storage.save_batch_schedule(job_id, schedule)
+    scheduler.reload(job_id)
+    return schedule

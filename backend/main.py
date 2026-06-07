@@ -56,6 +56,11 @@ def _migrate():
         execute("ALTER TABLE backlog_history ADD COLUMN IF NOT EXISTS segments JSONB")
     except Exception:
         pass
+    try:
+        from services.db import execute
+        execute("CREATE TABLE IF NOT EXISTS batch_schedules (job_id text PRIMARY KEY, data jsonb NOT NULL)")
+    except Exception:
+        pass
 
 
 @asynccontextmanager

@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from services import storage, report_generator, consensus_pipeline as _pipeline, job_runs
+from services import batch_registry
+from services.schedule_spec import build_trigger_kwargs
 
 _scheduler = AsyncIOScheduler()
-_JOB_ID = "daily_report"
-_GURU_JOB_ID = "guru_crawl"
 _DIGEST_JOB_ID = "daily_digest"
 _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
@@ -28,28 +30,6 @@ def _generate_all():
             print(f"[Scheduler] Pipeline run_daily completed for {len(all_stocks)} stocks")
         except Exception as e:
             print(f"[Scheduler] Pipeline run_daily failed: {e}")
-
-
-def _reschedule():
-    cfg = storage.get_schedule()
-    if _scheduler.get_job(_JOB_ID):
-        _scheduler.remove_job(_JOB_ID)
-    if not cfg.get("enabled"):
-        return
-    time_parts = cfg["time"].split(":")
-    hour, minute = int(time_parts[0]), int(time_parts[1])
-    days_str = ",".join(d for d in cfg.get("days", []) if d in _VALID_DAYS)
-    if not days_str:
-        return
-    _scheduler.add_job(
-        _generate_all,
-        CronTrigger(day_of_week=days_str, hour=hour, minute=minute, timezone="Asia/Seoul"),
-        id=_JOB_ID,
-        replace_existing=True,
-        misfire_grace_time=82800,
-        coalesce=True,
-    )
-    print(f"[Scheduler] Scheduled daily report at {cfg['time']} KST on {days_str}")
 
 
 def _run_guru_crawl():
@@ -233,24 +213,87 @@ def _seed_rankings_if_empty():
     _fetch_us_rankings()
 
 
-def _reschedule_guru():
-    cfg = storage.get_guru_schedule()
-    if _scheduler.get_job(_GURU_JOB_ID):
-        _scheduler.remove_job(_GURU_JOB_ID)
-    if not cfg.get("enabled"):
+_JOB_FUNCS = {
+    "daily_report": _generate_all,
+    "guru_crawl": _run_guru_crawl,
+    "daily_digest": _run_digest,
+    "earnings_refresh": _refresh_earnings,
+    "monthly_refresh": _refresh_monthly,
+    "leverage_fetch": _fetch_leverage,
+    "lending_fetch": _fetch_lending,
+    "kr_rankings_fetch": _fetch_kr_rankings,
+    "us_rankings_fetch": _fetch_us_rankings,
+    "investor_trend_fetch": _fetch_investor_trend,
+    "backlog_fetch": _fetch_backlog,
+}
+
+
+def _build_trigger(spec: dict, timezone: str) -> CronTrigger:
+    return CronTrigger(**build_trigger_kwargs(spec), timezone=timezone)
+
+
+def _reschedule_job(job_id: str) -> None:
+    """편집 가능한 배치 1종을 storage 스펙대로 리스케줄. disabled면 잡 제거만."""
+    entry = batch_registry.get_batch(job_id)
+    if entry is None or not entry.get("editable"):
         return
-    time_parts = cfg["time"].split(":")
-    hour, minute = int(time_parts[0]), int(time_parts[1])
-    day = cfg.get("day", "sun")
-    if day not in _VALID_DAYS:
-        day = "sun"
+    spec = storage.get_batch_schedule(job_id)
+    if _scheduler.get_job(job_id):
+        _scheduler.remove_job(job_id)
+    if not spec or not spec.get("enabled"):
+        return
+    job_kwargs = dict(id=job_id, coalesce=True, replace_existing=True)
+    # misfire_grace_time 미지정 시 인자를 빼서 스케줄러 기본값(1초)을 쓴다 —
+    # None을 넘기면 APScheduler가 '유예 무제한'으로 해석해 거동이 바뀐다(daily_report만 82800 명시).
+    mgt = entry.get("misfire_grace_time")
+    if mgt is not None:
+        job_kwargs["misfire_grace_time"] = mgt
     _scheduler.add_job(
-        _run_guru_crawl,
-        CronTrigger(day_of_week=day, hour=hour, minute=minute),
-        id=_GURU_JOB_ID,
-        replace_existing=True,
+        _JOB_FUNCS[job_id],
+        _build_trigger(spec, entry["timezone"]),
+        **job_kwargs,
     )
-    print(f"[Scheduler] Guru crawl scheduled at {cfg['time']} on {day}")
+    print(f"[Scheduler] Scheduled {job_id}: {spec}")
+
+
+def _seed_spec_for(job_id: str) -> dict:
+    """기동 마이그레이션용 시드 스펙. daily_report/guru_crawl은 기존
+    schedules/guru_schedules 값을 통합 스펙으로 변환해 거동 보존."""
+    if job_id == "daily_report":
+        cfg = storage.get_schedule()
+        days = [d for d in cfg.get("days", []) if d in _VALID_DAYS]
+        if not days:
+            days = ["mon", "tue", "wed", "thu", "fri"]
+        return {
+            "enabled": bool(cfg.get("enabled")),
+            "type": "weekly",
+            "days": days,
+            "time": cfg.get("time", "08:00"),
+        }
+    if job_id == "guru_crawl":
+        cfg = storage.get_guru_schedule()
+        day = cfg.get("day", "sun")
+        if day not in _VALID_DAYS:
+            day = "sun"
+        return {
+            "enabled": bool(cfg.get("enabled")),
+            "type": "weekly",
+            "days": [day],
+            "time": cfg.get("time", "03:00"),
+        }
+    return batch_registry.get_batch(job_id)["default_schedule"]
+
+
+def _seed_batch_schedules() -> None:
+    """기동 idempotent 마이그레이션: 편집 배치에 batch_schedules 행이 없으면 시드.
+    이미 행이 있으면 건드리지 않는다."""
+    for entry in batch_registry.BATCHES:
+        if not entry.get("editable"):
+            continue
+        job_id = entry["id"]
+        if storage.get_batch_schedule(job_id) is not None:
+            continue
+        storage.save_batch_schedule(job_id, _seed_spec_for(job_id))
 
 
 _DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
@@ -260,8 +303,8 @@ def _check_missed_report():
     """기동 시 당일 스케줄이 이미 지났는데 리포트가 없으면 즉시 실행."""
     from datetime import datetime, date
     from services.db import query as db_query
-    cfg = storage.get_schedule()
-    if not cfg.get("enabled"):
+    cfg = storage.get_batch_schedule("daily_report")
+    if not cfg or not cfg.get("enabled"):
         return
     now = datetime.now(tz=__import__("zoneinfo").ZoneInfo("Asia/Seoul"))
     day_abbr = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
@@ -280,63 +323,11 @@ def _check_missed_report():
 
 
 def start():
-    _reschedule()
-    _reschedule_guru()
+    _seed_batch_schedules()
+    for entry in batch_registry.BATCHES:
+        if entry.get("editable"):
+            _reschedule_job(entry["id"])
     _check_missed_report()
-    _scheduler.add_job(
-        _run_digest,
-        CronTrigger(hour=8, minute=0, timezone="Asia/Seoul"),
-        id=_DIGEST_JOB_ID,
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _refresh_earnings,
-        CronTrigger(day_of_week="sun", hour=3, minute=0, timezone="Asia/Seoul"),
-        id="earnings_refresh",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _refresh_monthly,
-        CronTrigger(day=1, hour=2, minute=0, timezone="Asia/Seoul"),
-        id="monthly_refresh",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _fetch_leverage,
-        CronTrigger(hour=7, minute=0, timezone="Asia/Seoul"),
-        id="leverage_fetch",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _fetch_lending,
-        CronTrigger(day=5, hour=8, minute=0, timezone="Asia/Seoul"),
-        id="lending_fetch",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _fetch_kr_rankings,
-        CronTrigger(hour="9-15", minute="*/10", timezone="Asia/Seoul"),
-        id="kr_rankings_fetch",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _fetch_us_rankings,
-        CronTrigger(hour="9-16", minute="*/10", timezone="America/New_York"),
-        id="us_rankings_fetch",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _fetch_investor_trend,
-        CronTrigger(hour=18, minute=0, timezone="Asia/Seoul"),
-        id="investor_trend_fetch",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _fetch_backlog,
-        CronTrigger(day_of_week="sun", hour=4, minute=0, timezone="Asia/Seoul"),
-        id="backlog_fetch",
-        replace_existing=True,
-    )
     _seed_rankings_if_empty()
     _scheduler.start()
 
@@ -346,9 +337,5 @@ def stop():
         _scheduler.shutdown(wait=False)
 
 
-def reload():
-    _reschedule()
-
-
-def reload_guru():
-    _reschedule_guru()
+def reload(job_id: str):
+    _reschedule_job(job_id)

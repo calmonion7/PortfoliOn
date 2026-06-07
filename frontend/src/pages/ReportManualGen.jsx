@@ -2,12 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
-const DAYS = [
-  { key: 'mon', label: '월' }, { key: 'tue', label: '화' },
-  { key: 'wed', label: '수' }, { key: 'thu', label: '목' },
-  { key: 'fri', label: '금' }, { key: 'sat', label: '토' },
-  { key: 'sun', label: '일' },
-]
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 function getToday() {
@@ -25,13 +19,11 @@ function getLastScheduleDay(scheduleDays) {
   return null
 }
 
-export default function ReportSchedule() {
+export default function ReportManualGen() {
   const { role } = useAuth() || { role: null }
   const isAdmin = role === 'admin'
 
-  const [schedule, setSchedule] = useState({ enabled: false, time: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] })
-  const [saved, setSaved] = useState(false)
-  const [saveErr, setSaveErr] = useState('')
+  const [schedule, setSchedule] = useState({ enabled: false, type: 'weekly', time: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] })
 
   const [generating, setGenerating] = useState(false)
   const [genMsg, setGenMsg] = useState('')
@@ -52,7 +44,7 @@ export default function ReportSchedule() {
   const [backfillForce, setBackfillForce] = useState(false)
 
   useEffect(() => {
-    api.get('/api/schedule').then(({ data }) => setSchedule(data))
+    api.get('/api/batches/daily_report/schedule').then(({ data }) => setSchedule(data)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -71,9 +63,10 @@ export default function ReportSchedule() {
 
   const today = getToday()
   const todayKey = DAY_KEYS[new Date().getDay()]
-  const isScheduleDay = schedule.enabled && schedule.days.includes(todayKey)
-  const lastScheduleDay = (!isScheduleDay && schedule.enabled && schedule.days.length > 0)
-    ? getLastScheduleDay(schedule.days) : null
+  const scheduleDays = schedule.days || []
+  const isScheduleDay = schedule.enabled && scheduleDays.includes(todayKey)
+  const lastScheduleDay = (!isScheduleDay && schedule.enabled && scheduleDays.length > 0)
+    ? getLastScheduleDay(scheduleDays) : null
   const referenceDate = isScheduleDay ? today : lastScheduleDay
 
   const { pendingStocks, doneStocks, notInPeriodStocks } = (() => {
@@ -131,24 +124,6 @@ export default function ReportSchedule() {
     }, 1500)
   }
 
-  const toggleDay = (day) => {
-    setSchedule(s => ({
-      ...s,
-      days: s.days.includes(day) ? s.days.filter(d => d !== day) : [...s.days, day],
-    }))
-  }
-
-  const handleSave = async () => {
-    setSaveErr('')
-    try {
-      await api.put('/api/schedule', schedule)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch (err) {
-      setSaveErr(err?.response?.data?.detail || '저장에 실패했습니다.')
-    }
-  }
-
   const handleGenerate = async (targets) => {
     if (targets.length === 0) return
     setGenerating(true)
@@ -202,57 +177,8 @@ export default function ReportSchedule() {
 
   return (
     <div style={{ maxWidth: 480 }}>
-      {/* 자동 리포트 스케줄 */}
-      <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0, paddingTop: 8 }}>자동 리포트 스케줄</div>
-      <div className="list-card" style={{ margin: '0 0 6px' }}>
-        <div className="s-row">
-          <div className="title">자동 생성</div>
-          <button
-            className={`m-switch ${schedule.enabled ? 'on' : ''}`}
-            onClick={() => setSchedule(s => ({ ...s, enabled: !s.enabled }))}
-          />
-        </div>
-        <div className="s-row" style={{ opacity: schedule.enabled ? 1 : 0.4 }}>
-          <div className="title">생성 시간</div>
-          <input
-            type="time" value={schedule.time}
-            onChange={e => setSchedule(s => ({ ...s, time: e.target.value }))}
-            disabled={!schedule.enabled}
-            style={{
-              background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
-              color: 'var(--text)', fontSize: 14, fontFamily: 'inherit',
-              borderRadius: 8, padding: '4px 10px', cursor: schedule.enabled ? 'pointer' : 'default',
-            }}
-          />
-        </div>
-        <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)', opacity: schedule.enabled ? 1 : 0.4 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500, marginBottom: 10 }}>요일</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {DAYS.map(({ key, label }) => (
-              <button key={key} type="button"
-                onClick={() => schedule.enabled && toggleDay(key)}
-                style={{
-                  flex: 1, height: 36, borderRadius: '50%', border: 'none',
-                  background: schedule.days.includes(key) ? 'var(--text)' : 'var(--accent-soft)',
-                  color: schedule.days.includes(key) ? 'var(--bg)' : 'var(--text-3)',
-                  fontSize: 13, fontWeight: 500, cursor: schedule.enabled ? 'pointer' : 'default',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
-          <button className="btn btn-primary" onClick={handleSave} style={{ width: '100%', justifyContent: 'center' }}>
-            {saved ? '저장됨 ✓' : '저장'}
-          </button>
-          {saveErr && <p style={{ color: 'var(--down)', fontSize: 13, marginTop: 6 }}>{saveErr}</p>}
-        </div>
-      </div>
-
       {/* 즉시 리포트 생성 */}
-      <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0 }}>즉시 리포트 생성</div>
+      <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0, paddingTop: 8 }}>즉시 리포트 생성</div>
       <div className="list-card" style={{ margin: '0 0 6px' }}>
         <div style={{ padding: '10px 12px 0', display: 'flex', gap: 4 }}>
           {[

@@ -6,7 +6,6 @@ from services.guru_scraper import scrape_all_managers
 from services.guru_stats import compute_popularity, compute_manager_top3, compute_weighted
 from services.progress import ProgressTracker
 from auth import require_admin
-import scheduler as sched
 
 router = APIRouter(prefix="/api/guru", tags=["guru"])
 
@@ -65,18 +64,3 @@ def _run_crawl():
             print(f"[Guru] Crawl failed: {e}")
         finally:
             _progress.finish()
-
-
-@router.get("/schedule")
-def get_schedule():
-    return storage.get_guru_schedule()
-
-
-@router.put("/schedule")
-def update_schedule(schedule: dict, _: str = Depends(require_admin)):
-    missing = {"enabled", "day", "time"} - schedule.keys()
-    if missing:
-        raise HTTPException(status_code=400, detail=f"Missing fields: {missing}")
-    storage.save_guru_schedule(schedule)
-    sched.reload_guru()
-    return schedule

@@ -95,27 +95,6 @@ def test_start_crawl_returns_202():
     assert r.status_code == 202
 
 
-def test_get_guru_schedule():
-    default = {"enabled": False, "day": "sun", "time": "03:00"}
-    with patch("routers.guru.storage.get_guru_schedule", return_value=default):
-        r = client.get("/api/guru/schedule")
-    assert r.status_code == 200
-    assert r.json()["day"] == "sun"
-
-
-def test_update_guru_schedule_valid():
-    with patch("routers.guru.storage.save_guru_schedule") as mock_save:
-        with patch("routers.guru.sched.reload_guru"):
-            r = client.put("/api/guru/schedule", json={"enabled": True, "day": "mon", "time": "04:00"})
-    assert r.status_code == 200
-    mock_save.assert_called_once()
-
-
-def test_update_guru_schedule_missing_field():
-    r = client.put("/api/guru/schedule", json={"enabled": True, "time": "04:00"})
-    assert r.status_code == 400
-
-
 # --- 403 test: crawl blocked for non-admin ---
 
 from auth import get_current_user as _get_current_user

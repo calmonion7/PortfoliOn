@@ -101,8 +101,12 @@ def test_investor_job_swallows_errors(monkeypatch):
 
 
 def test_investor_job_registered_with_correct_cron(monkeypatch):
-    monkeypatch.setattr(scheduler, "_reschedule", lambda: None)
-    monkeypatch.setattr(scheduler, "_reschedule_guru", lambda: None)
+    import services.storage as storage
+    store: dict = {}
+    monkeypatch.setattr(storage, "get_batch_schedule", lambda jid: store.get(jid))
+    monkeypatch.setattr(storage, "save_batch_schedule", lambda jid, spec: store.__setitem__(jid, spec))
+    monkeypatch.setattr(storage, "get_schedule", lambda: {"enabled": False, "time": "08:00", "days": []})
+    monkeypatch.setattr(storage, "get_guru_schedule", lambda: {"enabled": False, "day": "sun", "time": "03:00"})
     monkeypatch.setattr(scheduler, "_check_missed_report", lambda: None)
     monkeypatch.setattr(scheduler, "_seed_rankings_if_empty", lambda: None)
     monkeypatch.setattr(scheduler._scheduler, "start", lambda: None)

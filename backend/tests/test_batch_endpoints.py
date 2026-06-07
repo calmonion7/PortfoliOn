@@ -182,34 +182,3 @@ def test_refresh_econ_admin_ok(monkeypatch):
     monkeypatch.setattr(mi, "_fetch_and_save_econ_indicators", lambda: {"cpi": [], "unemployment": []})
     resp = _admin_client(mi.router).post("/api/market/refresh-econ")
     assert resp.status_code == 200
-
-
-def test_schedule_put_blocks_non_admin(monkeypatch):
-    from routers.report import router
-    body = {"enabled": True, "time": "07:00", "days": ["mon"]}
-    resp = _non_admin_client(router, monkeypatch).put("/api/schedule", json=body)
-    assert resp.status_code == 403
-
-
-def test_schedule_put_admin_ok(monkeypatch):
-    import routers.report as report
-    monkeypatch.setattr(report.storage, "save_schedule", lambda s: None)
-    body = {"enabled": True, "time": "07:00", "days": ["mon"]}
-    resp = _admin_client(report.router).put("/api/schedule", json=body)
-    assert resp.status_code == 200
-
-
-def test_guru_schedule_put_blocks_non_admin(monkeypatch):
-    from routers.guru import router
-    body = {"enabled": True, "day": "sun", "time": "03:00"}
-    resp = _non_admin_client(router, monkeypatch).put("/api/guru/schedule", json=body)
-    assert resp.status_code == 403
-
-
-def test_guru_schedule_put_admin_ok(monkeypatch):
-    import routers.guru as guru
-    monkeypatch.setattr(guru.storage, "save_guru_schedule", lambda s: None)
-    monkeypatch.setattr(guru.sched, "reload_guru", lambda: None)
-    body = {"enabled": True, "day": "sun", "time": "03:00"}
-    resp = _admin_client(guru.router).put("/api/guru/schedule", json=body)
-    assert resp.status_code == 200

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
-import ReportSchedule from './ReportSchedule'
-import GuruCrawlSettings from './GuruCrawlSettings'
+import BatchScheduleEditor from '../components/BatchScheduleEditor'
+import ReportManualGen from './ReportManualGen'
+import GuruCrawlNow from './GuruCrawlNow'
 import ConsensusSettings from './ConsensusSettings'
 import LeverageBackfillSettings from './LeverageBackfillSettings'
 import useIsMobile from '../hooks/useIsMobile'
@@ -14,10 +15,12 @@ const CATEGORIES = [
   { key: 'guru',   label: '구루' },
 ]
 
-const EMBED = {
-  daily_report:   ReportSchedule,
+// 스케줄 에디터 외에 배치별로 추가로 노출할 컴포넌트.
+// consensus(편집 불가)는 에디터 없이 ConsensusSettings만 노출한다.
+const EXTRA = {
+  daily_report:   ReportManualGen,
   consensus:      ConsensusSettings,
-  guru_crawl:     GuruCrawlSettings,
+  guru_crawl:     GuruCrawlNow,
   leverage_fetch: LeverageBackfillSettings,
 }
 
@@ -92,9 +95,11 @@ function ManualRunButton({ batch }) {
 
 function BatchCard({ batch, isAdmin }) {
   const [open, setOpen] = useState(false)
-  const Embed = EMBED[batch.id]
+  const Extra = EXTRA[batch.id]
   const recent = batch.recent_runs?.[0]
   const nextRun = fmtKst(batch.next_run)
+  const showEditor = isAdmin && batch.editable
+  const showExtra = isAdmin && Extra
 
   return (
     <div className="list-card" style={{ margin: '0 0 10px' }}>
@@ -121,19 +126,27 @@ function BatchCard({ batch, isAdmin }) {
 
       {open && (
         <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
-          {Embed && isAdmin
-            ? <Embed />
-            : (
-              <>
-                <div className="s-row" style={{ padding: '0 0 12px', gridTemplateColumns: '1fr' }}>
-                  <div>
-                    <div className="desc">주기: {batch.schedule_desc}</div>
-                    {batch.usage?.length > 0 && <div className="desc">사용처: {batch.usage.join(', ')}</div>}
-                  </div>
+          {showEditor || showExtra ? (
+            <>
+              {showEditor && (
+                <BatchScheduleEditor jobId={batch.id} schedule={batch.schedule} timezone={batch.timezone} />
+              )}
+              {showExtra && <Extra />}
+              {!showExtra && batch.manual_endpoint && (
+                <div style={{ marginTop: 14 }}><ManualRunButton batch={batch} /></div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="s-row" style={{ padding: '0 0 12px', gridTemplateColumns: '1fr' }}>
+                <div>
+                  <div className="desc">주기: {batch.schedule_desc}</div>
+                  {batch.usage?.length > 0 && <div className="desc">사용처: {batch.usage.join(', ')}</div>}
                 </div>
-                {isAdmin && batch.manual_endpoint && <ManualRunButton batch={batch} />}
-              </>
-            )}
+              </div>
+              {isAdmin && batch.manual_endpoint && <ManualRunButton batch={batch} />}
+            </>
+          )}
         </div>
       )}
     </div>

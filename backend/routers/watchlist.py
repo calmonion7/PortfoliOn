@@ -15,7 +15,7 @@ _DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6
 
 
 def _last_scheduled_date() -> str:
-    schedule = storage.get_schedule()
+    schedule = storage.get_daily_report_schedule()
     enabled = {_DAY_MAP[d] for d in schedule.get("days", []) if d in _DAY_MAP}
     today = _date.today()
     if not schedule.get("enabled") or not enabled:

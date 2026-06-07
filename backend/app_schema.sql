@@ -58,6 +58,12 @@ CREATE TABLE guru_schedules (
 );
 INSERT INTO guru_schedules (data) VALUES ('{"enabled": false, "day": "sun", "time": "03:00"}');
 
+-- 통합 배치 스케줄 (job_id별, 시드는 코드에서 idempotent)
+CREATE TABLE IF NOT EXISTS batch_schedules (
+  job_id  text PRIMARY KEY,
+  data    jsonb NOT NULL
+);
+
 -- 일일 다이제스트 (사용자별)
 CREATE TABLE digests (
   user_id  uuid REFERENCES users(id) ON DELETE CASCADE,

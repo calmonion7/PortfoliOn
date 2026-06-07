@@ -111,7 +111,7 @@ def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = Non
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
     if not date:
-        date = _last_scheduled_date(storage.get_schedule())
+        date = _last_scheduled_date(storage.get_daily_report_schedule())
     _progress.start(len(stocks))
     background_tasks.add_task(_run_generation, stocks, date)
     return {"message": f"Generating reports for {len(stocks)} stock(s)"}
@@ -233,7 +233,7 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
             if ticker not in result:
                 result[ticker] = _mk_entry(ticker, [], "watchlist", stock, None)
 
-        schedule = storage.get_schedule()
+        schedule = storage.get_daily_report_schedule()
         return {"stocks": result, "last_scheduled_date": _last_scheduled_date(schedule)}
 
     if all_scope:
@@ -480,19 +480,3 @@ def refresh_backlog(ticker: str, user_id: str = Depends(require_admin)):
     from services.backlog import fetch_and_save_backlog
     result = fetch_and_save_backlog(ticker)
     return {"ticker": ticker.upper(), "count": len(result), "entries": result}
-
-
-@router.get("/schedule")
-def get_schedule():
-    return storage.get_schedule()
-
-
-@router.put("/schedule")
-def update_schedule(schedule: dict, user_id: str = Depends(require_admin)):
-    required = {"enabled", "time", "days"}
-    if not required.issubset(schedule.keys()):
-        raise HTTPException(
-            status_code=400, detail=f"Missing fields: {required - schedule.keys()}"
-        )
-    storage.save_schedule(schedule)
-    return schedule

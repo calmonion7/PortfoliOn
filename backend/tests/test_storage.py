@@ -45,6 +45,48 @@ def test_get_schedule_default():
     assert "time" in result
 
 
+# ── batch_schedules ──────────────────────────────────────────────────────────
+
+def test_get_batch_schedule_none_when_no_row():
+    from services import storage
+    with patch("services.storage.query", return_value=[]):
+        result = storage.get_batch_schedule("daily_digest")
+    assert result is None
+
+
+def test_get_batch_schedule_returns_data():
+    from services import storage
+    spec = {"enabled": True, "type": "daily", "time": "08:00"}
+    with patch("services.storage.query", return_value=[{"data": spec}]):
+        result = storage.get_batch_schedule("daily_digest")
+    assert result == spec
+
+
+def test_save_batch_schedule_upsert():
+    from services import storage
+    spec = {"enabled": True, "type": "daily", "time": "08:00"}
+    with patch("services.storage.execute") as ex:
+        storage.save_batch_schedule("daily_digest", spec)
+    sql = ex.call_args.args[0]
+    assert "INSERT INTO batch_schedules" in sql
+    assert "ON CONFLICT (job_id) DO UPDATE" in sql
+    params = ex.call_args.args[1]
+    assert params[0] == "daily_digest"
+
+
+def test_get_all_batch_schedules_maps_job_id_to_spec():
+    from services import storage
+    rows = [
+        {"job_id": "daily_digest", "data": {"enabled": True, "type": "daily", "time": "08:00"}},
+        {"job_id": "backlog_fetch", "data": {"enabled": True, "type": "weekly", "days": ["sun"], "time": "04:00"}},
+    ]
+    with patch("services.storage.query", return_value=rows):
+        result = storage.get_all_batch_schedules()
+    assert result["daily_digest"]["time"] == "08:00"
+    assert result["backlog_fetch"]["days"] == ["sun"]
+    assert set(result.keys()) == {"daily_digest", "backlog_fetch"}
+
+
 # ── save_stocks: ETF 플래그(is_etf) 저장 ──────────────────────────────────────
 
 def _capture_save_stocks(stock: dict):

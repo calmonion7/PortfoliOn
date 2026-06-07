@@ -1,5 +1,6 @@
 # backend/services/storage.py
 import json
+from typing import Optional
 from services.db import get_connection, query, execute
 
 _ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures", "insights"})
@@ -309,3 +310,34 @@ def save_guru_schedule(schedule: dict) -> None:
         "INSERT INTO guru_schedules (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
         (json.dumps(schedule),),
     )
+
+
+def get_batch_schedule(job_id: str) -> Optional[dict]:
+    rows = query("SELECT data FROM batch_schedules WHERE job_id = %s", (job_id,))
+    if rows:
+        return rows[0]["data"]
+    return None
+
+
+def save_batch_schedule(job_id: str, spec: dict) -> None:
+    execute(
+        "INSERT INTO batch_schedules (job_id, data) VALUES (%s, %s) ON CONFLICT (job_id) DO UPDATE SET data=EXCLUDED.data",
+        (job_id, json.dumps(spec)),
+    )
+
+
+def get_all_batch_schedules() -> dict:
+    rows = query("SELECT job_id, data FROM batch_schedules")
+    return {r["job_id"]: r["data"] for r in rows}
+
+
+def get_daily_report_schedule() -> dict:
+    """daily_report 스케줄 정본 — 통합 batch_schedules에서 읽고, 미시드/테이블부재 시 레거시 schedules로 폴백.
+    반환 dict는 enabled/days/time 키를 가져 _last_scheduled_date 계산에 그대로 쓰인다."""
+    try:
+        spec = get_batch_schedule("daily_report")
+    except Exception:
+        spec = None
+    if spec:
+        return spec
+    return get_schedule()
