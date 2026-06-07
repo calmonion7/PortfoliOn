@@ -23,9 +23,11 @@
 
 ### 수주잔고 분석 (backlog)
 ```
-1. GET /api/report/backlog/pending   → 분석 대기 중인 수주잔고 목록 조회
-2. (AI가 각 항목의 raw_text에서 수주잔고 수치를 분기별로 추출)
-3. PUT /api/report/{ticker}/backlog  → 분석 결과 저장 (ticker별 반복)
+1. GET /api/report/backlog/pending   → { prompt, items } 조회
+                                        (prompt = 추출 지침, items = 분석 대기 목록)
+2. (AI가 prompt 규칙에 따라 각 item의 raw_text에서 수주잔고를 분기별로 추출)
+   - raw_text 상단의 [재무 컨텍스트](매출·자산 등)로 단위/스케일(×100 오인)을 교차검증
+3. PUT /api/report/{ticker}/backlog  → 분석 결과 저장 (ticker별 반복, amount≠null만)
 ```
 
 ---
@@ -337,30 +339,35 @@ X-API-Key: {COWORK_API_KEY}
 
 ### `GET /api/report/backlog/pending`
 
-DART에서 수주잔고 섹션 텍스트를 가져왔으나 자동 파싱에 실패한 항목 목록입니다. Claude Cowork가 `raw_text`를 읽어 수치를 추출한 뒤 PUT으로 저장합니다.
+DART에서 수주 섹션을 가져왔으나 코드 자동 파싱(검산)에 실패한 항목들과, 이를 분석할 **추출 지침(prompt)**을 함께 반환합니다. Claude Cowork가 `prompt` 규칙대로 각 항목의 `raw_text`에서 수치를 추출한 뒤 PUT으로 저장합니다.
 
 **Auth:** `X-API-Key` 헤더
 
 **Response `200`**
 ```json
-[
-  {
-    "ticker": "012450",
-    "quarter": "2024Q3",
-    "raw_text": "수주잔고\n당기말\n전기말\n...",
-    "unit": "억원"
-  }
-]
+{
+  "prompt": "다음은 한 종목 정기보고서에서 추출한 [재무 컨텍스트]와 [수주 원문]입니다 ...",
+  "items": [
+    {
+      "ticker": "012450",
+      "quarter": "2025Q4",
+      "raw_text": "[재무 컨텍스트] (단위: 억원, 연결재무제표)\n  매출액: 당기=267029 전기=112401\n  자산총계: 당기=539536 ...\n\n회사 | 사업 | ... | 수주잔고\n합 계 | ... | 116,800,729",
+      "unit": "백만원"
+    }
+  ]
+}
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `ticker` | string | 종목 코드 (KR 6자리) |
-| `quarter` | string | 분기 (예: `"2024Q3"`, 형식 `YYYYQn`) |
-| `raw_text` | string | DART 보고서 섹션 원문 텍스트 (최대 8000자) |
-| `unit` | string | 금액 단위 (항상 `"억원"`) |
+| `prompt` | string | 수주잔고 추출 지침 (단위 정규화·외화·다중엔티티·공사진행·"틀린 값<누락" 규칙) |
+| `items` | array | 분석 대기 항목 목록 (아래 필드) |
+| `items[].ticker` | string | 종목 코드 (KR 6자리) |
+| `items[].quarter` | string | 분기 (예: `"2025Q4"`, 형식 `YYYYQn`) |
+| `items[].raw_text` | string | `[재무 컨텍스트]`(매출·자산 등 핵심계정, 억원) + `[수주 원문]`(표 구조 보존) 결합 텍스트 |
+| `items[].unit` | string | 수주 원문 표의 원래 단위 (`"백만원"`·`"억원"`·`"조원"` 등). **최종 저장은 prompt 지침대로 억원으로 정규화** |
 
-> 빈 배열이면 분석 대기 항목 없음.
+> `items`가 빈 배열이면 분석 대기 항목 없음. `raw_text`의 `[재무 컨텍스트]`는 수주잔고 단위/자릿수(×100 오인) 교차검증용 참고치이며 수주잔고 값 자체는 아닙니다.
 
 ---
 

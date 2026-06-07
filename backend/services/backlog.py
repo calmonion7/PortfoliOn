@@ -492,6 +492,96 @@ def save_llm_backlog(ticker: str, entries: list[dict]):
         )
 
 
+# ── 재무제표 컨텍스트 + 추출 프롬프트 (Cowork pending 분석용) ──────────
+# 수주잔고 수치 자체는 재무제표에 없지만, 매출/자산 등 핵심 계정을 함께 주면
+# Cowork가 단위/스케일(억원 ↔ 백만원 ×100 오인)을 교차검증할 수 있다.
+_QUARTER_TO_REPRT = {"Q1": "11013", "Q2": "11012", "Q3": "11014", "Q4": "11011"}
+_KEY_ACCOUNTS = ("매출액", "영업이익", "당기순이익", "자산총계", "부채총계", "자본총계")
+
+
+def _won_to_eok(raw: str) -> Optional[float]:
+    """DART thstrm_amount(원 단위 문자열) → 억원. 콤마 제거, 괄호 음수, 비수치 None."""
+    s = (raw or "").strip().replace(",", "")
+    neg = s.startswith("(") and s.endswith(")")
+    s = s.strip("()")
+    if not re.fullmatch(r"-?\d+(\.\d+)?", s):
+        return None
+    v = float(s) / 1e8
+    return -v if neg else v
+
+
+def get_financials(corp_code: str, quarter: str) -> dict:
+    """DART 주요계정(fnlttSinglAcnt)으로 핵심 재무계정을 억원으로 반환.
+
+    quarter='2025Q4' → bsns_year=2025, reprt_code=11011. 연결(CFS) 우선, 없으면
+    별도(OFS). {계정명: {'당기','전기'}} + '_fs'. 조회 실패 시 빈 dict(graceful)."""
+    if not quarter or len(quarter) < 6:
+        return {}
+    reprt = _QUARTER_TO_REPRT.get(quarter[4:])
+    if not reprt:
+        return {}
+    try:
+        resp = requests.get(
+            f"{_DART_BASE}/fnlttSinglAcnt.json",
+            params={
+                "crtfc_key": _dart_key(),
+                "corp_code": corp_code,
+                "bsns_year": quarter[:4],
+                "reprt_code": reprt,
+            },
+            timeout=15,
+        )
+        data = resp.json()
+        if data.get("status") != "000":
+            return {}
+        rows = data.get("list", [])
+    except Exception as e:
+        logger.warning(f"[Backlog] 재무제표 조회 실패 (corp={corp_code}, {quarter}): {e}")
+        return {}
+    fs_div = "CFS" if any(r.get("fs_div") == "CFS" for r in rows) else "OFS"
+    out: dict = {"_fs": "연결" if fs_div == "CFS" else "별도"}
+    for r in rows:
+        if r.get("fs_div") != fs_div:
+            continue
+        nm = (r.get("account_nm") or "").strip()
+        if nm in _KEY_ACCOUNTS and nm not in out:
+            out[nm] = {"당기": _won_to_eok(r.get("thstrm_amount")),
+                       "전기": _won_to_eok(r.get("frmtrm_amount"))}
+    return out
+
+
+def _financials_block(fin: dict) -> str:
+    """재무 컨텍스트 dict → raw_text 상단에 prepend할 텍스트 블록. 비면 ''."""
+    if not fin:
+        return ""
+    lines = [f"[재무 컨텍스트] (단위: 억원, {fin.get('_fs', '')}재무제표)"]
+    for acc in _KEY_ACCOUNTS:
+        v = fin.get(acc)
+        if v:
+            lines.append(f"  {acc}: 당기={v['당기']} 전기={v['전기']}")
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
+BACKLOG_EXTRACTION_PROMPT = """\
+다음은 한 종목 정기보고서에서 추출한 [재무 컨텍스트]와 [수주 원문]입니다.
+[수주 원문]에서 분기별 수주잔고(Order Backlog)를 읽어 **억원 단위**로 추출하세요.
+
+규칙:
+1. 단위 정규화 → 억원. 백만원÷100, 천원÷100000, 조원×10000.
+   [재무 컨텍스트]의 매출·자산과 자릿수(스케일)가 타당한지 반드시 교차검증.
+   (매출이 수십조인데 수주잔고가 수백억이면 단위 오인 → 재계산)
+2. 외화(USD천·백만달러 등)로만 표기돼 원화 환산값이 없으면 amount=null.
+3. 다중엔티티(연결): 상장사 연결 수주잔고(합계)를 쓴다. 사업부 일부만이거나
+   모회사 단독/연결 혼재로 판단이 안 서면 null.
+4. 공사진행(건설/EPC) 표(계약별 진행률·미청구공사)는 개별 도급계약 진행 공시로
+   전사 총 수주잔고가 아니다(분양·소규모 누락). 전사 수주잔고로 단정 말 것 → 원칙상 null.
+5. 확신 없으면 추측 말고 null. (틀린 값 < 누락)
+
+출력(JSON): [{"quarter":"2025Q4","amount":1168007.29}, ...]  (amount는 억원, 불가 시 null)
+PUT /api/report/{ticker}/backlog 으로 amount≠null 항목만 저장.
+"""
+
+
 def fetch_and_save_backlog(ticker: str) -> list[dict]:
     """DART document.xml 원문에서 수주잔고를 수집해 저장 후 반환.
 
@@ -526,9 +616,11 @@ def fetch_and_save_backlog(ticker: str) -> list[dict]:
                     "source": "dart", "raw_text": raw_text,
                 }])
             else:
+                block = _financials_block(get_financials(corp_code, quarter))
+                combined = (block + "\n\n" + raw_text) if block else raw_text
                 _upsert(ticker, [{
                     "quarter": quarter, "amount": None, "unit": unit,
-                    "source": "pending", "raw_text": raw_text,
+                    "source": "pending", "raw_text": combined,
                 }])
             seen_quarters.add(quarter)
 

@@ -220,6 +220,7 @@ def test_fetch_and_save_backlog_saves_pending_and_skips_no_keyword(monkeypatch):
     monkeypatch.setattr(svc, "_get_document_text", fake_document_text)
     monkeypatch.setattr(svc, "_upsert", lambda ticker, entries: upserts.append((ticker, entries)))
     monkeypatch.setattr(svc, "get_backlog", lambda ticker: [{"quarter": "2025Q4"}])
+    monkeypatch.setattr(svc, "get_financials", lambda *a, **k: {})
     monkeypatch.setattr(svc.time, "sleep", lambda s: None)
 
     result = svc.fetch_and_save_backlog("000720.KS")
@@ -246,3 +247,82 @@ def test_fetch_and_save_backlog_no_corp_code_returns_backlog(monkeypatch):
     monkeypatch.setattr(svc, "get_backlog", lambda ticker: [])
 
     assert svc.fetch_and_save_backlog("ZZZ") == []
+
+
+# ── 재무제표 컨텍스트 (Cowork pending 분석용) ──
+
+class _FakeJsonResp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def test_won_to_eok_normalizes_won_to_eok():
+    from services import backlog as svc
+
+    # 2,670,290,124,900원 = 26,702.9...억원
+    assert abs(svc._won_to_eok("2,670,290,124,900") - 26702.901249) < 1e-2
+    assert abs(svc._won_to_eok("(1,000,000,000)") - (-10.0)) < 1e-9
+    assert svc._won_to_eok("-") is None
+    assert svc._won_to_eok("xyz") is None
+
+
+def test_get_financials_prefers_cfs_and_normalizes(monkeypatch):
+    from services import backlog as svc
+
+    payload = {
+        "status": "000",
+        "list": [
+            {"fs_div": "CFS", "account_nm": "매출액",
+             "thstrm_amount": "2,670,290,124,900", "frmtrm_amount": "1,124,012,148,400"},
+            {"fs_div": "OFS", "account_nm": "매출액",  # 별도는 연결이 있으면 무시
+             "thstrm_amount": "999", "frmtrm_amount": "999"},
+            {"fs_div": "CFS", "account_nm": "자산총계",
+             "thstrm_amount": "5,395,366,960,400", "frmtrm_amount": "4,356,193,404,300"},
+        ],
+    }
+    monkeypatch.setattr(svc.requests, "get", lambda *a, **k: _FakeJsonResp(payload))
+
+    fin = svc.get_financials("00164478", "2025Q4")
+    assert fin["_fs"] == "연결"
+    assert abs(fin["매출액"]["당기"] - 26702.901249) < 1e-2
+    assert "자산총계" in fin
+
+
+def test_get_financials_bad_status_returns_empty(monkeypatch):
+    from services import backlog as svc
+
+    monkeypatch.setattr(svc.requests, "get", lambda *a, **k: _FakeJsonResp({"status": "013"}))
+    assert svc.get_financials("X", "2025Q4") == {}
+
+
+def test_fetch_and_save_prepends_financials_context(monkeypatch):
+    from services import backlog as svc
+
+    upserts = []
+    monkeypatch.setattr(svc, "_get_corp_code", lambda t: "00164478")
+    monkeypatch.setattr(svc, "_get_recent_reports", lambda corp_code: [
+        {"rcept_no": "111", "report_nm": "사업보고서 (2025.12)", "rcept_dt": "20260318"},
+    ])
+    monkeypatch.setattr(svc, "_get_document_text", lambda r: (
+        "<P>2025년 12월 31일 현재, 회사의 건설계약 수주잔고는 69,402,839백만원입니다.</P>"
+    ))
+    monkeypatch.setattr(svc, "_upsert", lambda ticker, entries: upserts.append((ticker, entries)))
+    monkeypatch.setattr(svc, "get_backlog", lambda ticker: [])
+    monkeypatch.setattr(svc, "get_financials", lambda corp, q: {
+        "_fs": "연결", "매출액": {"당기": 26702.9, "전기": 11240.1},
+    })
+    monkeypatch.setattr(svc.time, "sleep", lambda s: None)
+
+    svc.fetch_and_save_backlog("000720.KS")
+
+    assert len(upserts) == 1
+    _, entries = upserts[0]
+    raw = entries[0]["raw_text"]
+    assert "[재무 컨텍스트]" in raw
+    assert "매출액: 당기=26702.9" in raw
+    # 수주 원문은 컨텍스트 뒤에 그대로 보존
+    assert "수주잔고는 69,402,839백만원" in raw
+    assert raw.index("[재무 컨텍스트]") < raw.index("수주잔고는")
