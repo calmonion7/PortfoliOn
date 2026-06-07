@@ -4,7 +4,7 @@ import scheduler
 from auth import get_current_user, require_admin
 from services import job_runs, storage
 from services.batch_registry import BATCHES, get_batch
-from services.schedule_spec import validate_schedule_spec
+from services.schedule_spec import validate_schedule_spec, describe_schedule
 
 router = APIRouter(prefix="/api", tags=["batches"])
 
@@ -31,16 +31,22 @@ def _schedule_for(entry):
 
 @router.get("/batches")
 def list_batches(user_id: str = Depends(get_current_user)):
-    """배치 현황: 레지스트리 + 다음 실행 시각 + 최근 실행로그 + (편집가능 시) 스케줄."""
-    return [
-        {
+    """배치 현황: 레지스트리 + 다음 실행 시각 + 최근 실행로그 + (편집가능 시) 스케줄.
+
+    편집 가능한 배치의 schedule_desc는 저장된 스케줄 spec에서 파생(정본).
+    비편집 배치는 레지스트리의 정적 문자열을 유지."""
+    out = []
+    for b in BATCHES:
+        sched = _schedule_for(b)
+        desc = describe_schedule(sched) if (b.get("editable") and sched) else b["schedule_desc"]
+        out.append({
             **b,
+            "schedule_desc": desc,
             "next_run": _next_run(b["scheduler_job_id"]),
             "recent_runs": job_runs.recent(b["id"]),
-            "schedule": _schedule_for(b),
-        }
-        for b in BATCHES
-    ]
+            "schedule": sched,
+        })
+    return out
 
 
 @router.get("/batches/{job_id}/schedule")

@@ -120,6 +120,31 @@ def test_list_includes_schedule_editable_timezone():
     assert data["consensus"]["schedule"] is None
 
 
+def test_schedule_desc_derived_from_saved_spec_for_editable():
+    """편집 배치의 schedule_desc는 저장 spec에서 파생, 비편집은 정적 문자열 유지."""
+    def get_sched(job_id):
+        if job_id == "daily_digest":  # 시간 변경됨
+            return {"enabled": True, "type": "daily", "time": "09:30"}
+        if job_id == "leverage_fetch":  # 자동실행 꺼짐
+            return {"enabled": False, "type": "daily", "time": "07:00"}
+        return None
+
+    with patch("routers.batches.job_runs.recent", return_value=[]), \
+         patch("routers.batches.storage.get_batch_schedule", side_effect=get_sched), \
+         patch.object(__import__("scheduler"), "_scheduler") as mock_sched:
+        mock_sched.get_job.return_value = None
+        resp = client.get("/api/batches")
+    data = {b["id"]: b for b in resp.json()}
+    # editable + 저장값 → spec 반영
+    assert data["daily_digest"]["schedule_desc"] == "매일 09:30"
+    # editable + 비활성 → "자동실행 꺼짐"
+    assert data["leverage_fetch"]["schedule_desc"] == "자동실행 꺼짐"
+    # editable + 저장값 없음 → default_schedule에서 파생 (backlog_fetch 기본: 매주 일 04:00)
+    assert data["backlog_fetch"]["schedule_desc"] == "매주 일 04:00"
+    # 비편집(consensus)은 레지스트리 정적 문자열 유지
+    assert data["consensus"]["schedule_desc"] == "리포트 생성에 포함"
+
+
 def test_get_schedule_returns_stored_spec():
     spec = {"enabled": True, "type": "weekly", "days": ["mon", "wed"], "time": "08:00"}
     with patch("routers.batches.storage.get_batch_schedule", return_value=spec):

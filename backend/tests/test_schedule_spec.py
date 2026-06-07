@@ -1,6 +1,6 @@
 import pytest
 
-from services.schedule_spec import validate_schedule_spec, build_trigger_kwargs
+from services.schedule_spec import validate_schedule_spec, build_trigger_kwargs, describe_schedule
 
 
 # ── valid 패턴 4종 ────────────────────────────────────────────────────────────
@@ -228,3 +228,56 @@ def test_equivalent_to_current_hardcoded_triggers():
     assert build_trigger_kwargs(
         {"enabled": True, "type": "weekly", "days": ["sun"], "time": "04:00"}
     ) == {"day_of_week": "sun", "hour": 4, "minute": 0}
+
+
+# ── describe_schedule: spec → 사람이 읽는 주기설명 (제목 밑 표시) ────────────────
+
+def test_describe_disabled_overrides_all():
+    # enabled=False면 type/시간과 무관하게 "자동실행 꺼짐"
+    assert describe_schedule({"enabled": False, "type": "daily", "time": "08:00"}) == "자동실행 꺼짐"
+    assert describe_schedule(
+        {"enabled": False, "type": "weekly", "days": ["mon"], "time": "03:00"}
+    ) == "자동실행 꺼짐"
+
+
+def test_describe_daily():
+    assert describe_schedule({"enabled": True, "type": "daily", "time": "08:00"}) == "매일 08:00"
+    assert describe_schedule({"enabled": True, "type": "daily", "time": "09:30"}) == "매일 09:30"
+
+
+def test_describe_weekly_single_day():
+    # 기존 정적 문자열 "매주 일 04:00" 포맷과 일치
+    assert describe_schedule(
+        {"enabled": True, "type": "weekly", "days": ["sun"], "time": "04:00"}
+    ) == "매주 일 04:00"
+
+
+def test_describe_weekly_multi_day_mon_sun_order():
+    # days 입력 순서와 무관하게 월~일 순으로 콤마 결합
+    assert describe_schedule(
+        {"enabled": True, "type": "weekly", "days": ["fri", "mon", "wed"], "time": "08:00"}
+    ) == "매주 월,수,금 08:00"
+    assert describe_schedule(
+        {"enabled": True, "type": "weekly",
+         "days": ["mon", "tue", "wed", "thu", "fri"], "time": "08:00"}
+    ) == "매주 월,화,수,목,금 08:00"
+
+
+def test_describe_monthly():
+    # 기존 정적 문자열 "매월 1일 02:00" / "매월 5일 08:00" 포맷과 일치
+    assert describe_schedule(
+        {"enabled": True, "type": "monthly", "day_of_month": 1, "time": "02:00"}
+    ) == "매월 1일 02:00"
+    assert describe_schedule(
+        {"enabled": True, "type": "monthly", "day_of_month": 5, "time": "08:00"}
+    ) == "매월 5일 08:00"
+
+
+def test_describe_interval():
+    # 기존 정적 문자열 "장중 09–15시 10분마다" 포맷과 일치 (시각 2자리, en-dash)
+    assert describe_schedule(
+        {"enabled": True, "type": "interval", "every_minutes": 10, "start_hour": 9, "end_hour": 15}
+    ) == "장중 09–15시 10분마다"
+    assert describe_schedule(
+        {"enabled": True, "type": "interval", "every_minutes": 10, "start_hour": 9, "end_hour": 16}
+    ) == "장중 09–16시 10분마다"

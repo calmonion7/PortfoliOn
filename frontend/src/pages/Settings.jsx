@@ -93,7 +93,7 @@ function ManualRunButton({ batch }) {
   )
 }
 
-function BatchCard({ batch, isAdmin }) {
+function BatchCard({ batch, isAdmin, onSaved }) {
   const [open, setOpen] = useState(false)
   const Extra = EXTRA[batch.id]
   const recent = batch.recent_runs?.[0]
@@ -129,7 +129,7 @@ function BatchCard({ batch, isAdmin }) {
           {showEditor || showExtra ? (
             <>
               {showEditor && (
-                <BatchScheduleEditor jobId={batch.id} schedule={batch.schedule} timezone={batch.timezone} />
+                <BatchScheduleEditor jobId={batch.id} schedule={batch.schedule} timezone={batch.timezone} onSaved={onSaved} />
               )}
               {showExtra && <Extra />}
               {!showExtra && batch.manual_endpoint && (
@@ -157,11 +157,11 @@ function BatchHub({ isAdmin }) {
   const [batches, setBatches] = useState(null)
   const [err, setErr] = useState('')
 
-  useEffect(() => {
-    api.get('/api/batches')
-      .then(({ data }) => setBatches(data))
-      .catch(e => setErr(e?.response?.data?.detail || '배치 현황을 불러오지 못했습니다.'))
-  }, [])
+  const load = () => api.get('/api/batches')
+    .then(({ data }) => setBatches(data))
+    .catch(e => setErr(e?.response?.data?.detail || '배치 현황을 불러오지 못했습니다.'))
+
+  useEffect(() => { load() }, [])
 
   if (err) return <p style={{ color: 'var(--down)', fontSize: 13 }}>{err}</p>
   if (!batches) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</p>
@@ -175,7 +175,7 @@ function BatchHub({ isAdmin }) {
         return (
           <div key={cat.key}>
             <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0 }}>{cat.label}</div>
-            {items.map(b => <BatchCard key={b.id} batch={b} isAdmin={isAdmin} />)}
+            {items.map(b => <BatchCard key={b.id} batch={b} isAdmin={isAdmin} onSaved={load} />)}
           </div>
         )
       })}
