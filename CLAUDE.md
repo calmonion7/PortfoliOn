@@ -116,6 +116,7 @@ cd backend && .venv/bin/python -m pytest
 
 - **인프라**: Mac 로컬 Docker 4-컨테이너 (Render/Vercel/Supabase 제거)
 - **nginx**: HTTP(80) 서빙, /api/* → backend:8000 프록시
+- **프론트 서빙**: nginx가 `./frontend/dist`를 `:ro` 볼륨마운트로 직접 서빙. 로컬 `cd frontend && npm run build`가 **즉시 라이브**(서빙 번들 해시=로컬 빌드 해시로 검증 가능). `git push`는 폴러 재배포/영속용이며, **백엔드 변경은 폴러 재배포 후에야 라이브** 반영된다(프론트만 먼저 빌드하면 백엔드 의존 기능이 미동작).
 - **backend**: FastAPI 컨테이너 (port 8000)
 - **postgres**: PostgreSQL 16 컨테이너, pgdata 볼륨
 - **Cloudflare Tunnel**: portfolion.taebro.com → localhost:80
