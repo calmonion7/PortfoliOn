@@ -74,7 +74,7 @@ export default function InstallPrompt() {
   const ios = isIOS()
 
   return (
-    <div className="install-prompt mobile-only" role="dialog" aria-label="앱 설치 안내">
+    <div className="install-prompt" role="dialog" aria-label="앱 설치 안내">
       <button className="install-prompt-close" onClick={close} aria-label="닫기"><CloseIcon /></button>
       <div className="install-prompt-icon" aria-hidden="true">
         <img src="/favicon.svg" alt="" width="24" height="24" />
