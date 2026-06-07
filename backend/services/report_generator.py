@@ -34,6 +34,18 @@ def _infer_comp_market(ticker: str, parent_market: str, parent_exchange: str):
     return "US", ""
 
 
+def generate_report_with_retry(stock: dict, target_date: str = None, retries: int = 1) -> str:
+    """generate_report를 1회(기본) 재시도. 외부 fetch 일시 실패(quote None 등)로
+    종목이 그날 배치에서 통째 누락되는 것을 줄인다. 마지막 시도도 실패하면 예외 전파."""
+    last_exc = None
+    for _ in range(retries + 1):
+        try:
+            return generate_report(stock, target_date=target_date)
+        except Exception as e:
+            last_exc = e
+    raise last_exc
+
+
 def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_date: str = None) -> str:
     ticker = stock["ticker"]
     market = stock.get("market", "US")

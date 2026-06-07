@@ -20,7 +20,7 @@ def _generate_all():
             stocks = storage.get_all_stocks(user_id)
             for stock in stocks:
                 try:
-                    report_generator.generate_report(stock)
+                    report_generator.generate_report_with_retry(stock)
                     print(f"[Scheduler] Report generated for {stock['ticker']}")
                 except Exception as e:
                     print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
@@ -315,11 +315,32 @@ def _check_missed_report():
     if now.hour < sched_hour or (now.hour == sched_hour and now.minute < sched_minute):
         return
     today = now.date().strftime("%Y-%m-%d")
-    rows = db_query("SELECT 1 FROM snapshots WHERE date = %s LIMIT 1", (today,))
-    if rows:
+    # 전 사용자 종목 중 오늘 스냅샷이 없는 것만 골라 재생성 (부분 누락 복구).
+    # 기존엔 "하나라도 있으면 전체 스킵"이라 일부 종목만 빠진 날은 복구되지 않았다.
+    user_ids = list({r["user_id"] for r in db_query("SELECT DISTINCT user_id FROM user_stocks")})
+    stocks_by_ticker: dict = {}
+    for user_id in user_ids:
+        for stock in storage.get_all_stocks(user_id):
+            stocks_by_ticker.setdefault(stock["ticker"], stock)
+    if not stocks_by_ticker:
         return
-    print(f"[Scheduler] Missed job detected for {today}, running now...")
-    _generate_all()
+    have = {r["ticker"] for r in db_query(
+        "SELECT DISTINCT ticker FROM snapshots WHERE date = %s AND ticker = ANY(%s)",
+        (today, list(stocks_by_ticker.keys())),
+    )}
+    missing = [s for t, s in stocks_by_ticker.items() if t not in have]
+    if not missing:
+        return
+    print(f"[Scheduler] Missed report: {len(missing)} stock(s) for {today}, generating...")
+    for stock in missing:
+        try:
+            report_generator.generate_report_with_retry(stock)
+        except Exception as e:
+            print(f"[Scheduler] Missed-report failed for {stock['ticker']}: {e}")
+    try:
+        _pipeline.run_daily(missing)
+    except Exception as e:
+        print(f"[Scheduler] Missed-report pipeline failed: {e}")
 
 
 def start():

@@ -134,7 +134,7 @@ def _run_generation(stocks: list, target_date: str = None):
     def _process_one(stock):
         _progress.set(current=stock["ticker"])
         try:
-            report_generator.generate_report(stock, target_date=target_date)
+            report_generator.generate_report_with_retry(stock, target_date=target_date)
             cache_svc.invalidate(stock["ticker"])
             _pipeline.run_daily([stock])
         except Exception as e:
