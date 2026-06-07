@@ -320,6 +320,15 @@ def _run_backlog_all():
         fetch_all_backlog()
 
 
+# /report/{ticker}/backlog 은 catch-all /report/{ticker}/{date_str} 보다 먼저
+# 등록해야 한다. 아니면 "backlog"가 date_str로 매칭돼 snapshots를 date='backlog'로
+# 조회하다 500이 난다 (enrich/batch와 동일 클래스의 라우트 순서 함정).
+@router.get("/report/{ticker}/backlog")
+def get_backlog(ticker: str):
+    from services.backlog import get_backlog as _get_backlog
+    return _get_backlog(ticker)
+
+
 @router.get("/report/{ticker}/{date_str}")
 def get_report(ticker: str, date_str: str):
     upper = ticker.upper()
@@ -457,12 +466,6 @@ def backfill_consensus(ticker: str):
     market = summary.get("market", "US")
     added = consensus_svc.backfill(upper, market)
     return {"added": len(added), "entries": added}
-
-
-@router.get("/report/{ticker}/backlog")
-def get_backlog(ticker: str):
-    from services.backlog import get_backlog as _get_backlog
-    return _get_backlog(ticker)
 
 
 @router.put("/report/{ticker}/backlog")

@@ -294,3 +294,14 @@ def test_get_report_is_etf_false_for_equity(tmp_path):
         resp = client.get("/api/report/LLY/2026-05-05")
     assert resp.status_code == 200
     assert resp.json()["summary"]["is_etf"] is False
+
+
+# ── 라우트 순서 회귀: /report/{ticker}/backlog 가 catch-all /{date_str}에 가려지면 안 됨 ──
+# 가려지면 "backlog"가 date_str로 매칭돼 snapshots를 date='backlog'로 조회하다 500.
+
+def test_backlog_route_not_shadowed_by_date_str():
+    sample = [{"quarter": "2025Q4", "amount": 1168007.29, "unit": "억원", "source": "llm"}]
+    with patch("services.backlog.get_backlog", return_value=sample):
+        resp = client.get("/api/report/012450/backlog")
+    assert resp.status_code == 200
+    assert resp.json() == sample
