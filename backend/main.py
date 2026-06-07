@@ -49,8 +49,18 @@ def _warm_market_cache():
         pass
 
 
+def _migrate():
+    """기동 시 idempotent 추가 마이그레이션 (배포가 자동 적용; DDL은 ADD COLUMN IF NOT EXISTS)."""
+    try:
+        from services.db import execute
+        execute("ALTER TABLE backlog_history ADD COLUMN IF NOT EXISTS segments JSONB")
+    except Exception:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _migrate()
     sched.start()
     threading.Thread(target=_warm_calendar_cache, daemon=True).start()
     threading.Thread(target=_warm_market_cache, daemon=True).start()

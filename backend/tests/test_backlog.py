@@ -1,4 +1,5 @@
 import io
+import json
 import sys
 import zipfile
 from pathlib import Path
@@ -296,6 +297,46 @@ def test_get_financials_bad_status_returns_empty(monkeypatch):
 
     monkeypatch.setattr(svc.requests, "get", lambda *a, **k: _FakeJsonResp({"status": "013"}))
     assert svc.get_financials("X", "2025Q4") == {}
+
+
+def test_save_llm_backlog_with_segments(monkeypatch):
+    from services import backlog as svc
+    calls = []
+    monkeypatch.setattr(svc, "execute", lambda sql, params: calls.append((sql, params)))
+    segs = [{"sector": "항공", "entity": "한화에어로", "amount": 323995.45},
+            {"sector": "해양", "entity": "한화오션", "amount": 344950.64}]
+    svc.save_llm_backlog("012450", [{"quarter": "2025Q4", "amount": 1168007.29, "segments": segs}])
+    assert len(calls) == 1
+    sql, params = calls[0]
+    assert "COALESCE" in sql and "segments" in sql
+    assert "IN ('pending', 'llm')" in sql  # 자신이 채운 llm 행도 재-PUT 가능
+    assert params[0] == 1168007.29
+    assert json.loads(params[1]) == segs
+    assert params[2] == "012450" and params[3] == "2025Q4"
+
+
+def test_save_llm_backlog_without_segments_passes_null(monkeypatch):
+    from services import backlog as svc
+    calls = []
+    monkeypatch.setattr(svc, "execute", lambda sql, params: calls.append((sql, params)))
+    svc.save_llm_backlog("005380", [{"quarter": "2024Q3", "amount": 90312.0}])
+    _, params = calls[0]
+    assert params[1] is None  # segments 미제공 → COALESCE로 기존값 유지
+
+
+def test_get_backlog_selects_and_returns_segments(monkeypatch):
+    from services import backlog as svc
+    cap = {}
+
+    def fake_query(sql, params):
+        cap["sql"] = sql
+        return [{"quarter": "2025Q4", "amount": 1168007.29, "unit": "억원", "source": "llm",
+                 "segments": [{"sector": "항공", "entity": "한화에어로", "amount": 323995.45}]}]
+
+    monkeypatch.setattr(svc, "query", fake_query)
+    rows = svc.get_backlog("012450")
+    assert "segments" in cap["sql"]
+    assert rows[0]["segments"][0]["sector"] == "항공"
 
 
 def test_fetch_and_save_prepends_financials_context(monkeypatch):

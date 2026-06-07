@@ -11,6 +11,7 @@ DART 수주잔고(Order Backlog) 수집 서비스.
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 import re
@@ -463,9 +464,11 @@ def _upsert(ticker: str, entries: list[dict]):
 
 
 def get_backlog(ticker: str) -> list[dict]:
-    """DB에서 수주잔고 이력 반환. [{quarter, amount, unit, source}]"""
+    """DB에서 수주잔고 이력 반환. [{quarter, amount, unit, source, segments}]
+
+    segments는 사업부문>법인별 분해 [{sector, entity, amount(억원)}] 또는 None."""
     rows = query(
-        "SELECT quarter, amount, unit, source FROM backlog_history WHERE ticker = %s ORDER BY quarter",
+        "SELECT quarter, amount, unit, source, segments FROM backlog_history WHERE ticker = %s ORDER BY quarter",
         (ticker.upper(),),
     )
     return [dict(r) for r in rows]
@@ -480,15 +483,24 @@ def get_pending_backlog() -> list[dict]:
 
 
 def save_llm_backlog(ticker: str, entries: list[dict]):
-    """Claude Code 분석 결과 저장. entries: [{quarter, amount}]"""
+    """Cowork 분석 결과 저장. entries: [{quarter, amount, segments?}]
+
+    segments(선택): 사업부문>법인별 분해 [{sector, entity, amount}]. 주어지면 저장하고
+    없으면 기존값 유지(COALESCE). pending뿐 아니라 자신이 채운 llm 행도 갱신 가능
+    (재-PUT로 수치/분해 수정). dart(자동추출 검산 통과) 행은 보호."""
     for e in entries:
+        segs = e.get("segments")
         execute(
             """
             UPDATE backlog_history
-            SET amount = %s, source = 'llm', fetched_at = NOW()
-            WHERE ticker = %s AND quarter = %s AND source = 'pending'
+            SET amount = %s,
+                segments = COALESCE(%s::jsonb, segments),
+                source = 'llm', fetched_at = NOW()
+            WHERE ticker = %s AND quarter = %s AND source IN ('pending', 'llm')
             """,
-            (float(e["amount"]), ticker.upper(), e["quarter"]),
+            (float(e["amount"]),
+             json.dumps(segs, ensure_ascii=False) if segs is not None else None,
+             ticker.upper(), e["quarter"]),
         )
 
 

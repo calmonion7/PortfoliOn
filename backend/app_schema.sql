@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS backlog_history (
   unit       TEXT DEFAULT '억원',
   source     TEXT DEFAULT 'dart',
   raw_text   TEXT,
+  segments   JSONB,                -- 사업부문>법인별 분해: [{sector, entity, amount(억원)}]
   fetched_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (ticker, quarter)
 );
