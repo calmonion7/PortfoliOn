@@ -886,6 +886,93 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 ---
 
+### `GET /api/report/{ticker}/backlog`
+
+종목의 수주잔고(Order Backlog) 분기별 이력 조회. KR 종목 리포트 상세의 '수주잔고 추이' 차트가 사용. **Auth 불필요.**
+
+**Response `200`**
+```json
+[
+  { "quarter": "2025Q3", "amount": 1031207.96, "unit": "억원", "source": "dart",
+    "segments": [ { "sector": "항공", "entity": "한화에어로스페이스㈜", "amount": 314106.0 } ] },
+  { "quarter": "2024Q4", "amount": null, "unit": "억원", "source": "pending", "segments": null }
+]
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `quarter` | string | 분기 (`YYYYQn`) |
+| `amount` | number\|null | 수주잔고 총액(억원). `pending`이면 null |
+| `unit` | string | 원본 표 단위(저장은 억원 정규화) |
+| `source` | string | `"dart"`(코드 자동추출·검산 통과) \| `"llm"`(Cowork 수기) \| `"pending"`(미채움) |
+| `segments` | `{sector,entity,amount}[]`\|null | 다중엔티티 연결 종목의 사업부문>법인별 분해(억원). 없으면 null |
+
+---
+
+### `GET /api/report/backlog/pending`
+
+코드 자동 파싱(검산)에 실패해 분석 대기 중인 항목과 추출 지침(prompt)을 반환. Claude Cowork가 소비. **Auth:** `X-API-Key` 또는 로그인.
+
+**Response `200`**
+```json
+{
+  "prompt": "다음은 한 종목 정기보고서에서 추출한 [재무 컨텍스트]와 [수주 원문]입니다 ...",
+  "items": [
+    { "ticker": "000720", "quarter": "2025Q1",
+      "raw_text": "[재무 컨텍스트] (단위: 억원, 연결재무제표)\n  매출액: ...\n\n회사명 | 품목 | ... | 수주잔고\n...",
+      "unit": "억원" }
+  ]
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `prompt` | string | 수주잔고 추출 지침(단위 정규화·외화·다중엔티티·공사진행·"틀린 값<누락") |
+| `items[]` | array | 대기 항목 (`ticker`, `quarter`, `raw_text`=재무 컨텍스트+수주 원문 결합, `unit`) |
+
+> 다중엔티티 연결 종목은 코드가 `dart`+segments로 자동 채워 pending에 없음. `items` 빈 배열이면 대기 없음.
+
+---
+
+### `PUT /api/report/{ticker}/backlog`
+
+Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm'`인 행만 갱신(`'dart'` 보호). **Auth:** `X-API-Key` 또는 로그인.
+
+**Request Body** — 분기별 배열
+```json
+[
+  { "quarter": "2024Q3", "amount": 85432.0 },
+  { "quarter": "2025Q4", "amount": 1168007.29,
+    "segments": [ { "sector": "방산", "entity": "한화에어로스페이스㈜", "amount": 372199.02 } ] }
+]
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `quarter` | string | ✅ | 분기 (`YYYYQn`) |
+| `amount` | number | ✅ | 수주잔고 총액(억원). segments가 있으면 그 합과 일치 |
+| `segments` | `{sector,entity,amount}[]` | ⬜ | 사업부문>법인별 분해(억원). 미제공 시 기존값 유지(COALESCE) |
+
+**Response `200`** — `{ "ticker": "012450", "saved": 2 }`
+
+---
+
+### `POST /api/report/backlog/refresh-all`
+
+전 KR 종목 수주잔고 재수집(DART document.xml 스윕). 백그라운드 실행, 즉시 202. **Auth:** admin.
+
+**Response `202`** — `{ "message": "수주잔고 전 종목 수집 시작" }`
+
+---
+
+### `POST /api/report/{ticker}/backlog/refresh`
+
+단일 종목 수주잔고 재수집. **Auth:** admin.
+
+**Response `202`** — `{ "ticker": "012450", "count": 6, "entries": [ ... ] }`
+
+---
+
 ## Consensus (컨센서스)
 
 ### `GET /api/consensus/batch/progress`
