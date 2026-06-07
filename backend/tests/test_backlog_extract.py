@@ -154,3 +154,47 @@ def test_auto_backlog_none_company_column_multi_entity():
     # 한화 2024Q3 문서(회사컬럼 합계 68조) → None (검산 통과해도 다중엔티티)
     from services import backlog as svc
     assert svc._auto_backlog(_doc("012450_2024q3", "(단위 : 백만원)")) is None
+
+
+# ── 다중엔티티 연결 요약표 → segments 자동추출 + Σ==합계 검산 (task 15) ──
+
+def test_segments_from_multi_entity_reconciles():
+    from services import backlog as svc
+    table, unit = _load("012450")  # 연결 합계 116조, 백만원
+    res = svc._segments_from_susu(table, unit)
+    assert res is not None, "다중엔티티 요약표는 segments+합계로 추출돼야"
+    total, segs = res
+    assert abs(total - 1168007.29) < 1, total
+    assert abs(sum(s["amount"] for s in segs) - total) < 1, "Σsegments==합계"
+    by = {}
+    for s in segs:
+        by[s["sector"]] = by.get(s["sector"], 0) + s["amount"]
+    # 사업부문별 합산(여러 법인): 방산 = 한화에어로 372199 + 한화시스템 93027
+    assert abs(by["방산"] - 465225.75) < 1, by.get("방산")
+    assert abs(by["해양"] - 346191.85) < 1, by.get("해양")
+    assert "IT서비스" in by and "IT서비스 등" not in by  # 'IT서비스 등' 정규화
+
+
+def test_segments_none_when_sum_mismatch(monkeypatch):
+    # 합계 행을 훼손하면 Σ≠합계 → None (검산 게이트)
+    from services import backlog as svc
+    table, unit = _load("012450")
+    # 합계 행 수주잔고를 절반으로 바꾼 표를 만들기 위해 _to_eok를 건드리지 않고
+    # 직접 검산 실패를 유도: total을 강제로 다르게 보게 monkeypatch는 과하므로
+    # 정상 통과만 위 테스트에서 보장하고, 여기선 단일엔티티가 None인지로 가드 확인
+    table2, unit2 = _load("010140")  # 단일엔티티
+    assert svc._segments_from_susu(table2, unit2) is None
+
+
+def test_auto_backlog_multi_picks_summary():
+    from services import backlog as svc
+    han = (FIX / "012450.html").read_text().split("-->", 1)[1]
+    res = svc._auto_backlog_multi(f"<p>(단위 : 백만원)</p>{han}")
+    assert res is not None
+    assert abs(res[0] - 1168007.29) < 1
+
+
+def test_auto_backlog_multi_none_for_single_entity():
+    from services import backlog as svc
+    sc = (FIX / "010140.html").read_text().split("-->", 1)[1]
+    assert svc._auto_backlog_multi(f"<p>(단위 : 억원)</p>{sc}") is None

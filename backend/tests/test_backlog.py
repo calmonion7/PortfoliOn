@@ -3,6 +3,8 @@ import json
 import sys
 import zipfile
 from pathlib import Path
+
+import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
@@ -218,25 +220,25 @@ def test_fetch_and_save_backlog_saves_pending_and_skips_no_keyword(monkeypatch):
             )
         return "<P>해당 사항 없음.</P>"
 
+    pendings = []
     monkeypatch.setattr(svc, "_get_document_text", fake_document_text)
     monkeypatch.setattr(svc, "_upsert", lambda ticker, entries: upserts.append((ticker, entries)))
+    monkeypatch.setattr(svc, "_save_pending",
+                        lambda ticker, quarter, unit, raw_text: pendings.append((ticker, quarter, unit, raw_text)))
     monkeypatch.setattr(svc, "get_backlog", lambda ticker: [{"quarter": "2025Q4"}])
     monkeypatch.setattr(svc, "get_financials", lambda *a, **k: {})
     monkeypatch.setattr(svc.time, "sleep", lambda s: None)
 
     result = svc.fetch_and_save_backlog("000720.KS")
 
-    # 수주 있는 보고서(2025Q4)만 pending으로 저장, 수주 없는 보고서(2025Q3)는 skip
-    assert len(upserts) == 1
-    ticker, entries = upserts[0]
+    # 추출 실패(단일/다중 자동추출 모두 None) → _save_pending으로 저장(_upsert 아님), 수주 없는 보고서는 skip
+    assert upserts == []
+    assert len(pendings) == 1
+    ticker, quarter, unit, raw_text = pendings[0]
     assert ticker == "000720.KS"
-    assert len(entries) == 1
-    e = entries[0]
-    assert e["quarter"] == "2025Q4"
-    assert e["source"] == "pending"
-    assert e.get("amount") is None
-    assert "수주잔고는 69,402,839백만원" in e["raw_text"]
-    assert e["unit"] == "백만원"
+    assert quarter == "2025Q4"
+    assert "수주잔고는 69,402,839백만원" in raw_text
+    assert unit == "백만원"
     # 반환값은 get_backlog 결과
     assert result == [{"quarter": "2025Q4"}]
 
@@ -342,7 +344,7 @@ def test_get_backlog_selects_and_returns_segments(monkeypatch):
 def test_fetch_and_save_prepends_financials_context(monkeypatch):
     from services import backlog as svc
 
-    upserts = []
+    pendings = []
     monkeypatch.setattr(svc, "_get_corp_code", lambda t: "00164478")
     monkeypatch.setattr(svc, "_get_recent_reports", lambda corp_code: [
         {"rcept_no": "111", "report_nm": "사업보고서 (2025.12)", "rcept_dt": "20260318"},
@@ -350,7 +352,8 @@ def test_fetch_and_save_prepends_financials_context(monkeypatch):
     monkeypatch.setattr(svc, "_get_document_text", lambda r: (
         "<P>2025년 12월 31일 현재, 회사의 건설계약 수주잔고는 69,402,839백만원입니다.</P>"
     ))
-    monkeypatch.setattr(svc, "_upsert", lambda ticker, entries: upserts.append((ticker, entries)))
+    monkeypatch.setattr(svc, "_save_pending",
+                        lambda ticker, quarter, unit, raw_text: pendings.append((ticker, quarter, unit, raw_text)))
     monkeypatch.setattr(svc, "get_backlog", lambda ticker: [])
     monkeypatch.setattr(svc, "get_financials", lambda corp, q: {
         "_fs": "연결", "매출액": {"당기": 26702.9, "전기": 11240.1},
@@ -359,11 +362,48 @@ def test_fetch_and_save_prepends_financials_context(monkeypatch):
 
     svc.fetch_and_save_backlog("000720.KS")
 
-    assert len(upserts) == 1
-    _, entries = upserts[0]
-    raw = entries[0]["raw_text"]
+    assert len(pendings) == 1
+    raw = pendings[0][3]
     assert "[재무 컨텍스트]" in raw
     assert "매출액: 당기=26702.9" in raw
     # 수주 원문은 컨텍스트 뒤에 그대로 보존
     assert "수주잔고는 69,402,839백만원" in raw
     assert raw.index("[재무 컨텍스트]") < raw.index("수주잔고는")
+
+
+# ── pending 값 보존 가드 + 다중엔티티 자동 segments (task 15) ──
+
+def test_save_pending_preserves_existing_amount(monkeypatch):
+    from services import backlog as svc
+    calls = []
+    monkeypatch.setattr(svc, "execute", lambda sql, params: calls.append((sql, params)))
+    svc._save_pending("012450", "2025Q4", "백만원", "raw")
+    sql, params = calls[0]
+    # 이미 채워진(amount not null) 행은 pending으로 덮지 않음: SET 절에 amount 대입 없음
+    set_part = sql.split("DO UPDATE SET", 1)[1]
+    assert "amount =" not in set_part and "amount=" not in set_part.replace(" ", "")
+    # 미채움일 때만 pending: amount IS NULL 가드 존재
+    assert "amount IS NULL" in sql
+    assert params[0] == "012450" and params[1] == "2025Q4"
+
+
+def test_fetch_and_save_multi_entity_auto_segments(monkeypatch):
+    from services import backlog as svc
+    han = (Path(__file__).parent / "fixtures" / "backlog" / "012450.html").read_text().split("-->", 1)[1]
+    doc = f"<p>(단위 : 백만원)</p>{han}"
+    ups = []
+    monkeypatch.setattr(svc, "_get_corp_code", lambda t: "X")
+    monkeypatch.setattr(svc, "_get_recent_reports",
+                        lambda c: [{"rcept_no": "1", "report_nm": "사업보고서 (2025.12)", "rcept_dt": "20260318"}])
+    monkeypatch.setattr(svc, "_get_document_text", lambda r: doc)
+    monkeypatch.setattr(svc, "_upsert", lambda tk, entries: ups.append((tk, entries)))
+    monkeypatch.setattr(svc, "_save_pending", lambda *a: ups.append(("PENDING", a)))
+    monkeypatch.setattr(svc, "get_backlog", lambda t: [])
+    monkeypatch.setattr(svc.time, "sleep", lambda s: None)
+
+    svc.fetch_and_save_backlog("012450")
+    assert len(ups) == 1 and ups[0][0] == "012450", "다중엔티티는 dart로 저장(pending 아님)"
+    e = ups[0][1][0]
+    assert e["source"] == "dart"
+    assert abs(e["amount"] - 1168007.29) < 1
+    assert e["segments"] and abs(sum(s["amount"] for s in e["segments"]) - e["amount"]) < 1

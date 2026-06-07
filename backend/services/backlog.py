@@ -392,6 +392,67 @@ def _auto_backlog(html: str) -> Optional[float]:
     return None
 
 
+def _segments_from_susu(table, unit: str) -> "Optional[tuple[float, list[dict]]]":
+    """다중엔티티 수주상황 요약표 → (연결 합계 억원, segments[{sector,entity,amount}]).
+
+    Σ(부문·법인 행) == 합계 행(상대 1%) 검산을 통과할 때만 반환. 비-KRW/회사컬럼 없음/
+    무합계/Σ≠합계면 None. 금액은 억원 정규화, sector 'IT서비스 등'→'IT서비스' 정규화."""
+    if not _is_krw(unit):
+        return None
+    grid = _expand_grid(table)
+    if not grid:
+        return None
+    hrs = _header_rows(grid)
+    ecol = _find_col(grid, hrs, "회사")
+    scol = _find_col(grid, hrs, "사업")
+    bcol = _find_col(grid, hrs, "기말수주잔고") or _find_col(grid, hrs, "수주잔고")
+    if ecol is None or bcol is None:
+        return None
+    total: Optional[float] = None
+    segs: list[dict] = []
+    for i in range(len(grid)):
+        if i in hrs:
+            continue
+        amt = _num(grid[i][bcol]) if bcol < len(grid[i]) else None
+        if _TOTAL_ROW_RE.search(" ".join(grid[i])):
+            if amt is not None:
+                total = amt
+            continue
+        if amt is None:
+            continue
+        entity = re.sub(r"\s+", " ", grid[i][ecol]).strip() if ecol < len(grid[i]) else ""
+        sector = (re.sub(r"\s+", " ", grid[i][scol]).strip()
+                  if (scol is not None and scol < len(grid[i])) else "")
+        sector = re.sub(r"\s*등$", "", sector).strip()
+        segs.append({"sector": sector, "entity": entity,
+                     "amount": round(_to_eok(amt, unit), 2)})
+    if total is None or not segs:
+        return None
+    total_eok = _to_eok(total, unit)
+    seg_sum = sum(s["amount"] for s in segs)
+    if abs(seg_sum - total_eok) > _RECONCILE_TOL * max(abs(total_eok), abs(seg_sum), 1.0):
+        return None
+    return round(total_eok, 2), segs
+
+
+def _auto_backlog_multi(html: str) -> "Optional[tuple[float, list[dict]]]":
+    """다중엔티티 연결 요약표에서 (합계 억원, segments) 자동추출. 실패 시 None.
+
+    susu 표 중 다중엔티티(회사 컬럼)이고 Σ==합계 검산을 통과하는 표 중 합계 최대
+    (= 연결 요약표; 품목 상세표·부분표 회피)를 채택."""
+    if not html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    best: Optional[tuple[float, list[dict]]] = None
+    for t in soup.find_all("table"):
+        if _classify_table(t) != "susu" or not _is_multi_entity(t):
+            continue
+        res = _segments_from_susu(t, _table_unit(t))
+        if res is not None and (best is None or res[0] > best[0]):
+            best = res
+    return best
+
+
 def _extract_backlog_blocks(html: str) -> tuple[str, str]:
     """원문 HTML에서 수주 관련 블록을 추출해 (raw_text, unit) 반환.
 
@@ -440,16 +501,19 @@ def _extract_backlog_blocks(html: str) -> tuple[str, str]:
 
 
 def _upsert(ticker: str, entries: list[dict]):
+    """값이 있는 행(dart/llm) upsert. segments(다중엔티티 분해)는 선택."""
     for e in entries:
+        segs = e.get("segments")
         execute(
             """
-            INSERT INTO backlog_history (ticker, quarter, amount, unit, source, raw_text, fetched_at)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            INSERT INTO backlog_history (ticker, quarter, amount, unit, source, raw_text, segments, fetched_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, NOW())
             ON CONFLICT (ticker, quarter) DO UPDATE SET
               amount = EXCLUDED.amount,
               unit = EXCLUDED.unit,
               source = EXCLUDED.source,
               raw_text = EXCLUDED.raw_text,
+              segments = EXCLUDED.segments,
               fetched_at = NOW()
             """,
             (
@@ -459,8 +523,29 @@ def _upsert(ticker: str, entries: list[dict]):
                 e.get("unit", "억원"),
                 e.get("source", "dart"),
                 e.get("raw_text"),
+                json.dumps(segs, ensure_ascii=False) if segs is not None else None,
             ),
         )
+
+
+def _save_pending(ticker: str, quarter: str, unit: str, raw_text: str):
+    """추출 실패 분기를 pending으로 저장하되 **기존에 채워진 값(llm/dart)은 보존**한다.
+
+    신규/미채움(amount IS NULL) 행만 pending으로 두고 raw_text·unit을 갱신하고,
+    이미 amount가 있는 행은 amount/source/unit을 유지한다(주간 배치가 Cowork 수치를
+    null로 덮어쓰던 동작 방지). amount는 SET 절에 없으므로 절대 덮어쓰지 않는다."""
+    execute(
+        """
+        INSERT INTO backlog_history (ticker, quarter, amount, unit, source, raw_text, fetched_at)
+        VALUES (%s, %s, NULL, %s, 'pending', %s, NOW())
+        ON CONFLICT (ticker, quarter) DO UPDATE SET
+          raw_text = EXCLUDED.raw_text,
+          unit = CASE WHEN backlog_history.amount IS NULL THEN EXCLUDED.unit ELSE backlog_history.unit END,
+          source = CASE WHEN backlog_history.amount IS NULL THEN 'pending' ELSE backlog_history.source END,
+          fetched_at = NOW()
+        """,
+        (ticker.upper(), quarter, unit, raw_text),
+    )
 
 
 def get_backlog(ticker: str) -> list[dict]:
@@ -628,12 +713,17 @@ def fetch_and_save_backlog(ticker: str) -> list[dict]:
                     "source": "dart", "raw_text": raw_text,
                 }])
             else:
-                block = _financials_block(get_financials(corp_code, quarter))
-                combined = (block + "\n\n" + raw_text) if block else raw_text
-                _upsert(ticker, [{
-                    "quarter": quarter, "amount": None, "unit": unit,
-                    "source": "pending", "raw_text": combined,
-                }])
+                multi = _auto_backlog_multi(text)
+                if multi is not None:
+                    total, segments = multi
+                    _upsert(ticker, [{
+                        "quarter": quarter, "amount": total, "unit": "억원",
+                        "source": "dart", "raw_text": raw_text, "segments": segments,
+                    }])
+                else:
+                    block = _financials_block(get_financials(corp_code, quarter))
+                    combined = (block + "\n\n" + raw_text) if block else raw_text
+                    _save_pending(ticker, quarter, unit, combined)
             seen_quarters.add(quarter)
 
         # DART API 레이트 리밋 방지
