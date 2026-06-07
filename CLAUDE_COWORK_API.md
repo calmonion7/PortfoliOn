@@ -87,6 +87,7 @@ X-API-Key: {COWORK_API_KEY}
       "dates": ["2026-05-20", "2026-05-01"],
       "category": "holdings",
       "market": "US",
+      "is_etf": false,
       "summary": {
         "name": "Eli Lilly and Company",
         "price": 823.45,
@@ -105,6 +106,7 @@ X-API-Key: {COWORK_API_KEY}
       "dates": ["2026-05-15"],
       "category": "watchlist",
       "market": "US",
+      "is_etf": false,
       "summary": null
     }
   },
@@ -113,6 +115,7 @@ X-API-Key: {COWORK_API_KEY}
 ```
 
 > 종목 데이터는 `response["stocks"]` 아래에 있습니다. `summary`는 리포트가 없으면 `null`.
+> `is_etf`는 ETF 여부(`tickers.is_etf`). ETF는 애널리스트 의견이 없어 관심 "⚠ 경고" 분류에서 제외됩니다.
 
 ---
 

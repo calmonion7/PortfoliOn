@@ -784,6 +784,9 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
   "AAPL": {
     "dates": ["2024-11-15", "2024-11-01"],
     "category": "holdings",
+    "market": "US",
+    "exchange": "",
+    "is_etf": false,
     "summary": {
       "score": 85,
       "recommendation": "매수",
@@ -793,6 +796,9 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
   "TSLA": {
     "dates": ["2024-11-10"],
     "category": "watchlist",
+    "market": "US",
+    "exchange": "",
+    "is_etf": false,
     "summary": null
   }
 }
@@ -803,6 +809,8 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 | `"holdings"` | 보유종목 |
 | `"watchlist"` | 관심종목 |
 | `"other"` | 포트폴리오에서 제거된 종목 |
+
+- `is_etf` — ETF 여부(`tickers.is_etf` 기준). ETF는 애널리스트 의견이 없어 관심(watchlist) "⚠ 경고" 서브탭/카운트에서 제외된다.
 
 ---
 

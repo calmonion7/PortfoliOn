@@ -73,6 +73,25 @@ def test_list_reports_no_markdown_in_dates():
     assert all(not d.endswith(".md") for d in dates)
 
 
+def test_list_reports_exposes_is_etf():
+    """목록 엔트리에 is_etf가 노출돼야 프론트가 ETF를 '경고' 분류에서 제외할 수 있다."""
+    portfolio = {
+        "stocks": [{"ticker": "069500", "name": "KODEX 200", "is_etf": True,
+                    "competitors": [], "moat": "", "growth_plan": ""}],
+        "watchlist": [],
+    }
+    date_rows = [{"ticker": "069500", "date": "2026-05-05"}]
+    summary_rows = [{"ticker": "069500", "date": "2026-05-05",
+                     "data": {"name": "KODEX 200", "price": 100.0}}]
+    with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
+         patch("routers.report.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.report.storage.get_schedule", return_value={}), \
+         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
+        resp = client.get("/api/report/list")
+    assert resp.status_code == 200
+    assert resp.json()["stocks"]["069500"]["is_etf"] is True
+
+
 def test_get_report_returns_summary_no_content(tmp_path):
     ticker_dir = tmp_path / "LLY"
     ticker_dir.mkdir()

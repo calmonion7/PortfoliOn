@@ -35,19 +35,19 @@ export default function useReportList() {
   const holdingsCount = Object.values(reportList).filter(v => v.category === 'holdings').length
   const watchlistAll = Object.entries(reportList).filter(([, v]) => v.category === 'watchlist')
   const _targetPct = (s) => { const t = s?.target_mean, p = s?.price; return (t != null && p) ? (t - p) / p * 100 : null }
-  const _hasWarning = (s) => {
-    if (!s) return false
+  const _hasWarning = (s, isEtf) => {
+    if (isEtf || !s) return false  // ETF는 애널 의견이 없어 '의견 수 적음' 경고 대상 아님
     const total = (s.buy ?? 0) + (s.hold ?? 0) + (s.sell ?? 0)
     return total <= 10
   }
-  const watchlistWarnCount = watchlistAll.filter(([, v]) => _hasWarning(v.summary)).length
+  const watchlistWarnCount = watchlistAll.filter(([, v]) => _hasWarning(v.summary, v.is_etf)).length
   const watchlistLowCount = watchlistAll.filter(([, v]) => {
-    if (_hasWarning(v.summary)) return false
+    if (_hasWarning(v.summary, v.is_etf)) return false
     const g = _targetPct(v.summary)
     return g === null || g >= 40
   }).length
   const watchlistHighCount = watchlistAll.filter(([, v]) => {
-    if (_hasWarning(v.summary)) return false
+    if (_hasWarning(v.summary, v.is_etf)) return false
     const g = _targetPct(v.summary)
     return g !== null && g < 40
   }).length

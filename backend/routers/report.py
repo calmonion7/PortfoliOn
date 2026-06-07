@@ -214,7 +214,7 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
 
         def _mk_entry(ticker, dates, category, stock_info, summary):
             market = stock_info.get("market") or (summary or {}).get("market", "US")
-            e = {"dates": dates, "category": category, "summary": summary, "market": market, "exchange": stock_info.get("exchange", "")}
+            e = {"dates": dates, "category": category, "summary": summary, "market": market, "exchange": stock_info.get("exchange", ""), "is_etf": bool(stock_info.get("is_etf"))}
             if my_tickers is not None:
                 e["is_mine"] = ticker in my_tickers
             return e

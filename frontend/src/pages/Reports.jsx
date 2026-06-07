@@ -81,10 +81,10 @@ export default function Reports() {
     if (activeTab === 'ungenerated') return _isUngenerated([, v])
     if (activeTab === 'holdings') return v.category === 'holdings'
     if (v.category !== 'watchlist') return false
-    if (watchlistSub === 'warn') return _hasWarning(v.summary)
+    if (watchlistSub === 'warn') return _hasWarning(v.summary, v.is_etf)
     const g = _targetPct(v.summary)
-    if (watchlistSub === 'low') return !_hasWarning(v.summary) && (g === null || g >= 40)
-    return !_hasWarning(v.summary) && (g !== null && g < 40)
+    if (watchlistSub === 'low') return !_hasWarning(v.summary, v.is_etf) && (g === null || g >= 40)
+    return !_hasWarning(v.summary, v.is_etf) && (g !== null && g < 40)
   }
   const subTabEntries = Object.entries(reportList).filter(_matchSubTab)
   const _mktBase = activeTab === 'others' ? Object.entries(othersData || {}) : subTabEntries
