@@ -10,6 +10,7 @@ import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
 import LoginPage from './pages/LoginPage'
 import MobileNav from './components/MobileNav'
+import InstallPrompt from './components/InstallPrompt'
 import { Sun, Moon, Refresh, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
@@ -158,6 +159,7 @@ export default function App() {
           </Routes>
         </main>
         <MobileNav />
+        <InstallPrompt />
       </div>
     </BrowserRouter>
     </AuthProvider>

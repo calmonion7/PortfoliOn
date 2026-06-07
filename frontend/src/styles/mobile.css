@@ -318,3 +318,44 @@ thead .col-sticky { background: var(--bg-elev-2); }
 .report-item {
   background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px;
 }
+
+/* ── PWA 설치 유도 배너 (모바일 전용, 탭바 위) ───────────────── */
+.install-prompt {
+  position: fixed; left: 12px; right: 12px;
+  bottom: calc(64px + env(safe-area-inset-bottom, 16px));
+  z-index: 29;
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 42px 14px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  animation: toast-in 0.28s ease;
+}
+.install-prompt-icon {
+  flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px;
+  background: var(--accent-soft);
+  display: flex; align-items: center; justify-content: center;
+}
+.install-prompt-body { flex: 1; min-width: 0; }
+.install-prompt-title {
+  margin: 0 0 3px; font-size: 14px; font-weight: 600; color: var(--text);
+  letter-spacing: -0.01em;
+}
+.install-prompt-desc {
+  margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-2);
+}
+.install-prompt-desc b { color: var(--text); font-weight: 600; }
+.install-prompt-share { vertical-align: -3px; margin: 0 2px; color: var(--text); }
+.install-prompt-actions { margin-top: 10px; }
+.install-prompt-btn {
+  background: var(--accent); color: var(--bg-elev);
+  border: 0; border-radius: 9px; padding: 8px 18px;
+  font-size: 13px; font-weight: 600;
+}
+.install-prompt-close {
+  position: absolute; top: 8px; right: 8px;
+  width: 28px; height: 28px; border-radius: 999px;
+  background: transparent; border: 0; color: var(--text-3);
+  display: flex; align-items: center; justify-content: center;
+}
