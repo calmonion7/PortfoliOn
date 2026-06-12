@@ -2,7 +2,7 @@ from datetime import date as _date, timedelta as _timedelta
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List
-from services import storage, errors, report_generator, consensus as consensus_svc
+from services import storage, errors, report_generator, consensus_pipeline as _pipeline
 from services import cache as cache_svc, market as market_svc
 from services.utils import find_ticker_index, ticker_exists_in
 from services.parallel import parallel_map
@@ -30,10 +30,10 @@ def _last_scheduled_date() -> str:
 def _generate_with_consensus(stock_dict: dict):
     report_generator.generate_report(stock_dict, target_date=stock_dict.get("_target_date"))
     ticker = stock_dict["ticker"]
-    market = stock_dict.get("market", "US")
     cache_svc.invalidate(ticker)
     try:
-        consensus_svc.backfill(ticker, market)
+        # 정본 = daily_consensus_mart (ADR-0008). consensus_history 직접 적재(legacy) 대신 파이프라인 경유.
+        _pipeline.backfill([stock_dict], days=180)
     except Exception as e:
         print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
 

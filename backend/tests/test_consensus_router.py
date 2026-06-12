@@ -1,7 +1,7 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from routers.report import router
 
@@ -38,110 +38,35 @@ def test_backfill_no_report():
     assert r.status_code == 400
 
 
-def test_backfill_kr():
-    from datetime import date, timedelta
-    upper = "005930"
-    today = date.today()
-    d1 = (today - timedelta(days=30)).isoformat()
-    d2 = (today - timedelta(days=10)).isoformat()
+def test_backfill_uses_pipeline_targets_mart():
+    """백필 버튼은 정본 _pipeline.backfill(→ daily_consensus_mart)을 호출한다 (ADR-0008).
 
-    snapshot_data = {"market": "KR", "target_mean": 80000, "buy": 10, "hold": 2, "sell": 0}
-    router_query_result = [{"date": today.isoformat(), "data": snapshot_data}]
-    consensus_query_result = []
-
-    list_payload = [
-        {"researchId": "101", "writeDate": d1, "brokerName": "NH"},
-        {"researchId": "102", "writeDate": d1, "brokerName": "KB"},
-        {"researchId": "103", "writeDate": d2, "brokerName": "KI"},
-    ]
-    details = {
-        "101": {"researchContent": {"opinion": "매수", "goalPrice": "80,000"}},
-        "102": {"researchContent": {"opinion": "중립", "goalPrice": "78,000"}},
-        "103": {"researchContent": {"opinion": "매수", "goalPrice": "82,000"}},
-    }
-
-    def mock_get(url, **kwargs):
-        m = MagicMock()
-        m.raise_for_status = lambda: None
-        last = url.split("?")[0].rstrip("/").split("/")[-1]
-        m.json.return_value = details[last] if last in details else list_payload
-        return m
+    legacy consensus_history 쓰기 경로(consensus.backfill)는 더 이상 타지 않으며,
+    응답은 파이프라인이 upsert한 raw 행 수를 담은 {"added": <int>}이다(entries 없음).
+    """
+    from datetime import date
+    snapshot_data = {"market": "KR", "target_mean": 80000}
+    router_query_result = [{"date": date.today().isoformat(), "data": snapshot_data}]
 
     with patch("routers.report.query", return_value=router_query_result), \
-         patch("services.consensus.query", return_value=consensus_query_result), \
-         patch("services.consensus.execute", return_value=1), \
-         patch("requests.get", side_effect=mock_get):
-        r = client.post(f"/api/consensus/{upper}/backfill")
+         patch("routers.report._pipeline.backfill", return_value=7) as mock_pipeline:
+        r = client.post("/api/consensus/005930/backfill")
 
     assert r.status_code == 200
-    body = r.json()
-    assert body["added"] == 2
+    assert r.json() == {"added": 7}
+    # 정본 파이프라인을 종목 dict 리스트로 호출
+    mock_pipeline.assert_called_once()
+    args, _ = mock_pipeline.call_args
+    assert args[0] == [{"ticker": "005930", "market": "KR"}]
 
 
-def test_backfill_us():
-    import pandas as pd
-    from datetime import date, timedelta
-    upper = "AAPL"
-    today = date.today()
-    d1 = (today - timedelta(days=10)).isoformat()
-    d2 = (today - timedelta(days=20)).isoformat()
-
-    snapshot_data = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
-    router_query_result = [{"date": today.isoformat(), "data": snapshot_data}]
-    consensus_query_result = []
-
-    df = pd.DataFrame(
-        {
-            "ToGrade": ["Buy", "Outperform", "Hold"],
-            "Firm": ["MS", "GS", "JPM"],
-            "FromGrade": ["", "", ""],
-            "Action": ["up", "up", "main"],
-            "currentPriceTarget": [210.0, 220.0, 190.0],
-        },
-        index=pd.DatetimeIndex([d1, d1, d2], name="GradeDate"),
-    )
-    mock_ticker = MagicMock()
-    mock_ticker.upgrades_downgrades = df
-
+def test_backfill_market_defaults_us_when_missing():
+    from datetime import date
+    router_query_result = [{"date": date.today().isoformat(), "data": {}}]
     with patch("routers.report.query", return_value=router_query_result), \
-         patch("services.consensus.query", return_value=consensus_query_result), \
-         patch("services.consensus.execute", return_value=1), \
-         patch("yfinance.Ticker", return_value=mock_ticker):
-        r = client.post(f"/api/consensus/{upper}/backfill")
-
+         patch("routers.report._pipeline.backfill", return_value=0) as mock_pipeline:
+        r = client.post("/api/consensus/AAPL/backfill")
     assert r.status_code == 200
-    body = r.json()
-    assert body["added"] == 2
-    by_date = {e["date"]: e for e in body["entries"]}
-    assert by_date[d1]["buy"] == 2
-    assert by_date[d1]["target_mean"] == 215.0
-    assert by_date[d2]["target_mean"] == 190.0
-
-
-def test_backfill_skips_existing_dates():
-    import pandas as pd
-    from datetime import date, timedelta
-    upper = "AAPL"
-    today = date.today()
-    existing_date = (today - timedelta(days=10)).isoformat()
-
-    snapshot_data = {"market": "US", "target_mean": 200.0, "buy": 25, "hold": 5, "sell": 1}
-    router_query_result = [{"date": today.isoformat(), "data": snapshot_data}]
-    existing_rows = [{"date": existing_date}]
-
-    df = pd.DataFrame(
-        {"ToGrade": ["Buy"], "Firm": ["MS"], "FromGrade": [""], "Action": ["up"],
-         "currentPriceTarget": [210.0]},
-        index=pd.DatetimeIndex([existing_date], name="GradeDate"),
-    )
-    mock_ticker = MagicMock()
-    mock_ticker.upgrades_downgrades = df
-
-    with patch("routers.report.query", return_value=router_query_result), \
-         patch("services.consensus.query", return_value=existing_rows), \
-         patch("services.consensus.execute", return_value=1), \
-         patch("yfinance.Ticker", return_value=mock_ticker):
-        r = client.post(f"/api/consensus/{upper}/backfill")
-
-    assert r.status_code == 200
-    assert r.json()["added"] == 0
+    assert r.json() == {"added": 0}
+    args, _ = mock_pipeline.call_args
+    assert args[0] == [{"ticker": "AAPL", "market": "US"}]

@@ -461,7 +461,7 @@ def refresh_analyst(ticker: str):
 
 
 @router.post("/consensus/{ticker}/backfill")
-def backfill_consensus(ticker: str):
+def backfill_consensus(ticker: str, days: int = 180, force: bool = False):
     upper = ticker.upper()
     rows = query(
         "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
@@ -471,8 +471,9 @@ def backfill_consensus(ticker: str):
         raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
     summary = rows[0]["data"] or {}
     market = summary.get("market", "US")
-    added = consensus_svc.backfill(upper, market)
-    return {"added": len(added), "entries": added}
+    # 정본 = daily_consensus_mart. _pipeline.backfill이 raw_reports upsert 후 마트 재계산 (ADR-0008).
+    added = _pipeline.backfill([{"ticker": upper, "market": market}], days, force)
+    return {"added": added}
 
 
 @router.put("/report/{ticker}/backlog")

@@ -147,3 +147,14 @@ def test_add_stock_skips_report_when_snapshot_exists():
         })
     assert resp.status_code == 201
     mock_gen.assert_not_called()
+
+
+def test_generate_with_consensus_backfills_via_pipeline():
+    """종목 추가 후 자동 리포트가 정본 _pipeline.backfill(→ mart)로 백필한다 (ADR-0008)."""
+    from routers import portfolio
+    stock = {"ticker": "AAPL", "market": "US"}
+    with patch("routers.portfolio.report_generator.generate_report"), \
+         patch("routers.portfolio.cache_svc.invalidate"), \
+         patch("routers.portfolio._pipeline.backfill", return_value=3) as mock_bf:
+        portfolio._generate_with_consensus(dict(stock))
+    mock_bf.assert_called_once_with([stock], days=180)

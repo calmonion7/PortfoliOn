@@ -1037,17 +1037,21 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `POST /api/consensus/{ticker}/backfill`
 
-특정 종목의 컨센서스 데이터 백필 (snapshot DB 기반).
+특정 종목의 컨센서스 데이터를 정본 `daily_consensus_mart`로 백필 (raw_reports upsert 후 마트 재계산, ADR-0008). snapshot에서 market을 읽어 파이프라인을 호출한다.
 
 **Path Parameter:** `ticker` — 종목 코드
+
+**Query Parameters:**
+- `days` (int, 기본 `180`) — 백필 기간
+- `force` (bool, 기본 `false`) — 기존 마트 구간 삭제 후 재계산
 
 **Response `200`**
 ```json
 {
-  "added": 12,
-  "entries": [...]
+  "added": 12
 }
 ```
+`added` — 파이프라인이 upsert한 raw_reports 행 수.
 
 ---
 
