@@ -50,6 +50,7 @@ def test_list_reports_detects_json_snapshots():
     date_rows = [{"ticker": "LLY", "date": "2026-05-05"}]
     summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]
     with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
+         patch("services.consensus.query", return_value=[]), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
          patch("routers.report.storage.get_schedule", return_value={}), \
          patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
@@ -65,6 +66,7 @@ def test_list_reports_no_markdown_in_dates():
     date_rows = [{"ticker": "LLY", "date": "2026-05-05"}]
     summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]
     with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
+         patch("services.consensus.query", return_value=[]), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
          patch("routers.report.storage.get_schedule", return_value={}), \
          patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
@@ -84,12 +86,31 @@ def test_list_reports_exposes_is_etf():
     summary_rows = [{"ticker": "069500", "date": "2026-05-05",
                      "data": {"name": "KODEX 200", "price": 100.0}}]
     with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
+         patch("services.consensus.query", return_value=[]), \
          patch("routers.report.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.report.storage.get_schedule", return_value={}), \
          patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
         resp = client.get("/api/report/list")
     assert resp.status_code == 200
     assert resp.json()["stocks"]["069500"]["is_etf"] is True
+
+
+def test_list_reports_overrides_target_and_opinion_from_mart_asof():
+    """목록 목표가·의견수는 동결 snapshot이 아니라 mart as-of 정본에서 와 상세와 일치한다. ADR-0008."""
+    date_rows = [{"ticker": "LLY", "date": "2026-05-05"}]
+    summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]  # snapshot target_mean=980
+    mart_row = [{"target_mean": 1000.0, "target_high": 1200.0, "target_low": 900.0,
+                 "buy": 20, "hold": 2, "sell": 0}]
+    with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
+         patch("services.consensus.query", return_value=mart_row), \
+         patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
+         patch("routers.report.storage.get_schedule", return_value={}), \
+         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
+        resp = client.get("/api/report/list")
+    assert resp.status_code == 200
+    s = resp.json()["stocks"]["LLY"]["summary"]
+    assert s["target_mean"] == 1000.0   # snapshot 980 → mart as-of 1000
+    assert s["buy"] == 20 and s["hold"] == 2 and s["sell"] == 0
 
 
 def test_get_report_returns_summary_no_content(tmp_path):
@@ -99,6 +120,7 @@ def test_get_report_returns_summary_no_content(tmp_path):
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
          patch("routers.report.query", return_value=[]), \
+         patch("services.consensus.query", return_value=[]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-05")
@@ -120,6 +142,7 @@ def test_get_report_fallback_to_reports_dir(tmp_path):
     with patch("routers.report.SNAPSHOTS_DIR", snapshots_dir), \
          patch("routers.report.REPORTS_DIR", legacy_dir), \
          patch("routers.report.query", return_value=[]), \
+         patch("services.consensus.query", return_value=[]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-01")
@@ -131,6 +154,7 @@ def test_get_report_404_when_not_found(tmp_path):
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
          patch("routers.report.query", return_value=[]), \
+         patch("services.consensus.query", return_value=[]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2000-01-01")
@@ -318,7 +342,8 @@ def test_backfill_blocked_for_non_admin():
 
 # ── get_report: ETF 플래그(is_etf) 노출 ──────────────────────────────────────
 # detail 응답의 summary.is_etf는 tickers.is_etf에서 읽어 주입한다(스냅샷 재생성 불필요).
-# query 호출 순서: ① _read_snapshot ② mart(목표가+의견 as-of-date) ③ consensus_history 폴백 ④ tickers(enriched_at,is_etf)
+# query 호출: routers.report.query = ① _read_snapshot ② tickers(enriched_at,is_etf).
+# 목표가·의견 as-of(mart→consensus_history)는 consensus_svc.apply_asof → services.consensus.query로 분리됐다.
 
 def test_get_report_surfaces_is_etf_true(tmp_path):
     ticker_dir = tmp_path / "SPY"
@@ -326,7 +351,8 @@ def test_get_report_surfaces_is_etf_true(tmp_path):
     (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
-         patch("routers.report.query", side_effect=[[], [], [], [{"enriched_at": None, "is_etf": True}]]), \
+         patch("routers.report.query", side_effect=[[], [{"enriched_at": None, "is_etf": True}]]), \
+         patch("services.consensus.query", return_value=[]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/SPY/2026-05-05")
@@ -340,7 +366,8 @@ def test_get_report_is_etf_false_for_equity(tmp_path):
     (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
-         patch("routers.report.query", side_effect=[[], [], [], [{"enriched_at": None, "is_etf": False}]]), \
+         patch("routers.report.query", side_effect=[[], [{"enriched_at": None, "is_etf": False}]]), \
+         patch("services.consensus.query", return_value=[]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-05")
@@ -360,7 +387,8 @@ def test_get_report_overrides_target_and_opinion_from_mart_as_of_date(tmp_path):
                  "buy": 20, "hold": 2, "sell": 0}]
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
-         patch("routers.report.query", side_effect=[[], mart_row, [{"enriched_at": None, "is_etf": False}]]), \
+         patch("routers.report.query", side_effect=[[], [{"enriched_at": None, "is_etf": False}]]), \
+         patch("services.consensus.query", return_value=mart_row), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-05")
@@ -380,7 +408,8 @@ def test_get_report_keeps_snapshot_target_when_mart_target_null(tmp_path):
                  "buy": 5, "hold": 1, "sell": 0}]
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
-         patch("routers.report.query", side_effect=[[], mart_row, [{"enriched_at": None, "is_etf": False}]]), \
+         patch("routers.report.query", side_effect=[[], [{"enriched_at": None, "is_etf": False}]]), \
+         patch("services.consensus.query", return_value=mart_row), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-05")
@@ -397,7 +426,8 @@ def test_get_report_falls_back_to_consensus_history_when_no_mart(tmp_path):
                  "buy": 12, "hold": 4, "sell": 2}]
     with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
          patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
-         patch("routers.report.query", side_effect=[[], [], cons_row, [{"enriched_at": None, "is_etf": False}]]), \
+         patch("routers.report.query", side_effect=[[], [{"enriched_at": None, "is_etf": False}]]), \
+         patch("services.consensus.query", side_effect=[[], cons_row]), \
          patch("routers.report.cache_svc._snapshots", {}), \
          patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
         resp = client.get("/api/report/LLY/2026-05-05")

@@ -223,6 +223,9 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
         for ticker, dates in ticker_dates.items():
             category = "holdings" if ticker in holding_tickers else "watchlist"
             summary = ticker_summary.get(ticker)
+            # 목표가·의견수 정본 = daily_consensus_mart as-of(종목별 최신 리포트 날짜). 상세와 동일 헬퍼로 정합. ADR-0008.
+            if summary:
+                summary = consensus_svc.apply_asof(summary, ticker, dates[0])
             stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
             result[ticker] = _mk_entry(ticker, dates, category, stock_info, summary)
 
@@ -342,29 +345,8 @@ def get_report(ticker: str, date_str: str):
     if summary is None:
         raise HTTPException(status_code=404, detail="Report not found")
     # 목표가·의견수 정본 = daily_consensus_mart (base_date<=리포트날짜 최신 = as-of-date). ADR-0008.
-    rows = query(
-        "SELECT avg_target_price AS target_mean, avg_target_high AS target_high,"
-        " avg_target_low AS target_low, buy_count AS buy, hold_count AS hold, sell_count AS sell"
-        " FROM daily_consensus_mart WHERE ticker = %s AND base_date <= %s"
-        " ORDER BY base_date DESC LIMIT 1",
-        (upper, date_str),
-    )
-    if not rows:
-        rows = query(
-            "SELECT target_high, target_mean, target_low, buy, hold, sell FROM consensus_history"
-            " WHERE ticker = %s AND date <= %s ORDER BY date DESC LIMIT 1",
-            (upper, date_str),
-        )
-    if rows:
-        r = rows[0]
-        summary = dict(summary)
-        summary["buy"] = r["buy"]
-        summary["hold"] = r["hold"]
-        summary["sell"] = r["sell"]
-        # 목표가는 정본 값이 있을 때만 덮어써 snapshot 동결값 보존(예: raw 부재로 mart 목표가 NULL)
-        for _k in ("target_mean", "target_high", "target_low"):
-            if r.get(_k) is not None:
-                summary[_k] = r[_k]
+    # 목록·대시보드와 동일 헬퍼를 호출해 세 화면의 값 정합을 코드 구조로 보장한다.
+    summary = consensus_svc.apply_asof(summary, upper, date_str)
     enriched_at = None
     ea_rows = query("SELECT enriched_at, is_etf FROM tickers WHERE ticker = %s", (upper,))
     summary = dict(summary)

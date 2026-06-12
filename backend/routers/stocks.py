@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from services import market
 from services import scraper
 from services import cache as cache_svc
+from services import consensus as consensus_svc
 from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
@@ -230,6 +231,12 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             vah = vp.get("vah")
             val = vp.get("val")
             hvn = vp.get("hvn") or []
+            # 목표가·의견수 정본 = daily_consensus_mart as-of(최신 snapshot 날짜). 상세·목록과 동일 헬퍼로 정합. ADR-0008.
+            _c = consensus_svc.apply_asof(
+                {"target_mean": target_mean, "buy": buy, "hold": hold, "sell": sell},
+                ticker, snapshot_date,
+            )
+            target_mean, buy, hold, sell = _c["target_mean"], _c["buy"], _c["hold"], _c["sell"]
 
         return {
             "ticker": ticker,

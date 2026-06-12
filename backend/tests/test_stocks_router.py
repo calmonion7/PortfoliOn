@@ -156,6 +156,34 @@ def test_dashboard_returns_cards_for_holdings():
     assert card["target_mean"] is None
 
 
+def test_dashboard_uses_mart_asof_for_target_and_opinion():
+    """대시보드 카드 목표가·의견수는 동결 snapshot이 아니라 mart as-of 정본에서 와 상세와 일치한다. ADR-0008."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    portfolio = {
+        "stocks": [{"ticker": "AAPL", "name": "Apple Inc.", "market": "US",
+                    "avg_cost": 150.0, "quantity": 10, "exchange": ""}],
+        "watchlist": []
+    }
+    quote = {"ticker": "AAPL", "price": 185.2, "daily_change_pct": 1.4,
+             "weekly_change_pct": 2.1, "monthly_change_pct": 5.8,
+             "name": "Apple Inc.", "market": "US"}
+    snap_row = [{"date": "2026-05-05",
+                 "data": {"target_mean": 200.0, "buy": 3, "hold": 1, "sell": 0,
+                          "daily_rsi": {"rsi": 50.0}, "volume_profile": {"poc": 180.0}}}]
+    mart_row = [{"target_mean": 250.0, "target_high": 270.0, "target_low": 230.0,
+                 "buy": 12, "hold": 2, "sell": 1}]
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.stocks.market.get_quote", return_value=quote), \
+         patch("routers.stocks.query", return_value=snap_row), \
+         patch("services.consensus.query", return_value=mart_row):
+        resp = client.get("/api/stocks/dashboard")
+    assert resp.status_code == 200
+    card = resp.json()[0]
+    assert card["target_mean"] == 250.0   # snapshot 200 → mart as-of 250
+    assert card["buy"] == 12 and card["hold"] == 2 and card["sell"] == 1
+
+
 def test_dashboard_returns_empty_list_when_no_holdings():
     portfolio = {"stocks": [], "watchlist": []}
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio):
