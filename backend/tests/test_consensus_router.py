@@ -32,32 +32,6 @@ def test_get_consensus_returns_data():
     assert resp.json()[0]["target_mean"] == 352000
 
 
-def test_collect_consensus_saves_entry():
-    snapshot_rows = [{"data": SAMPLE_SUMMARY}]
-    with patch("services.consensus.query", return_value=snapshot_rows), \
-         patch("services.consensus.execute", return_value=1):
-        resp = client.post("/api/consensus/005930")
-    assert resp.status_code == 200
-    assert resp.json()["target_mean"] == 352000.0
-
-
-def test_collect_consensus_no_report():
-    with patch("services.consensus.query", return_value=[]):
-        resp = client.post("/api/consensus/UNKNOWN")
-    assert resp.status_code == 400
-
-
-def test_collect_consensus_upsert_same_date():
-    snapshot_rows = [{"data": SAMPLE_SUMMARY}]
-    mock_execute = MagicMock(return_value=1)
-    with patch("services.consensus.query", return_value=snapshot_rows), \
-         patch("services.consensus.execute", mock_execute):
-        resp = client.post("/api/consensus/005930")
-    assert resp.status_code == 200
-    # execute was called to upsert consensus_history
-    assert mock_execute.called
-
-
 def test_backfill_no_report():
     with patch("routers.report.query", return_value=[]):
         r = client.post("/api/consensus/AAPL/backfill")

@@ -1035,16 +1035,6 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
-### `POST /api/consensus/{ticker}`
-
-특정 종목의 최신 컨센서스 수집 (동기).
-
-**Path Parameter:** `ticker` — 종목 코드
-
-**Response `200`** — 수집된 컨센서스 항목
-
----
-
 ### `POST /api/consensus/{ticker}/backfill`
 
 특정 종목의 컨센서스 데이터 백필 (snapshot DB 기반).

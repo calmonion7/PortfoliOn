@@ -156,52 +156,85 @@ SAMPLE_SUMMARY_2 = {
 }
 
 
-def test_get_history_returns_sorted_lean_array():
-    rows = [
+# 목표가·의견 시계열은 지표 차트와 동일 정본(consensus_svc.get_history = mart-first → consensus_history 폴백)에서
+# 오고, price/RSI·has_snapshot은 snapshots에서 join한다. consensus_svc.get_history는 DESC를 반환.
+CONSENSUS_SERIES = [
+    {"date": "2026-05-06", "target_high": 1110.0, "target_mean": 990.0, "target_low": 860.0, "buy": 16, "hold": 3, "sell": 1},
+    {"date": "2026-05-05", "target_high": 1100.0, "target_mean": 980.0, "target_low": 850.0, "buy": 15, "hold": 3, "sell": 1},
+]
+
+
+def test_get_history_uses_consensus_series_joined_with_snapshot():
+    snap_rows = [
         {"date": "2026-05-05", "data": SAMPLE_SUMMARY_WITH_RSI},
         {"date": "2026-05-06", "data": SAMPLE_SUMMARY_2},
     ]
-    with patch("routers.report.query", side_effect=[[], rows]):
+    with patch("routers.report.consensus_svc.get_history", return_value=CONSENSUS_SERIES), \
+         patch("routers.report.query", return_value=snap_rows):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
-    assert data[0]["date"] == "2026-05-05"
+    assert data[0]["date"] == "2026-05-05"   # 오름차순
     assert data[1]["date"] == "2026-05-06"
-    assert data[0]["price"] == 890.0
+    # 목표가·의견은 정본 시계열에서
     assert data[0]["target_mean"] == 980.0
     assert data[0]["target_high"] == 1100.0
     assert data[0]["target_low"] == 850.0
-    assert data[0]["buy"] == 15
-    assert data[0]["hold"] == 3
-    assert data[0]["sell"] == 1
+    assert data[0]["buy"] == 15 and data[0]["hold"] == 3 and data[0]["sell"] == 1
+    assert data[1]["target_mean"] == 990.0
+    # price/RSI는 snapshot에서 join
+    assert data[0]["price"] == 890.0
     assert data[0]["rsi_daily"] == 45.2
     assert data[0]["rsi_weekly"] == 55.1
+    assert data[0]["rsi_monthly"] == 62.3
+    assert data[0]["has_snapshot"] is True
+
+
+def test_get_history_unions_consensus_and_snapshot_dates():
+    """정본 시계열에만 있는 날짜도 dense하게 포함(price/RSI는 null·has_snapshot=false),
+    snapshot에만 있는 날짜는 동결 목표가로 폴백된다."""
+    series = [{"date": "2026-05-07", "target_high": 1120.0, "target_mean": 1000.0, "target_low": 870.0, "buy": 17, "hold": 2, "sell": 1}]
+    snap_rows = [{"date": "2026-05-05", "data": SAMPLE_SUMMARY_WITH_RSI}]
+    with patch("routers.report.consensus_svc.get_history", return_value=series), \
+         patch("routers.report.query", return_value=snap_rows):
+        resp = client.get("/api/report/LLY/history")
+    data = resp.json()
+    assert [d["date"] for d in data] == ["2026-05-05", "2026-05-07"]
+    c = next(d for d in data if d["date"] == "2026-05-07")
+    assert c["target_mean"] == 1000.0 and c["has_snapshot"] is False and c["price"] is None
+    s = next(d for d in data if d["date"] == "2026-05-05")
+    assert s["target_mean"] == 980.0 and s["has_snapshot"] is True   # snapshot 동결값 폴백
+
+
+def test_get_history_falls_back_to_snapshots_when_no_consensus():
+    rows = [{"date": "2026-05-05", "data": SAMPLE_SUMMARY_WITH_RSI}]
+    with patch("routers.report.consensus_svc.get_history", return_value=[]), \
+         patch("routers.report.query", return_value=rows):
+        resp = client.get("/api/report/LLY/history")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["target_mean"] == 980.0
     assert data[0]["rsi_monthly"] == 62.3
 
 
 def test_get_history_handles_null_rsi():
     rows = [{"date": "2026-05-06", "data": SAMPLE_SUMMARY_2}]
-    with patch("routers.report.query", side_effect=[[], rows]):
+    with patch("routers.report.consensus_svc.get_history", return_value=[]), \
+         patch("routers.report.query", return_value=rows):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     data = resp.json()
     assert data[0]["rsi_monthly"] is None
 
 
-def test_get_history_empty_when_no_snapshots():
-    with patch("routers.report.query", return_value=[]):
+def test_get_history_empty_when_no_data():
+    with patch("routers.report.consensus_svc.get_history", return_value=[]), \
+         patch("routers.report.query", return_value=[]):
         resp = client.get("/api/report/LLY/history")
     assert resp.status_code == 200
     assert resp.json() == []
-
-
-def test_get_history_fallback_to_reports_dir():
-    rows = [{"date": "2026-05-01", "data": SAMPLE_SUMMARY_WITH_RSI}]
-    with patch("routers.report.query", return_value=rows):
-        resp = client.get("/api/report/LLY/history")
-    assert resp.status_code == 200
-    assert len(resp.json()) == 1
 
 
 def test_generate_all_runs_all_stocks():
@@ -285,7 +318,7 @@ def test_backfill_blocked_for_non_admin():
 
 # ── get_report: ETF 플래그(is_etf) 노출 ──────────────────────────────────────
 # detail 응답의 summary.is_etf는 tickers.is_etf에서 읽어 주입한다(스냅샷 재생성 불필요).
-# query 호출 순서: ① _read_snapshot ② consensus mart ③ consensus_history ④ tickers(enriched_at,is_etf)
+# query 호출 순서: ① _read_snapshot ② mart(목표가+의견 as-of-date) ③ consensus_history 폴백 ④ tickers(enriched_at,is_etf)
 
 def test_get_report_surfaces_is_etf_true(tmp_path):
     ticker_dir = tmp_path / "SPY"
@@ -313,6 +346,64 @@ def test_get_report_is_etf_false_for_equity(tmp_path):
         resp = client.get("/api/report/LLY/2026-05-05")
     assert resp.status_code == 200
     assert resp.json()["summary"]["is_etf"] is False
+
+
+# ── get_report: 목표가·의견수 정본 = daily_consensus_mart (as-of-date) ──────────
+# summary.target_mean/high/low + buy/hold/sell은 base_date<=리포트날짜의 최신 mart행에서 온다.
+# mart 없으면 consensus_history(date<=리포트날짜 최신) → snapshot 동결값으로 폴백. (ADR-0008)
+
+def test_get_report_overrides_target_and_opinion_from_mart_as_of_date(tmp_path):
+    ticker_dir = tmp_path / "LLY"
+    ticker_dir.mkdir()
+    (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
+    mart_row = [{"target_mean": 1000.0, "target_high": 1200.0, "target_low": 900.0,
+                 "buy": 20, "hold": 2, "sell": 0}]
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("routers.report.query", side_effect=[[], mart_row, [{"enriched_at": None, "is_etf": False}]]), \
+         patch("routers.report.cache_svc._snapshots", {}), \
+         patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
+        resp = client.get("/api/report/LLY/2026-05-05")
+    assert resp.status_code == 200
+    s = resp.json()["summary"]
+    assert s["target_mean"] == 1000.0      # snapshot 980 → mart 1000으로 덮어씀
+    assert s["target_high"] == 1200.0
+    assert s["target_low"] == 900.0
+    assert s["buy"] == 20 and s["hold"] == 2 and s["sell"] == 0
+
+
+def test_get_report_keeps_snapshot_target_when_mart_target_null(tmp_path):
+    ticker_dir = tmp_path / "LLY"
+    ticker_dir.mkdir()
+    (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
+    mart_row = [{"target_mean": None, "target_high": None, "target_low": None,
+                 "buy": 5, "hold": 1, "sell": 0}]
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("routers.report.query", side_effect=[[], mart_row, [{"enriched_at": None, "is_etf": False}]]), \
+         patch("routers.report.cache_svc._snapshots", {}), \
+         patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
+        resp = client.get("/api/report/LLY/2026-05-05")
+    s = resp.json()["summary"]
+    assert s["target_mean"] == 980.0       # mart 목표가 NULL → snapshot 동결값 보존
+    assert s["buy"] == 5                    # 의견수는 mart로 덮어씀
+
+
+def test_get_report_falls_back_to_consensus_history_when_no_mart(tmp_path):
+    ticker_dir = tmp_path / "LLY"
+    ticker_dir.mkdir()
+    (ticker_dir / "2026-05-05.json").write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
+    cons_row = [{"target_high": 1050.0, "target_mean": 970.0, "target_low": 880.0,
+                 "buy": 12, "hold": 4, "sell": 2}]
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("routers.report.query", side_effect=[[], [], cons_row, [{"enriched_at": None, "is_etf": False}]]), \
+         patch("routers.report.cache_svc._snapshots", {}), \
+         patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
+        resp = client.get("/api/report/LLY/2026-05-05")
+    s = resp.json()["summary"]
+    assert s["target_mean"] == 970.0
+    assert s["buy"] == 12 and s["hold"] == 4 and s["sell"] == 2
 
 
 # ── 라우트 순서 회귀: /report/{ticker}/backlog 가 catch-all /{date_str}에 가려지면 안 됨 ──

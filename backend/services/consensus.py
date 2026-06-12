@@ -28,46 +28,6 @@ def get_history(ticker: str) -> list[dict]:
     ]
 
 
-def collect(ticker: str) -> dict | None:
-    upper = ticker.upper()
-    rows = query(
-        "SELECT data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
-        (upper,),
-    )
-    if not rows:
-        return None
-    summary = rows[0]["data"] or {}
-    target_high = summary.get("target_high")
-    target_mean = summary.get("target_mean")
-    target_low = summary.get("target_low")
-    buy = summary.get("buy")
-    hold = summary.get("hold")
-    sell = summary.get("sell")
-    if all(v is None for v in [target_mean, buy, hold, sell]):
-        return None
-    entry = {
-        "ticker": upper,
-        "date": str(date.today()),
-        "target_high": target_high,
-        "target_mean": target_mean,
-        "target_low": target_low,
-        "buy": buy,
-        "hold": hold,
-        "sell": sell,
-    }
-    execute(
-        "INSERT INTO consensus_history (ticker, date, target_high, target_mean, target_low, buy, hold, sell)"
-        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-        " ON CONFLICT (ticker, date) DO UPDATE SET"
-        "  target_high=EXCLUDED.target_high, target_mean=EXCLUDED.target_mean,"
-        "  target_low=EXCLUDED.target_low, buy=EXCLUDED.buy,"
-        "  hold=EXCLUDED.hold, sell=EXCLUDED.sell",
-        (upper, entry["date"], entry["target_high"], entry["target_mean"], entry["target_low"],
-         entry["buy"], entry["hold"], entry["sell"]),
-    )
-    return {k: v for k, v in entry.items() if k != "ticker"}
-
-
 def backfill(ticker: str, market: str, days: int = 180, force: bool = False) -> list[dict]:
     from datetime import timedelta
     upper = ticker.upper()

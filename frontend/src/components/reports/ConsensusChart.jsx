@@ -8,7 +8,6 @@ import { useToast } from '../Toast'
 export default function ConsensusChart({ ticker, market }) {
   const { showToast } = useToast()
   const [data, setData] = useState([])
-  const [collecting, setCollecting] = useState(false)
   const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState(0)
@@ -22,21 +21,6 @@ export default function ConsensusChart({ ticker, market }) {
   }, [ticker])
 
   useEffect(() => { fetchData() }, [fetchData])
-
-  const collect = async () => {
-    setCollecting(true)
-    setError(null)
-    try {
-      await api.post(`/api/consensus/${ticker}`)
-      fetchData()
-      showToast('수집 완료')
-    } catch (e) {
-      const msg = e.response?.data?.detail || '수집 실패'
-      setError(msg); showToast(msg, 'error')
-    } finally {
-      setCollecting(false)
-    }
-  }
 
   const backfill = async () => {
     setBackfilling(true)
@@ -313,18 +297,6 @@ export default function ConsensusChart({ ticker, market }) {
             }}
           >
             {backfilling ? '백필 중...' : '백필'}
-          </button>
-          <button
-            onClick={collect}
-            disabled={collecting}
-            style={{
-              background: 'transparent', border: '1px solid var(--border)',
-              color: collecting ? 'var(--accent)' : 'var(--text-3)',
-              borderRadius: 3, padding: '2px 8px', fontSize: 11,
-              cursor: collecting ? 'default' : 'pointer',
-            }}
-          >
-            {collecting ? '수집 중...' : '수집'}
           </button>
         </div>
       </div>

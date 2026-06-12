@@ -244,36 +244,42 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
 @router.get("/report/{ticker}/history")
 def get_history(ticker: str):
     upper = ticker.upper()
-    crows = query(
-        "SELECT date, target_high, target_mean, target_low, buy, hold, sell"
-        " FROM consensus_history WHERE ticker = %s ORDER BY date",
-        (upper,),
-    )
+    # 목표가·의견 시계열은 지표 차트와 동일 정본(mart-first → consensus_history 폴백)에서 받는다. ADR-0008.
+    series = consensus_svc.get_history(upper)
     srows = query("SELECT date, data FROM snapshots WHERE ticker = %s", (upper,))
     snap_by_date = {}
     for r in srows:
         raw = r["data"] or {}
         snap_by_date[str(r["date"])] = {
             "price": raw.get("price"),
+            "target_high": raw.get("target_high"),
+            "target_mean": raw.get("target_mean"),
+            "target_low": raw.get("target_low"),
+            "buy": raw.get("buy"),
+            "hold": raw.get("hold"),
+            "sell": raw.get("sell"),
             "rsi_daily": (raw.get("daily_rsi") or {}).get("rsi"),
             "rsi_weekly": (raw.get("weekly_rsi") or {}).get("rsi"),
             "rsi_monthly": (raw.get("monthly_rsi") or {}).get("rsi"),
         }
 
-    if crows:
+    if series:
+        cons_by_date = {str(s["date"]): s for s in series}
+        # mart∪snapshot 날짜 합집합으로 dense하게 구성(비교 드롭다운의 snapshot 날짜가 비지 않도록)
         result = []
-        for r in crows:
-            d = str(r["date"])
+        for d in sorted(set(cons_by_date) | set(snap_by_date)):
             snap = snap_by_date.get(d, {})
+            # 목표가·의견은 정본 시계열 우선, 그 날짜가 없으면 snapshot 동결값 폴백
+            src = cons_by_date.get(d) or snap
             result.append({
                 "date": d,
                 "price": snap.get("price"),
-                "target_high": r.get("target_high"),
-                "target_mean": r.get("target_mean"),
-                "target_low": r.get("target_low"),
-                "buy": r.get("buy"),
-                "hold": r.get("hold"),
-                "sell": r.get("sell"),
+                "target_high": src.get("target_high"),
+                "target_mean": src.get("target_mean"),
+                "target_low": src.get("target_low"),
+                "buy": src.get("buy"),
+                "hold": src.get("hold"),
+                "sell": src.get("sell"),
                 "rsi_daily": snap.get("rsi_daily"),
                 "rsi_weekly": snap.get("rsi_weekly"),
                 "rsi_monthly": snap.get("rsi_monthly"),
@@ -281,7 +287,7 @@ def get_history(ticker: str):
             })
         return result
 
-    # consensus 데이터 없으면 snapshots fallback
+    # 정본 데이터 없으면 snapshots fallback
     result = []
     for r in sorted(srows, key=lambda x: x["date"]):
         raw = r["data"] or {}
@@ -335,21 +341,30 @@ def get_report(ticker: str, date_str: str):
     summary = cache_svc.get_snapshot(upper, date_str, lambda: _read_snapshot(upper, date_str))
     if summary is None:
         raise HTTPException(status_code=404, detail="Report not found")
+    # 목표가·의견수 정본 = daily_consensus_mart (base_date<=리포트날짜 최신 = as-of-date). ADR-0008.
     rows = query(
-        "SELECT buy_count AS buy, hold_count AS hold, sell_count AS sell"
-        " FROM daily_consensus_mart WHERE ticker = %s ORDER BY base_date DESC LIMIT 1",
-        (upper,),
+        "SELECT avg_target_price AS target_mean, avg_target_high AS target_high,"
+        " avg_target_low AS target_low, buy_count AS buy, hold_count AS hold, sell_count AS sell"
+        " FROM daily_consensus_mart WHERE ticker = %s AND base_date <= %s"
+        " ORDER BY base_date DESC LIMIT 1",
+        (upper, date_str),
     )
     if not rows:
         rows = query(
-            "SELECT buy, hold, sell FROM consensus_history WHERE ticker = %s ORDER BY date DESC LIMIT 1",
-            (upper,),
+            "SELECT target_high, target_mean, target_low, buy, hold, sell FROM consensus_history"
+            " WHERE ticker = %s AND date <= %s ORDER BY date DESC LIMIT 1",
+            (upper, date_str),
         )
     if rows:
+        r = rows[0]
         summary = dict(summary)
-        summary["buy"] = rows[0]["buy"]
-        summary["hold"] = rows[0]["hold"]
-        summary["sell"] = rows[0]["sell"]
+        summary["buy"] = r["buy"]
+        summary["hold"] = r["hold"]
+        summary["sell"] = r["sell"]
+        # 목표가는 정본 값이 있을 때만 덮어써 snapshot 동결값 보존(예: raw 부재로 mart 목표가 NULL)
+        for _k in ("target_mean", "target_high", "target_low"):
+            if r.get(_k) is not None:
+                summary[_k] = r[_k]
     enriched_at = None
     ea_rows = query("SELECT enriched_at, is_etf FROM tickers WHERE ticker = %s", (upper,))
     summary = dict(summary)
@@ -393,14 +408,6 @@ def _run_consensus_batch(stocks: list, days: int = 180, force: bool = False):
 @router.get("/consensus/{ticker}")
 def get_consensus(ticker: str):
     return consensus_svc.get_history(ticker)
-
-
-@router.post("/consensus/{ticker}")
-def collect_consensus(ticker: str):
-    entry = consensus_svc.collect(ticker)
-    if entry is None:
-        raise HTTPException(status_code=400, detail="리포트를 먼저 생성하세요")
-    return entry
 
 
 @router.post("/report/{ticker}/refresh-analyst")
