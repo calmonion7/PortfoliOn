@@ -56,16 +56,14 @@ def test_calc_rsi_target_price_returns_float():
     assert isinstance(result, float)
 
 def test_get_timeframe_rsi_returns_all_timeframes():
-    mock_ticker = MagicMock()
+    # get_timeframe_rsi는 이제 market.get_history_df로 라우팅(KR=키움/그외=yfinance).
     df = pd.DataFrame({
         "Close": _make_price_series(100),
         "High": _make_price_series(100) + 1,
         "Low": _make_price_series(100) - 1,
     })
-    mock_ticker.history.return_value = df
-    with patch("services.indicators.yf.Ticker", return_value=mock_ticker):
+    with patch("services.market.get_history_df", return_value=df):
         from services import indicators
-        import importlib; importlib.reload(indicators)
         result = indicators.get_timeframe_rsi("TEST")
     assert "daily" in result
     assert "weekly" in result

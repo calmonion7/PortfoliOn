@@ -1,7 +1,6 @@
 from __future__ import annotations
 import pandas as pd
 import numpy as np
-import yfinance as yf
 
 def calc_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     delta = series.diff()
@@ -60,17 +59,18 @@ def calc_rsi_target_price(
         return round(result, 2)
     return None
 
-def get_timeframe_rsi(ticker: str) -> dict:
-    t = yf.Ticker(ticker)
+def get_timeframe_rsi(ticker: str, market: str = "US", exchange: str = "") -> dict:
+    # KR은 키움(ka10081/82/83) 우선, 그 외/폴백은 yfinance — market.get_history_df가 라우팅.
+    from services import market as mkt
     result = {}
     configs = [
-        ("daily",   {"period": "1y",  "interval": "1d"},  30),
-        ("weekly",  {"period": "5y",  "interval": "1wk"}, 60),
-        ("monthly", {"period": "10y", "interval": "1mo"}, 60),
+        ("daily",   30),
+        ("weekly",  60),
+        ("monthly", 60),
     ]
-    for tf, params, n in configs:
+    for tf, n in configs:
         try:
-            df = t.history(**params)
+            df = mkt.get_history_df(ticker, market, exchange, tf)
             if df.empty:
                 result[tf] = {
                     "rsi": None,

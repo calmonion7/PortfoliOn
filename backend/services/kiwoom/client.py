@@ -95,10 +95,30 @@ def request(api_id: str, body: dict, category: str,
     """
     if not configured():
         raise KiwoomAuthError("KIWOOM 자격증명 미설정")
-    return _request(api_id, body, category, cont_yn, next_key, retry=True)
+    d, _ = _request(api_id, body, category, cont_yn, next_key, retry=True)
+    return d
 
 
-def _request(api_id, body, category, cont_yn, next_key, retry) -> dict:
+def request_paged(api_id: str, body: dict, category: str, list_key: str,
+                  max_items: int = 1000) -> list:
+    """연속조회(cont-yn/next-key)로 응답 LIST(list_key) 항목을 max_items까지 모아 반환.
+
+    차트/시계열 TR처럼 한 번에 다 안 오는 응답을 페이지네이션. 첫 페이지에 충분히
+    오면(대부분의 우리 조회 깊이) 1콜로 끝난다.
+    """
+    items: list = []
+    cont_yn, next_key = "", ""
+    while True:
+        d, resp_headers = _request(api_id, body, category, cont_yn, next_key, retry=True)
+        items.extend(d.get(list_key) or [])
+        cont_yn = (resp_headers.get("cont-yn") or "").strip()
+        next_key = (resp_headers.get("next-key") or "").strip()
+        if cont_yn != "Y" or not next_key or len(items) >= max_items:
+            break
+    return items
+
+
+def _request(api_id, body, category, cont_yn, next_key, retry) -> tuple[dict, dict]:
     token = _get_token()
     _throttle()
     headers = {
@@ -120,4 +140,4 @@ def _request(api_id, body, category, cont_yn, next_key, retry) -> dict:
     rc = d.get("return_code")
     if rc not in (0, None):
         raise KiwoomError(f"{api_id} 실패 (return_code={rc}): {d.get('return_msg')}")
-    return d
+    return d, r.headers

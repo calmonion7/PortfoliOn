@@ -136,6 +136,15 @@ def _kr_basic_kiwoom(ticker: str) -> tuple | None:
     return q["price"], q.get("daily_change_pct"), q.get("prev_close"), q.get("market_cap"), (q.get("name") or ticker)
 
 
+def _kr_closes_kiwoom(ticker: str, max_items: int = 30) -> list:
+    """키움 일봉 종가 시리즈(과거→현재). 미설정/실패 시 [] (호출측 폴백). monthly(-23)용 30개."""
+    from services.kiwoom import chart as kchart
+    try:
+        return kchart.daily_closes(ticker, max_items=max_items)
+    except Exception:
+        return []
+
+
 def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
     try:
         # 키움 우선 + Naver 폴백 (경계: .forge/adr/0009). 상폐 종목은 폴백의 409로 검출.
@@ -149,18 +158,32 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
         ytd_return = None
         weekly_change_pct = None
         monthly_change_pct = None
+
+        # 가격 변동률(ytd/주/월): 키움 일봉 우선
+        kcloses = _kr_closes_kiwoom(ticker, max_items=260)
+        if kcloses and price:
+            start = kcloses[0]
+            if start:
+                ytd_return = round((price - start) / start * 100, 2)
+            if len(kcloses) >= 6 and kcloses[-6]:
+                weekly_change_pct = round((price - kcloses[-6]) / kcloses[-6] * 100, 2)
+            if len(kcloses) >= 23 and kcloses[-23]:
+                monthly_change_pct = round((price - kcloses[-23]) / kcloses[-23] * 100, 2)
+
+        # sector/industry는 키움에 TR이 없어 yfinance 유지(.forge/adr/0009). 키움 변동률 실패 시 여기서 폴백.
         try:
             yf_t = yf.Ticker(f"{ticker}.{exchange or 'KS'}")
-            hist = yf_t.history(period="1y")
-            if not hist.empty and price:
-                start = float(hist["Close"].iloc[0])
-                ytd_return = round((price - start) / start * 100, 2)
-                if len(hist) >= 6:
-                    week_ago = float(hist["Close"].iloc[-6])
-                    weekly_change_pct = round((price - week_ago) / week_ago * 100, 2)
-                if len(hist) >= 23:
-                    month_ago = float(hist["Close"].iloc[-23])
-                    monthly_change_pct = round((price - month_ago) / month_ago * 100, 2)
+            if not kcloses and price:
+                hist = yf_t.history(period="1y")
+                if not hist.empty:
+                    start = float(hist["Close"].iloc[0])
+                    ytd_return = round((price - start) / start * 100, 2)
+                    if len(hist) >= 6:
+                        week_ago = float(hist["Close"].iloc[-6])
+                        weekly_change_pct = round((price - week_ago) / week_ago * 100, 2)
+                    if len(hist) >= 23:
+                        month_ago = float(hist["Close"].iloc[-23])
+                        monthly_change_pct = round((price - month_ago) / month_ago * 100, 2)
             yf_info = yf_t.info
             sector = _norm_sector(yf_info.get("sector", "") or "")
             industry = yf_info.get("industry", "") or ""
@@ -552,12 +575,50 @@ def get_quotes_batch(stocks: list) -> dict:
 
     for s in kr:
         tk = s["ticker"].upper()
-        q = get_quote(s["ticker"], "KR", s.get("exchange", ""))  # part1 캐시
-        result[tk] = {"price": q.get("price"), "daily_change_pct": q.get("daily_change_pct"),
-                      "weekly_change_pct": q.get("weekly_change_pct"),
-                      "monthly_change_pct": q.get("monthly_change_pct")}
+        # 키움 우선: 일봉 종가 시리즈 1콜 → US 경로와 동형으로 daily/weekly/monthly 산출(yfinance 제거).
+        closes = _kr_closes_kiwoom(s["ticker"])
+        if closes:
+            result[tk] = _changes_from_closes(closes)
+        else:
+            # 폴백: 기존 get_quote 루프(part1 캐시, get_quote_kr이 키움 우선+Naver 폴백)
+            q = get_quote(s["ticker"], "KR", s.get("exchange", ""))
+            result[tk] = {"price": q.get("price"), "daily_change_pct": q.get("daily_change_pct"),
+                          "weekly_change_pct": q.get("weekly_change_pct"),
+                          "monthly_change_pct": q.get("monthly_change_pct")}
 
     return result
+
+
+_HISTORY_CFG = {
+    "daily":   ({"period": "1y",  "interval": "1d"},  260),
+    "weekly":  ({"period": "5y",  "interval": "1wk"}, 300),
+    "monthly": ({"period": "10y", "interval": "1mo"}, 240),
+}
+
+
+def get_history_df(ticker: str, market: str = "US", exchange: str = "",
+                   timeframe: str = "daily", yf_period: str | None = None,
+                   max_items: int | None = None):
+    """yfinance history()와 동형 OHLCV DataFrame. KR은 키움(ka10081/82/83) 우선, 실패 시
+    yfinance 폴백. 그 외 마켓은 yfinance. (.forge/adr/0009 — 키움은 KR 전용)"""
+    yf_params, default_max = _HISTORY_CFG.get(timeframe, _HISTORY_CFG["daily"])
+    if yf_period:
+        yf_params = {**yf_params, "period": yf_period}
+    max_items = max_items or default_max
+    if market == "KR":
+        try:
+            from services.kiwoom import chart as kchart, client as kclient
+            if kclient.configured():
+                df = kchart.history_df(ticker, timeframe, max_items=max_items)
+                if not df.empty:
+                    return df
+        except Exception:
+            pass
+    yf_sym = _yf_sym(ticker, market, exchange)
+    try:
+        return yf.Ticker(yf_sym).history(**yf_params)
+    except Exception:
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
 
 
 def get_financials(ticker: str, market: str = "US", exchange: str = "") -> list[dict]:

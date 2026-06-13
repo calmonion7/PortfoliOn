@@ -64,15 +64,18 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
             _ = _t.info  # info 사전 캐싱
         except Exception:
             pass
-    _hist_fn = _t.history if _t is not None else yf.Ticker(yf_sym).history
-    daily_df = _hist_fn(period="1y")
+    # KR 일봉은 키움 우선(실패 시 yfinance 폴백), 그 외는 yfinance.
+    if market == "KR":
+        daily_df = mkt.get_history_df(ticker, market, exchange, "daily")
+    else:
+        daily_df = _t.history(period="1y")
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange, _t)
         f_fin       = ex.submit(mkt.get_financials, ticker, market, exchange)
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
         f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
-        f_rsi       = ex.submit(indicators.get_timeframe_rsi, yf_sym)
+        f_rsi       = ex.submit(indicators.get_timeframe_rsi, ticker, market, exchange)
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
         f_comps     = [ex.submit(mkt.get_quote, c, *_infer_comp_market(c, market, exchange)) for c in competitors]
@@ -232,10 +235,15 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
         existing = {f.stem for f in output_dir.glob("*.json")}
 
     try:
-        t = yf.Ticker(yf_sym)
-        daily_df   = _normalize_index(t.history(period="2y",  interval="1d"))
-        weekly_df  = _normalize_index(t.history(period="5y",  interval="1wk"))
-        monthly_df = _normalize_index(t.history(period="10y", interval="1mo"))
+        t = yf.Ticker(yf_sym)  # US history + (US) info용. KR은 info 대신 quote 사용.
+        if market == "KR":
+            daily_df   = _normalize_index(mkt.get_history_df(ticker, market, exchange, "daily", yf_period="2y", max_items=520))
+            weekly_df  = _normalize_index(mkt.get_history_df(ticker, market, exchange, "weekly"))
+            monthly_df = _normalize_index(mkt.get_history_df(ticker, market, exchange, "monthly"))
+        else:
+            daily_df   = _normalize_index(t.history(period="2y",  interval="1d"))
+            weekly_df  = _normalize_index(t.history(period="5y",  interval="1wk"))
+            monthly_df = _normalize_index(t.history(period="10y", interval="1mo"))
     except Exception:
         return 0
 
