@@ -238,12 +238,12 @@ export default function Calendar() {
       }
 
       <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-3)', flexWrap: 'wrap' }}>
-        <span style={{ ...EVENT_STYLE.holding_earnings,   padding: '1px 6px', borderRadius: 3 }}>보유 실적</span>
-        <span style={{ ...EVENT_STYLE.holding_dividend,   padding: '1px 6px', borderRadius: 3 }}>보유 배당락</span>
-        <span style={{ ...EVENT_STYLE.watchlist_earnings, padding: '1px 6px', borderRadius: 3 }}>관심 실적</span>
-        <span style={{ ...EVENT_STYLE.watchlist_dividend, padding: '1px 6px', borderRadius: 3 }}>관심 배당락</span>
-        <span style={{ ...EVENT_STYLE.holiday_us,         padding: '1px 6px', borderRadius: 3 }}>NYSE 휴장</span>
-        <span style={{ ...EVENT_STYLE.holiday_kr,         padding: '1px 6px', borderRadius: 3 }}>KRX 휴장</span>
+        <span>{EVENT_ICON.holding_earnings} 보유 실적</span>
+        <span>{EVENT_ICON.holding_dividend} 보유 배당락</span>
+        <span>{EVENT_ICON.watchlist_earnings} 관심 실적</span>
+        <span>{EVENT_ICON.watchlist_dividend} 관심 배당락</span>
+        <span>{EVENT_ICON.holiday_us} NYSE 휴장</span>
+        <span>{EVENT_ICON.holiday_kr} KRX 휴장</span>
       </div>
     </div>
   )
