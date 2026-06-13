@@ -1,52 +1,34 @@
 ---
-last_mapped_commit: 1bbea86804f93c6f544092809ff8ed13977e5975
-mapped: 2026-06-06
+last_mapped_commit: 27346baec719306d5c2be8f259cc448ca4f64f4a
+mapped: 2026-06-13
 ---
 
-# 테스트 가이드
+# TESTING
 
-PortfoliOn 테스트의 프레임워크·구조·모킹·실행 방법과, 무엇이 테스트되고 무엇이 안 되는지를 실제 파일 기준으로 정리한다.
+PortfoliOn의 테스트 프레임워크·구조·모킹·실행·커버리지 사실 정리. 모든 경로는 실제 파일이다.
 
-## 요약
+## 프레임워크 & 실행
 
-- **백엔드**: pytest 기반, `backend/tests/`에 31개 테스트 파일·총 284개 테스트 함수. `pytest --co`로 수집 검증 완료(Python 3.9, `backend/.venv`).
-- **프론트엔드**: 테스트 없음. Vitest/Jest 등 테스트 프레임워크 미설치, 테스트 파일 0건(아래 상세).
-
----
-
-## 백엔드 테스트
-
-### 프레임워크 및 설정
-
-- 프레임워크는 **pytest**다. `backend/requirements*.txt`에 `pytest>=7.4.0`만 명시돼 있고, 별도 플러그인(pytest-cov, pytest-mock 등)은 없다 — 모킹은 표준 라이브러리 `unittest.mock`을 직접 쓴다.
-- 설정 파일 `backend/pytest.ini`:
-  ```ini
-  [pytest]
-  testpaths = tests
-  pythonpath = .
+- **백엔드: pytest**, 테스트는 `backend/tests/`에 위치. 가상환경은 `backend/.venv/`.
+- 실행:
+  ```bash
+  cd backend && .venv/bin/python -m pytest
   ```
-  `pythonpath = .`로 `backend/`를 import 루트로 잡아 `from main import app`, `from routers.portfolio import router`가 동작한다.
-- 커버리지 측정 설정·도구는 없다(coverage 의존성 없음). 커버리지 리포트를 생성하는 구성은 발견되지 않았다.
+  (조용히 카운트만: `cd backend && .venv/bin/python -m pytest -q`)
+- **현재 테스트 수: 466 passed (6 warnings, 약 12.7s)** — `27346bae` HEAD 기준 실측. 테스트 파일은 `backend/tests/test_*.py` 38개.
+- **프론트엔드: 컴포넌트 테스트 프레임워크 없음.** `frontend/package.json`의 scripts는 `dev`/`build`/`lint`/`preview`뿐이며 vitest·jest·@testing-library 의존성이 전혀 없다. 프론트의 유일한 사실상 검증 게이트는 `npm run build`(`vite build`). (수동 UAT는 Playwright 디바이스 에뮬레이션으로 수행 — 코드 테스트 프레임워크는 아님.)
 
-### 실행 방법
+## 구조
 
-```bash
-cd backend && .venv/bin/python -m pytest
-```
+- `backend/tests/conftest.py` — 공유 픽스처/세팅.
+- `backend/tests/__init__.py` — 패키지 마커.
+- `backend/tests/fixtures/backlog/` — 수주잔고 파서용 실 DART 표 HTML fixture(`*.html`). 로딩은 `Path(__file__).parent / "fixtures" / "backlog"`(`test_backlog_extract.py:16`).
+- 테스트 파일은 라우터/서비스 단위로 나뉜다: `test_<router>_router.py`(report/stocks/portfolio/watchlist/admin/calendar/digest/guru/events/analytics/analysis/investor/rankings/batches), `test_<service>.py`(storage/market/cache/indicators/leverage_service/investor_service/ranking_service/digest_service/...), 도메인 단위(`test_consensus_asof.py`, `test_backlog_extract.py`, `test_schedule_spec.py`) 등.
 
-(CLAUDE.md 명시 명령. Windows는 `backend/.venv/Scripts/python`.) 특정 파일만: `cd backend && .venv/bin/python -m pytest tests/test_portfolio_router.py`.
-
-### 테스트 위치 및 구조
-
-- 모든 테스트는 `backend/tests/` 한 디렉터리에 평면 배치, 파일명은 `test_*.py` 컨벤션.
-- 명명 규칙: `test_<router>_router.py`(라우터 통합 테스트)와 `test_<service>.py`/`test_<service>_service.py`(서비스 단위 테스트)로 나뉜다.
-- 테스트 함수명은 행동 서술형 `test_<동작>_<기대결과>`. 예: `test_add_duplicate_ticker_returns_400`, `test_delete_nonexistent_ticker_returns_404`, `test_add_stock_triggers_report_when_no_snapshot` (`backend/tests/test_portfolio_router.py`).
-- 일부 테스트는 한국어 docstring으로 의도를 설명한다. 예: `test_update_stock_updates_holdings_and_preserves_structured_analysis`의 `"""수정 시 수량/평단은 갱신하고 name·competitors만 마스터에 반영하되, 구조화된 moat/growth_plan 등은 덮어쓰지 않고 보존해야 한다."""` (`backend/tests/test_portfolio_router.py:62`).
-
-### 공통 픽스처 (`backend/tests/conftest.py`)
+## conftest 및 경로 부트스트랩 (`backend/tests/conftest.py`)
 
 ```python
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))   # backend/ 를 import 경로에 추가
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 
 @pytest.fixture
@@ -54,59 +36,56 @@ def client():
     return TestClient(app)
 ```
 
-- `sys.path` 삽입으로 `backend/` import 보장(개별 서비스 테스트도 파일 상단에서 같은 삽입을 반복하는 경우가 있다, 예: `backend/tests/test_ranking_service.py:1-3`, `test_leverage_service.py:1-3`).
-- 전역 인증 우회: `app.dependency_overrides[get_current_user] = lambda: "test-user-id"`로 `main.app`의 인증 의존성을 고정 user_id로 대체한다.
+- `sys.path.insert`로 `backend/`를 루트로 잡아 `from main import app`, `from auth import ...`, `from routers.X import router`가 가능. 일부 단위 테스트는 conftest에 의존하지 않고 자기 파일 안에서 `sys.path.insert`를 직접 한다(`test_backlog_extract.py:14`).
+- conftest의 `client` 픽스처는 `main.py`의 전체 `app`을 쓰며 `get_current_user`를 전역 오버라이드.
 
-### 라우터 테스트 패턴
+## FastAPI TestClient 사용 + 인증 모킹
 
-두 가지 앱 진입 방식이 공존한다.
+대다수 라우터 테스트는 **전체 앱이 아니라 단일 라우터만 마운트한 가벼운 `FastAPI()`**를 만든다(`test_stocks_router.py:9-13`, `test_report_router.py:24-30`):
 
-1. **conftest의 전역 `app`/`client`** — `from main import app` 전체 앱을 쓰고 `client` 픽스처를 주입받음.
-2. **라우터 단독 마운트** — 테스트 파일 내에서 독립 `FastAPI()`를 만들고 해당 라우터만 `include_router` 후 의존성 오버라이드. 예 (`backend/tests/test_portfolio_router.py:8-11`):
-   ```python
-   app = FastAPI()
-   app.include_router(router)
-   app.dependency_overrides[get_current_user] = lambda: "test-user-id"
-   client = TestClient(app)
-   ```
-   요청은 `starlette` `TestClient`로 `client.get/post/put/delete(...)` 호출 후 `resp.status_code`/`resp.json()` 단언.
+```python
+app = FastAPI()
+app.include_router(router)
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
+client = TestClient(app)
+```
 
-### 모킹 접근
+인증은 **실제 JWT 검증 대신 `app.dependency_overrides`로 의존성을 람다 치환**한다. report 라우터는 네 가지 인증 의존성을 모두 오버라이드(`test_report_router.py:26-29`): `get_current_user`, `require_admin`, `get_current_user_or_api_key`, `require_admin_or_api_key`. `dependency_overrides`를 쓰는 테스트 파일은 17개.
 
-DB·외부 API·yfinance 같은 부수효과는 전부 모킹한다. 실제 PostgreSQL/네트워크에 의존하지 않는다.
+## DB `query` 모킹
 
-- **`unittest.mock.patch`** (지배적) — 대상 함수를 **import된 위치**에서 패치한다. 모듈 import 컨벤션 덕에 `patch("routers.portfolio.storage.get_holdings", return_value=[])`처럼 라우터가 참조하는 심볼을 정확히 가로챈다. 호출 인자는 `mock_save_holdings.call_args[0][1]`로 검증, 호출 여부는 `assert_called_once_with(...)`/`assert_not_called()`로 검증 (`backend/tests/test_portfolio_router.py:33-105`).
-- **`MagicMock` + `patch`로 외부 HTTP 모킹** — `requests.get` 응답 객체를 `MagicMock`으로 만들어 `mock_resp.json.return_value = ...`, `mock_resp.raise_for_status = lambda: None`로 세팅 후 `patch("services.leverage_service.requests.get", return_value=mock_resp)` (`backend/tests/test_leverage_service.py:31-35`). KOFIA 응답 같은 외부 페이로드는 `_kofia_response(items)` 같은 헬퍼 빌더로 합성한다(`:9`).
-- **`monkeypatch`** (일부) — `test_market_indicators.py`, `test_leverage_service.py`, `test_ranking_service.py`, `test_event_tracker.py`, `test_scheduler_*.py`, `test_digest_service.py`, `test_cache.py`, `test_auth.py` 등에서 사용.
-- **순수 함수 단위 테스트** — 파서/포매터 등 부수효과 없는 헬퍼는 모킹 없이 직접 단언. 예: `_parse_int`/`_parse_float`/`_is_etf`/`_kr_row`/`_top_n_by` (`backend/tests/test_ranking_service.py:23-70`), 부동소수 비교는 `pytest.approx` 사용.
-- 테스트 데이터는 모듈 상단 `SAMPLE_*` 상수(`backend/tests/test_portfolio_router.py:13-23`)나 팩토리 함수(`_kr_stock(...)`, `backend/tests/test_ranking_service.py:8`)로 만든다.
+DB는 실제로 연결하지 않고 **모듈에 임포트된 `query`/`execute` 심볼을 `unittest.mock.patch`로 가로챈다**. 핵심: **임포트된 위치 기준으로 패치**한다 — 라우터가 `from services.db import query`로 받았으면 `routers.X.query`를, 서비스가 자기 모듈에서 쓰면 `services.X.query`를 패치.
 
-### 무엇이 테스트되는가 (커버 영역)
+- 라우터 DB: `patch("routers.report.query", side_effect=[date_rows, summary_rows])`(`test_report_router.py:52`) — 호출 순서대로 다른 결과를 돌려줄 땐 `side_effect` 리스트.
+- 컨센서스 정본: `patch("services.consensus.query", ...)`(`test_report_router.py:53`, `test_consensus_asof.py:19`). `consensus.py`가 `from services.db import query`로 받으므로 `services.consensus.query`를 패치해야 가로채진다.
+- 실측 분포(테스트 코드 내 `patch(...query...)` 빈도): `routers.report.query`·`services.consensus.query` 각 20, `services.storage.query` 9, `routers.calendar.query` 7, `routers.admin.query`·`services.investor_service.query`·`services.db.query` 등.
 
-`backend/tests/`에 존재하는 테스트 파일 기준:
+`apply_asof`/`get_asof` 단위 테스트(`test_consensus_asof.py`)는 DB를 `patch("services.consensus.query", return_value=...)` 또는 `side_effect=[[], hist_row]`(마트 미스→히스토리 폴백 시뮬레이션, `:31`)로만 제어하고 mart-hit/history-fallback/no-op/target-null-preserve/원본-불변 5경로를 검증한다.
 
-- **라우터(통합)**: portfolio, watchlist, stocks, report, consensus, calendar, analytics, analysis, admin, digest, guru, events, rankings, investor.
-  - `test_portfolio_router.py`, `test_watchlist_router.py`, `test_stocks_router.py`, `test_report_router.py`, `test_consensus_router.py`, `test_calendar_router.py`, `test_analytics_router.py`, `test_analysis_router.py`, `test_admin_router.py`, `test_digest_router.py`, `test_guru_router.py`, `test_events_router.py`, `test_rankings_router.py`, `test_investor_router.py`.
-- **서비스(단위)**: market, indicators, market_indicators, market_cache, leverage_service, lending(=market_indicators 내), ranking_service, investor_service, report_generator, digest_service, guru_stats, storage, cache.
-  - `test_market.py`, `test_indicators.py`, `test_market_indicators.py`(가장 큰 24KB), `test_market_cache.py`, `test_leverage_service.py`, `test_ranking_service.py`, `test_investor_service.py`, `test_report_generator.py`, `test_digest_service.py`, `test_guru_stats.py`, `test_storage.py`, `test_cache.py`.
-- **인증**: `test_auth.py`(토큰/인증 로직), `test_auth_me.py`(`/api/auth/me`).
-- **미들웨어/스케줄러**: `test_event_tracker.py`(`middleware/event_tracker.py`), `test_scheduler_rankings.py`, `test_scheduler_investor.py`(스케줄러 잡 등록/동작).
+서비스 외부 의존(yfinance·requests·storage·cache·job_runs)은 `patch("routers.stocks.storage.enrich_stock", return_value=True)`(`test_stocks_router.py:40`)처럼 임포트 경로 기준으로 패치. 인메모리 캐시 우회는 `patch("routers.report.cache_svc.get_list", side_effect=lambda f: f())`(`test_report_router.py:56`).
 
-### 무엇이 테스트되지 않는가 (갭)
+## 백그라운드 작업 / 계측 스텁
 
-- 다음 라우터/서비스에 대응하는 전용 테스트 파일이 없다: `auth_service`(엔드포인트 `test_auth*`로 간접 커버되나 서비스 단위 테스트는 없음), `consensus`/`consensus_pipeline`(라우터 테스트는 있으나 파이프라인 서비스 단독 테스트 없음), `report_generator` 외의 `report` 비즈니스 로직 일부, `charts`, `scraper`, `guru_scraper`, `backlog`, `analysis_service`(라우터 `test_analysis_router.py`로 간접 커버), `db.py`(직접 단위 테스트 없음 — 모든 DB 접근이 모킹되므로), `auth.py`의 `require_admin_or_api_key`.
-- 통합/엔드투엔드(실제 PostgreSQL·실제 외부 API) 테스트는 없다. 모든 외부 의존성은 모킹된다.
-- 부하/동시성, DB 마이그레이션(`auth_schema.sql`/`app_schema.sql`) 검증 테스트는 없다.
+report 라우터 테스트는 `job_runs.record` 계측이 테스트 DB를 건드리지 않도록 `autouse` 픽스처로 no-op 컨텍스트매니저 치환:
 
----
+```python
+@pytest.fixture(autouse=True)
+def _stub_job_runs(monkeypatch):
+    @contextmanager
+    def _noop(job_id, trigger):
+        yield 1
+    monkeypatch.setattr(job_runs, "record", _noop)
+```
+(`test_report_router.py:12-21`) — `monkeypatch`로 모듈 함수를 직접 대체하는 패턴.
 
-## 프론트엔드 테스트
+## 중요 로컬 함정: lxml 미설치 → `html.parser`
 
-**프론트엔드에는 테스트가 전혀 없다.** 다음으로 확인했다:
+로컬 `backend/.venv`에는 `lxml`이 **없다**(`requirements.txt`엔 있고 Docker 이미지엔 설치됨). 따라서 로컬 pytest로 도는 HTML 파싱 코드/테스트는 `BeautifulSoup(html, "lxml")`이 아니라 **stdlib `BeautifulSoup(html, "html.parser")`**를 써야 로컬·프로덕션 모두 통과한다.
 
-- `*.test.js(x)` / `*.spec.js(x)` 파일 검색 결과 0건 (`frontend/src/` 전체).
-- `frontend/package.json`에 `test` 스크립트 없음. `scripts`는 `dev`/`build`/`lint`/`preview`만 존재.
-- `devDependencies`에 Vitest·Jest·@testing-library·Cypress·Playwright 등 테스트 도구가 하나도 없다. 품질 도구는 ESLint(`eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`)뿐이며 `npm run lint`로 실행한다.
-- `vitest.config.*` / `jest.config.*` 설정 파일도 없다.
+- `backend/services/backlog.py:382,445,466` — 전부 `BeautifulSoup(html, "html.parser")`. `:30` 주석: "document.xml 원문은 XML이지만 html.parser로 파싱하므로(lxml 로컬 미설치)".
+- `backend/tests/test_backlog_extract.py:25,131,134` — fixture 파싱도 `"html.parser"`.
 
-프론트엔드 검증은 현재 ESLint 정적 분석과 수동/배포 후 확인에 의존한다.
+## 커버리지
+
+전용 커버리지 도구(`pytest-cov`/`coverage`) 설정은 없으며 카운트는 `pytest -q`의 통과 수로 가늠한다. 라우터·핵심 서비스(consensus/storage/market/cache/indicators/backlog/leverage/investor/ranking/digest/schedule_spec/job_runs)·스케줄러 시드·배치 회복력 단위까지 테스트가 존재하나, 프론트엔드에는 자동화 테스트가 없다(빌드 + 수동 UAT만).

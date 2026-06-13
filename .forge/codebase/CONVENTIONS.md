@@ -1,125 +1,134 @@
 ---
-last_mapped_commit: 1bbea86804f93c6f544092809ff8ed13977e5975
-mapped: 2026-06-06
+last_mapped_commit: 27346baec719306d5c2be8f259cc448ca4f64f4a
+mapped: 2026-06-13
 ---
 
-# 코딩 컨벤션
+# CONVENTIONS
 
-PortfoliOn 코드베이스의 실제 코드 스타일·네이밍·패턴을 정리한다. 모든 사실은 실제 파일에서 확인한 것이다.
-
-## 언어 및 주석 정책
-
-- 코드 식별자(변수·함수·클래스명)는 영어, **주석과 사용자 노출 문자열은 대부분 한국어**다.
-- 예: `backend/services/db.py`의 `query()`/`execute()` docstring이 `"""단일 SELECT — 결과를 dict 리스트로 반환."""` 처럼 한국어다.
-- 사용자 노출 에러 메시지도 한국어다. `backend/routers/portfolio.py:86`의 `detail="상장폐지 종목입니다. 등록할 수 없습니다."`, `backend/routers/market_indicators.py:132`의 `detail="이미 백필이 실행 중입니다."`.
-- 주석 밀도는 낮은 편이다. 함수 docstring은 "왜/무엇"을 한 줄로 설명할 때만 붙고, 인라인 주석은 비자명한 결정(스레드 안전성, 보존 로직 등)에만 단다. 예: `backend/services/report_generator.py:48`의 `# _t.history / _t.info는 thread-safe하지 않으므로 executor 외부에서 직렬 호출`, `backend/routers/portfolio.py:161`의 `# 편집 가능 필드(name, competitors)만 갱신 — 구조화 분석(moat/growth_plan 등)은 보존`.
-
----
+PortfoliOn 코드베이스의 코드 스타일·네이밍·반복 패턴·에러 처리 규약. 모든 예시는 실제 파일·라인을 인용한다.
 
 ## 백엔드 (Python / FastAPI)
 
-### 파일 헤더 및 import
-
-- 일부 파일은 경로 주석으로 시작한다: `backend/services/db.py:1`의 `# backend/services/db.py`, `backend/routers/events.py:1`의 `# backend/routers/events.py`. 일관되게 적용되지는 않는다.
-- 미래 어노테이션을 쓰는 파일이 있다: `backend/services/utils.py:1`, `backend/services/db.py:2`의 `from __future__ import annotations`. 이 파일들은 PEP 604 union 문법(`ThreadedConnectionPool | None`, `list[dict]`)을 사용한다.
-- 서비스/라우터 import는 `from services import storage, errors, report_generator` 형태로 모듈 단위 import 후 `storage.get_holdings(...)`처럼 점 표기로 호출하는 것이 지배적이다 (`backend/routers/portfolio.py:5-9`). 이 패턴은 테스트에서 `patch("routers.portfolio.storage.get_holdings", ...)`로 모킹하기 쉽게 만든다.
-- 무거운/순환 의존 import는 함수 내부에서 지연 import 한다. 예: `backend/routers/report.py:446`의 `from services.backlog import get_backlog as _get_backlog`, `backend/services/cache.py:108`의 `from routers import calendar as calendar_router`, `backend/services/analysis_service.py:51`의 `from services.market import _norm_sector`.
-
 ### 라우터 구조
 
-라우터는 모두 동일한 골격을 따른다 (`backend/routers/` 전체).
+각 라우터는 `APIRouter(prefix=..., tags=[...])`로 자기 prefix를 소유한다.
 
-- 모듈 상단에서 `router = APIRouter(prefix="/api/<domain>", tags=["<domain>"])`로 라우터 생성. 예: `backend/routers/portfolio.py:12`, `backend/routers/events.py:17`, `backend/routers/market_indicators.py:21`(prefix `/api/market`).
-- 요청 바디는 모듈 레벨 Pydantic `BaseModel` 서브클래스로 정의하고, 기본값을 직접 명시한다. 예: `backend/routers/portfolio.py:46`의 `class Stock(BaseModel)` (`competitors: List[str] = []`, `market: str = "US"`), `backend/routers/events.py:20`의 `class EventBody(BaseModel)` (`properties: dict = {}`), `backend/routers/stocks.py:88`의 `class EnrichBody(BaseModel)`.
-- 인증은 의존성 주입으로 일괄 처리한다: `user_id: str = Depends(get_current_user)` (`backend/routers/portfolio.py:60`). admin 전용 엔드포인트는 `Depends(require_admin)` (`backend/routers/market_indicators.py:128`), API 키 허용 엔드포인트는 `Depends(get_current_user_or_api_key)` (`backend/routers/report.py:451`). 인증 의존성은 `backend/auth.py`에 정의돼 있다.
-- `main.py`는 각 라우터를 `app.include_router(...)`로 등록한다 (`backend/main.py:73-87`). 앱 lifespan에서 스케줄러 시작/종료와 캐시 워밍 스레드를 띄운다 (`backend/main.py:51-57`).
+- `backend/routers/stocks.py:48` — `router = APIRouter(prefix="/api/stocks", tags=["stocks"])`
+- `backend/routers/portfolio.py:12` — `router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])`
+- `backend/routers/report.py:23` — `router = APIRouter(prefix="/api", tags=["report"])` (report·backlog는 `/api` 직하)
+- `backend/routers/batches.py:9` — `router = APIRouter(prefix="/api", tags=["batches"])`
 
-#### FastAPI `Body(...)` 규칙 (중요)
+핸들러는 `@router.get/post/put` 데코레이터 + 함수. 상태코드는 데코레이터 인자로 명시한다(`@router.post("", status_code=201)` — `portfolio.py:81`; `status_code=202`는 백그라운드 작업 시작, `report.py:74`).
 
-bare `list`/`dict`를 바디로 받을 때는 반드시 `Body(...)`로 명시해야 한다. Pydantic 모델 없이 받는 유일한 예가 이 규칙을 보여준다:
+### 인증 의존성 (`backend/auth.py`)
 
-```python
-# backend/routers/report.py:451
-@router.put("/report/{ticker}/backlog")
-def put_backlog(ticker: str, entries: list = Body(...), user_id: str = Depends(get_current_user_or_api_key)):
-```
+인증은 모두 FastAPI `Depends(...)`로 주입한다. 정의는 `backend/auth.py`:
 
-`= Body(...)`를 빠뜨리면 FastAPI가 query 파라미터로 해석해 기동/요청이 깨진다. 대부분의 엔드포인트는 이를 피하려 Pydantic 모델을 쓰지만, schedule처럼 자유형 dict를 받는 경우엔 `def update_schedule(schedule: dict)`로 모델 파라미터 자체가 바디로 인식되게 한다 (`backend/routers/report.py:470`).
+- `get_current_user` (`auth.py:18`) — HTTP Bearer JWT(HS256, `JWT_SECRET`) 검증 후 `payload["sub"]`(user_id) 반환. 실패 시 401.
+- `get_current_user_or_api_key` (`auth.py:37`) — `X-API-Key` 헤더(`COWORK_API_KEY`)이면 sentinel `_API_KEY_USER_ID = "__api_key__"`(`auth.py:15`) 반환, 아니면 JWT. Cowork 외부 API 진입점에 사용.
+- `require_admin` (`auth.py:61`) — `get_current_user`에 의존, `auth_service.get_user_by_id`로 `role == "admin"` 확인, 아니면 403. 리포트 생성·Guru 크롤·배치 스케줄 수정 등 관리자 전용 엔드포인트에 사용(`admin.py`, `batches.py`, `investor.py`, `guru.py`, `digest.py`, `rankings.py`, `report.py`, `market_indicators.py`).
+- `require_admin_or_api_key` (`auth.py:68`) — API 키이면 통과, 아니면 admin JWT 요구.
 
-#### 라우터 등록 순서 주의
+사용 예: `def get_portfolio(user_id: str = Depends(get_current_user))` (`portfolio.py:60`), `def backfill_all(..., user_id: str = Depends(require_admin))` (`report.py:75`).
 
-`PUT /api/stocks/enrich/batch`는 `PUT /api/stocks/{ticker}/enrich`보다 **먼저** 등록해야 `enrich`가 ticker 값으로 라우팅되지 않는다 (`backend/routers/stocks.py`, CLAUDE.md Gotchas 명시).
+라우터는 이 심볼들을 `from auth import get_current_user, require_admin, get_current_user_or_api_key, ...`로 임포트한다(`report.py:20`, `stocks.py:16`). `_API_KEY_USER_ID`도 동일 모듈에서 임포트한다.
 
-### 에러 처리
+### FastAPI `Body(...)` 규칙 (중요 함정)
 
-- 공통 HTTP 에러는 `backend/services/errors.py`의 팩토리 함수로 생성한다: `errors.not_found(ticker)` (404), `errors.already_exists(ticker)` (400). 사용 예: `backend/routers/portfolio.py:90,148`.
-- 일회성 에러는 라우터에서 직접 `raise HTTPException(status_code=..., detail="...")`로 던진다 (`backend/routers/portfolio.py:86,174`).
-- 외부 데이터 조회 엔드포인트(yfinance/외부 API)는 `try/except Exception as e: raise HTTPException(status_code=500, detail=str(e))`로 감싸는 패턴이 일관적이다. `backend/routers/market_indicators.py`의 거의 모든 GET 핸들러가 이 형태다 (예: `:24-29`).
-- 베스트-에포트(실패해도 무시) 경로는 `try/except`로 삼키고 진행한다. 예: `backend/routers/events.py:31`의 `_persist`는 `except Exception: pass`, `backend/routers/portfolio.py:74`의 가격 조회 `_fetch`도 예외를 삼키고 빈 dict 반환. 백그라운드 작업 실패는 `print(f"[AutoReport] consensus backfill failed ...")`로 로깅한다 (`backend/routers/portfolio.py:38`).
-- 스냅샷 조회는 DB 우선, 실패 시 파일시스템 폴백한다 (`backend/routers/stocks.py:21-44`, `_latest_snapshot`).
+PUT/POST에서 **bare `list`/`dict` 본문 파라미터는 반드시 `Body(...)`로 명시**해야 한다. 누락 시 FastAPI가 query 파라미터로 해석해 기동이 깨진다.
 
-### NaN/Inf 직렬화 방어
+- `report.py:462` — `def put_backlog(ticker: str, entries: list = Body(...), ...)`
+- `batches.py:64` — `schedule: dict = Body(...)`
 
-JSON 직렬화 전 NaN/Inf를 `None`으로 치환하는 것이 표준이다.
+구조화된 본문은 `pydantic.BaseModel`로 받는다(`stocks.py:89` `EnrichBody`, `portfolio.py:46` `Stock`, `admin.py:35` `PermissionsBody`).
 
-- `backend/services/utils.py`의 `sanitize(obj)`가 dict/list를 재귀 순회하며 `math.isnan`/`math.isinf` float을 `None`으로 바꾼다.
-- 보통 `from services.utils import sanitize as _sanitize`로 별칭 import 후 응답/저장 직전에 적용한다. 사용처: `backend/routers/report.py:57,154,159`, `backend/services/report_generator.py:165,322`.
-- yfinance의 개별 숫자 필드는 `_fin_num(v)` (`backend/services/report_generator.py:18`)로 `math.isfinite` 검사 후 비유한값을 `None`으로 만든다.
+### 서비스 레이어 분리
 
-### 서비스 계층 패턴
+라우터는 얇게 유지하고 로직은 `backend/services/*`에 둔다. 라우터는 `from services import storage, market, consensus as consensus_svc, ...` 형태로 임포트한다(`stocks.py:12-15`, `portfolio.py:5-9`). 별칭 관례: `consensus as consensus_svc`, `cache as cache_svc`, `market as market_svc`, `consensus_pipeline as _pipeline`.
 
-- DB 접근은 전부 `backend/services/db.py`를 거친다. `ThreadedConnectionPool`(minconn=1, maxconn=10) 싱글톤 + `@contextmanager get_connection()`이 커밋/롤백/반환을 책임진다. 단순 조회는 `query(sql, params) -> list[dict]`(RealDictCursor), 변경은 `execute(sql, params) -> int`(rowcount). 다중 statement 트랜잭션은 `with get_connection() as conn:` 직접 사용 (`backend/services/storage.py:49`).
-- SQL은 파라미터화 쿼리(`%s` placeholder + 튜플)만 사용한다. 문자열 포매팅으로 값 삽입하는 곳은 없다. UPSERT는 `INSERT ... ON CONFLICT ... DO UPDATE/NOTHING` 패턴 (`backend/services/storage.py:57,79`).
-- text 컬럼에 JSON 객체를 저장하는 필드(`moat`, `growth_plan`, `risks`, `recent_disclosures`, `insights`)는 `json.dumps`로 저장하고 `_parse_json_field`로 역파싱한다 (`backend/services/storage.py:5-21,38-45`).
-- 병렬 I/O는 `backend/services/parallel.py`의 `parallel_map(func, items, max_workers=10)`(내부 `ThreadPoolExecutor`)을 쓴다. 사용처: `backend/routers/portfolio.py:78`, `backend/services/analysis_service.py:52`. ThreadPool worker 수는 DB 풀 크기(10)를 넘지 않도록 맞춘다(MEMORY 교훈).
-- 진행 상태 추적은 `backend/services/progress.py`의 `ProgressTracker`(`threading.Lock`로 보호되는 dict 상태)를 사용한다.
-- 인메모리 캐시는 `backend/services/cache.py`의 `TTLCache` 클래스 + 모듈 레벨 싱글톤 인스턴스들(`_dashboard_cache`, `_correlation_cache`, `_sector_cache`, `_macro_cache` 등 TTL 300s)과 LRU `OrderedDict` `_snapshots`(max 50)로 구현. 무효화 헬퍼(`invalidate_dashboard`, `invalidate_portfolio_caches` 등)를 종목 변경 시 호출한다.
+서비스 서브패키지: `backend/services/market_indicators/`(fx/commodities/earnings/econ/exports/cache 모듈 분할).
 
-### 네이밍 컨벤션 (Python)
+### DB 헬퍼 (`backend/services/db.py`)
 
-- 함수/변수: `snake_case`. 모듈 프라이빗은 선행 언더스코어: `_last_scheduled_date`, `_generate_with_consensus` (`backend/routers/portfolio.py:17,30`), `_fetch_etf`, `_calc_return` (`backend/services/analysis_service.py`).
-- 모듈 레벨 상수: `UPPER_SNAKE` 또는 선행 언더스코어 상수. 예: `VALID_EVENTS` (`backend/routers/events.py:8`), `SECTOR_ETFS`/`MACRO_TICKERS` (`backend/services/analysis_service.py:7,21`), `_DAY_MAP` (`backend/routers/portfolio.py:14`), `_ANALYST_KEYS = frozenset({...})` (`backend/services/storage.py:5`).
-- 화이트리스트/집합은 `frozenset`로 정의하는 경향(`storage.py:5-6`).
+PostgreSQL 접근은 모듈 단일 진입점 두 함수로 통일한다:
 
----
+- `query(sql, params=None) -> list[dict]` (`db.py:42`) — SELECT, `RealDictCursor`로 dict 리스트 반환.
+- `execute(sql, params=None) -> int` (`db.py:50`) — INSERT/UPDATE/DELETE, 영향 행 수 반환.
 
-## 프론트엔드 (React 18 + Vite, plain CSS)
+둘 다 `get_connection()` 컨텍스트매니저(`db.py:29`)를 쓴다 — 성공 시 `commit`, 예외 시 `rollback`, 끝나면 `putconn`. 풀은 `ThreadedConnectionPool(minconn=1, maxconn=10, dsn=os.environ["DATABASE_URL"])`(`db.py:21`)로 lazy 싱글턴(`_get_pool`, double-checked lock).
 
-빌드 도구는 Vite다 (`frontend/package.json`). React 의존성은 `^19.2.5`로 명시돼 있다(package.json 기준). **TailwindCSS·styled-components·CSS Modules를 쓰지 않는다** — `grep`으로 `tailwind`/`styled-components`/`*.module.css` 매칭 0건 확인.
+라우터/서비스는 `from services.db import query, execute`(`report.py:19`) 또는 별칭 `from services.db import query as db_query`(`portfolio.py:9`)로 임포트한다. SQL은 문자열, 파라미터는 항상 `%s` 플레이스홀더 + 튜플(`stocks.py:25-28`) — f-string 보간 금지.
 
-### 스타일링 방식
+### NaN/Inf sanitize 유틸 (`backend/services/utils.py`)
 
-두 가지를 혼용한다.
+`sanitize(obj)` (`utils.py:21`) — `float`의 NaN/Inf를 `None`으로, dict/list는 재귀 처리. JSON 직렬화 전 필수 통과. 별칭 임포트 관례 `from services.utils import sanitize as _sanitize`(`report.py:16`, `report_generator.py:12`).
 
-1. **CSS 토큰 + BEM 유사 클래스** — 재사용 UI 컴포넌트(`frontend/src/components/ui/`)는 같은 디렉터리의 `.css` 파일을 `import './Card.css'`로 불러오고, `card`, `card--p-md`, `card__header` 같은 BEM 스타일 클래스를 쓴다 (`frontend/src/components/ui/Card.jsx`, `Card.css`). 디자인 토큰은 `frontend/src/styles/tokens.css`의 CSS 변수(`--bg-elev`, `--border`, `--text-3`, `--up`(상승=red)/`--down`(하락=blue), `--radius-md`, `--space-3` 등)로 정의되고 `var(...)`로 참조한다.
-2. **인라인 `style={{}}`** — 페이지/일회성 레이아웃은 인라인 스타일을 대량으로 쓴다 (`style={{ ... }}` 약 740회, `pages/` + `components/` 기준). 예: `frontend/src/pages/Portfolio.jsx:18,20`. 색상/간격은 인라인에서도 토큰을 참조한다(`color: 'var(--text-3)'`).
+- 응답 직전: `return _sanitize(rows[0]["data"])` (`report.py:157`), `_slim_summary` 끝에서 `return _sanitize(s)` (`report.py:58`).
+- DB 저장 직전: `report_generator.py:177` `sanitized = _sanitize(summary)` 후 `json.dumps(sanitized, ensure_ascii=False, indent=2)`.
 
-전역/레이아웃 CSS는 `frontend/src/App.css`, `index.css`, `styles/pc.css`, `styles/mobile.css`에 있다.
+같은 모듈의 티커 검색 헬퍼: `find_ticker_index` / `ticker_exists_in` / `find_ticker` (`utils.py:6-18`) — 전부 대문자 정규화 후 비교. `portfolio.py:89`에서 `ticker_exists_in(holdings, stock.ticker)`로 사용.
 
-### 컴포넌트 작성 패턴
+### 컨센서스 as-of 공유 헬퍼 (`backend/services/consensus.py`)
 
-- 함수형 컴포넌트만 사용. `export default function Portfolio()` (페이지) 또는 화살표 함수 보조 컴포넌트 `const DashboardGrid = ({ cards, loading }) => {...}` (`frontend/src/pages/Portfolio.jsx:16,26`).
-- 재사용 UI 컴포넌트는 `props` 디스트럭처링 + 기본값 + `...props` 스프레드 패턴. `Card`는 `padding='md'`, `as: As='div'`, `className=''`을 받고 클래스 배열을 `.filter(Boolean).join(' ')`로 합성한다 (`frontend/src/components/ui/Card.jsx`). 같은 파일에 `CardHeader` 보조 컴포넌트를 named export.
-- UI 컴포넌트 배럴은 `frontend/src/components/ui/index.js`로 묶는다. 아이콘은 `frontend/src/components/ui/icons.jsx`에 모여 named import.
+목표가·의견수 표시 정본은 `daily_consensus_mart`(ADR-0008). 표시 경로는 이 모듈의 공유 헬퍼를 거친다:
 
-### 상태 관리
+- `get_asof(ticker, date)` (`consensus.py:5`) — `daily_consensus_mart`에서 `base_date <= date` 최신행, 없으면 `consensus_history`(`date <= date`) 폴백, 둘 다 없으면 `None`.
+- `apply_asof(summary, ticker, date)` (`consensus.py:25`) — summary를 **복사**(원본 불변)해 정본으로 정합. 행이 있으면 `buy/hold/sell`은 항상 덮어쓰고, `target_*`은 **non-null일 때만** 덮어써 snapshot 동결값을 보존. 행이 없으면 그대로 반환.
+- `get_history(ticker)` (`consensus.py:42`) — 마트 우선, 없으면 `consensus_history` 폴백.
 
-- 전역 라이브러리(Redux/Zustand) 없음. **Context + 커스텀 훅** 조합이다.
-- 인증/권한은 `frontend/src/contexts/AuthContext.jsx`의 `AuthProvider`가 `/api/auth/me`를 받아 `role`/`menuPermissions`/`loading`을 제공하고, `useAuth()`로 소비한다. 라우팅/내비게이션은 `menuPermissions`로 필터링한다 (`frontend/src/App.jsx:34-46`).
-- 토스트는 `frontend/src/components/Toast.jsx`의 `ToastProvider` + `useToast()` 훅.
-- 데이터 페칭/로컬 상태는 페이지별 `useState`/`useEffect`/`useCallback` 또는 도메인 커스텀 훅으로 캡슐화한다. `frontend/src/hooks/usePortfolioData.js`는 stocks/watchlist/dashboard/fx 등 다중 상태와 `fetchAll`/`fetchDashboard`(`useCallback`)을 반환한다. 그 외 `useReportGeneration`, `useReportList`, `useTheme`, `useIsMobile`(matchMedia 기반) 훅이 있다(`frontend/src/hooks/`).
-- 폼/모달은 컨테이너의 로컬 `useState`로 열림 상태·편집 대상을 관리한다 (`frontend/src/pages/Portfolio.jsx:29-36`).
+사용처: `report.py:228` `summary = consensus_svc.apply_asof(summary, ticker, dates[0])`, `report.py:349`, `stocks.py:235`.
 
-### API 호출
+### 에러 헬퍼 (`backend/services/errors.py`)
 
-- 중앙 axios 인스턴스 `frontend/src/api.js`. `baseURL`은 `import.meta.env.VITE_API_BASE_URL || ''`(미설정 시 상대경로 → Vite 프록시).
-- 요청 인터셉터가 `localStorage`의 `access_token`을 `Authorization: Bearer`로 자동 첨부. 응답 인터셉터가 401 시 토큰 제거 후 `window.location.href = '/'`로 리다이렉트한다 (`frontend/src/api.js:7-25`).
-- 호출은 `api.get/post/put/delete('/api/...')` 형태. 에러는 `err.response?.data?.detail`에서 한국어 메시지를 꺼내 토스트로 보여준다 (`frontend/src/pages/Portfolio.jsx:77`).
-- 사용자 행동 이벤트는 `frontend/src/utils/analytics.js`의 `trackEvent(eventName, properties)`로 `fetch('/api/events', ...)` 발송(토큰 없으면 no-op, 실패는 `.catch(() => {})`로 무시). 백엔드는 `VALID_EVENTS` 화이트리스트로 검증한다 (`backend/routers/events.py:8`).
+표준 404/400을 팩토리로 통일한다:
 
-### 네이밍 컨벤션 (JS/JSX)
+- `not_found(ticker, context="")` (`errors.py:4`) → 404 `"{ticker} not found in {context}"`.
+- `already_exists(ticker, context="")` (`errors.py:9`) → 400 `"{ticker} already exists ..."`.
 
-- 컴포넌트/페이지 파일·컴포넌트명: `PascalCase` (`Portfolio.jsx`, `DashboardCard.jsx`, `StockModal.jsx`).
-- 훅: `useXxx` camelCase 파일 (`usePortfolioData.js`, `useIsMobile.js`).
-- 변수/함수: `camelCase` (`fetchAll`, `pollReportGeneration`, `handleSave`).
-- 세미콜론 미사용, 작은따옴표 문자열, 2-스페이스 들여쓰기가 일관적이다. 린트는 ESLint(`npm run lint`, `eslint-plugin-react-hooks`/`-react-refresh` 사용, `frontend/package.json`).
+`raise errors.already_exists(stock.ticker)` (`portfolio.py:90`), `raise errors.not_found(ticker, "watchlist")` (`watchlist.py:130`). 그 외 일회성 에러는 `HTTPException(status_code=..., detail=...)` 직접 raise(`portfolio.py:86`, `batches.py:57`).
+
+### 한국어 커밋 메시지 규약
+
+`<type>: <한국어 요약>` Conventional Commits 형식. `git log --oneline -20` 기준 사용 타입: `fix:`, `feat:`, `refactor:`, `docs:`. 요약은 한국어, 필요 시 `—`로 부연. 예:
+
+- `fix: 배치 허브 컨센서스 사용처에 목표가(상세·목록·대시보드) 반영`
+- `feat: iOS PWA 설치 안내 배너 (모바일·로그인 후)`
+- `refactor: 컨센서스 쓰기 경로를 daily_consensus_mart로 일원화`
+- `docs: API 명세서 2개 backlog 동기화 + 동기 갱신 규칙`
+
+### 기타 관례
+
+- 파일 상단 `from __future__ import annotations`(`db.py:2`, `consensus.py:1`, `report.py:1`, `utils.py:1`).
+- 모듈 프라이빗은 `_` 접두(`_latest_snapshot`, `_slim_summary`, `_pool`, `_KST`).
+- KST 타임존: `_KST = ZoneInfo("Asia/Seoul")`(`report.py:6`), `datetime.now(tz=_KST)`.
+- 외부 호출(yfinance·requests)·파일 폴백은 `try/except Exception:`으로 감싸고 빈 결과/`None` 반환 또는 `pass`(`stocks.py:31`, `stocks.py:85`, `portfolio.py:74`).
+- 병렬화는 `services.parallel.parallel_map`(`portfolio.py:78`) 또는 `ThreadPoolExecutor`.
+
+## 프론트엔드 (React 18 / Vite, plain CSS)
+
+### 컴포넌트 스타일
+
+함수형 컴포넌트 + 훅만 사용(`useState`/`useEffect`/`useRef`/`useCallback`). 페이지는 `export default function ComponentName()`(`ConsensusSettings.jsx:6`). cleanup은 effect 반환으로(`ConsensusSettings.jsx:13` `useEffect(() => () => clearInterval(pollRef.current), [])`).
+
+### 인라인 스타일 + CSS 변수 (Tailwind 없음)
+
+스타일은 인라인 `style={{...}}` 객체 또는 `className`(plain CSS 클래스)로 준다. **TailwindCSS를 쓰지 않는다.** 색·간격·반경은 모두 CSS 변수 토큰을 참조한다 — `frontend/src/styles/tokens.css`에 정의(`--bg`, `--text`/`--text-2`/`--text-3`, `--border`, `--accent-soft`, `--up`/`--down`(한국식: 빨강=상승/파랑=하락), `--radius`, `--shadow-sm` 등).
+
+예(`ConsensusSettings.jsx`): `color: 'var(--text-3)'`(`:43`), `background: 'var(--accent-soft)'`(`:48`), `boxShadow: days === d ? 'var(--shadow-sm)' : 'none'`(`:55`), `color: 'var(--up)'`(`:89`). 공용 클래스: `className="btn btn-primary"`(`:65`), `className="list-card"`(`:41`).
+
+### `api.js` 사용 (`frontend/src/api.js`)
+
+HTTP는 전부 단일 axios 인스턴스를 통한다 — `import api from '../api'`(`ConsensusSettings.jsx:2`, `AuthContext.jsx:2`).
+
+- `baseURL = import.meta.env.VITE_API_BASE_URL || ''`(`api.js:4`) — 미설정 시 상대경로(Vite 프록시).
+- 요청 인터셉터(`api.js:7`)가 `localStorage`의 `access_token`을 `Authorization: Bearer`로 자동 첨부.
+- 응답 인터셉터(`api.js:15`)가 401이면 토큰 제거 후 `/`로 강제 이동.
+- 호출: `await api.post('/api/consensus/batch?...')`, `await api.get('/api/consensus/batch/progress')`(`ConsensusSettings.jsx:20-23`). 에러는 `err?.response?.data?.detail` 패턴으로 추출(`:32`).
+
+### Toast 패턴 (`frontend/src/components/Toast.jsx`)
+
+`ToastProvider`(`Toast.jsx:5`)가 컨텍스트를 제공, 컴포넌트는 `const { showToast } = useToast()`(`Toast.jsx:40`)로 소비. `showToast(message, type)`의 `type`은 `'success'`(기본)/`'error'`/`'warning'`. 토스트는 3초 후 자동 제거, 최근 3개만 유지. 사용처: `Portfolio.jsx`, `Calendar.jsx`, `Ranking.jsx`, `Reports.jsx`, `reports/ConsensusChart.jsx`.
+
+### AuthContext 패턴 (`frontend/src/contexts/AuthContext.jsx`)
+
+`AuthProvider`(`AuthContext.jsx:6`)가 로그인 시 `api.get('/api/auth/me')`로 `role`·`menu_permissions`를 로드해 컨텍스트로 제공. 실패 시 `role='user'`/빈 권한으로 폴백(`:23`). 소비는 `const { role, menuPermissions, loading } = useAuth()`(`AuthContext.jsx:37`). `useAuth`는 `App.jsx`·`MobileNav.jsx`(nav 필터링)·`StockModal.jsx`·`Settings.jsx` 등에서 사용. `frontend/src/hooks/useAuth.js`도 존재.
