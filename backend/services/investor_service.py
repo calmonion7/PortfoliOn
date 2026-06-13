@@ -53,13 +53,8 @@ def _map_row(raw: dict) -> dict | None:
     }
 
 
-def fetch_trend(ticker: str, bizdate: str | None = None) -> list[dict]:
-    """Naver /trend에서 일별 수급 행 리스트 반환 (KR 전용).
-
-    bizdate=None  -> 최신 ~10일.
-    bizdate='YYYYMMDD' -> 그 날짜 이전 ~10일 (후진 백필용).
-    각 행: base_date(date), foreign_net/organ_net/individual_net(int),
-    foreign_hold_ratio(float|None), close_price(int)."""
+def _fetch_trend_naver(ticker: str, bizdate: str | None = None) -> list[dict]:
+    """Naver /trend 폴백 (기존 로직)."""
     url = f"{_NAVER_BASE}/{ticker}/trend"
     params = {"bizdate": bizdate} if bizdate else None
     r = requests.get(url, headers=_NAVER_HEADERS, params=params, timeout=8)
@@ -69,6 +64,25 @@ def fetch_trend(ticker: str, bizdate: str | None = None) -> list[dict]:
         return []
     rows = [_map_row(item) for item in data]
     return [row for row in rows if row is not None]
+
+
+def fetch_trend(ticker: str, bizdate: str | None = None) -> list[dict]:
+    """일별 수급 행 리스트 반환 (KR 전용). 키움 우선(ka10059 순매수+ka10008 보유율),
+    미설정/실패/빈 결과 시 Naver /trend 폴백 (.forge/adr/0009).
+
+    bizdate=None  -> 최신.
+    bizdate='YYYYMMDD' -> 그 날짜 이전 (후진 백필용).
+    각 행: base_date(date), foreign_net/organ_net/individual_net(int, 주식 수량),
+    foreign_hold_ratio(float|None, %), close_price(int)."""
+    try:
+        from services.kiwoom import investor as kinv, client as kclient
+        if kclient.configured():
+            rows = kinv.fetch_trend_rows(ticker, dt=bizdate)
+            if rows:
+                return rows
+    except Exception:
+        pass
+    return _fetch_trend_naver(ticker, bizdate)
 
 
 def upsert_trend(ticker: str, rows: list[dict]) -> None:
