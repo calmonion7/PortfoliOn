@@ -11,6 +11,7 @@ export default function usePortfolioData() {
   const [dashboardLoading, setDashboardLoading] = useState(false)
   const [fx, setFx] = useState(1380)
   const [events7d, setEvents7d] = useState([])
+  const [lastUpdated, setLastUpdated] = useState(null)  // 시세 마지막 갱신 시각(폴링·초기 fetch)
 
   const fetchAll = useCallback(async () => {
     setListLoading(true)
@@ -21,6 +22,7 @@ export default function usePortfolioData() {
     setHasFetched(true)
     api.get('/api/portfolio/prices').then(({ data: prices }) => {
       setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
+      setLastUpdated(new Date())
     }).catch(() => {})
   }, [])
 
@@ -51,6 +53,7 @@ export default function usePortfolioData() {
             daily_change_pct: prices[c.ticker].change_pct ?? c.daily_change_pct,
           }
         : c)))
+      setLastUpdated(new Date())
     } catch {
       // silent (네트워크/일시 오류 시 다음 틱에 재시도)
     }
@@ -81,5 +84,5 @@ export default function usePortfolioData() {
     }).catch(() => {})
   }, [])
 
-  return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, fetchAll, fetchDashboard, refreshLivePrices }
+  return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, lastUpdated, fetchAll, fetchDashboard, refreshLivePrices }
 }

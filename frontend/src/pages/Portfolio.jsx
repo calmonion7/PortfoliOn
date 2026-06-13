@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { trackEvent } from '../utils/analytics'
 import api from '../api'
 import usePortfolioData from '../hooks/usePortfolioData'
+import PriceFreshness from '../components/portfolio/PriceFreshness'
+import { krFreshnessLabel } from '../utils/marketHours'
 import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -35,7 +37,7 @@ export default function Portfolio() {
   const [error, setError] = useState('')
   const [analysisTab, setAnalysisTab] = useState('sector')
 
-  const { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, fetchAll, fetchDashboard } = usePortfolioData()
+  const { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, lastUpdated, fetchAll, fetchDashboard } = usePortfolioData()
 
   const pollReportGeneration = (ticker) => {
     let attempts = 0
@@ -135,7 +137,7 @@ export default function Portfolio() {
       </header>
 
       <div className="hero">
-        <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} · 15분 지연</div>
+        <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} · {krFreshnessLabel()}</div>
         <div className="val tnum">₩{fmt(totalValue ?? totalCost, 0)}</div>
         {totalPnl != null ? (
           <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`}>
@@ -302,7 +304,7 @@ export default function Portfolio() {
       <div className="page-head">
         <div>
           <h1 className="page-title">내 포트폴리오</h1>
-          <p className="page-sub">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} · 15분 지연</p>
+          <p className="page-sub">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} · <PriceFreshness lastUpdated={lastUpdated} /></p>
         </div>
       </div>
 

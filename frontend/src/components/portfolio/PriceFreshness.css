@@ -1,0 +1,24 @@
+.price-freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.price-freshness__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted, #9aa3af);
+  display: inline-block;
+  flex: none;
+}
+.price-freshness__dot.is-live {
+  background: #22c55e;
+  animation: pf-pulse 1.6s ease-in-out infinite;
+}
+@keyframes pf-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  50%      { opacity: 0.55; box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .price-freshness__dot.is-live { animation: none; }
+}

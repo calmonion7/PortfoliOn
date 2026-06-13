@@ -33,3 +33,8 @@ export function isUsMarketOpen(date = new Date()) {
 export function isAnyMarketOpen(date = new Date()) {
   return isKrMarketOpen(date) || isUsMarketOpen(date)
 }
+
+// 시세 freshness 라벨: KR은 키움(장중 ~실시간), US는 yfinance(~15분 지연)이라 마켓별 명시.
+export function krFreshnessLabel(date = new Date()) {
+  return isKrMarketOpen(date) ? 'KR 실시간 · US 15분 지연' : 'KR 장마감 · US 15분 지연'
+}
