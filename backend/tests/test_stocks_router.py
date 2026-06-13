@@ -204,8 +204,8 @@ def test_dashboard_card_includes_sector():
     }
     quote = {"price": 185.2, "daily_change_pct": 1.4,
              "weekly_change_pct": 2.1, "monthly_change_pct": 5.8}
-    # sector는 이제 snapshot에서 옴(batch 아님)
-    snap_row = [{"date": "2026-05-05", "data": {"sector": "Technology", "daily_rsi": {"rsi": 50.0}}}]
+    # sector는 이제 snapshot에서 오며, _norm_sector로 정규화된다(raw "Financial Services" → "Financials")
+    snap_row = [{"date": "2026-05-05", "data": {"sector": "Financial Services", "daily_rsi": {"rsi": 50.0}}}]
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.stocks.market.get_quotes_batch", return_value={"AAPL": quote}), \
          patch("routers.stocks.query", return_value=snap_row), \
@@ -213,7 +213,7 @@ def test_dashboard_card_includes_sector():
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
     card = resp.json()[0]
-    assert card["sector"] == "Technology"
+    assert card["sector"] == "Financials"
 
 
 def test_get_stock_news_returns_list_and_calls_scraper():

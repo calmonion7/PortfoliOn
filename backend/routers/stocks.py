@@ -219,6 +219,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
         target_mean = buy = hold = sell = None
         poc = vah = val = None
         hvn = []
+        sector = ""
         if snapshot:
             rsi = (snapshot.get("daily_rsi") or {}).get("rsi")
             target_mean = snapshot.get("target_mean")
@@ -230,6 +231,8 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             vah = vp.get("vah")
             val = vp.get("val")
             hvn = vp.get("hvn") or []
+            # sector는 snapshot에서(part2 — t.info 제거). 기존 동치 위해 _norm_sector 적용.
+            sector = market._norm_sector(snapshot.get("sector") or "")
             # 목표가·의견수 정본 = daily_consensus_mart as-of(최신 snapshot 날짜). 상세·목록과 동일 헬퍼로 정합. ADR-0008.
             _c = consensus_svc.apply_asof(
                 {"target_mean": target_mean, "buy": buy, "hold": hold, "sell": sell},
@@ -258,7 +261,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "hold": hold,
             "sell": sell,
             "snapshot_date": snapshot_date,
-            "sector": (snapshot.get("sector") if snapshot else "") or "기타",
+            "sector": sector or "기타",
         }
 
     def _build_all():
