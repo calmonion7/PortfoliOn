@@ -31,7 +31,7 @@ BATCHES = [
         "label": "컨센서스 수집",
         "category": "report",
         "schedule_desc": "리포트 생성에 포함",
-        "usage": ["리포트 컨센서스 차트"],
+        "usage": ["리포트 컨센서스 차트", "목표가·의견수(상세·목록·대시보드)"],
         "editable": False,
         "trigger_kinds": ["auto", "manual"],
         "manual_endpoint": "/api/consensus/batch",
