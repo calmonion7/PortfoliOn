@@ -470,6 +470,99 @@ def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=
         }
 
 
+def _closes_from_download(df, yf_sym: str, n_syms: int) -> list:
+    """yf.download 결과에서 한 심볼의 Close 시계열(과거→현재)을 리스트로 추출."""
+    try:
+        series = df["Close"] if n_syms == 1 else df[yf_sym]["Close"]
+        return [float(x) for x in series.dropna().tolist()]
+    except Exception:
+        return []
+
+
+def _changes_from_closes(closes: list) -> dict:
+    """일봉 종가 리스트에서 price·daily/weekly/monthly 변동률 산출(get_quote와 동일 인덱스)."""
+    price = closes[-1] if closes else None
+    prev = closes[-2] if len(closes) >= 2 else None
+    week = closes[-6] if len(closes) >= 6 else None
+    month = closes[-23] if len(closes) >= 23 else None
+
+    def _pct(c, b):
+        return round((c - b) / b * 100, 2) if (c and b) else None
+
+    return {
+        "price": float(price) if price else None,
+        "daily_change_pct": _pct(price, prev),
+        "weekly_change_pct": _pct(price, week),
+        "monthly_change_pct": _pct(price, month),
+    }
+
+
+def _sector_cached(ticker: str, market: str, exchange: str) -> str:
+    """sector는 롱 TTL(1일) 캐시 — 미스 시에만 t.info 1콜."""
+    from services import cache as cache_svc
+    key = f"{ticker.upper()}/{market}/{exchange}"
+
+    def _load():
+        try:
+            info = yf.Ticker(_yf_sym(ticker, market, exchange)).info
+            return _norm_sector(info.get("sector", "") or "")
+        except Exception:
+            return ""
+
+    return cache_svc.get_quote_sector_cached(key, _load)
+
+
+def get_quotes_batch(stocks: list) -> dict:
+    """dashboard/prices 전용 일괄 시세 조회.
+
+    US는 yf.download 1콜(일봉 종가 기반)로 price/변동률, KR은 종목별 get_quote(part1 캐시),
+    sector는 롱TTL 캐시. 반환 {TICKER: {price, daily/weekly/monthly_change_pct, sector}}.
+    get_quote(full, ytd 포함)는 report_generator 등 다른 호출처용으로 그대로 보존.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    result: dict = {}
+    us = [s for s in stocks if (s.get("market") or "US") != "KR"]
+    kr = [s for s in stocks if (s.get("market") or "US") == "KR"]
+
+    if us:
+        sym_map = {s["ticker"].upper(): _yf_sym(s["ticker"], "US", s.get("exchange", "")) for s in us}
+        syms = sorted(set(sym_map.values()))
+        try:
+            # auto_adjust=False: raw 종가(브로커 표시가에 근접) — 수정종가는 배당/분할 종목서 어긋남.
+            df = yf.download(syms, period="3mo", progress=False, group_by="ticker",
+                             auto_adjust=False, threads=True)
+        except Exception:
+            df = None
+        for s in us:
+            tk = s["ticker"].upper()
+            closes = _closes_from_download(df, sym_map[tk], len(syms)) if df is not None else []
+            if closes:
+                result[tk] = _changes_from_closes(closes)
+            else:
+                # 배치 추출 실패 → part1 캐시된 단일 get_quote로 폴백(정확성 보존)
+                q = get_quote(s["ticker"], "US", s.get("exchange", ""))
+                result[tk] = {"price": q.get("price"), "daily_change_pct": q.get("daily_change_pct"),
+                              "weekly_change_pct": q.get("weekly_change_pct"),
+                              "monthly_change_pct": q.get("monthly_change_pct")}
+        # sector: 롱캐시(미스만 t.info), 병렬
+        with ThreadPoolExecutor(max_workers=min(len(us), 10)) as ex:
+            secs = list(ex.map(
+                lambda s: (s["ticker"].upper(), _sector_cached(s["ticker"], "US", s.get("exchange", ""))), us))
+        for tk, sec in secs:
+            if tk in result:
+                result[tk]["sector"] = sec
+
+    for s in kr:
+        tk = s["ticker"].upper()
+        q = get_quote(s["ticker"], "KR", s.get("exchange", ""))  # part1 캐시
+        result[tk] = {"price": q.get("price"), "daily_change_pct": q.get("daily_change_pct"),
+                      "weekly_change_pct": q.get("weekly_change_pct"),
+                      "monthly_change_pct": q.get("monthly_change_pct"), "sector": q.get("sector")}
+
+    return result
+
+
 def get_financials(ticker: str, market: str = "US", exchange: str = "") -> list[dict]:
     if market == "KR":
         return get_financials_kr(ticker)

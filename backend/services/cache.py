@@ -115,6 +115,13 @@ def invalidate_quote(key: str = None) -> None:
     _quote_cache.invalidate(key)
 
 
+_quote_sector_cache = TTLCache(86400.0)  # sector는 거의 불변 → 1일 롱 TTL
+
+
+def get_quote_sector_cached(key: str, loader) -> str:
+    return _quote_sector_cache.get(key, loader)
+
+
 def invalidate_portfolio_caches() -> None:
     from routers import calendar as calendar_router
     calendar_router.clear_cache()

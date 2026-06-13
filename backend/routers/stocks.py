@@ -211,10 +211,9 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
     if not holdings:
         return []
 
-    def _build_card(stock: dict) -> dict:
+    def _build_card(stock: dict, quote: dict) -> dict:
         ticker = stock["ticker"].upper()
         snapshot, snapshot_date = _latest_snapshot(ticker)
-        quote = market.get_quote(ticker, stock.get("market", "US"), stock.get("exchange", ""))
 
         rsi = None
         target_mean = buy = hold = sell = None
@@ -263,7 +262,9 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
         }
 
     def _build_all():
+        quotes = market.get_quotes_batch(holdings)
         with ThreadPoolExecutor(max_workers=min(len(holdings), 10)) as executor:
-            return list(executor.map(_build_card, holdings))
+            return list(executor.map(
+                lambda s: _build_card(s, quotes.get(s["ticker"].upper(), {})), holdings))
 
     return cache_svc.get_dashboard(user_id, _build_all)

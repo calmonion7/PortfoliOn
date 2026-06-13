@@ -137,7 +137,7 @@ def test_dashboard_returns_cards_for_holdings():
     }
     from pathlib import Path
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.stocks.market.get_quote", return_value=quote), \
+         patch("routers.stocks.market.get_quotes_batch", return_value={"AAPL": quote}), \
          patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
          patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
          patch("routers.stocks.query", return_value=[]):
@@ -174,7 +174,7 @@ def test_dashboard_uses_mart_asof_for_target_and_opinion():
     mart_row = [{"target_mean": 250.0, "target_high": 270.0, "target_low": 230.0,
                  "buy": 12, "hold": 2, "sell": 1}]
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.stocks.market.get_quote", return_value=quote), \
+         patch("routers.stocks.market.get_quotes_batch", return_value={"AAPL": quote}), \
          patch("routers.stocks.query", return_value=snap_row), \
          patch("services.consensus.query", return_value=mart_row):
         resp = client.get("/api/stocks/dashboard")
@@ -210,7 +210,7 @@ def test_dashboard_card_includes_sector():
     }
     from pathlib import Path
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.stocks.market.get_quote", return_value=quote), \
+         patch("routers.stocks.market.get_quotes_batch", return_value={"AAPL": quote}), \
          patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
          patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")):
         resp = client.get("/api/stocks/dashboard")

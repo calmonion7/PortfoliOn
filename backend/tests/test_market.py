@@ -95,6 +95,26 @@ def test_get_quote_caches_within_ttl():
     assert mk.call_count == 1
 
 
+def test_get_quotes_batch_us_computes_changes():
+    from services import market
+    import importlib; importlib.reload(market)
+    # 다종목 download DataFrame: 컬럼 MultiIndex (sym, field), 마지막 종가만 +10%
+    dates = pd.date_range("2026-01-02", periods=30, freq="B")
+    frames = {("AAPL", "Close"): [100.0] * 29 + [110.0],
+              ("MSFT", "Close"): [200.0] * 29 + [220.0]}
+    df = pd.DataFrame(frames, index=dates)
+    df.columns = pd.MultiIndex.from_tuples(df.columns)
+    sector_mock = MagicMock(); sector_mock.info = {"sector": "Technology"}
+    with patch("services.market.yf.download", return_value=df), \
+         patch("services.market.yf.Ticker", return_value=sector_mock):
+        result = market.get_quotes_batch([{"ticker": "AAPL", "market": "US"},
+                                          {"ticker": "MSFT", "market": "US"}])
+    assert result["AAPL"]["price"] == 110.0
+    assert result["AAPL"]["daily_change_pct"] == 10.0   # (110-100)/100
+    assert result["MSFT"]["price"] == 220.0
+    assert result["AAPL"]["sector"] == "Technology"
+
+
 def test_get_quote_includes_sector():
     mock = _make_mock_ticker()
     mock.info["sector"] = "Technology"

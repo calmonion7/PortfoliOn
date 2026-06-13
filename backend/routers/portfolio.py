@@ -5,7 +5,6 @@ from typing import List
 from services import storage, errors, report_generator, consensus_pipeline as _pipeline
 from services import cache as cache_svc, market as market_svc
 from services.utils import find_ticker_index, ticker_exists_in
-from services.parallel import parallel_map
 from services.db import query as db_query
 from auth import get_current_user
 
@@ -65,17 +64,14 @@ def get_portfolio(user_id: str = Depends(get_current_user)):
 def get_portfolio_prices(user_id: str = Depends(get_current_user)):
     portfolio = storage.get_full_portfolio(user_id)
     all_stocks = portfolio.get("stocks", [])
-
-    def _fetch(s):
-        try:
-            quote = market_svc.get_quote(s["ticker"], s.get("market", "US"), s.get("exchange", ""))
-            if quote:
-                return s["ticker"], {"current_price": quote.get("price"), "change_pct": quote.get("daily_change_pct")}
-        except Exception:
-            pass
-        return s["ticker"], {}
-
-    return dict(parallel_map(_fetch, all_stocks))
+    quotes = market_svc.get_quotes_batch(all_stocks)
+    return {
+        s["ticker"]: {
+            "current_price": quotes.get(s["ticker"].upper(), {}).get("price"),
+            "change_pct": quotes.get(s["ticker"].upper(), {}).get("daily_change_pct"),
+        }
+        for s in all_stocks
+    }
 
 
 @router.post("", status_code=201)
