@@ -13,3 +13,11 @@ app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _clear_quote_cache():
+    # get_quote는 종목 단위 TTL 캐시를 쓰므로, 테스트 간 교차 오염을 막기 위해 매 테스트 전 비운다.
+    from services import cache as cache_svc
+    cache_svc.invalidate_quote()
+    yield

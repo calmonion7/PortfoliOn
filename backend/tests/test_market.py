@@ -84,6 +84,17 @@ def test_get_quote_includes_weekly_monthly_change_fields():
     for key in ("daily_change_pct", "weekly_change_pct", "monthly_change_pct"):
         assert result[key] is None or isinstance(result[key], float)
 
+def test_get_quote_caches_within_ttl():
+    from services import market
+    import importlib; importlib.reload(market)
+    mock = _make_mock_ticker()
+    with patch("services.market.yf.Ticker", return_value=mock) as mk:
+        market.get_quote("CACHEME")
+        market.get_quote("CACHEME")
+    # 두 번째 호출은 TTL 캐시 히트 → 하부 yfinance fetch는 1회만.
+    assert mk.call_count == 1
+
+
 def test_get_quote_includes_sector():
     mock = _make_mock_ticker()
     mock.info["sector"] = "Technology"

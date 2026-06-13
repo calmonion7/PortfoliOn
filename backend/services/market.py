@@ -417,6 +417,13 @@ def get_analyst_data_kr(ticker: str) -> dict:
 
 
 def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
+    # 종목 단위 TTL 캐시 — yfinance/Naver 호출을 종목당 TTL당 1회로 상한(rate-limit 방어).
+    from services import cache as cache_svc
+    key = f"{ticker.upper()}/{market}/{exchange}"
+    return cache_svc.get_quote_cached(key, lambda: _get_quote_uncached(ticker, market, exchange, _t))
+
+
+def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
     if market == "KR":
         return get_quote_kr(ticker, exchange)
 

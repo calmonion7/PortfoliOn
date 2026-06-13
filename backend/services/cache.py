@@ -104,6 +104,17 @@ def invalidate_macro(user_id: str = None) -> None:
     _macro_cache.invalidate(user_id)
 
 
+_quote_cache = TTLCache(60.0)
+
+
+def get_quote_cached(key: str, loader) -> dict:
+    return _quote_cache.get(key, loader)
+
+
+def invalidate_quote(key: str = None) -> None:
+    _quote_cache.invalidate(key)
+
+
 def invalidate_portfolio_caches() -> None:
     from routers import calendar as calendar_router
     calendar_router.clear_cache()
