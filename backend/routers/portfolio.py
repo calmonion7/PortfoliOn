@@ -62,16 +62,19 @@ def get_portfolio(user_id: str = Depends(get_current_user)):
 
 @router.get("/prices")
 def get_portfolio_prices(user_id: str = Depends(get_current_user)):
-    portfolio = storage.get_full_portfolio(user_id)
-    all_stocks = portfolio.get("stocks", [])
-    quotes = market_svc.get_quotes_batch(all_stocks)
-    return {
-        s["ticker"]: {
-            "current_price": quotes.get(s["ticker"].upper(), {}).get("price"),
-            "change_pct": quotes.get(s["ticker"].upper(), {}).get("daily_change_pct"),
+    # 장중 자동폴링 대상: 보유+관심 종목 시세를 user당 15s 캐시(다중 폴링 레이트리밋 방어).
+    def _compute():
+        portfolio = storage.get_full_portfolio(user_id)
+        all_stocks = portfolio.get("stocks", []) + portfolio.get("watchlist", [])
+        quotes = market_svc.get_quotes_batch(all_stocks)
+        return {
+            s["ticker"]: {
+                "current_price": quotes.get(s["ticker"].upper(), {}).get("price"),
+                "change_pct": quotes.get(s["ticker"].upper(), {}).get("daily_change_pct"),
+            }
+            for s in all_stocks
         }
-        for s in all_stocks
-    }
+    return cache_svc.get_live_prices(user_id, _compute)
 
 
 @router.post("", status_code=201)

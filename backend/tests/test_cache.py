@@ -152,3 +152,35 @@ def test_invalidate_also_clears_correlation():
     c.invalidate("AAPL")
     c.get_correlation("test-user", lambda: (calls.append(1), {"tickers": [], "matrix": []})[1])
     assert len(calls) == 2
+
+
+# ── 장중 라이브 시세 캐시 (Phase 3 part 1, S1) ──
+
+def test_live_prices_cache_hits_within_ttl_then_invalidates():
+    from services import cache as c
+    calls = {"n": 0}
+    def loader():
+        calls["n"] += 1
+        return {"005930": {"current_price": 322500, "change_pct": 1.2}}
+    c.invalidate_live_prices()
+    r1 = c.get_live_prices("user-A", loader)
+    r2 = c.get_live_prices("user-A", loader)   # TTL 내 → 캐시 히트(loader 재호출 X)
+    assert calls["n"] == 1 and r1 == r2
+    # 다른 유저는 별도 키
+    c.get_live_prices("user-B", loader)
+    assert calls["n"] == 2
+    # 무효화 후 재호출
+    c.invalidate_live_prices("user-A")
+    c.get_live_prices("user-A", loader)
+    assert calls["n"] == 3
+
+
+def test_stock_mutation_invalidates_live_prices():
+    from services import cache as c
+    calls = {"n": 0}
+    loader = lambda: (calls.__setitem__("n", calls["n"] + 1) or {"x": 1})
+    c.invalidate_live_prices()
+    c.get_live_prices("user-A", loader)
+    c.invalidate("005930")   # 종목 변경 → 라이브 캐시도 무효화
+    c.get_live_prices("user-A", loader)
+    assert calls["n"] == 2

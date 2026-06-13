@@ -58,6 +58,7 @@ def invalidate(ticker: str) -> None:
     invalidate_correlation()
     invalidate_sector()
     invalidate_macro()
+    invalidate_live_prices()  # 장중 폴링 캐시도 무효화(종목 추가/삭제 즉시 반영)
 
 
 def invalidate_dashboard(user_id: str = None) -> None:
@@ -113,6 +114,20 @@ def get_quote_cached(key: str, loader) -> dict:
 
 def invalidate_quote(key: str = None) -> None:
     _quote_cache.invalidate(key)
+
+
+# 장중 자동폴링 전용: /api/portfolio/prices 결과를 user당 짧게 캐시.
+# 다중 사용자·다중 탭의 15초 폴링이 단일 키움 자격증명 레이트리밋을 치지 않게 상한.
+# (yf.download/ka10081 일괄은 1콜이라 KR/US 분리 TTL 없이 통합 15s로 단순화)
+_live_prices_cache = TTLCache(15.0)
+
+
+def get_live_prices(user_id: str, loader) -> dict:
+    return _live_prices_cache.get(user_id, loader)
+
+
+def invalidate_live_prices(user_id: str = None) -> None:
+    _live_prices_cache.invalidate(user_id)
 
 
 def invalidate_portfolio_caches() -> None:
