@@ -104,15 +104,14 @@ def test_get_quotes_batch_us_computes_changes():
               ("MSFT", "Close"): [200.0] * 29 + [220.0]}
     df = pd.DataFrame(frames, index=dates)
     df.columns = pd.MultiIndex.from_tuples(df.columns)
-    sector_mock = MagicMock(); sector_mock.info = {"sector": "Technology"}
-    with patch("services.market.yf.download", return_value=df), \
-         patch("services.market.yf.Ticker", return_value=sector_mock):
+    with patch("services.market.yf.download", return_value=df):
         result = market.get_quotes_batch([{"ticker": "AAPL", "market": "US"},
                                           {"ticker": "MSFT", "market": "US"}])
     assert result["AAPL"]["price"] == 110.0
     assert result["AAPL"]["daily_change_pct"] == 10.0   # (110-100)/100
     assert result["MSFT"]["price"] == 220.0
-    assert result["AAPL"]["sector"] == "Technology"
+    # sector는 batch가 아니라 snapshot에서 옴(여기 미포함)
+    assert "sector" not in result["AAPL"]
 
 
 def test_get_quote_includes_sector():

@@ -497,30 +497,14 @@ def _changes_from_closes(closes: list) -> dict:
     }
 
 
-def _sector_cached(ticker: str, market: str, exchange: str) -> str:
-    """sector는 롱 TTL(1일) 캐시 — 미스 시에만 t.info 1콜."""
-    from services import cache as cache_svc
-    key = f"{ticker.upper()}/{market}/{exchange}"
-
-    def _load():
-        try:
-            info = yf.Ticker(_yf_sym(ticker, market, exchange)).info
-            return _norm_sector(info.get("sector", "") or "")
-        except Exception:
-            return ""
-
-    return cache_svc.get_quote_sector_cached(key, _load)
-
-
 def get_quotes_batch(stocks: list) -> dict:
     """dashboard/prices 전용 일괄 시세 조회.
 
-    US는 yf.download 1콜(일봉 종가 기반)로 price/변동률, KR은 종목별 get_quote(part1 캐시),
-    sector는 롱TTL 캐시. 반환 {TICKER: {price, daily/weekly/monthly_change_pct, sector}}.
-    get_quote(full, ytd 포함)는 report_generator 등 다른 호출처용으로 그대로 보존.
+    US는 yf.download 1콜(raw 일봉 종가)로 price/변동률, KR은 종목별 get_quote(part1 캐시).
+    sector는 여기서 안 가져온다 — 호출측(_build_card)이 snapshot에서 취해 t.info 비용을 없앤다.
+    get_quote(full, ytd/sector 포함)는 report_generator 등 다른 호출처용으로 그대로 보존.
+    반환 {TICKER: {price, daily/weekly/monthly_change_pct}}.
     """
-    from concurrent.futures import ThreadPoolExecutor
-
     result: dict = {}
     us = [s for s in stocks if (s.get("market") or "US") != "KR"]
     kr = [s for s in stocks if (s.get("market") or "US") == "KR"]
@@ -545,20 +529,13 @@ def get_quotes_batch(stocks: list) -> dict:
                 result[tk] = {"price": q.get("price"), "daily_change_pct": q.get("daily_change_pct"),
                               "weekly_change_pct": q.get("weekly_change_pct"),
                               "monthly_change_pct": q.get("monthly_change_pct")}
-        # sector: 롱캐시(미스만 t.info), 병렬
-        with ThreadPoolExecutor(max_workers=min(len(us), 10)) as ex:
-            secs = list(ex.map(
-                lambda s: (s["ticker"].upper(), _sector_cached(s["ticker"], "US", s.get("exchange", ""))), us))
-        for tk, sec in secs:
-            if tk in result:
-                result[tk]["sector"] = sec
 
     for s in kr:
         tk = s["ticker"].upper()
         q = get_quote(s["ticker"], "KR", s.get("exchange", ""))  # part1 캐시
         result[tk] = {"price": q.get("price"), "daily_change_pct": q.get("daily_change_pct"),
                       "weekly_change_pct": q.get("weekly_change_pct"),
-                      "monthly_change_pct": q.get("monthly_change_pct"), "sector": q.get("sector")}
+                      "monthly_change_pct": q.get("monthly_change_pct")}
 
     return result
 

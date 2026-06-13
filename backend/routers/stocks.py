@@ -258,7 +258,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "hold": hold,
             "sell": sell,
             "snapshot_date": snapshot_date,
-            "sector": quote.get("sector") or "기타",
+            "sector": (snapshot.get("sector") if snapshot else "") or "기타",
         }
 
     def _build_all():

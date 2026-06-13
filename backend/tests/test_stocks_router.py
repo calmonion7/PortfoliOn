@@ -202,17 +202,14 @@ def test_dashboard_card_includes_sector():
         ],
         "watchlist": []
     }
-    quote = {
-        "ticker": "AAPL", "price": 185.2,
-        "daily_change_pct": 1.4, "weekly_change_pct": 2.1, "monthly_change_pct": 5.8,
-        "name": "Apple Inc.", "market": "US",
-        "sector": "Technology", "industry": "Consumer Electronics",
-    }
-    from pathlib import Path
+    quote = {"price": 185.2, "daily_change_pct": 1.4,
+             "weekly_change_pct": 2.1, "monthly_change_pct": 5.8}
+    # sector는 이제 snapshot에서 옴(batch 아님)
+    snap_row = [{"date": "2026-05-05", "data": {"sector": "Technology", "daily_rsi": {"rsi": 50.0}}}]
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.stocks.market.get_quotes_batch", return_value={"AAPL": quote}), \
-         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
-         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")):
+         patch("routers.stocks.query", return_value=snap_row), \
+         patch("services.consensus.query", return_value=[]):
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
     card = resp.json()[0]
