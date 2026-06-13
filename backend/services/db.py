@@ -20,7 +20,9 @@ def _get_pool() -> ThreadedConnectionPool:
             if _pool is None:
                 _pool = ThreadedConnectionPool(
                     minconn=1,
-                    maxconn=10,
+                    # 최대 ThreadPool 동시성(calendar 15·analysis 11)보다 크게 — psycopg2 풀은
+                    # 소진 시 블록이 아니라 PoolError를 던지므로 워커 수 이상으로 둔다(CONCERNS §4.2).
+                    maxconn=20,
                     dsn=os.environ["DATABASE_URL"],
                 )
     return _pool
