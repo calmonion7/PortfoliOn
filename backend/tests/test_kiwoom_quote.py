@@ -45,3 +45,11 @@ def test_normalize_basic_missing_fields():
     assert q["prev_close"] is None
     assert q["market_cap"] is None
     assert q["name"] is None
+
+
+# ── 통합(SOR) 코드 변환 (Phase 3 part 2, S2) ──
+def test_integrated_code_appends_AL():
+    from services.kiwoom import client
+    assert client.integrated_code("005930") == "005930_AL"
+    assert client.integrated_code("005930_AL") == "005930_AL"   # 이미 접미사 → 그대로
+    assert client.integrated_code("005930_NX") == "005930_NX"

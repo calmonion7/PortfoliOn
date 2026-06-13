@@ -21,8 +21,8 @@ def _num(val) -> float | None:
 
 
 def get_basic_info(stk_cd: str) -> dict:
-    """ka10001 주식기본정보요청 — raw 응답 dict."""
-    return client.request("ka10001", {"stk_cd": stk_cd}, "stkinfo")
+    """ka10001 주식기본정보요청 — raw 응답 dict. 통합(SOR) 코드로 NXT 확장시간 가격 포함."""
+    return client.request("ka10001", {"stk_cd": client.integrated_code(stk_cd)}, "stkinfo")
 
 
 def normalize_basic(d: dict) -> dict:

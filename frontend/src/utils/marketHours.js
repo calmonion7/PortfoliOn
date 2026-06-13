@@ -17,9 +17,11 @@ function _openIn(timeZone, openMin, closeMin, date) {
   return weekday >= 1 && weekday <= 5 && minutes >= openMin && minutes <= closeMin
 }
 
-// KR 정규장(KRX): 09:00~15:30 KST 평일. (NXT 확장시간은 part 2)
+// KR 거래시간: NXT 확장시간 외곽 08:00~20:00 KST 평일(프리 08:00~/애프터 ~20:00).
+// 시세를 통합(SOR) 코드로 받으므로 확장시간에도 가격이 갱신됨 → 폴링도 그 창에서.
+// (08:50~09:00:30·15:20~15:40 휴장 구간엔 값이 안 변할 뿐 폴링은 무해하게 계속.)
 export function isKrMarketOpen(date = new Date()) {
-  return _openIn('Asia/Seoul', 9 * 60, 15 * 60 + 30, date)
+  return _openIn('Asia/Seoul', 8 * 60, 20 * 60, date)
 }
 
 // US 정규장: 09:30~16:00 America/New_York 평일 (DST 자동 반영, ≈23:30~06:00 KST).

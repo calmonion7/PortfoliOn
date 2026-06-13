@@ -56,7 +56,7 @@ def fetch_bars(stk_cd: str, timeframe: str, base_dt: str | None = None,
     api_id, list_key = _TF[timeframe]
     base_dt = base_dt or _dt.date.today().strftime("%Y%m%d")
     rows = client.request_paged(
-        api_id, {"stk_cd": stk_cd, "base_dt": base_dt, "upd_stkpc_tp": "1"},
+        api_id, {"stk_cd": client.integrated_code(stk_cd), "base_dt": base_dt, "upd_stkpc_tp": "1"},
         "chart", list_key, max_items,
     )
     bars = normalize_bars(rows)
