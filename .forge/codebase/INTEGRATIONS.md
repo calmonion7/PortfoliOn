@@ -29,6 +29,10 @@ mapped: 2026-06-13
   - `backend/services/guru_scraper.py` — `https://api.stock.naver.com/stock/{code}/basic`로 US 종목 한글명 보강.
   - `backend/services/investor_service.py`, `backend/services/ranking_service.py`도 Naver 소스를 사용.
 
+## 키움 REST API (KR 읽기전용 시세 소스)
+
+- 오너 개인계좌 자격증명(서버측 단일 키)으로 KR 시세 조회. **KR 전용·읽기전용** 경계(ADR-0009). `backend/services/kiwoom/client.py` — `KIWOOM_APP_KEY`/`KIWOOM_SECRET_KEY`/`KIWOOM_BASE_URL`(`.env.docker`)로 au10001 토큰 발급(인프로세스 싱글톤, 401 재발급 재시도) + `request(api_id, body, category)`(`POST {base}/api/dostk/{category}`, 헤더 `api-id`/`authorization Bearer`, return_code≠0→예외, 직렬 throttle). `kiwoom/quote.py` ka10001(주식기본정보) 조회·정규화(부호포함 문자열·시총 억원→원). `market.get_quote_kr`이 **키움 우선 + Naver 폴백**으로 KR 현재가를 받는다(`get_quotes_batch` KR도 이 함수 경유). 전체 TR 카탈로그·대체 로드맵: 루트 `KIWOOM_API.md`. 계좌·주문 TR·실시간 WebSocket(0B/0D)·KR 차트/수급/랭킹 대체는 후속 Phase(미착수).
+
 ## FnGuide (KR 컨센서스 1차 소스)
 
 - KR 컨센서스 원천(Naver Research fallback의 우선 소스). `backend/services/consensus_pipeline.py` — `https://comp.fnguide.com/SVO2/json/data/01_06/03_A{ticker}.json`.

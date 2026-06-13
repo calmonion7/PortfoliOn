@@ -108,19 +108,39 @@ def _fmt_market_cap(mc, market: str = "US") -> str:
     return f"${mc/1e9:.1f}B"
 
 
+def _kr_basic_naver(ticker: str) -> tuple:
+    """Naver basic → (price, ratio, prev_close, mc, name). HTTP 오류(상폐 409)는 전파."""
+    d = _naver_get(ticker, "basic")
+    price = _n(d.get("closePrice"))
+    change = _n(d.get("compareToPreviousClosePrice"))
+    ratio = _n(d.get("fluctuationsRatio"))
+    mc = _n(d.get("marketValue")) or _fnguide_market_cap(ticker)
+    name = d.get("stockName", ticker)
+    if ratio is not None and change is not None and ratio > 0 and change < 0:
+        ratio = -ratio
+    prev_close = (price - change) if (price is not None and change is not None) else None
+    return price, ratio, (round(prev_close, 0) if prev_close is not None else None), mc, name
+
+
+def _kr_basic_kiwoom(ticker: str) -> tuple | None:
+    """키움 ka10001 → (price, ratio, prev_close, mc, name). 미설정/실패/빈 price면 None."""
+    from services.kiwoom import client, quote as kq
+    if not client.configured():
+        return None
+    try:
+        q = kq.get_quote(ticker)
+    except Exception:
+        return None
+    if q.get("price") is None:
+        return None
+    return q["price"], q.get("daily_change_pct"), q.get("prev_close"), q.get("market_cap"), (q.get("name") or ticker)
+
+
 def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
     try:
-        d = _naver_get(ticker, "basic")
-        price = _n(d.get("closePrice"))
-        change = _n(d.get("compareToPreviousClosePrice"))
-        ratio = _n(d.get("fluctuationsRatio"))
-        mc = _n(d.get("marketValue")) or _fnguide_market_cap(ticker)
-        name = d.get("stockName", ticker)
-
-        if ratio is not None and change is not None and ratio > 0 and change < 0:
-            ratio = -ratio
-
-        prev_close = (price - change) if (price is not None and change is not None) else None
+        # 키움 우선 + Naver 폴백 (경계: .forge/adr/0009). 상폐 종목은 폴백의 409로 검출.
+        basic = _kr_basic_kiwoom(ticker) or _kr_basic_naver(ticker)
+        price, ratio, prev_close, mc, name = basic
         daily_change = f"{ratio:+.2f}%" if ratio is not None else "N/A"
 
         sector = ""
