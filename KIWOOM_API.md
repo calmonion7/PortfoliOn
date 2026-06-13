@@ -41,12 +41,12 @@
 | 데이터 | 현재 소스 | 키움 TR | 상태 |
 |--------|-----------|---------|------|
 | KR 현재가/시세 | Naver basic | `ka10001` | ✅ **적용**(Phase 1, 키움 우선+Naver 폴백) |
-| KR 일괄 시세(대시보드) | `get_quote` 루프 | `ka10095`(관심종목) | 계획(Phase 2) |
-| KR 호가 | 없음 | `ka10004` / 실시간 `0D` | 계획(Phase 2/3) |
-| KR 일/주/월/년봉 | yfinance·Naver | `ka10081/82/83/94` | 계획(Phase 2) |
-| KR 분/틱봉 | 없음 | `ka10080/79` | 계획(Phase 2) |
-| KR 수급(투자자/기관/외인) | investor_service(Naver) | `ka10059/10131/10058` | 계획(Phase 2) |
-| KR 랭킹(거래대금/거래량/등락률) | ranking_service(Naver) | `ka10032/10030/10027` | 계획(Phase 2) |
+| KR 일괄 시세(대시보드) | `get_quotes_batch` | `ka10081`(일봉 종가시리즈) | ✅ **적용**(Phase 2 part 1, 키움 일봉→daily/weekly/monthly) |
+| KR 호가 | 없음 | `ka10004` / 실시간 `0D` | 계획(Phase 3) |
+| KR 일/주/월봉 + RSI/차트 | yfinance | `ka10081/82/83` | ✅ **적용**(Phase 2 part 1, get_history_df seam, sector만 yfinance 잔존) |
+| KR 분/틱봉 | 없음 | `ka10080/79` | 검토 |
+| KR 수급(개인/외인/기관 + 외국인 보유율) | investor_service(Naver) | `ka10059`(순매수)+`ka10008`(보유율 wght) | 계획(Phase 2 part 3) |
+| KR 랭킹(거래대금/거래량/등락률) | ranking_service(Naver marketValue) | `ka10032/10030/10027` | **유지(Naver)** — 키움 랭킹 TR은 시가총액·ETF구분 미제공(UI 회귀), Naver가 더 풍부·안정. 대체 미채택(2026-06-13) |
 | KR 공매도 추이 | 없음 | `ka10014` | 계획(Phase 2) |
 | KR 신용매매동향 | KOFIA(leverage, 별개 지표) | `ka10013` | 검토 |
 | KR 대차거래 | 금융위(lending) | `ka10068/20068/90012` | 검토 |
