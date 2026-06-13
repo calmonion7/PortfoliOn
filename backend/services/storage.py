@@ -279,13 +279,6 @@ def get_schedule() -> dict:
     return {"enabled": False, "time": "08:00", "days": ["mon", "tue", "wed", "thu", "fri"]}
 
 
-def save_schedule(schedule: dict) -> None:
-    execute(
-        "INSERT INTO schedules (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
-        (json.dumps(schedule),),
-    )
-
-
 def get_guru_managers() -> dict:
     rows = query("SELECT data FROM guru_managers WHERE id = 1")
     if rows:

@@ -54,13 +54,13 @@ def _migrate():
     try:
         from services.db import execute
         execute("ALTER TABLE backlog_history ADD COLUMN IF NOT EXISTS segments JSONB")
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[migrate] backlog_history.segments 추가 실패: {e}")
     try:
         from services.db import execute
         execute("CREATE TABLE IF NOT EXISTS batch_schedules (job_id text PRIMARY KEY, data jsonb NOT NULL)")
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[migrate] batch_schedules 생성 실패: {e}")
 
 
 @asynccontextmanager
