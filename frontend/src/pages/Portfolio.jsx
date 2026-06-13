@@ -8,6 +8,7 @@ import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import DashboardCard from '../components/portfolio/DashboardCard'
+import FlashValue from '../components/portfolio/FlashValue'
 import { Search, Plus, Spark, MarketBadge, Sig, fmt, sparkFor, Pencil } from '../components/ui/icons'
 import useIsMobile from '../hooks/useIsMobile'
 import { useToast } from '../components/Toast'
@@ -15,12 +16,12 @@ import SectorTab from './SectorTab'
 import MacroTab from './MacroTab'
 import Analytics from './Analytics'
 
-const DashboardGrid = ({ cards, loading }) => {
+const DashboardGrid = ({ cards, loading, tick }) => {
   if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
   if (!cards.length) return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유종목이 없습니다.</p>
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, padding: '4px 0' }}>
-      {cards.map(item => <DashboardCard key={item.ticker} item={item} />)}
+      {cards.map(item => <DashboardCard key={item.ticker} item={item} tick={tick} />)}
     </div>
   )
 }
@@ -37,7 +38,7 @@ export default function Portfolio() {
   const [error, setError] = useState('')
   const [analysisTab, setAnalysisTab] = useState('sector')
 
-  const { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, lastUpdated, fetchAll, fetchDashboard } = usePortfolioData()
+  const { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard } = usePortfolioData()
 
   const pollReportGeneration = (ticker) => {
     let attempts = 0
@@ -138,7 +139,7 @@ export default function Portfolio() {
 
       <div className="hero">
         <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} · {krFreshnessLabel()}</div>
-        <div className="val tnum">₩{fmt(totalValue ?? totalCost, 0)}</div>
+        <FlashValue as="div" className="val tnum" value={totalValue ?? totalCost} tick={priceTick}>₩{fmt(totalValue ?? totalCost, 0)}</FlashValue>
         {totalPnl != null ? (
           <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`}>
             {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
@@ -208,14 +209,14 @@ export default function Portfolio() {
                   <div className="name">{h.ticker} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {h.name}</span></div>
                   <div className="sub">{(h.market || 'US') === 'US' ? '🇺🇸' : h.exchange === 'KS' ? '🇰🇷 KOSPI' : h.exchange === 'KQ' ? '🇰🇷 KOSDAQ' : '🇰🇷'} {h.quantity}주 · 평단 {ccy}{fmt(h.avg_cost || 0, dec)}</div>
                 </div>
-                <div className="price">
+                <FlashValue as="div" className="price" value={pnl} tick={priceTick}>
                   {pnl != null ? (
                     <>
                       <div className={`v tnum ${isUp ? 'up' : 'down'}`}>{isUp ? '+' : '-'}{ccy}{fmt(Math.abs(pnl), dec)}</div>
                       <div className={`d tnum ${isUp ? 'up' : 'down'}`}>{pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%</div>
                     </>
                   ) : null}
-                </div>
+                </FlashValue>
                 <button className="row-edit" onClick={() => openEdit(h)}><Pencil /></button>
                 <button className="row-del" onClick={() => handleDelete(h.ticker)}>×</button>
               </div>
@@ -264,7 +265,7 @@ export default function Portfolio() {
 
       {tab === 'dash' && (
         <div style={{ padding: '0 20px' }}>
-          <DashboardGrid cards={dashboardCards} loading={dashboardLoading} />
+          <DashboardGrid cards={dashboardCards} loading={dashboardLoading} tick={priceTick} />
         </div>
       )}
 
@@ -312,7 +313,7 @@ export default function Portfolio() {
       <div className="kpi-row">
         <div className="kpi">
           <div className="label">{totalValue != null ? '평가금액' : '투자 원가'}</div>
-          <div className="val tnum">₩{fmt(totalValue ?? totalCost, 0)}</div>
+          <FlashValue as="div" className="val tnum" value={totalValue ?? totalCost} tick={priceTick}>₩{fmt(totalValue ?? totalCost, 0)}</FlashValue>
           {totalPnl != null && (
             <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`} style={{ marginTop: 4 }}>
               {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
@@ -409,7 +410,7 @@ export default function Portfolio() {
                     <td>{h.name}</td>
                     <td className="num tnum">{h.quantity}</td>
                     <td className="num tnum">{ccy}{fmt(h.avg_cost || 0, dec)}</td>
-                    <td className="num tnum">
+                    <FlashValue as="td" className="num tnum" value={pnl} tick={priceTick}>
                       {pnl != null ? (
                         <>
                           <div className={pnl >= 0 ? 'up' : 'down'} style={{ fontWeight: 600 }}>
@@ -418,7 +419,7 @@ export default function Portfolio() {
                           <div style={{ fontSize: 11.5 }}><Sig v={pnlPct} /></div>
                         </>
                       ) : <span className="muted">—</span>}
-                    </td>
+                    </FlashValue>
                     <td style={{ width: 100 }}>
                       <Spark data={sparkFor(h.ticker, 40, pnl == null ? 0 : pnl >= 0 ? 0.4 : -0.4)} w={96} h={24}
                         color={pnl == null ? 'var(--text-3)' : pnl >= 0 ? 'var(--up)' : 'var(--down)'} />
@@ -480,7 +481,7 @@ export default function Portfolio() {
       )}
 
       {/* 대시보드 탭 */}
-      {tab === 'dash' && <DashboardGrid cards={dashboardCards} loading={dashboardLoading} />}
+      {tab === 'dash' && <DashboardGrid cards={dashboardCards} loading={dashboardLoading} tick={priceTick} />}
 
       {tab === 'analysis' && (
         <div>

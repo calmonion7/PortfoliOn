@@ -1,0 +1,22 @@
+/* 가격 변동 플래시: 값 뒤로 방향색(상승=빨강 soft, 하락=파랑 soft)이 차올랐다 ~0.7s에 페이드아웃. */
+.price-flash {
+  border-radius: 4px;
+}
+.price-flash--up {
+  animation: price-flash-up 0.7s ease-out;
+}
+.price-flash--down {
+  animation: price-flash-down 0.7s ease-out;
+}
+@keyframes price-flash-up {
+  0%   { background-color: var(--up-soft); }
+  100% { background-color: transparent; }
+}
+@keyframes price-flash-down {
+  0%   { background-color: var(--down-soft); }
+  100% { background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .price-flash--up,
+  .price-flash--down { animation: none; }
+}

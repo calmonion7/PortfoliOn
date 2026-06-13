@@ -2,6 +2,7 @@ import Card from '../ui/Card'
 import './DashboardCard.css'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
 import { fmtPrice } from '../../utils'
+import FlashValue from './FlashValue'
 
 const _weather = (score) => {
   if (score <= 0) return { icon: '☀️', label: '맑음' }
@@ -31,7 +32,7 @@ const overallWeather = (item) => {
   return _weather(Math.round(scores.reduce((a, b) => a + b, 0) / scores.length))
 }
 
-export default function DashboardCard({ item }) {
+export default function DashboardCard({ item, tick }) {
   const weather = overallWeather(item)
   const pnlPct = item.current_price != null && item.avg_cost != null
     ? (item.current_price - item.avg_cost) / item.avg_cost * 100
@@ -49,12 +50,12 @@ export default function DashboardCard({ item }) {
         <MarketBadge market={item.market || 'US'} exchange={item.exchange || ''} />
       </div>
       <div className="dashcard__name">{item.name}</div>
-      <div className="dashcard__price-row">
+      <FlashValue as="div" className="dashcard__price-row" value={item.current_price} tick={tick}>
         <span className="dashcard__price tnum">
           {item.current_price == null ? '—' : fmtPrice(item.current_price, item.market)}
         </span>
         <ChangeBadge value={item.daily_change_pct} />
-      </div>
+      </FlashValue>
       <div className="dashcard__change-row">
         <span className="dashcard__change-label">주간</span>
         <ChangeBadge value={item.weekly_change_pct} />

@@ -12,6 +12,7 @@ export default function usePortfolioData() {
   const [fx, setFx] = useState(1380)
   const [events7d, setEvents7d] = useState([])
   const [lastUpdated, setLastUpdated] = useState(null)  // 시세 마지막 갱신 시각(폴링·초기 fetch)
+  const [priceTick, setPriceTick] = useState(0)  // 라이브 폴링 틱 카운터 — 가격 플래시 발화 게이트(폴링에서만 증가)
 
   const fetchAll = useCallback(async () => {
     setListLoading(true)
@@ -49,11 +50,12 @@ export default function usePortfolioData() {
       setDashboardCards((prev) => prev.map((c) => (prices[c.ticker]
         ? {
             ...c,
-            price: prices[c.ticker].current_price ?? c.price,
+            current_price: prices[c.ticker].current_price ?? c.current_price,
             daily_change_pct: prices[c.ticker].change_pct ?? c.daily_change_pct,
           }
         : c)))
       setLastUpdated(new Date())
+      setPriceTick((t) => t + 1)  // 폴링 틱 → 가격 플래시 발화 허용
     } catch {
       // silent (네트워크/일시 오류 시 다음 틱에 재시도)
     }
@@ -84,5 +86,5 @@ export default function usePortfolioData() {
     }).catch(() => {})
   }, [])
 
-  return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, lastUpdated, fetchAll, fetchDashboard, refreshLivePrices }
+  return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard, refreshLivePrices }
 }
