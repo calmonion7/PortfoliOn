@@ -136,6 +136,21 @@ def _kr_basic_kiwoom(ticker: str) -> tuple | None:
     return q["price"], q.get("daily_change_pct"), q.get("prev_close"), q.get("market_cap"), (q.get("name") or ticker)
 
 
+def _kr_basic_kis(ticker: str) -> tuple | None:
+    """KIS 국내 현재가 → (price, ratio, prev_close, mc, name). 미설정/실패/빈 price면 None.
+    백업 폴백(키움 다음, Naver 앞): .forge/adr/0011."""
+    from services.kis import client, quote as kisq
+    if not client.configured():
+        return None
+    try:
+        q = kisq.get_quote_kr(ticker)
+    except Exception:
+        return None
+    if q.get("price") is None:
+        return None
+    return q["price"], q.get("daily_change_pct"), q.get("prev_close"), q.get("market_cap"), (q.get("name") or ticker)
+
+
 def _kr_closes_kiwoom(ticker: str, max_items: int = 30) -> list:
     """키움 일봉 종가 시리즈(과거→현재). 미설정/실패 시 [] (호출측 폴백). monthly(-23)용 30개."""
     from services.kiwoom import chart as kchart
@@ -147,8 +162,8 @@ def _kr_closes_kiwoom(ticker: str, max_items: int = 30) -> list:
 
 def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
     try:
-        # 키움 우선 + Naver 폴백 (경계: .forge/adr/0009). 상폐 종목은 폴백의 409로 검출.
-        basic = _kr_basic_kiwoom(ticker) or _kr_basic_naver(ticker)
+        # 키움 우선 → KIS 백업 → Naver 폴백 (경계: .forge/adr/0009·0011). 상폐 종목은 Naver 409로 검출.
+        basic = _kr_basic_kiwoom(ticker) or _kr_basic_kis(ticker) or _kr_basic_naver(ticker)
         price, ratio, prev_close, mc, name = basic
         daily_change = f"{ratio:+.2f}%" if ratio is not None else "N/A"
 

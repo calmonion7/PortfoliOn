@@ -33,6 +33,10 @@ mapped: 2026-06-13
 
 - 오너 개인계좌 자격증명(서버측 단일 키)으로 KR 시세 조회. **KR 전용·읽기전용** 경계(ADR-0009). `backend/services/kiwoom/client.py` — `KIWOOM_APP_KEY`/`KIWOOM_SECRET_KEY`/`KIWOOM_BASE_URL`(`.env.docker`)로 au10001 토큰 발급(인프로세스 싱글톤, 401 재발급 재시도) + `request(api_id, body, category)`(`POST {base}/api/dostk/{category}`, 헤더 `api-id`/`authorization Bearer`, return_code≠0→예외, 직렬 throttle). `kiwoom/quote.py` ka10001(주식기본정보) 조회·정규화(부호포함 문자열·시총 억원→원). `market.get_quote_kr`이 **키움 우선 + Naver 폴백**으로 KR 현재가를 받는다(`get_quotes_batch` KR도 이 함수 경유). 전체 TR 카탈로그·대체 로드맵: 루트 `KIWOOM_API.md`. 계좌·주문 TR·실시간 WebSocket(0B/0D)·KR 차트/수급/랭킹 대체는 후속 Phase(미착수).
 
+## 한국투자증권(KIS) REST API (KR+US 읽기전용 백업 시세 소스)
+
+- 오너 개인 KIS 앱키(서버측 단일 키)로 현재가 조회. **KR+US 읽기전용·백업** 경계(ADR-0011) — 1차(KR=키움, US=yfinance) 실패 시 폴백. `backend/services/kis/client.py` — `KIS_APP_KEY`/`KIS_APP_SECRET`/`KIS_BASE_URL`(`.env.docker`, 기본 실전 `:9443`)로 `/oauth2/tokenP` 토큰 발급(인프로세스 싱글톤, 발급 1분당 1회 EGW00133 방어 60s 가드 + 401 재발급 재시도) + `request(tr_id, path, params)`(GET `/uapi/...`, 헤더 `tr_id`/`appkey`/`appsecret`/`custtype=P`, `rt_cd≠"0"`→예외, 직렬 throttle). `kis/quote.py` 국내 `FHKST01010100`(현재가 정규화: 부호포함 등락율·시총 억원→원, 종목명 없음). `market.get_quote_kr` 체인이 **키움→KIS→Naver**(`_kr_basic_kis`, `configured()` False면 휴면). `get_quotes_batch` KR 폴백(get_quote 경유)이 KIS 자동 상속. US 현재가 폴백(`HHDFS00000300`+dailyprice, EXCD probe)·실시간 WS(approval_key/H0STCNT0)는 후속. 전체 카탈로그: 루트 `KIS_API.md`.
+
 ## FnGuide (KR 컨센서스 1차 소스)
 
 - KR 컨센서스 원천(Naver Research fallback의 우선 소스). `backend/services/consensus_pipeline.py` — `https://comp.fnguide.com/SVO2/json/data/01_06/03_A{ticker}.json`.
