@@ -31,7 +31,7 @@ def test_sector_returns_11_etfs():
     portfolio = {"stocks": [], "watchlist": []}
     with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader: loader()):
+         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader, market="US": loader()):
         resp = client.get("/api/analysis/sector")
     assert resp.status_code == 200
     data = resp.json()
@@ -45,7 +45,7 @@ def test_sector_includes_return_fields():
     portfolio = {"stocks": [], "watchlist": []}
     with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
-         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader: loader()):
+         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader, market="US": loader()):
         resp = client.get("/api/analysis/sector")
     s = resp.json()["sectors"][0]
     assert "return_1w" in s
@@ -64,7 +64,7 @@ def test_sector_portfolio_overlay():
     with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.analysis.db_query", return_value=[{"ticker": "AAPL", "sector": "Technology"}]), \
-         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader: loader()):
+         patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader, market="US": loader()):
         resp = client.get("/api/analysis/sector")
     assert resp.json()["portfolio_sectors"]["AAPL"] == "Technology"
 

@@ -1126,9 +1126,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(16종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(17종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
 
-> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다.
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다.
 
 **Auth:** Bearer token 필요
 
@@ -1604,7 +1604,15 @@ dataroma 전체 매니저 크롤링 시작 (비동기, admin 전용).
 
 ### `GET /api/analysis/sector`
 
-보유종목 섹터 모멘텀 분석. 섹터 ETF(XLK, XLV 등 11종) 기반 모멘텀 데이터와 보유종목의 섹터 배분을 결합. TTL 300s 캐시.
+보유종목 섹터 모멘텀 분석. TTL 300s 캐시. `market` 쿼리 파라미터로 시장을 분기한다.
+
+**Query Parameters**
+
+| 파라미터 | 타입 | 기본값 | 설명 |
+|----------|------|--------|------|
+| `market` | string | `"US"` | `"US"`(미지정 포함) = 섹터 ETF 기반 yfinance 경로. `"KR"` = 키움 KRX 업종 지수 모멘텀(배치 사전계산값) |
+
+**`market=US`(기본)** — 섹터 ETF(XLK, XLV 등 11종) 기반 모멘텀 데이터와 보유종목의 섹터 배분을 결합.
 
 **Response `200`**
 ```json
@@ -1624,6 +1632,51 @@ dataroma 전체 매니저 크롤링 시작 (비동기, admin 전용).
   }
 }
 ```
+
+**`market=KR`** — 키움 업종 지수(KRX KOSPI 업종) 모멘텀. `kr_sector_fetch` 배치가 사전계산해 `market_cache`에 저장한 값을 읽고(배치 미실행 시 `sectors`는 빈 배열), 보유 KR 종목을 업종에 매핑해 함께 반환한다.
+
+**Response `200`**
+```json
+{
+  "sectors": [
+    {
+      "name": "전기/전자",
+      "code": "013",
+      "return_1w": 1.8,
+      "return_1mo": 4.2,
+      "return_3mo": 9.5
+    }
+  ],
+  "portfolio_sectors": {
+    "005930": "전기/전자"
+  }
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `sectors` | object[] | KRX 업종별 모멘텀. `name`(업종명) · `code`(키움 업종코드) · `return_1w`/`return_1mo`/`return_3mo`(1주/1개월/3개월 수익률 %, 데이터 부족 시 `null`) |
+| `portfolio_sectors` | object | `{보유 KR 종목코드: 업종명}`. 업종 미상 종목은 키 누락(비-KR 종목은 미포함) |
+
+---
+
+### `POST /api/analysis/sector/refresh-kr`
+
+KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다시 받아 모멘텀을 계산·저장(`market_cache`)하고 섹터 캐시를 무효화한다. `kr_sector_fetch` 배치와 동일 본문을 수동 실행하는 엔드포인트.
+
+**Auth:** admin 권한 필요
+
+**Response `200`**
+```json
+{ "ok": true, "sectors": 24 }
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `ok` | boolean | 성공 여부 |
+| `sectors` | int | 갱신·저장된 업종 수 |
+
+**Error `500`** — 키움 조회/저장 실패 시 `detail`에 사유 포함
 
 ---
 

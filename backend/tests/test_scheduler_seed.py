@@ -85,6 +85,7 @@ def test_all_editable_jobs():
         "earnings_kr", "earnings_us", "monthly_kr", "monthly_us",
         "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
+        "kr_sector_fetch",
     }
 
 
@@ -166,6 +167,7 @@ def test_seed_only_fills_missing_rows(monkeypatch):
         "earnings_kr", "earnings_us", "monthly_kr", "monthly_us",
         "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
+        "kr_sector_fetch",
     }
     assert set(saved) == expected_seeded
     assert "consensus" not in store

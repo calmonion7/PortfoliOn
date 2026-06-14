@@ -228,6 +228,16 @@ def _fetch_short_sell():
         _short_sell_work()
 
 
+def _fetch_kr_sector():
+    from services import kr_sector_service
+    with job_runs.record("kr_sector_fetch", "auto"):
+        try:
+            sectors = kr_sector_service.refresh()
+            print(f"[Scheduler] KR sector momentum refreshed: {len(sectors)} sectors")
+        except Exception as e:
+            print(f"[Scheduler] KR sector momentum refresh failed: {e}")
+
+
 def _short_sell_work():
     """보유/관심 KR 종목 일일 공매도 추이 배치(키움 ka10014). 종목당 1콜로 252일 멱등 적립.
 
@@ -294,6 +304,7 @@ _JOB_FUNCS = {
     "investor_trend_fetch": _fetch_investor_trend,
     "short_sell_fetch": _fetch_short_sell,
     "backlog_fetch": _fetch_backlog,
+    "kr_sector_fetch": _fetch_kr_sector,
 }
 
 

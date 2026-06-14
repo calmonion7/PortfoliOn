@@ -89,8 +89,10 @@ _sector_cache = TTLCache(300.0)
 _macro_cache = TTLCache(300.0)
 
 
-def get_sector(user_id: str, loader) -> dict:
-    return _sector_cache.get(user_id, loader)
+def get_sector(user_id: str, loader, market: str = "US") -> dict:
+    # market을 캐시키에 반영해 US/KR이 같은 user_id로 충돌하지 않게 한다.
+    # 종목 변경 시 invalidate_sector()(인자 없음 전체 clear)가 두 키 모두 무효화.
+    return _sector_cache.get(f"{user_id}:{market}", loader)
 
 
 def get_macro(user_id: str, loader) -> dict:
