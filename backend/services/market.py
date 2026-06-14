@@ -500,6 +500,50 @@ def resolve_name(ticker: str, market: str = "US", exchange: str = "", user_name:
     return un or ticker
 
 
+def _us_quote_kis(ticker: str, exchange: str = "") -> dict | None:
+    """KIS 해외 현재가 백업 → get_quote(US) dict. 미설정/실패/빈 price면 None.
+    백업 폴백(yfinance 다음): .forge/adr/0011. KIS 해외엔 sector/industry/ytd/시총이
+    없어 빈값(price·prev_close·일간변동만). 15분 지연 수용(백업 한정)."""
+    from services.kis import client, quote as kisq
+    if not client.configured():
+        return None
+    try:
+        q = kisq.get_quote_us(ticker, exchange)
+    except Exception:
+        return None
+    if not q or q.get("price") is None:
+        return None
+    pct = q.get("daily_change_pct")
+    return {
+        "ticker": ticker,
+        "name": ticker,                       # KIS 해외 현재가엔 종목명 없음 → 티커(resolve_name 후처리)
+        "price": q["price"],
+        "prev_close": q.get("prev_close"),
+        "daily_change": f"{pct:+.2f}%" if pct is not None else "N/A",
+        "daily_change_pct": pct,
+        "weekly_change_pct": None,
+        "monthly_change_pct": None,
+        "market_cap": None,
+        "ytd_return": None,
+        "market": "US",
+        "sector": "",
+        "industry": "",
+    }
+
+
+def _us_none_quote(ticker: str, market: str, error: str | None = None) -> dict:
+    d = {
+        "ticker": ticker, "name": ticker, "price": None,
+        "prev_close": None, "daily_change": "N/A",
+        "daily_change_pct": None, "weekly_change_pct": None, "monthly_change_pct": None,
+        "market_cap": None, "ytd_return": None, "market": market,
+        "sector": "", "industry": "",
+    }
+    if error is not None:
+        d["error"] = error
+    return d
+
+
 def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
     if market == "KR":
         return get_quote_kr(ticker, exchange)
@@ -514,37 +558,37 @@ def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=
         if not current and not hist.empty:
             current = float(hist["Close"].iloc[-1])
         current = current or None
-        prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else None
-        week_ago = float(hist["Close"].iloc[-6]) if len(hist) >= 6 else None
-        month_ago = float(hist["Close"].iloc[-23]) if len(hist) >= 23 else None
-        ytd_start = float(hist["Close"].iloc[0]) if not hist.empty else None
-        daily_change_pct = round((current - prev_close) / prev_close * 100, 2) if current and prev_close else None
-        weekly_change_pct = round((current - week_ago) / week_ago * 100, 2) if current and week_ago else None
-        monthly_change_pct = round((current - month_ago) / month_ago * 100, 2) if current and month_ago else None
-        ytd_return = ((current - ytd_start) / ytd_start * 100) if current and ytd_start else None
-        return {
-            "ticker": ticker,
-            "name": info.get("shortName", ticker),
-            "price": float(current) if current else None,
-            "prev_close": round(prev_close, 2) if prev_close else None,
-            "daily_change": f"{daily_change_pct:+.2f}%" if daily_change_pct is not None else "N/A",
-            "daily_change_pct": daily_change_pct,
-            "weekly_change_pct": weekly_change_pct,
-            "monthly_change_pct": monthly_change_pct,
-            "market_cap": info.get("marketCap"),
-            "ytd_return": round(ytd_return, 2) if ytd_return else None,
-            "market": market,
-            "sector": _norm_sector(info.get("sector", "") or ""),
-            "industry": info.get("industry", "") or "",
-        }
+        if current:
+            current = float(current)
+            prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else None
+            week_ago = float(hist["Close"].iloc[-6]) if len(hist) >= 6 else None
+            month_ago = float(hist["Close"].iloc[-23]) if len(hist) >= 23 else None
+            ytd_start = float(hist["Close"].iloc[0]) if not hist.empty else None
+            daily_change_pct = round((current - prev_close) / prev_close * 100, 2) if prev_close else None
+            weekly_change_pct = round((current - week_ago) / week_ago * 100, 2) if week_ago else None
+            monthly_change_pct = round((current - month_ago) / month_ago * 100, 2) if month_ago else None
+            ytd_return = ((current - ytd_start) / ytd_start * 100) if ytd_start else None
+            return {
+                "ticker": ticker,
+                "name": info.get("shortName", ticker),
+                "price": current,
+                "prev_close": round(prev_close, 2) if prev_close else None,
+                "daily_change": f"{daily_change_pct:+.2f}%" if daily_change_pct is not None else "N/A",
+                "daily_change_pct": daily_change_pct,
+                "weekly_change_pct": weekly_change_pct,
+                "monthly_change_pct": monthly_change_pct,
+                "market_cap": info.get("marketCap"),
+                "ytd_return": round(ytd_return, 2) if ytd_return else None,
+                "market": market,
+                "sector": _norm_sector(info.get("sector", "") or ""),
+                "industry": info.get("industry", "") or "",
+            }
     except Exception as e:
-        return {
-            "ticker": ticker, "name": ticker, "price": None,
-            "prev_close": None, "daily_change": "N/A",
-            "daily_change_pct": None, "weekly_change_pct": None, "monthly_change_pct": None,
-            "market_cap": None, "ytd_return": None, "market": market,
-            "sector": "", "industry": "", "error": str(e),
-        }
+        # yfinance 예외 → KIS 백업(US, .forge/adr/0011), 그래도 없으면 에러 dict
+        return _us_quote_kis(ticker, exchange) or _us_none_quote(ticker, market, error=str(e))
+
+    # yfinance는 성공했으나 시세 없음 → KIS 백업
+    return _us_quote_kis(ticker, exchange) or _us_none_quote(ticker, market)
 
 
 def _closes_from_download(df, yf_sym: str, n_syms: int) -> list:
