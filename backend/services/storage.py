@@ -261,13 +261,36 @@ def enrich_stock(ticker: str, fields: dict) -> bool:
     return True
 
 
+def refresh_snapshot_names(ticker: str, name: str) -> None:
+    """종목 이름 변경 시 그 종목 스냅샷에 박제된 data.name도 동기 갱신.
+    리포트 목록/상세는 박제된 snapshot name을 읽으므로(전체 재생성 아님), 이게 없으면
+    종목관리(live tickers.name)와 리서치(snapshot name)가 어긋난다(목록↔상세 desync)."""
+    execute(
+        "UPDATE snapshots SET data = jsonb_set(data, '{name}', to_jsonb(%s::text)) WHERE ticker = %s",
+        (name, ticker.upper()),
+    )
+
+
+def set_ticker_name(ticker: str, name: str) -> None:
+    """tickers.name + 그 종목 스냅샷 name 동기 갱신 (이름 백필용)."""
+    execute("UPDATE tickers SET name = %s WHERE ticker = %s", (name, ticker.upper()))
+    refresh_snapshot_names(ticker, name)
+
+
+def tickers_missing_name() -> list[dict]:
+    """name이 비었거나 티커와 같은(=실명 미채움) 종목 목록 (이름 백필 대상)."""
+    return query("SELECT ticker, market, exchange FROM tickers WHERE name = '' OR name = ticker")
+
+
 def update_ticker_meta(ticker: str, name: str, competitors: list) -> None:
     """수정 모달에서 편집 가능한 필드(name, competitors)만 갱신.
-    구조화 분석(moat/growth_plan/risks/recent_disclosures)은 건드리지 않고 보존."""
+    구조화 분석(moat/growth_plan/risks/recent_disclosures)은 건드리지 않고 보존.
+    이름은 스냅샷에도 전파해 리포트 목록/상세까지 동기화."""
     execute(
         "UPDATE tickers SET name = %s, competitors = %s WHERE ticker = %s",
         (name, json.dumps(competitors or []), ticker.upper()),
     )
+    refresh_snapshot_names(ticker, name)
 
 
 # ── 전역 함수 ─────────────────────────────────────────────────────────────────

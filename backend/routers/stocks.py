@@ -8,12 +8,12 @@ import json
 import requests as http_requests
 import yfinance as yf
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from services import market
 from services import scraper
 from services import cache as cache_svc
 from services import consensus as consensus_svc
-from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID
+from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID, require_admin
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
@@ -202,6 +202,32 @@ def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(get_curr
 def clear_dashboard_cache():
     cache_svc.invalidate_dashboard()
     return {"cleared": True}
+
+
+@router.post("/names/backfill", status_code=202)
+def backfill_names(_: str = Depends(require_admin)):
+    """name이 비었거나 티커와 같은(=종목번호로 박힌) 종목을 quote 실명으로 일괄 교정.
+    tickers.name + 기존 스냅샷 name 동기 갱신(KR=키움/Naver, US=yfinance). admin 전용."""
+    candidates = storage.tickers_missing_name()
+
+    def _one(row):
+        ticker = row["ticker"]
+        name = market.resolve_name(ticker, row.get("market") or "US", row.get("exchange") or "", "")
+        if name and name.upper() != ticker.upper():
+            storage.set_ticker_name(ticker, name)
+            return ticker
+        return None
+
+    updated = []
+    if candidates:
+        # max_workers ≤ 8: 워커가 DB 풀(maxconn=10)을 점유(set_ticker_name 2 writes) → 풀 초과 방지
+        with ThreadPoolExecutor(max_workers=max(1, min(len(candidates), 8))) as executor:
+            for future in as_completed([executor.submit(_one, c) for c in candidates]):
+                t = future.result()
+                if t:
+                    updated.append(t)
+        cache_svc.invalidate_portfolio_caches()
+    return {"ok": True, "candidates": len(candidates), "updated": len(updated)}
 
 
 @router.get("/dashboard")

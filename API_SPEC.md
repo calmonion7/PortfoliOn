@@ -680,6 +680,21 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 ---
 
+### `POST /api/stocks/names/backfill`
+
+종목명이 비었거나 종목번호(티커)로 박힌 종목을 quote 실명으로 일괄 교정 (KR=키움 stk_nm/Naver, US=yfinance shortName). `tickers.name`과 기존 스냅샷의 박제 name을 동기 갱신. **admin 전용.**
+
+**Auth:** Bearer token + admin
+
+**Response `202`**
+```json
+{ "ok": true, "candidates": 12, "updated": 9 }
+```
+
+- `candidates` 교정 대상 수(name=''이거나 name=ticker) · `updated` 실제 실명으로 갱신된 수(quote 실패/실명 없으면 skip).
+
+---
+
 ### `GET /api/stocks/{ticker}/short-sell`
 
 종목 공매도 추이 시계열 (KR 전용, 키움 ka10014 → `market_short_sell`). `base_date` 오름차순. 데이터 없으면 `items` 빈 배열.

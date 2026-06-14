@@ -466,6 +466,25 @@ def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None) -> d
     return cache_svc.get_quote_cached(key, lambda: _get_quote_uncached(ticker, market, exchange, _t))
 
 
+def resolve_name(ticker: str, market: str = "US", exchange: str = "", user_name: str = "", quote: dict | None = None) -> str:
+    """종목 표시명 확정 — 사용자 입력이 비었거나 티커와 같으면 quote의 실명(KR=키움 stk_nm/Naver,
+    US=yfinance shortName)으로 대체. quote도 실명이 없으면(조회 실패 등) 입력/티커를 그대로 둔다.
+
+    이름이 종목번호로 박히는 것을 방지(근거: stock-name-enrichment). quote를 넘기면 재조회 안 함."""
+    t = ticker.upper()
+    un = (user_name or "").strip()
+    if un and un.upper() != t:
+        return un  # 사용자가 제대로 입력 → 존중
+    try:
+        q = quote if quote is not None else get_quote(ticker, market, exchange)
+        qn = (q.get("name") or "").strip()
+        if qn and qn.upper() != t:
+            return qn
+    except Exception:
+        pass
+    return un or ticker
+
+
 def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
     if market == "KR":
         return get_quote_kr(ticker, exchange)

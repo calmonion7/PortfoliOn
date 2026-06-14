@@ -79,10 +79,14 @@ def get_portfolio_prices(user_id: str = Depends(get_current_user)):
 
 @router.post("", status_code=201)
 def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+    quote = None
     if stock.market == "KR":
         quote = market_svc.get_quote(stock.ticker, "KR", stock.exchange)
         if quote.get("delisted"):
             raise HTTPException(status_code=422, detail="상장폐지 종목입니다. 등록할 수 없습니다.")
+
+    # 이름칸이 비거나 티커면 quote 실명으로 대체(종목번호로 박히는 것 방지)
+    name = market_svc.resolve_name(stock.ticker, stock.market, stock.exchange, stock.name, quote=quote)
 
     holdings = storage.get_holdings(user_id)
     if ticker_exists_in(holdings, stock.ticker):
@@ -92,7 +96,7 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
     if not ticker_exists_in(stocks, stock.ticker):
         storage.save_stocks(user_id, [{
             "ticker": stock.ticker.upper(),
-            "name": stock.name,
+            "name": name,
             "competitors": stock.competitors,
             "moat": stock.moat,
             "growth_plan": stock.growth_plan,
@@ -120,7 +124,7 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
     if not existing:
         stock_dict = {
             "ticker": stock.ticker.upper(),
-            "name": stock.name,
+            "name": name,
             "market": stock.market,
             "exchange": stock.exchange,
             "competitors": stock.competitors,
@@ -134,7 +138,7 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
         else:
             background_tasks.add_task(_generate_with_consensus, stock_dict)
 
-    return {**new_holding, "name": stock.name, "competitors": stock.competitors,
+    return {**new_holding, "name": name, "competitors": stock.competitors,
             "moat": stock.moat, "growth_plan": stock.growth_plan,
             "report_queued": not bool(existing)}
 
