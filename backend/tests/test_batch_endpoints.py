@@ -71,7 +71,7 @@ def test_digest_generate_all_admin_records(spy, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# POST /api/market/refresh-monthly → monthly_refresh
+# POST /api/market/refresh-monthly?market= → monthly_us (default) / monthly_kr
 # ---------------------------------------------------------------------------
 
 def test_refresh_monthly_blocks_non_admin(monkeypatch):
@@ -86,7 +86,7 @@ def test_refresh_monthly_admin_records(spy, monkeypatch):
     monkeypatch.setattr(mi, "_fetch_and_save_kr_exports", lambda: {"history": []})
     resp = _admin_client(mi.router).post("/api/market/refresh-monthly")
     assert resp.status_code == 200
-    assert ("monthly_refresh", "manual") in spy
+    assert ("monthly_us", "manual") in spy
 
 
 # ---------------------------------------------------------------------------

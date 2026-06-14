@@ -63,14 +63,19 @@ def _run_guru_crawl():
             print(f"[Scheduler] Guru crawl failed: {e}")
 
 
-def _refresh_monthly():
-    from services.market_indicators import _fetch_and_save_econ_indicators, _fetch_and_save_kr_exports
-    with job_runs.record("monthly_refresh", "auto"):
+def _refresh_monthly_us():
+    from services.market_indicators import _fetch_and_save_econ_indicators
+    with job_runs.record("monthly_us", "auto"):
         try:
             _fetch_and_save_econ_indicators()
             print("[Scheduler] Econ indicators refreshed")
         except Exception as e:
             print(f"[Scheduler] Econ indicators refresh failed: {e}")
+
+
+def _refresh_monthly_kr():
+    from services.market_indicators import _fetch_and_save_kr_exports
+    with job_runs.record("monthly_kr", "auto"):
         try:
             _fetch_and_save_kr_exports()
             print("[Scheduler] KR exports refreshed")
@@ -78,14 +83,19 @@ def _refresh_monthly():
             print(f"[Scheduler] KR exports refresh failed: {e}")
 
 
-def _refresh_earnings():
-    from services.market_indicators import _fetch_and_save_m7_earnings, _fetch_and_save_kr_top2_earnings
-    with job_runs.record("earnings_refresh", "auto"):
+def _refresh_earnings_us():
+    from services.market_indicators import _fetch_and_save_m7_earnings
+    with job_runs.record("earnings_us", "auto"):
         try:
             _fetch_and_save_m7_earnings()
             print("[Scheduler] M7 earnings refreshed")
         except Exception as e:
             print(f"[Scheduler] M7 earnings refresh failed: {e}")
+
+
+def _refresh_earnings_kr():
+    from services.market_indicators import _fetch_and_save_kr_top2_earnings
+    with job_runs.record("earnings_kr", "auto"):
         try:
             _fetch_and_save_kr_top2_earnings()
             print("[Scheduler] KR Top2 earnings refreshed")
@@ -273,8 +283,10 @@ _JOB_FUNCS = {
     "daily_report_us": _generate_us,
     "guru_crawl": _run_guru_crawl,
     "daily_digest": _run_digest,
-    "earnings_refresh": _refresh_earnings,
-    "monthly_refresh": _refresh_monthly,
+    "earnings_kr": _refresh_earnings_kr,
+    "earnings_us": _refresh_earnings_us,
+    "monthly_kr": _refresh_monthly_kr,
+    "monthly_us": _refresh_monthly_us,
     "leverage_fetch": _fetch_leverage,
     "lending_fetch": _fetch_lending,
     "kr_rankings_fetch": _fetch_kr_rankings,
@@ -342,6 +354,17 @@ def _seed_spec_for(job_id: str) -> dict:
             "days": [day],
             "time": cfg.get("time", "03:00"),
         }
+    # earnings_kr/us·monthly_kr/us: 은퇴한 earnings_refresh·monthly_refresh 행의
+    # enabled·spec을 그대로 승계(시각 override 없음 — 주/월 주기라 장마감 민감도 없음).
+    # 옛 행이 없으면 default_schedule로 폴백.
+    if job_id in ("earnings_kr", "earnings_us"):
+        old = storage.get_batch_schedule("earnings_refresh")
+        if old is not None:
+            return old
+    if job_id in ("monthly_kr", "monthly_us"):
+        old = storage.get_batch_schedule("monthly_refresh")
+        if old is not None:
+            return old
     return batch_registry.get_batch(job_id)["default_schedule"]
 
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Query
 from services.leverage_service import get_leverage_data, get_coverage, backfill_with_progress, _backfill_progress
 from services.lending_service import get_lending_data, fetch_and_store as lending_fetch_and_store
 from services import job_runs
@@ -88,20 +88,27 @@ def econ_indicators():
 
 
 @router.post("/refresh-earnings")
-def refresh_earnings(_: str = Depends(require_admin)):
+def refresh_earnings(market: str = Query("KR"), _: str = Depends(require_admin)):
+    """시장별 실적 갱신: KR=KR Top2(earnings_kr) / US=M7(earnings_us). 각자 자기 id로 기록."""
+    if market not in ("KR", "US"):
+        raise HTTPException(status_code=400, detail="market must be KR or US")
     try:
-        with job_runs.record("earnings_refresh", "manual"):
+        if market == "KR":
+            with job_runs.record("earnings_kr", "manual"):
+                kr = _fetch_and_save_kr_top2_earnings()
+            return {"ok": True, "market": "KR", "kr_quarters": len(kr.get("quarters", []))}
+        with job_runs.record("earnings_us", "manual"):
             m7 = _fetch_and_save_m7_earnings()
-            kr = _fetch_and_save_kr_top2_earnings()
-        return {"ok": True, "m7_quarters": len(m7.get("quarters", [])), "kr_quarters": len(kr.get("quarters", []))}
+        return {"ok": True, "market": "US", "m7_quarters": len(m7.get("quarters", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/refresh-econ")
 def refresh_econ(_: str = Depends(require_admin)):
+    """FRED 경제지표 단독 갱신(고아 엔드포인트) — monthly_us(해외 월간)로 흡수 기록."""
     try:
-        with job_runs.record("monthly_refresh", "manual"):
+        with job_runs.record("monthly_us", "manual"):
             data = _fetch_and_save_econ_indicators()
         return {"ok": True, "cpi_points": len(data.get("cpi", [])), "unemp_points": len(data.get("unemployment", []))}
     except Exception as e:
@@ -109,13 +116,18 @@ def refresh_econ(_: str = Depends(require_admin)):
 
 
 @router.post("/refresh-monthly")
-def refresh_monthly(_: str = Depends(require_admin)):
-    """월간 지표 갱신: 경제지표 + KR 수출 (스케줄러 _refresh_monthly와 동일)."""
+def refresh_monthly(market: str = Query("US"), _: str = Depends(require_admin)):
+    """시장별 월간 지표 갱신: KR=KR 수출(monthly_kr) / US=FRED 경제지표(monthly_us). 각자 자기 id로 기록."""
+    if market not in ("KR", "US"):
+        raise HTTPException(status_code=400, detail="market must be KR or US")
     try:
-        with job_runs.record("monthly_refresh", "manual"):
+        if market == "KR":
+            with job_runs.record("monthly_kr", "manual"):
+                exports = _fetch_and_save_kr_exports()
+            return {"ok": True, "market": "KR", "export_points": len(exports.get("history", []))}
+        with job_runs.record("monthly_us", "manual"):
             econ = _fetch_and_save_econ_indicators()
-            _fetch_and_save_kr_exports()
-        return {"ok": True, "cpi_points": len(econ.get("cpi", [])), "unemp_points": len(econ.get("unemployment", []))}
+        return {"ok": True, "market": "US", "cpi_points": len(econ.get("cpi", [])), "unemp_points": len(econ.get("unemployment", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -15,6 +15,12 @@ const CATEGORIES = [
   { key: 'guru',   label: '구루' },
 ]
 
+const MARKETS = [
+  { key: 'KR', label: '국내' },
+  { key: 'US', label: '해외' },
+  { key: '공통', label: '공통' },
+]
+
 // 스케줄 에디터 외에 배치별로 추가로 노출할 컴포넌트.
 // consensus(편집 불가)는 에디터 없이 ConsensusSettings만 노출한다.
 const EXTRA = {
@@ -153,9 +159,10 @@ function BatchCard({ batch, isAdmin, onSaved }) {
   )
 }
 
-function BatchHub({ isAdmin }) {
+function BatchHub({ isAdmin, isMobile }) {
   const [batches, setBatches] = useState(null)
   const [err, setErr] = useState('')
+  const [market, setMarket] = useState('KR')
 
   const load = () => api.get('/api/batches')
     .then(({ data }) => setBatches(data))
@@ -167,18 +174,36 @@ function BatchHub({ isAdmin }) {
   if (!batches) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</p>
   if (batches.length === 0) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>등록된 배치가 없습니다.</p>
 
+  const marketItems = batches.filter(b => b.market === market)
+
   return (
     <>
-      {CATEGORIES.map(cat => {
-        const items = batches.filter(b => b.category === cat.key)
-        if (items.length === 0) return null
-        return (
-          <div key={cat.key}>
-            <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0 }}>{cat.label}</div>
-            {items.map(b => <BatchCard key={b.id} batch={b} isAdmin={isAdmin} onSaved={load} />)}
-          </div>
-        )
-      })}
+      {isMobile ? (
+        <div className="seg" style={{ marginBottom: 16 }}>
+          {MARKETS.map(m => (
+            <button key={m.key} className={market === m.key ? 'is-active' : ''} onClick={() => setMarket(m.key)}>{m.label}</button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
+          {MARKETS.map(m => (
+            <button key={m.key} className={`tab-btn${market === m.key ? ' active' : ''}`} onClick={() => setMarket(m.key)}>{m.label}</button>
+          ))}
+        </div>
+      )}
+
+      {marketItems.length === 0
+        ? <p style={{ color: 'var(--text-3)', fontSize: 13 }}>해당 시장의 배치가 없습니다.</p>
+        : CATEGORIES.map(cat => {
+            const items = marketItems.filter(b => b.category === cat.key)
+            if (items.length === 0) return null
+            return (
+              <div key={cat.key}>
+                <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0 }}>{cat.label}</div>
+                {items.map(b => <BatchCard key={b.id} batch={b} isAdmin={isAdmin} onSaved={load} />)}
+              </div>
+            )
+          })}
     </>
   )
 }
@@ -208,7 +233,7 @@ export default function Settings() {
       </div>
 
       <div style={{ padding: '0 20px 20px' }}>
-        {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} />}
+        {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} isMobile={isMobile} />}
         {activeTab === 'account' && showAccount && <PermissionManager />}
       </div>
     </>
@@ -225,7 +250,7 @@ export default function Settings() {
         )}
       </div>
 
-      {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} />}
+      {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} isMobile={isMobile} />}
       {activeTab === 'account' && showAccount && <PermissionManager />}
     </div>
   )

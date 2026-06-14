@@ -23,7 +23,7 @@ def record(job_id: str, trigger: str):
     run_id가 None이면 종료 UPDATE는 no-op이고, UPDATE 자체 실패도 본문 결과에 영향 주지 않게 삼킨다.
 
     실패 가시성 주의: failed는 본문이 예외를 '전파'할 때만 기록된다. 다수의 스케줄러 잡
-    (_run_guru_crawl/_refresh_monthly/_refresh_earnings/_fetch_leverage/_fetch_lending/
+    (_run_guru_crawl/_refresh_monthly_kr/_refresh_monthly_us/_refresh_earnings_kr/_refresh_earnings_us/_fetch_leverage/_fetch_lending/
     _fetch_kr_rankings/_fetch_us_rankings/_run_digest/_fetch_investor_trend)과 일부 워커
     (report._run_*/guru._run_crawl/leverage_service.backfill_with_progress)는 내부 예외를
     try/except로 삼키고 정상 종료하므로, 부분/전체 실패여도 success로 기록된다.

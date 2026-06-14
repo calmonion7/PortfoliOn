@@ -24,13 +24,14 @@ REQUIRED_FIELDS = {
 }
 
 EXPECTED_IDS = {
-    "daily_report_kr", "daily_report_us", "consensus", "daily_digest", "earnings_refresh",
-    "monthly_refresh", "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
+    "daily_report_kr", "daily_report_us", "consensus", "daily_digest",
+    "earnings_kr", "earnings_us", "monthly_kr", "monthly_us",
+    "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
     "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "guru_crawl", "backlog_fetch",
 }
 
 
-def test_lists_fourteen_batches_with_required_fields():
+def test_lists_sixteen_batches_with_required_fields():
     with patch("routers.batches.job_runs.recent", return_value=[]), \
          patch("routers.batches.storage.get_batch_schedule", return_value=None), \
          patch.object(__import__("scheduler"), "_scheduler") as mock_sched:
@@ -38,10 +39,11 @@ def test_lists_fourteen_batches_with_required_fields():
         resp = client.get("/api/batches")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 14
+    assert len(data) == 16
     assert {b["id"] for b in data} == EXPECTED_IDS
     for b in data:
         assert REQUIRED_FIELDS.issubset(b.keys()), b["id"]
+        assert b["market"] in {"KR", "US", "공통"}, b["id"]
 
 
 def test_next_run_nullable_and_populated_from_scheduler():

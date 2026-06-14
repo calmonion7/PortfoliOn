@@ -209,7 +209,7 @@ def test_equivalent_to_current_hardcoded_triggers():
         {"enabled": True, "type": "daily", "time": "08:00"}
     ) == {"hour": 8, "minute": 0}
 
-    # monthly_refresh (monthly): CronTrigger(day=1, hour=2, minute=0)
+    # monthly_us (monthly): CronTrigger(day=1, hour=2, minute=0)
     assert build_trigger_kwargs(
         {"enabled": True, "type": "monthly", "day_of_month": 1, "time": "02:00"}
     ) == {"day": 1, "hour": 2, "minute": 0}

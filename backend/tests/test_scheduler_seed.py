@@ -21,8 +21,10 @@ def _fields(trigger):
 # 거동 보존 검증의 기준. 시드 스펙→build_trigger_kwargs로 빌드한 트리거가 이것과 동치여야 한다.
 _HARDCODED = {
     "daily_digest": CronTrigger(hour=8, minute=0, timezone="Asia/Seoul"),
-    "earnings_refresh": CronTrigger(day_of_week="sun", hour=3, minute=0, timezone="Asia/Seoul"),
-    "monthly_refresh": CronTrigger(day=1, hour=2, minute=0, timezone="Asia/Seoul"),
+    "earnings_kr": CronTrigger(day_of_week="sun", hour=3, minute=0, timezone="Asia/Seoul"),
+    "earnings_us": CronTrigger(day_of_week="sun", hour=3, minute=0, timezone="Asia/Seoul"),
+    "monthly_kr": CronTrigger(day=1, hour=2, minute=0, timezone="Asia/Seoul"),
+    "monthly_us": CronTrigger(day=1, hour=2, minute=0, timezone="Asia/Seoul"),
     "leverage_fetch": CronTrigger(hour=7, minute=0, timezone="Asia/Seoul"),
     "lending_fetch": CronTrigger(day=5, hour=8, minute=0, timezone="Asia/Seoul"),
     "kr_rankings_fetch": CronTrigger(hour="9-15", minute="*/10", timezone="Asia/Seoul"),
@@ -79,8 +81,9 @@ def test_consensus_not_editable():
 def test_all_editable_jobs():
     editable = [b["id"] for b in batch_registry.BATCHES if b.get("editable")]
     assert set(editable) == {
-        "daily_report_kr", "daily_report_us", "guru_crawl", "daily_digest", "earnings_refresh",
-        "monthly_refresh", "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
+        "daily_report_kr", "daily_report_us", "guru_crawl", "daily_digest",
+        "earnings_kr", "earnings_us", "monthly_kr", "monthly_us",
+        "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
     }
 
@@ -159,8 +162,9 @@ def test_seed_only_fills_missing_rows(monkeypatch):
     assert store["leverage_fetch"]["time"] == "23:00"
     # 나머지 editable 잡은 시드됨 (consensus 제외, leverage는 기존값 유지)
     expected_seeded = {
-        "daily_report_kr", "daily_report_us", "guru_crawl", "daily_digest", "earnings_refresh",
-        "monthly_refresh", "lending_fetch", "kr_rankings_fetch",
+        "daily_report_kr", "daily_report_us", "guru_crawl", "daily_digest",
+        "earnings_kr", "earnings_us", "monthly_kr", "monthly_us",
+        "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
     }
     assert set(saved) == expected_seeded

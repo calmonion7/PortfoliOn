@@ -1,9 +1,12 @@
 # backend/services/batch_registry.py
-"""배치 레지스트리 — 현황 허브가 노출하는 14개 배치의 정적 메타데이터.
+"""배치 레지스트리 — 현황 허브가 노출하는 16개 배치의 정적 메타데이터.
 
 job_id는 스케줄러 잡 id 및 services.job_runs.record 호출 id와 반드시 일치한다.
 consensus는 자체 스케줄러 잡이 없고(daily_report_kr/us에 내장) next_run이 null이다.
 일일 리포트는 시장별로 daily_report_kr(20:30 KST)·daily_report_us(07:00 KST) 2배치로 분리된다.
+실적·월간 지표도 시장별로 분리: earnings_kr(KR Top2)/earnings_us(M7),
+monthly_kr(KR수출)/monthly_us(FRED 경제지표).
+각 배치는 market 속성(KR/US/공통)을 가진다 — 출처국 기준 분류(ADR-0013).
 """
 from __future__ import annotations
 
@@ -58,6 +61,7 @@ BATCHES = [
         "trigger_kinds": ["auto", "manual"],
         "manual_endpoint": "/api/consensus/batch",
         "scheduler_job_id": None,
+        "market": "공통",
     },
     {
         "id": "daily_digest",
@@ -70,6 +74,7 @@ BATCHES = [
         "manual_endpoint": "/api/digest/generate-all",
         "scheduler_job_id": "daily_digest",
         "timezone": "Asia/Seoul",
+        "market": "공통",
         "default_schedule": {"enabled": True, "type": "daily", "time": "08:00"},
     },
     {
@@ -83,32 +88,67 @@ BATCHES = [
         "manual_endpoint": "/api/report/backlog/refresh-all",
         "scheduler_job_id": "backlog_fetch",
         "timezone": "Asia/Seoul",
+        "market": "KR",
         "default_schedule": {"enabled": True, "type": "weekly", "days": ["sun"], "time": "04:00"},
     },
     {
-        "id": "earnings_refresh",
-        "label": "실적 갱신",
+        "id": "earnings_kr",
+        "label": "실적 갱신(국내)",
         "category": "market",
         "schedule_desc": "매주 일 03:00",
-        "usage": ["Market Hub M7/KR Top2"],
+        "usage": ["Market Hub KR Top2"],
         "editable": True,
         "trigger_kinds": ["auto", "manual"],
-        "manual_endpoint": "/api/market/refresh-earnings",
-        "scheduler_job_id": "earnings_refresh",
+        "manual_endpoint": "/api/market/refresh-earnings?market=KR",
+        "scheduler_job_id": "earnings_kr",
         "timezone": "Asia/Seoul",
+        "misfire_grace_time": None,
+        "market": "KR",
         "default_schedule": {"enabled": True, "type": "weekly", "days": ["sun"], "time": "03:00"},
     },
     {
-        "id": "monthly_refresh",
-        "label": "월간 지표 갱신",
+        "id": "earnings_us",
+        "label": "실적 갱신(해외)",
         "category": "market",
-        "schedule_desc": "매월 1일 02:00",
-        "usage": ["Market Hub 경제지표", "KR 수출"],
+        "schedule_desc": "매주 일 03:00",
+        "usage": ["Market Hub M7"],
         "editable": True,
         "trigger_kinds": ["auto", "manual"],
-        "manual_endpoint": "/api/market/refresh-monthly",
-        "scheduler_job_id": "monthly_refresh",
+        "manual_endpoint": "/api/market/refresh-earnings?market=US",
+        "scheduler_job_id": "earnings_us",
         "timezone": "Asia/Seoul",
+        "misfire_grace_time": None,
+        "market": "US",
+        "default_schedule": {"enabled": True, "type": "weekly", "days": ["sun"], "time": "03:00"},
+    },
+    {
+        "id": "monthly_kr",
+        "label": "월간 지표(국내)",
+        "category": "market",
+        "schedule_desc": "매월 1일 02:00",
+        "usage": ["Market Hub KR 수출"],
+        "editable": True,
+        "trigger_kinds": ["auto", "manual"],
+        "manual_endpoint": "/api/market/refresh-monthly?market=KR",
+        "scheduler_job_id": "monthly_kr",
+        "timezone": "Asia/Seoul",
+        "misfire_grace_time": None,
+        "market": "KR",
+        "default_schedule": {"enabled": True, "type": "monthly", "day_of_month": 1, "time": "02:00"},
+    },
+    {
+        "id": "monthly_us",
+        "label": "월간 지표(해외)",
+        "category": "market",
+        "schedule_desc": "매월 1일 02:00",
+        "usage": ["Market Hub 경제지표"],
+        "editable": True,
+        "trigger_kinds": ["auto", "manual"],
+        "manual_endpoint": "/api/market/refresh-monthly?market=US",
+        "scheduler_job_id": "monthly_us",
+        "timezone": "Asia/Seoul",
+        "misfire_grace_time": None,
+        "market": "US",
         "default_schedule": {"enabled": True, "type": "monthly", "day_of_month": 1, "time": "02:00"},
     },
     {
@@ -122,6 +162,7 @@ BATCHES = [
         "manual_endpoint": None,
         "scheduler_job_id": "leverage_fetch",
         "timezone": "Asia/Seoul",
+        "market": "KR",
         "default_schedule": {"enabled": True, "type": "daily", "time": "07:00"},
     },
     {
@@ -135,6 +176,7 @@ BATCHES = [
         "manual_endpoint": None,
         "scheduler_job_id": "lending_fetch",
         "timezone": "Asia/Seoul",
+        "market": "KR",
         "default_schedule": {"enabled": True, "type": "monthly", "day_of_month": 5, "time": "08:00"},
     },
     {
@@ -148,6 +190,7 @@ BATCHES = [
         "manual_endpoint": "/api/rankings/refresh?market=KR",
         "scheduler_job_id": "kr_rankings_fetch",
         "timezone": "Asia/Seoul",
+        "market": "KR",
         "default_schedule": {"enabled": True, "type": "interval", "every_minutes": 10, "start_hour": 9, "end_hour": 15},
     },
     {
@@ -161,6 +204,7 @@ BATCHES = [
         "manual_endpoint": "/api/rankings/refresh?market=US",
         "scheduler_job_id": "us_rankings_fetch",
         "timezone": "America/New_York",
+        "market": "US",
         "default_schedule": {"enabled": True, "type": "interval", "every_minutes": 10, "start_hour": 9, "end_hour": 16},
     },
     {
@@ -174,6 +218,7 @@ BATCHES = [
         "manual_endpoint": "/api/investor/refresh",
         "scheduler_job_id": "investor_trend_fetch",
         "timezone": "Asia/Seoul",
+        "market": "KR",
         "default_schedule": {"enabled": True, "type": "daily", "time": "18:00"},
     },
     {
@@ -187,6 +232,7 @@ BATCHES = [
         "manual_endpoint": "/api/short-sell/refresh",
         "scheduler_job_id": "short_sell_fetch",
         "timezone": "Asia/Seoul",
+        "market": "KR",
         "default_schedule": {"enabled": True, "type": "daily", "time": "18:30"},
     },
     {
@@ -200,6 +246,7 @@ BATCHES = [
         "manual_endpoint": None,
         "scheduler_job_id": "guru_crawl",
         "timezone": "Asia/Seoul",
+        "market": "공통",
         "default_schedule": {"enabled": False, "type": "weekly", "days": ["sun"], "time": "03:00"},
     },
 ]

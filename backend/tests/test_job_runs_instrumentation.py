@@ -57,20 +57,32 @@ def test_run_digest_records(spy, monkeypatch):
     assert ("daily_digest", "auto") in spy
 
 
-def test_refresh_earnings_records(spy, monkeypatch):
+def test_refresh_earnings_kr_records(spy, monkeypatch):
+    import scheduler
+    monkeypatch.setattr("services.market_indicators._fetch_and_save_kr_top2_earnings", lambda: None)
+    scheduler._refresh_earnings_kr()
+    assert ("earnings_kr", "auto") in spy
+
+
+def test_refresh_earnings_us_records(spy, monkeypatch):
     import scheduler
     monkeypatch.setattr("services.market_indicators._fetch_and_save_m7_earnings", lambda: None)
-    monkeypatch.setattr("services.market_indicators._fetch_and_save_kr_top2_earnings", lambda: None)
-    scheduler._refresh_earnings()
-    assert ("earnings_refresh", "auto") in spy
+    scheduler._refresh_earnings_us()
+    assert ("earnings_us", "auto") in spy
 
 
-def test_refresh_monthly_records(spy, monkeypatch):
+def test_refresh_monthly_kr_records(spy, monkeypatch):
+    import scheduler
+    monkeypatch.setattr("services.market_indicators._fetch_and_save_kr_exports", lambda: None)
+    scheduler._refresh_monthly_kr()
+    assert ("monthly_kr", "auto") in spy
+
+
+def test_refresh_monthly_us_records(spy, monkeypatch):
     import scheduler
     monkeypatch.setattr("services.market_indicators._fetch_and_save_econ_indicators", lambda: None)
-    monkeypatch.setattr("services.market_indicators._fetch_and_save_kr_exports", lambda: None)
-    scheduler._refresh_monthly()
-    assert ("monthly_refresh", "auto") in spy
+    scheduler._refresh_monthly_us()
+    assert ("monthly_us", "auto") in spy
 
 
 def test_fetch_leverage_records(spy, monkeypatch):
@@ -192,9 +204,9 @@ def test_refresh_earnings_endpoint_records(spy, monkeypatch):
     app = FastAPI()
     app.include_router(router)
     app.dependency_overrides[require_admin] = lambda: "admin-id"
-    resp = TestClient(app).post("/api/market/refresh-earnings")
+    resp = TestClient(app).post("/api/market/refresh-earnings?market=US")
     assert resp.status_code == 200
-    assert ("earnings_refresh", "manual") in spy
+    assert ("earnings_us", "manual") in spy
 
 
 def test_refresh_econ_endpoint_records(spy, monkeypatch):
@@ -210,7 +222,7 @@ def test_refresh_econ_endpoint_records(spy, monkeypatch):
     app.dependency_overrides[require_admin] = lambda: "admin-id"
     resp = TestClient(app).post("/api/market/refresh-econ")
     assert resp.status_code == 200
-    assert ("monthly_refresh", "manual") in spy
+    assert ("monthly_us", "manual") in spy
 
 
 def test_refresh_all_backlog_rejects_non_admin():

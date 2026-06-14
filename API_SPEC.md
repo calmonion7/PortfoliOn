@@ -1126,9 +1126,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(14종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(16종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
 
-> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음).
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다.
 
 **Auth:** Bearer token 필요
 
@@ -1139,6 +1139,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     "id": "daily_digest",
     "label": "일일 다이제스트",
     "category": "report",
+    "market": "공통",
     "editable": true,
     "timezone": "Asia/Seoul",
     "scheduler_job_id": "daily_digest",
@@ -1153,6 +1154,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
+| `market` | string | 배치 분류: `"KR"`(국내) \| `"US"`(해외) \| `"공통"`. 출처국 기준이라 FRED 경제지표(`monthly_us`)는 해외로 분류(ADR-0013) |
 | `editable` | boolean | 스케줄 편집 가능 여부 |
 | `timezone` | string | 잡 타임존(편집 불가 고정값). 편집 가능 배치에만 존재 |
 | `schedule` | object \| null | 현재 스케줄 스펙(저장값 없으면 기본 스펙). 편집 불가 배치(`consensus`)는 `null` |
@@ -1406,22 +1408,33 @@ M7 빅테크 최근 실적 요약.
 
 ### `POST /api/market/refresh-earnings`
 
-M7·KR Top2 실적 데이터 캐시 초기화 후 재수집.
+시장별 실적 데이터 재수집. `?market=KR`은 KR Top2(삼성전자·SK하이닉스)를, `?market=US`는 M7을 갱신하며, 각 시장은 자기 배치 id(`earnings_kr`/`earnings_us`)로 실행이력을 기록한다.
 
-**Response `200`**
+**Auth:** admin 권한 필요
+
+**Query Parameter**
+
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|---------|------|------|--------|------|
+| `market` | string | — | `KR` | `KR`(KR Top2) \| `US`(M7) |
+
+**Response `200`** — `market`에 따라 필드가 달라진다.
 ```json
-{
-  "ok": true,
-  "m7_quarters": 20,
-  "kr_quarters": 16
-}
+{ "ok": true, "market": "KR", "kr_quarters": 16 }
 ```
+```json
+{ "ok": true, "market": "US", "m7_quarters": 20 }
+```
+
+**Error `400`** — `market`이 `KR`/`US`가 아님
 
 ---
 
 ### `POST /api/market/refresh-econ`
 
-경제지표(CPI, 실업률) 캐시 초기화 후 FRED API 재수집.
+FRED 경제지표(CPI, 실업률) 단독 재수집. 별도 배치 id 없이 해외 월간 배치 `monthly_us`로 흡수 기록한다(`refresh-monthly?market=US`와 동일 동작).
+
+**Auth:** admin 권한 필요
 
 **Response `200`**
 ```json
@@ -1431,6 +1444,30 @@ M7·KR Top2 실적 데이터 캐시 초기화 후 재수집.
   "unemp_points": 36
 }
 ```
+
+---
+
+### `POST /api/market/refresh-monthly`
+
+시장별 월간 지표 재수집. `?market=KR`은 KR 수출을, `?market=US`는 FRED 경제지표(CPI·실업률)를 갱신하며, 각 시장은 자기 배치 id(`monthly_kr`/`monthly_us`)로 실행이력을 기록한다.
+
+**Auth:** admin 권한 필요
+
+**Query Parameter**
+
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|---------|------|------|--------|------|
+| `market` | string | — | `US` | `KR`(KR 수출) \| `US`(FRED 경제지표) |
+
+**Response `200`** — `market`에 따라 필드가 달라진다.
+```json
+{ "ok": true, "market": "KR", "export_points": 60 }
+```
+```json
+{ "ok": true, "market": "US", "cpi_points": 36, "unemp_points": 36 }
+```
+
+**Error `400`** — `market`이 `KR`/`US`가 아님
 
 ---
 
