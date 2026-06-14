@@ -1,10 +1,10 @@
 from datetime import date as _date, timedelta as _timedelta
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List
 from services import storage, errors, cache as cache_svc, report_generator, consensus_pipeline as _pipeline
 from services import market as market_svc
-from services.utils import ticker_exists_in, find_ticker
+from services.utils import ticker_exists_in, find_ticker, is_valid_ticker
 from services.db import query as db_query
 from routers import calendar as calendar_router
 from auth import get_current_user
@@ -52,6 +52,14 @@ class WatchlistStock(BaseModel):
     market: str = "US"
     exchange: str = ""
     security_type: str = "EQUITY"
+
+    @field_validator("ticker")
+    @classmethod
+    def _validate_ticker(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not is_valid_ticker(v):
+            raise ValueError("ticker must be 1-15 chars of letters, digits, '.' or '-'")
+        return v
 
 
 class PromotePayload(BaseModel):

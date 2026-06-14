@@ -1,10 +1,10 @@
 from datetime import date as _date, timedelta as _timedelta
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List
 from services import storage, errors, report_generator, consensus_pipeline as _pipeline
 from services import cache as cache_svc, market as market_svc
-from services.utils import find_ticker_index, ticker_exists_in
+from services.utils import find_ticker_index, ticker_exists_in, is_valid_ticker
 from services.db import query as db_query
 from auth import get_current_user
 
@@ -53,6 +53,14 @@ class Stock(BaseModel):
     market: str = "US"
     exchange: str = ""
     security_type: str = "EQUITY"
+
+    @field_validator("ticker")
+    @classmethod
+    def _validate_ticker(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not is_valid_ticker(v):
+            raise ValueError("ticker must be 1-15 chars of letters, digits, '.' or '-'")
+        return v
 
 
 @router.get("")

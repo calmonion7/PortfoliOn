@@ -313,7 +313,7 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| `ticker` | string | ✅ | 종목 코드 (자동 대문자 변환) |
+| `ticker` | string | ✅ | 종목 코드 (strip·자동 대문자 변환, `^[A-Za-z0-9.\-]{1,15}$` 형식 검증 — 공백/잡문자/빈값/과길이 거부) |
 | `name` | string | ✅ | 종목명 |
 | `quantity` | float | ✅ | 보유 수량 |
 | `avg_cost` | float | ✅ | 평균 매입 단가 |
@@ -335,6 +335,8 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 ```
 
 **Error `400`** — 이미 보유 중인 ticker
+
+**Error `422`** — `ticker`가 `^[A-Za-z0-9.\-]{1,15}$` 형식이 아닌 경우 (공백/잡문자/빈값/과길이)
 
 ---
 
@@ -413,7 +415,7 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| `ticker` | string | ✅ | 종목 코드 |
+| `ticker` | string | ✅ | 종목 코드 (strip·자동 대문자 변환, `^[A-Za-z0-9.\-]{1,15}$` 형식 검증 — 공백/잡문자/빈값/과길이 거부) |
 | `name` | string | ✅ | 종목명 |
 | `competitors` | string[] | ❌ | 경쟁사 티커 목록 |
 | `moat` | string | ❌ | 경제적 해자 |
@@ -422,6 +424,8 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 **Response `201`** — 추가된 종목 객체
 
 **Error `400`** — 이미 보유종목 또는 관심종목에 존재
+
+**Error `422`** — `ticker`가 `^[A-Za-z0-9.\-]{1,15}$` 형식이 아닌 경우 (공백/잡문자/빈값/과길이)
 
 ---
 

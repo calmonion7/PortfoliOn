@@ -1,6 +1,14 @@
 from __future__ import annotations
 import math
+import re
 from typing import Optional
+
+TICKER_RE = re.compile(r"^[A-Za-z0-9.\-]{1,15}$")
+
+
+def is_valid_ticker(ticker: str) -> bool:
+    """티커 형식 검증: strip·upper 후 영숫자+'.'/'-' 1~15자만 허용 (공백/잡문자/빈값/과길이 거부)."""
+    return bool(TICKER_RE.match(ticker.strip().upper()))
 
 
 def find_ticker_index(items: list, ticker: str, key: str = "ticker") -> Optional[int]:
