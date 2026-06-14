@@ -1,23 +1,27 @@
 # PortfoliOn
 
-주식 포트폴리오 관리 & AI 리포트 생성 앱
+주식 포트폴리오 관리 & AI 리포트 생성 앱 (다중 사용자 SPA)
 
 ## 인프라
 
-Mac 로컬 Docker 4-컨테이너 구성. Cloudflare Tunnel로 외부 접근 가능.
+Mac 로컬 Docker 구성 + Cloudflare Tunnel로 외부 접근. `docker compose`는 4개 컨테이너를 띄운다.
 
 | 컨테이너 | 역할 |
 |---------|------|
-| nginx | HTTP(:80) 서빙, /api/* → backend:8000 프록시 |
+| nginx | HTTP(:80) 서빙, `/api/*` → backend:8000 프록시, `frontend/dist` 정적 서빙 |
 | backend | FastAPI(:8000) |
 | postgres | PostgreSQL 16, pgdata 볼륨 |
-| cloudflared | Cloudflare Tunnel (portfolion.taebro.com → localhost:80) |
+| certbot | HTTPS 인증서 자동 갱신 |
+
+**Cloudflare Tunnel**(`portfolion.taebro.com` → `localhost:80`)은 compose 컨테이너가 아니라 **launchd**로 실행한다. launchd는 cloudflared와 자동 배포 폴러(`git push origin main` 시 재배포)도 함께 구동한다.
 
 ## 빠른 시작
 
 ```bash
 docker compose up -d
 ```
+
+> 배포는 `git push origin main`으로 자동화돼 있다. 수동 `docker compose build` / `up` 재빌드는 하지 않는다 — 폴러가 origin/main을 따라 재배포한다.
 
 ### 로컬 개발 (Docker 없이)
 
@@ -40,23 +44,44 @@ cd frontend && npm run dev
 
 ## 환경변수
 
-`backend/.env.docker` 파일에 설정:
+`backend/.env.docker`에 설정 (루트 `.env`에도 `POSTGRES_PASSWORD`를 두어 docker-compose 보간에 사용):
 
 ```
+# 필수
 POSTGRES_PASSWORD=...
 JWT_SECRET=...
 SESSION_SECRET=...
-ANTHROPIC_API_KEY=...
-FRED_API_KEY=...
+
+# 시세·데이터 소스 키 (미설정 시 해당 기능 휴면)
+KIWOOM_APP_KEY=...        # KR 1차 시세(키움 REST, 읽기전용)
+KIWOOM_SECRET_KEY=...
+KIWOOM_BASE_URL=...
+KIS_APP_KEY=...           # KR+US 백업 시세(한국투자증권, 읽기전용)
+KIS_APP_SECRET=...
+KIS_BASE_URL=...
+FRED_API_KEY=...          # 경제지표(미 연준)
+KOFIA_API_KEY=...         # 신용잔고·반대매매·대차잔고
+DART_API_KEY=...          # 수주잔고
+KITA_API_KEY=...          # 관세청 수출(미설정 시 UN Comtrade 폴백)
+
+# OAuth
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+
+# 기타
+TELEGRAM_BOT_TOKEN=...    # 일일 다이제스트 발송
+TELEGRAM_CHAT_ID=...
+COWORK_API_KEY=...        # 외부 AI(Cowork) enrich API 인증
+FRONTEND_URL=...          # CORS 허용 origin
 ```
 
-루트 `.env` 파일에 `POSTGRES_PASSWORD` 추가 (docker-compose 보간용).
+> 백엔드에는 **LLM/Anthropic 호출이 없다**. AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API(`CLAUDE_COWORK_API.md`)로 작성하며, 백엔드 리포트 생성은 시장 데이터 스냅샷만 만든다.
 
 ## 초기 DB 설정
 
-PostgreSQL 스키마를 순서대로 실행:
+PostgreSQL 스키마를 순서대로 실행 (인증 → 앱):
 
 ```bash
 # 1. 인증 스키마 (users, refresh_tokens)
@@ -66,6 +91,8 @@ docker exec -i portfolion-postgres psql -U postgres -d portfolion < backend/auth
 docker exec -i portfolion-postgres psql -U postgres -d portfolion < backend/app_schema.sql
 ```
 
+> 신규 테이블/컬럼은 기동 시 `main._migrate()`의 `CREATE TABLE IF NOT EXISTS`가 정본이다(app_schema.sql은 빈 DB 최초 1회만 적용).
+
 Admin 계정 설정:
 
 ```sql
@@ -74,81 +101,54 @@ UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
 
 ## 화면 구성
 
-### 포트폴리오
+내비게이션은 5개 탭(+ admin 전용 1개)으로 구성된다.
 
-보유종목과 관심종목을 탭으로 구분해서 관리합니다.
+### 종목관리 (Portfolio)
+
+보유·관심 종목 관리와 분석 탭.
 
 | 기능 | 설명 |
 |------|------|
-| 보유종목 추가/수정/삭제 | 티커, 종목명, 매수가, 수량, 시장(KR/US) 입력 |
-| 관심종목 추가/수정/삭제 | 티커, 종목명 등록 |
-| 관심종목 → 보유종목 승격 | 관심종목에서 매수가/수량 입력 후 보유종목으로 이동 |
+| 보유/관심 추가·수정·삭제·승격 | 티커·종목명·매수가·수량·시장(KR/US), 추가 시 실명 자동 채움 |
 | 검색 · 시장 필터 | 종목명/티커 검색, KR/US 필터 |
+| 분석 탭 | 섹터 모멘텀(11개 섹터 ETF), 매크로 상관(TLT/UUP/USO/VIX), 보유 종목 상관관계 히트맵 |
 
-### 리포트
+### 리서치 (Research 허브)
 
-보유·관심종목에 대한 AI 분석 리포트를 확인합니다.
+| 탭 | 설명 |
+|------|------|
+| 리포트 | 종목별 4탭(요약·심층분석·리포트·이력), 주가·RSI 차트, 목표가 컨센서스·괴리율, 수주잔고, 공매도·수급 추이. 즉시 생성·과거 백필(admin) |
+| 랭킹 | 거래대금·거래량·등락률 상위(KR/US) + 외국인/기관/개인 수급(랭킹·리포트 상세 공유) |
+| 다이제스트 | 보유·관심 종목 요약 매일 자동 생성(텔레그램 발송) |
+| 캘린더 | 실적 발표일·배당락일 월간 그리드 |
+
+### 시장 (MarketHub)
+
+| 탭 | 설명 |
+|------|------|
+| 시장지표 | 국채, FX, VIX, 원자재, 경제지표(FRED), M7/KR Top2 실적, KR 수출 |
+| 수급지표 | 신용잔고·반대매매, 내외국인 대차잔고 |
+
+### 구루 (Guru)
+
+[dataroma](https://www.dataroma.com) 기반 유명 가치투자자 포트폴리오 분석.
 
 | 기능 | 설명 |
 |------|------|
-| 리포트 열람 | 종목별 Markdown 리포트 (Claude AI 생성) |
-| 주가 · RSI 차트 | 최근 주가 추이 및 RSI 지표 시각화 |
-| 목표주가 분석 | 증권사 컨센서스 목표가 및 괴리율 표시 |
-| 즉시 생성 | 전체 종목 리포트 즉시 생성, 진행률 표시 (admin only) |
+| 매니저 목록 | 포트폴리오 가치, 보유 종목 수, Top 10 |
+| 추천 통계 | 여러 구루 공통 보유 종목 랭킹·가중치 |
+| 즉시 크롤링 | 전체 매니저 데이터 즉시 수집 (admin) |
 
-### 이벤트 캘린더
-
-보유·관심종목의 실적 발표일과 배당락일을 월간 달력으로 확인합니다.
+### 설정 (Settings)
 
 | 기능 | 설명 |
 |------|------|
-| 월간 그리드 | 날짜 셀에 이벤트 뱃지 표시 (실적=파란색, 배당락=초록색) |
-| 보유/관심 전환 | 탭으로 보유종목 ↔ 관심종목 이벤트 전환 |
-| 월 이동 | ‹ › 버튼으로 이전·다음 달 탐색 |
+| 배치 현황 허브 | 전 배치의 주기·사용처·다음 실행·실행 이력 열람. 스케줄 편집·즉시 실행은 admin. 국내/해외/공통 시장 탭으로 구분 |
+| 권한 관리 | 사용자별 메뉴 접근 권한 (admin) |
 
-### 시장 지표
+### 행동 (AdminAnalytics, admin 전용)
 
-FX, VIX, 원자재, 경제지표를 한 화면에서 확인합니다.
-
-| 기능 | 설명 |
-|------|------|
-| FX | USD/KRW, USD/JPY, EUR/USD 환율 (전일 대비 등락 표시) |
-| VIX | 공포지수, 공포/탐욕 색상 코딩 |
-| 원자재 | 금, WTI 원유, 구리 가격 |
-| 경제지표 | CPI, 실업률 (FRED API) |
-| M7 실적 | AAPL·MSFT·GOOGL·AMZN·NVDA·META·TSLA 분기 순이익 vs 나머지 S&P 500 |
-| 한국 KOSPI Top2 실적 | 삼성전자+SK하이닉스 vs KOSPI 나머지 |
-| 한국 수출 | 반도체 vs 비반도체 월별 수출액 (관세청 API, 미설정 시 UN Comtrade 폴백) |
-
-### 일일 다이제스트
-
-보유·관심종목 요약을 매일 08:00 KST 자동 생성합니다.
-
-### 구루 매니저
-
-[dataroma](https://www.dataroma.com) 기반으로 유명 가치투자자들의 포트폴리오를 분석합니다.
-
-| 기능 | 설명 |
-|------|------|
-| 매니저 목록 | 포트폴리오 가치, 보유 종목 수, Top 10 종목 |
-| 추천 통계 | 여러 구루가 공통 보유한 종목 랭킹, 가중치 점수 |
-| 즉시 크롤링 | 지금 바로 전체 매니저 데이터 수집 (admin only) |
-
-### 애널리틱스
-
-보유 종목 간 상관관계를 히트맵으로 시각화합니다.
-
-### 분석 허브
-
-섹터 모멘텀(11개 섹터 ETF)과 매크로 상관관계(TLT/UUP/USO/VIX)를 분석합니다.
-
-### 설정
-
-| 기능 | 설명 |
-|------|------|
-| 리포트 스케줄 | 요일·시간 지정 자동 생성 (admin only) |
-| 구루 스케줄 | 요일·시간 지정 자동 크롤링 (admin only) |
-| 권한 관리 | 사용자별 메뉴 접근 권한 설정 (admin only) |
+사용자 행동 이벤트 집계 분석 (`/admin-analytics`).
 
 ---
 
@@ -166,55 +166,61 @@ FX, VIX, 원자재, 경제지표를 한 화면에서 확인합니다.
 
 | 라이브러리 | 용도 |
 |-----------|------|
-| FastAPI | REST API 프레임워크 |
-| uvicorn | ASGI 서버 |
+| FastAPI / uvicorn | REST API + ASGI 서버 |
 | psycopg2 | PostgreSQL 드라이버 |
 | python-jose | HS256 JWT 인증 |
-| APScheduler | 리포트/크롤링 자동 스케줄 |
-| yfinance | 주가 데이터 (미국 주식) |
+| APScheduler | 배치(리포트·크롤링·시세·지표) 자동 스케줄 |
+| yfinance | US 주가·시장 데이터 (US 1차 소스) |
+| 키움 / 한국투자증권(KIS) REST | KR 시세(1차=키움, 백업=KIS), US 백업 시세 — 읽기전용 |
 | pandas / numpy | 데이터 처리 |
 | matplotlib | 차트 이미지 생성 |
-| beautifulsoup4 | HTML 파싱 (Naver, dataroma) |
+| beautifulsoup4 / lxml | HTML 파싱 (Naver, dataroma, DART) |
 
 **프론트엔드**
 
 | 라이브러리 | 용도 |
 |-----------|------|
-| React 18 + Vite | UI 프레임워크 + 빌드 도구 |
-| react-router-dom | 클라이언트 라우팅 |
+| React 19 + Vite 8 (rolldown) | UI 프레임워크 + 빌드 도구 |
+| react-router-dom 7 | 클라이언트 라우팅 |
 | axios | HTTP 클라이언트 |
-| recharts | 주가·차트 |
+| recharts (+d3) | 주가·지표 차트 |
 | react-markdown | Markdown 리포트 렌더링 |
 
 ## 아키텍처
 
 ```
-Browser (React/Vite :5173)
+Browser (React 19 / Vite 8 :5173)
         │  REST API
         ▼
-    nginx (:80)
-        │  /api/* proxy
+    nginx (:80)   ─ /api/* proxy + frontend/dist 정적 서빙
         ▼
 FastAPI (:8000)
- ├─ routers/    portfolio, watchlist, stocks, report, guru,
- │              calendar, digest, market_indicators, analytics,
- │              analysis, auth, admin, events
- ├─ services/   market(yfinance+Naver), charts, report_generator(Claude AI),
- │              consensus, digest_service, market_indicators/(fx/vix/commodities/
- │              earnings/econ/exports), leverage_service,
- │              auth_service, cache, db, errors, parallel, progress
+ ├─ routers/    portfolio, watchlist, stocks, report, guru, calendar,
+ │              digest, market_indicators, analytics, analysis, auth,
+ │              admin, events, batches, rankings, investor, short_sell
+ ├─ services/   market(yfinance+키움/KIS+Naver), charts, indicators,
+ │              report_generator(시장데이터 스냅샷·LLM 미호출),
+ │              consensus / consensus_pipeline, digest_service,
+ │              market_indicators/(fx·vix·commodities·earnings·econ·exports),
+ │              leverage_service, lending_service, ranking_service,
+ │              investor_service, short_sell_service, backlog, analysis_service,
+ │              guru_scraper / guru_stats, batch_registry, job_runs,
+ │              kiwoom/, kis/, auth_service, cache, db, errors, parallel, progress
+ ├─ scheduler.py  APScheduler 배치(시장별 분리 포함)
  │
  └─ PostgreSQL 16
-     ├─ users / refresh_tokens   (인증)
-     ├─ tickers / user_stocks    (종목)
-     ├─ snapshots                (리포트)
-     ├─ schedules / guru_*       (스케줄)
-     ├─ digests / consensus_history
+     ├─ users / refresh_tokens                  (인증)
+     ├─ tickers / user_stocks                   (종목)
+     ├─ snapshots / raw_reports                 (리포트)
+     ├─ schedules / guru_schedules / guru_managers   (스케줄·구루)
+     ├─ digests / consensus_history / daily_consensus_mart
      ├─ calendar_cache / market_cache
-     ├─ user_menu_permissions / default_menu_permissions    (권한)
-     ├─ user_events / market_leverage_indicators
-     └─ raw_reports / daily_consensus_mart
+     ├─ user_menu_permissions / default_menu_permissions   (권한)
+     ├─ user_events                              (행동 로그)
+     └─ market_leverage_indicators / market_lending_balance   (수급지표)
 ```
+
+> AI 분석 텍스트는 백엔드가 생성하지 않는다 — 외부 Cowork 클라이언트가 enrich API로 작성한다.
 
 ## 프로젝트 구조
 
@@ -228,10 +234,13 @@ PortfoliOn/
 │   ├── app_schema.sql         # 앱 스키마
 │   ├── routers/
 │   ├── services/
-│   └── data/                  # sp500_tickers.json, kospi_tickers.json
+│   │   ├── market_indicators/ # fx·vix·commodities·earnings·econ·exports
+│   │   ├── kiwoom/            # 키움 REST(KR 시세, 읽기전용)
+│   │   └── kis/               # 한국투자증권 REST(KR+US 백업 시세)
+│   └── data/                  # sp500_tickers.json, kospi_tickers.json (정적 참조)
 └── frontend/
     └── src/
-        ├── pages/
+        ├── pages/             # Portfolio, Research·MarketHub 허브, Guru, Settings 등
         ├── components/
         └── contexts/          # AuthContext (role + 메뉴 권한)
 ```
@@ -239,4 +248,7 @@ PortfoliOn/
 ## 참고 문서
 
 - `API_SPEC.md` — REST API 전체 스펙
-- `CLAUDE_COWORK_API.md` — Claude AI 연동용 외부 API
+- `CLAUDE_COWORK_API.md` — 외부 AI(Cowork) 연동용 API (리포트 enrich)
+- `KIWOOM_API.md` — 키움 REST 연동 카탈로그·경계
+- `KIS_API.md` — 한국투자증권(KIS) 백업 시세 연동 카탈로그·경계
+- `CLAUDE.md` — 프로젝트 컨텍스트·아키텍처·gotcha (개발 가이드)
