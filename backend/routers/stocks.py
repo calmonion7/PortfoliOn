@@ -226,8 +226,14 @@ def backfill_names(_: str = Depends(require_admin)):
                 t = future.result()
                 if t:
                     updated.append(t)
-        cache_svc.invalidate_portfolio_caches()
-    return {"ok": True, "candidates": len(candidates), "updated": len(updated)}
+
+    # tickers.name을 이미 고쳤지만 스냅샷이 옛 이름인 종목(예: 수동교정)까지 동기화
+    reconciled = storage.reconcile_snapshot_names()
+    for t in set(updated) | set(reconciled):
+        cache_svc.invalidate(t)
+    cache_svc.invalidate_list()
+    cache_svc.invalidate_portfolio_caches()
+    return {"ok": True, "candidates": len(candidates), "updated": len(updated), "reconciled": len(reconciled)}
 
 
 @router.get("/dashboard")
