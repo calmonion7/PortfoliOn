@@ -236,6 +236,20 @@ CREATE TABLE IF NOT EXISTS market_investor_trend (
 );
 CREATE INDEX IF NOT EXISTS idx_investor_trend_read ON market_investor_trend(ticker, base_date DESC);
 
+-- 공매도 추이 (일별 공매도 거래량·거래대금·비중·잔량, 종목 단위, KR 전용 — 키움 ka10014)
+CREATE TABLE IF NOT EXISTS market_short_sell (
+    ticker        TEXT NOT NULL,
+    base_date     DATE NOT NULL,
+    short_volume  NUMERIC(20, 0),   -- 공매도 거래량(주) shrts_qty
+    short_value   NUMERIC(20, 0),   -- 공매도 거래대금(원) = shrts_trde_prica(천원) × 1000
+    short_ratio   NUMERIC(6, 2),    -- 공매도 비중(%) trde_wght
+    short_balance NUMERIC(20, 0),   -- 공매도 잔량(주, 미상환 누적) ovr_shrts_qty
+    close_price   NUMERIC,          -- 종가(원) close_pric
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (ticker, base_date)
+);
+CREATE INDEX IF NOT EXISTS idx_short_sell_read ON market_short_sell(ticker, base_date DESC);
+
 -- 배치 실행로그 (job_id별 최근 20건만 보관)
 -- 배포 주의: 이 파일은 빈 pgdata 최초 init 때만 자동 적용된다(docker-compose의 initdb 마운트).
 --   기존 운영 DB는 pgdata가 이미 채워져 있으므로 git push 자동배포로는 아래 두 문장이 적용되지 않는다.

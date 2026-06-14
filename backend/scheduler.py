@@ -197,6 +197,45 @@ def _investor_trend_work():
     print(f"[Scheduler] Investor trend fetched for {len(tickers)} KR tickers")
 
 
+def _fetch_short_sell():
+    with job_runs.record("short_sell_fetch", "auto"):
+        _short_sell_work()
+
+
+def _short_sell_work():
+    """보유/관심 KR 종목 일일 공매도 추이 배치(키움 ka10014). 종목당 1콜로 252일 멱등 적립.
+
+    ka10014가 날짜범위로 전 구간을 한 번에 주므로 후진 백필 불필요(전진 upsert만)."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from services import short_sell_service as svc
+    from services.db import query as db_query
+
+    try:
+        tickers = [r["ticker"] for r in db_query(
+            "SELECT DISTINCT t.ticker FROM tickers t "
+            "JOIN user_stocks us ON us.ticker = t.ticker WHERE t.market = 'KR'")]
+    except Exception as e:
+        print(f"[Scheduler] Short-sell: failed to fetch KR universe: {e}")
+        return
+
+    if not tickers:
+        print("[Scheduler] Short-sell: no KR tickers")
+        return
+
+    def _fetch_one(ticker):
+        try:
+            svc.upsert_trend(ticker, svc.fetch_trend(ticker))
+        except Exception as e:
+            print(f"[Scheduler] Short-sell failed for {ticker}: {e}")
+
+    # max_workers ≤ 8: DB 풀(maxconn=10) 초과(PoolError) 방지 (investor_trend와 동일 가드)
+    with ThreadPoolExecutor(max_workers=max(1, min(len(tickers), 8))) as executor:
+        futures = [executor.submit(_fetch_one, t) for t in tickers]
+        for future in as_completed(futures):
+            future.result()
+    print(f"[Scheduler] Short-sell fetched for {len(tickers)} KR tickers")
+
+
 def _seed_rankings_if_empty():
     """기동 시 market_rankings가 비어 있으면(예: 장외 시간 배포) 즉시 1회 적재.
     장중 cron이 돌기 전까지 랭킹 탭이 빈 상태로 남는 것을 방지(_check_missed_report와 동일 취지)."""
@@ -224,6 +263,7 @@ _JOB_FUNCS = {
     "kr_rankings_fetch": _fetch_kr_rankings,
     "us_rankings_fetch": _fetch_us_rankings,
     "investor_trend_fetch": _fetch_investor_trend,
+    "short_sell_fetch": _fetch_short_sell,
     "backlog_fetch": _fetch_backlog,
 }
 

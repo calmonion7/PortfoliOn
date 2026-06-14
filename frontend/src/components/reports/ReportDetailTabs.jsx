@@ -6,6 +6,7 @@ import FinancialsChart from './FinancialsChart'
 import HistoryTab from './HistoryTab'
 import { ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from './Sections'
 import InvestorTrendSection from './InvestorTrendSection'
+import ShortSellSection from './ShortSellSection'
 
 const noop = () => {}
 
@@ -103,6 +104,7 @@ export default function ReportDetailTabs({
                         />
                       )}
                       {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
+                      {market === 'KR' && <ShortSellSection ticker={ticker} />}
                     </>
                   )
                   : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술·수급 데이터가 없습니다.</p>

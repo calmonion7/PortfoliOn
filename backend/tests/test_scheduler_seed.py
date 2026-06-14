@@ -28,6 +28,7 @@ _HARDCODED = {
     "kr_rankings_fetch": CronTrigger(hour="9-15", minute="*/10", timezone="Asia/Seoul"),
     "us_rankings_fetch": CronTrigger(hour="9-16", minute="*/10", timezone="America/New_York"),
     "investor_trend_fetch": CronTrigger(hour=18, minute=0, timezone="Asia/Seoul"),
+    "short_sell_fetch": CronTrigger(hour=18, minute=30, timezone="Asia/Seoul"),
     "backlog_fetch": CronTrigger(day_of_week="sun", hour=4, minute=0, timezone="Asia/Seoul"),
 }
 
@@ -70,7 +71,7 @@ def test_all_eleven_jobs_editable():
     assert set(editable) == {
         "daily_report", "guru_crawl", "daily_digest", "earnings_refresh",
         "monthly_refresh", "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
-        "us_rankings_fetch", "investor_trend_fetch", "backlog_fetch",
+        "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
     }
 
 
@@ -130,11 +131,11 @@ def test_seed_only_fills_missing_rows(monkeypatch):
     # leverage_fetch는 이미 있었으니 안 덮어쓰고 사용자 값 유지
     assert "leverage_fetch" not in saved
     assert store["leverage_fetch"]["time"] == "23:00"
-    # 나머지 10개 editable 잡은 시드됨 (consensus 제외)
+    # 나머지 editable 잡은 시드됨 (consensus 제외, leverage는 기존값 유지)
     expected_seeded = {
         "daily_report", "guru_crawl", "daily_digest", "earnings_refresh",
         "monthly_refresh", "lending_fetch", "kr_rankings_fetch",
-        "us_rankings_fetch", "investor_trend_fetch", "backlog_fetch",
+        "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
     }
     assert set(saved) == expected_seeded
     assert "consensus" not in store

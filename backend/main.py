@@ -19,6 +19,7 @@ from routers.admin import router as admin_router
 from routers.events import router as events_router
 from routers.rankings import router as rankings_router
 from routers.investor import router as investor_router
+from routers.short_sell import router as short_sell_router
 from routers.batches import router as batches_router
 from middleware.event_tracker import EventTrackerMiddleware
 
@@ -61,6 +62,16 @@ def _migrate():
         execute("CREATE TABLE IF NOT EXISTS batch_schedules (job_id text PRIMARY KEY, data jsonb NOT NULL)")
     except Exception as e:
         print(f"[migrate] batch_schedules 생성 실패: {e}")
+    try:
+        from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS market_short_sell (
+            ticker TEXT NOT NULL, base_date DATE NOT NULL,
+            short_volume NUMERIC(20,0), short_value NUMERIC(20,0),
+            short_ratio NUMERIC(6,2), short_balance NUMERIC(20,0), close_price NUMERIC,
+            created_at TIMESTAMPTZ DEFAULT NOW(), PRIMARY KEY (ticker, base_date))""")
+        execute("CREATE INDEX IF NOT EXISTS idx_short_sell_read ON market_short_sell(ticker, base_date DESC)")
+    except Exception as e:
+        print(f"[migrate] market_short_sell 생성 실패: {e}")
 
 
 @asynccontextmanager
@@ -100,6 +111,7 @@ app.include_router(analysis_router)
 app.include_router(events_router)
 app.include_router(rankings_router)
 app.include_router(investor_router)
+app.include_router(short_sell_router)
 app.include_router(batches_router)
 app.include_router(admin_router)
 

@@ -680,6 +680,46 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 ---
 
+### `GET /api/stocks/{ticker}/short-sell`
+
+종목 공매도 추이 시계열 (KR 전용, 키움 ka10014 → `market_short_sell`). `base_date` 오름차순. 데이터 없으면 `items` 빈 배열.
+
+**Query**: `days` (기본 252, 1~1000)
+
+**Response `200`**
+```json
+{
+  "ticker": "005930",
+  "items": [
+    {
+      "base_date": "2026-06-12",
+      "short_volume": 1067591,
+      "short_value": 351129846000,
+      "short_ratio": 3.44,
+      "short_balance": 19509651,
+      "close_price": 322500
+    }
+  ]
+}
+```
+
+- `short_volume` 공매도 거래량(주) · `short_value` 공매도 거래대금(원) · `short_ratio` 공매도 비중(%) · `short_balance` 공매도 잔량(주, 미상환) · `close_price` 종가(원).
+
+---
+
+### `POST /api/short-sell/refresh`
+
+공매도 추이 배치(`short_sell_fetch`) 수동 실행. **admin 전용.** 보유/관심 KR 종목의 공매도 시계열을 키움에서 갱신.
+
+**Auth:** Bearer token + admin
+
+**Response `202`**
+```json
+{ "ok": true }
+```
+
+---
+
 ## Report (리포트)
 
 ### `GET /api/report/progress`
