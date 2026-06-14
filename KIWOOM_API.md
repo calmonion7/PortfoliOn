@@ -50,7 +50,7 @@
 | KR 공매도 추이 | 없음 | `ka10014` | 계획(Phase 2) |
 | KR 신용매매동향 | KOFIA(leverage, 별개 지표) | `ka10013` | 검토 |
 | KR 대차거래 | 금융위(lending) | `ka10068/20068/90012` | 검토 |
-| KR 업종/섹터 지수 | analysis_service | `ka20001~20009` | 계획(Phase 2) |
+| KR 업종/섹터 지수 모멘텀 | analysis_service(US ETF만) | `ka20006`(업종일봉)+`ka10101`(업종코드)+`ka20002`(업종별주가) | ✅ **적용**(task#48, `kr_sector_fetch` 일배치→KOSPI 24업종 모멘텀 사전계산·market_cache, 분석탭 KR/US 토글). 보유종목→업종은 `ka20002` 역인덱스 — **`ka10001`엔 업종 필드 없음**(라이브 전수 키 확인) |
 | KR 프로그램매매 | 없음 | `ka90003~90013` | 계획(Phase 2) |
 | KR 실시간 체결/호가 푸시 | 없음(60s 폴링) | WS `0B`/`0D` | 계획(Phase 3) |
 | KR 재무(매출·자산 등) | Naver finance | (ka10001 PER/EPS만) | **유지**(Naver가 풍부) |
