@@ -3,7 +3,7 @@ import api from '../api'
 
 export default function useReportList() {
   const [reportList, setReportList] = useState({})
-  const [lastScheduledDate, setLastScheduledDate] = useState(null)
+  const [lastScheduledDates, setLastScheduledDates] = useState(null)
   const [listLoading, setListLoading] = useState(true)
   const [hasFetched, setHasFetched] = useState(false)
   const [guruMap, setGuruMap] = useState({})
@@ -20,7 +20,7 @@ export default function useReportList() {
 
   const applyList = useCallback((data) => {
     setReportList(data.stocks ?? data)
-    if (data.last_scheduled_date) setLastScheduledDate(data.last_scheduled_date)
+    if (data.last_scheduled_date) setLastScheduledDates(data.last_scheduled_date)
   }, [])
 
   const fetchList = useCallback(() => {
@@ -52,14 +52,22 @@ export default function useReportList() {
     return g !== null && g < 40
   }).length
   const watchlistCount = watchlistAll.length
-  const _isUngenerated = ([, v]) => !lastScheduledDate
-    ? (v.dates.length === 0 || v.summary?.price == null)
-    : (v.dates.length === 0 || String(v.dates[0]) < lastScheduledDate)
+  const _expectedDate = (market) => {
+    if (!lastScheduledDates) return null
+    const key = (market || '').toUpperCase() === 'KR' ? 'KR' : 'US'
+    return lastScheduledDates[key]
+  }
+  const _isUngenerated = ([, v]) => {
+    const expected = _expectedDate(v.market)
+    return !expected
+      ? (v.dates.length === 0 || v.summary?.price == null)
+      : (v.dates.length === 0 || String(v.dates[0]) < expected)
+  }
   const ungeneratedTickers = Object.entries(reportList).filter(_isUngenerated).map(([t]) => t)
   const ungeneratedCount = ungeneratedTickers.length
 
   return {
-    reportList, lastScheduledDate, listLoading, hasFetched,
+    reportList, lastScheduledDates, listLoading, hasFetched,
     guruMap, fetchList, applyList,
     holdingsCount, watchlistAll, watchlistCount,
     watchlistWarnCount, watchlistLowCount, watchlistHighCount,

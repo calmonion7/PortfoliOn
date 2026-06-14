@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import api from '../api'
 import { useToast } from '../components/Toast'
 
-export default function useReportGeneration({ onApplyList, lastScheduledDate }) {
+export default function useReportGeneration({ onApplyList }) {
   const { showToast } = useToast()
   const [generating, setGenerating] = useState(null)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0, failed: [] })
@@ -53,8 +53,8 @@ export default function useReportGeneration({ onApplyList, lastScheduledDate }) 
     setGenProgress({ done: 0, total: 0, failed: [] })
     clearInterval(pollRef.current)
     try {
-      const dateParam = lastScheduledDate ? `&date=${lastScheduledDate}` : ''
-      await api.post(`/api/report/generate?tickers=${tickers.join(',')}${dateParam}`)
+      // date 생략 → 서버가 종목 market별 기대날짜(KR/US)로 분리 생성한다.
+      await api.post(`/api/report/generate?tickers=${tickers.join(',')}`)
       _startPoll((data) => {
         if (data.failed?.length) {
           const toName = f => typeof f === 'string' ? f : (f?.ticker || '?')

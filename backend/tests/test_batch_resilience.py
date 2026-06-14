@@ -33,15 +33,15 @@ def test_retry_gives_up_and_raises_after_all_attempts():
     assert m.call_count == 2
 
 
-# ── S2: _check_missed_report 부분 누락 복구 ──────────────────────────────────
+# ── S2: _check_missed_report 부분 누락 복구 + 시장 필터 ──────────────────────
 
 _CFG = {"enabled": True,
         "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
         "time": "00:00"}  # 모든 요일 + 00:00 → 요일·시각 조기 return 우회
 
 
-def _run_missed(have_tickers, user_stocks):
-    """_check_missed_report를 모킹 환경에서 실행하고, 생성 호출된 종목 목록을 반환."""
+def _run_missed_for(market, have_tickers, user_stocks):
+    """_check_missed_report_for(job_id, market)를 모킹 환경에서 실행하고, 생성 호출된 종목 목록을 반환."""
     import scheduler
 
     def db_side(sql, params=None):
@@ -51,19 +51,21 @@ def _run_missed(have_tickers, user_stocks):
             return [{"ticker": t} for t in have_tickers]
         return []
 
+    job_id = "daily_report_kr" if market == "KR" else "daily_report_us"
     gen = MagicMock(return_value="/snap/x.json")
     with patch("services.storage.get_batch_schedule", return_value=_CFG), \
          patch("services.storage.get_all_stocks", return_value=user_stocks), \
          patch("services.db.query", side_effect=db_side), \
          patch("services.report_generator.generate_report_with_retry", gen), \
          patch("services.consensus_pipeline.run_daily", MagicMock()):
-        scheduler._check_missed_report()
+        scheduler._check_missed_report_for(job_id, market)
     return [c.args[0]["ticker"] for c in gen.call_args_list]
 
 
 def test_missed_report_generates_only_missing_tickers():
-    """오늘 스냅샷이 없는 종목만 재생성하고, 있는 종목은 건드리지 않는다."""
-    generated = _run_missed(
+    """오늘 스냅샷이 없는 종목만 재생성하고, 있는 종목은 건드리지 않는다(US 시장)."""
+    generated = _run_missed_for(
+        "US",
         have_tickers={"AAA"},
         user_stocks=[{"ticker": "AAA"}, {"ticker": "BBB"}],
     )
@@ -72,8 +74,23 @@ def test_missed_report_generates_only_missing_tickers():
 
 def test_missed_report_noop_when_all_present():
     """전 종목이 오늘 스냅샷을 가지면 아무 것도 생성하지 않는다."""
-    generated = _run_missed(
+    generated = _run_missed_for(
+        "US",
         have_tickers={"AAA", "BBB"},
         user_stocks=[{"ticker": "AAA"}, {"ticker": "BBB"}],
     )
     assert generated == []
+
+
+def test_missed_report_kr_only_generates_kr_stocks():
+    """KR 배치는 KR 종목만 대상으로 한다(US 종목은 무시)."""
+    stocks = [{"ticker": "005930", "market": "KR"}, {"ticker": "AAPL", "market": "US"}]
+    generated = _run_missed_for("KR", have_tickers=set(), user_stocks=stocks)
+    assert generated == ["005930"]
+
+
+def test_missed_report_us_includes_marketless_as_us():
+    """US 배치는 market 없는 종목을 US로 잡아 포함한다(누락 방지)."""
+    stocks = [{"ticker": "005930", "market": "KR"}, {"ticker": "NOMKT"}]
+    generated = _run_missed_for("US", have_tickers=set(), user_stocks=stocks)
+    assert generated == ["NOMKT"]

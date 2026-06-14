@@ -21,7 +21,7 @@ export default function Reports() {
   const { showToast } = useToast()
 
   const {
-    reportList, lastScheduledDate, listLoading, hasFetched,
+    reportList, listLoading, hasFetched,
     guruMap, fetchList, applyList,
     holdingsCount, watchlistAll, watchlistCount,
     watchlistWarnCount, watchlistLowCount, watchlistHighCount,
@@ -29,7 +29,7 @@ export default function Reports() {
     ungeneratedTickers, ungeneratedCount,
   } = useReportList()
 
-  const { generating, genProgress, generateOne, generateBatch, cleanup } = useReportGeneration({ onApplyList: applyList, lastScheduledDate })
+  const { generating, genProgress, generateOne, generateBatch, cleanup } = useReportGeneration({ onApplyList: applyList })
 
   const [selected, setSelected] = useState({ ticker: null, date: null })
   const [detail, setDetail] = useState({ summary: null, enriched_at: null })

@@ -18,10 +18,10 @@ const CATEGORIES = [
 // 스케줄 에디터 외에 배치별로 추가로 노출할 컴포넌트.
 // consensus(편집 불가)는 에디터 없이 ConsensusSettings만 노출한다.
 const EXTRA = {
-  daily_report:   ReportManualGen,
-  consensus:      ConsensusSettings,
-  guru_crawl:     GuruCrawlNow,
-  leverage_fetch: LeverageBackfillSettings,
+  daily_report_kr: ReportManualGen,
+  consensus:       ConsensusSettings,
+  guru_crawl:      GuruCrawlNow,
+  leverage_fetch:  LeverageBackfillSettings,
 }
 
 function fmtKst(iso) {

@@ -28,11 +28,18 @@ def spy(monkeypatch):
 # 자동 잡 (scheduler) — trigger="auto"
 # ---------------------------------------------------------------------------
 
-def test_generate_all_records_daily_report(spy, monkeypatch):
+def test_generate_kr_records_daily_report_kr(spy, monkeypatch):
     import scheduler
     monkeypatch.setattr("services.db.query", lambda *a, **k: [])
-    scheduler._generate_all()
-    assert ("daily_report", "auto") in spy
+    scheduler._generate_kr()
+    assert ("daily_report_kr", "auto") in spy
+
+
+def test_generate_us_records_daily_report_us(spy, monkeypatch):
+    import scheduler
+    monkeypatch.setattr("services.db.query", lambda *a, **k: [])
+    scheduler._generate_us()
+    assert ("daily_report_us", "auto") in spy
 
 
 def test_run_guru_crawl_records(spy, monkeypatch):
@@ -120,7 +127,7 @@ def test_report_generation_worker_records(spy, monkeypatch):
     monkeypatch.setattr(report.cache_svc, "invalidate", lambda *a, **k: None)
     monkeypatch.setattr(report._pipeline, "run_daily", lambda *a, **k: None)
     report._run_generation([{"ticker": "AAPL"}])
-    assert ("daily_report", "manual") in spy
+    assert ("daily_report_us", "manual") in spy
 
 
 def test_report_backfill_worker_records(spy, monkeypatch):
@@ -128,7 +135,7 @@ def test_report_backfill_worker_records(spy, monkeypatch):
     monkeypatch.setattr(report.report_generator, "backfill_ticker", lambda *a, **k: 0)
     monkeypatch.setattr(report.cache_svc, "invalidate", lambda *a, **k: None)
     report._run_backfill([{"ticker": "AAPL"}], days=1, force=False)
-    assert ("daily_report", "manual") in spy
+    assert ("daily_report_us", "manual") in spy
 
 
 def test_consensus_batch_worker_records(spy, monkeypatch):

@@ -55,9 +55,19 @@ def test_seoul_timezone_for_other_jobs():
         assert batch_registry.get_batch(job_id)["timezone"] == "Asia/Seoul"
 
 
-def test_daily_report_misfire_grace_preserved():
-    entry = batch_registry.get_batch("daily_report")
-    assert entry["misfire_grace_time"] == 82800
+def test_daily_report_split_misfire_grace_preserved():
+    for job_id in ("daily_report_kr", "daily_report_us"):
+        assert batch_registry.get_batch(job_id)["misfire_grace_time"] == 82800
+
+
+def test_daily_report_split_market_and_time():
+    """S1: 시장별 2배치가 올바른 market·시각·tz를 갖고, 통합 daily_report는 사라짐."""
+    kr = batch_registry.get_batch("daily_report_kr")
+    us = batch_registry.get_batch("daily_report_us")
+    assert kr["market"] == "KR" and kr["default_schedule"]["time"] == "20:30"
+    assert us["market"] == "US" and us["default_schedule"]["time"] == "07:00"
+    assert kr["timezone"] == "Asia/Seoul" and us["timezone"] == "Asia/Seoul"
+    assert batch_registry.get_batch("daily_report") is None
 
 
 def test_consensus_not_editable():
@@ -66,10 +76,10 @@ def test_consensus_not_editable():
     assert "default_schedule" not in entry
 
 
-def test_all_eleven_jobs_editable():
+def test_all_editable_jobs():
     editable = [b["id"] for b in batch_registry.BATCHES if b.get("editable")]
     assert set(editable) == {
-        "daily_report", "guru_crawl", "daily_digest", "earnings_refresh",
+        "daily_report_kr", "daily_report_us", "guru_crawl", "daily_digest", "earnings_refresh",
         "monthly_refresh", "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
     }
@@ -77,21 +87,37 @@ def test_all_eleven_jobs_editable():
 
 # ── _seed_spec_for: daily_report/guru_crawl 기존값 변환 ────────────────────────
 
-def test_seed_spec_daily_report_converts_legacy(monkeypatch):
+def test_seed_spec_daily_report_kr_inherits_enabled_days_overrides_time(monkeypatch):
+    """KR 시드: enabled·days는 기존 통합 daily_report에서 승계, 시각만 20:30으로 override."""
     import services.storage as storage
+    monkeypatch.setattr(storage, "get_batch_schedule",
+                        lambda jid: {"enabled": True, "type": "weekly", "days": ["mon", "wed"], "time": "08:00"}
+                        if jid == "daily_report" else None)
     monkeypatch.setattr(storage, "get_schedule",
-                        lambda: {"enabled": True, "time": "09:30", "days": ["mon", "wed"]})
-    spec = scheduler._seed_spec_for("daily_report")
-    assert spec == {"enabled": True, "type": "weekly", "days": ["mon", "wed"], "time": "09:30"}
+                        lambda: {"enabled": False, "time": "00:00", "days": []})
+    spec = scheduler._seed_spec_for("daily_report_kr")
+    assert spec == {"enabled": True, "type": "weekly", "days": ["mon", "wed"], "time": "20:30"}
+
+
+def test_seed_spec_daily_report_us_inherits_from_legacy_overrides_time(monkeypatch):
+    """US 시드: 통합 daily_report 행이 없으면 레거시 get_schedule()에서 승계, 시각만 07:00."""
+    import services.storage as storage
+    monkeypatch.setattr(storage, "get_batch_schedule", lambda jid: None)
+    monkeypatch.setattr(storage, "get_schedule",
+                        lambda: {"enabled": True, "time": "09:30", "days": ["tue", "thu"]})
+    spec = scheduler._seed_spec_for("daily_report_us")
+    assert spec == {"enabled": True, "type": "weekly", "days": ["tue", "thu"], "time": "07:00"}
 
 
 def test_seed_spec_daily_report_empty_days_defaults_weekdays(monkeypatch):
     import services.storage as storage
+    monkeypatch.setattr(storage, "get_batch_schedule", lambda jid: None)
     monkeypatch.setattr(storage, "get_schedule",
                         lambda: {"enabled": False, "time": "08:00", "days": []})
-    spec = scheduler._seed_spec_for("daily_report")
+    spec = scheduler._seed_spec_for("daily_report_kr")
     assert spec["days"] == ["mon", "tue", "wed", "thu", "fri"]
     assert spec["enabled"] is False
+    assert spec["time"] == "20:30"
 
 
 def test_seed_spec_guru_converts_legacy(monkeypatch):
@@ -133,7 +159,7 @@ def test_seed_only_fills_missing_rows(monkeypatch):
     assert store["leverage_fetch"]["time"] == "23:00"
     # 나머지 editable 잡은 시드됨 (consensus 제외, leverage는 기존값 유지)
     expected_seeded = {
-        "daily_report", "guru_crawl", "daily_digest", "earnings_refresh",
+        "daily_report_kr", "daily_report_us", "guru_crawl", "daily_digest", "earnings_refresh",
         "monthly_refresh", "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
     }

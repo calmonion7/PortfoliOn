@@ -871,6 +871,14 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 - `is_etf` — ETF 여부(`tickers.is_etf` 기준). ETF는 애널리스트 의견이 없어 관심(watchlist) "⚠ 경고" 서브탭/카운트에서 제외된다.
 
+응답에는 종목 맵과 함께 `last_scheduled_date`가 포함된다. 일일 리포트 배치가 시장별(`daily_report_kr`/`daily_report_us`)로 분리되어 시장마다 기대 리포트 날짜가 다르므로, 값은 시장별 기대날짜 **객체**다.
+
+```json
+{ "last_scheduled_date": { "KR": "2026-06-12", "US": "2026-06-15" } }
+```
+
+> `last_scheduled_date`는 과거에 단일 문자열(`"2026-05-20"`)이었으나 시장별 객체 `{ "KR": ..., "US": ... }`로 형태가 변경되었다(외부 소비자 파싱 영향).
+
 ---
 
 ### `GET /api/report/{ticker}/history`
@@ -1118,7 +1126,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(12종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(14종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음).
 
 **Auth:** Bearer token 필요
 

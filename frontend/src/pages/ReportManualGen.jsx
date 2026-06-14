@@ -2,28 +2,16 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
-const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-
-function getToday() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
-}
-
-function getLastScheduleDay(scheduleDays) {
-  const d = new Date()
-  for (let i = 1; i <= 7; i++) {
-    d.setDate(d.getDate() - 1)
-    if (scheduleDays.includes(DAY_KEYS[d.getDay()])) {
-      return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
-    }
-  }
-  return null
+// 종목 market을 KR/US 기대날짜 키로 정규화 (비-KR 전부 US).
+function marketKey(market) {
+  return (market || '').toUpperCase() === 'KR' ? 'KR' : 'US'
 }
 
 export default function ReportManualGen() {
   const { role } = useAuth() || { role: null }
   const isAdmin = role === 'admin'
 
-  const [schedule, setSchedule] = useState({ enabled: false, type: 'weekly', time: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] })
+  const [expectedDates, setExpectedDates] = useState(null) // { KR, US } | null
 
   const [generating, setGenerating] = useState(false)
   const [genMsg, setGenMsg] = useState('')
@@ -44,10 +32,6 @@ export default function ReportManualGen() {
   const [backfillForce, setBackfillForce] = useState(false)
 
   useEffect(() => {
-    api.get('/api/batches/daily_report/schedule').then(({ data }) => setSchedule(data)).catch(() => {})
-  }, [])
-
-  useEffect(() => {
     if (role !== null) loadStockList()
   }, [role]) // eslint-disable-line
 
@@ -57,38 +41,27 @@ export default function ReportManualGen() {
       const scopeParam = role === 'admin' ? '?scope=all' : ''
       const { data } = await api.get(`/api/report/list${scopeParam}`)
       setStockList(data.stocks ?? data)
+      if (data.last_scheduled_date) setExpectedDates(data.last_scheduled_date)
     } catch {}
     setListLoading(false)
   }
 
-  const today = getToday()
-  const todayKey = DAY_KEYS[new Date().getDay()]
-  const scheduleDays = schedule.days || []
-  const isScheduleDay = schedule.enabled && scheduleDays.includes(todayKey)
-  const lastScheduleDay = (!isScheduleDay && schedule.enabled && scheduleDays.length > 0)
-    ? getLastScheduleDay(scheduleDays) : null
-  const referenceDate = isScheduleDay ? today : lastScheduleDay
-
-  const { pendingStocks, doneStocks, notInPeriodStocks } = (() => {
-    if (!stockList) return { pendingStocks: [], doneStocks: [], notInPeriodStocks: [] }
-    const pending = [], done = [], notInPeriod = []
+  const { pendingStocks, doneStocks } = (() => {
+    if (!stockList) return { pendingStocks: [], doneStocks: [] }
+    const pending = [], done = []
     for (const [ticker, info] of Object.entries(stockList)) {
       const name = info.summary?.name || ''
-      const entry = { ticker, name, is_mine: info.is_mine, market: info.market || '' }
+      const market = info.market || ''
+      const entry = { ticker, name, is_mine: info.is_mine, market }
       const latestDate = info.dates?.[0]
-      if (isScheduleDay) {
-        if (latestDate === today) done.push(entry)
-        else pending.push(entry)
-      } else if (referenceDate) {
-        if (latestDate >= referenceDate) done.push(entry)
-        else pending.push(entry)
-      } else {
-        notInPeriod.push(entry)
-      }
+      // 종목 market의 기대날짜로 미생성/생성 판정 (KR/US 기준일이 다름).
+      const expected = expectedDates?.[marketKey(market)]
+      if (expected && latestDate && String(latestDate) >= expected) done.push(entry)
+      else pending.push(entry)
     }
     const byTicker = (a, b) => a.ticker.localeCompare(b.ticker)
-    pending.sort(byTicker); done.sort(byTicker); notInPeriod.sort(byTicker)
-    return { pendingStocks: pending, doneStocks: done, notInPeriodStocks: notInPeriod }
+    pending.sort(byTicker); done.sort(byTicker)
+    return { pendingStocks: pending, doneStocks: done }
   })()
 
   const applyOwnerFilter = (stocks) => {
@@ -130,9 +103,9 @@ export default function ReportManualGen() {
     setGenMsg('')
     setProgress({ done: 0, total: 0, current: '' })
     const tickerParam = targets.map(s => s.ticker).join(',')
-    const dateParam = referenceDate && !isScheduleDay ? `&date=${referenceDate}` : ''
     try {
-      await api.post(`/api/report/generate?tickers=${encodeURIComponent(tickerParam)}${dateParam}`)
+      // date 생략 → 서버가 종목 market별 기대날짜(KR/US)로 분리 생성한다.
+      await api.post(`/api/report/generate?tickers=${encodeURIComponent(tickerParam)}`)
       startPolling(loadStockList)
     } catch (err) {
       setGenMsg(err.response?.data?.detail || '생성 실패')
@@ -169,8 +142,8 @@ export default function ReportManualGen() {
   useEffect(() => () => clearInterval(backfillPollRef.current), [])
 
   const pct = progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0
-  const secondTabStocks = referenceDate || isScheduleDay ? doneStocks : notInPeriodStocks
-  const secondTabLabel = referenceDate || isScheduleDay ? '생성됨' : '수집기간아님'
+  const secondTabStocks = doneStocks
+  const secondTabLabel = '생성됨'
   const rawTabStocks = genTab === 'pending' ? pendingStocks : secondTabStocks
   const currentTabStocks = applyMarketFilter(applyOwnerFilter(rawTabStocks))
   const filteredPending = applyMarketFilter(applyOwnerFilter(pendingStocks))
@@ -238,7 +211,7 @@ export default function ReportManualGen() {
           <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</div>
         ) : currentTabStocks.length === 0 ? (
           <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
-            {genTab === 'pending' ? `모든 종목의 ${referenceDate || '오늘'} 리포트가 생성되었습니다.` : `${secondTabLabel} 종목이 없습니다.`}
+            {genTab === 'pending' ? `모든 종목의 최신 리포트가 생성되었습니다.` : `${secondTabLabel} 종목이 없습니다.`}
           </div>
         ) : (
           <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--border)', marginTop: 8 }}>

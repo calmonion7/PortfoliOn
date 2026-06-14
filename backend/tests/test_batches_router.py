@@ -24,13 +24,13 @@ REQUIRED_FIELDS = {
 }
 
 EXPECTED_IDS = {
-    "daily_report", "consensus", "daily_digest", "earnings_refresh",
+    "daily_report_kr", "daily_report_us", "consensus", "daily_digest", "earnings_refresh",
     "monthly_refresh", "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
     "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "guru_crawl", "backlog_fetch",
 }
 
 
-def test_lists_eleven_batches_with_required_fields():
+def test_lists_fourteen_batches_with_required_fields():
     with patch("routers.batches.job_runs.recent", return_value=[]), \
          patch("routers.batches.storage.get_batch_schedule", return_value=None), \
          patch.object(__import__("scheduler"), "_scheduler") as mock_sched:
@@ -38,7 +38,7 @@ def test_lists_eleven_batches_with_required_fields():
         resp = client.get("/api/batches")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 13
+    assert len(data) == 14
     assert {b["id"] for b in data} == EXPECTED_IDS
     for b in data:
         assert REQUIRED_FIELDS.issubset(b.keys()), b["id"]
@@ -75,10 +75,10 @@ def test_next_run_swallows_scheduler_errors():
 
 
 def test_recent_runs_included_from_job_runs():
-    runs = [{"id": 1, "job_id": "daily_report", "status": "success"}]
+    runs = [{"id": 1, "job_id": "daily_report_kr", "status": "success"}]
 
     def recent(job_id, *a, **k):
-        return runs if job_id == "daily_report" else []
+        return runs if job_id == "daily_report_kr" else []
 
     with patch("routers.batches.job_runs.recent", side_effect=recent), \
          patch("routers.batches.storage.get_batch_schedule", return_value=None), \
@@ -86,7 +86,7 @@ def test_recent_runs_included_from_job_runs():
         mock_sched.get_job.return_value = None
         resp = client.get("/api/batches")
     data = {b["id"]: b for b in resp.json()}
-    assert data["daily_report"]["recent_runs"] == runs
+    assert data["daily_report_kr"]["recent_runs"] == runs
     assert data["guru_crawl"]["recent_runs"] == []
 
 
@@ -146,9 +146,9 @@ def test_schedule_desc_derived_from_saved_spec_for_editable():
 
 
 def test_get_schedule_returns_stored_spec():
-    spec = {"enabled": True, "type": "weekly", "days": ["mon", "wed"], "time": "08:00"}
+    spec = {"enabled": True, "type": "weekly", "days": ["mon", "wed"], "time": "20:30"}
     with patch("routers.batches.storage.get_batch_schedule", return_value=spec):
-        resp = client.get("/api/batches/daily_report/schedule")
+        resp = client.get("/api/batches/daily_report_kr/schedule")
     assert resp.status_code == 200
     assert resp.json() == spec
 
@@ -174,18 +174,18 @@ def test_put_schedule_saves_and_reloads():
     spec = {"enabled": True, "type": "weekly", "days": ["mon", "tue"], "time": "07:30"}
     with patch("routers.batches.storage.save_batch_schedule") as save, \
          patch("routers.batches.scheduler.reload") as reload_:
-        resp = admin_client.put("/api/batches/daily_report/schedule", json=spec)
+        resp = admin_client.put("/api/batches/daily_report_kr/schedule", json=spec)
     assert resp.status_code == 200
     assert resp.json() == spec
-    save.assert_called_once_with("daily_report", spec)
-    reload_.assert_called_once_with("daily_report")
+    save.assert_called_once_with("daily_report_kr", spec)
+    reload_.assert_called_once_with("daily_report_kr")
 
 
 def test_put_schedule_invalid_spec_400():
     bad = {"enabled": True, "type": "daily", "time": "99:99"}
     with patch("routers.batches.storage.save_batch_schedule") as save, \
          patch("routers.batches.scheduler.reload") as reload_:
-        resp = admin_client.put("/api/batches/daily_report/schedule", json=bad)
+        resp = admin_client.put("/api/batches/daily_report_kr/schedule", json=bad)
     assert resp.status_code == 400
     save.assert_not_called()
     reload_.assert_not_called()
@@ -211,5 +211,5 @@ def test_put_schedule_blocked_for_non_admin():
     """require_admin 미오버라이드 앱: 비-admin role이면 403."""
     spec = {"enabled": True, "type": "daily", "time": "08:00"}
     with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
-        resp = client.put("/api/batches/daily_report/schedule", json=spec)
+        resp = client.put("/api/batches/daily_report_kr/schedule", json=spec)
     assert resp.status_code == 403

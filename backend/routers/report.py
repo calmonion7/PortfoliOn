@@ -1,9 +1,5 @@
 from __future__ import annotations
 import json
-from datetime import date as _date, timedelta, datetime as _datetime
-from zoneinfo import ZoneInfo as _ZoneInfo
-
-_KST = _ZoneInfo("Asia/Seoul")
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Body
 from pathlib import Path
@@ -24,20 +20,6 @@ router = APIRouter(prefix="/api", tags=["report"])
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
-
-_DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
-
-def _last_scheduled_date(schedule: dict) -> str:
-    """Return the most recent date matching the schedule's days of week."""
-    enabled_days = {_DAY_MAP[d] for d in schedule.get("days", []) if d in _DAY_MAP}
-    today = _datetime.now(tz=_KST).date()
-    if not schedule.get("enabled") or not enabled_days:
-        return today.strftime("%Y-%m-%d")
-    for i in range(7):
-        d = today - timedelta(days=i)
-        if d.weekday() in enabled_days:
-            return d.strftime("%Y-%m-%d")
-    return today.strftime("%Y-%m-%d")
 
 _RSI_KEYS = ("rsi", "target_20", "target_25", "target_30", "target_70", "target_75", "target_80")
 _SLIM_KEYS = (
@@ -82,7 +64,9 @@ def backfill_all(background_tasks: BackgroundTasks, days: int = 60, force: bool 
 
 
 def _run_backfill(stocks: list, days: int, force: bool = False):
-    with job_runs.record("daily_report", "manual"):
+    # 수동 리포트 활동은 mixed KR+US라 시장별 분할이 없다 — 항상 존재하는 리포트 배치
+    # daily_report_us에 기록해 배치 현황 실행이력에 노출되게 한다(daily_report 은퇴 후).
+    with job_runs.record("daily_report_us", "manual"):
         _backfill_progress.start(len(stocks))
         _backfill_progress.set(created=0)
         total_created = 0
@@ -110,10 +94,16 @@ def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = Non
         stocks = all_stocks
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
-    if not date:
-        date = _last_scheduled_date(storage.get_daily_report_schedule())
     _progress.start(len(stocks))
-    background_tasks.add_task(_run_generation, stocks, date)
+    if date:
+        background_tasks.add_task(_run_generation, stocks, date)
+    else:
+        # 명시 날짜가 없으면 종목 market별 기대날짜로 분리 생성(KR/US 기준일이 다름).
+        by_market: dict = {}
+        for s in stocks:
+            by_market.setdefault((s.get("market") or "US") == "KR" and "KR" or "US", []).append(s)
+        for market, group in by_market.items():
+            background_tasks.add_task(_run_generation, group, storage.expected_report_date(market))
     return {"message": f"Generating reports for {len(stocks)} stock(s)"}
 
 
@@ -143,7 +133,9 @@ def _run_generation(stocks: list, target_date: str = None):
         finally:
             _progress.increment()
 
-    with job_runs.record("daily_report", "manual"):
+    # 수동 생성은 mixed KR+US라 시장별 분할이 없다 — 항상 존재하는 리포트 배치
+    # daily_report_us에 기록해 배치 현황 실행이력에 노출되게 한다(daily_report 은퇴 후).
+    with job_runs.record("daily_report_us", "manual"):
         parallel_map(_process_one, stocks, max_workers=5)
         _progress.finish()
 
@@ -236,8 +228,7 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
             if ticker not in result:
                 result[ticker] = _mk_entry(ticker, [], "watchlist", stock, None)
 
-        schedule = storage.get_daily_report_schedule()
-        return {"stocks": result, "last_scheduled_date": _last_scheduled_date(schedule)}
+        return {"stocks": result, "last_scheduled_date": storage.expected_report_dates()}
 
     if all_scope:
         return _build()

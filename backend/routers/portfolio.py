@@ -1,4 +1,3 @@
-from datetime import date as _date, timedelta as _timedelta
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel, field_validator
 from typing import List
@@ -9,21 +8,6 @@ from services.db import query as db_query
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
-
-_DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
-
-
-def _last_scheduled_date() -> str:
-    schedule = storage.get_daily_report_schedule()
-    enabled = {_DAY_MAP[d] for d in schedule.get("days", []) if d in _DAY_MAP}
-    today = _date.today()
-    if not schedule.get("enabled") or not enabled:
-        return today.isoformat()
-    for i in range(7):
-        d = today - _timedelta(days=i)
-        if d.weekday() in enabled:
-            return d.isoformat()
-    return today.isoformat()
 
 
 def _generate_with_consensus(stock_dict: dict):
@@ -124,7 +108,7 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
     storage.save_holdings(user_id, holdings)
     cache_svc.invalidate_portfolio_caches()
 
-    target_date = _last_scheduled_date()
+    target_date = storage.expected_report_date(stock.market)
     existing = db_query(
         "SELECT 1 FROM snapshots WHERE ticker = %s AND date = %s LIMIT 1",
         (stock.ticker.upper(), target_date),

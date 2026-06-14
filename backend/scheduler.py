@@ -11,14 +11,22 @@ _DIGEST_JOB_ID = "daily_digest"
 _VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
 
-def _generate_all():
+def _in_market(stock: dict, market: str) -> bool:
+    """KR = market=='KR', US = 그 외 전부(기본 'US'). 비-KR을 US로 잡아 누락 방지."""
+    m = stock.get("market") or "US"
+    return (m == "KR") if market == "KR" else (m != "KR")
+
+
+def _generate_all(market: str, job_id: str):
     from services.db import query
-    with job_runs.record("daily_report", "auto"):
+    with job_runs.record(job_id, "auto"):
         user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks")})
         all_stocks: dict = {}
         for user_id in user_ids:
             stocks = storage.get_all_stocks(user_id)
             for stock in stocks:
+                if not _in_market(stock, market):
+                    continue
                 try:
                     report_generator.generate_report_with_retry(stock)
                     print(f"[Scheduler] Report generated for {stock['ticker']}")
@@ -30,6 +38,14 @@ def _generate_all():
             print(f"[Scheduler] Pipeline run_daily completed for {len(all_stocks)} stocks")
         except Exception as e:
             print(f"[Scheduler] Pipeline run_daily failed: {e}")
+
+
+def _generate_kr():
+    _generate_all("KR", "daily_report_kr")
+
+
+def _generate_us():
+    _generate_all("US", "daily_report_us")
 
 
 def _run_guru_crawl():
@@ -253,7 +269,8 @@ def _seed_rankings_if_empty():
 
 
 _JOB_FUNCS = {
-    "daily_report": _generate_all,
+    "daily_report_kr": _generate_kr,
+    "daily_report_us": _generate_us,
     "guru_crawl": _run_guru_crawl,
     "daily_digest": _run_digest,
     "earnings_refresh": _refresh_earnings,
@@ -297,10 +314,14 @@ def _reschedule_job(job_id: str) -> None:
 
 
 def _seed_spec_for(job_id: str) -> dict:
-    """기동 마이그레이션용 시드 스펙. daily_report/guru_crawl은 기존
-    schedules/guru_schedules 값을 통합 스펙으로 변환해 거동 보존."""
-    if job_id == "daily_report":
-        cfg = storage.get_schedule()
+    """기동 마이그레이션용 시드 스펙. daily_report_kr/us·guru_crawl은 기존
+    schedules/guru_schedules 값을 통합 스펙으로 변환해 거동 보존.
+
+    daily_report_kr/us는 기존 통합 daily_report(batch_schedules)→레거시 get_schedule()
+    순으로 enabled·days를 승계하되 time만 신규 기본값(KR 20:30 / US 07:00)으로 override.
+    배포 즉시 KR을 오후로 옮기는 마이그레이션."""
+    if job_id in ("daily_report_kr", "daily_report_us"):
+        cfg = storage.get_batch_schedule("daily_report") or storage.get_schedule()
         days = [d for d in cfg.get("days", []) if d in _VALID_DAYS]
         if not days:
             days = ["mon", "tue", "wed", "thu", "fri"]
@@ -308,7 +329,7 @@ def _seed_spec_for(job_id: str) -> dict:
             "enabled": bool(cfg.get("enabled")),
             "type": "weekly",
             "days": days,
-            "time": cfg.get("time", "08:00"),
+            "time": batch_registry.get_batch(job_id)["default_schedule"]["time"],
         }
     if job_id == "guru_crawl":
         cfg = storage.get_guru_schedule()
@@ -340,10 +361,15 @@ _DAY_MAP = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6
 
 
 def _check_missed_report():
-    """기동 시 당일 스케줄이 이미 지났는데 리포트가 없으면 즉시 실행."""
-    from datetime import datetime, date
+    """기동 시 시장별(KR/US) 당일 스케줄이 이미 지났는데 리포트가 없으면 즉시 실행."""
+    for job_id, market in (("daily_report_kr", "KR"), ("daily_report_us", "US")):
+        _check_missed_report_for(job_id, market)
+
+
+def _check_missed_report_for(job_id: str, market: str):
+    from datetime import datetime
     from services.db import query as db_query
-    cfg = storage.get_batch_schedule("daily_report")
+    cfg = storage.get_batch_schedule(job_id)
     if not cfg or not cfg.get("enabled"):
         return
     now = datetime.now(tz=__import__("zoneinfo").ZoneInfo("Asia/Seoul"))
@@ -355,13 +381,14 @@ def _check_missed_report():
     if now.hour < sched_hour or (now.hour == sched_hour and now.minute < sched_minute):
         return
     today = now.date().strftime("%Y-%m-%d")
-    # 전 사용자 종목 중 오늘 스냅샷이 없는 것만 골라 재생성 (부분 누락 복구).
+    # 전 사용자 종목 중 이 시장에 속하고 오늘 스냅샷이 없는 것만 골라 재생성 (부분 누락 복구).
     # 기존엔 "하나라도 있으면 전체 스킵"이라 일부 종목만 빠진 날은 복구되지 않았다.
     user_ids = list({r["user_id"] for r in db_query("SELECT DISTINCT user_id FROM user_stocks")})
     stocks_by_ticker: dict = {}
     for user_id in user_ids:
         for stock in storage.get_all_stocks(user_id):
-            stocks_by_ticker.setdefault(stock["ticker"], stock)
+            if _in_market(stock, market):
+                stocks_by_ticker.setdefault(stock["ticker"], stock)
     if not stocks_by_ticker:
         return
     have = {r["ticker"] for r in db_query(
@@ -371,7 +398,7 @@ def _check_missed_report():
     missing = [s for t, s in stocks_by_ticker.items() if t not in have]
     if not missing:
         return
-    print(f"[Scheduler] Missed report: {len(missing)} stock(s) for {today}, generating...")
+    print(f"[Scheduler] Missed report ({market}): {len(missing)} stock(s) for {today}, generating...")
     for stock in missing:
         try:
             report_generator.generate_report_with_retry(stock)

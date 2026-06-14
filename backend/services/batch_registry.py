@@ -1,29 +1,51 @@
 # backend/services/batch_registry.py
-"""배치 레지스트리 — 현황 허브가 노출하는 12개 배치의 정적 메타데이터.
+"""배치 레지스트리 — 현황 허브가 노출하는 14개 배치의 정적 메타데이터.
 
 job_id는 스케줄러 잡 id 및 services.job_runs.record 호출 id와 반드시 일치한다.
-consensus는 자체 스케줄러 잡이 없고(daily_report에 내장) next_run이 null이다.
+consensus는 자체 스케줄러 잡이 없고(daily_report_kr/us에 내장) next_run이 null이다.
+일일 리포트는 시장별로 daily_report_kr(20:30 KST)·daily_report_us(07:00 KST) 2배치로 분리된다.
 """
 from __future__ import annotations
 
 BATCHES = [
     {
-        "id": "daily_report",
-        "label": "일일 리포트 생성",
+        "id": "daily_report_kr",
+        "label": "일일 리포트 생성(국내)",
         "category": "report",
         "schedule_desc": "설정에 따름",
         "usage": ["리포트 탭"],
         "editable": True,
         "trigger_kinds": ["auto", "manual"],
         "manual_endpoint": None,
-        "scheduler_job_id": "daily_report",
+        "scheduler_job_id": "daily_report_kr",
         "timezone": "Asia/Seoul",
         "misfire_grace_time": 82800,
+        "market": "KR",
         "default_schedule": {
             "enabled": False,
             "type": "weekly",
             "days": ["mon", "tue", "wed", "thu", "fri"],
-            "time": "08:00",
+            "time": "20:30",
+        },
+    },
+    {
+        "id": "daily_report_us",
+        "label": "일일 리포트 생성(해외)",
+        "category": "report",
+        "schedule_desc": "설정에 따름",
+        "usage": ["리포트 탭"],
+        "editable": True,
+        "trigger_kinds": ["auto", "manual"],
+        "manual_endpoint": None,
+        "scheduler_job_id": "daily_report_us",
+        "timezone": "Asia/Seoul",
+        "misfire_grace_time": 82800,
+        "market": "US",
+        "default_schedule": {
+            "enabled": False,
+            "type": "weekly",
+            "days": ["mon", "tue", "wed", "thu", "fri"],
+            "time": "07:00",
         },
     },
     {

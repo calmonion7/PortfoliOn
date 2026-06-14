@@ -110,10 +110,11 @@ X-API-Key: {COWORK_API_KEY}
       "summary": null
     }
   },
-  "last_scheduled_date": "2026-05-20"
+  "last_scheduled_date": { "KR": "2026-06-12", "US": "2026-06-15" }
 }
 ```
 
+> ⚠️ `last_scheduled_date`는 단일 문자열(`"2026-05-20"`)에서 시장별 객체 `{ "KR": ..., "US": ... }`로 형태가 변경되었습니다. 종목의 `market`에 맞는 키를 골라 기대 리포트 날짜를 비교하세요(파싱 영향).
 > 종목 데이터는 `response["stocks"]` 아래에 있습니다. `summary`는 리포트가 없으면 `null`.
 > `is_etf`는 ETF 여부(`tickers.is_etf`). ETF는 애널리스트 의견이 없어 관심 "⚠ 경고" 분류에서 제외됩니다.
 
