@@ -183,7 +183,7 @@ X-API-Key: {COWORK_API_KEY}
     "strategy": "비만 시장 독점 확대 + 차세대 치료 영역 선점",
     "initiatives": [
       { "title": "경구용 비만 치료제 파운다요 FDA 승인", "description": "2026-04 세계 최초 경구용 비만 치료제 FDA 승인.", "status": "launched", "timeline": "2026-04" },
-      { "title": "레타트루티드 임상 3상", "description": "삼중 작용제, 압도적 임상 데이터 확보 중.", "status": "phase3", "timeline": null }
+      { "title": "레타트루티드 임상 3상", "description": "삼중 작용제, 압도적 임상 데이터 확보 중.", "label": "임상3상", "status": "phase3", "timeline": null }
     ]
   },
   "risks": {
@@ -235,8 +235,9 @@ X-API-Key: {COWORK_API_KEY}
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `strategy` | string | 전략 개요 |
-| `initiatives` | `{title, description, status, timeline}[]` | 성장 이니셔티브 목록 |
-| `initiatives[].status` | string | `"launched"` \| `"phase3"` \| `"phase2"` \| `"announced"` \| `"completed"` |
+| `initiatives` | `{title, description, label, status, timeline}[]` | 성장 이니셔티브 목록 |
+| `initiatives[].label` | string\|null | 칩에 표시할 자유문구 단계명. 종목 도메인에 맞게 짧게 (≤~12자 권장, 예: `"양산 램프업"`, `"임상3상"`). 있으면 `status` 폴백보다 우선 표시 |
+| `initiatives[].status` | string | 범용 진행 단계 (칩 색상 결정). `"launched"`(출시) \| `"phase3"`(3단계) \| `"phase2"`(2단계) \| `"announced"`(발표) \| `"completed"`(완료). 칩 문구는 `label`이 있으면 그것을, 없으면 이 단계명을 표시 |
 | `initiatives[].timeline` | string\|null | 타임라인 (예: `"2026-04"`) |
 
 **`risks` 객체 필드**

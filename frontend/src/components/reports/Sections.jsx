@@ -144,8 +144,8 @@ export function MoatSection({ moat }) {
 
 const STATUS_CFG = {
   launched:  { label: '출시',    color: '#81c784' },
-  phase3:    { label: '임상3상', color: '#64b5f6' },
-  phase2:    { label: '임상2상', color: '#9575cd' },
+  phase3:    { label: '3단계', color: '#64b5f6' },
+  phase2:    { label: '2단계', color: '#9575cd' },
   announced: { label: '발표',    color: '#ffb74d' },
   completed: { label: '완료',    color: 'var(--text-3)' },
 }
@@ -168,7 +168,7 @@ export function GrowthPlanSection({ growth_plan }) {
               <div key={i} style={_FACTOR_LINE}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={_FACTOR_TITLE}>{item.title}</span>
-                  {item.status && <span style={_CHIP(sc.color || 'var(--text-3)')}>{sc.label || item.status}</span>}
+                  {(item.label || item.status) && <span style={_CHIP(sc.color || 'var(--text-3)')}>{item.label || sc.label || item.status}</span>}
                   {item.timeline && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{item.timeline}</span>}
                 </div>
                 <div style={_FACTOR_DESC}>{item.description}</div>
