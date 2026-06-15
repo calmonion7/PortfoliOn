@@ -263,6 +263,17 @@ CREATE TABLE IF NOT EXISTS stock_disclosures (
 );
 CREATE INDEX IF NOT EXISTS idx_disclosures_read ON stock_disclosures(ticker, rcept_dt DESC);
 
+-- 배당 트래킹 (보유·관심 종목의 연 주당배당·배당수익률, ticker 단위 — US=yfinance/KR=DART)
+-- income(연 예상배당·매수가 대비 수익률)은 대시보드가 보유의 quantity·avg_cost로 읽기 시 계산.
+CREATE TABLE IF NOT EXISTS stock_dividends (
+    ticker                    TEXT PRIMARY KEY,
+    annual_dividend_per_share NUMERIC,        -- 연 주당배당(USD 또는 KRW)
+    dividend_yield            NUMERIC,        -- 배당수익률(%)
+    currency                  TEXT,           -- USD | KRW
+    source                    TEXT,           -- yfinance | dart
+    fetched_at                TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 배치 실행로그 (job_id별 최근 20건만 보관)
 -- 배포 주의: 이 파일은 빈 pgdata 최초 init 때만 자동 적용된다(docker-compose의 initdb 마운트).
 --   기존 운영 DB는 pgdata가 이미 채워져 있으므로 git push 자동배포로는 아래 두 문장이 적용되지 않는다.

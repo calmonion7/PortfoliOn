@@ -641,35 +641,64 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 ### `GET /api/stocks/dashboard`
 
-보유종목 대시보드 카드 목록 (현재가, 수익률, RSI, 컨센서스). TTL 300s 캐시.
+보유종목 대시보드 카드 목록 (현재가, 수익률, RSI, 컨센서스, 배당) + 포트폴리오 총계. TTL 300s 캐시.
 
 **Auth:** Bearer token 필요
 
-**Response `200`**
+**Response `200`** — `{ "holdings": [...], "totals": {...} | null }`
 ```json
-[
-  {
-    "ticker": "AAPL",
-    "name": "Apple Inc.",
-    "market": "US",
-    "avg_cost": 150.0,
-    "quantity": 10,
-    "current_price": 175.5,
-    "daily_change_pct": 1.2,
-    "weekly_change_pct": 3.4,
-    "monthly_change_pct": 8.1,
-    "rsi": 62.3,
-    "target_mean": 210.0,
-    "buy": 15,
-    "hold": 8,
-    "sell": 2,
-    "snapshot_date": "2026-05-20",
-    "sector": "Technology"
+{
+  "holdings": [
+    {
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "market": "US",
+      "exchange": "",
+      "avg_cost": 150.0,
+      "quantity": 10,
+      "current_price": 175.5,
+      "daily_change_pct": 1.2,
+      "weekly_change_pct": 3.4,
+      "monthly_change_pct": 8.1,
+      "rsi": 62.3,
+      "poc": 168.0,
+      "vah": 180.0,
+      "val": 160.0,
+      "hvn": [],
+      "target_mean": 210.0,
+      "buy": 15,
+      "hold": 8,
+      "sell": 2,
+      "snapshot_date": "2026-05-20",
+      "sector": "Technology",
+      "annual_dividend_per_share": 1.0,
+      "dividend_yield": 0.57,
+      "yield_on_cost": 0.67,
+      "expected_annual_income": 10.0
+    }
+  ],
+  "totals": {
+    "total_expected_annual_income_krw": 13800.0,
+    "total_market_value_krw": 2420900.0,
+    "avg_dividend_yield": 0.57
   }
-]
+}
 ```
 
-보유종목이 없으면 빈 배열 `[]` 반환.
+| 필드 (per-holding 배당) | 타입 | 설명 |
+|------|------|------|
+| `annual_dividend_per_share` | float \| null | 연 주당배당(통화는 종목 통화: US=USD/KR=KRW). 저장된 배당값만 읽음(라이브 호출 0), 무배당/미수집은 `null` |
+| `dividend_yield` | float \| null | 배당수익률(%) |
+| `yield_on_cost` | float \| null | 매수가 대비 수익률(%) = `annual_dividend_per_share / avg_cost × 100`. `avg_cost` 없으면 `null` |
+| `expected_annual_income` | float \| null | 연 예상배당 = `annual_dividend_per_share × quantity`(종목 통화). `quantity` 없으면 `null` |
+
+| 필드 (`totals`) | 타입 | 설명 |
+|------|------|------|
+| `total_expected_annual_income_krw` | float | 연 예상배당 합계(KRW 환산: US$×usdkrw, KR원×1) |
+| `total_market_value_krw` | float | 평가금액 합계(KRW 환산) |
+| `avg_dividend_yield` | float \| null | 포트 평균 배당수익률(%) = 총배당/총평가. 평가금액 0이면 `null` |
+
+> `totals`의 KRW 환산은 저장된 FX(`market_cache` `fx`의 `usdkrw`)만 사용한다. US 종목에 환율이 없으면 그 종목은 총계에서 제외(달러를 원으로 오합산 방지). 보유종목이 없으면 `{ "holdings": [], "totals": null }` 반환.
 
 ---
 
@@ -681,6 +710,21 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 ```json
 { "cleared": true }
 ```
+
+---
+
+### `POST /api/stocks/dividends/refresh`
+
+보유·관심 종목의 배당(연 주당배당·배당수익률)을 시장별 소스에서 전 종목 재수집해 `stock_dividends`에 저장. US=yfinance, KR=DART alotMatter. 백그라운드 실행(`dividend_fetch` 배치 manual lane). **admin 전용.**
+
+**Auth:** Bearer token + admin
+
+**Response `202`**
+```json
+{ "message": "배당 전 종목 수집 시작" }
+```
+
+> `dividend_fetch` 자동 배치(`GET /api/batches`)와 동일 수집 로직. 무배당/결측 종목은 저장하지 않음(빈 박제 방지).
 
 ---
 
@@ -1159,9 +1203,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(18종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(19종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
 
-> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다.
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다.
 
 **Auth:** Bearer token 필요
 

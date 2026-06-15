@@ -16,13 +16,39 @@ import SectorTab from './SectorTab'
 import MacroTab from './MacroTab'
 import Analytics from './Analytics'
 
-const DashboardGrid = ({ cards, loading, tick }) => {
+const DividendSummary = ({ totals }) => {
+  if (!totals || !totals.total_expected_annual_income_krw) return null
+  const income = Math.round(totals.total_expected_annual_income_krw).toLocaleString('ko-KR')
+  const avgYield = totals.avg_dividend_yield
+  return (
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', gap: 24, padding: '12px 16px', marginBottom: 12,
+      background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 10,
+    }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>총 연 예상배당</span>
+        <span className="tnum" style={{ fontSize: 16, fontWeight: 700 }}>₩{income}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>평균 배당수익률</span>
+        <span className="tnum" style={{ fontSize: 16, fontWeight: 700 }}>
+          {avgYield != null ? `${avgYield.toFixed(2)}%` : '—'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+const DashboardGrid = ({ cards, totals, loading, tick }) => {
   if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
   if (!cards.length) return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유종목이 없습니다.</p>
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, padding: '4px 0' }}>
-      {cards.map(item => <DashboardCard key={item.ticker} item={item} tick={tick} />)}
-    </div>
+    <>
+      <DividendSummary totals={totals} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, padding: '4px 0' }}>
+        {cards.map(item => <DashboardCard key={item.ticker} item={item} tick={tick} />)}
+      </div>
+    </>
   )
 }
 
@@ -38,7 +64,7 @@ export default function Portfolio() {
   const [error, setError] = useState('')
   const [analysisTab, setAnalysisTab] = useState('sector')
 
-  const { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard } = usePortfolioData()
+  const { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardTotals, dashboardLoading, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard } = usePortfolioData()
 
   const pollReportGeneration = (ticker) => {
     let attempts = 0
@@ -265,7 +291,7 @@ export default function Portfolio() {
 
       {tab === 'dash' && (
         <div style={{ padding: '0 20px' }}>
-          <DashboardGrid cards={dashboardCards} loading={dashboardLoading} tick={priceTick} />
+          <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} />
         </div>
       )}
 
@@ -481,7 +507,7 @@ export default function Portfolio() {
       )}
 
       {/* 대시보드 탭 */}
-      {tab === 'dash' && <DashboardGrid cards={dashboardCards} loading={dashboardLoading} tick={priceTick} />}
+      {tab === 'dash' && <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} />}
 
       {tab === 'analysis' && (
         <div>

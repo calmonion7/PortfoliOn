@@ -8,6 +8,7 @@ export default function usePortfolioData() {
   const [listLoading, setListLoading] = useState(true)
   const [hasFetched, setHasFetched] = useState(false)
   const [dashboardCards, setDashboardCards] = useState([])
+  const [dashboardTotals, setDashboardTotals] = useState(null)
   const [dashboardLoading, setDashboardLoading] = useState(false)
   const [fx, setFx] = useState(1380)
   const [events7d, setEvents7d] = useState([])
@@ -32,7 +33,9 @@ export default function usePortfolioData() {
     try {
       if (invalidate) await api.delete('/api/stocks/dashboard/cache').catch(() => {})
       const res = await api.get('/api/stocks/dashboard')
-      setDashboardCards(res.data || [])
+      // 응답 형태: { holdings: [...], totals: {...} | null }
+      setDashboardCards(res.data?.holdings || [])
+      setDashboardTotals(res.data?.totals || null)
     } catch {
       // silent
     } finally {
@@ -86,5 +89,5 @@ export default function usePortfolioData() {
     }).catch(() => {})
   }, [])
 
-  return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardLoading, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard, refreshLivePrices }
+  return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardTotals, dashboardLoading, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard, refreshLivePrices }
 }

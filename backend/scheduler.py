@@ -161,6 +161,16 @@ def _fetch_disclosures():
             print(f"[Scheduler] Disclosure fetch failed: {e}")
 
 
+def _fetch_dividends():
+    from services.dividends import fetch_all_dividends
+    with job_runs.record("dividend_fetch", "auto"):
+        try:
+            r = fetch_all_dividends()
+            print(f"[Scheduler] Dividends fetched: {r}")
+        except Exception as e:
+            print(f"[Scheduler] Dividend fetch failed: {e}")
+
+
 def _fetch_kr_rankings():
     from services import ranking_service
     with job_runs.record("kr_rankings_fetch", "auto"):
@@ -329,6 +339,7 @@ _JOB_FUNCS = {
     "backlog_fetch": _fetch_backlog,
     "kr_sector_fetch": _fetch_kr_sector,
     "disclosure_fetch": _fetch_disclosures,
+    "dividend_fetch": _fetch_dividends,
 }
 
 

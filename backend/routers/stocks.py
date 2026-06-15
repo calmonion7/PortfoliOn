@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List, Any
 from services import storage
@@ -13,6 +13,9 @@ from services import market
 from services import scraper
 from services import cache as cache_svc
 from services import consensus as consensus_svc
+from services import job_runs
+from services import dividends
+from services.market_indicators.cache import _mc_load
 from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID, require_admin
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
@@ -236,12 +239,39 @@ def backfill_names(_: str = Depends(require_admin)):
     return {"ok": True, "candidates": len(candidates), "updated": len(updated), "reconciled": len(reconciled)}
 
 
+@router.post("/dividends/refresh", status_code=202)
+def refresh_all_dividends(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+    background_tasks.add_task(_run_dividends_all)
+    return {"message": "배당 전 종목 수집 시작"}
+
+
+def _run_dividends_all():
+    from services.dividends import fetch_all_dividends
+    with job_runs.record("dividend_fetch", "manual"):
+        fetch_all_dividends()
+
+
+def _usdkrw_rate() -> "float | None":
+    """저장된 USD/KRW 환율(market_cache 'fx')만 읽는다 — 요청 경로 라이브 FX 호출 0.
+
+    FX 배치(get_fx)가 채운 영구 캐시를 읽는다. 없으면 None(US 배당은 KRW 환산서 제외)."""
+    stored = _mc_load("fx")
+    if not stored:
+        return None
+    rate = ((stored.get("data") or {}).get("rates") or {}).get("usdkrw") or {}
+    cur = rate.get("current")
+    try:
+        return float(cur) if cur else None
+    except (TypeError, ValueError):
+        return None
+
+
 @router.get("/dashboard")
 def get_dashboard(user_id: str = Depends(get_current_user)):
     portfolio = storage.get_full_portfolio(user_id)
     holdings = portfolio.get("stocks", [])
     if not holdings:
-        return []
+        return {"holdings": [], "totals": None}
 
     def _build_card(stock: dict, quote: dict) -> dict:
         ticker = stock["ticker"].upper()
@@ -272,13 +302,24 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             )
             target_mean, buy, hold, sell = _c["target_mean"], _c["buy"], _c["hold"], _c["sell"]
 
+        # 배당(income 뷰): 저장값만 읽음(라이브 yfinance/DART 호출 0). 무배당은 None graceful.
+        div = dividends.get_dividend(ticker)
+        annual_div = div.get("annual_dividend_per_share") if div else None
+        div_yield = div.get("dividend_yield") if div else None
+        avg_cost = stock.get("avg_cost")
+        qty = stock.get("quantity")
+        yield_on_cost = (round(annual_div / avg_cost * 100, 2)
+                         if (annual_div is not None and avg_cost) else None)
+        expected_income = (round(annual_div * qty, 2)
+                           if (annual_div is not None and qty) else None)
+
         return {
             "ticker": ticker,
             "name": stock.get("name", ticker),
             "market": stock.get("market", "US"),
             "exchange": stock.get("exchange", ""),
-            "avg_cost": stock.get("avg_cost"),
-            "quantity": stock.get("quantity"),
+            "avg_cost": avg_cost,
+            "quantity": qty,
             "current_price": quote.get("price"),
             "daily_change_pct": quote.get("daily_change_pct"),
             "weekly_change_pct": quote.get("weekly_change_pct"),
@@ -294,12 +335,48 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "sell": sell,
             "snapshot_date": snapshot_date,
             "sector": sector or "기타",
+            "annual_dividend_per_share": annual_div,
+            "dividend_yield": div_yield,
+            "yield_on_cost": yield_on_cost,
+            "expected_annual_income": expected_income,
+        }
+
+    def _portfolio_totals(cards: list) -> "dict | None":
+        """통화 혼재 합산은 KRW로 환산(US$×usdkrw, KR원×1). 평균 수익률=총배당/총평가.
+
+        usdkrw는 저장 FX(_usdkrw_rate)만 사용. US 카드에 환율이 없으면 그 종목은
+        총계에서 제외해 단위 혼동(달러를 원으로 오합산)을 막는다."""
+        usdkrw = _usdkrw_rate()
+
+        def _fx(card) -> "float | None":
+            if (card.get("market") or "US") == "KR":
+                return 1.0
+            return usdkrw
+
+        total_income = 0.0
+        total_value = 0.0
+        for c in cards:
+            fx = _fx(c)
+            if fx is None:
+                continue
+            inc = c.get("expected_annual_income")
+            if inc is not None:
+                total_income += inc * fx
+            price, qty = c.get("current_price"), c.get("quantity")
+            if price is not None and qty:
+                total_value += float(price) * float(qty) * fx
+        avg_yield = round(total_income / total_value * 100, 2) if total_value > 0 else None
+        return {
+            "total_expected_annual_income_krw": round(total_income, 2),
+            "total_market_value_krw": round(total_value, 2),
+            "avg_dividend_yield": avg_yield,
         }
 
     def _build_all():
         quotes = market.get_quotes_batch(holdings)
         with ThreadPoolExecutor(max_workers=min(len(holdings), 10)) as executor:
-            return list(executor.map(
+            cards = list(executor.map(
                 lambda s: _build_card(s, quotes.get(s["ticker"].upper(), {})), holdings))
+        return {"holdings": cards, "totals": _portfolio_totals(cards)}
 
     return cache_svc.get_dashboard(user_id, _build_all)

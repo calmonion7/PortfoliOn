@@ -140,13 +140,16 @@ def test_dashboard_returns_cards_for_holdings():
          patch("routers.stocks.market.get_quotes_batch", return_value={"AAPL": quote}), \
          patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
          patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.dividends.get_dividend", return_value=None), \
          patch("routers.stocks.query", return_value=[]):
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
     data = resp.json()
+    # 신규 shape: {"holdings": [...], "totals": {...}}
+    cards = data["holdings"]
     # watchlist excluded — only holdings
-    assert len(data) == 1
-    card = data[0]
+    assert len(cards) == 1
+    card = cards[0]
     assert card["ticker"] == "AAPL"
     assert card["current_price"] == 185.2
     assert card["daily_change_pct"] == 1.4
@@ -154,6 +157,123 @@ def test_dashboard_returns_cards_for_holdings():
     assert card["monthly_change_pct"] == 5.8
     assert card["rsi"] is None      # no snapshot
     assert card["target_mean"] is None
+    # 무배당(get_dividend None) — graceful None/0
+    assert card["annual_dividend_per_share"] is None
+    assert card["dividend_yield"] is None
+    assert card["yield_on_cost"] is None
+    assert card["expected_annual_income"] is None
+
+
+def test_dashboard_dividend_fields_per_holding():
+    """배당 저장값이 있으면 per-holding 배당필드·yield_on_cost·expected_income을 계산."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    portfolio = {
+        "stocks": [{"ticker": "KO", "name": "Coca-Cola", "market": "US",
+                    "avg_cost": 50.0, "quantity": 10, "exchange": ""}],
+        "watchlist": [],
+    }
+    quote = {"ticker": "KO", "price": 82.0, "daily_change_pct": 0.5,
+             "weekly_change_pct": 1.0, "monthly_change_pct": 2.0, "market": "US"}
+    div = {"annual_dividend_per_share": 2.0, "dividend_yield": 2.44,
+           "currency": "USD", "source": "yfinance"}
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.stocks.market.get_quotes_batch", return_value={"KO": quote}), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.dividends.get_dividend", return_value=div), \
+         patch("routers.stocks.query", return_value=[]):
+        resp = client.get("/api/stocks/dashboard")
+    card = resp.json()["holdings"][0]
+    assert card["annual_dividend_per_share"] == 2.0
+    assert card["dividend_yield"] == 2.44
+    assert card["yield_on_cost"] == 4.0           # 2.0/50.0*100
+    assert card["expected_annual_income"] == 20.0  # 2.0*10
+
+
+def test_dashboard_totals_krw_conversion_mixed_currency():
+    """포트 총계: US$ 배당을 _to_krw(저장 FX)로 환산해 KR원과 합산. 평균 수익률=총배당/총평가."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    portfolio = {
+        "stocks": [
+            {"ticker": "KO", "name": "Coca-Cola", "market": "US",
+             "avg_cost": 50.0, "quantity": 10, "exchange": ""},
+            {"ticker": "005930.KS", "name": "삼성전자", "market": "KR",
+             "avg_cost": 60000.0, "quantity": 100, "exchange": "KS"},
+        ],
+        "watchlist": [],
+    }
+    quotes = {
+        "KO": {"ticker": "KO", "price": 80.0, "market": "US"},
+        "005930.KS": {"ticker": "005930.KS", "price": 70000.0, "market": "KR"},
+    }
+
+    def fake_get_div(t):
+        if t.upper() == "KO":
+            return {"annual_dividend_per_share": 2.0, "dividend_yield": 2.5,
+                    "currency": "USD", "source": "yfinance"}
+        return {"annual_dividend_per_share": 1500.0, "dividend_yield": 2.1,
+                "currency": "KRW", "source": "dart"}
+
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.stocks.market.get_quotes_batch", return_value=quotes), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.dividends.get_dividend", side_effect=fake_get_div), \
+         patch("routers.stocks._usdkrw_rate", return_value=1300.0), \
+         patch("routers.stocks.query", return_value=[]):
+        resp = client.get("/api/stocks/dashboard")
+    totals = resp.json()["totals"]
+    # 연 예상배당: KO 2.0*10=20$ → 26000원, 삼성 1500*100=150000원 → 합 176000원
+    assert totals["total_expected_annual_income_krw"] == 176000.0
+    # 총 평가액: KO 80*10=800$ → 1,040,000원, 삼성 70000*100=7,000,000원 → 합 8,040,000원
+    assert totals["total_market_value_krw"] == 8040000.0
+    # 평균 배당수익률 = 176000/8040000*100 ≈ 2.19%
+    assert totals["avg_dividend_yield"] == round(176000.0 / 8040000.0 * 100, 2)
+
+
+def test_dashboard_reads_stored_fx_no_live_call():
+    """_usdkrw_rate는 market_cache 저장값만 읽는다(요청 경로 라이브 FX 호출 0)."""
+    from routers import stocks as s
+    captured = {}
+
+    def fake_mc_load(key):
+        captured["key"] = key
+        return {"data": {"rates": {"usdkrw": {"current": 1325.5}}}}
+
+    with patch("routers.stocks._mc_load", fake_mc_load):
+        assert s._usdkrw_rate() == 1325.5
+    assert captured["key"] == "fx"
+
+
+def test_dashboard_us_regression_no_dividend_unchanged():
+    """배당 없는 US 보유의 기존 평가/손익 경로 필드는 그대로(회귀 0)."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    portfolio = {
+        "stocks": [{"ticker": "GOOGL", "name": "Alphabet", "market": "US",
+                    "avg_cost": 100.0, "quantity": 5, "exchange": ""}],
+        "watchlist": [],
+    }
+    quote = {"ticker": "GOOGL", "price": 150.0, "daily_change_pct": 1.0,
+             "weekly_change_pct": 2.0, "monthly_change_pct": 3.0, "market": "US"}
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.stocks.market.get_quotes_batch", return_value={"GOOGL": quote}), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.dividends.get_dividend", return_value=None), \
+         patch("routers.stocks.query", return_value=[]):
+        resp = client.get("/api/stocks/dashboard")
+    card = resp.json()["holdings"][0]
+    assert card["ticker"] == "GOOGL"
+    assert card["current_price"] == 150.0
+    assert card["avg_cost"] == 100.0
+    assert card["quantity"] == 5
+    assert card["expected_annual_income"] is None
 
 
 def test_dashboard_uses_mart_asof_for_target_and_opinion():
@@ -175,11 +295,12 @@ def test_dashboard_uses_mart_asof_for_target_and_opinion():
                  "buy": 12, "hold": 2, "sell": 1}]
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.stocks.market.get_quotes_batch", return_value={"AAPL": quote}), \
+         patch("routers.stocks.dividends.get_dividend", return_value=None), \
          patch("routers.stocks.query", return_value=snap_row), \
          patch("services.consensus.query", return_value=mart_row):
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
-    card = resp.json()[0]
+    card = resp.json()["holdings"][0]
     assert card["target_mean"] == 250.0   # snapshot 200 → mart as-of 250
     assert card["buy"] == 12 and card["hold"] == 2 and card["sell"] == 1
 
@@ -189,7 +310,7 @@ def test_dashboard_returns_empty_list_when_no_holdings():
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio):
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
-    assert resp.json() == []
+    assert resp.json() == {"holdings": [], "totals": None}
 
 
 def test_dashboard_card_includes_sector():
@@ -208,11 +329,12 @@ def test_dashboard_card_includes_sector():
     snap_row = [{"date": "2026-05-05", "data": {"sector": "Financial Services", "daily_rsi": {"rsi": 50.0}}}]
     with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.stocks.market.get_quotes_batch", return_value={"AAPL": quote}), \
+         patch("routers.stocks.dividends.get_dividend", return_value=None), \
          patch("routers.stocks.query", return_value=snap_row), \
          patch("services.consensus.query", return_value=[]):
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
-    card = resp.json()[0]
+    card = resp.json()["holdings"][0]
     assert card["sector"] == "Financials"
 
 

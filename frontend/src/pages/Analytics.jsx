@@ -267,7 +267,7 @@ export default function Analytics() {
 
   useEffect(() => {
     api.get('/api/stocks/dashboard')
-      .then(r => { setCards(r.data); setLoading(false) })
+      .then(r => { setCards(r.data?.holdings ?? r.data ?? []); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 

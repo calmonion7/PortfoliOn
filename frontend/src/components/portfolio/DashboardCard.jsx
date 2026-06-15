@@ -41,6 +41,8 @@ export default function DashboardCard({ item, tick }) {
     ? (item.target_mean - item.current_price) / item.current_price * 100
     : null
   const consClass = consPct == null ? '' : consPct >= 0 ? 'up' : 'down'
+  const yoc = item.yield_on_cost
+  const yocClass = yoc == null ? '' : yoc >= 0 ? 'up' : 'down'
 
   return (
     <Card>
@@ -103,6 +105,24 @@ export default function DashboardCard({ item, tick }) {
           <span className="dashcard__stat-label">HVN</span>
           <span className="dashcard__stat-value tnum">
             {item.hvn?.length ? item.hvn.map(p => fmtPrice(p, item.market)).join(' · ') : '—'}
+          </span>
+        </div>
+        <div className="dashcard__stat">
+          <span className="dashcard__stat-label">연배당/주</span>
+          <span className="dashcard__stat-value tnum">
+            {item.annual_dividend_per_share ? fmtPrice(item.annual_dividend_per_share, item.market) : '—'}
+          </span>
+        </div>
+        <div className="dashcard__stat">
+          <span className="dashcard__stat-label">배당수익률</span>
+          <span className="dashcard__stat-value tnum">
+            {item.dividend_yield != null ? `${item.dividend_yield.toFixed(2)}%` : '—'}
+          </span>
+        </div>
+        <div className="dashcard__stat dashcard__stat--full">
+          <span className="dashcard__stat-label">매수가 대비 배당</span>
+          <span className={`dashcard__stat-value tnum ${yocClass}`}>
+            {yoc != null ? `${yoc.toFixed(2)}%` : '—'}
           </span>
         </div>
       </div>
