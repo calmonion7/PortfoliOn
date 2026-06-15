@@ -1217,6 +1217,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     "label": "일일 다이제스트",
     "category": "report",
     "market": "공통",
+    "source": ["보유종목 다이제스트 집계"],
+    "usage": ["다이제스트 탭"],
     "editable": true,
     "timezone": "Asia/Seoul",
     "scheduler_job_id": "daily_digest",
@@ -1232,6 +1234,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `market` | string | 배치 분류: `"KR"`(국내) \| `"US"`(해외) \| `"공통"`. 출처국 기준이라 FRED 경제지표(`monthly_us`)는 해외로 분류(ADR-0013) |
+| `source` | string[] | 배치가 데이터를 fetch하는 출처(예: `["키움", "KIS", "Naver"]`). 소비 UI인 `usage`와 반대 방향(fetch vs. 사용처) |
 | `editable` | boolean | 스케줄 편집 가능 여부 |
 | `timezone` | string | 잡 타임존(편집 불가 고정값). 편집 가능 배치에만 존재 |
 | `schedule` | object \| null | 현재 스케줄 스펙(저장값 없으면 기본 스펙). 편집 불가 배치(`consensus`)는 `null` |

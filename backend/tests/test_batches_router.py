@@ -20,7 +20,7 @@ admin_client = TestClient(admin_app)
 REQUIRED_FIELDS = {
     "id", "label", "category", "schedule_desc", "usage", "editable",
     "trigger_kinds", "manual_endpoint", "scheduler_job_id",
-    "next_run", "recent_runs",
+    "next_run", "recent_runs", "source",
 }
 
 EXPECTED_IDS = {
@@ -45,6 +45,22 @@ def test_lists_sixteen_batches_with_required_fields():
     for b in data:
         assert REQUIRED_FIELDS.issubset(b.keys()), b["id"]
         assert b["market"] in {"KR", "US", "공통"}, b["id"]
+
+
+def test_every_batch_has_nonempty_source():
+    """전 배치가 비어있지 않은 source(list[str])를 가지고, /api/batches로 노출된다.
+
+    source = [[데이터 소스]](fetch 출처) — 신규 배치가 source를 빠뜨리면 RED."""
+    with patch("routers.batches.job_runs.recent", return_value=[]), \
+         patch("routers.batches.storage.get_batch_schedule", return_value=None), \
+         patch.object(__import__("scheduler"), "_scheduler") as mock_sched:
+        mock_sched.get_job.return_value = None
+        resp = client.get("/api/batches")
+    assert resp.status_code == 200
+    for b in resp.json():
+        src = b.get("source")
+        assert isinstance(src, list) and len(src) > 0, b["id"]
+        assert all(isinstance(s, str) and s.strip() for s in src), b["id"]
 
 
 def test_next_run_nullable_and_populated_from_scheduler():

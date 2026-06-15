@@ -121,6 +121,7 @@ function BatchCard({ batch, isAdmin, onSaved }) {
           <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>
             {batch.schedule_desc}
             {batch.usage?.length > 0 && <> · {batch.usage.join(', ')}</>}
+            {batch.source?.length > 0 && <> · 소스: {batch.source.join(', ')}</>}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
             <span>다음 {nextRun || '예정 없음'}</span>
@@ -148,6 +149,7 @@ function BatchCard({ batch, isAdmin, onSaved }) {
                 <div>
                   <div className="desc">주기: {batch.schedule_desc}</div>
                   {batch.usage?.length > 0 && <div className="desc">사용처: {batch.usage.join(', ')}</div>}
+                  {batch.source?.length > 0 && <div className="desc">소스: {batch.source.join(', ')}</div>}
                 </div>
               </div>
               {isAdmin && batch.manual_endpoint && <ManualRunButton batch={batch} />}
