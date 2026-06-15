@@ -60,10 +60,13 @@ def test_jobs_registered_with_correct_cron(monkeypatch):
     monkeypatch.setattr(storage, "get_guru_schedule", lambda: {"enabled": False, "day": "sun", "time": "03:00"})
     monkeypatch.setattr(scheduler, "_check_missed_report", lambda: None)
     monkeypatch.setattr(scheduler, "_seed_rankings_if_empty", lambda: None)
+    seeded = {"kr_sector": False}
+    monkeypatch.setattr(scheduler, "_seed_kr_sector_if_empty", lambda: seeded.__setitem__("kr_sector", True))
     monkeypatch.setattr(scheduler._scheduler, "start", lambda: None)
 
     scheduler.start()
 
+    assert seeded["kr_sector"], "start() must call _seed_kr_sector_if_empty"
     kr = scheduler._scheduler.get_job("kr_rankings_fetch")
     us = scheduler._scheduler.get_job("us_rankings_fetch")
     assert kr is not None

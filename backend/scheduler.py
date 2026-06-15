@@ -288,6 +288,19 @@ def _seed_rankings_if_empty():
     _fetch_us_rankings()
 
 
+def _seed_kr_sector_if_empty():
+    """기동 시 kr_sector_momentum 캐시가 비어 있으면(신규 배포·16:00 cron 전) 즉시 1회 적재.
+    분석탭 섹터 모멘텀 KR 토글이 첫 배치 전까지 빈 표로 남는 것을 방지(_seed_rankings_if_empty와 동일 취지)."""
+    from services import kr_sector_service
+    try:
+        if kr_sector_service.load_momentum():
+            return
+        print("[Scheduler] kr_sector_momentum empty, seeding now...")
+        kr_sector_service.refresh()
+    except Exception as e:
+        print(f"[Scheduler] KR sector seed failed: {e}")
+
+
 _JOB_FUNCS = {
     "daily_report_kr": _generate_kr,
     "daily_report_us": _generate_us,
@@ -451,6 +464,7 @@ def start():
             _reschedule_job(entry["id"])
     _check_missed_report()
     _seed_rankings_if_empty()
+    _seed_kr_sector_if_empty()
     _scheduler.start()
 
 
