@@ -1203,9 +1203,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(19종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(20종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
 
-> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다.
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다.
 
 **Auth:** Bearer token 필요
 
@@ -1482,6 +1482,65 @@ M7 빅테크 최근 실적 요약.
 한국 수출 지표. `KITA_API_KEY`(관세청 API) 미설정 시 UN Comtrade 공개 API 폴백.
 
 **Response `200`** — 월별 수출 데이터 객체
+
+---
+
+### `GET /api/market/macro-signals`
+
+FRED 매크로 신호 4종 시계열 + 핵심 신호 플래그. `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 FRED 호출은 없다(데이터는 `macro_signals_fetch` 일배치/수동 refresh가 채운다). 저장값이 없으면 각 시리즈는 빈 배열, `signals`는 `{}`.
+
+**Response `200`**
+```json
+{
+  "yield_curve": [{ "date": "2026-06-13", "value": 0.32 }],
+  "hy_spread":   [{ "date": "2026-06-13", "value": 3.18 }],
+  "m2":          [{ "date": "2026-05-01", "value": 21800.0 }],
+  "fed_funds":   [{ "date": "2026-06-13", "value": 4.33 }],
+  "signals": {
+    "inverted": false,
+    "credit_stress": false,
+    "yield_curve_latest": 0.32,
+    "hy_spread_latest": 3.18
+  }
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `yield_curve` | object[] | 10Y-2Y 국채 금리차(FRED `T10Y2Y`, 일간 %p). `value<0`이면 수익률곡선 역전 |
+| `hy_spread` | object[] | ICE BofA US HY OAS(FRED `BAMLH0A0HYM2`, 일간 %). 급확대 시 신용 스트레스 |
+| `m2` | object[] | M2 통화량(FRED `M2SL`, 월간 십억달러) |
+| `fed_funds` | object[] | 연방기금 실효금리(FRED `DFF`, 일간 %) |
+| `signals.inverted` | boolean \| null | 최신 금리차 `<0`(침체 경고). 시리즈 없으면 `null` |
+| `signals.credit_stress` | boolean \| null | 최신 HY 스프레드 `≥5.0%`(신용 스트레스 임계). 시리즈 없으면 `null` |
+| `signals.yield_curve_latest` | number \| null | 최신 금리차 값 |
+| `signals.hy_spread_latest` | number \| null | 최신 HY 스프레드 값 |
+
+각 시계열 항목은 `{ "date": "YYYY-MM-DD", "value": number }` 형태.
+
+---
+
+### `POST /api/market/refresh-macro-signals`
+
+FRED 매크로 신호 4종(`T10Y2Y`/`BAMLH0A0HYM2`/`M2SL`/`DFF`) 수동 재수집. 마지막 저장일 이후만 증분 조회해 `market_cache`에 병합 저장하고, 신호 플래그를 재평가한다. 실행이력은 일배치와 동일한 `macro_signals_fetch` id로 기록한다.
+
+**Auth:** admin 권한 필요
+
+**Response `200`**
+```json
+{
+  "ok": true,
+  "yield_curve_points": 760,
+  "signals": {
+    "inverted": false,
+    "credit_stress": false,
+    "yield_curve_latest": 0.32,
+    "hy_spread_latest": 3.18
+  }
+}
+```
+
+> `FRED_API_KEY` 미설정 시 수집은 실패하며 저장값은 변경되지 않는다.
 
 ---
 

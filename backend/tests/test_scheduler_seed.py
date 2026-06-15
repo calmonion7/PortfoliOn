@@ -82,7 +82,7 @@ def test_all_editable_jobs():
     editable = [b["id"] for b in batch_registry.BATCHES if b.get("editable")]
     assert set(editable) == {
         "daily_report_kr", "daily_report_us", "guru_crawl", "daily_digest",
-        "earnings_kr", "earnings_us", "monthly_kr", "monthly_us",
+        "earnings_kr", "earnings_us", "monthly_kr", "monthly_us", "macro_signals_fetch",
         "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
         "kr_sector_fetch", "disclosure_fetch", "dividend_fetch",
@@ -164,7 +164,7 @@ def test_seed_only_fills_missing_rows(monkeypatch):
     # 나머지 editable 잡은 시드됨 (consensus 제외, leverage는 기존값 유지)
     expected_seeded = {
         "daily_report_kr", "daily_report_us", "guru_crawl", "daily_digest",
-        "earnings_kr", "earnings_us", "monthly_kr", "monthly_us",
+        "earnings_kr", "earnings_us", "monthly_kr", "monthly_us", "macro_signals_fetch",
         "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
         "kr_sector_fetch", "disclosure_fetch", "dividend_fetch",

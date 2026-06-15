@@ -12,10 +12,12 @@ from services.market_indicators import (
     get_vix,
     get_commodities,
     get_econ_indicators,
+    get_macro_signals,
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
     _fetch_and_save_kr_exports,
+    _fetch_and_save_macro_signals,
     _mc_delete,
     _cache,
 )
@@ -83,6 +85,27 @@ def commodities():
 def econ_indicators():
     try:
         return get_econ_indicators()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/macro-signals")
+def macro_signals():
+    """FRED 매크로 신호(금리차·HY·M2·기준금리) 저장 시계열+신호. 요청경로 라이브 FRED 0."""
+    try:
+        return get_macro_signals()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-macro-signals")
+def refresh_macro_signals(_: str = Depends(require_admin)):
+    """매크로 신호(FRED 4종) 수동 갱신 — macro_signals_fetch로 기록."""
+    try:
+        with job_runs.record("macro_signals_fetch", "manual"):
+            data = _fetch_and_save_macro_signals()
+        return {"ok": True, "yield_curve_points": len(data.get("yield_curve", [])),
+                "signals": data.get("signals", {})}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -73,6 +73,16 @@ def _refresh_monthly_us():
             print(f"[Scheduler] Econ indicators refresh failed: {e}")
 
 
+def _refresh_macro_signals():
+    from services.market_indicators import _fetch_and_save_macro_signals
+    with job_runs.record("macro_signals_fetch", "auto"):
+        try:
+            _fetch_and_save_macro_signals()
+            print("[Scheduler] Macro signals refreshed")
+        except Exception as e:
+            print(f"[Scheduler] Macro signals refresh failed: {e}")
+
+
 def _refresh_monthly_kr():
     from services.market_indicators import _fetch_and_save_kr_exports
     with job_runs.record("monthly_kr", "auto"):
@@ -330,6 +340,7 @@ _JOB_FUNCS = {
     "earnings_us": _refresh_earnings_us,
     "monthly_kr": _refresh_monthly_kr,
     "monthly_us": _refresh_monthly_us,
+    "macro_signals_fetch": _refresh_macro_signals,
     "leverage_fetch": _fetch_leverage,
     "lending_fetch": _fetch_lending,
     "kr_rankings_fetch": _fetch_kr_rankings,

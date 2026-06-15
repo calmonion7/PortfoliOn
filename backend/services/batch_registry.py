@@ -1,5 +1,5 @@
 # backend/services/batch_registry.py
-"""배치 레지스트리 — 현황 허브가 노출하는 19개 배치의 정적 메타데이터.
+"""배치 레지스트리 — 현황 허브가 노출하는 20개 배치의 정적 메타데이터.
 
 job_id는 스케줄러 잡 id 및 services.job_runs.record 호출 id와 반드시 일치한다.
 consensus는 자체 스케줄러 잡이 없고(daily_report_kr/us에 내장) next_run이 null이다.
@@ -178,6 +178,20 @@ BATCHES = [
         "misfire_grace_time": None,
         "market": "US",
         "default_schedule": {"enabled": True, "type": "monthly", "day_of_month": 1, "time": "02:00"},
+    },
+    {
+        "id": "macro_signals_fetch",
+        "label": "매크로 신호 수집",
+        "category": "market",
+        "schedule_desc": "매일 06:00",
+        "usage": ["Market Hub 매크로 신호"],
+        "editable": True,
+        "trigger_kinds": ["auto", "manual"],
+        "manual_endpoint": "/api/market/refresh-macro-signals",
+        "scheduler_job_id": "macro_signals_fetch",
+        "timezone": "Asia/Seoul",
+        "market": "US",
+        "default_schedule": {"enabled": True, "type": "daily", "time": "06:00"},
     },
     {
         "id": "leverage_fetch",
