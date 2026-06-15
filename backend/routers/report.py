@@ -320,6 +320,18 @@ def _run_backlog_all():
         fetch_all_backlog()
 
 
+@router.post("/report/disclosures/refresh", status_code=202)
+def refresh_all_disclosures(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+    background_tasks.add_task(_run_disclosures_all)
+    return {"message": "공시 피드 전 종목 수집 시작"}
+
+
+def _run_disclosures_all():
+    from services.disclosures import fetch_all_disclosures
+    with job_runs.record("disclosure_fetch", "manual"):
+        fetch_all_disclosures()
+
+
 # /report/{ticker}/backlog 은 catch-all /report/{ticker}/{date_str} 보다 먼저
 # 등록해야 한다. 아니면 "backlog"가 date_str로 매칭돼 snapshots를 date='backlog'로
 # 조회하다 500이 난다 (enrich/batch와 동일 클래스의 라우트 순서 함정).
@@ -327,6 +339,14 @@ def _run_backlog_all():
 def get_backlog(ticker: str):
     from services.backlog import get_backlog as _get_backlog
     return _get_backlog(ticker)
+
+
+# /report/{ticker}/disclosures 도 catch-all /report/{ticker}/{date_str} 보다 먼저
+# 등록해야 한다(backlog와 동일 라우트 순서 함정).
+@router.get("/report/{ticker}/disclosures")
+def get_disclosures(ticker: str):
+    from services.disclosures import get_disclosures as _get_disclosures
+    return _get_disclosures(ticker)
 
 
 @router.get("/report/{ticker}/{date_str}")

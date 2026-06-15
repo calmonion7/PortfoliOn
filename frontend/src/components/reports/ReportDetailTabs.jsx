@@ -7,6 +7,7 @@ import HistoryTab from './HistoryTab'
 import { ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from './Sections'
 import InvestorTrendSection from './InvestorTrendSection'
 import ShortSellSection from './ShortSellSection'
+import LatestDisclosuresSection from './LatestDisclosuresSection'
 
 const noop = () => {}
 
@@ -140,6 +141,7 @@ export default function ReportDetailTabs({
                 disclosures={summary.recent_disclosures}
                 news={summary.news}
               />
+              <LatestDisclosuresSection ticker={ticker} market={market} />
             </div>
           )
           : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>심층분석 데이터가 없습니다.</p>

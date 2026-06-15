@@ -1048,6 +1048,39 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
+### `GET /api/report/{ticker}/disclosures`
+
+종목의 DART 공시 피드 조회 (최신순). KR 종목 리포트 상세의 '최신 공시' 섹션이 사용. `disclosure_fetch` 배치가 채우는 `stock_disclosures` 테이블에서 읽으며, **Cowork가 enrich하는 `recent_disclosures`(애널리스트 코멘터리)와는 별도 store**다. **Auth 불필요.**
+
+**Response `200`**
+```json
+[
+  { "rcept_no": "20260612000123", "rcept_dt": "2026-06-12", "report_nm": "주요사항보고서(유상증자결정)",
+    "pblntf_ty": "B", "corp_name": "삼성전자", "dart_url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260612000123" }
+]
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `rcept_no` | string | DART 접수번호 (dedup 키) |
+| `rcept_dt` | string\|null | 접수일자 (`YYYY-MM-DD`) |
+| `report_nm` | string | 공시 제목 |
+| `pblntf_ty` | string | 공시 유형: `A`(정기) \| `B`(주요사항) \| `C`(발행) \| `D`(지분) — 핵심 유형만 수집 |
+| `corp_name` | string | 회사명 |
+| `dart_url` | string | DART 원문 뷰어 URL |
+
+> 비-KR 종목·corp_code 미매핑 종목은 빈 배열을 반환한다.
+
+---
+
+### `POST /api/report/disclosures/refresh`
+
+전 KR 종목(보유+관심) DART 공시 피드 재수집(`disclosure_fetch` 배치 수동 트리거). 백그라운드 실행, 즉시 202. **Auth:** admin.
+
+**Response `202`** — `{ "message": "공시 피드 전 종목 수집 시작" }`
+
+---
+
 ## Consensus (컨센서스)
 
 ### `GET /api/consensus/batch/progress`
@@ -1126,9 +1159,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(17종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(18종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
 
-> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다.
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다.
 
 **Auth:** Bearer token 필요
 
@@ -1299,10 +1332,21 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 ```json
 {
   "date": "2026-05-23",
-  "generated_at": "2026-05-23T08:00:00",
-  "content": "## 오늘의 포트폴리오 요약\n..."
+  "generated_at": "2026-05-23T08:00:00+09:00",
+  "portfolio_summary": { "total_value_krw": 12345678, "daily_change_pct": 1.2, "daily_change_krw": 145000 },
+  "stocks": [ { "ticker": "AAPL", "change_pct": -0.8 } ],
+  "events_7d": [ { "ticker": "005930", "event_type": "earnings", "date": "2026-05-28", "days_until": 5 } ],
+  "anomalies": [ { "ticker": "TSLA", "change_pct": 7.3 } ],
+  "disclosures": [
+    { "ticker": "005930", "rcept_dt": "20260522", "report_nm": "주요사항보고서(유상증자결정)",
+      "pblntf_ty": "B", "corp_name": "삼성전자", "dart_url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=..." }
+  ]
 }
 ```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `disclosures[]` | array | 보유 KR 종목의 최근 DART 공시 피드(`stock_disclosures`에서 읽음). Cowork 코멘터리 `recent_disclosures`와 무관 |
 
 **Error `404`** — 아직 생성된 다이제스트 없음
 
@@ -1310,18 +1354,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `POST /api/digest/generate`
 
-다이제스트 즉시 생성 (동기).
+다이제스트 즉시 생성 (동기). 응답 형태는 `GET /api/digest/latest`와 동일(`disclosures` 포함).
 
 **Auth:** Bearer token 필요
-
-**Response `200`**
-```json
-{
-  "date": "2026-05-23",
-  "generated_at": "2026-05-23T12:00:00",
-  "content": "## 오늘의 포트폴리오 요약\n..."
-}
-```
 
 ---
 

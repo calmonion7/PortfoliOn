@@ -72,6 +72,16 @@ def _migrate():
         execute("CREATE INDEX IF NOT EXISTS idx_short_sell_read ON market_short_sell(ticker, base_date DESC)")
     except Exception as e:
         print(f"[migrate] market_short_sell 생성 실패: {e}")
+    try:
+        from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS stock_disclosures (
+            rcept_no TEXT PRIMARY KEY,
+            ticker TEXT NOT NULL, rcept_dt DATE, report_nm TEXT,
+            pblntf_ty TEXT, corp_name TEXT,
+            fetched_at TIMESTAMPTZ DEFAULT NOW())""")
+        execute("CREATE INDEX IF NOT EXISTS idx_disclosures_read ON stock_disclosures(ticker, rcept_dt DESC)")
+    except Exception as e:
+        print(f"[migrate] stock_disclosures 생성 실패: {e}")
 
 
 @asynccontextmanager

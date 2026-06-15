@@ -17,6 +17,7 @@ from routers.calendar import _get_events
 DIGEST_DIR = Path(__file__).parent.parent / "data" / "digest"
 DIGEST_DIR.mkdir(exist_ok=True)
 ANOMALY_THRESHOLD = 5.0
+DISCLOSURE_WINDOW_DAYS = 7  # 다이제스트에 포함할 최근 공시 윈도우
 
 
 def generate(user_id: str, today: date = None) -> dict:
@@ -109,6 +110,8 @@ def generate(user_id: str, today: date = None) -> dict:
         key=lambda x: x["date"],
     )
 
+    disclosures = _recent_disclosures(holdings, today)
+
     kst = timezone(timedelta(hours=9))
     digest = {
         "date": today.isoformat(),
@@ -121,6 +124,7 @@ def generate(user_id: str, today: date = None) -> dict:
         "stocks": stocks_list,
         "events_7d": events_7d,
         "anomalies": anomalies,
+        "disclosures": disclosures,
     }
 
     try:
@@ -133,6 +137,41 @@ def generate(user_id: str, today: date = None) -> dict:
         path = DIGEST_DIR / f"{user_id}-{today.isoformat()}.json"
         path.write_text(json.dumps(digest, ensure_ascii=False, indent=2), encoding="utf-8")
     return digest
+
+
+def _recent_disclosures(holdings: list[dict], today: date) -> list[dict]:
+    """보유 종목의 최근 DART 공시(공시 피드 store, 최근 DISCLOSURE_WINDOW_DAYS일).
+
+    services.disclosures.get_disclosures(=stock_disclosures 테이블)에서만 읽는다 —
+    tickers.recent_disclosures(Cowork 코멘터리)는 건드리지 않는다([[공시 피드]] 경계)."""
+    from services import disclosures as disc_svc
+    cutoff = today - timedelta(days=DISCLOSURE_WINDOW_DAYS)
+    out: list[dict] = []
+    for h in holdings:
+        ticker = h["ticker"].upper()
+        try:
+            rows = disc_svc.get_disclosures(ticker, limit=20)
+        except Exception:
+            continue
+        for r in rows:
+            dt = r.get("rcept_dt")
+            try:
+                d = date(int(dt[0:4]), int(dt[4:6]), int(dt[6:8])) if dt and "-" not in dt \
+                    else (date.fromisoformat(dt) if dt else None)
+            except (ValueError, TypeError):
+                d = None
+            if d is None or d < cutoff or d > today:
+                continue
+            out.append({
+                "ticker": ticker,
+                "rcept_dt": r.get("rcept_dt"),
+                "report_nm": r.get("report_nm"),
+                "pblntf_ty": r.get("pblntf_ty"),
+                "corp_name": r.get("corp_name"),
+                "dart_url": r.get("dart_url"),
+            })
+    out.sort(key=lambda x: (x.get("rcept_dt") or ""), reverse=True)
+    return out
 
 
 def get_latest(user_id: str) -> dict | None:
@@ -177,6 +216,12 @@ def send_telegram(digest: dict) -> None:
         for ev in digest["events_7d"][:5]:
             label = "실적" if ev["event_type"] == "earnings" else "배당"
             lines.append(f"  D-{ev['days_until']}  {ev['ticker']}  {label}")
+
+    disclosures = digest.get("disclosures") or []
+    if disclosures:
+        lines.append("\n📑 최신 공시")
+        for d in disclosures[:5]:
+            lines.append(f"  {d['ticker']}  {d['report_nm']}")
 
     lines.append("\n종목별 등락")
     for s in digest["stocks"]:

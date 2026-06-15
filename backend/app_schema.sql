@@ -250,6 +250,19 @@ CREATE TABLE IF NOT EXISTS market_short_sell (
 );
 CREATE INDEX IF NOT EXISTS idx_short_sell_read ON market_short_sell(ticker, base_date DESC);
 
+-- 공시 피드 (보유·관심 KR 종목의 DART 원시 공시 목록, rcept_no 기준 dedup — KR 전용)
+-- tickers.recent_disclosures(Cowork 애널리스트 코멘터리)와는 별도 store(.forge/CONTEXT '공시 피드').
+CREATE TABLE IF NOT EXISTS stock_disclosures (
+    rcept_no   TEXT PRIMARY KEY,             -- DART 접수번호(dedup 키)
+    ticker     TEXT NOT NULL,
+    rcept_dt   DATE,                          -- 접수일
+    report_nm  TEXT,                          -- 보고서명
+    pblntf_ty  TEXT,                          -- 공시 유형(A정기·B주요사항·C발행·D지분)
+    corp_name  TEXT,
+    fetched_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_disclosures_read ON stock_disclosures(ticker, rcept_dt DESC);
+
 -- 배치 실행로그 (job_id별 최근 20건만 보관)
 -- 배포 주의: 이 파일은 빈 pgdata 최초 init 때만 자동 적용된다(docker-compose의 initdb 마운트).
 --   기존 운영 DB는 pgdata가 이미 채워져 있으므로 git push 자동배포로는 아래 두 문장이 적용되지 않는다.

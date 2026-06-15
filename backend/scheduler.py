@@ -151,6 +151,16 @@ def _fetch_backlog():
             print(f"[Scheduler] Backlog fetch failed: {e}")
 
 
+def _fetch_disclosures():
+    from services.disclosures import fetch_all_disclosures
+    with job_runs.record("disclosure_fetch", "auto"):
+        try:
+            r = fetch_all_disclosures()
+            print(f"[Scheduler] Disclosures fetched: {r}")
+        except Exception as e:
+            print(f"[Scheduler] Disclosure fetch failed: {e}")
+
+
 def _fetch_kr_rankings():
     from services import ranking_service
     with job_runs.record("kr_rankings_fetch", "auto"):
@@ -318,6 +328,7 @@ _JOB_FUNCS = {
     "short_sell_fetch": _fetch_short_sell,
     "backlog_fetch": _fetch_backlog,
     "kr_sector_fetch": _fetch_kr_sector,
+    "disclosure_fetch": _fetch_disclosures,
 }
 
 
