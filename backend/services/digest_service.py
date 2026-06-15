@@ -110,7 +110,7 @@ def generate(user_id: str, today: date = None) -> dict:
         key=lambda x: x["date"],
     )
 
-    disclosures = _recent_disclosures(holdings, today)
+    disclosures = _recent_disclosure_feed(holdings, today)
 
     kst = timezone(timedelta(hours=9))
     digest = {
@@ -139,7 +139,7 @@ def generate(user_id: str, today: date = None) -> dict:
     return digest
 
 
-def _recent_disclosures(holdings: list[dict], today: date) -> list[dict]:
+def _recent_disclosure_feed(holdings: list[dict], today: date) -> list[dict]:
     """보유 종목의 최근 DART 공시(공시 피드 store, 최근 DISCLOSURE_WINDOW_DAYS일).
 
     services.disclosures.get_disclosures(=stock_disclosures 테이블)에서만 읽는다 —
