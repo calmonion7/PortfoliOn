@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: fd8dd650ede08d103b907ac4d87955f669ce3298
-mapped: 2026-06-15
+last_mapped_commit: 504b6e098488b3d8bdd2c2ebdf69a9c9151df32f
+mapped: 2026-06-16
 ---
 
 # PortfoliOn Directory Structure
@@ -8,24 +8,24 @@ mapped: 2026-06-15
 ## Backend (`backend/`)
 
 ### Root Entry Points
-- `main.py` (122 lines): FastAPI app initialization, lifespan hook, middleware setup, router mounting
-- `scheduler.py` (478 lines): APScheduler lifecycle, 17 batch job functions, startup idempotent migrations
+- `main.py` (143 lines): FastAPI app initialization, lifespan hook (_migrate creates `batch_schedules`, `market_short_sell`, `stock_disclosures`, `stock_dividends` tables), middleware setup, router mounting
+- `scheduler.py` (478 lines): APScheduler lifecycle, 20 batch job functions (_fetch_disclosures, _fetch_dividends, _refresh_macro_signals added), startup idempotent migrations
 
-### Routers (`backend/routers/`) — 17 HTTP endpoints
+### Routers (`backend/routers/`) — 18 HTTP endpoints
 Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 
 | File | Endpoint | Purpose |
 |------|----------|---------|
 | `portfolio.py` | `/api/portfolio` | Get/save user holdings, portfolio analytics, dashboard |
 | `watchlist.py` | `/api/watchlist` | Manage watched stocks, watch/unwatch operations |
-| `stocks.py` | `/api/stocks` | Ticker master (search, add, edit analyst notes) |
-| `report.py` | `/api/report` | Generate, list, detail reports; backfill snapshots |
+| `stocks.py` | `/api/stocks` | Ticker master (search, add, edit analyst notes); dividends refresh endpoint |
+| `report.py` | `/api/report` | Generate, list, detail reports; backfill snapshots; disclosures endpoint |
 | `guru.py` | `/api/guru` | Fund manager profiles, holdings, performance stats |
 | `calendar.py` | `/api/calendar` | Market event calendar (earnings, splits, etc.) |
 | `digest.py` | `/api/digest` | Daily market digest generation & distribution |
 | `analytics.py` | `/api/analytics` | Portfolio performance, sector allocation charts |
 | `analysis.py` | `/api/analysis` | Sector momentum, macro analysis tabs |
-| `market_indicators.py` | `/api/market` | KR/US econ indicators, earnings, FX, commodities |
+| `market_indicators.py` | `/api/market` | KR/US econ indicators, earnings, FX, commodities; macro-signals endpoints |
 | `auth.py` | `/api/auth` | OAuth2 (Google/Naver), JWT tokens, session |
 | `admin.py` | `/api/admin` | Batch schedule edits, permission management |
 | `events.py` | `/api/events` | User activity tracking (clicks, views) |
@@ -34,9 +34,17 @@ Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 | `short_sell.py` | `/api/short-sell` | Short-selling trend data for KR stocks |
 | `batches.py` | `/api/batches` | Batch status hub (execution logs, schedules) |
 
-### Services (`backend/services/`) — 30 core modules + 3 subpackages
+#### New Endpoints (v3)
+- `GET /api/report/{ticker}/disclosures` → `services.disclosures.get_disclosures()` — KR stock latest DART notices
+- `POST /api/report/disclosures/refresh` → `services.disclosures.fetch_all_disclosures()` — manual refresh
+- `GET /api/stocks/dashboard` response reshaped → includes `holdings[].annual_dividend_per_share`, `dividend_yield`, `yield_on_cost`
+- `POST /api/stocks/dividends/refresh` → `services.dividends.fetch_all_dividends()` — manual refresh
+- `GET /api/market/macro-signals` → `services.market_indicators.macro.get_macro_signals()` — FRED time-series + signals
+- `POST /api/market/refresh-macro-signals` → `services.market_indicators.macro._fetch_and_save_macro_signals()` — manual refresh
 
-#### Core Service Layer (30 modules)
+### Services (`backend/services/`) — 32 core modules + 4 subpackages
+
+#### Core Service Layer (32 modules)
 | File | Purpose |
 |------|---------|
 | `storage.py` | User portfolio operations (get_stocks, save_stocks, get_holdings, etc.) |
@@ -45,7 +53,7 @@ Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 | `report_generator.py` | Snapshot generation, parallel API calls, TSV export |
 | `consensus_pipeline.py` | Analyst opinion normalization (5-point scale), FnGuide/Naver scraping |
 | `consensus.py` | Consensus data models & queries |
-| `batch_registry.py` | 17 batch metadata (static) |
+| `batch_registry.py` | **20 batch** metadata (static, includes disclosure_fetch, dividend_fetch, macro_signals_fetch) |
 | `schedule_spec.py` | Cron trigger builder (weekly, monthly, interval) |
 | `job_runs.py` | Execution logging (running/success/failed, 20-row keep) |
 | `indicators.py` | RSI, timeframe analysis, volume profile |
@@ -61,7 +69,9 @@ Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 | `kr_sector_service.py` | Sector momentum calculation & caching |
 | `leverage_service.py` | Margin call ratio, reverse repo ratio (KR) |
 | `lending_service.py` | Securities lending balance (monthly) |
-| `backlog.py` | Order backlog (수주잔고) for KR stocks |
+| `backlog.py` | Order backlog (수주잔고) for KR stocks; **_get_corp_code_map()** cached here, reused by disclosures/dividends |
+| `disclosures.py` | **NEW:** KR DART public notice feed (list.json, core types A/B/C/D) → `stock_disclosures` table |
+| `dividends.py` | **NEW:** Dividend tracking (KR: DART alotMatter, US: yfinance) → `stock_dividends` table |
 | `cache.py` | Report snapshot caching (in-memory + DB) |
 | `charts.py` | Chart data generation (unused in current build) |
 | `analysis_service.py` | Sector/macro analysis helpers |
@@ -88,7 +98,7 @@ Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 | `client.py` | KIS REST API connection, auth, request signing |
 | `quote.py` | KR stock quote (competitive with Kiwoom) |
 
-#### Subpackage: `services/market_indicators/` — External Economic Data
+#### Subpackage: `services/market_indicators/` — External Economic Data (8 modules)
 | File | Purpose |
 |------|---------|
 | `__init__.py` | Re-exports fetch/save/load functions |
@@ -98,25 +108,49 @@ Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 | `earnings.py` | M7 earnings (yfinance), KR Top2 (Naver) |
 | `exports.py` | KR monthly exports (KOSTAT) |
 | `fx.py` | KRW/USD, KRW/JPY rates |
+| `macro.py` | **NEW:** FRED 4-series (T10Y2Y, BAMLH0A0HYM2, M2SL, DFF) → signals (inverted, credit_stress) |
 
 ### Other Backend Files
 - `middleware/event_tracker.py`: HTTP request event logging (analytics)
 - `auth.py`: Auth dependencies (get_current_user, require_admin, API key validation)
 - `tests/`: test_scheduler_*.py, test_*.py (pytest)
 
+### Database Schema (PostgreSQL)
+
+#### New Tables (v3)
+- **`stock_disclosures`** (KR-only, DART):
+  - PK: `rcept_no` (공시번호)
+  - Columns: `ticker, rcept_dt, report_nm, pblntf_ty (A|B|C|D), corp_name, fetched_at`
+  - Index: `idx_disclosures_read(ticker, rcept_dt DESC)`
+  - Upserted by `disclosure_fetch` batch daily 07:30 KST
+
+- **`stock_dividends`** (both KR & US):
+  - PK: `ticker`
+  - Columns: `annual_dividend_per_share (NUMERIC), dividend_yield (NUMERIC), currency (TEXT: KRW|USD), source (TEXT: dart|yfinance), fetched_at`
+  - Upserted by `dividend_fetch` batch weekly 05:00 KST
+
+#### Existing Key Tables
+- `user_stocks` (user_id, ticker, type[holding|watchlist], quantity, avg_cost)
+- `tickers` (ticker[PK], name, market[KR|US], exchange, competitors, moat, growth_plan, risks, recent_disclosures, insights, is_etf)
+- `snapshots` (ticker, user_id, date[PK], created_at, views)
+- `consensus` (ticker[PK], buy, hold, sell, target_mean, consensus_data)
+- `batch_schedules` (job_id[PK], data[JSONB])
+- `market_short_sell` (ticker, base_date[PK], short_volume, short_value, short_ratio, short_balance, close_price, created_at)
+- `market_leverage_indicators`, `market_lending_balance`, `market_indicators_kr_exports`, `market_rankings`, `market_investor_trend`, etc.
+
 ## Frontend (`frontend/src/`)
 
 ### App Entry
 - `App.jsx` (169 lines): Route setup, auth flow (OAuth callback parsing), theme context, top nav with menu permissions
 
-### Pages (`frontend/src/pages/`) — 22 JSX files
+### Pages (`frontend/src/pages/`) — 23 JSX files
 
-#### Main Navigation (5 tabs)
+#### Main Navigation (6 tabs)
 | File | Route | Purpose |
 |------|-------|---------|
 | `Portfolio.jsx` | `/` | Holdings table, SectorTab/MacroTab analytics, portfolio value chart |
 | `Research.jsx` | `/research` | Stock research hub (search, add, list user stocks, snapshot view) |
-| `MarketHub.jsx` | `/market` | Market indicators hub (passthrough to MarketHub layout) |
+| `Market.jsx` | `/market` | **NEW (v3):** Market Hub passthrough; includes MacroSignalsSection |
 | `Guru.jsx` | `/guru` | Fund manager profiles, holdings, performance |
 | `Settings.jsx` | `/settings` | Batch schedule editor, consensus settings, API key mgmt, user preferences |
 
@@ -129,7 +163,7 @@ Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 | File | Purpose |
 |------|---------|
 | `ReportManualGen.jsx` | Manual report generation UI (backfill wizard) |
-| `Reports.jsx` | Report list, snapshot browser, detail panels |
+| `Reports.jsx` | Report list, snapshot browser, detail panels with LatestDisclosuresSection |
 | `Ranking.jsx` | Market rankings (KR/US), live intraday updates |
 | `Analytics.jsx` | Performance analytics, holdings history chart |
 | `SectorTab.jsx` | Sector allocation pie, momentum grid (KR/US toggle) |
@@ -143,124 +177,139 @@ Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 | `LeverageBackfillSettings.jsx` | Historical leverage data backfill |
 | `LoginPage.jsx` | OAuth/form login UI |
 | `Showcase.jsx` | Dev component showcase page |
-| `Market.jsx` | Placeholder redirect to MarketHub |
 
-### Components (`frontend/src/components/`) — 38 JSX files
+### Components (`frontend/src/components/`) — 41 JSX files
 
 #### Core Components
-| File | Purpose |
-|------|---------|
-| `MobileNav.jsx` | Mobile bottom tab bar |
-| `InstallPrompt.jsx` | PWA install prompt |
-| `PermissionManager.jsx` | Admin UI for user permission matrix |
-| `PermissionPanel.jsx` | Permission group selector |
-| `StockModal.jsx` | Add/edit stock modal (ticker, competitors, analyst notes) |
-| `BatchScheduleEditor.jsx` | Batch cron editor (days, times, interval config) |
-| `PromoteModal.jsx` | Promote watchlist → holding modal |
-| `Toast.jsx` | Notification toast (success, error, info) |
-| `LoadingSpinner.jsx` | Loading indicator |
+- `ui/Card.jsx`, `Badge.jsx`, `Chart.jsx` — reusable UI primitives
+- `ui/TextInput.jsx`, `Select.jsx`, `Checkbox.jsx`, `Button.jsx`
 
-#### Subcomponent: `components/portfolio/` (8 JSX)
-- Holdings table, position details, cost basis, P&L, sector allocation, dashboard cards
+#### Portfolio Components (`components/portfolio/`)
+- `DashboardCard.jsx` | **UPDATED (v3):** Added dividend stats (annual_dividend_per_share, dividend_yield, yield_on_cost)
+- `DividendSummary.jsx` | **NEW (v3):** Summary widget showing portfolio dividend income (annual_dividend * quantity)
+- `PortfolioChart.jsx`, `SectorChart.jsx`, `PerformanceChart.jsx`
+- `FlashValue.jsx` — highlights price updates
 
-#### Subcomponent: `components/market/` (11 JSX)
-- Econ indicators sections (FX, commodities, FRED), earnings tables, lending/leverage charts
-- `marketUtils.jsx`: Shared formatters for market data
+#### Report Components (`components/reports/`)
+- `ReportDetail.jsx`, `ReportList.jsx` | Snapshot rendering
+- `ConsensusChart.jsx` | Buy/hold/sell opinion chart
+- `RecentDisclosuresSection.jsx` | Cowork-generated commentary
+- `LatestDisclosuresSection.jsx` | **NEW (v3):** Raw DART notices (rcept_dt, report_nm, pblntf_ty badge, dart_url link)
+- `AnalystSection.jsx` | Analyst consensus details
 
-#### Subcomponent: `components/reports/` (10 JSX)
-- Report detail tabs (HistoryTab, FinancialsChart, ConsensusChart, DetailTab)
-- Investor trend chart, short-sell section, backlog chart
-- `reportUtils.jsx`: Snapshot formatting, consensus scoring
+#### Market Components (`components/market/`)
+- `MacroSignalsSection.jsx` | **NEW (v3):** FRED 4-series charts (yield curve, HY spread, M2, DFF) + signal alerts (inverted, credit_stress)
+- `EconomicIndicators.jsx` | Econ data table
+- `FXChart.jsx`, `CommoditiesChart.jsx`
+- `MarketUtils.jsx` | Shared market UI utilities
 
-#### Subcomponent: `components/ui/` (8 JSX + CSS)
-- `Badge.jsx`, `Button.jsx`, `Card.jsx`, `Stat.jsx` (reusable UI primitives)
-- `icons.jsx` (Lucide/SVG icon exports)
-- CSS modules for each component
+#### Analysis Components (`components/analysis/`)
+- `SectorMomentum.jsx`, `AnalysisTab.jsx` | Sector/market analysis views
 
-### Hooks & Context (`frontend/src/hooks/`, `frontend/src/contexts/`)
-- `useTheme.jsx`: Dark/light mode persistence
-- `AuthContext.jsx`: Auth state, user permissions, role (admin/user)
-- `useToast.jsx`: Toast notification trigger
+#### Shared Components
+- `Header.jsx`, `Navigation.jsx`, `Footer.jsx` | Layout
+- `LoadingSpinner.jsx`, `ErrorBoundary.jsx` | Status
 
-### Utilities (`frontend/src/utils/`)
-- `analytics.jsx`: trackEvent() → backend event logging
-- `api.jsx`: Fetch helpers, base URL, auth headers
-- `formatters.jsx`: Number/date formatting, currency
-
-### Static Assets
-- `public/favicon.svg`, `public/index.html`
+### Pages Subdirectory Structure
+```
+frontend/src/
+├── pages/
+│   ├── Portfolio.jsx          # Holdings + analytics
+│   ├── Research.jsx           # Stock search & snapshot view
+│   ├── Reports.jsx            # Report list + detail (includes LatestDisclosuresSection)
+│   ├── Market.jsx             # Market Hub (NEW v3, includes MacroSignalsSection)
+│   ├── Ranking.jsx            # Live rankings
+│   ├── Analytics.jsx          # Performance charts
+│   ├── Digest.jsx             # Daily summary
+│   ├── Calendar.jsx           # Event calendar
+│   ├── SectorTab.jsx          # Sector analysis
+│   ├── MacroTab.jsx           # Macro indicators (legacy; MacroSignalsSection is in Market.jsx)
+│   ├── Guru*.jsx              # Fund manager UIs
+│   ├── Settings.jsx           # Configuration
+│   ├── AdminAnalytics.jsx     # Admin dashboards
+│   └── ...
+├── components/
+│   ├── portfolio/
+│   │   ├── DashboardCard.jsx  # UPDATED: dividend fields
+│   │   ├── DividendSummary.jsx # NEW v3
+│   │   └── ...
+│   ├── reports/
+│   │   ├── LatestDisclosuresSection.jsx # NEW v3: DART list
+│   │   ├── RecentDisclosuresSection.jsx # Cowork commentary
+│   │   └── ...
+│   ├── market/
+│   │   ├── MacroSignalsSection.jsx # NEW v3: FRED signals
+│   │   └── ...
+│   └── ...
+└── App.jsx
+```
 
 ### Styling
-- `App.css`: Top nav, page layout, theme variables
-- Component-scoped CSS (CSS Modules or inline)
+- `frontend/src/index.css` — CSS variables (--accent, --bg-elev, --text, etc.)
+- `frontend/src/pages/*.jsx` — component-scoped CSS imports
+- `frontend/src/components/**/*.css` — utility CSS (flex, grid, responsive)
 
-### Build Config
-- `vite.config.js`: Vite + React plugin
-- `package.json`: Dependencies (react, react-router-dom, lucide-react, axios)
+## Key Files & Naming Conventions
 
-## Database Schema (PostgreSQL)
+### Backend Naming
+- **Services:** snake_case (`disclosures.py`, `dividends.py`, `market_indicators/macro.py`)
+- **Functions:** snake_case, verb-first (`fetch_disclosures()`, `upsert_dividend()`, `get_macro_signals()`)
+- **Classes:** PascalCase (none in new modules)
+- **Constants:** UPPER_CASE (`_DART_BASE`, `_CORE_TYPES`, `HY_STRESS_THRESHOLD`)
+- **Routers:** prefix-driven (`GET /api/report/{ticker}/disclosures`, `POST /api/stocks/dividends/refresh`)
 
-### User & Auth
-- `users`: user_id (PK), email, role, created_at
-- `user_stocks`: user_id + ticker (PK), type, quantity, avg_cost, added_at
-- `oauth_sessions`: (session_id, provider, user_id, expires_at)
+### Frontend Naming
+- **Pages:** PascalCase (`Portfolio.jsx`, `Reports.jsx`, `Market.jsx`)
+- **Components:** PascalCase (`DashboardCard.jsx`, `LatestDisclosuresSection.jsx`, `MacroSignalsSection.jsx`)
+- **Props:** camelCase (`ticker`, `market`, `onToggle`, `annual_dividend_per_share`)
+- **CSS classes:** kebab-case (`.dashcard__header`, `.disclosures-list`, `.macro-signals-chart`)
+- **State:** camelCase (`open`, `data`, `loading`, `error`)
 
-### Portfolio & Market Data
-- `tickers`: ticker (PK), name, market, exchange, competitors, moat, growth_plan, risks, recent_disclosures, insights, is_etf
-- `snapshots`: ticker + date (PK), data (JSONB), created_at
-- `portfolio_snapshots`: user_id + date (PK), total_value, daily_change, sector_allocation
-- `holdings_history`: user_id + ticker + date (PK), quantity, cost_value, market_value
+### Database Naming
+- **Tables:** snake_case, plural where appropriate (`stock_disclosures`, `stock_dividends`, `market_short_sell`)
+- **Columns:** snake_case (`annual_dividend_per_share`, `dividend_yield`, `rcept_no`, `pblntf_ty`)
+- **Indexes:** `idx_{table}_{purpose}` (e.g., `idx_disclosures_read`)
 
-### Market Cache Tables
-- `consensus`: ticker + report_date (PK), analyst_count, avg_score, target_mean, buy/hold/sell counts
-- `market_rankings`: market + ticker (PK), rank, price, change, volume, date
-- `market_indicators_*`: (econ_indicators, kr_exports, m7_earnings, kr_top2_earnings, fx_rates, commodities, vix)
-- `leverage`: ticker + date (PK), credit_ratio, reverse_repo_ratio
-- `lending_balance`: ticker + date (PK), balance_qty, balance_value
-- `investor_trend`: ticker + date (PK), foreign, institutional, retail (qty, ratio)
-- `market_short_sell`: ticker + date (PK), short_volume, short_ratio, short_balance
+## Port Assignments
+- Backend FastAPI: `:8000`
+- Frontend Vite: `:3000` (dev) or `:5173` (fallback)
+- PostgreSQL: `:5432` (Docker Compose internal)
+- Redis (if used): `:6379`
 
-### Batch & Admin
-- `batch_schedules`: job_id (PK), data (JSONB spec: enabled, type, days, time, etc.)
-- `job_runs`: id (PK), job_id, trigger, status, started_at, finished_at, error (20-row rotate)
-- `user_events`: id (PK), user_id, event_type, payload, timestamp
+## Environment Variables
 
-### Report Data
-- `guru_managers`: id (PK), name, company, portfolio (JSONB), last_updated
-- `backlog_items`: ticker + date (PK), value, count
+### Backend (`.env`)
+- `DATABASE_URL` — PostgreSQL connection string
+- `FRONTEND_URL` — CORS origin
+- `SESSION_SECRET` — SessionMiddleware secret
+- `DART_API_KEY` — DART public API key (used by disclosures + dividends batches)
+- `FRED_API_KEY` — FRED API key (used by macro_signals_fetch batch)
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — Digest distribution
+- `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` — Naver OAuth & Stock API
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — Google OAuth
+- `KIWOOM_API_KEY` — Kiwoom Securities API credentials
+- `COWORK_API_KEY` — Cowork (external SaaS for AI generation, frontend-only)
 
-## Code Naming Conventions
+### Frontend (`.env`)
+- `VITE_API_URL` — Backend API root (e.g., `http://localhost:8000`)
+- `VITE_GOOGLE_CLIENT_ID`, `VITE_NAVER_CLIENT_ID` — OAuth client IDs
 
-### Backend
-- Functions: snake_case (e.g., `get_all_stocks`, `_generate_kr`, `fetch_trend`)
-- Services: `*_service.py`, `*_client.py`, `*_scraper.py`
-- Endpoints: RESTful `/api/{domain}/{resource}/{action}` (e.g., `/api/portfolio/stocks`, `/api/report/refresh-all`)
-- Internal functions: `_private_function()`
+## Build & Deployment
 
-### Frontend
-- Components: PascalCase (e.g., `Portfolio.jsx`, `SectorTab.jsx`)
-- Hooks: camelCase with `use` prefix (e.g., `useTheme.jsx`, `useAuth.jsx`)
-- Utilities: camelCase (e.g., `formatNumber()`, `trackEvent()`)
-- Pages: PascalCase matching route (e.g., `Portfolio` → `/`, `Settings` → `/settings`)
+### Local Development
+```bash
+# Backend
+cd backend && python -m pip install -r requirements.txt && python -m uvicorn main:app --reload
 
-## Key File Locations
+# Frontend
+cd frontend && npm install && npm run dev
 
-| Purpose | Path |
-|---------|------|
-| App entry (backend) | `backend/main.py` |
-| Scheduler logic | `backend/scheduler.py` |
-| Batch registry | `backend/services/batch_registry.py` |
-| Report generation | `backend/services/report_generator.py` |
-| User portfolio | `backend/services/storage.py` |
-| Market data fetch | `backend/services/market.py` |
-| Consensus aggregation | `backend/services/consensus_pipeline.py` |
-| Execution logging | `backend/services/job_runs.py` |
-| Kiwoom client | `backend/services/kiwoom/client.py` |
-| Market indicators | `backend/services/market_indicators/*.py` |
-| App entry (frontend) | `frontend/src/App.jsx` |
-| Auth context | `frontend/src/contexts/AuthContext.jsx` |
-| Main pages | `frontend/src/pages/*.jsx` |
-| UI components | `frontend/src/components/*.jsx` |
-| Market components | `frontend/src/components/market/*.jsx` |
-| Report components | `frontend/src/components/reports/*.jsx` |
-| Report snapshots (file storage) | `backend/snapshots/{ticker}/{YYYY-MM-DD}.json` |
+# PostgreSQL (Docker Compose)
+docker-compose up -d db
+```
+
+### Production
+- Backend: Gunicorn + uvicorn workers (8–16 workers per CPU)
+- Frontend: Vite build → static `dist/` served by nginx
+- Database: Managed PostgreSQL (RDS/Supabase)
+- Scheduler: Runs inside single-process FastAPI app (NOT separate service)

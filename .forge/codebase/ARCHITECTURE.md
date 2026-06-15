@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: fd8dd650ede08d103b907ac4d87955f669ce3298
-mapped: 2026-06-15
+last_mapped_commit: 504b6e098488b3d8bdd2c2ebdf69a9c9151df32f
+mapped: 2026-06-16
 ---
 
 # PortfoliOn Architecture
@@ -14,13 +14,13 @@ PortfoliOn is a multi-user stock portfolio management and analysis SPA. Users tr
 - Frontend: React 18 + Vite SPA
 - Database: PostgreSQL
 - Infrastructure: Docker Compose (backend + frontend + PostgreSQL)
-- External APIs: yfinance, Naver Stock API, FnGuide, FRED, Cowork (AI text generation)
+- External APIs: yfinance, Naver Stock API, FnGuide, FRED, DART, Cowork (AI text generation)
 
 ## Architectural Layers
 
 ### 1. Request Path (HTTP API → DB)
 
-**Entry:** `backend/main.py` mounts 14 routers via FastAPI:
+**Entry:** `backend/main.py` mounts 18 routers via FastAPI:
 - `routers/{portfolio,report,watchlist,stocks,guru,calendar,digest,analytics,analysis,market_indicators,auth,admin,events,rankings,investor,short_sell,batches}`
 
 **Pattern:** Router → Service → PostgreSQL
@@ -41,29 +41,32 @@ POST /api/portfolio/stocks (router)
 
 **Entry:** `backend/scheduler.py` starts APScheduler on app lifespan.
 
-**Batch Registry:** `services/batch_registry.py` defines 17 static batch entries (metadata: id, label, category, schedule, market field, editable status).
+**Batch Registry:** `services/batch_registry.py` defines 20 static batch entries (metadata: id, label, category, schedule, market field, editable status).
 
 **Batch Categories:**
-1. **Report Generation** (3 batches)
+1. **Report Generation** (4 batches)
    - `daily_report_kr` (20:30 KST, KR stocks)
    - `daily_report_us` (07:00 KST, US stocks)
+   - `disclosure_fetch` (07:30 KST, KR public notices—DART API)
    - `consensus` (inline during report generation, no standalone job)
 
-2. **Market Data Refresh** (10 batches)
-   - Earnings: `earnings_kr`, `earnings_us`
+2. **Market Data Refresh** (12 batches)
+   - Earnings: `earnings_kr` (KR Top2), `earnings_us` (M7)
    - Monthly indicators: `monthly_kr` (KR exports), `monthly_us` (FRED econ)
    - Supply/demand: `leverage_fetch`, `lending_fetch`, `investor_trend_fetch`, `short_sell_fetch`
    - Rankings: `kr_rankings_fetch`, `us_rankings_fetch`
+   - Macro signals: `macro_signals_fetch` (FRED 4-series: T10Y2Y, HY OAS, M2, DFF)
+   - Dividends: `dividend_fetch` (yfinance US + DART KR)
 
-3. **Analysis & Admin** (3 batches)
+3. **Analysis & Admin** (4 batches)
    - `kr_sector_fetch` (KR sector momentum)
    - `daily_digest` (morning market summary)
    - `backlog_fetch` (order backlog data for KR)
    - `guru_crawl` (fund manager profile scraping)
 
 **Job Execution Model:**
-- Editable batches (13/17): schedule stored in `batch_schedules` table; can be modified via Settings UI
-- Fixed batches (4/17): hardcoded default schedule (consensus, digest, backlog, sector momentum)
+- Editable batches (16/20): schedule stored in `batch_schedules` table; can be modified via Settings UI
+- Fixed batches (4/20): hardcoded default schedule (consensus, digest, backlog, sector momentum)
 - Each batch logs execution start/end/status to `job_runs` table (20-row rotating keep)
 
 **On startup:**
@@ -98,23 +101,28 @@ POST /api/portfolio/stocks (router)
 - Cowork API (`/api/cowork/...`) generates AI text (analyst_summary, etc.) — called by frontend on report view, NOT backend
 - Backend stores NO AI-generated text; snapshots hold only market data & metadata
 
-### 4. Market Data Cache
+### 4. Market Data Cache & Batch-Precompute Pattern
+
+**Core Principle:** External APIs (키움/DART/FRED/yfinance) are fetched **ONLY in batches**, never on request path. Request path reads stored values from cache/tables.
 
 **Precomputed Batches (read from cache, NOT on-demand):**
-- KR exports (monthly, `market_indicators/kr_exports` table)
-- US econ indicators (FRED: unemployment, inflation, 10Y yield, etc.)
-- KR Top2 earnings (Samsung, SK Hynix quarterly results)
-- M7 earnings (Apple, Microsoft, etc. quarterly)
-- KR leverage/shortselling (신용거래, 공매도 추이)
-- KR lending balance (대차잔고)
-- Rankings (KR: 거래량/상승률 intraday; US: 52w high/low)
-- KR sector momentum (업종별 수익률)
-- Investor trend (foreign/institutional/retail supply/demand by ticker)
+- **KR Exports** (monthly, `market_indicators/kr_exports` table) — KOSTAT
+- **US Econ Indicators** (FRED: unemployment, inflation, 10Y yield, etc.)
+- **KR Top2 Earnings** (Samsung, SK Hynix quarterly results) — Naver API
+- **M7 Earnings** (Apple, Microsoft, etc. quarterly) — yfinance
+- **Macro Signals** (FRED 4-series — T10Y2Y yield curve inversion, HY OAS credit stress, M2, DFF) → signals computed (inverted, credit_stress)
+- **Stock Dividends** (KR: DART alotMatter.json annual dividend per share + yield; US: yfinance dividendRate/Yield) → stored in `stock_dividends` table
+- **Stock Disclosures** (KR: DART list.json core types A/B/C/D) → stored in `stock_disclosures` table
+- **KR Leverage/Shortselling** (신용거래, 공매도 추이) — Kiwoom
+- **KR Lending Balance** (대차잔고) — monthly
+- **Rankings** (KR: 거래량/상승률 intraday; US: 52w high/low)
+- **KR Sector Momentum** (업종별 수익률)
+- **Investor Trend** (foreign/institutional/retail supply/demand by ticker) — Kiwoom ka10033
 
 **Cache Invalidation:** No explicit invalidation; batches re-run on schedule → data refreshed in-place.
 
 **Access Pattern:**
-- Frontend queries `/api/market/indicators/{category}` → reads cache tables
+- Frontend queries `/api/market/indicators/{category}`, `/api/report/{ticker}/disclosures`, `/api/stocks/dashboard` → reads cache tables
 - If cache empty on first load, batch runs automatically (see scheduler startup)
 
 ### 5. User/Auth Layer
@@ -133,12 +141,12 @@ POST /api/portfolio/stocks (router)
 
 ## Key Abstractions
 
-### 1. Batch Registry (17 Batches)
+### 1. Batch Registry (20 Batches)
 
 Each batch has a `market` field (KR/US/공통):
-- **KR-only:** daily_report_kr, earnings_kr, monthly_kr, leverage_fetch, lending_fetch, kr_rankings_fetch, investor_trend_fetch, short_sell_fetch, kr_sector_fetch, backlog_fetch
-- **US-only:** daily_report_us, earnings_us, monthly_us, us_rankings_fetch
-- **공통 (shared):** consensus, daily_digest, guru_crawl
+- **KR-only:** daily_report_kr, earnings_kr, monthly_kr, leverage_fetch, lending_fetch, kr_rankings_fetch, investor_trend_fetch, short_sell_fetch, kr_sector_fetch, backlog_fetch, disclosure_fetch
+- **US-only:** daily_report_us, earnings_us, monthly_us, us_rankings_fetch, macro_signals_fetch
+- **공통 (shared):** consensus, daily_digest, guru_crawl, dividend_fetch
 
 ### 2. Portfolio Models
 
@@ -148,87 +156,166 @@ Each batch has a `market` field (KR/US/공통):
 
 **Global Portfolio:**
 - `tickers` table: (ticker, name, market, exchange, competitors, moat, growth_plan, risks, recent_disclosures, insights, is_etf)
-- Shared across all users (write-once, read-many for analyst metadata)
 
-**Analytics:**
-- `portfolio_snapshots` (user_id, date, total_value, daily_change, sector_allocation)
-- `holdings_history` (user_id, ticker, date, quantity, cost_value, market_value)
+### 3. Snapshot & Report Model
 
-### 3. Report Snapshots
+**Snapshot:**
+- File: `backend/snapshots/{ticker}/{YYYY-MM-DD}.json`
+- Contents: Quote, financials, analyst data, RSI, news, consensus opinion
+- DB link: `snapshots` table stores metadata (ticker, date, user_id, views, created_at)
 
-**Location:** `backend/snapshots/{ticker}/{YYYY-MM-DD}.json` (file system) + indexed in `snapshots` table (ticker, date, data JSONB)
+**Report Detail:**
+- Frontend fetches snapshot + consensus + analyst profile → renders dashboard
 
-**Fields:** price, quote, financials (P/E, ROE, debt), analyst_data (targets, consensus), rsi, news, volume_profile, recent_disclosures
+### 4. Disclosure & Dividend Tables
 
-**Immutability:** Snapshots are write-once; used by report detail views and charting.
+**`stock_disclosures` (KR-only, DART):**
+- Columns: rcept_no (PK), ticker, rcept_dt, report_nm, pblntf_ty (A/B/C/D), corp_name, fetched_at
+- Upserted daily by `disclosure_fetch` batch (07:30 KST)
+- Accessed via `GET /api/report/{ticker}/disclosures`
 
-### 4. Consensus Pipeline
+**`stock_dividends` (both KR & US):**
+- Columns: ticker (PK), annual_dividend_per_share, dividend_yield, currency (KRW/USD), source (dart/yfinance), fetched_at
+- Upserted weekly by `dividend_fetch` batch (05:00 KST)
+- Joined by dashboard when computing yield_on_cost
 
-**Opinion Normalization:**
-- KR opinions mapped to 5-point scale: 강력매수(5) → 매수(4) → 중립(3) → 비중축소(2) → 매도(1)
-- US opinions: Strong Buy(5) → Buy/Outperform(4) → Hold(3) → Underperform(2) → Sell(1)
+### 5. Macro Signals Table
 
-**Sources:**
-- KR: FnGuide (우선), fallback Naver Research
-- US: finviz scraper
+**`market_macro_signals` (US macro data):**
+- Stores FRED 4-series time-series + derived signals (inverted yield curve, credit stress)
+- Accessed via `GET /api/market/macro-signals`
+- Signals computed by `macro.evaluate_signals()` (pure function on time-series)
 
-**Storage:** `consensus` table (ticker, report_date, analyst_count, avg_score, target_mean, buy/hold/sell counts)
+### 6. Cowork Integration (NO LLM in Backend)
 
-### 5. External Service Clients
+- **Entry:** Frontend calls `POST /api/cowork/generate-text` with (stockObj, reportType, tone)
+- **Backend role:** None — Cowork is frontend-only, generates analyst_summary/sentiment async
+- **Reasoning:** Avoids backend latency for external API; frontend can stream/cancel; no cache needed (stateless generation)
 
-**Services/Subpackages:**
-- `services/kiwoom/` (키움 증권 API client) — KR historical data, investor trend, short-sell data
-- `services/kis/` (한투 KIS API client) — KR quote, order backlog
-- `services/market_indicators/` (economic data)
-  - `earnings.py` (M7, KR Top2 earnings)
-  - `econ.py` (FRED econ indicators)
-  - `exports.py` (KR monthly exports)
-  - `commodities.py`, `fx.py`, `cache.py`
+## Data Flow Summaries
 
-## Data Flow Summary
-
+### Daily Report Generation
 ```
-User Action (Frontend)
-  ↓
-HTTP Router (/api/...)
-  ↓
-Service Layer (business logic + external APIs)
-  ↓
-PostgreSQL (user portfolio, snapshots, cache tables)
-  ↓
-JSON Response → Frontend
+Scheduler → scheduler.py:_generate_kr()
+  → storage.get_all_stocks(user_id, market='KR')
+    → report_generator.generate_report_with_retry(stock)
+      → (parallel ThreadPool, max_workers=8):
+         • market.get_quote()
+         • market.get_financials()
+         • market.get_analyst_data()
+         • indicators.get_timeframe_rsi()
+         • scraper.scrape_finviz_consensus()
+         • scraper.get_news()
+      → snapshot saved: backend/snapshots/{ticker}/{date}.json
+      → snapshots table: upsert(ticker, user_id, date, ...)
+  → consensus_pipeline.run_daily(all_stocks)
+    → (FnGuide/Naver/finviz scrape if cache miss)
+    → consensus table: upsert(ticker, buy, hold, sell, target_mean)
+  → job_runs table: log success
+```
 
----
+### Disclosure Fetch Batch
+```
+Scheduler → scheduler.py:_fetch_disclosures()
+  → services.disclosures.fetch_all_disclosures()
+    → query: user_stocks ∩ tickers WHERE market='KR' AND type IN ('holding', 'watchlist')
+    → for each ticker:
+       → _corp_code(ticker) [backlog cache map]
+       → for each core type (A/B/C/D):
+          → DART list.json(corp_code, pblntf_ty=type, bgn_de=30d_ago)
+          → parse items → {rcept_dt, report_nm, pblntf_ty, rcept_no, corp_name}
+       → upsert_disclosures(ticker, rows)
+          → INSERT INTO stock_disclosures ON CONFLICT (rcept_no) DO UPDATE
+  → job_runs table: log {total, ok, failed}
+```
 
-Batch Scheduler (APScheduler)
-  ↓
-Job Function (_generate_kr, _fetch_leverage, etc.)
-  ↓
-Service Layer (report_generator, market_indicators, etc.)
-  ↓
-External APIs (yfinance, Naver, FRED, Kiwoom, KIS)
-  ↓
-PostgreSQL INSERT/UPDATE (snapshots, consensus, leverage, etc.)
-  ↓
-Cache ready for next request
+### Dividend Fetch Batch
+```
+Scheduler → scheduler.py:_fetch_dividends()
+  → services.dividends.fetch_all_dividends()
+    → query: user_stocks ∩ tickers WHERE type IN ('holding', 'watchlist')
+    → for each (ticker, market):
+       → market == 'KR':
+            → fetch_kr_dividend(ticker)
+              → _corp_code(ticker)
+              → DART alotMatter.json(corp_code, reprt_code=11011[annual], year=recent_biz_year)
+              → parse '주당 현금배당금(원)' + '현금배당수익률(%)' for common stock (보통주)
+              → return {annual_dividend_per_share, dividend_yield, currency='KRW', source='dart'}
+       → else (US):
+            → fetch_us_dividend(ticker)
+              → yfinance Ticker(ticker).info
+              → extract dividendRate, dividendYield
+              → return {annual_dividend_per_share, dividend_yield, currency='USD', source='yfinance'}
+       → if result not None: upsert_dividend(ticker, d)
+          → INSERT INTO stock_dividends ON CONFLICT (ticker) DO UPDATE
+  → job_runs table: log {total, ok, failed}
+```
+
+### Macro Signals Fetch Batch
+```
+Scheduler → scheduler.py:_refresh_macro_signals()
+  → services.market_indicators.macro._fetch_and_save_macro_signals()
+    → FRED_API_KEY from environment
+    → stored = _mc_load("macro_signals") [get previous cache]
+    → for each series (yield_curve=T10Y2Y, hy_spread=BAMLH0A0HYM2, m2=M2SL, fed_funds=DFF):
+       → prev_start = last_date from stored[key] or default_start (3Y ago)
+       → _fetch_series(series_id, api_key, start=prev_start)
+          → GET https://api.stlouisfed.org/fred/series/observations
+          → parse {date, value} tuples, skip missing ('.')
+       → _merge_history(prev, new_pts) → concat, dedup by date
+    → merged["signals"] = evaluate_signals(merged)
+       → inverted = (T10Y2Y < 0) ? True : False [recession warning]
+       → credit_stress = (HY_OAS >= 5.0%) ? True : False [stress signal]
+    → _mc_save("macro_signals", merged)
+       → store to market_cache/macro_signals JSON file
+  → job_runs table: log execution
+```
+
+### Request: GET /api/report/{ticker}/disclosures
+```
+routers.report.get_disclosures(ticker)
+  → services.disclosures.get_disclosures(ticker, limit=20)
+    → query stock_disclosures WHERE ticker = ? ORDER BY rcept_dt DESC
+    → for each row:
+       → append dart_url = _DART_VIEWER.format(rcept_no=rcept_no)
+    → return [{rcept_no, rcept_dt, report_nm, pblntf_ty, corp_name, dart_url}]
+  → JSON → frontend LatestDisclosuresSection renders
+```
+
+### Request: GET /api/market/macro-signals
+```
+routers.market_indicators.macro_signals()
+  → services.market_indicators.get_macro_signals()
+    → stored = _mc_load("macro_signals")
+    → if stored: return stored["data"]
+    → else: return {yield_curve: [], hy_spread: [], m2: [], fed_funds: [], signals: {}}
+  → JSON → frontend MacroSignalsSection renders charts + signal alerts
+```
+
+### Request: GET /api/stocks/dashboard
+```
+routers.stocks.dashboard(user_id)
+  → storage.get_all_stocks(user_id)
+    → query user_stocks JOIN tickers
+    → for each holding:
+       → get_quote(ticker, market) [cache or yfinance/Naver]
+       → get_financials(ticker, market)
+       → get_consensus(ticker)
+       → dividends.get_dividend(ticker) [read stock_dividends]
+       → compute yield_on_cost = (annual_dividend_per_share / avg_cost) * 100
+    → return {holdings: [{...holding, annual_dividend_per_share, dividend_yield, yield_on_cost}], totals: {...}}
+  → JSON → frontend DashboardCard renders with dividend stats
 ```
 
 ## No LLM in Backend
 
-- AI text generation (analyst_summary, report commentary) **only** via Cowork API, called by **frontend** on report view
-- Backend stores precomputed market data + structured metadata
-- Frontend renders market data + calls Cowork on-demand for text
+PortfoliOn backend contains **no language model integration**. All AI-powered text generation (analyst_summary, sentiment, stock_outlook) is handled by **Cowork API called from frontend**:
 
-## Performance & Reliability
+- Frontend detects `recent_disclosures` field is empty/null → calls `POST /api/cowork/generate-text` (Cowork is external SaaS)
+- Backend **cannot** call Cowork; it only stores/retrieves pre-generated data
+- Snapshots are pure market data (quote, financials, news, analyst consensus) — no synthetic text
 
-- **Parallelization:** ThreadPoolExecutor in report_generator (max_workers=8), investor_trend_fetch, short_sell_fetch
-- **Connection pooling:** psycopg2 pool (maxconn=10) managed by db.py
-- **Graceful degradation:** job_runs instrumentation never breaks batch execution; failed DB writes logged, not raised
-- **Idempotent batches:** All batch jobs can be re-run (via manual endpoint or auto-retry); upserts prevent duplicates
-- **Startup optimizations:** Calendar cache warm-up, market cache pre-load, missed-report recovery
-
-## Deployment
-
-- Docker Compose: `backend` (Uvicorn on port 8000), `frontend` (Vite dev server), `db` (PostgreSQL 13)
-- Environment: `.env` file (SESSION_SECRET, DB credentials, API keys)
-- Lifespan: FastAPI lifespan hook manages scheduler start/stop, migrations
+This architecture ensures:
+- Backend stays lightweight & non-blocking (no external LLM latency)
+- Frontend can handle streaming/cancellation
+- All text generation is stateless & cached client-side
