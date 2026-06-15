@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 27346baec719306d5c2be8f259cc448ca4f64f4a
-mapped: 2026-06-13
+last_mapped_commit: fd8dd650ede08d103b907ac4d87955f669ce3298
+mapped: 2026-06-15
 ---
 
 # INTEGRATIONS
@@ -12,8 +12,8 @@ mapped: 2026-06-13
 - **드라이버/풀**: `backend/services/db.py` — `psycopg2`의 `ThreadedConnectionPool`(minconn=1, maxconn=10). DSN은 `DATABASE_URL` 환경변수. `query()`(SELECT, RealDictCursor) / `execute()`(INSERT/UPDATE/DELETE) 헬퍼 제공.
 - **스키마 초기화**: `docker-compose.yml`이 `backend/auth_schema.sql`(01-auth.sql) → `backend/app_schema.sql`(02-app.sql) 순으로 `docker-entrypoint-initdb.d`에 마운트. auth 스키마가 app보다 먼저 실행돼야 한다.
   - `backend/auth_schema.sql` — `users`, `refresh_tokens`.
-  - `backend/app_schema.sql` — `tickers`, `snapshots`, `user_stocks`, `schedules`, `guru_managers`, `guru_schedules`, `batch_schedules`, `digests`, `consensus_history`, `calendar_cache`, `market_cache`, `user_menu_permissions`, `default_menu_permissions`, `raw_reports`, `daily_consensus_mart`, `user_events`, `market_leverage_indicators`, `market_lending_balance`, `backlog_history`, `market_rankings`, `market_investor_trend`, `job_runs`.
-- **런타임 마이그레이션**: `backend/main.py`의 `_migrate()`가 기동 시 idempotent DDL 적용 — `backlog_history.segments JSONB`(ADD COLUMN IF NOT EXISTS), `batch_schedules`(CREATE TABLE IF NOT EXISTS). 추가로 `backend/scheduler.py`의 `_seed_batch_schedules`가 편집 가능 배치의 스케줄 행을 시드.
+  - `backend/app_schema.sql` — `tickers`, `snapshots`, `user_stocks`, `schedules`, `guru_managers`, `guru_schedules`, `batch_schedules`, `digests`, `consensus_history`, `calendar_cache`, `market_cache`, `user_menu_permissions`, `default_menu_permissions`, `raw_reports`, `daily_consensus_mart`, `user_events`, `market_leverage_indicators`, `market_lending_balance`, `backlog_history`, `market_rankings`, `market_investor_trend`, `market_short_sell`, `job_runs`.
+- **런타임 마이그레이션**: `backend/main.py`의 `_migrate()`가 기동 시 idempotent DDL 적용 — `backlog_history.segments JSONB`(ADD COLUMN IF NOT EXISTS), `batch_schedules`(CREATE TABLE IF NOT EXISTS), `market_short_sell`(CREATE TABLE IF NOT EXISTS). 추가로 `backend/scheduler.py`의 `_seed_batch_schedules`가 편집 가능 배치의 스케줄 행을 시드.
 - **인메모리 캐시**(DB 아님): `backend/services/cache.py` — snapshot/list/dashboard/correlation/sector/macro 6종.
 
 ## yfinance (시세·재무·애널리스트)
@@ -31,15 +31,20 @@ mapped: 2026-06-13
 
 ## 키움 REST API (KR 읽기전용 시세 소스)
 
-- 오너 개인계좌 자격증명(서버측 단일 키)으로 KR 시세 조회. **KR 전용·읽기전용** 경계(ADR-0009). `backend/services/kiwoom/client.py` — `KIWOOM_APP_KEY`/`KIWOOM_SECRET_KEY`/`KIWOOM_BASE_URL`(`.env.docker`)로 au10001 토큰 발급(인프로세스 싱글톤, 401 재발급 재시도) + `request(api_id, body, category)`(`POST {base}/api/dostk/{category}`, 헤더 `api-id`/`authorization Bearer`, return_code≠0→예외, 직렬 throttle). `kiwoom/quote.py` ka10001(주식기본정보) 조회·정규화(부호포함 문자열·시총 억원→원). `market.get_quote_kr`이 **키움 우선 + Naver 폴백**으로 KR 현재가를 받는다(`get_quotes_batch` KR도 이 함수 경유). 전체 TR 카탈로그·대체 로드맵: 루트 `KIWOOM_API.md`. 계좌·주문 TR·실시간 WebSocket(0B/0D)·KR 차트/수급/랭킹 대체는 후속 Phase(미착수).
+- 오너 개인계좌 자격증명(서버측 단일 키)으로 KR 시세 조회. **KR 전용·읽기전용** 경계(ADR-0009). `backend/services/kiwoom/client.py` — `KIWOOM_APP_KEY`/`KIWOOM_SECRET_KEY`/`KIWOOM_BASE_URL`(`.env.docker`)로 au10001 토큰 발급(인프로세스 싱글톤, 401 재발급 재시도) + `request(api_id, body, category)`(`POST {base}/api/dostk/{category}`, 헤더 `api-id`/`authorization Bearer`, return_code≠0→예외, 직렬 throttle). 
+- `backend/services/kiwoom/quote.py` — ka10001(주식기본정보) 조회·정규화(부호포함 문자열·시총 억원→원).
+- `backend/services/kiwoom/sector.py` — 업종 지수(ka20001 등) 조회 및 모멘텀 계산.
+- `market.get_quote_kr`이 **키움 우선 + Naver 폴백**으로 KR 현재가를 받는다(`get_quotes_batch` KR도 이 함수 경유). 전체 TR 카탈로그·대체 로드맵: 루트 `KIWOOM_API.md`. 계좌·주문 TR·실시간 WebSocket(0B/0D)·KR 차트 대체는 후속 Phase(미착수).
 
 ## 한국투자증권(KIS) REST API (KR+US 읽기전용 백업 시세 소스)
 
-- 오너 개인 KIS 앱키(서버측 단일 키)로 현재가 조회. **KR+US 읽기전용·백업** 경계(ADR-0011) — 1차(KR=키움, US=yfinance) 실패 시 폴백. `backend/services/kis/client.py` — `KIS_APP_KEY`/`KIS_APP_SECRET`/`KIS_BASE_URL`(`.env.docker`, 기본 실전 `:9443`)로 `/oauth2/tokenP` 토큰 발급(인프로세스 싱글톤, 발급 1분당 1회 EGW00133 방어 60s 가드 + 401 재발급 재시도) + `request(tr_id, path, params)`(GET `/uapi/...`, 헤더 `tr_id`/`appkey`/`appsecret`/`custtype=P`, `rt_cd≠"0"`→예외, 직렬 throttle). `kis/quote.py` 국내 `FHKST01010100`(현재가 정규화: 부호포함 등락율·시총 억원→원, 종목명 없음). `market.get_quote_kr` 체인이 **키움→KIS→Naver**(`_kr_basic_kis`, `configured()` False면 휴면). `get_quotes_batch` KR 폴백(get_quote 경유)이 KIS 자동 상속. US 현재가 폴백(`HHDFS00000300`+dailyprice, EXCD probe)·실시간 WS(approval_key/H0STCNT0)는 후속. 전체 카탈로그: 루트 `KIS_API.md`.
+- 오너 개인 KIS 앱키(서버측 단일 키)로 현재가 조회. **KR+US 읽기전용·백업** 경계(ADR-0011) — 1차(KR=키움, US=yfinance) 실패 시 폴백. `backend/services/kis/client.py` — `KIS_APP_KEY`/`KIS_APP_SECRET`/`KIS_BASE_URL`(`.env.docker`, 기본 실전 `:9443`)로 `/oauth2/tokenP` 토큰 발급(인프로세스 싱글톤, 발급 1분당 1회 EGW00133 방어 60s 가드 + 401 재발급 재시도) + `request(tr_id, path, params)`(GET `/uapi/...`, 헤더 `tr_id`/`appkey`/`appsecret`/`custtype=P`, `rt_cd≠"0"`→예외, 직렬 throttle).
+- `backend/services/kis/quote.py` — 국내 `FHKST01010100`(현재가 정규화: 부호포함 등락율·시총 억원→원, 종목명 없음).
+- `market.get_quote_kr` 체인이 **키움→KIS→Naver**(`_kr_basic_kis`, `configured()` False면 휴면). `get_quotes_batch` KR 폴백(get_quote 경유)이 KIS 자동 상속. US 현재가 폴백(`HHDFS00000300`+dailyprice, EXCD probe)·실시간 WS(approval_key/H0STCNT0)는 후속. 전체 카탈로그: 루트 `KIS_API.md`.
 
 ## FnGuide (KR 컨센서스 1차 소스)
 
-- KR 컨센서스 원천(Naver Research fallback의 우선 소스). `backend/services/consensus_pipeline.py` — `https://comp.fnguide.com/SVO2/json/data/01_06/03_A{ticker}.json`.
+- KR 컨센서스 원천(Naver Research fallback의 우선 소스). `backend/services/consensus_pipeline.py`의 `_fetch_kr_fnguide` — `https://comp.fnguide.com/SVO2/json/data/01_06/03_A{ticker}.json`.
 
 ## Dataroma (구루 보유 종목)
 

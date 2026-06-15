@@ -1,185 +1,266 @@
 ---
-last_mapped_commit: 27346baec719306d5c2be8f259cc448ca4f64f4a
-mapped: 2026-06-13
+last_mapped_commit: fd8dd650ede08d103b907ac4d87955f669ce3298
+mapped: 2026-06-15
 ---
 
-# STRUCTURE
+# PortfoliOn Directory Structure
 
-디렉터리 레이아웃, 주요 파일 위치, 명명 규칙. 모든 경로는 프로젝트 루트 `/Users/calmonion/Project/PortfoliOn` 기준.
+## Backend (`backend/`)
 
-## 최상위 레이아웃
+### Root Entry Points
+- `main.py` (122 lines): FastAPI app initialization, lifespan hook, middleware setup, router mounting
+- `scheduler.py` (478 lines): APScheduler lifecycle, 17 batch job functions, startup idempotent migrations
 
-- `backend/` — Python/FastAPI 앱 (port 8000)
-- `frontend/` — React 18 + Vite SPA (port 5173 dev)
-- `nginx/nginx.conf` — nginx 서빙·프록시 설정 (HTTP 80, `/api/*`·`/health` → `backend:8000`)
-- `docker-compose.yml` — nginx/backend/postgres 컨테이너 정의
-- `supabase/` — (레거시) Supabase 관련 파일
-- `scripts/` — 운영 스크립트 (`auto-deploy-poll.sh`, `screenshot.js`, `check-permissions.js` 등)
-- `API_SPEC.md` — 전체 REST API 레퍼런스 (엔드포인트 정본)
-- `CLAUDE_COWORK_API.md` — 외부 Cowork API 명세
-- `CLAUDE.md` — 프로젝트 가이드라인·컨텍스트
+### Routers (`backend/routers/`) — 17 HTTP endpoints
+Each router is a FastAPI APIRouter with prefix `/api/{domain}`.
 
-## backend/ 주석 트리
+| File | Endpoint | Purpose |
+|------|----------|---------|
+| `portfolio.py` | `/api/portfolio` | Get/save user holdings, portfolio analytics, dashboard |
+| `watchlist.py` | `/api/watchlist` | Manage watched stocks, watch/unwatch operations |
+| `stocks.py` | `/api/stocks` | Ticker master (search, add, edit analyst notes) |
+| `report.py` | `/api/report` | Generate, list, detail reports; backfill snapshots |
+| `guru.py` | `/api/guru` | Fund manager profiles, holdings, performance stats |
+| `calendar.py` | `/api/calendar` | Market event calendar (earnings, splits, etc.) |
+| `digest.py` | `/api/digest` | Daily market digest generation & distribution |
+| `analytics.py` | `/api/analytics` | Portfolio performance, sector allocation charts |
+| `analysis.py` | `/api/analysis` | Sector momentum, macro analysis tabs |
+| `market_indicators.py` | `/api/market` | KR/US econ indicators, earnings, FX, commodities |
+| `auth.py` | `/api/auth` | OAuth2 (Google/Naver), JWT tokens, session |
+| `admin.py` | `/api/admin` | Batch schedule edits, permission management |
+| `events.py` | `/api/events` | User activity tracking (clicks, views) |
+| `rankings.py` | `/api/rankings` | Intraday market rankings (gainers, volume) |
+| `investor.py` | `/api/investor` | Foreign/retail/institutional supply/demand trends |
+| `short_sell.py` | `/api/short-sell` | Short-selling trend data for KR stocks |
+| `batches.py` | `/api/batches` | Batch status hub (execution logs, schedules) |
 
-```
-backend/
-  main.py                  # FastAPI 진입점: 라우터 마운트 + lifespan(_migrate/start/stop) + 미들웨어 + /health
-  auth.py                  # 인증 Depends: get_current_user / require_admin / get_current_user_or_api_key (JWT HS256 + X-API-Key)
-  scheduler.py             # APScheduler: _JOB_FUNCS(12 배치), start()/stop()/reload(), _check_missed_report
-  run_backfill.py          # 백필 실행 스크립트(엔트리)
-  auth_schema.sql          # 인증 스키마(users, refresh_tokens) — app_schema보다 먼저 실행
-  app_schema.sql           # 앱 스키마(tickers/snapshots/user_stocks/.../daily_consensus_mart/job_runs 등 전 테이블)
-  supabase_schema.sql      # 레거시 Supabase 스키마(참고용)
-  migrations/
-    001_user_events.sql    # user_events 테이블 마이그레이션
-    002_backlog_history.sql # backlog_history 테이블 마이그레이션
-  middleware/
-    event_tracker.py       # EventTrackerMiddleware — 응답 후 화이트리스트 라우트를 user_events에 기록
-  routers/                 # FastAPI 라우터 계층(각각 APIRouter)
-    auth.py                # /api/auth — 가입/로그인/리프레시/로그아웃/me/OAuth
-    portfolio.py           # /api/portfolio — 보유 종목 CRUD + /prices
-    watchlist.py           # /api/watchlist — 관심 종목 CRUD + /{ticker}/promote
-    stocks.py              # /api/stocks — 검색/뉴스/enrich(batch 먼저 등록)/dashboard
-    report.py              # /api — 리포트 생성/목록/히스토리/단건 + 컨센서스 + 수주잔고 (최대 라우터)
-    guru.py                # /api/guru — 구루 데이터/통계/크롤
-    calendar.py            # /api — 캘린더(파일 캐시) + 캐시 삭제
-    digest.py              # /api — 일일 다이제스트
-    market_indicators.py   # /api/market — FX/VIX/원자재/국채/실적/경제지표/수출/레버리지/대차잔고
-    analytics.py           # /api/analytics — 상관관계
-    analysis.py            # /api/analysis — 섹터 모멘텀 / 매크로 상관관계
-    events.py              # /api/events — 사용자 행동 이벤트 수집
-    rankings.py            # /api — 거래 랭킹 조회/refresh
-    investor.py            # /api — 수급 스크리닝/추이/refresh
-    batches.py             # /api/batches — 배치 현황 허브 + 스케줄 조회/수정
-    admin.py               # /api/admin — 사용자/권한 관리 + 행동 분석 집계
-  services/                # 비즈니스 로직 계층
-    db.py                  # ThreadedConnectionPool + query()/execute()/get_connection()
-    storage.py             # 종목/스케줄/구루/배치 영속화 래퍼(PostgreSQL)
-    market.py              # 시세·재무·애널리스트 수집(yfinance + Naver/FnGuide), KR/US 분기
-    consensus.py           # 목표가·의견 정본 조회 get_asof/apply_asof/get_history (ADR-0008)
-    consensus_pipeline.py  # _SCORE_MAP, upsert_raw_reports, refresh_mart, run_daily, backfill, get_mart_history
-    report_generator.py    # generate_report(병렬 fetch→summary→snapshot 저장), backfill_ticker
-    scraper.py             # Finviz 컨센서스 / KR·US 뉴스 스크래핑
-    cache.py               # 인메모리 TTLCache 6종(snapshot/list/dashboard/correlation/sector/macro)
-    digest_service.py      # 다이제스트 생성 + 텔레그램 발송
-    batch_registry.py      # BATCHES 정적 메타데이터(12 배치) + get_batch
-    job_runs.py            # job_runs 테이블 기록 record()/recent()/recent_map()
-    schedule_spec.py       # 스케줄 스펙 검증/CronTrigger 변환/문구
-    auth_service.py        # 비밀번호·JWT·OAuth·기본권한
-    guru_scraper.py        # 구루 운용역 크롤링
-    guru_stats.py          # popularity/top3/weighted 통계
-    analysis_service.py    # 섹터 모멘텀(SECTOR_ETFs) / 매크로 상관관계(MACRO_TICKERS)
-    leverage_service.py    # KOFIA 신용잔고·반대매매 → market_leverage_indicators
-    lending_service.py     # 금융위 대차잔고 → market_lending_balance
-    backlog.py             # 수주잔고 DART document.xml 파싱·검산·억원 정규화(최대 서비스 753L)
-    ranking_service.py     # KR/US 거래 랭킹 → market_rankings
-    investor_service.py    # 종목별 수급 추이 → market_investor_trend
-    indicators.py          # RSI/볼륨프로파일/지지저항 계산
-    charts.py              # 매출·RSI 차트 PNG 생성
-    errors.py              # 공통 HTTPException 헬퍼
-    utils.py               # NaN/Inf sanitize, ticker 조회 헬퍼
-    parallel.py            # parallel_map
-    progress.py            # ProgressTracker(배치 진행률)
-    market_indicators/     # 시장지표 서브패키지
-      __init__.py          # 서브모듈 함수 재노출
-      cache.py             # market_cache 테이블 _mc_load/_mc_save/clear_cache
-      fx.py                # FX/VIX
-      commodities.py       # 원자재/국채
-      earnings.py          # M7/KR Top2 실적
-      econ.py              # FRED 경제지표
-      exports.py           # KR 수출
-  data/                    # 정적 참조 데이터 + 로컬 캐시(런타임 캐시는 gitignored)
-    sp500_tickers.json     # S&P500 종목 마스터(정적)
-    kospi_tickers.json     # KOSPI 종목 마스터(정적)
-    (stocks/holdings/watchlist/schedule/guru_*.json) # 레거시 JSON
-    calendar/              # 월별 캘린더 캐시 YYYY-MM.json (gitignored)
-    consensus/             # per-ticker 컨센서스 캐시 (gitignored)
-    digest/                # 다이제스트 캐시
-  snapshots/               # 생성된 리포트 스냅샷 {ticker}/{date}.json (gitignored)
-  reports/                 # 레거시 리포트 디렉터리(read-only 폴백)
-  tests/                   # pytest 스위트(아래)
-  .venv/                   # Python venv (macOS: .venv/bin/python)
-```
+### Services (`backend/services/`) — 30 core modules + 3 subpackages
 
-### backend/tests/ — `backend/tests/`
+#### Core Service Layer (30 modules)
+| File | Purpose |
+|------|---------|
+| `storage.py` | User portfolio operations (get_stocks, save_stocks, get_holdings, etc.) |
+| `db.py` | PostgreSQL connection pooling, query/execute helpers |
+| `market.py` | Market data fetching (yfinance, Naver quote, financials, analyst data) |
+| `report_generator.py` | Snapshot generation, parallel API calls, TSV export |
+| `consensus_pipeline.py` | Analyst opinion normalization (5-point scale), FnGuide/Naver scraping |
+| `consensus.py` | Consensus data models & queries |
+| `batch_registry.py` | 17 batch metadata (static) |
+| `schedule_spec.py` | Cron trigger builder (weekly, monthly, interval) |
+| `job_runs.py` | Execution logging (running/success/failed, 20-row keep) |
+| `indicators.py` | RSI, timeframe analysis, volume profile |
+| `scraper.py` | finviz consensus, news scraping |
+| `guru_scraper.py` | Fund manager portfolio scraping |
+| `guru_stats.py` | Manager holdings aggregation |
+| `analyst_service.py` | Analyst profile & performance |
+| `auth_service.py` | JWT/OAuth token generation, user lookup |
+| `digest_service.py` | Daily digest content generation, Telegram send |
+| `ranking_service.py` | Market rankings (KR/US), intraday fetch, storage |
+| `investor_service.py` | Foreign/retail/institutional trend (Kiwoom ka10033) |
+| `short_sell_service.py` | Short-sell trend (Kiwoom ka10014) |
+| `kr_sector_service.py` | Sector momentum calculation & caching |
+| `leverage_service.py` | Margin call ratio, reverse repo ratio (KR) |
+| `lending_service.py` | Securities lending balance (monthly) |
+| `backlog.py` | Order backlog (수주잔고) for KR stocks |
+| `cache.py` | Report snapshot caching (in-memory + DB) |
+| `charts.py` | Chart data generation (unused in current build) |
+| `analysis_service.py` | Sector/macro analysis helpers |
+| `utils.py` | Sanitization, normalization |
+| `errors.py` | Custom exception types |
+| `progress.py` | Progress tracker for long-running tasks |
+| `parallel.py` | ThreadPoolExecutor wrapper |
 
-`conftest.py`(픽스처) + 라우터별·서비스별 테스트. 라우터: `test_*_router.py`(admin/analysis/analytics/batches/calendar/digest/events/guru/investor/portfolio/rankings/report/stocks/watchlist). 서비스/단위: `test_storage.py`, `test_market.py`, `test_cache.py`, `test_indicators.py`, `test_consensus_router.py`, `test_consensus_asof.py`, `test_report_generator.py`, `test_digest_service.py`, `test_backlog.py`/`test_backlog_extract.py`, `test_leverage_service.py`, `test_investor_service.py`, `test_ranking_service.py`, `test_market_cache.py`/`test_market_indicators.py`, `test_job_runs.py`/`test_job_runs_instrumentation.py`, `test_schedule_spec.py`, `test_batch_endpoints.py`/`test_batch_resilience.py`, `test_scheduler_*.py`(investor/rankings/seed), `test_auth.py`/`test_auth_me.py`, `test_event_tracker.py`/`test_events_router.py`, `test_guru_stats.py`.
-실행: `cd backend && .venv/bin/python -m pytest`.
+#### Subpackage: `services/kiwoom/` — Kiwoom Securities API Client
+| File | Purpose |
+|------|---------|
+| `__init__.py` | Module exports |
+| `client.py` | Kiwoom API connection, request/response handling |
+| `quote.py` | KR stock quote (price, volume, bid/ask) |
+| `chart.py` | OHLCV historical data (daily/60min/5min) |
+| `investor.py` | Foreign/retail/institutional supply/demand (ka10033) |
+| `sector.py` | Sector quote & momentum |
+| `shortsell.py` | Short-sell trend (ka10014, 252-day cumulative) |
 
-## frontend/src/ 주석 트리
+#### Subpackage: `services/kis/` — Korea Investment & Securities API Client
+| File | Purpose |
+|------|---------|
+| `__init__.py` | Module exports |
+| `client.py` | KIS REST API connection, auth, request signing |
+| `quote.py` | KR stock quote (competitive with Kiwoom) |
 
-```
-frontend/src/
-  main.jsx                 # React 진입점(ReactDOM render)
-  App.jsx                  # 라우팅 + OAuth 부트스트랩 + TopNav(menuPermissions 필터)
-  api.js                   # axios 인스턴스 + Bearer 인터셉터 + 401 리다이렉트
-  utils.js                 # 공통 유틸
-  App.css / index.css      # 전역 스타일
-  pages/                   # 라우트/허브/탭 단위 페이지
-    Portfolio.jsx          # / — 보유/관심/대시보드/분석 탭
-    Research.jsx           # /research 허브 — 리포트/랭킹/다이제스트/캘린더 탭
-    MarketHub.jsx          # /market 허브 — Market 래핑
-    Guru.jsx               # /guru
-    Settings.jsx           # /settings
-    AdminAnalytics.jsx     # /admin-analytics (admin 전용)
-    Showcase.jsx           # /dev/showcase
-    LoginPage.jsx          # 비로그인 진입
-    Reports.jsx Ranking.jsx Digest.jsx Calendar.jsx  # Research 허브 내 탭
-    Market.jsx             # MarketHub 내 본문
-    Analytics.jsx          # 상관관계(분석 하위탭)
-    SectorTab.jsx MacroTab.jsx  # 섹터/매크로(분석 하위탭)
-    GuruCrawlNow.jsx GuruManagers.jsx GuruStats.jsx  # 구루 하위
-    ConsensusSettings.jsx ReportManualGen.jsx LeverageBackfillSettings.jsx  # 설정 하위
-  components/
-    StockModal.jsx PromoteModal.jsx                  # 모달
-    PermissionManager.jsx PermissionPanel.jsx         # 권한 UI
-    LoadingSpinner.jsx MobileNav.jsx Toast.jsx        # 공통 UI(ToastProvider)
-    InstallPrompt.jsx BatchScheduleEditor.jsx         # PWA 설치 배너 / 배치 스케줄 편집
-    portfolio/
-      DashboardCard.jsx DashboardCard.css            # 대시보드 카드
-    reports/                                          # 리포트 상세 컴포넌트
-      ReportDetailTabs.jsx                            # 리포트 상세 4탭 컨테이너
-      DetailTab.jsx HistoryTab.jsx Sections.jsx       # 탭/섹션
-      ConsensusChart.jsx FinancialsChart.jsx BacklogChart.jsx  # 차트
-      InvestorTrendSection.jsx                        # 수급 추이 섹션
-      reportUtils.jsx                                 # 리포트 포매팅 헬퍼
-    market/                                           # 시장지표 섹션 컴포넌트
-      FxSection.jsx VixSection.jsx CommoditiesSection.jsx TreasurySection.jsx
-      EconIndicatorsSection.jsx M7EarningsSection.jsx KrTop2Section.jsx KrExportsSection.jsx
-      LeverageSection.jsx LendingSection.jsx
-      marketUtils.jsx                                 # krFmt 등 포매팅 헬퍼(억/조 단위)
-    ui/                                               # 디자인 시스템 프리미티브
-      Badge.jsx Button.jsx Card.jsx Stat.jsx (+ .css) # 컴포넌트 + 스타일
-      icons.jsx index.js                              # 아이콘 / 배럴 export
-  contexts/
-    AuthContext.jsx        # role·menu_permissions 로드(GET /api/auth/me)
-  hooks/
-    useAuth.js useTheme.js useIsMobile.js             # 인증/테마/반응형
-    usePortfolioData.js useReportGeneration.js useReportList.js  # 데이터 훅
-  utils/
-    analytics.js           # trackEvent(이벤트 수집)
-    pwa.js                 # isStandalone/isIOS/isAndroid/install suppress
-  styles/
-    tokens.css mobile.css pc.css  # 디자인 토큰 / 디바이스별 스타일
-```
+#### Subpackage: `services/market_indicators/` — External Economic Data
+| File | Purpose |
+|------|---------|
+| `__init__.py` | Re-exports fetch/save/load functions |
+| `cache.py` | In-memory cache for recent indicator fetches |
+| `econ.py` | FRED API (unemployment, inflation, 10Y, VIX) |
+| `commodities.py` | Commodity prices (oil, gold, copper) |
+| `earnings.py` | M7 earnings (yfinance), KR Top2 (Naver) |
+| `exports.py` | KR monthly exports (KOSTAT) |
+| `fx.py` | KRW/USD, KRW/JPY rates |
 
-## 명명 규칙
+### Other Backend Files
+- `middleware/event_tracker.py`: HTTP request event logging (analytics)
+- `auth.py`: Auth dependencies (get_current_user, require_admin, API key validation)
+- `tests/`: test_scheduler_*.py, test_*.py (pytest)
 
-- **백엔드 라우터**: `backend/routers/<도메인>.py`, 각각 `router = APIRouter(prefix="/api/...")`. 대부분 prefix가 도메인명(`/api/portfolio` 등)이나 `report`/`calendar`/`digest`/`rankings`/`investor`/`batches`는 공통 `/api` prefix를 쓰고 경로에서 분기.
-- **백엔드 서비스**: `backend/services/<도메인>_service.py`(외부 통합·도메인 로직) 또는 `<명사>.py`(핵심 추상화: `storage`/`market`/`cache`/`consensus`/`db`). 비공개 헬퍼는 `_` 접두사.
-- **배치 식별자**: `batch_registry.BATCHES`의 `id` = `scheduler._JOB_FUNCS` 키 = `job_runs.record` 호출 id가 모두 일치(단일 진실원).
-- **SQL 스키마**: 실행 순서 `auth_schema.sql` → `app_schema.sql`. 점진 변경은 `backend/migrations/NNN_*.sql` + `main._migrate()`의 idempotent DDL.
-- **테스트**: `backend/tests/test_<대상>.py`(라우터는 `test_<도메인>_router.py`).
-- **프론트 페이지**: `frontend/src/pages/<PascalCase>.jsx`. 허브 페이지(`Research`/`MarketHub`/`Portfolio`)는 내부 탭으로 하위 페이지를 조합.
-- **프론트 컴포넌트**: `frontend/src/components/` 루트(범용) + 그룹 하위 디렉터리(`reports/`, `market/`, `ui/`, `portfolio/`). 그룹별 포매팅 헬퍼는 `<group>Utils.jsx`.
+## Frontend (`frontend/src/`)
 
-## 주요 파일 빠른 참조
+### App Entry
+- `App.jsx` (169 lines): Route setup, auth flow (OAuth callback parsing), theme context, top nav with menu permissions
 
-- 라우터: `backend/routers/`
-- 서비스: `backend/services/`
-- 시장지표 서브패키지: `backend/services/market_indicators/`
-- 프론트 페이지: `frontend/src/pages/` / 컴포넌트: `frontend/src/components/`(+ `market/`, `reports/`, `ui/`)
-- SQL 스키마: `backend/auth_schema.sql`, `backend/app_schema.sql`, `backend/migrations/`
-- 정적 참조 데이터: `backend/data/sp500_tickers.json`, `backend/data/kospi_tickers.json`
-- 테스트: `backend/tests/`
-- 배포: `nginx/nginx.conf`, `docker-compose.yml`, `frontend/vite.config.js`(dev 프록시)
+### Pages (`frontend/src/pages/`) — 22 JSX files
+
+#### Main Navigation (5 tabs)
+| File | Route | Purpose |
+|------|-------|---------|
+| `Portfolio.jsx` | `/` | Holdings table, SectorTab/MacroTab analytics, portfolio value chart |
+| `Research.jsx` | `/research` | Stock research hub (search, add, list user stocks, snapshot view) |
+| `MarketHub.jsx` | `/market` | Market indicators hub (passthrough to MarketHub layout) |
+| `Guru.jsx` | `/guru` | Fund manager profiles, holdings, performance |
+| `Settings.jsx` | `/settings` | Batch schedule editor, consensus settings, API key mgmt, user preferences |
+
+#### Admin (1 tab)
+| File | Route | Purpose |
+|------|-------|---------|
+| `AdminAnalytics.jsx` | `/admin-analytics` | User activity, batch execution history, export data |
+
+#### Detailed Views & Modals
+| File | Purpose |
+|------|---------|
+| `ReportManualGen.jsx` | Manual report generation UI (backfill wizard) |
+| `Reports.jsx` | Report list, snapshot browser, detail panels |
+| `Ranking.jsx` | Market rankings (KR/US), live intraday updates |
+| `Analytics.jsx` | Performance analytics, holdings history chart |
+| `SectorTab.jsx` | Sector allocation pie, momentum grid (KR/US toggle) |
+| `MacroTab.jsx` | Macro indicators (interest rates, VIX, FX, commodities) |
+| `Calendar.jsx` | Market event calendar (earnings, splits, IPOs) |
+| `Digest.jsx` | Daily market digest (summary, top movers) |
+| `GuruManagers.jsx` | Fund manager list, edit, delete |
+| `GuruStats.jsx` | Manager holdings aggregation, performance |
+| `GuruCrawlNow.jsx` | Trigger guru crawl batch |
+| `ConsensusSettings.jsx` | Consensus data source & refresh settings |
+| `LeverageBackfillSettings.jsx` | Historical leverage data backfill |
+| `LoginPage.jsx` | OAuth/form login UI |
+| `Showcase.jsx` | Dev component showcase page |
+| `Market.jsx` | Placeholder redirect to MarketHub |
+
+### Components (`frontend/src/components/`) — 38 JSX files
+
+#### Core Components
+| File | Purpose |
+|------|---------|
+| `MobileNav.jsx` | Mobile bottom tab bar |
+| `InstallPrompt.jsx` | PWA install prompt |
+| `PermissionManager.jsx` | Admin UI for user permission matrix |
+| `PermissionPanel.jsx` | Permission group selector |
+| `StockModal.jsx` | Add/edit stock modal (ticker, competitors, analyst notes) |
+| `BatchScheduleEditor.jsx` | Batch cron editor (days, times, interval config) |
+| `PromoteModal.jsx` | Promote watchlist → holding modal |
+| `Toast.jsx` | Notification toast (success, error, info) |
+| `LoadingSpinner.jsx` | Loading indicator |
+
+#### Subcomponent: `components/portfolio/` (8 JSX)
+- Holdings table, position details, cost basis, P&L, sector allocation, dashboard cards
+
+#### Subcomponent: `components/market/` (11 JSX)
+- Econ indicators sections (FX, commodities, FRED), earnings tables, lending/leverage charts
+- `marketUtils.jsx`: Shared formatters for market data
+
+#### Subcomponent: `components/reports/` (10 JSX)
+- Report detail tabs (HistoryTab, FinancialsChart, ConsensusChart, DetailTab)
+- Investor trend chart, short-sell section, backlog chart
+- `reportUtils.jsx`: Snapshot formatting, consensus scoring
+
+#### Subcomponent: `components/ui/` (8 JSX + CSS)
+- `Badge.jsx`, `Button.jsx`, `Card.jsx`, `Stat.jsx` (reusable UI primitives)
+- `icons.jsx` (Lucide/SVG icon exports)
+- CSS modules for each component
+
+### Hooks & Context (`frontend/src/hooks/`, `frontend/src/contexts/`)
+- `useTheme.jsx`: Dark/light mode persistence
+- `AuthContext.jsx`: Auth state, user permissions, role (admin/user)
+- `useToast.jsx`: Toast notification trigger
+
+### Utilities (`frontend/src/utils/`)
+- `analytics.jsx`: trackEvent() → backend event logging
+- `api.jsx`: Fetch helpers, base URL, auth headers
+- `formatters.jsx`: Number/date formatting, currency
+
+### Static Assets
+- `public/favicon.svg`, `public/index.html`
+
+### Styling
+- `App.css`: Top nav, page layout, theme variables
+- Component-scoped CSS (CSS Modules or inline)
+
+### Build Config
+- `vite.config.js`: Vite + React plugin
+- `package.json`: Dependencies (react, react-router-dom, lucide-react, axios)
+
+## Database Schema (PostgreSQL)
+
+### User & Auth
+- `users`: user_id (PK), email, role, created_at
+- `user_stocks`: user_id + ticker (PK), type, quantity, avg_cost, added_at
+- `oauth_sessions`: (session_id, provider, user_id, expires_at)
+
+### Portfolio & Market Data
+- `tickers`: ticker (PK), name, market, exchange, competitors, moat, growth_plan, risks, recent_disclosures, insights, is_etf
+- `snapshots`: ticker + date (PK), data (JSONB), created_at
+- `portfolio_snapshots`: user_id + date (PK), total_value, daily_change, sector_allocation
+- `holdings_history`: user_id + ticker + date (PK), quantity, cost_value, market_value
+
+### Market Cache Tables
+- `consensus`: ticker + report_date (PK), analyst_count, avg_score, target_mean, buy/hold/sell counts
+- `market_rankings`: market + ticker (PK), rank, price, change, volume, date
+- `market_indicators_*`: (econ_indicators, kr_exports, m7_earnings, kr_top2_earnings, fx_rates, commodities, vix)
+- `leverage`: ticker + date (PK), credit_ratio, reverse_repo_ratio
+- `lending_balance`: ticker + date (PK), balance_qty, balance_value
+- `investor_trend`: ticker + date (PK), foreign, institutional, retail (qty, ratio)
+- `market_short_sell`: ticker + date (PK), short_volume, short_ratio, short_balance
+
+### Batch & Admin
+- `batch_schedules`: job_id (PK), data (JSONB spec: enabled, type, days, time, etc.)
+- `job_runs`: id (PK), job_id, trigger, status, started_at, finished_at, error (20-row rotate)
+- `user_events`: id (PK), user_id, event_type, payload, timestamp
+
+### Report Data
+- `guru_managers`: id (PK), name, company, portfolio (JSONB), last_updated
+- `backlog_items`: ticker + date (PK), value, count
+
+## Code Naming Conventions
+
+### Backend
+- Functions: snake_case (e.g., `get_all_stocks`, `_generate_kr`, `fetch_trend`)
+- Services: `*_service.py`, `*_client.py`, `*_scraper.py`
+- Endpoints: RESTful `/api/{domain}/{resource}/{action}` (e.g., `/api/portfolio/stocks`, `/api/report/refresh-all`)
+- Internal functions: `_private_function()`
+
+### Frontend
+- Components: PascalCase (e.g., `Portfolio.jsx`, `SectorTab.jsx`)
+- Hooks: camelCase with `use` prefix (e.g., `useTheme.jsx`, `useAuth.jsx`)
+- Utilities: camelCase (e.g., `formatNumber()`, `trackEvent()`)
+- Pages: PascalCase matching route (e.g., `Portfolio` → `/`, `Settings` → `/settings`)
+
+## Key File Locations
+
+| Purpose | Path |
+|---------|------|
+| App entry (backend) | `backend/main.py` |
+| Scheduler logic | `backend/scheduler.py` |
+| Batch registry | `backend/services/batch_registry.py` |
+| Report generation | `backend/services/report_generator.py` |
+| User portfolio | `backend/services/storage.py` |
+| Market data fetch | `backend/services/market.py` |
+| Consensus aggregation | `backend/services/consensus_pipeline.py` |
+| Execution logging | `backend/services/job_runs.py` |
+| Kiwoom client | `backend/services/kiwoom/client.py` |
+| Market indicators | `backend/services/market_indicators/*.py` |
+| App entry (frontend) | `frontend/src/App.jsx` |
+| Auth context | `frontend/src/contexts/AuthContext.jsx` |
+| Main pages | `frontend/src/pages/*.jsx` |
+| UI components | `frontend/src/components/*.jsx` |
+| Market components | `frontend/src/components/market/*.jsx` |
+| Report components | `frontend/src/components/reports/*.jsx` |
+| Report snapshots (file storage) | `backend/snapshots/{ticker}/{YYYY-MM-DD}.json` |
