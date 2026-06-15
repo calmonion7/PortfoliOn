@@ -28,8 +28,9 @@ def momentum_from_closes(name: str, code: str, closes: list[float]) -> dict:
     }
 
 
-def save_momentum(sectors: list[dict]) -> None:
-    _mc_save(CACHE_KEY, {"sectors": sectors})
+def save(sectors: list[dict], index: dict[str, str]) -> None:
+    """모멘텀(sectors)과 보유→업종 역인덱스(index)를 한 페이로드로 저장."""
+    _mc_save(CACHE_KEY, {"sectors": sectors, "index": index})
 
 
 def load_momentum() -> list[dict]:
@@ -40,11 +41,22 @@ def load_momentum() -> list[dict]:
     return (stored.get("data") or {}).get("sectors") or []
 
 
+def load_sector_index() -> dict[str, str]:
+    """저장된 보유→업종 역인덱스({종목코드: 업종명}). 없으면 {}."""
+    stored = _mc_load(CACHE_KEY)
+    if not stored:
+        return {}
+    return (stored.get("data") or {}).get("index") or {}
+
+
 def _fetch_one_sector(entry: dict) -> dict:
     try:
         closes = kw_sector.fetch_sector_closes(entry["code"], max_items=100)
+        if not closes:
+            print(f"[kr_sector] {entry['code']} {entry['name']}: empty closes (ka20006 빈 종가)")
         return momentum_from_closes(entry["name"], entry["code"], closes)
-    except Exception:
+    except Exception as e:
+        print(f"[kr_sector] {entry['code']} {entry['name']}: fetch failed: {e}")
         return {"name": entry["name"], "code": entry["code"],
                 "return_1w": None, "return_1mo": None, "return_3mo": None}
 
@@ -56,9 +68,17 @@ def compute_momentum() -> list[dict]:
 
 
 def refresh() -> list[dict]:
-    """배치 본문: 전 업종 모멘텀 계산 → market_cache 저장. 저장한 sectors 반환."""
+    """배치 본문: 전 업종 모멘텀 + 보유→업종 역인덱스 사전계산 → market_cache 저장.
+
+    모든 sector 모멘텀이 None이면(ka20006 빈 종가 박제 케이스) save를 생략해
+    직전 양호값을 보존한다. 계산한 sectors는 그대로 반환(호출부 로깅용)."""
     sectors = compute_momentum()
-    save_momentum(sectors)
+    if all(s.get("return_1w") is None and s.get("return_1mo") is None
+           and s.get("return_3mo") is None for s in sectors):
+        print("[kr_sector] refresh: all-None momentum — skipping save (직전값 유지)")
+        return sectors
+    index = build_sector_index()
+    save(sectors, index)
     return sectors
 
 
@@ -71,7 +91,8 @@ def build_sector_index() -> dict[str, str]:
         try:
             for code in kw_sector.fetch_sector_stocks(entry["code"]):
                 idx.setdefault(code, entry["name"])
-        except Exception:
+        except Exception as e:
+            print(f"[kr_sector] build_sector_index {entry['code']} {entry['name']}: fetch failed: {e}")
             continue
     return idx
 
@@ -83,10 +104,9 @@ def map_holdings_to_sectors(holdings: list[dict]) -> dict[str, str]:
     kr = [h for h in holdings if (h.get("market") or "US") == "KR"]
     if not kr:
         return {}
-    try:
-        idx = build_sector_index()
-    except Exception:
-        return {}
+    idx = load_sector_index()  # 저장 인덱스만 읽음 — 요청 경로에서 키움(ka20002) 라이브 호출 없음
+    if not idx:
+        return {}              # 첫 배치 전이면 graceful 빈 매핑(라이브로 메우지 않음)
     out: dict[str, str] = {}
     for h in kr:
         ticker = (h.get("ticker") or "").strip()

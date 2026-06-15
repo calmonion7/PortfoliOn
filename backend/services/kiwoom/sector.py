@@ -5,6 +5,7 @@
 종가를 절대값·오름차순(과거→현재)으로 정규화한다.
 """
 from __future__ import annotations
+import datetime as _dt
 from services.kiwoom import client
 
 # KOSPI 업종 큐레이션 — 라이브 ka10101(mrkt_tp=0) 프로브로 확인(2026-06).
@@ -63,20 +64,41 @@ def normalize_closes(rows: list) -> list[float]:
     return [c for _, c in pairs]
 
 
+def _last_completed_trading_day(today: _dt.date) -> str:
+    """주말이면 직전 금요일로 당겨 마지막 완성 거래일(YYYYMMDD)을 돌려준다.
+
+    평일은 그날 그대로(거래중 인트라데이여도 ka20006 종가 history는 직전 거래일 종가까지 온다).
+    공휴일은 보정하지 않는다 — 폴백(빈 series → 직전일 1회 재조회)이 받아낸다."""
+    d = today
+    while d.weekday() >= 5:  # 5=토, 6=일
+        d -= _dt.timedelta(days=1)
+    return d.strftime("%Y%m%d")
+
+
 def fetch_sector_closes(inds_cd: str, base_dt: str | None = None,
                         max_items: int = 100) -> list[float]:
-    """업종 일봉 종가 series(과거→현재). base_dt 미지정 시 오늘 기준.
+    """업종 일봉 종가 series(과거→현재). base_dt 미지정 시 마지막 완성 거래일 기준.
 
     ka20006(업종일봉조회)는 한 페이지에 600개를 주므로 1콜로 끝난다. 최근 max_items개로 절단.
+    base_dt 미지정으로 호출한 경우, 그 날짜가 빈 series면(공휴일 등) 직전 거래일로 1회 폴백한다.
     """
-    import datetime as _dt
-    base_dt = base_dt or _dt.date.today().strftime("%Y%m%d")
-    rows = client.request_paged(
-        "ka20006", {"inds_cd": inds_cd, "base_dt": base_dt},
-        "chart", "inds_dt_pole_qry", max_items,
-    )
-    closes = normalize_closes(rows)
-    return closes[-max_items:] if max_items and len(closes) > max_items else closes
+    explicit = base_dt is not None
+    if base_dt is None:
+        base_dt = _last_completed_trading_day(_dt.date.today())
+
+    def _fetch(bd: str) -> list[float]:
+        rows = client.request_paged(
+            "ka20006", {"inds_cd": inds_cd, "base_dt": bd},
+            "chart", "inds_dt_pole_qry", max_items,
+        )
+        closes = normalize_closes(rows)
+        return closes[-max_items:] if max_items and len(closes) > max_items else closes
+
+    closes = _fetch(base_dt)
+    if not closes and not explicit:
+        prev = _dt.datetime.strptime(base_dt, "%Y%m%d").date() - _dt.timedelta(days=1)
+        closes = _fetch(_last_completed_trading_day(prev))
+    return closes
 
 
 def fetch_sector_stocks(inds_cd: str) -> list[str]:

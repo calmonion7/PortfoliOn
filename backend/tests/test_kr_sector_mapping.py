@@ -23,8 +23,9 @@ def test_build_sector_index_reverse_maps_stocks(monkeypatch):
 
 
 def test_map_holdings_to_sectors_hits_and_misses(monkeypatch):
+    # task 50 S2: 요청 경로는 저장 인덱스(load_sector_index)만 읽는다 — 라이브 build 호출 금지
     idx = {"005930": "전기/전자", "051910": "화학"}
-    monkeypatch.setattr(svc, "build_sector_index", lambda: idx)
+    monkeypatch.setattr(svc, "load_sector_index", lambda: idx)
 
     holdings = [
         {"ticker": "005930", "market": "KR"},
@@ -38,6 +39,30 @@ def test_map_holdings_to_sectors_hits_and_misses(monkeypatch):
     # 업종 미상은 graceful — 키 누락(예외 아님)
     assert "999999" not in out
     assert "AAPL" not in out
+
+
+def test_map_holdings_uses_stored_index_no_live_kiwoom(monkeypatch):
+    """task 50 S2: 요청 시 build_sector_index(ka20002 라이브)를 호출하지 않는다."""
+    monkeypatch.setattr(svc, "load_sector_index", lambda: {"005930": "전기/전자"})
+
+    def _fail():
+        raise AssertionError("build_sector_index must not be called on request path")
+    monkeypatch.setattr(svc, "build_sector_index", _fail)
+    # ka20002 직접 호출도 막아 이중 방어
+    monkeypatch.setattr(svc.kw_sector, "fetch_sector_stocks",
+                        lambda code: (_ for _ in ()).throw(AssertionError("ka20002 must not be called")))
+
+    out = svc.map_holdings_to_sectors([{"ticker": "005930", "market": "KR"}])
+    assert out == {"005930": "전기/전자"}
+
+
+def test_map_holdings_empty_when_stored_index_empty(monkeypatch):
+    """저장 인덱스가 비면(첫 배치 전) graceful 빈 매핑 — 라이브로 메우지 않는다."""
+    monkeypatch.setattr(svc, "load_sector_index", lambda: {})
+    monkeypatch.setattr(svc, "build_sector_index",
+                        lambda: (_ for _ in ()).throw(AssertionError("must not call build")))
+    out = svc.map_holdings_to_sectors([{"ticker": "005930", "market": "KR"}])
+    assert out == {}
 
 
 def test_build_sector_index_swallows_per_sector_errors(monkeypatch):

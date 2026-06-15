@@ -67,6 +67,78 @@ def test_fetch_sector_closes_truncates_to_recent(monkeypatch):
     assert closes[0] == 130.0
 
 
+# ── task 50 S3: base_dt 인트라데이 견고화 ──────────────────────────────────────
+def test_last_completed_trading_day_skips_weekend():
+    import datetime as _dt
+    # 토요일 2026-06-13 → 직전 거래일 금요일 2026-06-12
+    assert sector._last_completed_trading_day(_dt.date(2026, 6, 13)) == "20260612"
+    # 일요일 2026-06-14 → 금요일 2026-06-12
+    assert sector._last_completed_trading_day(_dt.date(2026, 6, 14)) == "20260612"
+    # 평일(화 2026-06-16) → 그날(거래중 인트라데이도 종가 history는 직전 종가까지 옴)
+    assert sector._last_completed_trading_day(_dt.date(2026, 6, 16)) == "20260616"
+    # 월요일 2026-06-15 → 그날
+    assert sector._last_completed_trading_day(_dt.date(2026, 6, 15)) == "20260615"
+
+
+def test_fetch_sector_closes_default_base_dt_is_trading_day(monkeypatch):
+    """base_dt 미지정 시 마지막 완성 거래일을 base_dt로 보낸다(주말 인트라데이 빈값 방지)."""
+    import datetime as _dt
+
+    class _FixedDate(_dt.date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 6, 14)  # 일요일
+
+    monkeypatch.setattr(sector._dt, "date", _FixedDate)
+    captured = {}
+
+    def fake_paged(api_id, body, *a, **k):
+        captured["base_dt"] = body["base_dt"]
+        return _rows()
+
+    monkeypatch.setattr(sector.client, "request_paged", fake_paged)
+    sector.fetch_sector_closes("008")
+    assert captured["base_dt"] == "20260612"  # 금요일로 정규화
+
+
+def test_fetch_sector_closes_falls_back_when_empty(monkeypatch):
+    """오늘 base_dt가 빈 series면 직전 거래일로 1회 폴백해 종가를 채운다."""
+    import datetime as _dt
+
+    class _FixedDate(_dt.date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 6, 16)  # 화요일(거래중)
+
+    monkeypatch.setattr(sector._dt, "date", _FixedDate)
+    calls = []
+
+    def fake_paged(api_id, body, *a, **k):
+        calls.append(body["base_dt"])
+        # 첫 콜(오늘 20260616)은 빈값, 폴백 콜(직전 거래일)은 데이터
+        return [] if body["base_dt"] == "20260616" else _rows()
+
+    monkeypatch.setattr(sector.client, "request_paged", fake_paged)
+    closes = sector.fetch_sector_closes("008")
+    assert closes == [475000.0, 480100.0, 477841.0]
+    assert calls[0] == "20260616"
+    assert calls[1] == "20260615"  # 직전 거래일(월)로 폴백
+
+
+def test_fetch_sector_closes_explicit_base_dt_no_fallback(monkeypatch):
+    """base_dt 명시 시 폴백 없이 그 날짜 1콜만(기존 동작 보존)."""
+    calls = []
+
+    def fake_paged(api_id, body, *a, **k):
+        calls.append(body["base_dt"])
+        return []
+
+    monkeypatch.setattr(sector.client, "request_paged", fake_paged)
+    closes = sector.fetch_sector_closes("008", base_dt="20260613")
+    assert closes == []
+    assert calls == ["20260613"]  # 폴백 안 함
+
+
 def test_kospi_sectors_curated():
     sectors = sector.KOSPI_SECTORS
     codes = {s["code"] for s in sectors}
