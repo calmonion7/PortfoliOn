@@ -1,6 +1,7 @@
 import Card from '../ui/Card'
 import './DashboardCard.css'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
+import SupplyBadge from '../ui/SupplyBadge'
 import { fmtPrice } from '../../utils'
 import FlashValue from './FlashValue'
 
@@ -123,6 +124,12 @@ export default function DashboardCard({ item, tick }) {
           <span className="dashcard__stat-label">매수가 대비 배당</span>
           <span className={`dashcard__stat-value tnum ${yocClass}`}>
             {yoc != null ? `${yoc.toFixed(2)}%` : '—'}
+          </span>
+        </div>
+        <div className="dashcard__stat dashcard__stat--full">
+          <span className="dashcard__stat-label">수급</span>
+          <span className="dashcard__stat-value">
+            <SupplyBadge band={item.supply?.band} />
           </span>
         </div>
       </div>

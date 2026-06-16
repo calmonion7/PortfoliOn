@@ -7,6 +7,7 @@ import HistoryTab from './HistoryTab'
 import { ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from './Sections'
 import InvestorTrendSection from './InvestorTrendSection'
 import ShortSellSection from './ShortSellSection'
+import SupplySection from './SupplySection'
 import LatestDisclosuresSection from './LatestDisclosuresSection'
 
 const noop = () => {}
@@ -104,6 +105,7 @@ export default function ReportDetailTabs({
                           market={market}
                         />
                       )}
+                      {market === 'KR' && <SupplySection ticker={ticker} />}
                       {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
                       {market === 'KR' && <ShortSellSection ticker={ticker} />}
                     </>
