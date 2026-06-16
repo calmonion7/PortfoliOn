@@ -38,11 +38,12 @@ _MARKET_BY_ID = {
     "kr_sector_fetch": "KR",
     "disclosure_fetch": "KR",
     "macro_signals_fetch": "US",
+    "supply_score_fetch": "KR",
 }
 
 
 def test_registry_has_sixteen_batches():
-    assert len(batch_registry.BATCHES) == 20
+    assert len(batch_registry.BATCHES) == 21
 
 
 def test_old_split_ids_absent():
@@ -63,11 +64,11 @@ def test_every_batch_has_valid_market():
 def test_market_classification_matches_adr():
     for b in batch_registry.BATCHES:
         assert b["market"] == _MARKET_BY_ID[b["id"]], b["id"]
-    # 분류 카운트: 국내 11 / 해외 5 / 공통 4 (macro_signals_fetch 추가, task 53)
+    # 분류 카운트: 국내 12 / 해외 5 / 공통 4 (supply_score_fetch 추가)
     counts = {"KR": 0, "US": 0, "공통": 0}
     for b in batch_registry.BATCHES:
         counts[b["market"]] += 1
-    assert counts == {"KR": 11, "US": 5, "공통": 4}
+    assert counts == {"KR": 12, "US": 5, "공통": 4}
 
 
 def test_new_earnings_entries_inherit_weekly_schedule():

@@ -224,6 +224,7 @@ def test_dashboard_totals_krw_conversion_mixed_currency():
          patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
          patch("routers.stocks.dividends.get_dividend", side_effect=fake_get_div), \
          patch("routers.stocks._usdkrw_rate", return_value=1300.0), \
+         patch("routers.stocks.supply_score.read_score", return_value=None), \
          patch("routers.stocks.query", return_value=[]):
         resp = client.get("/api/stocks/dashboard")
     totals = resp.json()["totals"]
@@ -336,6 +337,62 @@ def test_dashboard_card_includes_sector():
     assert resp.status_code == 200
     card = resp.json()["holdings"][0]
     assert card["sector"] == "Financials"
+
+
+def test_dashboard_supply_kr_populated_us_null():
+    """수급 스코어(ADR-0014): KR 보유만 저장값 {band,flags,as_of} 투영, US는 null."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    portfolio = {
+        "stocks": [
+            {"ticker": "005930.KS", "name": "삼성전자", "market": "KR",
+             "avg_cost": 60000.0, "quantity": 100, "exchange": "KS"},
+            {"ticker": "AAPL", "name": "Apple Inc.", "market": "US",
+             "avg_cost": 150.0, "quantity": 10, "exchange": ""},
+        ],
+        "watchlist": [],
+    }
+    quotes = {
+        "005930.KS": {"ticker": "005930.KS", "price": 70000.0, "market": "KR"},
+        "AAPL": {"ticker": "AAPL", "price": 185.2, "market": "US"},
+    }
+    score_row = {"ticker": "005930.KS", "computed_date": "2026-06-17",
+                 "band": "caution", "flags": ["공매도 비중 급증"],
+                 "as_of": {"short_sell": "2026-06-16", "investor": "2026-06-16"}}
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.stocks.market.get_quotes_batch", return_value=quotes), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.dividends.get_dividend", return_value=None), \
+         patch("routers.stocks.supply_score.read_score",
+               side_effect=lambda t: score_row if t.upper() == "005930.KS" else None), \
+         patch("routers.stocks.query", return_value=[]):
+        resp = client.get("/api/stocks/dashboard")
+    cards = {c["ticker"]: c for c in resp.json()["holdings"]}
+    kr = cards["005930.KS"]
+    assert kr["supply"] == {"band": "caution", "flags": ["공매도 비중 급증"],
+                            "as_of": {"short_sell": "2026-06-16", "investor": "2026-06-16"}}
+    # US는 read_score 결과 무관하게 null (KR 게이트)
+    assert cards["AAPL"]["supply"] is None
+
+
+def test_supply_score_endpoint_returns_projection():
+    score_row = {"ticker": "005930.KS", "computed_date": "2026-06-17",
+                 "band": "favorable", "flags": ["공매도 비중 둔화"],
+                 "as_of": {"short_sell": "2026-06-16", "investor": None}}
+    with patch("routers.stocks.supply_score.read_score", return_value=score_row):
+        resp = client.get("/api/stocks/005930.KS/supply-score")
+    assert resp.status_code == 200
+    assert resp.json() == {"band": "favorable", "flags": ["공매도 비중 둔화"],
+                           "as_of": {"short_sell": "2026-06-16", "investor": None}}
+
+
+def test_supply_score_endpoint_null_when_absent():
+    with patch("routers.stocks.supply_score.read_score", return_value=None):
+        resp = client.get("/api/stocks/AAPL/supply-score")
+    assert resp.status_code == 200
+    assert resp.json() is None
 
 
 def test_get_stock_news_returns_list_and_calls_scraper():

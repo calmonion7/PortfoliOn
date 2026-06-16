@@ -204,7 +204,7 @@ FastAPI (:8000)
  │              consensus / consensus_pipeline, digest_service,
  │              market_indicators/(fx·vix·commodities·earnings·econ·exports·macro),
  │              leverage_service, lending_service, ranking_service,
- │              investor_service, short_sell_service, backlog, disclosures,
+ │              investor_service, short_sell_service, supply_score, backlog, disclosures,
  │              dividends, analysis_service, kr_sector_service,
  │              guru_scraper / guru_stats, batch_registry, job_runs,
  │              kiwoom/, kis/, auth_service, cache, db, errors, parallel, progress
@@ -212,7 +212,7 @@ FastAPI (:8000)
  │
  └─ PostgreSQL 16
      ├─ users / refresh_tokens                  (인증)
-     ├─ tickers / user_stocks / stock_dividends   (종목·배당)
+     ├─ tickers / user_stocks / stock_dividends / stock_supply_score   (종목·배당·수급 스코어)
      ├─ snapshots / raw_reports / stock_disclosures   (리포트·공시)
      ├─ schedules / guru_schedules / guru_managers   (스케줄·구루)
      ├─ digests / consensus_history / daily_consensus_mart

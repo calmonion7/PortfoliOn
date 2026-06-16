@@ -15,6 +15,7 @@ from services import cache as cache_svc
 from services import consensus as consensus_svc
 from services import job_runs
 from services import dividends
+from services import supply_score
 from services.market_indicators.cache import _mc_load
 from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID, require_admin
 
@@ -164,6 +165,17 @@ def get_stock_news(ticker: str, market: str = "US"):
     return {"news": news}
 
 
+@router.get("/{ticker}/supply-score")
+def get_supply_score(ticker: str, user_id: str = Depends(get_current_user)):
+    """종목 수급 종합 스코어(ADR-0014) 저장값 조회 — 라이브 호출 0.
+
+    저장된 {band,flags,as_of}만 투영해 반환. 미산출(US·결측 포함)이면 None."""
+    score = supply_score.read_score(ticker)
+    if not score:
+        return None
+    return {"band": score.get("band"), "flags": score.get("flags"), "as_of": score.get("as_of")}
+
+
 @router.get("")
 def get_stocks(user_id: str = Depends(get_current_user_or_api_key)):
     portfolio = storage.get_global_portfolio() if user_id == _API_KEY_USER_ID else storage.get_full_portfolio(user_id)
@@ -251,6 +263,18 @@ def _run_dividends_all():
         fetch_all_dividends()
 
 
+@router.post("/supply-score/refresh", status_code=202)
+def refresh_supply_score(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+    background_tasks.add_task(_run_supply_score_all)
+    return {"message": "수급 종합 스코어 전 종목 산출 시작"}
+
+
+def _run_supply_score_all():
+    from scheduler import _supply_score_work
+    with job_runs.record("supply_score_fetch", "manual"):
+        _supply_score_work()
+
+
 def _usdkrw_rate() -> "float | None":
     """저장된 USD/KRW 환율(market_cache 'fx')만 읽는다 — 요청 경로 라이브 FX 호출 0.
 
@@ -313,6 +337,14 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
         expected_income = (round(annual_div * qty, 2)
                            if (annual_div is not None and qty) else None)
 
+        # 수급 종합 스코어(ADR-0014): KR 종목만 저장값(stock_supply_score) 조회 — 라이브 호출 0.
+        # US/결측은 None. read_score 행에서 {band,flags,as_of}만 투영.
+        supply = None
+        if (stock.get("market") or "US") == "KR":
+            score = supply_score.read_score(ticker)
+            if score:
+                supply = {"band": score.get("band"), "flags": score.get("flags"), "as_of": score.get("as_of")}
+
         return {
             "ticker": ticker,
             "name": stock.get("name", ticker),
@@ -339,6 +371,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "dividend_yield": div_yield,
             "yield_on_cost": yield_on_cost,
             "expected_annual_income": expected_income,
+            "supply": supply,
         }
 
     def _portfolio_totals(cards: list) -> "dict | None":

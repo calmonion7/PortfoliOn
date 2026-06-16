@@ -93,6 +93,17 @@ def _migrate():
             fetched_at TIMESTAMPTZ DEFAULT NOW())""")
     except Exception as e:
         print(f"[migrate] stock_dividends 생성 실패: {e}")
+    try:
+        from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS stock_supply_score (
+            ticker TEXT PRIMARY KEY,
+            computed_date DATE NOT NULL,
+            band TEXT NOT NULL,
+            flags JSONB NOT NULL DEFAULT '[]'::jsonb,
+            as_of JSONB,
+            created_at TIMESTAMPTZ DEFAULT NOW())""")
+    except Exception as e:
+        print(f"[migrate] stock_supply_score 생성 실패: {e}")
 
 
 @asynccontextmanager

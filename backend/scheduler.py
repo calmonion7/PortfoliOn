@@ -218,8 +218,12 @@ def _investor_trend_work():
     from services.db import query as db_query
 
     try:
+        # 랭킹 KR ∪ 보유/관심 KR (랭킹 밖 보유/관심 종목도 커버)
         tickers = [r["ticker"] for r in db_query(
-            "SELECT DISTINCT ticker FROM market_rankings WHERE market = 'KR'")]
+            "SELECT DISTINCT ticker FROM market_rankings WHERE market = 'KR' "
+            "UNION "
+            "SELECT DISTINCT t.ticker FROM tickers t "
+            "JOIN user_stocks us ON us.ticker = t.ticker WHERE t.market = 'KR'")]
     except Exception as e:
         print(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
         return
@@ -256,6 +260,51 @@ def _investor_trend_work():
 def _fetch_short_sell():
     with job_runs.record("short_sell_fetch", "auto"):
         _short_sell_work()
+
+
+def _fetch_supply_score():
+    with job_runs.record("supply_score_fetch", "auto"):
+        _supply_score_work()
+
+
+def _supply_score_work():
+    """보유/관심 KR 종목 수급 종합 스코어 산출 배치(.forge/adr/0014).
+
+    저장된 공매도(market_short_sell)+외인/기관(market_investor_trend) 시계열에서
+    파생 산출 — 요청·기동 경로 라이브 외부 호출 0(short_sell_fetch 18:30·
+    investor_trend_fetch 18:00 이후 19:00 실행). 산출 불가(None)면 save 생략+로깅
+    (silent except 금지, 직전 양호값 유지)."""
+    from services import short_sell_service, investor_service, supply_score
+    from services.db import query as db_query
+
+    try:
+        tickers = [r["ticker"] for r in db_query(
+            "SELECT DISTINCT t.ticker FROM tickers t "
+            "JOIN user_stocks us ON us.ticker = t.ticker WHERE t.market = 'KR'")]
+    except Exception as e:
+        print(f"[Scheduler] Supply score: failed to fetch KR universe: {e}")
+        return
+
+    if not tickers:
+        print("[Scheduler] Supply score: no KR tickers")
+        return
+
+    saved = 0
+    for ticker in tickers:
+        try:
+            short_series = short_sell_service.read_series(ticker)
+            investor_series = investor_service.read_series(ticker)
+            result = supply_score.compute_band(short_series, investor_series)
+            if result is None:
+                # 양쪽 시계열 모두 결측 — 직전 양호값 유지(빈/None 박제 금지)
+                print(f"[Scheduler] Supply score: no data for {ticker}, skipping save")
+                continue
+            supply_score.upsert_score(
+                ticker, result["band"], result["flags"], result["as_of"])
+            saved += 1
+        except Exception as e:
+            print(f"[Scheduler] Supply score failed for {ticker}: {e}")
+    print(f"[Scheduler] Supply score computed for {saved}/{len(tickers)} KR tickers")
 
 
 def _fetch_kr_sector():
@@ -347,6 +396,7 @@ _JOB_FUNCS = {
     "us_rankings_fetch": _fetch_us_rankings,
     "investor_trend_fetch": _fetch_investor_trend,
     "short_sell_fetch": _fetch_short_sell,
+    "supply_score_fetch": _fetch_supply_score,
     "backlog_fetch": _fetch_backlog,
     "kr_sector_fetch": _fetch_kr_sector,
     "disclosure_fetch": _fetch_disclosures,

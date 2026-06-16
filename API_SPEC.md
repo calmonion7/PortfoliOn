@@ -674,7 +674,8 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
       "annual_dividend_per_share": 1.0,
       "dividend_yield": 0.57,
       "yield_on_cost": 0.67,
-      "expected_annual_income": 10.0
+      "expected_annual_income": 10.0,
+      "supply": null
     }
   ],
   "totals": {
@@ -691,6 +692,15 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 | `dividend_yield` | float \| null | 배당수익률(%) |
 | `yield_on_cost` | float \| null | 매수가 대비 수익률(%) = `annual_dividend_per_share / avg_cost × 100`. `avg_cost` 없으면 `null` |
 | `expected_annual_income` | float \| null | 연 예상배당 = `annual_dividend_per_share × quantity`(종목 통화). `quantity` 없으면 `null` |
+
+| 필드 (수급 스코어) | 타입 | 설명 |
+|------|------|------|
+| `supply` | object \| null | 수급 종합 스코어(ADR-0014). **KR 종목만** 저장값(`stock_supply_score`)을 투영, US·미산출은 `null`. 저장값만 읽음(라이브 호출 0). 형태: `{ "band": ..., "flags": [...], "as_of": {...} }` |
+| `supply.band` | string | 밴드 enum 3종: `"favorable"` \| `"neutral"` \| `"caution"` |
+| `supply.flags` | string[] | 근거 플래그(한국어 문자열 리스트, 예: `"공매도 비중 급증"`, `"외인/기관 동반 순매도"`, `"외인/기관 데이터 부족"`). 켜진 신호 없으면 `[]` |
+| `supply.as_of` | object | 입력 데이터 기준일 `{ "short_sell": "YYYY-MM-DD" \| null, "investor": "YYYY-MM-DD" \| null }`. 결측 소스는 `null` |
+
+> **band enum ↔ 표시 매핑** (프론트 표시용): `favorable` = 우호, `neutral` = 중립, `caution` = 경계. 저장값은 locale-독립 영문 enum이고, 한국어 표시는 소비처(프론트)가 매핑한다.
 
 | 필드 (`totals`) | 타입 | 설명 |
 |------|------|------|
@@ -713,6 +723,31 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 ---
 
+### `GET /api/stocks/{ticker}/supply-score`
+
+종목 수급 종합 스코어(ADR-0014) 저장값(`stock_supply_score`) 조회. 저장값만 읽음(라이브 호출 0). 미산출(US·결측 포함)이면 `null`.
+
+**Auth:** Bearer token 필요
+
+**Response `200`** — 산출값이 있으면 객체, 없으면 `null`
+```json
+{
+  "band": "neutral",
+  "flags": ["공매도 비중 급증", "외인/기관 데이터 부족"],
+  "as_of": { "short_sell": "2026-06-16", "investor": null }
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `band` | string | 밴드 enum 3종: `"favorable"`(우호) \| `"neutral"`(중립) \| `"caution"`(경계) |
+| `flags` | string[] | 근거 플래그(한국어 문자열 리스트). 켜진 신호 없으면 `[]` |
+| `as_of` | object | 입력 데이터 기준일 `{ "short_sell": "YYYY-MM-DD" \| null, "investor": "YYYY-MM-DD" \| null }` |
+
+> 대시보드 응답의 `supply` 필드와 동일 형태·동일 저장원. 밴드 enum ↔ 표시 매핑은 `GET /api/stocks/dashboard` 절 참고.
+
+---
+
 ### `POST /api/stocks/dividends/refresh`
 
 보유·관심 종목의 배당(연 주당배당·배당수익률)을 시장별 소스에서 전 종목 재수집해 `stock_dividends`에 저장. US=yfinance, KR=DART alotMatter. 백그라운드 실행(`dividend_fetch` 배치 manual lane). **admin 전용.**
@@ -725,6 +760,21 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 ```
 
 > `dividend_fetch` 자동 배치(`GET /api/batches`)와 동일 수집 로직. 무배당/결측 종목은 저장하지 않음(빈 박제 방지).
+
+---
+
+### `POST /api/stocks/supply-score/refresh`
+
+보유·관심 KR 종목 수급 종합 스코어(ADR-0014)를 저장된 공매도(`market_short_sell`)+외인/기관(`market_investor_trend`) 시계열에서 전 종목 재산출해 `stock_supply_score`에 저장. 백그라운드 실행(`supply_score_fetch` 배치 manual lane). **admin 전용.**
+
+**Auth:** Bearer token + admin
+
+**Response `202`**
+```json
+{ "message": "수급 종합 스코어 전 종목 산출 시작" }
+```
+
+> `supply_score_fetch` 자동 배치(`GET /api/batches`)와 동일 산출 로직. 양쪽 시계열이 모두 결측인 종목은 저장하지 않음(직전 양호값 유지, 빈 박제 방지).
 
 ---
 
