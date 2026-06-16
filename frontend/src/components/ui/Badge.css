@@ -37,8 +37,8 @@
 }
 
 .badge--warning {
-  background: var(--warning-tint);
-  color: var(--color-warning);
+  background: var(--warn-soft);
+  color: var(--warn);
 }
 
 .badge--info {
