@@ -190,3 +190,48 @@ def test_short_history_no_crash():
     # 비교 불가하면 중립 + 데이터 부족 플래그(크래시 없음)
     assert out is not None
     assert out["band"] in ("neutral", "caution", "favorable")
+
+
+# ── 직전평균 0 베이스라인 급증(0→급증 regime 변화) ─────────────
+# 직전 20일 평균이 정확히 0인 종목(공매도 없던 종목)에 갑자기 활동이
+# 생기면 비율 기반 상대비교(pa>0 전제)는 사각이라 못 잡는다.
+# 절대 바닥(floor) 가드로 0→급증만 잡고 노이즈는 거른다.
+
+def test_zero_baseline_ratio_surge_fires_flag():
+    from services.supply_score import compute_band
+    # pa==0(직전 공매도 비중 0) & 최근 4%(>= 3.0 floor) → "공매도 비중 급증"
+    short_ratios = _flat(0.0, 20) + _flat(4.0, 5)
+    short = _short_series(short_ratios, _flat(1_000_000, 25))  # 잔량 평탄(신호 없음)
+    out = compute_band(short, [])
+    assert any("공매도 비중 급증" in f for f in out["flags"])
+
+
+def test_zero_baseline_balance_increase_fires_flag():
+    from services.supply_score import compute_band
+    # pb==0(직전 잔량 0) & 최근 양수 → "공매도 잔량 증가"
+    short_balances = _flat(0, 20) + _flat(1_000_000, 5)
+    short = _short_series(_flat(5.0, 25), short_balances)  # 비중 평탄(신호 없음)
+    out = compute_band(short, [])
+    assert any("공매도 잔량 증가" in f for f in out["flags"])
+
+
+def test_zero_baseline_ratio_below_floor_no_flag():
+    from services.supply_score import compute_band
+    # pa==0이지만 최근 2%(< 3.0 floor) → 노이즈 가드, 급증 미발화
+    short_ratios = _flat(0.0, 20) + _flat(2.0, 5)
+    short = _short_series(short_ratios, _flat(1_000_000, 25))
+    out = compute_band(short, [])
+    assert not any("공매도 비중 급증" in f for f in out["flags"])
+
+
+def test_zero_baseline_both_signals_caution():
+    from services.supply_score import compute_band
+    # 공매도 없던 종목이 갑자기 활성화: 비중 0→4%(>=floor) + 잔량 0→양수
+    # → 신규 경계 플래그 2개 → 밴드 caution (밴드 종합 규칙 불변)
+    short_ratios = _flat(0.0, 20) + _flat(4.0, 5)
+    short_balances = _flat(0, 20) + _flat(1_000_000, 5)
+    short = _short_series(short_ratios, short_balances)
+    out = compute_band(short, [])
+    assert out["band"] == "caution"
+    assert any("공매도 비중 급증" in f for f in out["flags"])
+    assert any("공매도 잔량 증가" in f for f in out["flags"])

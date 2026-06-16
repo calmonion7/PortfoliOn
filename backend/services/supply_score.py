@@ -21,6 +21,8 @@ PRIOR_DAYS = 20      # 직전 거래일
 SHORT_RATIO_SURGE_RATIO = 1.5     # 급증(경계 후보): 최근이 직전의 1.5배 이상
 SHORT_RATIO_STRONG_RATIO = 3.0    # 강한 단일 급증: 3배 이상 → 단독으로도 경계
 SHORT_RATIO_EASE_RATIO = 0.7      # 둔화(우호 후보): 최근이 직전의 0.7배 이하
+# 직전평균 0 베이스라인 급증(0→급증): 비율 비교 불가하므로 절대 바닥(%)으로 가드
+SHORT_RATIO_SURGE_FLOOR = 3.0     # pa==0일 때 최근평균이 이 이상이면 급증(노이즈 가드)
 # 공매도 잔량(short_balance): 최근평균 / 직전평균 비율로 증가 판정
 SHORT_BALANCE_INCREASE_RATIO = 1.2  # 증가(경계 후보): 최근이 직전의 1.2배 이상
 # 외인+기관 동반 순매수/순매도: 최근 5일 vs 직전 20일 일평균 순매수의 변화(주식 수/일)
@@ -97,6 +99,10 @@ def compute_band(short_series, investor_series):
             elif ra <= pa * SHORT_RATIO_EASE_RATIO:
                 flags.append("공매도 비중 둔화")
                 favorable_flags += 1
+        elif pa is not None and pa == 0 and ra is not None and ra >= SHORT_RATIO_SURGE_FLOOR:
+            # 0→급증: 직전 평균이 0이라 비율 비교 불가 → 절대 바닥으로만 판정
+            flags.append("공매도 비중 급증")
+            caution_flags += 1
 
         r_bal, p_bal = _windows(short_series, "short_balance")
         rb, pb = _avg(r_bal), _avg(p_bal)
@@ -104,6 +110,10 @@ def compute_band(short_series, investor_series):
             if rb >= pb * SHORT_BALANCE_INCREASE_RATIO:
                 flags.append("공매도 잔량 증가")
                 caution_flags += 1
+        elif pb is not None and pb == 0 and rb is not None and rb > 0:
+            # 0→양수: 잔량 regime 변화(주식수 절대 바닥은 종목별 임의라 미사용)
+            flags.append("공매도 잔량 증가")
+            caution_flags += 1
 
     # ── 외인/기관 신호 ──
     if investor_series:
