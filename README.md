@@ -111,22 +111,23 @@ UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
 |------|------|
 | 보유/관심 추가·수정·삭제·승격 | 티커·종목명·매수가·수량·시장(KR/US), 추가 시 실명 자동 채움 |
 | 검색 · 시장 필터 | 종목명/티커 검색, KR/US 필터 |
-| 분석 탭 | 섹터 모멘텀(11개 섹터 ETF), 매크로 상관(TLT/UUP/USO/VIX), 보유 종목 상관관계 히트맵 |
+| 배당 트래킹 | 보유 종목 배당수익률·매수가 대비 수익률·연 예상배당, 포트폴리오 KRW 환산 총계 |
+| 분석 탭 | 섹터 모멘텀(US=11개 섹터 ETF / KR=KRX 업종 모멘텀, KR/US 토글), 매크로 상관(TLT/UUP/USO/VIX), 보유 종목 상관관계 히트맵 |
 
 ### 리서치 (Research 허브)
 
 | 탭 | 설명 |
 |------|------|
-| 리포트 | 종목별 4탭(요약·심층분석·리포트·이력), 주가·RSI 차트, 목표가 컨센서스·괴리율, 수주잔고, 공매도·수급 추이. 즉시 생성·과거 백필(admin) |
+| 리포트 | 종목별 4탭(요약·심층분석·리포트·이력), 주가·RSI 차트, 목표가 컨센서스·괴리율, 수주잔고, 공매도·수급 추이, 최신 공시(DART). 즉시 생성·과거 백필(admin) |
 | 랭킹 | 거래대금·거래량·등락률 상위(KR/US) + 외국인/기관/개인 수급(랭킹·리포트 상세 공유) |
-| 다이제스트 | 보유·관심 종목 요약 매일 자동 생성(텔레그램 발송) |
+| 다이제스트 | 보유·관심 종목 요약 + 최신 공시 매일 자동 생성(텔레그램 발송) |
 | 캘린더 | 실적 발표일·배당락일 월간 그리드 |
 
 ### 시장 (MarketHub)
 
 | 탭 | 설명 |
 |------|------|
-| 시장지표 | 국채, FX, VIX, 원자재, 경제지표(FRED), M7/KR Top2 실적, KR 수출 |
+| 시장지표 | 국채, FX, VIX, 원자재, 경제지표(FRED), 매크로 신호(금리차·HY 스프레드·M2·기준금리 + 신호 해석), M7/KR Top2 실적, KR 수출 |
 | 수급지표 | 신용잔고·반대매매, 내외국인 대차잔고 |
 
 ### 구루 (Guru)
@@ -143,7 +144,7 @@ UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
 
 | 기능 | 설명 |
 |------|------|
-| 배치 현황 허브 | 전 배치의 주기·사용처·다음 실행·실행 이력 열람. 스케줄 편집·즉시 실행은 admin. 국내/해외/공통 시장 탭으로 구분 |
+| 배치 현황 허브 | 전 배치의 주기·데이터 소스(fetch 출처)·사용처·다음 실행·실행 이력 열람. 스케줄 편집·즉시 실행은 admin. 국내/해외/공통 시장 탭으로 구분 |
 | 권한 관리 | 사용자별 메뉴 접근 권한 (admin) |
 
 ### 행동 (AdminAnalytics, admin 전용)
@@ -201,17 +202,18 @@ FastAPI (:8000)
  ├─ services/   market(yfinance+키움/KIS+Naver), charts, indicators,
  │              report_generator(시장데이터 스냅샷·LLM 미호출),
  │              consensus / consensus_pipeline, digest_service,
- │              market_indicators/(fx·vix·commodities·earnings·econ·exports),
+ │              market_indicators/(fx·vix·commodities·earnings·econ·exports·macro),
  │              leverage_service, lending_service, ranking_service,
- │              investor_service, short_sell_service, backlog, analysis_service,
+ │              investor_service, short_sell_service, backlog, disclosures,
+ │              dividends, analysis_service, kr_sector_service,
  │              guru_scraper / guru_stats, batch_registry, job_runs,
  │              kiwoom/, kis/, auth_service, cache, db, errors, parallel, progress
  ├─ scheduler.py  APScheduler 배치(시장별 분리 포함)
  │
  └─ PostgreSQL 16
      ├─ users / refresh_tokens                  (인증)
-     ├─ tickers / user_stocks                   (종목)
-     ├─ snapshots / raw_reports                 (리포트)
+     ├─ tickers / user_stocks / stock_dividends   (종목·배당)
+     ├─ snapshots / raw_reports / stock_disclosures   (리포트·공시)
      ├─ schedules / guru_schedules / guru_managers   (스케줄·구루)
      ├─ digests / consensus_history / daily_consensus_mart
      ├─ calendar_cache / market_cache
