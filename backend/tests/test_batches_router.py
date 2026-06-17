@@ -29,6 +29,7 @@ EXPECTED_IDS = {
     "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
     "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "guru_crawl", "backlog_fetch",
     "kr_sector_fetch", "disclosure_fetch", "dividend_fetch", "supply_score_fetch",
+    "insider_fetch",
 }
 
 
@@ -40,7 +41,7 @@ def test_lists_sixteen_batches_with_required_fields():
         resp = client.get("/api/batches")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 21
+    assert len(data) == 22
     assert {b["id"] for b in data} == EXPECTED_IDS
     for b in data:
         assert REQUIRED_FIELDS.issubset(b.keys()), b["id"]

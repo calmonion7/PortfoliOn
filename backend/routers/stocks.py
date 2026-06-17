@@ -16,6 +16,7 @@ from services import consensus as consensus_svc
 from services import job_runs
 from services import dividends
 from services import supply_score
+from services import insider_trades
 from services.market_indicators.cache import _mc_load
 from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID, require_admin
 
@@ -345,6 +346,12 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             if score:
                 supply = {"band": score.get("band"), "flags": score.get("flags"), "as_of": score.get("as_of")}
 
+        # 내부자·5%지분 순매수 신호(S6): KR 종목만 저장값(stock_insider_trades) 집계 — 라이브 DART 0.
+        # US/무데이터는 None. compute_net_signal에서 {direction,net_shares,count,window_days} 투영.
+        insider = None
+        if (stock.get("market") or "US") == "KR":
+            insider = insider_trades.compute_net_signal(ticker)
+
         return {
             "ticker": ticker,
             "name": stock.get("name", ticker),
@@ -372,6 +379,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "yield_on_cost": yield_on_cost,
             "expected_annual_income": expected_income,
             "supply": supply,
+            "insider": insider,
         }
 
     def _portfolio_totals(cards: list) -> "dict | None":

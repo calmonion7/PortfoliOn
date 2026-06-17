@@ -111,6 +111,7 @@ def generate(user_id: str, today: date = None) -> dict:
     )
 
     disclosures = _recent_disclosure_feed(holdings, today)
+    insider_trades = _recent_insider_trades(holdings, today)
 
     kst = timezone(timedelta(hours=9))
     digest = {
@@ -125,6 +126,7 @@ def generate(user_id: str, today: date = None) -> dict:
         "events_7d": events_7d,
         "anomalies": anomalies,
         "disclosures": disclosures,
+        "insider_trades": insider_trades,
     }
 
     try:
@@ -171,6 +173,31 @@ def _recent_disclosure_feed(holdings: list[dict], today: date) -> list[dict]:
                 "dart_url": r.get("dart_url"),
             })
     out.sort(key=lambda x: (x.get("rcept_dt") or ""), reverse=True)
+    return out
+
+
+def _recent_insider_trades(holdings: list[dict], today: date) -> list[dict]:
+    """보유 종목 중 내부자·5%지분 순매수/순매도 신호가 있는 종목(윈도 내).
+
+    services.insider_trades.compute_net_signal(=stock_insider_trades 테이블)에서만
+    읽는다 — tickers.recent_disclosures(Cowork 코멘터리)는 건드리지 않는다([[공시 피드]] 경계).
+    direction이 neutral(신호 없음)인 종목은 제외."""
+    from services import insider_trades as ins_svc
+    out: list[dict] = []
+    for h in holdings:
+        ticker = h["ticker"].upper()
+        try:
+            sig = ins_svc.compute_net_signal(ticker)
+        except Exception:
+            continue
+        if sig["direction"] == "neutral":
+            continue
+        out.append({
+            "ticker": ticker,
+            "direction": sig["direction"],
+            "net_shares": sig["net_shares"],
+            "count": sig["count"],
+        })
     return out
 
 

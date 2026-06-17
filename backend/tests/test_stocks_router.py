@@ -225,6 +225,8 @@ def test_dashboard_totals_krw_conversion_mixed_currency():
          patch("routers.stocks.dividends.get_dividend", side_effect=fake_get_div), \
          patch("routers.stocks._usdkrw_rate", return_value=1300.0), \
          patch("routers.stocks.supply_score.read_score", return_value=None), \
+         patch("routers.stocks.insider_trades.compute_net_signal",
+               return_value={"direction": "neutral", "net_shares": 0, "count": 0, "window_days": 90}), \
          patch("routers.stocks.query", return_value=[]):
         resp = client.get("/api/stocks/dashboard")
     totals = resp.json()["totals"]
@@ -367,6 +369,8 @@ def test_dashboard_supply_kr_populated_us_null():
          patch("routers.stocks.dividends.get_dividend", return_value=None), \
          patch("routers.stocks.supply_score.read_score",
                side_effect=lambda t: score_row if t.upper() == "005930.KS" else None), \
+         patch("routers.stocks.insider_trades.compute_net_signal",
+               return_value={"direction": "neutral", "net_shares": 0, "count": 0, "window_days": 90}), \
          patch("routers.stocks.query", return_value=[]):
         resp = client.get("/api/stocks/dashboard")
     cards = {c["ticker"]: c for c in resp.json()["holdings"]}
@@ -375,6 +379,42 @@ def test_dashboard_supply_kr_populated_us_null():
                             "as_of": {"short_sell": "2026-06-16", "investor": "2026-06-16"}}
     # US는 read_score 결과 무관하게 null (KR 게이트)
     assert cards["AAPL"]["supply"] is None
+
+
+def test_dashboard_insider_kr_populated_us_null():
+    """S6 내부자 신호: KR 보유만 compute_net_signal 투영, US는 null(additive)."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    portfolio = {
+        "stocks": [
+            {"ticker": "005930.KS", "name": "삼성전자", "market": "KR",
+             "avg_cost": 60000.0, "quantity": 100, "exchange": "KS"},
+            {"ticker": "AAPL", "name": "Apple Inc.", "market": "US",
+             "avg_cost": 150.0, "quantity": 10, "exchange": ""},
+        ],
+        "watchlist": [],
+    }
+    quotes = {
+        "005930.KS": {"ticker": "005930.KS", "price": 70000.0, "market": "KR"},
+        "AAPL": {"ticker": "AAPL", "price": 185.2, "market": "US"},
+    }
+    signal = {"direction": "buy", "net_shares": 12000, "count": 3, "window_days": 90}
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.stocks.market.get_quotes_batch", return_value=quotes), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.dividends.get_dividend", return_value=None), \
+         patch("routers.stocks.supply_score.read_score", return_value=None), \
+         patch("routers.stocks.insider_trades.compute_net_signal",
+               return_value=signal) as cns, \
+         patch("routers.stocks.query", return_value=[]):
+        resp = client.get("/api/stocks/dashboard")
+    cards = {c["ticker"]: c for c in resp.json()["holdings"]}
+    assert cards["005930.KS"]["insider"] == signal
+    # US는 KR 게이트로 null이며 compute_net_signal을 호출하지 않음
+    assert cards["AAPL"]["insider"] is None
+    assert all(c.args[0] == "005930.KS" for c in cns.call_args_list)
 
 
 def test_supply_score_endpoint_returns_projection():

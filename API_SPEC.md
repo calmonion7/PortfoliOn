@@ -675,7 +675,8 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
       "dividend_yield": 0.57,
       "yield_on_cost": 0.67,
       "expected_annual_income": 10.0,
-      "supply": null
+      "supply": null,
+      "insider": null
     }
   ],
   "totals": {
@@ -701,6 +702,14 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 | `supply.as_of` | object | 입력 데이터 기준일 `{ "short_sell": "YYYY-MM-DD" \| null, "investor": "YYYY-MM-DD" \| null }`. 결측 소스는 `null` |
 
 > **band enum ↔ 표시 매핑** (프론트 표시용): `favorable` = 우호, `neutral` = 중립, `caution` = 경계. 저장값은 locale-독립 영문 enum이고, 한국어 표시는 소비처(프론트)가 매핑한다.
+
+| 필드 (내부자 신호) | 타입 | 설명 |
+|------|------|------|
+| `insider` | object \| null | 내부자·5%지분 순매수 신호. **KR 종목만** 저장값(`stock_insider_trades`)을 윈도(기본 90일) 집계, US·미매핑은 `null`. 저장값만 읽음(라이브 DART 0). 형태: `{ "direction": ..., "net_shares": ..., "count": ..., "window_days": ... }` |
+| `insider.direction` | string | 방향 enum 3종: `"buy"`(net>0) \| `"sell"`(net<0) \| `"neutral"`(net==0 또는 데이터 없음) |
+| `insider.net_shares` | int | 윈도 내 `shares_change` 합(부호 보존). 순매수면 양수, 순매도면 음수 |
+| `insider.count` | int | 윈도 내 집계된 보고 행 수 |
+| `insider.window_days` | int | 집계 윈도(달력일, 기본 90) |
 
 | 필드 (`totals`) | 타입 | 설명 |
 |------|------|------|
@@ -1175,6 +1184,53 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
+### `GET /api/report/{ticker}/insider-trades`
+
+종목의 내부자·5%지분 변동 공시 피드 + 순매수/순매도 신호 조회 (최신순). KR 종목 리포트 상세의 '내부자·5% 지분변동' 섹션이 사용. `insider_fetch` 배치가 채우는 `stock_insider_trades` 테이블에서 읽으며(DART `elestock.json`=임원·주요주주 소유보고 / `majorstock.json`=5% 대량보유보고 정규화), **Cowork가 enrich하는 `recent_disclosures`(애널리스트 코멘터리)와는 별도 store**다. 저장값만 읽고 요청경로 라이브 DART 호출은 0. **Auth 불필요.**
+
+**Response `200`**
+```json
+{
+  "trades": [
+    { "rcept_no": "20260612000123", "rcept_dt": "2026-06-12", "report_kind": "insider",
+      "repror": "홍길동", "rel": "대표이사", "shares_change": 12000, "shares_after": 320000,
+      "rate_after": 0.54, "dart_url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260612000123" }
+  ],
+  "signal": { "direction": "buy", "net_shares": 12000, "count": 3, "window_days": 90 }
+}
+```
+
+| 필드 (`trades[]`) | 타입 | 설명 |
+|------|------|------|
+| `rcept_no` | string | DART 접수번호 |
+| `rcept_dt` | string\|null | 접수일자 (`YYYY-MM-DD`) |
+| `report_kind` | string | 공시 종류: `insider`(임원·주요주주 소유보고, elestock) \| `major5`(5% 대량보유보고, majorstock) |
+| `repror` | string\|null | 보고자명 |
+| `rel` | string\|null | 회사와의 관계 |
+| `shares_change` | int\|null | 증감 주식 수(부호 보존: 양수=취득, 음수=처분) |
+| `shares_after` | int\|null | 변동 후 보유 주식 수 |
+| `rate_after` | float\|null | 변동 후 지분율(%) |
+| `dart_url` | string | DART 원문 뷰어 URL |
+
+| 필드 (`signal`) | 타입 | 설명 |
+|------|------|------|
+| `direction` | string | 윈도 순신호 enum 3종: `buy`(net>0) \| `sell`(net<0) \| `neutral`(net==0 또는 데이터 없음) |
+| `net_shares` | int | 윈도 내 `shares_change` 합(부호 보존) |
+| `count` | int | 윈도 내 집계된 보고 행 수 |
+| `window_days` | int | 집계 윈도(달력일, 기본 90) |
+
+> 비-KR 종목·corp_code 미매핑 종목은 `trades` 빈 배열·`signal.direction` `"neutral"`을 반환한다.
+
+---
+
+### `POST /api/report/insider-trades/refresh`
+
+전 KR 종목(보유+관심) 내부자·5%지분 공시 피드 재수집(`insider_fetch` 배치 수동 트리거). 백그라운드 실행, 즉시 202. **Auth:** admin.
+
+**Response `202`** — `{ "message": "내부자 지분공시 전 종목 수집 시작" }`
+
+---
+
 ## Consensus (컨센서스)
 
 ### `GET /api/consensus/batch/progress`
@@ -1253,9 +1309,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(20종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(22종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
 
-> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다.
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 내부자·5%지분 공시 신호 수집 `insider_fetch`(매일 07:45 KST, `market="KR"` — DART 출처)는 수동 트리거 `POST /api/report/insider-trades/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다.
 
 **Auth:** Bearer token 필요
 
@@ -1437,6 +1493,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "disclosures": [
     { "ticker": "005930", "rcept_dt": "20260522", "report_nm": "주요사항보고서(유상증자결정)",
       "pblntf_ty": "B", "corp_name": "삼성전자", "dart_url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=..." }
+  ],
+  "insider_trades": [
+    { "ticker": "005930", "direction": "buy", "net_shares": 12000, "count": 3 }
   ]
 }
 ```
@@ -1444,6 +1503,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `disclosures[]` | array | 보유 KR 종목의 최근 DART 공시 피드(`stock_disclosures`에서 읽음). Cowork 코멘터리 `recent_disclosures`와 무관 |
+| `insider_trades[]` | array | 보유 KR 종목 중 내부자·5%지분 순매수/순매도 신호가 있는 종목(`stock_insider_trades` 윈도 집계). neutral(신호 없음)은 제외. 각 항목 `{ "ticker", "direction": "buy"\|"sell", "net_shares"(부호 보존), "count" }` |
 
 **Error `404`** — 아직 생성된 다이제스트 없음
 
@@ -1451,7 +1511,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `POST /api/digest/generate`
 
-다이제스트 즉시 생성 (동기). 응답 형태는 `GET /api/digest/latest`와 동일(`disclosures` 포함).
+다이제스트 즉시 생성 (동기). 응답 형태는 `GET /api/digest/latest`와 동일(`disclosures`·`insider_trades` 포함).
 
 **Auth:** Bearer token 필요
 

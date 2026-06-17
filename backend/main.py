@@ -104,6 +104,23 @@ def _migrate():
             created_at TIMESTAMPTZ DEFAULT NOW())""")
     except Exception as e:
         print(f"[migrate] stock_supply_score 생성 실패: {e}")
+    try:
+        from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS stock_insider_trades (
+            row_hash TEXT PRIMARY KEY,
+            ticker TEXT NOT NULL,
+            report_kind TEXT NOT NULL,
+            rcept_no TEXT NOT NULL,
+            rcept_dt DATE,
+            repror TEXT,
+            rel TEXT,
+            shares_change BIGINT,
+            shares_after BIGINT,
+            rate_after NUMERIC,
+            fetched_at TIMESTAMPTZ DEFAULT NOW())""")
+        execute("CREATE INDEX IF NOT EXISTS idx_insider_read ON stock_insider_trades(ticker, rcept_dt DESC)")
+    except Exception as e:
+        print(f"[migrate] stock_insider_trades 생성 실패: {e}")
 
 
 @asynccontextmanager

@@ -171,6 +171,16 @@ def _fetch_disclosures():
             print(f"[Scheduler] Disclosure fetch failed: {e}")
 
 
+def _fetch_insider():
+    from services.insider_trades import fetch_all_insider_trades
+    with job_runs.record("insider_fetch", "auto"):
+        try:
+            r = fetch_all_insider_trades()
+            print(f"[Scheduler] Insider trades fetched: {r}")
+        except Exception as e:
+            print(f"[Scheduler] Insider fetch failed: {e}")
+
+
 def _fetch_dividends():
     from services.dividends import fetch_all_dividends
     with job_runs.record("dividend_fetch", "auto"):
@@ -401,6 +411,7 @@ _JOB_FUNCS = {
     "kr_sector_fetch": _fetch_kr_sector,
     "disclosure_fetch": _fetch_disclosures,
     "dividend_fetch": _fetch_dividends,
+    "insider_fetch": _fetch_insider,
 }
 
 

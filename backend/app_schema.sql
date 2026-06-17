@@ -285,6 +285,23 @@ CREATE TABLE IF NOT EXISTS stock_supply_score (
     created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 내부자·5% 지분공시 신호 (보유∪관심 KR 종목의 DART elestock/majorstock 보고 — KR 전용)
+-- 한 rcept_no에 보고자 다중행이라 rcept_no 단독 PK 불가 → 결정적 행 해시 PK로 멱등.
+CREATE TABLE IF NOT EXISTS stock_insider_trades (
+    row_hash      TEXT PRIMARY KEY,                         -- md5(rcept_no|report_kind|repror|shares_change|shares_after|rate_after)
+    ticker        TEXT NOT NULL,
+    report_kind   TEXT NOT NULL,                            -- insider | major5
+    rcept_no      TEXT NOT NULL,                            -- DART 접수번호
+    rcept_dt      DATE,                                     -- 접수일
+    repror        TEXT,                                     -- 보고자
+    rel           TEXT,                                     -- 직위(insider) / 보고구분(major5)
+    shares_change BIGINT,                                   -- 증감주식수 (+/−, 음수=순매도)
+    shares_after  BIGINT,                                   -- 거래 후 보유 주식수
+    rate_after    NUMERIC,                                  -- 거래 후 보유비율 %
+    fetched_at    TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_insider_read ON stock_insider_trades(ticker, rcept_dt DESC);
+
 -- 배치 실행로그 (job_id별 최근 20건만 보관)
 -- 배포 주의: 이 파일은 빈 pgdata 최초 init 때만 자동 적용된다(docker-compose의 initdb 마운트).
 --   기존 운영 DB는 pgdata가 이미 채워져 있으므로 git push 자동배포로는 아래 두 문장이 적용되지 않는다.

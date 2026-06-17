@@ -332,6 +332,18 @@ def _run_disclosures_all():
         fetch_all_disclosures()
 
 
+@router.post("/report/insider-trades/refresh", status_code=202)
+def refresh_all_insider_trades(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+    background_tasks.add_task(_run_insider_trades_all)
+    return {"message": "내부자 지분공시 전 종목 수집 시작"}
+
+
+def _run_insider_trades_all():
+    from services.insider_trades import fetch_all_insider_trades
+    with job_runs.record("insider_fetch", "manual"):
+        fetch_all_insider_trades()
+
+
 # /report/{ticker}/backlog 은 catch-all /report/{ticker}/{date_str} 보다 먼저
 # 등록해야 한다. 아니면 "backlog"가 date_str로 매칭돼 snapshots를 date='backlog'로
 # 조회하다 500이 난다 (enrich/batch와 동일 클래스의 라우트 순서 함정).
@@ -347,6 +359,15 @@ def get_backlog(ticker: str):
 def get_disclosures(ticker: str):
     from services.disclosures import get_disclosures as _get_disclosures
     return _get_disclosures(ticker)
+
+
+# /report/{ticker}/insider-trades 도 catch-all /report/{ticker}/{date_str} 보다 먼저
+# 등록해야 한다(backlog/disclosures와 동일 라우트 순서 함정 — 4번째 재발 방지).
+# 저장값만 읽음(요청경로 라이브 DART 0). US·corp_code 미매핑·무데이터는 빈 결과 graceful.
+@router.get("/report/{ticker}/insider-trades")
+def get_insider_trades_route(ticker: str):
+    from services.insider_trades import get_insider_trades, compute_net_signal
+    return {"trades": get_insider_trades(ticker), "signal": compute_net_signal(ticker)}
 
 
 @router.get("/report/{ticker}/{date_str}")
