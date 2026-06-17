@@ -21,6 +21,7 @@ from routers.rankings import router as rankings_router
 from routers.investor import router as investor_router
 from routers.short_sell import router as short_sell_router
 from routers.batches import router as batches_router
+from routers.recommendations import router as recommendations_router
 from middleware.event_tracker import EventTrackerMiddleware
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
@@ -121,6 +122,20 @@ def _migrate():
         execute("CREATE INDEX IF NOT EXISTS idx_insider_read ON stock_insider_trades(ticker, rcept_dt DESC)")
     except Exception as e:
         print(f"[migrate] stock_insider_trades 생성 실패: {e}")
+    try:
+        from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS stock_recommendations (
+            ticker TEXT PRIMARY KEY,
+            market TEXT NOT NULL,
+            score NUMERIC NOT NULL,
+            factors JSONB NOT NULL DEFAULT '{}'::jsonb,
+            flags JSONB NOT NULL DEFAULT '[]'::jsonb,
+            rank INTEGER,
+            base_date DATE NOT NULL,
+            updated_at TIMESTAMPTZ DEFAULT NOW())""")
+        execute("CREATE INDEX IF NOT EXISTS idx_recommendations_read ON stock_recommendations(market, score DESC)")
+    except Exception as e:
+        print(f"[migrate] stock_recommendations 생성 실패: {e}")
 
 
 @asynccontextmanager
@@ -162,6 +177,7 @@ app.include_router(rankings_router)
 app.include_router(investor_router)
 app.include_router(short_sell_router)
 app.include_router(batches_router)
+app.include_router(recommendations_router)
 app.include_router(admin_router)
 
 

@@ -317,6 +317,30 @@ def _supply_score_work():
     print(f"[Scheduler] Supply score computed for {saved}/{len(tickers)} KR tickers")
 
 
+def _fetch_recommendation_kr():
+    with job_runs.record("recommendation_kr", "auto"):
+        _recommendation_work("KR")
+
+
+def _fetch_recommendation_us():
+    with job_runs.record("recommendation_us", "auto"):
+        _recommendation_work("US")
+
+
+def _recommendation_work(market: str):
+    """발굴 유니버스 추천 점수 사전계산 배치(.forge/adr/0015).
+
+    2단 깔때기로 점수를 계산해 stock_recommendations에 통째 교체 저장 —
+    요청·기동 경로 라이브 호출 0(이 함수만 외부 fetch). 산출 불가(전부 None)면
+    save 생략+로깅(silent except 금지, all-None 박제 금지)."""
+    from services import recommendation
+    try:
+        stats = recommendation.run_recommendation_batch(market)
+        print(f"[Scheduler] Recommendation {market} computed: {stats}")
+    except Exception as e:
+        print(f"[Scheduler] Recommendation {market} failed: {e}")
+
+
 def _fetch_kr_sector():
     from services import kr_sector_service
     with job_runs.record("kr_sector_fetch", "auto"):
@@ -412,6 +436,8 @@ _JOB_FUNCS = {
     "disclosure_fetch": _fetch_disclosures,
     "dividend_fetch": _fetch_dividends,
     "insider_fetch": _fetch_insider,
+    "recommendation_kr": _fetch_recommendation_kr,
+    "recommendation_us": _fetch_recommendation_us,
 }
 
 

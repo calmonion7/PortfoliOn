@@ -31,8 +31,9 @@ def test_registry_has_macro_signals_fetch():
 
 def test_registry_count_grows_by_one():
     from services import batch_registry
-    # task 46 기준 19 + macro_signals_fetch + supply_score_fetch + insider_fetch = 22
-    assert len(batch_registry.BATCHES) == 22
+    # task 46 기준 19 + macro_signals_fetch + supply_score_fetch + insider_fetch
+    #   + recommendation_kr + recommendation_us = 24
+    assert len(batch_registry.BATCHES) == 24
 
 
 def test_macro_signals_counts_as_overseas():

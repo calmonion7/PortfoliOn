@@ -302,6 +302,20 @@ CREATE TABLE IF NOT EXISTS stock_insider_trades (
 );
 CREATE INDEX IF NOT EXISTS idx_insider_read ON stock_insider_trades(ticker, rcept_dt DESC);
 
+-- 종목 추천 점수 (발굴 유니버스 멀티팩터 합성 점수 + 정량 플래그 — ADR-0015)
+-- per-ticker 공유. recommendation_kr/us 배치가 시장 단위로 통째 교체, GET은 저장값만 읽음.
+CREATE TABLE IF NOT EXISTS stock_recommendations (
+    ticker      TEXT PRIMARY KEY,
+    market      TEXT NOT NULL,                          -- KR | US
+    score       NUMERIC NOT NULL,                       -- 0~100 합성 점수
+    factors     JSONB NOT NULL DEFAULT '{}'::jsonb,     -- 점수 입력 팩터(value/momentum/smart_money)
+    flags       JSONB NOT NULL DEFAULT '[]'::jsonb,     -- 정량 근거 플래그([{label, kind}])
+    rank        INTEGER,                                -- 시장 내 점수 내림차순 순위(1-base)
+    base_date   DATE NOT NULL,                          -- 산출 기준일
+    updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_recommendations_read ON stock_recommendations(market, score DESC);
+
 -- 배치 실행로그 (job_id별 최근 20건만 보관)
 -- 배포 주의: 이 파일은 빈 pgdata 최초 init 때만 자동 적용된다(docker-compose의 initdb 마운트).
 --   기존 운영 DB는 pgdata가 이미 채워져 있으므로 git push 자동배포로는 아래 두 문장이 적용되지 않는다.

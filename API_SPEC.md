@@ -23,6 +23,7 @@
 - [Batches (자동 배치 현황·스케줄)](#batches-자동-배치-현황스케줄)
 - [Analytics (분석)](#analytics-분석)
 - [Analysis (포트폴리오 분석)](#analysis-포트폴리오-분석)
+- [Recommendations (종목 추천·발굴)](#recommendations-종목-추천발굴)
 - [공통 스키마](#공통-스키마)
 - [공통 에러 응답](#공통-에러-응답)
 
@@ -1952,6 +1953,70 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 | `tickers` | string[] | 보유종목 코드 목록 |
 | `macro` | string[] | 매크로 지표 티커 목록 |
 | `matrix` | number[][] | `matrix[i][j]` = `tickers[i]`와 `macro[j]`의 상관계수 |
+
+---
+
+## Recommendations (종목 추천·발굴)
+
+2단 깔때기·점진 유니버스로 정량 점수를 사전계산(배치)해 `stock_recommendations`에 저장하고, 조회는 저장값만 읽는다(요청 경로 외부 호출 0). 점수는 종목 공유(per-ticker)이고, 섹션은 요청 시 호출자 추적종목 기준으로 분기한다(ADR-0015 §6). 응답은 섹션 키 객체(additive).
+
+### `GET /api/recommendations`
+
+발굴 섹션 반환 — 글로벌 점수 유니버스에서 호출자 추적종목(보유+관심)을 제외하고 점수 내림차순으로 반환한다.
+
+**인증**: 필요 (로그인 사용자).
+
+**쿼리 파라미터**
+
+| 파라미터 | 타입 | 기본 | 설명 |
+|----------|------|------|------|
+| `limit` | int (1~200) | 50 | 발굴 항목 상한 |
+
+**응답** `200 OK`
+
+```json
+{
+  "as_of": "2026-06-18",
+  "discovery": [
+    {
+      "ticker": "AAPL",
+      "name": "Apple",
+      "market": "US",
+      "score": 88.0,
+      "flags": [{ "label": "목표가 대비 +20%", "kind": "value" }],
+      "rank": 1
+    }
+  ]
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `as_of` | string\|null | 발굴 항목 중 최신 `base_date`(ISO date), 없으면 `null` |
+| `discovery` | object[] | 발굴 종목(점수 내림차순). part3/4에서 `watchlist`/`holdings` 키가 additive로 추가됨 |
+| `discovery[].score` | number | 정량 점수 0~100 |
+| `discovery[].flags` | object[] | 정량 근거 `{label, kind}`. `kind`=팩터군(`value`\|`momentum`\|`smart_money`\|`missing`), 색 아님 |
+| `discovery[].rank` | int\|null | 시장 내 점수 내림차순 순위(1-base) |
+
+### `POST /api/recommendations/refresh`
+
+해당 시장의 추천 점수 배치를 백그라운드로 트리거한다(저장값 재계산).
+
+**인증**: admin 전용.
+
+**쿼리 파라미터**
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| `market` | `KR`\|`US` | 예 | 갱신 대상 시장 |
+
+**응답** `202 Accepted`
+
+```json
+{ "ok": true }
+```
+
+배치 잡 id는 `recommendation_kr`/`recommendation_us`로 `job_runs`에 기록된다.
 
 ---
 
