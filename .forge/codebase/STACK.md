@@ -1,94 +1,117 @@
 ---
-last_mapped_commit: fd8dd650ede08d103b907ac4d87955f669ce3298
-mapped: 2026-06-15
+last_mapped_commit: 7f3aec7d6aab5b2ed9837f9aada7405f9505ae6b
+mapped: 2026-06-17
 ---
 
-# STACK
+# Technology Stack
 
-PortfoliOn은 백엔드(Python/FastAPI)와 프론트엔드(React 19 + Vite 8)로 구성된 풀스택 앱이며, Mac 로컬 Docker 컨테이너로 배포된다.
+**Analysis Date:** 2026-06-17
 
-## 언어 / 런타임
+## Languages
 
-- **백엔드**: Python 3.12 (`backend/Dockerfile`의 베이스 이미지 `python:3.12-slim`). 코드 전반에서 `from __future__ import annotations`, `zoneinfo`(stdlib) 사용.
-- **프론트엔드**: JavaScript(ESM, `frontend/package.json`의 `"type": "module"`). React 라이브러리는 `^19.2.5` 버전이 설치돼 있다(프로젝트 문서상 "React 18" 표기와 실제 설치 버전이 다름).
-- **DB**: PostgreSQL 16 (`docker-compose.yml`의 `postgres:16-alpine`).
+**Primary:**
+- Python (백엔드) — `backend/` 전체. 런타임 이미지 Python 3.12 (`backend/Dockerfile`의 `FROM python:3.12-slim`).
+- JavaScript / JSX (프론트엔드) — `frontend/src/`. ESM (`frontend/package.json`의 `"type": "module"`).
 
-## 백엔드 프레임워크 / 주요 의존성 (`backend/requirements.txt`)
+**Secondary:**
+- SQL — 스키마 정의 `backend/auth_schema.sql`, `backend/app_schema.sql`, 기동 마이그레이션 인라인 DDL `backend/main.py`.
+- Bash / Batch — 실행·배포 스크립트 `start.sh`, `stop.sh`, `deploy.sh`, `start.bat`, `stop.bat`, `scripts/auto-deploy-poll.sh`, `scripts/ddns_update.sh`.
+- 플레인 CSS — TailwindCSS 미사용. 토큰 `frontend/src/styles/tokens.css`, 컴포넌트별 `*.css`.
 
-- `fastapi>=0.104.0` — 웹 프레임워크. 진입점 `backend/main.py`가 라우터를 마운트하고 `lifespan`에서 스케줄러를 기동한다.
-- `uvicorn[standard]>=0.24.0` — ASGI 서버. 컨테이너 실행 커맨드는 `uvicorn main:app --host 0.0.0.0 --port 8000`(`backend/Dockerfile`).
-- `apscheduler>=3.10.4` — 배치 스케줄러. `backend/scheduler.py`가 `AsyncIOScheduler` + `CronTrigger`로 배치(리포트 생성, 구루 크롤, 다이제스트, 시장지표 갱신, 레버리지/대차/수주잔고 수집, 랭킹/수급 적재)를 등록한다.
-- `psycopg2-binary>=2.9.0` — PostgreSQL 드라이버. `backend/services/db.py`가 `ThreadedConnectionPool`(minconn=1, maxconn=10)로 커넥션 풀을 관리.
-- `yfinance>=0.2.40`, `pandas>=2.1.0`, `numpy>=1.26.0` — 시세/재무 데이터 수집·가공.
-- `requests>=2.31.0`, `httpx>=0.25.0` — 외부 HTTP 호출(requests는 동기 서비스, httpx는 `backend/routers/auth.py`의 OAuth async 흐름).
-- `beautifulsoup4>=4.12.0`, `lxml>=4.9.0` — HTML/XML 파싱. (주의: `lxml`은 Docker 이미지엔 있으나 로컬 `.venv`엔 없어, 로컬 검증 코드는 `html.parser` 사용 — `CLAUDE.md` Gotchas.)
-- `matplotlib>=3.8.0` — 차트 생성(`backend/services/charts.py`).
-- `exchange_calendars>=4.5` — 거래일 캘린더.
-- `authlib>=1.3.0` — OAuth 라이브러리(의존성에 포함). 다만 실제 OAuth 토큰 교환은 `backend/routers/auth.py`에서 `httpx` 직접 호출로 구현돼 있다.
-- `python-jose[cryptography]>=3.3.0` — JWT 발급/검증(`backend/services/auth_service.py`의 `jose.jwt`, HS256).
-- `bcrypt>=4.0.0` — 비밀번호 해싱(`backend/services/auth_service.py`).
-- `itsdangerous>=2.0.0` — Starlette `SessionMiddleware` 의존.
-- `python-dotenv` — `.env` 로딩(`backend/main.py` 최상단 `load_dotenv()`).
-- `pytest>=7.4.0` — 테스트(`backend/tests/`).
+## Runtime
 
-### 미들웨어 (`backend/main.py`)
+**환경:**
+- 백엔드 런타임: Python 3.12 (Docker), 로컬 개발은 `backend/.venv` (macOS `backend/.venv/bin/python`, Windows `backend/.venv/Scripts/python`).
+- ASGI 서버: uvicorn (`uvicorn[standard]>=0.24.0`), 진입점 `main:app` (`backend/main.py`).
+- 프론트 개발 서버: Vite dev server (port 5173).
 
-- `SessionMiddleware`(secret_key=`SESSION_SECRET`), `EventTrackerMiddleware`(`backend/middleware/event_tracker.py`), `CORSMiddleware`.
-- CORS allow_origins: `http://localhost:3000`, `http://localhost:5173`, `FRONTEND_URL` 환경변수(비어있지 않을 때만).
+**Package Manager:**
+- 백엔드: pip (`backend/requirements.txt`). 핀 방식은 `>=` 하한만 지정(상한 없음). 별도 lockfile 없음.
+- 프론트: npm (`frontend/package.json`). lockfile은 `frontend/package-lock.json` (저장소 존재 가정 — 빌드/배포 시 `npm install` 후 `npm run build`).
+- `scripts/`에도 별도 Node 패키지(`scripts/package.json`, `scripts/package-lock.json`) — Playwright 스크린샷 등 도구용(`scripts/screenshot.js`, `scripts/check-permissions.js`).
 
-## 프론트엔드 프레임워크 / 주요 의존성 (`frontend/package.json`)
+## Frameworks
 
-- 의존성: `react ^19.2.5`, `react-dom ^19.2.5`, `react-router-dom ^7.14.2`, `axios ^1.16.0`, `recharts ^3.8.1`(차트), `react-markdown ^10.1.0` + `remark-gfm ^4.0.1`(리포트 텍스트 렌더).
-- 빌드/개발 도구(devDependencies): `vite ^8.0.10`, `@vitejs/plugin-react ^6.0.1`, `eslint ^10.2.1`(+ `@eslint/js`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `globals`), `@types/react`, `@types/react-dom`.
-- **PWA**: `vite-plugin-pwa ^1.3.0` + `@vite-pwa/assets-generator ^1.0.2`. 설정은 `frontend/vite.config.js`의 `VitePWA`(registerType `autoUpdate`, Workbox runtimeCaching — google-fonts/cdn-fonts CacheFirst, `/api/` NetworkFirst(auth 제외), manifest name "PortfoliOn"). 빌드 후 커스텀 `sw-cache-bust` 플러그인이 `registerSW.js`/`manifest.webmanifest`/`sw.js`에 빌드 타임스탬프 쿼리를 붙여 캐시 버스팅.
-- 플레인 CSS(TailwindCSS 미사용).
+**Core (백엔드):**
+- FastAPI `>=0.104.0` — REST API 프레임워크. 앱 객체·라우터 마운트·미들웨어 `backend/main.py`.
+- Starlette `SessionMiddleware` — OAuth 상태 세션 (`backend/main.py`, `SESSION_SECRET`로 서명).
+- APScheduler `>=3.10.4` — 배치 스케줄러. 설정 `backend/scheduler.py`(루트 레벨, services 아님), 배치 카탈로그 `backend/services/batch_registry.py`.
 
-### Vite 설정 (`frontend/vite.config.js`)
+**Core (프론트엔드):**
+- React `^19.2.5` + react-dom `^19.2.5`.
+- react-router-dom `^7.14.2` — 라우팅.
+- recharts `^3.8.1` — 차트(시장지표·리포트 차트). 거대 의존성이라 별도 청크 `charts`로 분리(`frontend/vite.config.js`).
+- react-markdown `^10.1.0` + remark-gfm `^4.0.1` — 리포트 텍스트 렌더. 별도 청크 `markdown`.
+- axios `^1.16.0` — HTTP 클라이언트.
 
-- dev 서버 포트 5173, `/api` → `http://localhost:8000` 프록시(`changeOrigin: true`), `watch.usePolling: true`.
-- 빌드 산출물은 `frontend/dist/`(nginx가 직접 서빙).
-- **Vite 8(rolldown)**: 롤업 옵션에서 `manualChunks` 함수로 동적 청킹(객체 형식 미지원). recharts/d3 관련 패키지 → `charts` 청크, react-markdown/remark/rehype 관련 → `markdown` 청크, 나머지 `node_modules` → `vendor`.
+**Testing:**
+- pytest `>=7.4.0` — 백엔드 테스트. 테스트 위치 `backend/tests/`. 실행 `cd backend && .venv/bin/python -m pytest`.
+- 프론트엔드 테스트 러너 미설치(별도 단위 테스트 프레임워크 없음). UAT는 Playwright 디바이스 에뮬레이션(`scripts/screenshot.js`, 격리 하니스 `frontend/uat.html`).
 
-## 패키지 매니저 / 스크립트
+**Build/Dev:**
+- Vite `^8.0.10` — 번들러. **Vite 8 = rolldown 엔진**이라 `build.rollupOptions.output.manualChunks`는 **함수 형식만** 받음(`frontend/vite.config.js`). 객체형 사용 시 빌드 깨짐.
+- @vitejs/plugin-react `^6.0.1`.
+- vite-plugin-pwa `^1.3.0` + @vite-pwa/assets-generator `^1.0.2` — PWA(서비스워커·매니페스트·아이콘). 설정 `frontend/vite.config.js`(`VitePWA`, manifest `name: PortfoliOn`, `display: standalone`, `lang: ko`). 커스텀 closeBundle 플러그인 `sw-cache-bust`로 `registerSW.js`/`sw.js`/`manifest.webmanifest`에 BUILD_DATE 쿼리스트링 캐시버스팅.
+- ESLint `^10.2.1` + @eslint/js, eslint-plugin-react-hooks, eslint-plugin-react-refresh — 린트. 실행 `npm run lint`.
 
-- **백엔드**: pip + `backend/requirements.txt`. 로컬 가상환경 `backend/.venv/`(macOS: `backend/.venv/bin/python`). 테스트: `cd backend && .venv/bin/python -m pytest`.
-- **프론트엔드**: npm + `frontend/package.json`. 스크립트: `dev`(vite), `build`(vite build), `lint`(eslint .), `preview`(vite preview).
-- **양 서버 동시 기동**: `start.sh`(macOS/Linux), `start.bat`(Windows, hidden PowerShell), `stop.sh`/`stop.bat`.
+## Key Dependencies
 
-## 배포 — Docker 컨테이너 (`docker-compose.yml`)
+**Critical (백엔드 데이터):**
+- yfinance `>=0.2.40` — US 1차 시세·섹터·시총·히스토리, 배치 1콜(`yf.download`). KR은 키움 실패 시 폴백. 사용처 `backend/services/market.py`.
+- pandas `>=2.1.0`, numpy `>=1.26.0` — 시계열·수치 처리.
+- matplotlib `>=3.8.0` — 차트 PNG 생성(`backend/services/charts.py`, `matplotlib.use("Agg")` 헤드리스).
+- beautifulsoup4 `>=4.12.0` + lxml `>=4.9.0` — HTML 파싱(스크래핑·DART 원문). **주의: lxml은 Docker엔 있으나 로컬 `.venv`엔 없음** — 로컬 pytest 코드는 `html.parser` 파서 사용.
+- requests `>=2.31.0` — 동기 HTTP(대부분의 외부 API 호출). httpx `>=0.25.0` — 비동기 HTTP(OAuth 콜백 `backend/routers/auth.py`).
+- exchange_calendars `>=4.5` — 거래소 영업일 캘린더(`backend/routers/calendar.py`, `xcals.get_calendar`).
 
-`docker-compose.yml`에 정의된 4개 서비스:
+**Critical (백엔드 인증·DB):**
+- psycopg2-binary `>=2.9.0` — PostgreSQL 드라이버. 풀 `ThreadedConnectionPool` (`backend/services/db.py`, `DATABASE_URL` 사용).
+- python-jose[cryptography] `>=3.3.0` — JWT(HS256) 발급·검증 (`backend/services/auth_service.py`, `backend/auth.py`).
+- bcrypt `>=4.0.0` — 비밀번호 해시 (`backend/services/auth_service.py`).
+- authlib `>=1.3.0` — OAuth 보조(requirements에 존재). itsdangerous `>=2.0.0` — 세션 서명 보조.
+- python-dotenv — `.env` 로드 (`backend/main.py`의 `load_dotenv()`).
 
-- **postgres** — `postgres:16-alpine`, DB/USER `portfolion`, 패스워드 `${POSTGRES_PASSWORD}`(기본값 보간). 포트 5432 노출. 볼륨 `pgdata`. 초기화 시 `backend/auth_schema.sql`(01-auth.sql) → `backend/app_schema.sql`(02-app.sql)을 `docker-entrypoint-initdb.d`로 마운트해 순서대로 실행. `pg_isready` healthcheck.
-- **backend** — `./backend` 빌드(`backend/Dockerfile`). postgres healthy 조건 후 기동. `env_file: ./backend/.env.docker`.
-- **nginx** — `nginx:alpine`, 포트 80/443. `./frontend/dist`를 `:ro`로 직접 서빙, `./nginx/nginx.conf` 마운트, certbot 볼륨(`./certbot/conf`, `./certbot/www`) 마운트. `/api/` 및 `/health` → `http://backend:8000` 프록시(`nginx/nginx.conf`).
-- **certbot** — `certbot/certbot` 이미지. 12시간마다 `certbot renew` 루프.
+**참고 — 미사용:**
+- `ANTHROPIC_API_KEY` env는 `.env.docker`에 있으나 **백엔드에서 미사용**(`requirements.txt`에 anthropic 패키지 없음). AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API로 작성.
 
-`README.md`/`CLAUDE.md`는 "4-컨테이너(postgres, backend, nginx, cloudflared)"로 기술하지만, `docker-compose.yml`에 정의된 서비스는 postgres/backend/nginx/certbot이다. **cloudflared(Cloudflare Tunnel)와 docker compose는 launchd로 별도 자동실행**되며 compose 파일에는 포함돼 있지 않다(`CLAUDE.md` Deployment).
+## Configuration
 
-- **외부 노출**: Cloudflare Tunnel `portfolion.taebro.com → localhost:80`(launchd 자동실행). DDNS 갱신 스크립트 `scripts/ddns_update.sh`(Cloudflare API, `CF_ZONE_ID`/`CF_RECORD_ID`/`CF_API_TOKEN` 환경변수, cron 5분).
-- **자동 배포**: launchd `com.portfolion.auto-deploy-poll`이 2분마다 `scripts/auto-deploy-poll.sh`를 돌려 `origin/main`이 로컬 HEAD보다 앞서면 `git reset --hard origin/main` 후 `deploy.sh` 배포. `deploy.sh`는 frontend 빌드 → backend 이미지 빌드 → 컨테이너 교체 순(동시 배포 방지 락 `/tmp/portfolion-deploy.lock`).
+**환경변수 파일 (key NAME만 — 값 미기재):**
+- `backend/.env.docker` — Docker 백엔드 컨테이너 env(`docker-compose.yml`의 `env_file`). 키: `DATABASE_URL`, `JWT_SECRET`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `FRED_API_KEY`, `KITA_API_KEY`, `KOFIA_API_KEY`, `DART_API_KEY`, `FRONTEND_URL`, `COWORK_API_KEY`, `KIWOOM_BASE_URL`, `KIWOOM_APP_KEY`, `KIWOOM_SECRET_KEY`, `KIS_APP_KEY`, `KIS_APP_SECRET` (옵션 `KIS_BASE_URL`).
+- `backend/.env.docker.example` — 템플릿(빈 값/CHANGE_ME 플레이스홀더).
+- `backend/.env` — 로컬 개발용. 키: `SUPABASE_*`(레거시 잔존, 현 인프라 미사용), `JWT_SECRET`, `SESSION_SECRET`, `DATABASE_URL`.
+- 루트 `.env` — docker-compose 보간용. 키: `FRED_API_KEY`, `KITA_API_KEY` (+ `docker-compose.yml`이 보간하는 `POSTGRES_PASSWORD`).
+- 프론트: `VITE_API_BASE_URL`(배포 시 nginx 직접 호출용, 미설정 시 상대경로). 로컬은 Vite proxy `/api` → `http://localhost:8000`.
 
-## 스케줄러 (APScheduler — `backend/scheduler.py`)
+**모든 .env 파일은 gitignore 대상. 값은 절대 커밋 금지.**
 
-`AsyncIOScheduler`가 `backend/main.py`의 `lifespan`에서 기동(`sched.start()`)·종료(`sched.stop()`)된다. 배치 정의는 `backend/services/batch_registry.py`, 스케줄 스펙은 `backend/services/schedule_spec.py`로 관리. 등록 잡(`_JOB_FUNCS`): `daily_report`, `guru_crawl`, `daily_digest`, `earnings_refresh`, `monthly_refresh`, `leverage_fetch`, `lending_fetch`, `kr_rankings_fetch`, `us_rankings_fetch`, `investor_trend_fetch`, `backlog_fetch`. 기동 시 누락 리포트 복구(`_check_missed_report`)·빈 랭킹 시드(`_seed_rankings_if_empty`)·idempotent 마이그레이션 시드(`_seed_batch_schedules`) 수행. 잡 실행 기록은 `backend/services/job_runs.py`(`job_runs` 테이블).
+**Build:**
+- 프론트: `frontend/vite.config.js` (Vite 빌드 옵션·PWA·manualChunks·dev proxy).
+- 백엔드: `backend/Dockerfile` (Python 3.12-slim, `pip install -r requirements.txt`, `CMD uvicorn main:app --host 0.0.0.0 --port 8000`).
+- 린트: `frontend/eslint.config.*` (ESLint flat config).
 
-## 런타임 기동 마이그레이션 (`backend/main.py` `_migrate()`)
+## How Servers Start
 
-기동 시 idempotent DDL을 실행한다(배포가 자동 적용): `backlog_history`에 `segments JSONB` 컬럼 추가(IF NOT EXISTS), `batch_schedules` 테이블 생성(IF NOT EXISTS). 또한 `_warm_calendar_cache`/`_warm_market_cache`를 데몬 스레드로 워밍업.
+**로컬 개발 (양쪽 동시):**
+- macOS/Linux: `./start.sh` — `.env` 로드 → 포트 8000/5173 kill → uvicorn `main:app --reload --port 8000`(`backend/.venv` 활성화) + `npm run dev`(frontend) 백그라운드 기동 → `/health` 폴링 후 브라우저 오픈. 로그 `/tmp/portfolion-*.log`.
+- Windows: `start.bat` — 숨김 PowerShell 창에서 동일 기동. 종료 `stop.bat`.
+- 백엔드 단독: `cd backend && python -m uvicorn main:app --reload --port 8000`.
+- 프론트 단독: `cd frontend && npm run dev`.
 
-## 설정 파일 / 환경변수
+**프로덕션 (Mac 로컬 Docker 4-컨테이너):**
+- `docker-compose.yml` 서비스: `postgres`(postgres:16-alpine, 스키마 자동 적재 `01-auth.sql`→`02-app.sql`), `backend`(FastAPI 빌드), `nginx`(nginx:alpine, 80/443, `./frontend/dist` `:ro` 마운트·`/api/*`·`/health` → `backend:8000` 프록시), `certbot`(certbot/certbot, 12h마다 `certbot renew`).
+- 배포: `deploy.sh` — 프론트 `npm install && npm run build` → 백엔드 Docker 이미지 빌드 → 백엔드 컨테이너 교체. `git push origin main` 시 자동 배포(launchd 폴러 `scripts/auto-deploy-poll.sh`가 2분마다 `origin/main` 확인 후 `deploy.sh`). 수동 `docker compose build/up` 금지.
+- nginx config `nginx/nginx.conf` — index.html·서비스워커 캐시 금지, 해시 JS/CSS 장기 캐시(`max-age=31536000, immutable`), SPA fallback `try_files $uri /index.html`. 443 SSL 블록은 현재 주석 처리(HTTP만 활성).
+- 외부 노출: Cloudflare Tunnel(`portfolion.taebro.com` → localhost:80, cloudflared는 compose 아닌 launchd 실행). DDNS 보조 `scripts/ddns_update.sh`(Cloudflare API).
 
-- 설정 파일: `backend/.env.docker`(docker compose `env_file`), 루트 `.env`(compose 변수 보간용), `backend/Dockerfile`, `docker-compose.yml`, `nginx/nginx.conf`, `frontend/vite.config.js`, `frontend/eslint.config.js`(eslint flat config 추정).
-- 스키마: `backend/auth_schema.sql`, `backend/app_schema.sql`.
+## Platform Requirements
 
-### `backend/.env.docker`에 설정된 환경변수 (이름만)
+**Development:**
+- Python 3.12 + `backend/.venv`, Node.js(npm), 로컬 PostgreSQL 또는 Docker postgres(`DATABASE_URL`).
 
-`DATABASE_URL`, `JWT_SECRET`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `FRED_API_KEY`, `KITA_API_KEY`, `KOFIA_API_KEY`, `DART_API_KEY`, `KIWOOM_APP_KEY`, `KIWOOM_SECRET_KEY`, `KIWOOM_BASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_BASE_URL`, `FRONTEND_URL`, `COWORK_API_KEY`.
+**Production:**
+- 배포 대상: Mac 로컬 Docker(Render/Vercel/Supabase 제거됨). launchd가 cloudflared + docker compose 자동 기동.
 
-### 코드가 참조하지만 `.env.docker`에 없는 환경변수 (이름만)
+---
 
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — `backend/services/digest_service.py`의 `send_telegram`이 `os.getenv`로 조회(미설정 시 전송 스킵).
-- `POSTGRES_PASSWORD` — 루트 `.env`에서 compose 변수 보간(`docker-compose.yml`).
-- `CF_ZONE_ID`, `CF_RECORD_ID`, `CF_API_TOKEN` — `scripts/ddns_update.sh` 전용.
-- `VITE_API_BASE_URL` — 프론트 빌드 시 nginx 직접 호출용(미설정 시 상대경로, `CLAUDE.md`).
+*Stack analysis: 2026-06-17*
