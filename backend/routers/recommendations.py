@@ -18,32 +18,63 @@ def get_recommendations(
     limit: int = Query(50, ge=1, le=200),
     user_id: str = Depends(get_current_user),
 ):
-    """발굴 섹션 반환(저장값 read-only, 호출자 추적종목 제외, 점수 내림차순).
+    """발굴·관심 섹션 반환(저장값 read-only, 점수 내림차순).
 
     응답 shape(섹션 키 객체):
-        {"as_of": <date|null>, "discovery": [{ticker,name,market,score,flags,rank}, ...]}
-    part3/4가 "watchlist"/"holdings" 키를 additive로 추가한다.
+        {"as_of": <date|null>,
+         "discovery": [{ticker,name,market,score,flags,rank}, ...],  # 호출자 추적종목 제외
+         "watchlist": [{ticker,name,market,score,flags,rank}, ...]}  # 호출자 관심종목, 점수 없으면 score=None 말미
+    part4가 "holdings" 키를 additive로 추가한다.
     """
-    tracked = [s["ticker"] for s in storage.get_all_stocks(user_id) if s.get("ticker")]
+    portfolio = storage.get_full_portfolio(user_id)
+    wl_stocks = portfolio["watchlist"]
+    all_stocks = portfolio["stocks"] + wl_stocks
+    tracked = [s["ticker"] for s in all_stocks if s.get("ticker")]
     rows = recommendation.read_recommendations(exclude_tickers=tracked, limit=limit)
 
-    as_of = None
-    discovery = []
-    for r in rows:
-        bd = r.get("base_date")
-        bd_str = bd.isoformat() if hasattr(bd, "isoformat") else (str(bd) if bd else None)
-        if bd_str and (as_of is None or bd_str > as_of):
-            as_of = bd_str
-        discovery.append({
+    def _item(r):
+        return {
             "ticker": r["ticker"],
             "name": r.get("name"),
             "market": r.get("market"),
             "score": float(r["score"]) if r.get("score") is not None else None,
             "flags": r.get("flags") or [],
             "rank": r.get("rank"),
-        })
+        }
 
-    return {"as_of": as_of, "discovery": discovery}
+    def _as_of(rows_, current):
+        for r in rows_:
+            bd = r.get("base_date")
+            bd_str = bd.isoformat() if hasattr(bd, "isoformat") else (str(bd) if bd else None)
+            if bd_str and (current is None or bd_str > current):
+                current = bd_str
+        return current
+
+    as_of = _as_of(rows, None)
+    discovery = [_item(r) for r in rows]
+
+    # 관심 섹션: 호출자 watchlist를 저장 점수로 score DESC 정렬(저장값 read만).
+    wl_tickers = [s["ticker"] for s in wl_stocks if s.get("ticker")]
+    watchlist = []
+    if wl_tickers:
+        scored = recommendation.read_recommendations(only_tickers=wl_tickers)
+        as_of = _as_of(scored, as_of)
+        scored_by_ticker = {r["ticker"].upper(): r for r in scored}
+        watchlist = [_item(r) for r in scored]  # score DESC 보존
+        for s in wl_stocks:
+            t = s.get("ticker")
+            if not t or t.upper() in scored_by_ticker:
+                continue
+            watchlist.append({
+                "ticker": t,
+                "name": s.get("name"),
+                "market": s.get("market"),
+                "score": None,
+                "flags": [],
+                "rank": None,
+            })
+
+    return {"as_of": as_of, "discovery": discovery, "watchlist": watchlist}
 
 
 @router.post("/refresh", status_code=202)

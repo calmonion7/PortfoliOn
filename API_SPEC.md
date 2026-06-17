@@ -1962,7 +1962,7 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 
 ### `GET /api/recommendations`
 
-발굴 섹션 반환 — 글로벌 점수 유니버스에서 호출자 추적종목(보유+관심)을 제외하고 점수 내림차순으로 반환한다.
+발굴·관심 두 섹션 반환. `discovery`는 글로벌 점수 유니버스에서 호출자 추적종목(보유+관심)을 제외하고 점수 내림차순으로, `watchlist`는 호출자 관심종목을 저장 점수로 점수 내림차순 정렬해 반환한다(점수 없는 관심종목은 `score=null`로 말미 append). 새 점수 계산 없이 저장값만 재사용한다.
 
 **인증**: 필요 (로그인 사용자).
 
@@ -1970,7 +1970,7 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 
 | 파라미터 | 타입 | 기본 | 설명 |
 |----------|------|------|------|
-| `limit` | int (1~200) | 50 | 발굴 항목 상한 |
+| `limit` | int (1~200) | 50 | 발굴(`discovery`) 항목 상한 (`watchlist`엔 미적용) |
 
 **응답** `200 OK`
 
@@ -1986,17 +1986,28 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
       "flags": [{ "label": "목표가 대비 +20%", "kind": "value" }],
       "rank": 1
     }
+  ],
+  "watchlist": [
+    {
+      "ticker": "005930",
+      "name": "삼성전자",
+      "market": "KR",
+      "score": 75.0,
+      "flags": [],
+      "rank": 2
+    }
   ]
 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `as_of` | string\|null | 발굴 항목 중 최신 `base_date`(ISO date), 없으면 `null` |
-| `discovery` | object[] | 발굴 종목(점수 내림차순). part3/4에서 `watchlist`/`holdings` 키가 additive로 추가됨 |
+| `as_of` | string\|null | 발굴+관심 항목 중 최신 `base_date`(ISO date), 없으면 `null` |
+| `discovery` | object[] | 발굴 종목(점수 내림차순, 추적종목 제외). part4에서 `holdings` 키가 additive로 추가됨 |
 | `discovery[].score` | number | 정량 점수 0~100 |
 | `discovery[].flags` | object[] | 정량 근거 `{label, kind}`. `kind`=팩터군(`value`\|`momentum`\|`smart_money`\|`missing`), 색 아님 |
 | `discovery[].rank` | int\|null | 시장 내 점수 내림차순 순위(1-base) |
+| `watchlist` | object[] | 호출자 관심종목 재정렬(점수 내림차순). 항목 shape는 `discovery`와 동일. 점수 없는 관심종목은 `score=null`·`flags=[]`·`rank=null`로 말미 append |
 
 ### `POST /api/recommendations/refresh`
 

@@ -33,8 +33,12 @@ def _scored_rows():
     ]
 
 
+def _portfolio(stocks=None, watchlist=None):
+    return {"stocks": stocks or [], "watchlist": watchlist or []}
+
+
 def test_get_recommendations_returns_discovery_section():
-    with patch("routers.recommendations.storage.get_all_stocks", return_value=[]), \
+    with patch("routers.recommendations.storage.get_full_portfolio", return_value=_portfolio()), \
          patch("routers.recommendations.recommendation.read_recommendations",
                return_value=_scored_rows()) as mock_read:
         resp = client.get("/api/recommendations")
@@ -59,7 +63,8 @@ def test_get_recommendations_returns_discovery_section():
 
 def test_get_recommendations_excludes_caller_tracked():
     tracked = [{"ticker": "AAPL"}, {"ticker": "005930"}]
-    with patch("routers.recommendations.storage.get_all_stocks", return_value=tracked), \
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=tracked)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                return_value=[]) as mock_read:
         resp = client.get("/api/recommendations")
@@ -69,7 +74,7 @@ def test_get_recommendations_excludes_caller_tracked():
 
 
 def test_get_recommendations_passes_limit():
-    with patch("routers.recommendations.storage.get_all_stocks", return_value=[]), \
+    with patch("routers.recommendations.storage.get_full_portfolio", return_value=_portfolio()), \
          patch("routers.recommendations.recommendation.read_recommendations",
                return_value=[]) as mock_read:
         resp = client.get("/api/recommendations?limit=10")
@@ -79,7 +84,7 @@ def test_get_recommendations_passes_limit():
 
 
 def test_get_recommendations_empty_graceful():
-    with patch("routers.recommendations.storage.get_all_stocks", return_value=[]), \
+    with patch("routers.recommendations.storage.get_full_portfolio", return_value=_portfolio()), \
          patch("routers.recommendations.recommendation.read_recommendations",
                return_value=[]):
         resp = client.get("/api/recommendations")
@@ -91,13 +96,117 @@ def test_get_recommendations_empty_graceful():
 
 def test_get_recommendations_no_live_external_call():
     # 요청 경로에서 배치/외부 fetch 금지 — read_recommendations(저장값)만 호출
-    with patch("routers.recommendations.storage.get_all_stocks", return_value=[]), \
+    with patch("routers.recommendations.storage.get_full_portfolio", return_value=_portfolio()), \
          patch("routers.recommendations.recommendation.read_recommendations",
                return_value=[]), \
          patch("routers.recommendations.recommendation.run_recommendation_batch") as mock_batch:
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
     mock_batch.assert_not_called()
+
+
+# --- watchlist 섹션 (part 3/4) ---
+
+def test_get_recommendations_watchlist_scored_desc():
+    """watchlist 종목 중 점수 있는 것 → data["watchlist"]에 score DESC로 포함."""
+    watchlist = [
+        {"ticker": "AAPL", "name": "Apple", "market": "US"},
+        {"ticker": "005930", "name": "삼성전자", "market": "KR"},
+    ]
+
+    def _read(*args, **kwargs):
+        if "only_tickers" in kwargs and kwargs["only_tickers"] is not None:
+            return _scored_rows()  # score DESC: AAPL(88) → 005930(75)
+        return []  # discovery
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(watchlist=watchlist)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    data = resp.json()
+    wl = data["watchlist"]
+    assert [w["ticker"] for w in wl] == ["AAPL", "005930"]
+    first = wl[0]
+    assert first == {
+        "ticker": "AAPL", "name": "Apple", "market": "US",
+        "score": 88.0, "flags": [{"label": "목표가 대비 +20%", "kind": "value"}], "rank": 1,
+    }
+
+
+def test_get_recommendations_watchlist_unscored_appended_last():
+    """점수 없는 watchlist 종목 → 말미에 score=None, name/market은 watchlist dict값."""
+    watchlist = [
+        {"ticker": "AAPL", "name": "Apple", "market": "US"},
+        {"ticker": "TSLA", "name": "Tesla", "market": "US"},  # 점수 없음
+    ]
+    scored = [{
+        "ticker": "AAPL", "name": "Apple", "market": "US",
+        "score": 88.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18),
+    }]
+
+    def _read(*args, **kwargs):
+        if "only_tickers" in kwargs and kwargs["only_tickers"] is not None:
+            return scored
+        return []
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(watchlist=watchlist)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    wl = resp.json()["watchlist"]
+    assert [w["ticker"] for w in wl] == ["AAPL", "TSLA"]
+    last = wl[-1]
+    assert last == {
+        "ticker": "TSLA", "name": "Tesla", "market": "US",
+        "score": None, "flags": [], "rank": None,
+    }
+
+
+def test_get_recommendations_discovery_and_watchlist_coexist():
+    """discovery는 watchlist 추가와 무관하게 동일(additive) — 둘 다 응답에 존재."""
+    watchlist = [{"ticker": "AAPL", "name": "Apple", "market": "US"}]
+    discovery_rows = [{
+        "ticker": "NVDA", "name": "Nvidia", "market": "US",
+        "score": 95.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18),
+    }]
+    wl_rows = [{
+        "ticker": "AAPL", "name": "Apple", "market": "US",
+        "score": 88.0, "flags": [], "rank": 2, "base_date": date(2026, 6, 18),
+    }]
+
+    def _read(*args, **kwargs):
+        if "only_tickers" in kwargs and kwargs["only_tickers"] is not None:
+            return wl_rows
+        return discovery_rows
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(watchlist=watchlist)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [d["ticker"] for d in data["discovery"]] == ["NVDA"]
+    assert [w["ticker"] for w in data["watchlist"]] == ["AAPL"]
+    assert data["as_of"] == "2026-06-18"
+
+
+def test_get_recommendations_empty_watchlist_no_second_read():
+    """watchlist 비면 data["watchlist"]==[] 이고 두 번째 read_recommendations 호출 없음."""
+    with patch("routers.recommendations.storage.get_full_portfolio", return_value=_portfolio()), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               return_value=[]) as mock_read:
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    assert resp.json()["watchlist"] == []
+    # discovery 1회만 — only_tickers 호출(두 번째 read) 없음
+    assert mock_read.call_count == 1
+    for call in mock_read.call_args_list:
+        assert "only_tickers" not in call.kwargs
 
 
 def test_get_recommendations_requires_auth():
