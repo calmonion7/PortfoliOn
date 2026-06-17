@@ -119,9 +119,9 @@ UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
 
 | 탭 | 설명 |
 |------|------|
-| 리포트 | 종목별 4탭(요약·심층분석·리포트·이력), 주가·RSI 차트, 목표가 컨센서스·괴리율, 수주잔고, 공매도·수급 추이(수급 종합 밴드·근거 헤더, KR 종목만), 최신 공시(DART). 즉시 생성·과거 백필(admin) |
+| 리포트 | 종목별 4탭(요약·심층분석·리포트·이력), 주가·RSI 차트, 목표가 컨센서스·괴리율, 수주잔고, 공매도·수급 추이(수급 종합 밴드·근거 헤더, KR 종목만), 내부자·5% 지분변동(신호 배지, KR), 최신 공시(DART). 즉시 생성·과거 백필(admin) |
 | 랭킹 | 거래대금·거래량·등락률 상위(KR/US) + 외국인/기관/개인 수급(랭킹·리포트 상세 공유) |
-| 다이제스트 | 보유·관심 종목 요약 + 최신 공시 매일 자동 생성(텔레그램 발송) |
+| 다이제스트 | 보유·관심 종목 요약 + 최신 공시 + 내부자 순매수 라인 매일 자동 생성(텔레그램 발송) |
 | 캘린더 | 실적 발표일·배당락일 월간 그리드 |
 
 ### 시장 (MarketHub)
@@ -205,7 +205,7 @@ FastAPI (:8000)
  │              consensus / consensus_pipeline, digest_service,
  │              market_indicators/(fx·vix·commodities·earnings·econ·exports·macro),
  │              leverage_service, lending_service, ranking_service,
- │              investor_service, short_sell_service, supply_score, backlog, disclosures,
+ │              investor_service, short_sell_service, supply_score, backlog, disclosures, insider_trades,
  │              dividends, analysis_service, kr_sector_service,
  │              guru_scraper / guru_stats, batch_registry, job_runs,
  │              kiwoom/, kis/, auth_service, cache, db, errors, parallel, progress
@@ -214,7 +214,7 @@ FastAPI (:8000)
  └─ PostgreSQL 16
      ├─ users / refresh_tokens                  (인증)
      ├─ tickers / user_stocks / stock_dividends / stock_supply_score   (종목·배당·수급 스코어)
-     ├─ snapshots / raw_reports / stock_disclosures   (리포트·공시)
+     ├─ snapshots / raw_reports / stock_disclosures / stock_insider_trades   (리포트·공시·내부자)
      ├─ schedules / guru_schedules / guru_managers   (스케줄·구루)
      ├─ digests / consensus_history / daily_consensus_mart
      ├─ calendar_cache / market_cache

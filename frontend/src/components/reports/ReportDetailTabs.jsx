@@ -9,6 +9,7 @@ import InvestorTrendSection from './InvestorTrendSection'
 import ShortSellSection from './ShortSellSection'
 import SupplySection from './SupplySection'
 import LatestDisclosuresSection from './LatestDisclosuresSection'
+import InsiderTradesSection from './InsiderTradesSection'
 
 const noop = () => {}
 
@@ -144,6 +145,7 @@ export default function ReportDetailTabs({
                 news={summary.news}
               />
               <LatestDisclosuresSection ticker={ticker} market={market} />
+              <InsiderTradesSection ticker={ticker} market={market} />
             </div>
           )
           : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>심층분석 데이터가 없습니다.</p>

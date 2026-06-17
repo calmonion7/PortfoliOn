@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Spark, Sig, sparkFor, fmt } from '../components/ui/icons'
+import InsiderBadge from '../components/ui/InsiderBadge'
 import useIsMobile from '../hooks/useIsMobile'
 
 function StockRow({ s }) {
@@ -139,6 +140,29 @@ export default function Digest() {
                       <span className="muted" style={{ fontSize: 11 }}>{nameMap[ev.ticker]}</span>
                     )}
                     <span className="muted">{ev.event_type === 'earnings' ? '실적발표' : '배당락일'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 내부자 순매수 종목 */}
+          {(digest.insider_trades?.length ?? 0) > 0 && (
+            <div className="card" style={{ marginBottom: 12, padding: '12px 16px' }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>내부자 지분공시</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {digest.insider_trades.map((it, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
+                    <span>{it.ticker}</span>
+                    {nameMap[it.ticker] && nameMap[it.ticker] !== it.ticker && (
+                      <span className="muted" style={{ fontSize: 11 }}>{nameMap[it.ticker]}</span>
+                    )}
+                    <InsiderBadge direction={it.direction} />
+                    {it.net_shares != null && (
+                      <span className="muted tnum" style={{ fontSize: 12, marginLeft: 'auto' }}>
+                        {it.net_shares >= 0 ? '+' : '−'}{Math.abs(it.net_shares).toLocaleString()}주
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
