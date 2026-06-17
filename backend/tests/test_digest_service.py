@@ -212,6 +212,31 @@ def test_generate_insider_trades_excludes_neutral(tmp_path):
     assert result["insider_trades"] == []
 
 
+def _nan_ticker(symbol):
+    m = MagicMock()
+    m.history.return_value = pd.DataFrame(
+        {"Close": [float("nan"), float("nan")]},
+        index=pd.DatetimeIndex(["2026-05-22", "2026-05-23"]),
+    )
+    return m
+
+
+def test_generate_nan_quote_does_not_break_serialization(tmp_path):
+    """yfinance가 NaN 종가를 주는 종목을 보유하면 total_value=NaN → 응답 JSON 직렬화
+    (starlette allow_nan=False)가 500을 내던 회귀 방지. NaN 종가는 시세 없음 처리해 평가액에서 제외."""
+    import services.digest_service as ds
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.yf.Ticker", side_effect=_nan_ticker), \
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.execute", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
+    assert result["portfolio_summary"]["total_value_krw"] == 0.0
+    assert result["stocks"] == []
+    # 핵심: starlette JSONResponse 동형(allow_nan=False)으로 직렬화돼야 함(수정 전엔 ValueError)
+    json.dumps(result, allow_nan=False)
+
+
 def test_generate_insider_trades_graceful_on_error(tmp_path):
     """compute_net_signal 예외는 종목 단위로 graceful skip(다이제스트 생성 무중단)."""
     import services.digest_service as ds

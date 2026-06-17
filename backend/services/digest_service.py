@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import math
 import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -38,6 +39,10 @@ def generate(user_id: str, today: date = None) -> dict:
             if len(hist) >= 2:
                 prev_close = float(hist["Close"].iloc[-2])
                 current = float(hist["Close"].iloc[-1])
+                # yfinance가 NaN/inf 종가를 주는 종목은 "시세 없음"으로 처리(평가액에서 제외).
+                # 미가드 시 total_value=NaN → digest JSON 직렬화 500(starlette allow_nan=False).
+                if not math.isfinite(prev_close) or not math.isfinite(current) or prev_close == 0:
+                    return ticker, None
                 change_pct = round((current - prev_close) / prev_close * 100, 2)
                 return ticker, {"prev_close": prev_close, "current": current, "change_pct": change_pct}
         except Exception:
@@ -53,6 +58,8 @@ def generate(user_id: str, today: date = None) -> dict:
                 quotes[ticker] = data
 
     usdkrw = _fetch_usdkrw_current() or 1380
+    if not math.isfinite(usdkrw):  # NaN/inf 환율이 들어오면 total_value 오염 → 기본값
+        usdkrw = 1380
 
     def _to_krw(h, price_key):
         ticker = h["ticker"].upper()
