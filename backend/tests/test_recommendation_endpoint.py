@@ -64,13 +64,13 @@ def test_get_recommendations_returns_discovery_section():
 def test_get_recommendations_excludes_caller_tracked():
     # stocks 비어있지 않음 → holdings read가 세 번째로 발화하므로 discovery 단언은
     # call_args(마지막)가 아닌 call_args_list[0](첫 호출=discovery)로 한다.
-    # holdings 도달 경로의 외부 호출 0 보장을 위해 _latest_snapshot/_usdkrw_rate를 patch.
+    # holdings 도달 경로의 외부 호출 0 보장을 위해 _latest_snapshots/_usdkrw_rate를 patch.
     tracked = [{"ticker": "AAPL"}, {"ticker": "005930"}]
     with patch("routers.recommendations.storage.get_full_portfolio",
                return_value=_portfolio(stocks=tracked)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                return_value=[]) as mock_read, \
-         patch("routers.recommendations._latest_snapshot", return_value=(None, None)), \
+         patch("routers.recommendations._latest_snapshots", return_value={}), \
          patch("routers.recommendations._usdkrw_rate", return_value=None):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -94,7 +94,7 @@ def test_get_recommendations_discovery_excludes_low_liquidity():
                return_value=_portfolio(stocks=holdings, watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read) as mock_read, \
-         patch("routers.recommendations._latest_snapshot", return_value=(None, None)), \
+         patch("routers.recommendations._latest_snapshots", return_value={}), \
          patch("routers.recommendations._usdkrw_rate", return_value=None):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -277,8 +277,7 @@ def test_get_recommendations_exposes_exchange_all_sections():
                return_value=_portfolio(stocks=holdings, watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshot",
-               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._latest_snapshots", return_value=snaps), \
          patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -367,8 +366,7 @@ def test_get_recommendations_holdings_add_action():
                return_value=_portfolio(stocks=holdings)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshot",
-               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._latest_snapshots", return_value=snaps), \
          patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -398,8 +396,8 @@ def test_get_recommendations_holdings_take_profit_action():
                return_value=_portfolio(stocks=holdings)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshot",
-               return_value=({"price": 130.0}, date(2026, 6, 18))), \
+         patch("routers.recommendations._latest_snapshots",
+               return_value={"TSLA": ({"price": 130.0}, date(2026, 6, 18))}), \
          patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -429,8 +427,7 @@ def test_get_recommendations_holdings_missing_score_or_price_holds():
                return_value=_portfolio(stocks=holdings)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshot",
-               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._latest_snapshots", return_value=snaps), \
          patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -476,8 +473,7 @@ def test_get_recommendations_holdings_kr_us_weight():
                return_value=_portfolio(stocks=holdings)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshot",
-               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._latest_snapshots", return_value=snaps), \
          patch("routers.recommendations._usdkrw_rate", side_effect=_fx):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -513,8 +509,7 @@ def test_get_recommendations_holdings_us_no_fx_excluded_from_weight():
                return_value=_portfolio(stocks=holdings)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshot",
-               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._latest_snapshots", return_value=snaps), \
          patch("routers.recommendations._usdkrw_rate", return_value=None):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -548,8 +543,8 @@ def test_get_recommendations_holdings_does_not_change_discovery_watchlist():
                return_value=_portfolio(stocks=holdings, watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshot",
-               return_value=({"price": 120.0}, date(2026, 6, 18))), \
+         patch("routers.recommendations._latest_snapshots",
+               return_value={"MSFT": ({"price": 120.0}, date(2026, 6, 18))}), \
          patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
@@ -575,9 +570,49 @@ def test_get_recommendations_no_live_external_call_with_holdings():
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
          patch("routers.recommendations.recommendation.run_recommendation_batch") as mock_batch, \
-         patch("routers.recommendations._latest_snapshot",
-               return_value=({"price": 120.0}, date(2026, 6, 18))), \
+         patch("routers.recommendations._latest_snapshots",
+               return_value={"MSFT": ({"price": 120.0}, date(2026, 6, 18))}), \
          patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
     mock_batch.assert_not_called()
+
+
+def test_get_recommendations_holdings_snapshot_read_batched_once():
+    """보유 N개와 무관하게 스냅샷 read는 배치 1회(_latest_snapshots) — 보유 티커 전체를 한 번에 전달."""
+    holdings = [
+        _holding("AAPL", "Apple", "US", 1, 100.0),
+        _holding("MSFT", "Microsoft", "US", 1, 100.0),
+        _holding("TSLA", "Tesla", "US", 1, 100.0),
+    ]
+    scored = [
+        {"ticker": "AAPL", "name": "Apple", "market": "US",
+         "score": 60.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)},
+        {"ticker": "MSFT", "name": "Microsoft", "market": "US",
+         "score": 60.0, "flags": [], "rank": 2, "base_date": date(2026, 6, 18)},
+        {"ticker": "TSLA", "name": "Tesla", "market": "US",
+         "score": 60.0, "flags": [], "rank": 3, "base_date": date(2026, 6, 18)},
+    ]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            return scored
+        return []
+
+    snaps = {"AAPL": ({"price": 120.0}, date(2026, 6, 18)),
+             "MSFT": ({"price": 110.0}, date(2026, 6, 18)),
+             "TSLA": ({"price": 130.0}, date(2026, 6, 18))}
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations._latest_snapshots", return_value=snaps) as mock_batch, \
+         patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    assert len(resp.json()["holdings"]) == 3
+    # 보유 3개여도 스냅샷 배치 read는 1회, 인자는 보유 티커 전체
+    mock_batch.assert_called_once()
+    called_tickers = mock_batch.call_args.args[0]
+    assert sorted(called_tickers) == ["AAPL", "MSFT", "TSLA"]

@@ -50,6 +50,33 @@ def _latest_snapshot(ticker: str) -> tuple:
     return None, None
 
 
+def _latest_snapshots(tickers: list) -> dict:
+    """Batch-load the latest snapshot for many tickers in one DB query.
+
+    Returns {UPPER_ticker: (data, date)}. Tickers absent from the batch result
+    (DB miss, or DB error → all of them) fall back to per-ticker _latest_snapshot,
+    preserving the filesystem fallback path so the response is unchanged. Empty/None-safe.
+    """
+    clean = [t.upper() for t in (tickers or []) if t]
+    if not clean:
+        return {}
+    result = {}
+    try:
+        rows = query(
+            "SELECT DISTINCT ON (ticker) ticker, date, data FROM snapshots "
+            "WHERE ticker = ANY(%s) ORDER BY ticker, date DESC",
+            (clean,),
+        )
+        for row in rows:
+            result[row["ticker"].upper()] = (row["data"], row["date"])
+    except Exception:
+        pass
+    for t in clean:
+        if t not in result:
+            result[t] = _latest_snapshot(t)
+    return result
+
+
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
 _KR_PATTERN = re.compile(r'[가-힣]')

@@ -465,3 +465,62 @@ def test_get_stock_news_scraper_error_returns_empty():
         resp = client.get("/api/stocks/AAPL/news?market=US")
     assert resp.status_code == 200
     assert resp.json() == {"news": []}
+
+
+# --- _latest_snapshots 배치 헬퍼 (task#71) ---
+
+def test_latest_snapshots_returns_latest_per_ticker_in_one_query():
+    """여러 티커 최신 1건/티커 정확 반환 + DB 존재 전건이면 배치 쿼리 1회·폴백 0회."""
+    from datetime import date
+    from routers.stocks import _latest_snapshots
+    rows = [
+        {"ticker": "AAPL", "date": date(2026, 6, 18), "data": {"price": 185.0}},
+        {"ticker": "MSFT", "date": date(2026, 6, 18), "data": {"price": 410.0}},
+    ]
+    with patch("routers.stocks.query", return_value=rows) as mock_q, \
+         patch("routers.stocks._latest_snapshot") as mock_single:
+        result = _latest_snapshots(["AAPL", "MSFT"])
+    assert result["AAPL"] == ({"price": 185.0}, date(2026, 6, 18))
+    assert result["MSFT"] == ({"price": 410.0}, date(2026, 6, 18))
+    # 배치 쿼리 1회, per-ticker 폴백 미발화(전건 DB 존재)
+    assert mock_q.call_count == 1
+    mock_single.assert_not_called()
+
+
+def test_latest_snapshots_falls_back_per_ticker_for_db_miss():
+    """배치 결과에 없는 티커는 per-ticker _latest_snapshot 폴백으로 채워짐."""
+    from datetime import date
+    from routers.stocks import _latest_snapshots
+    rows = [{"ticker": "AAPL", "date": date(2026, 6, 18), "data": {"price": 185.0}}]  # DB엔 AAPL만
+    with patch("routers.stocks.query", return_value=rows), \
+         patch("routers.stocks._latest_snapshot",
+               return_value=({"price": 99.0}, date(2026, 6, 17))) as mock_single:
+        result = _latest_snapshots(["AAPL", "MSFT"])
+    assert result["AAPL"] == ({"price": 185.0}, date(2026, 6, 18))
+    assert result["MSFT"] == ({"price": 99.0}, date(2026, 6, 17))  # 폴백 값
+    # 폴백은 배치 누락 티커(MSFT)에 대해서만 호출
+    mock_single.assert_called_once_with("MSFT")
+
+
+def test_latest_snapshots_empty_or_none_input_graceful():
+    """빈 리스트/None/None원소 → {} 이고 DB·폴백 모두 미발화."""
+    from routers.stocks import _latest_snapshots
+    with patch("routers.stocks.query") as mock_q, \
+         patch("routers.stocks._latest_snapshot") as mock_single:
+        assert _latest_snapshots([]) == {}
+        assert _latest_snapshots(None) == {}
+        assert _latest_snapshots([None, ""]) == {}
+    mock_q.assert_not_called()
+    mock_single.assert_not_called()
+
+
+def test_latest_snapshots_db_error_falls_back_all():
+    """DB 쿼리 예외 시 except pass 후 전건 per-ticker 폴백(기존 동작 동치)."""
+    from datetime import date
+    from routers.stocks import _latest_snapshots
+    with patch("routers.stocks.query", side_effect=Exception("db down")), \
+         patch("routers.stocks._latest_snapshot",
+               side_effect=lambda t: ({"price": 1.0}, date(2026, 6, 18))) as mock_single:
+        result = _latest_snapshots(["AAPL", "MSFT"])
+    assert set(result.keys()) == {"AAPL", "MSFT"}
+    assert mock_single.call_count == 2
