@@ -1962,7 +1962,7 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 
 ### `GET /api/recommendations`
 
-발굴·관심 두 섹션 반환. `discovery`는 글로벌 점수 유니버스에서 호출자 추적종목(보유+관심)을 제외하고 점수 내림차순으로, `watchlist`는 호출자 관심종목을 저장 점수로 점수 내림차순 정렬해 반환한다(점수 없는 관심종목은 `score=null`로 말미 append). 새 점수 계산 없이 저장값만 재사용한다.
+발굴·관심·보유 액션 세 섹션 반환. `discovery`는 글로벌 점수 유니버스에서 호출자 추적종목(보유+관심)을 제외하고 점수 내림차순으로, `watchlist`는 호출자 관심종목을 저장 점수로 점수 내림차순 정렬해 반환한다(점수 없는 관심종목은 `score=null`로 말미 append). `holdings`는 호출자 보유종목에 저장 EOD 가격·저장 FX로 계산한 비중·평가손익을 붙이고 정량 점수 기반 행동(`action`=추매/익절/홀딩)과 한국어 사유를 도출해 반환한다. 새 점수 계산 없이 저장값만 재사용한다.
 
 **인증**: 필요 (로그인 사용자).
 
@@ -1996,18 +1996,37 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
       "flags": [],
       "rank": 2
     }
+  ],
+  "holdings": [
+    {
+      "ticker": "TSLA",
+      "name": "Tesla",
+      "market": "US",
+      "score": 82.0,
+      "flags": [{ "label": "12개월 모멘텀 +35%", "kind": "momentum" }],
+      "rank": 5,
+      "action": "추매",
+      "reasons": ["점수 82점(>= 70)으로 매력 상위", "비중 6.2%(< 10%)로 추가 여력 있음"],
+      "pnl_pct": 24.3,
+      "weight_pct": 6.2
+    }
   ]
 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `as_of` | string\|null | 발굴+관심 항목 중 최신 `base_date`(ISO date), 없으면 `null` |
-| `discovery` | object[] | 발굴 종목(점수 내림차순, 추적종목 제외). part4에서 `holdings` 키가 additive로 추가됨 |
+| `as_of` | string\|null | 발굴+관심+보유 항목 중 최신 `base_date`(ISO date), 없으면 `null` |
+| `discovery` | object[] | 발굴 종목(점수 내림차순, 추적종목 제외) |
 | `discovery[].score` | number | 정량 점수 0~100 |
 | `discovery[].flags` | object[] | 정량 근거 `{label, kind}`. `kind`=팩터군(`value`\|`momentum`\|`smart_money`\|`missing`), 색 아님 |
 | `discovery[].rank` | int\|null | 시장 내 점수 내림차순 순위(1-base) |
 | `watchlist` | object[] | 호출자 관심종목 재정렬(점수 내림차순). 항목 shape는 `discovery`와 동일. 점수 없는 관심종목은 `score=null`·`flags=[]`·`rank=null`로 말미 append |
+| `holdings` | object[] | 호출자 보유종목 액션. 기본 shape는 `discovery`와 동일하며 아래 4필드 추가. 점수 없는 보유종목은 `score=null`·`flags=[]`·`rank=null`. 보유종목 없으면 `[]` |
+| `holdings[].action` | string | 행동 신호 `추매`\|`익절`\|`홀딩`(점수·비중·손익 규칙으로 도출, ADR-0015 §5) |
+| `holdings[].reasons` | string[] | 행동 근거 한국어 한 줄 목록(정량 사유). 데이터 부족 시 `["데이터 부족"]` |
+| `holdings[].pnl_pct` | number\|null | 평가손익률(%). 가격·평단가 결측 시 `null` |
+| `holdings[].weight_pct` | number\|null | 포트폴리오 내 KRW 환산 비중(%). 가치 환산 불가 시 `null` |
 
 ### `POST /api/recommendations/refresh`
 

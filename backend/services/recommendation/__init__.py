@@ -11,6 +11,7 @@ from .universe import build_universe
 from .scoring import score_stock, derive_flags
 from .funnel import run_recommendation_batch
 from .store import replace_recommendations, read_recommendations
+from .actions import derive_holding_action
 
 __all__ = [
     "build_universe",
@@ -19,4 +20,5 @@ __all__ = [
     "run_recommendation_batch",
     "replace_recommendations",
     "read_recommendations",
+    "derive_holding_action",
 ]

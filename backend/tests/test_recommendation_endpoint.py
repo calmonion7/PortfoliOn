@@ -62,15 +62,20 @@ def test_get_recommendations_returns_discovery_section():
 
 
 def test_get_recommendations_excludes_caller_tracked():
+    # stocks 비어있지 않음 → holdings read가 세 번째로 발화하므로 discovery 단언은
+    # call_args(마지막)가 아닌 call_args_list[0](첫 호출=discovery)로 한다.
+    # holdings 도달 경로의 외부 호출 0 보장을 위해 _latest_snapshot/_usdkrw_rate를 patch.
     tracked = [{"ticker": "AAPL"}, {"ticker": "005930"}]
     with patch("routers.recommendations.storage.get_full_portfolio",
                return_value=_portfolio(stocks=tracked)), \
          patch("routers.recommendations.recommendation.read_recommendations",
-               return_value=[]) as mock_read:
+               return_value=[]) as mock_read, \
+         patch("routers.recommendations._latest_snapshot", return_value=(None, None)), \
+         patch("routers.recommendations._usdkrw_rate", return_value=None):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
-    _, kwargs = mock_read.call_args
-    assert sorted(kwargs.get("exclude_tickers")) == ["005930", "AAPL"]
+    discovery_kwargs = mock_read.call_args_list[0].kwargs
+    assert sorted(discovery_kwargs.get("exclude_tickers")) == ["005930", "AAPL"]
 
 
 def test_get_recommendations_passes_limit():
@@ -224,3 +229,274 @@ def test_refresh_triggers_batch():
     assert resp.status_code == 202
     assert resp.json() == {"ok": True}
     mock_work.assert_called_once_with("KR")
+
+
+# --- holdings 섹션 (part 4/4) ---
+
+def _holding(ticker, name, market, qty, avg_cost):
+    return {"ticker": ticker, "name": name, "market": market,
+            "quantity": qty, "avg_cost": avg_cost, "exchange": ""}
+
+
+def test_get_recommendations_empty_holdings_no_third_read():
+    """holdings 비면 data["holdings"]==[] 이고 세 번째 read(only_tickers) 미발화."""
+    watchlist = [{"ticker": "AAPL", "name": "Apple", "market": "US"}]
+    wl_rows = [{"ticker": "AAPL", "name": "Apple", "market": "US",
+                "score": 88.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)}]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            return wl_rows
+        return []
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(watchlist=watchlist)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read) as mock_read:
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["holdings"] == []
+    # discovery(1) + watchlist(1) = 2회; holdings read 없음
+    assert mock_read.call_count == 2
+
+
+def test_get_recommendations_holdings_add_action():
+    """score>=70 AND weight<10 → 추매."""
+    holdings = [
+        _holding("AAPL", "Apple", "US", 1, 100.0),    # 가치 작음 → 저비중
+        _holding("MSFT", "Microsoft", "US", 100, 100.0),  # 가치 큼 → 고비중
+    ]
+    scored = [
+        {"ticker": "AAPL", "name": "Apple", "market": "US",
+         "score": 85.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)},
+        {"ticker": "MSFT", "name": "Microsoft", "market": "US",
+         "score": 50.0, "flags": [], "rank": 2, "base_date": date(2026, 6, 18)},
+    ]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            return scored
+        return []
+
+    snaps = {"AAPL": ({"price": 120.0}, date(2026, 6, 18)),
+             "MSFT": ({"price": 110.0}, date(2026, 6, 18))}
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations._latest_snapshot",
+               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    holds = {h["ticker"]: h for h in resp.json()["holdings"]}
+    # AAPL: score 85, 작은 가치 → 저비중(<10) → 추매
+    assert holds["AAPL"]["action"] == "추매"
+    # weight_pct·pnl_pct 키 존재
+    assert holds["AAPL"]["pnl_pct"] == 20.0  # (120-100)/100*100
+    assert holds["AAPL"]["weight_pct"] < 10.0
+    # MSFT: score 50 → 추매/익절 조건 모두 미충족 → 홀딩
+    assert holds["MSFT"]["action"] == "홀딩"
+    assert holds["MSFT"]["weight_pct"] > 90.0
+
+
+def test_get_recommendations_holdings_take_profit_action():
+    """score<=40 AND pnl>=15 → 익절."""
+    holdings = [_holding("TSLA", "Tesla", "US", 1, 100.0)]
+    scored = [{"ticker": "TSLA", "name": "Tesla", "market": "US",
+               "score": 30.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)}]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            return scored
+        return []
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations._latest_snapshot",
+               return_value=({"price": 130.0}, date(2026, 6, 18))), \
+         patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    h = resp.json()["holdings"][0]
+    assert h["action"] == "익절"
+    assert h["pnl_pct"] == 30.0
+
+
+def test_get_recommendations_holdings_missing_score_or_price_holds():
+    """score 없거나 price 결측 → 홀딩(데이터 부족)."""
+    holdings = [
+        _holding("AAPL", "Apple", "US", 1, 100.0),   # score 없음
+        _holding("MSFT", "Microsoft", "US", 1, 100.0),  # price 결측
+    ]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            # MSFT만 점수 있음
+            return [{"ticker": "MSFT", "name": "Microsoft", "market": "US",
+                     "score": 90.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)}]
+        return []
+
+    snaps = {"AAPL": ({"price": 120.0}, date(2026, 6, 18)),
+             "MSFT": ({"price": None}, None)}  # price 결측
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations._latest_snapshot",
+               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    holds = {h["ticker"]: h for h in resp.json()["holdings"]}
+    # AAPL: score None → 홀딩(데이터 부족)
+    assert holds["AAPL"]["action"] == "홀딩"
+    assert holds["AAPL"]["score"] is None
+    assert holds["AAPL"]["reasons"] == ["데이터 부족"]
+    # MSFT: price None → pnl/weight None → 홀딩(데이터 부족)
+    assert holds["MSFT"]["action"] == "홀딩"
+    assert holds["MSFT"]["pnl_pct"] is None
+    assert holds["MSFT"]["weight_pct"] is None
+
+
+def test_get_recommendations_holdings_kr_us_weight():
+    """KR+US 혼재 — KRW 환산값으로 비중 계산."""
+    holdings = [
+        _holding("005930", "삼성전자", "KR", 10, 50000.0),  # KR: price*qty*1.0
+        _holding("AAPL", "Apple", "US", 10, 100.0),         # US: price*qty*usdkrw
+    ]
+    scored = [
+        {"ticker": "005930", "name": "삼성전자", "market": "KR",
+         "score": 60.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)},
+        {"ticker": "AAPL", "name": "Apple", "market": "US",
+         "score": 60.0, "flags": [], "rank": 2, "base_date": date(2026, 6, 18)},
+    ]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            return scored
+        return []
+
+    # 005930: 60000*10*1 = 600,000 KRW
+    # AAPL:   120*10*1300 = 1,560,000 KRW
+    # 합 = 2,160,000 → 005930 비중 ≈ 27.78%, AAPL ≈ 72.22%
+    snaps = {"005930": ({"price": 60000.0}, date(2026, 6, 18)),
+             "AAPL": ({"price": 120.0}, date(2026, 6, 18))}
+
+    def _fx():
+        return 1300.0
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations._latest_snapshot",
+               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._usdkrw_rate", side_effect=_fx):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    holds = {h["ticker"]: h for h in resp.json()["holdings"]}
+    assert abs(holds["005930"]["weight_pct"] - 27.7777) < 0.1
+    assert abs(holds["AAPL"]["weight_pct"] - 72.2222) < 0.1
+    # 합 ≈ 100
+    assert abs(holds["005930"]["weight_pct"] + holds["AAPL"]["weight_pct"] - 100.0) < 0.01
+
+
+def test_get_recommendations_holdings_us_no_fx_excluded_from_weight():
+    """US이고 usdkrw None → 환산 불가 → 분모 제외 & weight_pct None."""
+    holdings = [
+        _holding("005930", "삼성전자", "KR", 10, 50000.0),
+        _holding("AAPL", "Apple", "US", 10, 100.0),
+    ]
+    scored = [
+        {"ticker": "005930", "name": "삼성전자", "market": "KR",
+         "score": 80.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)},
+        {"ticker": "AAPL", "name": "Apple", "market": "US",
+         "score": 80.0, "flags": [], "rank": 2, "base_date": date(2026, 6, 18)},
+    ]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            return scored
+        return []
+
+    snaps = {"005930": ({"price": 60000.0}, date(2026, 6, 18)),
+             "AAPL": ({"price": 120.0}, date(2026, 6, 18))}
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations._latest_snapshot",
+               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._usdkrw_rate", return_value=None):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    holds = {h["ticker"]: h for h in resp.json()["holdings"]}
+    # AAPL: usdkrw None → weight None, 분모 제외 → KR 단독 100%
+    assert holds["AAPL"]["weight_pct"] is None
+    assert abs(holds["005930"]["weight_pct"] - 100.0) < 0.01
+
+
+def test_get_recommendations_holdings_does_not_change_discovery_watchlist():
+    """holdings 존재해도 discovery/watchlist 불변."""
+    holdings = [_holding("MSFT", "Microsoft", "US", 1, 100.0)]
+    watchlist = [{"ticker": "AAPL", "name": "Apple", "market": "US"}]
+    discovery_rows = [{"ticker": "NVDA", "name": "Nvidia", "market": "US",
+                       "score": 95.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)}]
+    wl_rows = [{"ticker": "AAPL", "name": "Apple", "market": "US",
+                "score": 88.0, "flags": [], "rank": 2, "base_date": date(2026, 6, 18)}]
+    h_rows = [{"ticker": "MSFT", "name": "Microsoft", "market": "US",
+               "score": 70.0, "flags": [], "rank": 3, "base_date": date(2026, 6, 18)}]
+
+    def _read(*args, **kwargs):
+        only = kwargs.get("only_tickers")
+        if only:
+            # watchlist read는 AAPL, holdings read는 MSFT로 구분
+            if "AAPL" in only:
+                return wl_rows
+            return h_rows
+        return discovery_rows
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings, watchlist=watchlist)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations._latest_snapshot",
+               return_value=({"price": 120.0}, date(2026, 6, 18))), \
+         patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [d["ticker"] for d in data["discovery"]] == ["NVDA"]
+    assert [w["ticker"] for w in data["watchlist"]] == ["AAPL"]
+    assert [h["ticker"] for h in data["holdings"]] == ["MSFT"]
+
+
+def test_get_recommendations_no_live_external_call_with_holdings():
+    """holdings 경로에서도 요청경로 외부 fetch 0 — read_recommendations·저장헬퍼만."""
+    holdings = [_holding("MSFT", "Microsoft", "US", 1, 100.0)]
+    scored = [{"ticker": "MSFT", "name": "Microsoft", "market": "US",
+               "score": 70.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)}]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            return scored
+        return []
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations.recommendation.run_recommendation_batch") as mock_batch, \
+         patch("routers.recommendations._latest_snapshot",
+               return_value=({"price": 120.0}, date(2026, 6, 18))), \
+         patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    mock_batch.assert_not_called()
