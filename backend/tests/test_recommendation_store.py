@@ -64,6 +64,40 @@ def test_replace_recommendations_includes_low_liquidity(monkeypatch):
     assert ins2_params[7] is False
 
 
+def test_replace_recommendations_includes_exchange(monkeypatch):
+    """INSERT에 exchange 컬럼·값(row.get('exchange') or '')을 9번째로 포함."""
+    from services.recommendation import store
+    calls = []
+    monkeypatch.setattr(store, "execute", lambda sql, params=None: calls.append((sql, params)))
+
+    store.replace_recommendations("KR", [
+        {"ticker": "005930", "market": "KR", "score": 88.5, "factors": {}, "flags": [],
+         "rank": 1, "base_date": date(2026, 6, 18), "exchange": "KQ"},
+        {"ticker": "000660", "market": "KR", "score": 71.0, "factors": {}, "flags": [],
+         "rank": 2, "base_date": date(2026, 6, 18)},  # exchange 누락 → ''
+    ])
+
+    ins_sql, ins_params = calls[1]
+    assert "exchange" in ins_sql
+    assert "EXCLUDED.exchange" in ins_sql
+    assert ins_params[8] == "KQ"
+    # 누락 시 기본 ''
+    _, ins2_params = calls[2]
+    assert ins2_params[8] == ""
+
+
+def test_read_recommendations_selects_exchange(monkeypatch):
+    """SELECT에 r.exchange 포함, 반환 dict에 exchange 보존."""
+    from services.recommendation import store
+    cap = _captured_query(monkeypatch, [
+        {"ticker": "005930", "name": "삼성전자", "market": "KR", "score": 88.5,
+         "flags": [], "rank": 1, "base_date": date(2026, 6, 18), "exchange": "KQ"},
+    ])
+    out = store.read_recommendations()
+    assert "r.exchange" in cap["sql"]
+    assert out[0]["exchange"] == "KQ"
+
+
 def test_replace_recommendations_empty_rows_only_deletes(monkeypatch):
     """rows가 비면 DELETE만 수행(insert 없음)."""
     from services.recommendation import store

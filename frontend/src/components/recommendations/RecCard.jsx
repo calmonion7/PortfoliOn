@@ -24,7 +24,7 @@ export default function RecCard({ item, footer = null }) {
           <span style={{ display: 'block', color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || item.ticker}</span>
           <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)' }}>{item.ticker}</span>
         </div>
-        <MarketBadge market={item.market} />
+        <MarketBadge market={item.market} exchange={item.exchange} />
       </div>
 
       {/* 추천 점수 */}

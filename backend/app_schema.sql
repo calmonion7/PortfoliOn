@@ -313,6 +313,7 @@ CREATE TABLE IF NOT EXISTS stock_recommendations (
     rank        INTEGER,                                -- 시장 내 점수 내림차순 순위(1-base)
     base_date   DATE NOT NULL,                          -- 산출 기준일
     low_liquidity BOOLEAN NOT NULL DEFAULT FALSE,        -- 저유동성(평균 거래대금 미달/미측정) — 발굴에서만 제외
+    exchange    TEXT,                                   -- 거래소 코드(KR=KS|KQ, US='')
     updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_recommendations_read ON stock_recommendations(market, score DESC);

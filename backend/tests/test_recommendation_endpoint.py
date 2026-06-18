@@ -165,6 +165,7 @@ def test_get_recommendations_watchlist_scored_desc():
     assert first == {
         "ticker": "AAPL", "name": "Apple", "market": "US",
         "score": 88.0, "flags": [{"label": "목표가 대비 +20%", "kind": "value"}], "rank": 1,
+        "exchange": "",
     }
 
 
@@ -195,7 +196,7 @@ def test_get_recommendations_watchlist_unscored_appended_last():
     last = wl[-1]
     assert last == {
         "ticker": "TSLA", "name": "Tesla", "market": "US",
-        "score": None, "flags": [], "rank": None,
+        "score": None, "flags": [], "rank": None, "exchange": "",
     }
 
 
@@ -240,6 +241,58 @@ def test_get_recommendations_empty_watchlist_no_second_read():
     assert mock_read.call_count == 1
     for call in mock_read.call_args_list:
         assert "only_tickers" not in call.kwargs
+
+
+def test_get_recommendations_exposes_exchange_all_sections():
+    """발굴·관심·보유 세 섹션 모두 exchange 노출(점수 있음=read 값, 없음=stock dict 값)."""
+    discovery_rows = [{"ticker": "005930", "name": "삼성전자", "market": "KR",
+                       "score": 90.0, "flags": [], "rank": 1,
+                       "base_date": date(2026, 6, 18), "exchange": "KS"}]
+    wl_scored = [{"ticker": "035720", "name": "카카오", "market": "KR",
+                  "score": 80.0, "flags": [], "rank": 2,
+                  "base_date": date(2026, 6, 18), "exchange": "KQ"}]
+    h_scored = [{"ticker": "000660", "name": "하이닉스", "market": "KR",
+                 "score": 70.0, "flags": [], "rank": 3,
+                 "base_date": date(2026, 6, 18), "exchange": "KS"}]
+    # 점수 없는 fallback: watchlist TSLA(US), holdings AAPL(US)
+    watchlist = [{"ticker": "035720", "name": "카카오", "market": "KR", "exchange": "KQ"},
+                 {"ticker": "TSLA", "name": "Tesla", "market": "US", "exchange": ""}]
+    holdings = [{"ticker": "000660", "name": "하이닉스", "market": "KR",
+                 "quantity": 1, "avg_cost": 50000.0, "exchange": "KS"},
+                {"ticker": "AAPL", "name": "Apple", "market": "US",
+                 "quantity": 1, "avg_cost": 100.0, "exchange": ""}]
+
+    def _read(*args, **kwargs):
+        only = kwargs.get("only_tickers")
+        if only:
+            if "035720" in only:
+                return wl_scored
+            return h_scored
+        return discovery_rows
+
+    snaps = {"000660": ({"price": 60000.0}, date(2026, 6, 18)),
+             "AAPL": ({"price": 120.0}, date(2026, 6, 18))}
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings, watchlist=watchlist)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read), \
+         patch("routers.recommendations._latest_snapshot",
+               side_effect=lambda t: snaps[t.upper()]), \
+         patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    data = resp.json()
+    # discovery (점수 있음 → read 값)
+    assert {d["ticker"]: d["exchange"] for d in data["discovery"]} == {"005930": "KS"}
+    # watchlist: 점수 있음(035720=KQ) + 점수 없음 fallback(TSLA=stock dict '')
+    wl = {w["ticker"]: w["exchange"] for w in data["watchlist"]}
+    assert wl["035720"] == "KQ"
+    assert wl["TSLA"] == ""
+    # holdings: 점수 있음(000660=KS) — AAPL은 점수 없음 fallback(stock dict '')
+    h = {x["ticker"]: x["exchange"] for x in data["holdings"]}
+    assert h["000660"] == "KS"
+    assert h["AAPL"] == ""
 
 
 def test_get_recommendations_requires_auth():

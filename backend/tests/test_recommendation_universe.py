@@ -12,12 +12,37 @@ from unittest.mock import patch
 #   tracked   : storage.get_global_portfolio 합집합 형태 (ticker,name,market,is_etf)
 #   guru      : 구루 보유 티커 문자열 집합 (US)
 
-def _kr_row(ticker, name, cap, is_etf=False):
-    return {"ticker": ticker, "name": name, "market_cap": cap, "is_etf": is_etf}
+def _kr_row(ticker, name, cap, is_etf=False, exchange="KS"):
+    return {"ticker": ticker, "name": name, "market_cap": cap, "is_etf": is_etf,
+            "exchange": exchange}
 
 
-def _tracked(ticker, name, market, is_etf=False):
-    return {"ticker": ticker, "name": name, "market": market, "is_etf": is_etf}
+def _tracked(ticker, name, market, is_etf=False, exchange=""):
+    return {"ticker": ticker, "name": name, "market": market, "is_etf": is_etf,
+            "exchange": exchange}
+
+
+# ── (f) exchange 코드 관통 (KR=KS/KQ, US='') ─────────────────────
+
+def test_merge_universe_carries_exchange():
+    from services.recommendation.universe import _merge_universe
+    kr_rows = [
+        _kr_row("005930", "삼성전자", 500, exchange="KS"),
+        _kr_row("035720", "카카오", 300, exchange="KQ"),
+    ]
+    sp500 = ["AAPL"]
+    tracked = [_tracked("TSLA", "Tesla", "US", exchange="")]
+    guru = ["BRK-B"]
+
+    out = _merge_universe(kr_rows, sp500, tracked, guru, kr_top_n=10)
+    by = {r["ticker"]: r for r in out}
+    # KR 행은 ranking_service가 채운 KS/KQ
+    assert by["005930"]["exchange"] == "KS"
+    assert by["035720"]["exchange"] == "KQ"
+    # US 행은 빈 문자열
+    assert by["AAPL"]["exchange"] == ""
+    assert by["BRK-B"]["exchange"] == ""
+    assert by["TSLA"]["exchange"] == ""
 
 
 # ── (a) 합집합·dedup·ETF 제외·시총 내림차순 절단 ──────────────

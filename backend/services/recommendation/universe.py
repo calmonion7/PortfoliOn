@@ -79,29 +79,30 @@ def _merge_universe(
     """
     seen: dict[str, dict] = {}
 
-    def _add(ticker: str, market: str, name: str, market_cap):
+    def _add(ticker: str, market: str, name: str, market_cap, exchange: str = ""):
         t = (ticker or "").strip()
         if not t or t in seen:
             return
-        seen[t] = {"ticker": t, "market": market, "name": name or t, "market_cap": market_cap}
+        seen[t] = {"ticker": t, "market": market, "name": name or t,
+                   "market_cap": market_cap, "exchange": exchange}
 
     # KR 시총 상위 N (ETF 제외)
     kr_stocks = [r for r in kr_rows if not r.get("is_etf")]
     kr_stocks.sort(key=lambda r: r.get("market_cap") or 0, reverse=True)
     for r in kr_stocks[:kr_top_n]:
-        _add(r.get("ticker", ""), "KR", r.get("name", ""), r.get("market_cap"))
+        _add(r.get("ticker", ""), "KR", r.get("name", ""), r.get("market_cap"), r.get("exchange", ""))
 
     # US S&P500
     for t in sp500:
-        _add(t, "US", "", None)
+        _add(t, "US", "", None, "")
 
     # US 구루 보유
     for t in guru:
-        _add(t, "US", "", None)
+        _add(t, "US", "", None, "")
 
     # 추적종목 — 항상 포함(ETF·컷오프 무관, 누락분만 추가)
     for s in tracked:
-        _add(s.get("ticker", ""), s.get("market") or "US", s.get("name", ""), None)
+        _add(s.get("ticker", ""), s.get("market") or "US", s.get("name", ""), None, s.get("exchange") or "")
 
     return list(seen.values())
 
@@ -109,7 +110,8 @@ def _merge_universe(
 def build_universe() -> list[dict]:
     """발굴 유니버스를 빌드해 종목 dict 리스트로 반환.
 
-    각 dict: {"ticker", "market", "name", "market_cap"} (market_cap은 결측 가능).
+    각 dict: {"ticker", "market", "name", "market_cap", "exchange"} (market_cap은 결측 가능;
+    exchange는 KR=KS|KQ, US='').
     KR 시총 상위 KR_MARKET_CAP_TOP_N + US S&P500 + 전 유저 추적종목 + US 구루 보유의
     합집합. ETF 제외. ticker로 dedup(첫 출처 우선). 추적종목은 항상 포함.
 

@@ -25,8 +25,8 @@ def replace_recommendations(market: str, rows: list[dict]) -> None:
         execute(
             """
             INSERT INTO stock_recommendations
-                (ticker, market, score, factors, flags, rank, base_date, low_liquidity, updated_at)
-            VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, NOW())
+                (ticker, market, score, factors, flags, rank, base_date, low_liquidity, exchange, updated_at)
+            VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, NOW())
             ON CONFLICT (ticker) DO UPDATE SET
                 market        = EXCLUDED.market,
                 score         = EXCLUDED.score,
@@ -35,6 +35,7 @@ def replace_recommendations(market: str, rows: list[dict]) -> None:
                 rank          = EXCLUDED.rank,
                 base_date     = EXCLUDED.base_date,
                 low_liquidity = EXCLUDED.low_liquidity,
+                exchange      = EXCLUDED.exchange,
                 updated_at    = NOW()
             """,
             (
@@ -46,6 +47,7 @@ def replace_recommendations(market: str, rows: list[dict]) -> None:
                 row.get("rank"),
                 row["base_date"],
                 bool(row.get("low_liquidity", False)),
+                row.get("exchange") or "",
             ),
         )
 
@@ -63,7 +65,7 @@ def read_recommendations(
     only_tickers: 교집합 한정(관심/보유 섹션) — 빈 리스트면 교집합 공집합이므로 쿼리 없이 [] 반환.
     limit: 상한. exclude_low_liquidity: True면 저유동성 제외(발굴 섹션 전용).
     name은 tickers 마스터에서 LEFT JOIN.
-    반환 각 dict: {"ticker", "name", "market", "score", "flags", "rank", "base_date"}.
+    반환 각 dict: {"ticker", "name", "market", "score", "flags", "rank", "base_date", "exchange"}.
     """
     # only_tickers가 명시적 빈 리스트면 교집합이 공집합 → DB 조회 없이 빈 결과.
     if only_tickers is not None and len(only_tickers) == 0:
@@ -84,7 +86,7 @@ def read_recommendations(
         where.append("r.low_liquidity = FALSE")
 
     sql = (
-        "SELECT r.ticker, t.name, r.market, r.score, r.flags, r.rank, r.base_date "
+        "SELECT r.ticker, t.name, r.market, r.score, r.flags, r.rank, r.base_date, r.exchange "
         "FROM stock_recommendations r "
         "LEFT JOIN tickers t ON t.ticker = r.ticker"
     )

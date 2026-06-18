@@ -318,6 +318,7 @@ def run_recommendation_batch(market: str) -> dict:
             "factors": factors,
             "flags": result["flags"],
             "low_liquidity": res["low_liquidity"],
+            "exchange": cand.get("exchange") or "",
             "base_date": today,
         })
 

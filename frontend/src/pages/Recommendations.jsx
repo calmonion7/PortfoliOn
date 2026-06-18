@@ -61,7 +61,7 @@ export default function Recommendations() {
       ticker: item.ticker,
       name: item.name || item.ticker,
       market: item.market,
-      exchange: item.market === 'KR' ? 'KS' : '',
+      exchange: item.exchange || (item.market === 'KR' ? 'KS' : ''),
       security_type: 'EQUITY',
     }
     api.post('/api/watchlist', payload)

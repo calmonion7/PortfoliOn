@@ -21,11 +21,11 @@ def get_recommendations(
 ):
     """발굴·관심 섹션 반환(저장값 read-only, 점수 내림차순).
 
-    응답 shape(섹션 키 객체):
+    응답 shape(섹션 키 객체; exchange=거래소 코드 KR=KS|KQ, US=''):
         {"as_of": <date|null>,
-         "discovery": [{ticker,name,market,score,flags,rank}, ...],  # 호출자 추적종목 제외
-         "watchlist": [{ticker,name,market,score,flags,rank}, ...],  # 호출자 관심종목, 점수 없으면 score=None 말미
-         "holdings": [{ticker,name,market,score,flags,rank,action,reasons,pnl_pct,weight_pct}, ...]}  # 보유종목 액션
+         "discovery": [{ticker,name,market,score,flags,rank,exchange}, ...],  # 호출자 추적종목 제외
+         "watchlist": [{ticker,name,market,score,flags,rank,exchange}, ...],  # 호출자 관심종목, 점수 없으면 score=None 말미
+         "holdings": [{ticker,name,market,score,flags,rank,exchange,action,reasons,pnl_pct,weight_pct}, ...]}  # 보유종목 액션
     """
     portfolio = storage.get_full_portfolio(user_id)
     wl_stocks = portfolio["watchlist"]
@@ -42,6 +42,7 @@ def get_recommendations(
             "score": float(r["score"]) if r.get("score") is not None else None,
             "flags": r.get("flags") or [],
             "rank": r.get("rank"),
+            "exchange": r.get("exchange") or "",
         }
 
     def _as_of(rows_, current):
@@ -74,6 +75,7 @@ def get_recommendations(
                 "score": None,
                 "flags": [],
                 "rank": None,
+                "exchange": s.get("exchange") or "",
             })
 
     # 보유 액션 섹션 (part 4/4): 저장 EOD 가격·저장 FX로 비중·손익 계산 후 action 도출.
@@ -143,6 +145,7 @@ def get_recommendations(
                     "score": None,
                     "flags": [],
                     "rank": None,
+                    "exchange": s.get("exchange") or "",
                 }
             c = ctx[t]
             weight_pct = (c["krw_value"] / total_krw * 100) if (c["krw_value"] is not None and total_krw) else None

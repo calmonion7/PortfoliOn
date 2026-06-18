@@ -1984,7 +1984,8 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
       "market": "US",
       "score": 88.0,
       "flags": [{ "label": "목표가 대비 +20%", "kind": "value" }],
-      "rank": 1
+      "rank": 1,
+      "exchange": ""
     }
   ],
   "watchlist": [
@@ -1994,7 +1995,8 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
       "market": "KR",
       "score": 75.0,
       "flags": [],
-      "rank": 2
+      "rank": 2,
+      "exchange": "KS"
     }
   ],
   "holdings": [
@@ -2005,6 +2007,7 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
       "score": 82.0,
       "flags": [{ "label": "12개월 모멘텀 +35%", "kind": "momentum" }],
       "rank": 5,
+      "exchange": "",
       "action": "추매",
       "reasons": ["점수 82점(>= 70)으로 매력 상위", "비중 6.2%(< 10%)로 추가 여력 있음"],
       "pnl_pct": 24.3,
@@ -2021,6 +2024,7 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 | `discovery[].score` | number | 정량 점수 0~100 |
 | `discovery[].flags` | object[] | 정량 근거 `{label, kind}`. `kind`=팩터군(`value`\|`momentum`\|`smart_money`\|`missing`), 색 아님 |
 | `discovery[].rank` | int\|null | 시장 내 점수 내림차순 순위(1-base) |
+| `discovery[].exchange` | string | 거래소 코드(KR=`KS`\|`KQ`, US=`""`). 결측 시 `""` |
 | `watchlist` | object[] | 호출자 관심종목 재정렬(점수 내림차순). 항목 shape는 `discovery`와 동일. 점수 없는 관심종목은 `score=null`·`flags=[]`·`rank=null`로 말미 append |
 | `holdings` | object[] | 호출자 보유종목 액션. 기본 shape는 `discovery`와 동일하며 아래 4필드 추가. 점수 없는 보유종목은 `score=null`·`flags=[]`·`rank=null`. 보유종목 없으면 `[]` |
 | `holdings[].action` | string | 행동 신호 `추매`\|`익절`\|`홀딩`(점수·비중·손익 규칙으로 도출, ADR-0015 §5) |

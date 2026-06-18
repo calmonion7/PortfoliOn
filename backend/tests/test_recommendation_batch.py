@@ -20,9 +20,9 @@ from unittest.mock import patch
 # _enrich_one 반환 shape: 신호 있으면 {"factors", "low_liquidity"}, 없으면 None.
 # run_recommendation_batch: scored row에 low_liquidity 실림 + 통계 dict 카운트.
 
-def _u(ticker, market, name, cap, guru=False):
+def _u(ticker, market, name, cap, guru=False, exchange=""):
     return {"ticker": ticker, "market": market, "name": name,
-            "market_cap": cap, "guru_member": guru}
+            "market_cap": cap, "guru_member": guru, "exchange": exchange}
 
 
 def _ohlc(closes, volumes):
@@ -89,6 +89,30 @@ def test_run_batch_low_liquidity_count_mixed():
     by_ticker = {r["ticker"]: r for r in captured["rows"]}
     assert by_ticker["LOWLIQ"]["low_liquidity"] is True
     assert by_ticker["BIGCAP"]["low_liquidity"] is False
+
+
+def test_run_batch_scored_rows_carry_exchange():
+    """scored row가 유니버스 cand의 exchange를 담는다(KR=KS/KQ, US='')."""
+    from services.recommendation import funnel as F
+    uni = [_u("005930", "KR", "삼성", 500, exchange="KS"),
+           _u("AAPL", "US", "Apple", 400, exchange="")]
+    history = {"005930": _ohlc([10_000.0] * 30, volumes=[1_000_000] * 30),
+               "AAPL": _ohlc([100.0] * 30, volumes=[1_000_000] * 30)}
+    upside = {"005930": 20.0, "AAPL": 15.0}
+
+    captured = {}
+
+    with patch.object(F, "build_universe", return_value=uni), \
+         patch.object(F, "_fetch_guru_tickers", return_value=[]), \
+         patch.object(F, "replace_recommendations",
+                      side_effect=lambda m, rows: captured.__setitem__("rows", rows)), \
+         patch.object(F, "_fetch_history", side_effect=lambda c: history.get(c["ticker"])), \
+         patch.object(F, "_consensus_upside", side_effect=lambda c, df: upside.get(c["ticker"])):
+        # KR 유니버스만 통과(market 필터)하므로 KR 시장으로 돌린다
+        F.run_recommendation_batch("KR")
+
+    by_ticker = {r["ticker"]: r for r in captured["rows"]}
+    assert by_ticker["005930"]["exchange"] == "KS"
 
 
 # ── 배치 레지스트리 엔트리 (recommendation_kr/us) ──────────────────────────────
