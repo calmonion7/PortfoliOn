@@ -25,16 +25,17 @@ def replace_recommendations(market: str, rows: list[dict]) -> None:
         execute(
             """
             INSERT INTO stock_recommendations
-                (ticker, market, score, factors, flags, rank, base_date, updated_at)
-            VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, NOW())
+                (ticker, market, score, factors, flags, rank, base_date, low_liquidity, updated_at)
+            VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, NOW())
             ON CONFLICT (ticker) DO UPDATE SET
-                market     = EXCLUDED.market,
-                score      = EXCLUDED.score,
-                factors    = EXCLUDED.factors,
-                flags      = EXCLUDED.flags,
-                rank       = EXCLUDED.rank,
-                base_date  = EXCLUDED.base_date,
-                updated_at = NOW()
+                market        = EXCLUDED.market,
+                score         = EXCLUDED.score,
+                factors       = EXCLUDED.factors,
+                flags         = EXCLUDED.flags,
+                rank          = EXCLUDED.rank,
+                base_date     = EXCLUDED.base_date,
+                low_liquidity = EXCLUDED.low_liquidity,
+                updated_at    = NOW()
             """,
             (
                 row["ticker"].upper(),
@@ -44,6 +45,7 @@ def replace_recommendations(market: str, rows: list[dict]) -> None:
                 json.dumps(row.get("flags") or [], ensure_ascii=False),
                 row.get("rank"),
                 row["base_date"],
+                bool(row.get("low_liquidity", False)),
             ),
         )
 
@@ -53,12 +55,14 @@ def read_recommendations(
     exclude_tickers: list[str] | None = None,
     only_tickers: list[str] | None = None,
     limit: int | None = None,
+    exclude_low_liquidity: bool = False,
 ) -> list[dict]:
     """추천 저장값 조회(저장값만 읽음, 점수 내림차순).
 
     markets: 시장 필터(None이면 전체). exclude_tickers: 제외(발굴=호출자 추적 제외).
     only_tickers: 교집합 한정(관심/보유 섹션) — 빈 리스트면 교집합 공집합이므로 쿼리 없이 [] 반환.
-    limit: 상한. name은 tickers 마스터에서 LEFT JOIN.
+    limit: 상한. exclude_low_liquidity: True면 저유동성 제외(발굴 섹션 전용).
+    name은 tickers 마스터에서 LEFT JOIN.
     반환 각 dict: {"ticker", "name", "market", "score", "flags", "rank", "base_date"}.
     """
     # only_tickers가 명시적 빈 리스트면 교집합이 공집합 → DB 조회 없이 빈 결과.
@@ -76,6 +80,8 @@ def read_recommendations(
     if only_tickers:
         where.append("r.ticker = ANY(%s)")
         params.append([t.upper() for t in only_tickers])
+    if exclude_low_liquidity:
+        where.append("r.low_liquidity = FALSE")
 
     sql = (
         "SELECT r.ticker, t.name, r.market, r.score, r.flags, r.rank, r.base_date "

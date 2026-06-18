@@ -78,6 +78,34 @@ def test_get_recommendations_excludes_caller_tracked():
     assert sorted(discovery_kwargs.get("exclude_tickers")) == ["005930", "AAPL"]
 
 
+def test_get_recommendations_discovery_excludes_low_liquidity():
+    # 저유동성은 discovery read에서만 제외(exclude_low_liquidity=True);
+    # watchlist/holdings read엔 미부여(노출 유지). read는 patch라 추가 kwarg 허용.
+    watchlist = [{"ticker": "AAPL", "name": "Apple", "market": "US"}]
+    holdings = [{"ticker": "MSFT", "name": "Microsoft", "market": "US",
+                 "quantity": 1, "avg_cost": 100.0, "exchange": ""}]
+
+    def _read(*args, **kwargs):
+        if kwargs.get("only_tickers"):
+            return []
+        return []
+
+    with patch("routers.recommendations.storage.get_full_portfolio",
+               return_value=_portfolio(stocks=holdings, watchlist=watchlist)), \
+         patch("routers.recommendations.recommendation.read_recommendations",
+               side_effect=_read) as mock_read, \
+         patch("routers.recommendations._latest_snapshot", return_value=(None, None)), \
+         patch("routers.recommendations._usdkrw_rate", return_value=None):
+        resp = client.get("/api/recommendations")
+    assert resp.status_code == 200
+    # 첫 호출=discovery → exclude_low_liquidity=True
+    discovery_kwargs = mock_read.call_args_list[0].kwargs
+    assert discovery_kwargs.get("exclude_low_liquidity") is True
+    # 이후 watchlist/holdings read는 exclude_low_liquidity 미부여(또는 기본 False)
+    for call in mock_read.call_args_list[1:]:
+        assert call.kwargs.get("exclude_low_liquidity", False) is False
+
+
 def test_get_recommendations_passes_limit():
     with patch("routers.recommendations.storage.get_full_portfolio", return_value=_portfolio()), \
          patch("routers.recommendations.recommendation.read_recommendations",

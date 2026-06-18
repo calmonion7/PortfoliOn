@@ -10,7 +10,85 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import pandas as pd
 import pytest
+
+from unittest.mock import patch
+
+
+# ── 저유동성 픽스처/배선 (#68) ─────────────────────────────────────────────────
+# _enrich_one 반환 shape: 신호 있으면 {"factors", "low_liquidity"}, 없으면 None.
+# run_recommendation_batch: scored row에 low_liquidity 실림 + 통계 dict 카운트.
+
+def _u(ticker, market, name, cap, guru=False):
+    return {"ticker": ticker, "market": market, "name": name,
+            "market_cap": cap, "guru_member": guru}
+
+
+def _ohlc(closes, volumes):
+    n = len(closes)
+    idx = pd.date_range("2026-01-01", periods=n, freq="D")
+    return pd.DataFrame(
+        {"Open": closes, "High": [c * 1.0 for c in closes],
+         "Low": [c * 0.9 for c in closes], "Close": closes, "Volume": volumes},
+        index=idx,
+    )
+
+
+def test_enrich_one_returns_dict_with_low_liquidity_when_signal():
+    from services.recommendation import funnel as F
+    cand = _u("000660", "KR", "하이닉스", 300)
+    # 거래대금 ≪ KR 1e9 → low_liquidity True, upside 신호로 _has_signal True
+    df = _ohlc([10_000.0] * 30, volumes=[1000] * 30)
+    with patch.object(F, "_fetch_history", return_value=df), \
+         patch.object(F, "_consensus_upside", return_value=28.0), \
+         patch.object(F, "_kr_supply", return_value=(None, None)), \
+         patch.object(F, "_kr_insider", return_value=None):
+        res = F._enrich_one(cand, set())
+    assert isinstance(res, dict)
+    assert set(res.keys()) == {"factors", "low_liquidity"}
+    assert isinstance(res["factors"], dict)
+    assert res["low_liquidity"] is True
+
+
+def test_enrich_one_none_when_no_signal():
+    from services.recommendation import funnel as F
+    cand = _u("000660", "KR", "하이닉스", 300)
+    # 히스토리 없음·컨센서스 없음·수급 없음·지분 없음 → 산출 근거 0 → None
+    with patch.object(F, "_fetch_history", return_value=None), \
+         patch.object(F, "_consensus_upside", return_value=None), \
+         patch.object(F, "_kr_supply", return_value=(None, None)), \
+         patch.object(F, "_kr_insider", return_value=None):
+        res = F._enrich_one(cand, set())
+    assert res is None
+
+
+def test_run_batch_low_liquidity_count_mixed():
+    from services.recommendation import funnel as F
+    uni = [_u("LOWLIQ", "US", "Thin", 500), _u("BIGCAP", "US", "Liquid", 400)]
+    # LOWLIQ: 거래대금 10*1000=10,000 < 1M → 저유동성
+    # BIGCAP: 거래대금 10*500,000=5,000,000 ≥ 1M → 정상
+    history = {"LOWLIQ": _ohlc([10.0] * 30, volumes=[1000] * 30),
+               "BIGCAP": _ohlc([10.0] * 30, volumes=[500_000] * 30)}
+    upside = {"LOWLIQ": 20.0, "BIGCAP": 15.0}
+
+    captured = {}
+
+    def _fake_replace(market, rows):
+        captured["rows"] = rows
+
+    with patch.object(F, "build_universe", return_value=uni), \
+         patch.object(F, "_fetch_guru_tickers", return_value=[]), \
+         patch.object(F, "replace_recommendations", side_effect=_fake_replace), \
+         patch.object(F, "_fetch_history", side_effect=lambda c: history.get(c["ticker"])), \
+         patch.object(F, "_consensus_upside", side_effect=lambda c, df: upside.get(c["ticker"])):
+        stats = F.run_recommendation_batch("US")
+
+    assert stats["scored"] == 2
+    assert stats["low_liquidity"] == 1  # LOWLIQ만 저유동성
+    by_ticker = {r["ticker"]: r for r in captured["rows"]}
+    assert by_ticker["LOWLIQ"]["low_liquidity"] is True
+    assert by_ticker["BIGCAP"]["low_liquidity"] is False
 
 
 # ── 배치 레지스트리 엔트리 (recommendation_kr/us) ──────────────────────────────

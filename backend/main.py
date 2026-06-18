@@ -132,7 +132,9 @@ def _migrate():
             flags JSONB NOT NULL DEFAULT '[]'::jsonb,
             rank INTEGER,
             base_date DATE NOT NULL,
+            low_liquidity BOOLEAN NOT NULL DEFAULT FALSE,
             updated_at TIMESTAMPTZ DEFAULT NOW())""")
+        execute("ALTER TABLE stock_recommendations ADD COLUMN IF NOT EXISTS low_liquidity BOOLEAN NOT NULL DEFAULT FALSE")
         execute("CREATE INDEX IF NOT EXISTS idx_recommendations_read ON stock_recommendations(market, score DESC)")
     except Exception as e:
         print(f"[migrate] stock_recommendations 생성 실패: {e}")

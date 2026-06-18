@@ -31,7 +31,8 @@ def get_recommendations(
     wl_stocks = portfolio["watchlist"]
     all_stocks = portfolio["stocks"] + wl_stocks
     tracked = [s["ticker"] for s in all_stocks if s.get("ticker")]
-    rows = recommendation.read_recommendations(exclude_tickers=tracked, limit=limit)
+    # 저유동성은 점수·저장 유지하되 discovery에서만 제외 — ADR-0015 §2(추적종목 점수 보존)·멀티유저 누수 회피
+    rows = recommendation.read_recommendations(exclude_tickers=tracked, limit=limit, exclude_low_liquidity=True)
 
     def _item(r):
         return {

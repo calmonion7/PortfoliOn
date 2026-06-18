@@ -43,6 +43,27 @@ def test_replace_recommendations_deletes_market_then_upserts(monkeypatch):
     assert ins_params[6] == date(2026, 6, 18)
 
 
+def test_replace_recommendations_includes_low_liquidity(monkeypatch):
+    """INSERT에 low_liquidity 컬럼·값(row.get('low_liquidity', False))을 8번째로 포함."""
+    from services.recommendation import store
+    calls = []
+    monkeypatch.setattr(store, "execute", lambda sql, params=None: calls.append((sql, params)))
+
+    store.replace_recommendations("KR", [
+        {"ticker": "005930", "market": "KR", "score": 88.5, "factors": {}, "flags": [],
+         "rank": 1, "base_date": date(2026, 6, 18), "low_liquidity": True},
+        {"ticker": "000660", "market": "KR", "score": 71.0, "factors": {}, "flags": [],
+         "rank": 2, "base_date": date(2026, 6, 18)},
+    ])
+
+    ins_sql, ins_params = calls[1]
+    assert "low_liquidity" in ins_sql
+    assert ins_params[7] is True
+    # 누락 시 기본 False
+    _, ins2_params = calls[2]
+    assert ins2_params[7] is False
+
+
 def test_replace_recommendations_empty_rows_only_deletes(monkeypatch):
     """rows가 비면 DELETE만 수행(insert 없음)."""
     from services.recommendation import store
@@ -111,6 +132,22 @@ def test_read_recommendations_limit(monkeypatch):
     store.read_recommendations(limit=20)
     assert "LIMIT %s" in cap["sql"]
     assert 20 in cap["params"]
+
+
+def test_read_recommendations_exclude_low_liquidity(monkeypatch):
+    """exclude_low_liquidity=True면 WHERE에 low_liquidity = FALSE 절 추가."""
+    from services.recommendation import store
+    cap = _captured_query(monkeypatch, [])
+    store.read_recommendations(exclude_low_liquidity=True)
+    assert "r.low_liquidity = FALSE" in cap["sql"]
+
+
+def test_read_recommendations_default_keeps_low_liquidity(monkeypatch):
+    """기본(exclude_low_liquidity=False)이면 low_liquidity 절 미포함."""
+    from services.recommendation import store
+    cap = _captured_query(monkeypatch, [])
+    store.read_recommendations()
+    assert "low_liquidity" not in cap["sql"]
 
 
 def test_read_recommendations_empty_only_tickers_returns_empty_without_query(monkeypatch):

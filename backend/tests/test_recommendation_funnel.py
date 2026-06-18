@@ -137,6 +137,8 @@ def test_run_batch_wires_and_stores():
     assert stats["universe"] == 2
     assert stats["candidates"] == 2
     assert stats["scored"] == 2
+    # 통계 dict에 저유동성 카운트 포함(거래대금 평균 ≪ KR 1e9 경계 → 둘 다 저유동성)
+    assert stats["low_liquidity"] == 2
     rows = captured["rows"]
     assert {r["ticker"] for r in rows} == {"005930", "000660"}
     # rank 1-base 점수 내림차순
@@ -148,6 +150,96 @@ def test_run_batch_wires_and_stores():
         assert isinstance(r["factors"], dict)
         assert isinstance(r["flags"], list)
         assert r["base_date"] is not None
+        # scored row에 low_liquidity 플래그 실림(bool)
+        assert isinstance(r["low_liquidity"], bool)
+        assert r["low_liquidity"] is True  # 거래량 1000 → 거래대금 ≪ 1e9
+
+
+# ── (e1) 유동성 측정: 거래대금(Close*Volume) 평균 ─────────────
+
+def test_avg_dollar_volume_normal():
+    from services.recommendation.funnel import _avg_dollar_volume
+    # Close 일정(=10), Volume 일정(=100) → 거래대금 1000 평균
+    closes = [10.0] * 30
+    volumes = [100] * 30
+    df = _ohlc(closes, volumes=volumes)
+    assert _avg_dollar_volume(df, window=20) == 1000.0
+
+
+def test_avg_dollar_volume_fewer_rows_than_window():
+    from services.recommendation.funnel import _avg_dollar_volume
+    closes = [10.0] * 5
+    volumes = [100] * 5
+    df = _ohlc(closes, volumes=volumes)
+    # window보다 적은 행이면 가용분(5행)만 평균 → 여전히 1000
+    assert _avg_dollar_volume(df, window=20) == 1000.0
+
+
+def test_avg_dollar_volume_missing_volume_none():
+    from services.recommendation.funnel import _avg_dollar_volume
+    closes = [10.0] * 30
+    idx = pd.date_range("2026-01-01", periods=30, freq="D")
+    df = pd.DataFrame({"Close": closes}, index=idx)  # Volume 결측
+    assert _avg_dollar_volume(df) is None
+
+
+def test_avg_dollar_volume_empty_or_none_df_none():
+    from services.recommendation.funnel import _avg_dollar_volume
+    assert _avg_dollar_volume(None) is None
+    assert _avg_dollar_volume(pd.DataFrame()) is None
+
+
+def test_avg_dollar_volume_nan_guard_none():
+    from services.recommendation.funnel import _avg_dollar_volume
+    import numpy as np
+    # 전 행 NaN → 유효행 없음 → None (NaN/Inf 가드)
+    closes = [np.nan] * 30
+    volumes = [np.nan] * 30
+    idx = pd.date_range("2026-01-01", periods=30, freq="D")
+    df = pd.DataFrame({"Close": closes, "Volume": volumes}, index=idx)
+    assert _avg_dollar_volume(df) is None
+
+
+# ── (e2) 저유동성 판정: 시장별 경계 ───────────────────────────
+
+def test_is_low_liquidity_us_below_and_above_threshold():
+    from services.recommendation.funnel import _is_low_liquidity
+    # US 경계 $1,000,000. 거래대금 평균 = Close*Volume.
+    # 아래: 10 * 50,000 = 500,000 < 1M → True
+    below = _ohlc([10.0] * 30, volumes=[50_000] * 30)
+    assert _is_low_liquidity(below, "US") is True
+    # 위: 10 * 200,000 = 2,000,000 ≥ 1M → False
+    above = _ohlc([10.0] * 30, volumes=[200_000] * 30)
+    assert _is_low_liquidity(above, "US") is False
+
+
+def test_is_low_liquidity_kr_below_and_above_threshold():
+    from services.recommendation.funnel import _is_low_liquidity
+    # KR 경계 1,000,000,000 KRW.
+    # 아래: 10,000 * 50,000 = 500,000,000 < 1e9 → True
+    below = _ohlc([10_000.0] * 30, volumes=[50_000] * 30)
+    assert _is_low_liquidity(below, "KR") is True
+    # 위: 10,000 * 200,000 = 2,000,000,000 ≥ 1e9 → False
+    above = _ohlc([10_000.0] * 30, volumes=[200_000] * 30)
+    assert _is_low_liquidity(above, "KR") is False
+
+
+def test_is_low_liquidity_unmeasurable_true():
+    from services.recommendation.funnel import _is_low_liquidity
+    # 측정 불가(빈 df) → True (미측정=discovery 제외, 'wrong<missing')
+    assert _is_low_liquidity(pd.DataFrame(), "US") is True
+    assert _is_low_liquidity(None, "KR") is True
+
+
+def test_is_low_liquidity_default_market_us():
+    from services.recommendation.funnel import _is_low_liquidity
+    # market 기본값 US — 알 수 없는 market은 US 경계 적용
+    # 10 * 50,000 = 500,000 < 1M(US) → True
+    below = _ohlc([10.0] * 30, volumes=[50_000] * 30)
+    assert _is_low_liquidity(below, "XX") is True
+    # 10 * 200,000 = 2M ≥ 1M(US) → False
+    above = _ohlc([10.0] * 30, volumes=[200_000] * 30)
+    assert _is_low_liquidity(above, "XX") is False
 
 
 # ── (e) all-None(전 종목 산출 불가) → replace 생략 ─────────────

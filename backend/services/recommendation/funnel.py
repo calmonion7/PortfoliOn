@@ -13,6 +13,7 @@ Stage-2(후보 한정): OHLC 히스토리(market.get_history_df; KR 키움→yfi
 """
 from __future__ import annotations
 
+import math
 import sys
 from datetime import date
 
@@ -26,6 +27,10 @@ CANDIDATE_TOP_K = 100
 
 # 모멘텀 윈도 — 최근 N거래일 수익률·거래량 비교 기준.
 _RETURN_WINDOW = 20
+
+# 저유동성 필터(#68) — native 통화(USD/KRW) 일평균 거래대금 하한.
+MIN_DOLLAR_VOLUME = {"US": 1_000_000, "KR": 1_000_000_000}
+_LIQUIDITY_WINDOW = 20  # 거래대금 평균 윈도(거래일)
 
 
 # ── Stage-1 스크린 (순수, 유닛 테스트 대상) ──────────────────
@@ -96,6 +101,36 @@ def _momentum_factors(df) -> dict:
     except Exception as e:
         print(f"recommendation.funnel: momentum compute failed: {e}", file=sys.stderr)
     return out
+
+
+# ── 저유동성 측정·판정 (순수, #68) ──────────────────────────
+
+def _avg_dollar_volume(df, window: int = _LIQUIDITY_WINDOW):
+    """최근 window 행의 거래대금(Close*Volume) 평균 (native 통화).
+
+    df None/빈/Close·Volume 결측/유효행 없음 → None.
+    결과가 math.isfinite 아니면 None (NaN/Inf 가드, CLAUDE.md NaN 가토)."""
+    if df is None or getattr(df, "empty", True):
+        return None
+    if "Close" not in df or "Volume" not in df:
+        return None
+    dollar = (df["Close"] * df["Volume"]).dropna()
+    if not len(dollar):
+        return None
+    avg = float(dollar.tail(window).mean())
+    return avg if math.isfinite(avg) else None
+
+
+def _is_low_liquidity(df, market: str) -> bool:
+    """거래대금 평균이 시장 하한 미만이면 저유동성(True).
+
+    avg None(측정 불가) → True(discovery 제외, 'wrong<missing').
+    market 미지정/미상은 US 경계 적용."""
+    avg = _avg_dollar_volume(df)
+    if avg is None:
+        return True
+    threshold = MIN_DOLLAR_VOLUME.get(market, MIN_DOLLAR_VOLUME["US"])
+    return avg < threshold
 
 
 # ── factors 조립 (순수) ──────────────────────────────────────
@@ -195,9 +230,10 @@ def _kr_insider(cand: dict):
 # ── 배치 오케스트레이션 ──────────────────────────────────────
 
 def _enrich_one(cand: dict, guru_set: set) -> dict | None:
-    """후보 1개 Stage-2 enrich → factors dict (산출 근거 없으면 None).
+    """후보 1개 Stage-2 enrich → {"factors", "low_liquidity"} dict (산출 근거 없으면 None).
 
-    종목별 fetch 실패는 로깅 후 해당 팩터만 결측 처리(부분 결과 보존)."""
+    종목별 fetch 실패는 로깅 후 해당 팩터만 결측 처리(부분 결과 보존).
+    low_liquidity는 fetch된 df 재사용(추가 호출 0)."""
     market = cand.get("market") or "US"
 
     df = None
@@ -236,7 +272,9 @@ def _enrich_one(cand: dict, guru_set: set) -> dict | None:
         foreign_net_5d=foreign_net_5d, organ_net_5d=organ_net_5d,
         insider_buy=insider_buy, guru_new_buy=guru_new_buy,
     )
-    return factors if _has_signal(factors) else None
+    if not _has_signal(factors):
+        return None
+    return {"factors": factors, "low_liquidity": _is_low_liquidity(df, market)}
 
 
 def run_recommendation_batch(market: str) -> dict:
@@ -267,9 +305,10 @@ def run_recommendation_batch(market: str) -> dict:
     today = date.today()
     scored: list[dict] = []
     for cand in candidates:
-        factors = _enrich_one(cand, guru_set)
-        if factors is None:
+        res = _enrich_one(cand, guru_set)
+        if res is None:
             continue
+        factors = res["factors"]
         result = score_stock(factors)
         scored.append({
             "ticker": cand["ticker"],
@@ -278,6 +317,7 @@ def run_recommendation_batch(market: str) -> dict:
             "score": result["score"],
             "factors": factors,
             "flags": result["flags"],
+            "low_liquidity": res["low_liquidity"],
             "base_date": today,
         })
 
@@ -290,9 +330,14 @@ def run_recommendation_batch(market: str) -> dict:
     if scored:
         replace_recommendations(market, scored)
 
+    n_low = sum(1 for r in scored if r["low_liquidity"])
+    print(f"recommendation.funnel: {market} scored={len(scored)} low_liquidity={n_low}",
+          file=sys.stderr)
+
     return {
         "market": market,
         "universe": len(universe),
         "candidates": len(candidates),
         "scored": len(scored),
+        "low_liquidity": n_low,
     }
