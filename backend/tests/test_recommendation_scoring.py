@@ -149,23 +149,63 @@ def test_partial_factor_within_group_graceful():
     assert 0.0 <= out["score"] <= 100.0
 
 
-# ── (5) 재정규화: 결측군 제외 후 가용군 가중 합이 1 ─────────
-# 동일 팩터값이라도 결측군이 있으면 가용군만으로 정규화되므로,
-# 모든 군이 동일 정규점수일 때 결측 여부와 무관하게 같은 합성 점수가 나온다.
+# ── (5) 중립 채움: 결측군을 중립(0.5)으로 채워 단일축 만점·편향 차단 ──
+# (ADR-0016) 결측군을 분모에서 제외(재정규화)하던 graceful-degrade를 supersede.
+# 결측군을 _NEUTRAL(0.5)로 채워 denom이 항상 1.0 → 단일군만으로는 만점 불가,
+# 근거 완전성(양으로 present인 군 수)이 점수에 단조 반영된다.
 
-def test_renormalization_consistent():
+def test_single_group_capped():
+    """한 군만 최대 강도여도 단일축 만점 불가(≤67.5); 전군 결측은 정확히 중립 50."""
     from services.recommendation.scoring import score_stock
-    # 밸류만, 강한 상승여력
-    only_value = _factors(value=_value(upside_pct=50.0))
-    # 밸류+모멘텀 둘 다 강함
-    two = _factors(
-        value=_value(upside_pct=50.0),
-        momentum=_momentum(return_pct=40.0, rsi=62.0, near_52w_high_pct=97.0,
+    # 각 군 정규점수=1.0(최대 강도), 나머지 두 군 결측
+    value_only = _factors(value=_value(upside_pct=50.0))
+    momentum_only = _factors(
+        momentum=_momentum(return_pct=40.0, rsi=70.0, near_52w_high_pct=100.0,
                            volume_surge_ratio=3.0),
     )
-    # 둘 다 가용군이 강하면 점수가 높게 유지(결측군이 0점으로 끌어내리지 않음)
-    assert score_stock(only_value)["score"] >= 60.0
-    assert score_stock(two)["score"] >= 60.0
+    smart_only = _factors(
+        smart_money=_smart(foreign_net_5d=1e9, organ_net_5d=1e9,
+                           insider_buy=True, guru_new_buy=True),
+    )
+    # 한 군 만점 + 나머지 두 군 중립(0.5) → 가중 상한 67.5(value/momentum)·65.0(smart_money)
+    assert score_stock(value_only)["score"] <= 67.5
+    assert score_stock(momentum_only)["score"] <= 67.5
+    assert score_stock(smart_only)["score"] <= 67.5
+    # 전군 결측 → 전부 중립 → 정확히 50.0(불변)
+    assert score_stock({})["score"] == 50.0
+
+
+def test_completeness_monotonic():
+    """모멘텀이 동일할 때, value·smart_money까지 양(+)으로 present면 점수가 더 높다."""
+    from services.recommendation.scoring import score_stock
+    mom = _momentum(return_pct=40.0, rsi=70.0, near_52w_high_pct=100.0,
+                    volume_surge_ratio=3.0)
+    momentum_only = _factors(momentum=mom)
+    complete = _factors(
+        value=_value(upside_pct=29.0),            # value 정규>0.5(양)
+        momentum=mom,                             # 동일 모멘텀
+        smart_money=_smart(foreign_net_5d=1e9, organ_net_5d=1e9,
+                           insider_buy=True),     # smart_money 정규>0.5(양)
+    )
+    # 근거가 더 완전한 종목이 결측 종목 이상 — 결측 재정규화 만점 편향이면 역전돼 실패
+    assert score_stock(complete)["score"] >= score_stock(momentum_only)["score"]
+
+
+def test_momentum_only_does_not_outrank_value_momentum():
+    """회귀 가드(편향 소멸): 모멘텀-only 강세가 value+momentum 종목을 추월하지 못한다."""
+    from services.recommendation.scoring import score_stock
+    # 모멘텀만 만점인 발굴형 종목(구 재정규화에선 100점 → 발굴 상위 점령)
+    momentum_only = _factors(
+        momentum=_momentum(return_pct=40.0, rsi=70.0, near_52w_high_pct=100.0,
+                           volume_surge_ratio=3.0),
+    )
+    # value+momentum 둘 다 양호(근거가 더 완전한 종목)
+    value_momentum = _factors(
+        value=_value(upside_pct=45.0),
+        momentum=_momentum(return_pct=25.0, rsi=60.0, near_52w_high_pct=92.0,
+                           volume_surge_ratio=2.0),
+    )
+    assert score_stock(momentum_only)["score"] <= score_stock(value_momentum)["score"]
 
 
 # ── (6) 가중치 변경 시 순위 변화 ───────────────────────────

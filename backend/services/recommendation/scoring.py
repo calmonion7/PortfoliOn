@@ -133,11 +133,14 @@ def score_stock(factors: dict) -> dict:
         g = factors.get(group)
         s = scorer(g) if isinstance(g, dict) else None
         if s is None:
-            continue
+            # 결측군은 중립(0.5)으로 채운다(ADR-0016) — 재정규화로 분모에서 빼면
+            # 단일 가용군만으로 만점에 도달해 모멘텀-only 발굴 종목이 상위를 점령한다.
+            # 중립 채움이면 denom이 항상 전 가중치 합(1.0)이라 근거 완전성이 점수에 반영.
+            s = _NEUTRAL
         w = FACTOR_WEIGHTS.get(group, 0.0)
         num += s * w
         denom += w
-    # 가용군이 하나도 없으면 중립 기준.
+    # denom은 항상 1.0(가중치 전합)이라 else 분기는 dead지만 무해하게 잔존.
     composite = (num / denom) if denom > 0 else _NEUTRAL
     return {
         "score": round(_clamp01(composite) * 100.0, 1),
