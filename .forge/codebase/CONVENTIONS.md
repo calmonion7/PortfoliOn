@@ -1,105 +1,81 @@
 ---
-last_mapped_commit: 163c29cbd89d9b1d2aa5a101670e9fa34ceb21c4
+last_mapped_commit: 6d95dcb9610a1b3c68075b0f587169989f6d8e10
 mapped: 2026-06-19
 ---
 
 # CONVENTIONS
 
-PortfoliOn 코드베이스에서 실제 파일을 읽어 귀납한 코드 스타일·네이밍·패턴·에러 처리 사실. 모든 경로는 프로젝트 루트(`/Users/calmonion/Project/PortfoliOn`) 기준.
+PortfoliOn의 코드 스타일·네이밍·구조·에러처리 관례. 실제 소스에서 추출한 패턴만 기록한다(도메인 용어 정의는 제외).
 
-## 1. 언어·주석
+## Backend — 언어/스타일
 
-- 산문 주석·docstring은 **한국어 위주**다. 함수 docstring과 인라인 `#` 주석 모두 한국어가 기본이며, 근거로 ADR 번호를 자주 인용한다(예: `services/recommendation/scoring.py:1` `"""멀티팩터 합성 점수 ... (.forge/adr/0015 §3, 순수 로직)."""`).
-- 변수·함수·클래스 식별자는 영어. 도메인 약어를 그대로 쓴다(`usdkrw`, `krw_value`, `_as_of`).
-- 일부 오래된 모듈은 영어 docstring 잔존(예: `routers/stocks.py`의 `_latest_snapshot`은 영어 docstring). 신규 코드일수록 한국어 비중이 높다.
+- Python 3, FastAPI. 들여쓰기 4-space, 문자열은 큰따옴표 우세.
+- 새 모듈 상단에 `from __future__ import annotations`를 자주 둠 (`backend/services/db.py`, `backend/services/utils.py`, `backend/services/market/__init__.py`).
+- 타입힌트 적극 사용: `list[dict]`, `dict | None`, `Optional[int]`, `str | None` (PEP 604 union 혼용).
+- 주석/docstring은 **한국어**가 기본 (`backend/services/market/__init__.py`의 함수 docstring, `db.py`의 `query`/`execute` 설명 등). 코드 식별자(함수·변수명)는 영어.
+- 내부 전용 심볼은 leading underscore (`_get_quote_uncached`, `_closes_from_download`, `_pct`, `_ANALYST_KEYS`).
+- 모듈 상수는 UPPER_SNAKE 또는 leading-underscore + UPPER (`TICKER_RE`, `_HISTORY_CFG`, `_ANALYST_KEYS`, `_JSON_TEXT_FIELDS`). 불변 집합은 `frozenset({...})` 사용 (`backend/services/storage/portfolio.py`).
 
-## 2. 백엔드 (Python / FastAPI)
+## Backend — 라우터 구조
 
-### 2.1 모듈 헤더 스타일
+대표 예시 `backend/routers/watchlist.py`:
 
-- 신규 라우터/서비스는 모듈 최상단 docstring에 **엔드포인트 요약·응답 shape·핵심 제약**을 적는다. 예: `routers/recommendations.py:1`은 GET/POST 동작, 응답이 섹션 키 객체(additive)임, "저장값만 읽음(요청경로 외부 호출 0)"을 명시.
-- `from __future__ import annotations`를 자주 씀(`services/`+`routers/` 중 45개 파일). 타입 힌트는 함수 시그니처에 부분 적용(`def query(sql: str, params=None) -> list[dict]:` `services/db.py:44`). 전수 강제는 아님.
+- 라우터당 `router = APIRouter(prefix="/api/<name>", tags=["<name>"])` 단일 인스턴스. 핸들러는 `@router.get("")`, `@router.post("", status_code=201)`, `@router.delete("/{ticker}")` 형태.
+- 인증은 의존성 주입: `user_id: str = Depends(get_current_user)` (admin 전용은 `Depends(require_admin)`). `auth.py`에서 import. 외부 Cowork용은 `get_current_user_or_api_key` (`backend/routers/report.py`).
+- 요청 본문은 Pydantic `BaseModel` 서브클래스로 정의. 필드 제약은 `Field(..., gt=0)`, 커스텀 검증은 `@field_validator(...)` + `@classmethod` (ticker는 `is_valid_ticker`로 검증 후 `strip().upper()` 정규화 — `WatchlistStock._validate_ticker`).
+- **FastAPI Body(...) 관례 (중요)**: PUT/POST 핸들러가 BaseModel이 아닌 **bare `list`/`dict`** 파라미터를 받을 때는 반드시 `Body(...)`로 명시한다 — 안 하면 FastAPI가 쿼리 파라미터로 오인해 기동 불가. 예: `entries: list = Body(...)` (`backend/routers/report.py:494`), `schedule: dict = Body(...)` (`backend/routers/batches.py:64`). 그 외 구조화 본문은 `class XxxBody(BaseModel)`로 모델화 (`EnrichBody`, `EventBody`, `PermissionsBody`).
+- 에러는 헬퍼로 통일: `backend/services/errors.py`의 `errors.not_found(ticker, context)` (404), `errors.already_exists(ticker, context)` (400). 직접 `raise HTTPException(status_code=..., detail=...)`도 사용 (422 상장폐지 등).
+- 라우트 등록 순서 주의: 더 구체적/상수 경로를 path-param 경로보다 **먼저** 등록 (`PUT /api/stocks/enrich/batch`를 `PUT /api/stocks/{ticker}/enrich`보다 앞에 — 안 하면 `enrich`가 ticker로 라우팅됨).
+- 백그라운드 작업은 `BackgroundTasks` 주입 + `background_tasks.add_task(fn, arg)` (리포트 자동 생성 — `watchlist.py`의 `_generate_with_consensus`).
+- 라우터→서비스는 모듈 단위 import 후 `storage.X`, `market_svc.X`처럼 **모듈 속성 접근** (`from services import storage, errors, cache as cache_svc`; `from services import market as market_svc`). 캐시 무효화는 mutation 후 명시 호출 (`cache_svc.invalidate(ticker)`, `cache_svc.invalidate_portfolio_caches()`, `calendar_router.clear_cache()`).
 
-### 2.2 라우터 등록 순서 — 구체 경로를 catch-all `{ticker}`보다 먼저
+## Backend — 서비스 구조
 
-- FastAPI는 선언 순서로 매칭하므로, 구체 세그먼트 라우트를 catch-all `{ticker}/{date_str}` 같은 변수 경로보다 **위에** 둬야 한다. `routers/report.py:347-371`이 `/report/{ticker}/backlog`, `/disclosures`, `/insider-trades`를 `/report/{ticker}/{date_str}`(`:373`)보다 먼저 등록하고, 주석으로 "아니면 'backlog'가 date_str로 매칭돼 ... 500"이라 명시.
-- 같은 함정이 `stocks.py`: `PUT /api/stocks/enrich/batch`(`:218`)를 `PUT /api/stocks/{ticker}/enrich`보다 먼저 등록. 이 클래스의 버그는 코드베이스에서 4회 재발했고 주석으로 추적됨(`report.py:365` "4번째 재발 방지").
+- `backend/services/` 아래 도메인별 모듈. 큰 모듈은 **패키지로 분리**되는 추세 (ADR-0017): `storage.py`→`services/storage/`, `market.py`→`services/market/`, `scheduler.py`(루트), `market_indicators/`, `kiwoom/`, `kis/`, `recommendation/`.
+- **패키지 분리 시 표면 보존 규약**: 분리된 패키지의 `__init__.py`가 서브모듈의 공개 + 외부참조 private 심볼을 **전부 re-export**한다. 외부 소비처가 `storage.X`/`market.X` 모듈 속성으로 접근하므로 모든 심볼이 패키지 루트에 존재해야 함 (`backend/services/storage/__init__.py`, `backend/services/market/__init__.py` 상단 주석 참고). 분리 후에도 `from services import storage`/`from services import market` 호출 형태 불변.
+- DB 접근은 `backend/services/db.py`의 3-함수 표면:
+  - `query(sql, params) -> list[dict]` — SELECT (RealDictCursor).
+  - `execute(sql, params) -> int` — INSERT/UPDATE/DELETE, rowcount 반환.
+  - `get_connection()` — contextmanager, 성공 시 commit/예외 시 rollback/항상 putconn. psycopg2 `ThreadedConnectionPool` (maxconn=20, ThreadPool 동시성보다 크게).
+  - 파라미터화 쿼리(`%s` placeholder)만 사용 — 문자열 포매팅 금지.
+  - UPSERT는 `INSERT ... ON CONFLICT (key) DO UPDATE SET col=EXCLUDED.col` 패턴 (`storage/portfolio.py` save_stocks). 플래그 보존은 `is_etf=tickers.is_etf OR EXCLUDED.is_etf`처럼 기존값 OR.
+- JSON 필드: text 컬럼에 JSON으로 저장한 값은 `_parse_json_field`로 역파싱, 저장 시 `json.dumps(...)`. 리스트 컬럼은 결측 시 `[]`, 텍스트는 `""`로 기본화.
+- 외부 시세 소스 라우팅: market별 분기(`if market == "KR": ...` / else yfinance). 폴백 체인은 try/except로 단계 하강 (US: yfinance→KIS→error dict; KR: 키움→KIS→Naver — `backend/services/market/__init__.py`, `kr.py`). 외부 호출 실패는 graceful default 반환 (`get_analyst_data`는 예외 시 `{target_mean: None, buy: 0, ...}`).
+- 순환참조 회피: 서비스→캐시 등 양방향 의존은 **함수 내부 지연 import** (`get_quote` 안에서 `from services import cache as cache_svc`).
+- 병렬화는 `backend/services/parallel.py`의 `parallel_map(func, items, max_workers)` (ThreadPoolExecutor, 빈 입력 빠른 반환). DB 풀(maxconn=20)보다 워커 수가 크지 않게 운용 (calendar 15, analysis 11).
 
-### 2.3 Body 파라미터 명시
+## Backend — NaN/Inf 위생 (핵심 패턴)
 
-- PUT/POST에서 bare `list`/`dict` 본문을 받을 땐 `Body(...)`로 명시한다(미명시 시 기동 불가 버그 이력). 예: `routers/report.py:494` `def put_backlog(ticker: str, entries: list = Body(...), ...)`, `routers/batches.py:64` `schedule: dict = Body(...)`.
-- 구조화 본문은 `pydantic.BaseModel` 서브클래스(`*Body` 네이밍): `EnrichBody`(`stocks.py:121`), `EventBody`(`events.py:20`), `PermissionsBody`/`BulkPermissionsBody`(`admin.py:35,39`).
+- `backend/services/utils.py`의 `sanitize(obj)` — dict/list 재귀 순회하며 `float`이 `nan`/`inf`면 `None`으로 치환. 응답 직렬화 전 출력 정화용.
+- **왜 필요한가**: starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 NaN/inf가 있으면 직렬화에서 500(`Out of range float values are not JSON compliant`). 폴백이 증상을 가린다 — PostgreSQL은 `json` 컬럼의 NaN을 거부(저장 실패)하지만 파이썬 `json.dumps`는 기본 `allow_nan=True`라 파일 폴백은 통과 → DB저장 실패+파일 성공+응답 직렬화 실패로 진단이 엇갈림.
+- **권장**: 일괄 sanitize보다 **소스에서 가드**(`math.isfinite` 체크 후 "시세 없음" 처리)가 깨끗하다. 외부 시세(yfinance `Close`=NaN, FX/usdkrw=NaN)에서 흘러든 NaN이 합산값(`total_value` 등)을 오염시키는 게 전형 패턴.
+- ticker 유효성: `utils.is_valid_ticker` (`TICKER_RE = ^[A-Za-z0-9.\-]{1,15}$`, strip·upper 후 매칭). 리스트 내 ticker 조회는 `find_ticker_index`/`ticker_exists_in`/`find_ticker` (대소문자 무시).
 
-### 2.4 NaN/inf 가드 (starlette `JSONResponse` allow_nan=False)
+## Backend — additive-vs-reshape API 규율
 
-- 응답 dict에 `NaN`/`inf`가 섞이면 직렬화에서 500이 난다. `services/utils.py:29` `sanitize(obj)`가 float NaN/inf를 `None`으로 재귀 치환하는 공용 헬퍼.
-- 선호 방식은 **소스에서 가드**. `services/recommendation/scoring.py:26` `_isnum(x)`은 `v == v`로 NaN을 거르고 bool/비숫자/None을 막아 점수 계산 진입 전에 차단. `routers/recommendations.py:105-121`도 가격/수량/평단을 `float(...)` + `try/except (TypeError, ValueError)`로 개별 정규화한 뒤 손익·환산을 계산(결측은 `None` 전파).
+- **응답 shape는 additive(필드 추가) 선호**, 비-additive reshape(배열→객체 등)는 회피. reshape가 불가피하면 그 엔드포인트를 fetch하는 **모든** 프론트 소비처를 전수 grep (`grep -rn '<경로>' frontend/src/`)해 갱신 (예: `Analytics.jsx`가 훅과 별개로 직접 fetch하는 케이스). 한 곳만 고치면 다른 곳이 옛 shape로 조용히 깨짐.
+- **read/외부호출의 additive 추가는 호출 *시퀀스*도 늘린다**: 기존 테스트가 `mock.call_args`(마지막 호출)로 단일 호출을 단언하면 두 번째 호출이 끼는 순간 거짓통과/오류. 대응 — ① 신규 호출은 `if <조건>:`로 입력 비면 생략해 기존 동작 보존, ② 기존 단언은 `call_args_list[i].kwargs`(인덱스 명시)로 마이그레이션, ③ 신규 테스트는 `call_count`로 시퀀스 못박음. (테스트 패턴은 `TESTING.md` 참고.)
+- 응답 shape 교체 시 외부 Cowork 파서 영향 주의 (`GET /api/report/list`의 `last_scheduled_date`가 문자열→`{"KR":..,"US":..}` 객체로 변경된 사례 — ADR-0012).
+- API 변경 시 명세 2종(`API_SPEC.md` + `CLAUDE_COWORK_API.md`)을 항상 함께 갱신(DoD). 기능 표면 변경 시 `README.md` 해당 절도 같은 PR에서 갱신(DoD).
 
-### 2.5 additive 응답·additive read 선호
+## Frontend — 스택/스타일
 
-- 응답 형태 변경 시 배열→객체 같은 reshape보다 **필드 추가(additive)**를 선호. `routers/recommendations.py:1-6` 주석이 "응답은 섹션 키 객체(additive) — part3/4가 'watchlist'/'holdings' 키를 추가만으로 붙인다"라고 명시. 응답은 항상 `{"as_of":..., "discovery":[...], "watchlist":[...], "holdings":[...]}` 객체(`:163`).
-- additive read는 **입력이 비면 호출 생략**한다(빈 watchlist/holdings면 추가 `read_recommendations` 미발화 — `routers/recommendations.py:62` `if wl_tickers:`, `:86` `if holdings_tickers:`). 이는 기존 테스트의 `mock.call_args`(마지막 호출) 단언 오염을 막는 패턴(§TESTING 참조).
+- React 19 + Vite 8 (rolldown 번들러), JSX. 함수형 컴포넌트 + 훅. `frontend/package.json` deps: axios, react-router-dom 7, recharts 3, react-markdown, remark-gfm. 테스트/Tailwind 의존성 없음.
+- **plain CSS (No TailwindCSS)** — 컴포넌트별 `.css` 파일을 import (`import './Badge.css'`). 디자인 토큰은 `frontend/src/styles/tokens.css`의 CSS 변수(`:root` + `[data-theme="dark"]`).
+- 컴포넌트 파일은 `PascalCase.jsx`, 같은 폴더에 동명 `.css`. 컴포넌트는 default export, 보조 컴포넌트는 named export (`Badge.jsx`의 `MarketBadge`/`ChangeBadge`).
+- 들여쓰기 2-space, 세미콜론 생략 스타일. props는 구조분해 + 기본값 (`{ variant = 'neutral', size = 'sm', ... }`).
+- API 호출은 `frontend/src/api.js`의 axios 인스턴스 (`import api from '../api'`). request 인터셉터가 `localStorage` access_token을 Bearer로 첨부, response 인터셉터가 401 시 토큰 삭제 후 `/`로 리다이렉트. `baseURL`은 `import.meta.env.VITE_API_BASE_URL || ''` (미설정 시 상대경로 → Vite proxy/nginx).
+- Vite 8 = rolldown: `vite.config.js`의 `build.rollupOptions.output.manualChunks`는 **함수 형식만** 받음(객체형 쓰면 빌드 깨짐). `manualChunks(id)`에서 `node_modules` 경로 substring으로 분기.
 
-### 2.6 캐시 무효화 규칙
+## Frontend — 색 토큰 관례 (KR 한국식, 핵심 게이트)
 
-- 인메모리 캐시는 `services/cache.py`에 집약: `_snapshots`(LRU `_MAX=50`), `_list_cache`(TTL 60s), `_dashboard_cache`/`_correlation_cache`(TTL 300s) + sector/macro/quote.
-- 종목 추가/수정/삭제 시 연쇄 무효화. `cache.invalidate(ticker)`(`:52`)가 해당 ticker LRU 항목 제거 후 `invalidate_list()`+`invalidate_dashboard()`+`invalidate_correlation()`+`invalidate_sector()`+`invalidate_macro()`를 호출(전 사용자 대시보드 클리어).
-- `TTLCache.get(key, loader)`(`:12`)는 loader 콜백을 받아 캐시 미스 시 호출하는 read-through 패턴.
+- 한국 시장 색: **`--up` = 빨강(상승)**, **`--down` = 파랑(하락)** (`tokens.css`). 서양(녹=좋음/빨=경고)과 반대.
+- **Badge variant gotcha**: `ui/Badge.css`에서 `.badge--success` = `--up`(빨강), `.badge--danger` = `--down`(파랑)이다(가격 방향용). `ChangeBadge`는 가격용이라 `value >= 0 ? 'success' : 'danger'`가 의도대로 동작(상승=빨).
+- **의미 상태 배지(수급 밴드 등 가격 방향이 아닌 것)에 `success`/`danger`를 쓰면 안 됨** — 색이 KR 가격색으로 박혀 의도와 반전된다(수급 우호=빨/경계=파 버그 사례). 의미 배지는 전용 색을 명시(가격 토큰 미사용). UI 리뷰는 variant 이름 통념이 아니라 토큰 실제값을 대조할 것.
+- `badge--warning`은 `--warn`/`--warn-soft`로 매핑돼 있으나(`Badge.css`), `badge--info`는 `--accent-tint`를 참조 — 토큰 정의 여부 확인 필요(미정의 변형은 깨짐). 차트 단위 포매팅은 `frontend/src/components/market/marketUtils.jsx`의 `krFmt`(억/조, 입력은 '억원' 단위 가정 — raw 원/주를 넘기면 오표기).
 
-### 2.7 지연(lazy) import로 순환참조 회피
+## Frontend — 훅 관례
 
-- 모듈 상호 의존은 함수 본문 안에서 import해 깬다. `services/storage.py:266-268` 주석 "storage↔cache 순환참조 회피용 지연 import" → 함수 내부 `from services import cache as cache_svc`.
-- 같은 패턴 다수: `services/market.py:127` `from services.kiwoom import client, quote as kq`, `:142` `from services.kis import client`, `services/analysis_service.py:51`, `services/consensus.py:43`, `services/digest_service.py:156,192`, `routers/report.py`의 핸들러들이 본문에서 서비스 함수를 import(`:352,360,369`).
-
-### 2.8 DB 접근 헬퍼
-
-- 모든 DB 접근은 `services/db.py`의 `query(sql, params)`(SELECT→dict 리스트)·`execute(sql, params)`(INSERT/UPDATE/DELETE→rowcount) 2개 헬퍼로 단일화. psycopg2 `ThreadedConnectionPool`(minconn=1, **maxconn=20** — ThreadPool 동시성보다 크게, 소진 시 블록 아닌 PoolError, `:21-27`), `RealDictCursor`로 dict 반환.
-- `get_connection()`(`:32`)은 `@contextmanager` — 성공 시 commit, 예외 시 rollback 후 re-raise, finally에서 putconn.
-- 외부 시세는 **DB 우선, 파일 폴백** 패턴. `routers/stocks.py:27` `_latest_snapshot`이 `try: query(...) except Exception: pass` 후 파일시스템(`SNAPSHOTS_DIR`/`REPORTS_DIR`) 폴백. 요청당 N콜을 줄이는 배치 read 헬퍼(`_latest_snapshots` `:53`, `SELECT DISTINCT ON (ticker) ... = ANY(%s)`)도 둠.
-
-### 2.9 에러·예외 처리
-
-- HTTP 에러는 `services/errors.py`의 팩토리로 통일: `not_found(ticker, context)`→404, `already_exists(ticker, context)`→400(둘 다 `HTTPException` 반환). 라우터에서 직접 `raise HTTPException(status_code=..., detail="...")`도 혼용(예: `report.py:436` "리포트를 먼저 생성하세요").
-- 외부 fetch 실패는 **graceful 빈 결과** 처리. 예: `services/insider_trades.py`의 `fetch_insider_trades`가 DART status 013(무데이터)·예외 모두 `[]` 반환(테스트 `test_insider_trades.py:103`).
-- **silent except 금지** 규범. 배치/외부 fetch 경로는 예외를 삼키지 말고 로깅·집계. `scheduler.py:33,39,62,72`는 `except Exception as e: print(f"[Scheduler] ... failed: {e}")`로 로깅(scheduler는 `print(f"[Scheduler] ...")` 진단 로그가 관례). 빈/all-None 결과는 캐시에 박제 금지(직전 양호값 유지).
-- 입력 검증 헬퍼는 `services/utils.py`: `is_valid_ticker`(`:9`, strip·upper 후 `^[A-Za-z0-9.\-]{1,15}$`), `find_ticker`/`find_ticker_index`/`ticker_exists_in`(모두 upper 비교).
-
-### 2.10 ticker 정규화 관례
-
-- ticker는 비교·저장 시 `.upper()`로 정규화하는 게 일관 관례(`utils.py:11,16,21,26`, `recommendations.py:65,89`, `insider_trades.upsert` 테스트가 `params[1] == "005930.KS"` upper 단언).
-
-## 3. 프론트엔드 (React 19 + Vite, plain CSS)
-
-### 3.1 스타일링 — 디자인 토큰 + plain CSS
-
-- TailwindCSS 없음. CSS 변수 토큰을 `frontend/src/styles/tokens.css`에 정의하고 컴포넌트는 `var(--token)`을 참조. `[data-theme="dark"]`로 라이트/다크 토큰 분기(`:73`).
-- 컴포넌트별 CSS 파일 동봉(`Badge.jsx`+`Badge.css`, `Button.jsx`+`Button.css` ... `frontend/src/components/ui/`). JSX 상단에서 `import './Badge.css'`.
-- 폰트는 시스템 스택(`--font-sans` Inter/Pretendard/-apple-system ...). `.tnum`/`.mono`로 tabular-nums 적용.
-
-### 3.2 한국 색 관례 (KR coloring) — success/danger 변형 함정
-
-- **`--up`=빨강(상승), `--down`=파랑(하락)** (`tokens.css:26-29`, 주석 "Korean coloring: 상승=red, 하락=blue").
-- 그 결과 `.badge--success`=`--up`(**빨강**), `.badge--danger`=`--down`(**파랑**)으로 매핑됨(`ui/Badge.css:29-37`). 즉 가격 방향 배지에는 맞지만(상승=success=빨강), **의미 상태 배지(좋음/나쁨)에 success/danger를 쓰면 Western 통념(녹=좋음/빨=경고)과 반전**된다.
-- `ChangeBadge`(`Badge.jsx:33`)는 가격 방향이므로 `value >= 0 ? 'success' : 'danger'`가 의도대로(상승=빨강). 반대로 **의미 상태 배지는 전용 색을 명시**: `ui/SupplyBadge.jsx`가 success/danger를 피하고 inline `style`로 우호=초록/중립=회색/경계=주황을 직접 지정(`:7-11`, 주석에 충돌 이유 기록).
-- `.badge--warning`은 `--warn`/`--warn-soft`(주황) 토큰을 참조(`Badge.css:39`). `.badge--info`는 `--accent-tint`를 참조하나 토큰이 tokens.css에 미정의로 보이므로(정의는 `--accent-soft`) caution 용도 확인 필요.
-- 백엔드도 이 관례를 따라 **플래그 색을 결정하지 않는다**: `scoring.py:8` 주석 "플래그 색은 백엔드에서 결정하지 않는다(KR 가격 토큰 success/danger 금지) — {label, kind} 문자열 페어로만 내보내고 색 매핑은 프론트 담당".
-
-### 3.3 컴포넌트 그룹핑
-
-- `frontend/src/components/`는 도메인별 디렉터리: `ui/`(Badge, Button, Card, Stat, icons, InsiderBadge, SupplyBadge + `index.js` 배럴), `market/`, `reports/`, `portfolio/`, 루트(StockModal, MobileNav, Toast 등).
-- `pages/`는 화면 단위, `hooks/`·`contexts/`·`utils/`로 로직 분리.
-
-### 3.4 API 클라이언트
-
-- `frontend/src/api.js`가 axios 인스턴스 단일 export. baseURL은 `import.meta.env.VITE_API_BASE_URL || ''`(미설정 시 상대경로 → Vite proxy). 요청 인터셉터가 `localStorage` access_token을 `Authorization: Bearer`로 주입, 응답 401 시 토큰 삭제 후 `/`로 리다이렉트.
-- JSX는 세미콜론 생략 스타일(`api.js` 등). `export default` 컴포넌트 + named export 보조 컴포넌트(`Badge.jsx`의 `MarketBadge`/`ChangeBadge`).
-
-### 3.5 비-additive 응답 변경 시 프론트 소비처 전수 grep
-
-- 엔드포인트 응답을 배열→객체 등으로 reshape하면 그 엔드포인트를 fetch하는 **모든** 프론트 소비처(훅과 별개의 독립 fetcher 포함)를 `grep -rn '<경로>' frontend/src/`로 찾아 전부 갱신해야 함(과거 대시보드 reshape 시 상관관계 탭이 조용히 깨진 이력). 가능하면 additive 선호.
-
-## 4. 문서 동기 규범 (DoD)
-
-- API 엔드포인트/스키마/인증 게이팅 변경 시 `API_SPEC.md`(전체 REST)와 `CLAUDE_COWORK_API.md`(외부 Cowork API) **둘 다** 갱신.
-- 기능 표면(화면·env·스택·아키텍처·배치) 변경 시 `README.md` 해당 절도 같은 PR에서 갱신.
-- 의사결정은 `.forge/adr/NNNN-*.md`로 기록하고 코드 docstring에서 인용.
+- 커스텀 훅은 `frontend/src/hooks/`에 `useXxx.js` (`useAuth`, `useIsMobile`, `usePortfolioData`, `usePriceFlash`, `useReportGeneration`, `useReportList`, `useTheme`).
+- 패턴(`useReportList.js`): `useState`로 상태, `useEffect`로 fetch 트리거, `useCallback`으로 fetcher 메모이즈, 데이터 가공 함수는 훅 내부 closure로 두고 파생값과 함께 단일 객체로 반환. 응답 shape 양립 처리(`data.stocks ?? data`)로 additive 변경 흡수.
+- Context는 `frontend/src/contexts/` (예: AuthContext가 로그인 시 메뉴 권한 로드해 nav 필터).

@@ -1,91 +1,78 @@
 ---
-last_mapped_commit: 163c29cbd89d9b1d2aa5a101670e9fa34ceb21c4
+last_mapped_commit: 6d95dcb9610a1b3c68075b0f587169989f6d8e10
 mapped: 2026-06-19
 ---
 
 # TESTING
 
-PortfoliOn 테스트 스위트를 실제 파일에서 귀납한 사실. 모든 경로는 프로젝트 루트 기준. 백엔드만 자동화 테스트가 존재한다(프론트는 없음).
+PortfoliOn의 테스트 프레임워크·위치·실행·모킹 관례. 실제 `backend/tests/` 내용에서 추출.
 
-## 1. 프레임워크·실행
+## 프레임워크 / 실행
 
-- **pytest** 단일 프레임워크. 백엔드 전용(`backend/tests/`).
-- 실행: `cd backend && .venv/bin/python -m pytest` (macOS venv 경로). 설정은 `backend/pytest.ini`:
+- **pytest** (`requirements.txt`: `pytest>=7.4.0`, `httpx>=0.25.0` — FastAPI `TestClient`용). 프론트엔드 단위 테스트 프레임워크는 없음(아래 UAT 절 참고).
+- 설정 `backend/pytest.ini`:
   ```
   [pytest]
   testpaths = tests
   pythonpath = .
   ```
-- `pythonpath = .`로 `backend/`를 import 루트에 두지만, 그와 별개로 거의 모든 테스트 파일이 상단에서 `sys.path.insert(0, str(Path(__file__).parent.parent))`를 직접 한다(예: `tests/test_recommendation_endpoint.py:2-4`, `tests/test_insider_trades.py:1-4`).
-- 현재 **835개 테스트 수집**(`pytest --collect-only` 기준). 전부 green 상태가 목표.
-- 테스트 파일 76개(`tests/test_*.py`). `tests/__init__.py` 존재(패키지).
-- 프론트엔드 테스트 없음: `frontend/package.json`에 test 스크립트·테스트 러너(vitest/jest) 의존성 없고, `frontend/src`에 `*.test.*`/`*.spec.*` 파일 0개. UAT는 별도(메모리 `reference-frontend-uat.md` — Playwright 에뮬레이션, 테스트계정).
+- 실행 (프로젝트 루트 기준):
+  ```bash
+  cd backend && .venv/bin/python -m pytest
+  ```
+  macOS는 `backend/.venv/bin/python`, Windows는 `backend/.venv/Scripts/python`.
+- **로컬 `.venv` ≠ Docker 의존성**: `lxml`은 `requirements.txt`/Docker엔 있으나 로컬 `.venv`엔 없을 수 있음. 로컬 pytest로 돌릴 HTML 파싱은 `BeautifulSoup(html, "lxml")` 대신 stdlib `BeautifulSoup(html, "html.parser")`를 쓸 것.
 
-## 2. 네이밍·구조
+## 테스트 위치 / 구성
 
-- 파일: `tests/test_<대상>.py`. 대상 단위로 분리됨 — 라우터(`test_stocks_router.py`, `test_report_router.py` ...), 서비스(`test_insider_trades.py`, `test_leverage_service.py` ...), 기능 단면(`test_batch_market_split.py`, `test_macro_signals.py`, `test_recommendation_scoring.py` ...).
-- 한 기능이 여러 파일로 쪼개짐: recommendation은 `test_recommendation_endpoint.py`(라우터), `_batch.py`/`_funnel.py`/`_scoring.py`/`_store.py`/`_universe.py`/`_actions.py`로 레이어별 분할.
-- 테스트 함수: `def test_<동작>_<조건>():`. docstring/이름이 한국어(예: `test_get_recommendations_excludes_caller_tracked`, docstring `"""watchlist 종목 중 점수 있는 것 → ..."""`).
-- 모듈/함수 docstring·인라인 주석은 **한국어 위주**이며 ADR·task 번호를 인용(예: `test_recommendation_batch.py:1` `"""S5: recommendation_kr/us 배치 본문 + registry 확정 (.forge/adr/0015)."""`).
-- 테스트 내부 헬퍼는 `_`-접두 모듈 함수: `_scored_rows()`, `_portfolio()`(`test_recommendation_endpoint.py:22,36`), `_u()`/`_ohlc()`(`test_recommendation_batch.py:23,28`), `_FakeJsonResp` 클래스(`test_insider_trades.py:7`).
+- 모든 백엔드 테스트는 `backend/tests/`. 현재 **74개 `test_*.py`** 파일. 함수명 `test_*`, 클래스 없이 모듈-레벨 함수 위주.
+- `backend/tests/__init__.py` (빈 파일), `backend/tests/conftest.py`, `backend/tests/fixtures/` (예: `fixtures/backlog/*.html` — DART 원문 HTML fixture, ticker별).
+- `conftest.py`가 하는 일:
+  - `sys.path.insert(0, <backend>)`로 `main`/`auth`/`services` import 가능하게 함(개별 테스트 파일 상단에도 동일 부트스트랩 반복 — 예 `test_recommendation_endpoint.py`).
+  - `app.dependency_overrides[get_current_user] = lambda: "test-user-id"`로 인증 전역 우회.
+  - `@pytest.fixture def client(): return TestClient(app)` 제공.
+  - `@pytest.fixture(autouse=True) _clear_quote_cache` — 매 테스트 전 `cache.invalidate_quote()`로 TTL 시세 캐시 교차오염 방지.
 
-## 3. 두 갈래 모킹 방식
+## TestClient / 인증 패턴
 
-스위트는 테스트 대상에 따라 두 모킹 스타일을 명확히 나눠 쓴다.
+- 두 가지 앱 구성 방식이 공존:
+  1. `conftest`의 `client` 픽스처 + `from main import app` 전체 앱 (라우터 통합 테스트).
+  2. 라우터 단위 미니 앱: `app = FastAPI(); app.include_router(router)` 후 `app.dependency_overrides[...]` (`test_recommendation_endpoint.py`).
+- 인증 우회: `app.dependency_overrides[get_current_user] = lambda: "test-user-id"`, admin 경로는 `app.dependency_overrides[require_admin] = lambda: "admin-id"`. `dependency_overrides`는 25개 테스트, `require_admin` 우회는 10여 개 파일에서 사용.
 
-### 3.1 라우터/엔드포인트 → `unittest.mock.patch` + FastAPI `TestClient`
+## 모킹 패턴 (`unittest.mock`)
 
-- 28개 파일이 `TestClient`, 45개가 `unittest.mock`(`patch`/`MagicMock`) 사용.
-- 두 가지 클라이언트 구성이 공존:
-  - **모듈-레벨 미니 앱**(라우터 단위 격리): `app = FastAPI(); app.include_router(router); app.dependency_overrides[...]; client = TestClient(app)`를 모듈 상단에 직접 둠(`test_recommendation_endpoint.py:15-19`, `test_stocks_router.py:9-13`).
-  - **`tests/conftest.py`의 공용 `client` fixture**: 실제 `main.app`을 import해 `client()` fixture로 제공. `app.dependency_overrides[get_current_user] = lambda: "test-user-id"`로 인증을 전역 오버라이드.
-- 인증 게이팅은 `app.dependency_overrides`로 우회: `get_current_user`→`"test-user-id"`, `require_admin`→`"admin-id"`, `get_current_user_or_api_key`→`"test-user-id"`(`test_recommendation_endpoint.py:17-18`, `test_stocks_router.py:11-12`).
-- 의존 함수는 **import 경로 문자열로 patch**(라우터가 import한 이름 기준): `patch("routers.recommendations.storage.get_full_portfolio", return_value=...)`, `patch("routers.recommendations.recommendation.read_recommendations", ...)`, `patch("routers.recommendations._latest_snapshots", ...)`. with-블록 다중 patch를 `\` 줄바꿈으로 묶는 스타일(`test_recommendation_endpoint.py:41-43`).
-- 검증: `resp.status_code` + `resp.json()` 구조/값 단언.
+- `from unittest.mock import patch, MagicMock`. 외부 I/O(DB·yfinance·외부 API)는 전부 patch.
+- **patch 타깃은 사용처 기준**: 패키지 분리 후 심볼이 실제 정의된 서브모듈을 패치한다. 예 `patch("services.storage.portfolio.query", ...)`, `patch("services.storage.schedule.execute")`, `patch("services.market.kr._naver_get", ...)`, `patch("services.market.yf.Ticker", ...)`. 라우터 단위는 라우터 네임스페이스로 패치(`patch("routers.recommendations.recommendation.read_recommendations", ...)`).
+- 인자 단언 위계 (CLAUDE.md 규율과 일치):
+  - 단일 호출: `mock.call_args.args[0]` / `mock.call_args.kwargs` 또는 `_, kwargs = mock.call_args`.
+  - **다중 호출 시 `call_args_list[i].kwargs`로 호출별 인덱스 명시** — 마지막 호출(`call_args`)에 의존하면 additive 호출 추가 시 깨짐. `test_recommendation_endpoint.py`가 모범: discovery 단언은 `call_args_list[0].kwargs`, 후속 watchlist/holdings는 `call_args_list[1:]` 루프로 단언.
+  - **호출 시퀀스 못박기는 `call_count`**: `assert mock_read.call_count == 1` / `== 2` (`test_recommendation_endpoint.py`), `test_market.py`의 `assert mk.call_count == 1`(TTL 캐시 히트 검증). `call_count`는 portfolio/watchlist/job_runs/batch_resilience/admin/market_indicators 등 9개 파일에서 사용.
+- SQL 단언: `ex.call_args.args[0]`(sql 문자열)에 `"INSERT INTO ..."`/`"ON CONFLICT ..."` 부분문자열 포함을 단언, `ex.call_args.args[1]`(params)로 값 검증 (`test_storage.py`의 `test_save_batch_schedule_upsert`, `test_save_stocks_*`).
+- DB 커서 모킹: contextmanager 흉내 — `mock_conn.cursor.return_value.__enter__.return_value = mock_cur` 후 `gc.return_value.__enter__.return_value = mock_conn` (`test_storage.py` `_capture_save_stocks` 헬퍼). `execute.call_args_list`를 순회해 원하는 INSERT를 찾는 식.
+- yfinance 모킹: `MagicMock`에 `.info`/`.history()`/`.quarterly_income_stmt`/`.analyst_price_targets`/`.recommendations_summary`를 pandas DataFrame으로 세팅 (`test_market.py`의 `_make_mock_ticker`). `mock.history.side_effect = Exception(...)`로 에러 경로 검증.
+- 모듈 재로드: 패키지 import 캐시로 패치가 안 먹는 경우 `import importlib; importlib.reload(market)` (`test_market.py`에서 2회). 드물게만 사용.
 
-### 3.2 서비스/순수 로직 → `monkeypatch`
+## 픽스처 / 헬퍼
 
-- 33개 파일이 pytest `monkeypatch` fixture 사용. 서비스 모듈을 직접 import해 외부 의존(`requests.get`, `db.query`/`execute`, 다른 서비스 함수)을 교체.
-- 예(`test_insider_trades.py`): `monkeypatch.setattr(svc.requests, "get", fake_get)`로 HTTP 교체, `monkeypatch.setattr(svc, "query", fake_query)`로 DB 교체, `monkeypatch.setattr(svc, "execute", lambda sql, params: calls.append(...))`로 쓰기 캡처.
-- 가짜 HTTP 응답은 `_FakeJsonResp`(`.json()`만 구현, `:7-12`) 또는 람다. 인자/SQL 캡처는 클로저 `captured = {}`/`cap = {}` dict에 적재 후 단언(`test_insider_trades.py:122-134`, `:183-195`).
-- `patch.object(module, "name", ...)`도 서비스 레이어에서 혼용(`test_recommendation_batch.py:43` `patch.object(F, "_fetch_history", return_value=df)`).
+- 테스트 데이터는 모듈-레벨 헬퍼 함수로 생성: `_scored_rows()`, `_portfolio(stocks, watchlist)`, `_make_mock_ticker(...)`, `_capture_save_stocks(...)`. 공유 픽스처보다 파일별 헬퍼 우세.
+- HTML fixture는 `backend/tests/fixtures/backlog/<ticker>.html` (DART 원문 파싱 회귀 — `test_backlog.py`, `test_backlog_extract.py`).
 
-### 3.3 자료형 픽스처
+## 무엇이 커버되는가
 
-- pandas DataFrame을 OHLC 픽스처로 생성하는 헬퍼(`test_recommendation_batch.py:28` `_ohlc(closes, volumes)` → `pd.date_range` 인덱스 + Open/High/Low/Close/Volume 컬럼).
-- HTML 파싱 테스트(backlog 등)는 `tests/fixtures/backlog/<ticker>.html` 실파일 픽스처를 읽음(`005930.html`, `207940.html` 등 다수). **주의**: 로컬 `.venv`엔 `lxml` 미설치이므로 파싱은 stdlib `BeautifulSoup(html, "html.parser")`를 써야 로컬 pytest가 통과(CLAUDE.md gotcha).
+- **서비스 단위**: storage(portfolio/schedule/names/dates 분리분), market(quote/financials/analyst, KR/US 분기, 배치, 캐시 TTL), market_indicators, cache, indicators, consensus, dividends, disclosures, backlog(+extract), leverage, investor, ranking, supply_score, insider_trades, kiwoom(quote/chart/investor/sector), kis(client/quote), kr_sector(mapping/momentum), recommendation(scoring/funnel/store/universe), job_runs, schedule_spec.
+- **라우터 단위**: portfolio, watchlist, stocks, report, guru, calendar, digest, market_indicators, analytics, analysis, admin, events, batches, rankings, investor, consensus, recommendation, auth(+me).
+- **배치/스케줄러**: `batch_registry` 시장 분리(`test_batch_market_split.py`), 스케줄러 시드(`test_scheduler_seed.py`, `test_scheduler_kr_sector_seed.py`, `test_scheduler_rankings.py`), 회복력(`test_batch_resilience.py`), job_runs 인스트루먼테이션(`test_job_runs_instrumentation.py`).
+- **회귀 고정 주의점**: 은퇴한 배치 id를 단언하던 테스트는 깨진 동작을 고정해 TDD green이 회귀를 못 잡음 — id 변경 시 테스트도 grep 대상(daily_report 시장분리 재발 교훈).
 
-## 4. additive read 오염 가토 — `call_args` vs `call_args_list[i].kwargs`
+## 무엇이 커버되지 않는가
 
-이 스위트의 핵심 모킹 규범. 엔드포인트에 read/외부호출을 **additive로 추가**하면 호출 *시퀀스*가 늘어, `mock.call_args`(마지막 호출)를 단언하던 기존 테스트가 조용히 오염된다(마지막 호출이 신규 호출로 바뀜).
+- 외부 API 실제 호출(yfinance/Naver/키움/KIS/DART/FRED/KOFIA)은 전부 모킹 — 라이브 응답 shape 드리프트는 테스트가 못 잡음. 데이터 파싱 변경(수주잔고 등)은 **배포 후 전 종목 재적재 UAT 필수**(fixture에 없던 실데이터 케이스: 외화 USD천, 단위 캡션 줄바꿈, 회사컬럼 표 등).
+- 실제 PostgreSQL 연동·마이그레이션·트랜잭션 무결성은 단위 테스트 대상 아님(DB는 모킹).
+- 프론트엔드 단위/컴포넌트 자동화 테스트 없음(아래).
 
-대응 3종이 `test_recommendation_endpoint.py`에 실제로 적용돼 있다:
+## 프론트엔드 검증 (UAT)
 
-1. **호출별 인덱스 단언으로 마이그레이션** — 단일 호출 전제 단언을 `call_args_list[i].kwargs`로 명시. 예: discovery read가 첫 호출임을 못박아 `mock_read.call_args_list[0].kwargs`로 `exclude_tickers`를 단언(`:77-78`, `:102-103`), 이후 호출은 루프로 검증(`:105-106` `for call in mock_read.call_args_list[1:]:`).
-2. **신규 호출은 입력 비면 생략** — 라우터가 `if wl_tickers:`/`if holdings_tickers:`로 빈 입력 시 추가 read를 안 해, 빈 portfolio 테스트(`:40-61`)는 여전히 마지막 호출=discovery라 `call_args`(`:60,115`)가 유효하게 보존됨.
-3. **`call_count`/`assert_*`로 시퀀스 못박기** — `mock_batch.assert_not_called()`로 요청경로 라이브 배치 호출 0을 단언(`:138`). 스위트 전반에서 `call_count`·`assert_called`·`assert_not_called`가 19개 파일에서 사용.
-
-`side_effect` 함수로 호출 인자에 따라 분기 반환하는 패턴도 흔함(`test_recommendation_endpoint.py:88,150` `def _read(*args, **kwargs): if kwargs.get("only_tickers"): ...`).
-
-`call_args_list`를 명시적으로 쓰는 파일: `test_recommendation_endpoint.py`, `test_job_runs.py`, `test_kis_quote.py`, `test_batch_resilience.py`, `test_storage.py`, `test_stocks_router.py`.
-
-## 5. 공용 fixture (`tests/conftest.py`)
-
-- `_clear_quote_cache`(`autouse=True`): 매 테스트 전 `services.cache.invalidate_quote()`를 호출해 종목 단위 TTL 캐시 교차 오염 방지(`conftest.py`).
-- `client`: `main.app` 기반 `TestClient` fixture.
-- 그 외 테스트별 fixture는 `@pytest.fixture`로 파일 내 정의(스위트 19개 파일에 pytest 마커/fixture/raises 사용).
-
-## 6. 단언 대상 경향
-
-- **시퀀스 불변식**: 요청경로에서 외부 fetch 0(`assert_not_called`), 배치만 외부 호출(`test_recommendation_batch.py` 헤더 "요청·기동 경로 라이브 호출 0").
-- **응답 shape**: 키 집합(`set(data.keys()) >= {...}`), additive 필드 존재/부재(`assert "base_date" not in first`), 정렬(score DESC) 단언.
-- **방어적 정규화**: 부호 보존(`_num("-500") == -500`), 파싱 불가→`None`/skip(기본값 폴백 금지 — `test_insider_trades.py:78` "기본값 폴백 금지"), NaN 제외.
-- **멱등성/dedup**: row_hash 결정성(`test_insider_trades.py:146`), `ON CONFLICT ... DO UPDATE` SQL 단언(`:173`), 2회 적재 시 동일 해시.
-- **DDL/마이그레이션**: `main._migrate()`가 발행하는 SQL을 캡처해 `CREATE TABLE IF NOT EXISTS ...`·인덱스·PK 단언(`test_insider_trades.py:289-298`).
-- **배치 id 4표면 일관**: registry read·market 분류·`job_runs.record`(auto+manual)·테스트가 같은 id를 쓰는지 검증(`test_recommendation_batch.py:3` 주석, `test_batch_market_split.py`).
-
-## 7. 커버리지 경향
-
-- 측정 도구(`pytest-cov`)는 설정에 없음 — 커버리지 수치 추적은 안 함. "약 800+ green"이 사실상의 건강 지표.
-- 커버리지는 **새 기능마다 동반 신설**되는 경향(최근 추가: `test_recommendation_*.py` 7파일, `test_insider_trades.py`, `test_disclosure_*.py`, `test_kis_*.py`, `test_kiwoom_*.py`, `test_kr_sector_*.py`). 한 기능을 라우터/서비스/배치/스케줄러 레이어로 나눠 다중 파일로 덮음.
-- 외부 의존(DART/yfinance/키움/KIS/KOFIA/FRED HTTP, PostgreSQL)은 전부 모킹 — 실 네트워크·실 DB 의존 테스트 없음(`requests.get`·`db.query`/`execute`를 monkeypatch, 라우터 의존은 patch).
+- 자동화 단위 테스트 프레임워크 없음. `frontend/package.json` scripts는 `dev`/`build`/`lint`(eslint)/`preview`만. lint는 `eslint .` (eslint-plugin-react-hooks 포함).
+- 프론트 동작 검증은 **Playwright 디바이스 에뮬레이션 UAT**(폰 없이): 테스트계정 `test@portfolion.com` / `test1234`. 격리 하니스로 `vite` 임시 `uat.html`을 띄워 우회 (사용자 메모리 `reference-frontend-uat`). 현 시점 리포지토리에 Playwright 설정/`uat.html`이 커밋돼 있지는 않음 — 검증 시 ad-hoc로 생성.
+- 검증 원칙: **프로덕션 쓰기·읽기·settings 자가권한은 분류기 차단** → 사용자 `!` 실행 또는 admin 엔드포인트 경유, 최종 확인은 사용자 화면(라이브 UAT). 자동배포 환경이라 변경 검증은 main 머지·배포 후에 가능.
