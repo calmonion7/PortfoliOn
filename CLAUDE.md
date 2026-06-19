@@ -109,7 +109,7 @@ cd backend && .venv/bin/python -m pytest
 
 **Frontend** — React 19 + Vite (port 5173), plain CSS (no TailwindCSS)
 
-- `frontend/src/pages/` — Portfolio, Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule), ConsensusSettings, LoginPage, Showcase, AdminAnalytics (admin 전용 사용자 행동 분석, `/admin-analytics`), LeverageBackfillSettings (수급지표 백필); 허브 2종: Research (리포트·랭킹·다이제스트·캘린더), MarketHub (=Market, 시장지표·수급지표 2탭); 탭 컴포넌트: SectorTab, MacroTab (섹터·매크로는 Portfolio 분석탭으로 통합됨); 개별 페이지(허브 내 탭용): Reports, Ranking, Calendar, Digest, Market, Analytics
+- `frontend/src/pages/` — Portfolio (`/portfolio`, 대시보드·분석 전용 — 종목 관리는 리서치로 이동), Settings, Guru (+ GuruCrawlSettings, GuruManagers, GuruStats, ReportSchedule), ConsensusSettings, LoginPage, Showcase, AdminAnalytics (admin 전용 사용자 행동 분석, `/admin-analytics`), LeverageBackfillSettings (수급지표 백필); 허브 2종: Research (홈 `/`, 리포트·랭킹·다이제스트·캘린더; 리포트 탭이 보유/관심 종목 관리=라이브 P&L·편집·삭제·승격·추가 흡수), MarketHub (=Market, 시장지표·수급지표 2탭); 탭 컴포넌트: SectorTab, MacroTab (섹터·매크로는 Portfolio 분석탭으로 통합됨); 개별 페이지(허브 내 탭용): Reports, Ranking, Calendar, Digest, Market, Analytics
 - `frontend/src/components/` — StockModal, PromoteModal, PermissionManager, PermissionPanel, LoadingSpinner, MobileNav, Toast (ToastProvider), portfolio/ (DashboardCard), reports/ (ConsensusChart, DetailTab, FinancialsChart, HistoryTab, Sections, reportUtils), market/ (FxSection, VixSection, CommoditiesSection, TreasurySection, EconIndicatorsSection, M7EarningsSection, KrTop2Section, KrExportsSection, LeverageSection, LendingSection, marketUtils.jsx), ui/ (Badge, Button, Card, Stat, icons)
 
 ## Deployment

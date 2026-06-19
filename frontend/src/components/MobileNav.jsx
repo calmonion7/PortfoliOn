@@ -4,11 +4,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { trackEvent } from '../utils/analytics'
 
 const ALL_TABS = [
-  { to: '/',         label: '종목관리', key: 'portfolio', Icon: HomeIcon,   end: true },
-  { to: '/research', label: '리서치',   key: 'research',  Icon: SearchIcon },
-  { to: '/market',   label: '시장',     key: 'market',    Icon: ChartIcon },
-  { to: '/guru',     label: '구루',     key: 'guru',      Icon: GuruIcon },
-  { to: '/settings', label: '설정',     key: 'settings',  Icon: GearIcon },
+  { to: '/',          label: '리서치',   key: 'research',  Icon: SearchIcon, end: true },
+  { to: '/portfolio', label: '포트폴리오', key: 'portfolio', Icon: HomeIcon },
+  { to: '/market',    label: '시장',     key: 'market',    Icon: ChartIcon },
+  { to: '/guru',      label: '구루',     key: 'guru',      Icon: GuruIcon },
+  { to: '/settings',  label: '설정',     key: 'settings',  Icon: GearIcon },
 ]
 
 export default function MobileNav() {

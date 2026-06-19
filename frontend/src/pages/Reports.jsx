@@ -3,8 +3,12 @@ import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import useReportList from '../hooks/useReportList'
 import useReportGeneration from '../hooks/useReportGeneration'
+import usePortfolioData from '../hooks/usePortfolioData'
 import { fmtPrice as fmt } from '../utils'
+import { fmt as fmtNum, Plus, Pencil } from '../components/ui/icons'
 import LoadingSpinner from '../components/LoadingSpinner'
+import StockModal from '../components/StockModal'
+import PromoteModal from '../components/PromoteModal'
 import { useToast } from '../components/Toast'
 import { fmtN, rsiColor, overallWeather } from '../components/reports/reportUtils.jsx'
 import ReportDetailTabs from '../components/reports/ReportDetailTabs'
@@ -31,6 +35,25 @@ export default function Reports() {
 
   const { generating, genProgress, generateOne, generateBatch, cleanup } = useReportGeneration({ onApplyList: applyList })
 
+  const { stocks, watchlist, fetchAll } = usePortfolioData()
+
+  // ticker(대문자)→보유/관심 항목 맵 — reportList 키가 대문자라 정규화해 맞춘다
+  const holdingMap = {}
+  for (const h of stocks) holdingMap[h.ticker?.toUpperCase()] = h
+  const watchMap = {}
+  for (const w of watchlist) watchMap[w.ticker?.toUpperCase()] = w
+
+  // 보유 카드 라이브 손익 — current_price(라이브)·avg_cost·quantity 모두 있을 때만
+  const pnlOf = (ticker, market) => {
+    const h = holdingMap[ticker?.toUpperCase()]
+    if (!h || h.current_price == null || h.avg_cost == null || h.quantity == null) return null
+    const ccy = (market || h.market || 'US') === 'KR' ? '₩' : '$'
+    const dec = (market || h.market || 'US') === 'KR' ? 0 : 2
+    const pnl = (h.current_price - h.avg_cost) * h.quantity
+    const pnlPct = h.avg_cost ? (h.current_price - h.avg_cost) / h.avg_cost * 100 : null
+    return { ccy, dec, pnl, pnlPct, quantity: h.quantity, avg_cost: h.avg_cost }
+  }
+
   const [selected, setSelected] = useState({ ticker: null, date: null })
   const [detail, setDetail] = useState({ summary: null, enriched_at: null })
   const [loading, setLoading] = useState(false)
@@ -43,6 +66,13 @@ export default function Reports() {
   const [view, setView] = useState('list')
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [marketFilter, setMarketFilter] = useState('ALL')
+
+  // 종목 관리(추가/편집/삭제/승격) — 종목관리에서 흡수
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState(null)        // { ...stock, isWatch }
+  const [addMode, setAddMode] = useState('holding')    // 'holding' | 'watchlist'
+  const [promoteTarget, setPromoteTarget] = useState(null)
+  const [mutError, setMutError] = useState('')
 
   useEffect(() => {
     if (activeTab !== 'others' || !isAdmin || othersData !== null) return
@@ -67,6 +97,89 @@ export default function Reports() {
     setSelected({ ticker, date })
     setView('detail')
     trackEvent('report_view_open', { ticker })
+  }
+
+  // ── 종목 관리 핸들러 (종목관리 → 리포트 탭 흡수) ──
+  const pollReportGeneration = (ticker) => {
+    let attempts = 0
+    const maxAttempts = 6
+    const id = setInterval(async () => {
+      attempts++
+      try {
+        const { data } = await api.get(`/api/report/${ticker}/history`)
+        if (data && data.length > 0) {
+          clearInterval(id)
+        } else if (attempts >= maxAttempts) {
+          clearInterval(id)
+          showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
+        }
+      } catch {
+        if (attempts >= maxAttempts) {
+          clearInterval(id)
+          showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
+        }
+      }
+    }, 15000)
+  }
+
+  const refreshAfterMutation = () => { fetchList(); fetchAll() }
+
+  const handleSave = async (stockData) => {
+    try {
+      const isWatch = editing ? editing.isWatch : addMode === 'watchlist'
+      if (editing) {
+        await api.put(`/api/${isWatch ? 'watchlist' : 'portfolio'}/${editing.ticker}`, stockData)
+        showToast(`${editing.ticker} 수정됐습니다`)
+      } else {
+        const res = await api.post(`/api/${isWatch ? 'watchlist' : 'portfolio'}`, stockData)
+        showToast(`${stockData.ticker} 추가됐습니다`)
+        if (res.data?.report_queued) {
+          pollReportGeneration(stockData.ticker.toUpperCase())
+        }
+      }
+      setModalOpen(false); setEditing(null); setMutError(''); refreshAfterMutation()
+    } catch (err) {
+      const msg = err.response?.data?.detail || '저장 실패'
+      setMutError(msg); showToast(msg, 'error')
+      throw err
+    }
+  }
+
+  const handleDelete = async (ticker, isWatch) => {
+    const msg = isWatch ? `${ticker}를 완전히 삭제하시겠습니까?` : `${ticker}를 보유종목에서 제거하고 관심종목으로 이동합니까?`
+    if (!window.confirm(msg)) return
+    try {
+      await api.delete(`/api/${isWatch ? 'watchlist' : 'portfolio'}/${ticker}`)
+      setMutError(''); refreshAfterMutation()
+      showToast(`${ticker} 삭제됐습니다`)
+    } catch (err) {
+      const errMsg = err.response?.data?.detail || '삭제 실패'
+      setMutError(errMsg); showToast(errMsg, 'error')
+    }
+  }
+
+  const handlePromote = async ({ quantity, avg_cost }) => {
+    try {
+      await api.post(`/api/watchlist/${promoteTarget.ticker}/promote`, { quantity, avg_cost })
+      showToast(`${promoteTarget.ticker} 보유종목으로 이동됐습니다`)
+      setPromoteTarget(null); setActiveTab('holdings'); refreshAfterMutation()
+    } catch (err) {
+      showToast('이동 실패', 'error')
+      throw err
+    }
+  }
+
+  // 편집 — 수량·평단은 reportList엔 없고 stocks/watchlist에 있다. ticker로 찾아 넘긴다.
+  const openEdit = (ticker, category) => {
+    const isWatch = category === 'watchlist'
+    const src = isWatch ? watchMap[ticker?.toUpperCase()] : holdingMap[ticker?.toUpperCase()]
+    setEditing({ ...(src || { ticker, market: 'US' }), isWatch })
+    setModalOpen(true)
+  }
+  const openAdd = () => {
+    setEditing(null)
+    setAddMode(activeTab === 'watchlist' ? 'watchlist' : 'holding')
+    setModalOpen(true)
   }
 
   useEffect(() => cleanup, [cleanup])
@@ -272,6 +385,27 @@ export default function Reports() {
           {s?.sector && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sector}</div>}
           {s?.industry && <div style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.industry}</div>}
           {(!hasReport || isBroken) && <div style={{ fontSize: 10, color: isBroken ? '#ef9a9a' : 'var(--text-3)', marginTop: 2 }}>{isBroken ? '데이터 오류' : '클릭하여 생성'}</div>}
+          {info.category === 'holdings' && (() => {
+            const p = pnlOf(ticker, market)
+            if (!p) return null
+            const isUp = p.pnl >= 0
+            return (
+              <div style={{ fontSize: 10, color: isUp ? '#81c784' : '#ef9a9a', marginTop: 3, fontWeight: 600 }}>
+                {p.quantity}주 · 평단 {p.ccy}{fmtNum(p.avg_cost, p.dec)}<br />
+                {isUp ? '+' : '-'}{p.ccy}{fmtNum(Math.abs(p.pnl), p.dec)}
+                {p.pnlPct != null && <span style={{ marginLeft: 4 }}>({p.pnlPct >= 0 ? '+' : ''}{p.pnlPct.toFixed(1)}%)</span>}
+              </div>
+            )
+          })()}
+          {(info.category === 'holdings' || info.category === 'watchlist') && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              <button className="sc-act-btn" title="수정" onClick={e => { e.stopPropagation(); openEdit(ticker, info.category) }}><Pencil /></button>
+              {info.category === 'watchlist' && (
+                <button className="sc-act-btn" title="보유로 이동" onClick={e => { e.stopPropagation(); setPromoteTarget({ ticker, market: market || 'US' }) }}>↑</button>
+              )}
+              <button className="sc-act-btn" title="삭제" onClick={e => { e.stopPropagation(); handleDelete(ticker, info.category === 'watchlist') }}>×</button>
+            </div>
+          )}
         </div>
 
         {/* 가격 / POC */}
@@ -422,6 +556,17 @@ export default function Reports() {
               )}
             </div>
           )}
+          {info.category === 'holdings' && (() => {
+            const p = pnlOf(ticker, market)
+            if (!p) return null
+            const isUp = p.pnl >= 0
+            return (
+              <div style={{ marginTop: 3, fontSize: 11, color: isUp ? '#81c784' : '#ef9a9a', fontWeight: 600 }}>
+                {p.quantity}주 · 평단 {p.ccy}{fmtNum(p.avg_cost, p.dec)} · {isUp ? '+' : '-'}{p.ccy}{fmtNum(Math.abs(p.pnl), p.dec)}
+                {p.pnlPct != null && <span> ({p.pnlPct >= 0 ? '+' : ''}{p.pnlPct.toFixed(1)}%)</span>}
+              </div>
+            )
+          })()}
           {generating === ticker && genProgress.total > 0 && (
             <div style={{ marginTop: 3 }}>
               <div style={{ background: 'var(--surface-hover)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
@@ -430,15 +575,26 @@ export default function Reports() {
             </div>
           )}
         </div>
-        {isAdmin && (
-          <button
-            onClick={e => { e.stopPropagation(); generateOne(ticker) }}
-            disabled={!!generating}
-            style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer', flexShrink: 0, marginTop: 2 }}
-          >
-            {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginTop: 2 }}>
+          {isAdmin && (
+            <button
+              onClick={e => { e.stopPropagation(); generateOne(ticker) }}
+              disabled={!!generating}
+              style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer' }}
+            >
+              {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+            </button>
+          )}
+          {(info.category === 'holdings' || info.category === 'watchlist') && (
+            <>
+              <button className="sc-act-btn" title="수정" onClick={e => { e.stopPropagation(); openEdit(ticker, info.category) }}><Pencil /></button>
+              {info.category === 'watchlist' && (
+                <button className="sc-act-btn" title="보유로 이동" onClick={e => { e.stopPropagation(); setPromoteTarget({ ticker, market: market || 'US' }) }}>↑</button>
+              )}
+              <button className="sc-act-btn" title="삭제" onClick={e => { e.stopPropagation(); handleDelete(ticker, info.category === 'watchlist') }}>×</button>
+            </>
+          )}
+        </div>
       </div>
     )
   }
@@ -450,6 +606,7 @@ export default function Reports() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
+        {mutError && <p style={{ color: 'var(--down)', fontSize: 12, marginTop: 0 }}>{mutError}</p>}
         {renderFilters()}
         {(activeTab === 'others' ? othersLoading : listLoading)
           ? <LoadingSpinner label="" size={20} style={{ padding: 20 }} />
@@ -613,6 +770,30 @@ export default function Reports() {
           </div>
         )}
       </div>
+
+      {/* 종목 추가 FAB — 목록 화면에서만 */}
+      {view === 'list' && activeTab !== 'others' && (
+        <button className="fab" onClick={openAdd} title={activeTab === 'watchlist' ? '관심종목 추가' : '보유종목 추가'}>
+          <Plus />
+        </button>
+      )}
+
+      {modalOpen && (
+        <StockModal
+          stock={editing}
+          mode={editing ? (editing.isWatch ? 'watchlist' : 'holding') : addMode}
+          onSave={handleSave}
+          onClose={() => { setModalOpen(false); setEditing(null) }}
+        />
+      )}
+      {promoteTarget && (
+        <PromoteModal
+          ticker={promoteTarget.ticker}
+          market={promoteTarget.market}
+          onConfirm={handlePromote}
+          onClose={() => setPromoteTarget(null)}
+        />
+      )}
     </div>
   )
 }

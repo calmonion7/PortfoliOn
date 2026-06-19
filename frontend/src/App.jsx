@@ -34,11 +34,11 @@ async function doLogout(setSession) {
 function TopNav({ theme, setTheme, setSession }) {
   const { menuPermissions, role, loading } = useAuth() || { menuPermissions: [], role: null, loading: true }
   const allItems = [
-    { to: '/',         label: '종목관리', key: 'portfolio', end: true },
-    { to: '/research', label: '리서치',   key: 'research' },
-    { to: '/market',   label: '시장',     key: 'market' },
-    { to: '/guru',     label: '구루',     key: 'guru' },
-    { to: '/settings', label: '설정',     key: 'settings' },
+    { to: '/',          label: '리서치',   key: 'research', end: true },
+    { to: '/portfolio', label: '포트폴리오', key: 'portfolio' },
+    { to: '/market',    label: '시장',     key: 'market' },
+    { to: '/guru',      label: '구루',     key: 'guru' },
+    { to: '/settings',  label: '설정',     key: 'settings' },
   ]
   const adminItem = role === 'admin' ? [{ to: '/admin-analytics', label: '행동', key: 'analytics' }] : []
   const navItems = loading ? [] : [
@@ -148,10 +148,11 @@ export default function App() {
         </header>
         <main className="page-wrap">
           <Routes>
-            <Route path="/" element={<Portfolio />} />
+            <Route path="/" element={<Research />} />
+            <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/research" element={<Research />} />
             <Route path="/market" element={<MarketHub />} />
-            <Route path="/analysis" element={<Navigate to="/" replace />} />
+            <Route path="/analysis" element={<Navigate to="/portfolio" replace />} />
             <Route path="/guru" element={<Guru />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin-analytics" element={<AdminAnalytics />} />
