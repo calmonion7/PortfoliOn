@@ -1,162 +1,232 @@
 ---
-last_mapped_commit: 7f3aec7d6aab5b2ed9837f9aada7405f9505ae6b
-mapped: 2026-06-17
+last_mapped_commit: 163c29cbd89d9b1d2aa5a101670e9fa34ceb21c4
+mapped: 2026-06-19
 ---
 
-# Codebase Concerns
+# CONCERNS — 기술 부채·버그·보안·성능·취약 영역
 
-**분석일:** 2026-06-17
-
-> 모든 항목은 실제 코드에서 검증된 구현 사실이다. 용어 정의(도메인 글로서리)는 이 문서에 두지 않는다.
-
-## 운영/배포 취약점 (Fragile Operations)
-
-### 자동배포 폴러가 로컬 tracked 편집을 hard-reset
-- 파일: `scripts/auto-deploy-poll.sh` (launchd `com.portfolion.auto-deploy-poll`, 2분 주기)
-- 동작: `git fetch origin main` 후 `LOCAL != REMOTE`이면 `git reset --hard origin/main` → `bash deploy.sh` (37행 `git reset --hard origin/main`).
-- 위험: 메인 체크아웃에서 **커밋 안 했거나 push 안 해 로컬이 origin보다 뒤처진 tracked 편집은 다음 폴(≤2분)에 소실**된다. lock 파일(`/tmp/portfolion-deploy.lock`)이 있으면 skip하지만 lock이 없는 평시엔 무조건 reset.
-- 안전책: 코드 변경은 commit + `git push origin main`을 **한 번에 묶어** 즉시 반영. `.forge/` 등 untracked 파일은 `reset --hard` 대상이 아니라 안전.
-
-### nginx 직접 서빙 vs 폴러 재배포의 라이브 시점 불일치
-- 프론트 번들은 nginx가 `./frontend/dist`를 `:ro` 볼륨마운트로 직접 서빙 → 로컬 `npm run build`가 즉시 라이브.
-- 그러나 **백엔드 변경은 폴러 재배포(컨테이너 재빌드) 이후에야 라이브**. 프론트만 먼저 빌드하면 백엔드 의존 기능이 미동작하는 시간차가 생긴다. (출처: `CLAUDE.md` Deployment 절, 검증 대상은 nginx 볼륨마운트 구성)
-
-## 라우팅/계약 취약점 (Routing & Contract)
-
-### FastAPI 라우트 순서 (enrich/batch가 {ticker}보다 먼저)
-- 파일: `backend/routers/stocks.py:190` (`PUT /enrich/batch`) — `backend/routers/stocks.py:205` (`PUT /{ticker}/enrich`)
-- `/enrich/batch`가 `/{ticker}/enrich`보다 **먼저** 등록돼 있어야 FastAPI가 `enrich`를 ticker 값으로 라우팅하지 않는다. 순서 역전 시 batch 호출이 깨진다.
-
-### 비-additive 응답 reshape → 프론트 소비처 전수 grep 필요
-- 파일: `backend/routers/stocks.py:293` `GET /dashboard` → `{"holdings": [...], "totals": ...}` (298행 빈 케이스 `{"holdings": [], "totals": None}`).
-- 위험: 응답을 배열→객체로 바꾸면 훅과 별개로 `/api/stocks/dashboard`를 직접 fetch하는 독립 소비처(예: 상관관계 탭)가 `res.data`를 옛 형태로 취급해 조용히 깨진다. reshape 시 `grep -rn '/api/stocks/dashboard' frontend/src/`로 전수 감사 필요. 가능하면 additive(필드 추가) 선호.
-
-### FastAPI bare list/dict Body 명시 필수
-- 파일: `backend/routers/report.py:473` (`entries: list = Body(...)`), `backend/routers/batches.py:64` (`schedule: dict = Body(...)`)
-- PUT/POST에서 bare `list`/`dict` 파라미터는 `Body(...)`로 명시해야 한다. 누락 시 FastAPI가 쿼리 파라미터로 해석해 기동/요청 단계에서 실패.
-
-### 배치 id 은퇴 시 전 표면 grep 계약
-- 파일: `backend/services/batch_registry.py` (id: `daily_report_kr`/`daily_report_us`/`earnings_kr`/`earnings_us`/`monthly_kr`/`monthly_us` 등), `backend/services/job_runs.py` (`record(id,...)`)
-- 위험: `BATCHES`에서 id를 빼면 ① 데이터 read(스케줄 소비처) ② 표시 문자열(`schedule_desc`) ③ `job_runs.record(id, ...)` **모든 lane**(auto/manual/backfill) ④ 그 id를 단언하는 테스트까지 전수 grep해야 한다. 한 곳이라도 옛 id로 남으면 stale read·배치 현황 실행이력 증발 회귀·고아 run 누적. 단 옛 스케줄 행→신규 id 승계 마이그레이션 read는 정당한 잔존.
-- 관련: `source`(fetch 출처)와 `usage`(소비 UI)는 반대 방향 필드 — fetch 체인을 바꾸면 `source`도 함께 갱신해야 현황 카드가 stale 출처를 안 보인다.
-
-## 배치/요청경로 안티패턴 (tasks #48/#49/#50)
-
-### 외부 API를 요청·기동 경로에서 라이브 호출 금지
-- 파일: `backend/services/kr_sector_service.py:107` `map_holdings_to_sectors` — "저장 인덱스만 읽음 — 요청 경로에서 키움(ka20002) 라이브 호출 없음" 주석으로 명시.
-- 원칙: 배치가 사전계산해 `market_cache`/테이블에 저장하고 요청은 저장값만 읽는다. 요청 시 라이브 빌드가 끼면 캐시 만료마다 수초 지연.
-
-### silent-except / all-None 캐시 박제 금지
-- 파일: `backend/services/kr_sector_service.py:58` `_fetch_one_sector` — except를 **삼키지 않고 로깅**(`print("[kr_sector] ... fetch failed")`)하고 all-None dict 반환.
-- 파일: `backend/services/kr_sector_service.py:70` `refresh` — **all-None 모멘텀이면 save 생략**(76~79행), 직전 양호값 보존. 의심 트리거가 아니라 *실패 클래스(all-None)*를 가드해 근본원인 미상이어도 재발 차단.
-- 기동 시 빈 캐시 적재 가드: `backend/scheduler.py:354` `_seed_rankings_if_empty`, `backend/scheduler.py:370` `_seed_kr_sector_if_empty`.
-- 주의: `backend/services/investor_service.py:83` `except Exception: pass`는 silent-except 패턴 — 진단 어려움(현재 정상 동작이나 실패 시 무로그).
-
-## 데이터 무결성 위험 (Data Integrity)
-
-### 수주잔고 단위 캡션 파싱 — ×100 대형 오저장 위험 ("wrong < missing")
-- 파일: `backend/services/backlog.py:362` `_table_unit`, `backend/services/backlog.py:180` `_EOK_FACTOR`(조원×10000·억원×1·백만원×0.01·천원×1e-5·원×1e-8).
-- 가드: 캡션에 KRW 토큰이 없으면(USD천·줄바꿈 분리 등) `_DEFAULT_UNIT`(억원) 폴백이 아니라 **'기타'(비KRW) 반환으로 자동추출 차단**(366~370행). 단위 추출 실패는 안전한 기본값(억원)이 아니라 pending(누락)으로 처리 — 기본값 폴백 시 백만원을 억원으로 오인하면 ×100 오저장.
-- 자동추출/pending 분기: `backend/services/backlog.py:374` `_auto_backlog` — 다중엔티티(`_is_multi_entity`) 표가 하나라도 있으면 문서 전체를 pending 처리. 검산 통과만 `source='dart'`(523~524행), 실패는 `_save_pending`(531행, amount=None, 기존 채운 값 보존).
-- 운영 주의: 파서 변경은 배포 후 전 종목 재적재 UAT 필수(fixture에 없던 실데이터 케이스 — 외화·단위 캡션 줄바꿈·연결 전 분기 회사컬럼 표).
-
-### 공시 피드 — list.json `pblntf_ty` 미echo
-- 파일: `backend/services/disclosures.py` (corp_code별 `list.json` 호출, `stock_disclosures` 테이블 `rcept_no` dedup upsert)
-- list.json이 응답에 `pblntf_ty`를 echo하지 않아 "단일 호출 후 응답필드 필터" 불가 → 핵심유형 A·B·C·D를 **각각 개별 호출**(종목당 4콜)해 질의 유형값을 stamp. KR 전용·`DART_API_KEY` 필수. status 013(무데이터)은 graceful 빈 리스트.
-- 별도 store 주의: 자동 DART 목록(`stock_disclosures`)은 Cowork 애널리스트 코멘터리(`tickers.recent_disclosures`)를 절대 덮지 않는다.
-
-### 컨센서스/목표가 정본 단일화 (as-of-date)
-- 파일: `backend/services/consensus.py:6` — "목표가·의견수 정본 = `daily_consensus_mart`의 base_date<=date 최신행(as-of-date), ADR-0008".
-- 파일: `backend/services/consensus_pipeline.py` — opinion 문자열을 5점 표준화 점수(`_SCORE_MAP`)로 변환 후 `consensus_history`에 저장하는 공통 파이프라인. `target_price`는 문자열 파싱(84행 `float(price_str.replace(",", ""))`, 실패 시 None).
-- 소비처: `stocks.py`/`watchlist.py`/`portfolio.py`/`report.py`가 `daily_consensus_mart`를 읽음 — 정본을 옮기면 이 소비처들 동기 필요.
-
-### 종목명 dual-source desync
-- 파일: `backend/services/storage.py:275` `refresh_snapshot_names`(주석: "종목관리(live tickers.name)와 리서치(snapshot name)가 어긋난다"), `backend/services/storage.py:292` `reconcile_snapshot_names`.
-- 위험: `tickers.name`(공유 마스터, 종목관리 목록 live read) vs `snapshots.data.name`(리포트 생성 시 박제, 리서치 목록·상세 read). 이름 변경 시 **둘 다** 갱신해야 목록↔상세 일치. DB만 바꾸면 `cache.get_list`·스냅샷 LRU 탓에 미반영 → `cache.invalidate(ticker)`+`invalidate_list()` 필수. 실명 채움: `backend/services/market.py:484` `resolve_name`.
-
-### 배당 dual-source (US yfinance / KR DART)
-- 파일: `backend/services/dividends.py:43` (US: yfinance `t.info` dividendRate/dividendYield), KR: DART `alotMatter.json`(reprt_code=11011 사업보고서, `DART_API_KEY` 필요).
-- 무배당/결측은 None graceful(저장 안 함, 빈 박제 방지 — 46행). `GET /api/stocks/dashboard`가 저장값만 읽어(라이브 0) yield_on_cost·expected_annual_income·KRW 환산 totals(저장 FX `usdkrw`만 사용) 계산. yfinance dividendYield 스케일(현재 퍼센트)이 라이브러리 버전에 따라 변할 수 있는 외부 의존.
-
-### krFmt 억원 단위 가정
-- 파일: `frontend/src/components/market/marketUtils.jsx:1` `krFmt` (임계값 10000억=1조, 그 이하 `억`).
-- 위험: **입력은 '억원' 단위 가정** — 원은 `/1e8` 변환 후 넘기고, 주(count) 등 다른 단위엔 부적합. raw 원/주를 그대로 넘기면 1e8배 오표기(공매도 "35조경원" 사례). 수익/수출 차트는 dual Y-axis 구조(`M7EarningsSection`/`KrTop2Section`/`KrExportsSection`).
-
-## 외부 의존성 취약점 (External Dependencies)
-
-### yfinance — 비공식 API
-- 파일: `backend/services/market.py`(US 1차 시세), `backend/services/dividends.py`, `backend/services/analysis_service.py`, `backend/services/consensus_pipeline.py`(upgrades_downgrades), `market_indicators/*`.
-- Yahoo 비공식 엔드포인트라 응답 스키마·레이트리밋·필드 스케일 변경 위험. US는 yfinance 1차, KIS 백업(이중화).
-
-### Naver 스크래핑 — 비공식 모바일 API
-- 파일: `backend/services/market.py:8`(`Referer: m.stock.naver.com`), `:25` `_naver_get`, `:111` `_kr_basic_naver`.
-- KR 시세 최종 폴백(키움→KIS→Naver, `market.py:165`). 상폐 종목은 Naver 409로 검출(예외 전파). 모바일 API라 차단/스키마 변경 위험.
-
-### 키움 토큰/throttle
-- 파일: `backend/services/kiwoom/client.py:14`(`_MIN_INTERVAL=0.25s` 직렬 throttle), `:15`(`_TOKEN_CACHE_SEC=12h`), `:75` `_get_token`(인프로세스 싱글톤, lock), `:143`(401/403 시 1회 force 재발급 재시도). `return_code≠0` → `KiwoomError`(150행).
-- KR 읽기전용 시세 1차. 직렬 throttle이라 배치 동시성은 무의미(`max_workers=4`).
-
-### KIS 토큰/throttle — EGW00133 방어
-- 파일: `backend/services/kis/client.py:17`(`_REISSUE_MIN_INTERVAL=60s` — 발급 1분당 1회 EGW00133 방어), `:15`(`_MIN_INTERVAL=0.05s`), `:16`(`_TOKEN_CACHE_SEC=23h`). `rt_cd≠"0"` → 예외.
-- KR+US 읽기전용 **백업**(KR=키움→KIS→Naver, US=yfinance→KIS). `configured()` False면 휴면(키 미설정이 안전 기본값, 기존 동작 무변화).
-
-### FRED/KOFIA/DART/KITA — 키 게이팅 + graceful degradation
-- `FRED_API_KEY`: `backend/services/market_indicators/macro.py`·`econ.py` — 미설정 시 수집 실패(저장값 무변경).
-- `KOFIA_API_KEY`: `backend/services/leverage_service.py`(신용잔고·반대매매), `backend/services/lending_service.py`(대차잔고, 동일 키) — 미설정 시 요청 실패.
-- `DART_API_KEY`: `backlog.py`·`disclosures.py`·`dividends.py`(KR) — 필수.
-- `KITA_API_KEY`: 실제로는 **관세청(Korea Customs Service)** 키(`apis.data.go.kr/1220000/Itemtrade`) — 미설정 시 UN Comtrade 공개 API 자동 폴백(`market_indicators/exports.py`).
-
-## 보안 (Security)
-
-### JWT HS256 + refresh token
-- 파일: `backend/services/auth_service.py:19`(`os.environ["JWT_SECRET"]` — 미설정 시 KeyError), `:96` access encode(HS256), `:14` `_ACCESS_EXPIRE=1h`, `:15` `_REFRESH_EXPIRE=30d`. refresh는 `refresh_tokens` 테이블 DB 저장, `consume_refresh_token`(115행)이 만료(126행) 검증, `revoke_refresh_token`(131행) DELETE.
-- HS256 대칭키 — 비밀 유출 시 위조 가능. refresh token이 DB에 평문 저장(컬럼 `token`).
-
-### OAuth — at_hash 우회 디코딩 + SW navigate 차단
-- 파일: `backend/routers/auth.py:170~172` — id_token payload를 `base64.urlsafe_b64decode`로 **직접 디코딩**(jose의 at_hash 검증 우회, 과거 at_hash 오류 회피). id_token 서명 자체는 검증하지 않고 Google 토큰 엔드포인트 응답을 신뢰하는 구조.
-- OAuth code는 인메모리 dict `_oauth_codes`(`auth.py:24`, 120s TTL) — 다중 워커/재시작 시 휘발.
-- 프론트 SW: `frontend/vite.config.js:24` `navigateFallback: null` — SW가 OAuth callback navigate를 가로채지 않도록(과거 SW가 callback을 인터셉트하던 버그 방어). `registerType: 'autoUpdate'`(11행).
-- OAuth 환경변수(`GOOGLE_CLIENT_ID`/`SECRET`, `GITHUB_CLIENT_ID`/`SECRET`, `FRONTEND_URL`)는 `os.environ[...]`로 직접 접근(`auth.py:137`,`186` 등) — 미설정 시 KeyError로 OAuth 경로 500.
-
-### admin role 게이팅
-- admin만 리포트 생성·Guru 크롤·각종 refresh/backfill·`GET /api/admin/analytics` 가능. `user_menu_permissions`(프론트 `AuthContext`가 nav 필터)는 표시 제어이지 서버 인가가 아님 — 실제 인가는 라우터 의존성(`get_current_user`/admin 체크).
-
-### CORS — env 기반 origin 허용
-- 파일: `backend/main.py:124~127` — `allow_origins=["http://localhost:3000", "http://localhost:5173", FRONTEND_URL]`(빈 값 필터). `FRONTEND_URL` 미설정 시 localhost만 허용 → 배포 환경에서 누락하면 프론트 차단.
-
-### secrets 위치 (키 NAME만)
-- 파일: `backend/.env.docker`(gitignore), 루트 `.env`(docker-compose 보간용).
-- 키 NAME: `POSTGRES_PASSWORD`, `JWT_SECRET`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`, `FRED_API_KEY`, `KOFIA_API_KEY`, `DART_API_KEY`, `KITA_API_KEY`, `KIWOOM_APP_KEY`/`KIWOOM_SECRET_KEY`, `KIS_APP_KEY`/`KIS_APP_SECRET`/`KIS_BASE_URL`, `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`, `FRONTEND_URL`, `ANTHROPIC_API_KEY`(미사용).
-
-## 성능 (Performance)
-
-### 캐시 TTL
-- 파일: `backend/services/cache.py` — snapshot LRU(maxsize 200), `_list_cache`(TTL 60s, 33행), `_dashboard_cache`(300s), `_correlation_cache`(300s), `_sector_cache`(300s), `_macro_cache`(300s). 종목 추가/수정/삭제 시 `invalidate`(52행)가 dashboard·correlation·sector·macro·live_prices·list 전부 무효화.
-- 주의: TTLCache는 maxsize 초과 시에만 만료 항목 정리(19~20행) — 항목 수가 적으면 만료된 키가 다음 get까지 메모리 잔존.
-- storage→cache 호출은 함수 내 지연 import로 순환참조 회피(`CLAUDE.md` gotcha).
-
-### ThreadPoolExecutor 병렬성 vs DB 풀
-- 파일: `backend/routers/calendar.py:70`(max_workers ≤15), `backend/services/analysis_service.py:52`(섹터 11)·`:74`(보유 10), `backend/services/digest_service.py:48`(10), `backend/services/report_generator.py:73`(8), `backend/services/ranking_service.py:110`(12), `backend/services/consensus_pipeline.py:101`(5), `backend/services/market_indicators/earnings.py:136,158`(20), `backend/services/kr_sector_service.py:67`(4 — 키움 직렬 throttle 탓 보수적), `backend/services/parallel.py:5` `parallel_map`(기본 10).
-- DB 풀: `backend/services/db.py:23` — 최대 ThreadPool 동시성(calendar 15·analysis 11)보다 크게 잡아 풀 고갈 회피. 신규 배치가 max_workers를 키우면 DB 풀 압박 재검토 필요.
-
-### 요청경로 직렬 외부 호출 지연
-- 키움/KIS는 직렬 throttle이라 요청당 N콜이면 수초 지연 누적. 배치 사전계산 + 저장값 read 원칙으로 회피(위 안티패턴 절). calendar yfinance는 ThreadPool 병렬화(15)로 완화.
-
-## 죽은 코드 / 레거시 (Dead/Legacy)
-
-### `backend/reports/` — 레거시 리포트 디렉터리
-- 종목별 디렉터리(`000720`/`005930`/`207940` 등) 존재. read-only JSON fallback(구 스냅샷용). 런타임 데이터는 Docker PostgreSQL — 이 디렉터리는 신규 쓰기 경로 없음.
-
-### `ANTHROPIC_API_KEY` — 미사용
-- `backend/.env.docker`(10행, 빈 값)·`.env.docker.example`에만 존재. 백엔드 코드에 anthropic import/호출 없음(`requirements.txt`에 anthropic 패키지 없음). AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API로 작성. (`snapshots/MSFT/*.json`·`data/stocks.json`의 "ANTHROPIC"은 종목 데이터이지 키 사용 아님.)
-
-### `SUPABASE_JWT_SECRET` — stale 테스트 참조
-- 파일: `backend/tests/test_auth.py:22` — `monkeypatch.setenv("SUPABASE_JWT_SECRET", secret)`로 설정하나, 실제 코드 `backend/services/auth_service.py:19`는 `JWT_SECRET`을 읽는다. Supabase 마이그레이션 잔재 — 테스트가 잘못된 키 이름을 set해 실제 검증과 불일치(테스트가 깨진 전제를 고정할 수 있음). 운영 코드엔 `SUPABASE_JWT_SECRET` 사용 없음.
-
-## 코드 마커 (TODO/FIXME)
-
-- `grep -rni 'TODO|FIXME|HACK|XXX'`(backend/frontend src, `__pycache__`/`node_modules` 제외) 결과 **명시적 마커 0건**. 미완 지점은 마커 대신 docstring 주석(예: `kr_sector_service.py`의 graceful 빈 매핑, `backlog.py`의 pending 처리)으로 표기돼 있다.
+이 문서는 코드를 직접 읽어 확인한 위험 팩트만 담는다. 도메인 용어 정의는 `CONTEXT.md` 소관이다.
+각 항목은 근거 파일·코드, 심각도(높음/중간/낮음), 수정 힌트를 붙인다.
 
 ---
 
-*Concerns 감사: 2026-06-17*
+## 1. 운영·배포 (Deployment)
+
+### 1.1 자동 배포 폴러가 커밋 안 한 tracked 편집을 소실시킴 — 심각도: 높음
+`scripts/auto-deploy-poll.sh`가 launchd로 2분마다 돌며, `origin/main`이 로컬 HEAD와 다르면
+`git reset --hard origin/main` 후 `bash deploy.sh`를 실행한다(스크립트 28~37행).
+→ 메인 체크아웃에서 **커밋 안 한(또는 push 안 한) tracked 편집은 다음 폴(≤2분)에 소실**된다.
+`/tmp/portfolion-deploy.lock`만 동시 실행을 막을 뿐, 작업 중인 워킹트리는 보호하지 않는다.
+- **수정 힌트**: 코드 변경은 commit + `git push origin main`을 즉시 묶을 것. 미커밋 실험은
+  worktree(`.claude/worktrees/`)나 untracked 파일(`.forge/`)로 격리. `reset --hard`는 untracked는
+  건드리지 않는다.
+
+### 1.2 기동 시 인라인 DDL 마이그레이션이 조용히 실패해도 부팅 진행 — 심각도: 중간
+`backend/main.py` `_migrate()`(54~142행)는 8개 테이블/컬럼을 `CREATE TABLE IF NOT EXISTS` /
+`ADD COLUMN IF NOT EXISTS`로 만들되 **각 블록을 `try/except`로 감싸 실패 시 `print`만** 하고 계속
+진행한다. DDL 실패(권한·문법·연결)는 로그 한 줄로만 남고 앱은 정상 기동된 것처럼 떠서, 이후 그
+테이블을 읽는 엔드포인트가 런타임에 깨진다. `stock_recommendations`·`stock_insider_trades` 등 신규
+테이블 생성도 여기에 의존.
+- **수정 힌트**: DDL 실패를 부팅 실패로 격상할지(fail-fast) 검토하거나, 최소한 헬스체크에
+  스키마 무결성 신호를 노출. 정식 마이그레이션 도구 부재가 근본 원인.
+
+---
+
+## 2. 데이터 직렬화·정합성 (Data Integrity)
+
+### 2.1 NaN/inf JSON 직렬화 500 — 소스 가드 누락 시 재발 — 심각도: 높음
+starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 `NaN`/`inf`가 있으면 직렬화 단계에서 500
+(`Out of range float values are not JSON compliant`). 폴백이 증상을 *다르게* 가린다: PostgreSQL은
+`json` 컬럼에 NaN 저장을 거부하지만 파이썬 `json.dumps`는 기본 `allow_nan=True`라 파일 폴백은 통과
+→ DB저장 실패·파일성공·응답 직렬화 실패로 진단이 엇갈린다. 외부 시세(yfinance `Close` NaN, FX
+`usdkrw` NaN)가 합산값을 오염시키는 게 전형.
+- **현재 가드 상태**: `services/digest_service.py`(42~61행)는 소스에서 `math.isfinite`로 가드.
+  `services/utils.py` `sanitize()`(29~36행)는 NaN/inf→None 재귀 치환 헬퍼 제공.
+  `recommendation/funnel.py` `_avg_dollar_volume`(108~121행)도 `math.isfinite` 가드.
+- **잔존 위험**: sanitize는 *호출하는 곳에서만* 동작하는 출력 일괄 처리라, 신규 엔드포인트가 float를
+  응답에 실으면서 sanitize/소스가드를 빠뜨리면 재발한다. `recommendations.py`의 `weight_pct`·
+  `pnl_pct`·`total_krw` 계산(131~160행)은 0 분모·결측을 None으로 막지만, 신규 float 필드 추가 시
+  동일 점검 필요.
+- **수정 힌트**: 가드는 **소스에서**(시세 없음 처리)가 출력 sanitize보다 깨끗. float 응답 추가 시
+  DoD에 NaN/inf 점검 포함.
+
+### 2.2 단위 파싱 실패 시 '안전 기본값' 폴백이 ×100 대형 오저장 — 심각도: 높음
+수주잔고(`services/backlog.py`)·내부자(`services/insider_trades.py`) 등 외부 원문 파싱 경로에서 단위
+캡션('억원' vs 'USD천' 등) 추출 실패 시 기본값으로 폴백하면 ×100 규모 오저장이 난다. 현 코드는
+'wrong < missing' 원칙을 따라 추출 실패를 **pending/None/skip**으로 처리한다:
+`insider_trades.py` `_num()`(65~78행)·`_parse_items()`(98행, `shares_change` None이면 행 skip).
+- **잔존 위험**: 파서가 만나지 못한 실데이터 케이스(외화·캡션 줄바꿈 분리·연결 전 분기 회사컬럼 표)는
+  fixture 단위 테스트가 전부 통과해도 운영 재적재에서만 드러난다.
+- **수정 힌트**: 파싱 로직 변경은 **배포 후 전 종목 재적재 UAT 필수**. 추출 실패는 기본값이 아니라
+  반드시 누락(pending/None)으로 처리.
+
+### 2.3 KR 색 관례 반전 — 의미 배지에 success/danger 변형 금지 — 심각도: 중간(UI)
+`frontend/src/styles/tokens.css`에서 `--up`=빨강(상승)·`--down`=파랑(하락)이라, `ui/Badge.css`의
+`.badge--success`=빨강·`.badge--danger`=파랑이다. 가격 방향이 아닌 **의미 상태 배지에 success/danger를
+쓰면 Western(녹=좋음/빨=경고) 의도와 반전**된다(수급 배지 우호=빨·경계=파 버그 전례).
+`warning` 변형은 `--color-warning`/`--warning-tint` 미정의로 깨져 있다.
+- **백엔드 측 회피 설계 확인**: `recommendation/scoring.py`(8~9행)·`actions.py`(4~5행)는 플래그/액션을
+  `{label, kind}` 문자열·enum으로만 내보내고 **색은 프론트가 결정**하도록 위임 — 백엔드는 가격 토큰
+  미사용. 이 경계가 무너지면 위 버그가 재발.
+- **수정 힌트**: 의미 배지는 `ui/SupplyBadge.jsx`처럼 전용 색 명시. UI 리뷰는 variant 이름 통념이
+  아니라 토큰 실제값 대조.
+
+---
+
+## 3. 보안 (Security)
+
+### 3.1 Cowork API 키 비교가 타이밍-언세이프 — 심각도: 중간
+`backend/auth.py` `get_current_user_or_api_key`(43행 부근)는 `api_key == expected` **단순 문자열
+비교**로 검증한다. `hmac.compare_digest` 같은 상수시간 비교를 쓰지 않아 이론상 타이밍 사이드채널에
+노출(원격 환경에선 네트워크 지터에 묻혀 실효성은 낮음).
+- **수정 힌트**: `secrets.compare_digest(api_key, expected)`로 교체.
+
+### 3.2 시크릿 관리 — env 키 미설정이 안전 기본값(휴면) — 심각도: 낮음(설계상 의도)
+`.gitignore`가 `backend/.env.docker`·`.env`·`backend/.venv/`를 제외(확인). 시크릿은 환경변수로만
+주입(`JWT_SECRET`/`SESSION_SECRET`/`COWORK_API_KEY`/`DART_API_KEY`/`KOFIA_API_KEY`/
+`KIWOOM_*`/`KIS_*` 등). 키 미설정 시 동작:
+- `JWT_SECRET`/`SESSION_SECRET`/`DATABASE_URL` 미설정은 `os.environ[...]` 직접 접근이라 **기동 시
+  KeyError로 부팅 실패**(auth_service.py 19행, db.py 26행, main.py 157행) — fail-loud, 양호.
+- `COWORK_API_KEY` 빈 문자열이면 API 키 인증 자체를 거부(auth.py: `expected and api_key == expected`).
+- 외부 데이터 키(DART/KOFIA/KIWOOM/KIS/FRED)는 미설정 시 해당 배치만 휴면/실패하고 저장값 무변경 —
+  코드 머지는 무해.
+- **잔존 위험**: 휴면이 조용하면 "데이터가 안 채워지는데 에러도 없는" 진단 지연. 키 미설정 휴면은
+  로깅으로 가시화 권장.
+
+### 3.3 인증 토큰 수명·폐기 — 심각도: 낮음
+`auth_service.py`: access JWT 1시간(`_ACCESS_EXPIRE`)·refresh 30일(`_REFRESH_EXPIRE`). refresh 토큰은
+`secrets.token_urlsafe(64)`로 DB 저장(평문). `consume_refresh_token`은 만료만 검사하고 **로테이션
+없이** 재사용 가능(폐기는 명시적 `revoke_refresh_token` 호출 시에만). 30일 평문 refresh 토큰 유출 시
+장기 악용 여지.
+- **수정 힌트**: 사용 시 로테이션(1회용) 또는 해시 저장 검토. 현 규모(소수 사용자)에선 우선순위 낮음.
+
+### 3.4 CORS — allow_credentials 미설정 — 심각도: 낮음(현 동작 정상)
+`backend/main.py`(161~166행)는 `allow_origins`만 지정하고 `allow_credentials`는 미설정(기본 False).
+인증을 쿠키가 아닌 Bearer 헤더로 하므로 현재는 문제없음. 추후 쿠키 기반 인증 도입 시 origin 화이트
+리스트·credentials 조합 재점검 필요.
+
+---
+
+## 4. 성능 (Performance)
+
+### 4.1 추천 배치 Stage-2가 후보 100+개를 직렬 외부 fetch — 심각도: 중간
+`recommendation/funnel.py` `run_recommendation_batch`(307행)는 `for cand in candidates:` **직렬 루프**로
+후보(`CANDIDATE_TOP_K=100` + 구루 멤버, 26행)마다 `_enrich_one`을 호출하고, 그 안에서 종목당
+`market.get_history_df`(OHLCV, KR=키움→yfinance) + consensus + KR이면 investor_service·insider_trades
+read를 한다(232~277행). 후보 100개 × (외부 시세 1콜 + DB read 수콜)이 직렬이라 배치 1회가 수 분
+소요될 수 있다. KIS/키움 throttle(`_MIN_INTERVAL` 0.25s/0.05s)이 추가 지연.
+- **완화 요인**: 배치 경로 전용(요청·기동 경로 라이브 호출 0 — 설계상 보장). KR/US 별도 크론
+  (`recommendation_kr`/`recommendation_us`, `batch_registry.py` 359·374행)으로 분리.
+- **수정 힌트**: 후보 수 증가 시 `_enrich_one`을 ThreadPool 병렬화 검토하되 **§4.2 DB 풀(maxconn=20)
+  한도 내**로 워커 수 제한. silent except 금지 원칙 유지(현 코드는 종목별 실패를 stderr 로깅).
+
+### 4.2 ThreadPool 동시성 vs DB 커넥션 풀 — 심각도: 중간
+`services/db.py`는 `ThreadedConnectionPool(minconn=1, maxconn=20)`. psycopg2 풀은 소진 시 **블록이
+아니라 `PoolError`를 던진다**(주석 23~25행이 명시). 현 ThreadPool 사용처: calendar(max 30,
+CLAUDE.md), analysis(11), `parallel.py` `parallel_map`(기본 10), short_sell 배치 ThreadPool.
+- **위험**: calendar의 max 30 워커가 각자 `query()`로 커넥션을 잡으면 동시 30 > maxconn 20 →
+  PoolError 가능. calendar는 yfinance만 병렬이고 DB 접근은 캐시 경로라 현재는 충돌이 드물지만, 워커가
+  DB를 동시에 잡는 신규 배치 추가 시 즉시 한도 초과.
+- **수정 힌트**: 신규 ThreadPool 배치는 워커 수 ≤ (maxconn − 여유)로 설계. `parallel.py`는
+  `max_workers` 기본 10이라 안전하지만 호출자가 더 키우면 위험.
+
+### 4.3 인메모리 캐시 TTL·LRU — 심각도: 낮음
+`services/cache.py` 6종: snapshot(LRU 200), list(TTL 5s), dashboard(TTL 300s), correlation(300s),
+sector(300s), macro(300s). 종목 추가/수정/삭제 시 dashboard·correlation·sector·macro 자동 무효화.
+프로세스 인메모리라 **다중 워커/재시작 시 캐시 미공유**(현 단일 컨테이너 단일 프로세스라 무해).
+멀티프로세스(gunicorn 등)로 확장하면 캐시 일관성 깨짐.
+
+---
+
+## 5. 외부 의존·환경 차이 (External / Environment)
+
+### 5.1 로컬 `.venv` ≠ Docker 의존성 — `lxml` 부재 — 심각도: 중간
+`requirements.txt`에 `lxml>=4.9.0`(10행)이 있고 Docker엔 설치되지만 **로컬 `backend/.venv`엔 없다**.
+HTML/XML 파싱은 전부 stdlib `html.parser`로 작성됨(확인: `backlog.py` 382·445·466행, `scraper.py`
+19행, `guru_scraper.py` 56·79행; `backlog.py` 30행 주석이 이유 명시). 신규 코드가
+`BeautifulSoup(html, "lxml")`을 쓰면 로컬 pytest에서 파서 미존재로 깨진다.
+- **수정 힌트**: 로컬 검증 대상 파싱은 `"html.parser"` 사용(로컬·프로덕션 모두 동작).
+
+### 5.2 배치-백킹 뷰의 silent except·all-None 박제 위험 — 심각도: 중간
+배치가 사전계산→`market_cache`/테이블 저장, 요청은 저장값만 읽는 패턴(랭킹·KR 업종·추천). 과거
+회귀 클래스: ① 외부 fetch 실패를 silent except로 삼켜 진단 불가, ② 빈/all-None 결과를 캐시에 박제해
+시드 가드가 "채워짐"으로 오판·고착.
+- **현재 준수 상태**: `recommendation/funnel.py`는 종목별 실패를 stderr 로깅(243·252·260·265·298행),
+  전부 산출 불가면 `replace_recommendations` 생략(331행 `if scored:`), `_has_signal`로 all-None 후보
+  제외(275행). `universe.py`도 소스별 실패 로깅(124~143행).
+- **잔존 위험**: 신규 배치가 이 규율을 빠뜨리면 회귀. **의심 트리거가 아니라 실패 클래스(all-None)를
+  가드**해야 근본원인 미상이어도 재발 방지.
+
+### 5.3 LLM 호출 없음 — anthropic 미설치 — 심각도: 정보성
+백엔드 `report_generator`는 시장 데이터 스냅샷만 만들고 **LLM/Anthropic 호출 없음**(requirements.txt에
+anthropic 없음 — 확인). AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API로 작성. `.env.docker`의
+`ANTHROPIC_API_KEY`는 잔존하나 백엔드 미사용 — 혼동 주의(데드 설정).
+
+---
+
+## 6. 라우팅·계약 취약성 (Routing / API Contract)
+
+### 6.1 FastAPI 라우터 순서 — 구체 경로가 catch-all `{ticker}`보다 먼저 — 심각도: 중간
+`routers/report.py`에서 `/report/{ticker}/{date_str}`(373행) catch-all 앞에 구체 경로를 등록해야
+한다: `/report/{ticker}/backlog`(350행)·`/disclosures`(358행)·`/insider-trades`(367행)는 주석
+(347·356·364행)으로 순서 의존을 명시하고 catch-all보다 위에 둠. 동일 패턴: CLAUDE.md가 경고하는
+`PUT /api/stocks/enrich/batch`는 `PUT /api/stocks/{ticker}/enrich`보다 먼저.
+- **위험**: 신규 `/report/{ticker}/<segment>` 경로를 catch-all 아래에 추가하면 `<segment>`가
+  `date_str`로 라우팅돼 조용히 깨진다(과거 `/{ticker}/backlog` 500 전례).
+- **수정 힌트**: `{ticker}` 하위 신규 경로는 항상 `{date_str}` catch-all 위에 등록.
+
+### 6.2 비-additive reshape 시 프론트 소비처 전수 grep 필요 — 심각도: 중간
+응답을 배열→객체 등 비-additive로 바꾸면 그 엔드포인트를 fetch하는 **모든** 프론트 소비처를
+`grep -rn '<경로>' frontend/src/`로 찾아 전부 갱신해야 한다. 독립 fetcher(훅과 별개로 직접 fetch하는
+화면)가 옛 형태로 취급해 조용히 깨진 전례(대시보드 배열→객체 변경 시 상관관계 탭 "보유종목 없음").
+- **현재 추천 응답 설계**: `recommendations.py` GET은 `{as_of, discovery, watchlist, holdings}` 섹션
+  키 객체로, watchlist/holdings는 additive(키 추가)로 붙임(주석 24~28행) — 비-additive 회피.
+- **수정 힌트**: additive(필드 추가) 선호. reshape 불가피하면 소비처 전수 감사 DoD 포함.
+
+### 6.3 additive read 추가가 `mock.call_args` 단언 오염 — 심각도: 중간(테스트)
+엔드포인트에 read/외부호출을 additive로 추가하면 호출 *시퀀스*가 늘어, 마지막 호출 인자를
+`mock.call_args`로 단언하는 기존 테스트가 거짓통과/오류. `recommendations.py` GET이
+`read_recommendations`를 **3회** 호출(discovery 35행, watchlist 63행, holdings 87행)하는 게 그 사례 —
+빈 watchlist/holdings면 호출 생략(`if wl_tickers:`·`if holdings_tickers:`)으로 기존 테스트 보존.
+- **수정 힌트**: 기존 단언은 `call_args_list[i].kwargs`로 인덱스 명시 마이그레이션, 신규 호출은 입력
+  비면 생략, 신규 테스트는 `call_count`로 시퀀스 못박음.
+
+---
+
+## 7. 추천·내부자 신규 서브시스템 특이 위험 (Recommendation / Insider)
+
+### 7.1 추천 점수 결측군 중립(0.5) 채움 — 점수 해석 주의 — 심각도: 낮음(설계 의도, 가시성 위험)
+`scoring.py` `score_stock`(132~144행)은 결측 팩터군을 재정규화로 분모에서 빼지 않고 **중립
+0.5로 채운다**(136~139행 주석). 단일 가용군만으로 만점 도달을 막는 의도지만, 근거가 거의 없는 종목도
+점수가 50 근방으로 수렴해 "데이터 부족"과 "실제 중립"이 점수만으로는 구분 안 된다(플래그
+`kind:"missing"`로만 구분 — `derive_flags` 167·183·197행). 144행 `else` 분기는 denom이 항상 1.0이라
+dead code(주석이 명시, 무해 잔존).
+- **수정 힌트**: 소비 UI가 `missing` 플래그를 반드시 노출해 점수만으로 오판 방지.
+
+### 7.2 내부자 신호 — 주식수 합산이 종목 분할/액면 변경에 취약 — 심각도: 낮음
+`insider_trades.py` `compute_net_signal`(245~270행)은 윈도 내 `shares_change` 단순 SUM의 부호로
+buy/sell 방향 판정. 주식수(금액 아님) 합이라 액면분할·무상증자로 주식수 단위가 바뀐 보고가 섞이면
+합산이 왜곡될 수 있다. `direction`만 쓰고 규모는 안 쓰므로 영향은 제한적.
+- **부가**: `_row_hash`(81행)가 `rcept_no|kind|repror|change|after|rate` 조합 MD5 PK라, 같은 보고가
+  정정 공시로 값이 바뀌면 다른 해시로 **중복 행** 생성 가능(멱등은 동일 값일 때만). 순매수 합이
+  정정 전후 이중 계상될 여지.
+- **수정 힌트**: 정정 공시 처리가 필요하면 `rcept_no` 단위 dedup/최신 우선 정책 추가 검토.
+
+### 7.3 추천 저장이 DELETE→INSERT 통째 교체 — 트랜잭션 경계 — 심각도: 낮음
+`store.py` `replace_recommendations`(15~52행)는 시장 단위 `DELETE` 후 행별 `execute` INSERT. `db.py`
+`execute`는 호출마다 `get_connection`으로 **각각 커밋**(31~41행)한다 — 즉 DELETE와 N개 INSERT가
+**별도 트랜잭션**. 중간에 한 INSERT가 실패하면 그 시장 추천이 부분 비워진 상태로 남는다. 호출측
+(`funnel.py` 331행)이 `if scored:`로 빈 교체는 막지만, 부분 실패 원자성은 보장 안 됨.
+- **수정 힌트**: 통째 교체는 단일 트랜잭션(하나의 connection 내 DELETE+executemany)으로 묶는 게 안전.
+  현 규모·배치 빈도에선 영향 낮음.
+
+---
+
+## 8. 알려진 미해결 관찰 (Open Observations)
+
+- **JS 404 리소스 요청 1건**: 배포 후 브라우저 콘솔에 404 1건, 기능 영향 없으나 원인 미확인
+  (user memory `project-js-404.md`). 코드 근거 미확정 — 추적 필요.
+- **PC OAuth SW 가로채기**: SW navigate가 OAuth callback을 가로채던 버그 수정 배포됨(472cea0),
+  PC 재검증 미완(user memory `project-oauth-sw-fix.md`).
+- **forge 동시 세션 슬롯 충돌**: 여러 세션이 `.forge` 활성 슬롯 공유 시 동시 fg-run/cleanup이 슬롯
+  탈취·오봉인(user memory). 코드 위험은 아니나 작업 프로세스 주의.
