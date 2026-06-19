@@ -140,7 +140,7 @@ def test_get_quote_kr_sector_from_yfinance_fallback():
         {"Close": [74000.0] + [75000.0] * 99},
         index=dates,
     )
-    with patch("services.market._naver_get", return_value=naver_basic), \
+    with patch("services.market.kr._naver_get", return_value=naver_basic), \
          patch("services.market.yf.Ticker", return_value=mock_yf):
         from services import market
         import importlib; importlib.reload(market)

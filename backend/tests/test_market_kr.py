@@ -30,7 +30,7 @@ def test_get_quote_kr_falls_back_to_naver_when_kiwoom_unconfigured():
                    "fluctuationsRatio": "1.69", "marketValue": "100000", "stockName": "폴백종목"}
     with _patch_yf(), \
          patch("services.kiwoom.client.configured", return_value=False), \
-         patch("services.market._naver_get", return_value=naver_basic):
+         patch("services.market.kr._naver_get", return_value=naver_basic):
         from services import market
         q = market.get_quote_kr("000660")
     assert q["price"] == 60000.0
@@ -45,7 +45,7 @@ def test_get_quote_kr_falls_back_when_kiwoom_raises():
          patch("services.kiwoom.client.configured", return_value=True), \
          patch("services.kiwoom.quote.get_quote", side_effect=RuntimeError("키움 장애")), \
          patch("services.kis.client.configured", return_value=False), \
-         patch("services.market._naver_get", return_value=naver_basic):
+         patch("services.market.kr._naver_get", return_value=naver_basic):
         from services import market
         q = market.get_quote_kr("005930")
     assert q["price"] == 50000.0          # 키움 예외 + KIS 미설정 → Naver 폴백
@@ -62,7 +62,7 @@ def test_get_quote_kr_uses_kis_when_kiwoom_fails():
          patch("services.kiwoom.quote.get_quote", side_effect=RuntimeError("키움 장애")), \
          patch("services.kis.client.configured", return_value=True), \
          patch("services.kis.quote.get_quote_kr", return_value=kis_norm) as kis_call, \
-         patch("services.market._naver_get") as naver_call:
+         patch("services.market.kr._naver_get") as naver_call:
         from services import market
         q = market.get_quote_kr("000660")
     assert q["price"] == 64000.0
@@ -80,7 +80,7 @@ def test_get_quote_kr_skips_kis_when_kiwoom_ok():
          patch("services.kiwoom.client.configured", return_value=True), \
          patch("services.kiwoom.quote.get_quote", return_value=kiwoom_norm), \
          patch("services.kis.quote.get_quote_kr") as kis_call, \
-         patch("services.market._naver_get") as naver_call:
+         patch("services.market.kr._naver_get") as naver_call:
         from services import market
         q = market.get_quote_kr("005930")
     assert q["price"] == 75000.0
@@ -97,7 +97,7 @@ def test_get_quote_kr_kis_to_naver_when_kis_also_fails():
          patch("services.kiwoom.quote.get_quote", side_effect=RuntimeError("키움 장애")), \
          patch("services.kis.client.configured", return_value=True), \
          patch("services.kis.quote.get_quote_kr", side_effect=RuntimeError("KIS 장애")), \
-         patch("services.market._naver_get", return_value=naver_basic):
+         patch("services.market.kr._naver_get", return_value=naver_basic):
         from services import market
         q = market.get_quote_kr("005930")
     assert q["price"] == 30000.0
