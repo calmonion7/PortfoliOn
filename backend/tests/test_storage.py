@@ -3,43 +3,43 @@ from unittest.mock import patch, MagicMock
 
 def test_get_watchlist_tickers_empty():
     from services import storage
-    with patch("services.storage.query", return_value=[]):
+    with patch("services.storage.portfolio.query", return_value=[]):
         result = storage.get_watchlist_tickers("user-123")
     assert result == []
 
 
 def test_get_watchlist_tickers_returns_list():
     from services import storage
-    with patch("services.storage.query", return_value=[{"ticker": "AAPL"}, {"ticker": "TSLA"}]):
+    with patch("services.storage.portfolio.query", return_value=[{"ticker": "AAPL"}, {"ticker": "TSLA"}]):
         result = storage.get_watchlist_tickers("user-123")
     assert result == ["AAPL", "TSLA"]
 
 
 def test_get_holdings_empty():
     from services import storage
-    with patch("services.storage.query", return_value=[]):
+    with patch("services.storage.portfolio.query", return_value=[]):
         result = storage.get_holdings("user-123")
     assert result == []
 
 
 def test_enrich_stock_not_found():
     from services import storage
-    with patch("services.storage.query", return_value=[]):
+    with patch("services.storage.portfolio.query", return_value=[]):
         result = storage.enrich_stock("AAPL", {"moat": "wide"})
     assert result is False
 
 
 def test_enrich_stock_found():
     from services import storage
-    with patch("services.storage.query", return_value=[{"ticker": "AAPL"}]), \
-         patch("services.storage.execute", return_value=1):
+    with patch("services.storage.portfolio.query", return_value=[{"ticker": "AAPL"}]), \
+         patch("services.storage.portfolio.execute", return_value=1):
         result = storage.enrich_stock("AAPL", {"moat": "wide"})
     assert result is True
 
 
 def test_get_schedule_default():
     from services import storage
-    with patch("services.storage.query", return_value=[]):
+    with patch("services.storage.schedule.query", return_value=[]):
         result = storage.get_schedule()
     assert result["enabled"] is False
     assert "time" in result
@@ -49,7 +49,7 @@ def test_get_schedule_default():
 
 def test_get_batch_schedule_none_when_no_row():
     from services import storage
-    with patch("services.storage.query", return_value=[]):
+    with patch("services.storage.schedule.query", return_value=[]):
         result = storage.get_batch_schedule("daily_digest")
     assert result is None
 
@@ -57,7 +57,7 @@ def test_get_batch_schedule_none_when_no_row():
 def test_get_batch_schedule_returns_data():
     from services import storage
     spec = {"enabled": True, "type": "daily", "time": "08:00"}
-    with patch("services.storage.query", return_value=[{"data": spec}]):
+    with patch("services.storage.schedule.query", return_value=[{"data": spec}]):
         result = storage.get_batch_schedule("daily_digest")
     assert result == spec
 
@@ -65,7 +65,7 @@ def test_get_batch_schedule_returns_data():
 def test_save_batch_schedule_upsert():
     from services import storage
     spec = {"enabled": True, "type": "daily", "time": "08:00"}
-    with patch("services.storage.execute") as ex:
+    with patch("services.storage.schedule.execute") as ex:
         storage.save_batch_schedule("daily_digest", spec)
     sql = ex.call_args.args[0]
     assert "INSERT INTO batch_schedules" in sql
@@ -80,7 +80,7 @@ def test_get_all_batch_schedules_maps_job_id_to_spec():
         {"job_id": "daily_digest", "data": {"enabled": True, "type": "daily", "time": "08:00"}},
         {"job_id": "backlog_fetch", "data": {"enabled": True, "type": "weekly", "days": ["sun"], "time": "04:00"}},
     ]
-    with patch("services.storage.query", return_value=rows):
+    with patch("services.storage.schedule.query", return_value=rows):
         result = storage.get_all_batch_schedules()
     assert result["daily_digest"]["time"] == "08:00"
     assert result["backlog_fetch"]["days"] == ["sun"]
@@ -95,7 +95,7 @@ def _capture_save_stocks(stock: dict):
     mock_cur = MagicMock()
     mock_conn = MagicMock()
     mock_conn.cursor.return_value.__enter__.return_value = mock_cur
-    with patch("services.storage.get_connection") as gc:
+    with patch("services.storage.portfolio.get_connection") as gc:
         gc.return_value.__enter__.return_value = mock_conn
         storage.save_stocks("user-123", [stock])
     for call in mock_cur.execute.call_args_list:
