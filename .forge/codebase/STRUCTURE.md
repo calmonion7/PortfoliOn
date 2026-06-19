@@ -1,11 +1,11 @@
 ---
-last_mapped_commit: 6d95dcb9610a1b3c68075b0f587169989f6d8e10
-mapped: 2026-06-19
+last_mapped_commit: a78576f706579812552909d53642d1ceccb6ff3a
+mapped: 2026-06-20
 ---
 
 # STRUCTURE
 
-디스크 상의 실제 현재 트리(HEAD `6d95dcb9`). 최근 4커밋이 file→package 분리 리팩토링이라 아래 패키지 경로는 직접 `ls`로 확인한 값이다.
+디스크 상의 실제 현재 트리(HEAD `a78576f7`). 백엔드 패키지 경로는 `ls`로 확인한 값이다.
 
 ## Top level
 
@@ -83,7 +83,7 @@ backend/
 ```
 src/
   main.jsx                 React 진입
-  App.jsx                  BrowserRouter + Auth/Toast Provider, TopNav, 라우트 정의
+  App.jsx                  BrowserRouter + Auth/Toast Provider, TopNav, 라우트 정의 (홈 /=Research, /portfolio=Portfolio)
   App.css / index.css
   api.js                   API 베이스 헬퍼
   utils.js
@@ -97,13 +97,17 @@ src/
 ```
 
 ### `src/pages/` (23개)
-허브/최상위: `Portfolio.jsx`, `Research.jsx`, `MarketHub.jsx`, `Market.jsx`, `Guru.jsx`, `Settings.jsx`, `LoginPage.jsx`, `Showcase.jsx`, `AdminAnalytics.jsx`.
+허브/최상위: `Research.jsx`(홈 `/`·`/research`), `Portfolio.jsx`(`/portfolio`), `MarketHub.jsx`, `Market.jsx`, `Guru.jsx`, `Settings.jsx`, `LoginPage.jsx`, `Showcase.jsx`, `AdminAnalytics.jsx`.
 허브 내 탭/하위 페이지: `Reports.jsx`, `Ranking.jsx`, `Calendar.jsx`, `Digest.jsx`, `Analytics.jsx`, `Recommendations.jsx`, `SectorTab.jsx`, `MacroTab.jsx`.
+
+페이지 역할(task#76·ADR-0018):
+- `Reports.jsx` — Research 허브 리포트 탭. **내 종목 단일 척추**: `useReportList`+`usePortfolioData()`로 리포트 목록에 보유 라이브 P&L을 머지하고, 종목 관리(추가/편집/삭제/승격)·`StockModal`/`PromoteModal`·추가 FAB를 보유한다(종목관리에서 흡수).
+- `Portfolio.jsx` — `/portfolio`. **대시보드·분석(섹터/매크로/상관관계) 집계 전용**으로 슬림화(목록·관리 모달·FAB 제거). 상단 KPI·hero 집계는 유지.
 Guru 계열: `GuruCrawlNow.jsx`, `GuruManagers.jsx`, `GuruStats.jsx`.
 설정/관리: `ConsensusSettings.jsx`, `LeverageBackfillSettings.jsx`, `ReportManualGen.jsx`.
 
 ### `src/components/`
-최상위: `BatchScheduleEditor.jsx`, `InstallPrompt.jsx`, `LoadingSpinner.jsx`, `MobileNav.jsx`, `PermissionManager.jsx`, `PermissionPanel.jsx`, `PromoteModal.jsx`, `StockModal.jsx`, `Toast.jsx`.
+최상위: `BatchScheduleEditor.jsx`, `InstallPrompt.jsx`, `LoadingSpinner.jsx`, `MobileNav.jsx`(`ALL_TABS` 순서 리서치 `/` SearchIcon end:true→포트폴리오 `/portfolio` HomeIcon→시장→구루→설정, `App.jsx` TopNav와 동일), `PermissionManager.jsx`, `PermissionPanel.jsx`, `PromoteModal.jsx`, `StockModal.jsx`, `Toast.jsx`.
 하위 폴더:
 - `market/` — `FxSection`, `VixSection`, `CommoditiesSection`, `TreasurySection`, `EconIndicatorsSection`, `M7EarningsSection`, `KrTop2Section`, `KrExportsSection`, `LeverageSection`, `LendingSection`, `MacroSignalsSection` (+ `marketUtils.jsx` — `krFmt` 억/조 포매터).
 - `portfolio/` — `DashboardCard.jsx`(+css), `FlashValue.jsx`, `PriceFreshness.jsx`(+css), `PriceFlash.css`.
