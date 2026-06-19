@@ -55,7 +55,8 @@ def save_stocks(user_id: str, stocks: list[dict]) -> None:
                     INSERT INTO tickers (ticker, name, market, exchange, competitors, moat, growth_plan, risks, recent_disclosures, is_etf)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (ticker) DO UPDATE SET
-                        name=EXCLUDED.name, market=EXCLUDED.market, exchange=EXCLUDED.exchange,
+                        name=CASE WHEN EXCLUDED.name IS NULL OR EXCLUDED.name = EXCLUDED.ticker THEN tickers.name ELSE EXCLUDED.name END,
+                        market=EXCLUDED.market, exchange=EXCLUDED.exchange,
                         competitors=EXCLUDED.competitors, moat=EXCLUDED.moat,
                         growth_plan=EXCLUDED.growth_plan, risks=EXCLUDED.risks,
                         recent_disclosures=EXCLUDED.recent_disclosures,
@@ -120,7 +121,8 @@ def save_holdings(user_id: str, holdings: list[dict]) -> None:
                     INSERT INTO tickers (ticker, name, market, exchange)
                     VALUES (%s, %s, %s, %s)
                     ON CONFLICT (ticker) DO UPDATE SET
-                        name=EXCLUDED.name, market=EXCLUDED.market, exchange=EXCLUDED.exchange
+                        name=CASE WHEN EXCLUDED.name IS NULL OR EXCLUDED.name = EXCLUDED.ticker THEN tickers.name ELSE EXCLUDED.name END,
+                        market=EXCLUDED.market, exchange=EXCLUDED.exchange
                     """,
                     (ticker, h.get("name") or ticker, h.get("market") or "US", h.get("exchange") or ""),
                 )

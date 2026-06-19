@@ -128,3 +128,36 @@ def test_save_stocks_preserves_is_etf_on_conflict():
         {"ticker": "AAPL", "name": "Apple", "market": "US"}
     )
     assert "is_etf=tickers.is_etf OR EXCLUDED.is_etf" in sql
+
+
+# ── save_holdings / save_stocks: 종목명 ticker 클로버 방어 (stock-name-ticker-revert-fix) ──
+
+def _capture_save_holdings(holding: dict):
+    """save_holdings 실행 중 tickers INSERT의 (sql, params)를 캡처해 반환."""
+    from services import storage
+    mock_cur = MagicMock()
+    mock_cur.fetchall.return_value = []
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+    with patch("services.storage.portfolio.get_connection") as gc:
+        gc.return_value.__enter__.return_value = mock_conn
+        storage.save_holdings("user-123", [holding])
+    for call in mock_cur.execute.call_args_list:
+        sql = call.args[0]
+        if "INSERT INTO tickers" in sql:
+            return sql, call.args[1]
+    raise AssertionError("tickers INSERT not executed")
+
+
+def test_save_holdings_guards_name_clobber_when_name_missing():
+    """name 없이 보유 저장 시 tickers UPSERT가 비파괴 가드(CASE WHEN)로 기존 name을 보존한다."""
+    sql, _ = _capture_save_holdings({"ticker": "005930", "quantity": 10, "avg_cost": 70000})
+    assert "EXCLUDED.name = EXCLUDED.ticker" in sql
+    assert "tickers.name" in sql
+
+
+def test_save_stocks_guards_name_clobber_when_name_missing():
+    """name 없이 관심종목 저장 시에도 tickers UPSERT가 비파괴 가드로 기존 name을 보존한다."""
+    sql, _ = _capture_save_stocks({"ticker": "005930", "market": "KR"})
+    assert "EXCLUDED.name = EXCLUDED.ticker" in sql
+    assert "tickers.name" in sql

@@ -121,7 +121,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
 
     summary = {
         "ticker": ticker,
-        "name": stock.get("name", ticker),
+        "name": mkt.resolve_name(ticker, market, exchange, stock.get("name", ""), quote=quote),
         "date": today,
         "market": market,
         "price": quote.get("price") or (round(float(daily_df["Close"].iloc[-1]), 2) if not daily_df.empty else None),
@@ -276,6 +276,8 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
             sector = industry = ""
             trailing_per = forward_per = pbr = None
 
+    resolved_name = mkt.resolve_name(ticker, market, exchange, stock.get("name", ""), quote=quote if market == "KR" else None)
+
     cutoff = pd.Timestamp(date.today() - timedelta(days=days)).normalize()
     trade_dates = daily_df[daily_df.index >= cutoff].index
 
@@ -306,7 +308,7 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
 
         summary = {
             "ticker": ticker,
-            "name": stock.get("name", ticker),
+            "name": resolved_name,
             "date": date_str,
             "market": market,
             "price": price,

@@ -148,3 +148,45 @@ def test_generate_report_calls_all_io_functions(tmp_path):
     patched["services.report_generator.mkt.get_analyst_data"].assert_called_once()
     patched["services.report_generator.indicators.get_timeframe_rsi"].assert_called_once()
     patched["services.report_generator.scraper.get_news"].assert_called_once()
+
+
+# ── 종목명 ticker 박제 방어 (stock-name-ticker-revert-fix) ─────────────────────
+
+def _mock_kr(quote_name: str):
+    df = pd.DataFrame({
+        "Close": [70000.0 + i for i in range(50)],
+        "High":  [70100.0 + i for i in range(50)],
+        "Low":   [69900.0 + i for i in range(50)],
+        "Volume": [1_000_000] * 50,
+    })
+    return {
+        "services.report_generator.mkt.get_quote": MagicMock(return_value={
+            "ticker": "005930", "name": quote_name, "price": 70000.0,
+            "market_cap": 400_000_000_000_000, "sector": "", "industry": "",
+        }),
+        "services.report_generator.mkt.get_history_df": MagicMock(return_value=df),
+        "services.report_generator.mkt.get_financials": MagicMock(return_value=[]),
+        "services.report_generator.mkt.get_annual_financials": MagicMock(return_value=[]),
+        "services.report_generator.mkt.get_analyst_data": MagicMock(return_value={
+            "target_mean": None, "target_high": None, "target_low": None,
+            "buy": 0, "hold": 0, "sell": 0,
+        }),
+        "services.report_generator.indicators.get_timeframe_rsi": MagicMock(return_value={
+            "daily": {}, "weekly": {}, "monthly": {},
+        }),
+        "services.report_generator.indicators.get_volume_profile": MagicMock(return_value={}),
+        "services.report_generator.scraper.get_news": MagicMock(return_value=[]),
+    }
+
+
+def test_generate_report_resolves_ticker_like_name_from_quote(tmp_path):
+    """stock.name이 종목번호(ticker)면 quote의 실명으로 스냅샷 name을 채운다(배치 재박제 방어)."""
+    stock = {"ticker": "005930", "name": "005930", "market": "KR", "exchange": "KS", "competitors": []}
+    with contextlib.ExitStack() as stack:
+        for target, mock in _mock_kr("삼성전자").items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        json_path = report_generator.generate_report(stock, tmp_path)
+    summary = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    assert summary["name"] == "삼성전자"
