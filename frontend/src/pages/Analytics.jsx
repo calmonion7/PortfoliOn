@@ -235,24 +235,26 @@ function CorrelationHeatmap() {
         값이 1에 가까울수록 두 종목이 같은 방향으로 움직임. 진한 양의 상관이 많으면 분산 효과가 낮아<br />
         시장 충격 시 포트폴리오 전체가 동반 하락할 위험이 있습니다. 보유종목 2개 이상 필요.
       </p>
-      <svg width={LABEL + n * CELL} height={LABEL + n * CELL}>
-        {tickers.map((t, j) => (
-          <text key={`col-${j}`} x={LABEL + j * CELL + CELL / 2} y={LABEL - 8}
-            textAnchor="middle" fontSize={11} fill="var(--text-3)">{t}</text>
-        ))}
-        {tickers.map((t, i) => (
-          <text key={`row-${i}`} x={LABEL - 8} y={LABEL + i * CELL + CELL / 2 + 4}
-            textAnchor="end" fontSize={11} fill="var(--text-3)">{t}</text>
-        ))}
-        {matrix.map((row, i) => row.map((v, j) => (
-          <g key={`${i}-${j}`}>
-            <rect x={LABEL + j * CELL} y={LABEL + i * CELL}
-              width={CELL} height={CELL} fill={corrColor(v)} rx={2} />
-            <text x={LABEL + j * CELL + CELL / 2} y={LABEL + i * CELL + CELL / 2 + 4}
-              textAnchor="middle" fontSize={10} fill="white">{v !== null ? v.toFixed(2) : '—'}</text>
-          </g>
-        )))}
-      </svg>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <svg width={LABEL + n * CELL} height={LABEL + n * CELL}>
+          {tickers.map((t, j) => (
+            <text key={`col-${j}`} x={LABEL + j * CELL + CELL / 2} y={LABEL - 8}
+              textAnchor="middle" fontSize={11} fill="var(--text-3)">{t}</text>
+          ))}
+          {tickers.map((t, i) => (
+            <text key={`row-${i}`} x={LABEL - 8} y={LABEL + i * CELL + CELL / 2 + 4}
+              textAnchor="end" fontSize={11} fill="var(--text-3)">{t}</text>
+          ))}
+          {matrix.map((row, i) => row.map((v, j) => (
+            <g key={`${i}-${j}`}>
+              <rect x={LABEL + j * CELL} y={LABEL + i * CELL}
+                width={CELL} height={CELL} fill={corrColor(v)} rx={2} />
+              <text x={LABEL + j * CELL + CELL / 2} y={LABEL + i * CELL + CELL / 2 + 4}
+                textAnchor="middle" fontSize={10} fill="white">{v !== null ? v.toFixed(2) : '—'}</text>
+            </g>
+          )))}
+        </svg>
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
         <span style={{ fontSize: 11, color: 'var(--text-3)' }}>-1.0</span>
         <div style={{

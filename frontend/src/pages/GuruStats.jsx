@@ -13,11 +13,12 @@ const TABS = [
 ]
 
 function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
+  const isMobile = useIsMobile()
   const [loading, setLoading] = useState(false)
   const [errMsg, setErrMsg] = useState('')
   const entry = stockMap[ticker]
   if (entry === 'holding') {
-    return <span style={{ fontSize: 11, color: 'var(--text-3)', padding: '3px 8px' }}>보유중</span>
+    return <span style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-3)', padding: '3px 8px' }}>보유중</span>
   }
   const inWatchlist = entry === 'watchlist'
 
@@ -39,12 +40,12 @@ function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
         onClick={handleClick}
         disabled={loading}
         style={{
-          fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none',
+          fontSize: isMobile ? 13 : 11, padding: isMobile ? '10px 14px' : '3px 8px', borderRadius: 4, border: 'none',
           cursor: loading ? 'progress' : 'pointer',
           background: inWatchlist ? 'var(--surface-hover)' : 'var(--bg-elev-2)',
           color: inWatchlist ? 'var(--color-error)' : 'var(--color-success)',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          minWidth: 48, opacity: loading ? 0.7 : 1, transition: 'opacity .15s',
+          minWidth: isMobile ? 56 : 48, minHeight: isMobile ? 44 : undefined, opacity: loading ? 0.7 : 1, transition: 'opacity .15s',
         }}
       >
         {loading
@@ -141,20 +142,20 @@ export default function GuruStats() {
       </div>
 
       {tab === 'popularity' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 8 }}>
           {filteredPopularity.map((row, i) => (
             <div key={row.ticker} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
+              display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 10,
               background: 'var(--bg-elev)', border: '1px solid var(--border)',
-              borderRadius: 10, padding: '10px 12px',
+              borderRadius: 10, padding: isMobile ? '14px 14px' : '10px 12px',
             }}>
-              <span style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, minWidth: 18, flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ fontSize: isMobile ? 14 : 11, color: 'var(--text-faint)', fontWeight: 600, minWidth: isMobile ? 24 : 18, flexShrink: 0 }}>{i + 1}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{row.ticker}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name_kr || row.name || '-'}</div>
+                <div style={{ fontWeight: 700, fontSize: isMobile ? 17 : 14, color: 'var(--accent)' }}>{row.ticker}</div>
+                <div style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name_kr || row.name || '-'}</div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
-                <span style={{ fontWeight: 700, fontSize: 13 }}>{row.count}명</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: isMobile ? 6 : 3, flexShrink: 0 }}>
+                <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 13 }}>{row.count}명</span>
                 <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={handleToggle} />
               </div>
             </div>
@@ -163,15 +164,15 @@ export default function GuruStats() {
       )}
 
       {tab === 'top3' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
           {filteredTop3.map(m => (
             <div key={m.manager_name} style={{
               background: 'var(--bg-elev)', border: '1px solid var(--border)',
               borderRadius: 12, overflow: 'hidden',
             }}>
               <div style={{
-                padding: '8px 12px', borderBottom: '1px solid var(--border)',
-                fontWeight: 700, fontSize: 12, color: 'var(--text)',
+                padding: isMobile ? '12px 14px' : '8px 12px', borderBottom: '1px solid var(--border)',
+                fontWeight: 700, fontSize: isMobile ? 15 : 12, color: 'var(--text)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {m.manager_name}
@@ -181,23 +182,23 @@ export default function GuruStats() {
                   const h = m.top3[i]
                   return (
                     <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '7px 12px',
+                      display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 8,
+                      padding: isMobile ? '12px 14px' : '7px 12px',
                       borderBottom: i < 2 ? '1px solid var(--border)' : 'none',
                     }}>
                       <span style={{
-                        minWidth: 22, fontSize: 11, fontWeight: 700,
+                        minWidth: isMobile ? 28 : 22, fontSize: isMobile ? 13 : 11, fontWeight: 700,
                         color: i === 0 ? '#f6c90e' : i === 1 ? 'var(--text-3)' : '#cd7f32',
                       }}>{i + 1}위</span>
                       {h ? (
                         <>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)', minWidth: 48 }}>{h.ticker}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.name_kr || h.name || ''}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{h.count}명</span>
+                          <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 13, color: 'var(--accent)', minWidth: isMobile ? 56 : 48 }}>{h.ticker}</span>
+                          <span style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.name_kr || h.name || ''}</span>
+                          <span style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{h.count}명</span>
                           <WatchlistBtn ticker={h.ticker} name={h.name_kr || h.name} stockMap={stockMap} onToggle={handleToggle} />
                         </>
                       ) : (
-                        <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>-</span>
+                        <span style={{ color: 'var(--text-faint)', fontSize: isMobile ? 14 : 12 }}>-</span>
                       )}
                     </div>
                   )
@@ -217,20 +218,20 @@ export default function GuruStats() {
               </span>
             ))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 8 }}>
             {filteredWeighted.map((row, i) => (
               <div key={row.ticker} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
+                display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 10,
                 background: 'var(--bg-elev)', border: '1px solid var(--border)',
-                borderRadius: 10, padding: '10px 12px',
+                borderRadius: 10, padding: isMobile ? '14px 14px' : '10px 12px',
               }}>
-                <span style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, minWidth: 18, flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: isMobile ? 14 : 11, color: 'var(--text-faint)', fontWeight: 600, minWidth: isMobile ? 24 : 18, flexShrink: 0 }}>{i + 1}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{row.ticker}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name_kr || row.name || '-'}</div>
+                  <div style={{ fontWeight: 700, fontSize: isMobile ? 17 : 14, color: 'var(--accent)' }}>{row.ticker}</div>
+                  <div style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name_kr || row.name || '-'}</div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{row.score.toFixed(3)}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: isMobile ? 6 : 3, flexShrink: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 13 }}>{row.score.toFixed(3)}</span>
                   <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={handleToggle} />
                 </div>
               </div>

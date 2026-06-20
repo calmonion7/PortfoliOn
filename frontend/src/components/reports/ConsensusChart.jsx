@@ -4,9 +4,13 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { fmtPrice as fmt } from '../../utils'
 import { _weather } from './reportUtils.jsx'
 import { useToast } from '../Toast'
+import useIsMobile from '../../hooks/useIsMobile'
 
 export default function ConsensusChart({ ticker, market }) {
   const { showToast } = useToast()
+  const isMobile = useIsMobile()
+  // 모바일: 툴팁이 차트 우측 뷰포트를 벗어나지 않도록 폭 제한 + 뷰박스 내 고정
+  const tooltipWrapperStyle = isMobile ? { maxWidth: '60vw', zIndex: 10 } : undefined
   const [data, setData] = useState([])
   const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState(null)
@@ -333,7 +337,7 @@ export default function ConsensusChart({ ticker, market }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
-                <Tooltip content={targetTooltip} />
+                <Tooltip content={targetTooltip} allowEscapeViewBox={{ x: false, y: false }} wrapperStyle={tooltipWrapperStyle} />
                 <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="var(--data-3)" strokeWidth={2} dot={targetDot} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
@@ -350,7 +354,7 @@ export default function ConsensusChart({ ticker, market }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                   <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                   <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
-                  <Tooltip content={opinionTooltip} />
+                  <Tooltip content={opinionTooltip} allowEscapeViewBox={{ x: false, y: false }} wrapperStyle={tooltipWrapperStyle} />
                   <Line type="monotone" dataKey="buy" name="매수" stroke="var(--semantic-buy)" strokeWidth={2} dot={makeDot('var(--semantic-buy)', 'buy')} activeDot={{ r: 5 }} connectNulls />
                   <Line type="monotone" dataKey="hold" name="중립" stroke="var(--data-4)" strokeWidth={2} dot={makeDot('var(--data-4)', 'hold')} activeDot={{ r: 5 }} connectNulls />
                   <Line type="monotone" dataKey="sell" name="매도" stroke="var(--semantic-sell)" strokeWidth={2} dot={makeDot('var(--semantic-sell)', 'sell')} activeDot={{ r: 5 }} connectNulls />
@@ -373,7 +377,7 @@ export default function ConsensusChart({ ticker, market }) {
                 <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <YAxis yAxisId="right" orientation="right" tick={axisStyle} axisLine={false} tickLine={false} width={24} />
-                <Tooltip content={({ active, payload, label }) => {
+                <Tooltip allowEscapeViewBox={{ x: false, y: false }} wrapperStyle={tooltipWrapperStyle} content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null
                   const idx = filteredData.findIndex(d => d.date === label)
                   const prev = idx > 0 ? filteredData[idx - 1] : null

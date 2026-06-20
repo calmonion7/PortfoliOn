@@ -78,11 +78,14 @@
   display: inline-flex; padding: 3px;
   background: var(--accent-soft); border-radius: 10px;
   width: 100%;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
+.seg::-webkit-scrollbar { display: none; }
 .seg > button {
-  flex: 1; background: transparent; border: 0; padding: 8px 8px;
-  font-size: 13px; color: var(--text-3); border-radius: 8px; font-weight: 500;
+  flex: 1; background: transparent; border: 0; padding: 8px 6px;
+  font-size: 12px; color: var(--text-3); border-radius: 8px; font-weight: 500;
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  white-space: nowrap;
 }
 .seg > button.is-active { background: var(--bg-elev); color: var(--text); box-shadow: var(--shadow-sm); }
 .seg-pad { padding: 0 20px; margin-bottom: 14px; }
@@ -203,16 +206,21 @@
 .m-cal-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; padding: 0 12px; }
 .m-cal-wk .h { text-align: center; font-size: 10.5px; color: var(--text-3); padding: 8px 0; }
 .m-cal-wk .d {
-  padding: 8px 4px; min-height: 44px; text-align: center;
+  padding: 6px 4px; aspect-ratio: 3 / 4; min-height: 56px; text-align: center;
   font-size: 13px; color: var(--text-2);
   position: relative;
+  /* 위=날짜 / 아래=도트 영역 상하 분리 (도트는 셀 하단 밴드에 가로 정렬) */
+  display: grid; grid-template-rows: auto 1fr; justify-items: center;
 }
 .m-cal-wk .d.today { color: var(--text); font-weight: 600; }
 .m-cal-wk .d.today::before {
-  content: ''; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
-  width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); z-index: -1;
+  content: ''; position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+  width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); z-index: 0;
 }
-.m-cal-wk .d .ev { display:inline-block; width: 4px; height: 4px; border-radius: 50%; background: var(--up); margin: 4px 1px 0; }
+.m-cal-wk .d .ev {
+  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--up); margin: 6px 1px 0; align-self: end; z-index: 1;
+}
 
 /* Accordion section header (market/analysis 섹션용) */
 .accordion-header {
@@ -280,8 +288,8 @@
   z-index: 25;
 }
 
-/* Asset row spacing on holdings */
-.holdings-list { padding-bottom: 8px; }
+/* Asset row spacing on holdings — clear fixed tabbar */
+.holdings-list { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 
 /* List search + filter chips */
 .m-list-search {
@@ -358,4 +366,11 @@ thead .col-sticky { background: var(--bg-elev-2); }
   width: 28px; height: 28px; border-radius: 999px;
   background: transparent; border: 0; color: var(--text-3);
   display: flex; align-items: center; justify-content: center;
+}
+
+/* ── S3 터치타깃: 작은 인터랙티브 요소 공통 보강 (≥44×44px) ──── */
+/* 시각 크기는 유지하고 탭 영역만 최소 44px 보장 (카드 액션 버튼은 Reports.jsx 인라인 touchStyle로 처리) */
+.appbar .icon-btn,
+.install-prompt-close {
+  min-width: 44px; min-height: 44px;
 }

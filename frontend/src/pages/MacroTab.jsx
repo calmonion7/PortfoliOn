@@ -87,9 +87,9 @@ export default function MacroTab() {
                 cursor: 'pointer',
               }}
             >
-              <td style={{ padding: '7px 20px 7px 0', color: 'var(--text)', background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.indicator}</td>
-              <td style={{ padding: '7px 16px', color: 'var(--text-3)', textAlign: 'center', fontSize: 11, background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.ticker}</td>
-              <td style={{ padding: '7px 0', textAlign: 'right', background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>
+              <td style={{ padding: isMobile ? '14px 20px 14px 0' : '7px 20px 7px 0', color: 'var(--text)', background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.indicator}</td>
+              <td style={{ padding: isMobile ? '14px 16px' : '7px 16px', color: 'var(--text-3)', textAlign: 'center', fontSize: 11, background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.ticker}</td>
+              <td style={{ padding: isMobile ? '14px 0' : '7px 0', textAlign: 'right', background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>
                 <span style={{
                   color: corrColor(c.corr_90d),
                   fontVariantNumeric: 'tabular-nums',

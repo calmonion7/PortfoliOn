@@ -122,7 +122,7 @@ export default function Portfolio() {
       </div>
 
       {tab === 'dash' && (
-        <div style={{ padding: '0 20px' }}>
+        <div style={{ padding: '0 20px 100px' }}>
           <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} />
         </div>
       )}

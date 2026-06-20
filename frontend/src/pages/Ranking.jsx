@@ -8,6 +8,7 @@ import { krFmt } from '../components/market/marketUtils.jsx'
 import { useToast } from '../components/Toast'
 import { trackEvent } from '../utils/analytics'
 import ReportDetailTabs from '../components/reports/ReportDetailTabs'
+import useIsMobile from '../hooks/useIsMobile'
 
 const LIMIT = 20
 
@@ -62,6 +63,7 @@ const decodeHtml = (str) => {
 
 export default function Ranking() {
   const { showToast } = useToast()
+  const isMobile = useIsMobile()
   const [market, setMarket] = useState('KR')
   const [metric, setMetric] = useState('value')
   const [type, setType] = useState('all')
@@ -281,7 +283,9 @@ export default function Ranking() {
         }}>{rank}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-            <span style={{ color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || row.ticker}</span>
+            <span style={isMobile
+              ? { color: 'var(--text)', fontWeight: 600, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word', minWidth: 0 }
+              : { color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || row.ticker}</span>
             {row.is_etf && (
               <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#ce93d8', border: '1px solid var(--border)' }}>ETF</span>
             )}

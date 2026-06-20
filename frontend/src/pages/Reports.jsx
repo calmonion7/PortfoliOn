@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import useReportList from '../hooks/useReportList'
 import useReportGeneration from '../hooks/useReportGeneration'
 import usePortfolioData from '../hooks/usePortfolioData'
+import useIsMobile from '../hooks/useIsMobile'
 import { fmtPrice as fmt } from '../utils'
 import { fmt as fmtNum, Plus, Pencil } from '../components/ui/icons'
 import Skeleton from '../components/ui/Skeleton'
@@ -23,6 +24,9 @@ export default function Reports() {
   const { role } = useAuth() || { role: 'user' }
   const isAdmin = role === 'admin'
   const { showToast } = useToast()
+  const isMobile = useIsMobile()
+  // S3(#80): 모바일 카드 액션 버튼 터치타깃 ≥44×44px — 패딩으로 클릭영역만 확보(아이콘 크기 유지)
+  const touchStyle = isMobile ? { minWidth: 44, minHeight: 44, padding: '0 8px' } : undefined
 
   const {
     reportList, listLoading, hasFetched,
@@ -399,11 +403,11 @@ export default function Reports() {
           })()}
           {(info.category === 'holdings' || info.category === 'watchlist') && (
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-              <button className="sc-act-btn" title="수정" onClick={e => { e.stopPropagation(); openEdit(ticker, info.category) }}><Pencil /></button>
+              <button className="sc-act-btn" style={touchStyle} title="수정" onClick={e => { e.stopPropagation(); openEdit(ticker, info.category) }}><Pencil /></button>
               {info.category === 'watchlist' && (
-                <button className="sc-act-btn" title="보유로 이동" onClick={e => { e.stopPropagation(); setPromoteTarget({ ticker, market: market || 'US' }) }}>↑</button>
+                <button className="sc-act-btn" style={touchStyle} title="보유로 이동" onClick={e => { e.stopPropagation(); setPromoteTarget({ ticker, market: market || 'US' }) }}>↑</button>
               )}
-              <button className="sc-act-btn" title="삭제" onClick={e => { e.stopPropagation(); handleDelete(ticker, info.category === 'watchlist') }}>×</button>
+              <button className="sc-act-btn" style={touchStyle} title="삭제" onClick={e => { e.stopPropagation(); handleDelete(ticker, info.category === 'watchlist') }}>×</button>
             </div>
           )}
         </div>
@@ -587,11 +591,11 @@ export default function Reports() {
           )}
           {(info.category === 'holdings' || info.category === 'watchlist') && (
             <>
-              <button className="sc-act-btn" title="수정" onClick={e => { e.stopPropagation(); openEdit(ticker, info.category) }}><Pencil /></button>
+              <button className="sc-act-btn" style={touchStyle} title="수정" onClick={e => { e.stopPropagation(); openEdit(ticker, info.category) }}><Pencil /></button>
               {info.category === 'watchlist' && (
-                <button className="sc-act-btn" title="보유로 이동" onClick={e => { e.stopPropagation(); setPromoteTarget({ ticker, market: market || 'US' }) }}>↑</button>
+                <button className="sc-act-btn" style={touchStyle} title="보유로 이동" onClick={e => { e.stopPropagation(); setPromoteTarget({ ticker, market: market || 'US' }) }}>↑</button>
               )}
-              <button className="sc-act-btn" title="삭제" onClick={e => { e.stopPropagation(); handleDelete(ticker, info.category === 'watchlist') }}>×</button>
+              <button className="sc-act-btn" style={touchStyle} title="삭제" onClick={e => { e.stopPropagation(); handleDelete(ticker, info.category === 'watchlist') }}>×</button>
             </>
           )}
         </div>

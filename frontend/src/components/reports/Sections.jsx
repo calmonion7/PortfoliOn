@@ -233,26 +233,28 @@ export function RecentDisclosuresSection({ disclosures, news }) {
         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.6, margin: '0 0 10px' }}>{disclosures.headline}</p>
       )}
       {disclosures.metrics?.length > 0 && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['항목', '발표치', '예상치', 'vs 예상', '비고'].map(h => (
-                <th key={h} style={{ padding: '5px 8px', color: 'var(--text-3)', fontWeight: 600, textAlign: h === '항목' || h === '비고' ? 'left' : 'right' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {disclosures.metrics.map((m, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '6px 8px', color: 'var(--text)' }}>{m.label}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text)', fontWeight: 700 }}>{m.actual}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-2)' }}>{m.consensus}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'right', color: vsColor(m.vs_consensus), fontWeight: 700 }}>{m.vs_consensus}</td>
-                <td style={{ padding: '6px 8px', color: 'var(--text-3)' }}>{m.note || '—'}</td>
+        <div className="table-mobile-wrap" style={{ marginBottom: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['항목', '발표치', '예상치', 'vs 예상', '비고'].map(h => (
+                  <th key={h} style={{ padding: '5px 8px', color: 'var(--text-3)', fontWeight: 600, textAlign: h === '항목' || h === '비고' ? 'left' : 'right', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {disclosures.metrics.map((m, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 8px', color: 'var(--text)' }}>{m.label}</td>
+                  <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text)', fontWeight: 700, whiteSpace: 'nowrap' }}>{m.actual}</td>
+                  <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{m.consensus}</td>
+                  <td style={{ padding: '6px 8px', textAlign: 'right', color: vsColor(m.vs_consensus), fontWeight: 700, whiteSpace: 'nowrap' }}>{m.vs_consensus}</td>
+                  <td style={{ padding: '6px 8px', color: 'var(--text-3)' }}>{m.note || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {disclosures.events?.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>

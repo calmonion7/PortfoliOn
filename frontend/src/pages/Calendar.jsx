@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../api'
 import Skeleton from '../components/ui/Skeleton'
 import { useToast } from '../components/Toast'
+import useIsMobile from '../hooks/useIsMobile'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -29,6 +30,7 @@ function eventKey(e) {
 
 function MonthGrid({ year, month, events }) {
   const [selectedDate, setSelectedDate] = useState(null)
+  const isMobile = useIsMobile()
 
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -80,7 +82,7 @@ function MonthGrid({ year, month, events }) {
               }}
               style={{
                 background: day ? 'var(--bg-elev)' : 'var(--bg)',
-                aspectRatio: '1 / 1',
+                ...(isMobile ? { minHeight: 56 } : { aspectRatio: '1 / 1' }),
                 padding: 4,
                 overflow: 'hidden',
                 cursor: day && dayEvents.length > 0 ? 'pointer' : 'default',
@@ -91,12 +93,12 @@ function MonthGrid({ year, month, events }) {
               }}
             >
               {day && (
-                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent)' : 'var(--text-3)' }}>
+                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent)' : 'var(--text-3)', textAlign: isMobile ? 'center' : 'left', flexShrink: 0 }}>
                   {day}
                 </div>
               )}
               {dayEvents.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1, marginTop: 'auto' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1, marginTop: isMobile ? 3 : 'auto', justifyContent: isMobile ? 'center' : 'flex-start', alignContent: 'flex-end', flex: isMobile ? 1 : 'none' }}>
                   {dayEvents.slice(0, 4).map((e, j) => (
                     <span key={j} style={{ fontSize: 11, lineHeight: 1 }}>
                       {EVENT_ICON[eventKey(e)] || '●'}
