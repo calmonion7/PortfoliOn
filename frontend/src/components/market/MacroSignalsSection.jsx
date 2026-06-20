@@ -41,7 +41,13 @@ export default function MacroSignalsSection() {
   const creditStress = signals.credit_stress
 
   const lastYc = data.yield_curve?.slice(-1)[0]
-  const summary = lastYc ? `금리차 ${lastYc.value.toFixed(2)}%p` : ''
+  const summaryHints = [
+    inverted ? '역전' : null,
+    creditStress ? '신용주의' : null,
+  ].filter(Boolean)
+  const summary = lastYc
+    ? `금리차 ${lastYc.value.toFixed(2)}%p${summaryHints.length ? ` · ${summaryHints.join(' · ')}` : ''}`
+    : ''
 
   const cards = series.map(s => {
     const hist = data[s.key] || []

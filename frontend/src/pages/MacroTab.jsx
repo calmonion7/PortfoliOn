@@ -122,7 +122,7 @@ export default function MacroTab() {
       {scatterData.length > 0 && (
         <div>
           <h3 style={{ color: 'var(--text)', marginBottom: 4, fontSize: 14 }}>
-            {INDICATOR_LABELS[selected] || selected} vs 포트폴리오 수익률 (90일)
+            {INDICATOR_LABELS[selected] || selected} vs 포트폴리오 수익률 (최근 90일)
           </h3>
           <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 12 }}>
             각 점 = 하루의 데이터. X축: 해당 매크로 지표의 일별 변동%, Y축: 내 포트폴리오의 가중평균 수익률%.
@@ -132,10 +132,10 @@ export default function MacroTab() {
             <ScatterChart margin={{ top: 16, right: 24, bottom: 32, left: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis type="number" dataKey="macro_delta" name="매크로 변동" unit="%" stroke="var(--text-3)" tick={{ fontSize: 11 }}>
-                <Label value="매크로 변동 %" position="insideBottom" offset={-16} fill="var(--text-3)" fontSize={11} />
+                <Label value="매크로 지표 일별 변동 (%)" position="insideBottom" offset={-16} fill="var(--text-3)" fontSize={11} />
               </XAxis>
               <YAxis type="number" dataKey="portfolio_return" name="포트폴리오 수익률" unit="%" stroke="var(--text-3)" tick={{ fontSize: 11 }}>
-                <Label value="수익률 %" angle={-90} position="insideLeft" offset={10} fill="var(--text-3)" fontSize={11} />
+                <Label value="포트폴리오 수익률 (%)" angle={-90} position="insideLeft" offset={10} fill="var(--text-3)" fontSize={11} />
               </YAxis>
               <ReferenceLine x={0} stroke="var(--text-3)" strokeDasharray="4 2" />
               <ReferenceLine y={0} stroke="var(--text-3)" strokeDasharray="4 2" />

@@ -125,8 +125,8 @@ function BatchCard({ batch, isAdmin, onSaved }) {
             {batch.source?.length > 0 && <> · 소스: {batch.source.join(', ')}</>}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-            <span>다음 {nextRun || '예정 없음'}</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>최근 <RecentRun run={recent} /></span>
+            <span>다음 예정: {nextRun || '없음'}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>최근 실행: <RecentRun run={recent} /></span>
           </div>
         </div>
         <span style={{ color: 'var(--text-faint)', fontSize: 12, flexShrink: 0 }}>{open ? '▲' : '▼'}</span>

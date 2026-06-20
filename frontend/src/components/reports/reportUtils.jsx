@@ -4,7 +4,7 @@ import { fmtPrice as fmt } from '../../utils'
 export const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--text-3)', position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-elev-2)' }
 export const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12 }
 
-export const fmtN = (val) => val != null ? val : 'N/A'
+export const fmtN = (val) => val != null ? val : '—'
 export const rsiColor = (rsi) => {
   if (rsi == null) return 'var(--text-3)'
   const hue = Math.round(120 - (rsi / 100) * 120)
@@ -66,7 +66,7 @@ export const GapCell = ({ target, price, baseColor, highlight, market }) => {
   const gap = fmtGap(target, price)
   return (
     <td style={{ ...TD, color: baseColor, background: highlight ? 'var(--surface-hover)' : undefined, border: highlight ? '2px solid var(--accent)' : undefined, fontWeight: highlight ? 700 : undefined }}>
-      {target != null ? <>{fmt(target, market)}{gap && <span style={{ color: gap.positive ? 'var(--up)' : 'var(--down)' }}>({gap.text})</span>}</> : 'N/A'}
+      {target != null ? <>{fmt(target, market)}{gap && <span style={{ color: gap.positive ? 'var(--up)' : 'var(--down)' }}>({gap.text})</span>}</> : '—'}
     </td>
   )
 }
@@ -93,7 +93,7 @@ export function TargetTooltip({ s }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setVisible(false)}
     >
-      {s ? fmt(s.target_mean, s.market) : 'N/A'}
+      {s ? fmt(s.target_mean, s.market) : '—'}
       {gap != null && <div style={{ color: gap >= 0 ? 'var(--up)' : 'var(--down)', fontSize: 10 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</div>}
       {visible && s?.target_mean != null && (
         <div style={{
@@ -121,7 +121,7 @@ export function TargetTooltip({ s }) {
             <span style={{ color: 'var(--text-3)' }}>최저</span>
             <span style={{ color: 'var(--down)' }}>{fmt(s.target_low, s.market)}</span>
             <span style={{ color: 'var(--text-3)' }}>애널리스트</span>
-            <span>{total > 0 ? `${total}명` : 'N/A'}</span>
+            <span>{total > 0 ? `${total}명` : '—'}</span>
             <span style={{ color: 'var(--text-3)' }}>Buy</span>
             <span style={{ color: 'var(--semantic-buy)' }}>{s.buy ?? 0}{pct(s.buy ?? 0)}</span>
             <span style={{ color: 'var(--text-3)' }}>Hold</span>

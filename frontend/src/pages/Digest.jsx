@@ -61,7 +61,7 @@ export default function Digest() {
   return (
     <div style={{ maxWidth: 640 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <span className="muted" style={{ fontSize: 13 }}>Daily Digest {digest?.date && `· ${digest.date}`}</span>
+        <span className="muted" style={{ fontSize: 13 }}>다이제스트 {digest?.date && `· ${digest.date}`}</span>
         <button className="btn" onClick={handleRefresh} disabled={refreshing} style={{ marginLeft: 'auto' }}>
           {refreshing ? '생성 중…' : '↺ 새로고침'}
         </button>
@@ -77,7 +77,13 @@ export default function Digest() {
           <Skeleton variant="row" count={6} />
         </>
       ) : !digest ? (
-        <div className="muted">아직 생성된 Digest가 없습니다. 새로고침 버튼을 눌러 생성하세요.</div>
+        <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 40, lineHeight: 1 }}>📰</div>
+          <div className="muted" style={{ fontSize: 14 }}>아직 생성된 다이제스트가 없습니다.</div>
+          <button className="btn" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? '생성 중…' : '다이제스트 생성'}
+          </button>
+        </div>
       ) : (
         <>
           {digest.anomalies.length > 0 && (

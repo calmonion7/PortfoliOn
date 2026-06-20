@@ -211,6 +211,9 @@ export default function GuruStats() {
 
       {tab === 'weighted' && (
         <div>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px', lineHeight: 1.5 }}>
+            매니저 보유 순위가 높을수록 가중치가 큽니다 (보유 순위 역수 기준).
+          </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
             {WEIGHT_LEGEND.map(({ rank, score }) => (
               <span key={rank} style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg-elev-2)', padding: '2px 6px', borderRadius: 3 }}>

@@ -21,7 +21,7 @@ export function ReportSectionText({ title, text }) {
 export function ReportSectionCompetitors({ competitors, market, ticker }) {
   if (!competitors?.length) return null
   const fmtMC = (mc) => {
-    if (mc == null) return 'N/A'
+    if (mc == null) return '—'
     if (market === 'KR') {
       if (mc >= 1e12) return `${(mc / 1e12).toFixed(1)}조`
       if (mc >= 1e8) return `${(mc / 1e8).toFixed(0)}억`
@@ -39,7 +39,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
           const isSelf = c.is_self || c.ticker === ticker
           const ytdPos = c.ytd_return != null && c.ytd_return >= 0
           const ytdColor = c.ytd_return != null ? (ytdPos ? 'var(--up)' : 'var(--down)') : 'var(--text-3)'
-          const mcStr = c.market_cap ? (market === 'KR' ? `₩${fmtMC(c.market_cap)}` : `$${fmtMC(c.market_cap)}`) : 'N/A'
+          const mcStr = c.market_cap ? (market === 'KR' ? `₩${fmtMC(c.market_cap)}` : `$${fmtMC(c.market_cap)}`) : '—'
           const rankColor = i === 0 ? '#F59E0B' : i === 1 ? '#94A3B8' : i === 2 ? '#C07842' : 'var(--border)'
           return (
             <div key={i} style={{

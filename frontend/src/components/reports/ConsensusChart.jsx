@@ -393,7 +393,7 @@ export default function ConsensusChart({ ticker, market }) {
                         const dColor = delta == null || delta === 0 ? p.stroke : delta > 0 ? 'var(--up)' : 'var(--down)'
                         return (
                           <div key={p.dataKey} style={{ color: p.stroke, marginBottom: 2 }}>
-                            {p.name}: {val ?? 'N/A'}
+                            {p.name}: {val ?? '—'}
                             {delta != null && delta !== 0 && pct != null && <span style={{ color: dColor, fontSize: 10 }}>{deltaStr(delta, pct, isPrice)}</span>}
                           </div>
                         )

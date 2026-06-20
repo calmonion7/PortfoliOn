@@ -96,7 +96,7 @@ export default function Recommendations() {
   return (
     <div>
       {asOf && (
-        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 12 }}>기준 {asOf}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600, marginBottom: 16 }}>데이터 기준일 {asOf}</div>
       )}
 
       {/* 보유 액션 섹션 — 최상단. 액션 배지 + 포지션 근거 한 줄을 footer로 주입 */}

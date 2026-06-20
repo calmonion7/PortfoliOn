@@ -235,8 +235,17 @@ export default function Calendar() {
       {loading
         ? <Skeleton variant="calendar" />
         : error
-        ? <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: 48 }}>{error}</div>
-        : <MonthGrid year={year} month={month} events={events} />
+        ? <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <span>{error}</span>
+            <button onClick={() => setFetchKey(k => k + 1)}
+              style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '4px 12px', borderRadius: 4, fontSize: 13 }}>다시 시도</button>
+          </div>
+        : <>
+            <MonthGrid year={year} month={month} events={events} />
+            {events.length === 0 && (
+              <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: '24px 16px', fontSize: 13 }}>이번 달 일정이 없습니다</div>
+            )}
+          </>
       }
 
       <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-3)', flexWrap: 'wrap' }}>

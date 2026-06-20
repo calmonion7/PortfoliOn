@@ -346,11 +346,11 @@ export default function Reports() {
       return (
         <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 6 }}>
           {/* 레벨 배지 */}
-          <span style={{
+          <span title={`RSI ${num} 도달 시 예상 가격 (RSI 기준선)`} style={{
             fontSize: 9, fontWeight: 700, color,
             background: soft, border: `1px solid ${soft}`,
             borderRadius: 3, padding: '1px 4px',
-            minWidth: 22, textAlign: 'center', flexShrink: 0, marginTop: 1,
+            minWidth: 22, textAlign: 'center', flexShrink: 0, marginTop: 1, cursor: 'help',
           }}>{num}</span>
           {/* 일봉 + 게이지 */}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -362,7 +362,7 @@ export default function Reports() {
               <div style={{ height: 2, background: 'var(--bg-elev-2)', borderRadius: 1, overflow: 'hidden', marginTop: 3, marginBottom: 2 }}>
                 <div style={{ height: '100%', width: `${barWidth(dv)}%`, background: color, borderRadius: 1, opacity: 0.55 }} />
               </div>
-            </> : <span style={{ fontSize: 9, color: 'var(--text-3)' }}>N/A</span>}
+            </> : <span style={{ fontSize: 9, color: 'var(--text-3)' }}>—</span>}
           </div>
         </div>
       )
@@ -654,8 +654,8 @@ export default function Reports() {
                     <span className={`sort-col${sortCol === 'gap' ? ' active' : ''}`} onClick={() => handleSort('gap')}>목표가 / 컨센서스{sortArrow('gap')}</span>
                     <span>밸류</span>
                     <span className={`sort-col${sortCol === 'rsi' ? ' active' : ''}`} onClick={() => handleSort('rsi')}>RSI{sortArrow('rsi')}<br/><small>일/주/월</small></span>
-                    <span style={{ color: 'var(--semantic-buy)' }}>RSI 매수<br/><small>일봉 20 / 25 / 30</small></span>
-                    <span style={{ color: 'var(--semantic-sell)' }}>RSI 매도<br/><small>일봉 70 / 75 / 80</small></span>
+                    <span style={{ color: 'var(--semantic-buy)' }} title="일봉 RSI가 20·25·30(과매도 기준선)에 도달할 때의 예상 가격">RSI 매수<br/><small>일봉 20 / 25 / 30</small></span>
+                    <span style={{ color: 'var(--semantic-sell)' }} title="일봉 RSI가 70·75·80(과매수 기준선)에 도달할 때의 예상 가격">RSI 매도<br/><small>일봉 70 / 75 / 80</small></span>
                     <span></span>
                   </div>
                   {activeEntries.map(([t, info]) => renderStockCard(t, info))}

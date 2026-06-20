@@ -117,7 +117,7 @@ export default function GuruManagers() {
     <div style={{ padding: '0 0 80px' }}>
       {data.last_updated && (
         <p style={{ color: 'var(--text-faint)', fontSize: 11, padding: '0 20px 8px' }}>
-          갱신: {data.last_updated.slice(0, 10)}
+          마지막 갱신: {data.last_updated.slice(0, 10)}
         </p>
       )}
 
@@ -223,7 +223,7 @@ export default function GuruManagers() {
   return (
     <div>
       {data.last_updated && (
-        <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated}</p>
+        <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated.slice(0, 10)}</p>
       )}
       <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
         <input

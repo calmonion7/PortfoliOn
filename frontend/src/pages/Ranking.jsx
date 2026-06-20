@@ -36,7 +36,7 @@ const fmtNet = (v) => {
   if (v == null) return <span style={{ color: 'var(--text-3)' }}>-</span>
   const color = v > 0 ? 'var(--up)' : v < 0 ? 'var(--down)' : 'var(--text-3)'
   const sign = v > 0 ? '+' : ''
-  return <span style={{ color, fontVariantNumeric: 'tabular-nums' }}>{sign}{Number(v).toLocaleString('ko-KR')}</span>
+  return <span style={{ color, fontVariantNumeric: 'tabular-nums' }}>{sign}{Number(v).toLocaleString('ko-KR')}주</span>
 }
 
 const fmtTradingValue = (v, market) => {
