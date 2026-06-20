@@ -102,3 +102,56 @@ def test_get_quote_kr_kis_to_naver_when_kis_also_fails():
         q = market.get_quote_kr("005930")
     assert q["price"] == 30000.0
     assert q["name"] == "최종폴백"
+
+
+# ── 발산 가드: 시세가 일봉 종가와 2배 넘게 어긋나면 그 소스 폐기 (task#93) ──
+def test_guard_discards_diverging_source_and_falls_back():
+    # 키움이 일봉(354k)의 ~1/5인 70k 반환 → 폐기, Naver(354k)로 폴백
+    kiwoom_norm = {"price": 70000.0, "daily_change_pct": -2.0, "prev_close": 71000,
+                   "market_cap": 4000 * 10**8, "name": "삼성전자"}
+    naver_basic = {"closePrice": "354000", "compareToPreviousClosePrice": "-8500",
+                   "fluctuationsRatio": "-2.34", "marketValue": "2000000", "stockName": "삼성전자"}
+    with _patch_yf(), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[350000.0, 352000.0, 354000.0]), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.kiwoom.quote.get_quote", return_value=kiwoom_norm), \
+         patch("services.kis.client.configured", return_value=False), \
+         patch("services.market.kr._naver_get", return_value=naver_basic):
+        from services import market
+        q = market.get_quote_kr("005930")
+    assert q["price"] == 354000.0          # 70k 폐기 → Naver 354k
+    assert q["daily_change_pct"] == -2.34
+
+
+def test_guard_allows_price_within_range_and_short_circuits():
+    # 키움 355k, 일봉 354k → 정상 범위 → 키움 채택, KIS/Naver 미호출(short-circuit 유지)
+    kiwoom_norm = {"price": 355000.0, "daily_change_pct": 0.28, "prev_close": 354000,
+                   "market_cap": 2000000 * 10**8, "name": "삼성전자"}
+    with _patch_yf(), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[350000.0, 354000.0]), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.kiwoom.quote.get_quote", return_value=kiwoom_norm), \
+         patch("services.kis.quote.get_quote_kr") as kis_call, \
+         patch("services.market.kr._naver_get") as naver_call:
+        from services import market
+        q = market.get_quote_kr("005930")
+    assert q["price"] == 355000.0
+    kis_call.assert_not_called()
+    naver_call.assert_not_called()
+
+
+def test_guard_disabled_without_chart_reference():
+    # 일봉 참조 없음(키움 차트 실패) → 가드 생략, 키움 값 그대로(기존 동작 보존)
+    kiwoom_norm = {"price": 70000.0, "daily_change_pct": -2.0, "prev_close": 71000,
+                   "market_cap": 4000 * 10**8, "name": "삼성전자"}
+    with _patch_yf(), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[]), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.kiwoom.quote.get_quote", return_value=kiwoom_norm), \
+         patch("services.kis.quote.get_quote_kr") as kis_call, \
+         patch("services.market.kr._naver_get") as naver_call:
+        from services import market
+        q = market.get_quote_kr("005930")
+    assert q["price"] == 70000.0           # 참조 없으면 검증 불가 → 폐기 안 함
+    kis_call.assert_not_called()
+    naver_call.assert_not_called()

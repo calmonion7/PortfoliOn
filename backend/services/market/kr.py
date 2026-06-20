@@ -101,10 +101,48 @@ def _kr_closes_kiwoom(ticker: str, max_items: int = 30) -> list:
         return []
 
 
+def _within_chart(price: float, ref: float | None) -> bool:
+    """price가 참조 일봉 종가 ref의 [ref/2, ref*2] 이내면 True.
+    참조 무효(None/≤0)면 검증 불가 → True(가드 생략). KR 일일 ±30% 제한상
+    정상 현재가는 일봉 종가의 2배 안 — 2배 밖은 소스 간 조정 불일치/오류."""
+    if ref is None or ref <= 0:
+        return True
+    return ref / 2 <= price <= ref * 2
+
+
+def _kr_pick_basic(ticker: str, ref_close: float | None) -> tuple | None:
+    """키움 → KIS → Naver 중 첫 유효 소스 (price, ratio, prev_close, mc, name).
+    price가 참조 일봉 종가와 2배 넘게 어긋나는 소스는 소스 간 조정 불일치(액면/병합 등)로
+    보고 폐기하고 다음 소스를 시도한다 — 005930 현재가가 ~1/5로 박제돼 매물대/RSI를
+    깨뜨린 사례. 유효 소스를 못 찾으면 첫 non-null price 소스로 폴백(모든 소스가 참조와
+    어긋나면 차트가 이상값일 수 있어 소스 합의를 따른다). 평소(가드 미발동)엔 키움이 통과해
+    KIS/Naver를 호출하지 않는 기존 short-circuit을 유지(lazy 호출)."""
+    fallback = None
+    last = None
+    for src, getter in (("키움", _kr_basic_kiwoom), ("KIS", _kr_basic_kis), ("Naver", _kr_basic_naver)):
+        basic = getter(ticker)
+        if basic is None:
+            continue
+        last = basic
+        if basic[0] is None:
+            continue
+        if fallback is None:
+            fallback = basic
+        if _within_chart(basic[0], ref_close):
+            return basic
+        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 일봉 종가 {ref_close}와 2배 이상 괴리 — 폐기")
+    return fallback or last
+
+
 def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
     try:
+        # 매물대/RSI가 쓰는 키움 일봉 종가를 시세 검증 참조로 먼저 확보(같은 호출, 추가 콜 없음).
+        kcloses = _kr_closes_kiwoom(ticker, max_items=260)
+        ref_close = kcloses[-1] if kcloses else None
+
         # 키움 우선 → KIS 백업 → Naver 폴백 (경계: .forge/adr/0009·0011). 상폐 종목은 Naver 409로 검출.
-        basic = _kr_basic_kiwoom(ticker) or _kr_basic_kis(ticker) or _kr_basic_naver(ticker)
+        # 일봉 종가와 2배 넘게 어긋나는 소스는 _kr_pick_basic이 폐기·다음 소스로 폴백.
+        basic = _kr_pick_basic(ticker, ref_close)
         price, ratio, prev_close, mc, name = basic
         daily_change = f"{ratio:+.2f}%" if ratio is not None else "N/A"
 
@@ -115,8 +153,7 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
         weekly_change_pct = None
         monthly_change_pct = None
 
-        # 가격 변동률(ytd/주/월): 키움 일봉 우선
-        kcloses = _kr_closes_kiwoom(ticker, max_items=260)
+        # 가격 변동률(ytd/주/월): 위에서 받은 키움 일봉 재사용
         if kcloses and price:
             start = kcloses[0]
             if start:
