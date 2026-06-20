@@ -1,244 +1,220 @@
 ---
-last_mapped_commit: 91173837359c5f157349a51501f72efa7342c3fa
+last_mapped_commit: 6793157d58f56e2b8392cfbe725de186d9f95e0d
 mapped: 2026-06-20
 ---
 
-# CONCERNS
+# CONCERNS — tech debt, known issues, risk areas
 
-PortfoliOn(FastAPI 백엔드 + React/Vite 프론트)의 기술부채·잠재버그·보안·성능 취약·위험 영역 지도. 각 항목은 현재 소스(HEAD `91173837`)에 대해 검증했고, 패키지 분리 리팩토링(`storage`/`scheduler`/`market`/`backlog_parser`, ADR-0017)으로 파일이 이동한 경우 **신/구 경로를 모두 표기**한다. 직전 매핑(`53b30e71`) 이후 머지된 task#89(`Reports.jsx` god-file을 프레젠테이션 컴포넌트 4개로 분리, commit 91173837)를 반영했다 — 이로써 종전 "최대 파일/프론트 god-file" 부채가 **부분 해소**됐고, 잔존 부채(추출 전부터 있던 dead code·react-hooks lint·보류된 R4 훅 추출)는 항목 17에 갱신했다. 그 이전 머지분(task#85 dead-code 제거·task#86 fmtPrice NaN/Inf 가드·task#87 Reports 필터 단일 호스트 lift·task#88 이름 백필 skipped 표면화)도 그대로 반영돼 있다. 최근 완화된 항목은 **삭제하지 않고 "완화됨"으로 표기**한다.
-
----
-
-## 0. 문서 메타: CLAUDE.md Gotchas가 가리키는 경로가 stale (LOW, 광범위)
-
-`CLAUDE.md`의 Gotchas/Architecture 절은 아직 **분리 전 단일 파일 경로**를 다수 가리킨다 — 코드는 이미 패키지로 쪼개졌다. 신규 합류자가 grep할 때 못 찾는다.
-
-| CLAUDE.md가 말하는 경로 | 현재 실제 경로 |
-|---|---|
-| `backend/scheduler.py` (루트) | `backend/scheduler/` 패키지 (`__init__.py`·`_state.py`·`jobs.py`·`schedule.py`) |
-| `backend/services/storage` | `backend/services/storage/` 패키지 (`portfolio.py`·`names.py`·`schedule.py`·`dates.py`) |
-| `backend/services/market` (yfinance+Naver) | `backend/services/market/` 패키지 (`__init__.py`·`format.py`·`kr.py`·`us.py`) |
-| `backend/services/backlog.py` (파싱 클러스터) | 파싱 헬퍼는 `backend/services/backlog_parser.py`로 추출됨; `backlog.py`는 fetch/DB만 |
-
-검증 결과 **로직은 보존**되어 동작 위험은 없으나, 문서 드리프트는 grep 실패를 유발한다. (참고: `CLAUDE.md`는 `services/market_indicators/` 패키지는 이미 정확히 문서화함.)
+Numbered for continuity. Each cites where it lives. Implementation facts only.
 
 ---
 
-## 1. 종목명 dual-source — 매일 종목번호로 되돌아가던 클로버 (HIGH, task#77로 가드됨이나 구조적 fragile)
+## Frontend lint / hooks debt
 
-**증상(과거 버그)**: 사용자가 종목명을 고쳐도 다음날이면 다시 종목번호(`005930` 등)로 되돌아갔다.
+### #16 — Frontend test harness: PARTIAL (Vitest, R4-scoped only)
+Resolved in part by ADR-0019 (`.forge/adr/0019-frontend-test-harness-vitest.md`). Vitest is wired
+(`npm test` → `vitest run`), but coverage is only **two R4 hooks + one smoke test**:
+- `frontend/src/hooks/useReportFilters.test.js`
+- `frontend/src/hooks/useStockManagement.test.js`
+- `frontend/src/test/smoke.test.js`
 
-**근본원인 — 종목명이 두 저장소에 박제됨**:
-- `tickers.name`(공유 마스터, 종목관리 목록이 live로 읽음)
-- `snapshots.data.name`(리포트 생성 시 박제, 리서치 목록·상세가 읽음)
+No component/page tests, no coverage for the other ~7 hooks or any `pages/`. Full frontend test backfill is
+still outstanding. (Backend by contrast has 75 `test_*.py` under `backend/tests/`, pytest via `backend/pytest.ini`.)
 
-이름을 한쪽만 갱신하면 목록↔상세가 어긋난다. 두 가지 클로버 동인이 있었다:
-1. **저장 라운드트립**: `save_holdings`/`save_stocks`의 tickers UPSERT가 들어온 name으로 무조건 덮어써, 보유 추가/편집 시 name이 누락(NULL/빈값/ticker)이면 기존 실명을 ticker로 클로버.
-2. **일일 배치 재박제**: `report_generator`가 스냅샷 name을 `stock.get("name", ticker)`로 박아, 스냅샷만 고쳐도 다음날 배치가 다시 종목번호로 재박제.
+### #18 — react-hooks lint errors are real and growing (90 errors, 3 warnings repo-wide)
+`npx eslint src/` reports **93 problems (90 errors, 3 warnings)** — NOT confined to `Reports.jsx`.
+Breakdown by rule:
+- `react-hooks/set-state-in-effect` — **26** (calling `setState` synchronously in an effect body; new React Compiler rule)
+- `no-unused-vars` — **25** (dead imports/locals; see #DC below)
+- `react-refresh/only-export-components` — **21**
+- `react-hooks/static-components` — **9**
+- `no-empty` — **6** (empty `catch {}` / blocks)
+- `react-hooks/exhaustive-deps` — **2**
+- `react-hooks/immutability` — **2**
+- `no-sparse-arrays` — **1**
 
-**task#77 가드(검증, commit 0c66d4f3·5fbe7ce1)**:
-- 저장소 가드: `backend/services/storage/portfolio.py:58,124` — tickers UPSERT가 비파괴 CASE WHEN으로 변경. `name=CASE WHEN EXCLUDED.name IS NULL OR EXCLUDED.name = EXCLUDED.ticker THEN tickers.name ELSE EXCLUDED.name END`. 들어온 name이 NULL/ticker와 같으면 기존 `tickers.name` 보존.
-- 배치 방어: `backend/services/report_generator.py:124,279` — name 박제를 `stock.get("name", ticker)` 대신 `mkt.resolve_name(ticker, market, exchange, stock.get("name",""), quote=quote)`로 교체. ticker형 이름이면 이미 페치한 quote의 실명(KR=키움 stk_nm/Naver, US=yfinance shortName)을 박는다.
-- 실명 확정 로직: `backend/services/market/__init__.py:45` `resolve_name` — 사용자 입력이 비었거나 티커와 같으면 quote 실명으로 대체, quote도 없으면 입력/티커 보존. **단 `:59`에서 quote 실패를 `except Exception: pass`로 삼킴** → 시세 일시실패 시 이름이 티커로 박힐 수 있음.
-- 동기화/백필 헬퍼: `backend/services/storage/names.py` — `refresh_snapshot_names`(단건, tickers→snapshot), `reconcile_snapshot_names`(전체 강제 동기화), `set_ticker_name`(둘 다), `update_ticker_meta`(편집 모달), `tickers_missing_name`(백필 대상 = `name='' OR name=ticker`).
-- 캐시 무효화: 이름 변경 후 `_invalidate_name_caches`(`names.py:6`)가 `cache.invalidate(ticker)`+`invalidate_list()` 호출(storage→cache 순환참조 회피 지연 import). 이게 없으면 리포트 목록 캐시·스냅샷 LRU 탓에 화면 미반영.
+Worst files: `components/reports/DetailTab.jsx` (12), `market/marketUtils.jsx` (7),
+`reports/reportUtils.jsx` (7), `pages/Ranking.jsx` (6).
 
-**남은 fragile 표면(가드 후에도 주의)**:
-- **이름은 여전히 두 store에 박제** — 이름을 건드리는 신규 코드는 `tickers.name`만 바꾸면 안 되고 `refresh_snapshot_names`/`reconcile_snapshot_names`로 스냅샷도 동기화해야 한다. 구조적으로 SSOT가 아니라 "박제 2벌 + 동기화 헬퍼"라 동기화 누락이 재발 가능.
-- **백필 무재시도 silent skip → 부분 완화(task#88)**: `POST /api/stocks/names/backfill`(`backend/routers/stocks.py:250`, admin)는 후보(`tickers_missing_name`)를 `resolve_name`으로 채우되 **시세 일시실패 시 그 종목을 재시도 없이 스킵**. **task#88(commit f4da149d)로 스킵이 더는 무성이 아니다** — `stocks.py:275-276`에서 스킵 티커를 `skipped` 리스트에 모으고 `print("[backfill_names] skip {ticker}: resolve_name이 실명을 못 찾음...")` WARNING 로그를 남기며, 응답에 `skipped`(티커 목록)를 additive 추가(`stocks.py:284`, `API_SPEC.md` 갱신됨). `updated:0`/예상보다 작으면 `skipped`로 진단 가능. **재시도 자체는 미도입**(`resolve_name`이 "일시실패 vs 실명 없음"을 구분 못 하므로) — 결과가 작으면 운영자가 수동 재실행해야 하는 점은 유지. 신규 TDD 테스트 2건(`backend/tests/test_backfill_names_skip.py`).
-- `_invalidate_name_caches`(`names.py:13`)도 `except Exception: pass` — 캐시 무효화 실패가 무성이라 "이름 고쳤는데 화면 미반영"의 원인이 추적 불가.
-- 회귀 테스트: `test_storage.py` 클로버 가드 2 + `test_report_generator.py` 배치 방어 1 + `test_backfill_names_skip.py` 2(task#88).
+In `frontend/src/pages/Reports.jsx` specifically (4 problems): two `set-state-in-effect` errors at
+lines **106** (detail-fetch effect: `setLoading(true)`) and **122** (ungenerated→holdings auto-switch effect:
+`setActiveTab('holdings')`), plus the **stale `eslint-disable-next-line react-hooks/exhaustive-deps`** at line
+**120** flagged as "Unused eslint-disable directive (no problems reported)". The `othersData` fetch effect
+(lines 93–102) is clean. All tolerated/untouched debt.
 
----
+**No CI lint gate** — `.github/workflows/deploy.yml` runs only `git reset --hard origin/main` + `deploy.sh`;
+`deploy.sh` runs `npm install && npm run build` (no `npm run lint`, no `npm test`, no backend pytest). So these
+errors do not block deploy and have accreted unnoticed. Second stale disable: `pages/ReportManualGen.jsx:36`
+`// eslint-disable-line`.
 
-## 2. NaN/Inf → JSON 직렬화 500 (HIGH, 부분 가드됨)
+### #DC — Pre-existing dead code (frontend)
+25 `no-unused-vars` hits are mostly orphaned imports left after refactors. Confirmed examples:
+- `components/reports/DetailTab.jsx` — 9 unused recharts imports (`ScatterChart`, `Scatter`, `XAxis`, `YAxis`,
+  `CartesianGrid`, `Tooltip`, `ResponsiveContainer`, `ReferenceLine`, `Cell`) + `fmtN`, plus unused `closestKey` (line 351)
+- `components/market/TreasurySection.jsx` — `LoadingBox`, `ErrorBox`
+- `components/market/EconIndicatorsSection.jsx` — `ErrorBox`; `LendingSection.jsx` — `CARD_STYLE`
+- `components/reports/Sections.jsx` — `TH`, `TD`; `FinancialsChart.jsx` — `fmt`; `HistoryTab.jsx` — `dates`
+- `pages/GuruManagers.jsx` — `tdStyle`, `badgeErr`, `handleSort`; `StockModal.jsx` — `useCallback`
 
-**증상**: starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 `NaN`/`inf`가 있으면 직렬화에서 500(`Out of range float values are not JSON compliant`).
-**근본원인**: 외부 시세(yfinance `Close`가 NaN, FX/usdkrw NaN 등)에서 흘러든 NaN이 합산값(`total_value`)을 오염. PostgreSQL은 `json` 컬럼에 NaN을 거부(저장 실패)하지만 `json.dumps`는 기본 `allow_nan=True`라 파일 폴백만 통과 → DB저장 실패/파일 성공/응답 직렬화 실패로 증상이 엇갈린다.
-
-**현재 가드 현황(검증)**:
-- 소스 가드: `backend/services/digest_service.py`(`math.isfinite`로 prev_close/current/usdkrw 가드), `backend/services/recommendation/funnel.py`, `backend/services/report_generator.py`, `backend/routers/analytics.py`.
-- 출력 sanitize: `backend/services/utils.py` `sanitize()`가 NaN/inf→None 재귀 치환. 소비처는 `routers/report.py`, `services/report_generator.py`, `services/lending_service.py`, `services/leverage_service.py`.
-- **프론트 표시 가드(완화, task#86, commit 11f3632f)**: `frontend/src/utils.js:2` `fmtPrice`가 이제 `val == null || !Number.isFinite(Number(val))`이면 `₩NaN`/`$NaN` 대신 앱 관례 `—`를 반환. 정상 숫자·0·숫자문자열은 기존 ₩/$ 포맷 유지. **이는 백엔드가 NaN을 흘리더라도 화면에 `₩NaN`이 보이지 않게 하는 표시단 방어막**이지, 500을 막지는 못한다(백엔드 sanitize/소스가드가 여전히 1차 방어).
-
-**남은 위험**: sanitize는 **전수 적용이 아니다**. float를 응답에 싣는 엔드포인트 중 sanitize/소스가드 둘 다 없는 경로(예: market quote dict를 그대로 반환하는 경로, dashboard totals 계산)는 새 NaN 소스가 끼면 다시 500날 수 있다. CLAUDE.md 권고대로 **소스 가드(math.isfinite 체크 후 "시세 없음")**가 출력 일괄 sanitize보다 깨끗하다. 사례: 다이제스트 생성 500(8cd70a42).
-
----
-
-## 3. 시장지표 캐시 read/write 실패를 silent하게 삼킴 (MEDIUM)
-
-`backend/services/market_indicators/cache.py:34,48,55`의 `_mc_load`·`_mc_save`·`_mc_delete`는 모두 `except Exception: pass`로 **DB 오류를 완전 무성(silent)으로 삼킨다**(로그 0, 현 HEAD 검증).
-- `_mc_save` 실패 시: 외부 fetch는 성공했는데 영구 저장이 조용히 실패 → 다음 요청이 캐시 미스로 매번 라이브 fetch(성능 저하)하거나 영영 빈 캐시. 진단 단서 없음.
-- `_mc_load` 실패 시: 캐시가 있어도 못 읽어 fetch 경로로 폴백 — 무성이라 "왜 느린지" 추적 불가.
-
-CLAUDE.md가 명시한 교훈(task#48 `_fetch_one_sector` silent except → all-None 박제)의 **재발 가능 표면**이다. `kr_sector_service.py`는 이미 `print(...)` 로깅으로 교정됐으나, `cache.py`의 3개 pass는 아직 무성이다. 단, 이건 인프라 헬퍼라 "실패 클래스 가드"(저장 생략·직전값 유지)는 호출부(`kr_sector_service.refresh`의 all-None skip)에 있어 데이터 박제 위험은 차단됨 — 남은 건 **진단성 부족**.
-
----
-
-## 4. all-None 캐시 박제 가드는 kr_sector에만 존재 (MEDIUM)
-
-CLAUDE.md 교훈: 배치가 빈/all-None 결과를 캐시에 박제하면 시드 가드가 "채워짐"으로 오판해 고착(task#48→#49→#50).
-
-**검증**: `backend/services/kr_sector_service.py:76-78` `refresh()`는 모든 sector의 `return_1w/1mo/3mo`가 None이면 `save` 생략·직전값 유지(`print("[kr_sector] refresh: all-None momentum — skipping save (직전값 유지)")`, 올바름). 그러나 이 패턴은 **kr_sector 한 곳에만** 구현돼 있다. `market_indicators/` 서브모듈(`fx.py`·`commodities.py`·`earnings.py`·`exports.py`)의 `_yf_close_history`(`cache.py`)는 `hist.empty`면 `stored`(직전값) 반환으로 비어있는 저장은 막지만, **"전부 None인데도 일부 형태가 있는" 케이스**에 대한 명시 가드는 없다. yfinance/FRED가 빈 응답을 다른 형태로 줄 때 재발 가능. "의심 트리거가 아니라 실패 클래스(all-None)를 가드하라"는 교훈을 다른 배치로 일반화하지 않은 상태.
+Per CLAUDE.md §3, do NOT mass-delete pre-existing dead code unless asked — clean up only orphans your own change creates.
 
 ---
 
-## 5. 비-additive 응답 reshape → 프론트 독립 fetcher 조용히 깨짐 (MEDIUM, 활성 표면)
+## Backend — serialization & data-loss traps
 
-CLAUDE.md task52 교훈: `/api/stocks/dashboard`를 배열→`{holdings,totals}`로 reshape했을 때 훅과 별개로 직접 fetch하던 `Analytics.jsx`가 깨짐.
+### #N1 — NaN/inf JSON serialization 500 risk
+starlette `JSONResponse` uses `allow_nan=False`; any `NaN`/`inf` in a response dict → HTTP **500**
+(`Out of range float values are not JSON compliant`). Insidious because fallbacks mask it: PostgreSQL rejects
+NaN in `json` columns (save fails) but Python `json.dumps` defaults `allow_nan=True` (file fallback passes) →
+DB-save-fail + file-success + response-serialize-fail give crossed symptoms. NaN typically flows in from external
+quotes (yfinance `Close` NaN, FX `usdkrw` NaN) and contaminates aggregates (`total_value` etc).
+- Generic guard: `backend/services/utils.py` `sanitize()` (lines ~29–36) recurses dict/list and nulls non-finite floats.
+- Source-level `isfinite`/`isnan` guards present in: `services/digest_service.py`, `services/indicators.py`,
+  `services/report_generator.py`, `services/recommendation/funnel.py`, `routers/analytics.py`.
+- CLAUDE.md gotcha: guard **at the source** (treat NaN as "no quote") rather than blanket output-sanitize. Any
+  new endpoint emitting external-derived floats must guard.
 
-**검증(현재도 활성)**: `/api/stocks/dashboard`를 fetch하는 곳이 **여전히 2개**다 —
-- `frontend/src/hooks/usePortfolioData.js:35` (훅)
-- `frontend/src/pages/Analytics.jsx:276` (독립 fetcher)
+### #N2 — Dual-source 종목명 (stock name) sync trap
+A stock name lives in two stores that drift independently:
+- `tickers.name` (shared master; 종목관리 list reads live)
+- `snapshots.data.name` (frozen at report-gen time; research list/detail read this)
 
-다음에 이 엔드포인트 응답을 다시 reshape하면 두 소비처를 전수 grep하지 않는 한 한쪽이 옛 형태로 조용히 깨진다. 동일 위험은 `last_scheduled_date`(단일 문자열→`{KR,US}` 객체로 reshape됨, ADR-0012)를 파싱하는 외부 Cowork에도 있음. (참고: task#88의 `skipped` 추가는 **additive**라 이 위험 없음 — 기존 소비처 영향 0.)
+Renaming must update **both** or list↔detail disagree. Sync helpers: `services/storage/names.py`
+(`refresh_snapshot_names` single / `reconcile_snapshot_names` full), called from `routers/stocks.py`. DB-only
+edits are masked by caches (`cache.get_list`, snapshot LRU) → must `cache.invalidate(ticker)` + `invalidate_list()`.
+Real-name resolution: `services/market/__init__.py` `resolve_name` (KR Kiwoom `stk_nm`/Naver, US yfinance shortName).
+Clobber guard in `save_holdings`/`save_stocks` (CASE-WHEN preserves existing name when incoming is NULL/blank/==ticker).
+Backfill `POST /api/stocks/names/backfill` **silently skips** stocks whose live quote momentarily fails
+(`updated:0`) — re-run if result is 0; check `skipped` list (task#77/#88).
 
----
-
-## 6. mock.call_args 오염 — additive 호출이 기존 테스트를 거짓통과시킴 (MEDIUM, 테스트 부채)
-
-CLAUDE.md 교훈(task#66·67): 엔드포인트에 read/외부호출을 additive로 추가하면 `mock.call_args`(마지막 호출)를 단언하는 기존 테스트가 마지막 호출이 신규 호출로 바뀌며 거짓통과/오류. 대응은 `call_args_list[i].kwargs`로 인덱스 명시·`call_count`로 시퀀스 못박기.
-
-`mock.call_args`(마지막 호출 단언) 패턴을 쓰는 테스트는 향후 additive 변경에 취약하다. 패키지 분리 retro(god-file-split)에서도 **patch-site는 grep 실측·분류가 필요**하다고 기록됨. ADR-0017로 인해 patch 경로가 서브모듈로 이전됐으므로(`services.market._naver_get`→`services.market.kr._naver_get`, `services.storage.query`→`portfolio.query`), **루트 경로로 patch하던 옛 테스트나 새로 작성하는 테스트가 잘못된 경로를 patch하면 mock이 안 닿아 라이브 호출이 새어나간다**(standalone 테스트로만 잡힘). task#77/#88 신규 테스트는 올바르게 서브모듈 경로(`services.report_generator.mkt.*`, `services.storage.portfolio.get_connection`)를 patch한다.
-
----
-
-## 7. 외부 API 라이브 호출이 요청/기동 경로에 새어들 위험 (MEDIUM, 성능)
-
-CLAUDE.md 교훈(task#50): 배치-백킹 뷰(랭킹·KR 업종 모멘텀)는 외부 API(키움)를 요청·기동 경로에서 라이브 호출 금지 — 배치가 사전계산해 저장, 요청은 저장값만 읽어야 한다.
-
-**검증(현재 올바름)**: `kr_sector_service.map_holdings_to_sectors`는 `load_sector_index()`로 **저장 인덱스만 읽고**, 첫 배치 전이면 graceful 빈 매핑. 시드 가드 `_seed_*_if_empty`(랭킹·kr_sector)도 존재. 패턴은 지켜지고 있으나, **신규 배치-백킹 기능 추가 시 매번 이 규약을 수동으로 지켜야 하는** 구조적 부채(아키텍처 강제장치 없음). `market/__init__.py:38` `get_quote`는 종목당 TTL 캐시(`get_quote_cached`)는 있으나 캐시 미스 시 요청 경로에서 라이브 yfinance/Naver 호출(rate-limit 의존).
-
----
-
-## 8. 폴백 경로가 실패를 다르게 가림 (MEDIUM, 진단성)
-
-여러 fetch 체인이 폴백으로 실패를 가려 "동작하는 것처럼 보이나 데이터는 stale/빈" 상태를 만든다:
-- `market/__init__.py:103` US quote: yfinance 예외→KIS 백업→`_us_none_quote`(에러 dict). 폴백이 깊어 어느 단계서 실패했는지 응답만 봐선 모호.
-- `market/__init__.py:210,215` `get_history_df` KR: 키움 실패를 `except Exception: pass`로 삼키고 yfinance 폴백 — 키움 실패 원인 미로깅.
-- `market/__init__.py:59` `resolve_name`: quote 실패를 `except: pass`로 삼킴 → 이름이 티커로 박힐 수 있음(항목 1과 연동).
-- `market/us.py`·`market/kr.py`: 다수 `except Exception: pass`.
-
-CLAUDE.md의 KITA/KOFIA/FRED 키 미설정 시 graceful 폴백(UN Comtrade 등)도 같은 부류 — **키 미설정과 키 오류가 같은 빈 결과로 수렴**해 운영자가 "왜 데이터가 없는지" 구분 불가.
+### #N3 — Name backfill silent-skip (resolved into observable, still a footgun)
+`routers/stocks.py:273` comment marks the spot where `resolve_name` returning ticker-form/blank causes a skip.
+A transient quote failure yields a no-op backfill with no retry. Diagnosability was improved (server skip log +
+`skipped` in response) but the behavior (skip, don't retry) remains — operator must notice `updated:0` and re-run.
 
 ---
 
-## 9. 데이터 파싱 오저장(×100) — backlog/단위 캡션 (MEDIUM, 가드됨이나 fragile)
+## Backend — batch / external-API discipline
 
-CLAUDE.md 교훈(ADR-0003·0004): 단위 캡션 파싱 실패 시 "안전한 기본값(억원)" 폴백은 ×100 대형 오저장. 추출 실패는 기본값이 아니라 pending(누락)으로(‘wrong < missing’).
+### #B1 — Batch-backing views must NOT live-call external APIs on the request/startup path
+Rankings, KR sector momentum, market indicators are precomputed by batches into `market_cache`/tables; requests
+read stored values only. Live N-call serial fetch on the request path = multi-second latency (task#50). Enforced in:
+- `services/kr_sector_service.py`, `services/market_indicators/*` (`cache.py` `_mc_load`/`_mc_save`),
+  `services/recommendation/funnel.py`/`store.py`/`universe.py`.
 
-**검증(현재 올바름)**: `backend/services/backlog_parser.py`의 `_table_unit`은 KRW 토큰이 없으면(USD천·백만달러·줄바꿈 분리) `_DEFAULT_UNIT`(억원)이 아니라 **"기타"(비KRW)를 반환해 자동추출을 막는다**. `_EOK_FACTOR`로 조원/억원/백만원/천원/원을 정규화. 다만 `_DEFAULT_UNIT="억원"`이 코드에 상수로 존재해 **미래에 잘못 폴백으로 쓰이면 ×100 재발 위험**(현재는 캡션 추출 성공 시에만 매핑에 쓰임). CLAUDE.md 명시: **수주잔고/데이터 파싱 변경은 배포 후 전 종목 재적재 UAT 필수**(fixture 테스트로 못 잡는 실데이터 케이스).
+Three sub-rules, each a past bug:
+1. **Don't swallow fetch failures silently** — `services/recommendation/funnel.py:9` & `universe.py:118` explicitly
+   forbid `except: pass` (task#48: `_fetch_one_sector` swallowed empty closes → all-None enshrined).
+2. **Don't enshrine empty/all-None into cache** — if every value is None, skip the save (keep last good).
+   `kr_sector_service.py:78` logs `all-None momentum — skipping save (직전값 유지)`; `funnel.py:330` `save 생략(all-None 박제 금지)`.
+3. **Guard the failure class (all-None), not the suspected trigger** — re-occurrence prevention without root cause.
 
-추가 위험: `market/kr.py`·`market_indicators/` 차트는 입력을 **'억원' 단위로 가정**(`krFmt` 헬퍼, `frontend/src/components/market/marketUtils.jsx`). raw 원/주(count)를 그대로 넘기면 1e8배 오표기(과거 "35조경원" 사례). `kr.py`에서 시총을 `*100_000_000`, 매출을 `*1e8`로 변환 — 단위 변환 지점이 분산돼 있어 신규 코드가 단위를 틀리기 쉽다.
+Startup empty-cache seeding via `_seed_*_if_empty` (rankings, kr_sector) in `backend/scheduler.py`
+(see `backend/tests/test_scheduler_rankings.py`).
 
----
-
-## 10. KR 색 관례 토큰 — 의미 배지 반전 (LOW, 가드됨)
-
-CLAUDE.md 교훈: 이 앱은 `--up`=빨강(상승)·`--down`=파랑(하락)이라 `.badge--success`=빨강·`.badge--danger`=파랑(`frontend/src/components/ui/Badge.jsx:5-7`). 의미 상태 배지에 success/danger를 쓰면 Western(녹=좋음) 의도와 색이 반전(라이브 UAT 포착 b288f494).
-
-**검증**: 전용 `frontend/src/components/ui/SupplyBadge.jsx`가 존재(가격 토큰 미사용으로 교정됨). `Badge.jsx`의 success/danger/warning variant는 `value >= 0 ? 'success' : 'danger'`(가격 방향, `Badge.jsx:35`)와 `Showcase.jsx`에서 사용. **남은 함정**: ① `warning` 변형은 `--color-warning`/`--warning-tint` 미정의로 **현재 깨져 있어** caution 색으로 쓸 수 없음. ② UI 리뷰가 variant 이름의 통념(success=녹)이 아니라 토큰 실제값을 대조하지 않으면 신규 의미 배지에서 재발.
-
-**체계적 해소(task#79, 2026-06-20)**: `tokens.css` `:root`(라이트)+`[data-theme="dark"]`(다크) 양쪽에 **가격방향과 무관한 시맨틱 토큰군** — `--color-success/error/info`, `--semantic-buy/sell`, `--corr-pos/neg/zero`(WCAG 4.5:1 대비) — 을 신설하고, 앱 전반(48파일)의 서양식 하드코딩(`#81c784`녹·`#e57373`·`#ef9a9a`빨)을 **가격방향=`--up`/`--down`** vs **의미상태=시맨틱 토큰**으로 전수 분리. 상관 히트맵도 가격토큰 무관 중립 발산 팔레트(`--corr-*`)로 교체. 이로써 "의미 배지에 가격 토큰을 쓰는" 함정 ②의 표면이 대폭 축소됨. **단 신규 코드가 가격방향과 의미상태를 다시 혼동하면 재발 가능** — 적대리뷰가 잡은 critical 1건(InsiderTrades 내부자 매수/매도 신호를 `--up/--down`으로 오분류)이 정확히 그 실패모드였다(→`--semantic-buy/sell`로 교정).
-
----
-
-## 11. lxml 로컬 .venv 부재 (LOW, 가드됨)
-
-CLAUDE.md 교훈: `lxml`은 `requirements.txt`(`lxml>=4.9.0`)·Docker엔 있으나 로컬 `backend/.venv`엔 없음. HTML 파싱은 `BeautifulSoup(html, "lxml")` 대신 stdlib `html.parser`를 써야 로컬·프로덕션 모두 동작.
-
-**검증(현재 준수)**: 전 backend 코드가 `BeautifulSoup(..., "html.parser")` 사용 — `backlog_parser.py`·`scraper.py`·`guru_scraper.py`·`market_indicators/earnings.py`. lxml 직접 사용 0건. 신규 코드가 무심코 `"lxml"`을 쓰면 로컬 pytest만 깨지므로 주의 표면 유지.
-
----
-
-## 12. 배치 id/source 다표면 grep 부채 (MEDIUM, 운영 회귀 위험)
-
-CLAUDE.md 교훈(daily_report-market-split task15·17·45 재발): 배치 id를 `batch_registry.BATCHES`에서 빼면 ① 데이터 read ② 표시 문자열(`schedule_desc`) ③ **모든 `job_runs.record(id,...)` lane(auto·manual·backfill)** ④ 그 id 단언 테스트를 전수 grep해야 한다. 한 곳이라도 옛 id면 배치 현황 실행이력에서 증발하는 회귀. 옛 id 단언 테스트는 깨진 동작을 고정(TDD green이 회귀 못 잡음). 또한 fetch 소스 변경 시 `source` 필드도 갱신해야 현황 카드가 stale 출처를 안 보임.
-
-`backend/services/batch_registry.py`(395줄)가 단일 진실원이나, id/source/market/usage가 여러 표면에 흩어져 일관성을 **수동으로** 유지해야 하는 구조적 부채. ADR-0012(daily_report 분리)·ADR-0013(earnings/monthly 분리)이 이 위험의 누적 사례.
+### #B2 — Batch-id retirement / source-field drift
+Removing a batch id from `batch_registry.BATCHES` requires grepping **all** surfaces: schedule readers,
+display strings (`schedule_desc`), every `job_runs.record(id, ...)` lane (auto + manual + backfill), and
+asserting tests. A stale id ⇒ stale read or **execution history vanishing from the batch-status card**
+(daily_report split, tasks 15/17/45 — recurred). Changing a batch's fetch source (e.g. KR ranking Naver→Kiwoom)
+must also update that batch's `source` in `batch_registry` (else the status card shows the wrong origin).
+`source` (fetch origin) and `usage` (consuming UI) point opposite ways — don't conflate.
 
 ---
 
-## 13. 자동 배포 폴러가 커밋 안 한 tracked 편집을 소실 (HIGH, 작업 안전)
+## Backend — quote / data-parsing fragility
 
-**증상/근본원인**: launchd `com.portfolion.auto-deploy-poll`이 2분마다 `scripts/auto-deploy-poll.sh`를 실행, `origin/main`이 로컬 HEAD보다 앞서면 **`git reset --hard origin/main`**(검증: 스크립트 35행) 후 배포. → 메인 체크아웃에서 **커밋 안 한(또는 push 안 해 로컬이 origin보다 앞선) tracked 편집은 다음 폴(≤2분)에 소실**.
-**완화**: 코드 변경은 commit+`git push origin main`을 묶어 즉시 반영. `.forge/` 등 **untracked 파일은 reset --hard 대상이 아니라 안전**. 단, `.forge/codebase/*.md`처럼 **tracked가 된 forge 파일은 이 보호를 못 받는다**(재생성 중 소실 위험 — 커밋되지 않은 채 폴이 돌면 덮어써짐).
-- **배포 모델 부수효과**: 프론트는 `npm run build`가 즉시 라이브지만 **백엔드 변경은 폴러 재배포 후에야 라이브** — 프론트만 먼저 빌드하면 백엔드 의존 기능이 미동작.
+### #Q1 — Kiwoom signed-string / 억원 unit normalization
+`backend/services/kiwoom/quote.py`: ka10001 returns sign-prefixed comma strings and 억원-unit market cap.
+`_num()` (lines 10–20) strips signs/commas and maps `""`/`"-"`/`"+"` → None. `normalize_basic` (lines 28–56)
+must: take `abs(cur_prc)` for price, derive `prev_close = price − pred_pre`, multiply `mac × 1e8` for KRW market cap.
+Any consumer that skips this normalization gets sign-corrupted prices or 1e8-off caps. Quote chain is
+Kiwoom→KIS→Naver (`market.get_quote_kr`); US is yfinance→KIS.
 
----
+### #Q2 — KR chart 억원 formatter misuse (×1e8 mis-display)
+`frontend/src/components/market/marketUtils.jsx` `krFmt` assumes input is **억원** (10,000억 = 1조 threshold).
+Feeding raw 원 (must `/1e8` first) or counts (shares) → 1e8-off labels (the "35조경원" short-sell chart bug, f9594f2b).
+Earnings/export charts (`M7EarningsSection`, `KrTop2Section`, `KrExportsSection`) are dual-Y (left=억/조 or $B, right=%).
 
-## 14. 인증·권한·CORS 표면 (MEDIUM)
+### #Q3 — DART backlog parsing: 'wrong < missing'
+`backend/services/backlog.py` parses 수주잔고 from raw disclosure XML (`/api/document.xml`, ZIP→decode) — DART has
+no structured backlog API. Type-1 tables are extracted via header column mapping (`_expand_grid` rowspan/colspan),
+amount 억원-normalized, validated by ~1% cross-check; only then `source='dart'`. Failures (cross-check fail,
+multi-entity, foreign currency `USD천`, no-total multi-row) → `source='pending'` (amount=None) for Cowork to fill.
+**Critical**: a parse failure must become `pending`, never an "억원 default" fallback — a wrong unit caption
+default produces ×100 large mis-saves. ADR-0002/0003/0004/0005 govern this; ADR-0004 = explicitly DO NOT
+auto-extract construction backlog. **Any parsing change needs post-deploy full-reload UAT** — fixture tests pass
+yet miss real-data cases (foreign currency, split unit captions, pre-consolidation 회사-column tables).
+`disclosures.py` shares the corp_code map (`_get_corp_code_map`); note `list.json` does NOT echo `pblntf_ty`, so
+each core type A/B/C/D is fetched separately (4 calls/ticker).
 
-- **단일 서버측 키 경계**: 키움·KIS는 서버측 단일키(`.env.docker`)로 전 사용자 공유(ADR-0009/0011) — 읽기전용·조회 TR만이라 경계는 명시됐으나, 키 유출 시 영향 범위가 전역. **검증: 추적 코드에 하드코딩 시크릿 0건**, `.env.docker`는 gitignore, `.env.docker.example`은 placeholder만(실값 0).
-- **CORS**: `localhost:3000`/`localhost:5173`/`FRONTEND_URL` env(`backend/main.py`). 배포 시 `FRONTEND_URL` 미설정이면 origin 누락.
-- **메뉴 권한**: `user_menu_permissions`는 **프론트 nav 필터링용**(AuthContext) — 서버 엔드포인트 자체 게이팅은 admin role 의존(`UPDATE users SET role='admin'`). 프론트 nav를 숨겨도 엔드포인트를 직접 호출하면 도달 가능한지(메뉴별 서버 가드 유무)는 라우터별 `Depends` 확인 필요.
-- **이벤트 화이트리스트**: `routers/events.py`의 `VALID_EVENTS` 집합으로 검증 — 신규 이벤트 추가 시 누락하면 조용히 거부.
-- **FastAPI 라우트 순서**: `PUT /api/stocks/enrich/batch`(`stocks.py:218`)가 `PUT /api/stocks/{ticker}/enrich`(`stocks.py:233`)보다 **먼저** 등록됨(검증 OK) — 순서가 뒤집히면 `enrich`가 ticker로 라우팅.
-- **bare list/dict Body 파라미터**: PUT/POST에서 bare list/dict는 `Body(...)` 명시 필수(미명시 시 재빌드 후 기동 불가, PR#12 사례). 신규 엔드포인트가 누락하면 기동 실패.
-
----
-
-## 15. 외부 의존성 단일점 + rate-limit (MEDIUM, 성능/가용성)
-
-- **yfinance**: US 시세·히스토리·재무·애널리스트의 1차 소스. 비공식 API라 Yahoo 장애/구조변경/rate-limit에 취약. KIS가 US 백업이나 가격만(15분 지연). 종목당 TTL 캐시(`market/__init__.py` `get_quote_cached`)로 호출 상한.
-- **키움(KR 1차)**: `get_quote_kr`이 키움 우선 + KIS + Naver 폴백. 단일 서버측 키, 직렬 throttle.
-- **DART**: backlog·disclosures·dividends(KR)가 `DART_API_KEY` 필수. status 013(무데이터)은 graceful. corp_code 매핑은 `backlog._get_corp_code_map` 재사용(단일점).
-- **KOFIA(`KOFIA_API_KEY`)**: leverage·lending 공유 키. 미설정 시 요청 실패.
-- **FRED(`FRED_API_KEY`)**: 경제지표·macro-signals. 미설정 시 수집 실패(저장값 무변경).
-- **키 명명 함정**: `KITA_API_KEY`는 실제로 **관세청(Korea Customs Service)** 키 — 이름과 출처 불일치.
-- 다수 외부 fetch가 ThreadPoolExecutor 병렬(calendar max 30, digest max 10, kr_sector max 4, names/backfill max 8). DB 풀 크기(maxconn=10) ≤ ThreadPool 워커여야 풀 고갈 회피(refactor-db-pool-sizing retro). 이름 백필은 워커당 2 writes(`set_ticker_name`)라 max 8로 캡됨.
-
----
-
-## 16. 테스트 커버리지 공백 (LOW~MEDIUM)
-
-테스트 파일로 라우터·서비스 대부분 커버(검증: `backend/tests/`). 명시적 테스트가 **얇거나 없는** 영역:
-- **패키지 re-export 표면 자체**: ADR-0017이 "전체 pytest green + 이전 전 심볼 전부 해석"을 게이트로 두나, re-export 목록 누락(특히 underscore private)을 단언하는 전용 테스트는 부재 — 서브모듈 재배치 시 표면 구멍이 런타임에만 드러남.
-- **종목명 dual-source 동기화**: task#77이 저장소 가드(SQL 문자열)·배치 실명 박제 3종을, task#88이 백필 skip 표면화 2종을 고정했으나, **`reconcile_snapshot_names`/`refresh_snapshot_names`의 동기화 정확성**(tickers↔snapshot 일치)이나 **백필의 시세 실패 재시도 누락** 자체(재시도 미도입)는 계약 테스트가 막지 않는다 — `skipped` 표면화로 진단만 가능.
-- **NaN 가드 전수**: digest/funnel/report_generator엔 NaN 테스트가 있으나, sanitize 미적용 엔드포인트의 NaN 회귀를 막는 계약 테스트는 부분적. 프론트 `fmtPrice` NaN 가드(task#86)는 프론트 단위 테스트 부재로 회귀를 자동으로 못 잡음.
-- **프론트**: 프론트 단위 테스트 부재(UAT는 Playwright 디바이스 에뮬레이션 수동, reference-frontend-uat). 비-additive reshape 소비처 회귀·CSS lift 회귀(항목 17)는 테스트로 못 잡고 라이브 UAT/메인 세션 grep에 의존. **이 공백이 직접 차단한 작업이 있다**: `Reports.jsx`의 종목관리 핸들러·필터/정렬 훅 추출(task#89 R4 후속)이 회귀 위험으로 보류됨(항목 18) — 프론트 테스트 하니스 도입이 그 추출의 선결 조건.
-- **silent except 경로**: `except: pass` 다수(부록 참고)는 실패 분기 테스트 부재 — 폴백이 데이터를 가리는 케이스가 테스트로 고정되지 않음.
+### #Q4 — lxml not in local .venv
+`lxml` is in `requirements.txt` + Docker image but **absent from `backend/.venv`**. HTML parsing in code/tests
+verified locally must use stdlib `BeautifulSoup(html, "html.parser")`, not `"lxml"` — else local pytest breaks
+while prod works (silent divergence).
 
 ---
 
-## 17. 죽은/레거시 CSS가 수정을 오도 (MEDIUM, 프론트 드리프트 — 부분 청소됨 task#85/#87)
+## Deploy / operational hazards
 
-`frontend/src/styles/mobile.css`·`pc.css`에 **현재 JSX가 렌더하지 않는 클래스**와 **신규 `ui/` 프리미티브를 이기는 레거시 태그선택자**가 누적돼, "권위 있어 보이지만 실제론 안 먹는" CSS가 수정을 잘못된 곳으로 유도한다(2026-06-20 UI 폴리시 배치 #80·#83 둘 다서 분기 유발).
+### #D1 — Auto-deploy poller `git reset --hard` wipes uncommitted tracked edits
+launchd `com.portfolion.auto-deploy-poll` runs `scripts/auto-deploy-poll.sh` every 2 min; if `origin/main` is ahead
+of local HEAD it does `git reset --hard origin/main`. **Tracked edits not yet committed (or local ahead of origin,
+not pushed) are lost within ≤2 min.** Always bundle commit + `git push origin main` immediately. `.forge/` and other
+untracked files are safe (`reset --hard` doesn't touch them). The same `--hard` runs in `.github/workflows/deploy.yml`.
+Concurrent deploys (poller + Actions runner) are serialized by `/tmp/portfolion-deploy.lock` in `deploy.sh`.
 
-- **미렌더(dead) 클래스 → 부분 청소(task#85, commit 361b965e)**: `.holdings-list`·`.m-cal-wk` 일가는 **mobile.css에서 삭제됨**(현 HEAD grep 0건 검증). 함께 GuruStats 도달불가 내부 탭경로·GuruManagers 미참조 `COLUMNS` 배열도 제거(전부 dead-code, 행동·시각 무변경, build 728 modules pass). **교훈 자체는 유지: CSS 클래스를 고치기 전 그 클래스가 실제 DOM에 렌더되는지 grep+런타임 확인**(없으면 인라인/다른 클래스가 실효 소스). #80에서 에이전트가 `.holdings-list`에 패딩을 줬으나 dead라 무효였던 게 동인.
-- **레거시 태그선택자 specificity(미청소)**: `.m-login input`/`.login-form input`(specificity 0,1,1)이 `.ui-input`(0,1,0)을 이겨, 입력을 `ui/Input` 프리미티브로 교체해도 스타일이 통일되지 않았다(#83) → 담당 파일 내 인라인 스타일(클래스·태그선택자 모두 이김)로 우회. **교훈: ui/ 프리미티브로 이관 시 기존 태그선택자/높은 specificity 규칙이 덮는지 확인**, 안 그러면 컴포넌트만 바뀌고 시각은 그대로다.
-- **잔존 dead 선언(미청소)**: pc.css/mobile.css의 `.m-login input`/`.login-form input` 배경·테두리·radius는 이제 인라인에 덮여 dead. 별도 CSS 정리 패스에서 제거하고 `.ui-input` 단일 소스화 가능(후속 후보).
-- **스코프 의존 스타일 lift 회귀 → 가드됨(task#87, commit 3a872112)**: `.parent .child` 형태로만 정의되고 전역 정의가 없는 스타일은, child를 부모 밖으로 옮길 때 이중 함정 — ① 그 규칙이 dead가 되고 ② child가 스타일을 통째로 잃는다. **task#87이 Reports 필터를 사이드바+main 2벌 렌더에서 `.reports-filters` 단일 호스트(layout 앞 형제)로 lift**하면서 죽은 사이드바 컴팩트 규칙을 제거하고 `.reports-sidebar .tab-cnt`(전역 정의 없음)를 `.reports-filters .tab-cnt`로 **retarget해 카운트 배지 무스타일 회귀를 가드**(`pc.css:326` 검증; 모바일 detail 필터 미노출은 `pc.css:323` `.reports-filters[data-view="detail"]{display:none}`로 보존). 전역 `.tab-btn`/`.sm`은 tokens.css에 전역 정의가 있어 폴백 안전 — 차이는 '전역 vs 스코프 전용'. **교훈: 컴포넌트를 컨테이너 밖으로 lift하기 전 `grep '\.<container> '`로 스코프 의존 규칙을 전수해 retarget**(안 하면 컴포넌트는 옮겨졌는데 시각만 깨진다). Playwright 4조합 UAT 통과.
+### #D2 — Frontend lands live before backend on a frontend-only build
+nginx serves `frontend/dist` via `:ro` volume mount, so a local `npm run build` is immediately live. But
+**backend changes are only live after the poller/Actions redeploy** (image rebuild). Building frontend first for a
+feature that depends on new backend code yields a non-functioning feature until backend redeploys. Never run
+`docker compose build/up` manually (CLAUDE.md).
 
-**상태**: task#85가 미렌더 클래스 일부를, task#87이 스코프 의존 lift 1건을 청소·가드했으나 mobile.css/pc.css의 레거시 태그선택자(`.m-login input` 등) 표면은 **미청소**로 남아 다음 프론트 수정도 같은 함정에 빠질 수 있다. 근본 청소(레거시 태그선택자→프리미티브 단일화)는 별도 태스크 후보.
-
----
-
-## 18. 프론트 god-file — 부분 해소 + 잔존 dead code/lint/보류된 훅 추출 (LOW~MEDIUM, 프론트 부채)
-
-**부분 해소(task#89, commit 91173837)**: 종전 최대 부채였던 `frontend/src/pages/Reports.jsx`(804줄 god-file, 직전 매핑이 "최대 파일"로 지목)가 **447줄로 축소**(-44%)됐다. 인라인 렌더 함수 4개(stock card·ticker list item·filters·상세 헤더)를 `frontend/src/components/reports/`의 신규 4파일 — `StockCard.jsx`(190줄)·`TickerListItem.jsx`·`ReportFilters.jsx`·`ReportDetailHeader.jsx` — 로 **순수 구조 추출**(props over closures 명시 배선, 동작·시각 무변경). 로직·state·핸들러·훅·CSS는 잔류. ESLint 신규 에러 0(기존 9건 유지)·Playwright UAT 16/16 PASS로 검증. 라인 추정 교훈: props 많은 프레젠테이션 추출은 호출부가 `Σ(컴포넌트별 prop 수)`만큼 부푼다(이번 24/15/13/10 props → 호출부 ~60줄 추가)라, "함수 본문 빠지니 줄겠지" 추정이 빗나간다.
-
-**잔존 부채(추출 전부터 존재, surgical-change 원칙으로 미수정)**:
-- **dead code(검증)**: `Reports.jsx:34` `hasFetched`(`useReportList` 구조분해되나 본문 미사용)·`Reports.jsx:36` `watchlistAll`(미사용)·`Reports.jsx:73` `setDetailRefreshKey`(useState로 선언되나 **set 함수가 한 번도 호출 안 됨** — `detailRefreshKey`만 effect deps에서 읽힘, `:100`). 셋 다 task#89 변경의 소산이 아니라 그 이전부터 있던 미사용 변수 → 별도 청소 작업(fg-quick 후보)로 분리 가능.
-- **react-hooks lint 에러(기존 9건)**: `set-state-in-effect`(예: `Reports.jsx:194-196` effect 내 `setActiveTab('holdings')`)·`exhaustive-deps`(`:193`에 이미 `// eslint-disable-next-line react-hooks/exhaustive-deps` 억제 주석 존재). 동작은 하나 React 권장 패턴 위반으로 lint가 경고.
-- **보류된 R4(deferred)**: 종목관리 핸들러(`handleSave`/`handleDelete`/`handlePromote`/`openEdit`/`openAdd`)와 필터·정렬 로직(`_matchSubTab`·`tabEntries` 정렬 클로저)을 커스텀 훅으로 추출하는 R4 후속은 **프론트 단위 테스트 부재로 회귀 위험**이 커 보류됨(항목 16의 프론트 테스트 공백과 직결). 추출 전 프론트 테스트 하니스 도입이 선결.
-
-**남은 큰 파일(참고, 검증)**: `frontend/src/components/reports/DetailTab.jsx`(572줄)가 이제 프론트 최대 파일이며 `frontend/src/pages/Ranking.jsx`(521줄)·`ConsensusChart.jsx`(413줄)가 뒤따른다. 백엔드 최대는 `backend/routers/report.py`(504줄)·`routers/stocks.py`(455줄)·`services/backlog.py`(438줄)·`scheduler/jobs.py`(434줄). 이들은 아직 god-file 임계는 아니나 동일 추출 패턴의 다음 후보.
+### #D3 — Production writes/reads require user mediation
+Prod DB/container writes, reads, and self-permission grants are blocked by the command classifier
+(memory: reference-prod-writes-need-user). Mutations go through admin endpoints or user-run `!` commands; verify
+end-state on the user's screen.
 
 ---
 
-## 부록: silent `except ...: pass` 인벤토리 (검증, 무성 폴백 표면)
+## Cross-cutting contract / doc-drift risks
 
-진단성 위험 순. 로깅 없이 예외를 삼키는 지점:
+### #C1 — Endpoint reshape must sweep ALL frontend consumers
+Changing a response shape (array→object, etc.) non-additively requires `grep -rn '<path>' frontend/src/` for every
+independent fetcher (e.g. `Analytics.jsx` fetches `/api/stocks/dashboard` directly, separate from the hook). One
+missed consumer silently breaks (task52: dashboard array→`{holdings,totals}` left correlation tab always "no holdings").
+Prefer additive field-adds.
 
-- `services/market_indicators/cache.py`: 3건(`_mc_load`·`_mc_save`·`_mc_delete`) — **DB I/O 무성** (가장 위험)
-- `services/market/__init__.py`: 다수 (`resolve_name` 이름 폴백·`get_history_df` KR 폴백·US quote 폴백 등)
-- `services/market/kr.py`·`services/market/us.py`: 시총·재무·애널리스트 파싱 폴백
-- `services/storage/names.py`: 1건 (`_invalidate_name_caches` — 캐시 무효화 실패 무성 → 이름 변경 화면 미반영 가능, 항목 1과 연동)
-- `services/storage/portfolio.py`: JSON 파싱 (타입 한정 `json.JSONDecodeError, TypeError`)
-- `services/scraper.py`·`guru_scraper.py`·`digest_service.py`·`short_sell_service.py`·`investor_service.py`·`report_generator.py`: 각 1~2건
-- `routers/stocks.py`·`routers/events.py`·`routers/report.py`: 폴백 다수
-- `middleware/event_tracker.py`: 2건 (이벤트 추적 실패 무성 — 요청 본류 보호 목적)
-- `auth.py`: `(JWTError, KeyError)` 한정 (토큰 디코드 폴백)
+### #C2 — Additive endpoint calls pollute `mock.call_args` tests
+Adding a read/external call to an endpoint lengthens the *call sequence*, not just the response shape. Tests asserting
+the last call via `mock.call_args` (single-call assumption) silently pass/fail wrong. Migrate to
+`call_args_list[i].kwargs`, gate new calls behind `if <input non-empty>:`, and pin sequence with `call_count`
+(tasks #66/#67).
 
-대조: `scheduler/jobs.py`의 배치 잡은 **`except Exception as e: print(...)`로 모두 로깅**(검증) — 무성 아님. silent except의 위험은 "기능이 죽었는데 조용한" 데이터/캐시 경로에 집중. **task#88(이름 백필)·kr_sector·scheduler/jobs는 이미 `print(...)` 로깅으로 무성 탈출**한 사례.
+### #C3 — Triple doc-sync obligation (DoD)
+API surface changes must update **both** `API_SPEC.md` and `CLAUDE_COWORK_API.md` (one alone goes stale and misleads
+Cowork). Feature-surface changes (nav/screens, env vars, stack, router/service/table, batches) must update the
+matching `README.md` section in the same PR. Easy to forget; not enforced by CI.
+
+### #C4 — KR color-token semantic-badge inversion
+`frontend/src/styles/tokens.css`: `--up`=red (rise), `--down`=blue (fall). So `.badge--success`=red and
+`.badge--danger`=blue (`ui/Badge.css`). Using success/danger on **semantic** (non-price-direction) badges inverts
+Western meaning (green=good/red=warn) — the supply-band badge bug (b288f494). Semantic badges must specify explicit
+colors (e.g. `ui/SupplyBadge.jsx`). The `warning` variant is currently broken (`--color-warning`/`--warning-tint`
+undefined) and unusable as a caution color.
+
+### #C5 — FastAPI route-order fragility
+`PUT /api/stocks/enrich/batch` must be registered **before** `PUT /api/stocks/{ticker}/enrich` or FastAPI routes
+`enrich` as a ticker value. Any new path-param route near a literal sibling risks the same shadowing
+(`GET /{ticker}/backlog` once hid behind a catch-all → 500, fixed 57616211).
+
+---
+
+## Lower-severity / watch items
+- **Empty catch blocks** — 6 `no-empty` lint hits indicate `catch {}` swallowing errors in frontend (diagnostic loss).
+- **`react-refresh/only-export-components` (21)** — util modules co-export non-components alongside components,
+  breaking HMR fast-refresh; concentrated in `marketUtils.jsx`/`reportUtils.jsx`/`icons.jsx`.
+- **No backend coverage gate** — 75 test files exist but CI doesn't run pytest; regressions can land via the
+  poller without test execution.
+- **`ANTHROPIC_API_KEY`** still present in `.env.docker` but unused by backend (no `anthropic` in `requirements.txt`);
+  dead config that can mislead (AI text comes from external Cowork via enrich API).
