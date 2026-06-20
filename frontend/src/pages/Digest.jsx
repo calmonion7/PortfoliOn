@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 import Skeleton from '../components/ui/Skeleton'
+import Button from '../components/ui/Button'
 import { Spark, Sig, sparkFor, fmt } from '../components/ui/icons'
 import InsiderBadge from '../components/ui/InsiderBadge'
 import useIsMobile from '../hooks/useIsMobile'
@@ -62,9 +63,9 @@ export default function Digest() {
     <div style={{ maxWidth: 640 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <span className="muted" style={{ fontSize: 13 }}>다이제스트 {digest?.date && `· ${digest.date}`}</span>
-        <button className="btn" onClick={handleRefresh} disabled={refreshing} style={{ marginLeft: 'auto' }}>
-          {refreshing ? '생성 중…' : '↺ 새로고침'}
-        </button>
+        <Button variant="secondary" size="sm" icon="↺" onClick={handleRefresh} loading={refreshing} style={{ marginLeft: 'auto' }}>
+          {refreshing ? '생성 중…' : '새로고침'}
+        </Button>
       </div>
 
       {error && <div style={{ color: 'var(--color-error)', marginBottom: 12, fontSize: 13 }}>{error}</div>}
@@ -80,9 +81,9 @@ export default function Digest() {
         <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div style={{ fontSize: 40, lineHeight: 1 }}>📰</div>
           <div className="muted" style={{ fontSize: 14 }}>아직 생성된 다이제스트가 없습니다.</div>
-          <button className="btn" onClick={handleRefresh} disabled={refreshing}>
+          <Button variant="primary" onClick={handleRefresh} loading={refreshing}>
             {refreshing ? '생성 중…' : '다이제스트 생성'}
-          </button>
+          </Button>
         </div>
       ) : (
         <>

@@ -54,9 +54,9 @@ export default function ReportDetailTabs({
         summary
           ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* 하위 탭 바 (세그먼트형, 메인 탭과 구분) — ETF는 기술·수급만이라 숨김 */}
+              {/* 하위 탭 바 — 메인 탭과 동일한 언어(.tab-btn.sm, 작은 변형)로 구분. ETF는 기술·수급만이라 숨김 */}
               {!isEtf && (
-              <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-start' }}>
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', alignSelf: 'stretch' }}>
                 {[
                   { key: 'consensus', label: '컨센서스' },
                   { key: 'financials', label: '재무·수주' },
@@ -65,13 +65,8 @@ export default function ReportDetailTabs({
                   <button
                     key={key}
                     onClick={() => setAnalysisSubTab(key)}
-                    style={{
-                      padding: '5px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
-                      background: analysisSubTab === key ? 'var(--accent-soft)' : 'transparent',
-                      color: analysisSubTab === key ? 'var(--accent)' : 'var(--text-3)',
-                      border: `1px solid ${analysisSubTab === key ? 'var(--accent)' : 'var(--border)'}`,
-                      fontWeight: analysisSubTab === key ? 600 : 400,
-                    }}
+                    className={`tab-btn sm${analysisSubTab === key ? ' active' : ''}`}
+                    style={{ marginBottom: -1 }}
                   >
                     {label}
                   </button>

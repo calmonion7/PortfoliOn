@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 import Skeleton from '../components/ui/Skeleton'
+import Button from '../components/ui/Button'
 import { useToast } from '../components/Toast'
 import useIsMobile from '../hooks/useIsMobile'
 
@@ -220,15 +221,12 @@ export default function Calendar() {
     <div style={{ maxWidth: 700, margin: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={refresh} disabled={loading} title="캐시 삭제 후 새로고침"
-            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: loading ? 'default' : 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 13 }}>↺</button>
-          <button onClick={prevMonth}
-            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '2px 10px', borderRadius: 4, fontSize: 16 }}>‹</button>
+          <Button variant="secondary" size="sm" iconOnly icon="↺" onClick={refresh} disabled={loading} title="캐시 삭제 후 새로고침" />
+          <Button variant="ghost" size="sm" iconOnly icon="‹" onClick={prevMonth} aria-label="이전 달" />
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', minWidth: 90, textAlign: 'center' }}>
             {year}년 {month}월
           </span>
-          <button onClick={nextMonth}
-            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '2px 10px', borderRadius: 4, fontSize: 16 }}>›</button>
+          <Button variant="ghost" size="sm" iconOnly icon="›" onClick={nextMonth} aria-label="다음 달" />
         </div>
       </div>
 
@@ -237,8 +235,7 @@ export default function Calendar() {
         : error
         ? <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             <span>{error}</span>
-            <button onClick={() => setFetchKey(k => k + 1)}
-              style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', padding: '4px 12px', borderRadius: 4, fontSize: 13 }}>다시 시도</button>
+            <Button variant="secondary" size="sm" onClick={() => setFetchKey(k => k + 1)}>다시 시도</Button>
           </div>
         : <>
             <MonthGrid year={year} month={month} events={events} />

@@ -3,14 +3,22 @@ import GuruManagers from './GuruManagers'
 import GuruStats from './GuruStats'
 import useIsMobile from '../hooks/useIsMobile'
 
+// 이중 탭(상위 매니저/통계 + GuruStats 내부 탭)을 단일 탭행으로 평탄화.
+// stats 뷰 key는 GuruStats의 내부 view 값과 일치(popularity/top3/weighted).
 const TABS = [
-  { key: 'managers', label: '매니저 목록' },
-  { key: 'stats',    label: '추천 통계' },
+  { key: 'managers',   label: '매니저 목록' },
+  { key: 'popularity', label: '인기순' },
+  { key: 'top3',       label: '매니저별 탑3' },
+  { key: 'weighted',   label: '가중치' },
 ]
 
 export default function Guru() {
   const isMobile = useIsMobile()
   const [tab, setTab] = useState('managers')
+
+  const body = tab === 'managers'
+    ? <GuruManagers />
+    : <GuruStats view={tab} />
 
   if (isMobile) return (
     <>
@@ -19,13 +27,15 @@ export default function Guru() {
       </header>
       <div className="seg-pad">
         <div className="seg">
-          <button className={tab === 'managers' ? 'is-active' : ''} onClick={() => setTab('managers')}>매니저</button>
-          <button className={tab === 'stats' ? 'is-active' : ''} onClick={() => setTab('stats')}>추천 통계</button>
+          {TABS.map(t => (
+            <button key={t.key} className={tab === t.key ? 'is-active' : ''} onClick={() => setTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
       <div className="m-page">
-        {tab === 'managers' && <GuruManagers />}
-        {tab === 'stats'    && <GuruStats />}
+        {body}
       </div>
     </>
   )
@@ -42,8 +52,7 @@ export default function Guru() {
         ))}
       </div>
 
-      {tab === 'managers' && <GuruManagers />}
-      {tab === 'stats'    && <GuruStats />}
+      {body}
     </div>
   )
 }

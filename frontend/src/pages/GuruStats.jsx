@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
 import '../components/ui/Button.css'
 
@@ -58,15 +59,18 @@ function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
   )
 }
 
-export default function GuruStats() {
+export default function GuruStats({ view }) {
   const isMobile = useIsMobile()
   const [popularity, setPopularity] = useState([])
   const [top3, setTop3]             = useState([])
   const [weighted, setWeighted]     = useState([])
   const [stockMap, setStockMap]     = useState({})  // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]       = useState(true)
-  const [tab, setTab]               = useState('popularity')
+  const [innerTab, setInnerTab]     = useState('popularity')
   const [query, setQuery]           = useState('')
+
+  // view prop가 있으면 그 값으로 표시 뷰 고정(내부 탭행 미렌더), 없으면 자체 탭 사용
+  const tab = view ?? innerTab
 
   const loadStockMap = useCallback(async () => {
     const { data } = await api.get('/api/stocks')
@@ -121,20 +125,22 @@ export default function GuruStats() {
 
   return (
     <div>
-      <div className="tabs" style={{ marginBottom: 14 }}>
-        {TABS.map(t => (
-          <button key={t.key} className={tab === t.key ? 'is-active' : ''} onClick={() => setTab(t.key)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {!view && (
+        <div className="tabs" style={{ marginBottom: 14 }}>
+          {TABS.map(t => (
+            <button key={t.key} className={tab === t.key ? 'is-active' : ''} onClick={() => setInnerTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input
+        <Input
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="티커 / 종목명 / 매니저명 검색..."
-          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-elev)', color: 'var(--text)', fontSize: 13, flex: 1, minWidth: 0 }}
+          style={{ flex: 1, minWidth: 0 }}
         />
         {query && tab === 'popularity' && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredPopularity.length}개</span>}
         {query && tab === 'weighted'   && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredWeighted.length}개</span>}

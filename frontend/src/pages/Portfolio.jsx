@@ -7,6 +7,7 @@ import Skeleton from '../components/ui/Skeleton'
 import DashboardCard from '../components/portfolio/DashboardCard'
 import FlashValue from '../components/portfolio/FlashValue'
 import { fmt } from '../components/ui/icons'
+import Button from '../components/ui/Button'
 import useIsMobile from '../hooks/useIsMobile'
 import SectorTab from './SectorTab'
 import MacroTab from './MacroTab'
@@ -196,14 +197,25 @@ export default function Portfolio() {
         </div>
       </div>
 
-      {/* 세그먼트 탭 */}
+      {/* 세그먼트 탭 — 새로고침 액션은 탭바와 분리(우측 icon-only ui/Button) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <div className="tabs">
           <button className={tab === 'dash' ? 'is-active' : ''} onClick={() => { setTab('dash'); fetchDashboard(); trackEvent('tab_dash') }}>대시보드</button>
           <button className={tab === 'analysis' ? 'is-active' : ''} onClick={() => { setTab('analysis'); trackEvent('tab_analysis') }}>분석</button>
         </div>
         {tab === 'dash' && (
-          <button className="btn" onClick={() => fetchDashboard({ invalidate: true })} disabled={dashboardLoading}>↺ 새로고침</button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="↺"
+            onClick={() => fetchDashboard({ invalidate: true })}
+            disabled={dashboardLoading}
+            loading={dashboardLoading}
+            title="새로고침"
+            aria-label="새로고침"
+            style={{ marginLeft: 'auto' }}
+          />
         )}
       </div>
 

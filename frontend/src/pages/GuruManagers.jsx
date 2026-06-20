@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
 
 function formatValue(val) {
@@ -226,11 +227,11 @@ export default function GuruManagers() {
         <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated.slice(0, 10)}</p>
       )}
       <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input
+        <Input
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="매니저명 / 펌 / 티커 검색..."
-          style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-elev)', color: 'var(--text)', fontSize: 13, width: 260 }}
+          style={{ width: 260 }}
         />
         {query && (
           <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{sorted.length} / {data.managers.length}명</span>
