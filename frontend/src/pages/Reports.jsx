@@ -604,14 +604,15 @@ export default function Reports() {
   }
 
   return (
+    <>
+    {mutError && <p style={{ color: 'var(--color-error)', fontSize: 12, marginTop: 0 }}>{mutError}</p>}
+    <div className="reports-filters" data-view={view}>{renderFilters()}</div>
     <div className="reports-layout" data-view={view}>
       {/* 좌측 사이드바 */}
       <div className="reports-sidebar">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
-        {mutError && <p style={{ color: 'var(--color-error)', fontSize: 12, marginTop: 0 }}>{mutError}</p>}
-        {renderFilters()}
         {(activeTab === 'others' ? othersLoading : listLoading)
           ? <Skeleton variant="row" count={8} />
           : (activeEntries.length === 0)
@@ -628,19 +629,11 @@ export default function Reports() {
         {view === 'list' ? (
           /* 목록화면 */
           (activeTab === 'others' ? othersLoading : listLoading) ? (
-            <>
-              <div style={{ marginBottom: 16 }}>
-                {renderFilters()}
-              </div>
-              <div className="stock-card-grid">
-                <Skeleton variant="row" count={8} />
-              </div>
-            </>
+            <div className="stock-card-grid">
+              <Skeleton variant="row" count={8} />
+            </div>
           ) : (
             <>
-              <div style={{ marginBottom: 16 }}>
-                {renderFilters()}
-              </div>
               {activeEntries.length === 0 ? (
                 <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-3)' }}>
                   <p>리포트가 없습니다.</p>
@@ -806,5 +799,6 @@ export default function Reports() {
         />
       )}
     </div>
+    </>
   )
 }

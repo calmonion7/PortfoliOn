@@ -316,10 +316,14 @@
 .reports-main { flex: 1; overflow-x: clip; }
 .reports-layout[data-view="detail"] .reports-main { overflow-x: hidden; }
 
-/* 좁은 사이드바(210px)용 컴팩트 탭: 한 줄 고정 + 카운트 보조표기 (전역 .tab-btn 불변) */
-.reports-sidebar .tab-btn { padding: 6px 4px; font-size: 12px; white-space: nowrap; }
-.reports-sidebar .tab-btn.sm { padding: 4px 4px; font-size: 11px; }
-.reports-sidebar .tab-cnt { font-size: 10px; opacity: 0.55; margin-left: 3px; }
+/* 필터를 사이드바·메인에서 빼 단일 호스트로 1벌만 렌더 (DOM 중복 제거) */
+.reports-filters { margin-bottom: 8px; }
+/* 모바일 상세뷰는 기존대로 필터 미노출 (사이드바 숨김 + 상세만) */
+@media (max-width: 640px) {
+  .reports-filters[data-view="detail"] { display: none; }
+}
+/* 카운트 보조표기 (전역 .tab-btn 불변) */
+.reports-filters .tab-cnt { font-size: 10px; opacity: 0.55; margin-left: 3px; }
 
 /* ----- STOCK CARD GRID ----- */
 .stock-card-grid { display: flex; flex-direction: column; gap: 5px; padding-right: 10px; }
