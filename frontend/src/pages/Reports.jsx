@@ -31,9 +31,9 @@ export default function Reports() {
   const touchStyle = isMobile ? { minWidth: 44, minHeight: 44, padding: '0 8px' } : undefined
 
   const {
-    reportList, listLoading, hasFetched,
+    reportList, listLoading,
     guruMap, fetchList, applyList,
-    holdingsCount, watchlistAll, watchlistCount,
+    holdingsCount, watchlistCount,
     watchlistWarnCount, watchlistLowCount, watchlistHighCount,
     _targetPct, _hasWarning, _isUngenerated,
     ungeneratedTickers, ungeneratedCount,
@@ -70,7 +70,7 @@ export default function Reports() {
   const [othersData, setOthersData] = useState(null)
   const [othersLoading, setOthersLoading] = useState(false)
   const [view, setView] = useState('list')
-  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
+  const [detailRefreshKey] = useState(0)
   const [marketFilter, setMarketFilter] = useState('ALL')
 
   // 종목 관리(추가/편집/삭제/승격) — 종목관리에서 흡수
