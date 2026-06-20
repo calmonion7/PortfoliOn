@@ -41,7 +41,7 @@ export default function FxSection() {
                 {r ? r.current.toLocaleString() : '-'}
               </div>
               {r && (
-                <div style={{ fontSize: 12, color: up ? '#81c784' : down ? '#e57373' : 'var(--text-3)', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)', marginTop: 2 }}>
                   {up ? '▲' : down ? '▼' : '─'} {Math.abs(r.change_pct).toFixed(2)}%
                 </div>
               )}
@@ -60,7 +60,7 @@ export default function FxSection() {
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={48} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                        labelStyle={{ color: 'var(--text-3)' }} />
-              <Line type="monotone" dataKey="value" name="USD/KRW" stroke="#4fc3f7" dot={false} strokeWidth={1.5} />
+              <Line type="monotone" dataKey="value" name="USD/KRW" stroke="var(--data-2)" dot={false} strokeWidth={1.5} />
             </LineChart>
           </ResponsiveContainer>
         </div>

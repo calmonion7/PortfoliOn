@@ -20,7 +20,7 @@ export default function VixSection() {
   if (error || !data) return <SectionCardError title="공포탐욕지수 (VIX)" />
 
   const vix = data.current
-  const vixColor = vix >= 30 ? '#e57373' : vix >= 20 ? '#ffb74d' : '#81c784'
+  const vixColor = vix >= 30 ? 'var(--color-error)' : vix >= 20 ? 'var(--warn)' : 'var(--color-success)'
   const vixLabel = vix >= 30 ? '공포' : vix >= 20 ? '주의' : '탐욕'
   const history = (data.history || []).slice(-252)
 
@@ -37,7 +37,7 @@ export default function VixSection() {
           </div>
           <div style={{ fontSize: 12, color: vixColor, marginTop: 2 }}>{vixLabel}</div>
           {data.change != null && (
-            <div style={{ fontSize: 12, color: data.change > 0 ? '#e57373' : '#81c784', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: data.change > 0 ? 'var(--down)' : 'var(--up)', marginTop: 4 }}>
               {data.change > 0 ? '▲' : '▼'} {Math.abs(data.change).toFixed(2)}
             </div>
           )}
@@ -54,8 +54,8 @@ export default function VixSection() {
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={36} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                        labelStyle={{ color: 'var(--text-3)' }} />
-              <ReferenceLine y={30} stroke="#e57373" strokeDasharray="4 2" label={{ value: '30', fill: '#e57373', fontSize: 10 }} />
-              <Line type="monotone" dataKey="value" name="VIX" stroke="#ffb74d" dot={false} strokeWidth={1.5} />
+              <ReferenceLine y={30} stroke="var(--warn)" strokeDasharray="4 2" label={{ value: '30', fill: 'var(--warn)', fontSize: 10 }} />
+              <Line type="monotone" dataKey="value" name="VIX" stroke="var(--data-3)" dot={false} strokeWidth={1.5} />
             </LineChart>
           </ResponsiveContainer>
         </div>

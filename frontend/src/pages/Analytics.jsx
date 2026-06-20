@@ -7,9 +7,9 @@ import {
 } from 'recharts'
 
 const SECTOR_COLORS = [
-  '#4fc3f7', '#81c784', '#ffb74d', '#f06292',
-  '#ce93d8', '#80cbc4', '#fff176', '#a5d6a7',
-  '#ef9a9a', '#90caf9',
+  'var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)',
+  'var(--data-5)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)',
+  'var(--data-5)', 'var(--data-1)',
 ]
 
 function SectorAllocation({ cards }) {
@@ -132,7 +132,7 @@ function OpportunityBubble({ cards }) {
       upside,
       returnPct,
       weight,
-      fill: upside > 0 ? '#81c784' : '#ef9a9a',
+      fill: upside > 0 ? 'var(--up)' : 'var(--down)',
     })
   }
 
@@ -198,12 +198,9 @@ function OpportunityBubble({ cards }) {
 
 function corrColor(v) {
   if (v === null || v === undefined) return 'var(--bg-elev-2)'
-  const neutral = [69, 90, 100]
-  const pos = [79, 195, 247]
-  const neg = [239, 154, 154]
-  const t = Math.abs(v)
-  const to = v >= 0 ? pos : neg
-  return `rgb(${Math.round(neutral[0] + t * (to[0] - neutral[0]))},${Math.round(neutral[1] + t * (to[1] - neutral[1]))},${Math.round(neutral[2] + t * (to[2] - neutral[2]))})`
+  const t = Math.round(Math.min(Math.abs(v), 1) * 100)
+  const to = v >= 0 ? 'var(--corr-pos)' : 'var(--corr-neg)'
+  return `color-mix(in oklab, ${to} ${t}%, var(--corr-zero))`
 }
 
 function CorrelationHeatmap() {
@@ -218,7 +215,7 @@ function CorrelationHeatmap() {
   }, [])
 
   if (loading) return <LoadingSpinner label="상관관계 불러오는 중입니다." style={{ marginTop: 48 }} />
-  if (error) return <div style={{ color: '#ef9a9a', marginTop: 48 }}>오류: {error}</div>
+  if (error) return <div style={{ color: 'var(--color-error)', marginTop: 48 }}>오류: {error}</div>
   if (!data || !data.tickers.length) return (
     <div style={{ color: 'var(--text-3)', marginTop: 48 }}>보유종목 2개 이상 필요</div>
   )
@@ -235,7 +232,7 @@ function CorrelationHeatmap() {
         90일 종가 기준 Pearson 상관계수 &nbsp;·&nbsp; 1.0=완전 양의 상관 &nbsp;·&nbsp; -1.0=완전 음의 상관
       </p>
       <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 16, lineHeight: 1.7 }}>
-        값이 1에 가까울수록 두 종목이 같은 방향으로 움직임. 파란색 계열이 많으면 분산 효과가 낮아<br />
+        값이 1에 가까울수록 두 종목이 같은 방향으로 움직임. 진한 양의 상관이 많으면 분산 효과가 낮아<br />
         시장 충격 시 포트폴리오 전체가 동반 하락할 위험이 있습니다. 보유종목 2개 이상 필요.
       </p>
       <svg width={LABEL + n * CELL} height={LABEL + n * CELL}>
@@ -256,6 +253,14 @@ function CorrelationHeatmap() {
           </g>
         )))}
       </svg>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>-1.0</span>
+        <div style={{
+          width: 200, height: 12, borderRadius: 2,
+          background: 'linear-gradient(to right, var(--corr-neg), var(--corr-zero), var(--corr-pos))',
+        }} />
+        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>+1.0</span>
+      </div>
     </div>
   )
 }
@@ -272,7 +277,7 @@ export default function Analytics() {
   }, [])
 
   if (loading) return <LoadingSpinner label="분석 데이터 불러오는 중입니다." />
-  if (error) return <div style={{ color: '#ef9a9a' }}>오류: {error}</div>
+  if (error) return <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
   if (!cards.length) return <div style={{ color: 'var(--text-3)' }}>보유종목 없음</div>
 
   return (

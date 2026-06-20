@@ -7,10 +7,10 @@ import api from '../../api'
 
 // DART pblntf_ty 단일문자 코드 → 한글 배지 라벨/색.
 const _TY_CFG = {
-  A: { label: '정기공시', color: '#64b5f6' },
-  B: { label: '주요사항', color: '#ffb74d' },
-  C: { label: '발행공시', color: '#9575cd' },
-  D: { label: '지분공시', color: '#81c784' },
+  A: { label: '정기공시', color: 'var(--color-info)' },
+  B: { label: '주요사항', color: 'var(--warn)' },
+  C: { label: '발행공시', color: 'var(--data-4)' },
+  D: { label: '지분공시', color: 'var(--color-success)' },
 }
 
 // YYYYMMDD → YYYY.MM.DD

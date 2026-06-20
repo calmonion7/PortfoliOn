@@ -5,10 +5,10 @@ import Badge, { MarketBadge } from '../ui/Badge'
 // SupplyBadge식으로 neutral Badge에 kind별 전용색을 명시 지정한다.
 // kind enum은 백엔드 derive_flags 출력(value/momentum/smart_money/missing).
 const FLAG_STYLE = {
-  value:       { background: 'rgba(79, 195, 247, 0.14)', color: '#4fc3f7', borderColor: 'rgba(79, 195, 247, 0.30)' },   // 밸류 — 블루
-  momentum:    { background: 'rgba(245, 124, 0, 0.16)',  color: '#f57c00', borderColor: 'rgba(245, 124, 0, 0.32)' },    // 모멘텀 — 주황
-  smart_money: { background: 'rgba(76, 175, 80, 0.14)',  color: '#4caf50', borderColor: 'rgba(76, 175, 80, 0.30)' },    // 스마트머니 — 초록
-  missing:     { background: 'var(--bg-elev-2)',         color: 'var(--text-3)', borderColor: 'var(--border)' },        // 데이터 부족 — 회색 muted
+  value:       { background: 'var(--color-info-soft)',    color: 'var(--color-info)',    borderColor: 'var(--color-info-soft)' },    // 밸류 — 정보(블루)
+  momentum:    { background: 'var(--warn-soft)',          color: 'var(--warn)',          borderColor: 'var(--warn-soft)' },          // 모멘텀 — 경계(주황)
+  smart_money: { background: 'var(--semantic-buy-soft)',  color: 'var(--semantic-buy)',  borderColor: 'var(--semantic-buy-soft)' },  // 스마트머니 — 시맨틱 buy(초록)
+  missing:     { background: 'var(--bg-elev-2)',          color: 'var(--text-3)',        borderColor: 'var(--border)' },             // 데이터 부족 — 회색 muted
 }
 
 const fmtScore = (s) => (s == null ? null : Number(s).toFixed(1))

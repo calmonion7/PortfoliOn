@@ -42,7 +42,7 @@ export default function CommoditiesSection() {
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{p?.unit}</div>
               {p && (
-                <div style={{ fontSize: 12, color: up ? '#81c784' : down ? '#e57373' : 'var(--text-3)', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)', marginTop: 2 }}>
                   {up ? '▲' : down ? '▼' : '─'} {Math.abs(p.change_pct).toFixed(2)}%
                 </div>
               )}
@@ -52,9 +52,9 @@ export default function CommoditiesSection() {
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {[
-          { key: 'gold', label: '금', color: '#ffd54f' },
-          { key: 'oil',  label: 'WTI', color: '#4fc3f7' },
-          { key: 'copper', label: '구리', color: '#ff8a65' },
+          { key: 'gold', label: '금', color: 'var(--data-3)' },
+          { key: 'oil',  label: 'WTI', color: 'var(--data-2)' },
+          { key: 'copper', label: '구리', color: 'var(--data-5)' },
         ].map(({ key, label, color }) => {
           const h = (history[key] || []).slice(-252)
           if (!h.length) return null

@@ -147,7 +147,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     if (abs == null) return null
     const pos = abs >= 0
     const arrow = pos ? '▲' : '▼'
-    const color = pos ? '#81c784' : '#ef9a9a'
+    const color = pos ? 'var(--up)' : 'var(--down)'
     return (
       <span style={{ color, marginLeft: 6, fontSize: 10 }}>
         {arrow} {fmtFn(Math.abs(abs))} ({pos ? '+' : ''}{pct}%)
@@ -199,7 +199,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     if (index === 0 || value == null) return null
     const pos = value >= 0
     return (
-      <text x={x} y={y - 10} textAnchor="middle" fontSize={8} fill={pos ? '#81c784' : '#ef9a9a'}>
+      <text x={x} y={y - 10} textAnchor="middle" fontSize={8} fill={pos ? 'var(--up)' : 'var(--down)'}>
         {pos ? '+' : ''}{value.toFixed(1)}%
       </text>
     )
@@ -262,7 +262,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
 
         {/* 매출 / 영업이익 */}
         <div style={{ marginTop: 8 }}>
-          <Legend items={[{ color: '#4fc3f7', label: '매출' }, { color: '#81c784', label: '영업이익' }]} weather={revOpWeather} />
+          <Legend items={[{ color: 'var(--data-2)', label: '매출' }, { color: 'var(--data-5)', label: '영업이익' }]} weather={revOpWeather} />
           <ResponsiveContainer width="100%" height={165}>
             <LineChart data={data} margin={{ ...chartMargin, top: 18 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
@@ -270,10 +270,10 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
               <YAxis tickFormatter={fmtVal} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
               <Tooltip content={makeTooltip(true)} />
               <ReferenceLine y={0} stroke="var(--border)" />
-              <Line {...lineCfg} dataKey="revenue"   name="매출"    stroke="#4fc3f7">
+              <Line {...lineCfg} dataKey="revenue"   name="매출"    stroke="var(--data-2)">
                 <LabelList dataKey="rev_chg_pct" content={PctLabel()} />
               </Line>
-              <Line {...lineCfg} dataKey="op_income" name="영업이익" stroke="#81c784">
+              <Line {...lineCfg} dataKey="op_income" name="영업이익" stroke="var(--data-5)">
                 <LabelList dataKey="op_chg_pct" content={PctLabel()} />
               </Line>
             </LineChart>
@@ -283,15 +283,15 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
         {/* EPS / BPS */}
         {hasEpsBps && (
           <div style={{ marginTop: 12 }}>
-            <Legend items={[{ color: '#80cbc4', label: 'EPS' }, { color: '#f48fb1', label: 'BPS' }]} weather={epsWeather} />
+            <Legend items={[{ color: 'var(--data-2)', label: 'EPS' }, { color: 'var(--data-3)', label: 'BPS' }]} weather={epsWeather} />
             <ResponsiveContainer width="100%" height={140}>
               <LineChart data={data} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={fmtShareAxis} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
                 <Tooltip content={makeShareTooltip()} />
-                <Line {...lineCfg} dataKey="eps" name="EPS" stroke="#80cbc4" />
-                <Line {...lineCfg} dataKey="bps" name="BPS" stroke="#f48fb1" />
+                <Line {...lineCfg} dataKey="eps" name="EPS" stroke="var(--data-2)" />
+                <Line {...lineCfg} dataKey="bps" name="BPS" stroke="var(--data-3)" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -300,15 +300,15 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
         {/* PER / PBR */}
         {hasPerPbr && (
           <div style={{ marginTop: 12 }}>
-            <Legend items={[{ color: '#ffcc80', label: 'PER' }, { color: '#ce93d8', label: 'PBR' }]} weather={perWeather} />
+            <Legend items={[{ color: 'var(--data-3)', label: 'PER' }, { color: 'var(--data-4)', label: 'PBR' }]} weather={perWeather} />
             <ResponsiveContainer width="100%" height={140}>
               <LineChart data={data} margin={chartMargin}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
                 <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
                 <Tooltip content={makeTooltip(false)} />
-                <Line {...lineCfg} dataKey="per" name="PER" stroke="#ffcc80" />
-                <Line {...lineCfg} dataKey="pbr" name="PBR" stroke="#ce93d8" />
+                <Line {...lineCfg} dataKey="per" name="PER" stroke="var(--data-3)" />
+                <Line {...lineCfg} dataKey="pbr" name="PBR" stroke="var(--data-4)" />
               </LineChart>
             </ResponsiveContainer>
           </div>

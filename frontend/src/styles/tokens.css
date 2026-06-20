@@ -39,6 +39,21 @@
   --warn:        #c97a29;
   --warn-soft:   rgba(201, 122, 41, 0.12);
 
+  /* Semantic state colors — NOT price direction */
+  --color-success:      #2e7d32;
+  --color-success-soft: rgba(46, 125, 50, 0.12);
+  --color-error:        #d32f2f;
+  --color-error-soft:   rgba(211, 47, 47, 0.12);
+  --color-info:         #1565c0;
+  --color-info-soft:    rgba(21, 101, 192, 0.12);
+  --semantic-buy:       #2e7d32;
+  --semantic-buy-soft:  rgba(46, 125, 50, 0.12);
+  --semantic-sell:      #c62828;
+  --semantic-sell-soft: rgba(198, 40, 40, 0.12);
+  --corr-pos:           #2f6f6f;
+  --corr-neg:           #c98a2b;
+  --corr-zero:          #e2e2dc;
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius:    10px;
@@ -99,6 +114,21 @@
 
   --warn:        #e29957;
   --warn-soft:   rgba(226, 153, 87, 0.16);
+
+  /* Semantic state colors — NOT price direction */
+  --color-success:      #81c784;
+  --color-success-soft: rgba(129, 199, 132, 0.18);
+  --color-error:        #ef5350;
+  --color-error-soft:   rgba(239, 83, 80, 0.18);
+  --color-info:         #4fc3f7;
+  --color-info-soft:    rgba(79, 195, 247, 0.18);
+  --semantic-buy:       #81c784;
+  --semantic-buy-soft:  rgba(129, 199, 132, 0.18);
+  --semantic-sell:      #e57373;
+  --semantic-sell-soft: rgba(229, 115, 115, 0.18);
+  --corr-pos:           #5fb0b0;
+  --corr-neg:           #e0b56b;
+  --corr-zero:          #2a2a2d;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
   --shadow:    0 1px 3px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);

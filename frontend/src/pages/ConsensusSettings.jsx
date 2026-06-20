@@ -86,11 +86,11 @@ export default function ConsensusSettings() {
             </div>
           )}
           {!batch.running && batch.total > 0 && batch.done >= batch.total && (
-            <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>
+            <p style={{ marginTop: 8, color: 'var(--color-success)', fontSize: 13 }}>
               완료: {batch.done}개 종목 수집됨
             </p>
           )}
-          {batchErr && <p style={{ marginTop: 8, color: 'var(--down)', fontSize: 13 }}>{batchErr}</p>}
+          {batchErr && <p style={{ marginTop: 8, color: 'var(--color-error)', fontSize: 13 }}>{batchErr}</p>}
         </div>
       </div>
     </div>

@@ -103,7 +103,7 @@
   background: none; border: none; padding: 4px 6px; cursor: pointer;
   color: var(--text-faint); font-size: 18px; line-height: 1;
 }
-.row-del:hover { color: var(--down); }
+.row-del:hover { color: var(--color-error); }
 .h-row .logo {
   width: 36px; height: 36px; border-radius: 10px;
   background: var(--accent-soft); color: var(--text-2);

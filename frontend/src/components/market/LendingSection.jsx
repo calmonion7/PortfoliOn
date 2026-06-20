@@ -39,7 +39,7 @@ export default function LendingSection() {
       onToggle={() => setOpen(o => !o)}
       badge={
         latest ? (
-          <span style={{ fontSize: 12, color: '#888', marginLeft: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
             외국인 차입 {latest.foreign_borrow?.toFixed(1)}조 · 내국인 차입 {latest.domestic_borrow?.toFixed(1)}조
           </span>
         ) : null
@@ -72,15 +72,15 @@ export default function LendingSection() {
               labelFormatter={tooltipLabel}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Line type="monotone" dataKey="foreign_borrow" name="외국인 차입" stroke="#ef4444" dot={false} strokeWidth={2} />
-            <Line type="monotone" dataKey="domestic_borrow" name="내국인 차입" stroke="#3b82f6" dot={false} strokeWidth={2} />
-            <Line type="monotone" dataKey="foreign_lend" name="외국인 대여" stroke="#f97316" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
-            <Line type="monotone" dataKey="domestic_lend" name="내국인 대여" stroke="#6366f1" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
+            <Line type="monotone" dataKey="foreign_borrow" name="외국인 차입" stroke="var(--data-2)" dot={false} strokeWidth={2} />
+            <Line type="monotone" dataKey="domestic_borrow" name="내국인 차입" stroke="var(--data-3)" dot={false} strokeWidth={2} />
+            <Line type="monotone" dataKey="foreign_lend" name="외국인 대여" stroke="var(--data-4)" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
+            <Line type="monotone" dataKey="domestic_lend" name="내국인 대여" stroke="var(--data-5)" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
           </LineChart>
         </ResponsiveContainer>
         </div>
       ) : (
-        <p style={{ color: '#666', fontSize: 13 }}>데이터 없음 — 관리자 메뉴에서 동기화하세요.</p>
+        <p style={{ color: 'var(--text-3)', fontSize: 13 }}>데이터 없음 — 관리자 메뉴에서 동기화하세요.</p>
       )}
     </SectionCard>
   )

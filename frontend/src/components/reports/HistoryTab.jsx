@@ -44,7 +44,7 @@ export default function HistoryTab({ ticker, dates, market }) {
   }, [ticker, compareB])
 
   if (histLoading) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>로딩 중...</p>
-  if (histError) return <p style={{ color: '#ef9a9a', fontSize: 13 }}>{histError}</p>
+  if (histError) return <p style={{ color: 'var(--color-error)', fontSize: 13 }}>{histError}</p>
   if (history.length === 0) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>히스토리 데이터가 없습니다.</p>
 
   const xTickFormatter = (date) => date?.slice(5) ?? ''
@@ -74,10 +74,10 @@ export default function HistoryTab({ ticker, dates, market }) {
                 formatter={(v, name) => [v != null ? fmt(v, market) : 'N/A', name]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="target_high" name="최고" stroke="#81c784" strokeWidth={1} dot={false} connectNulls={false} />
+              <Line type="monotone" dataKey="target_high" name="최고" stroke="var(--data-2)" strokeWidth={1} dot={false} connectNulls={false} />
               <Line type="monotone" dataKey="target_mean" name="평균" stroke="var(--accent)" strokeWidth={2} dot={false} connectNulls={false} />
-              <Line type="monotone" dataKey="target_low" name="최저" stroke="#ef9a9a" strokeWidth={1} dot={false} connectNulls={false} />
-              <Line type="monotone" dataKey="price" name="현재가" stroke="#90caf9" strokeWidth={1} strokeDasharray="4 2" dot={false} connectNulls={false} />
+              <Line type="monotone" dataKey="target_low" name="최저" stroke="var(--data-3)" strokeWidth={1} dot={false} connectNulls={false} />
+              <Line type="monotone" dataKey="price" name="현재가" stroke="var(--data-4)" strokeWidth={1} strokeDasharray="4 2" dot={false} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -90,11 +90,11 @@ export default function HistoryTab({ ticker, dates, market }) {
               <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-3)' }} width={30} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 11 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <ReferenceLine y={70} stroke="#ef9a9a" strokeDasharray="4 2" label={{ value: '과매수', fill: '#ef9a9a', fontSize: 10 }} />
-              <ReferenceLine y={30} stroke="#81c784" strokeDasharray="4 2" label={{ value: '과매도', fill: '#81c784', fontSize: 10 }} />
+              <ReferenceLine y={70} stroke="var(--semantic-sell)" strokeDasharray="4 2" label={{ value: '과매수', fill: 'var(--semantic-sell)', fontSize: 10 }} />
+              <ReferenceLine y={30} stroke="var(--semantic-buy)" strokeDasharray="4 2" label={{ value: '과매도', fill: 'var(--semantic-buy)', fontSize: 10 }} />
               <Line type="monotone" dataKey="rsi_daily" name="일" stroke="var(--accent)" strokeWidth={2} dot={false} connectNulls={false} />
-              <Line type="monotone" dataKey="rsi_weekly" name="주" stroke="#90caf9" strokeWidth={1.5} dot={false} connectNulls={false} />
-              <Line type="monotone" dataKey="rsi_monthly" name="월" stroke="#ce93d8" strokeWidth={1.5} dot={false} connectNulls={false} />
+              <Line type="monotone" dataKey="rsi_weekly" name="주" stroke="var(--data-2)" strokeWidth={1.5} dot={false} connectNulls={false} />
+              <Line type="monotone" dataKey="rsi_monthly" name="월" stroke="var(--data-3)" strokeWidth={1.5} dot={false} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -147,7 +147,7 @@ export default function HistoryTab({ ticker, dates, market }) {
                         <td style={{ ...TD, textAlign: 'left', color: 'var(--text-3)' }}>{label}</td>
                         <td style={TD}>{fmtFn(keyA)}</td>
                         <td style={TD}>{fmtFn(keyB)}</td>
-                        <td style={{ ...TD, color: delta == null ? 'var(--text-3)' : delta >= 0 ? '#81c784' : '#ef9a9a' }}>
+                        <td style={{ ...TD, color: delta == null ? 'var(--text-3)' : delta >= 0 ? 'var(--up)' : 'var(--down)' }}>
                           {delta != null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%` : '—'}
                         </td>
                       </tr>

@@ -52,8 +52,8 @@ export default function KrExportsSection() {
       <p style={DESC_STYLE}>관세청 월별 수출 통계 기준입니다. 반도체(HS 8542)는 한국 무역수지와 원화 가치의 핵심 동력으로, 수출 비중 상승은 업황 호조를 의미합니다. 비반도체 비중은 수출 다각화 정도를 나타냅니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: '반도체', value: latest?.semiconductor, mom: chg3(latest?.semiconductor, prev?.semiconductor), yoy: chg3(latest?.semiconductor, yoy3?.semiconductor), prevVal: prev?.semiconductor, yoyVal: yoy3?.semiconductor, color: '#4fc3f7' },
-          { label: '비반도체', value: latest?.non_semiconductor, mom: chg3(latest?.non_semiconductor, prev?.non_semiconductor), yoy: chg3(latest?.non_semiconductor, yoy3?.non_semiconductor), prevVal: prev?.non_semiconductor, yoyVal: yoy3?.non_semiconductor, color: '#80cbc4' },
+          { label: '반도체', value: latest?.semiconductor, mom: chg3(latest?.semiconductor, prev?.semiconductor), yoy: chg3(latest?.semiconductor, yoy3?.semiconductor), prevVal: prev?.semiconductor, yoyVal: yoy3?.semiconductor, color: 'var(--data-2)' },
+          { label: '비반도체', value: latest?.non_semiconductor, mom: chg3(latest?.non_semiconductor, prev?.non_semiconductor), yoy: chg3(latest?.non_semiconductor, yoy3?.non_semiconductor), prevVal: prev?.non_semiconductor, yoyVal: yoy3?.non_semiconductor, color: 'var(--data-5)' },
         ].map(({ label, value, mom, yoy: yoyChg, prevVal, yoyVal, color }) => (
           <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 수출액 ({latestLabel})</div>
@@ -62,7 +62,7 @@ export default function KrExportsSection() {
             </div>
             {mom != null && (
               <>
-                <div style={{ fontSize: 12, color: mom > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
+                <div style={{ fontSize: 12, color: mom > 0 ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
                   {mom > 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>MoM</span>
                 </div>
                 {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전월 {prevVal.toLocaleString()} 억달러 ({prev?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})</div>}
@@ -70,7 +70,7 @@ export default function KrExportsSection() {
             )}
             {yoyChg != null && (
               <>
-                <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: yoyChg > 0 ? 'var(--up)' : 'var(--down)', marginTop: 2 }}>
                   {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
                 </div>
                 {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {yoyVal.toLocaleString()} 억달러 ({yoy3?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})</div>}
@@ -80,7 +80,7 @@ export default function KrExportsSection() {
         ))}
         <div style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>반도체 수출 비중</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#ffb74d' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--data-3)' }}>
             {semiShare != null ? semiShare.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {semiShare != null && (semiSharePrev ?? semiShareMom) != null && (() => {
@@ -92,7 +92,7 @@ export default function KrExportsSection() {
               : `전월 ${base.toFixed(1)}% (${prev?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})`
             return (
               <>
-                <div style={{ fontSize: 12, color: semiShare > base ? '#81c784' : '#e57373', marginTop: 3 }}>
+                <div style={{ fontSize: 12, color: semiShare > base ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
                   {semiShare > base ? '▲' : '▼'} {Math.abs(semiShare - base).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>{label}</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>{baseLabel}</div>
@@ -112,18 +112,18 @@ export default function KrExportsSection() {
             <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-3)' }}
                    tickFormatter={v => v.slice(2)} />
             <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={40} />
-            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} width={36} />
+            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--data-3)' }} tickFormatter={v => `${v}%`} width={36} />
             <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                      labelFormatter={v => v.replace(/(\d{4})(\d{2})/, '$1-$2')}
                      formatter={(v, n) => n === '반도체 비중' ? [`${v?.toFixed(1)}%`, n] : [v.toLocaleString() + ' 억달러', n]} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Line yAxisId="left" type="monotone" dataKey="semiconductor" name="반도체" stroke="#4fc3f7" dot={{ r: 3 }} strokeWidth={2}>
-              <LabelList dataKey="semiconductor" position="top" style={{ fontSize: 9, fill: '#4fc3f7' }} formatter={v => v?.toFixed(0)} />
+            <Line yAxisId="left" type="monotone" dataKey="semiconductor" name="반도체" stroke="var(--data-2)" dot={{ r: 3 }} strokeWidth={2}>
+              <LabelList dataKey="semiconductor" position="top" style={{ fontSize: 9, fill: 'var(--data-2)' }} formatter={v => v?.toFixed(0)} />
             </Line>
-            <Line yAxisId="left" type="monotone" dataKey="non_semiconductor" name="비반도체" stroke="#80cbc4" dot={{ r: 3 }} strokeWidth={2}>
-              <LabelList dataKey="non_semiconductor" position="bottom" style={{ fontSize: 9, fill: '#80cbc4' }} formatter={v => v?.toFixed(0)} />
+            <Line yAxisId="left" type="monotone" dataKey="non_semiconductor" name="비반도체" stroke="var(--data-5)" dot={{ r: 3 }} strokeWidth={2}>
+              <LabelList dataKey="non_semiconductor" position="bottom" style={{ fontSize: 9, fill: 'var(--data-5)' }} formatter={v => v?.toFixed(0)} />
             </Line>
-            <Line yAxisId="right" type="monotone" dataKey="semishare" name="반도체 비중" stroke="#ffb74d" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
+            <Line yAxisId="right" type="monotone" dataKey="semishare" name="반도체 비중" stroke="var(--data-3)" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
           </LineChart>
         </ResponsiveContainer>
       </div>

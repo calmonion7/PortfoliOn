@@ -188,7 +188,7 @@ export default function BatchScheduleEditor({ jobId, schedule, timezone, onSaved
           <button className="btn btn-primary" onClick={handleSave} style={{ width: '100%', justifyContent: 'center' }}>
             {saved ? '저장됨 ✓' : '저장'}
           </button>
-          {saveErr && <p style={{ color: 'var(--down)', fontSize: 13, marginTop: 6 }}>{saveErr}</p>}
+          {saveErr && <p style={{ color: 'var(--color-error)', fontSize: 13, marginTop: 6 }}>{saveErr}</p>}
         </div>
       </div>
     </div>

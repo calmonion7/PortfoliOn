@@ -22,7 +22,7 @@ const fmtPrice = (v, market) => {
 
 const fmtChange = (v) => {
   if (v == null) return <span style={{ color: 'var(--text-3)' }}>-</span>
-  const color = v > 0 ? '#81c784' : v < 0 ? '#ef9a9a' : 'var(--text-3)'
+  const color = v > 0 ? 'var(--up)' : v < 0 ? 'var(--down)' : 'var(--text-3)'
   const sign = v > 0 ? '+' : ''
   return <span style={{ color, fontVariantNumeric: 'tabular-nums' }}>{sign}{v.toFixed(2)}%</span>
 }
@@ -32,7 +32,7 @@ const fmtVolume = (v) => (v == null ? '-' : Number(v).toLocaleString('ko-KR'))
 // 순매수(수량, 부호 정수) — +/- 색상. 외국인/기관/개인 컬럼 공용.
 const fmtNet = (v) => {
   if (v == null) return <span style={{ color: 'var(--text-3)' }}>-</span>
-  const color = v > 0 ? '#81c784' : v < 0 ? '#ef9a9a' : 'var(--text-3)'
+  const color = v > 0 ? 'var(--up)' : v < 0 ? 'var(--down)' : 'var(--text-3)'
   const sign = v > 0 ? '+' : ''
   return <span style={{ color, fontVariantNumeric: 'tabular-nums' }}>{sign}{Number(v).toLocaleString('ko-KR')}</span>
 }
@@ -340,7 +340,7 @@ export default function Ranking() {
       {loading && <LoadingSpinner label="불러오는 중입니다." size={20} style={{ padding: 24 }} />}
 
       {!loading && error && (
-        <div style={{ textAlign: 'center', color: '#ef9a9a', fontSize: 13, padding: 32 }}>랭킹을 불러오지 못했습니다.</div>
+        <div style={{ textAlign: 'center', color: 'var(--color-error)', fontSize: 13, padding: 32 }}>랭킹을 불러오지 못했습니다.</div>
       )}
 
       {!loading && !error && items.length === 0 && (
@@ -390,8 +390,8 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
             <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 17 }}>{summary.name || ticker}</span>
             <span style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 6 }}>({ticker})</span>
             {market === 'KR'
-              ? <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
-              : <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#4fc3f7', border: '1px solid var(--border)' }}>🇺🇸 US</span>}
+              ? <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--color-success-soft)', color: 'var(--color-success)', border: '1px solid var(--border)' }}>🇰🇷 KR</span>
+              : <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--color-info-soft)', color: 'var(--color-info)', border: '1px solid var(--border)' }}>🇺🇸 US</span>}
             {date && <span style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 8 }}>{date}</span>}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 6 }}>
@@ -401,8 +401,8 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
             {summary.drop_from_high_20d != null && (
               <span style={{
                 fontSize: 11, padding: '2px 7px', borderRadius: 3,
-                background: summary.drop_from_high_20d >= 0 ? '#1a3a1a' : '#2a1000',
-                color: summary.drop_from_high_20d >= 0 ? '#81c784' : '#ffb74d',
+                background: summary.drop_from_high_20d >= 0 ? 'var(--up-soft)' : 'var(--down-soft)',
+                color: summary.drop_from_high_20d >= 0 ? 'var(--up)' : 'var(--down)',
               }}>
                 {summary.drop_from_high_20d < -10 && '⚠ '}
                 20일고점 {summary.drop_from_high_20d >= 0 ? '+' : ''}{summary.drop_from_high_20d.toFixed(1)}%

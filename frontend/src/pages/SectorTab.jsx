@@ -69,7 +69,7 @@ export default function SectorTab() {
       {loading ? (
         <LoadingSpinner label="섹터 데이터 불러오는 중입니다." />
       ) : error ? (
-        <div style={{ color: '#ef9a9a' }}>오류: {error}</div>
+        <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
       ) : !data ? null : (
         <>
       <table style={{ borderCollapse: 'separate', borderSpacing: '0 3px', fontSize: 13, width: '100%', maxWidth: 620 }}>

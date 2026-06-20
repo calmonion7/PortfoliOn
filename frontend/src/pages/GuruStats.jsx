@@ -42,7 +42,7 @@ function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
           fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none',
           cursor: loading ? 'progress' : 'pointer',
           background: inWatchlist ? 'var(--surface-hover)' : 'var(--bg-elev-2)',
-          color: inWatchlist ? 'var(--down)' : 'var(--up)',
+          color: inWatchlist ? 'var(--color-error)' : 'var(--color-success)',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           minWidth: 48, opacity: loading ? 0.7 : 1, transition: 'opacity .15s',
         }}
@@ -52,7 +52,7 @@ function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
           : (inWatchlist ? '★ 삭제' : '☆ 추가')
         }
       </button>
-      {errMsg && <span style={{ fontSize: 10, color: 'var(--down)' }}>{errMsg}</span>}
+      {errMsg && <span style={{ fontSize: 10, color: 'var(--color-error)' }}>{errMsg}</span>}
     </span>
   )
 }

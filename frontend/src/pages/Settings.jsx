@@ -93,8 +93,8 @@ function ManualRunButton({ batch }) {
         style={{ justifyContent: 'center' }}>
         {busy ? '실행 중...' : '지금 실행'}
       </button>
-      {msg && <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>{msg}</p>}
-      {err && <p style={{ marginTop: 8, color: 'var(--down)', fontSize: 13 }}>{err}</p>}
+      {msg && <p style={{ marginTop: 8, color: 'var(--color-success)', fontSize: 13 }}>{msg}</p>}
+      {err && <p style={{ marginTop: 8, color: 'var(--color-error)', fontSize: 13 }}>{err}</p>}
     </div>
   )
 }
@@ -172,7 +172,7 @@ function BatchHub({ isAdmin, isMobile }) {
 
   useEffect(() => { load() }, [])
 
-  if (err) return <p style={{ color: 'var(--down)', fontSize: 13 }}>{err}</p>
+  if (err) return <p style={{ color: 'var(--color-error)', fontSize: 13 }}>{err}</p>
   if (!batches) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</p>
   if (batches.length === 0) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>등록된 배치가 없습니다.</p>
 

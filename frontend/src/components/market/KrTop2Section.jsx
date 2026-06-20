@@ -42,8 +42,8 @@ export default function KrTop2Section() {
       <p style={DESC_STYLE}>삼성전자·SK하이닉스 두 반도체 대장주의 분기 순이익과 KOSPI 전체 나머지 종목을 비교합니다. 비중이 높을수록 한국 증시가 반도체 업황에 구조적으로 집중되어 있음을 나타냅니다. <span style={{ opacity: 0.7 }}>(E) = 네이버 컨센서스 추정치</span></p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: '삼성+하이닉스', value: latest?.top2, qoq: chg2(latest?.top2, prev?.top2), yoy: chg2(latest?.top2, yoy2?.top2), prevVal: prev?.top2, prevQ: prev?.q, yoyVal: yoy2?.top2, yoyQ: yoy2?.q, color: '#4fc3f7' },
-          { label: 'KOSPI 나머지 전체', value: latest?.rest, qoq: chg2(latest?.rest, prev?.rest), yoy: chg2(latest?.rest, yoy2?.rest), prevVal: prev?.rest, prevQ: prev?.q, yoyVal: yoy2?.rest, yoyQ: yoy2?.q, color: '#80cbc4' },
+          { label: '삼성+하이닉스', value: latest?.top2, qoq: chg2(latest?.top2, prev?.top2), yoy: chg2(latest?.top2, yoy2?.top2), prevVal: prev?.top2, prevQ: prev?.q, yoyVal: yoy2?.top2, yoyQ: yoy2?.q, color: 'var(--data-2)' },
+          { label: 'KOSPI 나머지 전체', value: latest?.rest, qoq: chg2(latest?.rest, prev?.rest), yoy: chg2(latest?.rest, yoy2?.rest), prevVal: prev?.rest, prevQ: prev?.q, yoyVal: yoy2?.rest, yoyQ: yoy2?.q, color: 'var(--data-5)' },
         ].map(({ label, value, qoq, yoy: yoyChg, prevVal, prevQ, yoyVal, yoyQ, color }) => (
           <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 순이익 ({latest?.q})</div>
@@ -52,7 +52,7 @@ export default function KrTop2Section() {
             </div>
             {qoq != null && (
               <>
-                <div style={{ fontSize: 12, color: qoq > 0 ? '#81c784' : '#e57373', marginTop: 3 }}>
+                <div style={{ fontSize: 12, color: qoq > 0 ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
                   {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
                 </div>
                 {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전분기 {krFmt(prevVal)}원 ({prevQ})</div>}
@@ -60,7 +60,7 @@ export default function KrTop2Section() {
             )}
             {yoyChg != null && (
               <>
-                <div style={{ fontSize: 12, color: yoyChg > 0 ? '#81c784' : '#e57373', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: yoyChg > 0 ? 'var(--up)' : 'var(--down)', marginTop: 2 }}>
                   {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
                 </div>
                 {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {krFmt(yoyVal)}원 ({yoyQ})</div>}
@@ -70,12 +70,12 @@ export default function KrTop2Section() {
         ))}
         <div style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>삼성+하이닉스 순이익 비중</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#ffb74d' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--data-3)' }}>
             {top2Share != null ? top2Share.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {top2Share != null && top2SharePrev != null && (
             <>
-              <div style={{ fontSize: 12, color: top2Share > top2SharePrev ? '#81c784' : '#e57373', marginTop: 3 }}>
+              <div style={{ fontSize: 12, color: top2Share > top2SharePrev ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
                 {top2Share > top2SharePrev ? '▲' : '▼'} {Math.abs(top2Share - top2SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {top2SharePrev.toFixed(1)}% ({yoy2?.q})</div>
@@ -93,18 +93,18 @@ export default function KrTop2Section() {
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="q" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickFormatter={v => isEstimated(v) ? `${v}(E)` : v} />
             <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} tickFormatter={krFmt} width={44} />
-            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#ffb74d' }} tickFormatter={v => `${v}%`} width={36} />
+            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--data-3)' }} tickFormatter={v => `${v}%`} width={36} />
             <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                      formatter={(v, n) => n === '삼성+하이닉스 비중' ? [`${v?.toFixed(1)}%`, n] : [v != null ? `${krFmt(v)}원` : '-', n]} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Line yAxisId="left" type="monotone" dataKey="top2_act" name="삼성+하이닉스" stroke="#4fc3f7" dot={{ r: 3 }} strokeWidth={2} connectNulls={false}>
-              <LabelList dataKey="top2_act" position="top" style={{ fontSize: 9, fill: '#4fc3f7' }} formatter={krFmt} />
+            <Line yAxisId="left" type="monotone" dataKey="top2_act" name="삼성+하이닉스" stroke="var(--data-2)" dot={{ r: 3 }} strokeWidth={2} connectNulls={false}>
+              <LabelList dataKey="top2_act" position="top" style={{ fontSize: 9, fill: 'var(--data-2)' }} formatter={krFmt} />
             </Line>
-            <Line yAxisId="left" type="monotone" dataKey="top2_est" name="삼성+하이닉스 (E)" stroke="#4fc3f7" dot={{ r: 3 }} strokeWidth={1.5} strokeDasharray="5 3" connectNulls={false} legendType="none" />
-            <Line yAxisId="left" type="monotone" dataKey="rest" name="KOSPI 나머지 전체" stroke="#80cbc4" dot={{ r: 3 }} strokeWidth={2}>
-              <LabelList dataKey="rest" position="bottom" style={{ fontSize: 9, fill: '#80cbc4' }} formatter={krFmt} />
+            <Line yAxisId="left" type="monotone" dataKey="top2_est" name="삼성+하이닉스 (E)" stroke="var(--data-2)" dot={{ r: 3 }} strokeWidth={1.5} strokeDasharray="5 3" connectNulls={false} legendType="none" />
+            <Line yAxisId="left" type="monotone" dataKey="rest" name="KOSPI 나머지 전체" stroke="var(--data-5)" dot={{ r: 3 }} strokeWidth={2}>
+              <LabelList dataKey="rest" position="bottom" style={{ fontSize: 9, fill: 'var(--data-5)' }} formatter={krFmt} />
             </Line>
-            <Line yAxisId="right" type="monotone" dataKey="top2share" name="삼성+하이닉스 비중" stroke="#ffb74d" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
+            <Line yAxisId="right" type="monotone" dataKey="top2share" name="삼성+하이닉스 비중" stroke="var(--data-3)" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
           </LineChart>
         </ResponsiveContainer>
       </div>

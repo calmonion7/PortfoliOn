@@ -123,12 +123,12 @@ export default function ReportDetailTabs({
             <div style={{ padding: '0 4px' }}>
               {enrichedAt && (
                 <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: '#81c784', fontWeight: 600 }}>✓</span>
+                  <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>✓</span>
                   AI 분석 업데이트: {new Date(enrichedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                 </div>
               )}
               {!enrichedAt && (
-                <div style={{ marginBottom: 14, fontSize: 11, color: '#ffb74d', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--warn)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span>⚠</span> AI 분석 미업데이트 (enrich API 미실행)
                 </div>
               )}

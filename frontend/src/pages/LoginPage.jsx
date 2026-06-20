@@ -64,8 +64,8 @@ export default function LoginPage() {
       <form onSubmit={isLogin ? doLogin : doRegister}>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="이메일" required/>
         <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="비밀번호" required/>
-        {error && <p style={{color:'var(--down)', fontSize:13, marginBottom:8}}>{error}</p>}
-        {success && <p style={{color:'var(--up)', fontSize:13, marginBottom:8}}>{success}</p>}
+        {error && <p style={{color:'var(--color-error)', fontSize:13, marginBottom:8}}>{error}</p>}
+        {success && <p style={{color:'var(--color-success)', fontSize:13, marginBottom:8}}>{success}</p>}
         <button className="btn btn-primary submit" type="submit" disabled={loading}>
           {loading ? (isLogin ? '로그인 중…' : '가입 중…') : (isLogin ? '로그인' : '회원가입')}
         </button>
@@ -117,8 +117,8 @@ export default function LoginPage() {
             <label>비밀번호</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required/>
           </div>
-          {error && <p style={{color:'var(--down)', fontSize:13, marginBottom:8}}>{error}</p>}
-          {success && <p style={{color:'var(--up)', fontSize:13, marginBottom:8}}>{success}</p>}
+          {error && <p style={{color:'var(--color-error)', fontSize:13, marginBottom:8}}>{error}</p>}
+          {success && <p style={{color:'var(--color-success)', fontSize:13, marginBottom:8}}>{success}</p>}
           <button className="btn btn-primary submit" type="submit" disabled={loading}>
             {loading ? (isLogin ? '로그인 중…' : '가입 중…') : (isLogin ? '로그인' : '회원가입')}
           </button>

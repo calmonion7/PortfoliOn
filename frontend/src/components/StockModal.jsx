@@ -262,7 +262,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
           )}
 
           {saveError && (
-            <p style={{ color: 'var(--down)', fontSize: 13, marginTop: 12, marginBottom: 0 }}>{saveError}</p>
+            <p style={{ color: 'var(--color-error)', fontSize: 13, marginTop: 12, marginBottom: 0 }}>{saveError}</p>
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button type="submit" className="btn btn-primary" disabled={saving}>

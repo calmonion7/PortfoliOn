@@ -98,7 +98,7 @@ export default function LeverageBackfillSettings() {
           </div>
         </div>
       ) : coverageErr ? (
-        <div style={{ color: 'var(--down)', fontSize: 13, padding: '8px 0' }}>{coverageErr}</div>
+        <div style={{ color: 'var(--color-error)', fontSize: 13, padding: '8px 0' }}>{coverageErr}</div>
       ) : (
         <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '8px 0' }}>로딩 중...</div>
       )}
@@ -139,10 +139,10 @@ export default function LeverageBackfillSettings() {
             </div>
           )}
           {!progress.running && progress.total > 0 && progress.done >= progress.total && (
-            <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>완료: {progress.total}개 연도 처리됨</p>
+            <p style={{ marginTop: 8, color: 'var(--color-success)', fontSize: 13 }}>완료: {progress.total}개 연도 처리됨</p>
           )}
-          {progress.error && <p style={{ marginTop: 6, color: 'var(--down)', fontSize: 12 }}>{progress.error}</p>}
-          {err && <p style={{ marginTop: 8, color: 'var(--down)', fontSize: 13 }}>{err}</p>}
+          {progress.error && <p style={{ marginTop: 6, color: 'var(--color-error)', fontSize: 12 }}>{progress.error}</p>}
+          {err && <p style={{ marginTop: 8, color: 'var(--color-error)', fontSize: 13 }}>{err}</p>}
         </div>
       </div>
     </div>

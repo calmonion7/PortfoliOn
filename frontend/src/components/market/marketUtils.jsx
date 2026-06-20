@@ -52,7 +52,7 @@ const SECTION_CARD_OUTER = {
 export function SectionCard({ title, summary, change, changeSuffix = '', changeInverted = false, open, onToggle, children }) {
   const changeColor = change == null ? null
     : change === 0 ? 'var(--text-3)'
-    : (change > 0) !== changeInverted ? '#81c784' : '#e57373'
+    : (change > 0) !== changeInverted ? 'var(--up)' : 'var(--down)'
   const changeArrow = change > 0 ? '▲' : change < 0 ? '▼' : '─'
   const decimals = changeSuffix === 'bp' ? 1 : 2
 
@@ -106,7 +106,7 @@ export function SectionCardError({ title }) {
     <div style={SECTION_CARD_OUTER}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-        <span style={{ fontSize: 12, color: '#e57373' }}>오류</span>
+        <span style={{ fontSize: 12, color: 'var(--color-error)' }}>오류</span>
       </div>
       <div style={SECTION_CONTENT_STYLE}><ErrorBox /></div>
     </div>
@@ -123,7 +123,7 @@ export function LoadingBox() {
 
 export function ErrorBox({ msg }) {
   return (
-    <div style={{ ...CARD_STYLE, color: '#e57373', fontSize: 13, padding: 16 }}>
+    <div style={{ ...CARD_STYLE, color: 'var(--color-error)', fontSize: 13, padding: 16 }}>
       {msg || '데이터를 불러오지 못했습니다.'}
     </div>
   )

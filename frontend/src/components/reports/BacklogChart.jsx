@@ -5,7 +5,7 @@ import {
 import { SectionTitle } from './reportUtils.jsx'
 
 const SECTOR_ORDER = ['항공', '방산', '해양', 'IT서비스', '항공우주']
-const SECTOR_COLORS = ['#4fc3f7', '#81c784', '#ffb74d', '#ba68c8', '#f06292', '#a1887f', '#90a4ae']
+const SECTOR_COLORS = ['var(--data-2)', 'var(--data-5)', 'var(--data-3)', 'var(--data-4)', 'var(--data-1)', 'var(--corr-pos)', 'var(--corr-neg)']
 
 const fmtAmt = (v) => {
   if (v == null) return '—'
@@ -47,8 +47,8 @@ export default function BacklogChart({ data }) {
     }))
     const sources = [...new Set(data.map(d => d.source).filter(Boolean))]
     const SourceBadge = ({ source }) => {
-      if (source === 'llm') return <span style={badgeStyle('#4fc3f7', '#1a2a3a')}>AI 추출</span>
-      if (source === 'manual') return <span style={badgeStyle('#ce93d8', '#2a1a2a')}>수동</span>
+      if (source === 'llm') return <span style={badgeStyle('var(--color-info)')}>AI 추출</span>
+      if (source === 'manual') return <span style={badgeStyle('var(--data-4)')}>수동</span>
       return null
     }
     const SingleTooltip = ({ active, payload, label }) => {
@@ -58,8 +58,8 @@ export default function BacklogChart({ data }) {
       return (
         <div style={tooltipBox}>
           <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}{warn && ' ⚠️'}</div>
-          {row.amount != null && <div style={{ color: '#4fc3f7', marginBottom: 2 }}>수주잔고: {fmtAmt(row.amount)}원</div>}
-          {row.qoq != null && <div style={{ color: row.qoq >= 0 ? '#81c784' : '#ef9a9a' }}>QoQ: {row.qoq >= 0 ? '+' : ''}{row.qoq}%{warn && <span style={{ marginLeft: 4, color: '#ffb74d' }}>이상값</span>}</div>}
+          {row.amount != null && <div style={{ color: 'var(--data-2)', marginBottom: 2 }}>수주잔고: {fmtAmt(row.amount)}원</div>}
+          {row.qoq != null && <div style={{ color: row.qoq >= 0 ? 'var(--up)' : 'var(--down)' }}>QoQ: {row.qoq >= 0 ? '+' : ''}{row.qoq}%{warn && <span style={{ marginLeft: 4, color: 'var(--warn)' }}>이상값</span>}</div>}
           {row.source && <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-3)' }}>출처: {row.source === 'llm' ? 'AI 추출' : row.source === 'manual' ? '수동' : 'DART'}</div>}
         </div>
       )
@@ -74,8 +74,8 @@ export default function BacklogChart({ data }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>
-          <Legend color="#4fc3f7" label="수주잔고" />
-          <Legend color="#ffcc80" label="QoQ 변동률" line />
+          <Legend color="var(--data-2)" label="수주잔고" />
+          <Legend color="var(--data-3)" label="QoQ 변동률" line />
         </div>
         <ResponsiveContainer width="100%" height={180}>
           <ComposedChart data={chartData} margin={{ top: 8, right: 36, left: 0, bottom: 0 }}>
@@ -85,8 +85,8 @@ export default function BacklogChart({ data }) {
             <YAxis yAxisId="right" orientation="right" tickFormatter={v => `${v}%`} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
             <Tooltip content={<SingleTooltip />} />
             <ReferenceLine yAxisId="right" y={0} stroke="var(--border)" />
-            <Bar yAxisId="left" dataKey="amount" name="수주잔고" fill="#4fc3f7" opacity={0.8} radius={[2, 2, 0, 0]} />
-            <Line yAxisId="right" type="monotone" dataKey="qoq" name="QoQ%" stroke="#ffcc80" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+            <Bar yAxisId="left" dataKey="amount" name="수주잔고" fill="var(--data-2)" opacity={0.8} radius={[2, 2, 0, 0]} />
+            <Line yAxisId="right" type="monotone" dataKey="qoq" name="QoQ%" stroke="var(--data-3)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -131,7 +131,7 @@ export default function BacklogChart({ data }) {
     return (
       <div style={tooltipBox}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}{warn && ' ⚠️'}</div>
-        <div style={{ color: '#fff', marginBottom: 4 }}>합계: {fmtAmt(row.total)}원</div>
+        <div style={{ color: 'var(--text)', marginBottom: 4 }}>합계: {fmtAmt(row.total)}원</div>
         {groupByEntity(row._segments).map(g => (
           <div key={g.sector} style={{ marginBottom: 2 }}>
             <div style={{ color: colorOf(g.sector) }}>■ {g.sector}: {fmtAmt(g.total)}</div>
@@ -142,7 +142,7 @@ export default function BacklogChart({ data }) {
             ))}
           </div>
         ))}
-        {row.qoq != null && <div style={{ marginTop: 2, color: row.qoq >= 0 ? '#81c784' : '#ef9a9a' }}>QoQ: {row.qoq >= 0 ? '+' : ''}{row.qoq}%{warn && <span style={{ marginLeft: 4, color: '#ffb74d' }}>이상값</span>}</div>}
+        {row.qoq != null && <div style={{ marginTop: 2, color: row.qoq >= 0 ? 'var(--up)' : 'var(--down)' }}>QoQ: {row.qoq >= 0 ? '+' : ''}{row.qoq}%{warn && <span style={{ marginLeft: 4, color: 'var(--warn)' }}>이상값</span>}</div>}
       </div>
     )
   }
@@ -151,11 +151,11 @@ export default function BacklogChart({ data }) {
     <div style={cardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <SectionTitle>📦 수주잔고 추이 (사업부문별)</SectionTitle>
-        <span style={badgeStyle('#4fc3f7', '#1a2a3a')}>AI 추출</span>
+        <span style={badgeStyle('var(--color-info)')}>AI 추출</span>
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>
         {sectors.map(s => <Legend key={s} color={colorOf(s)} label={s} />)}
-        <Legend color="#ffcc80" label="QoQ" line />
+        <Legend color="var(--data-3)" label="QoQ" line />
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <ComposedChart data={chartData} margin={{ top: 8, right: 36, left: 0, bottom: 0 }}>
@@ -169,7 +169,7 @@ export default function BacklogChart({ data }) {
             <Bar key={s} yAxisId="left" dataKey={s} stackId="a" fill={colorOf(s)} opacity={0.85}
               radius={i === sectors.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]} />
           ))}
-          <Line yAxisId="right" type="monotone" dataKey="qoq" name="QoQ%" stroke="#ffcc80" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+          <Line yAxisId="right" type="monotone" dataKey="qoq" name="QoQ%" stroke="var(--data-3)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -178,7 +178,7 @@ export default function BacklogChart({ data }) {
 
 const cardStyle = { background: 'var(--bg-elev)', borderRadius: 6, padding: 14, marginTop: 12 }
 const tooltipBox = { background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }
-const badgeStyle = (color, bg) => ({ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: bg, color, border: `1px solid ${color}` })
+const badgeStyle = (color) => ({ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: `color-mix(in srgb, ${color} 14%, transparent)`, color, border: `1px solid ${color}` })
 
 function Legend({ color, label, line }) {
   return (

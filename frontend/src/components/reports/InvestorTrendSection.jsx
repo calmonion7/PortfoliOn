@@ -52,15 +52,15 @@ export default function InvestorTrendSection({ ticker }) {
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }} minTickGap={24} />
               <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={52}
                      tickFormatter={v => krFmt(v)} />
-              <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#ffb74d' }}
+              <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--data-3)' }}
                      tickFormatter={v => `${v}%`} width={40} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                        formatter={(v, n) => n === '외국인 보유율' ? [`${v?.toFixed(2)}%`, n] : [Number(v).toLocaleString('ko-KR'), n]} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line yAxisId="left" type="monotone" dataKey="foreign" name="외국인" stroke="#4fc3f7" dot={false} strokeWidth={2} />
-              <Line yAxisId="left" type="monotone" dataKey="organ" name="기관" stroke="#81c784" dot={false} strokeWidth={2} />
-              <Line yAxisId="left" type="monotone" dataKey="individual" name="개인" stroke="#ef9a9a" dot={false} strokeWidth={2} />
-              <Line yAxisId="right" type="monotone" dataKey="hold" name="외국인 보유율" stroke="#ffb74d" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
+              <Line yAxisId="left" type="monotone" dataKey="foreign" name="외국인" stroke="var(--data-2)" dot={false} strokeWidth={2} />
+              <Line yAxisId="left" type="monotone" dataKey="organ" name="기관" stroke="var(--data-5)" dot={false} strokeWidth={2} />
+              <Line yAxisId="left" type="monotone" dataKey="individual" name="개인" stroke="var(--data-4)" dot={false} strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="hold" name="외국인 보유율" stroke="var(--data-3)" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
             </LineChart>
           </ResponsiveContainer>
         </>

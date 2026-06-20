@@ -228,8 +228,8 @@ export default function ReportManualGen() {
                   <span style={{
                     flexShrink: 0, marginLeft: 8, fontSize: 10, fontWeight: 600,
                     padding: '1px 6px', borderRadius: 4,
-                    background: is_mine ? 'var(--down-soft)' : 'var(--bg-elev-2)',
-                    color: is_mine ? 'var(--down)' : 'var(--text-faint)',
+                    background: is_mine ? 'var(--color-info-soft)' : 'var(--bg-elev-2)',
+                    color: is_mine ? 'var(--color-info)' : 'var(--text-faint)',
                   }}>
                     {is_mine ? '나' : '그외'}
                   </span>
@@ -258,7 +258,7 @@ export default function ReportManualGen() {
                   </div>
                 </div>
               )}
-              {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
+              {genMsg && <p style={{ marginTop: 10, color: 'var(--color-success)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
             </>
           ) : (
             <>
@@ -278,7 +278,7 @@ export default function ReportManualGen() {
                   </div>
                 </div>
               )}
-              {genMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
+              {genMsg && <p style={{ marginTop: 10, color: 'var(--color-success)', fontSize: 13, margin: '10px 0 0' }}>{genMsg}</p>}
             </>
           )}
         </div>
@@ -336,7 +336,7 @@ export default function ReportManualGen() {
               </div>
             </div>
           )}
-          {backfillMsg && <p style={{ marginTop: 10, color: 'var(--up)', fontSize: 13, margin: '10px 0 0' }}>{backfillMsg}</p>}
+          {backfillMsg && <p style={{ marginTop: 10, color: 'var(--color-success)', fontSize: 13, margin: '10px 0 0' }}>{backfillMsg}</p>}
         </div>
       </div>
     </div>

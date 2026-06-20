@@ -11,8 +11,8 @@ import InsiderBadge from '../ui/InsiderBadge'
 
 // report_kind → 한글 라벨/색.
 const _KIND_CFG = {
-  insider: { label: '내부자', color: '#81c784' },
-  major5: { label: '5%대량보유', color: '#ffb74d' },
+  insider: { label: '내부자', color: 'var(--color-info)' },
+  major5: { label: '5%대량보유', color: 'var(--warn)' },
 }
 
 // ISO 문자열|null → YYYY.MM.DD (방어적: 파싱 실패 시 원문/빈 문자열).
@@ -82,7 +82,7 @@ export default function InsiderTradesSection({ ticker, market }) {
             {trades.map((t) => {
               const kc = _KIND_CFG[t.report_kind] || { label: t.report_kind || '', color: 'var(--text-3)' }
               const changeStr = fmtShares(t.shares_change)
-              const changeColor = t.shares_change > 0 ? '#4caf50' : t.shares_change < 0 ? '#f57c00' : 'var(--text-3)'
+              const changeColor = t.shares_change > 0 ? 'var(--semantic-buy)' : t.shares_change < 0 ? 'var(--semantic-sell)' : 'var(--text-3)'
               return (
                 <a
                   key={t.rcept_no}

@@ -54,7 +54,7 @@ export default function TreasurySection() {
                 {r ? `${r.current.toFixed(2)}%` : '-'}
               </div>
               {r && (
-                <div style={{ fontSize: 12, color: up ? '#81c784' : down ? '#e57373' : 'var(--text-3)', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)', marginTop: 2 }}>
                   {up ? '▲' : down ? '▼' : '─'} {Math.abs(r.change_bp).toFixed(1)}bp
                 </div>
               )}
@@ -77,9 +77,9 @@ export default function TreasurySection() {
                        labelStyle={{ color: 'var(--text-3)' }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <ReferenceLine y={0} stroke="var(--border)" />
-              <Line type="monotone" dataKey="10년" stroke="#4fc3f7" dot={false} strokeWidth={1.5} />
-              <Line type="monotone" dataKey="3개월" stroke="#81c784" dot={false} strokeWidth={1.5} />
-              <Line type="monotone" dataKey="스프레드" stroke="#ffb74d" dot={false} strokeWidth={1} strokeDasharray="4 2" />
+              <Line type="monotone" dataKey="10년" stroke="var(--data-2)" dot={false} strokeWidth={1.5} />
+              <Line type="monotone" dataKey="3개월" stroke="var(--data-5)" dot={false} strokeWidth={1.5} />
+              <Line type="monotone" dataKey="스프레드" stroke="var(--data-3)" dot={false} strokeWidth={1} strokeDasharray="4 2" />
             </LineChart>
           </ResponsiveContainer>
         </div>

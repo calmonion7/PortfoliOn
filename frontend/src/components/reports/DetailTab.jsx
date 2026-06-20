@@ -13,17 +13,17 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   if (!price && !vp?.poc) return null
 
   const levels = [
-    ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i+1}`, color: '#81c784' })),
-    vp?.poc != null && { value: vp.poc, label: 'POC', color: '#80cbc4' },
-    vp?.vah != null && { value: vp.vah, label: 'VAH', color: '#4fc3f7' },
-    vp?.val != null && { value: vp.val, label: 'VAL', color: '#4fc3f7' },
-    target != null && { value: target, label: '목표가', color: '#ffcc80' },
-    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: '#4db6ac', side: 'below' },
-    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: '#4db6ac', side: 'below' },
-    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: '#4db6ac', side: 'below' },
-    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: '#ff8a65', side: 'above' },
-    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: '#ff8a65', side: 'above' },
-    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: '#ff8a65', side: 'above' },
+    ...(vp?.hvn || []).map((h, i) => ({ value: h, label: `HVN${i+1}`, color: 'var(--data-5)' })),
+    vp?.poc != null && { value: vp.poc, label: 'POC', color: 'var(--data-2)' },
+    vp?.vah != null && { value: vp.vah, label: 'VAH', color: 'var(--color-info)' },
+    vp?.val != null && { value: vp.val, label: 'VAL', color: 'var(--color-info)' },
+    target != null && { value: target, label: '목표가', color: 'var(--data-3)' },
+    rsiData?.target_20 != null && { value: rsiData.target_20, label: 'RSI20', color: 'var(--semantic-buy)', side: 'below' },
+    rsiData?.target_25 != null && { value: rsiData.target_25, label: 'RSI25', color: 'var(--semantic-buy)', side: 'below' },
+    rsiData?.target_30 != null && { value: rsiData.target_30, label: 'RSI30', color: 'var(--semantic-buy)', side: 'below' },
+    rsiData?.target_70 != null && { value: rsiData.target_70, label: 'RSI70', color: 'var(--semantic-sell)', side: 'above' },
+    rsiData?.target_75 != null && { value: rsiData.target_75, label: 'RSI75', color: 'var(--semantic-sell)', side: 'above' },
+    rsiData?.target_80 != null && { value: rsiData.target_80, label: 'RSI80', color: 'var(--semantic-sell)', side: 'above' },
   ].filter(Boolean)
 
   const currentEntry = price != null ? {
@@ -106,16 +106,16 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
               const height = Math.max(2, priceToY(vp.val) - priceToY(vp.vah))
               return <>
                 {/* 배경 fill */}
-                <div style={{ position: 'absolute', left: 13, width: 54, top, height, background: 'rgba(79,195,247,0.08)', zIndex: 6 }} />
+                <div style={{ position: 'absolute', left: 13, width: 54, top, height, background: 'color-mix(in srgb, var(--color-info) 8%, transparent)', zIndex: 6 }} />
                 {/* 좌우 테두리 — 갭 SVG(zIndex:5) 위에 */}
-                <div style={{ position: 'absolute', left: 13, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
-                <div style={{ position: 'absolute', left: 66, width: 1, top, height, background: 'rgba(79,195,247,0.5)', zIndex: 6 }} />
+                <div style={{ position: 'absolute', left: 13, width: 1, top, height, background: 'color-mix(in srgb, var(--color-info) 50%, transparent)', zIndex: 6 }} />
+                <div style={{ position: 'absolute', left: 66, width: 1, top, height, background: 'color-mix(in srgb, var(--color-info) 50%, transparent)', zIndex: 6 }} />
               </>
             })()}
             <div style={{ position: 'absolute', left: 25, top: 0, bottom: 0, width: 30, borderRadius: 3, overflow: 'hidden', zIndex: 1 }}>
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.1)' }} />
-              {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: priceToY(price), background: 'rgba(239,154,154,0.3)' }} />}
-              {price != null && <div style={{ position: 'absolute', top: priceToY(price), left: 0, right: 0, bottom: 0, background: 'rgba(129,199,132,0.3)' }} />}
+              {price != null && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: priceToY(price), background: 'var(--color-error-soft)' }} />}
+              {price != null && <div style={{ position: 'absolute', top: priceToY(price), left: 0, right: 0, bottom: 0, background: 'var(--color-success-soft)' }} />}
             </div>
             {allRows.map((l, i) => {
               const isKey = l.isCurrent || l.label === 'VAH' || l.label === 'VAL' || l.label === '목표가'
@@ -168,7 +168,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
                   display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap',
                 }}>
                   {p != null && (
-                    <span style={{ fontSize: 13, color: p > 0 ? '#ef9a9a' : '#81c784', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontSize: 13, color: p > 0 ? 'var(--color-error)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>
                       {p >= 0 ? '+' : ''}{p.toFixed(1)}%
                     </span>
                   )}
@@ -207,7 +207,8 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
   const aboveGroups = groupByPrice(above)
 
   const hexToRgba = (hex, alpha) => {
-    if (!hex || hex.startsWith('var(')) return `rgba(160,160,160,${alpha})`
+    if (!hex) return `rgba(160,160,160,${alpha})`
+    if (hex.startsWith('var(')) return `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, transparent)`
     const h = hex.replace('#', '')
     return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${alpha})`
   }
@@ -246,7 +247,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
             {fmt(value, market)}
           </span>
           {p != null && (
-            <span style={{ fontSize: 9, color: isBelow ? '#81c784' : '#ef9a9a', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 9, color: isBelow ? 'var(--color-success)' : 'var(--color-error)', fontVariantNumeric: 'tabular-nums' }}>
               {p >= 0 ? '+' : ''}{p.toFixed(1)}%
             </span>
           )}
@@ -276,11 +277,11 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
         <div style={{ flex: 1, textAlign: 'right' }}>
-          <span style={{ fontSize: 9, color: '#81c784', fontWeight: 600 }}>지지 구간 ▼</span>
+          <span style={{ fontSize: 9, color: 'var(--color-success)', fontWeight: 600 }}>지지 구간 ▼</span>
         </div>
         <div style={{ width: 1 }} />
         <div style={{ flex: 1 }}>
-          <span style={{ fontSize: 9, color: '#ef9a9a', fontWeight: 600 }}>저항 구간 ▲</span>
+          <span style={{ fontSize: 9, color: 'var(--color-error)', fontWeight: 600 }}>저항 구간 ▲</span>
         </div>
       </div>
       {rows.map((row, i) => {
@@ -435,7 +436,7 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
             >{refreshing ? '갱신 중...' : '데이터 갱신'}</button>
           )}
         </div>
-        {refreshError && <div style={{ color: '#ef9a9a', fontSize: 11, marginBottom: 4 }}>{refreshError}</div>}
+        {refreshError && <div style={{ color: 'var(--color-error)', fontSize: 11, marginBottom: 4 }}>{refreshError}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -446,7 +447,7 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
           {gap != null && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <span style={{ color: 'var(--text-3)', fontSize: 9 }}>상승여력</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? '#81c784' : '#ef9a9a' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? 'var(--up)' : 'var(--down)' }}>
                 {gap >= 0 ? '+' : ''}{gap.toFixed(1)}%
               </span>
             </div>
@@ -455,18 +456,18 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
           {/* 최고/최저 목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-3)', fontSize: 9 }}>최고목표가</span>
-            <span style={{ color: '#81c784', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high, summary.market)}</span>
+            <span style={{ color: 'var(--up)', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high, summary.market)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-3)', fontSize: 9 }}>최저목표가</span>
-            <span style={{ color: '#ef9a9a', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low, summary.market)}</span>
+            <span style={{ color: 'var(--down)', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low, summary.market)}</span>
           </div>
           {summary.finviz_recom != null && (
             <>
               <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span style={{ color: 'var(--text-3)', fontSize: 9 }}>Finviz 추천</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: summary.finviz_recom <= 2 ? '#81c784' : 'var(--text)' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: summary.finviz_recom <= 2 ? 'var(--semantic-buy)' : 'var(--text)' }}>
                   {summary.finviz_recom.toFixed(1)} <span style={{ fontSize: 9, color: 'var(--text-3)' }}>/ 5</span>
                 </span>
               </div>
@@ -478,13 +479,13 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span style={{ color: 'var(--text-3)', fontSize: 9 }}>애널리스트 의견</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: '#81c784', fontSize: 11 }}>매수 {buy}</span>
+                  <span style={{ color: 'var(--semantic-buy)', fontSize: 11 }}>매수 {buy}</span>
                   <span style={{ color: 'var(--text-3)', fontSize: 11 }}>중립 {hold}</span>
-                  <span style={{ color: '#ef9a9a', fontSize: 11 }}>매도 {sell}</span>
+                  <span style={{ color: 'var(--semantic-sell)', fontSize: 11 }}>매도 {sell}</span>
                   <div style={{ display: 'flex', height: 4, borderRadius: 2, overflow: 'hidden', width: 50, flexShrink: 0 }}>
-                    <div style={{ width: `${Math.round(buy / total * 100)}%`, background: '#43a047' }} />
-                    <div style={{ width: `${Math.round(hold / total * 100)}%`, background: '#424242' }} />
-                    <div style={{ width: `${Math.round(sell / total * 100)}%`, background: '#b71c1c' }} />
+                    <div style={{ width: `${Math.round(buy / total * 100)}%`, background: 'var(--semantic-buy)' }} />
+                    <div style={{ width: `${Math.round(hold / total * 100)}%`, background: 'var(--data-4)' }} />
+                    <div style={{ width: `${Math.round(sell / total * 100)}%`, background: 'var(--semantic-sell)' }} />
                   </div>
                 </div>
               </div>
@@ -513,11 +514,11 @@ export function VolumeRsiSnapshot({ summary }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 2, marginTop: 2 }}>
         {[
           { color: 'var(--text)', label: '현재가', desc: '현재 주가' },
-          { color: '#ffcc80', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
-          { color: '#80cbc4', label: 'POC', desc: '거래량 최대 가격대' },
-          { color: '#81c784', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
-          { color: '#4db6ac', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
-          { color: '#ff8a65', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
+          { color: 'var(--data-3)', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
+          { color: 'var(--data-2)', label: 'POC', desc: '거래량 최대 가격대' },
+          { color: 'var(--data-5)', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
+          { color: 'var(--semantic-buy)', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
+          { color: 'var(--semantic-sell)', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
         ].map(({ color, label, desc }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
             <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />

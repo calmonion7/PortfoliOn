@@ -30,8 +30,8 @@ export default function EconIndicatorsSection() {
   }
 
   const charts = [
-    { key: 'cpi', label: 'CPI (소비자물가지수)', color: '#ce93d8', unit: '' },
-    { key: 'unemployment', label: '실업률', color: '#80cbc4', unit: '%' },
+    { key: 'cpi', label: 'CPI (소비자물가지수)', color: 'var(--data-3)', unit: '' },
+    { key: 'unemployment', label: '실업률', color: 'var(--data-2)', unit: '%' },
   ]
 
   const lastCpi = data.cpi?.slice(-1)[0]
@@ -45,13 +45,13 @@ export default function EconIndicatorsSection() {
 
   const indicators = [
     {
-      label: 'CPI (소비자물가지수)', color: '#ce93d8',
+      label: 'CPI (소비자물가지수)', color: 'var(--data-3)',
       last: lastCpi, prev: prevCpi,
       valFmt: v => v.toFixed(1), unit: '',
       chg: cpiChange, chgUnit: '%', chgLabel: 'MoM%',
     },
     {
-      label: '실업률', color: '#80cbc4',
+      label: '실업률', color: 'var(--data-2)',
       last: lastUnemp, prev: prevUnemp,
       valFmt: v => `${v.toFixed(1)}%`, unit: '%',
       chg: unempChange, chgUnit: '%p', chgLabel: 'MoM',
@@ -71,7 +71,7 @@ export default function EconIndicatorsSection() {
             {last && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{last.date?.slice(0, 7)}</div>}
             {chg != null && (
               <>
-                <div style={{ fontSize: 12, color: chg > 0 ? '#81c784' : chg < 0 ? '#e57373' : 'var(--text-3)', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: chg > 0 ? 'var(--up)' : chg < 0 ? 'var(--down)' : 'var(--text-3)', marginTop: 4 }}>
                   {chg > 0 ? '▲' : chg < 0 ? '▼' : '─'} {Math.abs(chg).toFixed(2)}{chgUnit} <span style={{ color: 'var(--text-3)' }}>{chgLabel}</span>
                 </div>
                 {prev && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전월 {valFmt(prev.value)} ({prev.date?.slice(0, 7)})</div>}

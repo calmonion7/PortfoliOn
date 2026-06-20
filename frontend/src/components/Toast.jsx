@@ -21,9 +21,9 @@ export function ToastProvider({ children }) {
       }}>
         {toasts.map(t => (
           <div key={t.id} style={{
-            background: t.type === 'error' ? 'var(--toast-err-bg, #3b1a1a)' : t.type === 'warning' ? 'var(--toast-warn-bg, #3b2e1a)' : 'var(--toast-ok-bg, #1a3b2a)',
-            color: t.type === 'error' ? 'var(--toast-err-color, #ef9a9a)' : t.type === 'warning' ? 'var(--toast-warn-color, #ffcc80)' : 'var(--toast-ok-color, #81c784)',
-            border: `1px solid ${t.type === 'error' ? 'var(--toast-err-border, #7f2020)' : t.type === 'warning' ? 'var(--toast-warn-border, #7f5a20)' : 'var(--toast-ok-border, #2e6b4a)'}`,
+            background: t.type === 'error' ? 'var(--color-error-soft)' : t.type === 'warning' ? 'var(--warn-soft)' : 'var(--color-success-soft)',
+            color: t.type === 'error' ? 'var(--color-error)' : t.type === 'warning' ? 'var(--warn)' : 'var(--color-success)',
+            border: `1px solid ${t.type === 'error' ? 'var(--color-error)' : t.type === 'warning' ? 'var(--warn)' : 'var(--color-success)'}`,
             borderRadius: 8, padding: '10px 20px', fontSize: 13,
             whiteSpace: 'pre-wrap', maxWidth: 280, textAlign: 'center',
             boxShadow: '0 4px 16px rgba(0,0,0,0.4)',

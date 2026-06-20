@@ -38,7 +38,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
         {competitors.map((c, i) => {
           const isSelf = c.is_self || c.ticker === ticker
           const ytdPos = c.ytd_return != null && c.ytd_return >= 0
-          const ytdColor = c.ytd_return != null ? (ytdPos ? '#81c784' : '#ef9a9a') : 'var(--text-3)'
+          const ytdColor = c.ytd_return != null ? (ytdPos ? 'var(--up)' : 'var(--down)') : 'var(--text-3)'
           const mcStr = c.market_cap ? (market === 'KR' ? `₩${fmtMC(c.market_cap)}` : `$${fmtMC(c.market_cap)}`) : 'N/A'
           const rankColor = i === 0 ? '#F59E0B' : i === 1 ? '#94A3B8' : i === 2 ? '#C07842' : 'var(--border)'
           return (
@@ -114,9 +114,9 @@ export function MoatSection({ moat }) {
   if (typeof moat === 'string') return <ReportSectionText title="🏰 경제적 해자" text={moat} />
 
   const RATING = {
-    wide:   { label: 'Wide Moat',   color: '#81c784' },
-    narrow: { label: 'Narrow Moat', color: '#ffb74d' },
-    none:   { label: 'No Moat',     color: '#ef9a9a' },
+    wide:   { label: 'Wide Moat',   color: 'var(--color-success)' },
+    narrow: { label: 'Narrow Moat', color: 'var(--warn)' },
+    none:   { label: 'No Moat',     color: 'var(--color-error)' },
   }
   const rc = RATING[moat.rating] || { label: moat.rating || '', color: 'var(--text-3)' }
 
@@ -143,10 +143,10 @@ export function MoatSection({ moat }) {
 }
 
 const STATUS_CFG = {
-  launched:  { label: '출시',    color: '#81c784' },
-  phase3:    { label: '3단계', color: '#64b5f6' },
-  phase2:    { label: '2단계', color: '#9575cd' },
-  announced: { label: '발표',    color: '#ffb74d' },
+  launched:  { label: '출시',    color: 'var(--color-success)' },
+  phase3:    { label: '3단계', color: 'var(--color-info)' },
+  phase2:    { label: '2단계', color: 'var(--data-2)' },
+  announced: { label: '발표',    color: 'var(--warn)' },
   completed: { label: '완료',    color: 'var(--text-3)' },
 }
 
@@ -182,9 +182,9 @@ export function GrowthPlanSection({ growth_plan }) {
 }
 
 const SEVERITY_CFG = {
-  high:   '#ef9a9a',
-  medium: '#ffb74d',
-  low:    '#fff176',
+  high:   'var(--color-error)',
+  medium: 'var(--warn)',
+  low:    'var(--color-info)',
 }
 
 export function RisksSection({ risks }) {
@@ -214,14 +214,14 @@ export function RisksSection({ risks }) {
   )
 }
 
-const IMPACT_COLOR = { positive: '#81c784', negative: '#ef9a9a', neutral: 'var(--text-3)' }
+const IMPACT_COLOR = { positive: 'var(--color-success)', negative: 'var(--color-error)', neutral: 'var(--text-3)' }
 
 export function RecentDisclosuresSection({ disclosures, news }) {
   if (!disclosures || typeof disclosures === 'string') {
     return <ReportSectionNews disclosures={disclosures} news={news} />
   }
 
-  const vsColor = (s) => !s ? 'var(--text-3)' : s.startsWith('+') ? '#81c784' : s.startsWith('-') ? '#ef9a9a' : 'var(--text-3)'
+  const vsColor = (s) => !s ? 'var(--text-3)' : s.startsWith('+') ? 'var(--up)' : s.startsWith('-') ? 'var(--down)' : 'var(--text-3)'
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -289,9 +289,9 @@ export function RecentDisclosuresSection({ disclosures, news }) {
 }
 
 const STANCE_CFG = {
-  진입: { label: '진입', color: '#81c784' },
+  진입: { label: '진입', color: 'var(--semantic-buy)' },
   관망: { label: '관망', color: 'var(--text-3)' },
-  회피: { label: '회피', color: '#ef9a9a' },
+  회피: { label: '회피', color: 'var(--semantic-sell)' },
 }
 
 function _insightLines(value) {
@@ -325,14 +325,14 @@ export function InsightsSection({ insights }) {
         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{insights.one_liner}</p>
       )}
       {hasEntry && (
-        <div style={{ ...(_FACTOR_LINE), borderLeft: '2px solid #81c784', marginBottom: 8 }}>
-          <div style={{ ..._FACTOR_TITLE, color: '#81c784' }}>📈 진입 조건</div>
+        <div style={{ ...(_FACTOR_LINE), borderLeft: '2px solid var(--semantic-buy)', marginBottom: 8 }}>
+          <div style={{ ..._FACTOR_TITLE, color: 'var(--semantic-buy)' }}>📈 진입 조건</div>
           {_insightLines(insights.entry)}
         </div>
       )}
       {hasAvoid && (
-        <div style={{ ...(_FACTOR_LINE), borderLeft: '2px solid #ef9a9a' }}>
-          <div style={{ ..._FACTOR_TITLE, color: '#ef9a9a' }}>🚫 회피 조건</div>
+        <div style={{ ...(_FACTOR_LINE), borderLeft: '2px solid var(--semantic-sell)' }}>
+          <div style={{ ..._FACTOR_TITLE, color: 'var(--semantic-sell)' }}>🚫 회피 조건</div>
           {_insightLines(insights.avoid)}
         </div>
       )}

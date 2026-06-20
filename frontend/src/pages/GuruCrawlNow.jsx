@@ -78,7 +78,7 @@ export default function GuruCrawlNow() {
               </div>
             </div>
           )}
-          {crawlMsg && <p style={{ marginTop: 8, color: 'var(--up)', fontSize: 13 }}>{crawlMsg}</p>}
+          {crawlMsg && <p style={{ marginTop: 8, color: 'var(--color-success)', fontSize: 13 }}>{crawlMsg}</p>}
         </div>
       </div>
     </div>

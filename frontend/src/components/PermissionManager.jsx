@@ -222,7 +222,7 @@ export default function PermissionManager() {
                   {!u.oauth_provider && (
                     <button
                       onClick={() => deleteUser(u)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--down)', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
                       title="삭제"
                     >×</button>
                   )}

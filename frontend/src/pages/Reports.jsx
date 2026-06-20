@@ -257,7 +257,7 @@ export default function Reports() {
         <button className={`tab-btn${activeTab === 'holdings' ? ' active' : ''}`} onClick={() => setActiveTab('holdings')}>보유<span className="tab-cnt">{holdingsCount}</span></button>
         <button className={`tab-btn${activeTab === 'watchlist' ? ' active' : ''}`} onClick={() => setActiveTab('watchlist')}>관심<span className="tab-cnt">{watchlistCount}</span></button>
         {ungeneratedCount > 0 && (
-          <button className={`tab-btn${activeTab === 'ungenerated' ? ' active' : ''}`} onClick={() => setActiveTab('ungenerated')} style={{ color: activeTab === 'ungenerated' ? 'var(--accent)' : '#ffb74d' }}>미생성<span className="tab-cnt">{ungeneratedCount}</span></button>
+          <button className={`tab-btn${activeTab === 'ungenerated' ? ' active' : ''}`} onClick={() => setActiveTab('ungenerated')} style={{ color: activeTab === 'ungenerated' ? 'var(--accent)' : 'var(--warn)' }}>미생성<span className="tab-cnt">{ungeneratedCount}</span></button>
         )}
         {isAdmin && (
           <button className={`tab-btn${activeTab === 'others' ? ' active' : ''}`} onClick={() => setActiveTab('others')}>
@@ -267,9 +267,9 @@ export default function Reports() {
       </div>
       {activeTab === 'watchlist' && (
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 8, marginTop: 4 }}>
-          <button className="tab-btn sm" style={{ color: watchlistSub === 'low' ? '#81c784' : 'var(--text-3)', borderBottomColor: watchlistSub === 'low' ? '#81c784' : 'transparent', fontWeight: watchlistSub === 'low' ? 600 : 400 }} onClick={() => setWatchlistSub('low')}>목표≥40%<span className="tab-cnt">{watchlistLowCount}</span></button>
-          <button className="tab-btn sm" style={{ color: watchlistSub === 'high' ? '#ef9a9a' : 'var(--text-3)', borderBottomColor: watchlistSub === 'high' ? '#ef9a9a' : 'transparent', fontWeight: watchlistSub === 'high' ? 600 : 400 }} onClick={() => setWatchlistSub('high')}>목표&lt;40%<span className="tab-cnt">{watchlistHighCount}</span></button>
-          <button className="tab-btn sm" style={{ color: watchlistSub === 'warn' ? '#ffb74d' : 'var(--text-3)', borderBottomColor: watchlistSub === 'warn' ? '#ffb74d' : 'transparent', fontWeight: watchlistSub === 'warn' ? 600 : 400 }} onClick={() => setWatchlistSub('warn')}>⚠ 경고<span className="tab-cnt">{watchlistWarnCount}</span></button>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'low' ? 'var(--semantic-buy)' : 'var(--text-3)', borderBottomColor: watchlistSub === 'low' ? 'var(--semantic-buy)' : 'transparent', fontWeight: watchlistSub === 'low' ? 600 : 400 }} onClick={() => setWatchlistSub('low')}>목표≥40%<span className="tab-cnt">{watchlistLowCount}</span></button>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'high' ? 'var(--semantic-sell)' : 'var(--text-3)', borderBottomColor: watchlistSub === 'high' ? 'var(--semantic-sell)' : 'transparent', fontWeight: watchlistSub === 'high' ? 600 : 400 }} onClick={() => setWatchlistSub('high')}>목표&lt;40%<span className="tab-cnt">{watchlistHighCount}</span></button>
+          <button className="tab-btn sm" style={{ color: watchlistSub === 'warn' ? 'var(--warn)' : 'var(--text-3)', borderBottomColor: watchlistSub === 'warn' ? 'var(--warn)' : 'transparent', fontWeight: watchlistSub === 'warn' ? 600 : 400 }} onClick={() => setWatchlistSub('warn')}>⚠ 경고<span className="tab-cnt">{watchlistWarnCount}</span></button>
         </div>
       )}
       <div style={{ display: 'flex', gap: 4, marginBottom: 10, justifyContent: 'flex-start' }}>
@@ -318,10 +318,10 @@ export default function Reports() {
     const isBroken = hasReport && s?.price == null
     const weather = overallWeather(s)
     const weatherAccent = !weather ? 'var(--border)'
-      : weather.icon === '☀️' ? '#4caf50'
-      : weather.icon === '⛅' ? '#8bc34a'
-      : weather.icon === '☁️' ? '#78909c'
-      : '#ef5350'
+      : weather.icon === '☀️' ? 'var(--semantic-buy)'
+      : weather.icon === '⛅' ? 'var(--warn)'
+      : weather.icon === '☁️' ? 'var(--text-3)'
+      : 'var(--semantic-sell)'
     const buy = s?.buy ?? 0, hold = s?.hold ?? 0, sell = s?.sell ?? 0
     const total = buy + hold + sell
     const targetGap = s?.target_mean && s?.price ? (s.target_mean - s.price) / s.price * 100 : null
@@ -329,10 +329,10 @@ export default function Reports() {
     const priceGap = (t) => {
       if (t == null || !s?.price) return null
       const p = (t - s.price) / s.price * 100
-      return <span style={{ fontSize: 9, color: p >= 0 ? '#81c784' : '#ef9a9a' }}>({p >= 0 ? '+' : ''}{p.toFixed(1)}%)</span>
+      return <span style={{ fontSize: 9, color: p >= 0 ? 'var(--up)' : 'var(--down)' }}>({p >= 0 ? '+' : ''}{p.toFixed(1)}%)</span>
     }
 
-    const rsiTargetBlock = (key, color) => {
+    const rsiTargetBlock = (key, color, soft) => {
       const num = key.replace('target_', '')
       const dv = dr?.[key]
       const barWidth = (t) => {
@@ -344,7 +344,7 @@ export default function Reports() {
           {/* 레벨 배지 */}
           <span style={{
             fontSize: 9, fontWeight: 700, color,
-            background: `${color}1a`, border: `1px solid ${color}44`,
+            background: soft, border: `1px solid ${soft}`,
             borderRadius: 3, padding: '1px 4px',
             minWidth: 22, textAlign: 'center', flexShrink: 0, marginTop: 1,
           }}>{num}</span>
@@ -380,17 +380,17 @@ export default function Reports() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{ticker}</span>
             {market && <span className={`sc-market ${market === 'KR' ? 'kr' : 'us'}`}>{market === 'KR' ? `🇰🇷 ${info.exchange === 'KS' ? 'KOSPI' : info.exchange === 'KQ' ? 'KOSDAQ' : 'KR'}` : '🇺🇸 US'}</span>}
-            {guruMap[ticker] && <span style={{ fontSize: 9, color: '#ffb74d' }}>구루{guruMap[ticker]}명</span>}
+            {guruMap[ticker] && <span style={{ fontSize: 9, color: 'var(--warn)' }}>구루{guruMap[ticker]}명</span>}
           </div>
           {s?.sector && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sector}</div>}
           {s?.industry && <div style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.industry}</div>}
-          {(!hasReport || isBroken) && <div style={{ fontSize: 10, color: isBroken ? '#ef9a9a' : 'var(--text-3)', marginTop: 2 }}>{isBroken ? '데이터 오류' : '클릭하여 생성'}</div>}
+          {(!hasReport || isBroken) && <div style={{ fontSize: 10, color: isBroken ? 'var(--color-error)' : 'var(--text-3)', marginTop: 2 }}>{isBroken ? '데이터 오류' : '클릭하여 생성'}</div>}
           {info.category === 'holdings' && (() => {
             const p = pnlOf(ticker, market)
             if (!p) return null
             const isUp = p.pnl >= 0
             return (
-              <div style={{ fontSize: 10, color: isUp ? '#81c784' : '#ef9a9a', marginTop: 3, fontWeight: 600 }}>
+              <div style={{ fontSize: 10, color: isUp ? 'var(--up)' : 'var(--down)', marginTop: 3, fontWeight: 600 }}>
                 {p.quantity}주 · 평단 {p.ccy}{fmtNum(p.avg_cost, p.dec)}<br />
                 {isUp ? '+' : '-'}{p.ccy}{fmtNum(Math.abs(p.pnl), p.dec)}
                 {p.pnlPct != null && <span style={{ marginLeft: 4 }}>({p.pnlPct >= 0 ? '+' : ''}{p.pnlPct.toFixed(1)}%)</span>}
@@ -413,7 +413,7 @@ export default function Reports() {
           {s?.price != null ? <>
             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{fmt(s.price, market)}</div>
             {s.drop_from_high_20d != null && (
-              <div style={{ fontSize: 11, color: s.drop_from_high_20d >= 0 ? '#81c784' : '#ef9a9a', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: s.drop_from_high_20d >= 0 ? 'var(--up)' : 'var(--down)', marginTop: 2 }}>
                 {s.drop_from_high_20d < -10 && '⚠ '}{s.drop_from_high_20d >= 0 ? '+' : ''}{s.drop_from_high_20d.toFixed(1)}%
               </div>
             )}
@@ -426,21 +426,21 @@ export default function Reports() {
         {/* 목표가 / 컨센서스 */}
         <div>
           {targetGap != null && (
-            <div style={{ fontSize: 12, color: targetGap >= 0 ? '#81c784' : '#ef9a9a', fontWeight: 600 }}>
+            <div style={{ fontSize: 12, color: targetGap >= 0 ? 'var(--up)' : 'var(--down)', fontWeight: 600 }}>
               {fmt(s.target_mean, market)} {targetGap >= 0 ? '▲' : '▼'}{Math.abs(targetGap).toFixed(1)}%
             </div>
           )}
           {total > 0 && <>
             <div style={{ display: 'flex', borderRadius: 2, overflow: 'hidden', height: 4, margin: '4px 0 3px', background: 'var(--bg-elev-2)' }}>
-              <div style={{ width: `${buy / total * 100}%`, background: '#4caf50' }} />
-              <div style={{ width: `${hold / total * 100}%`, background: '#777' }} />
-              <div style={{ width: `${sell / total * 100}%`, background: '#ef5350' }} />
+              <div style={{ width: `${buy / total * 100}%`, background: 'var(--semantic-buy)' }} />
+              <div style={{ width: `${hold / total * 100}%`, background: 'var(--data-4)' }} />
+              <div style={{ width: `${sell / total * 100}%`, background: 'var(--semantic-sell)' }} />
             </div>
             <div style={{ fontSize: 10, display: 'flex', gap: 5 }}>
-              <span style={{ color: '#81c784' }}>B{buy}</span>
+              <span style={{ color: 'var(--semantic-buy)' }}>B{buy}</span>
               <span style={{ color: 'var(--text-3)' }}>H{hold}</span>
-              <span style={{ color: '#ef9a9a' }}>S{sell}</span>
-              {total <= 10 && <span style={{ color: '#ffb74d' }}>⚠{total}명</span>}
+              <span style={{ color: 'var(--semantic-sell)' }}>S{sell}</span>
+              {total <= 10 && <span style={{ color: 'var(--warn)' }}>⚠{total}명</span>}
             </div>
           </>}
           {s?.finviz_recom != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Finviz {fmtN(s.finviz_recom)}</div>}
@@ -471,10 +471,10 @@ export default function Reports() {
         </div>
 
         {/* RSI 매수구간 20/25/30 */}
-        <div>{['target_20', 'target_25', 'target_30'].map(k => rsiTargetBlock(k, '#81c784'))}</div>
+        <div>{['target_20', 'target_25', 'target_30'].map(k => rsiTargetBlock(k, 'var(--semantic-buy)', 'var(--semantic-buy-soft)'))}</div>
 
         {/* RSI 매도구간 70/75/80 */}
-        <div>{['target_70', 'target_75', 'target_80'].map(k => rsiTargetBlock(k, '#ef9a9a'))}</div>
+        <div>{['target_70', 'target_75', 'target_80'].map(k => rsiTargetBlock(k, 'var(--semantic-sell)', 'var(--semantic-sell-soft)'))}</div>
 
         {/* 생성 버튼 */}
         <div>
@@ -514,7 +514,7 @@ export default function Reports() {
             <span style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
             {(() => { const w = overallWeather(s); return w ? <span title={w.label} style={{ fontSize: 12, lineHeight: 1 }}>{w.icon}</span> : null })()}
             {market && (
-              <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 2, background: market === 'KR' ? '#1a3a2a' : 'var(--bg-elev-2)', color: market === 'KR' ? '#81c784' : '#4fc3f7', border: `1px solid ${market === 'KR' ? '#2e6b4a' : 'var(--border)'}` }}>
+              <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 2, background: market === 'KR' ? 'var(--color-success-soft)' : 'var(--color-info-soft)', color: market === 'KR' ? 'var(--color-success)' : 'var(--color-info)', border: '1px solid var(--border)' }}>
                 {market === 'KR' ? '🇰🇷 KR' : '🇺🇸 US'}
               </span>
             )}
@@ -523,21 +523,21 @@ export default function Reports() {
             <div style={{ color: 'var(--text-3)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
           )}
           {guruMap[ticker] && (
-            <div style={{ color: '#ffb74d', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
+            <div style={{ color: 'var(--warn)', fontSize: 10 }}>구루 {guruMap[ticker]}명</div>
           )}
-          {(!hasReport || isBroken) && <div style={{ color: isBroken ? '#ef9a9a' : 'var(--text-3)', fontSize: 10 }}>{isBroken ? '데이터 오류 — 클릭하여 재생성' : '클릭하여 생성'}</div>}
+          {(!hasReport || isBroken) && <div style={{ color: isBroken ? 'var(--color-error)' : 'var(--text-3)', fontSize: 10 }}>{isBroken ? '데이터 오류 — 클릭하여 재생성' : '클릭하여 생성'}</div>}
           {hasReport && s && (
             <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
               {s.price != null && (
                 <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmt(s.price, market)}</span>
               )}
               {s.drop_from_high_20d != null && (
-                <span style={{ fontSize: 11, color: s.drop_from_high_20d >= 0 ? '#81c784' : '#ef9a9a' }}>
+                <span style={{ fontSize: 11, color: s.drop_from_high_20d >= 0 ? 'var(--up)' : 'var(--down)' }}>
                   고점 {s.drop_from_high_20d >= 0 ? '+' : ''}{s.drop_from_high_20d.toFixed(1)}%
                 </span>
               )}
               {targetGap != null && (
-                <span style={{ fontSize: 11, color: targetGap >= 0 ? '#81c784' : '#ef9a9a' }}>
+                <span style={{ fontSize: 11, color: targetGap >= 0 ? 'var(--up)' : 'var(--down)' }}>
                   목표 {fmt(s.target_mean, market)} ({targetGap >= 0 ? '+' : ''}{targetGap.toFixed(1)}%)
                 </span>
               )}
@@ -546,11 +546,11 @@ export default function Reports() {
               )}
               {total > 0 && (
                 <span style={{ fontSize: 11 }}>
-                  <span style={{ color: '#81c784' }}>B{buy}</span>
+                  <span style={{ color: 'var(--semantic-buy)' }}>B{buy}</span>
                   <span style={{ color: 'var(--text-3)' }}>/H{hold}</span>
-                  <span style={{ color: '#ef9a9a' }}>/S{sell}</span>
+                  <span style={{ color: 'var(--semantic-sell)' }}>/S{sell}</span>
                   {total <= 10 && (
-                    <span title={`애널리스트 ${total}명 — 의견 수가 적어 신뢰도가 낮을 수 있습니다`} style={{ color: '#ffb74d', marginLeft: 3, cursor: 'help' }}>⚠{total}</span>
+                    <span title={`애널리스트 ${total}명 — 의견 수가 적어 신뢰도가 낮을 수 있습니다`} style={{ color: 'var(--warn)', marginLeft: 3, cursor: 'help' }}>⚠{total}</span>
                   )}
                 </span>
               )}
@@ -561,7 +561,7 @@ export default function Reports() {
             if (!p) return null
             const isUp = p.pnl >= 0
             return (
-              <div style={{ marginTop: 3, fontSize: 11, color: isUp ? '#81c784' : '#ef9a9a', fontWeight: 600 }}>
+              <div style={{ marginTop: 3, fontSize: 11, color: isUp ? 'var(--up)' : 'var(--down)', fontWeight: 600 }}>
                 {p.quantity}주 · 평단 {p.ccy}{fmtNum(p.avg_cost, p.dec)} · {isUp ? '+' : '-'}{p.ccy}{fmtNum(Math.abs(p.pnl), p.dec)}
                 {p.pnlPct != null && <span> ({p.pnlPct >= 0 ? '+' : ''}{p.pnlPct.toFixed(1)}%)</span>}
               </div>
@@ -606,7 +606,7 @@ export default function Reports() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
         </div>
-        {mutError && <p style={{ color: 'var(--down)', fontSize: 12, marginTop: 0 }}>{mutError}</p>}
+        {mutError && <p style={{ color: 'var(--color-error)', fontSize: 12, marginTop: 0 }}>{mutError}</p>}
         {renderFilters()}
         {(activeTab === 'others' ? othersLoading : listLoading)
           ? <LoadingSpinner label="" size={20} style={{ padding: 20 }} />
@@ -643,8 +643,8 @@ export default function Reports() {
                     <span className={`sort-col${sortCol === 'gap' ? ' active' : ''}`} onClick={() => handleSort('gap')}>목표가 / 컨센서스{sortArrow('gap')}</span>
                     <span>밸류</span>
                     <span className={`sort-col${sortCol === 'rsi' ? ' active' : ''}`} onClick={() => handleSort('rsi')}>RSI{sortArrow('rsi')}<br/><small>일/주/월</small></span>
-                    <span style={{ color: '#81c784' }}>RSI 매수<br/><small>일봉 20 / 25 / 30</small></span>
-                    <span style={{ color: '#ef9a9a' }}>RSI 매도<br/><small>일봉 70 / 75 / 80</small></span>
+                    <span style={{ color: 'var(--semantic-buy)' }}>RSI 매수<br/><small>일봉 20 / 25 / 30</small></span>
+                    <span style={{ color: 'var(--semantic-sell)' }}>RSI 매도<br/><small>일봉 70 / 75 / 80</small></span>
                     <span></span>
                   </div>
                   {activeEntries.map(([t, info]) => renderStockCard(t, info))}
@@ -693,11 +693,11 @@ export default function Reports() {
                 </span>
                 <span style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 6 }}>({selected.ticker})</span>
                 {detail.summary?.market === 'KR'
-                  ? <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: '#1a3a2a', color: '#81c784', border: '1px solid #2e6b4a' }}>🇰🇷 KR</span>
-                  : <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#4fc3f7', border: '1px solid var(--border)' }}>🇺🇸 US</span>
+                  ? <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--color-success-soft)', color: 'var(--color-success)', border: '1px solid var(--border)' }}>🇰🇷 KR</span>
+                  : <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--color-info-soft)', color: 'var(--color-info)', border: '1px solid var(--border)' }}>🇺🇸 US</span>
                 }
                 {guruMap[selected.ticker] && (
-                  <span style={{ color: '#ffb74d', fontSize: 11, marginLeft: 6, background: '#2a1a00', padding: '2px 7px', borderRadius: 3 }}>
+                  <span style={{ color: 'var(--warn)', fontSize: 11, marginLeft: 6, background: 'var(--warn-soft)', padding: '2px 7px', borderRadius: 3 }}>
                     구루 {guruMap[selected.ticker]}명
                   </span>
                 )}
@@ -725,8 +725,8 @@ export default function Reports() {
                 {detail.summary?.drop_from_high_20d != null && (
                   <span style={{
                     fontSize: 11, padding: '2px 7px', borderRadius: 3,
-                    background: detail.summary.drop_from_high_20d >= 0 ? '#1a3a1a' : '#2a1000',
-                    color: detail.summary.drop_from_high_20d >= 0 ? '#81c784' : '#ffb74d',
+                    background: detail.summary.drop_from_high_20d >= 0 ? 'var(--up-soft)' : 'var(--down-soft)',
+                    color: detail.summary.drop_from_high_20d >= 0 ? 'var(--up)' : 'var(--down)',
                   }}>
                     {detail.summary.drop_from_high_20d < -10 && '⚠ '}
                     20일고점 {detail.summary.drop_from_high_20d >= 0 ? '+' : ''}{detail.summary.drop_from_high_20d.toFixed(1)}%

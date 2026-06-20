@@ -5,8 +5,8 @@ import Badge from './Badge'
 // 가격 색과 충돌 → 신호는 전용 색을 명시 지정한다(순매수=초록·순매도=주황·중립=회색).
 // 결측/US/null은 "해당 없음" muted(neutral + 흐리게). SupplyBadge.jsx와 동일 구조.
 const DIR_DISPLAY = {
-  buy: { label: '순매수', style: { background: 'rgba(76, 175, 80, 0.14)', color: '#4caf50', borderColor: 'rgba(76, 175, 80, 0.30)' } },
-  sell: { label: '순매도', style: { background: 'rgba(245, 124, 0, 0.16)', color: '#f57c00', borderColor: 'rgba(245, 124, 0, 0.32)' } },
+  buy: { label: '순매수', style: { background: 'var(--semantic-buy-soft)', color: 'var(--semantic-buy)', borderColor: 'var(--semantic-buy)' } },
+  sell: { label: '순매도', style: { background: 'var(--semantic-sell-soft)', color: 'var(--semantic-sell)', borderColor: 'var(--semantic-sell)' } },
   neutral: { label: '중립' }, // neutral 변형(회색) 그대로
 }
 

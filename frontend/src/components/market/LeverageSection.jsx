@@ -40,11 +40,11 @@ export default function LeverageSection() {
 
   const badges = []
   if (credit_ratio_alert)
-    badges.push({ label: '빚투 과열', color: 'var(--down)', bg: 'rgba(239,68,68,0.12)' })
+    badges.push({ label: '빚투 과열', color: 'var(--warn)', bg: 'var(--warn-soft)' })
   if (margin_call_signal === 'ALERT')
-    badges.push({ label: '반대매매 급증', color: 'var(--down)', bg: 'rgba(239,68,68,0.12)' })
+    badges.push({ label: '반대매매 급증', color: 'var(--warn)', bg: 'var(--warn-soft)' })
   if (credit_momentum === 'ACCELERATING')
-    badges.push({ label: '신용잔고 가속', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' })
+    badges.push({ label: '신용잔고 가속', color: 'var(--warn)', bg: 'var(--warn-soft)' })
 
   const badgeEls = badges.length > 0 ? (
     <span style={{ marginLeft: 8 }}>
@@ -72,8 +72,8 @@ export default function LeverageSection() {
       {latest && (
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
           {[
-            { label: '신용잔고', value: latestCredit, unit: '조원', color: '#4fc3f7' },
-            { label: '반대매매 비중', value: latestRatio, unit: '%', color: '#ef5350' },
+            { label: '신용잔고', value: latestCredit, unit: '조원', color: 'var(--data-2)' },
+            { label: '반대매매 비중', value: latestRatio, unit: '%', color: 'var(--data-3)' },
           ].map(({ label, value, unit, color }) => (
             <div key={label} style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
@@ -125,8 +125,9 @@ export default function LeverageSection() {
             type="monotone"
             dataKey="total_credit"
             name="신용잔고 합계"
-            fill="#4fc3f740"
-            stroke="#4fc3f7"
+            fill="var(--data-2)"
+            fillOpacity={0.25}
+            stroke="var(--data-2)"
             strokeWidth={1.5}
             dot={false}
           />
@@ -135,7 +136,7 @@ export default function LeverageSection() {
             type="monotone"
             dataKey="liquidation_ratio"
             name="반대매매 비중"
-            stroke="#ef5350"
+            stroke="var(--data-3)"
             strokeWidth={1.5}
             dot={false}
           />

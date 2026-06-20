@@ -146,13 +146,13 @@ export default function ConsensusChart({ ticker, market }) {
     const delta = prevValue != null ? value - prevValue : null
     const pct = delta != null ? (delta / Math.abs(prevValue) * 100) : null
     const up = delta == null || delta >= 0
-    const color = delta === null ? '#ffcc80' : up ? '#81c784' : '#ef9a9a'
+    const color = delta === null ? 'var(--data-3)' : up ? 'var(--up)' : 'var(--down)'
     const label = delta != null
       ? `${fmt(value, market)} ${up ? '↑' : '↓'}${Math.abs(pct).toFixed(1)}%`
       : fmt(value, market)
     return (
       <g key={index}>
-        <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
+        <circle cx={cx} cy={cy} r={3} fill="var(--data-3)" />
         {targetLabelSet.has(index) && label && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), up ? -10 : 14)}
       </g>
     )
@@ -178,13 +178,13 @@ export default function ConsensusChart({ ticker, market }) {
     const delta = prevValue != null ? value - prevValue : null
     const pct = delta != null ? (delta / Math.abs(prevValue) * 100) : null
     const up = delta == null || delta >= 0
-    const color = delta === null ? '#ffcc80' : up ? '#81c784' : '#ef9a9a'
+    const color = delta === null ? 'var(--data-3)' : up ? 'var(--up)' : 'var(--down)'
     const label = delta != null
       ? `${fmt(value, market)} ${up ? '↑' : '↓'}${Math.abs(pct).toFixed(1)}%`
       : fmt(value, market)
     return (
       <g key={index}>
-        <circle cx={cx} cy={cy} r={3} fill="#ffcc80" />
+        <circle cx={cx} cy={cy} r={3} fill="var(--data-3)" />
         {targetLabelSet.has(index) && bgLabel(cx, cy, label, color, anchor(index, filteredData.length), -10)}
       </g>
     )
@@ -203,13 +203,13 @@ export default function ConsensusChart({ ticker, market }) {
     if (prevVal === value) return <g key={index} />
     const delta = prevVal != null ? value - prevVal : null
     const up = delta > 0
-    const labelColor = delta == null || delta === 0 ? '#43a047' : up ? '#81c784' : '#ef9a9a'
+    const labelColor = delta == null || delta === 0 ? 'var(--semantic-buy)' : up ? 'var(--up)' : 'var(--down)'
     const label = delta == null
       ? String(value)
       : delta !== 0 ? `${value}${pctLabel(delta, prevVal, up)}` : null
     return (
       <g key={index}>
-        <circle cx={cx} cy={cy} r={3} fill="#43a047" />
+        <circle cx={cx} cy={cy} r={3} fill="var(--semantic-buy)" />
         {label && bgLabel(cx, cy, label, labelColor, anchor(index, filteredData.length), 14)}
       </g>
     )
@@ -223,7 +223,7 @@ export default function ConsensusChart({ ticker, market }) {
     if (prevVal === value) return <g key={index} />
     const delta = prevVal != null ? value - prevVal : null
     const up = delta > 0
-    const labelColor = delta == null || delta === 0 ? color : up ? '#81c784' : '#ef9a9a'
+    const labelColor = delta == null || delta === 0 ? color : up ? 'var(--up)' : 'var(--down)'
     const label = delta == null
       ? String(value)
       : delta !== 0 ? `${value}${pctLabel(delta, prevVal, up)}` : null
@@ -245,11 +245,11 @@ export default function ConsensusChart({ ticker, market }) {
     const prev = idx > 0 ? filteredData.slice(0, idx).reverse().find(d => d.target_mean != null && d.target_mean !== value) : null
     const delta = prev != null && value != null ? value - prev.target_mean : null
     const pct = delta != null ? delta / prev.target_mean * 100 : null
-    const dColor = delta == null ? '#ffcc80' : delta >= 0 ? '#81c784' : '#ef9a9a'
+    const dColor = delta == null ? 'var(--data-3)' : delta >= 0 ? 'var(--up)' : 'var(--down)'
     return (
       <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
-        <div style={{ color: '#ffcc80' }}>평균목표가: {fmt(value, market)}</div>
+        <div style={{ color: 'var(--data-3)' }}>평균목표가: {fmt(value, market)}</div>
         {delta != null && <div style={{ color: dColor, fontSize: 10 }}>{deltaStr(delta, pct, true)}</div>}
       </div>
     )
@@ -266,7 +266,7 @@ export default function ConsensusChart({ ticker, market }) {
         {payload.map(p => {
           const delta = prev != null ? (p.value ?? 0) - prev[p.dataKey] : null
           const pct = delta != null && prev[p.dataKey] !== 0 ? delta / prev[p.dataKey] * 100 : null
-          const dColor = delta == null || delta === 0 ? p.fill : delta > 0 ? '#81c784' : '#ef9a9a'
+          const dColor = delta == null || delta === 0 ? p.fill : delta > 0 ? 'var(--up)' : 'var(--down)'
           return (
             <div key={p.dataKey} style={{ color: p.fill, marginBottom: 2 }}>
               {p.name}: {p.value ?? 0}{total > 0 ? ` (${Math.round((p.value ?? 0) / total * 100)}%)` : ''}
@@ -300,7 +300,7 @@ export default function ConsensusChart({ ticker, market }) {
           </button>
         </div>
       </div>
-      {error && <div style={{ color: '#ef9a9a', fontSize: 11, marginBottom: 6 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--color-error)', fontSize: 11, marginBottom: 6 }}>{error}</div>}
       {ascData.length === 0 ? (
         <div style={{ color: 'var(--text-3)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
           아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요.
@@ -334,7 +334,7 @@ export default function ConsensusChart({ ticker, market }) {
                 <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={fmtYAxis} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <Tooltip content={targetTooltip} />
-                <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="#ffcc80" strokeWidth={2} dot={targetDot} activeDot={{ r: 5 }} connectNulls />
+                <Line type="monotone" dataKey="target_mean" name="평균목표가" stroke="var(--data-3)" strokeWidth={2} dot={targetDot} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -351,13 +351,13 @@ export default function ConsensusChart({ ticker, market }) {
                   <XAxis dataKey="date" tick={xTick} height={40} axisLine={false} tickLine={false} />
                   <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={20} />
                   <Tooltip content={opinionTooltip} />
-                  <Line type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={makeDot('#43a047', 'buy')} activeDot={{ r: 5 }} connectNulls />
-                  <Line type="monotone" dataKey="hold" name="중립" stroke="#616161" strokeWidth={2} dot={makeDot('#616161', 'hold')} activeDot={{ r: 5 }} connectNulls />
-                  <Line type="monotone" dataKey="sell" name="매도" stroke="#ef9a9a" strokeWidth={2} dot={makeDot('#ef9a9a', 'sell')} activeDot={{ r: 5 }} connectNulls />
+                  <Line type="monotone" dataKey="buy" name="매수" stroke="var(--semantic-buy)" strokeWidth={2} dot={makeDot('var(--semantic-buy)', 'buy')} activeDot={{ r: 5 }} connectNulls />
+                  <Line type="monotone" dataKey="hold" name="중립" stroke="var(--data-4)" strokeWidth={2} dot={makeDot('var(--data-4)', 'hold')} activeDot={{ r: 5 }} connectNulls />
+                  <Line type="monotone" dataKey="sell" name="매도" stroke="var(--semantic-sell)" strokeWidth={2} dot={makeDot('var(--semantic-sell)', 'sell')} activeDot={{ r: 5 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
               <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>
-                {[['#43a047', '매수'], ['#616161', '중립'], ['#ef9a9a', '매도']].map(([color, label]) => (
+                {[['var(--semantic-buy)', '매수'], ['var(--data-4)', '중립'], ['var(--semantic-sell)', '매도']].map(([color, label]) => (
                   <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 8, height: 8, background: color, display: 'inline-block', borderRadius: 2 }} />
                     {label}
@@ -386,7 +386,7 @@ export default function ConsensusChart({ ticker, market }) {
                         const delta = prevVal != null && val != null ? val - prevVal : null
                         const pct = delta != null && prevVal !== 0 ? delta / prevVal * 100 : null
                         const isPrice = p.dataKey === 'target_mean'
-                        const dColor = delta == null || delta === 0 ? p.stroke : delta > 0 ? '#81c784' : '#ef9a9a'
+                        const dColor = delta == null || delta === 0 ? p.stroke : delta > 0 ? 'var(--up)' : 'var(--down)'
                         return (
                           <div key={p.dataKey} style={{ color: p.stroke, marginBottom: 2 }}>
                             {p.name}: {val ?? 'N/A'}
@@ -397,8 +397,8 @@ export default function ConsensusChart({ ticker, market }) {
                     </div>
                   )
                 }} />
-                <Line yAxisId="left" type="monotone" dataKey="target_mean" name="목표가" stroke="#ffcc80" strokeWidth={2} dot={overlayTargetDot} activeDot={{ r: 5 }} connectNulls />
-                <Line yAxisId="right" type="monotone" dataKey="buy" name="매수" stroke="#43a047" strokeWidth={2} dot={overlayBuyDot} activeDot={{ r: 5 }} connectNulls />
+                <Line yAxisId="left" type="monotone" dataKey="target_mean" name="목표가" stroke="var(--data-3)" strokeWidth={2} dot={overlayTargetDot} activeDot={{ r: 5 }} connectNulls />
+                <Line yAxisId="right" type="monotone" dataKey="buy" name="매수" stroke="var(--semantic-buy)" strokeWidth={2} dot={overlayBuyDot} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           )}

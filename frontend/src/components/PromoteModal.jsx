@@ -50,7 +50,7 @@ export default function PromoteModal({ ticker, market = 'US', onConfirm, onClose
               min="0.01"
             />
           </div>
-          {saveError && <p style={{ color: 'var(--down)', fontSize: 13, margin: '12px 0 0' }}>{saveError}</p>}
+          {saveError && <p style={{ color: 'var(--color-error)', fontSize: 13, margin: '12px 0 0' }}>{saveError}</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
             <button type="submit" className="btn btn-primary" disabled={saving} style={{ width: '100%', justifyContent: 'center', padding: '12px' }}>
               {saving ? '처리 중…' : '보유종목으로 전환'}

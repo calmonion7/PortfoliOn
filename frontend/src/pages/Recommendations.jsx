@@ -8,9 +8,9 @@ import { useToast } from '../components/Toast'
 // 보유 액션 배지 색 — ⚠️ 가격 토큰(success=빨/danger=파, ADR-0015) 금지.
 // RecCard의 FLAG_STYLE처럼 전용색을 inline으로 직접 박는다(가격 방향 아님).
 const ACTION_STYLE = {
-  추매: { background: 'rgba(76, 175, 80, 0.14)', color: '#4caf50', borderColor: 'rgba(76, 175, 80, 0.30)' }, // 초록 계열
-  익절: { background: 'rgba(245, 158, 11, 0.16)', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.32)' }, // 앰버/골드 계열
-  홀딩: { background: 'var(--bg-elev-2)', color: 'var(--text-3)', borderColor: 'var(--border)' },              // 중립 회색
+  추매: { background: 'var(--semantic-buy-soft)', color: 'var(--semantic-buy)', borderColor: 'var(--semantic-buy-soft)' }, // 매수 신호 — 시맨틱 buy
+  익절: { background: 'var(--warn-soft)', color: 'var(--warn)', borderColor: 'var(--warn-soft)' },                          // 경계 — warn
+  홀딩: { background: 'var(--bg-elev-2)', color: 'var(--text-3)', borderColor: 'var(--border)' },                          // 중립 회색
 }
 
 export default function Recommendations() {
@@ -78,7 +78,7 @@ export default function Recommendations() {
   if (loading) return <LoadingSpinner label="추천 종목 불러오는 중입니다." style={{ padding: 40 }} />
 
   if (error) return (
-    <div style={{ textAlign: 'center', color: '#ef9a9a', fontSize: 13, padding: 32 }}>추천 종목을 불러오지 못했습니다.</div>
+    <div style={{ textAlign: 'center', color: 'var(--color-error)', fontSize: 13, padding: 32 }}>추천 종목을 불러오지 못했습니다.</div>
   )
 
   if (items.length === 0 && watchlist.length === 0 && holdings.length === 0) return (

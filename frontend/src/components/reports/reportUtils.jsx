@@ -66,7 +66,7 @@ export const GapCell = ({ target, price, baseColor, highlight, market }) => {
   const gap = fmtGap(target, price)
   return (
     <td style={{ ...TD, color: baseColor, background: highlight ? 'var(--surface-hover)' : undefined, border: highlight ? '2px solid var(--accent)' : undefined, fontWeight: highlight ? 700 : undefined }}>
-      {target != null ? <>{fmt(target, market)}{gap && <span style={{ color: gap.positive ? '#81c784' : '#ef9a9a' }}>({gap.text})</span>}</> : 'N/A'}
+      {target != null ? <>{fmt(target, market)}{gap && <span style={{ color: gap.positive ? 'var(--up)' : 'var(--down)' }}>({gap.text})</span>}</> : 'N/A'}
     </td>
   )
 }
@@ -94,7 +94,7 @@ export function TargetTooltip({ s }) {
       onMouseLeave={() => setVisible(false)}
     >
       {s ? fmt(s.target_mean, s.market) : 'N/A'}
-      {gap != null && <div style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', fontSize: 10 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</div>}
+      {gap != null && <div style={{ color: gap >= 0 ? 'var(--up)' : 'var(--down)', fontSize: 10 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</div>}
       {visible && s?.target_mean != null && (
         <div style={{
           position: 'fixed',
@@ -115,19 +115,19 @@ export function TargetTooltip({ s }) {
           <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 6, fontSize: 11 }}>목표가 근거</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px' }}>
             <span style={{ color: 'var(--text-3)' }}>평균</span>
-            <span style={{ color: 'var(--text)', fontWeight: 600 }}>{fmt(s.target_mean, s.market)}{gap != null && <span style={{ color: gap >= 0 ? '#81c784' : '#ef9a9a', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
+            <span style={{ color: 'var(--text)', fontWeight: 600 }}>{fmt(s.target_mean, s.market)}{gap != null && <span style={{ color: gap >= 0 ? 'var(--up)' : 'var(--down)', marginLeft: 4 }}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>}</span>
             <span style={{ color: 'var(--text-3)' }}>최고</span>
-            <span style={{ color: '#81c784' }}>{fmt(s.target_high, s.market)}</span>
+            <span style={{ color: 'var(--up)' }}>{fmt(s.target_high, s.market)}</span>
             <span style={{ color: 'var(--text-3)' }}>최저</span>
-            <span style={{ color: '#ef9a9a' }}>{fmt(s.target_low, s.market)}</span>
+            <span style={{ color: 'var(--down)' }}>{fmt(s.target_low, s.market)}</span>
             <span style={{ color: 'var(--text-3)' }}>애널리스트</span>
             <span>{total > 0 ? `${total}명` : 'N/A'}</span>
             <span style={{ color: 'var(--text-3)' }}>Buy</span>
-            <span style={{ color: '#81c784' }}>{s.buy ?? 0}{pct(s.buy ?? 0)}</span>
+            <span style={{ color: 'var(--semantic-buy)' }}>{s.buy ?? 0}{pct(s.buy ?? 0)}</span>
             <span style={{ color: 'var(--text-3)' }}>Hold</span>
             <span>{s.hold ?? 0}{pct(s.hold ?? 0)}</span>
             <span style={{ color: 'var(--text-3)' }}>Sell</span>
-            <span style={{ color: '#ef9a9a' }}>{s.sell ?? 0}{pct(s.sell ?? 0)}</span>
+            <span style={{ color: 'var(--semantic-sell)' }}>{s.sell ?? 0}{pct(s.sell ?? 0)}</span>
             {s.finviz_recom != null && <>
               <span style={{ color: 'var(--text-3)' }}>Finviz</span>
               <span>{s.finviz_recom} <span style={{ color: 'var(--text-3)', fontSize: 10 }}>(1=강매수)</span></span>

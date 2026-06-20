@@ -69,7 +69,7 @@ export default function Digest() {
         </button>
       </div>
 
-      {error && <div style={{ color: 'var(--down)', marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--color-error)', marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
       {!digest ? (
         <div className="muted">아직 생성된 Digest가 없습니다. 새로고침 버튼을 눌러 생성하세요.</div>

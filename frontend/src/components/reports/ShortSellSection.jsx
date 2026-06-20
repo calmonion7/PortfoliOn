@@ -83,12 +83,12 @@ export default function ShortSellSection({ ticker }) {
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }} minTickGap={24} />
               <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={52}
                      tickFormatter={v => fmtShares(v)} />
-              <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#ffb74d' }}
+              <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--data-3)' }}
                      tickFormatter={v => `${v}%`} width={40} />
               <Tooltip content={<ShortTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar yAxisId="left" dataKey="vol" name="공매도 거래량" fill="#90a4ae" />
-              <Line yAxisId="right" type="monotone" dataKey="ratio" name="공매도 비중(%)" stroke="#ffb74d" dot={false} strokeWidth={2} />
+              <Bar yAxisId="left" dataKey="vol" name="공매도 거래량" fill="var(--data-4)" />
+              <Line yAxisId="right" type="monotone" dataKey="ratio" name="공매도 비중(%)" stroke="var(--data-3)" dot={false} strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </>

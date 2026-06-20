@@ -90,8 +90,8 @@
   border-color: var(--text);
 }
 .btn-primary:hover { background: color-mix(in oklab, var(--text) 85%, var(--bg)); }
-.btn-danger { color: var(--down); border-color: transparent; background: transparent; }
-.btn-danger:hover { background: var(--down-soft); }
+.btn-danger { color: var(--color-error); border-color: transparent; background: transparent; }
+.btn-danger:hover { background: var(--color-error-soft); }
 .btn-sm { padding: 6px 10px; font-size: 12px; }
 
 /* ----- TABS PILLS ----- */
@@ -360,13 +360,13 @@
 .stock-card > div:last-child { border-right: none; display: flex; justify-content: center; align-items: center; padding: 10px 4px; }
 
 /* RSI buy zone - subtle green tint */
-.stock-card > div:nth-child(6) { background: rgba(76, 175, 80, 0.05); }
+.stock-card > div:nth-child(6) { background: var(--semantic-buy-soft); }
 /* RSI sell zone - subtle red tint */
-.stock-card > div:nth-child(7) { background: rgba(239, 83, 80, 0.05); }
+.stock-card > div:nth-child(7) { background: var(--semantic-sell-soft); }
 
 .sc-market { font-size: 9px; padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
-.sc-market.kr { background: #1a3a2a; color: #81c784; border: 1px solid #2e6b4a; }
-.sc-market.us { background: var(--bg-elev-2); color: #4fc3f7; border: 1px solid var(--border); }
+.sc-market.kr { background: var(--color-info-soft); color: var(--color-info); border: 1px solid color-mix(in oklab, var(--color-info) 30%, transparent); }
+.sc-market.us { background: var(--bg-elev-2); color: var(--color-info); border: 1px solid var(--border); }
 .sc-gen-btn { background: transparent; border: 1px solid var(--border); color: var(--text-3); border-radius: 3px; padding: 3px 8px; font-size: 10px; cursor: pointer; }
 .sc-gen-btn:disabled { cursor: default; }
 .sc-act-btn {

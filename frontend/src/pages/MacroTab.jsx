@@ -17,12 +17,9 @@ const INDICATOR_LABELS = {
 
 function corrColor(v) {
   if (v === null || v === undefined) return 'var(--text-3)'
-  const neutral = [69, 90, 100]
-  const pos = [79, 195, 247]
-  const neg = [239, 154, 154]
-  const t = Math.min(Math.abs(v), 1)
-  const to = v >= 0 ? pos : neg
-  return `rgb(${Math.round(neutral[0] + t * (to[0] - neutral[0]))},${Math.round(neutral[1] + t * (to[1] - neutral[1]))},${Math.round(neutral[2] + t * (to[2] - neutral[2]))})`
+  const t = Math.round(Math.min(Math.abs(v), 1) * 100)
+  const to = v >= 0 ? 'var(--corr-pos)' : 'var(--corr-neg)'
+  return `color-mix(in oklab, ${to} ${t}%, var(--corr-zero))`
 }
 
 export default function MacroTab() {
@@ -44,7 +41,7 @@ export default function MacroTab() {
   }, [])
 
   if (loading) return <LoadingSpinner label="매크로 데이터 불러오는 중입니다." />
-  if (error) return <div style={{ color: '#ef9a9a' }}>오류: {error}</div>
+  if (error) return <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
   if (!data || !data.correlations.length) return (
     <div style={{ color: 'var(--text-3)' }}>보유종목 없음 또는 데이터 부족</div>
   )
@@ -100,6 +97,12 @@ export default function MacroTab() {
           ))}
         </tbody>
       </table>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 11, color: 'var(--text-3)' }}>
+        <span>−1.0</span>
+        <div style={{ flex: '0 0 140px', height: 8, borderRadius: 4, background: 'linear-gradient(to right, var(--corr-neg), var(--corr-zero), var(--corr-pos))' }} />
+        <span>+1.0</span>
+      </div>
 
       <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 16 }}>
         👆 지표를 클릭하면 산점도를 확인할 수 있습니다.
