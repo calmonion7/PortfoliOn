@@ -1,97 +1,84 @@
 ---
-last_mapped_commit: 53b30e71425b810f8ce3edc33b2767b1be2e242c
+last_mapped_commit: 91173837359c5f157349a51501f72efa7342c3fa
 mapped: 2026-06-20
 ---
 
-# ARCHITECTURE
+# Architecture
 
-PortfoliOn은 Python/FastAPI 백엔드(`backend/`, 포트 8000)와 React 19 + Vite 프론트엔드(`frontend/`, 포트 5173)로 구성된 단일 레포 풀스택 앱이다. 저장소는 Docker PostgreSQL 16, 외부 시세는 키움/KIS/yfinance/Naver, 배포는 Mac 로컬 Docker 4-컨테이너(nginx·backend·postgres·certbot) + Cloudflare Tunnel.
+PortfoliOn은 Python/FastAPI 백엔드(포트 8000)와 React 19 + Vite 프론트엔드(포트 5173)로 구성된 2-tier 웹 애플리케이션이다. 단일 저장소(`/Users/calmonion/Project/PortfoliOn`)에 `backend/`와 `frontend/`를 같이 두고, 운영은 Mac 로컬 Docker 4-컨테이너(nginx / backend / postgres / certbot)로 한다. 데이터 저장소는 Docker PostgreSQL이며 로컬 JSON 파일은 런타임 캐시 용도다.
 
-## 전체 패턴
+## Overall Pattern
 
-요청 흐름은 **routers → services → db** 3-레이어 단방향이다.
+- **Backend — Router/Service 레이어링**: HTTP 표면은 `backend/routers/`의 `APIRouter`들이 담당하고, 도메인 로직·외부 API 호출·DB 접근은 `backend/services/`로 위임한다. 라우터는 요청 파싱·인증 게이팅·응답 정리(`services.utils.sanitize`)를 하고, 서비스가 실제 일을 한다.
+- **Frontend — Pages/Hooks/Components**: `frontend/src/pages/`가 화면(라우트/탭), `frontend/src/hooks/`가 데이터 패칭·상태 로직, `frontend/src/components/`가 표현(presentational) 컴포넌트를 맡는 분리 구조다.
+- **Hub-Tab UI**: 상단 nav는 5개 항목(리서치/포트폴리오/시장/구루/설정)이며, 일부는 내부에 탭을 가진 "허브" 페이지다. `Research`(홈 `/`)가 리포트·추천·랭킹·다이제스트·캘린더 탭을, `MarketHub`(`/market`)가 시장지표·수급지표 탭을 묶는다. 허브는 탭별 페이지 컴포넌트를 조건부 렌더링한다.
 
-- `backend/routers/*.py` — HTTP 표면(엔드포인트). 인증 게이팅, 요청/응답 스키마 처리. 비즈니스 로직은 services에 위임. 모든 라우터는 `APIRouter(prefix="/api", ...)`를 쓴다.
-- `backend/services/*.py` (+ 서브패키지) — 도메인 로직, 외부 API 연동, 캐싱, 영속화.
-- `backend/services/db.py` — psycopg2 `ThreadedConnectionPool`(minconn=1, maxconn=20) 위의 얇은 헬퍼. `query(sql, params)`(SELECT→dict 리스트), `execute(sql, params)`(INSERT/UPDATE/DELETE→rowcount), `get_connection()`(컨텍스트 매니저, 정상 시 commit·예외 시 rollback). 모든 SQL은 이 3개 함수만 통과한다. `DATABASE_URL` env로 연결.
+## Layers
 
-프론트는 **hub 페이지 → 탭(개별 페이지) → 컴포넌트** 구조. 라우팅은 `react-router-dom` 5개 nav(리서치/포트폴리오/시장/구루/설정)이고, 각 hub가 내부에서 탭 상태로 하위 페이지를 스위칭한다.
+### Backend
 
-## 엔트리 포인트
+1. **Entry point** — `backend/main.py`: `FastAPI` 앱을 생성하고 미들웨어(`SessionMiddleware`, `EventTrackerMiddleware`, `CORSMiddleware`)와 모든 라우터를 `include_router`로 마운트한다. `lifespan`에서 idempotent DDL 마이그레이션(`_migrate`)을 실행하고 스케줄러를 기동(`sched.start()`)하며, 백그라운드 스레드로 캘린더/시장 캐시를 워밍한다.
+2. **Routers** (`backend/routers/`) — HTTP 엔드포인트. 인증은 `backend/auth.py`의 `get_current_user`/`require_admin`/`*_or_api_key` 의존성으로 게이팅. 라우터 목록: `auth`, `portfolio`, `report`, `watchlist`, `stocks`, `guru`, `calendar`, `digest`, `market_indicators`, `analytics`, `analysis`, `events`, `rankings`, `investor`, `short_sell`, `batches`, `recommendations`, `admin`.
+3. **Services** (`backend/services/`) — 도메인 로직. 외부 시세(yfinance/Naver/키움/KIS), DART 파싱, 컨센서스 파이프라인, 캐시, 스케줄 메타 등. 일부는 서브패키지로 분리됨: `storage/`(포트폴리오·이름·스케줄·날짜), `market/`(US/KR 시세 + 포맷), `market_indicators/`(FX/VIX/원자재/국채/실적/경제/수출/매크로), `kiwoom/`·`kis/`(KR/백업 시세 소스), `recommendation/`(추천 스코어링·퍼널·유니버스·액션·store).
+4. **Data access** (`backend/services/db.py`) — `psycopg2` `ThreadedConnectionPool`(minconn 1 / maxconn 20) 기반 `get_connection`/`query`/`execute` 헬퍼. `storage` 패키지 루트가 이를 re-export해 `storage.query` 등으로도 노출(표면 보존).
+5. **Scheduler** (`backend/scheduler/`) — APScheduler 패키지(`__init__.py`, `jobs.py`, `schedule.py`, `_state.py`). 배치 작업을 등록·실행하고 결과를 `services.job_runs`에 기록한다.
 
-- `backend/main.py` — FastAPI 앱 생성. `lifespan`에서 ① `_migrate()`(기동 시 idempotent `CREATE TABLE IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS` DDL — 배포가 자동 적용; `backlog_history.segments`, `batch_schedules`, `market_short_sell`, `stock_disclosures`, `stock_dividends`, `stock_supply_score`, `stock_insider_trades`, `stock_recommendations` 등) ② `sched.start()`(스케줄러 기동) ③ 캘린더/시장 캐시 워밍 데몬 스레드. 미들웨어: `SessionMiddleware`(OAuth용), `EventTrackerMiddleware`(`backend/middleware/event_tracker.py`, 사용자 행동 로그), `CORSMiddleware`. 17개 라우터를 `include_router`로 마운트하고 `/health` 엔드포인트 제공.
-- `backend/scheduler/` — APScheduler 패키지(`__init__.py`의 `start()`/`stop()`/`reload(job_id)`). 기동 시 `_seed_batch_schedules()` → `batch_registry.BATCHES` 중 `editable` 잡을 `_reschedule_job` → `_check_missed_report()`(시장별 미생성 리포트 복구) → `_seed_rankings_if_empty()`/`_seed_kr_sector_if_empty()`(빈 캐시 시드) → `_scheduler.start()`.
-- `frontend/src/main.jsx` — `createRoot`로 `<App/>` 렌더(StrictMode). `styles/tokens.css` + `index.css` 로드.
-- `frontend/src/App.jsx` — `BrowserRouter` + `Routes`. `AuthProvider`/`ToastProvider`로 감싸고, OAuth 콜백(`?oauth=`/`?token=`/`?refresh=`) 처리, `localStorage` access/refresh 토큰 관리, 미인증 시 `LoginPage` 렌더. 5개 nav 탭은 `menuPermissions`로 필터(admin은 `행동` 탭 추가).
+### Frontend
 
-## 레이어별 책임
+1. **Entry point** — `frontend/src/main.jsx`: `createRoot`로 `<App/>`를 마운트하고 `styles/tokens.css`·`index.css`를 로드.
+2. **App shell** (`frontend/src/App.jsx`): `ToastProvider` → `AuthProvider` → `BrowserRouter` 중첩. OAuth 콜백/토큰 부트스트랩, 세션 로드, `TopNav`(메뉴 권한·role로 필터링), 라우트 정의, `MobileNav`/`InstallPrompt`.
+3. **Pages** (`frontend/src/pages/`) — 라우트 화면 및 허브 탭 컴포넌트.
+4. **Hooks** (`frontend/src/hooks/`) — `useAuth`, `useTheme`, `useIsMobile`, `usePortfolioData`, `useReportList`, `useReportGeneration`, `usePriceFlash`. 데이터 패칭·파생 상태를 캡슐화해 페이지에 제공.
+5. **Contexts** (`frontend/src/contexts/`) — `AuthContext.jsx`(세션·role·메뉴 권한).
+6. **Components** (`frontend/src/components/`) — 표현 컴포넌트. 도메인별 하위 디렉터리(`reports/`, `market/`, `portfolio/`, `recommendations/`)와 공용 `ui/` 디자인 시스템.
+7. **API client** (`frontend/src/api.js`) — fetch 래퍼. 토큰 첨부·`VITE_API_BASE_URL` 처리(미설정 시 상대경로, Vite가 `/api/*`를 `localhost:8000`으로 프록시).
 
-### 라우터 (`backend/routers/`)
-17개 라우터: `auth`, `portfolio`, `report`, `watchlist`, `stocks`, `guru`, `calendar`, `digest`, `market_indicators`, `analytics`, `analysis`, `events`, `rankings`, `investor`, `short_sell`, `batches`, `recommendations`, `admin`. 라우팅 순서 주의 — `PUT /api/stocks/enrich/batch`는 `PUT /api/stocks/{ticker}/enrich`보다 **먼저** 등록(FastAPI가 `enrich`를 ticker로 오인 방지). `GET /api/report/{ticker}/backlog` 같은 구체 경로는 catch-all보다 앞.
+## Data Flow
 
-### 서비스 (`backend/services/`)
-도메인별 모듈 + 서브패키지(아래 캐싱·시세·배치 절 참조). `errors.py`(예외), `utils.py`(NaN/Inf sanitize), `parallel.py`(ThreadPool 헬퍼), `progress.py`(진행률), `schedule_spec.py`(스케줄 직렬화), `job_runs.py`(배치 실행 이력 `job_runs.record(id, lane)`).
+### 일반 요청 경로
 
-### 저장 (`backend/services/storage/`)
-`storage`는 패키지(ADR-0017)다. `__init__.py`가 하위 모듈(`portfolio.py`·`names.py`·`schedule.py`·`dates.py`)의 전 심볼을 re-export — 외부는 `storage.X` 모듈 속성으로 조회하므로 루트에 전부 존재해야 한다. `db`의 `get_connection`/`query`/`execute`도 표면 보존을 위해 re-export.
+```
+브라우저 (page/hook)
+  → frontend/src/api.js (fetch, Bearer 토큰)
+  → nginx /api/* 프록시 (운영) | Vite proxy (로컬)
+  → FastAPI 라우터 (인증 의존성 + 파싱)
+  → 서비스 (도메인 로직)
+  → 인메모리 캐시(services/cache.py) 또는 PostgreSQL(services/db.py)
+  → 응답 sanitize(NaN/Inf 가드) → JSON
+```
 
-## 데이터 모델 — 스냅샷/리포트
+`services/cache.py`는 6종 인메모리 캐시(snapshot LRU 200, list TTL 5s, dashboard/correlation/sector/macro TTL 300s)를 운용한다. 종목 추가/수정/삭제 시 dashboard·correlation·sector·macro 캐시가 자동 무효화된다.
 
-- `snapshots` 테이블(공유, per-ticker·per-date JSON) — 일일 리포트 배치(`report_generator`)가 시장 데이터 스냅샷을 박제. **백엔드에 LLM 호출 없음**(`requirements.txt`에 anthropic 없음) — AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API로 작성(`CLAUDE_COWORK_API.md`).
-- `backend/snapshots/`(파일, gitignored, per-ticker/date) + `backend/reports/`(legacy read-only) — JSON 폴백.
-- `raw_reports` — 종목별 원본 AI 리포트 텍스트.
+### 배치 precompute 경로 (요청은 저장값만 읽음)
 
-## 캐싱 레이어 (`backend/services/cache.py`)
+외부 API 직렬 호출이 느린 지표(KR 업종 모멘텀·랭킹·수급·시장지표·추천 스코어·배당·공시·수주잔고 등)는 **요청 경로에서 라이브 호출하지 않는다**. 스케줄러 배치가 사전계산해 `market_cache` 또는 전용 테이블(`market_leverage_indicators`, `stock_recommendations`, `stock_dividends` 등)에 저장하고, 요청은 저장값만 읽는다.
 
-인메모리 캐시 다종(`TTLCache`/LRU `OrderedDict`):
-- `_snapshots`(LRU, max 50) — snapshot
-- `_list_cache`(TTL 60s) — 리포트 목록
-- `_dashboard_cache`(TTL 300s) — per-user 대시보드
-- `_correlation_cache`/`_sector_cache`/`_macro_cache`(TTL 300s) — 분석탭(sector는 `user_id:market` 키)
-- `_quote_cache`(TTL 60s) — 시세
-- `_live_prices_cache`(TTL 15s) — 장중 자동폴링 `/api/portfolio/prices`(다중 탭/사용자가 단일 키움 자격증명 레이트리밋을 안 치게 상한)
+```
+APScheduler 배치 (backend/scheduler/)
+  → 서비스가 외부 API 호출 (yfinance/Naver/키움/KIS/FRED/DART/KOFIA)
+  → market_cache 또는 전용 테이블에 저장 (all-None 결과는 박제 금지)
+  → services/job_runs.record(id, ...) 로 실행이력 기록
+[이후]
+GET 요청 → 라우터 → 저장값 read (외부 호출 0)
+```
 
-종목 추가/수정/삭제 시 `invalidate(ticker)`가 snapshot·list·dashboard·correlation·sector·macro·live_prices를 일괄 무효화. storage→cache는 순환참조 회피용 지연 import.
+배치 메타데이터(라벨·스케줄·source·usage·market 분류)는 `services/batch_registry.py`의 정적 `BATCHES` 리스트에 정의되고 `GET /api/batches`로 노출된다.
 
-## 배치 precompute → 요청 read 경계 (핵심 규칙)
+## Key Abstractions
 
-배치-백킹 뷰(랭킹·KR 업종 모멘텀·추천·수급·시장지표 등)는 외부 API(키움 등)를 **요청/기동 경로에서 라이브 호출하지 않는다**. 배치가 사전계산해 `market_cache`/전용 테이블에 저장하고, **요청은 저장값만 읽는다**. 근거: 요청당 N콜 직렬은 수초 지연, 캐시 만료마다 재호출. 가드 원칙(CLAUDE.md): ① 외부 fetch 실패를 silent except로 삼키지 말고 로깅 ② 빈/all-None 결과를 캐시에 박제 금지(직전 양호값 유지) ③ 의심 트리거가 아니라 실패 클래스(all-None)를 가드. 기동 시 빈 캐시 적재는 `_seed_*_if_empty` 패턴.
+- **`storage` 패키지 (facade)** — `backend/services/storage/__init__.py`가 하위 모듈(`portfolio`, `names`, `schedule`, `dates`)과 `db` 헬퍼의 심볼을 전부 re-export한다. 외부 소비처가 `storage.X` 모듈 속성으로 접근하므로 패키지 루트에 모든 심볼이 존재해야 한다(ADR-0017).
+- **이중 시세 소스 체인** — KR은 `get_quote_kr`이 키움→KIS→Naver 폴백, US는 `get_quote_us`가 yfinance→KIS 폴백. 키 미설정이 안전 기본값(휴면).
+- **컨센서스 파이프라인** — `consensus_pipeline.py`가 opinion 문자열을 5점 표준 점수로 변환해 `consensus_history`에 저장하는 공통 경로.
+- **응답 sanitize** — `services/utils.sanitize`가 NaN/Inf를 가드(starlette `JSONResponse`는 `allow_nan=False`라 미가드 시 500).
+- **인증 게이팅** — `backend/auth.py`의 JWT(HS256) 의존성 + admin-only 엔드포인트. 메뉴 권한은 `user_menu_permissions`로 사용자별 nav 제어.
+- **Frontend ui/ 디자인 시스템** — `components/ui/`(Badge/Button/Card/Stat/Input/Skeleton/icons + index.js)와 `styles/tokens.css` CSS 변수. KR 색 관례(`--up`=빨강 상승, `--down`=파랑 하락).
 
-- `market_cache` 테이블 — fx/vix/commodities/treasury/econ/m7/krtop2/krexports/macro_signals/랭킹/KR섹터 영구 캐시. `market_indicators/cache.py`의 `_mc_load`/`_mc_save`로 읽기/쓰기, 각 서브모듈이 `_merge_history`/`_yf_close_history`로 yfinance incremental fetch(마지막 날짜 이후만).
-- 시계열/파생 전용 테이블 — `market_leverage_indicators`(신용잔고), `market_lending_balance`(대차잔고), `market_short_sell`(공매도), `consensus_history`/`daily_consensus_mart`(컨센서스), `stock_recommendations`(추천 점수), `stock_disclosures`/`stock_insider_trades`/`stock_dividends`/`backlog_history`(DART 파생), `stock_supply_score`(수급 점수).
+## Entry Points
 
-## 배치 레지스트리 (`backend/services/batch_registry.py`)
+- **Backend**: `backend/main.py` (`app = FastAPI(...)`, uvicorn 진입). 기동: `cd backend && python -m uvicorn main:app --reload --port 8000`.
+- **Frontend**: `frontend/src/main.jsx` → `frontend/src/App.jsx`. 기동: `cd frontend && npm run dev`.
+- **양쪽 동시**: 루트 `start.sh`(macOS/Linux) / `start.bat`(Windows).
 
-`BATCHES` 리스트가 현황 허브가 노출하는 ~20개 배치의 정적 메타데이터(id·label·category·schedule_desc·usage·source·editable·market·default_schedule 등). `id`는 스케줄러 잡 id 및 `job_runs.record(id, ...)` 호출 id와 **반드시 일치**. `GET /api/batches`가 이 메타를 그대로 노출. 일일 리포트는 시장별 분리: `daily_report_kr`(20:30 KST)·`daily_report_us`(07:00 KST). 실적/월간도 분리: `earnings_kr`/`earnings_us`, `monthly_kr`/`monthly_us`. `market` 속성은 출처국 기준(FRED=US). `source`=fetch 출처, `usage`=소비 UI(반대 방향). 스케줄러 잡 함수는 `scheduler/jobs.py`의 `_JOB_FUNCS`에 등록.
+## Notable Recent Refactor
 
-## 종목명 dual-source 모델
-
-종목명은 두 출처가 공존:
-- `tickers.name` — 공유 마스터, 종목관리 목록이 live로 읽음.
-- `snapshots.data.name` — 리포트 생성 시 박제, 리서치 목록·상세가 읽음.
-
-이름 변경 시 **둘 다** 갱신해야 목록↔상세 일치(`storage.refresh_snapshot_names` 단건 / `reconcile_snapshot_names` 전체). DB만 바꾸면 list 캐시·snapshot LRU 탓에 미반영 → `cache.invalidate`+`invalidate_list()` 필수. 실명은 `market.resolve_name`이 quote(KR 키움 stk_nm/Naver·US yfinance shortName)에서 채움. 클로버 방지 가드: tickers UPSERT는 들어온 name이 NULL/빈값/티커와 같으면 기존 `tickers.name` 보존.
-
-## 시세 소스 체인 (`backend/services/market/`)
-
-- KR: 키움 → KIS → Naver(`market.get_quote_kr`, `_kr_basic_kiwoom`/`_kr_basic_kis`/`_kr_basic_naver`). 키움 1차(ADR-0009), KIS 백업(ADR-0011).
-- US: yfinance → KIS(`market._get_quote_uncached` US 분기, `_us_quote_kis`). yfinance 1차(전 티커·섹터/시총/히스토리·배치 1콜), KIS 백업.
-- 배치 시세: `get_quotes_batch`(yf.download/ka10081 일괄 1콜).
-- 외부 시세 키 미설정은 안전 기본값(휴면) — 코드 머지 무해, 키 주입 시 활성.
-
-## 프론트 hub 구조
-
-- **리서치** (`/`, `pages/Research.jsx`) — 홈 hub. 탭: 리포트(`Reports`)·추천(`Recommendations`)·랭킹(`Ranking`)·캘린더(`Calendar`)·다이제스트(`Digest`). 리포트 탭이 보유/관심 종목 관리(라이브 P&L·편집·삭제·승격·추가)를 흡수.
-- **포트폴리오** (`/portfolio`, `pages/Portfolio.jsx`) — 대시보드·분석 전용. 탭: 대시보드(`DashboardGrid`)·분석. 분석은 하위탭 섹터(`SectorTab`)·매크로(`MacroTab`)·상관관계(`Analytics`).
-- **시장** (`/market`, `pages/MarketHub.jsx`) — `Market` 래핑. 시장지표·수급지표 2탭.
-- **구루** (`/guru`, `pages/Guru.jsx`), **설정** (`/settings`, `pages/Settings.jsx`), **행동** (`/admin-analytics`, `pages/AdminAnalytics.jsx`, admin 전용). `/dev/showcase`는 컴포넌트 카탈로그(`Showcase.jsx`).
-
-상태/데이터: `contexts/AuthContext.jsx`(로그인·menuPermissions·role), `hooks/`(usePortfolioData·useReportList·useReportGeneration·usePriceFlash·useIsMobile·useTheme·useAuth), `api.js`(axios 인스턴스 — Bearer 토큰 요청 인터셉터, 401 시 토큰 제거 후 `/` 리다이렉트). `utils/analytics.js`의 `trackEvent`가 행동 로그 전송.
-
-## 데이터 흐름 요약
-
-1. **읽기(목록·대시보드·시장지표·랭킹)**: 프론트 `api` → 라우터 → cache(인메모리) → storage/db(`market_cache`/테이블 저장값). 외부 API 라이브 호출 없음.
-2. **시세(장중)**: `/api/portfolio/prices` → `_live_prices_cache`(15s) → `market.get_quotes_batch`(키움/yfinance 일괄).
-3. **쓰기(종목 추가/enrich)**: 라우터 → storage(tickers/user_stocks UPSERT) → `cache.invalidate`.
-4. **배치(precompute)**: APScheduler 잡(`scheduler/jobs.py`) → 외부 API fetch → 테이블/`market_cache` 저장 → `job_runs.record`로 실행 이력.
-5. **리포트 생성**: `daily_report_kr/us` 배치 → `report_generator`(시장 데이터 스냅샷) → `snapshots` 테이블 + `consensus_pipeline.run_daily`. AI 텍스트는 외부 Cowork enrich.
+커밋 `91173837`에서 `frontend/src/pages/Reports.jsx`(804줄 god-file)를 447줄로 줄이면서 4개의 인라인 렌더 함수를 표현 컴포넌트로 추출했다: `StockCard.jsx`, `TickerListItem.jsx`, `ReportFilters.jsx`, `ReportDetailHeader.jsx`(모두 `frontend/src/components/reports/`). 로직·상태·핸들러·훅(`useReportList`/`useReportGeneration`/`usePortfolioData` 등)은 `Reports.jsx`에 그대로 남아, 페이지는 데이터·핸들러를 보유하고 추출된 컴포넌트는 props로 받아 그리는 presentational 역할만 한다.

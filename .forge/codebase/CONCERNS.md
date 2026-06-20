@@ -1,11 +1,11 @@
 ---
-last_mapped_commit: 53b30e71425b810f8ce3edc33b2767b1be2e242c
+last_mapped_commit: 91173837359c5f157349a51501f72efa7342c3fa
 mapped: 2026-06-20
 ---
 
 # CONCERNS
 
-PortfoliOn(FastAPI 백엔드 + React/Vite 프론트)의 기술부채·잠재버그·보안·성능 취약·위험 영역 지도. 각 항목은 현재 소스(HEAD `53b30e71`)에 대해 검증했고, 패키지 분리 리팩토링(`storage`/`scheduler`/`market`/`backlog_parser`, ADR-0017)으로 파일이 이동한 경우 **신/구 경로를 모두 표기**한다. 직전 매핑(`5fbe7ce1`) 이후 머지된 task#85(프론트 dead-code 제거)·task#86(fmtPrice NaN/Inf 가드)·task#87(Reports 필터 단일 호스트 lift)·task#88(이름 백필 skipped 표면화)를 반영했다. 최근 완화된 항목은 **삭제하지 않고 "완화됨"으로 표기**한다.
+PortfoliOn(FastAPI 백엔드 + React/Vite 프론트)의 기술부채·잠재버그·보안·성능 취약·위험 영역 지도. 각 항목은 현재 소스(HEAD `91173837`)에 대해 검증했고, 패키지 분리 리팩토링(`storage`/`scheduler`/`market`/`backlog_parser`, ADR-0017)으로 파일이 이동한 경우 **신/구 경로를 모두 표기**한다. 직전 매핑(`53b30e71`) 이후 머지된 task#89(`Reports.jsx` god-file을 프레젠테이션 컴포넌트 4개로 분리, commit 91173837)를 반영했다 — 이로써 종전 "최대 파일/프론트 god-file" 부채가 **부분 해소**됐고, 잔존 부채(추출 전부터 있던 dead code·react-hooks lint·보류된 R4 훅 추출)는 항목 17에 갱신했다. 그 이전 머지분(task#85 dead-code 제거·task#86 fmtPrice NaN/Inf 가드·task#87 Reports 필터 단일 호스트 lift·task#88 이름 백필 skipped 표면화)도 그대로 반영돼 있다. 최근 완화된 항목은 **삭제하지 않고 "완화됨"으로 표기**한다.
 
 ---
 
@@ -196,7 +196,7 @@ CLAUDE.md 교훈(daily_report-market-split task15·17·45 재발): 배치 id를 
 - **패키지 re-export 표면 자체**: ADR-0017이 "전체 pytest green + 이전 전 심볼 전부 해석"을 게이트로 두나, re-export 목록 누락(특히 underscore private)을 단언하는 전용 테스트는 부재 — 서브모듈 재배치 시 표면 구멍이 런타임에만 드러남.
 - **종목명 dual-source 동기화**: task#77이 저장소 가드(SQL 문자열)·배치 실명 박제 3종을, task#88이 백필 skip 표면화 2종을 고정했으나, **`reconcile_snapshot_names`/`refresh_snapshot_names`의 동기화 정확성**(tickers↔snapshot 일치)이나 **백필의 시세 실패 재시도 누락** 자체(재시도 미도입)는 계약 테스트가 막지 않는다 — `skipped` 표면화로 진단만 가능.
 - **NaN 가드 전수**: digest/funnel/report_generator엔 NaN 테스트가 있으나, sanitize 미적용 엔드포인트의 NaN 회귀를 막는 계약 테스트는 부분적. 프론트 `fmtPrice` NaN 가드(task#86)는 프론트 단위 테스트 부재로 회귀를 자동으로 못 잡음.
-- **프론트**: 프론트 단위 테스트 부재(UAT는 Playwright 디바이스 에뮬레이션 수동, reference-frontend-uat). 비-additive reshape 소비처 회귀·CSS lift 회귀(항목 17)는 테스트로 못 잡고 라이브 UAT/메인 세션 grep에 의존.
+- **프론트**: 프론트 단위 테스트 부재(UAT는 Playwright 디바이스 에뮬레이션 수동, reference-frontend-uat). 비-additive reshape 소비처 회귀·CSS lift 회귀(항목 17)는 테스트로 못 잡고 라이브 UAT/메인 세션 grep에 의존. **이 공백이 직접 차단한 작업이 있다**: `Reports.jsx`의 종목관리 핸들러·필터/정렬 훅 추출(task#89 R4 후속)이 회귀 위험으로 보류됨(항목 18) — 프론트 테스트 하니스 도입이 그 추출의 선결 조건.
 - **silent except 경로**: `except: pass` 다수(부록 참고)는 실패 분기 테스트 부재 — 폴백이 데이터를 가리는 케이스가 테스트로 고정되지 않음.
 
 ---
@@ -211,6 +211,19 @@ CLAUDE.md 교훈(daily_report-market-split task15·17·45 재발): 배치 id를 
 - **스코프 의존 스타일 lift 회귀 → 가드됨(task#87, commit 3a872112)**: `.parent .child` 형태로만 정의되고 전역 정의가 없는 스타일은, child를 부모 밖으로 옮길 때 이중 함정 — ① 그 규칙이 dead가 되고 ② child가 스타일을 통째로 잃는다. **task#87이 Reports 필터를 사이드바+main 2벌 렌더에서 `.reports-filters` 단일 호스트(layout 앞 형제)로 lift**하면서 죽은 사이드바 컴팩트 규칙을 제거하고 `.reports-sidebar .tab-cnt`(전역 정의 없음)를 `.reports-filters .tab-cnt`로 **retarget해 카운트 배지 무스타일 회귀를 가드**(`pc.css:326` 검증; 모바일 detail 필터 미노출은 `pc.css:323` `.reports-filters[data-view="detail"]{display:none}`로 보존). 전역 `.tab-btn`/`.sm`은 tokens.css에 전역 정의가 있어 폴백 안전 — 차이는 '전역 vs 스코프 전용'. **교훈: 컴포넌트를 컨테이너 밖으로 lift하기 전 `grep '\.<container> '`로 스코프 의존 규칙을 전수해 retarget**(안 하면 컴포넌트는 옮겨졌는데 시각만 깨진다). Playwright 4조합 UAT 통과.
 
 **상태**: task#85가 미렌더 클래스 일부를, task#87이 스코프 의존 lift 1건을 청소·가드했으나 mobile.css/pc.css의 레거시 태그선택자(`.m-login input` 등) 표면은 **미청소**로 남아 다음 프론트 수정도 같은 함정에 빠질 수 있다. 근본 청소(레거시 태그선택자→프리미티브 단일화)는 별도 태스크 후보.
+
+---
+
+## 18. 프론트 god-file — 부분 해소 + 잔존 dead code/lint/보류된 훅 추출 (LOW~MEDIUM, 프론트 부채)
+
+**부분 해소(task#89, commit 91173837)**: 종전 최대 부채였던 `frontend/src/pages/Reports.jsx`(804줄 god-file, 직전 매핑이 "최대 파일"로 지목)가 **447줄로 축소**(-44%)됐다. 인라인 렌더 함수 4개(stock card·ticker list item·filters·상세 헤더)를 `frontend/src/components/reports/`의 신규 4파일 — `StockCard.jsx`(190줄)·`TickerListItem.jsx`·`ReportFilters.jsx`·`ReportDetailHeader.jsx` — 로 **순수 구조 추출**(props over closures 명시 배선, 동작·시각 무변경). 로직·state·핸들러·훅·CSS는 잔류. ESLint 신규 에러 0(기존 9건 유지)·Playwright UAT 16/16 PASS로 검증. 라인 추정 교훈: props 많은 프레젠테이션 추출은 호출부가 `Σ(컴포넌트별 prop 수)`만큼 부푼다(이번 24/15/13/10 props → 호출부 ~60줄 추가)라, "함수 본문 빠지니 줄겠지" 추정이 빗나간다.
+
+**잔존 부채(추출 전부터 존재, surgical-change 원칙으로 미수정)**:
+- **dead code(검증)**: `Reports.jsx:34` `hasFetched`(`useReportList` 구조분해되나 본문 미사용)·`Reports.jsx:36` `watchlistAll`(미사용)·`Reports.jsx:73` `setDetailRefreshKey`(useState로 선언되나 **set 함수가 한 번도 호출 안 됨** — `detailRefreshKey`만 effect deps에서 읽힘, `:100`). 셋 다 task#89 변경의 소산이 아니라 그 이전부터 있던 미사용 변수 → 별도 청소 작업(fg-quick 후보)로 분리 가능.
+- **react-hooks lint 에러(기존 9건)**: `set-state-in-effect`(예: `Reports.jsx:194-196` effect 내 `setActiveTab('holdings')`)·`exhaustive-deps`(`:193`에 이미 `// eslint-disable-next-line react-hooks/exhaustive-deps` 억제 주석 존재). 동작은 하나 React 권장 패턴 위반으로 lint가 경고.
+- **보류된 R4(deferred)**: 종목관리 핸들러(`handleSave`/`handleDelete`/`handlePromote`/`openEdit`/`openAdd`)와 필터·정렬 로직(`_matchSubTab`·`tabEntries` 정렬 클로저)을 커스텀 훅으로 추출하는 R4 후속은 **프론트 단위 테스트 부재로 회귀 위험**이 커 보류됨(항목 16의 프론트 테스트 공백과 직결). 추출 전 프론트 테스트 하니스 도입이 선결.
+
+**남은 큰 파일(참고, 검증)**: `frontend/src/components/reports/DetailTab.jsx`(572줄)가 이제 프론트 최대 파일이며 `frontend/src/pages/Ranking.jsx`(521줄)·`ConsensusChart.jsx`(413줄)가 뒤따른다. 백엔드 최대는 `backend/routers/report.py`(504줄)·`routers/stocks.py`(455줄)·`services/backlog.py`(438줄)·`scheduler/jobs.py`(434줄). 이들은 아직 god-file 임계는 아니나 동일 추출 패턴의 다음 후보.
 
 ---
 
