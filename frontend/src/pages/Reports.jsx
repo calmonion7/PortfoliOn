@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import useReportList from '../hooks/useReportList'
+import useReportFilters from '../hooks/useReportFilters'
+import useStockManagement from '../hooks/useStockManagement'
 import useReportGeneration from '../hooks/useReportGeneration'
 import usePortfolioData from '../hooks/usePortfolioData'
 import useIsMobile from '../hooks/useIsMobile'
@@ -64,21 +66,29 @@ export default function Reports() {
   const [detail, setDetail] = useState({ summary: null, enriched_at: null })
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('holdings')
-  const [watchlistSub, setWatchlistSub] = useState('low')
-  const [sortCol, setSortCol] = useState(null)
-  const [sortDir, setSortDir] = useState('asc')
   const [othersData, setOthersData] = useState(null)
   const [othersLoading, setOthersLoading] = useState(false)
   const [view, setView] = useState('list')
   const [detailRefreshKey] = useState(0)
-  const [marketFilter, setMarketFilter] = useState('ALL')
 
-  // 종목 관리(추가/편집/삭제/승격) — 종목관리에서 흡수
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState(null)        // { ...stock, isWatch }
-  const [addMode, setAddMode] = useState('holding')    // 'holding' | 'watchlist'
-  const [promoteTarget, setPromoteTarget] = useState(null)
-  const [mutError, setMutError] = useState('')
+  // 필터/정렬 파생 — useReportFilters 훅으로 추출(R4 part 1/2, ADR-0019)
+  const {
+    activeEntries, tabEntries,
+    mCountAll, mCountKR, mCountUS,
+    sortCol, handleSort, sortArrow,
+    marketFilter, setMarketFilter,
+    watchlistSub, setWatchlistSub,
+  } = useReportFilters({ reportList, othersData, activeTab, _targetPct, _hasWarning, _isUngenerated })
+
+  // 종목 관리(추가/편집/삭제/승격) — useStockManagement 훅으로 추출(R4 part 2/2, ADR-0019)
+  const {
+    modalOpen, setModalOpen,
+    editing, setEditing,
+    addMode,
+    promoteTarget, setPromoteTarget,
+    mutError,
+    handleSave, handleDelete, handlePromote, openEdit, openAdd,
+  } = useStockManagement({ holdingMap, watchMap, fetchList, fetchAll, showToast, activeTab, setActiveTab })
 
   useEffect(() => {
     if (activeTab !== 'others' || !isAdmin || othersData !== null) return
@@ -105,157 +115,12 @@ export default function Reports() {
     trackEvent('report_view_open', { ticker })
   }
 
-  // ── 종목 관리 핸들러 (종목관리 → 리포트 탭 흡수) ──
-  const pollReportGeneration = (ticker) => {
-    let attempts = 0
-    const maxAttempts = 6
-    const id = setInterval(async () => {
-      attempts++
-      try {
-        const { data } = await api.get(`/api/report/${ticker}/history`)
-        if (data && data.length > 0) {
-          clearInterval(id)
-        } else if (attempts >= maxAttempts) {
-          clearInterval(id)
-          showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
-        }
-      } catch {
-        if (attempts >= maxAttempts) {
-          clearInterval(id)
-          showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
-        }
-      }
-    }, 15000)
-  }
-
-  const refreshAfterMutation = () => { fetchList(); fetchAll() }
-
-  const handleSave = async (stockData) => {
-    try {
-      const isWatch = editing ? editing.isWatch : addMode === 'watchlist'
-      if (editing) {
-        await api.put(`/api/${isWatch ? 'watchlist' : 'portfolio'}/${editing.ticker}`, stockData)
-        showToast(`${editing.ticker} 수정됐습니다`)
-      } else {
-        const res = await api.post(`/api/${isWatch ? 'watchlist' : 'portfolio'}`, stockData)
-        showToast(`${stockData.ticker} 추가됐습니다`)
-        if (res.data?.report_queued) {
-          pollReportGeneration(stockData.ticker.toUpperCase())
-        }
-      }
-      setModalOpen(false); setEditing(null); setMutError(''); refreshAfterMutation()
-    } catch (err) {
-      const msg = err.response?.data?.detail || '저장 실패'
-      setMutError(msg); showToast(msg, 'error')
-      throw err
-    }
-  }
-
-  const handleDelete = async (ticker, isWatch) => {
-    const msg = isWatch ? `${ticker}를 완전히 삭제하시겠습니까?` : `${ticker}를 보유종목에서 제거하고 관심종목으로 이동합니까?`
-    if (!window.confirm(msg)) return
-    try {
-      await api.delete(`/api/${isWatch ? 'watchlist' : 'portfolio'}/${ticker}`)
-      setMutError(''); refreshAfterMutation()
-      showToast(`${ticker} 삭제됐습니다`)
-    } catch (err) {
-      const errMsg = err.response?.data?.detail || '삭제 실패'
-      setMutError(errMsg); showToast(errMsg, 'error')
-    }
-  }
-
-  const handlePromote = async ({ quantity, avg_cost }) => {
-    try {
-      await api.post(`/api/watchlist/${promoteTarget.ticker}/promote`, { quantity, avg_cost })
-      showToast(`${promoteTarget.ticker} 보유종목으로 이동됐습니다`)
-      setPromoteTarget(null); setActiveTab('holdings'); refreshAfterMutation()
-    } catch (err) {
-      showToast('이동 실패', 'error')
-      throw err
-    }
-  }
-
-  // 편집 — 수량·평단은 reportList엔 없고 stocks/watchlist에 있다. ticker로 찾아 넘긴다.
-  const openEdit = (ticker, category) => {
-    const isWatch = category === 'watchlist'
-    const src = isWatch ? watchMap[ticker?.toUpperCase()] : holdingMap[ticker?.toUpperCase()]
-    setEditing({ ...(src || { ticker, market: 'US' }), isWatch })
-    setModalOpen(true)
-  }
-  const openAdd = () => {
-    setEditing(null)
-    setAddMode(activeTab === 'watchlist' ? 'watchlist' : 'holding')
-    setModalOpen(true)
-  }
-
   useEffect(() => cleanup, [cleanup])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (activeTab === 'ungenerated' && ungeneratedCount === 0) setActiveTab('holdings')
   }, [ungeneratedCount, activeTab])
-
-  const _matchSubTab = ([, v]) => {
-    if (activeTab === 'others') return false
-    if (activeTab === 'ungenerated') return _isUngenerated([, v])
-    if (activeTab === 'holdings') return v.category === 'holdings'
-    if (v.category !== 'watchlist') return false
-    if (watchlistSub === 'warn') return _hasWarning(v.summary, v.is_etf)
-    const g = _targetPct(v.summary)
-    if (watchlistSub === 'low') return !_hasWarning(v.summary, v.is_etf) && (g === null || g >= 40)
-    return !_hasWarning(v.summary, v.is_etf) && (g !== null && g < 40)
-  }
-  const subTabEntries = Object.entries(reportList).filter(_matchSubTab)
-  const _mktBase = activeTab === 'others' ? Object.entries(othersData || {}) : subTabEntries
-  const mCountAll = _mktBase.length
-  const mCountKR = _mktBase.filter(([, v]) => (v.summary?.market || v.market) === 'KR').length
-  const mCountUS = _mktBase.filter(([, v]) => (v.summary?.market || v.market) === 'US').length
-
-  const tabEntries = subTabEntries
-    .filter(([, v]) => {
-      if (marketFilter === 'ALL') return true
-      const m = v.summary?.market || v.market
-      return m === marketFilter
-    })
-    .sort(([, a], [, b]) => {
-      const cmp = (va, vb, dir) => {
-        if (va === null && vb === null) return 0
-        if (va === null) return 1
-        if (vb === null) return -1
-        return dir === 'asc' ? va - vb : vb - va
-      }
-      const gapOf = (s) => {
-        const t = s.summary?.target_mean, p = s.summary?.price
-        return t != null && p ? (t - p) / p * 100 : null
-      }
-      if (sortCol === 'gap') return cmp(gapOf(a), gapOf(b), sortDir)
-      if (sortCol === 'rsi') return cmp(a.summary?.daily_rsi?.rsi ?? null, b.summary?.daily_rsi?.rsi ?? null, sortDir)
-      if (sortCol === 'chg') return cmp(a.summary?.drop_from_high_20d ?? null, b.summary?.drop_from_high_20d ?? null, sortDir)
-      // 기본 정렬
-      if (activeTab === 'holdings') {
-        const gapA = gapOf(a), gapB = gapOf(b)
-        if (gapA !== gapB) { if (gapA === null) return 1; if (gapB === null) return -1; return gapA - gapB }
-        const rA = a.summary?.daily_rsi?.rsi ?? null, rB = b.summary?.daily_rsi?.rsi ?? null
-        if (rA === null && rB === null) return 0; if (rA === null) return 1; if (rB === null) return -1; return rB - rA
-      }
-      const gapA = gapOf(a), gapB = gapOf(b)
-      if (gapA !== gapB) { if (gapA === null) return 1; if (gapB === null) return -1; return gapB - gapA }
-      const rA = a.summary?.daily_rsi?.rsi ?? null, rB = b.summary?.daily_rsi?.rsi ?? null
-      if (rA === null && rB === null) return 0; if (rA === null) return 1; if (rB === null) return -1; return rA - rB
-    })
-
-  const othersEntries = othersData
-    ? Object.entries(othersData)
-        .filter(([, v]) => marketFilter === 'ALL' || (v.summary?.market || v.market) === marketFilter)
-        .sort(([a], [b]) => a.localeCompare(b))
-    : []
-  const activeEntries = activeTab === 'others' ? othersEntries : tabEntries
-
-  const handleSort = (col) => {
-    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortCol(col); setSortDir('asc') }
-  }
-  const sortArrow = (col) => sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕'
 
   return (
     <>
