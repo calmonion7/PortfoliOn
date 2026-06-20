@@ -3,6 +3,7 @@ import InvestorTrendSection from '../components/reports/InvestorTrendSection'
 import api from '../api'
 import Card from '../components/ui/Card'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Skeleton from '../components/ui/Skeleton'
 import { krFmt } from '../components/market/marketUtils.jsx'
 import { useToast } from '../components/Toast'
 import { trackEvent } from '../utils/analytics'
@@ -337,7 +338,9 @@ export default function Ranking() {
         ))}
       </div>
 
-      {loading && <LoadingSpinner label="불러오는 중입니다." size={20} style={{ padding: 24 }} />}
+      {loading && items.length === 0 && <Skeleton variant="card" count={6} />}
+
+      {loading && items.length > 0 && <LoadingSpinner label="불러오는 중입니다." size={20} style={{ padding: 24 }} />}
 
       {!loading && error && (
         <div style={{ textAlign: 'center', color: 'var(--color-error)', fontSize: 13, padding: 32 }}>랭킹을 불러오지 못했습니다.</div>

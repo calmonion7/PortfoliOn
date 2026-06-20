@@ -1,3 +1,5 @@
+import Skeleton from '../ui/Skeleton'
+
 export const krFmt = v => {
   if (v == null) return '-'
   if (Math.abs(v) >= 10000) return `${(v / 10000).toFixed(1)}조`
@@ -114,11 +116,7 @@ export function SectionCardError({ title }) {
 }
 
 export function LoadingBox() {
-  return (
-    <div style={{ ...CARD_STYLE, color: 'var(--text-3)', fontSize: 13, padding: 24 }}>
-      데이터 수집 중입니다. 처음 로드 시 수분 소요될 수 있습니다...
-    </div>
-  )
+  return <Skeleton variant="chart" height={200} />
 }
 
 export function ErrorBox({ msg }) {

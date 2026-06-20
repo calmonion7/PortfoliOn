@@ -8,6 +8,7 @@ import LeverageBackfillSettings from './LeverageBackfillSettings'
 import useIsMobile from '../hooks/useIsMobile'
 import { useAuth } from '../contexts/AuthContext'
 import PermissionManager from '../components/PermissionManager'
+import Skeleton from '../components/ui/Skeleton'
 
 const CATEGORIES = [
   { key: 'report', label: '리포트·분석' },
@@ -173,7 +174,7 @@ function BatchHub({ isAdmin, isMobile }) {
   useEffect(() => { load() }, [])
 
   if (err) return <p style={{ color: 'var(--color-error)', fontSize: 13 }}>{err}</p>
-  if (!batches) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>불러오는 중...</p>
+  if (!batches) return <Skeleton variant="row" count={8} />
   if (batches.length === 0) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>등록된 배치가 없습니다.</p>
 
   const marketItems = batches.filter(b => b.market === market)

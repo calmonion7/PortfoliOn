@@ -1,0 +1,83 @@
+/* Skeleton loading placeholders — pulse animation, design tokens only */
+
+@keyframes skeleton-pulse {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+.skeleton-block {
+  background: var(--border-strong);
+  border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+  }
+}
+
+/* card — responsive grid of card-shaped blocks */
+.skeleton-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+.skeleton-cards .skeleton-block {
+  height: 140px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+/* row — full-width list rows */
+.skeleton-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.skeleton-rows .skeleton-block {
+  height: 44px;
+  width: 100%;
+}
+
+/* chart — single height-reserved block */
+.skeleton-chart {
+  width: 100%;
+  background: var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+/* calendar — 7-column grid of square cells */
+.skeleton-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-2);
+}
+.skeleton-calendar .skeleton-block {
+  aspect-ratio: 1 / 1;
+}
+
+/* stat — KPI blocks in a row */
+.skeleton-stats {
+  display: grid;
+  grid-template-columns: repeat(var(--skeleton-stat-cols, 4), 1fr);
+  gap: var(--space-4);
+}
+.skeleton-stats .skeleton-block {
+  height: 64px;
+}
+
+/* text — stacked lines */
+.skeleton-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.skeleton-text .skeleton-block {
+  height: 14px;
+  width: 100%;
+}
+.skeleton-text .skeleton-block:last-child {
+  width: 60%;
+}

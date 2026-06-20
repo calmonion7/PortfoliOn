@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
-import LoadingSpinner from '../components/LoadingSpinner'
+import Skeleton from '../components/ui/Skeleton'
 import { Spark, Sig, sparkFor, fmt } from '../components/ui/icons'
 import InsiderBadge from '../components/ui/InsiderBadge'
 import useIsMobile from '../hooks/useIsMobile'
@@ -54,8 +54,6 @@ export default function Digest() {
     }
   }
 
-  if (loading) return <LoadingSpinner label="다이제스트 불러오는 중입니다." />
-
   const holdings = digest?.stocks?.filter(s => s.is_holding) ?? []
   const watchlist = digest?.stocks?.filter(s => !s.is_holding) ?? []
   const nameMap = Object.fromEntries((digest?.stocks ?? []).map(s => [s.ticker, s.name]))
@@ -71,7 +69,14 @@ export default function Digest() {
 
       {error && <div style={{ color: 'var(--color-error)', marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
-      {!digest ? (
+      {loading ? (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <Skeleton variant="chart" height={92} />
+          </div>
+          <Skeleton variant="row" count={6} />
+        </>
+      ) : !digest ? (
         <div className="muted">아직 생성된 Digest가 없습니다. 새로고침 버튼을 눌러 생성하세요.</div>
       ) : (
         <>

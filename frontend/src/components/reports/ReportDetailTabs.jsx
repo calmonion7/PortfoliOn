@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import LoadingSpinner from '../LoadingSpinner'
+import Skeleton from '../ui/Skeleton'
 import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable } from './DetailTab'
 import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
@@ -38,7 +38,7 @@ export default function ReportDetailTabs({
 
   const content = (
     <>
-      {loading && <LoadingSpinner />}
+      {loading && <Skeleton variant="chart" height={280} />}
       {!loading && detailTab === 'summary' && (
         summary
           ? (

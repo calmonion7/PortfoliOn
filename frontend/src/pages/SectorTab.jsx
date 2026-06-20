@@ -1,7 +1,7 @@
 // frontend/src/pages/SectorTab.jsx
 import { useState, useEffect } from 'react'
 import api from '../api'
-import LoadingSpinner from '../components/LoadingSpinner'
+import Skeleton from '../components/ui/Skeleton'
 import useIsMobile from '../hooks/useIsMobile'
 
 const PERIODS = ['return_1w', 'return_1mo', 'return_3mo']
@@ -67,7 +67,7 @@ export default function SectorTab() {
         ★ 표시된 {isKr ? '업종' : '섹터'}에 내 보유 종목이 속합니다. 해당 {isKr ? '업종' : '섹터'}이 강하면 순풍, 약하면 역풍.
       </p>
       {loading ? (
-        <LoadingSpinner label="섹터 데이터 불러오는 중입니다." />
+        <div style={{ maxWidth: 620 }}><Skeleton variant="row" count={11} /></div>
       ) : error ? (
         <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
       ) : !data ? null : (

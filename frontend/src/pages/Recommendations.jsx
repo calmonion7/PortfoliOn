@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 import RecCard from '../components/recommendations/RecCard'
-import LoadingSpinner from '../components/LoadingSpinner'
+import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
 import { useToast } from '../components/Toast'
 
@@ -75,7 +75,12 @@ export default function Recommendations() {
       .finally(() => setPending(prev => { const n = new Set(prev); n.delete(t); return n }))
   }
 
-  if (loading) return <LoadingSpinner label="추천 종목 불러오는 중입니다." style={{ padding: 40 }} />
+  if (loading) return (
+    <div>
+      <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>발굴</h3>
+      <Skeleton variant="card" count={6} />
+    </div>
+  )
 
   if (error) return (
     <div style={{ textAlign: 'center', color: 'var(--color-error)', fontSize: 13, padding: 32 }}>추천 종목을 불러오지 못했습니다.</div>

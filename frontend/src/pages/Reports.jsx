@@ -6,7 +6,7 @@ import useReportGeneration from '../hooks/useReportGeneration'
 import usePortfolioData from '../hooks/usePortfolioData'
 import { fmtPrice as fmt } from '../utils'
 import { fmt as fmtNum, Plus, Pencil } from '../components/ui/icons'
-import LoadingSpinner from '../components/LoadingSpinner'
+import Skeleton from '../components/ui/Skeleton'
 import StockModal from '../components/StockModal'
 import PromoteModal from '../components/PromoteModal'
 import { useToast } from '../components/Toast'
@@ -609,7 +609,7 @@ export default function Reports() {
         {mutError && <p style={{ color: 'var(--color-error)', fontSize: 12, marginTop: 0 }}>{mutError}</p>}
         {renderFilters()}
         {(activeTab === 'others' ? othersLoading : listLoading)
-          ? <LoadingSpinner label="" size={20} style={{ padding: 20 }} />
+          ? <Skeleton variant="row" count={8} />
           : (activeEntries.length === 0)
             ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>리포트 없음</p>
             : null
@@ -624,7 +624,14 @@ export default function Reports() {
         {view === 'list' ? (
           /* 목록화면 */
           (activeTab === 'others' ? othersLoading : listLoading) ? (
-            <LoadingSpinner label="리포트 불러오는 중입니다." style={{ marginTop: 80 }} />
+            <>
+              <div style={{ marginBottom: 16 }}>
+                {renderFilters()}
+              </div>
+              <div className="stock-card-grid">
+                <Skeleton variant="row" count={8} />
+              </div>
+            </>
           ) : (
             <>
               <div style={{ marginBottom: 16 }}>

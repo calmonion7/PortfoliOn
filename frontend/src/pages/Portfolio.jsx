@@ -3,7 +3,7 @@ import { trackEvent } from '../utils/analytics'
 import usePortfolioData from '../hooks/usePortfolioData'
 import PriceFreshness from '../components/portfolio/PriceFreshness'
 import { krFreshnessLabel } from '../utils/marketHours'
-import LoadingSpinner from '../components/LoadingSpinner'
+import Skeleton from '../components/ui/Skeleton'
 import DashboardCard from '../components/portfolio/DashboardCard'
 import FlashValue from '../components/portfolio/FlashValue'
 import { fmt } from '../components/ui/icons'
@@ -36,7 +36,7 @@ const DividendSummary = ({ totals }) => {
 }
 
 const DashboardGrid = ({ cards, totals, loading, tick }) => {
-  if (loading) return <LoadingSpinner label="보유종목 불러오는 중입니다." />
+  if (loading) return <Skeleton variant="card" count={6} />
   if (!cards.length) return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유종목이 없습니다.</p>
   return (
     <>

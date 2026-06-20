@@ -1,7 +1,7 @@
 // frontend/src/pages/MacroTab.jsx
 import { useState, useEffect } from 'react'
 import api from '../api'
-import LoadingSpinner from '../components/LoadingSpinner'
+import Skeleton from '../components/ui/Skeleton'
 import useIsMobile from '../hooks/useIsMobile'
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
@@ -40,7 +40,12 @@ export default function MacroTab() {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
-  if (loading) return <LoadingSpinner label="매크로 데이터 불러오는 중입니다." />
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ maxWidth: 360 }}><Skeleton variant="row" count={4} /></div>
+      <Skeleton variant="chart" height={360} />
+    </div>
+  )
   if (error) return <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
   if (!data || !data.correlations.length) return (
     <div style={{ color: 'var(--text-3)' }}>보유종목 없음 또는 데이터 부족</div>

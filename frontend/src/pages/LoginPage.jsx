@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useIsMobile from '../hooks/useIsMobile'
+import '../components/ui/Button.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -67,6 +68,7 @@ export default function LoginPage() {
         {error && <p style={{color:'var(--color-error)', fontSize:13, marginBottom:8}}>{error}</p>}
         {success && <p style={{color:'var(--color-success)', fontSize:13, marginBottom:8}}>{success}</p>}
         <button className="btn btn-primary submit" type="submit" disabled={loading}>
+          {loading && <span className="btn__spinner" aria-hidden />}
           {loading ? (isLogin ? '로그인 중…' : '가입 중…') : (isLogin ? '로그인' : '회원가입')}
         </button>
       </form>
@@ -120,6 +122,7 @@ export default function LoginPage() {
           {error && <p style={{color:'var(--color-error)', fontSize:13, marginBottom:8}}>{error}</p>}
           {success && <p style={{color:'var(--color-success)', fontSize:13, marginBottom:8}}>{success}</p>}
           <button className="btn btn-primary submit" type="submit" disabled={loading}>
+            {loading && <span className="btn__spinner" aria-hidden />}
             {loading ? (isLogin ? '로그인 중…' : '가입 중…') : (isLogin ? '로그인' : '회원가입')}
           </button>
         </form>

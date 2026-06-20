@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
-import LoadingSpinner from '../components/LoadingSpinner'
+import Skeleton from '../components/ui/Skeleton'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, ReferenceLine, Label,
@@ -214,7 +214,7 @@ function CorrelationHeatmap() {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
-  if (loading) return <LoadingSpinner label="상관관계 불러오는 중입니다." style={{ marginTop: 48 }} />
+  if (loading) return <div style={{ marginTop: 48 }}><Skeleton variant="chart" height={300} /></div>
   if (error) return <div style={{ color: 'var(--color-error)', marginTop: 48 }}>오류: {error}</div>
   if (!data || !data.tickers.length) return (
     <div style={{ color: 'var(--text-3)', marginTop: 48 }}>보유종목 2개 이상 필요</div>
@@ -276,7 +276,13 @@ export default function Analytics() {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
-  if (loading) return <LoadingSpinner label="분석 데이터 불러오는 중입니다." />
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
+      <Skeleton variant="chart" height={260} />
+      <Skeleton variant="chart" height={420} />
+      <Skeleton variant="chart" height={300} />
+    </div>
+  )
   if (error) return <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
   if (!cards.length) return <div style={{ color: 'var(--text-3)' }}>보유종목 없음</div>
 
