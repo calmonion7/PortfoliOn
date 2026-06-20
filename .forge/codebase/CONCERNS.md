@@ -207,6 +207,7 @@ CLAUDE.md 교훈(daily_report-market-split task15·17·45 재발): 배치 id를 
 - **미렌더(dead) 클래스**: `.holdings-list`·`.m-cal-wk`는 mobile.css에 정의돼 있으나 실제 모바일 대시보드/캘린더는 인라인 스타일 div·`Calendar.jsx` 인라인으로 렌더된다. #80에서 에이전트가 `.holdings-list`에 하단 패딩을 줬으나 무효(dead) → 진짜 컨테이너(`<div style={{padding:'0 20px'}}>`)를 직접 고쳐야 했다. **교훈: CSS 클래스를 고치기 전 그 클래스가 실제 DOM에 렌더되는지 grep+런타임 확인**(없으면 인라인/다른 클래스가 실효 소스).
 - **레거시 태그선택자 specificity**: `.m-login input`/`.login-form input`(specificity 0,1,1)이 `.ui-input`(0,1,0)을 이겨, 입력을 `ui/Input` 프리미티브로 교체해도 스타일이 통일되지 않았다(#83) → 담당 파일 내 인라인 스타일(클래스·태그선택자 모두 이김)로 우회. **교훈: ui/ 프리미티브로 이관 시 기존 태그선택자/높은 specificity 규칙이 덮는지 확인**, 안 그러면 컴포넌트만 바뀌고 시각은 그대로다.
 - **잔존 dead 선언**: pc.css/mobile.css의 `.m-login input`/`.login-form input` 배경·테두리·radius는 이제 인라인에 덮여 dead. 별도 CSS 정리 패스에서 제거하고 `.ui-input` 단일 소스화 가능(후속 후보).
+- **스코프 의존 스타일 lift 회귀**(task#87): `.parent .child` 형태로만 정의되고 전역 정의가 없는 스타일은, child를 부모 밖으로 옮길 때 이중 함정 — ① 그 규칙이 dead가 되고 ② child가 스타일을 통째로 잃는다. Reports 필터를 사이드바 밖 단일 호스트로 lift할 때 `.reports-sidebar .tab-cnt`(전역 정의 없음)가 그 예로, 카운트 배지가 무스타일이 될 뻔해 `.reports-filters .tab-cnt`로 retarget해 가드했다(전역 `.tab-btn`/`.sm`은 tokens.css에 전역 정의가 있어 폴백 안전 — 차이는 '전역 vs 스코프 전용'). **교훈: 컴포넌트를 컨테이너 밖으로 lift하기 전 `grep '\.<container> '`로 스코프 의존 규칙을 전수해 retarget**(안 하면 컴포넌트는 옮겨졌는데 시각만 깨진다).
 
 **상태**: 개별 분기는 그때그때 우회했으나 mobile.css/pc.css의 dead/레거시 표면 자체는 미청소 — 다음 프론트 수정도 같은 함정에 빠질 수 있다. 근본 청소(미렌더 클래스 제거 + 레거시 태그선택자→프리미티브 단일화)는 별도 태스크 후보.
 
