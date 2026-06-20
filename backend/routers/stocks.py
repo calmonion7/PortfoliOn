@@ -258,17 +258,22 @@ def backfill_names(_: str = Depends(require_admin)):
         name = market.resolve_name(ticker, row.get("market") or "US", row.get("exchange") or "", "")
         if name and name.upper() != ticker.upper():
             storage.set_ticker_name(ticker, name)
-            return ticker
-        return None
+            return ticker, True
+        return ticker, False  # resolve_name이 실명 못 찾음(빈값/티커형 반환) — skip
 
-    updated = []
+    updated, skipped = [], []
     if candidates:
         # max_workers ≤ 8: 워커가 DB 풀(maxconn=10)을 점유(set_ticker_name 2 writes) → 풀 초과 방지
         with ThreadPoolExecutor(max_workers=max(1, min(len(candidates), 8))) as executor:
             for future in as_completed([executor.submit(_one, c) for c in candidates]):
-                t = future.result()
-                if t:
-                    updated.append(t)
+                ticker, ok = future.result()
+                if ok:
+                    updated.append(ticker)
+                else:
+                    # silent skip 금지(CLAUDE.md): resolve_name이 티커형/빈값을 반환해 건너뜀.
+                    # 시세 일시실패와 '실명 없음'을 구분 못 하므로 재시도 대신 진단 로그+표면화.
+                    skipped.append(ticker)
+                    print(f"[backfill_names] skip {ticker}: resolve_name이 실명을 못 찾음(시세 일시실패 가능, 결과가 예상보다 작으면 재실행 권장)")
 
     # tickers.name을 이미 고쳤지만 스냅샷이 옛 이름인 종목(예: 수동교정)까지 동기화
     reconciled = storage.reconcile_snapshot_names()
@@ -276,7 +281,7 @@ def backfill_names(_: str = Depends(require_admin)):
         cache_svc.invalidate(t)
     cache_svc.invalidate_list()
     cache_svc.invalidate_portfolio_caches()
-    return {"ok": True, "candidates": len(candidates), "updated": len(updated), "reconciled": len(reconciled)}
+    return {"ok": True, "candidates": len(candidates), "updated": len(updated), "skipped": skipped, "reconciled": len(reconciled)}
 
 
 @router.post("/dividends/refresh", status_code=202)

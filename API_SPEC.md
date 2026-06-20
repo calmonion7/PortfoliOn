@@ -796,10 +796,10 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 
 **Response `202`**
 ```json
-{ "ok": true, "candidates": 12, "updated": 9 }
+{ "ok": true, "candidates": 12, "updated": 9, "skipped": ["CFRHF", "HKHHF"], "reconciled": 2 }
 ```
 
-- `candidates` 교정 대상 수(name=''이거나 name=ticker) · `updated` 실제 실명으로 갱신된 수(quote 실패/실명 없으면 skip).
+- `candidates` 교정 대상 수(name=''이거나 name=ticker) · `updated` 실제 실명으로 갱신된 수 · `skipped` 실명을 못 찾아 건너뛴 티커 목록(quote 일시실패 가능 — 결과가 예상보다 작으면 재실행 권장; 서버에 진단 로그도 남김) · `reconciled` 스냅샷 name 동기화 수.
 
 ---
 
