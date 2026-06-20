@@ -21,7 +21,7 @@ export default function RecCard({ item, footer = null }) {
       {/* 헤더: 종목명/티커 + 시장 배지 */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || item.ticker}</span>
+          <span style={{ display: 'block', color: 'var(--text)', fontWeight: 700, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || item.ticker}</span>
           <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)' }}>{item.ticker}</span>
         </div>
         <MarketBadge market={item.market} exchange={item.exchange} />
@@ -31,7 +31,7 @@ export default function RecCard({ item, footer = null }) {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         {score != null ? (
           <>
-            <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 20, fontVariantNumeric: 'tabular-nums' }}>{score}</span>
+            <span style={{ color: 'var(--text-2)', fontWeight: 600, fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>{score}</span>
             <span style={{ fontSize: 11, color: 'var(--text-3)' }}>점</span>
           </>
         ) : (

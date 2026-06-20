@@ -26,6 +26,7 @@ export default function SectorTab() {
   useEffect(() => {
     setLoading(true)
     setError(null)
+    setData(null)
     api.get('/api/analysis/sector', { params: { market } })
       .then(r => { setData(r.data); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })

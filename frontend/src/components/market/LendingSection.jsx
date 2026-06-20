@@ -35,15 +35,9 @@ export default function LendingSection() {
   return (
     <SectionCard
       title="대차잔고 추이 (내외국인)"
+      summary={latest ? `외국인 차입 ${latest.foreign_borrow?.toFixed(1)}조 · 내국인 차입 ${latest.domestic_borrow?.toFixed(1)}조` : ''}
       open={open}
       onToggle={() => setOpen(o => !o)}
-      badge={
-        latest ? (
-          <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
-            외국인 차입 {latest.foreign_borrow?.toFixed(1)}조 · 내국인 차입 {latest.domestic_borrow?.toFixed(1)}조
-          </span>
-        ) : null
-      }
     >
       <p style={DESC_STYLE}>
         한국증권금융 내외국인 대차잔고 비교 (월별, 단위: 조원). 외국인 차입잔액 증가는 공매도 압력 신호입니다.

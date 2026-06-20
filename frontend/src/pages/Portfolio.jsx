@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { trackEvent } from '../utils/analytics'
 import usePortfolioData from '../hooks/usePortfolioData'
 import PriceFreshness from '../components/portfolio/PriceFreshness'
@@ -11,6 +11,16 @@ import useIsMobile from '../hooks/useIsMobile'
 import SectorTab from './SectorTab'
 import MacroTab from './MacroTab'
 import Analytics from './Analytics'
+
+// 평가금액 한국식 억/만 축약 (예: 84,975,545 → ₩8,498만, 1억 이상은 ₩X.X억)
+const fmtKrwCompact = (n) => {
+  if (n == null || !isFinite(n)) return '₩—'
+  const sign = n < 0 ? '-' : ''
+  const v = Math.abs(n)
+  if (v >= 1e8) return `${sign}₩${(v / 1e8).toFixed(1)}억`
+  if (v >= 1e4) return `${sign}₩${Math.round(v / 1e4).toLocaleString('ko-KR')}만`
+  return `${sign}₩${Math.round(v).toLocaleString('ko-KR')}`
+}
 
 const DividendSummary = ({ totals }) => {
   if (!totals || !totals.total_expected_annual_income_krw) return null
@@ -37,7 +47,7 @@ const DividendSummary = ({ totals }) => {
 
 const DashboardGrid = ({ cards, totals, loading, tick }) => {
   if (loading) return <Skeleton variant="card" count={6} />
-  if (!cards.length) return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유종목이 없습니다.</p>
+  if (!cards.length) return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유 종목이 없습니다. 리서치 탭에서 종목을 추가해 보세요.</p>
   return (
     <>
       <DividendSummary totals={totals} />
@@ -54,6 +64,15 @@ export default function Portfolio() {
   const [analysisTab, setAnalysisTab] = useState('sector')
 
   const { stocks, watchlist, dashboardCards, dashboardTotals, dashboardLoading, fx, priceTick, lastUpdated, fetchDashboard } = usePortfolioData()
+
+  const dashHealedRef = useRef(false)
+  useEffect(() => { fetchDashboard() }, [fetchDashboard])   // 마운트 시(dash가 기본탭) 그리드 fetch
+  useEffect(() => {
+    if (!dashboardLoading && dashboardCards.length === 0 && stocks.length > 0 && !dashHealedRef.current) {
+      dashHealedRef.current = true
+      fetchDashboard({ invalidate: true })                 // 헤더 N인데 그리드 빈 = stale 캐시 → 1회 self-heal
+    }
+  }, [dashboardLoading, dashboardCards.length, stocks.length, fetchDashboard])
 
   // KPI 계산
   const toKrw = (h, price) => (price || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : fx)
@@ -72,7 +91,7 @@ export default function Portfolio() {
 
       <div className="hero">
         <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} · {krFreshnessLabel()}</div>
-        <FlashValue as="div" className="val tnum" value={totalValue ?? totalCost} tick={priceTick}>₩{fmt(totalValue ?? totalCost, 0)}</FlashValue>
+        <FlashValue as="div" className="val tnum" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(totalValue ?? totalCost)}</FlashValue>
         {totalPnl != null ? (
           <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`}>
             {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
@@ -140,7 +159,7 @@ export default function Portfolio() {
       <div className="kpi-row">
         <div className="kpi">
           <div className="label">{totalValue != null ? '평가금액' : '투자 원가'}</div>
-          <FlashValue as="div" className="val tnum" value={totalValue ?? totalCost} tick={priceTick}>₩{fmt(totalValue ?? totalCost, 0)}</FlashValue>
+          <FlashValue as="div" className="val tnum" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(totalValue ?? totalCost)}</FlashValue>
           {totalPnl != null && (
             <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`} style={{ marginTop: 4 }}>
               {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
@@ -166,10 +185,14 @@ export default function Portfolio() {
         <div className="kpi">
           <div className="label">관심 종목</div>
           <div className="val tnum">{watchlist.length}</div>
+          <div className="delta muted">
+            미국 {watchlist.filter(h => (h.market || 'US') === 'US').length} · 한국 {watchlist.filter(h => h.market === 'KR').length}
+          </div>
         </div>
         <div className="kpi">
           <div className="label">총 종목</div>
           <div className="val tnum">{stocks.length + watchlist.length}</div>
+          <div className="delta muted">보유 {stocks.length} · 관심 {watchlist.length}</div>
         </div>
       </div>
 

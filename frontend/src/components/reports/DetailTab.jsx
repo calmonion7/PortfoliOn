@@ -511,7 +511,7 @@ export function VolumeRsiSnapshot({ summary }) {
   return (
     <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: 14 }}>
       <SectionTitle weather={rsiWeather}>📉 매물대 &amp; RSI 현황</SectionTitle>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 2, marginTop: 2 }}>
+      <div style={{ display: 'flex', columnGap: 14, rowGap: 6, flexWrap: 'wrap', marginBottom: 6, marginTop: 4 }}>
         {[
           { color: 'var(--text)', label: '현재가', desc: '현재 주가' },
           { color: 'var(--data-3)', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
@@ -520,10 +520,10 @@ export function VolumeRsiSnapshot({ summary }) {
           { color: 'var(--semantic-buy)', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
           { color: 'var(--semantic-sell)', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
         ].map(({ color, label, desc }) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={desc}>
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }} title={desc}>
             <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-            <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{label}</span>
-            <span style={{ fontSize: 9, color: 'var(--text-3)' }}>({desc})</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-2)' }}>{label}</span>
+            <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{desc}</span>
           </div>
         ))}
       </div>

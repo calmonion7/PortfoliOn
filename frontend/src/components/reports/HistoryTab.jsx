@@ -128,20 +128,21 @@ export default function HistoryTab({ ticker, dates, market }) {
                 </thead>
                 <tbody>
                   {[
-                    { label: '현재가', keyA: snapshotA?.price, keyB: snapshotB?.price, fmt: (v) => fmt(v, market) },
-                    { label: '목표가(평균)', keyA: snapshotA?.target_mean, keyB: snapshotB?.target_mean, fmt: (v) => fmt(v, market) },
-                    { label: '목표가(최고)', keyA: snapshotA?.target_high, keyB: snapshotB?.target_high, fmt: (v) => fmt(v, market) },
-                    { label: '목표가(최저)', keyA: snapshotA?.target_low, keyB: snapshotB?.target_low, fmt: (v) => fmt(v, market) },
+                    { label: '현재가', keyA: snapshotA?.price, keyB: snapshotB?.price, fmt: (v) => v == null ? fmt(v, market) : Number.isFinite(v) ? fmt(v, market) : '—' },
+                    { label: '목표가(평균)', keyA: snapshotA?.target_mean, keyB: snapshotB?.target_mean, fmt: (v) => v == null ? fmt(v, market) : Number.isFinite(v) ? fmt(v, market) : '—' },
+                    { label: '목표가(최고)', keyA: snapshotA?.target_high, keyB: snapshotB?.target_high, fmt: (v) => v == null ? fmt(v, market) : Number.isFinite(v) ? fmt(v, market) : '—' },
+                    { label: '목표가(최저)', keyA: snapshotA?.target_low, keyB: snapshotB?.target_low, fmt: (v) => v == null ? fmt(v, market) : Number.isFinite(v) ? fmt(v, market) : '—' },
                     { label: 'Buy', keyA: snapshotA?.buy, keyB: snapshotB?.buy, fmt: (v) => v ?? 'N/A' },
                     { label: 'Hold', keyA: snapshotA?.hold, keyB: snapshotB?.hold, fmt: (v) => v ?? 'N/A' },
                     { label: 'Sell', keyA: snapshotA?.sell, keyB: snapshotB?.sell, fmt: (v) => v ?? 'N/A' },
-                    { label: 'RSI(일)', keyA: snapshotA?.daily_rsi?.rsi, keyB: snapshotB?.daily_rsi?.rsi, fmt: (v) => v != null ? v.toFixed(1) : 'N/A' },
-                    { label: 'RSI(주)', keyA: snapshotA?.weekly_rsi?.rsi, keyB: snapshotB?.weekly_rsi?.rsi, fmt: (v) => v != null ? v.toFixed(1) : 'N/A' },
-                    { label: 'RSI(월)', keyA: snapshotA?.monthly_rsi?.rsi, keyB: snapshotB?.monthly_rsi?.rsi, fmt: (v) => v != null ? v.toFixed(1) : 'N/A' },
+                    { label: 'RSI(일)', keyA: snapshotA?.daily_rsi?.rsi, keyB: snapshotB?.daily_rsi?.rsi, fmt: (v) => v == null ? 'N/A' : Number.isFinite(v) ? v.toFixed(1) : '—' },
+                    { label: 'RSI(주)', keyA: snapshotA?.weekly_rsi?.rsi, keyB: snapshotB?.weekly_rsi?.rsi, fmt: (v) => v == null ? 'N/A' : Number.isFinite(v) ? v.toFixed(1) : '—' },
+                    { label: 'RSI(월)', keyA: snapshotA?.monthly_rsi?.rsi, keyB: snapshotB?.monthly_rsi?.rsi, fmt: (v) => v == null ? 'N/A' : Number.isFinite(v) ? v.toFixed(1) : '—' },
                   ].map(({ label, keyA, keyB, fmt: fmtFn }) => {
-                    const delta = (keyA != null && keyB != null)
+                    const rawDelta = (keyA != null && keyB != null)
                       ? ((keyA - keyB) / Math.abs(keyB) * 100)
                       : null
+                    const delta = Number.isFinite(rawDelta) ? rawDelta : null
                     return (
                       <tr key={label}>
                         <td style={{ ...TD, textAlign: 'left', color: 'var(--text-3)' }}>{label}</td>
