@@ -12,8 +12,6 @@ function formatValue(val) {
   return `$${val.toLocaleString()}`
 }
 
-const tdStyle = { padding: '8px 12px', color: 'var(--text)' }
-
 const SORT_OPTIONS = [
   { key: 'num_stocks',      label: '종목수',   dir: 1 },
   { key: 'portfolio_value', label: '포트폴리오 규모', dir: -1 },
@@ -31,7 +29,7 @@ export default function GuruManagers() {
   const [loading, setLoading]   = useState(true)
   const [sort, setSort]         = useState({ key: 'num_stocks', dir: 1 })
   const [query, setQuery]       = useState('')
-  const [badgeErr, setBadgeErr] = useState('')
+  const [, setBadgeErr] = useState('')
 
   const loadStockMap = useCallback(() => {
     api.get('/api/stocks').then(({ data }) => {
@@ -69,15 +67,6 @@ export default function GuruManagers() {
     if (type === 'holding')   return { background: 'var(--tag-hold-bg)',  color: 'var(--tag-hold-color)',  border: '1px solid var(--tag-hold-border)' }
     if (type === 'watchlist') return { background: 'var(--tag-watch-bg)', color: 'var(--tag-watch-color)', border: '1px solid var(--tag-watch-border)' }
     return { background: 'var(--tag-track-bg)', color: 'var(--tag-track-color)', border: '1px solid var(--tag-track-border)' }
-  }
-
-  const handleSort = (col) => {
-    if (!col.sortKey) return
-    setSort(prev =>
-      prev.key === col.sortKey
-        ? { key: col.sortKey, dir: -prev.dir }
-        : { key: col.sortKey, dir: col.sortKey === 'num_stocks' ? 1 : -1 }
-    )
   }
 
   const q = query.trim().toLowerCase()

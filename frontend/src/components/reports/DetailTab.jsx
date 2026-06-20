@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
 import { fmtPrice as fmt } from '../../utils'
-import { fmtN, SectionTitle, _weather } from './reportUtils.jsx'
+import { SectionTitle, _weather } from './reportUtils.jsx'
 import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
 import BacklogChart from './BacklogChart'
@@ -284,7 +283,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
           <span style={{ fontSize: 9, color: 'var(--color-error)', fontWeight: 600 }}>저항 구간 ▲</span>
         </div>
       </div>
-      {rows.map((row, i) => {
+      {rows.map((row) => {
         if (row.type === 'current') {
           return (
             <div key="__current__" style={{ margin: '4px 0' }}>
@@ -348,12 +347,12 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
     { key: 'monthly', label: '월봉', d: monthlyRsi },
   ]
   const keys = ['target_20', 'target_25', 'target_30', 'target_70', 'target_75', 'target_80']
-  let closestKey = null, minDiff = Infinity
+  let minDiff = Infinity
   if (price && dailyRsi) {
     keys.forEach(k => {
       if (dailyRsi[k] == null) return
       const diff = Math.abs(dailyRsi[k] - price)
-      if (diff < minDiff) { minDiff = diff; closestKey = k }
+      if (diff < minDiff) { minDiff = diff }
     })
   }
   const available = rows.filter(r => r.d?.rsi != null)

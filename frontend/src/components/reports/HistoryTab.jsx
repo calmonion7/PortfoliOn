@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { fmtPrice as fmt } from '../../utils'
 import { TH, TD } from './reportUtils.jsx'
 
-export default function HistoryTab({ ticker, dates, market }) {
+export default function HistoryTab({ ticker, market }) {
   const [history, setHistory] = useState([])
   const [histLoading, setHistLoading] = useState(false)
   const [histError, setHistError] = useState(null)

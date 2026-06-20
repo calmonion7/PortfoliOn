@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts'
-import { fmtPrice as fmt } from '../../utils'
 import { _weather, SectionTitle } from './reportUtils.jsx'
 
 export default function FinancialsChart({ financials, financialsAnnual, market }) {

@@ -1,5 +1,4 @@
 import { fmtPrice as fmt } from '../../utils'
-import { TH, TD } from './reportUtils.jsx'
 
 function decodeHtml(str) {
   if (!str) return str

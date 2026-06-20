@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, ErrorBox } from './marketUtils.jsx'
+import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function EconIndicatorsSection() {
   const [open, setOpen] = useState(false)

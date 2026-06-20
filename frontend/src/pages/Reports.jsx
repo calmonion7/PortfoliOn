@@ -117,7 +117,6 @@ export default function Reports() {
 
   useEffect(() => cleanup, [cleanup])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (activeTab === 'ungenerated' && ungeneratedCount === 0) setActiveTab('holdings')
   }, [ungeneratedCount, activeTab])

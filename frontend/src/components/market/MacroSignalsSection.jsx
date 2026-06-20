@@ -80,7 +80,7 @@ export default function MacroSignalsSection() {
       )}
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        {cards.map(({ key, label, color, valFmt, chg, chgUnit, last, prev, zeroLine }) => {
+        {cards.map(({ key, label, color, valFmt, chg, chgUnit, last, zeroLine }) => {
           const warn = zeroLine && last && last.value < 0
           return (
             <div key={key} style={{ ...CARD_STYLE, flex: 1, minWidth: 150, ...(warn ? { border: '1px solid var(--warn)' } : {}) }}>

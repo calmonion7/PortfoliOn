@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, LoadingBox, ErrorBox, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 import useIsMobile from '../../hooks/useIsMobile'
 
 export default function TreasurySection() {
