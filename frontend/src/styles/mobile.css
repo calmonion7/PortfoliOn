@@ -202,26 +202,6 @@
 }
 .theme-pills button.is-active { background: var(--bg-elev); color: var(--text); box-shadow: var(--shadow-sm); }
 
-/* Calendar mobile */
-.m-cal-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; padding: 0 12px; }
-.m-cal-wk .h { text-align: center; font-size: 10.5px; color: var(--text-3); padding: 8px 0; }
-.m-cal-wk .d {
-  padding: 6px 4px; aspect-ratio: 3 / 4; min-height: 56px; text-align: center;
-  font-size: 13px; color: var(--text-2);
-  position: relative;
-  /* 위=날짜 / 아래=도트 영역 상하 분리 (도트는 셀 하단 밴드에 가로 정렬) */
-  display: grid; grid-template-rows: auto 1fr; justify-items: center;
-}
-.m-cal-wk .d.today { color: var(--text); font-weight: 600; }
-.m-cal-wk .d.today::before {
-  content: ''; position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
-  width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); z-index: 0;
-}
-.m-cal-wk .d .ev {
-  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
-  background: var(--up); margin: 6px 1px 0; align-self: end; z-index: 1;
-}
-
 /* Accordion section header (market/analysis 섹션용) */
 .accordion-header {
   display: flex; align-items: center; gap: 8px;
@@ -287,9 +267,6 @@
   box-shadow: var(--shadow-lg);
   z-index: 25;
 }
-
-/* Asset row spacing on holdings — clear fixed tabbar */
-.holdings-list { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 
 /* List search + filter chips */
 .m-list-search {

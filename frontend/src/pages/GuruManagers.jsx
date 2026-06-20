@@ -14,15 +14,6 @@ function formatValue(val) {
 
 const tdStyle = { padding: '8px 12px', color: 'var(--text)' }
 
-const COLUMNS = [
-  { key: '#',     label: '#',               sortKey: null },
-  { key: 'name',  label: 'Manager',         sortKey: 'name' },
-  { key: 'firm',  label: 'Firm',            sortKey: 'firm' },
-  { key: 'pval',  label: 'Portfolio Value', sortKey: 'portfolio_value' },
-  { key: 'stocks',label: 'Stocks',          sortKey: 'num_stocks' },
-  { key: 'top10', label: 'Top 10',          sortKey: null },
-]
-
 const SORT_OPTIONS = [
   { key: 'num_stocks',      label: '종목수',   dir: 1 },
   { key: 'portfolio_value', label: '포트폴리오 규모', dir: -1 },

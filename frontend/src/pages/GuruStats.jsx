@@ -7,12 +7,6 @@ import '../components/ui/Button.css'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 
-const TABS = [
-  { key: 'popularity', label: '인기순' },
-  { key: 'top3',       label: '매니저별 탑3' },
-  { key: 'weighted',   label: '가중치 통계' },
-]
-
 function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
   const isMobile = useIsMobile()
   const [loading, setLoading] = useState(false)
@@ -66,11 +60,10 @@ export default function GuruStats({ view }) {
   const [weighted, setWeighted]     = useState([])
   const [stockMap, setStockMap]     = useState({})  // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]       = useState(true)
-  const [innerTab, setInnerTab]     = useState('popularity')
   const [query, setQuery]           = useState('')
 
-  // view prop가 있으면 그 값으로 표시 뷰 고정(내부 탭행 미렌더), 없으면 자체 탭 사용
-  const tab = view ?? innerTab
+  // 표시 뷰는 Guru가 넘기는 view로 고정(기본 'popularity')
+  const tab = view ?? 'popularity'
 
   const loadStockMap = useCallback(async () => {
     const { data } = await api.get('/api/stocks')
@@ -125,16 +118,6 @@ export default function GuruStats({ view }) {
 
   return (
     <div>
-      {!view && (
-        <div className="tabs" style={{ marginBottom: 14 }}>
-          {TABS.map(t => (
-            <button key={t.key} className={tab === t.key ? 'is-active' : ''} onClick={() => setInnerTab(t.key)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Input
           value={query}
