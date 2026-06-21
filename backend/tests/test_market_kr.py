@@ -106,15 +106,20 @@ def test_get_quote_kr_kis_to_naver_when_kis_also_fails():
 
 # ── 발산 가드: 시세가 일봉 종가와 2배 넘게 어긋나면 그 소스 폐기 (task#93) ──
 def test_guard_discards_diverging_source_and_falls_back():
-    # 키움이 일봉(354k)의 ~1/5인 70k 반환 → 폐기, Naver(354k)로 폴백
+    # 키움 NXT가 일봉(354k)의 ~1/5인 70k 반환 → 폐기, Naver(354k)로 폴백.
+    # KRX(regular=True)는 글리치 시에도 깨끗(354k)이라 교차검증이 Naver를 폐기하지 않는다.
     kiwoom_norm = {"price": 70000.0, "daily_change_pct": -2.0, "prev_close": 71000,
                    "market_cap": 4000 * 10**8, "name": "삼성전자"}
+    krx_norm = {"price": 354000.0, "daily_change_pct": -2.34, "prev_close": 362500,
+                "market_cap": 2000000 * 10**8, "name": "삼성전자"}
     naver_basic = {"closePrice": "354000", "compareToPreviousClosePrice": "-8500",
                    "fluctuationsRatio": "-2.34", "marketValue": "2000000", "stockName": "삼성전자"}
+    def kq_side(ticker, regular=False):
+        return krx_norm if regular else kiwoom_norm
     with _patch_yf(), \
          patch("services.market.kr._kr_closes_kiwoom", return_value=[350000.0, 352000.0, 354000.0]), \
          patch("services.kiwoom.client.configured", return_value=True), \
-         patch("services.kiwoom.quote.get_quote", return_value=kiwoom_norm), \
+         patch("services.kiwoom.quote.get_quote", side_effect=kq_side), \
          patch("services.kis.client.configured", return_value=False), \
          patch("services.market.kr._naver_get", return_value=naver_basic):
         from services import market
@@ -218,3 +223,63 @@ def test_get_quote_kr_default_keeps_nxt():
         market.get_quote_kr("005930")
     assert kb.call_args.kwargs.get("regular") is False
     assert kc.call_args.kwargs.get("regular") is False
+
+
+# ── 독립 KRX 교차검증: 자기일관적 _AL 전체오염 차단 (.forge/adr/0020, task#96) ──
+def test_price_sane_krx_crosscheck():
+    from services.market.kr import _price_sane
+    # 자기일관 NXT 글리치: price 70k·prev 71k(①통과)·NXT일봉 70k(②통과) → KRX 354k(③)가 잡음
+    assert _price_sane(70000, 71000, 70000, krx_close=354000) is False
+    # KRX 참조 없으면 ③ 생략 → ①②만, 자기일관이라 통과(블라인드 — 기존 동작)
+    assert _price_sane(70000, 71000, 70000, krx_close=None) is True
+    # 정상: NXT 350.5k vs KRX 354k → ③ 통과(정상 ~1% 괴리는 false-reject 안 함)
+    assert _price_sane(350500, 350000, 350500, krx_close=354000) is True
+
+
+def test_guard_krx_crosscheck_catches_self_consistent_al_glitch():
+    # _AL 전체오염: NXT quote·prev·일봉(ref) 모두 70k → ①② 블라인드. KRX 354k가 ③로 잡고,
+    # KIS 미설정·Naver는 글리치 ref(70k) 대비 ②로 폐기 → 깨끗한 KRX 참조를 반환.
+    def kiwoom_side(ticker, regular=False):
+        if regular:
+            return (354000.0, -2.34, 362500, 2000000 * 10**8, "삼성전자")        # KRX 깨끗
+        return (70000.0, -2.0, 71000, 4000 * 10**8, "삼성전자_NXT글리치")          # NXT 자기일관 글리치
+    naver_basic = {"closePrice": "354000", "compareToPreviousClosePrice": "-8500",
+                   "fluctuationsRatio": "-2.34", "marketValue": "2000000", "stockName": "삼성전자_네이버"}
+    with _patch_yf(), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.market.kr._kr_basic_kiwoom", side_effect=kiwoom_side), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[70000.0, 70000.0]), \
+         patch("services.kis.client.configured", return_value=False), \
+         patch("services.market.kr._naver_get", return_value=naver_basic):
+        from services import market
+        q = market.get_quote_kr("005930")
+    assert q["price"] == 354000.0      # NXT 70k 폐기 → 깨끗한 KRX 참조
+    assert q["name"] == "삼성전자"      # krx_ref 반환(네이버/NXT 글리치 아님)
+
+
+def test_get_quote_kr_regular_skips_krx_crosscheck():
+    # regular=True(리포트): 이미 KRX라 교차검증·추가 KRX 콜 스킵 → _kr_basic_kiwoom 1콜만
+    kiwoom_basic = (354000.0, -2.34, 362500, 2000000 * 10**8, "삼성전자")
+    with _patch_yf(), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.market.kr._kr_basic_kiwoom", return_value=kiwoom_basic) as kb, \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[353000.0, 354000.0]):
+        from services import market
+        q = market.get_quote_kr("005930", regular=True)
+    assert q["price"] == 354000.0
+    assert kb.call_count == 1                          # krx_ref 추가 콜 없음
+    assert kb.call_args.kwargs.get("regular") is True
+
+
+def test_get_quote_kr_default_fetches_krx_ref():
+    # regular=False: 독립 KRX 참조(regular=True) + NXT 소스(regular=False) = 2콜
+    kiwoom_basic = (350500.0, 0.10, 350000, 2000000 * 10**8, "삼성전자")
+    with _patch_yf(), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.market.kr._kr_basic_kiwoom", return_value=kiwoom_basic) as kb, \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[349000.0, 350500.0]):
+        from services import market
+        market.get_quote_kr("005930")
+    assert kb.call_count == 2
+    regulars = [c.kwargs.get("regular") for c in kb.call_args_list]
+    assert regulars == [True, False]   # krx_ref(regular=True) 먼저, 그 다음 NXT 소스

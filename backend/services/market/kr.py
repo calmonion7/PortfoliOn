@@ -103,17 +103,23 @@ def _kr_closes_kiwoom(ticker: str, max_items: int = 30, regular: bool = False) -
         return []
 
 
-def _price_sane(price: float, prev_close: float | None, ref_close: float | None) -> bool:
+def _price_sane(price: float, prev_close: float | None, ref_close: float | None,
+                krx_close: float | None = None) -> bool:
     """현재가가 비정상이면 False. 가능한 검증을 모두 통과해야 정상:
     ① 전일종가(prev_close)의 ±30% 이내 — KR 일일 가격제한폭(전날 대비 최대 ±30%),
     ② 키움 일봉 최근 종가(ref_close)의 [0.5, 2.0] 이내 — 독립 TR 교차검증(소스 자체
-       prev_close까지 함께 오염된 경우 대비). 각 참조가 무효(None/≤0)면 그 검증만 생략,
-       둘 다 없으면 검증 불가 → True.
+       prev_close까지 함께 오염된 경우 대비),
+    ③ 독립 KRX 평문코드 시세(krx_close)의 [0.5, 2.0] 이내 — NXT `_AL`이 quote·prev_close·
+       일봉ref를 *모두* 같은 오스케일로 자기일관 오염시켜 ①②를 둘 다 통과하는 전체오염을
+       잡는다(KRX는 다른 거래소 피드라 동시 동일오염이 사실상 없음, task#96). 각 참조가
+       무효(None/≤0)면 그 검증만 생략, 셋 다 없으면 검증 불가 → True.
     ponytail: ±30%는 일반 종목 기준 — 신규상장/정리매매(가격제한 없음)는 false-reject
-    가능하나 ②(2배)가 완충하고 그런 종목은 드물다. 한도 바뀌면 0.7/1.3 상수만 조정."""
+    가능하나 ②③(2배)가 완충하고 그런 종목은 드물다. 한도 바뀌면 0.7/1.3 상수만 조정."""
     if prev_close and prev_close > 0 and not (0.7 <= price / prev_close <= 1.3):
         return False
     if ref_close and ref_close > 0 and not (0.5 <= price / ref_close <= 2.0):
+        return False
+    if krx_close and krx_close > 0 and not (0.5 <= price / krx_close <= 2.0):
         return False
     return True
 
@@ -127,7 +133,13 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
     있어 소스 합의를 따른다). 평소(가드 미발동)엔 키움이 통과해 KIS/Naver를 호출하지 않는
     기존 short-circuit을 유지(lazy 호출).
     `regular=True`(리포트 스냅샷, .forge/adr/0020)는 키움만 KRX 정규장 코드로 — KIS/Naver는
-    NXT 개념이 없어 항상 정규장가라 그대로다."""
+    NXT 개념이 없어 항상 정규장가라 그대로다.
+    `regular=False`(NXT 라이브)면 독립 KRX 평문코드 시세(`_kr_basic_kiwoom(regular=True)`,
+    1콜)를 받아 자기일관적 `_AL` 전체오염을 교차검증한다 — 모든 라이브 소스가 검증 실패하면
+    글리치 NXT 대신 그 깨끗한 KRX 참조를 반환(.forge/adr/0020, task#96). regular=True는 이미
+    KRX라 교차검증·추가 콜 스킵."""
+    krx_ref = _kr_basic_kiwoom(ticker, regular=True) if not regular else None
+    krx_close = krx_ref[0] if (krx_ref and krx_ref[0]) else None
     fallback = None
     last = None
     for src, getter in (("키움", lambda t: _kr_basic_kiwoom(t, regular=regular)),
@@ -140,9 +152,12 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
             continue
         if fallback is None:
             fallback = basic
-        if _price_sane(basic[0], basic[2], ref_close):
+        if _price_sane(basic[0], basic[2], ref_close, krx_close):
             return basic
-        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30%/일봉 {ref_close} 범위 밖 — 폐기")
+        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30%/일봉 {ref_close}/KRX {krx_close} 범위 밖 — 폐기")
+    # 모든 라이브 소스 검증 실패: 깨끗한 KRX 참조가 있으면 글리치보다 그걸 우선
+    if krx_ref and krx_ref[0]:
+        return krx_ref
     return fallback or last
 
 
