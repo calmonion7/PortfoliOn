@@ -101,22 +101,29 @@ def _kr_closes_kiwoom(ticker: str, max_items: int = 30) -> list:
         return []
 
 
-def _within_chart(price: float, ref: float | None) -> bool:
-    """price가 참조 일봉 종가 ref의 [ref/2, ref*2] 이내면 True.
-    참조 무효(None/≤0)면 검증 불가 → True(가드 생략). KR 일일 ±30% 제한상
-    정상 현재가는 일봉 종가의 2배 안 — 2배 밖은 소스 간 조정 불일치/오류."""
-    if ref is None or ref <= 0:
-        return True
-    return ref / 2 <= price <= ref * 2
+def _price_sane(price: float, prev_close: float | None, ref_close: float | None) -> bool:
+    """현재가가 비정상이면 False. 가능한 검증을 모두 통과해야 정상:
+    ① 전일종가(prev_close)의 ±30% 이내 — KR 일일 가격제한폭(전날 대비 최대 ±30%),
+    ② 키움 일봉 최근 종가(ref_close)의 [0.5, 2.0] 이내 — 독립 TR 교차검증(소스 자체
+       prev_close까지 함께 오염된 경우 대비). 각 참조가 무효(None/≤0)면 그 검증만 생략,
+       둘 다 없으면 검증 불가 → True.
+    ponytail: ±30%는 일반 종목 기준 — 신규상장/정리매매(가격제한 없음)는 false-reject
+    가능하나 ②(2배)가 완충하고 그런 종목은 드물다. 한도 바뀌면 0.7/1.3 상수만 조정."""
+    if prev_close and prev_close > 0 and not (0.7 <= price / prev_close <= 1.3):
+        return False
+    if ref_close and ref_close > 0 and not (0.5 <= price / ref_close <= 2.0):
+        return False
+    return True
 
 
 def _kr_pick_basic(ticker: str, ref_close: float | None) -> tuple | None:
     """키움 → KIS → Naver 중 첫 유효 소스 (price, ratio, prev_close, mc, name).
-    price가 참조 일봉 종가와 2배 넘게 어긋나는 소스는 소스 간 조정 불일치(액면/병합 등)로
-    보고 폐기하고 다음 소스를 시도한다 — 005930 현재가가 ~1/5로 박제돼 매물대/RSI를
-    깨뜨린 사례. 유효 소스를 못 찾으면 첫 non-null price 소스로 폴백(모든 소스가 참조와
-    어긋나면 차트가 이상값일 수 있어 소스 합의를 따른다). 평소(가드 미발동)엔 키움이 통과해
-    KIS/Naver를 호출하지 않는 기존 short-circuit을 유지(lazy 호출)."""
+    현재가가 전일종가 ±30%(KR 일일 제한폭) 또는 일봉 종가 2배 범위 밖인 소스는 일시적
+    이상값/조정 불일치로 보고 폐기하고 다음 소스를 시도한다 — 005930이 ~70k(실값 ~1/5)로
+    박제돼 매물대/RSI를 깨뜨린 사례(NXT `_AL` 순간 이상체결 추정, task#93·94). 유효 소스를
+    못 찾으면 첫 non-null price 소스로 폴백(모든 소스가 참조와 어긋나면 차트가 이상값일 수
+    있어 소스 합의를 따른다). 평소(가드 미발동)엔 키움이 통과해 KIS/Naver를 호출하지 않는
+    기존 short-circuit을 유지(lazy 호출)."""
     fallback = None
     last = None
     for src, getter in (("키움", _kr_basic_kiwoom), ("KIS", _kr_basic_kis), ("Naver", _kr_basic_naver)):
@@ -128,9 +135,9 @@ def _kr_pick_basic(ticker: str, ref_close: float | None) -> tuple | None:
             continue
         if fallback is None:
             fallback = basic
-        if _within_chart(basic[0], ref_close):
+        if _price_sane(basic[0], basic[2], ref_close):
             return basic
-        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 일봉 종가 {ref_close}와 2배 이상 괴리 — 폐기")
+        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30%/일봉 {ref_close} 범위 밖 — 폐기")
     return fallback or last
 
 
@@ -141,7 +148,7 @@ def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
         ref_close = kcloses[-1] if kcloses else None
 
         # 키움 우선 → KIS 백업 → Naver 폴백 (경계: .forge/adr/0009·0011). 상폐 종목은 Naver 409로 검출.
-        # 일봉 종가와 2배 넘게 어긋나는 소스는 _kr_pick_basic이 폐기·다음 소스로 폴백.
+        # 현재가가 전일종가 ±30%(KR 일일 제한폭) 또는 일봉 2배 범위 밖인 소스는 _kr_pick_basic이 폐기·폴백.
         basic = _kr_pick_basic(ticker, ref_close)
         price, ratio, prev_close, mc, name = basic
         daily_change = f"{ratio:+.2f}%" if ratio is not None else "N/A"

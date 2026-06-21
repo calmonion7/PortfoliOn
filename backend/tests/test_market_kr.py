@@ -155,3 +155,38 @@ def test_guard_disabled_without_chart_reference():
     assert q["price"] == 70000.0           # 참조 없으면 검증 불가 → 폐기 안 함
     kis_call.assert_not_called()
     naver_call.assert_not_called()
+
+
+# ── 전일종가 ±30% 가드 (KR 일일 가격제한폭, task#94) ──
+def test_guard_30pct_catches_what_2x_misses():
+    # 현재가 200000: 일봉 354000의 [0.5,2.0]엔 들지만(0.565) 전일종가 362500의 ±30% 밖(0.55) → 폐기
+    kiwoom_norm = {"price": 200000.0, "daily_change_pct": -44.8, "prev_close": 362500,
+                   "market_cap": 1200000 * 10**8, "name": "삼성전자"}
+    naver_basic = {"closePrice": "354000", "compareToPreviousClosePrice": "-8500",
+                   "fluctuationsRatio": "-2.34", "marketValue": "2000000", "stockName": "삼성전자"}
+    with _patch_yf(), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[350000.0, 354000.0]), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.kiwoom.quote.get_quote", return_value=kiwoom_norm), \
+         patch("services.kis.client.configured", return_value=False), \
+         patch("services.market.kr._naver_get", return_value=naver_basic):
+        from services import market
+        q = market.get_quote_kr("005930")
+    assert q["price"] == 354000.0          # 전일종가 ±30% 밖 → Naver로 폴백
+
+
+def test_guard_keeps_legal_limit_down_move():
+    # 하한가(-30%): 254000 ≈ 362500*0.70 → ±30% 경계 내 → 정상 유지(합법 변동 false-reject 방지)
+    kiwoom_norm = {"price": 254000.0, "daily_change_pct": -29.93, "prev_close": 362500,
+                   "market_cap": 1500000 * 10**8, "name": "삼성전자"}
+    with _patch_yf(), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[360000.0, 362500.0]), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.kiwoom.quote.get_quote", return_value=kiwoom_norm), \
+         patch("services.kis.quote.get_quote_kr") as kis_call, \
+         patch("services.market.kr._naver_get") as naver_call:
+        from services import market
+        q = market.get_quote_kr("005930")
+    assert q["price"] == 254000.0          # 합법 하한가는 폐기 금지
+    kis_call.assert_not_called()
+    naver_call.assert_not_called()
