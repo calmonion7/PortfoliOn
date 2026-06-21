@@ -63,13 +63,14 @@ def _kr_basic_naver(ticker: str) -> tuple:
     return price, ratio, (round(prev_close, 0) if prev_close is not None else None), mc, name
 
 
-def _kr_basic_kiwoom(ticker: str) -> tuple | None:
-    """키움 ka10001 → (price, ratio, prev_close, mc, name). 미설정/실패/빈 price면 None."""
+def _kr_basic_kiwoom(ticker: str, regular: bool = False) -> tuple | None:
+    """키움 ka10001 → (price, ratio, prev_close, mc, name). 미설정/실패/빈 price면 None.
+    `regular=True`면 KRX 정규장 종가(.forge/adr/0020)."""
     from services.kiwoom import client, quote as kq
     if not client.configured():
         return None
     try:
-        q = kq.get_quote(ticker)
+        q = kq.get_quote(ticker, regular=regular)
     except Exception:
         return None
     if q.get("price") is None:
@@ -92,11 +93,12 @@ def _kr_basic_kis(ticker: str) -> tuple | None:
     return q["price"], q.get("daily_change_pct"), q.get("prev_close"), q.get("market_cap"), (q.get("name") or ticker)
 
 
-def _kr_closes_kiwoom(ticker: str, max_items: int = 30) -> list:
-    """키움 일봉 종가 시리즈(과거→현재). 미설정/실패 시 [] (호출측 폴백). monthly(-23)용 30개."""
+def _kr_closes_kiwoom(ticker: str, max_items: int = 30, regular: bool = False) -> list:
+    """키움 일봉 종가 시리즈(과거→현재). 미설정/실패 시 [] (호출측 폴백). monthly(-23)용 30개.
+    `regular=True`면 KRX 정규장 종가(.forge/adr/0020)."""
     from services.kiwoom import chart as kchart
     try:
-        return kchart.daily_closes(ticker, max_items=max_items)
+        return kchart.daily_closes(ticker, max_items=max_items, regular=regular)
     except Exception:
         return []
 
@@ -116,17 +118,20 @@ def _price_sane(price: float, prev_close: float | None, ref_close: float | None)
     return True
 
 
-def _kr_pick_basic(ticker: str, ref_close: float | None) -> tuple | None:
+def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) -> tuple | None:
     """키움 → KIS → Naver 중 첫 유효 소스 (price, ratio, prev_close, mc, name).
     현재가가 전일종가 ±30%(KR 일일 제한폭) 또는 일봉 종가 2배 범위 밖인 소스는 일시적
     이상값/조정 불일치로 보고 폐기하고 다음 소스를 시도한다 — 005930이 ~70k(실값 ~1/5)로
     박제돼 매물대/RSI를 깨뜨린 사례(NXT `_AL` 순간 이상체결 추정, task#93·94). 유효 소스를
     못 찾으면 첫 non-null price 소스로 폴백(모든 소스가 참조와 어긋나면 차트가 이상값일 수
     있어 소스 합의를 따른다). 평소(가드 미발동)엔 키움이 통과해 KIS/Naver를 호출하지 않는
-    기존 short-circuit을 유지(lazy 호출)."""
+    기존 short-circuit을 유지(lazy 호출).
+    `regular=True`(리포트 스냅샷, .forge/adr/0020)는 키움만 KRX 정규장 코드로 — KIS/Naver는
+    NXT 개념이 없어 항상 정규장가라 그대로다."""
     fallback = None
     last = None
-    for src, getter in (("키움", _kr_basic_kiwoom), ("KIS", _kr_basic_kis), ("Naver", _kr_basic_naver)):
+    for src, getter in (("키움", lambda t: _kr_basic_kiwoom(t, regular=regular)),
+                        ("KIS", _kr_basic_kis), ("Naver", _kr_basic_naver)):
         basic = getter(ticker)
         if basic is None:
             continue
@@ -141,15 +146,17 @@ def _kr_pick_basic(ticker: str, ref_close: float | None) -> tuple | None:
     return fallback or last
 
 
-def get_quote_kr(ticker: str, exchange: str = "KS") -> dict:
+def get_quote_kr(ticker: str, exchange: str = "KS", regular: bool = False) -> dict:
+    """`regular=True`(리포트 스냅샷, .forge/adr/0020)면 키움 시세·일봉을 KRX 정규장 종가로.
+    기본(False)은 NXT `_AL`(라이브 대시보드)."""
     try:
         # 매물대/RSI가 쓰는 키움 일봉 종가를 시세 검증 참조로 먼저 확보(같은 호출, 추가 콜 없음).
-        kcloses = _kr_closes_kiwoom(ticker, max_items=260)
+        kcloses = _kr_closes_kiwoom(ticker, max_items=260, regular=regular)
         ref_close = kcloses[-1] if kcloses else None
 
         # 키움 우선 → KIS 백업 → Naver 폴백 (경계: .forge/adr/0009·0011). 상폐 종목은 Naver 409로 검출.
         # 현재가가 전일종가 ±30%(KR 일일 제한폭) 또는 일봉 2배 범위 밖인 소스는 _kr_pick_basic이 폐기·폴백.
-        basic = _kr_pick_basic(ticker, ref_close)
+        basic = _kr_pick_basic(ticker, ref_close, regular=regular)
         price, ratio, prev_close, mc, name = basic
         daily_change = f"{ratio:+.2f}%" if ratio is not None else "N/A"
 

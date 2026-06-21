@@ -20,9 +20,10 @@ def _num(val) -> float | None:
         return None
 
 
-def get_basic_info(stk_cd: str) -> dict:
-    """ka10001 주식기본정보요청 — raw 응답 dict. 통합(SOR) 코드로 NXT 확장시간 가격 포함."""
-    return client.request("ka10001", {"stk_cd": client.integrated_code(stk_cd)}, "stkinfo")
+def get_basic_info(stk_cd: str, regular: bool = False) -> dict:
+    """ka10001 주식기본정보요청 — raw 응답 dict. 기본은 통합(SOR) 코드로 NXT 확장시간 가격
+    포함, `regular=True`면 KRX 평문 코드로 정규장 종가(.forge/adr/0020)."""
+    return client.request("ka10001", {"stk_cd": client.integrated_code(stk_cd, regular)}, "stkinfo")
 
 
 def normalize_basic(d: dict) -> dict:
@@ -56,6 +57,7 @@ def normalize_basic(d: dict) -> dict:
     }
 
 
-def get_quote(stk_cd: str) -> dict:
-    """ka10001 조회 → 정규화 dict. 키움 실패 시 예외 전파(호출측이 폴백)."""
-    return normalize_basic(get_basic_info(stk_cd))
+def get_quote(stk_cd: str, regular: bool = False) -> dict:
+    """ka10001 조회 → 정규화 dict. 키움 실패 시 예외 전파(호출측이 폴백).
+    `regular=True`면 KRX 정규장 종가(.forge/adr/0020)."""
+    return normalize_basic(get_basic_info(stk_cd, regular))

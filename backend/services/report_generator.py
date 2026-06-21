@@ -65,20 +65,21 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         except Exception:
             pass
     # KR 일봉은 키움 우선(실패 시 yfinance 폴백), 그 외는 yfinance.
+    # 리포트 스냅샷은 KRX 정규장 종가 기준(regular=True) — 매물대/고점/현재가 정합(.forge/adr/0020).
     if market == "KR":
-        daily_df = mkt.get_history_df(ticker, market, exchange, "daily")
+        daily_df = mkt.get_history_df(ticker, market, exchange, "daily", regular=True)
     else:
         daily_df = _t.history(period="1y")
 
     with ThreadPoolExecutor(max_workers=8) as ex:
-        f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange, _t)
+        f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange, _t, regular=True)
         f_fin       = ex.submit(mkt.get_financials, ticker, market, exchange)
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
         f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
-        f_rsi       = ex.submit(indicators.get_timeframe_rsi, ticker, market, exchange)
+        f_rsi       = ex.submit(indicators.get_timeframe_rsi, ticker, market, exchange)  # RSI는 NXT 유지(정규화라 무관, non-goal)
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
-        f_comps     = [ex.submit(mkt.get_quote, c, *_infer_comp_market(c, market, exchange)) for c in competitors]
+        f_comps     = [ex.submit(mkt.get_quote, c, *_infer_comp_market(c, market, exchange), regular=True) for c in competitors]
 
     quote             = f_quote.result()
     financials        = f_fin.result()
@@ -237,7 +238,9 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
     try:
         t = yf.Ticker(yf_sym)  # US history + (US) info용. KR은 info 대신 quote 사용.
         if market == "KR":
-            daily_df   = _normalize_index(mkt.get_history_df(ticker, market, exchange, "daily", yf_period="2y", max_items=520))
+            # daily는 스냅샷 price(d_trim Close)+매물대 소스 → KRX 정규장(regular=True, .forge/adr/0020).
+            # weekly/monthly는 RSI만 쓰므로 NXT 유지(정규화라 무관, 불필요한 전파 회피).
+            daily_df   = _normalize_index(mkt.get_history_df(ticker, market, exchange, "daily", yf_period="2y", max_items=520, regular=True))
             weekly_df  = _normalize_index(mkt.get_history_df(ticker, market, exchange, "weekly"))
             monthly_df = _normalize_index(mkt.get_history_df(ticker, market, exchange, "monthly"))
         else:
@@ -256,7 +259,7 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
     finviz            = scraper.scrape_finviz_consensus(ticker) if market == "US" else {}
 
     if market == "KR":
-        quote = mkt.get_quote(ticker, market, exchange)
+        quote = mkt.get_quote(ticker, market, exchange, regular=True)  # sector/이름용(price는 daily_df), 정규장 일관(.forge/adr/0020)
         sector = quote.get("sector", "")
         industry = quote.get("industry", "")
         actual_f = [f for f in financials if not f.get("is_consensus")]

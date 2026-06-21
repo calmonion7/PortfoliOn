@@ -441,7 +441,8 @@ def refresh_analyst(ticker: str):
     exchange = summary.get("exchange")
 
     analyst = market_svc.get_analyst_data(upper, market, exchange)
-    quote = market_svc.get_quote(upper, market, exchange or "")
+    # 스냅샷에 price를 박제(아래 UPDATE)하므로 리포트 기준=KRX 정규장 종가(regular=True, .forge/adr/0020).
+    quote = market_svc.get_quote(upper, market, exchange or "", regular=True)
     price = quote.get("price") or None
 
     patched: dict = {}

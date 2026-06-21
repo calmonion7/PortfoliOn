@@ -35,11 +35,12 @@ from services.market.us import (
 )
 
 
-def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
+def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None, regular: bool = False) -> dict:
     # 종목 단위 TTL 캐시 — yfinance/Naver 호출을 종목당 TTL당 1회로 상한(rate-limit 방어).
+    # regular(리포트 정규장 vs 대시보드 NXT)을 캐시 키에 포함해 두 시세가 섞이지 않게 한다(.forge/adr/0020).
     from services import cache as cache_svc
-    key = f"{ticker.upper()}/{market}/{exchange}"
-    return cache_svc.get_quote_cached(key, lambda: _get_quote_uncached(ticker, market, exchange, _t))
+    key = f"{ticker.upper()}/{market}/{exchange}/{regular}"
+    return cache_svc.get_quote_cached(key, lambda: _get_quote_uncached(ticker, market, exchange, _t, regular))
 
 
 def resolve_name(ticker: str, market: str = "US", exchange: str = "", user_name: str = "", quote: dict | None = None) -> str:
@@ -61,9 +62,9 @@ def resolve_name(ticker: str, market: str = "US", exchange: str = "", user_name:
     return un or ticker
 
 
-def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
+def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=None, regular: bool = False) -> dict:
     if market == "KR":
-        return get_quote_kr(ticker, exchange)
+        return get_quote_kr(ticker, exchange, regular=regular)
 
     yf_sym = _yf_sym(ticker, market, exchange)
     try:
@@ -193,9 +194,10 @@ _HISTORY_CFG = {
 
 def get_history_df(ticker: str, market: str = "US", exchange: str = "",
                    timeframe: str = "daily", yf_period: str | None = None,
-                   max_items: int | None = None):
+                   max_items: int | None = None, regular: bool = False):
     """yfinance history()와 동형 OHLCV DataFrame. KR은 키움(ka10081/82/83) 우선, 실패 시
-    yfinance 폴백. 그 외 마켓은 yfinance. (.forge/adr/0009 — 키움은 KR 전용)"""
+    yfinance 폴백. 그 외 마켓은 yfinance. (.forge/adr/0009 — 키움은 KR 전용)
+    `regular=True`면 KR 키움 일봉을 KRX 정규장 종가 기준으로(리포트 스냅샷, .forge/adr/0020)."""
     yf_params, default_max = _HISTORY_CFG.get(timeframe, _HISTORY_CFG["daily"])
     if yf_period:
         yf_params = {**yf_params, "period": yf_period}
@@ -204,7 +206,7 @@ def get_history_df(ticker: str, market: str = "US", exchange: str = "",
         try:
             from services.kiwoom import chart as kchart, client as kclient
             if kclient.configured():
-                df = kchart.history_df(ticker, timeframe, max_items=max_items)
+                df = kchart.history_df(ticker, timeframe, max_items=max_items, regular=regular)
                 if not df.empty:
                     return df
         except Exception:

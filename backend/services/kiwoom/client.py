@@ -37,12 +37,16 @@ def configured() -> bool:
     return bool(app_key and secret_key)
 
 
-def integrated_code(stk_cd: str) -> str:
-    """KR 종목코드를 통합(SOR) 거래소 코드(`_AL`)로. NXT 확장시간(08:00~20:00) 가격을
-    포착하고, NXT 미거래 종목은 통합이 KRX로 자동 폴백한다(라이브 프로브로 확인:
-    005930_AL=통합가, 비-NXT 소형주_AL=KRX 동일값). 이미 거래소 접미사가 있으면 그대로.
+def integrated_code(stk_cd: str, regular: bool = False) -> str:
+    """KR 종목코드를 거래소 코드로. 기본은 통합(SOR) 코드(`_AL`) — NXT 확장시간
+    (08:00~20:00) 가격을 포착하고, NXT 미거래 종목은 통합이 KRX로 자동 폴백한다(라이브
+    프로브로 확인: 005930_AL=통합가, 비-NXT 소형주_AL=KRX 동일값).
+    `regular=True`면 평문 KRX 코드(접미사 없음)를 써 정규장 종가를 받는다 — 리포트
+    스냅샷이 정규장 종가를 박제하기 위함(.forge/adr/0020). 이미 거래소 접미사가 있으면 그대로.
     경계: .forge/adr/0009 (시세 데이터만, SOR 주문 라우팅 아님)."""
-    return stk_cd if "_" in stk_cd else f"{stk_cd}_AL"
+    if "_" in stk_cd:
+        return stk_cd
+    return stk_cd if regular else f"{stk_cd}_AL"
 
 
 # ── 토큰 싱글톤 ───────────────────────────────────────────────────────────────

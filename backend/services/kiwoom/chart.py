@@ -51,12 +51,13 @@ def normalize_bars(rows: list) -> list[dict]:
 
 
 def fetch_bars(stk_cd: str, timeframe: str, base_dt: str | None = None,
-               max_items: int = 1000) -> list[dict]:
-    """timeframe(daily/weekly/monthly) OHLCV 리스트(과거→현재). base_dt 미지정 시 오늘 기준."""
+               max_items: int = 1000, regular: bool = False) -> list[dict]:
+    """timeframe(daily/weekly/monthly) OHLCV 리스트(과거→현재). base_dt 미지정 시 오늘 기준.
+    `regular=True`면 KRX 정규장 종가 기준 일봉(.forge/adr/0020)."""
     api_id, list_key = _TF[timeframe]
     base_dt = base_dt or _dt.date.today().strftime("%Y%m%d")
     rows = client.request_paged(
-        api_id, {"stk_cd": client.integrated_code(stk_cd), "base_dt": base_dt, "upd_stkpc_tp": "1"},
+        api_id, {"stk_cd": client.integrated_code(stk_cd, regular), "base_dt": base_dt, "upd_stkpc_tp": "1"},
         "chart", list_key, max_items,
     )
     bars = normalize_bars(rows)
@@ -66,9 +67,10 @@ def fetch_bars(stk_cd: str, timeframe: str, base_dt: str | None = None,
 
 
 def history_df(stk_cd: str, timeframe: str = "daily", base_dt: str | None = None,
-               max_items: int = 1000) -> pd.DataFrame:
-    """yfinance `history()`와 동형 DataFrame(DatetimeIndex, Open/High/Low/Close/Volume)."""
-    bars = fetch_bars(stk_cd, timeframe, base_dt, max_items)
+               max_items: int = 1000, regular: bool = False) -> pd.DataFrame:
+    """yfinance `history()`와 동형 DataFrame(DatetimeIndex, Open/High/Low/Close/Volume).
+    `regular=True`면 KRX 정규장 종가 기준(.forge/adr/0020)."""
+    bars = fetch_bars(stk_cd, timeframe, base_dt, max_items, regular)
     cols = ["Open", "High", "Low", "Close", "Volume"]
     if not bars:
         return pd.DataFrame(columns=cols)
@@ -78,6 +80,8 @@ def history_df(stk_cd: str, timeframe: str = "daily", base_dt: str | None = None
                               "close": "Close", "volume": "Volume"})[cols]
 
 
-def daily_closes(stk_cd: str, base_dt: str | None = None, max_items: int = 60) -> list[float]:
-    """일봉 종가 시리즈(과거→현재). get_quotes_batch의 _changes_from_closes용(monthly index -23 필요)."""
-    return [b["close"] for b in fetch_bars(stk_cd, "daily", base_dt, max_items) if b["close"] is not None]
+def daily_closes(stk_cd: str, base_dt: str | None = None, max_items: int = 60,
+                 regular: bool = False) -> list[float]:
+    """일봉 종가 시리즈(과거→현재). get_quotes_batch의 _changes_from_closes용(monthly index -23 필요).
+    `regular=True`면 KRX 정규장 종가(.forge/adr/0020)."""
+    return [b["close"] for b in fetch_bars(stk_cd, "daily", base_dt, max_items, regular) if b["close"] is not None]

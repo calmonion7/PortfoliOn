@@ -190,3 +190,31 @@ def test_guard_keeps_legal_limit_down_move():
     assert q["price"] == 254000.0          # 합법 하한가는 폐기 금지
     kis_call.assert_not_called()
     naver_call.assert_not_called()
+
+
+# ── regular=True → 키움 KRX 정규장 전파 (리포트 스냅샷, .forge/adr/0020, task#95) ──
+def test_get_quote_kr_regular_propagates_to_kiwoom():
+    # 리포트 경로(regular=True): 키움 시세·일봉 둘 다 KRX 정규장 코드로 호출돼야 한다
+    kiwoom_basic = (355000.0, 0.28, 354000, 2000000 * 10**8, "삼성전자")
+    with _patch_yf(), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.market.kr._kr_basic_kiwoom", return_value=kiwoom_basic) as kb, \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[350000.0, 354000.0]) as kc:
+        from services import market
+        q = market.get_quote_kr("005930", regular=True)
+    assert q["price"] == 355000.0                       # 키움 KRX 값 채택
+    assert kb.call_args.kwargs.get("regular") is True   # _kr_pick_basic이 키움에 regular 전파
+    assert kc.call_args.kwargs.get("regular") is True   # 시세검증 일봉 참조도 정규장
+
+
+def test_get_quote_kr_default_keeps_nxt():
+    # 기본(대시보드/라이브): regular 미지정 → 키움 NXT(regular=False) 유지(무변화)
+    kiwoom_basic = (350500.0, 0.10, 350000, 2000000 * 10**8, "삼성전자")
+    with _patch_yf(), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.market.kr._kr_basic_kiwoom", return_value=kiwoom_basic) as kb, \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[349000.0, 350500.0]) as kc:
+        from services import market
+        market.get_quote_kr("005930")
+    assert kb.call_args.kwargs.get("regular") is False
+    assert kc.call_args.kwargs.get("regular") is False

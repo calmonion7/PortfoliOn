@@ -53,3 +53,35 @@ def test_integrated_code_appends_AL():
     assert client.integrated_code("005930") == "005930_AL"
     assert client.integrated_code("005930_AL") == "005930_AL"   # 이미 접미사 → 그대로
     assert client.integrated_code("005930_NX") == "005930_NX"
+
+
+# ── regular=True → KRX 정규장 평문 코드 (리포트 스냅샷, .forge/adr/0020, task#95) ──
+def test_integrated_code_regular_uses_plain_krx():
+    from services.kiwoom import client
+    assert client.integrated_code("005930", regular=True) == "005930"   # 평문 KRX
+    assert client.integrated_code("005930") == "005930_AL"              # 기본은 NXT _AL
+    assert client.integrated_code("005930_AL", regular=True) == "005930_AL"  # 접미사 있으면 불변
+
+
+def test_get_basic_info_regular_propagates_krx_code():
+    """get_basic_info(regular=True)면 ka10001에 평문 KRX 코드, 기본이면 _AL."""
+    from unittest.mock import patch
+    from services.kiwoom import quote as kq
+    with patch("services.kiwoom.client.request", return_value={}) as req:
+        kq.get_basic_info("005930", regular=True)
+    assert req.call_args.args[1]["stk_cd"] == "005930"
+    with patch("services.kiwoom.client.request", return_value={}) as req:
+        kq.get_basic_info("005930")
+    assert req.call_args.args[1]["stk_cd"] == "005930_AL"
+
+
+def test_fetch_bars_regular_propagates_krx_code():
+    """fetch_bars(regular=True)면 일봉 TR에 평문 KRX 코드, 기본이면 _AL."""
+    from unittest.mock import patch
+    from services.kiwoom import chart as kc
+    with patch("services.kiwoom.client.request_paged", return_value=[]) as req:
+        kc.fetch_bars("005930", "daily", regular=True)
+    assert req.call_args.args[1]["stk_cd"] == "005930"
+    with patch("services.kiwoom.client.request_paged", return_value=[]) as req:
+        kc.fetch_bars("005930", "daily")
+    assert req.call_args.args[1]["stk_cd"] == "005930_AL"
