@@ -103,46 +103,44 @@ def _kr_closes_kiwoom(ticker: str, max_items: int = 30, regular: bool = False) -
         return []
 
 
-def _price_sane(price: float, prev_close: float | None, ref_close: float | None,
-                krx_close: float | None = None) -> bool:
+def _price_sane(price: float, prev_close: float | None, ref_close: float | None = None) -> bool:
     """현재가가 비정상이면 False. 가능한 검증을 모두 통과해야 정상:
     ① 전일종가(prev_close)의 ±30% 이내 — KR 일일 가격제한폭(전날 대비 최대 ±30%),
     ② 키움 일봉 최근 종가(ref_close)의 [0.5, 2.0] 이내 — 독립 TR 교차검증(소스 자체
-       prev_close까지 함께 오염된 경우 대비),
-    ③ 독립 KRX 평문코드 시세(krx_close)의 [0.5, 2.0] 이내 — NXT `_AL`이 quote·prev_close·
-       일봉ref를 *모두* 같은 오스케일로 자기일관 오염시켜 ①②를 둘 다 통과하는 전체오염을
-       잡는다(KRX는 다른 거래소 피드라 동시 동일오염이 사실상 없음, task#96). 각 참조가
-       무효(None/≤0)면 그 검증만 생략, 셋 다 없으면 검증 불가 → True.
+       prev_close까지 함께 오염된 경우 대비). 각 참조가 무효(None/≤0)면 그 검증만 생략,
+       둘 다 없으면 검증 불가 → True.
+    regular=False(NXT 라이브)의 단일 참조 글리치 면역은 ref_close/krx 단일검증이 아니라
+    독립 피드 다수결(`_corroborated_pick`)이 담당한다 — 이 함수는 regular=True(리포트) 경로와
+    다수결 합의 불가 시 degenerate self-check(±30%, ref_close 미전달)에만 쓰인다(task#98).
     ponytail: ±30%는 일반 종목 기준 — 신규상장/정리매매(가격제한 없음)는 false-reject
-    가능하나 ②③(2배)가 완충하고 그런 종목은 드물다. 한도 바뀌면 0.7/1.3 상수만 조정."""
+    가능하나 ②(2배)가 완충하고 그런 종목은 드물다. 한도 바뀌면 0.7/1.3 상수만 조정."""
     if prev_close and prev_close > 0 and not (0.7 <= price / prev_close <= 1.3):
         return False
     if ref_close and ref_close > 0 and not (0.5 <= price / ref_close <= 2.0):
         return False
-    if krx_close and krx_close > 0 and not (0.5 <= price / krx_close <= 2.0):
-        return False
     return True
 
 
-def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) -> tuple | None:
-    """키움 → KIS → Naver 중 첫 유효 소스 (price, ratio, prev_close, mc, name).
-    현재가가 전일종가 ±30%(KR 일일 제한폭) 또는 일봉 종가 2배 범위 밖인 소스는 일시적
-    이상값/조정 불일치로 보고 폐기하고 다음 소스를 시도한다 — 005930이 ~70k(실값 ~1/5)로
-    박제돼 매물대/RSI를 깨뜨린 사례(NXT `_AL` 순간 이상체결 추정, task#93·94). 유효 소스를
-    못 찾으면 첫 non-null price 소스로 폴백(모든 소스가 참조와 어긋나면 차트가 이상값일 수
-    있어 소스 합의를 따른다). 평소(가드 미발동)엔 키움이 통과해 KIS/Naver를 호출하지 않는
-    기존 short-circuit을 유지(lazy 호출).
-    `regular=True`(리포트 스냅샷, .forge/adr/0020)는 키움만 KRX 정규장 코드로 — KIS/Naver는
-    NXT 개념이 없어 항상 정규장가라 그대로다.
-    `regular=False`(NXT 라이브)면 독립 KRX 평문코드 시세(`_kr_basic_kiwoom(regular=True)`,
-    1콜)를 받아 자기일관적 `_AL` 전체오염을 교차검증한다 — 모든 라이브 소스가 검증 실패하면
-    글리치 NXT 대신 그 깨끗한 KRX 참조를 반환(.forge/adr/0020, task#96). regular=True는 이미
-    KRX라 교차검증·추가 콜 스킵."""
-    krx_ref = _kr_basic_kiwoom(ticker, regular=True) if not regular else None
-    krx_close = krx_ref[0] if (krx_ref and krx_ref[0]) else None
-    fallback = None
-    last = None
-    for src, getter in (("키움", lambda t: _kr_basic_kiwoom(t, regular=regular)),
+def _corroborated_pick(feeds: list) -> tuple | None:
+    """독립 현재가 피드들의 2-of-N 다수결. feeds = [(priority_rank, src, basic_tuple)].
+    어떤 피드 가격이 *다른* 피드 ≥1개와 2x([0.5,2.0]) 이내로 합의(corroborate)하면 trusted.
+    trusted 중 우선순위 최상위(rank 최소)를 반환, 합의 쌍이 없으면 None. 순수(I/O 없음).
+    rank 순서가 곧 반환 우선순위(키움 NXT 0 → KIS 1 → Naver 2 → 키움 KRX 3)."""
+    valid = [f for f in feeds if f[2] and f[2][0] and f[2][0] > 0]
+    trusted = [
+        fi for i, fi in enumerate(valid)
+        if any(j != i and 0.5 <= fi[2][0] / fj[2][0] <= 2.0 for j, fj in enumerate(valid))
+    ]
+    return min(trusted, key=lambda f: f[0]) if trusted else None
+
+
+def _kr_pick_regular(ticker: str, ref_close: float | None) -> tuple | None:
+    """regular=True(리포트 스냅샷, KRX 정규장, .forge/adr/0020): 키움(KRX)→KIS→Naver 첫 유효 +
+    _price_sane(전일종가±30%·일봉2x). task#94/95 동작 보존 — 독립 KRX 교차검증·다수결은 NXT
+    라이브(regular=False) 전용이라 여기선 미적용(이미 KRX 정규장가). 유효 소스가 없으면 첫
+    non-null로 폴백."""
+    fallback = last = None
+    for src, getter in (("키움", lambda t: _kr_basic_kiwoom(t, regular=True)),
                         ("KIS", _kr_basic_kis), ("Naver", _kr_basic_naver)):
         basic = getter(ticker)
         if basic is None:
@@ -152,13 +150,69 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
             continue
         if fallback is None:
             fallback = basic
-        if _price_sane(basic[0], basic[2], ref_close, krx_close):
+        if _price_sane(basic[0], basic[2], ref_close):
             return basic
-        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30%/일봉 {ref_close}/KRX {krx_close} 범위 밖 — 폐기")
-    # 모든 라이브 소스 검증 실패: 깨끗한 KRX 참조가 있으면 글리치보다 그걸 우선
-    if krx_ref and krx_ref[0]:
-        return krx_ref
+        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30%/일봉 {ref_close} 범위 밖 — 폐기")
     return fallback or last
+
+
+def _kr_pick_degenerate_lazy(ticker: str, nxt: tuple | None, krx: tuple | None) -> tuple | None:
+    """키움 outage(부재/단일 — 불일치 아님): 우선순위 NXT→KIS→Naver→KRX 첫 ±30%-sane 반환,
+    lazy short-circuit(앞 소스가 sane이면 뒤 getter 미호출 — 기존 lazy 동작 보존). 다수결의
+    degenerate floor(가용 독립 2피드 없음): 단일 피드는 자기 전일종가 ±30%만 자가검증
+    (자기일관 단일 글리치는 못 잡지만 wrong<missing — task#94 floor). 전부 실패면 첫 non-null."""
+    fallback = None
+    for src, getter in (("키움NXT", lambda: nxt), ("KIS", lambda: _kr_basic_kis(ticker)),
+                        ("Naver", lambda: _kr_basic_naver(ticker)), ("키움KRX", lambda: krx)):
+        basic = getter()
+        if basic is None or basic[0] is None:
+            continue
+        if fallback is None:
+            fallback = basic
+        if _price_sane(basic[0], basic[2]):
+            return basic
+        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30% 밖 — 폐기")
+    return fallback
+
+
+def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) -> tuple | None:
+    """현재가 소스 선택 (price, ratio, prev_close, mc, name).
+    `regular=True`(리포트 스냅샷, .forge/adr/0020): KRX 정규장 우선순위 체인 — `_kr_pick_regular`.
+    `regular=False`(NXT 라이브, task#98): **독립 피드 2-of-N 다수결**로 단일 참조 글리치에 면역.
+      ① 키움 NXT + 키움 KRX 2콜 → `_corroborated_pick` 합의면 NXT 반환(평소, lazy — KIS/Naver
+         미호출). ② 불일치(어느 한쪽 글리치)면 KIS(+설정 시)·Naver를 escalate해 최대 4피드
+         다수결로 합의된 최상위 반환·outlier(글리치) 폐기 — KRX-poison(KRX 단일 글리치)과 NXT
+         자기일관 전체오염(task#96)을 둘 다 잡는다(어떤 단일 피드 글리치도 다수를 못 이김).
+      ③ 키움 부재/단일(글리치 아닌 outage)·전 피드 합의 불가면 degenerate(±30% self-check)."""
+    if regular:
+        return _kr_pick_regular(ticker, ref_close)
+
+    # regular=False: 독립 피드 다수결. KRX 참조 먼저(기존 호출 순서 보존), 그 다음 NXT 라이브.
+    krx = _kr_basic_kiwoom(ticker, regular=True)
+    nxt = _kr_basic_kiwoom(ticker, regular=False)
+    kfeeds = [f for f in ((0, "키움NXT", nxt), (3, "키움KRX", krx)) if f[2] and f[2][0]]
+
+    if len(kfeeds) < 2:
+        # 키움 부재/단일 = 불일치 아님(outage). 다수결 미적용, 기존 lazy 체인.
+        return _kr_pick_degenerate_lazy(ticker, nxt, krx)
+
+    pick = _corroborated_pick(kfeeds)
+    if pick:
+        return pick[2]  # NXT≈KRX 합의 → 최상위(NXT), 평소 경로(2콜, KIS/Naver 미호출)
+
+    # NXT≠KRX 불일치(글리치): KIS+Naver escalate → 다수결로 outlier 폐기
+    feeds = list(kfeeds)
+    for rank, src, basic in ((1, "KIS", _kr_basic_kis(ticker)), (2, "Naver", _kr_basic_naver(ticker))):
+        if basic and basic[0]:
+            feeds.append((rank, src, basic))
+    pick = _corroborated_pick(feeds)
+    if pick:
+        outliers = [f[1] for f in feeds if not (0.5 <= f[2][0] / pick[2][0] <= 2.0)]
+        print(f"[quote] {ticker}: 피드 발산 — {pick[1]} {pick[2][0]} 채택(다수결), outlier {outliers} 폐기")
+        return pick[2]
+
+    # 4피드도 합의 불가: degenerate self-check
+    return _kr_pick_degenerate_lazy(ticker, nxt, krx)
 
 
 def get_quote_kr(ticker: str, exchange: str = "KS", regular: bool = False) -> dict:

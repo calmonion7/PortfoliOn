@@ -104,10 +104,10 @@ def test_get_quote_kr_kis_to_naver_when_kis_also_fails():
     assert q["name"] == "최종폴백"
 
 
-# ── 발산 가드: 시세가 일봉 종가와 2배 넘게 어긋나면 그 소스 폐기 (task#93) ──
+# ── 발산 가드: 단일 피드 글리치는 다수결로 폐기 (task#93·98) ──
 def test_guard_discards_diverging_source_and_falls_back():
-    # 키움 NXT가 일봉(354k)의 ~1/5인 70k 반환 → 폐기, Naver(354k)로 폴백.
-    # KRX(regular=True)는 글리치 시에도 깨끗(354k)이라 교차검증이 Naver를 폐기하지 않는다.
+    # 키움 NXT 70k 글리치·KRX 354k 정상 → 불일치 → Naver(354k) escalate →
+    # KRX≈Naver 다수결 → NXT 70k outlier 폐기, 합의값(354k) 반환.
     kiwoom_norm = {"price": 70000.0, "daily_change_pct": -2.0, "prev_close": 71000,
                    "market_cap": 4000 * 10**8, "name": "삼성전자"}
     krx_norm = {"price": 354000.0, "daily_change_pct": -2.34, "prev_close": 362500,
@@ -145,8 +145,9 @@ def test_guard_allows_price_within_range_and_short_circuits():
     naver_call.assert_not_called()
 
 
-def test_guard_disabled_without_chart_reference():
-    # 일봉 참조 없음(키움 차트 실패) → 가드 생략, 키움 값 그대로(기존 동작 보존)
+def test_guard_keeps_value_when_nxt_krx_agree():
+    # NXT≈KRX 둘 다 70k 합의(get_quote mock이 regular 무시·동일값) → 다수결 trusted → 70k 유지,
+    # KIS/Naver 미호출. (일봉 ref_close는 regular=False 가드에서 빠졌으므로 차트 유무 무관 — task#98)
     kiwoom_norm = {"price": 70000.0, "daily_change_pct": -2.0, "prev_close": 71000,
                    "market_cap": 4000 * 10**8, "name": "삼성전자"}
     with _patch_yf(), \
@@ -157,27 +158,29 @@ def test_guard_disabled_without_chart_reference():
          patch("services.market.kr._naver_get") as naver_call:
         from services import market
         q = market.get_quote_kr("005930")
-    assert q["price"] == 70000.0           # 참조 없으면 검증 불가 → 폐기 안 함
+    assert q["price"] == 70000.0           # NXT≈KRX 합의 → 유지
     kis_call.assert_not_called()
     naver_call.assert_not_called()
 
 
-# ── 전일종가 ±30% 가드 (KR 일일 가격제한폭, task#94) ──
-def test_guard_30pct_catches_what_2x_misses():
-    # 현재가 200000: 일봉 354000의 [0.5,2.0]엔 들지만(0.565) 전일종가 362500의 ±30% 밖(0.55) → 폐기
-    kiwoom_norm = {"price": 200000.0, "daily_change_pct": -44.8, "prev_close": 362500,
-                   "market_cap": 1200000 * 10**8, "name": "삼성전자"}
+# ── degenerate ±30% self-check: 키움 단일 글리치 → Naver 폴백 (task#94 floor, task#98) ──
+def test_majority_degenerate_30pct_discards_single_glitch():
+    # 키움 단일(NXT만, KRX 부재) + NXT가 전일종가 362500의 ±30% 밖(200000/362500=0.55) →
+    # 합의 가능한 2피드 없음(outage) → degenerate lazy 체인이 ±30%로 NXT 폐기 → Naver로 폴백.
+    def kiwoom_side(ticker, regular=False):
+        if regular:
+            return None  # KRX 부재
+        return (200000.0, -44.8, 362500, 1200000 * 10**8, "NXT글리치")
     naver_basic = {"closePrice": "354000", "compareToPreviousClosePrice": "-8500",
                    "fluctuationsRatio": "-2.34", "marketValue": "2000000", "stockName": "삼성전자"}
     with _patch_yf(), \
-         patch("services.market.kr._kr_closes_kiwoom", return_value=[350000.0, 354000.0]), \
          patch("services.kiwoom.client.configured", return_value=True), \
-         patch("services.kiwoom.quote.get_quote", return_value=kiwoom_norm), \
+         patch("services.market.kr._kr_basic_kiwoom", side_effect=kiwoom_side), \
          patch("services.kis.client.configured", return_value=False), \
          patch("services.market.kr._naver_get", return_value=naver_basic):
         from services import market
         q = market.get_quote_kr("005930")
-    assert q["price"] == 354000.0          # 전일종가 ±30% 밖 → Naver로 폴백
+    assert q["price"] == 354000.0          # 전일종가 ±30% 밖 NXT 폐기 → Naver로 폴백
 
 
 def test_guard_keeps_legal_limit_down_move():
@@ -225,36 +228,100 @@ def test_get_quote_kr_default_keeps_nxt():
     assert kc.call_args.kwargs.get("regular") is False
 
 
-# ── 독립 KRX 교차검증: 자기일관적 _AL 전체오염 차단 (.forge/adr/0020, task#96) ──
-def test_price_sane_krx_crosscheck():
-    from services.market.kr import _price_sane
-    # 자기일관 NXT 글리치: price 70k·prev 71k(①통과)·NXT일봉 70k(②통과) → KRX 354k(③)가 잡음
-    assert _price_sane(70000, 71000, 70000, krx_close=354000) is False
-    # KRX 참조 없으면 ③ 생략 → ①②만, 자기일관이라 통과(블라인드 — 기존 동작)
-    assert _price_sane(70000, 71000, 70000, krx_close=None) is True
-    # 정상: NXT 350.5k vs KRX 354k → ③ 통과(정상 ~1% 괴리는 false-reject 안 함)
-    assert _price_sane(350500, 350000, 350500, krx_close=354000) is True
+# ── 독립 피드 2-of-N 다수결: 단일 참조 글리치 면역 (.forge/adr/0020, task#96·98) ──
+def _basic(price, name="X"):
+    return (price, None, None, None, name)
 
 
-def test_guard_krx_crosscheck_catches_self_consistent_al_glitch():
-    # _AL 전체오염: NXT quote·prev·일봉(ref) 모두 70k → ①② 블라인드. KRX 354k가 ③로 잡고,
-    # KIS 미설정·Naver는 글리치 ref(70k) 대비 ②로 폐기 → 깨끗한 KRX 참조를 반환.
+def test_corroborated_pick_two_feeds_agree_returns_top_priority():
+    from services.market.kr import _corroborated_pick
+    # NXT(rank0) 350.5k ≈ KRX(rank3) 354k (2x 내) → 합의 → 최상위(NXT) 반환
+    pick = _corroborated_pick([(0, "NXT", _basic(350500)), (3, "KRX", _basic(354000))])
+    assert pick is not None and pick[1] == "NXT"
+
+
+def test_corroborated_pick_single_feed_none():
+    from services.market.kr import _corroborated_pick
+    assert _corroborated_pick([(0, "NXT", _basic(350000))]) is None  # 합의할 다른 피드 없음
+
+
+def test_corroborated_pick_outlier_excluded():
+    from services.market.kr import _corroborated_pick
+    # NXT 70k(outlier)·KRX 354k·Naver 350k → KRX≈Naver 합의, 둘 중 최상위(Naver rank2)
+    pick = _corroborated_pick([(0, "NXT", _basic(70000)), (3, "KRX", _basic(354000)),
+                               (2, "Naver", _basic(350000))])
+    assert pick is not None and pick[1] == "Naver"
+
+
+def test_corroborated_pick_all_disagree_none():
+    from services.market.kr import _corroborated_pick
+    # 100·300·900 — 모든 쌍이 2x 밖 → 합의 없음
+    assert _corroborated_pick([(0, "a", _basic(100)), (1, "b", _basic(300)),
+                               (2, "c", _basic(900))]) is None
+
+
+def test_corroborated_pick_boundary_2x():
+    from services.market.kr import _corroborated_pick
+    assert _corroborated_pick([(0, "a", _basic(100)), (1, "b", _basic(200))]) is not None  # 정확히 2.0x → 합의
+    assert _corroborated_pick([(0, "a", _basic(100)), (1, "b", _basic(201))]) is None       # 2.01x → 미합의
+
+
+def test_majority_normal_consensus_lazy():
+    # 평소 NXT≈KRX 합의 → NXT 반환, Naver/KIS 미호출(lazy, 2콜 유지)
     def kiwoom_side(ticker, regular=False):
-        if regular:
-            return (354000.0, -2.34, 362500, 2000000 * 10**8, "삼성전자")        # KRX 깨끗
-        return (70000.0, -2.0, 71000, 4000 * 10**8, "삼성전자_NXT글리치")          # NXT 자기일관 글리치
-    naver_basic = {"closePrice": "354000", "compareToPreviousClosePrice": "-8500",
-                   "fluctuationsRatio": "-2.34", "marketValue": "2000000", "stockName": "삼성전자_네이버"}
+        return (354000.0, -2.34, 362500, 2000000 * 10**8, "삼성KRX") if regular \
+            else (350500.0, 0.10, 350000, 2000000 * 10**8, "삼성NXT")
     with _patch_yf(), \
          patch("services.kiwoom.client.configured", return_value=True), \
          patch("services.market.kr._kr_basic_kiwoom", side_effect=kiwoom_side), \
-         patch("services.market.kr._kr_closes_kiwoom", return_value=[70000.0, 70000.0]), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[349000.0, 350500.0]), \
+         patch("services.kis.quote.get_quote_kr") as kis_call, \
+         patch("services.market.kr._naver_get") as naver_call:
+        from services import market
+        q = market.get_quote_kr("005930")
+    assert q["price"] == 350500.0          # NXT(최상위) 반환
+    naver_call.assert_not_called()         # 합의했으므로 escalate 안 함
+    kis_call.assert_not_called()
+
+
+def test_majority_krx_poison_keeps_nxt():
+    # KRX-poison: KRX 70k 글리치·NXT 350k 정상 → 불일치 → Naver 350k escalate →
+    # NXT≈Naver 다수결 → NXT 350k 반환, KRX 70k outlier 폐기 (task#96 KRX-poison 잔존 해소)
+    def kiwoom_side(ticker, regular=False):
+        return (70000.0, -2.0, 71000, 4000 * 10**8, "KRX글리치") if regular \
+            else (350000.0, -1.4, 355000, 2000000 * 10**8, "삼성NXT")
+    naver_basic = {"closePrice": "350000", "compareToPreviousClosePrice": "-5000",
+                   "fluctuationsRatio": "-1.4", "marketValue": "2000000", "stockName": "삼성네이버"}
+    with _patch_yf(), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.market.kr._kr_basic_kiwoom", side_effect=kiwoom_side), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[349000.0, 350000.0]), \
          patch("services.kis.client.configured", return_value=False), \
          patch("services.market.kr._naver_get", return_value=naver_basic):
         from services import market
         q = market.get_quote_kr("005930")
-    assert q["price"] == 354000.0      # NXT 70k 폐기 → 깨끗한 KRX 참조
-    assert q["name"] == "삼성전자"      # krx_ref 반환(네이버/NXT 글리치 아님)
+    assert q["price"] == 350000.0          # NXT 유지(다수결), KRX 70k 폐기
+    assert q["name"] == "삼성NXT"
+
+
+def test_majority_nxt_pollution_discards_nxt():
+    # NXT 자기일관 전체오염: NXT 70k 글리치·KRX 350k 정상 → 불일치 → Naver 350k escalate →
+    # KRX≈Naver 다수결 → NXT 70k 폐기, non-NXT 350k 반환 (task#96 전체오염 차단을 다수결로)
+    def kiwoom_side(ticker, regular=False):
+        return (350000.0, -1.4, 355000, 2000000 * 10**8, "삼성KRX") if regular \
+            else (70000.0, -2.0, 71000, 4000 * 10**8, "NXT글리치")
+    naver_basic = {"closePrice": "350000", "compareToPreviousClosePrice": "-5000",
+                   "fluctuationsRatio": "-1.4", "marketValue": "2000000", "stockName": "삼성네이버"}
+    with _patch_yf(), \
+         patch("services.kiwoom.client.configured", return_value=True), \
+         patch("services.market.kr._kr_basic_kiwoom", side_effect=kiwoom_side), \
+         patch("services.market.kr._kr_closes_kiwoom", return_value=[349000.0, 350000.0]), \
+         patch("services.kis.client.configured", return_value=False), \
+         patch("services.market.kr._naver_get", return_value=naver_basic):
+        from services import market
+        q = market.get_quote_kr("005930")
+    assert q["price"] == 350000.0          # NXT 70k 폐기 → non-NXT 합의값
+    assert q["name"] != "NXT글리치"         # 글리치 NXT 아님(Naver/KRX 합의)
 
 
 def test_get_quote_kr_regular_skips_krx_crosscheck():
