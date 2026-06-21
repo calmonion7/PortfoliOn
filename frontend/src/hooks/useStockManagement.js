@@ -4,7 +4,7 @@ import api from '../api'
 // Reports.jsx의 종목 관리(추가/편집/삭제/승격) 핸들러·모달 state 추출 (R4 part 2/2, ADR-0019).
 // 종목관리가 리서치 뷰로 흡수된(ADR-0018) 그 핸들러들의 재배치. 데이터 훅을 다시 호출하지 않고
 // 부모가 받은 값(map·fetcher·toast·activeTab)을 args로 받는다. 동작·시각·API 무변경.
-export default function useStockManagement({ holdingMap, watchMap, fetchList, fetchAll, showToast, activeTab, setActiveTab }) {
+export default function useStockManagement({ holdingMap, watchMap, fetchList, fetchAll, showToast, activeTab, setActiveTab, refreshOthers }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)        // { ...stock, isWatch }
   const [addMode, setAddMode] = useState('holding')    // 'holding' | 'watchlist'
@@ -69,6 +69,19 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
     }
   }
 
+  // 그외(타 사용자) 종목 — 관리자 전용. 전 사용자 user_stocks에서 제거(스냅샷 유지). is_mine=false일 때만 노출.
+  const handleGlobalDelete = async (ticker) => {
+    if (!window.confirm(`${ticker}를 모든 사용자의 보유·관심 목록에서 제거합니다. 리포트 데이터는 유지됩니다. 계속하시겠습니까?`)) return
+    try {
+      const { data } = await api.delete(`/api/admin/stocks/${ticker}`)
+      setMutError(''); refreshAfterMutation(); refreshOthers?.()
+      showToast(`${ticker} 삭제됐습니다 (${data.deleted}건)`)
+    } catch (err) {
+      const errMsg = err.response?.data?.detail || '삭제 실패'
+      setMutError(errMsg); showToast(errMsg, 'error')
+    }
+  }
+
   const handlePromote = async ({ quantity, avg_cost }) => {
     try {
       await api.post(`/api/watchlist/${promoteTarget.ticker}/promote`, { quantity, avg_cost })
@@ -99,7 +112,7 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
     addMode,
     promoteTarget, setPromoteTarget,
     mutError,
-    handleSave, handleDelete, handlePromote, openEdit, openAdd,
+    handleSave, handleDelete, handleGlobalDelete, handlePromote, openEdit, openAdd,
     pollReportGeneration, refreshAfterMutation,
   }
 }

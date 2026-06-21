@@ -251,6 +251,17 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 { "ok": true, "updated": 2 }
 ```
 
+### `DELETE /api/admin/stocks/{ticker}`
+
+관리자 전용. 한 종목을 **모든 사용자**의 보유·관심(`user_stocks`)에서 제거한다. 리서치 리포트 "그외" 탭(`scope=all` + `is_mine=false`, 다른 사용자가 담았으나 관리자 본인은 안 담은 종목)의 정리용. 스냅샷(리포트 데이터)은 건드리지 않아 보이지 않는 고아로 남는다. 없는 종목이어도 `200`(idempotent, `deleted: 0`).
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Response `200`**
+```json
+{ "deleted": 2, "ticker": "AAPL" }
+```
+
 ---
 
 ## Portfolio (보유종목)

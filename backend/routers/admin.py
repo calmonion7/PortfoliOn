@@ -5,6 +5,7 @@ from typing import Dict, List
 
 from auth import require_admin
 from services.db import query, execute
+from services import cache as cache_svc
 
 ALL_MENUS = ["portfolio", "research", "market", "guru", "settings"]
 
@@ -98,6 +99,15 @@ def delete_user(user_id: str, admin_id: str = Depends(require_admin)):
         execute(f"DELETE FROM {table} WHERE {col} = %s", (user_id,))
     execute("DELETE FROM users WHERE id = %s", (user_id,))
     return {"ok": True}
+
+
+@router.delete("/stocks/{ticker}")
+def delete_stock_all_users(ticker: str, admin_id: str = Depends(require_admin)):
+    """관리자: 한 종목을 모든 사용자의 보유·관심(user_stocks)에서 제거. 스냅샷은 유지."""
+    deleted = execute("DELETE FROM user_stocks WHERE UPPER(ticker) = %s", (ticker.upper(),))
+    cache_svc.invalidate_portfolio_caches()
+    cache_svc.invalidate_list()
+    return {"deleted": deleted, "ticker": ticker.upper()}
 
 
 @router.put("/default-permissions")

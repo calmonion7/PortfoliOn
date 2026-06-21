@@ -87,8 +87,8 @@ export default function Reports() {
     addMode,
     promoteTarget, setPromoteTarget,
     mutError,
-    handleSave, handleDelete, handlePromote, openEdit, openAdd,
-  } = useStockManagement({ holdingMap, watchMap, fetchList, fetchAll, showToast, activeTab, setActiveTab })
+    handleSave, handleDelete, handleGlobalDelete, handlePromote, openEdit, openAdd,
+  } = useStockManagement({ holdingMap, watchMap, fetchList, fetchAll, showToast, activeTab, setActiveTab, refreshOthers: () => setOthersData(null) })
 
   useEffect(() => {
     if (activeTab !== 'others' || !isAdmin || othersData !== null) return
@@ -182,6 +182,7 @@ export default function Reports() {
               generateOne={generateOne}
               openEdit={openEdit}
               handleDelete={handleDelete}
+              handleGlobalDelete={handleGlobalDelete}
               setPromoteTarget={setPromoteTarget}
             />
           ))}
@@ -230,6 +231,7 @@ export default function Reports() {
                       generateOne={generateOne}
                       openEdit={openEdit}
                       handleDelete={handleDelete}
+                      handleGlobalDelete={handleGlobalDelete}
                       setPromoteTarget={setPromoteTarget}
                     />
                   ))}

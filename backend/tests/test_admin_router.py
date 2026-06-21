@@ -106,3 +106,32 @@ def test_analytics_user_history():
         resp = client.get("/api/admin/analytics/users/user-1")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
+
+
+# --- Global stock delete (admin force-remove across ALL users) ---
+def test_delete_stock_all_users_removes_across_users():
+    with patch("routers.admin.execute", return_value=2) as mock_exec:
+        resp = client.delete("/api/admin/stocks/aapl")
+    assert resp.status_code == 200
+    assert resp.json() == {"deleted": 2, "ticker": "AAPL"}
+    sql, params = mock_exec.call_args.args
+    # 전 사용자 대상이어야 한다 — 소유자(user_id) 필터가 없어야 보유·관심 모든 행이 지워진다
+    assert "user_stocks" in sql and "user_id" not in sql
+    assert params == ("AAPL",)
+
+
+def test_delete_stock_all_users_missing_is_idempotent():
+    with patch("routers.admin.execute", return_value=0):
+        resp = client.delete("/api/admin/stocks/ZZZZ")
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == 0
+
+
+def test_delete_stock_all_users_blocked_for_non_admin():
+    no_admin_app = FastAPI()
+    no_admin_app.include_router(router)
+    no_admin_app.dependency_overrides[get_current_user] = lambda: "user-1"
+    c = TestClient(no_admin_app)
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        resp = c.delete("/api/admin/stocks/AAPL")
+    assert resp.status_code == 403
