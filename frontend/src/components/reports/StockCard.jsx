@@ -1,6 +1,7 @@
 import { fmtPrice as fmt } from '../../utils'
-import { fmt as fmtNum, Pencil } from '../ui/icons'
+import { fmt as fmtNum } from '../ui/icons'
 import { fmtN, rsiColor, overallWeather } from './reportUtils.jsx'
+import StockActions from './StockActions.jsx'
 
 export default function StockCard({
   ticker, info, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
@@ -94,19 +95,11 @@ export default function StockCard({
             </div>
           )
         })()}
-        {(info.category === 'holdings' || info.category === 'watchlist') && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-            {info.is_mine === false ? (
-              <button className="sc-act-btn" style={touchStyle} title="전체 삭제" onClick={e => { e.stopPropagation(); handleGlobalDelete(ticker) }}>×</button>
-            ) : (<>
-              <button className="sc-act-btn" style={touchStyle} title="수정" onClick={e => { e.stopPropagation(); openEdit(ticker, info.category) }}><Pencil /></button>
-              {info.category === 'watchlist' && (
-                <button className="sc-act-btn" style={touchStyle} title="보유로 이동" onClick={e => { e.stopPropagation(); setPromoteTarget({ ticker, market: market || 'US' }) }}>↑</button>
-              )}
-              <button className="sc-act-btn" style={touchStyle} title="삭제" onClick={e => { e.stopPropagation(); handleDelete(ticker, info.category === 'watchlist') }}>×</button>
-            </>)}
-          </div>
-        )}
+        <StockActions
+          info={info} ticker={ticker} market={market} touchStyle={touchStyle}
+          openEdit={openEdit} handleDelete={handleDelete} handleGlobalDelete={handleGlobalDelete}
+          setPromoteTarget={setPromoteTarget} layout="card"
+        />
       </div>
 
       {/* 가격 / POC */}
