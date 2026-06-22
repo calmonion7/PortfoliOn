@@ -123,7 +123,8 @@ cd backend && .venv/bin/python -m pytest
 - **Cloudflare Tunnel**: portfolion.taebro.com → localhost:80 (cloudflared는 compose 컨테이너가 아니라 launchd로 실행)
 - **launchd 자동실행**: cloudflared + docker compose
 - **환경변수**: `backend/.env.docker` (POSTGRES_PASSWORD, JWT_SECRET, SESSION_SECRET, OAuth, FRED_API_KEY, KOFIA_API_KEY), `.env` (루트, docker-compose 보간용)
-- **배포**: `git push origin main` 시 자동 배포됨. `docker compose build` / `docker compose up` 수동 재빌드 절대 하지 말 것.
+- **배포**: `git push origin main` 시 자동 배포됨(GitHub Actions 러너 + 폴러 폴백). `docker compose build` / `docker compose up` 같은 *ad-hoc* 재빌드는 하지 말 것.
+- **⚠️ 이 메인 체크아웃에서 직접 commit→push하면 폴러가 백엔드를 배포하지 않는다 (task#104)**: 폴러는 `origin/main`이 **로컬 HEAD보다 앞설 때만** `deploy.sh`를 돌린다. 그런데 이 배포 체크아웃(`/Users/calmonion/Project/PortfoliOn`) 안에서 commit하면 로컬 HEAD가 함께 전진 → push 후 `LOCAL==origin/main` → 폴러는 "up to date"로 **스킵** → `deploy.sh`가 영영 안 돈다(러너 webhook이 안 받으면 폴백도 없음). **프론트는** nginx가 `frontend/dist`를 직접 서빙해 `npm run build`로 즉시 라이브지만, **백엔드 변경은 컨테이너 rebuild가 필요**하므로 commit/push만으론 **6/20처럼 옛 코드가 계속 돈다**(NaN-500·KR 시세 가드 등 백엔드 수정이 안 먹는 증상). → **백엔드 변경 후엔 정식 배포 스크립트 `bash deploy.sh`를 1회 수동 실행**(working tree로 백엔드 이미지 rebuild+컨테이너 교체 — 이건 금지된 ad-hoc `docker compose`가 아니라 러너/폴러가 부르는 그 스크립트다). 배포 누락 의심 시 `tail ~/Library/Logs/com.portfolion.auto-deploy-poll.log`(마지막 실제 배포 시각) + cold 엔드포인트 프로브 타이밍으로 확인.
 - **⚠️ 자동 배포 폴러 (작업 시 주의)**: launchd `com.portfolion.auto-deploy-poll`이 2분마다 `scripts/auto-deploy-poll.sh`를 돌려 `origin/main`이 로컬 HEAD보다 앞서면 `git reset --hard origin/main` 후 배포한다. → 메인 체크아웃에서 **커밋 안 한(또는 push 안 해 로컬이 origin보다 앞선) tracked 편집은 다음 폴(≤2분)에 소실**된다. 코드 변경은 **commit과 `git push origin main`을 묶어 즉시** 반영할 것. `.forge/` 등 untracked 파일은 `reset --hard` 대상이 아니라 안전.
 
 ## Key Files
