@@ -176,6 +176,9 @@ def _mock_kr(quote_name: str):
         }),
         "services.report_generator.indicators.get_volume_profile": MagicMock(return_value={}),
         "services.report_generator.scraper.get_news": MagicMock(return_value=[]),
+        # 박제-시 독립피드 게이트(task#101)가 KR에서 _kr_basic_naver를 호출하므로, quote(70k)와
+        # 일관된 독립 참조를 mock해 게이트를 통과시킨다(이 테스트는 이름 해석 검증, 글리치 무관).
+        "services.market.kr._kr_basic_naver": MagicMock(return_value=(70000.0, 0.0, 70000.0, 0, "삼성전자")),
     }
 
 

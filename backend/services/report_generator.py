@@ -178,6 +178,26 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         detail = quote.get("error", "")
         raise ValueError(f"주가 데이터 없음{': ' + detail if detail else ''}")
 
+    # 박제-시 독립피드 게이트(KR, .forge/adr/0020 보완): 리포트는 regular=True(KRX)라 NXT `_AL`
+    # 글리치엔 노출 안 되지만, KRX 두 TR(quote·일봉)이 함께 일시 글리치하는 자기일관 오염엔
+    # 면역이 아니다(같은 KRX 피드라 서로 합의해 동일피드 교차검증·_price_sane 블라인드, task#101).
+    # KRX와 독립인 네이버 현재가로 price·일봉 기준종가를 2x 교차검증해, 어긋나면 글리치로 보고
+    # 그 종목 박제를 스킵한다(직전 양호 스냅샷 유지, wrong<missing). 네이버 부재면 검증 생략.
+    if market == "KR":
+        try:
+            from services.market.kr import _kr_basic_naver
+            _ref = _kr_basic_naver(ticker)
+            ref_price = _ref[0] if _ref and _ref[0] else None
+        except Exception:
+            ref_price = None
+        if ref_price and ref_price > 0:
+            daily_last = round(float(daily_df["Close"].iloc[-1]), 2) if not daily_df.empty else None
+            for _label, _val in (("price", summary["price"]), ("일봉종가", daily_last)):
+                if _val and not (0.5 <= _val / ref_price <= 2.0):
+                    raise ValueError(
+                        f"KRX 시세 글리치 의심: {_label} {_val} vs 독립(네이버) {ref_price} 2x 밖 — "
+                        f"박제 스킵(직전 스냅샷 유지, .forge/adr/0020, task#101)")
+
     sanitized = _sanitize(summary)
     json_path = output_dir / f"{today}.json"
     json_path.write_text(json.dumps(sanitized, ensure_ascii=False, indent=2), encoding="utf-8")
