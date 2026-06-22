@@ -4,6 +4,7 @@ from typing import Optional, List, Any
 from services import storage
 from services.db import query
 import re
+import sys
 import json
 import requests as http_requests
 import yfinance as yf
@@ -445,11 +446,45 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "avg_dividend_yield": avg_yield,
         }
 
+    def _minimal_card(stock: dict, quote: dict) -> dict:
+        """enrichment 실패 시 폴백 카드 — 기본 식별/보유 정보 + quote 시세만, 나머지 None.
+        holdings=N이면 그리드도 N을 보장(빈 그리드 금지, task#102). 지표/배당은 폴링·재fetch가 채운다."""
+        return {
+            "ticker": stock["ticker"].upper(), "name": stock.get("name", stock["ticker"]),
+            "market": stock.get("market", "US"), "exchange": stock.get("exchange", ""),
+            "avg_cost": stock.get("avg_cost"), "quantity": stock.get("quantity"),
+            "current_price": quote.get("price"),
+            "daily_change_pct": quote.get("daily_change_pct"),
+            "weekly_change_pct": quote.get("weekly_change_pct"),
+            "monthly_change_pct": quote.get("monthly_change_pct"),
+            "rsi": None, "poc": None, "vah": None, "val": None, "hvn": [],
+            "target_mean": None, "buy": None, "hold": None, "sell": None,
+            "snapshot_date": None, "sector": "기타",
+            "annual_dividend_per_share": None, "dividend_yield": None,
+            "yield_on_cost": None, "expected_annual_income": None,
+            "supply": None, "insider": None,
+        }
+
     def _build_all():
-        quotes = market.get_quotes_batch(holdings)
+        # 일괄시세 실패도 카드 빌드를 막지 않는다 — 시세 없이 빌드(price None, 폴링이 채움).
+        try:
+            quotes = market.get_quotes_batch(holdings)
+        except Exception as e:
+            print(f"[dashboard] 일괄시세 실패 — 시세 없이 카드 빌드: {e}", file=sys.stderr)
+            quotes = {}
+
+        # 카드당 graceful — 한 종목 enrichment(snapshot/consensus/배당/수급/내부자 등)가 throw해도
+        # 그 카드만 최소카드로 폴백하고 전체 500-to-empty를 막는다. holdings=N → 항상 N카드(task#102).
+        def _safe(stock: dict) -> dict:
+            q = quotes.get(stock["ticker"].upper(), {})
+            try:
+                return _build_card(stock, q)
+            except Exception as e:
+                print(f"[dashboard] {stock.get('ticker')} 카드 빌드 실패 — 최소카드 폴백: {e}", file=sys.stderr)
+                return _minimal_card(stock, q)
+
         with ThreadPoolExecutor(max_workers=min(len(holdings), 10)) as executor:
-            cards = list(executor.map(
-                lambda s: _build_card(s, quotes.get(s["ticker"].upper(), {})), holdings))
+            cards = list(executor.map(_safe, holdings))
         return {"holdings": cards, "totals": _portfolio_totals(cards)}
 
     return cache_svc.get_dashboard(user_id, _build_all)

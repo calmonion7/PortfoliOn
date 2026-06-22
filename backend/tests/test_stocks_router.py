@@ -524,3 +524,79 @@ def test_latest_snapshots_db_error_falls_back_all():
         result = _latest_snapshots(["AAPL", "MSFT"])
     assert set(result.keys()) == {"AAPL", "MSFT"}
     assert mock_single.call_count == 2
+
+
+# ── 대시보드 graceful 빌드: holdings=N → 항상 N카드, 500-to-empty 금지 (task#102) ──
+def _dash_portfolio(n=1):
+    stocks = [{"ticker": f"AAA{i}", "name": f"종목{i}", "market": "US",
+               "avg_cost": 100.0 + i, "quantity": 10 + i, "exchange": ""} for i in range(n)]
+    return {"stocks": stocks, "watchlist": []}
+
+
+def _dash_quotes(n=1):
+    return {f"AAA{i}": {"ticker": f"AAA{i}", "price": 185.2 + i, "daily_change_pct": 1.4,
+                        "weekly_change_pct": 2.1, "monthly_change_pct": 5.8} for i in range(n)}
+
+
+def test_dashboard_card_build_failure_yields_minimal_card_not_500():
+    """카드당 enrichment(get_dividend) throw → 500 아님, 최소카드(price는 quote서 보존)."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=_dash_portfolio(1)), \
+         patch("routers.stocks.market.get_quotes_batch", return_value=_dash_quotes(1)), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.query", return_value=[]), \
+         patch("routers.stocks.dividends.get_dividend", side_effect=RuntimeError("cold dep")):
+        resp = client.get("/api/stocks/dashboard")
+    assert resp.status_code == 200
+    cards = resp.json()["holdings"]
+    assert len(cards) == 1                          # holdings=1 → 1카드(빈 그리드 아님)
+    assert cards[0]["ticker"] == "AAA0"
+    assert cards[0]["current_price"] == 185.2       # 최소카드도 quote price 보존
+    assert cards[0]["annual_dividend_per_share"] is None  # 실패한 enrichment는 None
+
+
+def test_dashboard_all_cards_fail_still_returns_n_cards():
+    """모든 카드 enrichment throw → 여전히 N카드(holdings 수만큼), 500 아님."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=_dash_portfolio(3)), \
+         patch("routers.stocks.market.get_quotes_batch", return_value=_dash_quotes(3)), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.query", return_value=[]), \
+         patch("routers.stocks.dividends.get_dividend", side_effect=RuntimeError("cold dep")):
+        resp = client.get("/api/stocks/dashboard")
+    assert resp.status_code == 200
+    assert len(resp.json()["holdings"]) == 3
+
+
+def test_dashboard_quotes_batch_failure_still_returns_cards():
+    """get_quotes_batch 자체 throw → 500 아님, N카드(price None, 폴링이 채움)."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=_dash_portfolio(2)), \
+         patch("routers.stocks.market.get_quotes_batch", side_effect=RuntimeError("cold batch")), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.query", return_value=[]), \
+         patch("routers.stocks.dividends.get_dividend", return_value=None):
+        resp = client.get("/api/stocks/dashboard")
+    assert resp.status_code == 200
+    cards = resp.json()["holdings"]
+    assert len(cards) == 2
+    assert all(c["current_price"] is None for c in cards)   # 시세배치 실패 → price None, 카드는 존재
+
+
+def test_dashboard_empty_holdings_still_empty():
+    """holdings=[] → {holdings:[], totals:None} (기존 동작 보존, 무회귀)."""
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    with patch("routers.stocks.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}):
+        resp = client.get("/api/stocks/dashboard")
+    assert resp.status_code == 200
+    assert resp.json() == {"holdings": [], "totals": None}

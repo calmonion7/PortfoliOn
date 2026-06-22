@@ -46,9 +46,14 @@ const DividendSummary = ({ totals }) => {
   )
 }
 
-const DashboardGrid = ({ cards, totals, loading, tick }) => {
+const DashboardGrid = ({ cards, totals, loading, tick, hasHoldings }) => {
   if (loading) return <Skeleton variant="card" count={6} />
-  if (!cards.length) return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유 종목이 없습니다. 리서치 탭에서 종목을 추가해 보세요.</p>
+  // 헤더 N ↔ 그리드 빈 모순 제거(task#102): 보유 종목이 있는데 카드가 비면(빌드 실패/재시도 중)
+  // "없음"이 아니라 Skeleton을 보인다. 진짜 빈상태는 보유 0일 때만.
+  if (!cards.length) {
+    if (hasHoldings) return <Skeleton variant="card" count={6} />
+    return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유 종목이 없습니다. 리서치 탭에서 종목을 추가해 보세요.</p>
+  }
   return (
     <>
       <DividendSummary totals={totals} />
@@ -66,12 +71,14 @@ export default function Portfolio() {
 
   const { stocks, watchlist, dashboardCards, dashboardTotals, dashboardLoading, fx, priceTick, lastUpdated, fetchDashboard } = usePortfolioData()
 
-  const dashHealedRef = useRef(false)
+  const dashHealTriesRef = useRef(0)
   useEffect(() => { fetchDashboard() }, [fetchDashboard])   // 마운트 시(dash가 기본탭) 그리드 fetch
   useEffect(() => {
-    if (!dashboardLoading && dashboardCards.length === 0 && stocks.length > 0 && !dashHealedRef.current) {
-      dashHealedRef.current = true
-      fetchDashboard({ invalidate: true })                 // 헤더 N인데 그리드 빈 = stale 캐시 → 1회 self-heal
+    // 헤더 N인데 그리드 빈 = 첫 fetch가 일시 실패(콜드 빌드 throw 등, task#102) → bounded 재시도.
+    // one-shot이 아니라 최대 3회 — 콜드 실패에 한 방 헛쓰고 포기하던 회귀(재네비 전까지 stuck) 차단.
+    if (!dashboardLoading && dashboardCards.length === 0 && stocks.length > 0 && dashHealTriesRef.current < 3) {
+      dashHealTriesRef.current += 1
+      fetchDashboard({ invalidate: true })
     }
   }, [dashboardLoading, dashboardCards.length, stocks.length, fetchDashboard])
 
@@ -124,7 +131,7 @@ export default function Portfolio() {
 
       {tab === 'dash' && (
         <div style={{ padding: '0 20px 100px' }}>
-          <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} />
+          <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} hasHoldings={stocks.length > 0} />
         </div>
       )}
 
@@ -220,7 +227,7 @@ export default function Portfolio() {
       </div>
 
       {/* 대시보드 탭 */}
-      {tab === 'dash' && <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} />}
+      {tab === 'dash' && <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} hasHoldings={stocks.length > 0} />}
 
       {tab === 'analysis' && (
         <div>
