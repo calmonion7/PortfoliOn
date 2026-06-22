@@ -1,85 +1,142 @@
 ---
-last_mapped_commit: f835958b49b4a4d7ce30254fd610ed6362462311
+last_mapped_commit: b6193c3837f4125a41930c36a2b3ae2ef198dc3c
 mapped: 2026-06-22
 ---
 
 # TESTING
 
-PortfoliOn 테스트 프레임워크·구조·모킹·커버리지 관찰 기록.
+PortfoliOn 테스트 전략. 백엔드는 pytest + 무거운 `unittest.mock.patch`, 프론트는 vitest + Testing Library. 모든 사실은 실제 파일/실행 결과에서 확인됨.
 
-## Framework & 실행
+## Backend — pytest
 
-- **pytest** (`backend/requirements.txt`: `pytest>=7.4.0`, `httpx>=0.25.0`).
-- 설정은 `backend/pytest.ini`:
-  ```
-  [pytest]
-  testpaths = tests
-  pythonpath = .
-  ```
-  `pythonpath = .`로 `from main import app`, `from services import ...`, `from routers.report import router`가 모듈 루트 기준으로 동작.
-- 실행 명령 (macOS): `cd backend && .venv/bin/python -m pytest` (CLAUDE.md / 프로젝트 노트). 현재 약 863개 테스트 통과.
-- 테스트 디렉터리: `backend/tests/` — `test_*.py` 77개 파일 + `__init__.py` + `conftest.py` + `fixtures/`.
-- **프론트엔드 단위 테스트 프레임워크 없음.** UAT는 Playwright 디바이스 에뮬레이션으로 수행(테스트계정 `test@portfolion.com` / `test1234`, 격리 하니스 `vite uat.html`) — MEMORY.md `reference-frontend-uat.md`.
+### 실행
 
-## conftest.py — 공유 fixture
+```bash
+cd backend && .venv/bin/python -m pytest
+```
+
+- 테스트 디렉터리: `backend/tests/` (약 70개 파일)
+- **876 tests collected** (`pytest --collect-only -q` 기준, b6193c3 시점)
+- `backend/tests/conftest.py`가 `sys.path.insert(0, ...)`로 backend 루트를 path에 추가하고 `from main import app`을 import
+
+### conftest.py 공통 픽스처
 
 `backend/tests/conftest.py`:
-- `sys.path.insert(0, ...)`로 backend 루트를 path에 추가.
-- `from main import app` + FastAPI 의존성 오버라이드를 모듈 로드 시점에 적용: `app.dependency_overrides[get_current_user] = lambda: "test-user-id"`. 인증을 전역으로 우회.
-- `client` fixture: `TestClient(app)` 반환 (`fastapi.testclient`).
-- `_clear_quote_cache` (autouse): 매 테스트 전 `cache_svc.invalidate_quote()` 호출. `get_quote`가 종목 단위 TTL 캐시를 쓰므로 테스트 간 교차 오염 방지.
+- `app.dependency_overrides[get_current_user] = lambda: "test-user-id"` — 인증 우회(모듈 레벨, 전역)
+- `client` 픽스처: `TestClient(app)`
+- `_clear_quote_cache` (autouse): 매 테스트 전 `cache_svc.invalidate_quote()` — `get_quote`의 종목 단위 TTL 캐시가 테스트 간 교차 오염되는 것을 방지
 
-## 모킹 — `unittest.mock.patch` 중심
+### 라우터 테스트 — mini-app + dependency_overrides
 
-대부분의 테스트가 `from unittest.mock import patch, MagicMock`을 쓰고, `with patch(...)` 컨텍스트 매니저를 중첩(`\` 줄바꿈)해 외부 의존성을 차단한다.
+라우터 단위 테스트는 별도 `FastAPI()` 인스턴스에 해당 라우터만 마운트하고 인증을 오버라이드. 예: `backend/tests/test_stocks_router.py`
 
-### Patch 대상 = import된 위치
+```python
+app = FastAPI()
+app.include_router(router)
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
+client = TestClient(app)
+```
 
-- DB 헬퍼는 **사용처 모듈 경로**로 패치: `patch("services.storage.portfolio.query", ...)` (`test_storage.py:5-13`), `patch("routers.report.query", ...)` (`test_report_router.py:52`), `patch("services.consensus.query", ...)`. `services.db.query`가 아니라 import한 네임스페이스를 패치.
-- `side_effect`로 호출 순서별 다른 반환값: `patch("routers.report.query", side_effect=[date_rows, summary_rows])` — 같은 함수의 1·2번째 호출에 서로 다른 데이터 (`test_report_router.py:52,104`). 호출 시퀀스가 늘어나면 `call_args_list[i].kwargs`로 호출별 단언(additive read gotcha, CLAUDE.md).
-- 캐시는 함수를 통과시키는 패치: `patch("routers.report.cache_svc.get_list", side_effect=lambda f: f())`로 캐시 래퍼가 빌더를 그대로 호출하게 함 (`test_report_router.py:56`). 인메모리 캐시 dict 자체를 패치하기도: `patch("routers.report.cache_svc._snapshots", {})`, `patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0})` (`test_report_router.py:124-125`).
-- 스토리지 함수도 라우터 네임스페이스로 패치: `patch("routers.report.storage.get_full_portfolio", return_value=...)`.
+라우터 내부 의존성은 import 경로로 patch: `patch("routers.stocks.storage.get_full_portfolio", ...)`, `patch("routers.stocks.market.get_quotes_batch", ...)`, `patch("routers.stocks.query", return_value=[])`, `patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent"))`(파일 폴백 차단).
 
-### 라우터 테스트 — 의존성 오버라이드
+### 무거운 `unittest.mock.patch`
 
-- 일부 라우터 테스트는 `conftest`의 전역 client 대신 **로컬 FastAPI 앱**을 만들어 인증을 직접 오버라이드: `app = FastAPI(); app.include_router(router)`에 `app.dependency_overrides[require_admin] = lambda: "test-user-id"` 등을 붙이고 `TestClient(app)` (`test_report_router.py:24-30`).
-- 403 경로 테스트는 `require_admin` 오버라이드를 **뺀 별도 앱**(`_nonadmin_app`/`_nonadmin_client`)을 만들고 `patch("auth.auth_service.get_user_by_id", return_value={"role": "user"})`로 비관리자 시뮬레이션 (`test_report_router.py:314-340`).
-- 백그라운드 워커의 `job_runs.record` 계측이 테스트 DB를 건드리지 않게 autouse fixture로 no-op `@contextmanager` 주입: `_stub_job_runs` (`monkeypatch.setattr(job_runs, "record", _noop)`, `test_report_router.py:12-21`).
+외부 I/O(yfinance/키움/KIS/Naver/DART/DB)는 전부 patch로 차단. 동시에 여러 소스를 패치하는 `with patch(...), patch(...), ...` 스택이 표준.
 
-### KR quote 테스트 — `_patch_yf()` + `regular`-aware `side_effect`
+- `mock.assert_called_once()` / `mock.assert_not_called()`로 호출/미호출(lazy short-circuit, 폴백 미발화)을 단언
+- 호출 시퀀스 단언은 `mock.call_args_list`로 인덱싱(additive 호출이 끼면 `call_args`(마지막)는 깨짐 — CLAUDE.md gotcha). 예: `test_market_kr.py:test_get_quote_kr_default_fetches_krx_ref`가 `[c.kwargs.get("regular") for c in kb.call_args_list] == [True, False]`로 단언
+- `call_count`로 콜 수 고정: `assert kb.call_count == 2`
 
-`backend/tests/test_market_kr.py` — `get_quote_kr` 다중소스 폴백/발산가드 검증.
-- `_patch_yf()` 헬퍼 (`test_market_kr.py:6-11`): yfinance 보강 블록이 네트워크를 타지 않게 빈 히스토리로 mock. `MagicMock()`에 `m.history.return_value = pd.DataFrame({"Close": []})`, `m.info = {}`를 세팅하고 `patch("services.market.yf.Ticker", return_value=m)` 반환. 거의 모든 테스트가 `with _patch_yf(), ...`로 시작.
-- 소스 어댑터를 사용처 경로로 patch: `patch("services.kiwoom.client.configured", return_value=True)`, `patch("services.kiwoom.quote.get_quote", ...)`, `patch("services.kis.client.configured", ...)`, `patch("services.kis.quote.get_quote_kr", ...)`, `patch("services.market.kr._naver_get", ...)`.
-- **`regular`-aware `side_effect`** 패턴: 키움 quote가 정규장(KRX)/NXT 두 코드로 다른 값을 반환하는 걸 모사하기 위해 인자에 `regular`를 받는 side_effect 함수를 정의:
-  ```python
-  def kq_side(ticker, regular=False):
-      return krx_norm if regular else kiwoom_norm
-  patch("services.kiwoom.quote.get_quote", side_effect=kq_side)
-  ```
-  (`test_market_kr.py:117-122`). `_kr_basic_kiwoom` 레벨에서 patch할 때도 동일: `def kiwoom_side(ticker, regular=False): ... patch("services.market.kr._kr_basic_kiwoom", side_effect=kiwoom_side)` (`test_market_kr.py:170-178,270-276,290-297,310-317`).
-- 일봉 참조 mock: `patch("services.market.kr._kr_closes_kiwoom", return_value=[350000.0, 352000.0, 354000.0])` (`test_market_kr.py:120,136,191`).
-- 호출 시퀀스/횟수 단언: `kis_call.assert_called_once()`, `naver_call.assert_not_called()` (lazy short-circuit 검증, `:71-72,87-88`), `kb.call_count == 1` / `== 2` (`:337,350`), `kb.call_args.kwargs.get("regular") is True` (regular 전파 검증, `:214-215`), `regulars = [c.kwargs.get("regular") for c in kb.call_args_list]` (호출별 인자, `:351-352`).
-- 순수 함수는 직접 import해 단위 테스트: `from services.market.kr import _corroborated_pick` 후 입력 리스트로 다수결 로직 검증 (`test_market_kr.py:236-266`), 헬퍼 `_basic(price, name="X")`로 튜플 생성 (`:232-233`).
+### `regular`-aware side_effect mock — KR 시세 테스트
 
-### Storage / 서비스 단위 테스트
+키움 quote가 `regular` 플래그에 따라 KRX/NXT 다른 값을 반환하는 것을 `side_effect` 클로저로 모킹. `backend/tests/test_market_kr.py`:
 
-- 서비스 함수를 직접 import 후 DB 헬퍼만 patch: `from services import storage; with patch("services.storage.portfolio.query", return_value=[...]): storage.get_watchlist_tickers(...)` (`test_storage.py:4-15`). 쓰기 검증은 `with patch("services.storage.schedule.execute") as ex:` 후 `ex.call_args.args[0]`로 SQL 단언 (`test_storage.py:65-70`).
+```python
+def kq_side(ticker, regular=False):
+    return krx_norm if regular else kiwoom_norm
+... patch("services.kiwoom.quote.get_quote", side_effect=kq_side)
+```
 
-## Fixtures (HTML 등 데이터)
+또는 `_kr_basic_kiwoom` 레벨에서 직접 side_effect:
 
-- `backend/tests/fixtures/backlog/` — DART `document.xml` 표 HTML fixture (`<ticker>.html`). 파일 첫 줄 주석에서 단위(`조원|억원|...`)를 정규식으로 추출 (`test_backlog_extract.py:19-26`).
-- **로컬 `.venv`에 `lxml` 없음** (확인됨: `backend/.venv/.../site-packages`에 lxml 미설치; `requirements.txt`/Docker엔 있음). 따라서 로컬 pytest로 도는 HTML 파싱 테스트는 `BeautifulSoup(html, "html.parser")`(stdlib)를 쓴다 — `BeautifulSoup(html, "lxml")` 아님 (`test_backlog_extract.py:25`, CLAUDE.md gotcha).
-- 파일 시스템 폴백 경로 테스트는 pytest `tmp_path` fixture + `patch("routers.report.SNAPSHOTS_DIR", tmp_path)`로 디렉터리 주입 (`test_report_router.py:116-160`).
+```python
+def kiwoom_side(ticker, regular=False):
+    return (354000.0, ...) if regular else (350500.0, ...)
+... patch("services.market.kr._kr_basic_kiwoom", side_effect=kiwoom_side)
+```
 
-## 커버리지 — 무엇을 테스트하나
+이로써 다수결 시나리오(NXT≈KRX 합의, KRX-poison, NXT 전체오염, 단일 글리치 degenerate)를 분기별로 검증. `_corroborated_pick`은 순수 함수라 직접 호출 단위테스트도 있음(`test_corroborated_pick_*`).
 
-테스트 파일은 라우터·서비스·배치·스케줄러를 폭넓게 커버 (`backend/tests/` 77개). 대표:
-- 라우터: `test_report_router.py`, `test_stocks_router.py`, `test_watchlist_router.py`, `test_portfolio_router.py`, `test_admin_router.py`, `test_analysis_router.py`, `test_analytics_router.py`, `test_batch_endpoints.py`, `test_rankings_router.py`, `test_events_router.py`, `test_guru_router.py`, `test_digest_router.py`, `test_calendar_router.py`, `test_consensus_router.py`, `test_investor_router.py`.
-- 시세/시장: `test_market_kr.py`, `test_market.py`, `test_market_us_kis.py`, `test_market_indicators.py`, `test_market_cache.py`, `test_market_history_routing.py`, `test_macro_signals.py`.
-- 외부 어댑터: `test_kiwoom_quote.py`, `test_kiwoom_chart.py`, `test_kiwoom_investor.py`, `test_kiwoom_sector.py`, `test_kis_client.py`, `test_kis_quote.py`.
-- 도메인 서비스: `test_storage.py`, `test_backlog.py`, `test_backlog_extract.py`, `test_disclosures.py`, `test_dividends.py`, `test_insider_trades.py`, `test_consensus_asof.py`, `test_leverage_service.py`, `test_ranking_service.py`, `test_kr_sector_*.py`, `test_recommendation_*.py` (다수).
-- 배치/스케줄러/계측: `test_batch_market_split.py`, `test_batch_resilience.py`, `test_job_runs.py`, `test_job_runs_instrumentation.py`, `test_scheduler_*.py`, `test_macro_signals_batch.py`, `test_disclosure_batch.py`.
-- 인증/검증/캐시: `test_auth.py`, `test_auth_me.py`, `test_ticker_validation.py`, `test_cache.py`, `test_schedule_spec.py`.
+### `_patch_yf()` 헬퍼 — yfinance 보강 블록 차단
 
-테스트 스타일: 한국어 docstring/주석으로 의도와 근거(ADR 번호, task 번호)를 남기는 것이 일반적 (`test_market_kr.py`, `test_report_router.py` 전반). 단언은 동작(반환 dict의 키/값)과 호출 시퀀스(`call_count`, `assert_not_called`) 양쪽을 검증.
+`backend/tests/test_market_kr.py:_patch_yf()`:
+
+```python
+def _patch_yf():
+    m = MagicMock()
+    m.history.return_value = pd.DataFrame({"Close": []})
+    m.info = {}
+    return patch("services.market.yf.Ticker", return_value=m)
+```
+
+`get_quote_kr`는 키움 변동률 실패 시 yfinance(sector/industry 보강)로 폴백하므로, KR 시세 테스트는 항상 `with _patch_yf(), ...`로 감싸 네트워크를 타지 않게 함.
+
+### cache-invalidation-in-test 패턴
+
+대시보드/시세는 TTL/LRU 캐시를 쓰므로 테스트 본문에서 명시적으로 캐시 무효화. 약 24곳에서 사용:
+
+```python
+import services.cache as cache_svc
+cache_svc.invalidate_dashboard()
+```
+
+대시보드 테스트(`test_stocks_router.py`의 `test_dashboard_*`) 다수가 본문 첫 줄에서 호출. conftest의 autouse `invalidate_quote()`와 별개로, dashboard 캐시는 테스트가 직접 비워야 결과가 격리됨.
+
+### reload × direct-import patch footgun
+
+모듈을 `importlib.reload`로 다시 로드하는 테스트가 다수 존재(`test_market.py`, `test_report_generator.py`, `test_report_price_gate.py`). reload 시 모듈의 re-import 바인딩은 새 객체로 교체되므로, **patch 대상은 re-import 사이트가 아니라 source 모듈이어야 함**.
+
+- `test_report_price_gate.py:_run`: `with contextlib.ExitStack()`으로 patch들을 enter한 **상태에서** `importlib.reload(report_generator)` 호출 → reload가 patch된 source를 다시 바인딩하게 함
+- DB 쓰기 단언은 source인 `"services.db.execute"`를 patch (re-import 바인딩 `services.report_generator.something` 아님), 그 mock에 `.assert_not_called()` / `.assert_called()`
+- 외부 fetch는 re-import 사이트(`"services.report_generator.mkt.get_quote"` 등)를 patch — report_generator가 그 이름으로 호출하기 때문
+- `test_market.py`의 `get_financials`/`get_analyst_data`/`get_quote` 테스트들도 `import importlib; importlib.reload(market)`를 patch 컨텍스트 안에서 호출
+
+핵심: **patch는 호출이 실제로 일어나는 이름에 걸고, reload는 patch가 활성인 동안 수행**해야 한다. `services.market`은 패키지(`services/market/__init__.py`)가 `services.market.kr`/`us`를 re-export하므로, KR 헬퍼는 source인 `services.market.kr._kr_basic_naver` 등을 patch.
+
+### local `.venv`에 `lxml` 없음 → `html.parser`
+
+`lxml`은 `requirements.txt`/Docker엔 있으나 로컬 `backend/.venv`엔 없음. HTML 파싱은 stdlib `BeautifulSoup(html, "html.parser")` 사용(로컬·프로덕션 양쪽 동작):
+
+- `services/backlog_parser.py`(주석 "document.xml 원문은 XML이지만 html.parser로 파싱하므로(lxml 로컬 미설치)"), `services/scraper.py`, `services/guru_scraper.py`, `services/market_indicators/earnings.py`
+- 테스트 `tests/test_backlog_extract.py`도 `BeautifulSoup(html, "html.parser")`
+
+### Notable 테스트 파일
+
+- `test_market_kr.py` — KR 시세 다수결 가드(`regular`-aware side_effect, `_patch_yf`, `_corroborated_pick` 순수함수, 키움→KIS→Naver 폴백 체인, 합법 하한가 false-reject 방지)
+- `test_api_doc_sync.py` — API 문서 ↔ 라이브 라우터 drift 자동검출. `app.routes`(데코레이터 파싱 아님)에서 `(method, path)` 집합을 만들고 `API_SPEC.md`/`CLAUDE_COWORK_API.md`의 `### `METHOD /path`` 헤더와 exact-match 비교. path param은 `{}`로 정규화. `KNOWN_UNDOCUMENTED = frozenset()`(현재 0). 새 엔드포인트를 문서 없이 추가하면 즉시 실패
+- `test_report_price_gate.py` — bake-time independent-feed gate(reload+ExitStack patch, `services.db.execute` 미저장 단언, KRX 자기일관 글리치 스킵, US 미적용)
+- `test_stocks_router.py` — 대시보드 graceful 빌드(holdings=N→N카드, 카드 실패→최소카드 폴백, 일괄시세 실패→price None, KRW 환산 totals, `_latest_snapshots` 배치 헬퍼)
+
+## Frontend — vitest
+
+### 실행
+
+```bash
+cd frontend && npm test   # = vitest run
+```
+
+- **31 tests passed (3 files)** (b6193c3 시점, `vitest run` 실행 확인)
+- 설정: `frontend/vite.config.js`의 `test` 블록 — `environment: 'jsdom'`, `setupFiles: './src/test/setup.js'`
+- `frontend/src/test/setup.js`: `import '@testing-library/jest-dom'`
+- devDependencies: `vitest ^4.1.9`, `@testing-library/react ^16.3.2`, `@testing-library/jest-dom ^6.9.1`, `jsdom ^29.1.1`
+
+### 패턴 — 훅 characterization 테스트
+
+테스트는 주로 추출된 커스텀 훅을 `renderHook`/`act`로 검증. 컴포넌트 렌더 단위테스트보다 로직 훅 단위테스트가 중심.
+
+- `frontend/src/hooks/useReportFilters.test.js` — `import { describe, it, expect } from 'vitest'` + `import { renderHook, act } from '@testing-library/react'`. 정렬/필터/서브탭 분기를 fixture 데이터로 characterize. 의존 술어(`_targetPct`, `_hasWarning`)를 테스트가 미러해 주입
+- `frontend/src/hooks/useStockManagement.test.js`
+- `frontend/src/test/smoke.test.js`
+
+(과거 메모는 "프론트 단위테스트 프레임워크 없음 / UAT는 Playwright 디바이스 에뮬레이션"이라 기록했으나, 현재는 vitest가 도입돼 훅 단위테스트가 존재함. Playwright 기반 라이브 UAT는 별개 트랙으로 병행.)
