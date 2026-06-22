@@ -43,34 +43,10 @@ def _doc_endpoints(filename: str) -> set:
     return out
 
 
-# 미문서화 라이브 엔드포인트의 동결 베이스라인(task#99 시점, 23개). exact-match로 단언하므로:
-#  - 새 엔드포인트를 문서 없이 추가 → 집합이 커져 test_api_spec_documents_all_live_endpoints 실패(drift 포착).
-#  - 갭 하나를 API_SPEC.md에 문서화 → 여기서도 제거해야 통과(allowlist self-maintaining, 부패 방지).
-KNOWN_UNDOCUMENTED = frozenset({
-    ("DELETE", "/api/admin/users/{}"),
-    ("GET", "/api/admin/analytics/events"),
-    ("GET", "/api/admin/analytics/summary"),
-    ("GET", "/api/admin/analytics/users"),
-    ("GET", "/api/admin/analytics/users/{}"),
-    ("GET", "/api/admin/default-permissions"),
-    ("PUT", "/api/admin/default-permissions"),
-    ("GET", "/api/auth/oauth/token"),
-    ("GET", "/api/investor/screening"),
-    ("POST", "/api/investor/refresh"),
-    ("GET", "/api/market/lending"),
-    ("POST", "/api/market/lending/sync"),
-    ("GET", "/api/market/leverage"),
-    ("GET", "/api/market/leverage/coverage"),
-    ("GET", "/api/market/leverage/backfill/progress"),
-    ("POST", "/api/market/leverage/backfill"),
-    ("GET", "/api/portfolio/prices"),
-    ("GET", "/api/rankings"),
-    ("POST", "/api/rankings/refresh"),
-    ("GET", "/api/stocks/{}/investor-trend"),
-    ("GET", "/api/stocks/{}/news"),
-    ("POST", "/api/digest/generate-all"),
-    ("POST", "/api/events"),
-})
+# 미문서화 라이브 엔드포인트의 동결 베이스라인. task#100에서 23개 전수 문서화 완료 → 0.
+# exact-match로 단언하므로 새 엔드포인트를 문서 없이 추가하면 집합이 커져 즉시 실패(drift 포착).
+# 미문서 엔드포인트가 생기면(의도적 유예) 여기 추가, 문서화하면 제거(self-maintaining).
+KNOWN_UNDOCUMENTED = frozenset()
 
 
 def test_api_spec_documents_all_live_endpoints():

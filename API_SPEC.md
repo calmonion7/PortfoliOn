@@ -24,6 +24,9 @@
 - [Analytics (분석)](#analytics-분석)
 - [Analysis (포트폴리오 분석)](#analysis-포트폴리오-분석)
 - [Recommendations (종목 추천·발굴)](#recommendations-종목-추천발굴)
+- [Rankings](#rankings)
+- [Investor (수급 스크리닝)](#investor-수급-스크리닝)
+- [Events (행동 로그)](#events-행동-로그)
 - [공통 스키마](#공통-스키마)
 - [공통 에러 응답](#공통-에러-응답)
 
@@ -170,6 +173,30 @@ GitHub OAuth 로그인 시작. GitHub 로그인 페이지로 리다이렉트.
 
 GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트.
 
+
+### `GET /api/auth/oauth/token`
+
+OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 토큰으로 교환한다. 콜백이 토큰을 임시 저장하고 `?oauth=<code>`로 리다이렉트하면, 프론트가 이 엔드포인트로 code를 보내 access/refresh 토큰을 받아간다(code는 1회 소비).
+
+**Auth:** 불필요
+
+**Request** — query parameters
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| `code` | string | yes | OAuth 콜백이 발급한 일회성 교환 코드 |
+
+**Response `200`**
+```json
+{
+  "access_token": "<jwt>",
+  "refresh_token": "<token>",
+  "token_type": "bearer"
+}
+```
+
+**Error `400`** — Invalid or expired OAuth code
+
 ---
 
 ## Admin (관리자)
@@ -260,6 +287,156 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 **Response `200`**
 ```json
 { "deleted": 2, "ticker": "AAPL" }
+```
+
+
+### `DELETE /api/admin/users/{user_id}`
+
+관리자 전용. 특정 사용자를 삭제한다. 삭제 전 `user_stocks`·`user_menu_permissions`·`refresh_tokens`·`digests`·`calendar_cache`의 연관 행을 먼저 제거한 뒤 `users` 행을 삭제한다. 어드민 계정(`403`)·소셜 로그인 계정(`403`)은 삭제할 수 없고, 존재하지 않는 사용자는 `404`.
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Request**
+
+**Path Parameter:** `user_id` — 사용자 UUID
+
+**Response `200`**
+```json
+{ "ok": true }
+```
+
+### `GET /api/admin/analytics/events`
+
+관리자 전용. 지정 기간(`days`) 동안의 일자별·이벤트명별 발생 건수 집계를 날짜 내림차순으로 반환한다(`user_events` 기반).
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Request**
+
+| Query | Type | Default | 설명 |
+|-------|------|---------|------|
+| `days` | int | `7` | 집계 기간(일). `9999` 이상이면 전체 기간 |
+
+**Response `200`**
+```json
+[
+  {
+    "date": "2026-06-20",
+    "event_name": "page_view",
+    "count": 42
+  }
+]
+```
+
+### `GET /api/admin/analytics/summary`
+
+관리자 전용. 지정 기간(`days`) 동안의 활성 사용자 수(DAU=고유 user_id), 총 이벤트 수, 상위 이벤트 10종을 요약 반환한다(`user_events` 기반).
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Request**
+
+| Query | Type | Default | 설명 |
+|-------|------|---------|------|
+| `days` | int | `7` | 집계 기간(일). `9999` 이상이면 전체 기간 |
+
+**Response `200`**
+```json
+{
+  "dau": 12,
+  "total_events": 350,
+  "top_events": [
+    { "name": "page_view", "count": 120 }
+  ]
+}
+```
+
+### `GET /api/admin/analytics/users`
+
+관리자 전용. 이벤트를 발생시킨 사용자별 총 이벤트 수와 마지막 활동 시각을 총 이벤트 수 내림차순으로 반환한다(`user_events` ⋈ `users`).
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Response `200`**
+```json
+[
+  {
+    "user_id": "uuid",
+    "email": "user@example.com",
+    "total_events": 87,
+    "last_active": "2026-06-21T08:30:00+00:00"
+  }
+]
+```
+
+### `GET /api/admin/analytics/users/{user_id}`
+
+관리자 전용. 특정 사용자의 최근 이벤트 이력을 시각 내림차순으로 반환한다(최대 `limit`건). `properties`는 이벤트 저장 시의 JSON 페이로드를 그대로 담는다.
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Request**
+
+**Path Parameter:** `user_id` — 사용자 UUID
+
+| Query | Type | Default | 설명 |
+|-------|------|---------|------|
+| `limit` | int | `200` | 반환 이벤트 최대 건수 |
+
+**Response `200`**
+```json
+[
+  {
+    "event_name": "page_view",
+    "properties": { "path": "/portfolio" },
+    "created_at": "2026-06-21T08:30:00+00:00"
+  }
+]
+```
+
+### `GET /api/admin/default-permissions`
+
+관리자 전용. 신규 사용자에게 적용되는 기본 메뉴 권한을 조회한다(`default_menu_permissions`). 저장된 값이 없는 메뉴는 `false`로 채운다. 메뉴 키: `portfolio`·`research`·`market`·`guru`·`settings`.
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Response `200`**
+```json
+{
+  "portfolio": true,
+  "research": true,
+  "market": false,
+  "guru": false,
+  "settings": false
+}
+```
+
+### `PUT /api/admin/default-permissions`
+
+관리자 전용. 신규 사용자 기본 메뉴 권한을 수정한다(`default_menu_permissions` upsert). `ALL_MENUS`(`portfolio`·`research`·`market`·`guru`·`settings`)에 없는 키는 무시한다. 응답은 전체 메뉴 기준의 갱신 후 권한 맵(미지정 메뉴는 `false`).
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Request Body**
+```json
+{
+  "permissions": {
+    "portfolio": true,
+    "research": true,
+    "market": false
+  }
+}
+```
+
+**Response `200`**
+```json
+{
+  "portfolio": true,
+  "research": true,
+  "market": false,
+  "guru": false,
+  "settings": false
+}
 ```
 
 ---
@@ -382,6 +559,27 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 ```
 
 **Error `404`** — ticker 없음
+
+
+### `GET /api/portfolio/prices`
+
+보유+관심 종목의 라이브 시세(현재가·등락률)를 일괄 조회. 장중 자동폴링 대상이라 user당 15초 캐시로 다중 폴링 레이트리밋을 방어한다.
+
+**Auth:** Bearer token 필요
+
+**Response `200`** — ticker → {현재가, 등락률} 맵
+```json
+{
+  "AAPL": {
+    "current_price": 195.32,
+    "change_pct": 1.24
+  },
+  "005930": {
+    "current_price": 71200,
+    "change_pct": -0.56
+  }
+}
+```
 
 ---
 
@@ -851,6 +1049,64 @@ GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파
 ```json
 { "ok": true }
 ```
+
+
+### `GET /api/stocks/{ticker}/investor-trend`
+
+KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매수, 외국인 보유비율, 종가) 시계열을 조회. `investor_service.read_series` 저장값을 반환한다.
+
+**Auth:** 불필요
+
+**Request** — query parameters
+
+| 파라미터 | 타입 | 기본값 | 설명 |
+|----------|------|--------|------|
+| `days` | int | 252 | 조회 일수 (1~1000) |
+
+**Response `200`**
+```json
+{
+  "ticker": "005930",
+  "items": [
+    {
+      "base_date": "2026-06-20",
+      "foreign_net": 123456,
+      "organ_net": -45678,
+      "individual_net": -77778,
+      "foreign_hold_ratio": 52.34,
+      "close_price": 71200
+    }
+  ]
+}
+```
+
+### `GET /api/stocks/{ticker}/news`
+
+종목 최근 뉴스(최대 5건)를 on-demand 조회. 리포트가 없는 랭킹 종목 등에서 쓰며 `scraper.get_news`를 재사용한다(KR=Naver, US=yfinance). 공개 read.
+
+**Auth:** 불필요
+
+**Request** — query parameters
+
+| 파라미터 | 타입 | 기본값 | 설명 |
+|----------|------|--------|------|
+| `market` | string | `US` | `KR` 또는 `US` (그 외 값은 400) |
+
+**Response `200`**
+```json
+{
+  "news": [
+    {
+      "title": "종목 관련 기사 제목",
+      "link": "https://...",
+      "publisher": "매체명",
+      "published_at": "2026-06-20 09:22"
+    }
+  ]
+}
+```
+
+**Error `400`** — market이 KR/US가 아님
 
 ---
 
@@ -1527,6 +1783,21 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **Auth:** Bearer token 필요
 
+
+### `POST /api/digest/generate-all`
+
+전체 holding 사용자의 일일 다이제스트를 생성하고 텔레그램으로 전송 (스케줄러 `_run_digest`와 동일 로직의 수동 트리거). `daily_digest` job_run으로 기록된다.
+
+**Auth:** admin 권한 필요 (403 if not admin)
+
+**Response `200`**
+```json
+{
+  "ok": true,
+  "users": 5
+}
+```
+
 ---
 
 ## Market (시장 지표)
@@ -1748,6 +2019,154 @@ FX·VIX·국채·원자재 캐시 초기화 후 yfinance 1년치 재수집.
   "commodities_gold_points": 252
 }
 ```
+
+
+### `GET /api/market/lending`
+
+금융위원회 공공데이터 API에서 적재한 내외국인 대차잔고(대여·차입) 시계열을 반환한다. `market_lending_balance` 테이블의 최근 36개월치를 날짜 오름차순으로 읽으며, 잔고 금액은 백만 단위(`/1_000_000`)로 환산된다. 수급지표 탭 `LendingSection`이 소비한다.
+
+**Auth:** 불필요
+
+**Response `200`**
+```json
+{
+  "history": [
+    {
+      "date": "2026-05-01",
+      "domestic_borrow": 12.34,
+      "foreign_borrow": 56.78,
+      "domestic_lend": 9.01,
+      "foreign_lend": 23.45,
+      "borrow_foreign_ratio": 82.1
+    }
+  ],
+  "latest": {
+    "date": "2026-05-01",
+    "domestic_borrow": 12.34,
+    "foreign_borrow": 56.78,
+    "domestic_lend": 9.01,
+    "foreign_lend": 23.45,
+    "borrow_foreign_ratio": 82.1
+  }
+}
+```
+
+> 적재 데이터가 없으면 `{ "history": [], "latest": null }`을 반환한다.
+
+### `POST /api/market/lending/sync`
+
+금융위원회 대차잔고 API(`GetStocLendBorrInfoService_V2`)에서 전체 페이지를 조회해 `market_lending_balance`에 upsert한다. 실행이력은 `lending_fetch` 배치 id(manual lane)로 기록한다. `KOFIA_API_KEY` 필요.
+
+**Auth:** admin 권한 필요 (403 if not admin)
+
+**Response `200`**
+```json
+{ "ok": true, "rows": 222 }
+```
+
+> `rows`는 upsert한 행 수(API에서 받은 `basDt` 8자리 유효 항목 수).
+
+### `GET /api/market/leverage`
+
+KOFIA 통계 API로 적재한 신용잔고·반대매매·시총 시계열(`market_leverage_indicators`)을 읽어 과열/모멘텀 시그널을 계산해 반환한다. 시그널은 전체 기간 기준으로 계산하고, `history`는 최근 90일만 반환한다(신용잔고는 조 원, 미수금·고객예탁금은 억 원 단위 환산). 수급지표 탭 `LeverageSection`이 소비한다.
+
+**Auth:** 불필요
+
+**Response `200`**
+```json
+{
+  "history": [
+    {
+      "date": "2026-06-19",
+      "kospi_credit": 12.34,
+      "kosdaq_credit": 5.67,
+      "total_credit": 18.01,
+      "credit_ratio": 0.7421,
+      "liquidation_ratio": 3.12,
+      "misu_amt": 1234.5,
+      "customer_deposit": 567890.0
+    }
+  ],
+  "signals": {
+    "credit_ratio_alert": false,
+    "credit_ratio_p90": 0.8123,
+    "margin_call_signal": null,
+    "credit_momentum": "NEUTRAL"
+  },
+  "latest": {
+    "date": "2026-06-19",
+    "kospi_credit": 12.34,
+    "kosdaq_credit": 5.67,
+    "total_credit": 18.01,
+    "credit_ratio": 0.7421,
+    "liquidation_ratio": 3.12,
+    "misu_amt": 1234.5,
+    "customer_deposit": 567890.0
+  }
+}
+```
+
+> `margin_call_signal`은 반대매매 급증 시 `"ALERT"`, 평시 `null`. `credit_momentum`은 `ACCELERATING` \| `DECELERATING` \| `NEUTRAL`. 적재 데이터가 없으면 `history: []`, `latest: null`, 시그널은 기본값을 반환한다.
+
+### `GET /api/market/leverage/coverage`
+
+`market_leverage_indicators`에 적재된 레버리지 데이터의 현황(총 건수, 최소/최대 날짜, 연도별 분포)을 반환한다. 백필 진행 UI(`LeverageBackfillSettings`)가 적재 범위를 표시하는 데 쓴다.
+
+**Auth:** 불필요
+
+**Response `200`**
+```json
+{
+  "total": 1234,
+  "min_date": "2021-01-04",
+  "max_date": "2026-06-19",
+  "by_year": [
+    { "year": 2021, "count": 248, "min": "2021-01-04", "max": "2021-12-30" },
+    { "year": 2022, "count": 246, "min": "2022-01-03", "max": "2022-12-29" }
+  ]
+}
+```
+
+> 적재 데이터가 없으면 `total: 0`, `min_date`/`max_date`는 `null`, `by_year`는 빈 배열.
+
+### `GET /api/market/leverage/backfill/progress`
+
+진행 중(또는 직전)인 레버리지 백필 작업의 진행상황을 반환한다. 백그라운드 백필 태스크가 갱신하는 인메모리 진행 상태(`_backfill_progress`)를 그대로 노출한다.
+
+**Auth:** 불필요
+
+**Response `200`**
+```json
+{
+  "running": true,
+  "done": 2,
+  "total": 6,
+  "current": "2023년",
+  "error": ""
+}
+```
+
+> `total`은 백필 대상 연도(청크) 수, `done`은 완료된 청크 수, `current`는 처리 중 연도(완료 시 `"완료"`). 특정 연도 수집 실패 시 `error`에 `"<연도>: <메시지>"`가 담긴다. 백필을 한 번도 돌리지 않았으면 `running: false`, `done: 0`, `total: 0`, `current`/`error`는 빈 문자열.
+
+### `POST /api/market/leverage/backfill`
+
+지정 연도 범위(`start_year`~`end_year`)의 신용잔고·반대매매·시총을 KOFIA API에서 백그라운드로 백필한다(이미 DB에 있는 날짜는 건너뜀). 즉시 응답하고 작업은 백그라운드로 진행되며, 진행상황은 `GET /api/market/leverage/backfill/progress`로 폴링한다. 실행이력은 `leverage_fetch` 배치 id(manual lane)로 기록한다. `KOFIA_API_KEY` 필요.
+
+**Auth:** admin 권한 필요 (403 if not admin)
+
+**Request**
+
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|---------|------|------|--------|------|
+| `start_year` | int | — | `2021` | 백필 시작 연도 |
+| `end_year` | int | — | `2026` | 백필 종료 연도 |
+
+**Response `200`**
+```json
+{ "ok": true, "start_year": 2021, "end_year": 2026 }
+```
+
+**Error `409`** — 이미 백필이 실행 중(`{"detail": "이미 백필이 실행 중입니다."}`)
 
 ---
 
@@ -2062,6 +2481,144 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 ```
 
 배치 잡 id는 `recommendation_kr`/`recommendation_us`로 `job_runs`에 기록된다.
+
+---
+
+## Rankings
+
+### `GET /api/rankings`
+
+KR/US 시장 랭킹 조회. 배치가 사전계산해 `market_rankings` 테이블에 저장한 값을 읽는다 (요청 경로 라이브 호출 없음). 랭킹 탭이 거래대금·거래량·등락률 상위 종목을 카드 그리드로 표시할 때 사용. 무한스크롤용 `limit`/`offset` 지원.
+
+**Auth:** 불필요
+
+**Request**
+
+| 쿼리 | 타입 | 기본값 | 설명 |
+| --- | --- | --- | --- |
+| `market` | string | `KR` | 시장 (`KR` \| `US`) |
+| `metric` | string | `value` | 랭킹 기준 (`value`=거래대금 \| `volume`=거래량 \| `change`=등락률 상승) |
+| `type` | string | `all` | 종목 유형 필터 (`all` \| `stock` \| `etf`, `is_etf` 기준) |
+| `limit` | int | `20` | 페이지 크기 (1~200) |
+| `offset` | int | `0` | 오프셋 (0 이상) |
+
+허용 외 값은 `400`. (`market` is not KR/US → `market must be KR or US`, `metric` 오류 → `metric must be value, volume, or change`, `type` 오류 → `type must be all, stock, or etf`)
+
+**Response `200`**
+```json
+{
+  "items": [
+    {
+      "rank": 1,
+      "ticker": "005930",
+      "name": "삼성전자",
+      "price": 71000.0,
+      "change_pct": 1.43,
+      "trading_value": 1234567890.0,
+      "trading_volume": 12345678,
+      "market_cap": 423000000000000.0,
+      "is_etf": false,
+      "exchange": "KOSPI"
+    }
+  ],
+  "base_ts": "2026-06-21T16:00:00",
+  "market": "KR",
+  "metric": "value"
+}
+```
+`base_ts`는 데이터 기준 시각 ISO 문자열(데이터 없으면 `null`).
+
+### `POST /api/rankings/refresh`
+
+해당 시장 랭킹을 즉시 재수집해 `market_rankings` 테이블을 교체한다 (KR=키움, US 소스). `job_runs`에 시장별 id(`kr_rankings_fetch`/`us_rankings_fetch`)로 manual 실행 기록.
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Request**
+
+| 쿼리 | 타입 | 기본값 | 설명 |
+| --- | --- | --- | --- |
+| `market` | string | `KR` | 시장 (`KR` \| `US`) |
+
+허용 외 `market`은 `400` (`market must be KR or US`).
+
+**Response `200`**
+```json
+{ "ok": true, "market": "KR" }
+```
+
+---
+
+## Investor (수급 스크리닝)
+
+### `GET /api/investor/screening`
+
+KR 랭킹 universe 종목별 최신 수급(외국인/기관/개인 순매수 + 외국인 보유율)을 외국인 보유율 내림차순으로 조회. 수급 스크리닝 화면이 사용하며, `market_investor_trend` 테이블의 종목별 최신 `base_date` 행을 읽는다. 무한스크롤용 `limit`/`offset` 지원.
+
+**Auth:** 불필요
+
+**Request**
+
+| 쿼리 | 타입 | 기본값 | 설명 |
+| --- | --- | --- | --- |
+| `limit` | int | `50` | 페이지 크기 (1~200) |
+| `offset` | int | `0` | 오프셋 (0 이상) |
+
+**Response `200`**
+```json
+{
+  "items": [
+    {
+      "ticker": "005930",
+      "name": "삼성전자",
+      "base_date": "2026-06-20",
+      "foreign_net": 1234567,
+      "organ_net": -234567,
+      "individual_net": -1000000,
+      "foreign_hold_ratio": 52.34,
+      "close_price": 71000
+    }
+  ],
+  "latest_date": "2026-06-20"
+}
+```
+`latest_date`는 반환 items 중 가장 최근 `base_date`(없으면 `null`). 순매수/종가는 정수, 보유율은 float, 결측은 `null`.
+
+### `POST /api/investor/refresh`
+
+KR 랭킹 종목 수급 추이를 백그라운드로 갱신한다 (스케줄러 `_investor_trend_work` 로직). 즉시 `202`로 응답하고 수집은 BackgroundTask로 비동기 수행하며, `job_runs`에 `investor_trend_fetch` manual로 기록.
+
+**Auth:** admin 권한 필요 (`403` if not admin)
+
+**Response `202`**
+```json
+{ "ok": true }
+```
+
+---
+
+## Events (행동 로그)
+
+### `POST /api/events`
+
+사용자 행동 이벤트를 수집해 `user_events` 테이블에 비동기 저장(BackgroundTask). `event_name`은 화이트리스트(`VALID_EVENTS`)로 검증하며, **허용 외 이벤트는 저장 없이 조용히 `{ "ok": true }` 반환**(에러 아님). 허용 이벤트: `nav_portfolio`, `nav_research`, `nav_market`, `nav_guru`, `nav_settings`, `tab_holdings`, `tab_watch`, `tab_analysis`, `tab_dash`, `tab_reports`, `tab_digest`, `tab_calendar`, `tab_ranking`, `report_view_open`, `report_tab_switch`, `ranking_row_click`, `stock_search`.
+
+**Auth:** Bearer token 필요
+
+**Request Body**
+```json
+{
+  "event_name": "report_view_open",
+  "properties": { "ticker": "005930" }
+}
+```
+`properties`는 선택(기본 `{}`).
+
+**Response `200`**
+```json
+{ "ok": true }
+```
+(화이트리스트 통과 여부와 무관하게 항상 `{ "ok": true }`. 저장은 admin이 `GET /api/admin/analytics`로 집계 조회.)
 
 ---
 
