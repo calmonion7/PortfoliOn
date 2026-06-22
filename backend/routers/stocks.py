@@ -3,8 +3,10 @@ from pydantic import BaseModel
 from typing import Optional, List, Any
 from services import storage
 from services.db import query
+from services.utils import sanitize
 import re
 import sys
+import math
 import json
 import requests as http_requests
 import yfinance as yf
@@ -319,9 +321,12 @@ def _usdkrw_rate() -> "float | None":
     rate = ((stored.get("data") or {}).get("rates") or {}).get("usdkrw") or {}
     cur = rate.get("current")
     try:
-        return float(cur) if cur else None
+        v = float(cur) if cur else None
     except (TypeError, ValueError):
         return None
+    # 비유한(nan/inf)은 None — 안 그러면 _portfolio_totals의 `if fx is None` 가드를 통과해(NaN≠None)
+    # totals가 NaN→응답 직렬화 500(CONCERNS §3, task#104). None이면 US 카드가 totals서 graceful 제외.
+    return v if (v is not None and math.isfinite(v)) else None
 
 
 @router.get("/dashboard")
@@ -485,6 +490,8 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
 
         with ThreadPoolExecutor(max_workers=min(len(holdings), 10)) as executor:
             cards = list(executor.map(_safe, holdings))
-        return {"holdings": cards, "totals": _portfolio_totals(cards)}
+        # NaN/inf는 None으로 — starlette JSONResponse(allow_nan=False)가 응답에 NaN/inf 있으면
+        # 직렬화 500을 내므로(CONCERNS §3, task#104) 외부시세서 흘러든 비유한값을 안전망으로 제거.
+        return sanitize({"holdings": cards, "totals": _portfolio_totals(cards)})
 
     return cache_svc.get_dashboard(user_id, _build_all)

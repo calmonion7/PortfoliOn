@@ -600,3 +600,36 @@ def test_dashboard_empty_holdings_still_empty():
         resp = client.get("/api/stocks/dashboard")
     assert resp.status_code == 200
     assert resp.json() == {"holdings": [], "totals": None}
+
+
+# ── NaN/inf 직렬화 500 방지: holdings=N이면 절대 500 금지 (task#104, CONCERNS §3) ──
+def test_dashboard_nan_fx_does_not_500():
+    """totals에 NaN이 섞여도(FX가 nan) 응답이 500이 아니라 200·NaN 없이 sanitize된다."""
+    import math
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=_dash_portfolio(1)), \
+         patch("routers.stocks.market.get_quotes_batch", return_value=_dash_quotes(1)), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.query", return_value=[]), \
+         patch("routers.stocks.dividends.get_dividend", return_value=None), \
+         patch("routers.stocks._usdkrw_rate", return_value=float("nan")):  # FX nan → US totals nan 유발
+        resp = client.get("/api/stocks/dashboard")
+    assert resp.status_code == 200                       # was 500 (NaN 직렬화)
+    data = resp.json()
+    assert len(data["holdings"]) == 1
+    tv = (data["totals"] or {}).get("total_market_value_krw")
+    assert tv is None or math.isfinite(tv)               # 응답에 NaN 없음(sanitize)
+
+
+def test_usdkrw_rate_non_finite_returns_none():
+    """저장 FX current가 nan/inf면 _usdkrw_rate()는 None(US 카드 totals 제외 → graceful)."""
+    from routers.stocks import _usdkrw_rate
+    nan_fx = {"data": {"rates": {"usdkrw": {"current": float("nan")}}}}
+    with patch("routers.stocks._mc_load", return_value=nan_fx):
+        assert _usdkrw_rate() is None
+    inf_fx = {"data": {"rates": {"usdkrw": {"current": float("inf")}}}}
+    with patch("routers.stocks._mc_load", return_value=inf_fx):
+        assert _usdkrw_rate() is None
