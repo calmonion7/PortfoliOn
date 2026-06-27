@@ -32,6 +32,20 @@ def _to_won(val) -> int | None:
     return int(v * 1e8) if abs(v) < 1e10 else int(v)
 
 
+def _safe_ratio(num, den) -> float | None:
+    """num/den rounded 2dp; None if den falsy/zero/non-finite or result non-finite."""
+    if not den or den == 0:
+        return None
+    try:
+        d = float(den)
+        if not math.isfinite(d) or d == 0:
+            return None
+        result = float(num) / d
+    except (TypeError, ValueError):
+        return None
+    return round(result, 2) if math.isfinite(result) else None
+
+
 def _safe_pct(num, den) -> float | None:
     """num/den*100 rounded 2dp; None if den falsy/zero or result non-finite."""
     # eco: single helper replaces 6 inline divide+guard expressions

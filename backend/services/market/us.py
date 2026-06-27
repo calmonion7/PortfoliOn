@@ -2,7 +2,7 @@ from __future__ import annotations
 import yfinance as yf
 import pandas as pd
 
-from services.market.format import _yf_sym, _yf_val, _safe_pct
+from services.market.format import _yf_sym, _yf_val, _safe_pct, _safe_ratio
 
 
 def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
@@ -16,6 +16,16 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
 
         if stmt is None or stmt.empty:
             return []
+
+        # eco: fetch once, reuse per-column below.
+        # get_cashflow() 메서드는 무공백 라벨(OperatingCashFlow 등)로 stmt와 동일 규칙 —
+        # .cash_flow 프로퍼티는 공백 라벨("Operating Cash Flow")이라 _yf_val 매칭 실패.
+        try:
+            cf = t.get_cashflow(freq='yearly', as_dict=False)
+            if cf is None or cf.empty:
+                cf = None
+        except Exception:
+            cf = None
 
         results = []
         for col in stmt.columns[:4]:
@@ -67,6 +77,29 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
             except Exception:
                 pass
 
+            # FCF & interest coverage (annual only)
+            fcf = interest_coverage = None
+            if cf is not None and col in cf.columns:
+                try:
+                    ocf = _yf_val(cf, "OperatingCashFlow", col)
+                    if ocf is None:
+                        ocf = _yf_val(cf, "CashFlowFromContinuingOperatingActivities", col)
+                    capex = _yf_val(cf, "CapitalExpenditure", col)
+                    if ocf is not None:
+                        # yfinance CapEx is already negative → OCF + CapEx = FCF
+                        fcf_raw = float(ocf) + (float(capex) if capex is not None else 0.0)
+                        # fallback: try 'Free Cash Flow' directly
+                        fcf_direct = _yf_val(cf, "FreeCashFlow", col)
+                        if fcf_direct is not None:
+                            fcf = int(fcf_direct)
+                        elif capex is not None:
+                            fcf = int(fcf_raw)
+                        # else: capex missing, leave None
+                except Exception:
+                    pass
+            interest_exp = _yf_val(stmt, "InterestExpense", col)
+            interest_coverage = _safe_ratio(op_income, interest_exp)
+
             results.append({
                 "period": period_str,
                 "revenue":          int(revenue)   if revenue   is not None else None,
@@ -81,6 +114,8 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                 "quick_ratio":      _safe_pct(
                     (current_assets or 0) - (inventory or 0), current_liabilities
                 ) if current_assets is not None else None,
+                "fcf": fcf,
+                "interest_coverage": interest_coverage,
                 "is_consensus": False,
             })
 

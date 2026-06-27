@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList, ComposedChart, Bar } from 'recharts'
 import { _weather, SectionTitle } from './reportUtils.jsx'
 
 export default function FinancialsChart({ financials, financialsAnnual, market }) {
@@ -93,6 +93,8 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
         op_chg_abs:  op.abs,   op_chg_pct:  op.pct,
         eps_chg_abs: eps.abs,  eps_chg_pct: eps.pct,
         bps_chg_abs: bps.abs,  bps_chg_pct: bps.pct,
+        fcf:      f.fcf      ?? null,
+        coverage: f.interest_coverage ?? null,
       }
     })
   }
@@ -235,7 +237,7 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
     return _weather(3)
   }
 
-  const Section = ({ data, title }) => {
+  const Section = ({ data, title, isAnnual }) => {
     const hasEpsBps = data.some(d => d.eps != null || d.bps != null)
     const hasPerPbr = data.some(d => d.per != null || d.pbr != null)
     const weather = calcFinancialsWeather(data)
@@ -374,6 +376,49 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
             </ResponsiveContainer>
           </div>
         )}
+
+        {/* FCF + 이자보상배율 (연간 전용) */}
+        {isAnnual && data.some(d => d.fcf != null) && (() => {
+          const hasCoverage = data.some(d => d.coverage != null)
+          return (
+            <div style={{ marginTop: 12 }}>
+              <Legend items={[
+                { color: '#7ea8c4', label: 'FCF' },
+                ...(hasCoverage ? [{ color: '#c4a87e', label: '이자보상배율' }] : []),
+              ]} />
+              <ResponsiveContainer width="100%" height={150}>
+                <ComposedChart data={data} margin={chartMargin}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left"  tickFormatter={fmtVal} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+                  {hasCoverage && (
+                    <YAxis yAxisId="right" orientation="right" tickFormatter={v => `${v}x`} tick={axisStyle} axisLine={false} tickLine={false} width={32} />
+                  )}
+                  <Tooltip content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null
+                    return (
+                      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+                        <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+                        {payload.map(p => (
+                          <div key={p.dataKey} style={{ color: p.stroke ?? p.fill, marginBottom: 2 }}>
+                            {p.name}: {p.value != null
+                              ? (p.dataKey === 'coverage' ? `${p.value.toFixed(1)}x` : fmtValFull(p.value))
+                              : '—'}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }} />
+                  <ReferenceLine yAxisId="left" y={0} stroke="var(--border)" />
+                  <Bar dataKey="fcf" yAxisId="left" name="FCF" fill="#7ea8c4" opacity={0.75} radius={[2,2,0,0]} />
+                  {hasCoverage && (
+                    <Line {...lineCfg} dataKey="coverage" yAxisId="right" name="이자보상배율" stroke="#c4a87e" strokeDasharray="5 3" />
+                  )}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )
+        })()}
       </div>
     )
   }
@@ -406,8 +451,8 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
         </div>
       )}
       {activeFin === 'annual'
-        ? <Section data={annualData} title="📈 연간 실적 추이" />
-        : <Section data={quarterData} title="📊 분기 실적 추이" />}
+        ? <Section data={annualData} title="📈 연간 실적 추이" isAnnual={true} />
+        : <Section data={quarterData} title="📊 분기 실적 추이" isAnnual={false} />}
     </>
   )
 }

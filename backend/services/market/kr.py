@@ -1,8 +1,11 @@
 from __future__ import annotations
+import logging
 import yfinance as yf
 import requests
 
-from services.market.format import _norm_sector, _n
+from services.market.format import _norm_sector, _n, _safe_ratio
+
+logger = logging.getLogger(__name__)
 
 _NAVER_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -359,6 +362,33 @@ def get_financials_kr(ticker: str) -> list[dict]:
         return []
 
 
+_DART_BASE = "https://opendart.fss.or.kr/api"
+
+# DART account_id (라이브 확정)
+_DART_OCF   = "ifrs-full_CashFlowsFromUsedInOperatingActivities"
+_DART_CAPEX = "ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"
+_DART_INT   = "ifrs-full_InterestPaidClassifiedAsOperatingActivities"
+_DART_EBIT  = "dart_OperatingIncomeLoss"
+
+
+def _dart_extract_3y(list_data: list) -> dict:
+    """fnlttSinglAcntAll list → {account_id: {0: thstrm_val, -1: frmtrm_val, -2: bfefrmtrm_val}} (원, int).
+    fs_div를 요청에 넣어 받은 응답이라 행에 fs_div 필드가 없다(단일 fs) — 별도 필터 불필요.
+    쉼표 제거 후 int; 결측/빈값 → None."""
+    target = {aid: {} for aid in (_DART_OCF, _DART_CAPEX, _DART_INT, _DART_EBIT)}
+    for row in list_data:
+        aid = row.get("account_id", "")
+        if aid not in target:
+            continue
+        for slot, key in ((0, "thstrm_amount"), (-1, "frmtrm_amount"), (-2, "bfefrmtrm_amount")):
+            raw = (row.get(key) or "").replace(",", "").strip()
+            try:
+                target[aid][slot] = int(raw) if raw and raw not in ("", "-") else None
+            except (ValueError, TypeError):
+                target[aid][slot] = None
+    return target
+
+
 def get_annual_financials_kr(ticker: str) -> list[dict]:
     try:
         d = _naver_get(ticker, "finance/annual")
@@ -399,7 +429,74 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
                 "roe":               round(rv(7, key), 2) if rv(7, key) is not None else None,
                 "debt_ratio":        round(rv(8, key), 2) if rv(8, key) is not None else None,
                 "quick_ratio":       round(rv(9, key), 2) if rv(9, key) is not None else None,
+                "fcf": None,
+                "interest_coverage": None,
             })
+
+        # DART 증강: FCF + 이자보상 (연간 전용)
+        try:
+            import os
+            dart_key = os.environ.get("DART_API_KEY", "")
+            if not dart_key:
+                return results  # early skip — 키 없음
+
+            from services.backlog import _get_corp_code_map
+            corp_code = _get_corp_code_map().get(ticker)
+            if not corp_code:
+                return results
+
+            # 최신 non-consensus 연도를 bsns_year로 사용
+            bsns_year = next(
+                (item["period"] for item in results if not item["is_consensus"]),
+                None
+            )
+            if not bsns_year:
+                return results
+
+            # fnlttSinglAcntAll은 fs_div를 요청 필수값으로 받는다(없으면 status 100).
+            # 연결(CFS) 우선, 없으면(미상장연결 등) 별도(OFS) 폴백.
+            data = None
+            for cand in ("CFS", "OFS"):
+                resp = requests.get(
+                    f"{_DART_BASE}/fnlttSinglAcntAll.json",
+                    params={"crtfc_key": dart_key, "corp_code": corp_code,
+                            "bsns_year": bsns_year, "reprt_code": "11011",
+                            "fs_div": cand},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                d = resp.json()
+                if d.get("status") == "000":
+                    data = d
+                    break
+            if not data:
+                return results
+
+            acc = _dart_extract_3y(data.get("list", []))
+
+            # bsns_year/bsns_year-1/bsns_year-2 → slot 0/-1/-2 매핑
+            year_to_slot = {
+                bsns_year: 0,
+                str(int(bsns_year) - 1): -1,
+                str(int(bsns_year) - 2): -2,
+            }
+
+            for item in results:
+                slot = year_to_slot.get(item["period"])
+                if slot is None:
+                    continue
+                ocf   = acc[_DART_OCF].get(slot)
+                capex = acc[_DART_CAPEX].get(slot)
+                ebit  = acc[_DART_EBIT].get(slot)
+                int_p = acc[_DART_INT].get(slot)
+
+                item["fcf"] = (ocf - capex) if (ocf is not None and capex is not None) else None
+                item["interest_coverage"] = _safe_ratio(ebit, int_p)
+
+        except Exception as e:
+            logger.warning(f"[Financials] DART 현금흐름 증강 실패 ({ticker}): {e}")
+            # 실패해도 Naver 결과만 반환 (graceful)
+
         return results
     except Exception:
         return []
