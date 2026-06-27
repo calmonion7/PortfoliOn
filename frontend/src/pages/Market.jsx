@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import IndexSection from '../components/market/IndexSection'
 import TreasurySection from '../components/market/TreasurySection'
 import FxSection from '../components/market/FxSection'
 import VixSection from '../components/market/VixSection'
@@ -22,6 +23,7 @@ export default function Market() {
       </div>
       {tab === 'market' && (
         <>
+          <IndexSection />
           <TreasurySection />
           <FxSection />
           <VixSection />

@@ -13,6 +13,7 @@ from services.market_indicators import (
     get_commodities,
     get_econ_indicators,
     get_macro_signals,
+    get_indices,
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
@@ -85,6 +86,14 @@ def commodities():
 def econ_indicators():
     try:
         return get_econ_indicators()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/indices")
+def indices():
+    try:
+        return get_indices()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
