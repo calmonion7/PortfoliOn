@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -110,9 +112,12 @@ def get_macro_correlation(holdings: list) -> dict:
                 continue
             p = portfolio_ret.loc[idx]
             md = macro_delta.loc[idx]
-            corr = round(float(p.corr(md)), 3)
+            corr_val = float(p.corr(md))
+            corr = round(corr_val, 3) if math.isfinite(corr_val) else None
             correlations.append({"indicator": m["label"], "ticker": m["ticker"], "corr_90d": corr})
             for dt, mv, pv in zip(idx, md.values, p.values):
+                if not (math.isfinite(float(mv)) and math.isfinite(float(pv))):
+                    continue
                 scatter.append({
                     "date": str(dt.date()),
                     "indicator": m["ticker"],

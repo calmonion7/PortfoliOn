@@ -5,9 +5,12 @@ GET /api/recommendations — 발굴 섹션(글로벌 점수 − 호출자 추적
   "watchlist"/"holdings" 키를 추가만으로 붙인다.
 POST /api/recommendations/refresh — admin, market 쿼리(KR|US) 수동 트리거.
 """
+import math
+
 from fastapi import APIRouter, Query, Depends, BackgroundTasks, HTTPException
 from auth import get_current_user, require_admin
 from services import recommendation, storage, job_runs
+from services.utils import sanitize
 from routers.stocks import _latest_snapshots, _usdkrw_rate  # 저장값 read 헬퍼 재사용(라이브 호출 0)
 import scheduler
 
@@ -104,6 +107,8 @@ def get_recommendations(
 
             try:
                 price_f = float(price) if price is not None else None
+                if price_f is not None and not math.isfinite(price_f):
+                    price_f = None
             except (TypeError, ValueError):
                 price_f = None
             try:
@@ -160,7 +165,8 @@ def get_recommendations(
             })
             holdings.append(item)
 
-    return {"as_of": as_of, "discovery": discovery, "watchlist": watchlist, "holdings": holdings}
+    # NaN/inf 네트(다중 float) — starlette allow_nan=False 직렬화 500 방지 (task#109, CONCERNS §1)
+    return sanitize({"as_of": as_of, "discovery": discovery, "watchlist": watchlist, "holdings": holdings})
 
 
 @router.post("/refresh", status_code=202)
