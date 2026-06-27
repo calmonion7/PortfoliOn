@@ -5,7 +5,6 @@ from services import storage, errors, cache as cache_svc, report_generator, cons
 from services import market as market_svc
 from services.utils import ticker_exists_in, find_ticker, is_valid_ticker
 from services.db import query as db_query
-from routers import calendar as calendar_router
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
@@ -89,7 +88,7 @@ def add_watchlist_stock(stock: WatchlistStock, background_tasks: BackgroundTasks
 
     watchlist.append(stock.ticker.upper())
     storage.save_watchlist_tickers(user_id, watchlist)
-    calendar_router.clear_cache()
+    cache_svc.invalidate_portfolio_caches()
 
     target_date = storage.expected_report_date(stock.market)
     existing = db_query(
@@ -144,7 +143,7 @@ def delete_watchlist_stock(ticker: str, user_id: str = Depends(get_current_user)
         raise errors.not_found(ticker, "watchlist")
 
     storage.save_watchlist_tickers(user_id, [t for t in watchlist if t.upper() != upper])
-    calendar_router.clear_cache()
+    cache_svc.invalidate_portfolio_caches()
 
     return {"deleted": upper}
 

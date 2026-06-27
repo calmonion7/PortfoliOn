@@ -154,8 +154,7 @@ def test_promote_invalidates_dashboard_cache():
              {"ticker": "NVDA", "name": "Nvidia", "market": "US", "exchange": ""}
          ]), \
          patch("routers.watchlist.storage.save_watchlist_tickers"), \
-         patch("routers.watchlist.storage.save_holdings"), \
-         patch("routers.watchlist.calendar_router.clear_cache"):
+         patch("routers.watchlist.storage.save_holdings"):
         resp = client.post("/api/watchlist/NVDA/promote", json={"quantity": 10, "avg_cost": 500.0})
     assert resp.status_code == 200
     mock_cache.invalidate_portfolio_caches.assert_called_once()
@@ -168,7 +167,7 @@ def test_add_watchlist_stock_triggers_report_when_no_snapshot():
          patch("routers.watchlist.storage.save_stocks"), \
          patch("routers.watchlist.storage.save_watchlist_tickers"), \
          patch("routers.watchlist.storage.get_schedule", return_value={}), \
-         patch("routers.watchlist.calendar_router.clear_cache"), \
+         patch("routers.watchlist.cache_svc.invalidate_portfolio_caches"), \
          patch("routers.watchlist.db_query", return_value=[]) as mock_query, \
          patch("routers.watchlist.report_generator.generate_report") as mock_gen:
         resp = client.post("/api/watchlist", json={
@@ -190,7 +189,7 @@ def test_add_watchlist_stock_skips_report_when_snapshot_exists():
          patch("routers.watchlist.storage.save_stocks"), \
          patch("routers.watchlist.storage.save_watchlist_tickers"), \
          patch("routers.watchlist.storage.get_schedule", return_value={}), \
-         patch("routers.watchlist.calendar_router.clear_cache"), \
+         patch("routers.watchlist.cache_svc.invalidate_portfolio_caches"), \
          patch("routers.watchlist.db_query", return_value=[{"ticker": "TSLA", "date": "2026-05-01"}]), \
          patch("routers.watchlist.report_generator.generate_report") as mock_gen:
         resp = client.post("/api/watchlist", json={

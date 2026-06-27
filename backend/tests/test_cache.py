@@ -154,6 +154,17 @@ def test_invalidate_also_clears_correlation():
     assert len(calls) == 2
 
 
+def test_invalidate_portfolio_caches_clears_list():
+    # 종목 변이(추가/삭제/편집·승격·관심) 후 리포트 목록이 stale로 남지 않아야 한다 (task#105)
+    import services.cache as c
+    _clear()
+    calls = []
+    c.get_list(lambda: (calls.append(1), {})[1])
+    c.invalidate_portfolio_caches()
+    c.get_list(lambda: (calls.append(1), {})[1])
+    assert len(calls) == 2
+
+
 # ── 장중 라이브 시세 캐시 (Phase 3 part 1, S1) ──
 
 def test_live_prices_cache_hits_within_ttl_then_invalidates():

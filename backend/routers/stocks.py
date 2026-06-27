@@ -282,7 +282,6 @@ def backfill_names(_: str = Depends(require_admin)):
     reconciled = storage.reconcile_snapshot_names()
     for t in set(updated) | set(reconciled):
         cache_svc.invalidate(t)
-    cache_svc.invalidate_list()
     cache_svc.invalidate_portfolio_caches()
     return {"ok": True, "candidates": len(candidates), "updated": len(updated), "skipped": skipped, "reconciled": len(reconciled)}
 

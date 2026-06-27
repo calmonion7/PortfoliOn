@@ -185,7 +185,7 @@ def test_watchlist_add_us_uses_us_expected_date(monkeypatch):
          patch("routers.watchlist.storage.get_stocks", return_value=[]), \
          patch("routers.watchlist.storage.save_stocks"), \
          patch("routers.watchlist.storage.save_watchlist_tickers"), \
-         patch("routers.watchlist.calendar_router.clear_cache"), \
+         patch("routers.watchlist.cache_svc.invalidate_portfolio_caches"), \
          patch("routers.watchlist.market_svc.resolve_name", return_value="Apple"), \
          patch("routers.watchlist.storage.expected_report_date",
                side_effect=lambda m: "2026-06-12" if m == "KR" else "2026-06-15"), \

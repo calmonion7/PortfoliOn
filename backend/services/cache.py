@@ -135,6 +135,7 @@ def invalidate_live_prices(user_id: str = None) -> None:
 def invalidate_portfolio_caches() -> None:
     from routers import calendar as calendar_router
     calendar_router.clear_cache()
+    invalidate_list()
     invalidate_dashboard()
     invalidate_sector()
     invalidate_macro()
