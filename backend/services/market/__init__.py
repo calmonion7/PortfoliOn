@@ -12,6 +12,7 @@ from services.market.format import (
     _yf_sym,
     _fmt_price,
     _fmt_market_cap,
+    _safe_pct,
 )
 from services.market.kr import (
     _NAVER_HEADERS,
@@ -263,8 +264,8 @@ def get_financials(ticker: str, market: str = "US", exchange: str = "") -> list[
                 per = round(price / (eps * 4), 1)
 
             bps = pbr = None
+            equity = total_liabilities = current_assets = inventory = current_liabilities = None
             if balance is not None and not balance.empty and col in balance.columns:
-                equity = None
                 for k in ("Common Stock Equity", "Stockholders Equity", "Total Equity Gross Minority Interest"):
                     v = _yf_val(balance, k, col)
                     if v is not None:
@@ -275,15 +276,31 @@ def get_financials(ticker: str, market: str = "US", exchange: str = "") -> list[
                     bps = round(equity / shares, 4)
                     if price and bps > 0:
                         pbr = round(price / bps, 2)
+                tl = _yf_val(balance, "Total Liabilities Net Minority Interest", col)
+                total_liabilities = float(tl) if tl is not None else None
+                ca = _yf_val(balance, "Current Assets", col)
+                current_assets = float(ca) if ca is not None else None
+                inv = _yf_val(balance, "Inventory", col)
+                inventory = float(inv) if inv is not None else None
+                cl = _yf_val(balance, "Current Liabilities", col)
+                current_liabilities = float(cl) if cl is not None else None
 
             results.append({
                 "period": period_str,
                 "revenue": int(revenue) if revenue is not None else None,
                 "operating_income": int(op_income) if op_income is not None else None,
+                "net_income": int(net_income) if net_income is not None else None,
                 "eps": eps,
                 "bps": bps,
                 "per": per,
                 "pbr": pbr,
+                "operating_margin": _safe_pct(op_income, revenue),
+                "net_margin": _safe_pct(net_income, revenue),
+                "roe": _safe_pct(net_income, equity),
+                "debt_ratio": _safe_pct(total_liabilities, equity),
+                "quick_ratio": _safe_pct(
+                    (current_assets or 0) - (inventory or 0), current_liabilities
+                ) if current_assets is not None else None,
                 "is_consensus": False,
             })
         return results

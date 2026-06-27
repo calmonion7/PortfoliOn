@@ -76,10 +76,16 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
         period: f.is_consensus ? `${f.period}(E)` : f.period,
         revenue:   f.revenue,
         op_income: f.operating_income,
+        net_income: f.net_income ?? null,
         eps: f.eps ?? null,
         bps: f.bps ?? null,
         per: f.per ?? null,
         pbr: f.pbr ?? null,
+        operating_margin: f.operating_margin ?? null,
+        net_margin:       f.net_margin       ?? null,
+        roe:              f.roe              ?? null,
+        debt_ratio:       f.debt_ratio       ?? null,
+        quick_ratio:      f.quick_ratio      ?? null,
         is_consensus: f.is_consensus,
         margin: f.revenue && f.operating_income != null
           ? Math.round(f.operating_income / f.revenue * 100) : null,
@@ -259,25 +265,37 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
       <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: 14, marginTop: 12 }}>
         <SectionTitle weather={weather}>{title}</SectionTitle>
 
-        {/* 매출 / 영업이익 */}
-        <div style={{ marginTop: 8 }}>
-          <Legend items={[{ color: 'var(--data-2)', label: '매출' }, { color: 'var(--data-5)', label: '영업이익' }]} weather={revOpWeather} />
-          <ResponsiveContainer width="100%" height={165}>
-            <LineChart data={data} margin={{ ...chartMargin, top: 18 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-              <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={fmtVal} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
-              <Tooltip content={makeTooltip(true)} />
-              <ReferenceLine y={0} stroke="var(--border)" />
-              <Line {...lineCfg} dataKey="revenue"   name="매출"    stroke="var(--data-2)">
-                <LabelList dataKey="rev_chg_pct" content={PctLabel()} />
-              </Line>
-              <Line {...lineCfg} dataKey="op_income" name="영업이익" stroke="var(--data-5)">
-                <LabelList dataKey="op_chg_pct" content={PctLabel()} />
-              </Line>
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        {/* 매출 / 영업이익 / 순이익 */}
+        {(() => {
+          const hasNetIncome = data.some(d => d.net_income != null)
+          return (
+            <div style={{ marginTop: 8 }}>
+              <Legend items={[
+                { color: 'var(--data-2)', label: '매출' },
+                { color: 'var(--data-5)', label: '영업이익' },
+                ...(hasNetIncome ? [{ color: 'var(--data-3)', label: '순이익' }] : []),
+              ]} weather={revOpWeather} />
+              <ResponsiveContainer width="100%" height={165}>
+                <LineChart data={data} margin={{ ...chartMargin, top: 18 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={fmtVal} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+                  <Tooltip content={makeTooltip(true)} />
+                  <ReferenceLine y={0} stroke="var(--border)" />
+                  <Line {...lineCfg} dataKey="revenue"    name="매출"    stroke="var(--data-2)">
+                    <LabelList dataKey="rev_chg_pct" content={PctLabel()} />
+                  </Line>
+                  <Line {...lineCfg} dataKey="op_income"  name="영업이익" stroke="var(--data-5)">
+                    <LabelList dataKey="op_chg_pct" content={PctLabel()} />
+                  </Line>
+                  {hasNetIncome && (
+                    <Line {...lineCfg} dataKey="net_income" name="순이익" stroke="var(--data-3)" strokeDasharray="4 2" />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )
+        })()}
 
         {/* EPS / BPS */}
         {hasEpsBps && (
@@ -308,6 +326,50 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
                 <Tooltip content={makeTooltip(false)} />
                 <Line {...lineCfg} dataKey="per" name="PER" stroke="var(--data-3)" />
                 <Line {...lineCfg} dataKey="pbr" name="PBR" stroke="var(--data-4)" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* 수익성 % */}
+        {data.some(d => d.operating_margin != null || d.net_margin != null || d.roe != null) && (
+          <div style={{ marginTop: 12 }}>
+            <Legend items={[
+              { color: '#6ea8a0', label: '영업이익률' },
+              { color: '#a06ea8', label: '순이익률' },
+              { color: '#a8906e', label: 'ROE' },
+            ]} />
+            <ResponsiveContainer width="100%" height={140}>
+              <LineChart data={data} margin={chartMargin}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={v => `${v}%`} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+                <Tooltip content={makeTooltip(false)} />
+                <ReferenceLine y={0} stroke="var(--border)" />
+                <Line {...lineCfg} dataKey="operating_margin" name="영업이익률" stroke="#6ea8a0" />
+                <Line {...lineCfg} dataKey="net_margin"       name="순이익률"   stroke="#a06ea8" />
+                <Line {...lineCfg} dataKey="roe"              name="ROE"        stroke="#a8906e" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* 안정성 % */}
+        {data.some(d => d.debt_ratio != null || d.quick_ratio != null) && (
+          <div style={{ marginTop: 12 }}>
+            <Legend items={[
+              { color: '#a07070', label: '부채비율' },
+              { color: '#70a0a8', label: '당좌비율' },
+            ]} />
+            <ResponsiveContainer width="100%" height={140}>
+              <LineChart data={data} margin={chartMargin}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={v => `${v}%`} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
+                <Tooltip content={makeTooltip(false)} />
+                <ReferenceLine y={0} stroke="var(--border)" />
+                <Line {...lineCfg} dataKey="debt_ratio"  name="부채비율" stroke="#a07070" />
+                <Line {...lineCfg} dataKey="quick_ratio" name="당좌비율" stroke="#70a0a8" />
               </LineChart>
             </ResponsiveContainer>
           </div>

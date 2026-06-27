@@ -2,7 +2,7 @@ from __future__ import annotations
 import yfinance as yf
 import pandas as pd
 
-from services.market.format import _yf_sym, _yf_val
+from services.market.format import _yf_sym, _yf_val, _safe_pct
 
 
 def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
@@ -27,6 +27,7 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
             diluted_eps  = _yf_val(stmt, "DilutedEPS", col)
 
             eps = bps = per = pbr = None
+            equity = total_liabilities = current_assets = inventory = current_liabilities = None
             try:
                 hist = t.history(period="5y")
                 price = None
@@ -45,7 +46,6 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                     per = round(price / eps, 1)
 
                 if balance is not None and not balance.empty and col in balance.columns:
-                    equity = None
                     for k in ("CommonStockEquity", "StockholdersEquity", "TotalEquityGrossMinorityInterest"):
                         v = _yf_val(balance, k, col)
                         if v is not None:
@@ -56,6 +56,14 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                         bps = round(float(equity) / float(shares_count), 4)
                         if price and bps > 0:
                             pbr = round(price / bps, 2)
+                    tl = _yf_val(balance, "TotalLiabilitiesNetMinorityInterest", col)
+                    total_liabilities = float(tl) if tl is not None else None
+                    ca = _yf_val(balance, "CurrentAssets", col)
+                    current_assets = float(ca) if ca is not None else None
+                    inv = _yf_val(balance, "Inventory", col)
+                    inventory = float(inv) if inv is not None else None
+                    cl = _yf_val(balance, "CurrentLiabilities", col)
+                    current_liabilities = float(cl) if cl is not None else None
             except Exception:
                 pass
 
@@ -63,8 +71,16 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                 "period": period_str,
                 "revenue":          int(revenue)   if revenue   is not None else None,
                 "operating_income": int(op_income) if op_income is not None else None,
+                "net_income":       int(net_income) if net_income is not None else None,
                 "eps": eps, "bps": bps,
                 "per": per, "pbr": pbr,
+                "operating_margin": _safe_pct(op_income, revenue),
+                "net_margin":       _safe_pct(net_income, revenue),
+                "roe":              _safe_pct(net_income, equity),
+                "debt_ratio":       _safe_pct(total_liabilities, equity),
+                "quick_ratio":      _safe_pct(
+                    (current_assets or 0) - (inventory or 0), current_liabilities
+                ) if current_assets is not None else None,
                 "is_consensus": False,
             })
 
@@ -84,8 +100,11 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                             "period": str(base_year + i + 1),
                             "revenue": int(rev_est) if rev_est is not None and not pd.isna(rev_est) else None,
                             "operating_income": None,
+                            "net_income": None,
                             "eps": round(float(eps_est), 4) if eps_est is not None and not pd.isna(eps_est) else None,
                             "bps": None, "per": None, "pbr": None,
+                            "operating_margin": None, "net_margin": None,
+                            "roe": None, "debt_ratio": None, "quick_ratio": None,
                             "is_consensus": True,
                         })
                 # Prepend reversed so that after frontend .reverse() they appear at the right (most future)

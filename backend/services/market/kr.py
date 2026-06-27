@@ -337,6 +337,7 @@ def get_financials_kr(ticker: str) -> list[dict]:
             if pbr is None and per is not None and eps is not None and bps and bps > 0:
                 pbr = round(per * eps / bps, 2)
 
+            ni_raw = rv(2, key)
             results.append({
                 "period": period_str,
                 "revenue":          int(revenue   * 1e8) if revenue   is not None else None,
@@ -346,6 +347,12 @@ def get_financials_kr(ticker: str) -> list[dict]:
                 "per": round(per, 1) if per is not None else None,
                 "pbr": round(pbr, 2) if pbr is not None else None,
                 "is_consensus": is_consensus,
+                "net_income":        int(ni_raw * 1e8) if ni_raw is not None else None,
+                "operating_margin":  round(rv(5, key), 2) if rv(5, key) is not None else None,
+                "net_margin":        round(rv(6, key), 2) if rv(6, key) is not None else None,
+                "roe":               round(rv(7, key), 2) if rv(7, key) is not None else None,
+                "debt_ratio":        round(rv(8, key), 2) if rv(8, key) is not None else None,
+                "quick_ratio":       round(rv(9, key), 2) if rv(9, key) is not None else None,
             })
         return results
     except Exception:
@@ -376,6 +383,7 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
             per       = rv(12, key)
             pbr       = rv(14, key)
 
+            ni_raw = rv(2, key)
             results.append({
                 "period": key[:4],
                 "revenue":          int(revenue   * 1e8) if revenue   is not None else None,
@@ -385,6 +393,12 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
                 "per": round(per, 1) if per is not None else None,
                 "pbr": round(pbr, 2) if pbr is not None else None,
                 "is_consensus": is_consensus,
+                "net_income":        int(ni_raw * 1e8) if ni_raw is not None else None,
+                "operating_margin":  round(rv(5, key), 2) if rv(5, key) is not None else None,
+                "net_margin":        round(rv(6, key), 2) if rv(6, key) is not None else None,
+                "roe":               round(rv(7, key), 2) if rv(7, key) is not None else None,
+                "debt_ratio":        round(rv(8, key), 2) if rv(8, key) is not None else None,
+                "quick_ratio":       round(rv(9, key), 2) if rv(9, key) is not None else None,
             })
         return results
     except Exception:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 import pandas as pd
 
 _SECTOR_NORM = {
@@ -29,6 +30,18 @@ def _to_won(val) -> int | None:
     if v is None:
         return None
     return int(v * 1e8) if abs(v) < 1e10 else int(v)
+
+
+def _safe_pct(num, den) -> float | None:
+    """num/den*100 rounded 2dp; None if den falsy/zero or result non-finite."""
+    # eco: single helper replaces 6 inline divide+guard expressions
+    if not den or den == 0:
+        return None
+    try:
+        result = float(num) / float(den) * 100
+    except (TypeError, ValueError):
+        return None
+    return round(result, 2) if math.isfinite(result) else None
 
 
 def _yf_val(src, key, col):
