@@ -43,7 +43,6 @@ mapped: 2026-06-27
 
 **백엔드 데이터/연산:**
 - `pandas>=2.1.0`, `numpy>=1.26.0` — 시세 시계열·지표 계산.
-- `matplotlib>=3.8.0` — 차트 생성 (`backend/services/charts.py`).
 - `exchange_calendars>=4.5` — 거래일 계산 (`backend/services/storage/dates.py`).
 - `yfinance>=0.2.40` — US 시세·히스토리·섹터 (`backend/services/market/us.py`).
 - `beautifulsoup4>=4.12.0` + `lxml>=4.9.0` — HTML 파싱. **로컬 `.venv`엔 lxml 미설치** — 로컬 pytest 대상 코드는 `html.parser` 사용 권장(프로젝트 Gotcha).
@@ -70,12 +69,11 @@ mapped: 2026-06-27
 - `react-router-dom@^7.14.2` — 라우팅.
 - `axios@^1.16.0` — API 호출.
 - `recharts@^3.8.1` — 차트(별도 `charts` 청크로 분리, `frontend/vite.config.js:105`).
-- `react-markdown@^10.1.0` + `remark-gfm@^4.0.1` — 마크다운 렌더(`markdown` 청크).
 
 **프론트엔드 Build/Dev:**
 - `vite@^8.0.10` (rolldown) — 빌드/dev 서버. **manualChunks는 함수 형식만** 지원 (`frontend/vite.config.js:103`).
 - `@vitejs/plugin-react@^6.0.1` — React 플러그인.
-- `vite-plugin-pwa@^1.3.0` + `@vite-pwa/assets-generator@^1.0.2` — PWA(서비스워커, manifest) (`frontend/vite.config.js:10-67`).
+- `vite-plugin-pwa@^1.3.0` — PWA(서비스워커, manifest) (`frontend/vite.config.js:10-67`).
 - `eslint@^10.2.1` + `@eslint/js` + `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh` + `globals` — 린팅. 설정 `frontend/eslint.config.js`(flat config).
 
 **프론트엔드 테스트:**

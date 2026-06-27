@@ -5,7 +5,7 @@ from services import storage, report_generator, consensus_pipeline as _pipeline,
 from services import batch_registry
 
 # 공유 상태/상수 (leaf 모듈에서 import — 부분초기화 순환 회피).
-from ._state import _scheduler, _DIGEST_JOB_ID, _VALID_DAYS, _DAY_MAP
+from ._state import _scheduler, _DIGEST_JOB_ID, _VALID_DAYS
 
 # 잡 함수 + _JOB_FUNCS (private 포함 명시 re-export — `import *`는 underscore를 건너뜀).
 from .jobs import (

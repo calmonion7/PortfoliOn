@@ -103,14 +103,6 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes('node_modules')) return
           if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor')) return 'charts'
-          if (
-            id.includes('react-markdown') || id.includes('remark') || id.includes('rehype') ||
-            id.includes('micromark') || id.includes('mdast') || id.includes('hast') ||
-            id.includes('unist') || id.includes('vfile') || id.includes('property-information') ||
-            id.includes('character-entities') || id.includes('html-url-attributes') ||
-            id.includes('separated-tokens') || id.includes('trim-lines') || id.includes('zwitch') ||
-            id.includes('longest-streak') || id.includes('decode-named-character-reference') || id.includes('devlop')
-          ) return 'markdown'
           return 'vendor'
         },
       },

@@ -173,7 +173,6 @@ UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
 | yfinance | US 주가·시장 데이터 (US 1차 소스) |
 | 키움 / 한국투자증권(KIS) REST | KR 시세(1차=키움, 백업=KIS), US 백업 시세 — 읽기전용 |
 | pandas / numpy | 데이터 처리 |
-| matplotlib | 차트 이미지 생성 |
 | beautifulsoup4 / lxml | HTML 파싱 (Naver, dataroma, DART) |
 
 **프론트엔드**
@@ -184,7 +183,6 @@ UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
 | react-router-dom 7 | 클라이언트 라우팅 |
 | axios | HTTP 클라이언트 |
 | recharts (+d3) | 주가·지표 차트 |
-| react-markdown | Markdown 리포트 렌더링 |
 
 ## 아키텍처
 
