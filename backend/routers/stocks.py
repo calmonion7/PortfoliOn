@@ -21,7 +21,7 @@ from services import dividends
 from services import supply_score
 from services import insider_trades
 from services.market_indicators.cache import _mc_load
-from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID, require_admin
+from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID, require_admin, require_admin_or_api_key
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
@@ -219,7 +219,7 @@ def get_stocks(user_id: str = Depends(get_current_user_or_api_key)):
 
 
 @router.put("/enrich/batch")
-def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(get_current_user_or_api_key)):
+def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(require_admin_or_api_key)):
     if not items:
         raise HTTPException(status_code=400, detail="No items provided")
     updated, not_found = [], []
@@ -234,7 +234,7 @@ def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(get_curren
 
 
 @router.put("/{ticker}/enrich")
-def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(get_current_user_or_api_key)):
+def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(require_admin_or_api_key)):
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
     if not fields:
         raise HTTPException(status_code=400, detail="No fields provided")
@@ -245,7 +245,7 @@ def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(get_curr
 
 
 @router.delete("/dashboard/cache")
-def clear_dashboard_cache():
+def clear_dashboard_cache(user_id: str = Depends(get_current_user)):
     cache_svc.invalidate_dashboard()
     return {"cleared": True}
 

@@ -425,7 +425,7 @@ def get_consensus(ticker: str):
 
 
 @router.post("/report/{ticker}/refresh-analyst")
-def refresh_analyst(ticker: str):
+def refresh_analyst(ticker: str, user_id: str = Depends(get_current_user)):
     import yfinance as yf
     upper = ticker.upper()
     rows = query(
@@ -476,7 +476,7 @@ def refresh_analyst(ticker: str):
 
 
 @router.post("/consensus/{ticker}/backfill")
-def backfill_consensus(ticker: str, days: int = 180, force: bool = False):
+def backfill_consensus(ticker: str, days: int = 180, force: bool = False, user_id: str = Depends(get_current_user)):
     upper = ticker.upper()
     rows = query(
         "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",

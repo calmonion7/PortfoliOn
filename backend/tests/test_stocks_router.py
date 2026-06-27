@@ -3,13 +3,15 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
 from routers.stocks import router
-from auth import get_current_user, get_current_user_or_api_key
+from auth import get_current_user, get_current_user_or_api_key, require_admin_or_api_key
 
 
 app = FastAPI()
 app.include_router(router)
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
+# enrich/batch는 require_admin_or_api_key로 게이트(task#108) — 인가된 호출자로 오버라이드.
+app.dependency_overrides[require_admin_or_api_key] = lambda: "test-user-id"
 client = TestClient(app)
 
 SAMPLE_PORTFOLIO = {

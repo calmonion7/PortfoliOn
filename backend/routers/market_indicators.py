@@ -210,7 +210,7 @@ def lending_sync(user_id: str = Depends(require_admin)):
 
 
 @router.post("/refresh-market")
-def refresh_market():
+def refresh_market(_: str = Depends(require_admin)):
     """FX/VIX/Treasury/Commodities Supabase 캐시 초기화 후 1년치 재조회."""
     try:
         for key in ("fx", "vix", "treasury", "commodities"):

@@ -4,9 +4,12 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch
 
 from routers.report import router
+from auth import get_current_user
 
 app = FastAPI()
 app.include_router(router)
+# backfill_consensus는 get_current_user로 게이트(task#108) — 인증된 호출자로 오버라이드.
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 client = TestClient(app)
 
 SAMPLE_SUMMARY = {

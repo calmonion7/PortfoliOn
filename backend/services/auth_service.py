@@ -125,6 +125,8 @@ def consume_refresh_token(token: str) -> str | None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at < datetime.now(timezone.utc):
         return None
+    # 회전: refresh token은 1회용 — 사용 즉시 폐기해 탈취 토큰 재사용 차단 (task#108)
+    execute("DELETE FROM refresh_tokens WHERE token = %s", (token,))
     return str(rows[0]["user_id"])
 
 
