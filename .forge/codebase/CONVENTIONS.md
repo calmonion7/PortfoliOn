@@ -1,114 +1,130 @@
 ---
-last_mapped_commit: b6193c3837f4125a41930c36a2b3ae2ef198dc3c
-mapped: 2026-06-22
+last_mapped_commit: 74f5ca940c42a3ee866a45ccccfe24ac701a04d9
+mapped: 2026-06-27
 ---
 
-# CONVENTIONS
+# 코딩 컨벤션
 
-PortfoliOn 코드 스타일·네이밍·패턴·에러처리 관례. 백엔드(Python/FastAPI)와 프론트(React 19 + plain CSS)로 나눠 기술. 모든 사실은 실제 파일에서 확인됨.
+**분석일:** 2026-06-27
 
-## Backend (Python)
+PortfoliOn은 Python/FastAPI 백엔드(`backend/`)와 React 19 + Vite 프론트엔드(`frontend/`) 모노레포다. 아래는 실제 코드에서 관찰된 규칙으로, 새 코드를 작성할 때 그대로 따른다.
 
-### Private helper 네이밍 — `_foo`
+## 네이밍 패턴
 
-모듈 내부 전용 헬퍼는 전부 leading-underscore. 라우터·서비스 모두 일관.
+### 백엔드 (Python)
 
-- `backend/services/market/kr.py`: `_naver_get`, `_fnguide_market_cap`, `_naver_row_val`, `_kr_basic_naver`, `_kr_basic_kiwoom`, `_kr_basic_kis`, `_kr_closes_kiwoom`, `_price_sane`, `_corroborated_pick`, `_kr_pick_regular`, `_kr_pick_degenerate_lazy`, `_kr_pick_basic`
-- `backend/routers/stocks.py`: `_latest_snapshot`, `_latest_snapshots`, `_search_naver`, `_usdkrw_rate`, `_run_dividends_all`, `_run_supply_score_all`
-- 공개 API는 underscore 없음: `get_quote_kr`, `get_dashboard`, `enrich_single`.
+- **모듈/파일:** snake_case — `backend/services/report_generator.py`, `backend/services/leverage_service.py`, `backend/routers/market_indicators.py`.
+- **함수:** snake_case — `is_valid_ticker`, `find_ticker_index`, `get_quote_kr`, `invalidate_portfolio_caches` (`backend/services/utils.py`, `backend/services/cache.py`).
+- **내부 헬퍼:** 선행 언더스코어 — `_build_all`, `_safe`, `_minimal_card`, `_usdkrw_rate`, `_portfolio_totals` (`backend/routers/stocks.py`), `_mc_load`/`_mc_save` (`backend/services/market_indicators/cache.py`), `_kr_pick_basic`/`_corroborated_pick` (`backend/services/market/kr.py`).
+- **상수:** UPPER_SNAKE — `TICKER_RE` (`backend/services/utils.py`), `SAMPLE_STOCKS`, `KNOWN_UNDOCUMENTED` (`backend/tests/test_api_doc_sync.py`), `BATCHES`/`ALL_MENUS`/`VALID_EVENTS`.
+- **Pydantic 요청 모델:** PascalCase + `Body` 접미사 — `EnrichBody` (`backend/routers/stocks.py`), `EventBody` (`backend/routers/events.py`), `PermissionsBody`/`BulkPermissionsBody` (`backend/routers/admin.py`).
+- **타입 힌트:** 함수 시그니처에 타입 힌트를 단다(`def find_ticker(items: list, ticker: str, key: str = "ticker") -> Optional[dict]:`). 신규 모듈은 `from __future__ import annotations`를 파일 상단에 둘 수 있다(`backend/services/utils.py`).
 
-### Graceful try/except — None / [] / 빈 dict / 최소형 반환
+### 프론트엔드 (React/JS)
 
-외부 I/O(시세·HTTP·DB)는 예외를 삼키고 빈/None/기본형을 반환하는 게 기본. 호출측은 항상 "데이터 없음"을 다룰 수 있어야 함.
+- **컴포넌트 파일/함수:** PascalCase, `.jsx` — `frontend/src/components/ui/Badge.jsx`, `StockActions.jsx`, `frontend/src/pages/Portfolio.jsx`. `export default function ComponentName(...)` 형태.
+- **훅:** `use` 접두 camelCase, `.js` — `frontend/src/hooks/useStockManagement.js`, `useReportFilters.js`, `usePortfolioData.js`. 디렉터리는 `frontend/src/hooks/`.
+- **유틸/헬퍼 모듈:** camelCase 또는 `*Utils` — `frontend/src/components/market/marketUtils.jsx`, `frontend/src/components/reports/reportUtils`.
+- **CSS 클래스:** BEM 변형 — 블록 `badge`, 변형 `badge--success`, 요소 `badge__icon` (`frontend/src/components/ui/Badge.jsx`).
+- **CSS 커스텀 프로퍼티(토큰):** kebab-case with `--` — `--up`, `--down`, `--bg-elev`, `--color-success` (`frontend/src/styles/tokens.css`).
 
-- `kr.py:get_financials_kr` / `get_annual_financials_kr`: `except Exception: return []`
-- `kr.py:get_analyst_data_kr`: `_empty` 상수 dict를 선언하고 실패 시 `return _empty`
-- `kr.py:_fnguide_market_cap`: `except Exception: pass` 후 `return None`
-- `kr.py:_kr_basic_kiwoom` / `_kr_basic_kis`: 미설정(`configured()` False)·예외·빈 price면 `return None`
-- `stocks.py:_latest_snapshot`: DB 시도 → `except Exception: pass` → 파일시스템 폴백 → 둘 다 실패 시 `(None, None)`
-- `stocks.py:_search_naver`, `get_stock_news`: `except Exception: return []`
+## 코드 스타일
 
-**예외의 부분 전파**: `kr.py:_kr_basic_naver` 독스트링 "HTTP 오류(상폐 409)는 전파" — 상장폐지 검출을 위해 일부 HTTP 에러는 일부러 위로 던지고, `get_quote_kr`의 바깥 try가 `requests.exceptions.HTTPError` status 409를 잡아 `delisted: true`로 변환.
+### 포매팅/린팅
 
-### NaN/inf sanitize
+- **프론트엔드 린트:** ESLint flat config — `frontend/eslint.config.js`. `@eslint/js` recommended + `eslint-plugin-react-hooks`(flat recommended) + `eslint-plugin-react-refresh`(vite). `dist`는 ignore. 실행: `cd frontend && npm run lint`.
+- 별도 Prettier 설정 파일은 없다(`.prettierrc` 없음). 스타일은 ESLint와 기존 코드 관행에 맞춘다.
+- **백엔드:** 별도 ruff/flake8/black 설정 파일은 없다(`backend/pytest.ini`만 존재). 기존 파일 스타일(4-space indent, snake_case, 짧은 도커스트링)에 맞춘다.
+- **주석:** 한국어로 작성하는 것이 관행 — `backend/tests/conftest.py`, `backend/services/utils.py`의 인라인 주석, `tokens.css` 주석 모두 한국어/혼용. 도커스트링도 한국어가 많다(`is_valid_ticker`, `test_api_doc_sync.py`).
 
-`backend/services/utils.py:sanitize(obj)` — float가 `math.isnan` 또는 `math.isinf`면 `None`으로, dict/list는 재귀 sanitize. starlette `JSONResponse`(allow_nan=False)가 NaN/inf에 500을 내는 것을 막는 출력단 가드. (CLAUDE.md 권장은 소스단 `math.isfinite` 가드가 더 깨끗.)
+### 모듈/파일 분리
 
-### Lazy import — 순환참조 회피
+- 비대해진 단일 파일은 **패키지 재export로 분리**한다(ADR-0017, `.forge/adr/0017-god-file-split-via-package-reexport.md`). 예: `backend/services/market_indicators/`(`cache.py`/`fx.py`/`commodities.py`/`earnings.py`/`econ.py`/`exports.py`/`macro.py`), `backend/services/kiwoom/`, `backend/services/kis/`, `backend/services/market/`(`kr.py` 등). 기존 import 경로는 패키지 `__init__`이 재export로 유지한다.
 
-`storage ↔ cache` 처럼 상호 import하는 모듈은 함수 내부에서 지연 import.
+## Import 구성
 
-- `backend/services/storage/names.py:_invalidate_name_caches`: 함수 본문에서 `from services import cache as cache_svc` (독스트링 "storage↔cache 순환참조 회피용 지연 import"), `try/except Exception: pass`로 감쌈
-- `backend/services/market/kr.py`의 키움/KIS 헬퍼: 함수 본문에서 `from services.kiwoom import client, quote as kq` / `from services.kis import client, quote as kisq` (런타임 서비스 경계 분리)
-- `routers/stocks.py:_run_dividends_all`: `from services.dividends import fetch_all_dividends` 함수 내부
+### 백엔드
 
-### Per-card graceful build — dashboard `_build_all` → `_safe` / `_minimal_card`
+- 순서 관행: ① 표준 라이브러리(`import math`, `import re`, `from pathlib import Path`) → ② 서드파티(`from fastapi import ...`, `import pytest`) → ③ 로컬 모듈(`from main import app`, `from routers.watchlist import router`).
+- **순환 import 회피는 함수 내부 지연 import로** 한다 — `storage`→`cache` 호출은 함수 내에서 `from services import cache`로 지연 import(루트 CLAUDE.md gotcha, `storage`↔`cache` 순환 방지).
 
-`backend/routers/stocks.py:get_dashboard`의 핵심 패턴. holdings=N이면 **항상 N개 카드**를 보장하고, 한 종목 실패가 전체 응답을 500-to-empty로 만들지 않음 (task#102).
+### 프론트엔드
 
-- `_build_all()`: 일괄시세(`market.get_quotes_batch`)를 try로 감싸 실패 시 `quotes = {}`로 진행(시세 없이 빌드, price None은 폴링이 채움)
-- `_safe(stock)`: `_build_card`를 try로 호출, 예외 시 `_minimal_card`로 폴백하고 `print(..., file=sys.stderr)`로 진단 로그
-- `_minimal_card(stock, quote)`: 식별/보유정보 + quote 시세만 채우고 지표/배당/수급/내부자는 전부 None
-- `ThreadPoolExecutor(max_workers=min(len(holdings), 10))`로 카드 병렬 빌드 — 워커 수를 holdings·풀크기로 캡
-- 응답 shape: `{"holdings": [...], "totals": {...} | None}`. holdings=[] 이면 `{"holdings": [], "totals": None}`로 조기 반환
+- API 호출은 `frontend/src/api.js`의 default export(axios 인스턴스)를 import해 사용 — `import api from '../api'` 후 `api.get/post/put/delete`. 테스트도 이 모듈을 mock 한다(`vi.mock('../api', ...)`).
+- 경로 별칭(path alias)은 사용하지 않는다 — 상대 경로(`'../api'`, `'./useReportFilters'`) 사용.
 
-### Bake-time independent-feed gate
+## 에러 핸들링
 
-리포트 스냅샷 박제 시 외부 시세 글리치를 독립 피드와 대조해 박제를 스킵하는 게이트(`backend/services/report_generator.py`, KR `regular=True` 경로). 자기일관 글리치(quote·일봉 둘 다 ~70k)를 네이버 등 독립 소스와 2x 밖이면 `ValueError`로 박제 중단 — 스냅샷에 잘못된 값을 영속화하지 않음. 검증은 `test_report_price_gate.py` 참조.
+### NaN/inf 가드 ("직렬화 500" 방지)
 
-### KR 시세 소스 발산 가드 — 다수결 + self-check
+starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 `NaN`/`inf`가 있으면 직렬화에서 **HTTP 500**(`Out of range float values are not JSON compliant`)이 난다. 외부 시세(yfinance `Close`, FX `usdkrw` 등)에서 흘러든 비유한값이 합산값을 오염시키는 게 전형이다.
 
-`backend/services/market/kr.py`의 멀티소스 시세 선택. 단일 참조 글리치에 면역시키는 패턴:
+- **출력 일괄 새니타이즈:** `backend/services/utils.py`의 `sanitize(obj)` — dict/list를 재귀 순회하며 `NaN`/`inf` float를 `None`으로 치환한다. 시세/합산을 응답에 싣는 엔드포인트(`backend/routers/stocks.py`의 `_build_all`, `backend/routers/report.py`, `backend/services/digest_service.py`, `leverage_service.py`, `recommendation/funnel.py`)가 이를 호출한다.
 
-- `_price_sane(price, prev_close, ref_close)`: ① 전일종가 ±30%(KR 일일 가격제한폭, 상수 `0.7`/`1.3`), ② 키움 일봉 종가 `[0.5, 2.0]` 교차검증. 참조 무효(None/≤0)면 그 검증만 생략
-- `_corroborated_pick(feeds)`: 독립 피드 2-of-N 다수결. 순수 함수(I/O 없음). `feeds = [(priority_rank, src, basic_tuple)]`, rank 순서가 곧 반환 우선순위(키움 NXT 0 → KIS 1 → Naver 2 → 키움 KRX 3)
-- `_kr_pick_basic(ticker, ref_close, regular)`: `regular=True`(리포트)면 `_kr_pick_regular`(KRX 우선순위 체인), `regular=False`(NXT 라이브)면 다수결. 평소엔 키움 NXT+KRX 2콜로 lazy short-circuit(KIS/Naver 미호출), 불일치 시에만 escalate
-- 폐기 시 `print(f"[quote] {ticker}: ... 폐기")` 진단 로그(silent except 금지 — CLAUDE.md)
+```python
+def sanitize(obj):
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize(v) for v in obj]
+    return obj
+```
 
-### `regular` 플래그 전파 — 시세 기준 이원화
+- **소스 가드(더 선호):** 비유한값을 응답에 싣기 *전에* `math.isfinite`로 차단하는 편이 출력 일괄 새니타이즈보다 깨끗하다. 예: `_usdkrw_rate`는 저장 FX가 비유한이면 `None`을 반환해 US totals를 graceful 제외(`backend/routers/stocks.py`). `NaN != None`이므로 `if fx is None` 가드는 NaN을 통과시킨다 — 반드시 `math.isfinite`를 쓴다.
+- **이중화:** 위험 엔드포인트는 소스 isfinite 가드 *와* 응답 `sanitize` 래핑을 둘 다 적용한다(출처 불문 안전망).
+- **함정:** PostgreSQL `json` 컬럼은 NaN 저장을 거부하지만 파이썬 `json.dumps`는 기본 `allow_nan=True`라 파일 폴백은 통과한다 → "DB저장 실패·파일성공·응답직렬화 실패"로 증상이 엇갈린다.
 
-키움 코드선택 단일 분기점이 `regular` 키워드 인자. 기본 `False`=NXT 시간외(`_AL`), `True`=KRX 정규장 평문코드. `get_quote_kr(ticker, exchange, regular=False)` → `_kr_pick_basic(..., regular=regular)` → `_kr_basic_kiwoom(t, regular=regular)` / `_kr_closes_kiwoom(t, regular=regular)`로 전파. 리포트 스냅샷 writer만 `regular=True`로 opt-in(ADR-0020).
+### "wrong < missing" (그레이스풀 스킵 vs 기본값)
 
-### 상수·정규식 모듈 레벨 선언
+데이터 추출/시세 검증에 실패하면 **틀린 값을 박제하지 말고 누락(pending/skip)으로 처리**한다. 잘못된 값이 정상으로 위장하는 것보다 비어 있는 게 낫다.
 
-`backend/routers/stocks.py`: `_KR_PATTERN = re.compile(r'[가-힣]')`, `_INTL_SUFFIX = re.compile(...)`, `SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"`. `backend/services/market/kr.py`: `_NAVER_HEADERS`, `_NAVER_BASE`, `_FNGUIDE_HEADERS`를 모듈 상단에 둠.
+- 수주잔고 단위 캡션 파싱 실패 시 '안전한 기본값(억원)' 폴백은 ×100 대형 오저장을 만든다 → 추출 실패는 기본값이 아니라 `source='pending'`(amount=None)으로 둔다(`backend/services/backlog.py`).
+- 리포트 박제 직전 KRX와 독립인 네이버 현재가로 2x 교차검증해 어긋나면 그 종목 박제를 **스킵**(직전 양호 스냅샷 유지)한다(`backend/services/report_generator.py`).
+- 라이브 KR 현재가는 독립 피드 2-of-N 다수결로 outlier(글리치)를 폐기한다(`backend/services/market/kr.py`, `_corroborated_pick`).
+- 배치 fetch가 빈/all-None 결과를 캐시에 박제하지 않는다 — 전부 None이면 save를 생략하고 직전 양호값을 유지한다. 외부 fetch 실패는 silent except로 삼키지 말고 로깅한다.
 
-### FastAPI 라우터 관례
+### HTTPException / 500-to-empty 금지
 
-- `router = APIRouter(prefix="/api/stocks", tags=["stocks"])` — prefix+tags
-- 인증: `Depends(get_current_user)` / `Depends(get_current_user_or_api_key)` / `Depends(require_admin)`
-- 라우트 등록 순서 주의: `PUT /enrich/batch`를 `PUT /{ticker}/enrich`보다 **먼저** 등록(FastAPI가 `enrich`를 ticker 값으로 라우팅하는 것 방지 — CLAUDE.md gotcha)
-- 본문 모델은 `pydantic.BaseModel` 서브클래스(`EnrichBody`, `BatchEnrichItem`), `Optional[Any]`로 nullable 필드
-- 백그라운드 작업은 `BackgroundTasks.add_task` + `with job_runs.record(id, "manual"):` 컨텍스트로 실행 기록
-- 응답은 plain dict/list 직접 반환(별도 response_model 없음이 일반)
-- ticker는 일관되게 `.upper()`로 정규화 후 비교/저장
+- 라우터는 검증 실패에 `HTTPException`을 raise한다(`backend/routers/` 14개 파일). 중복 추가→400, 미존재→404 등.
+- **불변식: holdings=N → 항상 N 카드.** `backend/routers/stocks.py`의 `_build_all`은 `get_quotes_batch`를 try/except→`{}`로, 카드당 enrichment를 `_safe`(throw→`_minimal_card`)로 감싸 per-card 실패에도 전체 500을 내지 않는다. 프론트는 `Portfolio.jsx`의 `DashboardGrid`가 `stocks>0`이면 빈 상태 대신 Skeleton을 보이고 bounded 재시도(최대 3)로 self-heal 한다.
 
-## Frontend (React 19)
+### FastAPI Body 파라미터
 
-### Plain CSS — TailwindCSS 없음
+- PUT/POST에서 bare list/dict 본문은 반드시 `Body(...)`로 명시한다 — 누락 시 재빌드 후 기동 불가. 예: `backend/routers/batches.py`의 `schedule: dict = Body(...)`. 구조화 본문은 Pydantic `*Body` 모델을 쓴다.
+- **라우트 등록 순서:** 구체 경로를 path-param 경로보다 먼저 등록한다 — `PUT /api/stocks/enrich/batch`를 `PUT /api/stocks/{ticker}/enrich`보다 **먼저** 등록(안 하면 `enrich`를 ticker 값으로 라우팅).
 
-스타일은 전부 plain CSS. 디자인 토큰은 `frontend/src/styles/tokens.css`의 CSS 변수(`:root` + `[data-theme="dark"]`). 컴포넌트별 `.css` 파일(`ui/Badge.css` 등) + 인라인 `style={{...}}` 혼용.
+## KR 색 관례 (가격색 ↔ 의미색 분리)
 
-### KR 색 관례 — `--up`=red / `--down`=blue
+`frontend/src/styles/tokens.css`는 한국 시장 관례를 따른다 — **상승=빨강(`--up: #d83a3a`), 하락=파랑(`--down: #2864e8`)**. Western(녹=좋음/빨=경고)과 반대다.
 
-`frontend/src/styles/tokens.css`:
-- `--up: #d83a3a`(red = 상승), `--down: #2864e8`(blue = 하락) — 한국 시장 관례(주석 "Korean market coloring")
-- 다크 테마는 `--up: #ff4d4d` / `--down: #4d8bff`
-- 유틸 클래스 `.up { color: var(--up); }` / `.down { color: var(--down); }`
-- **가격 방향이 아닌 의미 상태는 별도 토큰**: `--color-success` / `--color-error` / `--semantic-buy` / `--semantic-sell`(주석 "Semantic state colors — NOT price direction"). 의미 배지에 `success`/`danger` Badge variant를 쓰면 KR 가격색으로 박혀 의미가 반전됨(CLAUDE.md gotcha) — 전용 색 토큰을 명시할 것
+- 가격 *방향* 배지에는 `success`(빨강)/`danger`(파랑) 변형이 의도대로 동작한다 — `ChangeBadge`(`frontend/src/components/ui/Badge.jsx`)가 `value >= 0 ? 'success' : 'danger'`로 매핑(상승=빨/하락=파).
+- **가격 방향이 아닌 의미 상태 배지(수급 밴드 등)에 `success`/`danger`를 쓰지 말 것** — `.badge--success`=빨강·`.badge--danger`=파랑으로 박혀 의미가 반전된다. 의미 배지는 전용 색을 명시하는 컴포넌트를 쓴다(예: `frontend/src/components/ui/SupplyBadge.jsx`, 가격 토큰 미사용).
+- `--warn`/`--warn-soft`는 정의돼 있으나 `badge--warning`이 참조하는 `--color-warning`/`--warning-tint`는 미정의 — `warning` 변형은 현재 깨져 있어 caution 색으로 쓸 수 없다.
+- 의미 상태 전용 토큰은 별도로 둔다: `--color-success`/`--color-error`/`--color-info`, `--semantic-buy`/`--semantic-sell`, `--corr-pos`/`--corr-neg`(`tokens.css`). 다크 테마는 `[data-theme="dark"]`에서 재정의.
 
-### 공유 컴포넌트 추출 — `StockActions.jsx`의 `layout` prop
+## API 변경 규율: additive 우선, reshape는 전수 감사
 
-`frontend/src/components/reports/StockActions.jsx`: 보유/관심 카드 액션버튼(수정·승격·삭제·전체삭제)의 단일 소스(task#103). 이전엔 `StockCard`(그리드)·`TickerListItem`(사이드바)에 byte-identical로 중복돼 있던 블록을 통합.
+- **additive(필드 추가)를 선호**하고 비-additive reshape(배열→객체 등)는 피한다. 불가피하면 그 엔드포인트를 fetch하는 *모든* 프론트 소비처를 `grep -rn '<경로>' frontend/src/`로 전수 갱신한다(독립 fetcher 포함). 한 곳만 고치면 다른 곳이 옛 형태로 조용히 깨진다.
+- **additive로 read/외부호출을 *추가*하면 `mock.call_args`(마지막 호출)를 단언하는 기존 테스트가 오염된다.** additive는 응답 shape뿐 아니라 *호출 시퀀스*도 늘린다. 대응: ① 기존 단언을 `call_args_list[i].kwargs`(인덱스 명시)로 마이그레이션, ② 신규 호출은 입력 비면 `if`로 생략해 기존 테스트 보존, ③ 신규 테스트가 `call_count`로 시퀀스를 못박음. (테스트 작성 규약은 `TESTING.md` 참조.)
+- **엔드포인트 존재 drift는 자동 검출된다** — 새 엔드포인트를 `API_SPEC.md`에 안 적으면 `backend/tests/test_api_doc_sync.py`가 실패. 추가/삭제/개명 시 `API_SPEC.md`와 `CLAUDE_COWORK_API.md`를 함께 갱신한다(요청/응답 스키마·인증 게이팅은 수동 DoD).
 
-- `layout` prop으로 렌더 컨테이너 분기: `'card'`(그리드 카드 본문 — `<div style={{display:'flex',...}}>` 래퍼) | `'list'`(사이드바 — fragment `<>...</>`, 기본값)
-- 두 소비처 모두 `import StockActions from './StockActions.jsx'`: `StockCard.jsx:98`, `TickerListItem.jsx:102`
-- **가시성은 category가 아니라 `is_mine`으로 게이트**(task#97): `info.is_mine === false`(타인 종목)면 전체삭제(`/api/admin`)만, 본인 종목이면 수정·[승격]·삭제. 액션버튼 변경은 이 파일 한 곳만 고치면 됨
+## 캐시 무효화 패턴
 
-### 컴포넌트 디렉터리 구조
+`backend/services/cache.py`에 인메모리 캐시들이 있다 — `TTLCache` 클래스(`get`/`invalidate`) 기반. snapshot(LRU), `_list_cache`(60s), `_dashboard_cache`(300s), `_correlation_cache`(300s), `_sector_cache`(300s), `_macro_cache`(300s), `_quote_cache`(60s), `_live_prices_cache`(15s).
 
-`frontend/src/components/reports/`에 리포트/종목 카드 관련 컴포넌트 집중: `StockCard.jsx`, `TickerListItem.jsx`, `StockActions.jsx`, `DetailTab.jsx`, `HistoryTab.jsx`, `Sections.jsx`, `ConsensusChart.jsx`, `FinancialsChart.jsx`, `reportUtils.jsx`(공유 유틸). UI 프리미티브는 `components/ui/`(`Badge`, `Button`, `Card`, `Stat`, `icons`).
+- **무효화 함수는 명시적으로 호출한다** — `invalidate(ticker)`(스냅샷 LRU + `invalidate_list()`), `invalidate_dashboard`, `invalidate_correlation`, `invalidate_sector`, `invalidate_macro`, `invalidate_quote`, `invalidate_live_prices`, 그리고 묶음 `invalidate_portfolio_caches()`.
+- **종목 추가/수정/삭제 시 관련 캐시를 전부 무효화한다** — dashboard·correlation·sector·macro·list가 자동 무효화돼야 화면에 즉시 반영된다. 무효화 누락 시 stale 화면(예: 종목 추가 후 리포트 목록 미갱신 → `invalidate_portfolio_caches`에 리스트 캐시 무효화 추가로 수정).
+- **이름 변경은 dual-source 둘 다 갱신** — `tickers.name`(공유 마스터)과 `snapshots.data.name`(박제). DB만 바꾸면 `cache.get_list`·스냅샷 LRU 탓에 미반영 → `cache.invalidate(ticker)` + `invalidate_list()` 필수.
+- **테스트 격리:** `get_quote`는 종목 단위 TTL 캐시를 쓰므로, `backend/tests/conftest.py`의 `_clear_quote_cache`(autouse fixture)가 매 테스트 전 `cache.invalidate_quote()`를 호출해 교차 오염을 막는다.
 
-### 한국어 주석·UI 텍스트
+## 함수/모듈 설계
 
-코드 주석·UI 라벨·title 속성 모두 한국어("수정", "보유로 이동", "전체 삭제", "그외 탭"). 변수/함수명은 영어, 설명은 한국어가 일관된 패턴.
+- **작고 단일 책임** — `backend/services/utils.py`의 헬퍼들처럼 한 가지 일만 하는 짧은 함수. 단일-사용 추상화는 만들지 않는다(프로젝트 `CLAUDE.md` §2 Simplicity First).
+- **외부 API는 요청/기동 경로에서 라이브 호출하지 않는다** — 배치가 사전계산해 `market_cache`/테이블에 저장하고 요청은 저장값만 읽는다(랭킹·KR 업종 모멘텀 등). 기동 시 빈 캐시 적재는 `_seed_*_if_empty` 패턴.
+- **프론트 컴포넌트는 default export 함수** — `export default function X(...)`. 중복 렌더링 로직은 단일 컴포넌트로 통합한다(예: 액션 버튼은 `frontend/src/components/reports/StockActions.jsx` 한 곳, `layout="card"|"list"`로 분기 — 그리드/사이드바 양쪽이 공유).
+
+---
+
+*컨벤션 분석: 2026-06-27*

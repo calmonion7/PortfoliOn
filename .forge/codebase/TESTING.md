@@ -1,142 +1,199 @@
 ---
-last_mapped_commit: b6193c3837f4125a41930c36a2b3ae2ef198dc3c
-mapped: 2026-06-22
+last_mapped_commit: 74f5ca940c42a3ee866a45ccccfe24ac701a04d9
+mapped: 2026-06-27
 ---
 
-# TESTING
+# 테스트 패턴
 
-PortfoliOn 테스트 전략. 백엔드는 pytest + 무거운 `unittest.mock.patch`, 프론트는 vitest + Testing Library. 모든 사실은 실제 파일/실행 결과에서 확인됨.
+**분석일:** 2026-06-27
 
-## Backend — pytest
+백엔드는 pytest, 프론트엔드는 vitest를 쓴다(프론트 하니스는 ADR-0019, `.forge/adr/0019-frontend-test-harness-vitest.md`). 백엔드 테스트가 본진(약 80개 파일)이고, 프론트는 로직 훅 위주의 경량 하니스다.
 
-### 실행
+## 테스트 프레임워크
 
-```bash
-cd backend && .venv/bin/python -m pytest
+### 백엔드 — pytest
+
+- **러너:** pytest. 설정 `backend/pytest.ini`:
+
+```ini
+[pytest]
+testpaths = tests
+pythonpath = .
 ```
 
-- 테스트 디렉터리: `backend/tests/` (약 70개 파일)
-- **876 tests collected** (`pytest --collect-only -q` 기준, b6193c3 시점)
-- `backend/tests/conftest.py`가 `sys.path.insert(0, ...)`로 backend 루트를 path에 추가하고 `from main import app`을 import
+- **클라이언트:** FastAPI `TestClient`(`fastapi.testclient`). HTTP 단언으로 라우터를 검증.
+- **모킹:** stdlib `unittest.mock`(`patch`, `MagicMock`) + pytest `monkeypatch` 둘 다 사용(약 48개 파일이 `unittest.mock`, 약 33개 파일이 `monkeypatch`).
 
-### conftest.py 공통 픽스처
+**실행 명령:**
+
+```bash
+# 전체 (프로젝트 루트에서)
+cd backend && .venv/bin/python -m pytest
+
+# 특정 파일
+cd backend && .venv/bin/python -m pytest tests/test_stocks_router.py
+
+# 특정 테스트
+cd backend && .venv/bin/python -m pytest tests/test_api_doc_sync.py::test_api_spec_documents_all_live_endpoints -v
+```
+
+> macOS 가상환경은 `backend/.venv/bin/python`, Windows는 `backend/.venv/Scripts/python`.
+> **로컬 `.venv` ≠ Docker 의존성:** `lxml`은 Docker 이미지엔 있지만 로컬 `.venv`엔 없다. 로컬 pytest로 검증할 HTML 파싱은 `BeautifulSoup(html, "html.parser")`(stdlib)를 쓴다 — `"lxml"`을 쓰면 로컬에서만 깨진다.
+
+### 프론트엔드 — vitest
+
+- **러너:** vitest 4 + jsdom. 설정은 `frontend/vite.config.js`의 `test` 블록:
+
+```js
+test: {
+  environment: 'jsdom',
+  globals: true,
+  setupFiles: './src/test/setup.js',
+},
+```
+
+- **컴포넌트/훅 테스트:** `@testing-library/react`(`renderHook`, `act`) + `@testing-library/jest-dom`. 셋업 `frontend/src/test/setup.js`는 `import '@testing-library/jest-dom'` 한 줄.
+- **모킹:** vitest `vi`(`vi.mock`, `vi.fn`, `vi.spyOn`, `vi.clearAllMocks`).
+
+**실행 명령:**
+
+```bash
+cd frontend && npm test        # vitest run (1회 실행, package.json scripts.test)
+cd frontend && npx vitest       # watch 모드
+cd frontend && npm run lint      # eslint (테스트 아님, 함께 돌리는 게 관행)
+```
+
+## 테스트 파일 구성
+
+### 백엔드
+
+- **위치:** 전부 `backend/tests/`에 평평하게 둔다(`backend/tests/__init__.py` 존재 — 패키지). `pytest.ini`의 `testpaths = tests`로 수집.
+- **네이밍:** `test_<대상>.py`. 라우터=`test_<name>_router.py`(`test_stocks_router.py`, `test_watchlist_router.py`, `test_portfolio_router.py`), 서비스=`test_<service>.py`(`test_dividends.py`, `test_disclosures.py`, `test_market_kr.py`), 배치/스케줄러=`test_scheduler_*.py`·`test_*_batch.py`.
+- **공유 설정:** `backend/tests/conftest.py` — sys.path 주입, 인증 의존성 오버라이드, `client` fixture, quote 캐시 정리 autouse fixture(아래 §테스트 격리).
+- **픽스처 데이터:** `backend/tests/fixtures/`(예: 수주잔고 DART 원문 파싱용).
+
+### 프론트엔드
+
+- **위치:** co-located — 소스 옆에 `*.test.js`를 둔다. 예: `frontend/src/hooks/useStockManagement.test.js`, `frontend/src/hooks/useReportFilters.test.js`. 스모크는 `frontend/src/test/smoke.test.js`.
+- **네이밍:** `<module>.test.js`(훅·로직 위주). 컴포넌트 렌더 테스트는 현재 거의 없고, 로직이 분리된 훅을 직접 검증한다.
+
+## 테스트 격리
 
 `backend/tests/conftest.py`:
-- `app.dependency_overrides[get_current_user] = lambda: "test-user-id"` — 인증 우회(모듈 레벨, 전역)
-- `client` 픽스처: `TestClient(app)`
-- `_clear_quote_cache` (autouse): 매 테스트 전 `cache_svc.invalidate_quote()` — `get_quote`의 종목 단위 TTL 캐시가 테스트 간 교차 오염되는 것을 방지
-
-### 라우터 테스트 — mini-app + dependency_overrides
-
-라우터 단위 테스트는 별도 `FastAPI()` 인스턴스에 해당 라우터만 마운트하고 인증을 오버라이드. 예: `backend/tests/test_stocks_router.py`
 
 ```python
-app = FastAPI()
-app.include_router(router)
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
-app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+@pytest.fixture(autouse=True)
+def _clear_quote_cache():
+    # get_quote는 종목 단위 TTL 캐시를 쓰므로, 테스트 간 교차 오염을 막기 위해 매 테스트 전 비운다.
+    from services import cache as cache_svc
+    cache_svc.invalidate_quote()
+    yield
 ```
 
-라우터 내부 의존성은 import 경로로 patch: `patch("routers.stocks.storage.get_full_portfolio", ...)`, `patch("routers.stocks.market.get_quotes_batch", ...)`, `patch("routers.stocks.query", return_value=[])`, `patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent"))`(파일 폴백 차단).
+- **인증 우회:** `app.dependency_overrides[get_current_user]`로 고정 user id를 주입해 토큰 없이 보호 엔드포인트를 호출한다.
+- **인메모리 캐시 정리:** autouse fixture로 quote 캐시를 매 테스트 전 무효화 — TTL 캐시가 테스트 간 누수되면 거짓통과가 난다(`CONVENTIONS.md` 캐시 무효화 참조).
+- 일부 라우터 테스트는 conftest의 공유 app 대신 **자체 `FastAPI()` + `include_router`**로 격리된 앱을 만든다(`backend/tests/test_watchlist_router.py` 상단). 이때도 동일하게 `dependency_overrides`로 인증을 우회한다.
 
-### 무거운 `unittest.mock.patch`
+## 모킹 패턴
 
-외부 I/O(yfinance/키움/KIS/Naver/DART/DB)는 전부 patch로 차단. 동시에 여러 소스를 패치하는 `with patch(...), patch(...), ...` 스택이 표준.
+### 백엔드 — `patch`로 storage/외부호출 차단
 
-- `mock.assert_called_once()` / `mock.assert_not_called()`로 호출/미호출(lazy short-circuit, 폴백 미발화)을 단언
-- 호출 시퀀스 단언은 `mock.call_args_list`로 인덱싱(additive 호출이 끼면 `call_args`(마지막)는 깨짐 — CLAUDE.md gotcha). 예: `test_market_kr.py:test_get_quote_kr_default_fetches_krx_ref`가 `[c.kwargs.get("regular") for c in kb.call_args_list] == [True, False]`로 단언
-- `call_count`로 콜 수 고정: `assert kb.call_count == 2`
-
-### `regular`-aware side_effect mock — KR 시세 테스트
-
-키움 quote가 `regular` 플래그에 따라 KRX/NXT 다른 값을 반환하는 것을 `side_effect` 클로저로 모킹. `backend/tests/test_market_kr.py`:
+라우터 테스트는 `with patch(...)` 컨텍스트로 storage 함수와 DB/외부호출을 대체한다(`backend/tests/test_watchlist_router.py`):
 
 ```python
-def kq_side(ticker, regular=False):
-    return krx_norm if regular else kiwoom_norm
-... patch("services.kiwoom.quote.get_quote", side_effect=kq_side)
+def test_add_watchlist_stock_saves_ticker_and_stock_data():
+    with patch("routers.watchlist.storage.get_holdings", return_value=[]), \
+         patch("routers.watchlist.storage.save_stocks") as mock_save_stocks, \
+         patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist, \
+         patch("routers.watchlist.db_query", return_value=[]):
+        resp = client.post("/api/watchlist", json={"ticker": "TSLA", "name": "Tesla", ...})
+    assert resp.status_code == 201
+    saved_tickers = mock_save_watchlist.call_args[0][1]   # positional arg 단언
+    assert "TSLA" in saved_tickers
 ```
 
-또는 `_kr_basic_kiwoom` 레벨에서 직접 side_effect:
+- **patch 타깃은 사용처 기준** — `routers.watchlist.storage.X`처럼 *임포트된 곳*을 패치한다(정의된 모듈이 아니라).
+- 외부 API(yfinance, 키움/KIS/Naver, DART, FRED 등)는 항상 mock 한다 — 테스트는 네트워크를 타지 않는다.
+
+### 호출 시퀀스 단언: `call_args_list` / `call_count`
+
+additive read/외부호출이 호출 시퀀스를 늘릴 수 있으므로(`CONVENTIONS.md` additive 규율 참조), 단일 호출 전제의 `mock.call_args`(=마지막 호출) 단언은 깨지기 쉽다. 호출별로 단언한다(`backend/tests/test_recommendation_endpoint.py`):
 
 ```python
-def kiwoom_side(ticker, regular=False):
-    return (354000.0, ...) if regular else (350500.0, ...)
-... patch("services.market.kr._kr_basic_kiwoom", side_effect=kiwoom_side)
+# 마지막(call_args)이 아닌 첫 호출을 인덱스로 명시
+discovery_kwargs = mock_read.call_args_list[0].kwargs
+assert sorted(discovery_kwargs.get("exclude_tickers")) == ["005930", "AAPL"]
+
+# 두 번째 이후 호출 전수 검증
+for call in mock_read.call_args_list[1:]:
+    assert call.kwargs.get("exclude_low_liquidity", False) is False
+
+# 시퀀스를 call_count로 못박음
+assert mock_read.call_count == 1
 ```
 
-이로써 다수결 시나리오(NXT≈KRX 합의, KRX-poison, NXT 전체오염, 단일 글리치 degenerate)를 분기별로 검증. `_corroborated_pick`은 순수 함수라 직접 호출 단위테스트도 있음(`test_corroborated_pick_*`).
+- `call_args_list`를 쓰는 파일: `test_recommendation_endpoint.py`, `test_market_kr.py`, `test_stocks_router.py`, `test_job_runs.py`, `test_kis_quote.py`, `test_batch_resilience.py`, `test_storage.py`. `call_count`로 시퀀스 고정: `test_watchlist_router.py`, `test_portfolio_router.py`, `test_market.py`, `test_admin_router.py` 등.
+- side_effect 함수로 호출 인자에 따라 다른 응답을 돌려주는 패턴도 흔하다 — `def _read(*args, **kwargs): ... if kwargs.get("only_tickers"): ...`.
 
-### `_patch_yf()` 헬퍼 — yfinance 보강 블록 차단
+### 프론트엔드 — `vi.mock` + `renderHook`
 
-`backend/tests/test_market_kr.py:_patch_yf()`:
+훅 테스트는 axios 모듈을 mock하고 `renderHook`/`act`로 훅을 구동한다(`frontend/src/hooks/useStockManagement.test.js`):
 
-```python
-def _patch_yf():
-    m = MagicMock()
-    m.history.return_value = pd.DataFrame({"Close": []})
-    m.info = {}
-    return patch("services.market.yf.Ticker", return_value=m)
+```js
+vi.mock('../api', () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}))
+import api from '../api'
+
+beforeEach(() => { vi.clearAllMocks(); window.confirm = vi.fn() })
+
+it('추가×보유: portfolio POST', async () => {
+  api.post.mockResolvedValue({ data: {} })
+  const { result } = renderHook(() => useStockManagement(makeArgs({ activeTab: 'holdings' })))
+  await act(async () => { await result.current.handleSave({ ticker: 'NVDA' }) })
+  expect(api.post).toHaveBeenCalledWith('/api/portfolio', { ticker: 'NVDA' })
+})
 ```
 
-`get_quote_kr`는 키움 변동률 실패 시 yfinance(sector/industry 보강)로 폴백하므로, KR 시세 테스트는 항상 `with _patch_yf(), ...`로 감싸 네트워크를 타지 않게 함.
+- `beforeEach`에서 `vi.clearAllMocks()`로 mock 초기화, `window.confirm`/`setInterval` 등 브라우저 전역도 `vi.fn()`/`vi.spyOn`으로 스텁(`vi.spyOn(globalThis, 'setInterval')`).
+- 인자 빌더 헬퍼(`makeArgs(over = {})`)로 기본 args를 만들고 케이스별로 override.
+- 거부 케이스는 `await expect(promise).rejects.toBeTruthy()`로 단언.
+- `useReportFilters.test.js`는 characterization 테스트 — 원본 로직(predicate)을 미러로 두고 추출된 훅이 동일하게 합성하는지 검증.
 
-### cache-invalidation-in-test 패턴
+## API 문서 동기 테스트
 
-대시보드/시세는 TTL/LRU 캐시를 쓰므로 테스트 본문에서 명시적으로 캐시 무효화. 약 24곳에서 사용:
+`backend/tests/test_api_doc_sync.py` (task#99) — 라이브 라우터와 문서의 엔드포인트(method+path) *존재* drift를 자동 검출한다. 새 엔드포인트를 문서화하지 않으면 CI가 실패한다.
 
-```python
-import services.cache as cache_svc
-cache_svc.invalidate_dashboard()
-```
+- ground-truth는 `main.app`의 `app.routes`(데코레이터 파싱이 아니라 실제 등록된 라우트).
+- 문서의 canonical 정의는 `### \`METHOD /path\`` 헤더(정규식 `_HEADER_RE`). `API_SPEC.md`(전체)와 `CLAUDE_COWORK_API.md`(부분집합) 둘 다 대조.
+- path param은 `{ticker}`→`{}`로 정규화(`_norm`), 쿼리스트링·끝 슬래시 제거. FastAPI util 경로(`/openapi.json`, `/docs` 등)는 제외.
+- 세 테스트: `test_api_spec_documents_all_live_endpoints`(라이브−문서 == `KNOWN_UNDOCUMENTED`), `test_api_spec_has_no_stale_endpoints`(문서−라이브 == ∅), `test_cowork_api_has_no_stale_endpoints`.
+- `KNOWN_UNDOCUMENTED = frozenset()` — 미문서 엔드포인트 동결 베이스라인(현재 0, exact-match). 의도적으로 미문서로 둘 땐 여기 추가, 문서화하면 제거(self-maintaining).
+- **한계:** 엔드포인트 *존재*만 검증. 요청/응답 스키마·인증 게이팅 동기는 여전히 수동 DoD(prose는 파싱하지 않음).
 
-대시보드 테스트(`test_stocks_router.py`의 `test_dashboard_*`) 다수가 본문 첫 줄에서 호출. conftest의 autouse `invalidate_quote()`와 별개로, dashboard 캐시는 테스트가 직접 비워야 결과가 격리됨.
+## 테스트 타입
 
-### reload × direct-import patch footgun
+- **라우터(통합) 테스트:** `TestClient`로 HTTP 왕복 + storage mock. 대다수가 여기에 속한다(`test_*_router.py`).
+- **서비스(단위) 테스트:** 서비스 함수를 직접 호출하고 외부 의존을 mock(`test_dividends.py`, `test_market_kr.py`, `test_ranking_service.py`, `test_supply_score.py`).
+- **배치/스케줄러 테스트:** 시드/리질리언스/시장분리/job_runs 기록을 검증(`test_scheduler_seed.py`, `test_batch_resilience.py`, `test_batch_market_split.py`, `test_job_runs_instrumentation.py`).
+- **계약/회귀 가드:** `test_api_doc_sync.py`(문서 drift), `test_ticker_validation.py`, `test_market_split_report.py`.
+- **프론트 로직 훅 테스트 + 스모크:** vitest 하니스(`smoke.test.js` + `use*.test.js`). E2E는 vitest 범위 밖 — 프론트 UAT는 Playwright 디바이스 에뮬레이션(테스트계정 `test@portfolion.com`)으로 별도 수행.
 
-모듈을 `importlib.reload`로 다시 로드하는 테스트가 다수 존재(`test_market.py`, `test_report_generator.py`, `test_report_price_gate.py`). reload 시 모듈의 re-import 바인딩은 새 객체로 교체되므로, **patch 대상은 re-import 사이트가 아니라 source 모듈이어야 함**.
+## 회귀 검증 관행
 
-- `test_report_price_gate.py:_run`: `with contextlib.ExitStack()`으로 patch들을 enter한 **상태에서** `importlib.reload(report_generator)` 호출 → reload가 patch된 source를 다시 바인딩하게 함
-- DB 쓰기 단언은 source인 `"services.db.execute"`를 patch (re-import 바인딩 `services.report_generator.something` 아님), 그 mock에 `.assert_not_called()` / `.assert_called()`
-- 외부 fetch는 re-import 사이트(`"services.report_generator.mkt.get_quote"` 등)를 patch — report_generator가 그 이름으로 호출하기 때문
-- `test_market.py`의 `get_financials`/`get_analyst_data`/`get_quote` 테스트들도 `import importlib; importlib.reload(market)`를 patch 컨텍스트 안에서 호출
+- **데이터 파싱 변경(수주잔고 등)은 fixture 단위 테스트 통과 후에도 배포 후 전 종목 재적재 UAT 필수** — fixture에 없던 실데이터 케이스(외화 단위, 캡션 줄바꿈, 연결 전 분기 회사컬럼)를 잡아낸다.
+- **TDD green이 회귀를 못 잡는 함정:** 옛 동작/옛 id를 단언하던 테스트는 깨진 동작을 고정한다. 배치 id 은퇴·additive 추가 시 기존 테스트도 grep 대상에 포함해 갱신한다(`CONVENTIONS.md` additive 규율 참조).
 
-핵심: **patch는 호출이 실제로 일어나는 이름에 걸고, reload는 patch가 활성인 동안 수행**해야 한다. `services.market`은 패키지(`services/market/__init__.py`)가 `services.market.kr`/`us`를 re-export하므로, KR 헬퍼는 source인 `services.market.kr._kr_basic_naver` 등을 patch.
+## 커버리지
 
-### local `.venv`에 `lxml` 없음 → `html.parser`
+- 강제 커버리지 임계치 설정은 없다(`pytest.ini`에 coverage 옵션 없음, `pytest-cov` 미설정). 회귀 가드는 라우터/서비스 단위 테스트의 폭과 계약 테스트(`test_api_doc_sync.py`)로 확보한다.
 
-`lxml`은 `requirements.txt`/Docker엔 있으나 로컬 `backend/.venv`엔 없음. HTML 파싱은 stdlib `BeautifulSoup(html, "html.parser")` 사용(로컬·프로덕션 양쪽 동작):
+---
 
-- `services/backlog_parser.py`(주석 "document.xml 원문은 XML이지만 html.parser로 파싱하므로(lxml 로컬 미설치)"), `services/scraper.py`, `services/guru_scraper.py`, `services/market_indicators/earnings.py`
-- 테스트 `tests/test_backlog_extract.py`도 `BeautifulSoup(html, "html.parser")`
-
-### Notable 테스트 파일
-
-- `test_market_kr.py` — KR 시세 다수결 가드(`regular`-aware side_effect, `_patch_yf`, `_corroborated_pick` 순수함수, 키움→KIS→Naver 폴백 체인, 합법 하한가 false-reject 방지)
-- `test_api_doc_sync.py` — API 문서 ↔ 라이브 라우터 drift 자동검출. `app.routes`(데코레이터 파싱 아님)에서 `(method, path)` 집합을 만들고 `API_SPEC.md`/`CLAUDE_COWORK_API.md`의 `### `METHOD /path`` 헤더와 exact-match 비교. path param은 `{}`로 정규화. `KNOWN_UNDOCUMENTED = frozenset()`(현재 0). 새 엔드포인트를 문서 없이 추가하면 즉시 실패
-- `test_report_price_gate.py` — bake-time independent-feed gate(reload+ExitStack patch, `services.db.execute` 미저장 단언, KRX 자기일관 글리치 스킵, US 미적용)
-- `test_stocks_router.py` — 대시보드 graceful 빌드(holdings=N→N카드, 카드 실패→최소카드 폴백, 일괄시세 실패→price None, KRW 환산 totals, `_latest_snapshots` 배치 헬퍼)
-
-## Frontend — vitest
-
-### 실행
-
-```bash
-cd frontend && npm test   # = vitest run
-```
-
-- **31 tests passed (3 files)** (b6193c3 시점, `vitest run` 실행 확인)
-- 설정: `frontend/vite.config.js`의 `test` 블록 — `environment: 'jsdom'`, `setupFiles: './src/test/setup.js'`
-- `frontend/src/test/setup.js`: `import '@testing-library/jest-dom'`
-- devDependencies: `vitest ^4.1.9`, `@testing-library/react ^16.3.2`, `@testing-library/jest-dom ^6.9.1`, `jsdom ^29.1.1`
-
-### 패턴 — 훅 characterization 테스트
-
-테스트는 주로 추출된 커스텀 훅을 `renderHook`/`act`로 검증. 컴포넌트 렌더 단위테스트보다 로직 훅 단위테스트가 중심.
-
-- `frontend/src/hooks/useReportFilters.test.js` — `import { describe, it, expect } from 'vitest'` + `import { renderHook, act } from '@testing-library/react'`. 정렬/필터/서브탭 분기를 fixture 데이터로 characterize. 의존 술어(`_targetPct`, `_hasWarning`)를 테스트가 미러해 주입
-- `frontend/src/hooks/useStockManagement.test.js`
-- `frontend/src/test/smoke.test.js`
-
-(과거 메모는 "프론트 단위테스트 프레임워크 없음 / UAT는 Playwright 디바이스 에뮬레이션"이라 기록했으나, 현재는 vitest가 도입돼 훅 단위테스트가 존재함. Playwright 기반 라이브 UAT는 별개 트랙으로 병행.)
+*테스트 분석: 2026-06-27*
