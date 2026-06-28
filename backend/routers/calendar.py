@@ -1,9 +1,11 @@
 from __future__ import annotations
 import json
+import os
 import sys
 import calendar as cal_lib
+import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from fastapi import APIRouter, Query, Depends
 import pandas as pd
@@ -12,6 +14,14 @@ import exchange_calendars as xcals
 from services import storage
 from services.db import query, execute
 from auth import get_current_user
+
+# S2: curated FRED release names to show in calendar
+_FRED_RELEASES = {
+    "Consumer Price Index",
+    "Employment Situation",
+    "Gross Domestic Product",
+    "Producer Price Index",
+}
 
 router = APIRouter(prefix="/api", tags=["calendar"])
 
@@ -60,8 +70,9 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
         result = []
         try:
             t = yf.Ticker(stock["ticker"])
-            _collect_earnings(t, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, result)
-            _collect_dividend(t, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, result)
+            cal = t.calendar  # fetch once; shared by earnings + dividend
+            _collect_earnings(cal, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, result)
+            _collect_dividend(cal, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, result)
         except Exception as e:
             print(f"calendar: skip {stock['ticker']}: {e}", file=sys.stderr)
         return result
@@ -73,6 +84,7 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
             events.extend(future.result())
 
     events.extend(_get_holidays(month_start, month_end))
+    events.extend(_get_econ_events(month_start, month_end))
 
     if user_id:
         execute(
@@ -86,8 +98,7 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
     return events
 
 
-def _collect_earnings(t, ticker, stock_type, name, start, end, events):
-    cal = t.calendar
+def _collect_earnings(cal, ticker, stock_type, name, start, end, events):
     if not cal or "Earnings Date" not in cal:
         return
     dates = cal["Earnings Date"]
@@ -106,24 +117,77 @@ def _collect_earnings(t, ticker, stock_type, name, start, end, events):
             })
 
 
-def _collect_dividend(t, ticker, stock_type, name, start, end, events):
-    divs = t.dividends
-    if divs is None or len(divs) < 2:
+def _collect_dividend(cal, ticker, stock_type, name, start, end, events):
+    """S1: emit exact ex-dividend date from t.calendar (US only). KR: skip."""
+    if not cal:
         return
-    dates = [d.date() if hasattr(d, "date") else d for d in divs.index[-4:]]
-    if len(dates) < 2:
+    raw = cal.get("Ex-Dividend Date")
+    if raw is None:
         return
-    intervals = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
-    avg_interval = round(sum(intervals) / len(intervals))
-    next_div = dates[-1] + timedelta(days=avg_interval)
-    if start <= next_div <= end:
-        events.append({
-            "date": next_div.isoformat(),
-            "ticker": ticker,
-            "name": name,
-            "type": "dividend",
-            "stock_type": stock_type,
-        })
+    # raw may be a date, Timestamp, or list; normalise to a list of date
+    candidates = raw if isinstance(raw, list) else [raw]
+    for d in candidates:
+        if hasattr(d, "date"):
+            d = d.date()
+        try:
+            if pd.isna(d):
+                continue
+        except (TypeError, ValueError):
+            pass
+        if isinstance(d, date) and start <= d <= end:
+            events.append({
+                "date": d.isoformat(),
+                "ticker": ticker,
+                "name": name,
+                "type": "dividend",
+                "stock_type": stock_type,
+            })
+
+
+def _get_econ_events(month_start: date, month_end: date) -> list[dict]:
+    """S2: FRED /fred/releases/dates → curated major US release dates.
+    eco: fetched inline at cache-miss; upgrade path = batch into market_cache
+    if FRED rate-limits ever become a problem.
+    """
+    api_key = os.environ.get("FRED_API_KEY")
+    if not api_key:
+        return []
+    try:
+        r = requests.get(
+            "https://api.stlouisfed.org/fred/releases/dates",
+            params={
+                "api_key": api_key,
+                "file_type": "json",
+                "realtime_start": month_start.isoformat(),
+                "realtime_end": month_end.isoformat(),
+                "include_release_dates_with_no_data": "false",
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        items = r.json().get("release_dates", [])
+    except Exception as e:
+        print(f"calendar: FRED releases fetch failed: {e}", file=sys.stderr)
+        return []
+    events = []
+    for item in items:
+        name = item.get("release_name", "")
+        d_str = item.get("date", "")
+        if name not in _FRED_RELEASES or not d_str:
+            continue
+        try:
+            d = date.fromisoformat(d_str)
+        except ValueError:
+            continue
+        if month_start <= d <= month_end:
+            events.append({
+                "date": d.isoformat(),
+                "ticker": "FRED",
+                "name": f"{name} 발표",
+                "type": "econ",
+                "stock_type": "market",
+            })
+    return events
 
 
 def _get_holidays(month_start: date, month_end: date) -> list[dict]:

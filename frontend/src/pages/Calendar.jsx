@@ -14,6 +14,7 @@ const EVENT_STYLE = {
   watchlist_dividend: { background: 'transparent',              color: 'var(--cal-div-wl-color)',     border: '1px dashed var(--cal-div-wl-border)' },
   holiday_us:         { background: 'var(--cal-hol-us-bg)',     color: 'var(--cal-hol-us-color)',     border: '1px solid var(--cal-hol-us-border)' },
   holiday_kr:         { background: 'var(--cal-hol-kr-bg)',     color: 'var(--cal-hol-kr-color)',     border: '1px solid var(--cal-hol-kr-border)' },
+  econ:               { background: 'var(--warn-soft)',         color: 'var(--warn)',                 border: '1px solid var(--warn)' },
 }
 
 const EVENT_ICON = {
@@ -23,10 +24,12 @@ const EVENT_ICON = {
   watchlist_dividend: '💵',
   holiday_us:         '🇺🇸',
   holiday_kr:         '🇰🇷',
+  econ:               '🏛️',
 }
 
 function eventKey(e) {
-  return e.type === 'holiday_us' || e.type === 'holiday_kr' ? e.type : `${e.stock_type}_${e.type}`
+  if (e.type === 'holiday_us' || e.type === 'holiday_kr' || e.type === 'econ') return e.type
+  return `${e.stock_type}_${e.type}`
 }
 
 function MonthGrid({ year, month, events }) {
@@ -141,6 +144,11 @@ function MonthGrid({ year, month, events }) {
                 const key = eventKey(e)
                 const s = EVENT_STYLE[key] || EVENT_STYLE.holding_earnings
                 const isHoliday = e.type === 'holiday_us' || e.type === 'holiday_kr'
+                const isEcon = e.type === 'econ'
+                const typeLabel = isHoliday
+                  ? (e.type === 'holiday_us' ? 'NYSE 휴장' : 'KRX 휴장')
+                  : isEcon ? (e.name || '경제지표')
+                  : e.type === 'earnings' ? '실적' : '배당락'
                 return (
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
@@ -149,12 +157,12 @@ function MonthGrid({ year, month, events }) {
                   }}>
                     <span style={{ fontSize: 18, flexShrink: 0 }}>{EVENT_ICON[key] || '●'}</span>
                     <span style={{ ...s, padding: '2px 8px', borderRadius: 4, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {isHoliday ? (e.type === 'holiday_us' ? 'NYSE 휴장' : 'KRX 휴장') : e.type === 'earnings' ? '실적' : '배당락'}
+                      {typeLabel}
                     </span>
-                    {!isHoliday && e.ticker && (
+                    {!isHoliday && !isEcon && e.ticker && (
                       <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{e.ticker}</span>
                     )}
-                    {!isHoliday && (
+                    {!isHoliday && !isEcon && (
                       <span style={{ fontSize: 12, color: 'var(--text-3)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {e.name || ''}
                       </span>
@@ -252,6 +260,7 @@ export default function Calendar() {
         <span>{EVENT_ICON.watchlist_dividend} 관심 배당락</span>
         <span>{EVENT_ICON.holiday_us} NYSE 휴장</span>
         <span>{EVENT_ICON.holiday_kr} KRX 휴장</span>
+        <span>{EVENT_ICON.econ} 경제지표</span>
       </div>
     </div>
   )

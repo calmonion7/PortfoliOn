@@ -26,15 +26,12 @@ SAMPLE_PORTFOLIO = {
 def _mock_ticker(ticker):
     m = MagicMock()
     if ticker == "AAPL":
-        m.calendar = {"Earnings Date": [date(2026, 5, 20)]}
-        m.dividends = pd.Series(
-            [0.25, 0.25, 0.25],
-            index=pd.DatetimeIndex([
-                pd.Timestamp("2025-08-09", tz="UTC"),
-                pd.Timestamp("2025-11-07", tz="UTC"),
-                pd.Timestamp("2026-02-07", tz="UTC"),
-            ]),
-        )
+        # Ex-Dividend Date now sourced from calendar (exact), not estimated from dividends history
+        m.calendar = {
+            "Earnings Date": [date(2026, 5, 20)],
+            "Ex-Dividend Date": date(2026, 5, 9),
+        }
+        m.dividends = pd.Series([], dtype=float)
     else:
         m.calendar = {}
         m.dividends = pd.Series([], dtype=float)
@@ -58,7 +55,7 @@ def test_calendar_returns_earnings_event(tmp_path):
 
 
 def test_calendar_returns_dividend_event(tmp_path):
-    # AAPL: last div 2026-02-07, avg interval ~91 days → next ~2026-05-09 (in May)
+    # AAPL mock: Ex-Dividend Date = 2026-05-09 (exact, from t.calendar)
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
          patch("routers.calendar._CACHE_DIR", tmp_path), \
@@ -69,6 +66,7 @@ def test_calendar_returns_dividend_event(tmp_path):
     divs = [e for e in events if e["type"] == "dividend"]
     assert len(divs) == 1
     assert divs[0]["ticker"] == "AAPL"
+    assert divs[0]["date"] == "2026-05-09"
     assert divs[0]["stock_type"] == "holding"
 
 
@@ -171,3 +169,86 @@ def test_calendar_includes_krx_holiday(tmp_path):
     assert len(kr_holidays) > 0
     assert all(e["ticker"] == "KRX" for e in kr_holidays)
     assert all(e["stock_type"] == "market" for e in kr_holidays)
+
+
+# --- eco runnable checks: S1 ex-date parse + S2 FRED parse ---
+
+from routers.calendar import _collect_dividend, _get_econ_events
+
+
+def _run_collect_dividend(cal, month_start, month_end):
+    events = []
+    _collect_dividend(cal, "TEST", "holding", "Test Corp", month_start, month_end, events)
+    return events
+
+
+def test_exact_ex_date_in_month():
+    cal = {"Ex-Dividend Date": date(2026, 6, 10)}
+    events = _run_collect_dividend(cal, date(2026, 6, 1), date(2026, 6, 30))
+    assert len(events) == 1
+    assert events[0]["date"] == "2026-06-10"
+    assert events[0]["type"] == "dividend"
+
+
+def test_exact_ex_date_out_of_month():
+    cal = {"Ex-Dividend Date": date(2026, 7, 10)}
+    events = _run_collect_dividend(cal, date(2026, 6, 1), date(2026, 6, 30))
+    assert events == []
+
+
+def test_ex_date_none_graceful():
+    events = _run_collect_dividend({"Ex-Dividend Date": None}, date(2026, 6, 1), date(2026, 6, 30))
+    assert events == []
+
+
+def test_ex_date_nat_graceful():
+    import pandas as pd
+    events = _run_collect_dividend({"Ex-Dividend Date": pd.NaT}, date(2026, 6, 1), date(2026, 6, 30))
+    assert events == []
+
+
+def test_ex_date_missing_key_graceful():
+    events = _run_collect_dividend({}, date(2026, 6, 1), date(2026, 6, 30))
+    assert events == []
+
+
+def test_fred_releases_parse():
+    """_get_econ_events: mocked FRED response → only curated names pass through."""
+    fake_response = {
+        "release_dates": [
+            {"release_name": "Consumer Price Index", "date": "2026-06-11"},
+            {"release_name": "Employment Situation", "date": "2026-06-05"},
+            {"release_name": "Some Obscure Release", "date": "2026-06-15"},
+            {"release_name": "Gross Domestic Product", "date": "2026-05-30"},  # out of month
+        ]
+    }
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = fake_response
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("routers.calendar.os.environ.get", return_value="fake-key"), \
+         patch("routers.calendar.requests.get", return_value=mock_resp):
+        events = _get_econ_events(date(2026, 6, 1), date(2026, 6, 30))
+
+    assert len(events) == 2
+    names = {e["name"] for e in events}
+    assert "Consumer Price Index 발표" in names
+    assert "Employment Situation 발표" in names
+    assert all(e["type"] == "econ" for e in events)
+    assert all(e["stock_type"] == "market" for e in events)
+    assert all(e["ticker"] == "FRED" for e in events)
+
+
+def test_fred_key_absent_returns_empty():
+    """FRED_API_KEY absent → empty list, no error."""
+    with patch("routers.calendar.os.environ.get", return_value=None):
+        events = _get_econ_events(date(2026, 6, 1), date(2026, 6, 30))
+    assert events == []
+
+
+def test_fred_request_error_returns_empty():
+    """FRED request failure → empty list gracefully."""
+    with patch("routers.calendar.os.environ.get", return_value="fake-key"), \
+         patch("routers.calendar.requests.get", side_effect=Exception("network error")):
+        events = _get_econ_events(date(2026, 6, 1), date(2026, 6, 30))
+    assert events == []

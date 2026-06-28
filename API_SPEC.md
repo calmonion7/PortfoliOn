@@ -1717,10 +1717,12 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `date` | string | 이벤트 날짜 (`YYYY-MM-DD`) |
 | `ticker` | string | 종목 코드 |
 | `name` | string | 종목명 또는 공휴일명 |
-| `type` | string | `"earnings"` \| `"dividend"` \| `"holiday_us"` \| `"holiday_kr"` |
+| `type` | string | `"earnings"` \| `"dividend"` \| `"econ"` \| `"holiday_us"` \| `"holiday_kr"` |
 | `stock_type` | string | `"holding"` \| `"watchlist"` \| `"market"` |
 
-> **배당락일 추정:** yfinance 배당 이력에서 최근 4회 지급 간격의 평균으로 다음 배당락일을 예측합니다. 배당 이력이 2회 미만인 종목은 생략됩니다.
+> **배당락일(dividend):** US 종목은 `t.calendar['Ex-Dividend Date']`의 확정 ex-date 사용. 과거 추정 방식(4회 평균 간격)은 더 이상 사용하지 않음.
+>
+> **경제지표 발표일(econ):** FRED `/fred/releases/dates`에서 수집한 주요 US 경제지표 발표 일정(CPI·고용보고서·GDP·PPI). `ticker="FRED"`, `stock_type="market"`. `FRED_API_KEY` 미설정 시 비어 있음.
 
 **Error `422`** — `month` 파라미터가 `YYYY-MM` 형식이 아닌 경우
 
