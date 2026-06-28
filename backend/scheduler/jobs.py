@@ -164,6 +164,16 @@ def _fetch_disclosures():
             print(f"[Scheduler] Disclosure fetch failed: {e}")
 
 
+def _fetch_agm():
+    from services.agm import fetch_agm_meeting_dates
+    with job_runs.record("agm_fetch", "auto"):
+        try:
+            r = fetch_agm_meeting_dates()
+            print(f"[Scheduler] AGM meeting dates fetched: {r}")
+        except Exception as e:
+            print(f"[Scheduler] AGM fetch failed: {e}")
+
+
 def _fetch_insider():
     from services.insider_trades import fetch_all_insider_trades
     with job_runs.record("insider_fetch", "auto"):
@@ -427,6 +437,7 @@ _JOB_FUNCS = {
     "backlog_fetch": _fetch_backlog,
     "kr_sector_fetch": _fetch_kr_sector,
     "disclosure_fetch": _fetch_disclosures,
+    "agm_fetch": _fetch_agm,
     "dividend_fetch": _fetch_dividends,
     "insider_fetch": _fetch_insider,
     "recommendation_kr": _fetch_recommendation_kr,

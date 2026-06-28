@@ -24,6 +24,7 @@ from .jobs import (
     _fetch_lending,
     _fetch_backlog,
     _fetch_disclosures,
+    _fetch_agm,
     _fetch_insider,
     _fetch_dividends,
     _fetch_kr_rankings,

@@ -85,6 +85,7 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
 
     events.extend(_get_holidays(month_start, month_end))
     events.extend(_get_econ_events(month_start, month_end))
+    events.extend(_get_agm_events(all_stocks, month_start, month_end))
 
     if user_id:
         execute(
@@ -142,6 +143,39 @@ def _collect_dividend(cal, ticker, stock_type, name, start, end, events):
                 "type": "dividend",
                 "stock_type": stock_type,
             })
+
+
+def _get_agm_events(stocks: list[dict], month_start: date, month_end: date) -> list[dict]:
+    """S3: AGM dates from stock_disclosures.meeting_date — read-only, batch-populated.
+    eco: pass all tickers; stock_disclosures is KR-only so US tickers return nothing."""
+    if not stocks:
+        return []
+    stock_map = {s["ticker"]: s for s in stocks}
+    placeholders = ",".join(["%s"] * len(stocks))
+    rows = query(
+        f"""
+        SELECT DISTINCT ON (ticker) ticker, meeting_date
+        FROM stock_disclosures
+        WHERE ticker IN ({placeholders})
+          AND report_nm LIKE '%%주주총회%%'
+          AND meeting_date BETWEEN %s AND %s
+        ORDER BY ticker, rcept_dt DESC
+        """,
+        (*stock_map.keys(), month_start, month_end),
+    )
+    events = []
+    for row in rows:
+        s = stock_map.get(row["ticker"])
+        if not s:
+            continue
+        events.append({
+            "date": row["meeting_date"].isoformat(),
+            "ticker": row["ticker"],
+            "name": s["name"],
+            "type": "agm",
+            "stock_type": s["stock_type"],
+        })
+    return events
 
 
 def _get_econ_events(month_start: date, month_end: date) -> list[dict]:

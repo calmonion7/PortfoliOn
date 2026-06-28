@@ -1503,6 +1503,14 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
+### `POST /api/report/agm/refresh`
+
+전 KR 종목(보유+관심) 주총 개최일 재수집(`agm_fetch` 배치 수동 트리거). 백그라운드 실행, 즉시 202. **Auth:** admin.
+
+**Response `202`** — `{ "message": "주총 일시 전 종목 수집 시작" }`
+
+---
+
 ## Consensus (컨센서스)
 
 ### `GET /api/consensus/batch/progress`
@@ -1717,12 +1725,14 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `date` | string | 이벤트 날짜 (`YYYY-MM-DD`) |
 | `ticker` | string | 종목 코드 |
 | `name` | string | 종목명 또는 공휴일명 |
-| `type` | string | `"earnings"` \| `"dividend"` \| `"econ"` \| `"holiday_us"` \| `"holiday_kr"` |
+| `type` | string | `"earnings"` \| `"dividend"` \| `"agm"` \| `"econ"` \| `"holiday_us"` \| `"holiday_kr"` |
 | `stock_type` | string | `"holding"` \| `"watchlist"` \| `"market"` |
 
 > **배당락일(dividend):** US 종목은 `t.calendar['Ex-Dividend Date']`의 확정 ex-date 사용. 과거 추정 방식(4회 평균 간격)은 더 이상 사용하지 않음.
 >
 > **경제지표 발표일(econ):** FRED `/fred/releases/dates`에서 수집한 주요 US 경제지표 발표 일정(CPI·고용보고서·GDP·PPI). `ticker="FRED"`, `stock_type="market"`. `FRED_API_KEY` 미설정 시 비어 있음.
+>
+> **주주총회(agm):** KR 보유·관심 종목의 주총 개최일(`stock_disclosures.meeting_date`). `disclosure_fetch` 배치(매일 07:30 KST)가 사전 수집한 저장값만 읽음(요청 시 라이브 DART 호출 없음).
 
 **Error `422`** — `month` 파라미터가 `YYYY-MM` 형식이 아닌 경우
 

@@ -257,9 +257,10 @@ CREATE TABLE IF NOT EXISTS stock_disclosures (
     ticker     TEXT NOT NULL,
     rcept_dt   DATE,                          -- 접수일
     report_nm  TEXT,                          -- 보고서명
-    pblntf_ty  TEXT,                          -- 공시 유형(A정기·B주요사항·C발행·D지분)
-    corp_name  TEXT,
-    fetched_at TIMESTAMPTZ DEFAULT NOW()
+    pblntf_ty    TEXT,                         -- 공시 유형(A정기·B주요사항·C발행·D지분)
+    corp_name    TEXT,
+    meeting_date DATE,                          -- 주총 개최일 (주주총회 공시에서 추출)
+    fetched_at   TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_disclosures_read ON stock_disclosures(ticker, rcept_dt DESC);
 

@@ -344,6 +344,18 @@ def _run_insider_trades_all():
         fetch_all_insider_trades()
 
 
+@router.post("/report/agm/refresh", status_code=202)
+def refresh_all_agm(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+    background_tasks.add_task(_run_agm_all)
+    return {"message": "주총 일시 전 종목 수집 시작"}
+
+
+def _run_agm_all():
+    from services.agm import fetch_agm_meeting_dates
+    with job_runs.record("agm_fetch", "manual"):
+        fetch_agm_meeting_dates()
+
+
 # /report/{ticker}/backlog 은 catch-all /report/{ticker}/{date_str} 보다 먼저
 # 등록해야 한다. 아니면 "backlog"가 date_str로 매칭돼 snapshots를 date='backlog'로
 # 조회하다 500이 난다 (enrich/batch와 동일 클래스의 라우트 순서 함정).

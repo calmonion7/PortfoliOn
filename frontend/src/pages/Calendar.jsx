@@ -12,6 +12,8 @@ const EVENT_STYLE = {
   holding_dividend:   { background: 'var(--cal-div-hold-bg)',   color: 'var(--cal-div-hold-color)',   border: '1px solid var(--cal-div-hold-border)' },
   watchlist_earnings: { background: 'transparent',              color: 'var(--cal-earn-wl-color)',    border: '1px dashed var(--cal-earn-wl-border)' },
   watchlist_dividend: { background: 'transparent',              color: 'var(--cal-div-wl-color)',     border: '1px dashed var(--cal-div-wl-border)' },
+  holding_agm:        { background: 'var(--cal-earn-hold-bg)',  color: 'var(--cal-earn-hold-color)',  border: '1px solid var(--cal-earn-hold-border)' },
+  watchlist_agm:      { background: 'transparent',              color: 'var(--cal-earn-wl-color)',    border: '1px dashed var(--cal-earn-wl-border)' },
   holiday_us:         { background: 'var(--cal-hol-us-bg)',     color: 'var(--cal-hol-us-color)',     border: '1px solid var(--cal-hol-us-border)' },
   holiday_kr:         { background: 'var(--cal-hol-kr-bg)',     color: 'var(--cal-hol-kr-color)',     border: '1px solid var(--cal-hol-kr-border)' },
   econ:               { background: 'var(--warn-soft)',         color: 'var(--warn)',                 border: '1px solid var(--warn)' },
@@ -20,8 +22,10 @@ const EVENT_STYLE = {
 const EVENT_ICON = {
   holding_earnings:   '📈',
   holding_dividend:   '💰',
+  holding_agm:        '🗳️',
   watchlist_earnings: '📊',
   watchlist_dividend: '💵',
+  watchlist_agm:      '🗳️',
   holiday_us:         '🇺🇸',
   holiday_kr:         '🇰🇷',
   econ:               '🏛️',
@@ -148,7 +152,7 @@ function MonthGrid({ year, month, events }) {
                 const typeLabel = isHoliday
                   ? (e.type === 'holiday_us' ? 'NYSE 휴장' : 'KRX 휴장')
                   : isEcon ? (e.name || '경제지표')
-                  : e.type === 'earnings' ? '실적' : '배당락'
+                  : e.type === 'earnings' ? '실적' : e.type === 'agm' ? '주총' : '배당락'
                 return (
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
@@ -256,8 +260,10 @@ export default function Calendar() {
       <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-3)', flexWrap: 'wrap' }}>
         <span>{EVENT_ICON.holding_earnings} 보유 실적</span>
         <span>{EVENT_ICON.holding_dividend} 보유 배당락</span>
+        <span>{EVENT_ICON.holding_agm} 보유 주총</span>
         <span>{EVENT_ICON.watchlist_earnings} 관심 실적</span>
         <span>{EVENT_ICON.watchlist_dividend} 관심 배당락</span>
+        <span>{EVENT_ICON.watchlist_agm} 관심 주총</span>
         <span>{EVENT_ICON.holiday_us} NYSE 휴장</span>
         <span>{EVENT_ICON.holiday_kr} KRX 휴장</span>
         <span>{EVENT_ICON.econ} 경제지표</span>

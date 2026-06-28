@@ -215,3 +215,14 @@ def test_migrate_creates_stock_disclosures(monkeypatch):
     assert "CREATE TABLE IF NOT EXISTS stock_disclosures" in joined
     assert "rcept_no TEXT PRIMARY KEY" in joined
     assert "idx_disclosures_read" in joined
+
+
+def test_migrate_adds_meeting_date_column(monkeypatch):
+    """main._migrate가 meeting_date DATE 컬럼 추가 DDL을 발행한다(ADD COLUMN IF NOT EXISTS)."""
+    import main
+    ddl = []
+    import services.db as db
+    monkeypatch.setattr(db, "execute", lambda sql, *a, **k: ddl.append(sql))
+    main._migrate()
+    joined = "\n".join(ddl)
+    assert "stock_disclosures ADD COLUMN IF NOT EXISTS meeting_date DATE" in joined

@@ -124,6 +124,11 @@ def _migrate():
         print(f"[migrate] stock_insider_trades 생성 실패: {e}")
     try:
         from services.db import execute
+        execute("ALTER TABLE stock_disclosures ADD COLUMN IF NOT EXISTS meeting_date DATE")
+    except Exception as e:
+        print(f"[migrate] stock_disclosures.meeting_date 추가 실패: {e}")
+    try:
+        from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_recommendations (
             ticker TEXT PRIMARY KEY,
             market TEXT NOT NULL,
