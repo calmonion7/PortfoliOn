@@ -194,6 +194,37 @@ def test_dashboard_dividend_fields_per_holding():
     assert card["expected_annual_income"] == 20.0  # 2.0*10
 
 
+def test_dashboard_dividend_decimal_avg_cost_no_throw():
+    """avg_cost/quantity가 DB NUMERIC→Decimal로 와도 yield_on_cost/expected_income 계산이
+    float/Decimal TypeError로 throw하지 않는다 — throw하면 카드가 minimal로 폴백돼
+    enrichment(RSI·컨센서스·매물대·배당)가 전멸한다(대시보드 데이터 안나옴 회귀 차단)."""
+    from decimal import Decimal
+    import services.cache as cache_svc
+    cache_svc.invalidate_dashboard()
+    portfolio = {
+        "stocks": [{"ticker": "KO", "name": "Coca-Cola", "market": "US",
+                    "avg_cost": Decimal("50.0"), "quantity": Decimal("10"), "exchange": ""}],
+        "watchlist": [],
+    }
+    quote = {"ticker": "KO", "price": 82.0, "daily_change_pct": 0.5,
+             "weekly_change_pct": 1.0, "monthly_change_pct": 2.0, "market": "US"}
+    div = {"annual_dividend_per_share": 2.0, "dividend_yield": 2.44,
+           "currency": "USD", "source": "yfinance"}
+    from pathlib import Path
+    with patch("routers.stocks.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.stocks.market.get_quotes_batch", return_value={"KO": quote}), \
+         patch("routers.stocks.SNAPSHOTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.REPORTS_DIR", Path("/nonexistent")), \
+         patch("routers.stocks.dividends.get_dividend", return_value=div), \
+         patch("routers.stocks.query", return_value=[]):
+        resp = client.get("/api/stocks/dashboard")
+    card = resp.json()["holdings"][0]
+    # full 카드(enrichment 살아있음) — minimal 폴백이면 아래가 전부 None
+    assert card["yield_on_cost"] == 4.0            # 2.0/50.0*100
+    assert card["expected_annual_income"] == 20.0  # 2.0*10
+    assert card["annual_dividend_per_share"] == 2.0
+
+
 def test_dashboard_totals_krw_conversion_mixed_currency():
     """포트 총계: US$ 배당을 _to_krw(저장 FX)로 환산해 KR원과 합산. 평균 수익률=총배당/총평가."""
     import services.cache as cache_svc

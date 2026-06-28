@@ -370,9 +370,12 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
         div_yield = div.get("dividend_yield") if div else None
         avg_cost = stock.get("avg_cost")
         qty = stock.get("quantity")
-        yield_on_cost = (round(annual_div / avg_cost * 100, 2)
+        # avg_cost/qty는 DB NUMERIC→Decimal, annual_div는 float이라 그대로 나누면
+        # float/Decimal TypeError로 카드 빌드가 throw→minimal 폴백된다(대시보드 enrichment 전멸,
+        # task#102 증상의 실제 트리거). 양쪽을 float로 정규화.
+        yield_on_cost = (round(float(annual_div) / float(avg_cost) * 100, 2)
                          if (annual_div is not None and avg_cost) else None)
-        expected_income = (round(annual_div * qty, 2)
+        expected_income = (round(float(annual_div) * float(qty), 2)
                            if (annual_div is not None and qty) else None)
 
         # 수급 종합 스코어(ADR-0014): KR 종목만 저장값(stock_supply_score) 조회 — 라이브 호출 0.
