@@ -25,6 +25,39 @@ def _fin_num(v):
         return None
 
 
+def _comp_valuation(ticker: str, market: str) -> dict:
+    """경쟁사 PER/PBR. US=yfinance info, KR=Naver finance/quarter 최신 실적행. 결측/예외→None."""
+    import math
+    def _fin(v):
+        try:
+            f = float(v)
+            return f if math.isfinite(f) else None
+        except (TypeError, ValueError):
+            return None
+    try:
+        if market == "KR":
+            from services.market.kr import _naver_get, _naver_row_val
+            d = _naver_get(ticker, "finance/quarter")
+            fi = d.get("financeInfo", {})
+            metas = sorted(fi.get("trTitleList", []), key=lambda t: t["key"], reverse=True)
+            rows = fi.get("rowList", [])
+            key = next((m["key"] for m in metas if m.get("isConsensus") != "Y"), None)
+            if not key:
+                return {"per": None, "pbr": None}
+            return {
+                "per": _fin(_naver_row_val(rows, 12, key)),
+                "pbr": _fin(_naver_row_val(rows, 14, key)),
+            }
+        else:
+            info = yf.Ticker(ticker).info or {}
+            return {
+                "per": _fin(info.get("trailingPE")),
+                "pbr": _fin(info.get("priceToBook")),
+            }
+    except Exception:
+        return {"per": None, "pbr": None}
+
+
 def _infer_comp_market(ticker: str, parent_market: str, parent_exchange: str):
     """티커 형식으로 마켓을 추론. 6자리 숫자 → KR, 그 외 → US."""
     clean = ticker.upper().split('.')[0]
@@ -80,6 +113,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
         f_comps     = [ex.submit(mkt.get_quote, c, *_infer_comp_market(c, market, exchange), regular=True) for c in competitors]
+        f_comp_vals = [ex.submit(_comp_valuation, c, _infer_comp_market(c, market, exchange)[0]) for c in competitors]
 
     quote             = f_quote.result()
     financials        = f_fin.result()
@@ -89,6 +123,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
     finviz            = f_finviz.result() if f_finviz is not None else {}
     news              = f_news.result()
     competitor_quotes = [f.result() for f in f_comps]
+    competitor_vals   = [f.result() for f in f_comp_vals]
 
     vp = indicators.get_volume_profile(daily_df)
 
@@ -108,6 +143,19 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         forward_per = round(current_price / (consensus_f["eps"] * 4), 1) if current_price and consensus_f else None
         actual_bps = next((f["bps"] for f in actual_f if f.get("bps") is not None), None)
         pbr = round(current_price / actual_bps, 2) if current_price and actual_bps else None
+        # PSR: 시총÷TTM매출(Naver finance/quarter rv0 최근 4 non-consensus 분기 합×1e8)
+        psr = ev_ebitda = None
+        try:
+            import math
+            mc = quote.get("market_cap")  # 원 단위
+            ttm_rev_uck = sum(
+                f["revenue"] for f in actual_f[:4]
+                if f.get("revenue") is not None
+            )  # revenue는 이미 원 단위(×1e8 변환됨, get_financials_kr)
+            if mc and ttm_rev_uck and ttm_rev_uck > 0 and math.isfinite(mc / ttm_rev_uck):
+                psr = round(mc / ttm_rev_uck, 2)
+        except Exception:
+            pass
     else:
         try:
             _info = (_t.info if _t is not None else {}) or {}
@@ -116,9 +164,12 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
             trailing_per = _fin_num(_info.get("trailingPE"))
             forward_per = _fin_num(_info.get("forwardPE"))
             pbr = _fin_num(_info.get("priceToBook"))
+            # eco: priceToSalesTrailing12Months is the actual key (라이브 AAPL 확인 2026-06-28)
+            psr = _fin_num(_info.get("priceToSalesTrailing12Months"))
+            ev_ebitda = _fin_num(_info.get("enterpriseToEbitda"))
         except Exception:
             sector, industry = "", ""
-            trailing_per = forward_per = pbr = None
+            trailing_per = forward_per = pbr = psr = ev_ebitda = None
 
     summary = {
         "ticker": ticker,
@@ -144,6 +195,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         "per": round(trailing_per, 2) if trailing_per else None,
         "forward_per": round(forward_per, 2) if forward_per else None,
         "pbr": round(pbr, 2) if pbr else None,
+        "psr": psr,
+        "ev_ebitda": ev_ebitda,
         "high_20d": high_20d,
         "drop_from_high_20d": drop_from_high_20d,
         "moat": stock.get("moat", ""),
@@ -162,10 +215,13 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
                     "market_cap": q.get("market_cap"),
                     "ytd_return": q.get("ytd_return"),
                     "is_self": c == ticker,
+                    "per": (round(trailing_per, 2) if trailing_per else None) if c == ticker else v.get("per"),
+                    "pbr": (round(pbr, 2) if pbr else None) if c == ticker else v.get("pbr"),
                 }
-                for c, q in zip(
+                for c, q, v in zip(
                     [ticker] + list(competitors),
                     [quote] + competitor_quotes,
+                    [{}] + competitor_vals,
                 )
             ],
             key=lambda x: x["market_cap"] or 0,

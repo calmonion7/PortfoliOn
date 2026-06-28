@@ -67,6 +67,16 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
                   {c.ytd_return != null ? `${ytdPos ? '+' : ''}${c.ytd_return.toFixed(1)}%` : '—'}
                 </span>
               </div>
+              {(c.per != null || c.pbr != null) && (
+                <div style={{ display: 'flex', gap: 8, paddingLeft: 19 }}>
+                  {c.per != null && (
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>PER {c.per.toFixed(1)}</span>
+                  )}
+                  {c.pbr != null && (
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>PBR {c.pbr.toFixed(2)}</span>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}

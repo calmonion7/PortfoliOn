@@ -88,6 +88,16 @@ export default function ReportDetailHeader({
             PBR {detail.summary.pbr.toFixed(2)}
           </span>
         )}
+        {detail.summary?.psr != null && (
+          <span style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
+            PSR {detail.summary.psr.toFixed(2)}
+          </span>
+        )}
+        {detail.summary?.ev_ebitda != null && (
+          <span style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
+            EV/EBITDA {detail.summary.ev_ebitda.toFixed(1)}
+          </span>
+        )}
       </div>
     </div>
   )
