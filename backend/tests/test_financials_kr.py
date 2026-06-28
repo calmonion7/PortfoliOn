@@ -43,9 +43,9 @@ def _make_naver_response(row9_value="187.68"):
 
 
 def test_kr_financials_ratios():
-    from backend.services.market.kr import get_financials_kr
+    from services.market.kr import get_financials_kr
 
-    with patch("backend.services.market.kr._naver_get", return_value=_make_naver_response()):
+    with patch("services.market.kr._naver_get", return_value=_make_naver_response()):
         results = get_financials_kr("005930")
 
     assert results, "결과가 비어있음"
@@ -61,9 +61,9 @@ def test_kr_financials_ratios():
 
 def test_kr_financials_quick_ratio_graceful_none():
     """row9 == '-' → quick_ratio is None (graceful)."""
-    from backend.services.market.kr import get_financials_kr
+    from services.market.kr import get_financials_kr
 
-    with patch("backend.services.market.kr._naver_get", return_value=_make_naver_response(row9_value="-")):
+    with patch("services.market.kr._naver_get", return_value=_make_naver_response(row9_value="-")):
         results = get_financials_kr("005930")
 
     assert results[0]["quick_ratio"] is None

@@ -62,10 +62,10 @@ def _dart_resp(status="000", list_data=None):
 
 def test_fcf_and_coverage_matched():
     """thstrm: FCF = OCF − CapEx, coverage = EBIT / 이자지급."""
-    with patch("backend.services.market.kr._naver_get", return_value=_NAVER_ANNUAL), \
-         patch("backend.services.market.kr.requests.get") as mock_req, \
+    with patch("services.market.kr._naver_get", return_value=_NAVER_ANNUAL), \
+         patch("services.market.kr.requests.get") as mock_req, \
          patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
-         patch("backend.services.market.kr._get_corp_code_map_from_backlog",
+         patch("services.market.kr._get_corp_code_map_from_backlog",
                return_value={"005930": "00126380"}, create=True):
 
         # patch _get_corp_code_map inside the function's import
@@ -74,7 +74,7 @@ def test_fcf_and_coverage_matched():
             mock_resp.json.return_value = _dart_resp()
             mock_req.return_value = mock_resp
 
-            from backend.services.market.kr import get_annual_financials_kr
+            from services.market.kr import get_annual_financials_kr
             results = get_annual_financials_kr("005930")
 
     assert results, "결과 비어있음"
@@ -90,10 +90,10 @@ def test_fcf_and_coverage_matched():
 
 def test_no_dart_key_graceful():
     """DART_API_KEY 없으면 fcf/coverage 전부 None, 함수 안 깨짐."""
-    with patch("backend.services.market.kr._naver_get", return_value=_NAVER_ANNUAL), \
+    with patch("services.market.kr._naver_get", return_value=_NAVER_ANNUAL), \
          patch("os.environ.get", side_effect=lambda k, d="": "" if k == "DART_API_KEY" else d):
 
-        from backend.services.market.kr import get_annual_financials_kr
+        from services.market.kr import get_annual_financials_kr
         results = get_annual_financials_kr("005930")
 
     assert results
@@ -104,8 +104,8 @@ def test_no_dart_key_graceful():
 
 def test_dart_status_non_000_graceful():
     """DART status != '000' → fcf/coverage None, 정상 반환."""
-    with patch("backend.services.market.kr._naver_get", return_value=_NAVER_ANNUAL), \
-         patch("backend.services.market.kr.requests.get") as mock_req, \
+    with patch("services.market.kr._naver_get", return_value=_NAVER_ANNUAL), \
+         patch("services.market.kr.requests.get") as mock_req, \
          patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d):
 
         with patch("services.backlog._get_corp_code_map", return_value={"005930": "00126380"}):
@@ -113,7 +113,7 @@ def test_dart_status_non_000_graceful():
             mock_resp.json.return_value = _dart_resp(status="013")
             mock_req.return_value = mock_resp
 
-            from backend.services.market.kr import get_annual_financials_kr
+            from services.market.kr import get_annual_financials_kr
             results = get_annual_financials_kr("005930")
 
     assert results
