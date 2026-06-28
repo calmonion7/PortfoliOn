@@ -15,14 +15,117 @@ def calc_ema(series: pd.Series, period: int) -> pd.Series:
     return series.ewm(span=period, adjust=False).mean()
 
 def get_support_resistance(df: pd.DataFrame) -> dict:
-    close = df["Close"]
+    import math
+    _none = {"week52_high": None, "week52_low": None, "ema20": None, "ema50": None, "ema200": None}
+    if df.empty or "Close" not in df.columns:
+        return _none
+    close = df["Close"].dropna()
+    if close.empty:
+        return _none
+
+    def _fin(v):
+        try:
+            f = float(v)
+            return round(f, 2) if math.isfinite(f) else None
+        except (TypeError, ValueError):
+            return None
+
+    high = df["High"].dropna() if "High" in df.columns else close
+    low  = df["Low"].dropna()  if "Low"  in df.columns else close
     return {
-        "week52_high": round(float(df["High"].tail(252).max()), 2),
-        "week52_low": round(float(df["Low"].tail(252).min()), 2),
-        "ema20": round(float(calc_ema(close, 20).iloc[-1]), 2),
-        "ema50": round(float(calc_ema(close, 50).iloc[-1]), 2),
-        "ema200": round(float(calc_ema(close, 200).iloc[-1]), 2),
+        "week52_high": _fin(high.tail(252).max()),
+        "week52_low":  _fin(low.tail(252).min()),
+        "ema20":  _fin(calc_ema(close, 20).iloc[-1]),
+        "ema50":  _fin(calc_ema(close, 50).iloc[-1]),
+        "ema200": _fin(calc_ema(close, 200).iloc[-1]),
     }
+
+
+def calc_trend_summary(df: pd.DataFrame) -> dict:
+    """Price/EMA trend summary. Pure calc — no I/O."""
+    import math
+    _none = {"above_ema20": None, "above_ema50": None, "above_ema200": None,
+             "return_30d": None, "golden_cross": None, "dead_cross": None}
+    if df.empty or "Close" not in df.columns:
+        return _none
+    close = df["Close"].dropna()
+    if len(close) < 2:
+        return _none
+
+    def _fin(v):
+        try:
+            f = float(v)
+            return f if math.isfinite(f) else None
+        except (TypeError, ValueError):
+            return None
+
+    price = _fin(close.iloc[-1])
+    if price is None:
+        return _none
+
+    e20  = calc_ema(close, 20)
+    e50  = calc_ema(close, 50)
+    e200 = calc_ema(close, 200)
+
+    def _above(ema_series):
+        v = _fin(ema_series.iloc[-1])
+        return (price > v) if v is not None else None
+
+    # 30-day return: close[-1] / close[-31] - 1
+    return_30d = None
+    if len(close) >= 31:
+        p30 = _fin(close.iloc[-31])
+        if p30 and p30 > 0:
+            r = (price / p30) - 1.0
+            return_30d = round(r * 100, 2) if math.isfinite(r) else None
+
+    # golden/dead cross: did ema50 cross ema200 in last ~30 bars?
+    golden_cross = dead_cross = None
+    n = min(30, len(e50) - 1)
+    if n >= 1:
+        cur50  = _fin(e50.iloc[-1]);   cur200  = _fin(e200.iloc[-1])
+        prev50 = _fin(e50.iloc[-1-n]); prev200 = _fin(e200.iloc[-1-n])
+        if all(v is not None for v in (cur50, cur200, prev50, prev200)):
+            golden_cross = bool(cur50 > cur200 and prev50 <= prev200)
+            dead_cross   = bool(cur50 < cur200 and prev50 >= prev200)
+
+    return {
+        "above_ema20":  _above(e20),
+        "above_ema50":  _above(e50),
+        "above_ema200": _above(e200),
+        "return_30d":   return_30d,
+        "golden_cross": golden_cross,
+        "dead_cross":   dead_cross,
+    }
+
+
+def calc_beta(stock_returns: pd.Series, index_returns: pd.Series, min_obs: int = 20) -> float | None:
+    """OLS beta = cov(stock, index) / var(index). None if insufficient/zero-var."""
+    import math
+    aligned = pd.concat([stock_returns, index_returns], axis=1).dropna()
+    aligned.columns = ["s", "i"]
+    if len(aligned) < min_obs:
+        return None
+    var_i = float(aligned["i"].var())
+    if not math.isfinite(var_i) or var_i == 0:
+        return None
+    cov = float(aligned["s"].cov(aligned["i"]))
+    if not math.isfinite(cov):
+        return None
+    return round(cov / var_i, 4)
+
+
+def calc_hv(returns: pd.Series, min_obs: int = 10) -> float | None:
+    """Historical volatility = stdev(daily returns) * sqrt(252)."""
+    import math
+    clean = returns.dropna()
+    if len(clean) < min_obs:
+        return None
+    std = float(clean.std())
+    if not math.isfinite(std):
+        return None
+    hv = std * math.sqrt(252)
+    return round(hv, 6) if math.isfinite(hv) else None
 
 def calc_rsi_target_price(
     prices: pd.Series, rsi_values: pd.Series, target_rsi: float, n: int = 30,

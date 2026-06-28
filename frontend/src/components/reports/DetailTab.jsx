@@ -537,6 +537,104 @@ export function VolumeRsiSnapshot({ summary }) {
   )
 }
 
+// eco: inline-style only, no new CSS file — matches surrounding component idiom
+export function TechnicalStats({ summary }) {
+  if (!summary) return null
+  const { week52_high, week52_low, ema20, ema50, ema200, trend, beta, hv, price, market } = summary
+
+  const hasLevels = week52_high != null || week52_low != null || ema20 != null || ema50 != null || ema200 != null
+  const hasTrend = trend != null
+  const hasBetaHv = beta != null || hv != null
+
+  if (!hasLevels && !hasTrend && !hasBetaHv) return null
+
+  const fmtPct = v => (v == null || !Number.isFinite(v)) ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+  const fmtFloat = (v, digits = 2) => (v == null || !Number.isFinite(v)) ? '—' : v.toFixed(digits)
+
+  // above/below EMA: use price-direction tokens (--up=red=up, --down=blue=down) — KR convention
+  const emaColor = (flag) => flag == null ? 'var(--text-3)' : flag ? 'var(--up)' : 'var(--down)'
+  const emaLabel = (flag, ema) => {
+    if (flag == null || ema == null) return '—'
+    return flag ? '위 ▲' : '아래 ▼'
+  }
+
+  const StatRow = ({ label, value, valueColor }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
+      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: valueColor || 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+    </div>
+  )
+
+  return (
+    <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '10px 12px', marginBottom: 16 }}>
+      <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>📐 기술적 지표</div>
+
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+
+        {/* 52주 고저 + EMA 레벨 */}
+        {hasLevels && (
+          <div style={{ flex: '1 1 160px', minWidth: 140 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, marginBottom: 4 }}>가격 레벨</div>
+            <StatRow label="52주 고가" value={fmt(week52_high, market)} valueColor="var(--up)" />
+            <StatRow label="52주 저가" value={fmt(week52_low, market)} valueColor="var(--down)" />
+            <StatRow label="EMA 20" value={fmt(ema20, market)} />
+            <StatRow label="EMA 50" value={fmt(ema50, market)} />
+            <StatRow label="EMA 200" value={fmt(ema200, market)} />
+          </div>
+        )}
+
+        {/* 추세 요약 */}
+        {hasTrend && (
+          <div style={{ flex: '1 1 160px', minWidth: 140 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, marginBottom: 4 }}>추세 요약</div>
+            <StatRow
+              label="EMA 20 대비"
+              value={emaLabel(trend.above_ema20, ema20)}
+              valueColor={emaColor(trend.above_ema20)}
+            />
+            <StatRow
+              label="EMA 50 대비"
+              value={emaLabel(trend.above_ema50, ema50)}
+              valueColor={emaColor(trend.above_ema50)}
+            />
+            <StatRow
+              label="EMA 200 대비"
+              value={emaLabel(trend.above_ema200, ema200)}
+              valueColor={emaColor(trend.above_ema200)}
+            />
+            <StatRow
+              label="30일 수익률"
+              value={fmtPct(trend.return_30d)}
+              valueColor={trend.return_30d == null ? undefined : trend.return_30d >= 0 ? 'var(--up)' : 'var(--down)'}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>크로스</span>
+              <span style={{ fontSize: 11, fontWeight: 600 }}>
+                {trend.golden_cross
+                  ? <span style={{ color: 'var(--up)' }}>골든크로스 ✓</span>
+                  : trend.dead_cross
+                    ? <span style={{ color: 'var(--down)' }}>데드크로스 ✗</span>
+                    : <span style={{ color: 'var(--text-3)' }}>—</span>
+                }
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* 베타·변동성 */}
+        {hasBetaHv && (
+          <div style={{ flex: '1 1 120px', minWidth: 110 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, marginBottom: 4 }}>리스크 지표</div>
+            <StatRow label="베타 (β)" value={fmtFloat(beta)} />
+            <StatRow label="역사적 변동성" value={beta != null || hv != null ? (hv == null ? '—' : `${fmtFloat(hv * 100, 1)}%`) : '—'} />
+          </div>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
 export function BacklogSection({ ticker, market }) {
   const [backlogData, setBacklogData] = useState(null)
 

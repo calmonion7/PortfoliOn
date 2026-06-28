@@ -193,3 +193,27 @@ def test_generate_report_resolves_ticker_like_name_from_quote(tmp_path):
         json_path = report_generator.generate_report(stock, tmp_path)
     summary = json.loads(Path(json_path).read_text(encoding="utf-8"))
     assert summary["name"] == "삼성전자"
+
+
+# ── S1/S2/S3 field presence in snapshot ──────────────────────────────────────
+
+def test_generate_report_has_price_technical_fields(tmp_path):
+    """Snapshot must contain S1/S2/S3 fields (may be None on short mock df, must be present)."""
+    with contextlib.ExitStack() as stack:
+        for target, mock in _mock_all().items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        json_path = report_generator.generate_report(SAMPLE_STOCK, tmp_path)
+    summary = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    # S1
+    for key in ("week52_high", "week52_low", "ema20", "ema50", "ema200"):
+        assert key in summary, f"Missing S1 field: {key}"
+    # S2
+    assert "trend" in summary
+    assert isinstance(summary["trend"], dict)
+    for key in ("above_ema20", "above_ema50", "above_ema200", "return_30d", "golden_cross", "dead_cross"):
+        assert key in summary["trend"], f"Missing trend sub-key: {key}"
+    # S3
+    assert "beta" in summary
+    assert "hv" in summary

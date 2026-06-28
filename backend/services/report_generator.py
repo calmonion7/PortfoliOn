@@ -131,6 +131,37 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
     _cur = quote.get("price")
     drop_from_high_20d = round((_cur - high_20d) / high_20d * 100, 2) if high_20d and _cur else None
 
+    # S1: 52w high/low + EMA levels
+    sr = indicators.get_support_resistance(daily_df)
+
+    # S2: trend summary (price vs EMA, 30d return, golden/dead cross)
+    trend = indicators.calc_trend_summary(daily_df)
+
+    # S3: beta + HV
+    import math
+    _daily_returns = daily_df["Close"].pct_change().dropna() if not daily_df.empty else None
+    hv = indicators.calc_hv(_daily_returns) if _daily_returns is not None and len(_daily_returns) >= 10 else None
+    beta = None
+    if market == "KR":
+        try:
+            ks11_df = mkt.get_history_df("^KS11", "US", "")
+            if not ks11_df.empty:
+                ks11_ret = ks11_df["Close"].pct_change().dropna()
+                # Strip tz from ks11_ret: yfinance returns tz-aware (Asia/Seoul),
+                # kiwoom daily_df is tz-naive — concat raises TypeError without this.
+                if ks11_ret.index.tz is not None:
+                    ks11_ret = ks11_ret.copy()
+                    ks11_ret.index = ks11_ret.index.tz_localize(None)
+                beta = indicators.calc_beta(_daily_returns, ks11_ret)
+        except Exception:
+            pass
+    else:
+        try:
+            _b = _fin_num((_t.info if _t is not None else {}).get("beta"))
+            beta = _b
+        except Exception:
+            pass
+
     if market == "KR":
         sector = quote.get("sector", "")
         industry = quote.get("industry", "")
@@ -199,6 +230,14 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         "ev_ebitda": ev_ebitda,
         "high_20d": high_20d,
         "drop_from_high_20d": drop_from_high_20d,
+        "week52_high": sr.get("week52_high"),
+        "week52_low": sr.get("week52_low"),
+        "ema20": sr.get("ema20"),
+        "ema50": sr.get("ema50"),
+        "ema200": sr.get("ema200"),
+        "trend": trend,
+        "beta": beta,
+        "hv": hv,
         "moat": stock.get("moat", ""),
         "growth_plan": stock.get("growth_plan", ""),
         "recent_disclosures": stock.get("recent_disclosures", ""),

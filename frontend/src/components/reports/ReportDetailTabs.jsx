@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Skeleton from '../ui/Skeleton'
-import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable } from './DetailTab'
+import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable, TechnicalStats } from './DetailTab'
 import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
 import HistoryTab from './HistoryTab'
@@ -101,6 +101,7 @@ export default function ReportDetailTabs({
                           market={market}
                         />
                       )}
+                      <TechnicalStats summary={summary} />
                       {market === 'KR' && <SupplySection ticker={ticker} />}
                       {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
                       {market === 'KR' && <ShortSellSection ticker={ticker} />}
