@@ -252,3 +252,100 @@ def test_fred_request_error_returns_empty():
          patch("routers.calendar.requests.get", side_effect=Exception("network error")):
         events = _get_econ_events(date(2026, 6, 1), date(2026, 6, 30))
     assert events == []
+
+
+# --- KR forward earnings: yfinance .KS/.KQ suffix ---
+
+def test_kr_earnings_uses_yf_sym_suffix(tmp_path):
+    """KR stock (market=KR, exchange=KS) must use '005930.KS' not '005930'."""
+    portfolio = {
+        "stocks": [{"ticker": "005930", "type": "holding", "name": "삼성전자", "market": "KR", "exchange": "KS"}],
+        "watchlist": [],
+    }
+    called_with = []
+
+    def _mock_ticker(sym):
+        called_with.append(sym)
+        m = MagicMock()
+        if sym == "005930.KS":
+            m.calendar = {"Earnings Date": [date(2026, 7, 29)]}
+        else:
+            m.calendar = {}
+        m.dividends = pd.Series([], dtype=float)
+        return m
+
+    with patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
+         patch("routers.calendar._CACHE_DIR", tmp_path), \
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
+        resp = client.get("/api/calendar?month=2026-07")
+
+    assert resp.status_code == 200
+    # Must have called yf.Ticker with the .KS suffix, not bare ticker
+    assert "005930.KS" in called_with, f"Expected '005930.KS' in {called_with}"
+    assert "005930" not in called_with or all(c != "005930" for c in called_with), \
+        f"Bare '005930' must not be used, got {called_with}"
+    events = resp.json()["events"]
+    earnings = [e for e in events if e["type"] == "earnings" and e["ticker"] == "005930"]
+    assert len(earnings) == 1
+    assert earnings[0]["date"] == "2026-07-29"
+
+
+def test_kr_earnings_kosdaq_kq_suffix(tmp_path):
+    """KOSDAQ stock (exchange=KQ) uses '247540.KQ' suffix."""
+    portfolio = {
+        "stocks": [{"ticker": "247540", "type": "holding", "name": "에코프로비엠", "market": "KR", "exchange": "KQ"}],
+        "watchlist": [],
+    }
+    called_with = []
+
+    def _mock_ticker(sym):
+        called_with.append(sym)
+        m = MagicMock()
+        if sym == "247540.KQ":
+            m.calendar = {"Earnings Date": [date(2026, 7, 29)]}
+        else:
+            m.calendar = {}
+        m.dividends = pd.Series([], dtype=float)
+        return m
+
+    with patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
+         patch("routers.calendar._CACHE_DIR", tmp_path), \
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
+        resp = client.get("/api/calendar?month=2026-07")
+
+    assert resp.status_code == 200
+    assert "247540.KQ" in called_with
+    events = resp.json()["events"]
+    earnings = [e for e in events if e["type"] == "earnings" and e["ticker"] == "247540"]
+    assert len(earnings) == 1
+    assert earnings[0]["date"] == "2026-07-29"
+
+
+def test_kr_earnings_default_exchange_ks(tmp_path):
+    """KR stock with no exchange field defaults to .KS suffix."""
+    portfolio = {
+        "stocks": [{"ticker": "017670", "type": "holding", "name": "SK텔레콤", "market": "KR"}],
+        "watchlist": [],
+    }
+    called_with = []
+
+    def _mock_ticker(sym):
+        called_with.append(sym)
+        m = MagicMock()
+        m.calendar = {}
+        m.dividends = pd.Series([], dtype=float)
+        return m
+
+    with patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
+         patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
+         patch("routers.calendar._CACHE_DIR", tmp_path), \
+         patch("routers.calendar.query", return_value=[]), \
+         patch("routers.calendar.execute", return_value=1):
+        resp = client.get("/api/calendar?month=2026-08")
+
+    assert resp.status_code == 200
+    assert "017670.KS" in called_with

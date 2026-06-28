@@ -1728,6 +1728,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `type` | string | `"earnings"` \| `"dividend"` \| `"agm"` \| `"econ"` \| `"holiday_us"` \| `"holiday_kr"` |
 | `stock_type` | string | `"holding"` \| `"watchlist"` \| `"market"` |
 
+> **실적 발표일(earnings):** US+KR 모두 커버. yfinance `t.calendar['Earnings Date']`에서 수집하며, KR 종목은 `.KS`(KOSPI) / `.KQ`(KOSDAQ) 접미사를 붙인 심볼(`yf.Ticker(f"{ticker}.{exchange}")`)로 조회해 미래 날짜만 필터링한다.
+>
 > **배당락일(dividend):** US 종목은 `t.calendar['Ex-Dividend Date']`의 확정 ex-date 사용. 과거 추정 방식(4회 평균 간격)은 더 이상 사용하지 않음.
 >
 > **경제지표 발표일(econ):** FRED `/fred/releases/dates`에서 수집한 주요 US 경제지표 발표 일정(CPI·고용보고서·GDP·PPI). `ticker="FRED"`, `stock_type="market"`. `FRED_API_KEY` 미설정 시 비어 있음.

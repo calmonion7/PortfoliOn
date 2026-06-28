@@ -13,6 +13,7 @@ import yfinance as yf
 import exchange_calendars as xcals
 from services import storage
 from services.db import query, execute
+from services.market.format import _yf_sym
 from auth import get_current_user
 
 # S2: curated FRED release names to show in calendar
@@ -62,14 +63,15 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
 
     portfolio = storage.get_full_portfolio(user_id) if user_id else {"stocks": [], "watchlist": []}
     all_stocks = (
-        [{"ticker": s["ticker"], "stock_type": "holding", "name": s.get("name", s["ticker"])} for s in portfolio["stocks"]]
-        + [{"ticker": s["ticker"], "stock_type": "watchlist", "name": s.get("name", s["ticker"])} for s in portfolio["watchlist"]]
+        [{"ticker": s["ticker"], "stock_type": "holding", "name": s.get("name", s["ticker"]), "market": s.get("market", "US"), "exchange": s.get("exchange", "")} for s in portfolio["stocks"]]
+        + [{"ticker": s["ticker"], "stock_type": "watchlist", "name": s.get("name", s["ticker"]), "market": s.get("market", "US"), "exchange": s.get("exchange", "")} for s in portfolio["watchlist"]]
     )
 
     def _fetch_stock(stock):
         result = []
         try:
-            t = yf.Ticker(stock["ticker"])
+            sym = _yf_sym(stock["ticker"], stock["market"], stock["exchange"])
+            t = yf.Ticker(sym)
             cal = t.calendar  # fetch once; shared by earnings + dividend
             _collect_earnings(cal, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, result)
             _collect_dividend(cal, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, result)
