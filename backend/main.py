@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from pathlib import Path
 from contextlib import asynccontextmanager
-from datetime import date
 import threading
 
 import scheduler as sched
@@ -26,20 +25,6 @@ from middleware.event_tracker import EventTrackerMiddleware
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
 SNAPSHOTS_DIR.mkdir(exist_ok=True)
-
-
-def _warm_calendar_cache():
-    today = date.today()
-    months = [today.replace(day=1)]
-    next_month = date(today.year + (today.month // 12), today.month % 12 + 1, 1)
-    months.append(next_month)
-    for m in months:
-        month_str = m.strftime("%Y-%m")
-        if not calendar._cache_path(month_str).exists():
-            try:
-                calendar._get_events(month_str)
-            except Exception:
-                pass
 
 
 def _warm_market_cache():
@@ -165,7 +150,6 @@ def _migrate():
 async def lifespan(app: FastAPI):
     _migrate()
     sched.start()
-    threading.Thread(target=_warm_calendar_cache, daemon=True).start()
     threading.Thread(target=_warm_market_cache, daemon=True).start()
     yield
     sched.stop()
