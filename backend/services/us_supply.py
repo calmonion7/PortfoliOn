@@ -12,6 +12,7 @@ import json
 import math
 from datetime import datetime, date
 
+import pandas as pd
 import yfinance as yf
 
 from services.db import execute, query
@@ -31,10 +32,61 @@ def _finite(val):
     return f if math.isfinite(f) else None
 
 
-def fetch_us_supply(ticker: str, exchange: str = "") -> dict | None:
-    """yf.Ticker 1패스로 공매도 + 기관 보유 파싱.
+def _parse_insider_transactions(df) -> list[dict]:
+    """insider_transactions DataFrame → compact list. NaN/inf 가드."""
+    if df is None or len(df) == 0:
+        return []
+    out = []
+    for _, row in df.iterrows():
+        sd = row.get("Start Date")
+        try:
+            start_date = pd.Timestamp(sd).strftime("%Y-%m-%d") if pd.notna(sd) else None
+        except Exception:
+            start_date = None
+        shares_raw = row.get("Shares")
+        value_raw = row.get("Value")
+        out.append({
+            "insider": str(row.get("Insider") or ""),
+            "position": str(row.get("Position") or ""),
+            "transaction": str(row.get("Transaction") or ""),
+            "shares": _finite(shares_raw),
+            "value": _finite(value_raw),
+            "start_date": start_date,
+            "ownership": str(row.get("Ownership") or ""),
+        })
+    return out
 
-    반환: {"short": {...}, "institutional": [...]}
+
+def _parse_insider_net(df) -> dict:
+    """insider_purchases DataFrame → 6mo net summary dict."""
+    if df is None or len(df) == 0:
+        return {}
+    # eco: key column is first col regardless of name — index into it
+    label_col = df.columns[0]
+    val_col = "Shares" if "Shares" in df.columns else df.columns[1] if len(df.columns) > 1 else None
+    if val_col is None:
+        return {}
+    rows = {str(r[label_col]).strip(): r[val_col] for _, r in df.iterrows()}
+    result = {}
+    ns = _finite(rows.get("Net Shares Purchased (Sold)"))
+    if ns is not None:
+        result["net_shares"] = int(ns)
+    pb = _finite(rows.get("% Buy Shares"))
+    if pb is not None:
+        result["pct_buy"] = pb
+    ps = _finite(rows.get("% Sell Shares"))
+    if ps is not None:
+        result["pct_sell"] = ps
+    th = _finite(rows.get("Total Insider Shares Held"))
+    if th is not None:
+        result["total_held"] = int(th)
+    return result
+
+
+def fetch_us_supply(ticker: str, exchange: str = "") -> dict | None:
+    """yf.Ticker 1패스로 공매도 + 기관 보유 + 내부자 거래 파싱.
+
+    반환: {"short": {...}, "institutional": [...], "insider": {"transactions": [...], "net": {...}}}
     yfinance 예외 → None (caller가 skip 처리).
     missing/NaN 필드는 None graceful.
     """
@@ -43,6 +95,8 @@ def fetch_us_supply(ticker: str, exchange: str = "") -> dict | None:
         t = yf.Ticker(sym)
         info = t.info or {}
         holders_df = t.institutional_holders
+        txn_df = t.insider_transactions
+        purch_df = t.insider_purchases
     except Exception as e:
         print(f"[us_supply] yfinance 오류 {ticker}: {e}")
         return None
@@ -80,27 +134,36 @@ def fetch_us_supply(ticker: str, exchange: str = "") -> dict | None:
                 "pct_change": pc,
             })
 
-    return {"short": short, "institutional": inst}
+    insider = {
+        "transactions": _parse_insider_transactions(txn_df),
+        "net": _parse_insider_net(purch_df),
+    }
+
+    return {"short": short, "institutional": inst, "insider": insider}
 
 
 # ── upsert / read ─────────────────────────────────────────────────────────────
 
 def upsert_us_supply(ticker: str, data: dict) -> None:
-    """us_supply_snapshot 테이블에 ticker PK upsert."""
+    """us_supply_snapshot 테이블에 ticker PK upsert (insider 컬럼 포함)."""
     short = data.get("short") or {}
     inst = data.get("institutional") or []
+    insider = data.get("insider") or {}
     execute(
         """INSERT INTO us_supply_snapshot
                (ticker, short_pct_float, short_ratio, shares_short,
-                date_short_interest, institutional_holders, fetched_at)
-           VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                date_short_interest, institutional_holders,
+                insider_transactions, insider_net, fetched_at)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
            ON CONFLICT (ticker) DO UPDATE SET
-               short_pct_float      = EXCLUDED.short_pct_float,
-               short_ratio          = EXCLUDED.short_ratio,
-               shares_short         = EXCLUDED.shares_short,
-               date_short_interest  = EXCLUDED.date_short_interest,
+               short_pct_float       = EXCLUDED.short_pct_float,
+               short_ratio           = EXCLUDED.short_ratio,
+               shares_short          = EXCLUDED.shares_short,
+               date_short_interest   = EXCLUDED.date_short_interest,
                institutional_holders = EXCLUDED.institutional_holders,
-               fetched_at           = EXCLUDED.fetched_at""",
+               insider_transactions  = EXCLUDED.insider_transactions,
+               insider_net           = EXCLUDED.insider_net,
+               fetched_at            = EXCLUDED.fetched_at""",
         (
             ticker.upper(),
             short.get("short_pct_float"),
@@ -108,6 +171,8 @@ def upsert_us_supply(ticker: str, data: dict) -> None:
             short.get("shares_short"),
             short.get("date_short_interest"),
             json.dumps(inst),
+            json.dumps(insider.get("transactions") or []),
+            json.dumps(insider.get("net") or {}),
         ),
     )
 
@@ -132,6 +197,26 @@ def get_us_supply(ticker: str) -> dict | None:
         "shares_short": row.get("shares_short"),
         "date_short_interest": date_si.isoformat() if isinstance(date_si, date) else date_si,
         "institutional_holders": row.get("institutional_holders") or [],
+        "fetched_at": row.get("fetched_at").isoformat() if row.get("fetched_at") else None,
+    }
+
+
+def get_us_insider(ticker: str) -> dict | None:
+    """us_supply_snapshot에서 insider 컬럼만 읽기 (라이브 yfinance 0).
+
+    저장 행 없으면 None.
+    """
+    rows = query(
+        "SELECT insider_transactions, insider_net, fetched_at "
+        "FROM us_supply_snapshot WHERE ticker = %s",
+        (ticker.upper(),),
+    )
+    if not rows:
+        return None
+    row = rows[0]
+    return {
+        "insider_transactions": row.get("insider_transactions") or [],
+        "insider_net": row.get("insider_net") or {},
         "fetched_at": row.get("fetched_at").isoformat() if row.get("fetched_at") else None,
     }
 

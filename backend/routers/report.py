@@ -415,6 +415,22 @@ def get_insider_trades_route(ticker: str):
     return {"trades": get_insider_trades(ticker), "signal": compute_net_signal(ticker)}
 
 
+# /report/{ticker}/us-insider 도 catch-all /report/{ticker}/{date_str} 보다 먼저
+# 등록해야 한다(5번째 재발 방지). 저장값만 읽음(요청경로 라이브 yfinance 0).
+# KR·무데이터는 {transactions:[], net:{}} graceful.
+@router.get("/report/{ticker}/us-insider")
+def get_us_insider_route(ticker: str, user_id: str = Depends(get_current_user_or_api_key)):
+    from services.us_supply import get_us_insider
+    stored = get_us_insider(ticker)
+    if stored is None:
+        return {"transactions": [], "net": {}}
+    return {
+        "transactions": stored.get("insider_transactions") or [],
+        "net": stored.get("insider_net") or {},
+        "fetched_at": stored.get("fetched_at"),
+    }
+
+
 @router.get("/report/{ticker}/{date_str}")
 def get_report(ticker: str, date_str: str):
     upper = ticker.upper()

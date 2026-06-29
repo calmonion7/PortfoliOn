@@ -21,6 +21,8 @@ def _fake_ticker(info: dict, holders_df):
         def __init__(self):
             self.info = info
             self.institutional_holders = holders_df
+            self.insider_transactions = None  # eco: supply tests don't exercise insider
+            self.insider_purchases = None
     return _FakeTicker()
 
 

@@ -345,5 +345,7 @@ CREATE TABLE IF NOT EXISTS us_supply_snapshot (
     shares_short          BIGINT,                -- 공매도 잔량(주)
     date_short_interest   DATE,                  -- 공매도 잔량 기준일
     institutional_holders JSONB DEFAULT '[]'::jsonb, -- 상위 기관 [{holder, pct_held, shares, pct_change}]
+    insider_transactions  JSONB DEFAULT '[]'::jsonb, -- 최근 내부자 거래 목록 (Form4)
+    insider_net           JSONB DEFAULT '{}'::jsonb, -- 6개월 내부자 순매수 요약
     fetched_at            TIMESTAMPTZ DEFAULT NOW()
 );

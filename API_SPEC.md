@@ -1541,6 +1541,36 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
+### `GET /api/report/{ticker}/us-insider`
+
+종목의 US 내부자 거래(Form4) 조회. `us_supply_fetch` 배치가 채우는 `us_supply_snapshot.insider_transactions` / `insider_net`에서 읽으며, 요청경로 라이브 yfinance 호출 없음. KR 종목·무데이터 시 `transactions: [], net: {}` graceful. **Auth:** user(API 키 가능).
+
+**Response `200`**
+```json
+{
+  "transactions": [
+    {
+      "insider": "Tim Cook",
+      "position": "CEO",
+      "transaction": "Sale",
+      "shares": 100000,
+      "value": 18500000.0,
+      "start_date": "2026-05-10",
+      "ownership": "Direct"
+    }
+  ],
+  "net": {
+    "net_shares": -95000,
+    "pct_buy": 0.0476,
+    "pct_sell": 0.9524,
+    "total_held": 3200000
+  },
+  "fetched_at": "2026-06-29T06:00:00"
+}
+```
+
+---
+
 ## Consensus (컨센서스)
 
 ### `GET /api/consensus/batch/progress`
