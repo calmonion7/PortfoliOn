@@ -10,6 +10,7 @@ import ShortSellSection from './ShortSellSection'
 import SupplySection from './SupplySection'
 import LatestDisclosuresSection from './LatestDisclosuresSection'
 import InsiderTradesSection from './InsiderTradesSection'
+import UsSupplySection from './UsSupplySection'
 
 const noop = () => {}
 
@@ -105,6 +106,7 @@ export default function ReportDetailTabs({
                       {market === 'KR' && <SupplySection ticker={ticker} />}
                       {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
                       {market === 'KR' && <ShortSellSection ticker={ticker} />}
+                      {market !== 'KR' && <UsSupplySection ticker={ticker} market={market} />}
                     </>
                   )
                   : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>기술·수급 데이터가 없습니다.</p>

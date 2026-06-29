@@ -1511,6 +1511,36 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
+### `GET /api/report/{ticker}/us-supply`
+
+종목의 US 공매도 비중 + 기관 보유 스냅샷 조회. `us_supply_fetch` 배치가 채우는 `us_supply_snapshot` 테이블에서 읽으며, 요청경로 라이브 yfinance 호출 없음. KR 종목·무데이터 시 `short: null, institutional: []` graceful. **Auth:** user(API 키 가능).
+
+**Response `200`**
+```json
+{
+  "short": {
+    "short_pct_float": 0.0098,
+    "short_ratio": 2.5,
+    "shares_short": 75000000,
+    "date_short_interest": "2026-05-01"
+  },
+  "institutional": [
+    { "holder": "Vanguard Group Inc", "pct_held": 0.0812, "shares": 1234000, "pct_change": 0.002 }
+  ],
+  "fetched_at": "2026-06-29T06:00:00"
+}
+```
+
+---
+
+### `POST /api/report/us-supply/refresh`
+
+전 US 종목(보유+관심) 공매도 비중·기관 보유 재수집(`us_supply_fetch` 배치 수동 트리거). 백그라운드 실행, 즉시 202. **Auth:** admin.
+
+**Response `202`** — `{ "message": "US 공매도·기관 보유 전 종목 수집 시작" }`
+
+---
+
 ## Consensus (컨센서스)
 
 ### `GET /api/consensus/batch/progress`

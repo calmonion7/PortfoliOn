@@ -344,6 +344,16 @@ def _recommendation_work(market: str):
         print(f"[Scheduler] Recommendation {market} failed: {e}")
 
 
+def _fetch_us_supply():
+    from services.us_supply import fetch_all_us_supply
+    with job_runs.record("us_supply_fetch", "auto"):
+        try:
+            r = fetch_all_us_supply()
+            print(f"[Scheduler] US supply fetched: {r}")
+        except Exception as e:
+            print(f"[Scheduler] US supply fetch failed: {e}")
+
+
 def _fetch_kr_sector():
     from services import kr_sector_service
     with job_runs.record("kr_sector_fetch", "auto"):
@@ -442,4 +452,5 @@ _JOB_FUNCS = {
     "insider_fetch": _fetch_insider,
     "recommendation_kr": _fetch_recommendation_kr,
     "recommendation_us": _fetch_recommendation_us,
+    "us_supply_fetch": _fetch_us_supply,
 }

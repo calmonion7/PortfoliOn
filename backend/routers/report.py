@@ -332,6 +332,18 @@ def _run_disclosures_all():
         fetch_all_disclosures()
 
 
+@router.post("/report/us-supply/refresh", status_code=202)
+def refresh_all_us_supply(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+    background_tasks.add_task(_run_us_supply_all)
+    return {"message": "US 공매도·기관 보유 전 종목 수집 시작"}
+
+
+def _run_us_supply_all():
+    from services.us_supply import fetch_all_us_supply
+    with job_runs.record("us_supply_fetch", "manual"):
+        fetch_all_us_supply()
+
+
 @router.post("/report/insider-trades/refresh", status_code=202)
 def refresh_all_insider_trades(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
     background_tasks.add_task(_run_insider_trades_all)
@@ -354,6 +366,27 @@ def _run_agm_all():
     from services.agm import fetch_agm_meeting_dates
     with job_runs.record("agm_fetch", "manual"):
         fetch_agm_meeting_dates()
+
+
+# /report/{ticker}/us-supply 도 catch-all /report/{ticker}/{date_str} 보다 먼저
+# 등록해야 한다(backlog/disclosures/insider-trades와 동일 라우트 순서 함정 — 5번째 재발 방지).
+# 저장값만 읽음(요청경로 라이브 yfinance 0). KR·무데이터는 {short:null, institutional:[]} graceful.
+@router.get("/report/{ticker}/us-supply")
+def get_us_supply_route(ticker: str, user_id: str = Depends(get_current_user_or_api_key)):
+    from services.us_supply import get_us_supply
+    stored = get_us_supply(ticker)
+    if stored is None:
+        return {"short": None, "institutional": []}
+    return {
+        "short": {
+            "short_pct_float": stored.get("short_pct_float"),
+            "short_ratio": stored.get("short_ratio"),
+            "shares_short": stored.get("shares_short"),
+            "date_short_interest": stored.get("date_short_interest"),
+        },
+        "institutional": stored.get("institutional_holders") or [],
+        "fetched_at": stored.get("fetched_at"),
+    }
 
 
 # /report/{ticker}/backlog 은 catch-all /report/{ticker}/{date_str} 보다 먼저

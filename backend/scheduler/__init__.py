@@ -37,6 +37,7 @@ from .jobs import (
     _fetch_recommendation_kr,
     _fetch_recommendation_us,
     _recommendation_work,
+    _fetch_us_supply,
     _fetch_kr_sector,
     _short_sell_work,
     _seed_rankings_if_empty,

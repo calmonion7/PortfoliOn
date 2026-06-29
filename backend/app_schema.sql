@@ -335,3 +335,15 @@ CREATE TABLE IF NOT EXISTS job_runs (
     error       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_job_runs_read ON job_runs(job_id, started_at DESC);
+
+-- US 공매도 비중 + 기관 보유 스냅샷 (보유·관심 US 종목, ticker 단위 — yfinance info + institutional_holders)
+-- us_supply_fetch 배치(주 1회)가 채우고 GET /api/report/{ticker}/us-supply가 읽음.
+CREATE TABLE IF NOT EXISTS us_supply_snapshot (
+    ticker                TEXT PRIMARY KEY,
+    short_pct_float       NUMERIC,               -- 유통주식 대비 공매도 비중 (e.g. 0.0098)
+    short_ratio           NUMERIC,               -- 공매도 비율(days to cover)
+    shares_short          BIGINT,                -- 공매도 잔량(주)
+    date_short_interest   DATE,                  -- 공매도 잔량 기준일
+    institutional_holders JSONB DEFAULT '[]'::jsonb, -- 상위 기관 [{holder, pct_held, shares, pct_change}]
+    fetched_at            TIMESTAMPTZ DEFAULT NOW()
+);

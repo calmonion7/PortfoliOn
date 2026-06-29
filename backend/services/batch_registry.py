@@ -400,6 +400,21 @@ BATCHES = [
         "market": "US",
         "default_schedule": {"enabled": True, "type": "daily", "time": "07:00"},
     },
+    {
+        "id": "us_supply_fetch",
+        "label": "US 공매도·기관 보유 수집",
+        "category": "report",
+        "schedule_desc": "매주 일 06:00",
+        "usage": ["리포트 탭"],
+        "source": ["yfinance"],
+        "editable": True,
+        "trigger_kinds": ["auto", "manual"],
+        "manual_endpoint": "/api/report/us-supply/refresh",
+        "scheduler_job_id": "us_supply_fetch",
+        "timezone": "Asia/Seoul",
+        "market": "US",
+        "default_schedule": {"enabled": True, "type": "weekly", "days": ["sun"], "time": "06:00"},
+    },
 ]
 
 _BY_ID = {b["id"]: b for b in BATCHES}

@@ -145,6 +145,18 @@ def _migrate():
         execute("CREATE INDEX IF NOT EXISTS idx_recommendations_read ON stock_recommendations(market, score DESC)")
     except Exception as e:
         print(f"[migrate] stock_recommendations 생성 실패: {e}")
+    try:
+        from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS us_supply_snapshot (
+            ticker                TEXT PRIMARY KEY,
+            short_pct_float       NUMERIC,
+            short_ratio           NUMERIC,
+            shares_short          BIGINT,
+            date_short_interest   DATE,
+            institutional_holders JSONB DEFAULT '[]'::jsonb,
+            fetched_at            TIMESTAMPTZ DEFAULT NOW())""")
+    except Exception as e:
+        print(f"[migrate] us_supply_snapshot 생성 실패: {e}")
 
 
 @asynccontextmanager
