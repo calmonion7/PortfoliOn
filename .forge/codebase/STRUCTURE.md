@@ -1,99 +1,83 @@
 ---
-last_mapped_commit: 6b1c06b514d7ca9511360a7263b14cf97d783d18
-mapped: 2026-06-28
+last_mapped_commit: 78750ecc2c96d71a9e3a3f225a56aea99db71db5
+mapped: 2026-07-01
 ---
 
-# PortfoliOn — Structure
+# Structure
 
-Repo root: `/Users/calmonion/Project/PortfoliOn`. Two top-level apps: `backend/` (Python/FastAPI) and `frontend/` (React/Vite). Deployment, docs, and ops files at root.
+Repo root: `/Users/calmonion/Project/PortfoliOn`. Two top-level apps: `backend/` (Python/FastAPI) and `frontend/` (React 19 + Vite). Docs and contracts live at the root.
 
-## Top-level layout
+## Top-level
 
-- `backend/` — FastAPI app, services, schema, snapshots.
-- `frontend/` — React 19 + Vite SPA.
+- `backend/` — FastAPI app, services, scheduler, schemas, tests.
+- `frontend/` — Vite React app.
 - `API_SPEC.md` — full REST API reference (source of truth for endpoints).
-- `CLAUDE_COWORK_API.md` — external enrich API for the Cowork client.
-- `KIWOOM_API.md`, `KIS_API.md` — broker API catalogs.
-- `README.md`, `CLAUDE.md` — overview + agent guidelines.
-- `docker-compose.yml`, `nginx.conf`, `deploy.sh`, `start.sh`/`start.bat`/`stop.bat` — infra/run scripts.
-- `.forge/` — forge workflow state (ADRs in `.forge/adr/`, this map in `.forge/codebase/`).
+- `CLAUDE_COWORK_API.md` — external Cowork enrich API.
+- `KIWOOM_API.md`, `KIS_API.md` — broker API catalogs / roadmaps.
+- `README.md`, `CLAUDE.md` — overview + project instructions.
+- `start.sh` / `start.bat` / `stop.bat`, `deploy.sh`, `docker-compose.yml`, `nginx.conf` — run/deploy.
+- `.forge/` — forge state (ADRs in `.forge/adr/`, retros in `.forge/retro/`, this map in `.forge/codebase/`).
 
-## Backend — `backend/`
+## Backend layout (`backend/`)
 
-Top-level modules:
-- `main.py` — app entry, router mounts, `_migrate()` startup migrations, `lifespan`.
-- `auth.py` — auth dependencies (`get_current_user`, `require_admin`, `get_current_user_or_api_key`).
-- `app_schema.sql` — full app schema (tickers, snapshots, user_stocks, batch_schedules, job_runs, market_*, stock_*, daily_consensus_mart, etc.).
-- `auth_schema.sql` — auth schema (users, refresh_tokens); run before `app_schema.sql`.
-- `supabase_schema.sql` — legacy (Supabase removed).
-- `requirements.txt`, `Dockerfile`, `Procfile`, `pytest.ini`.
-- `run_backfill.py` — standalone backfill script.
+- `main.py` — app entry: `_migrate()` (idempotent startup DDL), `lifespan` (migrate → `sched.start()` → `_warm_market_cache` daemon thread), middleware + router wiring, `/health`.
+- `auth.py` — `get_current_user`, `require_admin`, `require_admin_or_api_key` dependencies.
+- `auth_schema.sql` — PostgreSQL auth schema (`users`, `refresh_tokens`); run BEFORE `app_schema.sql`.
+- `app_schema.sql` — PostgreSQL app schema (tickers, user_stocks, snapshots, schedules, guru_*, digests, consensus_history, calendar_cache, market_cache, user_menu_permissions, user_events, market_leverage_indicators, market_lending_balance, etc.). Startup `_migrate()` adds newer tables idempotently (see ARCHITECTURE.md).
+- `Dockerfile`, `Procfile`, `requirements.txt`, `pytest.ini`, `.env.docker` (+ `.example`), `.env`.
+- `run_backfill.py` — backfill CLI/entry.
+- `.venv/` — local Python venv (macOS: `.venv/bin/python`). NOTE: `lxml` is NOT in the local venv though it is in Docker — use `BeautifulSoup(html, "html.parser")` for code run under local pytest.
 
-### `backend/scheduler/` — PACKAGE (not a single file; no `scheduler.py` exists)
-- `__init__.py` — re-exports + public `start()`/`stop()`/`reload()`.
-- `_state.py` — shared `_scheduler` (`AsyncIOScheduler`), `_DIGEST_JOB_ID`, `_VALID_DAYS`.
-- `jobs.py` — all job functions + `_JOB_FUNCS` dict (job_id → function) + startup seeders.
-- `schedule.py` — `CronTrigger` building, `_reschedule_job`, schedule-seeding migration, missed-report recovery.
+### `backend/routers/` (one module per HTTP surface)
+`admin.py`, `analysis.py`, `analytics.py`, `auth.py`, `batches.py`, `calendar.py`, `digest.py`, `events.py`, `guru.py`, `investor.py`, `market_indicators.py`, `portfolio.py`, `rankings.py`, `recommendations.py`, `report.py`, `short_sell.py`, `stocks.py`, `watchlist.py`. Each defines `router = APIRouter(...)`; `main.py` imports and `include_router`s all of them.
 
-### `backend/routers/` — one `APIRouter` per file
-`__init__.py` (empty), `admin.py`, `analysis.py`, `analytics.py`, `auth.py`, `batches.py`, `calendar.py`, `digest.py`, `events.py`, `guru.py`, `investor.py`, `market_indicators.py`, `portfolio.py`, `rankings.py`, `recommendations.py`, `report.py`, `short_sell.py`, `stocks.py`, `watchlist.py`.
+### `backend/services/`
+Mix of single modules and packages.
 
-### `backend/services/` — business logic + persistence
-DB & infra: `db.py` (connection pool, `query`/`execute`), `cache.py` (6 in-memory caches), `job_runs.py` (batch execution log), `batch_registry.py` (`BATCHES`), `schedule_spec.py` (4 schedule spec types), `parallel.py`, `progress.py`, `errors.py`, `utils.py` (NaN/inf `sanitize`).
+- **Packages**:
+  - `market/` — quote/financials façade: `__init__.py` (re-exports + `get_quote`/`resolve_name`/`_get_quote_uncached`), `format.py` (symbol/value/price helpers), `kr.py` (KR quote chain 키움→KIS→Naver, Naver/FnGuide fetch), `us.py` (US quote yfinance→KIS, annual financials).
+  - `market_indicators/` — `cache.py` (PostgreSQL `market_cache` r/w), `fx.py`, `commodities.py`, `earnings.py`, `econ.py` (FRED), `exports.py` (KR exports), `macro.py` (FRED macro signals), `indices.py` (index levels + S&P500 CAPE).
+  - `kiwoom/` — Kiwoom REST: `client.py`, `quote.py`, `chart.py`, `investor.py`, `sector.py`, `shortsell.py`.
+  - `kis/` — KIS REST: `client.py`, `quote.py`.
+  - `storage/` — persistence façade: `__init__.py` (flat re-export), `portfolio.py`, `names.py`, `schedule.py`, `dates.py`.
+  - `recommendation/` — funnel: `__init__.py`, `universe.py`, `scoring.py`, `funnel.py`, `store.py`, `actions.py`.
+- **Single-module services** (notable): `agm.py` (AGM meeting-date extraction → `stock_disclosures.meeting_date`), `us_supply.py` (one-pass yfinance → `us_supply_snapshot` + insider), `backlog.py` + `backlog_parser.py` (DART order backlog), `disclosures.py` (DART disclosure feed), `dividends.py` (US/KR dividends → `stock_dividends`), `supply_score.py` (KR supply band), `insider_trades.py` (DART 5%/insider → `stock_insider_trades`), `short_sell_service.py`, `investor_service.py`, `ranking_service.py`, `kr_sector_service.py`, `leverage_service.py`, `lending_service.py`, `consensus.py`, `consensus_pipeline.py`, `report_generator.py`, `digest_service.py`, `analysis_service.py`, `guru_scraper.py`, `guru_stats.py`, `scraper.py`, `indicators.py`, `batch_registry.py`, `job_runs.py`, `schedule_spec.py`, `cache.py`, `db.py`, `utils.py`, `errors.py`, `parallel.py`, `progress.py`, `auth_service.py`.
 
-Domain modules: `report_generator.py` (snapshots), `consensus.py`, `consensus_pipeline.py`, `analysis_service.py`, `auth_service.py`, `digest_service.py`, `scraper.py`, `indicators.py`, `guru_scraper.py`, `guru_stats.py`, `leverage_service.py`, `lending_service.py`, `ranking_service.py`, `investor_service.py`, `short_sell_service.py`, `supply_score.py`, `insider_trades.py`, `kr_sector_service.py`, `backlog.py`, `backlog_parser.py`, `disclosures.py`, `dividends.py`, `agm.py`.
-
-Sub-packages (each `__init__.py` re-exports its public surface, per ADR-0017):
-- `market/` — `__init__.py` (quote/financials/history dispatch), `format.py`, `kr.py`, `us.py`.
-- `market_indicators/` — `__init__.py`, `cache.py` (`market_cache` read/write), `fx.py`, `commodities.py`, `earnings.py`, `econ.py`, `exports.py`, `indices.py`, `macro.py`.
-- `kiwoom/` — `__init__.py`, `client.py`, `quote.py`, `chart.py`, `sector.py`, `investor.py`, `shortsell.py` (KR read-only quote/chart source).
-- `kis/` — `__init__.py`, `client.py`, `quote.py` (KR+US read-only backup quote source).
-- `storage/` — `__init__.py`, `portfolio.py`, `names.py`, `schedule.py`, `dates.py`.
-- `recommendation/` — `__init__.py`, `actions.py`, `funnel.py`, `scoring.py`, `store.py`, `universe.py`.
+### `backend/scheduler/` (a PACKAGE, not a single `scheduler.py`)
+- `__init__.py` — public `start()`/`stop()`/`reload()`, re-exports of job funcs + `_JOB_FUNCS` and schedule helpers.
+- `_state.py` — shared APScheduler instance + constants (leaf module).
+- `jobs.py` — job-body functions + `_JOB_FUNCS` map.
+- `schedule.py` — trigger building, rescheduling, schedule seeding/migration, missed-report recovery.
 
 ### Other backend dirs
-- `middleware/` — `__init__.py`, `event_tracker.py`.
-- `migrations/` — numbered SQL files (`001_user_events.sql`, `002_backlog_history.sql`); additive runtime DDL also lives in `main.py:_migrate()`.
-- `data/` — static reference data (`sp500_tickers.json`, `kospi_tickers.json`) + gitignored runtime caches: `calendar/` (`YYYY-MM.json`), `consensus/` (per-ticker), `digest/`, `guru_managers.json`, plus legacy JSON stores.
-- `snapshots/` — generated per-ticker/date JSON snapshots (gitignored; DB `snapshots` table is canonical).
-- `reports/` — legacy read-only report directory (JSON fallback for old snapshots).
-- `tests/` — pytest suite (~90 files, `test_*.py`); includes `test_api_doc_sync.py` (endpoint doc drift), `conftest.py`.
-- `scripts/` — currently empty.
-- `.venv/` — virtualenv (macOS: `.venv/bin/python`). NB: `lxml` is in `requirements.txt`/Docker but NOT in local `.venv` — use `BeautifulSoup(html, "html.parser")`.
+- `middleware/` — `event_tracker.py` (`EventTrackerMiddleware`), `__init__.py`.
+- `migrations/` — one-off SQL (`001_user_events.sql`, `002_backlog_history.sql`). NOTE: the live idempotent migrations are in `main.py:_migrate()`, not here.
+- `data/` — static reference data + local file caches (`calendar/`, `consensus/`, gitignored).
+- `snapshots/` — generated per-ticker JSON snapshots (gitignored).
+- `reports/` — legacy read-only JSON fallback.
+- `tests/` — pytest suite (`test_*.py`).
+- `scripts/`, `auth.py`, `supabase_schema.sql` (legacy).
 
-## Frontend — `frontend/src/`
+## Frontend layout (`frontend/src/`)
 
-- `main.jsx` — React root, imports `styles/tokens.css` + `index.css`.
-- `App.jsx` — top nav, OAuth/session bootstrap, `BrowserRouter` routes, context providers.
-- `api.js`, `utils.js` — fetch helpers / shared utilities.
-- `index.css`, `App.css`.
-
-### `frontend/src/pages/`
-`AdminAnalytics.jsx`, `Analytics.jsx`, `Calendar.jsx`, `ConsensusSettings.jsx`, `Digest.jsx`, `Guru.jsx`, `GuruCrawlNow.jsx`, `GuruManagers.jsx`, `GuruStats.jsx`, `LeverageBackfillSettings.jsx`, `LoginPage.jsx`, `MacroTab.jsx`, `Market.jsx`, `MarketHub.jsx`, `Portfolio.jsx`, `Ranking.jsx`, `Recommendations.jsx`, `ReportManualGen.jsx`, `Reports.jsx`, `Research.jsx` (home hub), `SectorTab.jsx`, `Settings.jsx`, `Showcase.jsx`.
-
-Hub pages compose tab/sub-pages: `Research.jsx` (home `/`) hosts Reports/Ranking/Digest/Calendar; `MarketHub.jsx` (`/market`) hosts Market + leverage tabs; `Settings.jsx` routes to `ConsensusSettings` etc.
-
-### `frontend/src/components/`
-Top-level: `BatchScheduleEditor.jsx`, `InstallPrompt.jsx`, `LoadingSpinner.jsx`, `MobileNav.jsx`, `PermissionManager.jsx`, `PermissionPanel.jsx`, `PromoteModal.jsx`, `StockModal.jsx`, `Toast.jsx`.
-
-Sub-folders:
-- `market/` — `FxSection`, `VixSection`, `CommoditiesSection`, `TreasurySection`, `EconIndicatorsSection`, `M7EarningsSection`, `KrTop2Section`, `KrExportsSection`, `LeverageSection`, `LendingSection`, `IndexSection`, `MacroSignalsSection`, `marketUtils.jsx`.
-- `reports/` — `BacklogChart`, `ConsensusChart`, `DetailTab`, `FinancialsChart`, `HistoryTab`, `InsiderTradesSection`, `InvestorTrendSection`, `LatestDisclosuresSection`, `ReportDetailHeader`, `ReportDetailTabs`, `ReportFilters`, `Sections`, `ShortSellSection`, `StockActions`, `StockCard`, `SupplySection`, `TickerListItem`, `reportUtils.jsx`.
-- `portfolio/` — `DashboardCard`, `FlashValue`, `PriceFreshness` (+ CSS).
-- `recommendations/` — `RecCard.jsx`.
-- `ui/` — design-system primitives: `Badge`, `Button`, `Card`, `Input`, `Stat`, `Skeleton`, `InsiderBadge`, `SupplyBadge`, `icons.jsx`, `index.js` (+ matching CSS).
-
-### Other frontend dirs
-- `contexts/` — `AuthContext.jsx`.
-- `hooks/` — `useAuth.js`, `useIsMobile.js`, `usePortfolioData.js`, `usePriceFlash.js`, `useReportFilters.js`, `useReportGeneration.js`, `useReportList.js`, `useStockManagement.js`, `useTheme.js` (+ `*.test.js` for some — Vitest, ADR-0019).
+- `main.jsx` — React entry (`createRoot`, mounts `<App/>`).
+- `App.jsx` — router + nav + auth bootstrap.
+- `api.js` — shared axios instance (Bearer-token interceptor, 401 → clear tokens). `utils.js` — misc helpers.
+- `pages/` — route screens: `Research.jsx` (home `/`), `Portfolio.jsx`, `MarketHub.jsx` (+ `Market.jsx`), `Guru.jsx` (+ `GuruCrawlNow.jsx`, `GuruManagers.jsx`, `GuruStats.jsx`), `Settings.jsx`, `ConsensusSettings.jsx`, `LeverageBackfillSettings.jsx`, `LoginPage.jsx`, `AdminAnalytics.jsx`, `Showcase.jsx`, `Recommendations.jsx`, `Reports.jsx`, `Ranking.jsx`, `Calendar.jsx`, `Digest.jsx`, `Analytics.jsx`, `SectorTab.jsx`, `MacroTab.jsx`, `ReportManualGen.jsx`.
+- `components/` — top-level: `StockModal.jsx`, `PromoteModal.jsx`, `PermissionManager.jsx`, `PermissionPanel.jsx`, `LoadingSpinner.jsx`, `MobileNav.jsx`, `Toast.jsx`, `InstallPrompt.jsx`, `BatchScheduleEditor.jsx`.
+  - `components/reports/` — report list + detail widgets: `ReportDetailTabs.jsx` (tab shell), `ReportDetailHeader.jsx`, `DetailTab.jsx`, `HistoryTab.jsx`, `Sections.jsx`, `ReportFilters.jsx`, `reportUtils.jsx`, `StockActions.jsx`, `StockCard.jsx`, `TickerListItem.jsx`, charts (`ConsensusChart.jsx`, `FinancialsChart.jsx`, `BacklogChart.jsx`), and section widgets `SupplySection.jsx`, `ShortSellSection.jsx`, `InvestorTrendSection.jsx`, `LatestDisclosuresSection.jsx`. **US-only sections in the 기술·수급 sub-tab** (gated `market !== 'KR'` in `ReportDetailTabs.jsx`): `UsSupplySection.jsx`, `UsInsiderSection.jsx`, `GuruHoldersSection.jsx`.
+  - `components/market/` — Market Hub sections: `FxSection`, `VixSection`, `CommoditiesSection`, `TreasurySection`, `EconIndicatorsSection`, `M7EarningsSection`, `KrTop2Section`, `KrExportsSection`, `LeverageSection`, `LendingSection`, `MacroSignalsSection`, `IndexSection`, `marketUtils.jsx`.
+  - `components/portfolio/` — `DashboardCard.jsx`, `FlashValue.jsx`, `PriceFreshness.jsx` (+ CSS).
+  - `components/recommendations/` — `RecCard.jsx`.
+  - `components/ui/` — primitives: `Badge`, `Button`, `Card`, `Stat`, `Input`, `Skeleton`, `icons.jsx`, `index.js`, plus semantic badges `InsiderBadge.jsx`, `SupplyBadge.jsx` (use explicit colors, not price-direction `success`/`danger` tokens).
+- `contexts/` — `AuthContext.jsx` (auth + `menuPermissions` + `role`).
+- `hooks/` — `useAuth`, `useTheme`, `useIsMobile`, `usePortfolioData`, `usePriceFlash`, `useReportFilters` (+ test), `useReportGeneration`, `useReportList`, `useStockManagement` (+ test).
 - `utils/` — `analytics.js`, `marketHours.js`, `priceFlash.js`, `pwa.js`.
-- `styles/` — `tokens.css` (CSS custom props; KR price colors `--up`=red/`--down`=blue), `pc.css`, `mobile.css`.
-- `test/`, `assets/`.
+- `styles/` — `tokens.css` (CSS custom-property design tokens; KR color convention `--up`=red/`--down`=blue). `test/` — Vitest harness.
 
 ## Naming conventions
 
-- **Backend**: snake_case modules/functions. Routers named for their domain; services suffixed `_service` for the heavier ones (`leverage_service`, `ranking_service`) but not all. Private helpers prefixed `_`. Packages re-export their public + externally-referenced private surface from `__init__.py`.
-- **Batch ids**: a single string (e.g. `daily_report_kr`, `kr_rankings_fetch`) is used identically as the APScheduler job id, the `batch_registry` `id`, the `job_runs.record(id, ...)` id, and the `_JOB_FUNCS` key — they must stay in sync.
-- **SQL**: lowercase table/column names, raw parameterized SQL via `db.query`/`db.execute`; idempotent DDL uses `IF NOT EXISTS`.
-- **Frontend**: PascalCase `.jsx` components (one component per file, co-located `.css`); camelCase hooks prefixed `use`; `utils/*.js` lowercase. Tests are `*.test.js[x]` beside source.
-- **API**: routes under `/api`, kebab-ish path segments; documented in `API_SPEC.md` + `CLAUDE_COWORK_API.md` (kept in sync, enforced for endpoint existence by `backend/tests/test_api_doc_sync.py`).
+- **Backend**: `snake_case` modules/functions; private helpers prefixed `_` (`_migrate`, `_get_events`, `_kr_basic_*`, `_fetch_*`). Scheduler job bodies are `_fetch_<x>` / `_refresh_<x>` / `_generate_<x>`; the public job id (in `batch_registry`, `_JOB_FUNCS`, and `job_runs.record`) is the SAME string across all three (e.g. `us_supply_fetch`, `agm_fetch`) — keep them in lockstep.
+- **Services are packages when split** ("god-file split via package re-export", ADR-0017): the package `__init__.py` re-exports the prior flat public surface (incl. externally-referenced `_private` symbols) so `from services.X import Y` and `services.X.Y` both keep working.
+- **Frontend**: `PascalCase.jsx` for components/pages, `camelCase.js` for hooks/utils; hooks prefixed `use`. Plain CSS (no Tailwind); co-located `*.css` per component. Section widgets named `<Domain>Section.jsx`.
+- **SQL**: tables `snake_case`; idempotent DDL uses `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`.

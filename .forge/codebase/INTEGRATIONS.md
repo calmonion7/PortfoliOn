@@ -1,94 +1,97 @@
 ---
-last_mapped_commit: 6b1c06b514d7ca9511360a7263b14cf97d783d18
-mapped: 2026-06-28
+last_mapped_commit: 78750ecc2c96d71a9e3a3f225a56aea99db71db5
+mapped: 2026-07-01
 ---
 
 # INTEGRATIONS
 
-External APIs, data sources, datastore, and auth providers — what each is used for and the service file path. (Domain concepts belong in CONTEXT.md.)
+External APIs and data sources, each with its backend service file path. All HTTP unless noted; most use `requests`, OAuth token exchange uses `httpx`. Keys read from env (see STACK.md).
 
-## Market quote / financial data
+## yfinance (Yahoo Finance)
 
-### yfinance (Yahoo Finance)
-- **Use**: primary US quotes/financials/history; also some KR financials and market-indicator history. US 1st-line source.
-- **Files**: `backend/services/market/us.py` (`get_annual_financials_us` via `get_income_stmt`/`get_balance_sheet`/`get_cashflow` methods), `backend/services/market/kr.py`, `backend/services/ranking_service.py`, `backend/services/analysis_service.py` (SECTOR_ETFS, MACRO_TICKERS TLT/UUP/USO/^VIX), `backend/services/market_indicators/` (`fx.py` `^VIX`, `commodities.py` treasuries `^IRX/^FVX/^TNX/^TYX`, `earnings.py`, `indices.py` `^GSPC`/`^KS11`/`^KQ11`).
-- **No API key.** US quote chain: yfinance → KIS (backup).
+Library (`import yfinance as yf`), not an HTTP endpoint. Primary US source.
 
-### Naver Mobile Stock API
-- **Use**: KR quote/financials fallback (when 키움 unset/fails/empty); also KR earnings.
-- **Endpoint**: `https://m.stock.naver.com/api/stock/{code}/...` (custom User-Agent + Referer headers).
-- **Files**: `backend/services/market/kr.py` (`_naver_get`, `_NAVER_BASE`), `backend/services/market_indicators/earnings.py`.
-- **No API key** (public web API).
+- **US market quotes / history / financials** — `backend/services/market/us.py`. `yf.Ticker(yf_sym)`, `.history(period=...)`, `get_income_stmt()`/`get_balance_sheet()`/`get_cashflow()` methods (no-space index labels — see CLAUDE.md gotcha vs `.income_stmt` property labels). Backup falls back to KIS.
+- **US supply / ownership** — `backend/services/us_supply.py`. `fetch_us_supply(ticker, exchange)` reads `t.institutional_holders`, `t.insider_transactions`, and `info["shortPercentOfFloat"]` (with NaN/inf guards via `_finite`); persists to `us_supply_snapshot` table. Read via `get_us_supply` / `get_us_insider`.
+- **Calendar earnings/dividend events** — `backend/routers/calendar.py`. `yf.Ticker(sym).calendar` fetched per stock, parallelized over a `ThreadPoolExecutor(max_workers ≤ 15)`.
 
-### FnGuide (KR market cap scrape)
-- **Use**: KR market-cap fallback parsed from `comp.fnguide.com` HTML.
-- **File**: `backend/services/market/kr.py` (`_fnguide_market_cap`, regex over stripped HTML).
+## Naver (m.stock.naver.com / api.stock.naver.com / finance.naver.com)
 
-### 키움 / Kiwoom REST API
-- **Use**: **KR read-only primary quote source** (boundary ADR-0009 — quotes/charts/sector/investor/short-sell TRs only; no account/order). KR 1st-line.
-- **Auth**: server-side single key `KIWOOM_APP_KEY`/`KIWOOM_SECRET_KEY`, base `KIWOOM_BASE_URL` (default `https://api.kiwoom.com`). In-process singleton token, 401 retry, serial throttle (min 0.25s), 12h token cache. `configured()` gates (unset → caller falls back).
-- **Files**: `backend/services/kiwoom/client.py` (token + `request(api_id, body, category)`, `integrated_code(stk_cd, regular)` SOR `_AL` vs plain KRX), `backend/services/kiwoom/quote.py` (ka10001), `backend/services/kiwoom/sector.py` (ka20006 sector daily closes, ka20002 sector→stock mapping), `backend/services/kiwoom/investor.py` (ka10059 flows, ka10008 foreign ratio), `backend/services/kiwoom/chart.py` (ka10081 daily / ka10082 weekly / ka10083 monthly bars), `backend/services/kiwoom/shortsell.py` (ka10014).
-- Consumed by `backend/services/kr_sector_service.py`, `backend/services/short_sell_service.py`, `backend/services/investor_service.py`. Catalog: `KIWOOM_API.md`.
+Unauthenticated public JSON/HTML endpoints (custom `User-Agent` + `Referer: https://m.stock.naver.com/`).
 
-### KIS — 한국투자증권 (Korea Investment Securities) REST API
-- **Use**: **read-only BACKUP quote source** (boundary ADR-0011). KR chain 키움→KIS→Naver; US chain yfinance→KIS. Dormant when keys unset.
-- **Auth**: `KIS_APP_KEY`/`KIS_APP_SECRET`, base `KIS_BASE_URL` (default live `https://openapi.koreainvestment.com:9443`). `/oauth2/tokenP` singleton token, EGW00133 reissue guard (60s min), 401 retry, serial throttle (0.05s), 23h token cache, `custtype=P` header.
-- **Files**: `backend/services/kis/client.py` (`request(tr_id, path, params)`), `backend/services/kis/quote.py` (KR `FHKST01010100`; US price `HHDFS00000300` + daily `HHDFS76240000`, EXCD NAS→NYS→AMS probe).
-- Catalog: `KIS_API.md`.
+- **KR quotes (fallback)** — `backend/services/market/kr.py`. `_NAVER_BASE = "https://m.stock.naver.com/api/stock"`; part of the KR quote corroboration chain (Kiwoom → KIS → Naver).
+- **Consensus / research reports** — `backend/services/consensus_pipeline.py`. `https://m.stock.naver.com/api/research/stock/{ticker}?pageSize=200` and `/{rid}` detail.
+- **News scraping** — `backend/services/scraper.py`. `https://m.stock.naver.com/api/news/stock/{ticker}` + article pages `https://n.news.naver.com/mnews/article/{office_id}/{article_id}`.
+- **Guru (US holdings)** — `backend/services/guru_scraper.py`. `_NAVER_US_BASE = "https://api.stock.naver.com/stock"`.
+- **Rankings (market value)** — `backend/services/ranking_service.py`. `_NAVER_MARKETVALUE = "https://m.stock.naver.com/api/stocks/marketValue"`.
+- **KR earnings / market-cap list** — `backend/services/market_indicators/earnings.py`. `_NAVER_BASE = "https://m.stock.naver.com/api/stock"` + `https://finance.naver.com/sise/sise_market_sum.naver`.
 
-## DART — OpenDART (Korea FSS disclosures)
-- **Base**: `https://opendart.fss.or.kr/api`. **Auth**: `DART_API_KEY` (required, KR-only). corp_code map from `corpCode.xml` (cached ~1 week), reused across services via `backlog._get_corp_code_map`.
-- **Order backlog** — `backend/services/backlog.py` (+ parser `backend/services/backlog_parser.py`): `list.json` → recent report `rcept_no`; `document.xml` (ZIP, all members decoded/joined) for raw text; `fnlttSinglAcnt.json` for financial-context accounts. Auto-extract type-1 supply tables with reconciliation, else `pending` for Cowork.
-- **Disclosure feed** — `backend/services/disclosures.py`: `list.json` called **per core type A/B/C/D separately** (response omits `pblntf_ty`, so query value is stamped). dedup upsert by `rcept_no` to `stock_disclosures`. status 013 (no data) graceful.
-- **AGM meeting dates** — `backend/services/agm.py`: `list.json` called with **NO `pblntf_ty`** (specifying type returns 0 AGM filings) then filtered by '주주총회'; `document.xml` text parsed for meeting date (structured table / free-text / fallback strategies). Upsert to `stock_disclosures.meeting_date`. Batch id `agm_fetch`.
-- **Insider / 5% holdings** — `backend/services/insider_trades.py`: `elestock.json` (officer/major-shareholder ownership → 'insider') + `majorstock.json` (5%-rule → 'major5'), idempotent upsert by `row_hash` to `stock_insider_trades`.
-- **Dividends (KR side)** — `backend/services/dividends.py`: `alotMatter.json` (latest annual `reprt_code=11011`, common-stock per-share dividend + yield current-period values).
+## Kiwoom (키움) REST API
 
-## FRED — St. Louis Fed (US macro / economic data)
-- **Base**: `https://api.stlouisfed.org/fred/series/observations`. **Auth**: `FRED_API_KEY` (unset → fetch fails gracefully, stored values unchanged). Incremental fetch (observation_start = last stored date).
-- **Files**: `backend/services/market_indicators/econ.py` (CPI, unemployment, etc. — `monthly_us` batch), `backend/services/market_indicators/macro.py` (`macro_signals`: `T10Y2Y`, `BAMLH0A0HYM2`, `M2SL`, `DFF` + signal evaluation; `macro_signals_fetch` batch). **Also `backend/routers/calendar.py` `_get_econ_events`** uses the `https://api.stlouisfed.org/fred/releases/dates` endpoint (curated major US release names — CPI/Employment/GDP/PPI) for the calendar `econ` event type (request-time on calendar cache-miss, market-wide; `FRED_API_KEY` unset → no econ events, graceful).
-- Note: two FRED endpoints are used — `series/observations` (market-indicator values, `econ.py`/`macro.py`) and `releases/dates` (calendar econ event dates, `calendar.py`). FRED has no S&P CAPE series (FRED "Case-Shiller" is housing prices); CAPE is scraped from multpl.com (see below).
+Primary KR quote source. Read-only TR endpoints only (no accounts/orders). Client `backend/services/kiwoom/client.py`.
 
-## S&P 500 Shiller CAPE — multpl.com scrape
-- **Use**: US valuation (S&P500 CAPE current + mean/median/min/max) for `GET /api/market/indices`.
-- **Endpoint**: `https://www.multpl.com/shiller-pe` (HTML scrape via `requests` + `BeautifulSoup(html, "html.parser")` — local lxml absent).
-- **File**: `backend/services/market_indicators/indices.py` (`_parse_multpl_cape`).
+- Base URL: `KIWOOM_BASE_URL` env, default `https://api.kiwoom.com`. Keys: `KIWOOM_APP_KEY` / `KIWOOM_SECRET_KEY`.
+- Token: `POST {base}/oauth2/token` with `{grant_type: "client_credentials", appkey, secretkey}` (in-process singleton, 401 retry/re-issue).
+- TR request: `POST {base}/api/dostk/{category}` with `api-id` / `authorization` headers, serial throttle, `return_code != 0` raises.
+- Submodules: `quote.py` (ka10001 current price), `chart.py` (ka10081 daily bars), `sector.py` (ka20006 sector index daily / ka20002 sector membership), `investor.py` (investor flows), `shortsell.py` (short-sell). KR quotes consumed by `backend/services/market/kr.py` (Kiwoom-first + Naver fallback). KR sector momentum precomputed by `backend/services/kr_sector_service.py`. Integrated code selection (`integrated_code(stk_cd, regular=)`) toggles KRX-regular vs NXT `_AL` codes.
 
-## FX rate — open.er-api.com
-- **Use**: USD-base FX rates (e.g. USDKRW) for FX section / portfolio KRW conversion.
-- **Endpoint**: `https://open.er-api.com/v6/latest/USD` (no key).
-- **File**: `backend/services/market_indicators/fx.py`.
+## KIS (한국투자증권 / Korea Investment)
 
-## KOFIA / 공공데이터포털 (data.go.kr) — leverage & lending
-- **Auth**: `KOFIA_API_KEY` (shared by both services; unset → request fails). Paginated (`numOfRows`/`pageNo`).
-- **Leverage** — `backend/services/leverage_service.py`: `https://apis.data.go.kr/1160100/service/GetKofiaStatisticsInfoService` (credit balance, forced liquidation/반대매매) + `.../GetMarketIndexInfoService` (market cap). → `market_leverage_indicators` table.
-- **Lending** — `backend/services/lending_service.py`: `https://apis.data.go.kr/1160100/GetStocLendBorrInfoService_V2/getNatiAndForeLendAndBorrBalaCo_V2` (domestic/foreign 대차잔고). → `market_lending_balance` table.
+Backup quote source (KR fallback after Kiwoom; US fallback after yfinance). Read-only, no orders/accounts. Client `backend/services/kis/client.py`.
 
-## 관세청 / KITA — KR exports (semiconductors etc.)
-- **Use**: KR monthly export figures (`monthly_kr` batch).
-- **Primary**: Korea Customs Service `https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList` via `KITA_API_KEY` (note: env name `KITA_API_KEY` is actually the 관세청 key).
-- **Fallback**: UN Comtrade public API `https://comtradeapi.un.org/public/v1/preview/C/M/HS` (no key) — used when `KITA_API_KEY` unset or customs fetch fails.
-- **File**: `backend/services/market_indicators/exports.py`.
+- Base URL: `KIS_BASE_URL` env, default `https://openapi.koreainvestment.com:9443` (live). Keys: `KIS_APP_KEY` / `KIS_APP_SECRET`. Dormant when keys unset (`configured()` False).
+- Token: `POST {base}/oauth2/tokenP` (in-process singleton; forced re-issue guarded to ≤ once/60s for EGW00133; 401 retry).
+- Request: `GET {base}/uapi/...` with `tr_id` / `appkey` / `appsecret` / `custtype=P` headers, serial throttle, `rt_cd != "0"` raises.
+- `quote.py`: KR `FHKST01010100` (current price), US price `HHDFS00000300` + dailyprice `HHDFS76240000` (EXCD NAS→NYS→AMS probe).
+
+## DART (OpenDART, opendart.fss.or.kr)
+
+KR-only, `DART_API_KEY` required. Base `https://opendart.fss.or.kr/api`. Status 013 (no data) handled gracefully.
+
+- **Order backlog (수주잔고)** — `backend/services/backlog.py` (+ parser `backend/services/backlog_parser.py`). No structured backlog API → `list.json` for report `rcept_no`, then `document.xml` (ZIP → decode all members → combined raw text) parsed for backlog tables. `_get_corp_code_map` provides ticker→corp_code mapping (reused by other DART services).
+- **Disclosures feed** — `backend/services/disclosures.py`. `list.json` called **per core type A/B/C/D separately** (response does not echo `pblntf_ty`, so the query type is stamped onto each item). Dedup by `rcept_no` into `stock_disclosures`.
+- **AGM meeting dates (주주총회)** — `backend/services/agm.py`. `_DART_BASE = "https://opendart.fss.or.kr/api"`. `_fetch_agm_list(corp_code)` calls `list.json` **with no `pblntf_ty`** (specifying it returns 0 AGM disclosures) then filters items for '주주총회'; `parse_agm_meeting_date(document_text)` extracts the meeting date from `document.xml` text. Serial throttle `_DART_THROTTLE = 0.3s`. Reuses `services.backlog._get_corp_code_map`.
+- **Insider trades** — `backend/services/insider_trades.py`. `elestock.json` (임원·주요주주 소유상황 → 'insider') + `majorstock.json` (5% rule → 'major5'); deterministic `row_hash` for idempotent upsert into `stock_insider_trades`.
+- **KR dividends** — referenced via DART `alotMatter.json` (per CLAUDE.md, in `backend/services/dividends.py` KR branch).
+- **KR financials** — `backend/services/market/kr.py` uses `fnlttSinglAcntAll` (full statements, requires `fs_div`) and `fnlttSinglAcnt` (major accounts).
+
+## FRED (St. Louis Fed) — TWO distinct endpoints
+
+`FRED_API_KEY` required; graceful no-op / error message when unset.
+
+- **`series/observations`** — economic & macro time series.
+  - `backend/services/market_indicators/econ.py`: `https://api.stlouisfed.org/fred/series/observations` (`_fetch_series(series_id, start)`), economic indicators.
+  - `backend/services/market_indicators/macro.py`: same `series/observations` endpoint (`_fetch_series(series_id, api_key, start)`) for macro signal series (`T10Y2Y`, `BAMLH0A0HYM2`, `M2SL`, `DFF`).
+- **`releases/dates`** — calendar econ-release events. `backend/routers/calendar.py` `_get_econ_events(month_start, month_end)` calls `https://api.stlouisfed.org/fred/releases/dates` for curated major US release dates. **FOMC dates come from a static `_FOMC_DATES` list** in the same file (always included regardless of `FRED_API_KEY`; coverage ~2027-12, manually refreshed, graceful when exhausted).
+
+## KOFIA / data.go.kr (공공데이터포털)
+
+`KOFIA_API_KEY` required (shared by both services). HTTP `requests.get` with `User-Agent: Mozilla/5.0`.
+
+- **Leverage indicators** (신용잔고·반대매매·시총) — `backend/services/leverage_service.py`. `_KOFIA_BASE = "https://apis.data.go.kr/1160100/service/GetKofiaStatisticsInfoService"` (endpoints `getGrantingOfCreditBalanceInfo`, `getSecuritiesMarketTotalCapitalInfo`, …) and `_INDEX_BASE = "https://apis.data.go.kr/1160100/service/GetMarketIndexInfoService"`; paginates all pages → `market_leverage_indicators` table.
+- **Lending balance** (내외국인 대차잔고) — `backend/services/lending_service.py`. `_BASE = "https://apis.data.go.kr/1160100/GetStocLendBorrInfoService_V2"` → `market_lending_balance` table.
+
+## 관세청 / KITA (Korea Customs / exports)
+
+`backend/services/market_indicators/exports.py`. KR export statistics.
+
+- Primary (when `KITA_API_KEY` set): Korea Customs `https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList` (`_fetch_customs_exports`).
+- Fallback (no key, or on failure): UN Comtrade `_COMTRADE_URL = "https://comtradeapi.un.org/public/v1/preview/C/M/HS"` (`_fetch_comtrade_exports`).
+
+(Note: env var named `KITA_API_KEY` is actually the Korea Customs Service key — see CLAUDE.md.)
 
 ## PostgreSQL (Docker)
-- **Use**: primary datastore (runtime data); local JSON files are caches only.
-- **Driver/access**: `backend/services/db.py` (psycopg2 `ThreadedConnectionPool`, DSN `DATABASE_URL`).
-- **Schemas**: `backend/auth_schema.sql` (users, refresh_tokens — runs first) then `backend/app_schema.sql` (tickers, user_stocks, snapshots, schedules, guru_*, digests, consensus_history, calendar_cache, market_cache, user_menu_permissions, user_events, market_leverage_indicators, market_lending_balance, raw_reports, daily_consensus_mart, stock_disclosures, stock_insider_trades, market_short_sell, backlog_history, stock_dividends, etc.). Container: `postgres:16-alpine` (`docker-compose.yml`).
-- **Market-indicator cache**: `backend/services/market_indicators/cache.py` (`_mc_load`/`_mc_save` over `market_cache`).
 
-## Auth providers
-- **Google OAuth** — `backend/routers/auth.py`: redirect to `https://accounts.google.com/o/oauth2/v2/auth`, token exchange `https://oauth2.googleapis.com/token` (via `httpx`). Keys `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`. Callback `FRONTEND_URL + /api/auth/oauth/google/callback`.
-- **GitHub OAuth** — `backend/routers/auth.py`: `https://github.com/login/oauth/authorize` → `.../access_token` → `https://api.github.com/user` + `/user/emails`. Keys `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` (currently blank in env → effectively dormant).
-- **JWT (local + OAuth sessions)** — `backend/services/auth_service.py`: HS256 via `python-jose`, `JWT_SECRET`; access 1h / refresh 30d; bcrypt password hashing; `upsert_oauth_user` links provider accounts. Library: `authlib` (dep) + `python-jose`.
-- **Session** — starlette `SessionMiddleware` with `SESSION_SECRET` (`backend/main.py`).
+`backend/services/db.py`. `psycopg2` with `RealDictCursor` and a module-level `ThreadedConnectionPool` (`_get_pool()`, dsn from `os.environ["DATABASE_URL"]`, pool sized above max ThreadPool concurrency). Connections via `get_connection()` (getconn/putconn). Container is `postgres:16-alpine` (`docker-compose.yml`); schemas `backend/auth_schema.sql` then `backend/app_schema.sql`.
 
-## Cowork (external AI analysis writer)
-- **Use**: external Claude/Cowork client writes AI analysis text via enrich/backlog endpoints (backend itself has no LLM). Gated by `COWORK_API_KEY`.
-- **Spec**: `CLAUDE_COWORK_API.md` (consumes `PUT /api/report/{ticker}/...` enrich routes). Backend code in `backend/routers/report.py` / `backend/routers/stocks.py`.
+## Google & GitHub OAuth + JWT
+
+`backend/routers/auth.py` (flows) + `backend/services/auth_service.py` (tokens/users).
+
+- **Google OAuth**: authorize `https://accounts.google.com/o/oauth2/v2/auth`, token exchange `https://oauth2.googleapis.com/token` (via `httpx`). Redirect URI `{FRONTEND_URL}/api/auth/oauth/google/callback`. Keys `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+- **GitHub OAuth**: authorize `https://github.com/login/oauth/authorize`, token `https://github.com/login/oauth/access_token`, profile `https://api.github.com/user`. Keys `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`.
+- **JWT**: `from jose import jwt`; HS256 encode/decode with `JWT_SECRET` (`backend/services/auth_service.py` `create_token` / `decode`). OAuth users upserted into `users` by `(oauth_provider, oauth_sub)`. Short-lived OAuth codes held in an in-process `_oauth_codes` dict (120s TTL).
 
 ## Cloudflare Tunnel
-- **Use**: public ingress `portfolion.taebro.com` → `localhost:80` (nginx). TLS terminated at Cloudflare (nginx 443 block commented out).
-- **Run**: `cloudflared` is NOT a compose container — launched via launchd. Referenced in `CLAUDE.md`, `README.md`, `docs/ops/deploy.md`, `scripts/ddns_update.sh` (Cloudflare DNS API for DDNS). Not driven from application code.
 
-## Scheduling / batches
-- `backend/scheduler/` (APScheduler) drives batch jobs; `backend/services/batch_registry.py` is the batch catalog (each batch has `market` KR/US/공통, `source`, `usage`); `backend/services/job_runs.py` records runs (`job_runs.record`). `GET /api/batches` exposes the registry.
+Not a code integration — infra. `portfolion.taebro.com` → `localhost:80`, run via launchd (not a compose container) per `README.md` and `CLAUDE.md`. A separate DDNS updater script `scripts/ddns_update.sh` uses the Cloudflare API (`CF_ZONE_ID` / `CF_API_TOKEN`, set outside `.env.docker`).

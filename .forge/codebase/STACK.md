@@ -1,139 +1,126 @@
 ---
-last_mapped_commit: 6b1c06b514d7ca9511360a7263b14cf97d783d18
-mapped: 2026-06-28
+last_mapped_commit: 78750ecc2c96d71a9e3a3f225a56aea99db71db5
+mapped: 2026-07-01
 ---
 
 # STACK
 
-Tech stack, build, and configuration facts for PortfoliOn. (Glossary/domain terms live in CONTEXT.md, not here.)
+Technology stack, runtime versions, dependencies, build/config, and environment variable names.
 
 ## Languages & Runtimes
 
-| Layer | Language | Runtime version | Source |
-|-------|----------|-----------------|--------|
-| Backend | Python | 3.12 (`python:3.12-slim`) | `backend/Dockerfile` |
-| Frontend | JavaScript (ESM, `"type": "module"`) | Node (no pinned `.nvmrc`/`engines`) | `frontend/package.json` |
-| DB | SQL (PostgreSQL 16) | `postgres:16-alpine` | `docker-compose.yml` |
-
-No `.python-version`, `.nvmrc`, or `engines` field is pinned. Backend venv lives at `backend/.venv/` (local) — note `lxml` is in `requirements.txt`/Docker but NOT in local `.venv`.
+- **Backend**: Python. `backend/Dockerfile` pins `FROM python:3.12-slim`. (Local dev venv at `backend/.venv/`; host `python3` is 3.14.) App entry `backend/main.py` (`from dotenv import load_dotenv` first, then FastAPI app).
+- **Frontend**: JavaScript (ESM, `"type": "module"`), React 19 / JSX. No TypeScript at runtime (`@types/*` present for editor tooling only).
 
 ## Backend — Python / FastAPI
 
-Entry: `backend/main.py` (FastAPI `app`, mounts routers + scheduler). Run: `uvicorn main:app --host 0.0.0.0 --port 8000`.
-
-Middleware stack (`backend/main.py`): `SessionMiddleware` (starlette, `SESSION_SECRET`), `EventTrackerMiddleware` (custom), `CORSMiddleware`.
-
-Routers mounted in `main.py`: auth, portfolio, report, watchlist, stocks, guru, calendar, digest, market_indicators, analytics, analysis, events, rankings, investor, short_sell, batches, recommendations, admin.
-
-Scheduler is a **package** `backend/scheduler/` (`__init__.py`, `_state.py`, `jobs.py`, `schedule.py`) — APScheduler.
-
-### Key dependencies (`backend/requirements.txt`)
+Dependencies from `backend/requirements.txt` (version floors, not pins):
 
 | Package | Constraint | Role |
-|---------|-----------|------|
-| `fastapi` | >=0.104.0 | web framework |
-| `uvicorn[standard]` | >=0.24.0 | ASGI server |
-| `apscheduler` | >=3.10.4 | batch scheduling (`backend/scheduler/`) |
-| `yfinance` | >=0.2.40 | US/KR market data |
-| `pandas` | >=2.1.0 | dataframes |
-| `numpy` | >=1.26.0 | numerics |
-| `requests` | >=2.31.0 | sync HTTP (most external APIs) |
-| `httpx` | >=0.25.0 | async HTTP (OAuth token exchange in `backend/routers/auth.py`) |
-| `beautifulsoup4` | >=4.12.0 | HTML parsing (CAPE crawl, FnGuide) |
-| `lxml` | >=4.9.0 | HTML/XML parser (Docker only; local uses `html.parser`) |
-| `exchange_calendars` | >=4.5 | market calendar / expected report dates |
-| `psycopg2-binary` | >=2.9.0 | PostgreSQL driver (`backend/services/db.py`) |
-| `authlib` | >=1.3.0 | OAuth |
-| `python-jose[cryptography]` | >=3.3.0 | JWT (HS256) |
-| `bcrypt` | >=4.0.0 | password hashing |
-| `itsdangerous` | >=2.0.0 | session signing |
-| `python-dotenv` | (unpinned) | env loading |
-| `pytest` | >=7.4.0 | tests (`cd backend && .venv/bin/python -m pytest`) |
+|---|---|---|
+| `fastapi` | `>=0.104.0` | Web framework (`backend/main.py` mounts routers) |
+| `uvicorn[standard]` | `>=0.24.0` | ASGI server (Dockerfile CMD: `uvicorn main:app --host 0.0.0.0 --port 8000`) |
+| `apscheduler` | `>=3.10.4` | Job scheduler — `AsyncIOScheduler` + `CronTrigger` (see `backend/scheduler/`) |
+| `yfinance` | `>=0.2.40` | US market data + US supply |
+| `pandas` | `>=2.1.0` | Dataframe handling |
+| `numpy` | `>=1.26.0` | Numerics |
+| `requests` | `>=2.31.0` | Synchronous HTTP (most external APIs) |
+| `beautifulsoup4` | `>=4.12.0` | HTML parsing (Shiller CAPE crawl, etc.) |
+| `lxml` | `>=4.9.0` | BS4 parser backend (Docker only; **not in local `.venv`** — local code uses `html.parser`) |
+| `httpx` | `>=0.25.0` | Async HTTP (OAuth token exchange in `backend/routers/auth.py`) |
+| `pytest` | `>=7.4.0` | Backend test runner (`backend/tests/`) |
+| `exchange_calendars` | `>=4.5` | Market trading-day calendars |
+| `psycopg2-binary` | `>=2.9.0` | PostgreSQL driver (pooled — `ThreadedConnectionPool`) |
+| `authlib` | `>=1.3.0` | OAuth client support |
+| `python-jose[cryptography]` | `>=3.3.0` | JWT encode/decode (HS256) |
+| `bcrypt` | `>=4.0.0` | Password hashing |
+| `itsdangerous` | `>=2.0.0` | Signed session/state values |
+| `python-dotenv` | (unpinned) | `.env` loading at startup |
 
-No `anthropic` dep — backend does NOT call any LLM (AI analysis is written externally via Cowork enrich API).
+No `anthropic` dependency — backend makes no LLM calls; AI analysis text arrives via the external Cowork enrich API.
 
-### DB access (`backend/services/db.py`)
+Run command (per `CLAUDE.md`): `cd backend && python -m uvicorn main:app --reload --port 8000`. Tests: `cd backend && .venv/bin/python -m pytest`.
 
-psycopg2 `ThreadedConnectionPool`, `minconn=1`, `maxconn=20`, DSN from `DATABASE_URL`. `RealDictCursor`. Pool raises `PoolError` (not block) on exhaustion — sized above max ThreadPool concurrency (calendar 15, analysis 11).
+### Scheduler (`backend/scheduler/` package)
+
+APScheduler is configured in the `backend/scheduler/` package (not a single `scheduler.py` — `backend/main.py` does `import scheduler as sched`):
+- `backend/scheduler/_state.py` — `from apscheduler.schedulers.asyncio import AsyncIOScheduler`; module-level `_scheduler = AsyncIOScheduler()`.
+- `backend/scheduler/schedule.py` — `_build_trigger` returns `CronTrigger(**build_trigger_kwargs(spec), timezone=timezone)`.
+- `backend/scheduler/jobs.py`, `backend/scheduler/__init__.py` — job wiring / package surface.
 
 ## Frontend — React 19 + Vite
 
-Plain CSS (no TailwindCSS). Dev port 5173.
+From `frontend/package.json` (`"name": "frontend"`, `"private": true`, ESM). Scripts: `dev` (`vite`), `build` (`vite build`), `test` (`vitest run`), `lint` (`eslint .`), `preview` (`vite preview`).
 
-Scripts (`frontend/package.json`): `dev` (vite), `build` (vite build), `test` (vitest run), `lint` (eslint), `preview`.
+Dependencies:
 
-### Dependencies (`frontend/package.json`)
+| Package | Constraint | Role |
+|---|---|---|
+| `react` / `react-dom` | `^19.2.5` | UI runtime |
+| `react-router-dom` | `^7.14.2` | Routing |
+| `axios` | `^1.16.0` | HTTP client |
+| `recharts` | `^3.8.1` | Charts (split into `charts` manual chunk with d3/victory-vendor) |
 
-- Runtime: `react` ^19.2.5, `react-dom` ^19.2.5, `react-router-dom` ^7.14.2, `axios` ^1.16.0, `recharts` ^3.8.1.
-- Dev/build: `vite` ^8.0.10 (**rolldown** bundler), `@vitejs/plugin-react` ^6.0.1, `vite-plugin-pwa` ^1.3.0, `vitest` ^4.1.9, `jsdom` ^29.1.1, `@testing-library/react` + `jest-dom`, `eslint` ^10 + `@eslint/js` + react-hooks/react-refresh plugins, `globals`.
+Dev dependencies:
 
-### Build config (`frontend/vite.config.js`)
+| Package | Constraint | Role |
+|---|---|---|
+| `vite` | `^8.0.10` | Build tool / dev server (Vite 8 = rolldown bundler — manualChunks must be a **function**) |
+| `@vitejs/plugin-react` | `^6.0.1` | React plugin |
+| `vite-plugin-pwa` | `^1.3.0` | PWA (service worker, manifest) |
+| `vitest` | `^4.1.9` | Test runner (config embedded in `vite.config.js` `test` block) |
+| `jsdom` | `^29.1.1` | Test DOM environment |
+| `@testing-library/react` | `^16.3.2` | Component testing |
+| `@testing-library/jest-dom` | `^6.9.1` | DOM matchers |
+| `eslint` | `^10.2.1` | Linter (`frontend/eslint.config.js`) |
+| `@eslint/js` | `^10.0.1` | ESLint base config |
+| `eslint-plugin-react-hooks` | `^7.1.1` | Hooks lint rules |
+| `eslint-plugin-react-refresh` | `^0.5.2` | Fast-refresh lint rules |
+| `globals` | `^17.5.0` | ESLint globals |
+| `@types/react` / `@types/react-dom` | `^19.2.x` | Editor type hints |
 
-- **Vite 8 = rolldown**: `build.rollupOptions.output.manualChunks` is a **function** (object form unsupported). Splits `charts` chunk (recharts / `/d3-` / `victory-vendor`) vs `vendor` (rest of `node_modules`).
-- `VitePWA`: `registerType: 'autoUpdate'`, workbox `runtimeCaching` (google-fonts CacheFirst, jsdelivr CacheFirst, `/api/*` NetworkFirst excluding `/api/auth/*`), manifest (name PortfoliOn, ko, standalone). `cacheId` includes a build-date stamp.
-- Custom `sw-cache-bust` plugin: appends build-date query to `registerSW.js`, `manifest.webmanifest`, `sw.js` references in `dist/index.html`.
-- Vitest config: `environment: 'jsdom'`, `globals: true`, `setupFiles: './src/test/setup.js'`.
-- Dev server: port 5173, proxies `/api` → `http://localhost:8000`, watch `usePolling: true`.
-- Prod: `VITE_API_BASE_URL` env (unset → relative paths via nginx).
+### Vitest harness
 
-## Containers & Deployment
+Config lives in `frontend/vite.config.js` `test` block (no separate `vitest.config.js`): `environment: 'jsdom'`, `globals: true`, `setupFiles: './src/test/setup.js'`. Harness files: `frontend/src/test/setup.js`, `frontend/src/test/smoke.test.js`.
 
-`docker-compose.yml` services:
+## Build & Config
 
-| Service | Image / build | Ports | Notes |
-|---------|---------------|-------|-------|
-| `postgres` | `postgres:16-alpine` | 5432 | `pgdata` volume; init SQL mounted: `backend/auth_schema.sql` → `01-auth.sql`, `backend/app_schema.sql` → `02-app.sql`; healthcheck `pg_isready` |
-| `backend` | build `./backend` | (internal 8000) | `env_file: ./backend/.env.docker`; depends on healthy postgres |
-| `nginx` | `nginx:alpine` | 80, 443 | mounts `./frontend/dist:ro`, `./nginx/nginx.conf:ro`, certbot conf/www |
-| `certbot` | `certbot/certbot` | — | renew loop (`certbot renew` every 12h) |
-
-Note: per CLAUDE.md the live `backend` runs via `docker run` (not `docker compose`), so it does not appear in `docker compose ps`.
+### `frontend/vite.config.js`
+- Plugins: `@vitejs/plugin-react`, `VitePWA` (`registerType: 'autoUpdate'`, `pwaAssets` from `public/favicon.svg`, workbox `cacheId` keyed to a `BUILD_DATE` timestamp, runtime caching for google-fonts / cdn-fonts / `api-cache` NetworkFirst excluding `/api/auth/`), and a custom inline `sw-cache-bust` plugin (`closeBundle`) that appends `?<BUILD_DATE>` to `registerSW.js` / `manifest.webmanifest` / `sw.js`.
+- `build.rollupOptions.output.manualChunks(id)` — function form: bundles `recharts`/`/d3-`/`victory-vendor` → `charts`, other `node_modules` → `vendor`.
+- `server`: port 5173, proxy `/api` → `http://localhost:8000` (`changeOrigin: true`), `watch.usePolling: true`.
 
 ### `backend/Dockerfile`
+`python:3.12-slim`, `WORKDIR /app`, `pip install --no-cache-dir -r requirements.txt`, `COPY . .`, `CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]`.
 
-`FROM python:3.12-slim`, `WORKDIR /app`, `pip install -r requirements.txt`, CMD `uvicorn main:app --host 0.0.0.0 --port 8000`.
+### `docker-compose.yml` (version `"3.9"`, 4 services)
+- `postgres` — `postgres:16-alpine`, db/user `portfolion`, password from `${POSTGRES_PASSWORD:-portfolion}`, port `5432:5432`, `pgdata` volume, init SQL mounted: `backend/auth_schema.sql` → `01-auth.sql`, `backend/app_schema.sql` → `02-app.sql` (auth before app). Healthcheck `pg_isready`.
+- `backend` — `build: ./backend`, `depends_on` postgres healthy, `env_file: ./backend/.env.docker`.
+- `nginx` — `nginx:alpine`, ports `80:80` + `443:443`, mounts `frontend/dist` (`:ro`), `nginx/nginx.conf` (`:ro`), `certbot/conf` + `certbot/www` (`:ro`).
+- `certbot` — `certbot/certbot` image, renew loop (`certbot renew` every 12h).
+- Named volume: `pgdata`.
+
+(Per `CLAUDE.md`: the actual `backend` container is run via `docker run` (not `docker compose`), so it does not appear in `docker compose ps`.)
 
 ### `nginx/nginx.conf`
+HTTP `:80` server: `/.well-known/acme-challenge/` → certbot webroot; `/health` and `/api/` proxy to `http://backend:8000` (with `X-Forwarded-*` headers on `/api/`); `/index.html` and `sw.js`/`workbox-*.js` served `no-store`; hashed assets (`js|css|png|...|woff2?`) `max-age=31536000, immutable`; SPA fallback `try_files $uri /index.html`. The `:443` SSL server block is present but commented out.
 
-- HTTP `listen 80`. `/api/` and `/health` → `proxy_pass http://backend:8000` (sets X-Real-IP, X-Forwarded-For/Proto).
-- ACME challenge at `/.well-known/acme-challenge/` (certbot).
-- `/index.html` and service-worker files (`sw.js`, `workbox-*.js`) served `no-cache`; hashed JS/CSS/images served `max-age=31536000, immutable`.
-- SPA fallback `try_files $uri /index.html` from `/usr/share/nginx/html`.
-- HTTPS `listen 443 ssl` server block is **commented out** (TLS terminated at Cloudflare Tunnel; cert paths reference `portfolion.taebro.com`).
+## Environment Variables
 
-### Frontend serving
+Names only (from `backend/.env.docker`; never values). Example template at `backend/.env.docker.example`. Root `.env` exists for docker-compose interpolation. CORS origins (`backend/main.py`): `localhost:3000`, `localhost:5173`, plus `FRONTEND_URL`.
 
-nginx mounts `./frontend/dist` read-only and serves directly — `npm run build` is immediately live (independent of git push). Backend changes go live only after deploy (runner/poller).
-
-## Build / config / deploy files (paths)
-
-- `backend/Dockerfile`, `docker-compose.yml`, `nginx/nginx.conf`
-- `frontend/vite.config.js`, `frontend/package.json`, `frontend/src/test/setup.js`
-- `backend/requirements.txt`
-- `backend/auth_schema.sql`, `backend/app_schema.sql` (DB schemas; auth runs first)
-- `deploy.sh` (uses `docker run` for backend container), `docs/ops/deploy.md`
-- `scripts/auto-deploy-poll.sh` (fallback poller), `scripts/ddns_update.sh`
-- Self-hosted GitHub Actions runner deploy: `.github/workflows/deploy.yml` (`runs-on: self-hosted`)
-- `start.bat` / `stop.bat` (Windows), `start.sh` (macOS/Linux)
-
-## Environment variables (NAMES ONLY — values never copied)
-
-From `backend/.env.docker` (gitignored; values redacted here):
-
-- `DATABASE_URL`
-- `JWT_SECRET`, `SESSION_SECRET`
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
-- `ANTHROPIC_API_KEY` (present but unused by backend)
-- `FRED_API_KEY`
-- `KITA_API_KEY` (actually the Korea Customs Service / 관세청 key)
-- `KOFIA_API_KEY` (shared by leverage + lending services; public-data portal key)
-- `DART_API_KEY`
-- `FRONTEND_URL`
-- `COWORK_API_KEY`
-- `KIWOOM_BASE_URL`, `KIWOOM_APP_KEY`, `KIWOOM_SECRET_KEY`
-- `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_BASE_URL` (`KIS_BASE_URL` is commented out by default → live domain `:9443`)
-
-From root `.env` (docker-compose interpolation): `FRED_API_KEY`, `KITA_API_KEY` (also `POSTGRES_PASSWORD` referenced as `${POSTGRES_PASSWORD:-portfolion}` in `docker-compose.yml`).
-
-CORS origins (`backend/main.py`): `localhost:3000`, `localhost:5173`, and `FRONTEND_URL`.
+- `DATABASE_URL` — PostgreSQL DSN (`backend/services/db.py` reads `os.environ["DATABASE_URL"]`)
+- `POSTGRES_PASSWORD` — postgres container password (compose interpolation)
+- `JWT_SECRET` — HS256 signing key (`backend/services/auth_service.py`)
+- `SESSION_SECRET` — signed session/state
+- `FRONTEND_URL` — OAuth redirect base + CORS origin
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — Google OAuth
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` — GitHub OAuth
+- `FRED_API_KEY` — FRED (econ/macro/calendar release dates)
+- `DART_API_KEY` — OpenDART (backlog, disclosures, AGM, insider trades)
+- `KOFIA_API_KEY` — KOFIA / data.go.kr (leverage + lending)
+- `KITA_API_KEY` — Korea Customs Service (exports; falls back to UN Comtrade if unset)
+- `KIWOOM_APP_KEY`, `KIWOOM_SECRET_KEY`, `KIWOOM_BASE_URL` — Kiwoom REST (KR quotes/sector/etc.)
+- `KIS_APP_KEY`, `KIS_APP_SECRET` — KIS (Korea Investment) backup quote source (`KIS_BASE_URL` read with a default, not necessarily set)
+- `COWORK_API_KEY` — external Cowork enrich API key
+- `ANTHROPIC_API_KEY` — present in env file but currently unused by the backend

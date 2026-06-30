@@ -1,95 +1,72 @@
 ---
-last_mapped_commit: 6b1c06b514d7ca9511360a7263b14cf97d783d18
-mapped: 2026-06-28
+last_mapped_commit: 78750ecc2c96d71a9e3a3f225a56aea99db71db5
+mapped: 2026-07-01
 ---
 
 # CONVENTIONS
 
-Code style and recurring patterns in PortfoliOn. Backend = Python/FastAPI; frontend = React 19 + Vite, plain CSS. Facts verified against source; file paths in backticks.
+Coding conventions and recurring patterns for PortfoliOn (Python/FastAPI backend + React 19/Vite frontend, plain CSS). Implementation facts only — for term definitions see `.forge/CONTEXT.md`.
 
-## Backend
+## Backend (Python / FastAPI)
 
-### Layering: routers → services → db
+### Service-layer separation
+Routers (`backend/routers/`) hold HTTP/validation only and delegate data work to `backend/services/`. Routers import services at the top, e.g. `routers/watchlist.py` does `from services import storage, errors, cache as cache_svc, report_generator, ...` and `from services.db import query as db_query`. Business logic, external fetches, and persistence live in services; routers wire them to endpoints.
 
-- **Routers** (`backend/routers/*.py`) are thin: parse request, call into a service, shape the JSON response. App entry `backend/main.py` mounts each router. Domain logic lives in `backend/services/`.
-- **Services** (`backend/services/*.py`, plus packages `services/market/`, `services/market_indicators/`, `services/storage/`, `services/kiwoom/`, `services/kis/`, `services/recommendation/`) hold all data fetching, parsing, and computation.
-- **DB access is centralized in `backend/services/db.py`** — no raw `psycopg2` in routers/services. Two primitives:
-  - `query(sql, params) -> list[dict]` — SELECT, returns `RealDictCursor` rows as dicts.
-  - `execute(sql, params) -> int` — INSERT/UPDATE/DELETE, returns rowcount.
-  - `get_connection()` is a `@contextmanager` that commits on success / rolls back on exception, drawn from a module-level `ThreadedConnectionPool` (`minconn=1, maxconn=20`, lazily built under a `threading.Lock`). The pool is sized **above** max ThreadPool concurrency on purpose: psycopg2 raises `PoolError` (not blocks) on exhaustion (see `CONCERNS.md` §4).
-- SQL is parameterized (`%s` placeholders + a params tuple) — no string interpolation of user values.
+### DB access — `services.db`
+All SQL goes through `backend/services/db.py`:
+- `query(sql, params) -> list[dict]` for SELECT (uses `RealDictCursor`, returns dict rows).
+- `execute(sql, params) -> int` for INSERT/UPDATE/DELETE (returns rowcount).
+- `get_connection()` is a context manager that commits on success / rolls back on exception, drawing from a module-level `ThreadedConnectionPool` (`minconn=1`, `maxconn=20`). The pool max (20) is deliberately set **above** the largest `ThreadPoolExecutor` worker count (calendar 15, analysis 11) because psycopg2's pool raises `PoolError` rather than blocking when exhausted.
 
-### JSON serialization safety: NaN/inf must be guarded
+### NaN/inf JSON-500 safety (mandatory for value-bearing responses)
+starlette `JSONResponse` is `allow_nan=False`, so any `NaN`/`inf` in a response dict serializes to a **500** (`Out of range float values are not JSON compliant`). Two guard layers, used together:
+- **Source guard** — `math.isfinite(...)` checks where external values enter (preferred; cleaner than blanket output sanitization). Used across `routers/stocks.py`, `routers/recommendations.py`, `services/digest_service.py`, `services/indicators.py`, `services/report_generator.py`, `services/analysis_service.py`, `services/us_supply.py`, `services/recommendation/funnel.py`, `services/market_indicators/indices.py`, `services/market/format.py`.
+- **Output sanitize** — `services.utils.sanitize(obj)` (`backend/services/utils.py`) recursively walks dicts/lists and maps any non-finite float to `None`. Wrap a whole response dict before returning when NaN could enter from many places (e.g. the `_build_all` dashboard build). Consumers: `routers/stocks.py`, `routers/recommendations.py`, `routers/report.py`, `services/report_generator.py`, `services/leverage_service.py`, `services/lending_service.py`, `services/market_indicators/indices.py`.
 
-Starlette `JSONResponse` uses `allow_nan=False`, so any `NaN`/`inf` in a response dict raises a 500 (`Out of range float values are not JSON compliant`). Two complementary guard styles, both used:
+Storage trap: PostgreSQL rejects `NaN` in a `json` column (save fails), but Python `json.dumps` defaults to `allow_nan=True` so a **file fallback silently succeeds** — DB-fail / file-pass / response-serialize-fail produces split symptoms. Guard at the source.
 
-- **Output sanitize** — `sanitize(obj)` in `backend/services/utils.py` recursively walks dicts/lists and maps any non-finite float to `None`. Used as a final safety net before returning, e.g. `routers/stocks.py` `_build_all()` wraps its return in `sanitize({...})`; also imported in `routers/recommendations.py`, `routers/report.py`, `services/report_generator.py`, `services/lending_service.py`, `services/leverage_service.py`, `services/market_indicators/indices.py`.
-- **Source `math.isfinite` guards** — preferred where practical (cleaner than blanket sanitize): check finiteness at the source and treat non-finite as "no data". `backend/services/market/format.py` shows the idiom in `_safe_ratio`/`_safe_pct` (return `None` if denominator falsy/zero/non-finite or result non-finite, wrapped in `try/except (TypeError, ValueError)`).
-- Rule of thumb (per `CLAUDE.md`): any endpoint putting external-quote-derived floats (yfinance Close, FX) into the response needs one of these. Postgres rejects `NaN` in a `json` column while Python `json.dumps` defaults `allow_nan=True`, so the DB-vs-file fallback split can mask the bug.
+### DB NUMERIC → Decimal: coerce `float()` before float arithmetic
+psycopg2 returns SQL `NUMERIC` columns as Python `Decimal`. Mixing `Decimal` with `float` (external quotes, ratios, FX) raises `TypeError`. Always `float()`-coerce DB-sourced numerics before arithmetic with floats/external values. See `routers/stocks.py`:
+```python
+yield_on_cost = round(float(annual_div) / float(avg_cost) * 100, 2)   # line 376
+expected_income = round(float(annual_div) * float(qty), 2)            # line 378
+total_value += float(price) * float(qty) * fx                         # line 448
+```
+(The dashboard `yield_on_cost` bug came from omitting this coercion.)
 
-### Graceful external-fetch fallback — "wrong < missing"
+### yfinance percent fields are 0-1 fractions → ×100 at display
+yfinance `t.info` percent fields (`dividendYield`, etc.) are returned as **fractions (0-1)**, not whole percents. Multiply by `100` at display, and keep the scale consistent with the documented/fixture value (match doc/fixture scale). `services/dividends.py` notes the current yfinance scale inline; the cross-cutting rule is to verify the live scale and `×100` at presentation, never store a half-converted value. Related label trap: yfinance `get_income_stmt()`/`get_balance_sheet()`/`get_cashflow()` *methods* use no-space index labels (`OperatingCashFlow`) while the `.income_stmt`/`.cash_flow` *properties* use spaced labels (`Operating Cash Flow`); `format._yf_val` does exact matching and returns `None` silently on mismatch, so `services/market/us.py` must use the `get_*` methods consistently.
 
-External fetches (yfinance, Naver, DART, Kiwoom, KIS, FRED, KOFIA) fail or return partial data routinely. The convention:
+### Graceful external-fetch — "wrong < missing"
+External fetches (yfinance, DART, KOFIA, Naver, FRED, Kiwoom, KIS) must fail gracefully: a fetch failure yields `None`/skip, never a fabricated default. A wrong default (e.g. assuming "억원" units when a caption parse fails → ×100 over-store) is worse than a missing value. Extraction failures resolve to pending/`None`, not a guessed value. Do **not** silently swallow fetch exceptions — log them (silent `except` blocks defeat diagnosis); and do **not** persist empty/all-`None` batch results into the cache (skip the save, keep the last good value).
 
-- On fetch failure, prefer omitting/skipping (`None`, skip the ticker, keep the prior good value) over writing a fabricated/default value. Comments tag this `wrong<missing`. Example in `backend/services/report_generator.py` (~lines 279–317): the report-snapshot writer cross-validates KR `price` against an independent ref feed (Naver retry-once → KIS fallback) and **skips persisting that ticker** when no ref exists, keeping the last good snapshot, with a loud `print("[Report] ...")`.
-- Batch-fetch convention (per `CLAUDE.md`): never silently swallow fetch errors (log them) and never persist an all-`None`/empty result to cache (skip the save, keep prior good value) — guard the *failure class*, not a suspected trigger.
+### `_yf_sym` for yfinance symbols
+`backend/services/market/format.py:_yf_sym(ticker, market, exchange)` builds the yfinance symbol: KR → `f"{ticker}.{suffix}"` (suffix from exchange, default `KS`); US → `ticker.replace(".", "-")` (e.g. BRK.B → BRK-B). Used throughout `services/market/__init__.py` and `services/market/us.py`. Companion helpers in the same file: `_yf_val` (exact index/column match — silently returns `None` on label mismatch), `_safe_pct` / `_safe_ratio` (finite-guarded division), `_to_won`, `_fmt_price`, `_fmt_market_cap`.
 
-### yfinance symbol normalization: `_yf_sym`
+### No live external calls at request-time
+Batch-backed views (rankings, KR sector momentum, market indicators) must **not** call external APIs on the request or startup path. Batches precompute into `market_cache` / tables; requests read stored values only. (Per-request serial fetches add seconds of latency and re-fetch on every cache expiry.)
 
-`_yf_sym(ticker, market="US", exchange="") -> str` in `backend/services/market/format.py` is the single place that maps an internal ticker to a yfinance symbol: KR → `{ticker}.{exchange or "KS"}`; US → `ticker.replace(".", "-")` (e.g. `BRK.B` → `BRK-B`). Re-exported via `services/market/__init__.py` and used by `services/market/us.py` and the package facade. yfinance row-label lookups go through `_yf_val(src, key, col)` which exact-matches `key` in the frame index/columns and returns `None` on miss or NaN (no exception) — see `CLAUDE.md` gotcha on yfinance `get_*()` method vs `.property` label mismatch.
+### Lazy imports for circular references
+When two modules import each other (notably `storage` ↔ `cache`), defer the import inside the function. Example — `services/storage/names.py`:
+```python
+def ...:
+    """storage↔cache 순환참조 회피용 지연 import."""
+    from services import cache as cache_svc
+```
 
-### Lazy (in-function) imports to break circular refs
+### Route ordering — register specific paths BEFORE catch-all `/report/{ticker}/{date_str}`
+In `backend/routers/report.py` the catch-all `@router.get("/report/{ticker}/{date_str}")` (line 434) matches any two-segment path, so every more-specific `/report/{ticker}/<word>` route (`/us-supply`, `/backlog`, `/disclosures`, `/insider-trades`, `/us-insider`) must be **declared before** it — otherwise the literal segment (e.g. `backlog`) is captured as `date_str` and the snapshot read fails. Inline comments at lines 371/392/401/409/418 document this. (Same class of bug as the `PUT /api/stocks/enrich/batch` before `/enrich` ordering in `routers/stocks.py`.)
 
-When module A needs B but B already imports A, the dependency is imported **inside the function**, not at module top. Canonical example: `backend/services/storage/names.py` `_invalidate_name_caches()` does `from services import cache as cache_svc` inside the function (`storage ↔ cache` cycle), wrapped in `try/except: pass`. Same idiom appears elsewhere for storage→cache invalidation.
+## Frontend (React 19 / Vite, plain CSS)
 
-### Per-card / per-item resilience (`_safe`, `_minimal_card`)
+### Function components + inline styles + tokens
+Components are plain function components. Styling is a mix of inline `style={{...}}` objects and shared CSS-variable tokens defined in `frontend/src/styles/tokens.css`. Reusable inline style objects are exported from util modules (e.g. `components/reports/reportUtils.jsx` exports `TH`/`TD`/`MetricCard`/`SectionTitle`; `components/market/marketUtils.jsx` exports `CARD_STYLE`/`SECTION_STYLE`/`SectionCard`). No TailwindCSS.
 
-Endpoints that build N items from N external lookups isolate per-item failure so one bad item never 500s the whole response. `routers/stocks.py` `_build_all()` runs cards through a `ThreadPoolExecutor`, each card wrapped by `_safe(stock)` which on throw falls back to `_minimal_card(stock, quote)`; the batch quote call is `try/except → {}`. Invariant (per `CLAUDE.md`): `holdings=N → always N cards`.
+### KR color convention — `--up` = red, `--down` = blue (and the badge inversion gotcha)
+`frontend/src/styles/tokens.css`: `--up: #d83a3a` (red = 상승/up), `--down: #2864e8` (blue = 하락/down) — the Korean market convention, inverted from Western. **Gotcha:** `components/ui/Badge.css` wires `.badge--success` → `var(--up)` (red) and `.badge--danger` → `var(--down)` (blue). So a `success`/`danger` *semantic* badge renders in the KR *price* colors, inverting the Western good=green / warning=red intent. For non-price semantic state badges use a dedicated-color component (e.g. `ui/SupplyBadge.jsx`), never `success`/`danger` variants. `.badge--warning` references undefined `--color-warning`/`--warning-tint` and is currently broken — unusable for caution.
 
-### Errors
+### US-only / KR-only section guards on `market`
+KR-specific report sections gate on `market === 'KR'` and US-only sections gate on `market !== 'KR'` (returning `null` early). Examples in `frontend/src/components/reports/`: `DetailTab.jsx` (lines 642/648 — backlog KR-only), `InsiderTradesSection.jsx`, `LatestDisclosuresSection.jsx` (KR-only), `GuruHoldersSection.jsx` (US-only via `market === 'KR'` → return), `ConsensusChart.jsx`, `FinancialsChart.jsx` (`const isKR = market === 'KR'`).
 
-- HTTP errors via small factory helpers in `backend/services/errors.py`: `not_found(ticker, context="")` → `HTTPException(404)`, `already_exists(ticker, context="")` → `HTTPException(400)`. Routers raise these rather than constructing `HTTPException` inline.
-- Background/batch instrumentation (`backend/services/job_runs.py` `record(job_id, trigger)`) logs failures via the stdlib `logging` module (`log.warning(..., exc_info=True)`) and **never lets instrumentation failure break the job body** — the body runs uninstrumented if recording fails.
-- Ticker validation: `is_valid_ticker(ticker)` in `services/utils.py` (regex `^[A-Za-z0-9.\-]{1,15}$` after strip/upper).
-
-### Startup migrations: idempotent DDL in `main.py`
-
-`backend/main.py` `_migrate()` runs additive, idempotent DDL on startup — `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS` — each in its own `try/except` that `print`s `[migrate] ... 실패` on error so one failure doesn't block the rest. Base schema lives in `backend/auth_schema.sql` then `backend/app_schema.sql`; `_migrate()` carries deltas applied automatically on deploy.
-
-### Naming & idioms
-
-- snake_case functions/vars; leading underscore for module-private helpers (`_yf_sym`, `_safe`, `_migrate`, `_norm_sector`).
-- `from __future__ import annotations` at the top of newer modules; `X | None` union types.
-- Comments and docstrings are predominantly **Korean**; match that when editing.
-- Money/unit normalization helpers live in `services/market/format.py`: `_to_won` (억원→원), `_fmt_price`/`_fmt_market_cap` (KR `₩…억/조` vs US `$…B`), `_norm_sector` (yfinance sector → canonical).
-
-## Frontend
-
-### React function components, no TailwindCSS
-
-- All components are function components (React 19) under `frontend/src/components/` and pages under `frontend/src/pages/`. JSX files use `.jsx`.
-- Styling is **plain CSS**: design tokens + component CSS files, plus **inline `style={{...}}`** for dynamic/computed values. No utility-class framework.
-
-### Design tokens — `frontend/src/styles/tokens.css`
-
-CSS custom properties on `:root` (with a `[data-theme="dark"]` override block). Spacing (`--space-1..6`), radius (`--radius-*`), shadows, font stacks, and color tokens. Components reference `var(--token)` rather than hard-coding values. Other global stylesheets: `frontend/src/styles/pc.css`, `frontend/src/styles/mobile.css`, plus `frontend/src/index.css` / `frontend/src/App.css`.
-
-### KR color convention + the success/danger badge inversion
-
-- **`--up` = red `#d83a3a` (상승), `--down` = blue `#2864e8` (하락)** — Korean market coloring, the inverse of Western convention. Defined in `tokens.css`.
-- Consequence in `frontend/src/components/ui/Badge.css`: `.badge--success` maps to `--up` (red), `.badge--danger` maps to `--down` (blue). So the `success`/`danger` Badge variants are **price-direction** colors, not Western good/bad. `frontend/src/components/ui/Badge.jsx` `ChangeBadge` correctly uses `value >= 0 ? 'success' : 'danger'` (gain → red, loss → blue).
-- **Gotcha (live-UAT-caught):** semantic state badges (e.g. supply/demand bands) must NOT reuse `success`/`danger` or they invert against Western intent. `frontend/src/components/ui/SupplyBadge.jsx` instead specifies explicit colors inline (우호=green, 중립=gray via `neutral`, 경계=orange) and never uses the price tokens. UI review must compare against the actual token value, not the variant name's connotation. (`warning` variant is effectively unusable — its `--color-warning`/`--warning-tint` tokens are undefined.)
-
-### Finite-guarded formatters
-
-User-facing number formatting always guards against `null`/non-finite and falls back to a dash:
-
-- `fmtPrice(val, market)` in `frontend/src/utils.js`: `if (val == null || !Number.isFinite(Number(val))) return '—'`; KR → `₩` + `toLocaleString('ko-KR')`, US → `$` + `toFixed(2)`.
-- KR unit formatters live in `frontend/src/components/market/marketUtils.jsx` (억/조 thresholds) — input assumed in 억원; raw 원/주 must be converted first (see `CLAUDE.md` "35조경원" gotcha).
-- `frontend/src/utils.js` is the small shared formatter module; component-local `fmt` helpers follow the same null/finite-guard-then-dash shape.
-
-### Other frontend conventions
-
-- API calls go through `frontend/src/api.js` (axios); Vite proxies `/api/*` to `http://localhost:8000` in dev, or `VITE_API_BASE_URL` in deploy.
-- Vite 8 = rolldown bundler — `build.rollupOptions.output.manualChunks` in `frontend/vite.config.js` must be the **function** form (`manualChunks(id)` switching on `node_modules` substrings); the object form breaks the build.
-- Korean is the primary UI language; comments are Korean. Match existing style.
+### `fmtPrice` / `fmt` are finite-guarded
+`frontend/src/utils.js` `fmtPrice(val, market)` returns `'—'` when `val == null || !Number.isFinite(Number(val))`; KR formats `₩` with `toLocaleString('ko-KR')` (0 fraction digits), US formats `$` with `.toFixed(2)`. Other formatters follow the same null/finite-guard-then-format shape (`components/reports/reportUtils.jsx:fmtN`, `components/market/marketUtils.jsx:krFmt`). `krFmt` assumes **억원** input (10,000억 = 1조 threshold) — convert won via `/1e8` first; raw won/share counts misformat by 1e8.

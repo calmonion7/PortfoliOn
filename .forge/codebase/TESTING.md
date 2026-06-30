@@ -1,52 +1,46 @@
 ---
-last_mapped_commit: 6b1c06b514d7ca9511360a7263b14cf97d783d18
-mapped: 2026-06-28
+last_mapped_commit: 78750ecc2c96d71a9e3a3f225a56aea99db71db5
+mapped: 2026-07-01
 ---
 
 # TESTING
 
-How PortfoliOn is tested. Facts verified against source; file paths in backticks.
+Test layout, harnesses, and verification gates for PortfoliOn. Implementation facts only — for term definitions see `.forge/CONTEXT.md`.
 
 ## Backend — pytest
 
-- **Framework:** pytest, tests under `backend/tests/` (87 `test_*.py` files; **960 tests collected** at this commit).
-- **Run:** `cd backend && .venv/bin/python -m pytest` (macOS venv; Windows: `backend/.venv/Scripts/python`). No `pytest.ini`/`conftest`-based markers beyond the shared conftest below.
-- **Fixtures dir:** `backend/tests/fixtures/` holds captured external-source payloads (DART XML/JSON, yfinance/Naver rows) used by parser tests.
+- Tests live in `backend/tests/` (91 `test_*.py` files, ~957 test functions). Run from the backend dir:
+  ```bash
+  cd backend && .venv/bin/python -m pytest
+  ```
+  (`.venv/bin/python` on macOS; `.venv/Scripts/python` on Windows.) Note the local `.venv` lacks `lxml` — HTML parsing in test-covered code must use stdlib `BeautifulSoup(html, "html.parser")`, not `"lxml"`.
+- `backend/tests/conftest.py` prepends the backend dir to `sys.path`, imports `main.app`, and globally overrides auth via `app.dependency_overrides[get_current_user] = lambda: "test-user-id"`. It exposes a `client` fixture (`TestClient(app)`) and an `autouse` fixture `_clear_quote_cache` that calls `cache.invalidate_quote()` between tests to prevent TTL-cache cross-contamination.
+- `backend/tests/fixtures/` holds static fixture data (e.g. `backlog/`).
 
-### Shared conftest (`backend/tests/conftest.py`)
+### Patterns
 
-- Inserts the repo root on `sys.path`, imports `from main import app`, and globally overrides auth: `app.dependency_overrides[get_current_user] = lambda: "test-user-id"`.
-- `client` fixture = `TestClient(app)` over the real `main.app`.
-- Autouse `_clear_quote_cache` fixture invalidates the per-ticker quote TTL cache before each test (`from services import cache; cache_svc.invalidate_quote()`) to prevent cross-test pollution.
+- **Fixture mocks** — external/DB calls are patched with `unittest.mock.patch` targeting the router's import path, e.g. `patch("routers.watchlist.storage.get_watchlist_tickers", return_value=...)`. `monkeypatch` is used for module-level swaps (e.g. swapping `main.db_execute` to capture emitted DDL).
+- **Self-built `FastAPI()` + `app.dependency_overrides` for auth in router tests** — many router tests do **not** use the conftest `client`. They build a fresh app at module top and override auth on it:
+  ```python
+  from fastapi import FastAPI
+  from routers.watchlist import router
+  from auth import get_current_user
+  app = FastAPI()
+  app.include_router(router)
+  app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+  client = TestClient(app)
+  ```
+  (`test_watchlist_router.py`, `test_portfolio_router.py`, `test_batch_endpoints.py`, `test_us_supply.py`, `test_calendar_router.py`, `test_macro_signals_batch.py`, `test_disclosure_batch.py`, `test_job_runs_instrumentation.py`, `test_auth*.py`, etc.) **Consequence:** the conftest only overrides auth on `main.app`, so adding an auth `Depends` (e.g. `require_admin_or_api_key`) to an endpoint breaks every self-built-app test of that path with 401/403 unless that test also overrides the new dependency. Verify the no-auth rejection with a fresh app that has **no** override (`tests/test_security_auth_gaps.py` pattern).
+- **`main._migrate` migration tests** — `main._migrate()` runs idempotent additive DDL at startup (`backend/main.py:39`, called at line 151; all DDL is `ADD COLUMN / CREATE TABLE IF NOT EXISTS`). Tests assert the emitted SQL by monkeypatching the execute path and calling `main._migrate()` directly: `test_migrate_creates_stock_disclosures` / `test_migrate_adds_meeting_date_column` (`test_disclosures.py`), `test_migrate_creates_stock_dividends` (`test_dividends.py`), `test_migrate_creates_stock_insider_trades` (`test_insider_trades.py`), `test_migrate_creates_us_supply_snapshot_idempotent` (`test_us_supply.py`).
+- **`test_api_doc_sync.py` — endpoint drift detector** — compares the live route set (`main.app.routes`, ground truth) against the `### \`METHOD /path\`` headers in `API_SPEC.md` and `CLAUDE_COWORK_API.md`. `_norm` collapses path params (`{ticker}`→`{}`) and strips query strings/trailing slashes. A frozen `KNOWN_UNDOCUMENTED` baseline (currently empty) is exact-matched, so adding a new endpoint without documenting it in `API_SPEC.md` fails the test; documenting a baselined one requires removing it from the set. Only endpoint *existence* (method+path) is checked — request/response schema and auth gating remain a manual DoD (the test does not parse prose).
 
-### Two router-test styles (important distinction)
+### Recurring caution — fixture-pass / live-fail
+External-source parsing and numeric scaling are the repeat offenders: unit tests mock the upstream response and therefore **cannot** catch index-label mismatches, unit-scale errors, or echo-field differences that only appear against the real API. Confirmed cases: yfinance method-vs-property label drift (`market/us.py` FCF/CapEx all-`None`), KR Naver financial row labels, DART `account_id`/`fs_div` echo behavior. The rule: for any external-source parsing/scaling slice, include a **live 1-ticker extraction check in the DoD** — fixtures passing is not sufficient evidence the parse works on real data. Data-parsing changes (e.g. backlog) additionally warrant a full re-ingest UAT after deploy, since production hits real-data shapes absent from fixtures.
 
-1. **Real-app tests** use the `client` fixture (real `main.app`, auth overridden in conftest). Good for end-to-end routing.
-2. **Self-built-app tests** construct their own `app = FastAPI()`, `app.include_router(router)`, and set their own `app.dependency_overrides[...]`, then `TestClient(app)` at module scope. ~30 test modules do this (e.g. `backend/tests/test_stocks_router.py`, `test_consensus_router.py`, `test_recommendation_endpoint.py`, `test_nan_serialization_guards.py`, `test_portfolio_router.py`, `test_watchlist_router.py`).
-   - **Caveat (per `CLAUDE.md`):** conftest only overrides auth on `main.app`, so self-built apps must override every auth dependency their router uses, or the test 401/403s. `test_stocks_router.py` overrides `get_current_user`, `get_current_user_or_api_key`, **and** `require_admin_or_api_key`. **When you add/change an auth `Depends` on an endpoint, grep the self-built-app tests that hit that path and add the new override.** Verify the unauthenticated-reject path separately with a fresh, un-overridden app — see `backend/tests/test_security_auth_gaps.py`.
+## Frontend — vitest harness + build/lint/Playwright gate
 
-### Mocking patterns
-
-- `unittest.mock` `patch`/`MagicMock` to stub service/storage calls at the router boundary, e.g. `with patch("routers.stocks.storage.get_full_portfolio", return_value=...)`. Patch where the symbol is *used*, not where defined.
-- `monkeypatch` fixture is also used (~34 test modules) for attribute/env swaps, e.g. `patch.object(analysis_service.yf, "Ticker", _FakeTicker)` in `test_nan_serialization_guards.py`.
-- External-source classes are faked with small in-test classes returning canned DataFrames (e.g. `_ConstTicker` producing zero-variance closes to force `corr=NaN`).
-- **`call_args` / `call_args_list` caveat (per `CLAUDE.md`):** when an endpoint adds an additive read/external call, tests asserting the *last* call via `mock.call_args` silently break (the last call shifts). Migrate such assertions to indexed `call_args_list[i].kwargs` and pin sequence with `call_count`.
-
-### Notable cross-cutting tests
-
-- **API doc-sync — `backend/tests/test_api_doc_sync.py`** (task#99/#100). Diffs live endpoints (parsed from `main.app.routes`, not decorators) against the `### \`METHOD /path\`` headers in `API_SPEC.md` and `CLAUDE_COWORK_API.md`. Paths are normalized (`{param}`→`{}`, query/trailing-slash stripped). Tests:
-  - `test_api_spec_documents_all_live_endpoints` — live − API_SPEC must equal `KNOWN_UNDOCUMENTED` exactly (currently `frozenset()`), so a new undocumented endpoint fails the suite (self-maintaining allowlist).
-  - `test_api_spec_has_no_stale_endpoints` / `test_cowork_api_has_no_stale_endpoints` — neither doc may list an endpoint absent from live (catches deletions). Note this checks *existence* drift only — request/response schema and auth-gating sync remain a manual DoD.
-- **NaN serialization guards — `backend/tests/test_nan_serialization_guards.py`** (task#109). Forces NaN through endpoints/services and asserts `json.dumps(result, allow_nan=False)` succeeds and the offending floats came back as `None` — guards against the starlette `allow_nan=False` 500 class.
-- **Migration / startup-DDL & batch tests:** `test_market_cache.py`, `test_market_history_routing.py`, `test_batch_market_split.py`, `test_batch_resilience.py`, `test_batch_endpoints.py`, `test_batches_router.py`, `test_job_runs_instrumentation.py`, `test_job_runs.py`, `test_disclosure_batch.py`, `test_macro_signals_batch.py`, `test_kr_sector_batch.py`, `test_agm_batch.py` cover batch registration, market-split partitioning, and job-run instrumentation. (No dedicated test for `main._migrate()` idempotent DDL itself.)
-- **External-source parser tests** sit in `test_backlog.py`/`test_backlog_extract.py`, `test_disclosures.py`, `test_dividends.py`, `test_financials_kr*.py`, `test_financials_us*.py`, `test_indices.py`, `test_kiwoom_*.py`, `test_kis_*.py`, `test_investor_service*.py`, etc.
-
-### "Fixture-pass / live-fail" caution (recurring, in DoD)
-
-Unit tests mock the external payload, so they cannot catch row-label / `account_id` / `fs_div` mismatches that only surface against the real source (yfinance `get_*()` vs `.property` labels; DART `account_id` vs `account_nm`; Naver row keys). Per `CLAUDE.md` this bit at least at task#111 and task#117. **DoD for any external-source parsing slice: a live 1-ticker extraction cross-check**, not just green fixtures. For data-reload-affecting changes (backlog parsing), a full re-ingest UAT is also required — and extraction failure must degrade to `pending`/missing, never a "safe default" (a wrong unit caption can cause a ×100 mis-store: `wrong < missing`).
-
-## Frontend — vitest (build + smoke only)
-
-- **Harness exists** (added per ADR-0019): `frontend/package.json` has `"test": "vitest run"`, devDeps `vitest@^4`, `@testing-library/react`, `@testing-library/jest-dom`. Config block lives in `frontend/vite.config.js` (`test: { environment: 'jsdom', globals: true, setupFiles: './src/test/setup.js' }`); `frontend/src/test/setup.js` imports `@testing-library/jest-dom`.
-- **Coverage is essentially nil:** the only spec is `frontend/src/test/smoke.test.js` (a `1 + 1 === 2` harness-liveness check). There are no component/page tests. In practice the frontend gate is still `npm run build` (and `npm run lint`).
-- **UAT instead of unit tests:** frontend behavior is verified via Playwright device emulation against a test account (see project memory `reference-frontend-uat.md`), not automated JS unit tests.
+- A vitest harness exists but is effectively a placeholder. `frontend/vite.config.js` configures the `test` block (`environment: 'jsdom'`, `globals: true`, `setupFiles: './src/test/setup.js'`), and `frontend/package.json` defines `"test": "vitest run"`. The only test is `frontend/src/test/smoke.test.js` — a single `expect(1 + 1).toBe(2)` sanity check confirming the runner works (ADR-0019). There is no meaningful unit-test coverage of components.
+- The **effective frontend quality gate is therefore: build + lint + Playwright UAT**, not the vitest suite:
+  - `npm run build` (`vite build`) — the deploy artifact; nginx serves `frontend/dist` directly, so a successful build is immediately live.
+  - `npm run lint` (`eslint .`, with `eslint-plugin-react-hooks` / `eslint-plugin-react-refresh`).
+  - Playwright device-emulation UAT for visual/behavioral verification without a physical phone (test account `test@portfolion.com` / `test1234`). This is where KR color-convention regressions, header↔grid mismatches, and other live-only issues are caught.
