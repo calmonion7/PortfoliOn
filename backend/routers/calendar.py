@@ -24,6 +24,16 @@ _FRED_RELEASES = {
     "Producer Price Index",
 }
 
+# FOMC 정책결정일(2일차) — federalreserve.gov 공표, 커버리지 ~2027-12, 차기 일정 공표 시 연 1회 수동 갱신; 소진 시 FOMC 미표시(graceful)
+_FOMC_DATES = [
+    "2025-01-29", "2025-03-19", "2025-05-07", "2025-06-18",
+    "2025-07-30", "2025-09-17", "2025-10-29", "2025-12-10",
+    "2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17",
+    "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-09",
+    "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",
+    "2027-07-28", "2027-09-15", "2027-10-27", "2027-12-08",
+]
+
 router = APIRouter(prefix="/api", tags=["calendar"])
 
 _CACHE_DIR = Path(__file__).parent.parent / "data" / "calendar"
@@ -182,12 +192,30 @@ def _get_agm_events(stocks: list[dict], month_start: date, month_end: date) -> l
 
 def _get_econ_events(month_start: date, month_end: date) -> list[dict]:
     """S2: FRED /fred/releases/dates → curated major US release dates.
+    FOMC 정책결정일은 _FOMC_DATES 정적 목록에서 — FRED_API_KEY 미설정 시에도 항상 포함.
     eco: fetched inline at cache-miss; upgrade path = batch into market_cache
     if FRED rate-limits ever become a problem.
     """
+    events: list[dict] = []
+
+    # FOMC: static — always included regardless of FRED_API_KEY
+    for d_str in _FOMC_DATES:
+        try:
+            d = date.fromisoformat(d_str)
+        except ValueError:
+            continue
+        if month_start <= d <= month_end:
+            events.append({
+                "date": d_str,
+                "ticker": "FOMC",
+                "name": "FOMC 정책결정",
+                "type": "econ",
+                "stock_type": "market",
+            })
+
     api_key = os.environ.get("FRED_API_KEY")
     if not api_key:
-        return []
+        return events
     try:
         r = requests.get(
             "https://api.stlouisfed.org/fred/releases/dates",
@@ -204,8 +232,7 @@ def _get_econ_events(month_start: date, month_end: date) -> list[dict]:
         items = r.json().get("release_dates", [])
     except Exception as e:
         print(f"calendar: FRED releases fetch failed: {e}", file=sys.stderr)
-        return []
-    events = []
+        return events
     for item in items:
         name = item.get("release_name", "")
         d_str = item.get("date", "")

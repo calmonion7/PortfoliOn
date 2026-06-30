@@ -1792,7 +1792,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 >
 > **배당락일(dividend):** US 종목은 `t.calendar['Ex-Dividend Date']`의 확정 ex-date 사용. 과거 추정 방식(4회 평균 간격)은 더 이상 사용하지 않음.
 >
-> **경제지표 발표일(econ):** FRED `/fred/releases/dates`에서 수집한 주요 US 경제지표 발표 일정(CPI·고용보고서·GDP·PPI). `ticker="FRED"`, `stock_type="market"`. `FRED_API_KEY` 미설정 시 비어 있음.
+> **경제지표 발표일(econ):** FRED `/fred/releases/dates`에서 수집한 주요 US 경제지표 발표 일정(CPI·고용보고서·GDP·PPI). `ticker="FRED"`, `stock_type="market"`. `FRED_API_KEY` 미설정 시 FRED 항목은 비어 있음. **FOMC 정책결정일**도 같은 `type="econ"` 이벤트로 포함(`ticker="FOMC"`, `name="FOMC 정책결정"`); 정적 목록(`_FOMC_DATES`, ~2027-12 커버)에서 제공되어 `FRED_API_KEY` 없이도 항상 노출됨.
 >
 > **주주총회(agm):** KR 보유·관심 종목의 주총 개최일(`stock_disclosures.meeting_date`). `disclosure_fetch` 배치(매일 07:30 KST)가 사전 수집한 저장값만 읽음(요청 시 라이브 DART 호출 없음).
 

@@ -83,7 +83,9 @@ def test_calendar_empty_for_ticker_with_no_data(tmp_path):
          patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-07")
     assert resp.status_code == 200
-    assert resp.json()["events"] == []
+    # 2026-07 has an FOMC date (2026-07-29); only non-FOMC/non-holiday events should be absent
+    events = resp.json()["events"]
+    assert not any(e["type"] in ("earnings", "dividend", "agm") for e in events)
 
 
 def test_calendar_invalid_month_returns_422():
@@ -173,7 +175,7 @@ def test_calendar_includes_krx_holiday(tmp_path):
 
 # --- eco runnable checks: S1 ex-date parse + S2 FRED parse ---
 
-from routers.calendar import _collect_dividend, _get_econ_events
+from routers.calendar import _collect_dividend, _get_econ_events, _FOMC_DATES
 
 
 def _run_collect_dividend(cal, month_start, month_end):
@@ -213,7 +215,7 @@ def test_ex_date_missing_key_graceful():
 
 
 def test_fred_releases_parse():
-    """_get_econ_events: mocked FRED response → only curated names pass through."""
+    """_get_econ_events: mocked FRED response → only curated names pass through; FOMC also included."""
     fake_response = {
         "release_dates": [
             {"release_name": "Consumer Price Index", "date": "2026-06-11"},
@@ -230,28 +232,73 @@ def test_fred_releases_parse():
          patch("routers.calendar.requests.get", return_value=mock_resp):
         events = _get_econ_events(date(2026, 6, 1), date(2026, 6, 30))
 
-    assert len(events) == 2
-    names = {e["name"] for e in events}
+    fred_events = [e for e in events if e["ticker"] == "FRED"]
+    assert len(fred_events) == 2
+    names = {e["name"] for e in fred_events}
     assert "Consumer Price Index 발표" in names
     assert "Employment Situation 발표" in names
     assert all(e["type"] == "econ" for e in events)
     assert all(e["stock_type"] == "market" for e in events)
-    assert all(e["ticker"] == "FRED" for e in events)
+    # FOMC 2026-06-17 also present
+    fomc_events = [e for e in events if e["ticker"] == "FOMC"]
+    assert len(fomc_events) == 1
 
 
-def test_fred_key_absent_returns_empty():
-    """FRED_API_KEY absent → empty list, no error."""
+def test_fred_key_absent_returns_fomc_only():
+    """FRED_API_KEY absent → FOMC events still emitted (static), no FRED events."""
     with patch("routers.calendar.os.environ.get", return_value=None):
         events = _get_econ_events(date(2026, 6, 1), date(2026, 6, 30))
-    assert events == []
+    # 2026-06-17 is an FOMC date in this month
+    fomc = [e for e in events if e["ticker"] == "FOMC"]
+    assert len(fomc) == 1
+    assert fomc[0]["date"] == "2026-06-17"
+    assert fomc[0]["type"] == "econ"
+    assert fomc[0]["stock_type"] == "market"
+    # No FRED events without a key
+    assert not any(e["ticker"] == "FRED" for e in events)
 
 
-def test_fred_request_error_returns_empty():
-    """FRED request failure → empty list gracefully."""
+# --- eco FOMC tests ---
+
+def test_fomc_date_in_month():
+    """A month containing an FOMC date emits an econ event with ticker FOMC."""
+    # 2026-07-29 is in _FOMC_DATES
+    with patch("routers.calendar.os.environ.get", return_value=None):
+        events = _get_econ_events(date(2026, 7, 1), date(2026, 7, 31))
+    fomc = [e for e in events if e["ticker"] == "FOMC"]
+    assert len(fomc) == 1
+    assert fomc[0]["date"] == "2026-07-29"
+    assert fomc[0]["name"] == "FOMC 정책결정"
+    assert fomc[0]["type"] == "econ"
+
+
+def test_fomc_absent_for_month_with_no_meeting():
+    """A month with no FOMC date → no FOMC event."""
+    # 2026-02 has no FOMC meeting
+    with patch("routers.calendar.os.environ.get", return_value=None):
+        events = _get_econ_events(date(2026, 2, 1), date(2026, 2, 28))
+    assert not any(e["ticker"] == "FOMC" for e in events)
+
+
+def test_fomc_present_without_fred_key():
+    """FOMC events appear even when FRED_API_KEY is absent."""
+    # 2026-09-16 is in _FOMC_DATES
+    with patch("routers.calendar.os.environ.get", return_value=None):
+        events = _get_econ_events(date(2026, 9, 1), date(2026, 9, 30))
+    fomc = [e for e in events if e["ticker"] == "FOMC"]
+    assert len(fomc) == 1
+    assert fomc[0]["date"] == "2026-09-16"
+
+
+def test_fred_request_error_returns_fomc_only():
+    """FRED request failure → FOMC events still emitted, no FRED events."""
     with patch("routers.calendar.os.environ.get", return_value="fake-key"), \
          patch("routers.calendar.requests.get", side_effect=Exception("network error")):
         events = _get_econ_events(date(2026, 6, 1), date(2026, 6, 30))
-    assert events == []
+    # FOMC 2026-06-17 survives even on FRED error
+    fomc = [e for e in events if e["ticker"] == "FOMC"]
+    assert len(fomc) == 1
+    assert not any(e["ticker"] == "FRED" for e in events)
 
 
 # --- KR forward earnings: yfinance .KS/.KQ suffix ---
