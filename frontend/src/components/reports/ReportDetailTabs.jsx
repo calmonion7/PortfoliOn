@@ -38,6 +38,7 @@ export default function ReportDetailTabs({
   const detailTab = isEtf && tab === 'summary' ? 'analysis' : tab
   const market = summary?.market
   const histMarket = historyMarket ?? summary?.market ?? 'US'
+  const hasRsi = [summary?.daily_rsi, summary?.weekly_rsi, summary?.monthly_rsi].some(r => r?.rsi != null)
 
   const content = (
     <>
@@ -93,17 +94,20 @@ export default function ReportDetailTabs({
                 (summary.daily_rsi || market === 'KR')
                   ? (
                     <>
-                      {summary.daily_rsi && (
-                        <RsiTable
-                          dailyRsi={summary.daily_rsi}
-                          weeklyRsi={summary.weekly_rsi}
-                          monthlyRsi={summary.monthly_rsi}
-                          price={summary.price}
-                          vp={summary.volume_profile}
-                          target={summary.target_mean}
-                          market={market}
-                        />
-                      )}
+                      {/* RSI 있으면 RSI 예상 타점, 없으면(신규 상장 <14봉 등) 요약 탭과 동일한 매물대 차트 폴백 */}
+                      {hasRsi
+                        ? (
+                          <RsiTable
+                            dailyRsi={summary.daily_rsi}
+                            weeklyRsi={summary.weekly_rsi}
+                            monthlyRsi={summary.monthly_rsi}
+                            price={summary.price}
+                            vp={summary.volume_profile}
+                            target={summary.target_mean}
+                            market={market}
+                          />
+                        )
+                        : <VolumeRsiSnapshot summary={summary} />}
                       <TechnicalStats summary={summary} />
                       {market === 'KR' && <SupplySection ticker={ticker} />}
                       {market === 'KR' && <InvestorTrendSection ticker={ticker} />}
