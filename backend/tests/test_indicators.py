@@ -77,6 +77,42 @@ def test_get_timeframe_rsi_returns_all_timeframes():
         assert "target_75" in result[tf]
         assert "target_80" in result[tf]
 
+def test_get_timeframe_rsi_reuses_daily_df_without_fetch():
+    # daily_df 제공 시 daily 타임프레임은 재fetch 없이 그 df로 계산(동시 호출 rate-limit로
+    # daily RSI만 빠지는 것 방지 — report_generator가 이미 받은 일봉 재사용).
+    daily_df = pd.DataFrame({
+        "Close": _make_price_series(100),
+        "High": _make_price_series(100) + 1,
+        "Low": _make_price_series(100) - 1,
+    })
+    fetched = pd.DataFrame({
+        "Close": _make_price_series(100, start=200.0),
+        "High": _make_price_series(100, start=200.0) + 1,
+        "Low": _make_price_series(100, start=200.0) - 1,
+    })
+    mock_ghd = MagicMock(return_value=fetched)
+    with patch("services.market.get_history_df", mock_ghd):
+        from services import indicators
+        result = indicators.get_timeframe_rsi("TEST", "US", "", daily_df=daily_df)
+    assert result["daily"]["rsi"] is not None
+    fetched_tfs = [c.args[3] for c in mock_ghd.call_args_list if len(c.args) > 3]
+    assert "daily" not in fetched_tfs               # daily는 재fetch 안 함
+    assert "weekly" in fetched_tfs and "monthly" in fetched_tfs
+
+def test_get_timeframe_rsi_fetches_daily_when_no_df():
+    # daily_df 미전달(None)이면 기존대로 daily도 fetch(하위호환).
+    df = pd.DataFrame({
+        "Close": _make_price_series(100),
+        "High": _make_price_series(100) + 1,
+        "Low": _make_price_series(100) - 1,
+    })
+    mock_ghd = MagicMock(return_value=df)
+    with patch("services.market.get_history_df", mock_ghd):
+        from services import indicators
+        indicators.get_timeframe_rsi("TEST", "US", "")
+    fetched_tfs = [c.args[3] for c in mock_ghd.call_args_list if len(c.args) > 3]
+    assert "daily" in fetched_tfs
+
 def test_get_volume_profile_returns_poc_hvn_lvn():
     from services.indicators import get_volume_profile
     prices = np.concatenate([

@@ -356,6 +356,7 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
     })
   }
   const available = rows.filter(r => r.d?.rsi != null)
+  if (available.length === 0) return null  // RSI 전무 시 빈 '예상 타점' 헤더 박스 미렌더
   const activeTf = available.some(r => r.key === tf) ? tf : available[0]?.key
   const activeRow = available.find(r => r.key === activeTf)
   return (

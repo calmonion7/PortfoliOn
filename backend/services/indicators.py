@@ -162,8 +162,10 @@ def calc_rsi_target_price(
         return round(result, 2)
     return None
 
-def get_timeframe_rsi(ticker: str, market: str = "US", exchange: str = "") -> dict:
+def get_timeframe_rsi(ticker: str, market: str = "US", exchange: str = "", daily_df=None) -> dict:
     # KR은 키움(ka10081/82/83) 우선, 그 외/폴백은 yfinance — market.get_history_df가 라우팅.
+    # daily_df 제공 시 daily 타임프레임은 재fetch 없이 그 df 사용 — 호출부가 이미 받은 일봉을
+    # 재사용해 동시 호출 rate-limit로 daily RSI만 빠지는 것을 방지(report_generator).
     from services import market as mkt
     result = {}
     configs = [
@@ -173,7 +175,10 @@ def get_timeframe_rsi(ticker: str, market: str = "US", exchange: str = "") -> di
     ]
     for tf, n in configs:
         try:
-            df = mkt.get_history_df(ticker, market, exchange, tf)
+            if tf == "daily" and daily_df is not None and not daily_df.empty:
+                df = daily_df
+            else:
+                df = mkt.get_history_df(ticker, market, exchange, tf)
             if df.empty:
                 result[tf] = {
                     "rsi": None,

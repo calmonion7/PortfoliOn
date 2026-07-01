@@ -109,7 +109,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         f_fin       = ex.submit(mkt.get_financials, ticker, market, exchange)
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
         f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
-        f_rsi       = ex.submit(indicators.get_timeframe_rsi, ticker, market, exchange)  # RSI는 NXT 유지(정규화라 무관, non-goal)
+        f_rsi       = ex.submit(indicators.get_timeframe_rsi, ticker, market, exchange, daily_df if market != "KR" else None)  # US: daily RSI는 이미 받은 daily_df 재사용(별도 flaky fetch 제거). KR daily RSI는 NXT 유지(정규화라 무관, non-goal)
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
         f_comps     = [ex.submit(mkt.get_quote, c, *_infer_comp_market(c, market, exchange), regular=True) for c in competitors]
