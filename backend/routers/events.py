@@ -1,9 +1,12 @@
 # backend/routers/events.py
 import json
+import logging
 from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 from auth import get_current_user
 from services.db import execute
+
+logger = logging.getLogger(__name__)
 
 VALID_EVENTS = {
     "nav_portfolio", "nav_research", "nav_market", "nav_guru", "nav_settings",
@@ -28,7 +31,8 @@ def _persist(user_id: str, event_name: str, properties: dict):
             "INSERT INTO user_events (user_id, event_name, properties) VALUES (%s, %s, %s)",
             (user_id, event_name, json.dumps(properties)),
         )
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Events] user_events INSERT 실패: {e}")
         pass
 
 

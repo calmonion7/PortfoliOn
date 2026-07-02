@@ -9,8 +9,11 @@ KR 종목은 비대상(yfinance US-only), KR ticker 호출 시 graceful None.
 from __future__ import annotations
 
 import json
+import logging
 import math
 from datetime import datetime, date
+
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 import yfinance as yf
@@ -41,7 +44,8 @@ def _parse_insider_transactions(df) -> list[dict]:
         sd = row.get("Start Date")
         try:
             start_date = pd.Timestamp(sd).strftime("%Y-%m-%d") if pd.notna(sd) else None
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[us_supply] 내부자거래 날짜 파싱 실패: {e}")
             start_date = None
         shares_raw = row.get("Shares")
         value_raw = row.get("Value")
@@ -107,7 +111,8 @@ def fetch_us_supply(ticker: str, exchange: str = "") -> dict | None:
     if date_ts:
         try:
             date_si = datetime.fromtimestamp(int(date_ts)).strftime("%Y-%m-%d")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[us_supply] dateShortInterest 타임스탬프 파싱 실패: {e}")
             pass
 
     short = {

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Body
 
 import scheduler
@@ -5,6 +7,8 @@ from auth import get_current_user, require_admin
 from services import job_runs, storage
 from services.batch_registry import BATCHES, get_batch
 from services.schedule_spec import validate_schedule_spec, describe_schedule
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["batches"])
 
@@ -18,7 +22,8 @@ def _next_run(scheduler_job_id):
         if job is None or job.next_run_time is None:
             return None
         return job.next_run_time.isoformat()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Batches] 스케줄러 다음 실행 시각 조회 실패 job={scheduler_job_id}: {e}")
         return None
 
 

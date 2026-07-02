@@ -1,6 +1,9 @@
 from __future__ import annotations
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history
+
+logger = logging.getLogger(__name__)
 
 _COMMODITY_SYMBOLS: dict[str, tuple[str, str]] = {
     "gold":   ("GC=F", "USD/oz"),
@@ -21,7 +24,8 @@ def _fetch_commodity(args: tuple) -> tuple:
         prev = round(history[-2]["value"], 2) if len(history) > 1 else current
         change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
         return key, {"current": current, "change_pct": change_pct, "unit": unit, "history": history}
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Commodities] {key} fetch 실패: {e}")
         return key, None
 
 
@@ -61,7 +65,8 @@ def _fetch_treasury(args: tuple) -> tuple:
         current = round(history[-1]["value"], 3)
         prev = round(history[-2]["value"], 3) if len(history) > 1 else current
         return key, {"current": current, "change_bp": round((current - prev) * 100, 1), "history": history}
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Treasury] {key} fetch 실패: {e}")
         return key, None
 
 

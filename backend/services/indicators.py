@@ -1,6 +1,9 @@
 from __future__ import annotations
+import logging
 import pandas as pd
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 def calc_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     delta = series.diff()
@@ -208,7 +211,8 @@ def get_timeframe_rsi(ticker: str, market: str = "US", exchange: str = "", daily
                 "target_20": t20, "target_25": t25, "target_30": t30,
                 "target_70": t70, "target_75": t75, "target_80": t80,
             }
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[RSI] {ticker} {tf} 타임프레임 RSI 계산 실패: {e}")
             result[tf] = {
                 "rsi": None,
                 "target_20": None, "target_25": None, "target_30": None,

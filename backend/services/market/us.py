@@ -1,8 +1,11 @@
 from __future__ import annotations
+import logging
 import yfinance as yf
 import pandas as pd
 
 from services.market.format import _yf_sym, _yf_val, _safe_pct, _safe_ratio
+
+logger = logging.getLogger(__name__)
 
 
 def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
@@ -24,7 +27,8 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
             cf = t.get_cashflow(freq='yearly', as_dict=False)
             if cf is None or cf.empty:
                 cf = None
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Financials] {yf_sym} cashflow fetch 실패: {e}")
             cf = None
 
         results = []
@@ -74,7 +78,8 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                     inventory = float(inv) if inv is not None else None
                     cl = _yf_val(balance, "CurrentLiabilities", col)
                     current_liabilities = float(cl) if cl is not None else None
-            except Exception:
+            except Exception as e:
+                logger.warning(f"[Financials] {yf_sym} {period_str} history/balance 처리 실패: {e}")
                 pass
 
             # FCF & interest coverage (annual only)
@@ -95,7 +100,8 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                         elif capex is not None:
                             fcf = int(fcf_raw)
                         # else: capex missing, leave None
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"[Financials] {yf_sym} {period_str} FCF 계산 실패: {e}")
                     pass
             interest_exp = _yf_val(stmt, "InterestExpense", col)
             interest_coverage = _safe_ratio(op_income, interest_exp)
@@ -144,11 +150,13 @@ def get_annual_financials_us(ticker: str, exchange: str = "") -> list[dict]:
                         })
                 # Prepend reversed so that after frontend .reverse() they appear at the right (most future)
                 results = list(reversed(forward)) + results
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Financials] {yf_sym} consensus 추정치 fetch 실패: {e}")
             pass
 
         return results
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Financials] {ticker} get_annual_financials_us 실패: {e}")
         return []
 
 

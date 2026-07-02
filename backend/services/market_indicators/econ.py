@@ -1,7 +1,11 @@
 from __future__ import annotations
+import logging
 import os
 import requests
+
 from .cache import _mc_save, _cache, _mc_load, _get_cache, _set_cache, _merge_history, _mc_delete
+
+logger = logging.getLogger(__name__)
 
 
 def _fetch_and_save_econ_indicators() -> dict:
@@ -35,7 +39,8 @@ def _fetch_and_save_econ_indicators() -> dict:
     try:
         new_cpi = _fetch_series("CPIAUCSL", cpi_start)
         new_unemp = _fetch_series("UNRATE", unemp_start)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Econ] FRED 시계열 fetch 실패: {e}")
         return stored_data or {"cpi": [], "unemployment": []}
 
     cpi = _merge_history(cpi_stored, new_cpi)

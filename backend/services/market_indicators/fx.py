@@ -1,7 +1,10 @@
 from __future__ import annotations
+import logging
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history
+
+logger = logging.getLogger(__name__)
 
 _FX_SYMBOLS = {"usdkrw": "USDKRW=X", "usdjpy": "USDJPY=X", "eurusd": "EURUSD=X"}
 
@@ -12,7 +15,8 @@ def _fetch_usdkrw_current() -> float | None:
         r.raise_for_status()
         krw = r.json().get("rates", {}).get("KRW")
         return round(float(krw), 2) if krw else None
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[FX] _fetch_usdkrw_current 실패: {e}")
         return None
 
 
@@ -25,7 +29,8 @@ def _fetch_fx(args: tuple) -> tuple:
             prev = round(history[-2]["value"], 4) if len(history) > 1 else current
             change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
             return key, {"current": current, "change_pct": change_pct, "history": history}
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[FX] _fetch_fx({key}) yfinance 실패: {e}")
         pass
 
     if stored_history:
@@ -93,5 +98,6 @@ def get_vix() -> dict:
         _mc_save("vix", data)
         _set_cache("vix", data, ttl=3600)
         return data
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[VIX] get_vix 실패: {e}")
         return {"current": None, "change": None, "history": []}

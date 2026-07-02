@@ -1,6 +1,9 @@
 from __future__ import annotations
 from datetime import date, timedelta
+import logging
 from services.db import execute, query, get_connection
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # opinion → 5점 표준화 점수
@@ -60,7 +63,8 @@ def _fetch_kr_raw(ticker: str, days: int = 7) -> list[dict]:
         )
         r.raise_for_status()
         items = r.json()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Consensus] _fetch_kr_raw Naver 요청 실패 {ticker}: {e}")
         return []
 
     recent = [i for i in items if i.get("writeDate", "") >= cutoff]
@@ -90,7 +94,8 @@ def _fetch_kr_raw(ticker: str, days: int = 7) -> list[dict]:
                 "target_price": target_price,
                 "raw_opinion": opinion,
             }
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Consensus] fetch_detail 실패 {ticker}/{rid}: {e}")
             return {
                 "report_date": report_date,
                 "brokerage_code": brokerage,
@@ -121,7 +126,8 @@ def _fetch_kr_fnguide(ticker: str) -> list[dict]:
         r = requests.get(url, headers=headers, timeout=10)
         r.raise_for_status()
         data = _json.loads(r.content.decode("utf-8-sig"))
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Consensus] _fetch_kr_fnguide FnGuide 요청 실패 {ticker}: {e}")
         return []
 
     results = []
@@ -198,7 +204,8 @@ def _fetch_us_raw(ticker: str, days: int = 7) -> list[dict]:
                 })
 
         return results
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Consensus] _fetch_us_raw yfinance 파싱 실패 {ticker}: {e}")
         return []
 
 

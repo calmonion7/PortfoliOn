@@ -22,6 +22,9 @@ from services import supply_score
 from services import insider_trades
 from services.market_indicators.cache import _mc_load
 from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID, require_admin, require_admin_or_api_key
+import logging
+
+logger = logging.getLogger(__name__)
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
@@ -36,7 +39,8 @@ def _latest_snapshot(ticker: str) -> tuple:
         )
         if rows:
             return rows[0]["data"], rows[0]["date"]
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Snapshot] DB 조회 실패 ({ticker}): {e}")
         pass
     # Filesystem fallback (pre-migration)
     for base in (SNAPSHOTS_DIR, REPORTS_DIR):
@@ -48,7 +52,8 @@ def _latest_snapshot(ticker: str) -> tuple:
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
                     return data, dates[0]
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"[Snapshot] 파일 읽기 실패 ({path}): {e}")
                     pass
     return None, None
 
@@ -72,7 +77,8 @@ def _latest_snapshots(tickers: list) -> dict:
         )
         for row in rows:
             result[row["ticker"].upper()] = (row["data"], row["date"])
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Snapshot] 배치 DB 조회 실패: {e}")
         pass
     for t in clean:
         if t not in result:
@@ -117,7 +123,8 @@ def _search_naver(q: str, max_results: int = 12) -> list:
                 "security_type": security_type,
             })
         return results
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Search] Naver 자동완성 실패 ({q!r}): {e}")
         return []
 
 
@@ -152,7 +159,8 @@ def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
     try:
         results = yf.Search(q, max_results=12, enable_fuzzy_query=True)
         quotes = results.quotes or []
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Search] yfinance 검색 실패 ({q!r}): {e}")
         return []
 
     filtered = []
@@ -191,7 +199,8 @@ def get_stock_news(ticker: str, market: str = "US"):
         raise HTTPException(status_code=400, detail="market must be KR or US")
     try:
         news = scraper.get_news(ticker, market)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[News] 뉴스 조회 실패 ({ticker}): {e}")
         news = []
     return {"news": news}
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
+import logging
 import math
 import re
 import requests
 from bs4 import BeautifulSoup
 from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history
+
+logger = logging.getLogger(__name__)
 
 _INDEX_SYMBOLS = {
     "gspc": "^GSPC",
@@ -22,8 +25,8 @@ def _fetch_index(key: str, sym: str, stored_history: list) -> tuple[str, dict | 
             if not math.isfinite(change_pct):
                 change_pct = None
             return key, {"current": current, "change_pct": change_pct, "history": history}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("[Index] %s yfinance fetch 실패, stored 폴백: %s", sym, e)
 
     if stored_history:
         current = stored_history[-1]["value"]
@@ -87,7 +90,8 @@ def _parse_multpl_cape(html: str) -> dict | None:
             return None
 
         return {"current": current, **stats}
-    except Exception:
+    except Exception as e:
+        logger.warning("[CAPE] multpl 파싱 실패: %s", e)
         return None
 
 
@@ -100,7 +104,8 @@ def _fetch_cape() -> dict | None:
         )
         r.raise_for_status()
         return _parse_multpl_cape(r.text)
-    except Exception:
+    except Exception as e:
+        logger.warning("[CAPE] multpl.com fetch 실패: %s", e)
         return None
 
 

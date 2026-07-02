@@ -8,6 +8,9 @@ import pandas as pd
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor
 from .cache import _mc_save, _cache, get_or_refresh, _BASE_DIR, _DATA_DIR
+import logging
+
+logger = logging.getLogger(__name__)
 
 _NAVER_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -101,7 +104,8 @@ def _get_yf_quarterly_net_income(ticker: str) -> dict[str, float]:
                 q = (col.month - 1) // 3 + 1
                 result[f"{col.year}Q{q}"] = float(val) / 1e9
         return result
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Earnings] yf 분기 순이익 조회 실패 ticker={ticker}: {e}")
         return {}
 
 
@@ -126,7 +130,8 @@ def _get_naver_quarterly_net_income(ticker: str) -> dict[str, float]:
                 except (ValueError, IndexError):
                     pass
         return result
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Earnings] Naver 분기 순이익 조회 실패 ticker={ticker}: {e}")
         return {}
 
 

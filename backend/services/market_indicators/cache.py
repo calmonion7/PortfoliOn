@@ -1,9 +1,12 @@
 from __future__ import annotations
 import json
+import logging
 import os
 import time
 import yfinance as yf
 from services.db import query, execute
+
+logger = logging.getLogger(__name__)
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _DATA_DIR = os.path.join(_BASE_DIR, "data")
@@ -31,8 +34,8 @@ def _mc_load(key: str) -> dict | None:
         rows = query("SELECT data, fetched_at FROM market_cache WHERE key = %s", (key,))
         if rows:
             return {"data": rows[0]["data"], "fetched_at": rows[0]["fetched_at"]}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[Cache] _mc_load key={key} 실패: {e}")
     return None
 
 
@@ -45,15 +48,15 @@ def _mc_save(key: str, data: dict) -> None:
             "ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, fetched_at=EXCLUDED.fetched_at",
             (key, json.dumps(data), fetched_at),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[Cache] _mc_save key={key} 실패: {e}")
 
 
 def _mc_delete(key: str) -> None:
     try:
         execute("DELETE FROM market_cache WHERE key = %s", (key,))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[Cache] _mc_delete key={key} 실패: {e}")
 
 
 def clear_cache(key: str) -> None:

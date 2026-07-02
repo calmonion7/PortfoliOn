@@ -1,3 +1,4 @@
+import logging
 import math
 
 import numpy as np
@@ -5,6 +6,8 @@ import pandas as pd
 import yfinance as yf
 from services.market import _yf_sym
 from services.parallel import parallel_map
+
+logger = logging.getLogger(__name__)
 
 SECTOR_ETFS = [
     {"name": "Technology",             "etf": "XLK"},
@@ -44,7 +47,8 @@ def _fetch_etf(entry: dict) -> dict:
             "return_1mo": _calc_return(hist, 21),
             "return_3mo": _calc_return(hist, 63),
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Sector] ETF fetch 실패 {entry['etf']}: {e}")
         return {"name": entry["name"], "etf": entry["etf"],
                 "return_1w": None, "return_1mo": None, "return_3mo": None}
 
@@ -68,7 +72,8 @@ def _fetch_holding_closes(item: dict):
         if len(closes) < 20 or not qty:
             return None
         return closes, qty
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Correlation] 보유종목 히스토리 fetch 실패 {ticker}: {e}")
         return None
 
 
@@ -124,7 +129,8 @@ def get_macro_correlation(holdings: list) -> dict:
                     "macro_delta": round(float(mv) * 100, 4),
                     "portfolio_return": round(float(pv) * 100, 4),
                 })
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Correlation] 매크로 지표 fetch 실패 {m['ticker']}: {e}")
             correlations.append({"indicator": m["label"], "ticker": m["ticker"], "corr_90d": None})
 
     return {"correlations": correlations, "scatter": scatter}

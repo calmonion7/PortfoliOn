@@ -6,8 +6,12 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import logging
+
 import requests
 import yfinance as yf
+
+logger = logging.getLogger(__name__)
 
 from services import storage
 from services.db import query, execute
@@ -45,7 +49,8 @@ def generate(user_id: str, today: date = None) -> dict:
                     return ticker, None
                 change_pct = round((current - prev_close) / prev_close * 100, 2)
                 return ticker, {"prev_close": prev_close, "current": current, "change_pct": change_pct}
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Digest] 시세 fetch 실패 ticker={ticker}: {e}")
             pass
         return ticker, None
 
@@ -160,7 +165,8 @@ def _recent_disclosure_feed(holdings: list[dict], today: date) -> list[dict]:
         ticker = h["ticker"].upper()
         try:
             rows = disc_svc.get_disclosures(ticker, limit=20)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Digest] 공시 fetch 실패 ticker={ticker}: {e}")
             continue
         for r in rows:
             dt = r.get("rcept_dt")
@@ -195,7 +201,8 @@ def _recent_insider_trades(holdings: list[dict], today: date) -> list[dict]:
         ticker = h["ticker"].upper()
         try:
             sig = ins_svc.compute_net_signal(ticker)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Digest] 내부자거래 fetch 실패 ticker={ticker}: {e}")
             continue
         if sig["direction"] == "neutral":
             continue

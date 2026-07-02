@@ -1,5 +1,9 @@
 # backend/services/storage/dates.py
+import logging
+
 from .schedule import get_batch_schedule
+
+logger = logging.getLogger(__name__)
 
 
 _REPORT_BATCH_BY_MARKET = {"KR": "daily_report_kr", "US": "daily_report_us"}
@@ -22,7 +26,8 @@ def expected_report_date(market: str) -> str:
     job_id = _REPORT_BATCH_BY_MARKET.get(market, "daily_report_us")
     try:
         cfg = get_batch_schedule(job_id)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Report] get_batch_schedule({job_id}) 실패: {e}")
         cfg = None
     now = _now_kst()
     today = now.date()

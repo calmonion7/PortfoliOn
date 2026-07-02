@@ -1,8 +1,12 @@
+import logging
+
 from fastapi import APIRouter, Depends
 import math
 
 import yfinance as yf
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from services import storage, cache as cache_svc
 from services.market import _yf_sym
@@ -20,7 +24,8 @@ def _fetch_closes(item: dict) -> tuple:
         if len(closes) < 20:
             return None, None
         return ticker, closes
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Correlation] {sym} 종가 fetch 실패: {e}")
         return None, None
 
 

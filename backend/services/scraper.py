@@ -1,7 +1,10 @@
+import logging
 import requests
 from bs4 import BeautifulSoup
 import yfinance as yf
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 _HEADERS = {
     "User-Agent": (
@@ -35,7 +38,8 @@ def scrape_finviz_consensus(ticker: str) -> dict:
                 except ValueError:
                     pass
         return data
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Scraper] scrape_finviz_consensus({ticker}) 실패: {e}")
         return {}
 
 def get_news_kr(ticker: str) -> list[dict]:
@@ -88,7 +92,8 @@ def get_news_kr(ticker: str) -> list[dict]:
                     "published_at": pub_date,
                 })
         return result
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Scraper] get_news_kr({ticker}) 실패: {e}")
         return []
 
 
@@ -126,5 +131,6 @@ def get_news(ticker: str, market: str = "US") -> list[dict]:
             if title:
                 result.append({"title": title, "link": link, "publisher": publisher, "published_at": published_at})
         return result
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Scraper] get_news({ticker}) 실패: {e}")
         return []

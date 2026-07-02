@@ -1,9 +1,12 @@
 from __future__ import annotations
 import json
+import logging
 import os
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from .cache import _mc_save, _mc_load, _cache, _get_cache, _set_cache, _DATA_DIR
+
+logger = logging.getLogger(__name__)
 
 _EXPORTS_CACHE = os.path.join(_DATA_DIR, "kr_exports.json")
 _COMTRADE_URL = "https://comtradeapi.un.org/public/v1/preview/C/M/HS"
@@ -117,7 +120,8 @@ def _fetch_and_save_kr_exports() -> dict:
     api_key = os.environ.get("KITA_API_KEY")
     try:
         data = _fetch_customs_exports(api_key) if api_key else _fetch_comtrade_exports()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[KrExports] 1차 수출 fetch 실패, Comtrade 폴백 시도: {e}")
         try:
             data = _fetch_comtrade_exports()
         except Exception as e:

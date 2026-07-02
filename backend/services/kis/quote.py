@@ -5,7 +5,10 @@
 prdy_ctrt(등락율)는 부호 포함 문자열이라 그대로 쓴다. 경계: .forge/adr/0011.
 """
 from __future__ import annotations
+import logging
 from services.kis import client
+
+logger = logging.getLogger(__name__)
 
 _KR_PRICE_PATH = "/uapi/domestic-stock/v1/quotations/inquire-price"
 _KR_PRICE_TR = "FHKST01010100"
@@ -135,7 +138,8 @@ def get_quote_us(ticker: str, exchange: str = "") -> dict:
         try:
             d = client.request(_US_PRICE_TR, _US_PRICE_PATH,
                                {"AUTH": "", "EXCD": excd, "SYMB": sym})
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[KIS Quote] US price fetch 실패 ticker={sym} excd={excd}: {e}")
             continue
         q = _normalize_us_price(d.get("output") or {})
         if q["price"]:
@@ -146,7 +150,8 @@ def get_quote_us(ticker: str, exchange: str = "") -> dict:
             d = client.request(_US_DAILY_TR, _US_DAILY_PATH,
                                {"AUTH": "", "EXCD": excd, "SYMB": sym,
                                 "GUBN": "0", "BYMD": "", "MODP": "0"})
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[KIS Quote] US dailyprice fetch 실패 ticker={sym} excd={excd}: {e}")
             continue
         q = _normalize_us_daily(d.get("output2") or [])
         if q["price"]:

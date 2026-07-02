@@ -35,7 +35,8 @@ def _fnguide_market_cap(ticker: str) -> float | None:
         m = re.search(r"시가총액\s*\(보통주,억원\)\s*([\d,]+)", clean)
         if m:
             return int(m.group(1).replace(",", "")) * 100_000_000
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[FnguideMarketCap] 시가총액 크롤 실패 ({ticker}): {e}")
         pass
     return None
 
@@ -74,7 +75,8 @@ def _kr_basic_kiwoom(ticker: str, regular: bool = False) -> tuple | None:
         return None
     try:
         q = kq.get_quote(ticker, regular=regular)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[KiwoomQuote] 키움 현재가 조회 실패 ({ticker}): {e}")
         return None
     if q.get("price") is None:
         return None
@@ -89,7 +91,8 @@ def _kr_basic_kis(ticker: str) -> tuple | None:
         return None
     try:
         q = kisq.get_quote_kr(ticker)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[KISQuote] KIS 현재가 조회 실패 ({ticker}): {e}")
         return None
     if q.get("price") is None:
         return None
@@ -102,7 +105,8 @@ def _kr_closes_kiwoom(ticker: str, max_items: int = 30, regular: bool = False) -
     from services.kiwoom import chart as kchart
     try:
         return kchart.daily_closes(ticker, max_items=max_items, regular=regular)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[KiwoomCloses] 키움 일봉 조회 실패 ({ticker}): {e}")
         return []
 
 
@@ -268,7 +272,8 @@ def get_quote_kr(ticker: str, exchange: str = "KS", regular: bool = False) -> di
             industry = yf_info.get("industry", "") or ""
             if not mc:
                 mc = _n(yf_info.get("marketCap"))
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[KRQuote] yfinance 섹터/변동률 보강 실패 ({ticker}): {e}")
             pass
 
         return {
@@ -358,7 +363,8 @@ def get_financials_kr(ticker: str) -> list[dict]:
                 "quick_ratio":       round(rv(9, key), 2) if rv(9, key) is not None else None,
             })
         return results
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Financials] 분기 재무 조회 실패 ({ticker}): {e}")
         return []
 
 
@@ -498,7 +504,8 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
             # 실패해도 Naver 결과만 반환 (graceful)
 
         return results
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Financials] 연간 재무 조회 실패 ({ticker}): {e}")
         return []
 
 
@@ -543,5 +550,6 @@ def get_analyst_data_kr(ticker: str) -> dict:
             "target_low":  min(prices) if prices else None,
             "buy": buy, "hold": hold, "sell": sell,
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[AnalystData] FnGuide 애널리스트 데이터 조회 실패 ({ticker}): {e}")
         return _empty

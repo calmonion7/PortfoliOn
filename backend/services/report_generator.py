@@ -11,6 +11,9 @@ import yfinance as yf
 from services import market as mkt, indicators, scraper
 from services.utils import sanitize as _sanitize
 from services.db import execute, query
+import logging
+
+logger = logging.getLogger(__name__)
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent / "snapshots"
 
@@ -54,7 +57,8 @@ def _comp_valuation(ticker: str, market: str) -> dict:
                 "per": _fin(info.get("trailingPE")),
                 "pbr": _fin(info.get("priceToBook")),
             }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Valuation] {ticker} 경쟁사 밸류에이션 조회 실패: {e}")
         return {"per": None, "pbr": None}
 
 
@@ -95,7 +99,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
     if _t is not None:
         try:
             _ = _t.info  # info 사전 캐싱
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Report] {ticker} yfinance info 사전 캐싱 실패: {e}")
             pass
     # KR 일봉은 키움 우선(실패 시 yfinance 폴백), 그 외는 yfinance.
     # 리포트 스냅샷은 KRX 정규장 종가 기준(regular=True) — 매물대/고점/현재가 정합(.forge/adr/0020).
@@ -153,13 +158,15 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
                     ks11_ret = ks11_ret.copy()
                     ks11_ret.index = ks11_ret.index.tz_localize(None)
                 beta = indicators.calc_beta(_daily_returns, ks11_ret)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Report] {ticker} KR 베타 계산 실패: {e}")
             pass
     else:
         try:
             _b = _fin_num((_t.info if _t is not None else {}).get("beta"))
             beta = _b
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Report] {ticker} US 베타 조회 실패: {e}")
             pass
 
     if market == "KR":
@@ -185,7 +192,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
             )  # revenue는 이미 원 단위(×1e8 변환됨, get_financials_kr)
             if mc and ttm_rev_uck and ttm_rev_uck > 0 and math.isfinite(mc / ttm_rev_uck):
                 psr = round(mc / ttm_rev_uck, 2)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Report] {ticker} KR PSR 계산 실패: {e}")
             pass
     else:
         try:
@@ -198,7 +206,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
             # eco: priceToSalesTrailing12Months is the actual key (라이브 AAPL 확인 2026-06-28)
             psr = _fin_num(_info.get("priceToSalesTrailing12Months"))
             ev_ebitda = _fin_num(_info.get("enterpriseToEbitda"))
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Report] {ticker} US 섹터·밸류에이션 조회 실패: {e}")
             sector, industry = "", ""
             trailing_per = forward_per = pbr = psr = ev_ebitda = None
 
@@ -370,7 +379,8 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
     try:
         rows = query("SELECT date FROM snapshots WHERE ticker = %s", (ticker.upper(),))
         existing = {str(r["date"]) for r in rows}
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Backfill] {ticker} DB 날짜 조회 실패, 파일 폴백: {e}")
         existing = {f.stem for f in output_dir.glob("*.json")}
 
     try:
@@ -385,7 +395,8 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
             daily_df   = _normalize_index(t.history(period="2y",  interval="1d"))
             weekly_df  = _normalize_index(t.history(period="5y",  interval="1wk"))
             monthly_df = _normalize_index(t.history(period="10y", interval="1mo"))
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Backfill] {ticker} 히스토리 fetch 실패: {e}")
         return 0
 
     if daily_df.empty:
@@ -413,7 +424,8 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
             trailing_per = info.get("trailingPE")
             forward_per = info.get("forwardPE")
             pbr = info.get("priceToBook")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[Backfill] {ticker} US info 조회 실패: {e}")
             sector = industry = ""
             trailing_per = forward_per = pbr = None
 

@@ -1,8 +1,11 @@
 from __future__ import annotations
+import logging
 import os
 import requests
 from datetime import date as _date
 from .cache import _mc_save, _mc_load, _merge_history
+
+logger = logging.getLogger(__name__)
 
 # 큐레이션 4종 FRED 시리즈 → 내부 키.
 _SERIES = {
@@ -67,7 +70,8 @@ def _fetch_and_save_macro_signals() -> dict:
             start = prev[-1]["date"] if prev else default_start
             new_pts = _fetch_series(series_id, api_key, start)
             merged[key] = _merge_history(prev, new_pts)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Macro] FRED 시계열 수집 실패, 저장값 반환: {e}")
         return stored_data or {k: [] for k in _SERIES} | {"signals": {}}
 
     merged["signals"] = evaluate_signals(merged)

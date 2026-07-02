@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Body
 from pathlib import Path
@@ -15,6 +16,8 @@ from services.parallel import parallel_map
 from services.db import query, execute
 from auth import get_current_user, require_admin, get_current_user_or_api_key, require_admin_or_api_key, _API_KEY_USER_ID
 from services import auth_service as _auth_svc
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["report"])
 
@@ -523,7 +526,8 @@ def refresh_analyst(ticker: str, user_id: str = Depends(get_current_user)):
                 drop = round((price - high_20d) / high_20d * 100, 2)
                 summary["drop_from_high_20d"] = drop
                 patched["drop_from_high_20d"] = drop
-        except Exception:
+        except Exception as e:
+            logger.warning("[Report] refresh_analyst drop_from_high_20d 계산 실패: %s", e)
             pass
 
     if not patched:

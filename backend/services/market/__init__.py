@@ -1,6 +1,9 @@
 from __future__ import annotations
+import logging
 import yfinance as yf
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # ── 공개 표면 보존: 서브모듈의 공개+외부참조 private 심볼을 패키지 루트로 re-export ──
 # (.forge/adr/0017 — from services.market import X / from services import market; market.X 둘 다 보존)
@@ -58,7 +61,8 @@ def resolve_name(ticker: str, market: str = "US", exchange: str = "", user_name:
         qn = (q.get("name") or "").strip()
         if qn and qn.upper() != t:
             return qn
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[ResolveName] 종목명 조회 실패 ticker={ticker}: {e}")
         pass
     return un or ticker
 
@@ -115,7 +119,8 @@ def _closes_from_download(df, yf_sym: str, n_syms: int) -> list:
     try:
         series = df["Close"] if n_syms == 1 else df[yf_sym]["Close"]
         return [float(x) for x in series.dropna().tolist()]
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[BatchClose] Close 시리즈 추출 실패 sym={yf_sym}: {e}")
         return []
 
 
@@ -156,7 +161,8 @@ def get_quotes_batch(stocks: list) -> dict:
             # auto_adjust=False: raw 종가(브로커 표시가에 근접) — 수정종가는 배당/분할 종목서 어긋남.
             df = yf.download(syms, period="3mo", progress=False, group_by="ticker",
                              auto_adjust=False, threads=True)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[BatchQuote] yf.download 실패: {e}")
             df = None
         for s in us:
             tk = s["ticker"].upper()
@@ -210,12 +216,14 @@ def get_history_df(ticker: str, market: str = "US", exchange: str = "",
                 df = kchart.history_df(ticker, timeframe, max_items=max_items, regular=regular)
                 if not df.empty:
                     return df
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[History] 키움 일봉 조회 실패 ticker={ticker} timeframe={timeframe}: {e}")
             pass
     yf_sym = _yf_sym(ticker, market, exchange)
     try:
         return yf.Ticker(yf_sym).history(**yf_params)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[History] yfinance 일봉 조회 실패 sym={yf_sym}: {e}")
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
 
 
@@ -304,7 +312,8 @@ def get_financials(ticker: str, market: str = "US", exchange: str = "") -> list[
                 "is_consensus": False,
             })
         return results
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Financials] 분기 재무 조회 실패 ticker={ticker}: {e}")
         return []
 
 
@@ -335,5 +344,6 @@ def get_analyst_data(ticker: str, market: str = "US", exchange: str = "", _t=Non
             "target_low":  targets.get("low"),
             "buy": buy, "hold": hold, "sell": sell,
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Analyst] 애널리스트 데이터 조회 실패 ticker={ticker}: {e}")
         return {"target_mean": None, "target_high": None, "target_low": None, "buy": 0, "hold": 0, "sell": 0}

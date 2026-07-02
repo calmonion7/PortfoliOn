@@ -1,8 +1,11 @@
 from __future__ import annotations
+import logging
 import requests
 from datetime import date
 from services.market import _NAVER_HEADERS, _NAVER_BASE
 from services.db import execute, query
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_signed_int(val) -> int:
@@ -80,7 +83,8 @@ def fetch_trend(ticker: str, bizdate: str | None = None) -> list[dict]:
             rows = kinv.fetch_trend_rows(ticker, dt=bizdate)
             if rows:
                 return rows
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[InvestorTrend] 키움 fetch_trend 실패, Naver 폴백: {e}")
         pass
     return _fetch_trend_naver(ticker, bizdate)
 

@@ -1,6 +1,9 @@
 # backend/services/storage/names.py
 import json
+import logging
 from services.db import query, execute
+
+logger = logging.getLogger(__name__)
 
 
 def _invalidate_name_caches(ticker: str) -> None:
@@ -10,7 +13,8 @@ def _invalidate_name_caches(ticker: str) -> None:
         from services import cache as cache_svc
         cache_svc.invalidate(ticker)   # 스냅샷 LRU (리포트 상세)
         cache_svc.invalidate_list()    # 리포트 목록 캐시
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[Names] 캐시 무효화 실패: {e}")
         pass
 
 
