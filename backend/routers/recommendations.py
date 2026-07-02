@@ -5,17 +5,39 @@ GET /api/recommendations — 발굴 섹션(글로벌 점수 − 호출자 추적
   "watchlist"/"holdings" 키를 추가만으로 붙인다.
 POST /api/recommendations/refresh — admin, market 쿼리(KR|US) 수동 트리거.
 """
+import logging
 import math
 from typing import Optional, Literal
 
 from fastapi import APIRouter, Query, Depends, BackgroundTasks, HTTPException
 from auth import get_current_user, require_admin
 from services import recommendation, storage, job_runs
+from services.db import query
 from services.utils import sanitize
 from routers.stocks import _latest_snapshots, _usdkrw_rate  # 저장값 read 헬퍼 재사용(라이브 호출 0)
 import scheduler
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
+
+
+def _enriched_set(tickers: list) -> set:
+    """AI 분석이 채워진 티커 집합 — 정본은 tickers.enriched_at 컬럼(report.py와 동일 소스).
+
+    스냅샷 data JSON엔 enriched_at이 없다(task#132 — 구 판정이 그걸 읽어 항상 False였음).
+    조회 실패는 로깅 후 빈 집합(enriched=False graceful)."""
+    clean = [t.upper() for t in (tickers or []) if t]
+    if not clean:
+        return set()
+    try:
+        rows = query(
+            "SELECT ticker, enriched_at FROM tickers WHERE ticker = ANY(%s)", (clean,)
+        )
+        return {r["ticker"].upper() for r in rows if r.get("enriched_at")}
+    except Exception as e:
+        logger.warning(f"[Recommendations] enriched 조회 실패: {e}")
+        return set()
 
 
 @router.get("")
@@ -73,12 +95,11 @@ def get_recommendations(
         scored = recommendation.read_recommendations(only_tickers=wl_tickers)
         as_of = _as_of(scored, as_of)
         scored_by_ticker = {r["ticker"].upper(): r for r in scored}
-        # enriched 판정용 스냅샷 배치 read(watchlist 비면 생략 — additive-read 가토 방지)
-        wl_snaps = _latest_snapshots(wl_tickers)
+        # enriched 판정 — tickers.enriched_at 배치 1콜(watchlist 비면 생략)
+        wl_enriched = _enriched_set(wl_tickers)
 
         def _enriched(ticker: str) -> bool:
-            snap, _ = wl_snaps.get(ticker.upper(), (None, None))
-            return bool((snap or {}).get("enriched_at"))
+            return ticker.upper() in wl_enriched
 
         def _wl_item(r):
             item = _item(r)

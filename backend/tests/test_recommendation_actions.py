@@ -2,7 +2,8 @@
 """S1 — 보유 액션 도출 순수 함수 테스트 (TDD).
 
 derive_holding_action(score, weight_pct, pnl_pct) → {"action", "reasons"}.
-규칙(우선순위): 추매(score>=70 AND weight<10) → 익절(score<=40 AND pnl>=15) → 홀딩.
+규칙(우선순위): 추매(score>=70 AND weight<10) → 익절(score<=45 AND pnl>=15) → 홀딩.
+(익절 임계 40→45 상향 — task#132 S3, 000660 score 40.5·손익 +1358% 라이브 관찰 근거.)
 결측(None 하나라도) → 홀딩 + ["데이터 부족"]. 색은 백엔드 미결정(action enum + 한국어 사유만).
 """
 import sys
@@ -19,7 +20,7 @@ from services.recommendation.actions import (
 
 def test_module_constants():
     assert HI_SCORE == 70
-    assert LO_SCORE == 40
+    assert LO_SCORE == 45
     assert ADD_WEIGHT_CAP == 10
     assert TAKE_PROFIT_PNL == 15
 
@@ -51,7 +52,7 @@ def test_no_add_weight_exactly_cap():
     assert r["action"] == "홀딩"
 
 
-# --- 익절: score<=40 AND pnl>=15 ---
+# --- 익절: score<=45 AND pnl>=15 (task#132 S3 임계 상향) ---
 
 def test_take_profit_low_score_high_pnl():
     r = derive_holding_action(30.0, 5.0, 25.0)
@@ -59,15 +60,21 @@ def test_take_profit_low_score_high_pnl():
     assert r["reasons"]
 
 
-def test_take_profit_boundary_score_40_pnl_15():
-    # score 정확히 40(<=) AND pnl 정확히 15(>=) → 익절
-    r = derive_holding_action(40.0, 5.0, 15.0)
+def test_take_profit_boundary_score_45_pnl_15():
+    # score 정확히 45(<=) AND pnl 정확히 15(>=) → 익절
+    r = derive_holding_action(45.0, 5.0, 15.0)
     assert r["action"] == "익절"
 
 
-def test_no_take_profit_score_41():
-    # score 41 > 40 → 익절 아님 → 홀딩
-    r = derive_holding_action(41.0, 5.0, 25.0)
+def test_take_profit_live_case_000660():
+    # 라이브 관찰(2026-07-02): score 40.5·손익 +1358% — 구 임계(40)에선 0.5점 차 홀딩이던 케이스
+    r = derive_holding_action(40.5, 62.6, 1358.0)
+    assert r["action"] == "익절"
+
+
+def test_no_take_profit_score_457_live_case_cost():
+    # 라이브 관찰: COST score 45.7 > 45 → 익절 아님 → 홀딩(경계 위)
+    r = derive_holding_action(45.7, 14.5, 32.1)
     assert r["action"] == "홀딩"
 
 

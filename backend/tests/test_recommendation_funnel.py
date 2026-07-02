@@ -615,3 +615,46 @@ def test_run_batch_log_includes_universe_candidates_scored_elapsed(capsys):
     assert "candidates=" in err,  "로그에 candidates= 필드 있어야 한다"
     assert "scored=" in err,      "로그에 scored= 필드 있어야 한다"
     assert "elapsed=" in err,     "로그에 elapsed= 필드(경과초) 있어야 한다"
+
+
+# ── task#132 S2: yfinance 외부 콜 스로틀 (rate-limit 방어) ──────────
+
+def test_fetch_yf_name_throttled():
+    """이름 fetch는 yfinance 콜 직전 스로틀(sleep 1회) — 대량 연속 콜 rate-limit 방어."""
+    from services.recommendation import funnel as F
+    from unittest.mock import MagicMock
+
+    fake_yf = MagicMock()
+    fake_yf.Ticker.return_value.info = {"shortName": "U.S. Bancorp"}
+    with patch.object(F.time, "sleep") as mock_sleep, \
+         patch.dict(sys.modules, {"yfinance": fake_yf}):
+        name = F._fetch_yf_name("USB")
+    assert name == "U.S. Bancorp"
+    mock_sleep.assert_called_once_with(F._YF_THROTTLE_S)
+
+
+def test_backfill_us_consensus_throttled_only_when_fetching():
+    """백필 스로틀은 실제 fetch 직전에만 — 정본 있음·KR 후보는 sleep 0회(비용 불변)."""
+    from services.recommendation import funnel as F
+    from unittest.mock import MagicMock
+    import services.consensus as consensus_mod
+    import services.consensus_pipeline as pipeline_mod
+
+    # fetch 발생 케이스(정본 없음): sleep 1회
+    with patch.object(consensus_mod, "get_asof", MagicMock(return_value=None)), \
+         patch.object(pipeline_mod, "upsert_raw_reports", MagicMock(return_value=1)), \
+         patch.object(pipeline_mod, "refresh_mart", MagicMock()), \
+         patch.object(F.time, "sleep") as s1:
+        F._backfill_us_consensus(_u("USB", "US", "USB", None))
+    s1.assert_called_once_with(F._YF_THROTTLE_S)
+
+    # 정본 있음: fetch 없음 → sleep 0회
+    with patch.object(consensus_mod, "get_asof", MagicMock(return_value={"target_mean": 100.0})), \
+         patch.object(F.time, "sleep") as s2:
+        F._backfill_us_consensus(_u("USB", "US", "USB", None))
+    s2.assert_not_called()
+
+    # KR 후보: 보강 자체가 없음 → sleep 0회
+    with patch.object(F.time, "sleep") as s3:
+        F._backfill_us_consensus(_u("005930", "KR", "삼성전자", None))
+    s3.assert_not_called()

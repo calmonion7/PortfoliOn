@@ -34,6 +34,11 @@ _RETURN_WINDOW = 20
 MIN_DOLLAR_VOLUME = {"US": 1_000_000, "KR": 1_000_000_000}
 _LIQUIDITY_WINDOW = 20  # 거래대금 평균 윈도(거래일)
 
+# yfinance 이름·목표가 fetch 직렬 스로틀(task#132 S2) — 대량 연속 콜 rate-limit 방어
+# (키움 client 직렬 throttle 관례의 yfinance판). 결측분에만 걸리므로 carry/정본이
+# 채워질수록 배치 비용이 자연 감소한다.
+_YF_THROTTLE_S = 0.35
+
 
 # ── Stage-1 스크린 (순수, 유닛 테스트 대상) ──────────────────
 
@@ -275,6 +280,7 @@ def _fetch_yf_name(ticker: str) -> str:
 
     eco: carry 덕에 사실상 첫 배치에서만 호출됨.
     천장: 대량 종목에서 느릴 수 있음 — 필요 시 batch Ticker([...])로 업그레이드."""
+    time.sleep(_YF_THROTTLE_S)  # rate-limit 방어(콜 직전 직렬 스로틀)
     try:
         import yfinance as yf
         info = yf.Ticker(ticker).info
@@ -327,6 +333,7 @@ def _backfill_us_consensus(cand: dict) -> None:
     if consensus.get_asof(ticker, date.today()) is not None:
         return
 
+    time.sleep(_YF_THROTTLE_S)  # rate-limit 방어(실제 fetch 직전에만 — 정본 있으면 위에서 반환)
     try:
         n = consensus_pipeline.upsert_raw_reports(ticker, "US")
         if n > 0:

@@ -152,19 +152,19 @@ def test_get_recommendations_watchlist_scored_desc():
             return _scored_rows()  # score DESC: AAPL(88) → 005930(75)
         return []  # discovery
 
-    # S2: watchlist 스냅샷 read(_latest_snapshots) 패치 필수(enriched 판정용)
+    # enriched 판정용 tickers 조회 패치(task#132 S1 — 행 없음 → False)
     with patch("routers.recommendations.storage.get_full_portfolio",
                return_value=_portfolio(watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshots", return_value={}):
+         patch("routers.recommendations.query", return_value=[]):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
     data = resp.json()
     wl = data["watchlist"]
     assert [w["ticker"] for w in wl] == ["AAPL", "005930"]
     first = wl[0]
-    # additive: enriched 포함(스냅샷 없음 → False)
+    # additive: enriched 포함(tickers 행 없음 → False)
     assert first == {
         "ticker": "AAPL", "name": "Apple", "market": "US",
         "score": 88.0, "flags": [{"label": "목표가 대비 +20%", "kind": "value"}], "rank": 1,
@@ -188,18 +188,18 @@ def test_get_recommendations_watchlist_unscored_appended_last():
             return scored
         return []
 
-    # S2: watchlist 스냅샷 read(_latest_snapshots) 패치 필수(enriched 판정용)
+    # enriched 판정용 tickers 조회 패치(task#132 S1 — 행 없음 → False)
     with patch("routers.recommendations.storage.get_full_portfolio",
                return_value=_portfolio(watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshots", return_value={}):
+         patch("routers.recommendations.query", return_value=[]):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
     wl = resp.json()["watchlist"]
     assert [w["ticker"] for w in wl] == ["AAPL", "TSLA"]
     last = wl[-1]
-    # additive: enriched 포함(스냅샷 없음 → False)
+    # additive: enriched 포함(tickers 행 없음 → False)
     assert last == {
         "ticker": "TSLA", "name": "Tesla", "market": "US",
         "score": None, "flags": [], "rank": None, "exchange": "", "enriched": False,
@@ -684,8 +684,12 @@ def test_market_filter_invalid_value_422():
 
 # --- S2: watchlist enriched 필드 ---
 
-def test_watchlist_enriched_true_when_snapshot_has_enriched_at():
-    """watchlist 종목 스냅샷에 enriched_at 있으면 enriched=True."""
+def test_watchlist_enriched_true_from_tickers_enriched_at():
+    """enriched 정본 = tickers.enriched_at 컬럼(report.py와 동일 소스) — 값 있으면 True.
+
+    task#132 S1: snapshots.data JSON이 아니라 tickers 테이블에서 읽는다(실저장구조 —
+    스냅샷 JSON 기반 구 판정은 라이브에서 항상 False였던 fixture-pass-live-fail).
+    """
     watchlist = [{"ticker": "AAPL", "name": "Apple", "market": "US"}]
     wl_rows = [{"ticker": "AAPL", "name": "Apple", "market": "US",
                 "score": 88.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)}]
@@ -695,22 +699,24 @@ def test_watchlist_enriched_true_when_snapshot_has_enriched_at():
             return wl_rows
         return []
 
-    snaps = {"AAPL": ({"price": 150.0, "enriched_at": "2026-06-18T10:00:00"}, date(2026, 6, 18))}
-
     with patch("routers.recommendations.storage.get_full_portfolio",
                return_value=_portfolio(watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshots", return_value=snaps):
+         patch("routers.recommendations.query",
+               return_value=[{"ticker": "AAPL", "enriched_at": "2026-07-01T17:25:35+00:00"}]) as mock_q:
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
     wl = resp.json()["watchlist"]
     assert wl[0]["ticker"] == "AAPL"
     assert wl[0]["enriched"] is True
+    # 실저장구조 못박기 — tickers 테이블의 enriched_at 컬럼을 조회해야 한다
+    sql = mock_q.call_args[0][0]
+    assert "FROM tickers" in sql and "enriched_at" in sql
 
 
-def test_watchlist_enriched_false_when_snapshot_missing_enriched_at():
-    """watchlist 종목 스냅샷에 enriched_at 없거나 None이면 enriched=False."""
+def test_watchlist_enriched_false_when_enriched_at_null():
+    """tickers.enriched_at 이 NULL이면 enriched=False."""
     watchlist = [{"ticker": "AAPL", "name": "Apple", "market": "US"}]
     wl_rows = [{"ticker": "AAPL", "name": "Apple", "market": "US",
                 "score": 88.0, "flags": [], "rank": 1, "base_date": date(2026, 6, 18)}]
@@ -720,21 +726,20 @@ def test_watchlist_enriched_false_when_snapshot_missing_enriched_at():
             return wl_rows
         return []
 
-    snaps = {"AAPL": ({"price": 150.0}, date(2026, 6, 18))}  # enriched_at 없음
-
     with patch("routers.recommendations.storage.get_full_portfolio",
                return_value=_portfolio(watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshots", return_value=snaps):
+         patch("routers.recommendations.query",
+               return_value=[{"ticker": "AAPL", "enriched_at": None}]):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
     wl = resp.json()["watchlist"]
     assert wl[0]["enriched"] is False
 
 
-def test_watchlist_enriched_false_when_no_snapshot():
-    """watchlist 종목 스냅샷 자체 없으면 enriched=False."""
+def test_watchlist_enriched_false_when_no_tickers_row():
+    """tickers 마스터에 행 자체 없으면 enriched=False."""
     watchlist = [{"ticker": "TSLA", "name": "Tesla", "market": "US"}]
     wl_rows = [{"ticker": "TSLA", "name": "Tesla", "market": "US",
                 "score": 70.0, "flags": [], "rank": 2, "base_date": date(2026, 6, 18)}]
@@ -748,26 +753,31 @@ def test_watchlist_enriched_false_when_no_snapshot():
                return_value=_portfolio(watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshots", return_value={}):
+         patch("routers.recommendations.query", return_value=[]):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
     wl = resp.json()["watchlist"]
     assert wl[0]["enriched"] is False
 
 
-def test_watchlist_empty_no_snapshot_read():
-    """watchlist 비면 _latest_snapshots 호출 없음(additive-read 가토 방지)."""
+def test_watchlist_empty_no_enriched_read():
+    """watchlist 비면 enriched용 tickers 조회 없음(additive-read 가토 방지) — 스냅샷 read도 없음."""
     with patch("routers.recommendations.storage.get_full_portfolio", return_value=_portfolio()), \
          patch("routers.recommendations.recommendation.read_recommendations", return_value=[]), \
+         patch("routers.recommendations.query") as mock_q, \
          patch("routers.recommendations._latest_snapshots") as mock_snaps:
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
+    mock_q.assert_not_called()
     # holdings도 없으므로 _latest_snapshots 미호출
     mock_snaps.assert_not_called()
 
 
-def test_watchlist_snapshot_read_call_count_with_holdings():
-    """watchlist 있고 holdings 있을 때 _latest_snapshots 호출 시퀀스: watchlist용 1회 + holdings용 1회."""
+def test_watchlist_enriched_read_call_count_with_holdings():
+    """watchlist+holdings 동시: tickers 조회(query) 1회 + 스냅샷 read는 holdings용 1회뿐.
+
+    task#132 S1로 watchlist용 _latest_snapshots read가 제거됨(용도가 enriched 판정뿐이었음).
+    """
     watchlist = [{"ticker": "AAPL", "name": "Apple", "market": "US"}]
     holdings = [_holding("MSFT", "Microsoft", "US", 1, 100.0)]
     wl_rows = [{"ticker": "AAPL", "name": "Apple", "market": "US",
@@ -783,20 +793,18 @@ def test_watchlist_snapshot_read_call_count_with_holdings():
             return h_rows
         return []
 
-    def _snaps(tickers):
-        if "AAPL" in tickers:
-            return {"AAPL": ({"price": 150.0, "enriched_at": "2026-06-18T10:00:00"}, date(2026, 6, 18))}
-        return {"MSFT": ({"price": 120.0}, date(2026, 6, 18))}
-
     with patch("routers.recommendations.storage.get_full_portfolio",
                return_value=_portfolio(stocks=holdings, watchlist=watchlist)), \
          patch("routers.recommendations.recommendation.read_recommendations",
                side_effect=_read), \
-         patch("routers.recommendations._latest_snapshots", side_effect=_snaps) as mock_snaps, \
+         patch("routers.recommendations.query",
+               return_value=[{"ticker": "AAPL", "enriched_at": "2026-07-01T17:25:35+00:00"}]) as mock_q, \
+         patch("routers.recommendations._latest_snapshots",
+               return_value={"MSFT": ({"price": 120.0}, date(2026, 6, 18))}) as mock_snaps, \
          patch("routers.recommendations._usdkrw_rate", return_value=1300.0):
         resp = client.get("/api/recommendations")
     assert resp.status_code == 200
-    # watchlist 1회 + holdings 1회 = 2회
-    assert mock_snaps.call_count == 2
+    assert mock_q.call_count == 1  # enriched용 tickers 조회 1회
+    assert mock_snaps.call_count == 1  # holdings용 1회뿐(watchlist read 제거)
     wl = resp.json()["watchlist"]
     assert wl[0]["enriched"] is True

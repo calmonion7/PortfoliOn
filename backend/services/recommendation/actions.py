@@ -8,7 +8,7 @@ from __future__ import annotations
 
 # 임계 상수
 HI_SCORE = 70          # 추매 진입 점수 하한(>=)
-LO_SCORE = 40          # 익절 진입 점수 상한(<=)
+LO_SCORE = 45          # 익절 진입 점수 상한(<=) — 40→45 상향(task#132, 000660 라이브 관찰)
 ADD_WEIGHT_CAP = 10    # 추매 허용 비중 상한(%) — strict <
 TAKE_PROFIT_PNL = 15   # 익절 진입 손익 하한(%) — >=
 
