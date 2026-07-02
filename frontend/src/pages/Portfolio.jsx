@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { trackEvent } from '../utils/analytics'
 import usePortfolioData from '../hooks/usePortfolioData'
 import PriceFreshness from '../components/portfolio/PriceFreshness'
@@ -46,11 +46,17 @@ const DividendSummary = ({ totals }) => {
   )
 }
 
-const DashboardGrid = ({ cards, totals, loading, tick, hasHoldings }) => {
+const DashboardGrid = ({ cards, totals, loading, tick, hasHoldings, retriesExhausted, onRetry }) => {
   if (loading) return <Skeleton variant="card" count={6} />
-  // 헤더 N ↔ 그리드 빈 모순 제거(task#102): 보유 종목이 있는데 카드가 비면(빌드 실패/재시도 중)
-  // "없음"이 아니라 Skeleton을 보인다. 진짜 빈상태는 보유 0일 때만.
   if (!cards.length) {
+    // 재시도 소진 + 에러: 사용자에게 복구 수단 제공
+    if (hasHoldings && retriesExhausted) return (
+      <div style={{ textAlign: 'center', padding: 40 }}>
+        <p style={{ color: 'var(--text-3)', marginBottom: 12 }}>대시보드를 불러오지 못했습니다.</p>
+        <Button variant="secondary" size="sm" onClick={onRetry}>다시 시도</Button>
+      </div>
+    )
+    // 헤더 N ↔ 그리드 빈 모순 제거(task#102): 재시도 중엔 Skeleton
     if (hasHoldings) return <Skeleton variant="card" count={6} />
     return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유 종목이 없습니다. 리서치 탭에서 종목을 추가해 보세요.</p>
   }
@@ -71,16 +77,22 @@ export default function Portfolio() {
 
   const { stocks, watchlist, dashboardCards, dashboardTotals, dashboardLoading, fx, priceTick, lastUpdated, fetchDashboard } = usePortfolioData()
 
-  const dashHealTriesRef = useRef(0)
+  // heal 카운터는 state(렌더-reactive): ref이면 소진 판정이 dashboardError 갱신 타이밍에 결합돼
+  // 에러카드가 누락될 수 있고(리뷰 major), 리셋만으로는 effect가 재발화하지 않는다.
+  const [dashHealTries, setDashHealTries] = useState(0)
   useEffect(() => { fetchDashboard() }, [fetchDashboard])   // 마운트 시(dash가 기본탭) 그리드 fetch
   useEffect(() => {
     // 헤더 N인데 그리드 빈 = 첫 fetch가 일시 실패(콜드 빌드 throw 등, task#102) → bounded 재시도.
     // one-shot이 아니라 최대 3회 — 콜드 실패에 한 방 헛쓰고 포기하던 회귀(재네비 전까지 stuck) 차단.
-    if (!dashboardLoading && dashboardCards.length === 0 && stocks.length > 0 && dashHealTriesRef.current < 3) {
-      dashHealTriesRef.current += 1
+    if (!dashboardLoading && dashboardCards.length === 0 && stocks.length > 0 && dashHealTries < 3) {
+      setDashHealTries(t => t + 1)
       fetchDashboard({ invalidate: true })
     }
-  }, [dashboardLoading, dashboardCards.length, stocks.length, fetchDashboard])
+  }, [dashboardLoading, dashboardCards.length, stocks.length, dashHealTries, fetchDashboard])
+
+  const dashRetriesExhausted = dashHealTries >= 3
+  // 리셋만 — heal effect가 fetch를 주도해 클릭당 중복 fetch(1 direct + 3 heal) 없이 재시도 루프 재가동
+  const handleDashRetry = () => setDashHealTries(0)
 
   // KPI 계산
   const toKrw = (h, price) => (price || 0) * (h.quantity || 0) * ((h.market || 'US') === 'KR' ? 1 : fx)
@@ -131,7 +143,7 @@ export default function Portfolio() {
 
       {tab === 'dash' && (
         <div style={{ padding: '0 20px 100px' }}>
-          <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} hasHoldings={stocks.length > 0} />
+          <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} hasHoldings={stocks.length > 0} retriesExhausted={dashRetriesExhausted} onRetry={handleDashRetry} />
         </div>
       )}
 
@@ -227,7 +239,7 @@ export default function Portfolio() {
       </div>
 
       {/* 대시보드 탭 */}
-      {tab === 'dash' && <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} hasHoldings={stocks.length > 0} />}
+      {tab === 'dash' && <DashboardGrid cards={dashboardCards} totals={dashboardTotals} loading={dashboardLoading} tick={priceTick} hasHoldings={stocks.length > 0} retriesExhausted={dashRetriesExhausted} onRetry={handleDashRetry} />}
 
       {tab === 'analysis' && (
         <div>

@@ -71,6 +71,20 @@ describe('useStockManagement — handleSave', () => {
     expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 15000)
     setIntervalSpy.mockRestore()
   })
+  it('언마운트 시 폴링 인터벌 해제 — 이탈 후 타이머 진행해도 showToast 미발화', async () => {
+    vi.useFakeTimers()
+    // 히스토리 조회는 항상 빈 배열 반환(리포트 미생성 상태 유지)
+    api.post.mockResolvedValue({ data: { report_queued: true } })
+    api.get.mockResolvedValue({ data: [] })
+    const args = makeArgs({ activeTab: 'holdings' })
+    const { result, unmount } = renderHook(() => useStockManagement(args))
+    await act(async () => { await result.current.handleSave({ ticker: 'NVDA' }) })
+    unmount()
+    // 언마운트 후 6틱(maxAttempts) 경과
+    await act(async () => { vi.advanceTimersByTime(15000 * 6) })
+    expect(args.showToast).not.toHaveBeenCalledWith(expect.stringContaining('실패'), 'warning')
+    vi.useRealTimers()
+  })
   it('실패: mutError 세팅·에러 토스트·throw', async () => {
     api.post.mockRejectedValue({ response: { data: { detail: '중복' } } })
     const args = makeArgs({ activeTab: 'holdings' })

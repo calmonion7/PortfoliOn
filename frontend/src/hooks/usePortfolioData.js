@@ -10,6 +10,7 @@ export default function usePortfolioData() {
   const [dashboardCards, setDashboardCards] = useState([])
   const [dashboardTotals, setDashboardTotals] = useState(null)
   const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardError, setDashboardError] = useState(null)
   const [fx, setFx] = useState(1380)
   const [events7d, setEvents7d] = useState([])
   const [lastUpdated, setLastUpdated] = useState(null)  // 시세 마지막 갱신 시각(폴링·초기 fetch)
@@ -17,15 +18,21 @@ export default function usePortfolioData() {
 
   const fetchAll = useCallback(async () => {
     setListLoading(true)
-    const { data } = await api.get('/api/portfolio')
-    setStocks(data.stocks || [])
-    setWatchlist(data.watchlist || [])
-    setListLoading(false)
-    setHasFetched(true)
-    api.get('/api/portfolio/prices').then(({ data: prices }) => {
-      setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
-      setLastUpdated(new Date())
-    }).catch((e) => { console.warn('[usePortfolioData] 초기 시세(/portfolio/prices) 조회 실패', e) })
+    try {
+      const { data } = await api.get('/api/portfolio')
+      setStocks(data.stocks || [])
+      setWatchlist(data.watchlist || [])
+      setListLoading(false)  // 변경 전 순서 보존(listLoading=false → hasFetched=true); finally의 재호출은 no-op
+      setHasFetched(true)
+      api.get('/api/portfolio/prices').then(({ data: prices }) => {
+        setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
+        setLastUpdated(new Date())
+      }).catch((e) => { console.warn('[usePortfolioData] 초기 시세(/portfolio/prices) 조회 실패', e) })
+    } catch (e) {
+      console.warn('[usePortfolioData] 포트폴리오 목록(/portfolio) 조회 실패', e)
+    } finally {
+      setListLoading(false)
+    }
   }, [])
 
   const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
@@ -36,8 +43,10 @@ export default function usePortfolioData() {
       // 응답 형태: { holdings: [...], totals: {...} | null }
       setDashboardCards(res.data?.holdings || [])
       setDashboardTotals(res.data?.totals || null)
+      setDashboardError(null)
     } catch (e) {
       console.warn('[usePortfolioData] dashboard(/stocks/dashboard) 조회 실패', e)
+      setDashboardError(e)
     } finally {
       setDashboardLoading(false)
     }
@@ -89,5 +98,5 @@ export default function usePortfolioData() {
     }).catch((e) => { console.warn('[usePortfolioData] digest(/digest/latest) 조회 실패', e) })
   }, [])
 
-  return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardTotals, dashboardLoading, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard, refreshLivePrices }
+  return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardTotals, dashboardLoading, dashboardError, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard, refreshLivePrices }
 }

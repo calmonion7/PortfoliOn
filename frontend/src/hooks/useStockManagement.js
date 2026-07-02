@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import api from '../api'
 
 // Reports.jsx의 종목 관리(추가/편집/삭제/승격) 핸들러·모달 state 추출 (R4 part 2/2, ADR-0019).
@@ -10,6 +10,9 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
   const [addMode, setAddMode] = useState('holding')    // 'holding' | 'watchlist'
   const [promoteTarget, setPromoteTarget] = useState(null)
   const [mutError, setMutError] = useState('')
+  const pollIntervalsRef = useRef(new Set())  // Set: 종목 여러 개 연속 추가 시 동시 폴링을 전부 추적
+
+  useEffect(() => () => { pollIntervalsRef.current.forEach(clearInterval) }, [])
 
   const pollReportGeneration = (ticker) => {
     let attempts = 0
@@ -19,18 +22,19 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
       try {
         const { data } = await api.get(`/api/report/${ticker}/history`)
         if (data && data.length > 0) {
-          clearInterval(id)
+          clearInterval(id); pollIntervalsRef.current.delete(id)
         } else if (attempts >= maxAttempts) {
-          clearInterval(id)
+          clearInterval(id); pollIntervalsRef.current.delete(id)
           showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
         }
       } catch {
         if (attempts >= maxAttempts) {
-          clearInterval(id)
+          clearInterval(id); pollIntervalsRef.current.delete(id)
           showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
         }
       }
     }, 15000)
+    pollIntervalsRef.current.add(id)
   }
 
   const refreshAfterMutation = () => { fetchList(); fetchAll() }

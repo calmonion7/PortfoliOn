@@ -10,12 +10,6 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      pwaAssets: {
-        image: 'public/favicon.svg',
-        preset: 'minimal-2023',
-        includeHtmlHeadLinks: true,
-        overrideManifestIcons: true,
-      },
       workbox: {
         cacheId: `portfolion-${BUILD_DATE}`,
         globPatterns: ['**/*.{js,css,svg,png,woff2}'],
