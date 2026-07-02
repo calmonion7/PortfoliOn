@@ -163,14 +163,19 @@ def _kr_pick_regular(ticker: str, ref_close: float | None) -> tuple | None:
     return fallback or last
 
 
-def _kr_pick_degenerate_lazy(ticker: str, nxt: tuple | None, krx: tuple | None) -> tuple | None:
+def _kr_pick_degenerate_lazy(ticker: str, nxt: tuple | None, krx: tuple | None,
+                             kis: tuple | None = None, naver: tuple | None = None) -> tuple | None:
     """키움 outage(부재/단일 — 불일치 아님): 우선순위 NXT→KIS→Naver→KRX 첫 ±30%-sane 반환,
     lazy short-circuit(앞 소스가 sane이면 뒤 getter 미호출 — 기존 lazy 동작 보존). 다수결의
     degenerate floor(가용 독립 2피드 없음): 단일 피드는 자기 전일종가 ±30%만 자가검증
-    (자기일관 단일 글리치는 못 잡지만 wrong<missing — task#94 floor). 전부 실패면 첫 non-null."""
+    (자기일관 단일 글리치는 못 잡지만 wrong<missing — task#94 floor). 전부 실패면 첫 non-null.
+    kis/naver: escalation이 이미 받은 결과를 전달하면 재사용(중복 HTTP 제거, task#137) —
+    None(미전달·예외로 못 받음)이면 기존 lazy 호출."""
     fallback = None
-    for src, getter in (("키움NXT", lambda: nxt), ("KIS", lambda: _kr_basic_kis(ticker)),
-                        ("Naver", lambda: _kr_basic_naver(ticker)), ("키움KRX", lambda: krx)):
+    for src, getter in (("키움NXT", lambda: nxt),
+                        ("KIS", lambda: kis if kis is not None else _kr_basic_kis(ticker)),
+                        ("Naver", lambda: naver if naver is not None else _kr_basic_naver(ticker)),
+                        ("키움KRX", lambda: krx)):
         basic = getter()
         if basic is None or basic[0] is None:
             continue
@@ -209,6 +214,7 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
 
     # NXT≠KRX 불일치(글리치): KIS+Naver escalate → 다수결로 outlier 폐기
     feeds = list(kfeeds)
+    esc: dict = {}  # escalation이 받은 결과 — 합의 불가 시 degenerate에 전달해 재호출 방지(task#137)
     for rank, src, getter in ((1, "KIS", lambda: _kr_basic_kis(ticker)),
                               (2, "Naver", lambda: _kr_basic_naver(ticker))):
         try:
@@ -216,6 +222,7 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
         except Exception as e:
             logger.warning(f"[quote] {ticker}: escalation {src} 피드 실패 — {e}")
             continue
+        esc[src] = basic
         if basic and basic[0]:
             feeds.append((rank, src, basic))
     pick = _corroborated_pick(feeds)
@@ -224,8 +231,8 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
         print(f"[quote] {ticker}: 피드 발산 — {pick[1]} {pick[2][0]} 채택(다수결), outlier {outliers} 폐기")
         return pick[2]
 
-    # 4피드도 합의 불가: degenerate self-check
-    return _kr_pick_degenerate_lazy(ticker, nxt, krx)
+    # 4피드도 합의 불가: degenerate self-check (escalation 결과 재사용)
+    return _kr_pick_degenerate_lazy(ticker, nxt, krx, kis=esc.get("KIS"), naver=esc.get("Naver"))
 
 
 def get_quote_kr(ticker: str, exchange: str = "KS", regular: bool = False) -> dict:
