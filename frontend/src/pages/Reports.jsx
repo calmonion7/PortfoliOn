@@ -24,7 +24,7 @@ import { trackEvent } from '../utils/analytics'
 
 
 
-export default function Reports() {
+export default function Reports({ initialTicker = null }) {
   const { role } = useAuth() || { role: 'user' }
   const isAdmin = role === 'admin'
   const { showToast } = useToast()
@@ -114,6 +114,15 @@ export default function Reports() {
     setView('detail')
     trackEvent('report_view_open', { ticker })
   }
+
+  // 추천 탭 '분석 보기' 딥링크 — 목록 로드 후 해당 종목 최신 리포트 상세로 자동 진입 (task#131)
+  useEffect(() => {
+    if (!initialTicker || listLoading) return
+    const t = initialTicker.toUpperCase()
+    const dates = reportList[t]?.dates
+    if (dates?.length) openDetail(t, dates[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTicker, listLoading])
 
   useEffect(() => cleanup, [cleanup])
 

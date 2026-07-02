@@ -6,6 +6,7 @@ GET /api/recommendations — 발굴 섹션(글로벌 점수 − 호출자 추적
 POST /api/recommendations/refresh — admin, market 쿼리(KR|US) 수동 트리거.
 """
 import math
+from typing import Optional, Literal
 
 from fastapi import APIRouter, Query, Depends, BackgroundTasks, HTTPException
 from auth import get_current_user, require_admin
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 @router.get("")
 def get_recommendations(
     limit: int = Query(50, ge=1, le=200),
+    market: Optional[Literal["KR", "US"]] = Query(None),
     user_id: str = Depends(get_current_user),
 ):
     """발굴·관심 섹션 반환(저장값 read-only, 점수 내림차순).
@@ -35,7 +37,12 @@ def get_recommendations(
     all_stocks = portfolio["stocks"] + wl_stocks
     tracked = [s["ticker"] for s in all_stocks if s.get("ticker")]
     # 저유동성은 점수·저장 유지하되 discovery에서만 제외 — ADR-0015 §2(추적종목 점수 보존)·멀티유저 누수 회피
-    rows = recommendation.read_recommendations(exclude_tickers=tracked, limit=limit, exclude_low_liquidity=True)
+    # market 지정 시 discovery 섹션만 해당 시장으로 필터(read 쿼리 레벨)
+    discovery_markets = [market] if market else None
+    rows = recommendation.read_recommendations(
+        exclude_tickers=tracked, limit=limit, exclude_low_liquidity=True,
+        markets=discovery_markets,
+    )
 
     def _item(r):
         return {
@@ -66,7 +73,19 @@ def get_recommendations(
         scored = recommendation.read_recommendations(only_tickers=wl_tickers)
         as_of = _as_of(scored, as_of)
         scored_by_ticker = {r["ticker"].upper(): r for r in scored}
-        watchlist = [_item(r) for r in scored]  # score DESC 보존
+        # enriched 판정용 스냅샷 배치 read(watchlist 비면 생략 — additive-read 가토 방지)
+        wl_snaps = _latest_snapshots(wl_tickers)
+
+        def _enriched(ticker: str) -> bool:
+            snap, _ = wl_snaps.get(ticker.upper(), (None, None))
+            return bool((snap or {}).get("enriched_at"))
+
+        def _wl_item(r):
+            item = _item(r)
+            item["enriched"] = _enriched(r["ticker"])
+            return item
+
+        watchlist = [_wl_item(r) for r in scored]  # score DESC 보존
         for s in wl_stocks:
             t = s.get("ticker")
             if not t or t.upper() in scored_by_ticker:
@@ -79,6 +98,7 @@ def get_recommendations(
                 "flags": [],
                 "rank": None,
                 "exchange": s.get("exchange") or "",
+                "enriched": _enriched(t),
             })
 
     # 보유 액션 섹션 (part 4/4): 저장 EOD 가격·저장 FX로 비중·손익 계산 후 action 도출.

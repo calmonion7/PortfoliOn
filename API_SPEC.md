@@ -2518,6 +2518,7 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 | 파라미터 | 타입 | 기본 | 설명 |
 |----------|------|------|------|
 | `limit` | int (1~200) | 50 | 발굴(`discovery`) 항목 상한 (`watchlist`엔 미적용) |
+| `market` | `KR`\|`US` | - | 발굴(`discovery`) 섹션 시장 필터. 미지정 시 전 시장 통합 반환 (`watchlist`/`holdings`엔 미적용) |
 
 **응답** `200 OK`
 
@@ -2543,7 +2544,8 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
       "score": 75.0,
       "flags": [],
       "rank": 2,
-      "exchange": "KS"
+      "exchange": "KS",
+      "enriched": true
     }
   ],
   "holdings": [
@@ -2572,7 +2574,8 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 | `discovery[].flags` | object[] | 정량 근거 `{label, kind}`. `kind`=팩터군(`value`\|`momentum`\|`smart_money`\|`missing`), 색 아님 |
 | `discovery[].rank` | int\|null | 시장 내 점수 내림차순 순위(1-base) |
 | `discovery[].exchange` | string | 거래소 코드(KR=`KS`\|`KQ`, US=`""`). 결측 시 `""` |
-| `watchlist` | object[] | 호출자 관심종목 재정렬(점수 내림차순). 항목 shape는 `discovery`와 동일. 점수 없는 관심종목은 `score=null`·`flags=[]`·`rank=null`로 말미 append |
+| `watchlist` | object[] | 호출자 관심종목 재정렬(점수 내림차순). 기본 shape는 `discovery`와 동일하며 아래 1필드 추가. 점수 없는 관심종목은 `score=null`·`flags=[]`·`rank=null`로 말미 append |
+| `watchlist[].enriched` | boolean | AI 분석 존재 여부(`enriched_at` 기준). 분석이 채워진 종목은 `true`, 미채움은 `false` |
 | `holdings` | object[] | 호출자 보유종목 액션. 기본 shape는 `discovery`와 동일하며 아래 4필드 추가. 점수 없는 보유종목은 `score=null`·`flags=[]`·`rank=null`. 보유종목 없으면 `[]` |
 | `holdings[].action` | string | 행동 신호 `추매`\|`익절`\|`홀딩`(점수·비중·손익 규칙으로 도출, ADR-0015 §5) |
 | `holdings[].reasons` | string[] | 행동 근거 한국어 한 줄 목록(정량 사유). 데이터 부족 시 `["데이터 부족"]` |
