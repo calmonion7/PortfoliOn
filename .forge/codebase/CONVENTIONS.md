@@ -1,88 +1,68 @@
 ---
-last_mapped_commit: 40662f153ae0d9e86f1c77de85e9c7ecf509225c
+last_mapped_commit: c482aa6811262685f424cb8fb871e8121cf438c6
 mapped: 2026-07-02
 ---
 
-# CONVENTIONS
+# 코딩 컨벤션
 
-Coding conventions and recurring patterns for PortfoliOn (Python/FastAPI backend + React 19/Vite frontend, plain CSS). Implementation facts only — for term definitions see `.forge/CONTEXT.md`.
+## 언어·주석 스타일
 
-## Backend (Python / FastAPI)
+- **주석·docstring은 한국어**가 기본. 인라인 `#` 주석, `"""docstring"""` 모두 한국어로 쓴다.
+  - 예: `backend/services/utils.py` — `"""티커 형식 검증: strip·upper 후 영숫자+'.'/'-' 1~15자만 허용 (공백/잡문자/빈값/과길이 거부)."""`
+  - 예: `backend/services/report_generator.py` — `"""yfinance info 값을 유한 float으로 변환. 'Infinity'/NaN/None → None."""`
+- docstring에서 결측 처리를 `→ None` 화살표로 명시하는 관례 (`결측/예외→None`).
+- 섹션 구분자는 `# ---` 스타일 (예: `backend/services/market_indicators/indices.py`의 `# --- S1: index levels ---`, `backend/services/consensus_pipeline.py`의 한국어 라벨 구분선).
 
-### Service-layer separation
-Routers (`backend/routers/`) hold HTTP/validation only and delegate data work to `backend/services/`. Routers import services at the top, e.g. `routers/watchlist.py` does `from services import storage, errors, cache as cache_svc, report_generator, ...` and `from services.db import query as db_query`. Business logic, external fetches, and persistence live in services; routers wire them to endpoints.
+## 네이밍
 
-### DB access — `services.db`
-All SQL goes through `backend/services/db.py`:
-- `query(sql, params) -> list[dict]` for SELECT (uses `RealDictCursor`, returns dict rows).
-- `execute(sql, params) -> int` for INSERT/UPDATE/DELETE (returns rowcount).
-- `get_connection()` is a context manager that commits on success / rolls back on exception, drawing from a module-level `ThreadedConnectionPool` (`minconn=1`, `maxconn=20`). The pool max (20) is deliberately set **above** the largest `ThreadPoolExecutor` worker count (calendar 15, analysis 11) because psycopg2's pool raises `PoolError` rather than blocking when exhausted.
+- **공개 함수**: `snake_case` 동사-명사 — `get_quote`, `generate_report`, `fetch_trend`, `resolve_name`, `backfill_ticker`.
+- **비공개 헬퍼**: `_` 접두 — `_fin_num`, `_mc_load`, `_mc_save`, `_fetch_one_sector`, `_rsi_block`.
+- **상수/매핑**: ALL_CAPS — `_SCORE_MAP`, `_INDEX_SYMBOLS`, `SNAPSHOTS_DIR`, `TICKER_RE` (모듈 비공개면 `_` 접두 유지).
+- **모듈 비공개 싱글톤**: `_cache`, `_KST`.
+- **불리언 헬퍼**: `is_valid_ticker`, `ticker_exists_in`.
+- 섹션별 fetch 함수는 `(key, value_or_None)` 튜플 반환 패턴 (`indices.py` 등 market_indicators).
 
-### NaN/inf JSON-500 safety (mandatory for value-bearing responses)
-starlette `JSONResponse` is `allow_nan=False`, so any `NaN`/`inf` in a response dict serializes to a **500** (`Out of range float values are not JSON compliant`). Two guard layers, used together:
-- **Source guard** — `math.isfinite(...)` checks where external values enter (preferred; cleaner than blanket output sanitization). Used across `routers/stocks.py`, `routers/recommendations.py`, `services/digest_service.py`, `services/indicators.py`, `services/report_generator.py`, `services/analysis_service.py`, `services/us_supply.py`, `services/recommendation/funnel.py`, `services/market_indicators/indices.py`, `services/market/format.py`.
-- **Output sanitize** — `services.utils.sanitize(obj)` (`backend/services/utils.py`) recursively walks dicts/lists and maps any non-finite float to `None`. Wrap a whole response dict before returning when NaN could enter from many places (e.g. the `_build_all` dashboard build). Consumers: `routers/stocks.py`, `routers/recommendations.py`, `routers/report.py`, `services/report_generator.py`, `services/leverage_service.py`, `services/lending_service.py`, `services/market_indicators/indices.py`.
+## 모듈 레벨 I/O 분리 (mock 가능 구조)
 
-Storage trap: PostgreSQL rejects `NaN` in a `json` column (save fails), but Python `json.dumps` defaults to `allow_nan=True` so a **file fallback silently succeeds** — DB-fail / file-pass / response-serialize-fail produces split symptoms. Guard at the source.
+- 라우터는 서비스를 **모듈 레벨 이름으로 import** (`from services import storage`, `from services import market` — `backend/routers/stocks.py`). 테스트가 `patch("routers.stocks.storage.get_full_portfolio", ...)` 형태의 정규화된 경로로 patch할 수 있게 유지한다.
+- 서비스 내부의 외부 I/O(yfinance/키움/DART 호출)는 **모듈 레벨 함수로 분리**해 `patch.object(service_module, "function_name", ...)`로 mock — 예: `backend/tests/test_nan_serialization_guards.py`의 `patch.object(analysis_service.yf, "Ticker", _ConstTicker)`.
+- 함수를 클로저/람다 안에 숨기거나 함수 안에서 재바인딩하면 이 patch 관례가 깨지니 피할 것.
 
-### DB NUMERIC → Decimal: coerce `float()` before float arithmetic
-psycopg2 returns SQL `NUMERIC` columns as Python `Decimal`. Mixing `Decimal` with `float` (external quotes, ratios, FX) raises `TypeError`. Always `float()`-coerce DB-sourced numerics before arithmetic with floats/external values. See `routers/stocks.py`:
-```python
-yield_on_cost = round(float(annual_div) / float(avg_cost) * 100, 2)   # line 385
-expected_income = round(float(annual_div) * float(qty), 2)            # line 387
-total_value += float(price) * float(qty) * fx                         # line 457
-```
-(The dashboard `yield_on_cost` bug came from omitting this coercion.)
+## 에러 처리
 
-### yfinance percent fields are 0-1 fractions → ×100 at display
-yfinance `t.info` percent fields (`dividendYield`, etc.) are returned as **fractions (0-1)**, not whole percents. Multiply by `100` at display, and keep the scale consistent with the documented/fixture value (match doc/fixture scale). `services/dividends.py` notes the current yfinance scale inline; the cross-cutting rule is to verify the live scale and `×100` at presentation, never store a half-converted value. Related label trap: yfinance `get_income_stmt()`/`get_balance_sheet()`/`get_cashflow()` *methods* use no-space index labels (`OperatingCashFlow`) while the `.income_stmt`/`.cash_flow` *properties* use spaced labels (`Operating Cash Flow`); `format._yf_val` does exact matching and returns `None` silently on mismatch, so `services/market/us.py` must use the `get_*` methods consistently.
+### 외부 fetch 실패 로깅 — silent except 금지
 
-### Module logger + de-silenced broad excepts
-Near-universal convention across `backend/services/` and `backend/routers/`: a module logger declared at the top —
-```python
-import logging
-logger = logging.getLogger(__name__)
-```
-34 backend service/router files now carry it (`grep -rl "logging.getLogger(__name__)" backend/services backend/routers | wc -l`). Broad fallback handlers **log before falling back** rather than swallowing silently:
-```python
-except Exception as e:
-    logger.warning(f"[Tag] <what failed> ({ctx}): {e}")
-    return None   # or skip / keep last-good — fallback unchanged
-```
-The warning message carries a `[Tag]` prefix + Korean context + `{e}` (see `services/market/kr.py`, `services/agm.py`, `services/disclosures.py`). This is **log-only**: control flow is byte-identical — the `except` block still returns its fallback; only a `logger.warning` line was prepended. **Narrow value-coercion excepts (`ValueError`/`TypeError`/`KeyError`) are deliberately left un-logged** — they are the expected path (parse/coerce miss), not a diagnosable failure. Retry/re-raise blocks were also left as-is.
+- 표준 패턴: `except Exception as e:` → `logger.warning(f"[Module] 설명 실패: {e}")` → `return None`(또는 폴백 진행).
+- 로거는 모듈 레벨 `logger = logging.getLogger(__name__)` (거의 모든 서비스·라우터 공통).
+- 메시지 포맷: **`[대문자모듈명]` 접두 + 한국어 설명 + `: {e}`**.
+  - `logger.warning(f"[Scraper] scrape_finviz_consensus({ticker}) 실패: {e}")`
+  - `logger.warning(f"[Cache] _mc_load key={key} 실패: {e}")`
+  - `logger.warning(f"[Digest] 시세 fetch 실패 ticker={ticker}: {e}")`
+- **무음 `except Exception: pass` 금지** — 기능이 예외 없이 조용히 꺼져 진단 불가가 된다(task#48 사례, task#127·128·129에서 백엔드 28파일+프론트 7건 일괄 로깅화). 잔존 무음 except는 `backend/services/job_runs.py`(계측 인프라의 의도적 삼킴)·`guru_scraper.py` 일부뿐이며 레거시/부채로 취급.
+- 리포트 배치 등 stdout 진단이 필요한 곳은 loud `print("[Report] ...")` 병용 (`backend/services/report_generator.py`의 박제-스킵 로그).
 
-Not everything routes through the logger: several deliberate `print(...)` diagnostics survive unchanged (e.g. `routers/stocks.py:499` `... 최소카드 폴백: {e}` to `sys.stderr`, and `report_generator.py`'s `[Report]`/`[Backfill]` stamping lines) — these are load-bearing grep anchors and intentional stdout/stderr diagnostics, not converted.
+### graceful 결측 (wrong < missing)
 
-### Graceful external-fetch — "wrong < missing"
-External fetches (yfinance, DART, KOFIA, Naver, FRED, Kiwoom, KIS) must fail gracefully: a fetch failure yields `None`/skip, never a fabricated default. A wrong default (e.g. assuming "억원" units when a caption parse fails → ×100 over-store) is worse than a missing value. Extraction failures resolve to pending/`None`, not a guessed value. Do **not** silently swallow fetch exceptions — log them via the module logger (see above; the "silent `except` defeats diagnosis" aspiration is now largely realized backend-side — broad fetch excepts log before their fallback). And do **not** persist empty/all-`None` batch results into the cache (skip the save, keep the last good value). (The remaining silent-swallow surface is frontend — e.g. `frontend/src/hooks/usePortfolioData.js` `.catch(() => {})` / `// silent`, where a failed fetch is tolerated ephemerally and retried next tick.)
+- 외부 소스 실패·결측은 예외 전파 대신 **None/빈 리스트 반환** → 호출자가 `if result is None:`으로 저장값 폴백 또는 필드 생략.
+- 추출 실패에 '안전한 기본값'을 채우지 말 것 — 오저장(×100 등)보다 누락(pending/None)이 낫다.
+- 빈/all-None 결과는 캐시에 박제 금지(직전 양호값 유지).
 
-### `_yf_sym` for yfinance symbols
-`backend/services/market/format.py:_yf_sym(ticker, market, exchange)` builds the yfinance symbol: KR → `f"{ticker}.{suffix}"` (suffix from exchange, default `KS`); US → `ticker.replace(".", "-")` (e.g. BRK.B → BRK-B). Used throughout `services/market/__init__.py` and `services/market/us.py`. Companion helpers in the same file: `_yf_val` (exact index/column match — silently returns `None` on label mismatch), `_safe_pct` / `_safe_ratio` (finite-guarded division), `_to_won`, `_fmt_price`, `_fmt_market_cap`.
+### NaN/isfinite 가드
 
-### No live external calls at request-time
-Batch-backed views (rankings, KR sector momentum, market indicators) must **not** call external APIs on the request or startup path. Batches precompute into `market_cache` / tables; requests read stored values only. (Per-request serial fetches add seconds of latency and re-fetch on every cache expiry.)
+- 외부 값을 **처음 소비하는 지점에서 `math.isfinite(v)` 가드** — starlette `JSONResponse`는 `allow_nan=False`라 NaN/inf가 응답에 남으면 500.
+  - `backend/services/report_generator.py` `_fin_num`: `f = float(v); return f if math.isfinite(f) else None`
+  - `backend/services/market_indicators/indices.py`: `if not math.isfinite(change_pct): change_pct = None`
+  - `backend/routers/stocks.py`: `return v if (v is not None and math.isfinite(v)) else None`
+- NaN은 `is None` 가드를 통과하므로(NaN≠None) None 체크만으로는 불충분.
 
-### Lazy imports for circular references
-When two modules import each other (notably `storage` ↔ `cache`), defer the import inside the function. Example — `services/storage/names.py`:
-```python
-def ...:
-    """storage↔cache 순환참조 회피용 지연 import."""
-    from services import cache as cache_svc
-```
+### sanitize 안전망
 
-### Route ordering — register specific paths BEFORE catch-all `/report/{ticker}/{date_str}`
-In `backend/routers/report.py` the catch-all `@router.get("/report/{ticker}/{date_str}")` (line 437) matches any two-segment path, so every more-specific `/report/{ticker}/<word>` route (`/us-supply`, `/backlog`, `/disclosures`, `/insider-trades`, `/us-insider`) must be **declared before** it — otherwise the literal segment (e.g. `backlog`) is captured as `date_str` and the snapshot read fails. Inline comments at lines 374/395/404/412/421 document this. (Same class of bug as the `PUT /api/stocks/enrich/batch` before `/enrich` ordering in `routers/stocks.py`.)
+- 정의: `backend/services/utils.py`의 `sanitize(obj)` — dict/list 재귀 순회로 NaN/inf float → None 치환.
+- 사용처: `backend/routers/stocks.py`(대시보드 응답 전체), `backend/services/report_generator.py`(`_sanitize`로 import, 스냅샷 저장 전), `backend/routers/recommendations.py`(응답 전체).
+- 관례: **소스 지점 `isfinite` 가드가 1차, `sanitize`는 라우터 응답 최외곽의 최후 안전망**. 시세/합산 float를 응답에 싣는 엔드포인트는 둘 중 하나 필수.
 
-## Frontend (React 19 / Vite, plain CSS)
+## 기타
 
-### Function components + inline styles + tokens
-Components are plain function components. Styling is a mix of inline `style={{...}}` objects and shared CSS-variable tokens defined in `frontend/src/styles/tokens.css`. Reusable inline style objects are exported from util modules (e.g. `components/reports/reportUtils.jsx` exports `TH`/`TD`/`MetricCard`/`SectionTitle`; `components/market/marketUtils.jsx` exports `CARD_STYLE`/`SECTION_STYLE`/`SectionCard`). No TailwindCSS.
-
-### KR color convention — `--up` = red, `--down` = blue (and the badge inversion gotcha)
-`frontend/src/styles/tokens.css`: `--up: #d83a3a` (red = 상승/up), `--down: #2864e8` (blue = 하락/down) — the Korean market convention, inverted from Western. **Gotcha:** `components/ui/Badge.css` wires `.badge--success` → `var(--up)` (red) and `.badge--danger` → `var(--down)` (blue). So a `success`/`danger` *semantic* badge renders in the KR *price* colors, inverting the Western good=green / warning=red intent. For non-price semantic state badges use a dedicated-color component (e.g. `ui/SupplyBadge.jsx`), never `success`/`danger` variants. `.badge--warning` references undefined `--color-warning`/`--warning-tint` and is currently broken — unusable for caution.
-
-### US-only / KR-only section guards on `market`
-KR-specific report sections gate on `market === 'KR'` and US-only sections gate on `market !== 'KR'` (returning `null` early). Examples in `frontend/src/components/reports/`: `DetailTab.jsx` (lines 642/648 — backlog KR-only), `InsiderTradesSection.jsx`, `LatestDisclosuresSection.jsx` (KR-only), `GuruHoldersSection.jsx` (US-only via `market === 'KR'` → return), `ConsensusChart.jsx`, `FinancialsChart.jsx` (`const isKR = market === 'KR'`).
-
-### `fmtPrice` / `fmt` are finite-guarded
-`frontend/src/utils.js` `fmtPrice(val, market)` returns `'—'` when `val == null || !Number.isFinite(Number(val))`; KR formats `₩` with `toLocaleString('ko-KR')` (0 fraction digits), US formats `$` with `.toFixed(2)`. Other formatters follow the same null/finite-guard-then-format shape (`components/reports/reportUtils.jsx:fmtN`, `components/market/marketUtils.jsx:krFmt`). `krFmt` assumes **억원** input (10,000억 = 1조 threshold) — convert won via `/1e8` first; raw won/share counts misformat by 1e8.
+- DB NUMERIC 컬럼(avg_cost·quantity 등)은 psycopg가 **Decimal**로 반환 — float와 산술 전 `float()` 정규화 필수(`float/Decimal` TypeError, 대시보드 배당 사례).
+- KR 종목 series를 yfinance tz-aware series와 정렬할 땐 한쪽 인덱스 `tz_localize(None)` 필수.
+- HTML 파싱은 `BeautifulSoup(html, "html.parser")` (stdlib) — 로컬 `.venv`엔 lxml 부재.

@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 78750ecc2c96d71a9e3a3f225a56aea99db71db5
-mapped: 2026-07-01
+last_mapped_commit: c482aa6811262685f424cb8fb871e8121cf438c6
+mapped: 2026-07-02
 ---
 
 # INTEGRATIONS
@@ -14,6 +14,8 @@ Library (`import yfinance as yf`), not an HTTP endpoint. Primary US source.
 - **US market quotes / history / financials** — `backend/services/market/us.py`. `yf.Ticker(yf_sym)`, `.history(period=...)`, `get_income_stmt()`/`get_balance_sheet()`/`get_cashflow()` methods (no-space index labels — see CLAUDE.md gotcha vs `.income_stmt` property labels). Backup falls back to KIS.
 - **US supply / ownership** — `backend/services/us_supply.py`. `fetch_us_supply(ticker, exchange)` reads `t.institutional_holders`, `t.insider_transactions`, and `info["shortPercentOfFloat"]` (with NaN/inf guards via `_finite`); persists to `us_supply_snapshot` table. Read via `get_us_supply` / `get_us_insider`.
 - **Calendar earnings/dividend events** — `backend/routers/calendar.py`. `yf.Ticker(sym).calendar` fetched per stock, parallelized over a `ThreadPoolExecutor(max_workers ≤ 15)`.
+- **Recommendation funnel US consensus backfill** — `backend/services/recommendation/funnel.py` `_backfill_us_consensus(cand)`. US candidates that lack a `daily_consensus_mart` entry for today have their yfinance analyst targets (`t.upgrades_downgrades`) fetched once and fed through `consensus_pipeline.upsert_raw_reports` → `consensus_pipeline.refresh_mart`. Called from the recommendation funnel batch for US candidates only, guarded so it fires only when mart data is absent.
+- **종목명 해석 / 이름 백필** — `backend/services/market/__init__.py` `resolve_name(ticker, market, ...)`. US는 yfinance quote의 `info.get("shortName", ticker)`, KR은 키움 `stk_nm`/Naver에서 실명을 채운다. 이름 백필 `POST /api/stocks/names/backfill`이 이 경로로 shortName을 fetch한다.
 
 ## Naver (m.stock.naver.com / api.stock.naver.com / finance.naver.com)
 
