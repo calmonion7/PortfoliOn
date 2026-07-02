@@ -17,8 +17,8 @@ USERS = [
 
 
 def test_get_users_returns_list():
-    with patch("routers.admin.query", return_value=USERS), \
-         patch("routers.admin._get_user_permissions", return_value={"portfolio": True}):
+    perm_rows = [{"user_id": "user-1", "menu": "portfolio", "enabled": True}]
+    with patch("routers.admin.query", side_effect=[USERS, perm_rows]):
         resp = client.get("/api/admin/users")
     assert resp.status_code == 200
     data = resp.json()

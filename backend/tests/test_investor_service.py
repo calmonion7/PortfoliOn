@@ -138,15 +138,15 @@ class _FakeDB:
     def __init__(self):
         self.store = {}  # (ticker, base_date) -> row dict
 
-    def execute(self, sql, params):
-        ticker, base_date = params[0], params[1]
-        self.store[(ticker, base_date)] = {
-            "ticker": ticker, "base_date": base_date,
-            "foreign_net": params[2], "organ_net": params[3],
-            "individual_net": params[4], "foreign_hold_ratio": params[5],
-            "close_price": params[6],
-        }
-        return 1
+    def execute_many(self, sql, params_list):
+        for params in params_list:
+            ticker, base_date = params[0], params[1]
+            self.store[(ticker, base_date)] = {
+                "ticker": ticker, "base_date": base_date,
+                "foreign_net": params[2], "organ_net": params[3],
+                "individual_net": params[4], "foreign_hold_ratio": params[5],
+                "close_price": params[6],
+            }
 
 
 def _row(d, fnet=0, hold=None):
@@ -158,7 +158,7 @@ def test_upsert_trend_idempotent():
     from services import investor_service as svc
     fake = _FakeDB()
     rows = [_row(date(2026, 6, 5), fnet=111), _row(date(2026, 6, 4), fnet=222)]
-    with patch("services.investor_service.execute", fake.execute):
+    with patch("services.investor_service.execute_many", fake.execute_many):
         svc.upsert_trend("005930", rows)
         assert len(fake.store) == 2
         # 같은 날 재실행 — 행 수 그대로(멱등), 값 갱신

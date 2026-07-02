@@ -39,6 +39,56 @@ def apply_asof(summary: dict, ticker: str, date) -> dict:
     return summary
 
 
+def get_asof_batch(pairs: list[tuple]) -> dict[str, dict | None]:
+    """(ticker, date) 쌍 리스트를 최대 2쿼리로 일괄 조회. {ticker_upper: row_or_None} 반환.
+    mart에 행이 없는 티커만 consensus_history 폴백 2차 쿼리."""
+    if not pairs:
+        return {}
+    normalized = list(dict.fromkeys((t.upper(), d) for t, d in pairs))  # 중복 쌍 제거(VALUES 중복 방지)
+    tickers_needed = [t for t, _ in normalized]
+
+    # 1차: daily_consensus_mart DISTINCT ON (ticker) per-(ticker,date) 쌍
+    mart_rows = query(
+        "SELECT DISTINCT ON (m.ticker) m.ticker,"
+        " m.avg_target_price AS target_mean, m.avg_target_high AS target_high,"
+        " m.avg_target_low AS target_low, m.buy_count AS buy, m.hold_count AS hold, m.sell_count AS sell"
+        " FROM daily_consensus_mart m"
+        " JOIN (VALUES %s) AS v(ticker, d) ON m.ticker = v.ticker AND m.base_date <= v.d"
+        " ORDER BY m.ticker, m.base_date DESC" % _values_placeholder(normalized),
+        _flatten(normalized),
+    )
+    result: dict[str, dict | None] = {t: None for t in tickers_needed}
+    for r in mart_rows:
+        result[r["ticker"].upper()] = {k: v for k, v in r.items() if k != "ticker"}
+
+    # 2차: mart 미스 티커만 consensus_history 폴백
+    miss = [(t, d) for t, d in normalized if result[t] is None]
+    if miss:
+        hist_rows = query(
+            "SELECT DISTINCT ON (ch.ticker) ch.ticker,"
+            " ch.target_high, ch.target_mean, ch.target_low, ch.buy, ch.hold, ch.sell"
+            " FROM consensus_history ch"
+            " JOIN (VALUES %s) AS v(ticker, d) ON ch.ticker = v.ticker AND ch.date <= v.d"
+            " ORDER BY ch.ticker, ch.date DESC" % _values_placeholder(miss),
+            _flatten(miss),
+        )
+        for r in hist_rows:
+            result[r["ticker"].upper()] = {k: v for k, v in r.items() if k != "ticker"}
+
+    return result
+
+
+def _values_placeholder(pairs: list[tuple]) -> str:
+    """(%s,%s::date), (%s,%s::date), ... 형태의 VALUES 행 플레이스홀더 문자열.
+    ⚠️ 바깥 괄호를 추가로 감싸면 안 됨 — VALUES ((a,b),(c,d))는 N행이 아니라
+    record 컬럼의 1행이 돼 AS v(ticker, d) 매핑에서 라이브 에러."""
+    return ", ".join("(%s,%s::date)" for _ in pairs)
+
+
+def _flatten(pairs: list[tuple]) -> list:
+    return [v for pair in pairs for v in pair]
+
+
 def get_history(ticker: str) -> list[dict]:
     from services.consensus_pipeline import get_mart_history
     mart = get_mart_history(ticker)

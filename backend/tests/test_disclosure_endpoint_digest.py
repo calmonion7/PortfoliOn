@@ -82,8 +82,10 @@ def _normal_ticker(symbol):
 
 
 def test_generate_includes_recent_disclosures(tmp_path):
+    """S7: get_disclosures_batch 배치 경로로 mock 타깃 이동. 행에 ticker 필드 포함."""
     import services.digest_service as ds
     disc = [{
+        "ticker": "005930.KS",
         "rcept_no": "20260522000001", "rcept_dt": "20260522",
         "report_nm": "주요사항보고서(유상증자결정)", "pblntf_ty": "B", "corp_name": "삼성전자",
         "dart_url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260522000001",
@@ -92,7 +94,8 @@ def test_generate_includes_recent_disclosures(tmp_path):
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
          patch("services.digest_service._get_events", return_value=[]), \
-         patch("services.disclosures.get_disclosures", return_value=disc), \
+         patch("services.disclosures.get_disclosures_batch", return_value=disc), \
+         patch("services.insider_trades.compute_net_signals_batch", return_value={}), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert "disclosures" in result
@@ -104,19 +107,20 @@ def test_generate_includes_recent_disclosures(tmp_path):
 
 
 def test_generate_disclosures_only_recent(tmp_path):
-    """오래된 공시(윈도우 밖)는 제외한다."""
+    """오래된 공시(윈도우 밖)는 제외한다. S7: get_disclosures_batch 배치 경로로 mock 타깃 이동."""
     import services.digest_service as ds
     disc = [
-        {"rcept_no": "1", "rcept_dt": "20260522", "report_nm": "최근", "pblntf_ty": "A",
-         "corp_name": "삼성전자", "dart_url": "u1"},
-        {"rcept_no": "2", "rcept_dt": "20260401", "report_nm": "오래됨", "pblntf_ty": "A",
-         "corp_name": "삼성전자", "dart_url": "u2"},
+        {"ticker": "005930.KS", "rcept_no": "1", "rcept_dt": "20260522", "report_nm": "최근",
+         "pblntf_ty": "A", "corp_name": "삼성전자", "dart_url": "u1"},
+        {"ticker": "005930.KS", "rcept_no": "2", "rcept_dt": "20260401", "report_nm": "오래됨",
+         "pblntf_ty": "A", "corp_name": "삼성전자", "dart_url": "u2"},
     ]
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
          patch("services.digest_service._get_events", return_value=[]), \
-         patch("services.disclosures.get_disclosures", return_value=disc), \
+         patch("services.disclosures.get_disclosures_batch", return_value=disc), \
+         patch("services.insider_trades.compute_net_signals_batch", return_value={}), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
     rmts = [d["report_nm"] for d in result["disclosures"]]

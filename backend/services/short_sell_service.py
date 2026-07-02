@@ -5,7 +5,7 @@ investor_service와 동형 구조(fetch_trend/upsert_trend/read_series).
 """
 from __future__ import annotations
 import logging
-from services.db import execute, query
+from services.db import execute_many, query
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +35,11 @@ def upsert_trend(ticker: str, rows: list[dict]) -> None:
             short_balance = EXCLUDED.short_balance,
             close_price   = EXCLUDED.close_price
     """
-    for row in rows:
-        execute(sql, (
-            ticker,
-            row["base_date"],
-            row.get("short_volume"),
-            row.get("short_value"),
-            row.get("short_ratio"),
-            row.get("short_balance"),
-            row.get("close_price"),
-        ))
+    execute_many(sql, [
+        (ticker, row["base_date"], row.get("short_volume"), row.get("short_value"),
+         row.get("short_ratio"), row.get("short_balance"), row.get("close_price"))
+        for row in rows
+    ])
 
 
 def read_series(ticker: str, days: int = 252) -> list[dict]:

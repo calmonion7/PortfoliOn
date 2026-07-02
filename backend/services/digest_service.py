@@ -156,35 +156,36 @@ def generate(user_id: str, today: date = None) -> dict:
 def _recent_disclosure_feed(holdings: list[dict], today: date) -> list[dict]:
     """보유 종목의 최근 DART 공시(공시 피드 store, 최근 DISCLOSURE_WINDOW_DAYS일).
 
-    services.disclosures.get_disclosures(=stock_disclosures 테이블)에서만 읽는다 —
+    services.disclosures.get_disclosures_batch(=stock_disclosures 테이블)로 단일 쿼리 조회 —
     tickers.recent_disclosures(Cowork 코멘터리)는 건드리지 않는다([[공시 피드]] 경계)."""
     from services import disclosures as disc_svc
+    if not holdings:
+        return []
+    tickers = [h["ticker"].upper() for h in holdings]
     cutoff = today - timedelta(days=DISCLOSURE_WINDOW_DAYS)
+    try:
+        rows = disc_svc.get_disclosures_batch(tickers, limit_per_ticker=20)
+    except Exception as e:
+        logger.warning(f"[Digest] 공시 배치 fetch 실패: {e}")
+        return []
     out: list[dict] = []
-    for h in holdings:
-        ticker = h["ticker"].upper()
+    for r in rows:
+        dt = r.get("rcept_dt")
         try:
-            rows = disc_svc.get_disclosures(ticker, limit=20)
-        except Exception as e:
-            logger.warning(f"[Digest] 공시 fetch 실패 ticker={ticker}: {e}")
+            d = date(int(dt[0:4]), int(dt[4:6]), int(dt[6:8])) if dt and "-" not in dt \
+                else (date.fromisoformat(dt) if dt else None)
+        except (ValueError, TypeError):
+            d = None
+        if d is None or d < cutoff or d > today:
             continue
-        for r in rows:
-            dt = r.get("rcept_dt")
-            try:
-                d = date(int(dt[0:4]), int(dt[4:6]), int(dt[6:8])) if dt and "-" not in dt \
-                    else (date.fromisoformat(dt) if dt else None)
-            except (ValueError, TypeError):
-                d = None
-            if d is None or d < cutoff or d > today:
-                continue
-            out.append({
-                "ticker": ticker,
-                "rcept_dt": r.get("rcept_dt"),
-                "report_nm": r.get("report_nm"),
-                "pblntf_ty": r.get("pblntf_ty"),
-                "corp_name": r.get("corp_name"),
-                "dart_url": r.get("dart_url"),
-            })
+        out.append({
+            "ticker": r.get("ticker", "").upper(),
+            "rcept_dt": r.get("rcept_dt"),
+            "report_nm": r.get("report_nm"),
+            "pblntf_ty": r.get("pblntf_ty"),
+            "corp_name": r.get("corp_name"),
+            "dart_url": r.get("dart_url"),
+        })
     out.sort(key=lambda x: (x.get("rcept_dt") or ""), reverse=True)
     return out
 
@@ -192,19 +193,22 @@ def _recent_disclosure_feed(holdings: list[dict], today: date) -> list[dict]:
 def _recent_insider_trades(holdings: list[dict], today: date) -> list[dict]:
     """보유 종목 중 내부자·5%지분 순매수/순매도 신호가 있는 종목(윈도 내).
 
-    services.insider_trades.compute_net_signal(=stock_insider_trades 테이블)에서만
-    읽는다 — tickers.recent_disclosures(Cowork 코멘터리)는 건드리지 않는다([[공시 피드]] 경계).
+    services.insider_trades.compute_net_signals_batch(=stock_insider_trades 테이블)로
+    단일 쿼리 집계 — tickers.recent_disclosures(Cowork 코멘터리)는 건드리지 않는다.
     direction이 neutral(신호 없음)인 종목은 제외."""
     from services import insider_trades as ins_svc
+    if not holdings:
+        return []
+    tickers = [h["ticker"].upper() for h in holdings]
+    try:
+        signals = ins_svc.compute_net_signals_batch(tickers)
+    except Exception as e:
+        logger.warning(f"[Digest] 내부자거래 배치 fetch 실패: {e}")
+        return []
     out: list[dict] = []
-    for h in holdings:
-        ticker = h["ticker"].upper()
-        try:
-            sig = ins_svc.compute_net_signal(ticker)
-        except Exception as e:
-            logger.warning(f"[Digest] 내부자거래 fetch 실패 ticker={ticker}: {e}")
-            continue
-        if sig["direction"] == "neutral":
+    for ticker in tickers:
+        sig = signals.get(ticker, {})
+        if sig.get("direction") not in ("buy", "sell"):
             continue
         out.append({
             "ticker": ticker,

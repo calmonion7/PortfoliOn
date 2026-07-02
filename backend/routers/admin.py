@@ -26,10 +26,29 @@ def _get_user_permissions(user_id: str) -> Dict[str, bool]:
 @router.get("/users")
 def list_users(admin_id: str = Depends(require_admin)):
     users = query("SELECT id, email, role, oauth_provider FROM users ORDER BY created_at")
+    non_admin_ids = [str(u["id"]) for u in users if u["role"] != "admin"]
+    perm_rows = (
+        query(
+            "SELECT user_id, menu, enabled FROM user_menu_permissions WHERE user_id = ANY(%s::uuid[])",
+            (non_admin_ids,),
+        )
+        if non_admin_ids
+        else []
+    )
+    perm_map: Dict[str, Dict[str, bool]] = {}
+    for r in perm_rows:
+        uid = str(r["user_id"])
+        if uid not in perm_map:
+            perm_map[uid] = {m: False for m in ALL_MENUS}
+        perm_map[uid][r["menu"]] = r["enabled"]
     result = []
     for u in users:
-        perms = _get_user_permissions(str(u["id"])) if u["role"] != "admin" else {m: True for m in ALL_MENUS}
-        result.append({"id": str(u["id"]), "email": u["email"], "role": u["role"], "oauth_provider": u["oauth_provider"], "permissions": perms})
+        uid = str(u["id"])
+        if u["role"] == "admin":
+            perms = {m: True for m in ALL_MENUS}
+        else:
+            perms = perm_map.get(uid, {m: False for m in ALL_MENUS})
+        result.append({"id": uid, "email": u["email"], "role": u["role"], "oauth_provider": u["oauth_provider"], "permissions": perms})
     return result
 
 

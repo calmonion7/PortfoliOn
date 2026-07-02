@@ -99,7 +99,7 @@ def test_list_reports_overrides_target_and_opinion_from_mart_asof():
     """목록 목표가·의견수는 동결 snapshot이 아니라 mart as-of 정본에서 와 상세와 일치한다. ADR-0008."""
     date_rows = [{"ticker": "LLY", "date": "2026-05-05"}]
     summary_rows = [{"ticker": "LLY", "date": "2026-05-05", "data": SAMPLE_SUMMARY}]  # snapshot target_mean=980
-    mart_row = [{"target_mean": 1000.0, "target_high": 1200.0, "target_low": 900.0,
+    mart_row = [{"ticker": "LLY", "target_mean": 1000.0, "target_high": 1200.0, "target_low": 900.0,
                  "buy": 20, "hold": 2, "sell": 0}]
     with patch("routers.report.query", side_effect=[date_rows, summary_rows]), \
          patch("services.consensus.query", return_value=mart_row), \

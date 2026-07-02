@@ -3,7 +3,7 @@ import logging
 import requests
 from datetime import date
 from services.market import _NAVER_HEADERS, _NAVER_BASE
-from services.db import execute, query
+from services.db import execute_many, query
 
 logger = logging.getLogger(__name__)
 
@@ -105,16 +105,11 @@ def upsert_trend(ticker: str, rows: list[dict]) -> None:
             foreign_hold_ratio = EXCLUDED.foreign_hold_ratio,
             close_price        = EXCLUDED.close_price
     """
-    for row in rows:
-        execute(sql, (
-            ticker,
-            row["base_date"],
-            row.get("foreign_net"),
-            row.get("organ_net"),
-            row.get("individual_net"),
-            row.get("foreign_hold_ratio"),
-            row.get("close_price"),
-        ))
+    execute_many(sql, [
+        (ticker, row["base_date"], row.get("foreign_net"), row.get("organ_net"),
+         row.get("individual_net"), row.get("foreign_hold_ratio"), row.get("close_price"))
+        for row in rows
+    ])
 
 
 def read_series(ticker: str, days: int = 252) -> list[dict]:

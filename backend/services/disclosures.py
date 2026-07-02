@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 import requests
 
 from services.backlog import _get_corp_code_map
-from services.db import execute, query
+from services.db import execute, execute_many, query
 
 logger = logging.getLogger(__name__)
 
@@ -94,15 +94,46 @@ def upsert_disclosures(ticker: str, rows: list[dict]) -> None:
             corp_name  = EXCLUDED.corp_name,
             fetched_at = NOW()
     """
-    for row in rows:
-        execute(sql, (
+    params_list = [
+        (
             ticker.upper(),
             row["rcept_no"],
             row.get("rcept_dt"),
             row.get("report_nm"),
             row.get("pblntf_ty"),
             row.get("corp_name"),
-        ))
+        )
+        for row in rows
+    ]
+    execute_many(sql, params_list)
+
+
+def get_disclosures_batch(tickers: list[str], limit_per_ticker: int = 20) -> list[dict]:
+    """여러 종목의 저장된 공시를 단일 쿼리로 조회(rcept_dt 최신순). 뷰어 URL 부여.
+
+    tickers가 비면 빈 리스트. per-ticker 상한은 Python에서 그룹핑 후 슬라이스."""
+    if not tickers:
+        return []
+    upper = [t.upper() for t in tickers]
+    rows = query(
+        "SELECT ticker, rcept_no, rcept_dt, report_nm, pblntf_ty, corp_name "
+        "FROM stock_disclosures WHERE ticker = ANY(%s) "
+        "ORDER BY rcept_dt DESC, rcept_no DESC",
+        (upper,),
+    )
+    # per-ticker 상한 적용 + dart_url 부여
+    counts: dict[str, int] = {}
+    out = []
+    for r in rows:
+        t = r["ticker"]
+        if counts.get(t, 0) >= limit_per_ticker:
+            continue
+        counts[t] = counts.get(t, 0) + 1
+        d = dict(r)
+        d["rcept_dt"] = str(d["rcept_dt"]) if d.get("rcept_dt") is not None else None
+        d["dart_url"] = _DART_VIEWER.format(rcept_no=d["rcept_no"])
+        out.append(d)
+    return out
 
 
 def get_disclosures(ticker: str, limit: int = 20) -> list[dict]:

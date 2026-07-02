@@ -214,13 +214,26 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
                 e["is_mine"] = ticker in my_tickers
             return e
 
+        # 목표가·의견수 정본 = daily_consensus_mart as-of(종목별 최신 리포트 날짜). ADR-0008.
+        # N+1 방지: summary가 있는 티커만 배치 1쿼리(+폴백 1쿼리)로 일괄 조회.
+        _asof_pairs = [(t, dates[0]) for t, dates in ticker_dates.items()
+                       if ticker_summary.get(t) and dates]
+        _asof_rows = consensus_svc.get_asof_batch(_asof_pairs) if _asof_pairs else {}
+
         result = {}
         for ticker, dates in ticker_dates.items():
             category = "holdings" if ticker in holding_tickers else "watchlist"
             summary = ticker_summary.get(ticker)
-            # 목표가·의견수 정본 = daily_consensus_mart as-of(종목별 최신 리포트 날짜). 상세와 동일 헬퍼로 정합. ADR-0008.
             if summary:
-                summary = consensus_svc.apply_asof(summary, ticker, dates[0])
+                row = _asof_rows.get(ticker)
+                if row:
+                    summary = dict(summary)
+                    summary["buy"] = row["buy"]
+                    summary["hold"] = row["hold"]
+                    summary["sell"] = row["sell"]
+                    for k in ("target_mean", "target_high", "target_low"):
+                        if row.get(k) is not None:
+                            summary[k] = row[k]
             stock_info = portfolio_stocks.get(ticker) or portfolio_watchlist.get(ticker) or {}
             result[ticker] = _mk_entry(ticker, dates, category, stock_info, summary)
 

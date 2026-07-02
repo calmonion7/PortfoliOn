@@ -154,10 +154,11 @@ def test_row_hash_is_deterministic_and_distinguishes_rows():
 
 
 def test_upsert_dedups_on_row_hash(monkeypatch):
-    """upsert는 row_hash 충돌 시 갱신 — 같은 종목 2회 적재해도 동일 해시(중복 0)."""
+    """upsert는 row_hash 충돌 시 갱신 — 같은 종목 2회 적재해도 동일 해시(중복 0).
+    S4: execute_many 1콜로 배치화됐으므로 execute_many를 mock."""
     from services import insider_trades as svc
     calls = []
-    monkeypatch.setattr(svc, "execute", lambda sql, params: calls.append((sql, params)))
+    monkeypatch.setattr(svc, "execute_many", lambda sql, params_list: calls.append((sql, params_list)))
 
     rows = [{
         "report_kind": "insider", "rcept_no": "R1", "rcept_dt": "20260515",
@@ -168,12 +169,12 @@ def test_upsert_dedups_on_row_hash(monkeypatch):
     svc.upsert_insider_trades("005930.KS", rows)   # 2회차
 
     assert len(calls) == 2
-    sql, params = calls[0]
+    sql, params_list = calls[0]
     assert "INSERT INTO stock_insider_trades" in sql
     assert "ON CONFLICT (row_hash) DO UPDATE" in sql
-    assert params[1] == "005930.KS"                 # ticker upper
+    assert params_list[0][1] == "005930.KS"                 # ticker upper
     # 두 호출의 row_hash(PK)가 동일 → DB에서 중복 0
-    assert calls[0][1][0] == calls[1][1][0]
+    assert calls[0][1][0][0] == calls[1][1][0][0]
 
 
 def test_get_insider_trades_orders_latest_and_adds_url(monkeypatch):

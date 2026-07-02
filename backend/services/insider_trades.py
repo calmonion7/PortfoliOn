@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 import requests
 
 from services.backlog import _get_corp_code_map
-from services.db import execute, query
+from services.db import execute, execute_many, query
 
 logger = logging.getLogger(__name__)
 
@@ -162,12 +162,13 @@ def upsert_insider_trades(ticker: str, rows: list[dict]) -> None:
             rate_after    = EXCLUDED.rate_after,
             fetched_at    = NOW()
     """
+    params_list = []
     for row in rows:
         row_hash = _row_hash(
             row["rcept_no"], row["report_kind"], row.get("repror"),
             row.get("shares_change"), row.get("shares_after"), row.get("rate_after"),
         )
-        execute(sql, (
+        params_list.append((
             row_hash,
             ticker.upper(),
             row["report_kind"],
@@ -179,6 +180,42 @@ def upsert_insider_trades(ticker: str, rows: list[dict]) -> None:
             row.get("shares_after"),
             row.get("rate_after"),
         ))
+    execute_many(sql, params_list)
+
+
+def compute_net_signals_batch(tickers: list[str], window_days: int = INSIDER_NET_WINDOW_DAYS) -> dict[str, dict]:
+    """여러 종목의 순매수 방향을 단일 쿼리로 집계. {ticker: signal_dict} 반환.
+    목록에 없는 종목은 neutral/0/0으로 채워진다."""
+    if not tickers:
+        return {}
+    upper = [t.upper() for t in tickers]
+    rows = query(
+        "SELECT ticker, COALESCE(SUM(shares_change), 0) AS net_shares, COUNT(*) AS cnt "
+        "FROM stock_insider_trades "
+        "WHERE ticker = ANY(%s) AND rcept_dt >= (CURRENT_DATE - %s * INTERVAL '1 day') "
+        "GROUP BY ticker",
+        (upper, window_days),
+    )
+    result: dict[str, dict] = {}
+    for r in rows:
+        net_shares = int(r["net_shares"] or 0)
+        count = int(r["cnt"] or 0)
+        if net_shares > 0:
+            direction = "buy"
+        elif net_shares < 0:
+            direction = "sell"
+        else:
+            direction = "neutral"
+        result[r["ticker"]] = {
+            "direction": direction,
+            "net_shares": net_shares,
+            "count": count,
+            "window_days": window_days,
+        }
+    # tickers not in result → neutral (티커별 새 dict — 공유 참조면 호출자 변형이 전 티커 오염)
+    for t in upper:
+        result.setdefault(t, {"direction": "neutral", "net_shares": 0, "count": 0, "window_days": window_days})
+    return result
 
 
 def get_insider_trades(ticker: str, limit: int = 50) -> list[dict]:

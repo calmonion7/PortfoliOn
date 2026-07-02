@@ -6,7 +6,7 @@ import threading
 from contextlib import contextmanager
 
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor, execute_batch
 from psycopg2.pool import ThreadedConnectionPool
 
 _pool: ThreadedConnectionPool | None = None
@@ -55,3 +55,15 @@ def execute(sql: str, params=None) -> int:
         with conn.cursor() as cur:
             cur.execute(sql, params)
             return cur.rowcount
+
+
+def execute_many(sql: str, params_list: list) -> None:
+    """배치 INSERT/UPDATE/DELETE — 단일 커넥션에서 execute_batch 실행.
+
+    빈 params_list는 no-op(커넥션 미획득).
+    """
+    if not params_list:
+        return
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            execute_batch(cur, sql, params_list)

@@ -124,7 +124,7 @@ def test_upsert_disclosures_dedups_on_rcept_no(monkeypatch):
     """upsert SQL은 rcept_no 충돌 시 갱신(중복 재수집이 행 수를 늘리지 않게)."""
     from services import disclosures as svc
     calls = []
-    monkeypatch.setattr(svc, "execute", lambda sql, params: calls.append((sql, params)))
+    monkeypatch.setattr(svc, "execute_many", lambda sql, params_list: calls.append((sql, params_list)))
 
     svc.upsert_disclosures("005930.KS", [{
         "rcept_no": "20260515000001", "rcept_dt": "20260515",
@@ -132,11 +132,11 @@ def test_upsert_disclosures_dedups_on_rcept_no(monkeypatch):
     }])
 
     assert len(calls) == 1
-    sql, params = calls[0]
+    sql, params_list = calls[0]
     assert "INSERT INTO stock_disclosures" in sql
     assert "ON CONFLICT (rcept_no) DO UPDATE" in sql
-    assert params[0] == "005930.KS"  # ticker upper
-    assert params[1] == "20260515000001"
+    assert params_list[0][0] == "005930.KS"  # ticker upper
+    assert params_list[0][1] == "20260515000001"
 
 
 def test_get_disclosures_orders_latest_first_and_adds_url(monkeypatch):

@@ -180,15 +180,17 @@ KR_PORTFOLIO = {
 
 
 def test_generate_includes_insider_trades_when_signal(tmp_path):
-    """S6: 보유 종목에 순매수/순매도 신호가 있으면 insider_trades 필드에 부착."""
+    """S6: 보유 종목에 순매수/순매도 신호가 있으면 insider_trades 필드에 부착.
+    S7: compute_net_signals_batch 배치 경로로 mock 타깃 이동."""
     import services.digest_service as ds
+    ticker = "005930.KS"
     sig = {"direction": "buy", "net_shares": 12000, "count": 3, "window_days": 90}
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=KR_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
          patch("services.digest_service._get_events", return_value=[]), \
-         patch("services.disclosures.get_disclosures", return_value=[]), \
-         patch("services.insider_trades.compute_net_signal", return_value=sig), \
+         patch("services.disclosures.get_disclosures_batch", return_value=[]), \
+         patch("services.insider_trades.compute_net_signals_batch", return_value={ticker: sig}), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert "insider_trades" in result
@@ -198,15 +200,17 @@ def test_generate_includes_insider_trades_when_signal(tmp_path):
 
 
 def test_generate_insider_trades_excludes_neutral(tmp_path):
-    """신호 없음(neutral)은 insider_trades 목록에서 제외(disclosures와 동형의 신호 필터)."""
+    """신호 없음(neutral)은 insider_trades 목록에서 제외(disclosures와 동형의 신호 필터).
+    S7: compute_net_signals_batch 배치 경로로 mock 타깃 이동."""
     import services.digest_service as ds
+    ticker = "005930.KS"
     sig = {"direction": "neutral", "net_shares": 0, "count": 0, "window_days": 90}
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=KR_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
          patch("services.digest_service._get_events", return_value=[]), \
-         patch("services.disclosures.get_disclosures", return_value=[]), \
-         patch("services.insider_trades.compute_net_signal", return_value=sig), \
+         patch("services.disclosures.get_disclosures_batch", return_value=[]), \
+         patch("services.insider_trades.compute_net_signals_batch", return_value={ticker: sig}), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert result["insider_trades"] == []
@@ -238,14 +242,15 @@ def test_generate_nan_quote_does_not_break_serialization(tmp_path):
 
 
 def test_generate_insider_trades_graceful_on_error(tmp_path):
-    """compute_net_signal 예외는 종목 단위로 graceful skip(다이제스트 생성 무중단)."""
+    """compute_net_signals_batch 예외는 배치 단위로 graceful skip(다이제스트 생성 무중단).
+    S7: 배치 경로로 mock 타깃 이동."""
     import services.digest_service as ds
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=KR_PORTFOLIO), \
          patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
          patch("services.digest_service._get_events", return_value=[]), \
-         patch("services.disclosures.get_disclosures", return_value=[]), \
-         patch("services.insider_trades.compute_net_signal", side_effect=Exception("db down")), \
+         patch("services.disclosures.get_disclosures_batch", return_value=[]), \
+         patch("services.insider_trades.compute_net_signals_batch", side_effect=Exception("db down")), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert result["insider_trades"] == []
