@@ -308,6 +308,7 @@ CREATE INDEX IF NOT EXISTS idx_insider_read ON stock_insider_trades(ticker, rcep
 CREATE TABLE IF NOT EXISTS stock_recommendations (
     ticker      TEXT PRIMARY KEY,
     market      TEXT NOT NULL,                          -- KR | US
+    name        TEXT,                                   -- 종목명(S3: 배치 저장, read 시 tickers 마스터 COALESCE 폴백)
     score       NUMERIC NOT NULL,                       -- 0~100 합성 점수
     factors     JSONB NOT NULL DEFAULT '{}'::jsonb,     -- 점수 입력 팩터(value/momentum/smart_money)
     flags       JSONB NOT NULL DEFAULT '[]'::jsonb,     -- 정량 근거 플래그([{label, kind}])
@@ -317,6 +318,8 @@ CREATE TABLE IF NOT EXISTS stock_recommendations (
     exchange    TEXT,                                   -- 거래소 코드(KR=KS|KQ, US='')
     updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
+-- S3 migration: 기존 운영 DB에 name 컬럼 추가 (idempotent)
+ALTER TABLE stock_recommendations ADD COLUMN IF NOT EXISTS name TEXT;
 CREATE INDEX IF NOT EXISTS idx_recommendations_read ON stock_recommendations(market, score DESC);
 
 -- 배치 실행로그 (job_id별 최근 20건만 보관)

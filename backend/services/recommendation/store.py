@@ -25,10 +25,11 @@ def replace_recommendations(market: str, rows: list[dict]) -> None:
         execute(
             """
             INSERT INTO stock_recommendations
-                (ticker, market, score, factors, flags, rank, base_date, low_liquidity, exchange, updated_at)
-            VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, NOW())
+                (ticker, market, name, score, factors, flags, rank, base_date, low_liquidity, exchange, updated_at)
+            VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, NOW())
             ON CONFLICT (ticker) DO UPDATE SET
                 market        = EXCLUDED.market,
+                name          = EXCLUDED.name,
                 score         = EXCLUDED.score,
                 factors       = EXCLUDED.factors,
                 flags         = EXCLUDED.flags,
@@ -41,6 +42,7 @@ def replace_recommendations(market: str, rows: list[dict]) -> None:
             (
                 row["ticker"].upper(),
                 row["market"],
+                row.get("name") or row["ticker"].upper(),
                 row["score"],
                 json.dumps(row.get("factors") or {}, ensure_ascii=False),
                 json.dumps(row.get("flags") or [], ensure_ascii=False),
@@ -86,7 +88,7 @@ def read_recommendations(
         where.append("r.low_liquidity = FALSE")
 
     sql = (
-        "SELECT r.ticker, t.name, r.market, r.score, r.flags, r.rank, r.base_date, r.exchange "
+        "SELECT r.ticker, COALESCE(t.name, r.name) AS name, r.market, r.score, r.flags, r.rank, r.base_date, r.exchange "
         "FROM stock_recommendations r "
         "LEFT JOIN tickers t ON t.ticker = r.ticker"
     )

@@ -47,18 +47,21 @@ def _fetch_tracked() -> list[dict]:
     return p.get("stocks", []) + p.get("watchlist", [])
 
 
-def _fetch_guru_tickers() -> list[str]:
-    """US 구루(dataroma) 보유 티커 — 캐시된 guru_managers의 top10에서 추출."""
+def _fetch_guru_tickers() -> dict[str, str]:
+    """US 구루(dataroma) 보유 티커 → {ticker: name} dict.
+
+    eco: name 필드가 없거나 빈 경우 ticker를 name으로 사용.
+    소비처 중 list(guru.keys())로 티커 집합이 필요하면 그렇게 쓴다."""
     from services import storage
 
     data = storage.get_guru_managers()
-    tickers: list[str] = []
+    result: dict[str, str] = {}
     for m in data.get("managers", []):
         for h in m.get("top10", []):
             t = (h.get("ticker") or "").strip().upper()
             if t:
-                tickers.append(t)
-    return tickers
+                result[t] = (h.get("name") or "").strip() or t
+    return result
 
 
 # ── 순수 합집합 (유닛 테스트 대상) ──────────────────────────────
@@ -67,7 +70,7 @@ def _merge_universe(
     kr_rows: list[dict],
     sp500: list[str],
     tracked: list[dict],
-    guru: list[str],
+    guru: "dict[str, str] | list[str]",
     kr_top_n: int = KR_MARKET_CAP_TOP_N,
 ) -> list[dict]:
     """이미 fetch된 소스들을 합집합·dedup·ETF 제외해 유니버스 리스트 반환.
@@ -76,6 +79,9 @@ def _merge_universe(
     - US: sp500 + guru 티커 (market=US).
     - tracked(추적종목): ETF·시총 컷오프와 무관하게 항상 포함.
     - ticker로 dedup, 첫 출처 우선(KR→US sp500→guru→tracked 순; tracked는 누락분만 추가).
+    - 각 행에 "tracked": bool 표식 추가 — sp500에 선점돼 dedup으로 스킵된
+      추적종목도 tracked=True로 갱신(선점 dedup이 플래그를 삭제하지 않도록).
+    - guru는 {ticker: name} dict(S3) 또는 list[str](하위 호환) 모두 허용.
     """
     seen: dict[str, dict] = {}
 
@@ -84,7 +90,7 @@ def _merge_universe(
         if not t or t in seen:
             return
         seen[t] = {"ticker": t, "market": market, "name": name or t,
-                   "market_cap": market_cap, "exchange": exchange}
+                   "market_cap": market_cap, "exchange": exchange, "tracked": False}
 
     # KR 시총 상위 N (ETF 제외)
     kr_stocks = [r for r in kr_rows if not r.get("is_etf")]
@@ -96,13 +102,22 @@ def _merge_universe(
     for t in sp500:
         _add(t, "US", "", None, "")
 
-    # US 구루 보유
-    for t in guru:
-        _add(t, "US", "", None, "")
+    # US 구루 보유 — dict(S3) 또는 list(하위 호환)
+    if isinstance(guru, dict):
+        for t, n in guru.items():
+            _add(t, "US", n or t, None, "")
+    else:
+        for t in guru:
+            _add(t, "US", "", None, "")
 
-    # 추적종목 — 항상 포함(ETF·컷오프 무관, 누락분만 추가)
+    # 추적종목 — 항상 포함(ETF·컷오프 무관, 누락분만 추가).
+    # 이미 seen에 있는 티커(sp500 선점 등)도 tracked=True로 플래그 갱신.
+    tracked_tickers = {(s.get("ticker") or "").strip() for s in tracked if s.get("ticker")}
     for s in tracked:
         _add(s.get("ticker", ""), s.get("market") or "US", s.get("name", ""), None, s.get("exchange") or "")
+    for t in tracked_tickers:
+        if t in seen:
+            seen[t]["tracked"] = True
 
     return list(seen.values())
 

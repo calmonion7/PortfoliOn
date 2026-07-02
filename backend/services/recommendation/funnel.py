@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import math
 import sys
+import time
 from datetime import date
 
 from .universe import build_universe, _fetch_guru_tickers
 from .scoring import score_stock
 from .store import replace_recommendations
+from services.db import query
 
 # ── 깔때기 다이얼 (ADR-0015 §1) ────────────────────────────
 # Stage-1 스크린 후 리치 enrich를 적용할 후보 상한 — 배치 비용의 주 손잡이.
@@ -36,19 +38,49 @@ _LIQUIDITY_WINDOW = 20  # 거래대금 평균 윈도(거래일)
 # ── Stage-1 스크린 (순수, 유닛 테스트 대상) ──────────────────
 
 def _screen_candidates(universe: list[dict], top_k: int = CANDIDATE_TOP_K) -> list[dict]:
-    """싼 시장 전체 신호(시총·구루 멤버십)로 후보 top-K 선별.
+    """싼 시장 전체 신호로 후보 선별 (ADR-0021 §1 개정).
 
-    시총 내림차순 상위 top_k + 구루 멤버(`guru_member` True)는 컷오프 밖이어도 포함.
-    universe 행: {ticker, market, name, market_cap, guru_member}.
+    (a) market=="US" 행: 전량 통과 — S&P500 자체가 시총 큐레이션이므로 별도 컷 불필요.
+    (b) tracked=True 행: 시장·시총 무관 무조건 통과 — ADR-0015 §2 계약 강제.
+    (c) KR 비추적 행: 시총 내림차순 top_k 컷.
+    (d) guru_member=True 행: 컷오프 밖이어도 추가 통과 (현행 유지).
+    중복 없이 반환.
+
+    universe 행: {ticker, market, name, market_cap, guru_member, tracked}.
     """
-    ranked = sorted(universe, key=lambda r: r.get("market_cap") or 0, reverse=True)
-    top = ranked[:top_k]
-    seen = {r["ticker"] for r in top}
-    for r in ranked[top_k:]:
-        if r.get("guru_member") and r["ticker"] not in seen:
-            top.append(r)
-            seen.add(r["ticker"])
-    return top
+    seen: set = set()
+    result: list[dict] = []
+
+    def _keep(r: dict):
+        t = r["ticker"]
+        if t in seen:
+            return
+        seen.add(t)
+        result.append(r)
+
+    # (a) US 전량 통과
+    for r in universe:
+        if (r.get("market") or "US") == "US":
+            _keep(r)
+
+    # (b) tracked 전량 통과 (시장·시총 무관)
+    for r in universe:
+        if r.get("tracked"):
+            _keep(r)
+
+    # (c) KR 비추적: 시총 내림차순 top_k
+    kr_untracked = [r for r in universe
+                    if (r.get("market") or "US") == "KR" and not r.get("tracked")]
+    kr_untracked.sort(key=lambda r: r.get("market_cap") or 0, reverse=True)
+    for r in kr_untracked[:top_k]:
+        _keep(r)
+
+    # (d) guru_member — 컷오프 밖 KR 비추적 구루도 추가
+    for r in universe:
+        if r.get("guru_member"):
+            _keep(r)
+
+    return result
 
 
 # ── Stage-2 모멘텀 (순수, 유닛 테스트 대상) ──────────────────
@@ -227,6 +259,83 @@ def _kr_insider(cand: dict):
     return sig.get("direction") == "buy"
 
 
+def _load_stored_names() -> dict[str, str]:
+    """stock_recommendations에서 name이 ticker와 다른 행을 {ticker: name} dict로 반환.
+
+    배치 시작 시 1회 read — carry 덕에 yfinance 외부 fetch는 첫 배치(이름 미확보)에만 발생.
+    eco: 캐시는 배치 내 1회로 충분, 모듈 레벨 싱글톤 불필요."""
+    rows = query(
+        "SELECT ticker, name FROM stock_recommendations WHERE name IS DISTINCT FROM ticker",
+    )
+    return {r["ticker"]: r["name"] for r in rows}
+
+
+def _fetch_yf_name(ticker: str) -> str:
+    """yfinance shortName 1회 fetch. 실패 시 stderr 로깅 후 ticker 반환.
+
+    eco: carry 덕에 사실상 첫 배치에서만 호출됨.
+    천장: 대량 종목에서 느릴 수 있음 — 필요 시 batch Ticker([...])로 업그레이드."""
+    try:
+        import yfinance as yf
+        info = yf.Ticker(ticker).info
+        name = info.get("shortName") or info.get("longName") or ""
+        return name.strip() or ticker
+    except Exception as e:
+        print(f"recommendation.funnel: {ticker} yf name fetch failed: {e}", file=sys.stderr)
+        return ticker
+
+
+def _resolve_name(cand: dict, stored_names: dict[str, str]) -> str:
+    """후보 이름 결정 우선순위: ① stored carry ② yfinance(US만) ③ 기존 name 그대로.
+
+    KR은 tickers 마스터에서 read 시 COALESCE로 해소되므로 외부 fetch 불필요."""
+    ticker = cand["ticker"]
+    name = (cand.get("name") or "").strip()
+    market = cand.get("market") or "US"
+
+    # 이름이 이미 확보된 경우 (KR 포함)
+    if name and name != ticker:
+        return name
+
+    # ① carry: 이전 배치에서 저장된 실명
+    if ticker in stored_names:
+        return stored_names[ticker]
+
+    # ② yfinance (US만) — KR은 마스터 JOIN이 처리
+    if market != "KR":
+        return _fetch_yf_name(ticker)
+
+    return name or ticker
+
+
+def _backfill_us_consensus(cand: dict) -> None:
+    """US 후보 목표가 배치 보강 (ADR-0021 §3).
+
+    daily_consensus_mart에 오늘 기준 정본이 없는 US 후보에 한해 yfinance 애널리스트
+    목표가를 fetch → consensus_pipeline 경유 저장 후 mart 재계산.
+    KR 후보·정본 이미 있는 경우·upsert 0건은 호출 없음(call_count 가토 방지 — CLAUDE.md).
+    실패는 stderr 로깅 후 결측 유지(graceful)."""
+    from services import consensus, consensus_pipeline
+
+    # KR 후보는 보강 없음
+    if (cand.get("market") or "US") == "KR":
+        return
+
+    ticker = cand["ticker"]
+
+    # 정본이 이미 있으면 보강 불필요
+    if consensus.get_asof(ticker, date.today()) is not None:
+        return
+
+    try:
+        n = consensus_pipeline.upsert_raw_reports(ticker, "US")
+        if n > 0:
+            consensus_pipeline.refresh_mart(ticker, date.today())
+    except Exception as e:
+        print(f"recommendation.funnel: {ticker} US consensus backfill failed: {e}",
+              file=sys.stderr)
+
+
 # ── 배치 오케스트레이션 ──────────────────────────────────────
 
 def _enrich_one(cand: dict, guru_set: set) -> dict | None:
@@ -244,6 +353,14 @@ def _enrich_one(cand: dict, guru_set: set) -> dict | None:
               file=sys.stderr)
 
     momentum = _momentum_factors(df)
+
+    # US 후보만: 목표가 정본 없으면 배치 보강 (ADR-0021 §3)
+    if market != "KR":
+        try:
+            _backfill_us_consensus(cand)
+        except Exception as e:
+            print(f"recommendation.funnel: {cand['ticker']} US consensus backfill failed: {e}",
+                  file=sys.stderr)
 
     upside = None
     try:
@@ -288,12 +405,13 @@ def run_recommendation_batch(market: str) -> dict:
 
     반환 통계: {"market", "universe": int, "candidates": int, "scored": int}.
     종목별 fetch 실패는 로깅(부분 결과 저장), 전부 산출 불가면 replace 생략."""
+    t0 = time.monotonic()
     universe = [u for u in build_universe() if (u.get("market") or "US") == market]
 
     guru_set: set = set()
     if market != "KR":
         try:
-            guru_set = {t for t in _fetch_guru_tickers()}
+            guru_set = set(_fetch_guru_tickers().keys())
         except Exception as e:
             print(f"recommendation.funnel: guru membership fetch failed: {e}",
                   file=sys.stderr)
@@ -301,6 +419,13 @@ def run_recommendation_batch(market: str) -> dict:
         u["guru_member"] = u["ticker"] in guru_set
 
     candidates = _screen_candidates(universe, top_k=CANDIDATE_TOP_K)
+
+    # S3: 이름 carry — 이전 배치 저장 실명 1회 read. carry 덕에 외부 fetch는 첫 배치에만.
+    stored_names: dict[str, str] = {}
+    try:
+        stored_names = _load_stored_names()
+    except Exception as e:
+        print(f"recommendation.funnel: stored names load failed: {e}", file=sys.stderr)
 
     today = date.today()
     scored: list[dict] = []
@@ -313,7 +438,7 @@ def run_recommendation_batch(market: str) -> dict:
         scored.append({
             "ticker": cand["ticker"],
             "market": market,
-            "name": cand.get("name") or cand["ticker"],
+            "name": _resolve_name(cand, stored_names),
             "score": result["score"],
             "factors": factors,
             "flags": result["flags"],
@@ -332,8 +457,13 @@ def run_recommendation_batch(market: str) -> dict:
         replace_recommendations(market, scored)
 
     n_low = sum(1 for r in scored if r["low_liquidity"])
-    print(f"recommendation.funnel: {market} scored={len(scored)} low_liquidity={n_low}",
-          file=sys.stderr)
+    elapsed = round(time.monotonic() - t0, 1)
+    print(
+        f"recommendation.funnel: {market} "
+        f"universe={len(universe)} candidates={len(candidates)} "
+        f"scored={len(scored)} low_liquidity={n_low} elapsed={elapsed}s",
+        file=sys.stderr,
+    )
 
     return {
         "market": market,

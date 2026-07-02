@@ -35,12 +35,13 @@ def test_replace_recommendations_deletes_market_then_upserts(monkeypatch):
     assert "ON CONFLICT (ticker) DO UPDATE" in ins_sql
     assert ins_params[0] == "005930"
     assert ins_params[1] == "KR"
-    assert ins_params[2] == 88.5
+    # [2]=name (S3 추가), [3]=score, [4]=factors, [5]=flags, [6]=rank, [7]=base_date
+    assert ins_params[3] == 88.5
     # factors·flags는 JSON 직렬화 문자열
-    assert '"upside_pct"' in ins_params[3]
-    assert '"목표가 대비 +28%"' in ins_params[4]
-    assert ins_params[5] == 1
-    assert ins_params[6] == date(2026, 6, 18)
+    assert '"upside_pct"' in ins_params[4]
+    assert '"목표가 대비 +28%"' in ins_params[5]
+    assert ins_params[6] == 1
+    assert ins_params[7] == date(2026, 6, 18)
 
 
 def test_replace_recommendations_includes_low_liquidity(monkeypatch):
@@ -58,10 +59,11 @@ def test_replace_recommendations_includes_low_liquidity(monkeypatch):
 
     ins_sql, ins_params = calls[1]
     assert "low_liquidity" in ins_sql
-    assert ins_params[7] is True
+    # [2]=name, [3]=score, [4]=factors, [5]=flags, [6]=rank, [7]=base_date, [8]=low_liquidity (S3 인덱스 이동)
+    assert ins_params[8] is True
     # 누락 시 기본 False
     _, ins2_params = calls[2]
-    assert ins2_params[7] is False
+    assert ins2_params[8] is False
 
 
 def test_replace_recommendations_includes_exchange(monkeypatch):
@@ -80,10 +82,11 @@ def test_replace_recommendations_includes_exchange(monkeypatch):
     ins_sql, ins_params = calls[1]
     assert "exchange" in ins_sql
     assert "EXCLUDED.exchange" in ins_sql
-    assert ins_params[8] == "KQ"
+    # [2]=name, [3]=score, [4]=factors, [5]=flags, [6]=rank, [7]=base_date, [8]=low_liquidity, [9]=exchange (S3 인덱스 이동)
+    assert ins_params[9] == "KQ"
     # 누락 시 기본 ''
     _, ins2_params = calls[2]
-    assert ins2_params[8] == ""
+    assert ins2_params[9] == ""
 
 
 def test_read_recommendations_selects_exchange(monkeypatch):
@@ -192,3 +195,42 @@ def test_read_recommendations_empty_only_tickers_returns_empty_without_query(mon
     out = store.read_recommendations(only_tickers=[])
     assert out == []
     assert called["q"] is False
+
+
+# ── S3 (a) name COALESCE: 마스터에 없고 저장 name 있는 행 → 저장 name 반환 ──
+# 구 코드: SELECT r.ticker, t.name ... → t.name=NULL(마스터 없음) → name=null (red)
+
+def test_read_recommendations_coalesce_stored_name_when_master_absent(monkeypatch):
+    """tickers 마스터에 없는 US 미추적 종목 행은 저장된 r.name으로 반환된다(null 아님)."""
+    from services.recommendation import store
+
+    # query가 반환하는 행: t.name=None(마스터 없음), r.name='Apple Inc.'(저장)
+    # 구 코드는 SELECT에 r.name이 없어 t.name만 반환 → null
+    # 신 코드는 COALESCE(t.name, r.name) → 'Apple Inc.'
+    cap = _captured_query(monkeypatch, [
+        {"ticker": "AAPL", "name": "Apple Inc.", "market": "US", "score": 75.0,
+         "flags": [], "rank": 1, "base_date": date(2026, 7, 2), "exchange": ""},
+    ])
+    out = store.read_recommendations()
+    # SQL에 COALESCE + r.name 포함 단언
+    assert "COALESCE" in cap["sql"], "SELECT에 COALESCE(t.name, r.name)가 필요하다"
+    assert "r.name" in cap["sql"], "r.name이 SELECT에 포함돼야 한다"
+    assert out[0]["name"] == "Apple Inc."
+
+
+def test_replace_recommendations_stores_name(monkeypatch):
+    """INSERT에 name 컬럼·값이 포함된다."""
+    from services.recommendation import store
+    calls = []
+    monkeypatch.setattr(store, "execute", lambda sql, params=None: calls.append((sql, params)))
+
+    store.replace_recommendations("US", [
+        {"ticker": "AAPL", "market": "US", "score": 75.0,
+         "factors": {}, "flags": [], "rank": 1, "base_date": date(2026, 7, 2),
+         "name": "Apple Inc."},
+    ])
+
+    ins_sql, ins_params = calls[1]
+    assert "name" in ins_sql, "INSERT에 name 컬럼이 있어야 한다"
+    assert "EXCLUDED.name" in ins_sql, "ON CONFLICT에 name 갱신이 있어야 한다"
+    assert "Apple Inc." in ins_params, "name 값이 파라미터에 포함돼야 한다"

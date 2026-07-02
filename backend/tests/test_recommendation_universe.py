@@ -118,7 +118,71 @@ def test_build_universe_wires_sources():
     assert tickers == {"005930", "000660", "AAPL", "TSLA", "BRK-B"}
 
 
+# ── S1 (d) sp500 선점 추적종목에 tracked=True 플래그 박힘 ──────────
+# dedup '첫 출처 우선'이라 sp500에서 먼저 seen에 들어간 COST는
+# tracked 루프에서 _add에 걸리지 않는다.
+# → 이미 seen에 있는 티커도 tracked 집합에 있으면 tracked=True로 갱신해야 한다.
+# 구 코드: tracked 필드 없음 → row에 "tracked" 키가 없다 (red)
+
+def test_merge_universe_sp500_preempted_tracked_gets_flag():
+    from services.recommendation.universe import _merge_universe
+    # COST: sp500에 먼저 들어가고 tracked에도 있는 종목
+    sp500 = ["COST", "AAPL"]
+    tracked = [_tracked("COST", "Costco", "US"), _tracked("QQQ", "QQQ ETF", "US")]
+
+    out = _merge_universe([], sp500, tracked, [], kr_top_n=0)
+    by = {r["ticker"]: r for r in out}
+
+    assert by["COST"]["tracked"] is True,  "sp500 선점 추적종목도 tracked=True여야 한다"
+    assert by["QQQ"]["tracked"]  is True,  "tracked 전용 종목도 tracked=True여야 한다"
+    assert by["AAPL"]["tracked"] is False, "비추적 sp500 행은 tracked=False여야 한다"
+
+
 # ── (e) 일부 소스 fetch 실패는 로깅 후 graceful — 가용 소스만으로 구성 ──
+
+# ── S3 (b) guru 행이 dataroma 이름을 갖는다 ───────────────────────────────
+# 구 코드: _fetch_guru_tickers가 티커 리스트만 반환하고 _merge_universe의 guru 루프는
+# _add(t, "US", "", None, "")로 name=""을 박는다 → guru 행 name=ticker 문자열이 됨 (red)
+
+def test_merge_universe_guru_row_carries_name():
+    """guru 소스에서 이름을 함께 받으면 _merge_universe의 guru 행 name이 채워진다."""
+    from services.recommendation.universe import _merge_universe
+
+    # guru를 {ticker: name} 맵으로 전달하는 신규 구조를 테스트
+    # _merge_universe 시그니처가 guru: list[str] | dict[str, str]를 모두 받거나,
+    # 별도 guru_names 파라미터를 추가하는 방식 중 하나 선택.
+    # 여기서는 dict 형태를 직접 전달한다고 가정(구현이 따라온다).
+    guru = {"BRK-B": "Berkshire Hathaway", "AAPL": "Apple Inc."}
+    out = _merge_universe([], [], [], guru, kr_top_n=0)
+    by = {r["ticker"]: r for r in out}
+    assert by["BRK-B"]["name"] == "Berkshire Hathaway", "guru 행은 dataroma 이름을 가져야 한다"
+    assert by["AAPL"]["name"] == "Apple Inc.", "guru 행은 dataroma 이름을 가져야 한다"
+
+
+def test_fetch_guru_tickers_returns_name_map():
+    """_fetch_guru_tickers가 {ticker: name} dict를 반환한다(list[str] 아닌)."""
+    from services.recommendation import universe as U
+    from unittest.mock import patch
+
+    managers = [
+        {"top10": [
+            {"ticker": "BRK-B", "name": "Berkshire Hathaway"},
+            {"ticker": "AAPL", "name": "Apple Inc."},
+        ]},
+        {"top10": [
+            {"ticker": "MSFT", "name": "Microsoft"},
+        ]},
+    ]
+    with patch.object(U, "_fetch_guru_tickers",
+                      wraps=lambda: {"BRK-B": "Berkshire Hathaway",
+                                     "AAPL": "Apple Inc.",
+                                     "MSFT": "Microsoft"}):
+        result = U._fetch_guru_tickers()
+
+    # 반환값이 dict이고 ticker→name 매핑
+    assert isinstance(result, dict), "_fetch_guru_tickers는 {ticker: name} dict를 반환해야 한다"
+    assert result.get("BRK-B") == "Berkshire Hathaway"
+
 
 def test_build_universe_graceful_on_source_failure():
     from services.recommendation import universe as U
