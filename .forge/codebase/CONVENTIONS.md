@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 78750ecc2c96d71a9e3a3f225a56aea99db71db5
-mapped: 2026-07-01
+last_mapped_commit: 40662f153ae0d9e86f1c77de85e9c7ecf509225c
+mapped: 2026-07-02
 ---
 
 # CONVENTIONS
@@ -28,17 +28,33 @@ Storage trap: PostgreSQL rejects `NaN` in a `json` column (save fails), but Pyth
 ### DB NUMERIC → Decimal: coerce `float()` before float arithmetic
 psycopg2 returns SQL `NUMERIC` columns as Python `Decimal`. Mixing `Decimal` with `float` (external quotes, ratios, FX) raises `TypeError`. Always `float()`-coerce DB-sourced numerics before arithmetic with floats/external values. See `routers/stocks.py`:
 ```python
-yield_on_cost = round(float(annual_div) / float(avg_cost) * 100, 2)   # line 376
-expected_income = round(float(annual_div) * float(qty), 2)            # line 378
-total_value += float(price) * float(qty) * fx                         # line 448
+yield_on_cost = round(float(annual_div) / float(avg_cost) * 100, 2)   # line 385
+expected_income = round(float(annual_div) * float(qty), 2)            # line 387
+total_value += float(price) * float(qty) * fx                         # line 457
 ```
 (The dashboard `yield_on_cost` bug came from omitting this coercion.)
 
 ### yfinance percent fields are 0-1 fractions → ×100 at display
 yfinance `t.info` percent fields (`dividendYield`, etc.) are returned as **fractions (0-1)**, not whole percents. Multiply by `100` at display, and keep the scale consistent with the documented/fixture value (match doc/fixture scale). `services/dividends.py` notes the current yfinance scale inline; the cross-cutting rule is to verify the live scale and `×100` at presentation, never store a half-converted value. Related label trap: yfinance `get_income_stmt()`/`get_balance_sheet()`/`get_cashflow()` *methods* use no-space index labels (`OperatingCashFlow`) while the `.income_stmt`/`.cash_flow` *properties* use spaced labels (`Operating Cash Flow`); `format._yf_val` does exact matching and returns `None` silently on mismatch, so `services/market/us.py` must use the `get_*` methods consistently.
 
+### Module logger + de-silenced broad excepts
+Near-universal convention across `backend/services/` and `backend/routers/`: a module logger declared at the top —
+```python
+import logging
+logger = logging.getLogger(__name__)
+```
+34 backend service/router files now carry it (`grep -rl "logging.getLogger(__name__)" backend/services backend/routers | wc -l`). Broad fallback handlers **log before falling back** rather than swallowing silently:
+```python
+except Exception as e:
+    logger.warning(f"[Tag] <what failed> ({ctx}): {e}")
+    return None   # or skip / keep last-good — fallback unchanged
+```
+The warning message carries a `[Tag]` prefix + Korean context + `{e}` (see `services/market/kr.py`, `services/agm.py`, `services/disclosures.py`). This is **log-only**: control flow is byte-identical — the `except` block still returns its fallback; only a `logger.warning` line was prepended. **Narrow value-coercion excepts (`ValueError`/`TypeError`/`KeyError`) are deliberately left un-logged** — they are the expected path (parse/coerce miss), not a diagnosable failure. Retry/re-raise blocks were also left as-is.
+
+Not everything routes through the logger: several deliberate `print(...)` diagnostics survive unchanged (e.g. `routers/stocks.py:499` `... 최소카드 폴백: {e}` to `sys.stderr`, and `report_generator.py`'s `[Report]`/`[Backfill]` stamping lines) — these are load-bearing grep anchors and intentional stdout/stderr diagnostics, not converted.
+
 ### Graceful external-fetch — "wrong < missing"
-External fetches (yfinance, DART, KOFIA, Naver, FRED, Kiwoom, KIS) must fail gracefully: a fetch failure yields `None`/skip, never a fabricated default. A wrong default (e.g. assuming "억원" units when a caption parse fails → ×100 over-store) is worse than a missing value. Extraction failures resolve to pending/`None`, not a guessed value. Do **not** silently swallow fetch exceptions — log them (silent `except` blocks defeat diagnosis); and do **not** persist empty/all-`None` batch results into the cache (skip the save, keep the last good value).
+External fetches (yfinance, DART, KOFIA, Naver, FRED, Kiwoom, KIS) must fail gracefully: a fetch failure yields `None`/skip, never a fabricated default. A wrong default (e.g. assuming "억원" units when a caption parse fails → ×100 over-store) is worse than a missing value. Extraction failures resolve to pending/`None`, not a guessed value. Do **not** silently swallow fetch exceptions — log them via the module logger (see above; the "silent `except` defeats diagnosis" aspiration is now largely realized backend-side — broad fetch excepts log before their fallback). And do **not** persist empty/all-`None` batch results into the cache (skip the save, keep the last good value). (The remaining silent-swallow surface is frontend — e.g. `frontend/src/hooks/usePortfolioData.js` `.catch(() => {})` / `// silent`, where a failed fetch is tolerated ephemerally and retried next tick.)
 
 ### `_yf_sym` for yfinance symbols
 `backend/services/market/format.py:_yf_sym(ticker, market, exchange)` builds the yfinance symbol: KR → `f"{ticker}.{suffix}"` (suffix from exchange, default `KS`); US → `ticker.replace(".", "-")` (e.g. BRK.B → BRK-B). Used throughout `services/market/__init__.py` and `services/market/us.py`. Companion helpers in the same file: `_yf_val` (exact index/column match — silently returns `None` on label mismatch), `_safe_pct` / `_safe_ratio` (finite-guarded division), `_to_won`, `_fmt_price`, `_fmt_market_cap`.
@@ -55,7 +71,7 @@ def ...:
 ```
 
 ### Route ordering — register specific paths BEFORE catch-all `/report/{ticker}/{date_str}`
-In `backend/routers/report.py` the catch-all `@router.get("/report/{ticker}/{date_str}")` (line 434) matches any two-segment path, so every more-specific `/report/{ticker}/<word>` route (`/us-supply`, `/backlog`, `/disclosures`, `/insider-trades`, `/us-insider`) must be **declared before** it — otherwise the literal segment (e.g. `backlog`) is captured as `date_str` and the snapshot read fails. Inline comments at lines 371/392/401/409/418 document this. (Same class of bug as the `PUT /api/stocks/enrich/batch` before `/enrich` ordering in `routers/stocks.py`.)
+In `backend/routers/report.py` the catch-all `@router.get("/report/{ticker}/{date_str}")` (line 437) matches any two-segment path, so every more-specific `/report/{ticker}/<word>` route (`/us-supply`, `/backlog`, `/disclosures`, `/insider-trades`, `/us-insider`) must be **declared before** it — otherwise the literal segment (e.g. `backlog`) is captured as `date_str` and the snapshot read fails. Inline comments at lines 374/395/404/412/421 document this. (Same class of bug as the `PUT /api/stocks/enrich/batch` before `/enrich` ordering in `routers/stocks.py`.)
 
 ## Frontend (React 19 / Vite, plain CSS)
 
