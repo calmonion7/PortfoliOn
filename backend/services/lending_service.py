@@ -16,7 +16,8 @@ def _api_get(page: int = 1, page_size: int = 1000) -> list[dict]:
     if not r.ok:
         raise Exception(f"HTTP {r.status_code}: {r.text[:200]}")
     body = r.json()["response"]["body"]
-    raw = body["items"].get("item", [])
+    items_field = body.get("items") or {}
+    raw = items_field.get("item", []) if isinstance(items_field, dict) else []
     return raw if isinstance(raw, list) else ([raw] if raw else [])
 
 

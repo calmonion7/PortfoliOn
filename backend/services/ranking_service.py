@@ -139,6 +139,8 @@ def get_us_rankings(n: int = _TOP_N) -> dict:
     """yfinance most_actives 스크린에서 거래대금·거래량 상위 N 리스트 반환 (EQUITY 전용)."""
     res = yf.screen("most_actives", count=250)
     quotes = res.get("quotes", []) if isinstance(res, dict) else []
+    if not quotes:
+        raise RuntimeError("ranking: US fetch returned empty quotes — skipping replace")
     rows = [_us_row(q) for q in quotes]
     return {
         "value": _top_n_by(rows, "trading_value", n),

@@ -35,7 +35,8 @@ def _kofia_get(endpoint: str, extra_params: str = "") -> list[dict]:
             ep = endpoint.split("/")[-1]
             raise Exception(f"HTTP {r.status_code} [{ep}]: {r.text[:300]}")
         body = r.json()["response"]["body"]
-        raw = body["items"].get("item", [])
+        items_field = body.get("items") or {}
+        raw = items_field.get("item", []) if isinstance(items_field, dict) else []
         items = raw if isinstance(raw, list) else [raw]
         all_items.extend(items)
         total = int(body.get("totalCount", 0))

@@ -24,8 +24,13 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _oauth_codes: dict = {}
 
 def _store_oauth_tokens(tokens: dict) -> str:
+    now = time.time()
+    # eco: O(n) sweep on every insert; acceptable for low-volume OAuth flow
+    expired = [k for k, (_, exp) in _oauth_codes.items() if exp < now]
+    for k in expired:
+        _oauth_codes.pop(k, None)  # pop: 동시 exchange가 먼저 제거해도 KeyError 없이 관용
     code = secrets.token_urlsafe(24)
-    _oauth_codes[code] = (tokens, time.time() + 120)
+    _oauth_codes[code] = (tokens, now + 120)
     return code
 
 def _pop_oauth_tokens(code: str) -> dict | None:

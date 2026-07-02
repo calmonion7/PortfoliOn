@@ -209,7 +209,13 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
 
     # NXT≠KRX 불일치(글리치): KIS+Naver escalate → 다수결로 outlier 폐기
     feeds = list(kfeeds)
-    for rank, src, basic in ((1, "KIS", _kr_basic_kis(ticker)), (2, "Naver", _kr_basic_naver(ticker))):
+    for rank, src, getter in ((1, "KIS", lambda: _kr_basic_kis(ticker)),
+                              (2, "Naver", lambda: _kr_basic_naver(ticker))):
+        try:
+            basic = getter()
+        except Exception as e:
+            logger.warning(f"[quote] {ticker}: escalation {src} 피드 실패 — {e}")
+            continue
         if basic and basic[0]:
             feeds.append((rank, src, basic))
     pick = _corroborated_pick(feeds)

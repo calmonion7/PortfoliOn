@@ -106,7 +106,6 @@ def delete_stock_all_users(ticker: str, admin_id: str = Depends(require_admin)):
     """관리자: 한 종목을 모든 사용자의 보유·관심(user_stocks)에서 제거. 스냅샷은 유지."""
     deleted = execute("DELETE FROM user_stocks WHERE UPPER(ticker) = %s", (ticker.upper(),))
     cache_svc.invalidate_portfolio_caches()
-    cache_svc.invalidate_list()
     return {"deleted": deleted, "ticker": ticker.upper()}
 
 

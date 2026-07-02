@@ -67,9 +67,9 @@ def backfill_all(background_tasks: BackgroundTasks, days: int = 60, force: bool 
 
 
 def _run_backfill(stocks: list, days: int, force: bool = False):
-    # 수동 리포트 활동은 mixed KR+US라 시장별 분할이 없다 — 항상 존재하는 리포트 배치
-    # daily_report_us에 기록해 배치 현황 실행이력에 노출되게 한다(daily_report 은퇴 후).
-    with job_runs.record("daily_report_us", "manual"):
+    # 그룹이 전부 KR이면 daily_report_kr, 그 외(혼합·US 포함)는 daily_report_us로 기록.
+    _batch_id = "daily_report_kr" if stocks and all(s.get("market") == "KR" for s in stocks) else "daily_report_us"
+    with job_runs.record(_batch_id, "manual"):
         _backfill_progress.start(len(stocks))
         _backfill_progress.set(created=0)
         total_created = 0
@@ -136,9 +136,9 @@ def _run_generation(stocks: list, target_date: str = None):
         finally:
             _progress.increment()
 
-    # 수동 생성은 mixed KR+US라 시장별 분할이 없다 — 항상 존재하는 리포트 배치
-    # daily_report_us에 기록해 배치 현황 실행이력에 노출되게 한다(daily_report 은퇴 후).
-    with job_runs.record("daily_report_us", "manual"):
+    # 그룹이 전부 KR이면 daily_report_kr, 그 외(혼합·US 포함)는 daily_report_us로 기록.
+    _batch_id = "daily_report_kr" if stocks and all(s.get("market") == "KR" for s in stocks) else "daily_report_us"
+    with job_runs.record(_batch_id, "manual"):
         parallel_map(_process_one, stocks, max_workers=5)
         _progress.finish()
 

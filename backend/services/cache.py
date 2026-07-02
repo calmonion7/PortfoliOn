@@ -140,3 +140,4 @@ def invalidate_portfolio_caches() -> None:
     invalidate_sector()
     invalidate_macro()
     invalidate_correlation()
+    invalidate_live_prices()  # 장중 폴링 캐시도 무효화(종목 추가/삭제 즉시 반영)
