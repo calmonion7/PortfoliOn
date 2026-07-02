@@ -15,7 +15,7 @@ export default function useReportList() {
         data.forEach(r => { if (r.count > 0) map[r.ticker] = r.count })
         setGuruMap(map)
       })
-      .catch(() => {})
+      .catch((e) => { console.warn('[useReportList] 구루 인기도(/guru/stats/popularity) 조회 실패', e) })
   }, [])
 
   const applyList = useCallback((data) => {

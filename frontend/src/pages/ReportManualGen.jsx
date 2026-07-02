@@ -42,7 +42,9 @@ export default function ReportManualGen() {
       const { data } = await api.get(`/api/report/list${scopeParam}`)
       setStockList(data.stocks ?? data)
       if (data.last_scheduled_date) setExpectedDates(data.last_scheduled_date)
-    } catch {}
+    } catch (e) {
+      console.warn('[ReportManualGen] 종목 목록(/report/list) 조회 실패', e)
+    }
     setListLoading(false)
   }
 

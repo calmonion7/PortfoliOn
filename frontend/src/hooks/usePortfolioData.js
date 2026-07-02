@@ -25,7 +25,7 @@ export default function usePortfolioData() {
     api.get('/api/portfolio/prices').then(({ data: prices }) => {
       setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
       setLastUpdated(new Date())
-    }).catch(() => {})
+    }).catch((e) => { console.warn('[usePortfolioData] 초기 시세(/portfolio/prices) 조회 실패', e) })
   }, [])
 
   const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
@@ -36,8 +36,8 @@ export default function usePortfolioData() {
       // 응답 형태: { holdings: [...], totals: {...} | null }
       setDashboardCards(res.data?.holdings || [])
       setDashboardTotals(res.data?.totals || null)
-    } catch {
-      // silent
+    } catch (e) {
+      console.warn('[usePortfolioData] dashboard(/stocks/dashboard) 조회 실패', e)
     } finally {
       setDashboardLoading(false)
     }
@@ -81,12 +81,12 @@ export default function usePortfolioData() {
     api.get('/api/market/fx').then(({ data }) => {
       const rate = data?.rates?.usdkrw?.current
       if (rate) setFx(rate)
-    }).catch(() => {})
+    }).catch((e) => { console.warn('[usePortfolioData] FX(/market/fx) 조회 실패', e) })
   }, [])
   useEffect(() => {
     api.get('/api/digest/latest').then(({ data }) => {
       setEvents7d(data?.events_7d || [])
-    }).catch(() => {})
+    }).catch((e) => { console.warn('[usePortfolioData] digest(/digest/latest) 조회 실패', e) })
   }, [])
 
   return { stocks, watchlist, listLoading, hasFetched, dashboardCards, dashboardTotals, dashboardLoading, fx, events7d, lastUpdated, priceTick, fetchAll, fetchDashboard, refreshLivePrices }

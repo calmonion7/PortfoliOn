@@ -52,7 +52,7 @@ export default function AdminAnalytics() {
     ]).then(([s, u]) => {
       setSummary(s.data)
       setUsers(u.data)
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch((e) => { console.warn('[AdminAnalytics] 요약+사용자(/admin/analytics) 조회 실패', e) }).finally(() => setLoading(false))
   }, [days])
 
   const showUserHistory = (userId) => {
