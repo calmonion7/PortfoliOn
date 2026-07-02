@@ -2479,6 +2479,26 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 
 ---
 
+### `POST /api/analysis/sector/refresh-us`
+
+US 섹터 모멘텀 수동 갱신. 11개 섹터 ETF(XLK·XLF 등)의 yfinance 시계열을 다시 받아 모멘텀을 계산·저장(`market_cache`)하고 섹터 캐시를 무효화한다. `us_sector_fetch` 배치와 동일 본문을 수동 실행하는 엔드포인트.
+
+**Auth:** admin 권한 필요
+
+**Response `200`**
+```json
+{ "ok": true, "sectors": 11 }
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `ok` | boolean | 성공 여부 |
+| `sectors` | int | 갱신·저장된 섹터 수 |
+
+**Error `500`** — yfinance 조회/저장 실패 시 `detail`에 사유 포함
+
+---
+
 ### `GET /api/analysis/macro-correlation`
 
 보유종목과 매크로 지표(TLT·UUP·USO·^VIX) 간 상관관계 분석. TTL 300s 캐시.

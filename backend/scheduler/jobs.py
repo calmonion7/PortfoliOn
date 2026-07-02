@@ -414,6 +414,28 @@ def _seed_rankings_if_empty():
     _fetch_us_rankings()
 
 
+def _fetch_us_sector():
+    from services import us_sector_service
+    with job_runs.record("us_sector_fetch", "auto"):
+        try:
+            sectors = us_sector_service.refresh()
+            print(f"[Scheduler] US sector momentum refreshed: {len(sectors)} sectors")
+        except Exception as e:
+            print(f"[Scheduler] US sector momentum refresh failed: {e}")
+
+
+def _seed_us_sector_if_empty():
+    """기동 시 us_sector_momentum 캐시가 비어 있으면 즉시 1회 적재."""
+    from services import us_sector_service
+    try:
+        if us_sector_service.load_momentum():
+            return
+        print("[Scheduler] us_sector_momentum empty, seeding now...")
+        us_sector_service.refresh()
+    except Exception as e:
+        print(f"[Scheduler] US sector seed failed: {e}")
+
+
 def _seed_kr_sector_if_empty():
     """기동 시 kr_sector_momentum 캐시가 비어 있으면(신규 배포·16:00 cron 전) 즉시 1회 적재.
     분석탭 섹터 모멘텀 KR 토글이 첫 배치 전까지 빈 표로 남는 것을 방지(_seed_rankings_if_empty와 동일 취지)."""
@@ -453,4 +475,5 @@ _JOB_FUNCS = {
     "recommendation_kr": _fetch_recommendation_kr,
     "recommendation_us": _fetch_recommendation_us,
     "us_supply_fetch": _fetch_us_supply,
+    "us_sector_fetch": _fetch_us_sector,
 }

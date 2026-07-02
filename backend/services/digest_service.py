@@ -4,20 +4,34 @@ import math
 import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import logging
 
 import requests
-import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
 from services import storage
 from services.db import query, execute
-from services.market import _yf_sym
+from services.market import get_quotes_batch
+from services.market_indicators.cache import _mc_load
 from services.market_indicators.fx import _fetch_usdkrw_current
 from routers.calendar import _get_events
+
+
+def _get_usdkrw() -> float:
+    """저장 FX 우선, 없으면 라이브 폴백, 그래도 없으면 1380."""
+    stored = _mc_load("fx")
+    if stored:
+        rate = ((stored.get("data") or {}).get("rates") or {}).get("usdkrw") or {}
+        cur = rate.get("current")
+        try:
+            v = float(cur) if cur else None
+        except (TypeError, ValueError):
+            v = None
+        if v is not None and math.isfinite(v):
+            return v
+    return _fetch_usdkrw_current() or 1380
 
 DIGEST_DIR = Path(__file__).parent.parent / "data" / "digest"
 DIGEST_DIR.mkdir(exist_ok=True)
@@ -35,35 +49,29 @@ def generate(user_id: str, today: date = None) -> dict:
     all_stocks = holdings + watchlist
     holding_tickers = {h["ticker"].upper() for h in holdings}
 
-    def _fetch_quote(stock):
-        ticker = stock["ticker"].upper()
-        sym = _yf_sym(ticker, stock.get("market", "US"), stock.get("exchange", ""))
-        try:
-            hist = yf.Ticker(sym).history(period="2d")
-            if len(hist) >= 2:
-                prev_close = float(hist["Close"].iloc[-2])
-                current = float(hist["Close"].iloc[-1])
-                # yfinance가 NaN/inf 종가를 주는 종목은 "시세 없음"으로 처리(평가액에서 제외).
-                # 미가드 시 total_value=NaN → digest JSON 직렬화 500(starlette allow_nan=False).
-                if not math.isfinite(prev_close) or not math.isfinite(current) or prev_close == 0:
-                    return ticker, None
-                change_pct = round((current - prev_close) / prev_close * 100, 2)
-                return ticker, {"prev_close": prev_close, "current": current, "change_pct": change_pct}
-        except Exception as e:
-            logger.warning(f"[Digest] 시세 fetch 실패 ticker={ticker}: {e}")
-            pass
-        return ticker, None
-
+    # get_quotes_batch: {TICKER: {price, daily_change_pct, ...}}
+    # prev_close 역산: price / (1 + daily_change_pct/100), 분모 0이면 None 처리
+    raw_batch = get_quotes_batch(all_stocks)
     quotes: dict = {}
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(_fetch_quote, s): s for s in all_stocks}
-        for future in as_completed(futures):
-            ticker, data = future.result()
-            if data:
-                quotes[ticker] = data
+    for s in all_stocks:
+        tk = s["ticker"].upper()
+        b = raw_batch.get(tk)
+        if not b:
+            continue
+        price = b.get("price")
+        pct = b.get("daily_change_pct")
+        if price is None or pct is None:
+            continue
+        if not math.isfinite(price) or not math.isfinite(pct):
+            continue
+        denom = 1 + pct / 100
+        if denom == 0:
+            continue
+        prev_close = price / denom
+        quotes[tk] = {"prev_close": prev_close, "current": price, "change_pct": round(pct, 2)}
 
-    usdkrw = _fetch_usdkrw_current() or 1380
-    if not math.isfinite(usdkrw):  # NaN/inf 환율이 들어오면 total_value 오염 → 기본값
+    usdkrw = _get_usdkrw()
+    if not math.isfinite(usdkrw):
         usdkrw = 1380
 
     def _to_krw(h, price_key):

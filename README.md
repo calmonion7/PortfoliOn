@@ -202,7 +202,7 @@ FastAPI (:8000)
  │              market_indicators/(fx·vix·commodities·earnings·econ·exports·macro),
  │              leverage_service, lending_service, ranking_service,
  │              investor_service, short_sell_service, supply_score, backlog, disclosures, insider_trades,
- │              dividends, analysis_service, kr_sector_service,
+ │              dividends, analysis_service, kr_sector_service, us_sector_service,
  │              guru_scraper / guru_stats, batch_registry, job_runs,
  │              kiwoom/, kis/, auth_service, cache, db, errors, parallel, progress
  ├─ scheduler.py  APScheduler 배치(시장별 분리 포함)

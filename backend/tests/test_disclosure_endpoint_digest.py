@@ -3,11 +3,10 @@ import sys
 from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import pandas as pd
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -72,13 +71,10 @@ SAMPLE_PORTFOLIO = {
 }
 
 
-def _normal_ticker(symbol):
-    m = MagicMock()
-    m.history.return_value = pd.DataFrame(
-        {"Close": [100.0, 102.0]},
-        index=pd.DatetimeIndex(["2026-05-22", "2026-05-23"]),
-    )
-    return m
+_BATCH_QUOTES = {
+    "005930.KS": {"price": 102.0, "daily_change_pct": 2.0,
+                  "weekly_change_pct": None, "monthly_change_pct": None},
+}
 
 
 def test_generate_includes_recent_disclosures(tmp_path):
@@ -92,7 +88,8 @@ def test_generate_includes_recent_disclosures(tmp_path):
     }]
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_QUOTES), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.disclosures.get_disclosures_batch", return_value=disc), \
          patch("services.insider_trades.compute_net_signals_batch", return_value={}), \
@@ -117,7 +114,8 @@ def test_generate_disclosures_only_recent(tmp_path):
     ]
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_QUOTES), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.disclosures.get_disclosures_batch", return_value=disc), \
          patch("services.insider_trades.compute_net_signals_batch", return_value={}), \

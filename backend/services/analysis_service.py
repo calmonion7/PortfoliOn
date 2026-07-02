@@ -55,7 +55,10 @@ def _fetch_etf(entry: dict) -> dict:
 
 def get_sector_momentum(holdings: list) -> dict:
     from services.market import _norm_sector
-    sectors = parallel_map(_fetch_etf, SECTOR_ETFS, max_workers=11)
+    # eco: 지연 import — us_sector_service가 analysis_service(SECTOR_ETFS/_fetch_etf)를
+    # 지연 import하므로 여기도 지연 import로 순환참조 방지
+    from services.us_sector_service import load_momentum
+    sectors = load_momentum()  # 배치 저장값 read; 없으면 []
     portfolio_sectors = {
         h["ticker"].upper(): _norm_sector(h.get("sector") or "") or "기타"
         for h in holdings

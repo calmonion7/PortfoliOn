@@ -1,6 +1,6 @@
 # backend/routers/analysis.py
 from fastapi import APIRouter, Depends, Query, HTTPException
-from services import storage, cache as cache_svc, job_runs, kr_sector_service
+from services import storage, cache as cache_svc, job_runs, kr_sector_service, us_sector_service
 from services.analysis_service import get_sector_momentum, get_macro_correlation
 from services.db import query as db_query
 from services.market import _norm_sector
@@ -45,6 +45,18 @@ def refresh_kr_sector(_: str = Depends(require_admin)):
     try:
         with job_runs.record("kr_sector_fetch", "manual"):
             sectors = kr_sector_service.refresh()
+        cache_svc.invalidate_sector()
+        return {"ok": True, "sectors": len(sectors)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sector/refresh-us")
+def refresh_us_sector(_: str = Depends(require_admin)):
+    """US 섹터 모멘텀 수동 갱신(us_sector_fetch). 전 ETF series fetch→momentum 저장."""
+    try:
+        with job_runs.record("us_sector_fetch", "manual"):
+            sectors = us_sector_service.refresh()
         cache_svc.invalidate_sector()
         return {"ok": True, "sectors": len(sectors)}
     except Exception as e:

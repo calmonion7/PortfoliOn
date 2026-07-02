@@ -26,29 +26,22 @@ SAMPLE_DIGEST = {
 }
 
 
-def _normal_ticker(symbol):
-    m = MagicMock()
-    m.history.return_value = pd.DataFrame(
-        {"Close": [100.0, 102.0]},
-        index=pd.DatetimeIndex(["2026-05-22", "2026-05-23"]),
-    )
-    return m
-
-
-def _big_drop_ticker(symbol):
-    m = MagicMock()
-    m.history.return_value = pd.DataFrame(
-        {"Close": [100.0, 94.0]},
-        index=pd.DatetimeIndex(["2026-05-22", "2026-05-23"]),
-    )
-    return m
+# batch quote helpers: {TICKER: {price, daily_change_pct, weekly_change_pct, monthly_change_pct}}
+_BATCH_NORMAL = {
+    "AAPL": {"price": 102.0, "daily_change_pct": 2.0, "weekly_change_pct": 1.0, "monthly_change_pct": 0.5},
+    "TSLA": {"price": 200.0, "daily_change_pct": -1.0, "weekly_change_pct": 0.5, "monthly_change_pct": 2.0},
+}
+_BATCH_BIG_DROP = {
+    "AAPL": {"price": 94.0, "daily_change_pct": -6.0, "weekly_change_pct": -5.0, "monthly_change_pct": -4.0},
+}
 
 
 def test_generate_stocks_list(tmp_path):
     import services.digest_service as ds
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
@@ -67,7 +60,8 @@ def test_generate_detects_anomaly(tmp_path):
     }
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=portfolio), \
-         patch("services.digest_service.yf.Ticker", side_effect=_big_drop_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_BIG_DROP), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
@@ -80,7 +74,8 @@ def test_generate_saves_snapshot(tmp_path):
     import services.digest_service as ds
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         ds.generate("test-user-id", today=date(2026, 5, 23))
@@ -123,15 +118,13 @@ def test_send_telegram_posts_when_env_set(monkeypatch):
     assert kwargs["json"]["chat_id"] == "12345"
 
 
-def test_generate_skips_stock_on_yfinance_failure(tmp_path):
+def test_generate_skips_stock_on_batch_empty(tmp_path):
+    """get_quotes_batch가 빈 dict 반환하면 모든 종목 시세 없음 처리."""
     import services.digest_service as ds
-    def _failing_ticker(symbol):
-        m = MagicMock()
-        m.history.side_effect = Exception("network error")
-        return m
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_failing_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value={}), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
@@ -143,12 +136,12 @@ def test_generate_portfolio_summary(tmp_path):
     import services.digest_service as ds
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
-         patch("services.digest_service._fetch_usdkrw_current", return_value=1380), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
-    # AAPL: 10 shares, prev_close=100.0, current=102.0, usdkrw=1380
+    # AAPL: 10주, price=102.0, daily_change_pct=2.0 → prev_close=100.0, usdkrw=1380
     assert result["portfolio_summary"]["total_value_krw"] == 1407600.0
     assert result["portfolio_summary"]["daily_change_krw"] == 27600.0
     assert result["portfolio_summary"]["daily_change_pct"] == 2.0
@@ -162,7 +155,8 @@ def test_generate_events_7d_filter(tmp_path):
     ]
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=events), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
@@ -179,6 +173,11 @@ KR_PORTFOLIO = {
 }
 
 
+_BATCH_KR_NORMAL = {
+    "005930.KS": {"price": 102.0, "daily_change_pct": 2.0, "weekly_change_pct": 1.0, "monthly_change_pct": 0.5},
+}
+
+
 def test_generate_includes_insider_trades_when_signal(tmp_path):
     """S6: 보유 종목에 순매수/순매도 신호가 있으면 insider_trades 필드에 부착.
     S7: compute_net_signals_batch 배치 경로로 mock 타깃 이동."""
@@ -187,7 +186,8 @@ def test_generate_includes_insider_trades_when_signal(tmp_path):
     sig = {"direction": "buy", "net_shares": 12000, "count": 3, "window_days": 90}
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=KR_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_KR_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.disclosures.get_disclosures_batch", return_value=[]), \
          patch("services.insider_trades.compute_net_signals_batch", return_value={ticker: sig}), \
@@ -207,7 +207,8 @@ def test_generate_insider_trades_excludes_neutral(tmp_path):
     sig = {"direction": "neutral", "net_shares": 0, "count": 0, "window_days": 90}
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=KR_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_KR_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.disclosures.get_disclosures_batch", return_value=[]), \
          patch("services.insider_trades.compute_net_signals_batch", return_value={ticker: sig}), \
@@ -216,28 +217,21 @@ def test_generate_insider_trades_excludes_neutral(tmp_path):
     assert result["insider_trades"] == []
 
 
-def _nan_ticker(symbol):
-    m = MagicMock()
-    m.history.return_value = pd.DataFrame(
-        {"Close": [float("nan"), float("nan")]},
-        index=pd.DatetimeIndex(["2026-05-22", "2026-05-23"]),
-    )
-    return m
-
-
 def test_generate_nan_quote_does_not_break_serialization(tmp_path):
-    """yfinance가 NaN 종가를 주는 종목을 보유하면 total_value=NaN → 응답 JSON 직렬화
-    (starlette allow_nan=False)가 500을 내던 회귀 방지. NaN 종가는 시세 없음 처리해 평가액에서 제외."""
+    """get_quotes_batch가 NaN price를 주면 시세 없음으로 처리 → total_value 오염 방지.
+    starlette allow_nan=False 직렬화가 깨지지 않아야 한다(회귀 방지)."""
     import services.digest_service as ds
+    _batch_nan = {"AAPL": {"price": float("nan"), "daily_change_pct": 2.0,
+                           "weekly_change_pct": 0.0, "monthly_change_pct": 0.0}}
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_nan_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_batch_nan), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert result["portfolio_summary"]["total_value_krw"] == 0.0
     assert result["stocks"] == []
-    # 핵심: starlette JSONResponse 동형(allow_nan=False)으로 직렬화돼야 함(수정 전엔 ValueError)
     json.dumps(result, allow_nan=False)
 
 
@@ -247,10 +241,116 @@ def test_generate_insider_trades_graceful_on_error(tmp_path):
     import services.digest_service as ds
     with patch.object(ds, "DIGEST_DIR", tmp_path), \
          patch("services.digest_service.storage.get_full_portfolio", return_value=KR_PORTFOLIO), \
-         patch("services.digest_service.yf.Ticker", side_effect=_normal_ticker), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_KR_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
          patch("services.digest_service._get_events", return_value=[]), \
          patch("services.disclosures.get_disclosures_batch", return_value=[]), \
          patch("services.insider_trades.compute_net_signals_batch", side_effect=Exception("db down")), \
          patch("services.digest_service.execute", side_effect=Exception("no db")):
         result = ds.generate("test-user-id", today=date(2026, 5, 23))
     assert result["insider_trades"] == []
+
+
+# ── S4: get_quotes_batch 교체 + 저장 FX ─────────────────────────────────────
+# _BATCH_NORMAL / _BATCH_BIG_DROP (파일 상단 정의)을 재사용
+
+
+def test_s4_no_yf_ticker_call(tmp_path):
+    """S4: get_quotes_batch가 정확히 1회 호출된다(per-종목 개별 fetch 없음)."""
+    import services.digest_service as ds
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL) as mock_batch, \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.execute", side_effect=Exception("no db")):
+        ds.generate("test-user-id", today=date(2026, 5, 23))
+    mock_batch.assert_called_once()
+
+
+def test_s4_portfolio_summary_via_batch(tmp_path):
+    """S4: get_quotes_batch 경로에서 portfolio_summary 계산 정합.
+    AAPL 10주, price=102.0, daily_change_pct=2.0 → prev_close=102/(1.02)≈100.0
+    total_value=102×10×1380=1407600, prev=100×10×1380=1380000
+    daily_change_krw=27600, daily_change_pct=2.0."""
+    import services.digest_service as ds
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.execute", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
+    assert result["portfolio_summary"]["total_value_krw"] == 1407600.0
+    assert result["portfolio_summary"]["daily_change_krw"] == 27600.0
+    assert result["portfolio_summary"]["daily_change_pct"] == 2.0
+
+
+def test_s4_anomaly_via_batch(tmp_path):
+    """S4: get_quotes_batch 경로에서 이상신호(|change_pct|>=5) 탐지."""
+    import services.digest_service as ds
+    portfolio = {
+        "stocks": [{"ticker": "AAPL", "name": "Apple", "quantity": 5,
+                    "avg_cost": 100.0, "market": "US", "exchange": ""}],
+        "watchlist": [],
+    }
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=portfolio), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_BIG_DROP), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.execute", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
+    assert result["stocks"][0]["is_anomaly"] is True
+    assert result["anomalies"][0]["ticker"] == "AAPL"
+
+
+def test_s4_fx_stored_value(tmp_path):
+    """S4: 저장 FX 우선 사용 — _mc_load("fx")가 있으면 그 값을 쓴다."""
+    import services.digest_service as ds
+    stored_fx = {"data": {"rates": {"usdkrw": {"current": 1350.0}}}}
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL), \
+         patch("services.digest_service._mc_load", return_value=stored_fx), \
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.execute", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
+    # AAPL 10주 × 102.0 × 1350 = 1377000
+    assert result["portfolio_summary"]["total_value_krw"] == 1377000.0
+
+
+def test_s4_fx_fallback_on_no_stored(tmp_path):
+    """S4: 저장 FX 없으면 _fetch_usdkrw_current() 라이브 폴백."""
+    import services.digest_service as ds
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL), \
+         patch("services.digest_service._mc_load", return_value=None), \
+         patch("services.digest_service._fetch_usdkrw_current", return_value=1400) as mock_live, \
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.execute", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
+    mock_live.assert_called_once()
+    # AAPL 10주 × 102.0 × 1400 = 1428000
+    assert result["portfolio_summary"]["total_value_krw"] == 1428000.0
+
+
+def test_s4_batch_receives_market_field(tmp_path):
+    """S4: get_quotes_batch 호출 시 stock dict에 market 필드가 포함돼 있어야 한다."""
+    import services.digest_service as ds
+    captured = {}
+
+    def _capture_batch(stocks):
+        captured["stocks"] = stocks
+        return {}
+
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.get_quotes_batch", side_effect=_capture_batch), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("services.digest_service.execute", side_effect=Exception("no db")):
+        ds.generate("test-user-id", today=date(2026, 5, 23))
+    for s in captured["stocks"]:
+        assert "market" in s, f"market 키 없음: {s}"

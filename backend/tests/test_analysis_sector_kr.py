@@ -37,10 +37,21 @@ def _make_hist(seed: int, n: int = 70) -> MagicMock:
     return mock
 
 
-# ── US 경로 불변 (회귀 0) ──────────────────────────────────────────────────────
+_STORED_11_KR = [
+    {"name": n, "etf": e, "return_1w": 1.0, "return_1mo": 2.0, "return_3mo": 3.0}
+    for n, e in [
+        ("Technology", "XLK"), ("Financials", "XLF"), ("Health Care", "XLV"),
+        ("Energy", "XLE"), ("Industrials", "XLI"), ("Consumer Discretionary", "XLY"),
+        ("Consumer Staples", "XLP"), ("Materials", "XLB"), ("Utilities", "XLU"),
+        ("Real Estate", "XLRE"), ("Communication Services", "XLC"),
+    ]
+]
+
+
+# ── US 경로: 저장값 read(yfinance 미호출, S2 이후) ──────────────────────────────
 def test_us_default_path_unchanged():
     portfolio = {"stocks": [], "watchlist": []}
-    with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
+    with patch("services.us_sector_service.load_momentum", return_value=_STORED_11_KR), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader, market="US": loader()):
         resp = client.get("/api/analysis/sector")
@@ -52,7 +63,7 @@ def test_us_default_path_unchanged():
 
 def test_us_explicit_market_unchanged():
     portfolio = {"stocks": [], "watchlist": []}
-    with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
+    with patch("services.us_sector_service.load_momentum", return_value=_STORED_11_KR), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.analysis.cache_svc.get_sector", side_effect=lambda user_id, loader, market="US": loader()):
         resp = client.get("/api/analysis/sector?market=US")
@@ -104,7 +115,7 @@ def test_cache_keyed_by_market():
         return loader()
 
     portfolio = {"stocks": [], "watchlist": []}
-    with patch("services.analysis_service.yf.Ticker", return_value=_make_hist(0)), \
+    with patch("services.us_sector_service.load_momentum", return_value=[]), \
          patch("routers.analysis.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.analysis.kr_sector_service.load_momentum", return_value=[]), \
          patch("routers.analysis.kr_sector_service.map_holdings_to_sectors", return_value={}), \

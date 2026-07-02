@@ -39,9 +39,11 @@ from .jobs import (
     _recommendation_work,
     _fetch_us_supply,
     _fetch_kr_sector,
+    _fetch_us_sector,
     _short_sell_work,
     _seed_rankings_if_empty,
     _seed_kr_sector_if_empty,
+    _seed_us_sector_if_empty,
     _JOB_FUNCS,
 )
 
@@ -64,6 +66,7 @@ def start():
     _check_missed_report()
     _seed_rankings_if_empty()
     _seed_kr_sector_if_empty()
+    _seed_us_sector_if_empty()
     _scheduler.start()
 
 
