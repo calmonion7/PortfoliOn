@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel, field_validator
-from typing import List
+from typing import List, Optional
 from services import storage, errors, report_generator, consensus_pipeline as _pipeline
 from services import cache as cache_svc, market as market_svc
 from services.utils import find_ticker_index, ticker_exists_in, is_valid_ticker
@@ -31,6 +31,8 @@ class Stock(BaseModel):
     name: str
     quantity: float
     avg_cost: float
+    target_price: Optional[float] = None
+    stop_price: Optional[float] = None
     competitors: List[str] = []
     moat: str = ""
     growth_plan: str = ""
@@ -101,6 +103,8 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
         "ticker": stock.ticker.upper(),
         "quantity": stock.quantity,
         "avg_cost": stock.avg_cost,
+        "target_price": stock.target_price,
+        "stop_price": stock.stop_price,
         "market": stock.market,
         "exchange": stock.exchange,
     }
@@ -146,6 +150,8 @@ def update_stock(ticker: str, stock: Stock, user_id: str = Depends(get_current_u
         "ticker": ticker.upper(),
         "quantity": stock.quantity,
         "avg_cost": stock.avg_cost,
+        "target_price": stock.target_price,
+        "stop_price": stock.stop_price,
         "market": stock.market,
         "exchange": stock.exchange,
     }

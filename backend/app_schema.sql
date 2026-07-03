@@ -33,6 +33,8 @@ CREATE TABLE user_stocks (
   type      text NOT NULL CHECK (type IN ('holding', 'watchlist')),
   quantity  numeric,
   avg_cost  numeric,
+  target_price numeric,
+  stop_price   numeric,
   PRIMARY KEY (user_id, ticker)
 );
 

@@ -145,6 +145,12 @@ def _migrate():
         execute("ALTER TABLE us_supply_snapshot ADD COLUMN IF NOT EXISTS insider_net JSONB DEFAULT '{}'::jsonb")
     except Exception as e:
         print(f"[migrate] us_supply_snapshot 생성 실패: {e}")
+    try:
+        from services.db import execute
+        execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS target_price numeric")
+        execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS stop_price numeric")
+    except Exception as e:
+        print(f"[migrate] user_stocks 목표가/손절가 추가 실패: {e}")
 
 
 @asynccontextmanager

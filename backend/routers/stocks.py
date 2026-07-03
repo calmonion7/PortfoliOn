@@ -379,6 +379,9 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
         div_yield = div.get("dividend_yield") if div else None
         avg_cost = stock.get("avg_cost")
         qty = stock.get("quantity")
+        # 사용자 목표가/손절가(선택, 저장값만). 거리%는 프론트에서 current_price와 계산(task#142).
+        target_price = stock.get("target_price")
+        stop_price = stock.get("stop_price")
         # avg_cost/qty는 DB NUMERIC→Decimal, annual_div는 float이라 그대로 나누면
         # float/Decimal TypeError로 카드 빌드가 throw→minimal 폴백된다(대시보드 enrichment 전멸,
         # task#102 증상의 실제 트리거). 양쪽을 float로 정규화.
@@ -408,6 +411,8 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "exchange": stock.get("exchange", ""),
             "avg_cost": avg_cost,
             "quantity": qty,
+            "target_price": target_price,
+            "stop_price": stop_price,
             "current_price": quote.get("price"),
             "daily_change_pct": quote.get("daily_change_pct"),
             "weekly_change_pct": quote.get("weekly_change_pct"),
@@ -469,6 +474,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             "ticker": stock["ticker"].upper(), "name": stock.get("name", stock["ticker"]),
             "market": stock.get("market", "US"), "exchange": stock.get("exchange", ""),
             "avg_cost": stock.get("avg_cost"), "quantity": stock.get("quantity"),
+            "target_price": stock.get("target_price"), "stop_price": stock.get("stop_price"),
             "current_price": quote.get("price"),
             "daily_change_pct": quote.get("daily_change_pct"),
             "weekly_change_pct": quote.get("weekly_change_pct"),

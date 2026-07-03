@@ -43,6 +43,14 @@ export default function DashboardCard({ item, tick }) {
     ? (item.target_mean - item.current_price) / item.current_price * 100
     : null
   const consClass = consPct == null ? '' : consPct >= 0 ? 'up' : 'down'
+  // 사용자 목표가/손절가까지 현재가 대비 거리(%). 애널리스트 컨센서스와 별개 축(task#142).
+  // 방향색은 KR 색 관례 혼동 회피 위해 미적용 — +/− 부호로 방향 전달(중립).
+  const targetPct = item.current_price && item.target_price != null
+    ? (item.target_price - item.current_price) / item.current_price * 100
+    : null
+  const stopPct = item.current_price && item.stop_price != null
+    ? (item.stop_price - item.current_price) / item.current_price * 100
+    : null
   const yoc = item.yield_on_cost
   const yocClass = yoc == null ? '' : yoc >= 0 ? 'up' : 'down'
 
@@ -85,6 +93,22 @@ export default function DashboardCard({ item, tick }) {
               : '—'}
           </span>
         </div>
+        {item.target_price != null && (
+          <div className="dashcard__stat dashcard__stat--full">
+            <span className="dashcard__stat-label">목표가까지</span>
+            <span className="dashcard__stat-value tnum">
+              {targetPct != null ? `${targetPct >= 0 ? '+' : ''}${targetPct.toFixed(1)}% · ` : ''}{fmtPrice(item.target_price, item.market)}
+            </span>
+          </div>
+        )}
+        {item.stop_price != null && (
+          <div className="dashcard__stat dashcard__stat--full">
+            <span className="dashcard__stat-label">손절가까지</span>
+            <span className="dashcard__stat-value tnum">
+              {stopPct != null ? `${stopPct >= 0 ? '+' : ''}${stopPct.toFixed(1)}% · ` : ''}{fmtPrice(item.stop_price, item.market)}
+            </span>
+          </div>
+        )}
         <div className="dashcard__stat">
           <span className="dashcard__stat-label">POC</span>
           <span className="dashcard__stat-value tnum">

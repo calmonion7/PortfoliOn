@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
-const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '', security_type: 'EQUITY' }
+const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', target_price: '', stop_price: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '', security_type: 'EQUITY' }
 const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '', security_type: 'EQUITY' }
 
 const INPUT_STYLE = {
@@ -122,7 +122,7 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
 
   useEffect(() => {
     if (stock) {
-      setForm({ ...empty, ...stock, competitors: stock.competitors?.join(', ') || '', market: stock.market || 'US', exchange: stock.exchange || '' })
+      setForm({ ...empty, ...stock, competitors: stock.competitors?.join(', ') || '', market: stock.market || 'US', exchange: stock.exchange || '', target_price: stock.target_price ?? '', stop_price: stock.stop_price ?? '' })
     } else {
       setForm(empty)
     }
@@ -168,7 +168,13 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
     setSaveError('')
     try {
       if (mode === 'holding') {
-        await onSave({ ...base, quantity: parseFloat(form.quantity), avg_cost: parseFloat(form.avg_cost) })
+        await onSave({
+          ...base,
+          quantity: parseFloat(form.quantity),
+          avg_cost: parseFloat(form.avg_cost),
+          target_price: form.target_price !== '' ? parseFloat(form.target_price) : null,
+          stop_price: form.stop_price !== '' ? parseFloat(form.stop_price) : null,
+        })
       } else {
         await onSave(base)
       }
@@ -249,6 +255,14 @@ export default function StockModal({ stock, onSave, onClose, mode = 'holding' })
               <div className="form-field">
                 <label>평균 매입가 ({isKR ? '₩' : '$'})</label>
                 <input type="number" value={form.avg_cost} onChange={set('avg_cost')} required step={isKR ? '1' : '0.01'} style={INPUT_STYLE} />
+              </div>
+              <div className="form-field">
+                <label>목표가 (선택, {isKR ? '₩' : '$'})</label>
+                <input type="number" value={form.target_price} onChange={set('target_price')} step={isKR ? '1' : '0.01'} placeholder="익절 목표가" style={INPUT_STYLE} />
+              </div>
+              <div className="form-field">
+                <label>손절가 (선택, {isKR ? '₩' : '$'})</label>
+                <input type="number" value={form.stop_price} onChange={set('stop_price')} step={isKR ? '1' : '0.01'} placeholder="손절 기준가" style={INPUT_STYLE} />
               </div>
             </>
           )}

@@ -458,6 +458,8 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
       "name": "Apple Inc.",
       "quantity": 10,
       "avg_cost": 150.0,
+      "target_price": 220.0,
+      "stop_price": 140.0,
       "competitors": ["MSFT", "GOOGL"],
       "moat": "생태계 락인, 브랜드",
       "growth_plan": "서비스 매출 확대",
@@ -494,6 +496,8 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
   "name": "Apple Inc.",
   "quantity": 10,
   "avg_cost": 150.0,
+  "target_price": 220.0,
+  "stop_price": 140.0,
   "competitors": ["MSFT", "GOOGL"],
   "moat": "생태계 락인",
   "growth_plan": "서비스 매출 확대"
@@ -506,6 +510,8 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 | `name` | string | ✅ | 종목명 |
 | `quantity` | float | ✅ | 보유 수량 |
 | `avg_cost` | float | ✅ | 평균 매입 단가 |
+| `target_price` | float\|null | ❌ | 사용자 목표가(익절, native 통화, 기본값: `null`) — 애널리스트 컨센서스 목표가와 별개 |
+| `stop_price` | float\|null | ❌ | 사용자 손절가(native 통화, 기본값: `null`) |
 | `competitors` | string[] | ❌ | 경쟁사 티커 목록 (기본값: `[]`) |
 | `moat` | string | ❌ | 경제적 해자 설명 (기본값: `""`) |
 | `growth_plan` | string | ❌ | 성장 계획 메모 (기본값: `""`) |
@@ -516,6 +522,8 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
   "ticker": "AAPL",
   "quantity": 10,
   "avg_cost": 150.0,
+  "target_price": 220.0,
+  "stop_price": 140.0,
   "name": "Apple Inc.",
   "competitors": ["MSFT", "GOOGL"],
   "moat": "생태계 락인",
@@ -866,6 +874,8 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
       "exchange": "",
       "avg_cost": 150.0,
       "quantity": 10,
+      "target_price": 220.0,
+      "stop_price": 140.0,
       "current_price": 175.5,
       "daily_change_pct": 1.2,
       "weekly_change_pct": 3.4,
@@ -896,6 +906,11 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
   }
 }
 ```
+
+| 필드 (사용자 목표가/손절가) | 타입 | 설명 |
+|------|------|------|
+| `target_price` | float \| null | 사용자 설정 목표가(익절, 종목 통화). 미설정은 `null`. 거리%는 프론트가 `current_price`와 계산해 "목표가까지 +X%"로 표시 — 애널리스트 `target_mean`(컨센서스)과 별개 축 |
+| `stop_price` | float \| null | 사용자 설정 손절가(종목 통화). 미설정은 `null` |
 
 | 필드 (per-holding 배당) | 타입 | 설명 |
 |------|------|------|
