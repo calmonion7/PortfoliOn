@@ -34,6 +34,22 @@ _FOMC_DATES = [
     "2027-07-28", "2027-09-15", "2027-10-27", "2027-12-08",
 ]
 
+
+def fomc_coverage_status(threshold_months: int = 6) -> dict:
+    """_FOMC_DATES 하드코딩 목록의 마지막 날짜와 today를 비교 — 커버리지 소진까지 개월수 +
+    갱신필요 플래그. 소진 임박(< threshold개월)하면 배치 허브가 '갱신 필요' 경고를 띄워
+    무음 미표시(CONCERNS §7)를 막는다. 목록이 이미 소진돼도 예외 없이 graceful(음수 개월)."""
+    today = date.today()
+    last = max(_FOMC_DATES)                     # ISO 문자열 = 날짜 정렬
+    days_left = (date.fromisoformat(last) - today).days
+    return {
+        "last_date": last,
+        "months_left": round(days_left / 30.44, 1),
+        "needs_update": days_left < threshold_months * 30.44,
+        "threshold_months": threshold_months,
+    }
+
+
 router = APIRouter(prefix="/api", tags=["calendar"])
 
 _CACHE_DIR = Path(__file__).parent.parent / "data" / "calendar"

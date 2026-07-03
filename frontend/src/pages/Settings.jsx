@@ -166,12 +166,17 @@ function BatchHub({ isAdmin, isMobile }) {
   const [batches, setBatches] = useState(null)
   const [err, setErr] = useState('')
   const [market, setMarket] = useState('KR')
+  const [fomc, setFomc] = useState(null)
 
   const load = () => api.get('/api/batches')
     .then(({ data }) => setBatches(data))
     .catch(e => setErr(e?.response?.data?.detail || '배치 현황을 불러오지 못했습니다.'))
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    // FOMC 하드코딩 날짜 커버리지 — 소진 임박(< 6개월) 시에만 경고 (실패는 조용히 무시)
+    api.get('/api/batches/fomc-coverage').then(({ data }) => setFomc(data)).catch(() => {})
+  }, [])
 
   if (err) return <p style={{ color: 'var(--color-error)', fontSize: 13 }}>{err}</p>
   if (!batches) return <Skeleton variant="row" count={8} />
@@ -181,6 +186,15 @@ function BatchHub({ isAdmin, isMobile }) {
 
   return (
     <>
+      {fomc?.needs_update && (
+        <div style={{
+          marginBottom: 16, padding: '10px 14px', borderRadius: 8, fontSize: 13,
+          border: '1px solid var(--color-error)', background: 'var(--bg-elev)', color: 'var(--text)',
+        }}>
+          ⚠️ <b>FOMC 날짜 갱신 필요</b> — 하드코딩 커버리지가 {fomc.months_left}개월 남았습니다(마지막 {fomc.last_date}).
+          federalreserve.gov의 새 일정을 <code>backend/routers/calendar.py</code>의 <code>_FOMC_DATES</code>에 추가하세요.
+        </div>
+      )}
       {isMobile ? (
         <div className="seg" style={{ marginBottom: 16 }}>
           {MARKETS.map(m => (

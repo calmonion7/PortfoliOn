@@ -234,3 +234,43 @@ def test_put_schedule_blocked_for_non_admin():
     with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
         resp = client.put("/api/batches/daily_report_kr/schedule", json=spec)
     assert resp.status_code == 403
+
+
+# ── FOMC 커버리지 가드 (task#140) — 라이브로는 소진 임박 상태를 만들 수 없으므로
+#    양 브랜치를 patch로 결정적으로 못박는다(실행 날짜 무관). ──
+from datetime import date, timedelta
+import routers.calendar as _cal
+
+
+def test_fomc_coverage_needs_update_when_near_exhaustion():
+    soon = (date.today() + timedelta(days=90)).isoformat()  # ~3개월 남음
+    with patch.object(_cal, "_FOMC_DATES", ["2025-01-01", soon]):
+        st = _cal.fomc_coverage_status()
+    assert st["needs_update"] is True
+    assert st["last_date"] == soon
+    assert st["months_left"] < 6
+
+
+def test_fomc_coverage_ok_when_far():
+    far = (date.today() + timedelta(days=400)).isoformat()  # ~13개월 남음
+    with patch.object(_cal, "_FOMC_DATES", ["2025-01-01", far]):
+        st = _cal.fomc_coverage_status()
+    assert st["needs_update"] is False
+    assert st["months_left"] > 6
+
+
+def test_fomc_coverage_graceful_when_exhausted():
+    """목록이 이미 소진돼도 예외 없이 음수 개월 + needs_update True."""
+    past = (date.today() - timedelta(days=30)).isoformat()
+    with patch.object(_cal, "_FOMC_DATES", ["2024-01-01", past]):
+        st = _cal.fomc_coverage_status()
+    assert st["needs_update"] is True
+    assert st["months_left"] < 0
+
+
+def test_fomc_coverage_endpoint_shape():
+    resp = client.get("/api/batches/fomc-coverage")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert set(data) >= {"last_date", "months_left", "needs_update", "threshold_months"}
+    assert isinstance(data["needs_update"], bool)

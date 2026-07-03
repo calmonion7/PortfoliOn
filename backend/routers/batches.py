@@ -54,6 +54,14 @@ def list_batches(user_id: str = Depends(get_current_user)):
     return out
 
 
+@router.get("/batches/fomc-coverage")
+def fomc_coverage(user_id: str = Depends(get_current_user)):
+    """FOMC 하드코딩 날짜(`calendar._FOMC_DATES`) 커버리지 상태 — 배치 허브가 소진 임박 시
+    '갱신 필요' 경고를 띄우는 용도(task#140, CONCERNS §7). needs_update일 때만 프론트가 표시."""
+    from routers.calendar import fomc_coverage_status
+    return fomc_coverage_status()
+
+
 @router.get("/batches/{job_id}/schedule")
 def get_batch_schedule(job_id: str, user_id: str = Depends(get_current_user)):
     """편집 가능한 배치의 스케줄 스펙(저장값 없으면 default_schedule)."""

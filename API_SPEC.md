@@ -1706,6 +1706,31 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
+### `GET /api/batches/fomc-coverage`
+
+FOMC 정책결정일 하드코딩 목록(`calendar._FOMC_DATES`)의 커버리지 상태. 배치 허브가 소진 임박 시 '갱신 필요' 경고를 띄우는 데 쓴다(FOMC 날짜 자동 크롤 없이 무음 미표시 방지, ADR/CONCERNS §7). FOMC는 배치가 아니라 하드코딩 목록이라 `GET /api/batches` 배열에 넣지 않고 별도 엔드포인트로 분리(배열 reshape 회피).
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "last_date": "2027-12-08",
+  "months_left": 17.2,
+  "needs_update": false,
+  "threshold_months": 6
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `last_date` | string | `_FOMC_DATES`의 마지막(최신) 날짜 = 커버리지 소진일 |
+| `months_left` | float | 오늘부터 `last_date`까지 개월수(소진되면 음수) |
+| `needs_update` | boolean | `months_left < threshold_months`이면 `true` — 프론트는 이때만 경고 표시 |
+| `threshold_months` | int | 경고 임계(기본 6개월) |
+
+---
+
 ### `GET /api/batches/{job_id}/schedule`
 
 편집 가능한 배치의 스케줄 스펙 조회. 저장값이 없으면 해당 배치의 기본 스펙을 반환한다.
