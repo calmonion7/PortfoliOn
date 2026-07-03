@@ -7,7 +7,7 @@ import BacklogChart from './BacklogChart'
 import api from '../../api'
 import useIsMobile from '../../hooks/useIsMobile'
 
-function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
+function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly = false }) {
   const isMobile = useIsMobile()
   if (!price && !vp?.poc) return null
 
@@ -323,6 +323,19 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market }) {
     </div>
   )
 
+  // chartOnly: 바 차트만(지지/저항 카드 생략) — 요약 탭에서 동일 레벨 중복 표시 제거(task#145).
+  // 지표>기술·수급 탭은 chartOnly 미전달이라 기존 2단(차트+카드) 유지.
+  if (chartOnly) {
+    return (
+      <div style={{ marginTop: 8, display: 'flex', justifyContent: isMobile ? 'center' : 'flex-start' }}>
+        <div style={{ flex: '0 1 406px', minWidth: 0, maxWidth: 460, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', padding: 12 }}>
+          {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
+          {barListJSX}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ marginTop: 8 }}>
       {title && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>}
@@ -496,7 +509,7 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
   )
 }
 
-export function VolumeRsiSnapshot({ summary }) {
+export function VolumeRsiSnapshot({ summary, chartOnly = false }) {
   if (!summary) return null
 
   const rsiWeather = (() => {
@@ -533,6 +546,7 @@ export function VolumeRsiSnapshot({ summary }) {
         vp={summary.volume_profile}
         target={summary.target_mean}
         market={summary.market}
+        chartOnly={chartOnly}
       />
     </div>
   )

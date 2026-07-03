@@ -313,9 +313,17 @@ export default function ConsensusChart({ ticker, market }) {
         <>
           <div style={{ borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: 0 }}>
+              {/* 컨센서스 내부 뷰 전환 — 바깥 서브탭(.tab-btn.sm 언더라인)과 다른 세그먼트 토글로
+                  시각 구분해 "탭 6개" 착시 제거(task#145). 위계: 도메인 탭 아래 뷰 스위처. */}
+              <div style={{ display: 'inline-flex', gap: 2, background: 'var(--bg-elev-2)', borderRadius: 6, padding: 2, marginBottom: 4 }}>
                 {['목표가', '의견', '비교'].map((t, i) => (
-                  <button key={i} onClick={() => setTab(i)} className={`tab-btn sm${tab === i ? ' active' : ''}`}>{t}</button>
+                  <button key={i} onClick={() => setTab(i)} style={{
+                    background: tab === i ? 'var(--bg-elev)' : 'transparent',
+                    border: 0, borderRadius: 4, padding: '3px 10px', fontSize: 11,
+                    fontWeight: tab === i ? 600 : 500,
+                    color: tab === i ? 'var(--text)' : 'var(--text-3)',
+                    cursor: 'pointer',
+                  }}>{t}</button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 2, paddingBottom: 2 }}>

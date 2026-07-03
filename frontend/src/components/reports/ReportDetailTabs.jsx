@@ -49,7 +49,7 @@ export default function ReportDetailTabs({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <InsightsSection insights={summary.insights} />
               <ConsensusSummary summary={summary} ticker={ticker} onRefreshSuccess={onConsensusRefresh} />
-              <VolumeRsiSnapshot summary={summary} />
+              <VolumeRsiSnapshot summary={summary} chartOnly />
             </div>
           )
           : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>요약 데이터가 없습니다.</p>
