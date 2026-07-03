@@ -304,17 +304,17 @@ thead .col-sticky { background: var(--bg-elev-2); }
   background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px;
 }
 
-/* ── PWA 설치 유도 배너 (모바일 전용, 탭바 위) ───────────────── */
+/* ── PWA 설치 유도 배너 (모바일 전용, 콘텐츠 상단 인라인) ──────── */
+/* fixed 오버레이는 콘텐츠·하단 nav를 가려서 인플로우 상단 카드로 전환 (task#143) */
 .install-prompt {
-  position: fixed; left: 12px; right: 12px;
-  bottom: calc(64px + env(safe-area-inset-bottom, 16px));
-  z-index: 29;
+  position: relative;
+  margin: 12px 16px 4px;
   display: flex; gap: 12px; align-items: flex-start;
   padding: 14px 42px 14px 14px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   animation: toast-in 0.28s ease;
 }
 .install-prompt-icon {

@@ -147,6 +147,7 @@ export default function App() {
           </div>
         </header>
         <main className="page-wrap">
+          <InstallPrompt />
           <Routes>
             <Route path="/" element={<Research />} />
             <Route path="/portfolio" element={<Portfolio />} />
@@ -160,7 +161,6 @@ export default function App() {
           </Routes>
         </main>
         <MobileNav />
-        <InstallPrompt />
       </div>
     </BrowserRouter>
     </AuthProvider>
