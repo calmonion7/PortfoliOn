@@ -11,6 +11,7 @@ import Showcase from './pages/Showcase'
 import LoginPage from './pages/LoginPage'
 import MobileNav from './components/MobileNav'
 import InstallPrompt from './components/InstallPrompt'
+import GlobalSearch from './components/GlobalSearch'
 import { Sun, Moon, Refresh, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
@@ -62,6 +63,7 @@ function TopNav({ theme, setTheme, setSession }) {
           ))}
         </nav>
         <div className="topnav-tools">
+          <GlobalSearch variant="desktop" />
           <button className="icon-btn" title="새로고침" onClick={() => window.location.reload()}><Refresh /></button>
           <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
             {theme === 'dark' ? <Sun /> : <Moon />}
@@ -140,6 +142,7 @@ export default function App() {
             <span>PortfoliOn</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <GlobalSearch variant="mobile" />
             <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
               {theme === 'dark' ? <Sun /> : <Moon />}
             </button>
