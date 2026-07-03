@@ -48,6 +48,28 @@ const PENDING_BADGE_STYLE = {
   whiteSpace: 'nowrap',
 }
 
+// 긴 추천 리스트(관심 재정렬·발굴)를 초기 N개만 렌더하고 '더보기'로 점진 확장 —
+// 전체를 한 번에 렌더해 모바일 페이지가 수만 px로 늘어나던 문제 해소(task#144, 표시만 손봄).
+function ExpandableGrid({ items, gridStyle, initial = 6, step = 12, renderItem }) {
+  const [count, setCount] = useState(initial)
+  const shown = items.slice(0, count)
+  const remaining = items.length - count
+  return (
+    <>
+      <div style={gridStyle}>{shown.map(renderItem)}</div>
+      {remaining > 0 && (
+        <button
+          className="btn"
+          onClick={() => setCount(c => c + step)}
+          style={{ width: '100%', marginTop: 12 }}
+        >
+          더보기 ({remaining}개 더)
+        </button>
+      )}
+    </>
+  )
+}
+
 export default function Recommendations() {
   const { showToast } = useToast()
   const [items, setItems] = useState([])
@@ -196,8 +218,10 @@ export default function Recommendations() {
         <div style={{ marginBottom: 28 }}>
           <h3 style={{ color: 'var(--text)', marginBottom: 2 }}>관심 재정렬</h3>
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8 }}>내 관심종목 · 추천 점수순</div>
-          <div style={gridStyle}>
-            {watchlist.map((item, i) => (
+          <ExpandableGrid
+            items={watchlist}
+            gridStyle={gridStyle}
+            renderItem={(item, i) => (
               <RecCard
                 key={`${item.ticker}-${i}`}
                 item={item}
@@ -216,8 +240,8 @@ export default function Recommendations() {
                   )
                 }
               />
-            ))}
-          </div>
+            )}
+          />
         </div>
       )}
 
@@ -240,8 +264,11 @@ export default function Recommendations() {
           {discoveryLoading
             ? <Skeleton variant="card" count={3} />
             : (
-              <div style={gridStyle}>
-                {items.map((item, i) => {
+              <ExpandableGrid
+                key={marketChip}
+                items={items}
+                gridStyle={gridStyle}
+                renderItem={(item, i) => {
                   const t = item.ticker.toUpperCase()
                   const isWatched = watched.has(t)
                   const busy = pending.has(t)
@@ -262,8 +289,8 @@ export default function Recommendations() {
                       }
                     />
                   )
-                })}
-              </div>
+                }}
+              />
             )
           }
         </div>
