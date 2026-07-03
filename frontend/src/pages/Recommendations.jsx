@@ -21,6 +21,20 @@ const MARKET_CHIPS = [
   { key: 'US',   label: '해외' },
 ]
 
+// ticker(대문자) → 보유 구루 수. /api/guru/managers top10 역인덱스.
+// GuruHoldersSection(리포트 상세)·universe._fetch_guru_tickers와 동일 top10 소스라
+// 리포트 드릴다운·배치 guru_new_buy 칩과 개수가 일관된다.
+function buildGuruCounts(managers) {
+  const counts = {}
+  for (const m of (managers || [])) {
+    for (const h of (m.top10 || [])) {
+      const t = (h.ticker || '').toUpperCase()
+      if (t) counts[t] = (counts[t] || 0) + 1
+    }
+  }
+  return counts
+}
+
 // 관심 분석 대기 배지 색 — ⚠️ success/danger(가격 토큰) 금지. 전용 중립색 직접 명시.
 const PENDING_BADGE_STYLE = {
   background: 'var(--bg-elev-2)',
@@ -44,6 +58,7 @@ export default function Recommendations() {
   const [discoveryLoading, setDiscoveryLoading] = useState(false) // 발굴 칩 전환 시 로컬 로딩
   const [error, setError] = useState(false)
   const [marketChip, setMarketChip] = useState('all') // 발굴 필터 칩 ('all'|'KR'|'US')
+  const [guruCounts, setGuruCounts] = useState({}) // ticker(대문자)→보유 구루 수 (US 13F)
 
   // 관심종목 토글: watched=등록된 ticker(대문자) Set, pending=요청 중 Set(더블클릭 방지)
   const [watched, setWatched] = useState(() => new Set())
@@ -56,14 +71,17 @@ export default function Recommendations() {
     Promise.all([
       api.get('/api/recommendations', { params: { limit: 50 } }),
       api.get('/api/watchlist').catch(() => ({ data: [] })),
+      // 구루 보유 개수 — US 13F, 시장 무관이라 마운트 1회만(칩 토글 refetch 미포함). 실패 graceful.
+      api.get('/api/guru/managers').catch(() => ({ data: { managers: [] } })),
     ])
-      .then(([rec, wl]) => {
+      .then(([rec, wl, guru]) => {
         if (cancelled) return
         setItems(rec.data?.discovery || [])
         setWatchlist(rec.data?.watchlist || [])
         setHoldings(rec.data?.holdings || [])
         setAsOf(rec.data?.as_of || null)
         setWatched(new Set((wl.data || []).map(s => s.ticker.toUpperCase())))
+        setGuruCounts(buildGuruCounts(guru.data?.managers))
         setError(false)
       })
       .catch(() => {
@@ -115,6 +133,8 @@ export default function Recommendations() {
       .finally(() => setPending(prev => { const n = new Set(prev); n.delete(t); return n }))
   }
 
+  const guruCountFor = (t) => guruCounts[(t || '').toUpperCase()] || 0
+
   if (loading) return (
     <div>
       <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>발굴</h3>
@@ -155,6 +175,7 @@ export default function Recommendations() {
                 <RecCard
                   key={`${item.ticker}-${i}`}
                   item={item}
+                  guruCount={guruCountFor(item.ticker)}
                   footer={
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                       <Badge variant="neutral" style={ACTION_STYLE[item.action] || ACTION_STYLE.홀딩}>
@@ -180,6 +201,7 @@ export default function Recommendations() {
               <RecCard
                 key={`${item.ticker}-${i}`}
                 item={item}
+                guruCount={guruCountFor(item.ticker)}
                 footer={item.enriched === true
                   ? (
                     <Link
@@ -227,6 +249,7 @@ export default function Recommendations() {
                     <RecCard
                       key={`${item.ticker}-${i}`}
                       item={item}
+                      guruCount={guruCountFor(item.ticker)}
                       footer={
                         <button
                           className="btn btn-primary"

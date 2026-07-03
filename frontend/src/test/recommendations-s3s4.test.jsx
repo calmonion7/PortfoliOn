@@ -153,3 +153,72 @@ describe('RecCard footer 주입', () => {
     expect(container.querySelector('a')).toBeNull()
   })
 })
+
+// ────────────────────────────────────────────────
+// task#139: 추천 카드 구루 보유 개수 노출
+// ────────────────────────────────────────────────
+const GURU_FLAG = { label: '구루 신규 매수', kind: 'smart_money' }
+
+const makeRecDataGuru = () => ({
+  discovery: [
+    { ticker: 'NVDA', name: '엔비디아', market: 'US', exchange: '', score: 9.1, flags: [GURU_FLAG] },
+  ],
+  watchlist: [],
+  holdings: [],
+  as_of: '2026-07-01',
+})
+
+// Buffett·Ackman 둘 다 NVDA를 top10에 보유 → count 2
+const makeGuruManagers = () => ({
+  managers: [
+    { name: 'Buffett - BRK', firm: 'Berkshire', top10: [{ ticker: 'NVDA', weight_pct: 5.0, rank: 1 }] },
+    { name: 'Ackman - PSH', firm: 'Pershing', top10: [{ ticker: 'NVDA', weight_pct: 3.0, rank: 2 }, { ticker: 'AAPL', weight_pct: 8.0, rank: 1 }] },
+  ],
+})
+
+describe('구루 보유 개수 노출 (Recommendations 통합)', () => {
+  it('구루 보유 종목 카드는 "구루 N명 보유"로 표시(칩 제자리 교체)', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/api/watchlist') return Promise.resolve({ data: [] })
+      if (url === '/api/guru/managers') return Promise.resolve({ data: makeGuruManagers() })
+      return Promise.resolve({ data: makeRecDataGuru() })
+    })
+    render(<MemoryRouter><Recommendations /></MemoryRouter>)
+    await waitFor(() => expect(screen.getByText('구루 2명 보유')).toBeInTheDocument())
+    // 원본 이진 라벨은 사라진다
+    expect(screen.queryByText('구루 신규 매수')).toBeNull()
+  })
+
+  it('구루 데이터 fetch 실패 시 원본 "구루 신규 매수" 칩 유지(graceful)', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/api/watchlist') return Promise.resolve({ data: [] })
+      if (url === '/api/guru/managers') return Promise.reject(new Error('fail'))
+      return Promise.resolve({ data: makeRecDataGuru() })
+    })
+    render(<MemoryRouter><Recommendations /></MemoryRouter>)
+    await waitFor(() => expect(screen.getByText('구루 신규 매수')).toBeInTheDocument())
+    expect(screen.queryByText(/명 보유/)).toBeNull()
+  })
+})
+
+describe('RecCard 구루 칩 제자리 교체 (단위)', () => {
+  const guruItem = { ticker: 'NVDA', name: '엔비디아', market: 'US', score: 9, flags: [{ ...GURU_FLAG }] }
+
+  it('guruCount>=1 이면 "구루 N명 보유"로 교체', () => {
+    render(<MemoryRouter><RecCard item={guruItem} guruCount={3} /></MemoryRouter>)
+    expect(screen.getByText('구루 3명 보유')).toBeInTheDocument()
+    expect(screen.queryByText('구루 신규 매수')).toBeNull()
+  })
+
+  it('guruCount 0(기본)이면 원본 칩 유지', () => {
+    render(<MemoryRouter><RecCard item={guruItem} /></MemoryRouter>)
+    expect(screen.getByText('구루 신규 매수')).toBeInTheDocument()
+  })
+
+  it('다른 스마트머니 칩(외인 순매수)은 교체되지 않는다', () => {
+    const item = { ticker: 'X', market: 'KR', score: 5, flags: [{ label: '외인 5일 순매수', kind: 'smart_money' }] }
+    render(<MemoryRouter><RecCard item={item} guruCount={3} /></MemoryRouter>)
+    expect(screen.getByText('외인 5일 순매수')).toBeInTheDocument()
+    expect(screen.queryByText(/명 보유/)).toBeNull()
+  })
+})
