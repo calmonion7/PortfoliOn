@@ -61,9 +61,18 @@ def tickers_missing_name() -> list[dict]:
 def update_ticker_meta(ticker: str, name: str, competitors: list) -> None:
     """수정 모달에서 편집 가능한 필드(name, competitors)만 갱신.
     구조화 분석(moat/growth_plan/risks/recent_disclosures)은 건드리지 않고 보존.
-    이름은 스냅샷에도 전파해 리포트 목록/상세까지 동기화."""
-    execute(
-        "UPDATE tickers SET name = %s, competitors = %s WHERE ticker = %s",
-        (name, json.dumps(competitors or []), ticker.upper()),
-    )
-    refresh_snapshot_names(ticker, name)
+    이름은 스냅샷에도 전파해 리포트 목록/상세까지 동기화.
+    name이 None/빈값/공백·티커와 동일(대소문자 무시)이면 name 갱신을 생략하고 competitors만 UPDATE."""
+    _ticker = ticker.upper()
+    name_valid = bool(name and name.strip() and name.strip().upper() != _ticker)
+    if name_valid:
+        execute(
+            "UPDATE tickers SET name = %s, competitors = %s WHERE ticker = %s",
+            (name, json.dumps(competitors or []), _ticker),
+        )
+        refresh_snapshot_names(ticker, name)
+    else:
+        execute(
+            "UPDATE tickers SET competitors = %s WHERE ticker = %s",
+            (json.dumps(competitors or []), _ticker),
+        )

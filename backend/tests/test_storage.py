@@ -161,3 +161,56 @@ def test_save_stocks_guards_name_clobber_when_name_missing():
     sql, _ = _capture_save_stocks({"ticker": "005930", "market": "KR"})
     assert "EXCLUDED.name = EXCLUDED.ticker" in sql
     assert "tickers.name" in sql
+
+
+# ── update_ticker_meta 빈 이름 가드 ─────────────────────────────────────────
+
+def test_update_ticker_meta_skips_name_update_on_empty_name():
+    """빈 이름("")으로 호출하면 tickers.name UPDATE가 나가지 않고 competitors만 갱신된다."""
+    from services.storage.names import update_ticker_meta
+    calls = []
+    def fake_execute(sql, params):
+        calls.append((sql, params))
+    with patch("services.storage.names.execute", side_effect=fake_execute), \
+         patch("services.storage.names.refresh_snapshot_names") as mock_refresh:
+        update_ticker_meta("NVDA", "", ["AMD"])
+    assert mock_refresh.call_count == 0, "빈 이름이면 refresh_snapshot_names를 호출하면 안 됨"
+    assert len(calls) == 1
+    assert "name" not in calls[0][0].split("SET")[1].split("WHERE")[0]
+    # competitors는 갱신됐는지 확인
+    assert calls[0][1][0] == '["AMD"]'
+
+
+def test_update_ticker_meta_skips_name_update_on_whitespace_name():
+    """공백만인 이름으로 호출해도 name UPDATE를 생략한다."""
+    from services.storage.names import update_ticker_meta
+    with patch("services.storage.names.execute") as mock_exec, \
+         patch("services.storage.names.refresh_snapshot_names") as mock_refresh:
+        update_ticker_meta("NVDA", "   ", [])
+    mock_refresh.assert_not_called()
+    # execute는 1번(competitors만) 호출
+    assert mock_exec.call_count == 1
+    sql = mock_exec.call_args[0][0]
+    assert "name" not in sql.split("SET")[1].split("WHERE")[0]
+
+
+def test_update_ticker_meta_skips_name_update_when_name_equals_ticker():
+    """이름이 티커와 동일(대소문자 무시)이면 name UPDATE를 생략한다."""
+    from services.storage.names import update_ticker_meta
+    with patch("services.storage.names.execute") as mock_exec, \
+         patch("services.storage.names.refresh_snapshot_names") as mock_refresh:
+        update_ticker_meta("NVDA", "nvda", [])
+    mock_refresh.assert_not_called()
+    assert mock_exec.call_count == 1
+
+
+def test_update_ticker_meta_updates_name_when_valid():
+    """유효한 이름이면 기존과 동일하게 name + refresh_snapshot_names 모두 실행된다."""
+    from services.storage.names import update_ticker_meta
+    with patch("services.storage.names.execute") as mock_exec, \
+         patch("services.storage.names.refresh_snapshot_names") as mock_refresh:
+        update_ticker_meta("NVDA", "NVIDIA Corp", ["AMD"])
+    mock_exec.assert_called_once()
+    sql = mock_exec.call_args[0][0]
+    assert "name" in sql
+    mock_refresh.assert_called_once_with("NVDA", "NVIDIA Corp")

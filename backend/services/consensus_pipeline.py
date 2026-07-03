@@ -270,6 +270,7 @@ SELECT
   SUM(CASE WHEN opinion_score <  2.5 THEN 1 ELSE 0 END),
   NOW()
 FROM latest_per_brokerage
+HAVING COUNT(*) > 0
 ON CONFLICT (base_date, ticker) DO UPDATE SET
   avg_target_price  = EXCLUDED.avg_target_price,
   avg_target_high   = EXCLUDED.avg_target_high,
@@ -299,11 +300,11 @@ def run_daily(stocks: list) -> None:
         try:
             upsert_raw_reports(ticker, market, days=7)
         except Exception as e:
-            print(f"[Pipeline] raw upsert failed {ticker}: {e}")
+            logger.warning(f"[Pipeline] raw upsert failed {ticker}: {e}")
         try:
             refresh_mart(ticker, today)
         except Exception as e:
-            print(f"[Pipeline] mart refresh failed {ticker}: {e}")
+            logger.warning(f"[Pipeline] mart refresh failed {ticker}: {e}")
         if market == "KR":
             try:
                 from services.market import get_analyst_data_kr
@@ -315,7 +316,7 @@ def run_daily(stocks: list) -> None:
                         (kr["target_mean"], ticker.upper(), today),
                     )
             except Exception as e:
-                print(f"[Pipeline] AVG_PRC override failed {ticker}: {e}")
+                logger.warning(f"[Pipeline] AVG_PRC override failed {ticker}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +335,7 @@ def backfill(stocks: list, days: int = 180, force: bool = False) -> int:
             n = upsert_raw_reports(ticker, market, days=days)
             total += n
         except Exception as e:
-            print(f"[Pipeline] backfill raw failed {ticker}: {e}")
+            logger.warning(f"[Pipeline] backfill raw failed {ticker}: {e}")
             continue
 
         # 2단계: 마트 재계산 (raw가 있는 가장 이른 날짜부터 오늘까지)
@@ -355,10 +356,10 @@ def backfill(stocks: list, days: int = 180, force: bool = False) -> int:
                 try:
                     refresh_mart(ticker, d)
                 except Exception as e:
-                    print(f"[Pipeline] mart refresh failed {ticker} {d}: {e}")
+                    logger.warning(f"[Pipeline] mart refresh failed {ticker} {d}: {e}")
                 d += timedelta(days=1)
         except Exception as e:
-            print(f"[Pipeline] backfill mart failed {ticker}: {e}")
+            logger.warning(f"[Pipeline] backfill mart failed {ticker}: {e}")
 
     return total
 

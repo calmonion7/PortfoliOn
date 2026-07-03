@@ -327,9 +327,7 @@ def _extract_backlog_blocks(html: str) -> tuple[str, str]:
         seen.add(text)
         blocks.append(text)
         if unit is None and kind == "susu":
-            u = _table_unit(table)
-            if _is_krw(u):
-                unit = u
+            unit = _table_unit(table)  # eco: KRW 여부 불문 채택 — 비KRW는 '기타' 반환
     for p in soup.find_all("p"):
         text = re.sub(r"\s+", " ", p.get_text(separator=" ", strip=True)).strip()
         if not text or text in seen:

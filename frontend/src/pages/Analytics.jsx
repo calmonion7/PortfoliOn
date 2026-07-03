@@ -12,12 +12,12 @@ const SECTOR_COLORS = [
   'var(--data-5)', 'var(--data-1)',
 ]
 
-function SectorAllocation({ cards }) {
-  const total = cards.reduce((s, c) => s + (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market), 0)
+function SectorAllocation({ cards, usdkrw }) {
+  const total = cards.reduce((s, c) => s + (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market, usdkrw), 0)
 
   const sectorMap = {}
   for (const c of cards) {
-    const val = (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market)
+    const val = (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market, usdkrw)
     if (!val) continue
     const key = c.sector || '기타'
     sectorMap[key] = (sectorMap[key] ?? 0) + val
@@ -103,12 +103,11 @@ const CustomDot = (props) => {
   )
 }
 
-const KRW_TO_USD = 1380
-const toUSD = (price, market) => market === 'KR' ? price / KRW_TO_USD : price
+const toUSD = (price, market, rate) => market === 'KR' ? price / (rate || 1380) : price
 
-function OpportunityBubble({ cards }) {
+function OpportunityBubble({ cards, usdkrw }) {
   const totalVal = cards.reduce(
-    (s, c) => s + (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market),
+    (s, c) => s + (c.quantity ?? 0) * toUSD(c.current_price ?? 0, c.market, usdkrw),
     0,
   )
 
@@ -125,7 +124,7 @@ function OpportunityBubble({ cards }) {
     }
     const upside = parseFloat(((target - price) / price * 100).toFixed(1))
     const returnPct = parseFloat(((price - avgCost) / avgCost * 100).toFixed(1))
-    const weight = totalVal ? c.quantity * toUSD(price, c.market) / totalVal * 100 : 1
+    const weight = totalVal ? c.quantity * toUSD(price, c.market, usdkrw) / totalVal * 100 : 1
     included.push({
       ticker: c.ticker,
       market: c.market || 'US',
@@ -271,11 +270,15 @@ export default function Analytics() {
   const [cards, setCards] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [usdkrw, setUsdkrw] = useState(1380)
 
   useEffect(() => {
     api.get('/api/stocks/dashboard')
       .then(r => { setCards(r.data?.holdings ?? r.data ?? []); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
+    api.get('/api/market/fx')
+      .then(r => { const rate = r.data?.rates?.usdkrw?.current; if (rate) setUsdkrw(rate) })
+      .catch(e => console.warn('FX fetch failed, using fallback rate', e))
   }, [])
 
   if (loading) return (
@@ -291,8 +294,8 @@ export default function Analytics() {
   return (
     <div>
       <h2 style={{ color: 'var(--text)', marginBottom: 32 }}>포트폴리오 분석</h2>
-      <SectorAllocation cards={cards} />
-      <OpportunityBubble cards={cards} />
+      <SectorAllocation cards={cards} usdkrw={usdkrw} />
+      <OpportunityBubble cards={cards} usdkrw={usdkrw} />
       <CorrelationHeatmap />
     </div>
   )

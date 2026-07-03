@@ -127,6 +127,27 @@ def test_extract_backlog_blocks_bare_susu_excluded():
     assert raw_text == ""
 
 
+def test_extract_backlog_blocks_usd_caption_unit_propagated():
+    """susu 표의 외화(USD천) 캡션이 unit='기타'로 전파돼야 한다(bug #29 회귀 방지).
+
+    수정 전: _is_krw 필터로 '기타'가 버려져 unit=None → 폴백 '억원' 오라벨.
+    수정 후: KRW 여부 불문 첫 susu 표 unit을 채택 → '기타' 반환.
+    """
+    from services import backlog as svc
+
+    # susu 표(_classify_table 조건: 헤더 "수주잔고"+"기납품") + USD천 캡션(이전 노드)
+    html = (
+        "<p>(단위 : USD천)</p>"
+        "<TABLE>"
+        "<TR><TH>구분</TH><TH>기납품</TH><TH>수주잔고</TH></TR>"
+        "<TR><TD>A사업</TD><TD>50,000</TD><TD>120,000</TD></TR>"
+        "</TABLE>"
+    )
+    raw_text, unit = svc._extract_backlog_blocks(html)
+    assert unit == "기타", f"expected '기타', got {unit!r}"
+    assert unit != "억원"
+
+
 # ── _quarter_from_report (괄호 (YYYY.MM) 우선, 명칭 휴리스틱 폴백) ──
 
 def test_quarter_from_report_bracket_parsing():
