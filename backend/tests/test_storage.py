@@ -214,3 +214,56 @@ def test_update_ticker_meta_updates_name_when_valid():
     sql = mock_exec.call_args[0][0]
     assert "name" in sql
     mock_refresh.assert_called_once_with("NVDA", "NVIDIA Corp")
+
+
+# ── target_weight (리밸런싱, task#146) ──────────────────────────────────────
+
+def test_get_holdings_selects_target_weight():
+    from services import storage
+    with patch("services.storage.portfolio.query", return_value=[]) as mock_query:
+        storage.get_holdings("user-123")
+    assert "target_weight" in mock_query.call_args[0][0]
+
+
+def test_get_full_portfolio_includes_target_weight_for_holdings():
+    from services import storage
+    row = {"ticker": "AAPL", "type": "holding", "quantity": 10, "avg_cost": 150.0,
+           "target_price": None, "stop_price": None, "target_weight": 40.0,
+           "name": "Apple", "market": "US", "exchange": "", "is_etf": False,
+           "competitors": [], "moat": None, "growth_plan": None, "risks": None,
+           "recent_disclosures": None, "insights": None}
+    with patch("services.storage.portfolio.query", return_value=[row]):
+        result = storage.get_full_portfolio("user-123")
+    assert result["stocks"][0]["target_weight"] == 40.0
+
+
+def test_save_holdings_upsert_preserves_target_weight_when_not_provided():
+    """save_holdings는 target_weight를 넘기지 않아도(일반 수정 폼) 기존 값을 덮어쓰지 않는다(COALESCE)."""
+    from services import storage
+    mock_cur = MagicMock()
+    mock_cur.fetchall.return_value = []
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+    with patch("services.storage.portfolio.get_connection") as gc:
+        gc.return_value.__enter__.return_value = mock_conn
+        storage.save_holdings("user-123", [{"ticker": "AAPL", "quantity": 10, "avg_cost": 150.0}])
+    sql, params = next(
+        (c.args[0], c.args[1]) for c in mock_cur.execute.call_args_list
+        if "INSERT INTO user_stocks" in c.args[0]
+    )
+    assert "COALESCE(EXCLUDED.target_weight, user_stocks.target_weight)" in sql
+    assert params[-1] is None  # h.get("target_weight") → None
+
+
+def test_set_target_weights_updates_each_ticker():
+    from services import storage
+    mock_cur = MagicMock()
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+    with patch("services.storage.portfolio.get_connection") as gc:
+        gc.return_value.__enter__.return_value = mock_conn
+        storage.set_target_weights("user-123", {"aapl": 40, "TSLA": 60})
+    calls = mock_cur.execute.call_args_list
+    assert len(calls) == 2
+    tickers_updated = {c.args[1][2] for c in calls}
+    assert tickers_updated == {"AAPL", "TSLA"}

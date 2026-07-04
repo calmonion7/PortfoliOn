@@ -1,3 +1,4 @@
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from unittest.mock import patch
@@ -147,6 +148,31 @@ def test_add_stock_skips_report_when_snapshot_exists():
         })
     assert resp.status_code == 201
     mock_gen.assert_not_called()
+
+
+def test_get_rebalance_computes_drift_from_holdings_and_quotes():
+    holdings = [
+        {"ticker": "AAPL", "market": "US", "quantity": 10, "target_weight": 100.0, "exchange": ""},
+    ]
+    with patch("routers.portfolio.storage.get_holdings", return_value=holdings), \
+         patch("routers.portfolio.market_svc.get_quotes_batch", return_value={"AAPL": {"price": 150.0}}), \
+         patch("routers.portfolio._usdkrw_rate", return_value=1300.0):
+        resp = client.get("/api/portfolio/rebalance")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["holdings"][0]["ticker"] == "AAPL"
+    assert body["holdings"][0]["current_weight"] == pytest.approx(100.0)
+    assert body["holdings"][0]["target_weight"] == pytest.approx(100.0)
+
+
+def test_put_rebalance_targets_saves_only_held_tickers():
+    holdings = [{"ticker": "AAPL", "market": "US", "quantity": 10}]
+    with patch("routers.portfolio.storage.get_holdings", return_value=holdings), \
+         patch("routers.portfolio.storage.set_target_weights") as mock_set:
+        resp = client.put("/api/portfolio/rebalance/targets", json={"AAPL": 60, "NOTHELD": 40})
+    assert resp.status_code == 200
+    assert resp.json() == {"updated": 1, "targets": {"AAPL": 60}}
+    mock_set.assert_called_once_with("test-user-id", {"AAPL": 60})
 
 
 def test_generate_with_consensus_backfills_via_pipeline():

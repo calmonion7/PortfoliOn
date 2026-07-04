@@ -35,6 +35,7 @@ CREATE TABLE user_stocks (
   avg_cost  numeric,
   target_price numeric,
   stop_price   numeric,
+  target_weight numeric,
   PRIMARY KEY (user_id, ticker)
 );
 

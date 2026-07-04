@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Body
 from pydantic import BaseModel, field_validator
-from typing import List, Optional
+from typing import List, Optional, Dict
 from services import storage, errors, report_generator, consensus_pipeline as _pipeline
 from services import cache as cache_svc, market as market_svc
-from services.utils import find_ticker_index, ticker_exists_in, is_valid_ticker
+from services.utils import find_ticker_index, ticker_exists_in, is_valid_ticker, sanitize
 from services.db import query as db_query
+from services.rebalance import compute_rebalance
+from routers.stocks import _usdkrw_rate
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
@@ -69,6 +71,30 @@ def get_portfolio_prices(user_id: str = Depends(get_current_user)):
             for s in all_stocks
         }
     return cache_svc.get_live_prices(user_id, _compute)
+
+
+@router.get("/rebalance")
+def get_rebalance(user_id: str = Depends(get_current_user)):
+    """보유 종목 목표 비중 대비 현재 비중 드리프트 + 조정금액. 주문 실행은 범위 밖(읽기전용)."""
+    holdings = storage.get_holdings(user_id)
+    quotes = market_svc.get_quotes_batch(holdings)
+    calc_holdings = [
+        {**h, "current_price": quotes.get(h["ticker"].upper(), {}).get("price")}
+        for h in holdings
+    ]
+    targets = {h["ticker"]: float(h["target_weight"]) for h in holdings if h.get("target_weight") is not None}
+    result = compute_rebalance(calc_holdings, _usdkrw_rate(), targets)
+    return sanitize(result)
+
+
+@router.put("/rebalance/targets")
+def set_rebalance_targets(weights: Dict[str, float] = Body(...), user_id: str = Depends(get_current_user)):
+    """보유 종목별 목표 비중(%) 배치 저장. 보유 중이 아닌 티커는 무시(스코프=보유 종목만)."""
+    holdings = storage.get_holdings(user_id)
+    holding_tickers = {h["ticker"].upper() for h in holdings}
+    targets = {t.upper(): w for t, w in weights.items() if t.upper() in holding_tickers}
+    storage.set_target_weights(user_id, targets)
+    return {"updated": len(targets), "targets": targets}
 
 
 @router.post("", status_code=201)

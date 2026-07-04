@@ -149,6 +149,7 @@ def _migrate():
         from services.db import execute
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS target_price numeric")
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS stop_price numeric")
+        execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS target_weight numeric")
     except Exception as e:
         print(f"[migrate] user_stocks 목표가/손절가 추가 실패: {e}")
 

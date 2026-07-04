@@ -88,7 +88,7 @@ def save_stocks(user_id: str, stocks: list[dict]) -> None:
 def get_holdings(user_id: str) -> list[dict]:
     return query(
         """
-        SELECT us.ticker, us.quantity, us.avg_cost, us.target_price, us.stop_price,
+        SELECT us.ticker, us.quantity, us.avg_cost, us.target_price, us.stop_price, us.target_weight,
                t.name, t.market, t.exchange
         FROM user_stocks us
         JOIN tickers t ON t.ticker = us.ticker
@@ -110,7 +110,7 @@ def save_holdings(user_id: str, holdings: list[dict]) -> None:
 
             for t in current_tickers - new_tickers:
                 cur.execute(
-                    "UPDATE user_stocks SET type='watchlist', quantity=NULL, avg_cost=NULL, target_price=NULL, stop_price=NULL WHERE user_id=%s AND ticker=%s",
+                    "UPDATE user_stocks SET type='watchlist', quantity=NULL, avg_cost=NULL, target_price=NULL, stop_price=NULL, target_weight=NULL WHERE user_id=%s AND ticker=%s",
                     (user_id, t),
                 )
 
@@ -128,13 +128,25 @@ def save_holdings(user_id: str, holdings: list[dict]) -> None:
                 )
                 cur.execute(
                     """
-                    INSERT INTO user_stocks (user_id, ticker, type, quantity, avg_cost, target_price, stop_price)
-                    VALUES (%s, %s, 'holding', %s, %s, %s, %s)
+                    INSERT INTO user_stocks (user_id, ticker, type, quantity, avg_cost, target_price, stop_price, target_weight)
+                    VALUES (%s, %s, 'holding', %s, %s, %s, %s, %s)
                     ON CONFLICT (user_id, ticker) DO UPDATE SET
                         type='holding', quantity=EXCLUDED.quantity, avg_cost=EXCLUDED.avg_cost,
-                        target_price=EXCLUDED.target_price, stop_price=EXCLUDED.stop_price
+                        target_price=EXCLUDED.target_price, stop_price=EXCLUDED.stop_price,
+                        target_weight=COALESCE(EXCLUDED.target_weight, user_stocks.target_weight)
                     """,
-                    (user_id, ticker, h["quantity"], h["avg_cost"], h.get("target_price"), h.get("stop_price")),
+                    (user_id, ticker, h["quantity"], h["avg_cost"], h.get("target_price"), h.get("stop_price"), h.get("target_weight")),
+                )
+
+
+def set_target_weights(user_id: str, weights: dict) -> None:
+    """보유 종목의 target_weight만 배치 UPDATE. weights={ticker: weight}."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for ticker, weight in weights.items():
+                cur.execute(
+                    "UPDATE user_stocks SET target_weight=%s WHERE user_id=%s AND ticker=%s AND type='holding'",
+                    (weight, user_id, ticker.upper()),
                 )
 
 
@@ -176,7 +188,7 @@ def save_watchlist_tickers(user_id: str, tickers: list[str]) -> None:
 def get_full_portfolio(user_id: str) -> dict:
     rows = query(
         """
-        SELECT us.ticker, us.type, us.quantity, us.avg_cost, us.target_price, us.stop_price,
+        SELECT us.ticker, us.type, us.quantity, us.avg_cost, us.target_price, us.stop_price, us.target_weight,
                t.name, t.market, t.exchange, t.is_etf,
                t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights
         FROM user_stocks us
@@ -202,7 +214,8 @@ def get_full_portfolio(user_id: str) -> dict:
         }
         if r["type"] == "holding":
             entry.update({"quantity": r["quantity"], "avg_cost": r["avg_cost"],
-                          "target_price": r.get("target_price"), "stop_price": r.get("stop_price")})
+                          "target_price": r.get("target_price"), "stop_price": r.get("stop_price"),
+                          "target_weight": r.get("target_weight")})
             holdings.append(entry)
         else:
             watchlist.append(entry)

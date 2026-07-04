@@ -591,6 +591,91 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 
 ---
 
+### `GET /api/portfolio/rebalance`
+
+보유 종목의 목표 비중(사용자 설정) 대비 현재 비중 드리프트 + 목표 도달 조정금액(KRW)을 계산. 스코프는 보유 종목만(현금·관심종목 제외). **주문 실행은 범위 밖 — 읽기전용 계산기.**
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "holdings": [
+    {
+      "ticker": "AAPL",
+      "market": "US",
+      "current_value_krw": 2500000,
+      "current_weight": 45.5,
+      "target_weight": 40.0,
+      "drift_pp": 5.5,
+      "suggested_trade_krw": -275000,
+      "suggested_shares": -2,
+      "untargeted": false,
+      "no_fx": false
+    },
+    {
+      "ticker": "005930",
+      "market": "KR",
+      "current_value_krw": 3000000,
+      "current_weight": 54.5,
+      "target_weight": 60.0,
+      "drift_pp": -5.5,
+      "suggested_trade_krw": 275000,
+      "suggested_shares": 4,
+      "untargeted": false,
+      "no_fx": false
+    }
+  ],
+  "summary": {
+    "total_value_krw": 5500000,
+    "raw_target_sum": 100.0,
+    "has_untargeted": false,
+    "has_no_fx": false
+  }
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| `holdings[].current_value_krw` | 현재 평가액(KRW 환산). US는 저장 FX(`market_cache` 'fx') 사용, 없으면 `no_fx=true`로 계산 제외 |
+| `holdings[].target_weight` | 사용자가 설정한 목표 비중(%) — 미설정 시 `null`(`untargeted=true`) |
+| `holdings[].drift_pp` | 현재 비중 − 목표 비중(퍼센트 포인트). 양수=과체중(매도), 음수=저체중(매수) |
+| `holdings[].suggested_trade_krw` | 목표 도달을 위한 조정금액(KRW). 양수=매수, 음수=매도 |
+| `holdings[].suggested_shares` | 조정 주식 수(현재가 기준 반올림한 정수) — 계산 대상 제외 시(`untargeted`/`no_fx`) `null` |
+| `holdings[].untargeted` | 목표 비중 미설정 종목 여부(정규화·계산 대상에서 제외) |
+| `holdings[].no_fx` | US 종목인데 저장 FX가 없어 KRW 환산 불가(계산 대상에서 제외) |
+| `summary.total_value_krw` | 목표 설정 + FX 확보 종목만의 총 평가액(정규화 기준) |
+| `summary.raw_target_sum` | 사용자가 입력한 목표 비중 원값의 합(100이 아니어도 자동 정규화됨) |
+
+---
+
+### `PUT /api/portfolio/rebalance/targets`
+
+보유 종목별 목표 비중(%)을 배치 저장. 합이 100이 아니어도 저장 가능(조회 시 자동 정규화). 보유 중이 아닌 티커는 무시된다.
+
+**Auth:** Bearer token 필요
+
+**Request Body** — ticker → 목표 비중(%) 맵
+```json
+{
+  "AAPL": 40,
+  "005930": 60
+}
+```
+
+**Response `200`**
+```json
+{
+  "updated": 2,
+  "targets": {
+    "AAPL": 40,
+    "005930": 60
+  }
+}
+```
+
+---
+
 ## Watchlist (관심종목)
 
 ### `GET /api/watchlist`
