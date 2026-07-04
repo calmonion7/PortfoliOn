@@ -38,35 +38,44 @@ def test_suggested_shares_rounds_even_when_not_evenly_divisible():
     assert isinstance(by_ticker["A"]["suggested_shares"], int)
 
 
-def test_raw_target_sum_not_100_is_normalized():
+def test_targets_are_not_normalized_full_portfolio_basis():
+    """전체-포트 기준(task#147): 타겟은 전체 포트 대비 %라 정규화하지 않는다(raw 값 그대로)."""
     holdings = [
-        {"ticker": "A", "market": "KR", "current_price": 1000, "quantity": 700},
-        {"ticker": "B", "market": "KR", "current_price": 1000, "quantity": 300},
+        {"ticker": "A", "market": "KR", "current_price": 1000, "quantity": 700},  # 70%
+        {"ticker": "B", "market": "KR", "current_price": 1000, "quantity": 300},  # 30%
     ]
     result = compute_rebalance(holdings, usdkrw=None, targets={"A": 60, "B": 50})
+    by_ticker = {h["ticker"]: h for h in result["holdings"]}
 
     assert result["summary"]["raw_target_sum"] == pytest.approx(110)
-    by_ticker = {h["ticker"]: h for h in result["holdings"]}
-    normalized_sum = by_ticker["A"]["target_weight"] + by_ticker["B"]["target_weight"]
-    assert normalized_sum == pytest.approx(100.0)
+    # 정규화하지 않음 — raw 60/50 그대로
+    assert by_ticker["A"]["target_weight"] == pytest.approx(60)
+    assert by_ticker["B"]["target_weight"] == pytest.approx(50)
+    assert by_ticker["A"]["drift_pp"] == pytest.approx(70 - 60)
+    assert by_ticker["B"]["drift_pp"] == pytest.approx(30 - 50)
 
 
-def test_untargeted_holding_excluded_from_suggestion_and_total():
+def test_untargeted_holding_shows_full_portfolio_weight_but_no_suggestion():
+    """전체-포트 기준: 미설정 종목도 실제 비중을 표시(분모=전체 포트), 단 제안은 없음(hold)."""
     holdings = [
-        {"ticker": "A", "market": "KR", "current_price": 1000, "quantity": 700},
-        {"ticker": "C", "market": "KR", "current_price": 1000, "quantity": 500},  # 타겟 미설정
+        {"ticker": "A", "market": "KR", "current_price": 1000, "quantity": 700},  # 700,000
+        {"ticker": "C", "market": "KR", "current_price": 1000, "quantity": 500},  # 500,000 타겟 미설정
     ]
     result = compute_rebalance(holdings, usdkrw=None, targets={"A": 100})
     by_ticker = {h["ticker"]: h for h in result["holdings"]}
 
+    # C(미설정): 실제 비중은 표시되지만 타겟/드리프트/제안은 없음
     assert by_ticker["C"]["untargeted"] is True
+    assert by_ticker["C"]["current_weight"] == pytest.approx(500000 / 1200000 * 100)
     assert by_ticker["C"]["target_weight"] is None
+    assert by_ticker["C"]["drift_pp"] is None
     assert by_ticker["C"]["suggested_trade_krw"] is None
-    assert by_ticker["C"]["current_weight"] is None  # 정규화 대상(타겟 설정 종목) 총계에서 제외
+    # 총계는 전체 포트(A+C 모두 포함)
+    assert result["summary"]["total_value_krw"] == pytest.approx(1200000)
+    assert by_ticker["A"]["current_weight"] == pytest.approx(700000 / 1200000 * 100)
     assert result["summary"]["has_untargeted"] is True
-    # 총계는 A의 700,000만 (C의 500,000 미포함)
-    assert result["summary"]["total_value_krw"] == pytest.approx(700000)
-    assert by_ticker["A"]["current_weight"] == pytest.approx(100.0)
+    # 합계 = 설정 타겟(100) + 미설정 현재비중(41.67) ≈ 141.67
+    assert result["summary"]["allocation_sum"] == pytest.approx(100 + 500000 / 1200000 * 100)
 
 
 def test_us_holding_without_fx_excluded_as_no_fx():
@@ -79,8 +88,43 @@ def test_us_holding_without_fx_excluded_as_no_fx():
 
     assert by_ticker["U"]["no_fx"] is True
     assert by_ticker["U"]["current_value_krw"] is None
+    assert by_ticker["U"]["current_weight"] is None  # KRW 환산 불가 → 비중도 blank
     assert result["summary"]["has_no_fx"] is True
     # 총계는 A만 포함 (U는 FX 없어 KRW 환산 불가 → 제외)
+    assert result["summary"]["total_value_krw"] == pytest.approx(700000)
+    assert by_ticker["A"]["current_weight"] == pytest.approx(100.0)
+
+
+def test_name_passthrough():
+    holdings = [
+        {"ticker": "A", "name": "에이종목", "market": "KR", "current_price": 1000, "quantity": 700},
+    ]
+    result = compute_rebalance(holdings, usdkrw=None, targets={"A": 100})
+    assert result["holdings"][0]["name"] == "에이종목"
+
+
+def test_full_total_zero_no_crash():
+    """전 종목 no_fx(FX 없는 US)면 full_total=0 — 크래시 없이 current_weight None."""
+    holdings = [
+        {"ticker": "U", "market": "US", "current_price": 100, "quantity": 10},
+    ]
+    result = compute_rebalance(holdings, usdkrw=None, targets={"U": 100})
+    row = result["holdings"][0]
+    assert row["current_weight"] is None
+    assert row["suggested_trade_krw"] is None
+    assert result["summary"]["total_value_krw"] == pytest.approx(0)
+
+
+def test_zero_fx_treated_as_no_fx_no_zero_division():
+    """저장 FX가 0(무효)이면 US를 no_fx로 처리 — suggested_trade_krw/fx 0으로 나누기 방지."""
+    holdings = [
+        {"ticker": "A", "market": "KR", "current_price": 1000, "quantity": 700},
+        {"ticker": "U", "market": "US", "current_price": 100, "quantity": 10},
+    ]
+    result = compute_rebalance(holdings, usdkrw=0, targets={"A": 50, "U": 50})
+    by_ticker = {h["ticker"]: h for h in result["holdings"]}
+    assert by_ticker["U"]["no_fx"] is True
+    assert by_ticker["U"]["current_value_krw"] is None
     assert result["summary"]["total_value_krw"] == pytest.approx(700000)
 
 

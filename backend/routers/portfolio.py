@@ -88,8 +88,8 @@ def get_rebalance(user_id: str = Depends(get_current_user)):
 
 
 @router.put("/rebalance/targets")
-def set_rebalance_targets(weights: Dict[str, float] = Body(...), user_id: str = Depends(get_current_user)):
-    """보유 종목별 목표 비중(%) 배치 저장. 보유 중이 아닌 티커는 무시(스코프=보유 종목만)."""
+def set_rebalance_targets(weights: Dict[str, Optional[float]] = Body(...), user_id: str = Depends(get_current_user)):
+    """보유 종목별 목표 비중(%) 배치 저장. 값 null이면 타겟 삭제(컬럼 NULL). 보유 중이 아닌 티커는 무시(스코프=보유 종목만)."""
     holdings = storage.get_holdings(user_id)
     holding_tickers = {h["ticker"].upper() for h in holdings}
     targets = {t.upper(): w for t, w in weights.items() if t.upper() in holding_tickers}

@@ -51,9 +51,11 @@ export default function RebalanceTab() {
 
   const handleSave = () => {
     const weights = {}
-    Object.entries(inputs).forEach(([ticker, v]) => {
+    data.holdings.forEach(h => {
+      const v = inputs[h.ticker]
       const n = parseFloat(v)
-      if (v !== '' && Number.isFinite(n) && n >= 0) weights[ticker] = n
+      if (v !== '' && Number.isFinite(n) && n >= 0) weights[h.ticker] = n
+      else if ((v === '' || v == null) && h.target_weight != null) weights[h.ticker] = null  // 빈 입력 + 기존 타겟 → 삭제(null)
     })
     setSaving(true)
     api.put('/api/portfolio/rebalance/targets', weights)
@@ -68,7 +70,13 @@ export default function RebalanceTab() {
     <div style={{ color: 'var(--text-3)' }}>보유 종목이 없습니다.</div>
   )
 
-  const sumPct = Object.values(inputs).reduce((s, v) => s + (parseFloat(v) || 0), 0)
+  // 합계 = 설정한 타겟 + 미설정 종목의 현재 비중(hold). no_fx 종목은 current_weight null이라 제외.
+  const sumPct = data.holdings.reduce((s, h) => {
+    const v = inputs[h.ticker]
+    const n = parseFloat(v)
+    if (v !== '' && Number.isFinite(n)) return s + n
+    return s + (h.current_weight ?? 0)
+  }, 0)
   const sumWarn = sumPct > 0 && Math.abs(sumPct - 100) > 0.05
 
   const body = (
@@ -81,6 +89,7 @@ export default function RebalanceTab() {
         <Card key={h.ticker} padding="sm" style={{ marginBottom: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <strong>{h.ticker}</strong>
+            {h.name && h.name !== h.ticker && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{h.name}</span>}
             <MarketBadge market={h.market} />
             {h.untargeted && <Badge variant="neutral" size="sm">미설정</Badge>}
             {h.no_fx && <Badge variant="neutral" size="sm">환율 없음</Badge>}
@@ -116,7 +125,7 @@ export default function RebalanceTab() {
 
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
         <span style={{ fontSize: 13 }}>합계: <strong className="tnum">{sumPct.toFixed(1)}%</strong></span>
-        {sumWarn && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>100%가 아닙니다 — 저장 시 비율대로 자동 정규화됩니다</span>}
+        {sumWarn && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>포트폴리오 합이 100%가 아닙니다 (설정 타겟 + 미설정 종목 현재 비중)</span>}
         <Button variant="primary" size="sm" onClick={handleSave} loading={saving} disabled={saving} style={{ marginLeft: 'auto' }}>
           저장
         </Button>

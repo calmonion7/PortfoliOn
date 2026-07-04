@@ -126,6 +126,9 @@ def save_holdings(user_id: str, holdings: list[dict]) -> None:
                     """,
                     (ticker, h.get("name") or ticker, h.get("market") or "US", h.get("exchange") or ""),
                 )
+                # eco: target_weight만 COALESCE 보존(target_price/stop_price는 덮어쓰기와 비대칭) —
+                # 일반 보유종목 수정 폼(Stock 모델)엔 target_weight 필드가 없어 단순 덮어쓰기면
+                # 종목 편집 때마다 목표비중이 null로 리셋됨(데이터 손실). "패턴 통일"로 되돌리지 말 것.
                 cur.execute(
                     """
                     INSERT INTO user_stocks (user_id, ticker, type, quantity, avg_cost, target_price, stop_price, target_weight)
@@ -140,7 +143,7 @@ def save_holdings(user_id: str, holdings: list[dict]) -> None:
 
 
 def set_target_weights(user_id: str, weights: dict) -> None:
-    """보유 종목의 target_weight만 배치 UPDATE. weights={ticker: weight}."""
+    """보유 종목의 target_weight만 배치 UPDATE. weights={ticker: weight}. weight=None이면 NULL(타겟 삭제)."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             for ticker, weight in weights.items():
