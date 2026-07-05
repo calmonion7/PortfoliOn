@@ -1,5 +1,5 @@
 ---
-last_mapped_commit: 739c39c3f628376219789fb8b7850076941dc69c
+last_mapped_commit: a07e6406ac475d8ef7b5c2b0df2af9c99383cbd5
 mapped: 2026-07-04
 ---
 
@@ -57,7 +57,7 @@ backend/
 ```
 routers/
 ├── auth.py             /api/auth — 로그인·OAuth·토큰
-├── portfolio.py        /api/portfolio — 보유 목록·prices 폴링
+├── portfolio.py        /api/portfolio — 보유 목록·prices 폴링·rebalance(계산·targets 저장)
 ├── watchlist.py        /api/watchlist — 관심 종목·promote
 ├── stocks.py           /api/stocks — dashboard·enrich·dividends·supply-score
 ├── report.py           /api (report) — 리포트 생성·목록·상세·backlog·disclosures·agm
@@ -88,6 +88,7 @@ services/
 ├── utils.py            sanitize (NaN/inf → None)
 ├── errors.py · parallel.py · progress.py · schedule_spec.py
 ├── report_generator.py 리포트 스냅샷 생성 (generate_report / _with_retry / backfill_ticker)
+├── rebalance.py        리밸런싱 순수 계산 (compute_rebalance — DB/외부호출 없음)
 ├── consensus.py · consensus_pipeline.py  컨센서스 수집·표준화 (run_daily)
 ├── scraper.py · guru_scraper.py · guru_stats.py  구루 (dataroma)
 ├── digest_service.py   다이제스트 생성·텔레그램
@@ -104,7 +105,7 @@ services/
 ├── auth_service.py     JWT (HS256, jose) · 비밀번호 해시 · OAuth upsert
 ├── storage/            re-export 패키지 (ADR-0017)
 │   ├── __init__.py     portfolio·names·schedule·dates + db 심볼 re-export
-│   ├── portfolio.py    get/save_stocks·holdings·watchlist, get_global_portfolio, enrich_stock
+│   ├── portfolio.py    get/save_stocks·holdings·watchlist, get_global_portfolio, enrich_stock, set_target_weights (target_weight COALESCE preserve-on-null)
 │   ├── names.py        종목명 dual-source 동기 (refresh_snapshot_names, reconcile_snapshot_names)
 │   ├── schedule.py     schedules·guru_schedules·batch_schedules 읽기/쓰기
 │   └── dates.py        expected_report_date(s) — 시장별 기대 스냅샷 날짜
@@ -185,9 +186,9 @@ src/
 ├── pages/              라우트 레벨 + 허브 탭
 │   ├── Research.jsx     홈 허브 (/) — Reports·Recommendations·Ranking·Digest·Calendar 탭
 │   ├── MarketHub.jsx    시장 허브 — Market(시장지표)·수급지표 탭
-│   ├── Portfolio.jsx    대시보드·분석 (섹터/매크로/상관)
+│   ├── Portfolio.jsx    대시보드·분석 (섹터/매크로/상관/리밸런싱)
 │   ├── Reports.jsx · Ranking.jsx · Recommendations.jsx · Calendar.jsx · Digest.jsx
-│   ├── Market.jsx · Analytics.jsx · SectorTab.jsx · MacroTab.jsx
+│   ├── Market.jsx · Analytics.jsx · SectorTab.jsx · MacroTab.jsx · RebalanceTab.jsx
 │   ├── Settings.jsx · LoginPage.jsx · Showcase.jsx
 │   ├── Guru.jsx · GuruCrawlNow.jsx · GuruManagers.jsx · GuruStats.jsx
 │   ├── ConsensusSettings.jsx · LeverageBackfillSettings.jsx · ReportManualGen.jsx
