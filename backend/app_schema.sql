@@ -278,6 +278,15 @@ CREATE TABLE IF NOT EXISTS stock_dividends (
     fetched_at                TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 베타 (보유·관심 종목의 시장 민감도, ticker 단위 — US=yfinance/KR=calc_beta vs ^KS11)
+-- 포트폴리오 노출 탭의 베타가중 노출(portfolio_beta) 계산이 저장값만 읽음(요청경로 라이브 호출 0).
+CREATE TABLE IF NOT EXISTS stock_beta (
+    ticker     TEXT PRIMARY KEY,
+    beta       NUMERIC,
+    source     TEXT,           -- yfinance | kiwoom
+    fetched_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 수급 스코어 (per-종목 공매도+외인/기관 기반 우호/중립/경계 밴드, ticker 단위 — ADR-0014)
 -- 사전계산 저장, 소비처(대시보드·리포트 상세)는 저장값만 읽음(요청경로 라이브 호출 0).
 CREATE TABLE IF NOT EXISTS stock_supply_score (

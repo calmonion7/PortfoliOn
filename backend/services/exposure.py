@@ -12,12 +12,16 @@ SINGLE_NAME_THRESHOLD = 25.0
 SECTOR_THRESHOLD = 40.0
 
 
-def compute_exposure(holdings: List[dict], quotes: dict, fx, sector_map: Dict[str, str]) -> dict:
+def compute_exposure(
+    holdings: List[dict], quotes: dict, fx, sector_map: Dict[str, str], beta_map: Dict[str, float] = None
+) -> dict:
     """holdings: get_holdings() 반환 형태 [{ticker, name, market, quantity, ...}, ...]
     quotes: get_quotes_batch() 반환 {TICKER: {"price": ...}, ...}
     fx: 저장 FX(float|Decimal|None)
     sector_map: {ticker: 섹터명} — 없으면 '기타'
+    beta_map: {ticker: beta} — 없는 보유는 포트폴리오 베타 계산에서 제외
     """
+    beta_map = beta_map or {}
     priced = [
         {**h, "current_price": (quotes.get((h.get("ticker") or "").upper()) or {}).get("price")}
         for h in holdings
@@ -63,6 +67,15 @@ def compute_exposure(holdings: List[dict], quotes: dict, fx, sector_map: Dict[st
         if by_ticker else None
     )
 
+    total_weight = sum(e["weight"] for e in by_ticker)
+    covered = [e for e in by_ticker if e["ticker"] in beta_map]
+    covered_weight = sum(e["weight"] for e in covered)
+    portfolio_beta = (
+        sum(e["weight"] * beta_map[e["ticker"]] for e in covered) / covered_weight
+        if covered_weight > 0 else None
+    )
+    beta_coverage_pct = covered_weight / total_weight * 100.0 if total_weight > 0 else 0.0
+
     return {
         "holdings": by_ticker,
         "currency": currency,
@@ -76,6 +89,10 @@ def compute_exposure(holdings: List[dict], quotes: dict, fx, sector_map: Dict[st
             "single_name": any(e["weight"] > SINGLE_NAME_THRESHOLD for e in by_ticker),
             "sector": any(g["weight"] > SECTOR_THRESHOLD for g in sector.values()),
         },
+        "portfolio_beta": portfolio_beta,
+        "beta_coverage_pct": beta_coverage_pct,
+        "beta_covered_count": len(covered),
+        "beta_missing": [e["ticker"] for e in by_ticker if e["ticker"] not in beta_map],
         "no_fx": {
             "tickers": [r["ticker"] for r in rows if r["no_fx"]],
             "count": sum(1 for r in rows if r["no_fx"]),

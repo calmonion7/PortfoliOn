@@ -81,6 +81,15 @@ def _migrate():
         print(f"[migrate] stock_dividends 생성 실패: {e}")
     try:
         from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS stock_beta (
+            ticker TEXT PRIMARY KEY,
+            beta NUMERIC,
+            source TEXT,
+            fetched_at TIMESTAMPTZ DEFAULT NOW())""")
+    except Exception as e:
+        print(f"[migrate] stock_beta 생성 실패: {e}")
+    try:
+        from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_supply_score (
             ticker TEXT PRIMARY KEY,
             computed_date DATE NOT NULL,

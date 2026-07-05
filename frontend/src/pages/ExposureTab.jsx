@@ -11,6 +11,19 @@ const pctText = (v) => v == null ? '—' : `${v.toFixed(1)}%`
 // 경고 배지 전용색(caution 주황) — success/danger 변형 금지(--up=빨강/--down=파랑 반전, SupplyBadge 규약).
 const warnStyle = { background: 'rgba(245, 124, 0, 0.16)', color: '#f57c00', borderColor: 'rgba(245, 124, 0, 0.32)' }
 
+// 베타 설명 뱃지 전용색 — 가격방향(빨강/파랑)과 무관한 3색(SupplyBadge 규약과 동일 원칙).
+const BETA_STYLES = {
+  aggressive: { background: 'rgba(156, 39, 176, 0.16)', color: '#9c27b0', borderColor: 'rgba(156, 39, 176, 0.32)' },
+  market: { background: 'rgba(120, 120, 120, 0.16)', color: 'var(--text-3)', borderColor: 'rgba(120, 120, 120, 0.32)' },
+  defensive: { background: 'rgba(0, 150, 136, 0.16)', color: '#009688', borderColor: 'rgba(0, 150, 136, 0.32)' },
+}
+
+function betaBadge(beta) {
+  if (beta > 1.2) return { text: '공격적', style: BETA_STYLES.aggressive }
+  if (beta < 0.8) return { text: '방어적', style: BETA_STYLES.defensive }
+  return { text: '시장수준', style: BETA_STYLES.market }
+}
+
 const DATA_COLORS = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)']
 
 function WeightBar({ label, weight, color = 'var(--accent)', warn = false }) {
@@ -49,7 +62,7 @@ export default function ExposureTab() {
     <div style={{ color: 'var(--text-3)' }}>보유 종목이 없습니다.</div>
   )
 
-  const { currency, sector, holdings, concentration, warnings, no_fx } = data
+  const { currency, sector, holdings, concentration, warnings, no_fx, portfolio_beta, beta_coverage_pct, beta_missing } = data
   const sectorEntries = Object.entries(sector).sort((a, b) => b[1].weight - a[1].weight)
   const otherSector = sectorEntries.find(([name]) => name === '기타')
 
@@ -65,6 +78,24 @@ export default function ExposureTab() {
           {warnings.sector && <Badge variant="neutral" size="sm" style={warnStyle}>⚠ 섹터 40% 초과</Badge>}
         </div>
       )}
+
+      <Card padding="sm" style={{ marginBottom: 12 }}>
+        <h3 style={{ color: 'var(--text)', fontSize: 14, marginBottom: 10 }}>포트폴리오 베타</h3>
+        {portfolio_beta == null ? (
+          <p style={{ color: 'var(--text-3)', fontSize: 12 }}>베타 데이터 없음(리포트/백필 필요)</p>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+              <span className="tnum" style={{ color: 'var(--text)', fontSize: 20, fontWeight: 600 }}>{portfolio_beta.toFixed(2)}</span>
+              <Badge variant="neutral" size="sm" style={betaBadge(portfolio_beta).style}>{betaBadge(portfolio_beta).text}</Badge>
+            </div>
+            <p style={{ color: 'var(--text-3)', fontSize: 12 }}>
+              커버리지 {pctText(beta_coverage_pct)} · 베타없음 {beta_missing.length}종목
+              {beta_coverage_pct < 60 && <Badge variant="neutral" size="sm" style={{ ...warnStyle, marginLeft: 6 }}>참고용</Badge>}
+            </p>
+          </>
+        )}
+      </Card>
 
       <Card padding="sm" style={{ marginBottom: 12 }}>
         <h3 style={{ color: 'var(--text)', fontSize: 14, marginBottom: 10 }}>통화 노출</h3>

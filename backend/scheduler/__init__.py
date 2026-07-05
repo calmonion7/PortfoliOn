@@ -27,6 +27,7 @@ from .jobs import (
     _fetch_agm,
     _fetch_insider,
     _fetch_dividends,
+    _fetch_betas,
     _fetch_kr_rankings,
     _fetch_us_rankings,
     _fetch_investor_trend,

@@ -307,6 +307,18 @@ def _run_dividends_all():
         fetch_all_dividends()
 
 
+@router.post("/beta/refresh", status_code=202)
+def refresh_all_betas(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
+    background_tasks.add_task(_run_betas_all)
+    return {"message": "베타 전 종목 수집 시작"}
+
+
+def _run_betas_all():
+    from services.beta import fetch_all_betas
+    with job_runs.record("beta_fetch", "manual"):
+        fetch_all_betas()
+
+
 @router.post("/supply-score/refresh", status_code=202)
 def refresh_supply_score(background_tasks: BackgroundTasks, user_id: str = Depends(require_admin)):
     background_tasks.add_task(_run_supply_score_all)

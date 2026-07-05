@@ -194,6 +194,16 @@ def _fetch_dividends():
             print(f"[Scheduler] Dividend fetch failed: {e}")
 
 
+def _fetch_betas():
+    from services.beta import fetch_all_betas
+    with job_runs.record("beta_fetch", "auto"):
+        try:
+            r = fetch_all_betas()
+            print(f"[Scheduler] Betas fetched: {r}")
+        except Exception as e:
+            print(f"[Scheduler] Beta fetch failed: {e}")
+
+
 def _fetch_kr_rankings():
     from services import ranking_service
     with job_runs.record("kr_rankings_fetch", "auto"):
@@ -471,6 +481,7 @@ _JOB_FUNCS = {
     "disclosure_fetch": _fetch_disclosures,
     "agm_fetch": _fetch_agm,
     "dividend_fetch": _fetch_dividends,
+    "beta_fetch": _fetch_betas,
     "insider_fetch": _fetch_insider,
     "recommendation_kr": _fetch_recommendation_kr,
     "recommendation_us": _fetch_recommendation_us,

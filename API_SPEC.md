@@ -689,6 +689,10 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
     "single_name": true,
     "sector": true
   },
+  "portfolio_beta": 1.15,
+  "beta_coverage_pct": 41.7,
+  "beta_covered_count": 1,
+  "beta_missing": ["035420"],
   "no_fx": {
     "tickers": ["MSFT"],
     "count": 1
@@ -707,6 +711,10 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 | `concentration.max_single` | 최대 비중 단일종목(`ticker`, `weight`). 보유 없으면 `null` |
 | `warnings.single_name` | 어떤 종목이든 비중 25% 초과 시 `true` |
 | `warnings.sector` | 어떤 섹터든 비중 40% 초과 시 `true` |
+| `portfolio_beta` | `stock_beta`(사전계산 저장값) 기준 베타 있는 보유의 비중가중평균. 커버 0이면 `null` |
+| `beta_coverage_pct` | 베타 커버된 보유 비중 합 / 전체 비중 합(%) |
+| `beta_covered_count` | 베타가 있는 보유 종목 수 |
+| `beta_missing` | 베타 없는 보유 종목 티커 목록 |
 | `no_fx.tickers` / `count` | 저장 FX 없어 KRW 환산 불가한 US 종목 목록/개수(집계에서 제외됨) |
 
 ---
@@ -1144,6 +1152,21 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 ```
 
 > `dividend_fetch` 자동 배치(`GET /api/batches`)와 동일 수집 로직. 무배당/결측 종목은 저장하지 않음(빈 박제 방지).
+
+---
+
+### `POST /api/stocks/beta/refresh`
+
+보유·관심 종목의 베타(시장 민감도)를 시장별 소스에서 전 종목 재수집해 `stock_beta`에 저장. US=yfinance(`beta`, 없으면 `beta3Year` 폴백)·KR=`calc_beta` vs `^KS11`. 백그라운드 실행(`beta_fetch` 배치 manual lane). **admin 전용.**
+
+**Auth:** Bearer token + admin
+
+**Response `202`**
+```json
+{ "message": "베타 전 종목 수집 시작" }
+```
+
+> `beta_fetch` 자동 배치(`GET /api/batches`)와 동일 수집 로직. 결측 종목은 저장하지 않음(빈 박제 방지). 포트폴리오 노출 탭의 베타가중 노출은 이 저장값만 읽는다(요청경로 라이브 계산 없음).
 
 ---
 

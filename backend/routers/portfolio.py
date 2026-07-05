@@ -117,7 +117,16 @@ def get_exposure(user_id: str = Depends(get_current_user)):
         sector_map.update({r["ticker"]: _norm_sector(r["sector"]) for r in rows})
     sector_map.update(kr_sector_service.map_holdings_to_sectors(holdings))  # 저장 인덱스만 읽음(라이브 키움 호출 없음)
 
-    result = compute_exposure(holdings, quotes, _usdkrw_rate(), sector_map)
+    tickers = [h["ticker"].upper() for h in holdings]
+    beta_map: Dict[str, float] = {}
+    if tickers:
+        rows = db_query(
+            "SELECT ticker, beta FROM stock_beta WHERE ticker = ANY(%s) AND beta IS NOT NULL",
+            (tickers,),
+        )
+        beta_map = {r["ticker"]: float(r["beta"]) for r in rows}
+
+    result = compute_exposure(holdings, quotes, _usdkrw_rate(), sector_map, beta_map)
     return sanitize(result)
 
 

@@ -164,3 +164,53 @@ def test_decimal_quantity_and_fx_do_not_raise_type_error():
     by_ticker = {h["ticker"]: h for h in result["holdings"]}
     assert by_ticker["A"]["weight"] == pytest.approx(700_000 / 2_100_000 * 100)
     assert by_ticker["U"]["weight"] == pytest.approx(1_400_000 / 2_100_000 * 100)
+
+
+def test_portfolio_beta_weighted_average_full_coverage():
+    holdings = [
+        {"ticker": "A", "name": "A", "market": "KR", "quantity": 700},
+        {"ticker": "U", "name": "U", "market": "US", "quantity": 10},
+    ]
+    quotes = {"A": {"price": 1000}, "U": {"price": 100}}
+    # A weight=70%, U weight=... fx=1000 -> U value_krw=100*10*1000=1,000,000, A=700,000 -> total 1,700,000
+    result = compute_exposure(holdings, quotes, fx=1000, sector_map={}, beta_map={"A": 1.0, "U": 2.0})
+    w_a = 700_000 / 1_700_000
+    w_u = 1_000_000 / 1_700_000
+    expected = (w_a * 1.0 + w_u * 2.0)  # weight * beta, weight already in fraction-equivalent (both covered -> no renorm needed)
+    assert result["portfolio_beta"] == pytest.approx(expected)
+    assert result["beta_coverage_pct"] == pytest.approx(100.0)
+    assert result["beta_covered_count"] == 2
+    assert result["beta_missing"] == []
+
+
+def test_portfolio_beta_partial_coverage_renormalizes_over_covered_only():
+    """beta 없는 종목은 분모(재정규화)에서 제외 — 커버된 집합만의 가중평균."""
+    holdings = [
+        {"ticker": "A", "name": "A", "market": "KR", "quantity": 500},
+        {"ticker": "B", "name": "B", "market": "KR", "quantity": 500},
+    ]
+    quotes = {"A": {"price": 1000}, "B": {"price": 1000}}
+    # A, B 각각 50% 비중. B는 beta 없음 -> 재정규화하면 A만으로 포트베타 = A의 beta
+    result = compute_exposure(holdings, quotes, fx=None, sector_map={}, beta_map={"A": 1.5})
+    assert result["portfolio_beta"] == pytest.approx(1.5)
+    assert result["beta_coverage_pct"] == pytest.approx(50.0)
+    assert result["beta_covered_count"] == 1
+    assert result["beta_missing"] == ["B"]
+
+
+def test_portfolio_beta_empty_beta_map_graceful_none():
+    holdings = [{"ticker": "A", "name": "A", "market": "KR", "quantity": 100}]
+    quotes = {"A": {"price": 1000}}
+    result = compute_exposure(holdings, quotes, fx=None, sector_map={}, beta_map={})
+    assert result["portfolio_beta"] is None
+    assert result["beta_coverage_pct"] == pytest.approx(0.0)
+    assert result["beta_covered_count"] == 0
+    assert result["beta_missing"] == ["A"]
+
+
+def test_portfolio_beta_defaults_to_none_when_beta_map_omitted():
+    """beta_map 미전달(호출부 하위호환) -> portfolio_beta=None graceful, 크래시 없음."""
+    holdings = [{"ticker": "A", "name": "A", "market": "KR", "quantity": 100}]
+    quotes = {"A": {"price": 1000}}
+    result = compute_exposure(holdings, quotes, fx=None, sector_map={})
+    assert result["portfolio_beta"] is None
