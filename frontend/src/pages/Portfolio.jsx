@@ -13,6 +13,7 @@ import SectorTab from './SectorTab'
 import MacroTab from './MacroTab'
 import Analytics from './Analytics'
 import RebalanceTab from './RebalanceTab'
+import ExposureTab from './ExposureTab'
 
 // 평가금액 한국식 억/만 축약 (예: 84,975,545 → ₩8,498만, 1억 이상은 ₩X.X억)
 const fmtKrwCompact = (n) => {
@@ -156,6 +157,7 @@ export default function Portfolio() {
               <button className={analysisTab === 'macro' ? 'is-active' : ''} onClick={() => setAnalysisTab('macro')}>매크로</button>
               <button className={analysisTab === 'correlation' ? 'is-active' : ''} onClick={() => setAnalysisTab('correlation')}>상관관계</button>
               <button className={analysisTab === 'rebalance' ? 'is-active' : ''} onClick={() => setAnalysisTab('rebalance')}>리밸런싱</button>
+              <button className={analysisTab === 'exposure' ? 'is-active' : ''} onClick={() => setAnalysisTab('exposure')}>노출</button>
             </div>
           </div>
           <div className="m-page">
@@ -163,6 +165,7 @@ export default function Portfolio() {
             {analysisTab === 'macro' && <MacroTab />}
             {analysisTab === 'correlation' && <Analytics />}
             {analysisTab === 'rebalance' && <RebalanceTab />}
+            {analysisTab === 'exposure' && <ExposureTab />}
           </div>
         </>
       )}
@@ -251,11 +254,13 @@ export default function Portfolio() {
             <button className={analysisTab === 'macro' ? 'is-active' : ''} onClick={() => setAnalysisTab('macro')}>매크로</button>
             <button className={analysisTab === 'correlation' ? 'is-active' : ''} onClick={() => setAnalysisTab('correlation')}>상관관계</button>
             <button className={analysisTab === 'rebalance' ? 'is-active' : ''} onClick={() => setAnalysisTab('rebalance')}>리밸런싱</button>
+            <button className={analysisTab === 'exposure' ? 'is-active' : ''} onClick={() => setAnalysisTab('exposure')}>노출</button>
           </div>
           {analysisTab === 'sector' && <SectorTab />}
           {analysisTab === 'macro' && <MacroTab />}
           {analysisTab === 'correlation' && <Analytics />}
           {analysisTab === 'rebalance' && <RebalanceTab />}
+          {analysisTab === 'exposure' && <ExposureTab />}
         </div>
       )}
     </div>

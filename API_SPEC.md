@@ -659,6 +659,58 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 
 ---
 
+### `GET /api/portfolio/exposure`
+
+보유 종목의 통화(시장)·섹터·단일종목 3축 노출·집중도를 전체 포트폴리오 KRW 환산 비중으로 계산. 스코프는 보유 종목만(관심종목 제외). 임계 초과 시 경고 플래그(단일종목·섹터)를 반환한다.
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "holdings": [
+    { "ticker": "AAPL", "name": "Apple", "market": "US", "value_krw": 2500000, "weight": 41.7 },
+    { "ticker": "035420", "name": "NAVER", "market": "KR", "value_krw": 1500000, "weight": 25.0 }
+  ],
+  "currency": {
+    "US": { "value_krw": 2500000, "weight": 41.7 },
+    "KR": { "value_krw": 1500000, "weight": 25.0 }
+  },
+  "sector": {
+    "Technology": { "value_krw": 2500000, "weight": 41.7 },
+    "기타": { "value_krw": 1500000, "weight": 25.0 }
+  },
+  "concentration": {
+    "top3_pct": 66.7,
+    "top5_pct": 66.7,
+    "max_single": { "ticker": "AAPL", "weight": 41.7 }
+  },
+  "warnings": {
+    "single_name": true,
+    "sector": true
+  },
+  "no_fx": {
+    "tickers": ["MSFT"],
+    "count": 1
+  }
+}
+```
+
+비중 기준은 리밸런싱과 동일한 **전체 포트폴리오 KRW 환산 분모**다(`no_fx` 종목 제외). 섹터를 모르는 종목(리포트 미생성 US·업종 역인덱스 배치 전 KR)은 `기타`로 묶인다.
+
+| 필드 | 설명 |
+|------|------|
+| `holdings[]` | 종목별 비중 내림차순. `no_fx` 종목은 제외 |
+| `currency` | `market`(KR/US) 기준 그룹 합. 정보성 표시 — 경고 없음 |
+| `sector` | 섹터별 그룹 합(미상은 `기타`) |
+| `concentration.top3_pct` / `top5_pct` | 비중 상위 3/5종목 합(%) |
+| `concentration.max_single` | 최대 비중 단일종목(`ticker`, `weight`). 보유 없으면 `null` |
+| `warnings.single_name` | 어떤 종목이든 비중 25% 초과 시 `true` |
+| `warnings.sector` | 어떤 섹터든 비중 40% 초과 시 `true` |
+| `no_fx.tickers` / `count` | 저장 FX 없어 KRW 환산 불가한 US 종목 목록/개수(집계에서 제외됨) |
+
+---
+
 ### `PUT /api/portfolio/rebalance/targets`
 
 보유 종목별 목표 비중(%)을 배치 저장. 값이 `null`이면 해당 종목의 목표 비중을 삭제(컬럼 NULL). 합은 100이 아니어도 저장 가능(정규화하지 않음). 보유 중이 아닌 티커는 무시된다.

@@ -2,10 +2,12 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Body
 from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict
 from services import storage, errors, report_generator, consensus_pipeline as _pipeline
-from services import cache as cache_svc, market as market_svc
+from services import cache as cache_svc, market as market_svc, kr_sector_service
 from services.utils import find_ticker_index, ticker_exists_in, is_valid_ticker, sanitize
+from services.market import _norm_sector
 from services.db import query as db_query
 from services.rebalance import compute_rebalance
+from services.exposure import compute_exposure
 from routers.stocks import _usdkrw_rate
 from auth import get_current_user
 
@@ -95,6 +97,28 @@ def set_rebalance_targets(weights: Dict[str, Optional[float]] = Body(...), user_
     targets = {t.upper(): w for t, w in weights.items() if t.upper() in holding_tickers}
     storage.set_target_weights(user_id, targets)
     return {"updated": len(targets), "targets": targets}
+
+
+@router.get("/exposure")
+def get_exposure(user_id: str = Depends(get_current_user)):
+    """보유 종목의 통화·섹터·단일종목 노출·집중도(전체-포트 KRW 환산 비중). 보유(holding)만 대상."""
+    holdings = storage.get_holdings(user_id)
+    quotes = market_svc.get_quotes_batch(holdings)
+
+    us_tickers = [h["ticker"].upper() for h in holdings if h.get("market") != "KR"]
+    sector_map: Dict[str, str] = {}
+    if us_tickers:
+        rows = db_query(
+            "SELECT DISTINCT ON (ticker) ticker, data->>'sector' AS sector "
+            "FROM snapshots WHERE ticker = ANY(%s) AND data->>'sector' IS NOT NULL AND data->>'sector' != '' "
+            "ORDER BY ticker, date DESC",
+            (us_tickers,),
+        )
+        sector_map.update({r["ticker"]: _norm_sector(r["sector"]) for r in rows})
+    sector_map.update(kr_sector_service.map_holdings_to_sectors(holdings))  # 저장 인덱스만 읽음(라이브 키움 호출 없음)
+
+    result = compute_exposure(holdings, quotes, _usdkrw_rate(), sector_map)
+    return sanitize(result)
 
 
 @router.post("", status_code=201)

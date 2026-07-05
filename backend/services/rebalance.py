@@ -23,17 +23,16 @@ def _finite_float(value) -> Optional[float]:
     return f if math.isfinite(f) else None
 
 
-def compute_rebalance(holdings: List[dict], usdkrw, targets: Dict[str, float]) -> dict:
-    """보유 종목 리스트 + 저장 FX + 사용자 목표비중으로 리밸런싱 드리프트/제안금액 계산.
+def value_holdings_krw(holdings: List[dict], usdkrw) -> tuple[List[dict], float, Optional[float]]:
+    """보유 종목을 전체-포트 KRW 환산 — exposure.compute_exposure와 공유(eco: 중복 방지).
 
     holdings: [{ticker, name, market('KR'|'US'), current_price, quantity}, ...]
-    usdkrw: 저장 FX(float|None) — KR은 fx=1.0 취급
-    targets: {ticker: target_weight} — 사용자가 설정한 종목만 키 존재(전체 포트 대비 %, 정규화 안 함)
+    usdkrw: 저장 FX(float|Decimal|None) — 0/음수/None은 전부 무효(US는 no_fx 처리)
+    반환: (rows[{ticker,name,market,price,value_krw,no_fx}], full_total, fx_normalized)
     """
     fx = _finite_float(usdkrw)
     if fx is not None and fx <= 0:
         fx = None  # 0/음수 FX는 무효 — US를 no_fx로 처리(0으로 나누기 방지)
-    raw_target_sum = sum(float(w) for w in targets.values()) if targets else 0.0
 
     rows = []
     for h in holdings:
@@ -56,15 +55,27 @@ def compute_rebalance(holdings: List[dict], usdkrw, targets: Dict[str, float]) -
             "market": market,
             "price": price,
             "value_krw": value_krw,
-            "untargeted": ticker not in targets,
             "no_fx": no_fx,
         })
 
     # 전체 포트폴리오 총액 = KRW 환산 가능한 모든 보유(타겟·미설정 무관, no_fx 제외)
     full_total = sum(r["value_krw"] for r in rows if r["value_krw"] is not None)
+    return rows, full_total, fx
+
+
+def compute_rebalance(holdings: List[dict], usdkrw, targets: Dict[str, float]) -> dict:
+    """보유 종목 리스트 + 저장 FX + 사용자 목표비중으로 리밸런싱 드리프트/제안금액 계산.
+
+    holdings: [{ticker, name, market('KR'|'US'), current_price, quantity}, ...]
+    usdkrw: 저장 FX(float|None) — KR은 fx=1.0 취급
+    targets: {ticker: target_weight} — 사용자가 설정한 종목만 키 존재(전체 포트 대비 %, 정규화 안 함)
+    """
+    rows, full_total, fx = value_holdings_krw(holdings, usdkrw)
+    raw_target_sum = sum(float(w) for w in targets.values()) if targets else 0.0
 
     holdings_out = []
     for r in rows:
+        untargeted = r["ticker"] not in targets
         entry = {
             "ticker": r["ticker"],
             "name": r["name"],
@@ -75,13 +86,13 @@ def compute_rebalance(holdings: List[dict], usdkrw, targets: Dict[str, float]) -
             "drift_pp": None,
             "suggested_trade_krw": None,
             "suggested_shares": None,
-            "untargeted": r["untargeted"],
+            "untargeted": untargeted,
             "no_fx": r["no_fx"],
         }
         if r["value_krw"] is not None and full_total > 0:
             current_weight = r["value_krw"] / full_total * 100.0
             entry["current_weight"] = current_weight
-            if not r["untargeted"]:  # 미설정 종목은 hold — 실제 비중만 표시, 제안 없음
+            if not untargeted:  # 미설정 종목은 hold — 실제 비중만 표시, 제안 없음
                 target_weight = float(targets[r["ticker"]])
                 entry["target_weight"] = target_weight
                 entry["drift_pp"] = current_weight - target_weight
@@ -105,7 +116,7 @@ def compute_rebalance(holdings: List[dict], usdkrw, targets: Dict[str, float]) -
         "untargeted_weight_sum": untargeted_weight_sum,
         # 합계 = 설정 타겟 + 미설정 종목 현재비중. 100%면 포트 전액 배분(no_fx 제외)
         "allocation_sum": raw_target_sum + untargeted_weight_sum,
-        "has_untargeted": any(r["untargeted"] for r in rows),
+        "has_untargeted": any(e["untargeted"] for e in holdings_out),
         "has_no_fx": any(r["no_fx"] for r in rows),
     }
     return {"holdings": holdings_out, "summary": summary}
