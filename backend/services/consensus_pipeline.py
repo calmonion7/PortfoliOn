@@ -339,25 +339,36 @@ def backfill(stocks: list, days: int = 180, force: bool = False) -> int:
             continue
 
         # 2단계: 마트 재계산 (raw가 있는 가장 이른 날짜부터 오늘까지)
-        if force:
-            cutoff = today - timedelta(days=days)
-            execute(
-                "DELETE FROM daily_consensus_mart WHERE ticker = %s AND base_date >= %s",
-                (ticker.upper(), cutoff),
-            )
         try:
             rows = query(
                 "SELECT MIN(report_date) AS earliest FROM raw_reports WHERE ticker = %s",
                 (ticker.upper(),),
             )
             earliest = rows[0]["earliest"] if rows and rows[0]["earliest"] else today - timedelta(days=days)
-            d = earliest
-            while d <= today:
-                try:
-                    refresh_mart(ticker, d)
-                except Exception as e:
-                    logger.warning(f"[Pipeline] mart refresh failed {ticker} {d}: {e}")
-                d += timedelta(days=1)
+            if force:
+                # force: DELETE + 전체 재적재를 한 트랜잭션으로 묶어 원자화(#28) — 루프 중단(예외·킬)
+                # 시 get_connection이 롤백해 기존 mart가 통째 보존된다(비원자 DELETE→부분 소실 방지).
+                upper = ticker.upper()
+                cutoff = today - timedelta(days=days)
+                with get_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "DELETE FROM daily_consensus_mart WHERE ticker = %s AND base_date >= %s",
+                            (upper, cutoff),
+                        )
+                        d = earliest
+                        while d <= today:
+                            cur.execute(_MART_SQL, (upper, d, d, d, upper))
+                            d += timedelta(days=1)
+            else:
+                # non-force: DELETE 없는 멱등 재적재 — 파괴적 삭제가 없어 per-date 회복 루프 유지
+                d = earliest
+                while d <= today:
+                    try:
+                        refresh_mart(ticker, d)
+                    except Exception as e:
+                        logger.warning(f"[Pipeline] mart refresh failed {ticker} {d}: {e}")
+                    d += timedelta(days=1)
         except Exception as e:
             logger.warning(f"[Pipeline] backfill mart failed {ticker}: {e}")
 
