@@ -157,7 +157,13 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
                 if ks11_ret.index.tz is not None:
                     ks11_ret = ks11_ret.copy()
                     ks11_ret.index = ks11_ret.index.tz_localize(None)
-                beta = indicators.calc_beta(_daily_returns, ks11_ret)
+                # daily_df도 벗김: 키움 실패→yfinance 폴백 시 _daily_returns가 tz-aware라
+                # naive ks11_ret과 concat 시 TypeError→조용히 None (beta.py와 통일)
+                _dr = _daily_returns
+                if _dr is not None and _dr.index.tz is not None:
+                    _dr = _dr.copy()
+                    _dr.index = _dr.index.tz_localize(None)
+                beta = indicators.calc_beta(_dr, ks11_ret)
         except Exception as e:
             logger.warning(f"[Report] {ticker} KR 베타 계산 실패: {e}")
             pass
