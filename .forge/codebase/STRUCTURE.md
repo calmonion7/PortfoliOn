@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: a07e6406ac475d8ef7b5c2b0df2af9c99383cbd5
-mapped: 2026-07-04
+last_mapped_commit: e12f17d5c4a2f0cf9c1ed030a4b867aa207afdcc
+mapped: 2026-07-06
 ---
 
 # STRUCTURE — PortfoliOn
@@ -57,9 +57,9 @@ backend/
 ```
 routers/
 ├── auth.py             /api/auth — 로그인·OAuth·토큰
-├── portfolio.py        /api/portfolio — 보유 목록·prices 폴링·rebalance(계산·targets 저장)
+├── portfolio.py        /api/portfolio — 보유 목록·prices 폴링·rebalance(계산·targets 저장)·exposure(노출·집중도·포트 베타)
 ├── watchlist.py        /api/watchlist — 관심 종목·promote
-├── stocks.py           /api/stocks — dashboard·enrich·dividends·supply-score
+├── stocks.py           /api/stocks — dashboard·enrich·dividends·beta·supply-score
 ├── report.py           /api (report) — 리포트 생성·목록·상세·backlog·disclosures·agm
 ├── recommendations.py  /api/recommendations — 추천 조회·refresh
 ├── rankings.py         /api/rankings — 거래대금/거래량/등락률 랭킹
@@ -88,8 +88,10 @@ services/
 ├── utils.py            sanitize (NaN/inf → None)
 ├── errors.py · parallel.py · progress.py · schedule_spec.py
 ├── report_generator.py 리포트 스냅샷 생성 (generate_report / _with_retry / backfill_ticker)
-├── rebalance.py        리밸런싱 순수 계산 (compute_rebalance — DB/외부호출 없음)
-├── consensus.py · consensus_pipeline.py  컨센서스 수집·표준화 (run_daily)
+├── rebalance.py        리밸런싱 순수 계산 (compute_rebalance + 공유 value_holdings_krw — DB/외부호출 없음)
+├── exposure.py         노출·집중도 순수 계산 (compute_exposure — value_holdings_krw 재사용, 포트 베타)
+├── beta.py             베타 수집·저장·조회 (fetch_all_betas, upsert_beta/get_beta → stock_beta)
+├── consensus.py · consensus_pipeline.py  컨센서스 수집·표준화 (run_daily, backfill force DELETE+재적재 원자화)
 ├── scraper.py · guru_scraper.py · guru_stats.py  구루 (dataroma)
 ├── digest_service.py   다이제스트 생성·텔레그램
 ├── analysis_service.py 섹터 ETF·매크로 상관
@@ -152,7 +154,7 @@ data/
 ### backend/tests/
 
 `pytest` (conftest.py + fixtures/). 파일당 대상 모듈/라우터 대응. 대표:
-`test_api_doc_sync.py`(라이브 라우트 ↔ 두 문서 헤더 대조), `test_batches_router.py`·`test_batch_market_split.py`·`test_scheduler_seed.py`(배치 count/set 단언), `test_kr_quote_*`(다수결·escalation·degenerate), `test_financials_kr/us_*`, `test_recommendations_*`, `test_security_auth_gaps.py`.
+`test_api_doc_sync.py`(라이브 라우트 ↔ 두 문서 헤더 대조), `test_batches_router.py`·`test_batch_market_split.py`·`test_scheduler_seed.py`(배치 count/set 단언), `test_kr_quote_*`(다수결·escalation·degenerate), `test_financials_kr/us_*`, `test_recommendations_*`, `test_security_auth_gaps.py`, `test_rebalance.py`·`test_exposure.py`·`test_beta.py`(순수 계산기·베타), `test_consensus_backfill_atomic.py`(force DELETE+재적재).
 
 ## frontend/
 
@@ -186,9 +188,9 @@ src/
 ├── pages/              라우트 레벨 + 허브 탭
 │   ├── Research.jsx     홈 허브 (/) — Reports·Recommendations·Ranking·Digest·Calendar 탭
 │   ├── MarketHub.jsx    시장 허브 — Market(시장지표)·수급지표 탭
-│   ├── Portfolio.jsx    대시보드·분석 (섹터/매크로/상관/리밸런싱)
+│   ├── Portfolio.jsx    대시보드·분석 (섹터/매크로/상관/리밸런싱/노출)
 │   ├── Reports.jsx · Ranking.jsx · Recommendations.jsx · Calendar.jsx · Digest.jsx
-│   ├── Market.jsx · Analytics.jsx · SectorTab.jsx · MacroTab.jsx · RebalanceTab.jsx
+│   ├── Market.jsx · Analytics.jsx · SectorTab.jsx · MacroTab.jsx · RebalanceTab.jsx · ExposureTab.jsx
 │   ├── Settings.jsx · LoginPage.jsx · Showcase.jsx
 │   ├── Guru.jsx · GuruCrawlNow.jsx · GuruManagers.jsx · GuruStats.jsx
 │   ├── ConsensusSettings.jsx · LeverageBackfillSettings.jsx · ReportManualGen.jsx
