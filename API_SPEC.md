@@ -1270,7 +1270,7 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 ### `GET /api/stocks/{ticker}/news`
 
-종목 최근 뉴스(최대 5건)를 on-demand 조회. 리포트가 없는 랭킹 종목 등에서 쓰며 `scraper.get_news`를 재사용한다(KR=Naver, US=yfinance). 공개 read.
+종목 최근 뉴스(최대 10건, 링크 기준 중복제거·published_at 최신순)를 on-demand 조회. 리포트가 없는 랭킹 종목 등에서 쓰며 `scraper.get_news`를 재사용한다(KR=Naver, US=yfinance). 공개 read.
 
 **Auth:** 불필요
 
@@ -2055,6 +2055,10 @@ FOMC 정책결정일 하드코딩 목록(`calendar._FOMC_DATES`)의 커버리지
   ],
   "insider_trades": [
     { "ticker": "005930", "direction": "buy", "net_shares": 12000, "count": 3 }
+  ],
+  "news": [
+    { "ticker": "AAPL", "title": "종목 관련 기사 제목", "link": "https://...",
+      "publisher": "매체명", "published_at": "2026-05-23 09:22" }
   ]
 }
 ```
@@ -2063,6 +2067,7 @@ FOMC 정책결정일 하드코딩 목록(`calendar._FOMC_DATES`)의 커버리지
 |------|------|------|
 | `disclosures[]` | array | 보유 KR 종목의 최근 DART 공시 피드(`stock_disclosures`에서 읽음). Cowork 코멘터리 `recent_disclosures`와 무관 |
 | `insider_trades[]` | array | 보유 KR 종목 중 내부자·5%지분 순매수/순매도 신호가 있는 종목(`stock_insider_trades` 윈도 집계). neutral(신호 없음)은 제외. 각 항목 `{ "ticker", "direction": "buy"\|"sell", "net_shares"(부호 보존), "count" }` |
+| `news[]` | array | 보유+관심 종목의 최근 뉴스. 스냅샷(`snapshots.data.news`)에서 종목당 최신 2건만 읽음(라이브 스크레이프 없음). 스냅샷 없거나 news 비면 그 종목은 제외 |
 
 **Error `404`** — 아직 생성된 다이제스트 없음
 
@@ -2070,7 +2075,7 @@ FOMC 정책결정일 하드코딩 목록(`calendar._FOMC_DATES`)의 커버리지
 
 ### `POST /api/digest/generate`
 
-다이제스트 즉시 생성 (동기). 응답 형태는 `GET /api/digest/latest`와 동일(`disclosures`·`insider_trades` 포함).
+다이제스트 즉시 생성 (동기). 응답 형태는 `GET /api/digest/latest`와 동일(`disclosures`·`insider_trades`·`news` 포함).
 
 **Auth:** Bearer token 필요
 

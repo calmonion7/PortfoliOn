@@ -6,6 +6,13 @@ import { Spark, Sig, sparkFor, fmt } from '../components/ui/icons'
 import InsiderBadge from '../components/ui/InsiderBadge'
 import useIsMobile from '../hooks/useIsMobile'
 
+function decodeHtml(str) {
+  if (!str) return str
+  const txt = document.createElement('textarea')
+  txt.innerHTML = str
+  return txt.value
+}
+
 function StockRow({ s }) {
   return (
     <div className="digest-row">
@@ -175,6 +182,27 @@ export default function Digest() {
                         {it.net_shares >= 0 ? '+' : '−'}{Math.abs(it.net_shares).toLocaleString()}주
                       </span>
                     )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 종목 뉴스 */}
+          {(digest.news?.length ?? 0) > 0 && (
+            <div className="card" style={{ marginBottom: 12, padding: '12px 16px' }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>종목 뉴스</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {digest.news.map((n, i) => (
+                  <div key={i} style={{ fontSize: 13 }}>
+                    <span style={{ fontWeight: 600 }}>{n.ticker}</span>
+                    {nameMap[n.ticker] && nameMap[n.ticker] !== n.ticker && (
+                      <span className="muted" style={{ fontSize: 11, marginLeft: 4 }}>{nameMap[n.ticker]}</span>
+                    )}
+                    <div>
+                      <a href={n.link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{decodeHtml(n.title)}</a>
+                      <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>— {n.publisher} ({n.published_at})</span>
+                    </div>
                   </div>
                 ))}
               </div>

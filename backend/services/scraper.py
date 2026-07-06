@@ -42,7 +42,22 @@ def scrape_finviz_consensus(ticker: str) -> dict:
         logger.warning(f"[Scraper] scrape_finviz_consensus({ticker}) 실패: {e}")
         return {}
 
-def get_news_kr(ticker: str) -> list[dict]:
+def _dedup_sort_limit(items: list[dict], limit: int) -> list[dict]:
+    """링크 기준 중복제거 + published_at 최신순 정렬 + limit건 절단."""
+    seen = set()
+    deduped = []
+    for item in items:
+        link = item.get("link") or ""
+        if link and link in seen:
+            continue
+        if link:
+            seen.add(link)
+        deduped.append(item)
+    deduped.sort(key=lambda x: x.get("published_at") or "", reverse=True)
+    return deduped[:limit]
+
+
+def get_news_kr(ticker: str, limit: int = 10) -> list[dict]:
     try:
         r = requests.get(
             f"https://m.stock.naver.com/api/news/stock/{ticker}",
@@ -68,7 +83,7 @@ def get_news_kr(ticker: str) -> list[dict]:
             raw_items = data.get("items") or data.get("newsList") or data.get("list") or []
 
         result = []
-        for item in raw_items[:5]:
+        for item in raw_items:
             title      = item.get("title") or item.get("headline") or ""
             office_id  = item.get("officeId", "")
             article_id = item.get("articleId", "")
@@ -91,21 +106,21 @@ def get_news_kr(ticker: str) -> list[dict]:
                     "publisher": publisher,
                     "published_at": pub_date,
                 })
-        return result
+        return _dedup_sort_limit(result, limit)
     except Exception as e:
         logger.warning(f"[Scraper] get_news_kr({ticker}) 실패: {e}")
         return []
 
 
-def get_news(ticker: str, market: str = "US") -> list[dict]:
+def get_news(ticker: str, market: str = "US", limit: int = 10) -> list[dict]:
     if market == "KR":
-        return get_news_kr(ticker)
+        return get_news_kr(ticker, limit)
 
     try:
         t = yf.Ticker(ticker)
         raw = t.news or []
         result = []
-        for item in raw[:5]:
+        for item in raw:
             content = item.get("content") or item
             title = content.get("title") or item.get("title", "")
             link = (
@@ -130,7 +145,7 @@ def get_news(ticker: str, market: str = "US") -> list[dict]:
                 published_at = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else ""
             if title:
                 result.append({"title": title, "link": link, "publisher": publisher, "published_at": published_at})
-        return result
+        return _dedup_sort_limit(result, limit)
     except Exception as e:
         logger.warning(f"[Scraper] get_news({ticker}) 실패: {e}")
         return []

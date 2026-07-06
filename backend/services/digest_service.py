@@ -37,6 +37,7 @@ DIGEST_DIR = Path(__file__).parent.parent / "data" / "digest"
 DIGEST_DIR.mkdir(exist_ok=True)
 ANOMALY_THRESHOLD = 5.0
 DISCLOSURE_WINDOW_DAYS = 7  # 다이제스트에 포함할 최근 공시 윈도우
+NEWS_PER_TICKER = 2  # 다이제스트에 종목당 실을 최신 뉴스 건수
 
 
 def generate(user_id: str, today: date = None) -> dict:
@@ -132,6 +133,7 @@ def generate(user_id: str, today: date = None) -> dict:
 
     disclosures = _recent_disclosure_feed(holdings, today)
     insider_trades = _recent_insider_trades(holdings, today)
+    news = _recent_news(all_stocks)
 
     kst = timezone(timedelta(hours=9))
     digest = {
@@ -147,6 +149,7 @@ def generate(user_id: str, today: date = None) -> dict:
         "anomalies": anomalies,
         "disclosures": disclosures,
         "insider_trades": insider_trades,
+        "news": news,
     }
 
     try:
@@ -224,6 +227,24 @@ def _recent_insider_trades(holdings: list[dict], today: date) -> list[dict]:
             "net_shares": sig["net_shares"],
             "count": sig["count"],
         })
+    return out
+
+
+def _recent_news(stocks: list[dict]) -> list[dict]:
+    """보유+관심 종목의 최근 뉴스 — snapshots.data.news를 읽기만 함(라이브 스크레이프 없음, [[뉴스]] CONTEXT).
+
+    스냅샷 없거나 news 비면 그 종목 스킵. 종목당 최신 NEWS_PER_TICKER건."""
+    from routers.stocks import _latest_snapshots
+    if not stocks:
+        return []
+    tickers = [s["ticker"].upper() for s in stocks]
+    snaps = _latest_snapshots(tickers)
+    out: list[dict] = []
+    for ticker in tickers:
+        data, _ = snaps.get(ticker) or (None, None)
+        news = (data or {}).get("news") or []
+        for item in news[:NEWS_PER_TICKER]:
+            out.append({"ticker": ticker, **item})
     return out
 
 

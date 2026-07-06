@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import api from '../../api'
 import Skeleton from '../ui/Skeleton'
 import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable, TechnicalStats } from './DetailTab'
 import ConsensusChart from './ConsensusChart'
@@ -32,6 +33,8 @@ export default function ReportDetailTabs({
 }) {
   const [tab, setTab] = useState('summary')
   const [analysisSubTab, setAnalysisSubTab] = useState('consensus')
+  // 라이브 뉴스 — null=아직 없음(스냅샷 news로 폴백), 배열=fetch 성공(빈 배열이면 폴백 유지)
+  const [liveNews, setLiveNews] = useState(null)
 
   const isEtf = !!summary?.is_etf
   const analysisSub = isEtf ? 'technical' : analysisSubTab
@@ -39,6 +42,18 @@ export default function ReportDetailTabs({
   const market = summary?.market
   const histMarket = historyMarket ?? summary?.market ?? 'US'
   const hasRsi = [summary?.daily_rsi, summary?.weekly_rsi, summary?.monthly_rsi].some(r => r?.rsi != null)
+  const news = liveNews?.length ? liveNews : summary?.news
+
+  // 마운트/종목 전환 시 라이브 뉴스 fetch — 실패·빈값이면 news가 자동으로 스냅샷 summary.news 폴백 유지 (Ranking.jsx BasicInfo와 동일 패턴)
+  useEffect(() => {
+    setLiveNews(null)
+    if (!ticker) return
+    let cancelled = false
+    api.get(`/api/stocks/${ticker}/news`, { params: { market: market || 'US' } })
+      .then(({ data }) => { if (!cancelled) setLiveNews(data.news || []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [ticker, market])
 
   const content = (
     <>
@@ -148,7 +163,7 @@ export default function ReportDetailTabs({
               <RisksSection risks={summary.risks} />
               <RecentDisclosuresSection
                 disclosures={summary.recent_disclosures}
-                news={summary.news}
+                news={news}
               />
               <LatestDisclosuresSection ticker={ticker} market={market} />
               <InsiderTradesSection ticker={ticker} market={market} />

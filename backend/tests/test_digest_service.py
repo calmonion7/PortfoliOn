@@ -235,6 +235,54 @@ def test_generate_nan_quote_does_not_break_serialization(tmp_path):
     json.dumps(result, allow_nan=False)
 
 
+def test_recent_news_top2_per_ticker_skips_missing_or_empty():
+    """_recent_news: 스냅샷 news에서 종목당 top2, 스냅샷 없음/news 빔은 스킵. 라이브 스크레이프(scraper) 호출 0."""
+    import services.digest_service as ds
+    stocks = [{"ticker": "AAPL"}, {"ticker": "TSLA"}, {"ticker": "MSFT"}]
+    aapl_news = [
+        {"title": "n1", "link": "https://x/1", "publisher": "A", "published_at": "2026-07-03 09:00"},
+        {"title": "n2", "link": "https://x/2", "publisher": "A", "published_at": "2026-07-02 09:00"},
+        {"title": "n3", "link": "https://x/3", "publisher": "A", "published_at": "2026-07-01 09:00"},
+    ]
+    snaps = {
+        "AAPL": ({"news": aapl_news}, "2026-07-03"),
+        "TSLA": ({"news": []}, "2026-07-03"),  # news 빔 → 스킵
+        "MSFT": (None, None),  # 스냅샷 없음 → 스킵
+    }
+    with patch("routers.stocks._latest_snapshots", return_value=snaps) as mock_snaps, \
+         patch("services.scraper.get_news") as mock_scraper:
+        result = ds._recent_news(stocks)
+    mock_snaps.assert_called_once_with(["AAPL", "TSLA", "MSFT"])
+    mock_scraper.assert_not_called()
+    assert result == [
+        {"ticker": "AAPL", "title": "n1", "link": "https://x/1", "publisher": "A", "published_at": "2026-07-03 09:00"},
+        {"ticker": "AAPL", "title": "n2", "link": "https://x/2", "publisher": "A", "published_at": "2026-07-02 09:00"},
+    ]
+
+
+def test_recent_news_empty_stocks():
+    import services.digest_service as ds
+    assert ds._recent_news([]) == []
+
+
+def test_generate_includes_news_field(tmp_path):
+    """digest 반환 dict에 news 필드가 포함되고, _recent_news가 스냅샷에서 읽는다(스크레이프 없음)."""
+    import services.digest_service as ds
+    news_item = [{"title": "n1", "link": "https://x/1", "publisher": "A", "published_at": "2026-05-23 09:00"}]
+    with patch.object(ds, "DIGEST_DIR", tmp_path), \
+         patch("services.digest_service.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
+         patch("services.digest_service.get_quotes_batch", return_value=_BATCH_NORMAL), \
+         patch("services.digest_service._get_usdkrw", return_value=1380), \
+         patch("services.digest_service._get_events", return_value=[]), \
+         patch("routers.stocks._latest_snapshots", return_value={
+             "AAPL": ({"news": news_item}, "2026-05-23"),
+             "TSLA": (None, None),
+         }), \
+         patch("services.digest_service.execute", side_effect=Exception("no db")):
+        result = ds.generate("test-user-id", today=date(2026, 5, 23))
+    assert result["news"] == [{"ticker": "AAPL", **news_item[0]}]
+
+
 def test_generate_insider_trades_graceful_on_error(tmp_path):
     """compute_net_signals_batch 예외는 배치 단위로 graceful skip(다이제스트 생성 무중단).
     S7: 배치 경로로 mock 타깃 이동."""
