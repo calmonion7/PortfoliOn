@@ -3,6 +3,7 @@ import IndexSection from '../components/market/IndexSection'
 import TreasurySection from '../components/market/TreasurySection'
 import FxSection from '../components/market/FxSection'
 import VixSection from '../components/market/VixSection'
+import FearGreedSection from '../components/market/FearGreedSection'
 import CommoditiesSection from '../components/market/CommoditiesSection'
 import EconIndicatorsSection from '../components/market/EconIndicatorsSection'
 import MacroSignalsSection from '../components/market/MacroSignalsSection'
@@ -27,6 +28,7 @@ export default function Market() {
           <TreasurySection />
           <FxSection />
           <VixSection />
+          <FearGreedSection />
           <CommoditiesSection />
           <EconIndicatorsSection />
           <MacroSignalsSection />

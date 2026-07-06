@@ -14,6 +14,7 @@ from services.market_indicators import (
     get_econ_indicators,
     get_macro_signals,
     get_indices,
+    get_fear_greed,
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
@@ -94,6 +95,15 @@ def econ_indicators():
 def indices():
     try:
         return get_indices()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/fear-greed")
+def fear_greed():
+    """CNN Fear & Greed 지수(US). 요청경로 증분(fx/vix 패턴), 배치 없음. CNN 실패 시 직전 저장값 graceful."""
+    try:
+        return get_fear_greed()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

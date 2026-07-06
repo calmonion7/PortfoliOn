@@ -16,8 +16,8 @@ export default function VixSection() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <SectionCardLoading title="공포탐욕지수 (VIX)" />
-  if (error || !data) return <SectionCardError title="공포탐욕지수 (VIX)" />
+  if (loading) return <SectionCardLoading title="변동성지수 (VIX)" />
+  if (error || !data) return <SectionCardError title="변동성지수 (VIX)" />
 
   const vix = data.current
   const vixColor = vix >= 30 ? 'var(--color-error)' : vix >= 20 ? 'var(--warn)' : 'var(--color-success)'
@@ -27,7 +27,7 @@ export default function VixSection() {
   const summary = vix != null ? `${vix.toFixed(1)} ${vixLabel}` : ''
 
   return (
-    <SectionCard title="공포탐욕지수 (VIX)" summary={summary} change={data.change ?? null} changeSuffix="" changeInverted open={open} onToggle={() => setOpen(o => !o)}>
+    <SectionCard title="변동성지수 (VIX)" summary={summary} change={data.change ?? null} changeSuffix="" changeInverted open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>S&P 500 옵션 내재변동성을 기반으로 시장 심리를 수치화한 지수입니다. 20 이하는 안정, 20~30은 주의, 30 이상은 공포 구간으로 해석합니다. 급등 시 단기 과매도 신호로 활용되기도 합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <div style={{ ...CARD_STYLE, minWidth: 140 }}>
