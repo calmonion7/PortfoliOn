@@ -734,6 +734,23 @@ def test_compare_extract_computes_upside_and_week52_position():
     assert result["ev_ebitda"] == 15.0
 
 
+def test_compare_extract_decimal_inputs_no_typeerror():
+    """target_mean(daily_consensus_mart NUMERIC)·beta(stock_beta NUMERIC)·스냅샷 값이 Decimal로 와도
+    Decimal-float 산술 TypeError 없이 float로 정규화된다(라이브 500 회귀 — fixture가 float만 써 못 잡던 케이스)."""
+    from decimal import Decimal
+    from routers.stocks import _compare_extract
+    snapshot = {
+        "price": Decimal("100.0"), "per": Decimal("20.0"),
+        "week52_high": Decimal("120.0"), "week52_low": Decimal("80.0"),
+        "financials_annual": [{"is_consensus": False, "roe": Decimal("18.0")}],
+    }
+    result = _compare_extract(snapshot, Decimal("120.0"), Decimal("1.1"))
+    assert result["upside"] == 20.0
+    assert result["week52_position"] == 50.0
+    assert isinstance(result["per"], float) and isinstance(result["beta"], float)
+    assert result["roe"] == 18.0 and result["target_mean"] == 120.0
+
+
 def test_compare_endpoint_snapshot_missing_ticker_graceful():
     """스냅샷 없는 ticker는 available:false로 표기되고 예외 없이 값이 전부 None."""
     with patch("routers.stocks._latest_snapshots", return_value={

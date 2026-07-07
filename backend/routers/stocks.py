@@ -225,6 +225,15 @@ def _compare_best(values: dict, direction: str) -> list:
     return [t for t, v in finite.items() if v == target]
 
 
+def _f(v):
+    """비교값을 float로 정규화(None/비유한/비수치→None). DB NUMERIC(Decimal)↔float 혼산·JSON 직렬화 안전."""
+    try:
+        x = float(v)
+        return x if math.isfinite(x) else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _compare_extract(snapshot: "dict | None", target_mean, beta) -> dict:
     """스냅샷(+as-of 목표가 정본·stock_beta)에서 비교 지표값 추출. snapshot 없으면 전부 None.
 
@@ -234,30 +243,33 @@ def _compare_extract(snapshot: "dict | None", target_mean, beta) -> dict:
     RSI는 daily_rsi.rsi. 목표가는 daily_consensus_mart as-of(호출자가 조회해 넘김, ADR-0008)."""
     if not snapshot:
         return {k: None for k, _, _ in _COMPARE_METRICS}
-    price = snapshot.get("price")
+    # DB NUMERIC(Decimal)과 스냅샷 float 혼재 → 전부 float로 정규화:
+    # ① Decimal-float 산술 TypeError 방지 ② _compare_best의 isinstance(int,float)가 Decimal을 놓치지 않게 ③ JSON 직렬화(Decimal 불가) 안전
+    price = _f(snapshot.get("price"))
+    target_mean = _f(target_mean)
     upside = None
-    if price and target_mean and math.isfinite(price) and price != 0:
+    if price and target_mean and price != 0:
         upside = round((target_mean - price) / price * 100, 2)
     fin = next((f for f in (snapshot.get("financials_annual") or []) if not f.get("is_consensus")), None) or {}
-    w_hi, w_lo = snapshot.get("week52_high"), snapshot.get("week52_low")
+    w_hi, w_lo = _f(snapshot.get("week52_high")), _f(snapshot.get("week52_low"))
     week52_position = None
     if price is not None and w_hi and w_lo and w_hi != w_lo:
         week52_position = round((price - w_lo) / (w_hi - w_lo) * 100, 1)
     return {
-        "per": snapshot.get("per"),
-        "pbr": snapshot.get("pbr"),
-        "psr": snapshot.get("psr"),
-        "ev_ebitda": snapshot.get("ev_ebitda"),
+        "per": _f(snapshot.get("per")),
+        "pbr": _f(snapshot.get("pbr")),
+        "psr": _f(snapshot.get("psr")),
+        "ev_ebitda": _f(snapshot.get("ev_ebitda")),
         "target_mean": target_mean,
         "upside": upside,
-        "roe": fin.get("roe"),
-        "operating_margin": fin.get("operating_margin"),
-        "debt_ratio": fin.get("debt_ratio"),
-        "fcf": fin.get("fcf"),
-        "rsi": (snapshot.get("daily_rsi") or {}).get("rsi"),
+        "roe": _f(fin.get("roe")),
+        "operating_margin": _f(fin.get("operating_margin")),
+        "debt_ratio": _f(fin.get("debt_ratio")),
+        "fcf": _f(fin.get("fcf")),
+        "rsi": _f((snapshot.get("daily_rsi") or {}).get("rsi")),
         "week52_position": week52_position,
-        "hv": snapshot.get("hv"),
-        "beta": beta,
+        "hv": _f(snapshot.get("hv")),
+        "beta": _f(beta),
     }
 
 
