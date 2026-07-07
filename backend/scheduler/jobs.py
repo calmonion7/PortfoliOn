@@ -76,6 +76,16 @@ def _refresh_macro_signals():
             print(f"[Scheduler] Macro signals refresh failed: {e}")
 
 
+def _refresh_kospi_signal():
+    from services.market_indicators import kospi_signal
+    with job_runs.record("kospi_signal_fetch", "auto"):
+        try:
+            kospi_signal.refresh_kospi_signal()
+            print("[Scheduler] KOSPI signal refreshed")
+        except Exception as e:
+            print(f"[Scheduler] KOSPI signal refresh failed: {e}")
+
+
 def _refresh_monthly_kr():
     from services.market_indicators import _fetch_and_save_kr_exports
     with job_runs.record("monthly_kr", "auto"):
@@ -469,6 +479,7 @@ _JOB_FUNCS = {
     "monthly_kr": _refresh_monthly_kr,
     "monthly_us": _refresh_monthly_us,
     "macro_signals_fetch": _refresh_macro_signals,
+    "kospi_signal_fetch": _refresh_kospi_signal,
     "leverage_fetch": _fetch_leverage,
     "lending_fetch": _fetch_lending,
     "kr_rankings_fetch": _fetch_kr_rankings,

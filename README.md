@@ -127,7 +127,7 @@ UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
 
 | 탭 | 설명 |
 |------|------|
-| 시장지표 | 국채, FX, VIX(변동성지수), CNN Fear & Greed(시장 투자심리 지수, US 전용), 원자재, 경제지표(FRED), 매크로 신호(금리차·HY 스프레드·M2·기준금리 + 신호 해석), M7/KR Top2 실적, KR 수출, 글로벌 지수(S&P 500·KOSPI·KOSDAQ 레벨·등락률·시계열) + S&P 500 Shiller CAPE 밸류에이션 |
+| 시장지표 | 국채, FX, VIX(변동성지수), CNN Fear & Greed(시장 투자심리 지수, US 전용), 원자재, 경제지표(FRED), 매크로 신호(금리차·HY 스프레드·M2·기준금리 + 신호 해석), 코스피 방향 신호(S&P500·나스닥·USD/KRW 오버나잇 프록시 + 적중률 누적), M7/KR Top2 실적, KR 수출, 글로벌 지수(S&P 500·KOSPI·KOSDAQ 레벨·등락률·시계열) + S&P 500 Shiller CAPE 밸류에이션 |
 | 수급지표 | 신용잔고·반대매매, 내외국인 대차잔고 |
 
 ### 구루 (Guru)

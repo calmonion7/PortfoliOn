@@ -13,6 +13,8 @@ from services.market_indicators import (
     get_commodities,
     get_econ_indicators,
     get_macro_signals,
+    get_kospi_signal,
+    refresh_kospi_signal,
     get_indices,
     get_fear_greed,
     _fetch_and_save_m7_earnings,
@@ -125,6 +127,28 @@ def refresh_macro_signals(_: str = Depends(require_admin)):
             data = _fetch_and_save_macro_signals()
         return {"ok": True, "yield_curve_points": len(data.get("yield_curve", [])),
                 "signals": data.get("signals", {})}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/kospi-signal")
+def kospi_signal():
+    """다음날 코스피 방향 신호(오버나잇 프록시) 저장 시계열+최신. 요청경로 라이브 yfinance 0."""
+    try:
+        return get_kospi_signal()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-kospi-signal")
+def refresh_kospi_signal_endpoint(_: str = Depends(require_admin)):
+    """코스피 방향 신호 수동 갱신 — kospi_signal_fetch로 기록."""
+    try:
+        with job_runs.record("kospi_signal_fetch", "manual"):
+            data = refresh_kospi_signal()
+        series = data.get("series", [])
+        return {"ok": True, "series_points": len(series),
+                "latest": series[-1] if series else None}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

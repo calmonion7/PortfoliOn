@@ -16,6 +16,7 @@ from .jobs import (
     _run_guru_crawl,
     _refresh_monthly_us,
     _refresh_macro_signals,
+    _refresh_kospi_signal,
     _refresh_monthly_kr,
     _refresh_earnings_us,
     _refresh_earnings_kr,
