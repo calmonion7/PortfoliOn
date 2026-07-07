@@ -17,6 +17,7 @@ from services.market_indicators import (
     refresh_kospi_signal,
     get_indices,
     get_fear_greed,
+    get_kospi_futures,
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
@@ -97,6 +98,14 @@ def econ_indicators():
 def indices():
     try:
         return get_indices()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/kospi-futures")
+def kospi_futures():
+    try:
+        return get_kospi_futures()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

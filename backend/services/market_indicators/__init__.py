@@ -7,6 +7,7 @@ from .macro import get_macro_signals, _fetch_and_save_macro_signals
 from .kospi_signal import get_kospi_signal, refresh_kospi_signal
 from .indices import get_indices
 from .sentiment import get_fear_greed
+from .kospi_futures import get_kospi_futures
 from .cache import _mc_delete, _cache, clear_cache
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "_fetch_and_save_econ_indicators", "_fetch_and_save_kr_exports",
     "get_indices",
     "get_fear_greed",
+    "get_kospi_futures",
     "_mc_delete", "_cache", "clear_cache",
 ]

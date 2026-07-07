@@ -2320,6 +2320,37 @@ CNN 공포·탐욕 지수(Fear & Greed, US 전용, 비공식 엔드포인트). `
 
 ---
 
+### `GET /api/market/kospi-futures`
+
+코스피200 선물(최근월물, KIS) 현재가·등락률·베이시스 + 일봉 종가 시계열(~120봉). 요청경로 전체 윈도우 단발 조회(배치 없음, ADR-0022 — 최근월물 코드가 분기마다 바뀌어 증분/스티칭은 계약을 섞는다). KIS 미설정 시 dormant(빈 응답). fetch 실패 시 `market_cache` 직전 저장값을 반환(fx.py 수동 폴백 패턴 — `get_or_refresh`는 stale-fallback 안 함), 저장값도 없으면 `current: null`.
+
+**Response `200`**
+```json
+{
+  "current": {
+    "price": 1247.50,
+    "change_pct": -4.33,
+    "basis": 5.41,
+    "contract": "F 202609",
+    "last_tr_date": "20260910"
+  },
+  "history": [{ "date": "2026-07-06", "close": 1303.95 }]
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `current.price` | number \| null | 최근월물 현재가 |
+| `current.change_pct` | number \| null | 전일 대비 등락률(%) |
+| `current.basis` | number \| null | 베이시스(선물가 - 현물가) |
+| `current.contract` | string \| null | 계약명(예: `F 202609`) |
+| `current.last_tr_date` | string \| null | 최종거래일(`YYYYMMDD`) |
+| `history` | object[] | 일봉 종가 시계열(`{ "date": "YYYY-MM-DD", "close": number }`) |
+
+`current`가 `null`이면 dormant(KIS 미설정) 또는 저장값 없이 fetch 실패.
+
+---
+
 ### `POST /api/market/refresh-macro-signals`
 
 FRED 매크로 신호 4종(`T10Y2Y`/`BAMLH0A0HYM2`/`M2SL`/`DFF`) 수동 재수집. 마지막 저장일 이후만 증분 조회해 `market_cache`에 병합 저장하고, 신호 플래그를 재평가한다. 실행이력은 일배치와 동일한 `macro_signals_fetch` id로 기록한다.
