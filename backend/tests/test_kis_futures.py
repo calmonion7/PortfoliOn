@@ -1,8 +1,9 @@
 """KIS 국내선물 최근월물/일봉 단위테스트 — 코드공식·롤오버·output1/2/3 봉투 파싱(ADR-0022).
 
 fixture는 라이브 프로브(A01609, 2026-07-07) 응답 모양을 그대로 고정한다."""
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 from services.kis.futures import (
     _code, _candidate_quarter, _next_quarter, _front_month_code,
     get_front_month, fetch_daily,
@@ -63,8 +64,8 @@ def test_front_month_code_matches_probe():
 def test_get_front_month_parses_output1_no_rollover():
     # 오늘(7/7)이 만기(9/10) 전이라 롤오버 없이 첫 후보 그대로
     with patch("services.kis.futures.client.request", return_value=_PRICE_PAYLOAD) as req:
-        with patch("services.kis.futures.date") as mock_date:
-            mock_date.today.return_value = date(2026, 7, 7)
+        with patch("services.kis.futures.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 7, 7, tzinfo=ZoneInfo("Asia/Seoul"))
             info = get_front_month()
     assert info["code"] == "A01609"
     assert info["contract_name"] == "F 202609"
@@ -85,8 +86,8 @@ def test_get_front_month_rolls_over_past_expiry():
                             "hts_kor_isnm": "F 202612", "futs_last_tr_date": "20261210"}}
 
     with patch("services.kis.futures.client.request", side_effect=fake) as req:
-        with patch("services.kis.futures.date") as mock_date:
-            mock_date.today.return_value = date(2026, 9, 14)
+        with patch("services.kis.futures.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 9, 14, tzinfo=ZoneInfo("Asia/Seoul"))
             info = get_front_month()
     assert info["code"] == "A01612"
     assert info["contract_name"] == "F 202612"

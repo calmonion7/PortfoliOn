@@ -5,7 +5,8 @@
 롤오버한다. 응답은 output1/output2/output3 분할 구조(주식 현재가의 단수 output과 다름).
 """
 from __future__ import annotations
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from services.kis import client
 from services.kis.quote import _num
 
@@ -14,6 +15,7 @@ _PRICE_TR = "FHMIF10000000"
 _DAILY_PATH = "/uapi/domestic-futureoption/v1/quotations/inquire-daily-fuopchartprice"
 _DAILY_TR = "FHKIF03020100"
 
+_KST = ZoneInfo("Asia/Seoul")
 _QUARTER_MONTHS = (3, 6, 9, 12)
 
 
@@ -57,9 +59,10 @@ def _fetch_price(code: str) -> dict:
 def get_front_month() -> dict:
     """최근월물 해석 + 현재가. 만기(futs_last_tr_date) 지났으면 다음 분기로 롤오버해 재조회.
     KIS 실패 시 예외 전파(호출측이 캐시/폴백 처리, .forge/adr/0022)."""
-    year, month = _candidate_quarter(date.today())
+    today = datetime.now(_KST).date()
+    year, month = _candidate_quarter(today)
     info = _fetch_price(_code(year, month))
-    today_str = date.today().strftime("%Y%m%d")
+    today_str = today.strftime("%Y%m%d")
     last_tr = info.get("last_tr_date")
     if last_tr and today_str > last_tr:
         year, month = _next_quarter(year, month)
@@ -71,7 +74,7 @@ def fetch_daily(code: str, days: int = 120) -> list[dict]:
     """FHKIF03020100 일봉 — output2(최신순 리스트) → 날짜 오름차순 {date, close}.
     close는 절대값(부호 없는 문자열이 정상이나 방어적으로 abs 처리). 페이지네이션/
     연속선물 스티칭 없음(최근월물 전체 윈도우 단발 조회, ADR-0022)."""
-    today = date.today()
+    today = datetime.now(_KST).date()
     start = today - timedelta(days=int(days * 1.8))  # 거래일 확보를 위한 여유 창
     d = client.request(_DAILY_TR, _DAILY_PATH, {
         "FID_COND_MRKT_DIV_CODE": "F",

@@ -2338,6 +2338,8 @@ CNN 공포·탐욕 지수(Fear & Greed, US 전용, 비공식 엔드포인트). `
 }
 ```
 
+`current`가 `null`일 때(KIS 미설정 또는 저장값 없이 fetch 실패)만 추가로 `"configured": false | true` 필드가 실린다(둘을 구분하기 위한 additive 필드 — false=KIS 미설정 dormant, true=설정됐으나 일시적 fetch 실패·저장값 없음). `current`가 값을 가지면(라이브 성공 또는 저장값 폴백) `configured` 필드는 없다.
+
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `current.price` | number \| null | 최근월물 현재가 |
@@ -2346,8 +2348,9 @@ CNN 공포·탐욕 지수(Fear & Greed, US 전용, 비공식 엔드포인트). `
 | `current.contract` | string \| null | 계약명(예: `F 202609`) |
 | `current.last_tr_date` | string \| null | 최종거래일(`YYYYMMDD`) |
 | `history` | object[] | 일봉 종가 시계열(`{ "date": "YYYY-MM-DD", "close": number }`) |
+| `configured` | boolean | `current`가 null일 때만 존재. `false`=KIS 미설정, `true`=설정됐으나 일시적 fetch 실패 |
 
-`current`가 `null`이면 dormant(KIS 미설정) 또는 저장값 없이 fetch 실패.
+`current`가 `null`이면 dormant(KIS 미설정, `configured: false`) 또는 저장값 없이 fetch 실패(`configured: true`).
 
 ---
 

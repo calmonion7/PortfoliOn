@@ -23,9 +23,12 @@ export default function KospiFuturesSection() {
   const history = data?.history || []
 
   if (!cur) {
+    const msg = data?.configured === false
+      ? '코스피200 선물 데이터를 사용할 수 없습니다. (KIS 연동 미설정)'
+      : '코스피200 선물 데이터를 일시적으로 불러오지 못했습니다.'
     return (
       <SectionCard title="코스피200 선물" open={open} onToggle={() => setOpen(o => !o)}>
-        <p style={DESC_STYLE}>코스피200 선물 데이터를 사용할 수 없습니다. (KIS 연동 미설정)</p>
+        <p style={DESC_STYLE}>{msg}</p>
       </SectionCard>
     )
   }

@@ -14,7 +14,7 @@ _MODULE = "services.market_indicators.kospi_futures"
 def test_dormant_when_kis_not_configured():
     with patch(f"{_MODULE}.client.configured", return_value=False):
         result = get_kospi_futures()
-    assert result == {"current": None, "history": []}
+    assert result == {"current": None, "history": [], "configured": False}
 
 
 def test_assembles_shape_on_success():
@@ -56,20 +56,43 @@ def test_fetch_failure_no_stored_returns_empty():
         patch(f"{_MODULE}._mc_load", return_value=None),
     ):
         result = get_kospi_futures()
-    assert result == {"current": None, "history": []}
+    assert result == {"current": None, "history": [], "configured": True}
 
 
 def test_empty_result_not_persisted():
-    """fetch가 예외 없이도 사용 불가 값(front_month 실패 전파)이면 _mc_save 호출 안 됨."""
+    """rt_cd=0(예외 없음)이나 output1이 전부 None이면(price=None) _mc_save 호출 안 됨."""
+    empty_front = {"code": "A01609", "contract_name": None, "price": None,
+                   "change_pct": None, "basis": None, "last_tr_date": None}
     with (
         patch(f"{_MODULE}.client.configured", return_value=True),
         patch(f"{_MODULE}._get_cache", return_value=None),
-        patch(f"{_MODULE}.kis_futures.get_front_month", side_effect=Exception("KIS down")),
+        patch(f"{_MODULE}.kis_futures.get_front_month", return_value=empty_front),
+        patch(f"{_MODULE}.kis_futures.fetch_daily", return_value=[]),
         patch(f"{_MODULE}._mc_load", return_value=None),
         patch(f"{_MODULE}._mc_save") as mc_save,
     ):
-        get_kospi_futures()
+        result = get_kospi_futures()
     mc_save.assert_not_called()
+    assert result == {"current": None, "history": [], "configured": True}
+
+
+def test_empty_result_does_not_clobber_last_good():
+    """가드 없이는 all-None 결과가 저장값을 덮어썼을 케이스 — 가드 후엔 last-good 반환."""
+    empty_front = {"code": "A01609", "contract_name": None, "price": None,
+                   "change_pct": None, "basis": None, "last_tr_date": None}
+    stored_data = {"current": {"price": 1200.0}, "history": _HISTORY}
+    with (
+        patch(f"{_MODULE}.client.configured", return_value=True),
+        patch(f"{_MODULE}._get_cache", return_value=None),
+        patch(f"{_MODULE}.kis_futures.get_front_month", return_value=empty_front),
+        patch(f"{_MODULE}.kis_futures.fetch_daily", return_value=[]),
+        patch(f"{_MODULE}._mc_load", return_value={"data": stored_data}),
+        patch(f"{_MODULE}._mc_save") as mc_save,
+        patch(f"{_MODULE}._set_cache"),
+    ):
+        result = get_kospi_futures()
+    mc_save.assert_not_called()
+    assert result == stored_data
 
 
 def test_nan_inf_sanitized():

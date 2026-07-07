@@ -11,13 +11,16 @@ from .cache import _get_cache, _set_cache, _mc_load, _mc_save
 
 logger = logging.getLogger(__name__)
 
-_EMPTY = {"current": None, "history": []}
+_EMPTY = {"current": None, "history": [], "configured": False}
 
 
 def _fetch() -> dict | None:
     try:
         front = kis_futures.get_front_month()
         history = kis_futures.fetch_daily(front["code"], days=120)
+        if front.get("price") is None or not history:
+            logger.warning("[KospiFutures] rt_cd=0이나 output1/history 비어 사용불가 — 미영속")
+            return None
         return {
             "current": {
                 "price": front.get("price"),
@@ -53,4 +56,4 @@ def get_kospi_futures() -> dict:
     if stored:
         _set_cache("kospi_futures", stored["data"], ttl=3600)
         return stored["data"]
-    return dict(_EMPTY)
+    return {"current": None, "history": [], "configured": True}
