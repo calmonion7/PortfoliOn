@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: e12f17d5c4a2f0cf9c1ed030a4b867aa207afdcc
-mapped: 2026-07-06
+last_mapped_commit: a5fb8bc8fbb92ec9155e7bc20ba681388786bfcd
+mapped: 2026-07-07
 ---
 
 # STRUCTURE — PortfoliOn
@@ -22,7 +22,7 @@ mapped: 2026-07-06
 ├── deploy.sh           정식 배포 스크립트
 ├── scripts/            auto-deploy-poll.sh 등
 ├── docker-compose.yml  nginx/backend/postgres/certbot
-├── nginx.conf
+├── nginx/              nginx.conf
 ├── start.sh / start.bat / stop.bat
 └── .forge/             forge 상태 (codebase/·adr/·backlog/·retro/ …)
 ```
@@ -59,13 +59,13 @@ routers/
 ├── auth.py             /api/auth — 로그인·OAuth·토큰
 ├── portfolio.py        /api/portfolio — 보유 목록·prices 폴링·rebalance(계산·targets 저장)·exposure(노출·집중도·포트 베타)
 ├── watchlist.py        /api/watchlist — 관심 종목·promote
-├── stocks.py           /api/stocks — dashboard·enrich·dividends·beta·supply-score
+├── stocks.py           /api/stocks — dashboard·enrich·dividends·beta·supply-score·{ticker}/news
 ├── report.py           /api (report) — 리포트 생성·목록·상세·backlog·disclosures·agm
 ├── recommendations.py  /api/recommendations — 추천 조회·refresh
 ├── rankings.py         /api/rankings — 거래대금/거래량/등락률 랭킹
 ├── investor.py         /api/investor — 수급 추이
 ├── short_sell.py       /api/short-sell — 공매도 추이
-├── market_indicators.py /api/market·/api/market-indicators — FX/VIX/원자재/국채/경제/실적/수출/매크로/신용/대차
+├── market_indicators.py /api/market·/api/market-indicators — FX/VIX/원자재/국채/경제/실적/수출/매크로/지수/신용/대차/fear-greed
 ├── analysis.py         /api/analysis — 섹터 모멘텀·매크로 상관
 ├── analytics.py        /api/analytics — 보유 종목 상관관계
 ├── calendar.py         /api/calendar — 캘린더 이벤트 (파일 캐시)
@@ -82,18 +82,19 @@ routers/
 ```
 services/
 ├── db.py               ThreadedConnectionPool + query/execute/execute_many
-├── batch_registry.py   BATCHES 메타데이터 리스트 + get_batch
+├── batch_registry.py   BATCHES 메타데이터 리스트 (28개) + get_batch
 ├── job_runs.py         배치 실행로그 record/recent/recent_map
 ├── cache.py            인메모리 캐시 8종 (snapshot LRU + TTL 7종)
 ├── utils.py            sanitize (NaN/inf → None)
 ├── errors.py · parallel.py · progress.py · schedule_spec.py
-├── report_generator.py 리포트 스냅샷 생성 (generate_report / _with_retry / backfill_ticker)
+├── report_generator.py 리포트 스냅샷 생성 (generate_report / _with_retry / backfill_ticker; 뉴스 병렬 fetch → data.news 박제)
 ├── rebalance.py        리밸런싱 순수 계산 (compute_rebalance + 공유 value_holdings_krw — DB/외부호출 없음)
 ├── exposure.py         노출·집중도 순수 계산 (compute_exposure — value_holdings_krw 재사용, 포트 베타)
 ├── beta.py             베타 수집·저장·조회 (fetch_all_betas, upsert_beta/get_beta → stock_beta)
 ├── consensus.py · consensus_pipeline.py  컨센서스 수집·표준화 (run_daily, backfill force DELETE+재적재 원자화)
-├── scraper.py · guru_scraper.py · guru_stats.py  구루 (dataroma)
-├── digest_service.py   다이제스트 생성·텔레그램
+├── scraper.py          뉴스 스크레이프 (get_news US=yfinance / get_news_kr=Naver, _dedup_sort_limit)
+├── guru_scraper.py · guru_stats.py  구루 (dataroma)
+├── digest_service.py   다이제스트 생성·텔레그램 (_recent_news = 스냅샷 news 읽기, NEWS_PER_TICKER=2)
 ├── analysis_service.py 섹터 ETF·매크로 상관
 ├── kr_sector_service.py · us_sector_service.py  업종 모멘텀 (market_cache)
 ├── ranking_service.py  랭킹 (market_rankings)
@@ -103,7 +104,7 @@ services/
 ├── backlog.py · backlog_parser.py  수주잔고 (DART document.xml)
 ├── disclosures.py · agm.py · insider_trades.py  DART 공시·주총·지분
 ├── dividends.py        배당 (yfinance/DART → stock_dividends)
-├── indicators.py       RSI·EMA·HV 등 기술 지표
+├── indicators.py       RSI·EMA·HV·베타(calc_beta) 등 기술 지표
 ├── auth_service.py     JWT (HS256, jose) · 비밀번호 해시 · OAuth upsert
 ├── storage/            re-export 패키지 (ADR-0017)
 │   ├── __init__.py     portfolio·names·schedule·dates + db 심볼 re-export
@@ -118,9 +119,10 @@ services/
 │   └── us.py           get_annual_financials_us + KIS US 백업 (_us_quote_kis)
 ├── market_indicators/  시장지표 패키지
 │   ├── __init__.py     get_econ_indicators·get_kr_exports + _fetch_and_save_* (배치)
-│   ├── cache.py        _mc_load/_mc_save (market_cache 테이블) + get_or_refresh 증분
+│   ├── cache.py        _mc_load/_mc_save (market_cache 테이블) + _get_cache/_set_cache + get_or_refresh 증분
 │   ├── fx.py · commodities.py  FX/VIX · 원자재/국채 (요청경로 증분)
 │   ├── indices.py      시장지수 레벨 + S&P500 Shiller CAPE (multpl 크롤)
+│   ├── sentiment.py    CNN Fear&Greed (get_fear_greed, 요청경로 증분·배치 없음)
 │   ├── earnings.py     M7 / KR Top2 (주 1회)
 │   ├── econ.py · macro.py · exports.py  FRED 경제지표·매크로 신호·KR 수출
 ├── recommendation/     추천 엔진 패키지 (ADR-0015)
@@ -189,7 +191,7 @@ src/
 │   ├── Research.jsx     홈 허브 (/) — Reports·Recommendations·Ranking·Digest·Calendar 탭
 │   ├── MarketHub.jsx    시장 허브 — Market(시장지표)·수급지표 탭
 │   ├── Portfolio.jsx    대시보드·분석 (섹터/매크로/상관/리밸런싱/노출)
-│   ├── Reports.jsx · Ranking.jsx · Recommendations.jsx · Calendar.jsx · Digest.jsx
+│   ├── Reports.jsx · Ranking.jsx · Recommendations.jsx · Calendar.jsx · Digest.jsx (종목 뉴스 섹션)
 │   ├── Market.jsx · Analytics.jsx · SectorTab.jsx · MacroTab.jsx · RebalanceTab.jsx · ExposureTab.jsx
 │   ├── Settings.jsx · LoginPage.jsx · Showcase.jsx
 │   ├── Guru.jsx · GuruCrawlNow.jsx · GuruManagers.jsx · GuruStats.jsx
@@ -197,7 +199,7 @@ src/
 │   └── AdminAnalytics.jsx  (/admin-analytics, admin 전용)
 ├── components/
 │   ├── portfolio/      DashboardCard(.jsx/.css) · FlashValue · PriceFreshness · PriceFlash.css
-│   ├── reports/        ReportDetailTabs · DetailTab · HistoryTab · ReportDetailHeader
+│   ├── reports/        ReportDetailTabs (라이브 뉴스 fetch → 스냅샷 폴백) · DetailTab · HistoryTab · ReportDetailHeader
 │   │                   ConsensusChart · FinancialsChart · BacklogChart · Sections
 │   │                   StockActions(카드/리스트 공용) · StockCard · TickerListItem
 │   │                   SupplySection · ShortSellSection · InsiderTradesSection
@@ -206,7 +208,7 @@ src/
 │   ├── market/         FxSection · VixSection · CommoditiesSection · TreasurySection
 │   │                   EconIndicatorsSection · M7EarningsSection · KrTop2Section
 │   │                   KrExportsSection · IndexSection · MacroSignalsSection
-│   │                   LeverageSection · LendingSection · marketUtils.jsx
+│   │                   FearGreedSection · LeverageSection · LendingSection · marketUtils.jsx
 │   ├── recommendations/ RecCard.jsx
 │   ├── ui/             프리미티브 — Badge · Button · Card · Stat · Input · Skeleton
 │   │                   SupplyBadge · InsiderBadge · icons.jsx · index.js (+ .css 짝)
@@ -222,7 +224,7 @@ src/
 
 ## 명명 규칙
 
-- **백엔드 배치 id**: `<도메인>_<동작>` (`daily_report_kr`·`backlog_fetch`·`recommendation_us`). 시장 분리 배치는 `_kr`/`_us` 접미사. id = 스케줄러 잡 id = `job_runs.record` id로 일치.
+- **백엔드 배치 id**: `<도메인>_<동작>` (`daily_report_kr`·`backlog_fetch`·`recommendation_us`·`beta_fetch`). 시장 분리 배치는 `_kr`/`_us` 접미사. id = 스케줄러 잡 id = `job_runs.record` id로 일치.
 - **서비스 private 심볼**: 내부 헬퍼는 `_` prefix. 재-export 패키지는 `__init__.py`에서 private 포함 명시 re-export(`import *`는 underscore를 건너뛰므로).
 - **DART 외부 fetch 함수**: `fetch_all_<도메인>` (배치 본문), `_fetch_and_save_<도메인>` (market_indicators 배치).
 - **프론트 컴포넌트**: PascalCase `.jsx`, CSS는 동명 `.css` 짝. 훅은 `use<Name>.js`, 테스트는 `<name>.test.js(x)`.

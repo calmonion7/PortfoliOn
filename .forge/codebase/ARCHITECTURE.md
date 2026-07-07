@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: e12f17d5c4a2f0cf9c1ed030a4b867aa207afdcc
-mapped: 2026-07-06
+last_mapped_commit: a5fb8bc8fbb92ec9155e7bc20ba681388786bfcd
+mapped: 2026-07-07
 ---
 
 # ARCHITECTURE — PortfoliOn
@@ -54,7 +54,7 @@ mapped: 2026-07-06
 APScheduler `AsyncIOScheduler` 기반. 부분초기화 순환 회피를 위해 leaf 모듈로 분할:
 
 - **`_state.py`** — 공유 상태/상수: `_scheduler = AsyncIOScheduler()`, `_DIGEST_JOB_ID`, `_VALID_DAYS`.
-- **`jobs.py`** — 잡 함수 전체 + 매핑 `_JOB_FUNCS`(job_id → 함수). 각 잡은 `with job_runs.record(job_id, "auto"):`로 감싸고, 내부 예외는 대부분 try/except로 삼켜 로깅(스케줄러가 죽지 않게). `_generate_all(market, job_id)`가 KR/US 리포트 배치의 공통 본문, `_in_market()`이 시장 파티션(KR=`market=='KR'`, US=그 외 전부). 배치-백킹 뷰용 기동 시드: `_seed_rankings_if_empty`·`_seed_kr_sector_if_empty`·`_seed_us_sector_if_empty`.
+- **`jobs.py`** — 잡 함수 전체 + 매핑 `_JOB_FUNCS`(job_id → 함수). 각 잡은 `with job_runs.record(job_id, "auto"):`로 감싸고, 내부 예외는 대부분 try/except로 삼켜 로깅(스케줄러가 죽지 않게). `_generate_all(market, job_id)`가 KR/US 리포트 배치의 공통 본문, `_in_market()`이 시장 파티션(KR=`market=='KR'`, US=그 외 전부). 배치-백킹 뷰용 기동 시드: `_seed_rankings_if_empty`·`_seed_kr_sector_if_empty`·`_seed_us_sector_if_empty`. 베타 잡 `_fetch_betas`(task#150)도 여기.
 - **`schedule.py`** — 트리거 빌드·리스케줄·시드·누락복구: `_build_trigger`(`CronTrigger` + `schedule_spec.build_trigger_kwargs`), `_reschedule_job`(storage 스펙대로 잡 재등록, disabled면 제거만), `_seed_spec_for`/`_seed_batch_schedules`(기동 idempotent 스케줄 마이그레이션), `_check_missed_report`/`_check_missed_report_for`(기동 시 시장별 당일 스케줄이 지났는데 스냅샷 없으면 부분 누락 복구).
 - **`__init__.py`** — 배선: leaf 모듈들의 심볼을 명시 re-export(private 포함, `_fetch_betas` 포함) + `start()`(`_seed_batch_schedules` → editable 배치 전부 `_reschedule_job` → `_check_missed_report` → 시드 → `_scheduler.start()`), `stop()`, `reload(job_id)`.
 - `misfire_grace_time` 미지정 시 인자를 아예 빼서 APScheduler 기본값(1초)을 쓴다 — `None`을 넘기면 '유예 무제한'으로 해석되어 거동이 바뀐다(`daily_report_kr/us`만 82800초 명시).
@@ -98,13 +98,13 @@ APScheduler `AsyncIOScheduler` 기반. 부분초기화 순환 회피를 위해 l
 
 ### 2. `market_cache` 테이블 — `backend/services/market_indicators/cache.py`
 
-배치-백킹 시장지표의 영구 캐시. `_mc_load`/`_mc_save`/`_mc_delete`로 PostgreSQL `market_cache`(key/data/fetched_at) 읽기·쓰기. 인메모리 `_cache`(TTL) 위에 DB 계층을 얹은 `get_or_refresh(key, fetch_fn, ttl, force)`: TTL 인메모리 → `_mc_load` → `fetch_fn()`. `_merge_history`/`_yf_close_history`로 yfinance 증분 fetch(마지막 날짜 이후만), `_filter_outliers`로 median±5x 이탈 제거.
+배치-백킹 시장지표의 영구 캐시. `_mc_load`/`_mc_save`/`_mc_delete`로 PostgreSQL `market_cache`(key/data/fetched_at) 읽기·쓰기. 인메모리 `_cache`(TTL, `_get_cache`/`_set_cache`) 위에 DB 계층을 얹은 `get_or_refresh(key, fetch_fn, ttl, force)`: TTL 인메모리 → `_mc_load` → `fetch_fn()`. `_merge_history`/`_yf_close_history`로 yfinance 증분 fetch(마지막 날짜 이후만), `_filter_outliers`로 median±5x 이탈 제거.
 
 ### "배치가 사전계산, 요청은 저장값만 읽는다" 규칙
 
 외부 API(키움·FRED·yfinance 등)에 의존하는 뷰(랭킹·KR/US 업종 모멘텀·추천·수급 스코어·매크로 신호·시장지표·**포트폴리오 베타**)는 **요청·기동 경로에서 라이브 외부 호출을 하지 않는다**. 배치가 사전계산해 `market_cache` 또는 전용 테이블(`stock_recommendations`·`market_rankings`·`stock_supply_score`·`stock_beta` 등)에 저장하고, GET 엔드포인트는 저장값만 읽는다. 배치는 ① 실패를 조용히 삼키지 말고 로깅, ② 빈/all-None 결과를 캐시에 박제하지 말 것(직전 양호값 유지). (ADR-0014/0015)
 
-예외 — **요청경로 증분** 패턴: FX/VIX/원자재/국채/시장지수(`indices.py`)는 스케줄 배치 없이 요청 시 TTL캐시→`_mc_load`→라이브 fetch→`_mc_save`+폴백으로 증분 갱신(`batch_registry` 무등록).
+예외 — **요청경로 증분** 패턴: FX/VIX/원자재/국채/시장지수(`indices.py`)·**시장 Fear&Greed**(`sentiment.py`, task#151)는 스케줄 배치 없이 요청 시 TTL캐시→`_mc_load`→라이브 fetch→`_mc_save`+폴백으로 증분 갱신(`batch_registry` 무등록). 또 하나의 예외 — **뉴스**(task#152)는 요청 시 라이브 스크레이프, 저장 테이블 없음(아래 뉴스 흐름).
 
 ## 시세 소스 체인 — `backend/services/market/`
 
@@ -121,6 +121,7 @@ APScheduler `AsyncIOScheduler` 기반. 부분초기화 순환 회피를 위해 l
 ## 리포트 생성 흐름 — `backend/services/report_generator.py`
 
 - `generate_report(stock, ..., target_date)` — 시장 데이터 스냅샷 생성(**백엔드에 LLM/Anthropic 호출 없음**; AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API로 작성, `CLAUDE_COWORK_API.md`).
+- 병렬 fetch(`ThreadPoolExecutor`)로 시세·재무·차트·컨센서스·**뉴스**(`scraper.get_news`, task#152)를 모아 스냅샷 `data`에 박제(`data["news"]`) — 다이제스트가 이 저장값을 읽는다.
 - `generate_report_with_retry(stock, ...)` — 스케줄러/누락복구가 호출.
 - `backfill_ticker(stock, days, ...)` — 과거 날짜 백필(현재가 대조 불가라 박제 게이트 미적용).
 - 컨센서스는 `consensus_pipeline.run_daily(stocks)`가 별도로 처리(리포트 배치에 내장). `consensus_pipeline`의 백필 force 경로는 DELETE+재적재를 원자화(버그 #28, task#148).
@@ -146,6 +147,22 @@ APScheduler `AsyncIOScheduler` 기반. 부분초기화 순환 회피를 위해 l
 - **소스 분기**: US=yfinance `t.info` beta(없으면 `beta3Year` 폴백, ETF 대응) / KR=`indicators.calc_beta(종목 일수익률, ^KS11 일수익률)`. `^KS11`은 yfinance라 tz-strip 필수(키움 tz-naive와 concat TypeError→조용히 None 회피).
 - **저장소** `stock_beta`(ticker PK): `upsert_beta`(멱등)·`get_beta`(조회). 결측/예외는 None graceful(저장 안 함, wrong<missing — beta 0.0을 falsy로 폴백 치환하지 않게 명시 None 체크).
 - **배치** `fetch_all_betas()` — `user_stocks ∩ tickers`의 보유+관심 종목을 시장별 분기 수집(KR은 `^KS11` 1회 fetch 재사용). 자동 잡 `beta_fetch`(주 일 05:30, `scheduler/jobs.py:_fetch_betas` → `_JOB_FUNCS`) + 수동 `POST /api/stocks/beta/refresh`(admin). 노출 탭 베타가중 노출은 이 저장값만 읽는다(배치-백킹 뷰 라이브금지 가토).
+
+## 시장 Fear&Greed 흐름 — `backend/services/market_indicators/sentiment.py` (task#151)
+
+- `get_fear_greed()` — CNN 공포·탐욕 지수(US, 0~100 + rating). 시장지표 요청경로 증분(fx 패턴): 인메모리 TTL(`_get_cache`, 3600s) → `_fetch_fear_greed()` 라이브 → `sanitize` → `_mc_save("fear_greed")`+캐시. 실패 시 `_mc_load` 직전 저장값, 없으면 None graceful.
+- CNN **비공식** 엔드포인트(`production.dataviz.cnn.io/index/fearandgreed/graphdata`)라 전체 브라우저 헤더(`_CNN_HEADERS`: UA+Accept+Origin+Referer+sec-ch-ua)가 있어야 응답(불완전하면 418). 응답에서 `score`·`rating`·`previous_*`·최근 60일 history 추출.
+- **스케줄 배치 없음**(`batch_registry` 무등록 — fx/vix/indices와 동일 요청경로 증분).
+- **라우터**: `GET /api/market/fear-greed`(`backend/routers/market_indicators.py`, `get_fear_greed` import·공개 read).
+- **프론트**: `frontend/src/components/market/FearGreedSection.jsx`(MarketHub 시장지표 탭 `Market.jsx`에서 렌더).
+
+## 뉴스 흐름 — `backend/services/scraper.py` (task#152)
+
+- `get_news(ticker, market="US", limit=10)` — 시장별 라이브 스크레이프: KR=`get_news_kr`(Naver), US=yfinance(`t.news`). 두 경로 모두 `_dedup_sort_limit`(링크 기준 중복제거·최신순·limit)로 정규화. 예외 시 `[]` graceful. **전용 저장 테이블 없음.**
+- **세 소비 경로**:
+  1. **리포트 상세(라이브)**: `GET /api/stocks/{ticker}/news`(`routers/stocks.py:get_stock_news`, 공개 read, `scraper.get_news` 재사용). 프론트 `ReportDetailTabs.jsx`가 마운트/종목 전환 시 라이브 fetch → 실패·빈값이면 스냅샷 `summary.news`로 폴백(`liveNews?.length ? liveNews : summary?.news`).
+  2. **스냅샷 박제**: `report_generator`가 리포트 생성 시 `get_news`를 병렬 fetch해 `data["news"]`에 저장.
+  3. **다이제스트(스냅샷 읽기)**: `digest_service._recent_news(stocks)`가 아침 리포트가 박제한 `snapshots.data.news`를 **읽기만** 함(라이브 스크레이프 없음, `routers.stocks._latest_snapshots` 재사용). 종목당 최신 `NEWS_PER_TICKER=2`건. 다이제스트 `data["news"]`로 실려 프론트 `Digest.jsx` "종목 뉴스" 섹션에 표시.
 
 ## 프론트엔드 데이터 흐름
 
@@ -185,6 +202,8 @@ APScheduler `AsyncIOScheduler` 기반. 부분초기화 순환 회피를 위해 l
 | 리밸런싱 계산 | `backend/services/rebalance.py` (`compute_rebalance` / `value_holdings_krw`) |
 | 노출·집중도 계산 | `backend/services/exposure.py` (`compute_exposure`) |
 | 베타 수집·저장 | `backend/services/beta.py` (`fetch_all_betas` / `stock_beta`) |
+| Fear&Greed | `backend/services/market_indicators/sentiment.py` (`get_fear_greed`) |
+| 뉴스 스크레이프 | `backend/services/scraper.py` (`get_news`) |
 | 프론트 앱 진입 | `frontend/src/main.jsx` → `frontend/src/App.jsx` |
 | 프론트 API 클라이언트 | `frontend/src/api.js` |
 | 인증 컨텍스트 | `frontend/src/contexts/AuthContext.jsx` |
