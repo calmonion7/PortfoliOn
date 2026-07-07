@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 VALID_EVENTS = {
     "nav_portfolio", "nav_research", "nav_market", "nav_guru", "nav_settings",
     "tab_holdings", "tab_watch", "tab_analysis", "tab_dash",
-    "tab_reports", "tab_digest", "tab_calendar", "tab_ranking",
+    "tab_reports", "tab_digest", "tab_calendar", "tab_ranking", "tab_compare",
     "report_view_open", "report_tab_switch",
     "ranking_row_click",
     "stock_search",

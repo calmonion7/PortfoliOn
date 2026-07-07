@@ -666,3 +666,115 @@ def test_usdkrw_rate_non_finite_returns_none():
     inf_fx = {"data": {"rates": {"usdkrw": {"current": float("inf")}}}}
     with patch("routers.stocks._mc_load", return_value=inf_fx):
         assert _usdkrw_rate() is None
+
+
+# --- GET /api/stocks/compare (task#153) ---
+
+def test_compare_best_lower_is_better_picks_min():
+    from routers.stocks import _compare_best
+    assert _compare_best({"AAPL": 25.0, "MSFT": 30.0}, "lower") == ["AAPL"]
+
+
+def test_compare_best_higher_is_better_picks_max():
+    from routers.stocks import _compare_best
+    assert _compare_best({"AAPL": 25.0, "MSFT": 30.0}, "higher") == ["MSFT"]
+
+
+def test_compare_best_excludes_missing_and_non_finite():
+    from routers.stocks import _compare_best
+    import math
+    values = {"AAPL": 25.0, "MSFT": None, "TSLA": float("nan"), "NVDA": float("inf")}
+    assert _compare_best(values, "lower") == ["AAPL"]
+
+
+def test_compare_best_all_missing_returns_empty():
+    from routers.stocks import _compare_best
+    assert _compare_best({"AAPL": None, "MSFT": None}, "lower") == []
+
+
+def test_compare_best_tie_returns_joint_best():
+    from routers.stocks import _compare_best
+    assert _compare_best({"AAPL": 20.0, "MSFT": 20.0, "TSLA": 25.0}, "lower") == ["AAPL", "MSFT"]
+
+
+def test_compare_best_ambiguous_direction_returns_empty():
+    """RSI·베타·52주 위치처럼 방향이 없는(None) 지표는 값이 있어도 하이라이트하지 않는다."""
+    from routers.stocks import _compare_best
+    assert _compare_best({"AAPL": 50.0, "MSFT": 70.0}, None) == []
+
+
+def test_compare_extract_missing_snapshot_returns_all_none():
+    from routers.stocks import _compare_extract, _COMPARE_METRICS
+    result = _compare_extract(None, None, None)
+    assert result == {k: None for k, _, _ in _COMPARE_METRICS}
+
+
+def test_compare_extract_computes_upside_and_week52_position():
+    from routers.stocks import _compare_extract
+    snapshot = {
+        "price": 100.0, "per": 20.0, "pbr": 3.0, "psr": 5.0, "ev_ebitda": 15.0,
+        "week52_high": 120.0, "week52_low": 80.0, "hv": 0.3,
+        "daily_rsi": {"rsi": 55.0},
+        "financials_annual": [
+            {"period": "2027", "is_consensus": True, "roe": None},
+            {"period": "2026", "is_consensus": False, "roe": 18.0, "operating_margin": 25.0,
+             "debt_ratio": 40.0, "fcf": 1000},
+        ],
+    }
+    result = _compare_extract(snapshot, 120.0, 1.1)
+    assert result["upside"] == 20.0            # (120-100)/100*100
+    assert result["week52_position"] == 50.0   # (100-80)/(120-80)*100
+    assert result["roe"] == 18.0                # 최신 non-consensus 항목에서 추출
+    assert result["operating_margin"] == 25.0
+    assert result["debt_ratio"] == 40.0
+    assert result["fcf"] == 1000
+    assert result["rsi"] == 55.0
+    assert result["beta"] == 1.1
+    assert result["per"] == 20.0 and result["pbr"] == 3.0 and result["psr"] == 5.0
+    assert result["ev_ebitda"] == 15.0
+
+
+def test_compare_endpoint_snapshot_missing_ticker_graceful():
+    """스냅샷 없는 ticker는 available:false로 표기되고 예외 없이 값이 전부 None."""
+    with patch("routers.stocks._latest_snapshots", return_value={
+        "AAPL": ({"price": 100.0, "per": 20.0, "name": "Apple Inc."}, "2026-07-01"),
+        "FAKE": (None, None),
+    }), \
+         patch("routers.stocks.query", return_value=[]), \
+         patch("routers.stocks.consensus_svc.get_asof_batch", return_value={}):
+        resp = client.get("/api/stocks/compare?tickers=AAPL,FAKE")
+    assert resp.status_code == 200
+    body = resp.json()
+    tickers_info = {t["ticker"]: t for t in body["tickers"]}
+    assert tickers_info["AAPL"]["available"] is True
+    assert tickers_info["FAKE"]["available"] is False
+    assert tickers_info["FAKE"]["name"] == "FAKE"
+    per_metric = next(m for m in body["metrics"] if m["key"] == "per")
+    assert per_metric["values"] == {"AAPL": 20.0, "FAKE": None}
+    assert per_metric["best"] == ["AAPL"]  # FAKE 결측 제외
+
+
+def test_compare_endpoint_rejects_more_than_four_tickers():
+    resp = client.get("/api/stocks/compare?tickers=A,B,C,D,E")
+    assert resp.status_code == 400
+
+
+def test_compare_endpoint_uses_mart_asof_for_target_and_upside():
+    """목표가는 스냅샷 동결값이 아니라 daily_consensus_mart as-of 정본을 쓴다(ADR-0008)."""
+    with patch("routers.stocks._latest_snapshots", return_value={
+        "AAPL": ({"price": 100.0, "target_mean": 110.0, "name": "Apple Inc."}, "2026-07-01"),
+        "MSFT": ({"price": 200.0, "target_mean": 210.0, "name": "Microsoft"}, "2026-07-01"),
+    }), \
+         patch("routers.stocks.query", return_value=[]), \
+         patch("routers.stocks.consensus_svc.get_asof_batch",
+               return_value={"AAPL": {"target_mean": 150.0}, "MSFT": {"target_mean": None}}):
+        resp = client.get("/api/stocks/compare?tickers=AAPL,MSFT")
+    assert resp.status_code == 200
+    body = resp.json()
+    target_metric = next(m for m in body["metrics"] if m["key"] == "target_mean")
+    upside_metric = next(m for m in body["metrics"] if m["key"] == "upside")
+    assert target_metric["values"]["AAPL"] == 150.0    # mart as-of 150 (snapshot 동결 110 아님)
+    assert target_metric["values"]["MSFT"] == 210.0    # mart target_mean None → snapshot 폴백
+    assert target_metric["best"] == []                 # 목표가는 방향 애매 → 하이라이트 없음
+    assert upside_metric["values"]["AAPL"] == 50.0      # (150-100)/100*100
+

@@ -6,6 +6,7 @@ import Calendar from './Calendar'
 import Digest from './Digest'
 import Ranking from './Ranking'
 import Recommendations from './Recommendations'
+import Compare from './Compare'
 import useIsMobile from '../hooks/useIsMobile'
 
 export default function Research() {
@@ -37,6 +38,7 @@ export default function Research() {
           <button className={tab === 'reports' ? 'is-active' : ''} onClick={() => go('reports', 'tab_reports')}>리포트</button>
           <button className={tab === 'recommendations' ? 'is-active' : ''} onClick={() => go('recommendations')}>추천</button>
           <button className={tab === 'ranking' ? 'is-active' : ''} onClick={() => go('ranking', 'tab_ranking')}>랭킹</button>
+          <button className={tab === 'compare' ? 'is-active' : ''} onClick={() => go('compare', 'tab_compare')}>비교</button>
           <button className={tab === 'digest' ? 'is-active' : ''} onClick={() => go('digest', 'tab_digest')}>다이제스트</button>
           <button className={tab === 'calendar' ? 'is-active' : ''} onClick={() => go('calendar', 'tab_calendar')}>캘린더</button>
         </div>
@@ -46,6 +48,7 @@ export default function Research() {
         {tab === 'reports'  && <Reports initialTicker={deepTicker} />}
         {tab === 'recommendations' && <Recommendations />}
         {tab === 'ranking'  && <Ranking />}
+        {tab === 'compare'  && <Compare />}
         {tab === 'calendar' && <Calendar />}
       </div>
     </>
@@ -60,12 +63,14 @@ export default function Research() {
         <button className={tab === 'reports' ? 'is-active' : ''} onClick={() => go('reports', 'tab_reports')}>리포트</button>
         <button className={tab === 'recommendations' ? 'is-active' : ''} onClick={() => go('recommendations')}>추천</button>
         <button className={tab === 'ranking' ? 'is-active' : ''} onClick={() => go('ranking', 'tab_ranking')}>랭킹</button>
+        <button className={tab === 'compare' ? 'is-active' : ''} onClick={() => go('compare', 'tab_compare')}>비교</button>
         <button className={tab === 'calendar' ? 'is-active' : ''} onClick={() => go('calendar', 'tab_calendar')}>캘린더</button>
         <button className={tab === 'digest' ? 'is-active' : ''} onClick={() => go('digest', 'tab_digest')}>다이제스트</button>
       </div>
       {tab === 'reports'  && <Reports initialTicker={deepTicker} />}
       {tab === 'recommendations' && <Recommendations />}
       {tab === 'ranking'  && <Ranking />}
+      {tab === 'compare'  && <Compare />}
       {tab === 'calendar' && <Calendar />}
       {tab === 'digest'   && <Digest />}
     </div>

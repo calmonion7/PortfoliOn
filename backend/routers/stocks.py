@@ -192,6 +192,114 @@ def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
     return filtered
 
 
+# 종목 비교 — 방향 자명 지표만 그룹별 정의(direction: higher/lower/None=애매→하이라이트 제외)
+_COMPARE_METRICS = [
+    ("per", "valuation", "lower"),
+    ("pbr", "valuation", "lower"),
+    ("psr", "valuation", "lower"),
+    ("ev_ebitda", "valuation", "lower"),
+    ("target_mean", "valuation", None),
+    ("upside", "valuation", "higher"),
+    ("roe", "financial", "higher"),
+    ("operating_margin", "financial", "higher"),
+    ("debt_ratio", "financial", "lower"),
+    ("fcf", "financial", "higher"),
+    ("rsi", "technical", None),
+    ("week52_position", "technical", None),
+    ("hv", "technical", None),
+    ("beta", "technical", None),
+]
+
+
+def _compare_best(values: dict, direction: str) -> list:
+    """방향 자명 지표의 per-지표 best ticker 목록(순수함수).
+
+    결측/비유한은 비교 대상서 제외, 전부 결측이면 []. 동률은 공동 best. direction이
+    'higher'/'lower'가 아니면(애매 지표) 하이라이트 자체를 안 함 → []."""
+    if direction not in ("higher", "lower"):
+        return []
+    finite = {t: v for t, v in values.items() if isinstance(v, (int, float)) and math.isfinite(v)}
+    if not finite:
+        return []
+    target = max(finite.values()) if direction == "higher" else min(finite.values())
+    return [t for t, v in finite.items() if v == target]
+
+
+def _compare_extract(snapshot: "dict | None", target_mean, beta) -> dict:
+    """스냅샷(+as-of 목표가 정본·stock_beta)에서 비교 지표값 추출. snapshot 없으면 전부 None.
+
+    필드 경로는 report_generator.py 저장 스키마/routers/report.py 소비 경로와 동일(추정 아님):
+    per/pbr/psr/ev_ebitda/price/week52_high/week52_low/hv는 스냅샷 top-level,
+    ROE·영업이익률·부채비율·FCF는 financials_annual의 최신 non-consensus 항목,
+    RSI는 daily_rsi.rsi. 목표가는 daily_consensus_mart as-of(호출자가 조회해 넘김, ADR-0008)."""
+    if not snapshot:
+        return {k: None for k, _, _ in _COMPARE_METRICS}
+    price = snapshot.get("price")
+    upside = None
+    if price and target_mean and math.isfinite(price) and price != 0:
+        upside = round((target_mean - price) / price * 100, 2)
+    fin = next((f for f in (snapshot.get("financials_annual") or []) if not f.get("is_consensus")), None) or {}
+    w_hi, w_lo = snapshot.get("week52_high"), snapshot.get("week52_low")
+    week52_position = None
+    if price is not None and w_hi and w_lo and w_hi != w_lo:
+        week52_position = round((price - w_lo) / (w_hi - w_lo) * 100, 1)
+    return {
+        "per": snapshot.get("per"),
+        "pbr": snapshot.get("pbr"),
+        "psr": snapshot.get("psr"),
+        "ev_ebitda": snapshot.get("ev_ebitda"),
+        "target_mean": target_mean,
+        "upside": upside,
+        "roe": fin.get("roe"),
+        "operating_margin": fin.get("operating_margin"),
+        "debt_ratio": fin.get("debt_ratio"),
+        "fcf": fin.get("fcf"),
+        "rsi": (snapshot.get("daily_rsi") or {}).get("rsi"),
+        "week52_position": week52_position,
+        "hv": snapshot.get("hv"),
+        "beta": beta,
+    }
+
+
+@router.get("/compare")
+def compare_stocks(tickers: str = Query(..., min_length=1), user_id: str = Depends(get_current_user)):
+    """보유+관심 종목 2~4개의 밸류에이션·재무·기술 지표를 최신 스냅샷에서 비교(신규 수집 없음)."""
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    if not ticker_list:
+        raise HTTPException(status_code=400, detail="tickers required")
+    if len(ticker_list) > 4:
+        raise HTTPException(status_code=400, detail="최대 4개까지 비교 가능합니다")
+
+    snapshots = _latest_snapshots(ticker_list)
+    beta_rows = query(
+        "SELECT ticker, beta FROM stock_beta WHERE ticker = ANY(%s) AND beta IS NOT NULL",
+        (ticker_list,),
+    )
+    beta_map = {r["ticker"].upper(): float(r["beta"]) for r in beta_rows}
+    # 목표가 정본 = daily_consensus_mart as-of(종목별 최신 스냅샷 날짜). ADR-0008.
+    asof_pairs = [(t, snapshots[t][1]) for t in ticker_list if snapshots.get(t) and snapshots[t][0] and snapshots[t][1]]
+    asof_rows = consensus_svc.get_asof_batch(asof_pairs) if asof_pairs else {}
+
+    tickers_info = []
+    per_ticker_values = {}
+    for t in ticker_list:
+        data, _date = snapshots.get(t, (None, None))
+        tickers_info.append({"ticker": t, "name": (data or {}).get("name") or t, "available": bool(data)})
+        row = asof_rows.get(t)
+        target_mean = row["target_mean"] if row and row.get("target_mean") is not None else (data or {}).get("target_mean")
+        per_ticker_values[t] = _compare_extract(data, target_mean, beta_map.get(t))
+
+    metrics = []
+    for key, group, direction in _COMPARE_METRICS:
+        values = {t: per_ticker_values[t].get(key) for t in ticker_list}
+        metrics.append({
+            "key": key, "group": group, "direction": direction,
+            "values": values, "best": _compare_best(values, direction),
+        })
+
+    return sanitize({"tickers": tickers_info, "metrics": metrics})
+
+
 @router.get("/{ticker}/news")
 def get_stock_news(ticker: str, market: str = "US"):
     """종목 최근 뉴스 (랭킹 등 리포트 없는 종목용 on-demand 조회). scraper.get_news 재사용, 공개 read."""

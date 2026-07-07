@@ -1013,6 +1013,48 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 
 ---
 
+### `GET /api/stocks/compare`
+
+보유+관심 종목 2~4개의 밸류에이션·재무·기술 지표를 최신 스냅샷에서 나란히 비교. 신규 수집 없음(박제 read-only) — 요청경로 라이브 fetch 0.
+
+**Auth:** Bearer token 필요
+
+**Query Parameters**
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|---------|------|------|------|
+| `tickers` | string | ✅ | 콤마구분 티커 목록, 최대 4개(초과 시 `400`) |
+
+**Response `200`**
+```json
+{
+  "tickers": [
+    {"ticker": "AAPL", "name": "Apple Inc.", "available": true},
+    {"ticker": "FAKE", "name": "FAKE", "available": false}
+  ],
+  "metrics": [
+    {
+      "key": "per", "group": "valuation", "direction": "lower",
+      "values": {"AAPL": 28.5, "FAKE": null},
+      "best": ["AAPL"]
+    },
+    {
+      "key": "rsi", "group": "technical", "direction": null,
+      "values": {"AAPL": 55.2, "FAKE": null},
+      "best": []
+    }
+  ]
+}
+```
+- `metrics[].key`: `per`·`pbr`·`psr`·`ev_ebitda`·`target_mean`·`upside`(밸류에이션) / `roe`·`operating_margin`·`debt_ratio`·`fcf`(재무) / `rsi`·`week52_position`·`hv`·`beta`(기술).
+- `metrics[].direction`: `"lower"`(낮을수록 좋음) / `"higher"`(높을수록 좋음) / `null`(방향 애매 — RSI·베타·52주 위치·목표가는 하이라이트 대상 아님, `best`는 항상 `[]`).
+- `metrics[].best`: 결측/비유한 제외 후 방향상 최적값의 ticker 목록(동률은 공동 best). 전부 결측이면 `[]`.
+- 스냅샷 없는 ticker는 `available: false` + 모든 지표 `null`(비교 불가 graceful, 예외 없음).
+- 목표가(`target_mean`)·상승여력(`upside`)은 `daily_consensus_mart` as-of 정본을 사용(ADR-0008, 스냅샷 동결값 아님).
+- 베타(`beta`)는 `stock_beta` 저장값(배치 산출, 요청경로 라이브 계산 없음).
+
+---
+
 ### `GET /api/stocks/dashboard`
 
 보유종목 대시보드 카드 목록 (현재가, 수익률, RSI, 컨센서스, 배당) + 포트폴리오 총계. TTL 300s 캐시.
