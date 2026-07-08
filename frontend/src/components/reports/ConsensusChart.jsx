@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { fmtPrice as fmt } from '../../utils'
@@ -14,15 +14,27 @@ export default function ConsensusChart({ ticker, market }) {
   const [data, setData] = useState([])
   const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState(null)
+  const [fetchFailed, setFetchFailed] = useState(false)  // 조회 실패 — '데이터 없음'과 구분
   const [tab, setTab] = useState(0)
   const [period, setPeriod] = useState('3M')
+  const retriedRef = useRef(false)  // 무음 auto-retry 1회 제한
 
   const fetchData = useCallback(() => {
     if (!ticker) return
     api.get(`/api/consensus/${ticker}`)
-      .then(({ data }) => setData(data))
-      .catch(() => setError('데이터 조회 실패'))
+      .then(({ data }) => { setData(data); setFetchFailed(false); retriedRef.current = false })
+      .catch(() => {
+        // 일시적 오류(터널 520 등)는 대부분 즉시 재시도로 해소 — 1회 무음 재시도 후 실패 표시.
+        if (!retriedRef.current) {
+          retriedRef.current = true
+          setTimeout(() => fetchData(), 1500)
+        } else {
+          setFetchFailed(true)
+        }
+      })
   }, [ticker])
+
+  const retryFetch = () => { retriedRef.current = false; setFetchFailed(false); fetchData() }
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -305,7 +317,15 @@ export default function ConsensusChart({ ticker, market }) {
         </div>
       </div>
       {error && <div style={{ color: 'var(--color-error)', fontSize: 11, marginBottom: 6 }}>{error}</div>}
-      {ascData.length === 0 ? (
+      {fetchFailed ? (
+        <div style={{ color: 'var(--text-3)', fontSize: 12, textAlign: 'center', padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <span>일시적 연결 오류로 컨센서스를 불러오지 못했습니다.</span>
+          <button onClick={retryFetch} style={{
+            background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)',
+            borderRadius: 3, padding: '2px 10px', fontSize: 11, cursor: 'pointer',
+          }}>다시 시도</button>
+        </div>
+      ) : ascData.length === 0 ? (
         <div style={{ color: 'var(--text-3)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
           아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요.
         </div>
