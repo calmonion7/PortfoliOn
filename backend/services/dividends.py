@@ -15,7 +15,8 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 import yfinance as yf
@@ -187,22 +188,191 @@ def get_dividend(ticker: str) -> "dict | None":
     return r
 
 
+# ── 배당 스케줄 (다가오는 배당락 예상, stock_dividend_schedule) ─────────
+# t.dividends 이력에서 주기를 추론해 향후 N개월 배당락을 투영(예상). US는 t.calendar로
+# 최근접 건을 확정(confirmed)+지급일 보강. KR/그 외는 전부 예상(projected). ADR-0023.
+
+_KST = ZoneInfo("Asia/Seoul")
+
+
+def _today_kst() -> date:
+    """KR 시장-날짜 판정용 오늘 (컨테이너 UTC라 bare date.today() 금지 — CLAUDE.md)."""
+    return datetime.now(_KST).date()
+
+
+def _as_date(v) -> "date | None":
+    """yfinance calendar 값(Timestamp·date·list·None)을 date로 정규화."""
+    if isinstance(v, list):
+        v = v[0] if v else None
+    if v is None:
+        return None
+    if hasattr(v, "date"):
+        try:
+            return v.date()
+        except Exception:
+            return None
+    return v if isinstance(v, date) else None
+
+
+def _snap_interval(median_gap: int) -> int:
+    """관측 중앙 간격(일)을 표준 배당주기로 스냅 — 분기91/반기182/연365, 그 외 원값."""
+    if 60 <= median_gap <= 120:
+        return 91
+    if 150 <= median_gap <= 210:
+        return 182
+    if 300 <= median_gap <= 420:
+        return 365
+    return median_gap
+
+
+def _dividend_history(sym: str) -> "list[tuple]":
+    """yfinance t.dividends → [(ex_date, amount), ...] 오름차순. 실패·무배당은 []."""
+    try:
+        s = yf.Ticker(sym).dividends
+    except Exception as e:
+        logger.warning(f"[DivSchedule] t.dividends 실패 ({sym}): {e}")
+        return []
+    if s is None or len(s) == 0:
+        return []
+    out = []
+    for ts, amt in s.items():
+        d = _as_date(ts)
+        try:
+            a = float(amt)
+        except (TypeError, ValueError):
+            continue
+        if d is not None and a > 0:
+            out.append((d, a))
+    out.sort(key=lambda x: x[0])
+    return out
+
+
+def fetch_dividend_schedule(ticker: str, market: str = "US", exchange: str = "",
+                            horizon_months: int = 12) -> "list[dict]":
+    """종목의 향후 배당락 스케줄(예상+US 확정)을 산출. 주기 추론 불가·무배당은 [].
+
+    - 이력에서 최근 간격 중앙값→표준주기 스냅→마지막 배당락(또는 US 확정건) 기준 투영.
+    - 예상금액 = 직전 실금액(last_amt). status: KR/그 외=projected, US 최근접=confirmed(+지급일).
+    """
+    from services.market.format import _yf_sym
+    sym = _yf_sym(ticker, market, exchange)
+    hist = _dividend_history(sym)
+    if len(hist) < 2:
+        return []  # 주기 추론 불가(신규 배당·무배당)
+
+    recent = hist[-8:]
+    gaps = sorted((recent[i][0] - recent[i - 1][0]).days for i in range(1, len(recent)))
+    median_gap = gaps[len(gaps) // 2]
+    if median_gap <= 0:
+        return []
+    interval = _snap_interval(median_gap)
+    last_date, last_amt = recent[-1]
+    currency = "KRW" if market == "KR" else "USD"
+    today = _today_kst()
+    horizon_end = today + timedelta(days=int(horizon_months * 30.44) + 20)
+
+    rows: list[dict] = []
+    seen: set = set()
+
+    # US: t.calendar 확정 배당락 + 지급일 (미래·horizon 내일 때만)
+    confirmed_ex = None
+    if market != "KR":
+        try:
+            cal = yf.Ticker(sym).calendar or {}
+        except Exception:
+            cal = {}
+        ex = _as_date(cal.get("Ex-Dividend Date"))
+        pay = _as_date(cal.get("Dividend Date"))
+        if ex and today <= ex <= horizon_end:
+            rows.append({"ex_date": ex, "pay_date": pay, "amount_per_share": last_amt,
+                         "currency": currency, "status": "confirmed", "source": "yfinance"})
+            seen.add(ex)
+            confirmed_ex = ex
+
+    # 투영: anchor(확정건 또는 마지막 실제 배당락)에서 interval씩 전진, 오늘~horizon 범위만.
+    d = confirmed_ex or last_date
+    for _ in range(40):  # 무한루프 가드
+        d = d + timedelta(days=interval)
+        if d > horizon_end:
+            break
+        if d < today or d in seen:
+            continue
+        rows.append({"ex_date": d, "pay_date": None, "amount_per_share": last_amt,
+                     "currency": currency, "status": "projected", "source": "yfinance"})
+        seen.add(d)
+
+    rows.sort(key=lambda r: r["ex_date"])
+    return rows
+
+
+def replace_schedule(ticker: str, rows: "list[dict]") -> None:
+    """티커의 스케줄을 통째 교체(delete→insert). rows 비면 삭제만(무배당 정리)."""
+    tk = ticker.upper()
+    execute("DELETE FROM stock_dividend_schedule WHERE ticker = %s", (tk,))
+    for r in rows:
+        execute(
+            """
+            INSERT INTO stock_dividend_schedule
+                (ticker, ex_date, pay_date, amount_per_share, currency, status, source, fetched_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (ticker, ex_date) DO UPDATE SET
+                pay_date         = EXCLUDED.pay_date,
+                amount_per_share = EXCLUDED.amount_per_share,
+                currency         = EXCLUDED.currency,
+                status           = EXCLUDED.status,
+                source           = EXCLUDED.source,
+                fetched_at       = NOW()
+            """,
+            (tk, r["ex_date"], r.get("pay_date"), r.get("amount_per_share"),
+             r.get("currency"), r["status"], r.get("source")),
+        )
+
+
+def get_schedule_batch(tickers: "list[str]") -> "list[dict]":
+    """여러 티커의 오늘(KST) 이후 배당 스케줄을 ex_date 오름차순으로 반환(저장값만)."""
+    if not tickers:
+        return []
+    ph = ",".join(["%s"] * len(tickers))
+    rows = query(
+        f"""
+        SELECT ticker, ex_date, pay_date, amount_per_share, currency, status, source
+        FROM stock_dividend_schedule
+        WHERE ticker IN ({ph}) AND ex_date >= %s
+        ORDER BY ex_date ASC
+        """,
+        (*[t.upper() for t in tickers], _today_kst()),
+    )
+    out = []
+    for r in rows:
+        d = dict(r)
+        if d.get("amount_per_share") is not None:
+            d["amount_per_share"] = float(d["amount_per_share"])
+        for k in ("ex_date", "pay_date"):
+            if d.get(k) is not None:
+                d[k] = d[k].isoformat()
+        out.append(d)
+    return out
+
+
 # ── 배치 ──────────────────────────────────────────────────────────────
 
 def fetch_all_dividends() -> dict:
     """user_stocks ∩ tickers의 보유+관심 종목을 시장별로 분기 수집해 저장.
 
-    KR=DART alotMatter, 그 외(US 등)=yfinance. 무배당/결측(None)은 저장 안 함."""
+    연 DPS: KR=DART alotMatter, 그 외(US 등)=yfinance. 무배당/결측(None)은 저장 안 함.
+    배당 스케줄(stock_dividend_schedule): 시장 불문 yfinance t.dividends 이력으로 산출·교체."""
     rows = query(
-        "SELECT DISTINCT us.ticker, t.market FROM user_stocks us "
+        "SELECT DISTINCT us.ticker, t.market, t.exchange FROM user_stocks us "
         "JOIN tickers t ON us.ticker = t.ticker "
         "WHERE us.type IN ('holding', 'watchlist')"
     )
     ok = 0
     failed = 0
+    sched_ok = 0
     for r in rows:
         ticker = r["ticker"]
         market = r.get("market") or "US"
+        exchange = r.get("exchange") or ""
         try:
             d = fetch_kr_dividend(ticker) if market == "KR" else fetch_us_dividend(ticker)
             if d is not None:
@@ -211,5 +381,11 @@ def fetch_all_dividends() -> dict:
         except Exception as e:
             failed += 1
             logger.warning(f"[Dividends] fetch_all failed for {ticker}: {e}")
-    logger.info(f"[Dividends] fetch_all: {ok}/{len(rows)} ok, {failed} failed")
-    return {"total": len(rows), "ok": ok, "failed": failed}
+        # 스케줄은 연 DPS와 독립 — 한쪽 실패가 다른 쪽을 막지 않게 별도 try.
+        try:
+            replace_schedule(ticker, fetch_dividend_schedule(ticker, market, exchange))
+            sched_ok += 1
+        except Exception as e:
+            logger.warning(f"[Dividends] schedule failed for {ticker}: {e}")
+    logger.info(f"[Dividends] fetch_all: {ok}/{len(rows)} ok, {failed} failed; schedule {sched_ok}/{len(rows)}")
+    return {"total": len(rows), "ok": ok, "failed": failed, "schedule_ok": sched_ok}

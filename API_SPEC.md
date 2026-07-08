@@ -591,6 +591,55 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 
 ---
 
+### `GET /api/portfolio/dividends`
+
+보유·관심 종목의 **다가오는 배당 스케줄**(향후 12개월)을 배당락일 오름차순으로 조회 + 보유 종목의 12개월 예상 수령액(KRW 환산 합계). 배치(`dividend_fetch`)가 사전계산한 `stock_dividend_schedule`을 읽으며 **요청 경로 라이브 호출 0**. KR/그 외는 이력 기반 **예상(projected)**, US는 `t.calendar` 최근접 건을 **확정(confirmed)**+지급일로 보강한다(ADR-0023). 지급일(`pay_date`)은 US만, KR은 `null`.
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "items": [
+    {
+      "ticker": "005930",
+      "name": "삼성전자",
+      "market": "KR",
+      "stock_type": "holding",
+      "ex_date": "2026-09-26",
+      "pay_date": null,
+      "amount_per_share": 372.0,
+      "currency": "KRW",
+      "status": "projected",
+      "quantity": 100,
+      "expected_amount": 37200.0
+    },
+    {
+      "ticker": "AAPL",
+      "name": "Apple",
+      "market": "US",
+      "stock_type": "watchlist",
+      "ex_date": "2026-08-20",
+      "pay_date": "2026-08-25",
+      "amount_per_share": 0.27,
+      "currency": "USD",
+      "status": "confirmed",
+      "quantity": null,
+      "expected_amount": null
+    }
+  ],
+  "summary": {
+    "total_expected_12m_krw": 37200.0,
+    "holdings_with_dividend": 1,
+    "fx_usdkrw": 1385.2
+  }
+}
+```
+
+관심 종목(`stock_type: "watchlist"`)은 수량이 없어 `quantity`·`expected_amount`가 `null`. `total_expected_12m_krw`는 보유 종목의 예상 수령액을 KRW로 환산한 합계(US$는 저장 FX `fx_usdkrw`로 환산, FX 없으면 해당 US 종목은 합계서 제외).
+
+---
+
 ### `GET /api/portfolio/rebalance`
 
 보유 종목의 목표 비중(사용자 설정) 대비 현재 비중 드리프트 + 목표 도달 조정금액(KRW)을 계산. 스코프는 보유 종목만(현금·관심종목 제외). **주문 실행은 범위 밖 — 읽기전용 계산기.**

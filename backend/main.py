@@ -81,6 +81,21 @@ def _migrate():
         print(f"[migrate] stock_dividends 생성 실패: {e}")
     try:
         from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS stock_dividend_schedule (
+            ticker TEXT NOT NULL,
+            ex_date DATE NOT NULL,
+            pay_date DATE,
+            amount_per_share NUMERIC,
+            currency TEXT,
+            status TEXT NOT NULL,
+            source TEXT,
+            fetched_at TIMESTAMPTZ DEFAULT NOW(),
+            PRIMARY KEY (ticker, ex_date))""")
+        execute("CREATE INDEX IF NOT EXISTS idx_dividend_schedule_read ON stock_dividend_schedule(ticker, ex_date)")
+    except Exception as e:
+        print(f"[migrate] stock_dividend_schedule 생성 실패: {e}")
+    try:
+        from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_beta (
             ticker TEXT PRIMARY KEY,
             beta NUMERIC,

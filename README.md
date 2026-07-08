@@ -122,6 +122,7 @@ UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
 | 비교 | 보유·관심 종목 2~4개 다중선택 → 밸류에이션(PER·PBR·PSR·EV/EBITDA·목표가·상승여력)·재무(ROE·영업이익률·부채비율·FCF)·기술(RSI·52주 위치·HV·베타) 지표를 종목=열로 나란히 비교, 방향 자명 지표는 최적값 하이라이트. 최신 스냅샷 재활용(신규 수집 없음) |
 | 다이제스트 | 보유·관심 종목 요약 + 최신 공시 + 내부자 순매수 + 종목 뉴스 라인 매일 자동 생성(텔레그램 발송) |
 | 캘린더 | 실적 발표일(US+KR, yfinance)·배당락일(US: 정확한 ex-date)·주총 일정(KR, DART)·경제지표 발표일(FRED)·FOMC 정책결정일(정적, FRED_API_KEY 불필요) 월간 그리드 |
+| 배당 | 보유·관심 종목의 다가오는 배당 스케줄(향후 12개월, 배당락일순) + 보유 12개월 예상 수령액(KRW). KR/그외는 이력 주기 기반 예상(projected), US는 확정(confirmed)+지급일. 배치(dividend_fetch) 사전계산 저장값만 조회 |
 
 ### 시장 (MarketHub)
 

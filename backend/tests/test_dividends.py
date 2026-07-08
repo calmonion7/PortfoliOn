@@ -229,11 +229,14 @@ def test_fetch_all_dividends_routes_by_market(monkeypatch):
     monkeypatch.setattr(svc, "fetch_us_dividend", fake_us)
     upserts = []
     monkeypatch.setattr(svc, "upsert_dividend", lambda t, d: upserts.append(t))
+    # 스케줄 경로는 독립 — 모킹해 hermetic 유지(yfinance/DB 미접촉).
+    monkeypatch.setattr(svc, "fetch_dividend_schedule", lambda t, m, e: [])
+    monkeypatch.setattr(svc, "replace_schedule", lambda t, rows: None)
 
     result = svc.fetch_all_dividends()
     assert set(upserts) == {"005930.KS", "KO"}  # GOOGL(무배당)은 upsert 제외
     # ok = 예외 없이 처리된 종목 수(무배당 GOOGL 포함 — 정상 처리, 저장만 skip).
-    assert result == {"total": 3, "ok": 3, "failed": 0}
+    assert result == {"total": 3, "ok": 3, "failed": 0, "schedule_ok": 3}
 
 
 def test_fetch_all_dividends_continues_on_error(monkeypatch):
@@ -249,7 +252,10 @@ def test_fetch_all_dividends_continues_on_error(monkeypatch):
 
     monkeypatch.setattr(svc, "fetch_us_dividend", flaky)
     monkeypatch.setattr(svc, "upsert_dividend", lambda t, d: None)
-    assert svc.fetch_all_dividends() == {"total": 2, "ok": 1, "failed": 1}
+    monkeypatch.setattr(svc, "fetch_dividend_schedule", lambda t, m, e: [])
+    monkeypatch.setattr(svc, "replace_schedule", lambda t, rows: None)
+    # DPS fetch가 A에서 실패해도 스케줄(독립 경로)은 양쪽 성공 → schedule_ok=2.
+    assert svc.fetch_all_dividends() == {"total": 2, "ok": 1, "failed": 1, "schedule_ok": 2}
 
 
 def test_registry_has_dividend_fetch_common_market():
@@ -306,3 +312,75 @@ def test_manual_dividend_refresh_records_manual(monkeypatch):
     monkeypatch.setattr(svc, "fetch_all_dividends", lambda: {"total": 0, "ok": 0, "failed": 0})
     stocks_router._run_dividends_all()
     assert ("dividend_fetch", "manual") in recorded
+
+
+# ── 배당 스케줄 projection (task #158, ADR-0023) ────────────────────────
+
+class _FakeDivSeries:
+    def __init__(self, pairs):
+        self._pairs = pairs
+
+    def __len__(self):
+        return len(self._pairs)
+
+    def items(self):
+        return iter(self._pairs)
+
+
+class _FakeSchedTicker:
+    def __init__(self, divs, calendar=None):
+        self.dividends = _FakeDivSeries(divs)
+        self.calendar = calendar or {}
+
+
+def test_schedule_projects_kr_quarterly(monkeypatch):
+    """KR 분기배당 이력 → 향후 분기 예상(projected, KRW, 직전 실금액, 지급일 없음)."""
+    from services import dividends as svc
+    from datetime import datetime, date
+    divs = [(datetime(2025, 3, 28), 365.0), (datetime(2025, 6, 27), 367.0),
+            (datetime(2025, 9, 29), 370.0), (datetime(2025, 12, 29), 566.0),
+            (datetime(2026, 3, 30), 372.0)]
+    monkeypatch.setattr(svc.yf, "Ticker", lambda s: _FakeSchedTicker(divs))
+    monkeypatch.setattr(svc, "_today_kst", lambda: date(2026, 7, 8))
+    rows = svc.fetch_dividend_schedule("005930", "KR", "KS")
+    assert rows, "미래 예상 배당락이 생성돼야 함"
+    assert all(r["status"] == "projected" for r in rows)      # KR은 전부 예상
+    assert all(r["currency"] == "KRW" for r in rows)
+    assert all(r["amount_per_share"] == 372.0 for r in rows)  # 직전 실금액
+    assert all(r["pay_date"] is None for r in rows)           # KR 지급일 소스 없음
+    assert all(r["ex_date"] >= date(2026, 7, 8) for r in rows)  # 오늘 이후만
+
+
+def test_schedule_us_confirmed_with_paydate(monkeypatch):
+    """US는 t.calendar 미래 배당락을 확정(confirmed)+지급일로, 이후는 예상."""
+    from services import dividends as svc
+    from datetime import datetime, date
+    divs = [(datetime(2025, 8, 11), 0.26), (datetime(2025, 11, 10), 0.26),
+            (datetime(2026, 2, 9), 0.26), (datetime(2026, 5, 11), 0.27)]
+    cal = {"Ex-Dividend Date": date(2026, 8, 20), "Dividend Date": date(2026, 8, 25)}
+    monkeypatch.setattr(svc.yf, "Ticker", lambda s: _FakeSchedTicker(divs, cal))
+    monkeypatch.setattr(svc, "_today_kst", lambda: date(2026, 7, 8))
+    rows = svc.fetch_dividend_schedule("AAPL", "US", "")
+    assert rows[0]["status"] == "confirmed"
+    assert rows[0]["ex_date"] == date(2026, 8, 20)
+    assert rows[0]["pay_date"] == date(2026, 8, 25)
+    assert rows[0]["currency"] == "USD"
+    assert any(r["status"] == "projected" for r in rows[1:])
+
+
+def test_schedule_insufficient_history_is_empty(monkeypatch):
+    """이력 2건 미만(주기 추론 불가)은 빈 스케줄."""
+    from services import dividends as svc
+    from datetime import datetime, date
+    monkeypatch.setattr(svc.yf, "Ticker", lambda s: _FakeSchedTicker([(datetime(2026, 3, 30), 372.0)]))
+    monkeypatch.setattr(svc, "_today_kst", lambda: date(2026, 7, 8))
+    assert svc.fetch_dividend_schedule("005930", "KR", "KS") == []
+
+
+def test_snap_interval_buckets():
+    from services import dividends as svc
+    assert svc._snap_interval(91) == 91      # 분기
+    assert svc._snap_interval(88) == 91
+    assert svc._snap_interval(182) == 182    # 반기
+    assert svc._snap_interval(365) == 365    # 연
+    assert svc._snap_interval(30) == 30      # 표준 밖은 원값

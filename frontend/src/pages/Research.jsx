@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { trackEvent } from '../utils/analytics'
 import Reports from './Reports'
 import Calendar from './Calendar'
+import Dividends from './Dividends'
 import Digest from './Digest'
 import Ranking from './Ranking'
 import Recommendations from './Recommendations'
@@ -41,6 +42,7 @@ export default function Research() {
           <button className={tab === 'compare' ? 'is-active' : ''} onClick={() => go('compare', 'tab_compare')}>비교</button>
           <button className={tab === 'digest' ? 'is-active' : ''} onClick={() => go('digest', 'tab_digest')}>다이제스트</button>
           <button className={tab === 'calendar' ? 'is-active' : ''} onClick={() => go('calendar', 'tab_calendar')}>캘린더</button>
+          <button className={tab === 'dividends' ? 'is-active' : ''} onClick={() => go('dividends')}>배당</button>
         </div>
       </div>
       <div className="m-page">
@@ -50,6 +52,7 @@ export default function Research() {
         {tab === 'ranking'  && <Ranking />}
         {tab === 'compare'  && <Compare />}
         {tab === 'calendar' && <Calendar />}
+        {tab === 'dividends' && <Dividends />}
       </div>
     </>
   )
@@ -65,6 +68,7 @@ export default function Research() {
         <button className={tab === 'ranking' ? 'is-active' : ''} onClick={() => go('ranking', 'tab_ranking')}>랭킹</button>
         <button className={tab === 'compare' ? 'is-active' : ''} onClick={() => go('compare', 'tab_compare')}>비교</button>
         <button className={tab === 'calendar' ? 'is-active' : ''} onClick={() => go('calendar', 'tab_calendar')}>캘린더</button>
+        <button className={tab === 'dividends' ? 'is-active' : ''} onClick={() => go('dividends')}>배당</button>
         <button className={tab === 'digest' ? 'is-active' : ''} onClick={() => go('digest', 'tab_digest')}>다이제스트</button>
       </div>
       {tab === 'reports'  && <Reports initialTicker={deepTicker} />}
@@ -72,6 +76,7 @@ export default function Research() {
       {tab === 'ranking'  && <Ranking />}
       {tab === 'compare'  && <Compare />}
       {tab === 'calendar' && <Calendar />}
+      {tab === 'dividends' && <Dividends />}
       {tab === 'digest'   && <Digest />}
     </div>
   )

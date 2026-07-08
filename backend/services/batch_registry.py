@@ -101,7 +101,7 @@ BATCHES = [
         "label": "배당 수집",
         "category": "report",
         "schedule_desc": "매주 일 05:00",
-        "usage": ["대시보드(배당수익률·연 예상배당)"],
+        "usage": ["대시보드(배당수익률·연 예상배당)", "배당 탭(다가오는 배당 스케줄)"],
         "source": ["yfinance", "DART"],
         "editable": True,
         "trigger_kinds": ["auto", "manual"],

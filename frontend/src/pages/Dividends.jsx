@@ -1,0 +1,120 @@
+import { useState, useEffect } from 'react'
+import api from '../api'
+import Skeleton from '../components/ui/Skeleton'
+import Button from '../components/ui/Button'
+import { fmtPrice } from '../utils'
+
+// 예상/확정 배지 — KR 가격 토큰(--up 빨강/--down 파랑)과 무관한 전용색 (ADR-0023, 색 반전 방지)
+const STATUS_STYLE = {
+  confirmed: { color: 'var(--semantic-buy)', background: 'rgba(46,125,50,0.10)', border: '1px solid rgba(46,125,50,0.35)' },
+  projected: { color: 'var(--text-3)', background: 'var(--bg-elev-2)', border: '1px dashed var(--border)' },
+}
+
+const fmtDate = (iso) => {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-')
+  return `${y}.${m}.${d}`
+}
+
+function DividendRow({ it }) {
+  const isHolding = it.stock_type === 'holding'
+  const st = STATUS_STYLE[it.status] || STATUS_STYLE.projected
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+      borderBottom: '1px solid var(--border)',
+    }}>
+      <div style={{ minWidth: 84, flexShrink: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>{fmtDate(it.ex_date)}</div>
+        <div style={{ fontSize: 10, color: 'var(--text-3)' }}>배당락</div>
+        {it.pay_date && (
+          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>지급 {fmtDate(it.pay_date)}</div>
+        )}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>{it.ticker}</span>
+          <span style={{
+            fontSize: 9, padding: '0 5px', lineHeight: '15px', borderRadius: 3,
+            color: 'var(--text-3)', background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+          }}>{isHolding ? '보유' : '관심'}</span>
+          <span style={{ ...st, fontSize: 9, padding: '0 5px', lineHeight: '15px', borderRadius: 3 }}>
+            {it.status === 'confirmed' ? '확정' : '예상'}
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {it.name}
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontSize: 12 }}>{fmtPrice(it.amount_per_share, it.market)}<span style={{ fontSize: 10, color: 'var(--text-3)' }}> /주</span></div>
+        {isHolding && it.expected_amount != null && (
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>
+            {fmtPrice(it.expected_amount, it.market)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function Dividends() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  const load = () => {
+    setLoading(true)
+    setError(false)
+    api.get('/api/portfolio/dividends')
+      .then(({ data }) => setData(data))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  if (loading) return <div style={{ maxWidth: 700 }}><Skeleton /></div>
+
+  if (error) return (
+    <div style={{ maxWidth: 700, color: 'var(--text-3)', textAlign: 'center', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <span>배당 일정 불러오기 실패</span>
+      <Button variant="secondary" size="sm" onClick={load}>다시 시도</Button>
+    </div>
+  )
+
+  const items = data?.items || []
+  const summary = data?.summary || {}
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>12개월 예상 배당 수령액 (보유)</div>
+        <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>
+          {fmtPrice(summary.total_expected_12m_krw || 0, 'KR')}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>
+          배당 예정 보유 {summary.holdings_with_dividend || 0}종목
+          {summary.fx_usdkrw ? ` · 환율 ₩${Math.round(summary.fx_usdkrw).toLocaleString('ko-KR')}/$` : ''}
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: '32px 16px', fontSize: 13 }}>
+          다가오는 배당 일정이 없습니다.
+        </div>
+      ) : (
+        <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          {items.map((it, i) => <DividendRow key={`${it.ticker}-${it.ex_date}-${i}`} it={it} />)}
+        </div>
+      )}
+
+      <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-3)', lineHeight: 1.5 }}>
+        <span style={{ ...STATUS_STYLE.confirmed, fontSize: 9, padding: '0 5px', borderRadius: 3, marginRight: 4 }}>확정</span> 발표된 일정 ·{' '}
+        <span style={{ ...STATUS_STYLE.projected, fontSize: 9, padding: '0 5px', borderRadius: 3, margin: '0 4px' }}>예상</span> 과거 배당 주기 기반 추정 (국내·미확정)
+      </div>
+    </div>
+  )
+}

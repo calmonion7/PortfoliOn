@@ -278,6 +278,22 @@ CREATE TABLE IF NOT EXISTS stock_dividends (
     fetched_at                TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 배당 스케줄 (다가오는 배당락일 타임라인, ticker+ex_date 단위 — 배당 탭 배치-백킹, ADR-0023)
+-- dividend_fetch 배치가 t.dividends 이력→주기추론으로 향후 12개월 예상 배당락을 사전계산·저장.
+-- KR/US 예상(projected) + US는 t.calendar로 최근접 건 확정(confirmed)+지급일. 뷰는 저장값만 read.
+CREATE TABLE IF NOT EXISTS stock_dividend_schedule (
+    ticker           TEXT NOT NULL,
+    ex_date          DATE NOT NULL,            -- 배당락일 (KR/US 공통)
+    pay_date         DATE,                     -- 지급일 (US만, KR은 소스 없음 → NULL)
+    amount_per_share NUMERIC,                  -- 주당 배당액 (직전 실금액, USD 또는 KRW)
+    currency         TEXT,                     -- USD | KRW
+    status           TEXT NOT NULL,            -- confirmed | projected
+    source           TEXT,                     -- yfinance
+    fetched_at       TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (ticker, ex_date)
+);
+CREATE INDEX IF NOT EXISTS idx_dividend_schedule_read ON stock_dividend_schedule(ticker, ex_date);
+
 -- 베타 (보유·관심 종목의 시장 민감도, ticker 단위 — US=yfinance/KR=calc_beta vs ^KS11)
 -- 포트폴리오 노출 탭의 베타가중 노출(portfolio_beta) 계산이 저장값만 읽음(요청경로 라이브 호출 0).
 CREATE TABLE IF NOT EXISTS stock_beta (

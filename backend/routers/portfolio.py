@@ -3,6 +3,7 @@ from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict
 from services import storage, errors, report_generator, consensus_pipeline as _pipeline
 from services import cache as cache_svc, market as market_svc, kr_sector_service
+from services import dividends as dividends_svc
 from services.utils import find_ticker_index, ticker_exists_in, is_valid_ticker, sanitize
 from services.market import _norm_sector
 from services.db import query as db_query
@@ -56,6 +57,70 @@ class Stock(BaseModel):
 @router.get("")
 def get_portfolio(user_id: str = Depends(get_current_user)):
     return storage.get_full_portfolio(user_id)
+
+
+@router.get("/dividends")
+def get_dividends(user_id: str = Depends(get_current_user)):
+    """보유·관심 종목의 다가오는 배당 스케줄(저장값만) + 보유 12개월 예상 수령액(KRW).
+
+    배치(dividend_fetch)가 사전계산한 stock_dividend_schedule을 읽어(요청경로 라이브 호출 0)
+    유저 보유 수량과 조인해 예상 수령액을 계산. KR/그 외 예상(projected)·US 확정(confirmed). ADR-0023."""
+    portfolio = storage.get_full_portfolio(user_id)
+    def _qty(v):
+        # user_stocks.quantity는 DB NUMERIC→Decimal — 예상 수령액(amt는 float) 계산 시
+        # float*Decimal TypeError를 피하려 float로 정규화(CLAUDE.md 배당 Decimal 가토).
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    info: dict = {}
+    for s in portfolio.get("stocks", []):
+        info[s["ticker"].upper()] = {
+            "stock_type": "holding", "quantity": _qty(s.get("quantity")),
+            "name": s.get("name") or s["ticker"], "market": s.get("market", "US"),
+        }
+    for s in portfolio.get("watchlist", []):
+        info.setdefault(s["ticker"].upper(), {
+            "stock_type": "watchlist", "quantity": None,
+            "name": s.get("name") or s["ticker"], "market": s.get("market", "US"),
+        })
+    if not info:
+        return {"items": [], "summary": {"total_expected_12m_krw": 0, "holdings_with_dividend": 0, "fx_usdkrw": None}}
+
+    sched = dividends_svc.get_schedule_batch(list(info.keys()))
+    usdkrw = _usdkrw_rate()
+    items = []
+    total_12m_krw = 0.0
+    holdings_with_div: set = set()
+    for row in sched:
+        meta = info.get((row.get("ticker") or "").upper())
+        if not meta:
+            continue
+        amt = row.get("amount_per_share")
+        qty = meta["quantity"] if meta["stock_type"] == "holding" else None
+        expected = (amt * qty) if (amt is not None and qty) else None
+        items.append({
+            "ticker": row["ticker"], "name": meta["name"], "market": meta["market"],
+            "stock_type": meta["stock_type"], "ex_date": row.get("ex_date"), "pay_date": row.get("pay_date"),
+            "amount_per_share": amt, "currency": row.get("currency"), "status": row.get("status"),
+            "quantity": qty, "expected_amount": expected,
+        })
+        if expected is not None:
+            cur = row.get("currency")
+            if cur == "KRW":
+                total_12m_krw += expected
+                holdings_with_div.add(row["ticker"].upper())
+            elif cur == "USD" and usdkrw:
+                total_12m_krw += expected * usdkrw
+                holdings_with_div.add(row["ticker"].upper())
+            # USD인데 저장 FX 없음 → KRW 합계서 graceful 제외
+    summary = {
+        "total_expected_12m_krw": round(total_12m_krw, 2),
+        "holdings_with_dividend": len(holdings_with_div),
+        "fx_usdkrw": usdkrw,
+    }
+    return sanitize({"items": items, "summary": summary})
 
 
 @router.get("/prices")

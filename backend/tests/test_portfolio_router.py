@@ -184,3 +184,37 @@ def test_generate_with_consensus_backfills_via_pipeline():
          patch("routers.portfolio._pipeline.backfill", return_value=3) as mock_bf:
         portfolio._generate_with_consensus(dict(stock))
     mock_bf.assert_called_once_with([stock], days=180)
+
+
+def test_get_dividends_computes_expected_with_decimal_quantity():
+    """보유 수량이 DB NUMERIC→Decimal이어도 예상수령액(float amt×qty)이 TypeError 없이 계산.
+
+    수정 전(qty float 미정규화)이면 float*Decimal TypeError→500이던 경로 (CLAUDE.md 배당 Decimal 가토)."""
+    from decimal import Decimal
+    full = {
+        "stocks": [{"ticker": "005930", "name": "삼성전자", "quantity": Decimal("100"), "market": "KR"}],
+        "watchlist": [{"ticker": "AAPL", "name": "Apple", "market": "US"}],
+    }
+    sched = [
+        {"ticker": "005930", "ex_date": "2026-09-26", "pay_date": None,
+         "amount_per_share": 372.0, "currency": "KRW", "status": "projected", "source": "yfinance"},
+        {"ticker": "AAPL", "ex_date": "2026-08-20", "pay_date": "2026-08-25",
+         "amount_per_share": 0.27, "currency": "USD", "status": "confirmed", "source": "yfinance"},
+    ]
+    with patch("routers.portfolio.storage.get_full_portfolio", return_value=full), \
+         patch("routers.portfolio.dividends_svc.get_schedule_batch", return_value=sched), \
+         patch("routers.portfolio._usdkrw_rate", return_value=1385.0):
+        resp = client.get("/api/portfolio/dividends")
+    assert resp.status_code == 200
+    body = resp.json()
+    items = {i["ticker"]: i for i in body["items"]}
+    # 보유(KR): expected = 372 × 100 = 37200 (float, TypeError 없음)
+    assert items["005930"]["expected_amount"] == 37200.0
+    assert items["005930"]["stock_type"] == "holding"
+    # 관심(US): 수량 없음 → expected null
+    assert items["AAPL"]["expected_amount"] is None
+    assert items["AAPL"]["stock_type"] == "watchlist"
+    assert items["AAPL"]["pay_date"] == "2026-08-25"
+    # 요약: 보유 KRW 합계 = 37200 (US 관심은 수량 없어 제외)
+    assert body["summary"]["total_expected_12m_krw"] == 37200.0
+    assert body["summary"]["holdings_with_dividend"] == 1
