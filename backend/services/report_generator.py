@@ -3,8 +3,16 @@ from datetime import date, timedelta, datetime
 from zoneinfo import ZoneInfo as _ZoneInfo
 
 _KST = _ZoneInfo("Asia/Seoul")
+
+
+def _today_kst():
+    """KST 오늘 — 컨테이너가 UTC라 bare date.today()는 00~09시 KST에 하루 어긋남(task#161 #5)."""
+    return datetime.now(tz=_KST).date()
+
+
 from concurrent.futures import ThreadPoolExecutor
 import json
+import math
 import pandas as pd
 import yfinance as yf
 
@@ -114,7 +122,10 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         f_fin       = ex.submit(mkt.get_financials, ticker, market, exchange)
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
         f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
-        f_rsi       = ex.submit(indicators.get_timeframe_rsi, ticker, market, exchange, daily_df if market != "KR" else None)  # US: daily RSI는 이미 받은 daily_df 재사용(별도 flaky fetch 제거). KR daily RSI는 NXT 유지(정규화라 무관, non-goal)
+        # KR은 regular=True로 — RSI 타점(target_20~80)은 절대가라 차트(regular=True)와 스케일이 일치해야
+        # 한다(NXT `_AL` 글리치 시 타점만 어긋나던 것 방지, task#161 #2). daily는 KRX daily_df 재사용.
+        f_rsi       = ex.submit(indicators.get_timeframe_rsi, ticker, market, exchange,
+                                daily_df, regular=(market == "KR"))
         f_finviz    = ex.submit(scraper.scrape_finviz_consensus, ticker) if market == "US" else None
         f_news      = ex.submit(scraper.get_news, ticker, market)
         f_comps     = [ex.submit(mkt.get_quote, c, *_infer_comp_market(c, market, exchange), regular=True) for c in competitors]
@@ -181,7 +192,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         current_price = quote.get("price")
         actual_f = [f for f in financials if not f.get("is_consensus")]
         eps_list = [f["eps"] for f in actual_f if f.get("eps") is not None]
-        trailing_eps = sum(eps_list[:4]) if len(eps_list) >= 2 else None
+        trailing_eps = sum(eps_list[:4]) if len(eps_list) >= 4 else None  # TTM은 4분기 온전할 때만(sub-TTM PER 부풀림 방지, task#161 #3)
         trailing_per = round(current_price / trailing_eps, 1) if current_price and trailing_eps else None
         consensus_f = next((f for f in financials if f.get("is_consensus") and f.get("eps")), None)
         forward_per = round(current_price / (consensus_f["eps"] * 4), 1) if current_price and consensus_f else None
@@ -190,13 +201,11 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         # PSR: 시총÷TTM매출(Naver finance/quarter rv0 최근 4 non-consensus 분기 합×1e8)
         psr = ev_ebitda = None
         try:
-            import math
             mc = quote.get("market_cap")  # 원 단위
-            ttm_rev_uck = sum(
-                f["revenue"] for f in actual_f[:4]
-                if f.get("revenue") is not None
-            )  # revenue는 이미 원 단위(×1e8 변환됨, get_financials_kr)
-            if mc and ttm_rev_uck and ttm_rev_uck > 0 and math.isfinite(mc / ttm_rev_uck):
+            rev_q = [f["revenue"] for f in actual_f[:4] if f.get("revenue") is not None]
+            ttm_rev_uck = sum(rev_q)  # revenue는 이미 원 단위(×1e8 변환됨, get_financials_kr)
+            # TTM PSR도 4분기 매출이 온전할 때만 — 1~2분기를 TTM 취급 시 PSR 2~4× 부풀림(task#161 #3)
+            if mc and len(rev_q) >= 4 and ttm_rev_uck > 0 and math.isfinite(mc / ttm_rev_uck):
                 psr = round(mc / ttm_rev_uck, 2)
         except Exception as e:
             logger.warning(f"[Report] {ticker} KR PSR 계산 실패: {e}")
@@ -217,12 +226,21 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
             sector, industry = "", ""
             trailing_per = forward_per = pbr = psr = ev_ebitda = None
 
+    # price = quote 우선, 없으면 일봉 마지막 종가 — 단 비유한(NaN/inf, 미완성 바 등)이면 None.
+    # NaN을 그대로 두면 아래 `if summary["price"] is None` 가드를 통과(NaN≠None)해 US에서 price:null
+    # 스냅샷이 박제된다(KR은 박제게이트가 잡지만 US는 이 가드가 유일, task#161 #1).
+    _report_price = quote.get("price")
+    if _report_price is None or not math.isfinite(_report_price):
+        _report_price = round(float(daily_df["Close"].iloc[-1]), 2) if not daily_df.empty else None
+        if _report_price is not None and not math.isfinite(_report_price):
+            _report_price = None
+
     summary = {
         "ticker": ticker,
         "name": mkt.resolve_name(ticker, market, exchange, stock.get("name", ""), quote=quote),
         "date": today,
         "market": market,
-        "price": quote.get("price") or (round(float(daily_df["Close"].iloc[-1]), 2) if not daily_df.empty else None),
+        "price": _report_price,
         "target_mean": analyst.get("target_mean") or finviz.get("finviz_target"),
         "target_high": analyst.get("target_high"),
         "target_low": analyst.get("target_low"),
@@ -419,7 +437,7 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
         industry = quote.get("industry", "")
         actual_f = [f for f in financials if not f.get("is_consensus")]
         eps_list = [f["eps"] for f in actual_f if f.get("eps") is not None]
-        trailing_eps = sum(eps_list[:4]) if len(eps_list) >= 2 else None
+        trailing_eps = sum(eps_list[:4]) if len(eps_list) >= 4 else None  # TTM은 4분기 온전할 때만(sub-TTM PER 부풀림 방지, task#161 #3)
         consensus_f = next((f for f in financials if f.get("is_consensus") and f.get("eps")), None)
         actual_bps = next((f["bps"] for f in actual_f if f.get("bps") is not None), None)
     else:
@@ -437,8 +455,11 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
 
     resolved_name = mkt.resolve_name(ticker, market, exchange, stock.get("name", ""), quote=quote if market == "KR" else None)
 
-    cutoff = pd.Timestamp(date.today() - timedelta(days=days)).normalize()
-    trade_dates = daily_df[daily_df.index >= cutoff].index
+    _today = _today_kst()  # 컨테이너 UTC라 bare date.today() 금지 (task#161 #5)
+    cutoff = pd.Timestamp(_today - timedelta(days=days)).normalize()
+    # 오늘자는 제외 — backfill은 과거만 박제, 오늘은 독립피드 게이트 있는 daily 배치(generate_report)가 처리.
+    # 오늘자 ungated 박제 + force 덮어쓰기가 KRX 자기일관 글리치일에 양호 스냅샷을 오염시키던 것 방지(task#161 #4).
+    trade_dates = [ts for ts in daily_df[daily_df.index >= cutoff].index if ts.date() < _today]
 
     created = 0
     for ts in trade_dates:

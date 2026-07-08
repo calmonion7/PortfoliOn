@@ -297,3 +297,30 @@ def test_calc_hv_finite_guard():
     from services.indicators import calc_hv
     returns = pd.Series([float("nan")] * 50)
     assert calc_hv(returns) is None
+
+
+# ── get_timeframe_rsi regular 전파 (task#161 #2) ──────────────────────────
+def test_get_timeframe_rsi_propagates_regular_to_history():
+    """KR 리포트가 regular=True로 부르면 RSI 타점(절대가)이 KRX 일봉 기준이 되도록
+    get_history_df에 regular가 전파돼야 한다(NXT/KRX 스케일 불일치 방지)."""
+    from services import indicators
+    calls = []
+
+    def fake_hist(ticker, market, exchange, tf, **kw):
+        calls.append((tf, kw.get("regular")))
+        return pd.DataFrame()  # 빈 df → calc 스킵(전파 여부만 검증)
+
+    with patch("services.market.get_history_df", side_effect=fake_hist):
+        indicators.get_timeframe_rsi("005930", "KR", "KS", regular=True)
+    assert calls, "get_history_df가 호출돼야 함"
+    assert all(reg is True for _tf, reg in calls), f"모든 타임프레임에 regular=True 전파 필요: {calls}"
+
+
+def test_get_timeframe_rsi_regular_defaults_false():
+    """regular 미지정 시 기본 False(기존 호출처 무영향)."""
+    from services import indicators
+    calls = []
+    with patch("services.market.get_history_df",
+               side_effect=lambda t, m, e, tf, **kw: calls.append(kw.get("regular", "MISSING")) or pd.DataFrame()):
+        indicators.get_timeframe_rsi("AAPL", "US", "")
+    assert all(reg in (False, "MISSING") for reg in calls)

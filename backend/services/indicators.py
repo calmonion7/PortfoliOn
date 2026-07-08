@@ -165,7 +165,7 @@ def calc_rsi_target_price(
         return round(result, 2)
     return None
 
-def get_timeframe_rsi(ticker: str, market: str = "US", exchange: str = "", daily_df=None) -> dict:
+def get_timeframe_rsi(ticker: str, market: str = "US", exchange: str = "", daily_df=None, regular: bool = False) -> dict:
     # KR은 키움(ka10081/82/83) 우선, 그 외/폴백은 yfinance — market.get_history_df가 라우팅.
     # daily_df 제공 시 daily 타임프레임은 재fetch 없이 그 df 사용 — 호출부가 이미 받은 일봉을
     # 재사용해 동시 호출 rate-limit로 daily RSI만 빠지는 것을 방지(report_generator).
@@ -181,7 +181,9 @@ def get_timeframe_rsi(ticker: str, market: str = "US", exchange: str = "", daily
             if tf == "daily" and daily_df is not None and not daily_df.empty:
                 df = daily_df
             else:
-                df = mkt.get_history_df(ticker, market, exchange, tf)
+                # regular=True면 KRX 정규장 일봉으로 — RSI 타점(calc_rsi_target_price)이 절대가라
+                # 리포트 price/차트(regular=True)와 스케일 일치해야 함(NXT 글리치 방지, task#161 #2).
+                df = mkt.get_history_df(ticker, market, exchange, tf, regular=regular)
             if df.empty:
                 result[tf] = {
                     "rsi": None,

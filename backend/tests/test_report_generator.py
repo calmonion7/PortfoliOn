@@ -217,3 +217,94 @@ def test_generate_report_has_price_technical_fields(tmp_path):
     # S3
     assert "beta" in summary
     assert "hv" in summary
+
+
+# ── 적대적 감사 버그 수정 (task#161) ──────────────────────────────────────
+
+def test_generate_report_us_rejects_nan_price(tmp_path):
+    """[#1] US: quote price 없음 + 마지막 일봉 Close NaN → NaN이 `is None` 가드를 통과해
+    price:null 스냅샷을 박제하던 것 방지(math.isfinite로 reject → ValueError)."""
+    mocks = _mock_all()
+    mocks["services.report_generator.mkt.get_quote"] = MagicMock(return_value={
+        "ticker": "TEST", "name": "Test Corp", "price": None,
+        "prev_close": None, "market_cap": 1, "ytd_return": None,
+    })
+    nan_df = pd.DataFrame({
+        "Close": [100.0, float("nan")], "High": [101.0, 101.0],
+        "Low": [99.0, 99.0], "Volume": [1_000_000, 1_000_000],
+    })
+    mocks["services.report_generator.yf.Ticker"] = MagicMock(return_value=MagicMock(
+        history=MagicMock(return_value=nan_df), info={"sector": "Tech", "industry": "SW"}))
+    with contextlib.ExitStack() as stack:
+        for target, mock in mocks.items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        with pytest.raises(ValueError):
+            report_generator.generate_report(SAMPLE_STOCK, tmp_path)
+
+
+def _kr_stock():
+    return {"ticker": "005930", "name": "삼성전자", "market": "KR", "exchange": "KS", "competitors": []}
+
+
+def test_generate_report_kr_per_psr_none_under_4_quarters(tmp_path):
+    """[#3] 실적 <4분기 KR은 sub-TTM 합산으로 PER/PSR 부풀리지 말고 None(missing<wrong)."""
+    mocks = _mock_kr("삼성전자")
+    mocks["services.report_generator.mkt.get_financials"] = MagicMock(return_value=[
+        {"period": "2025-Q3", "eps": 1000.0, "revenue": 1_000_000_000_000, "bps": 50000.0},
+        {"period": "2025-Q4", "eps": 1100.0, "revenue": 1_100_000_000_000, "bps": 51000.0},
+    ])
+    with contextlib.ExitStack() as stack:
+        for target, mock in mocks.items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        json_path = report_generator.generate_report(_kr_stock(), tmp_path)
+    summary = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    assert summary.get("per") is None, "2분기 EPS를 TTM으로 취급하면 안 됨"
+    assert summary.get("psr") is None, "2분기 매출을 TTM으로 취급하면 안 됨"
+
+
+def test_generate_report_kr_per_psr_computed_with_4_quarters(tmp_path):
+    """[#3] 4분기 온전하면 PER/PSR 정상 계산."""
+    mocks = _mock_kr("삼성전자")
+    mocks["services.report_generator.mkt.get_financials"] = MagicMock(return_value=[
+        {"period": f"2025-Q{q}", "eps": 1000.0, "revenue": 1_000_000_000_000, "bps": 50000.0}
+        for q in range(1, 5)
+    ])
+    with contextlib.ExitStack() as stack:
+        for target, mock in mocks.items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        json_path = report_generator.generate_report(_kr_stock(), tmp_path)
+    summary = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    assert summary.get("per") is not None
+    assert summary.get("psr") is not None
+
+
+def test_backfill_ticker_excludes_today(tmp_path):
+    """[#4] backfill은 과거만 박제 — 오늘자는 독립피드 게이트 있는 daily 배치가 처리(force 덮어쓰기 방지)."""
+    from datetime import datetime, timedelta as _td
+    from services import report_generator
+    import importlib; importlib.reload(report_generator)
+    today = datetime.now(report_generator._KST).date()
+    idx = pd.to_datetime([str(today - _td(days=d)) for d in (6, 5, 4, 1, 0)])  # 오늘(0) 포함
+    df = pd.DataFrame({"Close": [100.0]*5, "High": [101.0]*5, "Low": [99.0]*5, "Volume": [1]*5}, index=idx)
+    stock = {"ticker": "TEST", "name": "Test", "market": "US", "exchange": "", "competitors": []}
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("services.report_generator.query", side_effect=Exception("no db")))
+        stack.enter_context(patch("services.report_generator.execute", MagicMock()))
+        stack.enter_context(patch("services.report_generator.yf.Ticker", MagicMock(return_value=MagicMock(
+            history=MagicMock(return_value=df), info={"sector": "T", "industry": "S"}))))
+        stack.enter_context(patch("services.report_generator.mkt.get_analyst_data", MagicMock(return_value={})))
+        stack.enter_context(patch("services.report_generator.mkt.get_financials", MagicMock(return_value=[])))
+        stack.enter_context(patch("services.report_generator.mkt.get_annual_financials", MagicMock(return_value=[])))
+        stack.enter_context(patch("services.report_generator.scraper.scrape_finviz_consensus", MagicMock(return_value={})))
+        stack.enter_context(patch("services.report_generator.indicators.get_timeframe_rsi", MagicMock(return_value={"daily": {}, "weekly": {}, "monthly": {}})))
+        stack.enter_context(patch("services.report_generator.indicators.get_volume_profile", MagicMock(return_value={})))
+        report_generator.backfill_ticker(stock, days=60, output_base_dir=tmp_path, force=True)
+    written = {p.stem for p in tmp_path.glob("**/*.json")}
+    assert str(today) not in written, f"backfill이 오늘자를 생성하면 안 됨: {written}"
+    assert str(today - _td(days=1)) in written, f"과거(어제)는 생성돼야 함: {written}"
