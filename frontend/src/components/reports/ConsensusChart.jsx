@@ -36,7 +36,8 @@ export default function ConsensusChart({ ticker, market }) {
 
   const retryFetch = () => { retriedRef.current = false; setFetchFailed(false); fetchData() }
 
-  useEffect(() => { fetchData() }, [fetchData])
+  // 종목 전환 시 재시도 상태 리셋 — 이전 종목의 소진된 retry가 새 종목의 auto-retry를 막지 않도록.
+  useEffect(() => { retriedRef.current = false; setFetchFailed(false); fetchData() }, [fetchData])
 
   const backfill = async () => {
     setBackfilling(true)
