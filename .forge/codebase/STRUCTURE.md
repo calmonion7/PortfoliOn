@@ -1,241 +1,106 @@
 ---
-last_mapped_commit: a5fb8bc8fbb92ec9155e7bc20ba681388786bfcd
-mapped: 2026-07-07
+last_mapped_commit: 78e6f09a65ee76a7af351da7b7d417a13b6de820
+mapped: 2026-07-09
 ---
 
-# STRUCTURE — PortfoliOn
+# STRUCTURE
 
-디렉터리 레이아웃, 핵심 파일 위치, 명명 규칙. (아키텍처·데이터 흐름은 `ARCHITECTURE.md`.)
+디렉터리 레이아웃, 주요 파일 위치, 네이밍 규칙. 모든 경로는 리포지토리 루트 `/Users/calmonion/Project/PortfoliOn` 기준.
 
 ## 최상위
 
 ```
-/Users/calmonion/Project/PortfoliOn/
-├── backend/            FastAPI 앱
-├── frontend/           React + Vite 앱
-├── API_SPEC.md         전체 REST API 레퍼런스 (엔드포인트 정본)
-├── CLAUDE_COWORK_API.md 외부 Cowork(AI enrich) API 명세
-├── KIWOOM_API.md       키움 REST API 카탈로그
-├── KIS_API.md          한국투자증권 REST API 카탈로그
-├── README.md           overview (화면·env·스택·아키텍처·배치)
-├── CLAUDE.md           프로젝트 지침 + 컨텍스트
-├── deploy.sh           정식 배포 스크립트
-├── scripts/            auto-deploy-poll.sh 등
-├── docker-compose.yml  nginx/backend/postgres/certbot
-├── nginx/              nginx.conf
-├── start.sh / start.bat / stop.bat
-└── .forge/             forge 상태 (codebase/·adr/·backlog/·retro/ …)
+backend/          FastAPI 앱 (Python)
+frontend/         React 19 + Vite (JS)
+.forge/           forge 워크플로우 상태·ADR·retro·codebase 맵
+API_SPEC.md       전체 REST API 레퍼런스 (엔드포인트 정본)
+CLAUDE_COWORK_API.md  외부 Cowork용 enrich/backlog API
+KIWOOM_API.md / KIS_API.md  키움·KIS API 카탈로그
+README.md         프로젝트 overview
+CLAUDE.md         프로젝트 지침
+start.sh / start.bat / stop.bat   양 서버 기동/종료
+deploy.sh         백엔드 컨테이너 재생성 스크립트
 ```
 
-## backend/
+## 백엔드 `backend/`
 
-```
-backend/
-├── main.py             앱 진입 · 라우터 마운트 · _migrate · lifespan
-├── auth.py             인증 의존성 (get_current_user, require_admin, require_admin_or_api_key, API 키)
-├── auth_schema.sql     PostgreSQL 인증 스키마 (users, refresh_tokens) — app_schema.sql보다 먼저 실행
-├── app_schema.sql      PostgreSQL 앱 스키마 (tickers, user_stocks, snapshots, …)
-├── supabase_schema.sql 레거시 (Supabase 시절)
-├── requirements.txt    (anthropic 없음 — 백엔드 LLM 호출 없음)
-├── Dockerfile · Procfile · pytest.ini
-├── run_backfill.py
-├── routers/            APIRouter 계층 (아래)
-├── services/           도메인 로직·외부 연동·DB (아래)
-├── scheduler/          APScheduler 패키지 (아래)
-├── middleware/         event_tracker.py (+ __init__.py)
-├── migrations/         001_user_events.sql, 002_backlog_history.sql
-├── data/               정적 참조 + 로컬 캐시 (아래)
-├── snapshots/          gitignored — per-ticker/date 리포트 JSON
-├── reports/            gitignored — 레거시 리포트 (read-only 폴백)
-└── tests/              pytest (아래)
-```
+### 진입·설정
+- `main.py` — FastAPI 앱, `_migrate()`(기동 idempotent 마이그레이션), lifespan, 라우터 배선.
+- `auth.py` — 인증 헬퍼(get_current_user 등).
+- `auth_schema.sql` → `app_schema.sql` — DB 스키마(auth 먼저 실행).
+- `.env` / `.env.docker` — 환경변수(후자에 시크릿; POSTGRES_PASSWORD·JWT_SECRET·OAuth·FRED_API_KEY·KOFIA_API_KEY·KIWOOM/KIS 키·DART_API_KEY).
+- `Dockerfile` / `Procfile` / `requirements.txt` / `pytest.ini`.
+- `run_backfill.py` — 백필 스크립트.
+- `migrations/` — 참조용 SQL 마이그레이션(`001_user_events.sql`, `002_backlog_history.sql`); 라이브 반영은 `main._migrate`가 담당.
+- `middleware/` — `event_tracker.py`(EventTrackerMiddleware, user_events 로깅).
 
-### backend/routers/
+### `backend/routers/` (HTTP 엔드포인트, prefix `/api/...`)
+`admin.py` `analysis.py` `analytics.py` `auth.py` `batches.py` `calendar.py` `digest.py` `events.py` `guru.py` `investor.py` `market_indicators.py` `portfolio.py` `rankings.py` `recommendations.py` `report.py` `short_sell.py` `stocks.py` `watchlist.py`
 
-`APIRouter` 파일 (파일당 `prefix="/api/..."`). main.py에서 include.
+- `portfolio.py` — `/api/portfolio`. 포트폴리오 조회·CRUD·리밸런스·노출. **`GET /api/portfolio/dividends`**(보유·관심 종목 배당수익 + 다가오는 배당락 스케줄, `dividends_svc.get_schedule_batch` 사용).
+- `stocks.py` — `/api/stocks`. 대시보드 빌드(`_build_all`)·enrich·이름 백필. **주의: `PUT /api/stocks/enrich/batch`를 `PUT /api/stocks/{ticker}/enrich`보다 먼저 등록**.
+- `report.py` — 리포트 목록/상세/생성, backlog/disclosures/agm refresh.
 
-```
-routers/
-├── auth.py             /api/auth — 로그인·OAuth·토큰
-├── portfolio.py        /api/portfolio — 보유 목록·prices 폴링·rebalance(계산·targets 저장)·exposure(노출·집중도·포트 베타)
-├── watchlist.py        /api/watchlist — 관심 종목·promote
-├── stocks.py           /api/stocks — dashboard·enrich·dividends·beta·supply-score·{ticker}/news
-├── report.py           /api (report) — 리포트 생성·목록·상세·backlog·disclosures·agm
-├── recommendations.py  /api/recommendations — 추천 조회·refresh
-├── rankings.py         /api/rankings — 거래대금/거래량/등락률 랭킹
-├── investor.py         /api/investor — 수급 추이
-├── short_sell.py       /api/short-sell — 공매도 추이
-├── market_indicators.py /api/market·/api/market-indicators — FX/VIX/원자재/국채/경제/실적/수출/매크로/지수/신용/대차/fear-greed
-├── analysis.py         /api/analysis — 섹터 모멘텀·매크로 상관
-├── analytics.py        /api/analytics — 보유 종목 상관관계
-├── calendar.py         /api/calendar — 캘린더 이벤트 (파일 캐시)
-├── digest.py           /api/digest — 일일 다이제스트
-├── guru.py             /api/guru — 구루 크롤·통계·스케줄
-├── batches.py          /api/batches — 배치 현황 허브
-├── events.py           /api/events — 사용자 행동 이벤트
-├── admin.py            /api/admin — 사용자·권한·analytics (require_admin)
-└── __init__.py
-```
+### `backend/services/` (비즈니스 로직)
+루트 모듈:
+`agm.py` `analysis_service.py` `auth_service.py` `backlog.py` `backlog_parser.py` `beta.py` `batch_registry.py` `cache.py` `consensus.py` `consensus_pipeline.py` `db.py` `digest_service.py` `disclosures.py` `dividends.py` `errors.py` `exposure.py` `guru_scraper.py` `guru_stats.py` `indicators.py` `insider_trades.py` `investor_service.py` `job_runs.py` `kr_sector_service.py` `lending_service.py` `leverage_service.py` `parallel.py` `progress.py` `ranking_service.py` `rebalance.py` `report_generator.py` `schedule_spec.py` `scraper.py` `short_sell_service.py` `supply_score.py` `us_sector_service.py` `us_supply.py` `utils.py`
 
-### backend/services/
+서브패키지:
+- `storage/` — `__init__.py`(전 심볼 re-export, ADR-0017), `portfolio.py`(get/save_stocks·holdings·watchlist·enrich), `names.py`(종목명 dual-source 동기), `schedule.py`(schedules·guru·batch_schedules), `dates.py`(expected_report_date 등).
+- `market/` — `__init__.py`(get_quote·get_history_df·resolve_name), `kr.py`(키움→KIS→Naver 체인·`_kr_pick_*` 다수결), `us.py`(yfinance→KIS), `format.py`(`_yf_sym`·정규화 헬퍼).
+- `market_indicators/` — `cache.py`(`_mc_load`/`_mc_save` market_cache I/O), `fx.py`(FX+VIX) `commodities.py` `earnings.py` `econ.py` `exports.py` `macro.py`(FRED 매크로 신호) `indices.py`(지수 레벨+CAPE) `kospi_futures.py` `kospi_signal.py` `sentiment.py`(CNN Fear&Greed).
+- `kiwoom/` — `client.py`(토큰·`integrated_code(regular)`·`request`), `quote.py`(ka10001), `chart.py`(일봉 ka10081), `sector.py`(업종), `investor.py`, `shortsell.py`. KR 전용 읽기전용(ADR-0009).
+- `kis/` — `client.py`(토큰·`request`), `quote.py`(국내 FHKST01010100·해외), `futures.py`(국내선물 output1/2/3). KR+US 읽기전용 백업(ADR-0011).
+- `recommendation/` — `universe.py` `scoring.py` `funnel.py` `store.py`(stock_recommendations 저장/조회) `actions.py`. 배치 precompute→read(ADR-0015).
 
-```
-services/
-├── db.py               ThreadedConnectionPool + query/execute/execute_many
-├── batch_registry.py   BATCHES 메타데이터 리스트 (28개) + get_batch
-├── job_runs.py         배치 실행로그 record/recent/recent_map
-├── cache.py            인메모리 캐시 8종 (snapshot LRU + TTL 7종)
-├── utils.py            sanitize (NaN/inf → None)
-├── errors.py · parallel.py · progress.py · schedule_spec.py
-├── report_generator.py 리포트 스냅샷 생성 (generate_report / _with_retry / backfill_ticker; 뉴스 병렬 fetch → data.news 박제)
-├── rebalance.py        리밸런싱 순수 계산 (compute_rebalance + 공유 value_holdings_krw — DB/외부호출 없음)
-├── exposure.py         노출·집중도 순수 계산 (compute_exposure — value_holdings_krw 재사용, 포트 베타)
-├── beta.py             베타 수집·저장·조회 (fetch_all_betas, upsert_beta/get_beta → stock_beta)
-├── consensus.py · consensus_pipeline.py  컨센서스 수집·표준화 (run_daily, backfill force DELETE+재적재 원자화)
-├── scraper.py          뉴스 스크레이프 (get_news US=yfinance / get_news_kr=Naver, _dedup_sort_limit)
-├── guru_scraper.py · guru_stats.py  구루 (dataroma)
-├── digest_service.py   다이제스트 생성·텔레그램 (_recent_news = 스냅샷 news 읽기, NEWS_PER_TICKER=2)
-├── analysis_service.py 섹터 ETF·매크로 상관
-├── kr_sector_service.py · us_sector_service.py  업종 모멘텀 (market_cache)
-├── ranking_service.py  랭킹 (market_rankings)
-├── investor_service.py · short_sell_service.py · supply_score.py  수급
-├── us_supply.py        US 공매도·기관 보유
-├── leverage_service.py · lending_service.py  KOFIA/금융위 (신용·대차)
-├── backlog.py · backlog_parser.py  수주잔고 (DART document.xml)
-├── disclosures.py · agm.py · insider_trades.py  DART 공시·주총·지분
-├── dividends.py        배당 (yfinance/DART → stock_dividends)
-├── indicators.py       RSI·EMA·HV·베타(calc_beta) 등 기술 지표
-├── auth_service.py     JWT (HS256, jose) · 비밀번호 해시 · OAuth upsert
-├── storage/            re-export 패키지 (ADR-0017)
-│   ├── __init__.py     portfolio·names·schedule·dates + db 심볼 re-export
-│   ├── portfolio.py    get/save_stocks·holdings·watchlist, get_global_portfolio, enrich_stock, set_target_weights (target_weight COALESCE preserve-on-null)
-│   ├── names.py        종목명 dual-source 동기 (refresh_snapshot_names, reconcile_snapshot_names)
-│   ├── schedule.py     schedules·guru_schedules·batch_schedules 읽기/쓰기
-│   └── dates.py        expected_report_date(s) — 시장별 기대 스냅샷 날짜
-├── market/             시세 패키지 (ADR-0017)
-│   ├── __init__.py     get_quote·get_quotes_batch·get_history_df·get_financials·resolve_name
-│   ├── format.py       _yf_sym·_norm_sector·_to_won·_yf_val 등 포매팅
-│   ├── kr.py           get_quote_kr (키움→KIS→Naver 다수결) + Naver/FnGuide + KR 재무
-│   └── us.py           get_annual_financials_us + KIS US 백업 (_us_quote_kis)
-├── market_indicators/  시장지표 패키지
-│   ├── __init__.py     get_econ_indicators·get_kr_exports + _fetch_and_save_* (배치)
-│   ├── cache.py        _mc_load/_mc_save (market_cache 테이블) + _get_cache/_set_cache + get_or_refresh 증분
-│   ├── fx.py · commodities.py  FX/VIX · 원자재/국채 (요청경로 증분)
-│   ├── indices.py      시장지수 레벨 + S&P500 Shiller CAPE (multpl 크롤)
-│   ├── sentiment.py    CNN Fear&Greed (get_fear_greed, 요청경로 증분·배치 없음)
-│   ├── earnings.py     M7 / KR Top2 (주 1회)
-│   ├── econ.py · macro.py · exports.py  FRED 경제지표·매크로 신호·KR 수출
-├── recommendation/     추천 엔진 패키지 (ADR-0015)
-│   ├── __init__.py     build_universe·score_stock·run_recommendation_batch·read_recommendations·derive_holding_action
-│   ├── universe.py · scoring.py · funnel.py · store.py · actions.py
-├── kiwoom/             키움 REST (KR 읽기전용 1차 시세, ADR-0009)
-│   ├── client.py       토큰·request·integrated_code(regular 플래그)
-│   ├── quote.py (ka10001) · chart.py (ka10081/82/83) · sector.py (ka20002/06)
-│   ├── investor.py · shortsell.py (ka10014)
-├── kis/                한국투자증권 REST (KR+US 읽기전용 백업, ADR-0011)
-│   ├── client.py       토큰(60s 재발급 가드)·request
-│   └── quote.py        국내 FHKST01010100 + 해외 HHDFS
-└── __init__.py
-```
+### `backend/scheduler/` (패키지, 단일 파일 아님)
+- `__init__.py` — `start()`/`stop()`/`reload()`, 잡·심볼 배선·re-export.
+- `jobs.py` — 잡 함수 실체(`_fetch_*`·`_generate_*`·`_refresh_*`·`_seed_*`), `_JOB_FUNCS`.
+- `schedule.py` — 트리거 빌드·리스케줄·시드·누락복구(KST `ZoneInfo`).
+- `_state.py` — 공유 `_scheduler` 인스턴스·상수.
 
-### backend/data/
+### 데이터·스냅샷
+- `data/` — 정적 참조(`sp500_tickers.json`·`kospi_tickers.json`) + 런타임 파일캐시(`consensus/`·`calendar/YYYY-MM.json`·`digest/`) + 레거시 JSON(`holdings.json`·`stocks.json`·`watchlist.json` 등).
+- `snapshots/` — per-ticker/date 리포트 JSON(gitignored).
+- `reports/` — 레거시 리포트(read-only 폴백).
+- `tests/` — pytest 스위트(`test_*.py`). 예: `test_api_doc_sync.py`(엔드포인트 문서 drift 검출), `test_scheduler_seed.py`·`test_batch_market_split.py`·`test_batches_router.py`(배치 count/set 단언).
 
-정적 참조(git 추적)와 로컬 캐시(gitignored) 혼재:
+## 프론트엔드 `frontend/src/`
 
-```
-data/
-├── sp500_tickers.json      (추적) US 티커 마스터
-├── kospi_tickers.json      (추적) KR 티커 마스터
-├── calendar/               gitignored — YYYY-MM.json 캘린더 파일 캐시
-├── consensus/              gitignored — per-ticker 컨센서스 JSON
-├── digest/                 로컬 다이제스트 캐시
-├── holdings.json · watchlist.json · stocks.json · schedule.json
-├── guru_managers.json · guru_schedule.json · kr_exports.json   (gitignored 레거시 JSON)
-```
+### 진입·공통
+- `main.jsx` — 앱 부트스트랩. `App.jsx` — 라우팅(`BrowserRouter`)·전역 nav·테마.
+- `api.js` — axios 인스턴스(Bearer 토큰 인터셉터·401 리다이렉트). `utils.js` — 공통 유틸.
+- `contexts/AuthContext.jsx` — 로그인·권한 상태.
+- `styles/` — `tokens.css`(디자인 토큰; `--up`=빨강/`--down`=파랑 KR 색관례), `pc.css`, `mobile.css`.
+- `utils/` — `analytics.js`(trackEvent), `marketHours.js`, `priceFlash.js`, `pwa.js`.
+- `test/` — vitest 하니스(ADR-0019).
 
-### backend/tests/
+### `frontend/src/pages/` (허브 + 탭용 개별 페이지)
+허브 3종: `Research.jsx`(홈), `Portfolio.jsx`, `MarketHub.jsx`(→ `Market.jsx`).
+- Research 탭 컴포넌트: `Reports.jsx` `Recommendations.jsx` `Ranking.jsx` `Compare.jsx` `Digest.jsx` `Calendar.jsx` **`Dividends.jsx`**(배당 탭).
+- Portfolio 분석 하위탭: `SectorTab.jsx` `MacroTab.jsx` `Analytics.jsx` `RebalanceTab.jsx` `ExposureTab.jsx`.
+- Market 섹션 조립: `Market.jsx`가 시장지표/수급지표 2탭으로 `components/market/*Section`들을 조립.
+- 그 외: `Settings.jsx` `Guru.jsx`(+`GuruCrawlNow`·`GuruManagers`·`GuruStats`) `ConsensusSettings.jsx` `LoginPage.jsx` `Showcase.jsx` `AdminAnalytics.jsx` `LeverageBackfillSettings.jsx` `ReportManualGen.jsx`.
 
-`pytest` (conftest.py + fixtures/). 파일당 대상 모듈/라우터 대응. 대표:
-`test_api_doc_sync.py`(라이브 라우트 ↔ 두 문서 헤더 대조), `test_batches_router.py`·`test_batch_market_split.py`·`test_scheduler_seed.py`(배치 count/set 단언), `test_kr_quote_*`(다수결·escalation·degenerate), `test_financials_kr/us_*`, `test_recommendations_*`, `test_security_auth_gaps.py`, `test_rebalance.py`·`test_exposure.py`·`test_beta.py`(순수 계산기·베타), `test_consensus_backfill_atomic.py`(force DELETE+재적재).
+### `frontend/src/components/`
+- 루트: `StockModal.jsx` `PromoteModal.jsx` `PermissionManager.jsx` `PermissionPanel.jsx` `MobileNav.jsx` `Toast.jsx` `GlobalSearch.jsx` `StockSearchBox.jsx` `InstallPrompt.jsx` `LoadingSpinner.jsx` `BatchScheduleEditor.jsx`.
+- `market/` — 시장지표 섹션: `IndexSection` `KospiFuturesSection` `KospiSignalSection` `TreasurySection` `FxSection` `VixSection` `FearGreedSection` `CommoditiesSection` `EconIndicatorsSection` `MacroSignalsSection` `M7EarningsSection` `KrTop2Section` `KrExportsSection` `LeverageSection` `LendingSection` + `marketUtils.jsx`.
+- `reports/` — `StockCard` `TickerListItem` `StockActions`(액션버튼 단일 소스, layout="card"|"list") `ReportDetailTabs`/`ReportDetailHeader` `DetailTab` `HistoryTab` `Sections` `ConsensusChart` `FinancialsChart` `BacklogChart` `SupplySection` `ShortSellSection` `InsiderTradesSection`/`UsInsiderSection` `InvestorTrendSection` `LatestDisclosuresSection` `GuruHoldersSection` `UsSupplySection` `ReportFilters` + `reportUtils.jsx`.
+- `portfolio/` — `DashboardCard` `FlashValue` `PriceFreshness`(+ .css).
+- `recommendations/` — `RecCard.jsx`.
+- `ui/` — 원자 컴포넌트: `Badge` `Button` `Card` `Stat` `Input` `Skeleton` `SupplyBadge` `InsiderBadge` `icons.jsx` `index.js`. (의미 배지는 가격 토큰 미사용 전용 색.)
 
-## frontend/
+### `frontend/src/hooks/`
+`usePortfolioData` `useReportList` `useReportFilters` `useReportGeneration` `useStockManagement` `useAuth` `useTheme` `useIsMobile` `usePriceFlash`. `.test.js`가 병치(vitest).
 
-```
-frontend/
-├── vite.config.js      rolldown 번들러 · VitePWA · dev proxy /api→localhost:8000 · manualChunks(함수형만)
-├── package.json
-├── index.html · uat.html
-├── public/             favicon.svg 등
-├── dist/               빌드 출력 (nginx가 직접 서빙)
-└── src/                (아래)
-```
+## 네이밍 규칙
 
-### frontend/src/
+- **백엔드**: 라우터 파일 = 리소스명(`portfolio.py`), 라우터 객체 `router = APIRouter(prefix="/api/...")`. 서비스 파일 = 도메인명(`dividends.py`). 배치 잡 함수는 `_fetch_*`/`_generate_*`/`_refresh_*`(스케줄러 private), `job_id`는 `<도메인>_<동작>`(예: `dividend_fetch`·`kr_rankings_fetch`) — `batch_registry.BATCHES[].id`·`job_runs.record(id)`와 3중 일치 필수.
+- **DB 테이블**: snake_case 복수/역할명(`user_stocks`·`stock_dividend_schedule`·`market_leverage_indicators`). 신규 컬럼은 `app_schema.sql` + `main._migrate` 쌍으로.
+- **프론트**: 페이지/컴포넌트 PascalCase `.jsx`, 훅 `use*.js`(camelCase), CSS는 같은 이름 `.css` 병치. 섹션 컴포넌트는 `*Section.jsx`.
+- **market_cache 키**: 지표별 문자열 키(`macro_signals` 등), `_mc_load`/`_mc_save`로 접근.
 
-```
-src/
-├── main.jsx            React 진입
-├── App.jsx             인증 부트스트랩 · Provider 래핑 · 라우트 · TopNav (권한 필터 nav)
-├── api.js              axios 인스턴스 (Bearer 주입 · 401 리다이렉트)
-├── utils.js · utils/   analytics.js · marketHours.js · priceFlash.js · pwa.js
-├── App.css · index.css
-├── contexts/
-│   └── AuthContext.jsx  role·menu_permissions 로드 (GET /api/auth/me), useAuth()
-├── hooks/
-│   ├── usePortfolioData.js  /api/portfolio + /prices 폴링 + /stocks/dashboard
-│   ├── useStockManagement.js · useReportList.js · useReportFilters.js
-│   ├── useReportGeneration.js · useAuth.js · usePriceFlash.js
-│   ├── useTheme.js · useIsMobile.js
-│   └── *.test.js        (vitest — usePortfolioData·useReportFilters·useStockManagement)
-├── pages/              라우트 레벨 + 허브 탭
-│   ├── Research.jsx     홈 허브 (/) — Reports·Recommendations·Ranking·Digest·Calendar 탭
-│   ├── MarketHub.jsx    시장 허브 — Market(시장지표)·수급지표 탭
-│   ├── Portfolio.jsx    대시보드·분석 (섹터/매크로/상관/리밸런싱/노출)
-│   ├── Reports.jsx · Ranking.jsx · Recommendations.jsx · Calendar.jsx · Digest.jsx (종목 뉴스 섹션)
-│   ├── Market.jsx · Analytics.jsx · SectorTab.jsx · MacroTab.jsx · RebalanceTab.jsx · ExposureTab.jsx
-│   ├── Settings.jsx · LoginPage.jsx · Showcase.jsx
-│   ├── Guru.jsx · GuruCrawlNow.jsx · GuruManagers.jsx · GuruStats.jsx
-│   ├── ConsensusSettings.jsx · LeverageBackfillSettings.jsx · ReportManualGen.jsx
-│   └── AdminAnalytics.jsx  (/admin-analytics, admin 전용)
-├── components/
-│   ├── portfolio/      DashboardCard(.jsx/.css) · FlashValue · PriceFreshness · PriceFlash.css
-│   ├── reports/        ReportDetailTabs (라이브 뉴스 fetch → 스냅샷 폴백) · DetailTab · HistoryTab · ReportDetailHeader
-│   │                   ConsensusChart · FinancialsChart · BacklogChart · Sections
-│   │                   StockActions(카드/리스트 공용) · StockCard · TickerListItem
-│   │                   SupplySection · ShortSellSection · InsiderTradesSection
-│   │                   InvestorTrendSection · LatestDisclosuresSection · GuruHoldersSection
-│   │                   UsSupplySection · UsInsiderSection · ReportFilters · reportUtils.jsx
-│   ├── market/         FxSection · VixSection · CommoditiesSection · TreasurySection
-│   │                   EconIndicatorsSection · M7EarningsSection · KrTop2Section
-│   │                   KrExportsSection · IndexSection · MacroSignalsSection
-│   │                   FearGreedSection · LeverageSection · LendingSection · marketUtils.jsx
-│   ├── recommendations/ RecCard.jsx
-│   ├── ui/             프리미티브 — Badge · Button · Card · Stat · Input · Skeleton
-│   │                   SupplyBadge · InsiderBadge · icons.jsx · index.js (+ .css 짝)
-│   ├── StockModal.jsx · PromoteModal.jsx · StockSearchBox.jsx · GlobalSearch.jsx
-│   ├── PermissionManager.jsx · PermissionPanel.jsx · BatchScheduleEditor.jsx
-│   ├── MobileNav.jsx · InstallPrompt.jsx · LoadingSpinner.jsx · Toast.jsx
-├── styles/
-│   ├── tokens.css      디자인 토큰 — KR 색 관례(--up=빨강 상승, --down=파랑 하락)
-│   ├── pc.css · mobile.css
-├── test/               setup.js · smoke.test.js · recommendations-s3s4.test.jsx
-└── assets/
-```
-
-## 명명 규칙
-
-- **백엔드 배치 id**: `<도메인>_<동작>` (`daily_report_kr`·`backlog_fetch`·`recommendation_us`·`beta_fetch`). 시장 분리 배치는 `_kr`/`_us` 접미사. id = 스케줄러 잡 id = `job_runs.record` id로 일치.
-- **서비스 private 심볼**: 내부 헬퍼는 `_` prefix. 재-export 패키지는 `__init__.py`에서 private 포함 명시 re-export(`import *`는 underscore를 건너뛰므로).
-- **DART 외부 fetch 함수**: `fetch_all_<도메인>` (배치 본문), `_fetch_and_save_<도메인>` (market_indicators 배치).
-- **프론트 컴포넌트**: PascalCase `.jsx`, CSS는 동명 `.css` 짝. 훅은 `use<Name>.js`, 테스트는 `<name>.test.js(x)`.
-- **KR 색**: 의미 배지에 `success`/`danger` variant 금지(`.badge--success`=빨강·`.badge--danger`=파랑). 의미 상태 배지는 `ui/SupplyBadge.jsx`처럼 전용 색 명시.
-- **환경변수 키**(값은 `backend/.env.docker`, gitignored): `POSTGRES_PASSWORD`, `DATABASE_URL`, `JWT_SECRET`, `SESSION_SECRET`, `COWORK_API_KEY`, `FRED_API_KEY`, `KOFIA_API_KEY`, `KITA_API_KEY`(관세청), `DART_API_KEY`, `KIWOOM_APP_KEY`/`KIWOOM_SECRET_KEY`, `KIS_APP_KEY`/`KIS_APP_SECRET`/`KIS_BASE_URL`, OAuth 키, `FRONTEND_URL`, `VITE_API_BASE_URL`(프론트).
-
-## gitignored 런타임 디렉터리
-
-- `backend/snapshots/` — per-ticker/date 리포트 JSON.
-- `backend/reports/` — 레거시 리포트(read-only 폴백).
-- `backend/data/calendar/` — 월별 캘린더 이벤트 파일 캐시(종목 변경 시 자동 무효화).
-- `backend/data/consensus/` — per-ticker 컨센서스 JSON.
-- `backend/data/*.json`(holdings·watchlist·stocks·schedule·guru_*·kr_exports) — 레거시 로컬 JSON.
-- `backend/.env` · `backend/.env.docker` · 루트 `.env`.
+## 최근 추가 항목
+- 테이블 `stock_dividend_schedule`(ticker+ex_date PK, 다가오는 배당락 스케줄) — `main._migrate` + `services/dividends.py`(`fetch_dividend_schedule`·`get_schedule_batch`).
+- 엔드포인트 `GET /api/portfolio/dividends`(`routers/portfolio.py`).
+- 페이지 `frontend/src/pages/Dividends.jsx` + Research 허브 '배당' 탭(`Research.jsx`).

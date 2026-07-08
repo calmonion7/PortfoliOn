@@ -1,50 +1,92 @@
 ---
-last_mapped_commit: a5fb8bc8fbb92ec9155e7bc20ba681388786bfcd
-mapped: 2026-07-07
+last_mapped_commit: 78e6f09a65ee76a7af351da7b7d417a13b6de820
+mapped: 2026-07-09
 ---
 
-# INTEGRATIONS
+# INTEGRATIONS — 외부 API / DB / 인증 / 웹훅
 
-PortfoliOn의 외부 API·데이터베이스·인증 공급자·외부 쓰기 API 지도. 각 통합의 파일 경로·필요 env 키 이름 명시. (env 값은 절대 미인용 — 키 이름만.)
+구현 사실만(용어 정의는 CONTEXT.md). 각 항목: 용도 · 파일 경로 · 키/설정. 경로는 리포 루트 기준.
 
-## Database — PostgreSQL 16 (Docker)
+## 데이터베이스 — PostgreSQL (Docker)
 
-- 엔진: `postgres:16-alpine` (`docker-compose.yml`), 볼륨 `pgdata`, 포트 5432. 접속: env `DATABASE_URL`.
-- 드라이버/풀: `psycopg2-binary` + `psycopg2.pool.ThreadedConnectionPool` (`backend/services/db.py` — `_get_pool()` minconn=1/maxconn=20, `RealDictCursor`, `execute_batch`). 헬퍼 `get_connection()`/쿼리 함수.
-- 스키마 실행 순서: `backend/auth_schema.sql`(01) → `backend/app_schema.sql`(02), INITDB 마운트. 라이브 DB는 기동 idempotent 마이그레이션(`backend/main.py:_migrate`)도 탐 — 신규 컬럼/테이블은 app_schema + `_migrate` 둘 다 필요.
-- `auth_schema.sql` 테이블: `users`(id UUID, email, password_hash, oauth_provider, oauth_sub, role `user`|`admin`), `refresh_tokens`. `pgcrypto` 확장(gen_random_uuid).
-- `app_schema.sql` 주요 테이블: `tickers`(공유 종목 마스터, `name`=종목명 정본·`enriched_at`), `snapshots`(per-ticker/date 리포트 JSON, `data.name`=박제 종목명), `user_stocks`(user별 holding/watchlist), `schedules`, `guru_managers`, `guru_schedules`, `batch_schedules`, `digests`, `consensus_history`, `calendar_cache`, `market_cache`(시장지표 영구 캐시), `user_menu_permissions`, `default_menu_permissions`, `raw_reports`, `daily_consensus_mart`(목표가 정본), `user_events`, `market_leverage_indicators`, `market_lending_balance`, `backlog_history`(segments JSONB), `market_rankings`, `market_investor_trend`, `market_short_sell`, `stock_disclosures`(meeting_date=AGM), `stock_dividends`, `stock_supply_score`, `stock_insider_trades`, `stock_recommendations`, `job_runs`(배치 실행 이력), `us_supply_snapshot`.
-- `market_cache` 저장 키(시장지표 영구 캐시): fx/vix/commodities/treasury/econ/m7/krtop2/krexports/macro_signals/indices/kr_sector/**fear_greed**.
-- 로컬 파일 캐시 (gitignored, 런타임 캐시 전용): `backend/data/consensus/`(per-ticker 컨센서스), `backend/data/calendar/`(월별 이벤트 `YYYY-MM.json`), `backend/snapshots/`(생성 JSON). `backend/data/`엔 정적 참조 데이터(`sp500_tickers.json`, `kospi_tickers.json`)만.
+- **엔진**: `postgres:16-alpine`(`docker-compose.yml`), DB/USER `portfolion`, 볼륨 `pgdata`, 포트 5432.
+- **접속 계층**: `backend/services/db.py` — psycopg2 `ThreadedConnectionPool`(minconn 1, **maxconn 20** — calendar 15·analysis 11 ThreadPool 동시성보다 크게), DSN = `os.environ["DATABASE_URL"]`. 헬퍼 `query`/`execute`/`execute_many`(`execute_batch`), `get_connection` 컨텍스트매니저(commit/rollback/putconn).
+- **스키마**: 신규 설치 `backend/auth_schema.sql`(users, refresh_tokens) → `backend/app_schema.sql`(앱 테이블 전체), docker-entrypoint-initdb.d 마운트. 라이브 증분은 `backend/main.py:_migrate()`(idempotent DDL; `stock_disclosures`·`stock_dividends`·`stock_beta`·`stock_supply_score`·`stock_insider_trades`·`stock_recommendations`·`us_supply_snapshot`·`market_short_sell` 등 생성/컬럼추가).
+- **인메모리 캐시**: `backend/services/cache.py`(snapshot LRU·list·dashboard·correlation·sector·macro TTL). PostgreSQL 영구 캐시 `market_cache`는 `backend/services/market_indicators/cache.py`(`_mc_load`/`_mc_save`).
 
-## 외부 데이터 소스 (시세·재무·시장지표·심리)
+## 시세/시장 데이터 소스
 
-- **yfinance** (`yfinance` 패키지) — US 1차 시세/재무/히스토리·배당·내부자·기관보유, 캘린더 실적/배당일. 구현: `backend/services/market/us.py`, `backend/services/market_indicators/`(fx·vix·commodities·earnings 등 `_yf_close_history` 증분 fetch), `backend/routers/calendar.py`. 시장지수 `^GSPC`/`^KS11`/`^KQ11`(`indices.py`). 키 불필요. KR 실적일 forward는 `.KS`/`.KQ` 접미사가 유일 소스.
-- **Naver 모바일** (`https://m.stock.naver.com/api/stock/{code}/...`, `backend/services/market/kr.py`) — KR 시세 폴백/독립 corroboration 피드. 키 불필요(공개 API).
-- **키움증권 Kiwoom REST** (`backend/services/kiwoom/`: client·quote·chart·investor·sector·shortsell) — **KR 1차 읽기전용 시세**(계좌·주문 미연동, ADR-0009). 베이스 `https://api.kiwoom.com` (env `KIWOOM_BASE_URL` override). 토큰: env `KIWOOM_APP_KEY` + `KIWOOM_SECRET_KEY`. `client.py`가 인프로세스 싱글톤 토큰(401 재발급) + `request(api_id, body, category)`(`POST /api/dostk/{category}`). ka10001(현재가)·ka10081(일봉)·ka20006/ka20002(업종)·투자자/공매도 TR. `client.integrated_code(stk_cd, regular=)` — False=`_AL`(NXT), True=KRX 평문. 미설정 시 휴면(Naver 폴백).
-- **한국투자증권 KIS REST** (`backend/services/kis/`: client·quote) — **KR+US 읽기전용 백업 시세**(키움/yfinance 실패 시, ADR-0011). 베이스 `https://openapi.koreainvestment.com:9443`(`kis/client.py` 하드코딩 기본, env `KIS_BASE_URL` override — 모의투자용). 토큰: env `KIS_APP_KEY` + `KIS_APP_SECRET` → `POST /oauth2/tokenP`(발급 60s 가드, EGW00133 방어). `request(tr_id, path, params)` GET. KR `FHKST01010100`, US `HHDFS00000300`/`HHDFS76240000`. 키 미설정=안전 기본값(휴면).
-- **DART (금융감독원 오픈)** — 베이스 `https://opendart.fss.or.kr/api`, 뷰어 `https://dart.fss.or.kr/dsaf001/...`. env `DART_API_KEY`. 용도: 수주잔고(`backend/services/backlog.py` — `document.xml` 원문 파싱), 공시 피드(`backend/services/disclosures.py` — 유형별 A/B/C/D `list.json`), 주총 일정(`backend/services/agm.py` — no-type list + document 파싱), KR 재무(`backend/services/market/kr.py` — `fnlttSinglAcnt`/`fnlttSinglAcntAll`), KR 배당(`dividends.py` — `alotMatter.json`). KR 전용, 미설정 시 휴면. status 013(무데이터) graceful.
-- **FRED (St. Louis Fed)** — 베이스 `https://api.stlouisfed.org/fred/series/observations`, `/releases/dates`(캘린더 econ 이벤트). env `FRED_API_KEY`. 용도: 경제지표(`backend/services/market_indicators/econ.py`), 매크로 신호 시계열 `T10Y2Y`/`BAMLH0A0HYM2`/`M2SL`/`DFF`(`macro.py`, `macro_signals` 캐시). 미설정 시 수집 실패(저장값 무변경). ⚠️ FRED엔 S&P CAPE 시리즈 없음.
-- **multpl.com CAPE 크롤** — `https://www.multpl.com/shiller-pe` 페이지를 `requests`+`BeautifulSoup(html, "html.parser")`로 파싱(`backend/services/market_indicators/indices.py`). S&P500 Shiller CAPE(FRED 부재 대체). 키 불필요, 실패 graceful.
-- **CNN Fear & Greed 지수** (신규) — `https://production.dataviz.cnn.io/index/fearandgreed/graphdata` (`backend/services/market_indicators/sentiment.py`). **비공식 API — 전체 브라우저 헤더(User-Agent/Origin/Referer/sec-ch-ua 등) 필수**. US 시장심리 score/rating + 최근 60일 히스토리. **요청경로 증분**(TTL 1h 인메모리 캐시 → 없으면 라이브 fetch → 성공 시 `sanitize` 후 `market_cache` key `fear_greed`로 저장; **실패 시 직전 저장값(`_mc_load`) graceful, 없으면 None**). 스케줄 배치 없음(fx/indices와 동일 패턴, `batch_registry` 무등록). 키 불필요. 조회 `GET /api/market/fear-greed`(`backend/routers/market_indicators.py`). 프론트 `frontend/src/components/market/FearGreedSection.jsx` → `frontend/src/pages/Market.jsx`.
-- **공공데이터포털 (KOFIA/금융위 계열)** — 베이스 `https://apis.data.go.kr/1160100/...`. env `KOFIA_API_KEY`(leverage·lending 공용). 용도: 신용잔고·반대매매·시총(`backend/services/leverage_service.py` → `market_leverage_indicators`), 내외국인 대차잔고(`backend/services/lending_service.py`, `GetStocLendBorrInfoService_V2` → `market_lending_balance`). 미설정 시 요청 실패.
-- **관세청 Korea Customs Service / UN Comtrade** — KR 수출 지표(`backend/services/market_indicators/exports.py`). 1차 관세청 `https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList`(env `KITA_API_KEY` — 실제로 관세청 키), 폴백 UN Comtrade 공개 API `https://comtradeapi.un.org/public/v1/preview/C/M/HS`(키 불필요). `KITA_API_KEY` 미설정 시 Comtrade 자동 폴백.
+### yfinance (US 1차 시세·히스토리)
+- **용도**: US 종목 quote/history/섹터/시총, 배치 `yf.download` 1콜, 시장지표(FX·VIX·원자재·국채·지수).
+- **파일**: `backend/services/market/__init__.py`(`get_quote`·`get_quotes_batch`·`get_history_df`), `backend/services/market/us.py`, `backend/services/market_indicators/`(`fx.py`·`commodities.py`·`indices.py`·`earnings.py` 등).
+- **키**: 없음(공개). rate-limit 방어로 종목당 TTL 캐시.
 
-## 인증 (Auth)
+### Naver (KR 시세 폴백 + 리서치/뉴스/컨센서스)
+- **용도**: KR quote 폴백(키움·KIS 실패 시), 애널리스트 컨센서스/리서치, 종목 검색·자동완성, 뉴스, 시총 랭킹.
+- **엔드포인트**: `m.stock.naver.com/api/stock/{code}/...`, `api.stock.naver.com/stock/...`, `m.stock.naver.com/api/research/stock/`, `finance.naver.com/sise/sise_market_sum.naver`, `ac.stock.naver.com/ac`(자동완성), `n.news.naver.com`.
+- **파일**: `backend/services/market/kr.py`(`_kr_basic_naver` — retry-once), `consensus_pipeline.py`, `scraper.py`, `ranking_service.py`, `investor_service.py`, `market_indicators/earnings.py`, `recommendation/universe.py`, `report_generator.py`.
+- **키**: 없음(공개 모바일 API).
 
-- **JWT (HS256)** — `backend/services/auth_service.py` (`jwt.encode(..., algorithm="HS256")` / `jwt.decode(..., algorithms=["HS256"])`, `python-jose`). env `JWT_SECRET`. 리프레시 토큰은 `refresh_tokens` 테이블.
-- **세션 서명** — starlette `SessionMiddleware`, env `SESSION_SECRET`(`itsdangerous`). `backend/main.py`.
-- **OAuth** — `backend/routers/auth.py` (`authlib`). Google(env `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`) + GitHub(env `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`). OAuth 토큰 교환은 임시 code(120s TTL, `_oauth_codes` 인메모리) → 프론트가 code로 교환. (Google at_hash는 base64 직접 디코딩 — jose 검증 우회.)
-- **역할/권한** — `users.role`(`user`|`admin`, admin만 리포트 생성·Guru 크롤·admin 엔드포인트). 메뉴 권한 `user_menu_permissions`/`default_menu_permissions`, `PUT /api/admin/users/:id/permissions`, 허용 메뉴는 `backend/routers/admin.py:ALL_MENUS`. auth 의존성: `get_current_user`/`require_admin`/`require_admin_or_api_key`/`get_current_user_or_api_key`.
+### 키움증권 REST (KR 1차 시세, 읽기전용)
+- **용도**: KR 현재가(ka10001)·일봉/주봉/월봉 차트(ka10081/82/83)·투자자별 수급·업종 모멘텀(ka20006/ka20002)·공매도. **읽기전용 시세만**, 계좌·주문 미연동(경계 ADR-0009).
+- **파일**: `backend/services/kiwoom/` — `client.py`(토큰·요청 헬퍼), `quote.py`·`chart.py`·`investor.py`·`sector.py`·`shortsell.py`.
+- **인증/설정**(`client.py`): base URL `KIWOOM_BASE_URL`(기본 `https://api.kiwoom.com`), 자격 `KIWOOM_APP_KEY`+`KIWOOM_SECRET_KEY`. 토큰 `POST /oauth2/token`(client_credentials, 인프로세스 싱글톤 캐시 12h, 401/403 시 1회 재발급 재시도). 요청 `POST /api/dostk/{category}`(헤더 `api-id`/`authorization`, `return_code≠0`→`KiwoomError`, 직렬 throttle 0.25s). 미설정 시 `configured()` False → 호출측 폴백.
 
-## Cowork 외부 쓰기 API
+### 한국투자증권 KIS REST (KR+US 백업 시세, 읽기전용)
+- **용도**: 시세 백업 — KR 체인 키움→**KIS**→Naver, US 체인 yfinance→**KIS**. 국내현재가(`FHKST01010100`), 해외가(`HHDFS00000300`/`HHDFS76240000`), 국내선물옵션(`FHMIF10000000`·`FHKIF03020100`, output1/2/3 분할). 주문·계좌 미연동(경계 ADR-0011/0022).
+- **파일**: `backend/services/kis/` — `client.py`(토큰·요청), `quote.py`(`_kr_basic_kis`·`get_quote_us`), `futures.py`(코스피200 선물).
+- **인증/설정**(`client.py`): base URL `KIS_BASE_URL`(기본 실전 `https://openapi.koreainvestment.com:9443`), 자격 `KIS_APP_KEY`+`KIS_APP_SECRET`. 토큰 `POST /oauth2/tokenP`(싱글톤 캐시 23h, EGW00133 발급 1분당 1회 방어로 강제 재발급 60s 가드). 요청 GET `/uapi/...`(헤더 `tr_id`/`appkey`/`appsecret`/`custtype=P`, `rt_cd≠"0"`→`KisError`, throttle 0.05s). 미설정 시 `configured()` False → 휴면(기존 체인만 동작).
 
-- 외부 Claude AI(Cowork 클라이언트)가 종목 AI 분석을 read/write하는 API. 명세 `CLAUDE_COWORK_API.md`(외부 소비자용) + `API_SPEC.md`(전체 REST 레퍼런스, source of truth).
-- 인증: API 키 게이팅 — env `COWORK_API_KEY`, 의존성 `require_admin_or_api_key`/`get_current_user_or_api_key`(`backend/routers/report.py`, `_API_KEY_USER_ID`로 매핑). enrich API가 AI 분석 텍스트·insights·`tickers.enriched_at`를 씀. 백엔드 자체엔 LLM 호출 없음(`ANTHROPIC_API_KEY`는 `.env.docker`에 잔존하나 현재 미사용).
-- 수주잔고 pending 채움: `PUT /api/report/{ticker}/backlog`(Cowork가 자동추출 실패분 수기 채움).
-- ⚠️ API 변경 시 `API_SPEC.md` + `CLAUDE_COWORK_API.md` **둘 다** 갱신(DoD). 엔드포인트 존재 drift는 `backend/tests/test_api_doc_sync.py`가 자동 검출.
+## 정부/공공 데이터 API
 
-## FRONTEND_URL / CORS
+### DART (전자공시, opendart.fss.or.kr)
+- **용도**: 수주잔고(document.xml 원문), 공시 피드(list.json), 주주총회 일정, 내부자 거래, KR 배당(alotMatter), KR 재무제표(fnlttSinglAcnt/fnlttSinglAcntAll).
+- **파일**: `backend/services/backlog.py`·`backlog_parser.py`, `disclosures.py`, `agm.py`, `insider_trades.py`, `dividends.py`, `market/kr.py`.
+- **엔드포인트**: `https://opendart.fss.or.kr/api/...`, 문서뷰어 `dart.fss.or.kr/dsaf001/main.do`. **키**: `DART_API_KEY`(필수, 미설정 시 KR 공시/재무 휴면). status 013(무데이터)은 graceful.
 
-- CORS origins (`backend/main.py`): `http://localhost:3000`, `http://localhost:5173`, env `FRONTEND_URL`(빈값이면 제외). 배포 시 `FRONTEND_URL`을 `.env.docker`에 설정.
-- **Cloudflare Tunnel**로 `portfolion.taebro.com` → localhost:80 노출(`cloudflared` launchd 실행). nginx가 `/api/*` → `backend:8000` 프록시.
+### FRED (미 세인트루이스 연준, api.stlouisfed.org)
+- **용도**: 경제지표·매크로 신호 시계열(금리차·HY OAS·M2·기준금리), 경제 릴리스 캘린더.
+- **파일**: `backend/services/market_indicators/econ.py`·`macro.py`, `backend/routers/calendar.py`(`/releases/dates`).
+- **엔드포인트**: `https://api.stlouisfed.org/fred/series/observations`, `.../fred/releases/dates`. **키**: `FRED_API_KEY`(미설정 시 수집 실패·저장값 무변경).
+
+### KOFIA / 공공데이터포털 (apis.data.go.kr, 서비스 1160100)
+- **용도**: 신용잔고·반대매매·시총(레버리지 지표), 내외국인 대차잔고, KR 수출 통계·시장지수.
+- **파일**: `backend/services/leverage_service.py`(`GetKofiaStatisticsInfoService`·`GetMarketIndexInfoService`), `lending_service.py`(`GetStocLendBorrInfoService_V2`), `market_indicators/exports.py`, 백필 `backend/run_backfill.py`.
+- **엔드포인트**: `https://apis.data.go.kr/1160100/...`. **키**: `KOFIA_API_KEY`(leverage/lending 공용, 미설정 시 요청 실패).
+
+### KITA / 관세청 (apis.data.go.kr, 서비스 1220000) + UN Comtrade 폴백
+- **용도**: KR 품목별 수출입 무역통계.
+- **파일**: `backend/services/market_indicators/exports.py`.
+- **엔드포인트**: `https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList`, 폴백 `https://comtradeapi.un.org/public/v1/preview/C/M/HS`(공개). **키**: `KITA_API_KEY`(실제로 **관세청** 키; 미설정 시 UN Comtrade 자동 폴백).
+
+## 인증 / OAuth
+
+- **자체 인증**(`backend/services/auth_service.py`, `backend/auth.py`): 비밀번호 `bcrypt`, JWT `python-jose` **HS256**(`JWT_SECRET`, access 1h). Refresh 토큰은 `refresh_tokens` 테이블 저장·**1회용 회전**(사용 즉시 폐기, task#108). 세션 `SessionMiddleware`(`SESSION_SECRET`).
+- **Google OAuth**(`backend/routers/auth.py`): authorize `https://accounts.google.com/o/oauth2/v2/auth`, 토큰 `https://oauth2.googleapis.com/token`. 키 `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`. redirect_uri = `FRONTEND_URL + /api/auth/oauth/google/callback`. 임시 code로 토큰 교환(`_oauth_codes`, 120s TTL).
+- **GitHub OAuth**(`backend/routers/auth.py`): authorize `https://github.com/login/oauth/authorize`, 토큰 `https://github.com/login/oauth/access_token`, 유저 `https://api.github.com/user`·`/user/emails`. 키 `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`.
+- **역할/권한**: `users.role`(user|admin), `require_admin`. 메뉴 권한 `user_menu_permissions`/`default_menu_permissions`.
+
+## 외부 Cowork API (인바운드)
+
+- **용도**: 외부 Claude Cowork 클라이언트가 종목 분석 텍스트 enrich·backlog 채움을 write(`CLAUDE_COWORK_API.md` 스코프).
+- **인증**(`backend/auth.py`): `X-API-Key` 헤더 = `COWORK_API_KEY`, 또는 JWT Bearer. 의존성 `require_admin_or_api_key`/`get_current_user_or_api_key`.
+- **소비 엔드포인트**: `backend/routers/stocks.py`(`enrich_batch`·`enrich_single`), `backend/routers/report.py`(`generate_all`·backlog).
+
+## 웹훅 / 알림 (아웃바운드)
+
+- **Telegram**(`backend/services/digest_service.py:send_telegram`): 일일 다이제스트를 `https://api.telegram.org/bot{token}/sendMessage`로 전송. 키 `TELEGRAM_BOT_TOKEN`+`TELEGRAM_CHAT_ID`(`os.getenv`, 미설정 시 스킵). 트리거 `backend/routers/digest.py`.
+
+## 기타 웹 데이터 소스 (키 없음, 크롤/공개 JSON)
+
+- **FnGuide**(`comp.fnguide.com`): KR 재무/컨센서스 — `backend/services/consensus_pipeline.py`, `market/kr.py`(`SVO2/json/...`, `SVD_main.asp`).
+- **Finviz**(`finviz.com/quote.ashx`): US 보조 지표 — `backend/services/scraper.py`, `report_generator.py`.
+- **Dataroma**(`dataroma.com/m`): 구루(슈퍼투자자) 보유 종목 — `backend/services/guru_scraper.py`, `recommendation/universe.py`, `batch_registry.py`.
+- **multpl.com**(`www.multpl.com/shiller-pe`): S&P500 Shiller CAPE(requests+BeautifulSoup 크롤) — `backend/services/market_indicators/indices.py`.
+- **CNN Fear & Greed**(`production.dataviz.cnn.io/index/fearandgreed/graphdata`): 시장 심리 지수 — `backend/services/market_indicators/sentiment.py`(취약 소스 → VIX식 수동 last-good 폴백).
+- **open.er-api.com**(`/v6/latest/USD`): FX 환율 폴백 — `backend/services/market_indicators/fx.py`.
+- **Wikipedia**(`en.wikipedia.org/wiki/List_of_S...`): S&P500 구성종목 — `backend/services/recommendation/universe.py`.
+
+## 코드에 존재하나 미사용
+
+- **Anthropic / LLM**: `ANTHROPIC_API_KEY`가 `backend/.env.docker`에 남아있으나 **백엔드에서 사용하지 않음**(`requirements.txt`에 anthropic 없음, `services`/`routers`에 호출 코드 0건). AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API로 작성(백엔드 `report_generator`는 시장 데이터 스냅샷만 생성).
+- **Supabase**: `backend/.env`·`frontend/.env`·`supabase/`·`supabase_schema.sql`에 잔재가 있으나 현 Docker 인프라에서 미사용(레거시).
