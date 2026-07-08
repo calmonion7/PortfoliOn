@@ -17,7 +17,8 @@ export default function ConsensusChart({ ticker, market }) {
   const [fetchFailed, setFetchFailed] = useState(false)  // 조회 실패 — '데이터 없음'과 구분
   const [tab, setTab] = useState(0)
   const [period, setPeriod] = useState('3M')
-  const retriedRef = useRef(false)  // 무음 auto-retry 1회 제한
+  const retriedRef = useRef(false)     // 무음 auto-retry 1회 제한
+  const retryTimerRef = useRef(null)   // 예약된 재시도 핸들 — 종목 전환/언마운트 시 취소
 
   const fetchData = useCallback(() => {
     if (!ticker) return
@@ -27,17 +28,24 @@ export default function ConsensusChart({ ticker, market }) {
         // 일시적 오류(터널 520 등)는 대부분 즉시 재시도로 해소 — 1회 무음 재시도 후 실패 표시.
         if (!retriedRef.current) {
           retriedRef.current = true
-          setTimeout(() => fetchData(), 1500)
+          retryTimerRef.current = setTimeout(() => fetchData(), 1500)
         } else {
           setFetchFailed(true)
         }
       })
   }, [ticker])
 
-  const retryFetch = () => { retriedRef.current = false; setFetchFailed(false); fetchData() }
+  const retryFetch = () => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+    retriedRef.current = false; setFetchFailed(false); fetchData()
+  }
 
-  // 종목 전환 시 재시도 상태 리셋 — 이전 종목의 소진된 retry가 새 종목의 auto-retry를 막지 않도록.
-  useEffect(() => { retriedRef.current = false; setFetchFailed(false); fetchData() }, [fetchData])
+  // 종목 전환/언마운트 시 재시도 상태 리셋 + 예약된 재시도 취소 — 이전 종목의 소진된 retry가
+  // 새 종목 auto-retry를 막거나, 스테일 fetch가 다른 종목 화면에 이전 종목 데이터를 쓰는 것 방지.
+  useEffect(() => {
+    retriedRef.current = false; setFetchFailed(false); fetchData()
+    return () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current) }
+  }, [fetchData])
 
   const backfill = async () => {
     setBackfilling(true)

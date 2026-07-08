@@ -217,4 +217,44 @@ def test_get_dividends_computes_expected_with_decimal_quantity():
     assert items["AAPL"]["pay_date"] == "2026-08-25"
     # 요약: 보유 KRW 합계 = 37200 (US 관심은 수량 없어 제외)
     assert body["summary"]["total_expected_12m_krw"] == 37200.0
+
+
+def test_get_dividends_total_excludes_beyond_365_days():
+    """[#158 버그] '12개월' 합계는 today+365일 이내 이벤트만 — horizon(+385일) 누수로 5회 합산 금지."""
+    from datetime import date
+    full = {"stocks": [{"ticker": "005930", "name": "삼성전자", "quantity": 100, "market": "KR"}],
+            "watchlist": []}
+    # 분기배당 5회 — 5번째(2027-07-14)는 cutoff(2027-07-08) 초과 → 합계 제외
+    sched = [{"ticker": "005930", "ex_date": d, "pay_date": None, "amount_per_share": 372.0,
+              "currency": "KRW", "status": "projected", "source": "yfinance"}
+             for d in ["2026-07-15", "2026-10-14", "2027-01-13", "2027-04-14", "2027-07-14"]]
+    with patch("routers.portfolio.storage.get_full_portfolio", return_value=full), \
+         patch("routers.portfolio.dividends_svc.get_schedule_batch", return_value=sched), \
+         patch("routers.portfolio.dividends_svc._today_kst", return_value=date(2026, 7, 8)), \
+         patch("routers.portfolio._usdkrw_rate", return_value=1385.0):
+        resp = client.get("/api/portfolio/dividends")
+    assert resp.status_code == 200
+    body = resp.json()
+    # 리스트는 5개 전부(horizon 유지), 합계는 4회분(372×100×4)만
+    assert len(body["items"]) == 5
+    assert body["summary"]["total_expected_12m_krw"] == 372.0 * 100 * 4
+
+
+def test_get_dividends_counts_us_holding_without_fx():
+    """[#158 버그 #5] FX 결측 시 US 보유가 holdings_with_dividend 카운트에 포함(합계엔 여전히 제외)."""
+    from datetime import date
+    full = {"stocks": [{"ticker": "AAPL", "name": "Apple", "quantity": 10, "market": "US"}],
+            "watchlist": []}
+    sched = [{"ticker": "AAPL", "ex_date": "2026-08-20", "pay_date": "2026-08-25", "amount_per_share": 0.27,
+              "currency": "USD", "status": "confirmed", "source": "yfinance"}]
+    with patch("routers.portfolio.storage.get_full_portfolio", return_value=full), \
+         patch("routers.portfolio.dividends_svc.get_schedule_batch", return_value=sched), \
+         patch("routers.portfolio.dividends_svc._today_kst", return_value=date(2026, 7, 8)), \
+         patch("routers.portfolio._usdkrw_rate", return_value=None):  # FX 배치 전
+        resp = client.get("/api/portfolio/dividends")
+    assert resp.status_code == 200
+    body = resp.json()
+    # US 보유 예상배당 있음 → 카운트 포함(1), 하지만 FX 없어 KRW 합계엔 제외(0)
+    assert body["summary"]["holdings_with_dividend"] == 1
+    assert body["summary"]["total_expected_12m_krw"] == 0
     assert body["summary"]["holdings_with_dividend"] == 1

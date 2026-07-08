@@ -1,3 +1,4 @@
+from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Body
 from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict
@@ -90,6 +91,9 @@ def get_dividends(user_id: str = Depends(get_current_user)):
 
     sched = dividends_svc.get_schedule_batch(list(info.keys()))
     usdkrw = _usdkrw_rate()
+    # '12개월' 합계는 today(KST)+365일 이내만 — 스케줄 horizon(+385일 버퍼)이 5번째 분기배당을
+    # 합계에 흘려 ~25% 과대집계하던 것 차단(리스트 items는 전체 horizon 유지). task#160 #1.
+    cutoff_365 = (dividends_svc._today_kst() + timedelta(days=365)).isoformat()
     items = []
     total_12m_krw = 0.0
     holdings_with_div: set = set()
@@ -107,14 +111,16 @@ def get_dividends(user_id: str = Depends(get_current_user)):
             "quantity": qty, "expected_amount": expected,
         })
         if expected is not None:
+            # 카운트는 예상배당 있는 보유면 FX 유무와 무관하게 포함(#5) — 합계 환산 가능여부와 분리.
+            holdings_with_div.add(row["ticker"].upper())
             cur = row.get("currency")
-            if cur == "KRW":
-                total_12m_krw += expected
-                holdings_with_div.add(row["ticker"].upper())
-            elif cur == "USD" and usdkrw:
-                total_12m_krw += expected * usdkrw
-                holdings_with_div.add(row["ticker"].upper())
-            # USD인데 저장 FX 없음 → KRW 합계서 graceful 제외
+            within_365 = (row.get("ex_date") or "") <= cutoff_365
+            if within_365:
+                if cur == "KRW":
+                    total_12m_krw += expected
+                elif cur == "USD" and usdkrw:
+                    total_12m_krw += expected * usdkrw
+                # USD인데 저장 FX 없음 → KRW 합계서만 graceful 제외(카운트엔 이미 포함)
     summary = {
         "total_expected_12m_krw": round(total_12m_krw, 2),
         "holdings_with_dividend": len(holdings_with_div),

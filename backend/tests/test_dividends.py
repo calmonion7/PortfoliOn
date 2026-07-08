@@ -384,3 +384,81 @@ def test_snap_interval_buckets():
     assert svc._snap_interval(182) == 182    # 반기
     assert svc._snap_interval(365) == 365    # 연
     assert svc._snap_interval(30) == 30      # 표준 밖은 원값
+
+
+# ── 배당 스케줄 클로버 방지 + 원자화 (task#160 #2·#4) ────────────────────
+
+class _BoomDividends:
+    """t.dividends 접근 시 예외 — yfinance rate-limit/네트워크 실패 모사."""
+    @property
+    def dividends(self):
+        raise RuntimeError("yfinance rate limit")
+
+
+def test_dividend_history_propagates_fetch_error(monkeypatch):
+    """[#2] fetch 예외는 전파돼야 함 — genuine 무배당([])과 구분(실패 시 last-good 보존 신호)."""
+    from services import dividends as svc
+    monkeypatch.setattr(svc.yf, "Ticker", lambda s: _BoomDividends())
+    with pytest.raises(RuntimeError):
+        svc._dividend_history("005930.KS")
+
+
+def test_fetch_all_skips_replace_on_schedule_failure(monkeypatch):
+    """[#2] 스케줄 fetch 실패 종목은 replace_schedule 미호출(저장 스케줄 클로버 금지),
+    genuine 무배당은 replace([])로 clear."""
+    from services import dividends as svc
+    monkeypatch.setattr(svc, "query", lambda sql, params=None: [
+        {"ticker": "FAILS", "market": "US", "exchange": ""},
+        {"ticker": "EMPTY", "market": "US", "exchange": ""}])
+    monkeypatch.setattr(svc, "fetch_us_dividend", lambda t, exchange="": None)
+    monkeypatch.setattr(svc, "fetch_kr_dividend", lambda t: None)
+    monkeypatch.setattr(svc, "upsert_dividend", lambda t, d: None)
+
+    def sched(t, m, e):
+        if t == "FAILS":
+            raise RuntimeError("yfinance down")
+        return []  # genuine 무배당
+
+    monkeypatch.setattr(svc, "fetch_dividend_schedule", sched)
+    replaced = []
+    monkeypatch.setattr(svc, "replace_schedule", lambda t, rows: replaced.append(t))
+    svc.fetch_all_dividends()
+    assert "FAILS" not in replaced   # 실패 → 기존 스케줄 보존(delete 안 함)
+    assert "EMPTY" in replaced       # genuine empty → clear
+
+
+def test_replace_schedule_single_transaction(monkeypatch):
+    """[#4] replace_schedule은 단일 트랜잭션(delete+insert 한 커넥션) — 중단 시 전체 rollback."""
+    from contextlib import contextmanager
+    from services import dividends as svc
+    verbs = []
+
+    class FakeCur:
+        def execute(self, sql, params=None):
+            verbs.append(sql.strip().split()[0].upper())
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCur()
+
+    conns = {"n": 0}
+
+    @contextmanager
+    def fake_conn():
+        conns["n"] += 1
+        yield FakeConn()
+
+    monkeypatch.setattr(svc, "get_connection", fake_conn)
+    svc.replace_schedule("005930", [
+        {"ex_date": "2026-09-26", "pay_date": None, "amount_per_share": 372.0,
+         "currency": "KRW", "status": "projected", "source": "yfinance"},
+        {"ex_date": "2026-12-26", "pay_date": None, "amount_per_share": 372.0,
+         "currency": "KRW", "status": "projected", "source": "yfinance"},
+    ])
+    assert conns["n"] == 1              # 단일 커넥션(=단일 트랜잭션)
+    assert verbs[0] == "DELETE"         # delete 먼저
+    assert verbs.count("INSERT") == 2   # 행별 insert 2건

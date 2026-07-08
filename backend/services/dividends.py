@@ -22,7 +22,7 @@ import requests
 import yfinance as yf
 
 from services.backlog import _get_corp_code_map
-from services.db import execute, query
+from services.db import execute, query, get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -226,12 +226,12 @@ def _snap_interval(median_gap: int) -> int:
 
 
 def _dividend_history(sym: str) -> "list[tuple]":
-    """yfinance t.dividends → [(ex_date, amount), ...] 오름차순. 실패·무배당은 []."""
-    try:
-        s = yf.Ticker(sym).dividends
-    except Exception as e:
-        logger.warning(f"[DivSchedule] t.dividends 실패 ({sym}): {e}")
-        return []
+    """yfinance t.dividends → [(ex_date, amount), ...] 오름차순. genuine 무배당은 [].
+
+    ⚠️ fetch 예외는 **전파**한다(swallow 금지) — 그래야 호출측(fetch_all_dividends)이
+    실패를 감지해 replace_schedule을 스킵하고 직전 양호 스케줄을 보존한다. 예외를 []로
+    삼키면 replace_schedule([])가 저장 스케줄을 파괴한다(wrong<missing, task#160 #2)."""
+    s = yf.Ticker(sym).dividends
     if s is None or len(s) == 0:
         return []
     out = []
@@ -306,26 +306,29 @@ def fetch_dividend_schedule(ticker: str, market: str = "US", exchange: str = "",
 
 
 def replace_schedule(ticker: str, rows: "list[dict]") -> None:
-    """티커의 스케줄을 통째 교체(delete→insert). rows 비면 삭제만(무배당 정리)."""
+    """티커 스케줄을 **단일 트랜잭션**으로 통째 교체(delete+insert 한 커넥션 — 중단 시 전체
+    rollback해 부분/빈 상태를 남기지 않음, task#160 #4). rows 비면 삭제만(genuine 무배당 정리)."""
     tk = ticker.upper()
-    execute("DELETE FROM stock_dividend_schedule WHERE ticker = %s", (tk,))
-    for r in rows:
-        execute(
-            """
-            INSERT INTO stock_dividend_schedule
-                (ticker, ex_date, pay_date, amount_per_share, currency, status, source, fetched_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-            ON CONFLICT (ticker, ex_date) DO UPDATE SET
-                pay_date         = EXCLUDED.pay_date,
-                amount_per_share = EXCLUDED.amount_per_share,
-                currency         = EXCLUDED.currency,
-                status           = EXCLUDED.status,
-                source           = EXCLUDED.source,
-                fetched_at       = NOW()
-            """,
-            (tk, r["ex_date"], r.get("pay_date"), r.get("amount_per_share"),
-             r.get("currency"), r["status"], r.get("source")),
-        )
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM stock_dividend_schedule WHERE ticker = %s", (tk,))
+            for r in rows:
+                cur.execute(
+                    """
+                    INSERT INTO stock_dividend_schedule
+                        (ticker, ex_date, pay_date, amount_per_share, currency, status, source, fetched_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (ticker, ex_date) DO UPDATE SET
+                        pay_date         = EXCLUDED.pay_date,
+                        amount_per_share = EXCLUDED.amount_per_share,
+                        currency         = EXCLUDED.currency,
+                        status           = EXCLUDED.status,
+                        source           = EXCLUDED.source,
+                        fetched_at       = NOW()
+                    """,
+                    (tk, r["ex_date"], r.get("pay_date"), r.get("amount_per_share"),
+                     r.get("currency"), r["status"], r.get("source")),
+                )
 
 
 def get_schedule_batch(tickers: "list[str]") -> "list[dict]":
