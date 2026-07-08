@@ -32,6 +32,12 @@ task#101 게이트가 배포돼 있었으나 005930이 2026-06-27·06-28 다시 
 
 ref 선택은 다수결 아님(first-available, 네이버 우선·KIS 폴백). 글리치 5x를 잡는 데 독립 ref 하나면 충분.
 
+## Amendment (2026-07-08, task#161) — 절대가 파생출력(RSI 타점)도 이 기준을 따른다
+
+위 Consequences의 "RSI는 정규장 전환 제외(정규화라 불변)"는 **RSI *값*엔 맞지만 RSI *타점*엔 틀렸다.** `calc_rsi_target_price`는 `cur_price + delta_p`로 **절대 가격**을 내므로 스케일 의존이다 — 타점을 NXT 기준으로 계산하면 리포트 price·차트(regular=True, KRX)와 스케일이 어긋나고, NXT `_AL` 글리치 시 타점만 70k 스케일로 붕괴한다(적대적 감사가 포착, task#161 #2). 정정: `indicators.get_timeframe_rsi`에 `regular` 파라미터를 더해, KR 리포트는 RSI도 `regular=True`(KRX)로 계산한다(RSI 값은 여전히 불변이라 무해, 타점만 KRX로 정합).
+
+**일반 원칙**: 이 이원화의 "정규장 제외" 판단은 출력이 **스케일 불변**일 때만 유효하다. *스케일 의존 파생출력*(절대가 타점·환산 금액 등)은 정규화 지표에서 파생되더라도 리포트 price와 같은 기준(KRX)을 따라야 한다.
+
 ## Amendment (2026-06-22, task#101) — regular=True ≠ 완전 면역, 박제-시 독립피드 게이트 보완
 
 ADR-0020은 "리포트=regular=True(KRX)"가 NXT `_AL` 글리치 노출을 없앤다고 했고 그건 맞다. 그러나 이를 "리포트 박제 70k의 *근본해결*"로 본 결론은 **불완전**했다 — 005930 리포트가 또 ~70k로 박제된 사례(task#101)에서 드러났듯, **KRX 두 TR(quote ka10001·일봉 ka10081)이 같은 배치 시점에 함께 일시 글리치하는 KRX 자기일관 오염**엔 regular=True가 면역이 아니다. 같은 KRX 피드라 quote↔일봉이 서로 합의해버려 동일피드 교차검증·`_price_sane`(prev±30%/일봉2x)이 블라인드다(task#96이 NXT 전체오염에서 본 것의 KRX판; 네이버 실값은 정상 357k였으므로 일시적 글리치).
