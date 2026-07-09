@@ -250,9 +250,10 @@ def _investor_trend_work():
     후진: oldest_date가 ~1년(약 365일) 이내면 그 날짜 이전 10일을 1청크 fetch.
     종목당 ~2 호출/회, ThreadPoolExecutor 병렬(정중한 동시성)."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from datetime import date, timedelta
+    from datetime import timedelta
     from services import investor_service as svc
     from services.db import query as db_query
+    from services.utils import today_kst
 
     try:
         # 랭킹 KR ∪ 보유/관심 KR (랭킹 밖 보유/관심 종목도 커버)
@@ -265,7 +266,7 @@ def _investor_trend_work():
         logger.warning(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
         return
 
-    backfill_floor = date.today() - timedelta(days=365)
+    backfill_floor = today_kst() - timedelta(days=365)
 
     def _fetch_one(ticker):
         # 전진

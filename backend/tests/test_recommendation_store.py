@@ -4,6 +4,31 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from datetime import date
+from contextlib import contextmanager
+
+
+def _mock_get_connection(monkeypatch, calls):
+    """store.get_connection patch — cur.execute 호출을 calls에 (sql, params) 기록
+    (단일 트랜잭션화(S4) 이후에도 옛 execute() 모킹과 동형 assertion을 유지)."""
+    from services.recommendation import store
+
+    class FakeCur:
+        def execute(self, sql, params=None):
+            calls.append((sql, params))
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCur()
+
+    @contextmanager
+    def fake_conn():
+        yield FakeConn()
+
+    monkeypatch.setattr(store, "get_connection", fake_conn)
 
 
 # ── replace_recommendations (시장 단위 교체: DELETE market + per-ticker upsert) ──
@@ -12,7 +37,7 @@ def test_replace_recommendations_deletes_market_then_upserts(monkeypatch):
     """한 시장을 통째 교체 — 기존 행 DELETE 후 각 row upsert(ON CONFLICT)."""
     from services.recommendation import store
     calls = []
-    monkeypatch.setattr(store, "execute", lambda sql, params=None: calls.append((sql, params)))
+    _mock_get_connection(monkeypatch, calls)
 
     store.replace_recommendations("KR", [
         {"ticker": "005930", "market": "KR", "score": 88.5,
@@ -48,7 +73,7 @@ def test_replace_recommendations_includes_low_liquidity(monkeypatch):
     """INSERT에 low_liquidity 컬럼·값(row.get('low_liquidity', False))을 8번째로 포함."""
     from services.recommendation import store
     calls = []
-    monkeypatch.setattr(store, "execute", lambda sql, params=None: calls.append((sql, params)))
+    _mock_get_connection(monkeypatch, calls)
 
     store.replace_recommendations("KR", [
         {"ticker": "005930", "market": "KR", "score": 88.5, "factors": {}, "flags": [],
@@ -70,7 +95,7 @@ def test_replace_recommendations_includes_exchange(monkeypatch):
     """INSERT에 exchange 컬럼·값(row.get('exchange') or '')을 9번째로 포함."""
     from services.recommendation import store
     calls = []
-    monkeypatch.setattr(store, "execute", lambda sql, params=None: calls.append((sql, params)))
+    _mock_get_connection(monkeypatch, calls)
 
     store.replace_recommendations("KR", [
         {"ticker": "005930", "market": "KR", "score": 88.5, "factors": {}, "flags": [],
@@ -105,7 +130,7 @@ def test_replace_recommendations_empty_rows_only_deletes(monkeypatch):
     """rows가 비면 DELETE만 수행(insert 없음)."""
     from services.recommendation import store
     calls = []
-    monkeypatch.setattr(store, "execute", lambda sql, params=None: calls.append((sql, params)))
+    _mock_get_connection(monkeypatch, calls)
 
     store.replace_recommendations("US", [])
     assert len(calls) == 1
@@ -222,7 +247,7 @@ def test_replace_recommendations_stores_name(monkeypatch):
     """INSERT에 name 컬럼·값이 포함된다."""
     from services.recommendation import store
     calls = []
-    monkeypatch.setattr(store, "execute", lambda sql, params=None: calls.append((sql, params)))
+    _mock_get_connection(monkeypatch, calls)
 
     store.replace_recommendations("US", [
         {"ticker": "AAPL", "market": "US", "score": 75.0,

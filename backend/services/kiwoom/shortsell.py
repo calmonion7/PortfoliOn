@@ -13,6 +13,7 @@ from __future__ import annotations
 import datetime as _dt
 from datetime import date
 from services.kiwoom import client
+from services.utils import today_kst
 
 
 def _int(val) -> int:
@@ -70,7 +71,7 @@ def fetch_rows(stk_cd: str, days: int = 252, end: str | None = None) -> list[dic
     """ka10014 공매도추이 → market_short_sell 동형 행(최근 days 거래일 커버).
 
     end=기준일 YYYYMMDD(없으면 오늘). 거래일 days를 캘린더 여유로 환산해 범위 조회."""
-    end_d = _dt.datetime.strptime(end, "%Y%m%d").date() if end else _dt.date.today()
+    end_d = _dt.datetime.strptime(end, "%Y%m%d").date() if end else today_kst()
     strt_d = end_d - _dt.timedelta(days=int(days * 1.6) + 14)  # 거래일→캘린더 여유(주말·휴장)
     items = client.request_paged(
         "ka10014",

@@ -4,6 +4,7 @@ import os
 import requests
 from datetime import date as _date
 from .cache import _mc_save, _mc_load, _merge_history
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def _fetch_and_save_macro_signals() -> dict:
 
     stored = _mc_load("macro_signals")
     stored_data = (stored["data"] if stored else None) or {}
-    default_start = _date(_date.today().year - 3, 1, 1).isoformat()
+    default_start = _date(today_kst().year - 3, 1, 1).isoformat()
 
     try:
         merged: dict = {}

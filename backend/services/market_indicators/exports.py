@@ -5,6 +5,7 @@ import os
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from .cache import _mc_save, _mc_load, _cache, _get_cache, _set_cache, _DATA_DIR
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +14,7 @@ _COMTRADE_URL = "https://comtradeapi.un.org/public/v1/preview/C/M/HS"
 
 
 def _last_n_month_codes(n: int) -> list[str]:
-    from datetime import date
-    today = date.today()
+    today = today_kst()
     y, m = today.year, today.month
     codes = []
     for _ in range(n):
@@ -27,8 +27,7 @@ def _last_n_month_codes(n: int) -> list[str]:
 
 
 def _months_ago(n: int) -> str:
-    from datetime import date
-    today = date.today()
+    today = today_kst()
     month = today.month - n
     year = today.year + (month - 1) // 12
     month = ((month - 1) % 12) + 1
@@ -104,12 +103,11 @@ def _fetch_comtrade_exports() -> dict:
 
 
 def _exports_is_stale(data: dict) -> bool:
-    from datetime import date
     months = data.get("months", [])
     if not months:
         return True
     last = months[-1]["month"]
-    today = date.today()
+    today = today_kst()
     last_y, last_m = int(last[:4]), int(last[4:])
     diff = (today.year - last_y) * 12 + (today.month - last_m)
     return diff >= 2

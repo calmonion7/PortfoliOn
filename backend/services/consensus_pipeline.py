@@ -2,6 +2,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 import logging
 from services.db import execute, query, get_connection
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def _fetch_kr_raw(ticker: str, days: int = 7) -> list[dict]:
     import requests
     from concurrent.futures import ThreadPoolExecutor
 
-    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    cutoff = (today_kst() - timedelta(days=days)).isoformat()
 
     # FnGuide 우선
     fg_results = _fetch_kr_fnguide(ticker)
@@ -173,7 +174,7 @@ def _fetch_us_raw(ticker: str, days: int = 7) -> list[dict]:
         ud = ud.copy()
         ud.index = idx.date
 
-        cutoff = date.today() - timedelta(days=days)
+        cutoff = today_kst() - timedelta(days=days)
         results = []
         for d, row in ud.iterrows():
             if d < cutoff:
@@ -197,7 +198,7 @@ def _fetch_us_raw(ticker: str, days: int = 7) -> list[dict]:
                 rec_key = (t.info.get("recommendationKey") or "hold")
                 opinion = rec_key.replace("_", " ").title()
                 results.append({
-                    "report_date": date.today().isoformat(),
+                    "report_date": today_kst().isoformat(),
                     "brokerage_code": "__consensus__",
                     "target_price": float(apt["mean"]),
                     "raw_opinion": opinion,
@@ -293,7 +294,7 @@ def refresh_mart(ticker: str, base_date: date) -> None:
 # 일별 파이프라인 (스케줄러 호출용)
 # ---------------------------------------------------------------------------
 def run_daily(stocks: list) -> None:
-    today = date.today()
+    today = today_kst()
     for stock in stocks:
         ticker = stock["ticker"]
         market = stock.get("market", "US")
@@ -323,7 +324,7 @@ def run_daily(stocks: list) -> None:
 # 백필 (최초 적재 or 재적재)
 # ---------------------------------------------------------------------------
 def backfill(stocks: list, days: int = 180, force: bool = False) -> int:
-    today = date.today()
+    today = today_kst()
     total = 0
 
     for stock in stocks:

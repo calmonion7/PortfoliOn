@@ -53,7 +53,7 @@ def test_list_reports_detects_json_snapshots():
          patch("services.consensus.query", return_value=[]), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
          patch("routers.report.storage.get_schedule", return_value={}), \
-         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
+         patch("routers.report.cache_svc.get_list", side_effect=lambda uid, f: f()):
         resp = client.get("/api/report/list")
     assert resp.status_code == 200
     data = resp.json()["stocks"]
@@ -69,7 +69,7 @@ def test_list_reports_no_markdown_in_dates():
          patch("services.consensus.query", return_value=[]), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
          patch("routers.report.storage.get_schedule", return_value={}), \
-         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
+         patch("routers.report.cache_svc.get_list", side_effect=lambda uid, f: f()):
         resp = client.get("/api/report/list")
     dates = resp.json()["stocks"]["LLY"]["dates"]
     assert all(not d.endswith(".md") for d in dates)
@@ -89,7 +89,7 @@ def test_list_reports_exposes_is_etf():
          patch("services.consensus.query", return_value=[]), \
          patch("routers.report.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.report.storage.get_schedule", return_value={}), \
-         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
+         patch("routers.report.cache_svc.get_list", side_effect=lambda uid, f: f()):
         resp = client.get("/api/report/list")
     assert resp.status_code == 200
     assert resp.json()["stocks"]["069500"]["is_etf"] is True
@@ -105,7 +105,7 @@ def test_list_reports_overrides_target_and_opinion_from_mart_asof():
          patch("services.consensus.query", return_value=mart_row), \
          patch("routers.report.storage.get_full_portfolio", return_value=FULL_PORTFOLIO), \
          patch("routers.report.storage.get_schedule", return_value={}), \
-         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
+         patch("routers.report.cache_svc.get_list", side_effect=lambda uid, f: f()):
         resp = client.get("/api/report/list")
     assert resp.status_code == 200
     s = resp.json()["stocks"]["LLY"]["summary"]

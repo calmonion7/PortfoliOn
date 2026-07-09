@@ -4,6 +4,7 @@ import os
 import requests
 
 from .cache import _mc_save, _cache, _mc_load, _get_cache, _set_cache, _merge_history, _mc_delete
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,8 @@ def _fetch_and_save_econ_indicators() -> dict:
     from datetime import date as _date
     cpi_stored = (stored_data or {}).get("cpi", [])
     unemp_stored = (stored_data or {}).get("unemployment", [])
-    cpi_start = cpi_stored[-1]["date"] if cpi_stored else _date(_date.today().year - 3, 1, 1).isoformat()
-    unemp_start = unemp_stored[-1]["date"] if unemp_stored else _date(_date.today().year - 3, 1, 1).isoformat()
+    cpi_start = cpi_stored[-1]["date"] if cpi_stored else _date(today_kst().year - 3, 1, 1).isoformat()
+    unemp_start = unemp_stored[-1]["date"] if unemp_stored else _date(today_kst().year - 3, 1, 1).isoformat()
 
     def _fetch_series(series_id: str, start: str) -> list:
         r = requests.get(

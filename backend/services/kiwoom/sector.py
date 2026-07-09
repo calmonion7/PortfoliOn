@@ -7,6 +7,7 @@
 from __future__ import annotations
 import datetime as _dt
 from services.kiwoom import client
+from services.utils import today_kst
 
 # KOSPI 업종 큐레이션 — 라이브 ka10101(mrkt_tp=0) 프로브로 확인(2026-06).
 # 실제 산업 업종(005~030)만. 규모지수(001 종합/002 대형/003 중형/004 소형)·
@@ -84,7 +85,7 @@ def fetch_sector_closes(inds_cd: str, base_dt: str | None = None,
     """
     explicit = base_dt is not None
     if base_dt is None:
-        base_dt = _last_completed_trading_day(_dt.date.today())
+        base_dt = _last_completed_trading_day(today_kst())
 
     def _fetch(bd: str) -> list[float]:
         rows = client.request_paged(

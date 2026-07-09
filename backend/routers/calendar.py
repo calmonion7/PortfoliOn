@@ -14,6 +14,7 @@ import exchange_calendars as xcals
 from services import storage
 from services.db import query, execute
 from services.market.format import _yf_sym
+from services.utils import today_kst
 from auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ def fomc_coverage_status(threshold_months: int = 6) -> dict:
     """_FOMC_DATES 하드코딩 목록의 마지막 날짜와 today를 비교 — 커버리지 소진까지 개월수 +
     갱신필요 플래그. 소진 임박(< threshold개월)하면 배치 허브가 '갱신 필요' 경고를 띄워
     무음 미표시(CONCERNS §7)를 막는다. 목록이 이미 소진돼도 예외 없이 graceful(음수 개월)."""
-    today = date.today()
+    today = today_kst()
     last = max(_FOMC_DATES)                     # ISO 문자열 = 날짜 정렬
     days_left = (date.fromisoformat(last) - today).days
     return {

@@ -17,6 +17,7 @@ from services.market import get_quotes_batch
 from services.market_indicators.cache import _mc_load
 from services.market_indicators.fx import _fetch_usdkrw_current
 from routers.calendar import _get_events
+from services.utils import today_kst
 
 
 def _get_usdkrw() -> float:
@@ -42,7 +43,7 @@ NEWS_PER_TICKER = 2  # 다이제스트에 종목당 실을 최신 뉴스 건수
 
 def generate(user_id: str, today: date = None) -> dict:
     if today is None:
-        today = date.today()
+        today = today_kst()
 
     portfolio = storage.get_full_portfolio(user_id)
     holdings = portfolio.get("stocks", [])

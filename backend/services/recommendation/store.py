@@ -9,49 +9,53 @@ from __future__ import annotations
 import json
 from datetime import date
 
-from services.db import execute, query
+from services.db import query, get_connection
 
 
 def replace_recommendations(market: str, rows: list[dict]) -> None:
     """한 시장(KR|US)의 추천 점수 스냅샷을 통째 교체(배치 write).
 
     해당 market 기존 행 삭제 후 신규 행을 per-ticker upsert(ON CONFLICT (ticker)).
+    **단일 트랜잭션**(delete+insert 한 커넥션) — 중단 시 전체 rollback해 부분/빈
+    상태를 남기지 않는다(dividends.replace_schedule과 동형).
     각 row: {"ticker", "market", "score", "factors": dict, "flags": list,
              "rank": int, "base_date": date}. factors·flags는 JSONB 저장.
     rows가 비면(all-None 등) 호출측이 생략하므로 여기서는 가드하지 않는다.
     """
-    execute("DELETE FROM stock_recommendations WHERE market = %s", (market,))
-    for row in rows:
-        execute(
-            """
-            INSERT INTO stock_recommendations
-                (ticker, market, name, score, factors, flags, rank, base_date, low_liquidity, exchange, updated_at)
-            VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, NOW())
-            ON CONFLICT (ticker) DO UPDATE SET
-                market        = EXCLUDED.market,
-                name          = EXCLUDED.name,
-                score         = EXCLUDED.score,
-                factors       = EXCLUDED.factors,
-                flags         = EXCLUDED.flags,
-                rank          = EXCLUDED.rank,
-                base_date     = EXCLUDED.base_date,
-                low_liquidity = EXCLUDED.low_liquidity,
-                exchange      = EXCLUDED.exchange,
-                updated_at    = NOW()
-            """,
-            (
-                row["ticker"].upper(),
-                row["market"],
-                row.get("name") or row["ticker"].upper(),
-                row["score"],
-                json.dumps(row.get("factors") or {}, ensure_ascii=False),
-                json.dumps(row.get("flags") or [], ensure_ascii=False),
-                row.get("rank"),
-                row["base_date"],
-                bool(row.get("low_liquidity", False)),
-                row.get("exchange") or "",
-            ),
-        )
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM stock_recommendations WHERE market = %s", (market,))
+            for row in rows:
+                cur.execute(
+                    """
+                    INSERT INTO stock_recommendations
+                        (ticker, market, name, score, factors, flags, rank, base_date, low_liquidity, exchange, updated_at)
+                    VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (ticker) DO UPDATE SET
+                        market        = EXCLUDED.market,
+                        name          = EXCLUDED.name,
+                        score         = EXCLUDED.score,
+                        factors       = EXCLUDED.factors,
+                        flags         = EXCLUDED.flags,
+                        rank          = EXCLUDED.rank,
+                        base_date     = EXCLUDED.base_date,
+                        low_liquidity = EXCLUDED.low_liquidity,
+                        exchange      = EXCLUDED.exchange,
+                        updated_at    = NOW()
+                    """,
+                    (
+                        row["ticker"].upper(),
+                        row["market"],
+                        row.get("name") or row["ticker"].upper(),
+                        row["score"],
+                        json.dumps(row.get("factors") or {}, ensure_ascii=False),
+                        json.dumps(row.get("flags") or [], ensure_ascii=False),
+                        row.get("rank"),
+                        row["base_date"],
+                        bool(row.get("low_liquidity", False)),
+                        row.get("exchange") or "",
+                    ),
+                )
 
 
 def read_recommendations(

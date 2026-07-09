@@ -8,6 +8,7 @@ import pandas as pd
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor
 from .cache import _mc_save, _cache, get_or_refresh, _BASE_DIR, _DATA_DIR
+from services.utils import today_kst
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ def _quarter_ended(q: str) -> bool:
     year, qn = int(q[:4]), int(q[5])
     end_month = qn * 3
     last_day = _cal.monthrange(year, end_month)[1]
-    return _date(year, end_month, last_day) <= _date.today()
+    return _date(year, end_month, last_day) <= today_kst()
 
 
 def _merge_quarters(results: list[dict[str, float]], n: int = 8, ended_only: bool = True) -> dict[str, float]:

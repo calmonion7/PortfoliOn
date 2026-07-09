@@ -6,6 +6,7 @@ import requests
 import psycopg2
 import psycopg2.extras
 from datetime import date, timedelta
+from services.utils import today_kst
 
 # ── DB connection (Docker postgres exposed on localhost:5432) ──
 DB_DSN = "host=localhost port=5432 dbname=portfolion user=portfolion password=portfolion"
@@ -142,7 +143,7 @@ def backfill(start: date | None = None, end: date | None = None, years: int = 5)
             existing = {str(row[0]) for row in cur.fetchall()}
 
         if end is None:
-            end = date.today() - timedelta(days=1)
+            end = today_kst() - timedelta(days=1)
         if start is None:
             start = end.replace(year=end.year - years)
 

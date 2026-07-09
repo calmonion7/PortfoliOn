@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from datetime import date
 from services.db import execute, query
+from services.utils import today_kst
 
 # ── 윈도 ─────────────────────────────────────────────
 RECENT_DAYS = 5      # 최근 거래일
@@ -182,7 +183,7 @@ def upsert_score(ticker: str, band: str, flags: list[str], as_of: dict | None) -
         """,
         (
             ticker.upper(),
-            date.today(),
+            today_kst(),
             band,
             json.dumps(flags, ensure_ascii=False),
             json.dumps(as_of, ensure_ascii=False, default=str) if as_of is not None else None,

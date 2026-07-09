@@ -54,6 +54,7 @@ def get_fx() -> dict:
 
     stored = _mc_load("fx")
     stored_histories = {}
+    stored_rates = (stored["data"].get("rates") or {}) if stored else {}
     if stored:
         for k in _FX_SYMBOLS:
             stored_histories[k] = (stored["data"].get("history") or {}).get(k, [])
@@ -68,6 +69,13 @@ def get_fx() -> dict:
         k: {"current": v["current"], "change_pct": v["change_pct"]}
         for k, v in results.items() if v
     }
+
+    failed = [k for k in _FX_SYMBOLS if k not in rates and k in stored_rates]
+    if failed:
+        logger.warning(f"[FX] 갱신 실패, 직전 저장값 유지: {failed}")
+        for k in failed:
+            rates[k] = stored_rates[k]
+
     history = {"usdkrw": results["usdkrw"]["history"]} if results.get("usdkrw") else {}
 
     if not rates:

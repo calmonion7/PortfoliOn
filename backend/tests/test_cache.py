@@ -70,8 +70,8 @@ def test_get_list_caches_within_ttl():
     def loader():
         calls.append(1)
         return {"data": "list"}
-    c.get_list(loader)
-    c.get_list(loader)
+    c.get_list("u1", loader)
+    c.get_list("u1", loader)
     assert len(calls) == 1
 
 
@@ -82,10 +82,10 @@ def test_get_list_refreshes_after_ttl(monkeypatch):
     def loader():
         calls.append(1)
         return {"data": "list"}
-    c.get_list(loader)
+    c.get_list("u1", loader)
     # ts를 0으로 만들어 TTL 만료 시뮬레이션
-    c._list_cache._store["__global__"] = (c._list_cache._store["__global__"][0], 0.0)
-    c.get_list(loader)
+    c._list_cache._store["u1"] = (c._list_cache._store["u1"][0], 0.0)
+    c.get_list("u1", loader)
     assert len(calls) == 2
 
 
@@ -93,9 +93,9 @@ def test_invalidate_list_resets_cache():
     import services.cache as c
     _clear()
     calls = []
-    c.get_list(lambda: (calls.append(1), {})[1])
+    c.get_list("u1", lambda: (calls.append(1), {})[1])
     c.invalidate_list()
-    c.get_list(lambda: (calls.append(1), {})[1])
+    c.get_list("u1", lambda: (calls.append(1), {})[1])
     assert len(calls) == 2
 
 
@@ -159,9 +159,9 @@ def test_invalidate_portfolio_caches_clears_list():
     import services.cache as c
     _clear()
     calls = []
-    c.get_list(lambda: (calls.append(1), {})[1])
+    c.get_list("u1", lambda: (calls.append(1), {})[1])
     c.invalidate_portfolio_caches()
-    c.get_list(lambda: (calls.append(1), {})[1])
+    c.get_list("u1", lambda: (calls.append(1), {})[1])
     assert len(calls) == 2
 
 

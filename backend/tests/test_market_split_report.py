@@ -121,7 +121,7 @@ def test_list_response_last_scheduled_date_is_object(monkeypatch):
          patch("routers.report.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
          patch("routers.report.storage.expected_report_dates",
                return_value={"KR": "2026-06-12", "US": "2026-06-15"}), \
-         patch("routers.report.cache_svc.get_list", side_effect=lambda f: f()):
+         patch("routers.report.cache_svc.get_list", side_effect=lambda uid, f: f()):
         resp = client.get("/api/report/list")
     assert resp.status_code == 200
     lsd = resp.json()["last_scheduled_date"]

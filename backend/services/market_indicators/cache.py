@@ -5,6 +5,7 @@ import os
 import time
 import yfinance as yf
 from services.db import query, execute
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[
     if stored:
         last = stored[-1]["date"]
         start = (date.fromisoformat(last) + timedelta(days=1)).isoformat()
-        if start > date.today().isoformat():
+        if start > today_kst().isoformat():
             return _filter_outliers(stored)
         hist = yf.Ticker(sym).history(start=start, interval="1d")
     else:
@@ -101,7 +102,7 @@ def _yf_close_history(sym: str, stored: list[dict], precision: int = 4) -> list[
         for d, v in zip(close.index, close.values)
     ]
     combined = _merge_history(stored, new_pts)
-    cutoff = (date.today() - timedelta(days=366)).isoformat()
+    cutoff = (today_kst() - timedelta(days=366)).isoformat()
     trimmed = [p for p in combined if p["date"] >= cutoff]
     return _filter_outliers(trimmed)
 

@@ -7,9 +7,9 @@ investor_service.market_investor_trend 스키마와 동형 행을 만든다:
 키움 실패 시 호출측이 Naver 폴백. 경계: .forge/adr/0009.
 """
 from __future__ import annotations
-import datetime as _dt
 from datetime import date
 from services.kiwoom import client
+from services.utils import today_kst
 
 
 def _signed_int(val) -> int:
@@ -46,7 +46,7 @@ def _to_date(val) -> date | None:
 def fetch_flows(stk_cd: str, dt: str | None = None, max_items: int = 100) -> dict:
     """ka10059 순매수(수량/주) → {date: {foreign_net, organ_net, individual_net, close_price}}.
     dt=기준일 YYYYMMDD(없으면 오늘); 그 날짜에서 과거로 시계열."""
-    dt = dt or _dt.date.today().strftime("%Y%m%d")
+    dt = dt or today_kst().strftime("%Y%m%d")
     rows = client.request_paged(
         "ka10059",
         {"dt": dt, "stk_cd": stk_cd, "amt_qty_tp": "2", "trde_tp": "0", "unit_tp": "1"},

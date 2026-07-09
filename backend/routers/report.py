@@ -248,7 +248,7 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
 
     if all_scope:
         return _build()
-    return cache_svc.get_list(_build)
+    return cache_svc.get_list(user_id, _build)
 
 
 @router.get("/report/{ticker}/history")

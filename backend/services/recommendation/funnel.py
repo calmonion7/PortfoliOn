@@ -16,12 +16,12 @@ from __future__ import annotations
 import logging
 import math
 import time
-from datetime import date
 
 from .universe import build_universe, _fetch_guru_tickers
 from .scoring import score_stock
 from .store import replace_recommendations
 from services.db import query
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,7 @@ def _consensus_upside(cand: dict, df):
     목표가(target_mean)와 현재 종가(df 마지막 Close)로 (목표/현재-1)*100. 결측이면 None.
     df는 _fetch_history 결과 재사용(요청경로 라이브 시세 호출 없음)."""
     from services import consensus
-    row = consensus.get_asof(cand["ticker"], date.today())
+    row = consensus.get_asof(cand["ticker"], today_kst())
     if not row:
         return None
     target = row.get("target_mean")
@@ -332,14 +332,14 @@ def _backfill_us_consensus(cand: dict) -> None:
     ticker = cand["ticker"]
 
     # 정본이 이미 있으면 보강 불필요
-    if consensus.get_asof(ticker, date.today()) is not None:
+    if consensus.get_asof(ticker, today_kst()) is not None:
         return
 
     time.sleep(_YF_THROTTLE_S)  # rate-limit 방어(실제 fetch 직전에만 — 정본 있으면 위에서 반환)
     try:
         n = consensus_pipeline.upsert_raw_reports(ticker, "US")
         if n > 0:
-            consensus_pipeline.refresh_mart(ticker, date.today())
+            consensus_pipeline.refresh_mart(ticker, today_kst())
     except Exception as e:
         logger.warning(f"[Funnel] recommendation.funnel: {ticker} US consensus backfill failed: {e}")
 
@@ -429,7 +429,7 @@ def run_recommendation_batch(market: str) -> dict:
     except Exception as e:
         logger.warning(f"[Funnel] recommendation.funnel: stored names load failed: {e}")
 
-    today = date.today()
+    today = today_kst()
     scored: list[dict] = []
     for cand in candidates:
         res = _enrich_one(cand, guru_set)

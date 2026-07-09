@@ -1,9 +1,16 @@
 from __future__ import annotations
 import math
 import re
+from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 TICKER_RE = re.compile(r"^[A-Za-z0-9.\-]{1,15}$")
+
+
+def today_kst():
+    """KR/KST 시장-날짜 판정용 — 컨테이너 UTC라 bare date.today() 금지, CLAUDE.md gotcha/task#157."""
+    return datetime.now(ZoneInfo("Asia/Seoul")).date()
 
 
 def is_valid_ticker(ticker: str) -> bool:

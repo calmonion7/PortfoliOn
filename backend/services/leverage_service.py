@@ -5,7 +5,7 @@ import time
 import requests
 from datetime import date, timedelta
 from services.db import execute, query
-from services.utils import sanitize
+from services.utils import sanitize, today_kst
 from services import job_runs
 
 logger = logging.getLogger(__name__)
@@ -160,7 +160,7 @@ def _query_rows() -> list[dict]:
 def fetch_and_store(target_date: str | None = None) -> None:
     """전일(또는 지정일) 데이터를 KOFIA API에서 가져와 DB에 저장."""
     if target_date is None:
-        d = date.today() - timedelta(days=1)
+        d = today_kst() - timedelta(days=1)
         target_date = d.strftime("%Y-%m-%d")
     dt_compact = target_date.replace("-", "")  # YYYYMMDD
 
@@ -214,7 +214,7 @@ def backfill_with_progress(start_year: int, end_year: int) -> None:
             "SELECT base_date FROM market_leverage_indicators"
         )}
         start = date(start_year, 1, 1)
-        end = min(date(end_year, 12, 31), date.today() - timedelta(days=1))
+        end = min(date(end_year, 12, 31), today_kst() - timedelta(days=1))
 
         chunks = []
         chunk_start = start
@@ -259,7 +259,7 @@ def backfill_with_progress(start_year: int, end_year: int) -> None:
 
 def backfill(years: int = 5) -> None:
     """과거 데이터 적재. 이미 DB에 있는 날짜는 건너뜀."""
-    today = date.today()
+    today = today_kst()
     backfill_with_progress(today.year - years, today.year)
 
 

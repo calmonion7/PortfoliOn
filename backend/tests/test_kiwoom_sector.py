@@ -84,12 +84,7 @@ def test_fetch_sector_closes_default_base_dt_is_trading_day(monkeypatch):
     """base_dt 미지정 시 마지막 완성 거래일을 base_dt로 보낸다(주말 인트라데이 빈값 방지)."""
     import datetime as _dt
 
-    class _FixedDate(_dt.date):
-        @classmethod
-        def today(cls):
-            return cls(2026, 6, 14)  # 일요일
-
-    monkeypatch.setattr(sector._dt, "date", _FixedDate)
+    monkeypatch.setattr(sector, "today_kst", lambda: _dt.date(2026, 6, 14))  # 일요일
     captured = {}
 
     def fake_paged(api_id, body, *a, **k):
@@ -105,12 +100,7 @@ def test_fetch_sector_closes_falls_back_when_empty(monkeypatch):
     """오늘 base_dt가 빈 series면 직전 거래일로 1회 폴백해 종가를 채운다."""
     import datetime as _dt
 
-    class _FixedDate(_dt.date):
-        @classmethod
-        def today(cls):
-            return cls(2026, 6, 16)  # 화요일(거래중)
-
-    monkeypatch.setattr(sector._dt, "date", _FixedDate)
+    monkeypatch.setattr(sector, "today_kst", lambda: _dt.date(2026, 6, 16))  # 화요일(거래중)
     calls = []
 
     def fake_paged(api_id, body, *a, **k):

@@ -81,8 +81,8 @@ def invalidate_list() -> None:
     _list_cache.invalidate()
 
 
-def get_list(loader) -> dict:
-    return _list_cache.get("__global__", loader)
+def get_list(user_id: str, loader) -> dict:
+    return _list_cache.get(user_id, loader)
 
 
 _sector_cache = TTLCache(300.0)

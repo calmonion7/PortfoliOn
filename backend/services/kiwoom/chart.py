@@ -5,9 +5,9 @@ Open/High/Low/Close/Volume)을 만들어 KR 가격 히스토리를 키움으로 
 키움 실패 시 호출측이 yfinance로 폴백(경계: .forge/adr/0009).
 """
 from __future__ import annotations
-import datetime as _dt
 import pandas as pd
 from services.kiwoom import client
+from services.utils import today_kst
 
 # timeframe → (api_id, 응답 LIST 키). 세 TR은 구조 동일, LIST 키만 다름.
 _TF = {
@@ -55,7 +55,7 @@ def fetch_bars(stk_cd: str, timeframe: str, base_dt: str | None = None,
     """timeframe(daily/weekly/monthly) OHLCV 리스트(과거→현재). base_dt 미지정 시 오늘 기준.
     `regular=True`면 KRX 정규장 종가 기준 일봉(.forge/adr/0020)."""
     api_id, list_key = _TF[timeframe]
-    base_dt = base_dt or _dt.date.today().strftime("%Y%m%d")
+    base_dt = base_dt or today_kst().strftime("%Y%m%d")
     rows = client.request_paged(
         api_id, {"stk_cd": client.integrated_code(stk_cd, regular), "base_dt": base_dt, "upd_stkpc_tp": "1"},
         "chart", list_key, max_items,

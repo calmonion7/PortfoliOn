@@ -228,6 +228,19 @@ def get_us_insider(ticker: str) -> dict | None:
 
 # ── batch ─────────────────────────────────────────────────────────────────────
 
+def _is_all_empty(result: dict) -> bool:
+    """yfinance가 예외 없이 '성공'했지만 전 필드가 빈 결과(t.info=={} 등)인지 판정.
+
+    short 3필드 all-None AND institutional 빈 리스트 AND insider(transactions·net) 빈값이면
+    genuine 빈 응답으로 보고 저장을 스킵(직전 양호 스냅샷 클로버 방지, wrong<missing)."""
+    short = result.get("short") or {}
+    short_empty = all(short.get(k) is None for k in ("short_pct_float", "short_ratio", "shares_short"))
+    inst_empty = not (result.get("institutional") or [])
+    insider = result.get("insider") or {}
+    insider_empty = not (insider.get("transactions") or []) and not (insider.get("net") or {})
+    return short_empty and inst_empty and insider_empty
+
+
 def fetch_all_us_supply() -> dict:
     """보유·관심 US 종목 전부 fetch → upsert. 배치 진입점."""
     from services.db import query as db_query
@@ -241,6 +254,10 @@ def fetch_all_us_supply() -> dict:
         try:
             result = fetch_us_supply(ticker, row.get("exchange") or "")
             if result is None:
+                failed += 1
+                continue
+            if _is_all_empty(result):
+                logger.warning(f"[UsSupply] {ticker} 전 필드 빈 응답 — 저장 스킵(직전값 유지)")
                 failed += 1
                 continue
             upsert_us_supply(ticker, result)
