@@ -2,12 +2,28 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from pathlib import Path
 from contextlib import asynccontextmanager
 import threading
+
+
+def _configure_logging():
+    """루트 로거 1회 배선 (로깅 방출 규약, task#162). config 부재 시 root lastResort가
+    WARNING+만 내보내 logger.info가 docker logs에 미표시되던 문제를 해소한다.
+    서드파티 노이즈 라이브러리는 WARNING으로 억제하고, uvicorn 로거는 propagate를 꺼
+    root 핸들러와의 중복 emit(double-log)을 막는다. 레벨/포맷 규약은 CONVENTIONS.md 참조."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    for _noisy in ("urllib3", "yfinance", "apscheduler", "asyncio"):
+        logging.getLogger(_noisy).setLevel(logging.WARNING)
+    for _uv in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        logging.getLogger(_uv).propagate = False
+
+
+_configure_logging()
 
 import scheduler as sched
 from routers import portfolio, report, watchlist, stocks, guru, calendar, digest, analytics
