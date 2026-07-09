@@ -139,7 +139,7 @@ def get_quote_us(ticker: str, exchange: str = "") -> dict:
             d = client.request(_US_PRICE_TR, _US_PRICE_PATH,
                                {"AUTH": "", "EXCD": excd, "SYMB": sym})
         except Exception as e:
-            logger.warning(f"[KIS Quote] US price fetch 실패 ticker={sym} excd={excd}: {e}")
+            logger.warning(f"[KISQuote] US price fetch 실패 ticker={sym} excd={excd}: {e}")
             continue
         q = _normalize_us_price(d.get("output") or {})
         if q["price"]:
@@ -151,7 +151,7 @@ def get_quote_us(ticker: str, exchange: str = "") -> dict:
                                {"AUTH": "", "EXCD": excd, "SYMB": sym,
                                 "GUBN": "0", "BYMD": "", "MODP": "0"})
         except Exception as e:
-            logger.warning(f"[KIS Quote] US dailyprice fetch 실패 ticker={sym} excd={excd}: {e}")
+            logger.warning(f"[KISQuote] US dailyprice fetch 실패 ticker={sym} excd={excd}: {e}")
             continue
         q = _normalize_us_daily(d.get("output2") or [])
         if q["price"]:
