@@ -92,8 +92,10 @@ def _all_none_sectors():
     ]
 
 
-def test_refresh_skips_save_when_all_none(monkeypatch, capsys):
+def test_refresh_skips_save_when_all_none(monkeypatch, caplog):
     """모든 sector의 모멘텀이 None이면(빈 종가 박제 케이스) save를 생략해 직전 양호값을 보존한다."""
+    import logging
+    caplog.set_level(logging.WARNING)
     saved = []
     monkeypatch.setattr(svc, "compute_momentum", lambda: _all_none_sectors())
     monkeypatch.setattr(svc, "build_sector_index", lambda: {"051910": "화학"})
@@ -102,7 +104,7 @@ def test_refresh_skips_save_when_all_none(monkeypatch, capsys):
     out = svc.refresh()
     assert saved == []                      # 미저장 → 직전값 유지
     assert out == _all_none_sectors()       # 계산값은 그대로 반환
-    assert "all-None" in capsys.readouterr().out  # 사실 로깅
+    assert "all-None" in caplog.text  # 사실 로깅
 
 
 def test_refresh_saves_when_partial_success(monkeypatch):
@@ -122,21 +124,25 @@ def test_refresh_saves_when_partial_success(monkeypatch):
     assert out == sectors
 
 
-def test_fetch_one_sector_logs_on_empty_closes(monkeypatch, capsys):
+def test_fetch_one_sector_logs_on_empty_closes(monkeypatch, caplog):
     """ka20006이 빈 종가를 주면 조용히 삼키지 않고 로깅한다(all-None 진단 가능)."""
+    import logging
+    caplog.set_level(logging.WARNING)
     monkeypatch.setattr(svc.kw_sector, "fetch_sector_closes", lambda code, max_items=100: [])
     out = svc._fetch_one_sector({"code": "008", "name": "화학"})
     assert out["return_1w"] is None and out["return_1mo"] is None and out["return_3mo"] is None
-    log = capsys.readouterr().out
+    log = caplog.text
     assert "008" in log and ("empty" in log.lower() or "빈" in log)
 
 
-def test_fetch_one_sector_logs_on_exception(monkeypatch, capsys):
+def test_fetch_one_sector_logs_on_exception(monkeypatch, caplog):
     """fetch 예외도 조용히 삼키지 않고 로깅한다(조용한 삼킴 제거)."""
+    import logging
+    caplog.set_level(logging.WARNING)
     def boom(code, max_items=100):
         raise RuntimeError("kiwoom timeout")
     monkeypatch.setattr(svc.kw_sector, "fetch_sector_closes", boom)
     out = svc._fetch_one_sector({"code": "008", "name": "화학"})
     assert out["return_1w"] is None
-    log = capsys.readouterr().out
+    log = caplog.text
     assert "008" in log and ("timeout" in log.lower() or "fail" in log.lower() or "실패" in log)

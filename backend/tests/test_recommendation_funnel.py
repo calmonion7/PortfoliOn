@@ -278,8 +278,10 @@ def test_run_batch_all_none_skips_save():
 
 # ── (f) 종목별 fetch 실패는 로깅 후 graceful(부분 결과 저장) ──────
 
-def test_run_batch_logs_and_continues_on_fetch_error(capsys):
+def test_run_batch_logs_and_continues_on_fetch_error(caplog):
+    import logging
     from services.recommendation import funnel as F
+    caplog.set_level(logging.WARNING)
 
     uni = [_u("005930", "KR", "삼성", 500), _u("000660", "KR", "하이닉스", 300)]
     history = {"005930": _ohlc([100 + i for i in range(60)]),
@@ -308,8 +310,7 @@ def test_run_batch_logs_and_continues_on_fetch_error(capsys):
 
     # 실패 종목도 다른 팩터로 점수 산출(부분 결과) — 두 종목 모두 저장
     assert {r["ticker"] for r in captured["rows"]} == {"005930", "000660"}
-    err = capsys.readouterr().err
-    assert "000660" in err and "supply" in err.lower()
+    assert "000660" in caplog.text and "supply" in caplog.text.lower()
 
 
 # ── S1 (a) 시총 None·비구루 US 행은 전량 통과 ─────────────────────
@@ -591,9 +592,11 @@ def test_name_kr_not_fetched(monkeypatch):
 # ── S4: 배치 관측 로그 — universe·candidates·scored·elapsed 포함 ───────────
 # 구 코드: 로그에 universe/candidates/elapsed 없음 → red
 
-def test_run_batch_log_includes_universe_candidates_scored_elapsed(capsys):
+def test_run_batch_log_includes_universe_candidates_scored_elapsed(caplog):
     """배치 완료 로그에 universe·candidates·scored·경과초가 모두 포함돼야 한다."""
+    import logging
     from services.recommendation import funnel as F
+    caplog.set_level(logging.INFO)
 
     uni = [_u("005930", "KR", "삼성", 500), _u("000660", "KR", "하이닉스", 300)]
     history = {"005930": _ohlc([100 + i for i in range(60)]),
@@ -609,12 +612,11 @@ def test_run_batch_log_includes_universe_candidates_scored_elapsed(capsys):
          p1, p2, p3, p4:
         F.run_recommendation_batch("KR")
 
-    err = capsys.readouterr().err
     # 로그 라인에 4가지 필드가 모두 있어야 한다
-    assert "universe=" in err,    "로그에 universe= 필드 있어야 한다"
-    assert "candidates=" in err,  "로그에 candidates= 필드 있어야 한다"
-    assert "scored=" in err,      "로그에 scored= 필드 있어야 한다"
-    assert "elapsed=" in err,     "로그에 elapsed= 필드(경과초) 있어야 한다"
+    assert "universe=" in caplog.text,    "로그에 universe= 필드 있어야 한다"
+    assert "candidates=" in caplog.text,  "로그에 candidates= 필드 있어야 한다"
+    assert "scored=" in caplog.text,      "로그에 scored= 필드 있어야 한다"
+    assert "elapsed=" in caplog.text,     "로그에 elapsed= 필드(경과초) 있어야 한다"
 
 
 # ── task#132 S2: yfinance 외부 콜 스로틀 (rate-limit 방어) ──────────

@@ -6,6 +6,9 @@ from services import market as market_svc
 from services.utils import ticker_exists_in, find_ticker, is_valid_ticker
 from services.db import query as db_query
 from auth import get_current_user
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
@@ -18,7 +21,7 @@ def _generate_with_consensus(stock_dict: dict):
         # 정본 = daily_consensus_mart (ADR-0008). consensus_history 직접 적재(legacy) 대신 파이프라인 경유.
         _pipeline.backfill([stock_dict], days=180)
     except Exception as e:
-        print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
+        logger.warning(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
 
 
 def _generate_etf_report(stock_dict: dict):

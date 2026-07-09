@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Depends
 from services import digest_service, job_runs
 from services.db import query
 from auth import get_current_user, require_admin
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["digest"])
 
@@ -31,5 +35,5 @@ def generate_all(_: str = Depends(require_admin)):
                 d = digest_service.generate(uid)
                 digest_service.send_telegram(d)
             except Exception as e:
-                print(f"[Digest] generate-all failed for {uid}: {e}")
+                logger.warning(f"[Digest] generate-all failed for {uid}: {e}")
     return {"ok": True, "users": len(user_ids)}

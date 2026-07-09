@@ -6,12 +6,16 @@ US 섹터(analysis_service.get_sector_momentum)와 동일 계산(_calc_return �
 """
 from __future__ import annotations
 
+import logging
+
 import pandas as pd
 
 from services.analysis_service import _calc_return
 from services.kiwoom import sector as kw_sector
 from services.market_indicators.cache import _mc_load, _mc_save
 from services.parallel import parallel_map
+
+logger = logging.getLogger(__name__)
 
 CACHE_KEY = "kr_sector_momentum"
 
@@ -53,10 +57,10 @@ def _fetch_one_sector(entry: dict) -> dict:
     try:
         closes = kw_sector.fetch_sector_closes(entry["code"], max_items=100)
         if not closes:
-            print(f"[kr_sector] {entry['code']} {entry['name']}: empty closes (ka20006 빈 종가)")
+            logger.warning(f"[KrSector] {entry['code']} {entry['name']}: empty closes (ka20006 빈 종가)")
         return momentum_from_closes(entry["name"], entry["code"], closes)
     except Exception as e:
-        print(f"[kr_sector] {entry['code']} {entry['name']}: fetch failed: {e}")
+        logger.warning(f"[KrSector] {entry['code']} {entry['name']}: fetch failed: {e}")
         return {"name": entry["name"], "code": entry["code"],
                 "return_1w": None, "return_1mo": None, "return_3mo": None}
 
@@ -75,7 +79,7 @@ def refresh() -> list[dict]:
     sectors = compute_momentum()
     if all(s.get("return_1w") is None and s.get("return_1mo") is None
            and s.get("return_3mo") is None for s in sectors):
-        print("[kr_sector] refresh: all-None momentum — skipping save (직전값 유지)")
+        logger.warning("[KrSector] refresh: all-None momentum — skipping save (직전값 유지)")
         return sectors
     index = build_sector_index()
     save(sectors, index)
@@ -92,7 +96,7 @@ def build_sector_index() -> dict[str, str]:
             for code in kw_sector.fetch_sector_stocks(entry["code"]):
                 idx.setdefault(code, entry["name"])
         except Exception as e:
-            print(f"[kr_sector] build_sector_index {entry['code']} {entry['name']}: fetch failed: {e}")
+            logger.warning(f"[KrSector] build_sector_index {entry['code']} {entry['name']}: fetch failed: {e}")
             continue
     return idx
 

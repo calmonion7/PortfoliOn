@@ -10,8 +10,10 @@ v1 = KR 시총 상위 N(Naver 시장 스냅샷 재사용) + US S&P500(sp500_tick
 from __future__ import annotations
 
 import json
-import sys
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # ── 성장 다이얼 (ADR-0015 §2) ──────────────────────────────
 # KR 시총 상위 N — 유니버스 크기를 키우는 단일 손잡이. 후속 단계 확장.
@@ -137,24 +139,24 @@ def build_universe() -> list[dict]:
     try:
         kr_rows = _fetch_kr_rows()
     except Exception as e:
-        print(f"recommendation.universe: KR fetch failed: {e}", file=sys.stderr)
+        logger.warning(f"[Universe] recommendation.universe: KR fetch failed: {e}")
 
     sp500: list[str] = []
     try:
         sp500 = _load_sp500()
     except Exception as e:
-        print(f"recommendation.universe: sp500 load failed: {e}", file=sys.stderr)
+        logger.warning(f"[Universe] recommendation.universe: sp500 load failed: {e}")
 
     tracked: list[dict] = []
     try:
         tracked = _fetch_tracked()
     except Exception as e:
-        print(f"recommendation.universe: tracked fetch failed: {e}", file=sys.stderr)
+        logger.warning(f"[Universe] recommendation.universe: tracked fetch failed: {e}")
 
     guru: list[str] = []
     try:
         guru = _fetch_guru_tickers()
     except Exception as e:
-        print(f"recommendation.universe: guru fetch failed: {e}", file=sys.stderr)
+        logger.warning(f"[Universe] recommendation.universe: guru fetch failed: {e}")
 
     return _merge_universe(kr_rows, sp500, tracked, guru)

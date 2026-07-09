@@ -5,7 +5,6 @@ from services import storage
 from services.db import query
 from services.utils import sanitize
 import re
-import sys
 import math
 import json
 import requests as http_requests
@@ -405,7 +404,7 @@ def backfill_names(_: str = Depends(require_admin)):
                     # silent skip 금지(CLAUDE.md): resolve_name이 티커형/빈값을 반환해 건너뜀.
                     # 시세 일시실패와 '실명 없음'을 구분 못 하므로 재시도 대신 진단 로그+표면화.
                     skipped.append(ticker)
-                    print(f"[backfill_names] skip {ticker}: resolve_name이 실명을 못 찾음(시세 일시실패 가능, 결과가 예상보다 작으면 재실행 권장)")
+                    logger.warning(f"[Backfill] skip {ticker}: resolve_name이 실명을 못 찾음(시세 일시실패 가능, 결과가 예상보다 작으면 재실행 권장)")
 
     # tickers.name을 이미 고쳤지만 스냅샷이 옛 이름인 종목(예: 수동교정)까지 동기화
     reconciled = storage.reconcile_snapshot_names()
@@ -624,7 +623,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
         try:
             quotes = market.get_quotes_batch(holdings)
         except Exception as e:
-            print(f"[dashboard] 일괄시세 실패 — 시세 없이 카드 빌드: {e}", file=sys.stderr)
+            logger.warning(f"[Dashboard] 일괄시세 실패 — 시세 없이 카드 빌드: {e}")
             quotes = {}
 
         # 카드당 graceful — 한 종목 enrichment(snapshot/consensus/배당/수급/내부자 등)가 throw해도
@@ -634,7 +633,7 @@ def get_dashboard(user_id: str = Depends(get_current_user)):
             try:
                 return _build_card(stock, q)
             except Exception as e:
-                print(f"[dashboard] {stock.get('ticker')} 카드 빌드 실패 — 최소카드 폴백: {e}", file=sys.stderr)
+                logger.warning(f"[Dashboard] {stock.get('ticker')} 카드 빌드 실패 — 최소카드 폴백: {e}")
                 return _minimal_card(stock, q)
 
         with ThreadPoolExecutor(max_workers=min(len(holdings), 10)) as executor:

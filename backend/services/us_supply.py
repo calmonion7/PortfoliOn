@@ -45,7 +45,7 @@ def _parse_insider_transactions(df) -> list[dict]:
         try:
             start_date = pd.Timestamp(sd).strftime("%Y-%m-%d") if pd.notna(sd) else None
         except Exception as e:
-            logger.warning(f"[us_supply] 내부자거래 날짜 파싱 실패: {e}")
+            logger.warning(f"[UsSupply] 내부자거래 날짜 파싱 실패: {e}")
             start_date = None
         shares_raw = row.get("Shares")
         value_raw = row.get("Value")
@@ -102,7 +102,7 @@ def fetch_us_supply(ticker: str, exchange: str = "") -> dict | None:
         txn_df = t.insider_transactions
         purch_df = t.insider_purchases
     except Exception as e:
-        print(f"[us_supply] yfinance 오류 {ticker}: {e}")
+        logger.warning(f"[UsSupply] yfinance 오류 {ticker}: {e}")
         return None
 
     # short stats
@@ -112,7 +112,7 @@ def fetch_us_supply(ticker: str, exchange: str = "") -> dict | None:
         try:
             date_si = datetime.fromtimestamp(int(date_ts)).strftime("%Y-%m-%d")
         except Exception as e:
-            logger.warning(f"[us_supply] dateShortInterest 타임스탬프 파싱 실패: {e}")
+            logger.warning(f"[UsSupply] dateShortInterest 타임스탬프 파싱 실패: {e}")
             pass
 
     short = {
@@ -246,6 +246,6 @@ def fetch_all_us_supply() -> dict:
             upsert_us_supply(ticker, result)
             ok += 1
         except Exception as e:
-            print(f"[us_supply] {ticker} 실패: {e}")
+            logger.warning(f"[UsSupply] {ticker} 실패: {e}")
             failed += 1
     return {"ok": ok, "failed": failed, "total": ok + failed}

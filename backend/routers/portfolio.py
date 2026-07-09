@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Body
 from pydantic import BaseModel, field_validator
@@ -14,6 +15,7 @@ from routers.stocks import _usdkrw_rate
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
+logger = logging.getLogger(__name__)
 
 
 def _generate_with_consensus(stock_dict: dict):
@@ -24,7 +26,7 @@ def _generate_with_consensus(stock_dict: dict):
         # 정본 = daily_consensus_mart (ADR-0008). consensus_history 직접 적재(legacy) 대신 파이프라인 경유.
         _pipeline.backfill([stock_dict], days=180)
     except Exception as e:
-        print(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
+        logger.warning(f"[AutoReport] consensus backfill failed for {ticker}: {e}")
 
 
 def _generate_etf_report(stock_dict: dict):

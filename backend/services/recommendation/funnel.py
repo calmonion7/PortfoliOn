@@ -13,8 +13,8 @@ Stage-2(후보 한정): OHLC 히스토리(market.get_history_df; KR 키움→yfi
 """
 from __future__ import annotations
 
+import logging
 import math
-import sys
 import time
 from datetime import date
 
@@ -22,6 +22,8 @@ from .universe import build_universe, _fetch_guru_tickers
 from .scoring import score_stock
 from .store import replace_recommendations
 from services.db import query
+
+logger = logging.getLogger(__name__)
 
 # ── 깔때기 다이얼 (ADR-0015 §1) ────────────────────────────
 # Stage-1 스크린 후 리치 enrich를 적용할 후보 상한 — 배치 비용의 주 손잡이.
@@ -136,7 +138,7 @@ def _momentum_factors(df) -> dict:
                 if avg:
                     out["volume_surge_ratio"] = round(recent / avg, 2)
     except Exception as e:
-        print(f"recommendation.funnel: momentum compute failed: {e}", file=sys.stderr)
+        logger.warning(f"[Funnel] recommendation.funnel: momentum compute failed: {e}")
     return out
 
 
@@ -287,7 +289,7 @@ def _fetch_yf_name(ticker: str) -> str:
         name = info.get("shortName") or info.get("longName") or ""
         return name.strip() or ticker
     except Exception as e:
-        print(f"recommendation.funnel: {ticker} yf name fetch failed: {e}", file=sys.stderr)
+        logger.warning(f"[Funnel] recommendation.funnel: {ticker} yf name fetch failed: {e}")
         return ticker
 
 
@@ -339,8 +341,7 @@ def _backfill_us_consensus(cand: dict) -> None:
         if n > 0:
             consensus_pipeline.refresh_mart(ticker, date.today())
     except Exception as e:
-        print(f"recommendation.funnel: {ticker} US consensus backfill failed: {e}",
-              file=sys.stderr)
+        logger.warning(f"[Funnel] recommendation.funnel: {ticker} US consensus backfill failed: {e}")
 
 
 # ── 배치 오케스트레이션 ──────────────────────────────────────
@@ -356,8 +357,7 @@ def _enrich_one(cand: dict, guru_set: set) -> dict | None:
     try:
         df = _fetch_history(cand)
     except Exception as e:
-        print(f"recommendation.funnel: {cand['ticker']} history fetch failed: {e}",
-              file=sys.stderr)
+        logger.warning(f"[Funnel] recommendation.funnel: {cand['ticker']} history fetch failed: {e}")
 
     momentum = _momentum_factors(df)
 
@@ -366,28 +366,24 @@ def _enrich_one(cand: dict, guru_set: set) -> dict | None:
         try:
             _backfill_us_consensus(cand)
         except Exception as e:
-            print(f"recommendation.funnel: {cand['ticker']} US consensus backfill failed: {e}",
-                  file=sys.stderr)
+            logger.warning(f"[Funnel] recommendation.funnel: {cand['ticker']} US consensus backfill failed: {e}")
 
     upside = None
     try:
         upside = _consensus_upside(cand, df)
     except Exception as e:
-        print(f"recommendation.funnel: {cand['ticker']} consensus fetch failed: {e}",
-              file=sys.stderr)
+        logger.warning(f"[Funnel] recommendation.funnel: {cand['ticker']} consensus fetch failed: {e}")
 
     foreign_net_5d = organ_net_5d = insider_buy = None
     if market == "KR":
         try:
             foreign_net_5d, organ_net_5d = _kr_supply(cand)
         except Exception as e:
-            print(f"recommendation.funnel: {cand['ticker']} supply fetch failed: {e}",
-                  file=sys.stderr)
+            logger.warning(f"[Funnel] recommendation.funnel: {cand['ticker']} supply fetch failed: {e}")
         try:
             insider_buy = _kr_insider(cand)
         except Exception as e:
-            print(f"recommendation.funnel: {cand['ticker']} insider fetch failed: {e}",
-                  file=sys.stderr)
+            logger.warning(f"[Funnel] recommendation.funnel: {cand['ticker']} insider fetch failed: {e}")
 
     guru_new_buy = True if cand["ticker"] in guru_set else None
 
@@ -420,8 +416,7 @@ def run_recommendation_batch(market: str) -> dict:
         try:
             guru_set = set(_fetch_guru_tickers().keys())
         except Exception as e:
-            print(f"recommendation.funnel: guru membership fetch failed: {e}",
-                  file=sys.stderr)
+            logger.warning(f"[Funnel] recommendation.funnel: guru membership fetch failed: {e}")
     for u in universe:
         u["guru_member"] = u["ticker"] in guru_set
 
@@ -432,7 +427,7 @@ def run_recommendation_batch(market: str) -> dict:
     try:
         stored_names = _load_stored_names()
     except Exception as e:
-        print(f"recommendation.funnel: stored names load failed: {e}", file=sys.stderr)
+        logger.warning(f"[Funnel] recommendation.funnel: stored names load failed: {e}")
 
     today = date.today()
     scored: list[dict] = []
@@ -465,11 +460,10 @@ def run_recommendation_batch(market: str) -> dict:
 
     n_low = sum(1 for r in scored if r["low_liquidity"])
     elapsed = round(time.monotonic() - t0, 1)
-    print(
-        f"recommendation.funnel: {market} "
+    logger.info(
+        f"[Funnel] recommendation.funnel: {market} "
         f"universe={len(universe)} candidates={len(candidates)} "
-        f"scored={len(scored)} low_liquidity={n_low} elapsed={elapsed}s",
-        file=sys.stderr,
+        f"scored={len(scored)} low_liquidity={n_low} elapsed={elapsed}s"
     )
 
     return {

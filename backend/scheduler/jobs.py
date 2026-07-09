@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import logging
+
 from services import storage, report_generator, consensus_pipeline as _pipeline, job_runs
 from services import batch_registry
+
+logger = logging.getLogger(__name__)
 
 
 def _in_market(stock: dict, market: str) -> bool:
@@ -22,15 +26,15 @@ def _generate_all(market: str, job_id: str):
                     continue
                 try:
                     report_generator.generate_report_with_retry(stock)
-                    print(f"[Scheduler] Report generated for {stock['ticker']}")
+                    logger.info(f"[Scheduler] Report generated for {stock['ticker']}")
                 except Exception as e:
-                    print(f"[Scheduler] Failed for {stock['ticker']}: {e}")
+                    logger.warning(f"[Scheduler] Failed for {stock['ticker']}: {e}")
                 all_stocks[stock["ticker"]] = stock
         try:
             _pipeline.run_daily(list(all_stocks.values()))
-            print(f"[Scheduler] Pipeline run_daily completed for {len(all_stocks)} stocks")
+            logger.info(f"[Scheduler] Pipeline run_daily completed for {len(all_stocks)} stocks")
         except Exception as e:
-            print(f"[Scheduler] Pipeline run_daily failed: {e}")
+            logger.warning(f"[Scheduler] Pipeline run_daily failed: {e}")
 
 
 def _generate_kr():
@@ -51,9 +55,9 @@ def _run_guru_crawl():
                 "last_updated": datetime.now().isoformat(timespec="seconds"),
                 "managers": managers,
             })
-            print("[Scheduler] Guru crawl completed")
+            logger.info("[Scheduler] Guru crawl completed")
         except Exception as e:
-            print(f"[Scheduler] Guru crawl failed: {e}")
+            logger.warning(f"[Scheduler] Guru crawl failed: {e}")
 
 
 def _refresh_monthly_us():
@@ -61,9 +65,9 @@ def _refresh_monthly_us():
     with job_runs.record("monthly_us", "auto"):
         try:
             _fetch_and_save_econ_indicators()
-            print("[Scheduler] Econ indicators refreshed")
+            logger.info("[Scheduler] Econ indicators refreshed")
         except Exception as e:
-            print(f"[Scheduler] Econ indicators refresh failed: {e}")
+            logger.warning(f"[Scheduler] Econ indicators refresh failed: {e}")
 
 
 def _refresh_macro_signals():
@@ -71,9 +75,9 @@ def _refresh_macro_signals():
     with job_runs.record("macro_signals_fetch", "auto"):
         try:
             _fetch_and_save_macro_signals()
-            print("[Scheduler] Macro signals refreshed")
+            logger.info("[Scheduler] Macro signals refreshed")
         except Exception as e:
-            print(f"[Scheduler] Macro signals refresh failed: {e}")
+            logger.warning(f"[Scheduler] Macro signals refresh failed: {e}")
 
 
 def _refresh_kospi_signal():
@@ -81,9 +85,9 @@ def _refresh_kospi_signal():
     with job_runs.record("kospi_signal_fetch", "auto"):
         try:
             kospi_signal.refresh_kospi_signal()
-            print("[Scheduler] KOSPI signal refreshed")
+            logger.info("[Scheduler] KOSPI signal refreshed")
         except Exception as e:
-            print(f"[Scheduler] KOSPI signal refresh failed: {e}")
+            logger.warning(f"[Scheduler] KOSPI signal refresh failed: {e}")
 
 
 def _refresh_monthly_kr():
@@ -91,9 +95,9 @@ def _refresh_monthly_kr():
     with job_runs.record("monthly_kr", "auto"):
         try:
             _fetch_and_save_kr_exports()
-            print("[Scheduler] KR exports refreshed")
+            logger.info("[Scheduler] KR exports refreshed")
         except Exception as e:
-            print(f"[Scheduler] KR exports refresh failed: {e}")
+            logger.warning(f"[Scheduler] KR exports refresh failed: {e}")
 
 
 def _refresh_earnings_us():
@@ -101,9 +105,9 @@ def _refresh_earnings_us():
     with job_runs.record("earnings_us", "auto"):
         try:
             _fetch_and_save_m7_earnings()
-            print("[Scheduler] M7 earnings refreshed")
+            logger.info("[Scheduler] M7 earnings refreshed")
         except Exception as e:
-            print(f"[Scheduler] M7 earnings refresh failed: {e}")
+            logger.warning(f"[Scheduler] M7 earnings refresh failed: {e}")
 
 
 def _refresh_earnings_kr():
@@ -111,9 +115,9 @@ def _refresh_earnings_kr():
     with job_runs.record("earnings_kr", "auto"):
         try:
             _fetch_and_save_kr_top2_earnings()
-            print("[Scheduler] KR Top2 earnings refreshed")
+            logger.info("[Scheduler] KR Top2 earnings refreshed")
         except Exception as e:
-            print(f"[Scheduler] KR Top2 earnings refresh failed: {e}")
+            logger.warning(f"[Scheduler] KR Top2 earnings refresh failed: {e}")
 
 
 def _run_digest():
@@ -123,15 +127,15 @@ def _run_digest():
         try:
             user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks WHERE type = 'holding'")})
         except Exception as e:
-            print(f"[Scheduler] Digest: failed to fetch user list: {e}")
+            logger.warning(f"[Scheduler] Digest: failed to fetch user list: {e}")
             return
         for user_id in user_ids:
             try:
                 d = digest_service.generate(user_id)
                 digest_service.send_telegram(d)
-                print(f"[Scheduler] Daily digest generated for {user_id}")
+                logger.info(f"[Scheduler] Daily digest generated for {user_id}")
             except Exception as e:
-                print(f"[Scheduler] Daily digest failed for {user_id}: {e}")
+                logger.warning(f"[Scheduler] Daily digest failed for {user_id}: {e}")
 
 
 def _fetch_leverage():
@@ -139,9 +143,9 @@ def _fetch_leverage():
     with job_runs.record("leverage_fetch", "auto"):
         try:
             fetch_and_store()
-            print("[Scheduler] Leverage indicators fetched")
+            logger.info("[Scheduler] Leverage indicators fetched")
         except Exception as e:
-            print(f"[Scheduler] Leverage fetch failed: {e}")
+            logger.warning(f"[Scheduler] Leverage fetch failed: {e}")
 
 
 def _fetch_lending():
@@ -149,9 +153,9 @@ def _fetch_lending():
     with job_runs.record("lending_fetch", "auto"):
         try:
             n = fetch_and_store()
-            print(f"[Scheduler] Lending balance fetched: {n} rows")
+            logger.info(f"[Scheduler] Lending balance fetched: {n} rows")
         except Exception as e:
-            print(f"[Scheduler] Lending fetch failed: {e}")
+            logger.warning(f"[Scheduler] Lending fetch failed: {e}")
 
 
 def _fetch_backlog():
@@ -159,9 +163,9 @@ def _fetch_backlog():
     with job_runs.record("backlog_fetch", "auto"):
         try:
             r = fetch_all_backlog()
-            print(f"[Scheduler] Backlog fetched: {r}")
+            logger.info(f"[Scheduler] Backlog fetched: {r}")
         except Exception as e:
-            print(f"[Scheduler] Backlog fetch failed: {e}")
+            logger.warning(f"[Scheduler] Backlog fetch failed: {e}")
 
 
 def _fetch_disclosures():
@@ -169,9 +173,9 @@ def _fetch_disclosures():
     with job_runs.record("disclosure_fetch", "auto"):
         try:
             r = fetch_all_disclosures()
-            print(f"[Scheduler] Disclosures fetched: {r}")
+            logger.info(f"[Scheduler] Disclosures fetched: {r}")
         except Exception as e:
-            print(f"[Scheduler] Disclosure fetch failed: {e}")
+            logger.warning(f"[Scheduler] Disclosure fetch failed: {e}")
 
 
 def _fetch_agm():
@@ -179,9 +183,9 @@ def _fetch_agm():
     with job_runs.record("agm_fetch", "auto"):
         try:
             r = fetch_agm_meeting_dates()
-            print(f"[Scheduler] AGM meeting dates fetched: {r}")
+            logger.info(f"[Scheduler] AGM meeting dates fetched: {r}")
         except Exception as e:
-            print(f"[Scheduler] AGM fetch failed: {e}")
+            logger.warning(f"[Scheduler] AGM fetch failed: {e}")
 
 
 def _fetch_insider():
@@ -189,9 +193,9 @@ def _fetch_insider():
     with job_runs.record("insider_fetch", "auto"):
         try:
             r = fetch_all_insider_trades()
-            print(f"[Scheduler] Insider trades fetched: {r}")
+            logger.info(f"[Scheduler] Insider trades fetched: {r}")
         except Exception as e:
-            print(f"[Scheduler] Insider fetch failed: {e}")
+            logger.warning(f"[Scheduler] Insider fetch failed: {e}")
 
 
 def _fetch_dividends():
@@ -199,9 +203,9 @@ def _fetch_dividends():
     with job_runs.record("dividend_fetch", "auto"):
         try:
             r = fetch_all_dividends()
-            print(f"[Scheduler] Dividends fetched: {r}")
+            logger.info(f"[Scheduler] Dividends fetched: {r}")
         except Exception as e:
-            print(f"[Scheduler] Dividend fetch failed: {e}")
+            logger.warning(f"[Scheduler] Dividend fetch failed: {e}")
 
 
 def _fetch_betas():
@@ -209,9 +213,9 @@ def _fetch_betas():
     with job_runs.record("beta_fetch", "auto"):
         try:
             r = fetch_all_betas()
-            print(f"[Scheduler] Betas fetched: {r}")
+            logger.info(f"[Scheduler] Betas fetched: {r}")
         except Exception as e:
-            print(f"[Scheduler] Beta fetch failed: {e}")
+            logger.warning(f"[Scheduler] Beta fetch failed: {e}")
 
 
 def _fetch_kr_rankings():
@@ -219,9 +223,9 @@ def _fetch_kr_rankings():
     with job_runs.record("kr_rankings_fetch", "auto"):
         try:
             ranking_service.replace_market_rankings("KR", ranking_service.get_kr_rankings())
-            print("[Scheduler] KR rankings refreshed")
+            logger.info("[Scheduler] KR rankings refreshed")
         except Exception as e:
-            print(f"[Scheduler] KR rankings refresh failed: {e}")
+            logger.warning(f"[Scheduler] KR rankings refresh failed: {e}")
 
 
 def _fetch_us_rankings():
@@ -229,9 +233,9 @@ def _fetch_us_rankings():
     with job_runs.record("us_rankings_fetch", "auto"):
         try:
             ranking_service.replace_market_rankings("US", ranking_service.get_us_rankings())
-            print("[Scheduler] US rankings refreshed")
+            logger.info("[Scheduler] US rankings refreshed")
         except Exception as e:
-            print(f"[Scheduler] US rankings refresh failed: {e}")
+            logger.warning(f"[Scheduler] US rankings refresh failed: {e}")
 
 
 def _fetch_investor_trend():
@@ -258,7 +262,7 @@ def _investor_trend_work():
             "SELECT DISTINCT t.ticker FROM tickers t "
             "JOIN user_stocks us ON us.ticker = t.ticker WHERE t.market = 'KR'")]
     except Exception as e:
-        print(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
+        logger.warning(f"[Scheduler] Investor trend: failed to fetch KR universe: {e}")
         return
 
     backfill_floor = date.today() - timedelta(days=365)
@@ -268,7 +272,7 @@ def _investor_trend_work():
         try:
             svc.upsert_trend(ticker, svc.fetch_trend(ticker))
         except Exception as e:
-            print(f"[Scheduler] Investor trend forward failed for {ticker}: {e}")
+            logger.warning(f"[Scheduler] Investor trend forward failed for {ticker}: {e}")
         # 후진 (1청크) — oldest가 1년 캡 이내일 때만
         try:
             oldest = svc.oldest_date(ticker)
@@ -277,17 +281,17 @@ def _investor_trend_work():
                 if older:
                     svc.upsert_trend(ticker, older)
         except Exception as e:
-            print(f"[Scheduler] Investor trend backfill failed for {ticker}: {e}")
+            logger.warning(f"[Scheduler] Investor trend backfill failed for {ticker}: {e}")
 
     if not tickers:
-        print("[Scheduler] Investor trend: no KR tickers")
+        logger.warning("[Scheduler] Investor trend: no KR tickers")
         return
     # max_workers ≤ 8: 워커가 DB 풀(maxconn=10)에서 커넥션을 점유하므로 풀 초과(PoolError) 방지
     with ThreadPoolExecutor(max_workers=max(1, min(len(tickers), 8))) as executor:
         futures = [executor.submit(_fetch_one, t) for t in tickers]
         for future in as_completed(futures):
             future.result()
-    print(f"[Scheduler] Investor trend fetched for {len(tickers)} KR tickers")
+    logger.info(f"[Scheduler] Investor trend fetched for {len(tickers)} KR tickers")
 
 
 def _fetch_short_sell():
@@ -315,11 +319,11 @@ def _supply_score_work():
             "SELECT DISTINCT t.ticker FROM tickers t "
             "JOIN user_stocks us ON us.ticker = t.ticker WHERE t.market = 'KR'")]
     except Exception as e:
-        print(f"[Scheduler] Supply score: failed to fetch KR universe: {e}")
+        logger.warning(f"[Scheduler] Supply score: failed to fetch KR universe: {e}")
         return
 
     if not tickers:
-        print("[Scheduler] Supply score: no KR tickers")
+        logger.warning("[Scheduler] Supply score: no KR tickers")
         return
 
     saved = 0
@@ -330,14 +334,14 @@ def _supply_score_work():
             result = supply_score.compute_band(short_series, investor_series)
             if result is None:
                 # 양쪽 시계열 모두 결측 — 직전 양호값 유지(빈/None 박제 금지)
-                print(f"[Scheduler] Supply score: no data for {ticker}, skipping save")
+                logger.warning(f"[Scheduler] Supply score: no data for {ticker}, skipping save")
                 continue
             supply_score.upsert_score(
                 ticker, result["band"], result["flags"], result["as_of"])
             saved += 1
         except Exception as e:
-            print(f"[Scheduler] Supply score failed for {ticker}: {e}")
-    print(f"[Scheduler] Supply score computed for {saved}/{len(tickers)} KR tickers")
+            logger.warning(f"[Scheduler] Supply score failed for {ticker}: {e}")
+    logger.info(f"[Scheduler] Supply score computed for {saved}/{len(tickers)} KR tickers")
 
 
 def _fetch_recommendation_kr():
@@ -359,9 +363,9 @@ def _recommendation_work(market: str):
     from services import recommendation
     try:
         stats = recommendation.run_recommendation_batch(market)
-        print(f"[Scheduler] Recommendation {market} computed: {stats}")
+        logger.info(f"[Scheduler] Recommendation {market} computed: {stats}")
     except Exception as e:
-        print(f"[Scheduler] Recommendation {market} failed: {e}")
+        logger.warning(f"[Scheduler] Recommendation {market} failed: {e}")
 
 
 def _fetch_us_supply():
@@ -369,9 +373,9 @@ def _fetch_us_supply():
     with job_runs.record("us_supply_fetch", "auto"):
         try:
             r = fetch_all_us_supply()
-            print(f"[Scheduler] US supply fetched: {r}")
+            logger.info(f"[Scheduler] US supply fetched: {r}")
         except Exception as e:
-            print(f"[Scheduler] US supply fetch failed: {e}")
+            logger.warning(f"[Scheduler] US supply fetch failed: {e}")
 
 
 def _fetch_kr_sector():
@@ -379,9 +383,9 @@ def _fetch_kr_sector():
     with job_runs.record("kr_sector_fetch", "auto"):
         try:
             sectors = kr_sector_service.refresh()
-            print(f"[Scheduler] KR sector momentum refreshed: {len(sectors)} sectors")
+            logger.info(f"[Scheduler] KR sector momentum refreshed: {len(sectors)} sectors")
         except Exception as e:
-            print(f"[Scheduler] KR sector momentum refresh failed: {e}")
+            logger.warning(f"[Scheduler] KR sector momentum refresh failed: {e}")
 
 
 def _short_sell_work():
@@ -397,25 +401,25 @@ def _short_sell_work():
             "SELECT DISTINCT t.ticker FROM tickers t "
             "JOIN user_stocks us ON us.ticker = t.ticker WHERE t.market = 'KR'")]
     except Exception as e:
-        print(f"[Scheduler] Short-sell: failed to fetch KR universe: {e}")
+        logger.warning(f"[Scheduler] Short-sell: failed to fetch KR universe: {e}")
         return
 
     if not tickers:
-        print("[Scheduler] Short-sell: no KR tickers")
+        logger.warning("[Scheduler] Short-sell: no KR tickers")
         return
 
     def _fetch_one(ticker):
         try:
             svc.upsert_trend(ticker, svc.fetch_trend(ticker))
         except Exception as e:
-            print(f"[Scheduler] Short-sell failed for {ticker}: {e}")
+            logger.warning(f"[Scheduler] Short-sell failed for {ticker}: {e}")
 
     # max_workers ≤ 8: DB 풀(maxconn=10) 초과(PoolError) 방지 (investor_trend와 동일 가드)
     with ThreadPoolExecutor(max_workers=max(1, min(len(tickers), 8))) as executor:
         futures = [executor.submit(_fetch_one, t) for t in tickers]
         for future in as_completed(futures):
             future.result()
-    print(f"[Scheduler] Short-sell fetched for {len(tickers)} KR tickers")
+    logger.info(f"[Scheduler] Short-sell fetched for {len(tickers)} KR tickers")
 
 
 def _seed_rankings_if_empty():
@@ -425,11 +429,11 @@ def _seed_rankings_if_empty():
     try:
         rows = db_query("SELECT 1 FROM market_rankings LIMIT 1")
     except Exception as e:
-        print(f"[Scheduler] Rankings seed check failed: {e}")
+        logger.warning(f"[Scheduler] Rankings seed check failed: {e}")
         return
     if rows:
         return
-    print("[Scheduler] market_rankings empty, seeding now...")
+    logger.info("[Scheduler] market_rankings empty, seeding now...")
     _fetch_kr_rankings()
     _fetch_us_rankings()
 
@@ -439,9 +443,9 @@ def _fetch_us_sector():
     with job_runs.record("us_sector_fetch", "auto"):
         try:
             sectors = us_sector_service.refresh()
-            print(f"[Scheduler] US sector momentum refreshed: {len(sectors)} sectors")
+            logger.info(f"[Scheduler] US sector momentum refreshed: {len(sectors)} sectors")
         except Exception as e:
-            print(f"[Scheduler] US sector momentum refresh failed: {e}")
+            logger.warning(f"[Scheduler] US sector momentum refresh failed: {e}")
 
 
 def _seed_us_sector_if_empty():
@@ -450,10 +454,10 @@ def _seed_us_sector_if_empty():
     try:
         if us_sector_service.load_momentum():
             return
-        print("[Scheduler] us_sector_momentum empty, seeding now...")
+        logger.info("[Scheduler] us_sector_momentum empty, seeding now...")
         us_sector_service.refresh()
     except Exception as e:
-        print(f"[Scheduler] US sector seed failed: {e}")
+        logger.warning(f"[Scheduler] US sector seed failed: {e}")
 
 
 def _seed_kr_sector_if_empty():
@@ -463,10 +467,10 @@ def _seed_kr_sector_if_empty():
     try:
         if kr_sector_service.load_momentum():
             return
-        print("[Scheduler] kr_sector_momentum empty, seeding now...")
+        logger.info("[Scheduler] kr_sector_momentum empty, seeding now...")
         kr_sector_service.refresh()
     except Exception as e:
-        print(f"[Scheduler] KR sector seed failed: {e}")
+        logger.warning(f"[Scheduler] KR sector seed failed: {e}")
 
 
 _JOB_FUNCS = {

@@ -158,7 +158,7 @@ def generate(user_id: str, today: date = None) -> dict:
             (user_id, today.isoformat(), json.dumps(digest)),
         )
     except Exception as e:
-        print(f"[Digest] DB save failed, falling back to file: {e}")
+        logger.warning(f"[Digest] DB save failed, falling back to file: {e}")
         path = DIGEST_DIR / f"{user_id}-{today.isoformat()}.json"
         path.write_text(json.dumps(digest, ensure_ascii=False, indent=2), encoding="utf-8")
     return digest
@@ -257,7 +257,7 @@ def get_latest(user_id: str) -> dict | None:
         if rows:
             return rows[0]["data"]
     except Exception as e:
-        print(f"[Digest] DB read failed, falling back to file: {e}")
+        logger.warning(f"[Digest] DB read failed, falling back to file: {e}")
     # Filesystem fallback
     files = sorted(DIGEST_DIR.glob(f"{user_id}-*.json"), reverse=True)
     if not files:
@@ -309,4 +309,4 @@ def send_telegram(digest: dict) -> None:
             timeout=10,
         )
     except Exception as e:
-        print(f"[Digest] Telegram send failed: {e}")
+        logger.warning(f"[Digest] Telegram send failed: {e}")

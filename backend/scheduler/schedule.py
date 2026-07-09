@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
+
 from apscheduler.triggers.cron import CronTrigger
 from services import storage, report_generator, consensus_pipeline as _pipeline, batch_registry
 from services.schedule_spec import build_trigger_kwargs
 
 from ._state import _scheduler, _VALID_DAYS
 from .jobs import _JOB_FUNCS, _in_market
+
+logger = logging.getLogger(__name__)
 
 
 def _build_trigger(spec: dict, timezone: str) -> CronTrigger:
@@ -33,7 +37,7 @@ def _reschedule_job(job_id: str) -> None:
         _build_trigger(spec, entry["timezone"]),
         **job_kwargs,
     )
-    print(f"[Scheduler] Scheduled {job_id}: {spec}")
+    logger.info(f"[Scheduler] Scheduled {job_id}: {spec}")
 
 
 def _seed_spec_for(job_id: str) -> dict:
@@ -129,13 +133,13 @@ def _check_missed_report_for(job_id: str, market: str):
     missing = [s for t, s in stocks_by_ticker.items() if t not in have]
     if not missing:
         return
-    print(f"[Scheduler] Missed report ({market}): {len(missing)} stock(s) for {today}, generating...")
+    logger.info(f"[Scheduler] Missed report ({market}): {len(missing)} stock(s) for {today}, generating...")
     for stock in missing:
         try:
             report_generator.generate_report_with_retry(stock)
         except Exception as e:
-            print(f"[Scheduler] Missed-report failed for {stock['ticker']}: {e}")
+            logger.warning(f"[Scheduler] Missed-report failed for {stock['ticker']}: {e}")
     try:
         _pipeline.run_daily(missing)
     except Exception as e:
-        print(f"[Scheduler] Missed-report pipeline failed: {e}")
+        logger.warning(f"[Scheduler] Missed-report pipeline failed: {e}")

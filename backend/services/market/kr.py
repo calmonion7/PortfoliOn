@@ -159,7 +159,7 @@ def _kr_pick_regular(ticker: str, ref_close: float | None) -> tuple | None:
             fallback = basic
         if _price_sane(basic[0], basic[2], ref_close):
             return basic
-        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30%/일봉 {ref_close} 범위 밖 — 폐기")
+        logger.warning(f"[Quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30%/일봉 {ref_close} 범위 밖 — 폐기")
     return fallback or last
 
 
@@ -183,7 +183,7 @@ def _kr_pick_degenerate_lazy(ticker: str, nxt: tuple | None, krx: tuple | None,
             fallback = basic
         if _price_sane(basic[0], basic[2]):
             return basic
-        print(f"[quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30% 밖 — 폐기")
+        logger.warning(f"[Quote] {ticker}: {src} 현재가 {basic[0]}가 전일종가 {basic[2]}±30% 밖 — 폐기")
     return fallback
 
 
@@ -220,7 +220,7 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
         try:
             basic = getter()
         except Exception as e:
-            logger.warning(f"[quote] {ticker}: escalation {src} 피드 실패 — {e}")
+            logger.warning(f"[Quote] {ticker}: escalation {src} 피드 실패 — {e}")
             continue
         esc[src] = basic
         if basic and basic[0]:
@@ -228,7 +228,7 @@ def _kr_pick_basic(ticker: str, ref_close: float | None, regular: bool = False) 
     pick = _corroborated_pick(feeds)
     if pick:
         outliers = [f[1] for f in feeds if not (0.5 <= f[2][0] / pick[2][0] <= 2.0)]
-        print(f"[quote] {ticker}: 피드 발산 — {pick[1]} {pick[2][0]} 채택(다수결), outlier {outliers} 폐기")
+        logger.warning(f"[Quote] {ticker}: 피드 발산 — {pick[1]} {pick[2][0]} 채택(다수결), outlier {outliers} 폐기")
         return pick[2]
 
     # 4피드도 합의 불가: degenerate self-check (escalation 결과 재사용)

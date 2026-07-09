@@ -56,7 +56,9 @@ def test_backfill_surfaces_skipped_in_response(capsys):
     assert set(body["skipped"]) == {"CCC", "DDD"}
 
 
-def test_backfill_logs_skipped_candidates(capsys):
+def test_backfill_logs_skipped_candidates(caplog):
+    import logging
+    caplog.set_level(logging.WARNING)
     ps = _patches()
     for p in ps:
         p.start()
@@ -65,7 +67,7 @@ def test_backfill_logs_skipped_candidates(capsys):
     finally:
         for p in ps:
             p.stop()
-    out = capsys.readouterr().out
+    out = caplog.text
     # 핵심: 건너뛴 후보가 진단 로그에 남아 silent가 아님
     assert "backfill" in out.lower()
     assert "CCC" in out and "DDD" in out

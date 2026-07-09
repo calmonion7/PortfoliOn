@@ -1,11 +1,13 @@
 from __future__ import annotations
+import logging
 import math
-import sys
 import requests
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from services.db import query, get_connection
+
+logger = logging.getLogger(__name__)
 
 _NAVER_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -114,7 +116,7 @@ def _fetch_naver_market(market: str) -> list[dict]:
                 stocks.extend(future.result())
             except Exception as e:
                 failed.append(futures[future])
-                print(f"ranking: {market} page {futures[future]} failed: {e}", file=sys.stderr)
+                logger.warning(f"[Ranking] {market} page {futures[future]} failed: {e}")
     if failed:
         raise RuntimeError(
             f"ranking: {market} fetch incomplete — {len(failed)} page(s) failed: {sorted(failed)}"

@@ -80,7 +80,7 @@ def _run_backfill(stocks: list, days: int, force: bool = False):
                 total_created += n
                 cache_svc.invalidate(stock["ticker"])
             except Exception as e:
-                print(f"[Backfill] Failed for {stock['ticker']}: {e}")
+                logger.warning(f"[Backfill] Failed for {stock['ticker']}: {e}")
             _backfill_progress.increment()
             _backfill_progress.set(created=total_created)
         _backfill_progress.finish()
@@ -131,7 +131,7 @@ def _run_generation(stocks: list, target_date: str = None):
             cache_svc.invalidate(stock["ticker"])
             _pipeline.run_daily([stock])
         except Exception as e:
-            print(f"[Report] Failed for {stock['ticker']}: {e}")
+            logger.warning(f"[Report] Failed for {stock['ticker']}: {e}")
             _progress.add_failed(stock["ticker"], str(e))
         finally:
             _progress.increment()
@@ -491,7 +491,7 @@ def _run_consensus_batch(stocks: list, days: int = 180, force: bool = False):
             try:
                 _pipeline.backfill([stock], days, force)
             except Exception as e:
-                print(f"[Consensus] backfill failed for {stock['ticker']}: {e}")
+                logger.warning(f"[Consensus] backfill failed for {stock['ticker']}: {e}")
             _consensus_progress.increment()
         _consensus_progress.finish()
 

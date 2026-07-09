@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
+import logging
 import os
-import sys
 import calendar as cal_lib
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -15,6 +15,8 @@ from services import storage
 from services.db import query, execute
 from services.market.format import _yf_sym
 from auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 # S2: curated FRED release names to show in calendar
 _FRED_RELEASES = {
@@ -102,7 +104,7 @@ def _get_events(month: str, user_id: str = "") -> list[dict]:
             _collect_earnings(cal, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, result)
             _collect_dividend(cal, stock["ticker"], stock["stock_type"], stock["name"], month_start, month_end, result)
         except Exception as e:
-            print(f"calendar: skip {stock['ticker']}: {e}", file=sys.stderr)
+            logger.warning(f"[Calendar] skip {stock['ticker']}: {e}")
         return result
 
     events: list[dict] = []
@@ -247,7 +249,7 @@ def _get_econ_events(month_start: date, month_end: date) -> list[dict]:
         r.raise_for_status()
         items = r.json().get("release_dates", [])
     except Exception as e:
-        print(f"calendar: FRED releases fetch failed: {e}", file=sys.stderr)
+        logger.warning(f"[Calendar] FRED releases fetch failed: {e}")
         return events
     for item in items:
         name = item.get("release_name", "")
@@ -291,5 +293,5 @@ def _get_holidays(month_start: date, month_end: date) -> list[dict]:
                     "stock_type": "market",
                 })
         except Exception as e:
-            print(f"calendar: holiday fetch failed {exchange}: {e}", file=sys.stderr)
+            logger.warning(f"[Calendar] holiday fetch failed {exchange}: {e}")
     return results

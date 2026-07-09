@@ -328,7 +328,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
                 if _attempt == 0:
                     time.sleep(0.5)
                 else:
-                    print(f"[Report] {ticker} 네이버 ref 실패(retry 소진): {_e}")
+                    logger.warning(f"[Report] {ticker} 네이버 ref 실패(retry 소진): {_e}")
         # KIS 폴백 (네이버 실패·None 시)
         if ref_price is None:
             _kis = _kr_basic_kis(ticker)
@@ -337,14 +337,14 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
                 ref_price, ref_src = _p, "KIS"
         # ref 전무 → 박제 스킵 (wrong<missing)
         if ref_price is None:
-            print(f"[Report] {ticker} 독립 ref(네이버·KIS) 전무 — 박제 스킵(직전 스냅샷 유지)")
+            logger.warning(f"[Report] {ticker} 독립 ref(네이버·KIS) 전무 — 박제 스킵(직전 스냅샷 유지)")
             raise ValueError(
                 f"독립 ref(네이버·KIS) 없음 — 박제 스킵(직전 스냅샷 유지, task#118): {ticker}")
         # ref 있음 → 2x 교차검증
         daily_last = round(float(daily_df["Close"].iloc[-1]), 2) if not daily_df.empty else None
         for _label, _val in (("price", summary["price"]), ("일봉종가", daily_last)):
             if _val and not (0.5 <= _val / ref_price <= 2.0):
-                print(f"[Report] {ticker} KRX 시세 글리치 감지: {_label}={_val} vs 독립({ref_src})={ref_price} 2x 밖")
+                logger.error(f"[Report] {ticker} KRX 시세 글리치 감지: {_label}={_val} vs 독립({ref_src})={ref_price} 2x 밖")
                 raise ValueError(
                     f"KRX 시세 글리치 의심: {_label} {_val} vs 독립({ref_src}) {ref_price} 2x 밖 — "
                     f"박제 스킵(직전 스냅샷 유지, .forge/adr/0020, task#101/118)")
@@ -359,7 +359,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
             (ticker, today, json.dumps(sanitized)),
         )
     except Exception as e:
-        print(f"[Report] Supabase save failed for {ticker}: {e}")
+        logger.warning(f"[Report] Supabase save failed for {ticker}: {e}")
     return str(json_path)
 
 
@@ -531,7 +531,7 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
                 (ticker, date_str, json.dumps(sanitized)),
             )
         except Exception as e:
-            print(f"[Backfill] Supabase save failed for {ticker} {date_str}: {e}")
+            logger.warning(f"[Backfill] Supabase save failed for {ticker} {date_str}: {e}")
             out_path.unlink(missing_ok=True)
             continue
         created += 1

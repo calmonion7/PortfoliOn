@@ -6,8 +6,12 @@ analysis_service.get_sector_momentum(market="US") 요청경로는 후속 슬라�
 """
 from __future__ import annotations
 
+import logging
+
 from services.market_indicators.cache import _mc_load, _mc_save
 from services.parallel import parallel_map
+
+logger = logging.getLogger(__name__)
 
 CACHE_KEY = "us_sector_momentum"
 
@@ -24,7 +28,7 @@ def refresh() -> list[dict]:
     sectors = parallel_map(_fetch_etf, SECTOR_ETFS, max_workers=11)
     if all(s.get("return_1w") is None and s.get("return_1mo") is None
            and s.get("return_3mo") is None for s in sectors):
-        print("[us_sector] refresh: all-None momentum — skipping save (직전값 유지)")
+        logger.warning("[UsSector] refresh: all-None momentum — skipping save (직전값 유지)")
         return sectors
     _mc_save(CACHE_KEY, {"sectors": sectors})
     return sectors

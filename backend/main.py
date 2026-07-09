@@ -10,6 +10,8 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 import threading
 
+logger = logging.getLogger(__name__)
+
 
 def _configure_logging():
     """루트 로거 1회 배선 (로깅 방출 규약, task#162). config 부재 시 root lastResort가
@@ -58,12 +60,12 @@ def _migrate():
         from services.db import execute
         execute("ALTER TABLE backlog_history ADD COLUMN IF NOT EXISTS segments JSONB")
     except Exception as e:
-        print(f"[migrate] backlog_history.segments 추가 실패: {e}")
+        logger.warning(f"[Migrate] backlog_history.segments 추가 실패: {e}")
     try:
         from services.db import execute
         execute("CREATE TABLE IF NOT EXISTS batch_schedules (job_id text PRIMARY KEY, data jsonb NOT NULL)")
     except Exception as e:
-        print(f"[migrate] batch_schedules 생성 실패: {e}")
+        logger.warning(f"[Migrate] batch_schedules 생성 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS market_short_sell (
@@ -73,7 +75,7 @@ def _migrate():
             created_at TIMESTAMPTZ DEFAULT NOW(), PRIMARY KEY (ticker, base_date))""")
         execute("CREATE INDEX IF NOT EXISTS idx_short_sell_read ON market_short_sell(ticker, base_date DESC)")
     except Exception as e:
-        print(f"[migrate] market_short_sell 생성 실패: {e}")
+        logger.warning(f"[Migrate] market_short_sell 생성 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_disclosures (
@@ -83,7 +85,7 @@ def _migrate():
             fetched_at TIMESTAMPTZ DEFAULT NOW())""")
         execute("CREATE INDEX IF NOT EXISTS idx_disclosures_read ON stock_disclosures(ticker, rcept_dt DESC)")
     except Exception as e:
-        print(f"[migrate] stock_disclosures 생성 실패: {e}")
+        logger.warning(f"[Migrate] stock_disclosures 생성 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_dividends (
@@ -94,7 +96,7 @@ def _migrate():
             source TEXT,
             fetched_at TIMESTAMPTZ DEFAULT NOW())""")
     except Exception as e:
-        print(f"[migrate] stock_dividends 생성 실패: {e}")
+        logger.warning(f"[Migrate] stock_dividends 생성 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_dividend_schedule (
@@ -109,7 +111,7 @@ def _migrate():
             PRIMARY KEY (ticker, ex_date))""")
         execute("CREATE INDEX IF NOT EXISTS idx_dividend_schedule_read ON stock_dividend_schedule(ticker, ex_date)")
     except Exception as e:
-        print(f"[migrate] stock_dividend_schedule 생성 실패: {e}")
+        logger.warning(f"[Migrate] stock_dividend_schedule 생성 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_beta (
@@ -118,7 +120,7 @@ def _migrate():
             source TEXT,
             fetched_at TIMESTAMPTZ DEFAULT NOW())""")
     except Exception as e:
-        print(f"[migrate] stock_beta 생성 실패: {e}")
+        logger.warning(f"[Migrate] stock_beta 생성 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_supply_score (
@@ -129,7 +131,7 @@ def _migrate():
             as_of JSONB,
             created_at TIMESTAMPTZ DEFAULT NOW())""")
     except Exception as e:
-        print(f"[migrate] stock_supply_score 생성 실패: {e}")
+        logger.warning(f"[Migrate] stock_supply_score 생성 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_insider_trades (
@@ -146,12 +148,12 @@ def _migrate():
             fetched_at TIMESTAMPTZ DEFAULT NOW())""")
         execute("CREATE INDEX IF NOT EXISTS idx_insider_read ON stock_insider_trades(ticker, rcept_dt DESC)")
     except Exception as e:
-        print(f"[migrate] stock_insider_trades 생성 실패: {e}")
+        logger.warning(f"[Migrate] stock_insider_trades 생성 실패: {e}")
     try:
         from services.db import execute
         execute("ALTER TABLE stock_disclosures ADD COLUMN IF NOT EXISTS meeting_date DATE")
     except Exception as e:
-        print(f"[migrate] stock_disclosures.meeting_date 추가 실패: {e}")
+        logger.warning(f"[Migrate] stock_disclosures.meeting_date 추가 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS stock_recommendations (
@@ -170,7 +172,7 @@ def _migrate():
         execute("ALTER TABLE stock_recommendations ADD COLUMN IF NOT EXISTS name TEXT")
         execute("CREATE INDEX IF NOT EXISTS idx_recommendations_read ON stock_recommendations(market, score DESC)")
     except Exception as e:
-        print(f"[migrate] stock_recommendations 생성 실패: {e}")
+        logger.warning(f"[Migrate] stock_recommendations 생성 실패: {e}")
     try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS us_supply_snapshot (
@@ -184,14 +186,14 @@ def _migrate():
         execute("ALTER TABLE us_supply_snapshot ADD COLUMN IF NOT EXISTS insider_transactions JSONB DEFAULT '[]'::jsonb")
         execute("ALTER TABLE us_supply_snapshot ADD COLUMN IF NOT EXISTS insider_net JSONB DEFAULT '{}'::jsonb")
     except Exception as e:
-        print(f"[migrate] us_supply_snapshot 생성 실패: {e}")
+        logger.warning(f"[Migrate] us_supply_snapshot 생성 실패: {e}")
     try:
         from services.db import execute
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS target_price numeric")
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS stop_price numeric")
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS target_weight numeric")
     except Exception as e:
-        print(f"[migrate] user_stocks 목표가/손절가 추가 실패: {e}")
+        logger.warning(f"[Migrate] user_stocks 목표가/손절가 추가 실패: {e}")
 
 
 @asynccontextmanager

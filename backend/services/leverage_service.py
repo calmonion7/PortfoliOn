@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import os
 import time
 import requests
@@ -6,6 +7,8 @@ from datetime import date, timedelta
 from services.db import execute, query
 from services.utils import sanitize
 from services import job_runs
+
+logger = logging.getLogger(__name__)
 
 _KOFIA_BASE = "https://apis.data.go.kr/1160100/service/GetKofiaStatisticsInfoService"
 _INDEX_BASE  = "https://apis.data.go.kr/1160100/service/GetMarketIndexInfoService"
@@ -246,7 +249,7 @@ def backfill_with_progress(start_year: int, end_year: int) -> None:
             if new_rows:
                 _upsert_rows(new_rows)
                 existing.update(r["date"] for r in new_rows)
-                print(f"[leverage_service] backfill {s}-{e}: {len(new_rows)} rows inserted")
+                logger.info(f"[LeverageService] backfill {s}-{e}: {len(new_rows)} rows inserted")
 
             _backfill_progress["done"] = i + 1
 

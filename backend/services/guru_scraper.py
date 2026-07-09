@@ -1,6 +1,9 @@
+import logging
 import requests
 from bs4 import BeautifulSoup
 import time
+
+logger = logging.getLogger(__name__)
 
 _BASE = "https://www.dataroma.com/m"
 _NAVER_US_BASE = "https://api.stock.naver.com/stock"
@@ -154,7 +157,7 @@ def scrape_all_managers(on_progress=None) -> list[dict]:
                 "top10": details["top10"],
             })
         except Exception as e:
-            print(f"[Guru] Failed for {m['name']}: {e}")
+            logger.warning(f"[Guru] Failed for {m['name']}: {e}")
         time.sleep(0.5)
 
     if on_progress:
