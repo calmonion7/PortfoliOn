@@ -1,148 +1,158 @@
 ---
-last_mapped_commit: 78e6f09a65ee76a7af351da7b7d417a13b6de820
+last_mapped_commit: ad7f85c68bdc80f3037212cf4b368c201a48054e
 mapped: 2026-07-09
 ---
 
-# CONVENTIONS — 코드 스타일·명명·패턴·에러 처리
+# 코딩 컨벤션
 
-PortfoliOn 코드베이스의 실제 구현 관례. 도메인 용어 정의가 아니라 "코드가 실제로 이렇게 짜여 있다"는 사실 기록.
+**분석 기준일:** 2026-07-09
 
----
-
-## 1. 백엔드 (Python / FastAPI)
-
-### 1.1 Router / Service 분리
-
-- **Router** (`backend/routers/`): HTTP 표면만. `APIRouter(prefix=..., tags=[...])`로 라우트 정의, 요청 검증, 인증 `Depends`, 응답 직렬화. 비즈니스 로직은 service에 위임.
-- **Service** (`backend/services/`): DB·외부 API·계산 로직. Router가 `from services import storage`, `from services.exposure import compute_exposure`처럼 import해 조합.
-- 대표 예: `backend/routers/portfolio.py`가 `from services.exposure import compute_exposure`를 import하고 `get_exposure`(`/api/portfolio/exposure`)가 holdings·quotes·fx·sector_map·beta_map을 모아 `compute_exposure`에 넘겨 계산 자체는 순수 함수에 위임한다.
-- DB 접근은 `backend/services/db.py`의 `query`/`execute`(+`execute_many`)를 통해서만. Router에서 raw connection을 직접 열지 않는다(단 트랜잭션 원자성이 필요하면 `get_connection()` 컨텍스트로 직접 커서 — 아래 §1.13 delete+insert 원자화).
-- **패키지형 service** (God-file 분할, ADR-0017): 커진 service는 re-export로 쪼갠다. `backend/services/market_indicators/`(cache/fx/commodities/earnings/econ/macro/indices/sentiment/`kospi_futures`/`kospi_signal`), `backend/services/kiwoom/`, `backend/services/kis/`(+`futures.py`), `backend/services/storage/`(+`dates.py`). `backend/scheduler/`도 단일 파일 아닌 패키지(`__init__.py` 잡 배선·`_JOB_FUNCS` + `jobs.py` + `schedule.py` + `_state.py`).
-
-### 1.2 순수 계산 service — 부수효과 없는 함수로 추출
-
-- 계산 로직은 DB/외부호출과 분리된 순수 함수로 뽑는다. 대표 예 `backend/services/exposure.py`의 `compute_exposure(holdings, quotes, fx, sector_map, beta_map=...)` — 입력 dict/스칼라만 받아 통화·섹터 그룹핑, 집중도(top3/top5/max_single), 경고 플래그, 포트 베타 가중평균을 계산해 dict 반환. DB·시세 fetch는 호출부(router)가 하고 함수는 순수. 그래서 `backend/tests/test_exposure.py`가 mock 없이 리터럴 입력만으로 전 분기를 단언한다.
-- 새 파생 지표를 붙일 땐 이 패턴 선호 — router는 데이터 수집만, service 함수는 순수 변환.
-
-### 1.3 NaN/inf → JSON 500 가드 (starlette `allow_nan=False`)
-
-- **핵심 함정**: starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 `NaN`/`inf`가 있으면 직렬화에서 **500**(`Out of range float values are not JSON compliant`). 반면 파이썬 `json.dumps`는 기본 `allow_nan=True`라 파일 폴백은 통과 → DB저장 실패/파일성공/응답실패로 증상이 엇갈린다.
-- **가드 헬퍼**: `backend/services/utils.py`의 `sanitize(obj)` — float가 `math.isnan`/`math.isinf`이면 `None`, dict/list는 재귀. 시세/합산을 응답에 싣는 엔드포인트에서 반환 직전 감싸는 안전망.
-- `sanitize`를 쓰는 곳(현재, grep 확정): `routers/portfolio.py`, `routers/recommendations.py`, `routers/report.py`, `routers/stocks.py`, `services/report_generator.py`, `services/lending_service.py`, `services/leverage_service.py`, `services/market_indicators/indices.py`, `services/market_indicators/kospi_futures.py`, `services/market_indicators/kospi_signal.py`, `services/market_indicators/sentiment.py`.
-- **소스 가드가 출력 sanitize보다 깨끗**: 외부 시세에서 흘러든 NaN은 소스에서 `math.isfinite`로 걸러 "값 없음"(None) 처리 선호. `_usdkrw_rate`가 비유한 FX를 `None`으로 반환하는 식. `if fx is None` 가드는 `NaN != None`이라 NaN을 통과시키므로 반드시 `math.isfinite` 병행. `sentiment._fetch_fear_greed`도 score가 `math.isnan`이면 `None` 반환(`test_fear_greed.py`).
-
-### 1.4 Graceful degradation — 부분 실패가 전체를 깨뜨리지 않게
-
-- **`_minimal_card` 폴백** (`backend/routers/stocks.py`): `GET /api/stocks/dashboard`의 `_build_all`은 카드당 `_safe`로 감싸 per-card enrichment throw를 잡아 그 카드만 `_minimal_card`로 폴백하고 전체 500-to-empty를 막는다. 불변식 "holdings=N → 항상 N카드"(task#102). 폴백 시 `print(..., file=sys.stderr)`로 로그 — 근본원인이 마스킹되므로 로그가 유일 단서.
-- **`job_runs.record` 계측** (`backend/services/job_runs.py`): 배치 실행로그는 관측 전용 — 본문(배치)을 절대 안 깨뜨린다. `@contextmanager`이며 `record(job_id, trigger)` 형태(trigger = `auto`/`manual`/`backfill` 등 lane 문자열). INSERT 실패 시 `run_id=None` 센티넬로 본문 계속, 종료 UPDATE 실패도 삼킨다. **주의**: `failed`는 본문이 예외를 *전파*할 때만 기록 — 다수 잡이 내부 예외를 삼켜 정상 종료하므로 `success`를 '내부 오류 없음'으로 과신 금물. 읽기(`recent`/`recent_map`)는 예외 시 `[]`로 degrade.
-- **외부 fetch는 조용히 삼키지 말 것**: silent `except: pass`는 진단 불가(task#48). 최소한 진단 로그(logging.warning) or 좁은 예외. 배치-백킹 캐시는 **빈/all-None 결과를 캐시에 박제 금지**(전부 None이면 save 생략·직전 양호값 유지).
-- **캐시-우선 → fetch → 저장 → stored 폴백 → None 4단계**: 요청경로 외부지표의 표준 골격. `services/market_indicators/sentiment.py`의 `get_fear_greed()`와 `market_indicators/kospi_futures.py`의 `get_kospi_futures()`가 전형 — ① 인메모리 TTL(`_get_cache`) → ② 라이브 `_fetch()` 성공 시 `sanitize`+`_mc_save`(PostgreSQL)+`_set_cache(ttl=3600)` → ③ fetch 실패면 `_mc_load` 저장값 폴백 → ④ 저장값도 없으면 `None`/빈 dict. `cache.get_or_refresh`는 stale-fallback을 *안 하므로*(캐시 있으면 스킵할 뿐, fetch 실패 시 직전값 반환 안 함) 취약 외부소스는 이 수동 4단계를 쓴다.
-- **"성공-but-빈응답"을 last-good에 박제 금지 — 예외 아닌 값 수준 가드(task#157)**: 외부 API가 `rt_cd=0`(무예외)로 빈 output을 주면 예외 가드를 통과한다. `kospi_futures._fetch()`는 예외뿐 아니라 **`front["price"] is None` 또는 빈 history면 `return None`**(=fetch 실패 취급→last-good 폴백)해 all-None dict가 `_mc_save`로 직전 양호값을 덮는 것을 막는다(`indices.py`의 `if any(v is not None ...)` 지속 가드와 동류). `_fetch` 예외만 잡고 값 None을 통과시키면 클로버.
-- **결측은 skip, 크래시 아님 (`wrong < missing`)**: 배치 수집기는 종목별 결측을 저장 skip으로 처리하고 배치는 계속. `services/beta.py`의 `fetch_all_betas`는 `{"total","ok","failed"}`를 반환하는데 결측(beta=None)은 `ok`에 카운트(정상 처리, 저장만 skip)하고 예외난 종목만 `failed`(`test_beta.py`). 이 `{total,ok,failed}` 반환 shape은 수집 배치의 공통 관례.
-- **배치-백킹 delete-rewrite store는 fetch 실패 시 delete를 스킵(task#160)**: 티커 스케줄을 통째 교체하는 store(`dividends.replace_schedule` — DELETE+INSERT)는 수집이 실패했을 때 예외를 `[]`로 삼키면 `replace_schedule([])`가 저장 스케줄을 파괴한다. 그래서 수집기(`fetch_dividend_schedule` 등)는 실패를 감지해 **replace 자체를 스킵하고 직전 양호 스케줄 보존**(`services/dividends.py`, task#160 #2). `consensus_pipeline`의 force 재적재도 DELETE+재삽입을 **한 트랜잭션**(`get_connection()`)으로 원자화해 중단 시 롤백으로 기존 mart 통째 보존(#28).
-
-### 1.5 외부 fetch 배치의 미러링 패턴 (dividends → beta)
-
-- 신규 종목별 지표 수집 배치는 기존 배치를 미러링한다. `services/beta.py`(task#150)는 `services/dividends.py` 구조를 그대로 복제: 시장별 분기 수집(US=yfinance `info["beta"]`, 없으면 `beta3Year` 폴백 — `fetch_us_beta`; KR=`calc_beta` vs `^KS11` — `fetch_kr_beta`) → `stock_beta` 테이블 `ON CONFLICT (ticker) DO UPDATE` upsert(`upsert_beta`) → 조회(`get_beta`) → `_migrate`에 DDL → `batch_registry`에 `beta_fetch` 엔트리(weekly·공통·report·auto+manual) + `scheduler._JOB_FUNCS` 등록 + `/api/stocks/beta/refresh` 수동 엔드포인트.
-- **falsy 유효값 주의**: `beta=0.0`은 유효값인데 falsy라 `beta or beta3Year`로 폴백하면 조용히 치환된다 → `is None` 체크로 분기(`test_beta.py` `test_us_beta_zero_is_kept`).
-
-### 1.6 공유 후처리 헬퍼 (scraper `_dedup_sort_limit`)
-
-- 여러 소스(KR Naver / US yfinance)에서 온 리스트를 동일 규칙으로 후처리할 땐 공유 헬퍼로 뽑는다. `services/scraper.py`의 `_dedup_sort_limit(items, limit)` — `link` 기준 dedup + `published_at` 내림차순 정렬 + limit 컷. `get_news`(US·yfinance)와 `get_news_kr`(Naver) 둘 다 자기 파싱 후 이 헬퍼로 마무리. `get_news(ticker, market=..., limit=10)`이 `market=="KR"`이면 `get_news_kr`로 디스패치(`test_scraper.py`).
-
-### 1.7 Lazy import로 순환참조 회피
-
-- 상호 참조 service는 함수 내부에서 지연 import. 실제 예: `services/analysis_service.py`(`us_sector_service` 지연 import), `services/dividends.py`(`from services.market.format import _yf_sym`를 함수 안에서), storage→cache 무효화도 함수 내 지연 import(`cache.invalidate`를 storage에서 호출할 때). `kospi_futures.get_kospi_futures`도 성공 분기 안에서 `from services.utils import sanitize`.
-
-### 1.8 Decimal vs float 산술 함정 (DB NUMERIC)
-
-- DB `NUMERIC` 컬럼(`avg_cost`, `quantity` 등)은 psycopg가 **`Decimal`**로 준다. 외부 시세·`stock_dividends`는 **float**. `float / Decimal` 혼합 산술은 `TypeError`.
-- 실사례: `_build_card`의 `yield_on_cost = annual_div / avg_cost` 등에서 배당 있는 모든 카드가 throw → `_minimal_card` 폴백 → enrichment 통째 blank(500도 안 나서 은밀). 종목 비교 엔드포인트도 동일 원인 500(task#153, 값 `float()` 정규화로 수정). 수정은 계산 양변 `float()` 정규화.
-- 순수 계산 함수도 동일 방어: `compute_exposure`는 `quantity`/`fx`가 `Decimal`이어도 안전(`test_exposure.py` `test_decimal_quantity_and_fx_do_not_raise_type_error`). **회귀 테스트 fixture도 `Decimal`을 써야** fixture-pass-live-fail을 막는다.
-
-### 1.9 tz-naive ↔ tz-aware 정렬은 strip 필수
-
-- 키움 일봉(tz-naive) ↔ yfinance(`^KS11` 등, tz-aware) `pd.concat(axis=1)`은 `TypeError`. 정렬 전 한쪽을 `tz_localize(None)`으로 벗긴다. `services/beta.py`의 `_ks11_returns`가 `^KS11` 히스토리를 받아 tz strip 후 반환(`test_beta.py` `test_ks11_returns_strips_tz`), `report_generator`의 KR beta 경로도 daily_df tz strip 통일. broad `except`가 이 오류를 삼키면 계산이 조용히 None이 되니 좁은 예외/진단 로그.
-
-### 1.10 종목명·enriched_at dual-source
-
-- 종목명은 **두 저장소**: `tickers.name`(공유 마스터, 종목관리 목록이 live read) vs `snapshots.data.name`(리포트 생성 시 박제, 리서치 목록·상세가 read). 이름 변경 시 둘 다 갱신(`storage.refresh_snapshot_names` 단건 / `reconcile_snapshot_names` 전체) + `cache.invalidate(ticker)`+`invalidate_list()`.
-- 유사 함정: **`enriched_at`(AI 분석 존재 여부) 정본은 `tickers` 테이블 컬럼 — 스냅샷 `data` JSON엔 없다**. 신규 판정/표시 필드의 정본 저장 위치를 가정하지 말고 기존 소비처를 grep으로 확정(스냅샷에서 읽도록 가정하면 fixture green·라이브 항상 False).
-
-### 1.11 배치 레지스트리 관례
-
-- `backend/services/batch_registry.py`의 `BATCHES`가 모든 배치의 단일 소스 — **현재 29개 엔트리**(`test_batch_market_split.py:54`·`test_macro_signals_batch.py:37`·`test_batches_router.py:45`가 `== 29` 단언). 각 엔트리: `id`·`market`(`KR`/`US`/`공통`)·`category`·`source`(fetch 출처)·`usage`(소비 UI)·`editable`·`trigger_kinds`·`manual_endpoint`·`scheduler_job_id`·`default_schedule`. `get_batch(id)`로 조회. `GET /api/batches`가 그대로 노출.
-- **fetch 소스를 바꾸면 `source`도 갱신(DoD)**. `source`=어디서 끌어오나, `usage`=어디서 쓰나(반대 방향).
-- **배치 id 은퇴/추가 시 전수 grep**: id 제거 시 ① 데이터 read ② 표시 문자열 ③ `job_runs.record(id, ...)` 모든 lane(auto/manual/backfill) ④ 그 id를 단언하는 테스트 모두 갱신. id 추가 시 exact-count(`== 29`)/exact-set(`EXPECTED_IDS`) 단언이 여러 파일에 흩어져 있어 전수 갱신(§ TESTING 1.6).
-
-### 1.12 신규 DB 컬럼/테이블 배포 관례 (DoD)
-
-- **신규 컬럼/테이블은 `app_schema.sql`만으론 배포에 반영 안 됨** — `backend/main.py`의 `_migrate`에 `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS`를 **쌍으로** 추가 필수. 스키마 파일은 신규 설치용, 라이브 DB는 기동 idempotent 마이그레이션(ADR-0006)만 탄다. `stock_beta` 테이블도 `_migrate`가 DDL 발행(`test_beta.py` `test_migrate_creates_stock_beta`), `stock_dividend_schedule`(task#158)도 동일 쌍.
-
-### 1.13 SQL 배치화/원자성 함정 (query-mock 테스트가 못 잡음)
-
-- **uuid `= ANY(%s)`**: 파이썬 str 리스트를 넘기면 text[]가 돼 `operator does not exist: uuid = text` 라이브 즉사. `ANY(%s::uuid[])` 명시 캐스트. 단건 `WHERE user_id = %s`는 str이 암묵 캐스트돼 동작하던 것이 배열화에서 깨진다.
-- **VALUES 나열**: 바깥 괄호로 감싸면(`VALUES ((a,b),(c,d))`) N행이 아니라 record 1행 → `AS v(...)` 매핑 에러. 행별 `(a,b), (c,d)` 나열만. `consensus._values_placeholder`가 형태 고정.
-- **upsert dedup**: 재수집이 행을 늘리지 않게 종목별 테이블은 `ON CONFLICT (ticker) DO UPDATE`(`stock_beta`·`stock_dividends`·`stock_dividend_schedule (ticker, ex_date)` 등).
-- **통째 교체는 단일 트랜잭션**: delete+insert로 store를 갈아끼울 땐 `with get_connection() as conn:` 한 커넥션 안에서 커서로 DELETE→INSERT를 묶어 중단 시 롤백으로 부분/빈 상태를 안 남긴다(`dividends.replace_schedule`, `consensus_pipeline` force 재적재).
-
-### 1.14 KST 시장-날짜는 `ZoneInfo("Asia/Seoul")` — bare `date.today()` 금지
-
-- **백엔드 컨테이너에 TZ env가 없어 `date.today()`=UTC**. 00:00~09:00 KST(UTC 전일)엔 하루 뒤처져 최근월물/영업일/오늘-이후 필터가 어긋난다(task#157·#161 #5). "어느 달력일이냐"를 판정하는 코드는 `datetime.now(ZoneInfo("Asia/Seoul")).date()`를 쓴다.
-- **패턴**: 모듈 상단 `_KST = ZoneInfo("Asia/Seoul")` + `_today_kst()` 헬퍼. 실사용: `services/report_generator.py`(`_KST`·`_today_kst()`), `services/dividends.py`(`_KST`·`_today_kst()`, `get_schedule_batch`의 오늘-이후 필터 인자), `services/kis/futures.py`(`_KST`, 최근월물/롤오버 판정), `services/market_indicators/kospi_signal.py`(`_KST`), `services/storage/dates.py`(KST now), `scheduler/schedule.py`(`ZoneInfo("Asia/Seoul")`).
-- **주의**: `services/consensus_pipeline.py`·`services/supply_score.py`·`services/leverage_service.py`·`services/recommendation/funnel.py`·`services/digest_service.py` 등엔 아직 bare `date.today()`가 남아 있다 — KST 경계 민감 판정을 새로 넣을 땐 `_today_kst()` 패턴으로.
-- 이 "어느 날인가" 판정용 KST 변환은 §1.9의 naive↔aware series *정렬*용 `tz_localize(None)`과 별개 문제(정렬 vs 날짜 판정).
-
-### 1.15 `_yf_sym` 접미사 규칙 (KR yfinance 심볼)
-
-- `backend/services/market/format.py:68`의 `_yf_sym(ticker, market="US", exchange="") -> str`: **KR이면 `{ticker}.{exchange||KS}`**(예 `005930.KS`·`.KQ`), **US면 `ticker.replace(".", "-")`**(예 `BRK.B`→`BRK-B`). `yf.Ticker`에 **반드시** 이 헬퍼로 접미사를 붙여야 KR이 0건이 안 난다(raw ticker면 KR yfinance 결과 통째 비는 잠재버그 — 캘린더 실적일·배당·beta에서 반복).
-- `market/__init__.py`가 re-export. 사용처: `services/beta.py`, `services/dividends.py`, `services/report_generator.py`, `services/us_supply.py`, `services/analysis_service.py`.
+두 스택으로 나뉜다: **백엔드** Python/FastAPI (`backend/`), **프론트엔드** React 19 + Vite (`frontend/`, plain CSS·no TypeScript). 아래 규약은 실제 코드에서 관찰된 지배적 패턴이며, 신규 코드는 이를 따른다.
 
 ---
 
-## 2. 프론트엔드 (React 19 + Vite 8)
+## 1. 네이밍 패턴
 
-### 2.1 스타일 — plain CSS + design tokens (TailwindCSS 없음)
+### 백엔드 (Python)
 
-- 스타일 정본: `frontend/src/styles/tokens.css`의 CSS 커스텀 프로퍼티. 컴포넌트별 `.css` 파일이 토큰을 참조.
-- **KR 색 관례**: `--up`=빨강(상승)·`--down`=파랑(하락). 서구 관례(녹=상승)와 반대.
-- **의미 상태 색은 별도 토큰**으로 가격 방향색과 분리(아래 §2.2).
+**파일:**
+- 서비스/라우터 모두 `snake_case.py` — 라우터는 도메인 단수/복수(`stocks.py`·`report.py`·`market_indicators.py`), 서비스는 기능명(`report_generator.py`·`consensus_pipeline.py`·`dividends.py`).
+- 대형 모듈은 **패키지로 분할 + `__init__.py` 재노출**(ADR-0017): `services/storage/`(`portfolio.py`·`names.py`·`dates.py`·`schedule.py`), `services/market/`, `services/market_indicators/`, `services/recommendation/`, `scheduler/`(`__init__.py`·`jobs.py`·`schedule.py`·`_state.py`), `services/kiwoom/`·`services/kis/`. 소비처는 `from services import storage`처럼 패키지명으로 import(내부 분할은 불투명).
 
-### 2.2 Badge variant 주의 (색 반전 함정)
+**함수:**
+- `snake_case`. **모듈 내부 전용 함수는 선행 언더스코어**(`_latest_snapshot`, `_build_all`, `_usdkrw_rate`, `_configure_logging`, `_migrate`) — 서비스 코드에서 private(`_`)가 113건, public이 157건으로 이 관례가 광범위하다. 공개 API/재사용 헬퍼만 언더스코어 없이 노출.
+- 타입 힌트를 시그니처에 부여: `def _latest_snapshot(ticker: str) -> tuple:`, `def is_valid_ticker(ticker: str) -> bool:`. `typing`의 `Optional`/`List`/`Any`를 사용하고, 신규 모듈은 상단에 `from __future__ import annotations`를 선언(`services/utils.py`·`services/dividends.py`).
 
-- `frontend/src/components/ui/Badge.css`에서 **`.badge--success`=빨강**, **`.badge--danger`=파랑**(variant 이름이 KR 가격색으로 매핑). 가격 방향이 아닌 의미 상태 배지(수급 밴드 등)에 `success`/`danger`를 쓰면 색이 반전 → 의미 배지는 `frontend/src/components/ui/SupplyBadge.jsx`처럼 전용 색을 명시. UI 리뷰는 variant 이름 통념(success=녹/danger=빨)이 아니라 `Badge.css`의 실제 토큰값을 대조. (`warning` 변형은 토큰 미정의로 현재 깨져 있어 caution 색으로 쓸 수 없음.)
+**변수/상수:**
+- 지역/인자 `snake_case`. **모듈 상수는 UPPER_SNAKE**(`TICKER_RE`, `SNAPSHOTS_DIR`, `REPORTS_DIR`, `SAMPLE_PORTFOLIO`).
 
-### 2.3 단일 공유 컴포넌트 패턴
+**타입/클래스:**
+- `PascalCase`. 요청 바디는 **Pydantic `BaseModel` 서브클래스**로 정의(`class EnrichBody(BaseModel):`, `class BatchEnrichItem(BaseModel):` — `routers/stocks.py`).
 
-- 중복 렌더링 블록은 단일 컴포넌트로 통합. 대표 예: `frontend/src/components/reports/StockActions.jsx` — 카드(`StockCard`)와 사이드바(`TickerListItem`) 양쪽의 액션버튼(수정·승격·삭제·전체삭제)을 통합, `layout="card"|"list"` prop으로 분기(task#103). **액션버튼/게이트 변경은 여기 한 곳만**.
-- **가시성 게이트는 `is_mine`으로**(category 아님): `info.is_mine === false`(타인 종목)면 전체삭제(`/api/admin`)만. category로만 게이트하면 admin `scope=all` 목록에서 타인 종목의 user-scoped 핸들러가 404로 조용히 깨진다.
+### 프론트엔드 (React/JS)
 
-### 2.4 Context provider (Toast·Auth)
+**파일:**
+- 컴포넌트는 `PascalCase.jsx`(`Badge.jsx`·`StockModal.jsx`·`BatchScheduleEditor.jsx`), CSS는 **동명 co-located** `PascalCase.css`(`Badge.jsx` + `Badge.css`).
+- 훅은 `camelCase.js`이며 **`use` 접두사**(`useAuth.js`·`usePortfolioData.js`·`useStockManagement.js`), `hooks/`에 위치.
+- 유틸/비컴포넌트 모듈은 `camelCase.js`(`api.js`·`utils.js`·`utils/analytics.js`·`utils/marketHours.js`).
+- Context는 `PascalCaseContext.jsx`(`contexts/AuthContext.jsx`).
 
-- `frontend/src/components/Toast.jsx`: `createContext` 기반 `ToastProvider`(앱 루트 래핑) + `useToast`(consumer 훅). `frontend/src/contexts/`의 `AuthContext`가 로그인 시 메뉴 권한을 로드해 nav 필터링.
-
-### 2.5 훅 추출 + 콜로케이트 테스트
-
-- 로직은 커스텀 훅으로 추출(`frontend/src/hooks/usePortfolioData.js`, `useStockManagement.js`, `useReportFilters.js`)하고 테스트를 소스 옆에 콜로케이트(`*.test.js`).
-
-### 2.6 엔드포인트 응답 shape 변경 시 소비처 전수 grep
-
-- 배열→객체 등 비-additive reshape 시 `grep -rn '<엔드포인트 경로>' frontend/src/`로 독립 fetcher까지 전수 갱신(예: `Analytics.jsx`가 훅과 별개로 `/api/stocks/dashboard`를 직접 fetch). 가능하면 additive(필드 추가) 선호.
-- **fetch 실패와 '데이터 없음' 구분**: 조회 실패를 빈 데이터로 뭉개지 말 것 — 컨센서스 차트는 조회 실패를 '데이터 없음'과 구분해 재시도 + auto-retry 1회, 종목 전환 시 재시도 상태 리셋(task#159).
-
-### 2.7 yfinance 퍼센트 필드는 소수분수 (×100 표시)
-
-- `info.shortPercentOfFloat`(0.0098=0.98%)·`pctHeld`/`pctChange`·insider `% Buy/Sell`·`dividendYield` 등은 0~1 소수분수. 프론트는 `(v*100).toFixed(n)%`로 표시. API_SPEC 예시값·테스트 fixture도 분수 스케일로. 단위테스트가 렌더 %를 단언 안 해 못 잡는 프론트 표시 트랩(task#122·#123).
-
-### 2.8 Vite 8 (rolldown) 청크 분할 + Vitest 설정
-
-- `frontend/vite.config.js`의 `build.rollupOptions.output.manualChunks`는 **함수 형식만** 받는다(rollup식 객체형 쓰면 `Expected Function but received Object`로 빌드 파손). id substring으로 분기 — `recharts`/`/d3-`/`victory-vendor`→`charts`, 나머지 `node_modules`→`vendor`.
-- Vitest 설정도 별도 파일 없이 `vite.config.js`의 `test` 블록(`environment: 'jsdom'`, `globals: true`, `setupFiles: './src/test/setup.js'`).
+**컴포넌트/함수:**
+- 함수형 컴포넌트, **기본 export는 named function 선언**: `export default function Badge({ variant = 'neutral', ... }) { ... }`. 같은 파일의 보조 컴포넌트는 named export(`export function MarketBadge(...)`, `export function ChangeBadge(...)` — `components/ui/Badge.jsx`).
+- props는 구조분해 + 기본값(`{ size = 'sm', className = '', ...props }`).
 
 ---
 
-## 3. 문서 동기화 (Doc-sync DoD)
+## 2. 코드 스타일
 
-- **API 변경 시 명세서 함께 갱신**: 엔드포인트 추가/삭제·요청/응답 스키마·인증 게이팅 변경은 `API_SPEC.md`(전체 REST 레퍼런스) 갱신. **Cowork 소비 대상 엔드포인트**(enrich/backlog 워크플로우)는 `CLAUDE_COWORK_API.md`도 함께(DoD). 사용자 대면 read 엔드포인트(`/api/portfolio/*`·admin refresh 등)는 `API_SPEC.md`에만 — "무조건 둘 다"는 과함, 신규 엔드포인트가 Cowork 대상인지 먼저 판별해 DoD를 좁힌다.
-- 엔드포인트 *존재* drift(method+path)는 `backend/tests/test_api_doc_sync.py`가 자동검출(라이브 `app.routes` ↔ 두 문서의 `` ### `METHOD /path` `` 헤더 대조). 요청/응답 스키마·인증 게이팅 동기는 여전히 **수동 DoD**(prose 파싱 안 함).
-- **기능 표면 변경 시 `README.md` 해당 절도 같은 PR에서 갱신(DoD)**: ① 화면 구성 ② 환경변수 ③ 기술 스택 ④ 아키텍처(router/service/table) ⑤ 배치 중 하나라도 추가·삭제·개명 시. README는 overview 레벨 — 엔드포인트/스키마 세부는 `API_SPEC.md`/`CLAUDE_COWORK_API.md`에만(역할 분담).
+**백엔드 포매팅/린팅:**
+- 전용 포매터/린터 설정 없음(`pyproject.toml`·`.flake8`·`ruff.toml` 부재). 스타일은 관례로만 유지 — 4-space 들여쓰기, 함수 사이 2줄. 신규 코드는 주변 파일 스타일에 맞출 것.
+- 유일하게 강제되는 자동 가드는 `tests/test_no_print.py`(§4의 print 금지)와 `tests/test_api_doc_sync.py`(문서 drift).
+
+**프론트엔드 포매팅/린팅:**
+- **ESLint flat config** `frontend/eslint.config.js` — `@eslint/js` recommended + `eslint-plugin-react-hooks`(flat.recommended) + `eslint-plugin-react-refresh`(vite). `dist` 무시. `npm run lint`.
+- Prettier 설정 **없음**. TypeScript **없음**(JSX + plain JS, `@types/react`는 에디터 힌트용 devDependency일 뿐).
+- 세미콜론 생략 스타일(ASI 의존), 작은따옴표. 주변 파일 관례 준수.
+
+---
+
+## 3. Import 조직
+
+**백엔드 순서(관찰된 관례):**
+1. `from __future__ import annotations`(신규 모듈)
+2. 표준 라이브러리(`import os`·`import logging`·`import math`·`from pathlib import Path`)
+3. 서드파티(`from fastapi import ...`·`from pydantic import BaseModel`·`import yfinance as yf`·`import pandas as pd`)
+4. 로컬(`from services import storage`·`from services.db import query`·`from auth import get_current_user`)
+5. 모듈 상단에서 로거 초기화: `import logging` → `logger = logging.getLogger(__name__)`.
+
+- **순환참조 회피용 지연 import**: 함수 본문 안에서 `from services.db import execute`처럼 늦게 import(예 `main._migrate`, storage↔cache). 모듈 최상단 import가 순환을 만들면 함수 내부로 옮긴다.
+
+**프론트엔드:**
+- 서드파티(`react`·`axios`·`recharts`·`react-router-dom`) → 로컬 상대경로(`./Badge.css`·`../api`·`../components/Toast`). 경로 alias 미사용(상대경로 `../`).
+- API 접근은 **단일 axios 인스턴스** `frontend/src/api.js`를 default import(`import api from '../api'`). 이 인스턴스가 `Authorization` 헤더 주입(request interceptor)과 401 시 토큰 제거·리다이렉트(response interceptor)를 담당하므로 컴포넌트에서 axios를 직접 쓰지 말 것.
+- UI 프리미티브는 barrel `components/ui/index.js`로 재노출(`export { default as Badge, MarketBadge, ChangeBadge } from './Badge'`).
+
+---
+
+## 4. 로깅 규약 (중요 — task#162/#163으로 전면 개편)
+
+**백엔드 진단/경고/에러는 모듈 `logger`로 통일한다. 앱 코드에 `print(` 신규 금지.** 개편 후 `routers/`·`services/`·`scheduler/`·`middleware/`·`main.py`의 `print(` 개수는 **0**이며, `tests/test_no_print.py`가 이를 ast로 단언한다.
+
+**루트 로거 배선 — `backend/main.py` `_configure_logging()`:**
+```python
+def _configure_logging():
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    for _noisy in ("urllib3", "yfinance", "apscheduler", "asyncio"):
+        logging.getLogger(_noisy).setLevel(logging.WARNING)
+    for _uv in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        logging.getLogger(_uv).propagate = False
+
+_configure_logging()  # import 시점(라우터 import 전)에 1회 호출
+```
+- **왜 필수인가:** config가 없으면 root의 lastResort 핸들러가 WARNING+만 내보내 `logger.info`가 docker logs에 안 뜬다. `basicConfig(level=INFO)`가 이를 해소.
+- 노이즈 서드파티(urllib3/yfinance/apscheduler/asyncio)는 WARNING으로 억제, uvicorn 로거는 `propagate=False`로 root 핸들러와의 중복 emit(double-log) 차단.
+
+**모듈 로거 초기화(53개 모듈에서 동일):**
+```python
+import logging
+logger = logging.getLogger(__name__)
+```
+
+**레벨 의미(사용 빈도로 확인됨):**
+- `logger.warning` — **graceful 담화**(예상된 실패를 잡아 폴백/스킵할 때). 지배적(≈197건). 예: `logger.warning(f"[Report] {ticker} KR 베타 계산 실패: {e}")`, `logger.warning(f"[Backfill] {ticker} 히스토리 fetch 실패: {e}")`.
+- `logger.error` — **예상치 못함·데이터 손실. 매우 아껴 쓴다**(현재 앱 전체에 단 1건): `logger.error(f"[Report] {ticker} KRX 시세 글리치 감지: {_label}=... 2x 밖")`(`services/report_generator.py`).
+- `logger.info` — **배치/라이프사이클**(≈46건). 예: `logger.info(f"[Scheduler] Report generated for {stock['ticker']}")`, `logger.info("[Scheduler] Guru crawl completed")`.
+- `logger.debug`/`logger.exception`은 현재 미사용.
+
+**포맷 규약 `logger.x(f"[Component] <무엇> (<ids>): {e}")`:**
+- **`[Component]`는 PascalCase, 개념당 1스펠링**을 지킨다. formatter 프리픽스가 `%(levelname)s %(name)s`(모듈명)일 뿐 컴포넌트를 안 찍으므로, **메시지 안의 `[Component]` 마커가 유일한 grep 앵커**다. 실제 어휘 예: `[Scheduler]`(최다)·`[Migrate]`·`[Report]`·`[Funnel]`·`[Financials]`·`[Backlog]`·`[Pipeline]`·`[Digest]`·`[Backfill]`·`[AGM]`·`[Dividends]`·`[Consensus]`·`[Beta]`·`[Quote]`·`[KISQuote]`·`[Snapshot]`. 같은 개념은 반드시 같은 철자로(예 `[KIS Quote]` 아닌 `[KISQuote]` — 커밋 ad7f85c가 이 정규화).
+- `{e}`로 예외를 뒤에 붙이고, 종목/사용자 등 식별자를 함께 실어 grep 가능하게 한다.
+
+**진단 로그를 삼키지 말 것:** 외부 fetch 실패를 broad `except: pass`로만 처리하면 "기능이 조용히 꺼짐"이 된다 — 최소한 `logger.warning`으로 담화를 남기고 좁은 예외만 잡는다.
+
+---
+
+## 5. 에러 처리
+
+**HTTP 계층(라우터):**
+- `raise HTTPException(status_code=..., detail="...")`. 4xx는 검증 실패(`400 "tickers required"`, `400 "최대 4개까지 비교 가능합니다"`), 미존재는 `404`.
+- 반복 패턴은 `services/errors.py` 헬퍼로 통일: `not_found(ticker, context)` / `already_exists(ticker, context)`가 `HTTPException`을 반환.
+- 비동기 배치 트리거 엔드포인트는 `@router.post(..., status_code=202)`(예 `/dividends/refresh`·`/beta/refresh`·`/names/backfill`) + `BackgroundTasks`.
+
+**서비스 계층 — graceful 폴백 원칙("wrong < missing"):**
+- 외부 소스(yfinance/DART/키움/KIS/Naver) 호출은 `try/except`로 감싸 실패 시 `logger.warning` 후 폴백/스킵. 예외를 위로 전파하기보다 **부분 성공을 유지**한다.
+- **빈/all-None 결과를 캐시에 박제 금지**: 전부 None이면 `_mc_save`를 생략하고 직전 양호값을 유지. delete-rewrite(replace) store는 fetch 실패 시 delete 자체를 스킵(직전 값 파괴 방지).
+- **NaN/inf 가드**(starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 NaN/inf가 있으면 500): 소스에서 `math.isfinite`로 거르는 게 1차, 출력 일괄 세정은 `services/utils.py`의 재귀 `sanitize(obj)`(NaN/inf→None, dict/list 재귀)로 방어. 시세/합산을 응답에 싣는 엔드포인트는 둘 중 하나 필수.
+
+**프론트엔드:**
+- `api.js` response interceptor가 401을 전역 처리(토큰 제거 + `/`로 리다이렉트). 컴포넌트/훅은 `try/catch` + Toast(`components/Toast.jsx`의 `useToast().showToast`)로 사용자에게 알린다. 조용한 catch로 삼키면 "헤더 N인데 그리드 빈" 류 은밀 버그가 되므로 유의.
+
+---
+
+## 6. 주석·문서화
+
+- **주석·docstring은 한국어**가 기본(사용자 언어). 백엔드 함수/모듈 docstring은 triple-quoted `"""..."""`로 목적·소스·정규화·gotcha를 상세히 적는다(예 `services/dividends.py` 모듈 docstring이 US/KR 분기·정규화 스키마를 서술).
+- 관련 근거는 `task#N` 또는 `ADR-000N`을 주석에 인라인 참조(`# ...(task#108)`, `근거: ADR-0009`). 프론트 주석도 한국어(`// api 모킹`, `// Vite 8(rolldown)은 manualChunks를 함수로만 받는다`).
+- JSDoc/TSDoc은 사용하지 않음.
+
+---
+
+## 7. 함수·모듈 설계
+
+- **함수 크기:** 라우터 핸들러는 얇게 유지하고 로직은 서비스로 위임(`routers/*` → `services/*`). 복잡한 조립(`_build_all`·`_build_card`)은 private 헬퍼로 분해.
+- **재사용 우선:** corp_code 매핑(`backlog._get_corp_code_map`)·document fetch 등은 여러 서비스가 공유 import해 중복 다운로드를 피한다.
+- **모듈 exports:** Python은 명시 `__all__` 없이 언더스코어 관례로 public/private을 구분. 대형 모듈은 패키지 `__init__.py`에서 심볼을 재노출해 외부 계약을 안정화(ADR-0017 — split via package re-export).
+- **프론트 exports:** 컴포넌트 파일은 주 컴포넌트 default + 보조 named. UI 프리미티브는 `components/ui/index.js` barrel로 묶어 소비.
+
+---
+
+## 8. 도메인 관례 (신규 코드가 흔히 어기는 것)
+
+- **KR 색 관례(`frontend/src/styles/tokens.css`):** `--up`=빨강(상승)·`--down`=파랑(하락). 그래서 `.badge--success`=빨강·`.badge--danger`=파랑(`ui/Badge.css`). 가격 방향이 아닌 **의미 상태 배지에 `success`/`danger` variant를 쓰면 색이 반전**된다 — 의미 배지는 `ui/SupplyBadge.jsx`처럼 전용 색을 명시. `ChangeBadge`(등락률)만 가격 색을 의도대로 쓴다.
+- **yfinance 퍼센트 필드는 소수분수**(0.0098 = 0.98%) — 표시 시 `×100`, 문서/fixture 예시값도 분수 스케일로.
+- **DB NUMERIC 컬럼(avg_cost·quantity 등)은 Decimal**로 온다 — float(외부값)과 산술하면 `TypeError`. 양변을 `float()`로 정규화.
+- **KR 시장-날짜 판정은 `datetime.now(ZoneInfo("Asia/Seoul")).date()`**(컨테이너 UTC라 bare `date.today()` 금지).
+
+---
+
+*컨벤션 분석: 2026-07-09*
