@@ -213,7 +213,11 @@ def test_recommendation_work_swallows_funnel_errors(spy, monkeypatch):
 # ── GET /api/batches 노출 (시장별 분류) ──────────────────────────────────────
 
 def test_batches_endpoint_exposes_recommendation_markets(client):
-    resp = client.get("/api/batches")
+    with patch("routers.batches.job_runs.recent", return_value=[]), \
+         patch("routers.batches.storage.get_batch_schedule", return_value=None), \
+         patch.object(__import__("scheduler"), "_scheduler") as mock_sched:
+        mock_sched.get_job.return_value = None
+        resp = client.get("/api/batches")
     assert resp.status_code == 200
     by_id = {b["id"]: b for b in resp.json()}
     assert by_id["recommendation_kr"]["market"] == "KR"

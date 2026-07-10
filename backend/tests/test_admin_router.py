@@ -110,7 +110,8 @@ def test_analytics_user_history():
 
 # --- Global stock delete (admin force-remove across ALL users) ---
 def test_delete_stock_all_users_removes_across_users():
-    with patch("routers.admin.execute", return_value=2) as mock_exec:
+    with patch("routers.admin.execute", return_value=2) as mock_exec, \
+         patch("routers.admin.cache_svc.invalidate_portfolio_caches"):
         resp = client.delete("/api/admin/stocks/aapl")
     assert resp.status_code == 200
     assert resp.json() == {"deleted": 2, "ticker": "AAPL"}
@@ -121,7 +122,8 @@ def test_delete_stock_all_users_removes_across_users():
 
 
 def test_delete_stock_all_users_missing_is_idempotent():
-    with patch("routers.admin.execute", return_value=0):
+    with patch("routers.admin.execute", return_value=0), \
+         patch("routers.admin.cache_svc.invalidate_portfolio_caches"):
         resp = client.delete("/api/admin/stocks/ZZZZ")
     assert resp.status_code == 200
     assert resp.json()["deleted"] == 0

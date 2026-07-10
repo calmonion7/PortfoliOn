@@ -129,7 +129,11 @@ def test_get_macro_signals_endpoint_returns_stored(monkeypatch):
 
 def test_batches_endpoint_exposes_macro_signals_overseas(client, monkeypatch):
     """GET /api/batches 가 macro_signals_fetch를 해외(US) 배치로 노출."""
-    resp = client.get("/api/batches")
+    with patch("routers.batches.job_runs.recent", return_value=[]), \
+         patch("routers.batches.storage.get_batch_schedule", return_value=None), \
+         patch.object(__import__("scheduler"), "_scheduler") as mock_sched:
+        mock_sched.get_job.return_value = None
+        resp = client.get("/api/batches")
     assert resp.status_code == 200
     by_id = {b["id"]: b for b in resp.json()}
     assert "macro_signals_fetch" in by_id
