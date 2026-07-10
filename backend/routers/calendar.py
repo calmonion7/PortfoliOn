@@ -6,7 +6,6 @@ import calendar as cal_lib
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
-from pathlib import Path
 from fastapi import APIRouter, Query, Depends
 import pandas as pd
 import yfinance as yf
@@ -55,20 +54,9 @@ def fomc_coverage_status(threshold_months: int = 6) -> dict:
 
 router = APIRouter(prefix="/api", tags=["calendar"])
 
-_CACHE_DIR = Path(__file__).parent.parent / "data" / "calendar"
-_CACHE_DIR.mkdir(exist_ok=True)
-
-
-def _cache_path(month: str) -> Path:
-    return _CACHE_DIR / f"{month}.json"
-
-
 def clear_cache(user_id: str = None) -> None:
-    # 로컬 파일 캐시 삭제 (레거시 — _get_events는 이제 이 파일을 읽지도 쓰지도 않는 dead store로 보이나
-    # 보존, CLAUDE.md 서지컬 규칙: 미사용 코드는 삭제하지 않고 명시만)
-    for f in _CACHE_DIR.glob("*.json"):
-        f.unlink(missing_ok=True)
-    # 실제 라이브 저장소: calendar_cache DB 테이블 (S1) — user_id 없으면 전체 삭제(관리자 전역 변경 등)
+    # 라이브 저장소: calendar_cache DB 테이블 — user_id 없으면 전체 삭제(관리자 전역 변경 등).
+    # 레거시 파일 캐시(backend/data/calendar/*.json)는 task#167에서 제거됨.
     if user_id:
         execute("DELETE FROM calendar_cache WHERE user_id = %s", (user_id,))
     else:

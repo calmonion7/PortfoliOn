@@ -41,7 +41,6 @@ def _mock_ticker(ticker):
 def test_calendar_returns_earnings_event(tmp_path):
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-05")
@@ -58,7 +57,6 @@ def test_calendar_returns_dividend_event(tmp_path):
     # AAPL mock: Ex-Dividend Date = 2026-05-09 (exact, from t.calendar)
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-05")
@@ -77,7 +75,6 @@ def test_calendar_empty_for_ticker_with_no_data(tmp_path):
     )
     with patch("routers.calendar.storage.get_full_portfolio", return_value=SAMPLE_PORTFOLIO), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.xcals.get_calendar", return_value=mock_cal), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
@@ -101,8 +98,7 @@ def test_calendar_tsla_watchlist_stock_type(tmp_path):
     mock = MagicMock()
     mock.calendar = {"Earnings Date": [date(2026, 5, 15)]}
     mock.dividends = pd.Series([], dtype=float)
-    with patch("routers.calendar._CACHE_DIR", tmp_path), \
-         patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
+    with patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.calendar.yf.Ticker", return_value=mock), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
@@ -117,7 +113,6 @@ def test_stale_cache_is_regenerated(tmp_path):
     mock_cal.sessions_in_range.return_value = pd.DatetimeIndex([])
     mock_execute = MagicMock(return_value=1)
     with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.xcals.get_calendar", return_value=mock_cal), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", mock_execute):
@@ -139,7 +134,6 @@ def test_calendar_includes_nyse_holiday(tmp_path):
     mock_cal.sessions_in_range.return_value = pd.DatetimeIndex([])  # no sessions → all weekdays are holidays
     # Only one weekday in range: 2026-05-25 is a Monday (Memorial Day)
     with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.xcals.get_calendar", return_value=mock_cal), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
@@ -159,7 +153,6 @@ def test_calendar_includes_krx_holiday(tmp_path):
     mock_cal = MagicMock()
     mock_cal.sessions_in_range.return_value = pd.DatetimeIndex([])
     with patch("routers.calendar.storage.get_full_portfolio", return_value={"stocks": [], "watchlist": []}), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.xcals.get_calendar", return_value=mock_cal), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
@@ -323,7 +316,6 @@ def test_kr_earnings_uses_yf_sym_suffix(tmp_path):
 
     with patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-07")
@@ -359,7 +351,6 @@ def test_kr_earnings_kosdaq_kq_suffix(tmp_path):
 
     with patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-07")
@@ -389,7 +380,6 @@ def test_kr_earnings_default_exchange_ks(tmp_path):
 
     with patch("routers.calendar.storage.get_full_portfolio", return_value=portfolio), \
          patch("routers.calendar.yf.Ticker", side_effect=_mock_ticker), \
-         patch("routers.calendar._CACHE_DIR", tmp_path), \
          patch("routers.calendar.query", return_value=[]), \
          patch("routers.calendar.execute", return_value=1):
         resp = client.get("/api/calendar?month=2026-08")
