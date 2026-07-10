@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 78e6f09a65ee76a7af351da7b7d417a13b6de820
-mapped: 2026-07-09
+last_mapped_commit: 1e8da3bc525d61545c6c374b1f91a04238dabf30
+mapped: 2026-07-10
 ---
 
 # INTEGRATIONS — 외부 API / DB / 인증 / 웹훅
@@ -12,12 +12,13 @@ mapped: 2026-07-09
 - **엔진**: `postgres:16-alpine`(`docker-compose.yml`), DB/USER `portfolion`, 볼륨 `pgdata`, 포트 5432.
 - **접속 계층**: `backend/services/db.py` — psycopg2 `ThreadedConnectionPool`(minconn 1, **maxconn 20** — calendar 15·analysis 11 ThreadPool 동시성보다 크게), DSN = `os.environ["DATABASE_URL"]`. 헬퍼 `query`/`execute`/`execute_many`(`execute_batch`), `get_connection` 컨텍스트매니저(commit/rollback/putconn).
 - **스키마**: 신규 설치 `backend/auth_schema.sql`(users, refresh_tokens) → `backend/app_schema.sql`(앱 테이블 전체), docker-entrypoint-initdb.d 마운트. 라이브 증분은 `backend/main.py:_migrate()`(idempotent DDL; `stock_disclosures`·`stock_dividends`·`stock_beta`·`stock_supply_score`·`stock_insider_trades`·`stock_recommendations`·`us_supply_snapshot`·`market_short_sell` 등 생성/컬럼추가).
-- **인메모리 캐시**: `backend/services/cache.py`(snapshot LRU·list·dashboard·correlation·sector·macro TTL). PostgreSQL 영구 캐시 `market_cache`는 `backend/services/market_indicators/cache.py`(`_mc_load`/`_mc_save`).
+- **DB 영구 캐시**: `market_cache`(시장지표, `backend/services/market_indicators/cache.py`의 `_mc_load`/`_mc_save`), `calendar_cache`(user_id+month 캘린더 이벤트 — **레거시 파일 캐시는 task#167에서 제거**, `backend/routers/calendar.py`는 DB만 읽고 쓴다).
+- **인메모리 캐시**(`backend/services/cache.py`): snapshot LRU(`OrderedDict`, maxsize 200) + TTLCache — list 60s(per-user 리포트 목록, task#165)·dashboard 300s·correlation 300s·sector 300s·macro 300s·rebalance 300s·exposure 300s·quote 60s·live_prices 15s. 종목 변경 시 `invalidate_portfolio_caches(user_id)`가 일괄 무효화(캘린더 DB 행 삭제 포함).
 
 ## 시세/시장 데이터 소스
 
 ### yfinance (US 1차 시세·히스토리)
-- **용도**: US 종목 quote/history/섹터/시총, 배치 `yf.download` 1콜, 시장지표(FX·VIX·원자재·국채·지수).
+- **용도**: US 종목 quote/history/섹터/시총, 배치 `yf.download` 1콜, 시장지표(FX·VIX·원자재·국채·지수), US 섹터 모멘텀 ETF(`us_sector_service.py` → `analysis_service.SECTOR_ETFS`).
 - **파일**: `backend/services/market/__init__.py`(`get_quote`·`get_quotes_batch`·`get_history_df`), `backend/services/market/us.py`, `backend/services/market_indicators/`(`fx.py`·`commodities.py`·`indices.py`·`earnings.py` 등).
 - **키**: 없음(공개). rate-limit 방어로 종목당 TTL 캐시.
 
@@ -33,8 +34,8 @@ mapped: 2026-07-09
 - **인증/설정**(`client.py`): base URL `KIWOOM_BASE_URL`(기본 `https://api.kiwoom.com`), 자격 `KIWOOM_APP_KEY`+`KIWOOM_SECRET_KEY`. 토큰 `POST /oauth2/token`(client_credentials, 인프로세스 싱글톤 캐시 12h, 401/403 시 1회 재발급 재시도). 요청 `POST /api/dostk/{category}`(헤더 `api-id`/`authorization`, `return_code≠0`→`KiwoomError`, 직렬 throttle 0.25s). 미설정 시 `configured()` False → 호출측 폴백.
 
 ### 한국투자증권 KIS REST (KR+US 백업 시세, 읽기전용)
-- **용도**: 시세 백업 — KR 체인 키움→**KIS**→Naver, US 체인 yfinance→**KIS**. 국내현재가(`FHKST01010100`), 해외가(`HHDFS00000300`/`HHDFS76240000`), 국내선물옵션(`FHMIF10000000`·`FHKIF03020100`, output1/2/3 분할). 주문·계좌 미연동(경계 ADR-0011/0022).
-- **파일**: `backend/services/kis/` — `client.py`(토큰·요청), `quote.py`(`_kr_basic_kis`·`get_quote_us`), `futures.py`(코스피200 선물).
+- **용도**: 시세 백업 — KR 체인 키움→**KIS**→Naver, US 체인 yfinance→**KIS**. 국내현재가(`FHKST01010100`), 해외가(`HHDFS00000300`/`HHDFS76240000`), 국내선물옵션(`FHMIF10000000`·`FHKIF03020100`, 응답이 output1/2/3 분할). 주문·계좌 미연동(경계 ADR-0011/0022).
+- **파일**: `backend/services/kis/` — `client.py`(토큰·요청), `quote.py`(`_kr_basic_kis`·`get_quote_us`), `futures.py`(코스피200 선물 — 소비처 `backend/services/market_indicators/kospi_futures.py`·`kospi_signal.py`, `GET /api/market-indicators/...`의 `kospi_futures`/`kospi_signal`).
 - **인증/설정**(`client.py`): base URL `KIS_BASE_URL`(기본 실전 `https://openapi.koreainvestment.com:9443`), 자격 `KIS_APP_KEY`+`KIS_APP_SECRET`. 토큰 `POST /oauth2/tokenP`(싱글톤 캐시 23h, EGW00133 발급 1분당 1회 방어로 강제 재발급 60s 가드). 요청 GET `/uapi/...`(헤더 `tr_id`/`appkey`/`appsecret`/`custtype=P`, `rt_cd≠"0"`→`KisError`, throttle 0.05s). 미설정 시 `configured()` False → 휴면(기존 체인만 동작).
 
 ## 정부/공공 데이터 API
@@ -82,11 +83,11 @@ mapped: 2026-07-09
 - **Finviz**(`finviz.com/quote.ashx`): US 보조 지표 — `backend/services/scraper.py`, `report_generator.py`.
 - **Dataroma**(`dataroma.com/m`): 구루(슈퍼투자자) 보유 종목 — `backend/services/guru_scraper.py`, `recommendation/universe.py`, `batch_registry.py`.
 - **multpl.com**(`www.multpl.com/shiller-pe`): S&P500 Shiller CAPE(requests+BeautifulSoup 크롤) — `backend/services/market_indicators/indices.py`.
-- **CNN Fear & Greed**(`production.dataviz.cnn.io/index/fearandgreed/graphdata`): 시장 심리 지수 — `backend/services/market_indicators/sentiment.py`(취약 소스 → VIX식 수동 last-good 폴백).
+- **CNN Fear & Greed**(`production.dataviz.cnn.io/index/fearandgreed/graphdata`): 시장 심리 지수 — `backend/services/market_indicators/sentiment.py`(취약 소스 → VIX식 수동 last-good 폴백, Origin/Referer 헤더 = `edition.cnn.com`).
 - **open.er-api.com**(`/v6/latest/USD`): FX 환율 폴백 — `backend/services/market_indicators/fx.py`.
-- **Wikipedia**(`en.wikipedia.org/wiki/List_of_S...`): S&P500 구성종목 — `backend/services/recommendation/universe.py`.
+- **Wikipedia**(`en.wikipedia.org/wiki/List_of_S%26P_500_companies`): S&P500 구성종목 — `backend/services/market_indicators/earnings.py`(추천 유니버스는 정적 `backend/data/sp500_tickers.json` 사용 — `recommendation/universe.py`).
 
 ## 코드에 존재하나 미사용
 
-- **Anthropic / LLM**: `ANTHROPIC_API_KEY`가 `backend/.env.docker`에 남아있으나 **백엔드에서 사용하지 않음**(`requirements.txt`에 anthropic 없음, `services`/`routers`에 호출 코드 0건). AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API로 작성(백엔드 `report_generator`는 시장 데이터 스냅샷만 생성).
+- **Anthropic / LLM**: `ANTHROPIC_API_KEY`가 `backend/.env.docker`(및 `.env.docker.example`)에 남아있으나 **백엔드에서 사용하지 않음**(`requirements.txt`에 anthropic 없음, `services`/`routers`에 호출 코드 0건). AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API로 작성(백엔드 `report_generator`는 시장 데이터 스냅샷만 생성).
 - **Supabase**: `backend/.env`·`frontend/.env`·`supabase/`·`supabase_schema.sql`에 잔재가 있으나 현 Docker 인프라에서 미사용(레거시).
