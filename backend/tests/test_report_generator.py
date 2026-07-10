@@ -179,6 +179,10 @@ def _mock_kr(quote_name: str):
         # 박제-시 독립피드 게이트(task#101)가 KR에서 _kr_basic_naver를 호출하므로, quote(70k)와
         # 일관된 독립 참조를 mock해 게이트를 통과시킨다(이 테스트는 이름 해석 검증, 글리치 무관).
         "services.market.kr._kr_basic_naver": MagicMock(return_value=(70000.0, 0.0, 70000.0, 0, "삼성전자")),
+        # KR 메인 EV/EBITDA(task#169/ADR-0024)가 yf.Ticker(yf_sym)를 신규 호출하므로 mock
+        # 없으면 라이브 네트워크를 탄다 — info에 enterpriseToEbitda를 실어 값 확인도 겸함.
+        "services.report_generator.yf.Ticker": MagicMock(return_value=MagicMock(
+            info={"enterpriseToEbitda": 12.3})),
     }
 
 
@@ -360,3 +364,108 @@ def test_generate_report_us_dedupes_yfinance_history_call(tmp_path):
 
     ticker_mock = mocks["services.report_generator.yf.Ticker"].return_value
     assert ticker_mock.history.call_count == 1, "get_quote가 daily_df를 재사용하지 않고 history()를 재fetch함"
+
+
+# ── task#169 상대 밸류에이션(PSR/EV-EBITDA) 조립부 (ADR-0024) ─────────────────
+
+def test_generate_report_us_psr_ev_ebitda_propagate_to_self_and_competitor(tmp_path):
+    """US: yfinance info의 psr/ev_ebitda가 summary(self)·경쟁사 행 모두에 실림."""
+    mocks = _mock_all()
+    mocks["services.report_generator.yf.Ticker"] = MagicMock(return_value=MagicMock(
+        history=MagicMock(return_value=pd.DataFrame({
+            "Close": [100.0 + i for i in range(50)],
+            "High":  [101.0 + i for i in range(50)],
+            "Low":   [99.0 + i for i in range(50)],
+            "Volume": [1_000_000] * 50,
+        })),
+        info={
+            "sector": "Technology", "industry": "Software",
+            "priceToSalesTrailing12Months": 8.5, "enterpriseToEbitda": 22.1,
+        },
+    ))
+    with contextlib.ExitStack() as stack:
+        for target, mock in mocks.items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        json_path = report_generator.generate_report(SAMPLE_STOCK, tmp_path)
+    summary = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    assert summary["psr"] == 8.5
+    assert summary["ev_ebitda"] == 22.1
+    self_row = next(c for c in summary["competitors_data"] if c["is_self"])
+    comp_row = next(c for c in summary["competitors_data"] if not c["is_self"])
+    assert self_row["psr"] == 8.5
+    assert self_row["ev_ebitda"] == 22.1
+    assert comp_row["psr"] == 8.5
+    assert comp_row["ev_ebitda"] == 22.1
+
+
+def _naver_quarter_response_4q(revenue_each, per=8.0, pbr=1.1):
+    """4개 non-consensus 분기(키 "4">"3">"2">"1")의 finance/quarter 응답 fixture."""
+    keys = ["4", "3", "2", "1"]
+    rows = [{"columns": {}} for _ in range(15)]
+    rows[0]["columns"] = {k: {"value": str(revenue_each)} for k in keys}
+    rows[12]["columns"] = {keys[0]: {"value": str(per)}}
+    rows[14]["columns"] = {keys[0]: {"value": str(pbr)}}
+    metas = [{"key": k, "isConsensus": "N"} for k in keys]
+    return {"financeInfo": {"trTitleList": metas, "rowList": rows}}
+
+
+def test_generate_report_kr_competitor_psr_via_kr_psr_fallback(tmp_path):
+    """KR: 경쟁사 psr은 _comp_valuation이 psr을 직접 못 주므로(시총 미보유) 조립부가
+    시총(경쟁사 quote)÷_ttm_revenue(_comp_valuation의 Naver TTM매출)로 _kr_psr 계산."""
+    df = pd.DataFrame({
+        "Close": [70000.0 + i for i in range(50)],
+        "High":  [70100.0 + i for i in range(50)],
+        "Low":   [69900.0 + i for i in range(50)],
+        "Volume": [1_000_000] * 50,
+    })
+
+    def _quote_side_effect(ticker, *args, **kwargs):
+        if ticker == "005930":
+            return {"ticker": "005930", "name": "삼성전자", "price": 70000.0,
+                     "market_cap": 400_000_000_000_000, "sector": "", "industry": ""}
+        return {"ticker": "000660", "name": "SK하이닉스", "price": 150000.0,
+                 "market_cap": 100_000_000_000_000}
+
+    def _yf_ticker_side_effect(sym):
+        if sym == "005930.KS":
+            return MagicMock(info={"enterpriseToEbitda": 12.3})
+        if sym == "000660.KS":
+            return MagicMock(info={"enterpriseToEbitda": 5.5})
+        return MagicMock(info={})
+
+    # 4분기×50,000억원 = TTM 200,000억원 = 2e13원(20조원) → psr = 100조÷20조 = 5.0
+    naver_resp = _naver_quarter_response_4q(50_000)
+
+    mocks = {
+        "services.report_generator.mkt.get_quote": MagicMock(side_effect=_quote_side_effect),
+        "services.report_generator.mkt.get_history_df": MagicMock(return_value=df),
+        "services.report_generator.mkt.get_financials": MagicMock(return_value=[]),
+        "services.report_generator.mkt.get_annual_financials": MagicMock(return_value=[]),
+        "services.report_generator.mkt.get_analyst_data": MagicMock(return_value={
+            "target_mean": None, "target_high": None, "target_low": None,
+            "buy": 0, "hold": 0, "sell": 0,
+        }),
+        "services.report_generator.indicators.get_timeframe_rsi": MagicMock(return_value={
+            "daily": {}, "weekly": {}, "monthly": {},
+        }),
+        "services.report_generator.indicators.get_volume_profile": MagicMock(return_value={}),
+        "services.report_generator.scraper.get_news": MagicMock(return_value=[]),
+        "services.market.kr._naver_get": MagicMock(return_value=naver_resp),
+        "services.market.kr._kr_basic_naver": MagicMock(return_value=(70000.0, 0.0, 70000.0, 0, "삼성전자")),
+        "services.report_generator.yf.Ticker": MagicMock(side_effect=_yf_ticker_side_effect),
+    }
+    stock = {"ticker": "005930", "name": "삼성전자", "market": "KR", "exchange": "KS", "competitors": ["000660"]}
+    with contextlib.ExitStack() as stack:
+        for target, mock in mocks.items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        json_path = report_generator.generate_report(stock, tmp_path)
+    summary = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    comp_row = next(c for c in summary["competitors_data"] if not c["is_self"])
+    assert comp_row["psr"] == round(100_000_000_000_000 / 20_000_000_000_000, 2)
+    assert comp_row["ev_ebitda"] == 5.5
+    self_row = next(c for c in summary["competitors_data"] if c["is_self"])
+    assert self_row["ev_ebitda"] == 12.3

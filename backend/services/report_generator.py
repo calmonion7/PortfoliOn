@@ -36,15 +36,40 @@ def _fin_num(v):
         return None
 
 
+def _kr_psr(market_cap, ttm_revenue):
+    """KR PSR = 시총(원)÷TTM매출(원). ttm_revenue는 4분기 온전할 때만 넘길 것
+    (sub-TTM 부풀림 방지, task#161 #3). 가드 실패 시 None."""
+    try:
+        if market_cap and ttm_revenue and ttm_revenue > 0 and math.isfinite(market_cap / ttm_revenue):
+            return round(market_cap / ttm_revenue, 2)
+    except (TypeError, ZeroDivisionError):
+        pass
+    return None
+
+
 def _comp_valuation(ticker: str, market: str) -> dict:
-    """경쟁사 PER/PBR. US=yfinance info, KR=Naver finance/quarter 최신 실적행. 결측/예외→None."""
-    import math
+    """경쟁사 PER/PBR/PSR/EV_EBITDA(ADR-0024). US=yfinance info(추가콜 0). KR: PER/PBR=Naver
+    finance/quarter 최신 실적행, PSR은 시총 미보유라 `_ttm_revenue`(원, 4분기 온전 시만)만 반환하고
+    조립부가 _kr_psr로 계산, EV/EBITDA=yfinance `.KS`→`.KQ` 폴백(독립 실패, per/pbr를 물귀신 삼지 않음).
+    결측/예외→None."""
     def _fin(v):
         try:
             f = float(v)
             return f if math.isfinite(f) else None
         except (TypeError, ValueError):
             return None
+
+    def _kr_ev_ebitda():
+        for suffix in (".KS", ".KQ"):
+            try:
+                v = _fin((yf.Ticker(f"{ticker}{suffix}").info or {}).get("enterpriseToEbitda"))
+            except Exception as e:
+                logger.warning(f"[Valuation] {ticker}{suffix} EV/EBITDA 조회 실패: {e}")
+                v = None
+            if v is not None:
+                return v
+        return None
+
     try:
         if market == "KR":
             from services.market.kr import _naver_get, _naver_row_val
@@ -52,22 +77,35 @@ def _comp_valuation(ticker: str, market: str) -> dict:
             fi = d.get("financeInfo", {})
             metas = sorted(fi.get("trTitleList", []), key=lambda t: t["key"], reverse=True)
             rows = fi.get("rowList", [])
-            key = next((m["key"] for m in metas if m.get("isConsensus") != "Y"), None)
+            non_consensus_keys = [m["key"] for m in metas if m.get("isConsensus") != "Y"]
+            key = non_consensus_keys[0] if non_consensus_keys else None
             if not key:
-                return {"per": None, "pbr": None}
+                return {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": _kr_ev_ebitda()}
+            rev_q = [_fin(_naver_row_val(rows, 0, k)) for k in non_consensus_keys[:4]]
+            ttm_revenue = (
+                sum(rev_q) * 1e8
+                if len(rev_q) >= 4 and all(v is not None for v in rev_q)
+                else None
+            )
             return {
                 "per": _fin(_naver_row_val(rows, 12, key)),
                 "pbr": _fin(_naver_row_val(rows, 14, key)),
+                "_ttm_revenue": ttm_revenue,
+                "ev_ebitda": _kr_ev_ebitda(),
             }
         else:
             info = yf.Ticker(ticker).info or {}
             return {
                 "per": _fin(info.get("trailingPE")),
                 "pbr": _fin(info.get("priceToBook")),
+                "psr": _fin(info.get("priceToSalesTrailing12Months")),
+                "ev_ebitda": _fin(info.get("enterpriseToEbitda")),
             }
     except Exception as e:
         logger.warning(f"[Valuation] {ticker} 경쟁사 밸류에이션 조회 실패: {e}")
-        return {"per": None, "pbr": None}
+        if market == "KR":
+            return {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": None}
+        return {"per": None, "pbr": None, "psr": None, "ev_ebitda": None}
 
 
 def _infer_comp_market(ticker: str, parent_market: str, parent_exchange: str):
@@ -204,13 +242,19 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         try:
             mc = quote.get("market_cap")  # 원 단위
             rev_q = [f["revenue"] for f in actual_f[:4] if f.get("revenue") is not None]
-            ttm_rev_uck = sum(rev_q)  # revenue는 이미 원 단위(×1e8 변환됨, get_financials_kr)
-            # TTM PSR도 4분기 매출이 온전할 때만 — 1~2분기를 TTM 취급 시 PSR 2~4× 부풀림(task#161 #3)
-            if mc and len(rev_q) >= 4 and ttm_rev_uck > 0 and math.isfinite(mc / ttm_rev_uck):
-                psr = round(mc / ttm_rev_uck, 2)
+            # TTM PSR은 4분기 매출이 온전할 때만 — 1~2분기를 TTM 취급 시 PSR 2~4× 부풀림(task#161 #3)
+            ttm_rev = sum(rev_q) if len(rev_q) >= 4 else None  # revenue는 이미 원 단위(×1e8 변환됨, get_financials_kr)
+            psr = _kr_psr(mc, ttm_rev)
         except Exception as e:
             logger.warning(f"[Report] {ticker} KR PSR 계산 실패: {e}")
             pass
+        # EV/EBITDA: yfinance info(ADR-0024, DART 파싱 회피). KR 메인은 _t가 None이라
+        # 신규 Ticker 호출 1회(일배치 직렬이라 승인된 비용).
+        try:
+            ev_ebitda = _fin_num(yf.Ticker(yf_sym).info.get("enterpriseToEbitda"))
+        except Exception as e:
+            logger.warning(f"[Report] {ticker} KR EV/EBITDA 조회 실패: {e}")
+            ev_ebitda = None
     else:
         try:
             _info = (_t.info if _t is not None else {}) or {}
@@ -290,6 +334,11 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
                     "is_self": c == ticker,
                     "per": (round(trailing_per, 2) if trailing_per else None) if c == ticker else v.get("per"),
                     "pbr": (round(pbr, 2) if pbr else None) if c == ticker else v.get("pbr"),
+                    "psr": psr if c == ticker else (
+                        v.get("psr") if v.get("psr") is not None
+                        else _kr_psr(q.get("market_cap"), v.get("_ttm_revenue"))
+                    ),
+                    "ev_ebitda": ev_ebitda if c == ticker else v.get("ev_ebitda"),
                 }
                 for c, q, v in zip(
                     [ticker] + list(competitors),

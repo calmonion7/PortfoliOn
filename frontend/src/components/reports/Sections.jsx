@@ -1,4 +1,5 @@
 import { fmtPrice as fmt } from '../../utils'
+import { computePeerPremiums } from './reportUtils.jsx'
 
 function decodeHtml(str) {
   if (!str) return str
@@ -30,9 +31,27 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
     if (mc >= 1e9) return `${(mc / 1e9).toFixed(1)}B`
     return `${(mc / 1e6).toFixed(0)}M`
   }
+  const premiums = computePeerPremiums(competitors)
+
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🏢 사업영역 & 시장순위</div>
+      {premiums.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {premiums.map(({ metric, pct, discount }) => (
+            <span key={metric} style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '3px 8px',
+              borderRadius: 4,
+              color: discount ? 'var(--color-success)' : 'var(--warn)',
+              background: discount ? 'var(--color-success-soft)' : 'var(--warn-soft)',
+            }}>
+              {metric} {pct >= 0 ? '+' : ''}{pct}% {discount ? '할인' : '할증'}
+            </span>
+          ))}
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
         {competitors.map((c, i) => {
           const isSelf = c.is_self || c.ticker === ticker
@@ -67,13 +86,19 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
                   {c.ytd_return != null ? `${ytdPos ? '+' : ''}${c.ytd_return.toFixed(1)}%` : '—'}
                 </span>
               </div>
-              {(c.per != null || c.pbr != null) && (
-                <div style={{ display: 'flex', gap: 8, paddingLeft: 19 }}>
+              {(c.per != null || c.pbr != null || c.psr != null || c.ev_ebitda != null) && (
+                <div style={{ display: 'flex', gap: 8, paddingLeft: 19, flexWrap: 'wrap' }}>
                   {c.per != null && (
                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>PER {c.per.toFixed(1)}</span>
                   )}
                   {c.pbr != null && (
                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>PBR {c.pbr.toFixed(2)}</span>
+                  )}
+                  {c.psr != null && (
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>PSR {c.psr.toFixed(2)}</span>
+                  )}
+                  {c.ev_ebitda != null && (
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>EV/EBITDA {c.ev_ebitda.toFixed(1)}</span>
                   )}
                 </div>
               )}

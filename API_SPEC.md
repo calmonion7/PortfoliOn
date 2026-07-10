@@ -1575,7 +1575,12 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
   "summary": {
     "score": 85,
     "recommendation": "매수",
-    "one_liner": "AI 수혜 + 서비스 성장 지속"
+    "one_liner": "AI 수혜 + 서비스 성장 지속",
+    "ev_ebitda": 21.4,
+    "competitors_data": [
+      { "ticker": "AAPL", "name": "Apple Inc.", "price": 227.5, "market_cap": 3450000000000, "ytd_return": 18.2, "is_self": true, "per": 32.1, "pbr": 48.5, "psr": 8.1, "ev_ebitda": 21.4 },
+      { "ticker": "MSFT", "name": "Microsoft Corporation", "price": 430.2, "market_cap": 3200000000000, "ytd_return": 15.6, "is_self": false, "per": 34.8, "pbr": 11.2, "psr": 12.3, "ev_ebitda": 24.9 }
+    ]
   }
 }
 ```
@@ -1584,6 +1589,10 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 |------|------|------|
 | `content` | string | Markdown 형식의 리포트 본문 |
 | `summary` | object \| null | 요약 JSON (없으면 `null`) |
+| `summary.ev_ebitda` | number \| null | 해당 종목의 EV/EBITDA 배수. KR·US 모두 yfinance `enterpriseToEbitda` 소스(KR은 task#169부터 채워짐 — 이전엔 항상 `null` 고정, ADR-0024) |
+| `summary.competitors_data` | object[] | 경쟁사 비교 데이터. 자기 종목(`is_self: true`)을 포함해 시가총액 내림차순 정렬 |
+| `summary.competitors_data[].psr` | number \| null | 주가매출비율(additive, task#169). KR=Naver TTM 계산(메인 종목과 동일 로직), US=yfinance `priceToSalesTrailing12Months` |
+| `summary.competitors_data[].ev_ebitda` | number \| null | EV/EBITDA 배수(additive, task#169). KR·US 모두 yfinance `enterpriseToEbitda` (KR은 `.KS`→`.KQ` 순 폴백 조회, 실패 시 `null`) |
 
 **Error `404`** — 해당 날짜의 리포트 없음
 

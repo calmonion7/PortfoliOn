@@ -17,6 +17,40 @@ export const fmtGap = (target, price) => {
   return { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, positive: pct >= 0 }
 }
 
+const _PEER_METRICS = [
+  { key: 'per', label: 'PER' },
+  { key: 'pbr', label: 'PBR' },
+  { key: 'psr', label: 'PSR' },
+  { key: 'ev_ebitda', label: 'EV/EBITDA' },
+]
+
+export const computePeerPremiums = (competitors) => {
+  if (!Array.isArray(competitors)) return []
+  const self = competitors.find((c) => c.is_self)
+  if (!self) return []
+  const peers = competitors.filter((c) => !c.is_self)
+
+  return _PEER_METRICS.reduce((acc, { key, label }) => {
+    const selfVal = self[key]
+    if (typeof selfVal !== 'number' || !Number.isFinite(selfVal)) return acc
+    const peerVals = peers
+      .map((c) => c[key])
+      .filter((v) => typeof v === 'number' && Number.isFinite(v))
+      .sort((a, b) => a - b)
+    if (peerVals.length < 2) return acc
+
+    const mid = peerVals.length / 2
+    const median = peerVals.length % 2 === 0
+      ? (peerVals[mid - 1] + peerVals[mid]) / 2
+      : peerVals[Math.floor(mid)]
+    if (median <= 0) return acc
+
+    const pct = Math.round((selfVal / median - 1) * 100)
+    acc.push({ metric: label, pct, discount: pct < 0 })
+    return acc
+  }, [])
+}
+
 export const _weather = (score) => {
   if (score <= 0) return { icon: '☀️', label: '맑음' }
   if (score <= 1) return { icon: '⛅', label: '구름 조금' }

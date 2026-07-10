@@ -48,6 +48,9 @@ def _mocks_kr(quote_price, daily_close, naver_price, kis_price=None):
         "services.market.kr._kr_basic_naver": MagicMock(return_value=naver_ret),
         "services.market.kr._kr_basic_kis": MagicMock(return_value=kis_ret),
         "services.db.execute": MagicMock(),
+        # KR 메인 EV/EBITDA(task#169/ADR-0024)가 yf.Ticker(yf_sym)를 신규 호출하므로 mock
+        # 없으면 라이브 네트워크를 탄다(이 스위트는 가격 게이트 검증, EV/EBITDA 무관).
+        "services.report_generator.yf.Ticker": MagicMock(return_value=MagicMock(info={})),
     }
 
 
