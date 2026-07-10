@@ -150,16 +150,18 @@ def get_portfolio_prices(user_id: str = Depends(get_current_user)):
 
 @router.get("/rebalance")
 def get_rebalance(user_id: str = Depends(get_current_user)):
-    """보유 종목 목표 비중 대비 현재 비중 드리프트 + 조정금액. 주문 실행은 범위 밖(읽기전용)."""
-    holdings = storage.get_holdings(user_id)
-    quotes = market_svc.get_quotes_batch(holdings)
-    calc_holdings = [
-        {**h, "current_price": quotes.get(h["ticker"].upper(), {}).get("price")}
-        for h in holdings
-    ]
-    targets = {h["ticker"]: float(h["target_weight"]) for h in holdings if h.get("target_weight") is not None}
-    result = compute_rebalance(calc_holdings, _usdkrw_rate(), targets)
-    return sanitize(result)
+    """보유 종목 목표 비중 대비 현재 비중 드리프트 + 조정금액. 주문 실행은 범위 밖(읽기전용).
+    S3: user_id별 300s TTL 캐시 — 요청마다 라이브 시세 재조회 방지(get_sector/get_macro와 동일 패턴)."""
+    def _compute():
+        holdings = storage.get_holdings(user_id)
+        quotes = market_svc.get_quotes_batch(holdings)
+        calc_holdings = [
+            {**h, "current_price": quotes.get(h["ticker"].upper(), {}).get("price")}
+            for h in holdings
+        ]
+        targets = {h["ticker"]: float(h["target_weight"]) for h in holdings if h.get("target_weight") is not None}
+        return compute_rebalance(calc_holdings, _usdkrw_rate(), targets)
+    return sanitize(cache_svc.get_rebalance(user_id, _compute))
 
 
 @router.put("/rebalance/targets")
@@ -169,38 +171,41 @@ def set_rebalance_targets(weights: Dict[str, Optional[float]] = Body(...), user_
     holding_tickers = {h["ticker"].upper() for h in holdings}
     targets = {t.upper(): w for t, w in weights.items() if t.upper() in holding_tickers}
     storage.set_target_weights(user_id, targets)
+    cache_svc.invalidate_rebalance(user_id)  # 타겟 변경이 캐시된 rebalance에 즉시 반영되도록
     return {"updated": len(targets), "targets": targets}
 
 
 @router.get("/exposure")
 def get_exposure(user_id: str = Depends(get_current_user)):
-    """보유 종목의 통화·섹터·단일종목 노출·집중도(전체-포트 KRW 환산 비중). 보유(holding)만 대상."""
-    holdings = storage.get_holdings(user_id)
-    quotes = market_svc.get_quotes_batch(holdings)
+    """보유 종목의 통화·섹터·단일종목 노출·집중도(전체-포트 KRW 환산 비중). 보유(holding)만 대상.
+    S3: user_id별 300s TTL 캐시 — 요청마다 라이브 시세 재조회 방지."""
+    def _compute():
+        holdings = storage.get_holdings(user_id)
+        quotes = market_svc.get_quotes_batch(holdings)
 
-    us_tickers = [h["ticker"].upper() for h in holdings if h.get("market") != "KR"]
-    sector_map: Dict[str, str] = {}
-    if us_tickers:
-        rows = db_query(
-            "SELECT DISTINCT ON (ticker) ticker, data->>'sector' AS sector "
-            "FROM snapshots WHERE ticker = ANY(%s) AND data->>'sector' IS NOT NULL AND data->>'sector' != '' "
-            "ORDER BY ticker, date DESC",
-            (us_tickers,),
-        )
-        sector_map.update({r["ticker"]: _norm_sector(r["sector"]) for r in rows})
-    sector_map.update(kr_sector_service.map_holdings_to_sectors(holdings))  # 저장 인덱스만 읽음(라이브 키움 호출 없음)
+        us_tickers = [h["ticker"].upper() for h in holdings if h.get("market") != "KR"]
+        sector_map: Dict[str, str] = {}
+        if us_tickers:
+            rows = db_query(
+                "SELECT DISTINCT ON (ticker) ticker, data->>'sector' AS sector "
+                "FROM snapshots WHERE ticker = ANY(%s) AND data->>'sector' IS NOT NULL AND data->>'sector' != '' "
+                "ORDER BY ticker, date DESC",
+                (us_tickers,),
+            )
+            sector_map.update({r["ticker"]: _norm_sector(r["sector"]) for r in rows})
+        sector_map.update(kr_sector_service.map_holdings_to_sectors(holdings))  # 저장 인덱스만 읽음(라이브 키움 호출 없음)
 
-    tickers = [h["ticker"].upper() for h in holdings]
-    beta_map: Dict[str, float] = {}
-    if tickers:
-        rows = db_query(
-            "SELECT ticker, beta FROM stock_beta WHERE ticker = ANY(%s) AND beta IS NOT NULL",
-            (tickers,),
-        )
-        beta_map = {r["ticker"]: float(r["beta"]) for r in rows}
+        tickers = [h["ticker"].upper() for h in holdings]
+        beta_map: Dict[str, float] = {}
+        if tickers:
+            rows = db_query(
+                "SELECT ticker, beta FROM stock_beta WHERE ticker = ANY(%s) AND beta IS NOT NULL",
+                (tickers,),
+            )
+            beta_map = {r["ticker"]: float(r["beta"]) for r in rows}
 
-    result = compute_exposure(holdings, quotes, _usdkrw_rate(), sector_map, beta_map)
-    return sanitize(result)
+        return compute_exposure(holdings, quotes, _usdkrw_rate(), sector_map, beta_map)
+    return sanitize(cache_svc.get_exposure(user_id, _compute))
 
 
 @router.post("", status_code=201)
@@ -242,7 +247,7 @@ def add_stock(stock: Stock, background_tasks: BackgroundTasks, user_id: str = De
     }
     holdings.append(new_holding)
     storage.save_holdings(user_id, holdings)
-    cache_svc.invalidate_portfolio_caches()
+    cache_svc.invalidate_portfolio_caches(user_id)
 
     target_date = storage.expected_report_date(stock.market)
     existing = db_query(
@@ -294,7 +299,7 @@ def update_stock(ticker: str, stock: Stock, user_id: str = Depends(get_current_u
         # 편집 가능 필드(name, competitors)만 갱신 — 구조화 분석(moat/growth_plan 등)은 보존
         storage.update_ticker_meta(ticker, stock.name, stock.competitors)
 
-    cache_svc.invalidate_portfolio_caches()
+    cache_svc.invalidate_portfolio_caches(user_id)
     return {**holdings[h_idx], "name": stock.name, "competitors": stock.competitors}
 
 
@@ -306,7 +311,7 @@ def delete_stock(ticker: str, user_id: str = Depends(get_current_user)):
     if len(filtered) == len(holdings):
         raise HTTPException(status_code=404, detail=f"{ticker} not found")
     storage.save_holdings(user_id, filtered)
-    cache_svc.invalidate_portfolio_caches()
+    cache_svc.invalidate_portfolio_caches(user_id)
 
     watchlist = storage.get_watchlist_tickers(user_id)
     if upper not in [t.upper() for t in watchlist]:

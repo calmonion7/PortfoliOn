@@ -308,3 +308,55 @@ def test_backfill_ticker_excludes_today(tmp_path):
     written = {p.stem for p in tmp_path.glob("**/*.json")}
     assert str(today) not in written, f"backfill이 오늘자를 생성하면 안 됨: {written}"
     assert str(today - _td(days=1)) in written, f"과거(어제)는 생성돼야 함: {written}"
+
+
+# ── report_generator 2건 (S2) ────────────────────────────────────────────────
+
+def test_backfill_ticker_kr_weekly_monthly_use_regular_true(tmp_path):
+    """[2a] KR backfill의 weekly/monthly fetch도 daily(KRX)와 스케일 일치하도록 regular=True로
+    호출해야 함 — generate_report의 get_timeframe_rsi(regular=True)와 동일 패턴(task#161 #2 backfill 누락분)."""
+    from datetime import datetime, timedelta as _td
+    from services import report_generator
+    import importlib; importlib.reload(report_generator)
+    today = datetime.now(report_generator._KST).date()
+    idx = pd.to_datetime([str(today - _td(days=d)) for d in (6, 5, 4, 1)])
+    df = pd.DataFrame({"Close": [70000.0] * 4, "High": [70100.0] * 4,
+                        "Low": [69900.0] * 4, "Volume": [1] * 4}, index=idx)
+    hist_mock = MagicMock(return_value=df)
+    stock = {"ticker": "005930", "name": "삼성전자", "market": "KR", "exchange": "KS", "competitors": []}
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("services.report_generator.query", side_effect=Exception("no db")))
+        stack.enter_context(patch("services.report_generator.execute", MagicMock()))
+        stack.enter_context(patch("services.report_generator.yf.Ticker", MagicMock()))
+        stack.enter_context(patch("services.report_generator.mkt.get_history_df", hist_mock))
+        stack.enter_context(patch("services.report_generator.mkt.get_quote", MagicMock(return_value={
+            "ticker": "005930", "name": "삼성전자", "price": 70000.0, "sector": "", "industry": "",
+        })))
+        stack.enter_context(patch("services.report_generator.mkt.get_analyst_data", MagicMock(return_value={})))
+        stack.enter_context(patch("services.report_generator.mkt.get_financials", MagicMock(return_value=[])))
+        stack.enter_context(patch("services.report_generator.mkt.get_annual_financials", MagicMock(return_value=[])))
+        stack.enter_context(patch("services.report_generator.indicators.get_volume_profile", MagicMock(return_value={})))
+        report_generator.backfill_ticker(stock, days=60, output_base_dir=tmp_path, force=True)
+
+    calls_by_tf = {c.args[3]: c.kwargs for c in hist_mock.call_args_list}
+    assert calls_by_tf["weekly"].get("regular") is True, "weekly fetch가 regular=True로 호출되지 않음"
+    assert calls_by_tf["monthly"].get("regular") is True, "monthly fetch가 regular=True로 호출되지 않음"
+
+
+def test_generate_report_us_dedupes_yfinance_history_call(tmp_path):
+    """[2b] US: daily_df 확보용 history()와 get_quote 내부 history()가 중복 호출되지 않음 —
+    get_quote에 hist=daily_df를 넘겨 재사용, 동일 yfinance Ticker의 history() call_count == 1."""
+    mocks = _mock_all()
+    del mocks["services.report_generator.mkt.get_quote"]  # 실제 get_quote/_get_quote_uncached 실행
+    stock = {**SAMPLE_STOCK, "competitors": []}  # 경쟁사 quote fetch가 섞여 call_count를 오염시키지 않도록
+    with contextlib.ExitStack() as stack:
+        for target, mock in mocks.items():
+            stack.enter_context(patch(target, mock))
+        # TTL 캐시가 다른 테스트의 값을 재사용하지 않도록 loader를 즉시 실행하게 우회.
+        stack.enter_context(patch("services.cache.get_quote_cached", side_effect=lambda key, loader: loader()))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        report_generator.generate_report(stock, tmp_path)
+
+    ticker_mock = mocks["services.report_generator.yf.Ticker"].return_value
+    assert ticker_mock.history.call_count == 1, "get_quote가 daily_df를 재사용하지 않고 history()를 재fetch함"

@@ -198,3 +198,32 @@ def test_build_universe_graceful_on_source_failure():
     tickers = {r["ticker"] for r in out}
     # KR이 죽어도 US sp500은 살아 있어야 한다
     assert tickers == {"AAPL"}
+
+
+# ── (g) market 파라미터 — 시장 불문 소스 fetch 스킵 (C 슬라이스) ──
+
+def test_build_universe_market_us_skips_kr_fetch():
+    from services.recommendation import universe as U
+    kr_raw = [{"ticker": "005930", "name": "삼성전자", "market_cap": 500, "is_etf": False}]
+    with patch.object(U, "_fetch_kr_rows", return_value=kr_raw) as m_kr, \
+         patch.object(U, "_load_sp500", return_value=["AAPL"]), \
+         patch.object(U, "_fetch_tracked", return_value=[]), \
+         patch.object(U, "_fetch_guru_tickers", return_value=["BRK-B"]):
+        out = U.build_universe(market="US")
+    assert m_kr.call_count == 0, "market=US면 KR fetch를 호출하지 않아야 한다"
+    tickers = {r["ticker"] for r in out}
+    assert tickers == {"AAPL", "BRK-B"}
+
+
+def test_build_universe_market_kr_skips_sp500_and_guru_fetch():
+    from services.recommendation import universe as U
+    kr_raw = [{"ticker": "005930", "name": "삼성전자", "market_cap": 500, "is_etf": False}]
+    with patch.object(U, "_fetch_kr_rows", return_value=kr_raw), \
+         patch.object(U, "_load_sp500", return_value=["AAPL"]) as m_sp500, \
+         patch.object(U, "_fetch_tracked", return_value=[]), \
+         patch.object(U, "_fetch_guru_tickers", return_value=["BRK-B"]) as m_guru:
+        out = U.build_universe(market="KR")
+    assert m_sp500.call_count == 0, "market=KR이면 sp500 로딩을 호출하지 않아야 한다"
+    assert m_guru.call_count == 0, "market=KR이면 guru 로딩을 호출하지 않아야 한다"
+    tickers = {r["ticker"] for r in out}
+    assert tickers == {"005930"}

@@ -409,7 +409,7 @@ def run_recommendation_batch(market: str) -> dict:
     반환 통계: {"market", "universe": int, "candidates": int, "scored": int}.
     종목별 fetch 실패는 로깅(부분 결과 저장), 전부 산출 불가면 replace 생략."""
     t0 = time.monotonic()
-    universe = [u for u in build_universe() if (u.get("market") or "US") == market]
+    universe = [u for u in build_universe(market) if (u.get("market") or "US") == market]
 
     guru_set: set = set()
     if market != "KR":

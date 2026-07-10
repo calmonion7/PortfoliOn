@@ -124,7 +124,7 @@ def _merge_universe(
     return list(seen.values())
 
 
-def build_universe() -> list[dict]:
+def build_universe(market: str | None = None) -> list[dict]:
     """발굴 유니버스를 빌드해 종목 dict 리스트로 반환.
 
     각 dict: {"ticker", "market", "name", "market_cap", "exchange"} (market_cap은 결측 가능;
@@ -132,31 +132,37 @@ def build_universe() -> list[dict]:
     KR 시총 상위 KR_MARKET_CAP_TOP_N + US S&P500 + 전 유저 추적종목 + US 구루 보유의
     합집합. ETF 제외. ticker로 dedup(첫 출처 우선). 추적종목은 항상 포함.
 
+    market: "US"면 KR fetch 스킵, "KR"이면 sp500/guru fetch 스킵(호출측이 어차피
+    버릴 시장 불문 fetch를 막는 최적화). None/미지정이면 기존처럼 양쪽 다 fetch(하위호환).
+    tracked(전 유저 추적종목)은 시장 무관 항상 fetch — 값싼 단일 DB read.
+
     외부 fetch(Naver/dataroma) 실패는 로깅(silent except 금지). 일부 소스가 비어도
     가용 소스만으로 유니버스를 구성한다(graceful degrade).
     """
     kr_rows: list[dict] = []
-    try:
-        kr_rows = _fetch_kr_rows()
-    except Exception as e:
-        logger.warning(f"[Universe] recommendation.universe: KR fetch failed: {e}")
+    if market != "US":
+        try:
+            kr_rows = _fetch_kr_rows()
+        except Exception as e:
+            logger.warning(f"[Universe] recommendation.universe: KR fetch failed: {e}")
 
     sp500: list[str] = []
-    try:
-        sp500 = _load_sp500()
-    except Exception as e:
-        logger.warning(f"[Universe] recommendation.universe: sp500 load failed: {e}")
+    guru: list[str] = []
+    if market != "KR":
+        try:
+            sp500 = _load_sp500()
+        except Exception as e:
+            logger.warning(f"[Universe] recommendation.universe: sp500 load failed: {e}")
+
+        try:
+            guru = _fetch_guru_tickers()
+        except Exception as e:
+            logger.warning(f"[Universe] recommendation.universe: guru fetch failed: {e}")
 
     tracked: list[dict] = []
     try:
         tracked = _fetch_tracked()
     except Exception as e:
         logger.warning(f"[Universe] recommendation.universe: tracked fetch failed: {e}")
-
-    guru: list[str] = []
-    try:
-        guru = _fetch_guru_tickers()
-    except Exception as e:
-        logger.warning(f"[Universe] recommendation.universe: guru fetch failed: {e}")
 
     return _merge_universe(kr_rows, sp500, tracked, guru)

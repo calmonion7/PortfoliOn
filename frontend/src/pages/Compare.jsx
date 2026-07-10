@@ -90,12 +90,14 @@ export default function Compare() {
 
   useEffect(() => {
     if (selected.length < 2) { setData(null); return }
+    let cancelled = false
     setLoading(true)
     setError(null)
     api.get('/api/stocks/compare', { params: { tickers: selected.join(',') } })
-      .then(({ data }) => setData(data))
-      .catch(() => setError('비교 데이터를 불러오지 못했습니다.'))
-      .finally(() => setLoading(false))
+      .then(({ data }) => { if (!cancelled) setData(data) })
+      .catch(() => { if (!cancelled) setError('비교 데이터를 불러오지 못했습니다.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [selected])
 
   const marketOf = (ticker) => candidates.find(c => c.ticker === ticker)?.market || 'US'

@@ -35,6 +35,7 @@ def test_add_watchlist_stock_saves_ticker_and_stock_data():
          patch("routers.watchlist.storage.save_stocks") as mock_save_stocks, \
          patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist, \
          patch("routers.watchlist.storage.get_schedule", return_value={}), \
+         patch("routers.watchlist.cache_svc.invalidate_portfolio_caches"), \
          patch("routers.watchlist.db_query", return_value=[]):
         resp = client.post("/api/watchlist", json={
             "ticker": "TSLA", "name": "Tesla",
@@ -75,7 +76,8 @@ def test_update_watchlist_stock_preserves_structured_analysis():
               "moat": {"summary": "GPU dominance", "factors": []}, "growth_plan": {"initiatives": []}}
          ]), \
          patch("routers.watchlist.storage.update_ticker_meta") as mock_update_meta, \
-         patch("routers.watchlist.storage.save_stocks") as mock_save_stocks:
+         patch("routers.watchlist.storage.save_stocks") as mock_save_stocks, \
+         patch("routers.watchlist.cache_svc.invalidate_portfolio_caches"):
         resp = client.put("/api/watchlist/NVDA", json={
             "ticker": "NVDA", "name": "NVIDIA Corp", "competitors": ["AMD"]
         })
@@ -87,7 +89,8 @@ def test_update_watchlist_stock_preserves_structured_analysis():
 def test_delete_watchlist_removes_from_watchlist_and_stocks():
     with patch("routers.watchlist.storage.get_watchlist_tickers", return_value=["NVDA"]), \
          patch("routers.watchlist.storage.get_holdings", return_value=[]), \
-         patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist:
+         patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist, \
+         patch("routers.watchlist.cache_svc.invalidate_portfolio_caches"):
         resp = client.delete("/api/watchlist/NVDA")
     assert resp.status_code == 200
     assert mock_save_watchlist.call_args[0][1] == []
@@ -97,7 +100,8 @@ def test_delete_watchlist_keeps_stock_data_when_in_holdings():
     with patch("routers.watchlist.storage.get_watchlist_tickers", return_value=["NFLX"]), \
          patch("routers.watchlist.storage.get_holdings", return_value=SAMPLE_HOLDINGS), \
          patch("routers.watchlist.storage.save_watchlist_tickers"), \
-         patch("routers.watchlist.storage.save_stocks") as mock_save_stocks:
+         patch("routers.watchlist.storage.save_stocks") as mock_save_stocks, \
+         patch("routers.watchlist.cache_svc.invalidate_portfolio_caches"):
         resp = client.delete("/api/watchlist/NFLX")
     assert resp.status_code == 200
     mock_save_stocks.assert_not_called()
@@ -116,7 +120,8 @@ def test_promote_moves_ticker_to_holdings():
              {"ticker": "NVDA", "name": "Nvidia", "competitors": ["AMD"], "moat": "GPU", "growth_plan": "AI"}
          ]), \
          patch("routers.watchlist.storage.save_watchlist_tickers") as mock_save_watchlist, \
-         patch("routers.watchlist.storage.save_holdings") as mock_save_holdings:
+         patch("routers.watchlist.storage.save_holdings") as mock_save_holdings, \
+         patch("routers.watchlist.cache_svc.invalidate_portfolio_caches"):
         resp = client.post("/api/watchlist/NVDA/promote",
                            json={"quantity": 5, "avg_cost": 200.0})
     assert resp.status_code == 200

@@ -91,7 +91,7 @@ def add_watchlist_stock(stock: WatchlistStock, background_tasks: BackgroundTasks
 
     watchlist.append(stock.ticker.upper())
     storage.save_watchlist_tickers(user_id, watchlist)
-    cache_svc.invalidate_portfolio_caches()
+    cache_svc.invalidate_portfolio_caches(user_id)
 
     target_date = storage.expected_report_date(stock.market)
     existing = db_query(
@@ -132,7 +132,7 @@ def update_watchlist_stock(ticker: str, stock: WatchlistStock, user_id: str = De
         # 편집 가능 필드(name, competitors)만 갱신 — 구조화 분석(moat/growth_plan 등)은 보존
         storage.update_ticker_meta(ticker, stock.name, stock.competitors)
 
-    cache_svc.invalidate_portfolio_caches()
+    cache_svc.invalidate_portfolio_caches(user_id)
     return {"ticker": ticker.upper(), "name": stock.name,
             "competitors": stock.competitors,
             "market": stock.market, "exchange": stock.exchange}
@@ -146,7 +146,7 @@ def delete_watchlist_stock(ticker: str, user_id: str = Depends(get_current_user)
         raise errors.not_found(ticker, "watchlist")
 
     storage.save_watchlist_tickers(user_id, [t for t in watchlist if t.upper() != upper])
-    cache_svc.invalidate_portfolio_caches()
+    cache_svc.invalidate_portfolio_caches(user_id)
 
     return {"deleted": upper}
 
@@ -177,6 +177,6 @@ def promote_to_holdings(ticker: str, payload: PromotePayload, user_id: str = Dep
     }
     holdings.append(new_holding)
     storage.save_holdings(user_id, holdings)
-    cache_svc.invalidate_portfolio_caches()
+    cache_svc.invalidate_portfolio_caches(user_id)
 
     return {**stock_data, "quantity": payload.quantity, "avg_cost": payload.avg_cost}

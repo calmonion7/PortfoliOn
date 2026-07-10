@@ -37,6 +37,7 @@ def test_add_stock_saves_to_holdings_and_stocks():
          patch("routers.portfolio.storage.save_stocks") as mock_save_stocks, \
          patch("routers.portfolio.storage.save_holdings") as mock_save_holdings, \
          patch("routers.portfolio.storage.get_schedule", return_value={}), \
+         patch("routers.portfolio.cache_svc.invalidate_portfolio_caches"), \
          patch("routers.portfolio.db_query", return_value=[]):
         resp = client.post("/api/portfolio", json={
             "ticker": "NVDA", "name": "Nvidia", "quantity": 5, "avg_cost": 200.0,
@@ -71,7 +72,8 @@ def test_update_stock_updates_holdings_and_preserves_structured_analysis():
          patch("routers.portfolio.storage.get_stocks", return_value=structured), \
          patch("routers.portfolio.storage.save_holdings") as mock_save_holdings, \
          patch("routers.portfolio.storage.update_ticker_meta") as mock_update_meta, \
-         patch("routers.portfolio.storage.save_stocks") as mock_save_stocks:
+         patch("routers.portfolio.storage.save_stocks") as mock_save_stocks, \
+         patch("routers.portfolio.cache_svc.invalidate_portfolio_caches"):
         resp = client.put("/api/portfolio/NFLX", json={
             "ticker": "NFLX", "name": "Netflix Inc", "quantity": 20, "avg_cost": 90.0,
             "competitors": ["DIS", "WBD"]
@@ -89,7 +91,8 @@ def test_delete_stock_removes_from_holdings_and_adds_to_watchlist():
     with patch("routers.portfolio.storage.get_holdings", return_value=list(SAMPLE_HOLDINGS)), \
          patch("routers.portfolio.storage.get_watchlist_tickers", return_value=[]), \
          patch("routers.portfolio.storage.save_holdings") as mock_save_holdings, \
-         patch("routers.portfolio.storage.save_watchlist_tickers") as mock_save_watchlist:
+         patch("routers.portfolio.storage.save_watchlist_tickers") as mock_save_watchlist, \
+         patch("routers.portfolio.cache_svc.invalidate_portfolio_caches"):
         resp = client.delete("/api/portfolio/NFLX")
     assert resp.status_code == 200
     assert mock_save_holdings.call_args[0][1] == []
@@ -100,7 +103,8 @@ def test_delete_stock_keeps_stock_data_when_in_watchlist():
     with patch("routers.portfolio.storage.get_holdings", return_value=list(SAMPLE_HOLDINGS)), \
          patch("routers.portfolio.storage.get_watchlist_tickers", return_value=["NFLX"]), \
          patch("routers.portfolio.storage.save_holdings"), \
-         patch("routers.portfolio.storage.save_stocks") as mock_save_stocks:
+         patch("routers.portfolio.storage.save_stocks") as mock_save_stocks, \
+         patch("routers.portfolio.cache_svc.invalidate_portfolio_caches"):
         resp = client.delete("/api/portfolio/NFLX")
     assert resp.status_code == 200
     mock_save_stocks.assert_not_called()
@@ -156,7 +160,8 @@ def test_get_rebalance_computes_drift_from_holdings_and_quotes():
     ]
     with patch("routers.portfolio.storage.get_holdings", return_value=holdings), \
          patch("routers.portfolio.market_svc.get_quotes_batch", return_value={"AAPL": {"price": 150.0}}), \
-         patch("routers.portfolio._usdkrw_rate", return_value=1300.0):
+         patch("routers.portfolio._usdkrw_rate", return_value=1300.0), \
+         patch("routers.portfolio.cache_svc.get_rebalance", side_effect=lambda user_id, loader: loader()):
         resp = client.get("/api/portfolio/rebalance")
     assert resp.status_code == 200
     body = resp.json()
@@ -165,14 +170,44 @@ def test_get_rebalance_computes_drift_from_holdings_and_quotes():
     assert body["holdings"][0]["target_weight"] == pytest.approx(100.0)
 
 
+def test_get_rebalance_caches_within_ttl_avoids_repeat_quote_fetch():
+    """S3: TTL 내 재요청은 라이브 시세를 재조회하지 않는다."""
+    from services import cache as cache_svc
+    holdings = [{"ticker": "AAPL", "market": "US", "quantity": 10, "target_weight": 100.0, "exchange": ""}]
+    cache_svc.invalidate_rebalance("test-user-id")
+    with patch("routers.portfolio.storage.get_holdings", return_value=holdings), \
+         patch("routers.portfolio.market_svc.get_quotes_batch", return_value={"AAPL": {"price": 150.0}}) as mock_quotes, \
+         patch("routers.portfolio._usdkrw_rate", return_value=1300.0):
+        client.get("/api/portfolio/rebalance")
+        client.get("/api/portfolio/rebalance")
+    assert mock_quotes.call_count == 1
+
+
+def test_get_exposure_caches_within_ttl_avoids_repeat_quote_fetch():
+    """S3: TTL 내 재요청은 라이브 시세를 재조회하지 않는다."""
+    from services import cache as cache_svc
+    holdings = [{"ticker": "AAPL", "market": "US", "quantity": 10, "exchange": ""}]
+    cache_svc.invalidate_exposure("test-user-id")
+    with patch("routers.portfolio.storage.get_holdings", return_value=holdings), \
+         patch("routers.portfolio.market_svc.get_quotes_batch", return_value={"AAPL": {"price": 150.0}}) as mock_quotes, \
+         patch("routers.portfolio.db_query", return_value=[]), \
+         patch("routers.portfolio.kr_sector_service.map_holdings_to_sectors", return_value={}), \
+         patch("routers.portfolio._usdkrw_rate", return_value=1300.0):
+        client.get("/api/portfolio/exposure")
+        client.get("/api/portfolio/exposure")
+    assert mock_quotes.call_count == 1
+
+
 def test_put_rebalance_targets_saves_only_held_tickers():
     holdings = [{"ticker": "AAPL", "market": "US", "quantity": 10}]
     with patch("routers.portfolio.storage.get_holdings", return_value=holdings), \
-         patch("routers.portfolio.storage.set_target_weights") as mock_set:
+         patch("routers.portfolio.storage.set_target_weights") as mock_set, \
+         patch("routers.portfolio.cache_svc.invalidate_rebalance") as mock_inv:
         resp = client.put("/api/portfolio/rebalance/targets", json={"AAPL": 60, "NOTHELD": 40})
     assert resp.status_code == 200
     assert resp.json() == {"updated": 1, "targets": {"AAPL": 60}}
     mock_set.assert_called_once_with("test-user-id", {"AAPL": 60})
+    mock_inv.assert_called_once_with("test-user-id")  # 타겟 변경 시 캐시된 rebalance가 stale로 남지 않도록
 
 
 def test_generate_with_consensus_backfills_via_pipeline():

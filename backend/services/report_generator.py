@@ -118,7 +118,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         daily_df = _t.history(period="1y")
 
     with ThreadPoolExecutor(max_workers=8) as ex:
-        f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange, _t, regular=True)
+        # hist=daily_df: US는 이미 확보한 1y history 재사용해 yfinance 중복 fetch 방지(task#161 B-2b).
+        f_quote     = ex.submit(mkt.get_quote, ticker, market, exchange, _t, regular=True, hist=daily_df)
         f_fin       = ex.submit(mkt.get_financials, ticker, market, exchange)
         f_fin_ann   = ex.submit(mkt.get_annual_financials, ticker, market, exchange)
         f_analyst   = ex.submit(mkt.get_analyst_data, ticker, market, exchange, _t)
@@ -410,11 +411,12 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
     try:
         t = yf.Ticker(yf_sym)  # US history + (US) info용. KR은 info 대신 quote 사용.
         if market == "KR":
-            # daily는 스냅샷 price(d_trim Close)+매물대 소스 → KRX 정규장(regular=True, .forge/adr/0020).
-            # weekly/monthly는 RSI만 쓰므로 NXT 유지(정규화라 무관, 불필요한 전파 회피).
+            # daily/weekly/monthly 모두 KRX 정규장(regular=True, .forge/adr/0020) — RSI 타점
+            # (calc_rsi_target_price)은 절대가라 daily(KRX)와 스케일이 일치해야 함(generate_report의
+            # get_timeframe_rsi(regular=True)와 동일 패턴, task#161 #2 backfill 누락분).
             daily_df   = _normalize_index(mkt.get_history_df(ticker, market, exchange, "daily", yf_period="2y", max_items=520, regular=True))
-            weekly_df  = _normalize_index(mkt.get_history_df(ticker, market, exchange, "weekly"))
-            monthly_df = _normalize_index(mkt.get_history_df(ticker, market, exchange, "monthly"))
+            weekly_df  = _normalize_index(mkt.get_history_df(ticker, market, exchange, "weekly", regular=True))
+            monthly_df = _normalize_index(mkt.get_history_df(ticker, market, exchange, "monthly", regular=True))
         else:
             daily_df   = _normalize_index(t.history(period="2y",  interval="1d"))
             weekly_df  = _normalize_index(t.history(period="5y",  interval="1wk"))

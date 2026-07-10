@@ -39,12 +39,13 @@ from services.market.us import (
 )
 
 
-def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None, regular: bool = False) -> dict:
+def get_quote(ticker: str, market: str = "US", exchange: str = "", _t=None, regular: bool = False, hist=None) -> dict:
     # 종목 단위 TTL 캐시 — yfinance/Naver 호출을 종목당 TTL당 1회로 상한(rate-limit 방어).
     # regular(리포트 정규장 vs 대시보드 NXT)을 캐시 키에 포함해 두 시세가 섞이지 않게 한다(.forge/adr/0020).
+    # hist: 호출부가 이미 가진 1y history 재사용(캐시 미스 시만 사용, 미스 여부와 무관하게 키엔 미포함).
     from services import cache as cache_svc
     key = f"{ticker.upper()}/{market}/{exchange}/{regular}"
-    return cache_svc.get_quote_cached(key, lambda: _get_quote_uncached(ticker, market, exchange, _t, regular))
+    return cache_svc.get_quote_cached(key, lambda: _get_quote_uncached(ticker, market, exchange, _t, regular, hist))
 
 
 def resolve_name(ticker: str, market: str = "US", exchange: str = "", user_name: str = "", quote: dict | None = None) -> str:
@@ -67,7 +68,7 @@ def resolve_name(ticker: str, market: str = "US", exchange: str = "", user_name:
     return un or ticker
 
 
-def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=None, regular: bool = False) -> dict:
+def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=None, regular: bool = False, hist=None) -> dict:
     if market == "KR":
         return get_quote_kr(ticker, exchange, regular=regular)
 
@@ -75,7 +76,8 @@ def _get_quote_uncached(ticker: str, market: str = "US", exchange: str = "", _t=
     try:
         t = _t if _t is not None else yf.Ticker(yf_sym)
         info = t.info
-        hist = t.history(period="1y")
+        # hist 제공 시(호출부가 이미 1y history를 받아둠) 재fetch 생략 — 동일 티커 중복 history() 호출 방지.
+        hist = hist if hist is not None else t.history(period="1y")
         current = info.get("currentPrice") or info.get("regularMarketPrice")
         # info 실패 시 history 마지막 종가로 폴백
         if not current and not hist.empty:

@@ -132,12 +132,35 @@ def invalidate_live_prices(user_id: str = None) -> None:
     _live_prices_cache.invalidate(user_id)
 
 
-def invalidate_portfolio_caches() -> None:
+# S3: rebalance/exposure 요청경로 라이브 시세 반복호출 방지 (get_sector/get_macro와 동일 패턴)
+_rebalance_cache = TTLCache(300.0)
+_exposure_cache = TTLCache(300.0)
+
+
+def get_rebalance(user_id: str, loader) -> dict:
+    return _rebalance_cache.get(user_id, loader)
+
+
+def invalidate_rebalance(user_id: str = None) -> None:
+    _rebalance_cache.invalidate(user_id)
+
+
+def get_exposure(user_id: str, loader) -> dict:
+    return _exposure_cache.get(user_id, loader)
+
+
+def invalidate_exposure(user_id: str = None) -> None:
+    _exposure_cache.invalidate(user_id)
+
+
+def invalidate_portfolio_caches(user_id: str = None) -> None:
     from routers import calendar as calendar_router
-    calendar_router.clear_cache()
+    calendar_router.clear_cache(user_id)  # S1: 라이브 저장소(calendar_cache 테이블)를 user_id로 무효화
     invalidate_list()
     invalidate_dashboard()
     invalidate_sector()
     invalidate_macro()
     invalidate_correlation()
     invalidate_live_prices()  # 장중 폴링 캐시도 무효화(종목 추가/삭제 즉시 반영)
+    invalidate_rebalance()
+    invalidate_exposure()

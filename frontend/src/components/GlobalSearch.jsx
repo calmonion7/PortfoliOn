@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import StockSearchBox from './StockSearchBox'
@@ -15,23 +15,20 @@ export default function GlobalSearch({ variant = 'desktop' }) {
   const { showToast } = useToast()
   const [open, setOpen] = useState(false)        // 모바일 오버레이
   const [prefill, setPrefill] = useState(null)   // add 모달 프리필(미추적 선택 시)
-  const trackedRef = useRef(null)                // 보유+관심 ticker Set (lazy)
 
-  const ensureTracked = async () => {
-    if (trackedRef.current) return trackedRef.current
+  const fetchTracked = async () => {
     try {
       const { data } = await api.get('/api/stocks')  // [{ticker,name,type,market}]
-      trackedRef.current = new Set((data || []).map(s => (s.ticker || '').toUpperCase()))
+      return new Set((data || []).map(s => (s.ticker || '').toUpperCase()))
     } catch {
-      trackedRef.current = new Set()
+      return new Set()
     }
-    return trackedRef.current
   }
 
   const handleSelect = async (item) => {
     const t = (item.ticker || '').toUpperCase()
     setOpen(false)
-    const tracked = await ensureTracked()
+    const tracked = await fetchTracked()  // eco: 선택마다 재조회 — 삭제 직후 stale 캐시 오판 방지
     if (tracked.has(t)) {
       navigate('/', { state: { tab: 'reports', ticker: t } })  // 리포트 상세 점프
     } else {
@@ -43,7 +40,6 @@ export default function GlobalSearch({ variant = 'desktop' }) {
     try {
       await api.post('/api/watchlist', payload)
       showToast(`${payload.ticker} 관심종목에 추가됐습니다`)
-      trackedRef.current?.add((payload.ticker || '').toUpperCase())
       setPrefill(null)
     } catch (err) {
       showToast(err?.response?.data?.detail || '추가 실패', 'error')

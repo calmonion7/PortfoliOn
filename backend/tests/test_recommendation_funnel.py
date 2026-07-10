@@ -313,6 +313,25 @@ def test_run_batch_logs_and_continues_on_fetch_error(caplog):
     assert "000660" in caplog.text and "supply" in caplog.text.lower()
 
 
+# ── (g) run_recommendation_batch가 자기 market을 build_universe에 전달 (C 슬라이스) ──
+
+def test_run_batch_threads_market_into_build_universe():
+    from services.recommendation import funnel as F
+
+    uni = [_u("AAPL", "US", "Apple", 500)]
+    history = {"AAPL": _ohlc([100 + i for i in range(60)])}
+    upside = {"AAPL": 15.0}
+
+    p1, p2, p3, p4 = _patch_stage2(F, history=history, upside=upside, supply={}, insider={})
+    with patch.object(F, "build_universe", return_value=uni) as m_universe, \
+         patch.object(F, "replace_recommendations"), \
+         patch.object(F, "_fetch_guru_tickers", return_value={}), \
+         p1, p2, p3, p4:
+        F.run_recommendation_batch("US")
+
+    m_universe.assert_called_once_with("US")
+
+
 # ── S1 (a) 시총 None·비구루 US 행은 전량 통과 ─────────────────────
 # 구 코드: market_cap=None → 정렬 0 → top_k 밖 → 잘림 (red)
 

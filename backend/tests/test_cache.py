@@ -1,4 +1,5 @@
 import time
+from unittest.mock import patch
 import pytest
 
 
@@ -160,7 +161,8 @@ def test_invalidate_portfolio_caches_clears_list():
     _clear()
     calls = []
     c.get_list("u1", lambda: (calls.append(1), {})[1])
-    c.invalidate_portfolio_caches()
+    with patch("routers.calendar.clear_cache"):  # 라이브 calendar_cache DB DELETE 차단
+        c.invalidate_portfolio_caches()
     c.get_list("u1", lambda: (calls.append(1), {})[1])
     assert len(calls) == 2
 
@@ -195,3 +197,59 @@ def test_stock_mutation_invalidates_live_prices():
     c.invalidate("005930")   # 종목 변경 → 라이브 캐시도 무효화
     c.get_live_prices("user-A", loader)
     assert calls["n"] == 2
+
+
+# ── rebalance/exposure 요청경로 캐시 (S3) — get_sector/get_macro와 동일 패턴 ──
+
+def test_get_rebalance_caches_within_ttl():
+    import services.cache as c
+    calls = []
+    def loader():
+        calls.append(1)
+        return {"data": "rebalance"}
+    c.invalidate_rebalance("rebal-user")
+    c.get_rebalance("rebal-user", loader)
+    c.get_rebalance("rebal-user", loader)
+    assert len(calls) == 1
+
+
+def test_invalidate_rebalance_clears_cache():
+    import services.cache as c
+    calls = []
+    c.get_rebalance("rebal-user-2", lambda: (calls.append(1), {})[1])
+    c.invalidate_rebalance("rebal-user-2")
+    c.get_rebalance("rebal-user-2", lambda: (calls.append(1), {})[1])
+    assert len(calls) == 2
+
+
+def test_get_exposure_caches_within_ttl():
+    import services.cache as c
+    calls = []
+    def loader():
+        calls.append(1)
+        return {"data": "exposure"}
+    c.invalidate_exposure("expo-user")
+    c.get_exposure("expo-user", loader)
+    c.get_exposure("expo-user", loader)
+    assert len(calls) == 1
+
+
+def test_invalidate_exposure_clears_cache():
+    import services.cache as c
+    calls = []
+    c.get_exposure("expo-user-2", lambda: (calls.append(1), {})[1])
+    c.invalidate_exposure("expo-user-2")
+    c.get_exposure("expo-user-2", lambda: (calls.append(1), {})[1])
+    assert len(calls) == 2
+
+
+def test_invalidate_portfolio_caches_also_clears_rebalance_and_exposure():
+    import services.cache as c
+    calls = []
+    c.get_rebalance("port-user", lambda: (calls.append(1), {})[1])
+    c.get_exposure("port-user", lambda: (calls.append(1), {})[1])
+    with patch("routers.calendar.clear_cache"):  # 라이브 calendar_cache DB DELETE 차단
+        c.invalidate_portfolio_caches()
+    c.get_rebalance("port-user", lambda: (calls.append(1), {})[1])
+    c.get_exposure("port-user", lambda: (calls.append(1), {})[1])
+    assert len(calls) == 4
