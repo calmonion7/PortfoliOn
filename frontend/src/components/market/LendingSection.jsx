@@ -7,7 +7,7 @@ import {
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function LendingSection() {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

@@ -10,6 +10,7 @@ const TABS = [
 
 export default function MarketHub({ tab }) {
   const isMobile = useIsMobile()
+  const activeLabel = tab === 'flow' ? '수급지표' : '시장지표'
 
   if (isMobile) return (
     <>
@@ -34,7 +35,10 @@ export default function MarketHub({ tab }) {
   return (
     <div className="page">
       <div className="page-head">
-        <h1 className="page-title">시장</h1>
+        <div>
+          <h1 className="page-title">시장</h1>
+          <p className="page-sub">{activeLabel}</p>
+        </div>
       </div>
       <Market tab={tab} />
     </div>

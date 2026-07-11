@@ -57,6 +57,12 @@
   .mobile-only { display: none !important; }
 }
 
+/* 시각적으로만 숨기고 스크린리더에는 노출(접근성 라벨용) */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 /* 모바일 상단 헤더 */
 .mobile-header { display: none; }
 @media (max-width: 768px) {

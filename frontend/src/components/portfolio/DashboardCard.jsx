@@ -4,6 +4,7 @@ import { MarketBadge, ChangeBadge } from '../ui/Badge'
 import SupplyBadge from '../ui/SupplyBadge'
 import InsiderBadge from '../ui/InsiderBadge'
 import { fmtPrice } from '../../utils'
+import { rsiColor } from '../reports/reportUtils'
 import FlashValue from './FlashValue'
 
 const _weather = (score) => {
@@ -81,7 +82,7 @@ export default function DashboardCard({ item, tick }) {
         </div>
         <div className="dashcard__stat">
           <span className="dashcard__stat-label">RSI</span>
-          <span className="dashcard__stat-value tnum">
+          <span className="dashcard__stat-value tnum" style={{ color: rsiColor(item.rsi) }}>
             {item.rsi != null ? item.rsi.toFixed(1) : '—'}
           </span>
         </div>

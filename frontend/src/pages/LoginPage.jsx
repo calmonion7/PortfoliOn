@@ -65,10 +65,12 @@ export default function LoginPage() {
       <p className="lead">보유 종목, 시장 지표, 구루 동향까지 — 흩어진 데이터를 한 곳에서.</p>
       <form onSubmit={isLogin ? doLogin : doRegister}>
         <div className="field">
-          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="이메일" required/>
+          <label htmlFor="m-login-email" className="sr-only">이메일</label>
+          <Input id="m-login-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="이메일" required/>
         </div>
         <div className="field">
-          <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="비밀번호" required/>
+          <label htmlFor="m-login-password" className="sr-only">비밀번호</label>
+          <Input id="m-login-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="비밀번호" required/>
         </div>
         {error && <p style={{color:'var(--color-error)', fontSize:13, marginBottom:8}}>{error}</p>}
         {success && <p style={{color:'var(--color-success)', fontSize:13, marginBottom:8}}>{success}</p>}
