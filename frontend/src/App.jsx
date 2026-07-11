@@ -18,6 +18,7 @@ import Showcase from './pages/Showcase'
 import LoginPage from './pages/LoginPage'
 import Sidebar from './components/Sidebar'
 import MobileNav from './components/MobileNav'
+import MobileTopActions from './components/MobileTopActions'
 import InstallPrompt from './components/InstallPrompt'
 import GlobalSearch from './components/GlobalSearch'
 import { Sun, Moon, Refresh, LogOut } from './components/ui/icons'
@@ -126,6 +127,7 @@ export default function App() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <GlobalSearch variant="mobile" />
+              <MobileTopActions />
               <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
                 {theme === 'dark' ? <Sun /> : <Moon />}
               </button>
