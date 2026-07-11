@@ -88,11 +88,10 @@ export default function MacroTab() {
               }}
             >
               <td style={{ padding: isMobile ? '14px 20px 14px 0' : '7px 20px 7px 0', color: 'var(--text)', background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.indicator}</td>
-              <td style={{ padding: isMobile ? '14px 16px' : '7px 16px', color: 'var(--text-3)', textAlign: 'center', fontSize: 11, background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.ticker}</td>
+              <td className="mono" style={{ padding: isMobile ? '14px 16px' : '7px 16px', color: 'var(--text-3)', textAlign: 'center', fontSize: 11, background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>{c.ticker}</td>
               <td style={{ padding: isMobile ? '14px 0' : '7px 0', textAlign: 'right', background: selected === c.ticker ? 'var(--bg-elev)' : 'transparent' }}>
-                <span style={{
+                <span className="mono tnum" style={{
                   color: corrColor(c.corr_90d),
-                  fontVariantNumeric: 'tabular-nums',
                   fontWeight: 600,
                 }}>
                   {c.corr_90d !== null ? c.corr_90d.toFixed(3) : '—'}
@@ -104,9 +103,9 @@ export default function MacroTab() {
       </table>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 11, color: 'var(--text-3)' }}>
-        <span>−1.0</span>
+        <span className="mono tnum">−1.0</span>
         <div style={{ flex: '0 0 140px', height: 8, borderRadius: 4, background: 'linear-gradient(to right, var(--corr-neg), var(--corr-zero), var(--corr-pos))' }} />
-        <span>+1.0</span>
+        <span className="mono tnum">+1.0</span>
       </div>
 
       <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 16 }}>
@@ -148,12 +147,12 @@ export default function MacroTab() {
                       background: 'var(--bg-elev)', border: '1px solid var(--border)',
                       padding: '8px 12px', borderRadius: 6, fontSize: 12,
                     }}>
-                      <div style={{ color: 'var(--text-3)', marginBottom: 4 }}>{d.date}</div>
+                      <div className="mono" style={{ color: 'var(--text-3)', marginBottom: 4 }}>{d.date}</div>
                       <div style={{ color: 'var(--text-3)' }}>
-                        매크로: <span style={{ color: 'var(--text)' }}>{d.macro_delta}%</span>
+                        매크로: <span className="mono tnum" style={{ color: 'var(--text)' }}>{d.macro_delta}%</span>
                       </div>
                       <div style={{ color: 'var(--text-3)' }}>
-                        수익률: <span style={{ color: 'var(--text)' }}>{d.portfolio_return}%</span>
+                        수익률: <span className="mono tnum" style={{ color: 'var(--text)' }}>{d.portfolio_return}%</span>
                       </div>
                     </div>
                   )

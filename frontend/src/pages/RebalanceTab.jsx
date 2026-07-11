@@ -88,7 +88,7 @@ export default function RebalanceTab() {
       {data.holdings.map(h => (
         <Card key={h.ticker} padding="sm" style={{ marginBottom: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <strong>{h.ticker}</strong>
+            <strong className="mono">{h.ticker}</strong>
             {h.name && h.name !== h.ticker && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{h.name}</span>}
             <MarketBadge market={h.market} />
             {h.untargeted && <Badge variant="neutral" size="sm">미설정</Badge>}
@@ -97,7 +97,7 @@ export default function RebalanceTab() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 12 }}>
             <div>
               <div style={labelStyle}>현재 비중</div>
-              <div className="tnum">{pctText(h.current_weight)}</div>
+              <div className="tnum mono">{pctText(h.current_weight)}</div>
             </div>
             <div>
               <div style={labelStyle}>목표 비중</div>
@@ -113,18 +113,18 @@ export default function RebalanceTab() {
             </div>
             <div>
               <div style={labelStyle}>드리프트</div>
-              <div className="tnum">{driftText(h.drift_pp)}</div>
+              <div className="tnum mono">{driftText(h.drift_pp)}</div>
             </div>
             <div>
               <div style={labelStyle}>조정금액</div>
-              <div className="tnum">{tradeText(h)}</div>
+              <div className="tnum mono">{tradeText(h)}</div>
             </div>
           </div>
         </Card>
       ))}
 
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
-        <span style={{ fontSize: 13 }}>합계: <strong className="tnum">{sumPct.toFixed(1)}%</strong></span>
+        <span style={{ fontSize: 13 }}>합계: <strong className="tnum mono">{sumPct.toFixed(1)}%</strong></span>
         {sumWarn && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>포트폴리오 합이 100%가 아닙니다 (설정 타겟 + 미설정 종목 현재 비중)</span>}
         <Button variant="primary" size="sm" onClick={handleSave} loading={saving} disabled={saving} style={{ marginLeft: 'auto' }}>
           저장

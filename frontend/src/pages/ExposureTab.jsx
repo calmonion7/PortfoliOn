@@ -31,7 +31,7 @@ function WeightBar({ label, weight, color = 'var(--accent)', warn = false }) {
     <div style={{ marginBottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
         <span style={{ color: 'var(--text)' }}>{label}</span>
-        <span className="tnum" style={{ color: warn ? '#f57c00' : 'var(--text-3)', fontWeight: warn ? 600 : 400 }}>{pctText(weight)}</span>
+        <span className="tnum mono" style={{ color: warn ? '#f57c00' : 'var(--text-3)', fontWeight: warn ? 600 : 400 }}>{pctText(weight)}</span>
       </div>
       <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-elev)', overflow: 'hidden' }}>
         <div style={{ width: `${Math.min(weight, 100)}%`, height: '100%', background: color }} />
@@ -86,7 +86,7 @@ export default function ExposureTab() {
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
-              <span className="tnum" style={{ color: 'var(--text)', fontSize: 20, fontWeight: 600 }}>{portfolio_beta.toFixed(2)}</span>
+              <span className="tnum mono" style={{ color: 'var(--text)', fontSize: 20, fontWeight: 600 }}>{portfolio_beta.toFixed(2)}</span>
               <Badge variant="neutral" size="sm" style={betaBadge(portfolio_beta).style}>{betaBadge(portfolio_beta).text}</Badge>
             </div>
             <p style={{ color: 'var(--text-3)', fontSize: 12 }}>

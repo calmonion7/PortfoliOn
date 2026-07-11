@@ -95,7 +95,7 @@ export default function InsiderTradesSection({ ticker, market }) {
                     background: 'var(--bg-elev)',
                   }}
                 >
-                  <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontVariantNumeric: 'tabular-nums', minWidth: 78 }}>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontVariantNumeric: 'tabular-nums', minWidth: 78 }}>
                     {fmtDate(t.rcept_dt)}
                   </span>
                   {kc.label && (
@@ -107,12 +107,12 @@ export default function InsiderTradesSection({ ticker, market }) {
                     {t.repror}{t.rel ? ` · ${t.rel}` : ''}
                   </span>
                   {changeStr && (
-                    <span style={{ fontSize: 12, color: changeColor, flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                    <span className="mono" style={{ fontSize: 12, color: changeColor, flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
                       {changeStr}
                     </span>
                   )}
                   {t.rate_after != null && (
-                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontVariantNumeric: 'tabular-nums', minWidth: 48, textAlign: 'right' }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontVariantNumeric: 'tabular-nums', minWidth: 48, textAlign: 'right' }}>
                       {t.rate_after}%
                     </span>
                   )}

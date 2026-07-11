@@ -12,6 +12,7 @@
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  font-family: var(--font-mono);
 }
 
 .dashcard__name {
@@ -34,6 +35,7 @@
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
+  font-family: var(--font-mono);
 }
 
 .dashcard__change-row {
@@ -76,4 +78,5 @@
 .dashcard__stat-value {
   font-size: 13px;
   font-weight: 600;
+  font-family: var(--font-mono);
 }

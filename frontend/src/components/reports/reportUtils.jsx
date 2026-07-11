@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { fmtPrice as fmt } from '../../utils'
 
 export const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--text-3)', position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-elev-2)' }
-export const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12 }
+export const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }
 
 export const fmtN = (val) => val != null ? val : '—'
 export const rsiColor = (rsi) => {
@@ -84,7 +84,7 @@ export const overallWeather = (summary) => {
 export const MetricCard = ({ label, value, sub, valueColor }) => (
   <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px' }}>
     <div style={{ color: 'var(--text-3)', fontSize: 10, marginBottom: 2 }}>{label}</div>
-    <div style={{ fontWeight: 700, fontSize: 12, color: valueColor ?? 'var(--text)' }}>{value}</div>
+    <div className="mono tnum" style={{ fontWeight: 700, fontSize: 12, color: valueColor ?? 'var(--text)' }}>{value}</div>
     {sub && <div style={{ color: 'var(--text-3)', fontSize: 9, marginTop: 1 }}>{sub}</div>}
   </div>
 )
@@ -99,7 +99,7 @@ export const SectionTitle = ({ children, weather }) => (
 export const GapCell = ({ target, price, baseColor, highlight, market }) => {
   const gap = fmtGap(target, price)
   return (
-    <td style={{ ...TD, color: baseColor, background: highlight ? 'var(--surface-hover)' : undefined, border: highlight ? '2px solid var(--accent)' : undefined, fontWeight: highlight ? 700 : undefined }}>
+    <td className="mono tnum" style={{ ...TD, color: baseColor, background: highlight ? 'var(--surface-hover)' : undefined, border: highlight ? '2px solid var(--accent)' : undefined, fontWeight: highlight ? 700 : undefined }}>
       {target != null ? <>{fmt(target, market)}{gap && <span style={{ color: gap.positive ? 'var(--up)' : 'var(--down)' }}>({gap.text})</span>}</> : '—'}
     </td>
   )

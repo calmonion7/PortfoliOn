@@ -62,7 +62,7 @@ export default function LatestDisclosuresSection({ ticker, market }) {
                   background: 'var(--bg-elev)',
                 }}
               >
-                <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontVariantNumeric: 'tabular-nums', minWidth: 78 }}>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontVariantNumeric: 'tabular-nums', minWidth: 78 }}>
                   {fmtDate(d.rcept_dt)}
                 </span>
                 {tc.label && (

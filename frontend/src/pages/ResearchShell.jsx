@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { trackEvent } from '../utils/analytics'
 import useIsMobile from '../hooks/useIsMobile'
 
@@ -16,6 +16,8 @@ const TABS = [
 
 export default function ResearchShell({ children }) {
   const isMobile = useIsMobile()
+  const { pathname } = useLocation()
+  const activeLabel = TABS.find(t => pathname.startsWith(t.to))?.label
 
   if (isMobile) return (
     <>
@@ -40,7 +42,10 @@ export default function ResearchShell({ children }) {
   return (
     <div className="page">
       <div className="page-head">
-        <h1 className="page-title">리서치</h1>
+        <div>
+          <h1 className="page-title">리서치</h1>
+          {activeLabel && <p className="page-sub">{activeLabel}</p>}
+        </div>
       </div>
       {children}
     </div>

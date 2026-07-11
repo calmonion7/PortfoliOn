@@ -34,10 +34,10 @@ function pctColor(v) {
 
 const STAT = { display: 'flex', flexDirection: 'column', background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 5, padding: '6px 10px', gap: 2, minWidth: 80 }
 const STAT_LABEL = { fontSize: 10, color: 'var(--text-3)' }
-const STAT_VAL = { fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }
+const STAT_VAL = { fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }
 
 const TH = { padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }
-const TD = { padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }
+const TD = { padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }
 const TDL = { ...TD, textAlign: 'left' }
 
 export default function UsSupplySection({ ticker, market }) {

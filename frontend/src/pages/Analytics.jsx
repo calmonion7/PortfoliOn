@@ -75,10 +75,10 @@ function SectorAllocation({ cards, usdkrw }) {
                   }} />
                   {d.name}
                 </td>
-                <td style={{ textAlign: 'right', paddingRight: 12, paddingTop: 4, color: 'var(--text)' }}>
+                <td className="mono tnum" style={{ textAlign: 'right', paddingRight: 12, paddingTop: 4, color: 'var(--text)' }}>
                   {d.pct}%
                 </td>
-                <td style={{ textAlign: 'right', paddingTop: 4, color: 'var(--text-3)' }}>
+                <td className="mono tnum" style={{ textAlign: 'right', paddingTop: 4, color: 'var(--text-3)' }}>
                   {fmt(d.value)}
                 </td>
               </tr>
@@ -96,7 +96,7 @@ const CustomDot = (props) => {
   return (
     <g>
       <circle cx={cx} cy={cy} r={r} fill={payload.fill} fillOpacity={0.75} stroke={payload.fill} />
-      <text x={cx} y={cy - r - 4} textAnchor="middle" fontSize={10} fill="var(--text)">
+      <text className="mono" x={cx} y={cy - r - 4} textAnchor="middle" fontSize={10} fill="var(--text)">
         {payload.ticker}
       </text>
     </g>
@@ -167,17 +167,17 @@ function OpportunityBubble({ cards, usdkrw }) {
                   background: 'var(--bg-elev)', border: '1px solid var(--border)',
                   padding: '8px 12px', borderRadius: 6, fontSize: 12,
                 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                  <div className="mono" style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
                     {d.ticker} <span style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 400 }}>{d.market === 'KR' ? '🇰🇷 KRW' : '🇺🇸 USD'}</span>
                   </div>
                   <div style={{ color: 'var(--text-3)' }}>
-                    업사이드: <span style={{ color: 'var(--text)' }}>{d.upside}%</span>
+                    업사이드: <span className="mono tnum" style={{ color: 'var(--text)' }}>{d.upside}%</span>
                   </div>
                   <div style={{ color: 'var(--text-3)' }}>
-                    수익률: <span style={{ color: 'var(--text)' }}>{d.returnPct}%</span>
+                    수익률: <span className="mono tnum" style={{ color: 'var(--text)' }}>{d.returnPct}%</span>
                   </div>
                   <div style={{ color: 'var(--text-3)' }}>
-                    비중: <span style={{ color: 'var(--text)' }}>{d.weight.toFixed(1)}%</span>
+                    비중: <span className="mono tnum" style={{ color: 'var(--text)' }}>{d.weight.toFixed(1)}%</span>
                   </div>
                 </div>
               )
@@ -237,30 +237,30 @@ function CorrelationHeatmap() {
       <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
         <svg width={LABEL + n * CELL} height={LABEL + n * CELL}>
           {tickers.map((t, j) => (
-            <text key={`col-${j}`} x={LABEL + j * CELL + CELL / 2} y={LABEL - 8}
+            <text key={`col-${j}`} className="mono" x={LABEL + j * CELL + CELL / 2} y={LABEL - 8}
               textAnchor="middle" fontSize={11} fill="var(--text-3)">{t}</text>
           ))}
           {tickers.map((t, i) => (
-            <text key={`row-${i}`} x={LABEL - 8} y={LABEL + i * CELL + CELL / 2 + 4}
+            <text key={`row-${i}`} className="mono" x={LABEL - 8} y={LABEL + i * CELL + CELL / 2 + 4}
               textAnchor="end" fontSize={11} fill="var(--text-3)">{t}</text>
           ))}
           {matrix.map((row, i) => row.map((v, j) => (
             <g key={`${i}-${j}`}>
               <rect x={LABEL + j * CELL} y={LABEL + i * CELL}
                 width={CELL} height={CELL} fill={corrColor(v)} rx={2} />
-              <text x={LABEL + j * CELL + CELL / 2} y={LABEL + i * CELL + CELL / 2 + 4}
+              <text className="mono" x={LABEL + j * CELL + CELL / 2} y={LABEL + i * CELL + CELL / 2 + 4}
                 textAnchor="middle" fontSize={10} fill="white">{v !== null ? v.toFixed(2) : '—'}</text>
             </g>
           )))}
         </svg>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>-1.0</span>
+        <span className="mono tnum" style={{ fontSize: 11, color: 'var(--text-3)' }}>-1.0</span>
         <div style={{
           width: 200, height: 12, borderRadius: 2,
           background: 'linear-gradient(to right, var(--corr-neg), var(--corr-zero), var(--corr-pos))',
         }} />
-        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>+1.0</span>
+        <span className="mono tnum" style={{ fontSize: 11, color: 'var(--text-3)' }}>+1.0</span>
       </div>
     </div>
   )

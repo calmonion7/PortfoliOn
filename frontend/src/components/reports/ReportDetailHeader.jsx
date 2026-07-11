@@ -1,4 +1,10 @@
 import { fmtPrice as fmt } from '../../utils'
+import { MarketBadge, ChangeBadge } from '../ui/Badge'
+
+// 섹터·PER·PBR·PSR·EV/EBITDA 메타 칩 — 4곳이 byte-identical 스타일을 반복하던 것을 로컬 헬퍼로 정리(같은 파일 내, 신규 모듈 아님).
+const MetaChip = ({ children }) => (
+  <span className="mono tnum" style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>{children}</span>
+)
 
 export default function ReportDetailHeader({
   detail, selected, setSelected, setView, isAdmin, generating, genProgress, generateOne, guruMap, reportList,
@@ -17,6 +23,7 @@ export default function ReportDetailHeader({
           <button
             onClick={() => generateOne(selected.ticker)}
             disabled={!!generating}
+            className="mono tnum"
             style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === selected.ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: generating ? 'default' : 'pointer' }}
           >
             {generating === selected.ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
@@ -28,11 +35,8 @@ export default function ReportDetailHeader({
         <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 17 }}>
           {detail.summary?.name || selected.ticker}
         </span>
-        <span style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 6 }}>({selected.ticker})</span>
-        {detail.summary?.market === 'KR'
-          ? <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--color-success-soft)', color: 'var(--color-success)', border: '1px solid var(--border)' }}>🇰🇷 KR</span>
-          : <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--color-info-soft)', color: 'var(--color-info)', border: '1px solid var(--border)' }}>🇺🇸 US</span>
-        }
+        <span className="mono" style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 6 }}>({selected.ticker})</span>
+        <span style={{ marginLeft: 6 }}><MarketBadge market={detail.summary?.market || 'US'} exchange={detail.summary?.exchange} /></span>
         {guruMap[selected.ticker] && (
           <span style={{ color: 'var(--warn)', fontSize: 11, marginLeft: 6, background: 'var(--warn-soft)', padding: '2px 7px', borderRadius: 3 }}>
             구루 {guruMap[selected.ticker]}명
@@ -45,6 +49,7 @@ export default function ReportDetailHeader({
           <select
             value={selected.date}
             onChange={e => setSelected({ ticker: selected.ticker, date: e.target.value })}
+            className="mono"
             style={{ background: 'var(--bg-elev-2)', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 4, padding: '2px 6px', fontSize: 12, cursor: 'pointer' }}
           >
             {reportList[selected.ticker].dates.map(d => (
@@ -52,21 +57,18 @@ export default function ReportDetailHeader({
             ))}
           </select>
         ) : (
-          <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{selected.date}</span>
+          <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12 }}>{selected.date}</span>
         )}
         {detail.summary?.price != null && (
-          <span style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700 }}>
+          <span className="mono tnum" style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700 }}>
             {fmt(detail.summary.price, detail.summary.market)}
           </span>
         )}
         {detail.summary?.drop_from_high_20d != null && (
-          <span style={{
-            fontSize: 11, padding: '2px 7px', borderRadius: 3,
-            background: detail.summary.drop_from_high_20d >= 0 ? 'var(--up-soft)' : 'var(--down-soft)',
-            color: detail.summary.drop_from_high_20d >= 0 ? 'var(--up)' : 'var(--down)',
-          }}>
-            {detail.summary.drop_from_high_20d < -10 && '⚠ '}
-            20일고점 {detail.summary.drop_from_high_20d >= 0 ? '+' : ''}{detail.summary.drop_from_high_20d.toFixed(1)}%
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {detail.summary.drop_from_high_20d < -10 && <span style={{ fontSize: 11 }}>⚠</span>}
+            <span className="mono" style={{ fontSize: 10, color: 'var(--text-3)' }}>20일고점</span>
+            <ChangeBadge value={detail.summary.drop_from_high_20d} />
           </span>
         )}
       </div>
@@ -78,26 +80,14 @@ export default function ReportDetailHeader({
           </span>
         )}
         {detail.summary?.per != null && (
-          <span style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
+          <MetaChip>
             PER {detail.summary.per.toFixed(1)}
             {detail.summary.forward_per != null && <span style={{ marginLeft: 4 }}>/ Fwd {detail.summary.forward_per.toFixed(1)}</span>}
-          </span>
+          </MetaChip>
         )}
-        {detail.summary?.pbr != null && (
-          <span style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
-            PBR {detail.summary.pbr.toFixed(2)}
-          </span>
-        )}
-        {detail.summary?.psr != null && (
-          <span style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
-            PSR {detail.summary.psr.toFixed(2)}
-          </span>
-        )}
-        {detail.summary?.ev_ebitda != null && (
-          <span style={{ color: 'var(--text-3)', fontSize: 11, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3 }}>
-            EV/EBITDA {detail.summary.ev_ebitda.toFixed(1)}
-          </span>
-        )}
+        {detail.summary?.pbr != null && <MetaChip>PBR {detail.summary.pbr.toFixed(2)}</MetaChip>}
+        {detail.summary?.psr != null && <MetaChip>PSR {detail.summary.psr.toFixed(2)}</MetaChip>}
+        {detail.summary?.ev_ebitda != null && <MetaChip>EV/EBITDA {detail.summary.ev_ebitda.toFixed(1)}</MetaChip>}
       </div>
     </div>
   )

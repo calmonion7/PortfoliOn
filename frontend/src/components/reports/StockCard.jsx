@@ -2,6 +2,7 @@ import { fmtPrice as fmt } from '../../utils'
 import { fmt as fmtNum } from '../ui/icons'
 import { fmtN, rsiColor, overallWeather } from './reportUtils.jsx'
 import StockActions from './StockActions.jsx'
+import { MarketBadge, ChangeBadge } from '../ui/Badge'
 
 export default function StockCard({
   ticker, info, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
@@ -27,7 +28,7 @@ export default function StockCard({
   const priceGap = (t) => {
     if (t == null || !s?.price) return null
     const p = (t - s.price) / s.price * 100
-    return <span style={{ fontSize: 9, color: p >= 0 ? 'var(--up)' : 'var(--down)' }}>({p >= 0 ? '+' : ''}{p.toFixed(1)}%)</span>
+    return <span className="mono tnum" style={{ fontSize: 9, color: p >= 0 ? 'var(--up)' : 'var(--down)' }}>({p >= 0 ? '+' : ''}{p.toFixed(1)}%)</span>
   }
 
   const rsiTargetBlock = (key, color, soft) => {
@@ -50,7 +51,7 @@ export default function StockCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           {dv != null ? <>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
-              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text)' }}>{fmt(dv, market)}</span>
+              <span className="mono tnum" style={{ fontSize: 11, fontWeight: 500, color: 'var(--text)' }}>{fmt(dv, market)}</span>
               {priceGap(dv)}
             </div>
             <div style={{ height: 2, background: 'var(--bg-elev-2)', borderRadius: 1, overflow: 'hidden', marginTop: 3, marginBottom: 2 }}>
@@ -76,8 +77,8 @@ export default function StockCard({
           {weather && <span title={weather.label} style={{ fontSize: 12, flexShrink: 0 }}>{weather.icon}</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{ticker}</span>
-          {market && <span className={`sc-market ${market === 'KR' ? 'kr' : 'us'}`}>{market === 'KR' ? `🇰🇷 ${info.exchange === 'KS' ? 'KOSPI' : info.exchange === 'KQ' ? 'KOSDAQ' : 'KR'}` : '🇺🇸 US'}</span>}
+          <span className="mono" style={{ fontSize: 11, color: 'var(--text-3)' }}>{ticker}</span>
+          {market && <MarketBadge market={market} exchange={info.exchange} />}
           {guruMap[ticker] && <span style={{ fontSize: 9, color: 'var(--warn)' }}>구루{guruMap[ticker]}명</span>}
         </div>
         {s?.sector && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sector}</div>}
@@ -88,7 +89,7 @@ export default function StockCard({
           if (!p) return null
           const isUp = p.pnl >= 0
           return (
-            <div style={{ fontSize: 10, color: isUp ? 'var(--up)' : 'var(--down)', marginTop: 3, fontWeight: 600 }}>
+            <div className="mono tnum" style={{ fontSize: 10, color: isUp ? 'var(--up)' : 'var(--down)', marginTop: 3, fontWeight: 600 }}>
               {p.quantity}주 · 평단 {p.ccy}{fmtNum(p.avg_cost, p.dec)}<br />
               {isUp ? '+' : '-'}{p.ccy}{fmtNum(Math.abs(p.pnl), p.dec)}
               {p.pnlPct != null && <span style={{ marginLeft: 4 }}>({p.pnlPct >= 0 ? '+' : ''}{p.pnlPct.toFixed(1)}%)</span>}
@@ -105,14 +106,15 @@ export default function StockCard({
       {/* 가격 / POC */}
       <div>
         {s?.price != null ? <>
-          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{fmt(s.price, market)}</div>
+          <div className="mono tnum" style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{fmt(s.price, market)}</div>
           {s.drop_from_high_20d != null && (
-            <div style={{ fontSize: 11, color: s.drop_from_high_20d >= 0 ? 'var(--up)' : 'var(--down)', marginTop: 2 }}>
-              {s.drop_from_high_20d < -10 && '⚠ '}{s.drop_from_high_20d >= 0 ? '+' : ''}{s.drop_from_high_20d.toFixed(1)}%
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+              {s.drop_from_high_20d < -10 && <span style={{ fontSize: 11 }}>⚠</span>}
+              <ChangeBadge value={s.drop_from_high_20d} />
             </div>
           )}
           {s.volume_profile?.poc != null && (
-            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>POC {fmt(s.volume_profile.poc, market)}</div>
+            <div className="mono tnum" style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>POC {fmt(s.volume_profile.poc, market)}</div>
           )}
         </> : <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
       </div>
@@ -120,8 +122,9 @@ export default function StockCard({
       {/* 목표가 / 컨센서스 */}
       <div>
         {targetGap != null && (
-          <div style={{ fontSize: 12, color: targetGap >= 0 ? 'var(--up)' : 'var(--down)', fontWeight: 600 }}>
-            {fmt(s.target_mean, market)} {targetGap >= 0 ? '▲' : '▼'}{Math.abs(targetGap).toFixed(1)}%
+          <div className="mono tnum" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600 }}>
+            <span style={{ color: 'var(--text)' }}>{fmt(s.target_mean, market)}</span>
+            <ChangeBadge value={targetGap} />
           </div>
         )}
         {total > 0 && <>
@@ -130,18 +133,18 @@ export default function StockCard({
             <div style={{ width: `${hold / total * 100}%`, background: 'var(--data-4)' }} />
             <div style={{ width: `${sell / total * 100}%`, background: 'var(--semantic-sell)' }} />
           </div>
-          <div style={{ fontSize: 10, display: 'flex', gap: 5 }}>
+          <div className="mono tnum" style={{ fontSize: 10, display: 'flex', gap: 5 }}>
             <span style={{ color: 'var(--semantic-buy)' }}>B{buy}</span>
             <span style={{ color: 'var(--text-3)' }}>H{hold}</span>
             <span style={{ color: 'var(--semantic-sell)' }}>S{sell}</span>
             {total <= 10 && <span style={{ color: 'var(--warn)' }}>⚠{total}명</span>}
           </div>
         </>}
-        {s?.finviz_recom != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Finviz {fmtN(s.finviz_recom)}</div>}
+        {s?.finviz_recom != null && <div className="mono tnum" style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Finviz {fmtN(s.finviz_recom)}</div>}
       </div>
 
       {/* 밸류에이션 */}
-      <div style={{ fontSize: 11 }}>
+      <div className="mono tnum" style={{ fontSize: 11 }}>
         <div>{s?.per != null ? `PER ${s.per.toFixed(1)}` : '—'}</div>
         {s?.forward_per != null && <div style={{ fontSize: 10, color: 'var(--text-3)' }}>Fwd {s.forward_per.toFixed(1)}</div>}
         {s?.pbr != null && <div style={{ marginTop: 2 }}>PBR {s.pbr.toFixed(2)}</div>}
@@ -155,7 +158,7 @@ export default function StockCard({
             <div key={label} style={{ marginBottom: 5 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <span style={{ fontSize: 8, color: 'var(--text-3)', letterSpacing: '0.3px' }}>{label}</span>
-                <span style={{ fontSize: bold ? 12 : 10, fontWeight: bold ? 700 : 400, color: rsiColor(rsi) }}>{fmtN(rsi)}</span>
+                <span className="mono tnum" style={{ fontSize: bold ? 12 : 10, fontWeight: bold ? 700 : 400, color: rsiColor(rsi) }}>{fmtN(rsi)}</span>
               </div>
               <div style={{ height: 3, background: 'var(--bg-elev-2)', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${rsi}%`, background: rsiColor(rsi), borderRadius: 2, opacity: bold ? 1 : 0.6 }} />
@@ -176,7 +179,7 @@ export default function StockCard({
           <button
             onClick={e => { e.stopPropagation(); generateOne(ticker) }}
             disabled={!!generating}
-            className="sc-gen-btn"
+            className="sc-gen-btn mono tnum"
           >
             {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
           </button>

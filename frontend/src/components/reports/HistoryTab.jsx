@@ -104,11 +104,13 @@ export default function HistoryTab({ ticker, market }) {
       <div>
         <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
           <select value={compareA ?? ''} onChange={e => setCompareA(e.target.value)}
+            className="mono"
             style={{ background: 'var(--bg-elev)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
             {snapDates.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
           </select>
           <span style={{ color: 'var(--text-3)', fontSize: 12 }}>vs</span>
           <select value={compareB ?? ''} onChange={e => setCompareB(e.target.value)}
+            className="mono"
             style={{ background: 'var(--bg-elev)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 8px', fontSize: 12 }}>
             {snapDates.map(h => <option key={h.date} value={h.date}>{h.date}</option>)}
           </select>
@@ -121,8 +123,8 @@ export default function HistoryTab({ ticker, market }) {
                 <thead>
                   <tr>
                     <th style={{ ...TH, textAlign: 'left' }}>항목</th>
-                    <th style={TH}>{compareA}</th>
-                    <th style={TH}>{compareB}</th>
+                    <th className="mono" style={TH}>{compareA}</th>
+                    <th className="mono" style={TH}>{compareB}</th>
                     <th style={TH}>변화</th>
                   </tr>
                 </thead>

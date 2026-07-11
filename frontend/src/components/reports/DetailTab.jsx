@@ -91,7 +91,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly 
                 position: 'absolute', right: 6, top: l.y - 10,
                 fontSize: l.isCurrent ? 15 : 13, textAlign: 'right', whiteSpace: 'nowrap',
                 color: l.isCurrent ? 'var(--text)' : 'var(--text-2)',
-                fontWeight: l.isCurrent ? 700 : 400, fontVariantNumeric: 'tabular-nums',
+                fontWeight: l.isCurrent ? 700 : 400, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)',
               }}>
                 {fmt(l.value, market)}
               </div>
@@ -167,7 +167,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly 
                   display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap',
                 }}>
                   {p != null && (
-                    <span style={{ fontSize: 13, color: p > 0 ? 'var(--color-error)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontSize: 13, color: p > 0 ? 'var(--color-error)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }}>
                       {p >= 0 ? '+' : ''}{p.toFixed(1)}%
                     </span>
                   )}
@@ -242,11 +242,11 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly 
           ) : (
             <span style={{ fontSize: 9, color: accentColor, fontWeight: 700 }}>{items[0].label}</span>
           )}
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }}>
             {fmt(value, market)}
           </span>
           {p != null && (
-            <span style={{ fontSize: 9, color: isBelow ? 'var(--color-success)' : 'var(--color-error)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 9, color: isBelow ? 'var(--color-success)' : 'var(--color-error)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }}>
               {p >= 0 ? '+' : ''}{p.toFixed(1)}%
             </span>
           )}
@@ -297,7 +297,7 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly 
               }}>
                 <span style={{ fontSize: 9, color: '#5b8dee', fontWeight: 600 }}>현재가</span>
                 {price != null && (
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }}>
                     {fmt(price, market)}
                   </span>
                 )}
@@ -454,13 +454,13 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-3)', fontSize: 9 }}>🎯 평균목표가</span>
-            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{fmt(summary.target_mean, summary.market)}</span>
+            <span className="mono tnum" style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{fmt(summary.target_mean, summary.market)}</span>
           </div>
           {/* 상승여력 */}
           {gap != null && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <span style={{ color: 'var(--text-3)', fontSize: 9 }}>상승여력</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? 'var(--up)' : 'var(--down)' }}>
+              <span className="mono tnum" style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? 'var(--up)' : 'var(--down)' }}>
                 {gap >= 0 ? '+' : ''}{gap.toFixed(1)}%
               </span>
             </div>
@@ -469,18 +469,18 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
           {/* 최고/최저 목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-3)', fontSize: 9 }}>최고목표가</span>
-            <span style={{ color: 'var(--up)', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high, summary.market)}</span>
+            <span className="mono tnum" style={{ color: 'var(--up)', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_high, summary.market)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ color: 'var(--text-3)', fontSize: 9 }}>최저목표가</span>
-            <span style={{ color: 'var(--down)', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low, summary.market)}</span>
+            <span className="mono tnum" style={{ color: 'var(--down)', fontSize: 12, fontWeight: 600 }}>{fmt(summary.target_low, summary.market)}</span>
           </div>
           {summary.finviz_recom != null && (
             <>
               <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span style={{ color: 'var(--text-3)', fontSize: 9 }}>Finviz 추천</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: summary.finviz_recom <= 2 ? 'var(--semantic-buy)' : 'var(--text)' }}>
+                <span className="mono tnum" style={{ fontSize: 12, fontWeight: 600, color: summary.finviz_recom <= 2 ? 'var(--semantic-buy)' : 'var(--text)' }}>
                   {summary.finviz_recom.toFixed(1)} <span style={{ fontSize: 9, color: 'var(--text-3)' }}>/ 5</span>
                 </span>
               </div>
@@ -491,7 +491,7 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
               <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span style={{ color: 'var(--text-3)', fontSize: 9 }}>애널리스트 의견</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div className="mono tnum" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: 'var(--semantic-buy)', fontSize: 11 }}>매수 {buy}</span>
                   <span style={{ color: 'var(--text-3)', fontSize: 11 }}>중립 {hold}</span>
                   <span style={{ color: 'var(--semantic-sell)', fontSize: 11 }}>매도 {sell}</span>
@@ -576,7 +576,7 @@ export function TechnicalStats({ summary }) {
   const StatRow = ({ label, value, valueColor }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
       <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: valueColor || 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      <span className="mono tnum" style={{ fontSize: 12, fontWeight: 600, color: valueColor || 'var(--text)' }}>{value}</span>
     </div>
   )
 

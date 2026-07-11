@@ -36,11 +36,11 @@ const DividendSummary = ({ totals }) => {
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ fontSize: 11, color: 'var(--text-3)' }}>총 연 예상배당</span>
-        <span className="tnum" style={{ fontSize: 16, fontWeight: 700 }}>₩{income}</span>
+        <span className="tnum mono" style={{ fontSize: 16, fontWeight: 700 }}>₩{income}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ fontSize: 11, color: 'var(--text-3)' }}>평균 배당수익률</span>
-        <span className="tnum" style={{ fontSize: 16, fontWeight: 700 }}>
+        <span className="tnum mono" style={{ fontSize: 16, fontWeight: 700 }}>
           {avgYield != null ? `${avgYield.toFixed(2)}%` : '—'}
         </span>
       </div>
@@ -113,20 +113,20 @@ export default function Portfolio() {
 
       <div className="hero">
         <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} · {krFreshnessLabel()}</div>
-        <FlashValue as="div" className="val tnum" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(totalValue ?? totalCost)}</FlashValue>
+        <FlashValue as="div" className="val tnum mono" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(totalValue ?? totalCost)}</FlashValue>
         {totalPnl != null ? (
-          <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`}>
+          <div className={`delta tnum mono ${totalPnl >= 0 ? 'up' : 'down'}`}>
             {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
             {totalPnlPct != null && <span style={{ marginLeft: 6, fontSize: 13 }}>({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>}
           </div>
         ) : (
-          <div className="delta muted tnum">{stocks.length}개 보유 · 관심 {watchlist.length}</div>
+          <div className="delta muted tnum mono">{stocks.length}개 보유 · 관심 {watchlist.length}</div>
         )}
         {totalPnl != null && (
-          <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 2 }}>{stocks.length}개 보유 · 원가 ₩{fmt(totalCost, 0)}</div>
+          <div className="delta muted tnum mono" style={{ fontSize: 12, marginTop: 2 }}>{stocks.length}개 보유 · 원가 ₩{fmt(totalCost, 0)}</div>
         )}
         {totalValueUsd != null && (
-          <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 1 }}>
+          <div className="delta muted tnum mono" style={{ fontSize: 12, marginTop: 1 }}>
             ${fmt(totalValueUsd, 2)} · 기준환율 ₩{fmt(fx, 0)}
           </div>
         )}
@@ -185,40 +185,40 @@ export default function Portfolio() {
       <div className="kpi-row">
         <div className="kpi">
           <div className="label">{totalValue != null ? '평가금액' : '투자 원가'}</div>
-          <FlashValue as="div" className="val tnum" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(totalValue ?? totalCost)}</FlashValue>
+          <FlashValue as="div" className="val tnum mono" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(totalValue ?? totalCost)}</FlashValue>
           {totalPnl != null && (
-            <div className={`delta tnum ${totalPnl >= 0 ? 'up' : 'down'}`} style={{ marginTop: 4 }}>
+            <div className={`delta tnum mono ${totalPnl >= 0 ? 'up' : 'down'}`} style={{ marginTop: 4 }}>
               {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
               {totalPnlPct != null && <span style={{ marginLeft: 5, fontSize: 12 }}>({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>}
             </div>
           )}
           {totalValue != null && (
-            <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 2 }}>원가 ₩{fmt(totalCost, 0)}</div>
+            <div className="delta muted tnum mono" style={{ fontSize: 12, marginTop: 2 }}>원가 ₩{fmt(totalCost, 0)}</div>
           )}
           {totalValueUsd != null && (
-            <div className="delta muted tnum" style={{ fontSize: 12, marginTop: 1 }}>
+            <div className="delta muted tnum mono" style={{ fontSize: 12, marginTop: 1 }}>
               ${fmt(totalValueUsd, 2)} · 기준환율 ₩{fmt(fx, 0)}
             </div>
           )}
         </div>
         <div className="kpi">
           <div className="label">보유 종목</div>
-          <div className="val tnum">{stocks.length}</div>
-          <div className="delta muted">
+          <div className="val tnum mono">{stocks.length}</div>
+          <div className="delta muted tnum mono">
             미국 {stocks.filter(h => (h.market || 'US') === 'US').length} · 한국 {stocks.filter(h => h.market === 'KR').length}
           </div>
         </div>
         <div className="kpi">
           <div className="label">관심 종목</div>
-          <div className="val tnum">{watchlist.length}</div>
-          <div className="delta muted">
+          <div className="val tnum mono">{watchlist.length}</div>
+          <div className="delta muted tnum mono">
             미국 {watchlist.filter(h => (h.market || 'US') === 'US').length} · 한국 {watchlist.filter(h => h.market === 'KR').length}
           </div>
         </div>
         <div className="kpi">
           <div className="label">총 종목</div>
-          <div className="val tnum">{stocks.length + watchlist.length}</div>
-          <div className="delta muted">보유 {stocks.length} · 관심 {watchlist.length}</div>
+          <div className="val tnum mono">{stocks.length + watchlist.length}</div>
+          <div className="delta muted tnum mono">보유 {stocks.length} · 관심 {watchlist.length}</div>
         </div>
       </div>
 

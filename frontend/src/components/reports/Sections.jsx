@@ -39,7 +39,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
       {premiums.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
           {premiums.map(({ metric, pct, discount }) => (
-            <span key={metric} style={{
+            <span key={metric} className="mono tnum" style={{
               fontSize: 11,
               fontWeight: 700,
               padding: '3px 8px',
@@ -79,7 +79,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontWeight: 500 }}>{c.ticker}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 19 }}>
+              <div className="mono tnum" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 19 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{fmt(c.price, market)}</span>
                 <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{mcStr}</span>
                 <span style={{ fontSize: 12, color: ytdColor, fontWeight: 700 }}>
@@ -87,7 +87,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
                 </span>
               </div>
               {(c.per != null || c.pbr != null || c.psr != null || c.ev_ebitda != null) && (
-                <div style={{ display: 'flex', gap: 8, paddingLeft: 19, flexWrap: 'wrap' }}>
+                <div className="mono tnum" style={{ display: 'flex', gap: 8, paddingLeft: 19, flexWrap: 'wrap' }}>
                   {c.per != null && (
                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>PER {c.per.toFixed(1)}</span>
                   )}
@@ -280,9 +280,9 @@ export function RecentDisclosuresSection({ disclosures, news }) {
               {disclosures.metrics.map((m, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '6px 8px', color: 'var(--text)' }}>{m.label}</td>
-                  <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text)', fontWeight: 700, whiteSpace: 'nowrap' }}>{m.actual}</td>
-                  <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{m.consensus}</td>
-                  <td style={{ padding: '6px 8px', textAlign: 'right', color: vsColor(m.vs_consensus), fontWeight: 700, whiteSpace: 'nowrap' }}>{m.vs_consensus}</td>
+                  <td className="mono tnum" style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text)', fontWeight: 700, whiteSpace: 'nowrap' }}>{m.actual}</td>
+                  <td className="mono tnum" style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{m.consensus}</td>
+                  <td className="mono tnum" style={{ padding: '6px 8px', textAlign: 'right', color: vsColor(m.vs_consensus), fontWeight: 700, whiteSpace: 'nowrap' }}>{m.vs_consensus}</td>
                   <td style={{ padding: '6px 8px', color: 'var(--text-3)' }}>{m.note || '—'}</td>
                 </tr>
               ))}

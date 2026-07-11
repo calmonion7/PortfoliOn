@@ -145,7 +145,7 @@ export default function ReportDetailTabs({
               {enrichedAt && (
                 <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>✓</span>
-                  AI 분석 업데이트: {new Date(enrichedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  AI 분석 업데이트: <span className="mono tnum">{new Date(enrichedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               )}
               {!enrichedAt && (

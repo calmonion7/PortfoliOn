@@ -73,13 +73,13 @@ export default function SectorTab() {
         <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
       ) : !data ? null : (
         <>
-      <table style={{ borderCollapse: 'separate', borderSpacing: '0 3px', fontSize: 13, width: '100%', maxWidth: 620 }}>
+      <table className="sector-tbl" style={{ maxWidth: 620 }}>
         <thead>
           <tr>
-            <th style={{ textAlign: 'left', paddingBottom: 8, color: 'var(--text-3)', fontWeight: 400 }}>{isKr ? '업종' : '섹터'}</th>
-            {!isKr && <th style={{ textAlign: 'center', padding: '0 12px 8px', color: 'var(--text-3)', fontWeight: 400 }}>ETF</th>}
+            <th>{isKr ? '업종' : '섹터'}</th>
+            {!isKr && <th style={{ textAlign: 'center' }}>ETF</th>}
             {PERIODS.map(p => (
-              <th key={p} style={{ textAlign: 'right', padding: '0 8px 8px', color: 'var(--text-3)', fontWeight: 400, minWidth: 68 }}>
+              <th key={p} style={{ textAlign: 'right', minWidth: 68 }}>
                 {PERIOD_LABELS[p]}
               </th>
             ))}
@@ -88,20 +88,17 @@ export default function SectorTab() {
         <tbody>
           {sectors.map(s => (
             <tr key={s.etf || s.name}>
-              <td style={{ padding: '4px 12px 4px 0', color: 'var(--text)' }}>
-                {heldSectors.has(s.name) ? `★ ${s.name}` : s.name}
-              </td>
-              {!isKr && <td style={{ padding: '4px 12px', color: 'var(--text-3)', textAlign: 'center', fontSize: 11 }}>{s.etf}</td>}
+              <td>{heldSectors.has(s.name) ? `★ ${s.name}` : s.name}</td>
+              {!isKr && <td className="mono" style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-3)' }}>{s.etf}</td>}
               {PERIODS.map(p => (
-                <td key={p} style={{
-                  padding: '3px 8px',
-                  textAlign: 'right',
-                  background: returnColor(s[p]),
-                  color: s[p] !== null ? 'white' : 'var(--text-3)',
-                  borderRadius: 4,
-                  fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {s[p] !== null ? `${s[p] > 0 ? '+' : ''}${s[p]}%` : '—'}
+                <td key={p} className="heat">
+                  <div className="mono" style={{
+                    background: returnColor(s[p]),
+                    color: s[p] !== null ? 'white' : 'var(--text-3)',
+                    borderRadius: 4,
+                  }}>
+                    {s[p] !== null ? `${s[p] > 0 ? '+' : ''}${s[p]}%` : '—'}
+                  </div>
                 </td>
               ))}
             </tr>

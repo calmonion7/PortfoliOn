@@ -2,6 +2,7 @@ import { fmtPrice as fmt } from '../../utils'
 import { fmt as fmtNum } from '../ui/icons'
 import { fmtN, rsiColor, overallWeather } from './reportUtils.jsx'
 import StockActions from './StockActions.jsx'
+import { MarketBadge, ChangeBadge } from '../ui/Badge'
 
 export default function TickerListItem({
   ticker, info, selected, view, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
@@ -25,13 +26,9 @@ export default function TickerListItem({
     >
       <div style={{ minWidth: 0, flex: 1 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-          <span style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
+          <span className="mono" style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
           {(() => { const w = overallWeather(s); return w ? <span title={w.label} style={{ fontSize: 12, lineHeight: 1 }}>{w.icon}</span> : null })()}
-          {market && (
-            <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 2, background: market === 'KR' ? 'var(--color-success-soft)' : 'var(--color-info-soft)', color: market === 'KR' ? 'var(--color-success)' : 'var(--color-info)', border: '1px solid var(--border)' }}>
-              {market === 'KR' ? '🇰🇷 KR' : '🇺🇸 US'}
-            </span>
-          )}
+          {market && <MarketBadge market={market} exchange={info.exchange} />}
         </span>
         {s?.name && (
           <div style={{ color: 'var(--text-3)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
@@ -41,25 +38,25 @@ export default function TickerListItem({
         )}
         {(!hasReport || isBroken) && <div style={{ color: isBroken ? 'var(--color-error)' : 'var(--text-3)', fontSize: 10 }}>{isBroken ? '데이터 오류 — 클릭하여 재생성' : '클릭하여 생성'}</div>}
         {hasReport && s && (
-          <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
+          <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px 8px' }}>
             {s.price != null && (
-              <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmt(s.price, market)}</span>
+              <span className="mono tnum" style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmt(s.price, market)}</span>
             )}
             {s.drop_from_high_20d != null && (
-              <span style={{ fontSize: 11, color: s.drop_from_high_20d >= 0 ? 'var(--up)' : 'var(--down)' }}>
-                고점 {s.drop_from_high_20d >= 0 ? '+' : ''}{s.drop_from_high_20d.toFixed(1)}%
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-3)' }}>
+                고점<ChangeBadge value={s.drop_from_high_20d} />
               </span>
             )}
             {targetGap != null && (
-              <span style={{ fontSize: 11, color: targetGap >= 0 ? 'var(--up)' : 'var(--down)' }}>
-                목표 {fmt(s.target_mean, market)} ({targetGap >= 0 ? '+' : ''}{targetGap.toFixed(1)}%)
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-3)' }}>
+                목표 <span className="mono tnum">{fmt(s.target_mean, market)}</span><ChangeBadge value={targetGap} />
               </span>
             )}
             {rsi != null && (
-              <span style={{ fontSize: 11, color: rsiColor(rsi) }}>RSI {fmtN(rsi)}</span>
+              <span className="mono tnum" style={{ fontSize: 11, color: rsiColor(rsi) }}>RSI {fmtN(rsi)}</span>
             )}
             {total > 0 && (
-              <span style={{ fontSize: 11 }}>
+              <span className="mono tnum" style={{ fontSize: 11 }}>
                 <span style={{ color: 'var(--semantic-buy)' }}>B{buy}</span>
                 <span style={{ color: 'var(--text-3)' }}>/H{hold}</span>
                 <span style={{ color: 'var(--semantic-sell)' }}>/S{sell}</span>
@@ -75,7 +72,7 @@ export default function TickerListItem({
           if (!p) return null
           const isUp = p.pnl >= 0
           return (
-            <div style={{ marginTop: 3, fontSize: 11, color: isUp ? 'var(--up)' : 'var(--down)', fontWeight: 600 }}>
+            <div className="mono tnum" style={{ marginTop: 3, fontSize: 11, color: isUp ? 'var(--up)' : 'var(--down)', fontWeight: 600 }}>
               {p.quantity}주 · 평단 {p.ccy}{fmtNum(p.avg_cost, p.dec)} · {isUp ? '+' : '-'}{p.ccy}{fmtNum(Math.abs(p.pnl), p.dec)}
               {p.pnlPct != null && <span> ({p.pnlPct >= 0 ? '+' : ''}{p.pnlPct.toFixed(1)}%)</span>}
             </div>
@@ -94,6 +91,7 @@ export default function TickerListItem({
           <button
             onClick={e => { e.stopPropagation(); generateOne(ticker) }}
             disabled={!!generating}
+            className="mono tnum"
             style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: generating ? 'default' : 'pointer' }}
           >
             {generating === ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}

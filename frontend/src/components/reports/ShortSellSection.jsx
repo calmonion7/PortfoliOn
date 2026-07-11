@@ -23,7 +23,7 @@ function ShortTooltip({ active, payload }) {
   const r = payload[0].payload
   const row = (label, val) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-      <span style={{ color: 'var(--text-3)' }}>{label}</span><span>{val}</span>
+      <span style={{ color: 'var(--text-3)' }}>{label}</span><span className="mono tnum">{val}</span>
     </div>
   )
   return (

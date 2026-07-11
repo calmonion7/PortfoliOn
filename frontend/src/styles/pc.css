@@ -7,14 +7,12 @@
 .brand-mark { width: 22px; height: 22px; flex-shrink: 0; }
 
 /* ----- UTIL BAR (PC — sits above page content, sidebar owns primary nav) ----- */
+/* Solid bg-elev + hairline border to match the sidebar's terminal panel language (ADR-0025 2/5 follow-up) */
 .util-bar {
   display: flex; align-items: center; justify-content: flex-end; gap: 8px;
   padding: 13px 32px;
   position: sticky; top: 0; z-index: 20;
   background: var(--bg-elev);
-  background: color-mix(in oklab, var(--bg) 92%, transparent);
-  backdrop-filter: saturate(160%) blur(14px);
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
   border-bottom: 1px solid var(--border);
 }
 .icon-btn {
@@ -299,7 +297,7 @@
   .reports-filters[data-view="detail"] { display: none; }
 }
 /* 카운트 보조표기 (전역 .tab-btn 불변) */
-.reports-filters .tab-cnt { font-size: 10px; opacity: 0.55; margin-left: 3px; }
+.reports-filters .tab-cnt { font-size: 10px; opacity: 0.55; margin-left: 3px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* ----- STOCK CARD GRID ----- */
 .stock-card-grid { display: flex; flex-direction: column; gap: 5px; padding-right: 10px; }
@@ -344,9 +342,6 @@
 /* RSI sell zone - subtle red tint */
 .stock-card > div:nth-child(7) { background: var(--semantic-sell-soft); }
 
-.sc-market { font-size: 9px; padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
-.sc-market.kr { background: var(--color-info-soft); color: var(--color-info); border: 1px solid color-mix(in oklab, var(--color-info) 30%, transparent); }
-.sc-market.us { background: var(--bg-elev-2); color: var(--color-info); border: 1px solid var(--border); }
 .sc-gen-btn { background: transparent; border: 1px solid var(--border); color: var(--text-3); border-radius: 3px; padding: 3px 8px; font-size: 10px; cursor: pointer; }
 .sc-gen-btn:disabled { cursor: default; }
 .sc-act-btn {
