@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 2bb05053ac83f6f74c1dddb595a4a6df6d2943dc
-mapped: 2026-07-11
+last_mapped_commit: b52f0f5e237fcffe1972eda44d70ad867f632331
+mapped: 2026-07-12
 ---
 
 # ARCHITECTURE
@@ -40,7 +40,7 @@ PortfoliOn은 FastAPI 백엔드(포트 8000)와 React 19 + Vite 프론트엔드(
 - `_state.py` — 공유 `_scheduler`(APScheduler) 인스턴스·상수(부분초기화 순환 회피용 leaf 모듈).
 
 ### 프론트엔드 — `frontend/src/App.jsx`
-`BrowserRouter` 라우팅. **PC 골격은 좌측 사이드바 + `.app-main` 컬럼**(상단 가로 nav 폐지 — task#172, ADR-0025). `<div className="app-pc">` 안에 `<Sidebar />`(PC nav) + `<div className="app-main">`이 나란히 놓이고, `app-main`은 `.util-bar`(PC 검색/새로고침/테마/로그아웃) + `.mobile-header`(모바일 브랜드·검색·테마·로그아웃) + `.page-wrap`(라우트 콘텐츠) + `<MobileNav />`(모바일 하단탭)으로 구성된다.
+`BrowserRouter` 라우팅. **PC 골격은 좌측 사이드바 + `.app-main` 컬럼**(상단 가로 nav 폐지 — task#172, ADR-0025). `<div className="app-pc">` 안에 `<Sidebar />`(PC nav) + `<div className="app-main">`이 나란히 놓이고, `app-main`은 `.util-bar`(PC 검색/새로고침/테마/로그아웃) + `.mobile-header`(모바일 브랜드·검색·`<MobileTopActions>`·테마·로그아웃) + `.page-wrap`(라우트 콘텐츠) + `<MobileNav />`(모바일 하단탭)으로 구성된다.
 
 라우트 → 페이지 매핑(개별 URL 라우트로 승격):
 - **리서치 그룹** — 각 라우트가 `<ResearchShell>`로 감싼 개별 페이지를 렌더한다: `/reports`(기본)·`/recommend`·`/ranking`·`/compare`·`/calendar`·`/dividends`·`/digest`. 구 URL `/`·`/research`는 `/reports`로 `<Navigate replace>` 리다이렉트.
@@ -50,10 +50,10 @@ PortfoliOn은 FastAPI 백엔드(포트 8000)와 React 19 + Vite 프론트엔드(
 - **딥링크 규약(task#131)**: `App.jsx`의 로컬 `ReportsRoute` 컴포넌트가 `location.state.ticker`를 읽어 `<Reports initialTicker>`로 전달(같은 라우트 재네비게이션도 `useEffect`로 반영). 소비처 `components/GlobalSearch.jsx`·`pages/Recommendations.jsx`가 `navigate('/reports', { state: { ticker } })`로 점프.
 - `contexts/AuthContext.jsx`가 로그인·권한(user_menu_permissions)·role을 로드해 nav를 필터링(`{ role, menuPermissions, loading }` 제공). `api.js`(axios)가 Bearer 토큰 주입 + 401 시 로그아웃 리다이렉트.
 
-### 프론트엔드 — 네비게이션 골격 (task#172, ADR-0025)
-- **PC 사이드바** (`components/Sidebar.jsx` + `Sidebar.css`) — 5섹션(리서치/포트폴리오/시장/일정·인컴/구루) + 하단(설정·admin 행동). 섹션은 `SECTIONS` 배열로 선언(섹션당 `perm` 1개). 단일항목 섹션은 헤더=링크(`NavLink`), 다항목 섹션은 그룹 헤더 + 하위 `NavLink` 목록. **접기/펼치기** 상태는 `localStorage('sidebar_collapsed')` 영속(축소 시 아이콘만 표시, 활성 하위경로면 하이라이트). 권한 게이팅은 `useAuth().menuPermissions.includes(section.perm)` — 일정·인컴 섹션은 `research` 권한에 매핑(ALL_MENUS 5키 불변). 하단 설정은 `settings` 권한, admin 행동(`/admin-analytics`)은 `role === 'admin'`.
-- **모바일 하단탭** (`components/MobileNav.jsx`) — 5탭(리서치→`/reports`·포트폴리오·시장→`/market/indicators`·구루·설정) + admin 행동. 활성표시는 `NavLink` 정확매칭이 아니라 `location.pathname` **prefix 매칭**(`RESEARCH_PATHS` 그룹 중 하나로 시작하면 리서치 탭 활성, `/market/*`면 시장 탭 활성).
-- **리서치 하위탭** (`pages/ResearchShell.jsx`) — 7개 리서치 라우트를 감싸는 얇은 래퍼. PC에선 `.page` 컨테이너 + 제목만(사이드바가 nav 담당). 모바일에선 7항목 `.seg` 필 서브nav를 `NavLink`로 렌더(동선 보존). `children`으로 라우트별 실제 탭 컴포넌트를 렌더.
+### 프론트엔드 — 네비게이션 골격 (task#172, ADR-0025 + task#174~178 후속 정제)
+- **PC 사이드바** (`components/Sidebar.jsx` + `Sidebar.css`) — 5섹션(리서치=리포트/추천/랭킹/비교 / 포트폴리오 / 시장=시장지표/수급지표 / 일정·인컴=캘린더/배당/다이제스트 / 구루) + 하단(설정·admin 행동). 섹션은 `SECTIONS` 배열로 선언(섹션당 `perm` 1개). 단일항목 섹션은 헤더=링크(`NavLink`), 다항목 섹션은 그룹 헤더 + 하위 `NavLink` 목록. **접기/펼치기** 상태는 `localStorage('sidebar_collapsed')` 영속(축소 시 아이콘만 표시, 활성 하위경로면 하이라이트). 권한 게이팅은 `useAuth().menuPermissions.includes(section.perm)` — 일정·인컴 섹션은 `research` 권한에 매핑(ALL_MENUS 5키 불변). 하단 설정은 `settings` 권한, admin 행동(`/admin-analytics`)은 `role === 'admin'`.
+- **모바일 하단탭** (`components/MobileNav.jsx`, task#178) — **PC 사이드바 5섹션을 그대로 미러**(리서치/포트폴리오/시장/일정·인컴/구루) — `ALL_TABS`의 `match(pathname)`으로 그룹별 prefix 판정(`RESEARCH_PATHS`/`SCHEDULE_PATHS` 배열). **설정·admin은 더 이상 하단탭에 없다** — `mobile-header`의 `<MobileTopActions>`(더보기 드롭다운, `components/MobileTopActions.jsx`)로 이동(task#178, 아이콘이 테마 Sun과 형태 겹침 혼동 해소).
+- **리서치/일정 하위탭** (`pages/ResearchShell.jsx`) — 7개 리서치+일정 라우트(`/reports`·`/recommend`·`/ranking`·`/compare`·`/calendar`·`/dividends`·`/digest`)를 감싸는 공용 래퍼. **task#178부터 경로에 따라 두 그룹으로 분기**(`isSchedule = SCHEDULE_PATHS.some(...)`) — 일정·인컴 경로면 `groupLabel='일정·인컴'`+`SCHEDULE_TABS`(3항목), 그 외는 `groupLabel='리서치'`+`RESEARCH_TABS`(4항목). PC는 `.page` 컨테이너 + 그룹 제목(사이드바가 nav 담당), 모바일은 해당 그룹만의 `.seg` 필 서브nav를 `NavLink`로 렌더(교차 노출 없음). `children`으로 라우트별 실제 탭 컴포넌트를 렌더.
 - **시장 서브탭** (`pages/MarketHub.jsx`) — PC는 제목 + `<Market tab>`. 모바일은 2항목(시장지표/수급지표) `.seg` 필 서브nav를 `/market/indicators`·`/market/flow` 라우트 네비게이션으로 렌더. `Market.jsx`는 내부 탭 상태 없이 `tab` prop(`'indicators'|'flow'`)만 받아 섹션을 조립.
 
 ## 데이터 흐름 패턴
@@ -66,6 +66,7 @@ PortfoliOn은 FastAPI 백엔드(포트 8000)와 React 19 + Vite 프론트엔드(
 - 실패 처리 규율: 빈/all-None 결과를 캐시에 박제 금지(직전 양호값 유지), delete-rewrite store는 fetch 실패 시 DELETE 자체를 스킵(task#160), 외부 fetch 실패는 로깅(silent except 금지). 기동 시 빈 캐시는 `_seed_*_if_empty`로 적재.
 - 레지스트리: `services/batch_registry.py`의 `BATCHES`(현재 29개 항목)가 각 배치의 정적 메타(`id`·`market`(KR/US/공통)·`source`·`usage`·`default_schedule`)를 정의하고 `GET /api/batches`로 노출. `job_id`는 스케줄러 잡 id 및 `job_runs.record` 호출 id와 반드시 일치.
 - 단, fx/vix/commodities/indices 등 일부 시장지표는 배치 없이 **요청경로 증분 fetch**(TTL캐시→`_mc_load`→라이브 fetch→`_mc_save`+폴백) 패턴을 쓴다. 이때도 "성공-but-빈응답"은 last-good에 박제 금지(값 수준 가드, task#157).
+- KR 수출(`market_indicators/exports.py`, 배치 `monthly_kr`)은 원래 요청경로에 `_exports_is_stale` 검사가 있어 저장값이 2개월 이상 오래되면 `GET`이 **라이브 재조회**를 트리거했다 — 배치-백킹 원칙 위반(요청경로 외부호출). task#176에서 이 stale 재조회를 제거하고 기동 시 캐시 워밍만 남겨, 요청은 순수 저장값 read로 정리됨.
 
 ### 시세 소스 체인 (quote-source chain)
 `services/market/__init__.py`의 `get_quote(ticker, market, exchange, regular, hist)`가 종목 단위 TTL 캐시(`cache.get_quote_cached`, 캐시 키에 `regular` 포함)를 씌우고 `_get_quote_uncached`로 위임.

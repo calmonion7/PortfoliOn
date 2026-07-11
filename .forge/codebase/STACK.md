@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 1e8da3bc525d61545c6c374b1f91a04238dabf30
-mapped: 2026-07-10
+last_mapped_commit: b52f0f5e237fcffe1972eda44d70ad867f632331
+mapped: 2026-07-12
 ---
 
 # STACK — 기술 스택 / 런타임 / 배포

@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 2bb05053ac83f6f74c1dddb595a4a6df6d2943dc
-mapped: 2026-07-11
+last_mapped_commit: b52f0f5e237fcffe1972eda44d70ad867f632331
+mapped: 2026-07-12
 ---
 
 # STRUCTURE
@@ -85,14 +85,14 @@ scripts/          배포 폴러·UAT/스크린샷 스크립트(Playwright)
 
 ### `frontend/src/pages/` (개별 라우트 페이지 + 허브 래퍼 + 탭용 페이지)
 라우팅 골격(task#172, ADR-0025): 사이드바 항목이 개별 URL 라우트로 승격됨. 구 `Research.jsx`(허브)는 삭제됨.
-- **리서치 래퍼**: `ResearchShell.jsx` — 7개 리서치 라우트(`/reports`·`/recommend`·`/ranking`·`/compare`·`/calendar`·`/dividends`·`/digest`)를 감싸는 얇은 래퍼. PC는 제목만, 모바일은 7항목 `.seg` 필 서브nav. 각 라우트가 `children`으로 실제 페이지를 렌더.
+- **리서치/일정 래퍼**: `ResearchShell.jsx` — 7개 라우트(`/reports`·`/recommend`·`/ranking`·`/compare`·`/calendar`·`/dividends`·`/digest`)를 감싸는 공용 래퍼. **task#178부터 경로로 2그룹 분기**(리서치 4항목 vs 일정·인컴 3항목, 사이드바 5섹션 중 2개 섹션과 대응) — PC는 그룹 제목만, 모바일은 해당 그룹만의 `.seg` 필 서브nav(교차 노출 없음). 각 라우트가 `children`으로 실제 페이지를 렌더.
 - **리서치 페이지**: `Reports.jsx`(딥링크 `initialTicker` prop) `Recommendations.jsx` `Ranking.jsx` `Compare.jsx` `Calendar.jsx` `Dividends.jsx` `Digest.jsx`.
 - **포트폴리오**: `Portfolio.jsx`(대시보드 + 분석 탭). 분석 하위탭 컴포넌트: `SectorTab.jsx` `MacroTab.jsx` `Analytics.jsx` `RebalanceTab.jsx` `ExposureTab.jsx`.
 - **시장 허브**: `MarketHub.jsx`(`tab` prop 받아 PC 제목 + `<Market>`, 모바일 2필 서브nav) → `Market.jsx`(내부 탭 상태 없이 `tab='indicators'|'flow'` prop만 받아 `components/market/*Section`들을 조립).
 - **그 외**: `Settings.jsx` `Guru.jsx`(+`GuruCrawlNow.jsx`·`GuruManagers.jsx`·`GuruStats.jsx`) `ConsensusSettings.jsx` `LoginPage.jsx` `Showcase.jsx` `AdminAnalytics.jsx` `LeverageBackfillSettings.jsx` `ReportManualGen.jsx`.
 
 ### `frontend/src/components/`
-- 루트: `Sidebar.jsx`(+`Sidebar.css`, PC 좌측 nav 5섹션·접기 localStorage) `MobileNav.jsx`(모바일 하단탭·pathname prefix 활성) `StockModal.jsx` `PromoteModal.jsx` `PermissionManager.jsx` `PermissionPanel.jsx` `Toast.jsx` `GlobalSearch.jsx`(variant desktop/mobile) `StockSearchBox.jsx` `InstallPrompt.jsx` `LoadingSpinner.jsx` `BatchScheduleEditor.jsx`.
+- 루트: `Sidebar.jsx`(+`Sidebar.css`, PC 좌측 nav 5섹션·접기 localStorage) `MobileNav.jsx`(모바일 하단탭, PC 5섹션 미러·pathname prefix 활성, task#178) `MobileTopActions.jsx`(모바일 헤더 '더보기' 드롭다운 — 설정·admin 진입점, task#178) `StockModal.jsx` `PromoteModal.jsx` `PermissionManager.jsx` `PermissionPanel.jsx` `Toast.jsx` `GlobalSearch.jsx`(variant desktop/mobile) `StockSearchBox.jsx` `InstallPrompt.jsx` `LoadingSpinner.jsx` `BatchScheduleEditor.jsx`.
 - `market/` — 시장지표 섹션 15종: `IndexSection` `KospiFuturesSection` `KospiSignalSection` `TreasurySection` `FxSection` `VixSection` `FearGreedSection` `CommoditiesSection` `EconIndicatorsSection` `MacroSignalsSection` `M7EarningsSection` `KrTop2Section` `KrExportsSection` `LeverageSection` `LendingSection` + `marketUtils.jsx`.
 - `reports/` — `StockCard` `TickerListItem` `StockActions`(액션버튼 단일 소스, layout="card"|"list") `ReportDetailTabs`/`ReportDetailHeader` `DetailTab` `HistoryTab` `Sections` `ConsensusChart` `FinancialsChart` `BacklogChart` `SupplySection` `ShortSellSection` `InsiderTradesSection`/`UsInsiderSection` `InvestorTrendSection` `LatestDisclosuresSection` `GuruHoldersSection` `UsSupplySection` `ReportFilters` + `reportUtils.jsx`.
 - `portfolio/` — `DashboardCard` `FlashValue` `PriceFreshness`(+ .css).
