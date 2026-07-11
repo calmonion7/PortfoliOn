@@ -5,9 +5,9 @@ import Badge from './Badge'
 // danger(--down=파랑) 변형은 가격 색과 충돌 → 밴드는 전용 색을 명시 지정한다
 // (우호=초록·중립=회색·경계=주황). 결측/US/null은 "해당 없음" muted(neutral + 흐리게).
 const BAND_DISPLAY = {
-  favorable: { label: '우호', style: { background: 'rgba(76, 175, 80, 0.14)', color: '#4caf50', borderColor: 'rgba(76, 175, 80, 0.30)' } },
+  favorable: { label: '우호', style: { background: 'var(--color-success-soft)', color: 'var(--color-success)', borderColor: 'var(--color-success)' } },
   neutral: { label: '중립' }, // neutral 변형(회색) 그대로
-  caution: { label: '경계', style: { background: 'rgba(245, 124, 0, 0.16)', color: '#f57c00', borderColor: 'rgba(245, 124, 0, 0.32)' } },
+  caution: { label: '경계', style: { background: 'var(--warn-soft)', color: 'var(--warn)', borderColor: 'var(--warn)' } },
 }
 
 export default function SupplyBadge({ band, size = 'sm' }) {

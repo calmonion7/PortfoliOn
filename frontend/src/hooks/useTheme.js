@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 
-const THEME_COLORS = { dark: '#0b0b0c', light: '#f6f6f4' }
+const THEME_COLORS = { dark: '#0b0e14', light: '#f7f8fa' }
 
 function applyTheme(value) {
   if (value === 'dark') {
@@ -19,13 +19,13 @@ function applyTheme(value) {
 
 export default function useTheme() {
   const [theme, setThemeState] = useState(() => {
-    const saved = localStorage.getItem('theme') ?? 'light'
+    const saved = localStorage.getItem('theme') ?? 'dark'
     applyTheme(saved)
     return saved
   })
 
   const setTheme = useCallback((next) => {
-    const value = typeof next === 'function' ? next(localStorage.getItem('theme') ?? 'light') : next
+    const value = typeof next === 'function' ? next(localStorage.getItem('theme') ?? 'dark') : next
     localStorage.setItem('theme', value)
     applyTheme(value)
     setThemeState(value)

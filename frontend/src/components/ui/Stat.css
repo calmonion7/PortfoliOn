@@ -2,7 +2,13 @@
 
 .stat__label { font-size: var(--font-size-sm); color: var(--text-3); font-weight: var(--font-weight-medium); }
 
-.stat__value { font-weight: var(--font-weight-semibold); color: var(--text); line-height: var(--line-height-tight); }
+.stat__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+  line-height: var(--line-height-tight);
+}
 .stat--sm .stat__value { font-size: var(--font-size-lg); }
 .stat--md .stat__value { font-size: var(--font-size-2xl); }
 .stat--lg .stat__value { font-size: var(--font-size-3xl); }

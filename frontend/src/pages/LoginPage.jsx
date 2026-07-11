@@ -5,14 +5,6 @@ import '../components/ui/Button.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || ''
 
-// 모바일/PC 입력이 동일 배경·테두리·radius 토큰을 공유하도록 강제
-// (레거시 .m-login input / .login-form input 태그 선택자보다 우선)
-const inputStyle = {
-  background: 'var(--bg-elev)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-sm)',
-}
-
 export default function LoginPage() {
   const isMobile = useIsMobile()
   const [mode, setMode] = useState('login')
@@ -72,8 +64,12 @@ export default function LoginPage() {
       <h1>당신의 자산을<br/>한 화면에서.</h1>
       <p className="lead">보유 종목, 시장 지표, 구루 동향까지 — 흩어진 데이터를 한 곳에서.</p>
       <form onSubmit={isLogin ? doLogin : doRegister}>
-        <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="이메일" style={inputStyle} required/>
-        <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="비밀번호" style={inputStyle} required/>
+        <div className="field">
+          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="이메일" required/>
+        </div>
+        <div className="field">
+          <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="비밀번호" required/>
+        </div>
         {error && <p style={{color:'var(--color-error)', fontSize:13, marginBottom:8}}>{error}</p>}
         {success && <p style={{color:'var(--color-success)', fontSize:13, marginBottom:8}}>{success}</p>}
         <button className="btn btn-primary submit" type="submit" disabled={loading}>
@@ -122,11 +118,11 @@ export default function LoginPage() {
         <form onSubmit={isLogin ? doLogin : doRegister}>
           <div className="field">
             <label>이메일</label>
-            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" style={inputStyle} required/>
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required/>
           </div>
           <div className="field">
             <label>비밀번호</label>
-            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={inputStyle} required/>
+            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required/>
           </div>
           {error && <p style={{color:'var(--color-error)', fontSize:13, marginBottom:8}}>{error}</p>}
           {success && <p style={{color:'var(--color-success)', fontSize:13, marginBottom:8}}>{success}</p>}

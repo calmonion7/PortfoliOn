@@ -1,5 +1,6 @@
 /* =========================================================
-   Design tokens — Apple Stocks / Wealthfront inspired
+   Design tokens — Pro finance terminal identity (ADR-0025)
+   Dark is the default theme; light is a retuned same-hue variant.
    Korean coloring: 상승=red, 하락=blue
    ========================================================= */
 
@@ -7,52 +8,74 @@
   --font-sans: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace;
 
-  /* Light theme — refined off-whites, Apple Stocks calm */
-  --bg:           #f6f6f4;
-  --bg-elev:     #ffffff;
-  --bg-elev-2:   #fbfbfa;
-  --surface-hover: #f0f0ee;
-  --border:      rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.14);
-  --text:        #0e0e0d;
-  --text-2:      #4a4a47;
-  --text-3:      #88887f;
-  --text-faint:  #b4b4ad;
+  /* Typography scale (shared by both themes) */
+  --font-size-xs:  11px;
+  --font-size-sm:  12px;
+  --font-size-base: 14px;
+  --font-size-md:  15px;
+  --font-size-lg:  18px;
+  --font-size-2xl: 22px;
+  --font-size-3xl: 30px;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --line-height-tight: 1.2;
 
-  --accent:      #0e0e0d;   /* premium near-black accent */
-  --accent-soft: rgba(14, 14, 13, 0.06);
+  /* Light theme — cool slate neutrals, same hue family as dark terminal */
+  --bg:           #f7f8fa;
+  --bg-elev:     #ffffff;
+  --bg-elev-2:   #f0f2f6;
+  --surface-hover: #eaedf3;
+  --border:      rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.16);
+  --text:        #0f172a;
+  --text-2:      #47536b;
+  --text-3:      #5f6b85;
+  --text-faint:  #5f6d89;
+
+  --accent:      #3663ce;   /* calm blue accent */
+  --accent-soft: rgba(54, 99, 206, 0.08);
+  --accent-tint: rgba(54, 99, 206, 0.12);
+  --accent-btn-hover: #2a4ea8;
 
   /* Korean market coloring */
-  --up:          #d83a3a;   /* red = 상승 */
-  --up-soft:     rgba(216, 58, 58, 0.12);
-  --down:        #2864e8;   /* blue = 하락 */
-  --down-soft:   rgba(40, 100, 232, 0.12);
-  --neutral:     #88887f;
+  --up:          #d9364c;   /* red = 상승 */
+  --up-soft:     rgba(217, 54, 76, 0.10);
+  --down:        #2f6fe0;   /* blue = 하락 */
+  --down-soft:   rgba(47, 111, 224, 0.10);
+  --neutral:     #5f6b85;
 
-  /* Data palette (calm, Wealthfront-ish) */
-  --data-1:      #0e0e0d;
-  --data-2:      #6b8c9e;
-  --data-3:      #c39a55;
-  --data-4:      #88887f;
-  --data-5:      #4a6b58;
+  /* Data palette (blue/green/amber/grey/purple categorical set) */
+  --data-1:      #3663ce;
+  --data-2:      #1f9d6e;
+  --data-3:      #a97b0a;
+  --data-4:      #5f6b85;
+  --data-5:      #8b5cc7;
 
-  --warn:        #c97a29;
-  --warn-soft:   rgba(201, 122, 41, 0.12);
+  --warn:        #a97b0a;
+  --warn-soft:   rgba(169, 123, 10, 0.12);
 
   /* Semantic state colors — NOT price direction */
-  --color-success:      #2e7d32;
-  --color-success-soft: rgba(46, 125, 50, 0.12);
-  --color-error:        #d32f2f;
-  --color-error-soft:   rgba(211, 47, 47, 0.12);
-  --color-info:         #1565c0;
-  --color-info-soft:    rgba(21, 101, 192, 0.12);
-  --semantic-buy:       #2e7d32;
-  --semantic-buy-soft:  rgba(46, 125, 50, 0.12);
-  --semantic-sell:      #c62828;
-  --semantic-sell-soft: rgba(198, 40, 40, 0.12);
+  --color-success:      #1f9d6e;
+  --color-success-soft: rgba(31, 157, 110, 0.12);
+  --color-error:        #d6394c;
+  --color-error-soft:   rgba(214, 57, 76, 0.12);
+  --color-danger:       var(--color-error);
+  --color-info:         #1e88c7;
+  --color-info-soft:    rgba(30, 136, 199, 0.12);
+  --semantic-buy:       #1f9d6e;
+  --semantic-buy-soft:  rgba(31, 157, 110, 0.12);
+  --semantic-sell:      #d6394c;
+  --semantic-sell-soft: rgba(214, 57, 76, 0.12);
   --corr-pos:           #2f6f6f;
   --corr-neg:           #c98a2b;
-  --corr-zero:          #e2e2dc;
+  --corr-zero:          #e4e7ed;
+
+  /* Aliases used by a few consumers — single source of truth */
+  --surface:     var(--bg-elev);
+  --surface-2:   var(--bg-elev-2);
+  --muted:       var(--text-3);
+  --text-muted:  var(--text-3);
+  --chart-grid:  var(--border);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -69,7 +92,10 @@
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.04);
   --shadow:    0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
   --shadow-lg: 0 6px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+
+  --transition-fast: 120ms ease;
 
   /* Semantic badge colors — adapts light/dark */
   --tag-hold-bg:    #e8f5e9; --tag-hold-color:  #2e7d32; --tag-hold-border: #a5d6a7;
@@ -86,64 +112,76 @@
 }
 
 [data-theme="dark"] {
-  --bg:           #0b0b0c;
-  --bg-elev:     #141416;
-  --bg-elev-2:   #1a1a1d;
-  --surface-hover: #1f1f23;
-  --border:      rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text:        #f3f3f1;
-  --text-2:      #b8b8b3;
-  --text-3:      #8a8a85;
-  --text-faint:  #5a5a55;
+  /* Deep blue-black terminal layers */
+  --bg:           #0b0e14;
+  --bg-elev:     #11151f;
+  --bg-elev-2:   #171c28;
+  --surface-hover: #1c2230;
+  --border:      #1f2635;
+  --border-strong: #2a3348;
+  --text:        #e6eaf2;
+  --text-2:      #9aa4b8;
+  --text-3:      #7986a3;
+  --text-faint:  #7a86a0;
 
-  --accent:      #f3f3f1;
-  --accent-soft: rgba(243, 243, 241, 0.08);
+  --accent:      #5b8def;
+  --accent-soft: rgba(91, 141, 239, 0.12);
+  --accent-tint: rgba(91, 141, 239, 0.18);
+  --accent-btn-hover: #4a7edb;
 
-  --up:          #ff4d4d;
-  --up-soft:     rgba(255, 77, 77, 0.18);
-  --down:        #4d8bff;
-  --down-soft:   rgba(77, 139, 255, 0.18);
-  --neutral:     #8a8a85;
+  --up:          #f6465d;
+  --up-soft:     rgba(246, 70, 93, 0.16);
+  --down:        #4a8cff;
+  --down-soft:   rgba(74, 140, 255, 0.16);
+  --neutral:     #7986a3;
 
-  --data-1:      #f3f3f1;
-  --data-2:      #9fb8c8;
-  --data-3:      #e0b56b;
-  --data-4:      #8a8a85;
-  --data-5:      #7ea08d;
+  --data-1:      #5b8def;
+  --data-2:      #2ebd85;
+  --data-3:      #f0b90b;
+  --data-4:      #7986a3;
+  --data-5:      #b57ede;
 
-  --warn:        #e29957;
-  --warn-soft:   rgba(226, 153, 87, 0.16);
+  --warn:        #f0b90b;
+  --warn-soft:   rgba(240, 185, 11, 0.16);
 
   /* Semantic state colors — NOT price direction */
-  --color-success:      #81c784;
-  --color-success-soft: rgba(129, 199, 132, 0.18);
-  --color-error:        #ef5350;
-  --color-error-soft:   rgba(239, 83, 80, 0.18);
+  --color-success:      #2ebd85;
+  --color-success-soft: rgba(46, 189, 133, 0.18);
+  --color-error:        #ef4a5f;
+  --color-error-soft:   rgba(239, 74, 95, 0.18);
+  --color-danger:       var(--color-error);
   --color-info:         #4fc3f7;
   --color-info-soft:    rgba(79, 195, 247, 0.18);
-  --semantic-buy:       #81c784;
-  --semantic-buy-soft:  rgba(129, 199, 132, 0.18);
-  --semantic-sell:      #e57373;
-  --semantic-sell-soft: rgba(229, 115, 115, 0.18);
-  --corr-pos:           #5fb0b0;
+  --semantic-buy:       #2ebd85;
+  --semantic-buy-soft:  rgba(46, 189, 133, 0.18);
+  --semantic-sell:      #ef4a5f;
+  --semantic-sell-soft: rgba(239, 74, 95, 0.18);
+  --corr-pos:           #4fbdbd;
   --corr-neg:           #e0b56b;
-  --corr-zero:          #2a2a2d;
+  --corr-zero:          #1e2534;
+
+  /* Aliases used by a few consumers — single source of truth */
+  --surface:     var(--bg-elev);
+  --surface-2:   var(--bg-elev-2);
+  --muted:       var(--text-3);
+  --text-muted:  var(--text-3);
+  --chart-grid:  var(--border);
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
   --shadow:    0 1px 3px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.35);
   --shadow-lg: 0 6px 24px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3);
 
-  --tag-hold-bg:    #1a3a1a; --tag-hold-color:  #81c784; --tag-hold-border: #2e6b4a;
-  --tag-watch-bg:   #3a1a1a; --tag-watch-color: #ef9a9a; --tag-watch-border: #6a2a2a;
-  --tag-track-bg:   #1e3a5f; --tag-track-color: #4fc3f7; --tag-track-border: #2a4a6a;
+  --tag-hold-bg:    #12261e; --tag-hold-color:  #2ebd85; --tag-hold-border: #1e4636;
+  --tag-watch-bg:   #2a1620; --tag-watch-color: #f0637a; --tag-watch-border: #4a2432;
+  --tag-track-bg:   #142236; --tag-track-color: #5ac8fa; --tag-track-border: #1f3b54;
 
-  --cal-earn-hold-bg: #1a2a4a; --cal-earn-hold-color: #4fc3f7; --cal-earn-hold-border: #2a4a6a;
-  --cal-div-hold-bg:  #1a3a2a; --cal-div-hold-color:  #81c784; --cal-div-hold-border:  #2e6b4a;
-  --cal-earn-wl-color: #3a8aaa; --cal-earn-wl-border: #2a4a6a;
-  --cal-div-wl-color:  #4a7a5a; --cal-div-wl-border:  #2e6b4a;
-  --cal-hol-us-bg:    #2a1a1a; --cal-hol-us-color:   #ef9a9a; --cal-hol-us-border: #5a2a2a;
-  --cal-hol-kr-bg:    #1a1a2a; --cal-hol-kr-color:   #90caf9; --cal-hol-kr-border: #2a2a5a;
+  --cal-earn-hold-bg: #142236; --cal-earn-hold-color: #5ac8fa; --cal-earn-hold-border: #1f3b54;
+  --cal-div-hold-bg:  #12261e; --cal-div-hold-color:  #2ebd85; --cal-div-hold-border:  #1e4636;
+  --cal-earn-wl-color: #3f8fb0; --cal-earn-wl-border: #1f3b54;
+  --cal-div-wl-color:  #4a9a6a; --cal-div-wl-border:  #1e4636;
+  --cal-hol-us-bg:    #2a1620; --cal-hol-us-color:   #f0637a; --cal-hol-us-border: #4a2432;
+  --cal-hol-kr-bg:    #1c1830; --cal-hol-kr-color:   #b57ede; --cal-hol-kr-border: #33285a;
 }
 
 /* Base reset */
@@ -163,6 +201,7 @@ body {
   background: var(--bg);
   font-size: 14px;
   line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   -webkit-tap-highlight-color: transparent;
 }
 
