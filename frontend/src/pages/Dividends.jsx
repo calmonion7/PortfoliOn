@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import api from '../api'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+import Stat from '../components/ui/Stat'
+import Badge from '../components/ui/Badge'
 import { fmtPrice } from '../utils'
 
 // 예상/확정 배지 — KR 가격 토큰(--up 빨강/--down 파랑)과 무관한 전용색 (ADR-0023, 색 반전 방지)
 const STATUS_STYLE = {
-  confirmed: { color: 'var(--semantic-buy)', background: 'rgba(46,125,50,0.10)', border: '1px solid rgba(46,125,50,0.35)' },
-  projected: { color: 'var(--text-3)', background: 'var(--bg-elev-2)', border: '1px dashed var(--border)' },
+  confirmed: { background: 'var(--semantic-buy-soft)', color: 'var(--semantic-buy)', borderColor: 'var(--semantic-buy)' },
+  projected: { background: 'var(--bg-elev-2)', color: 'var(--text-3)', border: '1px dashed var(--border)' },
 }
 
 const fmtDate = (iso) => {
@@ -35,13 +38,15 @@ function DividendRow({ it }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>{it.ticker}</span>
-          <span style={{
-            fontSize: 9, padding: '0 5px', lineHeight: '15px', borderRadius: 3,
-            color: 'var(--text-3)', background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
-          }}>{isHolding ? '보유' : '관심'}</span>
-          <span style={{ ...st, fontSize: 9, padding: '0 5px', lineHeight: '15px', borderRadius: 3 }}>
+          {/* 보유/관심 태그 — GuruManagers.jsx와 동일한 --tag-hold/--tag-watch 토큰 재사용 */}
+          <Badge variant="neutral" size="sm" style={isHolding
+            ? { background: 'var(--tag-hold-bg)', color: 'var(--tag-hold-color)', borderColor: 'var(--tag-hold-border)' }
+            : { background: 'var(--tag-watch-bg)', color: 'var(--tag-watch-color)', borderColor: 'var(--tag-watch-border)' }}>
+            {isHolding ? '보유' : '관심'}
+          </Badge>
+          <Badge variant="neutral" size="sm" style={st}>
             {it.status === 'confirmed' ? '확정' : '예상'}
-          </span>
+          </Badge>
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {it.name}
@@ -76,7 +81,12 @@ export default function Dividends() {
 
   useEffect(() => { load() }, [])
 
-  if (loading) return <div style={{ maxWidth: 700 }}><Skeleton /></div>
+  if (loading) return (
+    <div style={{ maxWidth: 700 }}>
+      <div style={{ marginBottom: 14 }}><Skeleton variant="stat" count={1} /></div>
+      <Skeleton variant="row" count={6} />
+    </div>
+  )
 
   if (error) return (
     <div style={{ maxWidth: 700, color: 'var(--text-3)', textAlign: 'center', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
@@ -90,30 +100,27 @@ export default function Dividends() {
 
   return (
     <div style={{ maxWidth: 700 }}>
-      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>12개월 예상 배당 수령액 (보유)</div>
-        <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>
-          {fmtPrice(summary.total_expected_12m_krw || 0, 'KR')}
-        </div>
-        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>
-          배당 예정 보유 {summary.holdings_with_dividend || 0}종목
-          {summary.fx_usdkrw ? ` · 환율 ₩${Math.round(summary.fx_usdkrw).toLocaleString('ko-KR')}/$` : ''}
-        </div>
-      </div>
+      <Card style={{ marginBottom: 14 }}>
+        <Stat
+          label="12개월 예상 배당 수령액 (보유)"
+          value={fmtPrice(summary.total_expected_12m_krw || 0, 'KR')}
+          helperText={`배당 예정 보유 ${summary.holdings_with_dividend || 0}종목${summary.fx_usdkrw ? ` · 환율 ₩${Math.round(summary.fx_usdkrw).toLocaleString('ko-KR')}/$` : ''}`}
+        />
+      </Card>
 
       {items.length === 0 ? (
         <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: '32px 16px', fontSize: 13 }}>
           다가오는 배당 일정이 없습니다.
         </div>
       ) : (
-        <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+        <div className="digest-list">
           {items.map((it, i) => <DividendRow key={`${it.ticker}-${it.ex_date}-${i}`} it={it} />)}
         </div>
       )}
 
       <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-3)', lineHeight: 1.5 }}>
-        <span style={{ ...STATUS_STYLE.confirmed, fontSize: 9, padding: '0 5px', borderRadius: 3, marginRight: 4 }}>확정</span> 발표된 일정 ·{' '}
-        <span style={{ ...STATUS_STYLE.projected, fontSize: 9, padding: '0 5px', borderRadius: 3, margin: '0 4px' }}>예상</span> 과거 배당 주기 기반 추정 (국내·미확정)
+        <Badge variant="neutral" size="sm" style={{ ...STATUS_STYLE.confirmed, marginRight: 4 }}>확정</Badge> 발표된 일정 ·{' '}
+        <Badge variant="neutral" size="sm" style={{ ...STATUS_STYLE.projected, margin: '0 4px' }}>예상</Badge> 과거 배당 주기 기반 추정 (국내·미확정)
       </div>
     </div>
   )

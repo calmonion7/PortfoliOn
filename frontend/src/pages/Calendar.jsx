@@ -3,10 +3,10 @@ import api from '../api'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import { useToast } from '../components/Toast'
-import useIsMobile from '../hooks/useIsMobile'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
+// 이벤트 타입별 배지 색 — --cal-*/--warn 토큰(tokens.css) 전용, 가격 방향(--up/--down)과 무관
 const EVENT_STYLE = {
   holding_earnings:   { background: 'var(--cal-earn-hold-bg)',  color: 'var(--cal-earn-hold-color)',  border: '1px solid var(--cal-earn-hold-border)' },
   holding_dividend:   { background: 'var(--cal-div-hold-bg)',   color: 'var(--cal-div-hold-color)',   border: '1px solid var(--cal-div-hold-border)' },
@@ -38,7 +38,6 @@ function eventKey(e) {
 
 function MonthGrid({ year, month, events }) {
   const [selectedDate, setSelectedDate] = useState(null)
-  const isMobile = useIsMobile()
 
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -68,11 +67,10 @@ function MonthGrid({ year, month, events }) {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--border)' }}>
+      {/* .cal-grid/.cal-head/.cal-cell/.cal-day (pc.css) — 기존 정의 재사용, 인라인 그리드 재구현 제거 */}
+      <div className="cal-grid">
         {DAY_LABELS.map(d => (
-          <div key={d} style={{ background: 'var(--bg-elev-2)', padding: '6px', textAlign: 'center', fontSize: 11, color: 'var(--text-3)' }}>
-            {d}
-          </div>
+          <div key={d} className="cal-head" style={{ textAlign: 'center' }}>{d}</div>
         ))}
         {cells.map((day, i) => {
           const dateStr = day
@@ -88,25 +86,21 @@ function MonthGrid({ year, month, events }) {
                 if (!day || dayEvents.length === 0) return
                 setSelectedDate(isSelected ? null : dateStr)
               }}
+              className={`cal-cell${!day ? ' dim' : ''}`}
               style={{
-                background: day ? 'var(--bg-elev)' : 'var(--bg)',
-                ...(isMobile ? { minHeight: 56 } : { aspectRatio: '1 / 1' }),
-                padding: 4,
-                overflow: 'hidden',
+                aspectRatio: '1 / 1',
+                display: 'flex', flexDirection: 'column', overflow: 'hidden',
                 cursor: day && dayEvents.length > 0 ? 'pointer' : 'default',
-                outline: isToday ? '2px solid var(--accent)' : 'none',
-                outlineOffset: -2,
-                display: 'flex',
-                flexDirection: 'column',
               }}
             >
               {day && (
-                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent)' : 'var(--text-3)', textAlign: isMobile ? 'center' : 'left', flexShrink: 0 }}>
-                  {day}
+                <div style={{ textAlign: 'center' }}>
+                  {/* .cal-day.today — 기존 정의된 오늘 배지(채움 원)로 통일, 셀 아웃라인 대체 */}
+                  <span className={`cal-day${isToday ? ' today' : ''}`}>{day}</span>
                 </div>
               )}
               {dayEvents.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1, marginTop: isMobile ? 3 : 'auto', justifyContent: isMobile ? 'center' : 'flex-start', alignContent: 'flex-end', flex: isMobile ? 1 : 'none' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1, marginTop: 'auto', justifyContent: 'center' }}>
                   {dayEvents.slice(0, 4).map((e, j) => (
                     <span key={j} style={{ fontSize: 11, lineHeight: 1 }}>
                       {EVENT_ICON[eventKey(e)] || '●'}
@@ -123,22 +117,8 @@ function MonthGrid({ year, month, events }) {
       </div>
 
       {selectedDate && selectedEvents.length > 0 && (
-        <div
-          onClick={() => setSelectedDate(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: 'var(--bg-elev)', border: '1px solid var(--border)',
-              borderRadius: 12, overflow: 'hidden', minWidth: 280, maxWidth: 400, width: '90%',
-              maxHeight: '80vh', display: 'flex', flexDirection: 'column',
-            }}
-          >
+        <div className="modal-overlay" onClick={() => setSelectedDate(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ padding: 0, overflow: 'hidden', maxWidth: 400, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate(selectedDate)}</span>
               <button onClick={() => setSelectedDate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>×</button>

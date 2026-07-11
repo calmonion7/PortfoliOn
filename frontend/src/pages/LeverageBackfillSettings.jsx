@@ -75,19 +75,18 @@ export default function LeverageBackfillSettings() {
               </div>
             </div>
             {coverage.by_year?.length > 0 && (
-              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+              // eco: list-card 내부라 .tbl-wrap(자체 bg/border)은 생략, 타이포/셀 규격만 .tbl 재사용
+              <table className="tbl" style={{ fontSize: 12 }}>
                 <thead>
                   <tr>
-                    {['연도', '행수', '시작', '종료'].map(h => (
-                      <th key={h} style={{ textAlign: 'left', color: 'var(--text-3)', fontWeight: 500, paddingBottom: 6, borderBottom: '1px solid var(--border)' }}>{h}</th>
-                    ))}
+                    {['연도', '행수', '시작', '종료'].map(h => <th key={h} className={h === '행수' ? 'num' : undefined}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {coverage.by_year.map(r => (
                     <tr key={r.year}>
-                      <td style={{ padding: '5px 0', fontWeight: 600 }}>{r.year}</td>
-                      <td style={{ color: 'var(--text-3)' }}>{r.count}</td>
+                      <td className="ticker-cell">{r.year}</td>
+                      <td className="num">{r.count}</td>
                       <td style={{ color: 'var(--text-3)' }}>{r.min}</td>
                       <td style={{ color: 'var(--text-3)' }}>{r.max}</td>
                     </tr>

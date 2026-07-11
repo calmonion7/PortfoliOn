@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 const INDEX_LABELS = { gspc: 'S&P 500', ks11: 'KOSPI', kq11: 'KOSDAQ' }
 
@@ -37,13 +37,11 @@ export default function IndexSection() {
           const up = idx?.change_pct > 0
           const down = idx?.change_pct < 0
           return (
-            <div key={key} style={{ ...CARD_STYLE, minWidth: 110, flex: 1 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{INDEX_LABELS[key]}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
-                {idx ? idx.current.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
-              </div>
+            <div key={key} className="metric-tile" style={{ minWidth: 110, flex: 1 }}>
+              <div className="lbl">{INDEX_LABELS[key]}</div>
+              <div className="v">{idx ? idx.current.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}</div>
               {idx && (
-                <div style={{ fontSize: 12, color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)', marginTop: 2 }}>
+                <div className="d" style={{ color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)' }}>
                   {up ? '▲' : down ? '▼' : '─'} {Math.abs(idx.change_pct).toFixed(2)}%
                 </div>
               )}
@@ -53,8 +51,8 @@ export default function IndexSection() {
       </div>
 
       {gspc?.history?.length > 0 && (
-        <div style={{ ...CARD_STYLE, marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>S&P 500 추이 (1년)</div>
+        <div className="chartbox" style={{ marginBottom: 16 }}>
+          <div className="sub">S&P 500 추이 (1년)</div>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={gspc.history.slice(-252)} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -70,10 +68,10 @@ export default function IndexSection() {
       )}
 
       {cape && (
-        <div style={{ ...CARD_STYLE, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="metric-tile" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>S&P 500 CAPE (실러 PER)</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{cape.current}</div>
+            <div className="lbl">S&P 500 CAPE (실러 PER)</div>
+            <div className="v">{cape.current}</div>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-3)' }}>
             <span>역사 평균 <strong style={{ color: 'var(--text-2)' }}>{cape.mean}</strong></span>

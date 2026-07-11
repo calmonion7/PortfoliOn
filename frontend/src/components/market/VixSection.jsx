@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function VixSection() {
   const [open, setOpen] = useState(false)
@@ -30,22 +30,20 @@ export default function VixSection() {
     <SectionCard title="변동성지수 (VIX)" summary={summary} change={data.change ?? null} changeSuffix="" changeInverted open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>S&P 500 옵션 내재변동성을 기반으로 시장 심리를 수치화한 지수입니다. 20 이하는 안정, 20~30은 주의, 30 이상은 공포 구간으로 해석합니다. 급등 시 단기 과매도 신호로 활용되기도 합니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-        <div style={{ ...CARD_STYLE, minWidth: 140 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>VIX 현재값</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: vixColor }}>
-            {vix != null ? vix.toFixed(1) : '-'}
-          </div>
-          <div style={{ fontSize: 12, color: vixColor, marginTop: 2 }}>{vixLabel}</div>
+        <div className="metric-tile" style={{ minWidth: 140 }}>
+          <div className="lbl">VIX 현재값</div>
+          <div className="v" style={{ color: vixColor }}>{vix != null ? vix.toFixed(1) : '-'}</div>
+          <div className="d" style={{ color: vixColor }}>{vixLabel}</div>
           {data.change != null && (
-            <div style={{ fontSize: 12, color: data.change > 0 ? 'var(--down)' : 'var(--up)', marginTop: 4 }}>
+            <div className="d" style={{ color: data.change > 0 ? 'var(--down)' : 'var(--up)' }}>
               {data.change > 0 ? '▲' : '▼'} {Math.abs(data.change).toFixed(2)}
             </div>
           )}
         </div>
       </div>
       {history.length > 0 && (
-        <div style={CARD_STYLE}>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>VIX 추이 (1년)</div>
+        <div className="chartbox">
+          <div className="sub">VIX 추이 (1년)</div>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={history} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

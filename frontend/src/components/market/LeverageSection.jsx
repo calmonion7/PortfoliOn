@@ -4,16 +4,7 @@ import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
-
-const SIGNAL_STYLE = {
-  display: 'inline-block',
-  fontSize: 11,
-  fontWeight: 600,
-  padding: '2px 7px',
-  borderRadius: 4,
-  marginRight: 6,
-}
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function LeverageSection() {
   const [open, setOpen] = useState(false)
@@ -39,19 +30,14 @@ export default function LeverageSection() {
   const summary = latestCredit != null ? `신용잔고 ${latestCredit.toFixed(1)}조` : ''
 
   const badges = []
-  if (credit_ratio_alert)
-    badges.push({ label: '빚투 과열', color: 'var(--warn)', bg: 'var(--warn-soft)' })
-  if (margin_call_signal === 'ALERT')
-    badges.push({ label: '반대매매 급증', color: 'var(--warn)', bg: 'var(--warn-soft)' })
-  if (credit_momentum === 'ACCELERATING')
-    badges.push({ label: '신용잔고 가속', color: 'var(--warn)', bg: 'var(--warn-soft)' })
+  if (credit_ratio_alert) badges.push('빚투 과열')
+  if (margin_call_signal === 'ALERT') badges.push('반대매매 급증')
+  if (credit_momentum === 'ACCELERATING') badges.push('신용잔고 가속')
 
   const badgeEls = badges.length > 0 ? (
     <span style={{ marginLeft: 8 }}>
-      {badges.map(b => (
-        <span key={b.label} style={{ ...SIGNAL_STYLE, color: b.color, background: b.bg }}>
-          {b.label}
-        </span>
+      {badges.map(label => (
+        <span key={label} className="pill pill-warn" style={{ marginRight: 6 }}>{label}</span>
       ))}
     </span>
   ) : null
@@ -75,9 +61,9 @@ export default function LeverageSection() {
             { label: '신용잔고', value: latestCredit, unit: '조원', color: 'var(--data-2)' },
             { label: '반대매매 비중', value: latestRatio, unit: '%', color: 'var(--data-3)' },
           ].map(({ label, value, unit, color }) => (
-            <div key={label} style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color }}>
+            <div key={label} className="metric-tile" style={{ minWidth: 120, flex: 1 }}>
+              <div className="lbl">{label}</div>
+              <div className="v" style={{ color }}>
                 {value != null ? value.toFixed(label === '신용잔고' ? 1 : 2) : '—'}
                 <span style={{ fontSize: 12, marginLeft: 3, color: 'var(--text-3)' }}>{unit}</span>
               </div>

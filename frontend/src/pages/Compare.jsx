@@ -122,7 +122,7 @@ export default function Compare() {
                   key={c.ticker}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                    border: '1px solid var(--border)', borderRadius: 6,
+                    border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
                     background: checked ? 'var(--accent-soft)' : 'var(--bg-elev)',
                     opacity: disabled && !checked ? 0.45 : 1,
                     cursor: disabled && !checked ? 'not-allowed' : 'pointer',
@@ -155,15 +155,17 @@ export default function Compare() {
       ) : error ? (
         <p style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</p>
       ) : data ? (
-        <div className="table-mobile-wrap">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        // eco: .tbl-wrap/.tbl 재사용(pc.css) — 인라인 표 스타일 대체, num 정렬·행 hover 내장
+        // .table-mobile-wrap 병기 — 5열(라벨+최대 4종목)이 좁은 화면에서 넘칠 때 overflow-x:auto로 스크롤 복원(.tbl-wrap 단독은 overflow:hidden)
+        <div className="tbl-wrap table-mobile-wrap">
+          <table className="tbl">
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 11 }}>지표</th>
+                <th>지표</th>
                 {data.tickers.map(t => (
-                  <th key={t.ticker} style={{ textAlign: 'right', padding: '8px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                  <th key={t.ticker} className="num" style={{ textTransform: 'none' }}>
                     {t.name}
-                    <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)', fontWeight: 400 }}>{t.ticker}{!t.available && ' · 미보고'}</span>
+                    <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)', fontWeight: 400, textTransform: 'none' }}>{t.ticker}{!t.available && ' · 미보고'}</span>
                   </th>
                 ))}
               </tr>
@@ -172,26 +174,21 @@ export default function Compare() {
               {GROUPS.map(group => (
                 <Fragment key={group}>
                   <tr>
-                    <td colSpan={data.tickers.length + 1} style={{ padding: '10px 10px 4px', fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>
+                    <td colSpan={data.tickers.length + 1} style={{ borderBottom: 0, fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>
                       {GROUP_LABELS[group]}
                     </td>
                   </tr>
                   {data.metrics.filter(m => m.group === group).map(m => (
                     <tr key={m.key}>
-                      <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text-3)' }}>{METRIC_LABELS[m.key] || m.key}</td>
+                      <td style={{ color: 'var(--text-3)' }}>{METRIC_LABELS[m.key] || m.key}</td>
                       {data.tickers.map(t => {
                         const v = m.values[t.ticker]
                         const isBest = m.best.includes(t.ticker)
                         return (
                           <td
                             key={t.ticker}
-                            style={{
-                              padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)',
-                              fontVariantNumeric: 'tabular-nums',
-                              color: isBest ? 'var(--color-success)' : 'var(--text)',
-                              background: isBest ? 'var(--color-success-soft)' : 'transparent',
-                              fontWeight: isBest ? 700 : 400,
-                            }}
+                            className="num"
+                            style={isBest ? { color: 'var(--color-success)', background: 'var(--color-success-soft)', fontWeight: 700 } : undefined}
                           >
                             {fmtMetric(m.key, v, marketOf(t.ticker))}
                           </td>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, krFmt, isEstimated } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, krFmt, isEstimated } from './marketUtils.jsx'
 
 export default function KrTop2Section() {
   const [open, setOpen] = useState(false)
@@ -45,14 +45,14 @@ export default function KrTop2Section() {
           { label: '삼성+하이닉스', value: latest?.top2, qoq: chg2(latest?.top2, prev?.top2), yoy: chg2(latest?.top2, yoy2?.top2), prevVal: prev?.top2, prevQ: prev?.q, yoyVal: yoy2?.top2, yoyQ: yoy2?.q, color: 'var(--data-2)' },
           { label: 'KOSPI 나머지 전체', value: latest?.rest, qoq: chg2(latest?.rest, prev?.rest), yoy: chg2(latest?.rest, yoy2?.rest), prevVal: prev?.rest, prevQ: prev?.q, yoyVal: yoy2?.rest, yoyQ: yoy2?.q, color: 'var(--data-5)' },
         ].map(({ label, value, qoq, yoy: yoyChg, prevVal, prevQ, yoyVal, yoyQ, color }) => (
-          <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 순이익 ({latest?.q})</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color }}>
+          <div key={label} className="metric-tile" style={{ minWidth: 140, flex: 1 }}>
+            <div className="lbl">{label} 순이익 ({latest?.q})</div>
+            <div className="v" style={{ color }}>
               {krFmt(value)} <span style={{ fontSize: 11, fontWeight: 400 }}>원</span>
             </div>
             {qoq != null && (
               <>
-                <div style={{ fontSize: 12, color: qoq > 0 ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
+                <div className="d" style={{ color: qoq > 0 ? 'var(--up)' : 'var(--down)' }}>
                   {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
                 </div>
                 {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전분기 {krFmt(prevVal)}원 ({prevQ})</div>}
@@ -60,7 +60,7 @@ export default function KrTop2Section() {
             )}
             {yoyChg != null && (
               <>
-                <div style={{ fontSize: 12, color: yoyChg > 0 ? 'var(--up)' : 'var(--down)', marginTop: 2 }}>
+                <div className="d" style={{ color: yoyChg > 0 ? 'var(--up)' : 'var(--down)' }}>
                   {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
                 </div>
                 {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {krFmt(yoyVal)}원 ({yoyQ})</div>}
@@ -68,14 +68,14 @@ export default function KrTop2Section() {
             )}
           </div>
         ))}
-        <div style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>삼성+하이닉스 순이익 비중</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--data-3)' }}>
+        <div className="metric-tile" style={{ minWidth: 120, flex: 1 }}>
+          <div className="lbl">삼성+하이닉스 순이익 비중</div>
+          <div className="v" style={{ color: 'var(--data-3)' }}>
             {top2Share != null ? top2Share.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {top2Share != null && top2SharePrev != null && (
             <>
-              <div style={{ fontSize: 12, color: top2Share > top2SharePrev ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
+              <div className="d" style={{ color: top2Share > top2SharePrev ? 'var(--up)' : 'var(--down)' }}>
                 {top2Share > top2SharePrev ? '▲' : '▼'} {Math.abs(top2Share - top2SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {top2SharePrev.toFixed(1)}% ({yoy2?.q})</div>
@@ -84,8 +84,8 @@ export default function KrTop2Section() {
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>삼성+하이닉스 / KOSPI 전체</div>
         </div>
       </div>
-      <div style={CARD_STYLE}>
-        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
+      <div className="chartbox">
+        <div className="sub">
           분기별 순이익 추이 — 삼성전자(005930) + SK하이닉스(000660) vs KOSPI 나머지 전체 &nbsp;·&nbsp; 점선=(E) 컨센서스
         </div>
         <ResponsiveContainer width="100%" height={240}>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 // CNN Fear & Greed rating → 한글 라벨 + 전용색(SupplyBadge 패턴: success/danger Badge 변형은
 // --up(빨강)/--down(파랑) KR 가격색에 물려있어 금지, 여기선 --color-success/--color-error 등
@@ -62,20 +62,20 @@ export default function FearGreedSection() {
     <SectionCard title="공포·탐욕지수 (Fear & Greed)" summary={`${score.toFixed(1)} ${label}`} change={change} changeSuffix="" changeInverted open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>CNN이 시장 지표 7종을 종합해 산출하는 투자심리 지수입니다(0=극단적 공포, 100=극단적 탐욕). 25 이하는 공포, 75 이상은 탐욕 구간으로, 극단으로 치우칠 때 역발상 신호로 참고됩니다.</p>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div style={{ ...CARD_STYLE, minWidth: 140 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>현재값</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color }}>{score.toFixed(1)}</div>
-          <div style={{ fontSize: 12, color, marginTop: 2 }}>{label}</div>
+        <div className="metric-tile" style={{ minWidth: 140 }}>
+          <div className="lbl">현재값</div>
+          <div className="v" style={{ color }}>{score.toFixed(1)}</div>
+          <div className="d" style={{ color }}>{label}</div>
           {stale && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>{daysAgo}일 전 기준</div>}
         </div>
-        <div style={{ ...CARD_STYLE, minWidth: 140, display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
+        <div className="metric-tile" style={{ minWidth: 140, display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
           <Delta label="전일" diff={change} />
           <Delta label="1주" diff={previous_1_week != null ? score - previous_1_week : null} />
           <Delta label="1개월" diff={previous_1_month != null ? score - previous_1_month : null} />
         </div>
       </div>
-      <div style={{ ...CARD_STYLE, marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>게이지</div>
+      <div className="chartbox" style={{ marginBottom: 16 }}>
+        <div className="sub">게이지</div>
         <div style={{ position: 'relative', height: 8, borderRadius: 4, background: 'linear-gradient(to right, var(--color-error), var(--warn), var(--text-3), var(--data-5), var(--color-success))' }}>
           <div style={{ position: 'absolute', top: -3, left: `calc(${Math.min(100, Math.max(0, score))}% - 2px)`, width: 4, height: 14, borderRadius: 2, background: 'var(--text)' }} />
         </div>
@@ -84,8 +84,8 @@ export default function FearGreedSection() {
         </div>
       </div>
       {history.length > 0 && (
-        <div style={CARD_STYLE}>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>추이 (최근 60일)</div>
+        <div className="chartbox">
+          <div className="sub">추이 (최근 60일)</div>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={history} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

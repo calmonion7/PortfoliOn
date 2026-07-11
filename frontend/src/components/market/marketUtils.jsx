@@ -13,13 +13,6 @@ export const isEstimated = q => {
   return new Date(parseInt(y), endMonth, 0) > new Date()
 }
 
-export const CARD_STYLE = {
-  background: 'var(--bg-elev)',
-  border: '1px solid var(--border)',
-  borderRadius: 6,
-  padding: '12px 16px',
-}
-
 export const SECTION_STYLE = { marginBottom: 40 }
 
 export const SECTION_HEADER_STYLE = {
@@ -121,7 +114,7 @@ export function LoadingBox() {
 
 export function ErrorBox({ msg }) {
   return (
-    <div style={{ ...CARD_STYLE, color: 'var(--color-error)', fontSize: 13, padding: 16 }}>
+    <div className="metric-tile" style={{ color: 'var(--color-error)', fontSize: 13 }}>
       {msg || '데이터를 불러오지 못했습니다.'}
     </div>
   )

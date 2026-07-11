@@ -129,45 +129,35 @@ export default function GuruManagers() {
         {q && <span style={{ color: 'var(--text-3)', fontSize: 12, alignSelf: 'center', marginLeft: 4 }}>{sorted.length}/{data.managers.length}명</span>}
       </div>
 
-      {/* 카드 목록 */}
+      {/* 카드 목록 — .guru-card/.guru-h/.guru-avatar/.guru-stats(pc.css) 재사용, 데스크탑 카드와 동일 문법 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 20px' }}>
         {sorted.map((m, i) => (
-          <div key={m.id} style={{
-            background: 'var(--bg-elev)', border: '1px solid var(--border)',
-            borderRadius: 14, padding: '14px 16px',
-          }}>
+          <div key={m.id} className="guru-card">
             {/* 헤더 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 12,
-                background: 'var(--accent-soft)', color: 'var(--text-2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: 13, flexShrink: 0,
-              }}>
-                {initials(m.name)}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', marginBottom: 2 }}>
+            <div className="guru-h">
+              <div className="guru-avatar">{initials(m.name)}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p className="guru-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.name.split(' - ')[0]}
-                </div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                </p>
+                <div className="guru-fund" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.firm || m.name}
                 </div>
               </div>
-              <div style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-faint)', flexShrink: 0 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', flexShrink: 0 }}>
                 #{i + 1}
               </div>
             </div>
 
             {/* 통계 */}
-            <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>포트폴리오</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{formatValue(m.portfolio_value)}</div>
+            <div className="guru-stats">
+              <div className="guru-stat">
+                <div className="l">포트폴리오</div>
+                <div className="v">{formatValue(m.portfolio_value)}</div>
               </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>종목수</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{m.num_stocks ?? '-'}</div>
+              <div className="guru-stat">
+                <div className="l">종목수</div>
+                <div className="v">{m.num_stocks ?? '-'}</div>
               </div>
             </div>
 
@@ -220,15 +210,10 @@ export default function GuruManagers() {
           {SORT_OPTIONS.map(opt => (
             <button
               key={opt.key}
+              className={`filter-chip${sort.key === opt.key ? ' is-active' : ''}`}
               onClick={() => setSort(prev =>
                 prev.key === opt.key ? { key: opt.key, dir: -prev.dir } : { key: opt.key, dir: opt.dir }
               )}
-              style={{
-                padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                border: '1px solid var(--border)', cursor: 'pointer',
-                background: sort.key === opt.key ? 'var(--accent-soft)' : 'var(--bg-elev)',
-                color: sort.key === opt.key ? 'var(--accent)' : 'var(--text-3)',
-              }}
             >
               {opt.label}{sort.key === opt.key ? (sort.dir === 1 ? ' ↑' : ' ↓') : ''}
             </button>
@@ -238,38 +223,28 @@ export default function GuruManagers() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
         {sorted.map((m, i) => (
-          <div key={m.id} style={{
-            background: 'var(--bg-elev)', border: '1px solid var(--border)',
-            borderRadius: 14, padding: '16px 18px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <div style={{
-                width: 42, height: 42, borderRadius: 12,
-                background: 'var(--accent-soft)', color: 'var(--text-2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: 13, flexShrink: 0,
-              }}>
-                {initials(m.name)}
-              </div>
+          <div key={m.id} className="guru-card">
+            <div className="guru-h">
+              <div className="guru-avatar">{initials(m.name)}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <p className="guru-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.name.split(' - ')[0]}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                </p>
+                <div className="guru-fund" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.firm || m.name}
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-faint)', flexShrink: 0 }}>#{i + 1}</div>
             </div>
 
-            <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>포트폴리오</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{formatValue(m.portfolio_value)}</div>
+            <div className="guru-stats">
+              <div className="guru-stat">
+                <div className="l">포트폴리오</div>
+                <div className="v">{formatValue(m.portfolio_value)}</div>
               </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>종목수</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{m.num_stocks ?? '-'}</div>
+              <div className="guru-stat">
+                <div className="l">종목수</div>
+                <div className="v">{m.num_stocks ?? '-'}</div>
               </div>
             </div>
 

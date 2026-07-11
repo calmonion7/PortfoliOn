@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function FxSection() {
   const [open, setOpen] = useState(false)
@@ -35,13 +35,11 @@ export default function FxSection() {
           const up = r?.change_pct > 0
           const down = r?.change_pct < 0
           return (
-            <div key={key} style={{ ...CARD_STYLE, minWidth: 110, flex: 1 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{FX_LABELS[key]}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
-                {r ? r.current.toLocaleString() : '-'}
-              </div>
+            <div key={key} className="metric-tile" style={{ minWidth: 110, flex: 1 }}>
+              <div className="lbl">{FX_LABELS[key]}</div>
+              <div className="v">{r ? r.current.toLocaleString() : '-'}</div>
               {r && (
-                <div style={{ fontSize: 12, color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)', marginTop: 2 }}>
+                <div className="d" style={{ color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)' }}>
                   {up ? '▲' : down ? '▼' : '─'} {Math.abs(r.change_pct).toFixed(2)}%
                 </div>
               )}
@@ -50,8 +48,8 @@ export default function FxSection() {
         })}
       </div>
       {usdkrwHistory.length > 0 && (
-        <div style={CARD_STYLE}>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>USD/KRW 추이 (1년)</div>
+        <div className="chartbox">
+          <div className="sub">USD/KRW 추이 (1년)</div>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={usdkrwHistory} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

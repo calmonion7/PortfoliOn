@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Button from '../components/ui/Button'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
@@ -67,31 +68,32 @@ export default function AdminAnalytics() {
   if (loading) return <LoadingSpinner label="로딩 중..." />
 
   return (
-    <div style={{ padding: '24px 16px', maxWidth: 960, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h2 style={{ color: 'var(--text)', margin: 0 }}>사용자 행동</h2>
-        <div className="tabs">
-          {DAYS_OPTIONS.map(o => (
-            <button key={o.value}
-              className={days === o.value ? 'is-active' : ''}
-              onClick={() => setDays(o.value)}>
-              {o.label}
-            </button>
-          ))}
-        </div>
+    <div className="page">
+      <div className="page-head">
+        <h1 className="page-title">사용자 행동</h1>
+      </div>
+      <div className="tabs" style={{ marginBottom: 24 }}>
+        {DAYS_OPTIONS.map(o => (
+          <button key={o.value}
+            className={days === o.value ? 'is-active' : ''}
+            onClick={() => setDays(o.value)}>
+            {o.label}
+          </button>
+        ))}
       </div>
 
       {/* Summary Cards */}
+      {/* eco: .kpi-row는 4열 그리드(Portfolio.jsx 소비)지만 이 화면은 KPI 3개뿐 — 인라인으로 3열 오버라이드 */}
       {summary && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 32 }}>
+        <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           {[
             { label: '오늘 DAU',       value: summary.dau },
             { label: `${days}일 총 이벤트`, value: summary.total_events },
             { label: 'Top 기능',        value: eName(summary.top_events[0]?.name) ?? '—' },
           ].map(({ label, value }) => (
-            <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px' }}>
-              <div style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 4 }}>{label}</div>
-              <div style={{ color: 'var(--text)', fontSize: 22, fontWeight: 700 }}>{value}</div>
+            <div key={label} className="kpi">
+              <div className="label">{label}</div>
+              <div className="val">{value}</div>
             </div>
           ))}
         </div>
@@ -118,60 +120,53 @@ export default function AdminAnalytics() {
       {selectedUser ? (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <button onClick={() => setSelectedUser(null)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', color: 'var(--text-3)', fontSize: 12 }}>← 목록</button>
+            <Button variant="secondary" size="sm" onClick={() => setSelectedUser(null)}>← 목록</Button>
             <h3 style={{ color: 'var(--text)', margin: 0, fontSize: 14 }}>이벤트 히스토리 (최근 200건)</h3>
           </div>
           {histLoading ? <LoadingSpinner label="로딩 중..." /> : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {['이벤트', 'properties', '시각'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-3)', fontWeight: 500 }}>{h}</th>
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr><th>이벤트</th><th>properties</th><th>시각</th></tr>
+                </thead>
+                <tbody>
+                  {history.map((row, i) => (
+                    <tr key={i}>
+                      <td>{eName(row.event_name)}</td>
+                      <td className="mono" style={{ color: 'var(--text-3)' }}>{JSON.stringify(row.properties)}</td>
+                      <td style={{ color: 'var(--text-3)' }}>{row.created_at ? new Date(row.created_at).toLocaleString('ko-KR') : '—'}</td>
+                    </tr>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((row, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)' }}>{eName(row.event_name)}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text-3)', fontFamily: 'monospace' }}>{JSON.stringify(row.properties)}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text-3)' }}>{row.created_at ? new Date(row.created_at).toLocaleString('ko-KR') : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       ) : (
         <div>
           <h3 style={{ color: 'var(--text)', marginBottom: 12, fontSize: 14 }}>사용자별 통계</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['이메일', '총 이벤트', '마지막 활동', ''].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-3)', fontWeight: 500 }}>{h}</th>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr><th>이메일</th><th>총 이벤트</th><th>마지막 활동</th><th /></tr>
+              </thead>
+              <tbody>
+                {users.map(u => (
+                  <tr key={u.user_id}>
+                    <td>{u.email}</td>
+                    <td>{u.total_events}</td>
+                    <td style={{ color: 'var(--text-3)' }}>{u.last_active ? new Date(u.last_active).toLocaleDateString('ko-KR') : '—'}</td>
+                    <td className="actions">
+                      <Button variant="ghost" size="sm" onClick={() => showUserHistory(u.user_id)}>상세</Button>
+                    </td>
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.user_id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '8px 12px', color: 'var(--text)' }}>{u.email}</td>
-                  <td style={{ padding: '8px 12px', color: 'var(--text)' }}>{u.total_events}</td>
-                  <td style={{ padding: '8px 12px', color: 'var(--text-3)' }}>{u.last_active ? new Date(u.last_active).toLocaleDateString('ko-KR') : '—'}</td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <button onClick={() => showUserHistory(u.user_id)}
-                      style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', color: 'var(--text-3)', fontSize: 11 }}>
-                      상세
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {users.length === 0 && (
-                <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>데이터 없음</td></tr>
-              )}
-            </tbody>
-          </table>
+                {users.length === 0 && (
+                  <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>데이터 없음</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

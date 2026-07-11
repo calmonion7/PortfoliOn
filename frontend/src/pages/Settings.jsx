@@ -51,9 +51,10 @@ function TriggerBadge({ trigger }) {
   )
 }
 
+// eco: 배치 성공/실패는 가격방향(up/down)이 아닌 의미 상태 — success/error 토큰으로 구분(CLAUDE.md 가토 #4/#5)
 function StatusIcon({ status }) {
-  if (status === 'success') return <span className="up" style={{ fontSize: 12 }}>●</span>
-  if (status === 'failed')  return <span className="down" style={{ fontSize: 12 }}>●</span>
+  if (status === 'success') return <span style={{ color: 'var(--color-success)', fontSize: 12 }}>●</span>
+  if (status === 'failed')  return <span style={{ color: 'var(--color-error)', fontSize: 12 }}>●</span>
   return <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>○</span>
 }
 
@@ -258,7 +259,9 @@ export default function Settings() {
 
   return (
     <div className="page">
-      <h1 style={{ color: 'var(--text)', marginBottom: 20 }}>설정</h1>
+      <div className="page-head">
+        <h1 className="page-title">설정</h1>
+      </div>
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
         <button className={`tab-btn${activeTab === 'batch' ? ' active' : ''}`} onClick={() => setTab('batch')}>배치</button>

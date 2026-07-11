@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import InvestorTrendSection from '../components/reports/InvestorTrendSection'
 import api from '../api'
 import Card from '../components/ui/Card'
+import { ChangeBadge, MarketBadge } from '../components/ui/Badge'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Skeleton from '../components/ui/Skeleton'
 import { krFmt } from '../components/market/marketUtils.jsx'
@@ -287,7 +288,7 @@ export default function Ranking() {
               ? { color: 'var(--text)', fontWeight: 600, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word', minWidth: 0 }
               : { color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || row.ticker}</span>
             {row.is_etf && (
-              <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#ce93d8', border: '1px solid var(--border)' }}>ETF</span>
+              <span style={{ fontSize: 9, padding: '0 4px', borderRadius: 3, background: 'var(--tag-etf-bg)', color: 'var(--tag-etf-color)', border: '1px solid var(--tag-etf-border)' }}>ETF</span>
             )}
           </div>
           <span style={{ display: 'block', fontSize: 10, color: 'var(--text-3)' }}>{row.ticker}</span>
@@ -332,7 +333,8 @@ export default function Ranking() {
           <RankCard key={`${row.ticker}-${row.rank}`} rank={row.rank} row={row}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>{fmtPrice(row.price, market)}</span>
-              <span style={{ fontSize: 13 }}>{fmtChange(row.change_pct)}</span>
+              {/* eco: ChangeBadge 재사용 — DashboardCard 헤드라인 변동률과 동일 패턴 */}
+              <ChangeBadge value={row.change_pct} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
               {statRow('거래대금', fmtTradingValue(row.trading_value, market))}
@@ -396,9 +398,8 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
           <div>
             <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 17 }}>{summary.name || ticker}</span>
             <span style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 6 }}>({ticker})</span>
-            {market === 'KR'
-              ? <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--color-success-soft)', color: 'var(--color-success)', border: '1px solid var(--border)' }}>🇰🇷 KR</span>
-              : <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--color-info-soft)', color: 'var(--color-info)', border: '1px solid var(--border)' }}>🇺🇸 US</span>}
+            {/* eco: MarketBadge 재사용 — 수기 KR/US 필과 동일 톤(색 무변경) */}
+            <span style={{ marginLeft: 6 }}><MarketBadge market={market} /></span>
             {date && <span style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 8 }}>{date}</span>}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 6 }}>
@@ -471,7 +472,7 @@ function BasicInfo({ row, market, adding, onAdd, onClose }) {
         <div>
           <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 17 }}>{row.name || row.ticker}</span>
           {row.is_etf && (
-            <span style={{ fontSize: 9, marginLeft: 6, padding: '0 4px', borderRadius: 3, background: 'var(--bg-elev-2)', color: '#ce93d8', border: '1px solid var(--border)' }}>ETF</span>
+            <span style={{ fontSize: 9, marginLeft: 6, padding: '0 4px', borderRadius: 3, background: 'var(--tag-etf-bg)', color: 'var(--tag-etf-color)', border: '1px solid var(--tag-etf-border)' }}>ETF</span>
           )}
           <div style={{ color: 'var(--text-3)', fontSize: 12, marginTop: 2 }}>{row.ticker}</div>
         </div>

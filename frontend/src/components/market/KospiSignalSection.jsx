@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { Bar, Cell, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 // KR 가격색 컨벤션(--up=빨강/--down=파랑)을 그대로 신호색으로 사용 — Badge success/danger 변형 금지
 const SIGNAL_DISPLAY = {
@@ -33,7 +33,7 @@ export default function KospiSignalSection() {
   if (!current) {
     return (
       <SectionCard title="코스피 방향 신호" summary="" open={open} onToggle={() => setOpen(o => !o)}>
-        <div style={{ ...CARD_STYLE, fontSize: 13, color: 'var(--text-3)' }}>
+        <div className="metric-tile" style={{ fontSize: 13, color: 'var(--text-3)' }}>
           <p>아직 수집된 데이터가 없습니다.</p>
         </div>
       </SectionCard>
@@ -56,10 +56,10 @@ export default function KospiSignalSection() {
       <p style={DESC_STYLE}>미국 증시 마감(S&P500·나스닥)과 원/달러 환율(원화약세=비우호로 역방향 반영) 등락률을 등가중 합성해 다음날 코스피 방향을 추정하는 오버나잇 프록시입니다. 합성치가 ±0.5%p를 넘으면 강세/약세, 그 안이면 중립으로 판정합니다. 실제 결과는 다음 배치 실행 시 코스피 시가·종가 데이터가 확보되는 대로 소급 확정됩니다.</p>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ ...CARD_STYLE, minWidth: 140 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{current.date} 신호</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color }}>{label}</div>
-          <div style={{ fontSize: 13, color, marginTop: 2 }}>
+        <div className="metric-tile" style={{ minWidth: 140 }}>
+          <div className="lbl">{current.date} 신호</div>
+          <div className="v" style={{ color }}>{label}</div>
+          <div className="d" style={{ color }}>
             {current.composite_pct != null ? `${current.composite_pct > 0 ? '+' : ''}${current.composite_pct.toFixed(2)}%` : '-'}
           </div>
           {stale && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>{daysAgo}일 전 기준</div>}
@@ -69,20 +69,18 @@ export default function KospiSignalSection() {
           const v = current.drivers?.[key]
           const c = v > 0 ? 'var(--up)' : v < 0 ? 'var(--down)' : 'var(--text-3)'
           return (
-            <div key={key} style={{ ...CARD_STYLE, minWidth: 120 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label2}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: c }}>
+            <div key={key} className="metric-tile" style={{ minWidth: 120 }}>
+              <div className="lbl">{label2}</div>
+              <div className="v" style={{ color: c }}>
                 {v != null ? `${v > 0 ? '+' : ''}${v.toFixed(2)}%` : '-'}
               </div>
             </div>
           )
         })}
 
-        <div style={{ ...CARD_STYLE, minWidth: 140 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>적중률 (방향성)</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
-            {hit_rate != null ? `${(hit_rate * 100).toFixed(1)}%` : '-'}
-          </div>
+        <div className="metric-tile" style={{ minWidth: 140 }}>
+          <div className="lbl">적중률 (방향성)</div>
+          <div className="v">{hit_rate != null ? `${(hit_rate * 100).toFixed(1)}%` : '-'}</div>
           <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>
             중립 {neutral?.total ?? 0}건 중 {neutral?.hit ?? 0}건 적중 (별도 집계)
           </div>
@@ -90,8 +88,8 @@ export default function KospiSignalSection() {
       </div>
 
       {chart.length > 0 && (
-        <div style={CARD_STYLE}>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>합성 신호 vs 실제 코스피 등락률 (최근 60일)</div>
+        <div className="chartbox">
+          <div className="sub">합성 신호 vs 실제 코스피 등락률 (최근 60일)</div>
           <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={chart} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

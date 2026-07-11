@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function KrExportsSection() {
   const [open, setOpen] = useState(false)
@@ -22,7 +22,7 @@ export default function KrExportsSection() {
   if (data.error) {
     return (
       <SectionCard title="한국 수출: 반도체 vs 비반도체" summary="" open={open} onToggle={() => setOpen(o => !o)}>
-        <div style={{ ...CARD_STYLE, fontSize: 13, color: 'var(--text-3)' }}>
+        <div className="metric-tile" style={{ fontSize: 13, color: 'var(--text-3)' }}>
           <p>{data.error}</p>
         </div>
       </SectionCard>
@@ -55,14 +55,14 @@ export default function KrExportsSection() {
           { label: '반도체', value: latest?.semiconductor, mom: chg3(latest?.semiconductor, prev?.semiconductor), yoy: chg3(latest?.semiconductor, yoy3?.semiconductor), prevVal: prev?.semiconductor, yoyVal: yoy3?.semiconductor, color: 'var(--data-2)' },
           { label: '비반도체', value: latest?.non_semiconductor, mom: chg3(latest?.non_semiconductor, prev?.non_semiconductor), yoy: chg3(latest?.non_semiconductor, yoy3?.non_semiconductor), prevVal: prev?.non_semiconductor, yoyVal: yoy3?.non_semiconductor, color: 'var(--data-5)' },
         ].map(({ label, value, mom, yoy: yoyChg, prevVal, yoyVal, color }) => (
-          <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 수출액 ({latestLabel})</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color }}>
+          <div key={label} className="metric-tile" style={{ minWidth: 140, flex: 1 }}>
+            <div className="lbl">{label} 수출액 ({latestLabel})</div>
+            <div className="v" style={{ color }}>
               {value != null ? value.toLocaleString() : '-'} <span style={{ fontSize: 11, fontWeight: 400 }}>억달러</span>
             </div>
             {mom != null && (
               <>
-                <div style={{ fontSize: 12, color: mom > 0 ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
+                <div className="d" style={{ color: mom > 0 ? 'var(--up)' : 'var(--down)' }}>
                   {mom > 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>MoM</span>
                 </div>
                 {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전월 {prevVal.toLocaleString()} 억달러 ({prev?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})</div>}
@@ -70,7 +70,7 @@ export default function KrExportsSection() {
             )}
             {yoyChg != null && (
               <>
-                <div style={{ fontSize: 12, color: yoyChg > 0 ? 'var(--up)' : 'var(--down)', marginTop: 2 }}>
+                <div className="d" style={{ color: yoyChg > 0 ? 'var(--up)' : 'var(--down)' }}>
                   {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
                 </div>
                 {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {yoyVal.toLocaleString()} 억달러 ({yoy3?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})</div>}
@@ -78,9 +78,9 @@ export default function KrExportsSection() {
             )}
           </div>
         ))}
-        <div style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>반도체 수출 비중</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--data-3)' }}>
+        <div className="metric-tile" style={{ minWidth: 120, flex: 1 }}>
+          <div className="lbl">반도체 수출 비중</div>
+          <div className="v" style={{ color: 'var(--data-3)' }}>
             {semiShare != null ? semiShare.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {semiShare != null && (semiSharePrev ?? semiShareMom) != null && (() => {
@@ -92,7 +92,7 @@ export default function KrExportsSection() {
               : `전월 ${base.toFixed(1)}% (${prev?.month?.replace(/(\d{4})(\d{2})/, '$1-$2')})`
             return (
               <>
-                <div style={{ fontSize: 12, color: semiShare > base ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
+                <div className="d" style={{ color: semiShare > base ? 'var(--up)' : 'var(--down)' }}>
                   {semiShare > base ? '▲' : '▼'} {Math.abs(semiShare - base).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>{label}</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>{baseLabel}</div>
@@ -102,8 +102,8 @@ export default function KrExportsSection() {
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>반도체 / 전체 수출</div>
         </div>
       </div>
-      <div style={CARD_STYLE}>
-        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
+      <div className="chartbox">
+        <div className="sub">
           월별 수출액 추이 (억달러) — 반도체 vs 비반도체
         </div>
         <ResponsiveContainer width="100%" height={240}>

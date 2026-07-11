@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function MacroSignalsSection() {
   const [open, setOpen] = useState(false)
@@ -22,7 +22,7 @@ export default function MacroSignalsSection() {
   if (data.error) {
     return (
       <SectionCard title="매크로 신호 (미국)" summary="" open={open} onToggle={() => setOpen(o => !o)}>
-        <div style={{ ...CARD_STYLE, fontSize: 13, color: 'var(--text-3)' }}>
+        <div className="metric-tile" style={{ fontSize: 13, color: 'var(--text-3)' }}>
           <p>{data.error}</p>
         </div>
       </SectionCard>
@@ -67,12 +67,12 @@ export default function MacroSignalsSection() {
       {(inverted || creditStress) && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           {inverted && (
-            <div style={{ ...CARD_STYLE, fontSize: 12, color: 'var(--warn)', border: '1px solid var(--warn)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="metric-tile" style={{ fontSize: 12, color: 'var(--warn)', border: '1px solid var(--warn)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>⚠</span> 수익률곡선 역전 (장단기 금리차 &lt; 0)
             </div>
           )}
           {creditStress && (
-            <div style={{ ...CARD_STYLE, fontSize: 12, color: 'var(--warn)', border: '1px solid var(--warn)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="metric-tile" style={{ fontSize: 12, color: 'var(--warn)', border: '1px solid var(--warn)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>⚠</span> 신용 스트레스 (HY 스프레드 ≥ 5%)
             </div>
           )}
@@ -83,14 +83,12 @@ export default function MacroSignalsSection() {
         {cards.map(({ key, label, color, valFmt, chg, chgUnit, last, zeroLine }) => {
           const warn = zeroLine && last && last.value < 0
           return (
-            <div key={key} style={{ ...CARD_STYLE, flex: 1, minWidth: 150, ...(warn ? { border: '1px solid var(--warn)' } : {}) }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: warn ? 'var(--warn)' : color }}>
-                {last ? valFmt(last.value) : '-'}
-              </div>
+            <div key={key} className="metric-tile" style={{ flex: 1, minWidth: 150, ...(warn ? { border: '1px solid var(--warn)' } : {}) }}>
+              <div className="lbl">{label}</div>
+              <div className="v" style={{ color: warn ? 'var(--warn)' : color }}>{last ? valFmt(last.value) : '-'}</div>
               {last && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{last.date}</div>}
               {chg != null && (
-                <div style={{ fontSize: 12, color: chg > 0 ? 'var(--up)' : chg < 0 ? 'var(--down)' : 'var(--text-3)', marginTop: 4 }}>
+                <div className="d" style={{ color: chg > 0 ? 'var(--up)' : chg < 0 ? 'var(--down)' : 'var(--text-3)' }}>
                   {chg > 0 ? '▲' : chg < 0 ? '▼' : '─'} {Math.abs(chg).toFixed(2)}{chgUnit} <span style={{ color: 'var(--text-3)' }}>전일</span>
                 </div>
               )}
@@ -101,8 +99,8 @@ export default function MacroSignalsSection() {
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {cards.map(({ key, label, color, hist, refLine, zeroLine }) => (
-          <div key={key} style={{ ...CARD_STYLE, flex: 1, minWidth: 280 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{label} (3년)</div>
+          <div key={key} className="chartbox" style={{ flex: 1, minWidth: 280 }}>
+            <div className="sub">{label} (3년)</div>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={hist} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

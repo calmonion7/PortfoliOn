@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
 
 export default function CommoditiesSection() {
   const [open, setOpen] = useState(false)
@@ -35,14 +35,12 @@ export default function CommoditiesSection() {
           const up = p?.change_pct > 0
           const down = p?.change_pct < 0
           return (
-            <div key={key} style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{LABELS[key]}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
-                {p ? `$${p.current.toLocaleString()}` : '-'}
-              </div>
+            <div key={key} className="metric-tile" style={{ minWidth: 120, flex: 1 }}>
+              <div className="lbl">{LABELS[key]}</div>
+              <div className="v">{p ? `$${p.current.toLocaleString()}` : '-'}</div>
               <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{p?.unit}</div>
               {p && (
-                <div style={{ fontSize: 12, color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)', marginTop: 2 }}>
+                <div className="d" style={{ color: up ? 'var(--up)' : down ? 'var(--down)' : 'var(--text-3)' }}>
                   {up ? '▲' : down ? '▼' : '─'} {Math.abs(p.change_pct).toFixed(2)}%
                 </div>
               )}
@@ -59,8 +57,8 @@ export default function CommoditiesSection() {
           const h = (history[key] || []).slice(-252)
           if (!h.length) return null
           return (
-            <div key={key} style={{ ...CARD_STYLE, flex: 1, minWidth: 240 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{label} 추이 (1년)</div>
+            <div key={key} className="chartbox" style={{ flex: 1, minWidth: 240 }}>
+              <div className="sub">{label} 추이 (1년)</div>
               <ResponsiveContainer width="100%" height={140}>
                 <LineChart data={h} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

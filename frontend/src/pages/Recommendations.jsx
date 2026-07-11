@@ -35,19 +35,6 @@ function buildGuruCounts(managers) {
   return counts
 }
 
-// 관심 분석 대기 배지 색 — ⚠️ success/danger(가격 토큰) 금지. 전용 중립색 직접 명시.
-const PENDING_BADGE_STYLE = {
-  background: 'var(--bg-elev-2)',
-  color: 'var(--text-3)',
-  border: '1px solid var(--border)',
-  borderRadius: 999,
-  fontSize: 11,
-  fontWeight: 500,
-  padding: '2px 8px',
-  display: 'inline-block',
-  whiteSpace: 'nowrap',
-}
-
 // 긴 추천 리스트(관심 재정렬·발굴)를 초기 N개만 렌더하고 '더보기'로 점진 확장 —
 // 전체를 한 번에 렌더해 모바일 페이지가 수만 px로 늘어나던 문제 해소(task#144, 표시만 손봄).
 function ExpandableGrid({ items, gridStyle, initial = 6, step = 12, renderItem }) {
@@ -236,7 +223,8 @@ export default function Recommendations() {
                       분석 보기
                     </Link>
                   ) : (
-                    <span style={PENDING_BADGE_STYLE}>분석 대기 중</span>
+                    // eco: Badge(neutral) 재사용 — 가격 토큰(success/danger) 아닌 전용 중립색
+                    <Badge variant="neutral">분석 대기 중</Badge>
                   )
                 }
               />

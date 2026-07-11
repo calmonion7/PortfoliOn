@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { CARD_STYLE, DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, isEstimated } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, isEstimated } from './marketUtils.jsx'
 
 export default function M7EarningsSection() {
   const [open, setOpen] = useState(false)
@@ -42,14 +42,14 @@ export default function M7EarningsSection() {
           { label: 'M7', value: latest?.m7, qoq: chg(latest?.m7, prev?.m7), yoy: chg(latest?.m7, yoy?.m7), prevVal: prev?.m7, prevQ: prev?.q, yoyVal: yoy?.m7, yoyQ: yoy?.q, color: 'var(--data-2)' },
           { label: '나머지 S&P 500', value: latest?.rest, qoq: chg(latest?.rest, prev?.rest), yoy: chg(latest?.rest, yoy?.rest), prevVal: prev?.rest, prevQ: prev?.q, yoyVal: yoy?.rest, yoyQ: yoy?.q, color: 'var(--data-5)' },
         ].map(({ label, value, qoq, yoy: yoyChg, prevVal, prevQ, yoyVal, yoyQ, color }) => (
-          <div key={label} style={{ ...CARD_STYLE, minWidth: 140, flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label} 순이익 ({latest?.q})</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color }}>
+          <div key={label} className="metric-tile" style={{ minWidth: 140, flex: 1 }}>
+            <div className="lbl">{label} 순이익 ({latest?.q})</div>
+            <div className="v" style={{ color }}>
               {value != null ? value.toLocaleString() : '-'} <span style={{ fontSize: 11, fontWeight: 400 }}>{data.unit}</span>
             </div>
             {qoq != null && (
               <>
-                <div style={{ fontSize: 12, color: qoq > 0 ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
+                <div className="d" style={{ color: qoq > 0 ? 'var(--up)' : 'var(--down)' }}>
                   {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
                 </div>
                 {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전분기 {prevVal.toLocaleString()} {data.unit} ({prevQ})</div>}
@@ -57,7 +57,7 @@ export default function M7EarningsSection() {
             )}
             {yoyChg != null && (
               <>
-                <div style={{ fontSize: 12, color: yoyChg > 0 ? 'var(--up)' : 'var(--down)', marginTop: 2 }}>
+                <div className="d" style={{ color: yoyChg > 0 ? 'var(--up)' : 'var(--down)' }}>
                   {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
                 </div>
                 {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {yoyVal.toLocaleString()} {data.unit} ({yoyQ})</div>}
@@ -65,14 +65,14 @@ export default function M7EarningsSection() {
             )}
           </div>
         ))}
-        <div style={{ ...CARD_STYLE, minWidth: 120, flex: 1 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>M7 순이익 비중</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--data-3)' }}>
+        <div className="metric-tile" style={{ minWidth: 120, flex: 1 }}>
+          <div className="lbl">M7 순이익 비중</div>
+          <div className="v" style={{ color: 'var(--data-3)' }}>
             {m7Share != null ? m7Share.toFixed(1) : '-'}<span style={{ fontSize: 13 }}>%</span>
           </div>
           {m7Share != null && m7SharePrev != null && (
             <>
-              <div style={{ fontSize: 12, color: m7Share > m7SharePrev ? 'var(--up)' : 'var(--down)', marginTop: 3 }}>
+              <div className="d" style={{ color: m7Share > m7SharePrev ? 'var(--up)' : 'var(--down)' }}>
                 {m7Share > m7SharePrev ? '▲' : '▼'} {Math.abs(m7Share - m7SharePrev).toFixed(1)}%p <span style={{ color: 'var(--text-3)' }}>YoY</span>
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {m7SharePrev.toFixed(1)}% ({yoy?.q})</div>
@@ -81,8 +81,8 @@ export default function M7EarningsSection() {
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>M7 / 전체 S&P 500</div>
         </div>
       </div>
-      <div style={CARD_STYLE}>
-        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
+      <div className="chartbox">
+        <div className="sub">
           분기별 순이익 추이 ({data.unit}) — AAPL·MSFT·GOOGL·AMZN·NVDA·META·TSLA vs S&P 500 ex-M7
         </div>
         <ResponsiveContainer width="100%" height={240}>

@@ -177,7 +177,7 @@ export default function GuruStats({ view }) {
                     }}>
                       <span style={{
                         minWidth: isMobile ? 28 : 22, fontSize: isMobile ? 13 : 11, fontWeight: 700,
-                        color: i === 0 ? '#f6c90e' : i === 1 ? 'var(--text-3)' : '#cd7f32',
+                        color: i === 0 ? 'var(--medal-gold)' : i === 1 ? 'var(--text-3)' : 'var(--medal-bronze)',
                       }}>{i + 1}위</span>
                       {h ? (
                         <>

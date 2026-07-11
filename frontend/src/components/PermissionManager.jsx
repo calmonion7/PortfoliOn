@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import useIsMobile from '../hooks/useIsMobile'
+import Input from './ui/Input'
 import EditPanel, { ALL_MENUS, MENU_LABELS, PermChip, PermBadges, DefaultPermissionsSection } from './PermissionPanel'
 
 export default function PermissionManager() {
@@ -111,16 +112,7 @@ export default function PermissionManager() {
     <div>
       {/* 검색창 */}
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="이메일로 검색..."
-          style={{
-            width: '100%', padding: '7px 10px', borderRadius: 6, fontSize: 13,
-            border: '1px solid var(--border)', background: 'var(--surface-2)',
-            color: 'var(--text)', boxSizing: 'border-box',
-          }}
-        />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="이메일로 검색..." />
       </div>
 
       {/* 다중선택 액션바 */}
@@ -277,16 +269,7 @@ export default function PermissionManager() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* 검색창 */}
           <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="이메일로 검색..."
-              style={{
-                width: '100%', padding: '7px 10px', borderRadius: 6, fontSize: 13,
-                border: '1px solid var(--border)', background: 'var(--surface-2)',
-                color: 'var(--text)', boxSizing: 'border-box',
-              }}
-            />
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="이메일로 검색..." />
           </div>
 
           {/* 아코디언 카드 리스트 */}

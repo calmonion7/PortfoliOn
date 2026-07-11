@@ -101,6 +101,7 @@
   --tag-hold-bg:    #e8f5e9; --tag-hold-color:  #2e7d32; --tag-hold-border: #a5d6a7;
   --tag-watch-bg:   #fce4ec; --tag-watch-color: #c62828; --tag-watch-border: #f48fb1;
   --tag-track-bg:   #e3f2fd; --tag-track-color: #1565c0; --tag-track-border: #90caf9;
+  --tag-etf-bg:     #f3e5f5; --tag-etf-color:   #7b1fa2; --tag-etf-border:  #ce93d8;
 
   /* Calendar event colors */
   --cal-earn-hold-bg: #e3f2fd; --cal-earn-hold-color: #1565c0; --cal-earn-hold-border: #90caf9;
@@ -109,6 +110,10 @@
   --cal-div-wl-color:  #388e3c; --cal-div-wl-border:  #a5d6a7;
   --cal-hol-us-bg:    #fce4ec; --cal-hol-us-color:   #c62828; --cal-hol-us-border: #f48fb1;
   --cal-hol-kr-bg:    #ede7f6; --cal-hol-kr-color:   #4527a0; --cal-hol-kr-border: #ce93d8;
+
+  /* Decorative medal ranks (구루 탑3) — darker on light bg for AA 4.5:1 vs white */
+  --medal-gold:   #8a6d00;
+  --medal-bronze: #8a5a2e;
 }
 
 [data-theme="dark"] {
@@ -175,6 +180,7 @@
   --tag-hold-bg:    #12261e; --tag-hold-color:  #2ebd85; --tag-hold-border: #1e4636;
   --tag-watch-bg:   #2a1620; --tag-watch-color: #f0637a; --tag-watch-border: #4a2432;
   --tag-track-bg:   #142236; --tag-track-color: #5ac8fa; --tag-track-border: #1f3b54;
+  --tag-etf-bg:     #241c36; --tag-etf-color:   #c893e0; --tag-etf-border:  #3a2a54;
 
   --cal-earn-hold-bg: #142236; --cal-earn-hold-color: #5ac8fa; --cal-earn-hold-border: #1f3b54;
   --cal-div-hold-bg:  #12261e; --cal-div-hold-color:  #2ebd85; --cal-div-hold-border:  #1e4636;
@@ -182,6 +188,10 @@
   --cal-div-wl-color:  #4a9a6a; --cal-div-wl-border:  #1e4636;
   --cal-hol-us-bg:    #2a1620; --cal-hol-us-color:   #f0637a; --cal-hol-us-border: #4a2432;
   --cal-hol-kr-bg:    #1c1830; --cal-hol-kr-color:   #b57ede; --cal-hol-kr-border: #33285a;
+
+  /* Decorative medal ranks (구루 탑3) — brighter on dark bg */
+  --medal-gold:   #f6c90e;
+  --medal-bronze: #cd7f32;
 }
 
 /* Base reset */

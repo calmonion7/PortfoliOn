@@ -42,7 +42,9 @@ export default function Guru() {
 
   return (
     <div className="page">
-      <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>구루 매니저</h3>
+      <div className="page-head">
+        <h1 className="page-title">구루 매니저</h1>
+      </div>
 
       <div className="tabs" style={{ marginBottom: 18 }}>
         {TABS.map(t => (
