@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 1e8da3bc525d61545c6c374b1f91a04238dabf30
-mapped: 2026-07-10
+last_mapped_commit: 2bb05053ac83f6f74c1dddb595a4a6df6d2943dc
+mapped: 2026-07-11
 ---
 
 # STRUCTURE
@@ -71,32 +71,33 @@ scripts/          배포 폴러·UAT/스크린샷 스크립트(Playwright)
 - `data/` — 정적 참조(`sp500_tickers.json`·`kospi_tickers.json`) + 런타임 파일캐시(`consensus/`·`digest/`) + 레거시 JSON(`holdings.json`·`stocks.json`·`watchlist.json` 등). `data/calendar/`는 dead 잔존 디렉터리(task#167 이후 코드 미참조).
 - `snapshots/` — per-ticker/date 리포트 JSON(gitignored).
 - `reports/` — 레거시 리포트(read-only 폴백).
-- `tests/` — pytest 스위트 124파일(`test_*.py` + `conftest.py` + `fixtures/`). 예: `test_api_doc_sync.py`(엔드포인트 문서 drift 검출), `test_scheduler_seed.py`·`test_batch_market_split.py`·`test_batches_router.py`(배치 count/set 단언), 가드 테스트 `test_no_print.py`(앱 코드 print 금지)·`test_no_bare_today.py`(bare date.today() 금지), `test_report_list_user_cache.py`·`test_calendar_cache_invalidation.py`.
+- `tests/` — pytest 스위트(`test_*.py` + `conftest.py` + `fixtures/`). 예: `test_api_doc_sync.py`(엔드포인트 문서 drift 검출), `test_scheduler_seed.py`·`test_batch_market_split.py`·`test_batches_router.py`(배치 count/set 단언), 가드 테스트 `test_no_print.py`(앱 코드 print 금지)·`test_no_bare_today.py`(bare date.today() 금지), `test_report_list_user_cache.py`·`test_calendar_cache_invalidation.py`. **conftest `_block_real_db` autouse 가드**가 실 DB 접근을 차단(DB 타는 테스트는 services.db mock 필수, task#169).
 
 ## 프론트엔드 `frontend/src/`
 
 ### 진입·공통
-- `main.jsx` — 앱 부트스트랩. `App.jsx` — 라우팅(`BrowserRouter`)·전역 nav·테마.
+- `main.jsx` — 앱 부트스트랩. `App.jsx` — 라우팅(`BrowserRouter`)·PC 골격(`.app-pc` = `<Sidebar>` + `.app-main`)·구 URL 리다이렉트·테마·로그아웃·딥링크 `ReportsRoute`(task#172). 상단 가로 nav(구 TopNav)는 폐지되고 `.util-bar`(PC)·`.mobile-header`(모바일)로 대체(ADR-0025).
 - `api.js` — axios 인스턴스(Bearer 토큰 인터셉터·401 리다이렉트). `utils.js` — 공통 유틸.
-- `contexts/AuthContext.jsx` — 로그인·권한 상태.
-- `styles/` — `tokens.css`(디자인 토큰; `--up`=빨강/`--down`=파랑 KR 색관례), `pc.css`, `mobile.css`.
+- `contexts/AuthContext.jsx` — 로그인·권한(`role`·`menuPermissions`·`loading`) 상태 제공.
+- `styles/` — `tokens.css`(디자인 토큰; 터미널 다크 기본, `--up`=빨강/`--down`=파랑 KR 색관례), `pc.css`, `mobile.css`.
 - `utils/` — `analytics.js`(trackEvent), `marketHours.js`, `priceFlash.js`, `pwa.js`.
-- `test/` — vitest 하니스(ADR-0019): `setup.js` `smoke.test.js` `recommendations-s3s4.test.jsx` `compare-race.test.jsx` `global-search-tracked.test.jsx`.
+- `test/` — vitest 하니스(ADR-0019): `setup.js` `smoke.test.js` `recommendations-s3s4.test.jsx` `compare-race.test.jsx` `global-search-tracked.test.jsx` `route-redirects.test.jsx`(구 URL 리다이렉트 검증) `sidebar.test.jsx`(사이드바 권한 게이팅).
 
-### `frontend/src/pages/` (허브 + 탭용 개별 페이지)
-허브 3종: `Research.jsx`(홈), `Portfolio.jsx`, `MarketHub.jsx`(→ `Market.jsx`).
-- Research 탭 컴포넌트: `Reports.jsx` `Recommendations.jsx` `Ranking.jsx` `Compare.jsx` `Digest.jsx` `Calendar.jsx` `Dividends.jsx`.
-- Portfolio 분석 하위탭: `SectorTab.jsx` `MacroTab.jsx` `Analytics.jsx` `RebalanceTab.jsx` `ExposureTab.jsx`.
-- Market 섹션 조립: `Market.jsx`가 시장지표/수급지표 2탭으로 `components/market/*Section`들을 조립.
-- 그 외: `Settings.jsx` `Guru.jsx`(+`GuruCrawlNow.jsx`·`GuruManagers.jsx`·`GuruStats.jsx`) `ConsensusSettings.jsx` `LoginPage.jsx` `Showcase.jsx` `AdminAnalytics.jsx` `LeverageBackfillSettings.jsx` `ReportManualGen.jsx`.
+### `frontend/src/pages/` (개별 라우트 페이지 + 허브 래퍼 + 탭용 페이지)
+라우팅 골격(task#172, ADR-0025): 사이드바 항목이 개별 URL 라우트로 승격됨. 구 `Research.jsx`(허브)는 삭제됨.
+- **리서치 래퍼**: `ResearchShell.jsx` — 7개 리서치 라우트(`/reports`·`/recommend`·`/ranking`·`/compare`·`/calendar`·`/dividends`·`/digest`)를 감싸는 얇은 래퍼. PC는 제목만, 모바일은 7항목 `.seg` 필 서브nav. 각 라우트가 `children`으로 실제 페이지를 렌더.
+- **리서치 페이지**: `Reports.jsx`(딥링크 `initialTicker` prop) `Recommendations.jsx` `Ranking.jsx` `Compare.jsx` `Calendar.jsx` `Dividends.jsx` `Digest.jsx`.
+- **포트폴리오**: `Portfolio.jsx`(대시보드 + 분석 탭). 분석 하위탭 컴포넌트: `SectorTab.jsx` `MacroTab.jsx` `Analytics.jsx` `RebalanceTab.jsx` `ExposureTab.jsx`.
+- **시장 허브**: `MarketHub.jsx`(`tab` prop 받아 PC 제목 + `<Market>`, 모바일 2필 서브nav) → `Market.jsx`(내부 탭 상태 없이 `tab='indicators'|'flow'` prop만 받아 `components/market/*Section`들을 조립).
+- **그 외**: `Settings.jsx` `Guru.jsx`(+`GuruCrawlNow.jsx`·`GuruManagers.jsx`·`GuruStats.jsx`) `ConsensusSettings.jsx` `LoginPage.jsx` `Showcase.jsx` `AdminAnalytics.jsx` `LeverageBackfillSettings.jsx` `ReportManualGen.jsx`.
 
 ### `frontend/src/components/`
-- 루트: `StockModal.jsx` `PromoteModal.jsx` `PermissionManager.jsx` `PermissionPanel.jsx` `MobileNav.jsx` `Toast.jsx` `GlobalSearch.jsx` `StockSearchBox.jsx` `InstallPrompt.jsx` `LoadingSpinner.jsx` `BatchScheduleEditor.jsx`.
+- 루트: `Sidebar.jsx`(+`Sidebar.css`, PC 좌측 nav 5섹션·접기 localStorage) `MobileNav.jsx`(모바일 하단탭·pathname prefix 활성) `StockModal.jsx` `PromoteModal.jsx` `PermissionManager.jsx` `PermissionPanel.jsx` `Toast.jsx` `GlobalSearch.jsx`(variant desktop/mobile) `StockSearchBox.jsx` `InstallPrompt.jsx` `LoadingSpinner.jsx` `BatchScheduleEditor.jsx`.
 - `market/` — 시장지표 섹션 15종: `IndexSection` `KospiFuturesSection` `KospiSignalSection` `TreasurySection` `FxSection` `VixSection` `FearGreedSection` `CommoditiesSection` `EconIndicatorsSection` `MacroSignalsSection` `M7EarningsSection` `KrTop2Section` `KrExportsSection` `LeverageSection` `LendingSection` + `marketUtils.jsx`.
 - `reports/` — `StockCard` `TickerListItem` `StockActions`(액션버튼 단일 소스, layout="card"|"list") `ReportDetailTabs`/`ReportDetailHeader` `DetailTab` `HistoryTab` `Sections` `ConsensusChart` `FinancialsChart` `BacklogChart` `SupplySection` `ShortSellSection` `InsiderTradesSection`/`UsInsiderSection` `InvestorTrendSection` `LatestDisclosuresSection` `GuruHoldersSection` `UsSupplySection` `ReportFilters` + `reportUtils.jsx`.
 - `portfolio/` — `DashboardCard` `FlashValue` `PriceFreshness`(+ .css).
 - `recommendations/` — `RecCard.jsx`.
-- `ui/` — 원자 컴포넌트: `Badge` `Button` `Card` `Stat` `Input` `Skeleton` `SupplyBadge` `InsiderBadge` `icons.jsx` `index.js`. (의미 배지는 가격 토큰 미사용 전용 색.)
+- `ui/` — 원자 컴포넌트: `Badge` `Button` `Card` `Stat` `Input` `Skeleton` `SupplyBadge` `InsiderBadge` `icons.jsx`(사이드바/nav 아이콘 포함) `index.js`. (의미 배지는 가격 토큰 미사용 전용 색.)
 
 ### `frontend/src/hooks/`
 `usePortfolioData` `useReportList` `useReportFilters` `useReportGeneration` `useStockManagement` `useAuth` `useTheme` `useIsMobile` `usePriceFlash`. `.test.js`가 병치(vitest — `usePortfolioData.test.js`·`useReportFilters.test.js`·`useStockManagement.test.js`).
@@ -106,6 +107,7 @@ scripts/          배포 폴러·UAT/스크린샷 스크립트(Playwright)
 - **백엔드**: 라우터 파일 = 리소스명(`portfolio.py`), 라우터 객체 `router = APIRouter(prefix="/api/...")`. 서비스 파일 = 도메인명(`dividends.py`). 배치 잡 함수는 `_fetch_*`/`_generate_*`/`_refresh_*`(스케줄러 private), `job_id`는 `<도메인>_<동작>`(예: `dividend_fetch`·`kr_rankings_fetch`) — `batch_registry.BATCHES[].id`·`job_runs.record(id)`와 3중 일치 필수.
 - **로깅**: 모듈 상단 `logger = logging.getLogger(__name__)`, `print` 신규 금지. 포맷 `logger.x(f"[Component] <무엇> (<ids>): {e}")`, `[Component]`는 PascalCase 1스펠링(전체 규약 `.forge/codebase/CONVENTIONS.md` §4).
 - **DB 테이블**: snake_case 복수/역할명(`user_stocks`·`stock_dividend_schedule`·`market_leverage_indicators`). 신규 컬럼은 `app_schema.sql` + `main._migrate` 쌍으로.
-- **프론트**: 페이지/컴포넌트 PascalCase `.jsx`, 훅 `use*.js`(camelCase), CSS는 같은 이름 `.css` 병치. 섹션 컴포넌트는 `*Section.jsx`.
+- **프론트**: 페이지/컴포넌트 PascalCase `.jsx`, 훅 `use*.js`(camelCase), CSS는 같은 이름 `.css` 병치(`Sidebar.jsx`↔`Sidebar.css`). 섹션 컴포넌트는 `*Section.jsx`. 사이드바 항목=개별 URL 라우트(`/reports`·`/market/indicators` 등, task#172), 구 URL은 `App.jsx`에서 `<Navigate replace>` 리다이렉트. nav 활성표시는 모바일에서 `location.pathname` prefix 매칭(`MobileNav.jsx`).
 - **market_cache 키**: 지표별 문자열 키(`macro_signals` 등), `_mc_load`/`_mc_save`로 접근.
 - **테스트**: 백엔드 `backend/tests/test_<대상>.py`(가드 테스트는 `test_no_*.py`), 프론트는 훅 병치 `.test.js` + 통합류 `frontend/src/test/*.test.jsx`.
+</content>

@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 1e8da3bc525d61545c6c374b1f91a04238dabf30
-mapped: 2026-07-10
+last_mapped_commit: 2bb05053ac83f6f74c1dddb595a4a6df6d2943dc
+mapped: 2026-07-11
 ---
 
 # ARCHITECTURE
@@ -40,12 +40,21 @@ PortfoliOn은 FastAPI 백엔드(포트 8000)와 React 19 + Vite 프론트엔드(
 - `_state.py` — 공유 `_scheduler`(APScheduler) 인스턴스·상수(부분초기화 순환 회피용 leaf 모듈).
 
 ### 프론트엔드 — `frontend/src/App.jsx`
-`BrowserRouter` 라우팅. 라우트 → 허브 매핑:
-- `/`, `/research` → **Research** 허브(`pages/Research.jsx`) — 홈. 탭: 리포트·추천·랭킹·비교·다이제스트·캘린더·배당.
-- `/portfolio` → **Portfolio**(`pages/Portfolio.jsx`) — 대시보드 탭 + 분석 탭(섹터/매크로/상관/리밸런스/노출 하위탭).
-- `/market` → **MarketHub**(`pages/MarketHub.jsx` → `Market.jsx`) — 시장지표·수급지표 2탭.
-- 그 외: `/guru`, `/settings`, `/admin-analytics`, `/dev/showcase`. `/analysis` → `/portfolio` 리다이렉트.
-- `contexts/AuthContext.jsx`가 로그인·권한(user_menu_permissions)을 로드해 nav를 필터링. `api.js`(axios)가 Bearer 토큰 주입 + 401 시 로그아웃 리다이렉트.
+`BrowserRouter` 라우팅. **PC 골격은 좌측 사이드바 + `.app-main` 컬럼**(상단 가로 nav 폐지 — task#172, ADR-0025). `<div className="app-pc">` 안에 `<Sidebar />`(PC nav) + `<div className="app-main">`이 나란히 놓이고, `app-main`은 `.util-bar`(PC 검색/새로고침/테마/로그아웃) + `.mobile-header`(모바일 브랜드·검색·테마·로그아웃) + `.page-wrap`(라우트 콘텐츠) + `<MobileNav />`(모바일 하단탭)으로 구성된다.
+
+라우트 → 페이지 매핑(개별 URL 라우트로 승격):
+- **리서치 그룹** — 각 라우트가 `<ResearchShell>`로 감싼 개별 페이지를 렌더한다: `/reports`(기본)·`/recommend`·`/ranking`·`/compare`·`/calendar`·`/dividends`·`/digest`. 구 URL `/`·`/research`는 `/reports`로 `<Navigate replace>` 리다이렉트.
+- `/portfolio` → **Portfolio**(`pages/Portfolio.jsx`) — 대시보드 탭 + 분석 탭(섹터/매크로/상관/리밸런스/노출 하위탭). 구 `/analysis`는 `/portfolio`로 리다이렉트.
+- `/market/indicators`(시장지표)·`/market/flow`(수급지표) → **MarketHub**(`pages/MarketHub.jsx`, `tab` prop 전달 → `Market.jsx`). 구 `/market`는 `/market/indicators`로 리다이렉트.
+- 그 외: `/guru`, `/settings`, `/admin-analytics`, `/dev/showcase`.
+- **딥링크 규약(task#131)**: `App.jsx`의 로컬 `ReportsRoute` 컴포넌트가 `location.state.ticker`를 읽어 `<Reports initialTicker>`로 전달(같은 라우트 재네비게이션도 `useEffect`로 반영). 소비처 `components/GlobalSearch.jsx`·`pages/Recommendations.jsx`가 `navigate('/reports', { state: { ticker } })`로 점프.
+- `contexts/AuthContext.jsx`가 로그인·권한(user_menu_permissions)·role을 로드해 nav를 필터링(`{ role, menuPermissions, loading }` 제공). `api.js`(axios)가 Bearer 토큰 주입 + 401 시 로그아웃 리다이렉트.
+
+### 프론트엔드 — 네비게이션 골격 (task#172, ADR-0025)
+- **PC 사이드바** (`components/Sidebar.jsx` + `Sidebar.css`) — 5섹션(리서치/포트폴리오/시장/일정·인컴/구루) + 하단(설정·admin 행동). 섹션은 `SECTIONS` 배열로 선언(섹션당 `perm` 1개). 단일항목 섹션은 헤더=링크(`NavLink`), 다항목 섹션은 그룹 헤더 + 하위 `NavLink` 목록. **접기/펼치기** 상태는 `localStorage('sidebar_collapsed')` 영속(축소 시 아이콘만 표시, 활성 하위경로면 하이라이트). 권한 게이팅은 `useAuth().menuPermissions.includes(section.perm)` — 일정·인컴 섹션은 `research` 권한에 매핑(ALL_MENUS 5키 불변). 하단 설정은 `settings` 권한, admin 행동(`/admin-analytics`)은 `role === 'admin'`.
+- **모바일 하단탭** (`components/MobileNav.jsx`) — 5탭(리서치→`/reports`·포트폴리오·시장→`/market/indicators`·구루·설정) + admin 행동. 활성표시는 `NavLink` 정확매칭이 아니라 `location.pathname` **prefix 매칭**(`RESEARCH_PATHS` 그룹 중 하나로 시작하면 리서치 탭 활성, `/market/*`면 시장 탭 활성).
+- **리서치 하위탭** (`pages/ResearchShell.jsx`) — 7개 리서치 라우트를 감싸는 얇은 래퍼. PC에선 `.page` 컨테이너 + 제목만(사이드바가 nav 담당). 모바일에선 7항목 `.seg` 필 서브nav를 `NavLink`로 렌더(동선 보존). `children`으로 라우트별 실제 탭 컴포넌트를 렌더.
+- **시장 서브탭** (`pages/MarketHub.jsx`) — PC는 제목 + `<Market tab>`. 모바일은 2항목(시장지표/수급지표) `.seg` 필 서브nav를 `/market/indicators`·`/market/flow` 라우트 네비게이션으로 렌더. `Market.jsx`는 내부 탭 상태 없이 `tab` prop(`'indicators'|'flow'`)만 받아 섹션을 조립.
 
 ## 데이터 흐름 패턴
 
@@ -86,3 +95,5 @@ PortfoliOn은 FastAPI 백엔드(포트 8000)와 React 19 + Vite 프론트엔드(
 
 ## 배포 구조 (요약)
 nginx가 `frontend/dist`를 직접 서빙(로컬 `npm run build` 즉시 라이브) + `/api/*` → backend:8000 프록시. Cloudflare Tunnel(portfolion.taebro.com → :80)은 launchd 실행. 자동 배포 = self-hosted GH Actions 러너(주) + `scripts/auto-deploy-poll.sh` 폴러(폴백, `LOCAL != origin/main`이면 `git reset --hard`).
+</content>
+</invoke>
