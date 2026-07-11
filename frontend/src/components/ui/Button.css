@@ -32,11 +32,11 @@
 .btn--lg { height: 44px; padding: 0 var(--space-6); font-size: var(--font-size-md); }
 
 /* Variants */
-/* eco: #ffffff is a fixed on-accent text color, not a themed surface — light
-   theme's --accent/--color-danger meet AA 4.5:1 for white text, ceiling: add
-   --text-on-accent token if that stops holding */
-.btn--primary { background: var(--accent); color: #ffffff; }
-.btn--primary:hover:not(:disabled) { background: var(--accent-btn-hover); }
+/* eco: #ffffff is a fixed on-accent text color, not a themed surface —
+   --btn-primary-bg/--btn-danger-bg (tokens.css) meet AA 4.5:1 for white text
+   in both themes, ceiling: add --text-on-accent token if that stops holding */
+.btn--primary { background: var(--btn-primary-bg); color: #ffffff; }
+.btn--primary:hover:not(:disabled) { background: var(--btn-primary-bg-hover); }
 
 .btn--secondary { background: var(--bg-elev-2); color: var(--text); border-color: var(--border); }
 .btn--secondary:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
@@ -44,17 +44,8 @@
 .btn--ghost { background: transparent; color: var(--text); }
 .btn--ghost:hover:not(:disabled) { background: var(--surface-hover); }
 
-.btn--danger { background: var(--color-danger); color: #ffffff; }
+.btn--danger { background: var(--btn-danger-bg); color: #ffffff; }
 .btn--danger:hover:not(:disabled) { filter: brightness(1.1); }
-
-/* eco: --accent/--color-danger are also used as foreground text on dark
-   surfaces elsewhere, so they're kept lighter than white-text-on-fill AA
-   needs — dark buttons get their own darker fill here instead of retuning
-   the shared tokens, ceiling: promote to --btn-primary-bg/--btn-danger-bg
-   tokens if a third consumer needs this shade */
-[data-theme="dark"] .btn--primary { background: #2f6ce0; }
-[data-theme="dark"] .btn--primary:hover:not(:disabled) { background: #3a6bd6; }
-[data-theme="dark"] .btn--danger { background: #e4142f; }
 
 /* Modifiers */
 .btn--full { width: 100%; }

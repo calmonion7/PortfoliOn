@@ -37,6 +37,12 @@
   --accent-tint: rgba(54, 99, 206, 0.12);
   --accent-btn-hover: #2a4ea8;
 
+  /* Button fill-behind-white-text — separate from --accent/--color-danger
+     (those are tuned for foreground text use, task#175 promotion of Button.css hardcode) */
+  --btn-primary-bg:       var(--accent);
+  --btn-primary-bg-hover: var(--accent-btn-hover);
+  --btn-danger-bg:        var(--color-danger);
+
   /* Korean market coloring */
   --up:          #d9364c;   /* red = 상승 */
   --up-soft:     rgba(217, 54, 76, 0.10);
@@ -51,21 +57,21 @@
   --data-4:      #5f6b85;
   --data-5:      #8b5cc7;
 
-  --warn:        #a97b0a;
-  --warn-soft:   rgba(169, 123, 10, 0.12);
+  --warn:        #8a5c00;   /* darkened for AA 4.5:1 on light bg (task#175, was #a97b0a @ 3.32:1) */
+  --warn-soft:   rgba(138, 92, 0, 0.12);
 
   /* Semantic state colors — NOT price direction */
-  --color-success:      #1f9d6e;
-  --color-success-soft: rgba(31, 157, 110, 0.12);
+  --color-success:      #146c4c;   /* darkened for AA 4.5:1 on light bg (task#175, was #1f9d6e @ 3.00:1) */
+  --color-success-soft: rgba(20, 108, 76, 0.12);
   --color-error:        #d6394c;
   --color-error-soft:   rgba(214, 57, 76, 0.12);
   --color-danger:       var(--color-error);
   --color-info:         #1e88c7;
   --color-info-soft:    rgba(30, 136, 199, 0.12);
-  --semantic-buy:       #1f9d6e;
-  --semantic-buy-soft:  rgba(31, 157, 110, 0.12);
-  --semantic-sell:      #d6394c;
-  --semantic-sell-soft: rgba(214, 57, 76, 0.12);
+  --semantic-buy:       #146c4c;   /* darkened for AA 4.5:1 on light bg (task#175, was #1f9d6e @ 3.00:1) */
+  --semantic-buy-soft:  rgba(20, 108, 76, 0.12);
+  --semantic-sell:      #a8480a;   /* orange, distinct from --up red (task#175 F22: was #d6394c, visually ~identical to --up #d9364c) */
+  --semantic-sell-soft: rgba(168, 72, 10, 0.12);
   --corr-pos:           #2f6f6f;
   --corr-neg:           #c98a2b;
   --corr-zero:          #e4e7ed;
@@ -134,6 +140,12 @@
   --accent-tint: rgba(91, 141, 239, 0.18);
   --accent-btn-hover: #4a7edb;
 
+  /* --accent/--color-danger stay lighter for foreground-text use on dark surfaces,
+     so button fills get their own darker shade (task#175, was hardcoded in Button.css) */
+  --btn-primary-bg:       #2f6ce0;
+  --btn-primary-bg-hover: #3a6bd6;
+  --btn-danger-bg:        #e4142f;
+
   --up:          #f6465d;
   --up-soft:     rgba(246, 70, 93, 0.07);
   --down:        #4a8cff;
@@ -159,8 +171,8 @@
   --color-info-soft:    rgba(79, 195, 247, 0.18);
   --semantic-buy:       #2ebd85;
   --semantic-buy-soft:  rgba(46, 189, 133, 0.18);
-  --semantic-sell:      #ef4a5f;
-  --semantic-sell-soft: rgba(239, 74, 95, 0.18);
+  --semantic-sell:      #ff8a3d;   /* orange, distinct from --up red (task#175 F22: was #ef4a5f, visually ~identical to --up #f6465d) */
+  --semantic-sell-soft: rgba(255, 138, 61, 0.18);
   --corr-pos:           #4fbdbd;
   --corr-neg:           #e0b56b;
   --corr-zero:          #1e2534;

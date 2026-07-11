@@ -22,7 +22,7 @@
 /* Variant styles */
 .badge--neutral {
   background: var(--bg-elev-2);
-  color: var(--text-3);
+  color: var(--text-2);
   border-color: var(--border);
 }
 

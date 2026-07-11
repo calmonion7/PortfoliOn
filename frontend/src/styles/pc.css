@@ -226,6 +226,7 @@
 
 /* Yield curve mini ladder */
 .yield-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.yield-row--4 { grid-template-columns: repeat(4, 1fr); }
 
 /* Chart container */
 .chartbox {
@@ -272,7 +273,7 @@
 
 /* ----- DIGEST ----- */
 .digest-banner {
-  background: var(--up-soft); color: var(--up);
+  background: var(--bg-elev); color: var(--up);
   padding: 14px 18px; border-radius: var(--radius-lg);
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   border: 1px solid color-mix(in oklab, var(--up) 24%, transparent);

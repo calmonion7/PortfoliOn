@@ -31,6 +31,7 @@
 
   /* Yield curve */
   .yield-row { grid-template-columns: repeat(3, 1fr); }
+  .yield-row--4 { grid-template-columns: repeat(2, 1fr); }
 
   /* Page padding for mobile non-hub content */
   .page { padding: 16px 16px 100px; }

@@ -14,14 +14,19 @@ const TABS = [
   { to: '/digest', label: '다이제스트', evt: 'tab_digest' },
 ]
 
+// 사이드바 IA(ADR-0025) 상 '일정·인컴' 섹션 소속 라우트 — 헤더 그룹 라벨 동기화용(task#175 F23)
+const SCHEDULE_PATHS = ['/calendar', '/dividends', '/digest']
+
 export default function ResearchShell({ children }) {
   const isMobile = useIsMobile()
   const { pathname } = useLocation()
   const activeLabel = TABS.find(t => pathname.startsWith(t.to))?.label
+  const groupLabel = SCHEDULE_PATHS.some(p => pathname.startsWith(p)) ? '일정·인컴' : '리서치'
 
   if (isMobile) return (
     <>
       <header className="appbar">
+        {/* 모바일 하단 MobileNav·서브내비가 아직 이 7탭을 '리서치'로 묶으므로(5섹션 모바일 IA는 후속 과제) 헤더도 '리서치'로 일치. PC는 사이드바 '일정·인컴' 섹션과 맞춰 groupLabel 사용. task#175 F23 회귀수정 */}
         <h1>리서치</h1>
       </header>
       <div className="seg-pad">
@@ -43,7 +48,7 @@ export default function ResearchShell({ children }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1 className="page-title">리서치</h1>
+          <h1 className="page-title">{groupLabel}</h1>
           {activeLabel && <p className="page-sub">{activeLabel}</p>}
         </div>
       </div>

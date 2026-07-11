@@ -90,6 +90,9 @@
 .seg > button.is-active, .seg > a.is-active { background: var(--bg-elev); color: var(--text); box-shadow: var(--shadow-sm); }
 .seg-pad { padding: 0 20px; margin-bottom: 14px; }
 .seg .count { color: var(--text-faint); font-size: 11px; }
+/* task#175 F24 회귀수정: 콘텐츠폭 필 세그먼트 — 항목이 적은 필터(국내/해외/공통 등)가 PC에서 전폭으로 늘어나지 않게. */
+.seg--compact { width: max-content; max-width: 100%; }
+.seg--compact > button, .seg--compact > a { flex: 0 1 auto; }
 
 /* Holding row — individual card */
 .h-row {

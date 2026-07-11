@@ -163,7 +163,7 @@ function BatchCard({ batch, isAdmin, onSaved }) {
   )
 }
 
-function BatchHub({ isAdmin, isMobile }) {
+function BatchHub({ isAdmin }) {
   const [batches, setBatches] = useState(null)
   const [err, setErr] = useState('')
   const [market, setMarket] = useState('KR')
@@ -196,19 +196,11 @@ function BatchHub({ isAdmin, isMobile }) {
           federalreserve.gov의 새 일정을 <code>backend/routers/calendar.py</code>의 <code>_FOMC_DATES</code>에 추가하세요.
         </div>
       )}
-      {isMobile ? (
-        <div className="seg" style={{ marginBottom: 16 }}>
-          {MARKETS.map(m => (
-            <button key={m.key} className={market === m.key ? 'is-active' : ''} onClick={() => setMarket(m.key)}>{m.label}</button>
-          ))}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-          {MARKETS.map(m => (
-            <button key={m.key} className={`tab-btn${market === m.key ? ' active' : ''}`} onClick={() => setMarket(m.key)}>{m.label}</button>
-          ))}
-        </div>
-      )}
+      <div className="seg seg--compact" style={{ marginBottom: 16 }}>
+        {MARKETS.map(m => (
+          <button key={m.key} className={market === m.key ? 'is-active' : ''} onClick={() => setMarket(m.key)}>{m.label}</button>
+        ))}
+      </div>
 
       {marketItems.length === 0
         ? <p style={{ color: 'var(--text-3)', fontSize: 13 }}>해당 시장의 배치가 없습니다.</p>
@@ -251,7 +243,7 @@ export default function Settings() {
       </div>
 
       <div style={{ padding: '0 20px 20px' }}>
-        {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} isMobile={isMobile} />}
+        {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} />}
         {activeTab === 'account' && showAccount && <PermissionManager />}
       </div>
     </>
@@ -270,7 +262,7 @@ export default function Settings() {
         )}
       </div>
 
-      {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} isMobile={isMobile} />}
+      {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} />}
       {activeTab === 'account' && showAccount && <PermissionManager />}
     </div>
   )

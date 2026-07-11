@@ -38,8 +38,7 @@ export default function TreasurySection() {
   return (
     <SectionCard title="미국 국채금리" summary={summary} change={r10y?.change_bp ?? null} changeSuffix="bp" open={open} onToggle={() => setOpen(o => !o)}>
       <p style={DESC_STYLE}>연준 통화정책 방향의 핵심 지표입니다. 단기(2년)는 금리 기대를, 장기(10년·30년)는 경기 및 인플레이션 전망을 반영합니다. 2년물이 10년물을 상회하는 장단기 역전은 역사적으로 경기 침체의 선행 신호입니다.</p>
-      {/* eco: .yield-row는 5열 그리드지만 이 화면은 타일 4개뿐 — 인라인으로 4열 오버라이드(빈 5번째 열 방지) */}
-      <div className="yield-row" style={{ marginBottom: 20, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <div className="yield-row yield-row--4" style={{ marginBottom: 20 }}>
         {['3m', '5y', '10y', '30y'].map(key => {
           const r = rates[key]
           const up = r?.change_bp > 0
