@@ -102,17 +102,6 @@ def _fetch_comtrade_exports() -> dict:
     }
 
 
-def _exports_is_stale(data: dict) -> bool:
-    months = data.get("months", [])
-    if not months:
-        return True
-    last = months[-1]["month"]
-    today = today_kst()
-    last_y, last_m = int(last[:4]), int(last[4:])
-    diff = (today.year - last_y) * 12 + (today.month - last_m)
-    return diff >= 2
-
-
 def _fetch_and_save_kr_exports() -> dict:
     stored = _mc_load("kr_exports")
     api_key = os.environ.get("KITA_API_KEY")
@@ -141,8 +130,6 @@ def get_kr_exports() -> dict:
     stored = _mc_load("kr_exports")
     if stored:
         data = stored["data"]
-        if _exports_is_stale(data):
-            return _fetch_and_save_kr_exports()
         _set_cache("kr_exports", data, ttl=86400)
         return data
     if os.path.exists(_EXPORTS_CACHE):

@@ -295,6 +295,42 @@ def test_get_kr_exports_with_api_key(tmp_path, monkeypatch):
     assert months["202501"]["non_semiconductor"] > 0
 
 
+def test_get_kr_exports_stored_stale_serves_stored_no_live_fetch(monkeypatch):
+    """F14: stored가 stale해도 요청경로에서 라이브 재조회하지 않고 저장값 반환 + 캐시 워밍."""
+    from services.market_indicators import get_kr_exports, _cache
+    from services.market_indicators.cache import _get_cache
+    _cache.clear()
+    stale_data = {"months": [
+        {"month": "202001", "semiconductor": 50.0, "non_semiconductor": 100.0},
+    ]}
+    with patch("services.market_indicators.exports._mc_load",
+               return_value={"data": stale_data, "fetched_at": "2020-02-01T00:00:00Z"}), \
+         patch("services.market_indicators.exports._fetch_and_save_kr_exports") as mock_fetch:
+        result = get_kr_exports()
+        assert not mock_fetch.called          # stale이어도 라이브 fetch 미호출
+    assert result == stale_data                # 저장값 그대로 반환
+    assert _get_cache("kr_exports") == stale_data   # 인메모리 캐시 워밍됨
+
+
+def test_get_kr_exports_cold_db_bootstraps_fetch_once(tmp_path, monkeypatch):
+    """DB가 완전히 빈 콜드 상태에서만 부트스트랩 fetch 1회."""
+    from services.market_indicators import get_kr_exports, _cache
+    _cache.clear()
+    monkeypatch.setattr(
+        "services.market_indicators.exports._EXPORTS_CACHE",
+        str(tmp_path / "kr_exports.json"),   # 레거시 파일 폴백도 없는 콜드 상태
+    )
+    monkeypatch.setenv("KITA_API_KEY", "test-key-123")
+    fake_data = {"months": [{"month": "202501", "semiconductor": 50.0, "non_semiconductor": 100.0}]}
+    with patch("services.market_indicators.exports._mc_load", return_value=None), \
+         patch("services.market_indicators.exports._mc_save"), \
+         patch("services.market_indicators.exports._fetch_customs_exports",
+               return_value=fake_data) as mock_fetch:
+        result = get_kr_exports()
+        assert mock_fetch.call_count == 1
+    assert result["months"][0]["month"] == "202501"
+
+
 # ── get_fx ────────────────────────────────────────────────────────────────────
 
 def test_get_fx_returns_three_rates():
