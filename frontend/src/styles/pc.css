@@ -2,34 +2,21 @@
    PC-specific styles (consumes tokens.css)
    =========================================================== */
 
-/* ----- TOP NAV ----- */
-.topnav {
-  position: sticky; top: 0; z-index: 30;
+/* ----- BRAND (shared: mobile-header, Sidebar) ----- */
+.brand { display:flex; align-items:center; gap: 10px; font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; }
+.brand-mark { width: 22px; height: 22px; flex-shrink: 0; }
+
+/* ----- UTIL BAR (PC — sits above page content, sidebar owns primary nav) ----- */
+.util-bar {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  padding: 13px 32px;
+  position: sticky; top: 0; z-index: 20;
   background: var(--bg-elev);
   background: color-mix(in oklab, var(--bg) 92%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
   -webkit-backdrop-filter: saturate(160%) blur(14px);
   border-bottom: 1px solid var(--border);
 }
-.topnav-inner {
-  max-width: 1440px; margin: 0 auto;
-  display: flex; align-items: center; gap: 32px;
-  padding: 14px 32px; height: 60px;
-}
-.brand { display:flex; align-items:center; gap: 10px; font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; }
-.brand-mark { width: 22px; height: 22px; flex-shrink: 0; }
-
-.topnav-tabs { display:flex; gap: 2px; flex: 1; }
-.topnav-tab {
-  background: transparent; border: 0; padding: 8px 14px;
-  font-size: 13.5px; color: var(--text-3); border-radius: 8px;
-  font-weight: 500; letter-spacing: -0.01em;
-  transition: color .15s, background .15s;
-}
-.topnav-tab:hover { color: var(--text); background: var(--accent-soft); }
-.topnav-tab.is-active { color: var(--text); background: var(--accent-soft); font-weight: 600; }
-
-.topnav-tools { display: flex; align-items: center; gap: 8px; }
 .icon-btn {
   position: relative;
   width: 32px; height: 32px; border-radius: 8px;
@@ -69,7 +56,8 @@
 .ghost-btn:hover { color: var(--text); background: var(--accent-soft); }
 
 /* ----- LAYOUT ----- */
-.app-pc { min-height: 100vh; }
+.app-pc { display: flex; min-height: 100vh; }
+.app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .page { max-width: 1440px; margin: 0 auto; padding: 28px 32px 80px; }
 
 .page-head { display:flex; align-items: flex-end; justify-content: space-between; margin-bottom: 18px; gap: 16px; }

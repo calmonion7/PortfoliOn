@@ -229,8 +229,8 @@ export default function Recommendations() {
                 footer={item.enriched === true
                   ? (
                     <Link
-                      to="/"
-                      state={{ tab: 'reports', ticker: item.ticker }}
+                      to="/reports"
+                      state={{ ticker: item.ticker }}
                       style={{ display: 'block', width: '100%', marginTop: 4, textAlign: 'center', fontSize: 13, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}
                     >
                       분석 보기

@@ -1,0 +1,63 @@
+/* Left sidebar IA (ADR-0025) — PC only, mobile uses MobileNav+seg pills instead */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  flex-shrink: 0;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--border);
+  transition: width .15s ease;
+}
+.sidebar.is-collapsed { width: 60px; }
+
+.sidebar-brand {
+  display: flex; align-items: center; gap: 8px;
+  padding: 16px 14px;
+  font-weight: 600; font-size: 14px; letter-spacing: -0.01em;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar.is-collapsed .sidebar-brand { padding: 14px 8px; gap: 4px; }
+.sidebar-brand .brand-mark { width: 22px; height: 22px; flex-shrink: 0; }
+.sidebar-brand span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-toggle {
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  width: 22px; height: 22px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-2);
+}
+.sidebar-toggle:hover { background: var(--accent-soft); color: var(--text); }
+
+.sidebar-nav { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 4px; }
+
+.sidebar-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: var(--text-2);
+  text-decoration: none; white-space: nowrap;
+}
+.sidebar-link:hover { background: var(--accent-soft); color: var(--text); }
+.sidebar-link.is-active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.sidebar-link svg { flex-shrink: 0; }
+.sidebar.is-collapsed .sidebar-link { justify-content: center; padding: 8px; }
+
+.sidebar-group-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  font-size: 11px; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.sidebar-group-items { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px 30px; }
+.sidebar-group-items .sidebar-link { padding: 6px 10px; font-size: 12.5px; }
+
+.sidebar-bottom {
+  padding: 10px 8px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+}

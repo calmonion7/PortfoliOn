@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import IndexSection from '../components/market/IndexSection'
 import KospiFuturesSection from '../components/market/KospiFuturesSection'
 import TreasurySection from '../components/market/TreasurySection'
@@ -15,16 +14,11 @@ import KrExportsSection from '../components/market/KrExportsSection'
 import LeverageSection from '../components/market/LeverageSection'
 import LendingSection from '../components/market/LendingSection'
 
-export default function Market() {
-  const [tab, setTab] = useState('market')
-
+// tab='indicators'(시장지표) | 'flow'(수급지표) — 라우트(/market/indicators, /market/flow)가 지정한다.
+export default function Market({ tab = 'indicators' }) {
   return (
     <div style={{ maxWidth: 900 }}>
-      <div className="tabs" style={{ marginBottom: 18, width: 'fit-content' }}>
-        <button className={tab === 'market' ? 'is-active' : ''} onClick={() => setTab('market')}>시장지표</button>
-        <button className={tab === 'supply' ? 'is-active' : ''} onClick={() => setTab('supply')}>수급지표</button>
-      </div>
-      {tab === 'market' && (
+      {tab === 'indicators' && (
         <>
           <IndexSection />
           <KospiFuturesSection />
@@ -41,7 +35,7 @@ export default function Market() {
           <KrExportsSection />
         </>
       )}
-      {tab === 'supply' && (
+      {tab === 'flow' && (
         <>
           <LeverageSection />
           <LendingSection />

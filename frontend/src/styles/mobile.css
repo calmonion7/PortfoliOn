@@ -81,13 +81,13 @@
   overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
 .seg::-webkit-scrollbar { display: none; }
-.seg > button {
+.seg > button, .seg > a {
   flex: 1; background: transparent; border: 0; padding: 8px 6px;
   font-size: 12px; color: var(--text-3); border-radius: 8px; font-weight: 500;
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-  white-space: nowrap;
+  white-space: nowrap; text-decoration: none;
 }
-.seg > button.is-active { background: var(--bg-elev); color: var(--text); box-shadow: var(--shadow-sm); }
+.seg > button.is-active, .seg > a.is-active { background: var(--bg-elev); color: var(--text); box-shadow: var(--shadow-sm); }
 .seg-pad { padding: 0 20px; margin-bottom: 14px; }
 .seg .count { color: var(--text-faint); font-size: 11px; }
 

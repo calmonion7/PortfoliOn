@@ -38,7 +38,7 @@ describe('GlobalSearch 추적 여부 매 선택마다 재조회', () => {
     render(<GlobalSearch />)
 
     fireEvent.click(screen.getByText('선택'))
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { state: { tab: 'reports', ticker: 'AAA' } }))
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/reports', { state: { ticker: 'AAA' } }))
 
     // 관심종목에서 삭제된 상태를 시뮬레이션 — 다음 /api/stocks 응답엔 AAA가 없다
     api.get.mockResolvedValueOnce({ data: [] })

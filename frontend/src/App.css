@@ -3,20 +3,13 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* NavLink는 <a>이므로 topnav-tab 스타일에 맞게 리셋 */
-.topnav-tabs a.topnav-tab {
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-}
-
 /* 페이지 콘텐츠 최소 높이 (탭바 회피) */
 .page-wrap {
   min-height: calc(100vh - 60px);
 }
 
 @media (max-width: 768px) {
-  .topnav { display: none; }
+  .util-bar { display: none; }
   .page-wrap { padding-bottom: 80px; min-height: 100vh; }
   .login-wrap { grid-template-columns: 1fr; }
   .login-art { display: none; }

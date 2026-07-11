@@ -30,7 +30,7 @@ export default function GlobalSearch({ variant = 'desktop' }) {
     setOpen(false)
     const tracked = await fetchTracked()  // eco: 선택마다 재조회 — 삭제 직후 stale 캐시 오판 방지
     if (tracked.has(t)) {
-      navigate('/', { state: { tab: 'reports', ticker: t } })  // 리포트 상세 점프
+      navigate('/reports', { state: { ticker: t } })  // 리포트 상세 점프
     } else {
       setPrefill(item)  // 미추적 → 관심종목 추가 프리필
     }

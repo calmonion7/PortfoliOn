@@ -1,21 +1,28 @@
 import { useState, useEffect } from 'react'
 import useTheme from './hooks/useTheme'
-import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AuthProvider } from './contexts/AuthContext'
 import Portfolio from './pages/Portfolio'
-import Research from './pages/Research'
+import ResearchShell from './pages/ResearchShell'
+import Reports from './pages/Reports'
+import Recommendations from './pages/Recommendations'
+import Ranking from './pages/Ranking'
+import Compare from './pages/Compare'
+import Calendar from './pages/Calendar'
+import Dividends from './pages/Dividends'
+import Digest from './pages/Digest'
 import MarketHub from './pages/MarketHub'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
 import LoginPage from './pages/LoginPage'
+import Sidebar from './components/Sidebar'
 import MobileNav from './components/MobileNav'
 import InstallPrompt from './components/InstallPrompt'
 import GlobalSearch from './components/GlobalSearch'
 import { Sun, Moon, Refresh, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
-import { trackEvent } from './utils/analytics'
 import AdminAnalytics from './pages/AdminAnalytics'
 
 async function doLogout(setSession) {
@@ -32,47 +39,14 @@ async function doLogout(setSession) {
   setSession(null)
 }
 
-function TopNav({ theme, setTheme, setSession }) {
-  const { menuPermissions, role, loading } = useAuth() || { menuPermissions: [], role: null, loading: true }
-  const allItems = [
-    { to: '/',          label: '리서치',   key: 'research', end: true },
-    { to: '/portfolio', label: '포트폴리오', key: 'portfolio' },
-    { to: '/market',    label: '시장',     key: 'market' },
-    { to: '/guru',      label: '구루',     key: 'guru' },
-    { to: '/settings',  label: '설정',     key: 'settings' },
-  ]
-  const adminItem = role === 'admin' ? [{ to: '/admin-analytics', label: '행동', key: 'analytics' }] : []
-  const navItems = loading ? [] : [
-    ...allItems.filter(item => menuPermissions.includes(item.key)),
-    ...adminItem,
-  ]
-  return (
-    <header className="topnav">
-      <div className="topnav-inner">
-        <div className="brand">
-          <img src="/favicon.svg" className="brand-mark" alt="" />
-          <span>PortfoliOn</span>
-        </div>
-        <nav className="topnav-tabs">
-          {navItems.map(({ to, label, end, key }) => (
-            <NavLink key={to} to={to} end={end}
-              onClick={() => trackEvent('nav_' + key)}
-              className={({ isActive }) => 'topnav-tab' + (isActive ? ' is-active' : '')}>
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="topnav-tools">
-          <GlobalSearch variant="desktop" />
-          <button className="icon-btn" title="새로고침" onClick={() => window.location.reload()}><Refresh /></button>
-          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
-            {theme === 'dark' ? <Sun /> : <Moon />}
-          </button>
-          <button className="icon-btn" title="로그아웃" onClick={() => doLogout(setSession)}><LogOut /></button>
-        </div>
-      </div>
-    </header>
-  )
+// 리포트 상세 딥링크(location.state.ticker) — 같은 라우트 재네비게이션도 반영해야 한다(task#131 가토)
+function ReportsRoute() {
+  const location = useLocation()
+  const [deepTicker, setDeepTicker] = useState(location.state?.ticker || null)
+  useEffect(() => {
+    setDeepTicker(location.state?.ticker || null)
+  }, [location.state])
+  return <Reports initialTicker={deepTicker} />
 }
 
 export default function App() {
@@ -135,35 +109,54 @@ export default function App() {
     <AuthProvider isLoggedIn={!!session}>
     <BrowserRouter>
       <div className="app-pc">
-        <TopNav theme={theme} setTheme={setTheme} setSession={setSession} />
-        <header className="mobile-header">
-          <div className="brand">
-            <img src="/favicon.svg" className="brand-mark" alt="" />
-            <span>PortfoliOn</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <GlobalSearch variant="mobile" />
+        <Sidebar />
+        <div className="app-main">
+          <div className="util-bar">
+            <GlobalSearch variant="desktop" />
+            <button className="icon-btn" title="새로고침" onClick={() => window.location.reload()}><Refresh /></button>
             <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
               {theme === 'dark' ? <Sun /> : <Moon />}
             </button>
             <button className="icon-btn" title="로그아웃" onClick={() => doLogout(setSession)}><LogOut /></button>
           </div>
-        </header>
-        <main className="page-wrap">
-          <InstallPrompt />
-          <Routes>
-            <Route path="/" element={<Research />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/research" element={<Research />} />
-            <Route path="/market" element={<MarketHub />} />
-            <Route path="/analysis" element={<Navigate to="/portfolio" replace />} />
-            <Route path="/guru" element={<Guru />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/admin-analytics" element={<AdminAnalytics />} />
-            <Route path="/dev/showcase" element={<Showcase />} />
-          </Routes>
-        </main>
-        <MobileNav />
+          <header className="mobile-header">
+            <div className="brand">
+              <img src="/favicon.svg" className="brand-mark" alt="" />
+              <span>PortfoliOn</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <GlobalSearch variant="mobile" />
+              <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
+                {theme === 'dark' ? <Sun /> : <Moon />}
+              </button>
+              <button className="icon-btn" title="로그아웃" onClick={() => doLogout(setSession)}><LogOut /></button>
+            </div>
+          </header>
+          <main className="page-wrap">
+            <InstallPrompt />
+            <Routes>
+              <Route path="/" element={<Navigate to="/reports" replace />} />
+              <Route path="/research" element={<Navigate to="/reports" replace />} />
+              <Route path="/reports" element={<ResearchShell><ReportsRoute /></ResearchShell>} />
+              <Route path="/recommend" element={<ResearchShell><Recommendations /></ResearchShell>} />
+              <Route path="/ranking" element={<ResearchShell><Ranking /></ResearchShell>} />
+              <Route path="/compare" element={<ResearchShell><Compare /></ResearchShell>} />
+              <Route path="/calendar" element={<ResearchShell><Calendar /></ResearchShell>} />
+              <Route path="/dividends" element={<ResearchShell><Dividends /></ResearchShell>} />
+              <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/market" element={<Navigate to="/market/indicators" replace />} />
+              <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
+              <Route path="/market/flow" element={<MarketHub tab="flow" />} />
+              <Route path="/analysis" element={<Navigate to="/portfolio" replace />} />
+              <Route path="/guru" element={<Guru />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/admin-analytics" element={<AdminAnalytics />} />
+              <Route path="/dev/showcase" element={<Showcase />} />
+            </Routes>
+          </main>
+          <MobileNav />
+        </div>
       </div>
     </BrowserRouter>
     </AuthProvider>
