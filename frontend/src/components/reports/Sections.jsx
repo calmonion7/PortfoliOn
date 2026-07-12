@@ -1,6 +1,6 @@
 import { fmtPrice as fmt } from '../../utils'
 import { computePeerPremiums } from './reportUtils.jsx'
-import KeyResourceChart, { isChartable } from './KeyResourceChart.jsx'
+import KeyResourceChart, { splitMetricsForRender } from './KeyResourceChart.jsx'
 
 function decodeHtml(str) {
   if (!str) return str
@@ -191,8 +191,10 @@ export function KeyResourceSection({ key_resource }) {
   const hasDrivers = key_resource.drivers?.length > 0
   if (!key_resource.resource && !key_resource.thesis && !hasMetrics && !hasDrivers && !key_resource.one_liner) return null
 
-  const periods = hasMetrics ? _keyResourcePeriods(key_resource.metrics) : []
-  const chartable = hasMetrics && isChartable(key_resource.metrics)
+  const { chartMetrics, tableMetrics } = hasMetrics
+    ? splitMetricsForRender(key_resource.metrics)
+    : { chartMetrics: [], tableMetrics: [] }
+  const tablePeriods = _keyResourcePeriods(tableMetrics)
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -203,26 +205,26 @@ export function KeyResourceSection({ key_resource }) {
       {key_resource.thesis && (
         <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{key_resource.thesis}</p>
       )}
-      {chartable && <KeyResourceChart metrics={key_resource.metrics} />}
-      {hasMetrics && !chartable && periods.length > 0 && (
+      {chartMetrics.length > 0 && <KeyResourceChart metrics={chartMetrics} />}
+      {tableMetrics.length > 0 && tablePeriods.length > 0 && (
         <div className="table-mobile-wrap" style={{ marginBottom: 12 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 <th style={{ padding: '5px 8px', color: 'var(--text-3)', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>지표</th>
-                {periods.map(p => (
+                {tablePeriods.map(p => (
                   <th key={p} style={{ padding: '5px 8px', color: 'var(--text-3)', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap' }}>{p}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {key_resource.metrics.map((m, i) => {
+              {tableMetrics.map((m, i) => {
                 const byPeriod = {}
                 ;(m.series || []).forEach(p => { if (p?.period) byPeriod[p.period] = p.value })
                 return (
                   <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '6px 8px', color: 'var(--text)' }}>{m.label}{m.unit ? ` (${m.unit})` : ''}</td>
-                    {periods.map(p => (
+                    {tablePeriods.map(p => (
                       <td key={p} className="mono tnum" style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text)', whiteSpace: 'nowrap' }}>
                         {byPeriod[p] != null ? byPeriod[p] : '—'}
                       </td>

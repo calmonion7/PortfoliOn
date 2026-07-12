@@ -14,11 +14,24 @@ export function groupMetricsByUnit(metrics) {
   return groups
 }
 
-/** 차트 렌더 가능 판정: distinct period ≥2 && unit 그룹 ≤2 */
-export function isChartable(metrics) {
-  const periods = new Set()
-  ;(metrics || []).forEach(m => (m.series || []).forEach(p => p?.period && periods.add(p.period)))
-  return periods.size >= 2 && groupMetricsByUnit(metrics).length <= 2 && groupMetricsByUnit(metrics).length >= 1
+/** metrics에 값이 있는 distinct period 수 */
+export function distinctPeriods(metrics) {
+  const s = new Set()
+  ;(metrics || []).forEach(m => (m.series || []).forEach(p => p?.period && p.value != null && s.add(p.period)))
+  return s.size
+}
+
+/**
+ * 차트/표 분할: 차트는 이중축 한계로 unit 그룹 2개까지만 → 앞 2개 그룹은 차트, 나머지 그룹은 표.
+ * 차트 대상의 distinct period가 <2면 차트 불가라 전부 표로 폴백.
+ * 반환: { chartMetrics, tableMetrics } (원본 순서 보존)
+ */
+export function splitMetricsForRender(metrics) {
+  const groups = groupMetricsByUnit(metrics)
+  const chartMetrics = groups.slice(0, 2).flatMap(g => g.indexes).map(i => metrics[i])
+  const tableMetrics = groups.slice(2).flatMap(g => g.indexes).map(i => metrics[i])
+  if (distinctPeriods(chartMetrics) < 2) return { chartMetrics: [], tableMetrics: metrics || [] }
+  return { chartMetrics, tableMetrics }
 }
 
 /** recharts rows: [{period, m0: v, m1: v, ...}] — period 정렬 합집합, 결측은 키 생략(gap) */
