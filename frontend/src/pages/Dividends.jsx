@@ -65,16 +65,14 @@ function DividendRow({ it }) {
   )
 }
 
-// 보유/관심 섹션 — 다이제스트 종목리스트의 muted 헤더 패턴 재사용, 빈 섹션은 숨김
+// 보유/관심 영역 — 각 영역을 Card 박스로 감싸 시각적으로 분리(빈 영역은 숨김)
 function DividendSection({ label, items }) {
   if (items.length === 0) return null
   return (
-    <>
-      <div className="muted" style={{ fontSize: 11, margin: '4px 0 6px', paddingLeft: 2 }}>{label}</div>
-      <div className="digest-list" style={{ marginBottom: 16 }}>
-        {items.map((it, i) => <DividendRow key={`${it.ticker}-${it.ex_date}-${i}`} it={it} />)}
-      </div>
-    </>
+    <Card padding="none" style={{ marginBottom: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 700 }}>{label}</div>
+      {items.map((it, i) => <DividendRow key={`${it.ticker}-${it.ex_date}-${i}`} it={it} />)}
+    </Card>
   )
 }
 
