@@ -6,7 +6,7 @@ import { MarketBadge, ChangeBadge } from '../ui/Badge'
 
 export default function TickerListItem({
   ticker, info, selected, view, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
-  openDetail, generateOne, openEdit, handleDelete, handleGlobalDelete, setPromoteTarget,
+  openDetail, generateOne, openEdit, handleDelete, handleGlobalDelete, setPromoteTarget, handlePinToggle,
 }) {
   const isSelected = selected.ticker === ticker && view === 'detail'
   const hasReport = info.dates.length > 0
@@ -100,7 +100,7 @@ export default function TickerListItem({
         <StockActions
           info={info} ticker={ticker} market={market} touchStyle={touchStyle}
           openEdit={openEdit} handleDelete={handleDelete} handleGlobalDelete={handleGlobalDelete}
-          setPromoteTarget={setPromoteTarget} layout="list"
+          setPromoteTarget={setPromoteTarget} handlePinToggle={handlePinToggle} layout="list"
         />
       </div>
     </div>

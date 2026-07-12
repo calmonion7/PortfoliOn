@@ -7,13 +7,14 @@ import { Pencil } from '../ui/icons'
 // layout: 'card'(그리드 카드 본문 흐름 — 전용 래퍼) | 'list'(사이드바, 이미 flex 행 안 — fragment).
 export default function StockActions({
   info, ticker, market, touchStyle,
-  openEdit, handleDelete, handleGlobalDelete, setPromoteTarget, layout = 'list',
+  openEdit, handleDelete, handleGlobalDelete, setPromoteTarget, handlePinToggle, layout = 'list',
 }) {
   if (info.category !== 'holdings' && info.category !== 'watchlist') return null
 
   const buttons = info.is_mine === false ? (
     <button className="sc-act-btn" style={touchStyle} title="전체 삭제" onClick={e => { e.stopPropagation(); handleGlobalDelete(ticker) }}>×</button>
   ) : (<>
+    <button className="sc-act-btn" style={{ ...touchStyle, opacity: info.pinned ? 1 : 0.4 }} title={info.pinned ? '고정 해제' : '고정'} onClick={e => { e.stopPropagation(); handlePinToggle(ticker, !info.pinned) }}>📌</button>
     <button className="sc-act-btn" style={touchStyle} title="수정" onClick={e => { e.stopPropagation(); openEdit(ticker, info.category) }}><Pencil /></button>
     {info.category === 'watchlist' && (
       <button className="sc-act-btn" style={touchStyle} title="보유로 이동" onClick={e => { e.stopPropagation(); setPromoteTarget({ ticker, market: market || 'US' }) }}>↑</button>

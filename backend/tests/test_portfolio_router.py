@@ -210,6 +210,22 @@ def test_put_rebalance_targets_saves_only_held_tickers():
     mock_inv.assert_called_once_with("test-user-id")  # 타겟 변경 시 캐시된 rebalance가 stale로 남지 않도록
 
 
+def test_set_pin_updates_and_invalidates_cache():
+    with patch("routers.portfolio.storage.set_pinned", return_value=True) as mock_set, \
+         patch("routers.portfolio.cache_svc.invalidate_portfolio_caches") as mock_inv:
+        resp = client.patch("/api/portfolio/AAPL/pin", json={"pinned": True})
+    assert resp.status_code == 200
+    assert resp.json() == {"ticker": "AAPL", "pinned": True}
+    mock_set.assert_called_once_with("test-user-id", "AAPL", True)
+    mock_inv.assert_called_once_with("test-user-id")
+
+
+def test_set_pin_returns_404_when_not_owned():
+    with patch("routers.portfolio.storage.set_pinned", return_value=False):
+        resp = client.patch("/api/portfolio/FAKE/pin", json={"pinned": True})
+    assert resp.status_code == 404
+
+
 def test_generate_with_consensus_backfills_via_pipeline():
     """종목 추가 후 자동 리포트가 정본 _pipeline.backfill(→ mart)로 백필한다 (ADR-0008)."""
     from routers import portfolio

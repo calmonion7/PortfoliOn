@@ -33,6 +33,7 @@ export default function useReportFilters({ reportList, othersData, activeTab, _t
       return m === marketFilter
     })
     .sort(([, a], [, b]) => {
+      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1
       const cmp = (va, vb, dir) => {
         if (va === null && vb === null) return 0
         if (va === null) return 1

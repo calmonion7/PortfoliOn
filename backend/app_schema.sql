@@ -36,6 +36,7 @@ CREATE TABLE user_stocks (
   target_price numeric,
   stop_price   numeric,
   target_weight numeric,
+  pinned    boolean NOT NULL DEFAULT false,
   PRIMARY KEY (user_id, ticker)
 );
 

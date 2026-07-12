@@ -15,6 +15,7 @@ from .portfolio import (
     get_holdings,
     save_holdings,
     set_target_weights,
+    set_pinned,
     get_watchlist_tickers,
     save_watchlist_tickers,
     get_full_portfolio,

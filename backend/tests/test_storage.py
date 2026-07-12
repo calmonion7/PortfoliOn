@@ -267,3 +267,31 @@ def test_set_target_weights_updates_each_ticker():
     assert len(calls) == 2
     tickers_updated = {c.args[1][2] for c in calls}
     assert tickers_updated == {"AAPL", "TSLA"}
+
+
+def test_get_full_portfolio_includes_pinned():
+    from services import storage
+    row = {"ticker": "AAPL", "type": "holding", "quantity": 10, "avg_cost": 150.0,
+           "target_price": None, "stop_price": None, "target_weight": None, "pinned": True,
+           "name": "Apple", "market": "US", "exchange": "", "is_etf": False,
+           "competitors": [], "moat": None, "growth_plan": None, "risks": None,
+           "recent_disclosures": None, "insights": None}
+    with patch("services.storage.portfolio.query", return_value=[row]):
+        result = storage.get_full_portfolio("user-123")
+    assert result["stocks"][0]["pinned"] is True
+
+
+def test_set_pinned_returns_true_when_row_updated():
+    from services import storage
+    with patch("services.storage.portfolio.execute", return_value=1) as mock_execute:
+        result = storage.set_pinned("user-123", "aapl", True)
+    assert result is True
+    args = mock_execute.call_args[0]
+    assert args[1] == (True, "user-123", "AAPL")
+
+
+def test_set_pinned_returns_false_when_not_owned():
+    from services import storage
+    with patch("services.storage.portfolio.execute", return_value=0):
+        result = storage.set_pinned("user-123", "AAPL", True)
+    assert result is False

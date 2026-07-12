@@ -6,7 +6,7 @@ import { MarketBadge, ChangeBadge } from '../ui/Badge'
 
 export default function StockCard({
   ticker, info, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
-  openDetail, generateOne, openEdit, handleDelete, handleGlobalDelete, setPromoteTarget,
+  openDetail, generateOne, openEdit, handleDelete, handleGlobalDelete, setPromoteTarget, handlePinToggle,
 }) {
   const s = info.summary
   const market = s?.market || info.market
@@ -99,7 +99,7 @@ export default function StockCard({
         <StockActions
           info={info} ticker={ticker} market={market} touchStyle={touchStyle}
           openEdit={openEdit} handleDelete={handleDelete} handleGlobalDelete={handleGlobalDelete}
-          setPromoteTarget={setPromoteTarget} layout="card"
+          setPromoteTarget={setPromoteTarget} handlePinToggle={handlePinToggle} layout="card"
         />
       </div>
 

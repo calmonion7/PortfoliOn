@@ -319,3 +319,12 @@ def delete_stock(ticker: str, user_id: str = Depends(get_current_user)):
         storage.save_watchlist_tickers(user_id, watchlist)
 
     return {"moved_to_watchlist": upper}
+
+
+@router.patch("/{ticker}/pin")
+def set_pin(ticker: str, pinned: bool = Body(..., embed=True), user_id: str = Depends(get_current_user)):
+    """추적 종목(보유/관심 무관)의 고정핀 토글 — 리포트 목록에서 최상단 정렬용."""
+    if not storage.set_pinned(user_id, ticker, pinned):
+        raise HTTPException(status_code=404, detail=f"{ticker} not found")
+    cache_svc.invalidate_portfolio_caches(user_id)
+    return {"ticker": ticker.upper(), "pinned": pinned}

@@ -126,6 +126,15 @@ describe('useReportFilters — 정렬', () => {
     act(() => result.current.handleSort('gap'))   // desc: CCC 100, FFF 50, GGG null
     expect(tickers(result.current.tabEntries)).toEqual(['CCC', 'FFF', 'GGG'])
   })
+  it('pinned 종목은 탭 안 최상단으로, 비핀 상대순서는 보존', () => {
+    const pinnedList = { ...reportList, FFF: { ...reportList.FFF, pinned: true } }
+    const { result } = renderHook(
+      (props) => useReportFilters(props),
+      { initialProps: { reportList: pinnedList, othersData, activeTab: 'watchlist', _targetPct, _hasWarning, _isUngenerated } },
+    )
+    // 기본 정렬은 CCC, FFF, GGG(gap desc, null last) — FFF만 pinned면 FFF가 맨 위, 나머지 상대순서(CCC, GGG) 보존
+    expect(tickers(result.current.tabEntries)).toEqual(['FFF', 'CCC', 'GGG'])
+  })
 })
 
 describe('useReportFilters — sortArrow', () => {

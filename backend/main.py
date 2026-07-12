@@ -192,6 +192,7 @@ def _migrate():
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS target_price numeric")
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS stop_price numeric")
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS target_weight numeric")
+        execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false")
     except Exception as e:
         logger.warning(f"[Migrate] user_stocks 목표가/손절가 추가 실패: {e}")
 

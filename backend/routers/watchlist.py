@@ -166,8 +166,9 @@ def promote_to_holdings(ticker: str, payload: PromotePayload, user_id: str = Dep
     stock_data = find_ticker(stocks, upper) or \
         {"ticker": upper, "name": upper, "competitors": [], "moat": "", "growth_plan": "", "market": "US", "exchange": ""}
 
-    storage.save_watchlist_tickers(user_id, [t for t in watchlist if t.upper() != upper])
-
+    # eco: save_watchlist_tickers의 하드 DELETE를 거치지 않는다 — 아래 save_holdings의
+    # ON CONFLICT(user_id, ticker) UPDATE가 기존 watchlist 행을 type='holding'으로 그대로
+    # 전환해 pinned 등 미언급 컬럼을 보존한다. DELETE+INSERT면 pinned가 유실됨(task#182).
     new_holding = {
         "ticker": upper,
         "quantity": payload.quantity,

@@ -114,6 +114,8 @@ def test_delete_nonexistent_returns_404():
 
 
 def test_promote_moves_ticker_to_holdings():
+    # save_watchlist_tickers는 promote 경로에서 더 이상 호출되지 않는다 — save_holdings의
+    # ON CONFLICT UPDATE가 기존 watchlist 행을 type='holding'으로 전환한다(pinned 보존, task#182).
     with patch("routers.watchlist.storage.get_watchlist_tickers", return_value=["NVDA"]), \
          patch("routers.watchlist.storage.get_holdings", return_value=[]), \
          patch("routers.watchlist.storage.get_stocks", return_value=[
@@ -125,8 +127,7 @@ def test_promote_moves_ticker_to_holdings():
         resp = client.post("/api/watchlist/NVDA/promote",
                            json={"quantity": 5, "avg_cost": 200.0})
     assert resp.status_code == 200
-    saved_watchlist = mock_save_watchlist.call_args[0][1]
-    assert "NVDA" not in saved_watchlist
+    mock_save_watchlist.assert_not_called()
     saved_holdings = mock_save_holdings.call_args[0][1]
     assert saved_holdings[0]["ticker"] == "NVDA"
     assert saved_holdings[0]["quantity"] == 5

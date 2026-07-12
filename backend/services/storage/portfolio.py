@@ -153,6 +153,15 @@ def set_target_weights(user_id: str, weights: dict) -> None:
                 )
 
 
+def set_pinned(user_id: str, ticker: str, pinned: bool) -> bool:
+    """단일 종목 고정핀 토글. 갱신된 행이 있으면 True, 그 유저 소유가 아니면 False(404)."""
+    rowcount = execute(
+        "UPDATE user_stocks SET pinned=%s WHERE user_id=%s AND ticker=%s",
+        (pinned, user_id, ticker.upper()),
+    )
+    return rowcount > 0
+
+
 def get_watchlist_tickers(user_id: str) -> list[str]:
     rows = query(
         "SELECT ticker FROM user_stocks WHERE user_id = %s AND type = 'watchlist'",
@@ -191,7 +200,7 @@ def save_watchlist_tickers(user_id: str, tickers: list[str]) -> None:
 def get_full_portfolio(user_id: str) -> dict:
     rows = query(
         """
-        SELECT us.ticker, us.type, us.quantity, us.avg_cost, us.target_price, us.stop_price, us.target_weight,
+        SELECT us.ticker, us.type, us.quantity, us.avg_cost, us.target_price, us.stop_price, us.target_weight, us.pinned,
                t.name, t.market, t.exchange, t.is_etf,
                t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights
         FROM user_stocks us
@@ -214,6 +223,7 @@ def get_full_portfolio(user_id: str) -> dict:
             "recent_disclosures": _parse_json_field(r.get("recent_disclosures")),
             "insights": _parse_json_field(r.get("insights")),
             "is_etf": bool(r.get("is_etf")),
+            "pinned": bool(r.get("pinned")),
         }
         if r["type"] == "holding":
             entry.update({"quantity": r["quantity"], "avg_cost": r["avg_cost"],

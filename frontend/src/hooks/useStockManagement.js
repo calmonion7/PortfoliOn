@@ -86,6 +86,15 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
     }
   }
 
+  const handlePinToggle = async (ticker, pinned) => {
+    try {
+      await api.patch(`/api/portfolio/${ticker}/pin`, { pinned })
+      fetchList()
+    } catch (err) {
+      showToast(err.response?.data?.detail || '핀 변경 실패', 'error')
+    }
+  }
+
   const handlePromote = async ({ quantity, avg_cost }) => {
     try {
       await api.post(`/api/watchlist/${promoteTarget.ticker}/promote`, { quantity, avg_cost })
@@ -116,7 +125,7 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
     addMode,
     promoteTarget, setPromoteTarget,
     mutError,
-    handleSave, handleDelete, handleGlobalDelete, handlePromote, openEdit, openAdd,
+    handleSave, handleDelete, handleGlobalDelete, handlePromote, handlePinToggle, openEdit, openAdd,
     pollReportGeneration, refreshAfterMutation,
   }
 }

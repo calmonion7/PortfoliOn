@@ -87,7 +87,7 @@ export default function Reports({ initialTicker = null }) {
     addMode,
     promoteTarget, setPromoteTarget,
     mutError,
-    handleSave, handleDelete, handleGlobalDelete, handlePromote, openEdit, openAdd,
+    handleSave, handleDelete, handleGlobalDelete, handlePromote, handlePinToggle, openEdit, openAdd,
   } = useStockManagement({ holdingMap, watchMap, fetchList, fetchAll, showToast, activeTab, setActiveTab, refreshOthers: () => setOthersData(null) })
 
   useEffect(() => {
@@ -193,6 +193,7 @@ export default function Reports({ initialTicker = null }) {
               handleDelete={handleDelete}
               handleGlobalDelete={handleGlobalDelete}
               setPromoteTarget={setPromoteTarget}
+              handlePinToggle={handlePinToggle}
             />
           ))}
         </div>
@@ -242,6 +243,7 @@ export default function Reports({ initialTicker = null }) {
                       handleDelete={handleDelete}
                       handleGlobalDelete={handleGlobalDelete}
                       setPromoteTarget={setPromoteTarget}
+                      handlePinToggle={handlePinToggle}
                     />
                   ))}
                 </div>

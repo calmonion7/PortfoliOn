@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { trackEvent } from '../utils/analytics'
 import useIsMobile from '../hooks/useIsMobile'
+import GlobalSearch from '../components/GlobalSearch'
 
 // 리서치 7하위 라우트 공용 얇은 래퍼(task#172 S2) — 각 라우트가 실제 탭 컴포넌트를 children으로 렌더한다.
 // 모바일: 기존 seg 필 nav(동선 보존, state 전환→라우트 네비게이션). PC: 사이드바가 nav를 담당하므로 필 숨김.
@@ -45,6 +46,11 @@ export default function ResearchShell({ children }) {
           ))}
         </div>
       </div>
+      {!isSchedule && (
+        <div className="seg-pad">
+          <GlobalSearch variant="bar" />
+        </div>
+      )}
       <div className="m-page">{children}</div>
     </>
   )

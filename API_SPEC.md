@@ -796,6 +796,26 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 
 ---
 
+### `PATCH /api/portfolio/{ticker}/pin`
+
+추적 종목(보유/관심 무관)의 고정핀 토글. 리포트 목록에서 현재 뷰 안 최상단 정렬용 표시일 뿐, 정렬 자체는 프론트에서 처리한다.
+
+**Auth:** Bearer token 필요
+
+**Request Body**
+```json
+{ "pinned": true }
+```
+
+**Response `200`**
+```json
+{ "ticker": "AAPL", "pinned": true }
+```
+
+**Response `404`** — 해당 유저의 보유/관심 종목이 아님
+
+---
+
 ## Watchlist (관심종목)
 
 ### `GET /api/watchlist`
