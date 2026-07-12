@@ -3,6 +3,7 @@ import api from '../api'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import { useToast } from '../components/Toast'
+import useIsMobile from '../hooks/useIsMobile'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -38,6 +39,7 @@ function eventKey(e) {
 
 function MonthGrid({ year, month, events }) {
   const [selectedDate, setSelectedDate] = useState(null)
+  const isMobile = useIsMobile()
 
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -79,6 +81,10 @@ function MonthGrid({ year, month, events }) {
           const dayEvents = dateStr ? (byDate[dateStr] || []) : []
           const isToday = dateStr === todayStr
           const isSelected = dateStr === selectedDate
+          // 모바일은 좁은 셀에 맞춰 마커를 한 줄로 고정: cap 초과 시 이모지 수를 줄여 +N 자리 확보
+          const emojiCap = isMobile ? 3 : 4
+          const shownCount = dayEvents.length > emojiCap ? (isMobile ? 2 : 4) : dayEvents.length
+          const remaining = dayEvents.length - shownCount
           return (
             <div
               key={i}
@@ -91,6 +97,7 @@ function MonthGrid({ year, month, events }) {
                 aspectRatio: '1 / 1',
                 display: 'flex', flexDirection: 'column', overflow: 'hidden',
                 cursor: day && dayEvents.length > 0 ? 'pointer' : 'default',
+                ...(isMobile && { padding: 4 }),
               }}
             >
               {day && (
@@ -100,14 +107,14 @@ function MonthGrid({ year, month, events }) {
                 </div>
               )}
               {dayEvents.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1, marginTop: 'auto', justifyContent: 'center' }}>
-                  {dayEvents.slice(0, 4).map((e, j) => (
-                    <span key={j} style={{ fontSize: 11, lineHeight: 1 }}>
+                <div style={{ display: 'flex', flexWrap: isMobile ? 'nowrap' : 'wrap', gap: 1, marginTop: 'auto', justifyContent: 'center', ...(isMobile && { alignItems: 'center' }) }}>
+                  {dayEvents.slice(0, shownCount).map((e, j) => (
+                    <span key={j} style={{ fontSize: isMobile ? 10 : 11, lineHeight: 1 }}>
                       {EVENT_ICON[eventKey(e)] || '●'}
                     </span>
                   ))}
-                  {dayEvents.length > 4 && (
-                    <span style={{ fontSize: 8, color: 'var(--text-3)', lineHeight: '12px' }}>+{dayEvents.length - 4}</span>
+                  {remaining > 0 && (
+                    <span style={{ fontSize: isMobile ? 9 : 8, color: 'var(--text-3)', lineHeight: isMobile ? '1' : '12px' }}>+{remaining}</span>
                   )}
                 </div>
               )}
