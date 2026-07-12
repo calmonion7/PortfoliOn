@@ -195,6 +195,11 @@ def _migrate():
         execute("ALTER TABLE user_stocks ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false")
     except Exception as e:
         logger.warning(f"[Migrate] user_stocks 목표가/손절가 추가 실패: {e}")
+    try:
+        from services.db import execute
+        execute("ALTER TABLE tickers ADD COLUMN IF NOT EXISTS key_resource text NOT NULL DEFAULT ''")
+    except Exception as e:
+        logger.warning(f"[Migrate] tickers.key_resource 추가 실패: {e}")
 
 
 @asynccontextmanager

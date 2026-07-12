@@ -133,6 +133,7 @@ class EnrichBody(BaseModel):
     risks: Optional[Any] = None
     recent_disclosures: Optional[Any] = None
     insights: Optional[Any] = None
+    key_resource: Optional[Any] = None
     competitors: Optional[List[str]] = None
 
 
@@ -143,6 +144,7 @@ class BatchEnrichItem(BaseModel):
     risks: Optional[Any] = None
     recent_disclosures: Optional[Any] = None
     insights: Optional[Any] = None
+    key_resource: Optional[Any] = None
     competitors: Optional[List[str]] = None
 
 

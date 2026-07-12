@@ -982,6 +982,17 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
   "growth_plan": "AI 서비스 확대",
   "risks": "규제 리스크, 경쟁 심화, 매크로 불확실성",
   "recent_disclosures": "2024-11-01: 4분기 실적 가이던스 상향...",
+  "key_resource": {
+    "resource": "인력 (Human Capital)",
+    "thesis": "우수 인력 확보·유지가 경쟁력의 핵심",
+    "metrics": [
+      { "label": "직원수", "unit": "명", "series": [{"period": "2025Q1", "value": 1200}] }
+    ],
+    "drivers": [
+      { "title": "스톡옵션·RSU", "description": "핵심인력 리텐션용 주식보상 규모/조건" }
+    ],
+    "one_liner": "1인당 생산성은 상승세이나 이직률 관리가 관건"
+  },
   "competitors": ["MSFT", "GOOGL"]
 }
 ```
@@ -992,6 +1003,12 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 | `growth_plan` | string | ❌ | 성장 계획 |
 | `risks` | string | ❌ | 리스크 요인 |
 | `recent_disclosures` | string | ❌ | 최근 공시/뉴스 요약 |
+| `key_resource` | object | ❌ | 업종별 핵심 자원(인력/생산능력/파이프라인 등) + 분기별 지표 추이 + 유지 동력. 저장 후 리포트 심층분석 탭 "핵심 자원" 섹션에 표시 |
+| `key_resource.resource` | string | ❌ | 핵심자원 라벨 (예: `"인력 (Human Capital)"`) |
+| `key_resource.thesis` | string | ❌ | 왜 이 자원이 경쟁력인지 한줄 논지 |
+| `key_resource.metrics` | `{label, unit, series}[]` | ❌ | 분기별 지표 목록. `series`는 `{period, value}[]`, `period` 형식 `YYYYQn`(예: `"2025Q1"`) |
+| `key_resource.drivers` | `{title, description}[]` | ❌ | 자원 유지 동력(리텐션 인센티브) 목록 |
+| `key_resource.one_liner` | string | ❌ | 한 줄 종합 요약 |
 | `competitors` | string[] | ❌ | 경쟁사 티커 목록 |
 
 > 최소 1개 이상의 필드를 포함해야 함.

@@ -14,6 +14,7 @@ CREATE TABLE tickers (
   risks               text NOT NULL DEFAULT '',
   recent_disclosures  text NOT NULL DEFAULT '',
   insights            text NOT NULL DEFAULT '',
+  key_resource        text NOT NULL DEFAULT '',
   enriched_at         timestamptz,
   is_etf              boolean NOT NULL DEFAULT false
 );

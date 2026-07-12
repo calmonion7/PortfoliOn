@@ -176,6 +176,80 @@ export function MoatSection({ moat }) {
   )
 }
 
+function _keyResourcePeriods(metrics) {
+  const set = new Set()
+  metrics.forEach(m => (m.series || []).forEach(p => p?.period && set.add(p.period)))
+  return Array.from(set).sort()
+}
+
+export function KeyResourceSection({ key_resource }) {
+  if (!key_resource) return null
+  if (typeof key_resource === 'string') return <ReportSectionText title="🔑 핵심 자원" text={key_resource} />
+
+  const hasMetrics = key_resource.metrics?.length > 0
+  const hasDrivers = key_resource.drivers?.length > 0
+  if (!key_resource.resource && !key_resource.thesis && !hasMetrics && !hasDrivers && !key_resource.one_liner) return null
+
+  const periods = hasMetrics ? _keyResourcePeriods(key_resource.metrics) : []
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🔑 핵심 자원</div>
+      {key_resource.resource && (
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{key_resource.resource}</div>
+      )}
+      {key_resource.thesis && (
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{key_resource.thesis}</p>
+      )}
+      {hasMetrics && periods.length > 0 && (
+        <div className="table-mobile-wrap" style={{ marginBottom: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: '5px 8px', color: 'var(--text-3)', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>지표</th>
+                {periods.map(p => (
+                  <th key={p} style={{ padding: '5px 8px', color: 'var(--text-3)', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap' }}>{p}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {key_resource.metrics.map((m, i) => {
+                const byPeriod = {}
+                ;(m.series || []).forEach(p => { if (p?.period) byPeriod[p.period] = p.value })
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '6px 8px', color: 'var(--text)' }}>{m.label}{m.unit ? ` (${m.unit})` : ''}</td>
+                    {periods.map(p => (
+                      <td key={p} className="mono tnum" style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                        {byPeriod[p] != null ? byPeriod[p] : '—'}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {hasDrivers && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+          {key_resource.drivers.map((d, i) => (
+            <div key={i} style={_FACTOR_LINE}>
+              <div style={_FACTOR_TITLE}>{d.title}</div>
+              <div style={_FACTOR_DESC}>{d.description}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {key_resource.one_liner && (
+        <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.7, padding: '8px 12px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid var(--accent)' }}>
+          💡 {key_resource.one_liner}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const STATUS_CFG = {
   launched:  { label: '출시',    color: 'var(--color-success)' },
   phase3:    { label: '3단계', color: 'var(--color-info)' },

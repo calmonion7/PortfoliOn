@@ -37,6 +37,19 @@ def test_enrich_stock_found():
     assert result is True
 
 
+def test_enrich_stock_accepts_key_resource_and_json_encodes_dict():
+    import json
+    from services import storage
+    key_resource = {"resource": "인력", "metrics": [{"label": "직원수", "unit": "명", "series": []}]}
+    with patch("services.storage.portfolio.query", return_value=[{"ticker": "AAPL"}]), \
+         patch("services.storage.portfolio.execute", return_value=1) as mock_execute:
+        result = storage.enrich_stock("AAPL", {"key_resource": key_resource})
+    assert result is True
+    sql, params = mock_execute.call_args[0]
+    assert "key_resource=%s" in sql
+    assert params[0] == json.dumps(key_resource)
+
+
 def test_get_schedule_default():
     from services import storage
     with patch("services.storage.schedule.query", return_value=[]):
@@ -279,6 +292,20 @@ def test_get_full_portfolio_includes_pinned():
     with patch("services.storage.portfolio.query", return_value=[row]):
         result = storage.get_full_portfolio("user-123")
     assert result["stocks"][0]["pinned"] is True
+
+
+def test_get_full_portfolio_parses_key_resource_json_text():
+    import json
+    from services import storage
+    key_resource = {"resource": "인력", "one_liner": "1인당 생산성 상승세"}
+    row = {"ticker": "AAPL", "type": "holding", "quantity": 10, "avg_cost": 150.0,
+           "target_price": None, "stop_price": None, "target_weight": None, "pinned": False,
+           "name": "Apple", "market": "US", "exchange": "", "is_etf": False,
+           "competitors": [], "moat": None, "growth_plan": None, "risks": None,
+           "recent_disclosures": None, "insights": None, "key_resource": json.dumps(key_resource)}
+    with patch("services.storage.portfolio.query", return_value=[row]):
+        result = storage.get_full_portfolio("user-123")
+    assert result["stocks"][0]["key_resource"] == key_resource
 
 
 def test_set_pinned_returns_true_when_row_updated():

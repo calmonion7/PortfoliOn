@@ -15,6 +15,7 @@ SAMPLE_STOCK = {
     "growth_plan": "Expand to Asia",
     "recent_disclosures": "Q1 실적 호조",
     "risks": "Competition risk",
+    "key_resource": {"resource": "인력", "one_liner": "1인당 생산성 상승세"},
 }
 
 SAMPLE_NEWS = [
@@ -106,6 +107,7 @@ def test_generate_report_json_has_analyst_text_fields(tmp_path):
     assert summary["growth_plan"] == "Expand to Asia"
     assert summary["recent_disclosures"] == "Q1 실적 호조"
     assert summary["risks"] == "Competition risk"
+    assert summary["key_resource"] == {"resource": "인력", "one_liner": "1인당 생산성 상승세"}
 
 
 def test_generate_report_json_has_competitors_data(tmp_path):

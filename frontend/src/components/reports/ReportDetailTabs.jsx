@@ -5,7 +5,7 @@ import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable, Technica
 import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
 import HistoryTab from './HistoryTab'
-import { ReportSectionCompetitors, MoatSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from './Sections'
+import { ReportSectionCompetitors, MoatSection, KeyResourceSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from './Sections'
 import InvestorTrendSection from './InvestorTrendSection'
 import ShortSellSection from './ShortSellSection'
 import SupplySection from './SupplySection'
@@ -159,6 +159,7 @@ export default function ReportDetailTabs({
                 ticker={ticker}
               />
               <MoatSection moat={summary.moat} />
+              <KeyResourceSection key_resource={summary.key_resource} />
               <GrowthPlanSection growth_plan={summary.growth_plan} />
               <RisksSection risks={summary.risks} />
               <RecentDisclosuresSection
