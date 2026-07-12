@@ -29,6 +29,21 @@ function StockRow({ s }) {
   )
 }
 
+function NewsItem({ n, nameMap }) {
+  return (
+    <div style={{ fontSize: 13 }}>
+      <span style={{ fontWeight: 600 }}>{n.ticker}</span>
+      {nameMap[n.ticker] && nameMap[n.ticker] !== n.ticker && (
+        <span className="muted" style={{ fontSize: 11, marginLeft: 4 }}>{nameMap[n.ticker]}</span>
+      )}
+      <div>
+        <a href={n.link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{decodeHtml(n.title)}</a>
+        <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>— {n.publisher} ({n.published_at})</span>
+      </div>
+    </div>
+  )
+}
+
 export default function Digest() {
   const isMobile = useIsMobile()
   const [digest, setDigest] = useState(null)
@@ -65,6 +80,10 @@ export default function Digest() {
   const holdings = digest?.stocks?.filter(s => s.is_holding) ?? []
   const watchlist = digest?.stocks?.filter(s => !s.is_holding) ?? []
   const nameMap = Object.fromEntries((digest?.stocks ?? []).map(s => [s.ticker, s.name]))
+  // 뉴스 scope는 digest.stocks의 is_holding에서 파생(모든 news ticker ⊆ stocks). 미매핑은 관심 취급.
+  const holdingTickerSet = new Set((digest?.stocks ?? []).filter(s => s.is_holding).map(s => (s.ticker || '').toUpperCase()))
+  const holdingNews = (digest?.news ?? []).filter(n => holdingTickerSet.has((n.ticker || '').toUpperCase()))
+  const watchNews = (digest?.news ?? []).filter(n => !holdingTickerSet.has((n.ticker || '').toUpperCase()))
 
   return (
     <div style={{ maxWidth: 640 }}>
@@ -188,24 +207,20 @@ export default function Digest() {
             </div>
           )}
 
-          {/* 종목 뉴스 */}
+          {/* 종목 뉴스 — 보유/관심 분리 */}
           {(digest.news?.length ?? 0) > 0 && (
             <div className="card" style={{ marginBottom: 12, padding: '12px 16px' }}>
               <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>종목 뉴스</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {digest.news.map((n, i) => (
-                  <div key={i} style={{ fontSize: 13 }}>
-                    <span style={{ fontWeight: 600 }}>{n.ticker}</span>
-                    {nameMap[n.ticker] && nameMap[n.ticker] !== n.ticker && (
-                      <span className="muted" style={{ fontSize: 11, marginLeft: 4 }}>{nameMap[n.ticker]}</span>
-                    )}
-                    <div>
-                      <a href={n.link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{decodeHtml(n.title)}</a>
-                      <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>— {n.publisher} ({n.published_at})</span>
+              {[['보유', holdingNews], ['관심', watchNews]].map(([label, list], gi) =>
+                list.length === 0 ? null : (
+                  <div key={label} style={{ marginTop: gi === 1 && holdingNews.length > 0 ? 12 : 0 }}>
+                    <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{label}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {list.map((n, i) => <NewsItem key={`${n.ticker}-${i}`} n={n} nameMap={nameMap} />)}
                     </div>
                   </div>
-                ))}
-              </div>
+                )
+              )}
             </div>
           )}
 

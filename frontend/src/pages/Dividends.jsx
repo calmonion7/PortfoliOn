@@ -65,6 +65,19 @@ function DividendRow({ it }) {
   )
 }
 
+// 보유/관심 섹션 — 다이제스트 종목리스트의 muted 헤더 패턴 재사용, 빈 섹션은 숨김
+function DividendSection({ label, items }) {
+  if (items.length === 0) return null
+  return (
+    <>
+      <div className="muted" style={{ fontSize: 11, margin: '4px 0 6px', paddingLeft: 2 }}>{label}</div>
+      <div className="digest-list" style={{ marginBottom: 16 }}>
+        {items.map((it, i) => <DividendRow key={`${it.ticker}-${it.ex_date}-${i}`} it={it} />)}
+      </div>
+    </>
+  )
+}
+
 export default function Dividends() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -97,6 +110,8 @@ export default function Dividends() {
 
   const items = data?.items || []
   const summary = data?.summary || {}
+  const holdingItems = items.filter(it => it.stock_type === 'holding')
+  const watchItems = items.filter(it => it.stock_type !== 'holding')
 
   return (
     <div style={{ maxWidth: 700 }}>
@@ -113,9 +128,10 @@ export default function Dividends() {
           다가오는 배당 일정이 없습니다.
         </div>
       ) : (
-        <div className="digest-list">
-          {items.map((it, i) => <DividendRow key={`${it.ticker}-${it.ex_date}-${i}`} it={it} />)}
-        </div>
+        <>
+          <DividendSection label="보유" items={holdingItems} />
+          <DividendSection label="관심" items={watchItems} />
+        </>
       )}
 
       <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-3)', lineHeight: 1.5 }}>
