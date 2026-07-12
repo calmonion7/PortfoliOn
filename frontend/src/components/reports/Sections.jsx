@@ -1,5 +1,6 @@
 import { fmtPrice as fmt } from '../../utils'
 import { computePeerPremiums } from './reportUtils.jsx'
+import KeyResourceChart, { isChartable } from './KeyResourceChart.jsx'
 
 function decodeHtml(str) {
   if (!str) return str
@@ -191,6 +192,7 @@ export function KeyResourceSection({ key_resource }) {
   if (!key_resource.resource && !key_resource.thesis && !hasMetrics && !hasDrivers && !key_resource.one_liner) return null
 
   const periods = hasMetrics ? _keyResourcePeriods(key_resource.metrics) : []
+  const chartable = hasMetrics && isChartable(key_resource.metrics)
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -201,7 +203,8 @@ export function KeyResourceSection({ key_resource }) {
       {key_resource.thesis && (
         <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{key_resource.thesis}</p>
       )}
-      {hasMetrics && periods.length > 0 && (
+      {chartable && <KeyResourceChart metrics={key_resource.metrics} />}
+      {hasMetrics && !chartable && periods.length > 0 && (
         <div className="table-mobile-wrap" style={{ marginBottom: 12 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
