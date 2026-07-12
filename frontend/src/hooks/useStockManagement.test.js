@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
 vi.mock('../api', () => ({
-  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), patch: vi.fn() },
 }))
 import api from '../api'
 import useStockManagement from './useStockManagement'
@@ -138,6 +138,25 @@ describe('useStockManagement — handlePromote', () => {
     expect(result.current.promoteTarget).toBe(null)
     expect(args.fetchList).toHaveBeenCalled()
     expect(args.fetchAll).toHaveBeenCalled()
+  })
+})
+
+describe('useStockManagement — handlePinToggle', () => {
+  it('성공: portfolio/{ticker}/pin PATCH·목록 재조회', async () => {
+    api.patch.mockResolvedValue({ data: { ticker: 'TSLA', pinned: true } })
+    const args = makeArgs()
+    const { result } = renderHook(() => useStockManagement(args))
+    await act(async () => { await result.current.handlePinToggle('TSLA', true) })
+    expect(api.patch).toHaveBeenCalledWith('/api/portfolio/TSLA/pin', { pinned: true })
+    expect(args.fetchList).toHaveBeenCalled()
+  })
+  it('실패: 에러 토스트·목록 재조회 안 함', async () => {
+    api.patch.mockRejectedValue({ response: { data: { detail: '핀 실패' } } })
+    const args = makeArgs()
+    const { result } = renderHook(() => useStockManagement(args))
+    await act(async () => { await result.current.handlePinToggle('TSLA', true) })
+    expect(args.showToast).toHaveBeenCalledWith('핀 실패', 'error')
+    expect(args.fetchList).not.toHaveBeenCalled()
   })
 })
 
