@@ -221,9 +221,9 @@ X-API-Key: {COWORK_API_KEY}
     "resource": "인력 (Human Capital)",
     "thesis": "IT 서비스업은 인력이 곧 생산설비 — 우수 인력 확보·유지가 경쟁력의 핵심",
     "metrics": [
-      { "label": "직원수",       "unit": "명",   "series": [{"period":"2025Q1","value":1200}, {"period":"2025Q2","value":1240}] },
-      { "label": "1인당 매출",    "unit": "억원", "series": [{"period":"2025Q1","value":2.4}] },
-      { "label": "1인당 영업이익", "unit": "억원", "series": [{"period":"2025Q1","value":0.5}] }
+      { "label": "직원수",       "unit": "명",   "series": [{"period":"2025Q2","value":1180}, {"period":"2025Q3","value":1200}, {"period":"2025Q4","value":1220}, {"period":"2026Q1","value":1240}] },
+      { "label": "1인당 매출",    "unit": "억원", "series": [{"period":"2025Q2","value":2.2}, {"period":"2025Q3","value":2.3}, {"period":"2025Q4","value":2.4}, {"period":"2026Q1","value":2.5}] },
+      { "label": "1인당 영업이익", "unit": "억원", "series": [{"period":"2025Q2","value":0.4}, {"period":"2025Q3","value":0.45}, {"period":"2025Q4","value":0.5}, {"period":"2026Q1","value":0.55}] }
     ],
     "drivers": [
       { "title": "스톡옵션·RSU", "description": "핵심인력 리텐션용 주식보상 규모/조건" },
@@ -307,7 +307,7 @@ X-API-Key: {COWORK_API_KEY}
 | `metrics` | `{label, unit, series}[]` | 분기별 지표 추이 목록 |
 | `metrics[].label` | string | 지표명 (예: `"직원수"`, `"1인당 매출"`) |
 | `metrics[].unit` | string | 단위 (예: `"명"`, `"억원"`) |
-| `metrics[].series` | `{period, value}[]` | 분기별 값. `period` 형식 `YYYYQn`(예: `"2025Q1"`) |
+| `metrics[].series` | `{period, value}[]` | 분기별 값. `period` 형식 `YYYYQn`(예: `"2025Q1"`). **최근 4분기(1년치) 이상** 채우는 것이 기본 — 확보 가능한 분기가 그보다 적을 때만 있는 만큼 |
 | `drivers` | `{title, description}[]` | 자원 유지 동력(리텐션 인센티브) 목록 |
 | `one_liner` | string | 한 줄 종합 요약 |
 
@@ -321,7 +321,7 @@ X-API-Key: {COWORK_API_KEY}
 > | 자동차·EV | 생산능력 | 생산대수, 공장 가동률 |
 > | 에너지·인프라·건설 | 수주잔고 | 수주잔고, 신규수주 — 단 수주잔고 수치 자체는 별도 `PUT /api/report/{ticker}/backlog` API가 자동 수집하므로 여기선 해석 중심으로 작성 |
 >
-> **소프트웨어·플랫폼(및 IT서비스·컨설팅) 인력 완전 명세** — `metrics`에 **직원수(명)·1인당 매출(억원)·1인당 영업이익(억원)** 분기별 series를 채웁니다. 산식: `1인당 X = 그 분기 X ÷ 그 분기(말) 직원수` (직원수 출처: KR=분기보고서 "직원 등의 현황", US=10-K/10-Q·proxy statement). `drivers`에는 인력을 붙잡는 유지 동력 — 주식보상(RSU·스톡옵션) 규모, 이직률 추세, 보상 경쟁력 등을 담습니다.
+> **소프트웨어·플랫폼(및 IT서비스·컨설팅) 인력 완전 명세** — `metrics`에 **직원수(명)·1인당 매출·1인당 영업이익 3개 지표를 모두** 채웁니다(하나라도 빼지 말 것 — 단 특정 분기 값이 확인 불가하면 그 분기만 생략). 각 지표의 series는 **최근 4분기(1년치) 이상**. 산식: `1인당 X = 그 분기 X ÷ 그 분기(말) 직원수` (직원수 출처: KR=분기보고서 "직원 등의 현황", US=10-K/10-Q·proxy statement; 직원수가 연 1회만 공시되면 같은 값을 해당 연도 분기에 이월 사용 가능). 단위는 종목 통화에 맞는 자유 문자열(KR=`"억원"`, US=`"천USD"`·`"$M"` 등 — 화면에 그대로 표시). `drivers`에는 인력을 붙잡는 유지 동력 — 주식보상(RSU·스톡옵션) 규모, 이직률 추세, 보상 경쟁력 등을 담습니다.
 
 > 모든 객체 필드는 선택적입니다. 최소 1개 이상의 최상위 필드를 포함해야 합니다.
 >
