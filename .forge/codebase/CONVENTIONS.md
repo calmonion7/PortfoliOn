@@ -51,6 +51,8 @@ mapped: 2026-07-12
 
 **포맷** `logger.x(f"[Component] <무엇> (<ids>): {e}")` — `[Component]`는 **PascalCase·개념당 1스펠링**(formatter가 컴포넌트를 안 찍으므로 메시지 내 마커가 유일 grep 앵커). 어휘 예: `[Scheduler]`·`[Report]`·`[Migrate]`·`[Backlog]`·`[Consensus]`·`[Quote]`·`[FX]`. 진단 로그를 broad `except: pass`로 삼키지 말 것.
 
+**프론트엔드(`console.*`):** 앱 로그는 `console.warn`/`console.error`만 사용(`console.log`는 진단 잔재라 신규 지양). **마커는 소스 모듈/훅명 실명**을 브래킷으로 — hook은 camelCase(`[usePortfolioData]`·`[useReportList]`), component/page는 PascalCase(`[AdminAnalytics]`·`[ReportManualGen]`); 백엔드 개념명 PascalCase와 달리 파일명 그대로다. **레벨:** `console.warn`=graceful 폴백/예상된 실패(폴백값 유지·부분성공, 지배적 다수) · `console.error`=예상외·저장(mutation) 실패 등(아껴 씀). 포맷 `console.warn('[모듈] <무엇>(<경로>) 조회 실패', e)`. **강제 가드는 없다** — `npm run lint`(`eslint .`)가 build(`vite build`)·deploy·CI 어디에도 미연결이라 백엔드 `test_no_print.py` 같은 자동 게이트가 없다(관례+리뷰 의존, 신규 무마커 로그 지양). 무음 catch 로깅화는 task#129, 의도적 무음(텔레메트리 `analytics.js`·프리페치·폴링·fire-and-forget)은 대상 아님.
+
 ---
 
 ## 5. 에러 처리

@@ -278,7 +278,7 @@ export default function Analytics() {
       .catch(e => { setError(e.message); setLoading(false) })
     api.get('/api/market/fx')
       .then(r => { const rate = r.data?.rates?.usdkrw?.current; if (rate) setUsdkrw(rate) })
-      .catch(e => console.warn('FX fetch failed, using fallback rate', e))
+      .catch(e => console.warn('[Analytics] 환율(/market/fx) 조회 실패, 폴백 환율 사용', e))
   }, [])
 
   if (loading) return (

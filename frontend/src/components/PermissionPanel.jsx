@@ -63,7 +63,7 @@ export function DefaultPermissionsSection() {
         clearTimeout(savedTimerRef.current)
         savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
       } catch (e) {
-        console.error('기본 권한 저장 실패', e)
+        console.error('[PermissionPanel] 기본 권한 저장(/admin/default-permissions) 실패', e)
       }
     }, 500)
   }
