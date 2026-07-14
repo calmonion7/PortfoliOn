@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../api'
+import { useToast } from './Toast'
 import useIsMobile from '../hooks/useIsMobile'
 import Input from './ui/Input'
 import EditPanel, { ALL_MENUS, MENU_LABELS, PermChip, PermBadges, DefaultPermissionsSection } from './PermissionPanel'
 
 export default function PermissionManager() {
   const isMobile = useIsMobile()
+  const { showToast } = useToast()
   const [users, setUsers] = useState([])
   const [search, setSearch] = useState('')
   const [renderCount, setRenderCount] = useState(20)
@@ -73,7 +75,7 @@ export default function PermissionManager() {
       clearTimeout(savedMsgTimerRef.current)
       savedMsgTimerRef.current = setTimeout(() => setSavedMsg(false), 2000)
     } catch {
-      alert('권한 변경에 실패했습니다.')
+      showToast('권한 변경에 실패했습니다.', 'error')
     } finally {
       setSaving(false)
     }
@@ -88,7 +90,7 @@ export default function PermissionManager() {
       setSelectedIds([])
       closePanel()
     } catch {
-      alert('일괄 권한 적용에 실패했습니다.')
+      showToast('일괄 권한 적용에 실패했습니다.', 'error')
     } finally {
       setSaving(false)
     }
@@ -102,7 +104,7 @@ export default function PermissionManager() {
       setSelectedIds(prev => prev.filter(id => id !== user.id))
       if (editingUser?.id === user.id) closePanel()
     } catch {
-      alert('사용자 삭제에 실패했습니다.')
+      showToast('사용자 삭제에 실패했습니다.', 'error')
     }
   }
 

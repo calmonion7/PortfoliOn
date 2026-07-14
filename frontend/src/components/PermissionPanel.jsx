@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../api'
+import { useToast } from './Toast'
 
 export const ALL_MENUS = ['portfolio', 'research', 'market', 'guru', 'settings']
 export const MENU_LABELS = {
@@ -47,6 +48,7 @@ export function DefaultPermissionsSection() {
   const [saved, setSaved] = useState(false)
   const timerRef = useRef(null)
   const savedTimerRef = useRef(null)
+  const { showToast } = useToast()
 
   useEffect(() => {
     api.get('/api/admin/default-permissions').then(r => setDefaults(r.data))
@@ -64,6 +66,8 @@ export function DefaultPermissionsSection() {
         savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
       } catch (e) {
         console.error('[PermissionPanel] 기본 권한 저장(/admin/default-permissions) 실패', e)
+        showToast('기본 권한 저장에 실패했습니다.', 'error')
+        api.get('/api/admin/default-permissions').then(r => setDefaults(r.data))
       }
     }, 500)
   }
