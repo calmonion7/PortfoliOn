@@ -71,6 +71,8 @@
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
-    position: sticky; top: 0; z-index: 10;
+    /* 페이지 레이어(appbar 20·fab 25·tabbar 30) 위, 모달(1000) 아래 —
+       그래야 헤더 안의 드롭다운(.more-pop)이 갇힌 stacking context 천장을 넘어 탭 위로 뜬다 (task#188) */
+    position: sticky; top: 0; z-index: 50;
   }
 }
