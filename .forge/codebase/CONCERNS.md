@@ -1,319 +1,308 @@
 ---
-last_mapped_commit: 23c5cadc945073d41ee8b114fad293af35d774e5
-mapped: 2026-07-12
+last_mapped_commit: 8e37e2ca03c09e76a31dd227d4c252f19246a11a
+mapped: 2026-07-14
 ---
 
-# CONCERNS — 기술부채·버그·보안·성능·취약지점
+# CONCERNS — 기술부채·알려진 버그·취약 영역
 
-PortfoliOn의 LIVE 관심사항을 구체 파일경로와 함께 정리한다. 근거는 `CLAUDE.md` gotchas 절, `.forge/adr/`, `.forge/retro/`, `docs/investment-info-gap-analysis.md`, 그리고 실제 코드 재확인. 각 항목은 "왜 위험한지 + 어디를 봐야 하는지 + 대응"으로 구성. (이번 재매핑 신규 갱신: **task#182 승격(promote) 경로 delete-rewrite가 신규 컬럼 pinned를 조용히 리셋한 데이터손실**(delete-rewrite 가족을 user_stocks type-transition으로 확장, §12·§8), **task#183 코워크 스킬 박제본 드리프트 — additive enrich 필드는 서버 배포만으론 안 온다**(§11), **task#184 리포트 목록 라이브 UAT 3중 함정**(§15), task#180 다이제스트 뉴스 scope 파생 엣지(§1e), task#181 PWA SW 캐시 배포 미반영(§7e). 직전 재매핑 핵심(유지): task#170 "005930 정확히 70000.0" 박제 귀속 정정(§1f·§4), task#169 fixture-writes-live·conftest `_block_real_db` 가드(§1f), 상대 밸류에이션 KR EV/EBITDA 소스(§1g), 디자인 리뉴얼 서브에이전트 build→dist 직접배포(§7d), kr-exports 요청경로 stale 해소(§6c).)
-
----
-
-## 1. fixture-pass-live-fail 가족 (반복 재발) — 최상위 관심사
-
-**공통 성질**: 단위테스트(mock/fixture)는 green인데 라이브에서 깨진다. 외부소스 실데이터·라이브 DB 타입·라이브 인덱스 정렬을 mock이 재현하지 못하기 때문. **대응 원칙: 외부소스 파싱·신규/개작 SQL 슬라이스는 배포 후 "라이브 스모크(1종목 추출 대조 / 엔드포인트 실호출)"를 DoD에 포함.**
-
-### 1a. yfinance 라벨 불일치 — get_* 메서드 vs 프로퍼티
-- `backend/services/market/us.py` — income/balance는 `get_income_stmt()`/`get_balance_sheet()`(무공백 라벨 `OperatingCashFlow`·`TotalRevenue`), **현금흐름도 반드시 `t.get_cashflow(freq='yearly', as_dict=False)` 메서드로** 받아야 한다. `t.cash_flow` 프로퍼티는 공백 라벨(`Operating Cash Flow`)이라 `format._yf_val`의 exact 매칭이 어긋나 **예외 없이 조용히 None** → FCF·CapEx 전부 None.
-- 파서: `backend/services/market/format.py` `_yf_val`(exact 인덱스 매칭 `key not in src.index`). (task#117)
-
-### 1b. KR Naver row / DART account_id 파싱
-- `backend/services/market/kr.py` `get_annual_financials_kr` — DART `fnlttSinglAcntAll`(전체 재무제표)는 `fs_div`를 **요청 필수값**으로 받고(누락 시 status 100), **응답을 행별 `fs_div`로 재필터하면 안 된다**(단일 fs 응답은 `fs_div`를 echo 안 함 → 전 행 스킵). 계정은 표기 변동하는 `account_nm`이 아니라 XBRL 표준 `account_id`로 매칭. 이자보상 분모는 `금융비용`(과대)이 아니라 `이자의 지급`(`ifrs-full_InterestPaidClassifiedAsOperatingActivities`). (task#117)
-- 주요계정 `fnlttSinglAcnt`(`backlog.get_financials`)은 반대로 fs_div 없이 호출 후 행별 필터 — 둘을 헷갈려 복붙하면 깨짐.
-
-### 1c. 신규/개작 SQL — uuid ANY 캐스트 & VALUES 행중첩 (task#135)
-- **uuid 컬럼 `= ANY(%s)`에 파이썬 str 리스트 → text[]가 돼 `operator does not exist: uuid = text` 라이브 즉사.** 단건 `WHERE user_id = %s`는 암묵 캐스트로 동작하던 게 배열화에서 깨짐. **`ANY(%s::uuid[])` 명시 캐스트 필수.**
-  - 주의: **text/varchar 컬럼의 `= ANY(%s)`는 안전**(암묵 text[] 매칭). 예: `backend/services/dividends.py` `get_schedule_batch`의 `WHERE ticker IN (...)`, `backend/routers/portfolio.py`의 `stock_beta WHERE ticker = ANY(%s)`는 `ticker`가 text라 무해. uuid 컬럼(`user_id` 등)에만 캐스트가 필요.
-- **VALUES 행 나열을 바깥 괄호로 감싸면(`VALUES ((a,b),(c,d))`) N행이 아니라 record 1행** → `AS v(ticker,d)` 컬럼 매핑 에러. 행별 `(a,b),(c,d)` 나열만.
-- 정본/가드: `backend/services/consensus.py` `_values_placeholder`, 형태 고정 테스트 `backend/tests/test_consensus_asof_batch.py`(`test_values_placeholder_shape`). 둘 다 query-mock pytest green 상태의 배포-즉사 버그였음(ADR-0008 관련).
-
-### 1d. 키움 tz-naive ↔ yfinance tz-aware concat — **✅ 통일 완료 (task#116·#150·86b714e)**
-- **근본 성질**: 키움 daily_df 인덱스는 tz-naive, yfinance(`^KS11` 등)는 tz-aware(Asia/Seoul) → `pd.concat([naive, aware], axis=1)`가 `TypeError`. `indicators.calc_beta`(`backend/services/indicators.py`)가 바로 이 concat을 하므로, KR series를 ^KS11과 정렬하는 모든 계산(베타·상관·상대강도)이 위험. broad `try/except`가 삼키면 **조용히 None**(라이브 전용 — fixture는 ^KS11 라이브 미모킹이라 미포착).
-- **✅ 세 소비처 모두 가드됨**: `backend/services/beta.py`(`_ks11_returns`·`fetch_kr_beta` 양쪽 strip), `backend/services/report_generator.py` `generate_report` KR beta(`ks11_ret`+`_daily_returns` 둘 다 tz-strip).
-- **남는 원칙(패턴 리스크)**: 앞으로 KR series를 yfinance 지수/자산과 정렬하는 *새* 계산을 추가하면 동일하게 양쪽 series를 `tz_localize(None)`으로 벗겨야 한다(fixture가 못 잡음). broad `except: pass`는 진단 로그를 남기거나 좁은 예외만.
-
-### 1e. dual-store 혼동 — `enriched_at`는 `tickers` 컬럼, 스냅샷 JSON 아님 (task#132)
-- AI 분석 존재 판정 정본은 `tickers` 테이블 컬럼. 스냅샷 `data` JSON에서 읽도록 가정하면 fixture green·라이브 항상 False. 소비처 확인: `backend/routers/report.py`.
-- 종목명 dual-source도 같은 가족: `tickers.name`(공유 마스터) vs `snapshots.data.name`(리포트 박제). 이름 변경 시 둘 다 갱신(`storage.refresh_snapshot_names`/`reconcile_snapshot_names`) + `cache.invalidate(ticker)`+`invalidate_list()` 필수. `backend/services/storage/`.
-- **뉴스도 dual-path(task#152)**: 리포트 상세는 `/api/stocks/{ticker}/news` **라이브 fetch**(`scraper.get_news`) + **스냅샷 폴백**, 다이제스트 `_recent_news`는 스냅샷(`_latest_snapshots`)만 읽어 종목당 top2(스크레이프 0). 저장·라이브 경로가 갈리므로 뉴스 형태/필드 변경 시 둘 다 확인. `backend/services/scraper.py`(`_dedup_sort_limit` 10건 dedup/최신순)·`backend/services/digest_service.py`.
-  - **다이제스트 뉴스 보유/관심 scope 파생 엣지(task#180, 미발현 latent)**: `frontend/src/pages/Digest.jsx`가 '종목 뉴스'를 `digest.stocks[].is_holding`으로 프론트에서 *파생* 분리한다. 보유 종목이 뉴스는 있으나 다이제스트 생성 시 **라이브 시세 실패로 `digest.stocks`에서 누락**(quote None→stocks_list skip)되면 그 뉴스가 방어적으로 '관심'에 오분류될 수 있다. 근본 해법은 `_recent_news`가 항목에 `is_holding`을 stamp(~2줄, `backend/services/digest_service.py`) — 정확도가 중요해지기 전엔 미적용(현재 전건 정상 매핑). additive UI 그룹핑 검증은 API ground truth(보유/관심 카운트) ↔ DOM count 대조가 효과적.
-- **배당도 dual-store(task#158, ADR-0023)**: 연 예상배당은 `stock_dividends`(`GET /api/stocks/dashboard` totals), 배당 *타임라인*은 신규 `stock_dividend_schedule`(`GET /api/portfolio/dividends`, `Dividends.jsx`). 둘은 목적이 달라(합계 vs 타임라인) 공존 — 한쪽 변경이 다른쪽을 자동 반영 안 함. `Dividends.jsx`는 `stock_type`으로 보유/관심 `DividendSection` 2개 박스(`Card padding="none"`)로 분리 렌더(task#180·#181).
-
-### 1f. ⭐ 역방향 신종 — fixture-writes-live: 테스트가 prod DB를 오염 (task#169, 9b540da)
-- 지금까지의 가족은 "fixture는 통과하는데 라이브가 깨진다"였다. 이 사례는 **반대**: 테스트 fixture가 실제 prod 데이터를 덮었다. 로컬 `DATABASE_URL`이 Docker postgres(=라이브 DB, 5432 노출)를 가리키는데 conftest에 DB 차단 가드가 없어, `generate_report` end-to-end 테스트의 스냅샷 INSERT가 **prod `snapshots`에 그대로 커밋**됐다(005930 스냅샷 11일치+가 fixture price `70000.0`으로 클로버, admin 삭제 테스트는 prod `calendar_cache` 전체 DELETE를 실행 중이었음).
-- **오염이 선택적이라 격리로 오인되기 쉽다**: 가짜 티커(TEST/COMP1)는 FK로 실패해 무해해 *보이고*, 실존 티커(005930)만 조용히 오염됐다 — "일부는 안 써지니 격리돼 있겠지"는 성립하지 않는다. 격리는 가드가 실제로 raise하는지로만 확인할 것.
-- **신호**: 라이브 값이 지나치게 라운드(정확히 `70000.0`, 정확히 `400조` 등)면 외부 피드 글리치보다 **테스트 오염을 먼저 의심**.
-- **✅ 수정**: `backend/tests/conftest.py` `_block_real_db`(autouse) — `services.db._get_pool`을 monkeypatch해 실 DB 접근 시 `RuntimeError`. **DB를 타는 신규 테스트는 반드시 `services.db`의 `query`/`execute` (또는 그 상위)를 mock할 것** — 가드가 raise하면 "그 테스트가 실 DB를 타고 있었다"는 뜻이지, 가드를 풀 신호가 아니다. reload 패턴 테스트(`importlib.reload(report_generator)`)는 모듈 자체 정의 심볼 patch가 reload로 무효화되니 하위 모듈 속성(`services.db.execute`·`_naver_get` 등)을 patch.
-- **이 정정이 되돌리는 과거 귀속**: task#94/#101/#118의 "005930 ~70k" 반복은 이 오염이 유력 진범이다. 자세한 내용은 §4 참조.
-
-### 1g. KR 상대 밸류에이션 신규 소스 — EV/EBITDA는 yfinance 단일소스 (ADR-0024, task#169)
-- KR EV/EBITDA는 Naver finance API에 원천 row가 없고(EBITDA·감가상각·차입금 미제공, 라이브 프로브 확인) DART 직접 계산(account_id 회사별 변동·차입금 분류 불안정)은 파싱 리스크가 최대라 **yfinance `info.enterpriseToEbitda`를 KR·US 공통 소스로 채택**(`backend/services/report_generator.py` `_comp_valuation`).
-- **지표별 동일 소스 원칙**: 하나의 멀티플 행(메인 종목 vs 경쟁사)은 모든 엔티티가 같은 소스·방법론이어야 peer 비교가 왜곡되지 않는다(PSR은 KR 메인·경쟁사 모두 Naver TTM 재사용, EV/EBITDA는 둘 다 yfinance). 신규 peer 지표를 추가할 때 "출처 다르면 콜 수는 줄지만 비교가 깨진다"는 이 원칙을 우선 확인할 것.
-- **비-이슈로 방치된 것**(리뷰 non-must-fix): 소형주 yfinance 커버리지 patchy → None graceful(값 없으면 칩에서 자연 제외, 실해 없음). KR 경쟁사 티커는 exchange 정보 없어 `.KS`→`.KQ` 순차 probe 필요.
+PortfoliOn의 tech debt / known bugs / security / performance / fragile areas 지도.
+출처: `CLAUDE.md` Gotchas + `.forge/adr/` + `.forge/retro/` + `.forge/bug-report.md` + 코드 직독.
+아래 영역은 대부분 *이미 방어 코드가 들어간 뒤*의 잔존 취약성이다 — "고쳐졌으니 안심"이 아니라
+"이 경로를 건드릴 때 재발 토양이 여기 있다"는 지도로 읽을 것.
 
 ---
 
-## 2. NaN/inf → JSON 직렬화 500 (starlette `allow_nan=False`)
+## 1. KR 시세 정확성 — 다피드 합의·기준 이원화·자기일관 글리치 (HIGH, 완화됨)
 
-응답 dict에 `NaN`/`inf`가 있으면 starlette `JSONResponse`가 직렬화에서 **500**(`Out of range float values are not JSON compliant`). 외부시세(yfinance Close NaN, FX/usdkrw NaN)에서 흘러든 NaN이 합산값을 오염시키는 게 전형.
+가장 오래·반복적으로 데인 영역. 005930이 반복적으로 `70000.0`(실값 354k의 1/5)으로 박제된
+"70k saga"가 task#93·94·96·98·101·118·169·170에 걸쳐 이어졌다.
 
-- **가림 함정**: PostgreSQL은 `json` 컬럼에 NaN을 거부(저장 실패)하지만 파이썬 `json.dumps`는 기본 `allow_nan=True`라 **파일 폴백은 통과** → DB저장 실패·파일 성공·응답 직렬화 실패로 증상이 엇갈려 진단 지연.
-- 대응 위치:
-  - `backend/routers/stocks.py` `_usdkrw_rate` — `math.isfinite` 가드(비유한→None). NaN≠None이라 `if fx is None` 가드를 통과해버리던 게 US totals=NaN→500의 근본(task#104). **노출/리밸런싱 엔드포인트도 이 `_usdkrw_rate`를 재사용**(`backend/routers/portfolio.py`)하고 결과를 `sanitize`로 감싼다(TTL 캐시 진입 전 `sanitize(cache_svc.get_rebalance(...))` 형태).
-  - `backend/services/utils.py` `sanitize` — NaN/inf→None 안전망. `_build_all`·rebalance/exposure 반환·F&G(`sentiment.get_fear_greed`)·코스피선물(`kospi_futures` 저장 직전)을 감쌈.
-  - `backend/services/beta.py` `_fin_num` — `math.isfinite` 통과 못하면 None(저장 안 함) → `stock_beta.beta`에 NaN 유입 차단. `sentiment.py` `_num`도 동일.
-  - **리포트 US price(task#161 #1)**: `backend/services/report_generator.py` `generate_report` — `quote.price`가 NaN/inf면 `math.isfinite` 실패→일봉 종가로, 그것도 비유한이면 None. NaN을 그대로 두면 `if summary["price"] is None` 가드를 통과(NaN≠None)해 US에서 `price:null` 스냅샷이 박제되던 것(KR은 박제게이트가 잡지만 US는 이 isfinite 가드가 유일).
-- **규칙: 시세/합산을 응답에 싣는 엔드포인트는 소스 `isfinite` 가드 또는 `sanitize` 필수.** 가드는 소스에서 하는 게 출력 일괄 sanitize보다 깨끗(다이제스트 생성 500 사례 8cd70a42).
+### 1.1 다피드 합의(corroboration) — 라이브 대시보드(NXT)
+- `backend/services/market/kr.py:131` `_corroborated_pick(feeds)` — 어떤 현재가 피드가 다른
+  독립 피드 ≥1개와 ±2x([0.5,2.0]) 이내로 **합의**해야 신뢰. lazy escalation(평소 키움 NXT+키움
+  KRX 2콜, 불일치 시에만 KIS·Naver 추가 호출 최대 4피드 다수결).
+- `kr.py:113` `_price_sane` — 단일피드 self-check(전일종가±30%/일봉2x). `regular=True`(리포트)와
+  degenerate 경로 전용. 단일피드 self-check만으로는 자기일관 오염을 못 잡는다.
+- `kr.py:190` `_kr_pick_basic`, `:166` `_kr_pick_degenerate_lazy`, `:144` `_kr_pick_regular`.
+- **취약점**: 대시보드 핫패스(`get_quotes_batch`/`_changes_from_closes`)는 이 가드를 안 탄다
+  (ephemeral 용인). 새 KR 시세 소비처를 추가할 때 어느 경로를 타는지 확인 필요.
 
----
+### 1.2 리포트 스냅샷(KRX 정규장) vs 라이브 대시보드(NXT) 기준 이원화
+- ADR-0020. 단일 분기점 `client.integrated_code(stk_cd, regular=False)`. 기본 False=`_AL`(NXT
+  시간외), `regular=True`=평문 KRX 코드(정규장 종가).
+- 리포트 writer만 opt-in: `report_generator.py:152-154`(daily_df `regular=True`), `:160`·`:170`.
+- **의도된 ~1% 불일치**: 같은 종목이 리포트(354k)와 대시보드(350.5k)에 다른 현재가를 보인다.
+  NXT `_AL`은 평시에도 KRX 정규장과 ~1% 다른 시간외가를 반환(task#94/95, 실재 현상).
+- `get_quote` TTL 캐시 키에 `regular` 포함(정규장/NXT quote 충돌 방지). 새 키움 fetch 추가 시
+  호출 의도에 맞게 `regular` 명시 필수.
 
-## 3. 대시보드 빌드 불변식 (holdings=N → 항상 N카드, 500-to-empty 금지)
+### 1.3 KRX 자기일관 오염 — regular=True는 완전 면역 아님
+- KRX 두 TR(quote ka10001·일봉 ka10081)이 같은 배치 시점에 함께 글리치하면 서로 합의해
+  동일피드 교차검증·`_price_sane`이 블라인드(ADR-0020 amendment task#101).
+- 방어: **박제-시 독립피드 게이트**(`report_generator.generate_report`, KR만) — 저장 직전
+  KRX와 독립인 ref 피드로 price·일봉 기준종가를 2x 교차검증, 어긋나면 그 종목 박제 스킵
+  (wrong<missing). ref는 다중 독립피드: Naver retry-once → KIS 폴백 → 둘 다 실패면 스킵+loud 로그
+  (ADR-0020 amendment task#118 — 단일 Naver ref가 rate-limit 시 게이트를 no-op으로 무력화하던 구멍 정정).
+- **한계**: 이미 박제된 stale 70k는 fix 배포로 소급 치료 안 됨 — 스냅샷 *재생성* 필요.
+  `backfill_ticker`(과거 날짜)는 현재가 대조 불가라 게이트 미적용.
 
-`GET /api/stocks/dashboard`의 `_build_all`(`backend/routers/stocks.py`)은 `get_quotes_batch`(try/except→{}) + 카드당 `_safe`(throw→`_minimal_card`)로 감싸 부분실패에도 전체 500을 안 낸다. 세 가지 다른 트리거가 이 불변식을 위협했음:
-
-1. **풀 경합(cold-start)** — 콜드 첫 호출에 워커 ThreadPool×카드당 다중 DB read가 풀 경합(PoolError)→throw→500→프론트 `usePortfolioData.fetchDashboard` catch가 silent로 삼킴→빈 그리드. 헤더(`/api/portfolio`=단일 쿼리)는 N 정상이라 "헤더 N·그리드 빈"(task#102). `_build_all`의 ThreadPool은 `max_workers=min(len(holdings), 10)`.
-2. **NaN 직렬화 500**(§2, task#104) — cold/warm 무관 결정적, per-card 가드 *위* 단계라 task#102 가드가 못 막음.
-3. **배당 `float/Decimal` TypeError**(commit d666cdd2) — `_build_card`의 `yield_on_cost = annual_div / avg_cost`에서 `avg_cost`/`qty`는 DB NUMERIC→**Decimal**, `annual_div`(stock_dividends)는 **float** → `float/Decimal` TypeError → 배당 있는 모든 보유카드가 `_minimal_card` 폴백(RSI·컨센서스·매물대·배당 통째 blank, **500도 안 나서 더 은밀**). ✅ 수정 잔존: 양변 `float()` 정규화. 회귀 테스트는 **Decimal** avg_cost fixture로.
-
-- 프론트 방어: `frontend/src/pages/Portfolio.jsx` `DashboardGrid`는 `stocks>0`이면 Skeleton, self-heal은 one-shot이 아니라 **bounded 재시도(최대 3)**.
-- **진단**: 헤더/시세 정상인데 enrichment만 일괄 blank면 `docker logs portfolion-backend-1 | grep '최소카드 폴백'`로 per-card 예외 확인(minimal-card 가드가 근본원인을 마스킹).
-- **DB NUMERIC(avg_cost·quantity)을 float·외부값과 산술하는 경로는 어디든 동일 위험** — 노출/리밸런싱/베타 파생계산도 `Decimal↔float` 혼산 주의. `services/rebalance.py value_holdings_krw`(KRW 환산)를 `services/exposure.py`가 공유하며 Decimal/fx≤0/None 가드 반영(task#149).
-
----
-
-## 4. KR 시세 글리치 (005930 ~70k 박제) — 다피드 교차검증 + ⚠️ 귀속 정정(task#170)
-
-**근본원인(task#94, 최초 귀속)**: 005930 ~70k는 영속 버그가 아니라 **키움 NXT `_AL`(SOR 통합코드) 순간 이상체결**이 일배치에 박제된 *일시적* 값이라고 판단했었다. "영속 소스 버그로 단정해 소스부터 고치려 들지 말 것."
-
-- **시세 기준 이원화(ADR-0020, task#95)**: 리포트 스냅샷=KRX 정규장 / 라이브 대시보드=NXT. 단일 분기점 `client.integrated_code(stk_cd, regular=False)`(`backend/services/kiwoom/client.py`). 기본 False=`_AL`(NXT), `regular=True`=평문 KRX. 리포트 writer만 opt-in(`report_generator`·`report.py:refresh_analyst`). beta 백필(`beta.py fetch_kr_beta`)도 `get_history_df(..., regular=True)`로 KRX 정규장 일봉 사용.
-- **✅ RSI 타점도 KRX 기준으로 통일(ADR-0020 amendment, task#161 #2 + task#166 backfill 누락분)**: RSI *값*은 NXT/KRX 무관(정규화)이나 RSI 타점(`cur_price+delta`)은 절대가라 시세 기준 의존. `backend/services/indicators.py` `get_timeframe_rsi(..., regular: bool=False)` + `report_generator.generate_report`가 KR일 때 `regular=(market=="KR")`. `backfill_ticker`의 daily/weekly/monthly 3봉 모두 `regular=True`로 통일(약 417–419행).
-- **라이브(NXT) 백스톱 — 2-of-N 다수결 corroboration(task#98, ADR-0010)**: `backend/services/market/kr.py` `_corroborated_pick`/`_kr_pick_basic` — 어떤 현재가 피드가 다른 독립 피드 ≥1개와 ±2x([0.5,2.0]) 이내 합의해야 신뢰, 우선순위 최상위(키움 NXT→KIS→Naver→키움 KRX) 반환. lazy escalation(불일치 시에만 KIS/Naver 추가). degenerate(단일 피드)는 prev_close ±30% 자가검증(`_kr_pick_degenerate_lazy`).
-- **리포트 박제-시 독립피드 게이트(task#101/#118)**: `backend/services/report_generator.py` `generate_report`(KR만, 약 314–341행) — 저장 직전 KRX와 독립인 ref 피드(네이버 retry-once → KIS 폴백)로 price·일봉 기준종가 2x 교차검증, 어긋나면 그 종목 박제 **스킵**(직전 양호 스냅샷 유지, wrong<missing). ref 전무면 박제 스킵 + loud `logger.warning`. `backfill_ticker`(과거 날짜)는 현재가 대조 불가라 게이트 미적용 — 대신 `ts.date() < _today` 가드로 오늘자 ungated 박제 차단(task#161 #4).
-- **⚠️ 정정(task#170, ADR-0020 amendment, 4e4afd6, 2026-07-11)** — **위 다수결/게이트 서사 전체를 재검토할 것**: 반복 등장하는 "005930 리포트 또 70k"(task#101)·"70k 재발"(task#118)의 **정확히 `70000.0`** 박제는, 실은 피드 글리치가 아니라 **로컬 pytest→prod DB 오염**(§1f)이었을 가능성이 매우 높다 — KR 리포트 테스트가 005930을 `price: 70000.0`으로 mock하고 `execute`를 가리지 않아 prod `snapshots`에 오늘 날짜로 커밋됐다(당시 네이버 라이브 시세는 357.5k로 정상이었음). **실제로 재발을 멈춘 건 이 절의 다수결/박제 게이트가 아니라 conftest `_block_real_db` 가드(task#169)였다.** 다수결·박제 게이트 메커니즘 자체는 유효하고 진짜 KRX 자기일관 글리치에 대한 보험으로 유지하되, **"이 게이트들이 70k 문제를 해결했다"고 읽지 말 것** — 테스트는 게이트를 우회하는 경로였으므로 이 게이트들이 실제로 발동한 적은 없었다. 라운드 70k가 또 보이면 피드 글리치보다 테스트 오염을 먼저 의심(§1f).
-- **regular=True도 근본해결 아님**(정정 이전 기준 유효): 같은 KRX 두 TR(quote ka10001·일봉 ka10081)이 동시 글리치하는 KRX 자기일관 오염엔 면역 아님 → 위 박제 게이트가 이론상 막음(실제 발동 이력은 없음, 위 정정 참조).
-- 진단: 네이버 공개 API(`m.stock.naver.com/api/stock/{code}/basic`) 실값 대조 + `docker exec -i portfolion-backend-1 python - < probe.py`로 KRX(`005930`) vs SOR(`005930_AL`) 원값 비교. **먼저 `docker exec -i portfolion-backend-1 python -c "..."`로 prod `snapshots`의 의심 행이 로컬 테스트 실행 시각과 겹치는지도 확인할 것**(§1f 신호).
-
----
-
-## 5. 포트폴리오 베타·노출 관심사 (task#149·#150·#166)
-
-### 5a. 배치-백킹/저장값 뷰는 백필·재생성 전 빈값(graceful)
-- **포트폴리오 베타**: `GET /api/portfolio/exposure`의 `portfolio_beta`는 `compute_exposure`(`backend/services/exposure.py`, 순수함수)가 **저장값 `stock_beta`만** 읽어 Σ(w×β)/Σw로 커버된 보유만 재정규화한다(요청경로 라이브 계산 0). 조회 배선은 `backend/routers/portfolio.py`.
-  - **백필(admin `POST /api/stocks/beta/refresh` 또는 주간 배치 `beta_fetch`) 전이면 `beta_coverage_pct`=0%·`portfolio_beta`=None**(graceful). 신규 보유 추가 후에도 다음 배치/수동 백필 전까지 그 종목은 `beta_missing`에 남아 커버리지 부분값.
-- **rebalance/exposure는 user_id 키 TTL 캐시(300s)를 탄다(task#166)**: `backend/services/cache.py` `get_rebalance`/`get_exposure`. 종목 변경(`invalidate_portfolio_caches`)·타깃 설정(`invalidate_rebalance(user_id)`, `backend/routers/portfolio.py`)이 무효화 — **그 외 경로로 저장값이 바뀌면 최대 300s stale**(§8 무효화 허브 규율 참조).
-- **일반화**: 저장값/배치-백킹 기능(랭킹·KR 업종 모멘텀·포트 베타·시장지표 캐시·배당 스케줄)은 **백필/재생성 전 빈값**이 정상 동작(graceful). "값이 안 나온다"를 코드 버그로 단정하기 전에 저장소에 값이 실제로 있는지 프로브(§15).
-- **admin-게이트 write라 자율(테스트계정) UAT로 "채워진 값 렌더"를 확인 못 함(403)** — 실값 확인은 사용자(admin) 백필 트리거로 위임(task#150 회고, reference-prod-writes-need-user 계열).
-
-### 5b. `stock_beta.source` 라벨 부정확 (정보성, 낮은 우선순위)
-- `backend/services/beta.py` `fetch_all_betas`는 KR 종목을 무조건 `source="kiwoom"`으로 하드코딩(루프 내 `market == "KR"` 분기)하나, KR 일봉을 주는 `get_history_df`는 **키움 실패 시 yfinance로 폴백**할 수 있다 → 실제 데이터 출처가 yfinance인데 `stock_beta.source`엔 "kiwoom"으로 기록되어 **어긋날 수 있음**. 파생값 정확도엔 무영향(정보성 컬럼). task#150 적대적 검토 minor(보류).
+### 1.4 ⚠️ 70k 원인 재판정 — 피드 글리치가 아니라 테스트 오염 (task#170)
+- ADR-0020 amendment(2026-07-11, near-certain): "*정확히* 70000.0" 박제의 실제 원인은
+  **로컬 pytest가 prod DB에 fixture 값을 직접 쓴 오염**. 근거 6종 — fixture 바이트 일치(70000.0·
+  시총 400조), prod INSERT 미mock + reload footgun, 오염일=테스트 실행일(task#101·#118 당일 포함),
+  당시 Naver 라이브=357.5k 정상.
+- **함의**: 라운드 값(70000, 정확히 400조)이 또 보이면 피드 글리치보다 **테스트 오염을 먼저
+  의심**. 게이트·다수결은 "미래의 진짜 글리치" 보험으로 유지하되 "과거 70k의 해결책"으로 읽지 말 것.
 
 ---
 
-## 6. 외부소스 stale 폴백 & 취약 엔드포인트 (task#151·#157·#165)
+## 2. 테스트 → prod DB 오염 (HIGH, 가드됨)
 
-### 6a. `get_or_refresh`는 "fetch 실패→직전 저장값 stale 폴백"을 안 함
-- `backend/services/market_indicators/cache.py` `get_or_refresh(key, fetch_fn, ttl, force)` — 인메모리 캐시 hit → `_mc_load`(DB 저장값) hit → **둘 다 없을 때만** `fetch_fn()` 호출. **`fetch_fn`이 throw하거나 빈/None을 반환해도 직전 저장값으로 되돌리지 않는다**(그대로 반환/전파). 특히 `force=True`(배치/수동 갱신)면 저장값 무시하고 강제 호출하므로 그 시점에 소스가 죽어 있으면 보호가 없다.
-- **대응: 취약 외부소스는 수동 폴백을 각자 구현할 것.** 정합 패턴 3종:
-  - `backend/services/market_indicators/fx.py` `get_vix` — `_mc_load` stored_history를 base로 fetch, 실패 시 graceful(기존 저장 history 보존).
-  - **`fx.py` `get_fx` 부분 실패 last-good 머지(task#165)** — 심볼별 fetch 결과에서 빠진 심볼을 `stored_rates`(직전 저장 rates)로 채우고 `logger.warning("[FX] 갱신 실패, 직전 저장값 유지")`. 일부 심볼만 실패해도 rates dict가 부분 클로버되지 않음. 회귀: `backend/tests/test_fx_partial_failure.py`.
-  - `backend/services/market_indicators/sentiment.py` `get_fear_greed` — fetch 성공 시 저장+반환, **실패(None) 시 `_mc_load` 직전 저장값 반환**, 그것도 없으면 None. `get_or_refresh`를 의도적으로 안 씀(commit 6cd9d5c).
-- 신규 외부소스 지표를 붙일 때 `get_or_refresh`만 믿고 stale 폴백을 생략하면, 소스 일시장애 시 값이 통째 사라진다(있던 저장값이 있어도).
-
-### 6b. CNN F&G 비공식 엔드포인트 봇차단 취약성
-- `backend/services/market_indicators/sentiment.py` — `https://production.dataviz.cnn.io/index/fearandgreed/graphdata`는 **CNN 비공식(문서화 안 된) 엔드포인트**로, 전체 브라우저 헤더(`_CNN_HEADERS`)를 실어 우회 fetch한다. **CNN이 봇차단(헤더 검사 강화·엔드포인트 이동)하면 fetch가 조용히 실패** → §6a 수동 폴백이 직전 저장값으로 graceful, 없으면 None. 요청경로 증분·**배치 없음**(`GET /api/market/fear-greed`, `batch_registry` 무등록). US 전용. 값이 stale/None으로 굳으면 이 취약성부터 의심.
-
-### 6c. ⭐ "성공-but-빈응답"을 last-good에 박제 금지 (task#157·#165·#176)
-- **외부 API가 무예외 성공응답(`rt_cd=0`, yfinance `t.info=={}`)에 빈 데이터를 주면 `except` 가드를 통과한다** — 예외만 가드하고 값 None을 통과시키면 all-None dict를 저장소에 박제→직전 양호값 클로버('wrong<missing' 위반).
-- **✅ 정합 패턴(요청경로 — 코스피200 선물)**: `backend/services/market_indicators/kospi_futures.py` — `_fetch()`가 **예외뿐 아니라 값 수준**(`front.price is None or not history`)도 가드해 None 반환, `get_kospi_futures()`는 fetch None이면 `_mc_load` 직전 저장값 폴백 → degenerate `_mc_save` 없음. 저장 직전 `sanitize`.
-- **✅ 정합 패턴(배치 — US 수급, task#165)**: `backend/services/us_supply.py` `_is_all_empty(result)` — short 3필드 all-None AND institutional 빈 AND insider 빈이면 **upsert 스킵**(`logger.warning("[UsSupply] ... 저장 스킵(직전값 유지)")`, `fetch_all_us_supply` 약 256–262행). yfinance가 예외 없이 빈 `t.info`를 줄 때 직전 주 데이터를 보존. 회귀: `backend/tests/test_us_supply_empty_guard.py`.
-- **정합 사촌**: `backend/services/market_indicators/indices.py`의 `if any(v is not None ...)` 지속 가드. 회귀 테스트는 저장 양호값 시드 후 빈응답이 save 미호출·last-good 반환을 단언(예외 side_effect가 아니라 *값이 빈 정상 반환*을 모킹해야 이 경로를 실제로 침).
-- **✅ 정본 예시(요청경로 캐시 워밍 — kr_exports, task#176)**: `backend/services/market_indicators/exports.py` `get_kr_exports` — in-memory 캐시 미스 → `_mc_load` 저장값 있으면 `_set_cache`로 24h TTL **워밍 후 반환**, 저장값도 없을 때만 라이브 fetch. 예전엔 저장값을 워밍 없이 매 요청 스킵해 라이브 재조회(3.75~7초)가 상시 발생하던 stale 분기가 있었으나 제거됨(고아가 된 `_exports_is_stale` 헬퍼도 동반 삭제). fx.py 패턴과 동형.
+- `backend/tests/conftest.py:27-37` `_block_real_db`(autouse) — `services.db._get_pool`을
+  raise로 monkeypatch. 로컬 `DATABASE_URL`이 도커 postgres(=라이브 DB, 5432 노출)를 가리켜,
+  가드 전엔 `generate_report` e2e 테스트의 스냅샷 INSERT가 **prod `snapshots`에 그대로 커밋**됐고
+  (005930 fixture price 70000 클로버), admin 삭제 테스트가 **prod `calendar_cache` 전체 DELETE**를 실행.
+- 오염이 **선택적**이라 격리된 듯 보였다 — 가짜 티커(TEST)는 FK로 실패해 무해해 *보이고* 실존
+  티커만 오염(fixture-writes-live, task#169).
+- **재발 토양**: `importlib.reload(report_generator)` reload 패턴은 모듈 자체 정의 심볼 patch를
+  무효화(reload가 `from services.db import execute`를 재바인딩) — 하위 모듈 속성
+  (`services.db.execute`·`_naver_get`)을 patch해야 한다. 가드가 raise하면 그 테스트가 실 DB에
+  닿는 것 — 가드를 풀지 말고 mock을 추가하라.
 
 ---
 
-## 7. 배포 footgun
+## 3. 대시보드 빌드 3중 취약 — 불변식·NaN 500·Decimal TypeError
 
-### 7a. 2분 자동배포 폴러가 로컬 편집·미푸시 커밋 삭제
-- launchd `com.portfolion.auto-deploy-poll` → `scripts/auto-deploy-poll.sh` 2분마다. **`LOCAL != origin/main`이면(양방향) `git reset --hard origin/main` 후 `deploy.sh`**.
-- **커밋 안 한 tracked 편집뿐 아니라 push 안 한 로컬 커밋(로컬이 앞선 경우)도 다음 폴(≤2분)에 reset으로 소실**(task#106 실사례, fg-map 지도 커밋 소실→cherry-pick 복구). **코드/문서 변경은 commit+`git push origin main`을 묶어 즉시.** `.forge/` 등 untracked는 reset 대상 아님(안전).
+`GET /api/stocks/dashboard`(`backend/routers/stocks.py`)는 "holdings=N → 항상 N카드" 불변식을
+지켜야 하는데 세 가지 서로 다른 실패 모드가 있었다(전부 방어 코드 존재).
 
-### 7b. self-hosted 러너 격리 (무음 미배포)
-- 자동배포 주 경로 = self-hosted GH Actions 러너(`deploy.yml`, `runs-on: self-hosted`). PortfoliOn 전용 러너 = `~/actions-runner-portfolion`(launchd `actions.runner.calmonion7-PortfoliOn.macbook-portfolion`).
-- **러너가 다른 repo로 재등록되면 조용히 사라져** 잡이 `queued→24h cancelled` **무음 미배포**(06-22~06-27 lab-taebro 세팅 때 실사례, task#105). in-checkout 푸시는 러너에만 의존하므로 러너 부재 시 폴러도 스킵(`LOCAL==origin/main`이라 exit 0)해 통째 미배포. **새 프로젝트가 기존 러너 디렉터리에 `config.sh` 재등록 금지**(전역 `~/.claude/CLAUDE.md` "멀티 프로젝트 인프라 격리").
+### 3.1 500-to-empty / minimal-card 마스킹 (task#102)
+- `_build_all`(`stocks.py:623`) — `get_quotes_batch` try/except→{} + 카드당 `_safe`→
+  `_minimal_card`(`:603`). per-card throw 시 `stocks.py:638`이 `logger.warning("[Dashboard] ...
+  최소카드 폴백")` 후 폴백.
+- **은밀함**: minimal-card 폴백은 500을 안 내고 조용히 enrichment(RSI·컨센서스·매물대·배당)만
+  blank. 진단은 `docker logs portfolion-backend-1 | grep '최소카드 폴백'`가 유일 단서.
+- 프론트도 방어: `Portfolio.jsx` DashboardGrid는 `stocks>0`이면 Skeleton, self-heal은 bounded
+  재시도(최대 3). 프론트 `usePortfolioData.fetchDashboard`의 silent catch가 500을 삼켜 빈 그리드가 됐던 게 근본.
 
-### 7c. "백엔드가 옛 코드"일 때 진단 순서
-1. **도커 churn 먼저**: `docker ps`로 uptime 확인(backend는 `docker run`이라 `docker compose ps`엔 안 잡힘). 필요 시 `bash deploy.sh` 1회로 백엔드 컨테이너 재생성(ad-hoc `docker compose` 금지).
-2. **러너**: `gh run list`(잡이 queued/cancelled면 러너 부재)·`gh api repos/calmonion7/PortfoliOn/actions/runners --jq '.runners[]|{name,status}'`.
-3. 그 다음에 폴러 footgun 의심.
-- 프론트는 nginx가 `frontend/dist` 직접 서빙 → `npm run build`로 즉시 라이브(배포 무관). **백엔드 변경은 폴러/러너 재배포 후에야 라이브.**
+### 3.2 NaN/inf 직렬화 500 (task#104) — per-card 가드 *위* 단계
+- `_usdkrw_rate`(`stocks.py:455-470`)에 `math.isfinite` 가드 — 비유한 FX(nan)를 그대로 반환하면
+  `if fx is None`(NaN≠None)을 통과해 US totals=NaN → starlette `allow_nan=False` 직렬화 500.
+- `_build_all` 반환을 `services.utils.sanitize`(`stocks.py:6`, `:645`)로 감싸 NaN/inf→None
+  (출처 불문 안전망). cold·warm 무관 결정적 500이라 task#102 per-card 가드가 못 막던 케이스.
 
-### 7d. ⭐ 프론트 서빙 = `frontend/dist` 직접 마운트 → 서브에이전트 `npm run build`도 즉시 라이브 (task#175)
-- nginx가 `./frontend/dist`를 `:ro` 볼륨마운트로 직접 서빙하므로, **어디서 실행되든** `npm run build`는 즉시 프로덕션에 반영된다. 이는 메인 세션 로컬 빌드뿐 아니라 **UI 재스타일 워크플로우의 Dynamic Workflow 서브에이전트가 컴파일 검증차 실행한 빌드에도 그대로 적용**된다.
-- **실사례**: task#175(디자인 감사 5/5)에서 fix 서브에이전트가 검증용으로 `npm run build`를 실제 `frontend/dist`에 실행 → 회귀 2건 포함 중간본(`index-V6zqzDZp.js`)이 조기 라이브됐다(task#174에서 확립한 "빌드는 메인 세션 최종 1회" 교훈이 메인 세션 프롬프트엔 반영됐지만 서브에이전트 프롬프트엔 명시가 없어 뚫림). 메인 세션이 회귀 수정 후 최종 빌드(`index-COtp6-rA.js`)로 remediate.
-- **대응**: ① UI 재스타일/수정 워크플로우의 fix·review 서브에이전트 프롬프트에 "`npm run build`로 `frontend/dist`를 직접 덮지 말 것, 컴파일 검증은 throwaway `--outDir`로만" 문구 표준화. ② 배포 전 무배포 시각검증은 `VITE_API_BASE_URL=<prod> npx vite build --outDir <throwaway>` → `npx vite preview --outDir <throwaway> --port 5173`(prod CORS 허용 오리진)으로 prod API를 실데이터로 베이크하되 라이브 dist는 건드리지 않는 패턴(`reference-frontend-uat` 메모리에 반영됨).
-
-### 7e. PWA Service Worker 캐시 — "배포했는데 화면 반영 안 됨" (task#181)
-- 프론트가 PWA(Service Worker)라, **번들을 배포해도 사용자 브라우저가 SW 캐시의 옛 자산을 계속 서빙**할 수 있다. task#181에서 사용자 스크린샷이 task#180 배포 후에도 옛 flat 리스트였던 원인이 바로 이 SW 캐시였다(하드 새로고침으로 해소).
-- **진단 순서**: "배포했는데 화면 미반영" 류 신고는 ① 서빙 번들 해시=로컬 빌드 해시 대조로 *라이브 반영 여부부터* 확인(§7c) → 해시가 일치하면 백엔드/코드가 아니라 **클라이언트 PWA SW 캐시**를 의심(하드 새로고침·SW 갱신 안내). 백엔드 미배포(§7a~c)와 클라이언트 캐시를 이 순서로 갈라야 오진 안 함.
-
----
-
-## 8. 다중표면 변경 위험 + 캐시 무효화 허브 (grep로 전수 감사할 것)
-
-- **⭐ user-scoped 인메모리 캐시는 키에 user_id 필수 (보안, task#165)**: `GET /api/report/list` scope=mine 캐시가 전역 단일 키여서 **교차 사용자 유출(HIGH)** — A의 목록이 B에게 캐시로 서빙됐다. 수정: `backend/services/cache.py` `get_list(user_id, loader)` + `backend/routers/report.py:251`. 회귀: `backend/tests/test_report_list_user_cache.py`. **신규 TTL 캐시를 붙일 때 응답이 user-scoped면 반드시 user_id(필요시 `f"{user_id}:{market}"` 합성) 키로.** 참고: `scope=all`(admin)은 미캐시 — 매 호출 풀 빌드(성능은 admin 전용이라 용인).
-- **⭐ `invalidate_portfolio_caches(user_id)`가 무효화 허브** (`backend/services/cache.py`) — 캘린더 DB 캐시(`calendar.clear_cache(user_id)`)·list·dashboard·sector·macro·correlation·live_prices·rebalance·exposure를 일괄 무효화하며 종목 추가/삭제/승격 시 호출된다(`routers/stocks.py`·`watchlist.py`·`portfolio.py`·`admin.py`). **user-scoped 파생 캐시를 새로 만들면 여기 등록을 잊지 말 것** — 빠뜨리면 종목 변경 후 최대 TTL(300s)만큼 stale(rebalance/exposure가 task#166에서 이 허브에 묶인 정합 사례). 캘린더 무효화는 task#166 전엔 dead 파일 캐시만 지워 DB가 stale였음(파일 캐시 코드는 task#167에서 제거).
-- **⭐ user_stocks에 신규 컬럼 추가 시 UPSERT 보존을 add/edit/delete뿐 아니라 *승격·강등* 경로까지 확인 (task#182, 데이터손실)**: `frontend`·`storage/portfolio.py`에 종목 컬럼(예: `pinned`)을 붙일 때 "UPSERT가 명시 컬럼만 SET하니 신규 컬럼은 보존된다"는 단정은 add/edit/delete 경로엔 맞지만 **승격(promote) 경로는 반례**다 — `promote_to_holdings`가 `save_watchlist_tickers`(하드 `DELETE`)로 watchlist 행을 통째 지운 뒤 `save_holdings`가 신규 `INSERT`를 태워, 미언급 신규 컬럼이 스키마 기본값으로 **조용히 리셋**됐다(pinned가 promote 시 false로 유실, 반대방향 강등은 UPDATE 분기라 보존돼 비대칭이 진범을 확증). **✅ 수정**: 승격 경로에서 `save_watchlist_tickers` 호출 제거 → `save_holdings`의 `INSERT … ON CONFLICT(user_id,ticker) DO UPDATE`가 기존 watchlist 행을 `type='holding'`으로 전환하고 pinned는 SET절에 없어 자동 보존(PK=user_id+ticker, type 무관). 이는 §12의 "delete-rewrite는 명시하지 않은 상태를 잃는다"(dividends `replace_schedule`) 가족과 동형 — **type-transition 재작성 경로**를 UPSERT 보존 가정의 반례로 계획 단계에서 먼저 점검할 것. 회귀: `test_promote_moves_ticker_to_holdings`(save_watchlist_tickers 미호출 단언). 적대적 리뷰가 impl 3에이전트+빌드+1275 백엔드 테스트가 모두 놓친 이 데이터손실을 포착 — 데이터 뮤테이션/마이그레이션/인증 슬라이스엔 리뷰 phase 표준.
-- **DB `execute`를 부르는 함수의 테스트는 execute를 patch할 것** — 로컬 pytest가 라이브 Docker postgres에 붙을 수 있어, `clear_cache` 테스트가 **라이브 `calendar_cache`에 실 DELETE**를 내보내던 것을 task#166 리뷰(HIGH)가 포착해 patch로 차단(`backend/tests/test_calendar_cache_invalidation.py`). **이 규율은 이제 conftest `_block_real_db` autouse 가드(§1f, task#169)로 프로젝트 전역에 강제된다** — 신규 DB-write 함수 테스트가 이 가드에 raise로 걸리면 mock을 추가할 것(가드 자체를 풀지 말 것).
-- **배치 id 은퇴 시 전수 grep**(`backend/services/batch_registry.py`): ① 데이터 read(스케줄 소비처) ② 표시 문자열(`schedule_desc`) ③ **`job_runs.record(id,...)` 모든 lane(auto·manual·backfill)** ④ id 단언 테스트. 한 곳이라도 옛 id면 stale read·배치 현황 실행이력 증발·고아 run 누적. 단 옛 id를 *읽는* 시드 마이그레이션은 정당한 잔존. (ADR-0001 job_runs, daily_report-market-split 재발)
-- **배치 id 추가 시 exact-count/exact-set 단언이 여러 테스트 파일에 흩어짐**(task#136·#150): `grep -rn "BATCHES) ==\|len(data) ==\|EXPECTED_IDS" backend/tests/`로 전수(`test_batches_router.py`·`test_batch_market_split.py`·`test_macro_signals_batch.py`·`test_scheduler_seed.py` 등).
-- **`scheduler/`는 명시 재export 패키지 — 신규 잡 함수는 `scheduler/__init__.py`에도 재export 필요**(task#150 divergence). `scheduler/jobs.py`에 잡 함수 정의 + `_JOB_FUNCS` 등록 + `__init__.py` 재export. 한 곳 빠뜨리면 배선 미완.
-- **enrich 필드 추가는 6계층 배선 — grep 패리티로 확인(task#183)**: 신규 enrich 필드(예: `key_resource`)는 ① `app_schema.sql`+`main._migrate` 쌍(§9) ② Pydantic 모델 ③ `storage`(`_ANALYST_KEYS`/`_ENRICH_KEYS` 집합 — `get_stocks`/`get_global_portfolio` SELECT·entry는 이 집합 제네릭 순회라 집합 추가만으로 자동 포함) ④ report summary 2곳 ⑤ 프론트 섹션 컴포넌트 ⑥ 문서 3종(`CLAUDE_COWORK_API.md`·`API_SPEC.md`·`README.md`)까지 배선돼야 한다. insights 선례 미러링 + "grep 패리티 확인을 에이전트 지시에 명시"가 리뷰 must-fix 0으로 통과시킨 유효 패턴. (단, `save_stocks`/`save_holdings` tickers INSERT엔 enrich 필드 미추가가 의도된 비대칭 — 쓰기는 `enrich_stock` 전용.)
-- **심볼 제거/개명·시그니처 변경이 mock patch 타깃을 파일 불문 깨뜨림**(task#136): `grep -rn "모듈경로.심볼" backend/tests/`. 예: digest_service `yf` import 제거 시 다른 파일의 `services.digest_service.yf.Ticker` patch가 `ModuleNotFoundError`. **파라미터 additive 추가도 사촌** — `get_quote(..., hist=None)` 추가(task#166)처럼 위치 인자를 단언하는 mock은 어긋날 수 있음(당시 테스트 8곳 동반 수정).
-- **비-additive 응답 reshape(배열→객체)는 모든 프론트 소비처 전수 grep**: `grep -rn '<엔드포인트>' frontend/src/`. 독립 fetcher(예: `Analytics.jsx`가 훅과 별개로 `/api/stocks/dashboard` 직접 fetch)까지. 가능하면 additive 선호(task#52).
-- **additive read 추가가 `mock.call_args`(마지막 호출) 오염**(task#66/#67): 기존 단언을 `call_args_list[i].kwargs`로 마이그레이션, 신규 호출은 `if <조건>:`로 입력 비면 생략, 신규 테스트는 `call_count`로 시퀀스 고정.
-- **auth `Depends` 추가가 자체-app 테스트 401/403로 깨뜨림**(task#108): 다수 테스트가 conftest `client`가 아니라 모듈 상단 `FastAPI()`를 직접 만들어 `app.dependency_overrides`로 우회(`test_stocks_router.py`·`test_consensus_router.py`). 새 의존성 override 추가 + 무인증 거부는 override 없는 fresh app으로 별도 검증(`backend/tests/test_security_auth_gaps.py` 패턴).
-- **엔드포인트 존재 drift는 자동검출**: `backend/tests/test_api_doc_sync.py`(라이브 `app.routes` ↔ `API_SPEC.md`/`CLAUDE_COWORK_API.md` 헤더 대조, task#99). 단 요청/응답 스키마·인증 게이팅 동기는 수동 DoD.
-- **`PUT /api/stocks/enrich/batch`는 `PUT /api/stocks/{ticker}/enrich`보다 *먼저* 등록**(FastAPI가 `enrich`를 ticker로 라우팅 방지).
-- **프론트 stale/race 패턴(task#166)**: ① 세션-수명 ref 캐시로 "추적 여부" 판정 금지 — 삭제 직후 stale 오판(`frontend/src/components/GlobalSearch.jsx`는 선택마다 재조회로 수정). ② 경쟁 fetch는 `cancelled` 가드(`frontend/src/pages/Compare.jsx` — 이전 선택의 늦은 응답이 최신 상태를 덮는 race 차단, 회귀 `frontend/src/test/compare-race.test.jsx`).
+### 3.3 Decimal/float 배당 TypeError (commit d666cdd2)
+- `stocks.py:521-523` `yield_on_cost`·`expected_income` — `avg_cost`/`qty`(DB NUMERIC→**Decimal**)와
+  `annual_div`(stock_dividends→**float**)의 `float/Decimal` 연산이 TypeError → 배당 있는 모든
+  보유종목 카드가 throw→minimal-card. 수정: 양변 `float()` 정규화.
+- **재발 토양**: DB NUMERIC 컬럼(avg_cost·quantity)을 float·외부값과 산술하는 경로는 어디든
+  동일 위험. 회귀 테스트 fixture는 float만 쓰면 못 잡는다(Decimal avg_cost 필수).
 
 ---
 
-## 9. 신규 DB 컬럼/테이블 배포 함정 (ADR-0006)
+## 4. 배치-백킹 뷰 빈-결과 오염 (HIGH-패턴)
 
-- **`app_schema.sql`만 고치면 라이브 DB에 반영 안 됨** — 스키마 파일은 신규 설치용, 라이브는 기동 idempotent 마이그레이션만 탐. **`backend/main.py` `_migrate`에 `ADD COLUMN IF NOT EXISTS`(또는 `CREATE TABLE IF NOT EXISTS`)를 쌍으로 추가 필수**. 한쪽만 고치면 배포 직후 그 컬럼/테이블 INSERT/SELECT가 부재로 깨짐(`stock_recommendations.name` 파손 직전, task#130). 완료기준에 두 파일 쌍 명시.
-- **최근 준수 사례**: `stock_dividend_schedule`(task#158)·`stock_beta`(task#150)·`tickers.key_resource`(task#183) 모두 `app_schema.sql`+`main.py _migrate` 쌍으로 추가됨(key_resource는 기동 `_migrate()`가 컬럼 자동 적용 — insights 때의 수동 psql 불요, 계획 예측대로). 이 쌍 규율이 정착됨.
+랭킹·KR 업종 모멘텀·시장지표 등 "배치가 사전계산 → 요청은 저장값만 read" 구조의 공통 함정.
+근본 신호는 **의심 트리거(base_dt 등)가 아니라 실패 클래스(all-None/빈응답)를 가드**하는 것.
 
----
+### 4.1 all-None 캐시 박제 금지 (task#48·49·50)
+- 배치 외부 fetch는 ① 실패를 silent except로 삼키지 말고 로깅, ② 빈/all-None 결과를 캐시에
+  save 금지(직전 양호값 유지). 기동 시 빈 캐시 적재는 `_seed_*_if_empty`(랭킹·kr_sector) 패턴.
 
-## 10. 로컬 `.venv` ≠ Docker 의존성 + 로깅 방출
+### 4.2 요청경로 "성공-but-빈응답" 박제 (task#157)
+- `backend/services/market_indicators/kospi_futures.py:21-22` — KIS `rt_cd=0`(무예외)이나
+  output1/history 비면 `_fetch`가 `None` 반환(값 수준 가드), `get_kospi_futures`(`:47-59`)가
+  `_mc_save` 스킵 후 `_mc_load` last-good 폴백. 예외만 가드하면 성공응답의 빈 output이 통과해
+  last-good을 클로버('wrong<missing' 위반).
+- 회귀는 저장 양호값 시드 후 *값이 None인 반환*을 모킹해야 이 경로를 실제로 침(예외 side_effect 아님).
 
-- **`lxml`은 `requirements.txt`·Docker엔 있지만 로컬 `backend/.venv`엔 없다.** 로컬 pytest로 검증할 HTML 파싱은 `BeautifulSoup(html, "lxml")` 대신 stdlib **`BeautifulSoup(html, "html.parser")`**. 해당 코드: `backend/services/market_indicators/indices.py`(Shiller CAPE), `backend/services/backlog.py`, `backend/services/agm.py`.
-- **로깅 config는 `backend/main.py` `_configure_logging()`(기동 1회)에서만 배선**(task#162) — `basicConfig(level=INFO)` + urllib3/yfinance/apscheduler/asyncio WARNING 억제 + uvicorn `propagate=False`. **config 없으면 root lastResort=WARNING+라 `logger.info`가 안 보인다** — `backend/run_backfill.py` 같은 별도 entrypoint는 logging config가 없어 info 로그 미방출(warning/error만 보임). 신규 standalone 스크립트를 만들면 방출 필요 시 basicConfig를 자체 배선할 것.
-- **`print` 신규 금지(zero-print 가드)**: `backend/tests/test_no_print.py`가 앱 코드(main/routers/services/scheduler/middleware) `print()` 호출 0건을 ast로 단언(task#163). 진단 로그는 모듈 `logger` + `[Component]` PascalCase 마커(규약: `.forge/codebase/CONVENTIONS.md` §4).
+### 4.3 delete-rewrite 데이터 손실 (task#160) — "빈 결과 박제 금지"의 파괴적 변형
+- `backend/services/dividends.py:308-314` `replace_schedule` — `DELETE+INSERT`를 **단일
+  트랜잭션**으로. fetch 실패를 빈 결과로 삼키면 save 생략이 아니라 **직전 양호값을 DELETE로 파괴**
+  (박제보다 은밀 — 토스트도 없음).
+- `dividends.py:228-233` `_dividend_history` — fetch 예외를 `[]`로 삼키지 말고 **전파**해야
+  호출측(`fetch_all_dividends:388-392`)이 실패 시 replace를 스킵하고 직전 값 보존.
+  genuine-empty(fetch 성공·무데이터)만 clear.
 
----
-
-## 11. 문서 동기화 부채 + 외부 클라이언트 계약 (DoD)
-
-- **API 변경 시 `API_SPEC.md` + `CLAUDE_COWORK_API.md`** — 단, **`CLAUDE_COWORK_API.md`는 외부 Cowork(enrich/backlog) 전용 스코프**라 사용자 대면 read 엔드포인트(`/portfolio/*`·`/market/fear-greed`·`/market/kospi-futures` 등)는 `API_SPEC.md`에만 넣는다(task#149 회고). doc-sync 테스트는 Cowork 문서엔 *stale*만 검출하므로 green 유지. 신규 엔드포인트가 Cowork 소비 대상인지 먼저 판별해 DoD를 좁힐 것(기계적 "둘 다"는 과함).
-- **기능 표면 변경 시 `README.md` 해당 절도** 같은 PR에서(화면구성·env·스택·아키텍처·배치). README는 overview 레벨 — 엔드포인트 세부는 명세서에만.
-- **⭐ 코워크 스킬 박제본 드리프트 — additive enrich 필드는 서버 배포만으론 안 온다(task#183)**: 외부 Cowork 클라이언트의 스킬에 enrich 필드 목록이 **박제**돼 있어, 가이드(`CLAUDE_COWORK_API.md`)를 갱신·배포해도 코워크가 스킬 사본을 갱신하기 전까지 신규 필드를 **조용히 누락**한다(1차 enrich 실증: 기존 필드 전부 채워지고 `key_resource`만 null — 백엔드 거부가 아니라 미전송). **신규 enrich 필드 슬라이스의 완결 DoD에 "코워크 스킬 사본 갱신 + 1종목 재-enrich 확인"을 포함**할 것. 진단 경로(크레덴셜 없이): 공개 `GET /api/report/{ticker}/{date}`의 `enriched_at`(라이브)·summary 키 존재/값 + `GET /api/report/progress`(done/total) 조합으로 "enrich 도착→필드 포함→재생성 완료"를 단계별 분리 판정.
-- **AI 소비 문서의 예시 JSON은 산문 규칙보다 강한 앵커(task#183)**: 가이드 예시 series가 단일 분기였더니 코워크가 2분기만 채움(3지표 나열 산문이 있어도 지표 누락 발생). 요구 최소 형태(예: 3지표×4분기)를 **예시 JSON 자체가 시연**하도록 작성하고 하한("최근 N분기 이상")은 필드 표에 명문화. LLM 소비 문서는 prose보다 example JSON을 계약으로 취급함.
-
----
-
-## 12. 배치/성능 관심사
-
-- **배치-백킹 뷰(랭킹·KR 업종 모멘텀·베타·노출·추천)는 외부 API를 요청·기동 경로에서 라이브 호출 금지** — 배치가 사전계산해 `market_cache`/테이블 저장, 요청은 저장값만 read(task#50). `compute_exposure`도 순수함수(DB/외부 호출 0). 추천 universe는 `build_universe(market)`(`backend/services/recommendation/universe.py`)로 **시장 분리** — US 배치가 KR 전수 스캔(Naver 페이지네이션)을 스킵, 대칭으로 KR도(task#166).
-  - 예외(의도된 요청경로 증분): fx/vix/commodities/indices/**fear-greed**/**kospi-futures**/**kr-exports**는 배치 없이 요청경로에서 증분 fetch(TTL캐시→`_mc_load`→라이브→저장). §6a stale 폴백 + §6c 빈응답 가드 + 캐시 워밍(task#176)이 이들에 적용. (⚠️ `kospi_signal_fetch`는 별개 배치 — 오버나잇 방향신호. `kospi_futures`(선물차트)와 혼동 금지.)
-- **⭐ 배치 delete-rewrite(replace) store는 "빈 결과 박제 금지"보다 한 단계 위험 (task#160 #2·#165·#182)** — 통째 교체 store는 fetch 실패를 genuine-empty와 구분해 **실패 시 delete 자체를 스킵**해야 한다(안 그러면 직전 양호값을 *파괴*). 이 "delete+insert 재작성은 명시하지 않은 상태를 잃는다"는 성질은 배치 store를 넘어 **user_stocks type-transition(승격/강등)에서도 재발**했다(§8 pinned 유실, task#182 — DB 데이터손실 가족의 동형). 정합 패턴:
-  - 배당 스케줄: `backend/services/dividends.py` `_dividend_history`가 예외를 []로 삼키지 않고 **전파** → `fetch_all_dividends`의 try/except가 `replace_schedule` 스킵→직전 스케줄 보존. genuine 무배당만 `replace_schedule([])` 정리. `replace_schedule`은 delete+insert **단일 `get_connection()` 트랜잭션**.
-  - 추천 store: `backend/services/recommendation/store.py` `replace_recommendations`도 **단일 트랜잭션화**(task#165) — 중간 실패 시 rollback으로 부분/빈 상태 안 남김. 회귀: `backend/tests/test_rec_store_atomic.py`.
-  - 신규 replace/upsert-by-delete·type-transition 경로를 만들 때 반사 점검(어느 상태가 delete로 유실되나?).
-- **외부 fetch 실패를 조용히 삼키지 말 것**(silent except는 진단 불가, task#48 `_fetch_one_sector` all-None 박제). **빈/all-None을 캐시에 박제 금지**(전부 None이면 save 생략·직전값 유지, §6c). 기동 시드: `_seed_*_if_empty`(랭킹·kr_sector).
-- **배치 ThreadPool 워커 ≤ DB 풀 사이즈**(수급 스크리닝 교훈) — 대시보드 콜드 풀 경합(§3)의 근원. DB 풀은 `backend/services/db.py` `ThreadedConnectionPool(minconn=1, maxconn=20)`(psycopg2 풀은 소진 시 PoolError를 던지므로 최대 워커 수 이상으로 둠). ⚠️ 정보성: `backend/routers/stocks.py:397` 이름-백필 주석은 아직 `maxconn=10` stale 표기 — 판단 근거로 삼지 말 것.
-- **캘린더 KR 실적발표일은 yfinance `.KS`/`.KQ`가 유일 forward 소스** — `backend/routers/calendar.py` `_collect_earnings`는 `_yf_sym(ticker, market, exchange)`로 접미사 붙여야 함(raw ticker면 KR 0건). Naver·DART 모두 forward 미제공(task#121). ⚠️ 데이터 품질: KR은 yfinance 빈값이 빈번(gap-analysis §⑦ 🔶) — 커버리지 patchy, 빈 결과 graceful.
-- **배치 fetch 소스 변경 시 `batch_registry`의 `source` 갱신**(DoD) — `source`=fetch 출처 ≠ `usage`=소비 UI.
-- **KR 시장-날짜(최근월물/영업일 판정)는 KST — bare `date.today()`/`datetime.today()` 전면 금지·✅ 전수 스윕 완료(task#165)**: 컨테이너 UTC라 00~09시 KST에 하루 어긋남(task#157/#161). 정본 헬퍼는 `backend/services/utils.py` `today_kst()` — 앱 코드 ~30곳이 이걸로 교체됐고, **`backend/tests/test_no_bare_today.py`가 ast로 앱 코드(main/routers/services/scheduler/middleware) `.today()` 호출 0건을 단언**해 재발 차단. (`report_generator.py`엔 동일 구현 로컬 `_today_kst`가 잔존 — 동작 동일, 정보성.) naive↔aware series *정렬*용 `tz_localize(None)`(§1d)와는 별개 문제.
-- **US 리포트 생성의 quote/history 중복 fetch 제거(task#166)**: `backend/services/market/__init__.py` `get_quote(..., hist=None)` — 호출부가 이미 받은 1y history를 재사용(캐시 미스 시만 사용, **캐시 키엔 hist 미포함**). `report_generator`가 daily_df를 넘겨 동일 티커 `t.history(period="1y")` 2회 호출 제거.
+### 4.4 get_or_refresh는 stale-fallback 안 함 (task#151)
+- `backend/services/market_indicators/cache.py:110` `get_or_refresh(key, fetch_fn, ttl)` — "저장값
+  있으면 fetch 스킵"일 뿐, fetch 실패 시 직전값 폴백을 안 한다(실패 전파). CNN F&G(`sentiment.py`)·
+  KOSPI 선물처럼 언제든 막히는 소스엔 `fx.py`의 VIX식 **수동 폴백**을 써야 stale 값이 뜬다.
+  FRED/yfinance처럼 안정적 소스는 `get_or_refresh`로 충분.
 
 ---
 
-## 13. 보안·인증 관심사
+## 5. 외부소스 파싱 fixture-pass-live-fail 가족 (HIGH-패턴)
 
-- **✅ 교차 사용자 캐시 유출(HIGH) 수정 — 규율은 §8 첫 항목**: `GET /api/report/list` scope=mine 전역 단일 캐시 키 → user_id 키(task#165). user-scoped 응답을 캐시할 땐 항상 user_id 키.
-- **admin `scope=all` 리포트 목록은 비소유 종목에도 `category`를 붙임**(`backend/routers/report.py` `_mk_entry`) — category로만 게이트된 관리 버튼(수정·승격·삭제)이 남의 종목에 노출되면 user-scoped 핸들러가 **404로 조용히 깨짐**. **액션 버튼 가시성은 category가 아니라 `is_mine`으로 게이트**(`frontend/src/components/reports/StockActions.jsx` — 단일 컴포넌트로 통합, task#103). 교차-사용자 동작은 `/api/admin/*` 전용(`require_admin`). 참고: 고정핀(📌) 버튼도 `is_mine=false`면 미표시라 scope=all(admin)/Cowork 경로에서 마스킹됨(task#182).
-- **mutation POST 엔드포인트를 거부(403/401) 예상으로 프로브하지 말 것 — 실행될 수 있다**(task#148 회고): `POST /consensus/{ticker}/backfill?force=true`는 `require_admin`이 아니라 `get_current_user` 게이트라 user 토큰으로 200=실제 backfill 실행됨. auth 상태는 코드 grep(Depends 확인)으로 먼저 볼 것.
-- **auth 의존성**: `get_current_user`/`require_admin`/`require_admin_or_api_key`. admin만 리포트 생성·Guru 크롤·백필(beta/dividends/consensus 등). `user_menu_permissions`로 메뉴 표시 제어(`admin.py` `ALL_MENUS`, 5키 — ADR-0025 사이드바 리뉴얼도 이 5키를 그대로 재사용, 권한 스키마 무변경).
-- **API 키 env**(값 인용 금지, 이름만): `.env.docker`에 `POSTGRES_PASSWORD`·`JWT_SECRET`·`SESSION_SECRET`·OAuth·`FRED_API_KEY`·`KOFIA_API_KEY`·`DART_API_KEY`·`KIWOOM_APP_KEY`/`KIWOOM_SECRET_KEY`·`KIS_APP_KEY`/`KIS_APP_SECRET`. `KITA_API_KEY`는 실제로 **관세청** 키(미설정 시 UN Comtrade 폴백). `ANTHROPIC_API_KEY`는 남아있으나 현재 백엔드 미사용(백엔드에 LLM 호출 없음 — AI 분석은 외부 Cowork).
-- **키 미설정 = 안전 기본값(휴면)**: KIS `configured()` False면 dormant(코스피 선물 포함 — `kospi_futures` 빈 응답), KOFIA/DART 미설정 시 해당 수집 실패지만 무해. KIS는 발급 1분당 1회(EGW00133) 강제 재발급 60s 가드(`backend/services/kis/client.py`).
-- **테스트 격리도 보안·데이터손실 관심사(§1f)**: conftest `_block_real_db`가 없던 시절 로컬 pytest가 prod DB에 실 INSERT/DELETE를 낸 사고(task#169)는, 인증 게이트 우회가 아니라 **테스트 환경이 곧 prod 자격증명을 그대로 물려받은 구조적 위험**이었다. 신규 로컬 개발 스크립트/엔트리포인트도 `DATABASE_URL`이 prod를 가리킬 수 있음을 전제할 것.
+단위테스트(응답 mock)는 라이브 정합을 못 잡는다 — 아래는 모두 fixture green·라이브 fail의 반복.
+**외부소스 파싱 슬라이스는 라이브 1종목 추출 대조를 DoD에 포함**할 것.
 
----
-
-## 14. KR UI 색 관례 함정
-
-- 이 앱은 `--up`=빨강(상승)·`--down`=파랑(하락, `frontend/src/styles/tokens.css`)이라 `.badge--success`=빨강·`.badge--danger`=파랑(`frontend/src/components/ui/Badge.css`). **의미 상태 배지(수급 밴드·노출 경고·F&G·배당 status 등)에 success/danger 쓰면 KR 가격색으로 박혀 Western 의도와 반전**(수급 배지 우호=빨·경계=파 버그, b288f394). 의미 배지는 `frontend/src/components/ui/SupplyBadge.jsx`처럼 전용 색 명시. 노출/베타 경고 배지·F&G 게이지(`FearGreedSection.jsx`)·배당 뷰(`Dividends.jsx` confirmed/projected 전용색)도 전용색 사용. `warning` 변형은 토큰 미정의로 현재 깨져 있음.
-- **`--semantic-sell` 재색상의 blast radius(task#175 F22)**: 순매도 배지가 `--up`(가격 상승 빨강)과 동일색이라 의미 반전이던 버그를 빨강→주황으로 수정했으나, 이 토큰은 InsiderBadge 외 15+ 소비처(ConsensusChart·StockCard S바·RSI 임계 라벨·weatherAccent 등)에 공유돼 **재색상 시 전 소비처 재캡처 필수**. 라이트 테마에서 `warn`(올리브)↔`sell`(적갈)의 구분력이 약해진 채로 남아있음(Low, 미해결·backlog 후보).
-- **"대비 미달" 증상은 색값 이전에 `opacity`부터 의심(task#177 F26)**: '해당없음' 배지의 AA 미달 근본원인은 색 토큰이 아니라 `opacity:0.5`였다 — 제거만으로 다크 6.79·라이트 6.89 대비 확보(AA 4.5 여유). 신규 배지/텍스트에 opacity를 얹을 땐 최종 실측 대비를 반드시 재계산할 것.
-- **KR 단위 포매팅**: `frontend/src/components/market/marketUtils.jsx` `krFmt`는 입력을 '억원' 단위 가정 — 원은 `/1e8` 변환 후, 주(count)엔 부적합. raw 원/주를 그대로 넘기면 1e8배 오표기(공매도 "35조경원" 사례 f9594f2b).
-- **yfinance 퍼센트는 소수분수**(`shortPercentOfFloat` 0.0098=0.98%, `pctHeld`, `dividendYield` 등) — 표시 ×100, API_SPEC 예시·fixture도 분수 스케일로(task#122/#123).
-- **차트 이중축(dual Y-axis)은 이 앱의 확립된 관례**(task#184): dataviz 스킬의 "이중축 금지" 원칙과 충돌하나, `M7EarningsSection`·`FinancialsChart`·`KeyResourceChart`(1그룹 Line / 2그룹 Bar좌+Line우) 등 KR 지표 차트가 이미 이중축이라 계획·CONTEXT가 source of truth로 우선한다. 차트 색은 신규 팔레트 검증 없이 앱 표준 `--data-1..5` 토큰(라이트/다크 정의됨) 재사용. 스킬은 참조 fuel이지 계약이 아님.
-
----
-
-## 15. 외부데이터 증상은 라이브 프로브 선행 (오진 방지)
-
-- **"다른 지표는 다 나오는데 RSI만 빈" = fetch 실패가 아니라 히스토리 부족일 수 있다**(task#126): RSI(14봉)는 상장 <14거래일 신규 종목에서 전부 NaN(EMA·52주·HV·매물대는 짧은 히스토리서도 값 나옴). **자연 해소**이므로 코드 버그 단정 금지. 진단: `docker exec -i portfolion-backend-1 python -`로 `yf.Ticker(t).history(period="1y")` 행수 + `indicators.calc_rsi(...).notna().sum()` 확인(행수<14=히스토리 부족 vs 0행=fetch 실패). 프론트: RSI 전무 시 `VolumeRsiSnapshot` 폴백, 생기면 `RsiTable`(`ReportDetailTabs` `hasRsi` 분기).
-- **"기능 오류" 신고도 라이브 프로브로 '기능 버그 vs 일시 인프라 blip' 선판별**(task#159): 컨센서스 차트 "데이터 없음" 신고가 실은 GET 일시 실패였음(터널·오리진 각 200 확인). 프론트가 fetch 실패와 빈 데이터를 구분(`ConsensusChart.jsx` `fetchFailed` + auto-retry 1회)해 오진 UX 제거.
-- **compute/파생계산 슬라이스는 스냅샷/저장소 결측을 프로브로 선확인**(task#150): "스냅샷 저장 beta 읽기"만으론 테스트계정 커버리지 0%임을 프로브로 확인 → read-stored 대신 **백필 방식** 채택. 신규 파생지표를 기존 스냅샷/테이블에서 읽으려면 그 저장소에 값이 실제로 있는지 먼저 프로브(§5a graceful-빈값과 짝).
-- **KIS output 봉투 파싱까지 프로브에 포함**(task#156/#157): KIS 국내선물 시세 TR은 주식 현재가(`output` 단수)와 달리 **output1/output2/output3** 분할이라, `output`만 읽으면 `rt_cd=0`인데도 늘 빈값 → "코드/파라미터 오류"로 오진. 라이브 프로브는 fetch 200뿐 아니라 **응답 봉투 파싱까지** 확인해야 완성. `backend/services/kis/futures.py`(ADR-0022). 표시 베이시스는 `mrkt_basis`(선물−현물), 이론 `basis` 아님.
-- **KR 시세/차트 소스 스케일 어긋남**: 리포트 현재가 마커는 `get_quote_kr`(키움 ka10001), 매물대/RSI는 `get_history_df`(키움 ka10081 일봉) — 다른 TR이라 한쪽만 액면조정되면 최대 5배 어긋나 "차트 깨짐"처럼 보임. 표시 버그가 아니라 박제 price 값 자체를 의심(`backend/services/market/kr.py`). ✅ RSI 타점 스케일은 리포트·backfill 모두 `regular=True`로 KRX 정합(§4).
-- **⭐ 라운드 숫자가 나오면 외부소스보다 로컬 테스트 오염을 먼저 의심(task#170)**: 위 KR 시세 프로브 항목들과 나란히, "정확히 70000.0"·"정확히 400조" 같은 지나치게 라운드한 라이브 값은 §1f/§4의 fixture-writes-live 패턴을 우선 배제할 것 — prod DB에 접근 가능한 로컬 pytest 실행 이력(시각 대조)부터 확인.
-- **⭐ 리포트 목록 라이브 UAT 3중 함정(task#184, 재사용 스크립트 `scripts/uat184-keyresource.mjs`)** — 특정 종목의 상세 탭을 자동화로 캡처할 때 반복되는 3가지 오측:
-  1. **관심 탭 하위칩 기본값이 대상 종목을 숨긴다** — 관심 탭은 `목표≥40%/목표<40%/⚠경고` 하위칩으로 갈리고, 애널리스트 의견 부족 종목(BAH 등)은 '경고'칩에만 뜬다. 기본 노출 칩만 보면 "종목 없음"으로 오판. **특정 종목 UAT는 칩 순회 필수**.
-  2. **사이드바 컨테이너가 zero-height CSS라 Playwright `visible` 판정이 전부 실패** — `.report-item`이 DOM엔 있는데 부모가 `scrollHeight/clientHeight=0`이라 `:visible`·`.click()` 가시성 대기가 타임아웃. **DOM `element.click()` 직접 디스패치로 우회**(라이브 캡처는 visibility 대기보다 DOM 조작이 견고).
-  3. **`.tab-btn` 인덱스 클릭이 중복 탭셋(hidden 렌더)에 오적중** — 탭이 9개 잡히고(중복 렌더) nth(2)가 hidden 사본을 눌러 상세 미전환. **텍스트('심층분석') 기준 클릭**으로 해결.
-  - 부수: 테스트 계정에 없는 종목은 관심 임시 추가→캡처→DELETE 자가정리(공개 read API엔 상세 딥링크 라우트 없음, prod 쓰기라 캡처 후 즉시 원복).
-- **UI 오버플로우/clip은 정적 스크린샷으로 못 잡음 — DOM 치수 측정 필요(task#179)**: 좁은 셀 마커 clip은 `scrollWidth/clientWidth`·행높이/자식높이·셀 경계 초과를 측정해야 broken 판정 가능(fixture-pass-live-fail 계열). Playwright `getBoundingClientRect` DOM 위치 휴리스틱은 false 오측을 낼 수 있으니(task#182 `searchBarAboveGrid` false) 최종 시각 사실은 스크린샷 캡처로 종결.
+- **yfinance 라벨 불일치**: `backend/services/market/us.py:24-27` — `get_cashflow()` *메서드*(무공백
+  `OperatingCashFlow`)와 `.cash_flow` *프로퍼티*(공백 `Operating Cash Flow`)의 index 라벨 규칙이
+  달라, `_yf_val` exact 매칭이 어긋나면 예외 없이 **조용히 None**. income/balance는 get_* 메서드
+  이므로 현금흐름도 `t.get_cashflow(freq='yearly', as_dict=False)`로 통일 필수(task#117).
+- **yfinance 퍼센트 = 소수분수**: `shortPercentOfFloat`(0.0098=0.98%)·`pctHeld`·`dividendYield` 등
+  0~1 분수. 프론트 표시 ×100 + API_SPEC/fixture도 분수 스케일로(task#122·123).
+- **DART fs_div**: `backend/services/market/kr.py:475-483` — `fnlttSinglAcntAll`은 `fs_div`를 요청
+  필수값으로 받고(누락 시 status 100), 응답을 행별 fs_div로 필터하면 안 됨(단일 fs라 필드 echo 안 함
+  →전 행 스킵). 계정 매칭은 `account_id`(XBRL, `kr.py:386-389`), 이자보상 분모는 `이자의 지급`
+  (`ifrs-full_InterestPaidClassifiedAsOperatingActivities`)(task#117).
+- **Kiwoom tz-naive ↔ yfinance tz-aware 정렬**: `backend/services/report_generator.py:206-209` —
+  키움 일봉(tz-naive)과 yfinance `^KS11`(tz-aware) `pd.concat`이 TypeError, broad except가 삼키면
+  KR beta가 조용히 None. `tz_localize(None)`로 정렬(task#116).
+- **KIS output1/2/3 봉투**: `backend/services/kis/futures.py:45-54` — 국내선물옵션 시세 TR은 단수
+  `output`이 아니라 output1(계약 quote)/output2(일봉 바)/output3(기초지수). `d.get("output")`만
+  읽으면 rt_cd=0인데도 늘 빈값→"코드 오류"로 오진(task#155·156). 베이시스는 `mrkt_basis`(선물−현물)
+  이지 이론 `basis` 아님. 라이브 프로브는 fetch 200뿐 아니라 응답 봉투 파싱까지 확인해야 완성.
+- **KR quote vs chart 스케일 어긋남**: `get_quote_kr`(키움 ka10001)와 `get_history_df`(ka10081
+  일봉)는 다른 TR이라 한쪽만 액면/병합 조정되면 최대 5배 어긋나 매물대/RSI가 "깨져" 보인다 —
+  표시 버그가 아니라 박제된 price 값 자체를 의심.
+- **수주잔고 파싱**: 배포 후 전 종목 재적재 UAT 필수. 단위 캡션 파싱 실패 시 '안전한 기본값(억원)'
+  폴백은 ×100 대형 오저장 — 추출 실패는 기본값이 아니라 pending(누락)으로('wrong < missing').
 
 ---
 
-## 16. 파싱/재적재 UAT 관심사
+## 6. SQL single→batch 개작 함정 (task#135)
 
-- **수주잔고/데이터 파싱 변경은 배포 후 전 종목 재적재 UAT 필수** — fixture 전부 통과해도 운영 재적재가 fixture에 없던 케이스(외화 `(단위:USD천)`, 단위 캡션 줄바꿈 분리, 회사컬럼 표)를 잡음. **단위 캡션 파싱 실패 시 '기본값(억원) 폴백'은 ×100 대형 오저장** → 추출 실패는 기본값이 아니라 pending(누락)으로('wrong < missing'). `backend/services/backlog.py`(ADR-0002/0003/0004/0005).
-- **DART list.json은 `pblntf_ty`를 echo 안 함** → "단일 호출 후 필터" 불가, 유형 A·B·C·D 개별 호출(종목당 4콜). AGM은 반대로 `pblntf_ty` *미지정* 호출로만 발견(`backend/services/agm.py` self-insert). 주총 회의일은 filing date가 아니라 document.xml 본문(2전략 파싱). 증분은 최신 AGM rcept_no 해결 시에만 fetch 스킵(티커당 스킵으로 만들면 연례 주총 영영 재fetch 안 됨, task#120).
+query-mock 테스트가 라이브 정합을 못 잡는 배포-즉사 버그 2종.
 
----
-
-## 17. 해소된 관심사 (히스토리 — 재-open 금지)
-
-- **리서치 고정핀 + 검색바 노출**(task#182, 2026-07-12): 전역 종목검색 노출(검색바) + 긴 관심목록 상단 고정핀(📌, `set_pinned`·`GET/PUT pinned`). 승격 시 pinned 유실 데이터손실을 적대적 리뷰가 in-run 포착·수정(§8·§12로 규율 승격). follow-up이던 `get_global_portfolio` `us.pinned` 미선택은 **현재 코드에서 이미 해소**(`backend/services/storage/portfolio.py:249·271`에 SELECT·entry 존재). 잔존 low: `handlePinToggle` 전용 훅 유닛테스트 부재(정렬·엔드포인트·API 라이브는 커버).
-- **업종별 핵심자원(key_resource) enrich 필드 + 지표 차트**(task#183·#184, 0cff9c1·70494f0·7dabf7e, 2026-07-12): 6계층 배선(schema+_migrate·Pydantic·storage·report summary 2곳·`KeyResourceSection`·문서 3종) + `KeyResourceChart.jsx`(recharts 이중축, chart-first/table-fallback). 코워크 스킬 박제본 드리프트(§11)·AI문서 예시JSON 앵커(§11)·리포트목록 UAT 3함정(§15)이 규율로 잔존. 가이드 업종 표 9업종 확장.
-- **배당/다이제스트 뉴스 보유/관심 섹션 분리 + 배당 Card 박스화**(task#180·#181, 97cad2b·83658fc·97cad2b, 2026-07-12): additive UI 그룹핑(`Dividends.jsx`·`Digest.jsx`, 백엔드 무변경). 다이제스트 뉴스 scope 파생 엣지(§1e)·PWA SW 캐시(§7e)가 규율로 잔존.
-- **모바일 캘린더 이벤트 마커 오버플로우 수정**(task#179, c58e88e, 2026-07-12): PC/모바일 공용 `MonthGrid` 정사각 셀+wrap+overflow:hidden 조합의 모바일 clip을 `useIsMobile()` JS 분기로 수정(≤3 전부 / >3은 이모지2+"+N" 고정폭). DOM 치수 측정 검증 규율(§15).
-- **⭐ fixture-writes-live 차단 + task#170 귀속 정정**(task#169·#170, 9b540da·4e4afd6, 2026-07-10~11): 로컬 pytest→prod DB 오염을 conftest `_block_real_db` autouse 가드로 차단(§1f), "005930 정확히 70000.0" 반복(task#94/#101/#118)의 진범이 피드 글리치가 아니라 이 오염이었다는 귀속 재판정(§4). 다수결/박제 게이트 메커니즘은 유효하나 "게이트가 해결했다"는 서술은 정정 대상.
-- **상대 밸류에이션 — 경쟁사 PSR·EV/EBITDA + peer 할인/할증 칩**(task#169, 4181ee2, ADR-0024, 2026-07-11): KR EV/EBITDA를 yfinance 단일소스로(§1g). API_SPEC `competitors_data` 전체 shape 신규 문서화.
-- **디자인 아이덴티티 전면 리뉴얼 5/5 완결**(task#171~178, ADR-0025, 8a6449e~b52f0f5, 2026-07-11~12): 터미널 다크 기본+좌측 사이드바 IA로 전 화면 재작업, 라이트 대비 AA 다수 수정, 모바일 5섹션 IA를 PC 사이드바와 미러(task#178). 서브에이전트 build→dist 직접배포 리스크는 §7d로, 잔존 색 구분력 이슈는 §14로 각각 잔존 규율 승격.
-- **KR 수출 요청경로 stale 라이브 재조회 제거**(task#176, a204480, F14, 2026-07-12): `get_kr_exports`가 저장값을 워밍 없이 스킵하고 매 요청 라이브 재조회(3.75~7초)하던 분기 제거 + 캐시 워밍(§6c). 고아 `_exports_is_stale` 헬퍼 동반 삭제.
-- **헌트164 상위 8건**(task#165, ecbe39c, 2026-07-10):
-  - [보안 HIGH] `GET /api/report/list` scope=mine 전역 단일 캐시 키 → user_id 키(교차 사용자 유출 차단, §8·§13에 규율 잔존).
-  - bare `date.today()`/`datetime.today()` ~30곳 → `services.utils.today_kst()` 전수 교체 + `tests/test_no_bare_today.py` ast 재발 가드(§12).
-  - fx 부분 실패 시 직전 저장 rates 머지(last-good 클로버 방지, §6a).
-  - recommendation store replace 단일 트랜잭션화(중간 실패 롤백, §12).
-  - us_supply all-empty 응답 upsert 스킵(직전 주 데이터 보존, §6c).
-- **헌트164 잔여 7건**(task#166, db7d95e, 2026-07-10):
-  - 캘린더: 종목 변경 시 라이브 저장소(`calendar_cache` DB)를 user_id로 무효화 — 기존엔 dead 파일 캐시만 지워 DB가 stale(§8 허브 규율).
-  - `backfill_ticker` KR daily/weekly/monthly `regular=True`(RSI 타점 KRX 통일, task#161 #2 누락분, §4).
-  - `get_quote` 옵셔널 `hist` 파라미터 — US 리포트 1y history 중복 fetch 제거(§12).
-  - rebalance/exposure user_id 키 TTL 캐시(300s) + 무효화 허브 등록(§5a·§8).
-  - `build_universe(market)` 시장 분리 — US 배치가 KR 전수 스캔 스킵(§12).
-  - 프론트: `GlobalSearch.jsx` 세션 캐시 제거(삭제 후 stale 오판)·`Compare.jsx` cancelled 가드(경쟁 fetch, §8).
-  - 리뷰 HIGH: 테스트가 라이브 `calendar_cache`에 실 DELETE 나가던 것 patch 차단(§8).
-- **캘린더 dead 파일 캐시 코드 제거**(task#167, 1e8da3b, 2026-07-10): `backend/routers/calendar.py`의 `_CACHE_DIR`/`_cache_path`·Path import·테스트 patch 10곳 제거. 라이브 캐시는 `calendar_cache` DB 테이블만.
-- **로깅 방출 규약 배선 + print→logger 전수 스윕**(task#162·#163, 60c542d·d553942·ad7f85c, 2026-07-09): `main._configure_logging()` 루트 로거 1회 배선, 앱 코드 135 print→logger, `tests/test_no_print.py` zero-print 가드, `[Component]` PascalCase 마커(§10에 잔존 규율).
-- **리포트 생성·시세 적대적 감사 버그 4종**(task#161, 5cccc45·78e6f09, 2026-07-08): US price NaN 박제→isfinite 가드(§2) / KR RSI 타점 스케일→`get_timeframe_rsi(regular=)`(§4, ADR-0020 amendment) / sub-TTM PER·PSR 부풀림→4분기 온전 시만 / backfill 오늘자 ungated 박제→`ts.date() < _today` 제외 / bare `date.today()`→`_today_kst()`.
-- **배당/컨센서스 적대적 리뷰 버그 3종**(task#160, 35e3915·eeeaeb7): 12개월 예상배당 overcount→365일 컷오프(`backend/routers/portfolio.py`) / transient fetch 실패가 저장 스케줄 파괴→예외 전파+replace 스킵(§12) / 컨센서스 차트 stale 재시도 타이머→cleanup `clearTimeout`.
-- **전용 배당 스케줄 뷰**(task#158, 954c413, ADR-0023) — `stock_dividend_schedule` 배치-백킹(§1e·§9에 잔존 규율).
-- **컨센서스 fetch 복원력**(task#159, c1fd335·0331864) — `ConsensusChart.jsx` fetch 실패/빈 데이터 구분 + auto-retry(§15).
-- **report_generator KR beta tz-strip 쌍둥이 갭**(86b714e, task#152 후속): `_daily_returns`도 tz-strip 통일(§1d).
-- **버그 리포트(task#107) 42건 전부 해소**(task#148, 2026-07-05) + **3차 헌트 사이클(task#168) 검증 통과 0건**(신규 결함 없음). `.forge/bug-report.md`가 이 이력의 정본.
+- **uuid `= ANY(%s)` 캐스트**: `backend/routers/admin.py:32`는 `= ANY(%s::uuid[])` 명시 캐스트.
+  파이썬 str 리스트를 `ANY(%s)`로 넘기면 text[]가 돼 `operator does not exist: uuid = text`
+  라이브 즉사. 단건 `WHERE user_id = %s`(str→unknown 암묵 캐스트)가 동작하던 게 배열화에서 깨진다.
+  (다른 `ANY(%s)` 사용처는 대부분 ticker=text 컬럼이라 무해 — uuid 컬럼만 명시 캐스트 필요.)
+- **VALUES 플레이스홀더**: `backend/services/consensus.py:81-85` `_values_placeholder` — 행별
+  `(%s,%s::date), ...` 나열만. 바깥 괄호로 감싸면(`VALUES ((a,b),(c,d))`) N행이 아니라 record
+  1행이 돼 `AS v(ticker,d)` 매핑 에러. `test_values_placeholder_shape`가 형태 못박음.
+- **DoD**: 새 SQL·단건→배치 개작 슬라이스는 mock 테스트 외에 **배포 후 라이브 스모크**를 DoD에 포함.
 
 ---
 
-## 18. 미해결 데이터 갭 (참고 — `docs/investment-info-gap-analysis.md`, 2026-06-27 1회성 감사)
+## 7. 컨테이너 UTC vs KST 날짜 (task#157)
 
-`docs/investment-info-gap-analysis.md`는 "무엇을 다음에 만들지"를 돕는 **시점성(2026-06-27) 감사**로, 유지보수 대상 레퍼런스가 아니다. 그 이후 후보 상당수가 이미 구축됨(재무 건전성 지표 task#177, 상대 밸류에이션 peer/멀티플 task#169, 시장지수 레벨 task#113) → 문서 자체는 부분 stale. 다만 **아직 미보유이거나 데이터 품질이 얕은 것들**은 잠재 관심사로 유효:
-- **US 수급 전반 미보유** — 기관 flow·공매도·내부자(Form4)·13D/13G가 KR과 비대칭(KR은 앱 최강 영역). yfinance `institutional_holders`/`shortPercentOfFloat`/`insider_purchases`로 확장 가능하나 미구현.
-- **이벤트 캘린더 얕음** — KR 실적발표 예정일 yfinance 빈값 빈번(§12), 배당락일은 yfinance 히스토리 *평균 추정*(확정일 아님, KR 커버리지 부실), 경제지표 발표 *예정일*·락업/IPO/액면분할 미수집.
-- **배당 시계열 부재** — `stock_dividends`가 ticker PK 단일행(최신값만)이라 DPS 배당성장 이력·배당성향·자사주·총주주환원율 분석 불가.
-- **KR 시장지수 밸류에이션 미구현** — S&P500 Shiller CAPE는 있으나(`indices.py`) KR 지수 PER/PBR은 무료 공식소스 부재로 미구현(후속).
-- **뉴스 센티먼트 점수화 없음** — `scraper.get_news`는 제목+링크만, 감성 분류·점수 없음.
-- 판정은 실코드에 그라운딩됐으나 **시점성 문서라 코드 변경으로 자연 stale** — 재감사가 갱신 방법(재-run task#110 패턴).
+- 백엔드 컨테이너에 TZ env가 없어 bare `date.today()`=UTC. 00:00~09:00 KST(UTC 전일)엔 하루
+  뒤처져 최근월물 휴리스틱·영업일 판정이 어긋난다.
+- KR 시장-날짜는 `datetime.now(ZoneInfo("Asia/Seoul")).date()` — `backend/services/market_indicators/
+  kospi_signal.py:18,114`(`_KST`), `backend/scheduler/schedule.py`의 `_KST` 패턴 재사용.
+- 정렬용 `tz_localize(None)`(§5 Kiwoom)과는 다른 문제 — 이건 *어느 달력일이냐* 판정용.
 
 ---
 
-## 부록: 경로 참고
+## 8. Pool contention — cold 대시보드 (PERFORMANCE)
 
-- `batch_registry`의 실제 위치는 **`backend/services/batch_registry.py`**(scheduler 패키지 아님). `backend/scheduler/`는 `__init__.py`(잡 배선·재export·`_JOB_FUNCS`)·`jobs.py`·`schedule.py`·`_state.py`만 존재.
-- pinned 저장/전이: `backend/services/storage/portfolio.py`(`set_pinned`·`get_full_portfolio`·`get_global_portfolio`·`save_watchlist_tickers`·`promote_to_holdings`). 프론트 핀 토글: `frontend/src/components/reports/StockActions.jsx`(📌, `is_mine` 게이트).
+- `backend/services/db.py:21-25` `ThreadedConnectionPool(minconn=1, maxconn=20)` — psycopg2 풀은
+  소진 시 **블록이 아니라 PoolError를 throw**하므로 워커 수 이상으로 둔다. 콜드 첫 호출에
+  10-워커 ThreadPool×카드당 다중 DB read가 풀 경합→PoolError→throw→500(§3.1 minimal-card 마스킹의
+  원 트리거였음).
+- ThreadPool 동시성 상한: calendar 15·analysis 11·dashboard 10(`stocks.py:641`)·이름백필 8(`:400`).
+- ⚠️ **문서 드리프트**: `stocks.py:399` 주석은 "DB 풀(maxconn=10)"이라 하나 실제 `db.py`는
+  maxconn=20. 코드는 20이 맞고 주석이 stale.
+
+---
+
+## 9. 스키마 마이그레이션 부채 (ADR-0006)
+
+- 별도 마이그레이션 프레임워크 없음. `app_schema.sql`은 빈 pgdata 최초 초기화(docker-entrypoint-
+  initdb.d) 때만 실행 → **이미 채워진 운영 DB엔 절대 반영 안 됨**.
+- 신규 컬럼/테이블은 `main.py:_migrate()`에 `ADD COLUMN IF NOT EXISTS`/`CREATE TABLE IF NOT
+  EXISTS`로 넣는 게 **정본**, `app_schema.sql`은 신규 DB 미러일 뿐(DoD: 두 파일 쌍).
+- **취약점**: 한쪽만 고치면 배포 직후 그 컬럼을 쓰는 INSERT/SELECT가 컬럼 부재로 깨지거나
+  (task#130 `stock_recommendations.name`), 신규 테이블 SELECT가 `relation does not exist`로
+  lifespan startup 실패→백엔드 부팅 차단(task#16 `batch_schedules`). additive·idempotent DDL에만
+  한정 — 파괴적 변경(drop/rename/type/백필)은 이 경로 금지.
+
+---
+
+## 10. NaN/inf 직렬화 500 일반 (DATA)
+
+- starlette `JSONResponse`는 `allow_nan=False` — 응답 dict에 NaN/inf가 있으면 500
+  (`Out of range float values are not JSON compliant`). `backend/services/utils.py:36` `sanitize`가
+  NaN/inf→None.
+- **은밀함**: PostgreSQL은 `json` 컬럼에 NaN 거부(저장 실패)하지만 파이썬 `json.dumps`는 기본
+  `allow_nan=True`라 파일 폴백은 통과 → DB저장 실패·파일 성공·응답 직렬화 실패로 증상이 엇갈려
+  진단이 늦어진다(다이제스트 500 사례 8cd70a42).
+- 가드는 **소스에서**(`math.isfinite` 후 "시세 없음") 하는 게 출력 일괄 sanitize보다 깨끗.
+  시세/합산을 응답에 싣는 엔드포인트는 sanitize 또는 소스 isfinite 가드 필수.
+
+---
+
+## 11. Silent-catch / 로깅 취약성
+
+- 프론트 silent catch가 500을 삼켜 증상을 가림(`usePortfolioData.fetchDashboard`, §3.1).
+- broad `except: pass`가 라이브 정렬 실패를 삼켜 "기능이 조용히 꺼짐"(§5 KR beta). 적어도 진단
+  로그를 남기거나 좁은 예외만 잡을 것.
+- 로깅 규약(task#162/163/185): 백엔드는 모듈 `logger`(앱 코드 `print`=0, `tests/test_no_print.py`
+  단언), 루트 로거는 `main.py:_configure_logging()`이 1회 배선 — config 없으면 lastResort=WARNING
+  이라 `logger.info`가 docker logs에 안 뜬다. 프론트 `console.*`는 자동 가드 없음(lint 미연결).
+  전체: `.forge/codebase/CONVENTIONS.md` §4.
+
+---
+
+## 12. 배포·인프라 취약성 (OPERATIONAL)
+
+- **폴러 hard reset**: launchd `com.portfolion.auto-deploy-poll`이 2분마다 `LOCAL != origin/main`
+  이면(양방향) `git reset --hard origin/main` → 커밋 안 한 tracked 편집뿐 아니라 **push 안 한 로컬
+  커밋도 소실**(task#106). 코드/문서 변경은 commit+push 묶어서. `.forge/` 등 untracked는 안전.
+- **러너 격리**: 자동배포 주 경로 = self-hosted 러너(`~/actions-runner-portfolion`). 타 프로젝트
+  세팅 때 재등록되면 사라져 잡이 `queued→24h cancelled` 무음 미배포(06-22~06-27 실사례, task#105).
+  백엔드가 옛 코드면 폴러 footgun 단정 전 `gh run list`/`gh api .../actions/runners`로 러너부터 확인.
+- **프론트/백엔드 배포 비대칭**: nginx가 `frontend/dist` 직접 서빙이라 `npm run build`로 즉시 라이브,
+  **백엔드 변경은 폴러 재배포 후에야 라이브** — 프론트만 먼저 빌드하면 백엔드 의존 기능이 미동작.
+
+---
+
+## 13. 문서 드리프트 (DOC DEBT)
+
+- **API 명세 2문서 동기**: `API_SPEC.md` + `CLAUDE_COWORK_API.md`. 엔드포인트 존재 drift는
+  `backend/tests/test_api_doc_sync.py`가 자동검출(미문서화 23개는 `KNOWN_UNDOCUMENTED` 베이스라인
+  동결). 단 요청/응답 스키마·인증 게이팅 동기는 수동 DoD. "2문서 모두"는 Cowork 관련 엔드포인트에
+  한함 — 사용자 대면 read는 `API_SPEC.md`에만.
+- **README 동기**: 화면구성·env·스택·아키텍처·배치 표면 변경 시 README 해당 절 같은 PR 갱신(DoD).
+- **배치 id/source drift**: `batch_registry.BATCHES`의 id를 빼면 read·표시문자열·`job_runs.record`
+  모든 lane(auto/manual/backfill)·테스트를 전수 grep(옛 id로 record하면 배치 현황에서 증발).
+  id 추가 시 count/set 하드코딩 단언 4파일(test_scheduler_seed·test_batch_market_split·
+  test_batches_router·test_macro_signals_batch) 전수 grep(task#136). fetch 소스 변경 시 `source` 갱신.
+- **심볼 제거/개명**: patch하는 테스트를 파일 불문 전수 grep(`services.digest_service.yf`가 다른
+  파일에서 patch돼 ModuleNotFoundError, task#136).
+
+---
+
+## 14. 계약 변경 blast radius 취약성
+
+- **비-additive reshape**: 엔드포인트 응답을 배열→객체 등으로 바꾸면 그걸 fetch하는 *모든* 프론트
+  소비처 전수 grep(task52: 대시보드 배열→객체 시 Analytics.jsx 독립 fetcher가 조용히 깨짐). additive 선호.
+- **additive read/외부호출 추가**: `mock.call_args`(마지막 호출)를 단언하는 기존 테스트가 조용히
+  오염 — `call_args_list[i].kwargs`로 마이그레이션, 빈 입력이면 호출 생략, `call_count`로 시퀀스 못박음(task#66/67).
+- **auth Depends 추가**: 모듈 상단에서 `FastAPI()`를 직접 만들어 `dependency_overrides`로 auth
+  우회하는 자체-app 테스트(test_stocks_router 등)가 401/403로 깨짐 — 새 의존성 override 전수 추가.
+  무인증 거부는 override 없는 fresh app으로 별도 검증(task#108).
+- **enrich 필드 정본 위치 혼동**: `enriched_at` 정본은 `tickers` 테이블 컬럼이지 스냅샷 `data` JSON이
+  아님 — 스냅샷에서 읽도록 가정하면 fixture green·라이브 항상 False(task#132). 종목명도 dual-source
+  (`tickers.name` vs `snapshots.data.name`) — 이름 변경 시 둘 다 + 캐시 무효화 필수(task#77).
+- **admin scope=all 리포트의 category vs is_mine**: 비소유 종목에도 category가 붙어, category로만
+  게이트한 액션 버튼이 남의 종목에 노출→user-scoped 핸들러가 404. 가시성은 `is_mine`으로 게이트,
+  액션 버튼은 단일 `StockActions.jsx`로 통합(task#97·103).
+
+---
+
+## 15. 알려진 미해결 / 의도적 미수정
+
+- **backfill force DELETE 비원자** (`.forge/bug-report.md`, task#28) — 1차 버그헌트 42건 중 유일
+  잔존, 의도적 미수정.
+- **KR 지수 밸류에이션 미구현** (ADR 관련) — KOSPI/KOSDAQ PER 무료 공식소스 부재로 미구현(후속).
+  US S&P500 Shiller CAPE는 `multpl.com` 크롤(FRED엔 CAPE 시리즈 없음, `indices.py`).
+- **KOSDAQ 실적일 커버리지 patchy** — yfinance가 일부 `.KQ`에 404, best-effort 빈 결과 graceful.
+- **discovery 저유동성 필터 라이브 행동 확인 미완**(task#68, MEMORY) — 배치 재계산 선행 필요.
+- **버그헌트 현황**: 2차(task#164) 15/15 수정 완료, 3차(task#168) 수정분 잔존 버그 0건.
+
+---
+
+## 16. Security / 접근 경계 (요약)
+
+- prod DB/컨테이너 쓰기·읽기·settings 자가권한은 에이전트 분류기가 하드 차단 — 사용자 `!` 실행
+  또는 admin 엔드포인트 경유(`reference-prod-writes-need-user`).
+- 외부 시세 소스(키움/KIS)는 **읽기전용·서버측 단일키 경계**(ADR-0009/0011/0022) — 계좌·주문 미연동.
+  키 미설정이 안전 기본값(`configured()` False면 휴면).
+- 시크릿은 `backend/.env.docker`(gitignore) — 키 이름만: POSTGRES_PASSWORD, JWT_SECRET,
+  SESSION_SECRET, OAuth, FRED_API_KEY, KOFIA_API_KEY, DART_API_KEY, KIWOOM_APP/SECRET_KEY,
+  KIS_APP_KEY/APP_SECRET. `ANTHROPIC_API_KEY`는 남아있으나 현재 백엔드 미사용(LLM 호출 없음).
+- 메뉴 접근은 `user_menu_permissions` + `AuthContext` nav 필터, admin만 리포트 생성·Guru 크롤.
