@@ -87,6 +87,7 @@ export default function PermissionManager() {
       await api.post('/api/admin/users/bulk-permissions', { user_ids: selectedIds, permissions: pendingPerms })
       const updated = await api.get('/api/admin/users')
       setUsers(updated.data)
+      showToast(`${selectedIds.length}명 권한을 일괄 적용했습니다.`, 'success')
       setSelectedIds([])
       closePanel()
     } catch {
@@ -103,6 +104,7 @@ export default function PermissionManager() {
       setUsers(prev => prev.filter(u => u.id !== user.id))
       setSelectedIds(prev => prev.filter(id => id !== user.id))
       if (editingUser?.id === user.id) closePanel()
+      showToast(`${user.email} 계정을 삭제했습니다.`, 'success')
     } catch {
       showToast('사용자 삭제에 실패했습니다.', 'error')
     }
