@@ -1,0 +1,13 @@
+// 스케치 SVG 에셋 re-export (task#190, ADR-0026 §4)
+export { default as SketchEmpty } from './SketchEmpty'
+export { default as SketchError } from './SketchError'
+export { default as SketchNotFound } from './SketchNotFound'
+export { default as SketchHero } from './SketchHero'
+export { default as IconResearch } from './IconResearch'
+export { default as IconPortfolio } from './IconPortfolio'
+export { default as IconMarket } from './IconMarket'
+export { default as IconCalendarIncome } from './IconCalendarIncome'
+export { default as IconGuru } from './IconGuru'
+export { default as SketchUnderline } from './SketchUnderline'
+export { default as SketchArrowUp } from './SketchArrowUp'
+export { default as SketchCircleMark } from './SketchCircleMark'

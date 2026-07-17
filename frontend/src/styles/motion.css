@@ -1,0 +1,61 @@
+/* 모션 유틸 (task#190, ADR-0026 §5) — fade-up, stagger, scroll reveal, 스케치 드로잉 */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.anim-fade-up {
+  animation: fade-up 0.4s ease-out both;
+}
+
+.anim-stagger > * {
+  animation-delay: calc(var(--stagger-i, 0) * 60ms);
+}
+.anim-stagger > *:nth-child(1) { --stagger-i: 0; }
+.anim-stagger > *:nth-child(2) { --stagger-i: 1; }
+.anim-stagger > *:nth-child(3) { --stagger-i: 2; }
+.anim-stagger > *:nth-child(4) { --stagger-i: 3; }
+.anim-stagger > *:nth-child(5) { --stagger-i: 4; }
+.anim-stagger > *:nth-child(6) { --stagger-i: 5; }
+.anim-stagger > *:nth-child(7) { --stagger-i: 6; }
+.anim-stagger > *:nth-child(8) { --stagger-i: 7; }
+
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes sk-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.sketch-draw .sk-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sk-draw 1.2s ease-out forwards;
+}
+.sketch-draw .sk-path:nth-child(2) { animation-delay: 0.15s; }
+.sketch-draw .sk-path:nth-child(3) { animation-delay: 0.3s; }
+.sketch-draw .sk-path:nth-child(4) { animation-delay: 0.45s; }
+.sketch-draw .sk-path:nth-child(5) { animation-delay: 0.6s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up,
+  .sketch-draw .sk-path {
+    animation: none !important;
+  }
+  .reveal {
+    transition: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .sketch-draw .sk-path {
+    stroke-dashoffset: 0;
+  }
+}

@@ -1,12 +1,13 @@
 /* =========================================================
-   Design tokens — Pro finance terminal identity (ADR-0025)
-   Dark is the default theme; light is a retuned same-hue variant.
+   Design tokens — Editorial identity (ADR-0026)
+   Light is the default theme (paper/ink); dark is a warm night-print variant.
    Korean coloring: 상승=red, 하락=blue
    ========================================================= */
 
 :root {
   --font-sans: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --font-serif: 'Noto Serif KR', 'Apple Myungjo', Georgia, serif;
 
   /* Typography scale (shared by both themes) */
   --font-size-xs:  11px;
@@ -20,22 +21,22 @@
   --font-weight-semibold: 600;
   --line-height-tight: 1.2;
 
-  /* Light theme — cool slate neutrals, same hue family as dark terminal */
-  --bg:           #f7f8fa;
-  --bg-elev:     #ffffff;
-  --bg-elev-2:   #f0f2f6;
-  --surface-hover: #eaedf3;
-  --border:      rgba(15, 23, 42, 0.08);
-  --border-strong: rgba(15, 23, 42, 0.16);
-  --text:        #0f172a;
-  --text-2:      #47536b;
-  --text-3:      #5f6b85;
-  --text-faint:  #5f6d89;
+  /* Light theme — paper & ink */
+  --bg:           #f6f1e7;   /* 크림 종이 */
+  --bg-elev:     #fdfaf3;   /* 밝은 지면(카드) */
+  --bg-elev-2:   #efe8d9;
+  --surface-hover: #eae2cf;
+  --border:      rgba(62, 50, 30, 0.14);
+  --border-strong: rgba(62, 50, 30, 0.28);
+  --text:        #201b13;   /* 웜 잉크 블랙 (15.2:1) */
+  --text-2:      #5a5142;   /* 6.93 */
+  --text-3:      #6e6350;   /* 5.23 */
+  --text-faint:  #6e6350;
 
-  --accent:      #3663ce;   /* calm blue accent */
-  --accent-soft: rgba(54, 99, 206, 0.08);
-  --accent-tint: rgba(54, 99, 206, 0.12);
-  --accent-btn-hover: #2a4ea8;
+  --accent:      #1d5f58;   /* 딥 틸 잉크 (6.59) */
+  --accent-soft: rgba(29, 95, 88, 0.09);
+  --accent-tint: rgba(29, 95, 88, 0.14);
+  --accent-btn-hover: #174d47;
 
   /* Button fill-behind-white-text — separate from --accent/--color-danger
      (those are tuned for foreground text use, task#175 promotion of Button.css hardcode) */
@@ -44,37 +45,37 @@
   --btn-danger-bg:        var(--color-danger);
 
   /* Korean market coloring */
-  --up:          #d9364c;   /* red = 상승 */
-  --up-soft:     rgba(217, 54, 76, 0.10);
-  --down:        #2f6fe0;   /* blue = 하락 */
-  --down-soft:   rgba(47, 111, 224, 0.10);
-  --neutral:     #5f6b85;
+  --up:          #b3372b;   /* 버밀리온 잉크 (5.33) */
+  --up-soft:     rgba(179, 55, 43, 0.10);
+  --down:        #2b5c9e;   /* 프러시안 블루 (5.97) */
+  --down-soft:   rgba(43, 92, 158, 0.10);
+  --neutral:     #6e6350;
 
   /* Data palette (blue/green/amber/grey/purple categorical set) */
-  --data-1:      #3663ce;
-  --data-2:      #1f9d6e;
-  --data-3:      #a97b0a;
-  --data-4:      #5f6b85;
-  --data-5:      #8b5cc7;
+  --data-1:      #1d5f58;
+  --data-2:      #2b5c9e;
+  --data-3:      #7d5600;
+  --data-4:      #6e6350;
+  --data-5:      #7a4a7e;
 
-  --warn:        #8a5c00;   /* darkened for AA 4.5:1 on light bg (task#175, was #a97b0a @ 3.32:1) */
-  --warn-soft:   rgba(138, 92, 0, 0.12);
+  --warn:        #7d5600;   /* 오커 잉크 (5.82) */
+  --warn-soft:   rgba(125, 86, 0, 0.12);
 
   /* Semantic state colors — NOT price direction */
-  --color-success:      #146c4c;   /* darkened for AA 4.5:1 on light bg (task#175, was #1f9d6e @ 3.00:1) */
-  --color-success-soft: rgba(20, 108, 76, 0.12);
-  --color-error:        #d6394c;
-  --color-error-soft:   rgba(214, 57, 76, 0.12);
+  --color-success:      #14664a;   /* 6.16 */
+  --color-success-soft: rgba(20, 102, 74, 0.12);
+  --color-error:        #b23636;   /* 5.37 (흰 텍스트 버튼 대비 6.05) */
+  --color-error-soft:   rgba(178, 54, 54, 0.12);
   --color-danger:       var(--color-error);
-  --color-info:         #1e88c7;
-  --color-info-soft:    rgba(30, 136, 199, 0.12);
-  --semantic-buy:       #146c4c;   /* darkened for AA 4.5:1 on light bg (task#175, was #1f9d6e @ 3.00:1) */
-  --semantic-buy-soft:  rgba(20, 108, 76, 0.12);
-  --semantic-sell:      #a8480a;   /* orange, distinct from --up red (task#175 F22: was #d6394c, visually ~identical to --up #d9364c) */
-  --semantic-sell-soft: rgba(168, 72, 10, 0.12);
-  --corr-pos:           #2f6f6f;
-  --corr-neg:           #c98a2b;
-  --corr-zero:          #e4e7ed;
+  --color-info:         #1a6a92;   /* 5.30 */
+  --color-info-soft:    rgba(26, 106, 146, 0.12);
+  --semantic-buy:       #14664a;
+  --semantic-buy-soft:  rgba(20, 102, 74, 0.12);
+  --semantic-sell:      #96470e;   /* 5.82, --up과 구분 유지 */
+  --semantic-sell-soft: rgba(150, 71, 14, 0.12);
+  --corr-pos:           #22635c;
+  --corr-neg:           #9a6a1f;
+  --corr-zero:          #e7dfcd;
 
   /* Aliases used by a few consumers — single source of truth */
   --surface:     var(--bg-elev);
@@ -96,86 +97,87 @@
   --space-5: 20px;
   --space-6: 24px;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.04);
-  --shadow:    0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
-  --shadow-md: 0 2px 8px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
-  --shadow-lg: 0 6px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 2px rgba(62,45,20,0.06), 0 0 0 1px rgba(62,45,20,0.05);
+  --shadow:    0 1px 3px rgba(62,45,20,0.08), 0 4px 16px rgba(62,45,20,0.05);
+  --shadow-md: 0 2px 8px rgba(62,45,20,0.09), 0 4px 16px rgba(62,45,20,0.06);
+  --shadow-lg: 0 6px 24px rgba(62,45,20,0.10), 0 1px 2px rgba(62,45,20,0.05);
 
   --transition-fast: 120ms ease;
 
-  /* Semantic badge colors — adapts light/dark */
-  --tag-hold-bg:    #e8f5e9; --tag-hold-color:  #2e7d32; --tag-hold-border: #a5d6a7;
-  --tag-watch-bg:   #fce4ec; --tag-watch-color: #c62828; --tag-watch-border: #f48fb1;
-  --tag-track-bg:   #e3f2fd; --tag-track-color: #1565c0; --tag-track-border: #90caf9;
-  --tag-etf-bg:     #f3e5f5; --tag-etf-color:   #7b1fa2; --tag-etf-border:  #ce93d8;
+  /* Semantic badge colors — adapts light/dark. Ink palette families:
+     hold/div=success green, watch/hol-us=vermilion, track/earn=prussian blue, etf/hol-kr=plum */
+  --tag-hold-bg:    #e2ecdf; --tag-hold-color:  #185c3e; --tag-hold-border: #9dbfa0;
+  --tag-watch-bg:   #f5e1d9; --tag-watch-color: #9c3a26; --tag-watch-border: #d9a68f;
+  --tag-track-bg:   #dde6ef; --tag-track-color: #234f85; --tag-track-border: #a3bfd9;
+  --tag-etf-bg:     #ece0ea; --tag-etf-color:   #6b3f6f; --tag-etf-border:  #c7a8c9;
 
   /* Calendar event colors */
-  --cal-earn-hold-bg: #e3f2fd; --cal-earn-hold-color: #1565c0; --cal-earn-hold-border: #90caf9;
-  --cal-div-hold-bg:  #e8f5e9; --cal-div-hold-color:  #2e7d32; --cal-div-hold-border:  #a5d6a7;
-  --cal-earn-wl-color: #1976d2; --cal-earn-wl-border: #90caf9;
-  --cal-div-wl-color:  #388e3c; --cal-div-wl-border:  #a5d6a7;
-  --cal-hol-us-bg:    #fce4ec; --cal-hol-us-color:   #c62828; --cal-hol-us-border: #f48fb1;
-  --cal-hol-kr-bg:    #ede7f6; --cal-hol-kr-color:   #4527a0; --cal-hol-kr-border: #ce93d8;
+  --cal-earn-hold-bg: #dde6ef; --cal-earn-hold-color: #234f85; --cal-earn-hold-border: #a3bfd9;
+  --cal-div-hold-bg:  #e2ecdf; --cal-div-hold-color:  #185c3e; --cal-div-hold-border:  #9dbfa0;
+  --cal-earn-wl-color: #2a5a92; --cal-earn-wl-border: #a3bfd9;
+  --cal-div-wl-color:  #1f6b48; --cal-div-wl-border:  #9dbfa0;
+  --cal-hol-us-bg:    #f5e1d9; --cal-hol-us-color:   #9c3a26; --cal-hol-us-border: #d9a68f;
+  --cal-hol-kr-bg:    #ece0ea; --cal-hol-kr-color:   #6b3f6f; --cal-hol-kr-border: #c7a8c9;
 
-  /* Decorative medal ranks (구루 탑3) — darker on light bg for AA 4.5:1 vs white */
-  --medal-gold:   #8a6d00;
-  --medal-bronze: #8a5a2e;
+  /* Decorative medal ranks (구루 탑3) — darker on light bg for AA 4.5:1 vs paper */
+  --medal-gold:   #7d5600;
+  --medal-bronze: #7d4a1e;
 }
 
 [data-theme="dark"] {
-  /* Deep blue-black terminal layers */
-  --bg:           #0b0e14;
-  --bg-elev:     #11151f;
-  --bg-elev-2:   #171c28;
-  --surface-hover: #1c2230;
-  --border:      #1f2635;
-  --border-strong: #2a3348;
-  --text:        #e6eaf2;
-  --text-2:      #9aa4b8;
-  --text-3:      #7986a3;
-  --text-faint:  #7a86a0;
+  /* 야간 인쇄본 — warm dark layers */
+  --bg:           #171310;
+  --bg-elev:     #1f1a15;
+  --bg-elev-2:   #28221b;
+  --surface-hover: #2f2820;
+  --border:      #322a20;
+  --border-strong: #443a2c;
+  --text:        #ece4d4;   /* 크림 잉크 (14.6) */
+  --text-2:      #b3a892;   /* 7.86 */
+  --text-3:      #948a75;   /* 5.41 */
+  --text-faint:  #948a75;
 
-  --accent:      #5b8def;
-  --accent-soft: rgba(91, 141, 239, 0.12);
-  --accent-tint: rgba(91, 141, 239, 0.18);
-  --accent-btn-hover: #4a7edb;
+  --accent:      #62b3a4;   /* 7.48 */
+  --accent-soft: rgba(98, 179, 164, 0.12);
+  --accent-tint: rgba(98, 179, 164, 0.18);
+  --accent-btn-hover: #75c2b3;
 
   /* --accent/--color-danger stay lighter for foreground-text use on dark surfaces,
      so button fills get their own darker shade (task#175, was hardcoded in Button.css) */
-  --btn-primary-bg:       #2f6ce0;
-  --btn-primary-bg-hover: #3a6bd6;
-  --btn-danger-bg:        #e4142f;
+  --btn-primary-bg:       #1f6a5f;  /* 흰 텍스트 6.39 */
+  --btn-primary-bg-hover: #27796d;
+  --btn-danger-bg:        #b23636;
 
-  --up:          #f6465d;
-  --up-soft:     rgba(246, 70, 93, 0.07);
-  --down:        #4a8cff;
-  --down-soft:   rgba(74, 140, 255, 0.16);
-  --neutral:     #7986a3;
+  --up:          #ef6a5a;
+  --up-soft:     rgba(239, 106, 90, 0.09);
+  --down:        #6fa1e8;
+  --down-soft:   rgba(111, 161, 232, 0.14);
+  --neutral:     #948a75;
 
-  --data-1:      #5b8def;
-  --data-2:      #2ebd85;
-  --data-3:      #f0b90b;
-  --data-4:      #7986a3;
-  --data-5:      #b57ede;
+  --data-1:      #62b3a4;
+  --data-2:      #6fa1e8;
+  --data-3:      #d9a53f;
+  --data-4:      #948a75;
+  --data-5:      #b98cbf;
 
-  --warn:        #f0b90b;
-  --warn-soft:   rgba(240, 185, 11, 0.16);
+  --warn:        #d9a53f;
+  --warn-soft:   rgba(217, 165, 63, 0.14);
 
   /* Semantic state colors — NOT price direction */
-  --color-success:      #2ebd85;
-  --color-success-soft: rgba(46, 189, 133, 0.18);
-  --color-error:        #ef4a5f;
-  --color-error-soft:   rgba(239, 74, 95, 0.18);
+  --color-success:      #4fae85;
+  --color-success-soft: rgba(79, 174, 133, 0.16);
+  --color-error:        #e56a6a;
+  --color-error-soft:   rgba(229, 106, 106, 0.16);
   --color-danger:       var(--color-error);
-  --color-info:         #4fc3f7;
-  --color-info-soft:    rgba(79, 195, 247, 0.18);
-  --semantic-buy:       #2ebd85;
-  --semantic-buy-soft:  rgba(46, 189, 133, 0.18);
-  --semantic-sell:      #ff8a3d;   /* orange, distinct from --up red (task#175 F22: was #ef4a5f, visually ~identical to --up #f6465d) */
-  --semantic-sell-soft: rgba(255, 138, 61, 0.18);
-  --corr-pos:           #4fbdbd;
-  --corr-neg:           #e0b56b;
-  --corr-zero:          #1e2534;
+  --color-info:         #5fb3d9;
+  --color-info-soft:    rgba(95, 179, 217, 0.16);
+  --semantic-buy:       #4fae85;
+  --semantic-buy-soft:  rgba(79, 174, 133, 0.16);
+  --semantic-sell:      #e08a4a;
+  --semantic-sell-soft: rgba(224, 138, 74, 0.16);
+  --corr-pos:           #55b0a5;
+  --corr-neg:           #cfa14f;
+  --corr-zero:          #2b241b;
 
   /* Aliases used by a few consumers — single source of truth */
   --surface:     var(--bg-elev);
@@ -189,21 +191,21 @@
   --shadow-md: 0 2px 8px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.35);
   --shadow-lg: 0 6px 24px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3);
 
-  --tag-hold-bg:    #12261e; --tag-hold-color:  #2ebd85; --tag-hold-border: #1e4636;
-  --tag-watch-bg:   #2a1620; --tag-watch-color: #f0637a; --tag-watch-border: #4a2432;
-  --tag-track-bg:   #142236; --tag-track-color: #5ac8fa; --tag-track-border: #1f3b54;
-  --tag-etf-bg:     #241c36; --tag-etf-color:   #c893e0; --tag-etf-border:  #3a2a54;
+  --tag-hold-bg:    #16281f; --tag-hold-color:  #5cc99a; --tag-hold-border: #2a4a3a;
+  --tag-watch-bg:   #2c1a14; --tag-watch-color: #f0917a; --tag-watch-border: #4a2c22;
+  --tag-track-bg:   #16222f; --tag-track-color: #86b6ea; --tag-track-border: #26394e;
+  --tag-etf-bg:     #251c29; --tag-etf-color:   #cd93cf; --tag-etf-border:  #3e2c40;
 
-  --cal-earn-hold-bg: #142236; --cal-earn-hold-color: #5ac8fa; --cal-earn-hold-border: #1f3b54;
-  --cal-div-hold-bg:  #12261e; --cal-div-hold-color:  #2ebd85; --cal-div-hold-border:  #1e4636;
-  --cal-earn-wl-color: #3f8fb0; --cal-earn-wl-border: #1f3b54;
-  --cal-div-wl-color:  #4a9a6a; --cal-div-wl-border:  #1e4636;
-  --cal-hol-us-bg:    #2a1620; --cal-hol-us-color:   #f0637a; --cal-hol-us-border: #4a2432;
-  --cal-hol-kr-bg:    #1c1830; --cal-hol-kr-color:   #b57ede; --cal-hol-kr-border: #33285a;
+  --cal-earn-hold-bg: #16222f; --cal-earn-hold-color: #86b6ea; --cal-earn-hold-border: #26394e;
+  --cal-div-hold-bg:  #16281f; --cal-div-hold-color:  #5cc99a; --cal-div-hold-border:  #2a4a3a;
+  --cal-earn-wl-color: #74a8e0; --cal-earn-wl-border: #26394e;
+  --cal-div-wl-color:  #4fbf8f; --cal-div-wl-border:  #2a4a3a;
+  --cal-hol-us-bg:    #2c1a14; --cal-hol-us-color:   #f0917a; --cal-hol-us-border: #4a2c22;
+  --cal-hol-kr-bg:    #251c29; --cal-hol-kr-color:   #cd93cf; --cal-hol-kr-border: #3e2c40;
 
   /* Decorative medal ranks (구루 탑3) — brighter on dark bg */
-  --medal-gold:   #f6c90e;
-  --medal-bronze: #cd7f32;
+  --medal-gold:   #d9a53f;
+  --medal-bronze: #c98a5b;
 }
 
 /* Base reset */
@@ -229,6 +231,9 @@ body {
 
 button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; color: inherit; }
+
+h1, h2, h3 { font-family: var(--font-serif); font-weight: 700; letter-spacing: -0.01em; }
+.serif { font-family: var(--font-serif); }
 
 .tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 .mono { font-family: var(--font-mono); font-feature-settings: 'tnum', 'zero'; }
