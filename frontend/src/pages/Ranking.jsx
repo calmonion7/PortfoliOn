@@ -150,15 +150,6 @@ export default function Ranking() {
     return () => obs.disconnect()
   }, [hasMore, items.length, offset, fetchPage])
 
-  // 모달 오픈 동안 배경(body) 스크롤 잠금 — 레이어 스크롤이 바닥 페이지로 전파되는 현상 방지, 닫히면 원복
-  const modalOpen = modal != null
-  useEffect(() => {
-    if (!modalOpen) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [modalOpen])
-
   // 진입 시 관심종목 목록 1회 로드 → 행 별표 상태 표시
   useEffect(() => {
     api.get('/api/watchlist')
