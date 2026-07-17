@@ -144,8 +144,8 @@ export default function PermissionManager() {
       {/* 테이블 헤더 */}
       <div style={{
         display: 'grid', gridTemplateColumns: '36px 1fr auto 60px',
-        padding: '8px 14px', borderBottom: '1px solid var(--border)',
-        fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em',
+        padding: '12px 14px', borderBottom: '1px solid var(--border)',
+        fontSize: 11.5, fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em',
       }}>
         <div>
           <input
@@ -161,16 +161,17 @@ export default function PermissionManager() {
       </div>
 
       {/* 테이블 행 */}
-      {displayed.map((u, i) => {
+      {displayed.map((u) => {
         const isAdmin = u.role === 'admin'
         const isSelected = selectedIds.includes(u.id)
         return (
           <div
             key={u.id}
+            className="admin-row"
             style={{
               display: 'grid', gridTemplateColumns: '36px 1fr auto 60px',
               padding: '10px 14px', alignItems: 'center',
-              background: isSelected ? 'var(--accent-soft)' : i % 2 === 1 ? 'var(--surface-2)' : 'transparent',
+              ...(isSelected && { background: 'var(--accent-soft)' }),
               borderBottom: '1px solid var(--border)',
             }}
           >

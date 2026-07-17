@@ -397,7 +397,7 @@
 
 /* ----- SETTINGS ----- */
 .settings-grid { display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: flex-start; }
-.settings-nav { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 80px; }
+.settings-nav { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 92px; } /* 마스트헤드(sticky 80px) + 여백 12px — task#193 S3 (구 셸 기준 80px는 여백 헐거움, task#191 이월) */
 .settings-nav > button { background: transparent; border: 0; text-align: left; padding: 9px 12px; border-radius: 8px; font-size: 13px; color: var(--text-3); }
 .settings-nav > button.is-active { background: var(--accent-soft); color: var(--text); font-weight: 500; }
 .settings-section { margin-bottom: 28px; }
@@ -418,6 +418,10 @@
   font-size: 12px; color: var(--text-2);
 }
 .day-pill.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+/* ----- ADMIN TABLE (dense div-grid rows, e.g. PermissionManager) — hairline + hover only, no zebra fill (task#193 S3) ----- */
+.admin-row { transition: background .1s; }
+.admin-row:hover { background: var(--surface-hover); }
 
 /* Subtle generic chart axis text */
 .axis-text { fill: var(--text-3); font-size: 10px; }

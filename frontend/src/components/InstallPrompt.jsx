@@ -3,6 +3,7 @@ import {
   isStandalone, isIOS, isAndroid, isIOSInAppBrowser,
   isInstallSuppressed, suppressInstall,
 } from '../utils/pwa'
+import './InstallPrompt.css'
 
 function CloseIcon() {
   return (
@@ -82,7 +83,7 @@ export default function InstallPrompt() {
       <div className="install-prompt-body">
         {inApp ? (
           <>
-            <p className="install-prompt-title">PortfoliOn 앱으로 설치</p>
+            <p className="install-prompt-title serif">PortfoliOn 앱으로 설치</p>
             <p className="install-prompt-desc">
               지금 브라우저에선 설치가 안 됩니다. 우측 상단 메뉴에서 <b>Safari로 열기</b> 후
               공유 → <b>홈 화면에 추가</b>를 선택하세요.
@@ -90,14 +91,14 @@ export default function InstallPrompt() {
           </>
         ) : ios ? (
           <>
-            <p className="install-prompt-title">홈 화면에 추가하면 앱처럼 쓸 수 있어요</p>
+            <p className="install-prompt-title serif">홈 화면에 추가하면 앱처럼 쓸 수 있어요</p>
             <p className="install-prompt-desc">
               하단의 공유 버튼<ShareIcon />을 누르고 <b>‘홈 화면에 추가’</b>를 선택하세요.
             </p>
           </>
         ) : (
           <>
-            <p className="install-prompt-title">PortfoliOn을 설치하세요</p>
+            <p className="install-prompt-title serif">PortfoliOn을 설치하세요</p>
             <p className="install-prompt-desc">홈 화면에 추가하면 앱처럼 빠르게 열 수 있어요.</p>
             <div className="install-prompt-actions">
               <button className="install-prompt-btn" onClick={install}>설치</button>

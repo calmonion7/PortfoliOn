@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
 
 export default function EconIndicatorsSection() {
   const [open, setOpen] = useState(false)
@@ -22,9 +22,7 @@ export default function EconIndicatorsSection() {
   if (data.error) {
     return (
       <SectionCard title="경제지표 (미국)" summary="" open={open} onToggle={() => setOpen(o => !o)}>
-        <div className="metric-tile" style={{ fontSize: 13, color: 'var(--text-3)' }}>
-          <p>{data.error}</p>
-        </div>
+        <EmptyNote msg={data.error} />
       </SectionCard>
     )
   }

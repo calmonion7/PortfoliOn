@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
 
 export default function KospiFuturesSection() {
   const [open, setOpen] = useState(false)
@@ -28,7 +28,7 @@ export default function KospiFuturesSection() {
       : '코스피200 선물 데이터를 일시적으로 불러오지 못했습니다.'
     return (
       <SectionCard title="코스피200 선물" open={open} onToggle={() => setOpen(o => !o)}>
-        <p style={DESC_STYLE}>{msg}</p>
+        <EmptyNote msg={msg} />
       </SectionCard>
     )
   }

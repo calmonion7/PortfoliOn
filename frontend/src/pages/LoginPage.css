@@ -1,0 +1,22 @@
+/* 로그인 히어로 스케치 스킨 (task#193 S4, ADR-0026 에디토리얼 소재 소비) — pc.css/mobile.css 미변경 */
+
+.login-hero {
+  width: 100%;
+  max-width: 280px;
+  color: var(--text-3);
+}
+
+.login-hero--mobile {
+  max-width: 180px;
+  margin: 8px 0 0;
+}
+
+/* 작은 화면(짧은 세로)에서는 히어로가 폼을 밀어내지 않도록 숨김 */
+@media (max-height: 700px) {
+  .login-hero--mobile { display: none; }
+}
+
+/* 좁은 화면에서는 히어로를 더 축소 */
+@media (max-width: 360px) {
+  .login-hero--mobile { max-width: 140px; }
+}

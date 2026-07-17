@@ -45,16 +45,9 @@ export default function ConsensusSettings() {
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <span style={{ fontSize: 13, color: 'var(--text-3)', flexShrink: 0 }}>기간</span>
-            <div style={{ flex: 1, display: 'flex', gap: 2, padding: 3, background: 'var(--accent-soft)', borderRadius: 10 }}>
+            <div className="seg" style={{ flex: 1 }}>
               {DAYS_OPTIONS.map(d => (
-                <button key={d} onClick={() => setDays(d)} style={{
-                  flex: 1, border: 0, padding: '7px 0', fontSize: 13, fontWeight: 500,
-                  borderRadius: 8, letterSpacing: '-0.01em',
-                  background: days === d ? 'var(--bg-elev)' : 'transparent',
-                  color: days === d ? 'var(--text)' : 'var(--text-3)',
-                  boxShadow: days === d ? 'var(--shadow-sm)' : 'none',
-                  cursor: 'pointer',
-                }}>{d}일</button>
+                <button key={d} className={days === d ? 'is-active' : ''} onClick={() => setDays(d)}>{d}일</button>
               ))}
             </div>
           </div>

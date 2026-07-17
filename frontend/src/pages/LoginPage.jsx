@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import useIsMobile from '../hooks/useIsMobile'
 import Input from '../components/ui/Input'
+import { SketchHero } from '../components/sketches'
 import '../components/ui/Button.css'
+import './LoginPage.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -61,6 +63,9 @@ export default function LoginPage() {
         <img src="/favicon.svg" className="brand-mark" alt="" />
         PortfoliOn
       </div>
+      <div className="login-hero login-hero--mobile sketch-draw">
+        <SketchHero />
+      </div>
       <h1>당신의 자산을<br/>한 화면에서.</h1>
       <p className="lead">보유 종목, 시장 지표, 구루 동향까지 — 흩어진 데이터를 한 곳에서.</p>
       <form onSubmit={isLogin ? doLogin : doRegister}>
@@ -98,6 +103,9 @@ export default function LoginPage() {
         <div className="brand-big">
           <img src="/favicon.svg" className="brand-mark" alt="" />
           PortfoliOn
+        </div>
+        <div className="login-hero sketch-draw">
+          <SketchHero />
         </div>
         <div className="login-quote">
           <h1>당신의 자산을<br/>한 화면에서.</h1>

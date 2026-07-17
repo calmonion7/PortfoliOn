@@ -6,6 +6,7 @@ import Card from '../components/ui/Card'
 import Stat from '../components/ui/Stat'
 import Badge from '../components/ui/Badge'
 import { fmtPrice } from '../utils'
+import { SketchEmpty, SketchError, SketchUnderline } from '../components/sketches'
 
 // 예상/확정 배지 — KR 가격 토큰(--up 빨강/--down 파랑)과 무관한 전용색 (ADR-0023, 색 반전 방지)
 const STATUS_STYLE = {
@@ -23,21 +24,21 @@ function DividendRow({ it }) {
   const isHolding = it.stock_type === 'holding'
   const st = STATUS_STYLE[it.status] || STATUS_STYLE.projected
   return (
-    <div style={{
+    <div className="anim-fade-up" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
       borderBottom: '1px solid var(--border)',
     }}>
       <div style={{ minWidth: 84, flexShrink: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 13 }}>{fmtDate(it.ex_date)}</div>
+        <div className="mono tnum" style={{ fontWeight: 700, fontSize: 13 }}>{fmtDate(it.ex_date)}</div>
         <div style={{ fontSize: 10, color: 'var(--text-3)' }}>배당락</div>
         {it.pay_date && (
-          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>지급 {fmtDate(it.pay_date)}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>지급 <span className="mono tnum">{fmtDate(it.pay_date)}</span></div>
         )}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>{it.ticker}</span>
+          <span className="mono" style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>{it.ticker}</span>
           {/* 보유/관심 태그 — GuruManagers.jsx와 동일한 --tag-hold/--tag-watch 토큰 재사용 */}
           <Badge variant="neutral" size="sm" style={isHolding
             ? { background: 'var(--tag-hold-bg)', color: 'var(--tag-hold-color)', borderColor: 'var(--tag-hold-border)' }
@@ -54,9 +55,9 @@ function DividendRow({ it }) {
       </div>
 
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontSize: 12 }}>{fmtPrice(it.amount_per_share, it.market)}<span style={{ fontSize: 10, color: 'var(--text-3)' }}> /주</span></div>
+        <div className="mono tnum" style={{ fontSize: 12 }}>{fmtPrice(it.amount_per_share, it.market)}<span style={{ fontSize: 10, color: 'var(--text-3)' }}> /주</span></div>
         {isHolding && it.expected_amount != null && (
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>
+          <div className="mono tnum" style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>
             {fmtPrice(it.expected_amount, it.market)}
           </div>
         )}
@@ -70,8 +71,10 @@ function DividendSection({ label, items }) {
   if (items.length === 0) return null
   return (
     <Card padding="none" style={{ marginBottom: 12, overflow: 'hidden' }}>
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 700 }}>{label}</div>
-      {items.map((it, i) => <DividendRow key={`${it.ticker}-${it.ex_date}-${i}`} it={it} />)}
+      <div className="muted" style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 700 }}>{label}</div>
+      <div className="anim-stagger">
+        {items.map((it, i) => <DividendRow key={`${it.ticker}-${it.ex_date}-${i}`} it={it} />)}
+      </div>
     </Card>
   )
 }
@@ -100,8 +103,9 @@ export default function Dividends() {
   )
 
   if (error) return (
-    <div style={{ maxWidth: 700, color: 'var(--text-3)', textAlign: 'center', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <span>배당 일정 불러오기 실패</span>
+    <div style={{ maxWidth: 700, textAlign: 'center', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchError size={140} /></div>
+      <span className="muted">배당 일정 불러오기 실패</span>
       <Button variant="secondary" size="sm" onClick={load}>다시 시도</Button>
     </div>
   )
@@ -119,11 +123,13 @@ export default function Dividends() {
           value={fmtPrice(summary.total_expected_12m_krw || 0, 'KR')}
           helperText={`배당 예정 보유 ${summary.holdings_with_dividend || 0}종목${summary.fx_usdkrw ? ` · 환율 ₩${Math.round(summary.fx_usdkrw).toLocaleString('ko-KR')}/$` : ''}`}
         />
+        <div style={{ color: 'var(--border-strong)', marginTop: 10 }}><SketchUnderline size={100} /></div>
       </Card>
 
       {items.length === 0 ? (
-        <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: '32px 16px', fontSize: 13 }}>
-          다가오는 배당 일정이 없습니다.
+        <div style={{ textAlign: 'center', padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={120} /></div>
+          <div className="muted" style={{ fontSize: 13 }}>다가오는 배당 일정이 없습니다.</div>
         </div>
       ) : (
         <>

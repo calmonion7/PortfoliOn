@@ -1,0 +1,5 @@
+/* PWA 설치 배너 에디토리얼 정돈 (task#193 S4) — mobile.css 레이아웃 위 추가 속성만(겹치는 속성 없음, mobile.css 미변경) */
+
+.install-prompt-icon {
+  border: 1px solid var(--border);
+}

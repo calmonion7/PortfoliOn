@@ -1,0 +1,8 @@
+/* 시장 허브 에디토리얼 표제 — 세리프 헤딩 + 잉크 언더라인 장식 (task#193 S1) */
+
+.mkt-title {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.mkt-underline { display: block; color: var(--border-strong); margin: 2px 0 12px; }

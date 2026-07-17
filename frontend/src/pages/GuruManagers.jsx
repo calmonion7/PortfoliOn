@@ -3,6 +3,7 @@ import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
+import { SketchEmpty } from '../components/sketches'
 
 function formatValue(val) {
   if (!val) return '-'
@@ -88,9 +89,12 @@ export default function GuruManagers() {
 
   if (loading) return <LoadingSpinner label="구루 운용역 불러오는 중입니다." />
   if (!data.managers.length) return (
-    <p style={{ color: 'var(--text-3)', fontSize: 14 }}>
-      데이터 없음 — "크롤링 설정" 탭에서 데이터를 가져오세요.
-    </p>
+    <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
+      <p className="muted" style={{ fontSize: 14, margin: 0 }}>
+        데이터 없음 — "크롤링 설정" 탭에서 데이터를 가져오세요.
+      </p>
+    </div>
   )
 
   // ── 모바일 카드 뷰 ────────────────────────────────────────
@@ -130,14 +134,14 @@ export default function GuruManagers() {
       </div>
 
       {/* 카드 목록 — .guru-card/.guru-h/.guru-avatar/.guru-stats(pc.css) 재사용, 데스크탑 카드와 동일 문법 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 20px' }}>
+      <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 20px' }}>
         {sorted.map((m, i) => (
-          <div key={m.id} className="guru-card">
+          <div key={m.id} className="guru-card anim-fade-up">
             {/* 헤더 */}
             <div className="guru-h">
               <div className="guru-avatar">{initials(m.name)}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <p className="guru-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <p className="guru-name serif" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.name.split(' - ')[0]}
                 </p>
                 <div className="guru-fund" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -221,13 +225,13 @@ export default function GuruManagers() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+      <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
         {sorted.map((m, i) => (
-          <div key={m.id} className="guru-card">
+          <div key={m.id} className="guru-card anim-fade-up">
             <div className="guru-h">
               <div className="guru-avatar">{initials(m.name)}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <p className="guru-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <p className="guru-name serif" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.name.split(' - ')[0]}
                 </p>
                 <div className="guru-fund" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -4,7 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
 
 export default function LendingSection() {
   const [open, setOpen] = useState(true)
@@ -74,7 +74,7 @@ export default function LendingSection() {
         </ResponsiveContainer>
         </div>
       ) : (
-        <p style={{ color: 'var(--text-3)', fontSize: 13 }}>데이터 없음 — 관리자 메뉴에서 동기화하세요.</p>
+        <EmptyNote msg="데이터 없음 — 관리자 메뉴에서 동기화하세요." />
       )}
     </SectionCard>
   )

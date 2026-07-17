@@ -3,6 +3,7 @@ import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
+import { SketchEmpty } from '../components/sketches'
 import '../components/ui/Button.css'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
@@ -113,7 +114,10 @@ export default function GuruStats({ view }) {
 
   if (loading) return <LoadingSpinner label="구루 통계 불러오는 중입니다." />
   if (!popularity.length) return (
-    <p style={{ color: 'var(--text-3)', fontSize: 14 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
+    <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
+      <p className="muted" style={{ fontSize: 14, margin: 0 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
+    </div>
   )
 
   return (
@@ -131,9 +135,9 @@ export default function GuruStats({ view }) {
       </div>
 
       {tab === 'popularity' && (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 8 }}>
+        <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 8 }}>
           {filteredPopularity.map((row, i) => (
-            <div key={row.ticker} style={{
+            <div key={row.ticker} className="anim-fade-up" style={{
               display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 10,
               background: 'var(--bg-elev)', border: '1px solid var(--border)',
               borderRadius: 10, padding: isMobile ? '14px 14px' : '10px 12px',
@@ -153,13 +157,13 @@ export default function GuruStats({ view }) {
       )}
 
       {tab === 'top3' && (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
+        <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
           {filteredTop3.map(m => (
-            <div key={m.manager_name} style={{
+            <div key={m.manager_name} className="anim-fade-up" style={{
               background: 'var(--bg-elev)', border: '1px solid var(--border)',
               borderRadius: 12, overflow: 'hidden',
             }}>
-              <div style={{
+              <div className="serif" style={{
                 padding: isMobile ? '12px 14px' : '8px 12px', borderBottom: '1px solid var(--border)',
                 fontWeight: 700, fontSize: isMobile ? 15 : 12, color: 'var(--text)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -210,9 +214,9 @@ export default function GuruStats({ view }) {
               </span>
             ))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 8 }}>
+          <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 8 }}>
             {filteredWeighted.map((row, i) => (
-              <div key={row.ticker} style={{
+              <div key={row.ticker} className="anim-fade-up" style={{
                 display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 10,
                 background: 'var(--bg-elev)', border: '1px solid var(--border)',
                 borderRadius: 10, padding: isMobile ? '14px 14px' : '10px 12px',

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
 
 export default function MacroSignalsSection() {
   const [open, setOpen] = useState(false)
@@ -22,9 +22,7 @@ export default function MacroSignalsSection() {
   if (data.error) {
     return (
       <SectionCard title="매크로 신호 (미국)" summary="" open={open} onToggle={() => setOpen(o => !o)}>
-        <div className="metric-tile" style={{ fontSize: 13, color: 'var(--text-3)' }}>
-          <p>{data.error}</p>
-        </div>
+        <EmptyNote msg={data.error} />
       </SectionCard>
     )
   }

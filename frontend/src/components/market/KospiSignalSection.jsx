@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { Bar, Cell, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts'
-import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
 
 // KR 가격색 컨벤션(--up=빨강/--down=파랑)을 그대로 신호색으로 사용 — Badge success/danger 변형 금지
 const SIGNAL_DISPLAY = {
@@ -33,9 +33,7 @@ export default function KospiSignalSection() {
   if (!current) {
     return (
       <SectionCard title="코스피 방향 신호" summary="" open={open} onToggle={() => setOpen(o => !o)}>
-        <div className="metric-tile" style={{ fontSize: 13, color: 'var(--text-3)' }}>
-          <p>아직 수집된 데이터가 없습니다.</p>
-        </div>
+        <EmptyNote msg="아직 수집된 데이터가 없습니다." />
       </SectionCard>
     )
   }

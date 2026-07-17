@@ -69,7 +69,7 @@ export default function GuruCrawlNow() {
             <div style={{ marginTop: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
                 <span>{progress.current ? `수집 중: ${progress.current}` : '준비 중...'}</span>
-                <span style={{ color: 'var(--text)', fontWeight: 600 }}>
+                <span className="mono tnum" style={{ color: 'var(--text)', fontWeight: 600 }}>
                   {progress.done} / {progress.total || '?'}
                 </span>
               </div>

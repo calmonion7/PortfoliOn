@@ -1,4 +1,7 @@
 import Skeleton from '../ui/Skeleton'
+import useReveal from '../../hooks/useReveal'
+import { SketchEmpty, SketchError, SketchUnderline } from '../sketches'
+import './Market.css'
 
 export const krFmt = v => {
   if (v == null) return '-'
@@ -45,6 +48,7 @@ const SECTION_CARD_OUTER = {
 }
 
 export function SectionCard({ title, summary, change, changeSuffix = '', changeInverted = false, open, onToggle, children }) {
+  const revealRef = useReveal()
   const changeColor = change == null ? null
     : change === 0 ? 'var(--text-3)'
     : (change > 0) !== changeInverted ? 'var(--up)' : 'var(--down)'
@@ -52,7 +56,7 @@ export function SectionCard({ title, summary, change, changeSuffix = '', changeI
   const decimals = changeSuffix === 'bp' ? 1 : 2
 
   return (
-    <div style={SECTION_CARD_OUTER}>
+    <div ref={revealRef} className="reveal" style={SECTION_CARD_OUTER}>
       <button
         onClick={onToggle}
         style={{
@@ -68,7 +72,7 @@ export function SectionCard({ title, summary, change, changeSuffix = '', changeI
           textAlign: 'left',
         }}
       >
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+        <span className="mkt-title" style={{ fontSize: 15, color: 'var(--text)' }}>{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {summary && <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{summary}</span>}
           {change != null && (
@@ -79,7 +83,12 @@ export function SectionCard({ title, summary, change, changeSuffix = '', changeI
           <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{open ? '∧' : '∨'}</span>
         </div>
       </button>
-      {open && <div style={SECTION_CONTENT_STYLE}>{children}</div>}
+      {open && (
+        <div style={SECTION_CONTENT_STYLE}>
+          <SketchUnderline size={56} className="mkt-underline" />
+          {children}
+        </div>
+      )}
     </div>
   )
 }
@@ -88,7 +97,7 @@ export function SectionCardLoading({ title }) {
   return (
     <div style={SECTION_CARD_OUTER}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+        <span className="mkt-title" style={{ fontSize: 15, color: 'var(--text)' }}>{title}</span>
         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>…</span>
       </div>
       <div style={SECTION_CONTENT_STYLE}><LoadingBox /></div>
@@ -100,7 +109,7 @@ export function SectionCardError({ title }) {
   return (
     <div style={SECTION_CARD_OUTER}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+        <span className="mkt-title" style={{ fontSize: 15, color: 'var(--text)' }}>{title}</span>
         <span style={{ fontSize: 12, color: 'var(--color-error)' }}>오류</span>
       </div>
       <div style={SECTION_CONTENT_STYLE}><ErrorBox /></div>
@@ -114,8 +123,19 @@ export function LoadingBox() {
 
 export function ErrorBox({ msg }) {
   return (
-    <div className="metric-tile" style={{ color: 'var(--color-error)', fontSize: 13 }}>
-      {msg || '데이터를 불러오지 못했습니다.'}
+    <div style={{ textAlign: 'center', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchError size={96} /></div>
+      <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{msg || '데이터를 불러오지 못했습니다.'}</span>
+    </div>
+  )
+}
+
+// 섹션 내 "아직 데이터 없음" 상태 공통 표시 (task#193 S1)
+export function EmptyNote({ msg }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={96} /></div>
+      <span style={{ color: 'var(--text-3)', fontSize: 13 }}>{msg}</span>
     </div>
   )
 }
