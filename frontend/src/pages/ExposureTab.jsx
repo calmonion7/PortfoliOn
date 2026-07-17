@@ -9,19 +9,29 @@ import useIsMobile from '../hooks/useIsMobile'
 const pctText = (v) => v == null ? '—' : `${v.toFixed(1)}%`
 
 // 경고 배지 전용색(caution 주황) — success/danger 변형 금지(--up=빨강/--down=파랑 반전, SupplyBadge 규약).
-const warnStyle = { background: 'rgba(245, 124, 0, 0.16)', color: '#f57c00', borderColor: 'rgba(245, 124, 0, 0.32)' }
+// --warn/--warn-soft는 라이트/다크 모두 WCAG AA 튜닝된 토큰이라 그대로 드롭인.
+const warnStyle = { background: 'var(--warn-soft)', color: 'var(--warn)', borderColor: 'var(--warn)' }
 
 // 베타 설명 뱃지 전용색 — 가격방향(빨강/파랑)과 무관한 3색(SupplyBadge 규약과 동일 원칙).
-const BETA_STYLES = {
-  aggressive: { background: 'rgba(156, 39, 176, 0.16)', color: '#9c27b0', borderColor: 'rgba(156, 39, 176, 0.32)' },
-  market: { background: 'rgba(120, 120, 120, 0.16)', color: 'var(--text-3)', borderColor: 'rgba(120, 120, 120, 0.32)' },
-  defensive: { background: 'rgba(0, 150, 136, 0.16)', color: '#009688', borderColor: 'rgba(0, 150, 136, 0.32)' },
+// aggressive/defensive는 대응 토큰이 없어 라이트/다크 각각 WCAG AA(≥4.5:1) 튜닝된 hex를 직접 분기(rsiColor와 동일 패턴).
+function betaStyles() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+  return {
+    aggressive: isDark
+      ? { background: 'rgba(206, 147, 216, 0.18)', color: '#ce93d8', borderColor: 'rgba(206, 147, 216, 0.36)' }
+      : { background: 'rgba(123, 31, 162, 0.14)', color: '#7b1fa2', borderColor: 'rgba(123, 31, 162, 0.30)' },
+    market: { background: 'rgba(120, 120, 120, 0.16)', color: 'var(--text-3)', borderColor: 'rgba(120, 120, 120, 0.32)' },
+    defensive: isDark
+      ? { background: 'rgba(77, 182, 172, 0.18)', color: '#4db6ac', borderColor: 'rgba(77, 182, 172, 0.36)' }
+      : { background: 'rgba(0, 105, 92, 0.14)', color: '#00695c', borderColor: 'rgba(0, 105, 92, 0.30)' },
+  }
 }
 
 function betaBadge(beta) {
-  if (beta > 1.2) return { text: '공격적', style: BETA_STYLES.aggressive }
-  if (beta < 0.8) return { text: '방어적', style: BETA_STYLES.defensive }
-  return { text: '시장수준', style: BETA_STYLES.market }
+  const styles = betaStyles()
+  if (beta > 1.2) return { text: '공격적', style: styles.aggressive }
+  if (beta < 0.8) return { text: '방어적', style: styles.defensive }
+  return { text: '시장수준', style: styles.market }
 }
 
 const DATA_COLORS = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)']

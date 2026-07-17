@@ -79,6 +79,9 @@ export default function Ranking() {
 
   const sentinelRef = useRef(null)
   const loadingRef = useRef(false)
+  // 최초 로드만 진입 애니메이션 재생 — 필터 변경 재적재는 재생 생략(carryover-2)
+  const [isFirstLoad, setIsFirstLoad] = useState(true)
+  const hasLoadedOnceRef = useRef(false)
 
   // 종목 클릭 → 리서치 분기 모달 상태
   // detail: 스냅샷 리포트 / basic: 기본정보 + 관심추가 CTA
@@ -127,6 +130,8 @@ export default function Ranking() {
     setOffset(0)
     setHasMore(true)
     setError(false)
+    if (hasLoadedOnceRef.current) setIsFirstLoad(false)
+    hasLoadedOnceRef.current = true
     fetchPage(0, true)
   }, [market, metric, type, fetchPage])
 
@@ -273,7 +278,7 @@ export default function Ranking() {
     <Card
       hover
       padding="sm"
-      className="anim-fade-up"
+      className={isFirstLoad ? 'anim-fade-up' : ''}
       onClick={() => onRowClick(row)}
       style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
     >
@@ -321,7 +326,7 @@ export default function Ranking() {
       </div>
 
       {/* 카드 그리드 — PC 멀티컬럼/모바일 1~2열 자동 줄바꿈, 모든 카드 동일 크기 */}
-      <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+      <div className={isFirstLoad ? 'anim-stagger' : ''} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
         {isSupply ? items.map((row, i) => (
           <RankCard key={`${row.ticker}-${i}`} rank={i + 1} row={row}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 8, borderTop: '1px solid var(--border)' }}>

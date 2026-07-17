@@ -10,7 +10,8 @@ export const fmtN = (val) => val != null ? val : '—'
 export const rsiColor = (rsi) => {
   if (rsi == null) return 'var(--text-3)'
   const hue = Math.round(120 - (rsi / 100) * 120)
-  return `hsl(${hue}, 60%, 60%)`
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+  return isDark ? `hsl(${hue}, 60%, 60%)` : `hsl(${hue}, 70%, 24%)`
 }
 
 export const fmtGap = (target, price) => {

@@ -252,15 +252,6 @@
 .cal-cell:nth-child(7n) { border-right: 0; }
 .cal-day { font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
 .cal-day.today { display:inline-flex; width: 20px; height: 20px; border-radius: 999px; background: var(--text); color: var(--bg); align-items:center; justify-content:center; font-weight: 600; }
-.cal-event {
-  font-size: 10.5px; padding: 2px 6px; border-radius: 4px;
-  background: var(--accent-soft); color: var(--text-2);
-  margin-bottom: 3px; display: block;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.cal-event.earn { background: var(--up-soft); color: var(--up); }
-.cal-event.div { background: rgba(126, 160, 141, 0.18); color: var(--data-5); }
-.cal-event.hol { background: var(--warn-soft); color: var(--warn); }
 .cal-cell.dim { background: var(--bg-elev-2); }
 
 /* ----- DIGEST ----- */
@@ -396,28 +387,7 @@
 .score-bar > div { height: 100%; background: var(--text); border-radius: 2px; }
 
 /* ----- SETTINGS ----- */
-.settings-grid { display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: flex-start; }
-.settings-nav { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 92px; } /* 마스트헤드(sticky 80px) + 여백 12px — task#193 S3 (구 셸 기준 80px는 여백 헐거움, task#191 이월) */
-.settings-nav > button { background: transparent; border: 0; text-align: left; padding: 9px 12px; border-radius: 8px; font-size: 13px; color: var(--text-3); }
-.settings-nav > button.is-active { background: var(--accent-soft); color: var(--text); font-weight: 500; }
 .settings-section { margin-bottom: 28px; }
-.settings-row { display: grid; grid-template-columns: 1fr auto; padding: 16px 0; border-top: 1px solid var(--border); align-items: center; gap: 20px; }
-.settings-row:last-child { border-bottom: 1px solid var(--border); }
-.settings-row .title { font-size: 13.5px; font-weight: 500; }
-.settings-row .desc { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-
-.switch { width: 36px; height: 22px; border-radius: 999px; background: var(--border-strong); position: relative; cursor: pointer; transition: background .15s; border: 0; padding: 0; }
-.switch.on { background: var(--text); }
-.switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg-elev); transition: left .15s; }
-.switch.on::after { left: 16px; }
-
-.day-pill {
-  display: inline-flex; width: 32px; height: 32px; border-radius: 8px;
-  align-items: center; justify-content: center;
-  background: var(--bg-elev); border: 1px solid var(--border);
-  font-size: 12px; color: var(--text-2);
-}
-.day-pill.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
 
 /* ----- ADMIN TABLE (dense div-grid rows, e.g. PermissionManager) — hairline + hover only, no zebra fill (task#193 S3) ----- */
 .admin-row { transition: background .1s; }

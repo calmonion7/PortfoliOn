@@ -292,12 +292,12 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly 
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 padding: '6px 12px', borderRadius: 6,
-                background: 'rgba(91,141,238,0.18)',
-                border: '1px solid rgba(91,141,238,0.45)',
-                borderLeft: '3px solid #5b8dee',
-                borderRight: '3px solid #5b8dee',
+                background: hexToRgba('var(--text)', 0.18),
+                border: `1px solid ${hexToRgba('var(--text)', 0.45)}`,
+                borderLeft: '3px solid var(--text)',
+                borderRight: '3px solid var(--text)',
               }}>
-                <span style={{ fontSize: 9, color: '#5b8dee', fontWeight: 600 }}>현재가</span>
+                <span style={{ fontSize: 9, color: 'var(--text)', fontWeight: 600 }}>현재가</span>
                 {price != null && (
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }}>
                     {fmt(price, market)}

@@ -27,13 +27,29 @@
 }
 
 .badge--success {
-  background: var(--up-soft);
-  color: var(--up);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  border-color: var(--color-success);
 }
 
 .badge--danger {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+/* Price-direction variants — KR convention: 상승=빨강(--up), 하락=파랑(--down).
+   ChangeBadge 전용. 의미 상태는 success/danger를 쓸 것(가격색과 분리 — task#194 게이트 회귀 교정) */
+.badge--up {
+  background: var(--up-soft);
+  color: var(--up);
+  border-color: var(--up);
+}
+
+.badge--down {
   background: var(--down-soft);
   color: var(--down);
+  border-color: var(--down);
 }
 
 .badge--warning {

@@ -27,9 +27,16 @@
 .appbar h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.025em; }
 .appbar .actions { display: flex; gap: 6px; align-items: center; }
 .appbar .icon-btn {
+  position: relative;
   width: 34px; height: 34px; border-radius: 999px;
   background: var(--accent-soft); border: 0; color: var(--text-2);
   display: flex; align-items: center; justify-content: center;
+}
+/* 시각 크기(34px)는 유지, 히트영역만 44px로 확장(F4) */
+.appbar .icon-btn::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
 }
 
 /* 상단바 '더보기' 메뉴(설정·admin 진입점, task#178) */

@@ -94,7 +94,7 @@ export default function SectorTab() {
                 <td key={p} className="heat">
                   <div className="mono" style={{
                     background: returnColor(s[p]),
-                    color: s[p] !== null ? 'white' : 'var(--text-3)',
+                    color: s[p] !== null ? 'var(--text)' : 'var(--text-3)',
                     borderRadius: 4,
                   }}>
                     {s[p] !== null ? `${s[p] > 0 ? '+' : ''}${s[p]}%` : '—'}

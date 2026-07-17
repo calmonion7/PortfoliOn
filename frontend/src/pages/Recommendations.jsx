@@ -184,9 +184,6 @@ export default function Recommendations() {
             {holdings.map((item, i) => {
               const pnl = item.pnl_pct
               const weight = item.weight_pct
-              const posLine = (pnl == null && weight == null)
-                ? '데이터 부족'
-                : `평가손익 ${pnl == null ? '—' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(1)}%`} · 비중 ${weight == null ? '—' : `${weight.toFixed(1)}%`}`
               return (
                 <RecCard
                   key={`${item.ticker}-${i}`}
@@ -198,7 +195,11 @@ export default function Recommendations() {
                       <Badge variant="neutral" style={ACTION_STYLE[item.action] || ACTION_STYLE.홀딩}>
                         {item.action}
                       </Badge>
-                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{posLine}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                        {pnl == null && weight == null ? '데이터 부족' : (
+                          <>평가손익 {pnl == null ? '—' : <span style={{ color: pnl >= 0 ? 'var(--up)' : 'var(--down)' }}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(1)}%</span>} · 비중 {weight == null ? '—' : `${weight.toFixed(1)}%`}</>
+                        )}
+                      </span>
                     </div>
                   }
                 />

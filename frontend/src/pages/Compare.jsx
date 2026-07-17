@@ -177,7 +177,7 @@ export default function Compare() {
                           checked={checked}
                           disabled={disabled && !checked}
                           onChange={() => toggle(c.ticker)}
-                          style={{ cursor: 'pointer' }}
+                          style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
                         />
                         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <span style={{ color: 'var(--text)', fontWeight: 600 }}>{c.name}</span>

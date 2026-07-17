@@ -4,6 +4,8 @@ const variantClass = {
   neutral: 'badge--neutral',
   success: 'badge--success',
   danger: 'badge--danger',
+  up: 'badge--up',
+  down: 'badge--down',
   warning: 'badge--warning',
   info: 'badge--info',
   'market-kr': 'badge--market-kr',
@@ -32,7 +34,7 @@ export function MarketBadge({ market, exchange = '' }) {
 
 export function ChangeBadge({ value, suffix = '%', size = 'sm' }) {
   if (value == null) return <Badge variant="neutral" size={size}>—</Badge>
-  const variant = value >= 0 ? 'success' : 'danger'
+  const variant = value >= 0 ? 'up' : 'down' // KR 가격색 관례 — 의미색(success/danger) 아님
   const arrow = value >= 0 ? '▲' : '▼'
   return (
     <Badge variant={variant} size={size}>

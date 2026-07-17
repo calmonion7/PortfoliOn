@@ -217,7 +217,7 @@ export default function Reports({ initialTicker = null }) {
                   {activeTab !== 'others' && <p style={{ margin: 0, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>}
                 </div>
               ) : (
-                <div className="stock-card-grid anim-stagger">
+                <>
                   <div className="card-list-header">
                     <span>종목</span>
                     <span className={`sort-col${sortCol === 'chg' ? ' active' : ''}`} onClick={() => handleSort('chg')}>현재가 / 고점{sortArrow('chg')}</span>
@@ -228,27 +228,29 @@ export default function Reports({ initialTicker = null }) {
                     <span style={{ color: 'var(--semantic-sell)' }} title="일봉 RSI가 70·75·80(과매수 기준선)에 도달할 때의 예상 가격">RSI 매도<br/><small>일봉 70 / 75 / 80</small></span>
                     <span></span>
                   </div>
-                  {activeEntries.map(([t, info]) => (
-                    <StockCard
-                      key={t}
-                      ticker={t}
-                      info={info}
-                      pnl={pnlOf(t, info.summary?.market || info.market)}
-                      guruMap={guruMap}
-                      isAdmin={isAdmin}
-                      generating={generating}
-                      genProgress={genProgress}
-                      touchStyle={touchStyle}
-                      openDetail={openDetail}
-                      generateOne={generateOne}
-                      openEdit={openEdit}
-                      handleDelete={handleDelete}
-                      handleGlobalDelete={handleGlobalDelete}
-                      setPromoteTarget={setPromoteTarget}
-                      handlePinToggle={handlePinToggle}
-                    />
-                  ))}
-                </div>
+                  <div className="stock-card-grid anim-stagger">
+                    {activeEntries.map(([t, info]) => (
+                      <StockCard
+                        key={t}
+                        ticker={t}
+                        info={info}
+                        pnl={pnlOf(t, info.summary?.market || info.market)}
+                        guruMap={guruMap}
+                        isAdmin={isAdmin}
+                        generating={generating}
+                        genProgress={genProgress}
+                        touchStyle={touchStyle}
+                        openDetail={openDetail}
+                        generateOne={generateOne}
+                        openEdit={openEdit}
+                        handleDelete={handleDelete}
+                        handleGlobalDelete={handleGlobalDelete}
+                        setPromoteTarget={setPromoteTarget}
+                        handlePinToggle={handlePinToggle}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </>
           )

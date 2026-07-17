@@ -24,10 +24,6 @@
   .grid-2, .grid-2-3 { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: 1fr 1fr; }
 
-  /* Settings */
-  .settings-grid { grid-template-columns: 1fr; }
-  .settings-nav { flex-direction: row; flex-wrap: wrap; position: static; }
-
   /* Yield curve */
   .yield-row { grid-template-columns: repeat(3, 1fr); }
   .yield-row--4 { grid-template-columns: repeat(2, 1fr); }

@@ -43,12 +43,12 @@ export default function TickerListItem({
               <span className="mono tnum" style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmt(s.price, market)}</span>
             )}
             {s.drop_from_high_20d != null && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-3)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
                 고점<ChangeBadge value={s.drop_from_high_20d} />
               </span>
             )}
             {targetGap != null && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-3)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
                 목표 <span className="mono tnum">{fmt(s.target_mean, market)}</span><ChangeBadge value={targetGap} />
               </span>
             )}
