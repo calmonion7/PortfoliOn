@@ -9,6 +9,18 @@
   animation: fade-up 0.4s ease-out both;
 }
 
+/* 라우트 래퍼 전용 — transform 없는 opacity 페이드.
+   transform 애니메이션(fill both)은 종료 후에도 computed matrix가 남아
+   fixed 자손(목록으로·FAB·모달)의 컨테이닝 블록을 래퍼로 바꿔버린다(task#195). */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.anim-fade {
+  animation: fade-in 0.4s ease-out both;
+}
+
 .anim-stagger > * {
   animation-delay: calc(var(--stagger-i, 0) * 60ms);
 }
@@ -47,6 +59,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .anim-fade-up,
+  .anim-fade,
   .sketch-draw .sk-path {
     animation: none !important;
   }

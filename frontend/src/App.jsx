@@ -72,7 +72,8 @@ function AppShell({ theme, setTheme, setSession }) {
           </div>
         </header>
         <main className="page-wrap">
-          <div key={location.pathname} className="anim-fade-up">
+          {/* 라우트 전환 페이드 — transform 없는 .anim-fade만 사용(fixed 자손 컨테이닝 블록 함정, task#195) */}
+          <div key={location.pathname} className="anim-fade">
             <InstallPrompt />
             <Routes>
               <Route path="/" element={<Navigate to="/reports" replace />} />
