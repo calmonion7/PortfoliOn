@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
+import useBodyScrollLock from '../hooks/useBodyScrollLock'
 
 export default function PromoteModal({ ticker, market = 'US', onConfirm, onClose }) {
+  useBodyScrollLock()
   const [quantity, setQuantity] = useState('')
   const [avgCost, setAvgCost] = useState('')
   const [saving, setSaving] = useState(false)

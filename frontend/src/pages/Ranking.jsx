@@ -10,6 +10,7 @@ import { useToast } from '../components/Toast'
 import { trackEvent } from '../utils/analytics'
 import ReportDetailTabs from '../components/reports/ReportDetailTabs'
 import useIsMobile from '../hooks/useIsMobile'
+import useBodyScrollLock from '../hooks/useBodyScrollLock'
 import { SketchEmpty, SketchError } from '../components/sketches'
 
 const LIMIT = 20
@@ -86,6 +87,7 @@ export default function Ranking() {
   // 종목 클릭 → 리서치 분기 모달 상태
   // detail: 스냅샷 리포트 / basic: 기본정보 + 관심추가 CTA
   const [modal, setModal] = useState(null)   // { row, mode: 'detail'|'basic', summary?, date?, enriched_at? }
+  useBodyScrollLock(Boolean(modal))
   const [modalLoading, setModalLoading] = useState(false)
   const [adding, setAdding] = useState(false)
 
@@ -454,7 +456,6 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
         ticker={ticker}
         enrichedAt={enriched_at}
         historyDates={[]}
-        contentMaxHeight="60vh"
       />
     </div>
   )

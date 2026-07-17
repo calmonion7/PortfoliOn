@@ -4,6 +4,7 @@ import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import { useToast } from '../components/Toast'
 import useIsMobile from '../hooks/useIsMobile'
+import useBodyScrollLock from '../hooks/useBodyScrollLock'
 import { SketchEmpty, SketchError } from '../components/sketches'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
@@ -60,6 +61,7 @@ function MonthGrid({ year, month, events }) {
   }
 
   const selectedEvents = selectedDate ? (byDate[selectedDate] || []) : []
+  useBodyScrollLock(Boolean(selectedDate && selectedEvents.length > 0))
 
   const fmtDate = (dateStr) => {
     if (!dateStr) return ''

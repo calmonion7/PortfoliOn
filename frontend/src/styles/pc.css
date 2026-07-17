@@ -412,6 +412,7 @@
   border-radius: 12px; padding: 24px;
   width: 100%; max-width: 480px;
   max-height: 90vh; overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
 }
 .modal h2 { font-size: 16px; font-weight: 600; margin: 0 0 18px; }

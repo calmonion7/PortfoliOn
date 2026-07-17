@@ -29,7 +29,6 @@ export default function ReportDetailTabs({
   historyMarket,
   onConsensusRefresh = noop,
   onTabChange,
-  contentMaxHeight,
 }) {
   const [tab, setTab] = useState('summary')
   const [analysisSubTab, setAnalysisSubTab] = useState('consensus')
@@ -197,7 +196,7 @@ export default function ReportDetailTabs({
           </button>
         ))}
       </div>
-      {contentMaxHeight ? <div style={{ maxHeight: contentMaxHeight, overflowY: 'auto' }}>{content}</div> : content}
+      {content}
     </>
   )
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import StockSearchBox from './StockSearchBox'
+import useBodyScrollLock from '../hooks/useBodyScrollLock'
 
 const HOLDING_EMPTY = { ticker: '', name: '', quantity: '', avg_cost: '', target_price: '', stop_price: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '', security_type: 'EQUITY' }
 const WATCHLIST_EMPTY = { ticker: '', name: '', competitors: '', moat: '', growth_plan: '', market: 'US', exchange: '', security_type: 'EQUITY' }
@@ -12,6 +13,7 @@ const INPUT_STYLE = {
 }
 
 export default function StockModal({ stock, onSave, onClose, mode = 'holding', prefill = null }) {
+  useBodyScrollLock()
   const { role } = useAuth()
   const isAdmin = role === 'admin'
   const empty = mode === 'watchlist' ? WATCHLIST_EMPTY : HOLDING_EMPTY
