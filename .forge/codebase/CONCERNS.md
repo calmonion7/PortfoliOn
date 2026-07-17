@@ -1,14 +1,23 @@
 ---
-last_mapped_commit: 8e37e2ca03c09e76a31dd227d4c252f19246a11a
-mapped: 2026-07-14
+last_mapped_commit: 3aa35ba7b754566835ea9a21f7076a5f4450789a
+mapped: 2026-07-17
 ---
 
 # CONCERNS — 기술부채·알려진 버그·취약 영역
 
 PortfoliOn의 tech debt / known bugs / security / performance / fragile areas 지도.
-출처: `CLAUDE.md` Gotchas + `.forge/adr/` + `.forge/retro/` + `.forge/bug-report.md` + 코드 직독.
+출처: `CLAUDE.md` Gotchas + `.forge/adr/` + `.forge/retro/` + `.forge/done/` + `.forge/bug-report.md` + 코드 직독.
 아래 영역은 대부분 *이미 방어 코드가 들어간 뒤*의 잔존 취약성이다 — "고쳐졌으니 안심"이 아니라
 "이 경로를 건드릴 때 재발 토양이 여기 있다"는 지도로 읽을 것.
+
+이번 갱신 범위: 8e37e2c 이후 `git diff --stat 8e37e2c..HEAD`로 확인한 변경은 **전부 프론트엔드**
+(에디토리얼 전면개편 task#190~195, 커밋 cb4d71a~3aa35ba) — 백엔드 파일은 무변경이라 §1~10·12(폴러/러너)·
+13~16의 백엔드 관련 서술은 그대로 유효하다. 이번 개편으로 **해소된 것**(문서에 별도 기재 불필요, 확인만 됨):
+`.cal-event`/`.settings-nav` 계열 죽은 CSS 삭제(task#194, grep 0건 확인), `ui/Button.css` 다크 하드코딩
+hex 토큰화(2026-07-11 design-renewal-5of5, 8e37e2c 이전에 이미 해소), vite `sw-cache-bust` 플러그인의
+`outDir` 하드코딩(`frontend/vite.config.js:68-69`에서 `configResolved`로 실제 `config.build.outDir` 사용 —
+과거엔 `--outDir <throwaway>` 검증 빌드에도 플러그인이 무조건 `dist/index.html`을 덮어써 §12 "throwaway
+빌드가 라이브 dist를 오염" 계열 footgun의 절반이 남아있었음, task#191 발견·수정).
 
 ---
 
@@ -234,6 +243,8 @@ query-mock 테스트가 라이브 정합을 못 잡는 배포-즉사 버그 2종
   단언), 루트 로거는 `main.py:_configure_logging()`이 1회 배선 — config 없으면 lastResort=WARNING
   이라 `logger.info`가 docker logs에 안 뜬다. 프론트 `console.*`는 자동 가드 없음(lint 미연결).
   전체: `.forge/codebase/CONVENTIONS.md` §4.
+- **프론트 이벤트 트래킹도 같은 계열의 무음 실패 표면 — §17 참조**(events.py `VALID_EVENTS`
+  화이트리스트 미스매치는 200 OK를 반환하면서 저장을 스킵해 콘솔에도 안 남는다).
 
 ---
 
@@ -247,6 +258,15 @@ query-mock 테스트가 라이브 정합을 못 잡는 배포-즉사 버그 2종
   백엔드가 옛 코드면 폴러 footgun 단정 전 `gh run list`/`gh api .../actions/runners`로 러너부터 확인.
 - **프론트/백엔드 배포 비대칭**: nginx가 `frontend/dist` 직접 서빙이라 `npm run build`로 즉시 라이브,
   **백엔드 변경은 폴러 재배포 후에야 라이브** — 프론트만 먼저 빌드하면 백엔드 의존 기능이 미동작.
+- **UI 리스타일 서브에이전트의 조기 라이브 반영**(task#175): fix/review 서브에이전트가 컴파일
+  검증차 `npm run build`를 그대로 실행하면 `frontend/dist`를 직접 덮어 중간본이 조기 라이브된다
+  (메인 세션 프롬프트엔 "빌드는 최종 1회"가 반영돼도 서브에이전트 프롬프트엔 명시 없으면 뚫림).
+  대응: fix/review 프롬프트에 "`npm run build`·`frontend/dist` 쓰기 금지, 컴파일 검증은 throwaway
+  `--outDir`만" 명문화(task#194 감사에서도 재확인·유지). **`sw-cache-bust` 플러그인 자체의 outDir
+  하드코딩 절반**(throwaway 빌드에도 `dist/index.html`을 덮어쓰던 부분)은 `frontend/vite.config.js:68-69`
+  `configResolved`에서 실제 `config.build.outDir`을 읽도록 수정됨(task#191) — 단 이 수정은 플러그인
+  레벨 안전망일 뿐, 서브에이전트가 애초에 `--outDir` 없이 기본 빌드를 돌리는 실수는 여전히 막지 못하므로
+  프롬프트 명문화 규율은 계속 필요.
 
 ---
 
@@ -263,6 +283,12 @@ query-mock 테스트가 라이브 정합을 못 잡는 배포-즉사 버그 2종
   test_batches_router·test_macro_signals_batch) 전수 grep(task#136). fetch 소스 변경 시 `source` 갱신.
 - **심볼 제거/개명**: patch하는 테스트를 파일 불문 전수 grep(`services.digest_service.yf`가 다른
   파일에서 patch돼 ModuleNotFoundError, task#136).
+- **`CONVENTIONS.md`의 배지 색 서술 잠재 stale**: `.forge/codebase/CONVENTIONS.md:81`은 "의미
+  배지에 success/danger 쓰면 가격색(빨강/파랑)과 반전"이라고 서술하는데, task#194 감사(커밋
+  1e686cf)에서 `ChangeBadge`(`ui/Badge.jsx:35`, 가격 등락 배지)가 `.badge--up`/`.badge--down`
+  전용 변형(`ui/Badge.css:41-49`)으로 분리됐다 — 의미 배지 규칙 자체(success/danger 금지)는 여전히
+  유효하나, "가격색과 반전"이라던 success/danger의 실제 정의가 지금도 그대로인지는 이번 매핑에서
+  재확인하지 않았다(범위 밖, §14 참조). 배지 관련 작업 시 문서 문구보다 **코드 실측**을 우선할 것.
 
 ---
 
@@ -281,10 +307,108 @@ query-mock 테스트가 라이브 정합을 못 잡는 배포-즉사 버그 2종
 - **admin scope=all 리포트의 category vs is_mine**: 비소유 종목에도 category가 붙어, category로만
   게이트한 액션 버튼이 남의 종목에 노출→user-scoped 핸들러가 404. 가시성은 `is_mine`으로 게이트,
   액션 버튼은 단일 `StockActions.jsx`로 통합(task#97·103).
+- **공용 UI킷 변형의 색 의미 교체 시 소비처 전수 grep 누락**(task#194 감사 사례): "의미 배지에
+  success/danger 쓰지 말 것" 규칙 위반처럼 보인다고 `ui/Badge.css`의 success/danger 변형을 가격
+  토큰에서 떼어내며, 실소비처인 `ChangeBadge`(`frontend/src/components/ui/Badge.jsx:35`, 가격 등락
+  배지·`value>=0→success` 변형)가 그 변형을 의도적으로 써 온 사실을 grep하지 않고 함께 뒤집어버려
+  상승=초록/하락=빨강(서구식)으로 앱 전역 가격색이 반전됐다. vitest·빌드는 통과(색 의미는 테스트
+  밖)했고 **감사 게이트의 스팟 재캡처**(수정 후 라이브 스크린샷 재확인 단계)만이 유일하게 포착해
+  메인 세션이 `Badge.css:41-49`에 `.badge--up`/`--down` 전용 변형(주석: "ChangeBadge 전용. 의미
+  상태는 success/danger를 쓸 것")을 신설하고 `ChangeBadge`를 `up`/`down`으로 전환해 교정(커밋
+  1e686cf). 위 "비-additive reshape 소비처 grep" 가토의 *CSS 변형판* — API 응답 shape뿐 아니라
+  공유 스타일 프리미티브의 색 의미를 바꿀 때도 "규칙 위반처럼 보이는 배선"이 실은 의도된 소비(가격
+  배지)일 수 있으므로 소비처 전수 확인이 선행돼야 하고, 시각적 회귀는 단위테스트가 못 잡으니 fix 후
+  스팟 시각 재검증이 최후 방어선이라는 교훈.
 
 ---
 
-## 15. 알려진 미해결 / 의도적 미수정
+## 15. 프론트 애니메이션 — transform 래퍼가 fixed 자손을 가두는 함정 (task#195)
+
+- CSS에서 `transform`이 `none`이 아닌 요소는 그 자손 중 `position: fixed`인 요소의 **컨테이닝
+  블록이 된다**(뷰포트가 아니라 그 요소 기준으로 고정) — `animation: ... fill-mode: both/forwards`로
+  transform 애니메이션을 걸면 애니메이션이 끝난 뒤에도 computed transform matrix가 요소에 남아
+  이 효과가 영구화된다.
+- 실사례: `frontend/src/App.jsx:75-76`의 라우트 전환 래퍼(`<div key={location.pathname}>`)가
+  `.anim-fade-up`(`transform: translateY(12px)→none`, `frontend/src/styles/motion.css:6-9`)을 쓰던
+  당시, 그 자손인 `.fab`(플로팅 액션 버튼, `frontend/src/styles/mobile.css:277-283`)·`.tabbar`
+  (모바일 하단 탭바, `mobile.css:61-69`)·`.modal-overlay`(`frontend/src/styles/pc.css:404-408`) 같은
+  `position: fixed` 요소들이 뷰포트가 아니라 라우트 래퍼에 갇혀 스크롤 시 밀려나거나 뷰포트를 완전히
+  덮지 못했다.
+- **수정**(task#195, 커밋 c469f0b): 라우트 래퍼 전용으로 `transform` 없는 `.anim-fade`(opacity만,
+  `motion.css:12-19`)를 신설해 `App.jsx:76`이 이걸로 교체. `motion.css:14-16` 주석이 이 규약을 명문화.
+- **재발 토양**: `.anim-fade-up`은 여전히 카드·리스트 아이템 등 다수 컴포넌트(`StockCard.jsx`·
+  `TickerListItem.jsx`·`DashboardCard.jsx`·`Masthead.jsx`(마스트헤드 자체)·`HistoryTab.jsx`·
+  `ReportDetailTabs.jsx` 등 15+ 파일)에서 쓰인다 — 이 자체는 안전(그 자손에 `fixed` 요소가 없는 한).
+  **위험한 건 "새 레이아웃/라우트 수준 래퍼"에 transform 애니메이션을 다는 경우**: 그 래퍼가
+  `.fab`·`.tabbar`·`.modal-overlay`·`.more-backdrop`(`mobile.css:44`) 같은 `position: fixed` 요소의
+  조상이 되면 동일 버그가 재발한다. 신규 페이지/레이아웃 래퍼 애니메이션은 그 서브트리에 `fixed`
+  자손이 있는지 먼저 확인하고, 있으면 `.anim-fade`(또는 transform 없는 별도 클래스)를 쓸 것.
+  회귀 프로브 패턴(task#195에서 표준화): 스크롤 전후 fixed 요소 rect 불변·모달이 뷰포트 전체를
+  커버·래퍼의 computed `transform`이 `none`인지 3종 확인.
+
+---
+
+## 16. 사용자 행동 이벤트 트래킹 — 화이트리스트/전송 경로 드리프트
+
+프론트 `trackEvent`(`frontend/src/utils/analytics.js`)와 백엔드 `VALID_EVENTS`
+(`backend/routers/events.py:11-18`) 화이트리스트가 서로 grep 없이 늘어나며 최소 두 이벤트가
+드리프트했고, 전송 경로 자체도 배포 환경 가정이 다른 소비처와 어긋난다.
+
+### 16.1 VALID_EVENTS 미등록 이벤트 — 200 OK인데 저장 안 됨(무음 스킵)
+- `backend/routers/events.py:45-46` `track_event` — `body.event_name not in VALID_EVENTS`면
+  `{"ok": True}`만 반환하고 `_persist`(INSERT)를 아예 스킵. 로그도 없고 프론트도 `.catch(() => {})`
+  라 **성공처럼 보이면서 조용히 미수집**.
+- 확인된 누락 2건(코드 grep, `grep -rn "trackEvent(" frontend/src`):
+  - `nav_analytics` — `frontend/src/components/Masthead.jsx:110`(admin 전용 "행동" 링크)·
+    `frontend/src/components/MobileTopActions.jsx:15`(모바일 더보기 메뉴)에서 발화하지만
+    `VALID_EVENTS`엔 `nav_portfolio`/`nav_research`/`nav_market`/`nav_guru`/`nav_settings`만 있고
+    `nav_analytics`는 없다.
+  - `ranking_watch_toggle` — `frontend/src/pages/Ranking.jsx:233`(랭킹 행에서 관심종목 토글)에서
+    발화하지만 `VALID_EVENTS`엔 `ranking_row_click`만 있다.
+- **재발 토양**: 새 `trackEvent('이벤트명', ...)` 호출을 프론트에 추가할 때 `backend/routers/
+  events.py`의 `VALID_EVENTS` 갱신을 잊기 쉽다(컴파일/테스트가 안 잡음 — 런타임에 조용히 스킵될
+  뿐). admin 분석 대시보드(`GET /api/admin/analytics`)에서 그 이벤트가 영원히 0으로 보이는 형태로만
+  드러난다.
+
+### 16.2 trackEvent가 VITE_API_BASE_URL을 무시 — 로컬 preview UAT에서만 502
+- `frontend/src/utils/analytics.js` — `fetch('/api/events', ...)`로 **상대경로 하드코딩**. 반면
+  `frontend/src/api.js:4`(`axios baseURL`)·`frontend/src/App.jsx:32,127`·`frontend/src/pages/
+  LoginPage.jsx:8`은 전부 `import.meta.env.VITE_API_BASE_URL || ''`를 접두어로 쓴다.
+- **영향 범위는 한정적**: 정식 배포(nginx가 `/api/*`를 백엔드로 프록시)에선 상대경로가 정상 동작
+  하므로 프로덕션에서 깨지지 않는다. `.forge/codebase/CONCERNS.md` §12의 "로컬 preview + prod API
+  베이크" 무배포 검증 기법(`VITE_API_BASE_URL=<prod> npx vite build --outDir <throwaway>` →
+  `npx vite preview`)을 쓸 때만 노출된다 — `vite preview`는 dev 서버의 `/api` 프록시(`vite.config.js`
+  의 `server.proxy`)를 적용하지 않으므로, 이때 발화되는 이벤트 트래킹 호출만 로컬 preview 서버로
+  가서 404/502가 난다(다른 API 호출은 `VITE_API_BASE_URL`로 prod를 직접 때려 정상).
+- **재발 토양**: 신규 fetch 유틸을 추가할 때 `api.js`/`App.jsx` 패턴(`VITE_API_BASE_URL` 접두어)을
+  따르지 않으면 이런 환경별 비대칭이 반복된다. 프로덕션 영향은 없으나, 무배포 UAT 기법으로 이벤트
+  트래킹 관련 화면을 검증할 때 이 502를 실제 버그로 오인하지 않도록 주의.
+
+---
+
+## 17. 에디토리얼 전면개편 감사 이월 5건 (task#194 defer, 백로그 후보)
+
+`.forge/done/2026-07-17-editorial-redesign-5of5-audit/run.md`(원시 발견 28건 → fix 15/defer 5/drop 4
+판정) 기준. defer는 "결함이 아니라고 확정"이 아니라 **라이브 확인/디자인 판단이 선행돼야 하는 미결정**
+항목 — fix 여부를 지금 단정하지 말 것.
+
+1. **경쟁사 카드명 클리핑**(R3) — `frontend/src/components/reports/Sections.jsx:22`
+   `ReportSectionCompetitors`. 원본 `name` 필드 자체가 긴/이상 값인지(데이터 원본 의심) 확인 선행.
+2. **히스토리 목표가 고립 점선**(R5) — `frontend/src/components/reports/HistoryTab.jsx`
+   (`GET /api/report/{ticker}/history` 응답 소비). 라이브 응답의 null 패턴(스냅샷 공백 구간)이
+   의도된 데이터 부재인지 렌더 결함인지 확인 선행.
+3. **모바일 탭바 콘텐츠 비침**(F3, task#188과 병합 논의) — `.tabbar`(`frontend/src/styles/
+   mobile.css:61-69`, `backdrop-filter`+반투명 배경). task#188에서 정적 스크린샷만으로 "레이어 가려짐"
+   을 오판했던 선례가 있어, 실기기 `elementFromPoint` 확인 없이는 fix 판정을 유보.
+4. **로그인 보조 버튼·Showcase 버튼 터치타겟** — `frontend/src/pages/LoginPage.jsx`·
+   `frontend/src/pages/Showcase.jsx`. 기존 사이즈 체계(`ui/Button.jsx`)가 있어 lg 사이즈 채택
+   여부는 디자인 판단 필요.
+5. **다크 테마 Elevated 카드 구분 강화** — `border` 보강 등 다크 테마 일반 특성(그림자 대비 저하)에
+   대한 디자인 판단 필요.
+
+---
+
+## 18. 알려진 미해결 / 의도적 미수정
 
 - **backfill force DELETE 비원자** (`.forge/bug-report.md`, task#28) — 1차 버그헌트 42건 중 유일
   잔존, 의도적 미수정.
@@ -293,10 +417,11 @@ query-mock 테스트가 라이브 정합을 못 잡는 배포-즉사 버그 2종
 - **KOSDAQ 실적일 커버리지 patchy** — yfinance가 일부 `.KQ`에 404, best-effort 빈 결과 graceful.
 - **discovery 저유동성 필터 라이브 행동 확인 미완**(task#68, MEMORY) — 배치 재계산 선행 필요.
 - **버그헌트 현황**: 2차(task#164) 15/15 수정 완료, 3차(task#168) 수정분 잔존 버그 0건.
+- **§17의 감사 defer 5건** — 위와 동일, 중복 기재 방지 위해 여기서는 참조만.
 
 ---
 
-## 16. Security / 접근 경계 (요약)
+## 19. Security / 접근 경계 (요약)
 
 - prod DB/컨테이너 쓰기·읽기·settings 자가권한은 에이전트 분류기가 하드 차단 — 사용자 `!` 실행
   또는 admin 엔드포인트 경유(`reference-prod-writes-need-user`).

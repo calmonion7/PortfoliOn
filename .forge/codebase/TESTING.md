@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 8e37e2ca03c09e76a31dd227d4c252f19246a11a
-mapped: 2026-07-14
+last_mapped_commit: 3aa35ba7b754566835ea9a21f7076a5f4450789a
+mapped: 2026-07-17
 ---
 
 # TESTING
@@ -13,7 +13,7 @@ PortfoliOn 테스트 프레임워크·구조·모킹·커버리지. 백엔드 py
 
 - **러너**: `cd backend && .venv/bin/python -m pytest`(macOS). Windows는 `.venv/Scripts/python`.
 - **구성 `backend/pytest.ini`**: `testpaths = tests`, `pythonpath = .`(그래서 테스트가 `from main import app`·`from routers.stocks import router`를 루트 기준 import).
-- **규모**: `backend/tests/*.py` 약 **123개 파일**, `def test_`(및 `async def test_`) 약 **1,254개**. fixture 데이터는 `backend/tests/fixtures/`(예: `backlog/`).
+- **규모**: `backend/tests/*.py` **121개 파일**(`find backend/tests -name "test_*.py" | wc -l`), `def test_`(및 `async def test_`) **1,254개**. fixture 데이터는 `backend/tests/fixtures/`(예: `backlog/`). 에디토리얼 개편(task#190~195)은 프론트 전용이라 백엔드 테스트는 3aa35ba 기준 8e37e2c 이후 무변경.
 
 ### 1.2 `conftest.py` — autouse 가드 3종
 
@@ -52,17 +52,25 @@ PortfoliOn 테스트 프레임워크·구조·모킹·커버리지. 백엔드 py
 - **구성은 `frontend/vite.config.js`의 `test` 블록**(`vite.config.js:88-91`): `environment: 'jsdom'`, `globals: true`(describe/it/expect 전역), `setupFiles: './src/test/setup.js'`. 별도 `vitest.config.*` 파일 없음.
 - **setup `frontend/src/test/setup.js`**: `import '@testing-library/jest-dom'` 한 줄(matcher 확장).
 - **의존성**: `@testing-library/react`·`@testing-library/jest-dom`·`vitest`(`package.json`).
-- **규모**: 테스트 파일 **13개**, `it()`/`test()` 약 **79개**. 위치는 두 곳 — 공통 `frontend/src/test/`(`smoke.test.js`·`sidebar.test.jsx`·`route-redirects.test.jsx`·`compare-*.test.jsx`·`recommendations-s3s4.test.jsx`·`global-search-tracked.test.jsx`) + 소스 곁(`frontend/src/hooks/*.test.js`·`frontend/src/components/**/*.test.jsx`).
+- **규모**: 테스트 파일 **13개**, `it()`/`test()` **79개**(3aa35ba 기준, 에디토리얼 개편 전후 파일·건수 불변 — 아래 §2.4 참조). 위치는 두 곳 — 공통 `frontend/src/test/`(`smoke.test.js`·`masthead.test.jsx`·`route-redirects.test.jsx`·`compare-race.test.jsx`·`compare-sector-group.test.jsx`·`recommendations-s3s4.test.jsx`·`global-search-tracked.test.jsx`) + 소스 곁(`frontend/src/hooks/usePortfolioData.test.js`·`useReportFilters.test.js`·`useStockManagement.test.js`·`frontend/src/components/PermissionPanel.test.jsx`·`frontend/src/components/reports/KeyResourceChart.test.js`·`reportUtils.test.js`).
 
 ### 2.2 모킹 패턴
 
 - **API 모듈 mock**: `vi.mock('../api', () => ({ default: { get: vi.fn(), delete: vi.fn() } }))` 후 `api.get.mockImplementation((url) => ...)`로 URL 분기 응답 반환(`usePortfolioData.test.js:4-22`). `beforeEach(() => { vi.clearAllMocks(); ... })`로 기본 응답 재설정.
 - **훅 테스트**: `renderHook(() => useXxx())` + `act`/`waitFor`(`@testing-library/react`). 상태 전이(`listLoading`·`hasFetched`·`dashboardError`)를 `await waitFor(...)`로 단언(`usePortfolioData.test.js`).
 - **Toast/useToast mock**: `vi.mock('./Toast', () => ({ useToast: () => ({ showToast: showToastMock }) }))`로 토스트 훅을 스텁(`PermissionPanel.test.jsx:8`). API mock도 같은 파일에서 `default: { get, put }` 형태로.
+- **Context mock + Provider 래핑 조합**: `masthead.test.jsx`가 전형 — `vi.mock('../contexts/AuthContext', () => ({ useAuth: () => authMock() }))`로 인증 컨텍스트를 스텁하고, `authMock.mockReturnValue({ menuPermissions, role, loading })`로 테스트별 권한 시나리오를 주입한 뒤 `<ToastProvider><MemoryRouter>{ui}</MemoryRouter></ToastProvider>`로 렌더 — 컴포넌트가 흡수한 하위 컴포넌트(`GlobalSearch`)가 `useToast()`를 쓰면 그 Provider까지 테스트 래퍼에 포함해야 한다(`masthead.test.jsx:19-22`).
 - **컴포넌트/라우팅 테스트**: `.test.jsx`에서 `@testing-library/react` render + jsdom.
 
 ### 2.3 커버리지 초점
 
 - 훅의 에러 경로(fetch reject → loading false·error state 전파)를 명시 검증(`usePortfolioData.test.js` S1/S2 케이스).
-- 라우트 리다이렉트·사이드바 필터·검색 트래킹 등 상호작용을 `frontend/src/test/`에서 통합 검증.
-- **프론트엔드 로깅 규약(§4.2)에 대응하는 자동 테스트는 없다** — eslint `no-console`이 빌드/CI에 미배선이라 마커 준수는 리뷰 의존.
+- 라우트 리다이렉트·마스트헤드 권한 필터·검색 트래킹 등 상호작용을 `frontend/src/test/`에서 통합 검증. 권한별 노출(`masthead.test.jsx`)은 `useAuth().menuPermissions`/`role`을 시나리오별로 mock해 카테고리 노출·숨김·admin 전용 링크·loading 중 미렌더를 검증한다.
+- **프론트엔드 로깅 규약(CONVENTIONS §4.2)에 대응하는 자동 테스트는 없다** — eslint `no-console`이 빌드/CI에 미배선이라 마커 준수는 리뷰 의존.
+- **모션 훅(`useReveal`/`useCountUp`, CONVENTIONS §13)에도 전용 단위테스트가 없다** — `prefers-reduced-motion` 분기·rAF 보간·IntersectionObserver 트리거는 자동 가드 없이 수동 시각 감사(캡처 매트릭스)로만 검증된다. 신규로 이 훅들의 게이트 로직(예: "첫 유효 데이터 1회" 조건)을 바꿀 때는 회귀 확인을 위한 렌더 테스트 추가를 고려할 것.
+
+### 2.4 파일 마이그레이션: `sidebar.test.jsx` → `masthead.test.jsx` (task#191, ADR-0026)
+
+- ADR-0025(터미널+좌측 사이드바)의 `Sidebar` 컴포넌트가 ADR-0026(에디토리얼+마스트헤드)에서 `frontend/src/components/Masthead.jsx`로 완전히 대체되면서, 대응 테스트도 `frontend/src/test/sidebar.test.jsx` → `frontend/src/test/masthead.test.jsx`로 1:1 리네임됐다(파일 수·구성 불변, 내용만 새 컴포넌트 대상으로 갱신).
+- 검증 골격은 계승: `describe('Masthead 권한별 카테고리 노출')` 아래 3케이스 — ① 일부 권한만 있을 때 해당 카테고리만 노출·나머지(시장/구루/설정/행동) 숨김, ② `role === 'admin'`이면 `menuPermissions`와 무관하게 관리자 링크(행동) 노출, ③ `loading` 중엔 카테고리 자체가 렌더되지 않음. `useAuth()` mock 반환값(`menuPermissions`/`role`/`loading`)을 케이스별로 바꿔가며 같은 렌더 헬퍼(`renderMasthead`)로 검증하는 패턴은 Sidebar 시절과 동일하게 유지됐다.
+- 앞으로 마스트헤드에 카테고리·권한 매핑을 추가/변경하면 이 파일이 1차 회귀 지점이다(과거 `sidebar.test.jsx`가 하던 역할을 그대로 승계).
