@@ -59,7 +59,7 @@
   background: color-mix(in oklab, var(--bg-elev) 92%, transparent);
   backdrop-filter: saturate(160%) blur(20px);
   -webkit-backdrop-filter: saturate(160%) blur(20px);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-strong);
   display: grid; grid-template-columns: repeat(5, 1fr);
   z-index: 30;
 }

@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 const BUILD_DATE = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+let swCacheBustOutDir = 'dist'
 
 export default defineConfig({
   plugins: [
@@ -62,6 +63,11 @@ export default defineConfig({
     {
       name: 'sw-cache-bust',
       apply: 'build',
+      // --outDir 빌드(throwaway 검증용)가 라이브 dist를 덮지 않도록 실제 outDir을 사용
+      // (기존 'dist' 하드코딩은 outDir 무관하게 dist/index.html을 매 빌드 오염 — task#191 발견)
+      configResolved(config) {
+        swCacheBustOutDir = config.build.outDir
+      },
       closeBundle: {
         sequential: true,
         order: 'post',
@@ -70,14 +76,14 @@ export default defineConfig({
           const path = await import('path')
 
           // index.html: registerSW.js + manifest.webmanifest 캐시 버스팅
-          const indexPath = path.resolve('dist/index.html')
+          const indexPath = path.resolve(swCacheBustOutDir, 'index.html')
           let html = fs.readFileSync(indexPath, 'utf-8')
           html = html.replace(/(registerSW\.js)/g, `$1?${BUILD_DATE}`)
           html = html.replace(/(manifest\.webmanifest)/g, `$1?${BUILD_DATE}`)
           fs.writeFileSync(indexPath, html)
 
           // registerSW.js: sw.js 캐시 버스팅
-          const swRegPath = path.resolve('dist/registerSW.js')
+          const swRegPath = path.resolve(swCacheBustOutDir, 'registerSW.js')
           let swReg = fs.readFileSync(swRegPath, 'utf-8')
           swReg = swReg.replace(/(\/sw\.js)/g, `$1?${BUILD_DATE}`)
           fs.writeFileSync(swRegPath, swReg)

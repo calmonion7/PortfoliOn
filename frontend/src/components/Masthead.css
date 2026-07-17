@@ -1,0 +1,64 @@
+/* 매거진 마스트헤드 (ADR-0026) — PC 전용, 모바일은 mobile-header 유지 */
+.masthead { display: none; }
+/* .masthead(header)의 형제로 렌더되므로(task#191 sticky containing block 수정) 별도로 모바일 숨김 필요 */
+.masthead-sticky { display: none; }
+
+@media (min-width: 769px) {
+  .masthead { display: block; background: var(--bg); }
+
+  /* 1행: 제호 + 유틸 — 신문식 이중 괘선으로 하단 마감 */
+  .masthead-row1 {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    border-bottom: 3px double var(--border-strong);
+  }
+  .masthead-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-serif); font-weight: 700; font-size: 26px; letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .masthead-mark { width: 28px; height: 28px; flex-shrink: 0; }
+  .masthead-utils { display: flex; align-items: center; gap: 8px; }
+
+  /* 2행(+3행): 카테고리 nav — 스크롤 시 상단 고정 (모달 z1000 아래, 기존 헤더 z=50 관례) */
+  .masthead-sticky {
+    display: block;
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .masthead-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px;
+  }
+  .masthead-cats { display: flex; align-items: stretch; gap: 4px; }
+  .masthead-cat {
+    display: flex; align-items: center; gap: 8px;
+    padding: 13px 14px 11px;
+    font-size: 13.5px; font-weight: 500; color: var(--text-2);
+    text-decoration: none; border-bottom: 2px solid transparent;
+  }
+  .masthead-cat:hover { color: var(--text); }
+  .masthead-cat.is-active { color: var(--text); font-weight: 600; border-bottom-color: var(--text); }
+
+  .masthead-admin { display: flex; align-items: center; gap: 4px; }
+  .masthead-admin-link {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 8px; color: var(--text-2);
+  }
+  .masthead-admin-link:hover { background: var(--accent-soft); color: var(--text); }
+  .masthead-admin-link.is-active { color: var(--text); background: var(--accent-soft); }
+
+  /* 3행: 서브바 — 활성 카테고리 하위 항목 2개 이상일 때만 */
+  .masthead-subbar {
+    display: flex; gap: 18px;
+    padding: 0 32px 10px;
+  }
+  .masthead-sublink {
+    font-size: 12.5px; color: var(--text-3);
+    text-decoration: none; padding-bottom: 3px;
+    border-bottom: 1.5px solid transparent;
+  }
+  .masthead-sublink:hover { color: var(--text-2); }
+  .masthead-sublink.is-active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+}

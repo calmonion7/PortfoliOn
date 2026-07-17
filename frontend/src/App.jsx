@@ -16,12 +16,12 @@ import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
 import LoginPage from './pages/LoginPage'
-import Sidebar from './components/Sidebar'
+import Masthead from './components/Masthead'
 import MobileNav from './components/MobileNav'
 import MobileTopActions from './components/MobileTopActions'
 import InstallPrompt from './components/InstallPrompt'
 import GlobalSearch from './components/GlobalSearch'
-import { Sun, Moon, Refresh, LogOut } from './components/ui/icons'
+import { Sun, Moon, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
 import AdminAnalytics from './pages/AdminAnalytics'
@@ -48,6 +48,58 @@ function ReportsRoute() {
     setDeepTicker(location.state?.ticker || null)
   }, [location.state])
   return <Reports initialTicker={deepTicker} />
+}
+
+// BrowserRouter 내부 셸 — location.pathname을 라우트 전환 페이드업 key로 쓰려면 Router 컨텍스트가 필요하다.
+function AppShell({ theme, setTheme, setSession }) {
+  const location = useLocation()
+  return (
+    <div className="app-pc">
+      <Masthead theme={theme} setTheme={setTheme} onLogout={() => doLogout(setSession)} />
+      <div className="app-main">
+        <header className="mobile-header">
+          <div className="brand">
+            <img src="/favicon.svg" className="brand-mark" alt="" />
+            <span className="serif">PortfoliOn</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <GlobalSearch variant="mobile" />
+            <MobileTopActions />
+            <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
+              {theme === 'dark' ? <Sun /> : <Moon />}
+            </button>
+            <button className="icon-btn" title="로그아웃" onClick={() => doLogout(setSession)}><LogOut /></button>
+          </div>
+        </header>
+        <main className="page-wrap">
+          <div key={location.pathname} className="anim-fade-up">
+            <InstallPrompt />
+            <Routes>
+              <Route path="/" element={<Navigate to="/reports" replace />} />
+              <Route path="/research" element={<Navigate to="/reports" replace />} />
+              <Route path="/reports" element={<ResearchShell><ReportsRoute /></ResearchShell>} />
+              <Route path="/recommend" element={<ResearchShell><Recommendations /></ResearchShell>} />
+              <Route path="/ranking" element={<ResearchShell><Ranking /></ResearchShell>} />
+              <Route path="/compare" element={<ResearchShell><Compare /></ResearchShell>} />
+              <Route path="/calendar" element={<ResearchShell><Calendar /></ResearchShell>} />
+              <Route path="/dividends" element={<ResearchShell><Dividends /></ResearchShell>} />
+              <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/market" element={<Navigate to="/market/indicators" replace />} />
+              <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
+              <Route path="/market/flow" element={<MarketHub tab="flow" />} />
+              <Route path="/analysis" element={<Navigate to="/portfolio" replace />} />
+              <Route path="/guru" element={<Guru />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/admin-analytics" element={<AdminAnalytics />} />
+              <Route path="/dev/showcase" element={<Showcase />} />
+            </Routes>
+          </div>
+        </main>
+        <MobileNav />
+      </div>
+    </div>
+  )
 }
 
 export default function App() {
@@ -109,57 +161,7 @@ export default function App() {
     <ToastProvider>
     <AuthProvider isLoggedIn={!!session}>
     <BrowserRouter>
-      <div className="app-pc">
-        <Sidebar />
-        <div className="app-main">
-          <div className="util-bar">
-            <GlobalSearch variant="desktop" />
-            <button className="icon-btn" title="새로고침" onClick={() => window.location.reload()}><Refresh /></button>
-            <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
-              {theme === 'dark' ? <Sun /> : <Moon />}
-            </button>
-            <button className="icon-btn" title="로그아웃" onClick={() => doLogout(setSession)}><LogOut /></button>
-          </div>
-          <header className="mobile-header">
-            <div className="brand">
-              <img src="/favicon.svg" className="brand-mark" alt="" />
-              <span>PortfoliOn</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <GlobalSearch variant="mobile" />
-              <MobileTopActions />
-              <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="테마">
-                {theme === 'dark' ? <Sun /> : <Moon />}
-              </button>
-              <button className="icon-btn" title="로그아웃" onClick={() => doLogout(setSession)}><LogOut /></button>
-            </div>
-          </header>
-          <main className="page-wrap">
-            <InstallPrompt />
-            <Routes>
-              <Route path="/" element={<Navigate to="/reports" replace />} />
-              <Route path="/research" element={<Navigate to="/reports" replace />} />
-              <Route path="/reports" element={<ResearchShell><ReportsRoute /></ResearchShell>} />
-              <Route path="/recommend" element={<ResearchShell><Recommendations /></ResearchShell>} />
-              <Route path="/ranking" element={<ResearchShell><Ranking /></ResearchShell>} />
-              <Route path="/compare" element={<ResearchShell><Compare /></ResearchShell>} />
-              <Route path="/calendar" element={<ResearchShell><Calendar /></ResearchShell>} />
-              <Route path="/dividends" element={<ResearchShell><Dividends /></ResearchShell>} />
-              <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/market" element={<Navigate to="/market/indicators" replace />} />
-              <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
-              <Route path="/market/flow" element={<MarketHub tab="flow" />} />
-              <Route path="/analysis" element={<Navigate to="/portfolio" replace />} />
-              <Route path="/guru" element={<Guru />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/admin-analytics" element={<AdminAnalytics />} />
-              <Route path="/dev/showcase" element={<Showcase />} />
-            </Routes>
-          </main>
-          <MobileNav />
-        </div>
-      </div>
+      <AppShell theme={theme} setTheme={setTheme} setSession={setSession} />
     </BrowserRouter>
     </AuthProvider>
     </ToastProvider>

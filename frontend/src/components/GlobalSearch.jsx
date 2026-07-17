@@ -9,7 +9,7 @@ import { Search } from './ui/icons'
 // 전역 종목 검색 (task#141): 어느 화면에서든 헤더에서 종목 검색 →
 //  · 추적(보유/관심) 종목  → 리포트 상세로 점프 (기존 location.state 딥링크 규약 재사용)
 //  · 미추적 종목          → 관심종목 추가 모달을 프리필로 오픈 (발굴)
-// variant='desktop'(TopNav 인라인 입력) | 'mobile'(헤더 아이콘 → 상단 시트 오버레이) | 'bar'(모바일 리서치 화면 인라인 풀폭 검색바, task#182).
+// variant='desktop'(마스트헤드 인라인 입력) | 'mobile'(헤더 아이콘 → 상단 시트 오버레이) | 'bar'(모바일 리서치 화면 인라인 풀폭 검색바, task#182).
 export default function GlobalSearch({ variant = 'desktop' }) {
   const navigate = useNavigate()
   const { showToast } = useToast()

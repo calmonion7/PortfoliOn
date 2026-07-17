@@ -2,19 +2,10 @@
    PC-specific styles (consumes tokens.css)
    =========================================================== */
 
-/* ----- BRAND (shared: mobile-header, Sidebar) ----- */
+/* ----- BRAND (mobile-header) ----- */
 .brand { display:flex; align-items:center; gap: 10px; font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; }
 .brand-mark { width: 22px; height: 22px; flex-shrink: 0; }
 
-/* ----- UTIL BAR (PC — sits above page content, sidebar owns primary nav) ----- */
-/* Solid bg-elev + hairline border to match the sidebar's terminal panel language (ADR-0025 2/5 follow-up) */
-.util-bar {
-  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
-  padding: 13px 32px;
-  position: sticky; top: 0; z-index: 20;
-  background: var(--bg-elev);
-  border-bottom: 1px solid var(--border);
-}
 .icon-btn {
   position: relative;
   width: 32px; height: 32px; border-radius: 8px;
@@ -54,7 +45,8 @@
 .ghost-btn:hover { color: var(--text); background: var(--accent-soft); }
 
 /* ----- LAYOUT ----- */
-.app-pc { display: flex; min-height: 100vh; }
+/* 마스트헤드(위) + 본문(아래) 세로 흐름 (ADR-0026, 좌측 사이드바 폐지) */
+.app-pc { display: flex; flex-direction: column; min-height: 100vh; }
 .app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .page { max-width: 1440px; margin: 0 auto; padding: 28px 32px 80px; }
 
@@ -313,7 +305,7 @@
   padding-bottom: 6px;
   margin-bottom: 4px;
   align-items: center;
-  position: sticky; top: 60px; z-index: 10; background: var(--bg);
+  position: sticky; top: 80px; z-index: 10; background: var(--bg);
 }
 .card-list-header > span { padding: 0 12px; }
 .card-list-header small { font-size: 9px; opacity: 0.7; }

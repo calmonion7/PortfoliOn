@@ -9,7 +9,6 @@
 }
 
 @media (max-width: 768px) {
-  .util-bar { display: none; }
   .page-wrap { padding-bottom: 80px; min-height: 100vh; }
   .login-wrap { grid-template-columns: 1fr; }
   .login-art { display: none; }
@@ -75,4 +74,5 @@
        그래야 헤더 안의 드롭다운(.more-pop)이 갇힌 stacking context 천장을 넘어 탭 위로 뜬다 (task#188) */
     position: sticky; top: 0; z-index: 50;
   }
+  .mobile-header .brand span { font-weight: 700; }
 }
