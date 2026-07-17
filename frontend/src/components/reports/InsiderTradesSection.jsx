@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import InsiderBadge from '../ui/InsiderBadge'
+import { SectionTitle } from './reportUtils.jsx'
 
 // 종목 내부자 지분공시 신호 + 거래 목록 (DART). KR 전용.
 // GET /api/report/{ticker}/insider-trades →
@@ -59,7 +60,7 @@ export default function InsiderTradesSection({ ticker, market }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>👤 내부자 지분공시 (DART)</div>
+      <SectionTitle>👤 내부자 지분공시 (DART)</SectionTitle>
       {error ? (
         <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>내부자 공시를 불러오지 못했습니다.</p>
       ) : data === null ? (

@@ -18,6 +18,7 @@ import TickerListItem from '../components/reports/TickerListItem'
 import ReportFilters from '../components/reports/ReportFilters'
 import ReportDetailHeader from '../components/reports/ReportDetailHeader'
 import { trackEvent } from '../utils/analytics'
+import { SketchEmpty } from '../components/sketches'
 
 
 
@@ -173,7 +174,7 @@ export default function Reports({ initialTicker = null }) {
             ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>리포트 없음</p>
             : null
         }
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {!(activeTab === 'others' ? othersLoading : listLoading) && activeEntries.map(([t, info]) => (
             <TickerListItem
               key={t}
@@ -210,12 +211,13 @@ export default function Reports({ initialTicker = null }) {
           ) : (
             <>
               {activeEntries.length === 0 ? (
-                <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--text-3)' }}>
-                  <p>리포트가 없습니다.</p>
-                  {activeTab !== 'others' && <p style={{ marginTop: 8, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>}
+                <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                  <div className="sketch-draw"><SketchEmpty size={140} /></div>
+                  <p style={{ margin: 0 }}>리포트가 없습니다.</p>
+                  {activeTab !== 'others' && <p style={{ margin: 0, fontSize: 13 }}>설정 페이지에서 "지금 생성" 버튼을 눌러 첫 리포트를 만드세요.</p>}
                 </div>
               ) : (
-                <div className="stock-card-grid">
+                <div className="stock-card-grid anim-stagger">
                   <div className="card-list-header">
                     <span>종목</span>
                     <span className={`sort-col${sortCol === 'chg' ? ' active' : ''}`} onClick={() => handleSort('chg')}>현재가 / 고점{sortArrow('chg')}</span>

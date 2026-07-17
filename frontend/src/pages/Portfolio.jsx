@@ -9,6 +9,9 @@ import FlashValue from '../components/portfolio/FlashValue'
 import { fmt } from '../components/ui/icons'
 import Button from '../components/ui/Button'
 import useIsMobile from '../hooks/useIsMobile'
+import useCountUp from '../hooks/useCountUp'
+import useReveal from '../hooks/useReveal'
+import { SketchEmpty } from '../components/sketches'
 import SectorTab from './SectorTab'
 import MacroTab from './MacroTab'
 import Analytics from './Analytics'
@@ -53,23 +56,35 @@ const DashboardGrid = ({ cards, totals, loading, tick, hasHoldings, retriesExhau
   if (!cards.length) {
     // 재시도 소진 + 에러: 사용자에게 복구 수단 제공
     if (hasHoldings && retriesExhausted) return (
-      <div style={{ textAlign: 'center', padding: 40 }}>
-        <p style={{ color: 'var(--text-3)', marginBottom: 12 }}>대시보드를 불러오지 못했습니다.</p>
+      <div className="sketch-draw" style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)' }}>
+        <SketchEmpty size={96} />
+        <p style={{ margin: '12px 0' }}>대시보드를 불러오지 못했습니다.</p>
         <Button variant="secondary" size="sm" onClick={onRetry}>다시 시도</Button>
       </div>
     )
     // 헤더 N ↔ 그리드 빈 모순 제거(task#102): 재시도 중엔 Skeleton
     if (hasHoldings) return <Skeleton variant="card" count={6} />
-    return <p style={{ color: 'var(--text-3)', textAlign: 'center', padding: 40 }}>보유 종목이 없습니다. 리서치 탭에서 종목을 추가해 보세요.</p>
+    return (
+      <div className="sketch-draw" style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)' }}>
+        <SketchEmpty size={96} />
+        <p style={{ margin: '12px 0 0' }}>보유 종목이 없습니다. 리서치 탭에서 종목을 추가해 보세요.</p>
+      </div>
+    )
   }
   return (
     <>
       <DividendSummary totals={totals} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, padding: '4px 0' }}>
+      <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, padding: '4px 0' }}>
         {cards.map(item => <DashboardCard key={item.ticker} item={item} tick={tick} />)}
       </div>
     </>
   )
+}
+
+// 분석 탭 섹션 진입 모션: 탭 전환마다(key로 리마운트) useReveal이 새로 발화해 페이드업.
+const RevealSection = ({ children }) => {
+  const ref = useReveal()
+  return <div ref={ref} className="reveal">{children}</div>
 }
 
 export default function Portfolio() {
@@ -77,7 +92,7 @@ export default function Portfolio() {
   const [tab, setTab] = useState('dash')
   const [analysisTab, setAnalysisTab] = useState('sector')
 
-  const { stocks, watchlist, dashboardCards, dashboardTotals, dashboardLoading, fx, priceTick, lastUpdated, fetchDashboard } = usePortfolioData()
+  const { stocks, watchlist, hasFetched, dashboardCards, dashboardTotals, dashboardLoading, fx, priceTick, lastUpdated, fetchDashboard } = usePortfolioData()
 
   // heal 카운터는 state(렌더-reactive): ref이면 소진 판정이 dashboardError 갱신 타이밍에 결합돼
   // 에러카드가 누락될 수 있고(리뷰 major), 리셋만으로는 effect가 재발화하지 않는다.
@@ -105,6 +120,13 @@ export default function Portfolio() {
   const totalPnlPct = totalPnl != null && totalCost > 0 ? totalPnl / totalCost * 100 : null
   const totalValueUsd = stocks.length > 0 ? (totalValue ?? totalCost) / fx : null
 
+  // 헤더 totals 카운트업: 마운트 후 첫 유효값에서 1회만 0→값 보간(useCountUp 내부 가드), 이후 값 갱신은 즉시 반영.
+  // FlashValue의 value/tick은 그대로 실값을 받아 폴링 플래시를 담당 — children 표시만 카운트업 값으로 교체(책임 분리).
+  // fetch 완료 전(stocks=[])엔 totalCost가 진짜 0이 아니라 placeholder라 null로 넘겨 one-shot 플래그가
+  // 조용히 소진되는 것을 막는다(hasFetched 이후 첫 값에서만 애니메이션 발화).
+  const animatedTotalValue = useCountUp(hasFetched ? (totalValue ?? totalCost) : null)
+  const animatedTotalPnl = useCountUp(totalPnl)
+
   if (isMobile) return (
     <>
       <header className="appbar">
@@ -113,10 +135,10 @@ export default function Portfolio() {
 
       <div className="hero">
         <div className="label">{totalValue != null ? '평가금액' : '투자 원가'} · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} · {krFreshnessLabel()}</div>
-        <FlashValue as="div" className="val tnum mono" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(totalValue ?? totalCost)}</FlashValue>
+        <FlashValue as="div" className="val tnum mono" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(animatedTotalValue)}</FlashValue>
         {totalPnl != null ? (
           <div className={`delta tnum mono ${totalPnl >= 0 ? 'up' : 'down'}`}>
-            {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
+            {animatedTotalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(animatedTotalPnl), 0)}
             {totalPnlPct != null && <span style={{ marginLeft: 6, fontSize: 13 }}>({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>}
           </div>
         ) : (
@@ -161,11 +183,13 @@ export default function Portfolio() {
             </div>
           </div>
           <div className="m-page">
-            {analysisTab === 'sector' && <SectorTab />}
-            {analysisTab === 'macro' && <MacroTab />}
-            {analysisTab === 'correlation' && <Analytics />}
-            {analysisTab === 'rebalance' && <RebalanceTab />}
-            {analysisTab === 'exposure' && <ExposureTab />}
+            <RevealSection key={analysisTab}>
+              {analysisTab === 'sector' && <SectorTab />}
+              {analysisTab === 'macro' && <MacroTab />}
+              {analysisTab === 'correlation' && <Analytics />}
+              {analysisTab === 'rebalance' && <RebalanceTab />}
+              {analysisTab === 'exposure' && <ExposureTab />}
+            </RevealSection>
           </div>
         </>
       )}
@@ -185,10 +209,10 @@ export default function Portfolio() {
       <div className="kpi-row">
         <div className="kpi">
           <div className="label">{totalValue != null ? '평가금액' : '투자 원가'}</div>
-          <FlashValue as="div" className="val tnum mono" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(totalValue ?? totalCost)}</FlashValue>
+          <FlashValue as="div" className="val tnum mono" value={totalValue ?? totalCost} tick={priceTick} title={`₩${Math.round(totalValue ?? totalCost).toLocaleString('ko-KR')}`}>{fmtKrwCompact(animatedTotalValue)}</FlashValue>
           {totalPnl != null && (
             <div className={`delta tnum mono ${totalPnl >= 0 ? 'up' : 'down'}`} style={{ marginTop: 4 }}>
-              {totalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnl), 0)}
+              {animatedTotalPnl >= 0 ? '+' : ''}₩{fmt(Math.abs(animatedTotalPnl), 0)}
               {totalPnlPct != null && <span style={{ marginLeft: 5, fontSize: 12 }}>({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>}
             </div>
           )}
@@ -256,11 +280,13 @@ export default function Portfolio() {
             <button className={analysisTab === 'rebalance' ? 'is-active' : ''} onClick={() => setAnalysisTab('rebalance')}>리밸런싱</button>
             <button className={analysisTab === 'exposure' ? 'is-active' : ''} onClick={() => setAnalysisTab('exposure')}>노출</button>
           </div>
-          {analysisTab === 'sector' && <SectorTab />}
-          {analysisTab === 'macro' && <MacroTab />}
-          {analysisTab === 'correlation' && <Analytics />}
-          {analysisTab === 'rebalance' && <RebalanceTab />}
-          {analysisTab === 'exposure' && <ExposureTab />}
+          <RevealSection key={analysisTab}>
+            {analysisTab === 'sector' && <SectorTab />}
+            {analysisTab === 'macro' && <MacroTab />}
+            {analysisTab === 'correlation' && <Analytics />}
+            {analysisTab === 'rebalance' && <RebalanceTab />}
+            {analysisTab === 'exposure' && <ExposureTab />}
+          </RevealSection>
         </div>
       )}
     </div>

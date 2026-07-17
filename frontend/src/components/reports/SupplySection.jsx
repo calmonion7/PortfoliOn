@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import SupplyBadge from '../ui/SupplyBadge'
 import Badge from '../ui/Badge'
+import { SectionTitle } from './reportUtils.jsx'
 
 // 수급 종합 스코어 헤더 (밴드 + 근거 플래그 칩). KR 전용 — 기술·수급 탭 상단에서
 // InvestorTrendSection/ShortSellSection 위에 렌더. SupplyBadge가 band 표시 매핑을 단독 소유(중복 금지).
@@ -21,12 +22,11 @@ export default function SupplySection({ ticker }) {
   if (!score) return null
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>수급 종합</span>
+    <SectionTitle right={<>
       <SupplyBadge band={score.band} />
       {(score.flags || []).map((flag, i) => (
         <Badge key={i} variant="neutral">{flag}</Badge>
       ))}
-    </div>
+    </>}>수급 종합</SectionTitle>
   )
 }

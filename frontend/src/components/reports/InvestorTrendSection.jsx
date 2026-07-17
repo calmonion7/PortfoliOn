@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import api from '../../api'
 import { krFmt } from '../market/marketUtils.jsx'
+import { SectionTitle } from './reportUtils.jsx'
 
 // 종목 수급 추이 차트 (외국인/기관/개인 누적 순매수 + 외국인 보유율). KR 전용.
 // 랭킹 모달과 리포트 상세에서 공유.
@@ -36,7 +37,7 @@ export default function InvestorTrendSection({ ticker }) {
 
   return (
     <div style={{ marginTop: 18 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>수급 추이</div>
+      <SectionTitle>수급 추이</SectionTitle>
       {error ? (
         <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>수급 추이를 불러오지 못했습니다.</p>
       ) : data === null ? (

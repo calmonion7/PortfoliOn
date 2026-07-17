@@ -6,6 +6,8 @@ import FinancialsChart from './FinancialsChart'
 import BacklogChart from './BacklogChart'
 import api from '../../api'
 import useIsMobile from '../../hooks/useIsMobile'
+import { SketchArrowUp } from '../sketches'
+import './ReportDetail.css'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly = false }) {
   const isMobile = useIsMobile()
@@ -374,7 +376,7 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
   const activeRow = available.find(r => r.key === activeTf)
   return (
     <div style={{ marginBottom: 16, background: 'var(--bg-elev)', borderRadius: 6, padding: '10px 12px' }}>
-      <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>🎯 RSI 예상 타점</div>
+      <SectionTitle>🎯 RSI 예상 타점</SectionTitle>
       {available.length > 0 && (
         <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
           {available.map(({ key, label }) => (
@@ -460,8 +462,9 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
           {gap != null && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <span style={{ color: 'var(--text-3)', fontSize: 9 }}>상승여력</span>
-              <span className="mono tnum" style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? 'var(--up)' : 'var(--down)' }}>
+              <span className="mono tnum" style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? 'var(--up)' : 'var(--down)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                 {gap >= 0 ? '+' : ''}{gap.toFixed(1)}%
+                {gap >= 0 && <SketchArrowUp size={13} className="rpt-upside-mark" />}
               </span>
             </div>
           )}
@@ -582,7 +585,7 @@ export function TechnicalStats({ summary }) {
 
   return (
     <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '10px 12px', marginBottom: 16 }}>
-      <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>📐 기술적 지표</div>
+      <SectionTitle>📐 기술적 지표</SectionTitle>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
 

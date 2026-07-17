@@ -56,7 +56,7 @@ export default function DashboardCard({ item, tick }) {
   const yocClass = yoc == null ? '' : yoc >= 0 ? 'up' : 'down'
 
   return (
-    <Card>
+    <Card className="anim-fade-up">
       <div className="dashcard__header">
         {weather && <span className="dashcard__weather" title={weather.label}>{weather.icon}</span>}
         <strong className="dashcard__ticker">{item.ticker}</strong>

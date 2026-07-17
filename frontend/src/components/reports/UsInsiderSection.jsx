@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
+import { SectionTitle } from './reportUtils.jsx'
 
 // US 종목 내부자 거래 (SEC Form4). 기술·수급 탭 US 브랜치.
 // GET /api/report/{ticker}/us-insider →
@@ -90,7 +91,7 @@ export default function UsInsiderSection({ ticker, market }) {
       {/* 6개월 순매수 요약 */}
       {hasNet && (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>내부자 거래 (6개월 순매수)</div>
+          <SectionTitle>내부자 거래 (6개월 순매수)</SectionTitle>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {net.net_shares != null && (
               <div style={STAT}>
@@ -125,7 +126,7 @@ export default function UsInsiderSection({ ticker, market }) {
       {/* 최근 내부자 거래 목록 */}
       {hasTx && (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>최근 내부자 거래 (Form 4)</div>
+          <SectionTitle>최근 내부자 거래 (Form 4)</SectionTitle>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>

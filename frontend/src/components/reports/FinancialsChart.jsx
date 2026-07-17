@@ -337,9 +337,9 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
         {data.some(d => d.operating_margin != null || d.net_margin != null || d.roe != null) && (
           <div style={{ marginTop: 12 }}>
             <Legend items={[
-              { color: '#6ea8a0', label: '영업이익률' },
-              { color: '#a06ea8', label: '순이익률' },
-              { color: '#a8906e', label: 'ROE' },
+              { color: 'var(--data-1)', label: '영업이익률' },
+              { color: 'var(--data-5)', label: '순이익률' },
+              { color: 'var(--data-3)', label: 'ROE' },
             ]} />
             <ResponsiveContainer width="100%" height={140}>
               <LineChart data={data} margin={chartMargin}>
@@ -348,9 +348,9 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
                 <YAxis tickFormatter={v => `${v}%`} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
                 <Tooltip content={makeTooltip(false)} />
                 <ReferenceLine y={0} stroke="var(--border)" />
-                <Line {...lineCfg} dataKey="operating_margin" name="영업이익률" stroke="#6ea8a0" />
-                <Line {...lineCfg} dataKey="net_margin"       name="순이익률"   stroke="#a06ea8" />
-                <Line {...lineCfg} dataKey="roe"              name="ROE"        stroke="#a8906e" />
+                <Line {...lineCfg} dataKey="operating_margin" name="영업이익률" stroke="var(--data-1)" />
+                <Line {...lineCfg} dataKey="net_margin"       name="순이익률"   stroke="var(--data-5)" />
+                <Line {...lineCfg} dataKey="roe"              name="ROE"        stroke="var(--data-3)" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -360,8 +360,8 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
         {data.some(d => d.debt_ratio != null || d.quick_ratio != null) && (
           <div style={{ marginTop: 12 }}>
             <Legend items={[
-              { color: '#a07070', label: '부채비율' },
-              { color: '#70a0a8', label: '당좌비율' },
+              { color: 'var(--warn)', label: '부채비율' },
+              { color: 'var(--data-2)', label: '당좌비율' },
             ]} />
             <ResponsiveContainer width="100%" height={140}>
               <LineChart data={data} margin={chartMargin}>
@@ -370,8 +370,8 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
                 <YAxis tickFormatter={v => `${v}%`} tick={axisStyle} axisLine={false} tickLine={false} width={42} />
                 <Tooltip content={makeTooltip(false)} />
                 <ReferenceLine y={0} stroke="var(--border)" />
-                <Line {...lineCfg} dataKey="debt_ratio"  name="부채비율" stroke="#a07070" />
-                <Line {...lineCfg} dataKey="quick_ratio" name="당좌비율" stroke="#70a0a8" />
+                <Line {...lineCfg} dataKey="debt_ratio"  name="부채비율" stroke="var(--warn)" />
+                <Line {...lineCfg} dataKey="quick_ratio" name="당좌비율" stroke="var(--data-2)" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -383,8 +383,8 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
           return (
             <div style={{ marginTop: 12 }}>
               <Legend items={[
-                { color: '#7ea8c4', label: 'FCF' },
-                ...(hasCoverage ? [{ color: '#c4a87e', label: '이자보상배율' }] : []),
+                { color: 'var(--data-2)', label: 'FCF' },
+                ...(hasCoverage ? [{ color: 'var(--data-3)', label: '이자보상배율' }] : []),
               ]} />
               <ResponsiveContainer width="100%" height={150}>
                 <ComposedChart data={data} margin={chartMargin}>
@@ -410,9 +410,9 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
                     )
                   }} />
                   <ReferenceLine yAxisId="left" y={0} stroke="var(--border)" />
-                  <Bar dataKey="fcf" yAxisId="left" name="FCF" fill="#7ea8c4" opacity={0.75} radius={[2,2,0,0]} />
+                  <Bar dataKey="fcf" yAxisId="left" name="FCF" fill="var(--data-2)" opacity={0.75} radius={[2,2,0,0]} />
                   {hasCoverage && (
-                    <Line {...lineCfg} dataKey="coverage" yAxisId="right" name="이자보상배율" stroke="#c4a87e" strokeDasharray="5 3" />
+                    <Line {...lineCfg} dataKey="coverage" yAxisId="right" name="이자보상배율" stroke="var(--data-3)" strokeDasharray="5 3" />
                   )}
                 </ComposedChart>
               </ResponsiveContainer>

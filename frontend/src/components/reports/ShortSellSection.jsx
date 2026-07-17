@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import api from '../../api'
 import { krFmt } from '../market/marketUtils.jsx'
+import { SectionTitle } from './reportUtils.jsx'
 
 // 종목 공매도 추이 차트 (거래량 막대 + 비중% 라인, 잔고·거래대금은 툴팁/헤더). KR 전용.
 // 키움 ka10014 → /api/stocks/{ticker}/short-sell. 수급 추이(InvestorTrendSection) 옆에 배치.
@@ -64,7 +65,7 @@ export default function ShortSellSection({ ticker }) {
 
   return (
     <div style={{ marginTop: 18 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>공매도 추이</div>
+      <SectionTitle>공매도 추이</SectionTitle>
       {error ? (
         <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>공매도 추이를 불러오지 못했습니다.</p>
       ) : data === null ? (

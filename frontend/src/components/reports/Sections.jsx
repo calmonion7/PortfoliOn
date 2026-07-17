@@ -1,5 +1,5 @@
 import { fmtPrice as fmt } from '../../utils'
-import { computePeerPremiums } from './reportUtils.jsx'
+import { computePeerPremiums, SectionTitle } from './reportUtils.jsx'
 import KeyResourceChart, { splitMetricsForRender } from './KeyResourceChart.jsx'
 
 function decodeHtml(str) {
@@ -13,7 +13,7 @@ export function ReportSectionText({ title, text }) {
   if (!text) return null
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{title}</div>
+      <SectionTitle>{title}</SectionTitle>
       <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}>{text}</p>
     </div>
   )
@@ -36,7 +36,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🏢 사업영역 & 시장순위</div>
+      <SectionTitle>🏢 사업영역 & 시장순위</SectionTitle>
       {premiums.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
           {premiums.map(({ metric, pct, discount }) => (
@@ -114,7 +114,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
 export function ReportSectionNews({ disclosures, news }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>📰 최근 공시 & 뉴스</div>
+      <SectionTitle>📰 최근 공시 & 뉴스</SectionTitle>
       {disclosures && (
         <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, margin: '0 0 10px' }}>{disclosures}</p>
       )}
@@ -157,11 +157,10 @@ export function MoatSection({ moat }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>🏰 경제적 해자</span>
+      <SectionTitle right={<>
         {moat.rating && <span style={_CHIP(rc.color)}>{rc.label}</span>}
         {moat.rating_source && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>by {moat.rating_source}</span>}
-      </div>
+      </>}>🏰 경제적 해자</SectionTitle>
       {moat.summary && <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{moat.summary}</p>}
       {moat.factors?.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -198,7 +197,7 @@ export function KeyResourceSection({ key_resource }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🔑 핵심 자원</div>
+      <SectionTitle>🔑 핵심 자원</SectionTitle>
       {key_resource.resource && (
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{key_resource.resource}</div>
       )}
@@ -269,7 +268,7 @@ export function GrowthPlanSection({ growth_plan }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>🌱 장기 성장 계획</div>
+      <SectionTitle>🌱 장기 성장 계획</SectionTitle>
       {growth_plan.strategy && (
         <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{growth_plan.strategy}</p>
       )}
@@ -306,7 +305,7 @@ export function RisksSection({ risks }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>⚠️ 리스크</div>
+      <SectionTitle>⚠️ 리스크</SectionTitle>
       {risks.factors?.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {risks.factors.map((f, i) => {
@@ -338,10 +337,9 @@ export function RecentDisclosuresSection({ disclosures, news }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>📰 최근 공시 & 뉴스</span>
-        {disclosures.period && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--bg-elev-2)', color: 'var(--text-2)' }}>{disclosures.period}</span>}
-      </div>
+      <SectionTitle right={disclosures.period && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--bg-elev-2)', color: 'var(--text-2)' }}>{disclosures.period}</span>}>
+        📰 최근 공시 & 뉴스
+      </SectionTitle>
       {disclosures.headline && (
         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.6, margin: '0 0 10px' }}>{disclosures.headline}</p>
       )}
@@ -432,10 +430,7 @@ export function InsightsSection({ insights }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>🎯 권고 인사이트</span>
-        {insights.stance && <span style={_CHIP(sc.color)}>{sc.label}</span>}
-      </div>
+      <SectionTitle right={insights.stance && <span style={_CHIP(sc.color)}>{sc.label}</span>}>🎯 권고 인사이트</SectionTitle>
       {insights.one_liner && (
         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{insights.one_liner}</p>
       )}

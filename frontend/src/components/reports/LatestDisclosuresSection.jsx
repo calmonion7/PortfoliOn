@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
+import { SectionTitle } from './reportUtils.jsx'
 
 // 종목 최신 공시 목록 (DART, 최신순). KR 전용.
 // GET /api/report/{ticker}/disclosures → [{rcept_dt, report_nm, pblntf_ty, rcept_no, corp_name, dart_url}]
@@ -39,7 +40,7 @@ export default function LatestDisclosuresSection({ ticker, market }) {
   // 공시 없음/에러는 graceful: 헤더 + 짧은 안내만.
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>📑 최신 공시 (DART)</div>
+      <SectionTitle>📑 최신 공시 (DART)</SectionTitle>
       {error ? (
         <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>공시를 불러오지 못했습니다.</p>
       ) : data === null ? (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
+import { SectionTitle } from './reportUtils.jsx'
 
 // US 13F 구루(운용역) 보유 드릴다운. 기술·수급 탭 US 브랜치.
 // GET /api/guru/managers → managers[].top10[].{ ticker, weight_pct, name, rank }
@@ -58,7 +59,7 @@ export default function GuruHoldersSection({ ticker, market }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 18 }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>보유 구루 (13F)</div>
+      <SectionTitle>보유 구루 (13F)</SectionTitle>
 
       {/* 요약 통계 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

@@ -61,7 +61,7 @@ export default function ReportDetailTabs({
       {!loading && detailTab === 'summary' && (
         summary
           ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="anim-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <InsightsSection insights={summary.insights} />
               <ConsensusSummary summary={summary} ticker={ticker} onRefreshSuccess={onConsensusRefresh} />
               <VolumeRsiSnapshot summary={summary} chartOnly />
@@ -72,7 +72,7 @@ export default function ReportDetailTabs({
       {!loading && detailTab === 'analysis' && (
         summary
           ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="anim-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {/* 하위 탭 바 — 메인 탭과 동일한 언어(.tab-btn.sm, 작은 변형)로 구분. ETF는 기술·수급만이라 숨김 */}
               {!isEtf && (
               <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', alignSelf: 'stretch' }}>
@@ -141,7 +141,7 @@ export default function ReportDetailTabs({
       {!loading && detailTab === 'report' && (
         summary
           ? (
-            <div style={{ padding: '0 4px' }}>
+            <div className="anim-fade-up" style={{ padding: '0 4px' }}>
               {enrichedAt && (
                 <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>✓</span>

@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import { Spark, Sig, sparkFor, fmt } from '../components/ui/icons'
 import InsiderBadge from '../components/ui/InsiderBadge'
 import useIsMobile from '../hooks/useIsMobile'
+import { SketchEmpty, SketchError } from '../components/sketches'
 
 function decodeHtml(str) {
   if (!str) return str
@@ -15,7 +16,7 @@ function decodeHtml(str) {
 
 function StockRow({ s }) {
   return (
-    <div className="digest-row">
+    <div className="digest-row anim-fade-up">
       <div>
         <span className="tick">{s.ticker}</span>
         {s.name && s.name !== s.ticker && (
@@ -94,7 +95,7 @@ export default function Digest() {
         </Button>
       </div>
 
-      {error && <div style={{ color: 'var(--color-error)', marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      {error && digest && <div style={{ color: 'var(--color-error)', marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
       {loading ? (
         <>
@@ -103,9 +104,15 @@ export default function Digest() {
           </div>
           <Skeleton variant="row" count={6} />
         </>
+      ) : !digest && error ? (
+        <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchError size={140} /></div>
+          <div className="muted" style={{ fontSize: 14 }}>{error}</div>
+          <Button variant="secondary" onClick={handleRefresh} loading={refreshing}>다시 시도</Button>
+        </div>
       ) : !digest ? (
         <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <div style={{ fontSize: 40, lineHeight: 1 }}>📰</div>
+          <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
           <div className="muted" style={{ fontSize: 14 }}>아직 생성된 다이제스트가 없습니다.</div>
           <Button variant="primary" onClick={handleRefresh} loading={refreshing}>
             {refreshing ? '생성 중…' : '다이제스트 생성'}
@@ -230,7 +237,7 @@ export default function Digest() {
               <div className="muted" style={{ fontSize: 11, marginBottom: 6, paddingLeft: 2, display: 'flex', justifyContent: 'space-between' }}>
                 <span>보유종목</span><span>전일대비</span>
               </div>
-              <div className="digest-list" style={{ marginBottom: watchlist.length > 0 ? 16 : 0 }}>
+              <div className="digest-list anim-stagger" style={{ marginBottom: watchlist.length > 0 ? 16 : 0 }}>
                 {holdings.map(s => <StockRow key={s.ticker} s={s} />)}
               </div>
             </>
@@ -242,7 +249,7 @@ export default function Digest() {
               <div className="muted" style={{ fontSize: 11, marginBottom: 6, paddingLeft: 2, display: 'flex', justifyContent: 'space-between' }}>
                 <span>관심종목</span><span>전일대비</span>
               </div>
-              <div className="digest-list">
+              <div className="digest-list anim-stagger">
                 {watchlist.map(s => <StockRow key={s.ticker} s={s} />)}
               </div>
             </>

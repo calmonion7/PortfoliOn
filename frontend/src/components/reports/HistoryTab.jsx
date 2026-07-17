@@ -51,7 +51,7 @@ export default function HistoryTab({ ticker, market }) {
   const snapDates = history.filter(h => h.has_snapshot)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="anim-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* 트렌드 섹션 */}
       <div>
         <div style={{ display: 'flex', gap: 0, marginBottom: 12 }}>

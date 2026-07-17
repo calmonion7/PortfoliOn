@@ -10,6 +10,7 @@ import { useToast } from '../components/Toast'
 import { trackEvent } from '../utils/analytics'
 import ReportDetailTabs from '../components/reports/ReportDetailTabs'
 import useIsMobile from '../hooks/useIsMobile'
+import { SketchEmpty, SketchError } from '../components/sketches'
 
 const LIMIT = 20
 
@@ -272,6 +273,7 @@ export default function Ranking() {
     <Card
       hover
       padding="sm"
+      className="anim-fade-up"
       onClick={() => onRowClick(row)}
       style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
     >
@@ -319,7 +321,7 @@ export default function Ranking() {
       </div>
 
       {/* 카드 그리드 — PC 멀티컬럼/모바일 1~2열 자동 줄바꿈, 모든 카드 동일 크기 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+      <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
         {isSupply ? items.map((row, i) => (
           <RankCard key={`${row.ticker}-${i}`} rank={i + 1} row={row}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
@@ -349,11 +351,17 @@ export default function Ranking() {
       {loading && items.length > 0 && <LoadingSpinner label="불러오는 중입니다." size={20} style={{ padding: 24 }} />}
 
       {!loading && error && (
-        <div style={{ textAlign: 'center', color: 'var(--color-error)', fontSize: 13, padding: 32 }}>랭킹을 불러오지 못했습니다.</div>
+        <div style={{ textAlign: 'center', padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+          <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchError size={140} /></div>
+          <span style={{ color: 'var(--color-error)', fontSize: 13 }}>랭킹을 불러오지 못했습니다.</span>
+        </div>
       )}
 
       {!loading && !error && items.length === 0 && (
-        <div style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 13, padding: 32 }}>표시할 랭킹이 없습니다.</div>
+        <div style={{ textAlign: 'center', padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+          <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
+          <span style={{ color: 'var(--text-3)', fontSize: 13 }}>표시할 랭킹이 없습니다.</span>
+        </div>
       )}
 
       {/* 무한 스크롤 센티넬 */}

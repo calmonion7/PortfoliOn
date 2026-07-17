@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
+import { SectionTitle } from './reportUtils.jsx'
 
 // US 종목 수급 — 공매도 비중 + 기관 보유 상위. 기술·수급 탭 US 브랜치.
 // GET /api/report/{ticker}/us-supply → { short, institutional, fetched_at }
@@ -72,7 +73,7 @@ export default function UsSupplySection({ ticker, market }) {
       {/* 공매도 통계 */}
       {hasShort && (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>공매도 통계</div>
+          <SectionTitle>공매도 통계</SectionTitle>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {short.short_pct_float != null && (
               <div style={STAT}>
@@ -105,7 +106,7 @@ export default function UsSupplySection({ ticker, market }) {
       {/* 기관 보유 상위 */}
       {hasInst && (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>기관 보유 상위</div>
+          <SectionTitle>기관 보유 상위</SectionTitle>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>

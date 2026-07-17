@@ -1,0 +1,17 @@
+/* 리포트 상세 에디토리얼 표제 스타일 — 세리프 헤드라인 + 잉크 언더라인 장식 (task#192 S2) */
+
+.rpt-title { margin-bottom: 10px; }
+.rpt-title__row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.rpt-title__text {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: var(--accent);
+}
+.rpt-title__weather { font-size: 14px; line-height: 1; }
+.rpt-title__underline { display: block; color: var(--border-strong); margin-top: 2px; }
+
+/* 핵심 지표 강조 마크(1~2곳) — 데이터 값 옆의 절제된 손글씨 악센트 */
+.rpt-price-mark { color: var(--accent); opacity: 0.55; flex-shrink: 0; }
+.rpt-upside-mark { color: var(--up); flex-shrink: 0; }

@@ -5,6 +5,7 @@ import RecCard from '../components/recommendations/RecCard'
 import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
 import { useToast } from '../components/Toast'
+import { SketchEmpty, SketchError } from '../components/sketches'
 
 // 보유 액션 배지 색 — ⚠️ 가격 토큰(success=빨/danger=파, ADR-0015) 금지.
 // RecCard의 FLAG_STYLE처럼 전용색을 inline으로 직접 박는다(가격 방향 아님).
@@ -43,7 +44,7 @@ function ExpandableGrid({ items, gridStyle, initial = 6, step = 12, renderItem }
   const remaining = items.length - count
   return (
     <>
-      <div style={gridStyle}>{shown.map(renderItem)}</div>
+      <div className="anim-stagger" style={gridStyle}>{shown.map(renderItem)}</div>
       {remaining > 0 && (
         <button
           className="btn"
@@ -152,11 +153,17 @@ export default function Recommendations() {
   )
 
   if (error) return (
-    <div style={{ textAlign: 'center', color: 'var(--color-error)', fontSize: 13, padding: 32 }}>추천 종목을 불러오지 못했습니다.</div>
+    <div style={{ textAlign: 'center', padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchError size={140} /></div>
+      <span style={{ color: 'var(--color-error)', fontSize: 13 }}>추천 종목을 불러오지 못했습니다.</span>
+    </div>
   )
 
   if (items.length === 0 && watchlist.length === 0 && holdings.length === 0) return (
-    <div style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 13, padding: 32 }}>추천 종목이 없습니다.</div>
+    <div style={{ textAlign: 'center', padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
+      <span style={{ color: 'var(--text-3)', fontSize: 13 }}>추천 종목이 없습니다.</span>
+    </div>
   )
 
   // 카드 그리드 — Ranking.jsx 관례(auto-fill minmax 260px, gap 10)
@@ -173,7 +180,7 @@ export default function Recommendations() {
         <div style={{ marginBottom: 28 }}>
           <h3 style={{ color: 'var(--text)', marginBottom: 2 }}>보유 액션</h3>
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8 }}>내 보유종목 · 추매/익절/홀딩 신호</div>
-          <div style={gridStyle}>
+          <div className="anim-stagger" style={gridStyle}>
             {holdings.map((item, i) => {
               const pnl = item.pnl_pct
               const weight = item.weight_pct
@@ -183,6 +190,7 @@ export default function Recommendations() {
               return (
                 <RecCard
                   key={`${item.ticker}-${i}`}
+                  className="anim-fade-up"
                   item={item}
                   guruCount={guruCountFor(item.ticker)}
                   footer={
@@ -211,6 +219,7 @@ export default function Recommendations() {
             renderItem={(item, i) => (
               <RecCard
                 key={`${item.ticker}-${i}`}
+                className="anim-fade-up"
                 item={item}
                 guruCount={guruCountFor(item.ticker)}
                 footer={item.enriched === true
@@ -263,6 +272,7 @@ export default function Recommendations() {
                   return (
                     <RecCard
                       key={`${item.ticker}-${i}`}
+                      className="anim-fade-up"
                       item={item}
                       guruCount={guruCountFor(item.ticker)}
                       footer={

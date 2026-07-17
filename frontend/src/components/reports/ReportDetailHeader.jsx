@@ -1,5 +1,7 @@
 import { fmtPrice as fmt } from '../../utils'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
+import { SketchCircleMark } from '../sketches'
+import './ReportDetail.css'
 
 // 섹터·PER·PBR·PSR·EV/EBITDA 메타 칩 — 4곳이 byte-identical 스타일을 반복하던 것을 로컬 헬퍼로 정리(같은 파일 내, 신규 모듈 아님).
 const MetaChip = ({ children }) => (
@@ -10,7 +12,7 @@ export default function ReportDetailHeader({
   detail, selected, setSelected, setView, isAdmin, generating, genProgress, generateOne, guruMap, reportList,
 }) {
   return (
-    <div className="detail-header" style={{ marginBottom: 16 }}>
+    <div className="detail-header" style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
       {/* 행1: 네비 버튼 */}
       <div className="detail-header-nav">
         <button
@@ -32,7 +34,7 @@ export default function ReportDetailHeader({
       </div>
       {/* 행2: 종목명 + 뱃지 */}
       <div className="detail-header-title">
-        <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 17 }}>
+        <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 18, fontFamily: 'var(--font-serif)' }}>
           {detail.summary?.name || selected.ticker}
         </span>
         <span className="mono" style={{ color: 'var(--text-3)', fontSize: 13, marginLeft: 6 }}>({selected.ticker})</span>
@@ -60,8 +62,11 @@ export default function ReportDetailHeader({
           <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12 }}>{selected.date}</span>
         )}
         {detail.summary?.price != null && (
-          <span className="mono tnum" style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700 }}>
-            {fmt(detail.summary.price, detail.summary.market)}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <SketchCircleMark size={18} className="rpt-price-mark" />
+            <span className="mono tnum" style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700 }}>
+              {fmt(detail.summary.price, detail.summary.market)}
+            </span>
           </span>
         )}
         {detail.summary?.drop_from_high_20d != null && (

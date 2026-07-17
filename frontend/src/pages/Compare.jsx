@@ -4,6 +4,7 @@ import usePortfolioData from '../hooks/usePortfolioData'
 import useReportList from '../hooks/useReportList'
 import Skeleton from '../components/ui/Skeleton'
 import { fmtPrice } from '../utils'
+import { SketchEmpty, SketchError } from '../components/sketches'
 
 const MAX_SELECT = 4
 
@@ -144,11 +145,14 @@ export default function Compare() {
         {portfolioLoading || reportLoading ? (
           <Skeleton variant="row" count={4} />
         ) : candidates.length === 0 ? (
-          <p style={{ color: 'var(--text-3)', fontSize: 13 }}>보유·관심 종목이 없습니다.</p>
+          <div style={{ textAlign: 'center', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={120} /></div>
+            <span style={{ color: 'var(--text-3)', fontSize: 13 }}>보유·관심 종목이 없습니다.</span>
+          </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {groupCandidatesBySector(candidates).map(g => (
-              <div key={g.sector}>
+              <div key={g.sector} className="anim-fade-up">
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6 }}>
                   {g.sector} <span style={{ fontWeight: 400 }}>({g.rows.length})</span>
                 </div>
@@ -195,7 +199,10 @@ export default function Compare() {
       ) : loading ? (
         <Skeleton variant="row" count={6} />
       ) : error ? (
-        <p style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</p>
+        <div style={{ textAlign: 'center', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchError size={120} /></div>
+          <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</span>
+        </div>
       ) : data ? (
         // eco: .tbl-wrap/.tbl 재사용(pc.css) — 인라인 표 스타일 대체, num 정렬·행 hover 내장
         // .table-mobile-wrap 병기 — 5열(라벨+최대 4종목)이 좁은 화면에서 넘칠 때 overflow-x:auto로 스크롤 복원(.tbl-wrap 단독은 overflow:hidden)

@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
 import { fmtPrice as fmt } from '../../utils'
+import { SketchUnderline } from '../sketches'
+import './ReportDetail.css'
 
 export const TH = { padding: '6px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--text-3)', position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-elev-2)' }
 export const TD = { padding: '5px 10px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontSize: 12, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }
@@ -89,10 +91,14 @@ export const MetricCard = ({ label, value, sub, valueColor }) => (
   </div>
 )
 
-export const SectionTitle = ({ children, weather }) => (
-  <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-    <span>{children}</span>
-    {weather && <span title={weather.label} style={{ fontSize: 14, lineHeight: 1 }}>{weather.icon}</span>}
+export const SectionTitle = ({ children, weather, right }) => (
+  <div className="rpt-title">
+    <div className="rpt-title__row">
+      <span className="rpt-title__text">{children}</span>
+      {weather && <span title={weather.label} className="rpt-title__weather">{weather.icon}</span>}
+      {right}
+    </div>
+    <SketchUnderline size={64} className="rpt-title__underline" />
   </div>
 )
 

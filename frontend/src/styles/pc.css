@@ -324,10 +324,10 @@
   overflow: hidden;
   transition: box-shadow 0.15s;
 }
-.stock-card:hover { box-shadow: 0 0 0 1px var(--accent), 0 2px 10px rgba(0,0,0,0.3); }
+.stock-card:hover { box-shadow: 0 0 0 1px var(--accent), var(--shadow-md); }
 
-/* Section cells */
-.stock-card > div { padding: 10px 12px; border-right: 1px solid rgba(255,255,255,0.04); overflow: hidden; }
+/* Section cells — 잉크 hairline 구분선 (ADR-0026) */
+.stock-card > div { padding: 10px 12px; border-right: 1px solid var(--border); overflow: hidden; }
 .stock-card > div:last-child { border-right: none; display: flex; justify-content: center; align-items: center; padding: 10px 4px; }
 
 /* RSI buy zone - subtle green tint */

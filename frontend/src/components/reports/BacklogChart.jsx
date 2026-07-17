@@ -66,13 +66,10 @@ export default function BacklogChart({ data }) {
     }
     return (
       <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <SectionTitle>📦 수주잔고 추이</SectionTitle>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {sources.includes('llm') && <SourceBadge source="llm" />}
-            {sources.includes('manual') && <SourceBadge source="manual" />}
-          </div>
-        </div>
+        <SectionTitle right={<div style={{ display: 'flex', gap: 4 }}>
+          {sources.includes('llm') && <SourceBadge source="llm" />}
+          {sources.includes('manual') && <SourceBadge source="manual" />}
+        </div>}>📦 수주잔고 추이</SectionTitle>
         <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>
           <Legend color="var(--data-2)" label="수주잔고" />
           <Legend color="var(--data-3)" label="QoQ 변동률" line />
@@ -149,10 +146,7 @@ export default function BacklogChart({ data }) {
 
   return (
     <div style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <SectionTitle>📦 수주잔고 추이 (사업부문별)</SectionTitle>
-        <span style={badgeStyle('var(--color-info)')}>AI 추출</span>
-      </div>
+      <SectionTitle right={<span style={badgeStyle('var(--color-info)')}>AI 추출</span>}>📦 수주잔고 추이 (사업부문별)</SectionTitle>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>
         {sectors.map(s => <Legend key={s} color={colorOf(s)} label={s} />)}
         <Legend color="var(--data-3)" label="QoQ" line />

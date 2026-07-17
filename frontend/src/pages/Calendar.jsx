@@ -4,6 +4,7 @@ import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import { useToast } from '../components/Toast'
 import useIsMobile from '../hooks/useIsMobile'
+import { SketchEmpty, SketchError } from '../components/sketches'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -114,7 +115,7 @@ function MonthGrid({ year, month, events }) {
                     </span>
                   ))}
                   {remaining > 0 && (
-                    <span style={{ fontSize: isMobile ? 9 : 8, color: 'var(--text-3)', lineHeight: isMobile ? '1' : '12px' }}>+{remaining}</span>
+                    <span style={{ fontSize: isMobile ? 9 : 8, color: 'var(--text-2)', fontWeight: 600, lineHeight: isMobile ? '1' : '12px' }}>+{remaining}</span>
                   )}
                 </div>
               )}
@@ -233,13 +234,17 @@ export default function Calendar() {
         ? <Skeleton variant="calendar" />
         : error
         ? <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <div className="sketch-draw"><SketchError size={140} /></div>
             <span>{error}</span>
             <Button variant="secondary" size="sm" onClick={() => setFetchKey(k => k + 1)}>다시 시도</Button>
           </div>
         : <>
             <MonthGrid year={year} month={month} events={events} />
             {events.length === 0 && (
-              <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: '24px 16px', fontSize: 13 }}>이번 달 일정이 없습니다</div>
+              <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <div className="sketch-draw"><SketchEmpty size={120} /></div>
+                <span style={{ fontSize: 13 }}>이번 달 일정이 없습니다</span>
+              </div>
             )}
           </>
       }

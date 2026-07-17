@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { fmtPrice as fmt } from '../../utils'
-import { _weather } from './reportUtils.jsx'
+import { _weather, SectionTitle } from './reportUtils.jsx'
 import { useToast } from '../Toast'
 import useIsMobile from '../../hooks/useIsMobile'
 
@@ -305,11 +305,8 @@ export default function ConsensusChart({ ticker, market }) {
 
   return (
     <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '8px 10px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12, letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>📈 컨센서스 추이</span>
-          {trendWeather && <span title={trendWeather.label} style={{ fontSize: 14, lineHeight: 1 }}>{trendWeather.icon}</span>}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <SectionTitle weather={trendWeather}>📈 컨센서스 추이</SectionTitle>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={backfill}
