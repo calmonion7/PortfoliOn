@@ -10,8 +10,9 @@ import './Glossary.css'
 function GlossaryPopover({ anchorEl, entry, onClose }) {
   const ref = useRef(null)
   const [pos, setPos] = useState(null)
+  const openedAtRef = useRef(0)
 
-  useLayoutEffect(() => {
+  const place = () => {
     const el = ref.current
     if (!el || !anchorEl.current) return
     const rect = anchorEl.current.getBoundingClientRect()
@@ -21,7 +22,12 @@ function GlossaryPopover({ anchorEl, entry, onClose }) {
     const top = below ? rect.bottom + 6 : Math.max(8, rect.top - 6 - h)
     const left = Math.min(Math.max(8, rect.left), window.innerWidth - W - 8)
     setPos({ top, left, width: W })
-  }, [anchorEl])
+  }
+
+  useLayoutEffect(() => {
+    openedAtRef.current = performance.now()
+    place()
+  }, [anchorEl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onPointer = (e) => {
@@ -30,17 +36,22 @@ function GlossaryPopover({ anchorEl, entry, onClose }) {
       onClose()
     }
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    // 화면 밖 단어 탭 시 브라우저 포커스 스크롤이 열림 직후 발생 — 400ms는 위치 추적, 이후 스크롤은 닫힘
+    const onScroll = () => {
+      if (performance.now() - openedAtRef.current < 400) place()
+      else onClose()
+    }
     document.addEventListener('pointerdown', onPointer, true)
-    window.addEventListener('scroll', onClose, true)
+    window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', onClose)
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('pointerdown', onPointer, true)
-      window.removeEventListener('scroll', onClose, true)
+      window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', onClose)
       document.removeEventListener('keydown', onKey)
     }
-  }, [anchorEl, onClose])
+  }, [anchorEl, onClose]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return createPortal(
     <div
