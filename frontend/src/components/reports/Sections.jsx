@@ -1,6 +1,7 @@
 import { fmtPrice as fmt } from '../../utils'
 import { computePeerPremiums, SectionTitle } from './reportUtils.jsx'
 import KeyResourceChart, { splitMetricsForRender } from './KeyResourceChart.jsx'
+import { GlossaryText } from '../Glossary.jsx'
 
 function decodeHtml(str) {
   if (!str) return str
@@ -14,7 +15,7 @@ export function ReportSectionText({ title, text }) {
   return (
     <div style={{ marginBottom: 20 }}>
       <SectionTitle>{title}</SectionTitle>
-      <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}>{text}</p>
+      <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}><GlossaryText text={text} /></p>
     </div>
   )
 }
@@ -161,13 +162,13 @@ export function MoatSection({ moat }) {
         {moat.rating && <span style={_CHIP(rc.color)}>{rc.label}</span>}
         {moat.rating_source && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>by {moat.rating_source}</span>}
       </>}>🏰 경제적 해자</SectionTitle>
-      {moat.summary && <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{moat.summary}</p>}
+      {moat.summary && <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}><GlossaryText text={moat.summary} /></p>}
       {moat.factors?.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {moat.factors.map((f, i) => (
             <div key={i} style={_FACTOR_LINE}>
               <div style={_FACTOR_TITLE}>{f.title}</div>
-              <div style={_FACTOR_DESC}>{f.description}</div>
+              <div style={_FACTOR_DESC}><GlossaryText text={f.description} /></div>
             </div>
           ))}
         </div>
@@ -202,7 +203,7 @@ export function KeyResourceSection({ key_resource }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{key_resource.resource}</div>
       )}
       {key_resource.thesis && (
-        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{key_resource.thesis}</p>
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}><GlossaryText text={key_resource.thesis} /></p>
       )}
       {chartMetrics.length > 0 && <KeyResourceChart metrics={chartMetrics} />}
       {tableMetrics.length > 0 && tablePeriods.length > 0 && (
@@ -240,14 +241,14 @@ export function KeyResourceSection({ key_resource }) {
           {key_resource.drivers.map((d, i) => (
             <div key={i} style={_FACTOR_LINE}>
               <div style={_FACTOR_TITLE}>{d.title}</div>
-              <div style={_FACTOR_DESC}>{d.description}</div>
+              <div style={_FACTOR_DESC}><GlossaryText text={d.description} /></div>
             </div>
           ))}
         </div>
       )}
       {key_resource.one_liner && (
         <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.7, padding: '8px 12px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid var(--accent)' }}>
-          💡 {key_resource.one_liner}
+          💡 <GlossaryText text={key_resource.one_liner} />
         </div>
       )}
     </div>
@@ -270,7 +271,7 @@ export function GrowthPlanSection({ growth_plan }) {
     <div style={{ marginBottom: 20 }}>
       <SectionTitle>🌱 장기 성장 계획</SectionTitle>
       {growth_plan.strategy && (
-        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{growth_plan.strategy}</p>
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}><GlossaryText text={growth_plan.strategy} /></p>
       )}
       {growth_plan.initiatives?.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -283,7 +284,7 @@ export function GrowthPlanSection({ growth_plan }) {
                   {(item.label || item.status) && <span style={_CHIP(sc.color || 'var(--text-3)')}>{item.label || sc.label || item.status}</span>}
                   {item.timeline && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{item.timeline}</span>}
                 </div>
-                <div style={_FACTOR_DESC}>{item.description}</div>
+                <div style={_FACTOR_DESC}><GlossaryText text={item.description} /></div>
               </div>
             )
           })}
@@ -316,7 +317,7 @@ export function RisksSection({ risks }) {
                   {f.category && <span style={_CHIP(borderColor)}>{f.category}</span>}
                   <span style={_FACTOR_TITLE}>{f.title}</span>
                 </div>
-                <div style={_FACTOR_DESC}>{f.description}</div>
+                <div style={_FACTOR_DESC}><GlossaryText text={f.description} /></div>
               </div>
             )
           })}
@@ -341,7 +342,7 @@ export function RecentDisclosuresSection({ disclosures, news }) {
         📰 최근 공시 & 뉴스
       </SectionTitle>
       {disclosures.headline && (
-        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.6, margin: '0 0 10px' }}>{disclosures.headline}</p>
+        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.6, margin: '0 0 10px' }}><GlossaryText text={disclosures.headline} /></p>
       )}
       {disclosures.metrics?.length > 0 && (
         <div className="table-mobile-wrap" style={{ marginBottom: 12 }}>
@@ -372,19 +373,19 @@ export function RecentDisclosuresSection({ disclosures, news }) {
           {disclosures.events.map((e, i) => (
             <div key={i} style={{ ...(_FACTOR_LINE), borderLeft: `2px solid ${IMPACT_COLOR[e.impact] || 'var(--border)'}` }}>
               <div style={_FACTOR_TITLE}>{e.title}</div>
-              <div style={_FACTOR_DESC}>{e.description}</div>
+              <div style={_FACTOR_DESC}><GlossaryText text={e.description} /></div>
             </div>
           ))}
         </div>
       )}
       {disclosures.price_impact && (
         <div style={{ fontSize: 12, color: 'var(--text-2)', padding: '6px 10px', background: 'var(--bg-elev)', borderRadius: 6, marginBottom: 8 }}>
-          📈 {disclosures.price_impact}
+          📈 <GlossaryText text={disclosures.price_impact} />
         </div>
       )}
       {disclosures.one_liner && (
         <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.7, padding: '8px 12px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid var(--accent)', marginBottom: 10 }}>
-          💡 {disclosures.one_liner}
+          💡 <GlossaryText text={disclosures.one_liner} />
         </div>
       )}
       {news?.length > 0 && (
@@ -412,7 +413,7 @@ function _insightLines(value) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {items.filter(Boolean).map((t, i) => (
-        <div key={i} style={_FACTOR_DESC}>{t}</div>
+        <div key={i} style={_FACTOR_DESC}><GlossaryText text={t} /></div>
       ))}
     </div>
   )
@@ -432,7 +433,7 @@ export function InsightsSection({ insights }) {
     <div style={{ marginBottom: 20 }}>
       <SectionTitle right={insights.stance && <span style={_CHIP(sc.color)}>{sc.label}</span>}>🎯 권고 인사이트</SectionTitle>
       {insights.one_liner && (
-        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}>{insights.one_liner}</p>
+        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px' }}><GlossaryText text={insights.one_liner} /></p>
       )}
       {hasEntry && (
         <div style={{ ...(_FACTOR_LINE), borderLeft: '2px solid var(--semantic-buy)', marginBottom: 8 }}>

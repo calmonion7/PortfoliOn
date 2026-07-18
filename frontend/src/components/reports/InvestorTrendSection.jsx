@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import api from '../../api'
 import { krFmt } from '../market/marketUtils.jsx'
 import { SectionTitle } from './reportUtils.jsx'
+import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 // 종목 수급 추이 차트 (외국인/기관/개인 누적 순매수 + 외국인 보유율). KR 전용.
 // 랭킹 모달과 리포트 상세에서 공유.
@@ -57,7 +58,7 @@ export default function InvestorTrendSection({ ticker }) {
                      tickFormatter={v => `${v}%`} width={40} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                        formatter={(v, n) => n === '외국인 보유율' ? [`${v?.toFixed(2)}%`, n] : [Number(v).toLocaleString('ko-KR'), n]} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Legend content={<GlossaryRechartsLegend />} />
               <Line yAxisId="left" type="monotone" dataKey="foreign" name="외국인" stroke="var(--data-2)" dot={false} strokeWidth={2} />
               <Line yAxisId="left" type="monotone" dataKey="organ" name="기관" stroke="var(--data-5)" dot={false} strokeWidth={2} />
               <Line yAxisId="left" type="monotone" dataKey="individual" name="개인" stroke="var(--data-4)" dot={false} strokeWidth={2} />

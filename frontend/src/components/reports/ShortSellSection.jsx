@@ -3,6 +3,7 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 import api from '../../api'
 import { krFmt } from '../market/marketUtils.jsx'
 import { SectionTitle } from './reportUtils.jsx'
+import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 // 종목 공매도 추이 차트 (거래량 막대 + 비중% 라인, 잔고·거래대금은 툴팁/헤더). KR 전용.
 // 키움 ka10014 → /api/stocks/{ticker}/short-sell. 수급 추이(InvestorTrendSection) 옆에 배치.
@@ -87,7 +88,7 @@ export default function ShortSellSection({ ticker }) {
               <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--data-3)' }}
                      tickFormatter={v => `${v}%`} width={40} />
               <Tooltip content={<ShortTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Legend content={<GlossaryRechartsLegend />} />
               <Bar yAxisId="left" dataKey="vol" name="공매도 거래량" fill="var(--data-4)" />
               <Line yAxisId="right" type="monotone" dataKey="ratio" name="공매도 비중(%)" stroke="var(--data-3)" dot={false} strokeWidth={2} />
             </ComposedChart>

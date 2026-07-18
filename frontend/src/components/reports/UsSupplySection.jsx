@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { SectionTitle } from './reportUtils.jsx'
+import { GlossaryText } from '../Glossary.jsx'
 
 // US 종목 수급 — 공매도 비중 + 기관 보유 상위. 기술·수급 탭 US 브랜치.
 // GET /api/report/{ticker}/us-supply → { short, institutional, fetched_at }
@@ -77,7 +78,7 @@ export default function UsSupplySection({ ticker, market }) {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {short.short_pct_float != null && (
               <div style={STAT}>
-                <span style={STAT_LABEL}>유통주식 대비 공매도</span>
+                <span style={STAT_LABEL}><GlossaryText text="유통주식 대비 공매도" /></span>
                 <span style={{ ...STAT_VAL, color: 'var(--up)' }}>{(short.short_pct_float * 100).toFixed(2)}%</span>
               </div>
             )}
@@ -89,7 +90,7 @@ export default function UsSupplySection({ ticker, market }) {
             )}
             {short.shares_short != null && (
               <div style={STAT}>
-                <span style={STAT_LABEL}>공매도 잔량</span>
+                <span style={STAT_LABEL}><GlossaryText text="공매도 잔량" /></span>
                 <span style={STAT_VAL}>{fmtShares(short.shares_short)}</span>
               </div>
             )}

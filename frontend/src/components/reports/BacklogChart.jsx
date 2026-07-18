@@ -3,6 +3,7 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts'
 import { SectionTitle } from './reportUtils.jsx'
+import { GlossaryText } from '../Glossary.jsx'
 
 const SECTOR_ORDER = ['항공', '방산', '해양', 'IT서비스', '항공우주']
 const SECTOR_COLORS = ['var(--data-2)', 'var(--data-5)', 'var(--data-3)', 'var(--data-4)', 'var(--data-1)', 'var(--corr-pos)', 'var(--corr-neg)']
@@ -178,7 +179,7 @@ function Legend({ color, label, line }) {
   return (
     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <span style={{ width: line ? 16 : 10, height: line ? 2 : 10, background: color, display: 'inline-block', borderRadius: line ? 1 : 2 }} />
-      {label}
+      <span><GlossaryText text={label} /></span>
     </span>
   )
 }

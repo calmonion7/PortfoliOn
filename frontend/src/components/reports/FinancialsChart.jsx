@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList, ComposedChart, Bar } from 'recharts'
 import { _weather, SectionTitle } from './reportUtils.jsx'
+import { GlossaryText } from '../Glossary.jsx'
 
 export default function FinancialsChart({ financials, financialsAnnual, market }) {
-  const [hoveredLegend, setHoveredLegend] = useState(null)
   const [finTab, setFinTab] = useState('annual')
   if (!financials?.length) return null
 
@@ -102,39 +102,15 @@ export default function FinancialsChart({ financials, financialsAnnual, market }
   const quarterData = toChartData(financials)
   const annualData  = financialsAnnual?.length ? toChartData(financialsAnnual) : []
 
-  const DESCS = {
-    EPS: '주당순이익 — 순이익 ÷ 발행주식수',
-    BPS: '주당순자산 — 순자산 ÷ 발행주식수',
-    PER: '주가수익비율 — 주가 ÷ EPS (낮을수록 저평가)',
-    PBR: '주가순자산비율 — 주가 ÷ BPS (낮을수록 저평가)',
-  }
-
+  // 범례 용어 설명은 용어집 클릭 팝오버로 통합 (기존 hover 툴팁 대체 — 모바일 탭도 지원)
   const Legend = ({ items, weather }) => (
     <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-3)', marginBottom: 4, alignItems: 'center' }}>
-      {items.map(({ color, label }) => {
-        const desc = DESCS[label]
-        return (
-          <span
-            key={label}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative', cursor: desc ? 'help' : 'default' }}
-            onMouseEnter={() => desc && setHoveredLegend(label)}
-            onMouseLeave={() => setHoveredLegend(null)}
-          >
-            <span style={{ width: 16, height: 2, background: color, display: 'inline-block', borderRadius: 1 }} />
-            {label}
-            {hoveredLegend === label && (
-              <div style={{
-                position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
-                background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 4,
-                padding: '5px 9px', fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap',
-                zIndex: 50, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-              }}>
-                {desc}
-              </div>
-            )}
-          </span>
-        )
-      })}
+      {items.map(({ color, label }) => (
+        <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 16, height: 2, background: color, display: 'inline-block', borderRadius: 1 }} />
+          <span><GlossaryText text={label} /></span>
+        </span>
+      ))}
       {weather && <span title={weather.label} style={{ marginLeft: 4, fontSize: 13, lineHeight: 1 }}>{weather.icon}</span>}
     </div>
   )

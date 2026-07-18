@@ -7,6 +7,7 @@ import BacklogChart from './BacklogChart'
 import api from '../../api'
 import useIsMobile from '../../hooks/useIsMobile'
 import { SketchArrowUp } from '../sketches'
+import { GlossaryTerm } from '../Glossary.jsx'
 import './ReportDetail.css'
 
 function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly = false }) {
@@ -278,11 +279,11 @@ function PriceLevelChart({ rsiData, price, vp, target, title, market, chartOnly 
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
         <div style={{ flex: 1, textAlign: 'right' }}>
-          <span style={{ fontSize: 9, color: 'var(--color-success)', fontWeight: 600 }}>지지 구간 ▼</span>
+          <span style={{ fontSize: 9, color: 'var(--color-success)', fontWeight: 600 }}><GlossaryTerm term="지지선">지지 구간</GlossaryTerm> ▼</span>
         </div>
         <div style={{ width: 1 }} />
         <div style={{ flex: 1 }}>
-          <span style={{ fontSize: 9, color: 'var(--color-error)', fontWeight: 600 }}>저항 구간 ▲</span>
+          <span style={{ fontSize: 9, color: 'var(--color-error)', fontWeight: 600 }}><GlossaryTerm term="저항선">저항 구간</GlossaryTerm> ▲</span>
         </div>
       </div>
       {rows.map((row) => {
@@ -455,13 +456,13 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* 평균목표가 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ color: 'var(--text-3)', fontSize: 9 }}>🎯 평균목표가</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 9 }}>🎯 <GlossaryTerm term="목표가">평균목표가</GlossaryTerm></span>
             <span className="mono tnum" style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{fmt(summary.target_mean, summary.market)}</span>
           </div>
           {/* 상승여력 */}
           {gap != null && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ color: 'var(--text-3)', fontSize: 9 }}>상승여력</span>
+              <span style={{ color: 'var(--text-3)', fontSize: 9 }}><GlossaryTerm term="상승여력">상승여력</GlossaryTerm></span>
               <span className="mono tnum" style={{ fontSize: 12, fontWeight: 600, color: gap >= 0 ? 'var(--up)' : 'var(--down)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                 {gap >= 0 ? '+' : ''}{gap.toFixed(1)}%
                 {gap >= 0 && <SketchArrowUp size={13} className="rpt-upside-mark" />}
@@ -493,7 +494,7 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
             <>
               <span style={{ color: 'var(--border)', fontSize: 10 }}>|</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ color: 'var(--text-3)', fontSize: 9 }}>애널리스트 의견</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 9 }}><GlossaryTerm term="투자의견">애널리스트 의견</GlossaryTerm></span>
                 <div className="mono tnum" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: 'var(--semantic-buy)', fontSize: 11 }}>매수 {buy}</span>
                   <span style={{ color: 'var(--text-3)', fontSize: 11 }}>중립 {hold}</span>
@@ -530,15 +531,17 @@ export function VolumeRsiSnapshot({ summary, chartOnly = false }) {
       <div style={{ display: 'flex', columnGap: 14, rowGap: 6, flexWrap: 'wrap', marginBottom: 6, marginTop: 4 }}>
         {[
           { color: 'var(--text)', label: '현재가', desc: '현재 주가' },
-          { color: 'var(--data-3)', label: '평균목표가', desc: '애널리스트 평균 목표주가' },
-          { color: 'var(--data-2)', label: 'POC', desc: '거래량 최대 가격대' },
-          { color: 'var(--data-5)', label: 'HVN', desc: '고거래량 가격대(지지·저항)' },
-          { color: 'var(--semantic-buy)', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격' },
-          { color: 'var(--semantic-sell)', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격' },
-        ].map(({ color, label, desc }) => (
+          { color: 'var(--data-3)', label: '평균목표가', desc: '애널리스트 평균 목표주가', term: '목표가' },
+          { color: 'var(--data-2)', label: 'POC', desc: '거래량 최대 가격대', term: 'POC' },
+          { color: 'var(--data-5)', label: 'HVN', desc: '고거래량 가격대(지지·저항)', term: 'HVN' },
+          { color: 'var(--semantic-buy)', label: 'RSI20~30', desc: '일봉 RSI 과매도 가격', term: 'RSI' },
+          { color: 'var(--semantic-sell)', label: 'RSI70~80', desc: '일봉 RSI 과매수 가격', term: 'RSI' },
+        ].map(({ color, label, desc, term }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }} title={desc}>
             <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-2)' }}>{label}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-2)' }}>
+              {term ? <GlossaryTerm term={term}>{label}</GlossaryTerm> : label}
+            </span>
             <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{desc}</span>
           </div>
         ))}
@@ -576,9 +579,9 @@ export function TechnicalStats({ summary }) {
     return flag ? '위 ▲' : '아래 ▼'
   }
 
-  const StatRow = ({ label, value, valueColor }) => (
+  const StatRow = ({ label, value, valueColor, term }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
-      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
+      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{term ? <GlossaryTerm term={term}>{label}</GlossaryTerm> : label}</span>
       <span className="mono tnum" style={{ fontSize: 12, fontWeight: 600, color: valueColor || 'var(--text)' }}>{value}</span>
     </div>
   )
@@ -593,11 +596,11 @@ export function TechnicalStats({ summary }) {
         {hasLevels && (
           <div style={{ flex: '1 1 160px', minWidth: 140 }}>
             <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, marginBottom: 4 }}>가격 레벨</div>
-            <StatRow label="52주 고가" value={fmt(week52_high, market)} valueColor="var(--up)" />
-            <StatRow label="52주 저가" value={fmt(week52_low, market)} valueColor="var(--down)" />
-            <StatRow label="EMA 20" value={fmt(ema20, market)} />
-            <StatRow label="EMA 50" value={fmt(ema50, market)} />
-            <StatRow label="EMA 200" value={fmt(ema200, market)} />
+            <StatRow label="52주 고가" value={fmt(week52_high, market)} valueColor="var(--up)" term="52주 고가" />
+            <StatRow label="52주 저가" value={fmt(week52_low, market)} valueColor="var(--down)" term="52주 저가" />
+            <StatRow label="EMA 20" value={fmt(ema20, market)} term="EMA" />
+            <StatRow label="EMA 50" value={fmt(ema50, market)} term="EMA" />
+            <StatRow label="EMA 200" value={fmt(ema200, market)} term="EMA" />
           </div>
         )}
 
@@ -629,9 +632,9 @@ export function TechnicalStats({ summary }) {
               <span style={{ fontSize: 11, color: 'var(--text-3)' }}>크로스</span>
               <span style={{ fontSize: 11, fontWeight: 600 }}>
                 {trend.golden_cross
-                  ? <span style={{ color: 'var(--up)' }}>골든크로스 ✓</span>
+                  ? <span style={{ color: 'var(--up)' }}><GlossaryTerm term="골든크로스">골든크로스</GlossaryTerm> ✓</span>
                   : trend.dead_cross
-                    ? <span style={{ color: 'var(--down)' }}>데드크로스 ✗</span>
+                    ? <span style={{ color: 'var(--down)' }}><GlossaryTerm term="데드크로스">데드크로스</GlossaryTerm> ✗</span>
                     : <span style={{ color: 'var(--text-3)' }}>—</span>
                 }
               </span>
@@ -643,8 +646,8 @@ export function TechnicalStats({ summary }) {
         {hasBetaHv && (
           <div style={{ flex: '1 1 120px', minWidth: 110 }}>
             <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, marginBottom: 4 }}>리스크 지표</div>
-            <StatRow label="베타 (β)" value={fmtFloat(beta)} />
-            <StatRow label="역사적 변동성" value={beta != null || hv != null ? (hv == null ? '—' : `${fmtFloat(hv * 100, 1)}%`) : '—'} />
+            <StatRow label="베타 (β)" value={fmtFloat(beta)} term="베타" />
+            <StatRow label="역사적 변동성" value={beta != null || hv != null ? (hv == null ? '—' : `${fmtFloat(hv * 100, 1)}%`) : '—'} term="역사적 변동성" />
           </div>
         )}
 
