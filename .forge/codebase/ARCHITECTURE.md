@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 3aa35ba7b754566835ea9a21f7076a5f4450789a
-mapped: 2026-07-17
+last_mapped_commit: 2a5e4ac00e4ef9ca7421a0958a64e60cd8a3dd2b
+mapped: 2026-07-18
 ---
 
 # ARCHITECTURE
@@ -8,6 +8,8 @@ mapped: 2026-07-17
 PortfoliOn은 **FastAPI 백엔드 + React SPA 프론트엔드**의 2티어 구조이며, Mac 로컬 Docker 4-컨테이너(postgres/backend/nginx/certbot)로 배포된다. 백엔드는 고전적 **라우터 → 서비스 → DB/외부소스** 계층형이고, 배치 스케줄러가 별도 패키지로 상주해 외부 데이터를 사전계산해 DB에 적재한다. 프론트는 React Router 기반 SPA로, 요청은 전부 nginx `/api/*` 프록시를 거쳐 백엔드로 간다.
 
 **이번 매핑 갱신 범위**: 이전 매핑(커밋 `8e37e2c`) 이후 `task#190~195`(ADR-0026)로 프론트엔드 디자인 아이덴티티가 "프로 금융 터미널(다크 기본 + 좌측 사이드바, ADR-0025)"에서 "에디토리얼 매거진(라이트 기본 + 상단 마스트헤드)"로 전면 교체됐다. **백엔드는 이 구간에 파일 변경 0**(`git diff --stat 8e37e2c..HEAD -- backend/` 빈 결과로 확인) — 아래 Backend 절은 이전 매핑 그대로다. Frontend 절만 현행화.
+
+**추가 갱신(2026-07-18, 커밋 `2a5e4ac`까지)**: `task#198~199`로 프론트에 **주식 용어집(Glossary) 모듈**이 신설됐다 — 리포트 본문·차트 범례에 나오는 전문용어를 클릭하면 정의 팝오버가 뜨는 기능. 순수 프론트 정적 데이터 + UI 컴포넌트라 **백엔드 변경 없음**. 아래 Frontend 절의 "용어집" 소절에 반영.
 
 ## 아키텍처 패턴 개요
 
@@ -139,6 +141,22 @@ axios 인스턴스(baseURL = `VITE_API_BASE_URL || ''`). 요청 인터셉터가 
 각 스케치는 SVG `<path>`에 `className="sk-path"`를 달아 `styles/motion.css`의 `.sketch-draw .sk-path`(stroke-dasharray/dashoffset 기반 드로잉 애니메이션, `nth-child` 순차 delay)와 짝을 이루는 관례.
 
 `contexts/AuthContext.jsx`가 로그인 시 메뉴 권한·role을 로드(무변). `utils/`(analytics·marketHours·priceFlash·pwa, 무변), `styles/`(아래 절 참조).
+
+### 용어집(Glossary) — `frontend/src/glossary/` + `components/Glossary.jsx`(task#198~199, 신규)
+
+정적 주식 용어집 정본과 그 소비 UI. 백엔드 API 없음 — 전부 프론트 번들에 박제된 정적 데이터 + 순수함수 + React 컴포넌트.
+
+- `glossary/terms.js` — `GLOSSARY` 배열(항목 95개, `{ term, def, aliases? }`). 기술적 지표·밸류에이션/재무·컨센서스·수급·기업 이벤트/기본·거시/시장 6개 카테고리로 그룹. `findTerm(key)`가 대표 표기(`term`) 또는 `aliases`로 항목을 찾는 `Map` 기반 조회 함수.
+- `glossary/match.js` — `matchTerms(text)` 순수함수. 자유 텍스트에서 용어집 키를 찾아 `[{text, entry?}]` 세그먼트 배열로 분할한다. 규칙: ① **longest-match 우선**(키 길이 내림차순 정렬 후 스캔 — "공매도 비중"이 "공매도"보다 먼저 매칭), ② **텍스트당 entry(용어)별 첫 등장만** 매칭(같은 용어 반복 등장해도 1회만 하이라이트), ③ 이미 매칭된 구간과 겹치면 스킵, ④ **라틴 키(영숫자만)는 앞뒤 영숫자 경계 필수**("SUPER" 안의 "PER" 오매칭 방지), 한글 키는 순수 substring(조사가 자연히 흡수됨, 예: "매물대가"→"매물대"). `glossary/match.test.js`(vitest)가 이 규칙들 + `GLOSSARY` 데이터 무결성(항목≥50·키 중복 없음)을 검증.
+- `components/Glossary.jsx` + `Glossary.css` — 소비 컴포넌트 4종:
+  - `GlossaryTerm({ term, entry, children })` — 클릭 가능한 용어 버튼. 클릭 시 `GlossaryPopover` 토글. 용어집에 없는 키면 평문(`children`)만 렌더.
+  - `GlossaryPopover` — `createPortal(document.body)` + `position: fixed` 뷰포트 좌표(앵커의 `getBoundingClientRect()` 기준 상/하 자동 배치) 팝오버. `z-index: 1100`(모달 오버레이 `z:1000`보다 위). **등장 모션은 `opacity`만**(task#195 규칙 — `.anim-fade`와 동일하게 `transform` 금지, fixed 후손의 containing block 오염 방지). 바깥 클릭·Escape·스크롤 시 닫힘이되, **열린 직후 400ms는 스크롤 이벤트를 닫힘이 아니라 위치 재계산으로 처리**(task#198 수정 — 화면 밖 단어를 탭하면 브라우저 포커스 스크롤이 열림 직후 발생해 즉시 닫혀버리던 버그의 유예창).
+  - `GlossaryText({ text })` — 자유 텍스트를 `matchTerms`로 매칭해 인라인 `GlossaryTerm`으로 감싼 노드 배열 반환(매칭 없으면 원문 그대로).
+  - `GlossaryRechartsLegend({ payload })` — recharts `<Legend content={...}>` 어댑터. 범례 항목 라벨을 `GlossaryText`로 감싸 용어 클릭을 지원.
+
+**배선(task#198~199)**: reports 컴포넌트(`Sections.jsx`의 해자/성장계획/리스크/공시 등 자유 텍스트 전부 `GlossaryText`로 래핑, `DetailTab.jsx`의 지지/저항·목표가/상승여력/투자의견·POC/HVN/RSI/베타/EMA/골든·데드크로스 라벨을 `GlossaryTerm`으로, `FinancialsChart.jsx`는 기존 hover 전용 커스텀 범례 설명(`DESCS`/`hoveredLegend` state)을 제거하고 `GlossaryText` 클릭 팝오버로 대체 — 모바일 탭도 지원, `BacklogChart.jsx` 범례 라벨), market 컴포넌트 다수(`EconIndicatorsSection`·`IndexSection`·`KospiFuturesSection`·`KospiSignalSection`·`KrExportsSection`·`KrTop2Section`·`LendingSection`·`LeverageSection`·`M7EarningsSection`·`MacroSignalsSection`·`TreasurySection`에서 recharts `<Legend wrapperStyle=.../>` → `<Legend content={<GlossaryRechartsLegend />} />`로 스왑 + 라벨 `GlossaryText`), `pages/Analytics.jsx`(버블 산점도에 색-부호 범례 신설, `GlossaryText`로 라벨 매칭), `KospiSignalSection.jsx`(막대 셀 색-신호 범례 신설, 리액트 인라인 스타일 — 이건 용어집이 아니라 셀 색 자체의 범례).
+
+새 의존성 없음(recharts 어댑터도 `Legend`의 `content` prop만 활용) — `package.json` 이 구간 변경 없음.
 
 ### 스타일·토큰 — `frontend/src/styles/`
 

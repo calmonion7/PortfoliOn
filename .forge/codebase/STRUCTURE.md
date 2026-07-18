@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 3aa35ba7b754566835ea9a21f7076a5f4450789a
-mapped: 2026-07-17
+last_mapped_commit: 2a5e4ac00e4ef9ca7421a0958a64e60cd8a3dd2b
+mapped: 2026-07-18
 ---
 
 # STRUCTURE
@@ -8,6 +8,8 @@ mapped: 2026-07-17
 프로젝트 루트: `/Users/calmonion/Project/PortfoliOn`. 최상위는 `backend/`(FastAPI), `frontend/`(React SPA), 배포 관련(`docker-compose.yml`·`deploy.sh`·`nginx/`·`certbot/`), 문서(`API_SPEC.md`·`CLAUDE_COWORK_API.md`·`README.md`·`KIWOOM_API.md`·`KIS_API.md`·`docs/`), forge 상태(`.forge/`), 운영 스크립트(`scripts/`)로 구성된다.
 
 **이번 매핑 갱신 범위**: 이전 매핑(커밋 `8e37e2c`) 이후 `task#190~195`(ADR-0026, 에디토리얼 매거진 전면개편)로 `frontend/src/` 배치가 바뀌었다. `backend/` 레이아웃은 이 구간 파일 변경 0(`git diff --stat 8e37e2c..HEAD -- backend/` 확인)이라 이전 매핑 그대로.
+
+**추가 갱신(2026-07-18, 커밋 `2a5e4ac`까지)**: `task#198~199`로 `frontend/src/glossary/`(신규 디렉터리)와 `components/Glossary.jsx`/`Glossary.css`(신규 파일)가 추가됐다. 나머지 배치는 무변경.
 
 ## 최상위 트리
 
@@ -97,7 +99,8 @@ frontend/
     ├── api.js          axios 인스턴스 (토큰 인터셉터·401 처리)
     ├── App.css / main.jsx
     ├── pages/          라우트 대상 화면 컴포넌트
-    ├── components/     재사용 컴포넌트 (도메인별 하위 디렉터리 + 신규 sketches/)
+    ├── components/     재사용 컴포넌트 (도메인별 하위 디렉터리 + sketches/) + Glossary.jsx/.css(신규)
+    ├── glossary/       주식 용어집 정본 (신규, task#198) — terms.js·match.js·match.test.js
     ├── hooks/          커스텀 훅 (+ 신규 useReveal.js·useCountUp.js)
     ├── contexts/       AuthContext.jsx
     ├── utils/          analytics·marketHours·priceFlash·pwa
@@ -112,7 +115,7 @@ frontend/
 
 ### frontend/src/components/
 
-최상위 공용: `Masthead.jsx`(+`Masthead.css`, 신규 — PC 상단 마스트헤드, `Sidebar.jsx`/`Sidebar.css` 대체·삭제)·`MobileNav.jsx`·`MobileTopActions.jsx`·`GlobalSearch.jsx`·`StockSearchBox.jsx`·`StockModal.jsx`·`PromoteModal.jsx`·`PermissionManager.jsx`·`PermissionPanel.jsx`·`Toast.jsx`·`InstallPrompt.jsx`·`LoadingSpinner.jsx`·`BatchScheduleEditor.jsx`.
+최상위 공용: `Masthead.jsx`(+`Masthead.css`, 신규 — PC 상단 마스트헤드, `Sidebar.jsx`/`Sidebar.css` 대체·삭제)·`MobileNav.jsx`·`MobileTopActions.jsx`·`GlobalSearch.jsx`·`StockSearchBox.jsx`·`StockModal.jsx`·`PromoteModal.jsx`·`PermissionManager.jsx`·`PermissionPanel.jsx`·`Toast.jsx`·`InstallPrompt.jsx`·`LoadingSpinner.jsx`·`BatchScheduleEditor.jsx`·`Glossary.jsx`(+`Glossary.css`, 신규 task#198 — 클릭 용어 팝오버·자유텍스트 자동매칭·recharts 범례 어댑터).
 
 도메인 하위 디렉터리:
 - `market/` — 지표 섹션들(`FxSection`·`VixSection`·`CommoditiesSection`·`TreasurySection`·`EconIndicatorsSection`·`M7EarningsSection`·`KrTop2Section`·`KrExportsSection`·`LeverageSection`·`LendingSection`·`IndexSection`·`MacroSignalsSection`·`FearGreedSection`·`KospiSignalSection`·`KospiFuturesSection`) + `marketUtils.jsx`
@@ -121,6 +124,14 @@ frontend/
 - `ui/` — `Badge`·`Button`·`Card`·`Stat`·`Input`·`Skeleton`·`SupplyBadge`·`InsiderBadge`·`icons.jsx` + `index.js` barrel
 - `recommendations/` — `RecCard`
 - **`sketches/`(신규, task#190, ADR-0026)** — 손그림 잉크 선화 SVG 컴포넌트. 카테고리 아이콘 `IconResearch`·`IconPortfolio`·`IconMarket`·`IconCalendarIncome`·`IconGuru`(Masthead 5섹션 1:1 대응), 빈상태/에러 `SketchEmpty`·`SketchError`·`SketchNotFound`·`SketchHero`, 장식 `SketchUnderline`·`SketchArrowUp`·`SketchCircleMark`. `index.js`가 barrel re-export. 각 SVG `<path>`는 `className="sk-path"`로 `styles/motion.css`의 드로잉 애니메이션과 짝.
+
+### frontend/src/glossary/(신규, task#198~199)
+
+`components/`가 아니라 `src/` 형제 디렉터리 — 정적 데이터 + 순수함수만 담고 UI는 없음(소비 UI는 `components/Glossary.jsx`).
+
+- `terms.js` — `GLOSSARY` 배열(95개 항목, `{term, def, aliases?}`) + `findTerm(key)` 조회. 기술적 지표·밸류에이션/재무·컨센서스·수급·기업 이벤트/기본·거시/시장 6카테고리.
+- `match.js` — `matchTerms(text)` — longest-match 우선·용어당 첫 등장만 매칭하는 자유텍스트 세그먼트 분할 순수함수.
+- `match.test.js` — vitest, `matchTerms` 매칭 규칙(경계·중복·alias) + `GLOSSARY` 데이터 무결성 검증.
 
 ### frontend/src/hooks/
 
@@ -137,5 +148,5 @@ frontend/
 ## 명명 규칙
 
 - **백엔드**: 라우터/서비스 모두 snake_case `.py`. 패키지는 디렉터리+`__init__.py`가 서브모듈 심볼을 re-export해 `services.X` 속성 접근 표면을 보존(ADR-0017). private/외부참조 심볼은 언더스코어 접두사 + 명시 re-export. 로그 마커는 `[Component]` PascalCase(개념당 1스펠링). 배치 job_id는 kebab 아닌 snake(`daily_report_kr`), 시장 분리 배치는 `_kr`/`_us` 접미사.
-- **프론트**: 컴포넌트/페이지 PascalCase `.jsx`, 훅 `useXxx.js`, 유틸 camelCase `.js`. CSS는 컴포넌트 병치(`X.jsx` + `X.css`) 또는 `styles/`(토큰·pc·mobile·motion). 테스트는 `*.test.js(x)` 병치. plain CSS(TailwindCSS·모션 라이브러리 없음), 색/간격/모션 토큰은 `styles/tokens.css`·`styles/motion.css`. 스케치 SVG는 `Sketch*`(장식/빈상태/에러) vs `Icon*`(카테고리 아이콘) 접두사로 구분, `components/sketches/index.js` barrel을 통해서만 import.
+- **프론트**: 컴포넌트/페이지 PascalCase `.jsx`, 훅 `useXxx.js`, 유틸 camelCase `.js`. CSS는 컴포넌트 병치(`X.jsx` + `X.css`) 또는 `styles/`(토큰·pc·mobile·motion). 테스트는 `*.test.js(x)` 병치. plain CSS(TailwindCSS·모션 라이브러리 없음), 색/간격/모션 토큰은 `styles/tokens.css`·`styles/motion.css`. 스케치 SVG는 `Sketch*`(장식/빈상태/에러) vs `Icon*`(카테고리 아이콘) 접두사로 구분, `components/sketches/index.js` barrel을 통해서만 import. 정적 도메인 데이터(용어집 등)는 `components/`가 아니라 `src/` 최상위 형제 디렉터리(`glossary/`)로 분리하고 소비 컴포넌트만 `Glossary*` 접두사로 `components/`에 둠.
 - **테스트**: `backend/tests/test_<대상>.py`. `conftest.py`가 `_block_real_db` autouse 가드로 실 DB 접근 차단(DB 경유 테스트는 `services.db` mock 필수). 도큐먼트 동기 검증: `test_api_doc_sync.py`(엔드포인트 존재 ↔ 두 명세서).
