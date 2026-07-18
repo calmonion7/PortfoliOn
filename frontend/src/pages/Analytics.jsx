@@ -147,7 +147,7 @@ function OpportunityBubble({ cards, usdkrw }) {
         {[['var(--up)', '업사이드 양수 (목표가까지 여력)'], ['var(--down)', '업사이드 음수 (목표가 하회)']].map(([color, label]) => (
           <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
-            <GlossaryText text={label} />
+            <span><GlossaryText text={label} /></span>
           </span>
         ))}
       </div>
