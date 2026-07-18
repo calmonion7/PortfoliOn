@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, Fragment } from 'react'
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import api from '../api'
 import usePortfolioData from '../hooks/usePortfolioData'
 import useReportList from '../hooks/useReportList'
 import Skeleton from '../components/ui/Skeleton'
 import { fmtPrice } from '../utils'
 import { SketchEmpty, SketchError } from '../components/sketches'
+import './Compare.css'
 
 const MAX_SELECT = 4
 
@@ -113,6 +114,7 @@ export default function Compare() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const resultRef = useRef(null)
 
   const toggle = (ticker) => {
     setSelected(prev => {
@@ -137,7 +139,7 @@ export default function Compare() {
   const marketOf = (ticker) => candidates.find(c => c.ticker === ticker)?.market || 'US'
 
   return (
-    <div>
+    <div style={{ paddingBottom: selected.length > 0 ? 84 : 0 }}>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
           비교할 종목을 최대 {MAX_SELECT}개 선택하세요 ({selected.length}/{MAX_SELECT})
@@ -194,6 +196,31 @@ export default function Compare() {
         )}
       </div>
 
+      {selected.length > 0 && (
+        <div className="cmp-selbar" role="region" aria-label="선택한 비교 종목">
+          <div className="cmp-selbar-chips">
+            {selected.map(t => {
+              const c = candidates.find(x => x.ticker === t)
+              return (
+                <button key={t} type="button" className="cmp-chip" onClick={() => toggle(t)} aria-label={`${c?.name || t} 선택 해제`}>
+                  {c?.name || t} <span className="x" aria-hidden="true">×</span>
+                </button>
+              )
+            })}
+          </div>
+          <span className="cmp-selbar-count">{selected.length}/{MAX_SELECT}</span>
+          <button
+            type="button"
+            className="cmp-selbar-go"
+            disabled={selected.length < 2}
+            onClick={() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            비교 보기
+          </button>
+        </div>
+      )}
+
+      <div ref={resultRef}>
       {selected.length < 2 ? (
         <p style={{ color: 'var(--text-3)', fontSize: 13 }}>2개 이상 선택하면 비교표가 표시됩니다.</p>
       ) : loading ? (
@@ -251,6 +278,7 @@ export default function Compare() {
           </table>
         </div>
       ) : null}
+      </div>
     </div>
   )
 }
