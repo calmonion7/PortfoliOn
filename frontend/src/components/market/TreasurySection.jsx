@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 export default function TreasurySection() {
   const [open, setOpen] = useState(true)
@@ -67,7 +68,7 @@ export default function TreasurySection() {
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={36} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                        labelStyle={{ color: 'var(--text-3)' }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Legend content={<GlossaryRechartsLegend />} />
               <ReferenceLine y={0} stroke="var(--border)" />
               <Line type="monotone" dataKey="10년" stroke="var(--data-2)" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="3개월" stroke="var(--data-5)" dot={false} strokeWidth={1.5} />

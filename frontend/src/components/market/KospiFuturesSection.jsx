@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
+import { GlossaryText } from '../Glossary.jsx'
 
 export default function KospiFuturesSection() {
   const [open, setOpen] = useState(false)
@@ -54,7 +55,7 @@ export default function KospiFuturesSection() {
           )}
         </div>
         <div className="metric-tile" style={{ minWidth: 110, flex: 1 }}>
-          <div className="lbl">베이시스{basisLabel ? ` (${basisLabel})` : ''}</div>
+          <div className="lbl"><GlossaryText text={`베이시스${basisLabel ? ` (${basisLabel})` : ''}`} /></div>
           <div className="v">{cur.basis != null ? cur.basis.toFixed(2) : '-'}</div>
         </div>
       </div>

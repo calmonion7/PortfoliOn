@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
+import { GlossaryText } from '../Glossary.jsx'
 
 export default function MacroSignalsSection() {
   const [open, setOpen] = useState(false)
@@ -82,7 +83,7 @@ export default function MacroSignalsSection() {
           const warn = zeroLine && last && last.value < 0
           return (
             <div key={key} className="metric-tile" style={{ flex: 1, minWidth: 150, ...(warn ? { border: '1px solid var(--warn)' } : {}) }}>
-              <div className="lbl">{label}</div>
+              <div className="lbl"><GlossaryText text={label} /></div>
               <div className="v" style={{ color: warn ? 'var(--warn)' : color }}>{last ? valFmt(last.value) : '-'}</div>
               {last && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{last.date}</div>}
               {chg != null && (

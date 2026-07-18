@@ -5,6 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
+import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 export default function LendingSection() {
   const [open, setOpen] = useState(true)
@@ -65,7 +66,7 @@ export default function LendingSection() {
               formatter={(v, name) => [`${Number(v).toFixed(1)}조원`, name]}
               labelFormatter={tooltipLabel}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend content={<GlossaryRechartsLegend />} />
             <Line type="monotone" dataKey="foreign_borrow" name="외국인 차입" stroke="var(--data-2)" dot={false} strokeWidth={2} />
             <Line type="monotone" dataKey="domestic_borrow" name="내국인 차입" stroke="var(--data-3)" dot={false} strokeWidth={2} />
             <Line type="monotone" dataKey="foreign_lend" name="외국인 대여" stroke="var(--data-4)" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />

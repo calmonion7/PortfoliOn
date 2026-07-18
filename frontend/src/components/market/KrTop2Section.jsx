@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, krFmt, isEstimated } from './marketUtils.jsx'
+import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 export default function KrTop2Section() {
   const [open, setOpen] = useState(false)
@@ -96,7 +97,7 @@ export default function KrTop2Section() {
             <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--data-3)' }} tickFormatter={v => `${v}%`} width={36} />
             <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                      formatter={(v, n) => n === '삼성+하이닉스 비중' ? [`${v?.toFixed(1)}%`, n] : [v != null ? `${krFmt(v)}원` : '-', n]} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend content={<GlossaryRechartsLegend />} />
             <Line yAxisId="left" type="monotone" dataKey="top2_act" name="삼성+하이닉스" stroke="var(--data-2)" dot={{ r: 3 }} strokeWidth={2} connectNulls={false}>
               <LabelList dataKey="top2_act" position="top" style={{ fontSize: 9, fill: 'var(--data-2)' }} formatter={krFmt} />
             </Line>

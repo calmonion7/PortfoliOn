@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
+import { GlossaryText } from '../Glossary.jsx'
 
 export default function EconIndicatorsSection() {
   const [open, setOpen] = useState(false)
@@ -62,7 +63,7 @@ export default function EconIndicatorsSection() {
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {indicators.map(({ label, color, last, prev, valFmt, chg, chgUnit, chgLabel }) => (
           <div key={label} className="metric-tile" style={{ flex: 1, minWidth: 140 }}>
-            <div className="lbl">{label}</div>
+            <div className="lbl"><GlossaryText text={label} /></div>
             <div className="v" style={{ color }}>{last ? valFmt(last.value) : '-'}</div>
             {last && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{last.date?.slice(0, 7)}</div>}
             {chg != null && (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { GlossaryText } from '../Glossary.jsx'
 
 const INDEX_LABELS = { gspc: 'S&P 500', ks11: 'KOSPI', kq11: 'KOSDAQ' }
 
@@ -70,7 +71,7 @@ export default function IndexSection() {
       {cape && (
         <div className="metric-tile" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div className="lbl">S&P 500 CAPE (실러 PER)</div>
+            <div className="lbl"><GlossaryText text="S&P 500 CAPE (실러 PER)" /></div>
             <div className="v">{cape.current}</div>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-3)' }}>

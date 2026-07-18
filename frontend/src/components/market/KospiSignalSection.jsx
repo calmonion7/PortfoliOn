@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { Bar, Cell, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
+import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 // KR 가격색 컨벤션(--up=빨강/--down=파랑)을 그대로 신호색으로 사용 — Badge success/danger 변형 금지
 const SIGNAL_DISPLAY = {
@@ -88,6 +89,15 @@ export default function KospiSignalSection() {
       {chart.length > 0 && (
         <div className="chartbox">
           <div className="sub">합성 신호 vs 실제 코스피 등락률 (최근 60일)</div>
+          {/* 막대 per-cell 색(신호 방향) 범례 — recharts Legend는 시리즈명만 보여줘 셀 색 의미가 비었음 */}
+          <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>
+            {Object.values(SIGNAL_DISPLAY).map(({ label, color }) => (
+              <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: color, display: 'inline-block' }} />
+                신호 {label}
+              </span>
+            ))}
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={chart} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -97,7 +107,7 @@ export default function KospiSignalSection() {
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                        labelStyle={{ color: 'var(--text-3)' }}
                        formatter={(v, name) => [v != null ? `${v.toFixed(2)}%` : '-', name]} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend content={<GlossaryRechartsLegend />} />
               <ReferenceLine y={0} stroke="var(--border)" />
               <Bar dataKey="composite_pct" name="합성 신호">
                 {chart.map((c, i) => <Cell key={i} fill={c.color} />)}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
 import Skeleton from '../components/ui/Skeleton'
+import { GlossaryText } from '../components/Glossary.jsx'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, ReferenceLine, Label,
@@ -141,6 +142,15 @@ function OpportunityBubble({ cards, usdkrw }) {
       <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 4 }}>
         X: 컨센서스 업사이드% &nbsp;·&nbsp; Y: 평단가 대비 수익률% &nbsp;·&nbsp; 버블 크기: 포트폴리오 비중
       </p>
+      {/* 버블 색 의미 범례 — 색만으로 업사이드 부호를 알 수 없던 것 보완 */}
+      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>
+        {[['var(--up)', '업사이드 양수 (목표가까지 여력)'], ['var(--down)', '업사이드 음수 (목표가 하회)']].map(([color, label]) => (
+          <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
+            <GlossaryText text={label} />
+          </span>
+        ))}
+      </div>
       <p style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 16, lineHeight: 1.7 }}>
         우상단(업사이드↑, 수익률↑): 목표가 여력이 있고 수익 중인 종목 &nbsp;·&nbsp;
         좌하단: 하락 중이면서 목표가 하회 — 점검 필요<br />

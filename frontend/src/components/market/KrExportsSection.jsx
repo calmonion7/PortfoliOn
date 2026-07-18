@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNote } from './marketUtils.jsx'
+import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 export default function KrExportsSection() {
   const [open, setOpen] = useState(false)
@@ -114,7 +115,7 @@ export default function KrExportsSection() {
             <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
                      labelFormatter={v => v.replace(/(\d{4})(\d{2})/, '$1-$2')}
                      formatter={(v, n) => n === '반도체 비중' ? [`${v?.toFixed(1)}%`, n] : [v.toLocaleString() + ' 억달러', n]} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend content={<GlossaryRechartsLegend />} />
             <Line yAxisId="left" type="monotone" dataKey="semiconductor" name="반도체" stroke="var(--data-2)" dot={{ r: 3 }} strokeWidth={2}>
               <LabelList dataKey="semiconductor" position="top" style={{ fontSize: 9, fill: 'var(--data-2)' }} formatter={v => v?.toFixed(0)} />
             </Line>

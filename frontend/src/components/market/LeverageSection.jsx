@@ -5,6 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from './marketUtils.jsx'
+import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 export default function LeverageSection() {
   const [open, setOpen] = useState(true)
@@ -105,7 +106,7 @@ export default function LeverageSection() {
               return [`${v}조`, name]
             }}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend content={<GlossaryRechartsLegend />} />
           <Area
             yAxisId="left"
             type="monotone"
