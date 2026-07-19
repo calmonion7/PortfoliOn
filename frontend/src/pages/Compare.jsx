@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import api from '../api'
 import usePortfolioData from '../hooks/usePortfolioData'
 import useReportList from '../hooks/useReportList'
+import useBodyScrollLock from '../hooks/useBodyScrollLock'
 import Skeleton from '../components/ui/Skeleton'
 import { fmtPrice } from '../utils'
 import { SketchEmpty, SketchError } from '../components/sketches'
@@ -114,7 +115,8 @@ export default function Compare() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const resultRef = useRef(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  useBodyScrollLock(modalOpen)
 
   const toggle = (ticker) => {
     setSelected(prev => {
@@ -213,24 +215,35 @@ export default function Compare() {
             type="button"
             className="cmp-selbar-go"
             disabled={selected.length < 2}
-            onClick={() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            onClick={() => setModalOpen(true)}
           >
             비교 보기
           </button>
         </div>
       )}
 
-      <div ref={resultRef}>
-      {selected.length < 2 ? (
-        <p style={{ color: 'var(--text-3)', fontSize: 13 }}>2개 이상 선택하면 비교표가 표시됩니다.</p>
-      ) : loading ? (
-        <Skeleton variant="row" count={6} />
-      ) : error ? (
-        <div style={{ textAlign: 'center', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchError size={120} /></div>
-          <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</span>
-        </div>
-      ) : data ? (
+      {modalOpen && (
+        <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 720, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h2 style={{ margin: 0 }}>종목 비교</h2>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                aria-label="닫기"
+                style={{ background: 'none', border: 0, fontSize: 22, color: 'var(--text-3)', cursor: 'pointer', lineHeight: 1, padding: 4 }}
+              >
+                ×
+              </button>
+            </div>
+            {loading ? (
+              <Skeleton variant="row" count={6} />
+            ) : error ? (
+              <div style={{ textAlign: 'center', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchError size={120} /></div>
+                <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</span>
+              </div>
+            ) : data ? (
         // eco: .tbl-wrap/.tbl 재사용(pc.css) — 인라인 표 스타일 대체, num 정렬·행 hover 내장
         // .table-mobile-wrap 병기 — 5열(라벨+최대 4종목)이 좁은 화면에서 넘칠 때 overflow-x:auto로 스크롤 복원(.tbl-wrap 단독은 overflow:hidden)
         <div className="tbl-wrap table-mobile-wrap">
@@ -277,8 +290,10 @@ export default function Compare() {
             </tbody>
           </table>
         </div>
-      ) : null}
-      </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

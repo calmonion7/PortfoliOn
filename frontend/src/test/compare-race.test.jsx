@@ -62,6 +62,7 @@ describe('Compare 경쟁 fetch 취소 가드', () => {
 
     fireEvent.click(getCheckbox('BBB'))  // BBB 해제 → selected=[AAA] (AAA,BBB 요청 cleanup으로 취소)
     fireEvent.click(getCheckbox('CCC'))  // CCC 선택 → AAA,CCC 요청(즉시 해결)
+    fireEvent.click(screen.getByText('비교 보기'))  // task#202: 비교표는 레이어(모달) 안에만 렌더
 
     await waitFor(() => {
       const table = document.querySelector('table')
