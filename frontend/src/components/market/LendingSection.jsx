@@ -8,7 +8,7 @@ import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, EmptyNot
 import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 export default function LendingSection() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

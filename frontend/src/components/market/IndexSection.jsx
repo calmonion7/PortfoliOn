@@ -7,7 +7,7 @@ import { GlossaryText } from '../Glossary.jsx'
 const INDEX_LABELS = { gspc: 'S&P 500', ks11: 'KOSPI', kq11: 'KOSDAQ' }
 
 export default function IndexSection() {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

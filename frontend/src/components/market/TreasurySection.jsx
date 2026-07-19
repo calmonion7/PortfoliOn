@@ -5,7 +5,7 @@ import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError } from '.
 import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 export default function TreasurySection() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
