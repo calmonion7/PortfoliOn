@@ -11,7 +11,7 @@ const SIGNAL_DISPLAY = {
   neutral: { label: '중립', color: 'var(--text-3)' },
 }
 
-const DRIVER_LABELS = { sp500: 'S&P500', nasdaq: '나스닥', usdkrw: 'USD/KRW' }
+const DRIVER_LABELS = { sp500: 'S&P500', nasdaq: '나스닥', usdkrw: 'USD/KRW', sox: '필라델피아 반도체(SOX)' }
 
 export default function KospiSignalSection() {
   const [open, setOpen] = useState(false)
@@ -52,7 +52,7 @@ export default function KospiSignalSection() {
 
   return (
     <SectionCard title="코스피 방향 신호" summary={`${label} ${current.composite_pct != null ? current.composite_pct.toFixed(2) : '-'}%`} open={open} onToggle={() => setOpen(o => !o)}>
-      <p style={DESC_STYLE}>미국 증시 마감(S&P500·나스닥)과 원/달러 환율(원화약세=비우호로 역방향 반영) 등락률을 등가중 합성해 다음날 코스피 방향을 추정하는 오버나잇 프록시입니다. 합성치가 ±0.5%p를 넘으면 강세/약세, 그 안이면 중립으로 판정합니다. 실제 결과는 다음 배치 실행 시 코스피 시가·종가 데이터가 확보되는 대로 소급 확정됩니다.</p>
+      <p style={DESC_STYLE}>미국 증시 마감(S&P500·나스닥·필라델피아 반도체지수 SOX)과 원/달러 환율 등락률을 가중치(S&P500 2·나스닥 0.5·USD/KRW −0.5(원화약세=비우호로 역방향 반영)·SOX 1)로 합성해 다음날 코스피 방향을 추정하는 오버나잇 프록시입니다(1년 백테스트로 재조정, task#203). 밴드는 코스피 20일 실현변동성(σ)의 0.5배로 매일 바뀌며, 합성치가 이 밴드를 넘으면 강세/약세, 그 안이면 중립으로 판정합니다. 적중 판정은 강세/약세는 실제 코스피 등락 부호가 신호와 일치하는지, 중립은 실제 등락률이 그날 밴드 이내인지로 봅니다. 실제 결과는 다음 배치 실행 시 코스피 시가·종가 데이터가 확보되는 대로 소급 확정됩니다.</p>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <div className="metric-tile" style={{ minWidth: 140 }}>
@@ -62,6 +62,11 @@ export default function KospiSignalSection() {
             {current.composite_pct != null ? `${current.composite_pct > 0 ? '+' : ''}${current.composite_pct.toFixed(2)}%` : '-'}
           </div>
           {stale && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>{daysAgo}일 전 기준</div>}
+        </div>
+
+        <div className="metric-tile" style={{ minWidth: 120 }}>
+          <div className="lbl">밴드 (σ20×0.5)</div>
+          <div className="v">{current.band != null ? `±${current.band.toFixed(2)}%` : '-'}</div>
         </div>
 
         {Object.entries(DRIVER_LABELS).map(([key, label2]) => {

@@ -256,7 +256,7 @@ BATCHES = [
         "category": "market",
         "schedule_desc": "평일 08:30",
         "usage": ["Market Hub 시장지표"],
-        "source": ["yfinance"],
+        "source": ["yfinance(S&P500·나스닥·USD/KRW·SOX·KOSPI)"],
         "editable": True,
         "trigger_kinds": ["auto", "manual"],
         "manual_endpoint": "/api/market/refresh-kospi-signal",
