@@ -993,6 +993,21 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
     ],
     "one_liner": "1인당 생산성은 상승세이나 이직률 관리가 관건"
   },
+  "competitor_edge": {
+    "axis": "원가경쟁력",
+    "entries": [
+      { "ticker": "MSFT", "edge": "클라우드 인프라 규모의 경제 우위", "position": "동등" }
+    ],
+    "one_liner": "생태계 락인은 강하나 원가 경쟁력은 대등한 수준"
+  },
+  "market_outlook": {
+    "market_name": "글로벌 AI 서비스 시장",
+    "size_current": { "value": 200, "unit": "십억달러", "year": 2025 },
+    "size_forecast": { "value": 600, "unit": "십억달러", "year": 2029 },
+    "cagr_pct": 31.5,
+    "sources": ["Gartner (2026-01)"],
+    "one_liner": "AI 서비스 시장은 연 31%대 고성장 국면"
+  },
   "competitors": ["MSFT", "GOOGL"]
 }
 ```
@@ -1009,6 +1024,19 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 | `key_resource.metrics` | `{label, unit, series}[]` | ❌ | 분기별 지표 목록. `series`는 `{period, value}[]`, `period` 형식 `YYYYQn`(예: `"2025Q1"`) |
 | `key_resource.drivers` | `{title, description}[]` | ❌ | 자원 유지 동력(리텐션 인센티브) 목록 |
 | `key_resource.one_liner` | string | ❌ | 한 줄 종합 요약 |
+| `competitor_edge` | object | ❌ | 경쟁사 대비 사업 경쟁력의 상대 위치(업종별 비교축 기준). 저장 후 리포트 심층분석 탭 "경쟁사 기술·경쟁력 비교" 섹션에 표시. **Peer 할인/할증**(밸류에이션 멀티플 기반 자동 계산 상대위치)**과는 별개** |
+| `competitor_edge.axis` | string | ❌ | 업종에 맞는 비교축 라벨 (예: `"원가경쟁력"`) |
+| `competitor_edge.one_liner` | string | ❌ | 한 줄 종합 요약 |
+| `competitor_edge.entries` | `{ticker, name, edge, position}[]` | ❌ | 경쟁사별 비교 목록. `ticker`로 `competitors_data`와 조인 |
+| `market_outlook` | object | ❌ | 회사가 속한 전방시장의 규모·성장 전망. 저장 후 리포트 심층분석 탭 "시장 전망" 섹션에 표시. `growth_plan`(회사 전략)**과는 별개** |
+| `market_outlook.market_name` | string | ❌ | 시장 정의 (예: `"글로벌 HBM 시장"`) |
+| `market_outlook.size_current` | `{value, unit, year}` | ❌ | 현재 시장 규모 |
+| `market_outlook.size_forecast` | `{value, unit, year}` | ❌ | 전망 시장 규모 |
+| `market_outlook.cagr_pct` | number | ❌ | 연평균 성장률(%) |
+| `market_outlook.company_share_pct` | number | ❌ | 회사의 해당 시장 점유율(%) |
+| `market_outlook.position` | string | ❌ | 시장 내 위치 (예: `"1위"`) |
+| `market_outlook.sources` | string[] | ✅(값 포함 시) | 근거 출처 목록. **출처 없는 값은 저장하지 말 것** |
+| `market_outlook.one_liner` | string | ❌ | 한 줄 종합 요약 |
 | `competitors` | string[] | ❌ | 경쟁사 티커 목록 |
 
 > 최소 1개 이상의 필드를 포함해야 함.

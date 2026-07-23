@@ -134,6 +134,8 @@ class EnrichBody(BaseModel):
     recent_disclosures: Optional[Any] = None
     insights: Optional[Any] = None
     key_resource: Optional[Any] = None
+    competitor_edge: Optional[Any] = None
+    market_outlook: Optional[Any] = None
     competitors: Optional[List[str]] = None
 
 
@@ -145,6 +147,8 @@ class BatchEnrichItem(BaseModel):
     recent_disclosures: Optional[Any] = None
     insights: Optional[Any] = None
     key_resource: Optional[Any] = None
+    competitor_edge: Optional[Any] = None
+    market_outlook: Optional[Any] = None
     competitors: Optional[List[str]] = None
 
 

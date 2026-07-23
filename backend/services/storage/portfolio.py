@@ -2,8 +2,8 @@
 import json
 from services.db import get_connection, query, execute
 
-_ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures", "insights", "key_resource"})
-_JSON_TEXT_FIELDS = frozenset({"moat", "growth_plan", "risks", "recent_disclosures", "insights", "key_resource"})
+_ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures", "insights", "key_resource", "competitor_edge", "market_outlook"})
+_JSON_TEXT_FIELDS = frozenset({"moat", "growth_plan", "risks", "recent_disclosures", "insights", "key_resource", "competitor_edge", "market_outlook"})
 
 
 def _parse_json_field(val):
@@ -27,7 +27,7 @@ def get_stocks(user_id: str) -> list[dict]:
     rows = query(
         """
         SELECT t.ticker, t.name, t.market, t.exchange,
-               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights, t.key_resource
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights, t.key_resource, t.competitor_edge, t.market_outlook
         FROM user_stocks us
         JOIN tickers t ON t.ticker = us.ticker
         WHERE us.user_id = %s
@@ -202,7 +202,7 @@ def get_full_portfolio(user_id: str) -> dict:
         """
         SELECT us.ticker, us.type, us.quantity, us.avg_cost, us.target_price, us.stop_price, us.target_weight, us.pinned,
                t.name, t.market, t.exchange, t.is_etf,
-               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights, t.key_resource
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights, t.key_resource, t.competitor_edge, t.market_outlook
         FROM user_stocks us
         LEFT JOIN tickers t ON t.ticker = us.ticker
         WHERE us.user_id = %s
@@ -223,6 +223,8 @@ def get_full_portfolio(user_id: str) -> dict:
             "recent_disclosures": _parse_json_field(r.get("recent_disclosures")),
             "insights": _parse_json_field(r.get("insights")),
             "key_resource": _parse_json_field(r.get("key_resource")),
+            "competitor_edge": _parse_json_field(r.get("competitor_edge")),
+            "market_outlook": _parse_json_field(r.get("market_outlook")),
             "is_etf": bool(r.get("is_etf")),
             "pinned": bool(r.get("pinned")),
         }
@@ -247,7 +249,7 @@ def get_global_portfolio() -> dict:
         """
         SELECT DISTINCT ON (us.ticker)
                us.ticker, us.type, us.pinned, t.name, t.market, t.exchange, t.is_etf,
-               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights, t.key_resource
+               t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights, t.key_resource, t.competitor_edge, t.market_outlook
         FROM user_stocks us
         LEFT JOIN tickers t ON t.ticker = us.ticker
         ORDER BY us.ticker, CASE us.type WHEN 'holding' THEN 0 ELSE 1 END
@@ -267,6 +269,8 @@ def get_global_portfolio() -> dict:
             "recent_disclosures": _parse_json_field(r.get("recent_disclosures")),
             "insights": _parse_json_field(r.get("insights")),
             "key_resource": _parse_json_field(r.get("key_resource")),
+            "competitor_edge": _parse_json_field(r.get("competitor_edge")),
+            "market_outlook": _parse_json_field(r.get("market_outlook")),
             "is_etf": bool(r.get("is_etf")),
             "pinned": bool(r.get("pinned")),
         }

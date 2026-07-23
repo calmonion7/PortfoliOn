@@ -16,6 +16,9 @@ SAMPLE_STOCK = {
     "recent_disclosures": "Q1 실적 호조",
     "risks": "Competition risk",
     "key_resource": {"resource": "인력", "one_liner": "1인당 생산성 상승세"},
+    "competitor_edge": {"axis": "점유율", "one_liner": "1위 유지", "entries": [{"ticker": "AAPL", "edge": "브랜드"}]},
+    "market_outlook": {"market_name": "AI 반도체", "size_current": {"value": 100, "unit": "억달러", "year": 2026},
+                        "cagr_pct": 20.0, "sources": [], "one_liner": "성장 지속"},
 }
 
 SAMPLE_NEWS = [
@@ -108,6 +111,8 @@ def test_generate_report_json_has_analyst_text_fields(tmp_path):
     assert summary["recent_disclosures"] == "Q1 실적 호조"
     assert summary["risks"] == "Competition risk"
     assert summary["key_resource"] == {"resource": "인력", "one_liner": "1인당 생산성 상승세"}
+    assert summary["competitor_edge"] == SAMPLE_STOCK["competitor_edge"]
+    assert summary["market_outlook"] == SAMPLE_STOCK["market_outlook"]
 
 
 def test_generate_report_json_has_competitors_data(tmp_path):
@@ -185,6 +190,9 @@ def _mock_kr(quote_name: str):
         # 없으면 라이브 네트워크를 탄다 — info에 enterpriseToEbitda를 실어 값 확인도 겸함.
         "services.report_generator.yf.Ticker": MagicMock(return_value=MagicMock(
             info={"enterpriseToEbitda": 12.3})),
+        # KR R&D집약도(task#204 S2)가 get_rd_intensity_kr(DART requests.get)를 신규 호출하므로
+        # mock 없으면 라이브 네트워크를 탄다(DART_API_KEY 미설정 시에만 우연히 no-op이던 것).
+        "services.market.kr.get_rd_intensity_kr": MagicMock(return_value=None),
     }
 
 

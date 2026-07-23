@@ -17,6 +17,7 @@ import pandas as pd
 import yfinance as yf
 
 from services import market as mkt, indicators, scraper
+from services.market.format import _yf_val, _safe_pct
 from services.utils import sanitize as _sanitize
 from services.db import execute, query
 import logging
@@ -47,11 +48,34 @@ def _kr_psr(market_cap, ttm_revenue):
     return None
 
 
+def _us_rd_intensity(t) -> float:
+    """US R&D집약도(%) = R&D비÷매출×100, 최신 연도(task#204 S2). `get_income_stmt` *메서드*
+    (무공백 라벨 ResearchAndDevelopment/TotalRevenue)만 쓸 것 — `.income_stmt` 프로퍼티는
+    공백 라벨이라 exact 매칭이 조용히 None(검증된 가토). sanity: 0<R&D<매출 아니면 None."""
+    try:
+        stmt = t.get_income_stmt(freq="yearly", as_dict=False)
+        if stmt is None or stmt.empty:
+            return None
+        col = stmt.columns[0]  # 최신 연도
+        rd = _yf_val(stmt, "ResearchAndDevelopment", col)
+        revenue = _yf_val(stmt, "TotalRevenue", col)
+        if rd is None or revenue is None:
+            return None
+        rd, revenue = float(rd), float(revenue)
+        if not (0 < rd < revenue):
+            return None
+        return _safe_pct(rd, revenue)
+    except Exception as e:
+        logger.warning(f"[Valuation] R&D 집약도 조회 실패: {e}")
+        return None
+
+
 def _comp_valuation(ticker: str, market: str) -> dict:
-    """경쟁사 PER/PBR/PSR/EV_EBITDA(ADR-0024). US=yfinance info(추가콜 0). KR: PER/PBR=Naver
-    finance/quarter 최신 실적행, PSR은 시총 미보유라 `_ttm_revenue`(원, 4분기 온전 시만)만 반환하고
-    조립부가 _kr_psr로 계산, EV/EBITDA=yfinance `.KS`→`.KQ` 폴백(독립 실패, per/pbr를 물귀신 삼지 않음).
-    결측/예외→None."""
+    """경쟁사 PER/PBR/PSR/EV_EBITDA/RD_INTENSITY(ADR-0024, task#204 S2). US=yfinance info
+    (추가콜 0)+get_income_stmt(R&D집약도, 추가콜 1). KR: PER/PBR=Naver finance/quarter 최신
+    실적행, PSR은 시총 미보유라 `_ttm_revenue`(원, 4분기 온전 시만)만 반환하고 조립부가
+    _kr_psr로 계산, EV/EBITDA=yfinance `.KS`→`.KQ` 폴백(독립 실패, per/pbr를 물귀신 삼지 않음),
+    RD_INTENSITY=DART best-effort(`get_rd_intensity_kr`, 독립 실패). 결측/예외→None."""
     def _fin(v):
         try:
             f = float(v)
@@ -72,7 +96,7 @@ def _comp_valuation(ticker: str, market: str) -> dict:
 
     try:
         if market == "KR":
-            from services.market.kr import _naver_get, _naver_row_val
+            from services.market.kr import _naver_get, _naver_row_val, get_rd_intensity_kr
             d = _naver_get(ticker, "finance/quarter")
             fi = d.get("financeInfo", {})
             metas = sorted(fi.get("trTitleList", []), key=lambda t: t["key"], reverse=True)
@@ -80,7 +104,8 @@ def _comp_valuation(ticker: str, market: str) -> dict:
             non_consensus_keys = [m["key"] for m in metas if m.get("isConsensus") != "Y"]
             key = non_consensus_keys[0] if non_consensus_keys else None
             if not key:
-                return {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": _kr_ev_ebitda()}
+                return {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": _kr_ev_ebitda(),
+                        "rd_intensity": get_rd_intensity_kr(ticker)}
             rev_q = [_fin(_naver_row_val(rows, 0, k)) for k in non_consensus_keys[:4]]
             ttm_revenue = (
                 sum(rev_q) * 1e8
@@ -92,20 +117,23 @@ def _comp_valuation(ticker: str, market: str) -> dict:
                 "pbr": _fin(_naver_row_val(rows, 14, key)),
                 "_ttm_revenue": ttm_revenue,
                 "ev_ebitda": _kr_ev_ebitda(),
+                "rd_intensity": get_rd_intensity_kr(ticker),
             }
         else:
-            info = yf.Ticker(ticker).info or {}
+            t = yf.Ticker(ticker)
+            info = t.info or {}
             return {
                 "per": _fin(info.get("trailingPE")),
                 "pbr": _fin(info.get("priceToBook")),
                 "psr": _fin(info.get("priceToSalesTrailing12Months")),
                 "ev_ebitda": _fin(info.get("enterpriseToEbitda")),
+                "rd_intensity": _us_rd_intensity(t),
             }
     except Exception as e:
         logger.warning(f"[Valuation] {ticker} 경쟁사 밸류에이션 조회 실패: {e}")
         if market == "KR":
-            return {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": None}
-        return {"per": None, "pbr": None, "psr": None, "ev_ebitda": None}
+            return {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": None, "rd_intensity": None}
+        return {"per": None, "pbr": None, "psr": None, "ev_ebitda": None, "rd_intensity": None}
 
 
 def _infer_comp_market(ticker: str, parent_market: str, parent_exchange: str):
@@ -255,6 +283,9 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         except Exception as e:
             logger.warning(f"[Report] {ticker} KR EV/EBITDA 조회 실패: {e}")
             ev_ebitda = None
+        # R&D집약도(%): DART best-effort, 독립 실패(task#204 S2, KR 고도화 Non-goal)
+        from services.market.kr import get_rd_intensity_kr
+        rd_intensity = get_rd_intensity_kr(ticker)
     else:
         try:
             _info = (_t.info if _t is not None else {}) or {}
@@ -266,10 +297,12 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
             # eco: priceToSalesTrailing12Months is the actual key (라이브 AAPL 확인 2026-06-28)
             psr = _fin_num(_info.get("priceToSalesTrailing12Months"))
             ev_ebitda = _fin_num(_info.get("enterpriseToEbitda"))
+            # R&D집약도(%): 이미 fetch한 _t 재사용, 독립 실패(task#204 S2)
+            rd_intensity = _us_rd_intensity(_t) if _t is not None else None
         except Exception as e:
             logger.warning(f"[Report] {ticker} US 섹터·밸류에이션 조회 실패: {e}")
             sector, industry = "", ""
-            trailing_per = forward_per = pbr = psr = ev_ebitda = None
+            trailing_per = forward_per = pbr = psr = ev_ebitda = rd_intensity = None
 
     # price = quote 우선, 없으면 일봉 마지막 종가 — 단 비유한(NaN/inf, 미완성 바 등)이면 None.
     # NaN을 그대로 두면 아래 `if summary["price"] is None` 가드를 통과(NaN≠None)해 US에서 price:null
@@ -322,6 +355,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         "risks": stock.get("risks", ""),
         "insights": stock.get("insights", ""),
         "key_resource": stock.get("key_resource", ""),
+        "competitor_edge": stock.get("competitor_edge", ""),
+        "market_outlook": stock.get("market_outlook", ""),
         "competitors_data": sorted(
             [
                 {
@@ -340,6 +375,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
                         else _kr_psr(q.get("market_cap"), v.get("_ttm_revenue"))
                     ),
                     "ev_ebitda": ev_ebitda if c == ticker else v.get("ev_ebitda"),
+                    "rd_intensity": rd_intensity if c == ticker else v.get("rd_intensity"),
                 }
                 for c, q, v in zip(
                     [ticker] + list(competitors),
@@ -570,6 +606,8 @@ def backfill_ticker(stock: dict, days: int = 60, output_base_dir: Path = SNAPSHO
             "risks": stock.get("risks", ""),
             "insights": stock.get("insights", ""),
             "key_resource": stock.get("key_resource", ""),
+            "competitor_edge": stock.get("competitor_edge", ""),
+            "market_outlook": stock.get("market_outlook", ""),
             "competitors_data": [],
             "news": [],
         }

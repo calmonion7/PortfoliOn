@@ -3,7 +3,7 @@ import logging
 import yfinance as yf
 import requests
 
-from services.market.format import _norm_sector, _n, _safe_ratio
+from services.market.format import _norm_sector, _n, _safe_ratio, _safe_pct
 
 logger = logging.getLogger(__name__)
 
@@ -520,6 +520,67 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
     except Exception as e:
         logger.warning(f"[Financials] 연간 재무 조회 실패 ({ticker}): {e}")
         return []
+
+
+def get_rd_intensity_kr(ticker: str) -> float | None:
+    """KR 경쟁사 R&D집약도(%) best-effort = R&D비÷매출×100 (task#204 S2).
+    DART 최신 연간 재무제표(fnlttSinglAcntAll, fs_div CFS→OFS 폴백)에서 '연구개발' 계열
+    계정(account_nm 부분일치)을 합산해 '매출액' 계정으로 나눈다. 표준 account_id가 없어
+    account_nm 부분일치 best-effort — KR 고도화는 명시적 Non-goal이라 계정 미발견·
+    corp_code/DART_API_KEY 부재·sanity 위반(0<R&D<매출 아님)은 모두 결측(None)으로 단순화."""
+    import os
+    dart_key = os.environ.get("DART_API_KEY", "")
+    if not dart_key:
+        return None
+    try:
+        from services.backlog import _get_corp_code_map
+        corp_code = _get_corp_code_map().get(ticker)
+        if not corp_code:
+            return None
+
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        this_year = datetime.now(ZoneInfo("Asia/Seoul")).year
+
+        for bsns_year in (str(this_year - 1), str(this_year - 2)):
+            data = None
+            for fs_div in ("CFS", "OFS"):
+                resp = requests.get(
+                    f"{_DART_BASE}/fnlttSinglAcntAll.json",
+                    params={"crtfc_key": dart_key, "corp_code": corp_code,
+                            "bsns_year": bsns_year, "reprt_code": "11011",
+                            "fs_div": fs_div},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                d = resp.json()
+                if d.get("status") == "000":
+                    data = d
+                    break
+            if not data:
+                continue
+
+            rd = revenue = None
+            for row in data.get("list", []):
+                nm = row.get("account_nm", "")
+                raw = (row.get("thstrm_amount") or "").replace(",", "").strip()
+                try:
+                    v = int(raw) if raw and raw not in ("", "-") else None
+                except (ValueError, TypeError):
+                    v = None
+                if v is None:
+                    continue
+                if "연구개발" in nm:
+                    rd = (rd or 0) + v
+                elif revenue is None and "매출액" in nm:
+                    revenue = v
+
+            if rd is not None and revenue is not None and 0 < rd < revenue:
+                return _safe_pct(rd, revenue)
+        return None
+    except Exception as e:
+        logger.warning(f"[Valuation] {ticker} KR R&D 집약도 조회 실패: {e}")
+        return None
 
 
 def get_analyst_data_kr(ticker: str) -> dict:

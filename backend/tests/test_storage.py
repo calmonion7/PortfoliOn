@@ -50,6 +50,23 @@ def test_enrich_stock_accepts_key_resource_and_json_encodes_dict():
     assert params[0] == json.dumps(key_resource)
 
 
+def test_enrich_stock_accepts_competitor_edge_and_market_outlook_and_json_encodes_dict():
+    import json
+    from services import storage
+    competitor_edge = {"axis": "점유율", "one_liner": "1위 유지", "entries": [{"ticker": "AAPL", "edge": "브랜드"}]}
+    market_outlook = {"market_name": "AI 반도체", "size_current": {"value": 100, "unit": "억달러", "year": 2026},
+                       "cagr_pct": 20.0, "sources": [], "one_liner": "성장 지속"}
+    with patch("services.storage.portfolio.query", return_value=[{"ticker": "AAPL"}]), \
+         patch("services.storage.portfolio.execute", return_value=1) as mock_execute:
+        result = storage.enrich_stock("AAPL", {"competitor_edge": competitor_edge, "market_outlook": market_outlook})
+    assert result is True
+    sql, params = mock_execute.call_args[0]
+    assert "competitor_edge=%s" in sql
+    assert "market_outlook=%s" in sql
+    assert params[0] == json.dumps(competitor_edge)
+    assert params[1] == json.dumps(market_outlook)
+
+
 def test_get_schedule_default():
     from services import storage
     with patch("services.storage.schedule.query", return_value=[]):
@@ -306,6 +323,24 @@ def test_get_full_portfolio_parses_key_resource_json_text():
     with patch("services.storage.portfolio.query", return_value=[row]):
         result = storage.get_full_portfolio("user-123")
     assert result["stocks"][0]["key_resource"] == key_resource
+
+
+def test_get_full_portfolio_parses_competitor_edge_and_market_outlook_json_text():
+    import json
+    from services import storage
+    competitor_edge = {"axis": "점유율", "one_liner": "1위 유지", "entries": [{"ticker": "AAPL", "edge": "브랜드"}]}
+    market_outlook = {"market_name": "AI 반도체", "size_current": {"value": 100, "unit": "억달러", "year": 2026},
+                       "cagr_pct": 20.0, "sources": [], "one_liner": "성장 지속"}
+    row = {"ticker": "AAPL", "type": "holding", "quantity": 10, "avg_cost": 150.0,
+           "target_price": None, "stop_price": None, "target_weight": None, "pinned": False,
+           "name": "Apple", "market": "US", "exchange": "", "is_etf": False,
+           "competitors": [], "moat": None, "growth_plan": None, "risks": None,
+           "recent_disclosures": None, "insights": None, "key_resource": None,
+           "competitor_edge": json.dumps(competitor_edge), "market_outlook": json.dumps(market_outlook)}
+    with patch("services.storage.portfolio.query", return_value=[row]):
+        result = storage.get_full_portfolio("user-123")
+    assert result["stocks"][0]["competitor_edge"] == competitor_edge
+    assert result["stocks"][0]["market_outlook"] == market_outlook
 
 
 def test_set_pinned_returns_true_when_row_updated():

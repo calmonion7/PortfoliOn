@@ -200,6 +200,16 @@ def _migrate():
         execute("ALTER TABLE tickers ADD COLUMN IF NOT EXISTS key_resource text NOT NULL DEFAULT ''")
     except Exception as e:
         logger.warning(f"[Migrate] tickers.key_resource 추가 실패: {e}")
+    try:
+        from services.db import execute
+        execute("ALTER TABLE tickers ADD COLUMN IF NOT EXISTS competitor_edge text NOT NULL DEFAULT ''")
+    except Exception as e:
+        logger.warning(f"[Migrate] tickers.competitor_edge 추가 실패: {e}")
+    try:
+        from services.db import execute
+        execute("ALTER TABLE tickers ADD COLUMN IF NOT EXISTS market_outlook text NOT NULL DEFAULT ''")
+    except Exception as e:
+        logger.warning(f"[Migrate] tickers.market_outlook 추가 실패: {e}")
 
 
 @asynccontextmanager

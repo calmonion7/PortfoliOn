@@ -109,7 +109,8 @@ def test_comp_valuation_us_reads_psr_ev_ebitda_from_info():
         "priceToSalesTrailing12Months": 8.5, "enterpriseToEbitda": 22.1,
     })):
         result = rg._comp_valuation("MSFT", "US")
-    assert result == {"per": 20.0, "pbr": 5.0, "psr": 8.5, "ev_ebitda": 22.1}
+    # get_income_stmt는 미설정 MagicMock(.empty가 기본 truthy) → rd_intensity None
+    assert result == {"per": 20.0, "pbr": 5.0, "psr": 8.5, "ev_ebitda": 22.1, "rd_intensity": None}
 
 
 def test_comp_valuation_us_nan_infinity_become_none():
@@ -118,7 +119,7 @@ def test_comp_valuation_us_nan_infinity_become_none():
         "priceToSalesTrailing12Months": None, "enterpriseToEbitda": float("inf"),
     })):
         result = rg._comp_valuation("MSFT", "US")
-    assert result == {"per": None, "pbr": None, "psr": None, "ev_ebitda": None}
+    assert result == {"per": None, "pbr": None, "psr": None, "ev_ebitda": None, "rd_intensity": None}
 
 
 def test_comp_valuation_kr_ttm_revenue_complete_4_quarters():
@@ -172,4 +173,95 @@ def test_comp_valuation_kr_ev_ebitda_ks_none_falls_back_kq():
 def test_comp_valuation_kr_exception_returns_all_none_four_keys():
     with patch("services.market.kr._naver_get", side_effect=RuntimeError("boom")):
         result = rg._comp_valuation("000660", "KR")
-    assert result == {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": None}
+    assert result == {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": None, "rd_intensity": None}
+
+
+# ── task#204 S2: R&D집약도(rd_intensity) ─────────────────────────────────────
+# US=yfinance get_income_stmt 메서드(무공백 라벨). KR=DART best-effort(Non-goal).
+
+import pandas as pd
+
+
+def _income_stmt(rd=None, revenue=None):
+    """get_income_stmt(freq='yearly', as_dict=False) 형태 fixture(무공백 라벨, 최신 연도 1컬럼)."""
+    data, index = {}, []
+    if rd is not None:
+        index.append("ResearchAndDevelopment")
+    if revenue is not None:
+        index.append("TotalRevenue")
+    values = [v for v in (rd, revenue) if v is not None]
+    return pd.DataFrame({pd.Timestamp("2025-12-31"): values}, index=index)
+
+
+def test_comp_valuation_us_rd_intensity_normal():
+    stmt = _income_stmt(rd=1_000_000_000.0, revenue=20_000_000_000.0)
+    with patch("services.report_generator.yf.Ticker", return_value=MagicMock(
+            info={}, get_income_stmt=MagicMock(return_value=stmt))):
+        result = rg._comp_valuation("MSFT", "US")
+    assert result["rd_intensity"] == 5.0
+
+
+def test_comp_valuation_us_rd_intensity_sanity_violation_returns_none():
+    """R&D > 매출(비정상) → None (wrong<missing)."""
+    stmt = _income_stmt(rd=25_000_000_000.0, revenue=20_000_000_000.0)
+    with patch("services.report_generator.yf.Ticker", return_value=MagicMock(
+            info={}, get_income_stmt=MagicMock(return_value=stmt))):
+        result = rg._comp_valuation("MSFT", "US")
+    assert result["rd_intensity"] is None
+
+
+def test_comp_valuation_us_rd_intensity_missing_label_returns_none():
+    stmt = _income_stmt(revenue=20_000_000_000.0)  # ResearchAndDevelopment 행 없음
+    with patch("services.report_generator.yf.Ticker", return_value=MagicMock(
+            info={}, get_income_stmt=MagicMock(return_value=stmt))):
+        result = rg._comp_valuation("MSFT", "US")
+    assert result["rd_intensity"] is None
+
+
+from services.market.kr import get_rd_intensity_kr
+
+
+def _dart_rd_list(rd_amount, revenue_amount):
+    return [
+        {"account_nm": "매출액", "thstrm_amount": str(revenue_amount)},
+        {"account_nm": "연구개발비", "thstrm_amount": str(rd_amount)},
+    ]
+
+
+def test_kr_rd_intensity_normal():
+    with patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
+         patch("services.backlog._get_corp_code_map", return_value={"000660": "00164779"}), \
+         patch("services.market.kr.requests.get") as mock_req:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"status": "000", "list": _dart_rd_list(1_000_000_000_000, 20_000_000_000_000)}
+        mock_req.return_value = mock_resp
+        result = get_rd_intensity_kr("000660")
+    assert result == 5.0
+
+
+def test_kr_rd_intensity_sanity_violation_returns_none():
+    with patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
+         patch("services.backlog._get_corp_code_map", return_value={"000660": "00164779"}), \
+         patch("services.market.kr.requests.get") as mock_req:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"status": "000", "list": _dart_rd_list(25_000_000_000_000, 20_000_000_000_000)}
+        mock_req.return_value = mock_resp
+        result = get_rd_intensity_kr("000660")
+    assert result is None
+
+
+def test_kr_rd_intensity_missing_label_returns_none():
+    with patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
+         patch("services.backlog._get_corp_code_map", return_value={"000660": "00164779"}), \
+         patch("services.market.kr.requests.get") as mock_req:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"status": "000", "list": [{"account_nm": "매출액", "thstrm_amount": "20000000000000"}]}
+        mock_req.return_value = mock_resp
+        result = get_rd_intensity_kr("000660")
+    assert result is None
+
+
+def test_kr_rd_intensity_no_dart_key_returns_none():
+    with patch("os.environ.get", side_effect=lambda k, d="": "" if k == "DART_API_KEY" else d):
+        result = get_rd_intensity_kr("000660")
+    assert result is None
