@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import re
 import yfinance as yf
 import requests
 
@@ -522,59 +523,92 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
         return []
 
 
+_RD_UNIT_RE = re.compile(r"단위[^)]*?(조원|억원|백만원|천원|원)")
+
+
+def _rd_unit(table) -> "str | None":
+    """표 직전 '(단위 ...)' 캡션에서 KRW 단위 추출. 캡션 없음/비KRW → None
+    (backlog._table_unit과 달리 안전 기본값 폴백 없음 — wrong<missing)."""
+    node = table.find_previous(string=re.compile("단위"))
+    if not node:
+        return None
+    m = _RD_UNIT_RE.search(str(node))
+    return m.group(1) if m else None
+
+
 def get_rd_intensity_kr(ticker: str) -> float | None:
-    """KR 경쟁사 R&D집약도(%) best-effort = R&D비÷매출×100 (task#204 S2).
-    DART 최신 연간 재무제표(fnlttSinglAcntAll, fs_div CFS→OFS 폴백)에서 '연구개발' 계열
-    계정(account_nm 부분일치)을 합산해 '매출액' 계정으로 나눈다. 표준 account_id가 없어
-    account_nm 부분일치 best-effort — KR 고도화는 명시적 Non-goal이라 계정 미발견·
-    corp_code/DART_API_KEY 부재·sanity 위반(0<R&D<매출 아님)은 모두 결측(None)으로 단순화."""
+    """KR 경쟁사 R&D집약도(%) best-effort (task#204 S2 M3 재구현).
+    fnlttSinglAcntAll(4대 재무제표)엔 R&D 세부 라인이 구조적으로 없어(라이브 확인)
+    구버전은 항상 None이었다 — 사업보고서 document.xml의 '연구개발비용' 표를 직접
+    파싱한다. 표 내 '연구개발비 / 매출액' 비율 행이 있으면 그 당기(%) 값을 그대로
+    쓰고(단위 무관), 없으면 같은 표의 연구개발비·매출액 행을 뽑아 계산한다(같은
+    표=같은 단위라 단위 불문 정확) — 단, 계산 경로는 단위 캡션 확정을 요구해 표
+    오인식을 걸러낸다(안전 기본값 폴백 금지). list.json 미발견·document.xml 실패·
+    표 미발견·sanity 위반(0<x<100 또는 0<rd<revenue 아님)은 모두 결측(None)."""
     import os
     dart_key = os.environ.get("DART_API_KEY", "")
     if not dart_key:
         return None
     try:
-        from services.backlog import _get_corp_code_map
+        from datetime import datetime, timedelta
+        from bs4 import BeautifulSoup
+        from services.backlog import _get_corp_code_map, _get_document_text
+        from services.backlog_parser import _expand_grid, _num
+
         corp_code = _get_corp_code_map().get(ticker)
         if not corp_code:
             return None
 
-        from datetime import datetime
-        from zoneinfo import ZoneInfo
-        this_year = datetime.now(ZoneInfo("Asia/Seoul")).year
+        resp = requests.get(
+            f"{_DART_BASE}/list.json",
+            params={
+                "crtfc_key": dart_key, "corp_code": corp_code, "pblntf_ty": "A",
+                "bgn_de": (datetime.utcnow() - timedelta(days=730)).strftime("%Y%m%d"),
+                "page_count": 10,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("status") != "000":
+            return None
+        rcept_no = next(
+            (r.get("rcept_no") for r in data.get("list", [])
+             if "사업보고서" in (r.get("report_nm") or "")),
+            None,
+        )
+        if not rcept_no:
+            return None
 
-        for bsns_year in (str(this_year - 1), str(this_year - 2)):
-            data = None
-            for fs_div in ("CFS", "OFS"):
-                resp = requests.get(
-                    f"{_DART_BASE}/fnlttSinglAcntAll.json",
-                    params={"crtfc_key": dart_key, "corp_code": corp_code,
-                            "bsns_year": bsns_year, "reprt_code": "11011",
-                            "fs_div": fs_div},
-                    timeout=15,
-                )
-                resp.raise_for_status()
-                d = resp.json()
-                if d.get("status") == "000":
-                    data = d
-                    break
-            if not data:
+        html = _get_document_text(rcept_no)
+        if not html:
+            return None
+
+        soup = BeautifulSoup(html, "html.parser")
+        for table in soup.find_all("table"):
+            grid = _expand_grid(table)
+            if not grid or not any("연구개발비" in " ".join(row) for row in grid):
                 continue
 
-            rd = revenue = None
-            for row in data.get("list", []):
-                nm = row.get("account_nm", "")
-                raw = (row.get("thstrm_amount") or "").replace(",", "").strip()
-                try:
-                    v = int(raw) if raw and raw not in ("", "-") else None
-                except (ValueError, TypeError):
-                    v = None
-                if v is None:
-                    continue
-                if "연구개발" in nm:
-                    rd = (rd or 0) + v
-                elif revenue is None and "매출액" in nm:
-                    revenue = v
+            # 1순위: '연구개발비 / 매출액' 비율 행 — 당기(leftmost 데이터열) % 직접 사용
+            for row in grid:
+                if row and "연구개발" in row[0] and "매출액" in row[0]:
+                    for cell in row[1:]:
+                        v = _num(cell.replace("%", "").strip())
+                        if v is not None and 0 < v < 100:
+                            return round(v, 2)
 
+            # 2순위: 연구개발비(당기)÷매출액(당기) — 단위 캡션 확정 필수
+            if _rd_unit(table) is None:
+                continue
+            rd = revenue = None
+            for row in grid:
+                if not row:
+                    continue
+                if rd is None and "연구개발비" in row[0] and "매출액" not in row[0]:
+                    rd = next((_num(c) for c in row[1:] if _num(c) is not None), None)
+                elif revenue is None and "매출액" in row[0] and "연구개발" not in row[0]:
+                    revenue = next((_num(c) for c in row[1:] if _num(c) is not None), None)
             if rd is not None and revenue is not None and 0 < rd < revenue:
                 return _safe_pct(rd, revenue)
         return None

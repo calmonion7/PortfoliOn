@@ -220,44 +220,72 @@ def test_comp_valuation_us_rd_intensity_missing_label_returns_none():
 
 from services.market.kr import get_rd_intensity_kr
 
+# KR 경로는 task M3에서 재구현됨: fnlttSinglAcntAll(4대 재무제표)엔 R&D 세부 라인이
+# 구조적으로 없어 구버전은 항상 None이었다 — 사업보고서 document.xml의 '연구개발비용'
+# 표를 직접 파싱한다(list.json → document.xml → HTML 표). 3형 fixture로 파싱 로직만
+# 단위검증(라이브 정합은 배포 후 메인 세션이 별도 확인 — fixture-pass-live-fail 가토).
 
-def _dart_rd_list(rd_amount, revenue_amount):
-    return [
-        {"account_nm": "매출액", "thstrm_amount": str(revenue_amount)},
-        {"account_nm": "연구개발비", "thstrm_amount": str(rd_amount)},
-    ]
+_LIST_JSON_사업보고서 = {"status": "000", "list": [
+    {"rcept_no": "20260101000001", "report_nm": "사업보고서 (2025.12)", "rcept_dt": "20260101"},
+]}
 
 
-def test_kr_rd_intensity_normal():
+def _mock_list_resp():
+    m = MagicMock()
+    m.json.return_value = _LIST_JSON_사업보고서
+    return m
+
+
+def test_kr_rd_intensity_000660형_ratio_row_direct():
+    """000660형(SK하이닉스): '연구개발비 / 매출액 비율(%)' 행이 있으면 그 당기 값을 직접 사용."""
+    html = """
+    <p>연구개발비용 (단위: 백만원)</p>
+    <table>
+      <tr><td>과목</td><td>제77기</td><td>제76기</td><td>제75기</td><td>비고</td></tr>
+      <tr><td>연구개발비용 계</td><td>2,000,000</td><td>1,800,000</td><td>1,700,000</td><td>-</td></tr>
+      <tr><td>연구개발비 / 매출액 비율(%)</td><td>3.50</td><td>3.20</td><td>3.10</td><td>-</td></tr>
+    </table>
+    """
     with patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
          patch("services.backlog._get_corp_code_map", return_value={"000660": "00164779"}), \
-         patch("services.market.kr.requests.get") as mock_req:
-        mock_resp = MagicMock()
-        mock_resp.json.return_value = {"status": "000", "list": _dart_rd_list(1_000_000_000_000, 20_000_000_000_000)}
-        mock_req.return_value = mock_resp
+         patch("services.market.kr.requests.get", return_value=_mock_list_resp()), \
+         patch("services.backlog._get_document_text", return_value=html):
         result = get_rd_intensity_kr("000660")
+    assert result == 3.5
+
+
+def test_kr_rd_intensity_035420형_cost_over_revenue_no_ratio_row():
+    """035420형(네이버): 비율 행 없음(연결/별도 컬럼) → 연구개발비÷매출액으로 계산."""
+    html = """
+    <p>[연구개발비용] (단위 : 백만원)</p>
+    <table>
+      <tr><td>과목</td><td>연결</td><td>별도</td></tr>
+      <tr><td>연구개발비</td><td>500,000</td><td>450,000</td></tr>
+      <tr><td>매출액</td><td>10,000,000</td><td>9,000,000</td></tr>
+    </table>
+    """
+    with patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
+         patch("services.backlog._get_corp_code_map", return_value={"035420": "00266961"}), \
+         patch("services.market.kr.requests.get", return_value=_mock_list_resp()), \
+         patch("services.backlog._get_document_text", return_value=html):
+        result = get_rd_intensity_kr("035420")
     assert result == 5.0
 
 
-def test_kr_rd_intensity_sanity_violation_returns_none():
+def test_kr_rd_intensity_unit_caption_missing_returns_none():
+    """단위 캡션 없음(계산 경로) → '안전 기본값' 폴백 없이 None(wrong<missing)."""
+    html = """
+    <table>
+      <tr><td>과목</td><td>연결</td><td>별도</td></tr>
+      <tr><td>연구개발비</td><td>500,000</td><td>450,000</td></tr>
+      <tr><td>매출액</td><td>10,000,000</td><td>9,000,000</td></tr>
+    </table>
+    """
     with patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
-         patch("services.backlog._get_corp_code_map", return_value={"000660": "00164779"}), \
-         patch("services.market.kr.requests.get") as mock_req:
-        mock_resp = MagicMock()
-        mock_resp.json.return_value = {"status": "000", "list": _dart_rd_list(25_000_000_000_000, 20_000_000_000_000)}
-        mock_req.return_value = mock_resp
-        result = get_rd_intensity_kr("000660")
-    assert result is None
-
-
-def test_kr_rd_intensity_missing_label_returns_none():
-    with patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
-         patch("services.backlog._get_corp_code_map", return_value={"000660": "00164779"}), \
-         patch("services.market.kr.requests.get") as mock_req:
-        mock_resp = MagicMock()
-        mock_resp.json.return_value = {"status": "000", "list": [{"account_nm": "매출액", "thstrm_amount": "20000000000000"}]}
-        mock_req.return_value = mock_resp
-        result = get_rd_intensity_kr("000660")
+         patch("services.backlog._get_corp_code_map", return_value={"035420": "00266961"}), \
+         patch("services.market.kr.requests.get", return_value=_mock_list_resp()), \
+         patch("services.backlog._get_document_text", return_value=html):
+        result = get_rd_intensity_kr("035420")
     assert result is None
 
 
