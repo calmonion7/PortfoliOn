@@ -1,19 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { REDIRECTS } from '../routes'
 
-// task#172 S2: 구 URL → 신규 라우트 맵(ADR-0025) 리다이렉트를 순수 라우팅 로직 수준에서 검증.
-// 실 목적지 페이지(Reports/MarketHub 등)는 무거운 데이터훅을 갖고 있어 마커로 대체하고,
-// App.jsx와 동일한 <Navigate replace> 매핑만 재현한다.
+// task#172 S2 / task#M4: 구 URL → 신규 라우트 맵(ADR-0025) 리다이렉트를 순수 라우팅 로직 수준에서 검증.
+// App.jsx가 실제로 쓰는 REDIRECTS(../routes.js)를 그대로 import — 수기 복제 제거, App.jsx 리다이렉트
+// 변경 시 테스트가 실소스를 보장한다(task#M4). 실 목적지 페이지(Reports/MarketHub 등)는 무거운
+// 데이터훅을 갖고 있어 마커로 대체하고, App.jsx와 동일한 <Navigate replace> 매핑만 재현한다.
 function RedirectRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/reports" replace />} />
-      <Route path="/research" element={<Navigate to="/reports" replace />} />
+      {REDIRECTS.map(([from, to]) => (
+        <Route key={from} path={from} element={<Navigate to={to} replace />} />
+      ))}
       <Route path="/reports" element={<div>REPORTS_PAGE</div>} />
-      <Route path="/market" element={<Navigate to="/market/indicators" replace />} />
       <Route path="/market/indicators" element={<div>MARKET_INDICATORS_PAGE</div>} />
-      <Route path="/analysis" element={<Navigate to="/portfolio" replace />} />
       <Route path="/portfolio" element={<div>PORTFOLIO_PAGE</div>} />
     </Routes>
   )

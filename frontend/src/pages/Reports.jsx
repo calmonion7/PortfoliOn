@@ -25,7 +25,7 @@ import { SketchEmpty } from '../components/sketches'
 
 
 
-export default function Reports({ initialTicker = null }) {
+export default function Reports({ initialTicker = null, navKey = null }) {
   const { role } = useAuth() || { role: 'user' }
   const isAdmin = role === 'admin'
   const { showToast } = useToast()
@@ -123,7 +123,7 @@ export default function Reports({ initialTicker = null }) {
     const dates = reportList[t]?.dates
     if (dates?.length) openDetail(t, dates[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialTicker, listLoading])
+  }, [initialTicker, listLoading, navKey])
 
   useEffect(() => cleanup, [cleanup])
 

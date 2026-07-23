@@ -113,6 +113,25 @@ def test_list_reports_overrides_target_and_opinion_from_mart_asof():
     assert s["buy"] == 20 and s["hold"] == 2 and s["sell"] == 0
 
 
+def test_list_reports_all_scope_uses_requesters_own_pinned():
+    """공유 티커의 pinned는 전역집계(DISTINCT ON 비결정 tie-break)가 아니라 요청자 본인의
+    pin 값이어야 한다 — get_global_portfolio가 다른 유저의 pinned(True)를 올려도 무시. task M2."""
+    global_portfolio = {
+        "stocks": [{"ticker": "SHARED", "name": "Shared Co", "competitors": [], "moat": "", "growth_plan": "",
+                    "pinned": True}],  # 타 유저 pinned가 tie-break로 노출된 상황을 시뮬레이션
+        "watchlist": [],
+    }
+    my_stocks = [{"ticker": "SHARED", "name": "Shared Co", "pinned": False}]  # 요청자 본인은 pin 안 함
+    with patch("routers.report._auth_svc.get_user_by_id", return_value={"role": "admin"}), \
+         patch("routers.report.query", return_value=[]), \
+         patch("routers.report.storage.get_global_portfolio", return_value=global_portfolio), \
+         patch("routers.report.storage.get_all_stocks", return_value=my_stocks), \
+         patch("routers.report.storage.expected_report_dates", return_value={}):
+        resp = client.get("/api/report/list?scope=all")
+    assert resp.status_code == 200
+    assert resp.json()["stocks"]["SHARED"]["pinned"] is False
+
+
 def test_get_report_returns_summary_no_content(tmp_path):
     ticker_dir = tmp_path / "LLY"
     ticker_dir.mkdir()

@@ -184,8 +184,33 @@ const _FACTOR_TITLE = { fontSize: 12, fontWeight: 600, color: 'var(--text)', mar
 const _FACTOR_DESC = { fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }
 const _CHIP = (color) => ({ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: 'var(--bg-elev-2)', color })
 
+// 빈 오브젝트({}) 가드 — 각 섹션이 실제로 렌더하는 필드 기준. ReportDetailTabs 그룹 헤더 조건도 이 헬퍼를 재사용.
+export function hasMoatContent(moat) {
+  if (!moat) return false
+  if (typeof moat === 'string') return true
+  return !!(moat.rating || moat.rating_source || moat.summary || moat.factors?.length)
+}
+
+export function hasKeyResourceContent(key_resource) {
+  if (!key_resource) return false
+  if (typeof key_resource === 'string') return true
+  return !!(key_resource.resource || key_resource.thesis || key_resource.metrics?.length || key_resource.drivers?.length || key_resource.one_liner)
+}
+
+export function hasGrowthPlanContent(growth_plan) {
+  if (!growth_plan) return false
+  if (typeof growth_plan === 'string') return true
+  return !!(growth_plan.strategy || growth_plan.initiatives?.length)
+}
+
+export function hasRisksContent(risks) {
+  if (!risks) return false
+  if (typeof risks === 'string') return true
+  return !!(risks.factors?.length)
+}
+
 export function MoatSection({ moat }) {
-  if (!moat) return null
+  if (!hasMoatContent(moat)) return null
   if (typeof moat === 'string') return <ReportSectionText title="🏰 경제적 해자" text={moat} />
 
   const RATING = {
@@ -303,7 +328,7 @@ const STATUS_CFG = {
 }
 
 export function GrowthPlanSection({ growth_plan }) {
-  if (!growth_plan) return null
+  if (!hasGrowthPlanContent(growth_plan)) return null
   if (typeof growth_plan === 'string') return <ReportSectionText title="🌱 장기 성장 계획" text={growth_plan} />
 
   return (
@@ -340,7 +365,7 @@ const SEVERITY_CFG = {
 }
 
 export function RisksSection({ risks }) {
-  if (!risks) return null
+  if (!hasRisksContent(risks)) return null
   if (typeof risks === 'string') return <ReportSectionText title="⚠️ 리스크" text={risks} />
 
   return (

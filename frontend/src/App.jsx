@@ -25,6 +25,7 @@ import { Sun, Moon, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
 import './App.css'
 import AdminAnalytics from './pages/AdminAnalytics'
+import { REDIRECTS } from './routes'
 
 async function doLogout(setSession) {
   const refresh = localStorage.getItem('refresh_token')
@@ -47,7 +48,7 @@ function ReportsRoute() {
   useEffect(() => {
     setDeepTicker(location.state?.ticker || null)
   }, [location.state])
-  return <Reports initialTicker={deepTicker} />
+  return <Reports initialTicker={deepTicker} navKey={location.key} />
 }
 
 // BrowserRouter 내부 셸 — location.pathname을 라우트 전환 페이드업 key로 쓰려면 Router 컨텍스트가 필요하다.
@@ -76,8 +77,9 @@ function AppShell({ theme, setTheme, setSession }) {
           <div key={location.pathname} className="anim-fade">
             <InstallPrompt />
             <Routes>
-              <Route path="/" element={<Navigate to="/reports" replace />} />
-              <Route path="/research" element={<Navigate to="/reports" replace />} />
+              {REDIRECTS.map(([from, to]) => (
+                <Route key={from} path={from} element={<Navigate to={to} replace />} />
+              ))}
               <Route path="/reports" element={<ResearchShell><ReportsRoute /></ResearchShell>} />
               <Route path="/recommend" element={<ResearchShell><Recommendations /></ResearchShell>} />
               <Route path="/ranking" element={<ResearchShell><Ranking /></ResearchShell>} />
@@ -86,10 +88,8 @@ function AppShell({ theme, setTheme, setSession }) {
               <Route path="/dividends" element={<ResearchShell><Dividends /></ResearchShell>} />
               <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
               <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/market" element={<Navigate to="/market/indicators" replace />} />
               <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
               <Route path="/market/flow" element={<MarketHub tab="flow" />} />
-              <Route path="/analysis" element={<Navigate to="/portfolio" replace />} />
               <Route path="/guru" element={<Guru />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/admin-analytics" element={<AdminAnalytics />} />

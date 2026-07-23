@@ -248,7 +248,7 @@ def get_global_portfolio() -> dict:
     rows = query(
         """
         SELECT DISTINCT ON (us.ticker)
-               us.ticker, us.type, us.pinned, t.name, t.market, t.exchange, t.is_etf,
+               us.ticker, us.type, t.name, t.market, t.exchange, t.is_etf,
                t.competitors, t.moat, t.growth_plan, t.risks, t.recent_disclosures, t.insights, t.key_resource, t.competitor_edge, t.market_outlook
         FROM user_stocks us
         LEFT JOIN tickers t ON t.ticker = us.ticker
@@ -272,7 +272,6 @@ def get_global_portfolio() -> dict:
             "competitor_edge": _parse_json_field(r.get("competitor_edge")),
             "market_outlook": _parse_json_field(r.get("market_outlook")),
             "is_etf": bool(r.get("is_etf")),
-            "pinned": bool(r.get("pinned")),
         }
         if r["type"] == "holding":
             holdings.append(entry)

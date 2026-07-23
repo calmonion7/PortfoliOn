@@ -169,10 +169,17 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
     def _build():
         if all_scope:
             portfolio = storage.get_global_portfolio()
-            my_tickers = {s["ticker"].upper() for s in storage.get_all_stocks(user_id)}
-        else:
-            portfolio = storage.get_global_portfolio() if user_id == _API_KEY_USER_ID else storage.get_full_portfolio(user_id)
+            my_stocks = storage.get_all_stocks(user_id)
+            my_tickers = {s["ticker"].upper() for s in my_stocks}
+            my_pinned = {s["ticker"].upper() for s in my_stocks if s.get("pinned")}
+        elif user_id == _API_KEY_USER_ID:
+            portfolio = storage.get_global_portfolio()
             my_tickers = None
+            my_pinned = set()
+        else:
+            portfolio = storage.get_full_portfolio(user_id)
+            my_tickers = None
+            my_pinned = None
 
         portfolio_stocks = {s["ticker"].upper(): s for s in portfolio.get("stocks", [])}
         portfolio_watchlist = {s["ticker"].upper(): s for s in portfolio.get("watchlist", [])}
@@ -210,7 +217,7 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
         def _mk_entry(ticker, dates, category, stock_info, summary):
             market = stock_info.get("market") or (summary or {}).get("market", "US")
             e = {"dates": dates, "category": category, "summary": summary, "market": market, "exchange": stock_info.get("exchange", ""), "is_etf": bool(stock_info.get("is_etf"))}
-            e["pinned"] = bool(stock_info.get("pinned"))
+            e["pinned"] = (ticker in my_pinned) if my_pinned is not None else bool(stock_info.get("pinned"))
             if my_tickers is not None:
                 e["is_mine"] = ticker in my_tickers
             return e

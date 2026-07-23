@@ -5,7 +5,7 @@ import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable, Technica
 import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
 import HistoryTab from './HistoryTab'
-import { ReportSectionCompetitors, MoatSection, KeyResourceSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection } from './Sections'
+import { ReportSectionCompetitors, MoatSection, KeyResourceSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection, hasMoatContent, hasKeyResourceContent, hasGrowthPlanContent, hasRisksContent } from './Sections'
 import InvestorTrendSection from './InvestorTrendSection'
 import ShortSellSection from './ShortSellSection'
 import SupplySection from './SupplySection'
@@ -172,14 +172,14 @@ export default function ReportDetailTabs({
                   />
                 </>
               )}
-              {(summary.moat || summary.key_resource) && (
+              {(hasMoatContent(summary.moat) || hasKeyResourceContent(summary.key_resource)) && (
                 <>
                   <GroupHeader>경쟁우위</GroupHeader>
                   <MoatSection moat={summary.moat} />
                   <KeyResourceSection key_resource={summary.key_resource} />
                 </>
               )}
-              {(summary.growth_plan || summary.risks) && (
+              {(hasGrowthPlanContent(summary.growth_plan) || hasRisksContent(summary.risks)) && (
                 <>
                   <GroupHeader>성장 & 리스크</GroupHeader>
                   <GrowthPlanSection growth_plan={summary.growth_plan} />
