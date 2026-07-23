@@ -1,76 +1,75 @@
 ---
-last_mapped_commit: 3aa35ba7b754566835ea9a21f7076a5f4450789a
-mapped: 2026-07-17
+last_mapped_commit: 44629f27cfb796dbd2120b7002a99e3d82f7c725
+mapped: 2026-07-24
 ---
 
 # TESTING
 
-PortfoliOn 테스트 프레임워크·구조·모킹·커버리지. 백엔드 pytest + 프론트 vitest 2계층.
+PortfoliOn 테스트 프레임워크·구조·모킹·커버리지. 구현 사실만 다룬다.
 
-## 1. Backend — pytest
+---
 
-### 1.1 실행·구성
+## 1. 백엔드 — pytest
 
-- **러너**: `cd backend && .venv/bin/python -m pytest`(macOS). Windows는 `.venv/Scripts/python`.
-- **구성 `backend/pytest.ini`**: `testpaths = tests`, `pythonpath = .`(그래서 테스트가 `from main import app`·`from routers.stocks import router`를 루트 기준 import).
-- **규모**: `backend/tests/*.py` **121개 파일**(`find backend/tests -name "test_*.py" | wc -l`), `def test_`(및 `async def test_`) **1,254개**. fixture 데이터는 `backend/tests/fixtures/`(예: `backlog/`). 에디토리얼 개편(task#190~195)은 프론트 전용이라 백엔드 테스트는 3aa35ba 기준 8e37e2c 이후 무변경.
+- 실행: `cd backend && .venv/bin/python -m pytest` (로컬 `.venv`는 Python 3.9.6 — `CONVENTIONS.md` §1 참조).
+- 위치: `backend/tests/` (123개 `test_*.py` 파일). 수집 규모 **1299 테스트**.
+- fixtures: `backend/tests/fixtures/`, 공유 설정: `backend/tests/conftest.py`.
+- 로컬 pytest가 배포 게이트다 — 배포 전 로컬 스위트 통과가 필수. 여러 count/set 하드코딩 단언이 파일에 흩어져 있어(예: `BATCHES` 개수), id 추가/삭제 시 전 파일 전수 grep이 필요하다.
 
-### 1.2 `conftest.py` — autouse 가드 3종
+### 1.1 conftest — 공유 fixture와 autouse 가드
 
 `backend/tests/conftest.py`:
+- `client` fixture — `main.app`을 감싼 `TestClient`.
+- `app.dependency_overrides[get_current_user] = lambda: "test-user-id"` — `main.app`의 인증을 모듈 로드 시 전역 override(테스트 계정 고정).
+- `_clear_quote_cache`(autouse) — `get_quote`의 종목 단위 TTL 캐시를 매 테스트 전 `cache.invalidate_quote()`로 비워 교차 오염 방지.
+- **`_block_real_db`(autouse) — 실 DB 접근 차단 가드(task#169).** `monkeypatch.setattr(services.db, "_get_pool", ...)`로 `_get_pool`이 `RuntimeError`를 던지게 한다. 로컬 `DATABASE_URL`이 도커 postgres(=라이브 DB)를 가리켜, 가드 전엔 `generate_report` end-to-end 테스트의 스냅샷 INSERT가 prod `snapshots`에 그대로 커밋되는 사고가 났다(fixture-writes-live). **DB가 필요한 테스트는 `services.db`의 `query`/`execute`를 테스트 계층에서 mock해야 한다** — 가드가 raise하면 그 테스트가 실 DB에 닿고 있다는 뜻이므로, 가드를 풀지 말고 mock을 추가한다.
 
-- **`client` fixture + 전역 auth override**: 모듈 로드 시 `from main import app` 후 `app.dependency_overrides[get_current_user] = lambda: "test-user-id"`. `client` fixture는 `TestClient(app)`. **main.app을 타는 테스트만** 이 override 적용.
-- **`_clear_quote_cache`(autouse)**: 매 테스트 전 `cache.invalidate_quote()` — `get_quote`의 종목 단위 TTL 캐시 교차 오염 방지.
-- **`_block_real_db`(autouse) — 가장 중요한 가드(task#169)**: `monkeypatch.setattr(services.db, "_get_pool", ...)`로 실 DB 접근을 raise 시킨다(`RuntimeError("tests must not touch the real DB — mock services.db.query/execute")`). 로컬 `DATABASE_URL`이 도커 postgres(=라이브 DB)를 가리켜, 가드 전엔 `generate_report` end-to-end 테스트의 스냅샷 INSERT가 prod에 커밋됐다(005930 클로버). **DB를 타는 테스트는 반드시 `services.db`의 `query`/`execute`/`execute_many` 또는 그 상위를 mock**한다. 가드가 raise하면 그 테스트가 실 DB에 닿는다는 뜻 — 가드를 풀지 말고 mock을 추가한다.
+### 1.2 self-app 테스트 — 라우터별 격리 앱
 
-### 1.3 두 가지 앱 테스트 패턴
+다수 라우터 테스트가 conftest의 `client`가 아니라 **모듈 상단에서 `FastAPI()`를 직접 만들고 `include_router(router)` + `dependency_overrides`로 auth를 우회**한다(약 35개 파일: `test_stocks_router.py`·`test_consensus_router.py`·`test_admin_router.py`·`test_portfolio_router.py` 등). 예(`test_consensus_router.py`):
 
-- **main.app 패턴(conftest `client`)**: `client` fixture로 `main.app`을 통째 호출. 전역 auth override가 이미 걸려 있음.
-- **self-app 패턴(모듈 상단 `FastAPI()` 직접 생성)**: 많은 라우터 테스트가 `app = FastAPI(); app.include_router(router)` 후 필요한 auth 의존성을 개별 override(`test_stocks_router.py:9-15`가 전형 — `get_current_user`·`get_current_user_or_api_key`·`require_admin_or_api_key`를 각각 lambda로 override). **conftest override는 main.app 한정이라 self-app엔 안 걸린다** → 엔드포인트에 새 auth 의존성을 추가하면 self-app 테스트를 전수 grep해 override를 추가해야 401/403로 안 깨진다(CONVENTIONS §8). self-app 사용 파일 다수(`test_portfolio_router.py`·`test_watchlist_router.py`·`test_batch_endpoints.py`·`test_us_supply.py`·`test_macro_signals_batch.py` 등).
-- **무인증 거부 검증은 override 없는 fresh app**: `backend/tests/test_security_auth_gaps.py`의 `_client(*routers)` 헬퍼가 override 없이 `FastAPI()`를 만들어 실제 auth 의존성을 태우고 `.status_code == 401`을 단언.
+```python
+app = FastAPI()
+app.include_router(router)
+app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+client = TestClient(app)
+```
 
-### 1.4 모킹 패턴
+- **conftest는 `main.app`의 `get_current_user`만 override**하므로 self-app 테스트엔 안 걸린다. 엔드포인트에 auth `Depends`(`get_current_user`/`require_admin`/`require_admin_or_api_key`)를 추가/변경하면 **그 경로를 호출하는 self-app 테스트를 전수 grep해 새 의존성의 override를 추가**해야 한다(안 하면 401/403으로 깨짐).
+- **무인증 거부(401/403)는 override 없는 fresh app으로 별도 검증**한다: `backend/tests/test_security_auth_gaps.py` 패턴 — 테스트마다 `FastAPI()` + `include_router`만 하고 override 없이 실제 auth 의존성을 태워 status_code 401을 단언.
 
-- **DB 레이어 mock**: `monkeypatch.setattr(svc, "query", fake_query)` / `"execute"` / `"execute_many"`(`test_disclosures.py`·`test_insider_digest_batch.py`). 문자열 경로 형식도 사용: `monkeypatch.setattr("services.db.query", lambda *a, **k: [])`(`test_job_runs_instrumentation.py`). `fake_query`가 SQL 문자열을 분기해 상황별 행을 반환하는 스타일.
-- **외부 소스 mock**: `unittest.mock.patch("routers.stocks.storage.get_full_portfolio", return_value=...)`(`test_stocks_router.py`) — 서비스 함수를 호출 시점에 patch.
-- **호출 시퀀스 단언**: read/외부호출 additive 추가 시 `mock.call_args`(마지막 호출) 대신 `call_args_list[i].kwargs`·`call_count`로 못박는다(`test_consensus_asof_batch.py`·`test_insider_digest_batch.py` 등, CONVENTIONS §8).
-- **reload 패턴의 함정**: `importlib.reload(report_generator)`를 쓰는 테스트(`test_report_generator.py`·`test_report_price_gate.py`·`test_market.py`)는 **모듈 자체 정의 심볼 patch가 reload로 무효화**되니 하위 모듈 속성(`services.db.execute`·`_naver_get` 등)을 patch해야 한다(task#169).
+### 1.3 모킹 규약
 
-### 1.5 규약 가드 테스트(스위트에 상주)
+- 라이브러리: `unittest.mock`의 `patch`/`MagicMock`/`monkeypatch`.
+- **DB는 서비스 계층에서 patch**: 서비스가 import한 심볼 기준으로 patch(예: `patch("services.storage.portfolio.query", return_value=[...])`, `patch("services.storage.portfolio.execute", ...)`). SQL 형태 단언은 `mock_execute.call_args[0]`로 `(sql, params)`를 꺼내 검증.
+- **additive read/외부호출 추가 시 `mock.call_args`(마지막 호출) 단언이 조용히 오염된다.** additive는 호출 시퀀스도 늘리므로, 기존 단언은 호출별 `mock.call_args_list[i].kwargs`로 마이그레이션(인덱스로 해당 호출 명시)하고, 신규 테스트는 `mock.call_count`로 시퀀스를 못박는다. 신규 호출은 `if <조건>:`로 입력이 비면 생략해 기존 테스트를 보존. 참조: `test_recommendation_endpoint.py`(`call_args_list[0].kwargs`가 discovery 호출을 명시, `call_count == 1` 단언).
+- **심볼을 제거/개명하면 그 심볼을 patch하는 테스트를 파일 불문 전수 grep**: `grep -rn "모듈경로.심볼" backend/tests/`. mock 타깃은 "주 테스트 파일"에만 있지 않다(`digest_service`에서 `yf` import 제거 시 다른 파일이 `services.digest_service.yf.Ticker`를 patch하고 있어 `ModuleNotFoundError`로 파손된 사례).
+- **reload 패턴 테스트 주의**: `importlib.reload(module)`을 쓰는 테스트에서 모듈 자체 정의 심볼 patch는 reload로 무효화된다 — 하위 모듈 속성(`services.db.execute`·`_naver_get` 등)을 patch한다.
 
-- **`test_no_print.py`**: `ast`로 앱 코드(`main.py`·`routers`·`services`·`scheduler`·`middleware`)의 `print()` 호출을 탐지, 신규 `print`를 차단(CONVENTIONS §4.1).
-- **`test_api_doc_sync.py`**: 라이브 `app.routes` ↔ `API_SPEC.md`/`CLAUDE_COWORK_API.md` 헤더 대조로 엔드포인트 존재 drift 검출(CONVENTIONS §6).
-- **배치 정합 테스트(exact-count/set)**: `test_batch_market_split.py`·`test_macro_signals_batch.py`가 `len(batch_registry.BATCHES) == 29`, `test_batches_router.py`가 `EXPECTED_IDS` set 동일 + `len(data) == 29`를 단언 — 배치 id 추가/삭제 시 이 3파일을 함께 고쳐야 스위트 통과(CONVENTIONS §11).
-- **`test_batch_resilience.py`·`test_job_runs*.py`**: 배치 실패 graceful·`job_runs.record` 계측 검증.
-- **SQL 형태 가드**: `test_db_execute_many.py`·`test_consensus_*`가 배치 SQL(ANY 배열 캐스트·VALUES placeholder 형태)을 단언. 단, query-mock 테스트는 라이브 SQL 정합(uuid 캐스트 등)을 못 잡으므로 SQL 신규/개작 슬라이스는 라이브 스모크를 별도 DoD로 둔다.
+### 1.4 fixture-pass-live-fail 계열 — 라이브 대조 DoD
 
-## 2. Frontend — vitest
+단위 테스트(mock/fixture)가 통과해도 라이브 실데이터에서만 드러나는 버그 계열이 반복됐다. 이 슬라이스들은 **배포 후 라이브 대조/스모크를 DoD에 포함**한다:
 
-### 2.1 실행·구성
+- **외부소스 파싱**(yfinance index 라벨·Naver row·DART `account_id`·KIS output 봉투): fixture가 라벨/봉투 불일치를 못 잡는다 — 라이브 1종목 추출 대조 필수. 라이브 프로브는 fetch 200뿐 아니라 응답 봉투(output vs output1/2/3) 파싱까지 확인해야 완성.
+- **신규/개작 SQL**(단건→배치 ANY 배열화·VALUES 조인): query-mock 테스트는 라이브 정합(uuid 캐스트·record 형태)을 못 잡는다 — 배포 후 해당 엔드포인트 라이브 스모크 필수.
+- **tz 정렬**(키움 tz-naive ↔ yfinance tz-aware): fixture는 라이브 지수를 안 모킹해 못 잡는다 — broad `except`가 삼키면 조용히 None. 회귀 테스트는 실구조(테이블·컬럼·Decimal·tz)를 단언한다.
+- **프론트 % 표시 스케일**(yfinance 소수분수 ×100): 단위 테스트는 렌더 %를 단언 안 해 못 잡는다 — API_SPEC 예시값·fixture도 분수 스케일로 적는다.
+- 외부데이터 증상은 **라이브 프로브 선행**(`docker exec -i portfolion-backend-1 python -`로 행수/값 확인) — fetch 실패인지 히스토리 부족인지 등을 코드 버그로 단정하기 전에 확인.
 
-- **러너**: `npm run --prefix frontend test`(= `vitest run`, `frontend/package.json:9`) 또는 `npx vitest run`.
-- **구성은 `frontend/vite.config.js`의 `test` 블록**(`vite.config.js:88-91`): `environment: 'jsdom'`, `globals: true`(describe/it/expect 전역), `setupFiles: './src/test/setup.js'`. 별도 `vitest.config.*` 파일 없음.
-- **setup `frontend/src/test/setup.js`**: `import '@testing-library/jest-dom'` 한 줄(matcher 확장).
-- **의존성**: `@testing-library/react`·`@testing-library/jest-dom`·`vitest`(`package.json`).
-- **규모**: 테스트 파일 **13개**, `it()`/`test()` **79개**(3aa35ba 기준, 에디토리얼 개편 전후 파일·건수 불변 — 아래 §2.4 참조). 위치는 두 곳 — 공통 `frontend/src/test/`(`smoke.test.js`·`masthead.test.jsx`·`route-redirects.test.jsx`·`compare-race.test.jsx`·`compare-sector-group.test.jsx`·`recommendations-s3s4.test.jsx`·`global-search-tracked.test.jsx`) + 소스 곁(`frontend/src/hooks/usePortfolioData.test.js`·`useReportFilters.test.js`·`useStockManagement.test.js`·`frontend/src/components/PermissionPanel.test.jsx`·`frontend/src/components/reports/KeyResourceChart.test.js`·`reportUtils.test.js`).
+### 1.5 API 문서 동기 테스트
 
-### 2.2 모킹 패턴
+`backend/tests/test_api_doc_sync.py` — 라이브 `main.app`의 `app.routes`(데코레이터 파싱 아님)와 두 문서의 `### `METHOD /path`` 헤더를 대조한다.
 
-- **API 모듈 mock**: `vi.mock('../api', () => ({ default: { get: vi.fn(), delete: vi.fn() } }))` 후 `api.get.mockImplementation((url) => ...)`로 URL 분기 응답 반환(`usePortfolioData.test.js:4-22`). `beforeEach(() => { vi.clearAllMocks(); ... })`로 기본 응답 재설정.
-- **훅 테스트**: `renderHook(() => useXxx())` + `act`/`waitFor`(`@testing-library/react`). 상태 전이(`listLoading`·`hasFetched`·`dashboardError`)를 `await waitFor(...)`로 단언(`usePortfolioData.test.js`).
-- **Toast/useToast mock**: `vi.mock('./Toast', () => ({ useToast: () => ({ showToast: showToastMock }) }))`로 토스트 훅을 스텁(`PermissionPanel.test.jsx:8`). API mock도 같은 파일에서 `default: { get, put }` 형태로.
-- **Context mock + Provider 래핑 조합**: `masthead.test.jsx`가 전형 — `vi.mock('../contexts/AuthContext', () => ({ useAuth: () => authMock() }))`로 인증 컨텍스트를 스텁하고, `authMock.mockReturnValue({ menuPermissions, role, loading })`로 테스트별 권한 시나리오를 주입한 뒤 `<ToastProvider><MemoryRouter>{ui}</MemoryRouter></ToastProvider>`로 렌더 — 컴포넌트가 흡수한 하위 컴포넌트(`GlobalSearch`)가 `useToast()`를 쓰면 그 Provider까지 테스트 래퍼에 포함해야 한다(`masthead.test.jsx:19-22`).
-- **컴포넌트/라우팅 테스트**: `.test.jsx`에서 `@testing-library/react` render + jsdom.
+- `test_api_spec_documents_all_live_endpoints`: 라이브 − `API_SPEC.md` == `KNOWN_UNDOCUMENTED`(정확히). 현재 `KNOWN_UNDOCUMENTED = frozenset()`(전부 문서화됨) — 새 엔드포인트를 `API_SPEC.md`에 안 적으면 실패.
+- `test_api_spec_has_no_stale_endpoints` / `test_cowork_api_has_no_stale_endpoints`: 문서가 라이브에 없는(삭제된) 엔드포인트를 문서화하지 않는지 검증.
+- 테스트는 엔드포인트 **존재**만 검증한다(prose 파싱 안 함) — 요청/응답 스키마·인증 게이팅 동기는 수동 DoD.
 
-### 2.3 커버리지 초점
+## 2. 프론트 — Vitest (ADR-0019)
 
-- 훅의 에러 경로(fetch reject → loading false·error state 전파)를 명시 검증(`usePortfolioData.test.js` S1/S2 케이스).
-- 라우트 리다이렉트·마스트헤드 권한 필터·검색 트래킹 등 상호작용을 `frontend/src/test/`에서 통합 검증. 권한별 노출(`masthead.test.jsx`)은 `useAuth().menuPermissions`/`role`을 시나리오별로 mock해 카테고리 노출·숨김·admin 전용 링크·loading 중 미렌더를 검증한다.
-- **프론트엔드 로깅 규약(CONVENTIONS §4.2)에 대응하는 자동 테스트는 없다** — eslint `no-console`이 빌드/CI에 미배선이라 마커 준수는 리뷰 의존.
-- **모션 훅(`useReveal`/`useCountUp`, CONVENTIONS §13)에도 전용 단위테스트가 없다** — `prefers-reduced-motion` 분기·rAF 보간·IntersectionObserver 트리거는 자동 가드 없이 수동 시각 감사(캡처 매트릭스)로만 검증된다. 신규로 이 훅들의 게이트 로직(예: "첫 유효 데이터 1회" 조건)을 바꿀 때는 회귀 확인을 위한 렌더 테스트 추가를 고려할 것.
-
-### 2.4 파일 마이그레이션: `sidebar.test.jsx` → `masthead.test.jsx` (task#191, ADR-0026)
-
-- ADR-0025(터미널+좌측 사이드바)의 `Sidebar` 컴포넌트가 ADR-0026(에디토리얼+마스트헤드)에서 `frontend/src/components/Masthead.jsx`로 완전히 대체되면서, 대응 테스트도 `frontend/src/test/sidebar.test.jsx` → `frontend/src/test/masthead.test.jsx`로 1:1 리네임됐다(파일 수·구성 불변, 내용만 새 컴포넌트 대상으로 갱신).
-- 검증 골격은 계승: `describe('Masthead 권한별 카테고리 노출')` 아래 3케이스 — ① 일부 권한만 있을 때 해당 카테고리만 노출·나머지(시장/구루/설정/행동) 숨김, ② `role === 'admin'`이면 `menuPermissions`와 무관하게 관리자 링크(행동) 노출, ③ `loading` 중엔 카테고리 자체가 렌더되지 않음. `useAuth()` mock 반환값(`menuPermissions`/`role`/`loading`)을 케이스별로 바꿔가며 같은 렌더 헬퍼(`renderMasthead`)로 검증하는 패턴은 Sidebar 시절과 동일하게 유지됐다.
-- 앞으로 마스트헤드에 카테고리·권한 매핑을 추가/변경하면 이 파일이 1차 회귀 지점이다(과거 `sidebar.test.jsx`가 하던 역할을 그대로 승계).
+- 실행: `cd frontend && npm run test` (`"test": "vitest run"`).
+- 러너: **Vitest**, 환경 `jsdom`, 라이브러리 `@testing-library/react`(+`@testing-library/jest-dom` 매처). 설정은 별도 파일 없이 `frontend/vite.config.js`의 `test` 블록(`environment: 'jsdom'`, `globals: true`, `setupFiles: './src/test/setup.js'`) — Vite 설정·플러그인·alias 재사용.
+- `frontend/src/test/setup.js`는 `import '@testing-library/jest-dom'` 한 줄(jest-dom 매처 등록).
+- 위치: 소스 옆 콜로케이트(`*.test.js`/`*.test.jsx`) + `frontend/src/test/`(통합/스모크). 16개 파일, 약 **99 테스트**.
+  - 콜로케이트 예: `frontend/src/hooks/usePortfolioData.test.js`·`useReportFilters.test.js`·`useStockManagement.test.js`, `frontend/src/components/PermissionPanel.test.jsx`, `frontend/src/components/reports/reportUtils.test.js`·`Sections.test.jsx`.
+  - `frontend/src/test/` 예: `smoke.test.js`, `masthead.test.jsx`, `route-redirects.test.jsx`, `global-search-tracked.test.jsx`, `recommendations-s3s4.test.jsx`, `compare-race.test.jsx`.
+- **도입 범위(ADR-0019)**: R4 훅 추출 대상(`useReportFilters`/`useStockManagement`)으로 시작 — 프론트 전체 테스트 백필은 별건. 자동 회귀 커버리지 공백은 여전히 존재하며, 색 의미·시각 회귀는 vitest·빌드가 블라인드라 Playwright 스팟 재캡처로 보완한다(reference-frontend-uat, `scripts/`의 디바이스 에뮬레이션 수동 UAT — 테스트 계정 `test@portfolion.com`).
