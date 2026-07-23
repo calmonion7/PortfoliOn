@@ -54,6 +54,23 @@ export const computePeerPremiums = (competitors) => {
   }, [])
 }
 
+// 연간 실적(financials_annual, is_consensus=false만) 매출 CAGR 파생. n<2 또는 시작/끝 매출이 0·음수면 null(wrong<missing).
+export const computeRevenueCagr = (financialsAnnual) => {
+  if (!Array.isArray(financialsAnnual)) return null
+  const rows = financialsAnnual
+    .filter((f) => !f?.is_consensus && f?.period != null && typeof f.revenue === 'number' && Number.isFinite(f.revenue))
+    .sort((a, b) => Number(a.period) - Number(b.period))
+  if (rows.length < 2) return null
+
+  const first = rows[0].revenue
+  const last = rows[rows.length - 1].revenue
+  if (first <= 0 || last <= 0) return null
+
+  const years = rows.length - 1
+  const pct = (Math.pow(last / first, 1 / years) - 1) * 100
+  return Number.isFinite(pct) ? { pct, years: rows.length } : null
+}
+
 export const _weather = (score) => {
   if (score <= 0) return { icon: '☀️', label: '맑음' }
   if (score <= 1) return { icon: '⛅', label: '구름 조금' }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computePeerPremiums } from './reportUtils.jsx'
+import { computePeerPremiums, computeRevenueCagr } from './reportUtils.jsx'
 
 describe('computePeerPremiums', () => {
   it('median 홀수 peer 기준 할인/할증 방향 판정', () => {
@@ -75,5 +75,43 @@ describe('computePeerPremiums', () => {
   it('입력이 배열이 아니면(undefined 등) 빈 배열', () => {
     expect(computePeerPremiums(undefined)).toEqual([])
     expect(computePeerPremiums(null)).toEqual([])
+  })
+})
+
+describe('computeRevenueCagr', () => {
+  it('실적(비-consensus) 매출 3개년 10% 복리 성장 → CAGR 10%', () => {
+    const financialsAnnual = [
+      { period: '2027', revenue: 200, is_consensus: true },  // 컨센서스는 제외
+      { period: '2025', revenue: 121, is_consensus: false },
+      { period: '2023', revenue: 100, is_consensus: false },
+      { period: '2024', revenue: 110, is_consensus: false },
+    ]
+    const result = computeRevenueCagr(financialsAnnual)
+    expect(result.years).toBe(3)
+    expect(result.pct).toBeCloseTo(10, 5)
+  })
+
+  it('실적 연도가 2개년 미만이면(컨센서스 제외 후 1개만 남음) null', () => {
+    const financialsAnnual = [
+      { period: '2027', revenue: 200, is_consensus: true },
+      { period: '2025', revenue: 121, is_consensus: false },
+    ]
+    expect(computeRevenueCagr(financialsAnnual)).toBeNull()
+  })
+
+  it('시작 매출이 0·음수면 null (분수 지수 미정의 가드)', () => {
+    expect(computeRevenueCagr([
+      { period: '2023', revenue: -50, is_consensus: false },
+      { period: '2024', revenue: 80, is_consensus: false },
+    ])).toBeNull()
+    expect(computeRevenueCagr([
+      { period: '2023', revenue: 0, is_consensus: false },
+      { period: '2024', revenue: 80, is_consensus: false },
+    ])).toBeNull()
+  })
+
+  it('입력이 배열이 아니면(undefined 등) null', () => {
+    expect(computeRevenueCagr(undefined)).toBeNull()
+    expect(computeRevenueCagr(null)).toBeNull()
   })
 })

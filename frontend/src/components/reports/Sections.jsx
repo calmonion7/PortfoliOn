@@ -20,7 +20,9 @@ export function ReportSectionText({ title, text }) {
   )
 }
 
-export function ReportSectionCompetitors({ competitors, market, ticker }) {
+const EDGE_POSITION_COLOR = { 우위: 'var(--color-success)', 열위: 'var(--color-error)', 동등: 'var(--text-3)' }
+
+export function ReportSectionCompetitors({ competitors, market, ticker, competitor_edge }) {
   if (!competitors?.length) return null
   const fmtMC = (mc) => {
     if (mc == null) return '—'
@@ -34,6 +36,8 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
     return `${(mc / 1e6).toFixed(0)}M`
   }
   const premiums = computePeerPremiums(competitors)
+  const hasRd = competitors.some(c => c.rd_intensity != null)
+  const competitorByTicker = Object.fromEntries(competitors.map(c => [c.ticker, c]))
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -88,7 +92,7 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
                   {c.ytd_return != null ? `${ytdPos ? '+' : ''}${c.ytd_return.toFixed(1)}%` : '—'}
                 </span>
               </div>
-              {(c.per != null || c.pbr != null || c.psr != null || c.ev_ebitda != null) && (
+              {(c.per != null || c.pbr != null || c.psr != null || c.ev_ebitda != null || hasRd) && (
                 <div className="mono tnum" style={{ display: 'flex', gap: 8, paddingLeft: 19, flexWrap: 'wrap' }}>
                   {c.per != null && (
                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>PER {c.per.toFixed(1)}</span>
@@ -102,12 +106,47 @@ export function ReportSectionCompetitors({ competitors, market, ticker }) {
                   {c.ev_ebitda != null && (
                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>EV/EBITDA {c.ev_ebitda.toFixed(1)}</span>
                   )}
+                  {hasRd && (
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>R&D {c.rd_intensity != null ? `${c.rd_intensity.toFixed(1)}%` : '—'}</span>
+                  )}
                 </div>
               )}
             </div>
           )
         })}
       </div>
+      {competitor_edge && (competitor_edge.axis || competitor_edge.one_liner || competitor_edge.entries?.length > 0) && (
+        <div style={{ marginTop: 14 }}>
+          {competitor_edge.axis && (
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 8 }}>
+              비교축 · {competitor_edge.axis}
+            </div>
+          )}
+          {competitor_edge.entries?.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: competitor_edge.one_liner ? 10 : 0 }}>
+              {competitor_edge.entries.map((e, i) => {
+                const match = competitorByTicker[e.ticker]
+                const posColor = EDGE_POSITION_COLOR[e.position] || 'var(--text-3)'
+                return (
+                  <div key={i} style={_FACTOR_LINE}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <span style={_FACTOR_TITLE}>{e.name || match?.name || e.ticker}</span>
+                      {e.ticker && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{e.ticker}</span>}
+                      {e.position && <span style={_CHIP(posColor)}>{e.position}</span>}
+                    </div>
+                    {e.edge && <div style={_FACTOR_DESC}><GlossaryText text={e.edge} /></div>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {competitor_edge.one_liner && (
+            <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.7, padding: '8px 12px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid var(--accent)' }}>
+              💡 <GlossaryText text={competitor_edge.one_liner} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

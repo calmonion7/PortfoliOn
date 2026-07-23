@@ -14,8 +14,16 @@ import InsiderTradesSection from './InsiderTradesSection'
 import UsSupplySection from './UsSupplySection'
 import UsInsiderSection from './UsInsiderSection'
 import GuruHoldersSection from './GuruHoldersSection'
+import MarketOutlookSection from './MarketOutlookSection'
 
 const noop = () => {}
+
+// 심층분석 탭 그룹 헤더 — SectionTitle(세리프+언더라인, 섹션당)보다 한 단 위의 가벼운 구분선. 하위탭 아님(정적 라벨만).
+const GroupHeader = ({ children }) => (
+  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, marginBottom: 10 }}>
+    {children}
+  </div>
+)
 
 // 리포트 상세 탭(요약/지표/심층분석/히스토리) 공통 렌더. Reports.jsx 상세 뷰와 Ranking.jsx 모달이 공유.
 // ETF는 표시 가능한 데이터만: 요약·심층분석 탭과 컨센서스/재무 서브탭 숨김 → 지표(기술·수급)+히스토리.
@@ -152,15 +160,34 @@ export default function ReportDetailTabs({
                   <span>⚠</span> AI 분석 미업데이트 (enrich API 미실행)
                 </div>
               )}
-              <ReportSectionCompetitors
-                competitors={summary.competitors_data}
-                market={market}
-                ticker={ticker}
-              />
-              <MoatSection moat={summary.moat} />
-              <KeyResourceSection key_resource={summary.key_resource} />
-              <GrowthPlanSection growth_plan={summary.growth_plan} />
-              <RisksSection risks={summary.risks} />
+              {(summary.market_outlook || summary.competitors_data?.length > 0) && (
+                <>
+                  <GroupHeader>시장 & 경쟁</GroupHeader>
+                  <MarketOutlookSection market_outlook={summary.market_outlook} financialsAnnual={summary.financials_annual} />
+                  <ReportSectionCompetitors
+                    competitors={summary.competitors_data}
+                    market={market}
+                    ticker={ticker}
+                    competitor_edge={summary.competitor_edge}
+                  />
+                </>
+              )}
+              {(summary.moat || summary.key_resource) && (
+                <>
+                  <GroupHeader>경쟁우위</GroupHeader>
+                  <MoatSection moat={summary.moat} />
+                  <KeyResourceSection key_resource={summary.key_resource} />
+                </>
+              )}
+              {(summary.growth_plan || summary.risks) && (
+                <>
+                  <GroupHeader>성장 & 리스크</GroupHeader>
+                  <GrowthPlanSection growth_plan={summary.growth_plan} />
+                  <RisksSection risks={summary.risks} />
+                </>
+              )}
+              {/* LatestDisclosuresSection·InsiderTradesSection은 자체 fetch로 항상 렌더 → 그룹 무조건 표시 (eco) */}
+              <GroupHeader>이벤트</GroupHeader>
               <RecentDisclosuresSection
                 disclosures={summary.recent_disclosures}
                 news={news}
