@@ -272,6 +272,27 @@ def test_kr_rd_intensity_035420형_cost_over_revenue_no_ratio_row():
     assert result == 5.0
 
 
+def test_kr_rd_intensity_영업수익_비율행_실네이버구조():
+    """실 035420(네이버) 사업보고서 구조: 분모 라벨이 '매출액'이 아니라 '영업수익'인
+    비율 행(연결/별도 4열, leftmost=연결 당기). 1순위 비율행이 '매출액'만 매칭하던
+    task#209 라이브 UAT 버그(=None) 재현·방어 — 연결 당기 17.3% 반환해야 한다."""
+    html = """
+    <p>연구개발비용 (단위 : 백만원, %)</p>
+    <table>
+      <tr><td>과 목</td><td>연결</td><td>연결</td><td>별도</td><td>별도</td></tr>
+      <tr><td>과 목</td><td>제 26기</td><td>제 25기</td><td>제 26기</td><td>제 25기</td></tr>
+      <tr><td>연구개발비용 계</td><td>1,857,936</td><td>1,992,636</td><td>623,045</td><td>635,717</td></tr>
+      <tr><td>연구개발비/영업수익 비율(%)</td><td>17.3%</td><td>20.6%</td><td>10.1%</td><td>11.3%</td></tr>
+    </table>
+    """
+    with patch("os.environ.get", side_effect=lambda k, d="": "dummy-key" if k == "DART_API_KEY" else d), \
+         patch("services.backlog._get_corp_code_map", return_value={"035420": "00266961"}), \
+         patch("services.market.kr.requests.get", return_value=_mock_list_resp()), \
+         patch("services.backlog._get_document_text", return_value=html):
+        result = get_rd_intensity_kr("035420")
+    assert result == 17.3
+
+
 def test_kr_rd_intensity_unit_caption_missing_returns_none():
     """단위 캡션 없음(계산 경로) → '안전 기본값' 폴백 없이 None(wrong<missing)."""
     html = """

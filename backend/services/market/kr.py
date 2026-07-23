@@ -540,8 +540,8 @@ def get_rd_intensity_kr(ticker: str) -> float | None:
     """KR 경쟁사 R&D집약도(%) best-effort (task#204 S2 M3 재구현).
     fnlttSinglAcntAll(4대 재무제표)엔 R&D 세부 라인이 구조적으로 없어(라이브 확인)
     구버전은 항상 None이었다 — 사업보고서 document.xml의 '연구개발비용' 표를 직접
-    파싱한다. 표 내 '연구개발비 / 매출액' 비율 행이 있으면 그 당기(%) 값을 그대로
-    쓰고(단위 무관), 없으면 같은 표의 연구개발비·매출액 행을 뽑아 계산한다(같은
+    파싱한다. 표 내 '연구개발비 / 매출액(또는 영업수익)' 비율 행이 있으면 그 당기(%)
+    값을 그대로 쓰고(단위 무관), 없으면 같은 표의 연구개발비·매출액 행을 뽑아 계산한다(같은
     표=같은 단위라 단위 불문 정확) — 단, 계산 경로는 단위 캡션 확정을 요구해 표
     오인식을 걸러낸다(안전 기본값 폴백 금지). list.json 미발견·document.xml 실패·
     표 미발견·sanity 위반(0<x<100 또는 0<rd<revenue 아님)은 모두 결측(None)."""
@@ -590,9 +590,10 @@ def get_rd_intensity_kr(ticker: str) -> float | None:
             if not grid or not any("연구개발비" in " ".join(row) for row in grid):
                 continue
 
-            # 1순위: '연구개발비 / 매출액' 비율 행 — 당기(leftmost 데이터열) % 직접 사용
+            # 1순위: '연구개발비 / 매출액(또는 영업수익)' 비율 행 — 당기(leftmost 데이터열) % 직접 사용
+            # 분모 라벨은 회사별 상이(매출액/매출/영업수익 — 네이버 등은 영업수익, task#209 라이브 UAT)
             for row in grid:
-                if row and "연구개발" in row[0] and "매출액" in row[0]:
+                if row and "연구개발" in row[0] and ("매출" in row[0] or "영업수익" in row[0]):
                     for cell in row[1:]:
                         v = _num(cell.replace("%", "").strip())
                         if v is not None and 0 < v < 100:
@@ -607,7 +608,7 @@ def get_rd_intensity_kr(ticker: str) -> float | None:
                     continue
                 if rd is None and "연구개발비" in row[0] and "매출액" not in row[0]:
                     rd = next((_num(c) for c in row[1:] if _num(c) is not None), None)
-                elif revenue is None and "매출액" in row[0] and "연구개발" not in row[0]:
+                elif revenue is None and ("매출액" in row[0] or "영업수익" in row[0]) and "연구개발" not in row[0]:
                     revenue = next((_num(c) for c in row[1:] if _num(c) is not None), None)
             if rd is not None and revenue is not None and 0 < rd < revenue:
                 return _safe_pct(rd, revenue)
