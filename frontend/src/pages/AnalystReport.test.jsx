@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import AnalystReport, { PerBandChart, RATING_META } from './AnalystReport'
+import AnalystReport, { PerBandChart, RATING_META, assignLabelRows } from './AnalystReport'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn() } }))
@@ -90,6 +90,34 @@ describe('PerBandChart', () => {
   it('밴드 재료 없으면 미렌더', () => {
     const { container } = render(<PerBandChart band={null} />)
     expect(container.innerHTML).toBe('')
+  })
+})
+
+describe('assignLabelRows (task#219 — 마커 라벨 근접 시 2단 스태거)', () => {
+  it('멀리 떨어진 마커는 전부 아랫줄(0)', () => {
+    expect(assignLabelRows([5.9, 20.2, 36.0], 40)).toEqual([0, 0, 0])
+  })
+
+  it('근접 2마커는 0/1 분리 (삼성전자 실사례: 현재 20.2 vs 평균 22.2)', () => {
+    // 도메인 폭 ~43 (2.2~40.5+pad), 간격 2 < 43*0.14 → 스태거
+    expect(assignLabelRows([22.2, 20.2, 5.9], 43)).toEqual([1, 0, 0])
+  })
+
+  it('3마커 밀집은 0/1 교차 배정', () => {
+    const rows = assignLabelRows([10, 10.5, 11], 40)
+    expect(rows[0]).toBe(0)
+    expect(rows[1]).toBe(1)
+  })
+
+  it('입력 순서와 무관하게 값 오름차순 기준으로 배정', () => {
+    // marks 배열 순서(평균·현재·Fwd)가 값 순서와 달라도 동일 결과
+    expect(assignLabelRows([20.2, 22.2], 43)).toEqual([0, 1])
+    expect(assignLabelRows([22.2, 20.2], 43)).toEqual([1, 0])
+  })
+
+  it('빈 배열·단일 마커 graceful', () => {
+    expect(assignLabelRows([], 40)).toEqual([])
+    expect(assignLabelRows([20.2], 40)).toEqual([0])
   })
 })
 

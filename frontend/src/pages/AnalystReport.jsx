@@ -37,6 +37,19 @@ const fmtEps = (v, isKR) => {
   return isKR ? `${Math.round(v).toLocaleString()}원` : `$${v.toFixed(2)}`
 }
 
+// 마커 라벨 행 배정 — 직전 라벨과 도메인 폭 대비 ratio 미만으로 근접하면 윗줄(1)로 토글 (task#219)
+export function assignLabelRows(values, domainWidth, ratio = 0.14) {
+  const thr = domainWidth * ratio
+  const last = [-Infinity, -Infinity]
+  const rows = new Array(values.length).fill(0)
+  values.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]).forEach(([v, i]) => {
+    const row = v - last[0] >= thr ? 0 : v - last[1] >= thr ? 1 : 0
+    rows[i] = row
+    last[row] = v
+  })
+  return rows
+}
+
 export function PerBandChart({ band }) {
   if (!band || band.min == null || band.max == null) return null
   const marks = [
@@ -47,20 +60,27 @@ export function PerBandChart({ band }) {
   const values = [band.min, band.max, ...marks.map(m => m.v)]
   const lo = Math.min(...values), hi = Math.max(...values)
   const pad = (hi - lo) * 0.12 || 1
+  // 마커 값이 근접하면(예: 현재 20.2 vs 평균 22.2) top 고정 라벨이 겹침 → 2단 스태거 (task#219)
+  const rows = assignLabelRows(marks.map(m => m.v), (hi + pad) - (lo - pad))
   // XAxis type=number는 실제 데이터 포인트가 있어야 domain이 유효 — 빈 행이면 축이 한 점으로 붕괴(uat212)
   const axisData = [{ x: lo - pad, y: 0 }, { x: hi + pad, y: 0 }]
   return (
     <div style={{ margin: '14px 0 4px' }}>
-      <ResponsiveContainer width="100%" height={96}>
-        <ComposedChart data={axisData} margin={{ top: 26, right: 28, bottom: 0, left: 28 }}>
+      <ResponsiveContainer width="100%" height={100}>
+        <ComposedChart data={axisData} margin={{ top: 30, right: 28, bottom: 0, left: 28 }}>
           <XAxis dataKey="x" type="number" domain={['dataMin', 'dataMax']} tickFormatter={v => v.toFixed(1)}
                  tick={{ fontSize: 10, fill: 'var(--text-3)' }} stroke="var(--border)" />
           <YAxis dataKey="y" hide />
           <ReferenceArea x1={band.min} x2={band.max} fill="var(--accent)" fillOpacity={0.1}
                          label={{ value: `밴드 ${band.min}~${band.max}`, position: 'insideBottomLeft', fontSize: 10, fill: 'var(--text-3)' }} />
-          {marks.map(m => (
+          {marks.map((m, i) => (
             <ReferenceLine key={m.key} x={m.v} stroke={m.color} strokeDasharray={m.dash}
-                           label={{ value: `${m.label} ${m.v}`, position: 'top', fontSize: 10, fill: m.color }} />
+                           label={({ viewBox }) => (
+                             <text x={viewBox.x} y={viewBox.y - (rows[i] === 1 ? 17 : 5)}
+                                   textAnchor="middle" fontSize={10} fill={m.color}>
+                               {`${m.label} ${m.v}`}
+                             </text>
+                           )} />
           ))}
         </ComposedChart>
       </ResponsiveContainer>
