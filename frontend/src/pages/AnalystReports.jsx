@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import Badge from '../components/ui/Badge'
+import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { useToast } from '../components/Toast'
 import { RATING_META } from './AnalystReport'
@@ -76,18 +77,24 @@ export default function AnalystReports() {
       ) : pubs.length === 0 ? (
         <p style={{ color: 'var(--text-3)', fontSize: 13 }}>발행된 애널리스트 리포트가 없습니다.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {pubs.map(p => (
-            <Link
+            <Card
               key={`${p.ticker}-${p.published_date}`}
+              as={Link}
               to={`/analyst-report/${p.ticker}/${p.published_date}`}
-              style={{ ...rowStyle, textDecoration: 'none' }}
+              hover
+              padding="sm"
+              style={{ textDecoration: 'none', display: 'block' }}
             >
-              <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11, flexShrink: 0 }}>{p.published_date}</span>
-              <span style={{ color: 'var(--text)', fontWeight: 600, flexShrink: 0 }}>{p.name || p.ticker}</span>
-              <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>
-              <span style={{ color: 'var(--text-2, var(--text))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
-            </Link>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'var(--font-serif)', fontSize: 15 }}>{p.name || p.ticker}</span>
+                <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.ticker}</span>
+                <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>
+                <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 'auto' }}>{p.published_date}</span>
+              </div>
+              <div style={{ color: 'var(--text-2, var(--text))', fontSize: 13, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+            </Card>
           ))}
         </div>
       )}

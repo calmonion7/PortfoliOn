@@ -3,11 +3,14 @@ import { useParams, Link } from 'react-router-dom'
 import { ComposedChart, XAxis, YAxis, ReferenceArea, ReferenceLine, ResponsiveContainer } from 'recharts'
 import api from '../api'
 import { fmtPrice } from '../utils'
-import Badge from '../components/ui/Badge'
+import Badge, { MarketBadge } from '../components/ui/Badge'
+import Card from '../components/ui/Card'
+import Stat from '../components/ui/Stat'
 import Skeleton from '../components/ui/Skeleton'
+import { SectionTitle, TH, TD } from '../components/reports/reportUtils.jsx'
 
-// 증권사 리포트식 단일 문서 페이지 (task#212, ADR-0027)
-// 헤더 → 한줄 논지 → 투자 포인트 → 밸류에이션(산정방식+PER 밴드+피어 멀티플) → 실적 추정 → 리스크
+// 증권사 리포트식 단일 문서 페이지 (task#212, 에디토리얼 재설계 task#216, ADR-0026/0027)
+// 헤더(스탯 스트립+밴드 게이지) → 한줄 논지 → 투자 포인트 → 밸류에이션 → 실적 추정 → 리스크
 
 export const RATING_META = {
   buy: { label: '매수', variant: 'success' },      // 의미 배지 — 가격색(up/down) 교차 사용 금지(task#194)
@@ -34,14 +37,6 @@ const fmtEps = (v, isKR) => {
   return isKR ? `${Math.round(v).toLocaleString()}원` : `$${v.toFixed(2)}`
 }
 
-function SectionHead({ children }) {
-  return (
-    <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--text)', fontSize: 16, margin: '28px 0 10px', paddingBottom: 6, borderBottom: '1px solid var(--border)' }}>
-      {children}
-    </h3>
-  )
-}
-
 export function PerBandChart({ band }) {
   if (!band || band.min == null || band.max == null) return null
   const marks = [
@@ -55,9 +50,9 @@ export function PerBandChart({ band }) {
   // XAxis type=number는 실제 데이터 포인트가 있어야 domain이 유효 — 빈 행이면 축이 한 점으로 붕괴(uat212)
   const axisData = [{ x: lo - pad, y: 0 }, { x: hi + pad, y: 0 }]
   return (
-    <div style={{ margin: '10px 0 4px' }}>
-      <ResponsiveContainer width="100%" height={86}>
-        <ComposedChart data={axisData} margin={{ top: 24, right: 24, bottom: 0, left: 24 }}>
+    <div style={{ margin: '14px 0 4px' }}>
+      <ResponsiveContainer width="100%" height={96}>
+        <ComposedChart data={axisData} margin={{ top: 26, right: 28, bottom: 0, left: 28 }}>
           <XAxis dataKey="x" type="number" domain={['dataMin', 'dataMax']} tickFormatter={v => v.toFixed(1)}
                  tick={{ fontSize: 10, fill: 'var(--text-3)' }} stroke="var(--border)" />
           <YAxis dataKey="y" hide />
@@ -74,8 +69,31 @@ export function PerBandChart({ band }) {
   )
 }
 
-const thStyle = { textAlign: 'right', padding: '6px 8px', color: 'var(--text-3)', fontWeight: 500, fontSize: 11, borderBottom: '1px solid var(--border)' }
-const tdStyle = { textAlign: 'right', padding: '6px 8px', fontSize: 12, borderBottom: '1px solid var(--border-soft, var(--border))' }
+// 적정주가 밴드 대비 현재가 위치 게이지 (task#216) — low~high 음영 + 현재가 마커
+export function BandGauge({ low, high, price, market }) {
+  if (low == null || high == null || price == null || high <= 0) return null
+  const lo = Math.min(low, price) * 0.97
+  const hi = Math.max(high, price) * 1.03
+  const pct = v => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))
+  return (
+    <div style={{ margin: '14px 2px 2px' }}>
+      <div style={{ position: 'relative', height: 26 }}>
+        <div style={{ position: 'absolute', top: 11, left: 0, right: 0, height: 4, background: 'var(--bg-elev-2)', borderRadius: 2 }} />
+        <div style={{ position: 'absolute', top: 11, left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%`, height: 4, background: 'var(--accent)', opacity: 0.35, borderRadius: 2 }} />
+        <div title="발행 시점 현재가" style={{ position: 'absolute', top: 6, left: `calc(${pct(price)}% - 7px)`, width: 14, height: 14, borderRadius: '50%', background: 'var(--up)', border: '2.5px solid var(--bg)', boxShadow: '0 0 0 1px var(--up)' }} />
+      </div>
+      <div className="mono tnum" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-3)' }}>
+        <span>밴드 하단 {fmtPrice(low, market)}</span>
+        <span>상단 {fmtPrice(high, market)}</span>
+      </div>
+    </div>
+  )
+}
+
+const numeralStyle = {
+  fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700, lineHeight: 1,
+  color: 'var(--accent)', opacity: 0.85, flexShrink: 0, width: 38,
+}
 
 export default function AnalystReport() {
   const { ticker, date } = useParams()
@@ -95,148 +113,159 @@ export default function AnalystReport() {
       .finally(() => setLoading(false))
   }, [ticker, date])
 
-  if (loading) return <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 16px' }}><Skeleton variant="row" count={8} /></div>
+  if (loading) return <div style={{ maxWidth: 780, margin: '0 auto', padding: '24px 16px' }}><Skeleton variant="row" count={8} /></div>
   if (error) return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '48px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
+    <div style={{ maxWidth: 780, margin: '0 auto', padding: '48px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
       <p>{error}</p>
-      <Link to="/reports" style={{ color: 'var(--accent)' }}>← 리서치로 돌아가기</Link>
+      <Link to="/analyst-reports" style={{ color: 'var(--accent)' }}>← 심층 리포트로 돌아가기</Link>
     </div>
   )
 
   const d = report.data || {}
-  const isKR = (d.market || report.market) === 'KR'
   const market = d.market || report.market
+  const isKR = market === 'KR'
   const rating = RATING_META[report.rating] || RATING_META.neutral
   const annual = d.financials_annual || []
   const hasOpIncome = annual.some(f => f.operating_income != null) // US forward 영업이익 null graceful — 전무면 열 생략
   const peers = d.competitors || []
+  const bandMid = (report.fair_value_low != null && report.fair_value_high != null)
+    ? (report.fair_value_low + report.fair_value_high) / 2 : null
+  const upside = (bandMid != null && d.price) ? (bandMid / d.price - 1) * 100 : null
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 16px 64px' }}>
-      {/* 1. 헤더 */}
-      <div style={{ borderBottom: '2px solid var(--text)', paddingBottom: 14, marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>
-            {report.name || d.name || ticker}
-          </span>
-          <span className="mono" style={{ color: 'var(--text-3)', fontSize: 14 }}>({report.ticker})</span>
-          <Badge variant={rating.variant}>{rating.label}</Badge>
-          <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 'auto' }}>{report.published_date} 발행</span>
-        </div>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 12, fontSize: 13 }}>
-          <div>
-            <div style={{ color: 'var(--text-3)', fontSize: 11 }}>적정주가 밴드</div>
-            <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16 }}>
-              {fmtPrice(report.fair_value_low, market)} ~ {fmtPrice(report.fair_value_high, market)}
-            </div>
-          </div>
-          {d.price != null && (
-            <div>
-              <div style={{ color: 'var(--text-3)', fontSize: 11 }}>발행 시점 현재가 <span className="mono">({d.snapshot_date})</span></div>
-              <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16 }}>{fmtPrice(d.price, market)}</div>
-            </div>
-          )}
-          {d.consensus?.target_mean != null && (
-            <div>
-              <div style={{ color: 'var(--text-3)', fontSize: 11 }}>컨센서스 평균 목표가</div>
-              <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16 }}>{fmtPrice(d.consensus.target_mean, market)}</div>
-            </div>
-          )}
-        </div>
+    <div style={{ maxWidth: 780, margin: '0 auto', padding: '20px 16px 64px' }}>
+      {/* ── 헤더 ─────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ color: 'var(--text-3)', fontSize: 11, letterSpacing: '0.12em', fontWeight: 600 }}>ANALYST REPORT</span>
+        <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 'auto' }}>{report.published_date} 발행</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '8px 0 14px' }}>
+        <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 700, color: 'var(--text)', lineHeight: 1.15 }}>
+          {report.name || d.name || ticker}
+        </span>
+        <span className="mono" style={{ color: 'var(--text-3)', fontSize: 14 }}>{report.ticker}</span>
+        <MarketBadge market={market || 'US'} />
+        <Badge variant={rating.variant} size="md">{rating.label}</Badge>
       </div>
 
-      {/* 2. 한줄 논지 */}
-      <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--text)', fontSize: 21, lineHeight: 1.4, margin: '0 0 20px' }}>
-        {report.title}
-      </h2>
-
-      {/* 3. 투자 포인트 */}
-      <SectionHead>투자 포인트</SectionHead>
-      {(report.points || []).map((p, i) => (
-        <div key={i} style={{ marginBottom: 14 }}>
-          <div style={{ color: 'var(--text)', fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
-            <span className="mono" style={{ color: 'var(--accent)', marginRight: 6 }}>{String(i + 1).padStart(2, '0')}</span>
-            {p.title}
-          </div>
-          <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{p.body}</p>
+      <Card padding="md">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+          <Stat size="sm" label="적정주가 밴드"
+                value={<span className="tnum">{fmtPrice(report.fair_value_low, market)} ~ {fmtPrice(report.fair_value_high, market)}</span>} />
+          <Stat size="sm" label="발행 시점 현재가" value={fmtPrice(d.price, market)} helperText={d.snapshot_date ? `${d.snapshot_date} 스냅샷` : null} />
+          <Stat size="sm" label="컨센서스 목표가" value={d.consensus?.target_mean != null ? fmtPrice(d.consensus.target_mean, market) : '—'}
+                helperText={d.consensus?.buy != null ? `매수 ${d.consensus.buy} · 보유 ${d.consensus.hold ?? 0} · 매도 ${d.consensus.sell ?? 0}` : null} />
+          <Stat size="sm" label="상승여력 (밴드 중앙)" value={upside != null ? `${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%` : '—'}
+                valueColor={upside == null ? null : upside >= 0 ? 'up' : 'down'} />
         </div>
-      ))}
+        <BandGauge low={report.fair_value_low} high={report.fair_value_high} price={d.price} market={market} />
+      </Card>
 
-      {/* 4. 밸류에이션 */}
-      <SectionHead>밸류에이션</SectionHead>
-      <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, marginTop: 0, whiteSpace: 'pre-wrap' }}>{report.valuation_method}</p>
-      <PerBandChart band={d.per_band} />
-      {peers.length > 0 && (
-        <div style={{ overflowX: 'auto', marginTop: 14 }}>
-          <table className="tnum" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
-            <thead>
-              <tr>
-                <th style={{ ...thStyle, textAlign: 'left' }}>피어</th>
-                <th style={thStyle}>PER</th>
-                <th style={thStyle}>PBR</th>
-                <th style={thStyle}>PSR</th>
-                <th style={thStyle}>EV/EBITDA</th>
-                <th style={thStyle}>R&D집약도</th>
-              </tr>
-            </thead>
-            <tbody>
-              {peers.map((c) => (
-                <tr key={c.ticker} style={c.is_self ? { background: 'var(--bg-elev-2)' } : undefined}>
-                  <td style={{ ...tdStyle, textAlign: 'left', color: 'var(--text)', fontWeight: c.is_self ? 700 : 400 }}>
-                    {c.name || c.ticker}{c.is_self ? ' ●' : ''}
-                  </td>
-                  <td style={tdStyle}>{c.per != null ? c.per.toFixed(1) : '—'}</td>
-                  <td style={tdStyle}>{c.pbr != null ? c.pbr.toFixed(2) : '—'}</td>
-                  <td style={tdStyle}>{c.psr != null ? c.psr.toFixed(2) : '—'}</td>
-                  <td style={tdStyle}>{c.ev_ebitda != null ? c.ev_ebitda.toFixed(1) : '—'}</td>
-                  <td style={tdStyle}>{c.rd_intensity != null ? `${c.rd_intensity.toFixed(1)}%` : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* ── 한줄 논지 ────────────────────────────────────── */}
+      <blockquote style={{ margin: '26px 0 30px', padding: '4px 0 4px 16px', borderLeft: '3px solid var(--accent)' }}>
+        <p style={{ fontFamily: 'var(--font-serif)', color: 'var(--text)', fontSize: 22, lineHeight: 1.45, margin: 0, fontWeight: 600 }}>
+          {report.title}
+        </p>
+      </blockquote>
 
-      {/* 5. 실적 추정 테이블 */}
-      {annual.length > 0 && (
-        <>
-          <SectionHead>실적 추정</SectionHead>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tnum" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 380 }}>
+      {/* ── 투자 포인트 ──────────────────────────────────── */}
+      <SectionTitle>투자 포인트</SectionTitle>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
+        {(report.points || []).map((p, i) => (
+          <Card key={i} padding="md">
+            <div style={{ display: 'flex', gap: 12 }}>
+              <span className="tnum" style={numeralStyle}>{String(i + 1).padStart(2, '0')}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>{p.title}</div>
+                <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}>{p.body}</p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* ── 밸류에이션 ───────────────────────────────────── */}
+      <SectionTitle>밸류에이션</SectionTitle>
+      <Card padding="md" style={{ marginBottom: 30 }}>
+        <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}>{report.valuation_method}</p>
+        <PerBandChart band={d.per_band} />
+        {peers.length > 0 && (
+          <div style={{ overflowX: 'auto', marginTop: 16 }}>
+            <table className="tnum" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 430 }}>
               <thead>
                 <tr>
-                  <th style={{ ...thStyle, textAlign: 'left' }}>연도</th>
-                  <th style={thStyle}>매출{isKR ? '(원)' : '($)'}</th>
-                  {hasOpIncome && <th style={thStyle}>영업이익</th>}
-                  <th style={thStyle}>EPS</th>
-                  <th style={thStyle}>PER</th>
+                  <th style={{ ...TH, textAlign: 'left' }}>피어 멀티플</th>
+                  <th style={TH}>PER</th>
+                  <th style={TH}>PBR</th>
+                  <th style={TH}>PSR</th>
+                  <th style={TH}>EV/EBITDA</th>
+                  <th style={TH}>R&D집약도</th>
                 </tr>
               </thead>
               <tbody>
-                {annual.map((f) => (
-                  <tr key={f.period} style={f.is_consensus ? { color: 'var(--accent)' } : undefined}>
-                    <td style={{ ...tdStyle, textAlign: 'left' }} className="mono">
-                      {f.period}{f.is_consensus ? '(E)' : ''}
+                {peers.map((c) => (
+                  <tr key={c.ticker} style={c.is_self ? { background: 'var(--bg-elev-2)' } : undefined}>
+                    <td style={{ ...TD, textAlign: 'left', fontFamily: 'var(--font-sans, inherit)', color: 'var(--text)', fontWeight: c.is_self ? 700 : 400 }}>
+                      {c.name || c.ticker}{c.is_self ? ' ●' : ''}
                     </td>
-                    <td style={tdStyle}>{fmtAmount(f.revenue, isKR)}</td>
-                    {hasOpIncome && <td style={tdStyle}>{fmtAmount(f.operating_income, isKR)}</td>}
-                    <td style={tdStyle}>{fmtEps(f.eps, isKR)}</td>
-                    <td style={tdStyle}>{f.per != null ? f.per.toFixed(1) : '—'}</td>
+                    <td style={TD}>{c.per != null ? c.per.toFixed(1) : '—'}</td>
+                    <td style={TD}>{c.pbr != null ? c.pbr.toFixed(2) : '—'}</td>
+                    <td style={TD}>{c.psr != null ? c.psr.toFixed(2) : '—'}</td>
+                    <td style={TD}>{c.ev_ebitda != null ? c.ev_ebitda.toFixed(1) : '—'}</td>
+                    <td style={TD}>{c.rd_intensity != null ? `${c.rd_intensity.toFixed(1)}%` : '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '6px 0 0' }}>(E) = 컨센서스 추정 · 발행 시점 스냅샷 기준</p>
+        )}
+      </Card>
+
+      {/* ── 실적 추정 ────────────────────────────────────── */}
+      {annual.length > 0 && (
+        <>
+          <SectionTitle>실적 추정</SectionTitle>
+          <Card padding="md" style={{ marginBottom: 30 }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tnum" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...TH, textAlign: 'left' }}>연도</th>
+                    <th style={TH}>매출{isKR ? '(원)' : '($)'}</th>
+                    {hasOpIncome && <th style={TH}>영업이익</th>}
+                    <th style={TH}>EPS</th>
+                    <th style={TH}>PER</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {annual.map((f) => (
+                    <tr key={f.period} style={f.is_consensus ? { color: 'var(--accent)', background: 'var(--bg-elev-2)' } : undefined}>
+                      <td style={{ ...TD, textAlign: 'left', color: f.is_consensus ? 'var(--accent)' : 'var(--text)' }}>
+                        {f.period}{f.is_consensus ? '(E)' : ''}
+                      </td>
+                      <td style={{ ...TD, color: 'inherit' }}>{fmtAmount(f.revenue, isKR)}</td>
+                      {hasOpIncome && <td style={{ ...TD, color: 'inherit' }}>{fmtAmount(f.operating_income, isKR)}</td>}
+                      <td style={{ ...TD, color: 'inherit' }}>{fmtEps(f.eps, isKR)}</td>
+                      <td style={{ ...TD, color: 'inherit' }}>{f.per != null ? f.per.toFixed(1) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '8px 0 0' }}>(E) = 컨센서스 추정 · 발행 시점 스냅샷 기준</p>
+          </Card>
         </>
       )}
 
-      {/* 6. 리스크 요인 */}
-      <SectionHead>리스크 요인</SectionHead>
-      <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{report.risks}</p>
+      {/* ── 리스크 요인 ──────────────────────────────────── */}
+      <SectionTitle>리스크 요인</SectionTitle>
+      <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--warn)', background: 'var(--warn-soft)', borderRadius: '0 6px 6px 0', marginBottom: 8 }}>
+        <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0 }}>{report.risks}</p>
+      </div>
 
-      <div style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-        <Link to="/reports" style={{ color: 'var(--accent)', fontSize: 13 }}>← 리서치로 돌아가기</Link>
+      <div style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <Link to="/analyst-reports" style={{ color: 'var(--accent)', fontSize: 13 }}>← 심층 리포트</Link>
+        <span style={{ color: 'var(--text-3)', fontSize: 11 }}>본 문서는 발행 시점 데이터로 박제된 판단 문서입니다 · 투자 판단의 책임은 투자자 본인에게 있습니다</span>
       </div>
     </div>
   )
