@@ -55,7 +55,9 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     expect(screen.getByText('밸류에이션')).toBeTruthy()
     expect(screen.getByText('SK하이닉스')).toBeTruthy()    // 피어 테이블
     expect(screen.getByText('실적 추정')).toBeTruthy()
-    expect(screen.getByText('2026(E)')).toBeTruthy()       // 컨센서스 행
+    // 차트 틱은 jsdom(0크기 컨테이너)에서 미렌더 — 범례·캡션으로 차트화 검증(task#217)
+    expect(screen.getByText('매출(원)')).toBeTruthy()
+    expect(screen.getByText(/\(E\) = 컨센서스 추정/)).toBeTruthy()
     expect(screen.getByText('리스크 요인')).toBeTruthy()
     expect(screen.getByText('리스크 서술')).toBeTruthy()
   })

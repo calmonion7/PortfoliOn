@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ComposedChart, XAxis, YAxis, ReferenceArea, ReferenceLine, ResponsiveContainer } from 'recharts'
+import { ComposedChart, LineChart, Line, LabelList, CartesianGrid, XAxis, YAxis, ReferenceArea, ReferenceLine, ResponsiveContainer } from 'recharts'
 import api from '../api'
 import { fmtPrice } from '../utils'
 import Badge, { MarketBadge } from '../components/ui/Badge'
@@ -90,6 +90,95 @@ export function BandGauge({ low, high, price, market }) {
   )
 }
 
+// 실적 추정 차트 (task#217) — 표 대체. 값·YoY 증감%를 상시 라벨로 병기(FinancialsChart 톤).
+export function EstimatesChart({ annual, isKR }) {
+  const rows = annual || []
+  if (!rows.length) return null
+  const pctOf = (c, p) => (c != null && p != null && p !== 0) ? Math.round((c - p) / Math.abs(p) * 1000) / 10 : null
+  const data = rows.map((f, i) => {
+    const prev = i > 0 ? rows[i - 1] : null
+    return {
+      period: f.is_consensus ? `${f.period}(E)` : f.period,
+      revenue: f.revenue, op: f.operating_income, eps: f.eps,
+      rev_pct: pctOf(f.revenue, prev?.revenue),
+      op_pct: pctOf(f.operating_income, prev?.operating_income),
+      eps_pct: pctOf(f.eps, prev?.eps),
+    }
+  })
+  const hasOp = data.some(d => d.op != null)
+  const hasEps = data.some(d => d.eps != null)
+  const fmtV = v => fmtAmount(v, isKR)
+
+  // 값(위) + YoY 증감%(아래) 2줄 상시 라벨
+  const makeLabel = (valueKey, pctKey, color, fmtFn) => (props) => {
+    const { x, y, index } = props
+    const row = data[index]
+    const v = row?.[valueKey]
+    if (v == null || x == null || y == null) return null
+    const pct = row?.[pctKey]
+    return (
+      <g>
+        <text x={x} y={y - 17} textAnchor="middle" fontSize={9.5} fontWeight={600} fill={color}>{fmtFn(v)}</text>
+        {pct != null && (
+          <text x={x} y={y - 7} textAnchor="middle" fontSize={8.5} fill={pct >= 0 ? 'var(--up)' : 'var(--down)'}>
+            {pct >= 0 ? '▲+' : '▼'}{pct}%
+          </text>
+        )}
+      </g>
+    )
+  }
+
+  const legendItem = (color, label) => (
+    <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ width: 16, height: 2, background: color, display: 'inline-block', borderRadius: 1 }} />
+      <span>{label}</span>
+    </span>
+  )
+  const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
+  const lineCfg = { type: 'monotone', strokeWidth: 2, dot: { r: 3 }, activeDot: { r: 5 }, connectNulls: true, isAnimationActive: false }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>
+        {legendItem('var(--data-2)', isKR ? '매출(원)' : '매출($)')}
+        {hasOp && legendItem('var(--data-5)', '영업이익')}
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={data} margin={{ top: 30, right: 26, left: 26, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+          <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+          <YAxis hide domain={['auto', 'auto']} />
+          <Line {...lineCfg} dataKey="revenue" name="매출" stroke="var(--data-2)">
+            <LabelList content={makeLabel('revenue', 'rev_pct', 'var(--data-2)', fmtV)} />
+          </Line>
+          {hasOp && (
+            <Line {...lineCfg} dataKey="op" name="영업이익" stroke="var(--data-5)">
+              <LabelList content={makeLabel('op', 'op_pct', 'var(--data-5)', fmtV)} />
+            </Line>
+          )}
+        </LineChart>
+      </ResponsiveContainer>
+      {hasEps && (
+        <>
+          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-3)', margin: '10px 0 4px' }}>
+            {legendItem('var(--data-3)', 'EPS')}
+          </div>
+          <ResponsiveContainer width="100%" height={130}>
+            <LineChart data={data} margin={{ top: 30, right: 26, left: 26, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+              <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
+              <YAxis hide domain={['auto', 'auto']} />
+              <Line {...lineCfg} dataKey="eps" name="EPS" stroke="var(--data-3)">
+                <LabelList content={makeLabel('eps', 'eps_pct', 'var(--data-3)', v => fmtEps(v, isKR))} />
+              </Line>
+            </LineChart>
+          </ResponsiveContainer>
+        </>
+      )}
+    </div>
+  )
+}
+
 const numeralStyle = {
   fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700, lineHeight: 1,
   color: 'var(--accent)', opacity: 0.85, flexShrink: 0, width: 38,
@@ -126,7 +215,6 @@ export default function AnalystReport() {
   const isKR = market === 'KR'
   const rating = RATING_META[report.rating] || RATING_META.neutral
   const annual = d.financials_annual || []
-  const hasOpIncome = annual.some(f => f.operating_income != null) // US forward 영업이익 null graceful — 전무면 열 생략
   const peers = d.competitors || []
   const bandMid = (report.fair_value_low != null && report.fair_value_high != null)
     ? (report.fair_value_low + report.fair_value_high) / 2 : null
@@ -221,38 +309,13 @@ export default function AnalystReport() {
         )}
       </Card>
 
-      {/* ── 실적 추정 ────────────────────────────────────── */}
+      {/* ── 실적 추정 (차트 — 값·YoY 증감% 병기, task#217) ── */}
       {annual.length > 0 && (
         <>
           <SectionTitle>실적 추정</SectionTitle>
           <Card padding="md" style={{ marginBottom: 30 }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="tnum" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...TH, textAlign: 'left' }}>연도</th>
-                    <th style={TH}>매출{isKR ? '(원)' : '($)'}</th>
-                    {hasOpIncome && <th style={TH}>영업이익</th>}
-                    <th style={TH}>EPS</th>
-                    <th style={TH}>PER</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {annual.map((f) => (
-                    <tr key={f.period} style={f.is_consensus ? { color: 'var(--accent)', background: 'var(--bg-elev-2)' } : undefined}>
-                      <td style={{ ...TD, textAlign: 'left', color: f.is_consensus ? 'var(--accent)' : 'var(--text)' }}>
-                        {f.period}{f.is_consensus ? '(E)' : ''}
-                      </td>
-                      <td style={{ ...TD, color: 'inherit' }}>{fmtAmount(f.revenue, isKR)}</td>
-                      {hasOpIncome && <td style={{ ...TD, color: 'inherit' }}>{fmtAmount(f.operating_income, isKR)}</td>}
-                      <td style={{ ...TD, color: 'inherit' }}>{fmtEps(f.eps, isKR)}</td>
-                      <td style={{ ...TD, color: 'inherit' }}>{f.per != null ? f.per.toFixed(1) : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '8px 0 0' }}>(E) = 컨센서스 추정 · 발행 시점 스냅샷 기준</p>
+            <EstimatesChart annual={annual} isKR={isKR} />
+            <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '8px 0 0' }}>(E) = 컨센서스 추정 · 증감%는 전년 대비 · 발행 시점 스냅샷 기준</p>
           </Card>
         </>
       )}

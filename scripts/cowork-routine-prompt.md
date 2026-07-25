@@ -18,6 +18,9 @@ BASE URL: https://portfolion.taebro.com
 - 발행: POST /api/analyst-reports/{ticker}. body 요구 최소형태:
 {"rating":"buy","title":"<한줄 논지>","fair_value_low":80000,"fair_value_high":95000,"valuation_method":"<적정주가 산정방식 서술, 예: 과거 5년 PER 밴드 평균 12배에 2026F EPS 적용>","points":[{"title":"<포인트1>","body":"<근거 문단>"},{"title":"<포인트2>","body":"<근거 문단>"}],"risks":"<리스크 요인 서술>"}
 - rating은 buy|neutral|sell 3단계만. points는 2~3개. fair_value_low ≤ fair_value_high. 숫자 데이터 블록(시세·추정·피어·PER밴드)은 서버가 스냅샷에서 자동 첨부하므로 본문에 넣지 않는다.
+- **각 투자 포인트의 body에는 정량 근거를 반드시 포함하라** — "무엇이 얼마나" 바뀌는지 스냅샷 실적·컨센서스 추정·공개 자료 기반 숫자로 서술하고 출처를 문장 안에 명시한다. body는 3~5문장.
+  좋은 예: "HBM 캐파가 2026년 말 월 17만장으로 약 2배 증설되면(회사 가이던스), HBM 매출은 2025년 약 12조원에서 2026F 25조원 수준으로 확대 가능하다. 이는 전사 매출 컨센서스 증가분(+33조원)의 약 40%를 설명하며, HBM 마진(추정 50%+)을 감안하면 영업이익 기여는 +6~7조원으로 추정된다."
+  나쁜 예(불합격): "HBM 매출 비중 확대가 메모리 부문 믹스 개선을 견인." (숫자 없는 정성 서술만의 포인트는 다시 써라.)
 - 409(스냅샷 없음)면 POST /api/report/generate?tickers={ticker} 후 5분 뒤 1회만 재시도.
 
 == 공통 규칙 ==
