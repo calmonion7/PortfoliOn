@@ -1,8 +1,10 @@
 # ADR-0028 — 이벤트 구동 분석 파이프라인: 배치 완료 → Claude Code 루틴 fire
 
-- 상태: 채택
+- 상태: 채택 (2026-07-25 당일 개정 — 실행 주체를 클라우드 루틴 → **로컬 headless `claude -p` 리스너**로 교체, 아래 개정 노트)
 - 날짜: 2026-07-25
 - 관련: task#213, ADR-0027(개정 — 발행 자동화 허용), CLAUDE_COWORK_API.md
+
+> **개정 노트 (2026-07-25, 같은 날 fix-forward)**: 클라우드 루틴을 생성·발사해 본 결과 **Anthropic 클라우드 샌드박스가 외부 네트워크(portfolion.taebro.com)에 도달하지 못함이 실측 확인**됨(3회 발사 모두 서버 로그 무흔적, health-only 진단 런 포함). 이에 기각했던 "로컬 headless" 안을 승격: **호스트 로컬 리스너(launchd 데몬, 127.0.0.1) → `claude -p`(구독 OAuth)** 가 실행 주체다. 백엔드 fire 훅(§2)은 전송처만 로컬 URL로 바뀌고 무변. 부수 개선: 쓰기 키(COWORK_API_KEY)가 클라우드에 상주하지 않고(§4 트레이드오프 해소), fire 토큰도 자체 발급(claude.ai UI 단계 불필요). launchd keychain footgun(HOME/USER/LOGNAME 필수)은 전역 플레이북 해법 적용. 정책 프롬프트는 레포 파일(`scripts/cowork-routine-prompt.md`)로 버전관리 — 박제본 드리프트도 완화. 클라우드 루틴(trig_0112BqEaa8D9ZGXaZ5JCcQpj)은 비활성 보존(egress 정책이 열리면 재검토).
 
 ## 맥락
 

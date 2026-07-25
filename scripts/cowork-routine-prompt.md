@@ -1,0 +1,27 @@
+PortfoliOn 자동 분석 루틴 — 아래 지침대로 수행하라. (트리거 지시가 별도로 오면 그 지시를 우선 수행한다.)
+
+BASE URL: https://portfolion.taebro.com
+모든 요청에 헤더 X-API-Key: {{COWORK_API_KEY}}
+(curl로 호출한다. 파일시스템/레포 작업은 하지 마라 — 모든 데이터는 위 API에서 얻는다.)
+
+== 1) enrich (rolling, 멱등) ==
+1. GET /api/stocks → 각 항목의 enriched_at 확인. 대상 = enriched_at이 null이거나 7일 초과 경과한 종목만, null 우선 → 오래된 순으로 최대 5종목. 대상이 없으면 이 단계는 건너뛴다.
+2. 각 종목: GET /api/report/list 에서 그 종목 최신 리포트 날짜 확인 → GET /api/report/{ticker}/{date} 로 스냅샷(재무·컨센서스·기술지표·수급) 참조 → 심층 분석 작성. 웹 검색이 가능하면 최근 뉴스·공시로 보강한다.
+3. PUT /api/stocks/enrich/batch 로 일괄 저장. body 예시(항목당 이 필드들을 한국어로 채움):
+[{"ticker":"005930","moat":"<경제적 해자 분석 2~4문장>","growth_plan":"<장기 성장 계획>","risks":"<리스크>","recent_disclosures":"<최근 공시·이슈가 주가에 주는 영향>","insights":"<권고 인사이트: 스탠스(매수/관망/회피)와 진입·회피 가이드 한줄>","key_resource":"<업종 핵심 자원 지표와 유지 동력>","competitor_edge":"<경쟁사 대비 기술·경쟁력>","market_outlook":"<시장 전망: 시장 규모·성장률과 자사 위치>"}]
+4. 저장 후 반드시 POST /api/report/generate?tickers={쉼표구분목록} 호출(리포트 재생성).
+
+== 2) 애널리스트 리포트 발행 (재량 + 가드레일) ==
+- 대상: GET /api/stocks에서 type=holding(보유)인 종목만.
+- 조건 확인: GET /api/analyst-reports (X-API-Key로 조회 가능) → 그 종목 최신 발행이 7일 이상 지났거나(발행물 없음 포함), 스냅샷에서 유의미한 변화(실적 발표, 컨센서스 목표가/의견 급변, 주가 급등락)가 확인될 때만 발행. 조건 미충족이면 발행하지 않는 것이 올바른 판단이다 — 무리하게 발행하지 마라.
+- 회당 최대 2종목.
+- 발행: POST /api/analyst-reports/{ticker}. body 요구 최소형태:
+{"rating":"buy","title":"<한줄 논지>","fair_value_low":80000,"fair_value_high":95000,"valuation_method":"<적정주가 산정방식 서술, 예: 과거 5년 PER 밴드 평균 12배에 2026F EPS 적용>","points":[{"title":"<포인트1>","body":"<근거 문단>"},{"title":"<포인트2>","body":"<근거 문단>"}],"risks":"<리스크 요인 서술>"}
+- rating은 buy|neutral|sell 3단계만. points는 2~3개. fair_value_low ≤ fair_value_high. 숫자 데이터 블록(시세·추정·피어·PER밴드)은 서버가 스냅샷에서 자동 첨부하므로 본문에 넣지 않는다.
+- 409(스냅샷 없음)면 POST /api/report/generate?tickers={ticker} 후 5분 뒤 1회만 재시도.
+
+== 공통 규칙 ==
+- 위에 명시된 엔드포인트 외에는 호출하지 마라.
+- 분석 텍스트는 한국어, 구체적 수치·근거 포함, 과장 없이.
+- 각 API 응답 코드를 확인하고, 실패하면 그 종목은 건너뛰고 나머지를 계속한다.
+- 마지막에 수행 요약(enrich 종목·발행 종목·건너뛴 이유)을 한 줄씩 출력하라.

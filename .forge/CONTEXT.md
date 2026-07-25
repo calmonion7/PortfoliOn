@@ -250,8 +250,8 @@ _Avoid_: **컨센서스 목표가와 혼동 금지** — 그건 증권사 애널
 
 ## 루틴 (Routine / 자동 분석 루틴)
 
-**claude.ai 클라우드에서 도는 자동 분석 에이전트** — 포트폴리온이 fire(HTTP POST 트리거)로 깨우면 즉시 기동해 CLAUDE_COWORK_API.md 워크플로우(enrich·애널리스트 리포트 발행)를 수행하고 API로 결과를 쓴다. **스케줄은 포트폴리온이 소유**한다: 일일 리포트 배치(daily_report_kr/us) 완료 직후 자동 fire + admin 수동 fire. 사용자 claude.ai **구독**으로 실행되며(Anthropic API 토큰 과금 계정 불필요), fire 토큰은 트리거 전용 토큰(백엔드 .env.docker 보관). 자동 경로 정책: enrich는 enriched_at 누락·오래된 순 rolling 최대 5종목/회, 발행은 재량+가드레일(애널리스트 리포트 항목 참조). (ADR-0028)
-_Avoid_: **Cowork(수동 세션)와 혼동 금지** — Cowork는 사람이 claude.ai에서 직접 여는 대화 세션이고, 루틴은 이벤트로 기동되는 무인 실행이다. 루틴 도입으로 정기 enrich/발행의 Cowork 수동 세션 의존이 사라진다(문서 CLAUDE_COWORK_API.md는 루틴 프롬프트의 소스로 계속 유효). **배치와도 다름** — 배치는 백엔드 APScheduler 잡(시장 데이터 수집)이고, 루틴은 백엔드 밖(claude.ai)에서 도는 LLM 분석이다(백엔드 무LLM 원칙 유지 — fire는 HTTP POST 1개).
+**서버 호스트(Mac)에서 headless `claude -p`로 도는 자동 분석 에이전트** — 포트폴리온이 fire(HTTP POST)로 로컬 리스너(launchd 데몬, 127.0.0.1:8787)를 깨우면 리스너가 정책 프롬프트(`scripts/cowork-routine-prompt.md`)+지시문으로 `claude -p`를 스폰해 CLAUDE_COWORK_API.md 워크플로우(enrich·애널리스트 리포트 발행)를 수행하고 API로 결과를 쓴다. **스케줄은 포트폴리온이 소유**한다: 일일 리포트 배치(daily_report_kr/us) 완료 직후 자동 fire + admin 수동 fire(`POST /api/admin/cowork/fire`). 사용자 claude **구독**(keychain OAuth)으로 실행되며(Anthropic API 토큰 과금 계정 불필요), fire 토큰·URL은 `.env.docker` 보관, 쓰기 키는 로컬에만 상주. 자동 경로 정책(멱등): enrich는 enriched_at 누락·7일+ 오래된 순 rolling 최대 5종목/회, 발행은 재량+가드레일(애널리스트 리포트 항목 참조). 실행 로그: `~/portfolion-routine-runs/<ts>/run.log`. (ADR-0028 개정 — 클라우드 루틴은 샌드박스 egress 차단으로 기각·비활성 보존)
+_Avoid_: **Cowork(수동 세션)와 혼동 금지** — Cowork는 사람이 claude.ai에서 직접 여는 대화 세션이고, 루틴은 이벤트로 기동되는 무인 실행이다. 루틴 도입으로 정기 enrich/발행의 Cowork 수동 세션 의존이 사라진다(문서 CLAUDE_COWORK_API.md는 루틴 프롬프트의 소스로 계속 유효). **배치와도 다름** — 배치는 백엔드 APScheduler 잡(시장 데이터 수집)이고, 루틴은 백엔드 컨테이너 밖(호스트 claude CLI)에서 도는 LLM 분석이다(백엔드 무LLM 원칙 유지 — fire는 HTTP POST 1개). **claude.ai 클라우드 루틴(Routines 기능)과도 다름** — 그건 시도했다 egress 차단으로 기각된 경로다.
 
 ---
 
