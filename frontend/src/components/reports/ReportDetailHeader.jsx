@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { fmtPrice as fmt } from '../../utils'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
 import { SketchCircleMark } from '../sketches'
@@ -10,6 +11,7 @@ const MetaChip = ({ children }) => (
 
 export default function ReportDetailHeader({
   detail, selected, setSelected, setView, isAdmin, generating, genProgress, generateOne, guruMap, reportList,
+  publications = [], // 애널리스트 리포트 발행물(task#212) — 없으면 링크 숨김
 }) {
   return (
     <div className="detail-header" style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
@@ -43,6 +45,14 @@ export default function ReportDetailHeader({
           <span style={{ color: 'var(--warn)', fontSize: 11, marginLeft: 6, background: 'var(--warn-soft)', padding: '2px 7px', borderRadius: 3 }}>
             구루 {guruMap[selected.ticker]}명
           </span>
+        )}
+        {publications.length > 0 && (
+          <Link
+            to={`/analyst-report/${selected.ticker}/${publications[0].published_date}`}
+            style={{ color: 'var(--accent)', fontSize: 11, marginLeft: 6, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3, textDecoration: 'none', border: '1px solid var(--border)' }}
+          >
+            애널리스트 리포트 →
+          </Link>
         )}
       </div>
       {/* 행3: 날짜 + 현재가 + 고점대비 */}

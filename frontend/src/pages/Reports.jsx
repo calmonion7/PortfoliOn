@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../api'
+import Badge from '../components/ui/Badge'
+import { RATING_META } from './AnalystReport'
 import { useAuth } from '../contexts/AuthContext'
 import useReportList from '../hooks/useReportList'
 import useReportFilters from '../hooks/useReportFilters'
@@ -65,6 +68,8 @@ export default function Reports({ initialTicker = null, navKey = null }) {
 
   const [selected, setSelected] = useState({ ticker: null, date: null })
   const [detail, setDetail] = useState({ summary: null, enriched_at: null })
+  // 애널리스트 리포트 발행물(task#212) — 목록 1콜로 ticker→판 목록 맵 구성(발행물 없는 종목은 링크 숨김)
+  const [pubs, setPubs] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('holdings')
   const [othersData, setOthersData] = useState(null)
@@ -101,6 +106,15 @@ export default function Reports({ initialTicker = null, navKey = null }) {
       })
       .finally(() => setOthersLoading(false))
   }, [activeTab, isAdmin, othersData])
+
+  useEffect(() => {
+    api.get('/api/analyst-reports')
+      .then(({ data }) => setPubs(data.reports || []))
+      .catch((e) => console.warn('[Reports] 애널리스트 리포트 목록 조회 실패:', e)) // 목록 부가 섹션 — 실패 시 섹션만 숨김
+  }, [])
+
+  const pubsByTicker = {}
+  for (const p of pubs) (pubsByTicker[p.ticker] ||= []).push(p)
 
   useEffect(() => {
     if (!selected.ticker || !selected.date) return
@@ -162,6 +176,26 @@ export default function Reports({ initialTicker = null, navKey = null }) {
         tabEntries={tabEntries}
       />
     </div>
+    {/* 애널리스트 리포트 발행물 목록(task#212) — reports-main은 모바일에서 숨겨지므로 레이아웃 위에 배치 */}
+    {view === 'list' && pubs.length > 0 && (
+      <div style={{ marginBottom: 18 }}>
+        <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--text)', fontSize: 15, margin: '0 0 8px' }}>애널리스트 리포트 발행물</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {pubs.map(p => (
+            <Link
+              key={`${p.ticker}-${p.published_date}`}
+              to={`/analyst-report/${p.ticker}/${p.published_date}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 4, textDecoration: 'none', fontSize: 13 }}
+            >
+              <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11, flexShrink: 0 }}>{p.published_date}</span>
+              <span style={{ color: 'var(--text)', fontWeight: 600, flexShrink: 0 }}>{p.name || p.ticker}</span>
+              <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>
+              <span style={{ color: 'var(--text-2, var(--text))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    )}
     <div className="reports-layout" data-view={view}>
       {/* 좌측 사이드바 */}
       <div className="reports-sidebar">
@@ -280,6 +314,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
               generateOne={generateOne}
               guruMap={guruMap}
               reportList={reportList}
+              publications={pubsByTicker[selected.ticker?.toUpperCase()] || []}
             />
             <ReportDetailTabs
               key={selected.ticker}
