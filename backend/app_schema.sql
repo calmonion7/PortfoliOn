@@ -384,3 +384,22 @@ CREATE TABLE IF NOT EXISTS us_supply_snapshot (
     insider_net           JSONB DEFAULT '{}'::jsonb, -- 6개월 내부자 순매수 요약
     fetched_at            TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 애널리스트 리포트 발행물 (ADR-0027, task#211) — enrich/스냅샷과 분리된 누적형 판단 문서.
+-- 판단 필드는 Cowork 제출, data는 서버가 발행 시점 최신 스냅샷에서 발췌·계산해 박제.
+-- 같은 (ticker, published_date) 재발행은 upsert(그날 판 교체), 다른 날은 누적.
+CREATE TABLE IF NOT EXISTS analyst_reports (
+    id               BIGSERIAL PRIMARY KEY,
+    ticker           TEXT NOT NULL,
+    published_date   DATE NOT NULL,
+    rating           TEXT NOT NULL,              -- buy | neutral | sell
+    title            TEXT NOT NULL,              -- 한줄 논지
+    fair_value_low   NUMERIC,                    -- 적정주가 밴드 하단
+    fair_value_high  NUMERIC,                    -- 적정주가 밴드 상단
+    valuation_method TEXT NOT NULL DEFAULT '',   -- 산정방식 서술
+    points           JSONB NOT NULL DEFAULT '[]'::jsonb, -- 투자포인트 [{title, body}] 2~3개
+    risks            TEXT NOT NULL DEFAULT '',   -- 리스크 요인
+    data             JSONB NOT NULL DEFAULT '{}'::jsonb, -- 서버 첨부 데이터 블록(시세·추정·피어·PER밴드·컨센서스)
+    created_at       TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (ticker, published_date)
+);

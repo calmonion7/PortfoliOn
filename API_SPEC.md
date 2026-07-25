@@ -15,6 +15,7 @@
 - [Watchlist (관심종목)](#watchlist-관심종목)
 - [Stocks (종목 정보)](#stocks-종목-정보)
 - [Report (리포트)](#report-리포트)
+- [Analyst Reports (애널리스트 리포트 발행물)](#analyst-reports-애널리스트-리포트-발행물)
 - [Consensus (컨센서스)](#consensus-컨센서스)
 - [Calendar (이벤트 캘린더)](#calendar-이벤트-캘린더)
 - [Digest (일일 다이제스트)](#digest-일일-다이제스트)
@@ -1995,6 +1996,141 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 }
 ```
 `added` — 파이프라인이 upsert한 raw_reports 행 수.
+
+---
+
+## Analyst Reports (애널리스트 리포트 발행물)
+
+발행물 누적형 애널리스트 리포트 (ADR-0027). 판단·서사(투자의견·논지·적정주가 밴드·산정방식·투자포인트·리스크)는 Cowork가 온디맨드로 제출하고, 숫자 데이터 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 서버가 그 종목의 **최신 스냅샷**에서 발행 순간 자동 첨부해 문서를 자기완결적으로 박제한다. 문서는 발행 후 불변 — 수정이 필요하면 새 판을 발행(같은 날 재발행만 그날 판을 교체).
+
+### `POST /api/analyst-reports/{ticker}`
+
+애널리스트 리포트 발행. 스냅샷이 없는 종목은 `409`로 거부(데이터 블록을 채울 수 없음 — 먼저 리포트 생성 필요).
+
+**Auth:** `X-API-Key` 또는 admin Bearer token (`require_admin_or_api_key`)
+
+**Path Parameter:** `ticker` — 종목 코드
+
+**Request Body**
+```json
+{
+  "rating": "buy",
+  "title": "HBM 증설이 이끄는 실적 재평가",
+  "fair_value_low": 80000,
+  "fair_value_high": 95000,
+  "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
+  "points": [
+    { "title": "HBM 캐파 2배 증설", "body": "2026년 말 기준 월 캐파가 ..." },
+    { "title": "파운드리 적자 축소", "body": "가동률 회복으로 ..." }
+  ],
+  "risks": "메모리 수요 둔화 시 ASP 하락 리스크. 경쟁사 증설로 ..."
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `rating` | string | ✅ | 투자의견 — `buy` \| `neutral` \| `sell` |
+| `title` | string | ✅ | 한줄 논지 (리포트 제목) |
+| `fair_value_low` | number | ✅ | 적정주가 밴드 하단 (≤ high) |
+| `fair_value_high` | number | ✅ | 적정주가 밴드 상단 |
+| `valuation_method` | string | ✅ | 산정방식 서술 |
+| `points` | array | ✅ | 투자포인트 `{title, body}` **2~3개** |
+| `risks` | string | ✅ | 리스크 요인 |
+
+**Response `201`**
+```json
+{ "ok": true, "ticker": "005930", "published_date": "2026-07-25" }
+```
+
+**Error `403`** — Bearer token 인증됐으나 admin 아님
+**Error `409`** — 해당 종목의 스냅샷 없음 (발행 전제조건 미충족)
+**Error `422`** — rating enum 위반 · points 개수(2~3) 위반 · 밴드 역전(low > high) · NaN/Infinity 값 · 필수 필드 누락
+
+---
+
+### `GET /api/analyst-reports`
+
+전체 발행물 목록 (요약, 발행일 최신순).
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "reports": [
+    {
+      "ticker": "005930",
+      "published_date": "2026-07-25",
+      "rating": "buy",
+      "title": "HBM 증설이 이끄는 실적 재평가",
+      "fair_value_low": 80000,
+      "fair_value_high": 95000,
+      "name": "삼성전자",
+      "market": "KR"
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/analyst-reports/{ticker}`
+
+종목별 발행 판 목록 (최신순). 발행물이 없으면 빈 배열.
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{ "ticker": "005930", "reports": [ { "published_date": "2026-07-25", "rating": "buy", "...": "..." } ] }
+```
+
+---
+
+### `GET /api/analyst-reports/{ticker}/{published_date}`
+
+발행물 상세 — Cowork 판단 필드 전체 + 서버 첨부 데이터 블록(`data`).
+
+**Auth:** Bearer token 필요
+
+**Path Parameters:** `ticker` — 종목 코드, `published_date` — `YYYY-MM-DD`
+
+**Response `200`**
+```json
+{
+  "ticker": "005930",
+  "published_date": "2026-07-25",
+  "rating": "buy",
+  "title": "HBM 증설이 이끄는 실적 재평가",
+  "fair_value_low": 80000,
+  "fair_value_high": 95000,
+  "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
+  "points": [ { "title": "...", "body": "..." } ],
+  "risks": "...",
+  "name": "삼성전자",
+  "market": "KR",
+  "data": {
+    "snapshot_date": "2026-07-25",
+    "price": 354000.0,
+    "market": "KR",
+    "name": "삼성전자",
+    "consensus": { "target_mean": 400000.0, "buy": 25, "hold": 2, "sell": 0 },
+    "financials_annual": [
+      { "period": "2024", "revenue": 300870900000000, "operating_income": 32725900000000, "eps": 4950, "per": 10.7, "is_consensus": false },
+      { "period": "2026", "revenue": 365000000000000, "operating_income": 62000000000000, "eps": 9100, "per": null, "is_consensus": true }
+    ],
+    "competitors": [
+      { "ticker": "000660", "name": "SK하이닉스", "is_self": false, "per": 8.2, "pbr": 2.1, "psr": 3.5, "ev_ebitda": 5.9, "rd_intensity": 10.2 }
+    ],
+    "per_band": { "min": 8.9, "max": 21.2, "avg": 13.4, "current": 12.1, "forward": 9.8 }
+  }
+}
+```
+
+`data.financials_annual` — 비컨센서스 최근 3개년 + forward 컨센서스 행(`is_consensus: true`), `period` 오름차순. US는 `operating_income`이 `null`일 수 있음(yfinance forward 미제공 — graceful).
+`data.per_band` — 과거 연간 PER(비컨센서스, 최근 최대 6개)의 min/max/avg + 현재/forward PER. 재료 부족(<2개)이면 `null`.
+
+**Error `404`** — 해당 ticker+date 발행물 없음
 
 ---
 

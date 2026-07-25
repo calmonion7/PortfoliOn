@@ -4,7 +4,9 @@ load_dotenv()
 import os
 import logging
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -39,6 +41,7 @@ from routers.investor import router as investor_router
 from routers.short_sell import router as short_sell_router
 from routers.batches import router as batches_router
 from routers.recommendations import router as recommendations_router
+from routers.analyst_reports import router as analyst_reports_router
 from middleware.event_tracker import EventTrackerMiddleware
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
@@ -210,6 +213,24 @@ def _migrate():
         execute("ALTER TABLE tickers ADD COLUMN IF NOT EXISTS market_outlook text NOT NULL DEFAULT ''")
     except Exception as e:
         logger.warning(f"[Migrate] tickers.market_outlook 추가 실패: {e}")
+    try:
+        from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS analyst_reports (
+            id               BIGSERIAL PRIMARY KEY,
+            ticker           TEXT NOT NULL,
+            published_date   DATE NOT NULL,
+            rating           TEXT NOT NULL,
+            title            TEXT NOT NULL,
+            fair_value_low   NUMERIC,
+            fair_value_high  NUMERIC,
+            valuation_method TEXT NOT NULL DEFAULT '',
+            points           JSONB NOT NULL DEFAULT '[]'::jsonb,
+            risks            TEXT NOT NULL DEFAULT '',
+            data             JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at       TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE (ticker, published_date))""")
+    except Exception as e:
+        logger.warning(f"[Migrate] analyst_reports 생성 실패: {e}")
 
 
 @asynccontextmanager
@@ -222,6 +243,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Stock Portfolio Manager", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request, exc):
+    # 422 detail이 요청의 NaN/inf 입력을 echo하면 starlette allow_nan=False 직렬화에서
+    # 500이 된다(예: analyst-reports 발행 body의 NaN) — sanitize로 비유한값을 null화(CONCERNS §3).
+    from fastapi.encoders import jsonable_encoder
+    from services.utils import sanitize
+    return JSONResponse(status_code=422, content={"detail": sanitize(jsonable_encoder(exc.errors()))})
+
 
 app.add_middleware(SessionMiddleware, secret_key=os.environ["SESSION_SECRET"])
 app.add_middleware(EventTrackerMiddleware)
@@ -251,6 +282,7 @@ app.include_router(investor_router)
 app.include_router(short_sell_router)
 app.include_router(batches_router)
 app.include_router(recommendations_router)
+app.include_router(analyst_reports_router)
 app.include_router(admin_router)
 
 

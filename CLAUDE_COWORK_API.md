@@ -30,6 +30,14 @@
 3. PUT /api/report/{ticker}/backlog  → 분석 결과 저장 (ticker별 반복, amount≠null만)
 ```
 
+### 애널리스트 리포트 발행 (analyst-reports)
+```
+1. (선택) GET /api/report/{ticker}/{date_str}  → 최신 스냅샷 데이터 참조 (분석 재료)
+2. (AI가 심층 분석 수행 — 투자의견·한줄 논지·적정주가 밴드·산정방식·투자포인트 2~3개·리스크 작성)
+3. POST /api/analyst-reports/{ticker}  → 발행 (숫자 데이터 블록은 서버가 최신 스냅샷에서 자동 첨부)
+   - 스냅샷 없는 종목은 409 거부 → 먼저 POST /api/report/generate?tickers={ticker} 후 재시도
+```
+
 ---
 
 ## 인증
@@ -547,6 +555,55 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 ```
 
 > 생성 완료까지 수 분 소요. 완료 여부는 `GET /api/report/progress`로 확인 가능.
+
+---
+
+### `POST /api/analyst-reports/{ticker}`
+
+발행물 누적형 애널리스트 리포트 발행 (ADR-0027). 판단·서사는 요청 본문으로 제출하고, 숫자 데이터 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 **서버가 최신 스냅샷에서 자동 첨부**한다 — 본문에 숫자 데이터를 넣지 말 것. 문서는 발행 후 불변 — 같은 날 재발행만 그날 판을 교체하고, 다른 날 발행은 새 판으로 누적된다.
+
+**Auth:** `X-API-Key` 헤더
+
+**Path Parameter:** `ticker` — 종목 코드
+
+**Request Body** (요구 최소형태 — points는 2~3개, 밴드는 low ≤ high, 산정방식 필수)
+```json
+{
+  "rating": "buy",
+  "title": "HBM 증설이 이끄는 실적 재평가",
+  "fair_value_low": 80000,
+  "fair_value_high": 95000,
+  "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
+  "points": [
+    { "title": "HBM 캐파 2배 증설", "body": "2026년 말 기준 월 캐파가 ..." },
+    { "title": "파운드리 적자 축소", "body": "가동률 회복으로 ..." }
+  ],
+  "risks": "메모리 수요 둔화 시 ASP 하락 리스크. 경쟁사 증설로 ..."
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `rating` | string | ✅ | 투자의견 — `buy` \| `neutral` \| `sell` (3단계, 다른 값 422) |
+| `title` | string | ✅ | 한줄 논지 (리포트 제목) |
+| `fair_value_low` | number | ✅ | 적정주가 밴드 하단 |
+| `fair_value_high` | number | ✅ | 적정주가 밴드 상단 (low보다 작으면 422) |
+| `valuation_method` | string | ✅ | 적정주가 산정방식 서술 |
+| `points` | array | ✅ | 투자포인트 `{title, body}` — **2개 이상 3개 이하** |
+| `risks` | string | ✅ | 리스크 요인 서술 |
+
+**Response `201`**
+```json
+{ "ok": true, "ticker": "005930", "published_date": "2026-07-25" }
+```
+
+**Errors**
+
+| 상태 | 설명 |
+|------|------|
+| `401` | API Key 누락/불일치 |
+| `409` | 해당 종목 스냅샷 없음 — `POST /api/report/generate?tickers={ticker}`로 먼저 생성 |
+| `422` | rating enum·points 개수·밴드 역전·필수 필드 누락 |
 
 ---
 
