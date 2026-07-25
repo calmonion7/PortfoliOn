@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from auth import get_current_user, require_admin_or_api_key
+from auth import get_current_user_or_api_key, require_admin_or_api_key
 from services import analyst_reports as svc
 from services.utils import sanitize
 
@@ -69,19 +69,19 @@ def publish_report(ticker: str, body: PublishBody, _: str = Depends(require_admi
 
 
 @router.get("")
-def list_all(_: str = Depends(get_current_user)):
-    """전체 발행물 목록(요약, 최신순)."""
+def list_all(_: str = Depends(get_current_user_or_api_key)):
+    """전체 발행물 목록(요약, 최신순). API key 허용 — 루틴의 발행 가드레일 판단 재료(task#213)."""
     return sanitize({"reports": svc.list_reports()})
 
 
 @router.get("/{ticker}")
-def list_by_ticker(ticker: str, _: str = Depends(get_current_user)):
+def list_by_ticker(ticker: str, _: str = Depends(get_current_user_or_api_key)):
     """종목별 판 목록(최신순)."""
     return sanitize({"ticker": ticker.upper(), "reports": svc.list_reports(ticker)})
 
 
 @router.get("/{ticker}/{published_date}")
-def get_detail(ticker: str, published_date: str, _: str = Depends(get_current_user)):
+def get_detail(ticker: str, published_date: str, _: str = Depends(get_current_user_or_api_key)):
     """발행물 상세 — Cowork 텍스트 + 서버 첨부 데이터 블록."""
     try:
         date.fromisoformat(published_date)  # 비정상 date 문자열의 DB 캐스트 500 방지

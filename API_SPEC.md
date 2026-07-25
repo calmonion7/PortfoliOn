@@ -2073,7 +2073,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 전체 발행물 목록 (요약, 발행일 최신순).
 
-**Auth:** Bearer token 필요
+**Auth:** Bearer token 또는 `X-API-Key` (API key는 루틴의 발행 가드레일 판단용, task#213)
 
 **Response `200`**
 ```json
@@ -2099,7 +2099,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 종목별 발행 판 목록 (최신순). 발행물이 없으면 빈 배열.
 
-**Auth:** Bearer token 필요
+**Auth:** Bearer token 또는 `X-API-Key`
 
 **Response `200`**
 ```json
@@ -2112,7 +2112,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 발행물 상세 — Cowork 판단 필드 전체 + 서버 첨부 데이터 블록(`data`).
 
-**Auth:** Bearer token 필요
+**Auth:** Bearer token 또는 `X-API-Key`
 
 **Path Parameters:** `ticker` — 종목 코드, `published_date` — `YYYY-MM-DD`
 

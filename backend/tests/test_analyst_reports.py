@@ -10,12 +10,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routers.analyst_reports import router
-from auth import get_current_user, get_current_user_or_api_key, require_admin_or_api_key
+from auth import get_current_user_or_api_key, require_admin_or_api_key
 from services import analyst_reports as svc
 
 app = FastAPI()
 app.include_router(router)
-app.dependency_overrides[get_current_user] = lambda: "test-user-id"
+# 조회는 get_current_user_or_api_key(루틴 API key 허용, task#213), 발행은 require_admin_or_api_key
+app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
 app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
 client = TestClient(app)
 
