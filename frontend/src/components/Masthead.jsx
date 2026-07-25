@@ -16,6 +16,7 @@ const SECTIONS = [
       { to: '/recommend', label: '추천' },
       { to: '/ranking', label: '랭킹', evt: 'tab_ranking' },
       { to: '/compare', label: '비교', evt: 'tab_compare' },
+      { to: '/analyst-reports', label: '심층 리포트' },
     ],
   },
   {
