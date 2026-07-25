@@ -12,8 +12,10 @@ const STAT_LABEL = { fontSize: 10, color: 'var(--text-3)' }
 const STAT_VAL = { fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }
 
 function fmtSize(s) {
-  if (!s || s.value == null) return null
-  return `${Number(s.value).toLocaleString()}${s.unit || ''}${s.year ? ` (${s.year})` : ''}`
+  const v = s && s.value != null ? Number(s.value) : null
+  if (v == null || !Number.isFinite(v)) return null
+  const yr = Number.isFinite(Number(s.year)) ? ` (${s.year})` : ''
+  return `${v.toLocaleString()}${s.unit || ''}${yr}`
 }
 
 export default function MarketOutlookSection({ market_outlook, financialsAnnual }) {
