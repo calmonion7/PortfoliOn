@@ -73,11 +73,13 @@ GITHUB_CLIENT_SECRET=...
 # 기타
 TELEGRAM_BOT_TOKEN=...    # 일일 다이제스트 발송
 TELEGRAM_CHAT_ID=...
-COWORK_API_KEY=...        # 외부 AI(Cowork) enrich API 인증
+COWORK_API_KEY=...        # 외부 AI(루틴/Cowork) enrich·발행 API 인증
+COWORK_ROUTINE_FIRE_URL=...   # Claude Code 루틴 API 트리거 fire URL (미설정 시 휴면)
+COWORK_ROUTINE_FIRE_TOKEN=... # 루틴 fire bearer 토큰
 FRONTEND_URL=...          # CORS 허용 origin
 ```
 
-> 백엔드에는 **LLM/Anthropic 호출이 없다**. AI 분석 텍스트는 외부 Cowork 클라이언트가 enrich API(`CLAUDE_COWORK_API.md`)로 작성하며, 백엔드 리포트 생성은 시장 데이터 스냅샷만 만든다.
+> 백엔드에는 **LLM/Anthropic 호출이 없다**. AI 분석 텍스트는 claude.ai **루틴**(일일 리포트 배치 완료 시 백엔드가 fire로 깨우는 클라우드 에이전트, ADR-0028)이 enrich·애널리스트 리포트 발행 API(`CLAUDE_COWORK_API.md`)로 작성하며, 백엔드 리포트 생성은 시장 데이터 스냅샷만 만든다. 수동 트리거는 `POST /api/admin/cowork/fire`.
 
 ## 초기 DB 설정
 
