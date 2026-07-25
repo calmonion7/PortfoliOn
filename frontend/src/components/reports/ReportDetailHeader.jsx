@@ -1,7 +1,10 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import api from '../../api'
 import { fmtPrice as fmt } from '../../utils'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
 import { SketchCircleMark } from '../sketches'
+import { useToast } from '../Toast'
 import './ReportDetail.css'
 
 // 섹터·PER·PBR·PSR·EV/EBITDA 메타 칩 — 4곳이 byte-identical 스타일을 반복하던 것을 로컬 헬퍼로 정리(같은 파일 내, 신규 모듈 아님).
@@ -13,6 +16,42 @@ export default function ReportDetailHeader({
   detail, selected, setSelected, setView, isAdmin, generating, genProgress, generateOne, guruMap, reportList,
   publications = [], // 애널리스트 리포트 발행물(task#212) — 없으면 링크 숨김
 }) {
+  const { showToast } = useToast()
+  // 애널 발행 대상 토글(task#214) — 정본은 detail.summary.analyst_target, 토글 시 낙관 갱신
+  const [analystTarget, setAnalystTarget] = useState(false)
+  const [firing, setFiring] = useState(false)
+  useEffect(() => {
+    setAnalystTarget(!!detail.summary?.analyst_target)
+  }, [detail.summary?.analyst_target, selected.ticker])
+
+  const toggleTarget = async () => {
+    const next = !analystTarget
+    setAnalystTarget(next)
+    try {
+      await api.put(`/api/admin/analyst-targets/${selected.ticker}`, { enabled: next })
+      showToast(next ? '애널리스트 리포트 자동 발행 대상으로 지정했습니다.' : '자동 발행 대상에서 해제했습니다.')
+    } catch (e) {
+      console.error('[ReportDetailHeader] 애널 대상 토글 실패:', e)
+      setAnalystTarget(!next)
+      showToast('대상 지정 실패 — 잠시 후 다시 시도하세요.', 'error')
+    }
+  }
+
+  const fireAnalystReport = async () => {
+    setFiring(true)
+    try {
+      await api.post('/api/admin/cowork/fire', {
+        text: `지시: ${selected.ticker} 1종목의 애널리스트 리포트를 발행하라 — 기본 정책의 7일 조건·대상 지정 여부는 이 지시에서 무시한다. enrich는 하지 마라.`,
+      })
+      showToast('발행을 지시했습니다 — 분석에 수 분 걸리며, 완료되면 발행물 목록에 나타납니다.')
+    } catch (e) {
+      console.error('[ReportDetailHeader] 애널 발행 fire 실패:', e)
+      showToast(e.response?.status === 503 ? '루틴 fire 미설정 상태입니다.' : '발행 지시 실패 — 서버 로그를 확인하세요.', 'error')
+    } finally {
+      setFiring(false)
+    }
+  }
+
   return (
     <div className="detail-header" style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
       {/* 행1: 네비 버튼 */}
@@ -31,6 +70,25 @@ export default function ReportDetailHeader({
             style={{ background: 'transparent', border: '1px solid var(--border)', color: generating === selected.ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: generating ? 'default' : 'pointer' }}
           >
             {generating === selected.ticker ? `${genProgress.done}/${genProgress.total || '?'}` : '생성'}
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={toggleTarget}
+            title="애널리스트 리포트 자동 발행 대상 지정 (opt-in — 지정 종목만 루틴이 자동 발행 후보로 봄)"
+            style={{ background: analystTarget ? 'var(--accent)' : 'transparent', border: '1px solid ' + (analystTarget ? 'var(--accent)' : 'var(--border)'), color: analystTarget ? 'var(--bg)' : 'var(--text-3)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}
+          >
+            애널 대상{analystTarget ? ' ✓' : ''}
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={fireAnalystReport}
+            disabled={firing}
+            title="이 종목의 애널리스트 리포트를 지금 발행하도록 루틴에 지시 (수 분 소요)"
+            style={{ background: 'transparent', border: '1px solid var(--border)', color: firing ? 'var(--accent)' : 'var(--text-3)', borderRadius: 4, padding: '4px 12px', fontSize: 12, cursor: firing ? 'default' : 'pointer' }}
+          >
+            {firing ? '지시 중…' : '애널 발행'}
           </button>
         )}
       </div>

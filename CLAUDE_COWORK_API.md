@@ -79,6 +79,7 @@ X-API-Key: {COWORK_API_KEY}
 | `type` | string | `"holding"` (보유종목) \| `"watchlist"` (관심종목) |
 | `market` | string | `"US"` \| `"KR"` |
 | `enriched_at` | string\|null | 마지막 AI 분석(enrich) 시각 — `null`이면 미분석. **enrich 대상 선별 기준**: null 우선, 그다음 오래된 순 |
+| `analyst_target` | boolean | 애널리스트 리포트 **자동 발행 대상** 여부(admin 지정 opt-in) — `true`인 종목만 자동 발행 후보, 전부 `false`면 발행 단계 스킵 |
 
 ---
 

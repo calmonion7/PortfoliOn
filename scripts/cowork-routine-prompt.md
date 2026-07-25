@@ -12,7 +12,7 @@ BASE URL: https://portfolion.taebro.com
 4. 저장 후 반드시 POST /api/report/generate?tickers={쉼표구분목록} 호출(리포트 재생성).
 
 == 2) 애널리스트 리포트 발행 (재량 + 가드레일) ==
-- 대상: GET /api/stocks에서 type=holding(보유)인 종목만.
+- 대상: GET /api/stocks에서 analyst_target=true인 종목만(보유/관심 무관 — admin이 지정한 opt-in 목록). **대상이 하나도 없으면 발행 단계 전체를 건너뛴다.** (단, 트리거 지시가 특정 종목 발행을 명시하면 지정 여부와 무관하게 수행한다.)
 - 조건 확인: GET /api/analyst-reports (X-API-Key로 조회 가능) → 그 종목 최신 발행이 7일 이상 지났거나(발행물 없음 포함), 스냅샷에서 유의미한 변화(실적 발표, 컨센서스 목표가/의견 급변, 주가 급등락)가 확인될 때만 발행. 조건 미충족이면 발행하지 않는 것이 올바른 판단이다 — 무리하게 발행하지 마라.
 - 회당 최대 2종목.
 - 발행: POST /api/analyst-reports/{ticker}. body 요구 최소형태:

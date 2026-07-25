@@ -342,14 +342,17 @@ def get_supply_score(ticker: str, user_id: str = Depends(get_current_user)):
 
 
 def _enriched_at_map(tickers: list) -> dict:
-    """ticker(대문자)→enriched_at ISO 문자열(없으면 None) — tickers 배치 1콜(task#213, 루틴 stale 선별 재료)."""
+    """ticker(대문자)→{enriched_at, analyst_target} — tickers 배치 1콜(task#213·214, 루틴 선별 재료)."""
     clean = [t.upper() for t in tickers if t]
     if not clean:
         return {}
     try:
-        rows = query("SELECT ticker, enriched_at FROM tickers WHERE ticker = ANY(%s)", (clean,))
+        rows = query("SELECT ticker, enriched_at, analyst_target FROM tickers WHERE ticker = ANY(%s)", (clean,))
         return {
-            r["ticker"].upper(): (r["enriched_at"].isoformat() if r.get("enriched_at") else None)
+            r["ticker"].upper(): {
+                "enriched_at": r["enriched_at"].isoformat() if r.get("enriched_at") else None,
+                "analyst_target": bool(r.get("analyst_target")),
+            }
             for r in rows
         }
     except Exception as e:
@@ -367,7 +370,9 @@ def get_stocks(user_id: str = Depends(get_current_user_or_api_key)):
         result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "watchlist", "market": s.get("market", "US")})
     ea = _enriched_at_map([r["ticker"] for r in result])
     for r in result:
-        r["enriched_at"] = ea.get(r["ticker"].upper())
+        meta = ea.get(r["ticker"].upper()) or {}
+        r["enriched_at"] = meta.get("enriched_at")
+        r["analyst_target"] = bool(meta.get("analyst_target"))
     return result
 
 

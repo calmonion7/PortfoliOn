@@ -18,7 +18,8 @@ CREATE TABLE tickers (
   competitor_edge     text NOT NULL DEFAULT '',
   market_outlook      text NOT NULL DEFAULT '',
   enriched_at         timestamptz,
-  is_etf              boolean NOT NULL DEFAULT false
+  is_etf              boolean NOT NULL DEFAULT false,
+  analyst_target      boolean NOT NULL DEFAULT false  -- 애널리스트 리포트 자동 발행 대상 (opt-in, admin 지정 — task#214)
 );
 
 -- 스냅샷/리포트 (공유, 티커별)

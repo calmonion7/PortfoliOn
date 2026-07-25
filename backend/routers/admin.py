@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List
 
-from auth import require_admin
+from auth import require_admin, require_admin_or_api_key
 from services.db import query, execute
 from services import cache as cache_svc
 
@@ -207,12 +207,26 @@ def analytics_users(admin_id: str = Depends(require_admin)):
     ]
 
 
+class AnalystTargetBody(BaseModel):
+    enabled: bool
+
+
+@router.put("/analyst-targets/{ticker}")
+def set_analyst_target(ticker: str, body: AnalystTargetBody, admin_id: str = Depends(require_admin_or_api_key)):
+    """애널리스트 리포트 자동 발행 대상 지정/해제 (전역 opt-in, task#214). Cowork-facing 쓰기 게이트 컨벤션."""
+    upper = ticker.upper()
+    n = execute("UPDATE tickers SET analyst_target = %s WHERE ticker = %s", (body.enabled, upper))
+    if n == 0:
+        raise HTTPException(status_code=404, detail=f"{upper} 종목 마스터에 없음")
+    return {"ok": True, "ticker": upper, "analyst_target": body.enabled}
+
+
 class CoworkFireBody(BaseModel):
     text: str = ""
 
 
 @router.post("/cowork/fire")
-def cowork_fire(body: CoworkFireBody = None, admin_id: str = Depends(require_admin)):
+def cowork_fire(body: CoworkFireBody = None, admin_id: str = Depends(require_admin_or_api_key)):
     """루틴 수동 fire (ADR-0028) — text 생략 시 기본 정책 지시문. 미설정 시 503."""
     from services import cowork_trigger
     if not cowork_trigger.configured():

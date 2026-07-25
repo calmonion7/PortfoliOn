@@ -52,11 +52,12 @@ def test_generate_all_fires_after_batch(monkeypatch):
 # ── admin 수동 fire ──────────────────────────────────────────────────
 
 from routers.admin import router as admin_router
-from auth import require_admin
+from auth import require_admin_or_api_key
 
 app = FastAPI()
 app.include_router(admin_router)
-app.dependency_overrides[require_admin] = lambda: "admin-id"
+# cowork/fire·analyst-targets는 require_admin_or_api_key (Cowork-facing 쓰기 게이트 컨벤션)
+app.dependency_overrides[require_admin_or_api_key] = lambda: "admin-id"
 client = TestClient(app)
 
 
@@ -106,15 +107,33 @@ PORTFOLIO = {
 }
 
 
-def test_get_stocks_includes_enriched_at():
+def test_get_stocks_includes_enriched_at_and_target():
     import datetime
-    rows = [{"ticker": "LLY", "enriched_at": datetime.datetime(2026, 7, 20, 1, 0)}]
+    rows = [{"ticker": "LLY", "enriched_at": datetime.datetime(2026, 7, 20, 1, 0), "analyst_target": True}]
     with patch("routers.stocks.storage.get_full_portfolio", return_value=PORTFOLIO), \
          patch("routers.stocks.query", return_value=rows):
         data = sclient.get("/api/stocks").json()
     by = {d["ticker"]: d for d in data}
     assert by["LLY"]["enriched_at"].startswith("2026-07-20")
+    assert by["LLY"]["analyst_target"] is True
     assert by["005930"]["enriched_at"] is None  # 미enrich → null
+    assert by["005930"]["analyst_target"] is False  # 미지정 기본 False
+
+
+def test_admin_analyst_target_toggle():
+    with patch("routers.admin.execute", return_value=1) as mock_exec:
+        resp = client.put("/api/admin/analyst-targets/tst", json={"enabled": True})
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "ticker": "TST", "analyst_target": True}
+    assert mock_exec.call_args.args[1] == (True, "TST")
+    with patch("routers.admin.execute", return_value=0):
+        assert client.put("/api/admin/analyst-targets/NONE", json={"enabled": True}).status_code == 404
+
+
+def test_admin_analyst_target_unauthenticated_401():
+    fresh = FastAPI()
+    fresh.include_router(admin_router)
+    assert TestClient(fresh).put("/api/admin/analyst-targets/TST", json={"enabled": True}).status_code == 401
 
 
 def test_get_stocks_enriched_at_query_failure_graceful():

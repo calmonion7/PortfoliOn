@@ -215,6 +215,11 @@ def _migrate():
         logger.warning(f"[Migrate] tickers.market_outlook 추가 실패: {e}")
     try:
         from services.db import execute
+        execute("ALTER TABLE tickers ADD COLUMN IF NOT EXISTS analyst_target boolean NOT NULL DEFAULT false")
+    except Exception as e:
+        logger.warning(f"[Migrate] tickers.analyst_target 추가 실패: {e}")
+    try:
+        from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS analyst_reports (
             id               BIGSERIAL PRIMARY KEY,
             ticker           TEXT NOT NULL,

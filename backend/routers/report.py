@@ -465,9 +465,10 @@ def get_report(ticker: str, date_str: str):
     # 목록·대시보드와 동일 헬퍼를 호출해 세 화면의 값 정합을 코드 구조로 보장한다.
     summary = consensus_svc.apply_asof(summary, upper, date_str)
     enriched_at = None
-    ea_rows = query("SELECT enriched_at, is_etf FROM tickers WHERE ticker = %s", (upper,))
+    ea_rows = query("SELECT enriched_at, is_etf, analyst_target FROM tickers WHERE ticker = %s", (upper,))
     summary = dict(summary)
     summary["is_etf"] = bool(ea_rows[0].get("is_etf")) if ea_rows else False
+    summary["analyst_target"] = bool(ea_rows[0].get("analyst_target")) if ea_rows else False
     if ea_rows and ea_rows[0].get("enriched_at"):
         enriched_at = ea_rows[0]["enriched_at"].isoformat()
     return {"ticker": upper, "date": date_str, "summary": summary, "enriched_at": enriched_at}

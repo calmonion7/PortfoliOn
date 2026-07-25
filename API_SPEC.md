@@ -279,11 +279,31 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 { "ok": true, "updated": 2 }
 ```
 
+### `PUT /api/admin/analyst-targets/{ticker}`
+
+애널리스트 리포트 **자동 발행 대상** 지정/해제 (전역 opt-in, task#214). 루틴은 `analyst_target=true`인 종목만 자동 발행 후보로 삼는다(목록이 비면 자동 발행 스킵). 보유·관심 무관 지정 가능.
+
+**Auth:** admin Bearer token 또는 `X-API-Key` (`require_admin_or_api_key`)
+
+**Request Body**
+```json
+{ "enabled": true }
+```
+
+**Response `200`**
+```json
+{ "ok": true, "ticker": "005930", "analyst_target": true }
+```
+
+**Error `404`** — 종목 마스터(`tickers`)에 없는 종목
+
+---
+
 ### `POST /api/admin/cowork/fire`
 
 Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인). 일일 배치 완료 시 자동 fire되는 것과 같은 루틴을 즉시 깨운다. `text` 생략/빈값이면 기본 정책 지시문(enrich rolling + 재량 발행) 사용.
 
-**Auth:** admin 권한 필요
+**Auth:** admin Bearer token 또는 `X-API-Key` (`require_admin_or_api_key`)
 
 **Request Body**
 ```json
