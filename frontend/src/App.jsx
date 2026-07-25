@@ -13,6 +13,7 @@ import Dividends from './pages/Dividends'
 import Digest from './pages/Digest'
 import MarketHub from './pages/MarketHub'
 import AnalystReport from './pages/AnalystReport'
+import AnalystReports from './pages/AnalystReports'
 import Guru from './pages/Guru'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
@@ -88,6 +89,7 @@ function AppShell({ theme, setTheme, setSession }) {
               <Route path="/calendar" element={<ResearchShell><Calendar /></ResearchShell>} />
               <Route path="/dividends" element={<ResearchShell><Dividends /></ResearchShell>} />
               <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
+              <Route path="/analyst-reports" element={<ResearchShell><AnalystReports /></ResearchShell>} />
               <Route path="/analyst-report/:ticker/:date" element={<ResearchShell><AnalystReport /></ResearchShell>} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />

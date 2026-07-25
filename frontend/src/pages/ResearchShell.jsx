@@ -12,6 +12,7 @@ const RESEARCH_TABS = [
   { to: '/recommend', label: '추천' },
   { to: '/ranking', label: '랭킹', evt: 'tab_ranking' },
   { to: '/compare', label: '비교', evt: 'tab_compare' },
+  { to: '/analyst-reports', label: '심층 리포트' },
 ]
 const SCHEDULE_TABS = [
   { to: '/calendar', label: '캘린더', evt: 'tab_calendar' },
