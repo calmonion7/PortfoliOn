@@ -279,6 +279,27 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 { "ok": true, "updated": 2 }
 ```
 
+### `POST /api/admin/cowork/fire`
+
+Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인). 일일 배치 완료 시 자동 fire되는 것과 같은 루틴을 즉시 깨운다. `text` 생략/빈값이면 기본 정책 지시문(enrich rolling + 재량 발행) 사용.
+
+**Auth:** admin 권한 필요
+
+**Request Body**
+```json
+{ "text": "005930 enrich 후 애널리스트 리포트 발행" }
+```
+
+**Response `200`**
+```json
+{ "ok": true, "text": "005930 enrich 후 애널리스트 리포트 발행" }
+```
+
+**Error `503`** — `COWORK_ROUTINE_FIRE_URL`/`COWORK_ROUTINE_FIRE_TOKEN` 미설정 (휴면)
+**Error `502`** — fire POST 실패 (서버 로그 확인)
+
+---
+
 ### `DELETE /api/admin/stocks/{ticker}`
 
 관리자 전용. 한 종목을 **모든 사용자**의 보유·관심(`user_stocks`)에서 제거한다. 리서치 리포트 "그외" 탭(`scope=all` + `is_mine=false`, 다른 사용자가 담았으나 관리자 본인은 안 담은 종목)의 정리용. 스냅샷(리포트 데이터)은 건드리지 않아 보이지 않는 고아로 남는다. 없는 종목이어도 `200`(idempotent, `deleted: 0`).

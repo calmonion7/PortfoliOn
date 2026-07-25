@@ -341,6 +341,22 @@ def get_supply_score(ticker: str, user_id: str = Depends(get_current_user)):
     return {"band": score.get("band"), "flags": score.get("flags"), "as_of": score.get("as_of")}
 
 
+def _enriched_at_map(tickers: list) -> dict:
+    """ticker(대문자)→enriched_at ISO 문자열(없으면 None) — tickers 배치 1콜(task#213, 루틴 stale 선별 재료)."""
+    clean = [t.upper() for t in tickers if t]
+    if not clean:
+        return {}
+    try:
+        rows = query("SELECT ticker, enriched_at FROM tickers WHERE ticker = ANY(%s)", (clean,))
+        return {
+            r["ticker"].upper(): (r["enriched_at"].isoformat() if r.get("enriched_at") else None)
+            for r in rows
+        }
+    except Exception as e:
+        logger.warning(f"[Stocks] enriched_at 조회 실패: {e}")
+        return {}
+
+
 @router.get("")
 def get_stocks(user_id: str = Depends(get_current_user_or_api_key)):
     portfolio = storage.get_global_portfolio() if user_id == _API_KEY_USER_ID else storage.get_full_portfolio(user_id)
@@ -349,6 +365,9 @@ def get_stocks(user_id: str = Depends(get_current_user_or_api_key)):
         result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "holding", "market": s.get("market", "US")})
     for s in portfolio["watchlist"]:
         result.append({"ticker": s["ticker"], "name": s.get("name", s["ticker"]), "type": "watchlist", "market": s.get("market", "US")})
+    ea = _enriched_at_map([r["ticker"] for r in result])
+    for r in result:
+        r["enriched_at"] = ea.get(r["ticker"].upper())
     return result
 
 

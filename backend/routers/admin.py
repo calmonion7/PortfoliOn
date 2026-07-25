@@ -207,6 +207,25 @@ def analytics_users(admin_id: str = Depends(require_admin)):
     ]
 
 
+class CoworkFireBody(BaseModel):
+    text: str = ""
+
+
+@router.post("/cowork/fire")
+def cowork_fire(body: CoworkFireBody = None, admin_id: str = Depends(require_admin)):
+    """루틴 수동 fire (ADR-0028) — text 생략 시 기본 정책 지시문. 미설정 시 503."""
+    from services import cowork_trigger
+    if not cowork_trigger.configured():
+        raise HTTPException(status_code=503, detail="루틴 fire 미설정 (COWORK_ROUTINE_FIRE_URL/TOKEN)")
+    text = (body.text if body else "") or (
+        "수동 트리거 — enrich rolling(오래된 순 최대 5종목)과 애널리스트 리포트 재량 발행 정책을 수행하라."
+    )
+    ok = cowork_trigger.fire(text)
+    if not ok:
+        raise HTTPException(status_code=502, detail="루틴 fire 실패 (서버 로그 확인)")
+    return {"ok": True, "text": text}
+
+
 @router.get("/analytics/users/{user_id}")
 def analytics_user_history(user_id: str, limit: int = 200, admin_id: str = Depends(require_admin)):
     rows = query(

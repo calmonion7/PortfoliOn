@@ -67,8 +67,8 @@ X-API-Key: {COWORK_API_KEY}
 **Response `200`**
 ```json
 [
-  { "ticker": "LLY",    "name": "일라이 릴리",      "type": "holding",   "market": "US" },
-  { "ticker": "012450", "name": "한화에어로스페이스", "type": "watchlist", "market": "KR" }
+  { "ticker": "LLY",    "name": "일라이 릴리",      "type": "holding",   "market": "US", "enriched_at": "2026-07-20T01:00:00" },
+  { "ticker": "012450", "name": "한화에어로스페이스", "type": "watchlist", "market": "KR", "enriched_at": null }
 ]
 ```
 
@@ -78,6 +78,7 @@ X-API-Key: {COWORK_API_KEY}
 | `name` | string | 종목명 (없으면 ticker 값) |
 | `type` | string | `"holding"` (보유종목) \| `"watchlist"` (관심종목) |
 | `market` | string | `"US"` \| `"KR"` |
+| `enriched_at` | string\|null | 마지막 AI 분석(enrich) 시각 — `null`이면 미분석. **enrich 대상 선별 기준**: null 우선, 그다음 오래된 순 |
 
 ---
 
