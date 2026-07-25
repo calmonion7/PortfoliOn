@@ -22,9 +22,16 @@ router = APIRouter(prefix="/api/analyst-reports", tags=["analyst-reports"])
 _KST = ZoneInfo("Asia/Seoul")
 
 
+class PointMetric(BaseModel):
+    """포인트 핵심 지표 칩(한눈 구조화, task#218) — value는 표시용 문자열("383.2조원"·"8.8배")."""
+    label: str = Field(..., min_length=1, max_length=40)
+    value: str = Field(..., min_length=1, max_length=40)
+    change_pct: float = Field(None, allow_inf_nan=False)  # 증감%(선택) — 프론트가 up/down 색
+
 class ReportPoint(BaseModel):
     title: str = Field(..., min_length=1)
     body: str = Field(..., min_length=1)
+    metrics: List[PointMetric] = Field(default_factory=list, max_length=4)  # additive — 구 판 호환
 
 
 class PublishBody(BaseModel):

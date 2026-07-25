@@ -15,12 +15,10 @@ BASE URL: https://portfolion.taebro.com
 - 대상: GET /api/stocks에서 analyst_target=true인 종목만(보유/관심 무관 — admin이 지정한 opt-in 목록). **대상이 하나도 없으면 발행 단계 전체를 건너뛴다.** (단, 트리거 지시가 특정 종목 발행을 명시하면 지정 여부와 무관하게 수행한다.)
 - 조건 확인: GET /api/analyst-reports (X-API-Key로 조회 가능) → 그 종목 최신 발행이 7일 이상 지났거나(발행물 없음 포함), 스냅샷에서 유의미한 변화(실적 발표, 컨센서스 목표가/의견 급변, 주가 급등락)가 확인될 때만 발행. 조건 미충족이면 발행하지 않는 것이 올바른 판단이다 — 무리하게 발행하지 마라.
 - 회당 최대 2종목.
-- 발행: POST /api/analyst-reports/{ticker}. body 요구 최소형태:
-{"rating":"buy","title":"<한줄 논지>","fair_value_low":80000,"fair_value_high":95000,"valuation_method":"<적정주가 산정방식 서술, 예: 과거 5년 PER 밴드 평균 12배에 2026F EPS 적용>","points":[{"title":"<포인트1>","body":"<근거 문단>"},{"title":"<포인트2>","body":"<근거 문단>"}],"risks":"<리스크 요인 서술>"}
+- 발행: POST /api/analyst-reports/{ticker}. body 요구 최소형태(포인트는 metrics 칩 + 짧은 문장 구조 — 한눈 가독):
+{"rating":"buy","title":"<한줄 논지>","fair_value_low":80000,"fair_value_high":95000,"valuation_method":"<산정방식 1~2문장, 예: 과거 5년 PER 밴드 평균 12배에 2026F EPS 적용>","points":[{"title":"<포인트1>","body":"<핵심 논리 1~2문장(글밥 금지)>","metrics":[{"label":"2026F 영업이익","value":"383.2조원","change_pct":779.0},{"label":"forward PER","value":"5.9배"},{"label":"2Q26E 마진","value":"48.9%"}]},{"title":"<포인트2>","body":"<1~2문장>","metrics":[{"label":"...","value":"..."}]}],"risks":"<리스크1 한 문장>\n<리스크2 한 문장>\n<리스크3 한 문장>"}
 - rating은 buy|neutral|sell 3단계만. points는 2~3개. fair_value_low ≤ fair_value_high. 숫자 데이터 블록(시세·추정·피어·PER밴드)은 서버가 스냅샷에서 자동 첨부하므로 본문에 넣지 않는다.
-- **각 투자 포인트의 body에는 정량 근거를 반드시 포함하라** — "무엇이 얼마나" 바뀌는지 스냅샷 실적·컨센서스 추정·공개 자료 기반 숫자로 서술하고 출처를 문장 안에 명시한다. body는 3~5문장.
-  좋은 예: "HBM 캐파가 2026년 말 월 17만장으로 약 2배 증설되면(회사 가이던스), HBM 매출은 2025년 약 12조원에서 2026F 25조원 수준으로 확대 가능하다. 이는 전사 매출 컨센서스 증가분(+33조원)의 약 40%를 설명하며, HBM 마진(추정 50%+)을 감안하면 영업이익 기여는 +6~7조원으로 추정된다."
-  나쁜 예(불합격): "HBM 매출 비중 확대가 메모리 부문 믹스 개선을 견인." (숫자 없는 정성 서술만의 포인트는 다시 써라.)
+- **한눈 구조화 규칙(필수)**: 각 포인트의 정량 근거는 문장에 늘어놓지 말고 **metrics 칩 2~4개**(label 짧게, value는 "383.2조원"·"8.8배"·"48.9%"처럼 표시용 문자열, 증감이면 change_pct 숫자)로 분리하라. body는 그 숫자들이 왜 중요한지 잇는 **1~2문장**만 — 3문장 이상이면 다시 써라. 수치의 출처(컨센서스/스냅샷/공시)는 body에 짧게. risks는 **줄바꿈(\n)으로 구분한 핵심 불릿 2~3개**, 각 한 문장.
 - 409(스냅샷 없음)면 POST /api/report/generate?tickers={ticker} 후 5분 뒤 1회만 재시도.
 
 == 공통 규칙 ==

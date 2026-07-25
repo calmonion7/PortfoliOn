@@ -256,16 +256,31 @@ export default function AnalystReport() {
         </p>
       </blockquote>
 
-      {/* ── 투자 포인트 ──────────────────────────────────── */}
+      {/* ── 투자 포인트 (지표 칩 + 1~2문장 — 한눈 구조화, task#218) ── */}
       <SectionTitle>투자 포인트</SectionTitle>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
         {(report.points || []).map((p, i) => (
           <Card key={i} padding="md">
             <div style={{ display: 'flex', gap: 12 }}>
               <span className="tnum" style={numeralStyle}>{String(i + 1).padStart(2, '0')}</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>{p.title}</div>
-                <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}>{p.body}</p>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{p.title}</div>
+                {p.metrics?.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(108px, 1fr))', gap: 8, marginBottom: 10 }}>
+                    {p.metrics.map((m, j) => (
+                      <div key={j} style={{ background: 'var(--bg-elev-2)', borderRadius: 6, padding: '8px 10px' }}>
+                        <div style={{ color: 'var(--text-3)', fontSize: 10, marginBottom: 3, lineHeight: 1.3 }}>{m.label}</div>
+                        <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, lineHeight: 1.15 }}>{m.value}</div>
+                        {m.change_pct != null && (
+                          <div className="mono tnum" style={{ fontSize: 11, marginTop: 2, color: m.change_pct >= 0 ? 'var(--up)' : 'var(--down)' }}>
+                            {m.change_pct >= 0 ? '▲+' : '▼'}{Math.abs(m.change_pct) >= 100 ? Math.round(m.change_pct) : m.change_pct}%
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{p.body}</p>
               </div>
             </div>
           </Card>
@@ -320,10 +335,18 @@ export default function AnalystReport() {
         </>
       )}
 
-      {/* ── 리스크 요인 ──────────────────────────────────── */}
+      {/* ── 리스크 요인 (줄바꿈 → 불릿, task#218) ─────────── */}
       <SectionTitle>리스크 요인</SectionTitle>
       <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--warn)', background: 'var(--warn-soft)', borderRadius: '0 6px 6px 0', marginBottom: 8 }}>
-        <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0 }}>{report.risks}</p>
+        {(report.risks || '').includes('\n') ? (
+          <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {report.risks.split('\n').map(l => l.trim().replace(/^[-•]\s*/, '')).filter(Boolean).map((line, i) => (
+              <li key={i} style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.6 }}>{line}</li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0 }}>{report.risks}</p>
+        )}
       </div>
 
       <div style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>

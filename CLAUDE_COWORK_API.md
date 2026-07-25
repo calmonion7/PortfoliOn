@@ -568,7 +568,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 
 **Path Parameter:** `ticker` — 종목 코드
 
-**Request Body** (요구 최소형태 — points는 2~3개, 밴드는 low ≤ high, 산정방식 필수)
+**Request Body** (요구 최소형태 — points는 2~3개·**정량 근거는 metrics 칩으로**, body는 1~2문장, 밴드는 low ≤ high)
 ```json
 {
   "rating": "buy",
@@ -577,10 +577,15 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
   "fair_value_high": 95000,
   "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
   "points": [
-    { "title": "HBM 캐파 2배 증설", "body": "2026년 말 기준 월 캐파가 ..." },
-    { "title": "파운드리 적자 축소", "body": "가동률 회복으로 ..." }
+    { "title": "HBM 캐파 2배 증설", "body": "캐파 확대가 컨센서스 증익의 40%를 설명한다(회사 가이던스 기반).",
+      "metrics": [
+        { "label": "2026F 영업이익", "value": "383.2조원", "change_pct": 779.0 },
+        { "label": "forward PER", "value": "5.9배" },
+        { "label": "2Q26E 마진", "value": "48.9%" }
+      ] },
+    { "title": "파운드리 적자 축소", "body": "가동률 회복으로 적자 폭 축소.", "metrics": [ { "label": "가동률", "value": "80%+" } ] }
   ],
-  "risks": "메모리 수요 둔화 시 ASP 하락 리스크. 경쟁사 증설로 ..."
+  "risks": "메모리 수요 둔화 시 ASP 하락\n파운드리 수주 지연\nHBM 인증 실패"
 }
 ```
 
@@ -590,9 +595,9 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `title` | string | ✅ | 한줄 논지 (리포트 제목) |
 | `fair_value_low` | number | ✅ | 적정주가 밴드 하단 |
 | `fair_value_high` | number | ✅ | 적정주가 밴드 상단 (low보다 작으면 422) |
-| `valuation_method` | string | ✅ | 적정주가 산정방식 서술 |
-| `points` | array | ✅ | 투자포인트 `{title, body}` — **2개 이상 3개 이하** |
-| `risks` | string | ✅ | 리스크 요인 서술 |
+| `valuation_method` | string | ✅ | 적정주가 산정방식 — **1~2문장** |
+| `points` | array | ✅ | 투자포인트 `{title, body, metrics}` — **2~3개**. `body`는 1~2문장, 정량 근거는 `metrics` 칩 `{label, value(표시용 문자열), change_pct?(숫자)}` 2~4개로 분리 |
+| `risks` | string | ✅ | 리스크 요인 — **줄바꿈(`\n`) 구분 불릿 2~3개**, 각 한 문장 |
 
 **Response `201`**
 ```json

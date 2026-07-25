@@ -119,6 +119,28 @@ def test_publish_ok_attaches_data_block():
     assert len(args[7]) == 2  # points
 
 
+def test_publish_with_point_metrics():
+    """포인트 지표 칩(metrics, task#218) — additive: 있으면 저장, 없으면(구 payload) 기본 []."""
+    body = {**VALID_BODY, "points": [
+        {"title": "이익 정상화", "body": "요약.", "metrics": [
+            {"label": "2026F 영업이익", "value": "383.2조원", "change_pct": 779.0},
+            {"label": "forward PER", "value": "5.9배"},
+        ]},
+        {"title": "포인트2", "body": "근거2"},
+    ]}
+    resp, mock_save = _publish(body)
+    assert resp.status_code == 201
+    points = mock_save.call_args.args[7]
+    assert points[0]["metrics"][0]["value"] == "383.2조원"
+    assert points[0]["metrics"][1]["change_pct"] is None
+    assert points[1]["metrics"] == []  # 구 형태 호환
+    too_many = {**VALID_BODY, "points": [
+        {"title": "t", "body": "b", "metrics": [{"label": f"l{i}", "value": "v"} for i in range(5)]},
+        {"title": "t2", "body": "b2"},
+    ]}
+    assert client.post("/api/analyst-reports/TST", json=too_many).status_code == 422
+
+
 def test_publish_no_snapshot_409():
     with patch.object(svc, "latest_snapshot", return_value=None):
         resp = client.post("/api/analyst-reports/TST", json=VALID_BODY)

@@ -2061,10 +2061,14 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "fair_value_high": 95000,
   "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
   "points": [
-    { "title": "HBM 캐파 2배 증설", "body": "2026년 말 기준 월 캐파가 ..." },
+    { "title": "HBM 캐파 2배 증설", "body": "핵심 논리 1~2문장.",
+      "metrics": [
+        { "label": "2026F 영업이익", "value": "383.2조원", "change_pct": 779.0 },
+        { "label": "forward PER", "value": "5.9배" }
+      ] },
     { "title": "파운드리 적자 축소", "body": "가동률 회복으로 ..." }
   ],
-  "risks": "메모리 수요 둔화 시 ASP 하락 리스크. 경쟁사 증설로 ..."
+  "risks": "리스크1 한 문장\n리스크2 한 문장"
 }
 ```
 
@@ -2074,9 +2078,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `title` | string | ✅ | 한줄 논지 (리포트 제목) |
 | `fair_value_low` | number | ✅ | 적정주가 밴드 하단 (≤ high) |
 | `fair_value_high` | number | ✅ | 적정주가 밴드 상단 |
-| `valuation_method` | string | ✅ | 산정방식 서술 |
-| `points` | array | ✅ | 투자포인트 `{title, body}` **2~3개** |
-| `risks` | string | ✅ | 리스크 요인 |
+| `valuation_method` | string | ✅ | 산정방식 서술 (1~2문장) |
+| `points` | array | ✅ | 투자포인트 `{title, body, metrics?}` **2~3개** — `metrics`는 지표 칩 `{label, value, change_pct?}` 최대 4개(additive, 생략 시 `[]`) |
+| `risks` | string | ✅ | 리스크 요인 — 줄바꿈(`\n`) 구분 시 불릿 렌더 |
 
 **Response `201`**
 ```json
