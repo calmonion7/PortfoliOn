@@ -7,7 +7,8 @@ import Badge, { MarketBadge } from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Stat from '../components/ui/Stat'
 import Skeleton from '../components/ui/Skeleton'
-import { SectionTitle, TH, TD } from '../components/reports/reportUtils.jsx'
+import { SectionTitle } from '../components/reports/reportUtils.jsx'
+import { GlossaryTerm, GlossaryText } from '../components/Glossary.jsx'
 
 // 증권사 리포트식 단일 문서 페이지 (task#212, 에디토리얼 재설계 task#216, ADR-0026/0027)
 // 헤더(스탯 스트립+밴드 게이지) → 한줄 논지 → 투자 포인트 → 밸류에이션 → 실적 추정 → 리스크
@@ -84,7 +85,7 @@ export function PerBandChart({ band }) {
           ))}
         </ComposedChart>
       </ResponsiveContainer>
-      <p style={{ color: 'var(--text-3)', fontSize: 11, margin: 0 }}>과거 연간 PER 밴드(min~max·평균) 대비 현재·forward PER 위치</p>
+      <p style={{ color: 'var(--text-3)', fontSize: 11, margin: 0 }}><GlossaryText text="과거 연간 PER 밴드(min~max·평균) 대비 현재·forward PER 위치" /></p>
     </div>
   )
 }
@@ -151,7 +152,7 @@ export function EstimatesChart({ annual, isKR }) {
   const legendItem = (color, label) => (
     <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <span style={{ width: 16, height: 2, background: color, display: 'inline-block', borderRadius: 1 }} />
-      <span>{label}</span>
+      <span><GlossaryText text={label} /></span>
     </span>
   )
   const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
@@ -195,6 +196,49 @@ export function EstimatesChart({ annual, isKR }) {
           </ResponsiveContainer>
         </>
       )}
+    </div>
+  )
+}
+
+// 피어 멀티플 스몰 멀티플 (task#220) — 표 대체. 지표 5종은 스케일이 제각각이라 지표별 독립 미니 가로막대.
+const PEER_METRICS = [
+  { key: 'per', label: 'PER', fmt: v => v.toFixed(1) },
+  { key: 'pbr', label: 'PBR', fmt: v => v.toFixed(2) },
+  { key: 'psr', label: 'PSR', fmt: v => v.toFixed(2) },
+  { key: 'ev_ebitda', label: 'EV/EBITDA', fmt: v => v.toFixed(1) },
+  { key: 'rd_intensity', label: 'R&D집약도', fmt: v => `${v.toFixed(1)}%` },
+]
+
+export function PeerMultiplesChart({ peers }) {
+  const metrics = PEER_METRICS
+    .map(m => ({ ...m, rows: (peers || []).filter(p => p[m.key] != null && Number.isFinite(p[m.key])) }))
+    .filter(m => m.rows.length > 0)
+  if (!metrics.length) return null
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px 28px', marginTop: 16 }}>
+      {metrics.map(m => {
+        const max = Math.max(...m.rows.map(p => p[m.key]))
+        return (
+          <div key={m.key}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2, var(--text))', marginBottom: 8 }}>
+              <GlossaryTerm term={m.label}>{m.label}</GlossaryTerm>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {m.rows.map(p => (
+                <div key={p.ticker} style={{ display: 'grid', gridTemplateColumns: 'minmax(64px, 38%) 1fr auto', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text)', fontWeight: p.is_self ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.name || p.ticker}{p.is_self ? ' ●' : ''}
+                  </span>
+                  <div style={{ height: 8, background: 'var(--bg-elev-2)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${max > 0 ? Math.max(0, (p[m.key] / max) * 100) : 0}%`, height: '100%', background: 'var(--accent)', opacity: p.is_self ? 0.95 : 0.35, borderRadius: 4 }} />
+                  </div>
+                  <span className="mono tnum" style={{ fontSize: 11, color: 'var(--text)', fontWeight: p.is_self ? 700 : 400 }}>{m.fmt(p[m.key])}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -258,12 +302,12 @@ export default function AnalystReport() {
 
       <Card padding="md">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
-          <Stat size="sm" label="적정주가 밴드"
+          <Stat size="sm" label={<span><GlossaryText text="적정주가 밴드" /></span>}
                 value={<span className="tnum">{fmtPrice(report.fair_value_low, market)} ~ {fmtPrice(report.fair_value_high, market)}</span>} />
           <Stat size="sm" label="발행 시점 현재가" value={fmtPrice(d.price, market)} helperText={d.snapshot_date ? `${d.snapshot_date} 스냅샷` : null} />
-          <Stat size="sm" label="컨센서스 목표가" value={d.consensus?.target_mean != null ? fmtPrice(d.consensus.target_mean, market) : '—'}
+          <Stat size="sm" label={<span><GlossaryText text="컨센서스 목표가" /></span>} value={d.consensus?.target_mean != null ? fmtPrice(d.consensus.target_mean, market) : '—'}
                 helperText={d.consensus?.buy != null ? `매수 ${d.consensus.buy} · 보유 ${d.consensus.hold ?? 0} · 매도 ${d.consensus.sell ?? 0}` : null} />
-          <Stat size="sm" label="상승여력 (밴드 중앙)" value={upside != null ? `${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%` : '—'}
+          <Stat size="sm" label={<span><GlossaryText text="상승여력 (밴드 중앙)" /></span>} value={upside != null ? `${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%` : '—'}
                 valueColor={upside == null ? null : upside >= 0 ? 'up' : 'down'} />
         </div>
         <BandGauge low={report.fair_value_low} high={report.fair_value_high} price={d.price} market={market} />
@@ -289,7 +333,7 @@ export default function AnalystReport() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(108px, 1fr))', gap: 8, marginBottom: 10 }}>
                     {p.metrics.map((m, j) => (
                       <div key={j} style={{ background: 'var(--bg-elev-2)', borderRadius: 6, padding: '8px 10px' }}>
-                        <div style={{ color: 'var(--text-3)', fontSize: 10, marginBottom: 3, lineHeight: 1.3 }}>{m.label}</div>
+                        <div style={{ color: 'var(--text-3)', fontSize: 10, marginBottom: 3, lineHeight: 1.3 }}><GlossaryText text={m.label} /></div>
                         <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, lineHeight: 1.15 }}>{m.value}</div>
                         {m.change_pct != null && (
                           <div className="mono tnum" style={{ fontSize: 11, marginTop: 2, color: m.change_pct >= 0 ? 'var(--up)' : 'var(--down)' }}>
@@ -300,7 +344,7 @@ export default function AnalystReport() {
                     ))}
                   </div>
                 )}
-                <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{p.body}</p>
+                <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}><GlossaryText text={p.body} /></p>
               </div>
             </div>
           </Card>
@@ -310,38 +354,9 @@ export default function AnalystReport() {
       {/* ── 밸류에이션 ───────────────────────────────────── */}
       <SectionTitle>밸류에이션</SectionTitle>
       <Card padding="md" style={{ marginBottom: 30 }}>
-        <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}>{report.valuation_method}</p>
+        <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}><GlossaryText text={report.valuation_method} /></p>
         <PerBandChart band={d.per_band} />
-        {peers.length > 0 && (
-          <div style={{ overflowX: 'auto', marginTop: 16 }}>
-            <table className="tnum" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 430 }}>
-              <thead>
-                <tr>
-                  <th style={{ ...TH, textAlign: 'left' }}>피어 멀티플</th>
-                  <th style={TH}>PER</th>
-                  <th style={TH}>PBR</th>
-                  <th style={TH}>PSR</th>
-                  <th style={TH}>EV/EBITDA</th>
-                  <th style={TH}>R&D집약도</th>
-                </tr>
-              </thead>
-              <tbody>
-                {peers.map((c) => (
-                  <tr key={c.ticker} style={c.is_self ? { background: 'var(--bg-elev-2)' } : undefined}>
-                    <td style={{ ...TD, textAlign: 'left', fontFamily: 'var(--font-sans, inherit)', color: 'var(--text)', fontWeight: c.is_self ? 700 : 400 }}>
-                      {c.name || c.ticker}{c.is_self ? ' ●' : ''}
-                    </td>
-                    <td style={TD}>{c.per != null ? c.per.toFixed(1) : '—'}</td>
-                    <td style={TD}>{c.pbr != null ? c.pbr.toFixed(2) : '—'}</td>
-                    <td style={TD}>{c.psr != null ? c.psr.toFixed(2) : '—'}</td>
-                    <td style={TD}>{c.ev_ebitda != null ? c.ev_ebitda.toFixed(1) : '—'}</td>
-                    <td style={TD}>{c.rd_intensity != null ? `${c.rd_intensity.toFixed(1)}%` : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <PeerMultiplesChart peers={peers} />
       </Card>
 
       {/* ── 실적 추정 (차트 — 값·YoY 증감% 병기, task#217) ── */}
@@ -361,11 +376,11 @@ export default function AnalystReport() {
         {(report.risks || '').includes('\n') ? (
           <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {report.risks.split('\n').map(l => l.trim().replace(/^[-•]\s*/, '')).filter(Boolean).map((line, i) => (
-              <li key={i} style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.6 }}>{line}</li>
+              <li key={i} style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.6 }}><GlossaryText text={line} /></li>
             ))}
           </ul>
         ) : (
-          <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0 }}>{report.risks}</p>
+          <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0 }}><GlossaryText text={report.risks} /></p>
         )}
       </div>
 

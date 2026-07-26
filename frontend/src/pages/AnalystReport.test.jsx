@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import AnalystReport, { PerBandChart, RATING_META, assignLabelRows } from './AnalystReport'
+import AnalystReport, { PerBandChart, PeerMultiplesChart, RATING_META, assignLabelRows } from './AnalystReport'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn() } }))
@@ -46,20 +46,33 @@ beforeEach(() => vi.clearAllMocks())
 describe('AnalystReport 문서 페이지 (task#212)', () => {
   it('전 섹션 렌더 — 헤더·논지·포인트·밸류에이션·추정·리스크', async () => {
     api.get.mockResolvedValue({ data: REPORT })
-    renderPage()
+    const { container } = renderPage()
     expect(await screen.findByText('한줄 논지 테스트')).toBeTruthy()
     expect(screen.getByText('삼성전자')).toBeTruthy()
     expect(screen.getByText('매수')).toBeTruthy()          // rating 의미 배지
     expect(screen.getByText('투자 포인트')).toBeTruthy()
     expect(screen.getByText('포인트A')).toBeTruthy()
     expect(screen.getByText('밸류에이션')).toBeTruthy()
-    expect(screen.getByText('SK하이닉스')).toBeTruthy()    // 피어 테이블
+    expect(screen.getAllByText('SK하이닉스').length).toBe(5)  // 피어 차트 — 지표당 1행 (task#220)
+    expect(container.querySelector('table')).toBeNull()    // 피어 표는 차트로 대체됨(task#220)
     expect(screen.getByText('실적 추정')).toBeTruthy()
     // 차트 틱은 jsdom(0크기 컨테이너)에서 미렌더 — 범례·캡션으로 차트화 검증(task#217)
     expect(screen.getByText('매출(원)')).toBeTruthy()
     expect(screen.getByText(/\(E\) = 컨센서스 추정/)).toBeTruthy()
     expect(screen.getByText('리스크 요인')).toBeTruthy()
     expect(screen.getByText('리스크 서술')).toBeTruthy()
+  })
+
+  it('용어집 배선 — 지표 라벨·본문에 glossary-term 버튼(task#220)', async () => {
+    api.get.mockResolvedValue({ data: REPORT })
+    const { container } = renderPage()
+    await screen.findByText('한줄 논지 테스트')
+    // 피어 차트 지표명(R&D집약도 신규 용어) + Stat 라벨(적정주가 밴드) + 본문(PER 밴드 산정의 PER)
+    expect(screen.getByRole('button', { name: 'R&D집약도' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '적정주가 밴드' })).toBeTruthy()
+    expect(container.querySelectorAll('.glossary-term').length).toBeGreaterThanOrEqual(5)
+    // 한줄 논지(제목)는 용어집 제외
+    expect(screen.getByText('한줄 논지 테스트').querySelector('.glossary-term')).toBeNull()
   })
 
   it('US 영업이익 전무면 열 생략(null graceful)', async () => {
@@ -83,6 +96,39 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     api.get.mockRejectedValue({ response: { status: 404 } })
     renderPage()
     expect(await screen.findByText('발행물을 찾을 수 없습니다.')).toBeTruthy()
+  })
+})
+
+describe('PeerMultiplesChart (task#220 — 피어 멀티플 표→지표별 미니 가로막대)', () => {
+  const PEERS = REPORT.data.competitors
+
+  it('지표 5종 라벨 + 자사 강조(●) + 포맷 값 렌더', () => {
+    render(<PeerMultiplesChart peers={PEERS} />)
+    for (const label of ['PER', 'PBR', 'PSR', 'EV/EBITDA', 'R&D집약도']) {
+      expect(screen.getByText(label)).toBeTruthy()
+    }
+    expect(screen.getAllByText('삼성전자 ●').length).toBe(5)  // 자사 마커, 지표당 1행
+    expect(screen.getByText('20.2')).toBeTruthy()   // per .toFixed(1)
+    expect(screen.getByText('3.47')).toBeTruthy()   // pbr .toFixed(2)
+    expect(screen.getByText('11.3%')).toBeTruthy()  // rd_intensity %
+  })
+
+  it('전 피어 null인 지표는 차트 생략, null 피어는 행 생략', () => {
+    const peers = [
+      { ticker: 'A', name: 'A사', is_self: true, per: 10.0, pbr: null, psr: null, ev_ebitda: 5.0, rd_intensity: null },
+      { ticker: 'B', name: 'B사', is_self: false, per: null, pbr: null, psr: null, ev_ebitda: 6.0, rd_intensity: null },
+    ]
+    render(<PeerMultiplesChart peers={peers} />)
+    expect(screen.queryByText('PBR')).toBeNull()
+    expect(screen.queryByText('PSR')).toBeNull()
+    expect(screen.queryByText('R&D집약도')).toBeNull()
+    expect(screen.getAllByText('A사 ●').length).toBe(2)  // PER·EV/EBITDA만
+    expect(screen.getAllByText('B사').length).toBe(1)    // EV/EBITDA만
+  })
+
+  it('피어 없으면 미렌더', () => {
+    const { container } = render(<PeerMultiplesChart peers={[]} />)
+    expect(container.innerHTML).toBe('')
   })
 })
 
