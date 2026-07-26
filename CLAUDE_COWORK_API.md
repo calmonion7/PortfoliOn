@@ -32,10 +32,12 @@
 
 ### 애널리스트 리포트 발행 (analyst-reports)
 ```
+0. (조건 확인) GET /api/analyst-reports  → **종목당 최신 1건**만 반환 (그 종목의 최신 발행일 판단용, task#222)
 1. (선택) GET /api/report/{ticker}/{date_str}  → 최신 스냅샷 데이터 참조 (분석 재료)
 2. (AI가 심층 분석 수행 — 투자의견·한줄 논지·적정주가 밴드·산정방식·투자포인트 2~3개·리스크 작성)
 3. POST /api/analyst-reports/{ticker}  → 발행 (숫자 데이터 블록은 서버가 최신 스냅샷에서 자동 첨부)
    - 스냅샷 없는 종목은 409 거부 → 먼저 POST /api/report/generate?tickers={ticker} 후 재시도
+   - 발행물 삭제는 admin 세션 전용(API key 불가) — Cowork/루틴은 삭제하지 않는다
 ```
 
 ---

@@ -2095,9 +2095,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/analyst-reports`
 
-전체 발행물 목록 (요약, 발행일 최신순).
+발행물 목록 — **종목당 최신 1건**만 (요약, 발행일 최신순). 목록의 정체성은 "그 종목에 대한 현재 판단"이며, 과거 판(이력)은 `GET /api/analyst-reports/{ticker}`가 전 판을 반환한다 (ADR-0027 개정, task#222).
 
-**Auth:** Bearer token 또는 `X-API-Key` (API key는 루틴의 발행 가드레일 판단용, task#213)
+**Auth:** Bearer token 또는 `X-API-Key` (API key는 루틴의 발행 가드레일 판단용, task#213 — 최신 1건이 "최신 발행 7일+ 경과" 판단에 정확한 형태)
 
 **Response `200`**
 ```json
@@ -2121,7 +2121,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/analyst-reports/{ticker}`
 
-종목별 발행 판 목록 (최신순). 발행물이 없으면 빈 배열.
+종목별 발행 판 **전체** 목록 (최신순). 발행물이 없으면 빈 배열. 문서 상세의 이력 네비게이션(이전 판 이동)이 이 응답을 쓴다 — 목록 엔드포인트와 달리 dedup하지 않는다.
 
 **Auth:** Bearer token 또는 `X-API-Key`
 
@@ -2129,6 +2129,21 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 ```json
 { "ticker": "005930", "reports": [ { "published_date": "2026-07-25", "rating": "buy", "...": "..." } ] }
 ```
+
+---
+
+### `DELETE /api/analyst-reports/{ticker}`
+
+그 종목의 발행물 **전 판 삭제** (이력 포함). 발행물은 불변 문서지만 오발행·대상 해제 종목 정리 수단으로 종목 단위 삭제만 제공한다 — 판 단위 삭제는 없다(잘못된 판 하나는 새 판 발행으로 덮는다, ADR-0027 개정 · task#222).
+
+**Auth:** Bearer token (**admin 세션 전용** — `X-API-Key` 불가. 루틴에 삭제 권한을 주지 않는다)
+
+**Response `200`**
+```json
+{ "ok": true, "ticker": "005930", "deleted": 3 }
+```
+
+**Errors:** `403` 비admin · `404` 해당 종목 발행물 없음
 
 ---
 

@@ -125,20 +125,32 @@ def _summary(row: dict) -> dict:
     }
 
 
+_COLS = "ticker, published_date, rating, title, fair_value_low, fair_value_high, data"
+
+
 def list_reports(ticker: Optional[str] = None) -> list:
-    """발행물 목록(요약, 최신순). ticker 지정 시 그 종목의 판 목록."""
+    """발행물 목록(요약, 최신순).
+
+    ticker 지정 = 그 종목의 **전 판**(문서 상세의 이력 네비게이션용),
+    미지정 = **종목당 최신 1건**(목록의 정체성 = 그 종목에 대한 현재 판단 — ADR-0027 개정).
+    소비처가 정확히 이렇게 갈리므로 플래그 없이 분기별 동작으로 둔다.
+    """
     if ticker:
         rows = query(
-            "SELECT ticker, published_date, rating, title, fair_value_low, fair_value_high, data"
-            " FROM analyst_reports WHERE ticker = %s ORDER BY published_date DESC",
+            f"SELECT {_COLS} FROM analyst_reports WHERE ticker = %s ORDER BY published_date DESC",
             (ticker.upper(),),
         )
     else:
         rows = query(
-            "SELECT ticker, published_date, rating, title, fair_value_low, fair_value_high, data"
-            " FROM analyst_reports ORDER BY published_date DESC, ticker",
+            f"SELECT * FROM (SELECT DISTINCT ON (ticker) {_COLS} FROM analyst_reports"
+            " ORDER BY ticker, published_date DESC) t ORDER BY published_date DESC, ticker",
         )
     return [_summary(r) for r in rows]
+
+
+def delete_reports(ticker: str) -> int:
+    """그 종목의 발행물 전 판 삭제 → 삭제 건수. 판 단위 삭제는 없다(ADR-0027 개정)."""
+    return execute("DELETE FROM analyst_reports WHERE ticker = %s", (ticker.upper(),))
 
 
 def get_report(ticker: str, published_date: str) -> Optional[dict]:

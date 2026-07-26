@@ -11,6 +11,7 @@ import { RATING_META } from './AnalystReport'
 // 심층 리포트 탭 (task#215) — 발행물 목록(전 사용자) + 대상 관리(admin: 지정 추가/해제/즉시 발행).
 // 백엔드는 task#214 완비 — GET /api/analyst-reports, GET /api/stocks(analyst_target),
 // PUT /api/admin/analyst-targets/{ticker}, POST /api/admin/cowork/fire 재사용.
+// 목록은 종목당 최신 1건(서버 dedup) — 과거 판은 문서 상세에서 이동, admin은 종목 단위 삭제 (task#222).
 
 const rowStyle = { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 13 }
 
@@ -53,6 +54,21 @@ export default function AnalystReports() {
     }
   }
 
+  // 발행물 삭제 — 종목 단위 전 판(ADR-0027 개정). 카드가 Link라 네비게이션 차단 필수.
+  const deletePub = async (e, p) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!window.confirm(`${p.name || p.ticker} 발행물을 이력까지 모두 삭제합니다.\n되돌릴 수 없습니다.`)) return
+    try {
+      const { data } = await api.delete(`/api/analyst-reports/${p.ticker}`)
+      setPubs(prev => prev.filter(x => x.ticker !== p.ticker))
+      showToast(`${p.ticker} 발행물 ${data.deleted}판을 삭제했습니다.`)
+    } catch (err) {
+      console.error('[AnalystReports] 발행물 삭제 실패:', err)
+      showToast('발행물 삭제 실패 — 잠시 후 다시 시도하세요.', 'error')
+    }
+  }
+
   const firePublish = async (ticker) => {
     setFiring(ticker)
     try {
@@ -92,6 +108,15 @@ export default function AnalystReports() {
                 <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.ticker}</span>
                 <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>
                 <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 'auto' }}>{p.published_date}</span>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => deletePub(e, p)}
+                    title="발행물 삭제 (이력 포함)"
+                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
+                  >
+                    삭제
+                  </button>
+                )}
               </div>
               <div style={{ color: 'var(--text-2, var(--text))', fontSize: 13, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
             </Card>

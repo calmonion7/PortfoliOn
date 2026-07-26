@@ -10,14 +10,16 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routers.analyst_reports import router
-from auth import get_current_user_or_api_key, require_admin_or_api_key
+from auth import get_current_user, get_current_user_or_api_key, require_admin, require_admin_or_api_key
 from services import analyst_reports as svc
 
 app = FastAPI()
 app.include_router(router)
-# 조회는 get_current_user_or_api_key(루틴 API key 허용, task#213), 발행은 require_admin_or_api_key
+# 조회는 get_current_user_or_api_key(루틴 API key 허용, task#213), 발행은 require_admin_or_api_key,
+# 삭제는 require_admin(admin 세션 전용 — 루틴 제외, task#222)
 app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
 app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
+app.dependency_overrides[require_admin] = lambda: "test-admin-id"
 client = TestClient(app)
 
 
@@ -196,12 +198,31 @@ def test_list_all():
     assert "data" not in reports[0]  # 목록은 요약만
 
 
+def test_list_all_dedups_to_latest_per_ticker():
+    """목록 SQL이 종목당 최신 1건으로 줄이는 형태인지 (task#222 — query mock이라 SQL 형태로 못박음)."""
+    with patch.object(svc, "query", return_value=[ROW]) as mock_q:
+        assert client.get("/api/analyst-reports").status_code == 200
+    sql = mock_q.call_args.args[0]
+    assert "DISTINCT ON (ticker)" in sql
+    assert "ORDER BY ticker, published_date DESC" in sql   # 종목별 최신 판 선택
+    assert sql.rstrip().endswith("ORDER BY published_date DESC, ticker")  # 목록 표시는 최신순
+
+
 def test_list_by_ticker():
     with patch.object(svc, "query", return_value=[ROW]):
         resp = client.get("/api/analyst-reports/tst")
     assert resp.status_code == 200
     assert resp.json()["ticker"] == "TST"
     assert len(resp.json()["reports"]) == 1
+
+
+def test_list_by_ticker_keeps_all_versions():
+    """종목별 조회는 이력 소비처 — dedup 금지, 전 판 유지 (task#222)."""
+    older = {**ROW, "published_date": "2026-07-20"}
+    with patch.object(svc, "query", return_value=[ROW, older]) as mock_q:
+        resp = client.get("/api/analyst-reports/TST")
+    assert len(resp.json()["reports"]) == 2
+    assert "DISTINCT ON" not in mock_q.call_args.args[0]
 
 
 def test_detail_and_404():
@@ -221,6 +242,36 @@ def test_save_report_upserts():
                         [{"title": "p", "body": "b"}], "r", {"k": 1})
     sql = mock_exec.call_args.args[0]
     assert "ON CONFLICT (ticker, published_date) DO UPDATE" in sql
+
+
+# ── 삭제 (종목 단위 전 판, admin 세션 전용 — task#222) ──
+
+def test_delete_by_ticker():
+    with patch.object(svc, "execute", return_value=3) as mock_exec:
+        resp = client.delete("/api/analyst-reports/tst")
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "ticker": "TST", "deleted": 3}
+    sql, params = mock_exec.call_args.args
+    assert "DELETE FROM analyst_reports WHERE ticker = %s" in sql
+    assert params == ("TST",)
+
+
+def test_delete_404_when_no_reports():
+    with patch.object(svc, "execute", return_value=0):
+        assert client.delete("/api/analyst-reports/NONE").status_code == 404
+
+
+def test_delete_blocked_for_non_admin():
+    """루틴 API key도 아닌 일반 사용자 세션 → 403 (require_admin 실게이트, override 없는 app)."""
+    nonadmin = FastAPI()
+    nonadmin.include_router(router)
+    nonadmin.dependency_overrides[get_current_user] = lambda: "test-user-id"
+    c = TestClient(nonadmin)
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = c.delete("/api/analyst-reports/TST")
+    assert resp.status_code == 403
+    mock_exec.assert_not_called()  # 게이트가 삭제 전에 막는다
 
 
 # ── 비admin 403 (require_admin_or_api_key 실게이트 — test_report_router 패턴) ──
@@ -245,3 +296,4 @@ def test_unauthenticated_401():
     assert c.get("/api/analyst-reports/TST").status_code == 401
     assert c.get("/api/analyst-reports/TST/2026-07-25").status_code == 401
     assert c.post("/api/analyst-reports/TST", json=VALID_BODY).status_code == 401
+    assert c.delete("/api/analyst-reports/TST").status_code == 401

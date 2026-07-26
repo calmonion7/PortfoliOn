@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from auth import get_current_user_or_api_key, require_admin_or_api_key
+from auth import get_current_user_or_api_key, require_admin, require_admin_or_api_key
 from services import analyst_reports as svc
 from services.utils import sanitize
 
@@ -77,8 +77,26 @@ def publish_report(ticker: str, body: PublishBody, _: str = Depends(require_admi
 
 @router.get("")
 def list_all(_: str = Depends(get_current_user_or_api_key)):
-    """전체 발행물 목록(요약, 최신순). API key 허용 — 루틴의 발행 가드레일 판단 재료(task#213)."""
+    """발행물 목록 — **종목당 최신 1건**(요약, 최신순).
+
+    목록의 정체성 = "그 종목에 대한 현재 판단"(ADR-0027 개정, task#222). 과거 판은
+    GET /{ticker}(전 판)로 문서 상세에서 이동. API key 허용 — 루틴의 발행 가드레일
+    판단 재료(task#213)이며, 최신 1건이 그 7일 판단에 정확한 형태다."""
     return sanitize({"reports": svc.list_reports()})
+
+
+@router.delete("/{ticker}")
+def delete_by_ticker(ticker: str, _: str = Depends(require_admin)):
+    """그 종목의 발행물 전 판 삭제 (admin 세션 전용 — 루틴/API key 제외, ADR-0027 개정).
+
+    발행물은 불변이지만 오발행·대상 해제 종목 정리 수단이 필요하다. 판 단위 삭제는
+    만들지 않는다(잘못된 판 하나는 새 판 발행으로 덮는다)."""
+    upper = ticker.upper()
+    deleted = svc.delete_reports(upper)
+    if deleted == 0:
+        raise HTTPException(status_code=404, detail=f"{upper} 발행물 없음")
+    logger.info(f"[AnalystReport] 삭제 ({upper}): {deleted}판")
+    return {"ok": True, "ticker": upper, "deleted": deleted}
 
 
 @router.get("/{ticker}")

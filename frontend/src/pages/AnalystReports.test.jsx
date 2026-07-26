@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import AnalystReports from './AnalystReports'
 import api from '../api'
 
-vi.mock('../api', () => ({ default: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
+vi.mock('../api', () => ({ default: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
 
 let mockRole = 'user'
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ role: mockRole }) }))
@@ -52,6 +52,36 @@ describe('심층 리포트 탭 (task#215)', () => {
 
     fireEvent.click(screen.getByText('해제'))
     await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/admin/analyst-targets/035420', { enabled: false }))
+  })
+
+  it('admin: 발행물 삭제 버튼 → confirm 후 DELETE 호출·목록에서 제거 (task#222)', async () => {
+    mockRole = 'admin'
+    api.delete.mockResolvedValue({ data: { ok: true, ticker: '035420', deleted: 2 } })
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderPage()
+    expect(await screen.findByText('AI 검색 수익화')).toBeTruthy()
+
+    fireEvent.click(screen.getByTitle('발행물 삭제 (이력 포함)'))
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/api/analyst-reports/035420'))
+    await waitFor(() => expect(screen.queryByText('AI 검색 수익화')).toBeNull())
+    confirmSpy.mockRestore()
+  })
+
+  it('admin: confirm 취소 시 삭제 안 함 (task#222)', async () => {
+    mockRole = 'admin'
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderPage()
+    await screen.findByText('AI 검색 수익화')
+    fireEvent.click(screen.getByTitle('발행물 삭제 (이력 포함)'))
+    expect(api.delete).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
+
+  it('비admin: 발행물 삭제 버튼 미노출 (task#222)', async () => {
+    mockRole = 'user'
+    renderPage()
+    await screen.findByText('AI 검색 수익화')
+    expect(screen.queryByTitle('발행물 삭제 (이력 포함)')).toBeNull()
   })
 
   it('admin: 후보 선택 → 추가 호출', async () => {

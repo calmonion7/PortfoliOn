@@ -253,6 +253,7 @@ export default function AnalystReport() {
   const [report, setReport] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [olderDates, setOlderDates] = useState([])  // 이전 판(이력) — 목록은 종목당 최신 1건이라 여기서 이동 (task#222)
 
   useEffect(() => {
     setLoading(true)
@@ -264,6 +265,18 @@ export default function AnalystReport() {
         setError(e.response?.status === 404 ? '발행물을 찾을 수 없습니다.' : '발행물을 불러오지 못했습니다.')
       })
       .finally(() => setLoading(false))
+  }, [ticker, date])
+
+  // 이력 목록(전 판) — 실패는 graceful(섹션만 숨김), 본문 표시를 막지 않는다
+  useEffect(() => {
+    api.get(`/api/analyst-reports/${ticker}`)
+      .then(({ data }) => setOlderDates(
+        (data.reports || []).map(r => r.published_date).filter(d => d !== date).slice(0, 5)
+      ))
+      .catch((e) => {
+        console.warn('[AnalystReport] 발행물 이력 조회 실패:', e)
+        setOlderDates([])
+      })
   }, [ticker, date])
 
   if (loading) return <div style={{ maxWidth: 780, margin: '0 auto', padding: '24px 16px' }}><Skeleton variant="row" count={8} /></div>
@@ -291,6 +304,14 @@ export default function AnalystReport() {
         <span style={{ color: 'var(--text-3)', fontSize: 11, letterSpacing: '0.12em', fontWeight: 600 }}>ANALYST REPORT</span>
         <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 'auto' }}>{report.published_date} 발행</span>
       </div>
+      {olderDates.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4, fontSize: 11, color: 'var(--text-3)' }}>
+          <span>이전 판</span>
+          {olderDates.map(d => (
+            <Link key={d} to={`/analyst-report/${ticker}/${d}`} className="mono" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{d}</Link>
+          ))}
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '8px 0 14px' }}>
         <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 700, color: 'var(--text)', lineHeight: 1.15 }}>
           {report.name || d.name || ticker}

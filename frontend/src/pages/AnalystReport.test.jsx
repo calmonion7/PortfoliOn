@@ -99,6 +99,42 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
   })
 })
 
+describe('발행물 이력 네비게이션 (task#222)', () => {
+  // 목록은 종목당 최신 1건이므로 과거 판 이동은 이 문서에서만 가능
+  const mockHistory = (dates) => api.get.mockImplementation((url) =>
+    url === '/api/analyst-reports/005930'
+      ? Promise.resolve({ data: { ticker: '005930', reports: dates.map(d => ({ ticker: '005930', published_date: d })) } })
+      : Promise.resolve({ data: REPORT }))
+
+  it('이전 판이 있으면 링크로 노출(현재 판 제외·최근 5개)', async () => {
+    mockHistory(['2026-07-25', '2026-07-18', '2026-07-11', '2026-07-04', '2026-06-27', '2026-06-20', '2026-06-13'])
+    renderPage()
+    expect(await screen.findByText('이전 판')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: '2026-07-25' })).toBeNull()   // 현재 보고 있는 판 제외
+    expect(screen.getByRole('link', { name: '2026-07-18' }).getAttribute('href'))
+      .toBe('/analyst-report/005930/2026-07-18')
+    expect(screen.getByRole('link', { name: '2026-06-20' })).toBeTruthy()   // 5번째
+    expect(screen.queryByRole('link', { name: '2026-06-13' })).toBeNull()   // 6번째부터 생략
+  })
+
+  it('판이 하나면 이력 섹션 미노출', async () => {
+    mockHistory(['2026-07-25'])
+    renderPage()
+    await screen.findByText('한줄 논지 테스트')
+    expect(screen.queryByText('이전 판')).toBeNull()
+  })
+
+  it('이력 조회 실패는 graceful — 본문은 그대로 렌더', async () => {
+    api.get.mockImplementation((url) =>
+      url === '/api/analyst-reports/005930'
+        ? Promise.reject(new Error('boom'))
+        : Promise.resolve({ data: REPORT }))
+    renderPage()
+    expect(await screen.findByText('한줄 논지 테스트')).toBeTruthy()
+    expect(screen.queryByText('이전 판')).toBeNull()
+  })
+})
+
 describe('PeerMultiplesChart (task#220 — 피어 멀티플 표→지표별 미니 가로막대)', () => {
   const PEERS = REPORT.data.competitors
 
