@@ -305,7 +305,7 @@ export default function AnalystReport() {
         <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 'auto' }}>{report.published_date} 발행</span>
       </div>
       {olderDates.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4, fontSize: 11, color: 'var(--text-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 3, fontSize: 11, color: 'var(--text-3)' }}>
           <span>이전 판</span>
           {olderDates.map(d => (
             <Link key={d} to={`/analyst-report/${ticker}/${d}`} className="mono" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{d}</Link>
