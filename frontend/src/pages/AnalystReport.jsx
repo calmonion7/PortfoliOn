@@ -346,16 +346,22 @@ export default function AnalystReport() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
         {(report.points || []).map((p, i) => (
           <Card key={i} padding="md">
-            <div style={{ display: 'flex', gap: 12 }}>
-              <span className="tnum" style={numeralStyle}>{String(i + 1).padStart(2, '0')}</span>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{p.title}</div>
+            {/* 번호를 제목 행에 인라인으로 — 좌측 번호 컬럼(38+gap12=50px)이 카드 전체 높이에 걸쳐
+                칩 그리드 폭을 237px로 좁혀 3열이 불가했다. 접으면 289px 확보 → minmax 84px에서 3열(task#225) */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
+                <span className="tnum" style={numeralStyle}>{String(i + 1).padStart(2, '0')}</span>
+                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, minWidth: 0 }}>{p.title}</div>
+              </div>
+              <div style={{ minWidth: 0 }}>
                 {p.metrics?.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(108px, 1fr))', gap: 8, marginBottom: 10 }}>
+                  // 칩 수에 맞춘 열 수 — ≤3개는 1행(3열), 4개는 2열 2행. 높이 동인은 열 수가 아니라 칩 내부
+                  // 텍스트 줄바꿈이라, 4개를 3열(트랙 91px)로 깔면 값이 접혀 칩 45→94px로 오히려 커진다(task#225 실측).
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${p.metrics.length <= 3 ? p.metrics.length : 2}, minmax(0, 1fr))`, gap: 8, marginBottom: 10 }}>
                     {p.metrics.map((m, j) => (
-                      <div key={j} style={{ background: 'var(--bg-elev-2)', borderRadius: 6, padding: '8px 10px' }}>
+                      <div key={j} style={{ background: 'var(--bg-elev-2)', borderRadius: 6, padding: '6px 8px' }}>
                         <div style={{ color: 'var(--text-3)', fontSize: 10, marginBottom: 3, lineHeight: 1.3 }}><GlossaryText text={m.label} /></div>
-                        <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, lineHeight: 1.15 }}>{m.value}</div>
+                        <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 15, lineHeight: 1.15 }}>{m.value}</div>
                         {m.change_pct != null && (
                           <div className="mono tnum" style={{ fontSize: 11, marginTop: 2, color: m.change_pct >= 0 ? 'var(--up)' : 'var(--down)' }}>
                             {m.change_pct >= 0 ? '▲+' : '▼'}{Math.abs(m.change_pct) >= 100 ? Math.round(m.change_pct) : m.change_pct}%
@@ -405,10 +411,12 @@ export default function AnalystReport() {
         )}
       </div>
 
-      <div style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <Link to="/analyst-reports" style={{ color: 'var(--accent)', fontSize: 13 }}>← 심층 리포트</Link>
+      <div style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
         <span style={{ color: 'var(--text-3)', fontSize: 11 }}>본 문서는 발행 시점 데이터로 박제된 판단 문서입니다 · 투자 판단의 책임은 투자자 본인에게 있습니다</span>
       </div>
+
+      {/* 목록 복귀 — 우하단 플로팅 pill(task#225). fixed이므로 조상에 transform 금지(task#195) */}
+      <Link to="/analyst-reports" className="list-pill">☰ 목록</Link>
     </div>
   )
 }

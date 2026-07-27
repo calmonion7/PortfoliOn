@@ -111,22 +111,30 @@ export default function AnalystReports() {
               padding="sm"
               style={{ textDecoration: 'none', display: 'block' }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'var(--font-serif)', fontSize: 15 }}>{p.name || p.ticker}</span>
-                <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.ticker}</span>
-                <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>
-                <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 'auto' }}>{p.published_date}</span>
-                {isAdmin && (
-                  <button
-                    onClick={(e) => deletePub(e, p)}
-                    title="발행물 삭제 (이력 포함)"
-                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
-                  >
-                    삭제
-                  </button>
-                )}
+              {/* 2행 고정 구조(task#225) — 1행: 이름 좌 / 티커·뱃지 우, 2행: 논지 좌 / 날짜·삭제 우.
+                  wrap 없음(긴 이름은 말줄임)이라 뱃지·삭제가 카드마다 같은 우측 열에 정렬된다. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'var(--font-serif)', fontSize: 15, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || p.ticker}</span>
+                <span style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.ticker}</span>
+                  <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>
+                </span>
               </div>
-              <div style={{ color: 'var(--text-2, var(--text))', fontSize: 13, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <span style={{ color: 'var(--text-2, var(--text))', fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                <span style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.published_date}</span>
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => deletePub(e, p)}
+                      title="발행물 삭제 (이력 포함)"
+                      style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
+                    >
+                      삭제
+                    </button>
+                  )}
+                </span>
+              </div>
             </Card>
           ))}
         </div>

@@ -19,7 +19,7 @@ BASE URL: https://portfolion.taebro.com
 - 발행: POST /api/analyst-reports/{ticker}. body 요구 최소형태(포인트는 metrics 칩 + 짧은 문장 구조 — 한눈 가독):
 {"rating":"buy","title":"<한줄 논지>","fair_value_low":80000,"fair_value_high":95000,"valuation_method":"<산정방식 1~2문장, 예: 과거 5년 PER 밴드 평균 12배에 2026F EPS 적용>","points":[{"title":"<포인트1>","body":"<핵심 논리 1~2문장(글밥 금지)>","metrics":[{"label":"2026F 영업이익","value":"383.2조원","change_pct":779.0},{"label":"forward PER","value":"5.9배"},{"label":"2Q26E 마진","value":"48.9%"}]},{"title":"<포인트2>","body":"<1~2문장>","metrics":[{"label":"...","value":"..."}]}],"risks":"<리스크1 한 문장>\n<리스크2 한 문장>\n<리스크3 한 문장>"}
 - rating은 buy|neutral|sell 3단계만. points는 2~3개. fair_value_low ≤ fair_value_high. 숫자 데이터 블록(시세·추정·피어·PER밴드)은 서버가 스냅샷에서 자동 첨부하므로 본문에 넣지 않는다.
-- **한눈 구조화 규칙(필수)**: 각 포인트의 정량 근거는 문장에 늘어놓지 말고 **metrics 칩 2~4개**(label 짧게, value는 "383.2조원"·"8.8배"·"48.9%"처럼 표시용 문자열, 증감이면 change_pct 숫자)로 분리하라. body는 그 숫자들이 왜 중요한지 잇는 **1~2문장**만 — 3문장 이상이면 다시 써라. 수치의 출처(컨센서스/스냅샷/공시)는 body에 짧게. risks는 **줄바꿈(\n)으로 구분한 핵심 불릿 2~3개**, 각 한 문장.
+- **한눈 구조화 규칙(필수)**: 각 포인트의 정량 근거는 문장에 늘어놓지 말고 **metrics 칩 2~3개**(모바일 1행에 들어가는 상한 — label 짧게, value는 "383.2조원"·"8.8배"·"48.9%"처럼 표시용 문자열, 증감이면 change_pct 숫자)로 분리하라. body는 그 숫자들이 왜 중요한지 잇는 **1~2문장**만 — 3문장 이상이면 다시 써라. 수치의 출처(컨센서스/스냅샷/공시)는 body에 짧게. risks는 **줄바꿈(\n)으로 구분한 핵심 불릿 2~3개**, 각 한 문장.
 - 409(스냅샷 없음)면 POST /api/report/generate?tickers={ticker} 후 5분 뒤 1회만 재시도.
 
 == 공통 규칙 ==

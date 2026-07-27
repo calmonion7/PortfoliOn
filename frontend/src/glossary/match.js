@@ -1,6 +1,7 @@
 // 용어 자동 매칭 순수 함수 (task#198)
 // 규칙: longest-match 우선 · 텍스트당 용어별 첫 등장만 · 이미 매칭된 구간과 중복 금지.
-// 라틴 키(PER 등)는 영숫자 경계 필수(SUPER의 PER 오매칭 방지), 한글 키는 substring(조사 자연 흡수).
+// 라틴 키(PER 등)는 앞쪽 영숫자 경계 필수(SUPER의 PER 오매칭 방지), 한글 키는 substring(조사 자연 흡수).
+// 뒤쪽은 붙은 숫자를 표기의 일부로 흡수(EMA200·PER12 — task#225), 뒤에 오는 letter는 여전히 금지(PERSON).
 import { GLOSSARY } from './terms'
 
 const _escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -29,9 +30,11 @@ export function matchTerms(text) {
     while (from < text.length) {
       const s = text.indexOf(key, from)
       if (s === -1) break
-      const e = s + key.length
+      let e = s + key.length
+      // 라틴 키에 붙은 숫자는 표기의 일부 → 매칭 범위에 포함(EMA200 전체가 한 용어)
+      if (latin) while (/[0-9]/.test(text[e] || '')) e++
       const boundaryOk = !latin || (
-        !/[A-Za-z0-9]/.test(text[s - 1] || '') && !/[A-Za-z0-9]/.test(text[e] || '')
+        !/[A-Za-z0-9]/.test(text[s - 1] || '') && !/[A-Za-z]/.test(text[e] || '')
       )
       if (boundaryOk && !_overlaps(claimed, s, e)) {
         claimed.push([s, e])

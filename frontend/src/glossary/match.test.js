@@ -31,10 +31,18 @@ describe('matchTerms', () => {
     expect(matched(segs)).toEqual(['매물대'])
   })
 
-  it('라틴 키는 영숫자 경계 필수 — SUPER의 PER 오매칭 금지', () => {
+  it('라틴 키는 앞쪽 영숫자 경계 필수 — SUPER의 PER 오매칭 금지', () => {
     expect(matched(matchTerms('SUPER 성장주'))).toEqual([])
     expect(matched(matchTerms('PER 10배'))).toEqual(['PER'])
     expect(matched(matchTerms('PER은 낮다'))).toEqual(['PER'])
+  })
+
+  it('라틴 키 뒤에 붙은 숫자는 표기의 일부 — EMA200 전체가 한 용어(task#225)', () => {
+    expect(matched(matchTerms('EMA200을 회복했다'))).toEqual(['EMA200'])
+    expect(matched(matchTerms('EMA20 위에서 버틴다'))).toEqual(['EMA20'])
+    // 뒤에 오는 letter는 여전히 금지 — 숫자 흡수 후에도 letter면 탈락
+    expect(matched(matchTerms('PERSON 사업부'))).toEqual([])
+    expect(matched(matchTerms('EMA200X 지표'))).toEqual([])
   })
 
   it('용어별 첫 등장만 — 같은 용어 2회 등장 시 1회만 매칭', () => {

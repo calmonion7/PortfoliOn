@@ -283,6 +283,18 @@
   z-index: 25;
 }
 
+/* Floating list-return pill (task#225) — .fab와 같은 레이어 규약(right 20 / z 25, 탭바 회피) */
+.list-pill {
+  position: fixed; right: 20px; bottom: 90px; z-index: 25;
+  padding: 9px 15px; border-radius: 999px;
+  background: var(--text); color: var(--bg);
+  font-size: 13px; font-weight: 700; text-decoration: none;
+  box-shadow: var(--shadow-lg);
+}
+@media (min-width: 769px) {
+  .list-pill { bottom: 24px; }
+}
+
 /* List search + filter chips */
 .m-list-search {
   width: 100%; padding: 10px 14px;

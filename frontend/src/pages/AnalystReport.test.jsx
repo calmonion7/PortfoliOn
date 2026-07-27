@@ -63,6 +63,30 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     expect(screen.getByText('리스크 서술')).toBeTruthy()
   })
 
+  it('칩 열 수는 칩 개수에 맞춤 — ≤3개는 1행, 4개는 2열(task#225)', async () => {
+    const withMetrics = (n) => ({
+      ...REPORT,
+      points: [{ title: '포인트A', body: '근거A', metrics: Array.from({ length: n }, (_, i) => ({ label: `L${i}`, value: `${i}배` })) }],
+    })
+    for (const [n, expected] of [[2, 2], [3, 3], [4, 2]]) {
+      api.get.mockResolvedValue({ data: withMetrics(n) })
+      const { container, unmount } = renderPage()
+      await screen.findByText('한줄 논지 테스트')
+      const grid = [...container.querySelectorAll('div')].find(d => /^repeat\(\d/.test(d.style.gridTemplateColumns || ''))
+      expect(grid.style.gridTemplateColumns).toBe(`repeat(${expected}, minmax(0, 1fr))`)
+      unmount()
+    }
+  })
+
+  it('문서 하단 복귀 링크 제거 + 플로팅 목록 pill(task#225)', async () => {
+    api.get.mockResolvedValue({ data: REPORT })
+    const { container } = renderPage()
+    await screen.findByText('한줄 논지 테스트')
+    expect([...container.querySelectorAll('a')].some(a => a.textContent.trim() === '← 심층 리포트')).toBe(false)
+    const pill = container.querySelector('.list-pill')
+    expect(pill?.getAttribute('href')).toBe('/analyst-reports')
+  })
+
   it('용어집 배선 — 지표 라벨·본문에 glossary-term 버튼(task#220)', async () => {
     api.get.mockResolvedValue({ data: REPORT })
     const { container } = renderPage()
