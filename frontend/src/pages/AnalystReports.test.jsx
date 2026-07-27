@@ -17,6 +17,15 @@ const STOCKS = [
   { ticker: '035420', name: 'NAVER', type: 'holding', market: 'KR', analyst_target: true },
   { ticker: '005930', name: '삼성전자', type: 'watchlist', market: 'KR', analyst_target: false },
 ]
+// 전역 지정 목록(task#224) — /api/stocks(세션 스코프)와 별도 소스
+const TARGETS = [{ ticker: '035420', name: 'NAVER', market: 'KR' }]
+
+function mockGets(targets = TARGETS) {
+  api.get.mockImplementation((url) =>
+    url === '/api/analyst-reports' ? Promise.resolve({ data: PUBS })
+      : url === '/api/admin/analyst-targets' ? Promise.resolve({ data: targets })
+        : Promise.resolve({ data: STOCKS }))
+}
 
 function renderPage() {
   return render(<MemoryRouter><AnalystReports /></MemoryRouter>)
@@ -24,8 +33,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  api.get.mockImplementation((url) =>
-    url === '/api/analyst-reports' ? Promise.resolve({ data: PUBS }) : Promise.resolve({ data: STOCKS }))
+  mockGets()
 })
 
 describe('심층 리포트 탭 (task#215)', () => {
@@ -52,6 +60,20 @@ describe('심층 리포트 탭 (task#215)', () => {
 
     fireEvent.click(screen.getByText('해제'))
     await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/admin/analyst-targets/035420', { enabled: false }))
+    // 해제 시 지정 목록에서 즉시 제거 (task#224 — 목록 소스가 전역 API라 별도 상태 갱신 필요)
+    await waitFor(() => expect(screen.getByText('지정된 종목이 없습니다 — 아래에서 추가하세요.')).toBeTruthy())
+  })
+
+  it('admin: 전역 지정 목록 — 내 보유·관심에 없는 종목도 노출·미보유 라벨 (task#224)', async () => {
+    mockRole = 'admin'
+    mockGets([
+      { ticker: '035420', name: 'NAVER', market: 'KR' },      // 내 보유
+      { ticker: 'LHX', name: 'L3Harris', market: 'US' },      // 타 사용자 보유분 — /api/stocks엔 없음
+    ])
+    renderPage()
+    await screen.findByText('자동 발행 대상 관리')
+    expect(await screen.findByText('L3Harris')).toBeTruthy()  // 세션 스코프론 안 보였던 종목
+    expect(screen.getAllByText('미보유').length).toBe(1)      // LHX만 (035420은 내 보유)
   })
 
   it('admin: 발행물 삭제 버튼 → confirm 후 DELETE 호출·목록에서 제거 (task#222)', async () => {

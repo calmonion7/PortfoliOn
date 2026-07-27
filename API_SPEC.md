@@ -279,6 +279,24 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 { "ok": true, "updated": 2 }
 ```
 
+### `GET /api/admin/analyst-targets`
+
+**전역** 자동 발행 대상 목록 (task#224). `analyst_target`은 `tickers` 공유 마스터 플래그이므로, 세션 스코프인 `GET /api/stocks`(본인 보유·관심)로는 **타 사용자 종목에 켜진 지정이 보이지 않아 해제도 못 한다** — 이 엔드포인트는 소유자와 무관하게 지정된 전 종목을 반환한다. admin 화면의 "자동 발행 대상 관리" 목록이 이걸 쓴다.
+
+**Auth:** admin Bearer token (`require_admin`) — 화면 전용, API 키 불가
+
+**Response `200`**
+```json
+[
+  { "ticker": "035420", "name": "NAVER", "market": "KR" },
+  { "ticker": "GOOGL", "name": "Alphabet Inc.", "market": "US" }
+]
+```
+
+`name`이 비면 ticker로, `market`이 비면 `"US"`로 폴백. 정렬은 ticker 오름차순.
+
+---
+
 ### `PUT /api/admin/analyst-targets/{ticker}`
 
 애널리스트 리포트 **자동 발행 대상** 지정/해제 (전역 opt-in, task#214). 루틴은 `analyst_target=true`인 종목만 자동 발행 후보로 삼는다(목록이 비면 자동 발행 스킵). 보유·관심 무관 지정 가능.

@@ -211,6 +211,17 @@ class AnalystTargetBody(BaseModel):
     enabled: bool
 
 
+@router.get("/analyst-targets")
+def list_analyst_targets(admin_id: str = Depends(require_admin)):
+    """전역 지정 종목 목록 (task#224). analyst_target은 tickers 공유 마스터 플래그라
+    GET /api/stocks(세션=본인 보유·관심)로는 타 사용자 종목의 지정이 안 보여 해제도 못 한다."""
+    rows = query("SELECT ticker, name, market FROM tickers WHERE analyst_target = true ORDER BY ticker")
+    return [
+        {"ticker": r["ticker"], "name": r.get("name") or r["ticker"], "market": r.get("market") or "US"}
+        for r in rows
+    ]
+
+
 @router.put("/analyst-targets/{ticker}")
 def set_analyst_target(ticker: str, body: AnalystTargetBody, admin_id: str = Depends(require_admin_or_api_key)):
     """애널리스트 리포트 자동 발행 대상 지정/해제 (전역 opt-in, task#214). Cowork-facing 쓰기 게이트 컨벤션."""

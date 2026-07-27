@@ -52,12 +52,14 @@ def test_generate_all_fires_after_batch(monkeypatch):
 # ── admin 수동 fire ──────────────────────────────────────────────────
 
 from routers.admin import router as admin_router
-from auth import require_admin_or_api_key
+from auth import require_admin, require_admin_or_api_key
 
 app = FastAPI()
 app.include_router(admin_router)
-# cowork/fire·analyst-targets는 require_admin_or_api_key (Cowork-facing 쓰기 게이트 컨벤션)
+# cowork/fire·analyst-targets 쓰기는 require_admin_or_api_key (Cowork-facing 쓰기 게이트 컨벤션),
+# analyst-targets 조회(task#224)는 화면 전용이라 require_admin
 app.dependency_overrides[require_admin_or_api_key] = lambda: "admin-id"
+app.dependency_overrides[require_admin] = lambda: "admin-id"
 client = TestClient(app)
 
 
@@ -134,6 +136,30 @@ def test_admin_analyst_target_unauthenticated_401():
     fresh = FastAPI()
     fresh.include_router(admin_router)
     assert TestClient(fresh).put("/api/admin/analyst-targets/TST", json={"enabled": True}).status_code == 401
+
+
+# ── GET /api/admin/analyst-targets — 전역 지정 목록 (task#224) ────────
+
+def test_admin_analyst_targets_list_is_global():
+    rows = [
+        {"ticker": "035420", "name": "NAVER", "market": "KR"},
+        {"ticker": "GOOGL", "name": "Alphabet Inc.", "market": "US"},
+        {"ticker": "TST", "name": None, "market": None},  # 이름·시장 결측 → 폴백
+    ]
+    with patch("routers.admin.query", return_value=rows) as mock_q:
+        data = client.get("/api/admin/analyst-targets").json()
+    assert [d["ticker"] for d in data] == ["035420", "GOOGL", "TST"]
+    # 소유자 무관 전역 조회 — user_id 조건 없이 analyst_target 플래그만 본다
+    sql = mock_q.call_args.args[0]
+    assert "analyst_target = true" in sql and "user_id" not in sql
+    assert data[0]["market"] == "KR"
+    assert data[2] == {"ticker": "TST", "name": "TST", "market": "US"}  # 결측 폴백
+
+
+def test_admin_analyst_targets_list_unauthenticated_401():
+    fresh = FastAPI()
+    fresh.include_router(admin_router)
+    assert TestClient(fresh).get("/api/admin/analyst-targets").status_code == 401
 
 
 def test_get_stocks_enriched_at_query_failure_graceful():

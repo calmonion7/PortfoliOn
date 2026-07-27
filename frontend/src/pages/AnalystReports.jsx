@@ -20,7 +20,8 @@ export default function AnalystReports() {
   const isAdmin = role === 'admin'
   const { showToast } = useToast()
   const [pubs, setPubs] = useState(null)      // null=로딩, []=없음
-  const [stocks, setStocks] = useState([])    // 추적 종목(analyst_target 포함) — admin 관리용
+  const [stocks, setStocks] = useState([])    // 내 보유·관심(후보 드롭다운용) — 세션 스코프
+  const [targets, setTargets] = useState([])  // 전역 지정 종목(task#224) — 타 사용자 보유분 포함
   const [firing, setFiring] = useState(null)  // 발행 지시 중인 ticker
   const [addPick, setAddPick] = useState('')
 
@@ -38,15 +39,22 @@ export default function AnalystReports() {
     api.get('/api/stocks')
       .then(({ data }) => setStocks(data || []))
       .catch((e) => console.warn('[AnalystReports] 종목 목록 조회 실패:', e))
+    // 지정 목록은 전역 조회 — /api/stocks는 세션 스코프라 타 사용자 보유분의 지정이 안 보인다
+    api.get('/api/admin/analyst-targets')
+      .then(({ data }) => setTargets(data || []))
+      .catch((e) => console.warn('[AnalystReports] 지정 목록 조회 실패:', e))
   }, [isAdmin])
 
-  const targets = stocks.filter(s => s.analyst_target)
   const candidates = stocks.filter(s => !s.analyst_target)
+  const notMine = ticker => stocks.length > 0 && !stocks.some(s => s.ticker === ticker)
 
   const setTarget = async (ticker, enabled) => {
     try {
       await api.put(`/api/admin/analyst-targets/${ticker}`, { enabled })
       setStocks(prev => prev.map(s => s.ticker === ticker ? { ...s, analyst_target: enabled } : s))
+      setTargets(prev => enabled
+        ? [...prev, stocks.find(s => s.ticker === ticker) || { ticker, name: ticker }]
+        : prev.filter(t => t.ticker !== ticker))
       showToast(enabled ? `${ticker} 자동 발행 대상으로 추가했습니다.` : `${ticker} 대상에서 해제했습니다.`)
     } catch (e) {
       console.error('[AnalystReports] 대상 지정 실패:', e)
@@ -139,6 +147,10 @@ export default function AnalystReports() {
                 <div key={s.ticker} style={rowStyle}>
                   <span style={{ color: 'var(--text)', fontWeight: 600 }}>{s.name}</span>
                   <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>({s.ticker})</span>
+                  {notMine(s.ticker) && (
+                    <span style={{ color: 'var(--text-3)', fontSize: 10, border: '1px solid var(--border)', borderRadius: 3, padding: '1px 5px' }}
+                          title="내 보유·관심에 없는 종목 (지정은 전역 플래그)">미보유</span>
+                  )}
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                     <button
                       onClick={() => firePublish(s.ticker)}
