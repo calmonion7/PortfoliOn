@@ -40,7 +40,7 @@ def _spawn_claude(text: str) -> str:
     workdir.mkdir(parents=True, exist_ok=True)
     log = open(workdir / "run.log", "w")
     subprocess.Popen(
-        ["claude", "-p", prompt, "--model", "sonnet",
+        ["claude", "-p", prompt, "--model", "opus",
          "--allowedTools", "Bash,WebSearch,WebFetch,Read,Write"],
         cwd=workdir, stdout=log, stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL, start_new_session=True,
