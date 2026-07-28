@@ -15,7 +15,9 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       <div style={{
-        position: 'fixed', bottom: 88, left: '50%', transform: 'translateX(-50%)',
+        // bottom 150 = 플로팅 버튼 띠(.list-pill/.fab: bottom 90, 높이 37~52) 위 레인.
+        // 88이면 최대폭(280) 토스트가 좌·우 pill과 ~30px, .fab과 15px 겹쳤다(task#229)
+        position: 'fixed', bottom: 150, left: '50%', transform: 'translateX(-50%)',
         zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8,
         alignItems: 'center', pointerEvents: 'none',
       }}>

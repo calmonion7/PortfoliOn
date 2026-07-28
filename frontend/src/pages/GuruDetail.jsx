@@ -197,7 +197,9 @@ export default function GuruDetail() {
   if (isMobile) return (
     <>
       <header className="appbar">
-        <h1>{manager.name}</h1>
+        {/* firm은 바로 아래 줄에 따로 표시되므로 이름 앞부분만 — 목록 카드와 같은 표기.
+            전체 이름은 2줄로 접혀 스크롤 시 헤더 아래 잔여를 남겼다(task#229) */}
+        <h1>{manager.name.split(' - ')[0]}</h1>
       </header>
       <div className="m-page">
         <Link to="/guru" style={{ fontSize: 12, color: 'var(--text-3)' }}>← 구루 매니저</Link>

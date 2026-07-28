@@ -24,7 +24,15 @@
   backdrop-filter: saturate(160%) blur(14px);
   -webkit-backdrop-filter: saturate(160%) blur(14px);
 }
-.appbar h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.025em; }
+/* 1줄 강제(task#229) — .appbar는 top:0에 붙지만 동급 top:0인 불투명 .mobile-header(z50)에 가려지므로
+   1줄일 때만 완전히 숨는다(잔여 2px). 제목이 2줄로 접히면 둘째 줄 35px이 헤더 아래 남고 배경이 92%
+   반투명이라 아래 콘텐츠가 비친다 → 높이를 55px로 고정해 그 클래스를 제거한다(포지셔닝은 무변경).
+   min-width:0은 필수 — flex 자식의 기본 min-width:auto는 nowrap 텍스트를 min-content(전체 폭)로
+   해석해 축소를 막고 ellipsis 대신 넘쳐 흐르게 만든다(.install-prompt-body와 같은 관용구). */
+.appbar h1 {
+  margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.025em;
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .appbar .actions { display: flex; gap: 6px; align-items: center; }
 .appbar .icon-btn {
   position: relative;

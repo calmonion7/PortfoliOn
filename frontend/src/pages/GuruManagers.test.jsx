@@ -88,6 +88,48 @@ describe('GuruManagers 기본 정렬 (task#228 S1)', () => {
   })
 })
 
+describe('GuruManagers 칩 초기 정렬 방향 (task#229 S4)', () => {
+  // 세 정렬의 기대 순서가 서로 다르도록 구성 — 규모↓: Zeta,Mid,Alpha / 종목수↓: Zeta,Alpha,Mid / 이름 A→Z: Alpha,Mid,Zeta
+  const MIXED = {
+    last_updated: null,
+    managers: [
+      { id: 'z', name: 'Zeta Fund',  firm: 'Z', portfolio_value: 300_000_000_000, num_stocks: 90, top10: [] },
+      { id: 'a', name: 'Alpha Fund', firm: 'A', portfolio_value: 1_000_000_000,   num_stocks: 50, top10: [] },
+      { id: 'm', name: 'Mid Fund',   firm: 'M', portfolio_value: 50_000_000_000,  num_stocks: 10, top10: [] },
+    ],
+  }
+  const order = (container) => [...container.querySelectorAll('.guru-name')].map(n => n.textContent)
+
+  const renderMixed = async () => {
+    api.get.mockImplementation((url) =>
+      url === '/api/guru/managers' ? Promise.resolve({ data: MIXED }) : Promise.resolve({ data: [] })
+    )
+    const r = render(<GuruManagers />)
+    await screen.findByText('Zeta Fund')
+    return r
+  }
+
+  // '종목수'는 카드 통계 라벨에도 있으므로 칩(button)으로 좁혀 조회한다
+  it('종목수 칩 첫 클릭 = 내림차순(많은 것부터) + 화살표 ↓', async () => {
+    const { container } = await renderMixed()
+    fireEvent.click(screen.getByRole('button', { name: '종목수' }))
+    expect(order(container)).toEqual(['Zeta Fund', 'Alpha Fund', 'Mid Fund'])
+    expect(screen.getByRole('button', { name: '종목수 ↓' })).toBeTruthy()
+  })
+
+  it('이름순 칩 첫 클릭 = A→Z + 화살표 ↑', async () => {
+    const { container } = await renderMixed()
+    fireEvent.click(screen.getByRole('button', { name: '이름순' }))
+    expect(order(container)).toEqual(['Alpha Fund', 'Mid Fund', 'Zeta Fund'])
+    expect(screen.getByRole('button', { name: '이름순 ↑' })).toBeTruthy()
+  })
+
+  it('기본 정렬(규모 내림차순)은 task#228 그대로 유지', async () => {
+    const { container } = await renderMixed()
+    expect(order(container)).toEqual(['Zeta Fund', 'Mid Fund', 'Alpha Fund'])
+  })
+})
+
 describe('GuruManagers 빈 상태 안내 문구 (task#227 S5)', () => {
   it('실제 경로("설정 > 구루")를 안내하고 존재하지 않는 "크롤링 설정" 탭을 언급하지 않음', async () => {
     mockApi({ stocks: [] })

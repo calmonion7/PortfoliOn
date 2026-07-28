@@ -5,7 +5,9 @@ import GuruDetail from './GuruDetail'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
-vi.mock('../hooks/useIsMobile', () => ({ default: () => false }))
+// 모바일 분기 테스트를 위해 토글 가능한 mock (PermissionPanel.test.jsx의 vi.hoisted 관용구). 기본은 PC.
+const { viewport } = vi.hoisted(() => ({ viewport: { mobile: false } }))
+vi.mock('../hooks/useIsMobile', () => ({ default: () => viewport.mobile }))
 
 function renderPage(id = 'brk') {
   return render(
@@ -40,7 +42,7 @@ function mockManager(data) {
   )
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => { vi.clearAllMocks(); viewport.mobile = false })
 
 describe('GuruDetail (task#226 S4)', () => {
   // 목록 하단 폴백 전용 캡션("기타 N종목 · x%")은 도넛 범례("기타 N종목", % 없음)와 텍스트가 겹치므로
@@ -75,6 +77,23 @@ describe('GuruDetail (task#226 S4)', () => {
     )
     renderPage()
     expect(await screen.findByText('매니저를 찾을 수 없습니다.')).toBeTruthy()
+  })
+})
+
+describe('GuruDetail 모바일 appbar 제목 축약 (task#229 S2)', () => {
+  // appbar 제목이 2줄로 접히면 스크롤 시 헤더 아래 잔여가 남는다 — 접힘의 원인이던 firm 중복을 제거.
+  // (2줄→1줄 여부 자체는 jsdom이 레이아웃을 계산하지 않아 단언 불가 → 라이브 실측이 게이트)
+  // 라이브 데이터의 실제 형태 — 이름 자체에 firm이 " - "로 붙어 있어 2줄로 접혔다
+  const DASHED = { ...MANAGER_NO_HOLDINGS, name: 'Warren Buffett - Berkshire Hathaway' }
+
+  it('appbar h1은 " - " 앞부분만 쓰고 firm 줄은 그대로 남는다', async () => {
+    viewport.mobile = true
+    mockManager(DASHED)
+    const { container } = renderPage()
+    await screen.findByText('Berkshire Hathaway')          // firm 문단은 유지
+    const h1 = container.querySelector('.appbar h1')
+    expect(h1.textContent).toBe('Warren Buffett')
+    expect(h1.textContent).not.toContain(' - ')
   })
 })
 

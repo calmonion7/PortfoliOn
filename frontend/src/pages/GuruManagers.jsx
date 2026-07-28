@@ -29,8 +29,8 @@ function formatValue(val) {
 // 기본 정렬 = 첫 항목(포트폴리오 규모 내림차순) — 규모 큰 펀드가 위, 카드 #N 배지도 규모 순위가 된다(task#228)
 const SORT_OPTIONS = [
   { key: 'portfolio_value', label: '포트폴리오 규모', dir: -1 },
-  { key: 'num_stocks',      label: '종목수',   dir: 1 },
-  { key: 'name',            label: '이름순',   dir: -1 },
+  { key: 'num_stocks',      label: '종목수',   dir: -1 },  // 많은 것부터 (task#229 — 오름차순은 미검토 값이었다)
+  { key: 'name',            label: '이름순',   dir: 1 },   // A→Z (task#229 — 내림차순=Z→A는 관례 위반)
 ]
 
 function initials(name) {
