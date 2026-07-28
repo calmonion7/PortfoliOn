@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from services import short_sell_service, job_runs
-from auth import require_admin
+from auth import require_admin, get_current_user
 import scheduler
 
 router = APIRouter(prefix="/api", tags=["short-sell"])
@@ -30,7 +30,7 @@ def _serialize(row: dict) -> dict:
 
 
 @router.get("/stocks/{ticker}/short-sell")
-def short_sell_trend(ticker: str, days: int = Query(252, ge=1, le=1000)):
+def short_sell_trend(ticker: str, days: int = Query(252, ge=1, le=1000), _: str = Depends(get_current_user)):
     """종목 공매도 추이 시계열 (KR 전용). 데이터 없으면 items 빈 배열."""
     try:
         rows = short_sell_service.read_series(ticker, days)

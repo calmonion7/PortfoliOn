@@ -1,16 +1,22 @@
 """task#108 보안: 무인증 mutation 엔드포인트가 인증을 강제하는지 + refresh token 1회용 회귀 검증.
+task#230(ADR-0029): 구루·랭킹·수급·공매도 read 9개도 인증을 강제하는지.
 
 각 테스트는 dependency override 없는 fresh app으로 실제 auth 의존성을 태운다
 (conftest override는 main.app 한정이라 여기 fresh app엔 안 걸린다)."""
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routers.report import router as report_router
 from routers.stocks import router as stocks_router
 from routers.market_indicators import router as mi_router
+from routers.guru import router as guru_router
+from routers.rankings import router as rankings_router
+from routers.investor import router as investor_router
+from routers.short_sell import router as short_sell_router
 
 
 def _client(*routers):
@@ -44,6 +50,32 @@ def test_enrich_single_requires_auth():
 def test_enrich_batch_requires_auth():
     r = _client(stocks_router).put("/api/stocks/enrich/batch", json=[{"ticker": "AAPL", "moat": "x"}])
     assert r.status_code == 401
+
+
+# task#230(ADR-0029) — 구루·랭킹·수급·공매도 read 9개는 무인증 접근이 401이어야 한다.
+_READ_GATES_230 = [
+    ("guru", "/api/guru/managers"),
+    ("guru", "/api/guru/managers/m1"),
+    ("guru", "/api/guru/stats/popularity"),
+    ("guru", "/api/guru/stats/weighted"),
+    ("guru", "/api/guru/crawl/progress"),
+    ("rankings", "/api/rankings"),
+    ("investor", "/api/investor/screening"),
+    ("investor", "/api/stocks/AAPL/investor-trend"),
+    ("short_sell", "/api/stocks/AAPL/short-sell"),
+]
+
+_ROUTERS_230 = {
+    "guru": guru_router,
+    "rankings": rankings_router,
+    "investor": investor_router,
+    "short_sell": short_sell_router,
+}
+
+
+@pytest.mark.parametrize("group,path", _READ_GATES_230, ids=[p for _, p in _READ_GATES_230])
+def test_read_endpoint_requires_auth_230(group, path):
+    assert _client(_ROUTERS_230[group]).get(path).status_code == 401
 
 
 def test_consume_refresh_token_is_one_time():

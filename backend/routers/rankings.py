@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from services import ranking_service, job_runs
-from auth import require_admin
+from auth import require_admin, get_current_user
 
 router = APIRouter(prefix="/api", tags=["rankings"])
 
@@ -51,6 +51,7 @@ def rankings(
     type: str = Query("all"),
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: str = Depends(get_current_user),
 ):
     if market not in _MARKETS:
         raise HTTPException(status_code=400, detail="market must be KR or US")

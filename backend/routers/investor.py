@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from services import investor_service, job_runs
-from auth import require_admin
+from auth import require_admin, get_current_user
 import scheduler
 
 router = APIRouter(prefix="/api", tags=["investor"])
@@ -47,6 +47,7 @@ def _serialize_trend(row: dict) -> dict:
 def investor_screening(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: str = Depends(get_current_user),
 ):
     try:
         rows = investor_service.read_screening(limit, offset)
@@ -68,7 +69,7 @@ def refresh_investor(background_tasks: BackgroundTasks, _: str = Depends(require
 
 
 @router.get("/stocks/{ticker}/investor-trend")
-def investor_trend(ticker: str, days: int = Query(252, ge=1, le=1000)):
+def investor_trend(ticker: str, days: int = Query(252, ge=1, le=1000), _: str = Depends(get_current_user)):
     try:
         rows = investor_service.read_series(ticker, days)
     except Exception as e:

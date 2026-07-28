@@ -1420,6 +1420,8 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 
 종목 공매도 추이 시계열 (KR 전용, 키움 ka10014 → `market_short_sell`). `base_date` 오름차순. 데이터 없으면 `items` 빈 배열.
 
+**Auth:** Bearer token 필요
+
 **Query**: `days` (기본 252, 1~1000)
 
 **Response `200`**
@@ -1459,7 +1461,7 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 
 KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매수, 외국인 보유비율, 종가) 시계열을 조회. `investor_service.read_series` 저장값을 반환한다.
 
-**Auth:** 불필요
+**Auth:** Bearer token 필요
 
 **Request** — query parameters
 
@@ -3031,6 +3033,8 @@ KOFIA 통계 API로 적재한 신용잔고·반대매매·시총 시계열(`mark
 
 dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 응답에 포함되지 않음(상세 엔드포인트 참조).
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 {
@@ -3053,6 +3057,8 @@ dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 
 
 특정 구루 매니저 1명의 전체 상세(보유 전 종목 `holdings` 포함). `GET /api/guru/managers`(목록)는 페이로드 절약을 위해 `holdings`를 벗겨 반환하므로, 전 종목이 필요하면 이 엔드포인트를 쓴다.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 {
@@ -3074,6 +3080,8 @@ dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 
 
 여러 구루가 보유한 종목을 보유자 수 기준으로 랭킹.
 
+**Auth:** Bearer token 필요
+
 **Response `200`** — `[{ "ticker": "AAPL", "count": 12 }, ...]`
 
 ---
@@ -3082,6 +3090,8 @@ dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 
 
 포트폴리오 내 순위 기반 가중치(1/rank) 합산 추천 점수.
 
+**Auth:** Bearer token 필요
+
 **Response `200`** — `[{ "ticker": "AAPL", "score": 5.23 }, ...]`
 
 ---
@@ -3089,6 +3099,8 @@ dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 
 ### `GET /api/guru/crawl/progress`
 
 구루 크롤링 진행 상황 조회.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -3381,7 +3393,7 @@ US 섹터 모멘텀 수동 갱신. 11개 섹터 ETF(XLK·XLF 등)의 yfinance �
 
 KR/US 시장 랭킹 조회. 배치가 사전계산해 `market_rankings` 테이블에 저장한 값을 읽는다 (요청 경로 라이브 호출 없음). 랭킹 탭이 거래대금·거래량·등락률 상위 종목을 카드 그리드로 표시할 때 사용. 무한스크롤용 `limit`/`offset` 지원.
 
-**Auth:** 불필요
+**Auth:** Bearer token 필요
 
 **Request**
 
@@ -3446,7 +3458,7 @@ KR/US 시장 랭킹 조회. 배치가 사전계산해 `market_rankings` 테이�
 
 KR 랭킹 universe 종목별 최신 수급(외국인/기관/개인 순매수 + 외국인 보유율)을 외국인 보유율 내림차순으로 조회. 수급 스크리닝 화면이 사용하며, `market_investor_trend` 테이블의 종목별 최신 `base_date` 행을 읽는다. 무한스크롤용 `limit`/`offset` 지원.
 
-**Auth:** 불필요
+**Auth:** Bearer token 필요
 
 **Request**
 

@@ -6,7 +6,7 @@ from services import job_runs
 from services.guru_scraper import scrape_all_managers
 from services.guru_stats import compute_popularity, compute_weighted
 from services.progress import ProgressTracker
-from auth import require_admin
+from auth import require_admin, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ _progress = ProgressTracker()
 
 
 @router.get("/managers")
-def get_managers():
+def get_managers(_: str = Depends(get_current_user)):
     data = storage.get_guru_managers()
     return {
         **data,
@@ -25,7 +25,7 @@ def get_managers():
 
 
 @router.get("/managers/{manager_id}")
-def get_manager_detail(manager_id: str):
+def get_manager_detail(manager_id: str, _: str = Depends(get_current_user)):
     data = storage.get_guru_managers()
     for m in data.get("managers", []):
         if m.get("id") == manager_id:
@@ -34,19 +34,19 @@ def get_manager_detail(manager_id: str):
 
 
 @router.get("/stats/popularity")
-def stats_popularity():
+def stats_popularity(_: str = Depends(get_current_user)):
     data = storage.get_guru_managers()
     return compute_popularity(data.get("managers", []))
 
 
 @router.get("/stats/weighted")
-def stats_weighted():
+def stats_weighted(_: str = Depends(get_current_user)):
     data = storage.get_guru_managers()
     return compute_weighted(data.get("managers", []))
 
 
 @router.get("/crawl/progress")
-def crawl_progress():
+def crawl_progress(_: str = Depends(get_current_user)):
     return _progress.get()
 
 
