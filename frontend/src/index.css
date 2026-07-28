@@ -1,6 +1,7 @@
 @import './styles/tokens.css';
 @import './styles/pc.css';
 @import './styles/mobile.css';
+@import './styles/guru.css';
 
 .recharts-wrapper,
 .recharts-wrapper *,

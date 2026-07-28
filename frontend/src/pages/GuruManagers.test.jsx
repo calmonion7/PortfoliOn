@@ -53,3 +53,27 @@ describe('GuruManagers 카드 클릭 (task#226 S5)', () => {
     expect(api.post).toHaveBeenCalledWith('/api/watchlist', { ticker: 'AAPL', name: 'Apple' })
   })
 })
+
+describe('GuruManagers 탑3 배지 흡수 (task#227 S1)', () => {
+  it('상위 3위 배지에 비중%·보유 구루 수가 title이 아니라 텍스트 노드로 노출', async () => {
+    mockApi()
+    render(<GuruManagers />)
+    await screen.findByText('Warren Buffett')
+    const meta = await screen.findByText('40% · 1명')
+    expect(meta.tagName).toBe('SPAN')
+    expect(meta.getAttribute('title')).toBeNull()
+  })
+})
+
+describe('GuruManagers 빈 상태 안내 문구 (task#227 S5)', () => {
+  it('실제 경로("설정 > 구루")를 안내하고 존재하지 않는 "크롤링 설정" 탭을 언급하지 않음', async () => {
+    mockApi({ stocks: [] })
+    api.get.mockImplementation((url) =>
+      url === '/api/guru/managers' ? Promise.resolve({ data: { last_updated: null, managers: [] } }) : Promise.resolve({ data: [] })
+    )
+    render(<GuruManagers />)
+    const empty = await screen.findByText(/데이터 없음/)
+    expect(empty.textContent).not.toMatch(/크롤링 설정/)
+    expect(empty.textContent).toMatch(/설정.*구루/)
+  })
+})

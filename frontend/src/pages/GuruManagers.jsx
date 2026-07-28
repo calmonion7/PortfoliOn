@@ -1,10 +1,22 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
 import { SketchEmpty } from '../components/sketches'
+
+// 티커별 보유 매니저 수 역인덱스 — Recommendations.jsx의 buildGuruCounts와 동일 방식(백엔드 호출 없이 이미 받은 managers blob만 사용)
+function buildGuruCounts(managers) {
+  const counts = {}
+  for (const m of (managers || [])) {
+    for (const h of (m.top10 || [])) {
+      const t = (h.ticker || '').toUpperCase()
+      if (t) counts[t] = (counts[t] || 0) + 1
+    }
+  }
+  return counts
+}
 
 function formatValue(val) {
   if (!val) return '-'
@@ -33,6 +45,7 @@ export default function GuruManagers() {
   const [sort, setSort]         = useState({ key: 'num_stocks', dir: 1 })
   const [query, setQuery]       = useState('')
   const [, setBadgeErr] = useState('')
+  const guruCounts = useMemo(() => buildGuruCounts(data.managers), [data.managers])
 
   const loadStockMap = useCallback(() => {
     api.get('/api/stocks').then(({ data }) => {
@@ -91,25 +104,25 @@ export default function GuruManagers() {
 
   if (loading) return <LoadingSpinner label="구루 운용역 불러오는 중입니다." />
   if (!data.managers.length) return (
-    <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
-      <p className="muted" style={{ fontSize: 14, margin: 0 }}>
-        데이터 없음 — "크롤링 설정" 탭에서 데이터를 가져오세요.
+    <div className="guru-empty">
+      <div className="sketch-draw"><SketchEmpty size={140} /></div>
+      <p className="muted">
+        데이터 없음 — 설정 &gt; 구루 탭의 "즉시 크롤링"에서 데이터를 가져오세요.
       </p>
     </div>
   )
 
   // ── 모바일 카드 뷰 ────────────────────────────────────────
   if (isMobile) return (
-    <div style={{ padding: '0 0 80px' }}>
+    <div className="guru-mobile">
       {data.last_updated && (
-        <p style={{ color: 'var(--text-faint)', fontSize: 11, padding: '0 20px 8px' }}>
+        <p className="guru-updated--mobile">
           마지막 갱신: {data.last_updated.slice(0, 10)}
         </p>
       )}
 
       {/* 검색 */}
-      <div style={{ padding: '0 20px 10px' }}>
+      <div className="guru-search-row--mobile">
         <input
           className="m-list-search"
           placeholder="매니저명 / 펌 / 티커 검색..."
@@ -119,12 +132,11 @@ export default function GuruManagers() {
       </div>
 
       {/* 정렬 칩 */}
-      <div className="filter-chips" style={{ padding: '0 20px 12px', overflowX: 'auto', flexWrap: 'nowrap' }}>
+      <div className="filter-chips guru-sort-row--mobile">
         {SORT_OPTIONS.map(opt => (
           <button
             key={opt.key}
             className={sort.key === opt.key ? 'is-active' : ''}
-            style={{ whiteSpace: 'nowrap' }}
             onClick={() => setSort(prev =>
               prev.key === opt.key ? { key: opt.key, dir: -prev.dir } : { key: opt.key, dir: opt.dir }
             )}
@@ -132,11 +144,11 @@ export default function GuruManagers() {
             {opt.label}{sort.key === opt.key ? (sort.dir === 1 ? ' ↑' : ' ↓') : ''}
           </button>
         ))}
-        {q && <span style={{ color: 'var(--text-3)', fontSize: 12, alignSelf: 'center', marginLeft: 4 }}>{sorted.length}/{data.managers.length}명</span>}
+        {q && <span className="guru-count--mobile">{sorted.length}/{data.managers.length}명</span>}
       </div>
 
       {/* 카드 목록 — .guru-card/.guru-h/.guru-avatar/.guru-stats(pc.css) 재사용, 데스크탑 카드와 동일 문법 */}
-      <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 20px' }}>
+      <div className="anim-stagger guru-list--mobile">
         {sorted.map((m, i) => (
           <div
             key={m.id}
@@ -145,20 +157,19 @@ export default function GuruManagers() {
             tabIndex={0}
             onClick={() => navigate(`/guru/${m.id}`)}
             onKeyDown={e => { if (e.key === 'Enter') navigate(`/guru/${m.id}`) }}
-            style={{ cursor: 'pointer' }}
           >
             {/* 헤더 */}
             <div className="guru-h">
               <div className="guru-avatar">{initials(m.name)}</div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <p className="guru-name serif" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className="guru-h-info">
+                <p className="guru-name serif">
                   {m.name.split(' - ')[0]}
                 </p>
-                <div className="guru-fund" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="guru-fund">
                   {m.firm || m.name}
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-faint)', flexShrink: 0 }}>
+              <div className="guru-rank">
                 #{i + 1}
               </div>
             </div>
@@ -175,24 +186,29 @@ export default function GuruManagers() {
               </div>
             </div>
 
-            {/* Top10 배지 */}
+            {/* Top10 배지 — 상위 3위는 비중%·보유 구루 수를 텍스트로 노출(구 '매니저별 탑3' 탭 흡수, task#227) */}
             {(m.top10 || []).length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              <div className="guru-badges">
                 {(m.top10 || []).map(h => {
                   const type = stockMap[h.ticker]
+                  const isTop3 = h.rank <= 3
                   return (
                     <span
                       key={h.rank}
                       onClick={e => { e.stopPropagation(); handleBadgeClick(h) }}
                       title={`#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`}
+                      className="guru-badge"
                       style={{
                         ...badgeStyle(h.ticker),
-                        borderRadius: 6, padding: '3px 8px',
-                        fontSize: 12, fontWeight: 600,
                         cursor: type === 'holding' ? 'default' : 'pointer',
                       }}
                     >
                       {h.ticker}
+                      {isTop3 && (
+                        <span className="guru-badge-meta">
+                          {h.weight_pct}% · {guruCounts[(h.ticker || '').toUpperCase()]}명
+                        </span>
+                      )}
                     </span>
                   )
                 })}
@@ -208,19 +224,19 @@ export default function GuruManagers() {
   return (
     <div>
       {data.last_updated && (
-        <p style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 8 }}>마지막 갱신: {data.last_updated.slice(0, 10)}</p>
+        <p className="guru-updated">마지막 갱신: {data.last_updated.slice(0, 10)}</p>
       )}
-      <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="guru-toolbar">
         <Input
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="매니저명 / 펌 / 티커 검색..."
-          style={{ width: 260 }}
+          className="guru-search--wide"
         />
         {query && (
-          <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{sorted.length} / {data.managers.length}명</span>
+          <span className="guru-count">{sorted.length} / {data.managers.length}명</span>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+        <div className="guru-sort-group">
           {SORT_OPTIONS.map(opt => (
             <button
               key={opt.key}
@@ -235,7 +251,7 @@ export default function GuruManagers() {
         </div>
       </div>
 
-      <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+      <div className="anim-stagger guru-grid">
         {sorted.map((m, i) => (
           <div
             key={m.id}
@@ -244,19 +260,18 @@ export default function GuruManagers() {
             tabIndex={0}
             onClick={() => navigate(`/guru/${m.id}`)}
             onKeyDown={e => { if (e.key === 'Enter') navigate(`/guru/${m.id}`) }}
-            style={{ cursor: 'pointer' }}
           >
             <div className="guru-h">
               <div className="guru-avatar">{initials(m.name)}</div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <p className="guru-name serif" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className="guru-h-info">
+                <p className="guru-name serif">
                   {m.name.split(' - ')[0]}
                 </p>
-                <div className="guru-fund" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="guru-fund">
                   {m.firm || m.name}
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-faint)', flexShrink: 0 }}>#{i + 1}</div>
+              <div className="guru-rank">#{i + 1}</div>
             </div>
 
             <div className="guru-stats">
@@ -271,9 +286,10 @@ export default function GuruManagers() {
             </div>
 
             {(m.top10 || []).length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              <div className="guru-badges">
                 {(m.top10 || []).map(h => {
                   const type = stockMap[h.ticker]
+                  const isTop3 = h.rank <= 3
                   const tooltip = `#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`
                     + (type === 'holding' ? '\n[보유중]' : type === 'watchlist' ? '\n[관심 — 클릭하여 삭제]' : '\n[클릭하여 관심종목 추가]')
                   return (
@@ -281,14 +297,18 @@ export default function GuruManagers() {
                       key={h.rank}
                       title={tooltip}
                       onClick={e => { e.stopPropagation(); handleBadgeClick(h) }}
+                      className="guru-badge"
                       style={{
                         ...badgeStyle(h.ticker),
-                        borderRadius: 6, padding: '3px 8px',
-                        fontSize: 11, fontWeight: 600,
                         cursor: type === 'holding' ? 'default' : 'pointer',
                       }}
                     >
                       {h.ticker}
+                      {isTop3 && (
+                        <span className="guru-badge-meta">
+                          {h.weight_pct}% · {guruCounts[(h.ticker || '').toUpperCase()]}명
+                        </span>
+                      )}
                     </span>
                   )
                 })}

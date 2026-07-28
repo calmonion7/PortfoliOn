@@ -118,10 +118,6 @@
   --cal-div-wl-color:  #1f6b48; --cal-div-wl-border:  #9dbfa0;
   --cal-hol-us-bg:    #f5e1d9; --cal-hol-us-color:   #9c3a26; --cal-hol-us-border: #d9a68f;
   --cal-hol-kr-bg:    #ece0ea; --cal-hol-kr-color:   #6b3f6f; --cal-hol-kr-border: #c7a8c9;
-
-  /* Decorative medal ranks (구루 탑3) — darker on light bg for AA 4.5:1 vs paper */
-  --medal-gold:   #7d5600;
-  --medal-bronze: #7d4a1e;
 }
 
 [data-theme="dark"] {
@@ -202,10 +198,6 @@
   --cal-div-wl-color:  #4fbf8f; --cal-div-wl-border:  #2a4a3a;
   --cal-hol-us-bg:    #2c1a14; --cal-hol-us-color:   #f0917a; --cal-hol-us-border: #4a2c22;
   --cal-hol-kr-bg:    #251c29; --cal-hol-kr-color:   #cd93cf; --cal-hol-kr-border: #3e2c40;
-
-  /* Decorative medal ranks (구루 탑3) — brighter on dark bg */
-  --medal-gold:   #d9a53f;
-  --medal-bronze: #c98a5b;
 }
 
 /* Base reset */

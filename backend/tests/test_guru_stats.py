@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from services.guru_stats import compute_popularity, compute_manager_top3, compute_weighted
+from services.guru_stats import compute_popularity, compute_weighted
 
 SAMPLE = [
     {
@@ -45,21 +45,6 @@ def test_compute_popularity_includes_name_fields():
     aapl = next(r for r in result if r["ticker"] == "AAPL")
     assert aapl["name"] == "Apple Inc."
     assert aapl["name_kr"] == "애플"
-
-
-def test_compute_manager_top3_returns_top3_per_manager():
-    result = compute_manager_top3(SAMPLE)
-    assert len(result) == 2
-    mgr_a = next(r for r in result if r["manager_name"] == "Manager A")
-    assert len(mgr_a["top3"]) == 3
-    assert mgr_a["top3"][0]["ticker"] == "AAPL"
-
-
-def test_compute_manager_top3_includes_global_count():
-    result = compute_manager_top3(SAMPLE)
-    mgr_a = next(r for r in result if r["manager_name"] == "Manager A")
-    aapl_entry = next(h for h in mgr_a["top3"] if h["ticker"] == "AAPL")
-    assert aapl_entry["count"] == 2
 
 
 def test_compute_weighted_inverse_rank():

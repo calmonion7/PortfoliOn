@@ -1,0 +1,79 @@
+/* ===== GURU — 매니저 카드·통계 리스트 (task#227 S4, ADR-0026 에디토리얼 톤) =====
+   GuruManagers.jsx / GuruStats.jsx의 인라인 style·isMobile 삼항을 이전.
+   isMobile 값은 미디어쿼리로, 데이터 의존 동적값(배지 색상·로딩 상태 등)은 컴포넌트에 인라인 유지.
+   브레이크포인트는 useIsMobile(768px)과 통일. */
+
+/* 빈 상태 (GuruManagers·GuruStats 공용) */
+.guru-empty { text-align: center; padding: 48px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.guru-empty .sketch-draw { color: var(--text-3); }
+.guru-empty p { font-size: 14px; margin: 0; }
+
+/* 검색/정렬 툴바 (데스크탑, GuruManagers+GuruStats 공용) */
+.guru-toolbar { margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.guru-updated { color: var(--text-3); font-size: 12px; margin-bottom: 8px; }
+.guru-count { color: var(--text-3); font-size: 12px; }
+.guru-sort-group { margin-left: auto; display: flex; gap: 6px; }
+.guru-search--wide { width: 260px; }
+.guru-search--flex { flex: 1; min-width: 0; }
+
+/* 매니저 카드 그리드 (데스크탑) */
+.guru-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.guru-card { cursor: pointer; }
+.guru-h-info { min-width: 0; flex: 1; }
+.guru-name, .guru-fund { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guru-rank { font-size: 11px; color: var(--text-faint); flex-shrink: 0; }
+
+/* Top10 배지 (매니저 카드) — 탑3은 비중%·보유 구루 수를 .guru-badge-meta로 흡수(task#227) */
+.guru-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.guru-badge { display: inline-flex; align-items: baseline; gap: 4px; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; }
+.guru-badge-meta { font-weight: 400; font-size: 9px; opacity: .85; }
+
+/* 매니저 카드 리스트 (모바일 — GuruManagers 전용 구조, pc.css .guru-card 계열 재사용) */
+.guru-mobile { padding: 0 0 80px; }
+.guru-updated--mobile { color: var(--text-faint); font-size: 11px; padding: 0 20px 8px; }
+.guru-search-row--mobile { padding: 0 20px 10px; }
+.guru-sort-row--mobile { padding: 0 20px 12px; overflow-x: auto; flex-wrap: nowrap; }
+.guru-sort-row--mobile > button { white-space: nowrap; }
+.guru-count--mobile { color: var(--text-3); font-size: 12px; align-self: center; margin-left: 4px; }
+.guru-list--mobile { display: flex; flex-direction: column; gap: 10px; padding: 0 20px; }
+
+@media (max-width: 768px) {
+  .guru-badge { font-size: 12px; }
+  .guru-badge-meta { font-size: 10px; }
+}
+
+/* ----- GuruStats (인기순/가중치 통합 카드) ----- */
+.guru-legend-desc { font-size: 12px; color: var(--text-3); margin: 0 0 8px; line-height: 1.5; }
+.guru-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.guru-legend-chip { font-size: 11px; color: var(--text-3); background: var(--bg-elev-2); padding: 2px 6px; border-radius: 3px; }
+
+.guru-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.guru-stat-row { display: flex; align-items: center; gap: 10px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.guru-stat-rank { font-size: 11px; color: var(--text-faint); font-weight: 600; min-width: 18px; flex-shrink: 0; }
+.guru-stat-main { flex: 1; min-width: 0; }
+.guru-stat-ticker { font-weight: 700; font-size: 14px; color: var(--accent); }
+.guru-stat-name { font-size: 11px; color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guru-stat-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.guru-stat-value { font-weight: 700; font-size: 13px; }
+
+@media (max-width: 768px) {
+  .guru-stat-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .guru-stat-row { gap: 12px; padding: 14px 14px; }
+  .guru-stat-rank { font-size: 14px; min-width: 24px; }
+  .guru-stat-ticker { font-size: 17px; }
+  .guru-stat-name { font-size: 13px; }
+  .guru-stat-side { gap: 6px; }
+  .guru-stat-value { font-size: 15px; }
+}
+
+/* WatchlistBtn (GuruStats.jsx export, GuruDetail.jsx 재사용 — task#226 보존) */
+.guru-wl { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.guru-wl-held { font-size: 11px; color: var(--text-3); padding: 3px 8px; }
+.guru-wl-btn { display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; border: none; font-size: 11px; padding: 3px 8px; min-width: 48px; transition: opacity .15s; }
+.guru-wl-spinner { width: 10px; height: 10px; border-width: 1.5px; }
+.guru-wl-err { font-size: 10px; color: var(--color-error); }
+
+@media (max-width: 768px) {
+  .guru-wl-held { font-size: 13px; }
+  .guru-wl-btn { font-size: 13px; padding: 10px 14px; min-width: 56px; min-height: 44px; }
+}

@@ -92,14 +92,6 @@ def test_stats_popularity():
     assert r.json()[0]["count"] == 1
 
 
-def test_stats_manager_top3():
-    with patch("routers.guru.storage.get_guru_managers", return_value=SAMPLE_DATA):
-        r = client.get("/api/guru/stats/manager-top3")
-    assert r.status_code == 200
-    assert r.json()[0]["manager_name"] == "Warren Buffett"
-    assert r.json()[0]["top3"][0]["ticker"] == "AAPL"
-
-
 def test_stats_weighted():
     with patch("routers.guru.storage.get_guru_managers", return_value=SAMPLE_DATA):
         r = client.get("/api/guru/stats/weighted")

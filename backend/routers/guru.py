@@ -4,7 +4,7 @@ from datetime import datetime
 from services import storage
 from services import job_runs
 from services.guru_scraper import scrape_all_managers
-from services.guru_stats import compute_popularity, compute_manager_top3, compute_weighted
+from services.guru_stats import compute_popularity, compute_weighted
 from services.progress import ProgressTracker
 from auth import require_admin
 
@@ -37,12 +37,6 @@ def get_manager_detail(manager_id: str):
 def stats_popularity():
     data = storage.get_guru_managers()
     return compute_popularity(data.get("managers", []))
-
-
-@router.get("/stats/manager-top3")
-def stats_manager_top3():
-    data = storage.get_guru_managers()
-    return compute_manager_top3(data.get("managers", []))
 
 
 @router.get("/stats/weighted")

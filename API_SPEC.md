@@ -3078,14 +3078,6 @@ dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 
 
 ---
 
-### `GET /api/guru/stats/manager-top3`
-
-각 구루의 포트폴리오 상위 3개 종목.
-
-**Response `200`** — `[{ "manager": "...", "top3": ["AAPL", "MSFT", "BRK.B"] }, ...]`
-
----
-
 ### `GET /api/guru/stats/weighted`
 
 포트폴리오 내 순위 기반 가중치(1/rank) 합산 추천 점수.

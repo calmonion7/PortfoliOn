@@ -2,19 +2,17 @@ import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
-import useIsMobile from '../hooks/useIsMobile'
 import { SketchEmpty } from '../components/sketches'
 import '../components/ui/Button.css'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 
 export function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
-  const isMobile = useIsMobile()
   const [loading, setLoading] = useState(false)
   const [errMsg, setErrMsg] = useState('')
   const entry = stockMap[ticker]
   if (entry === 'holding') {
-    return <span style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-3)', padding: '3px 8px' }}>보유중</span>
+    return <span className="guru-wl-held">보유중</span>
   }
   const inWatchlist = entry === 'watchlist'
 
@@ -31,33 +29,47 @@ export function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
   }
 
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+    <span className="guru-wl">
       <button
         onClick={handleClick}
         disabled={loading}
+        className="guru-wl-btn"
         style={{
-          fontSize: isMobile ? 13 : 11, padding: isMobile ? '10px 14px' : '3px 8px', borderRadius: 4, border: 'none',
           cursor: loading ? 'progress' : 'pointer',
           background: inWatchlist ? 'var(--surface-hover)' : 'var(--bg-elev-2)',
           color: inWatchlist ? 'var(--color-error)' : 'var(--color-success)',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          minWidth: isMobile ? 56 : 48, minHeight: isMobile ? 44 : undefined, opacity: loading ? 0.7 : 1, transition: 'opacity .15s',
+          opacity: loading ? 0.7 : 1,
         }}
       >
         {loading
-          ? <span className="btn__spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} aria-hidden />
+          ? <span className="btn__spinner guru-wl-spinner" aria-hidden />
           : (inWatchlist ? '★ 삭제' : '☆ 추가')
         }
       </button>
-      {errMsg && <span style={{ fontSize: 10, color: 'var(--color-error)' }}>{errMsg}</span>}
+      {errMsg && <span className="guru-wl-err">{errMsg}</span>}
     </span>
   )
 }
 
+// 인기순(count/명)·가중치(score/소수3자리) 뷰가 공유하는 행 카드 — 지표값·단위만 props로 받는다(task#227 S3).
+function StatRow({ index, row, value, unit, stockMap, onToggle }) {
+  return (
+    <div className="anim-fade-up guru-stat-row">
+      <span className="guru-stat-rank">{index + 1}</span>
+      <div className="guru-stat-main">
+        <div className="guru-stat-ticker">{row.ticker}</div>
+        <div className="guru-stat-name">{row.name_kr || row.name || '-'}</div>
+      </div>
+      <div className="guru-stat-side">
+        <span className="guru-stat-value">{value}{unit}</span>
+        <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={onToggle} />
+      </div>
+    </div>
+  )
+}
+
 export default function GuruStats({ view }) {
-  const isMobile = useIsMobile()
   const [popularity, setPopularity] = useState([])
-  const [top3, setTop3]             = useState([])
   const [weighted, setWeighted]     = useState([])
   const [stockMap, setStockMap]     = useState({})  // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]       = useState(true)
@@ -76,11 +88,9 @@ export default function GuruStats({ view }) {
   useEffect(() => {
     Promise.all([
       api.get('/api/guru/stats/popularity'),
-      api.get('/api/guru/stats/manager-top3'),
       api.get('/api/guru/stats/weighted'),
-    ]).then(([p, t, w]) => {
+    ]).then(([p, w]) => {
       setPopularity(p.data)
-      setTop3(t.data)
       setWeighted(w.data)
     }).finally(() => setLoading(false))
     loadStockMap()
@@ -96,145 +106,57 @@ export default function GuruStats({ view }) {
   }
 
   const q = query.trim().toLowerCase()
-
-  const filteredPopularity = q
-    ? popularity.filter(r => r.ticker.toLowerCase().includes(q) || (r.name_kr || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q))
-    : popularity
-
-  const filteredWeighted = q
-    ? weighted.filter(r => r.ticker.toLowerCase().includes(q) || (r.name_kr || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q))
-    : weighted
-
-  const filteredTop3 = q
-    ? top3.filter(m =>
-        m.manager_name.toLowerCase().includes(q) ||
-        m.top3.some(h => h && (h.ticker.toLowerCase().includes(q) || (h.name_kr || '').toLowerCase().includes(q)))
-      )
-    : top3
+  const matches = r => r.ticker.toLowerCase().includes(q) || (r.name_kr || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q)
+  const filteredPopularity = q ? popularity.filter(matches) : popularity
+  const filteredWeighted   = q ? weighted.filter(matches) : weighted
+  const rows = tab === 'popularity' ? filteredPopularity : filteredWeighted
 
   if (loading) return <LoadingSpinner label="구루 통계 불러오는 중입니다." />
   if (!popularity.length) return (
-    <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
-      <p className="muted" style={{ fontSize: 14, margin: 0 }}>데이터 없음 — 크롤링을 먼저 실행하세요.</p>
+    <div className="guru-empty">
+      <div className="sketch-draw"><SketchEmpty size={140} /></div>
+      <p className="muted">데이터 없음 — 크롤링을 먼저 실행하세요.</p>
     </div>
   )
 
   return (
     <div>
-      <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="guru-toolbar">
         <Input
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="티커 / 종목명 / 매니저명 검색..."
-          style={{ flex: 1, minWidth: 0 }}
+          className="guru-search--flex"
         />
-        {query && tab === 'popularity' && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredPopularity.length}개</span>}
-        {query && tab === 'weighted'   && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredWeighted.length}개</span>}
-        {query && tab === 'top3'       && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{filteredTop3.length}명</span>}
+        {query && <span className="guru-count">{rows.length}개</span>}
       </div>
 
-      {tab === 'popularity' && (
-        <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 8 }}>
-          {filteredPopularity.map((row, i) => (
-            <div key={row.ticker} className="anim-fade-up" style={{
-              display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 10,
-              background: 'var(--bg-elev)', border: '1px solid var(--border)',
-              borderRadius: 10, padding: isMobile ? '14px 14px' : '10px 12px',
-            }}>
-              <span style={{ fontSize: isMobile ? 14 : 11, color: 'var(--text-faint)', fontWeight: 600, minWidth: isMobile ? 24 : 18, flexShrink: 0 }}>{i + 1}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: isMobile ? 17 : 14, color: 'var(--accent)' }}>{row.ticker}</div>
-                <div style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name_kr || row.name || '-'}</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: isMobile ? 6 : 3, flexShrink: 0 }}>
-                <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 13 }}>{row.count}명</span>
-                <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={handleToggle} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === 'top3' && (
-        <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
-          {filteredTop3.map(m => (
-            <div key={m.manager_name} className="anim-fade-up" style={{
-              background: 'var(--bg-elev)', border: '1px solid var(--border)',
-              borderRadius: 12, overflow: 'hidden',
-            }}>
-              <div className="serif" style={{
-                padding: isMobile ? '12px 14px' : '8px 12px', borderBottom: '1px solid var(--border)',
-                fontWeight: 700, fontSize: isMobile ? 15 : 12, color: 'var(--text)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {m.manager_name}
-              </div>
-              <div>
-                {[0, 1, 2].map(i => {
-                  const h = m.top3[i]
-                  return (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 8,
-                      padding: isMobile ? '12px 14px' : '7px 12px',
-                      borderBottom: i < 2 ? '1px solid var(--border)' : 'none',
-                    }}>
-                      <span style={{
-                        minWidth: isMobile ? 28 : 22, fontSize: isMobile ? 13 : 11, fontWeight: 700,
-                        color: i === 0 ? 'var(--medal-gold)' : i === 1 ? 'var(--text-3)' : 'var(--medal-bronze)',
-                      }}>{i + 1}위</span>
-                      {h ? (
-                        <>
-                          <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 13, color: 'var(--accent)', minWidth: isMobile ? 56 : 48 }}>{h.ticker}</span>
-                          <span style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.name_kr || h.name || ''}</span>
-                          <span style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{h.count}명</span>
-                          <WatchlistBtn ticker={h.ticker} name={h.name_kr || h.name} stockMap={stockMap} onToggle={handleToggle} />
-                        </>
-                      ) : (
-                        <span style={{ color: 'var(--text-faint)', fontSize: isMobile ? 14 : 12 }}>-</span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {tab === 'weighted' && (
-        <div>
-          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px', lineHeight: 1.5 }}>
+        <>
+          <p className="guru-legend-desc">
             매니저 보유 순위가 높을수록 가중치가 큽니다 (보유 순위 역수 기준).
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+          <div className="guru-legend">
             {WEIGHT_LEGEND.map(({ rank, score }) => (
-              <span key={rank} style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg-elev-2)', padding: '2px 6px', borderRadius: 3 }}>
-                {rank}위={score}
-              </span>
+              <span key={rank} className="guru-legend-chip">{rank}위={score}</span>
             ))}
           </div>
-          <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 8 }}>
-            {filteredWeighted.map((row, i) => (
-              <div key={row.ticker} className="anim-fade-up" style={{
-                display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 10,
-                background: 'var(--bg-elev)', border: '1px solid var(--border)',
-                borderRadius: 10, padding: isMobile ? '14px 14px' : '10px 12px',
-              }}>
-                <span style={{ fontSize: isMobile ? 14 : 11, color: 'var(--text-faint)', fontWeight: 600, minWidth: isMobile ? 24 : 18, flexShrink: 0 }}>{i + 1}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: isMobile ? 17 : 14, color: 'var(--accent)' }}>{row.ticker}</div>
-                  <div style={{ fontSize: isMobile ? 13 : 11, color: 'var(--text-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name_kr || row.name || '-'}</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: isMobile ? 6 : 3, flexShrink: 0 }}>
-                  <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 13 }}>{row.score.toFixed(3)}</span>
-                  <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={handleToggle} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        </>
       )}
+
+      <div className="anim-stagger guru-stat-grid">
+        {rows.map((row, i) => (
+          <StatRow
+            key={row.ticker}
+            index={i}
+            row={row}
+            value={tab === 'popularity' ? row.count : row.score.toFixed(3)}
+            unit={tab === 'popularity' ? '명' : ''}
+            stockMap={stockMap}
+            onToggle={handleToggle}
+          />
+        ))}
+      </div>
     </div>
   )
 }
