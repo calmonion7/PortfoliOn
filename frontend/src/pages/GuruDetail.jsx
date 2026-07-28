@@ -137,7 +137,7 @@ export default function GuruDetail() {
       {/* eco: .kpi-row 기본은 4열(pc.css) — KPI 2개뿐이라 PC만 2열로 오버라이드.
           인라인은 미디어쿼리를 이기므로 모바일에선 걸지 않는다(App.css의 2열 규칙 유지 — 안 그러면 라벨이 2줄로 접힘).
           「상위 N종목 비중」은 도넛 중앙으로 이관 — 3장이면 모바일 2열에서 3번째가 홀로 2행이 됐다(task#235) */}
-      <div className="kpi-row" style={isMobile ? undefined : { gridTemplateColumns: 'repeat(2, 1fr)' }}>
+      <div className="kpi-row" style={isMobile ? undefined : { gridTemplateColumns: 'repeat(2, 1fr)', maxWidth: 720 }}>
         <div className="kpi">
           <div className="label">포트폴리오 규모</div>
           <div className="val">{formatValue(manager.portfolio_value)}</div>
