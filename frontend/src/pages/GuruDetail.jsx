@@ -86,7 +86,9 @@ export default function GuruDetail() {
 
   const body = (
     <>
-      <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      {/* eco: .kpi-row 기본은 4열(pc.css) — KPI 3개뿐이라 PC만 3열로 오버라이드.
+          인라인은 미디어쿼리를 이기므로 모바일에선 걸지 않는다(App.css의 2열 규칙 유지 — 안 그러면 라벨이 2줄로 접힘) */}
+      <div className="kpi-row" style={isMobile ? undefined : { gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="kpi">
           <div className="label">포트폴리오 규모</div>
           <div className="val">{formatValue(manager.portfolio_value)}</div>
