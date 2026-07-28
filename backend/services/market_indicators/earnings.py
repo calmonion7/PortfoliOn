@@ -2,12 +2,12 @@ from __future__ import annotations
 import os
 import re
 import json
-import time
 import requests
 import pandas as pd
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor
-from .cache import _mc_save, _cache, get_or_refresh, _BASE_DIR, _DATA_DIR
+from datetime import datetime, timezone
+from .cache import _mc_load, _mc_save, _cache, get_or_refresh, _BASE_DIR, _DATA_DIR
 from services.utils import today_kst
 import logging
 
@@ -22,8 +22,13 @@ _NAVER_BASE = "https://m.stock.naver.com/api/stock"
 
 M7 = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"]
 KR_TOP2 = ["005930", "000660"]
-_SP500_CACHE = os.path.join(_DATA_DIR, "sp500_tickers.json")
-_KOSPI_CACHE = os.path.join(_DATA_DIR, "kospi_tickers.json")
+# `backend/data/*.json`은 **read-only 정적 시드**다(CLAUDE.md "정적 참조 데이터만").
+# 7일 티커 캐시는 `market_cache` 테이블에 있다 — 시드 파일에 write하지 않는다.
+_SP500_SEED = os.path.join(_DATA_DIR, "sp500_tickers.json")
+_KOSPI_SEED = os.path.join(_DATA_DIR, "kospi_tickers.json")
+_SP500_KEY = "sp500_tickers"
+_KOSPI_KEY = "kospi_tickers"
+_TICKER_TTL_SEC = 86400 * 7
 
 
 def _quarter_ended(q: str) -> bool:
@@ -46,32 +51,86 @@ def _merge_quarters(results: list[dict[str, float]], n: int = 8, ended_only: boo
     return {q: round(total[q], 2) for q in quarters}
 
 
-def _get_sp500_tickers() -> list[str]:
-    if os.path.exists(_SP500_CACHE):
-        if time.time() - os.path.getmtime(_SP500_CACHE) < 86400 * 7:
-            with open(_SP500_CACHE) as f:
-                return json.load(f)
+def _stored_tickers(stored: dict | None) -> list[str]:
+    """`_mc_load` 결과에서 티커 목록만 꺼낸다(형태가 어긋나면 빈 목록)."""
+    data = (stored or {}).get("data") or {}
+    tickers = data.get("tickers") if isinstance(data, dict) else None
+    return tickers if isinstance(tickers, list) else []
+
+
+def _is_fresh(stored: dict | None) -> bool:
+    """저장값이 TTL(7일) 내인가 — 판정 기준은 `fetched_at`(timestamptz)이지 파일 mtime이 아니다.
+
+    파일 mtime 기준이던 옛 구현은 캐시를 덮어쓴 직후 mtime이 신선해져 7일간 조용해졌고,
+    그래서 시드 오염이 간헐 발생으로 보였다.
+    """
+    fetched_at = (stored or {}).get("fetched_at")
+    if fetched_at is None:
+        return False
+    try:
+        age = (datetime.now(timezone.utc) - fetched_at).total_seconds()
+    except TypeError:
+        # tz-naive·문자열 등 예상 밖 형태 → 신선하지 않은 것으로 취급해 재조회.
+        logger.warning(f"[Earnings] 티커 캐시 fetched_at 형태 이상: {fetched_at!r}")
+        return False
+    return 0 <= age < _TICKER_TTL_SEC
+
+
+def _read_seed(path: str) -> list[str]:
+    """저장소의 정적 시드를 **read-only**로 읽는다 — 이 경로에 write하는 코드는 없다."""
+    try:
+        with open(path) as f:
+            tickers = json.load(f)
+        return tickers if isinstance(tickers, list) else []
+    except (OSError, ValueError) as e:
+        logger.warning(f"[Earnings] 티커 시드 읽기 실패 path={path}: {e}")
+        return []
+
+
+def _tickers_with_cache(key: str, seed_path: str, scrape) -> list[str]:
+    """티커 목록 = market_cache(7일) → 스크레이프 → 만료된 저장값 → 정적 시드.
+
+    스크레이프 실패 시 `_mc_save`를 호출하지 않는다 — 빈/부분 목록을 박제하면 이후 7일간
+    그 목록으로 실적을 계산한다(CLAUDE.md "빈/실패 결과 캐시 박제 금지", wrong < missing).
+    """
+    stored = _mc_load(key)
+    if _is_fresh(stored):
+        fresh = _stored_tickers(stored)
+        if fresh:
+            return fresh
+    try:
+        tickers = scrape()
+    except Exception as e:
+        logger.warning(f"[Earnings] 티커 스크레이프 실패 key={key}: {e}")
+        tickers = []
+    if tickers:
+        _mc_save(key, {"tickers": tickers})
+        return tickers
+    stale = _stored_tickers(stored)
+    if stale:
+        logger.warning(f"[Earnings] 티커 스크레이프 실패 — 만료된 저장값 사용 key={key}")
+        return stale
+    return _read_seed(seed_path)
+
+
+def _scrape_sp500() -> list[str]:
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(r.text, "html.parser")
     table = soup.find("table", {"id": "constituents"})
-    tickers = [
+    return [
         row.find_all("td")[0].text.strip().replace(".", "-")
         for row in table.find_all("tr")[1:]
         if row.find_all("td")
     ]
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    with open(_SP500_CACHE, "w") as f:
-        json.dump(tickers, f)
-    return tickers
 
 
-def _get_kospi_tickers() -> list[str]:
-    if os.path.exists(_KOSPI_CACHE):
-        if time.time() - os.path.getmtime(_KOSPI_CACHE) < 86400 * 7:
-            with open(_KOSPI_CACHE) as f:
-                return json.load(f)
+def _get_sp500_tickers() -> list[str]:
+    return _tickers_with_cache(_SP500_KEY, _SP500_SEED, _scrape_sp500)
+
+
+def _scrape_kospi() -> list[str]:
     tickers: list[str] = []
     for page in range(1, 50):
         r = requests.get(
@@ -86,10 +145,11 @@ def _get_kospi_tickers() -> list[str]:
         if not codes:
             break
         tickers.extend(c for c in codes if c not in tickers)
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    with open(_KOSPI_CACHE, "w") as f:
-        json.dump(tickers, f)
     return tickers
+
+
+def _get_kospi_tickers() -> list[str]:
+    return _tickers_with_cache(_KOSPI_KEY, _KOSPI_SEED, _scrape_kospi)
 
 
 def _get_yf_quarterly_net_income(ticker: str) -> dict[str, float]:

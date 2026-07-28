@@ -64,40 +64,126 @@ def test_get_treasury_caches_result():
     assert call_count_1 == call_count_2  # second call hits cache, no new yf calls
 
 
-# ── _get_sp500_tickers ────────────────────────────────────────────────────────
+# ── 티커 캐시 = market_cache (task#234) ───────────────────────────────────────
+# `backend/data/*.json`은 **read-only 정적 시드**다 — 7일 캐시는 DB(`market_cache`)에 있고
+# 티커 조회는 시드 파일에 절대 write하지 않는다(CLAUDE.md "backend/data/는 정적 참조 데이터만").
+# 파일 write는 ① 추적 정적 데이터를 라이브 스크레이프 결과로 오염시키고 ② 컨테이너 FS라
+# 배포마다 리셋되며 ③ 덮어쓴 직후 mtime이 신선해져 7일간 증상을 숨겼다.
 
-def test_get_sp500_tickers_parses_wikipedia(tmp_path, monkeypatch):
+def _fresh(tickers: list[str]) -> dict:
+    """`_mc_load`가 주는 신선한 저장값 (fetched_at은 라이브와 동일하게 tz-aware datetime)."""
+    from datetime import datetime, timezone
+    return {"data": {"tickers": tickers}, "fetched_at": datetime.now(timezone.utc)}
+
+
+def _aged(tickers: list[str], days: int) -> dict:
+    from datetime import datetime, timedelta, timezone
+    return {"data": {"tickers": tickers},
+            "fetched_at": datetime.now(timezone.utc) - timedelta(days=days)}
+
+
+def _seed_state() -> dict:
+    """실제 시드 파일들의 (mtime, 바이트) — write 여부 판정용."""
+    from services.market_indicators import earnings
+    out = {}
+    for p in (earnings._SP500_SEED, earnings._KOSPI_SEED):
+        path = Path(p)
+        out[p] = (path.stat().st_mtime, path.read_bytes()) if path.exists() else None
+    return out
+
+
+_SP500_HTML = """
+<table id="constituents"><tbody>
+  <tr><th>Symbol</th></tr>
+  <tr><td>AAPL</td><td>Apple</td></tr>
+  <tr><td>BRK.B</td><td>Berkshire</td></tr>
+</tbody></table>
+"""
+
+
+def test_get_sp500_tickers_uses_db_cache():
+    """신선한 저장값이 있으면 스크레이프 0회."""
     from services.market_indicators.earnings import _get_sp500_tickers
-    monkeypatch.setattr(
-        "services.market_indicators.earnings._SP500_CACHE",
-        str(tmp_path / "sp500.json"),
-    )
-    fake_html = """
-    <table id="constituents"><tbody>
-      <tr><th>Symbol</th></tr>
-      <tr><td>AAPL</td><td>Apple</td></tr>
-      <tr><td>BRK.B</td><td>Berkshire</td></tr>
-    </tbody></table>
-    """
-    with patch("services.market_indicators.earnings.requests.get") as mock_get:
-        mock_get.return_value.text = fake_html
+    with patch("services.market_indicators.earnings._mc_load",
+               return_value=_fresh(["AAPL", "MSFT"])), \
+         patch("services.market_indicators.earnings.requests.get") as mock_get:
+        tickers = _get_sp500_tickers()
+        assert not mock_get.called
+    assert tickers == ["AAPL", "MSFT"]
+
+
+def test_get_sp500_tickers_expired_cache_rescrapes():
+    """TTL(7일) 초과 저장값은 신선하지 않다 — fetched_at 기준 판정(파일 mtime 아님)."""
+    from services.market_indicators.earnings import _get_sp500_tickers
+    with patch("services.market_indicators.earnings._mc_load",
+               return_value=_aged(["STALE"], days=8)), \
+         patch("services.market_indicators.earnings._mc_save"), \
+         patch("services.market_indicators.earnings.requests.get") as mock_get:
+        mock_get.return_value.text = _SP500_HTML
+        tickers = _get_sp500_tickers()
+    assert "AAPL" in tickers and "STALE" not in tickers
+
+
+def test_get_sp500_tickers_parses_wikipedia_and_saves_to_db():
+    """미스 시 스크레이프 후 market_cache에 `{"tickers": [...]}`로 저장."""
+    from services.market_indicators.earnings import _get_sp500_tickers
+    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._mc_save") as mock_save, \
+         patch("services.market_indicators.earnings.requests.get") as mock_get:
+        mock_get.return_value.text = _SP500_HTML
         tickers = _get_sp500_tickers()
     assert "AAPL" in tickers
     assert "BRK-B" in tickers  # dot converted to dash
+    mock_save.assert_called_once_with("sp500_tickers", {"tickers": tickers})
 
 
-def test_get_sp500_tickers_uses_file_cache(tmp_path, monkeypatch):
+def test_ticker_fetch_never_writes_seed_files():
+    """핵심 회귀 — 미스+스크레이프 경로가 `backend/data/*.json`을 수정하지 않는다."""
+    from services.market_indicators.earnings import _get_sp500_tickers, _get_kospi_tickers
+    before = _seed_state()
+
+    def kospi_get(url, **kwargs):
+        m = MagicMock()
+        m.content = b"code=005930" if "sise" in url else b""
+        return m
+
+    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._mc_save"), \
+         patch("services.market_indicators.earnings.requests.get") as mock_get:
+        mock_get.return_value.text = _SP500_HTML
+        _get_sp500_tickers()
+    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._mc_save"), \
+         patch("services.market_indicators.earnings.requests.get", side_effect=kospi_get):
+        _get_kospi_tickers()
+
+    assert _seed_state() == before, (
+        "티커 조회가 backend/data/ 시드 파일을 수정했다 — 시드는 read-only여야 한다")
+
+
+def test_get_sp500_tickers_scrape_failure_does_not_save():
+    """스크레이프 실패 시 빈 목록 박제 금지 — `_mc_save` 미호출 + 시드 폴백."""
     from services.market_indicators.earnings import _get_sp500_tickers
-    cache_file = tmp_path / "sp500.json"
-    cache_file.write_text('["AAPL", "MSFT"]')
-    import os as _os; _os.utime(cache_file, None)  # touch (recent mtime)
-    monkeypatch.setattr(
-        "services.market_indicators.earnings._SP500_CACHE", str(cache_file)
-    )
-    with patch("services.market_indicators.earnings.requests.get") as mock_get:
+    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._mc_save") as mock_save, \
+         patch("services.market_indicators.earnings.requests.get",
+               side_effect=RuntimeError("boom")):
         tickers = _get_sp500_tickers()
-        assert not mock_get.called  # should NOT hit network
-    assert tickers == ["AAPL", "MSFT"]
+    assert not mock_save.called
+    assert len(tickers) > 100  # 저장소 시드(S&P500 전체)로 폴백
+
+
+def test_get_sp500_tickers_scrape_failure_prefers_stale_over_seed():
+    """실패 시 만료된 직전 저장값이 있으면 그것을 쓴다(시드보다 최신)."""
+    from services.market_indicators.earnings import _get_sp500_tickers
+    with patch("services.market_indicators.earnings._mc_load",
+               return_value=_aged(["OLD1", "OLD2"], days=9)), \
+         patch("services.market_indicators.earnings._mc_save") as mock_save, \
+         patch("services.market_indicators.earnings.requests.get",
+               side_effect=RuntimeError("boom")):
+        tickers = _get_sp500_tickers()
+    assert not mock_save.called
+    assert tickers == ["OLD1", "OLD2"]
 
 
 # ── get_m7_earnings ───────────────────────────────────────────────────────────
@@ -136,12 +222,8 @@ def test_get_m7_earnings_rest_excludes_m7():
 
 # ── _get_kospi_tickers ────────────────────────────────────────────────────────
 
-def test_get_kospi200_tickers_parses_krx(tmp_path, monkeypatch):
+def test_get_kospi200_tickers_parses_krx_and_saves_to_db():
     from services.market_indicators.earnings import _get_kospi_tickers
-    monkeypatch.setattr(
-        "services.market_indicators.earnings._KOSPI_CACHE",
-        str(tmp_path / "kospi_tickers.json"),
-    )
     # current impl: GET requests to naver with regex code=([0-9]{6})
     call_count = [0]
     def mock_get(url, **kwargs):
@@ -152,24 +234,34 @@ def test_get_kospi200_tickers_parses_krx(tmp_path, monkeypatch):
             m.content = b""  # no codes → stop pagination
         call_count[0] += 1
         return m
-    with patch("services.market_indicators.earnings.requests.get", side_effect=mock_get):
+    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._mc_save") as mock_save, \
+         patch("services.market_indicators.earnings.requests.get", side_effect=mock_get):
         tickers = _get_kospi_tickers()
     assert "005930" in tickers
     assert "000660" in tickers
+    mock_save.assert_called_once_with("kospi_tickers", {"tickers": tickers})
 
 
-def test_get_kospi200_tickers_uses_file_cache(tmp_path, monkeypatch):
+def test_get_kospi200_tickers_uses_db_cache():
     from services.market_indicators.earnings import _get_kospi_tickers
-    cache_file = tmp_path / "kospi_tickers.json"
-    cache_file.write_text('["005930","000660","005380"]')
-    import os as _os; _os.utime(cache_file, None)
-    monkeypatch.setattr(
-        "services.market_indicators.earnings._KOSPI_CACHE", str(cache_file)
-    )
-    with patch("services.market_indicators.earnings.requests.get") as mock_get:
+    with patch("services.market_indicators.earnings._mc_load",
+               return_value=_fresh(["005930", "000660", "005380"])), \
+         patch("services.market_indicators.earnings.requests.get") as mock_get:
         tickers = _get_kospi_tickers()
         assert not mock_get.called
     assert "005380" in tickers
+
+
+def test_get_kospi_tickers_scrape_failure_does_not_save():
+    from services.market_indicators.earnings import _get_kospi_tickers
+    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+         patch("services.market_indicators.earnings._mc_save") as mock_save, \
+         patch("services.market_indicators.earnings.requests.get",
+               side_effect=RuntimeError("boom")):
+        tickers = _get_kospi_tickers()
+    assert not mock_save.called
+    assert len(tickers) > 100  # 저장소 시드(KOSPI 전체)로 폴백
 
 
 # ── _get_naver_quarterly_net_income ──────────────────────────────────────────
