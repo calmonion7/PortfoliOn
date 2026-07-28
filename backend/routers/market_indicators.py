@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Query
 from services.leverage_service import get_leverage_data, get_coverage, backfill_with_progress, _backfill_progress
 from services.lending_service import get_lending_data, fetch_and_store as lending_fetch_and_store
 from services import job_runs
-from auth import require_admin
+from auth import require_admin, get_current_user
 from services.market_indicators import (
     get_treasury,
     get_m7_earnings,
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/market", tags=["market"])
 
 
 @router.get("/treasury")
-def treasury():
+def treasury(_: str = Depends(get_current_user)):
     try:
         return get_treasury()
     except Exception as e:
@@ -39,7 +39,7 @@ def treasury():
 
 
 @router.get("/m7-earnings")
-def m7_earnings():
+def m7_earnings(_: str = Depends(get_current_user)):
     try:
         return get_m7_earnings()
     except Exception as e:
@@ -47,7 +47,7 @@ def m7_earnings():
 
 
 @router.get("/kr-top2-earnings")
-def kr_top2_earnings():
+def kr_top2_earnings(_: str = Depends(get_current_user)):
     try:
         return get_kr_top2_earnings()
     except Exception as e:
@@ -55,7 +55,7 @@ def kr_top2_earnings():
 
 
 @router.get("/kr-exports")
-def kr_exports():
+def kr_exports(_: str = Depends(get_current_user)):
     try:
         return get_kr_exports()
     except Exception as e:
@@ -63,7 +63,7 @@ def kr_exports():
 
 
 @router.get("/fx")
-def fx():
+def fx(_: str = Depends(get_current_user)):
     try:
         return get_fx()
     except Exception as e:
@@ -71,7 +71,7 @@ def fx():
 
 
 @router.get("/vix")
-def vix():
+def vix(_: str = Depends(get_current_user)):
     try:
         return get_vix()
     except Exception as e:
@@ -79,7 +79,7 @@ def vix():
 
 
 @router.get("/commodities")
-def commodities():
+def commodities(_: str = Depends(get_current_user)):
     try:
         return get_commodities()
     except Exception as e:
@@ -87,7 +87,7 @@ def commodities():
 
 
 @router.get("/econ-indicators")
-def econ_indicators():
+def econ_indicators(_: str = Depends(get_current_user)):
     try:
         return get_econ_indicators()
     except Exception as e:
@@ -95,7 +95,7 @@ def econ_indicators():
 
 
 @router.get("/indices")
-def indices():
+def indices(_: str = Depends(get_current_user)):
     try:
         return get_indices()
     except Exception as e:
@@ -103,7 +103,7 @@ def indices():
 
 
 @router.get("/kospi-futures")
-def kospi_futures():
+def kospi_futures(_: str = Depends(get_current_user)):
     try:
         return get_kospi_futures()
     except Exception as e:
@@ -111,7 +111,7 @@ def kospi_futures():
 
 
 @router.get("/fear-greed")
-def fear_greed():
+def fear_greed(_: str = Depends(get_current_user)):
     """CNN Fear & Greed 지수(US). 요청경로 증분(fx/vix 패턴), 배치 없음. CNN 실패 시 직전 저장값 graceful."""
     try:
         return get_fear_greed()
@@ -120,7 +120,7 @@ def fear_greed():
 
 
 @router.get("/macro-signals")
-def macro_signals():
+def macro_signals(_: str = Depends(get_current_user)):
     """FRED 매크로 신호(금리차·HY·M2·기준금리) 저장 시계열+신호. 요청경로 라이브 FRED 0."""
     try:
         return get_macro_signals()
@@ -141,7 +141,7 @@ def refresh_macro_signals(_: str = Depends(require_admin)):
 
 
 @router.get("/kospi-signal")
-def kospi_signal():
+def kospi_signal(_: str = Depends(get_current_user)):
     """다음날 코스피 방향 신호(오버나잇 프록시) 저장 시계열+최신. 요청경로 라이브 yfinance 0."""
     try:
         return get_kospi_signal()
@@ -208,7 +208,7 @@ def refresh_monthly(market: str = Query("US"), _: str = Depends(require_admin)):
 
 
 @router.get("/leverage")
-def leverage():
+def leverage(_: str = Depends(get_current_user)):
     try:
         return get_leverage_data()
     except Exception as e:
@@ -216,7 +216,7 @@ def leverage():
 
 
 @router.get("/leverage/coverage")
-def leverage_coverage():
+def leverage_coverage(_: str = Depends(get_current_user)):
     try:
         return get_coverage()
     except Exception as e:
@@ -238,13 +238,13 @@ def leverage_backfill(
 
 
 @router.get("/leverage/backfill/progress")
-def leverage_backfill_progress():
+def leverage_backfill_progress(_: str = Depends(get_current_user)):
     import services.leverage_service as svc
     return svc._backfill_progress
 
 
 @router.get("/lending")
-def lending():
+def lending(_: str = Depends(get_current_user)):
     try:
         return get_lending_data()
     except Exception as e:

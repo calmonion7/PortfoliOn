@@ -2483,6 +2483,8 @@ FOMC 정책결정일 하드코딩 목록(`calendar._FOMC_DATES`)의 커버리지
 
 미국 국채 금리 (2년, 10년). Supabase `market_cache`에서 읽고 없으면 yfinance 조회.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 { "us2y": 4.85, "us10y": 4.42 }
@@ -2493,6 +2495,8 @@ FOMC 정책결정일 하드코딩 목록(`calendar._FOMC_DATES`)의 커버리지
 ### `GET /api/market/fx`
 
 주요 환율 (yfinance).
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -2505,6 +2509,8 @@ FOMC 정책결정일 하드코딩 목록(`calendar._FOMC_DATES`)의 커버리지
 
 VIX 공포지수.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 { "value": 18.4, "label": "보통" }
@@ -2515,6 +2521,8 @@ VIX 공포지수.
 ### `GET /api/market/commodities`
 
 주요 원자재 가격.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -2527,6 +2535,8 @@ VIX 공포지수.
 
 경제지표 (FRED API). `FRED_API_KEY` 환경변수 필요.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 { "cpi_yoy": 3.2, "unemployment": 3.9 }
@@ -2538,6 +2548,8 @@ VIX 공포지수.
 
 M7 빅테크 최근 실적 요약.
 
+**Auth:** Bearer token 필요
+
 **Response `200`** — 종목 배열 (각 항목: ticker, eps_actual, eps_estimate, surprise_pct 등)
 
 ---
@@ -2545,6 +2557,8 @@ M7 빅테크 최근 실적 요약.
 ### `GET /api/market/kr-top2-earnings`
 
 삼성전자·SK하이닉스 최근 실적 요약.
+
+**Auth:** Bearer token 필요
 
 **Response `200`** — 종목 배열
 
@@ -2554,6 +2568,8 @@ M7 빅테크 최근 실적 요약.
 
 한국 수출 지표. `KITA_API_KEY`(관세청 API) 미설정 시 UN Comtrade 공개 API 폴백.
 
+**Auth:** Bearer token 필요
+
 **Response `200`** — 월별 수출 데이터 객체
 
 ---
@@ -2561,6 +2577,8 @@ M7 빅테크 최근 실적 요약.
 ### `GET /api/market/macro-signals`
 
 FRED 매크로 신호 4종 시계열 + 핵심 신호 플래그. `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 FRED 호출은 없다(데이터는 `macro_signals_fetch` 일배치/수동 refresh가 채운다). 저장값이 없으면 각 시리즈는 빈 배열, `signals`는 `{}`.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -2597,6 +2615,8 @@ FRED 매크로 신호 4종 시계열 + 핵심 신호 플래그. `market_cache`�
 
 글로벌 주요 지수(S&P 500·KOSPI·KOSDAQ) 최근 시계열 + S&P 500 Shiller CAPE 밸류에이션. `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 외부 호출은 없다(데이터는 `indices_fetch` 일배치가 채운다). 저장값이 없으면 `indices`는 `{}`, `valuation`은 `{}`.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 {
@@ -2632,6 +2652,8 @@ FRED 매크로 신호 4종 시계열 + 핵심 신호 플래그. `market_cache`�
 
 CNN 공포·탐욕 지수(Fear & Greed, US 전용, 비공식 엔드포인트). `market_cache`에 저장된 값을 요청경로 증분 갱신(fx/vix와 동일 패턴, `indices_fetch` 같은 배치 없음 — `batch_registry` 무등록). CNN이 봇차단(418 등)으로 실패하면 직전 저장값을 반환하고, 저장값도 없으면 `null`.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 {
@@ -2662,6 +2684,8 @@ CNN 공포·탐욕 지수(Fear & Greed, US 전용, 비공식 엔드포인트). `
 ### `GET /api/market/kospi-futures`
 
 코스피200 선물(최근월물, KIS) 현재가·등락률·베이시스 + 일봉 종가 시계열(~120봉). 요청경로 전체 윈도우 단발 조회(배치 없음, ADR-0022 — 최근월물 코드가 분기마다 바뀌어 증분/스티칭은 계약을 섞는다). KIS 미설정 시 dormant(빈 응답). fetch 실패 시 `market_cache` 직전 저장값을 반환(fx.py 수동 폴백 패턴 — `get_or_refresh`는 stale-fallback 안 함), 저장값도 없으면 `current: null`.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -2720,6 +2744,8 @@ FRED 매크로 신호 4종(`T10Y2Y`/`BAMLH0A0HYM2`/`M2SL`/`DFF`) 수동 재수�
 ### `GET /api/market/kospi-signal`
 
 다음날 코스피 방향 신호(오버나잇 프록시) 시계열 + 최신 신호 + 누적 적중률. `market_cache`(`kospi_signal`)에 저장된 값만 반환하며 요청 경로에서 라이브 yfinance 호출은 없다(데이터는 `kospi_signal_fetch` 평일 배치/수동 refresh가 채운다). 신호는 S&P500·나스닥·USD/KRW·필라델피아 반도체지수(SOX)의 가중 등락률 합성치(가중치 S&P500=2·나스닥=0.5·USD/KRW=−0.5(원화약세=비우호로 역방향 반영)·SOX=1, `composite=Σ(가중치×등락률)/Σ|가중치|`; 1년 백테스트로 채택된 구성, task#203)를 그날의 밴드(코스피 20일 실현변동성(σ)×0.5, 데이터 부족 시 고정 0.5%p 폴백)로 강세/중립/약세 판정하고, 다음 배치 실행 시 KOSPI 실제 시가·종가 데이터가 확보되는 대로 소급 채운다(고정 지연일수 없음). 저장값이 없으면 `current`는 `null`, `history`는 빈 배열.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -2882,7 +2908,7 @@ FX·VIX·국채·원자재 캐시 초기화 후 yfinance 1년치 재수집.
 
 금융위원회 공공데이터 API에서 적재한 내외국인 대차잔고(대여·차입) 시계열을 반환한다. `market_lending_balance` 테이블의 최근 36개월치를 날짜 오름차순으로 읽으며, 잔고 금액은 백만 단위(`/1_000_000`)로 환산된다. 수급지표 탭 `LendingSection`이 소비한다.
 
-**Auth:** 불필요
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -2927,7 +2953,7 @@ FX·VIX·국채·원자재 캐시 초기화 후 yfinance 1년치 재수집.
 
 KOFIA 통계 API로 적재한 신용잔고·반대매매·시총 시계열(`market_leverage_indicators`)을 읽어 과열/모멘텀 시그널을 계산해 반환한다. 시그널은 전체 기간 기준으로 계산하고, `history`는 최근 90일만 반환한다(신용잔고는 조 원, 미수금·고객예탁금은 억 원 단위 환산). 수급지표 탭 `LeverageSection`이 소비한다.
 
-**Auth:** 불필요
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -2969,7 +2995,7 @@ KOFIA 통계 API로 적재한 신용잔고·반대매매·시총 시계열(`mark
 
 `market_leverage_indicators`에 적재된 레버리지 데이터의 현황(총 건수, 최소/최대 날짜, 연도별 분포)을 반환한다. 백필 진행 UI(`LeverageBackfillSettings`)가 적재 범위를 표시하는 데 쓴다.
 
-**Auth:** 불필요
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -2990,7 +3016,7 @@ KOFIA 통계 API로 적재한 신용잔고·반대매매·시총 시계열(`mark
 
 진행 중(또는 직전)인 레버리지 백필 작업의 진행상황을 반환한다. 백그라운드 백필 태스크가 갱신하는 인메모리 진행 상태(`_backfill_progress`)를 그대로 노출한다.
 
-**Auth:** 불필요
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json

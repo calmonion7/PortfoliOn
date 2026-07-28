@@ -78,6 +78,37 @@ def test_read_endpoint_requires_auth_230(group, path):
     assert _client(_ROUTERS_230[group]).get(path).status_code == 401
 
 
+# task#231(ADR-0029) — 시장지표 read 17개는 무인증 접근이 401이어야 한다.
+# 경로는 전부 단일 prefix `/api/market` 아래다(라우터 열거로 확정 — `/api/market-indicators`는 존재하지 않는다).
+_READ_GATES_231 = [
+    "/api/market/treasury",
+    "/api/market/m7-earnings",
+    "/api/market/kr-top2-earnings",
+    "/api/market/kr-exports",
+    "/api/market/fx",
+    "/api/market/vix",
+    "/api/market/commodities",
+    "/api/market/econ-indicators",
+    "/api/market/indices",
+    "/api/market/kospi-futures",
+    "/api/market/fear-greed",
+    "/api/market/macro-signals",
+    "/api/market/kospi-signal",
+    "/api/market/leverage",
+    "/api/market/leverage/coverage",
+    "/api/market/leverage/backfill/progress",
+    "/api/market/lending",
+]
+
+
+@pytest.mark.parametrize("path", _READ_GATES_231)
+def test_market_read_requires_auth_231(path):
+    r = _client(mi_router).get(path)
+    # 404를 401로 오인하지 않도록 경로 존재를 함께 못박는다(오타·prefix 혼동 방어).
+    assert r.status_code != 404, f"경로가 존재하지 않는다: {path}"
+    assert r.status_code == 401
+
+
 def test_consume_refresh_token_is_one_time():
     """refresh token은 사용 즉시 폐기(회전)되어 재사용 시 거부된다."""
     from services import auth_service
