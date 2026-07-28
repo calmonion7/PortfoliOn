@@ -186,12 +186,11 @@ export default function GuruManagers() {
               </div>
             </div>
 
-            {/* Top10 배지 — 상위 3위는 비중%·보유 구루 수를 텍스트로 노출(구 '매니저별 탑3' 탭 흡수, task#227) */}
+            {/* Top10 배지 — 각 배지가 비중%·보유 구루 수를 텍스트로 노출(구 '매니저별 탑3' 탭 흡수 + 툴팁 의존 제거, task#227) */}
             {(m.top10 || []).length > 0 && (
               <div className="guru-badges">
                 {(m.top10 || []).map(h => {
                   const type = stockMap[h.ticker]
-                  const isTop3 = h.rank <= 3
                   return (
                     <span
                       key={h.rank}
@@ -204,11 +203,9 @@ export default function GuruManagers() {
                       }}
                     >
                       {h.ticker}
-                      {isTop3 && (
-                        <span className="guru-badge-meta">
-                          {h.weight_pct}% · {guruCounts[(h.ticker || '').toUpperCase()]}명
-                        </span>
-                      )}
+                      <span className="guru-badge-meta">
+                        {h.weight_pct}% · {guruCounts[(h.ticker || '').toUpperCase()] ?? 1}명
+                      </span>
                     </span>
                   )
                 })}
@@ -289,7 +286,6 @@ export default function GuruManagers() {
               <div className="guru-badges">
                 {(m.top10 || []).map(h => {
                   const type = stockMap[h.ticker]
-                  const isTop3 = h.rank <= 3
                   const tooltip = `#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`
                     + (type === 'holding' ? '\n[보유중]' : type === 'watchlist' ? '\n[관심 — 클릭하여 삭제]' : '\n[클릭하여 관심종목 추가]')
                   return (
@@ -304,11 +300,9 @@ export default function GuruManagers() {
                       }}
                     >
                       {h.ticker}
-                      {isTop3 && (
-                        <span className="guru-badge-meta">
-                          {h.weight_pct}% · {guruCounts[(h.ticker || '').toUpperCase()]}명
-                        </span>
-                      )}
+                      <span className="guru-badge-meta">
+                        {h.weight_pct}% · {guruCounts[(h.ticker || '').toUpperCase()] ?? 1}명
+                      </span>
                     </span>
                   )
                 })}
