@@ -13,24 +13,36 @@ import { WatchlistBtn } from './GuruStats'
 const DONUT_COLORS = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)']
 const DEFAULT_ROWS = 20
 const PAD_ANGLE = 2
-const LABEL_CHAR_W = 6.2   // 10px 볼드 라틴 문자 1자의 대략 폭
+const LABEL_LATIN_W = 6.2   // 10px 볼드 라틴 1자
+const LABEL_CJK_W = 10      // 한글·한자는 전각이라 라틴의 ~1.6배 (라틴 기준으로 재면 폭을 14% 과소평가한다)
+const LABEL_PCT_W = 30      // 2번째 줄 "00.0%"(9px)
+const LABEL_H = 22          // 2줄 라벨 실측 높이
 
-// 조각 위 라벨은 "그 조각이 라벨을 담을 만큼 클 때만" 그린다 — 호 길이를 직접 재서 판정한다(task#235).
+const isWide = (ch) => /[ᄀ-ᇿ⺀-鿿가-힯＀-￯]/.test(ch)
+const textWidth = (s) => [...(s || '')].reduce((w, ch) => w + (isWide(ch) ? LABEL_CJK_W : LABEL_LATIN_W), 0)
+
+// 조각 위 라벨은 "그 조각이 라벨을 담을 만큼 클 때만" 그린다 — 실측 기하로 판정한다(task#235).
 // 고정 임계값(8% 등)은 도넛 크기를 바꾸는 순간 틀려서 라벨이 조각 밖으로 삐져나온다.
+// 두 방향을 모두 봐야 한다: ① 접선 = 조각의 호 길이 ≥ 라벨 폭 ② 반경 = 라벨 박스의 *모서리*까지
+// 밴드 안(중심 반지름만 보면 가로로 긴 라벨이 밴드를 뚫는 걸 놓친다 — '기타 19종목'이 실제로 그랬다).
 export function fitsSliceLabel({ percent, innerRadius, outerRadius, ticker, paddingAngle = PAD_ANGLE }) {
+  const inner = innerRadius || 0
+  const outer = outerRadius || 0
   const span = Math.max(0, (percent || 0) * 360 - paddingAngle)
-  const midR = ((innerRadius || 0) + (outerRadius || 0)) / 2
+  const midR = (inner + outer) / 2
   const arc = 2 * Math.PI * midR * (span / 360)
-  const labelW = Math.max((ticker || '').length * LABEL_CHAR_W, 30) + 8   // 2줄이므로 티커·"00.0%" 중 넓은 쪽
-  return arc >= labelW && (outerRadius || 0) - (innerRadius || 0) >= 26   // 2줄이 들어갈 밴드 두께
+  const labelW = Math.max(textWidth(ticker), LABEL_PCT_W)
+  const halfDiag = Math.hypot(labelW, LABEL_H) / 2      // 회전에 무관한 보수적 외접 반지름
+  return arc >= labelW + 8 && midR - halfDiag >= inner && midR + halfDiag <= outer
 }
 
 // 라벨 색은 var(--bg) — 라이트는 크림이 어두운 데이터색 위에, 다크는 잉크가 밝은 데이터색 위에
 // 얹혀 양 테마 자동 대응(대비 5.23~8.27:1).
 function renderSliceLabel(p) {
   const { cx, cy, midAngle, innerRadius, outerRadius, percent } = p
-  const name = p.name ?? p.payload?.name ?? ''
   const value = p.value ?? p.payload?.value ?? 0
+  // 조각 위에는 짧은 표기를 쓴다 — '기타 19종목'은 50px로 밴드를 뚫는다(종목 수는 툴팁·아래 목록에 있다)
+  const name = p.payload?.short ?? p.name ?? p.payload?.name ?? ''
   if (!fitsSliceLabel({ percent, innerRadius, outerRadius, ticker: name })) return null
   const rad = -midAngle * Math.PI / 180
   const r = (innerRadius + outerRadius) / 2
@@ -109,7 +121,7 @@ export default function GuruDetail() {
 
   const donutData = [
     ...top10.map(h => ({ name: h.ticker, value: h.weight_pct || 0 })),
-    ...(otherCount > 0 ? [{ name: `기타 ${otherCount}종목`, value: otherPct, isOther: true }] : []),
+    ...(otherCount > 0 ? [{ name: `기타 ${otherCount}종목`, short: '기타', value: otherPct, isOther: true }] : []),
   ]
 
   // holdings에는 name_kr이 없다(꼬리 종목 한글명 조회는 Non-goal) — 상위 10종목은 top10에 이미

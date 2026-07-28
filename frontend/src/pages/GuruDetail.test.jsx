@@ -116,6 +116,19 @@ describe('fitsSliceLabel — 조각 위 라벨 기하 판정 (task#235 S2)', () 
     expect(fitsSliceLabel({ ...G, percent: 0.07, ticker: '기타 35종목' })).toBe(false)
   })
 
+  it('한글은 전각이라 라틴 기준으로 재면 안 된다 — 같은 글자수라도 더 넓다', () => {
+    // 라틴 6자는 들어가지만 한글 6자는 밴드를 뚫는다(라이브에서 '기타 19종목' 라벨이 minR 80·maxR 135로
+    // 밴드 84~130을 양쪽 다 넘긴 실측 사례 — 폭 추정이 6.2px/자였던 탓)
+    expect(fitsSliceLabel({ ...G, percent: 0.3, ticker: 'ABCDEF' })).toBe(true)
+    expect(fitsSliceLabel({ ...G, percent: 0.3, ticker: '가나다라마바' })).toBe(false)
+  })
+
+  it('조각이 아무리 커도 가로로 긴 라벨은 밴드를 뚫으므로 그리지 않는다', () => {
+    // 호 길이(접선)만 보면 통과하지만 라벨 박스 모서리가 밴드 밖으로 나간다
+    expect(fitsSliceLabel({ ...G, percent: 1, ticker: '기타 146종목' })).toBe(false)
+    expect(fitsSliceLabel({ ...G, percent: 1, ticker: '기타' })).toBe(true)
+  })
+
   it('밴드가 얇으면(2줄 불가) 조각이 커도 그리지 않는다', () => {
     expect(fitsSliceLabel({ innerRadius: 100, outerRadius: 120, percent: 0.5, ticker: 'KO' })).toBe(false)
   })
