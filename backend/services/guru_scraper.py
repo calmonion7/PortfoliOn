@@ -1,6 +1,7 @@
 import logging
 import requests
 from bs4 import BeautifulSoup
+from typing import Optional
 import time
 
 logger = logging.getLogger(__name__)
@@ -69,8 +70,29 @@ def scrape_manager_ids() -> list[dict]:
     return managers
 
 
+def _parse_stock_row(cells) -> Optional[dict]:
+    """grid 행(td 리스트)에서 ticker/name/weight_pct 추출.
+
+    cells[1] 형식: "AAPL- Apple Inc." — 헤더 행(Stock)은 대시가 없으므로 제외.
+    ticker 없으면 None.
+    """
+    raw = cells[1].get_text(strip=True)
+    if "-" not in raw:
+        return None  # 헤더 행 스킵
+    parts = raw.split("-", 1)
+    ticker = parts[0].strip().upper()
+    if not ticker:
+        return None
+    name = parts[1].strip() if len(parts) > 1 else ""
+    try:
+        weight_pct = float(cells[2].get_text(strip=True).replace("%", "").strip())
+    except ValueError:
+        weight_pct = 0.0
+    return {"ticker": ticker, "name": name, "weight_pct": weight_pct}
+
+
 def scrape_holdings(manager_id: str) -> dict:
-    """holdings.php?m={id} 에서 firm, portfolio_value, num_stocks, top10 추출.
+    """holdings.php?m={id} 에서 firm, portfolio_value, num_stocks, top10, holdings 추출.
 
     dataroma HTML 구조에 따라 CSS 선택자 조정이 필요할 수 있음.
     - 매니저 헤더: div#port_header
@@ -95,39 +117,27 @@ def scrape_holdings(manager_id: str) -> dict:
                 portfolio_value = _parse_portfolio_value(text)
                 break
 
-    top10 = []
-    num_stocks = 0
+    holdings = []
     table = soup.select_one("table#grid")
     if table:
-        # cells[1] 형식: "AAPL- Apple Inc." — 헤더 행(Stock)은 대시가 없으므로 제외
-        data_rows = []
         for row in table.select("tr"):
             cells = row.select("td")
             if len(cells) < 3:
                 continue
-            raw = cells[1].get_text(strip=True)
-            if "-" not in raw:
-                continue  # 헤더 행 스킵
-            data_rows.append((cells, raw))
-        num_stocks = len(data_rows)
-        for cells, raw in data_rows[:10]:
-            parts = raw.split("-", 1)
-            ticker = parts[0].strip().upper()
-            name = parts[1].strip() if len(parts) > 1 else ""
-            try:
-                weight_pct = float(cells[2].get_text(strip=True).replace("%", "").strip())
-            except ValueError:
-                weight_pct = 0.0
-            if ticker:
-                top10.append({
-                    "rank": len(top10) + 1,
-                    "ticker": ticker,
-                    "name": name,
-                    "name_kr": "",
-                    "weight_pct": weight_pct,
-                })
+            parsed = _parse_stock_row(cells)
+            if parsed is None:
+                continue
+            holdings.append({"rank": len(holdings) + 1, **parsed})
 
-    return {"firm": firm, "portfolio_value": portfolio_value, "num_stocks": num_stocks, "top10": top10}
+    top10 = [{**h, "name_kr": ""} for h in holdings[:10]]
+
+    return {
+        "firm": firm,
+        "portfolio_value": portfolio_value,
+        "num_stocks": len(holdings),
+        "top10": top10,
+        "holdings": holdings,
+    }
 
 
 def scrape_all_managers(on_progress=None) -> list[dict]:
@@ -155,6 +165,7 @@ def scrape_all_managers(on_progress=None) -> list[dict]:
                 "portfolio_value": details["portfolio_value"],
                 "num_stocks": details["num_stocks"],
                 "top10": details["top10"],
+                "holdings": details["holdings"],
             })
         except Exception as e:
             logger.warning(f"[Guru] Failed for {m['name']}: {e}")

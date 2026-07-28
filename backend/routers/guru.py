@@ -17,7 +17,20 @@ _progress = ProgressTracker()
 
 @router.get("/managers")
 def get_managers():
-    return storage.get_guru_managers()
+    data = storage.get_guru_managers()
+    return {
+        **data,
+        "managers": [{k: v for k, v in m.items() if k != "holdings"} for m in data.get("managers", [])],
+    }
+
+
+@router.get("/managers/{manager_id}")
+def get_manager_detail(manager_id: str):
+    data = storage.get_guru_managers()
+    for m in data.get("managers", []):
+        if m.get("id") == manager_id:
+            return m
+    raise HTTPException(status_code=404, detail="Manager not found")
 
 
 @router.get("/stats/popularity")

@@ -15,6 +15,7 @@ import MarketHub from './pages/MarketHub'
 import AnalystReport from './pages/AnalystReport'
 import AnalystReports from './pages/AnalystReports'
 import Guru from './pages/Guru'
+import GuruDetail from './pages/GuruDetail'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
 import LoginPage from './pages/LoginPage'
@@ -95,6 +96,7 @@ function AppShell({ theme, setTheme, setSession }) {
               <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
               <Route path="/market/flow" element={<MarketHub tab="flow" />} />
               <Route path="/guru" element={<Guru />} />
+              <Route path="/guru/:id" element={<GuruDetail />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/admin-analytics" element={<AdminAnalytics />} />
               <Route path="/dev/showcase" element={<Showcase />} />

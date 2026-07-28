@@ -38,6 +38,11 @@ SAMPLE_DATA = {
                 {"rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "name_kr": "애플", "weight_pct": 42.1},
                 {"rank": 2, "ticker": "BAC",  "name": "Bank of America", "name_kr": "", "weight_pct": 10.3},
             ],
+            "holdings": [
+                {"rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "weight_pct": 42.1},
+                {"rank": 2, "ticker": "BAC", "name": "Bank of America", "weight_pct": 10.3},
+                {"rank": 3, "ticker": "KO", "name": "Coca-Cola", "weight_pct": 8.0},
+            ],
         }
     ],
 }
@@ -47,7 +52,29 @@ def test_get_managers_returns_stored_data():
     with patch("routers.guru.storage.get_guru_managers", return_value=SAMPLE_DATA):
         r = client.get("/api/guru/managers")
     assert r.status_code == 200
-    assert r.json()["managers"][0]["name"] == "Warren Buffett"
+    body = r.json()
+    assert body["managers"][0]["name"] == "Warren Buffett"
+    # holdings 는 목록 응답에서 벗겨짐
+    assert "holdings" not in body["managers"][0]
+    # top10 은 그대로
+    assert body["managers"][0]["top10"] == SAMPLE_DATA["managers"][0]["top10"]
+    # 저장 데이터 자체는 mutate 되지 않음
+    assert "holdings" in SAMPLE_DATA["managers"][0]
+
+
+def test_get_manager_detail_includes_holdings():
+    with patch("routers.guru.storage.get_guru_managers", return_value=SAMPLE_DATA):
+        r = client.get("/api/guru/managers/brk")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == "brk"
+    assert body["holdings"] == SAMPLE_DATA["managers"][0]["holdings"]
+
+
+def test_get_manager_detail_404_for_unknown_id():
+    with patch("routers.guru.storage.get_guru_managers", return_value=SAMPLE_DATA):
+        r = client.get("/api/guru/managers/unknown")
+    assert r.status_code == 404
 
 
 def test_get_managers_returns_empty_default():

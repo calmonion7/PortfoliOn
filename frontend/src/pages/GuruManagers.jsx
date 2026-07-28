@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
@@ -25,6 +26,7 @@ function initials(name) {
 
 export default function GuruManagers() {
   const isMobile = useIsMobile()
+  const navigate = useNavigate()
   const [data, setData]         = useState({ last_updated: null, managers: [] })
   const [stockMap, setStockMap] = useState({})
   const [loading, setLoading]   = useState(true)
@@ -136,7 +138,15 @@ export default function GuruManagers() {
       {/* 카드 목록 — .guru-card/.guru-h/.guru-avatar/.guru-stats(pc.css) 재사용, 데스크탑 카드와 동일 문법 */}
       <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 20px' }}>
         {sorted.map((m, i) => (
-          <div key={m.id} className="guru-card anim-fade-up">
+          <div
+            key={m.id}
+            className="guru-card anim-fade-up"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/guru/${m.id}`)}
+            onKeyDown={e => { if (e.key === 'Enter') navigate(`/guru/${m.id}`) }}
+            style={{ cursor: 'pointer' }}
+          >
             {/* 헤더 */}
             <div className="guru-h">
               <div className="guru-avatar">{initials(m.name)}</div>
@@ -173,7 +183,7 @@ export default function GuruManagers() {
                   return (
                     <span
                       key={h.rank}
-                      onClick={() => handleBadgeClick(h)}
+                      onClick={e => { e.stopPropagation(); handleBadgeClick(h) }}
                       title={`#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`}
                       style={{
                         ...badgeStyle(h.ticker),
@@ -227,7 +237,15 @@ export default function GuruManagers() {
 
       <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
         {sorted.map((m, i) => (
-          <div key={m.id} className="guru-card anim-fade-up">
+          <div
+            key={m.id}
+            className="guru-card anim-fade-up"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/guru/${m.id}`)}
+            onKeyDown={e => { if (e.key === 'Enter') navigate(`/guru/${m.id}`) }}
+            style={{ cursor: 'pointer' }}
+          >
             <div className="guru-h">
               <div className="guru-avatar">{initials(m.name)}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
@@ -262,7 +280,7 @@ export default function GuruManagers() {
                     <span
                       key={h.rank}
                       title={tooltip}
-                      onClick={() => handleBadgeClick(h)}
+                      onClick={e => { e.stopPropagation(); handleBadgeClick(h) }}
                       style={{
                         ...badgeStyle(h.ticker),
                         borderRadius: 6, padding: '3px 8px',

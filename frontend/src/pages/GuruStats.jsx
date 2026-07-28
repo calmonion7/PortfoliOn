@@ -8,7 +8,7 @@ import '../components/ui/Button.css'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 
-function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
+export function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
   const isMobile = useIsMobile()
   const [loading, setLoading] = useState(false)
   const [errMsg, setErrMsg] = useState('')

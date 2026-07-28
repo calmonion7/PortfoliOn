@@ -3029,7 +3029,7 @@ KOFIA 통계 API로 적재한 신용잔고·반대매매·시총 시계열(`mark
 
 ### `GET /api/guru/managers`
 
-dataroma 기반 구루 매니저 전체 목록.
+dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 응답에 포함되지 않음(상세 엔드포인트 참조).
 
 **Response `200`**
 ```json
@@ -3046,6 +3046,27 @@ dataroma 기반 구루 매니저 전체 목록.
   ]
 }
 ```
+
+---
+
+### `GET /api/guru/managers/{manager_id}`
+
+특정 구루 매니저 1명의 전체 상세(보유 전 종목 `holdings` 포함). `GET /api/guru/managers`(목록)는 페이로드 절약을 위해 `holdings`를 벗겨 반환하므로, 전 종목이 필요하면 이 엔드포인트를 쓴다.
+
+**Response `200`**
+```json
+{
+  "id": "brk",
+  "name": "Warren Buffett",
+  "firm": "Berkshire Hathaway",
+  "portfolio_value": 350000000000,
+  "num_stocks": 45,
+  "top10": [{ "rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "name_kr": "애플", "weight_pct": 42.1 }],
+  "holdings": [{ "rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "weight_pct": 42.1 }]
+}
+```
+
+없는 `manager_id`는 `404`.
 
 ---
 
