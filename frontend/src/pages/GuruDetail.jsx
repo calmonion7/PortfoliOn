@@ -204,6 +204,8 @@ export default function GuruDetail() {
         {manager.firm && <p className="muted" style={{ fontSize: 13, margin: '4px 0 14px' }}>{manager.firm}</p>}
         {body}
       </div>
+      {/* 목록 복귀 — 좌하단 플로팅 pill(task#228). fixed이므로 조상에 transform 금지(task#195) */}
+      <Link to="/guru" className="list-pill list-pill--left">← 목록</Link>
     </>
   )
 
@@ -215,6 +217,8 @@ export default function GuruDetail() {
         {manager.firm && <p className="muted" style={{ fontSize: 13, margin: 0 }}>{manager.firm}</p>}
       </div>
       {body}
+      {/* 목록 복귀 — 좌하단 플로팅 pill(task#228). fixed이므로 조상에 transform 금지(task#195) */}
+      <Link to="/guru" className="list-pill list-pill--left">← 목록</Link>
     </div>
   )
 }

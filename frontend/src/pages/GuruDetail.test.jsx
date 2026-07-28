@@ -77,3 +77,16 @@ describe('GuruDetail (task#226 S4)', () => {
     expect(await screen.findByText('매니저를 찾을 수 없습니다.')).toBeTruthy()
   })
 })
+
+describe('GuruDetail 좌하단 목록복귀 pill (task#228 S2)', () => {
+  // fixed 좌표는 jsdom이 블라인드 — 여기선 렌더·링크 대상만 단언하고 위치는 라이브 실측으로 검증한다.
+  it('.list-pill--left 가 렌더되고 /guru 로 링크', async () => {
+    mockManager(MANAGER_NO_HOLDINGS)
+    const { container } = renderPage()
+    await screen.findByText('Warren Buffett')
+    const pill = container.querySelector('.list-pill--left')
+    expect(pill).toBeTruthy()
+    expect(pill.getAttribute('href')).toBe('/guru')
+    expect(pill.classList.contains('list-pill')).toBe(true)
+  })
+})

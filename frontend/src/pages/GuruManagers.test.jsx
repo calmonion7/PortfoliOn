@@ -65,6 +65,29 @@ describe('GuruManagers 탑3 배지 흡수 (task#227 S1)', () => {
   })
 })
 
+describe('GuruManagers 기본 정렬 (task#228 S1)', () => {
+  // 종목수 순서(mid 10 < small 50 < big 90)를 규모 순서와 어긋나게 둬서, 구 기본값(종목수 오름차순)이면
+  // ['Mid','Small','Big']이 나오도록 만든다 — 기본값이 되돌아가면 이 단언이 깨진다.
+  const MANY = {
+    last_updated: null,
+    managers: [
+      { id: 'small', name: 'Small Fund', firm: 'S', portfolio_value: 1_000_000_000,   num_stocks: 50, top10: [] },
+      { id: 'big',   name: 'Big Fund',   firm: 'B', portfolio_value: 300_000_000_000, num_stocks: 90, top10: [] },
+      { id: 'mid',   name: 'Mid Fund',   firm: 'M', portfolio_value: 50_000_000_000,  num_stocks: 10, top10: [] },
+    ],
+  }
+
+  it('정렬 칩 클릭 없이 렌더 직후 카드 순서가 포트폴리오 규모 내림차순', async () => {
+    api.get.mockImplementation((url) =>
+      url === '/api/guru/managers' ? Promise.resolve({ data: MANY }) : Promise.resolve({ data: [] })
+    )
+    const { container } = render(<GuruManagers />)
+    await screen.findByText('Big Fund')
+    const names = [...container.querySelectorAll('.guru-name')].map(n => n.textContent)
+    expect(names).toEqual(['Big Fund', 'Mid Fund', 'Small Fund'])
+  })
+})
+
 describe('GuruManagers 빈 상태 안내 문구 (task#227 S5)', () => {
   it('실제 경로("설정 > 구루")를 안내하고 존재하지 않는 "크롤링 설정" 탭을 언급하지 않음', async () => {
     mockApi({ stocks: [] })
