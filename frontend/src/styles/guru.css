@@ -44,6 +44,23 @@
   .guru-badge-meta { font-size: 10px; }
 }
 
+/* ----- GuruDetail 상세 — 도넛 ↔ 보유 종목 2열 (task#237) -----
+   PC에서 도넛 우측에 ~1,000px가 비어 있었다. 장식을 넣는 대신 바로 아래 있던
+   「보유 종목」 목록을 그 자리로 올려 「이 조각이 어느 종목인가」 대응을 즉각적으로 만든다.
+   모바일은 1열 순차 유지(현행) — JSX 분기 없이 미디어쿼리로만 갈린다. */
+.guru-detail-split { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 32px; align-items: start; }
+.guru-donut { position: relative; width: 100%; max-width: 420px; margin-bottom: 32px; }
+
+/* 상위 10행 색 점 = 도넛 조각의 범례. 별도 범례 블록을 되살리는 게 아니라(task#235에서 없앴다)
+   이미 화면에 있는 목록을 범례로 승격한 것. 11위 이하는 도넛에 없어 색이 없고,
+   노드는 남겨 좌측 정렬이 어긋나지 않게 한다(background 미지정 = 투명). */
+.guru-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+
+@media (max-width: 768px) {
+  .guru-detail-split { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .guru-donut { max-width: 360px; }
+}
+
 /* ----- GuruStats (인기순/가중치 통합 카드) ----- */
 .guru-legend-desc { font-size: 12px; color: var(--text-3); margin: 0 0 8px; line-height: 1.5; }
 .guru-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }

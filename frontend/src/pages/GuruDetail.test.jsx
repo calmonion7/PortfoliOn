@@ -178,6 +178,27 @@ describe('fitsSliceLabel — 조각 위 라벨 기하 판정 (task#235 S2)', () 
   })
 })
 
+describe('fitsSliceLabel — 실측 폭 주입 (task#237 S3)', () => {
+  const G = { innerRadius: 86, outerRadius: 134 }
+
+  it('주입된 실측 폭이 문자별 추정을 대체한다 — 크게 주면 안 들어간다', () => {
+    // 추정으로는 통과하는 조각(라틴 2자)이라도 실측이 넓게 나오면 라벨을 그리지 않는다
+    expect(fitsSliceLabel({ ...G, percent: 0.07, ticker: 'KO' })).toBe(true)
+    expect(fitsSliceLabel({ ...G, percent: 0.07, ticker: 'KO', labelWidth: 120 })).toBe(false)
+  })
+
+  it('작게 주면 추정으로 막혔던 라벨이 들어간다', () => {
+    expect(fitsSliceLabel({ ...G, percent: 0.07, ticker: '기타 35종목' })).toBe(false)
+    expect(fitsSliceLabel({ ...G, percent: 0.07, ticker: '기타 35종목', labelWidth: 20 })).toBe(true)
+  })
+
+  it('주입이 없으면 기존 추정 경로 — labelWidth undefined는 추정과 동일', () => {
+    const est = fitsSliceLabel({ ...G, percent: 0.3, ticker: '가나다라마바' })
+    expect(fitsSliceLabel({ ...G, percent: 0.3, ticker: '가나다라마바', labelWidth: undefined })).toBe(est)
+    expect(est).toBe(false)
+  })
+})
+
 describe('GuruDetail 도넛 인라인 범례 + KPI 2장 (task#235 S2·S3)', () => {
   // 조각 라벨·조각 자체는 recharts라 jsdom에서 렌더되지 않는다(겹침·위치는 라이브 프로브가 게이트).
   // 여기서 관측 가능한 것은 범례표 부재·HTML 중앙 오버레이·KPI 개수뿐이다.
@@ -209,6 +230,53 @@ describe('GuruDetail 도넛 인라인 범례 + KPI 2장 (task#235 S2·S3)', () =
     renderPage()
     await screen.findByText('Warren Buffett')
     expect(screen.queryByText(/^상위 \d+종목$/)).toBeNull()
+  })
+})
+
+describe('GuruDetail 목록 색 점 = 도넛 범례 (task#237 S2)', () => {
+  // 색 점이 도넛 조각 색과 실제로 같은지는 라이브 프로브가 대조한다(jsdom은 recharts를 렌더하지 않는다).
+  // 여기서 관측 가능한 것은 "어느 행에 점이 붙는가"뿐 — 상위 10행만.
+  it('상위 10행에만 색 점이 붙고 11위 이하는 색이 없다', async () => {
+    mockManager(MANAGER_WITH_HOLDINGS)   // 45종목 → 기본 20행 표시
+    const { container } = renderPage()
+    await screen.findByText('Warren Buffett')
+    expect(container.querySelectorAll('[data-testid="holding-row"]').length).toBe(20)
+    expect(container.querySelectorAll('.guru-dot[data-donut]').length).toBe(10)
+    // 노드 자체는 전 행에 남긴다 — 좌측 정렬이 어긋나지 않게
+    expect(container.querySelectorAll('.guru-dot').length).toBe(20)
+  })
+
+  it('색 점 인덱스는 0..9 — 도넛 조각 인덱스와 1:1', async () => {
+    mockManager(MANAGER_WITH_HOLDINGS)
+    const { container } = renderPage()
+    await screen.findByText('Warren Buffett')
+    const idx = [...container.querySelectorAll('.guru-dot[data-donut]')].map(e => e.getAttribute('data-donut'))
+    expect(idx).toEqual(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+  })
+
+  it('holdings 없는 폴백(top10 10행)에서도 전 행에 색 점', async () => {
+    mockManager(MANAGER_NO_HOLDINGS)
+    const { container } = renderPage()
+    await screen.findByText('Warren Buffett')
+    expect(container.querySelectorAll('.guru-dot[data-donut]').length).toBe(10)
+  })
+})
+
+describe('GuruDetail PC 2열 배치 (task#237 S1)', () => {
+  // 실제 좌우 배치·폭은 CSS 미디어쿼리라 jsdom이 블라인드 — 여기선 wrapper 유무만 단언하고
+  // 나란히 놓였는지·잘림은 라이브 프로브가 bbox로 검증한다.
+  it('도넛이 있으면 2열 wrapper를 건다', async () => {
+    mockManager(MANAGER_NO_HOLDINGS)
+    const { container } = renderPage()
+    await screen.findByText('Warren Buffett')
+    expect(container.querySelector('.guru-detail-split')).toBeTruthy()
+  })
+
+  it('도넛이 없는 매니저(num_stocks 0)는 2열을 걸지 않는다 — 좌측 빈 칸 방지', async () => {
+    mockManager({ ...MANAGER_NO_HOLDINGS, top10: [], num_stocks: 0 })
+    const { container } = renderPage()
+    await screen.findByText('Warren Buffett')
+    expect(container.querySelector('.guru-detail-split')).toBeNull()
   })
 })
 
