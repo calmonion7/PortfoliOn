@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: e815fb8e452f74713f9082fafeeb9e7d60334d0e
-mapped: 2026-07-26
+last_mapped_commit: a4994f84832f6215ac127c5ef0a645861ab2f857
+mapped: 2026-07-28
 ---
 
 # ARCHITECTURE
@@ -20,8 +20,8 @@ backend ─ cowork_trigger.fire(HTTP POST) ─► 로컬 리스너 ─► `claud
 
 | 계층 | 위치 | 역할 |
 |---|---|---|
-| HTTP 표면 | `backend/routers/*.py` (19개, 3,768줄) | 요청 검증(Pydantic)·인증 `Depends`·응답 `sanitize`. 얇게 유지 |
-| 도메인 로직 | `backend/services/*.py` + 6개 서브패키지 (12,759줄) | 외부 fetch·파싱·계산·저장. 라우터가 여기를 호출 |
+| HTTP 표면 | `backend/routers/*.py` (19개) | 요청 검증(Pydantic)·인증 `Depends`·응답 `sanitize`. 얇게 유지 |
+| 도메인 로직 | `backend/services/*.py` + 6개 서브패키지 | 외부 fetch·파싱·계산·저장. 라우터가 여기를 호출 |
 | 데이터 접근 | `backend/services/db.py` (69줄) | `query`/`execute`/`execute_many`/`get_connection`. **모든** SQL이 여기를 통과 |
 
 `services/db.py` — `ThreadedConnectionPool(minconn=1, maxconn=20)` 싱글톤(`_lock` double-checked).
@@ -62,9 +62,10 @@ psycopg2 풀은 소진 시 블록이 아니라 `PoolError`를 던지므로 maxco
 
 ## 2. 요청/데이터 흐름
 
-**읽기(사용자 대면)** — 라우터 → (인메모리 캐시 확인) → service → `db.query`(저장값) → `sanitize` → JSON.
+**읽기(사용자 대면)** — 라우터 → 인증 `Depends`(§6) → (인메모리 캐시 확인) → service → `db.query`(저장값) → `sanitize` → JSON.
 요청 경로에서 외부 API를 부르는 것은 예외적으로 시장지표 일부(fx/vix/commodities/indices/kospi_futures/sentiment)와
 rebalance/exposure(라이브 시세)뿐이며, 그마저 TTL 캐시 + `market_cache` last-good 폴백으로 감싼다.
+**`/api` 아래에 무인증 read는 없다**(ADR-0029, §6) — 인증 계층이 캐시 확인보다 먼저 온다.
 
 **쓰기(사용자)** — 라우터 → `storage.*`(user_stocks/tickers UPSERT) → `cache.invalidate_portfolio_caches(user_id)`
 (list·dashboard·sector·macro·correlation·live_prices·rebalance·exposure 인메모리 + `calendar_cache` DB 행 삭제).
@@ -106,6 +107,10 @@ service fetch(외부 API) → DB 저장. 실패는 잡 안에서 로깅으로 �
 - **누락 복구**: `_check_missed_report_for(job_id, market)`가 기동 시 "오늘 스케줄 지났고 이 시장 종목의
   오늘 스냅샷이 없는 것"만 골라 재생성(부분 누락 복구 — 예전엔 하나라도 있으면 전체 스킵).
 - **동시성 가드**: 배치 워커 ThreadPool은 `max_workers ≤ 8`(DB 풀 초과 PoolError 방지).
+- **정적 시드 vs 배치 캐시 분리(task#234)**: `market_indicators/earnings.py`의 S&P500/코스피 티커 목록은
+  더 이상 `backend/data/*.json`에 write하지 않는다 — 7일 TTL 캐시는 `market_cache` 키 `sp500_tickers`/`kospi_tickers`
+  (fetch 성공 시에만 `_mc_save`, 실패 시 만료된 저장값 → 그래도 없으면 정적 시드 `_read_seed`로 read-only 폴백).
+  `backend/data/{sp500,kospi}_tickers.json`은 이제 순수 read-only 시드다(§4 (c) 참조).
 
 ## 4. 캐싱 레이어
 
@@ -136,14 +141,23 @@ storage→cache는 함수 내 지연 import로 순환참조 회피).
 그 위에 자체 인메모리 `_cache`(`_get_cache`/`_set_cache`, TTL).
 
 - `get_or_refresh(key, fetch_fn, ttl, force)`: 메모리 → `_mc_load` → 없으면 `fetch_fn()`(저장까지 fetch_fn 책임).
-  **"fetch 실패 시 직전 저장값 폴백"은 하지 않는다**(실패 전파). 취약 소스는 `fx.py` VIX식 수동 폴백을 쓴다.
+  **`_mc_load`가 반환하는 DB 저장값에는 age(신선도) 검사가 없다** — 있으면(레코드 존재) 그대로 반환하고 인메모리에
+  `ttl`로 얹는다. 즉 `ttl` 인자는 **인메모리 레이어만** 통제하고, DB 저장값 자체의 "얼마나 오래됐는가"는 이 함수
+  수준에서 절대 체크하지 않는다(오래된 DB 행도 fetch를 스킵시키는 유효한 캐시 히트). **"fetch 실패 시 직전 저장값
+  폴백"도 별도 기능이 아니다** — fetch가 실패하면 `fetch_fn()` 예외가 그대로 전파된다(성공 시에만 저장 갱신). 취약
+  소스(CNN Fear&Greed 등)는 `fx.py` VIX식 수동 폴백(`_get_cache→try fetch→성공 시 _mc_save+반환, 실패 시 _mc_load
+  직전값 반환`)을 별도로 구현해 쓴다.
 - `_merge_history`(date 병합)·`_yf_close_history`(마지막 날짜 이후만 증분 fetch, 366일 트림)·`_filter_outliers`(중위 ±5x).
+- 배치가 아니라 **요청경로에서** `get_or_refresh`를 쓰는 소스(fx/vix/commodities/indices/kospi_futures/sentiment)는
+  이 "무-age-체크" 특성 때문에, DB에 값이 한 번 채워지면 그 값이 사실상 무기한 서빙될 수 있다 — 갱신은 fetch_fn 자체가
+  주기적으로 성공 호출돼야 일어난다(요청 트래픽 자체가 트리거).
 
 ### (c) 파일 (잔존)
 
 `backend/snapshots/`(per-ticker/date JSON — report_generator 쓰기, report/stocks 라우터 읽기 폴백),
 `backend/reports/`(레거시 read-only), `backend/data/digest/`(digest 파일 폴백),
-`backend/data/{sp500,kospi}_tickers.json`(정적 유니버스), `backend/data/kr_exports.json`(수출 파일 캐시).
+`backend/data/{sp500,kospi}_tickers.json`(정적 유니버스 — **read-only 시드**, 런타임 7일 캐시는 `market_cache`
+키 `sp500_tickers`/`kospi_tickers`로 이전됨, task#234), `backend/data/kr_exports.json`(수출 파일 캐시).
 `backend/data/{consensus,calendar}/`와 `holdings.json`/`stocks.json`/`watchlist.json`/`schedule.json`/`guru_*.json`은
 **코드에서 참조되지 않는 잔존물**(grep 0건).
 
@@ -164,6 +178,13 @@ storage→cache는 함수 내 지연 import로 순환참조 회피).
 
 ## 6. 인증 / 권한 흐름
 
+**정책(ADR-0029, 2026-07-28 확정)**: `/api` 아래에 무인증 read는 없다. 138개 라이브 라우트(로컬·배포 컨테이너
+양쪽 실측) 중 무인증은 **`auth.py`의 공개 9개뿐**(register·login·refresh·logout + OAuth google/github×2+token).
+그 외 read/write 전부가 4개 인증 의존성 중 하나를 건다. 회귀 게이트는 `backend/tests/test_no_public_reads.py` —
+라이브 `app`의 라우트를 `tests/_routes.py:walk_routes()`(§10 FastAPI 버전 발산 참조)로 순회해 각 엔드포인트
+함수 파라미터 default 또는 라우트 `dependencies=[...]`에 인증 `Depends`가 있는지 검사하고, 허용목록
+`ALLOWED_PUBLIC` 9개와 **양방향 exact-match**(새 무인증 발생 → 실패, 허용목록에 있는데 인증이 걸림/사라짐 → 실패)한다.
+
 **토큰** — `services/auth_service.py`: HS256 JWT access(`_ACCESS_EXPIRE = 1h`, payload `sub`=user_id) +
 opaque refresh(`_REFRESH_EXPIRE = 30d`, `refresh_tokens` 테이블). OAuth(Google·GitHub)는
 `SessionMiddleware` + 임시 `_oauth_codes`(코드 교환 `GET /api/auth/oauth/token`).
@@ -177,10 +198,16 @@ opaque refresh(`_REFRESH_EXPIRE = 30d`, `refresh_tokens` 테이블). OAuth(Googl
 | `require_admin` | JWT + `users.role == 'admin'` | user_id |
 | `require_admin_or_api_key` | API key **또는** admin JWT | user_id/센티넬 |
 
+Cowork 예외는 `get_current_user_or_api_key` 하나로 확정 — `GET /api/report/{ticker}/{date_str}`(외부 Cowork가
+읽는 AI 분석 본문)와 형제 `GET /api/report/list`·`GET /api/report/backlog/pending`이 이 의존성을 쓴다. 나머지
+일반 read(구루·랭킹·수급·공매도·시장지표·리포트 부속·검색·뉴스)는 `get_current_user`만으로 충분하다(ADR-0029는
+authn만 강제하고 메뉴 단위 authz까지는 강제하지 않는다).
+
 **메뉴 권한** — `user_menu_permissions`(user_id+menu+enabled). `ALL_MENUS = ["portfolio","research","market","guru","settings"]`
 (`routers/admin.py:10`). `GET /api/auth/me`가 role + `menu_permissions`(admin은 `ALL_MENUS` 전체) 반환 →
 프론트 `contexts/AuthContext.jsx`가 로드 → `components/Masthead.jsx`(PC 5섹션)·`components/MobileNav.jsx`(모바일 5탭)가
-`menuPermissions.includes(perm)`로 필터. 신규 사용자 기본값은 `default_menu_permissions`
+`menuPermissions.includes(perm)`로 필터. 이 필터는 **UI 노출 제어일 뿐**이며 API 인증(위 4종 Depends)과는 별개 층 —
+API는 항상 인증만 요구하고, 메뉴 숨김은 화면 진입로만 막는다. 신규 사용자 기본값은 `default_menu_permissions`
 (`auth_service` 45–52, 권한 행이 이미 있으면 스킵). 관리: `PUT /api/admin/users/{id}/permissions`,
 `POST /api/admin/users/bulk-permissions`, `PUT /api/admin/default-permissions`.
 
@@ -212,7 +239,8 @@ PUT /api/stocks/{ticker}/enrich   ·   POST /api/analyst-reports/{ticker}
 - `cowork_trigger.configured()`는 `COWORK_ROUTINE_FIRE_URL`+`COWORK_ROUTINE_FIRE_TOKEN` 둘 다 있을 때만 True —
   **미설정이면 휴면**(dormant-safe). 실패는 로깅만(배치 본문 무해).
 - 수동 발사: `POST /api/admin/cowork/fire`(`require_admin_or_api_key`). 대상 지정: `PUT /api/admin/analyst-targets/{ticker}`
-  → `tickers.analyst_target`.
+  → `tickers.analyst_target`. 전역 지정 목록 열람: `GET /api/admin/analyst-targets`(`require_admin`, task#224 —
+  세션이 본인 보유·관심만 보는 `GET /api/stocks`로는 타 사용자 종목의 지정을 볼 수 없어 해제도 못 하던 문제 해소).
 - 가드레일은 프롬프트 파일에 명시(enrich rolling 최대 5종목/회, 발행은 7일+ 경과·유의미 변화 종목 회당 최대 2).
 - **ADR-0028 본문 §1의 "실행 주체 = claude.ai 클라우드 루틴"은 같은 날 개정으로 폐기**됐다 —
   클라우드 샌드박스가 외부 egress 불가로 실측 확인. 코드의 정답은 로컬 리스너다.
@@ -238,7 +266,7 @@ PUT /api/stocks/{ticker}/enrich   ·   POST /api/analyst-reports/{ticker}
 - 셸 2종: `pages/ResearchShell.jsx`(리서치 5탭 + 일정·인컴 3탭, 모바일만 seg 필 — PC는 마스트헤드가 nav),
   `pages/MarketHub.jsx`(시장지표/수급지표 2탭 → `pages/Market.jsx`).
 - HTTP: `frontend/src/api.js` — axios 인스턴스, request 인터셉터가 `Authorization: Bearer`,
-  response 인터셉터가 401에 토큰 삭제 + `/`로 이동.
+  response 인터셉터가 401에 토큰 삭제 + `/`로 이동(§6 정책상 이제 read 401도 이 경로를 탄다).
 - 데이터 훅 = 페이지와 fetch의 경계층(`frontend/src/hooks/`): `usePortfolioData`(portfolio·prices·dashboard·fx·digest),
   `useReportList`, `useReportGeneration`, `useReportFilters`, `useStockManagement`, `usePriceFlash`,
   `useIsMobile`/`useTheme`/`useReveal`/`useCountUp`/`useBodyScrollLock`.
@@ -248,6 +276,31 @@ PUT /api/stocks/{ticker}/enrich   ·   POST /api/analyst-reports/{ticker}
 - PWA: `vite.config.js`의 `VitePWA`(autoUpdate, `navigateFallback: null` — OAuth 콜백 가로채기 방지) +
   자체 `sw-cache-bust` 플러그인(`config.build.outDir` 사용 — `dist` 하드코딩 금지).
 - 청크: Vite 8 = rolldown → `manualChunks`는 **함수 형식만**(`charts`=recharts/d3/victory-vendor, `vendor`=나머지).
+
+### 구조적 결합 — 리서치 하위탭 이원화 (task#215·227)
+
+리서치 셸의 탭 목록은 **두 파일에 별도로 하드코딩**돼 있고 이 둘은 항상 동기화돼야 한다:
+- `frontend/src/pages/ResearchShell.jsx`의 `RESEARCH_TABS`(모바일 seg nav) — 리포트·추천·랭킹·비교·심층 리포트 5개.
+- `frontend/src/components/Masthead.jsx`의 `SECTIONS`(PC 마스트헤드) — `key: 'research'`의 `items` 배열이 동일 5개.
+
+두 목록은 **자동 동기화 메커니즘이 없다** — 한쪽만 고치면 다른 플랫폼(PC 또는 모바일)에서 새/개명/삭제된 탭에
+진입할 수 없는 라이브 회귀가 난다(심층 리포트 탭 추가 시 실제 발생, `RESEARCH_TABS`만 고치고 PC를 놓쳤던 사례).
+탭을 추가·개명·삭제하는 변경은 `grep -rn "RESEARCH_TABS\|SECTIONS" frontend/src/`로 두 목록을 함께 확인·수정할 것.
+같은 파일에 `SCHEDULE_TABS`(일정·인컴 3개: 캘린더·배당·다이제스트)도 있고 이 역시 `Masthead.jsx`의 `key: 'schedule'`
+섹션과 쌍을 이룬다 — 구조는 동일(별개 하드코딩 쌍, 동기화 책임은 변경자에게 있다).
+
+### 구루 화면 IA (task#226·227·228)
+
+- `pages/Guru.jsx` — 3탭(매니저 목록/인기순/가중치, `TABS` 배열) 얇은 셸. **'매니저별 탑3' 탭은 제거됨**
+  (매니저 목록 카드의 top10 배지가 비중%·보유 구루 수를 흡수, task#227) — 과거 지도의 4탭 서술은 stale.
+- `pages/GuruManagers.jsx` — 목록(기본정렬 규모↓, task#228). 카드 클릭 → `navigate('/guru/${m.id}')`.
+- `pages/GuruDetail.jsx`(라우트 `/guru/:id`, task#226) — 매니저 상세: `GET /api/guru/managers/{id}` 응답의
+  `top10`(상위 10 + 한글명)과 `holdings`(전 종목, 크롤 이후에만 존재)를 도넛+목록으로 렌더. `holdings` 없으면
+  top10 + "기타 N종목 x%"로 graceful 폴백. 워치리스트 토글 버튼(`WatchlistBtn`)은 `pages/GuruStats.jsx`에서
+  export돼 `GuruManagers.jsx`·`GuruDetail.jsx` 양쪽이 공유(단일 소스, 별도 컴포넌트 파일로 분리되지 않음).
+  좌하단 플로팅 "← 목록" pill(`.list-pill.list-pill--left`, task#228) — fixed이므로 조상에 transform 금지.
+- `pages/GuruStats.jsx` — `view` prop(popularity/weighted)으로 `Guru.jsx`가 렌더 대상 결정. 스타일은
+  `frontend/src/styles/guru.css`(구루 전용, task#227에서 신설·이전).
 
 ## 9. 배포 흐름
 
@@ -261,7 +314,8 @@ PUT /api/stocks/{ticker}/enrich   ·   POST /api/analyst-reports/{ticker}
 
 nginx(`nginx/nginx.conf`): `/health`·`/api/` → `http://backend:8000`; `/index.html`·`sw.js`·정적 자산·SPA fallback은
 `/usr/share/nginx/html`. 프론트는 `frontend/dist` 직접 마운트라 로컬 `npm run build`가 **즉시 라이브**;
-백엔드 변경은 재배포 후에야 반영.
+백엔드 변경은 재배포 후에야 반영. Postgres는 1차 저장소이고 `backend/data/` 아래 로컬 JSON은 **read-only 정적 시드**
+(§4(c) — 런타임 캐시는 DB `market_cache`/전용 테이블로 옮겨져 있고, 이 시드 파일에 코드가 write하는 경로는 없다).
 
 ## 10. 문서·코드 불일치 (코드가 정답)
 
@@ -271,6 +325,8 @@ nginx(`nginx/nginx.conf`): `/health`·`/api/` → `http://backend:8000`; `/index
 | `services/batch_registry.py` docstring: "20개 배치" | `BATCHES` **29 엔트리**(`_JOB_FUNCS` 28 — consensus는 자체 잡 없음) |
 | `scheduler/jobs.py` 주석 ×2: "DB 풀(maxconn=10) 초과 방지" | `services/db.py`는 `maxconn=20`(주석만 stale, 워커 ≤8 가드는 유효) |
 | `CLAUDE.md`: `backend/data/consensus/` = per-ticker 컨센서스 캐시 | 코드 참조 0건(`services/consensus.py`는 DB 전용) — 디스크 잔존물 |
-| `CLAUDE.md` 프론트 페이지 목록(Research 허브가 홈 `/`, Sidebar) | `/`는 `/reports`로 리다이렉트, 허브는 `ResearchShell`+`Masthead`(ADR-0026이 ADR-0025 사이드바 대체), 신규 `/analyst-reports`·`/analyst-report/:ticker/:date`·`/compare`·`/dividends`·`/recommend` |
+| `CLAUDE.md` 프론트 페이지 목록(Research 허브가 홈 `/`, Sidebar) | `/`는 `/reports`로 리다이렉트, 허브는 `ResearchShell`+`Masthead`(ADR-0026이 ADR-0025 사이드바 대체), 신규 `/analyst-reports`·`/analyst-report/:ticker/:date`·`/compare`·`/dividends`·`/recommend`·`/guru/:id` |
 | `ADR-0028` §1 "실행 주체 = claude.ai 루틴" | 개정판대로 **로컬 launchd 리스너 + `claude -p`**(`scripts/cowork-fire-listener.py`) |
 | `ADR-0027` 본문 "발행은 Cowork 온디맨드, 자동 발행 없음"·"발행 후 불변" | 개정 2건이 적용된 코드: 루틴 자동 발행 허용, admin 종목 단위 삭제 존재 |
+| 구 지도(이전 fg-map)의 구루 4탭 서술("매니저 목록/인기순/매니저별 탑3/가중치") | 실제는 **3탭**(`Guru.jsx` `TABS`) — '매니저별 탑3' 제거됨(task#227) |
+| `scripts/audit_unauth_endpoints.py` (라이브 프로브 스크립트) | ADR-0029 정본은 `backend/tests/test_no_public_reads.py`(pytest 승격, task#233) — 이 스크립트는 커밋 대상이 아니라 로컬 ad-hoc 프로브용 잔존물 |

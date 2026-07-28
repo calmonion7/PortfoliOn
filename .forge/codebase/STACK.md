@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: e815fb8e452f74713f9082fafeeb9e7d60334d0e
-mapped: 2026-07-26
+last_mapped_commit: a4994f84832f6215ac127c5ef0a645861ab2f857
+mapped: 2026-07-28
 ---
 
 # STACK — 언어·런타임·프레임워크·의존성·빌드·배포 토폴로지
@@ -11,13 +11,14 @@ PortfoliOn의 기술 스택 실측 매핑. 도메인 용어 정의는 다루지 
 
 | 항목 | 실측 |
 |------|------|
-| 프로덕션 런타임 | **Python 3.12** — `backend/Dockerfile` = `FROM python:3.12-slim`, `CMD uvicorn main:app --host 0.0.0.0 --port 8000` |
+| 프로덕션 런타임 | **Python 3.12.13** — `backend/Dockerfile` = `FROM python:3.12-slim`, `CMD uvicorn main:app --host 0.0.0.0 --port 8000` |
 | 로컬 개발 런타임 | **Python 3.9.6** — `backend/.venv/pyvenv.cfg` |
 | 앱 엔트리 | `backend/main.py` (`app = FastAPI(title="Stock Portfolio Manager", lifespan=lifespan)`) |
-| 테스트 러너 | `pytest` — `backend/pytest.ini` (`testpaths = tests`, `pythonpath = .`), 테스트 파일 **123개**(`backend/tests/test_*.py`) |
+| 테스트 러너 | `pytest` — `backend/pytest.ini` (`testpaths = tests`, `pythonpath = .`), 테스트 파일 **125개**(`backend/tests/test_*.py`), `pytest --collect-only` **1380 tests** |
 
 - ⚠️ **로컬 3.9 ≠ Docker 3.12 갭**: 런타임 평가 어노테이션(Pydantic 모델·FastAPI 시그니처)에 PEP604 `X | None` 금지 → `Optional[X]`. `from __future__ import annotations`가 있는 모듈은 문자열화돼 로컬에서도 통과.
 - ⚠️ **`lxml`은 Docker에만 설치**(로컬 `.venv` 부재) → 실사용 파서는 전부 `BeautifulSoup(html, "html.parser")`.
+- ⚠️ **`fastapi` 핀 없는 `>=0.104.0`이 로컬·Docker 간 실측 버전 발산을 만든다 — 로컬 `0.128.8` vs 배포 컨테이너 `0.138.1`**. 이 발산은 값(파싱 결과)이 아니라 **라우트 트리의 형태**를 바꾼다: `app.include_router()`로 들어온 라우트를 0.138.1은 `_IncludedRouter`로 감싸 `.path`도 `.routes`도 노출하지 않고 `original_router`만 주는 반면, 로컬 0.128.8은 `app.routes`에 평탄하게 들어온다. 그 결과 **평탄 `app.routes` 순회는 로컬에서 138개를 세고 배포 컨테이너에서는 0개를 세며 조용히 통과**한다(무인증 엔드포인트 감사 스크립트 `scripts/audit_unauth_endpoints.py`가 처음 이렇게 거짓 통과했다, ADR-0029/task#233). 대응으로 **라우트를 열거하는 모든 테스트는 공용 헬퍼 `backend/tests/_routes.py:walk_routes()`(`routes`·`original_router` 재귀 하강)를 거치도록 통일**했다 — `backend/tests/test_no_public_reads.py`·`backend/tests/test_api_doc_sync.py`가 이 헬퍼를 공유한다. 핀이 없으므로 이 발산은 계속 진행된다.
 
 ### 의존성 (`backend/requirements.txt` — 18줄, 상한 핀 없음)
 
@@ -41,14 +42,15 @@ PortfoliOn의 기술 스택 실측 매핑. 도메인 용어 정의는 다루지 
 
 ### 앱 배선 (`backend/main.py`)
 
-- **라우터 19개** include(`backend/routers/`): `auth`, `portfolio`, `report`, `watchlist`, `stocks`, `guru`, `calendar`, `digest`, `market_indicators`, `analytics`, `analysis`, `events`, `rankings`, `investor`, `short_sell`, `batches`, `recommendations`, **`analyst_reports`**, `admin`.
+- **라우터 19개** include(`backend/routers/`): `auth`, `portfolio`, `report`, `watchlist`, `stocks`, `guru`, `calendar`, `digest`, `market_indicators`, `analytics`, `analysis`, `events`, `rankings`, `investor`, `short_sell`, `batches`, `recommendations`, `analyst_reports`, `admin`.
   - prefix 2계열: 전용(`/api/stocks`·`/api/analyst-reports`·`/api/admin`·`/api/auth`·`/api/guru`·`/api/analysis`·`/api/events`·`/api/recommendations`·`/api/market`·`/api/watchlist`·`/api/portfolio`·`/api/analytics`)과 **공용 `/api`**(`report`·`calendar`·`digest`·`rankings`·`investor`·`short_sell`·`batches`).
 - **미들웨어 순서**: `SessionMiddleware(secret_key=os.environ["SESSION_SECRET"])` → `EventTrackerMiddleware`(`backend/middleware/event_tracker.py`) → `CORSMiddleware`(origins = `localhost:3000`·`localhost:5173`·`FRONTEND_URL`, 빈 값 필터).
 - **예외 핸들러**: `RequestValidationError` → 422 body를 `services.utils.sanitize` 통과(요청의 NaN/inf echo가 starlette `allow_nan=False`에서 500 되는 것 차단, `backend/main.py:253-259`).
 - **lifespan**(`backend/main.py:241-247`): `_migrate()` → `sched.start()` → `_warm_market_cache()` 데몬 스레드 → (종료) `sched.stop()`.
 - **`_configure_logging()`**(모듈 로드 시 1회): `basicConfig(level=INFO)` + `urllib3`/`yfinance`/`apscheduler`/`asyncio` → WARNING + `uvicorn*` `propagate=False`.
-- **`_migrate()`**: 기동 idempotent DDL 20+ 블록, 각각 개별 `try/except` + `logger.warning`. 최신 블록 = `tickers.analyst_target`(boolean) · **`analyst_reports` 테이블**. 신규 컬럼/테이블의 **정본은 여기**(`app_schema.sql`은 빈 pgdata 초회만 적용).
+- **`_migrate()`**: 기동 idempotent DDL 20+ 블록, 각각 개별 `try/except` + `logger.warning`. 최신 블록 = `tickers.analyst_target`(boolean) · `analyst_reports` 테이블. 신규 컬럼/테이블의 **정본은 여기**(`app_schema.sql`은 빈 pgdata 초회만 적용).
 - **헬스체크**: `GET|HEAD /health` → `{"status":"ok"}` (nginx·`deploy.sh` 스모크가 소비).
+- **ADR-0029 "공개 read 없음" 완결(task#230·231·232, 회귀게이트 승격 task#233)**: `/api` 138개 엔드포인트 중 무인증은 `auth.py`의 공개 9개(register·login·refresh·logout + OAuth 5)뿐. 나머지는 4종 인증 의존성(`get_current_user`·`get_current_user_or_api_key`·`require_admin`·`require_admin_or_api_key`) 중 하나로 게이팅됨. 상시 회귀 게이트는 `backend/tests/test_no_public_reads.py`(라이브 `app` 라우트 트리를 `walk_routes()`로 순회 + 허용목록 `ALLOWED_PUBLIC` 9개 exact-match 양방향 단언) — `scripts/audit_unauth_endpoints.py`(선행 스캐폴딩)는 커밋되지 않고 로컬 ad-hoc 프로브로만 남음.
 
 ### 인메모리 캐시 계층 (`backend/services/cache.py`)
 
@@ -63,10 +65,10 @@ PortfoliOn의 기술 스택 실측 매핑. 도메인 용어 정의는 다루지 
 | 빌드 | `vite@^8.0.10` (**rolldown 번들러**), `@vitejs/plugin-react@^6.0.1` |
 | HTTP | `axios@^1.16.0` — 인스턴스 정본 `frontend/src/api.js` |
 | 차트 | `recharts@^3.8.1` (+트랜지티브 d3·victory-vendor) |
-| 테스트 | `vitest@^4.1.9` + `jsdom@^29.1.1` + `@testing-library/react@^16.3.2` — 설정은 **`frontend/vite.config.js`의 `test` 블록**(별도 vitest.config 없음), setup `frontend/src/test/setup.js`(1줄), 테스트 **19개** |
+| 테스트 | `vitest@^4.1.9` + `jsdom@^29.1.1` + `@testing-library/react@^16.3.2` — 설정은 **`frontend/vite.config.js`의 `test` 블록**(별도 vitest.config 없음), setup `frontend/src/test/setup.js`(1줄), 테스트 **22개**(`*.test.js`/`*.test.jsx`) |
 | 린트 | `eslint@^10.2.1` flat config `frontend/eslint.config.js`(`js.recommended` + `react-hooks` + `react-refresh`, 커스텀 룰 0, **테스트 글로벌 override 없음**) |
 | PWA | `vite-plugin-pwa@^1.3.0` |
-| CSS | plain CSS(TailwindCSS 없음) — `frontend/src/styles/tokens.css`(269줄, ADR-0026 에디토리얼 토큰) + `pc.css`·`mobile.css`·`motion.css` |
+| CSS | plain CSS(TailwindCSS 없음) — `frontend/src/styles/tokens.css`(ADR-0026 에디토리얼 토큰) + `pc.css`·`mobile.css`·`motion.css`·`guru.css`(task#227, 구루 IA 재편으로 신설) |
 
 - **스크립트**(`frontend/package.json`, `"type":"module"`): `dev` · `build` · `test`(vitest run) · `lint` · `preview`.
 - **dev 서버**: port 5173, `server.proxy['/api'] → http://localhost:8000`(`changeOrigin`), `watch.usePolling`.
@@ -75,8 +77,8 @@ PortfoliOn의 기술 스택 실측 매핑. 도메인 용어 정의는 다루지 
   - 인라인 플러그인 **`sw-cache-bust`**(apply build, closeBundle): `configResolved`에서 `build.outDir`를 읽어 `dist/index.html`(registerSW.js·manifest.webmanifest)과 `dist/registerSW.js`(`/sw.js`)에 `?<BUILD_DATE>` 부착.
   - SW 등록 코드는 `src/`에 없음(전부 플러그인 생성). 설치 유도 UI는 `frontend/src/components/InstallPrompt.jsx` + 판정 헬퍼 `frontend/src/utils/pwa.js`(iOS/Android/인앱브라우저 감지, localStorage `pwa-install-dismissed-at` 14일 억제).
   - ⚠️ manifest에 **`icons` 배열 없음**, `frontend/public/`엔 `favicon.svg`·`icons.svg`뿐(래스터 아이콘 0). `index.html` `lang="en"`·`theme-color #f6f1e7` ↔ manifest `lang:'ko'`·`theme_color #f6f6f4` **불일치**.
-- **API base URL**: `import.meta.env.VITE_API_BASE_URL || ''` — `frontend/src/api.js:4` 외에 `frontend/src/App.jsx:35,131`·`frontend/src/pages/LoginPage.jsx:8`이 raw `fetch`로 **독립 참조**(총 4곳), `frontend/src/utils/analytics.js:4`는 하드코딩 상대경로. axios 인터셉터가 `localStorage.access_token` 부착 + 401 시 토큰 제거 후 `/`로 하드 리다이렉트.
-- **라우팅**: `frontend/src/App.jsx`(라우트 16개, 전부 eager import — **`React.lazy`/`Suspense` 0**, **catch-all `*` 없음**). 리다이렉트 맵은 공유 모듈 `frontend/src/routes.js`(`/`→`/reports`, `/research`→`/reports`, `/market`→`/market/indicators`, `/analysis`→`/portfolio`). `LoginPage`는 라우트 없이 auth 게이트에서 직접 렌더. Provider 순서 `ToastProvider` → `AuthProvider`(`frontend/src/contexts/AuthContext.jsx`, 앱 유일 컨텍스트) → `BrowserRouter`.
+- **API base URL**: `import.meta.env.VITE_API_BASE_URL || ''` — `frontend/src/api.js:4` 외에 `frontend/src/App.jsx`·`frontend/src/pages/LoginPage.jsx`가 raw `fetch`로 **독립 참조**(총 4곳), `frontend/src/utils/analytics.js:4`는 하드코딩 상대경로. axios 인터셉터가 `localStorage.access_token` 부착 + 401 시 토큰 제거 후 `/`로 하드 리다이렉트.
+- **라우팅**: `frontend/src/App.jsx`(라우트 **17개**, 전부 eager import — **`React.lazy`/`Suspense` 0**, **catch-all `*` 없음**). 최신 추가는 `/guru/:id` → `GuruDetail`(task#226, 구루 매니저 상세 페이지). 리다이렉트 맵은 공유 모듈 `frontend/src/routes.js`(`/`→`/reports`, `/research`→`/reports`, `/market`→`/market/indicators`, `/analysis`→`/portfolio`). `LoginPage`는 라우트 없이 auth 게이트에서 직접 렌더. Provider 순서 `ToastProvider` → `AuthProvider`(`frontend/src/contexts/AuthContext.jsx`, 앱 유일 컨텍스트) → `BrowserRouter`.
 - **런타임 요구**: `engines`·`.nvmrc`·CI `setup-node` **전무**. 로컬 실측 Node **v24.15.0** / npm 11.12.1.
   - ⚠️ README는 "Node.js 18+"로 적지만 vite 8·vitest 4·eslint 10·jsdom 29는 Node ≥20 필요 — **README 서술이 스택과 모순**.
 
@@ -93,6 +95,7 @@ PortfoliOn의 기술 스택 실측 매핑. 도메인 용어 정의는 다루지 
 | `scripts/start-docker-compose.sh` | docker 소켓 대기 후 `docker compose up -d` — ⚠️ **존재하지 않는 워크트리 경로로 `cd`**(§5) |
 | `scripts/cowork-fire-listener.py` · `scripts/cowork-routine-prompt.md` | 루틴 fire 리스너 + 정책 프롬프트(§6) |
 | `backend/pytest.ini` · `frontend/vite.config.js`(test) · `frontend/eslint.config.js` | 테스트·린트 설정 |
+| `backend/tests/_routes.py` | 라우트 트리 순회 공용 헬퍼(`walk_routes()`) — FastAPI 버전 발산 대응, `test_no_public_reads.py`·`test_api_doc_sync.py`가 공유(task#233) |
 | `backend/auth_schema.sql`(25줄) → `backend/app_schema.sql`(406줄) | DB 스키마. compose가 `docker-entrypoint-initdb.d/01-auth.sql`·`02-app.sql`로 마운트(빈 pgdata 초회만) |
 | `backend/migrations/001_user_events.sql` · `002_backlog_history.sql` | 레거시 수동 마이그레이션(정본은 `main._migrate`) |
 | `start.sh`/`start.bat` · `stop.sh`/`stop.bat` | 로컬 양 서버 기동/종료 |
@@ -119,7 +122,7 @@ PortfoliOn의 기술 스택 실측 매핑. 도메인 용어 정의는 다루지 
 | `KIWOOM_APP_KEY` / `KIWOOM_SECRET_KEY` / `KIWOOM_BASE_URL` | `services/kiwoom/client.py:27,31` | `configured()` False → KR 시세는 KIS/Naver 폴백, 키움 전용 배치 빈 결과 |
 | `KIS_APP_KEY` / `KIS_APP_SECRET` / `KIS_BASE_URL` | `services/kis/client.py:30,34` | `configured()` False → 휴면(백업 시세 미가동·선물 dormant) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | `services/digest_service.py:270-271` | 조용히 return(발송 스킵) — ⚠️ **`.env.docker`에 이름 없음 → 현재 휴면** |
-| `POSTGRES_PASSWORD` | `docker-compose.yml:9` `${POSTGRES_PASSWORD:-…}` 보간만 | ⚠️ **루트 `.env`엔 없음**(실제 이름은 `FRED_API_KEY`·`KITA_API_KEY` 2개뿐) → compose 기본값 적용. README 47행 서술과 불일치 |
+| `POSTGRES_PASSWORD` | `docker-compose.yml:9` `${POSTGRES_PASSWORD:-…}` 보간만 | ⚠️ **루트 `.env`엔 없음**(실제 이름은 `FRED_API_KEY`·`KITA_API_KEY` 2개뿐) → compose 기본값 적용. README 서술과 불일치 |
 | `VITE_API_BASE_URL` | `frontend/src/api.js` · `App.jsx` · `LoginPage.jsx` | 빈 값 = same-origin 상대경로(정상 운용 형태) |
 
 **사장된 이름(코드 참조 0, grep 확인)**: `ANTHROPIC_API_KEY`(`.env.docker`·example에 존재) · `backend/.env`의 `SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·`SUPABASE_ANON_KEY`·`SUPABASE_JWT_SECRET` · `frontend/.env`의 `VITE_SUPABASE_URL`·`VITE_SUPABASE_ANON_KEY`.
@@ -167,15 +170,17 @@ daily_report_kr/us 배치 종료 (backend/scheduler/jobs.py:39-43, job_runs.reco
           POST {COWORK_ROUTINE_FIRE_URL}  Authorization: Bearer {…FIRE_TOKEN}  {"text": …}
           (컨테이너→호스트: host.docker.internal:8787)
         ▼ scripts/cowork-fire-listener.py   127.0.0.1:8787  POST /fire  (launchd, Bearer 검증)
-        ▼ subprocess.Popen(["claude","-p",prompt,"--model","sonnet",
+        ▼ subprocess.Popen(["claude","-p",prompt,"--model","opus",
                             "--allowedTools","Bash,WebSearch,WebFetch,Read,Write"])
           cwd=~/portfolion-routine-runs/<YYYYmmdd-HHMMSS>/, stdout→run.log, fire-and-forget
         ▼ claude -p 가 curl로 X-API-Key 인증해 enrich·발행 API 호출
 ```
 
-- 정책 프롬프트는 레포 파일 `scripts/cowork-routine-prompt.md`(29줄) — `{{COWORK_API_KEY}}` 자리표시자를 리스너가 spawn 시점에 `backend/.env.docker`에서 치환(레포에 실키 미상주).
+- 정책 프롬프트는 레포 파일 `scripts/cowork-routine-prompt.md` — `{{COWORK_API_KEY}}` 자리표시자를 리스너가 spawn 시점에 `backend/.env.docker`에서 치환(레포에 실키 미상주).
+- ⚠️ **실행 모델이 `sonnet`에서 `opus`로 승급됨(task#223)** — 위 `subprocess.Popen` 인자 `--model opus`가 현행. 기존 CLAUDE.md/일부 문서에 남은 "sonnet" 서술은 stale.
 - `cowork_trigger.fire()`는 **절대 raise하지 않음**(미설정·HTTP≥300·예외 모두 `logger.warning` + `False`) — 배치 본문 보호. admin 엔드포인트는 미설정 503 / fire 실패 502.
 - 클라우드 루틴(claude.ai) 경로는 샌드박스 egress 불가로 기각·비활성 보존(ADR-0028 개정 노트).
+- 관련 admin 엔드포인트: `GET /api/admin/analyst-targets`(전역 지정 종목 목록, task#224 — `tickers.analyst_target` 플래그가 사용자별이 아닌 공유 마스터 컬럼이라 세션-스코프 `GET /api/stocks`로는 타 사용자 지정이 안 보임) · `PUT /api/admin/analyst-targets/{ticker}`(`require_admin_or_api_key`).
 
 ## 7. 스케줄러 / 배치 인프라
 
@@ -191,4 +196,4 @@ daily_report_kr/us 배치 종료 (backend/scheduler/jobs.py:39-43, job_runs.reco
 - **PostgreSQL 16** = 정본. 접근은 `backend/services/db.py`의 `query`/`execute`/`execute_many`(psycopg2 `RealDictCursor`·`execute_batch`) + `get_connection()` 컨텍스트매니저(commit/rollback/putconn).
 - 테스트는 conftest `_block_real_db` autouse 가드로 실 DB 접근 차단(로컬 `DATABASE_URL`이 도커 postgres를 가리키므로 필수 가드).
 - 로컬 파일(gitignored 런타임): `backend/snapshots/`(per-ticker/date JSON) · `backend/data/consensus/` · `backend/data/calendar/`(빈 디렉터리 잔존) · `backend/reports/`(레거시 read-only).
-- 정적 참조 데이터(커밋됨): `backend/data/sp500_tickers.json` · `backend/data/kospi_tickers.json`.
+- **정적 참조 데이터(커밋됨, 지금은 순수 read-only)**: `backend/data/sp500_tickers.json` · `backend/data/kospi_tickers.json`. **task#234에서 이 파일들에 대한 write 경로가 제거됨** — 이전엔 `market_indicators/earnings.py`가 7일 TTL 스크레이프 캐시를 이 두 시드 파일에 직접 `write`해, 로컬 pytest 전체 스위트를 돌리면 이 추적 파일들이 라이브 스크레이프 결과(비실존 티커 포함)로 오염되는 위험이 있었다(CLAUDE.md gotcha, task#231에서 최초 발견). 지금은 캐시가 `market_cache` 테이블의 `sp500_tickers`/`kospi_tickers` 키로 이동했고, 두 JSON 파일은 그 캐시마저 없을 때만 읽는 **최종 폴백 시드**로만 쓰인다.

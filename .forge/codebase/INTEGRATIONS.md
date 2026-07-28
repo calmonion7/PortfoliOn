@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: e815fb8e452f74713f9082fafeeb9e7d60334d0e
-mapped: 2026-07-26
+last_mapped_commit: a4994f84832f6215ac127c5ef0a645861ab2f857
+mapped: 2026-07-28
 ---
 
 # INTEGRATIONS — 외부 API·데이터 소스·DB·인증·트리거
@@ -74,14 +74,15 @@ mapped: 2026-07-26
 - 2단 캐시: 인메모리 `_get_cache/_set_cache(ttl)` → DB `_mc_load/_mc_save`(테이블 `market_cache`, key PK upsert + `fetched_at`).
 - `get_or_refresh(key, fetch_fn, ttl)`는 "저장값 있으면 fetch 스킵"만 한다 — **fetch 실패 시 직전값 폴백은 안 함**(실패 전파). 취약한 소스는 수동 폴백 패턴 필수(`fx.py`·`sentiment.py`·`kospi_futures.py`).
 - 히스토리는 `_merge_history`(date 키 병합) + `_filter_outliers`(중앙값 ±5x) + 366일 트림.
-- 사용 키(실측): `fx`·`vix`·`commodities`·`treasury`·`econ_indicators`·`macro_signals`·`kr_exports`·`m7_earnings`·`kr_top2_earnings`·`indices`·`fear_greed`·`kospi_futures`·`kospi_signal`·`kr_sector_momentum`(`kr_sector_service.py`)·`us_sector_momentum`(`us_sector_service.py`).
+- 사용 키(실측): `fx`·`vix`·`commodities`·`treasury`·`econ_indicators`·`macro_signals`·`kr_exports`·`m7_earnings`·`kr_top2_earnings`·`indices`·`fear_greed`·`kospi_futures`·`kospi_signal`·`kr_sector_momentum`(`kr_sector_service.py`)·`us_sector_momentum`(`us_sector_service.py`)·**`sp500_tickers`·`kospi_tickers`**(`market_indicators/earnings.py`, task#234 신설 — 아래 참조).
 - ⚠️ 값 수준 가드: `kospi_futures.py`는 `rt_cd=0`인데 `output1`/history가 비면 `_mc_save`를 **생략**하고 last-good을 반환(성공-but-빈응답 클로버 방지, wrong<missing).
+- **`sp500_tickers`/`kospi_tickers`(task#234) — M7/KR Top2 실적(§8 `earnings_kr`/`earnings_us`)이 참조하는 전체 유니버스 티커 목록의 7일 TTL 캐시**. `_tickers_with_cache()`가 `market_cache`(fetched_at 기준 신선도 판정) → 스크레이프(위키피디아 S&P500 표 / Naver `sise_market_sum` 코스피 페이지네이션) → 만료된 저장값 → **정적 시드 파일**(`backend/data/sp500_tickers.json`·`kospi_tickers.json`, read-only) 순으로 폴백한다. **이 캐시는 이전엔 `market_cache`가 아니라 그 시드 JSON 파일 자체에 직접 write하고 있었다** — 로컬 pytest 스위트가 라이브 스크레이프를 트리거해 커밋된 정적 참조 데이터를 오염시키는 경로였다(task#231에서 발견, task#234에서 write 경로를 `market_cache`로 이전해 해소 — STACK.md §8 참조). 스크레이프 실패는 `_mc_save`를 호출하지 않아 빈 목록을 박제하지 않는다(wrong<missing).
 
 ## 4. 스크레이핑 · 기타
 
 | 소스 | 모듈 | 용도 |
 |------|------|------|
-| **Dataroma** `www.dataroma.com/m` | `backend/services/guru_scraper.py`, `recommendation/universe.py` | 구루 운용역·보유 종목, US 추천 유니버스 |
+| **Dataroma** `www.dataroma.com/m` | `backend/services/guru_scraper.py`, `recommendation/universe.py` | 구루 운용역·보유 종목(top10 **+ 전체 holdings 목록**, task#226 구루 상세 페이지용으로 `scrape_holdings`가 확장), US 추천 유니버스 |
 | **Finviz** `finviz.com/quote.ashx` | `backend/services/scraper.py:19` | US 컨센서스 스냅샷(`snapshot-table2`) |
 | **Naver 뉴스** `m.stock.naver.com/api/news/stock/{ticker}` → `n.news.naver.com/mnews/article/...` | `backend/services/scraper.py:63,91` | 종목 뉴스 |
 | **Naver US** `api.stock.naver.com/stock/{code}/basic` | `guru_scraper.py:21` | US 종목 한글명(`.O` 서픽스 재시도) |
@@ -113,6 +114,8 @@ mapped: 2026-07-26
 | 외부 쓰기(Cowork/루틴) | `X-API-Key` 헤더 검증(`backend/auth.py:44`), 사용자 sentinel `__api_key__` | `COWORK_API_KEY` |
 
 - **FastAPI 의존성 4종**(`backend/auth.py`): `get_current_user`(Bearer JWT만) · `get_current_user_or_api_key`(API-Key 또는 JWT) · `require_admin`(`users.role == 'admin'`) · `require_admin_or_api_key`.
+- **ADR-0029 "공개 read 없음" 3부작 완결(task#230·231·232)**: `/api` 138개 엔드포인트 중 무인증은 `auth.py`의 공개 9개(register·login·refresh·logout + OAuth 5)뿐 — 나머지 전부(구루·랭킹·수급·공매도·시장지표·리포트 read·검색·뉴스 포함) 위 4종 의존성 중 하나로 게이팅됨. **외부 Cowork용 read 예외는 `GET /api/report/{ticker}/{date_str}` 단 하나**로 확정됨(`get_current_user_or_api_key`) — `CLAUDE_COWORK_API.md` enrich 워크플로우가 이 read를 소비. 상시 회귀 게이트 = `backend/tests/test_no_public_reads.py`(허용목록 9개 exact-match).
+- ⚠️ **이 감사·게이트는 FastAPI 버전에 따라 라우트 트리 형태가 달라 로컬/배포 컨테이너에서 결과가 다를 수 있다** — 배포 이미지(0.138.1)는 `include_router`로 들어온 라우트를 `_IncludedRouter`로 감싸 평탄 `app.routes` 순회가 라우트 0개를 세며 조용히 통과한다(로컬 0.128.8은 138개). 상세는 STACK.md §1·`backend/tests/_routes.py`.
 - OAuth 콜백은 임시 코드 저장(`_store_oauth_tokens`, TTL 120s) 후 프론트가 `/api/auth/oauth/token`으로 교환. `upsert_oauth_user(email, provider, sub)`가 `users` upsert.
 - 메뉴 권한: `user_menu_permissions`(+`default_menu_permissions`) — `PUT /api/admin/users/:id/permissions`, 허용 목록은 `backend/routers/admin.py`의 `ALL_MENUS`. 프론트 `frontend/src/contexts/AuthContext.jsx`가 `GET /api/auth/me`로 로드해 nav 필터.
 - ⚠️ `ANTHROPIC_API_KEY`는 `.env.docker`/example에 잔존하나 **코드 참조 0**(백엔드 LLM 호출 없음).
