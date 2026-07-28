@@ -12,6 +12,37 @@ import { WatchlistBtn } from './GuruStats'
 
 const DONUT_COLORS = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)']
 const DEFAULT_ROWS = 20
+const PAD_ANGLE = 2
+const LABEL_CHAR_W = 6.2   // 10px 볼드 라틴 문자 1자의 대략 폭
+
+// 조각 위 라벨은 "그 조각이 라벨을 담을 만큼 클 때만" 그린다 — 호 길이를 직접 재서 판정한다(task#235).
+// 고정 임계값(8% 등)은 도넛 크기를 바꾸는 순간 틀려서 라벨이 조각 밖으로 삐져나온다.
+export function fitsSliceLabel({ percent, innerRadius, outerRadius, ticker, paddingAngle = PAD_ANGLE }) {
+  const span = Math.max(0, (percent || 0) * 360 - paddingAngle)
+  const midR = ((innerRadius || 0) + (outerRadius || 0)) / 2
+  const arc = 2 * Math.PI * midR * (span / 360)
+  const labelW = Math.max((ticker || '').length * LABEL_CHAR_W, 30) + 8   // 2줄이므로 티커·"00.0%" 중 넓은 쪽
+  return arc >= labelW && (outerRadius || 0) - (innerRadius || 0) >= 26   // 2줄이 들어갈 밴드 두께
+}
+
+// 라벨 색은 var(--bg) — 라이트는 크림이 어두운 데이터색 위에, 다크는 잉크가 밝은 데이터색 위에
+// 얹혀 양 테마 자동 대응(대비 5.23~8.27:1).
+function renderSliceLabel(p) {
+  const { cx, cy, midAngle, innerRadius, outerRadius, percent } = p
+  const name = p.name ?? p.payload?.name ?? ''
+  const value = p.value ?? p.payload?.value ?? 0
+  if (!fitsSliceLabel({ percent, innerRadius, outerRadius, ticker: name })) return null
+  const rad = -midAngle * Math.PI / 180
+  const r = (innerRadius + outerRadius) / 2
+  const x = cx + r * Math.cos(rad)
+  const y = cy + r * Math.sin(rad)
+  return (
+    <text x={x} y={y} fill="var(--bg)" textAnchor="middle" dominantBaseline="central">
+      <tspan x={x} dy="-0.35em" fontSize={10} fontWeight={700}>{name}</tspan>
+      <tspan x={x} dy="1.2em" fontSize={9} fontWeight={400}>{Number(value).toFixed(1)}%</tspan>
+    </text>
+  )
+}
 
 function formatValue(val) {
   if (!val) return '-'
@@ -91,9 +122,10 @@ export default function GuruDetail() {
 
   const body = (
     <>
-      {/* eco: .kpi-row 기본은 4열(pc.css) — KPI 3개뿐이라 PC만 3열로 오버라이드.
-          인라인은 미디어쿼리를 이기므로 모바일에선 걸지 않는다(App.css의 2열 규칙 유지 — 안 그러면 라벨이 2줄로 접힘) */}
-      <div className="kpi-row" style={isMobile ? undefined : { gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      {/* eco: .kpi-row 기본은 4열(pc.css) — KPI 2개뿐이라 PC만 2열로 오버라이드.
+          인라인은 미디어쿼리를 이기므로 모바일에선 걸지 않는다(App.css의 2열 규칙 유지 — 안 그러면 라벨이 2줄로 접힘).
+          「상위 N종목 비중」은 도넛 중앙으로 이관 — 3장이면 모바일 2열에서 3번째가 홀로 2행이 됐다(task#235) */}
+      <div className="kpi-row" style={isMobile ? undefined : { gridTemplateColumns: 'repeat(2, 1fr)' }}>
         <div className="kpi">
           <div className="label">포트폴리오 규모</div>
           <div className="val">{formatValue(manager.portfolio_value)}</div>
@@ -102,17 +134,20 @@ export default function GuruDetail() {
           <div className="label">보유 종목수</div>
           <div className="val">{manager.num_stocks ?? '-'}</div>
         </div>
-        <div className="kpi">
-          <div className="label">상위 10종목 비중</div>
-          <div className="val">{top10Sum.toFixed(1)}%</div>
-        </div>
       </div>
 
+      {/* 별도 범례표 없이 도넛 자체로 읽는다 — 큰 조각엔 조각 위 라벨, 비중 합계는 중앙 hole.
+          작은 조각은 라벨을 생략하지만 바로 아래 「보유 종목」 목록이 전 종목의 티커·한글명·비중을
+          이미 보여주므로 정보 손실이 없다(구 범례표는 그 목록과 중복이었다, task#235).
+          모바일/PC 분기 없이 폭 100%·최대 360px로 반응 — 반지름을 %로 줘 컨테이너에 맞춘다. */}
       {donutData.length > 0 && (
-        <div style={{ display: 'flex', gap: 32, alignItems: 'center', flexWrap: 'wrap', marginBottom: 32 }}>
-          <ResponsiveContainer width={240} height={240} style={{ flexShrink: 0 }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: 360, marginBottom: 32 }}>
+          <ResponsiveContainer width="100%" height={320}>
             <PieChart>
-              <Pie data={donutData} dataKey="value" innerRadius={70} outerRadius={110} paddingAngle={2}>
+              <Pie
+                data={donutData} dataKey="value" innerRadius="54%" outerRadius="84%"
+                paddingAngle={PAD_ANGLE} labelLine={false} label={renderSliceLabel} isAnimationActive={false}
+              >
                 {donutData.map((d, i) => (
                   <Cell key={d.name} fill={d.isOther ? 'var(--neutral)' : DONUT_COLORS[i % DONUT_COLORS.length]} />
                 ))}
@@ -123,40 +158,18 @@ export default function GuruDetail() {
               />
             </PieChart>
           </ResponsiveContainer>
-          <table style={{ borderCollapse: 'collapse', fontSize: 13 }}>
-            <tbody>
-              {top10.map((h, i) => (
-                <tr key={h.rank ?? h.ticker}>
-                  <td style={{ paddingRight: 16, paddingTop: 4, color: 'var(--text)' }}>
-                    <span style={{
-                      width: 10, height: 10, borderRadius: 2,
-                      background: DONUT_COLORS[i % DONUT_COLORS.length],
-                      display: 'inline-block', marginRight: 6, verticalAlign: 'middle',
-                    }} />
-                    {h.ticker}
-                    <span style={{ color: 'var(--text-3)', marginLeft: 6 }}>{h.name_kr || h.name || ''}</span>
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', paddingTop: 4, color: 'var(--text)' }}>
-                    {(h.weight_pct ?? 0).toFixed(1)}%
-                  </td>
-                </tr>
-              ))}
-              {otherCount > 0 && (
-                <tr>
-                  <td style={{ paddingRight: 16, paddingTop: 4, color: 'var(--text-3)' }}>
-                    <span style={{
-                      width: 10, height: 10, borderRadius: 2, background: 'var(--neutral)',
-                      display: 'inline-block', marginRight: 6, verticalAlign: 'middle',
-                    }} />
-                    기타 {otherCount}종목
-                  </td>
-                  <td className="mono tnum" style={{ textAlign: 'right', paddingTop: 4, color: 'var(--text-3)' }}>
-                    {otherPct.toFixed(1)}%
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          {/* 중앙 요약 = 구 「상위 10종목 비중」 KPI. SVG <text>가 아니라 HTML 오버레이 —
+              jsdom은 recharts를 렌더하지 않으므로 이래야 단위테스트로 관측된다.
+              top10이 비면(기타 100%) 표기할 상위 종목이 없어 생략. 문구는 실제 개수로 — 10개 미만 매니저가 있다 */}
+          {top10.length > 0 && (
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 2, pointerEvents: 'none',
+            }}>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>상위 {top10.length}종목</span>
+              <span className="mono tnum" style={{ fontSize: 22, fontWeight: 700 }}>{top10Sum.toFixed(1)}%</span>
+            </div>
+          )}
         </div>
       )}
 

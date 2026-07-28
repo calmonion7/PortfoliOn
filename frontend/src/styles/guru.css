@@ -28,14 +28,16 @@
 .guru-badge { display: inline-flex; align-items: baseline; gap: 4px; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; }
 .guru-badge-meta { font-weight: 400; font-size: 9px; opacity: .85; }
 
-/* 매니저 카드 리스트 (모바일 — GuruManagers 전용 구조, pc.css .guru-card 계열 재사용) */
-.guru-mobile { padding: 0 0 80px; }
-.guru-updated--mobile { color: var(--text-faint); font-size: 11px; padding: 0 20px 8px; }
-.guru-search-row--mobile { padding: 0 20px 10px; }
-.guru-sort-row--mobile { padding: 0 20px 12px; overflow-x: auto; flex-wrap: nowrap; }
+/* 매니저 카드 리스트 (모바일 — GuruManagers 전용 구조, pc.css .guru-card 계열 재사용)
+   좌우·하단 패딩을 두지 않는다 — 부모 .m-page(0 20px 100px)가 모바일 페이지 공통 패딩이라
+   자체 패딩을 겹치면 콘텐츠 폭이 350→310px로 좁아져 다른 페이지와 어긋난다(task#235).
+   .guru-mobile은 그래서 규칙 없음(구조용 클래스로만 남김). */
+.guru-updated--mobile { color: var(--text-faint); font-size: 11px; padding-bottom: 8px; }
+.guru-search-row--mobile { padding-bottom: 10px; }
+.guru-sort-row--mobile { padding-bottom: 12px; overflow-x: auto; flex-wrap: nowrap; }
 .guru-sort-row--mobile > button { white-space: nowrap; }
 .guru-count--mobile { color: var(--text-3); font-size: 12px; align-self: center; margin-left: 4px; }
-.guru-list--mobile { display: flex; flex-direction: column; gap: 10px; padding: 0 20px; }
+.guru-list--mobile { display: flex; flex-direction: column; gap: 10px; }
 
 @media (max-width: 768px) {
   .guru-badge { font-size: 12px; }

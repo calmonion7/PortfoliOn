@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import GuruDetail from './GuruDetail'
+import GuruDetail, { fitsSliceLabel } from './GuruDetail'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
@@ -45,8 +45,9 @@ function mockManager(data) {
 beforeEach(() => { vi.clearAllMocks(); viewport.mobile = false })
 
 describe('GuruDetail (task#226 S4)', () => {
-  // 목록 하단 폴백 전용 캡션("기타 N종목 · x%")은 도넛 범례("기타 N종목", % 없음)와 텍스트가 겹치므로
-  // exact textContent 매처로 구분한다.
+  // 목록 하단 폴백 전용 캡션("기타 N종목 · x%")을 exact textContent 매처로 고정한다.
+  // (범례표가 있던 시절엔 그 표의 "기타 N종목" 행과 텍스트가 겹쳐서 exact 매처가 필수였고,
+  //  task#235에서 범례표를 없앤 뒤로는 충돌이 사라졌지만 캡션을 정확히 겨냥하는 값은 그대로다)
   const fallbackCaption = (content) => content === '기타 35종목 · 22.5%'
 
   it('holdings 없는 응답 — top10 행 렌더 + 기타 캡션(폴백)', async () => {
@@ -94,6 +95,63 @@ describe('GuruDetail 모바일 appbar 제목 축약 (task#229 S2)', () => {
     const h1 = container.querySelector('.appbar h1')
     expect(h1.textContent).toBe('Warren Buffett')
     expect(h1.textContent).not.toContain(' - ')
+  })
+})
+
+describe('fitsSliceLabel — 조각 위 라벨 기하 판정 (task#235 S2)', () => {
+  // 현 도넛 기하(컨테이너 350~360px → inner 86 / outer 134). 고정 임계값이 아니라 호 길이 판정이므로
+  // 도넛 크기가 바뀌어도 규칙이 따라온다 — 그 규칙 자체를 못박는다.
+  const G = { innerRadius: 86, outerRadius: 134 }
+
+  it('작은 조각은 라벨을 담지 못한다', () => {
+    expect(fitsSliceLabel({ ...G, percent: 0.03, ticker: 'AAPL' })).toBe(false)
+  })
+
+  it('큰 조각은 라벨을 담는다', () => {
+    expect(fitsSliceLabel({ ...G, percent: 0.22, ticker: 'AAPL' })).toBe(true)
+  })
+
+  it('같은 조각이라도 긴 이름은 더 큰 조각을 요구한다', () => {
+    expect(fitsSliceLabel({ ...G, percent: 0.07, ticker: 'KO' })).toBe(true)
+    expect(fitsSliceLabel({ ...G, percent: 0.07, ticker: '기타 35종목' })).toBe(false)
+  })
+
+  it('밴드가 얇으면(2줄 불가) 조각이 커도 그리지 않는다', () => {
+    expect(fitsSliceLabel({ innerRadius: 100, outerRadius: 120, percent: 0.5, ticker: 'KO' })).toBe(false)
+  })
+})
+
+describe('GuruDetail 도넛 인라인 범례 + KPI 2장 (task#235 S2·S3)', () => {
+  // 조각 라벨·조각 자체는 recharts라 jsdom에서 렌더되지 않는다(겹침·위치는 라이브 프로브가 게이트).
+  // 여기서 관측 가능한 것은 범례표 부재·HTML 중앙 오버레이·KPI 개수뿐이다.
+  it('별도 범례표가 없다', async () => {
+    mockManager(MANAGER_NO_HOLDINGS)
+    const { container } = renderPage()
+    await screen.findByText('Warren Buffett')
+    expect(container.querySelector('table')).toBeNull()
+  })
+
+  it('중앙 요약이 상위 종목 개수와 합계 비중을 표시한다', async () => {
+    mockManager(MANAGER_NO_HOLDINGS)
+    renderPage()
+    await screen.findByText('Warren Buffett')
+    expect(screen.getByText('상위 10종목')).toBeTruthy()
+    expect(screen.getByText('77.5%')).toBeTruthy()   // TOP10 fixture 합계
+  })
+
+  it('KPI는 2장 — 「상위 N종목 비중」 카드는 중앙으로 이관돼 사라졌다', async () => {
+    mockManager(MANAGER_NO_HOLDINGS)
+    const { container } = renderPage()
+    await screen.findByText('Warren Buffett')
+    expect(container.querySelectorAll('.kpi').length).toBe(2)
+    expect(screen.queryByText('상위 10종목 비중')).toBeNull()
+  })
+
+  it('top10이 비면(기타 100%) 중앙 요약을 생략한다', async () => {
+    mockManager({ ...MANAGER_NO_HOLDINGS, top10: [] })
+    renderPage()
+    await screen.findByText('Warren Buffett')
+    expect(screen.queryByText(/^상위 \d+종목$/)).toBeNull()
   })
 })
 
