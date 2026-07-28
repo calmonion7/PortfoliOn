@@ -98,6 +98,50 @@ describe('GuruDetail 모바일 appbar 제목 축약 (task#229 S2)', () => {
   })
 })
 
+describe('GuruDetail 운용역·펀드 표기 (task#236 S2)', () => {
+  const BLURB = 'Investment Objective: The Fund seeks long-term capital appreciation...'
+  const PERSON_FUND = { ...MANAGER_NO_HOLDINGS, name: 'Alex Roepers - Atlantic Investment Management', firm: 'Alex Roepers - Atlantic Investment Management' }
+  const FUND_ONLY  = { ...MANAGER_NO_HOLDINGS, name: 'AKO Capital', firm: 'AKO Capital' }
+  const BLURBED    = { ...MANAGER_NO_HOLDINGS, name: 'Bruce Berkowitz - Fairholme Capital', firm: `Bruce Berkowitz - Fairholme Capital ${BLURB}` }
+
+  it('PC 제목은 전체 이름이 아니라 운용역 — 부제의 펀드명이 제목 안에서 반복되지 않는다', async () => {
+    mockManager(PERSON_FUND)
+    const { container } = renderPage()
+    await screen.findByText('Alex Roepers')
+    const h1 = container.querySelector('.page-title')
+    expect(h1.textContent).toBe('Alex Roepers')
+    expect(h1.textContent).not.toContain(' - ')
+    expect(screen.getByText('Atlantic Investment Management')).toBeTruthy()
+  })
+
+  it('펀드만인 매니저는 부제 문단이 없다 (PC)', async () => {
+    mockManager(FUND_ONLY)
+    const { container } = renderPage()
+    await screen.findByText('AKO Capital')
+    expect(container.querySelector('.page-title').textContent).toBe('AKO Capital')
+    expect(container.querySelector('.page-head p.muted')).toBeNull()
+    expect(screen.getAllByText('AKO Capital').length).toBe(1)
+  })
+
+  it('펀드만인 매니저는 부제 문단이 없다 (모바일)', async () => {
+    viewport.mobile = true
+    mockManager(FUND_ONLY)
+    const { container } = renderPage()
+    await screen.findByText('AKO Capital')
+    expect(container.querySelector('.appbar h1').textContent).toBe('AKO Capital')
+    // p.muted 셀렉터로는 못 좁힌다 — `{body}`가 프래그먼트라 "기타 N종목" 캡션도 .m-page 직계 자식이다.
+    // 완료기준 자체(제목과 같은 문자열이 2줄로 반복되지 않음)를 단언한다.
+    expect(screen.getAllByText('AKO Capital').length).toBe(1)
+  })
+
+  it('소개글 본문은 어느 뷰포트에도 표시되지 않는다', async () => {
+    mockManager(BLURBED)
+    const { container } = renderPage()
+    await screen.findByText('Bruce Berkowitz')
+    expect(container.textContent).not.toContain('Investment Objective')
+  })
+})
+
 describe('fitsSliceLabel — 조각 위 라벨 기하 판정 (task#235 S2)', () => {
   // 현 도넛 기하(컨테이너 350~360px → inner 86 / outer 134). 고정 임계값이 아니라 호 길이 판정이므로
   // 도넛 크기가 바뀌어도 규칙이 따라온다 — 그 규칙 자체를 못박는다.

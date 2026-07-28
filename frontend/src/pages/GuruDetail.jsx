@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import { SketchEmpty } from '../components/sketches'
 import useIsMobile from '../hooks/useIsMobile'
 import { WatchlistBtn } from './GuruStats'
+import { splitManagerName } from '../utils/guruName'
 
 // 구루 매니저 상세 (task#226 S4) — 상위 10종목 도넛 + 전 종목 목록.
 // holdings(전 종목)는 크롤 후에만 존재 — 없으면 top10 + "기타 N종목 x%"로 graceful 폴백(도넛도 동일 폴백 공유).
@@ -113,6 +114,8 @@ export default function GuruDetail() {
     </div>
   )
 
+  // 표기는 `name` 하나에서 파생 — `firm`은 71명이 name과 같고 12명은 소개글 전문이 붙어 온다(task#236)
+  const { person, fund } = splitManagerName(manager.name)
   const top10 = manager.top10 || []
   const holdings = manager.holdings || null   // null = 크롤 이전(폴백)
   const top10Sum = top10.reduce((s, h) => s + (h.weight_pct || 0), 0)
@@ -222,13 +225,13 @@ export default function GuruDetail() {
   if (isMobile) return (
     <>
       <header className="appbar">
-        {/* firm은 바로 아래 줄에 따로 표시되므로 이름 앞부분만 — 목록 카드와 같은 표기.
+        {/* 펀드명은 바로 아래 줄에 따로 표시되므로 운용역만 — 목록 카드와 같은 표기.
             전체 이름은 2줄로 접혀 스크롤 시 헤더 아래 잔여를 남겼다(task#229) */}
-        <h1>{manager.name.split(' - ')[0]}</h1>
+        <h1>{person || fund}</h1>
       </header>
       <div className="m-page">
         <Link to="/guru" style={{ fontSize: 12, color: 'var(--text-3)' }}>← 구루 매니저</Link>
-        {manager.firm && <p className="muted" style={{ fontSize: 13, margin: '4px 0 14px' }}>{manager.firm}</p>}
+        {person && <p className="muted" style={{ fontSize: 13, margin: '4px 0 14px' }}>{fund}</p>}
         {body}
       </div>
       {/* 목록 복귀 — 좌하단 플로팅 pill(task#228). fixed이므로 조상에 transform 금지(task#195) */}
@@ -240,8 +243,8 @@ export default function GuruDetail() {
     <div className="page">
       <div className="page-head" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
         <Link to="/guru" style={{ fontSize: 12, color: 'var(--text-3)' }}>← 구루 매니저</Link>
-        <h1 className="page-title serif">{manager.name}</h1>
-        {manager.firm && <p className="muted" style={{ fontSize: 13, margin: 0 }}>{manager.firm}</p>}
+        <h1 className="page-title serif">{person || fund}</h1>
+        {person && <p className="muted" style={{ fontSize: 13, margin: 0 }}>{fund}</p>}
       </div>
       {body}
       {/* 목록 복귀 — 좌하단 플로팅 pill(task#228). fixed이므로 조상에 transform 금지(task#195) */}

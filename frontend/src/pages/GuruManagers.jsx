@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
 import { SketchEmpty } from '../components/sketches'
+import { splitManagerName } from '../utils/guruName'
 
 // 티커별 보유 매니저 수 역인덱스 — Recommendations.jsx의 buildGuruCounts와 동일 방식(백엔드 호출 없이 이미 받은 managers blob만 사용)
 function buildGuruCounts(managers) {
@@ -90,7 +91,6 @@ export default function GuruManagers() {
   const filtered = q
     ? data.managers.filter(m =>
         m.name.toLowerCase().includes(q) ||
-        (m.firm || '').toLowerCase().includes(q) ||
         (m.top10 || []).some(h => h.ticker.toLowerCase().includes(q) || (h.name_kr || '').toLowerCase().includes(q))
       )
     : data.managers
@@ -129,7 +129,7 @@ export default function GuruManagers() {
       <div className="guru-search-row--mobile">
         <input
           className="m-list-search"
-          placeholder="매니저명 / 펌 / 티커 검색..."
+          placeholder="운용역 / 펀드 / 티커 검색..."
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
@@ -153,7 +153,9 @@ export default function GuruManagers() {
 
       {/* 카드 목록 — .guru-card/.guru-h/.guru-avatar/.guru-stats(pc.css) 재사용, 데스크탑 카드와 동일 문법 */}
       <div className="anim-stagger guru-list--mobile">
-        {sorted.map((m, i) => (
+        {sorted.map((m, i) => {
+          const { person, fund } = splitManagerName(m.name)
+          return (
           <div
             key={m.id}
             className="guru-card anim-fade-up"
@@ -167,11 +169,10 @@ export default function GuruManagers() {
               <div className="guru-avatar">{initials(m.name)}</div>
               <div className="guru-h-info">
                 <p className="guru-name serif">
-                  {m.name.split(' - ')[0]}
+                  {person || fund}
                 </p>
-                <div className="guru-fund">
-                  {m.firm || m.name}
-                </div>
+                {/* 펀드 부제는 운용역이 따로 있을 때만 — 없으면 제목과 같은 문자열이 2줄로 반복된다(task#236) */}
+                {person && <div className="guru-fund">{fund}</div>}
               </div>
               <div className="guru-rank">
                 #{i + 1}
@@ -216,7 +217,8 @@ export default function GuruManagers() {
               </div>
             )}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -231,7 +233,7 @@ export default function GuruManagers() {
         <Input
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="매니저명 / 펌 / 티커 검색..."
+          placeholder="운용역 / 펀드 / 티커 검색..."
           className="guru-search--wide"
         />
         {query && (
@@ -253,7 +255,9 @@ export default function GuruManagers() {
       </div>
 
       <div className="anim-stagger guru-grid">
-        {sorted.map((m, i) => (
+        {sorted.map((m, i) => {
+          const { person, fund } = splitManagerName(m.name)
+          return (
           <div
             key={m.id}
             className="guru-card anim-fade-up"
@@ -266,11 +270,10 @@ export default function GuruManagers() {
               <div className="guru-avatar">{initials(m.name)}</div>
               <div className="guru-h-info">
                 <p className="guru-name serif">
-                  {m.name.split(' - ')[0]}
+                  {person || fund}
                 </p>
-                <div className="guru-fund">
-                  {m.firm || m.name}
-                </div>
+                {/* 펀드 부제는 운용역이 따로 있을 때만 — 없으면 제목과 같은 문자열이 2줄로 반복된다(task#236) */}
+                {person && <div className="guru-fund">{fund}</div>}
               </div>
               <div className="guru-rank">#{i + 1}</div>
             </div>
@@ -313,7 +316,8 @@ export default function GuruManagers() {
               </div>
             )}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

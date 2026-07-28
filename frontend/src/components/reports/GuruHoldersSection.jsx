@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { SectionTitle } from './reportUtils.jsx'
+import { splitManagerName } from '../../utils/guruName'
 
 // US 13F 구루(운용역) 보유 드릴다운. 기술·수급 탭 US 브랜치.
 // GET /api/guru/managers → managers[].top10[].{ ticker, weight_pct, name, rank }
@@ -33,9 +34,11 @@ export default function GuruHoldersSection({ ticker, market }) {
         for (const m of (data.managers || [])) {
           for (const h of (m.top10 || [])) {
             if (h.ticker.toUpperCase() === target) {
+              // 운용역·운용사 모두 `name`에서 파생 — `firm`은 소개글 전문이 섞여 온다(task#236)
+              const { person, fund } = splitManagerName(m.name)
               found.push({
-                name: m.name.split(' - ')[0],
-                firm: m.firm || null,
+                name: person || fund,
+                fund: person ? fund : null,
                 rank: h.rank,
                 weightPct: h.weight_pct,
               })
@@ -90,7 +93,7 @@ export default function GuruHoldersSection({ ticker, market }) {
             {holders.map((h, i) => (
               <tr key={i}>
                 <td style={TDL}>{h.name}</td>
-                <td style={{ ...TDL, color: 'var(--text-3)', fontSize: 11 }}>{h.firm || '—'}</td>
+                <td style={{ ...TDL, color: 'var(--text-3)', fontSize: 11 }}>{h.fund || '—'}</td>
                 <td style={{ ...TD, fontWeight: 600 }}>
                   {h.weightPct != null ? `${Number(h.weightPct).toFixed(2)}%` : '—'}
                 </td>

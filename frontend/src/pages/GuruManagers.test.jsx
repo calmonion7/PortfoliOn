@@ -148,6 +148,63 @@ describe('GuruManagers 칩 초기 정렬 방향 (task#229 S4)', () => {
   })
 })
 
+describe('GuruManagers 운용역·펀드 표기 (task#236 S2)', () => {
+  // 라이브 83명의 실제 형태 3종. `firm`은 71명이 name과 같고 12명은 소개글 전문이 붙어 온다.
+  const BLURB = 'Investment Objective: The Fund seeks long-term capital appreciation by investing...'
+  function renderShapes() {
+    api.get.mockImplementation((url) =>
+      url === '/api/guru/managers'
+        ? Promise.resolve({ data: { last_updated: null, managers: [
+            // ① 운용역 + 펀드
+            { id: 'p', name: 'Alex Roepers - Atlantic Investment Management', firm: 'Alex Roepers - Atlantic Investment Management', portfolio_value: 3, num_stocks: 1, top10: [] },
+            // ② 펀드만(26명형) — 기존엔 제목·부제가 완전히 같은 문자열 2줄
+            { id: 'f', name: 'AKO Capital', firm: 'AKO Capital', portfolio_value: 2, num_stocks: 1, top10: [] },
+            // ③ 소개글 혼입(12명형)
+            { id: 'b', name: 'Bruce Berkowitz - Fairholme Capital', firm: `Bruce Berkowitz - Fairholme Capital ${BLURB}`, portfolio_value: 1, num_stocks: 1, top10: [] },
+          ] } })
+        : Promise.resolve({ data: [] })
+    )
+    return render(<GuruManagers />)
+  }
+
+  it('운용역이 있으면 제목=운용역·부제=펀드', async () => {
+    const { container } = renderShapes()
+    await screen.findByText('Alex Roepers')
+    const card = container.querySelectorAll('.guru-card')[0]
+    expect(card.querySelector('.guru-name').textContent.trim()).toBe('Alex Roepers')
+    expect(card.querySelector('.guru-fund').textContent.trim()).toBe('Atlantic Investment Management')
+  })
+
+  it('펀드만인 매니저는 부제 노드 자체가 없다 — 같은 문자열 2줄 반복 소멸', async () => {
+    const { container } = renderShapes()
+    await screen.findByText('AKO Capital')
+    const card = [...container.querySelectorAll('.guru-card')]
+      .find(c => c.querySelector('.guru-name').textContent.trim() === 'AKO Capital')
+    expect(card.querySelector('.guru-fund')).toBeNull()
+  })
+
+  it('어떤 카드에도 소개글 본문이 표시되지 않는다', async () => {
+    const { container } = renderShapes()
+    await screen.findByText('Bruce Berkowitz')
+    expect(container.textContent).not.toContain('Investment Objective')
+  })
+
+  it('소개글 본문으로는 검색되지 않는다 — firm 조건 제거', async () => {
+    renderShapes()
+    await screen.findByText('Bruce Berkowitz')
+    fireEvent.change(screen.getByPlaceholderText(/티커 검색/), { target: { value: 'Investment Objective' } })
+    expect(screen.queryByText('Bruce Berkowitz')).toBeNull()
+  })
+
+  it('펀드명 검색은 계속 동작한다 — name에 펀드가 들어있다', async () => {
+    renderShapes()
+    await screen.findByText('Alex Roepers')
+    fireEvent.change(screen.getByPlaceholderText(/티커 검색/), { target: { value: 'atlantic' } })
+    expect(screen.getByText('Alex Roepers')).toBeTruthy()
+    expect(screen.queryByText('AKO Capital')).toBeNull()
+  })
+})
+
 describe('GuruManagers 빈 상태 안내 문구 (task#227 S5)', () => {
   it('실제 경로("설정 > 구루")를 안내하고 존재하지 않는 "크롤링 설정" 탭을 언급하지 않음', async () => {
     mockApi({ stocks: [] })
