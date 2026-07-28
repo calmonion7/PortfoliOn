@@ -1158,6 +1158,8 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 
 종목 검색 (한글 → Naver, 영문 → yfinance).
 
+**Auth:** Bearer token 필요
+
 **Query Parameters**
 
 | 파라미터 | 타입 | 필수 | 설명 |
@@ -1490,7 +1492,7 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 종목 최근 뉴스(최대 10건, 링크 기준 중복제거·published_at 최신순)를 on-demand 조회. 리포트가 없는 랭킹 종목 등에서 쓰며 `scraper.get_news`를 재사용한다(KR=Naver, US=yfinance). 공개 read.
 
-**Auth:** 불필요
+**Auth:** Bearer token 필요
 
 **Request** — query parameters
 
@@ -1522,6 +1524,8 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 리포트 생성 진행 상황 조회. 생성 중일 때 폴링용으로 사용.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 {
@@ -1544,6 +1548,8 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 ### `GET /api/report/backfill/progress`
 
 리포트 백필 진행 상황 조회.
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -1662,6 +1668,8 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 종목의 가격·애널리스트 데이터 히스토리 조회. 차트 표시용.
 
+**Auth:** Bearer token 필요
+
 **Path Parameter:** `ticker` — 종목 코드
 
 **Response `200`**
@@ -1688,6 +1696,8 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 ### `GET /api/report/{ticker}/{date_str}`
 
 특정 날짜의 리포트 내용 조회.
+
+**Auth:** Bearer token 또는 `X-API-Key` (`get_current_user_or_api_key`) — Cowork enrich 워크플로우가 읽는다
 
 **Path Parameters**
 - `ticker` — 종목 코드
@@ -1752,6 +1762,8 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 ### `GET /api/report/{ticker}/backlog`
 
 종목의 수주잔고(Order Backlog) 분기별 이력 조회. KR 종목 리포트 상세의 '수주잔고 추이' 차트가 사용. **Auth 불필요.**
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -1840,6 +1852,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 종목의 DART 공시 피드 조회 (최신순). KR 종목 리포트 상세의 '최신 공시' 섹션이 사용. `disclosure_fetch` 배치가 채우는 `stock_disclosures` 테이블에서 읽으며, **Cowork가 enrich하는 `recent_disclosures`(애널리스트 코멘터리)와는 별도 store**다. **Auth 불필요.**
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 [
@@ -1872,6 +1886,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 ### `GET /api/report/{ticker}/insider-trades`
 
 종목의 내부자·5%지분 변동 공시 피드 + 순매수/순매도 신호 조회 (최신순). KR 종목 리포트 상세의 '내부자·5% 지분변동' 섹션이 사용. `insider_fetch` 배치가 채우는 `stock_insider_trades` 테이블에서 읽으며(DART `elestock.json`=임원·주요주주 소유보고 / `majorstock.json`=5% 대량보유보고 정규화), **Cowork가 enrich하는 `recent_disclosures`(애널리스트 코멘터리)와는 별도 store**다. 저장값만 읽고 요청경로 라이브 DART 호출은 0. **Auth 불필요.**
+
+**Auth:** Bearer token 필요
 
 **Response `200`**
 ```json
@@ -1990,6 +2006,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 컨센서스 일괄 수집 진행 상황 조회.
 
+**Auth:** Bearer token 필요
+
 **Response `200`**
 ```json
 {
@@ -2018,6 +2036,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 ### `GET /api/consensus/{ticker}`
 
 특정 종목의 컨센서스 히스토리 조회.
+
+**Auth:** Bearer token 필요
 
 **Path Parameter:** `ticker` — 종목 코드
 

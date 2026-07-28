@@ -47,12 +47,12 @@ _backfill_progress = ProgressTracker(created=0)
 
 
 @router.get("/report/progress")
-def get_progress():
+def get_progress(_: str = Depends(get_current_user)):
     return _progress.get()
 
 
 @router.get("/report/backfill/progress")
-def get_backfill_progress():
+def get_backfill_progress(_: str = Depends(get_current_user)):
     return _backfill_progress.get()
 
 
@@ -260,7 +260,7 @@ def list_reports(scope: str = "mine", user_id: str = Depends(get_current_user_or
 
 
 @router.get("/report/{ticker}/history")
-def get_history(ticker: str):
+def get_history(ticker: str, _: str = Depends(get_current_user)):
     upper = ticker.upper()
     # 목표가·의견 시계열은 지표 차트와 동일 정본(mart-first → consensus_history 폴백)에서 받는다. ADR-0008.
     series = consensus_svc.get_history(upper)
@@ -417,7 +417,7 @@ def get_us_supply_route(ticker: str, user_id: str = Depends(get_current_user_or_
 # 등록해야 한다. 아니면 "backlog"가 date_str로 매칭돼 snapshots를 date='backlog'로
 # 조회하다 500이 난다 (enrich/batch와 동일 클래스의 라우트 순서 함정).
 @router.get("/report/{ticker}/backlog")
-def get_backlog(ticker: str):
+def get_backlog(ticker: str, _: str = Depends(get_current_user)):
     from services.backlog import get_backlog as _get_backlog
     return _get_backlog(ticker)
 
@@ -425,7 +425,7 @@ def get_backlog(ticker: str):
 # /report/{ticker}/disclosures 도 catch-all /report/{ticker}/{date_str} 보다 먼저
 # 등록해야 한다(backlog와 동일 라우트 순서 함정).
 @router.get("/report/{ticker}/disclosures")
-def get_disclosures(ticker: str):
+def get_disclosures(ticker: str, _: str = Depends(get_current_user)):
     from services.disclosures import get_disclosures as _get_disclosures
     return _get_disclosures(ticker)
 
@@ -434,7 +434,7 @@ def get_disclosures(ticker: str):
 # 등록해야 한다(backlog/disclosures와 동일 라우트 순서 함정 — 4번째 재발 방지).
 # 저장값만 읽음(요청경로 라이브 DART 0). US·corp_code 미매핑·무데이터는 빈 결과 graceful.
 @router.get("/report/{ticker}/insider-trades")
-def get_insider_trades_route(ticker: str):
+def get_insider_trades_route(ticker: str, _: str = Depends(get_current_user)):
     from services.insider_trades import get_insider_trades, compute_net_signal
     return {"trades": get_insider_trades(ticker), "signal": compute_net_signal(ticker)}
 
@@ -456,7 +456,7 @@ def get_us_insider_route(ticker: str, user_id: str = Depends(get_current_user_or
 
 
 @router.get("/report/{ticker}/{date_str}")
-def get_report(ticker: str, date_str: str):
+def get_report(ticker: str, date_str: str, _: str = Depends(get_current_user_or_api_key)):
     upper = ticker.upper()
     summary = cache_svc.get_snapshot(upper, date_str, lambda: _read_snapshot(upper, date_str))
     if summary is None:
@@ -478,7 +478,7 @@ _consensus_progress = ProgressTracker()
 
 
 @router.get("/consensus/batch/progress")
-def get_consensus_batch_progress():
+def get_consensus_batch_progress(_: str = Depends(get_current_user)):
     return _consensus_progress.get()
 
 
@@ -506,7 +506,7 @@ def _run_consensus_batch(stocks: list, days: int = 180, force: bool = False):
 
 
 @router.get("/consensus/{ticker}")
-def get_consensus(ticker: str):
+def get_consensus(ticker: str, _: str = Depends(get_current_user)):
     return consensus_svc.get_history(ticker)
 
 

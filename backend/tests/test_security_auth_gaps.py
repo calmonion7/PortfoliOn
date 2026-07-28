@@ -109,6 +109,59 @@ def test_market_read_requires_auth_231(path):
     assert r.status_code == 401
 
 
+# task#232(ADR-0029) — 리포트 read 9개 + 검색·뉴스 2개는 무인증 접근이 401이어야 한다.
+# 이 11개를 닫으면 무인증 엔드포인트는 auth.py 공개 9개만 남는다(scripts/audit_unauth_endpoints.py가 게이트).
+_READ_GATES_232 = [
+    ("report", "/api/report/progress"),
+    ("report", "/api/report/backfill/progress"),
+    ("report", "/api/report/AAPL/history"),
+    ("report", "/api/report/AAPL/backlog"),
+    ("report", "/api/report/AAPL/disclosures"),
+    ("report", "/api/report/AAPL/insider-trades"),
+    ("report", "/api/report/AAPL/2026-07-28"),
+    ("report", "/api/consensus/batch/progress"),
+    ("report", "/api/consensus/AAPL"),
+    ("stocks", "/api/stocks/search?q=AA"),
+    ("stocks", "/api/stocks/AAPL/news"),
+]
+
+_ROUTERS_232 = {"report": report_router, "stocks": stocks_router}
+
+
+@pytest.mark.parametrize("group,path", _READ_GATES_232, ids=[p for _, p in _READ_GATES_232])
+def test_report_read_requires_auth_232(group, path):
+    r = _client(_ROUTERS_232[group]).get(path)
+    assert r.status_code != 404, f"경로가 존재하지 않는다: {path}"
+    assert r.status_code == 401
+
+
+def test_report_detail_accepts_api_key_232():
+    """GET /api/report/{ticker}/{date_str}는 Cowork가 X-API-Key로 읽는다 — 키 인증도 200이어야 한다.
+
+    `get_current_user`만 걸면 Cowork enrich 워크플로우가 조용히 깨지므로 positive 검증이 필수다."""
+    from routers import report as report_mod
+
+    snap = {"name": "Apple Inc.", "price": 100.0}
+    with patch.dict("os.environ", {"COWORK_API_KEY": "test-cowork-key"}), \
+         patch.object(report_mod.cache_svc, "get_snapshot", return_value=snap), \
+         patch.object(report_mod.consensus_svc, "apply_asof", side_effect=lambda s, *a, **k: s), \
+         patch.object(report_mod, "query", return_value=[]):
+        r = _client(report_router).get(
+            "/api/report/AAPL/2026-07-28", headers={"X-API-Key": "test-cowork-key"}
+        )
+    assert r.status_code == 200, r.text
+    assert r.json()["ticker"] == "AAPL"
+
+
+def test_report_detail_rejects_bad_api_key_232():
+    """잘못된 API 키는 401 — 키 경로가 무조건 통과하는 구멍이 아님을 못박는다."""
+    with patch.dict("os.environ", {"COWORK_API_KEY": "test-cowork-key"}):
+        r = _client(report_router).get(
+            "/api/report/AAPL/2026-07-28", headers={"X-API-Key": "wrong-key"}
+        )
+    assert r.status_code == 401
+
+
 def test_consume_refresh_token_is_one_time():
     """refresh token은 사용 즉시 폐기(회전)되어 재사용 시 거부된다."""
     from services import auth_service

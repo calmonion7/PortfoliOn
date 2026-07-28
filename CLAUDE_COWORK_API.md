@@ -136,7 +136,7 @@ X-API-Key: {COWORK_API_KEY}
 
 특정 날짜의 리포트 스냅샷 데이터를 조회합니다. 기존 분석을 참조할 때 사용합니다.
 
-**Auth:** 불필요
+**Auth:** `X-API-Key` 헤더
 
 **Path Parameters**
 - `ticker` — 종목 코드 (예: `LLY`)

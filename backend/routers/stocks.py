@@ -153,7 +153,7 @@ class BatchEnrichItem(BaseModel):
 
 
 @router.get("/search")
-def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL"):
+def search_stocks(q: str = Query(..., min_length=1), market: str = "ALL", _: str = Depends(get_current_user)):
     # Yahoo Finance doesn't support Korean text — use Naver autocomplete instead
     if _KR_PATTERN.search(q):
         results = _search_naver(q)
@@ -318,8 +318,8 @@ def compare_stocks(tickers: str = Query(..., min_length=1), user_id: str = Depen
 
 
 @router.get("/{ticker}/news")
-def get_stock_news(ticker: str, market: str = "US"):
-    """종목 최근 뉴스 (랭킹 등 리포트 없는 종목용 on-demand 조회). scraper.get_news 재사용, 공개 read."""
+def get_stock_news(ticker: str, market: str = "US", _: str = Depends(get_current_user)):
+    """종목 최근 뉴스 (랭킹 등 리포트 없는 종목용 on-demand 조회). scraper.get_news 재사용, 인증 필요(ADR-0029)."""
     if market not in ("KR", "US"):
         raise HTTPException(status_code=400, detail="market must be KR or US")
     try:
