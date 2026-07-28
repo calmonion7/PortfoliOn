@@ -128,6 +128,24 @@ describe('GuruManagers 칩 초기 정렬 방향 (task#229 S4)', () => {
     const { container } = await renderMixed()
     expect(order(container)).toEqual(['Zeta Fund', 'Mid Fund', 'Alpha Fund'])
   })
+
+  // 라이브에서 'AKO Capital'이 'Abrams Bison Investments' 앞에 오던 회귀 — 코드유닛 비교는
+  // 대문자(0x4B 'K')를 소문자(0x62 'b')보다 앞세운다. 로케일 비교로만 잡힌다.
+  it('이름순은 대소문자 혼재에도 사람이 읽는 알파벳 순서', async () => {
+    api.get.mockImplementation((url) =>
+      url === '/api/guru/managers'
+        ? Promise.resolve({ data: { last_updated: null, managers: [
+            { id: '1', name: 'AKO Capital',              firm: 'x', portfolio_value: 3, num_stocks: 1, top10: [] },
+            { id: '2', name: 'Abrams Bison Investments', firm: 'x', portfolio_value: 2, num_stocks: 1, top10: [] },
+            { id: '3', name: 'AltaRock Partners',        firm: 'x', portfolio_value: 1, num_stocks: 1, top10: [] },
+          ] } })
+        : Promise.resolve({ data: [] })
+    )
+    const { container } = render(<GuruManagers />)
+    await screen.findByText('AKO Capital')
+    fireEvent.click(screen.getByRole('button', { name: '이름순' }))
+    expect(order(container)).toEqual(['Abrams Bison Investments', 'AKO Capital', 'AltaRock Partners'])
+  })
 })
 
 describe('GuruManagers 빈 상태 안내 문구 (task#227 S5)', () => {

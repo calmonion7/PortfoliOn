@@ -95,12 +95,15 @@ export default function GuruManagers() {
       )
     : data.managers
 
+  // 문자열 키는 로케일 비교 — 코드유닛 비교(av < bv)는 대문자를 소문자보다 앞세워
+  // 'AKO Capital'을 'Abrams Bison Investments' 앞에 둬 이름순처럼 보이지 않았다(task#229)
   const sorted = [...filtered].sort((a, b) => {
     const av = a[sort.key] ?? ''
     const bv = b[sort.key] ?? ''
-    if (av < bv) return -sort.dir
-    if (av > bv) return sort.dir
-    return 0
+    const cmp = (typeof av === 'string' && typeof bv === 'string')
+      ? av.localeCompare(bv)
+      : (av < bv ? -1 : av > bv ? 1 : 0)
+    return Math.sign(cmp) * sort.dir
   })
 
   if (loading) return <LoadingSpinner label="구루 운용역 불러오는 중입니다." />
