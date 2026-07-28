@@ -81,7 +81,12 @@ export default function GuruDetail() {
     ...(otherCount > 0 ? [{ name: `기타 ${otherCount}종목`, value: otherPct, isOther: true }] : []),
   ]
 
-  const listRows = holdings || top10
+  // holdings에는 name_kr이 없다(꼬리 종목 한글명 조회는 Non-goal) — 상위 10종목은 top10에 이미
+  // 있는 한글명을 얹어 범례(한글)와 목록(영문) 불일치를 없앤다. 11위 이하는 영문명 그대로.
+  const krByTicker = Object.fromEntries(top10.filter(h => h.name_kr).map(h => [h.ticker, h.name_kr]))
+  const listRows = (holdings || top10).map(h => (
+    h.name_kr || !krByTicker[h.ticker] ? h : { ...h, name_kr: krByTicker[h.ticker] }
+  ))
   const visibleRows = expanded ? listRows : listRows.slice(0, DEFAULT_ROWS)
 
   const body = (
