@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from main import app
+from tests._routes import walk_routes
 
 _ROOT = Path(__file__).resolve().parents[2]
 
@@ -25,7 +26,7 @@ def _norm(path: str) -> str:
 
 def _live() -> set:
     out = set()
-    for r in app.routes:
+    for r in walk_routes(app.routes):
         if getattr(r, "path", None) in _EXCLUDE_PATHS:
             continue
         for m in getattr(r, "methods", None) or []:
