@@ -154,6 +154,13 @@ def _parse_stock_row(cells) -> Optional[dict]:
         activity = _parse_activity(cells[3].get_text(strip=True))
         if activity:
             row["activity"] = activity
+    # cells[6] = Value(신고 금액, 예 '$57,843,261,000'). 이 값이 [[구루 자산 배분]]
+    # 투자금의 정본이고, 없을 때만 소비측이 `비중 % × 포트폴리오 가치`로 추정한다.
+    # 파싱 실패(0)는 키를 만들지 않는다 — 0원 보유로 읽히면 안 된다(wrong < missing).
+    if len(cells) > 6:
+        value = _parse_portfolio_value(cells[6].get_text(strip=True))
+        if value:
+            row["value"] = value
     return row
 
 

@@ -46,6 +46,8 @@ def test_scrape_holdings_extracts_all_rows_and_top10_unchanged():
 
     # holdings 항목엔 name_kr 없음
     assert "name_kr" not in holdings[0]
+    # 3칸 fixture엔 Value 칸이 없다 — value 키도 없어야 한다(0 저장 금지, task#241)
+    assert "value" not in holdings[0]
 
     for i in range(10):
         assert top10[i]["rank"] == i + 1
@@ -83,7 +85,7 @@ def _make_real_grid_html() -> str:
     for tk, nm, pct, act in _REAL_ROWS:
         rows.append(
             f"<tr><td>≡</td><td>{tk}- {nm}</td><td>{pct}</td><td>{act}</td>"
-            f"<td>1,000</td><td>$10.00</td><td>$10,000</td><td></td>"
+            f"<td>1,000</td><td>$10.00</td><td>$57,843,261,000</td><td></td>"
             f"<td>$11.00</td><td>10.00%</td><td>$9.00</td><td>$12.00</td></tr>"
         )
     p2 = (
@@ -116,6 +118,9 @@ def test_scrape_holdings_extracts_activity_and_period():
     assert by_ticker["CCC"]["activity"] == {"kind": "add", "share_pct": 203.99}
     # 신규매수는 직전 분기가 0이라 증감률이 없다
     assert by_ticker["DDD"]["activity"] == {"kind": "buy", "share_pct": None}
+    # Value(cells[6]) = 신고 금액. 쉼표·$ 제거 후 정수(task#241)
+    assert by_ticker["AAA"]["value"] == 57_843_261_000
+    assert result["top10"][0]["value"] == 57_843_261_000
 
 
 def test_parse_activity_patterns():

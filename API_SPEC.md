@@ -3163,6 +3163,30 @@ dataroma 기반 구루 매니저 전체 목록. 상세 전용 계층인 전 종�
 
 ---
 
+### `GET /api/guru/stats/allocation`
+
+전 구루를 하나의 자금 풀로 보고 **전 종목 층**(`holdings`)을 티커별로 합산한 자산 배분 랭킹. 투자금 내림차순 정렬.
+
+투자금은 dataroma 신고 금액(`value`)이 정본이고, 그 값이 없는 행에 한해 `weight_pct/100 × portfolio_value`로 추정한다. `ratio`의 분모는 `total_value`(전 종목 투자금 합)라 전 행의 `ratio` 합은 100이다. 듀얼클래스(GOOGL/GOOG 등)는 별개 티커로 센다. `name_kr`은 `top10` 층에서 티커로 조인하며, 없으면 빈 문자열(소비측이 `name` 폴백).
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+
+```json
+{
+  "total_value": 1077800000000,
+  "manager_count": 83,
+  "ticker_count": 1723,
+  "rows": [
+    { "ticker": "AAPL", "name": "Apple Inc.", "name_kr": "애플",
+      "value": 67300000000, "ratio": 6.2452, "holder_count": 24 }
+  ]
+}
+```
+
+---
+
 ### `GET /api/guru/crawl/progress`
 
 구루 크롤링 진행 상황 조회.

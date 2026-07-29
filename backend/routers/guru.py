@@ -4,7 +4,7 @@ from datetime import datetime
 from services import storage
 from services import job_runs
 from services.guru_scraper import scrape_all_managers
-from services.guru_stats import compute_popularity, compute_weighted
+from services.guru_stats import compute_popularity, compute_weighted, compute_allocation
 from services.progress import ProgressTracker
 from auth import require_admin, get_current_user
 
@@ -49,6 +49,12 @@ def stats_popularity(_: str = Depends(get_current_user)):
 def stats_weighted(_: str = Depends(get_current_user)):
     data = storage.get_guru_managers()
     return compute_weighted(data.get("managers", []))
+
+
+@router.get("/stats/allocation")
+def stats_allocation(_: str = Depends(get_current_user)):
+    data = storage.get_guru_managers()
+    return compute_allocation(data.get("managers", []))
 
 
 @router.get("/crawl/progress")
