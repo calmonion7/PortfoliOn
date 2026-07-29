@@ -108,3 +108,15 @@
   .guru-alloc-caption { font-size: 13px; }
   .guru-alloc-scopes button { font-size: 13px; padding: 8px 14px; min-height: 40px; }
 }
+
+/* 메타줄: 이름만 줄이고 숫자(비율·명수)는 절대 안 줄인다 — ellipsis가 문자열 끝을 먹으면
+   정작 중요한 수치가 사라진다(task#241 라이브 PC에서 50행 중 38행 잘림, 육안 포착). */
+.guru-alloc-grid .guru-stat-name { display: flex; gap: 4px; }
+.guru-alloc-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.guru-alloc-num { flex-shrink: 0; }
+
+/* PC만 열을 넓힌다(모바일은 .guru-stat-grid 기본 1열 유지). 이 탭 전용 modifier라
+   인기순·가중치 탭 그리드는 손대지 않는다. */
+@media (min-width: 769px) {
+  .guru-alloc-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+}

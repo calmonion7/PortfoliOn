@@ -102,14 +102,17 @@ export default function GuruAllocation() {
         {query && <span className="guru-count">{rows.length}개</span>}
       </div>
 
-      <div className="anim-stagger guru-stat-grid">
+      <div className="anim-stagger guru-stat-grid guru-alloc-grid">
         {rows.map(({ r, rank }) => (
           <div key={r.ticker} className="anim-fade-up guru-stat-row">
             <span className="guru-stat-rank">{rank}</span>
             <div className="guru-stat-main">
               <div className="guru-stat-ticker">{r.ticker}</div>
+              {/* 잘리는 건 이름이어야 한다 — 숫자를 한 문자열에 섞으면 ellipsis가 문자열
+                  *끝*을 먹어 비율·명수가 통째 사라진다(라이브 PC에서 50행 중 38행 발생). */}
               <div className="guru-stat-name">
-                {r.name_kr || r.name || '-'} · {r.ratio.toFixed(2)}% · {r.holder_count}명
+                <span className="guru-alloc-nm">{r.name_kr || r.name || '-'}</span>
+                <span className="guru-alloc-num">· {r.ratio.toFixed(2)}% · {r.holder_count}명</span>
               </div>
             </div>
             <div className="guru-stat-side">
