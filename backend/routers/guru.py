@@ -78,10 +78,11 @@ def _run_crawl():
         _progress.set(running=True)
         try:
             managers = scrape_all_managers(on_progress=on_progress)
-            storage.save_guru_managers({
+            if not storage.save_guru_managers({
                 "last_updated": datetime.now().isoformat(timespec="seconds"),
                 "managers": managers,
-            })
+            }):
+                logger.warning("[Guru] 빈 결과 — 저장 생략, 직전값 유지 (manual)")
         except Exception as e:
             logger.warning(f"[Guru] Crawl failed: {e}")
         finally:

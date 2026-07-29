@@ -20,11 +20,19 @@ def get_guru_managers() -> dict:
     return {"last_updated": None, "managers": []}
 
 
-def save_guru_managers(data: dict) -> None:
+def save_guru_managers(data: dict) -> bool:
+    """빈 매니저 목록이면 저장하지 않고 False (직전 양호값 보존, wrong < missing).
+
+    CLAUDE.md "빈/all-None 결과 캐시 박제 금지". 판정을 writer가 소유해 호출부
+    가드 중복을 만들지 않는다.
+    """
+    if not data.get("managers"):
+        return False
     execute(
         "INSERT INTO guru_managers (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
         (json.dumps(data),),
     )
+    return True
 
 
 def get_guru_schedule() -> dict:

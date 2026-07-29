@@ -57,11 +57,13 @@ def _run_guru_crawl():
     with job_runs.record("guru_crawl", "auto"):
         try:
             managers = scrape_all_managers()
-            storage.save_guru_managers({
+            if storage.save_guru_managers({
                 "last_updated": datetime.now().isoformat(timespec="seconds"),
                 "managers": managers,
-            })
-            logger.info("[Scheduler] Guru crawl completed")
+            }):
+                logger.info("[Scheduler] Guru crawl completed")
+            else:
+                logger.warning("[Scheduler] Guru 빈 결과 — 저장 생략, 직전값 유지")
         except Exception as e:
             logger.warning(f"[Scheduler] Guru crawl failed: {e}")
 

@@ -404,4 +404,6 @@ def scrape_all_managers(on_progress=None) -> list[dict]:
 
     if on_progress:
         on_progress(total, total, "")
+    # 수집 성공률 — 부분 실패(83명 중 일부만 성공) 관측용. 두 호출부(배치·수동)가 공유.
+    logger.info(f"[Guru] 수집 {len(result)}/{total}")
     return result

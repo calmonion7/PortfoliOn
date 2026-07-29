@@ -205,6 +205,11 @@ def _fetch_and_save_m7_earnings() -> dict:
     m7_by_q = _merge_quarters(m7_data)
     rest_by_q = _merge_quarters(rest_data)
     quarters = sorted(set(m7_by_q) | set(rest_by_q))[-8:]
+    if not quarters:
+        logger.warning("[Earnings] M7 전 티커 fetch 실패 — 저장 생략, 저장값 유지")
+        stored = _mc_load("m7_earnings")
+        return stored["data"] if stored else {"quarters": [], "unit": "십억달러"}
+
     data = {
         "quarters": [{"q": q, "m7": m7_by_q.get(q, 0), "rest": rest_by_q.get(q, 0)} for q in quarters],
         "unit": "십억달러",
@@ -229,6 +234,11 @@ def _fetch_and_save_kr_top2_earnings() -> dict:
     ended_qs = sorted(q for q in (set(top2_by_q) | set(rest_by_q)) if _quarter_ended(q))[-8:]
     est_qs = sorted(q for q in top2_by_q if not _quarter_ended(q))
     all_qs = ended_qs + est_qs
+    if not all_qs:
+        logger.warning("[Earnings] KR Top2 전 티커 fetch 실패 — 저장 생략, 저장값 유지")
+        stored = _mc_load("kr_top2_earnings")
+        return stored["data"] if stored else {"quarters": [], "unit": "억원"}
+
     data = {
         "quarters": [
             {"q": q, "top2": top2_by_q.get(q, 0),

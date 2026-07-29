@@ -50,6 +50,10 @@ def get_commodities() -> dict:
               for k, v in results.items() if v}
     history = {k: v["history"] for k, v in results.items() if v}
 
+    if not prices:
+        logger.warning("[Commodities] 전 심볼 fetch 실패 — 저장 생략, 저장값 반환")
+        return stored["data"] if stored else {"prices": {}, "history": {}}
+
     data = {"prices": prices, "history": history}
     _mc_save("commodities", data)
     _set_cache("commodities", data, ttl=3600)
@@ -92,6 +96,10 @@ def get_treasury() -> dict:
 
     rates = {k: {"current": v["current"], "change_bp": v["change_bp"]}
              for k, v in results.items() if v}
+    if not rates:
+        logger.warning("[Treasury] 전 만기 fetch 실패 — 저장 생략, 저장값 반환")
+        return stored["data"] if stored else {"rates": {}, "history": {}, "spread": [], "_raw_histories": {}}
+
     history = {k: v["history"] for k, v in results.items() if v and k in ("3m", "10y")}
 
     spread: list = []
