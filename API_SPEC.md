@@ -3077,7 +3077,7 @@ KOFIA 통계 API로 적재한 신용잔고·반대매매·시총 시계열(`mark
 
 ### `GET /api/guru/managers`
 
-dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 응답에 포함되지 않음(상세 엔드포인트 참조).
+dataroma 기반 구루 매니저 전체 목록. 상세 전용 계층인 전 종목 `holdings`와 전량매도 `sold_out`은 목록 응답에 포함되지 않음(상세 엔드포인트 참조).
 
 **Auth:** Bearer token 필요
 
@@ -3090,6 +3090,8 @@ dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 
       "name": "Warren Buffett",
       "firm": "Berkshire Hathaway",
       "portfolio_value": 350000000000,
+      "period": "Q1 2026",
+      "portfolio_date": "2026-03-31",
       "num_stocks": 45,
       "top10": ["AAPL", "BAC", "AXP"]
     }
@@ -3097,11 +3099,13 @@ dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 
 }
 ```
 
+`period`/`portfolio_date`는 그 매니저의 **최신 13F 신고 분기**다 — 매니저마다 다를 수 있으므로(신고 시점 차) 전역 상수로 취급하지 말 것.
+
 ---
 
 ### `GET /api/guru/managers/{manager_id}`
 
-특정 구루 매니저 1명의 전체 상세(보유 전 종목 `holdings` 포함). `GET /api/guru/managers`(목록)는 페이로드 절약을 위해 `holdings`를 벗겨 반환하므로, 전 종목이 필요하면 이 엔드포인트를 쓴다.
+특정 구루 매니저 1명의 전체 상세(보유 전 종목 `holdings`, 전량매도 `sold_out` 포함). `GET /api/guru/managers`(목록)는 페이로드 절약을 위해 그 둘을 벗겨 반환하므로, 필요하면 이 엔드포인트를 쓴다.
 
 **Auth:** Bearer token 필요
 
@@ -3112,11 +3116,28 @@ dataroma 기반 구루 매니저 전체 목록. 전 종목 `holdings`는 목록 
   "name": "Warren Buffett",
   "firm": "Berkshire Hathaway",
   "portfolio_value": 350000000000,
+  "period": "Q1 2026",
+  "portfolio_date": "2026-03-31",
   "num_stocks": 45,
-  "top10": [{ "rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "name_kr": "애플", "weight_pct": 42.1 }],
-  "holdings": [{ "rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "weight_pct": 42.1 }]
+  "top10": [{ "rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "name_kr": "애플", "weight_pct": 42.1,
+              "activity": { "kind": "add", "share_pct": 203.99, "port_pct": 3.98 } }],
+  "holdings": [{ "rank": 1, "ticker": "AAPL", "name": "Apple Inc.", "weight_pct": 42.1,
+                 "activity": { "kind": "add", "share_pct": 203.99, "port_pct": 3.98 } }],
+  "sold_out": [{ "ticker": "V", "name": "Visa Inc.", "port_pct": 1.06 }]
 }
 ```
+
+**`activity`(직전 분기 대비 활동)** — dataroma 신고 기준. **변동이 없는 종목엔 이 키가 아예 없다**(빈 객체가 아님).
+
+| 필드 | 뜻 |
+|------|-----|
+| `kind` | `buy`(신규매수) · `add`(추가매수) · `reduce`(축소). locale-독립 저장 enum이고 표시 라벨은 프론트가 붙인다 |
+| `share_pct` | **주식수** 증감률(%). `kind: "buy"`는 직전 보유가 0이라 `null` |
+| `port_pct` | 이번 분기 거래분이 **현재 포트폴리오에서 차지하는 비중**(%). 무부호 — 방향은 `kind`가 갖는다. 활동 페이지가 실패·절단되면 `null`(그래도 `kind`/`share_pct`는 남는다) |
+
+⚠️ `port_pct`는 `이전비중 → 현재비중` **차이가 아니다**. `현재비중 × 증감주식수/현재주식수`이므로 `weight_pct - port_pct`로 이전 분기 비중을 역산하면 틀린다.
+
+**`sold_out`** — 이번 분기에 **전량매도**한 종목(보유 목록엔 없으므로 별도 계층). `port_pct`는 직전 비중.
 
 없는 `manager_id`는 `404`.
 

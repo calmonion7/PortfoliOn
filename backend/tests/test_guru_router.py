@@ -44,6 +44,8 @@ SAMPLE_DATA = {
                 {"rank": 2, "ticker": "BAC", "name": "Bank of America", "weight_pct": 10.3},
                 {"rank": 3, "ticker": "KO", "name": "Coca-Cola", "weight_pct": 8.0},
             ],
+            "period": "Q1 2026", "portfolio_date": "2026-03-31",
+            "sold_out": [{"ticker": "HLT", "name": "Hilton Worldwide", "port_pct": 5.6}],
         }
     ],
 }
@@ -59,8 +61,22 @@ def test_get_managers_returns_stored_data():
     assert "holdings" not in body["managers"][0]
     # top10 은 그대로
     assert body["managers"][0]["top10"] == SAMPLE_DATA["managers"][0]["top10"]
+    # sold_out 도 상세 전용 계층이라 목록에서 벗겨짐(task#239)
+    assert "sold_out" not in body["managers"][0]
+    # 분기 표기는 목록에도 남는다(카드에서 쓸 수 있어야 함)
+    assert body["managers"][0]["period"] == "Q1 2026"
     # 저장 데이터 자체는 mutate 되지 않음
     assert "holdings" in SAMPLE_DATA["managers"][0]
+    assert "sold_out" in SAMPLE_DATA["managers"][0]
+
+
+def test_get_manager_detail_includes_sold_out_and_period():
+    with patch("routers.guru.storage.get_guru_managers", return_value=SAMPLE_DATA):
+        r = client.get("/api/guru/managers/brk")
+    body = r.json()
+    assert body["sold_out"] == SAMPLE_DATA["managers"][0]["sold_out"]
+    assert body["period"] == "Q1 2026"
+    assert body["portfolio_date"] == "2026-03-31"
 
 
 def test_get_manager_detail_includes_holdings():

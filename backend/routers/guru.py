@@ -15,12 +15,18 @@ router = APIRouter(prefix="/api/guru", tags=["guru"])
 _progress = ProgressTracker()
 
 
+_DETAIL_ONLY_KEYS = ("holdings", "sold_out")   # 상세 전용 계층 — 목록 페이로드에서 벗긴다
+
+
 @router.get("/managers")
 def get_managers(_: str = Depends(get_current_user)):
     data = storage.get_guru_managers()
     return {
         **data,
-        "managers": [{k: v for k, v in m.items() if k != "holdings"} for m in data.get("managers", [])],
+        "managers": [
+            {k: v for k, v in m.items() if k not in _DETAIL_ONLY_KEYS}
+            for m in data.get("managers", [])
+        ],
     }
 
 
