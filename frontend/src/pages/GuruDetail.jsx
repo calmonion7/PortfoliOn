@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import { SketchEmpty } from '../components/sketches'
 import useIsMobile from '../hooks/useIsMobile'
 import { WatchlistBtn } from './GuruStats'
+import GuruActivityBadge from '../components/ui/GuruActivityBadge'
 import { splitManagerName } from '../utils/guruName'
 
 // 구루 매니저 상세 (task#226 S4) — 상위 10종목 도넛 + 전 종목 목록.
@@ -58,6 +59,36 @@ export const makeSliceLabel = (widths) => function renderSliceLabel(p) {
       <tspan x={x} dy="1.2em" fontSize={9} fontWeight={400}>{Number(value).toFixed(1)}%</tspan>
     </text>
   )
+}
+
+// '2026-03-31' → '3/31'. 값이 없거나 형식이 다르면 빈 문자열(표기 생략).
+export function shortDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
+  return m ? `${Number(m[2])}/${Number(m[3])}` : ''
+}
+
+// 비중 임팩트 표기. 소수 2자리로 반올림하면 0이 되는 미미한 거래가 실재하므로(라이브: 전량매도한
+// ETF 잔량 등) 그 경우 `-0.00%p`로 쓰지 않는다 — 버그처럼 읽힌다. 방향은 배지가 이미 갖고 있어
+// `≈0%p`로 부호 없이 둔다.
+export function ppText(portPct, down) {
+  if (portPct == null) return ''      // Number(null)은 0이라 finite 검사를 통과한다
+  const v = Number(portPct)
+  if (!Number.isFinite(v)) return ''
+  if (Math.abs(v) < 0.005) return '≈0%p'
+  return `${down ? '-' : '+'}${v.toFixed(2)}%p`
+}
+
+// 활동 배지 옆 수치 — 주식수 증감률과 비중 임팩트를 ' · '로 잇는다.
+// share_pct는 신규매수(직전 보유 0)에서 null, port_pct는 활동 페이지 실패·절단·분기불일치 시 null.
+// 둘 다 없으면 빈 문자열이라 호출측이 수치 span 자체를 생략한다.
+export function activityText(activity) {
+  if (!activity) return ''
+  const { kind, share_pct, port_pct } = activity
+  const down = kind === 'reduce' || kind === 'sold_out'
+  const parts = []
+  if (share_pct != null) parts.push(`${Number(share_pct).toFixed(1)}%`)
+  if (port_pct != null) parts.push(ppText(port_pct, down))
+  return parts.join(' · ')
 }
 
 function formatValue(val) {
@@ -165,6 +196,10 @@ export default function GuruDetail() {
     h.name_kr || !krByTicker[h.ticker] ? h : { ...h, name_kr: krByTicker[h.ticker] }
   ))
   const visibleRows = expanded ? listRows : listRows.slice(0, DEFAULT_ROWS)
+  // 분기 활동(task#239 수집분). 크롤 이전 데이터엔 없으므로 전부 옵셔널 — 없으면 줄·섹션 미생성.
+  // 활동이 아예 없는 매니저도 실존한다(dataroma가 그 분기 활동을 안 채운 경우, 라이브 실측 `aq`).
+  const hasActivity = listRows.some(h => h.activity)
+  const soldOut = manager.sold_out || []
 
   const body = (
     <>
@@ -227,13 +262,32 @@ export default function GuruDetail() {
       </div>
 
       <div>
-      <p className="serif" style={{ fontSize: 16, fontWeight: 700, margin: '0 0 10px' }}>보유 종목</p>
+      {/* 비중·활동은 모두 그 매니저의 최신 13F 신고 분기 기준이다 — 분기는 매니저마다 갈리므로
+          전역 상수로 박지 말고 응답값을 쓴다(실측: Q1 2026 77명 · Q2 2026 5명 · Q3 2025 1명, task#239) */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', margin: '0 0 10px' }}>
+        <p className="serif" style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>보유 종목</p>
+        {manager.period && (
+          <span className="muted" data-testid="period-note" style={{ fontSize: 11 }}>
+            {manager.period} 기준{shortDate(manager.portfolio_date) ? ` · ${shortDate(manager.portfolio_date)}` : ''}
+          </span>
+        )}
+      </div>
+      {/* %p는 엄밀히 '이전비중 → 현재비중' 차이가 아니다(현재비중 × 증감주식수/현재주식수) —
+          역산 오해를 막기 위해 정의를 한 줄로 밝힌다. 활동이 하나도 없으면 노이즈라 생략 */}
+      {hasActivity && (
+        <p className="muted" data-testid="activity-caption" style={{ fontSize: 11, margin: '0 0 10px', lineHeight: 1.5 }}>
+          dataroma 신고 기준 · 증감률은 주식수, %p는 이번 분기 거래분이 포트폴리오에서 차지하는 비중
+        </p>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {visibleRows.map((h, i) => (
+          /* 활동 줄을 전폭 2번째 줄로 두므로 행이 세로 컨테이너가 된다. padding·border는 이 바깥에
+             두고 상단 줄엔 주지 않는다 — 안 그러면 이름블록 폭(모바일 157px)이 줄고 무활동 행
+             높이(62px)도 바뀐다. `data-testid`·`.guru-dot`은 그 자리에 유지(기존 테스트·프로브 앵커) */
           <div key={h.rank ?? h.ticker} data-testid="holding-row" style={{
-            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
-            border: '1px solid var(--border)', borderRadius: 6,
+            padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6,
           }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* 상위 10행은 도넛 조각과 같은 색 점 = 목록이 범례를 겸한다(라벨이 안 붙는 조각도 대응 가능).
                 11위 이하는 도넛에 없어 색을 주지 않지만 노드는 남긴다 — 안 그러면 좌측 정렬이 어긋난다 */}
             <span className="guru-dot" data-donut={i < 10 ? i : undefined}
@@ -249,6 +303,20 @@ export default function GuruDetail() {
             </div>
             <span className="mono tnum" style={{ fontSize: 13, fontWeight: 600 }}>{(h.weight_pct ?? 0).toFixed(1)}%</span>
             <WatchlistBtn ticker={h.ticker} name={h.name_kr || h.name} stockMap={stockMap} onToggle={handleToggle} />
+            </div>
+            {/* 활동이 있는 행만 2번째 줄 — 변동없는 종목(표본 18%)은 줄을 만들지 않아 스크롤이 안 늘어난다 */}
+            {h.activity && (
+              <div data-testid="activity-line" style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 6,
+              }}>
+                <GuruActivityBadge kind={h.activity.kind} />
+                {activityText(h.activity) && (
+                  <span className="mono tnum" style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                    {activityText(h.activity)}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -261,6 +329,37 @@ export default function GuruDetail() {
         <button className="filter-chip" style={{ marginTop: 12 }} onClick={() => setExpanded(e => !e)}>
           {expanded ? '접기' : `전체 ${holdings.length}종목 보기`}
         </button>
+      )}
+
+      {/* 전량매도 종목은 보유 목록에 없으므로(팔았으니까) 별도 섹션이다. 최대 80종목인 매니저가
+          있어(라이브 실측) 행이 아니라 wrap 칩으로 둔다 — 전원 표시하면서 세로 길이를 줄인다.
+          비면 섹션 자체를 만들지 않는다(분기 불일치로 보강이 생략된 매니저도 같은 빈 상태) */}
+      {soldOut.length > 0 && (
+        <div data-testid="sold-out" style={{ marginTop: 18 }}>
+          <p className="serif" style={{ fontSize: 14, fontWeight: 700, margin: '0 0 8px' }}>
+            이번 분기 전량매도 <span className="muted" style={{ fontSize: 11, fontWeight: 400 }}>{soldOut.length}종목</span>
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {soldOut.map(s => (
+              <span key={s.ticker} data-testid="sold-out-chip" style={{
+                display: 'inline-flex', alignItems: 'baseline', gap: 6, maxWidth: '100%',
+                padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6,
+              }}>
+                <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>{s.ticker}</span>
+                {(krByTicker[s.ticker] || s.name) && (
+                  <span style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {krByTicker[s.ticker] || s.name}
+                  </span>
+                )}
+                {s.port_pct != null && (
+                  <span className="mono tnum" style={{ fontSize: 11, fontWeight: 600, color: 'var(--semantic-sell)' }}>
+                    {ppText(s.port_pct, true)}
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
       </div>
       </div>

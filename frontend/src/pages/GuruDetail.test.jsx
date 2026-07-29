@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import GuruDetail, { fitsSliceLabel } from './GuruDetail'
+import GuruDetail, { fitsSliceLabel, shortDate, activityText, ppText } from './GuruDetail'
+import GuruActivityBadge from '../components/ui/GuruActivityBadge'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
@@ -315,5 +316,156 @@ describe('GuruDetail 우하단 목록복귀 pill = 유일한 복귀 경로 (task
     await screen.findByText('매니저를 찾을 수 없습니다.')
     expectRightPill(container)
     expect(screen.queryByText(/← 구루 매니저/)).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// 분기 활동 표시 (task#240)
+// ─────────────────────────────────────────────────────────────────────
+
+const MANAGER_WITH_ACTIVITY = {
+  ...MANAGER_NO_HOLDINGS,
+  period: 'Q1 2026',
+  portfolio_date: '2026-03-31',
+  num_stocks: 12,
+  holdings: [
+    { rank: 1, ticker: 'AMZN', name: 'Amazon.com Inc.', weight_pct: 17.4,
+      activity: { kind: 'add', share_pct: 19.19, port_pct: 2.8 } },
+    { rank: 2, ticker: 'MSFT', name: 'Microsoft Corp.', weight_pct: 15.3,
+      activity: { kind: 'buy', share_pct: null, port_pct: 15.26 } },
+    { rank: 3, ticker: 'UBER', name: 'Uber Technologies', weight_pct: 11.2,
+      activity: { kind: 'reduce', share_pct: 0.82, port_pct: 0.13 } },
+    { rank: 4, ticker: 'QSR', name: 'Restaurant Brands', weight_pct: 9.1 },   // 변동없음
+    { rank: 5, ticker: 'PART', name: 'Partial Co.', weight_pct: 5.0,
+      activity: { kind: 'add', share_pct: 4.5, port_pct: null } },            // 활동 페이지 미보강
+  ],
+  sold_out: [
+    { ticker: 'HLT', name: 'Hilton Worldwide', port_pct: 5.6 },
+    { ticker: 'CMG', name: 'Chipotle', port_pct: 3.1 },
+  ],
+}
+
+describe('GuruActivityBadge — kind 표시 매핑 (task#240 S2)', () => {
+  it.each([
+    ['buy', '★ 신규', 'buy'],
+    ['add', '▲ 추가', 'buy'],
+    ['reduce', '▼ 축소', 'sell'],
+    ['sold_out', '✕ 매도', 'sell'],
+  ])('%s → %s (전용 %s 토큰)', (kind, label, side) => {
+    const { container } = render(<GuruActivityBadge kind={kind} />)
+    const el = container.querySelector('[data-activity]')
+    expect(el.textContent.replace(/\s+/g, ' ').trim()).toBe(label)
+    // 매매 방향엔 전용 색 토큰을 쓴다 — KR 가격 토큰(up/down)은 의미가 충돌해 금지(CLAUDE.md 규약)
+    expect(el.getAttribute('style')).toContain(`var(--semantic-${side})`)
+    expect(el.getAttribute('style')).not.toMatch(/var\(--(up|down)\)/)
+  })
+
+  it('미지의 kind·부재는 아무것도 렌더하지 않는다', () => {
+    expect(render(<GuruActivityBadge kind="weird" />).container.firstChild).toBeNull()
+    expect(render(<GuruActivityBadge />).container.firstChild).toBeNull()
+  })
+})
+
+describe('activityText / shortDate (task#240 S3·S4)', () => {
+  it('주식수 증감률과 비중 임팩트를 부호와 함께 잇는다', () => {
+    expect(activityText({ kind: 'add', share_pct: 19.19, port_pct: 2.8 })).toBe('19.2% · +2.80%p')
+    expect(activityText({ kind: 'reduce', share_pct: 0.82, port_pct: 0.13 })).toBe('0.8% · -0.13%p')
+    // 축소·매도는 감소이므로 무부호 port_pct에 음수 부호를 붙인다
+    expect(activityText({ kind: 'sold_out', share_pct: 100, port_pct: 5.6 })).toBe('100.0% · -5.60%p')
+  })
+
+  it('반올림해서 0이 되는 미미한 거래는 -0.00%p로 쓰지 않는다', () => {
+    // 라이브 실측: 잔량만 남은 ETF를 전량매도하면 port_pct가 0.004 같은 값이라 -0.00%p로 찍혀
+    // 버그처럼 보였다. 방향은 배지가 이미 갖고 있으니 부호 없이 ≈0%p로 둔다.
+    expect(activityText({ kind: 'add', share_pct: 0.2, port_pct: 0.004 })).toBe('0.2% · ≈0%p')
+    expect(activityText({ kind: 'sold_out', share_pct: 100, port_pct: 0 })).toBe('100.0% · ≈0%p')
+    expect(ppText(0.004, true)).toBe('≈0%p')
+    expect(ppText(0.005, true)).toBe('-0.01%p')   // 경계는 표기한다
+    expect(ppText(1.98, true)).toBe('-1.98%p')
+    expect(ppText(null, true)).toBe('')
+  })
+
+  it('신규매수는 증감률이 없고, 보강 실패는 %p가 없다', () => {
+    expect(activityText({ kind: 'buy', share_pct: null, port_pct: 15.26 })).toBe('+15.26%p')
+    expect(activityText({ kind: 'add', share_pct: 4.5, port_pct: null })).toBe('4.5%')
+    expect(activityText({ kind: 'add', share_pct: null, port_pct: null })).toBe('')
+    expect(activityText(null)).toBe('')
+  })
+
+  it('shortDate는 ISO만 축약하고 나머지는 빈 문자열', () => {
+    expect(shortDate('2026-03-31')).toBe('3/31')
+    expect(shortDate('2026-06-30')).toBe('6/30')
+    expect(shortDate(undefined)).toBe('')
+    expect(shortDate('31 Mar 2026')).toBe('')
+  })
+})
+
+describe('GuruDetail 활동 줄 · 전량매도 · 분기 표기 (task#240 S3·S4)', () => {
+  it('활동이 있는 행만 2번째 줄을 만든다', async () => {
+    mockManager(MANAGER_WITH_ACTIVITY)
+    const { container } = renderPage()
+    await screen.findByText('AMZN')
+    // holdings 5행 중 activity 보유 4행
+    expect(container.querySelectorAll('[data-testid="holding-row"]').length).toBe(5)
+    expect(container.querySelectorAll('[data-testid="activity-line"]').length).toBe(4)
+  })
+
+  it('행마다 올바른 배지와 수치를 붙인다', async () => {
+    mockManager(MANAGER_WITH_ACTIVITY)
+    const { container } = renderPage()
+    await screen.findByText('AMZN')
+    const rows = [...container.querySelectorAll('[data-testid="holding-row"]')]
+    // 인접 span은 CSS gap으로 띄우므로 textContent엔 공백이 없다 → 자식 단위로 읽는다
+    const lineOf = (t) => {
+      const line = rows.find(r => r.textContent.includes(t))?.querySelector('[data-testid="activity-line"]')
+      if (!line) return null
+      const kids = [...line.children].map(c => c.textContent.trim())
+      return kids.join(' | ')
+    }
+    expect(lineOf('AMZN')).toBe('▲ 추가 | 19.2% · +2.80%p')
+    expect(lineOf('MSFT')).toBe('★ 신규 | +15.26%p')
+    expect(lineOf('UBER')).toBe('▼ 축소 | 0.8% · -0.13%p')
+    expect(lineOf('PART')).toBe('▲ 추가 | 4.5%')     // port_pct 없으면 %p 생략
+    expect(lineOf('QSR')).toBeNull()                 // 변동없음은 줄 자체가 없다
+  })
+
+  it('분기 표기와 %p 정의 캡션을 보여준다', async () => {
+    mockManager(MANAGER_WITH_ACTIVITY)
+    renderPage()
+    expect((await screen.findByTestId('period-note')).textContent).toBe('Q1 2026 기준 · 3/31')
+    expect(screen.getByTestId('activity-caption').textContent).toContain('이번 분기 거래분이 포트폴리오에서 차지하는 비중')
+  })
+
+  it('전량매도 섹션에 전 종목을 칩으로 렌더한다', async () => {
+    mockManager(MANAGER_WITH_ACTIVITY)
+    const { container } = renderPage()
+    await screen.findByTestId('sold-out')
+    const chips = [...container.querySelectorAll('[data-testid="sold-out-chip"]')]
+    expect(chips.length).toBe(2)
+    expect([...chips[0].children].map(c => c.textContent.trim()))
+      .toEqual(['HLT', 'Hilton Worldwide', '-5.60%p'])
+    expect(chips.map(c => c.children[0].textContent)).toEqual(['HLT', 'CMG'])
+    expect(screen.getByTestId('sold-out').textContent).toContain('2종목')
+  })
+
+  it('활동이 전혀 없는 매니저는 줄·캡션·전량매도 섹션을 모두 만들지 않는다', async () => {
+    // 라이브 실측 `aq` 표본 — dataroma가 그 분기 활동을 안 채웠거나 분기 불일치로 보강이 생략된 경우
+    mockManager({ ...MANAGER_WITH_ACTIVITY, holdings: undefined, sold_out: [], top10: TOP10 })
+    const { container } = renderPage()
+    await screen.findByText('T1')
+    expect(container.querySelectorAll('[data-testid="activity-line"]').length).toBe(0)
+    expect(screen.queryByTestId('activity-caption')).toBeNull()
+    expect(screen.queryByTestId('sold-out')).toBeNull()
+    expect(screen.getByTestId('period-note')).toBeTruthy()   // 분기 표기는 남는다
+  })
+
+  it('크롤 이전 데이터(분기·활동·전량매도 전부 부재)에도 깨지지 않는다', async () => {
+    mockManager(MANAGER_WITH_HOLDINGS)     // period/activity/sold_out 없음
+    const { container } = renderPage()
+    await screen.findByText('T1')
+    expect(screen.queryByTestId('period-note')).toBeNull()
+    expect(screen.queryByTestId('activity-caption')).toBeNull()
+    expect(screen.queryByTestId('sold-out')).toBeNull()
+    expect(container.querySelectorAll('[data-testid="holding-row"]').length).toBe(20)
   })
 })
