@@ -2896,11 +2896,13 @@ FRED 경제지표(CPI, 실업률) 단독 재수집. 별도 배치 id 없이 해�
 
 **Response `200`** — `market`에 따라 필드가 달라진다.
 ```json
-{ "ok": true, "market": "KR", "export_points": 60 }
+{ "ok": true, "market": "KR", "export_points": 12, "saved": true }
 ```
 ```json
 { "ok": true, "market": "US", "cpi_points": 36, "unemp_points": 36 }
 ```
+
+`market=KR`의 `export_points`는 수집된 **월 수**(`months` 길이)다. `saved`는 실제 저장 여부 — 외부 API가 빈 결과(항목 0건)를 주면 직전 양호값을 보존하기 위해 저장을 생략하고 `saved: false`와 함께 **직전 저장값의** 월 수를 반환한다(task#243).
 
 **Error `400`** — `market`이 `KR`/`US`가 아님
 
@@ -3321,13 +3323,14 @@ KR 업종 모멘텀 수동 갱신. 전 KRX 업종의 키움 지수 series를 다
 
 **Response `200`**
 ```json
-{ "ok": true, "sectors": 24 }
+{ "ok": true, "sectors": 24, "index": 26 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `ok` | boolean | 성공 여부 |
 | `sectors` | int | 갱신·저장된 업종 수 |
+| `index` | int | 저장된 보유→업종 역인덱스의 종목 수. 역인덱스 fetch가 빈 결과면 직전값을 보존하므로(task#243) 이 값이 갱신 전과 같을 수 있다 |
 
 **Error `500`** — 키움 조회/저장 실패 시 `detail`에 사유 포함
 
