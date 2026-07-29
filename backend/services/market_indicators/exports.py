@@ -113,8 +113,16 @@ def _fetch_and_save_kr_exports() -> dict:
             data = _fetch_comtrade_exports()
         except Exception as e:
             if stored:
-                return stored["data"]
+                return {**stored["data"], "stale": True}
             return {"months": [], "error": str(e)}
+    # 성공-but-빈응답도 클로버다 — 예외가 아니라 *데이터*에 가드를 건다(customs·comtrade 두
+    # 경로 모두 200에 항목 0건이면 예외 없이 months=[]를 돌려준다). `stale`은 저장 결정
+    # *이후*에만 붙는 비저장 마커라 `_mc_save`로 새지 않는다(admin이 "생략"을 알 수 있게).
+    if not data.get("months"):
+        logger.warning("[KrExports] 빈 결과 — 저장 생략, 직전값 유지")
+        if stored:
+            return {**stored["data"], "stale": True}
+        return {"months": []}
     _mc_save("kr_exports", data)
     _cache.pop("kr_exports", None)
     os.makedirs(_DATA_DIR, exist_ok=True)

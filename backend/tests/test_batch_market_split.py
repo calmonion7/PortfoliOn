@@ -228,7 +228,7 @@ def test_manual_refresh_monthly_kr_records_kr(spy, monkeypatch):
     import routers.market_indicators as mi
     called = []
     monkeypatch.setattr(mi, "_fetch_and_save_kr_exports",
-                        lambda: called.append("kr") or {"history": []})
+                        lambda: called.append("kr") or {"months": []})
     monkeypatch.setattr(mi, "_fetch_and_save_econ_indicators",
                         lambda: called.append("us") or {"cpi": [], "unemployment": []})
     resp = _admin_client(mi.router).post("/api/market/refresh-monthly?market=KR")
@@ -241,7 +241,7 @@ def test_manual_refresh_monthly_us_records_us(spy, monkeypatch):
     import routers.market_indicators as mi
     called = []
     monkeypatch.setattr(mi, "_fetch_and_save_kr_exports",
-                        lambda: called.append("kr") or {"history": []})
+                        lambda: called.append("kr") or {"months": []})
     monkeypatch.setattr(mi, "_fetch_and_save_econ_indicators",
                         lambda: called.append("us") or {"cpi": [], "unemployment": []})
     resp = _admin_client(mi.router).post("/api/market/refresh-monthly?market=US")

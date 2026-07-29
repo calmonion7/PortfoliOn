@@ -199,7 +199,11 @@ def refresh_monthly(market: str = Query("US"), _: str = Depends(require_admin)):
         if market == "KR":
             with job_runs.record("monthly_kr", "manual"):
                 exports = _fetch_and_save_kr_exports()
-            return {"ok": True, "market": "KR", "export_points": len(exports.get("history", []))}
+            # 반환 키는 months다(history 아님 — 옛 표기는 항상 0을 보고했다). `stale`이면
+            # 빈 결과로 저장을 생략하고 직전값을 돌려준 것이므로 saved=False.
+            return {"ok": True, "market": "KR",
+                    "export_points": len(exports.get("months", [])),
+                    "saved": not exports.get("stale")}
         with job_runs.record("monthly_us", "manual"):
             econ = _fetch_and_save_econ_indicators()
         return {"ok": True, "market": "US", "cpi_points": len(econ.get("cpi", [])), "unemp_points": len(econ.get("unemployment", []))}

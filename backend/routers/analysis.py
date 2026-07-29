@@ -46,7 +46,10 @@ def refresh_kr_sector(_: str = Depends(require_admin)):
         with job_runs.record("kr_sector_fetch", "manual"):
             sectors = kr_sector_service.refresh()
         cache_svc.invalidate_sector()
-        return {"ok": True, "sectors": len(sectors)}
+        # index는 저장 결과를 되읽어 보고한다 — 빈 fetch 시 직전값이 보존됐음을 드러내려면
+        # 크기가 필요하고, refresh()의 반환 타입(-> list[dict])은 호출부 3곳 탓에 안 바꾼다.
+        return {"ok": True, "sectors": len(sectors),
+                "index": len(kr_sector_service.load_sector_index())}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

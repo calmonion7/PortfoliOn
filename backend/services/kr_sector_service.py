@@ -75,13 +75,19 @@ def refresh() -> list[dict]:
     """배치 본문: 전 업종 모멘텀 + 보유→업종 역인덱스 사전계산 → market_cache 저장.
 
     모든 sector 모멘텀이 None이면(ka20006 빈 종가 박제 케이스) save를 생략해
-    직전 양호값을 보존한다. 계산한 sectors는 그대로 반환(호출부 로깅용)."""
+    직전 양호값을 보존한다. 계산한 sectors는 그대로 반환(호출부 로깅용).
+
+    역인덱스가 빈 경우(ka20002 전부 실패)엔 직전 index를 보존하고 sectors만 갱신한다 —
+    sectors/index는 한 페이로드라 빈 index를 그대로 저장하면 보유→업종 매핑이 소멸한다."""
     sectors = compute_momentum()
     if all(s.get("return_1w") is None and s.get("return_1mo") is None
            and s.get("return_3mo") is None for s in sectors):
         logger.warning("[KrSector] refresh: all-None momentum — skipping save (직전값 유지)")
         return sectors
     index = build_sector_index()
+    if not index:
+        index = load_sector_index()
+        logger.warning("[KrSector] 역인덱스 빈 결과 — 직전 index 보존 (sectors만 갱신)")
     save(sectors, index)
     return sectors
 
