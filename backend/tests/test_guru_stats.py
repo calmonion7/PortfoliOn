@@ -137,3 +137,61 @@ def test_compute_allocation_empty_is_graceful():
     assert compute_allocation([]) == {
         "total_value": 0, "manager_count": 0, "ticker_count": 0, "rows": [],
     }
+
+
+# ── G4 (task#244): 오정렬이 만든 '그럴듯한 오값'을 교차검증으로 차단 ──────────
+# dataroma 열이 밀리면 다른 숫자 열(예 Reported Price $185.06)이 _parse_portfolio_value를
+# **성공** 통과해 185로 저장된다. `if value:`는 0만 걸러 파싱 성공을 진실로 신뢰하므로
+# 그 값이 종목 투자금과 total(비율 분모)을 동시에 오염시킨다.
+# 밴드 근거(라이브 3,927건): value/est의 median 0.9998·max 1.488·[1/2,2] 밖 0건.
+MISALIGNED = [
+    {
+        "id": "mgr1", "portfolio_value": 10_000_000_000, "top10": [],
+        "holdings": [
+            # 오정렬: value=185(달러 단가) vs 추정 12% × 100억 = 12억 → 자릿수 7개 어긋남
+            {"rank": 1, "ticker": "BAD", "name": "Bad Corp.", "weight_pct": 12.0, "value": 185},
+            # 정상: 신고값이 추정(25억)과 1.2배 — 밴드 안이므로 신고값을 그대로 쓴다
+            {"rank": 2, "ticker": "OK", "name": "Ok Corp.", "weight_pct": 25.0, "value": 3_000_000_000},
+        ],
+    },
+]
+
+
+def test_compute_allocation_rejects_misaligned_value_and_falls_back_to_estimate():
+    by_ticker = {r["ticker"]: r for r in compute_allocation(MISALIGNED)["rows"]}
+    # 옛 구현은 185를 그대로 합산했다 → 새 구현은 추정치 12억을 쓴다
+    assert by_ticker["BAD"]["value"] == 1_200_000_000
+
+
+def test_compute_allocation_keeps_reported_value_inside_band():
+    by_ticker = {r["ticker"]: r for r in compute_allocation(MISALIGNED)["rows"]}
+    assert by_ticker["OK"]["value"] == 3_000_000_000
+
+
+def test_compute_allocation_total_and_ratio_not_poisoned_by_misalignment():
+    result = compute_allocation(MISALIGNED)
+    # 12억 + 30억 = 42억 (옛 구현은 185 + 30억 = 30억으로 분모가 어긋났다)
+    assert result["total_value"] == 4_200_000_000
+    by_ticker = {r["ticker"]: r for r in result["rows"]}
+    assert by_ticker["BAD"]["ratio"] == pytest.approx(1_200_000_000 / 4_200_000_000 * 100, abs=0.01)
+
+
+def test_compute_allocation_misaligned_row_still_counts_holder():
+    """오값을 버려도 보유 사실은 남아야 인기순과 어긋나지 않는다."""
+    by_ticker = {r["ticker"]: r for r in compute_allocation(MISALIGNED)["rows"]}
+    assert by_ticker["BAD"]["holder_count"] == 1
+
+
+def test_compute_allocation_logs_warning_on_misalignment(caplog):
+    import logging
+    with caplog.at_level(logging.WARNING):
+        compute_allocation(MISALIGNED)
+    assert any("value/추정 불일치" in r.message for r in caplog.records)
+
+
+def test_compute_allocation_without_portfolio_value_trusts_reported_value():
+    """pv=0이면 추정치를 만들 수 없다 — 검증자가 없으므로 신고값을 신뢰한다(거부 아님)."""
+    sample = [{"id": "m", "portfolio_value": 0, "top10": [],
+               "holdings": [{"rank": 1, "ticker": "Z", "name": "Z", "weight_pct": 10.0, "value": 777}]}]
+    by_ticker = {r["ticker"]: r for r in compute_allocation(sample)["rows"]}
+    assert by_ticker["Z"]["value"] == 777

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('../api', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
+// 액션 실패는 토스트로 알린다(task#244 G5) — GlobalSearch와 같은 형태.
+const showToastSpy = vi.fn()
+vi.mock('../components/Toast', () => ({ useToast: () => ({ showToast: showToastSpy }) }))
 
 import api from '../api'
 import GuruStats from './GuruStats'
@@ -53,5 +56,42 @@ describe('GuruStats 인기순/가중치 카드 통합 (task#227 S3)', () => {
     expect(wRow.querySelector('.guru-stat-ticker')).toBeTruthy()
     expect(wRow.querySelector('.guru-stat-name')).toBeTruthy()
     expect(wRow.querySelector('.guru-stat-value')).toBeTruthy()
+  })
+})
+
+// G5 (task#244): `.then().finally()`가 rejection을 놓쳐 실패가
+// "데이터 없음 — 크롤링을 먼저 실행하세요"라는 *잘못된 행동 지시*로 위장됐다.
+describe('구루 통계 — 에러 정직성 (task#244)', () => {
+  it('fetch 실패는 에러로 보이고 빈 상태 문구는 뜨지 않는다', async () => {
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/api/guru/stats/')) return Promise.reject(new Error('boom'))
+      return Promise.resolve({ data: [] })
+    })
+    render(<GuruStats view="popularity" />)
+    expect(await screen.findByText(/불러오지 못했습니다/)).toBeTruthy()
+    expect(screen.queryByText(/크롤링을 먼저 실행/)).toBeNull()
+  })
+
+  it('정상 응답에는 에러 문구가 없다', async () => {
+    mockStats()
+    render(<GuruStats view="popularity" />)
+    await screen.findByText('7명')
+    expect(screen.queryByText(/불러오지 못했습니다/)).toBeNull()
+  })
+
+  it('빈 응답은 여전히 빈 상태로 보인다 (에러와 뒤바뀌지 않는다)', async () => {
+    api.get.mockImplementation(() => Promise.resolve({ data: [] }))
+    render(<GuruStats view="popularity" />)
+    expect(await screen.findByText(/크롤링을 먼저 실행/)).toBeTruthy()
+    expect(screen.queryByText(/불러오지 못했습니다/)).toBeNull()
+  })
+
+  it('관심 토글 실패는 토스트로 알린다', async () => {
+    mockStats()
+    api.post.mockRejectedValue(new Error('nope'))
+    const { container } = render(<GuruStats view="popularity" />)
+    await screen.findByText('7명')
+    fireEvent.click(container.querySelector('.guru-stat-row button'))
+    await vi.waitFor(() => expect(showToastSpy).toHaveBeenCalledWith(expect.any(String), 'error'))
   })
 })

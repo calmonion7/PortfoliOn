@@ -5,6 +5,9 @@ import { MemoryRouter } from 'react-router-dom'
 vi.mock('../api', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
 // jsdom엔 matchMedia가 없다 — 탭 라벨 검증에 반응형은 무관하므로 PC로 고정한다.
 vi.mock('../hooks/useIsMobile', () => ({ default: () => false }))
+// 액션 실패는 토스트로 알린다(task#244 G5) — GlobalSearch와 같은 형태.
+const showToastSpy = vi.fn()
+vi.mock('../components/Toast', () => ({ useToast: () => ({ showToast: showToastSpy }) }))
 
 import api from '../api'
 import GuruAllocation from './GuruAllocation'
@@ -111,5 +114,36 @@ describe('구루 자산 배분 탭 (task#241)', () => {
     mockApi({ total_value: 0, manager_count: 0, ticker_count: 0, rows: [] })
     render(<GuruAllocation />)
     expect(await screen.findByText(/크롤링을 먼저 실행/)).toBeTruthy()
+  })
+})
+
+// ── G5 (task#244): 실패를 빈 상태로 위장하지 않는다 ────────────────────────────
+// `.then().finally()`는 rejection을 잡지 않아 loading=false·data=null이 되고,
+// 그 결과 "크롤링을 먼저 실행하세요"라는 *잘못된 행동 지시*가 떴다.
+describe('구루 자산 배분 — 에러 정직성 (task#244)', () => {
+  it('fetch 실패는 에러로 보이고 빈 상태 문구는 뜨지 않는다', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/api/guru/stats/allocation') return Promise.reject(new Error('boom'))
+      return Promise.resolve({ data: [] })
+    })
+    render(<GuruAllocation />)
+    expect(await screen.findByText(/불러오지 못했습니다/)).toBeTruthy()
+    expect(screen.queryByText(/크롤링을 먼저 실행/)).toBeNull()
+  })
+
+  it('정상 응답에는 에러 문구가 없다', async () => {
+    mockApi()
+    render(<GuruAllocation />)
+    await screen.findByText('TCK1')
+    expect(screen.queryByText(/불러오지 못했습니다/)).toBeNull()
+  })
+
+  it('관심 토글 실패는 토스트로 알린다', async () => {
+    mockApi()
+    api.post.mockRejectedValue(new Error('nope'))
+    const { container } = render(<GuruAllocation />)
+    await screen.findByText('TCK1')
+    fireEvent.click(container.querySelector('.guru-stat-row button'))
+    await vi.waitFor(() => expect(showToastSpy).toHaveBeenCalledWith(expect.any(String), 'error'))
   })
 })

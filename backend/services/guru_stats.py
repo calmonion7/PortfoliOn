@@ -1,3 +1,13 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+# 신고 투자금(`value`)을 추정치(`weight_pct × portfolio_value`)와 대조할 때 허용 배율.
+# 라이브 3,927건 실측: 비율 median 0.9998 · max 1.488 · [1/2,2] 밖 0건(산포는 dataroma가
+# 비중을 소수 2자리로만 주는 반올림 오차). 5배는 그 위로 3.4배 여유 (task#244).
+_VALUE_EST_BAND = 5
+
+
 def compute_popularity(managers: list[dict]) -> list[dict]:
     counts: dict[str, dict] = {}
     for m in managers:
@@ -38,7 +48,20 @@ def compute_allocation(managers: list[dict]) -> dict:
         pv = m.get("portfolio_value") or 0
         for h in m.get("holdings", []):
             ticker = h["ticker"]
-            value = h.get("value") or (h.get("weight_pct") or 0) / 100 * pv
+            est = (h.get("weight_pct") or 0) / 100 * pv
+            value = h.get("value") or est
+            # dataroma 열이 밀리면 다른 *숫자* 열(예 Reported Price $185.06)이 파싱을
+            # **성공**해 경고 없이 wrong 값이 되고 total(비율 분모)까지 오염된다. 신고값과
+            # 추정값이 둘 다 있을 때 자릿수가 어긋나면 신고값을 버리고 추정치를 쓴다
+            # (실패 클래스를 가드 — 열 삽입·헤더 개명 등 원인 불문).
+            # 밴드 근거(라이브 3,927건): value/est의 median 0.9998·max 1.488·[1/2,2] 밖 0건
+            # → [1/5,5]는 관측 최대 대비 3.4배 여유이면서 오정렬(자릿수 6~9개)은 확실히 잡는다.
+            if h.get("value") and est and not (1 / _VALUE_EST_BAND <= value / est <= _VALUE_EST_BAND):
+                logger.warning(
+                    f"[GuruStats] value/추정 불일치 — 추정치 사용 "
+                    f"({m.get('id')} {ticker}: value={value} est={est:.0f})"
+                )
+                value = est
             row = rows.get(ticker)
             if row is None:
                 row = rows[ticker] = {

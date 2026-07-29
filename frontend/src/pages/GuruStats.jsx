@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
-import { SketchEmpty } from '../components/sketches'
+import { SketchEmpty, SketchError } from '../components/sketches'
+import { useToast } from '../components/Toast'
 import '../components/ui/Button.css'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
@@ -69,10 +70,12 @@ function StatRow({ index, row, value, unit, stockMap, onToggle }) {
 }
 
 export default function GuruStats({ view }) {
+  const { showToast } = useToast()
   const [popularity, setPopularity] = useState([])
   const [weighted, setWeighted]     = useState([])
   const [stockMap, setStockMap]     = useState({})  // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)  // 빈 상태와 구분 — 실패를 "크롤링을 먼저"로 위장하지 않는다
   const [query, setQuery]           = useState('')
 
   // 표시 뷰는 Guru가 넘기는 view로 고정(기본 'popularity')
@@ -92,17 +95,26 @@ export default function GuruStats({ view }) {
     ]).then(([p, w]) => {
       setPopularity(p.data)
       setWeighted(w.data)
+    }).catch(e => {
+      console.error('[GuruStats] 구루 통계 조회 실패:', e)
+      setError('구루 통계를 불러오지 못했습니다.')
     }).finally(() => setLoading(false))
-    loadStockMap()
+    // 배지용 보조 조회 — 실패해도 본문은 살린다(배지만 빈다).
+    loadStockMap().catch(e => console.error('[GuruStats] 보유/관심 조회 실패:', e))
   }, [loadStockMap])
 
   const handleToggle = async (ticker, name, inWatchlist) => {
-    if (inWatchlist) {
-      await api.delete(`/api/watchlist/${ticker}`)
-    } else {
-      await api.post('/api/watchlist', { ticker, name: name || ticker })
+    try {
+      if (inWatchlist) {
+        await api.delete(`/api/watchlist/${ticker}`)
+      } else {
+        await api.post('/api/watchlist', { ticker, name: name || ticker })
+      }
+      await loadStockMap()
+    } catch (e) {
+      console.error('[GuruStats] 관심종목 변경 실패:', e)
+      showToast(e?.response?.data?.detail || '관심종목 변경 실패', 'error')
     }
-    await loadStockMap()
   }
 
   const q = query.trim().toLowerCase()
@@ -112,6 +124,13 @@ export default function GuruStats({ view }) {
   const rows = tab === 'popularity' ? filteredPopularity : filteredWeighted
 
   if (loading) return <LoadingSpinner label="구루 통계 불러오는 중입니다." />
+  // 에러가 빈 상태보다 먼저다 — 실패에 "크롤링을 먼저 실행하세요"를 띄우면 잘못된 행동을 지시한다.
+  if (error) return (
+    <div className="guru-empty">
+      <div className="sketch-draw"><SketchError size={140} /></div>
+      <p style={{ color: 'var(--color-error)' }}>{error}</p>
+    </div>
+  )
   if (!popularity.length) return (
     <div className="guru-empty">
       <div className="sketch-draw"><SketchEmpty size={140} /></div>

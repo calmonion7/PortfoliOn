@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
-import { SketchEmpty } from '../components/sketches'
+import { SketchEmpty, SketchError } from '../components/sketches'
 import { WatchlistBtn } from './GuruStats'
+import { useToast } from '../components/Toast'
 import '../components/ui/Button.css'
 
 // 표시 줄 수(집계 범위가 아니다 — 집계는 항상 전 구루·전 종목). 'all'은 전량.
@@ -22,9 +23,11 @@ const fmtUsd = (v) => {
 }
 
 export default function GuruAllocation() {
+  const { showToast } = useToast()
   const [data, setData]         = useState(null)
   const [stockMap, setStockMap] = useState({})   // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState(null)  // 빈 상태와 구분 — 실패를 "크롤링을 먼저"로 위장하지 않는다
   const [scope, setScope]       = useState(20)
   const [query, setQuery]       = useState('')
 
@@ -38,20 +41,38 @@ export default function GuruAllocation() {
   useEffect(() => {
     api.get('/api/guru/stats/allocation')
       .then(r => setData(r.data))
+      .catch(e => {
+        console.error('[GuruAllocation] 자산 배분 조회 실패:', e)
+        setError('자산 배분을 불러오지 못했습니다.')
+      })
       .finally(() => setLoading(false))
-    loadStockMap()
+    // 배지용 보조 조회 — 실패해도 본문은 살린다(배지만 빈다).
+    loadStockMap().catch(e => console.error('[GuruAllocation] 보유/관심 조회 실패:', e))
   }, [loadStockMap])
 
   const handleToggle = async (ticker, name, inWatchlist) => {
-    if (inWatchlist) {
-      await api.delete(`/api/watchlist/${ticker}`)
-    } else {
-      await api.post('/api/watchlist', { ticker, name: name || ticker })
+    try {
+      if (inWatchlist) {
+        await api.delete(`/api/watchlist/${ticker}`)
+      } else {
+        await api.post('/api/watchlist', { ticker, name: name || ticker })
+      }
+      await loadStockMap()
+    } catch (e) {
+      console.error('[GuruAllocation] 관심종목 변경 실패:', e)
+      showToast(e?.response?.data?.detail || '관심종목 변경 실패', 'error')
     }
-    await loadStockMap()
   }
 
   if (loading) return <LoadingSpinner label="구루 자산 배분 불러오는 중입니다." />
+
+  // 에러가 빈 상태보다 먼저다 — 실패에 "크롤링을 먼저 실행하세요"를 띄우면 잘못된 행동을 지시한다.
+  if (error) return (
+    <div className="guru-empty">
+      <div className="sketch-draw"><SketchError size={140} /></div>
+      <p style={{ color: 'var(--color-error)' }}>{error}</p>
+    </div>
+  )
 
   const all = data?.rows || []
   if (!all.length) return (
