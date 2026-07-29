@@ -135,11 +135,14 @@ export default function GuruDetail() {
 
   if (loading) return <LoadingSpinner label="구루 매니저 정보 불러오는 중입니다." />
   if (error) return (
-    <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
-      <p className="muted" style={{ fontSize: 14, margin: 0 }}>{error}</p>
-      <Link to="/guru" style={{ color: 'var(--accent)', fontSize: 13 }}>← 구루 매니저 목록으로</Link>
-    </div>
+    <>
+      <div style={{ textAlign: 'center', padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
+        <p className="muted" style={{ fontSize: 14, margin: 0 }}>{error}</p>
+      </div>
+      {/* 복귀 수단은 pill 하나뿐 — 상단 텍스트 링크를 지웠으므로 에러 화면에도 붙인다(task#238) */}
+      <Link to="/guru" className="list-pill">☰ 목록</Link>
+    </>
   )
 
   // 표기는 `name` 하나에서 파생 — `firm`은 71명이 name과 같고 12명은 소개글 전문이 붙어 온다(task#236)
@@ -279,25 +282,24 @@ export default function GuruDetail() {
         <h1>{person || fund}</h1>
       </header>
       <div className="m-page">
-        <Link to="/guru" style={{ fontSize: 12, color: 'var(--text-3)' }}>← 구루 매니저</Link>
-        {person && <p className="muted" style={{ fontSize: 13, margin: '4px 0 14px' }}>{fund}</p>}
+        {/* margin-top 0 — 상단 링크가 사라져 appbar 하단 패딩(14px)이 그대로 첫 여백이 된다(task#238) */}
+        {person && <p className="muted" style={{ fontSize: 13, margin: '0 0 14px' }}>{fund}</p>}
         {body}
       </div>
-      {/* 목록 복귀 — 좌하단 플로팅 pill(task#228). fixed이므로 조상에 transform 금지(task#195) */}
-      <Link to="/guru" className="list-pill list-pill--left">← 목록</Link>
+      {/* 목록 복귀 — 우하단 플로팅 pill(task#238, AnalystReport와 동일). fixed이므로 조상에 transform 금지(task#195) */}
+      <Link to="/guru" className="list-pill">☰ 목록</Link>
     </>
   )
 
   return (
     <div className="page">
       <div className="page-head" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-        <Link to="/guru" style={{ fontSize: 12, color: 'var(--text-3)' }}>← 구루 매니저</Link>
         <h1 className="page-title serif">{person || fund}</h1>
         {person && <p className="muted" style={{ fontSize: 13, margin: 0 }}>{fund}</p>}
       </div>
       {body}
-      {/* 목록 복귀 — 좌하단 플로팅 pill(task#228). fixed이므로 조상에 transform 금지(task#195) */}
-      <Link to="/guru" className="list-pill list-pill--left">← 목록</Link>
+      {/* 목록 복귀 — 우하단 플로팅 pill(task#238, AnalystReport와 동일). fixed이므로 조상에 transform 금지(task#195) */}
+      <Link to="/guru" className="list-pill">☰ 목록</Link>
     </div>
   )
 }

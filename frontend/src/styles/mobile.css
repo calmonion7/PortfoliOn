@@ -299,8 +299,6 @@
   font-size: 13px; font-weight: 700; text-decoration: none;
   box-shadow: var(--shadow-lg);
 }
-/* 좌하단 변형(task#228) — bottom/z-index/모양은 .list-pill 상속, 좌우만 반전 */
-.list-pill--left { left: 20px; right: auto; }
 @media (min-width: 769px) {
   .list-pill { bottom: 24px; }
 }

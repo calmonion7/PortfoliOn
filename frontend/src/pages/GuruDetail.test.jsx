@@ -280,15 +280,40 @@ describe('GuruDetail PC 2열 배치 (task#237 S1)', () => {
   })
 })
 
-describe('GuruDetail 좌하단 목록복귀 pill (task#228 S2)', () => {
+describe('GuruDetail 우하단 목록복귀 pill = 유일한 복귀 경로 (task#238 S2)', () => {
   // fixed 좌표는 jsdom이 블라인드 — 여기선 렌더·링크 대상만 단언하고 위치는 라이브 실측으로 검증한다.
-  it('.list-pill--left 가 렌더되고 /guru 로 링크', async () => {
+  const expectRightPill = (container) => {
+    const pill = container.querySelector('.list-pill')
+    expect(pill).toBeTruthy()
+    expect(pill.getAttribute('href')).toBe('/guru')
+    expect(pill.textContent).toBe('☰ 목록')
+    // 좌측 변형은 폐기 — 우하단 기저 클래스만 쓴다(AnalystReport와 동일 레이어)
+    expect(pill.classList.contains('list-pill--left')).toBe(false)
+  }
+
+  it.each([['PC', false], ['모바일', true]])('%s: 우하단 pill 1개만 렌더되고 상단 이동 링크는 없다', async (_label, mobile) => {
+    viewport.mobile = mobile
     mockManager(MANAGER_NO_HOLDINGS)
     const { container } = renderPage()
     await screen.findByText('Warren Buffett')
-    const pill = container.querySelector('.list-pill--left')
-    expect(pill).toBeTruthy()
-    expect(pill.getAttribute('href')).toBe('/guru')
-    expect(pill.classList.contains('list-pill')).toBe(true)
+    expectRightPill(container)
+    expect(container.querySelectorAll('.list-pill')).toHaveLength(1)
+    // 상단 텍스트 링크는 삭제됨 — /guru 로 가는 링크는 pill 하나뿐
+    expect(screen.queryByText(/← 구루 매니저/)).toBeNull()
+    const guruLinks = [...container.querySelectorAll('a[href="/guru"]')]
+    expect(guruLinks).toHaveLength(1)
+    expect(guruLinks[0].classList.contains('list-pill')).toBe(true)
+  })
+
+  it('에러 상태에도 pill이 붙는다 — 상단 링크를 지웠으므로 유일한 탈출구', async () => {
+    api.get.mockImplementation((url) =>
+      url === '/api/guru/managers/brk'
+        ? Promise.reject({ response: { status: 404 } })
+        : Promise.resolve({ data: [] })
+    )
+    const { container } = renderPage()
+    await screen.findByText('매니저를 찾을 수 없습니다.')
+    expectRightPill(container)
+    expect(screen.queryByText(/← 구루 매니저/)).toBeNull()
   })
 })
