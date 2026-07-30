@@ -136,6 +136,66 @@ def _comp_valuation(ticker: str, market: str) -> dict:
         return {"per": None, "pbr": None, "psr": None, "ev_ebitda": None, "rd_intensity": None}
 
 
+# 피어 멀티플을 나머지 peer 중앙값과 대조할 때 허용 배율. 절대 임계값(PBR 0~30 등)은
+# 근거 없는 추정치이고 과소 방향(TSM PSR 0.458)을 못 잡아, 대칭 배수 밴드를 쓴다.
+# 실측 근거(005930 발행물): TSM pbr 21.0× · psr 1/16.9× 는 밖, 정상 지표는 최대 2.45×·
+# 1/3.06× 로 안 — 오값과 정상값 사이가 2배 이상 벌어져 5배 밴드가 둘을 가른다.
+# 형제 선례 _VALUE_EST_BAND(guru_stats, task#244)와 동형.
+_PEER_MULTIPLE_BAND = 5
+_PEER_MULTIPLE_METRICS = ("per", "pbr", "psr", "ev_ebitda")
+
+
+def _peer_median(vals):
+    """computePeerPremiums(reportUtils.jsx)와 **같은 정의** — 짝수면 중간 두 값 평균.
+    두 곳이 다른 중앙값을 쓰면 화면이 쓰는 기준과 가드가 쓰는 기준이 어긋난다."""
+    s = sorted(vals)
+    mid = len(s) // 2
+    return (s[mid - 1] + s[mid]) / 2 if len(s) % 2 == 0 else s[mid]
+
+
+def _guard_peer_multiples(rows):
+    """peer 밸류에이션 멀티플의 이상치를 **지표별로** 결측 처리(wrong<missing).
+
+    외부 소스(yfinance info·Naver)가 단위 혼선 오값을 주면 파싱이 **성공**해 예외도
+    경고도 없이 들어오고, 소표본 중앙값은 outlier의 *순위*에 민감해 화면의 Peer
+    할인/할증이 2배 넘게 틀어진다. 그래서 소스 한 곳에서 배제한다 — 소비처가 둘
+    (리포트 상세·발행물)이라 여기서 걸러야 둘이 함께 정화된다.
+
+    판정: 각 peer 행의 지표를 **그 행을 뺀 나머지 peer**(자사·비유한값 제외) 중앙값과
+    대조해 배수가 `[1/밴드, 밴드]` 밖이면 그 필드만 None. 자기를 표본에 포함하면
+    오값이 자기 기준을 오염시켜 밴드가 무력해지므로 leave-one-out이다. 나머지 표본이
+    2개 미만이거나 중앙값이 0 이하면 판정 생략(computePeerPremiums의 기존 관례).
+    자사(is_self)는 판정 대상도 표본도 아니다 — 출처가 달라 신뢰도가 비대칭.
+
+    rows를 제자리 수정해 그대로 반환한다.
+    """
+    peers = [r for r in rows if not r.get("is_self")]
+    for metric in _PEER_MULTIPLE_METRICS:
+        # 원값 스냅샷으로 판정한 뒤 일괄 적용 — 순차 결측이면 앞 행의 결과가 뒤 행의
+        # 표본을 바꿔 행 순서에 따라 판정이 달라진다.
+        vals = [(r, _fin_num(r.get(metric))) for r in peers]
+        drops = []
+        for row, value in vals:
+            if value is None:
+                continue
+            others = [v for other, v in vals if other is not row and v is not None]
+            if len(others) < 2:
+                continue
+            median = _peer_median(others)
+            if median <= 0:
+                continue
+            ratio = value / median
+            if not (1 / _PEER_MULTIPLE_BAND <= ratio <= _PEER_MULTIPLE_BAND):
+                drops.append((row, value, median, ratio))
+        for row, value, median, ratio in drops:
+            logger.warning(
+                f"[Valuation] 피어 멀티플 이상치 — 결측 처리 "
+                f"({row.get('ticker')} {metric}: value={value} median={median} ratio={ratio:.2f})"
+            )
+            row[metric] = None
+    return rows
+
+
 def _infer_comp_market(ticker: str, parent_market: str, parent_exchange: str):
     """티커 형식으로 마켓을 추론. 6자리 숫자 → KR, 그 외 → US."""
     clean = ticker.upper().split('.')[0]
@@ -357,7 +417,8 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
         "key_resource": stock.get("key_resource", ""),
         "competitor_edge": stock.get("competitor_edge", ""),
         "market_outlook": stock.get("market_outlook", ""),
-        "competitors_data": sorted(
+        # 가드는 psr의 KR 폴백(_kr_psr)까지 끝난 **최종 값**에 걸어야 폴백이 우회하지 못한다.
+        "competitors_data": _guard_peer_multiples(sorted(
             [
                 {
                     "ticker": q.get("ticker") or c,
@@ -385,7 +446,7 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
             ],
             key=lambda x: x["market_cap"] or 0,
             reverse=True,
-        ),
+        )),
         "news": news,
     }
 

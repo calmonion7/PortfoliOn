@@ -1731,6 +1731,8 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 | `summary.competitors_data[].psr` | number \| null | 주가매출비율(additive, task#169). KR=Naver TTM 계산(메인 종목과 동일 로직), US=yfinance `priceToSalesTrailing12Months` |
 | `summary.competitors_data[].ev_ebitda` | number \| null | EV/EBITDA 배수(additive, task#169). KR·US 모두 yfinance `enterpriseToEbitda` (KR은 `.KS`→`.KQ` 순 폴백 조회, 실패 시 `null`) |
 
+> **경쟁사(peer) 멀티플은 이상치가 `null`로 빠질 수 있습니다(task#248)** — `per`·`pbr`·`psr`·`ev_ebitda`는 외부 소스(yfinance·Naver)의 단위 혼선 오값이 파싱을 성공해 들어올 수 있어, 리포트 생성 시 **그 행을 뺀 나머지 peer 중앙값 대비 배수가 `[1/5, 5]` 밖인 지표만** 결측 처리합니다(종목 단위 배제가 아니라 지표 단위, wrong<missing). 자기 종목(`is_self: true`)은 판정 대상이 아니며, 나머지 peer 표본이 2개 미만이거나 중앙값이 0 이하면 판정을 생략합니다.
+
 **Error `404`** — 해당 날짜의 리포트 없음
 
 ---

@@ -410,6 +410,52 @@ def test_generate_report_us_psr_ev_ebitda_propagate_to_self_and_competitor(tmp_p
     assert comp_row["ev_ebitda"] == 22.1
 
 
+def test_generate_report_wires_peer_multiple_guard(tmp_path):
+    """배선 게이트(task#248): 조립부가 `_guard_peer_multiples`를 실제로 통과시키는지.
+
+    순수 함수 단위 테스트(test_report_valuation_multiples)는 함수만 검증하고 라이브
+    프로브도 `_comp_valuation`+가드를 직접 호출하므로 — `generate_report` 경로에 가드가
+    안 걸려 있어도 둘 다 green이 된다(fixture-pass-live-fail). 경쟁사 4개 중 하나만
+    pbr이 밴드 밖(100 / median(3.0,3.5,4.0)=3.5 → 28.6×)인 fixture로 그 경로를 못박는다.
+    """
+    _PBR = {"COMP1": 100.0, "COMP2": 3.0, "COMP3": 3.5, "COMP4": 4.0}
+    df = pd.DataFrame({
+        "Close": [100.0 + i for i in range(50)],
+        "High":  [101.0 + i for i in range(50)],
+        "Low":   [99.0 + i for i in range(50)],
+        "Volume": [1_000_000] * 50,
+    })
+
+    def _quote_side_effect(t, *args, **kwargs):
+        if t == "TEST":
+            return {"ticker": "TEST", "name": "Test Corp", "price": 120.0, "prev_close": 118.0,
+                    "daily_change": "+1.69%", "market_cap": 500_000_000_000, "ytd_return": 15.0}
+        return {"ticker": t, "name": t, "price": 50.0, "market_cap": 100_000_000_000}
+
+    def _yf_ticker_side_effect(sym):
+        if sym in _PBR:
+            return MagicMock(info={"trailingPE": 10.0, "priceToBook": _PBR[sym],
+                                   "priceToSalesTrailing12Months": 2.0, "enterpriseToEbitda": 8.0})
+        return MagicMock(history=MagicMock(return_value=df),
+                         info={"sector": "Technology", "industry": "Software"})
+
+    mocks = _mock_all()
+    mocks["services.report_generator.mkt.get_quote"] = MagicMock(side_effect=_quote_side_effect)
+    mocks["services.report_generator.yf.Ticker"] = MagicMock(side_effect=_yf_ticker_side_effect)
+    stock = dict(SAMPLE_STOCK, competitors=list(_PBR))
+    with contextlib.ExitStack() as stack:
+        for target, mock in mocks.items():
+            stack.enter_context(patch(target, mock))
+        from services import report_generator
+        import importlib; importlib.reload(report_generator)
+        json_path = report_generator.generate_report(stock, tmp_path)
+    summary = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    rows = {c["ticker"]: c for c in summary["competitors_data"] if not c["is_self"]}
+    assert rows["COMP1"]["pbr"] is None                                     # 28.6× → 결측
+    assert rows["COMP1"]["per"] == 10.0                                     # 밴드 안 지표는 보존
+    assert [rows[t]["pbr"] for t in ("COMP2", "COMP3", "COMP4")] == [3.0, 3.5, 4.0]
+
+
 def _naver_quarter_response_4q(revenue_each, per=8.0, pbr=1.1):
     """4개 non-consensus 분기(키 "4">"3">"2">"1")의 finance/quarter 응답 fixture."""
     keys = ["4", "3", "2", "1"]
