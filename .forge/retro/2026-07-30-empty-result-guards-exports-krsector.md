@@ -24,7 +24,8 @@
 
 - **`us_sector_service.refresh()`에 index 개념이 있는지 확인** — 있으면 같은 부분-페이로드 축을 적용해야 한다(KR만 고쳤다).
 - **`.forge/codebase/CONCERNS.md` G2·G3 해소 반영** — 이 작업으로 무가드가 사라졌으므로 지도가 stale. fg-map(concerns 포커스) 후보.
-- **admin 엔드포인트 2개 1회 실행 확인** — `POST /api/market/refresh-monthly?market=KR`·`POST /api/analysis/sector/refresh-kr`의 `saved`/`index` 값. 테스트 계정이 비admin이라 이월된 채 **아직 미확인**.
+- ~~**admin 엔드포인트 2개 1회 실행 확인**~~ → ✅ **해소 (2026-07-30, 사용자 화면 확인)**. `설정 → 배치 → 국내 → 시장 데이터`에서 두 카드의 `지금 실행`을 눌러 응답 직독: `월간 지표(국내)` = `market: KR · export_points: 12 · saved: true`(**저장 생략이 아니라 실제 갱신**), `KR 업종 모멘텀 수집` = `sectors: 24 · index: 938`(**역인덱스 보존 — 부분-페이로드 결함 재발 없음**). 약한 값(`0`·`false`) 0건.
+  - 확인 과정에서 **관측 수단 자체가 없었다는 것이 드러났다** — `ManualRunButton`이 응답을 버리고 `실행 요청됨`만 띄워 정작 이 작업이 추가한 `saved`·`export_points`·`index`가 화면에 없었다. 즉 **이 작업의 DoD("갱신됨과 생략을 구분")를 UI가 절반만 지키고 있었고**, 그래서 이월이 오래 미확인으로 남았다. fg-quick으로 응답 표시를 붙여(커밋 `eaab7b8`) 이월을 그 자리에서 닫았다. → **교훈: admin 응답에 관측용 필드를 추가하는 슬라이스는 "그 필드가 화면에 보이는가"까지 완료기준에 넣어야 한다** — 필드를 만들어도 표시하지 않으면 관측은 성립하지 않고, 확인이 개발자도구·curl로 밀려 실제로는 안 하게 된다.
 
 ## 문서 갱신
 
