@@ -181,7 +181,9 @@ for (const view of VIEWS) {
   bump(`${V}/pills`, 3);
   P(m.pills.map(p => p.label).join(',') === '10명,20명,50명,전체', `${V}/pills`,
     `필: ${m.pills.map(p => p.label).join(',')}`);
-  P(m.groupLabel === '포트폴리오 규모 상위', `${V}/group-label`, `그룹 라벨: ${m.groupLabel}`);
+  // 라벨은 이후 UI/UX 개선에서 '규모 상위'로 축약됐다(캡션이 이미 "포트폴리오 규모 상위 N명"을
+  // 말해 중복이었고, 긴 라벨이 350px에서 필 행을 2줄로 밀어냈다). 발견 신호 자체는 유지된다.
+  P(m.groupLabel === '규모 상위', `${V}/group-label`, `그룹 라벨: ${m.groupLabel}`);
   P(m.pills.find(p => p.active)?.label === '전체', `${V}/default-all`,
     `기본 활성: ${m.pills.find(p => p.active)?.label}`);
 

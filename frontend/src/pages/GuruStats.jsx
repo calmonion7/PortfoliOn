@@ -36,8 +36,10 @@ export function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
         disabled={loading}
         className="guru-wl-btn"
         style={{
+          // 배경 채움은 CSS에서 제거했다(테두리형) — 채운 빨강 「★ 삭제」가 행마다 반복되며
+          // 카드에서 가장 강한 요소가 돼 티커·값보다 부차 액션이 앞서 읽혔다.
+          // 색 의미(추가=success·삭제=error)는 그대로 유지한다.
           cursor: loading ? 'progress' : 'pointer',
-          background: inWatchlist ? 'var(--surface-hover)' : 'var(--bg-elev-2)',
           color: inWatchlist ? 'var(--color-error)' : 'var(--color-success)',
           opacity: loading ? 0.7 : 1,
         }}
@@ -58,13 +60,14 @@ function StatRow({ index, row, value, unit, stockMap, onToggle }) {
     <div className="anim-fade-up guru-stat-row">
       <span className="guru-stat-rank">{index + 1}</span>
       <div className="guru-stat-main">
-        <div className="guru-stat-ticker">{row.ticker}</div>
+        {/* 순위·티커·지표값이 한 축(baseline) — 값을 우측 세로 stack에서 이 행으로 올렸다. */}
+        <div className="guru-stat-head">
+          <span className="guru-stat-ticker">{row.ticker}</span>
+          <span className="guru-stat-value">{value}{unit}</span>
+        </div>
         <div className="guru-stat-name">{row.name_kr || row.name || '-'}</div>
       </div>
-      <div className="guru-stat-side">
-        <span className="guru-stat-value">{value}{unit}</span>
-        <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={onToggle} />
-      </div>
+      <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={onToggle} />
     </div>
   )
 }

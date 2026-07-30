@@ -153,15 +153,34 @@ export default function GuruAllocation() {
   const cohortEmpty = q && rows.length === 0 && shownScope !== 'all'
   const scopeLabel = shownScope === 'all' ? '구루 전체' : '포트폴리오 규모 상위'
 
+  // 비중 막대는 1위 비율로 정규화한 **상대** 폭이다(절대 %가 아니다 — 수치 정본은 메타줄).
+  // rows는 투자금 내림차순이라 [0]이 최댓값. 코호트가 비거나 0이면 막대를 그리지 않는다.
+  const maxRatio = data.rows[0]?.ratio || 0
+  const barPct = (v) => maxRatio > 0 ? (v / maxRatio * 100) : 0
+
   return (
     <div>
-      <p className="guru-alloc-caption">
-        {scopeLabel} {data.manager_count}명 · 총 {fmtUsd(data.total_value)} · {data.ticker_count.toLocaleString()}종목
-        <span className="guru-alloc-note"> — 비율은 이 총액 대비</span>
-      </p>
+      {/* 캡션과 「데이터 기준」 토글을 한 행에 둔다 — 접힌 기본 상태에서도 캡션·스코프·칩·검색이
+          각각 독립 행이라 첫 카드가 458px(뷰포트 69%) 아래에 있었다(모바일 390 실측). */}
+      <div className="guru-alloc-head">
+        {/* 조각별 nowrap — 좁은 폭에서 줄이 바뀌어도 「합계 $1,077.0B」가 통째로 넘어간다
+            (묶지 않으면 '합계'만 남고 금액이 다음 줄로 떨어져 읽힌다, 350px 육안 포착). */}
+        <p className="guru-alloc-caption">
+          <span>{scopeLabel} {data.manager_count}명</span>
+          {' · '}
+          <span>{data.ticker_count.toLocaleString()}종목</span>
+          {' · '}
+          <span>합계 {fmtUsd(data.total_value)}</span>
+        </p>
+        <button className="filter-chip" aria-expanded={infoOpen} onClick={() => setInfoOpen(o => !o)}>
+          {infoOpen ? '접기' : '데이터 기준'}
+        </button>
+      </div>
 
       <div className="guru-alloc-scopes">
-        <span className="guru-alloc-scopes-label">포트폴리오 규모 상위</span>
+        {/* 축약형 — 캡션이 이미 "포트폴리오 규모 상위 N명"을 말한다(중복 제거). 350px에서
+            긴 라벨은 필 행을 2줄(84px)로 밀어냈다. 발견 신호는 유지된다(task#247). */}
+        <span className="guru-alloc-scopes-label">규모 상위</span>
         {SCOPES.map(s => (
           <button
             key={s.key}
@@ -174,9 +193,6 @@ export default function GuruAllocation() {
       </div>
       {fetching && <LoadingSpinner label={null} size={14} style={{ padding: '0 0 8px' }} />}
 
-      <button className="filter-chip" style={{ marginBottom: 12 }} onClick={() => setInfoOpen(o => !o)}>
-        {infoOpen ? '접기' : '데이터 기준'}
-      </button>
       {infoOpen && (
         <div className="guru-alloc-info-panel">
           <div>
@@ -223,23 +239,28 @@ export default function GuruAllocation() {
             <div key={r.ticker} className="anim-fade-up guru-stat-row">
               <span className="guru-stat-rank">{rank}</span>
               <div className="guru-stat-main">
-                <div className="guru-stat-ticker">{r.ticker}</div>
+                <div className="guru-stat-head">
+                  <span className="guru-stat-ticker">{r.ticker}</span>
+                  <span className="guru-stat-value">{fmtUsd(r.value)}</span>
+                </div>
                 {/* 잘리는 건 이름이어야 한다 — 숫자를 한 문자열에 섞으면 ellipsis가 문자열
                     *끝*을 먹어 비율·명수가 통째 사라진다(라이브 PC에서 50행 중 38행 발생). */}
                 <div className="guru-stat-name">
                   <span className="guru-alloc-nm">{r.name_kr || r.name || '-'}</span>
                   <span className="guru-alloc-num">· {r.ratio.toFixed(2)}% · {r.holder_count}명</span>
                 </div>
+                {maxRatio > 0 && (
+                  <div className="guru-alloc-bar" aria-hidden="true">
+                    <span style={{ width: `${barPct(r.ratio).toFixed(2)}%` }} />
+                  </div>
+                )}
               </div>
-              <div className="guru-stat-side">
-                <span className="guru-stat-value">{fmtUsd(r.value)}</span>
-                <WatchlistBtn
-                  ticker={r.ticker}
-                  name={r.name_kr || r.name}
-                  stockMap={stockMap}
-                  onToggle={handleToggle}
-                />
-              </div>
+              <WatchlistBtn
+                ticker={r.ticker}
+                name={r.name_kr || r.name}
+                stockMap={stockMap}
+                onToggle={handleToggle}
+              />
             </div>
           ))}
         </div>

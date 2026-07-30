@@ -67,28 +67,43 @@
 .guru-legend-chip { font-size: 11px; color: var(--text-3); background: var(--bg-elev-2); padding: 2px 6px; border-radius: 3px; }
 
 .guru-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-.guru-stat-row { display: flex; align-items: center; gap: 10px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
-.guru-stat-rank { font-size: 11px; color: var(--text-faint); font-weight: 600; min-width: 18px; flex-shrink: 0; }
+/* align-items를 flex-start로 두는 게 이 행의 핵심 — 순위가 「2~3줄 본문의 세로 중앙」이 아니라
+   티커·값과 같은 첫 줄에 놓인다. 액션만 align-self로 되돌려 세로 중앙에 남긴다.
+   before 실측(모바일 390): 값 t=473.5 · 티커 t=486.8 · 순위 t=499.3 — 세 요소가 전부 다른 축이라
+   시선이 지그재그였고, 우측 [값 / 버튼] 2단 stack이 카드 높이를 102.5px로 밀어올렸다. */
+.guru-stat-row { display: flex; align-items: flex-start; gap: 10px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.guru-stat-rank { font-size: 11px; line-height: 1.45; color: var(--text-faint); font-weight: 600; min-width: 18px; flex-shrink: 0; }
 .guru-stat-main { flex: 1; min-width: 0; }
-.guru-stat-ticker { font-weight: 700; font-size: 14px; color: var(--accent); }
+/* 스캔선: 순위 → 티커 → 값이 한 baseline. 값은 절대 줄이지 않고(flex-shrink:0) 티커만 줄인다. */
+.guru-stat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; line-height: 1.45; }
+.guru-stat-ticker { font-weight: 700; font-size: 14px; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .guru-stat-name { font-size: 11px; color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.guru-stat-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
-.guru-stat-value { font-weight: 700; font-size: 13px; }
+.guru-stat-value { font-weight: 700; font-size: 13px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+/* 행이 flex-start라 액션(WatchlistBtn의 .guru-wl / 보유중 라벨)만 세로 중앙으로 되돌린다.
+   margin-left는 값 ↔ 액션 분리용 — 값을 head 우측 끝으로 올린 뒤 둘이 같은 시선 높이에
+   12px 간격으로 나란히 놓여 「26명 ☆추가」가 한 덩어리로 읽혔다(라이브 육안 포착).
+   row gap을 키우면 순위↔티커 간격까지 늘어나 스캔선이 늘어지므로 액션 앞에만 준다. */
+.guru-stat-row > .guru-wl,
+.guru-stat-row > .guru-wl-held { align-self: center; margin-left: 4px; }
 
 @media (max-width: 768px) {
   .guru-stat-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .guru-stat-row { gap: 12px; padding: 14px 14px; }
+  .guru-stat-row { gap: 12px; padding: 12px 14px; }
   .guru-stat-rank { font-size: 14px; min-width: 24px; }
   .guru-stat-ticker { font-size: 17px; }
   .guru-stat-name { font-size: 13px; }
-  .guru-stat-side { gap: 6px; }
   .guru-stat-value { font-size: 15px; }
+  .guru-stat-row > .guru-wl,
+  .guru-stat-row > .guru-wl-held { margin-left: 8px; }
 }
 
 /* WatchlistBtn (GuruStats.jsx export, GuruDetail.jsx 재사용 — task#226 보존) */
 .guru-wl { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
 .guru-wl-held { font-size: 11px; color: var(--text-3); padding: 3px 8px; }
-.guru-wl-btn { display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; border: none; font-size: 11px; padding: 3px 8px; min-width: 48px; transition: opacity .15s; }
+/* 테두리형 — 배경 채움을 뺐다(색 의미는 유지: 추가=success·삭제=error). 채운 「★ 삭제」가
+   행마다 반복되며 티커·값보다 강하게 읽혀 위계가 역전돼 있었다(3탭 공용 버튼이라 함께 개선). */
+.guru-wl-btn { display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border); background: transparent; font-size: 11px; padding: 3px 8px; min-width: 48px; transition: opacity .15s, background .15s; }
+.guru-wl-btn:hover:not(:disabled) { background: var(--surface-hover); }
 .guru-wl-spinner { width: 10px; height: 10px; border-width: 1.5px; }
 .guru-wl-err { font-size: 10px; color: var(--color-error); }
 
@@ -98,8 +113,13 @@
 }
 
 /* 구루 자산 배분(task#241) — 행은 .guru-stat-* 를 그대로 재사용하고, 여기선 스코프 필·캡션만 */
-.guru-alloc-caption { font-size: 12px; color: var(--text-3); margin: 0 0 10px; }
-.guru-alloc-note { color: var(--text-faint); }
+/* 캡션 ↔ 「데이터 기준」 토글 한 행. 토글은 절대 접히지 않게(flex-shrink:0) 두고 캡션만 흐른다.
+   margin-left:auto를 쓰지 않는다 — PC의 full-width 컨테이너에서 칩이 1,300px 밖으로 밀려나
+   캡션과 한 그룹으로 읽히지 않았다(라이브 육안 포착). 캡션 바로 뒤에 붙인다. */
+.guru-alloc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.guru-alloc-head > .filter-chip { flex-shrink: 0; }
+.guru-alloc-caption { font-size: 12px; color: var(--text-3); margin: 0; min-width: 0; }
+.guru-alloc-caption > span { white-space: nowrap; }
 /* wrap + nowrap 조합이 핵심: 폭이 모자라면 **줄바꿈으로 흐르게** 하고, 라벨·버튼 텍스트
    자체는 절대 접히지 않게 한다. 안 하면 350px에서 넘침 없이(=bbox 검사 통과) 버튼 4개가
    전부 '10/명'처럼 2줄로 접혀 높이가 2배가 된다(라이브 육안 포착, 회고 #225 ② 계열). */
@@ -112,8 +132,16 @@
 @media (max-width: 768px) {
   .guru-alloc-caption { font-size: 13px; }
   .guru-alloc-scopes-label { font-size: 13px; }
-  .guru-alloc-scopes button { font-size: 13px; padding: 8px 14px; min-height: 40px; }
+  /* 가로 패딩만 줄인다(높이 40px 터치 타겟 유지) — 350px에서 필 4개+라벨이 한 줄에 들어가게 */
+  .guru-alloc-scopes button { font-size: 13px; padding: 8px 12px; min-height: 40px; }
+  .guru-alloc-head > .filter-chip { min-height: 36px; }
 }
+
+/* 비중 막대 — 이 탭의 주제(코호트 총액 대비 비중)를 수치 텍스트만으로는 스캔할 수 없었다.
+   1위 비율로 정규화한 **상대** 폭이라 절대 %가 아니다(정본 수치는 메타줄의 6.25% 쪽).
+   min-width로 아주 작은 비중도 한 픽셀은 보이게 한다(0 폭이면 "없음"으로 오독된다). */
+.guru-alloc-bar { height: 3px; margin-top: 6px; border-radius: 2px; background: var(--accent-soft); overflow: hidden; }
+.guru-alloc-bar > span { display: block; height: 100%; min-width: 2px; border-radius: 2px; background: var(--accent); }
 
 /* 메타줄: 이름만 줄이고 숫자(비율·명수)는 절대 안 줄인다 — ellipsis가 문자열 끝을 먹으면
    정작 중요한 수치가 사라진다(task#241 라이브 PC에서 50행 중 38행 잘림, 육안 포착). */
@@ -129,9 +157,12 @@
 
 /* 데이터 기준 펼침 설명란(task#247 S3) — 기본 접힘, 토글은 .filter-chip 재사용.
    ellipsis/nowrap 금지(회고 #241) — 문장이 잘리면 안 되므로 자연 줄바꿈만 쓴다. */
-.guru-alloc-info-panel { display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; font-size: 12px; line-height: 1.6; color: var(--text-3); }
+/* 카드로 담아 「설명」과 「데이터」를 시각적으로 분리한다 — 전엔 본문 배경 위 맨 산문이라
+   8문장이 화면 절반을 먹으면서도 어디까지가 설명인지 경계가 없었다. 3그룹은 hairline으로 구분. */
+.guru-alloc-info-panel { display: flex; flex-direction: column; margin: 0 0 14px; font-size: 12px; line-height: 1.6; color: var(--text-3); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.guru-alloc-info-panel > div + div { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .guru-alloc-info-panel p { margin: 0; }
-.guru-alloc-info-title { font-weight: 600; color: var(--text-2); margin: 0 0 2px; }
+.guru-alloc-info-title { font-weight: 600; color: var(--text-2); margin: 0 0 3px; }
 
 @media (min-width: 769px) {
   /* PC라도 통줄(1200px) 금지 — 회고 #235 ⑤, 폭을 넓히면 오히려 밀도가 내려간다 */
