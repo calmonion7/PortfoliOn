@@ -18,7 +18,8 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
-      window.location.href = '/'
+      // replace — 만료 시점 딥링크 엔트리를 남기지 않는다(재로그인 후 뒤로가기 재진입 차단)
+      window.location.replace('/')
     }
     return Promise.reject(err)
   }

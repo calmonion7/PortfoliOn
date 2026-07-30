@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import useTheme from './hooks/useTheme'
+import useBfcacheAuthGuard from './hooks/useBfcacheAuthGuard'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Portfolio from './pages/Portfolio'
@@ -160,6 +161,8 @@ export default function App() {
     setSession(stored ? { access_token: stored } : null)
     setAuthLoading(false)
   }, [])
+
+  useBfcacheAuthGuard(!!session)
 
   if (authLoading) return null
   if (!session) return <LoginPage />

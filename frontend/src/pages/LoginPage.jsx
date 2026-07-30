@@ -31,7 +31,8 @@ export default function LoginPage() {
       const { access_token, refresh_token } = await res.json()
       localStorage.setItem('access_token', access_token)
       localStorage.setItem('refresh_token', refresh_token)
-      window.location.href = '/'
+      // replace — 로그인 화면 엔트리를 히스토리에 남기지 않는다(뒤로가기 재진입 차단)
+      window.location.replace('/')
     } catch { setError('네트워크 오류') }
     finally { setLoading(false) }
   }
@@ -52,8 +53,9 @@ export default function LoginPage() {
     finally { setLoading(false) }
   }
 
-  const handleGoogle = () => { window.location.href = `${API}/api/auth/oauth/google` }
-  const handleGithub = () => { window.location.href = `${API}/api/auth/oauth/github` }
+  // replace — OAuth로 떠날 때 로그인 화면 엔트리를 교체해 뒤로가기로 되돌아오지 않게 한다
+  const handleGoogle = () => { window.location.replace(`${API}/api/auth/oauth/google`) }
+  const handleGithub = () => { window.location.replace(`${API}/api/auth/oauth/github`) }
 
   const isLogin = mode === 'login'
 
