@@ -100,12 +100,15 @@
 /* 구루 자산 배분(task#241) — 행은 .guru-stat-* 를 그대로 재사용하고, 여기선 스코프 필·캡션만 */
 .guru-alloc-caption { font-size: 12px; color: var(--text-3); margin: 0 0 10px; }
 .guru-alloc-note { color: var(--text-faint); }
-.guru-alloc-scopes { display: flex; gap: 4px; margin-bottom: 12px; }
+.guru-alloc-scopes { display: flex; align-items: center; gap: 4px; margin-bottom: 12px; }
+/* 이 기능의 유일한 발견 신호 — --text-faint(흐림)가 아니라 읽히는 밝기로(task#247) */
+.guru-alloc-scopes-label { color: var(--text-3); font-size: 11px; margin-right: 4px; }
 .guru-alloc-scopes button { padding: 4px 12px; font-size: 11px; border-radius: 6px; cursor: pointer; background: transparent; color: var(--text-3); border: 1px solid var(--border); font-weight: 400; }
 .guru-alloc-scopes button.is-active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
 
 @media (max-width: 768px) {
   .guru-alloc-caption { font-size: 13px; }
+  .guru-alloc-scopes-label { font-size: 13px; }
   .guru-alloc-scopes button { font-size: 13px; padding: 8px 14px; min-height: 40px; }
 }
 
@@ -119,4 +122,15 @@
    인기순·가중치 탭 그리드는 손대지 않는다. */
 @media (min-width: 769px) {
   .guru-alloc-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+}
+
+/* 데이터 기준 펼침 설명란(task#247 S3) — 기본 접힘, 토글은 .filter-chip 재사용.
+   ellipsis/nowrap 금지(회고 #241) — 문장이 잘리면 안 되므로 자연 줄바꿈만 쓴다. */
+.guru-alloc-info-panel { display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; font-size: 12px; line-height: 1.6; color: var(--text-3); }
+.guru-alloc-info-panel p { margin: 0; }
+.guru-alloc-info-title { font-weight: 600; color: var(--text-2); margin: 0 0 2px; }
+
+@media (min-width: 769px) {
+  /* PC라도 통줄(1200px) 금지 — 회고 #235 ⑤, 폭을 넓히면 오히려 밀도가 내려간다 */
+  .guru-alloc-info-panel { font-size: 13px; max-width: 680px; }
 }

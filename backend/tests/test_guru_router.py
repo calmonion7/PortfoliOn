@@ -117,6 +117,26 @@ def test_stats_weighted():
     assert r.json()[0]["score"] == pytest.approx(1.0, abs=0.001)
 
 
+def test_stats_allocation_includes_last_updated_passthrough():
+    with patch("routers.guru.storage.get_guru_managers", return_value=SAMPLE_DATA):
+        r = client.get("/api/guru/stats/allocation")
+    assert r.status_code == 200
+    assert r.json()["last_updated"] == SAMPLE_DATA["last_updated"]
+
+
+def test_stats_allocation_passes_top_query_param_to_service():
+    with patch("routers.guru.storage.get_guru_managers", return_value=SAMPLE_DATA):
+        with patch("routers.guru.compute_allocation", return_value={"rows": []}) as mock_alloc:
+            r = client.get("/api/guru/stats/allocation?top=10")
+    assert r.status_code == 200
+    mock_alloc.assert_called_once_with(SAMPLE_DATA["managers"], top=10)
+
+
+def test_stats_allocation_rejects_non_positive_top():
+    assert client.get("/api/guru/stats/allocation?top=0").status_code == 422
+    assert client.get("/api/guru/stats/allocation?top=-1").status_code == 422
+
+
 def test_crawl_progress_initial():
     r = client.get("/api/guru/crawl/progress")
     assert r.status_code == 200

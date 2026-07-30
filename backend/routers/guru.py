@@ -1,5 +1,6 @@
 import logging
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from typing import Optional
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Query
 from datetime import datetime
 from services import storage
 from services import job_runs
@@ -52,9 +53,12 @@ def stats_weighted(_: str = Depends(get_current_user)):
 
 
 @router.get("/stats/allocation")
-def stats_allocation(_: str = Depends(get_current_user)):
+def stats_allocation(top: Optional[int] = Query(None, ge=1), _: str = Depends(get_current_user)):
     data = storage.get_guru_managers()
-    return compute_allocation(data.get("managers", []))
+    return {
+        "last_updated": data.get("last_updated"),
+        **compute_allocation(data.get("managers", []), top=top),
+    }
 
 
 @router.get("/crawl/progress")

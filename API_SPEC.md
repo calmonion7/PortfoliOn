@@ -3167,9 +3167,11 @@ dataroma 기반 구루 매니저 전체 목록. 상세 전용 계층인 전 종�
 
 ### `GET /api/guru/stats/allocation`
 
-전 구루를 하나의 자금 풀로 보고 **전 종목 층**(`holdings`)을 티커별로 합산한 자산 배분 랭킹. 투자금 내림차순 정렬.
+**포트폴리오 규모(13F 신고 자산) 상위 `top`명 코호트**의 **전 종목 층**(`holdings`)을 티커별로 합산한 자산 배분 랭킹. 투자금 내림차순 정렬.
 
-투자금은 dataroma 신고 금액(`value`)이 정본이고, 그 값이 없는 행에 한해 `weight_pct/100 × portfolio_value`로 추정한다. `ratio`의 분모는 `total_value`(전 종목 투자금 합)라 전 행의 `ratio` 합은 100이다. 듀얼클래스(GOOGL/GOOG 등)는 별개 티커로 센다. `name_kr`은 `top10` 층에서 티커로 조인하며, 없으면 빈 문자열(소비측이 `name` 폴백).
+**Query:** `top`(선택, 정수 ≥1) — 코호트 크기. 생략하면 전 구루(83명)를 코호트로 집계(기존 동작). `top`이 매니저 수보다 크면 자연히 전체와 동일. 코호트 선별은 `portfolio_value` 내림차순, 동값은 `id` 오름차순 보조키로 결정적이다(같은 입력 → 항상 같은 코호트).
+
+투자금은 dataroma 신고 금액(`value`)이 정본이고, 그 값이 없는 행에 한해 `weight_pct/100 × portfolio_value`로 추정한다. `ratio`의 분모는 **코호트** 투자금 총합(`total_value`)이라 전 행의 `ratio` 합은 100이다(코호트 기준 — 전체가 아니다). 듀얼클래스(GOOGL/GOOG 등)는 별개 티커로 센다. `name_kr`은 `top10` 층에서 티커로 조인하며, 없으면 빈 문자열(소비측이 `name` 폴백).
 
 **Auth:** Bearer token 필요
 
@@ -3177,15 +3179,27 @@ dataroma 기반 구루 매니저 전체 목록. 상세 전용 계층인 전 종�
 
 ```json
 {
-  "total_value": 1077800000000,
-  "manager_count": 83,
-  "ticker_count": 1723,
+  "last_updated": "2026-07-30T10:00:00",
+  "total_value": 766300000000,
+  "manager_count": 10,
+  "all_manager_count": 83,
+  "all_total_value": 1077000000000,
+  "ticker_count": 412,
+  "periods": { "Q1 2026": 10 },
+  "estimated_count": 37,
   "rows": [
     { "ticker": "AAPL", "name": "Apple Inc.", "name_kr": "애플",
-      "value": 67300000000, "ratio": 6.2452, "holder_count": 24 }
+      "value": 67300000000, "ratio": 8.7744, "holder_count": 9 }
   ]
 }
 ```
+
+- `last_updated` — `GET /api/guru/managers`와 동일한 크롤 시각(라우터 레벨 passthrough, 코호트와 무관).
+- `total_value`/`ticker_count`/`rows`/`ratio` — **코호트** 기준(`top` 적용 후).
+- `manager_count` — 코호트 크기(`top` 생략 시에만 83).
+- `all_manager_count`/`all_total_value` — **전체 83명** 기준 매니저 수·집계 투자금 합(`top`과 무관하게 항상 동일). `all_total_value`는 Σ`portfolio_value`가 **아니다** — `holdings` 층을 동일한 value/추정 교차검증으로 합산한 값이라 소폭 다르다(예 $1,077.8B vs $1,077.0B). `total_value / all_total_value`가 코호트의 전체 대비 비중이다.
+- `periods` — 코호트 매니저의 신고분기(`period`) 구성 dict(예 `{"Q1 2026": 10}`). `period` 없는 매니저는 세지 않는다.
+- `estimated_count` — 코호트 안에서 신고 금액(`value`)이 없어 추정한 보유 행 수.
 
 ---
 

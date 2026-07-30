@@ -134,8 +134,11 @@ def test_compute_allocation_header_totals():
 
 
 def test_compute_allocation_empty_is_graceful():
+    # task#247 S1: 코호트 메타 필드(all_manager_count 등)가 additive로 추가돼
+    # 빈 입력의 응답 shape도 넓어진다 — 값은 전부 그대로(0/빈 dict/빈 리스트).
     assert compute_allocation([]) == {
         "total_value": 0, "manager_count": 0, "ticker_count": 0, "rows": [],
+        "all_manager_count": 0, "all_total_value": 0, "periods": {}, "estimated_count": 0,
     }
 
 
@@ -189,9 +192,110 @@ def test_compute_allocation_logs_warning_on_misalignment(caplog):
     assert any("value/추정 불일치" in r.message for r in caplog.records)
 
 
+def test_compute_allocation_does_not_duplicate_warning_across_full_and_cohort_scan(caplog):
+    """top이 지정되면 전체 스캔(메타용)과 코호트 스캔(본문용)이 같은 매니저를 두 번
+    훑는다 — 공유 없이 각 스캔이 독립적으로 경고를 찍으면 같은 불일치 행에 대해
+    경고가 두 번 남는다(리뷰 발견, task#247)."""
+    import logging
+    with caplog.at_level(logging.WARNING):
+        compute_allocation(MISALIGNED, top=1)   # 매니저 1명 → 코호트=전체 스캔과 동일 대상
+    warnings = [r for r in caplog.records if "value/추정 불일치" in r.message]
+    assert len(warnings) == 1
+
+
 def test_compute_allocation_without_portfolio_value_trusts_reported_value():
     """pv=0이면 추정치를 만들 수 없다 — 검증자가 없으므로 신고값을 신뢰한다(거부 아님)."""
     sample = [{"id": "m", "portfolio_value": 0, "top10": [],
                "holdings": [{"rank": 1, "ticker": "Z", "name": "Z", "weight_pct": 10.0, "value": 777}]}]
     by_ticker = {r["ticker"]: r for r in compute_allocation(sample)["rows"]}
     assert by_ticker["Z"]["value"] == 777
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 서비스 코호트 절단 `top=` (task#247 S1) — 포트폴리오 규모 상위 N명만 합산
+# ─────────────────────────────────────────────────────────────────────
+
+# m1·m2는 portfolio_value 동값(300)으로 top 경계 타이브레이크(id 오름차순)를 만든다.
+# m3은 period 있으나 신고값 없는 행(추정), m4는 period 자체가 없다.
+COHORT_SAMPLE = [
+    {"id": "m1", "portfolio_value": 300, "period": "Q1 2026", "top10": [],
+     "holdings": [{"rank": 1, "ticker": "AAA", "name": "AAA Co", "weight_pct": 50.0, "value": 150}]},
+    {"id": "m2", "portfolio_value": 300, "period": "Q1 2026", "top10": [],
+     "holdings": [{"rank": 1, "ticker": "BBB", "name": "BBB Co", "weight_pct": 50.0, "value": 150}]},
+    {"id": "m3", "portfolio_value": 200, "period": "Q4 2025", "top10": [],
+     "holdings": [{"rank": 1, "ticker": "CCC", "name": "CCC Co", "weight_pct": 50.0}]},
+    {"id": "m4", "portfolio_value": 100, "top10": [],
+     "holdings": [{"rank": 1, "ticker": "DDD", "name": "DDD Co", "weight_pct": 50.0}]},
+]
+
+
+def test_compute_allocation_top_cutoff_changes_cohort_size_and_totals():
+    result = compute_allocation(COHORT_SAMPLE, top=2)
+    assert result["manager_count"] == 2
+    assert result["ticker_count"] == 2
+    assert result["total_value"] == 300
+    assert {r["ticker"] for r in result["rows"]} == {"AAA", "BBB"}
+
+
+def test_compute_allocation_top_tiebreak_is_deterministic_by_id():
+    """m1·m2는 portfolio_value 동값(300) — top=1 경계에서 id 오름차순으로 m1만 뽑혀야
+    하고, 입력 순서를 뒤집어도(섞어도) 같은 코호트가 나와야 한다."""
+    forward = compute_allocation(COHORT_SAMPLE, top=1)
+    shuffled = compute_allocation(list(reversed(COHORT_SAMPLE)), top=1)
+    assert forward["rows"][0]["ticker"] == "AAA"
+    assert forward == shuffled
+
+
+def test_compute_allocation_ratio_sums_to_100_for_cohort():
+    result = compute_allocation(COHORT_SAMPLE, top=2)
+    assert sum(r["ratio"] for r in result["rows"]) == pytest.approx(100.0, abs=0.01)
+
+
+def test_compute_allocation_manager_count_is_cohort_size():
+    assert compute_allocation(COHORT_SAMPLE, top=2)["manager_count"] == 2
+    assert compute_allocation(COHORT_SAMPLE)["manager_count"] == 4  # top=None → 전체
+
+
+def test_compute_allocation_all_totals_invariant_to_top():
+    full = compute_allocation(COHORT_SAMPLE)
+    top1 = compute_allocation(COHORT_SAMPLE, top=1)
+    top999 = compute_allocation(COHORT_SAMPLE, top=999)
+    assert full["all_manager_count"] == top1["all_manager_count"] == top999["all_manager_count"] == 4
+    assert full["all_total_value"] == top1["all_total_value"] == top999["all_total_value"] == 450
+
+
+def test_compute_allocation_periods_counts_by_manager_period():
+    cohort = compute_allocation(COHORT_SAMPLE, top=2)
+    assert cohort["periods"] == {"Q1 2026": 2}
+
+    full = compute_allocation(COHORT_SAMPLE)
+    assert full["periods"] == {"Q1 2026": 2, "Q4 2025": 1}  # period 없는 m4는 세지 않음
+
+
+def test_compute_allocation_estimated_count_zero_when_all_reported():
+    assert compute_allocation(COHORT_SAMPLE, top=1)["estimated_count"] == 0
+
+
+def test_compute_allocation_estimated_count_counts_missing_value_rows():
+    full = compute_allocation(COHORT_SAMPLE)
+    assert full["estimated_count"] == 2  # m3 CCC · m4 DDD 신고금액 없음
+
+
+def test_compute_allocation_top_larger_than_manager_count_is_full():
+    assert compute_allocation(COHORT_SAMPLE, top=999) == compute_allocation(COHORT_SAMPLE)
+
+
+def test_compute_allocation_top1_single_manager_cohort():
+    result = compute_allocation(COHORT_SAMPLE, top=1)
+    assert result["manager_count"] == 1
+    assert result["ticker_count"] == 1
+
+
+def test_compute_allocation_empty_managers_with_top_is_graceful():
+    result = compute_allocation([], top=10)
+    assert result["manager_count"] == 0
+    assert result["all_manager_count"] == 0
+    assert result["all_total_value"] == 0
+    assert result["periods"] == {}
+    assert result["estimated_count"] == 0
+    assert result["rows"] == []
