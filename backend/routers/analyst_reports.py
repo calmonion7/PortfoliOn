@@ -5,7 +5,7 @@
 """
 import logging
 from datetime import date, datetime
-from typing import List, Literal
+from typing import List, Literal, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -26,7 +26,9 @@ class PointMetric(BaseModel):
     """포인트 핵심 지표 칩(한눈 구조화, task#218) — value는 표시용 문자열("383.2조원"·"8.8배")."""
     label: str = Field(..., min_length=1, max_length=40)
     value: str = Field(..., min_length=1, max_length=40)
-    change_pct: float = Field(None, allow_inf_nan=False)  # 증감%(선택) — 프론트가 up/down 색
+    # 증감%(선택) — 프론트가 up/down 색. Optional 필수: pydantic v2는 validate_default=False라
+    # 키 생략은 통과하지만 명시적 null은 타입 검증을 타서, float이면 발행 전체가 422로 죽는다(task#250).
+    change_pct: Optional[float] = Field(None, allow_inf_nan=False)
 
 class ReportPoint(BaseModel):
     title: str = Field(..., min_length=1)

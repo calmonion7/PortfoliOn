@@ -143,6 +143,54 @@ def test_publish_with_point_metrics():
     assert client.post("/api/analyst-reports/TST", json=too_many).status_code == 422
 
 
+def test_publish_explicit_null_change_pct_accepted():
+    """명시적 `"change_pct": null`이 발행 요청 전체를 422로 막던 버그(task#250).
+
+    pydantic v2는 validate_default=False라 **키 생략은 통과하지만 명시적 null은 타입 검증을 탄다** —
+    `float = Field(None, ...)`이면 null이 float_type 422가 되어, 선택 칩 필드 하나 때문에
+    발행 전체가 죽었다. Optional[float]이 그 비대칭을 없앤다.
+    """
+    body = {**VALID_BODY, "points": [
+        {"title": "포인트1", "body": "근거1", "metrics": [
+            {"label": "forward PER", "value": "5.9배", "change_pct": None},
+        ]},
+        {"title": "포인트2", "body": "근거2"},
+    ]}
+    resp, mock_save = _publish(body)
+    assert resp.status_code == 201
+    points = mock_save.call_args.args[7]
+    assert points[0]["metrics"][0]["change_pct"] is None
+
+
+def test_publish_nan_change_pct_rejected_422():
+    """change_pct의 NaN 차단(allow_inf_nan=False)을 못박는다 — Optional화가 가드를 떨어뜨리지 않도록.
+
+    수정 전에도 통과하므로 red-first가 원리적으로 불가능하다. 목적은 미래 회귀 차단:
+    누가 `Optional[float] = None`으로 '정리'하며 allow_inf_nan=False를 지워도 초록으로
+    통과하는 것을 막는다. raw NaN 토큰은 json.loads를 통과하고 422 detail이 그 NaN을
+    echo해 직렬화 500이 되므로(main.app 커스텀 핸들러가 차단) self-app이 아니라 main.app을 태운다.
+    """
+    import json as _json
+    from main import app as main_app
+    body = {**VALID_BODY, "points": [
+        {"title": "포인트1", "body": "근거1", "metrics": [
+            {"label": "2026F 영업이익", "value": "383.2조원", "change_pct": 779.0},
+        ]},
+        {"title": "포인트2", "body": "근거2"},
+    ]}
+    raw = _json.dumps(body).replace('"change_pct": 779.0', '"change_pct": NaN')
+    main_app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
+    try:
+        c = TestClient(main_app)
+        with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
+             patch.object(svc, "save_report"):
+            resp = c.post("/api/analyst-reports/TST", content=raw,
+                          headers={"Content-Type": "application/json"})
+        assert resp.status_code == 422
+    finally:
+        main_app.dependency_overrides.pop(require_admin_or_api_key, None)
+
+
 def test_publish_no_snapshot_409():
     with patch.object(svc, "latest_snapshot", return_value=None):
         resp = client.post("/api/analyst-reports/TST", json=VALID_BODY)
