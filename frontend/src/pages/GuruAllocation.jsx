@@ -36,6 +36,13 @@ const fmtPeriods = (periods) => {
 
 const fmtUpdated = (iso) => iso ? iso.replace('T', ' ').slice(0, 16) : '—'
 
+// 전체 스코프에선 "전체 83명 중 83명이지만 구루 자산의 100.0%를 덮는다"가 무의미한 노이즈로
+// 읽힌다(PC·모바일 라이브 육안 확인) — 코호트를 실제로 좁혔을 때만 커버리지를 밝힌다.
+const coverageSentence = (d) => d.manager_count >= d.all_manager_count
+  ? `지금은 전체 ${d.all_manager_count}명 전부를 합산한다.`
+  : `전체 ${d.all_manager_count}명 중 ${d.manager_count}명이지만 구루 자산의 `
+    + `${(d.all_total_value ? d.total_value / d.all_total_value * 100 : 0).toFixed(1)}%를 덮는다.`
+
 export default function GuruAllocation() {
   const { showToast } = useToast()
   const cacheRef = useRef({})   // scope -> 응답(재클릭 재요청 0)
@@ -174,7 +181,7 @@ export default function GuruAllocation() {
         <div className="guru-alloc-info-panel">
           <div>
             <p className="guru-alloc-info-title">이 화면이 세는 범위</p>
-            <p>탑N — 표시 줄 수가 아니라 13F 신고 자산 상위 N명 구루 합산. 전체 {data.all_manager_count}명 중 {data.manager_count}명이지만 구루 자산의 {(data.all_total_value ? data.total_value / data.all_total_value * 100 : 0).toFixed(1)}%를 덮는다.</p>
+            <p>탑N — 표시 줄 수가 아니라 13F 신고 자산 상위 N명 구루 합산. {coverageSentence(data)}</p>
             <p>비율 — 분모는 코호트 총액 {fmtUsd(data.total_value)}. 필을 바꾸면 같은 종목의 비율도 변한다.</p>
             <p>보유 구루 수 — 코호트 안에서 든 수(전체 기준이 아니다).</p>
           </div>

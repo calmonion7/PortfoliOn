@@ -100,10 +100,13 @@
 /* 구루 자산 배분(task#241) — 행은 .guru-stat-* 를 그대로 재사용하고, 여기선 스코프 필·캡션만 */
 .guru-alloc-caption { font-size: 12px; color: var(--text-3); margin: 0 0 10px; }
 .guru-alloc-note { color: var(--text-faint); }
-.guru-alloc-scopes { display: flex; align-items: center; gap: 4px; margin-bottom: 12px; }
+/* wrap + nowrap 조합이 핵심: 폭이 모자라면 **줄바꿈으로 흐르게** 하고, 라벨·버튼 텍스트
+   자체는 절대 접히지 않게 한다. 안 하면 350px에서 넘침 없이(=bbox 검사 통과) 버튼 4개가
+   전부 '10/명'처럼 2줄로 접혀 높이가 2배가 된다(라이브 육안 포착, 회고 #225 ② 계열). */
+.guru-alloc-scopes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 12px; }
 /* 이 기능의 유일한 발견 신호 — --text-faint(흐림)가 아니라 읽히는 밝기로(task#247) */
-.guru-alloc-scopes-label { color: var(--text-3); font-size: 11px; margin-right: 4px; }
-.guru-alloc-scopes button { padding: 4px 12px; font-size: 11px; border-radius: 6px; cursor: pointer; background: transparent; color: var(--text-3); border: 1px solid var(--border); font-weight: 400; }
+.guru-alloc-scopes-label { color: var(--text-3); font-size: 11px; margin-right: 4px; white-space: nowrap; }
+.guru-alloc-scopes button { padding: 4px 12px; font-size: 11px; border-radius: 6px; cursor: pointer; background: transparent; color: var(--text-3); border: 1px solid var(--border); font-weight: 400; white-space: nowrap; }
 .guru-alloc-scopes button.is-active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
 
 @media (max-width: 768px) {
