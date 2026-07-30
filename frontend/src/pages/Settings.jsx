@@ -70,17 +70,32 @@ function RecentRun({ run }) {
   )
 }
 
-function ManualRunButton({ batch }) {
+// 응답값 표시용. 0·false는 "안 했다/저장 생략"이라 초록으로 뭉개면 안 된다 — 이 24개
+// manual_endpoint의 응답 필드는 전부 "저장했나(saved)/몇 건인가(*_points·sectors·index)"
+// 의미라 그 규칙이 성립한다(message 같은 문자열은 중립).
+const isWeak = (v) => v === false || v === 0
+const fmtRunVal = (v) =>
+  v === null || v === undefined ? '—'
+    : Array.isArray(v) ? `${v.length}건`
+      : typeof v === 'object' ? '…'
+        : String(v)
+
+export function ManualRunButton({ batch }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
+  const [result, setResult] = useState(null)
 
   const run = async () => {
     setBusy(true)
     setMsg('')
     setErr('')
+    setResult(null)
     try {
-      await api.post(batch.manual_endpoint)
+      const { data } = await api.post(batch.manual_endpoint)
+      // 응답을 버리면 "갱신됨"과 "저장 생략·직전값 유지"가 화면에서 구별되지 않는다
+      // (job_runs는 예외가 없으면 스킵도 success로 기록하므로 실행이력도 못 가른다).
+      setResult(data && typeof data === 'object' && !Array.isArray(data) ? data : null)
       setMsg('실행 요청됨')
     } catch (e) {
       setErr(e?.response?.data?.detail || '실행에 실패했습니다.')
@@ -89,6 +104,9 @@ function ManualRunButton({ batch }) {
     }
   }
 
+  // ok는 성공 응답에 항상 true라 정보가 없다.
+  const entries = Object.entries(result || {}).filter(([k]) => k !== 'ok')
+
   return (
     <div>
       <button className="btn btn-primary" onClick={run} disabled={busy}
@@ -96,6 +114,20 @@ function ManualRunButton({ batch }) {
         {busy ? '실행 중...' : '지금 실행'}
       </button>
       {msg && <p style={{ marginTop: 8, color: 'var(--color-success)', fontSize: 13 }}>{msg}</p>}
+      {entries.length > 0 && (
+        <div data-testid="run-result" style={{
+          marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontSize: 12,
+        }}>
+          {entries.map(([k, v]) => (
+            <span key={k} style={{ color: 'var(--text-3)' }}>
+              {k}:{' '}
+              <b className="mono tnum" style={isWeak(v) ? { color: 'var(--warn)' } : undefined}>
+                {fmtRunVal(v)}
+              </b>
+            </span>
+          ))}
+        </div>
+      )}
       {err && <p style={{ marginTop: 8, color: 'var(--color-error)', fontSize: 13 }}>{err}</p>}
     </div>
   )
