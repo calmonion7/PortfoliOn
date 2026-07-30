@@ -316,10 +316,15 @@ def test_kr_rd_intensity_no_dart_key_returns_none():
     assert result is None
 
 
-# ── task#248: 피어 멀티플 이상치 가드(_guard_peer_multiples) ────────────────────
+# ── task#248/#249: 피어 멀티플 이상치 가드(_guard_peer_multiples) ───────────────
 # 외부 소스의 단위 혼선 오값(TSM PBR 81.87 = 실제 ~4배의 20배)이 파싱을 성공해
-# 경고 없이 들어온다. 판정축 = 그 행을 뺀 나머지 peer 중앙값 대비 배수가 [1/5, 5]
-# 밖인지 — 절대 임계값을 추정하지 않는다(형제 _VALUE_EST_BAND, task#244와 동형).
+# 경고 없이 들어온다. 판정축 = **값이 있는 peer 전체 + 자사**(기준 표본) 중앙값 대비
+# 배수가 [1/5, 5] 밖인지 — 절대 임계값을 추정하지 않는다(형제 _VALUE_EST_BAND, #244).
+# task#249에서 판정축을 leave-one-out(판정 대상을 표본에서 뺌)에서 교체했다: LOO는
+# 표본을 항상 1개 줄여 peer 3개에서 오값 지분이 50%가 되고, 정상 peer가 결측돼 지표
+# 비교가 통째 사라졌다(005930 PBR 칩 소멸). 생략 임계도 "나머지 <2"에서 **"표본 <3"**
+# 으로 옮겼다 — 표본 2개는 중앙값이 두 값 평균이라 배수가 (0,2)에만 머물러 5배 밴드가
+# 원리적으로 발동할 수 없다(ADR-0030). 판정 대상에서 자사를 빼는 것은 유지.
 
 import logging
 
@@ -342,7 +347,10 @@ def _peer_rows():
 
 def test_guard_peer_multiples_nulls_only_tsm_pbr_and_psr():
     """실측 5행: TSM pbr(21.0×)·psr(1/16.9×)만 결측, 밴드 안 지표·비판정 필드는 불변.
-    대칭 밴드가 과대·과소 방향 오류를 동시에 잡고 멀쩡한 지표는 건드리지 않는다."""
+    대칭 밴드가 과대·과소 방향 오류를 동시에 잡고 멀쩡한 지표는 건드리지 않는다.
+
+    task#249 판정축 교체 후에도 결과 동일 — 자사를 표본에 넣어 pbr 표본은
+    [2.9, 3.48, 81.87, 9.20, 3.89] median 3.89, psr은 median 7.63으로 #248과 같다."""
     original = {r["ticker"]: dict(r) for r in _peer_rows()}
     rows = rg._guard_peer_multiples(_peer_rows())
 
@@ -362,12 +370,38 @@ def test_guard_peer_multiples_nulls_only_tsm_pbr_and_psr():
 
 
 def test_guard_peer_multiples_never_judges_self_row():
-    """자사(is_self)는 판정 대상도 중앙값 표본도 아니다 — 출처가 달라 신뢰도가 비대칭."""
+    """자사(is_self)는 **판정 대상이 아니다** — 값이 밴드 밖이어도 결측되지 않는다.
+
+    자사는 비교할 동종 집단이 없어 판정이 횡단면(peer 대조)이 아니라 자기 과거값
+    대조여야 하므로 메커니즘이 다르다(ADR-0030 비목표). 표본 포함은 별개 축이라
+    아래 `_self_is_in_reference_sample`가 따로 단언한다."""
     rows = _peer_rows()
     rows[0]["pbr"] = 999.0
     out = rg._guard_peer_multiples(rows)
-    assert out[0]["pbr"] == 999.0                                       # 밴드 밖이어도 불변
-    assert next(r for r in out if r["ticker"] == "TSM")["pbr"] is None   # 표본에서도 빠짐
+    # 표본 [999, 3.48, 81.87, 9.20, 3.89] median 9.20 → 자사는 108.6×인데도 불변
+    assert out[0]["pbr"] == 999.0
+    assert next(r for r in out if r["ticker"] == "TSM")["pbr"] is None   # 8.9× → 결측
+
+
+def test_guard_peer_multiples_self_is_in_reference_sample():
+    """자사는 **기준 표본에 포함된다** — 자사를 빼면 판정이 뒤집히는 구성으로 못박는다.
+
+    peers {1.9, 10, 10} + 자사 2.0. 표본에 자사가 있으면 median (2.0+10)/2 = 6.0 →
+    1.9는 0.317×로 보존. 자사를 빼면(구 LOO/자사제외) 표본 {10, 10} median 10.0 →
+    1.9가 0.19×로 결측된다. 즉 자사 1개가 정상 peer의 생사를 갈랐다 — 라이브 005930의
+    PBR 칩 소멸과 같은 메커니즘의 최소 재현."""
+    rows = [
+        {"ticker": "T", "is_self": False, "pbr": 1.9},
+        {"ticker": "A", "is_self": False, "pbr": 10.0},
+        {"ticker": "B", "is_self": False, "pbr": 10.0},
+        {"ticker": "SELF", "is_self": True, "pbr": 2.0},
+    ]
+    out = rg._guard_peer_multiples(rows)
+    assert [r["pbr"] for r in out] == [1.9, 10.0, 10.0, 2.0]
+
+    # 대조군: 자사 행을 뺀 같은 peer 구성이면 1.9가 결측된다(표본이 얇아진 탓)
+    without_self = rg._guard_peer_multiples([dict(r) for r in rows if not r["is_self"]])
+    assert [r["pbr"] for r in without_self] == [None, 10.0, 10.0]
 
 
 def test_guard_peer_multiples_ignores_rd_intensity():
@@ -377,15 +411,35 @@ def test_guard_peer_multiples_ignores_rd_intensity():
     assert rg._guard_peer_multiples(rows)[2]["rd_intensity"] == 999.0
 
 
-def test_guard_peer_multiples_skips_when_under_two_other_peers():
-    """나머지 표본이 1개면 판정 생략 — computePeerPremiums의 `<2` 관례를 그대로 따른다."""
+def test_guard_peer_multiples_skips_when_sample_under_three():
+    """기준 표본이 3개 미만이면 판정 생략 — 표본 2개는 중앙값이 두 값 평균이라 배수가
+    `2v/(v+s)` = (0, 2) 구간에만 머물러 5배 밴드가 원리적으로 발동할 수 없다(ADR-0030).
+    발동하는 것처럼 보이는 경우는 정상값이 오값과 짝지어져 밀려나는 역전뿐이다."""
     rows = [
         {"ticker": "A", "is_self": True, "pbr": 3.0},
         {"ticker": "B", "is_self": False, "pbr": 100.0},
-        {"ticker": "C", "is_self": False, "pbr": 1.0},
     ]
     out = rg._guard_peer_multiples(rows)
-    assert [r["pbr"] for r in out] == [3.0, 100.0, 1.0]
+    assert [r["pbr"] for r in out] == [3.0, 100.0]      # 표본 2개 → 판정 자격 없음
+
+    # 표본이 3개가 되는 순간 판정이 시작된다(경계 확인 — 생략이 오값을 영구 면제하지 않는다)
+    rows.append({"ticker": "C", "is_self": False, "pbr": 1.0})
+    out = rg._guard_peer_multiples(rows)
+    assert [r["pbr"] for r in out] == [3.0, None, 1.0]  # median 3.0 → 100은 33.3×
+
+
+def test_guard_peer_multiples_skips_when_self_missing_leaves_two_peers():
+    """자사 값이 `None`이면 표본에서 빠진다 — peer 2개만 남으면 생략으로 **역전을 막는다**.
+
+    판정했다면 median 43.74로 정상값 3.48이 0.0796×에 결측되고 오값 84.0은 1.92×로
+    살아남는다(정확히 거꾸로). 자사 `None`을 표본 크기에 세지 않는 것이 이 방어의 핵심."""
+    rows = [
+        {"ticker": "SELF", "is_self": True, "pbr": None},
+        {"ticker": "OK", "is_self": False, "pbr": 3.48},
+        {"ticker": "BAD", "is_self": False, "pbr": 84.0},
+    ]
+    out = rg._guard_peer_multiples(rows)
+    assert [r["pbr"] for r in out] == [None, 3.48, 84.0]
 
 
 def test_guard_peer_multiples_skips_non_positive_median():
@@ -412,23 +466,30 @@ def test_guard_peer_multiples_excludes_none_from_target_and_sample():
     out = rg._guard_peer_multiples(rows)
     assert out[0]["per"] is None
     assert [r["per"] for r in out[1:4]] == [10.0, 11.0, 12.0]
-    assert out[4]["per"] is None      # 1000 / median(10,11,12)=11 → 90.9×
+    assert out[4]["per"] is None      # 1000 / median(10,11,12,1000)=11.5 → 87.0×
 
 
 def test_guard_peer_multiples_even_sample_median_is_mean_of_middle_two():
     """짝수 표본 중앙값 = 중간 두 값 평균 — computePeerPremiums(reportUtils.jsx)와 같은 정의.
-    표본 [2,4,10,100] → median 7.0. 34.9=4.99× 안 / 35.1=5.01× 밖으로 정의를 못박는다
-    (중간 하나만 쓰면 4.0 또는 10.0이 되어 두 단언 중 하나가 반드시 깨진다)."""
+
+    판정 대상이 표본에 남으므로(task#249) **표본이 짝수가 되는 구성**으로 재설계했다:
+    peer 5행 + 자사 1행 = 6개. target이 최솟값이라 정렬은 [target,2,4,10,30,200]이고
+    중간 두 값은 4·10 → median 7.0, 밴드 하단 1.4. 1.41=0.2014× 안 / 1.39=0.1986× 밖.
+    중간 하나만 쓰는 구현이면 median이 4.0(→둘 다 보존) 또는 10.0(→둘 다 결측)이 되어
+    두 단언 중 하나가 반드시 깨진다."""
     def _rows(target):
         return [
             {"ticker": "T", "is_self": False, "pbr": target},
             {"ticker": "A", "is_self": False, "pbr": 2.0},
             {"ticker": "B", "is_self": False, "pbr": 4.0},
             {"ticker": "C", "is_self": False, "pbr": 10.0},
-            {"ticker": "D", "is_self": False, "pbr": 100.0},
+            {"ticker": "D", "is_self": False, "pbr": 30.0},
+            {"ticker": "SELF", "is_self": True, "pbr": 200.0},
         ]
-    assert rg._guard_peer_multiples(_rows(34.9))[0]["pbr"] == 34.9
-    assert rg._guard_peer_multiples(_rows(35.1))[0]["pbr"] is None
+    assert rg._guard_peer_multiples(_rows(1.41))[0]["pbr"] == 1.41
+    assert rg._guard_peer_multiples(_rows(1.39))[0]["pbr"] is None
+    # 다른 peer는 어느 쪽에서도 건드려지지 않는다(경계 테스트가 거짓양성을 숨기지 않도록)
+    assert [r["pbr"] for r in rg._guard_peer_multiples(_rows(1.39))[1:]] == [2.0, 4.0, 10.0, 30.0, 200.0]
 
 
 def test_guard_peer_multiples_warns_once_per_dropped_field(caplog):
@@ -442,14 +503,57 @@ def test_guard_peer_multiples_warns_once_per_dropped_field(caplog):
     assert all("[Valuation]" in w.message for w in warns)
 
 
-def test_guard_peer_multiples_three_peers_is_over_conservative_known():
-    """알려진 한계(결정 #4 leave-one-out × #5 `<2` 생략의 조합): peer가 3개면 나머지
-    표본이 2개라 극단 outlier가 중앙값(중간 두 값 평균)을 끌어 정상 행까지 결측된다.
-    지표가 통째 사라지면 computePeerPremiums가 그 지표를 생략하므로 wrong<missing은
-    유지된다(과보수적일 뿐 틀리지 않는다). 실측 005930은 peer 4개라 해당 없음."""
+def test_guard_peer_multiples_three_peers_drops_only_the_outlier():
+    """**task#249가 뒤집은 회귀**: peer 3개에서 오값만 결측되고 정상 2행은 보존된다.
+
+    구 판정축(leave-one-out)에서는 나머지 표본이 2개라 오값 지분이 50%가 되어 중앙값이
+    끌려가 3행 전멸(`[None, None, None]`)이었다 — 지표가 통째 사라져 화면의 비교가
+    없어졌다(005930 PBR 칩 소멸). 이 반전이 작업의 목적이므로 값으로 못박는다."""
     rows = [
         {"ticker": "A", "is_self": False, "pbr": 10.0},
         {"ticker": "B", "is_self": False, "pbr": 10.0},
         {"ticker": "C", "is_self": False, "pbr": 1000.0},
     ]
-    assert [r["pbr"] for r in rg._guard_peer_multiples(rows)] == [None, None, None]
+    assert [r["pbr"] for r in rg._guard_peer_multiples(rows)] == [10.0, 10.0, None]
+
+
+# ── task#249 스트레스 4케이스 (자사 PBR 2.88, ADR-0030 측정표) ──────────────────
+# `오값 잔존`=화면에 틀린 값(wrong) · `거짓양성`=정상값 결측(missing). 결측 **집합**을
+# 정확히 단언해 두 실패 방향을 동시에 잡는다(한쪽만 보면 반대쪽을 놓친다).
+
+def _stress_rows(peer_pbrs, self_pbr=2.88):
+    rows = [{"ticker": "SELF", "is_self": True, "pbr": self_pbr}]
+    rows += [{"ticker": f"P{i}", "is_self": False, "pbr": v} for i, v in enumerate(peer_pbrs)]
+    return rows
+
+
+def _dropped(rows):
+    """가드 후 결측된 peer 티커 집합."""
+    out = rg._guard_peer_multiples(rows)
+    return {r["ticker"] for r in out if not r["is_self"] and r["pbr"] is None}
+
+
+def test_guard_peer_multiples_stress_peer3_one_bad():
+    """라이브 케이스(005930): peer 3개·오값 1개 → 오값만 결측, 정상 2개 보존.
+    표본 {2.88, 3.48, 84.11, 9.80} median 6.64 → 3.48=0.52× 보존 · 84.11=12.66× 결측
+    · 9.80=1.48× 보존. 구 판정축은 여기서 3.48을 결측시켰다(거짓양성)."""
+    assert _dropped(_stress_rows([3.48, 84.11, 9.80])) == {"P1"}
+
+
+def test_guard_peer_multiples_stress_peer4_two_bad():
+    """peer 4개·오값 2개 → 오값 2개만 결측. 표본 {2.88, 3.48, 3.89, 84, 86} median 3.89
+    → 84=21.6× · 86=22.1× 결측, 정상 2개 보존. 구 판정축은 4행 전멸이었다."""
+    assert _dropped(_stress_rows([3.48, 3.89, 84.0, 86.0])) == {"P2", "P3"}
+
+
+def test_guard_peer_multiples_stress_peer2_one_bad():
+    """peer 2개·오값 1개 → 오값만 결측. 표본 {2.88, 3.48, 84} 3개로 **판정이 가능해진다**
+    (median 3.48 → 84가 24.1×). 구 판정축은 나머지 표본 1개로 생략해 오값이 화면에
+    남았다 — `wrong<missing` 위반 구멍이었고 이 변경이 함께 닫는다(ADR-0030 부수 발견)."""
+    assert _dropped(_stress_rows([3.48, 84.0])) == {"P1"}
+
+
+def test_guard_peer_multiples_stress_peer4_no_bad():
+    """평시(오값 0) → 거짓양성 0. 표본 {2.88, 3.48, 3.89, 9.80, 12.4} median 3.89 →
+    최대 배수가 12.4/3.89 = 3.19×로 밴드 안. 가드가 정상 표본을 갉아먹지 않는다."""
+    assert _dropped(_stress_rows([3.48, 3.89, 9.80, 12.4])) == set()

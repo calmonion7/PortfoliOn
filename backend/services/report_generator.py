@@ -161,38 +161,45 @@ def _guard_peer_multiples(rows):
     할인/할증이 2배 넘게 틀어진다. 그래서 소스 한 곳에서 배제한다 — 소비처가 둘
     (리포트 상세·발행물)이라 여기서 걸러야 둘이 함께 정화된다.
 
-    판정: 각 peer 행의 지표를 **그 행을 뺀 나머지 peer**(자사·비유한값 제외) 중앙값과
-    대조해 배수가 `[1/밴드, 밴드]` 밖이면 그 필드만 None. 자기를 표본에 포함하면
-    오값이 자기 기준을 오염시켜 밴드가 무력해지므로 leave-one-out이다. 나머지 표본이
-    2개 미만이거나 중앙값이 0 이하면 판정 생략(computePeerPremiums의 기존 관례).
-    자사(is_self)는 판정 대상도 표본도 아니다 — 출처가 달라 신뢰도가 비대칭.
+    판정: 각 peer 행의 지표를 **기준 표본**(값이 있는 peer 전체 + 자사) 중앙값과 대조해
+    배수가 `[1/밴드, 밴드]` 밖이면 그 필드만 None. 표본이 3개 미만이거나 중앙값이 0
+    이하면 판정 생략. 자사(is_self)는 **판정 대상은 아니지만 표본에는 포함**된다 — 두
+    역할의 소속이 갈린다(ADR-0030).
+
+    표본에서 판정 대상을 빼지 않는(leave-one-out이 아닌) 이유: 중앙값은 outlier의 *값*엔
+    둔감하지만 표본 크기에 민감해 오값 지분이 50%에 닿으면 중앙값 자체가 끌려간다. LOO는
+    표본을 항상 1개 줄이므로 peer 3개에서 정상 행을 판정할 때 표본이 2개가 되어 지분이
+    정확히 50%가 되고, 라이브에서 정상 peer가 결측돼 **지표 비교가 통째 사라졌다**
+    (005930 PBR 칩 소멸). 표본 3개 미만 생략도 같은 산수 — 표본 2개면 중앙값이 두 값
+    평균이라 배수가 `2v/(v+s)` = (0, 2)에만 머물러 5배 밴드가 원리적으로 발동할 수 없다.
+
+    자사를 표본에 넣는 1차 근거는 **표본을 1개 늘리는 레버**다(신뢰 앵커가 아니다 —
+    US 자사와 KR 자사 `ev_ebitda`는 peer와 같은 yfinance `info` 소스라 앵커 효과가 없다).
 
     rows를 제자리 수정해 그대로 반환한다.
     """
     peers = [r for r in rows if not r.get("is_self")]
     for metric in _PEER_MULTIPLE_METRICS:
-        # 원값 스냅샷으로 판정한 뒤 일괄 적용 — 순차 결측이면 앞 행의 결과가 뒤 행의
-        # 표본을 바꿔 행 순서에 따라 판정이 달라진다.
-        vals = [(r, _fin_num(r.get(metric))) for r in peers]
-        drops = []
-        for row, value in vals:
+        targets = [(r, _fin_num(r.get(metric))) for r in peers]
+        # 기준 표본은 지표마다 한 번만 계산된다 — 판정 대상을 빼지 않으므로 모든 행에
+        # 동일하고, 따라서 제자리 수정이 행 순서 의존을 만들지 않는다(#248의 원값
+        # 스냅샷 장치가 구조적으로 불필요해짐).
+        sample = [v for v in (_fin_num(r.get(metric)) for r in rows) if v is not None]
+        if len(sample) < 3:
+            continue
+        median = _peer_median(sample)
+        if median <= 0:
+            continue
+        for row, value in targets:
             if value is None:
-                continue
-            others = [v for other, v in vals if other is not row and v is not None]
-            if len(others) < 2:
-                continue
-            median = _peer_median(others)
-            if median <= 0:
                 continue
             ratio = value / median
             if not (1 / _PEER_MULTIPLE_BAND <= ratio <= _PEER_MULTIPLE_BAND):
-                drops.append((row, value, median, ratio))
-        for row, value, median, ratio in drops:
-            logger.warning(
-                f"[Valuation] 피어 멀티플 이상치 — 결측 처리 "
-                f"({row.get('ticker')} {metric}: value={value} median={median} ratio={ratio:.2f})"
-            )
-            row[metric] = None
+                logger.warning(
+                    f"[Valuation] 피어 멀티플 이상치 — 결측 처리 "
+                    f"({row.get('ticker')} {metric}: value={value} median={median} ratio={ratio:.2f})"
+                )
+                row[metric] = None
     return rows
 
 
