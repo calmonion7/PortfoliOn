@@ -203,6 +203,37 @@ def _guard_peer_multiples(rows):
     return rows
 
 
+def _self_multiple_outliers(self_row, history_values):
+    """자사 4지표를 **자기 과거 스냅샷 값의 중앙값**과 대조해 시계열 이탈을 *감지만* 한다(task#258).
+
+    목적: ADR-0030 '남는 한계'(자사+peer 동시 오염 breakdown)가 실제로 발생하는지를
+    데이터로 확정하는 관측 장치 — **값을 절대 수정하지 않는다.** 자사 값을 결측시키면
+    computePeerPremiums가 그 지표 칩을 통째 생략하므로(비교 주체 소멸), 거짓양성 1건이
+    곧 칩 소멸이다(#249가 고친 실패 모드). 감지되면 그때 처방을 논한다.
+
+    history_values: {metric: [과거값, ...]} — None 섞임 허용(제외 후 판정).
+    지표별로 유효 과거값 3개 미만·중앙값 ≤ 0이면 판정 생략(peer 가드와 동형 산수).
+    밴드는 _PEER_MULTIPLE_BAND 재사용 — 자기 시계열은 실적 발표 EPS 교체도 배수로는
+    몇 배 이내라, 5배는 단위 혼선급 오값(10~100배)만 잡아 로그 소음이 낮다.
+    반환: [(metric, value, median, ratio), ...]
+    """
+    out = []
+    for metric in _PEER_MULTIPLE_METRICS:
+        value = _fin_num(self_row.get(metric))
+        if value is None:
+            continue
+        hist = [v for v in (_fin_num(h) for h in history_values.get(metric, [])) if v is not None]
+        if len(hist) < 3:
+            continue
+        median = _peer_median(hist)
+        if median <= 0:
+            continue
+        ratio = value / median
+        if not (1 / _PEER_MULTIPLE_BAND <= ratio <= _PEER_MULTIPLE_BAND):
+            out.append((metric, value, median, ratio))
+    return out
+
+
 def _infer_comp_market(ticker: str, parent_market: str, parent_exchange: str):
     """티커 형식으로 마켓을 추론. 6자리 숫자 → KR, 그 외 → US."""
     clean = ticker.upper().split('.')[0]
@@ -503,6 +534,34 @@ def generate_report(stock: dict, output_base_dir: Path = SNAPSHOTS_DIR, target_d
                 raise ValueError(
                     f"KRX 시세 글리치 의심: {_label} {_val} vs 독립({ref_src}) {ref_price} 2x 밖 — "
                     f"박제 스킵(직전 스냅샷 유지, .forge/adr/0020, task#101/118)")
+
+    # 자사 멀티플 시계열 이탈 관측(감지만, task#258) — 표시·판정·저장값 전부 무변경.
+    # 당일 생성 경로에만(과거 날짜 재생성은 "과거값" 기준이 어긋나 판정 의미가 다름).
+    # 관측 장치가 본업을 깨면 안 되므로 read 실패는 graceful 생략.
+    if target_date is None:
+        try:
+            hist_rows = query(
+                "SELECT data FROM snapshots WHERE ticker = %s AND date < %s"
+                " ORDER BY date DESC LIMIT 5",
+                (ticker, today),
+            )
+            history = {m: [] for m in _PEER_MULTIPLE_METRICS}
+            for hr in hist_rows or []:
+                data = hr.get("data")
+                if isinstance(data, str):
+                    data = json.loads(data)
+                self_rows = [r for r in ((data or {}).get("competitors_data") or []) if r.get("is_self")]
+                for m in _PEER_MULTIPLE_METRICS:
+                    history[m].append(self_rows[0].get(m) if self_rows else None)
+            self_row = next((r for r in summary["competitors_data"] if r.get("is_self")), None)
+            if self_row:
+                for metric, value, median, ratio in _self_multiple_outliers(self_row, history):
+                    logger.warning(
+                        f"[Valuation] 자사 멀티플 시계열 이탈 — {ticker} {metric}: {value}"
+                        f" vs 과거중앙값 {median} ({ratio:.1f}×)"
+                    )
+        except Exception as e:
+            logger.warning(f"[Valuation] {ticker} 자사 시계열 관측 생략(과거 스냅샷 read 실패): {e}")
 
     sanitized = _sanitize(summary)
     json_path = output_dir / f"{today}.json"

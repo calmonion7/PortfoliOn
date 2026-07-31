@@ -557,3 +557,55 @@ def test_guard_peer_multiples_stress_peer4_no_bad():
     """평시(오값 0) → 거짓양성 0. 표본 {2.88, 3.48, 3.89, 9.80, 12.4} median 3.89 →
     최대 배수가 12.4/3.89 = 3.19×로 밴드 안. 가드가 정상 표본을 갉아먹지 않는다."""
     assert _dropped(_stress_rows([3.48, 3.89, 9.80, 12.4])) == set()
+
+
+# ── 자사 멀티플 시계열 이탈 관측(task#258) — 감지만, 값 무변경 ──────────────
+
+def test_self_outliers_band_out_detected():
+    """밴드 밖(10×) → 1건 수집. 과거중앙값·배율이 함께 반환된다."""
+    self_row = {"per": 100.0, "pbr": 2.9, "psr": None, "ev_ebitda": None}
+    hist = {"per": [10.0, 10.0, 10.0], "pbr": [2.8, 2.9, 3.0]}
+    out = rg._self_multiple_outliers(self_row, hist)
+    assert len(out) == 1
+    metric, value, median, ratio = out[0]
+    assert (metric, value, median) == ("per", 100.0, 10.0)
+    assert ratio == pytest.approx(10.0)
+
+
+def test_self_outliers_band_in_zero():
+    """밴드 안(최대 5배 이내) → 0건. 과소 방향(1/5 이상)도 안."""
+    self_row = {"per": 45.0, "pbr": 0.7, "psr": 3.0, "ev_ebitda": 10.0}
+    hist = {"per": [10.0, 11.0, 12.0], "pbr": [3.0, 3.2, 3.4],
+            "psr": [3.0, 3.0, 3.0], "ev_ebitda": [9.0, 10.0, 11.0]}
+    assert rg._self_multiple_outliers(self_row, hist) == []
+
+
+def test_self_outliers_skips_under_3_history():
+    """유효 과거값 2개 → 판정 생략(peer 가드와 동형 산수)."""
+    self_row = {"per": 100.0, "pbr": None, "psr": None, "ev_ebitda": None}
+    assert rg._self_multiple_outliers(self_row, {"per": [10.0, 10.0]}) == []
+
+
+def test_self_outliers_excludes_none_then_judges():
+    """과거값에 None 섞임 → 제외 후 유효 3개로 판정."""
+    self_row = {"per": 100.0, "pbr": None, "psr": None, "ev_ebitda": None}
+    out = rg._self_multiple_outliers(self_row, {"per": [None, 10.0, 10.0, 10.0]})
+    assert [o[0] for o in out] == ["per"]
+
+
+def test_self_outliers_skips_nonpositive_median():
+    """중앙값 ≤ 0 → 판정 생략(적자 EPS 시계열 등)."""
+    self_row = {"per": 100.0, "pbr": None, "psr": None, "ev_ebitda": None}
+    assert rg._self_multiple_outliers(self_row, {"per": [-5.0, -5.0, -5.0]}) == []
+
+
+def test_self_outliers_never_mutates_inputs():
+    """감지 함수는 입력 dict를 수정하지 않는다 — 처방이 아님을 구조로 못박는다."""
+    self_row = {"per": 100.0, "pbr": 2.9, "psr": 0.1, "ev_ebitda": 300.0}
+    hist = {"per": [10.0, 10.0, 10.0], "pbr": [2.8, 2.9, 3.0],
+            "psr": [3.0, 3.1, 3.2], "ev_ebitda": [9.0, 10.0, 11.0]}
+    row_before, hist_before = dict(self_row), {k: list(v) for k, v in hist.items()}
+    out = rg._self_multiple_outliers(self_row, hist)
+    assert len(out) == 3          # per 10×·psr 1/30×·ev_ebitda 30× 이탈, pbr 안
+    assert self_row == row_before
+    assert hist == hist_before

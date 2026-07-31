@@ -525,3 +525,60 @@ def test_generate_report_kr_competitor_psr_via_kr_psr_fallback(tmp_path):
     assert comp_row["ev_ebitda"] == 5.5
     self_row = next(c for c in summary["competitors_data"] if c["is_self"])
     assert self_row["ev_ebitda"] == 12.3
+
+
+# ── 자사 멀티플 시계열 이탈 관측 배선(task#258) — 감지만, 저장값 무변경 ──────
+
+def _hist_snapshot_rows(per, n=5):
+    """과거 스냅샷 query 반환 모양 — data는 JSONB라 dict로 온다."""
+    return [{"data": {"competitors_data": [
+        {"is_self": True, "per": per, "pbr": None, "psr": None, "ev_ebitda": None}]}}
+        for _ in range(n)]
+
+
+def _run_with_history(tmp_path, caplog, query_mock):
+    import logging
+    mocks = _mock_all()
+    # 자사 per=100 — 과거중앙값 1.0 대비 100× 이탈을 만들 소스(trailingPE → trailing_per).
+    mocks["services.report_generator.yf.Ticker"].return_value.info = {
+        "sector": "Technology", "industry": "Software", "trailingPE": 100.0,
+    }
+    from services import report_generator
+    import importlib; importlib.reload(report_generator)
+    with contextlib.ExitStack() as stack:
+        for target, mock in mocks.items():
+            stack.enter_context(patch(target, mock))
+        # 모듈 자체 심볼(query/execute)은 reload 이후에 patch해야 무효화되지 않는다(conftest 가드 참조).
+        stack.enter_context(patch("services.report_generator.query", query_mock))
+        stack.enter_context(patch("services.report_generator.execute", MagicMock()))
+        with caplog.at_level(logging.WARNING, logger="services.report_generator"):
+            json_path = report_generator.generate_report(dict(SAMPLE_STOCK), tmp_path)
+    return json.loads(Path(json_path).read_text(encoding="utf-8"))
+
+
+def test_self_timeseries_outlier_emits_warning_and_keeps_value(tmp_path, caplog):
+    """이탈 시 warning 1건 방출 + 반환 스냅샷의 자사 값은 그대로(감지 ≠ 처방)."""
+    query_mock = MagicMock(return_value=_hist_snapshot_rows(per=1.0))
+    summary = _run_with_history(tmp_path, caplog, query_mock)
+    outlier_logs = [r for r in caplog.records if "자사 멀티플 시계열 이탈" in r.message]
+    assert len(outlier_logs) == 1
+    assert "TEST per: 100.0" in outlier_logs[0].message
+    self_row = next(c for c in summary["competitors_data"] if c["is_self"])
+    assert self_row["per"] == 100.0   # 이탈이어도 저장값 무변경
+
+
+def test_self_timeseries_in_band_no_warning(tmp_path, caplog):
+    """과거중앙값과 같은 수준이면 warning 0건."""
+    query_mock = MagicMock(return_value=_hist_snapshot_rows(per=100.0))
+    summary = _run_with_history(tmp_path, caplog, query_mock)
+    assert not [r for r in caplog.records if "자사 멀티플 시계열 이탈" in r.message]
+    self_row = next(c for c in summary["competitors_data"] if c["is_self"])
+    assert self_row["per"] == 100.0
+
+
+def test_self_timeseries_read_failure_is_graceful(tmp_path, caplog):
+    """과거 스냅샷 read 실패 → 감지만 생략하고 리포트 생성은 계속(관측 장치가 본업을 깨지 않는다)."""
+    query_mock = MagicMock(side_effect=Exception("db down"))
+    summary = _run_with_history(tmp_path, caplog, query_mock)
+    assert summary["ticker"] == "TEST"   # 리포트는 정상 생성
+    assert [r for r in caplog.records if "자사 시계열 관측 생략" in r.message]
