@@ -71,7 +71,10 @@ def publish_report(ticker: str, body: PublishBody, _: str = Depends(require_admi
     # consensus_detail로. 파이프라인 미커버·read 실패는 None → 기존 블록 그대로(graceful).
     basis = svc.consensus_basis(upper)
     if basis:
+        snap_mean = data["consensus"].get("target_mean")
         data["consensus"].update(basis["consensus"])
+        if snap_mean is not None:
+            data["consensus"]["target_mean"] = snap_mean   # 스냅샷 값 우선(mart 평균은 null 보충용)
         data["consensus_detail"] = basis["consensus_detail"]
     data = sanitize(data)
     published_date = datetime.now(_KST).date().isoformat()

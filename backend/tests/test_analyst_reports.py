@@ -357,7 +357,8 @@ from decimal import Decimal as _D
 def test_consensus_basis_normalizes_decimal_and_pins_sentinel_exclusion():
     """mart·raw_reports Decimal → float 정규화(json 직렬화 가능), 증권사 최신순,
     __consensus__ 배제는 SQL 담당 — 질의문에 조건이 박혀 있음을 핀."""
-    mart_row = {"base_date": _dt.date(2026, 7, 31), "avg_target_high": _D("250000"),
+    mart_row = {"base_date": _dt.date(2026, 7, 31), "avg_target_price": _D("215000"),
+                "avg_target_high": _D("250000"),
                 "avg_target_low": _D("180000"), "avg_opinion_score": _D("4.13"),
                 "analyst_count": 8}
     brok_rows = [
@@ -372,7 +373,8 @@ def test_consensus_basis_normalizes_decimal_and_pins_sentinel_exclusion():
         return [mart_row] if "daily_consensus_mart" in sql else brok_rows
     with patch.object(svc, "query", side_effect=fake_query):
         out = svc.consensus_basis("tst")
-    assert out["consensus"] == {"target_high": 250000.0, "target_low": 180000.0,
+    assert out["consensus"] == {"target_mean": 215000.0, "target_high": 250000.0,
+                                "target_low": 180000.0,
                                 "opinion_score": 4.13, "analyst_count": 8,
                                 "base_date": "2026-07-31"}
     bs = out["consensus_detail"]["brokerages"]
@@ -391,23 +393,36 @@ def test_consensus_basis_empty_returns_none_and_read_failure_graceful():
         assert svc.consensus_basis("TST") is None   # 발행을 막지 않는다
 
 
+_BASIS = {
+    "consensus": {"target_mean": 215000.0, "target_high": 250000.0, "target_low": 180000.0,
+                  "opinion_score": 4.13, "analyst_count": 8, "base_date": "2026-07-31"},
+    "consensus_detail": {"brokerages": [
+        {"brokerage": "NH투자", "opinion": "Buy", "target_price": 230000.0,
+         "opinion_score": 4.0, "report_date": "2026-07-31"}]},
+}
+
+
 def test_publish_attaches_consensus_basis_additively():
-    basis = {
-        "consensus": {"target_high": 250000.0, "target_low": 180000.0, "opinion_score": 4.13,
-                      "analyst_count": 8, "base_date": "2026-07-31"},
-        "consensus_detail": {"brokerages": [
-            {"brokerage": "NH투자", "opinion": "Buy", "target_price": 230000.0,
-             "opinion_score": 4.0, "report_date": "2026-07-31"}]},
-    }
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
-         patch.object(svc, "consensus_basis", return_value=basis), \
+         patch.object(svc, "consensus_basis", return_value=_BASIS), \
          patch.object(svc, "save_report") as mock_save:
         resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
     assert resp.status_code == 201
     data = mock_save.call_args.args[9]
-    assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]   # 스냅샷 값 유지
+    assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]   # 스냅샷 값 우선(mart로 안 덮음)
     assert data["consensus"]["target_high"] == 250000.0                  # additive 확장
     assert data["consensus_detail"]["brokerages"][0]["brokerage"] == "NH투자"
+
+
+def test_publish_fills_null_target_mean_from_mart():
+    """KR 스냅샷 target_mean이 null이면 mart 평균으로 보충 — 평균 스탯·델타 성립(라이브 발견)."""
+    snap = {**SNAPSHOT, "target_mean": None}
+    with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", snap)), \
+         patch.object(svc, "consensus_basis", return_value=_BASIS), \
+         patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
+    assert resp.status_code == 201
+    assert mock_save.call_args.args[9]["consensus"]["target_mean"] == 215000.0
 
 
 def test_publish_without_consensus_basis_keeps_existing_block():

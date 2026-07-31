@@ -105,7 +105,7 @@ def consensus_basis(ticker: str) -> Optional[dict]:
     upper = ticker.upper()
     try:
         mart = query(
-            "SELECT base_date, avg_target_high, avg_target_low,"
+            "SELECT base_date, avg_target_price, avg_target_high, avg_target_low,"
             "       avg_opinion_score, analyst_count"
             " FROM daily_consensus_mart WHERE ticker = %s ORDER BY base_date DESC LIMIT 1",
             (upper,),
@@ -131,6 +131,9 @@ def consensus_basis(ticker: str) -> Optional[dict]:
     if mart:
         m = mart[0]
         out["consensus"] = {
+            # target_mean은 스냅샷 값 우선 — 라우터가 스냅샷이 null일 때만 이 값으로 보충
+            # (KR 스냅샷 target_mean이 비어도 mart 평균이 있으면 평균·델타가 성립, task#260 라이브 발견).
+            "target_mean": _fnum(m.get("avg_target_price")),
             "target_high": _fnum(m.get("avg_target_high")),
             "target_low": _fnum(m.get("avg_target_low")),
             "opinion_score": _fnum(m.get("avg_opinion_score")),

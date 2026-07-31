@@ -2236,7 +2236,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 }
 ```
 
-`data.consensus` — 발행 시점 박제. `target_mean`·`buy`/`hold`/`sell`은 스냅샷 값, `target_high`/`target_low`/`opinion_score`/`analyst_count`/`base_date`는 `daily_consensus_mart` 최신 행에서 additive 확장(task#260, 파이프라인 미커버 종목은 확장 필드 부재).
+`data.consensus` — 발행 시점 박제. `target_mean`·`buy`/`hold`/`sell`은 스냅샷 값(단 `target_mean`이 null이면 mart 평균 `avg_target_price`로 보충), `target_high`/`target_low`/`opinion_score`/`analyst_count`/`base_date`는 `daily_consensus_mart` 최신 행에서 additive 확장(task#260, 파이프라인 미커버 종목은 확장 필드 부재).
 `data.consensus_detail.brokerages` — 발행 순간 raw_reports 90일 창(마트 base_date 앵커) `DISTINCT ON(brokerage_code)` 최신 의견, 최신순. US 집계 sentinel `__consensus__`는 제외. 파이프라인 미커버 종목(구발행물 포함)은 `consensus_detail` 자체가 없음 — 프론트는 이때 컨센서스 섹션을 생략(graceful).
 `data.financials_annual` — 비컨센서스 최근 3개년 + forward 컨센서스 행(`is_consensus: true`), `period` 오름차순. US는 `operating_income`이 `null`일 수 있음(yfinance forward 미제공 — graceful).
 `data.per_band` — 과거 연간 PER(비컨센서스, 최근 최대 6개)의 min/max/avg + 현재/forward PER. 재료 부족(<2개)이면 `null`.
