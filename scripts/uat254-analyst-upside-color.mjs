@@ -85,7 +85,12 @@ async function run(view, ctxOpts) {
     const path = `/analyst-report/${t.ticker}/${t.published_date}`;
     await page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
     await settle(page);
-    const p = await probe(page, t.ticker);
+    let p = await probe(page, t.ticker);
+    if (!p.sign) {  // 렌더 미완을 무음 스킵하지 않는다 — 1회 재시도 후에도 없으면 FAIL(⑧ⓑ).
+      console.log(`[${view} · ${t.ticker}] sign 미검출 → 1회 재시도`);
+      await page.waitForTimeout(1500);
+      p = await probe(page, t.ticker);
+    }
     console.log(`\n[${view} · ${t.ticker} ${path}]`, JSON.stringify(p, null, 1));
 
     // ── 대상 유효성(판정축과 분리, 먼저) ──
@@ -96,12 +101,10 @@ async function run(view, ctxOpts) {
     assert(view, '이빨: --up/--down/--text가 서로 다름',
       new Set([p.up, p.down, p.text]).size, 3, t.ticker);
 
-    // ── 판정축: computed color === 부호에 맞는 토큰 실측값 ──
-    if (p.sign) {
-      assert(view, `상승여력 색 = --${p.sign}(${p.sign === 'up' ? p.up : p.down})`,
-        p.color, p.sign === 'up' ? p.up : p.down, t.ticker);
-      seen.add(p.sign);
-    }
+    // ── 판정축: computed color === 부호에 맞는 토큰 실측값 (무조건 단언 — 총계 고정) ──
+    const want = p.sign === 'up' ? p.up : p.sign === 'down' ? p.down : 'SIGN_MISSING';
+    assert(view, `상승여력 색 = --${p.sign || '?'}`, p.color, want, t.ticker);
+    if (p.sign) seen.add(p.sign);
     if (view === 'pc' && !fs.existsSync(`${OUT}/pc-detail.png`)) {
       await page.screenshot({ path: `${OUT}/pc-detail.png`, fullPage: false });
     }
