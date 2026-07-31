@@ -72,7 +72,7 @@ export default function Showcase() {
       <h2>Stat</h2>
       <div style={{ display: 'flex', gap: 24 }}>
         <Stat label="총 평가금액" value="$124,500" change={2.3} />
-        <Stat label="일간 손익" value="+$1,240" valueColor="success" />
+        <Stat label="일간 손익" value="+$1,240" valueColor="up" />
         <Stat label="보유 종목" value="12" size="sm" />
       </div>
 

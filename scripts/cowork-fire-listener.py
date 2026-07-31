@@ -4,7 +4,11 @@
 - POST /fire  헤더 Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>  body {"text": "..."}
 - 127.0.0.1:8787 바인드 (백엔드 컨테이너는 host.docker.internal:8787로 도달)
 - 프롬프트 = scripts/cowork-routine-prompt.md ({{COWORK_API_KEY}}는 .env.docker 값으로 치환) + 트리거 text
+  → argv가 아니라 **stdin**으로 넘긴다(ps에 API 키가 보이지 않게). claude -p는 positional
+  prompt가 없으면 stdin에서 읽는다.
 - claude -p는 빈 스크래치 디렉터리에서 실행(레포 컨텍스트/편집 차단), 출력은 런별 로그 파일
+  → workdir은 mkdtemp로 **원자 생성**한다. 리스너는 launchd 장수 단일 프로세스라 PID가 늘
+  같아서, 초 단위 ts만으로는 같은 초 2회 fire가 cwd를 공유해 앞 run의 run.log를 truncate했다.
 - launchd 서비스: com.portfolion.cowork-fire-listener (HOME/USER/LOGNAME 필수 — keychain footgun)
 
 eco: 동시 fire는 그대로 병행 스폰(중복 enrich 가능하나 무해) — 큐잉은 필요해지면.
@@ -12,6 +16,7 @@ eco: 동시 fire는 그대로 병행 스폰(중복 enrich 가능하나 무해) �
 import json
 import os
 import subprocess
+import tempfile
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -36,15 +41,18 @@ def _spawn_claude(text: str) -> str:
     if text:
         prompt += f"\n\n[트리거 지시]\n{text}\n"
     ts = time.strftime("%Y%m%d-%H%M%S")
-    workdir = RUN_DIR / ts
-    workdir.mkdir(parents=True, exist_ok=True)
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    workdir = Path(tempfile.mkdtemp(prefix=ts + "-", dir=str(RUN_DIR)))
     log = open(workdir / "run.log", "w")
-    subprocess.Popen(
-        ["claude", "-p", prompt, "--model", "opus",
+    proc = subprocess.Popen(
+        ["claude", "-p", "--model", "opus",
          "--allowedTools", "Bash,WebSearch,WebFetch,Read,Write"],
         cwd=workdir, stdout=log, stderr=subprocess.STDOUT,
-        stdin=subprocess.DEVNULL, start_new_session=True,
+        stdin=subprocess.PIPE, start_new_session=True,
     )
+    # 프롬프트 ~8KB ≪ 파이프 버퍼 64KB → 논블로킹(claude를 기다리지 않는다).
+    proc.stdin.write(prompt.encode())
+    proc.stdin.close()
     return str(workdir)
 
 

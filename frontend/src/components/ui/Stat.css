@@ -13,8 +13,10 @@
 .stat--md .stat__value { font-size: var(--font-size-2xl); }
 .stat--lg .stat__value { font-size: var(--font-size-3xl); }
 
-.stat__value--success { color: var(--up); }
-.stat__value--danger  { color: var(--down); }
+/* 가격 방향 전용(KR 관례: 상승=--up·하락=--down). 의미 상태 variant는 두지 않는다 —
+   success/danger는 통념색이라 가격 방향에 쓰면 뜻이 뒤집힌다(CLAUDE.md 색 관례 가토). */
+.stat__value--up   { color: var(--up); }
+.stat__value--down { color: var(--down); }
 
 .stat__meta { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
 .stat__helper { font-size: var(--font-size-xs); color: var(--text-3); }

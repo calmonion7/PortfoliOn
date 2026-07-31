@@ -37,3 +37,38 @@ describe('MarketOutlookSection nan 표시 가드 (task#210)', () => {
     expect(getByText('100억달러 (2026)')).toBeTruthy()
   })
 })
+
+// task#254 — 결측(null/빈 문자열)이 Number()로 0이 되어 `(0)`·`0`으로 오표시되던 회귀를 잠근다.
+// `'' != null`은 true고 `Number('') === 0`이라, nan 가드(task#210)만으로는 빈 문자열이 샌다.
+describe('MarketOutlookSection 결측 표시 가드 (task#254)', () => {
+  it('year가 null이면 값·단위는 표시되고 (0) 접미사가 없다', () => {
+    const { container, getByText } = render(
+      <MarketOutlookSection market_outlook={{
+        size_forecast: { value: 100, unit: '억달러', year: null },
+      }} />
+    )
+    expect(getByText('100억달러')).toBeTruthy()
+    expect(container.textContent).not.toMatch(/\(0\)/)
+  })
+
+  it("year가 빈 문자열이어도 (0) 접미사가 없다", () => {
+    const { container, getByText } = render(
+      <MarketOutlookSection market_outlook={{
+        size_forecast: { value: 100, unit: '억달러', year: '' },
+      }} />
+    )
+    expect(getByText('100억달러')).toBeTruthy()
+    expect(container.textContent).not.toMatch(/\(0\)/)
+  })
+
+  it("value가 빈 문자열이면 시장 규모 stat 자체를 표시하지 않는다(0 미노출)", () => {
+    const { container, queryByText } = render(
+      <MarketOutlookSection market_outlook={{
+        market_name: 'AI 반도체',
+        size_current: { value: '', unit: '조원', year: 2026 },
+      }} />
+    )
+    expect(queryByText('시장 규모(현재)')).toBeNull()
+    expect(container.textContent).not.toMatch(/0조원/)
+  })
+})

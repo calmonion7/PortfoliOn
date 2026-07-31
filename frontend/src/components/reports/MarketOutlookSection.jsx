@@ -11,10 +11,14 @@ const STAT = { display: 'flex', flexDirection: 'column', background: 'var(--bg-e
 const STAT_LABEL = { fontSize: 10, color: 'var(--text-3)' }
 const STAT_VAL = { fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }
 
+// 결측은 Number()가 0으로 만든다(`Number(null)`·`Number('')` 모두 0) → 값·연도 양쪽에서 먼저 배제.
+const _blank = (v) => v == null || String(v).trim() === ''
+
 function fmtSize(s) {
-  const v = s && s.value != null ? Number(s.value) : null
-  if (v == null || !Number.isFinite(v)) return null
-  const yr = Number.isFinite(Number(s.year)) ? ` (${s.year})` : ''
+  if (!s || _blank(s.value)) return null
+  const v = Number(s.value)
+  if (!Number.isFinite(v)) return null
+  const yr = !_blank(s.year) && Number.isFinite(Number(s.year)) ? ` (${s.year})` : ''
   return `${v.toLocaleString()}${s.unit || ''}${yr}`
 }
 
