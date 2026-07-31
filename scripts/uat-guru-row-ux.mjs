@@ -270,6 +270,43 @@ for (const view of VIEWS) {
       console.log(`    · ${T}: 첫 카드 docTop=${m.firstRowDocTop}px · 필행 h=${m.scopes?.h} · 캡션 h=${m.caption?.h}`);
     }
 
+    // ⑤ 하단 탭바 겹침 축(task#259 복원) — baseline이 bare `nav`로 masthead-nav(h=0)를
+    // 잡아 "겹침 483px" 헛값을 냈고 축을 통째로 뺐던 자리(⑧ⓒ). 대상은 MobileNav의
+    // `nav.tabbar`뿐이다(PC는 display:none이라 모바일 뷰에서만 잰다 — 조건부 스킵이
+    // 아니라 축의 정의역). 없으면 sentinel FAIL(⑧ⓑ).
+    if (V !== 'pc') {
+      bump(`${T}/tabbar`);
+      const tb = await page.evaluate(async () => {
+        const el = document.querySelector('nav.tabbar');
+        if (!el) return { err: 'TABBAR_MISSING' };
+        // 목록 최하단까지 스크롤한 뒤 재야 화면 안 좌표다 — 스크롤 전에 재면 화면 밖 요소를 잰다.
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        await new Promise(r => requestAnimationFrame(() => setTimeout(r, 150)));
+        const rows = document.querySelectorAll('.guru-stat-row');
+        const lastRow = rows[rows.length - 1];
+        if (!lastRow) return { err: 'LAST_ROW_MISSING' };
+        const r = el.getBoundingClientRect();
+        const chain = [];
+        for (let p = el; p; p = p.parentElement)
+          chain.push(p.tagName.toLowerCase() + (p.className ? '.' + String(p.className).split(' ')[0] : ''));
+        return {
+          tabTop: +r.top.toFixed(1), tabH: +r.height.toFixed(1),
+          pos: getComputedStyle(el).position, chain: chain.join(' < '),
+          rowBottom: +lastRow.getBoundingClientRect().bottom.toFixed(1),
+          scrollY: Math.round(window.scrollY),
+        };
+      });
+      if (tb.err) {
+        P(false, `${T}/tabbar-overlap`, `${tb.err} (sentinel — 무음 스킵 금지)`);
+      } else {
+        const margin = +(tb.tabTop - tb.rowBottom).toFixed(1);
+        // 여유 픽셀 자체는 출력만(대리지표) — 단언은 "겹치지 않는다"(margin ≥ 0)에만.
+        P(margin >= 0, `${T}/tabbar-overlap`,
+          `마지막 행 하단(${tb.rowBottom}) vs 탭바 상단(${tb.tabTop}) — 여유 ${margin}px`
+          + ` · 탭바 h=${tb.tabH} pos=${tb.pos} scrollY=${tb.scrollY} 체인[${tb.chain}]`);
+      }
+    }
+
     // 육안 — 시각 변경은 프로브 PASS 후에도 스크린샷 1장이 유일한 포착 수단이었던 적이 3회 있다(#235 ⓐ)
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(250);
@@ -296,6 +333,7 @@ for (const x of results) console.log(`${x.ok ? 'PASS' : 'FAIL'} [${x.tag}] ${x.m
 console.log('\n── 커버리지(계열별 검사 수 — 재실행 간 총계를 비교할 것) ──');
 console.log(Object.entries(cov).map(([k, v]) => `${k}:${v}`).join(' · '));
 console.log(`커버리지 합계 ${Object.values(cov).reduce((a, c) => a + c, 0)} · 단언 ${results.length}건`);
+console.log('(task#259 탭바 겹침 축 복원 — 단언 +6: 모바일 2뷰 × 3탭. baseline 111 → 117)');
 console.log(`\n${failed.length ? `❌ FAIL ${failed.length}` : '✅ ALL PASS'}`);
 console.log(`스크린샷: ${OUT}`);
 process.exit(failed.length ? 1 : 0);
