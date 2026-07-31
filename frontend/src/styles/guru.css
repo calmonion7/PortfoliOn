@@ -155,6 +155,24 @@
   .guru-alloc-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 }
 
+/* 오프스크린 행의 style·layout을 건너뛴다(task#255).
+   실측 근거 — CPU 4x·1,723행 스코프 전환 588ms의 CDP 누적 차분:
+   Script(React 재조정+DOM 생성) 109ms  vs  RecalcStyle 120ms + Layout 155ms = 275ms.
+   지배 비용은 재조정이 아니라 **초기 style·layout**이라 처방을 여기로 잡았다. ③(스크롤 중
+   재페인트)이 임계값을 통과한 것과 모순이 아니다 — 그건 *이미 마운트된* 행의 비용이다.
+   DOM 노드는 그대로 남으므로 「화면 행 수 == 코호트 크기」계약(task#247)과 "검색은 코호트
+   전량 대상"이 유지된다 — 점진 노출·가상화와 달리 계약을 깨지 않는다.
+   contain-intrinsic-size는 **실측 행 높이**다(라이브 균일: PC 4열 68.8px · 모바일 1열 80.1px).
+   `auto` 접두는 한 번 렌더된 행의 실제 크기를 기억해 쓰고 첫 스킵에만 이 값을 쓴다 —
+   값이 틀리면 스크롤바가 튄다. 미지원 브라우저는 규칙을 무시하므로 기존 동작 그대로. */
+.guru-alloc-grid .guru-stat-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80.1px;
+}
+@media (min-width: 769px) {
+  .guru-alloc-grid .guru-stat-row { contain-intrinsic-size: auto 68.8px; }
+}
+
 /* 데이터 기준 펼침 설명란(task#247 S3) — 기본 접힘, 토글은 .filter-chip 재사용.
    ellipsis/nowrap 금지(회고 #241) — 문장이 잘리면 안 되므로 자연 줄바꿈만 쓴다. */
 /* 카드로 담아 「설명」과 「데이터」를 시각적으로 분리한다 — 전엔 본문 배경 위 맨 산문이라
