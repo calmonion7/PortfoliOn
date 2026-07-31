@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import useTheme from './hooks/useTheme'
 import useBfcacheAuthGuard from './hooks/useBfcacheAuthGuard'
-import { returnFromOAuth } from './utils/oauthHistory'
+import useAuthBootstrap from './hooks/useAuthBootstrap'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Portfolio from './pages/Portfolio'
@@ -113,56 +113,7 @@ function AppShell({ theme, setTheme, setSession }) {
 
 export default function App() {
   const [theme, setTheme] = useTheme()
-  const [session, setSession] = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const oauthCode = params.get('oauth')
-    const oauthError = params.get('error')
-    const token = params.get('token')
-    const refresh = params.get('refresh')
-
-    if (oauthError) {
-      window.history.replaceState({}, '', '/')
-      setSession(null)
-      setAuthLoading(false)
-      return
-    }
-
-    if (oauthCode) {
-      window.history.replaceState({}, '', '/')
-      const API = import.meta.env.VITE_API_BASE_URL || ''
-      fetch(`${API}/api/auth/oauth/token?code=${oauthCode}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data?.access_token) {
-            localStorage.setItem('access_token', data.access_token)
-            localStorage.setItem('refresh_token', data.refresh_token)
-            // IdP 엔트리를 뒤가 아니라 앞으로 밀어낸다 — 되감기 불가 시 replace('/')로 폴백(task#252)
-            returnFromOAuth()
-          } else {
-            setSession(null)
-            setAuthLoading(false)
-          }
-        })
-        .catch(() => {
-          setSession(null)
-          setAuthLoading(false)
-        })
-      return
-    }
-
-    if (token && refresh) {
-      localStorage.setItem('access_token', token)
-      localStorage.setItem('refresh_token', refresh)
-      window.history.replaceState({}, '', '/')
-    }
-
-    const stored = localStorage.getItem('access_token')
-    setSession(stored ? { access_token: stored } : null)
-    setAuthLoading(false)
-  }, [])
+  const { session, setSession, authLoading } = useAuthBootstrap()
 
   useBfcacheAuthGuard(!!session)
 
