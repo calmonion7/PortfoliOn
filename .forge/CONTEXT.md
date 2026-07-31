@@ -298,6 +298,11 @@ _Avoid_: **리포트(일일 스냅샷)와 혼동 금지** — 그건 전 종목 
 애널리스트 리포트 헤더에 싣는 **Cowork 판단의 적정주가 범위(하단~상단) + 산정방식 서술**(예: forward EPS × 목표 PER 근거). 단일값이 아니라 밴드로 제시하고, 시장 컨센서스 평균 목표가와 **병기**해 대조한다.
 _Avoid_: **컨센서스 목표가와 혼동 금지** — 그건 증권사 애널리스트들의 평균값(consensus mart 자동 수집)이고, 적정주가 밴드는 Cowork 자체 판단이다. [[사용자 목표가·손절가]]와도 다름 — 그건 사용자 개인의 매매 기준값.
 
+## 컨센서스 근거 (Consensus Basis)
+
+컨센서스 목표가 **평균 하나의 뒤에 있는 원천**: ① 증권사별 개별 의견(`raw_reports` — 증권사명·의견·목표가·표준화 점수·리포트 날짜, 마트와 같은 90일 창 증권사별 최신행) ② 마트 집계 분포(`daily_consensus_mart` — 목표가 최고/최저/평균·평균 의견점수·애널리스트 수·매수/보유/매도). [[애널리스트 리포트]]에서는 발행 순간 data 블록에 **박제**되고(`consensus_detail`), "현재 대비"만 라이브 마트 최신 행과 병기한다. US의 `__consensus__` 행은 증권사가 아니라 집계 placeholder라 근거 목록에서 제외.
+_Avoid_: **컨센서스 추이와 혼동 금지** — 추이는 시계열 차트(일반 리포트 상세 ConsensusChart)이고, 근거는 특정 시점의 구성(누가·얼마·언제). **리포트의 판단 근거(투자 포인트)와도 다름** — 그건 Cowork 서사이고, 컨센서스 근거는 외부 증권사 데이터다.
+
 ## 루틴 (Routine / 자동 분석 루틴)
 
 **서버 호스트(Mac)에서 headless `claude -p`로 도는 자동 분석 에이전트** — 포트폴리온이 fire(HTTP POST)로 로컬 리스너(launchd 데몬, 127.0.0.1:8787)를 깨우면 리스너가 정책 프롬프트(`scripts/cowork-routine-prompt.md`)+지시문으로 `claude -p`를 스폰해 CLAUDE_COWORK_API.md 워크플로우(enrich·애널리스트 리포트 발행)를 수행하고 API로 결과를 쓴다. **스케줄은 포트폴리온이 소유**한다: 일일 리포트 배치(daily_report_kr/us) 완료 직후 자동 fire + admin 수동 fire(`POST /api/admin/cowork/fire`). 사용자 claude **구독**(keychain OAuth)으로 실행되며(Anthropic API 토큰 과금 계정 불필요), fire 토큰·URL은 `.env.docker` 보관, 쓰기 키는 로컬에만 상주. 자동 경로 정책(멱등): enrich는 enriched_at 누락·7일+ 오래된 순 rolling 최대 5종목/회, 발행은 재량+가드레일(애널리스트 리포트 항목 참조). 실행 로그: `~/portfolion-routine-runs/<ts>/run.log`. (ADR-0028 개정 — 클라우드 루틴은 샌드박스 egress 차단으로 기각·비활성 보존)
