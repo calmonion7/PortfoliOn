@@ -1,7 +1,10 @@
 // task#245 — 로그인 후 뒤로가기로 로그인 화면 재진입 차단.
 // 검증 대상 2종:
 //   ① bfcache 가드(useBfcacheAuthGuard) 4분기
-//   ② 전체이동 진입점이 push(location.href)가 아니라 replace인지 — LoginPage 폼 로그인 · api.js 401
+//   ② 전체이동 진입점의 히스토리 취급 — 진입점마다 다르다:
+//      · LoginPage 폼 로그인 · api.js 401 → replace (남길 엔트리가 없다)
+//      · OAuth 시작(구글·깃허브) → **의도된 push**(task#252) — 되감기 착지점을 우리 문서로 남겨야
+//        하기 때문이다. 되감기 자체의 분기는 utils/oauthHistory.test.js가 고정한다.
 // jsdom은 bfcache를 원리적으로 재현할 수 없으므로 여기서 고정하는 건 '가드의 분기'까지다.
 // 실제 복원 동작은 라이브 프로브(scripts/uat245-back-to-login.mjs)가 실측한다.
 import { render, renderHook, waitFor, fireEvent } from '@testing-library/react'
@@ -24,11 +27,13 @@ beforeEach(() => {
     replace: replaceSpy, assign: vi.fn(), reload: vi.fn(),
   })
   localStorage.clear()
+  sessionStorage.clear()
 })
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
   localStorage.clear()
+  sessionStorage.clear()
 })
 
 const firePageShow = (persisted) => {
@@ -80,7 +85,23 @@ describe('useBfcacheAuthGuard — bfcache 복원 시 토큰 유무와 화면 상
   })
 })
 
-describe('전체이동 진입점 — push가 아니라 replace', () => {
+describe('전체이동 진입점 — 폼·401은 replace, OAuth 시작은 의도된 push', () => {
+  it('구글 버튼은 push(href)로 떠나며 되감기 기준값을 남긴다 (task#252)', () => {
+    const { getByText } = render(<LoginPage />)
+    fireEvent.click(getByText('Google로 계속'))
+    expect(window.location.href).toBe('/api/auth/oauth/google')
+    expect(replaceSpy).not.toHaveBeenCalled()
+    expect(Number(sessionStorage.getItem('oauth_hist_len'))).toBe(window.history.length)
+  })
+
+  it('깃허브 버튼도 같은 경로 — 두 IdP 대칭 (task#252)', () => {
+    const { getByText } = render(<LoginPage />)
+    fireEvent.click(getByText('GitHub로 계속'))
+    expect(window.location.href).toBe('/api/auth/oauth/github')
+    expect(replaceSpy).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('oauth_hist_len')).not.toBeNull()
+  })
+
   it('LoginPage 폼 로그인 성공 시 replace(/) — 로그인 화면 엔트리를 남기지 않는다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

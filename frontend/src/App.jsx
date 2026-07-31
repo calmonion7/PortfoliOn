@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import useTheme from './hooks/useTheme'
 import useBfcacheAuthGuard from './hooks/useBfcacheAuthGuard'
+import { returnFromOAuth } from './utils/oauthHistory'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Portfolio from './pages/Portfolio'
@@ -138,7 +139,8 @@ export default function App() {
           if (data?.access_token) {
             localStorage.setItem('access_token', data.access_token)
             localStorage.setItem('refresh_token', data.refresh_token)
-            window.location.replace('/')
+            // IdP 엔트리를 뒤가 아니라 앞으로 밀어낸다 — 되감기 불가 시 replace('/')로 폴백(task#252)
+            returnFromOAuth()
           } else {
             setSession(null)
             setAuthLoading(false)

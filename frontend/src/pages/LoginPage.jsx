@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useIsMobile from '../hooks/useIsMobile'
+import { markOAuthStart } from '../utils/oauthHistory'
 import Input from '../components/ui/Input'
 import { SketchHero } from '../components/sketches'
 import '../components/ui/Button.css'
@@ -53,9 +54,15 @@ export default function LoginPage() {
     finally { setLoading(false) }
   }
 
-  // replace — OAuth로 떠날 때 로그인 화면 엔트리를 교체해 뒤로가기로 되돌아오지 않게 한다
-  const handleGoogle = () => { window.location.replace(`${API}/api/auth/oauth/google`) }
-  const handleGithub = () => { window.location.replace(`${API}/api/auth/oauth/github`) }
+  // push(href) — 되감기 착지점을 우리 문서로 남긴다(task#252). IdP가 자기 도메인에 만든 엔트리는
+  // 지울 수 없으므로, 로그인 성공 랜딩에서 returnFromOAuth()가 되감아 그것들을 앞으로 밀어낸다.
+  // replace로 떠나면 착지점이 IdP 엔트리가 되어 되감기가 성립하지 않는다.
+  const startOAuth = (provider) => {
+    markOAuthStart()
+    window.location.href = `${API}/api/auth/oauth/${provider}`
+  }
+  const handleGoogle = () => startOAuth('google')
+  const handleGithub = () => startOAuth('github')
 
   const isLogin = mode === 'login'
 
