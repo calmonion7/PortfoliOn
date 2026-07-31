@@ -111,6 +111,113 @@ export function BandGauge({ low, high, price, market }) {
   )
 }
 
+// 내 판단 밴드 vs 컨센서스 범위 — 한 축(같은 스케일) 두 줄 오버레이 (task#260).
+// BandGauge 패턴의 custom div — recharts 금지(jsdom 블라인드 가토).
+export function ConsensusRangeGauge({ myLow, myHigh, cLow, cHigh, market }) {
+  if (myLow == null || myHigh == null || cLow == null || cHigh == null) return null
+  const vals = [myLow, myHigh, cLow, cHigh]
+  const lo = Math.min(...vals) * 0.97
+  const hi = Math.max(...vals) * 1.03
+  const pct = v => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))
+  const row = (label, a, b, color) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ width: 74, flexShrink: 0, fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
+      <div style={{ position: 'relative', flex: 1, height: 16, minWidth: 0 }}>
+        <div style={{ position: 'absolute', top: 6, left: 0, right: 0, height: 4, background: 'var(--bg-elev-2)', borderRadius: 2 }} />
+        <div style={{ position: 'absolute', top: 6, left: `${pct(a)}%`, width: `${Math.max(pct(b) - pct(a), 0.8)}%`, height: 4, background: color, borderRadius: 2 }} />
+      </div>
+      <span className="mono tnum" style={{ flexShrink: 0, fontSize: 11, color: 'var(--text-2, var(--text))' }}>
+        {fmtPrice(a, market)} ~ {fmtPrice(b, market)}
+      </span>
+    </div>
+  )
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '12px 0 4px' }}>
+      {row('내 판단 밴드', myLow, myHigh, 'var(--accent)')}
+      {row('컨센서스', cLow, cHigh, 'var(--text-3)')}
+    </div>
+  )
+}
+
+// 컨센서스 근거 섹션 (task#260) — 발행 순간 박제된 집계·증권사별 의견 + 현재 대비 델타.
+// data.consensus_detail 없는 구발행물은 섹션 전체 생략(헤더 Stat은 기존 그대로).
+export function ConsensusSection({ report, market }) {
+  const d = report.data || {}
+  const detail = d.consensus_detail
+  const cons = d.consensus || {}
+  const [showAll, setShowAll] = useState(false)
+  const [current, setCurrent] = useState(null)   // 현재 컨센서스 최신 행 — 실패·부재 시 델타만 생략
+
+  useEffect(() => {
+    if (!detail) return undefined
+    let ignore = false
+    api.get(`/api/consensus/${report.ticker}`)
+      .then(({ data }) => {
+        if (ignore) return
+        const latest = Array.isArray(data) && data.length ? data[0] : null
+        if (latest?.target_mean != null) setCurrent(latest)
+      })
+      .catch((e) => { console.warn('[AnalystReport] 현재 컨센서스 조회 실패(델타 생략):', e) })
+    return () => { ignore = true }
+  }, [report.ticker, detail])
+
+  if (!detail) return null
+  const brokerages = detail.brokerages || []
+  const shown = showAll ? brokerages : brokerages.slice(0, 10)
+  const deltaPct = (current?.target_mean != null && cons.target_mean != null && cons.target_mean !== 0)
+    ? (current.target_mean / cons.target_mean - 1) * 100 : null
+
+  return (
+    <>
+      <SectionTitle>컨센서스</SectionTitle>
+      <Card padding="md" style={{ marginBottom: 30 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+          <Stat size="sm" label="목표가 (평균)" value={cons.target_mean != null ? fmtPrice(cons.target_mean, market) : '—'}
+                helperText={cons.base_date ? `${cons.base_date} 집계` : null} />
+          <Stat size="sm" label="최고 / 최저" value={(cons.target_high != null && cons.target_low != null)
+            ? <span className="tnum">{fmtPrice(cons.target_high, market)} / {fmtPrice(cons.target_low, market)}</span> : '—'} />
+          <Stat size="sm" label="애널리스트" value={cons.analyst_count != null ? `${cons.analyst_count}명` : '—'} />
+          <Stat size="sm" label="평균 의견 (5점)" value={cons.opinion_score != null ? cons.opinion_score.toFixed(2) : '—'}
+                helperText={cons.buy != null ? `매수 ${cons.buy} · 보유 ${cons.hold ?? 0} · 매도 ${cons.sell ?? 0}` : null} />
+        </div>
+        <ConsensusRangeGauge myLow={report.fair_value_low} myHigh={report.fair_value_high}
+                             cLow={cons.target_low} cHigh={cons.target_high} market={market} />
+        {deltaPct != null && (
+          <p className="tnum" style={{ color: 'var(--text-2, var(--text))', fontSize: 12, margin: '10px 0 0' }}>
+            목표가 평균: 발행 시점 {fmtPrice(cons.target_mean, market)} → 현재 {fmtPrice(current.target_mean, market)}{' '}
+            <span className="mono" style={{ color: deltaPct >= 0 ? 'var(--up)' : 'var(--down)' }}>
+              ({deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%)
+            </span>
+            {current.date && <span style={{ color: 'var(--text-3)' }}> · {current.date} 기준</span>}
+          </p>
+        )}
+        {brokerages.length > 0 && (
+          <div style={{ marginTop: 14, borderTop: '1px solid var(--border)' }}>
+            {shown.map((b, i) => (
+              // 줄어드는 건 증권사명만(ellipsis) — 수치·날짜는 flex-shrink:0(잘림이 수치부터 먹는 가토, task#241)
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>{b.brokerage}</span>
+                <span style={{ flexShrink: 0, color: 'var(--text-2, var(--text))' }}>{b.opinion || '—'}</span>
+                <span className="mono tnum" style={{ flexShrink: 0, minWidth: 76, textAlign: 'right', color: 'var(--text)' }}>
+                  {b.target_price != null ? fmtPrice(b.target_price, market) : '—'}
+                </span>
+                <span className="mono" style={{ flexShrink: 0, color: 'var(--text-3)', fontSize: 11 }}>{b.report_date}</span>
+              </div>
+            ))}
+            {brokerages.length > 10 && (
+              <button onClick={() => setShowAll(v => !v)}
+                style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, cursor: 'pointer' }}>
+                {showAll ? '접기' : `더보기 (+${brokerages.length - 10})`}
+              </button>
+            )}
+          </div>
+        )}
+        <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '10px 0 0' }}>발행 시점 박제 — 90일 창 증권사별 최신 의견 · 현재 대비만 라이브</p>
+      </Card>
+    </>
+  )
+}
+
 // 실적 추정 차트 (task#217) — 표 대체. 값·YoY 증감%를 상시 라벨로 병기(FinancialsChart 톤).
 export function EstimatesChart({ annual, isKR }) {
   const rows = annual || []
@@ -385,6 +492,9 @@ export default function AnalystReport() {
         <PerBandChart band={d.per_band} />
         <PeerMultiplesChart peers={peers} />
       </Card>
+
+      {/* ── 컨센서스 근거 (박제 + 현재 델타, task#260) — 구발행물은 섹션 자체 생략 ── */}
+      <ConsensusSection report={report} market={market} />
 
       {/* ── 실적 추정 (차트 — 값·YoY 증감% 병기, task#217) ── */}
       {annual.length > 0 && (

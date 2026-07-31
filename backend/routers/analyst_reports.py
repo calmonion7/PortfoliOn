@@ -66,7 +66,14 @@ def publish_report(ticker: str, body: PublishBody, _: str = Depends(require_admi
     if snap is None:
         raise HTTPException(status_code=409, detail=f"{upper} 스냅샷 없음 — 리포트 생성 후 발행 가능")
     snapshot_date, snapshot_data = snap
-    data = sanitize(svc.build_data_block(snapshot_data or {}, snapshot_date))
+    data = svc.build_data_block(snapshot_data or {}, snapshot_date)
+    # 컨센서스 근거 박제(task#260) — 집계는 data.consensus에 additive, 증권사 행은
+    # consensus_detail로. 파이프라인 미커버·read 실패는 None → 기존 블록 그대로(graceful).
+    basis = svc.consensus_basis(upper)
+    if basis:
+        data["consensus"].update(basis["consensus"])
+        data["consensus_detail"] = basis["consensus_detail"]
+    data = sanitize(data)
     published_date = datetime.now(_KST).date().isoformat()
     svc.save_report(
         upper, published_date, body.rating, body.title,

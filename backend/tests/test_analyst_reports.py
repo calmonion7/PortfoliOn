@@ -345,3 +345,78 @@ def test_unauthenticated_401():
     assert c.get("/api/analyst-reports/TST/2026-07-25").status_code == 401
     assert c.post("/api/analyst-reports/TST", json=VALID_BODY).status_code == 401
     assert c.delete("/api/analyst-reports/TST").status_code == 401
+
+
+# ── 컨센서스 근거 박제 (task#260) ──────────────────────────────────────
+
+import json as _json
+import datetime as _dt
+from decimal import Decimal as _D
+
+
+def test_consensus_basis_normalizes_decimal_and_pins_sentinel_exclusion():
+    """mart·raw_reports Decimal → float 정규화(json 직렬화 가능), 증권사 최신순,
+    __consensus__ 배제는 SQL 담당 — 질의문에 조건이 박혀 있음을 핀."""
+    mart_row = {"base_date": _dt.date(2026, 7, 31), "avg_target_high": _D("250000"),
+                "avg_target_low": _D("180000"), "avg_opinion_score": _D("4.13"),
+                "analyst_count": 8}
+    brok_rows = [
+        {"brokerage_code": "미래에셋", "raw_opinion": "매수", "target_price": _D("240000"),
+         "opinion_score": _D("5"), "report_date": _dt.date(2026, 7, 30)},
+        {"brokerage_code": "NH투자", "raw_opinion": "Buy", "target_price": _D("230000"),
+         "opinion_score": _D("4"), "report_date": _dt.date(2026, 7, 31)},
+    ]
+    calls = []
+    def fake_query(sql, params=None):
+        calls.append(sql)
+        return [mart_row] if "daily_consensus_mart" in sql else brok_rows
+    with patch.object(svc, "query", side_effect=fake_query):
+        out = svc.consensus_basis("tst")
+    assert out["consensus"] == {"target_high": 250000.0, "target_low": 180000.0,
+                                "opinion_score": 4.13, "analyst_count": 8,
+                                "base_date": "2026-07-31"}
+    bs = out["consensus_detail"]["brokerages"]
+    assert [b["brokerage"] for b in bs] == ["NH투자", "미래에셋"]   # 최신순
+    assert bs[0]["target_price"] == 230000.0 and isinstance(bs[0]["target_price"], float)
+    assert bs[0]["report_date"] == "2026-07-31"
+    raw_sql = next(s for s in calls if "raw_reports" in s)
+    assert "__consensus__" in raw_sql
+    _json.dumps(out)   # Decimal 잔존이면 여기서 TypeError
+
+
+def test_consensus_basis_empty_returns_none_and_read_failure_graceful():
+    with patch.object(svc, "query", return_value=[]):
+        assert svc.consensus_basis("TST") is None
+    with patch.object(svc, "query", side_effect=Exception("db down")):
+        assert svc.consensus_basis("TST") is None   # 발행을 막지 않는다
+
+
+def test_publish_attaches_consensus_basis_additively():
+    basis = {
+        "consensus": {"target_high": 250000.0, "target_low": 180000.0, "opinion_score": 4.13,
+                      "analyst_count": 8, "base_date": "2026-07-31"},
+        "consensus_detail": {"brokerages": [
+            {"brokerage": "NH투자", "opinion": "Buy", "target_price": 230000.0,
+             "opinion_score": 4.0, "report_date": "2026-07-31"}]},
+    }
+    with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
+         patch.object(svc, "consensus_basis", return_value=basis), \
+         patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
+    assert resp.status_code == 201
+    data = mock_save.call_args.args[9]
+    assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]   # 스냅샷 값 유지
+    assert data["consensus"]["target_high"] == 250000.0                  # additive 확장
+    assert data["consensus_detail"]["brokerages"][0]["brokerage"] == "NH투자"
+
+
+def test_publish_without_consensus_basis_keeps_existing_block():
+    """파이프라인 미커버 종목 — consensus_detail 부재, 기존 consensus는 스냅샷 값 그대로."""
+    with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
+         patch.object(svc, "consensus_basis", return_value=None), \
+         patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
+    assert resp.status_code == 201
+    data = mock_save.call_args.args[9]
+    assert "consensus_detail" not in data
+    assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]

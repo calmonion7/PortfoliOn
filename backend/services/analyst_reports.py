@@ -10,10 +10,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 from typing import Optional
 
 from services.db import query, execute
+
+logger = logging.getLogger(__name__)
 
 RATINGS = ("buy", "neutral", "sell")
 
@@ -76,6 +79,75 @@ def build_data_block(snapshot: dict, snapshot_date: str) -> dict:
         ],
         "per_band": per_band(annual, snapshot.get("per"), snapshot.get("forward_per")),
     }
+
+
+def _fnum(v):
+    """DB NUMERIC(Decimal)·문자열을 float로 정규화 — json.dumps TypeError·NaN/inf 직렬화 가드."""
+    if v is None:
+        return None
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return v if math.isfinite(v) else None
+
+
+def consensus_basis(ticker: str) -> Optional[dict]:
+    """발행 순간 컨센서스 근거 발췌 — 집계(mart 최신 행) + 증권사별 최신 의견 (task#260).
+
+    raw_reports 창은 마트의 latest_per_brokerage CTE(_MART_SQL)와 **같은 계보** —
+    mart 최신 행의 base_date를 앵커로 90일 창 `DISTINCT ON (brokerage_code)` 최신행.
+    두 곳이 다른 창을 쓰면 박제된 집계와 증권사 행이 어긋난다.
+    US sentinel `__consensus__`는 증권사가 아니라 집계 placeholder라 테이블에서 제외
+    (consensus_pipeline이 US 집계를 그 코드로 넣는다).
+    파이프라인 미커버 종목·read 실패는 None — 발행 자체를 막지 않는다(graceful).
+    """
+    upper = ticker.upper()
+    try:
+        mart = query(
+            "SELECT base_date, avg_target_high, avg_target_low,"
+            "       avg_opinion_score, analyst_count"
+            " FROM daily_consensus_mart WHERE ticker = %s ORDER BY base_date DESC LIMIT 1",
+            (upper,),
+        )
+        anchor = mart[0]["base_date"] if mart else None
+        brokerages = query(
+            "SELECT DISTINCT ON (brokerage_code)"
+            "       brokerage_code, raw_opinion, target_price, opinion_score, report_date"
+            " FROM raw_reports"
+            " WHERE ticker = %s"
+            "   AND report_date BETWEEN COALESCE(%s, CURRENT_DATE)::date - INTERVAL '90 days'"
+            "                       AND COALESCE(%s, CURRENT_DATE)::date"
+            "   AND brokerage_code <> '__consensus__'"
+            " ORDER BY brokerage_code, report_date DESC",
+            (upper, anchor, anchor),
+        )
+    except Exception as e:
+        logger.warning(f"[AnalystReport] {upper} 컨센서스 근거 발췌 생략(read 실패): {e}")
+        return None
+    if not mart and not brokerages:
+        return None
+    out = {"consensus": {}, "consensus_detail": {"brokerages": []}}
+    if mart:
+        m = mart[0]
+        out["consensus"] = {
+            "target_high": _fnum(m.get("avg_target_high")),
+            "target_low": _fnum(m.get("avg_target_low")),
+            "opinion_score": _fnum(m.get("avg_opinion_score")),
+            "analyst_count": int(m["analyst_count"]) if m.get("analyst_count") is not None else None,
+            "base_date": str(m["base_date"]) if m.get("base_date") is not None else None,
+        }
+    out["consensus_detail"]["brokerages"] = [
+        {
+            "brokerage": r.get("brokerage_code"),
+            "opinion": r.get("raw_opinion"),
+            "target_price": _fnum(r.get("target_price")),
+            "opinion_score": _fnum(r.get("opinion_score")),
+            "report_date": str(r["report_date"]) if r.get("report_date") is not None else None,
+        }
+        for r in sorted(brokerages, key=lambda r: str(r.get("report_date") or ""), reverse=True)
+    ]
+    return out
 
 
 def latest_snapshot(ticker: str) -> Optional[tuple]:
