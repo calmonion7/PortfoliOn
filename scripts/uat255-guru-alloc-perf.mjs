@@ -31,8 +31,13 @@ import { chromium } from 'playwright';
 
 const BASE = 'https://portfolion.taebro.com';
 const THROTTLES = [1, 4];
-const SCROLL_MS = 3000;
+const SCROLL_MAX_MS = 15000;   // 안전 상한 — 정상 종료는 "끝 도달"이다(고정 시간 아님)
 const SEARCH_KEYS = ['A', 'AP', 'APP', 'APPL', 'APPLE'];   // 누적 입력 5단계(키당 1측정)
+
+// 대조군 모드 — `CONTROL=1 node uat255-...` 로 돌리면 처방(content-visibility)을 무효화해
+// **같은 실행 조건에서 처방 전 수치**를 얻는다. 처방 전후를 서로 다른 자(옛 고정3초 프로브 vs
+// 새 끝까지-스크롤)로 비교하면 회귀 판정이 성립하지 않는다 — 대조는 같은 자여야 한다(#246 ⓔ).
+const CONTROL = process.env.CONTROL === '1';
 
 // 임계값 (계획서 사전 명시 — 실측 후 조정 금지)
 const TH_SWITCH = 200;   // ms, INP '좋음' 상한
@@ -109,8 +114,13 @@ const HELPERS = () => {
     return { ms: t1 - t0, rows: rowCount(), rowsSync };
   };
 
-  // 스크롤 3초 — longtask 최댓값(단언축) + 프레임 간격(출력만).
-  window.__scroll = (ms) => new Promise(resolve => {
+  // 스크롤 — longtask 최댓값(단언축) + 프레임 간격(출력만).
+  // **고정 시간이 아니라 "한 번 끝까지"** 스크롤한다. 고정 3초로 재면 문서 높이가 바뀌는
+  // 변경 전후에 작업량이 달라져 비교가 성립하지 않는다(실제로 겪었다: 처방 전엔 32,545px를
+  // ~81프레임에 주파하고 남은 239프레임을 바닥에서 공회전 → 처방 후엔 3초 내내 실제 스크롤
+  // → "longtask 78→117ms 악화"가 회귀가 아니라 작업량 증가일 수 있었다). 끝 도달은 scrollY가
+  // 3프레임 연속 안 늘면으로 판정하고, elapsed·hitBottom을 함께 출력해 조건을 드러낸다.
+  window.__scroll = (maxMs) => new Promise(resolve => {
     const lt = [];
     let po;
     try {
@@ -120,21 +130,27 @@ const HELPERS = () => {
     window.scrollTo(0, 0);
     const gaps = [];
     const t0 = performance.now();
-    let last = t0, first = true;
-    const y0 = window.scrollY;
+    let last = t0, first = true, stuck = 0, prevY = window.scrollY;
+    const y0 = prevY;
     const step = () => {
       const now = performance.now();
       if (first) first = false; else gaps.push(now - last);
       last = now;
       window.scrollBy(0, 400);
-      if (now - t0 >= ms) {
+      const y = window.scrollY;
+      if (y <= prevY) stuck++; else stuck = 0;
+      prevY = y;
+      const done = stuck >= 3, timeout = now - t0 >= maxMs;
+      if (done || timeout) {
         po.disconnect();
         return resolve({
           maxLongtask: lt.length ? Math.max(...lt) : 0,
           longtaskCount: lt.length,
           frames: gaps.length,
           maxGap: gaps.length ? Math.max(...gaps) : null,
-          scrolled: window.scrollY - y0,
+          scrolled: y - y0,
+          elapsed: now - t0,
+          hitBottom: done,
         });
       }
       requestAnimationFrame(step);
@@ -168,6 +184,8 @@ for (const rate of THROTTLES) {
     localStorage.setItem('theme', 'light');
   }, [access_token, refresh_token]);
   await page.goto(`${BASE}/guru`, { waitUntil: 'domcontentloaded' });
+  if (CONTROL) await page.addStyleTag({
+    content: '.guru-alloc-grid .guru-stat-row{content-visibility:visible!important}' });
   await page.waitForTimeout(1500);
 
   const cdp = await ctx.newCDPSession(page);
@@ -230,7 +248,7 @@ for (const rate of THROTTLES) {
     }
     put(rate, 'proxy', scope, await page.evaluate(() => window.__proxy()));
 
-    const sc = await page.evaluate((ms) => window.__scroll(ms), SCROLL_MS);
+    const sc = await page.evaluate((ms) => window.__scroll(ms), SCROLL_MAX_MS);
     put(rate, 'scroll', scope, sc);
     bump('③스크롤');
 
@@ -250,7 +268,7 @@ await browser.close();
 
 // ── 출력 ────────────────────────────────────────────────────────
 const ms = (v) => num(v) ? `${v.toFixed(0)}ms` : `실패(${JSON.stringify(v)})`;
-console.log('\n════ 수치 ════');
+console.log(`\n════ 수치 ${CONTROL ? '[대조군 — 처방 무효화]' : '[처방 적용]'} ════`);
 for (const rate of THROTTLES) {
   console.log(`\n── CPU ${rate}x ──`);
   console.log(`① 첫 진입(fetch+렌더, 단언 없음)  전체 ${ms(M[rate].first['전체'])} · 10명(첫 전환) ${ms(M[rate].first['10명'])}`);
@@ -261,8 +279,9 @@ for (const rate of THROTTLES) {
     + ` · Task총 ${sp ? sp.task.toFixed(0) : '—'}ms`);
   for (const scope of ['10명', '전체']) {
     const s = M[rate].scroll[scope];
-    console.log(`③ 스크롤 3초 [${scope}]  최장 longtask ${num(s?.maxLongtask) ? s.maxLongtask.toFixed(0) + 'ms' : '실패'}`
-      + ` (건수 ${s?.longtaskCount ?? '—'} · 프레임 ${s?.frames ?? '—'} · 최장 프레임간격 ${s?.maxGap ? s.maxGap.toFixed(0) + 'ms' : '—'} · 스크롤 ${s?.scrolled ?? '—'}px)`);
+    console.log(`③ 스크롤 끝까지 [${scope}]  최장 longtask ${num(s?.maxLongtask) ? s.maxLongtask.toFixed(0) + 'ms' : '실패'}`
+      + ` (건수 ${s?.longtaskCount ?? '—'} · 프레임 ${s?.frames ?? '—'} · 최장 프레임간격 ${s?.maxGap ? s.maxGap.toFixed(0) + 'ms' : '—'}`
+      + ` · 스크롤 ${s?.scrolled ?? '—'}px · ${s?.elapsed ? s.elapsed.toFixed(0) + 'ms' : '—'} · 끝도달 ${s?.hitBottom ? 'Y' : 'N'})`);
     const k = M[rate].search[scope] || [];
     console.log(`④ 검색 [${scope}]  ${k.map((x, i) => `${SEARCH_KEYS[i]}:${num(x?.ms) ? x.ms.toFixed(0) : '실패'}`).join(' · ')}`
       + `  (행 ${k.map(x => x?.rows ?? '—').join('/')})`);
@@ -283,11 +302,12 @@ for (const rate of THROTTLES) {
     assertMs(M[rate].switch[dir], TH_SWITCH, `${rate}x/②전환/${dir}`, `전환 ${dir}`);
   }
   for (const scope of ['10명', '전체']) {
-    // ③ 스크롤 longtask — 프레임 0이면 스크롤 자체가 안 돈 것이라 측정 실패로 FAIL.
+    // ③ 스크롤 longtask — 끝까지 못 갔으면(상한 타임아웃) 작업량이 달라 비교 불가 → 측정 실패.
     const s = M[rate].scroll[scope];
-    const okMeasured = s && num(s.maxLongtask) && s.frames > 0 && s.scrolled > 0;
+    const okMeasured = s && num(s.maxLongtask) && s.frames > 0 && s.scrolled > 0 && s.hitBottom;
     P(okMeasured && s.maxLongtask <= TH_LONGTASK, `${rate}x/③스크롤/${scope}`,
-      okMeasured ? `최장 longtask ${s.maxLongtask.toFixed(0)}ms (임계 ${TH_LONGTASK}ms · 프레임 ${s.frames} · 스크롤 ${s.scrolled}px)`
+      okMeasured ? `최장 longtask ${s.maxLongtask.toFixed(0)}ms (임계 ${TH_LONGTASK}ms · 프레임 ${s.frames}`
+        + ` · 스크롤 ${s.scrolled}px · ${s.elapsed.toFixed(0)}ms)`
         : `MEASURE_FAIL(${JSON.stringify(s)})`);
     // ④ 검색 5키
     const k = M[rate].search[scope] || [];
