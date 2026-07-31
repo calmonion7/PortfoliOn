@@ -2,31 +2,22 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { trackEvent } from '../utils/analytics'
 import useIsMobile from '../hooks/useIsMobile'
 import GlobalSearch from '../components/GlobalSearch'
+import { sectionByKey, matchesSection, matchesItem } from '../navSections'
 
 // 리서치 7하위 라우트 공용 얇은 래퍼(task#172 S2) — 각 라우트가 실제 탭 컴포넌트를 children으로 렌더한다.
 // 모바일: 기존 seg 필 nav(동선 보존, state 전환→라우트 네비게이션). PC: 마스트헤드가 nav를 담당하므로 필 숨김(ADR-0026).
-// 마스트헤드 IA 5섹션 미러: 리서치(리포트/추천/랭킹/비교)와 일정·인컴(캘린더/배당/다이제스트)을
-// 별도 모바일 섹션으로 분리 — seg는 현재 섹션 하위만 노출(교차 노출 없음, task#178).
-const RESEARCH_TABS = [
-  { to: '/reports', label: '리포트', evt: 'tab_reports' },
-  { to: '/recommend', label: '추천' },
-  { to: '/ranking', label: '랭킹', evt: 'tab_ranking' },
-  { to: '/compare', label: '비교', evt: 'tab_compare' },
-  { to: '/analyst-reports', label: '심층 리포트' },
-]
-const SCHEDULE_TABS = [
-  { to: '/calendar', label: '캘린더', evt: 'tab_calendar' },
-  { to: '/dividends', label: '배당' },
-  { to: '/digest', label: '다이제스트', evt: 'tab_digest' },
-]
-const SCHEDULE_PATHS = SCHEDULE_TABS.map(t => t.to)
+// 마스트헤드 IA 5섹션(navSections.js 단일 소스, task#251) 중 리서치·일정·인컴 두 섹션을 파생 —
+// seg는 현재 섹션 하위만 노출(교차 노출 없음, task#178).
+const RESEARCH = sectionByKey('research')
+const SCHEDULE = sectionByKey('schedule')
 
 export default function ResearchShell({ children }) {
   const isMobile = useIsMobile()
   const { pathname } = useLocation()
-  const isSchedule = SCHEDULE_PATHS.some(p => pathname.startsWith(p))
-  const groupLabel = isSchedule ? '일정·인컴' : '리서치'
-  const segTabs = isSchedule ? SCHEDULE_TABS : RESEARCH_TABS
+  const isSchedule = matchesSection(pathname, SCHEDULE)
+  const section = isSchedule ? SCHEDULE : RESEARCH
+  const groupLabel = section.label
+  const segTabs = section.items
 
   if (isMobile) return (
     <>
@@ -39,7 +30,7 @@ export default function ResearchShell({ children }) {
           {segTabs.map(t => (
             <NavLink key={t.to} to={t.to}
               onClick={() => t.evt && trackEvent(t.evt)}
-              className={({ isActive }) => isActive ? 'is-active' : ''}>
+              className={matchesItem(pathname, t) ? 'is-active' : ''}>
               {t.label}
             </NavLink>
           ))}
