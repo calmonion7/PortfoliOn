@@ -39,6 +39,14 @@ const SEARCH_KEYS = ['A', 'AP', 'APP', 'APPL', 'APPLE'];   // 누적 입력 5단
 // 새 끝까지-스크롤)로 비교하면 회귀 판정이 성립하지 않는다 — 대조는 같은 자여야 한다(#246 ⓔ).
 const CONTROL = process.env.CONTROL === '1';
 
+// 대조군 모드 2 — `CONTROL=anim` 으로 돌리면 스코프 전환 시 1,723행 전량에 걸리는
+// `.anim-fade-up` 애니메이션만 무효화한다(task#257 S1). CONTROL=1(content-visibility
+// 무효화)과 별개 플래그 — 그 처방은 #255에서 되돌려져 지금 라이브에 없다.
+// anim-on(플래그 없음) / anim-off(CONTROL=anim)를 같은 프로브·같은 부하로 돌려
+// ②의 차 = 애니메이션 몫. anim-on이 baseline(② ≈ 582~596ms @4x)을 재현하는지로
+// 대조군 자체를 검증한다(⑧ⓚ).
+const CONTROL_ANIM = process.env.CONTROL === 'anim';
+
 // 임계값 (계획서 사전 명시 — 실측 후 조정 금지)
 const TH_SWITCH = 200;   // ms, INP '좋음' 상한
 const TH_LONGTASK = 100; // ms, 체감 버벅 실용 기준
@@ -186,6 +194,8 @@ for (const rate of THROTTLES) {
   await page.goto(`${BASE}/guru`, { waitUntil: 'domcontentloaded' });
   if (CONTROL) await page.addStyleTag({
     content: '.guru-alloc-grid .guru-stat-row{content-visibility:visible!important}' });
+  if (CONTROL_ANIM) await page.addStyleTag({
+    content: '.guru-alloc-grid .anim-fade-up{animation:none!important}' });
   await page.waitForTimeout(1500);
 
   const cdp = await ctx.newCDPSession(page);
@@ -236,7 +246,9 @@ for (const rate of THROTTLES) {
   put(rate, 'split', '10명→전체', splitOf(m0, await metrics()));
   put(rate, 'switch', '10명→전체', sw1.ms ?? sw1);
   bump('②스코프전환');
+  const m1 = await metrics();
   const sw2 = await page.evaluate(([l, e]) => window.__clickScope(l, e, 60000), ['10명', ROWS['10명']]);
+  put(rate, 'split', '전체→10명', splitOf(m1, await metrics()));
   put(rate, 'switch', '전체→10명', sw2.ms ?? sw2);
   bump('②스코프전환');
 
@@ -268,15 +280,17 @@ await browser.close();
 
 // ── 출력 ────────────────────────────────────────────────────────
 const ms = (v) => num(v) ? `${v.toFixed(0)}ms` : `실패(${JSON.stringify(v)})`;
-console.log(`\n════ 수치 ${CONTROL ? '[대조군 — 처방 무효화]' : '[처방 적용]'} ════`);
+console.log(`\n════ 수치 ${CONTROL ? '[대조군 — 처방 무효화]' : CONTROL_ANIM ? '[대조군 — 애니메이션 무효화]' : '[라이브 그대로]'} ════`);
 for (const rate of THROTTLES) {
   console.log(`\n── CPU ${rate}x ──`);
   console.log(`① 첫 진입(fetch+렌더, 단언 없음)  전체 ${ms(M[rate].first['전체'])} · 10명(첫 전환) ${ms(M[rate].first['10명'])}`);
   console.log(`② 스코프 전환(순수 렌더)          10명→전체 ${ms(M[rate].switch['10명→전체'])} · 전체→10명 ${ms(M[rate].switch['전체→10명'])}`);
-  const sp = M[rate].split?.['10명→전체'];
-  console.log(`   ② 내부 분해(CDP 누적 차분) — Script ${sp ? sp.script.toFixed(0) : '—'}ms`
-    + ` · RecalcStyle ${sp ? sp.style.toFixed(0) : '—'}ms · Layout ${sp ? sp.layout.toFixed(0) : '—'}ms`
-    + ` · Task총 ${sp ? sp.task.toFixed(0) : '—'}ms`);
+  for (const dir of ['10명→전체', '전체→10명']) {
+    const sp = M[rate].split?.[dir];
+    console.log(`   ② 내부 분해 [${dir}] (CDP 누적 차분) — Script ${sp ? sp.script.toFixed(0) : '—'}ms`
+      + ` · RecalcStyle ${sp ? sp.style.toFixed(0) : '—'}ms · Layout ${sp ? sp.layout.toFixed(0) : '—'}ms`
+      + ` · Task총 ${sp ? sp.task.toFixed(0) : '—'}ms`);
+  }
   for (const scope of ['10명', '전체']) {
     const s = M[rate].scroll[scope];
     console.log(`③ 스크롤 끝까지 [${scope}]  최장 longtask ${num(s?.maxLongtask) ? s.maxLongtask.toFixed(0) + 'ms' : '실패'}`

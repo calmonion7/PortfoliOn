@@ -55,6 +55,10 @@ export default function GuruAllocation() {
   const [shownScope, setShownScope] = useState('all')   // 실제 렌더 중인 data가 속한 스코프(캡션·검색 가드는 이 값 기준 — fetch 대기 중엔 scope가 먼저 바뀌어도 data는 아직 이전 스코프라 어긋난다)
   const [query, setQuery]       = useState('')
   const [infoOpen, setInfoOpen] = useState(false)   // 데이터 기준 설명란 — 기본 접힘
+  // 진입 애니메이션은 첫 진입 1회만 — 스코프 전환 시 1,723행 전량 동시 시작이 전환 비용의
+  // ~190ms(4x 실측, task#257)를 차지한다. Ranking.jsx isFirstLoad 선례와 동형.
+  const [isFirstLoad, setIsFirstLoad] = useState(true)
+  const hasLoadedOnceRef = useRef(false)
 
   const loadStockMap = useCallback(async () => {
     const { data } = await api.get('/api/stocks')
@@ -69,6 +73,8 @@ export default function GuruAllocation() {
   }, [loadStockMap])
 
   useEffect(() => {
+    if (hasLoadedOnceRef.current) setIsFirstLoad(false)
+    hasLoadedOnceRef.current = true
     const cached = cacheRef.current[scope]
     if (cached) {
       setData(cached)
@@ -234,9 +240,9 @@ export default function GuruAllocation() {
           <button className="btn btn--sm btn--secondary" onClick={() => setScope('all')}>전체에서 검색</button>
         </div>
       ) : (
-        <div className="anim-stagger guru-stat-grid guru-alloc-grid">
+        <div className={`${isFirstLoad ? 'anim-stagger ' : ''}guru-stat-grid guru-alloc-grid`}>
           {rows.map(({ r, rank }) => (
-            <div key={r.ticker} className="anim-fade-up guru-stat-row">
+            <div key={r.ticker} className={`${isFirstLoad ? 'anim-fade-up ' : ''}guru-stat-row`}>
               <span className="guru-stat-rank">{rank}</span>
               <div className="guru-stat-main">
                 <div className="guru-stat-head">
