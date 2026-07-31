@@ -360,7 +360,7 @@ def test_consensus_basis_normalizes_decimal_and_pins_sentinel_exclusion():
     mart_row = {"base_date": _dt.date(2026, 7, 31), "avg_target_price": _D("215000"),
                 "avg_target_high": _D("250000"),
                 "avg_target_low": _D("180000"), "avg_opinion_score": _D("4.13"),
-                "analyst_count": 8}
+                "analyst_count": 8, "buy_count": 6, "hold_count": 2, "sell_count": 0}
     brok_rows = [
         {"brokerage_code": "미래에셋", "raw_opinion": "매수", "target_price": _D("240000"),
          "opinion_score": _D("5"), "report_date": _dt.date(2026, 7, 30)},
@@ -376,7 +376,8 @@ def test_consensus_basis_normalizes_decimal_and_pins_sentinel_exclusion():
     assert out["consensus"] == {"target_mean": 215000.0, "target_high": 250000.0,
                                 "target_low": 180000.0,
                                 "opinion_score": 4.13, "analyst_count": 8,
-                                "base_date": "2026-07-31"}
+                                "base_date": "2026-07-31",
+                                "buy": 6, "hold": 2, "sell": 0}
     bs = out["consensus_detail"]["brokerages"]
     assert [b["brokerage"] for b in bs] == ["NH투자", "미래에셋"]   # 최신순
     assert bs[0]["target_price"] == 230000.0 and isinstance(bs[0]["target_price"], float)
@@ -395,7 +396,8 @@ def test_consensus_basis_empty_returns_none_and_read_failure_graceful():
 
 _BASIS = {
     "consensus": {"target_mean": 215000.0, "target_high": 250000.0, "target_low": 180000.0,
-                  "opinion_score": 4.13, "analyst_count": 8, "base_date": "2026-07-31"},
+                  "opinion_score": 4.13, "analyst_count": 8, "base_date": "2026-07-31",
+                  "buy": 6, "hold": 2, "sell": 0},
     "consensus_detail": {"brokerages": [
         {"brokerage": "NH투자", "opinion": "Buy", "target_price": 230000.0,
          "opinion_score": 4.0, "report_date": "2026-07-31"}]},
@@ -411,18 +413,21 @@ def test_publish_attaches_consensus_basis_additively():
     data = mock_save.call_args.args[9]
     assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]   # 스냅샷 값 우선(mart로 안 덮음)
     assert data["consensus"]["target_high"] == 250000.0                  # additive 확장
+    assert data["consensus"]["buy"] == SNAPSHOT["buy"]                   # 분포도 스냅샷 우선
     assert data["consensus_detail"]["brokerages"][0]["brokerage"] == "NH투자"
 
 
 def test_publish_fills_null_target_mean_from_mart():
     """KR 스냅샷 target_mean이 null이면 mart 평균으로 보충 — 평균 스탯·델타 성립(라이브 발견)."""
-    snap = {**SNAPSHOT, "target_mean": None}
+    snap = {**SNAPSHOT, "target_mean": None, "buy": 0, "hold": 0, "sell": 0}
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", snap)), \
          patch.object(svc, "consensus_basis", return_value=_BASIS), \
          patch.object(svc, "save_report") as mock_save:
         resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
     assert resp.status_code == 201
-    assert mock_save.call_args.args[9]["consensus"]["target_mean"] == 215000.0
+    data = mock_save.call_args.args[9]
+    assert data["consensus"]["target_mean"] == 215000.0
+    assert (data["consensus"]["buy"], data["consensus"]["hold"], data["consensus"]["sell"]) == (6, 2, 0)
 
 
 def test_publish_without_consensus_basis_keeps_existing_block():

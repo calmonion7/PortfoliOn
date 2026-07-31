@@ -72,9 +72,12 @@ def publish_report(ticker: str, body: PublishBody, _: str = Depends(require_admi
     basis = svc.consensus_basis(upper)
     if basis:
         snap_mean = data["consensus"].get("target_mean")
+        snap_dist = {k: data["consensus"].get(k) for k in ("buy", "hold", "sell")}
         data["consensus"].update(basis["consensus"])
         if snap_mean is not None:
             data["consensus"]["target_mean"] = snap_mean   # 스냅샷 값 우선(mart 평균은 null 보충용)
+        if any(snap_dist.values()):
+            data["consensus"].update(snap_dist)   # 분포도 스냅샷 우선 — 전부 0/None일 때만 mart 보충
         data["consensus_detail"] = basis["consensus_detail"]
     data = sanitize(data)
     published_date = datetime.now(_KST).date().isoformat()

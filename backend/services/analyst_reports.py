@@ -106,7 +106,7 @@ def consensus_basis(ticker: str) -> Optional[dict]:
     try:
         mart = query(
             "SELECT base_date, avg_target_price, avg_target_high, avg_target_low,"
-            "       avg_opinion_score, analyst_count"
+            "       avg_opinion_score, analyst_count, buy_count, hold_count, sell_count"
             " FROM daily_consensus_mart WHERE ticker = %s ORDER BY base_date DESC LIMIT 1",
             (upper,),
         )
@@ -139,6 +139,10 @@ def consensus_basis(ticker: str) -> Optional[dict]:
             "opinion_score": _fnum(m.get("avg_opinion_score")),
             "analyst_count": int(m["analyst_count"]) if m.get("analyst_count") is not None else None,
             "base_date": str(m["base_date"]) if m.get("base_date") is not None else None,
+            # 분포도 target_mean과 같은 보충 규칙 — 스냅샷 분포가 전부 0/None일 때만 라우터가 채택
+            "buy": int(m["buy_count"]) if m.get("buy_count") is not None else None,
+            "hold": int(m["hold_count"]) if m.get("hold_count") is not None else None,
+            "sell": int(m["sell_count"]) if m.get("sell_count") is not None else None,
         }
     out["consensus_detail"]["brokerages"] = [
         {
