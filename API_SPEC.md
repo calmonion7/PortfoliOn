@@ -2218,10 +2218,11 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     "name": "삼성전자",
     "consensus": { "target_mean": 400000.0, "buy": 25, "hold": 2, "sell": 0,
                    "target_high": 450000.0, "target_low": 320000.0, "opinion_score": 4.13,
-                   "analyst_count": 25, "base_date": "2026-07-25" },
+                   "analyst_count": 2, "base_date": "2026-07-25" },
     "consensus_detail": {
       "brokerages": [
-        { "brokerage": "NH투자증권", "opinion": "매수", "target_price": 430000.0, "opinion_score": 5.0, "report_date": "2026-07-24" }
+        { "brokerage": "NH투자증권", "opinion": "매수", "target_price": 430000.0, "opinion_score": 5.0, "report_date": "2026-07-24" },
+        { "brokerage": "미래에셋증권", "opinion": "매수", "target_price": 420000.0, "opinion_score": 5.0, "report_date": "2026-07-22" }
       ]
     },
     "financials_annual": [
@@ -2236,7 +2237,10 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 }
 ```
 
-`data.consensus` — 발행 시점 박제. `target_mean`·`buy`/`hold`/`sell`은 스냅샷 값(단 `target_mean`이 null이면 mart 평균 `avg_target_price`로 보충), `target_high`/`target_low`/`opinion_score`/`analyst_count`/`base_date`는 `daily_consensus_mart` 최신 행에서 additive 확장(task#260, 파이프라인 미커버 종목은 확장 필드 부재).
+`data.consensus` — 발행 시점 박제. `target_mean`·`buy`/`hold`/`sell`은 스냅샷 값(단 `target_mean`이 null이면 mart 평균 `avg_target_price`로 보충), `target_high`/`target_low`/`opinion_score`는 `daily_consensus_mart` 최신 행에서 additive 확장(task#260, 파이프라인 미커버 종목은 확장 필드 부재).
+`analyst_count`는 **`consensus_detail.brokerages`의 행수**이며 표와 항상 일치한다(없으면 `null` → 화면 `—`). mart의 `analyst_count`는 US 집계 sentinel `__consensus__`를 세는 반면 증권사 목록은 그것을 제외해 둘이 어긋났었다(task#268).
+`base_date`는 **바로 그 `target_mean`의 기준일**이다 — 스냅샷 값을 채택하면 스냅샷 날짜, mart 평균으로 보충하면 mart 기준일(task#268; 이전에는 출처와 무관하게 항상 mart 날짜였다).
+같은 날 **재발행** 시 컨센서스 근거 조회가 일시 실패하면, 이미 저장돼 있던 그날 판의 `consensus_detail`과 결측 확장 필드를 **보존**한다(전체 치환으로 근거가 사라지던 것 — task#268). 보존은 같은 `(ticker, published_date)` 행에서만 하며, 다른 날 발행은 과거 판의 근거를 끌어오지 않는다.
 `data.consensus_detail.brokerages` — 발행 순간 raw_reports 90일 창(마트 base_date 앵커) `DISTINCT ON(brokerage_code)` 최신 의견, 최신순. US 집계 sentinel `__consensus__`는 제외. 파이프라인 미커버 종목(구발행물 포함)은 `consensus_detail` 자체가 없음 — 프론트는 이때 컨센서스 섹션을 생략(graceful).
 `data.financials_annual` — 비컨센서스 최근 3개년 + forward 컨센서스 행(`is_consensus: true`), `period` 오름차순. US는 `operating_income`이 `null`일 수 있음(yfinance forward 미제공 — graceful).
 `data.per_band` — 과거 연간 PER(비컨센서스, 최근 최대 6개)의 min/max/avg + 현재/forward PER. 재료 부족(<2개)이면 `null`.

@@ -172,8 +172,11 @@ export function ConsensusSection({ report, market }) {
       <SectionTitle>컨센서스</SectionTitle>
       <Card padding="md" style={{ marginBottom: 30 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+          {/* 캡션이 "집계"가 아니라 "기준"인 이유: base_date의 출처가 두 가지다 — 스냅샷 값을
+              채택하면 스냅샷 날짜, mart로 보충하면 mart 기준일(BH7-L2). 어느 쪽이든 역할은
+              "옆 숫자의 기준일" 하나이므로 mart 집계를 함의하지 않는 중립어를 쓴다. */}
           <Stat size="sm" label="목표가 (평균)" value={cons.target_mean != null ? fmtPrice(cons.target_mean, market) : '—'}
-                helperText={cons.base_date ? `${cons.base_date} 집계` : null} />
+                helperText={cons.base_date ? `${cons.base_date} 기준` : null} />
           <Stat size="sm" label="최고 / 최저" value={(cons.target_high != null && cons.target_low != null)
             ? <span className="tnum">{fmtPrice(cons.target_high, market)} / {fmtPrice(cons.target_low, market)}</span> : '—'} />
           <Stat size="sm" label="애널리스트" value={cons.analyst_count != null ? `${cons.analyst_count}명` : '—'} />

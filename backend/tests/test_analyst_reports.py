@@ -373,9 +373,14 @@ def test_consensus_basis_normalizes_decimal_and_pins_sentinel_exclusion():
         return [mart_row] if "daily_consensus_mart" in sql else brok_rows
     with patch.object(svc, "query", side_effect=fake_query):
         out = svc.consensus_basis("tst")
+    # analyst_count는 mart의 8이 아니라 **증권사 행수 2**다(task#268/BH7-M2로 판정축 변경).
+    # task#260 계획은 "mart에서 analyst_count를 additive 추가"라고 적었지만 같은 줄에서
+    # "sentinel은 증권사가 아니라 집계 placeholder라 제외"라고 근거를 밝혔다 — 두 진술이
+    # 서로 모순이었고, 계획의 *의도*(sentinel은 애널리스트가 아니다)가 이쪽을 지지한다.
+    # 즉 기록된 결정을 뒤집은 게 아니라 부수적 단언을 바로잡은 것이다.
     assert out["consensus"] == {"target_mean": 215000.0, "target_high": 250000.0,
                                 "target_low": 180000.0,
-                                "opinion_score": 4.13, "analyst_count": 8,
+                                "opinion_score": 4.13, "analyst_count": 2,
                                 "base_date": "2026-07-31",
                                 "buy": 6, "hold": 2, "sell": 0}
     bs = out["consensus_detail"]["brokerages"]
@@ -440,3 +445,91 @@ def test_publish_without_consensus_basis_keeps_existing_block():
     data = mock_save.call_args.args[9]
     assert "consensus_detail" not in data
     assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]
+
+
+# ══ 7차 버그헌트 — 발행 경로 계약 3건 (BH7-M1 · BH7-M2 · BH7-L2) ══════════════
+
+def test_republish_preserves_prior_basis_when_read_fails_BH7_M1():
+    """BH7-M1 — 같은 날 재발행 중 consensus_basis read가 실패하면, save_report의
+    `data = EXCLUDED.data` 전체 치환이 이미 박제된 근거를 통째로 지운다. ADR-0027이
+    '잘못된 판은 새 판 발행으로 덮는다'로 같은 날 재발행을 정정 수단으로 규정하므로
+    우연한 경로가 아니다. 같은 (ticker, published_date) 행의 근거만 보존한다."""
+    prior = {"data": {"consensus": {"target_high": 250000.0, "target_low": 180000.0,
+                                    "opinion_score": 4.13, "analyst_count": 8,
+                                    "base_date": "2026-07-31"},
+                      "consensus_detail": {"brokerages": [{"brokerage": "NH투자"}]}}}
+    with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
+         patch.object(svc, "consensus_basis", return_value=None), \
+         patch.object(svc, "get_report", return_value=prior), \
+         patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
+    assert resp.status_code == 201
+    data = mock_save.call_args.args[9]
+    assert data["consensus_detail"]["brokerages"][0]["brokerage"] == "NH투자"
+    assert data["consensus"]["target_high"] == 250000.0      # mart 유래 보충 필드도 보존
+    assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]   # 스냅샷 값은 안 덮음
+
+
+def test_new_date_publish_does_not_borrow_old_basis_BH7_M1():
+    """BH7-M1 — 보존 범위는 **같은 날 재발행**뿐이다. 새 발행일에 read가 실패했다면
+    근거는 없는 게 맞다(wrong < missing). 과거 판의 근거를 새 판에 실으면 stale
+    날짜 귀속이 되어 BH7-L2를 되살린다."""
+    with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
+         patch.object(svc, "consensus_basis", return_value=None), \
+         patch.object(svc, "get_report", return_value=None), \
+         patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
+    assert resp.status_code == 201
+    data = mock_save.call_args.args[9]
+    assert "consensus_detail" not in data
+
+
+def _basis_with(mart_count, brok_rows):
+    mart_row = {"base_date": _dt.date(2026, 7, 31), "avg_target_price": _D("215000"),
+                "avg_target_high": _D("250000"), "avg_target_low": _D("180000"),
+                "avg_opinion_score": _D("4.13"), "analyst_count": mart_count,
+                "buy_count": 6, "hold_count": 2, "sell_count": 0}
+    def fake_query(sql, params=None):
+        return [mart_row] if "daily_consensus_mart" in sql else brok_rows
+    with patch.object(svc, "query", side_effect=fake_query):
+        return svc.consensus_basis("tst")
+
+
+def _brok(code):
+    return {"brokerage_code": code, "raw_opinion": "Buy", "target_price": _D("230000"),
+            "opinion_score": _D("4"), "report_date": _dt.date(2026, 7, 31)}
+
+
+def test_analyst_count_matches_brokerage_rows_BH7_M2():
+    """BH7-M2 — mart의 COUNT(DISTINCT brokerage_code)는 __consensus__ sentinel을 세는데
+    (_MART_SQL의 latest_per_brokerage CTE엔 제외가 없다) 증권사 쿼리는 그것을 제외해,
+    발행물에 '애널리스트 N명'과 그보다 짧은 증권사 표가 함께 박제된다."""
+    out = _basis_with(mart_count=5, brok_rows=[_brok("NH투자"), _brok("미래에셋"),
+                                              _brok("삼성"), _brok("KB")])
+    assert out["consensus"]["analyst_count"] == 4
+    assert len(out["consensus_detail"]["brokerages"]) == 4
+
+
+def test_analyst_count_none_when_sentinel_only_BH7_M2():
+    """BH7-M2 — sentinel만 있는 US 종목은 mart가 1을 주지만 표는 0행이다. 숫자를 지워
+    '—'로 표시하는 게 맞다(1명이라 적고 표가 비는 것이 wrong)."""
+    out = _basis_with(mart_count=1, brok_rows=[])
+    assert out["consensus"]["analyst_count"] is None
+
+
+def test_base_date_follows_the_shown_target_mean_BH7_L2():
+    """BH7-L2 — 라우터가 스냅샷 target_mean을 채택하면(mart 평균을 덮어씀) 그 옆 캡션의
+    base_date도 스냅샷 날짜여야 한다. mart 날짜가 남으면 캡션이 옆 숫자의 기준일이 아니다."""
+    with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
+         patch.object(svc, "consensus_basis", return_value=_BASIS), \
+         patch.object(svc, "save_report") as mock_save:
+        client.post("/api/analyst-reports/tst", json=VALID_BODY)
+    assert mock_save.call_args.args[9]["consensus"]["base_date"] == "2026-07-25"
+
+    # 스냅샷이 비어 mart 평균으로 보충한 경우엔 mart 기준일이 맞다.
+    snap = {**SNAPSHOT, "target_mean": None}
+    with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", snap)), \
+         patch.object(svc, "consensus_basis", return_value=_BASIS), \
+         patch.object(svc, "save_report") as mock_save:
+        client.post("/api/analyst-reports/tst", json=VALID_BODY)
+    assert mock_save.call_args.args[9]["consensus"]["base_date"] == "2026-07-31"

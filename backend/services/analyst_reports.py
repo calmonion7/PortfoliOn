@@ -154,6 +154,14 @@ def consensus_basis(ticker: str) -> Optional[dict]:
         }
         for r in sorted(brokerages, key=lambda r: str(r.get("report_date") or ""), reverse=True)
     ]
+    # analyst_count는 mart가 아니라 **이 함수가 반환하는 증권사 목록**에서 파생한다(BH7-M2).
+    # mart의 COUNT(DISTINCT brokerage_code)는 __consensus__ sentinel을 세는데(_MART_SQL의
+    # latest_per_brokerage CTE엔 제외가 없다) 바로 위 증권사 쿼리는 그것을 제외하므로, mart 값을
+    # 그대로 실으면 발행물에 "애널리스트 N명"과 그보다 짧은/빈 증권사 표가 함께 박제된다.
+    # 두 쿼리는 같은 90일 창·같은 anchor·DISTINCT ON(brokerage_code)이라 len이 곧 표의 행수다.
+    # ⚠️ _MART_SQL에서 sentinel을 빼는 쪽(버그 리포트 1안)은 회귀다 — HAVING COUNT(*) > 0이라
+    #    sentinel 단독 US 종목은 마트 행 자체가 사라져 목표가 정본(ADR-0008)이 소멸한다.
+    out["consensus"]["analyst_count"] = len(out["consensus_detail"]["brokerages"]) or None
     return out
 
 
