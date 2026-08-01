@@ -29,9 +29,14 @@ export default function useAuthBootstrap() {
 
     // 에러 사유(oauth_denied·oauth_failed)는 표시하지 않는다 — 이 경로의 지배적 상황에서
     // 사용자는 로그인을 시도한 게 아니므로 알림이 노이즈다(그릴링에서 통지 제외 선택).
+    // 실패 분기도 성공 분기와 **대칭으로** 되감는다(task#264). IdP 엔트리는 실패했다고
+    // 사라지지 않으므로, 되감지 않으면 실패 후 뒤로가기 1회가 구글 화면으로 나간다.
+    // resolveStored()를 먼저 두는 이유: returnFromOAuth()의 두 경로(history.go / replace)는
+    // 비동기 내비게이션이라 그 사이 authLoading이 true로 남으면 스피너가 노출된다.
     if (oauthError) {
       window.history.replaceState({}, '', '/')
       resolveStored()
+      returnFromOAuth()
       return
     }
 
@@ -49,11 +54,13 @@ export default function useAuthBootstrap() {
           } else {
             // 코드 교환 실패(소진·만료 코드는 400) — 저장 토큰이 있으면 그대로 유지한다.
             resolveStored()
+            returnFromOAuth()
           }
         })
         .catch(() => {
           // 네트워크 실패도 세션 부재의 근거가 아니다.
           resolveStored()
+          returnFromOAuth()
         })
       return
     }
