@@ -1,16 +1,29 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
 import { SketchEmpty, SketchError } from '../components/sketches'
-import { useToast } from '../components/Toast'
+import useTrackedStocks from '../hooks/useTrackedStocks'
 import '../components/ui/Button.css'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 
-export function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
+export function WatchlistBtn({ ticker, name, stockMap, onToggle, unknown = false }) {
   const [loading, setLoading] = useState(false)
-  const [errMsg, setErrMsg] = useState('')
+  // 분기 순서는 unknown → holding → watchlist → none이다. 모름을 먼저 걸러야 하는 이유:
+  // stockMap이 빈 맵이면 그 아래 분기가 전부 "미추적"으로 떨어져 이미 관심에 있는 종목에
+  // 「☆ 추가」를 제시하게 된다(누르면 제거가 아니라 중복 추가 — 의도와 반대).
+  if (unknown) {
+    return (
+      <span className="guru-wl">
+        <button className="guru-wl-btn" disabled
+                title="보유·관심 상태를 불러오지 못했습니다"
+                style={{ cursor: 'not-allowed', opacity: 0.45, color: 'var(--text-3)' }}>
+          ☆ —
+        </button>
+      </span>
+    )
+  }
   const entry = stockMap[ticker]
   if (entry === 'holding') {
     return <span className="guru-wl-held">보유중</span>
@@ -19,11 +32,9 @@ export function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
 
   const handleClick = async () => {
     setLoading(true)
-    setErrMsg('')
+    // 실패는 훅이 토스트로 알린다(re-throw 없음) — 버튼은 로딩 복구만 책임진다.
     try {
       await onToggle(ticker, name, inWatchlist)
-    } catch (err) {
-      setErrMsg(err?.response?.data?.detail || '오류')
     } finally {
       setLoading(false)
     }
@@ -49,13 +60,12 @@ export function WatchlistBtn({ ticker, name, stockMap, onToggle }) {
           : (inWatchlist ? '★ 삭제' : '☆ 추가')
         }
       </button>
-      {errMsg && <span className="guru-wl-err">{errMsg}</span>}
     </span>
   )
 }
 
 // 인기순(count/명)·가중치(score/소수3자리) 뷰가 공유하는 행 카드 — 지표값·단위만 props로 받는다(task#227 S3).
-function StatRow({ index, row, value, unit, stockMap, onToggle }) {
+function StatRow({ index, row, value, unit, stockMap, onToggle, unknown }) {
   return (
     <div className="anim-fade-up guru-stat-row">
       <span className="guru-stat-rank">{index + 1}</span>
@@ -67,29 +77,21 @@ function StatRow({ index, row, value, unit, stockMap, onToggle }) {
         </div>
         <div className="guru-stat-name">{row.name_kr || row.name || '-'}</div>
       </div>
-      <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={onToggle} />
+      <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={onToggle} unknown={unknown} />
     </div>
   )
 }
 
 export default function GuruStats({ view }) {
-  const { showToast } = useToast()
+  const { stockMap, unknown, toggle } = useTrackedStocks()
   const [popularity, setPopularity] = useState([])
   const [weighted, setWeighted]     = useState([])
-  const [stockMap, setStockMap]     = useState({})  // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)  // 빈 상태와 구분 — 실패를 "크롤링을 먼저"로 위장하지 않는다
   const [query, setQuery]           = useState('')
 
   // 표시 뷰는 Guru가 넘기는 view로 고정(기본 'popularity')
   const tab = view ?? 'popularity'
-
-  const loadStockMap = useCallback(async () => {
-    const { data } = await api.get('/api/stocks')
-    const map = {}
-    data.forEach(s => { map[s.ticker] = s.type })
-    setStockMap(map)
-  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -102,23 +104,7 @@ export default function GuruStats({ view }) {
       console.error('[GuruStats] 구루 통계 조회 실패:', e)
       setError('구루 통계를 불러오지 못했습니다.')
     }).finally(() => setLoading(false))
-    // 배지용 보조 조회 — 실패해도 본문은 살린다(배지만 빈다).
-    loadStockMap().catch(e => console.error('[GuruStats] 보유/관심 조회 실패:', e))
-  }, [loadStockMap])
-
-  const handleToggle = async (ticker, name, inWatchlist) => {
-    try {
-      if (inWatchlist) {
-        await api.delete(`/api/watchlist/${ticker}`)
-      } else {
-        await api.post('/api/watchlist', { ticker, name: name || ticker })
-      }
-      await loadStockMap()
-    } catch (e) {
-      console.error('[GuruStats] 관심종목 변경 실패:', e)
-      showToast(e?.response?.data?.detail || '관심종목 변경 실패', 'error')
-    }
-  }
+  }, [])
 
   const q = query.trim().toLowerCase()
   const matches = r => r.ticker.toLowerCase().includes(q) || (r.name_kr || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q)
@@ -175,7 +161,8 @@ export default function GuruStats({ view }) {
             value={tab === 'popularity' ? row.count : row.score.toFixed(3)}
             unit={tab === 'popularity' ? '명' : ''}
             stockMap={stockMap}
-            onToggle={handleToggle}
+            onToggle={toggle}
+            unknown={unknown}
           />
         ))}
       </div>

@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
 import { SketchEmpty, SketchError } from '../components/sketches'
 import { WatchlistBtn } from './GuruStats'
 import { useToast } from '../components/Toast'
+import useTrackedStocks from '../hooks/useTrackedStocks'
 import '../components/ui/Button.css'
 
 // 포트폴리오 규모(13F 신고 자산) 상위 N명 코호트 — 스코프가 곧 집계 범위다(더 이상 표시
@@ -44,10 +45,10 @@ const coverageSentence = (d) => d.manager_count >= d.all_manager_count
     + `${(d.all_total_value ? d.total_value / d.all_total_value * 100 : 0).toFixed(1)}%를 덮는다.`
 
 export default function GuruAllocation() {
-  const { showToast } = useToast()
+  const { showToast } = useToast()   // 스코프 전환 실패 토스트(토글 실패는 훅이 처리)
+  const { stockMap, unknown, toggle } = useTrackedStocks()
   const cacheRef = useRef({})   // scope -> 응답(재클릭 재요청 0)
   const [data, setData]         = useState(null)
-  const [stockMap, setStockMap] = useState({})   // ticker -> 'holding'|'watchlist'
   const [loading, setLoading]   = useState(true)  // 최초 로딩(전면 스피너)만
   const [fetching, setFetching] = useState(false) // 스코프 전환 캐시미스(기존 내용 유지 + 작은 표시)
   const [error, setError]       = useState(null)  // 빈 상태와 구분 — 실패를 "크롤링을 먼저"로 위장하지 않는다
@@ -59,18 +60,6 @@ export default function GuruAllocation() {
   // ~190ms(4x 실측, task#257)를 차지한다. Ranking.jsx isFirstLoad 선례와 동형.
   const [isFirstLoad, setIsFirstLoad] = useState(true)
   const hasLoadedOnceRef = useRef(false)
-
-  const loadStockMap = useCallback(async () => {
-    const { data } = await api.get('/api/stocks')
-    const map = {}
-    data.forEach(s => { map[s.ticker] = s.type })
-    setStockMap(map)
-  }, [])
-
-  useEffect(() => {
-    // 배지용 보조 조회 — 실패해도 본문은 살린다(배지만 빈다).
-    loadStockMap().catch(e => console.error('[GuruAllocation] 보유/관심 조회 실패:', e))
-  }, [loadStockMap])
 
   useEffect(() => {
     if (hasLoadedOnceRef.current) setIsFirstLoad(false)
@@ -114,20 +103,6 @@ export default function GuruAllocation() {
       })
     return () => { ignore = true }
   }, [scope])
-
-  const handleToggle = async (ticker, name, inWatchlist) => {
-    try {
-      if (inWatchlist) {
-        await api.delete(`/api/watchlist/${ticker}`)
-      } else {
-        await api.post('/api/watchlist', { ticker, name: name || ticker })
-      }
-      await loadStockMap()
-    } catch (e) {
-      console.error('[GuruAllocation] 관심종목 변경 실패:', e)
-      showToast(e?.response?.data?.detail || '관심종목 변경 실패', 'error')
-    }
-  }
 
   if (loading) return <LoadingSpinner label="구루 자산 배분 불러오는 중입니다." />
 
@@ -265,7 +240,8 @@ export default function GuruAllocation() {
                 ticker={r.ticker}
                 name={r.name_kr || r.name}
                 stockMap={stockMap}
-                onToggle={handleToggle}
+                onToggle={toggle}
+                unknown={unknown}
               />
             </div>
           ))}

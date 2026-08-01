@@ -6,6 +6,8 @@ import GuruActivityBadge from '../components/ui/GuruActivityBadge'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
+// useToast()는 useContext라 provider 없이 렌더하면 null이다 — 훅이 토스트를 쓰므로 목킹 필수.
+vi.mock('../components/Toast', () => ({ useToast: () => ({ showToast: vi.fn() }) }))
 // 모바일 분기 테스트를 위해 토글 가능한 mock (PermissionPanel.test.jsx의 vi.hoisted 관용구). 기본은 PC.
 const { viewport } = vi.hoisted(() => ({ viewport: { mobile: false } }))
 vi.mock('../hooks/useIsMobile', () => ({ default: () => viewport.mobile }))

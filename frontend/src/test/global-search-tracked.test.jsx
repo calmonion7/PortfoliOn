@@ -10,8 +10,9 @@ vi.mock('react-router-dom', async (importOriginal) => {
 vi.mock('../api', () => ({
   default: { get: vi.fn(), post: vi.fn() },
 }))
+const showToastSpy = vi.fn()
 vi.mock('../components/Toast', () => ({
-  useToast: () => ({ showToast: vi.fn() }),
+  useToast: () => ({ showToast: showToastSpy }),
 }))
 vi.mock('../components/StockSearchBox', () => ({
   default: ({ onSelect }) => (
@@ -48,5 +49,28 @@ describe('GlobalSearch 추적 여부 매 선택마다 재조회', () => {
     await waitFor(() => expect(screen.getByTestId('add-modal')).toBeInTheDocument())
     expect(navigateMock).not.toHaveBeenCalled()
     expect(api.get).toHaveBeenCalledTimes(2)  // 캐시 재사용 없이 매번 재조회
+  })
+})
+
+// B11 — 추적 상태를 **모르면** navigate도 모달도 하지 않는다.
+// 옛 fetchTracked는 실패 시 빈 Set을 돌려줘 조회 실패가 "미추적"으로 붕괴했고, 그래서
+// 이미 추적 중인 종목을 골라도 리포트가 아니라 추가 모달로 보냈다. 어느 쪽으로 추측해도
+// 절반은 틀리므로, 모르면 아무 경로도 고르지 않고 사유만 알린다(wrong < missing).
+describe('B11 — GlobalSearch 추적 상태 조회 실패', () => {
+  beforeEach(() => {
+    navigateMock.mockClear()
+    showToastSpy.mockClear()
+    api.get.mockReset()
+  })
+
+  it('실패 시 add-modal 미출현·navigate 미호출·토스트 1회', async () => {
+    api.get.mockRejectedValueOnce(new Error('tracked down'))
+    render(<GlobalSearch />)
+
+    fireEvent.click(screen.getByText('선택'))
+    await waitFor(() => expect(showToastSpy).toHaveBeenCalledTimes(1))
+    expect(showToastSpy.mock.calls[0][1]).toBe('error')
+    expect(navigateMock).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('add-modal')).toBeNull()
   })
 })

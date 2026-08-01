@@ -5,6 +5,7 @@ import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { SketchEmpty } from '../components/sketches'
 import useIsMobile from '../hooks/useIsMobile'
+import useTrackedStocks from '../hooks/useTrackedStocks'
 import { WatchlistBtn } from './GuruStats'
 import GuruActivityBadge from '../components/ui/GuruActivityBadge'
 import { splitManagerName } from '../utils/guruName'
@@ -105,19 +106,11 @@ export default function GuruDetail() {
   const [manager, setManager] = useState(null)
   const [error, setError]     = useState(null)
   const [loading, setLoading] = useState(true)
-  const [stockMap, setStockMap] = useState({})
   const [expanded, setExpanded] = useState(false)
   // 라벨 폭 실측 캐시(task#237) — null이면 추정 폴백. 후보는 최대 11개뿐이라 마운트당 1회로 충분하다.
   const measureRef = useRef(null)
   const [labelWidths, setLabelWidths] = useState(null)
-
-  const loadStockMap = () => {
-    api.get('/api/stocks').then(({ data }) => {
-      const map = {}
-      data.forEach(s => { map[s.ticker] = s.type })
-      setStockMap(map)
-    })
-  }
+  const { stockMap, unknown, toggle } = useTrackedStocks()
 
   useEffect(() => {
     setLoading(true)
@@ -130,7 +123,6 @@ export default function GuruDetail() {
         setError(e.response?.status === 404 ? '매니저를 찾을 수 없습니다.' : '매니저 정보를 불러오지 못했습니다.')
       })
       .finally(() => setLoading(false))
-    loadStockMap()
   }, [id])
 
   // 조각 라벨 폭을 실제 렌더 폰트로 실측한다 — 문자별 추정(전각/반각 상수)은 커닝·비례폭을 못 본다.
@@ -154,15 +146,6 @@ export default function GuruDetail() {
     }
     setLabelWidths(out)
   }, [manager])
-
-  const handleToggle = async (ticker, name, inWatchlist) => {
-    if (inWatchlist) {
-      await api.delete(`/api/watchlist/${ticker}`)
-    } else {
-      await api.post('/api/watchlist', { ticker, name: name || ticker })
-    }
-    loadStockMap()
-  }
 
   if (loading) return <LoadingSpinner label="구루 매니저 정보 불러오는 중입니다." />
   if (error) return (
@@ -302,7 +285,7 @@ export default function GuruDetail() {
               )}
             </div>
             <span className="mono tnum" style={{ fontSize: 13, fontWeight: 600 }}>{(h.weight_pct ?? 0).toFixed(1)}%</span>
-            <WatchlistBtn ticker={h.ticker} name={h.name_kr || h.name} stockMap={stockMap} onToggle={handleToggle} />
+            <WatchlistBtn ticker={h.ticker} name={h.name_kr || h.name} stockMap={stockMap} onToggle={toggle} unknown={unknown} />
             </div>
             {/* 활동이 있는 행만 2번째 줄 — 변동없는 종목(표본 18%)은 줄을 만들지 않아 스크롤이 안 늘어난다 */}
             {h.activity && (

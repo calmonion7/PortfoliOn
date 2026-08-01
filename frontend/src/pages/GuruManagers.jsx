@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
+import useTrackedStocks from '../hooks/useTrackedStocks'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
@@ -42,45 +43,31 @@ export default function GuruManagers() {
   const isMobile = useIsMobile()
   const navigate = useNavigate()
   const [data, setData]         = useState({ last_updated: null, managers: [] })
-  const [stockMap, setStockMap] = useState({})
   const [loading, setLoading]   = useState(true)
+  const { stockMap, unknown, toggle } = useTrackedStocks()
   const [sort, setSort]         = useState({ key: SORT_OPTIONS[0].key, dir: SORT_OPTIONS[0].dir })
   const [query, setQuery]       = useState('')
-  const [, setBadgeErr] = useState('')
   const guruCounts = useMemo(() => buildGuruCounts(data.managers), [data.managers])
-
-  const loadStockMap = useCallback(() => {
-    api.get('/api/stocks').then(({ data }) => {
-      const map = {}
-      data.forEach(s => { map[s.ticker] = s.type })
-      setStockMap(map)
-    })
-  }, [])
 
   useEffect(() => {
     api.get('/api/guru/managers')
       .then(({ data }) => setData(data))
       .finally(() => setLoading(false))
-    loadStockMap()
-  }, [loadStockMap])
+  }, [])
 
-  const handleBadgeClick = async (h) => {
+  const handleBadgeClick = (h) => {
+    // 모름이면 아무 동작도 하지 않는다 — 빈 맵을 "미추적"으로 읽으면 이미 관심에 있는
+    // 종목에 추가 요청을 보내게 된다(BH: B10 가족).
+    if (unknown) return
     const type = stockMap[h.ticker]
     if (type === 'holding') return
-    setBadgeErr('')
-    try {
-      if (type === 'watchlist') {
-        await api.delete(`/api/watchlist/${h.ticker}`)
-      } else {
-        await api.post('/api/watchlist', { ticker: h.ticker, name: h.name_kr || h.name || h.ticker })
-      }
-      loadStockMap()
-    } catch (err) {
-      setBadgeErr(err.response?.data?.detail || '관심종목 변경에 실패했습니다.')
-    }
+    return toggle(h.ticker, h.name_kr || h.name || h.ticker, type === 'watchlist')
   }
 
   const badgeStyle = (ticker) => {
+    // 모름을 미추적 색으로 두면 "모름"이 "미추적"으로 보인다 — 흐려서 상태 없음을 드러낸다.
+    if (unknown) return { background: 'var(--tag-track-bg)', color: 'var(--text-3)',
+                          border: '1px dashed var(--border)', opacity: 0.5 }
     const type = stockMap[ticker]
     if (type === 'holding')   return { background: 'var(--tag-hold-bg)',  color: 'var(--tag-hold-color)',  border: '1px solid var(--tag-hold-border)' }
     if (type === 'watchlist') return { background: 'var(--tag-watch-bg)', color: 'var(--tag-watch-color)', border: '1px solid var(--tag-watch-border)' }
@@ -202,9 +189,10 @@ export default function GuruManagers() {
                       onClick={e => { e.stopPropagation(); handleBadgeClick(h) }}
                       title={`#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`}
                       className="guru-badge"
+                      aria-disabled={unknown || undefined}
                       style={{
                         ...badgeStyle(h.ticker),
-                        cursor: type === 'holding' ? 'default' : 'pointer',
+                        cursor: (unknown || type === 'holding') ? 'default' : 'pointer',
                       }}
                     >
                       {h.ticker}
@@ -301,9 +289,10 @@ export default function GuruManagers() {
                       title={tooltip}
                       onClick={e => { e.stopPropagation(); handleBadgeClick(h) }}
                       className="guru-badge"
+                      aria-disabled={unknown || undefined}
                       style={{
                         ...badgeStyle(h.ticker),
-                        cursor: type === 'holding' ? 'default' : 'pointer',
+                        cursor: (unknown || type === 'holding') ? 'default' : 'pointer',
                       }}
                     >
                       {h.ticker}

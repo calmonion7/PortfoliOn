@@ -16,12 +16,15 @@ export default function GlobalSearch({ variant = 'desktop' }) {
   const [open, setOpen] = useState(false)        // 모바일 오버레이
   const [prefill, setPrefill] = useState(null)   // add 모달 프리필(미추적 선택 시)
 
+  // 실패는 **null**(모름)이다 — 옛 구현은 빈 Set을 돌려줘 조회 실패가 "미추적"으로 붕괴했고,
+  // 이미 추적 중인 종목을 골라도 리포트가 아니라 추가 모달로 보냈다(B11).
   const fetchTracked = async () => {
     try {
       const { data } = await api.get('/api/stocks')  // [{ticker,name,type,market}]
       return new Set((data || []).map(s => (s.ticker || '').toUpperCase()))
-    } catch {
-      return new Set()
+    } catch (e) {
+      console.warn('[GlobalSearch] 추적 상태 조회 실패:', e)
+      return null
     }
   }
 
@@ -29,6 +32,11 @@ export default function GlobalSearch({ variant = 'desktop' }) {
     const t = (item.ticker || '').toUpperCase()
     setOpen(false)
     const tracked = await fetchTracked()  // eco: 선택마다 재조회 — 삭제 직후 stale 캐시 오판 방지
+    if (tracked === null) {
+      // navigate도 모달도 하지 않는다 — 어느 쪽으로 추측해도 절반은 틀린다(B11).
+      showToast('보유·관심 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.', 'error')
+      return
+    }
     if (tracked.has(t)) {
       navigate('/reports', { state: { ticker: t } })  // 리포트 상세 점프
     } else {

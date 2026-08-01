@@ -93,6 +93,7 @@ export default function Ranking() {
 
   // 관심종목 토글: watched=등록된 ticker(대문자) Set, pending=요청 중 ticker Set(더블클릭 방지)
   const [watched, setWatched] = useState(() => new Set())
+  const [watchUnknown, setWatchUnknown] = useState(false)   // 조회 실패 = 모름(빈 Set과 구별)
   const [pending, setPending] = useState(() => new Set())
 
   const isSupply = metric === 'supply'
@@ -153,8 +154,17 @@ export default function Ranking() {
   // 진입 시 관심종목 목록 1회 로드 → 행 별표 상태 표시
   useEffect(() => {
     api.get('/api/watchlist')
-      .then(({ data }) => setWatched(new Set((data || []).map(s => s.ticker.toUpperCase()))))
-      .catch(() => {})
+      .then(({ data }) => {
+        setWatched(new Set((data || []).map(s => s.ticker.toUpperCase())))
+        setWatchUnknown(false)
+      })
+      // 옛 `.catch(() => {})`는 실패를 **빈 Set**으로 남겼다 — 그러면 이미 등록된 종목의
+      // 별이 ☆(미등록)으로 보이고, 누르면 DELETE가 아니라 POST가 나간다(제거하려던 의도와
+      // 정반대). 모름은 미등록이 아니므로 액션을 제시하지 않는다(B10).
+      .catch((e) => {
+        console.warn('[Ranking] 관심종목 조회 실패:', e)
+        setWatchUnknown(true)
+      })
   }, [])
 
   // 클릭 시 스냅샷 가용 여부로 분기: 있으면 리서치 리포트 모달, 없으면 기본정보 모달 + 관심추가 CTA.
@@ -210,6 +220,7 @@ export default function Ranking() {
   const toggleWatch = (row, e) => {
     e.stopPropagation()
     const t = row.ticker.toUpperCase()
+    if (watchUnknown) return   // 모름 — 어느 쪽으로 추측해도 절반은 틀린다(B10)
     if (pending.has(t)) return
     const isWatched = watched.has(t)
     setPending(prev => new Set(prev).add(t))
@@ -237,16 +248,20 @@ export default function Ranking() {
     const t = row.ticker.toUpperCase()
     const on = watched.has(t)
     const busy = pending.has(t)
+    const label = watchUnknown ? '관심종목 상태를 불러오지 못했습니다'
+                 : (on ? '관심종목에서 제거' : '관심종목 추가')
     return (
       <button
         onClick={(e) => toggleWatch(row, e)}
-        disabled={busy}
-        title={on ? '관심종목에서 제거' : '관심종목 추가'}
-        aria-label={on ? '관심종목에서 제거' : '관심종목 추가'}
+        disabled={busy || watchUnknown}
+        title={label}
+        aria-label={label}
         style={{
-          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          background: 'none', border: 'none',
+          cursor: watchUnknown ? 'not-allowed' : 'pointer', padding: 0,
           fontSize: 16, lineHeight: 1, justifySelf: 'center',
-          color: on ? 'var(--accent)' : 'var(--text-3)', opacity: busy ? 0.4 : 1,
+          color: on ? 'var(--accent)' : 'var(--text-3)',
+          opacity: (busy || watchUnknown) ? 0.4 : 1,
         }}
       >{on ? '★' : '☆'}</button>
     )

@@ -8,6 +8,8 @@ vi.mock('react-router-dom', async (importOriginal) => {
 })
 
 vi.mock('../api', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
+// useToast()는 useContext라 provider 없이 렌더하면 null이다 — 훅이 토스트를 쓰므로 목킹 필수.
+vi.mock('../components/Toast', () => ({ useToast: () => ({ showToast: vi.fn() }) }))
 vi.mock('../hooks/useIsMobile', () => ({ default: () => false }))
 
 import api from '../api'
