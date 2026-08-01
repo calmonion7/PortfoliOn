@@ -218,8 +218,13 @@ def main():
               f"② {ticker} {metric} 가드 후 결측 (={fmt(peers_after[ticker][metric])})")
 
     # ② 밴드 안 지표는 보존
+    # 원값이 결측이면 before/after가 둘 다 None이라 `a == b`가 자명 통과한다 —
+    # 측정 실패를 "보존됨" PASS로 위장하지 않도록 ③과 같은 sentinel 가드를 둔다.
     for metric in EXPECT_KEEP_TSM:
         b, a = peers_before["TSM"][metric], peers_after["TSM"][metric]
+        if rg._fin_num(b) is None:
+            check(False, f"② TSM {metric} 원값 결측 — 보존 단언을 측정 못 했다(외부 소스 실패)")
+            continue
         check(a == b, f"② TSM {metric} 보존 (before={fmt(b)} after={fmt(a)})")
 
     # ③ **이번 작업의 목적** — 정상 peer가 보존된다(구 판정축은 여기서 결측시켰다)

@@ -1763,7 +1763,7 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 ### `GET /api/report/{ticker}/backlog`
 
-종목의 수주잔고(Order Backlog) 분기별 이력 조회. KR 종목 리포트 상세의 '수주잔고 추이' 차트가 사용. **Auth 불필요.**
+종목의 수주잔고(Order Backlog) 분기별 이력 조회. KR 종목 리포트 상세의 '수주잔고 추이' 차트가 사용.
 
 **Auth:** Bearer token 필요
 
@@ -1852,7 +1852,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/report/{ticker}/disclosures`
 
-종목의 DART 공시 피드 조회 (최신순). KR 종목 리포트 상세의 '최신 공시' 섹션이 사용. `disclosure_fetch` 배치가 채우는 `stock_disclosures` 테이블에서 읽으며, **Cowork가 enrich하는 `recent_disclosures`(애널리스트 코멘터리)와는 별도 store**다. **Auth 불필요.**
+종목의 DART 공시 피드 조회 (최신순). KR 종목 리포트 상세의 '최신 공시' 섹션이 사용. `disclosure_fetch` 배치가 채우는 `stock_disclosures` 테이블에서 읽으며, **Cowork가 enrich하는 `recent_disclosures`(애널리스트 코멘터리)와는 별도 store**다.
 
 **Auth:** Bearer token 필요
 
@@ -1887,7 +1887,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/report/{ticker}/insider-trades`
 
-종목의 내부자·5%지분 변동 공시 피드 + 순매수/순매도 신호 조회 (최신순). KR 종목 리포트 상세의 '내부자·5% 지분변동' 섹션이 사용. `insider_fetch` 배치가 채우는 `stock_insider_trades` 테이블에서 읽으며(DART `elestock.json`=임원·주요주주 소유보고 / `majorstock.json`=5% 대량보유보고 정규화), **Cowork가 enrich하는 `recent_disclosures`(애널리스트 코멘터리)와는 별도 store**다. 저장값만 읽고 요청경로 라이브 DART 호출은 0. **Auth 불필요.**
+종목의 내부자·5%지분 변동 공시 피드 + 순매수/순매도 신호 조회 (최신순). KR 종목 리포트 상세의 '내부자·5% 지분변동' 섹션이 사용. `insider_fetch` 배치가 채우는 `stock_insider_trades` 테이블에서 읽으며(DART `elestock.json`=임원·주요주주 소유보고 / `majorstock.json`=5% 대량보유보고 정규화), **Cowork가 enrich하는 `recent_disclosures`(애널리스트 코멘터리)와는 별도 store**다. 저장값만 읽고 요청경로 라이브 DART 호출은 0.
 
 **Auth:** Bearer token 필요
 
