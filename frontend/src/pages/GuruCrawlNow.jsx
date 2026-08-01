@@ -6,6 +6,7 @@ export default function GuruCrawlNow() {
   const { role } = useAuth() || { role: 'user' }
   const [crawling, setCrawling]   = useState(false)
   const [crawlMsg, setCrawlMsg]   = useState('')
+  const [crawlOk, setCrawlOk]     = useState(true)
   const [progress, setProgress]   = useState({ done: 0, total: 0, current: '' })
   const [lastUpdated, setLastUpdated] = useState(null)
   const pollRef = useRef(null)
@@ -19,10 +20,17 @@ export default function GuruCrawlNow() {
       try {
         const { data } = await api.get('/api/guru/crawl/progress')
         setProgress({ done: data.done, total: data.total, current: data.current })
-        if (!data.running && data.total > 0 && data.done >= data.total) {
+        // 종료 판정은 done>=total이 아니라 result다 — 크롤이 초반에 죽으면 total이 0이거나
+        // done<total이라 옛 조건은 영영 발화하지 않고 스피너만 돈다(경고를 볼 방법이 없다).
+        if (!data.running && data.result) {
           clearInterval(pollRef.current)
           setCrawling(false)
-          setCrawlMsg(`완료: ${data.done}명 매니저 데이터 수집됨`)
+          setCrawlOk(data.result === 'saved')
+          setCrawlMsg(
+            data.result === 'saved'  ? `완료: ${data.done}명 매니저 데이터 수집됨`
+            : data.result === 'skipped' ? '수집 실패 — 직전 데이터 유지'
+            : '크롤링 중단 — 직전 데이터 유지'
+          )
           api.get('/api/guru/managers').then(({ data }) => setLastUpdated(data.last_updated))
         }
       } catch {}
@@ -32,11 +40,13 @@ export default function GuruCrawlNow() {
   const handleCrawlNow = async () => {
     setCrawling(true)
     setCrawlMsg('')
+    setCrawlOk(true)
     setProgress({ done: 0, total: 0, current: '' })
     try {
       await api.post('/api/guru/crawl')
       startPolling()
     } catch (err) {
+      setCrawlOk(false)
       setCrawlMsg(err.response?.data?.detail || '크롤링 실패')
       setCrawling(false)
     }
@@ -78,7 +88,12 @@ export default function GuruCrawlNow() {
               </div>
             </div>
           )}
-          {crawlMsg && <p style={{ marginTop: 8, color: 'var(--color-success)', fontSize: 13 }}>{crawlMsg}</p>}
+          {crawlMsg && (
+            <p data-testid="crawl-msg"
+              style={{ marginTop: 8, color: crawlOk ? 'var(--color-success)' : 'var(--warn)', fontSize: 13 }}>
+              {crawlMsg}
+            </p>
+          )}
         </div>
       </div>
     </div>

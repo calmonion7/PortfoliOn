@@ -151,6 +151,56 @@ def test_start_crawl_returns_202():
     assert r.status_code == 202
 
 
+# ── 크롤 종료 사유(result) — 저장 스킵을 초록 "완료"와 구분하기 위한 관측 (task#262) ──
+# 프론트(GuruCrawlNow)는 이 필드로 문구·색을 가른다. 없으면 done>=total만 보고 무조건 초록.
+
+def _run_crawl_and_get_result(monkeypatch, *, managers, saved):
+    import routers.guru as guru
+    monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: managers)
+    monkeypatch.setattr(guru.storage, "save_guru_managers", lambda payload: saved)
+    guru._run_crawl()
+    return guru._progress.get()
+
+
+def test_run_crawl_records_saved_on_success(monkeypatch):
+    state = _run_crawl_and_get_result(monkeypatch, managers=[{"id": "brk"}], saved=True)
+    assert state["result"] == "saved" and state["running"] is False
+
+
+def test_run_crawl_records_skipped_when_save_declined(monkeypatch):
+    """빈 스크랩 → save_guru_managers False(저장 생략·직전값 유지)를 'saved'와 구분해 기록."""
+    state = _run_crawl_and_get_result(monkeypatch, managers=[], saved=False)
+    assert state["result"] == "skipped" and state["running"] is False
+
+
+def test_run_crawl_records_failed_on_exception(monkeypatch):
+    import routers.guru as guru
+
+    def _boom(*a, **k):
+        raise RuntimeError("dataroma down")
+
+    monkeypatch.setattr(guru, "scrape_all_managers", _boom)
+    guru._run_crawl()
+    state = guru._progress.get()
+    # 예외로 죽으면 total이 0이라 done>=total 종료 조건이 영영 발화하지 않는다 — result가 유일한 신호.
+    assert state["result"] == "failed" and state["running"] is False
+
+
+def test_start_crawl_resets_stale_result_before_background_task(monkeypatch):
+    """BackgroundTasks는 응답 *후* 실행 — POST 응답 시점에 직전 실행의 result가 남아 있으면
+    폴러가 즉시 완료로 오판한다. 핸들러가 리셋하는지 못박는다."""
+    import routers.guru as guru
+    guru._progress.set(running=False, done=5, total=5, result="saved")   # 직전 실행 잔재
+    captured = {}
+
+    class _NoRunTasks:
+        def add_task(self, fn, *a, **k):
+            captured["state"] = guru._progress.get()   # 배치 실행 전 상태 = 응답 시점 상태
+
+    guru.start_crawl(_NoRunTasks(), "admin-id")
+    assert captured["state"]["result"] is None and captured["state"]["running"] is True
+
+
 # --- 403 test: crawl blocked for non-admin ---
 
 from auth import get_current_user as _get_current_user
