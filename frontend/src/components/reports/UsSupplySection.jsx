@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../api'
 import { SectionTitle } from './reportUtils.jsx'
 import { GlossaryText } from '../Glossary.jsx'
+import { fmtSharesUs } from '../../utils'
 
 // US 종목 수급 — 공매도 비중 + 기관 보유 상위. 기술·수급 탭 US 브랜치.
 // GET /api/report/{ticker}/us-supply → { short, institutional, fetched_at }
@@ -16,16 +17,6 @@ function fmtDate(s) {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}.${m}.${day}`
-}
-
-// 숫자 천단위 포매터 (K/M/B 축약)
-function fmtShares(n) {
-  if (n == null) return '—'
-  const v = Number(n)
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`
-  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`
-  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`
-  return v.toLocaleString()
 }
 
 // +/-% 색상: 양수=--up(빨강, KR 상승), 음수=--down(파랑, KR 하락)
@@ -91,7 +82,7 @@ export default function UsSupplySection({ ticker, market }) {
             {short.shares_short != null && (
               <div style={STAT}>
                 <span style={STAT_LABEL}><GlossaryText text="공매도 잔량" /></span>
-                <span style={STAT_VAL}>{fmtShares(short.shares_short)}</span>
+                <span style={STAT_VAL}>{fmtSharesUs(short.shares_short)}</span>
               </div>
             )}
             {short.date_short_interest && (
@@ -123,7 +114,7 @@ export default function UsSupplySection({ ticker, market }) {
                   <tr key={i}>
                     <td style={TDL}>{row.holder || '—'}</td>
                     <td style={TD}>{row.pct_held != null ? `${(row.pct_held * 100).toFixed(2)}%` : '—'}</td>
-                    <td style={TD}>{fmtShares(row.shares)}</td>
+                    <td style={TD}>{fmtSharesUs(row.shares)}</td>
                     <td style={{ ...TD, color: pctColor(row.pct_change), fontWeight: row.pct_change != null ? 600 : 400 }}>
                       {row.pct_change != null
                         ? `${row.pct_change > 0 ? '+' : ''}${(row.pct_change * 100).toFixed(2)}%`

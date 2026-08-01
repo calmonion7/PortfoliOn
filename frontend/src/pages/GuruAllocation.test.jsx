@@ -100,6 +100,16 @@ describe('구루 자산 배분 탭 (task#241)', () => {
     expect(row.querySelector('.guru-stat-name').textContent).toContain('60명')
   })
 
+  // B14 (task#271): 총 투자금 1.077e12가 T 티어 부재로 '$1,077.0B'로 뭉개지던 자리.
+  // 정본 fmtUsdCompact의 T 티어가 실제로 화면에 닿는지를 보는 유일한 컴포넌트 게이트다.
+  it('총 투자금이 1조 달러를 넘으면 T 티어로 표기한다', async () => {
+    mockApi()
+    const { container } = render(<GuruAllocation />)
+    await screen.findByText('TCK1')
+    expect(container.textContent).toContain('$1.1T')
+    expect(container.textContent).not.toContain('$1,077.0B')
+  })
+
   it('데이터 없으면 빈 상태를 보여준다', async () => {
     mockApi({ total_value: 0, manager_count: 0, ticker_count: 0, rows: [] })
     render(<GuruAllocation />)

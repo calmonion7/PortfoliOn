@@ -7,6 +7,7 @@ import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
 import { SketchEmpty } from '../components/sketches'
 import { splitManagerName } from '../utils/guruName'
+import { fmtUsdCompact } from '../utils'
 
 // 티커별 보유 매니저 수 역인덱스 — Recommendations.jsx의 buildGuruCounts와 동일 방식(백엔드 호출 없이 이미 받은 managers blob만 사용)
 function buildGuruCounts(managers) {
@@ -18,14 +19,6 @@ function buildGuruCounts(managers) {
     }
   }
   return counts
-}
-
-function formatValue(val) {
-  if (!val) return '-'
-  if (val >= 1e12) return `$${(val / 1e12).toFixed(1)}T`
-  if (val >= 1e9)  return `$${(val / 1e9).toFixed(1)}B`
-  if (val >= 1e6)  return `$${(val / 1e6).toFixed(1)}M`
-  return `$${val.toLocaleString()}`
 }
 
 // 기본 정렬 = 첫 항목(포트폴리오 규모 내림차순) — 규모 큰 펀드가 위, 카드 #N 배지도 규모 순위가 된다(task#228)
@@ -170,7 +163,7 @@ export default function GuruManagers() {
             <div className="guru-stats">
               <div className="guru-stat">
                 <div className="l">포트폴리오</div>
-                <div className="v">{formatValue(m.portfolio_value)}</div>
+                <div className="v">{fmtUsdCompact(m.portfolio_value)}</div>
               </div>
               <div className="guru-stat">
                 <div className="l">종목수</div>
@@ -269,7 +262,7 @@ export default function GuruManagers() {
             <div className="guru-stats">
               <div className="guru-stat">
                 <div className="l">포트폴리오</div>
-                <div className="v">{formatValue(m.portfolio_value)}</div>
+                <div className="v">{fmtUsdCompact(m.portfolio_value)}</div>
               </div>
               <div className="guru-stat">
                 <div className="l">종목수</div>

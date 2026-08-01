@@ -4,15 +4,10 @@ import {
 } from 'recharts'
 import { SectionTitle } from './reportUtils.jsx'
 import { GlossaryText } from '../Glossary.jsx'
+import { fmtEokWon } from '../../utils'
 
 const SECTOR_ORDER = ['항공', '방산', '해양', 'IT서비스', '항공우주']
 const SECTOR_COLORS = ['var(--data-2)', 'var(--data-5)', 'var(--data-3)', 'var(--data-4)', 'var(--data-1)', 'var(--corr-pos)', 'var(--corr-neg)']
-
-const fmtAmt = (v) => {
-  if (v == null) return '—'
-  if (Math.abs(v) >= 10000) return `${(v / 10000).toFixed(1)}조`
-  return `${Math.round(v).toLocaleString()}억`
-}
 
 const axisStyle = { fontSize: 10, fill: 'var(--text-3)' }
 
@@ -59,7 +54,7 @@ export default function BacklogChart({ data }) {
       return (
         <div style={tooltipBox}>
           <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}{warn && ' ⚠️'}</div>
-          {row.amount != null && <div style={{ color: 'var(--data-2)', marginBottom: 2 }}>수주잔고: {fmtAmt(row.amount)}원</div>}
+          {row.amount != null && <div style={{ color: 'var(--data-2)', marginBottom: 2 }}>수주잔고: {fmtEokWon(row.amount)}원</div>}
           {row.qoq != null && <div style={{ color: row.qoq >= 0 ? 'var(--up)' : 'var(--down)' }}>QoQ: {row.qoq >= 0 ? '+' : ''}{row.qoq}%{warn && <span style={{ marginLeft: 4, color: 'var(--warn)' }}>이상값</span>}</div>}
           {row.source && <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-3)' }}>출처: {row.source === 'llm' ? 'AI 추출' : row.source === 'manual' ? '수동' : 'DART'}</div>}
         </div>
@@ -79,7 +74,7 @@ export default function BacklogChart({ data }) {
           <ComposedChart data={chartData} margin={{ top: 8, right: 36, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis dataKey="quarter" tick={axisStyle} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="left" tickFormatter={fmtAmt} tick={axisStyle} axisLine={false} tickLine={false} width={40} />
+            <YAxis yAxisId="left" tickFormatter={fmtEokWon} tick={axisStyle} axisLine={false} tickLine={false} width={40} />
             <YAxis yAxisId="right" orientation="right" tickFormatter={v => `${v}%`} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
             <Tooltip content={<SingleTooltip />} />
             <ReferenceLine yAxisId="right" y={0} stroke="var(--border)" />
@@ -129,13 +124,13 @@ export default function BacklogChart({ data }) {
     return (
       <div style={tooltipBox}>
         <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 4 }}>{label}{warn && ' ⚠️'}</div>
-        <div style={{ color: 'var(--text)', marginBottom: 4 }}>합계: {fmtAmt(row.total)}원</div>
+        <div style={{ color: 'var(--text)', marginBottom: 4 }}>합계: {fmtEokWon(row.total)}원</div>
         {groupByEntity(row._segments).map(g => (
           <div key={g.sector} style={{ marginBottom: 2 }}>
-            <div style={{ color: colorOf(g.sector) }}>■ {g.sector}: {fmtAmt(g.total)}</div>
+            <div style={{ color: colorOf(g.sector) }}>■ {g.sector}: {fmtEokWon(g.total)}</div>
             {g.entities.map((e, i) => (
               <div key={i} style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 12 }}>
-                {shortEntity(e.entity)} · {fmtAmt(e.amount)}
+                {shortEntity(e.entity)} · {fmtEokWon(e.amount)}
               </div>
             ))}
           </div>
@@ -156,7 +151,7 @@ export default function BacklogChart({ data }) {
         <ComposedChart data={chartData} margin={{ top: 8, right: 36, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
           <XAxis dataKey="quarter" tick={axisStyle} axisLine={false} tickLine={false} />
-          <YAxis yAxisId="left" tickFormatter={fmtAmt} tick={axisStyle} axisLine={false} tickLine={false} width={40} />
+          <YAxis yAxisId="left" tickFormatter={fmtEokWon} tick={axisStyle} axisLine={false} tickLine={false} width={40} />
           <YAxis yAxisId="right" orientation="right" tickFormatter={v => `${v}%`} tick={axisStyle} axisLine={false} tickLine={false} width={36} />
           <Tooltip content={<SegTooltip />} />
           <ReferenceLine yAxisId="right" y={0} stroke="var(--border)" />

@@ -9,6 +9,7 @@ import useTrackedStocks from '../hooks/useTrackedStocks'
 import { WatchlistBtn } from './GuruStats'
 import GuruActivityBadge from '../components/ui/GuruActivityBadge'
 import { splitManagerName } from '../utils/guruName'
+import { fmtUsdCompact } from '../utils'
 
 // 구루 매니저 상세 (task#226 S4) — 상위 10종목 도넛 + 전 종목 목록.
 // holdings(전 종목)는 크롤 후에만 존재 — 없으면 top10 + "기타 N종목 x%"로 graceful 폴백(도넛도 동일 폴백 공유).
@@ -90,14 +91,6 @@ export function activityText(activity) {
   if (share_pct != null) parts.push(`${Number(share_pct).toFixed(1)}%`)
   if (port_pct != null) parts.push(ppText(port_pct, down))
   return parts.join(' · ')
-}
-
-function formatValue(val) {
-  if (!val) return '-'
-  if (val >= 1e12) return `$${(val / 1e12).toFixed(1)}T`
-  if (val >= 1e9)  return `$${(val / 1e9).toFixed(1)}B`
-  if (val >= 1e6)  return `$${(val / 1e6).toFixed(1)}M`
-  return `$${val.toLocaleString()}`
 }
 
 export default function GuruDetail() {
@@ -192,7 +185,7 @@ export default function GuruDetail() {
       <div className="kpi-row" style={isMobile ? undefined : { gridTemplateColumns: 'repeat(2, 1fr)', maxWidth: 720 }}>
         <div className="kpi">
           <div className="label">포트폴리오 규모</div>
-          <div className="val">{formatValue(manager.portfolio_value)}</div>
+          <div className="val">{fmtUsdCompact(manager.portfolio_value)}</div>
         </div>
         <div className="kpi">
           <div className="label">보유 종목수</div>

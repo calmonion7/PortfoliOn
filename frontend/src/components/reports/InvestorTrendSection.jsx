@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import api from '../../api'
-import { krFmt } from '../market/marketUtils.jsx'
+import { fmtSharesKr } from '../../utils'
 import { SectionTitle } from './reportUtils.jsx'
 import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
@@ -53,7 +53,7 @@ export default function InvestorTrendSection({ ticker }) {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }} minTickGap={24} />
               <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={52}
-                     tickFormatter={v => krFmt(v)} />
+                     tickFormatter={v => fmtSharesKr(v)} />
               <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--data-3)' }}
                      tickFormatter={v => `${v}%`} width={40} />
               <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}

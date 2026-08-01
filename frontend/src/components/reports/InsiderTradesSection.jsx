@@ -30,8 +30,8 @@ function fmtDate(s) {
   return str
 }
 
-// 부호 포함 천단위 주식수.
-function fmtShares(n) {
+// 부호 포함 천단위 주식수(축약 없음, 빈값 ''). 소비처 1곳이라 정본 이관 안 함 — 개명만.
+function fmtSignedCount(n) {
   if (n == null) return ''
   const sign = n > 0 ? '+' : ''
   return `${sign}${n.toLocaleString()}`
@@ -82,7 +82,7 @@ export default function InsiderTradesSection({ ticker, market }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {trades.map((t) => {
               const kc = _KIND_CFG[t.report_kind] || { label: t.report_kind || '', color: 'var(--text-3)' }
-              const changeStr = fmtShares(t.shares_change)
+              const changeStr = fmtSignedCount(t.shares_change)
               const changeColor = t.shares_change > 0 ? 'var(--semantic-buy)' : t.shares_change < 0 ? 'var(--semantic-sell)' : 'var(--text-3)'
               return (
                 <a

@@ -1,24 +1,15 @@
 import { useState, useEffect } from 'react'
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import api from '../../api'
-import { krFmt } from '../market/marketUtils.jsx'
+import { fmtEokWon, fmtSharesKr } from '../../utils'
 import { SectionTitle } from './reportUtils.jsx'
 import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 // 종목 공매도 추이 차트 (거래량 막대 + 비중% 라인, 잔고·거래대금은 툴팁/헤더). KR 전용.
 // 키움 ka10014 → /api/stocks/{ticker}/short-sell. 수급 추이(InvestorTrendSection) 옆에 배치.
 
-// 주식 수량(주) 컴팩트 포매터 — krFmt는 '억원' 입력 가정이라 주 단위엔 부적합.
-const fmtShares = (v) => {
-  if (v == null) return '—'
-  const n = Math.abs(Number(v))
-  if (n >= 1e8) return `${(n / 1e8).toFixed(1)}억`
-  if (n >= 1e4) return `${Math.round(n / 1e4)}만`
-  return String(Math.round(n))
-}
-
-// 거래대금(원) → krFmt(억 입력)용으로 원/1e8 변환 후 '원' 부착.
-const wonFmt = (v) => `${krFmt((Number(v) || 0) / 1e8)}원`
+// 거래대금(원) → fmtEokWon(억원 입력)용으로 원/1e8 변환 후 '원' 부착.
+const wonFmt = (v) => `${fmtEokWon((Number(v) || 0) / 1e8)}원`
 
 function ShortTooltip({ active, payload }) {
   if (!active || !payload || !payload.length) return null
@@ -84,7 +75,7 @@ export default function ShortSellSection({ ticker }) {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }} minTickGap={24} />
               <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={52}
-                     tickFormatter={v => fmtShares(v)} />
+                     tickFormatter={v => fmtSharesKr(v)} />
               <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--data-3)' }}
                      tickFormatter={v => `${v}%`} width={40} />
               <Tooltip content={<ShortTooltip />} />

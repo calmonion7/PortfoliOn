@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { LineChart, Line, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, krFmt, isEstimated } from './marketUtils.jsx'
+import { DESC_STYLE, SectionCard, SectionCardLoading, SectionCardError, isEstimated } from './marketUtils.jsx'
+import { fmtEokWon } from '../../utils'
 import { GlossaryRechartsLegend } from '../Glossary.jsx'
 
 export default function KrTop2Section() {
@@ -49,14 +50,14 @@ export default function KrTop2Section() {
           <div key={label} className="metric-tile" style={{ minWidth: 140, flex: 1 }}>
             <div className="lbl">{label} 순이익 ({latest?.q})</div>
             <div className="v" style={{ color }}>
-              {krFmt(value)} <span style={{ fontSize: 11, fontWeight: 400 }}>원</span>
+              {fmtEokWon(value)} <span style={{ fontSize: 11, fontWeight: 400 }}>원</span>
             </div>
             {qoq != null && (
               <>
                 <div className="d" style={{ color: qoq > 0 ? 'var(--up)' : 'var(--down)' }}>
                   {qoq > 0 ? '▲' : '▼'} {Math.abs(qoq).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>QoQ</span>
                 </div>
-                {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전분기 {krFmt(prevVal)}원 ({prevQ})</div>}
+                {prevVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전분기 {fmtEokWon(prevVal)}원 ({prevQ})</div>}
               </>
             )}
             {yoyChg != null && (
@@ -64,7 +65,7 @@ export default function KrTop2Section() {
                 <div className="d" style={{ color: yoyChg > 0 ? 'var(--up)' : 'var(--down)' }}>
                   {yoyChg > 0 ? '▲' : '▼'} {Math.abs(yoyChg).toFixed(1)}% <span style={{ color: 'var(--text-3)' }}>YoY</span>
                 </div>
-                {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {krFmt(yoyVal)}원 ({yoyQ})</div>}
+                {yoyVal != null && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>전년동기 {fmtEokWon(yoyVal)}원 ({yoyQ})</div>}
               </>
             )}
           </div>
@@ -93,17 +94,17 @@ export default function KrTop2Section() {
           <LineChart data={qs} margin={{ top: 16, right: 4, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="q" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickFormatter={v => isEstimated(v) ? `${v}(E)` : v} />
-            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} tickFormatter={krFmt} width={44} />
+            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} tickFormatter={fmtEokWon} width={44} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--data-3)' }} tickFormatter={v => `${v}%`} width={36} />
             <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', fontSize: 12 }}
-                     formatter={(v, n) => n === '삼성+하이닉스 비중' ? [`${v?.toFixed(1)}%`, n] : [v != null ? `${krFmt(v)}원` : '-', n]} />
+                     formatter={(v, n) => n === '삼성+하이닉스 비중' ? [`${v?.toFixed(1)}%`, n] : [v != null ? `${fmtEokWon(v)}원` : '-', n]} />
             <Legend content={<GlossaryRechartsLegend />} />
             <Line yAxisId="left" type="monotone" dataKey="top2_act" name="삼성+하이닉스" stroke="var(--data-2)" dot={{ r: 3 }} strokeWidth={2} connectNulls={false}>
-              <LabelList dataKey="top2_act" position="top" style={{ fontSize: 9, fill: 'var(--data-2)' }} formatter={krFmt} />
+              <LabelList dataKey="top2_act" position="top" style={{ fontSize: 9, fill: 'var(--data-2)' }} formatter={fmtEokWon} />
             </Line>
             <Line yAxisId="left" type="monotone" dataKey="top2_est" name="삼성+하이닉스 (E)" stroke="var(--data-2)" dot={{ r: 3 }} strokeWidth={1.5} strokeDasharray="5 3" connectNulls={false} legendType="none" />
             <Line yAxisId="left" type="monotone" dataKey="rest" name="KOSPI 나머지 전체" stroke="var(--data-5)" dot={{ r: 3 }} strokeWidth={2}>
-              <LabelList dataKey="rest" position="bottom" style={{ fontSize: 9, fill: 'var(--data-5)' }} formatter={krFmt} />
+              <LabelList dataKey="rest" position="bottom" style={{ fontSize: 9, fill: 'var(--data-5)' }} formatter={fmtEokWon} />
             </Line>
             <Line yAxisId="right" type="monotone" dataKey="top2share" name="삼성+하이닉스 비중" stroke="var(--data-3)" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
           </LineChart>

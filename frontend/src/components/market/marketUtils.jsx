@@ -3,12 +3,6 @@ import useReveal from '../../hooks/useReveal'
 import { SketchEmpty, SketchError, SketchUnderline } from '../sketches'
 import './Market.css'
 
-export const krFmt = v => {
-  if (v == null) return '-'
-  if (Math.abs(v) >= 10000) return `${(v / 10000).toFixed(1)}조`
-  return `${Math.round(v).toLocaleString()}억`
-}
-
 export const isEstimated = q => {
   if (!q) return false
   const [y, qn] = q.split('Q')

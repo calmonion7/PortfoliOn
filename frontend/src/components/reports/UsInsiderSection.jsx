@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api'
 import { SectionTitle } from './reportUtils.jsx'
+import { fmtSharesUs } from '../../utils'
 
 // US 종목 내부자 거래 (SEC Form4). 기술·수급 탭 US 브랜치.
 // GET /api/report/{ticker}/us-insider →
@@ -17,16 +18,6 @@ function fmtDate(s) {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}.${m}.${day}`
-}
-
-// K/M/B 축약 주수 (UsSupplySection 동일 패턴)
-function fmtShares(n) {
-  if (n == null) return '—'
-  const v = Number(n)
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`
-  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`
-  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`
-  return v.toLocaleString()
 }
 
 // 달러 금액 축약
@@ -97,7 +88,7 @@ export default function UsInsiderSection({ ticker, market }) {
               <div style={STAT}>
                 <span style={STAT_LABEL}>순 주식수</span>
                 <span style={{ ...STAT_VAL, color: netColor }}>
-                  {net.net_shares > 0 ? '+' : ''}{fmtShares(net.net_shares)}
+                  {net.net_shares > 0 ? '+' : ''}{fmtSharesUs(net.net_shares)}
                 </span>
               </div>
             )}
@@ -116,7 +107,7 @@ export default function UsInsiderSection({ ticker, market }) {
             {net.total_held != null && (
               <div style={STAT}>
                 <span style={STAT_LABEL}>내부자 총 보유</span>
-                <span style={STAT_VAL}>{fmtShares(net.total_held)}</span>
+                <span style={STAT_VAL}>{fmtSharesUs(net.total_held)}</span>
               </div>
             )}
           </div>
@@ -145,7 +136,7 @@ export default function UsInsiderSection({ ticker, market }) {
                     <td style={TDL}>{t.insider || '—'}</td>
                     <td style={{ ...TDL, color: 'var(--text-3)', fontSize: 11 }}>{t.position || '—'}</td>
                     <td style={{ ...TD, color: txColor(t.transaction), fontWeight: 600 }}>{t.transaction || '—'}</td>
-                    <td style={TD}>{fmtShares(t.shares)}</td>
+                    <td style={TD}>{fmtSharesUs(t.shares)}</td>
                     <td style={TD}>{fmtValue(t.value)}</td>
                     <td style={{ ...TD, color: 'var(--text-3)' }}>{fmtDate(t.start_date)}</td>
                   </tr>

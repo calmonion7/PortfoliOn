@@ -7,6 +7,7 @@ import { WatchlistBtn } from './GuruStats'
 import { useToast } from '../components/Toast'
 import useTrackedStocks from '../hooks/useTrackedStocks'
 import '../components/ui/Button.css'
+import { fmtUsdCompact } from '../utils'
 
 // 포트폴리오 규모(13F 신고 자산) 상위 N명 코호트 — 스코프가 곧 집계 범위다(더 이상 표시
 // 줄 수만 자르는 필이 아니다, task#247). 스코프별로 백엔드에 별도 요청(`?top=`)해 코호트
@@ -21,13 +22,6 @@ const SCOPES = [
 const scopeUrl = (key) => key === 'all'
   ? '/api/guru/stats/allocation'
   : `/api/guru/stats/allocation?top=${key}`
-
-const fmtUsd = (v) => {
-  if (!v || v <= 0) return '—'
-  if (v >= 1e9) return `$${(v / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}B`
-  if (v >= 1e6) return `$${Math.round(v / 1e6)}M`
-  return `$${Math.round(v / 1e3)}K`
-}
 
 // 데이터 기준 설명란(task#247 S3) 전용 포맷터 — 응답의 periods/last_updated를 그대로 문장화.
 const fmtPeriods = (periods) => {
@@ -151,7 +145,7 @@ export default function GuruAllocation() {
           {' · '}
           <span>{data.ticker_count.toLocaleString()}종목</span>
           {' · '}
-          <span>합계 {fmtUsd(data.total_value)}</span>
+          <span>합계 {fmtUsdCompact(data.total_value)}</span>
         </p>
         <button className="filter-chip" aria-expanded={infoOpen} onClick={() => setInfoOpen(o => !o)}>
           {infoOpen ? '접기' : '데이터 기준'}
@@ -179,7 +173,7 @@ export default function GuruAllocation() {
           <div>
             <p className="guru-alloc-info-title">이 화면이 세는 범위</p>
             <p>탑N — 표시 줄 수가 아니라 13F 신고 자산 상위 N명 구루 합산. {coverageSentence(data)}</p>
-            <p>비율 — 분모는 코호트 총액 {fmtUsd(data.total_value)}. 필을 바꾸면 같은 종목의 비율도 변한다.</p>
+            <p>비율 — 분모는 코호트 총액 {fmtUsdCompact(data.total_value)}. 필을 바꾸면 같은 종목의 비율도 변한다.</p>
             <p>보유 구루 수 — 코호트 안에서 든 수(전체 기준이 아니다).</p>
           </div>
           <div>
@@ -222,7 +216,7 @@ export default function GuruAllocation() {
               <div className="guru-stat-main">
                 <div className="guru-stat-head">
                   <span className="guru-stat-ticker">{r.ticker}</span>
-                  <span className="guru-stat-value">{fmtUsd(r.value)}</span>
+                  <span className="guru-stat-value">{fmtUsdCompact(r.value)}</span>
                 </div>
                 {/* 잘리는 건 이름이어야 한다 — 숫자를 한 문자열에 섞으면 ellipsis가 문자열
                     *끝*을 먹어 비율·명수가 통째 사라진다(라이브 PC에서 50행 중 38행 발생). */}

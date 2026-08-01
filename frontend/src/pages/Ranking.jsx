@@ -5,7 +5,7 @@ import Card from '../components/ui/Card'
 import { ChangeBadge, MarketBadge } from '../components/ui/Badge'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Skeleton from '../components/ui/Skeleton'
-import { krFmt } from '../components/market/marketUtils.jsx'
+import { fmtPrice, fmtEokWon } from '../utils'
 import { useToast } from '../components/Toast'
 import { trackEvent } from '../utils/analytics'
 import ReportDetailTabs from '../components/reports/ReportDetailTabs'
@@ -18,12 +18,6 @@ const LIMIT = 20
 const MARKETS = [['KR', '🇰🇷 국내'], ['US', '🇺🇸 해외']]
 const METRICS = [['value', '거래대금'], ['volume', '거래량'], ['change', '등락률'], ['supply', '수급']]
 const TYPES = [['all', '전체'], ['stock', '주식만'], ['etf', 'ETF']]
-
-const fmtPrice = (v, market) => {
-  if (v == null) return '-'
-  if (market === 'KR') return `₩${Number(v).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`
-  return `$${Number(v).toFixed(2)}`
-}
 
 const fmtChange = (v) => {
   if (v == null) return <span style={{ color: 'var(--text-3)' }}>-</span>
@@ -44,7 +38,7 @@ const fmtNet = (v) => {
 
 const fmtTradingValue = (v, market) => {
   if (v == null) return '-'
-  if (market === 'KR') return krFmt(v / 1e8)  // KRW → 억 단위로 변환 후 krFmt(억/조)
+  if (market === 'KR') return fmtEokWon(v / 1e8)  // KRW → 억 단위로 변환 후 억/조 표기
   return `$${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 }
 
