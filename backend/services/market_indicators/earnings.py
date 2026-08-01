@@ -215,7 +215,14 @@ def _fetch_and_save_m7_earnings() -> dict:
         logger.warning(f"[Earnings] M7 자체 fetch 불완전({m7_ok}/{len(M7)}) — 저장 생략, 저장값 유지")
         stored = _mc_load("m7_earnings")
         return stored["data"] if stored else {"quarters": [], "unit": "십억달러"}
-    if rest and rest_ok / len(rest) < _REST_MIN_COVERAGE:
+    # ⚠️ `if rest and ...`의 단락평가는 rest가 비면 커버리지 가드를 통째로 건너뛴다(BH7-L5).
+    #    그 뒤 _merge_quarters([]) → {} → rest_by_q.get(q, 0)이 전 분기 rest를 0으로 채워
+    #    8분기 blob을 치환한다 — 유니버스 공백을 별도 가드로 먼저 막는다.
+    if not rest:
+        logger.warning("[Earnings] M7 rest 유니버스 공백 — 저장 생략, 저장값 유지")
+        stored = _mc_load("m7_earnings")
+        return stored["data"] if stored else {"quarters": [], "unit": "십억달러"}
+    if rest_ok / len(rest) < _REST_MIN_COVERAGE:
         logger.warning(f"[Earnings] M7 rest 성공률 미달({rest_ok}/{len(rest)}) — 저장 생략, 저장값 유지")
         stored = _mc_load("m7_earnings")
         return stored["data"] if stored else {"quarters": [], "unit": "십억달러"}
@@ -254,7 +261,12 @@ def _fetch_and_save_kr_top2_earnings() -> dict:
         logger.warning(f"[Earnings] KR Top2 자체 fetch 불완전({top2_ok}/{len(KR_TOP2)}) — 저장 생략, 저장값 유지")
         stored = _mc_load("kr_top2_earnings")
         return stored["data"] if stored else {"quarters": [], "unit": "억원"}
-    if rest and rest_ok / len(rest) < _REST_MIN_COVERAGE:
+    # M7과 동일한 단락평가 함정(BH7-L5).
+    if not rest:
+        logger.warning("[Earnings] KR Top2 rest 유니버스 공백 — 저장 생략, 저장값 유지")
+        stored = _mc_load("kr_top2_earnings")
+        return stored["data"] if stored else {"quarters": [], "unit": "억원"}
+    if rest_ok / len(rest) < _REST_MIN_COVERAGE:
         logger.warning(f"[Earnings] KR Top2 rest 성공률 미달({rest_ok}/{len(rest)}) — 저장 생략, 저장값 유지")
         stored = _mc_load("kr_top2_earnings")
         return stored["data"] if stored else {"quarters": [], "unit": "억원"}

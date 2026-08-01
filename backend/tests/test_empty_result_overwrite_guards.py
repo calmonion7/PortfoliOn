@@ -220,7 +220,9 @@ def test_m7_earnings_returns_stored_and_skips_save_on_empty(monkeypatch):
 
 def test_m7_earnings_saves_on_success(monkeypatch):
     from services.market_indicators import earnings as mod
-    monkeypatch.setattr(mod, "_get_sp500_tickers", lambda: [])
+    # rest 유니버스는 비면 안 된다 — 빈 리스트는 이제 "저장 생략"의 정당한 사유다(BH7-L5).
+    # 이 테스트의 의도는 "정상 성공 → 저장"이므로 실제 rest 종목을 준다.
+    monkeypatch.setattr(mod, "_get_sp500_tickers", lambda: ["AAA"])
     monkeypatch.setattr(mod, "_get_yf_quarterly_net_income", lambda t: {"2026Q1": 1.0})
     monkeypatch.setattr(mod, "_mc_load", lambda key: None)
     with patch.object(mod, "_mc_save") as mock_save:
@@ -242,7 +244,7 @@ def test_kr_top2_earnings_returns_stored_and_skips_save_on_empty(monkeypatch):
 
 def test_kr_top2_earnings_saves_on_success(monkeypatch):
     from services.market_indicators import earnings as mod
-    monkeypatch.setattr(mod, "_get_kospi_tickers", lambda: [])
+    monkeypatch.setattr(mod, "_get_kospi_tickers", lambda: ["000001"])
     monkeypatch.setattr(mod, "_get_naver_quarterly_net_income", lambda t: {"2025Q1": 1.0})
     monkeypatch.setattr(mod, "_mc_load", lambda key: None)
     with patch.object(mod, "_mc_save") as mock_save:
@@ -461,3 +463,83 @@ def test_save_guru_managers_drops_retired_from_roster_BH7_H1():
     assert stats["dropped"] == 1
     ids = [m["id"] for m in _saved_payload(mock_exec)["managers"]]
     assert ids == ["a"]   # 'gone'은 드롭, 'b'는 저장값도 없으니 그냥 없음
+
+
+# ══ 7차 버그헌트 — 도달하지 못하는 가드 2건 (BH7-L1 · BH7-L5) ═══════════════════
+
+def _hist(v):
+    return [{"date": "2026-07-30", "value": v}, {"date": "2026-07-31", "value": v}]
+
+
+def test_get_treasury_all_fetch_fail_skips_save_with_stored_histories_BH7_L1(monkeypatch):
+    """BH7-L1 — 전량실패 판정이 개별 백필 **뒤**에 있으면, 정상 운영 중(=저장 히스토리가
+    차 있음)에는 백필이 rates를 채워 `if not rates:`가 **영영 발동하지 않는다**. 경고는
+    안 찍히고 _mc_save가 그대로 돌아 fetched_at만 갱신된다.
+
+    기존 테스트는 `_raw_histories`를 빈 {}로 둬서 이 결함을 은폐한다(백필할 게 없으니
+    가드가 발동한다) — 그래서 이 테스트는 반드시 **채워진** fixture를 쓴다.
+    """
+    from services.market_indicators import commodities as mod
+    stored = {"rates": {k: {"current": 4.2, "change_bp": 1.0} for k in ("3m", "2y", "10y", "30y")},
+              "history": {}, "spread": [],
+              "_raw_histories": {k: _hist(4.2) for k in ("3m", "2y", "10y", "30y")}}
+    _no_memcache(monkeypatch, mod)
+    monkeypatch.setattr(mod, "_mc_load", lambda key: {"data": stored, "fetched_at": None})
+    monkeypatch.setattr(mod, "_fetch_treasury", lambda args: (args[0], None))   # 전 만기 실패
+    with patch.object(mod, "_mc_save") as mock_save, caplog_at_warning() as records:
+        assert mod.get_treasury() == stored
+        mock_save.assert_not_called()
+    assert any("전 만기 fetch 실패" in r.message for r in records)
+
+
+import contextlib
+
+
+@contextlib.contextmanager
+def caplog_at_warning():
+    """caplog fixture 없이 WARNING 레코드를 모으는 최소 헬퍼(이 파일의 다른 테스트는
+    caplog fixture를 쓰지만 여기선 patch 컨텍스트와 함께 써야 해 순서가 꼬인다)."""
+    records = []
+
+    class _H(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    h = _H(level=logging.WARNING)
+    root = logging.getLogger()
+    root.addHandler(h)
+    prev = root.level
+    root.setLevel(logging.WARNING)
+    try:
+        yield records
+    finally:
+        root.removeHandler(h)
+        root.setLevel(prev)
+
+
+def test_m7_earnings_empty_universe_skips_save_BH7_L5(monkeypatch):
+    """BH7-L5 — `if rest and rest_ok/len(rest) < _REST_MIN_COVERAGE`는 rest가 빈 리스트면
+    **and 단락평가로 가드 전체를 건너뛴다**. 그 뒤 _merge_quarters([]) → {} → get(q, 0)이
+    전 분기 rest를 0으로 채워 8분기 blob을 치환한다 — 6차 H1이 막으려던 실패 모드가
+    '유니버스 공백' 경로로 되살아난다. M7 자체는 성공시켜 그 가드를 통과시킨다."""
+    from services.market_indicators import earnings as mod
+    stored = {"quarters": [{"q": "2026Q1", "m7": 1.0, "rest": 900.0}], "unit": "십억달러"}
+    monkeypatch.setattr(mod, "_get_sp500_tickers", lambda: [])          # 유니버스 공백
+    monkeypatch.setattr(mod, "_get_yf_quarterly_net_income", lambda t: {"2026Q1": 1.0})
+    monkeypatch.setattr(mod, "_mc_load", lambda key: {"data": stored, "fetched_at": None})
+    with patch.object(mod, "_mc_save") as mock_save:
+        assert mod._fetch_and_save_m7_earnings() == stored
+        mock_save.assert_not_called()
+
+
+def test_kr_top2_earnings_empty_universe_skips_save_BH7_L5(monkeypatch):
+    """BH7-L5 — KR Top2도 같은 단락평가 구조(`:257`)."""
+    from services.market_indicators import earnings as mod
+    stored = {"quarters": [{"q": "2026Q1", "top2": 1.0, "rest": 900.0, "estimated": False}],
+              "unit": "억원"}
+    monkeypatch.setattr(mod, "_get_kospi_tickers", lambda: [])
+    monkeypatch.setattr(mod, "_get_naver_quarterly_net_income", lambda t: {"2025Q1": 1.0})
+    monkeypatch.setattr(mod, "_mc_load", lambda key: {"data": stored, "fetched_at": None})
+    with patch.object(mod, "_mc_save") as mock_save:
+        assert mod._fetch_and_save_kr_top2_earnings() == stored
+        mock_save.assert_not_called()

@@ -97,6 +97,15 @@ def get_treasury() -> dict:
             [(k, sym, stored_raw.get(k, [])) for k, sym in _TREASURY_SYMBOLS.items()]
         ))
 
+    # ⚠️ 전량실패 판정은 백필 **앞**이고, 판정 대상은 백필 후 `rates`가 아니라 **raw fetch 결과**다
+    #    (BH7-L1). 뒤에 두면 정상 운영 중엔 _raw_histories가 차 있어 백필이 rates를 채우므로
+    #    이 분기가 영영 발동하지 않고, 경고 없이 _mc_save가 돌아 fetched_at만 갱신된다.
+    #    형제 get_commodities()가 같은 커밋에서 이미 이 순서로 짜여 있다(:49-51).
+    if not any(results.values()):
+        logger.warning("[Treasury] 전 만기 fetch 실패 — 저장 생략, 저장값 반환")
+        return stored["data"] if stored else {"rates": {}, "history": {}, "spread": [], "_raw_histories": {}}
+
+    # 개별 백필 — 10y만 실패해도 그 만기의 직전 current·history를 채워 전체 blob 소멸을 막는다.
     for k, stored_h in stored_raw.items():
         if results.get(k) is None and stored_h:
             last = stored_h[-1]["value"]
@@ -105,9 +114,6 @@ def get_treasury() -> dict:
 
     rates = {k: {"current": v["current"], "change_bp": v["change_bp"]}
              for k, v in results.items() if v}
-    if not rates:
-        logger.warning("[Treasury] 전 만기 fetch 실패 — 저장 생략, 저장값 반환")
-        return stored["data"] if stored else {"rates": {}, "history": {}, "spread": [], "_raw_histories": {}}
 
     history = {k: v["history"] for k, v in results.items() if v and k in ("3m", "10y")}
 
