@@ -75,7 +75,9 @@ def start_crawl(background_tasks: BackgroundTasks, _: str = Depends(require_admi
         raise HTTPException(status_code=409, detail="Crawl already running")
     # BackgroundTasks는 응답 *후* 실행되므로, 리셋을 _run_crawl에만 두면 POST 직후~배치 시작
     # 사이에 폴러가 직전 실행의 result와 running=False를 읽어 즉시 완료로 오판한다.
-    _progress.set(running=True, done=0, total=0, current="", result=None)
+    # fresh/stale도 같은 이유로 여기서 함께 비운다 — 안 하면 폴러가 직전 크롤의 건수를
+    # 이번 실행의 것으로 표시한다(BH7-H1).
+    _progress.set(running=True, done=0, total=0, current="", result=None, fresh=None, stale=None)
     background_tasks.add_task(_run_crawl)
     return {"message": "Crawl started"}
 
@@ -85,15 +87,24 @@ def _run_crawl():
         _progress.set(running=True, done=done, total=total, current=current)
 
     with job_runs.record("guru_crawl", "manual"):
-        _progress.set(running=True, result=None)
+        _progress.set(running=True, result=None, fresh=None, stale=None)
         result = "failed"
         try:
-            managers = scrape_all_managers(on_progress=on_progress)
-            if storage.save_guru_managers({
+            managers, roster = scrape_all_managers(on_progress=on_progress)
+            stats = storage.save_guru_managers({
                 "last_updated": datetime.now().isoformat(timespec="seconds"),
                 "managers": managers,
-            }):
-                result = "saved"
+                "roster": roster,
+            })
+            if stats["saved"]:
+                # 부분 성공을 'saved'(초록)로 뭉뚱그리면 화면이 데이터 절반 소실을 성공으로
+                # 단언한다 — 직전값으로 백필된 매니저가 하나라도 있으면 'partial'이다(BH7-H1).
+                result = "partial" if stats["stale"] else "saved"
+                _progress.set(fresh=stats["fresh"], stale=stats["stale"])
+                if stats["stale"]:
+                    logger.warning(
+                        f"[Guru] 부분 크롤 — 갱신 {stats['fresh']} · 직전값 유지 {stats['stale']} (manual)"
+                    )
             else:
                 result = "skipped"
                 logger.warning("[Guru] 빈 결과 — 저장 생략, 직전값 유지 (manual)")

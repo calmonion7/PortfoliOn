@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 from services.guru_scraper import (
     scrape_holdings,
     scrape_activity,
+    scrape_all_managers,
     _enrich_activity,
     _parse_activity,
     _parse_period,
@@ -302,3 +303,31 @@ def test_enrich_activity_skips_when_period_unknown():
     with patch("services.guru_scraper.requests.get", return_value=_resp(html)):
         assert _enrich_activity("X", details) == []
     assert "port_pct" not in details["holdings"][0]["activity"]
+
+
+# ── BH7-H1: 부분 크롤이 나머지 매니저를 지우지 않으려면 명부가 필요하다 ────────────────
+# 반환이 "성공분"뿐이면 호출부는 빠진 매니저가 *실패해서* 빠진 건지 *명부에서 사라져서*
+# 빠진 건지 원리적으로 구별할 수 없고, 그래서 백필도 드롭도 못 한다.
+
+def _ok_details():
+    return {"firm": "F", "portfolio_value": 1, "period": "Q1 2026",
+            "portfolio_date": "2026-03-31", "num_stocks": 1, "top10": [], "holdings": []}
+
+
+def test_scrape_all_managers_returns_roster_alongside_successes_BH7_H1():
+    """BH7-H1 — 3명 명부 중 1명이 실패해도 (성공 2건, 명부 3건)을 반환한다."""
+    roster = [{"id": "a", "name": "A"}, {"id": "b", "name": "B"}, {"id": "c", "name": "C"}]
+
+    def _holdings(mid):
+        if mid == "b":
+            raise RuntimeError("dataroma 500")
+        return _ok_details()
+
+    with patch("services.guru_scraper.scrape_manager_ids", return_value=roster), \
+         patch("services.guru_scraper.scrape_holdings", side_effect=_holdings), \
+         patch("services.guru_scraper._enrich_activity", return_value=[]), \
+         patch("services.guru_scraper.time.sleep"):
+        managers, returned_roster = scrape_all_managers()
+
+    assert [m["id"] for m in managers] == ["a", "c"]
+    assert [r["id"] for r in returned_roster] == ["a", "b", "c"]

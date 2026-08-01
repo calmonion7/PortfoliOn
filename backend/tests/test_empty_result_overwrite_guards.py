@@ -10,23 +10,28 @@ import logging
 
 # ─────────────────────────── S1. 구루 매니저 ───────────────────────────
 
+# task#267(BH7-H1) 이후 save_guru_managers는 dict를 반환하고 저장 전에 직전값을 read한다
+# (부분 실패 백필). 그래서 이 절의 테스트는 반환을 ["saved"]로 보고 get_guru_managers를 목킹한다.
+
 def test_save_guru_managers_skips_execute_on_empty():
     from services.storage.schedule import save_guru_managers
     with patch("services.storage.schedule.execute") as mock_exec:
-        assert save_guru_managers({"last_updated": "x", "managers": []}) is False
+        assert save_guru_managers({"last_updated": "x", "managers": []})["saved"] is False
         mock_exec.assert_not_called()
 
 
 def test_save_guru_managers_writes_when_present():
     from services.storage.schedule import save_guru_managers
-    with patch("services.storage.schedule.execute") as mock_exec:
-        assert save_guru_managers({"last_updated": "x", "managers": [{"id": "1"}]}) is True
+    with patch("services.storage.schedule.execute") as mock_exec, \
+         patch("services.storage.schedule.get_guru_managers",
+               return_value={"last_updated": None, "managers": []}):
+        assert save_guru_managers({"last_updated": "x", "managers": [{"id": "1"}]})["saved"] is True
         assert mock_exec.call_count == 1
 
 
 def test_run_crawl_warns_and_keeps_previous_on_empty(caplog, monkeypatch):
     import routers.guru as guru
-    monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: [])
+    monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: ([], [{"id": "1"}]))
     with patch("services.storage.schedule.execute") as mock_exec:
         with caplog.at_level(logging.WARNING):
             guru._run_crawl()
@@ -36,7 +41,8 @@ def test_run_crawl_warns_and_keeps_previous_on_empty(caplog, monkeypatch):
 
 def test_scheduler_guru_crawl_warns_and_keeps_previous_on_empty(caplog, monkeypatch):
     from scheduler import jobs
-    monkeypatch.setattr("services.guru_scraper.scrape_all_managers", lambda *a, **k: [])
+    monkeypatch.setattr("services.guru_scraper.scrape_all_managers",
+                        lambda *a, **k: ([], [{"id": "1"}]))
     with patch("services.storage.schedule.execute") as mock_exec:
         with caplog.at_level(logging.WARNING):
             jobs._run_guru_crawl()
@@ -393,3 +399,65 @@ def test_kr_top2_earnings_skips_save_when_top2_itself_partially_fails(caplog, mo
         mock_save.assert_not_called()
     assert any(f"KR Top2 성공 {len(mod.KR_TOP2) - 1}/{len(mod.KR_TOP2)}" in r.message
                for r in caplog.records)
+
+
+# ── BH7-H1: 부분 크롤은 실패분을 직전값으로 백필한다 ──────────────────────────────
+# 매니저는 서로 합산되지 않는 **독립 항목**이라 처방은 커버리지 임계가 아니라 개별 백필이다
+# (CLAUDE.md ⭐가드 ③ⓒ). 임계를 쓰면 성공한 40명까지 함께 버리게 된다.
+
+def _mgr(mid):
+    return {"id": mid, "name": f"M{mid}", "holdings": [{"ticker": f"T{mid}"}]}
+
+
+def _saved_payload(mock_exec):
+    import json
+    return json.loads(mock_exec.call_args[0][1][0])
+
+
+def test_save_guru_managers_backfills_failed_from_stored_BH7_H1():
+    """BH7-H1 — 83명 명부 중 40명만 성공해도 나머지 43명의 직전 데이터가 살아남는다."""
+    from services.storage.schedule import save_guru_managers
+    roster = [{"id": str(i)} for i in range(83)]
+    stored = {"last_updated": "old", "managers": [_mgr(str(i)) for i in range(83)]}
+    fresh = [dict(_mgr(str(i)), name="NEW") for i in range(40)]
+
+    with patch("services.storage.schedule.execute") as mock_exec, \
+         patch("services.storage.schedule.get_guru_managers", return_value=stored):
+        stats = save_guru_managers({"last_updated": "new", "managers": fresh, "roster": roster})
+
+    assert stats == {"saved": True, "fresh": 40, "stale": 43, "dropped": 0}
+    payload = _saved_payload(mock_exec)
+    assert len(payload["managers"]) == 83
+    by_id = {m["id"]: m for m in payload["managers"]}
+    assert by_id["0"]["name"] == "NEW"      # 성공분은 갱신
+    assert by_id["50"]["name"] == "M50"     # 실패분은 직전값 보존
+    assert "roster" not in payload          # 저장 blob 형태는 그대로
+
+
+def test_save_guru_managers_all_fail_skips_write_BH7_H1():
+    """BH7-H1 — 전량 실패 판정은 백필 *앞*에 있어야 한다. 뒤에 있으면 백필이 목록을
+    채워 판정이 영영 발동하지 않는다(BH7-L1이 get_treasury에서 정확히 그렇게 죽어 있다)."""
+    from services.storage.schedule import save_guru_managers
+    stored = {"last_updated": "old", "managers": [_mgr("1")]}
+
+    with patch("services.storage.schedule.execute") as mock_exec, \
+         patch("services.storage.schedule.get_guru_managers", return_value=stored):
+        stats = save_guru_managers({"last_updated": "new", "managers": [], "roster": [{"id": "1"}]})
+
+    mock_exec.assert_not_called()
+    assert stats["saved"] is False
+
+
+def test_save_guru_managers_drops_retired_from_roster_BH7_H1():
+    """BH7-H1 — 명부에서 사라진 매니저는 백필하지 않는다(영구 잔존 방지)."""
+    from services.storage.schedule import save_guru_managers
+    stored = {"last_updated": "old", "managers": [_mgr("a"), _mgr("gone")]}
+
+    with patch("services.storage.schedule.execute") as mock_exec, \
+         patch("services.storage.schedule.get_guru_managers", return_value=stored):
+        stats = save_guru_managers({"last_updated": "new", "managers": [_mgr("a")],
+                                    "roster": [{"id": "a"}, {"id": "b"}]})
+
+    assert stats["dropped"] == 1
+    ids = [m["id"] for m in _saved_payload(mock_exec)["managers"]]
+    assert ids == ["a"]   # 'gone'은 드롭, 'b'는 저장값도 없으니 그냥 없음

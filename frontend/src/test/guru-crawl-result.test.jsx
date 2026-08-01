@@ -40,12 +40,26 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('GuruCrawlNow 크롤 결과 표시', () => {
-  it('saved면 초록 완료 문구를 띄운다', async () => {
-    stubProgress({ running: false, done: 83, total: 83, current: '', result: 'saved' })
+  it('saved면 초록 완료 문구를 띄운다 (BH7-H1: 숫자는 done이 아니라 fresh)', async () => {
+    // done=99는 함정 — 옛 배선은 시도 총계인 done을 표시했다. fresh(실제 갱신 건수)를 써야 한다.
+    stubProgress({ running: false, done: 99, total: 99, current: '', result: 'saved', fresh: 83, stale: 0 })
     await clickCrawlAndPoll()
     const msg = await screen.findByTestId('crawl-msg')
-    expect(msg).toHaveTextContent('완료: 83명 매니저 데이터 수집됨')
+    expect(msg).toHaveTextContent('완료: 83명 갱신됨')
+    expect(msg).not.toHaveTextContent('99')
     expect(msg).toHaveStyle({ color: 'var(--color-success)' })
+  })
+
+  it('BH7-H1 — 부분 성공은 초록이 아니고, 갱신·유지 건수를 둘 다 밝힌다', async () => {
+    // 옛 배선: result='saved' 초록 + "완료: 83명 매니저 데이터 수집됨"(= 시도 총계).
+    // 40명만 저장됐는데 화면이 83을 초록으로 단언하던 것이 결함의 절반이었다.
+    stubProgress({ running: false, done: 83, total: 83, current: '', result: 'partial', fresh: 40, stale: 43 })
+    await clickCrawlAndPoll()
+    const msg = await screen.findByTestId('crawl-msg')
+    expect(msg).toHaveTextContent('40')
+    expect(msg).toHaveTextContent('43')
+    expect(msg).not.toHaveTextContent('83')
+    expect(msg).not.toHaveStyle({ color: 'var(--color-success)' })
   })
 
   it('skipped면 초록이 아니라 경고로 "직전 데이터 유지"를 알린다', async () => {

@@ -56,14 +56,22 @@ def _run_guru_crawl():
     from datetime import datetime
     with job_runs.record("guru_crawl", "auto"):
         try:
-            managers = scrape_all_managers()
-            if storage.save_guru_managers({
+            managers, roster = scrape_all_managers()
+            stats = storage.save_guru_managers({
                 "last_updated": datetime.now().isoformat(timespec="seconds"),
                 "managers": managers,
-            }):
-                logger.info("[Scheduler] Guru crawl completed")
-            else:
+                "roster": roster,
+            })
+            if not stats["saved"]:
                 logger.warning("[Scheduler] Guru 빈 결과 — 저장 생략, 직전값 유지")
+            elif stats["stale"]:
+                # 부분 실패는 이 크롤의 기대되는 모드다. "completed"로 뭉뚱그리면 로그만 보는
+                # 운영자가 절반 소실을 알 수 없다(BH7-H1).
+                logger.warning(
+                    f"[Scheduler] Guru 부분 크롤 — 갱신 {stats['fresh']} · 직전값 유지 {stats['stale']}"
+                )
+            else:
+                logger.info(f"[Scheduler] Guru crawl completed ({stats['fresh']}명)")
         except Exception as e:
             logger.warning(f"[Scheduler] Guru crawl failed: {e}")
 

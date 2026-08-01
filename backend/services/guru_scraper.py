@@ -368,8 +368,14 @@ def _enrich_activity(manager_id: str, details: dict) -> list[dict]:
     ]
 
 
-def scrape_all_managers(on_progress=None) -> list[dict]:
-    """전체 매니저 크롤링. on_progress(done, total, current_name) 콜백 선택."""
+def scrape_all_managers(on_progress=None) -> tuple[list[dict], list[dict]]:
+    """전체 매니저 크롤링. on_progress(done, total, current_name) 콜백 선택.
+
+    반환 = **(성공한 매니저, 명부)**. 명부를 함께 돌려주는 이유(BH7-H1): 성공분만 반환하면
+    호출부가 빠진 매니저를 *실패해서* 빠진 건지 *명부에서 사라져서* 빠진 건지 구별할 수 없어
+    백필도 드롭도 못 한다. `scrape_manager_ids()`가 실패하면 예외가 그대로 전파되므로,
+    이 아래로 내려왔다면 명부는 항상 신뢰할 수 있다 — 그게 백필을 안전하게 만드는 전제다.
+    """
     manager_ids = scrape_manager_ids()
     total = len(manager_ids)
     result = []
@@ -406,4 +412,4 @@ def scrape_all_managers(on_progress=None) -> list[dict]:
         on_progress(total, total, "")
     # 수집 성공률 — 부분 실패(83명 중 일부만 성공) 관측용. 두 호출부(배치·수동)가 공유.
     logger.info(f"[Guru] 수집 {len(result)}/{total}")
-    return result
+    return result, manager_ids

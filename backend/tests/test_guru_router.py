@@ -145,7 +145,7 @@ def test_crawl_progress_initial():
 
 
 def test_start_crawl_returns_202():
-    with patch("routers.guru.scrape_all_managers", return_value=[]):
+    with patch("routers.guru.scrape_all_managers", return_value=([], [])):
         with patch("routers.guru.storage.save_guru_managers"):
             r = client.post("/api/guru/crawl")
     assert r.status_code == 202
@@ -156,8 +156,11 @@ def test_start_crawl_returns_202():
 
 def _run_crawl_and_get_result(monkeypatch, *, managers, saved):
     import routers.guru as guru
-    monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: managers)
-    monkeypatch.setattr(guru.storage, "save_guru_managers", lambda payload: saved)
+    roster = [{"id": m["id"]} for m in managers] or [{"id": "x"}]
+    monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: (managers, roster))
+    monkeypatch.setattr(guru.storage, "save_guru_managers",
+                        lambda payload: {"saved": saved, "fresh": len(managers),
+                                         "stale": 0, "dropped": 0})
     guru._run_crawl()
     return guru._progress.get()
 
@@ -215,3 +218,54 @@ def test_crawl_blocked_for_non_admin():
     with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
         r = _nonadmin_guru_client.post("/api/guru/crawl")
     assert r.status_code == 403
+
+
+# ── BH7-H1: 부분 크롤을 초록 "완료"와 구분하고, 숫자는 실제 갱신 건수를 싣는다 ────────
+# 이전에는 부분 성공도 result="saved"(초록)였고, 프론트가 쓰는 done은 성공 수가 아니라
+# 루프 종료 시 on_progress(total, total, "")가 세팅한 **시도 총계**였다.
+
+def _crawl_with(monkeypatch, *, managers, roster, stats):
+    import routers.guru as guru
+    monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: (managers, roster))
+    monkeypatch.setattr(guru.storage, "save_guru_managers", lambda payload: stats)
+    guru._run_crawl()
+    return guru._progress.get()
+
+
+def test_run_crawl_reports_partial_with_real_counts_BH7_H1(monkeypatch):
+    """BH7-H1 — 83명 중 40명 성공은 'saved'가 아니라 'partial'이고, fresh/stale이 실측이다."""
+    state = _crawl_with(
+        monkeypatch,
+        managers=[{"id": str(i)} for i in range(40)],
+        roster=[{"id": str(i)} for i in range(83)],
+        stats={"saved": True, "fresh": 40, "stale": 43, "dropped": 0},
+    )
+    assert state["result"] == "partial"
+    assert state["fresh"] == 40 and state["stale"] == 43
+    assert state["running"] is False
+
+
+def test_run_crawl_reports_saved_only_when_complete_BH7_H1(monkeypatch):
+    """BH7-H1 — 직전값 백필이 하나도 없을 때만 'saved'(초록)."""
+    state = _crawl_with(
+        monkeypatch,
+        managers=[{"id": "a"}], roster=[{"id": "a"}],
+        stats={"saved": True, "fresh": 1, "stale": 0, "dropped": 0},
+    )
+    assert state["result"] == "saved" and state["fresh"] == 1 and state["stale"] == 0
+
+
+def test_start_crawl_resets_stale_counts_before_background_task_BH7_H1(monkeypatch):
+    """BH7-H1 — BackgroundTasks는 응답 *후* 실행이라, fresh/stale을 배치 본문에서만
+    세팅하면 POST 직후 폴러가 **직전 실행의 건수**를 읽는다(task#262 회고가 result에 대해
+    발견한 함정이 신규 필드에 그대로 재현된다). 핸들러가 함께 리셋하는지 못박는다."""
+    import routers.guru as guru
+    guru._progress.set(running=False, done=83, total=83, result="partial", fresh=40, stale=43)
+    captured = {}
+
+    class _NoRunTasks:
+        def add_task(self, fn, *a, **k):
+            captured["state"] = guru._progress.get()
+
+    guru.start_crawl(_NoRunTasks(), "admin-id")
+    assert captured["state"]["fresh"] is None and captured["state"]["stale"] is None

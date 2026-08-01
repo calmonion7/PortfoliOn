@@ -44,8 +44,11 @@ def test_generate_us_records_daily_report_us(spy, monkeypatch):
 
 def test_run_guru_crawl_records(spy, monkeypatch):
     import scheduler
-    monkeypatch.setattr("services.guru_scraper.scrape_all_managers", lambda *a, **k: [])
-    monkeypatch.setattr("services.storage.save_guru_managers", lambda *a, **k: None)
+    # (managers, roster) 계약 + dict 반환 — 옛 mock은 언팩 예외로 실패 경로를 타면서도
+    # "기록됐다"만 보는 이 단언은 통과해, 성공 경로를 검증하지 못했다(task#267).
+    monkeypatch.setattr("services.guru_scraper.scrape_all_managers", lambda *a, **k: ([], []))
+    monkeypatch.setattr("services.storage.save_guru_managers",
+                        lambda *a, **k: {"saved": False, "fresh": 0, "stale": 0, "dropped": 0})
     scheduler._run_guru_crawl()
     assert ("guru_crawl", "auto") in spy
 
@@ -159,8 +162,9 @@ def test_consensus_batch_worker_records(spy, monkeypatch):
 
 def test_guru_crawl_worker_records(spy, monkeypatch):
     import routers.guru as guru
-    monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: [])
-    monkeypatch.setattr(guru.storage, "save_guru_managers", lambda *a, **k: None)
+    monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: ([], []))
+    monkeypatch.setattr(guru.storage, "save_guru_managers",
+                        lambda *a, **k: {"saved": False, "fresh": 0, "stale": 0, "dropped": 0})
     guru._run_crawl()
     assert ("guru_crawl", "manual") in spy
 
