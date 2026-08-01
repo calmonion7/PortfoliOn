@@ -71,19 +71,42 @@ def compute_momentum() -> list[dict]:
     return parallel_map(_fetch_one_sector, kw_sector.KOSPI_SECTORS, max_workers=4)
 
 
+def _is_all_none(s: dict) -> bool:
+    return (s.get("return_1w") is None and s.get("return_1mo") is None
+            and s.get("return_3mo") is None)
+
+
 def refresh() -> list[dict]:
     """배치 본문: 전 업종 모멘텀 + 보유→업종 역인덱스 사전계산 → market_cache 저장.
 
     모든 sector 모멘텀이 None이면(ka20006 빈 종가 박제 케이스) save를 생략해
-    직전 양호값을 보존한다. 계산한 sectors는 그대로 반환(호출부 로깅용).
+    직전 양호값을 보존한다. 일부 업종만 None인 경우(부분 페이로드 — _fetch_one_sector가
+    업종별 독립 예외처리라 자연스러운 결과 형태)는 그 업종만 직전 저장값(같은 code)의
+    수익률로 백필한다 — name은 이번 fetch 값을 유지. 직전값에 그 code가 없으면
+    all-None 그대로 둔다(없는 값을 지어내지 않는다).
 
     역인덱스가 빈 경우(ka20002 전부 실패)엔 직전 index를 보존하고 sectors만 갱신한다 —
     sectors/index는 한 페이로드라 빈 index를 그대로 저장하면 보유→업종 매핑이 소멸한다."""
     sectors = compute_momentum()
-    if all(s.get("return_1w") is None and s.get("return_1mo") is None
-           and s.get("return_3mo") is None for s in sectors):
+    if all(_is_all_none(s) for s in sectors):
         logger.warning("[KrSector] refresh: all-None momentum — skipping save (직전값 유지)")
         return sectors
+    if any(_is_all_none(s) for s in sectors):
+        prev_by_code = {p.get("code"): p for p in load_momentum() if p.get("code")}
+        backfilled = 0
+        filled = []
+        for s in sectors:
+            if _is_all_none(s):
+                prev = prev_by_code.get(s.get("code"))
+                if prev:
+                    s = {**s, "return_1w": prev.get("return_1w"),
+                         "return_1mo": prev.get("return_1mo"),
+                         "return_3mo": prev.get("return_3mo")}
+                    backfilled += 1
+            filled.append(s)
+        sectors = filled
+        if backfilled:
+            logger.info(f"[KrSector] refresh: 업종 {backfilled}개 부분실패 → 직전값 백필")
     index = build_sector_index()
     if not index:
         index = load_sector_index()

@@ -22,6 +22,10 @@ _NAVER_BASE = "https://m.stock.naver.com/api/stock"
 
 M7 = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"]
 KR_TOP2 = ["005930", "000660"]
+# rest(S&P500/KOSPI 나머지 종목) 성공률 하한 — 미달 시 부분 성공을 저장하지 않는다(task#261).
+# m7/top2는 정상인데 rest만 대량 실패하면 union 가드(`if not quarters`)를 통과해
+# rest_by_q.get(q, 0)이 실패분을 0으로 채워 8분기 blob 전체를 치환한다.
+_REST_MIN_COVERAGE = 0.5
 # `backend/data/*.json`은 **read-only 정적 시드**다(CLAUDE.md "정적 참조 데이터만").
 # 7일 티커 캐시는 `market_cache` 테이블에 있다 — 시드 파일에 write하지 않는다.
 _SP500_SEED = os.path.join(_DATA_DIR, "sp500_tickers.json")
@@ -202,11 +206,24 @@ def _fetch_and_save_m7_earnings() -> dict:
     with ThreadPoolExecutor(max_workers=20) as ex:
         m7_data = list(ex.map(_get_yf_quarterly_net_income, M7))
         rest_data = list(ex.map(_get_yf_quarterly_net_income, rest))
+    m7_ok = sum(1 for d in m7_data if d)
+    rest_ok = sum(1 for d in rest_data if d)
+    logger.info(f"[Earnings] M7 성공 {m7_ok}/{len(M7)} · rest 성공 {rest_ok}/{len(rest)}")
+    # M7은 고정 7종목의 '합'이라 한 종목만 빠져도 합계가 정의상 틀린다(비중 차트의 분자).
+    # 유동적인 rest(~490종목)의 커버리지 임계와 달리 완전성을 요구한다.
+    if m7_ok < len(M7):
+        logger.warning(f"[Earnings] M7 자체 fetch 불완전({m7_ok}/{len(M7)}) — 저장 생략, 저장값 유지")
+        stored = _mc_load("m7_earnings")
+        return stored["data"] if stored else {"quarters": [], "unit": "십억달러"}
+    if rest and rest_ok / len(rest) < _REST_MIN_COVERAGE:
+        logger.warning(f"[Earnings] M7 rest 성공률 미달({rest_ok}/{len(rest)}) — 저장 생략, 저장값 유지")
+        stored = _mc_load("m7_earnings")
+        return stored["data"] if stored else {"quarters": [], "unit": "십억달러"}
     m7_by_q = _merge_quarters(m7_data)
     rest_by_q = _merge_quarters(rest_data)
     quarters = sorted(set(m7_by_q) | set(rest_by_q))[-8:]
     if not quarters:
-        logger.warning("[Earnings] M7 전 티커 fetch 실패 — 저장 생략, 저장값 유지")
+        logger.warning("[Earnings] M7 마감 분기 데이터 없음 — 저장 생략, 저장값 유지")
         stored = _mc_load("m7_earnings")
         return stored["data"] if stored else {"quarters": [], "unit": "십억달러"}
 
@@ -229,13 +246,25 @@ def _fetch_and_save_kr_top2_earnings() -> dict:
     with ThreadPoolExecutor(max_workers=20) as ex:
         top2_data = list(ex.map(_get_naver_quarterly_net_income, KR_TOP2))
         rest_data = list(ex.map(_get_naver_quarterly_net_income, rest))
+    top2_ok = sum(1 for d in top2_data if d)
+    rest_ok = sum(1 for d in rest_data if d)
+    logger.info(f"[Earnings] KR Top2 성공 {top2_ok}/{len(KR_TOP2)} · rest 성공 {rest_ok}/{len(rest)}")
+    # Top2도 고정 2종목의 '합' — m7과 동일 근거로 완전성을 요구한다.
+    if top2_ok < len(KR_TOP2):
+        logger.warning(f"[Earnings] KR Top2 자체 fetch 불완전({top2_ok}/{len(KR_TOP2)}) — 저장 생략, 저장값 유지")
+        stored = _mc_load("kr_top2_earnings")
+        return stored["data"] if stored else {"quarters": [], "unit": "억원"}
+    if rest and rest_ok / len(rest) < _REST_MIN_COVERAGE:
+        logger.warning(f"[Earnings] KR Top2 rest 성공률 미달({rest_ok}/{len(rest)}) — 저장 생략, 저장값 유지")
+        stored = _mc_load("kr_top2_earnings")
+        return stored["data"] if stored else {"quarters": [], "unit": "억원"}
     top2_by_q = _merge_quarters(top2_data, ended_only=False)
     rest_by_q = _merge_quarters(rest_data, ended_only=True)
     ended_qs = sorted(q for q in (set(top2_by_q) | set(rest_by_q)) if _quarter_ended(q))[-8:]
     est_qs = sorted(q for q in top2_by_q if not _quarter_ended(q))
     all_qs = ended_qs + est_qs
     if not all_qs:
-        logger.warning("[Earnings] KR Top2 전 티커 fetch 실패 — 저장 생략, 저장값 유지")
+        logger.warning("[Earnings] KR Top2 분기 데이터 없음 — 저장 생략, 저장값 유지")
         stored = _mc_load("kr_top2_earnings")
         return stored["data"] if stored else {"quarters": [], "unit": "억원"}
 

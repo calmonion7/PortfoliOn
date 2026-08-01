@@ -158,6 +158,80 @@ def test_kr_sector_all_none_still_skips_save_entirely(monkeypatch):
     assert out == _SECTORS_ALL_NONE
 
 
+# ─────────────────── S3. KR 업종별 모멘텀 부분실패 백필 (부분 페이로드) ───────────────────
+
+_SECTORS_PARTIAL = [
+    {"name": "반도체", "code": "013", "return_1w": None, "return_1mo": None, "return_3mo": None},
+    {"name": "화학", "code": "021", "return_1w": None, "return_1mo": None, "return_3mo": None},
+    {"name": "은행", "code": "005", "return_1w": 2.0, "return_1mo": 4.0, "return_3mo": 6.0},
+]
+_PREV_MOMENTUM = [
+    {"name": "반도체(구)", "code": "013", "return_1w": 1.1, "return_1mo": 2.2, "return_3mo": 3.3},
+    {"name": "화학(구)", "code": "021", "return_1w": 0.1, "return_1mo": 0.2, "return_3mo": 0.3},
+]
+
+
+def test_kr_sector_partial_none_backfills_from_previous_by_code(monkeypatch, caplog):
+    """업종 2개 all-None + 나머지 정상 → save에 넘어간 인자에서 그 2개가 code 매칭으로
+    직전값 복원(name은 이번 fetch 유지)되고 나머지 정상 업종은 새 값 그대로."""
+    import services.kr_sector_service as mod
+    monkeypatch.setattr(mod, "compute_momentum", lambda: _SECTORS_PARTIAL)
+    monkeypatch.setattr(mod, "build_sector_index", lambda: {"005930": "반도체"})
+    monkeypatch.setattr(mod, "load_momentum", lambda: _PREV_MOMENTUM)
+    with patch.object(mod, "save") as mock_save:
+        with caplog.at_level(logging.INFO):
+            out = mod.refresh()
+    assert mock_save.call_count == 1
+    saved_sectors, _saved_index = mock_save.call_args[0]
+    by_code = {s["code"]: s for s in saved_sectors}
+    assert by_code["013"]["return_1w"] == 1.1
+    assert by_code["013"]["return_1mo"] == 2.2
+    assert by_code["013"]["return_3mo"] == 3.3
+    assert by_code["013"]["name"] == "반도체"      # 옛 이름을 되살리지 않는다
+    assert by_code["021"]["return_1w"] == 0.1
+    assert by_code["005"]["return_1w"] == 2.0      # 정상 업종은 그대로
+    assert out == saved_sectors
+    assert any("백필" in r.message for r in caplog.records)
+
+
+def test_kr_sector_partial_none_without_previous_code_stays_none(monkeypatch):
+    """직전 저장값에 그 code가 없으면 all-None 그대로 두되(값을 지어내지 않음),
+    다른 업종이 정상이라 저장 자체는 진행된다."""
+    import services.kr_sector_service as mod
+    sectors = [
+        {"name": "조선", "code": "099", "return_1w": None, "return_1mo": None, "return_3mo": None},
+        {"name": "은행", "code": "005", "return_1w": 2.0, "return_1mo": 4.0, "return_3mo": 6.0},
+    ]
+    monkeypatch.setattr(mod, "compute_momentum", lambda: sectors)
+    monkeypatch.setattr(mod, "build_sector_index", lambda: {"005930": "반도체"})
+    monkeypatch.setattr(mod, "load_momentum", lambda: _PREV_MOMENTUM)   # code 099 없음
+    with patch.object(mod, "save") as mock_save:
+        mod.refresh()
+    assert mock_save.call_count == 1
+    saved_sectors, _saved_index = mock_save.call_args[0]
+    by_code = {s["code"]: s for s in saved_sectors}
+    assert by_code["099"]["return_1w"] is None
+    assert by_code["099"]["return_1mo"] is None
+    assert by_code["099"]["return_3mo"] is None
+
+
+def test_kr_sector_all_normal_skips_backfill_and_load_momentum(monkeypatch):
+    """전량 정상 → 백필 미개입, load_momentum은 호출조차 안 된다(lazy — 불필요한 DB read 방지)."""
+    import services.kr_sector_service as mod
+
+    def _must_not_be_called():
+        raise AssertionError("전량 정상인데 load_momentum이 호출됨")
+
+    monkeypatch.setattr(mod, "compute_momentum", lambda: _SECTORS_OK)
+    monkeypatch.setattr(mod, "build_sector_index", lambda: {"005930": "반도체"})
+    monkeypatch.setattr(mod, "load_momentum", _must_not_be_called)
+    with patch.object(mod, "save") as mock_save:
+        out = mod.refresh()
+    assert mock_save.call_count == 1
+    assert mock_save.call_args[0][0] == _SECTORS_OK
+    assert out == _SECTORS_OK
+
+
 def test_refresh_kr_sector_reports_index_size(monkeypatch):
     import routers.analysis as an
     monkeypatch.setattr(an.kr_sector_service, "refresh", lambda: _SECTORS_OK)

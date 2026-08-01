@@ -46,13 +46,22 @@ def get_commodities() -> dict:
             [(k, sym_unit, stored_histories.get(k, [])) for k, sym_unit in _COMMODITY_SYMBOLS.items()]
         ))
 
+    if not any(results.values()):
+        logger.warning("[Commodities] 전 심볼 fetch 실패 — 저장 생략, 저장값 반환")
+        return stored["data"] if stored else {"prices": {}, "history": {}}
+
+    # 개별 백필 — gold만 실패해도 그 항목의 직전 price·history를 채워 전체 blob 소멸을 막는다.
+    for k, stored_h in stored_histories.items():
+        if results.get(k) is None and stored_h:
+            last = stored_h[-1]["value"]
+            prev = stored_h[-2]["value"] if len(stored_h) > 1 else last
+            change_pct = round((last - prev) / prev * 100, 2) if prev else 0.0
+            results[k] = {"current": last, "change_pct": change_pct,
+                          "unit": _COMMODITY_SYMBOLS[k][1], "history": stored_h}
+
     prices = {k: {"current": v["current"], "change_pct": v["change_pct"], "unit": v["unit"]}
               for k, v in results.items() if v}
     history = {k: v["history"] for k, v in results.items() if v}
-
-    if not prices:
-        logger.warning("[Commodities] 전 심볼 fetch 실패 — 저장 생략, 저장값 반환")
-        return stored["data"] if stored else {"prices": {}, "history": {}}
 
     data = {"prices": prices, "history": history}
     _mc_save("commodities", data)
