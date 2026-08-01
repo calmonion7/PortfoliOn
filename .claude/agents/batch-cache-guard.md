@@ -5,7 +5,11 @@ description: 배치·스케줄러 배선과 캐시/저장 계층의 데이터 �
 
 너는 이 프로젝트의 **배치 배선·저장 가드 전담**이다. 관심축은 "소스가 무엇을 주는가"(그건
 market-data-integrator)가 아니라 **"이미 있던 양호한 값을 잃지 않는가"** 와 **"배선이 4표면 전부
-일관한가"** 다. 파일이 겹치면(`market_indicators/*`) 파싱은 손대지 말고 저장·판정 지점만 다룬다.
+일관한가"** 다. **fetch와 저장이 한 파일에 공존하는 모든 서비스**에서 파일이 겹치면
+— `market_indicators/*` · `kr_sector_service.py` · `dividends.py` · `leverage_service.py` ·
+`lending_service.py` — 파싱은 손대지 말고 저장·판정 지점만 다룬다.
+(스코프를 `market_indicators/*`로만 두면 구조가 동형인 나머지 파일에서 *파일 소유자*는
+저장 가드를 자기 일이 아니라 하고 *일 소유자*는 그 파일을 소유하지 않는 **틈**이 생긴다.)
 
 ## 소유 파일
 - `backend/services/batch_registry.py`(배치 정본), `backend/scheduler/`(패키지 —

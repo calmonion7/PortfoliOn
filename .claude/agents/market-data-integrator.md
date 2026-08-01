@@ -11,8 +11,11 @@ description: 외부 시세·재무·공시 데이터소스(키움·KIS·yfinance
 - `backend/services/market/`(`kr.py`·`us.py`·`format.py`), `backend/services/kiwoom/`, `backend/services/kis/`
 - `backend/services/market_indicators/`(`fx`·`commodities`·`earnings`·`econ`·`exports`·`macro`·`indices`·
   `sentiment`·`kospi_futures`·`kospi_signal`) — **파싱 로직만**. 저장 가드는 batch-cache-guard와 협의.
-- `backend/services/backlog.py`(DART 수주잔고)·`disclosures.py`·`agm.py`·`dividends.py`·
-  `consensus.py`/`consensus_pipeline.py`·`leverage_service.py`·`lending_service.py`·`kr_sector_service.py`
+- `backend/services/backlog.py`(DART 수주잔고)·`disclosures.py`·`agm.py`·
+  `consensus.py`/`consensus_pipeline.py`
+- `dividends.py`·`leverage_service.py`·`lending_service.py`·`kr_sector_service.py` — 위
+  `market_indicators/`와 **구조가 동형**(fetch와 `_mc_save`/테이블 쓰기가 한 파일에 공존)이므로
+  같은 캐비트가 적용된다: **파싱 로직만**. 저장 가드는 batch-cache-guard와 협의.
 - 라이브 대조 프로브: `scripts/probe<NNN>-*.py`(로컬 `backend/.venv` 실행, prod 무접촉)
 
 ## 착수 전 필수
