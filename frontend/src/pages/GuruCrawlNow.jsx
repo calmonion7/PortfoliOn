@@ -32,8 +32,14 @@ export default function GuruCrawlNow() {
             // **시도 총계**라, 40명만 저장돼도 "83명 수집됨"을 초록으로 단언했다(BH7-H1).
             // fresh 부재는 배포 창(nginx가 dist를 즉시 서빙 → 폴러 재배포 전 옛 백엔드)에서만
             // 생긴다. 그때 done으로 폴백하면 바로 그 틀린 숫자가 되살아나니, 숫자를 뺀다.
-            data.result === 'saved'  ? (data.fresh != null ? `완료: ${data.fresh}명 갱신됨` : '완료: 매니저 데이터 갱신됨')
-            : data.result === 'partial' ? `부분 완료: ${data.fresh}명 갱신 · ${data.stale}명 직전값 유지`
+            // held(명부 축소로 삭제 보류)·dropped(정상 은퇴)도 같은 규칙을 따른다 — 필드가
+            // 없으면 절(節)을 통째로 빼고, 0이면 노이즈라 붙이지 않는다.
+            data.result === 'saved'  ? (data.fresh != null
+                ? `완료: ${data.fresh}명 갱신됨${data.dropped ? ` · ${data.dropped}명 은퇴 반영` : ''}`
+                : '완료: 매니저 데이터 갱신됨')
+            : data.result === 'partial' ? `부분 완료: ${data.fresh}명 갱신`
+                + (data.stale ? ` · ${data.stale}명 직전값 유지` : '')
+                + (data.held ? ` · 명부 축소로 ${data.held}명 삭제 보류` : '')
             : data.result === 'skipped' ? '수집 실패 — 직전 데이터 유지'
             : '크롤링 중단 — 직전 데이터 유지'
           )

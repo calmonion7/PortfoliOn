@@ -54,7 +54,9 @@ def _generate_us():
 def _run_guru_crawl():
     from services.guru_scraper import scrape_all_managers
     from datetime import datetime
-    with job_runs.record("guru_crawl", "auto"):
+    # 수동 경로(routers/guru._run_crawl)와 **같은 분기**다 — 한쪽만 고치면 다른 쪽이 그대로
+    # 남는 게 B29의 본질이었다. 분류를 바꿀 땐 두 곳을 함께 볼 것.
+    with job_runs.record("guru_crawl", "auto") as run:
         try:
             managers, roster = scrape_all_managers()
             stats = storage.save_guru_managers({
@@ -63,16 +65,29 @@ def _run_guru_crawl():
                 "roster": roster,
             })
             if not stats["saved"]:
+                run.set_status("skipped")
                 logger.warning("[Scheduler] Guru 빈 결과 — 저장 생략, 직전값 유지")
-            elif stats["stale"]:
-                # 부분 실패는 이 크롤의 기대되는 모드다. "completed"로 뭉뚱그리면 로그만 보는
-                # 운영자가 절반 소실을 알 수 없다(BH7-H1).
-                logger.warning(
-                    f"[Scheduler] Guru 부분 크롤 — 갱신 {stats['fresh']} · 직전값 유지 {stats['stale']}"
-                )
             else:
-                logger.info(f"[Scheduler] Guru crawl completed ({stats['fresh']}명)")
+                if stats["held"]:
+                    run.set_status("partial")
+                    logger.warning(
+                        f"[Scheduler] Guru 명부 축소 — 드롭 {stats['held']}건 보류, 명부 확인 필요"
+                    )
+                if stats["stale"]:
+                    # 부분 실패는 이 크롤의 기대되는 모드다. "completed"로 뭉뚱그리면 로그만 보는
+                    # 운영자가 절반 소실을 알 수 없다(BH7-H1).
+                    run.set_status("partial")
+                    logger.warning(
+                        f"[Scheduler] Guru 부분 크롤 — 갱신 {stats['fresh']} · 직전값 유지 {stats['stale']}"
+                    )
+                if stats["dropped"]:
+                    # 정상 은퇴 반영이라 초록을 유지한다 — 숫자만 보이게 한다(B29).
+                    logger.info(f"[Scheduler] Guru 매니저 은퇴 반영 — {stats['dropped']}명 제거")
+                if not (stats["held"] or stats["stale"]):
+                    logger.info(f"[Scheduler] Guru crawl completed ({stats['fresh']}명)")
         except Exception as e:
+            # 예외를 삼켜 정상 종료하므로 job_runs가 스스로는 failed를 알 수 없다(B31).
+            run.set_status("failed", str(e))
             logger.warning(f"[Scheduler] Guru crawl failed: {e}")
 
 

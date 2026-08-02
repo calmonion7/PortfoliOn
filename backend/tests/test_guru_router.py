@@ -25,7 +25,8 @@ def _stub_job_runs(monkeypatch):
 
     @contextmanager
     def _noop(job_id, trigger):
-        yield 1
+        # 핸들을 yield한다 — 워커가 set_status로 종료 상태를 말한다(task#274)
+        yield job_runs.Run(1)
 
     monkeypatch.setattr(job_runs, "record", _noop)
 
@@ -160,7 +161,7 @@ def _run_crawl_and_get_result(monkeypatch, *, managers, saved):
     monkeypatch.setattr(guru, "scrape_all_managers", lambda *a, **k: (managers, roster))
     monkeypatch.setattr(guru.storage, "save_guru_managers",
                         lambda payload: {"saved": saved, "fresh": len(managers),
-                                         "stale": 0, "dropped": 0})
+                                         "stale": 0, "dropped": 0, "held": 0})
     guru._run_crawl()
     return guru._progress.get()
 
@@ -238,7 +239,7 @@ def test_run_crawl_reports_partial_with_real_counts_BH7_H1(monkeypatch):
         monkeypatch,
         managers=[{"id": str(i)} for i in range(40)],
         roster=[{"id": str(i)} for i in range(83)],
-        stats={"saved": True, "fresh": 40, "stale": 43, "dropped": 0},
+        stats={"saved": True, "fresh": 40, "stale": 43, "dropped": 0, "held": 0},
     )
     assert state["result"] == "partial"
     assert state["fresh"] == 40 and state["stale"] == 43
@@ -250,7 +251,7 @@ def test_run_crawl_reports_saved_only_when_complete_BH7_H1(monkeypatch):
     state = _crawl_with(
         monkeypatch,
         managers=[{"id": "a"}], roster=[{"id": "a"}],
-        stats={"saved": True, "fresh": 1, "stale": 0, "dropped": 0},
+        stats={"saved": True, "fresh": 1, "stale": 0, "dropped": 0, "held": 0},
     )
     assert state["result"] == "saved" and state["fresh"] == 1 and state["stale"] == 0
 

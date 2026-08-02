@@ -14,12 +14,14 @@ def spy(monkeypatch):
     """services.job_runs.record를 (job_id, trigger)를 기록하는 컨텍스트매니저로 대체."""
     calls = []
 
+    import services.job_runs as job_runs
+
     @contextmanager
     def fake_record(job_id, trigger):
         calls.append((job_id, trigger))
-        yield 1
+        # 핸들을 yield한다 — 본문이 set_status로 종료 상태를 말할 수 있다(task#274)
+        yield job_runs.Run(1)
 
-    import services.job_runs as job_runs
     monkeypatch.setattr(job_runs, "record", fake_record)
     return calls
 

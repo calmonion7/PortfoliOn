@@ -373,8 +373,14 @@ def scrape_all_managers(on_progress=None) -> tuple[list[dict], list[dict]]:
 
     반환 = **(성공한 매니저, 명부)**. 명부를 함께 돌려주는 이유(BH7-H1): 성공분만 반환하면
     호출부가 빠진 매니저를 *실패해서* 빠진 건지 *명부에서 사라져서* 빠진 건지 구별할 수 없어
-    백필도 드롭도 못 한다. `scrape_manager_ids()`가 실패하면 예외가 그대로 전파되므로,
-    이 아래로 내려왔다면 명부는 항상 신뢰할 수 있다 — 그게 백필을 안전하게 만드는 전제다.
+    백필도 드롭도 못 한다.
+
+    ⚠️ **명부의 신뢰성은 조건부다**(B28, task#274 정정). `scrape_manager_ids()`가 실패하면 예외가
+    전파되므로 *전량* 실패는 여기 못 내려온다 — 그러나 `raise_for_status`는 HTTP 오류만 잡으므로
+    **HTTP 200 + 마크업 변경**이면 예외 없이 *짧은* 명부가 그대로 내려온다. 그 경우 생존
+    매니저가 '은퇴'로 오분류되므로, 드롭 판정을 하는 `storage.save_guru_managers`가
+    `_ROSTER_MIN_COVERAGE` 커버리지 가드로 그 회차의 드롭을 보류한다. 즉 백필을 안전하게
+    만드는 전제는 "명부가 항상 옳다"가 아니라 "명부가 수상하면 드롭하지 않는다"이다.
     """
     manager_ids = scrape_manager_ids()
     total = len(manager_ids)

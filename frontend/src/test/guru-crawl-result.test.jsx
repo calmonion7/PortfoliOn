@@ -87,3 +87,47 @@ describe('GuruCrawlNow 크롤 결과 표시', () => {
     expect(screen.getByRole('button', { name: '수집 중...' })).toBeDisabled()
   })
 })
+
+// ── task#274 — 명부 축소 보류(held)와 은퇴 반영(dropped)을 문구에 싣는다 ──────────
+describe('GuruCrawlNow 명부 축소·은퇴 표시 (task#274)', () => {
+  it('held가 있으면 보류 건수를 숫자로 알린다', async () => {
+    stubProgress({ running: false, done: 83, total: 83, current: '', result: 'partial',
+                   fresh: 40, stale: 43, dropped: 0, held: 43 })
+    await clickCrawlAndPoll()
+    const msg = await screen.findByTestId('crawl-msg')
+    expect(msg).toHaveTextContent('43')
+    expect(msg).toHaveTextContent(/보류/)
+    expect(msg).not.toHaveStyle({ color: 'var(--color-success)' })
+  })
+
+  it('held 필드가 없으면(배포 창의 옛 백엔드) undefined를 렌더하지 않는다', async () => {
+    // 프론트는 빌드 즉시 라이브인데 백엔드는 재배포 후라, 그 창에서 신규 필드는 undefined다.
+    // 옛 필드로 폴백하면 고치려던 오값이 되살아나니 숫자를 뺀다(wrong < missing).
+    stubProgress({ running: false, done: 83, total: 83, current: '', result: 'partial',
+                   fresh: 40, stale: 43 })
+    await clickCrawlAndPoll()
+    const msg = await screen.findByTestId('crawl-msg')
+    expect(msg).not.toHaveTextContent('undefined')
+    expect(msg).not.toHaveTextContent(/보류/)
+    expect(msg).toHaveTextContent('43')          // stale 기반 기존 문구는 그대로
+  })
+
+  it('dropped는 초록을 유지하되 은퇴 건수를 보여준다', async () => {
+    stubProgress({ running: false, done: 83, total: 83, current: '', result: 'saved',
+                   fresh: 80, stale: 0, dropped: 3, held: 0 })
+    await clickCrawlAndPoll()
+    const msg = await screen.findByTestId('crawl-msg')
+    expect(msg).toHaveTextContent('80')
+    expect(msg).toHaveTextContent('3')
+    expect(msg).toHaveTextContent(/은퇴/)
+  })
+
+  it('dropped가 0이면 은퇴 문구를 붙이지 않는다', async () => {
+    stubProgress({ running: false, done: 83, total: 83, current: '', result: 'saved',
+                   fresh: 83, stale: 0, dropped: 0, held: 0 })
+    await clickCrawlAndPoll()
+    const msg = await screen.findByTestId('crawl-msg')
+    expect(msg).toHaveTextContent('완료: 83명 갱신됨')
+    expect(msg).not.toHaveTextContent(/은퇴/)
+  })
+})

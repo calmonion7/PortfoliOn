@@ -52,10 +52,20 @@ function TriggerBadge({ trigger }) {
 }
 
 // eco: 배치 성공/실패는 가격방향(up/down)이 아닌 의미 상태 — success/error 토큰으로 구분(CLAUDE.md 가토 #4/#5)
-function StatusIcon({ status }) {
-  if (status === 'success') return <span style={{ color: 'var(--color-success)', fontSize: 12 }}>●</span>
-  if (status === 'failed')  return <span style={{ color: 'var(--color-error)', fontSize: 12 }}>●</span>
-  return <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>○</span>
+// 불변식: 채워진 ● = 종료 상태 · 빈 ○ = 미종료/미지. job_runs가 partial·skipped를 갖게 되면서
+// (task#274) 그 둘이 running과 똑같은 빈 동그라미로 떨어져 구별 불가였다.
+// 색은 의미 상태 토큰만 쓴다 — 가격 토큰(--up/--down) 금지(KR 색 관례, 파일 상단 eco 주석).
+// 4상태를 색만으로 가르게 됐으므로 전부 title을 단다.
+const STATUS_ICONS = {
+  success: ['●', 'var(--color-success)', '성공'],
+  failed:  ['●', 'var(--color-error)',   '실패'],
+  partial: ['●', 'var(--warn)',          '부분 완료 — 일부는 직전값 유지'],
+  skipped: ['●', 'var(--text-3)',        '저장 생략 — 직전값 유지'],
+}
+
+export function StatusIcon({ status }) {
+  const [glyph, color, title] = STATUS_ICONS[status] || ['○', 'var(--text-faint)', '실행 중']
+  return <span title={title} style={{ color, fontSize: 12 }}>{glyph}</span>
 }
 
 function RecentRun({ run }) {

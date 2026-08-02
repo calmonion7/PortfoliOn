@@ -365,7 +365,8 @@ CREATE TABLE IF NOT EXISTS job_runs (
     id          BIGSERIAL PRIMARY KEY,
     job_id      TEXT NOT NULL,                 -- daily_report | guru_crawl | ...
     trigger     TEXT NOT NULL,                 -- auto | manual
-    status      TEXT NOT NULL,                 -- running | success | failed
+    status      TEXT NOT NULL,                 -- running | success | partial | skipped | failed
+                                               -- (CHECK 제약 없음 — 어휘 추가에 마이그레이션 불필요)
     started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     finished_at TIMESTAMPTZ,
     error       TEXT

@@ -3226,8 +3226,24 @@ dataroma 기반 구루 매니저 전체 목록. 상세 전용 계층인 전 종�
 
 **Response `200`**
 ```json
-{ "running": true, "done": 3, "total": 20, "current": "Warren Buffett" }
+{
+  "running": false, "done": 83, "total": 83, "current": "",
+  "result": "partial", "fresh": 40, "stale": 43, "dropped": 0, "held": 43
+}
 ```
+
+| 필드 | 의미 |
+|------|------|
+| `running` | 크롤 진행 중 여부 |
+| `done` / `total` | 진행률(**시도** 기준 — 저장 건수가 아니다) |
+| `current` | 현재 수집 중인 매니저명 |
+| `result` | 종료 사유 — `saved`(전원 갱신) \| `partial`(일부 직전값 유지 또는 명부 축소 보류) \| `skipped`(빈 결과, 저장 생략) \| `failed`. 크롤 진행 중에는 `null` |
+| `fresh` | 이번 회차에 실제로 갱신된 매니저 수 |
+| `stale` | 개별 수집 실패로 직전값을 유지한 매니저 수 |
+| `dropped` | 명부에서 사라져 은퇴로 반영·제거된 매니저 수 |
+| `held` | 명부가 직전 저장분의 80% 미만으로 축소돼 **삭제를 보류**한 매니저 수. 0보다 크면 명부(dataroma 마크업) 확인이 필요하다 |
+
+`result`/`fresh`/`stale`/`dropped`/`held`는 크롤이 끝나기 전에는 `null`이다.
 
 ---
 

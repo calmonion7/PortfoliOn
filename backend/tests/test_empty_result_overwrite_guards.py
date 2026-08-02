@@ -427,7 +427,8 @@ def test_save_guru_managers_backfills_failed_from_stored_BH7_H1():
          patch("services.storage.schedule.get_guru_managers", return_value=stored):
         stats = save_guru_managers({"last_updated": "new", "managers": fresh, "roster": roster})
 
-    assert stats == {"saved": True, "fresh": 40, "stale": 43, "dropped": 0}
+    # held=0 — 명부는 83명 온전하다(짧아진 건 개별 fetch 결과지 명부가 아니다, task#274)
+    assert stats == {"saved": True, "fresh": 40, "stale": 43, "dropped": 0, "held": 0}
     payload = _saved_payload(mock_exec)
     assert len(payload["managers"]) == 83
     by_id = {m["id"]: m for m in payload["managers"]}
@@ -543,3 +544,86 @@ def test_kr_top2_earnings_empty_universe_skips_save_BH7_L5(monkeypatch):
     with patch.object(mod, "_mc_save") as mock_save:
         assert mod._fetch_and_save_kr_top2_earnings() == stored
         mock_save.assert_not_called()
+
+
+# ══ task#274 (B28) — 명부 축소 가드 ══════════════════════════════════════════════
+#
+# BH7-H1이 닫은 것은 "명부는 온전한데 개별 매니저 fetch가 실패한" 경우다. 남은 구멍은
+# **명부 자체가 짧게 오는** 경우 — dataroma가 HTTP 200 + 마크업 변경으로 응답하면
+# `raise_for_status`가 못 잡고, 짧은 명부는 생존 매니저를 '은퇴'로 오분류해 드롭시킨다.
+
+def test_save_guru_managers_holds_drops_when_roster_shrinks_T274():
+    """명부가 직전 저장분의 80% 미만이면 그 회차의 드롭을 보류한다(83 → 40)."""
+    from services.storage.schedule import save_guru_managers
+    stored = {"last_updated": "old", "managers": [_mgr(str(i)) for i in range(83)]}
+    fresh = [_mgr(str(i)) for i in range(40)]
+
+    with patch("services.storage.schedule.execute") as mock_exec, \
+         patch("services.storage.schedule.get_guru_managers", return_value=stored):
+        stats = save_guru_managers({"last_updated": "new", "managers": fresh,
+                                    "roster": [{"id": str(i)} for i in range(40)]})
+
+    assert stats["dropped"] == 0      # 43명을 은퇴로 오분류하지 않는다
+    assert stats["held"] == 43        # 보류로 살아남은 수
+    assert stats["stale"] == 43
+    assert len(_saved_payload(mock_exec)["managers"]) == 83
+
+
+def test_save_guru_managers_drops_normally_above_threshold_T274():
+    """임계(83×0.8=66.4)를 넘는 명부는 정상 은퇴 반영 — 보류가 드롭을 영구히 막지 않는다."""
+    from services.storage.schedule import save_guru_managers
+    stored = {"last_updated": "old", "managers": [_mgr(str(i)) for i in range(83)]}
+    fresh = [_mgr(str(i)) for i in range(80)]
+
+    with patch("services.storage.schedule.execute") as mock_exec, \
+         patch("services.storage.schedule.get_guru_managers", return_value=stored):
+        stats = save_guru_managers({"last_updated": "new", "managers": fresh,
+                                    "roster": [{"id": str(i)} for i in range(80)]})
+
+    assert stats["dropped"] == 3
+    assert stats["held"] == 0
+    assert len(_saved_payload(mock_exec)["managers"]) == 80
+
+
+def test_save_guru_managers_first_run_has_no_baseline_T274():
+    """첫 실행은 비교 대상이 없으므로 판정하지 않는다(드롭도 0이라 무해)."""
+    from services.storage.schedule import save_guru_managers
+    with patch("services.storage.schedule.execute"), \
+         patch("services.storage.schedule.get_guru_managers",
+               return_value={"last_updated": None, "managers": []}):
+        stats = save_guru_managers({"last_updated": "new",
+                                    "managers": [_mgr(str(i)) for i in range(5)],
+                                    "roster": [{"id": str(i)} for i in range(5)]})
+
+    assert stats["held"] == 0
+    assert stats["dropped"] == 0
+
+
+def test_save_guru_managers_no_roster_keeps_legacy_path_T274():
+    """명부 미제공은 이미 드롭을 안 하는 경로다 — 보류는 '명부가 있는데 짧다'에만 해당한다."""
+    from services.storage.schedule import save_guru_managers
+    stored = {"last_updated": "old", "managers": [_mgr(str(i)) for i in range(83)]}
+
+    with patch("services.storage.schedule.execute") as mock_exec, \
+         patch("services.storage.schedule.get_guru_managers", return_value=stored):
+        stats = save_guru_managers({"last_updated": "new",
+                                    "managers": [_mgr(str(i)) for i in range(40)]})
+
+    assert stats["held"] == 0                       # 보류가 아니라 기존 폴백이 처리
+    assert stats["dropped"] == 0
+    assert len(_saved_payload(mock_exec)["managers"]) == 83
+
+
+def test_save_guru_managers_total_failure_still_skips_write_T274():
+    """전량 실패는 가드보다 앞이다 — 보류 판정이 이 분기를 가리지 않는다."""
+    from services.storage.schedule import save_guru_managers
+    stored = {"last_updated": "old", "managers": [_mgr(str(i)) for i in range(83)]}
+
+    with patch("services.storage.schedule.execute") as mock_exec, \
+         patch("services.storage.schedule.get_guru_managers", return_value=stored):
+        stats = save_guru_managers({"last_updated": "new", "managers": [],
+                                    "roster": [{"id": "0"}]})
+
+    assert stats["saved"] is False
+    assert stats["held"] == 0
+    mock_exec.assert_not_called()
