@@ -28,6 +28,9 @@ mapped: 2026-07-31
 
 번호는 지난 매핑(`91bac67`)과 **연속**이다 — 해소된 것은 아래 "해소" 표로 내리고 번호를 재사용하지 않는다.
 
+> **재검증: 2026-08-02 (task#272) — 이 절만 갱신됨.** 8차 버그 헌트가 기존 "열림" 21건을 전수 재검증해 5건(B10~B14)을 해소로 내리고, 새로 확정된 13건(B27~B39)을 추가했다. 판정 근거·현재 코드 인용은 `.forge/bug-report.md`(8차)의 「B목록 재검증」 절에 있다.
+> **문서의 나머지 절(§1~§14)은 여전히 `last_mapped_commit: 4752112`(07-31) 기준**이며 이번에 검증되지 않았다.
+
 ### 데이터 손실·오염
 | # | 결함 | 위치 | 도달 조건 |
 |---|---|---|---|
@@ -36,6 +39,7 @@ mapped: 2026-07-31
 | B3 | `POST /api/portfolio`가 raw JSON `NaN`을 저장 → `GET /api/portfolio` 영구 500 | `routers/portfolio.py:40-43` → `:249` → `:62` | 본문에 `NaN` 토큰 |
 | B4 | NaN이 컨센서스 마트까지 전파 | `services/consensus_pipeline.py:184` → `:237` | yfinance가 NaN target 제공 |
 | B5 | 사용자 삭제가 6개 트랜잭션 — 중간 실패 시 반쯤 삭제된 사용자 | `routers/admin.py:111-119` | 루프 중 DB 오류 |
+| **B28** | 구루 매니저 **명부의 부분 열화**가 '은퇴'로 오분류돼 생존 매니저가 통째 drop — `if not fresh:`는 빈 목록만 막고 '축소된' 목록은 못 막는다 | `services/guru_scraper.py:114-128` → `services/storage/schedule.py:44-70` (`:69` drop 집계) | dataroma 마크업 변경·응답 절단으로 `a[href*='holdings.php?m=']`가 일부만 매칭 |
 
 ### 무음 미동작 / 오값
 | # | 결함 | 위치 | 도달 조건 |
@@ -44,17 +48,19 @@ mapped: 2026-07-31
 | B7 | KR 배당 기준연도가 1년 어긋남 | `services/dividends.py:101-102` | 4월 1일 00:00–09:00 KST |
 | B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | `services/consensus_pipeline.py:173` → `:188` | US/Eastern 저녁 발행 리포트 |
 | B9 | 프론트에 access token 갱신 경로가 없다 | `frontend/src/api.js:15-26` | 1시간 경과 (항상) |
-| B10 | 관심종목 토글이 POST/DELETE를 반대로 고른다 | `pages/Ranking.jsx:154-156` → `:214-218` | `/api/watchlist` fetch 실패 |
-| B11 | 이미 추적 중인 종목이 "추가" 모달로 라우팅 | `components/GlobalSearch.jsx:19-26` → `:32-35` | `/api/stocks` fetch 실패 |
-| B12 | `loadStockMap`에 catch 없음 → unhandled rejection | `pages/GuruDetail.jsx:114-120`, `pages/GuruManagers.jsx:52-58` | fetch 실패 |
 | **B24** | 프론트가 쏘는 이벤트 2종이 백엔드 화이트리스트에 없어 **200 OK로 무음 폐기** | `routers/events.py:11-18,45-46` ← `components/Masthead.jsx:84`·`MobileTopActions.jsx:15`(`nav_analytics`), `pages/Ranking.jsx:226`(`ranking_watch_toggle`) | 항상 |
 | **B25** | FX 저장 payload가 `usdkrw` history만 담아 `usdjpy`/`eurusd`의 last-good 폴백이 **원리적으로 발동 불가** | `services/market_indicators/fx.py:79` (폴백은 `:36-40`) | 항상(+매 실행 1y 전량 재조회) |
+| **B29** | 구루 크롤 `dropped` 건수를 읽는 코드가 테스트 밖에 **0건** — 매니저 삭제가 초록 "완료"로 보고된다(`result`는 `stale`만 본다) | `routers/guru.py:99-107`(`:102`) · `scheduler/jobs.py` ← 생산은 `storage/schedule.py:69` | `dropped>0` (정상 은퇴 포함, 항상) |
+| **B30** | 티커 유니버스 캐시가 **축소된**(빈 것은 아닌) 스크레이프를 무검증 저장 → rest 커버리지 임계가 **이미 틀린 분모**로 통과 | `market_indicators/earnings.py:94-117`(`:110` `if tickers:`) → `:205`,`:225`,`:269` | `_scrape_kospi`의 `if not codes: break`(`:149-150`) 조기종료 등 예외 없는 부분 축소 |
+| **B31** | 구루 크롤의 저장 스킵·부분크롤·완전 실패가 `job_runs`에 항상 `success`로 기록(자동 크롤은 `_progress`도 안 씀) | `services/job_runs.py:16-73` ← `routers/guru.py:92-114`, `scheduler/jobs.py:58-76` | 항상 (docstring이 이미 명시한 한계) |
+| **B32** | `Recommendations.jsx`의 관심목록 조회 실패가 **성공-빈배열로 위장** — 추적상태 잔존 패턴(현재는 서버 제외로 우연히 차폐) | `pages/Recommendations.jsx:83` → `:93` → `:271` | `/api/watchlist` fetch 실패 + 서버 `exclude_tickers`가 느슨해지면 발현 |
+| **B33** | `any(snap_dist.values())`가 스냅샷의 **진짜 0/0/0**을 결측으로 보고 mart 값으로 대체 → `base_date` 귀속 불일치 | `routers/analyst_reports.py:79` (귀속은 `:102-103`) | `market/kr.py:639-647`에서 `RECOM_CD`만 전량 파싱 실패 |
 
 ### 표시 오류
 | # | 결함 | 위치 |
 |---|---|---|
-| B13 | 수급 추이 Y축이 주(株)를 억원으로 포맷 → "541.4조" | `components/reports/InvestorTrendSection.jsx:56` |
-| B14 | 구루 총 투자금에 T 단위가 없어 `$1,077.0B` | `pages/GuruAllocation.jsx:24-29` → `:173,201,244` |
+| **B27** | **랭킹 마켓 토글 레이스** — 옛 시장 데이터가 새 `market` 상태로 렌더돼 원화가 `$` 포맷으로 고착(자동 회복 없음). `fetchPage`는 뮤텍스만 있고 staleness 가드가 없다 · **라이브 2회 재현**(HIGH) | `pages/Ranking.jsx:95-117`(`:96`,`:107`) + `:125-133` → 렌더 `:344`,`:349` |
+| **B34** | `fmtSharesUs`가 음수에서 축약 없이 전액 표기 — 형제 `fmtSharesKr`(`:32-40`)의 부호보존이 US판에 미적용 | `frontend/src/utils.js:43-50` ← `components/reports/UsInsiderSection.jsx:90` |
 
 ### 계약·보안
 | # | 결함 | 위치 |
@@ -63,7 +69,17 @@ mapped: 2026-07-31
 | B20 | 레이트리밋 전무 (로그인·회원가입·리포트 생성) | `main.py`, `nginx/nginx.conf` 전역 |
 | B21 | Postgres가 tracked 폴백 비밀번호로 호스트 전 인터페이스에 발행 | `docker-compose.yml:9` + `:10-11` |
 | B23 | `pages/Portfolio.jsx`를 vitest에서 마운트할 수 없다 | `frontend/src/test/setup.js` (1줄, 폴리필 0) |
-| **B26** | tracked UAT 스크립트 **15개**가 라이브 테스트 계정 크리덴셜을 평문 하드코딩 | `scripts/uat*.mjs` 다수 (값은 이 문서에 인용하지 않음) |
+| **B26** | tracked UAT 스크립트 **16개**가 라이브 테스트 계정 크리덴셜을 평문 하드코딩 (task#272 실측 — 이전 표기 15는 과소) | `scripts/uat*.mjs` 다수 (값은 이 문서에 인용하지 않음) |
+
+### 검증장치·문서
+
+| # | 결함 | 위치 |
+|---|---|---|
+| **B35** | 구루 크롤 완전성 경로(`guru_scraper.py`·`routers/guru.py`·`services/storage/`)를 **소유한 에이전트 카드가 없다** + `batch-cache-guard`가 적은 `schedule.py`는 **동명이인**(`backend/scheduler/schedule.py` ≠ `backend/services/storage/schedule.py`) | `.claude/agents/batch-cache-guard.md:15-16` (7개 카드 전수 grep 0건) |
+| **B36** | 날짜 스코프 회귀 테스트가 `call_args`를 안 봐서 스코프가 아니라 "`get_report`가 None이면"만 검증 — 라우터가 다른 날짜로 조회해도 green | `backend/tests/test_analyst_reports.py:473-484` |
+| **B37** | `CLAUDE.md` 가토의 예시 코드 인용이 실제 리터럴과 다름(`'완료: 갱신됨'` ≠ `'완료: 매니저 데이터 갱신됨'`) — 승급 시점부터 부정확 | `CLAUDE.md:127` ↔ `pages/GuruCrawlNow.jsx:35` |
+| **B38** | 에이전트 카드가 읽기전용 표방을 `tools` 프론트매터로 강제하지 않음(키 자체 부재 → Edit/Write 상속). ADR-0024 개정문이 지목한 실패 양식의 재발 | `.claude/agents/live-forensics.md` (프론트매터) |
+| **B39** | 애니메이션 게이팅(`isFirstLoad`)에 회귀 테스트 **0건** — 유일하게 클래스명을 아는 스크립트는 애니메이션을 *무효화*하는 성능 프로브다 | `pages/GuruAllocation.jsx:55`,`:212`,`:214` |
 
 ### 지난 매핑 이후 **해소**된 확인된 버그 (재제기 금지)
 | 옛 # | 결함 | 무엇이 닫았나 |
@@ -73,6 +89,11 @@ mapped: 2026-07-31
 | B17 | `PointMetric.change_pct`가 명시적 `null`을 422로 거부 | `routers/analyst_reports.py:31` `Optional[float]`화 (`allow_inf_nan=False` 유지, task#250) |
 | B18 | `COWORK_API_KEY`가 `argv`로 노출 | `scripts/cowork-fire-listener.py:47-55` — 프롬프트를 argv에서 빼고 **stdin**으로 전달 (task#254) |
 | B22 | fire 워크디렉터리 초 단위 충돌 → `run.log` truncate | `scripts/cowork-fire-listener.py:44-46` `mkdtemp(prefix=ts+"-", dir=RUN_DIR)` (task#254) |
+| B10 | 관심종목 토글이 POST/DELETE를 반대로 고른다 | `pages/Ranking.jsx:149-162`(`watchUnknown` 도입)·`:214-224` — 토글이 fetch 결과가 아니라 *알려진 상태*로 결정 (task#266, 재검증 task#272) |
+| B11 | 이미 추적 중인 종목이 "추가" 모달로 라우팅 | `components/GlobalSearch.jsx:19-29`(`fetchTracked`가 실패 시 null 반환)·`:31-45` — 라우팅이 unknown을 별도 분기 (task#266, 재검증 task#272) |
+| B12 | `loadStockMap`에 catch 없음 → unhandled rejection | 옛 인라인 로직 소멸, `hooks/useTrackedStocks.js:29-45`의 `reload()`로 **이동하며 닫힘** — `try/catch`(`:30`,`:38`)로 감싸 내부 처리 후 `false` 반환이라 reject 불가 (task#266, 재검증 task#272) |
+| B13 | 수급 추이 Y축이 주(株)를 억원으로 포맷 → "541.4조" | `components/reports/InvestorTrendSection.jsx:55-56` — 주(株) 입력에 `fmtSharesKr` 적용 (task#271, 재검증 task#272) |
+| B14 | 구루 총 투자금에 T 단위가 없어 `$1,077.0B` | `pages/GuruAllocation.jsx:10`,`:148`,`:176`,`:219` — T 티어를 가진 `fmtUsdCompact`로 교체 (task#271, 재검증 task#272) |
 
 ---
 
