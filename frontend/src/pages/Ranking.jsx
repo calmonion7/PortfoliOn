@@ -11,6 +11,7 @@ import { trackEvent } from '../utils/analytics'
 import ReportDetailTabs from '../components/reports/ReportDetailTabs'
 import useIsMobile from '../hooks/useIsMobile'
 import useBodyScrollLock from '../hooks/useBodyScrollLock'
+import useTrackedStocks from '../hooks/useTrackedStocks'
 import { SketchEmpty, SketchError } from '../components/sketches'
 
 const LIMIT = 20
@@ -74,6 +75,10 @@ export default function Ranking() {
 
   const sentinelRef = useRef(null)
   const loadingRef = useRef(false)
+  // B27 — reset 호출(마켓/지표/타입 전환)이 뮤텍스로 no-op되는 사이 옛 응답이 새 화면을
+  // 덮던 레이스 가드. reset은 세대를 올려 뮤텍스를 우회하고, 응답 콜백은 자기 세대가
+  // 최신일 때만 상태를 만진다(자동 회복 없이 고착되던 실측 버그, task#272 CONCERNS B27).
+  const genRef = useRef(0)
   // 최초 로드만 진입 애니메이션 재생 — 필터 변경 재적재는 재생 생략(carryover-2)
   const [isFirstLoad, setIsFirstLoad] = useState(true)
   const hasLoadedOnceRef = useRef(false)
@@ -85,15 +90,19 @@ export default function Ranking() {
   const [modalLoading, setModalLoading] = useState(false)
   const [adding, setAdding] = useState(false)
 
-  // 관심종목 토글: watched=등록된 ticker(대문자) Set, pending=요청 중 ticker Set(더블클릭 방지)
-  const [watched, setWatched] = useState(() => new Set())
-  const [watchUnknown, setWatchUnknown] = useState(false)   // 조회 실패 = 모름(빈 Set과 구별)
-  const [pending, setPending] = useState(() => new Set())
+  // 관심종목 토글 데이터 계층은 useTrackedStocks가 소유(task#273 S2, ADR-0032) — stockMap
+  // 키는 /api/stocks가 반환한 원본 ticker(백엔드가 upper()해 저장하므로 US도 이미 대문자,
+  // KR은 숫자라 대소문자 이슈 없음 — GuruStats/GuruManagers 소비처와 동일 키 형태).
+  const { stockMap, unknown: watchUnknown, pending, toggle } = useTrackedStocks()
 
   const isSupply = metric === 'supply'
 
   const fetchPage = useCallback((off, reset) => {
-    if (loadingRef.current) return
+    // reset(마켓/지표/타입 전환)은 뮤텍스를 우회하고 세대를 올린다 — 무한스크롤 재호출만
+    // 뮤텍스로 막는다(B27, 위 genRef 주석 참고).
+    if (!reset && loadingRef.current) return
+    if (reset) genRef.current += 1
+    const myGen = genRef.current
     loadingRef.current = true
     setLoading(true)
     // 수급 뷰: 스크리닝 엔드포인트(외국인 보유율 desc, 서버 정렬). 그 외: 기존 랭킹.
@@ -102,6 +111,7 @@ export default function Ranking() {
       : api.get('/api/rankings', { params: { market, metric, type, limit: LIMIT, offset: off } })
     req
       .then(({ data }) => {
+        if (myGen !== genRef.current) return   // 낡은 세대 — 이후 reset이 이미 화면을 소유
         const rows = data.items || []
         setBaseTs(metric === 'supply' ? (data.latest_date ?? null) : (data.base_ts ?? null))
         setItems(prev => reset ? rows : [...prev, ...rows])
@@ -109,8 +119,13 @@ export default function Ranking() {
         setHasMore(rows.length === LIMIT)
         setError(false)
       })
-      .catch(() => setError(true))
+      .catch(() => {
+        if (myGen !== genRef.current) return
+        setError(true)
+      })
       .finally(() => {
+        // 낡은 세대의 finally가 loadingRef를 열면 다음 무한스크롤 트리거와 겹쳐 이중 append가 난다.
+        if (myGen !== genRef.current) return
         loadingRef.current = false
         setLoading(false)
       })
@@ -145,22 +160,6 @@ export default function Ranking() {
     return () => obs.disconnect()
   }, [hasMore, items.length, offset, fetchPage])
 
-  // 진입 시 관심종목 목록 1회 로드 → 행 별표 상태 표시
-  useEffect(() => {
-    api.get('/api/watchlist')
-      .then(({ data }) => {
-        setWatched(new Set((data || []).map(s => s.ticker.toUpperCase())))
-        setWatchUnknown(false)
-      })
-      // 옛 `.catch(() => {})`는 실패를 **빈 Set**으로 남겼다 — 그러면 이미 등록된 종목의
-      // 별이 ☆(미등록)으로 보이고, 누르면 DELETE가 아니라 POST가 나간다(제거하려던 의도와
-      // 정반대). 모름은 미등록이 아니므로 액션을 제시하지 않는다(B10).
-      .catch((e) => {
-        console.warn('[Ranking] 관심종목 조회 실패:', e)
-        setWatchUnknown(true)
-      })
-  }, [])
-
   // 클릭 시 스냅샷 가용 여부로 분기: 있으면 리서치 리포트 모달, 없으면 기본정보 모달 + 관심추가 CTA.
   const onRowClick = (row) => {
     trackEvent('ranking_row_click', { ticker: row.ticker, market })
@@ -186,76 +185,91 @@ export default function Ranking() {
 
   const closeModal = () => { setModal(null); setModalLoading(false) }
 
-  // watchlist 추가 payload (모달 추가 · 행 토글 공유)
-  const watchPayload = (row) => ({
-    ticker: row.ticker,
-    name: row.name || row.ticker,
-    market,
-    exchange: market === 'KR' ? (row.exchange || 'KS') : '',
-    security_type: row.is_etf ? 'ETF' : 'EQUITY',
-  })
+  // watchlist 추가 payload (모달 추가 · 행 토글 공유) — 행 데이터에서 파생한다(ADR-0032 §결정 3).
+  // 컴포넌트 market 상태는 row.exchange가 없을 때(수급 스크리닝 행)만 폴백으로 쓴다 — 컴포넌트
+  // 상태를 읽으면 B27(마켓 토글 레이스) 창에서 KR 행이 US로 영구 저장된다.
+  const watchPayload = (row) => {
+    const isUs = row.exchange ? row.exchange === 'US' : market === 'US'
+    return {
+      ticker: row.ticker,
+      name: row.name || row.ticker,
+      market: isUs ? 'US' : 'KR',
+      // 수급 스크리닝 행은 exchange·is_etf가 없다(investor.py:_serialize_screening) →
+      // KR·'KS'로 떨어지며 이는 기존 동작과 동일(보존, ADR-0032 §결정 4).
+      exchange: isUs ? '' : (row.exchange || 'KS'),
+      security_type: row.is_etf ? 'ETF' : 'EQUITY',
+    }
+  }
 
-  // 기본정보 모달의 '관심종목 추가' — 기존 watchlist 추가 흐름 재사용
-  const addToWatchlist = (row) => {
+  // 기본정보 모달의 '관심종목 추가' — 훅 toggle(POST 전용)로 위임. 실패 토스트는 훅이
+  // 자체로 띄우므로(re-throw 없음) 여기선 성공(true)일 때만 성공 토스트+모달 닫기.
+  const addToWatchlist = async (row) => {
     setAdding(true)
-    api.post('/api/watchlist', watchPayload(row))
-      .then(() => {
-        setWatched(prev => new Set(prev).add(row.ticker.toUpperCase()))
-        showToast(`${row.ticker} 관심종목에 추가됐습니다.\n리포트는 새벽 자동 생성 파이프라인이 만듭니다.`)
-        closeModal()
-      })
-      .catch((err) => {
-        showToast(err?.response?.data?.detail || '관심종목 추가에 실패했습니다.', 'error')
-      })
-      .finally(() => setAdding(false))
+    const ok = await toggle(watchPayload(row), false)
+    setAdding(false)
+    if (ok) {
+      showToast(`${row.ticker} 관심종목에 추가됐습니다.\n리포트는 새벽 자동 생성 파이프라인이 만듭니다.`)
+      closeModal()
+    }
   }
 
-  // 행 별표 토글 — 등록 시 DELETE, 미등록 시 POST. 행 클릭(모달)과 분리.
-  const toggleWatch = (row, e) => {
+  // 행 별표 토글 — 등록 시 DELETE, 미등록 시 POST(훅 toggle에 위임). 행 클릭(모달)과 분리.
+  const toggleWatch = async (row, e) => {
     e.stopPropagation()
-    const t = row.ticker.toUpperCase()
     if (watchUnknown) return   // 모름 — 어느 쪽으로 추측해도 절반은 틀린다(B10)
-    if (pending.has(t)) return
-    const isWatched = watched.has(t)
-    setPending(prev => new Set(prev).add(t))
-    const req = isWatched
-      ? api.delete(`/api/watchlist/${row.ticker}`)
-      : api.post('/api/watchlist', watchPayload(row))
-    req
-      .then(() => {
-        setWatched(prev => {
-          const n = new Set(prev)
-          if (isWatched) n.delete(t); else n.add(t)
-          return n
-        })
-        trackEvent('ranking_watch_toggle', { ticker: row.ticker, market, action: isWatched ? 'remove' : 'add' })
-        showToast(isWatched ? `${row.ticker} 관심종목에서 제거됐습니다.` : `${row.ticker} 관심종목에 추가됐습니다.`)
-      })
-      .catch((err) => {
-        showToast(err?.response?.data?.detail || (isWatched ? '관심종목 제거에 실패했습니다.' : '관심종목 추가에 실패했습니다.'), 'error')
-      })
-      .finally(() => setPending(prev => { const n = new Set(prev); n.delete(t); return n }))
+    const isWatched = stockMap[row.ticker] === 'watchlist'
+    const ok = await toggle(watchPayload(row), isWatched)
+    if (ok) {
+      trackEvent('ranking_watch_toggle', { ticker: row.ticker, market, action: isWatched ? 'remove' : 'add' })
+      showToast(isWatched ? `${row.ticker} 관심종목에서 제거됐습니다.` : `${row.ticker} 관심종목에 추가됐습니다.`)
+    }
   }
 
-  // 행 끝 별표 버튼 — ★ 등록 / ☆ 미등록
+  // 행 끝 별표 버튼 — ★ 등록 / ☆ 미등록. 보유 종목은 액션이 무의미하므로 표식만 렌더하고
+  // 버튼을 두지 않는다(CONTEXT 「추적 상태」 일반화 규칙). 분기 순서는 구루 WatchlistBtn과
+  // 동일: unknown → holding → watchlist → none.
   const renderStar = (row) => {
-    const t = row.ticker.toUpperCase()
-    const on = watched.has(t)
-    const busy = pending.has(t)
-    const label = watchUnknown ? '관심종목 상태를 불러오지 못했습니다'
-                 : (on ? '관심종목에서 제거' : '관심종목 추가')
+    if (watchUnknown) {
+      const label = '관심종목 상태를 불러오지 못했습니다'
+      return (
+        <button
+          onClick={(e) => toggleWatch(row, e)}
+          disabled
+          title={label}
+          aria-label={label}
+          style={{
+            background: 'none', border: 'none', cursor: 'not-allowed', padding: 0,
+            fontSize: 16, lineHeight: 1, justifySelf: 'center',
+            color: 'var(--text-3)', opacity: 0.4,
+          }}
+        >☆</button>
+      )
+    }
+    if (stockMap[row.ticker] === 'holding') {
+      // 260px minmax 카드 헤더에서 순위·이름·ETF 배지·티커와 폭을 다투므로 1줄 고정(nowrap)
+      // + 압축 방지(flexShrink:0). 라벨은 구루 .guru-wl-held 관례("보유중")를 따른다.
+      return (
+        <span style={{
+          justifySelf: 'center', flexShrink: 0, whiteSpace: 'nowrap',
+          fontSize: 10, color: 'var(--text-3)',
+        }}>보유중</span>
+      )
+    }
+    const on = stockMap[row.ticker] === 'watchlist'
+    const busy = pending.has(row.ticker)
+    const label = on ? '관심종목에서 제거' : '관심종목 추가'
     return (
       <button
         onClick={(e) => toggleWatch(row, e)}
-        disabled={busy || watchUnknown}
+        disabled={busy}
         title={label}
         aria-label={label}
         style={{
           background: 'none', border: 'none',
-          cursor: watchUnknown ? 'not-allowed' : 'pointer', padding: 0,
+          cursor: 'pointer', padding: 0,
           fontSize: 16, lineHeight: 1, justifySelf: 'center',
           color: on ? 'var(--accent)' : 'var(--text-3)',
-          opacity: (busy || watchUnknown) ? 0.4 : 1,
+          opacity: busy ? 0.4 : 1,
         }}
       >{on ? '★' : '☆'}</button>
     )

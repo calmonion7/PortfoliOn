@@ -54,7 +54,12 @@ export default function GuruManagers() {
     if (unknown) return
     const type = stockMap[h.ticker]
     if (type === 'holding') return
-    return toggle(h.ticker, h.name_kr || h.name || h.ticker, type === 'watchlist')
+    // 구루 보유는 전부 US 13F다. market:'US'는 백엔드 기본값과 같은 값이지만, 그 사실이
+    // 코드에 적혀 있어야 다음 KR 소비처가 조용히 market='US'로 저장되는 재발을 막는다
+    // (ADR-0032 §결정 2, 지우지 말 것).
+    const ticker = h.ticker
+    const name = h.name_kr || h.name || ticker
+    return toggle({ ticker, name, market: 'US', exchange: '', security_type: 'EQUITY' }, type === 'watchlist')
   }
 
   const badgeStyle = (ticker) => {

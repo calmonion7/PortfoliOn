@@ -34,7 +34,10 @@ export function WatchlistBtn({ ticker, name, stockMap, onToggle, unknown = false
     setLoading(true)
     // 실패는 훅이 토스트로 알린다(re-throw 없음) — 버튼은 로딩 복구만 책임진다.
     try {
-      await onToggle(ticker, name, inWatchlist)
+      // WatchlistBtn 소비처(GuruStats·GuruAllocation·GuruDetail) 전부 US 13F 데이터다.
+      // market:'US'는 백엔드 기본값과 같은 값이지만, 그 사실이 코드에 적혀 있어야
+      // 다음 KR 소비처가 조용히 market='US'로 저장되는 재발을 막는다(ADR-0032 §결정 2, 지우지 말 것).
+      await onToggle({ ticker, name: name || ticker, market: 'US', exchange: '', security_type: 'EQUITY' }, inWatchlist)
     } finally {
       setLoading(false)
     }

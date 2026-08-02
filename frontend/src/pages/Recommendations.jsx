@@ -6,6 +6,7 @@ import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
 import { useToast } from '../components/Toast'
 import { SketchEmpty, SketchError } from '../components/sketches'
+import useTrackedStocks from '../hooks/useTrackedStocks'
 
 // 보유 액션 배지 색 — ⚠️ 가격 토큰(success=빨/danger=파, ADR-0015) 금지.
 // RecCard의 FLAG_STYLE처럼 전용색을 inline으로 직접 박는다(가격 방향 아님).
@@ -34,6 +35,18 @@ function buildGuruCounts(managers) {
     }
   }
   return counts
+}
+
+// 딥다이브 버튼 상태 — 액션이 무의미한 상태(보유·모름)에도 관심 등록 상태와 마찬가지로
+// 액션을 제시하지 않는다(모름이면 어느 쪽으로 추측해도 절반은 틀린다, wrong<missing).
+export function deepDiveButtonState(ticker, stockMap, unknown, pending) {
+  const t = (ticker || '').toUpperCase()
+  if (unknown) return { label: '상태 확인 불가', title: '보유·관심 상태를 불러오지 못했습니다', disabled: true }
+  const status = stockMap[t]
+  if (status === 'holding') return { label: '보유중', title: '이미 보유 중인 종목입니다', disabled: true }
+  if (status === 'watchlist') return { label: '관심종목 추가됨', title: undefined, disabled: true }
+  if (pending.has(t)) return { label: '추가 중…', title: undefined, disabled: true }
+  return { label: '딥다이브', title: undefined, disabled: false }
 }
 
 // 긴 추천 리스트(관심 재정렬·발굴)를 초기 N개만 렌더하고 '더보기'로 점진 확장 —
@@ -70,27 +83,27 @@ export default function Recommendations() {
   const [marketChip, setMarketChip] = useState('all') // 발굴 필터 칩 ('all'|'KR'|'US')
   const [guruCounts, setGuruCounts] = useState({}) // ticker(대문자)→보유 구루 수 (US 13F)
 
-  // 관심종목 토글: watched=등록된 ticker(대문자) Set, pending=요청 중 Set(더블클릭 방지)
-  const [watched, setWatched] = useState(() => new Set())
-  const [pending, setPending] = useState(() => new Set())
+  // 추적 상태(보유/관심/모름) + 토글 — useTrackedStocks가 조회·pending·실패 표시까지 소유한다.
+  // B32: 예전엔 관심종목 조회 실패를 `.catch(() => ({ data: [] }))`로 빈 배열 위장해,
+  // 이미 관심에 있는 종목에도 「딥다이브」가 활성화됐다(누르면 중복 추가). 훅은 실패를
+  // unknown=true로 1급 표현하므로 그 위장이 사라진다.
+  const { stockMap, unknown, pending, toggle } = useTrackedStocks()
 
-  // 초기 로드: 발굴 목록 + 관심종목 병렬 fetch
+  // 초기 로드: 발굴 목록 + 구루 보유 개수 병렬 fetch (추적 상태는 훅이 별도 소유)
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     Promise.all([
       api.get('/api/recommendations', { params: { limit: 50 } }),
-      api.get('/api/watchlist').catch(() => ({ data: [] })),
       // 구루 보유 개수 — US 13F, 시장 무관이라 마운트 1회만(칩 토글 refetch 미포함). 실패 graceful.
       api.get('/api/guru/managers').catch(() => ({ data: { managers: [] } })),
     ])
-      .then(([rec, wl, guru]) => {
+      .then(([rec, guru]) => {
         if (cancelled) return
         setItems(rec.data?.discovery || [])
         setWatchlist(rec.data?.watchlist || [])
         setHoldings(rec.data?.holdings || [])
         setAsOf(rec.data?.as_of || null)
-        setWatched(new Set((wl.data || []).map(s => s.ticker.toUpperCase())))
         setGuruCounts(buildGuruCounts(guru.data?.managers))
         setError(false)
       })
@@ -120,11 +133,8 @@ export default function Recommendations() {
       .finally(() => setDiscoveryLoading(false))
   }
 
-  // 딥다이브 = 관심종목 추가. 추가 성공 후 watched에 넣어 버튼 비활성.
+  // 딥다이브 = 관심종목 추가. pending 중복 가드·실패 토스트는 훅이 담당 — 성공 시에만 여기서 토스트.
   const deepDive = (item) => {
-    const t = item.ticker.toUpperCase()
-    if (pending.has(t) || watched.has(t)) return
-    setPending(prev => new Set(prev).add(t))
     const payload = {
       ticker: item.ticker,
       name: item.name || item.ticker,
@@ -132,15 +142,9 @@ export default function Recommendations() {
       exchange: item.exchange || (item.market === 'KR' ? 'KS' : ''),
       security_type: 'EQUITY',
     }
-    api.post('/api/watchlist', payload)
-      .then(() => {
-        setWatched(prev => new Set(prev).add(t))
-        showToast(`${item.ticker} 관심종목에 추가 — 분석이 곧 생성됩니다.`)
-      })
-      .catch((err) => {
-        showToast(err?.response?.data?.detail || '관심종목 추가에 실패했습니다.', 'error')
-      })
-      .finally(() => setPending(prev => { const n = new Set(prev); n.delete(t); return n }))
+    toggle(payload, false).then(ok => {
+      if (ok) showToast(`${item.ticker} 관심종목에 추가 — 분석이 곧 생성됩니다.`)
+    })
   }
 
   const guruCountFor = (t) => guruCounts[(t || '').toUpperCase()] || 0
@@ -267,9 +271,7 @@ export default function Recommendations() {
                 items={items}
                 gridStyle={gridStyle}
                 renderItem={(item, i) => {
-                  const t = item.ticker.toUpperCase()
-                  const isWatched = watched.has(t)
-                  const busy = pending.has(t)
+                  const { label, title, disabled } = deepDiveButtonState(item.ticker, stockMap, unknown, pending)
                   return (
                     <RecCard
                       key={`${item.ticker}-${i}`}
@@ -280,10 +282,11 @@ export default function Recommendations() {
                         <button
                           className="btn btn-primary"
                           onClick={() => deepDive(item)}
-                          disabled={isWatched || busy}
+                          disabled={disabled}
+                          title={title}
                           style={{ width: '100%', marginTop: 4 }}
                         >
-                          {isWatched ? '관심종목 추가됨' : busy ? '추가 중…' : '딥다이브'}
+                          {label}
                         </button>
                       }
                     />

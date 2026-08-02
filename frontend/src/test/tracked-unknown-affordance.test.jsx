@@ -85,7 +85,8 @@ describe('B10 — 추적상태 모름이면 토글 어포던스가 비활성이�
   })
 })
 
-// ── B10/B11 원본 결함 2건 — 훅을 쓰지 않는 두 표면(계약이 다르다)에도 같은 불변식 ──
+// ── B10 원본 결함 — Ranking(task#273 S2부터 useTrackedStocks 사용)에도 같은 불변식.
+// B11(Recommendations 쪽 원본 결함)은 이후 B32로 재구성돼 recommendations-s3s4.test.jsx로 이전됨 ──
 
 import Ranking from '../pages/Ranking'
 
@@ -96,8 +97,10 @@ globalThis.IntersectionObserver = class {
 
 describe('B10 — Ranking: 관심목록 조회 실패 시 별표가 비활성이고 쓰기가 나가지 않는다', () => {
   it('실패를 빈 Set으로 남기면 등록된 종목의 별이 ☆로 보여 DELETE 대신 POST가 나간다', async () => {
+    // task#273 S2 — 데이터 계층이 useTrackedStocks로 이전되며 조회처가 /api/watchlist에서
+    // /api/stocks로 바뀌었다(훅 계약). 불변식(별표 비활성 + 쓰기 0건)은 그대로, 목킹 URL만 갱신.
     api.get.mockImplementation((url) => {
-      if (url === '/api/watchlist') return Promise.reject(new Error('watchlist down'))
+      if (url === '/api/stocks') return Promise.reject(new Error('tracked down'))
       if (url.startsWith('/api/ranking')) return Promise.resolve({ data: {
         items: [{ ticker: 'AAPL', name: 'Apple', market: 'US', price: 1, change_pct: 1,
                   trade_value: 1, volume: 1 }], has_more: false } })

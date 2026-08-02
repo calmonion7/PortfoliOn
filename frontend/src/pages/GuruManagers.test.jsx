@@ -52,7 +52,7 @@ describe('GuruManagers 카드 클릭 (task#226 S5)', () => {
     const badge = await screen.findByText('AAPL')
     fireEvent.click(badge)
     expect(navigateMock).not.toHaveBeenCalled()
-    expect(api.post).toHaveBeenCalledWith('/api/watchlist', { ticker: 'AAPL', name: 'Apple' })
+    expect(api.post).toHaveBeenCalledWith('/api/watchlist', { ticker: 'AAPL', name: 'Apple', market: 'US', exchange: '', security_type: 'EQUITY' })
   })
 })
 

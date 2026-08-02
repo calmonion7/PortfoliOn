@@ -13,7 +13,7 @@ VALID_EVENTS = {
     "tab_holdings", "tab_watch", "tab_analysis", "tab_dash",
     "tab_reports", "tab_digest", "tab_calendar", "tab_ranking", "tab_compare",
     "report_view_open", "report_tab_switch",
-    "ranking_row_click",
+    "ranking_row_click", "ranking_watch_toggle",
     "stock_search",
 }
 

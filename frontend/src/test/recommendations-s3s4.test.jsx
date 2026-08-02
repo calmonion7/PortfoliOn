@@ -42,7 +42,7 @@ const makeRecDataWithWatchlist = () => ({
 describe('S3 발굴 필터 칩', () => {
   beforeEach(() => {
     api.get.mockImplementation((url) => {
-      if (url === '/api/watchlist') return Promise.resolve({ data: [] })
+      if (url === '/api/stocks') return Promise.resolve({ data: [] })
       return Promise.resolve({ data: makeRecData() })
     })
   })
@@ -102,12 +102,59 @@ describe('S3 발굴 필터 칩', () => {
 })
 
 // ────────────────────────────────────────────────
+// B32: /api/stocks(추적 상태) 조회 실패 시 딥다이브 비활성 — 성공-빈배열 위장 제거 회귀
+// ────────────────────────────────────────────────
+describe('B32 추적 상태 조회 실패 — 딥다이브 비활성', () => {
+  it('/api/stocks 실패 시 딥다이브 버튼이 비활성이고 api.post가 나가지 않는다', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/api/stocks') return Promise.reject(new Error('tracked down'))
+      return Promise.resolve({ data: makeRecData() })
+    })
+    render(<MemoryRouter><Recommendations /></MemoryRouter>)
+    const btn = await screen.findByTitle('보유·관심 상태를 불러오지 못했습니다')
+    expect(btn).toBeDisabled()
+    fireEvent.click(btn)
+    expect(api.post).not.toHaveBeenCalled()
+  })
+})
+
+// ────────────────────────────────────────────────
+// 적대적 리뷰 렌즈3 발견2 — /api/stocks 실데이터로 holding/watchlist 분기 커버(coverage gap)
+// ────────────────────────────────────────────────
+describe('deepDiveButtonState holding/watchlist 분기 — 실 stockMap 데이터', () => {
+  it('보유 종목(holding)이면 「보유중」이고 api.post가 나가지 않는다', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/api/stocks') return Promise.resolve({ data: [{ ticker: 'TST', type: 'holding' }] })
+      return Promise.resolve({ data: makeRecData() })
+    })
+    render(<MemoryRouter><Recommendations /></MemoryRouter>)
+    const btn = await screen.findByTitle('이미 보유 중인 종목입니다')
+    expect(btn).toHaveTextContent('보유중')
+    expect(btn).toBeDisabled()
+    fireEvent.click(btn)
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('관심종목(watchlist)이면 「관심종목 추가됨」이고 api.post가 나가지 않는다', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/api/stocks') return Promise.resolve({ data: [{ ticker: 'TST', type: 'watchlist' }] })
+      return Promise.resolve({ data: makeRecData() })
+    })
+    render(<MemoryRouter><Recommendations /></MemoryRouter>)
+    const btn = await screen.findByText('관심종목 추가됨')
+    expect(btn).toBeDisabled()
+    fireEvent.click(btn)
+    expect(api.post).not.toHaveBeenCalled()
+  })
+})
+
+// ────────────────────────────────────────────────
 // S4: 관심 카드 분석 상태
 // ────────────────────────────────────────────────
 describe('S4 관심 카드 분석 상태', () => {
   beforeEach(() => {
     api.get.mockImplementation((url) => {
-      if (url === '/api/watchlist') return Promise.resolve({ data: [] })
+      if (url === '/api/stocks') return Promise.resolve({ data: [] })
       return Promise.resolve({ data: makeRecDataWithWatchlist() })
     })
   })
@@ -179,7 +226,7 @@ const makeGuruManagers = () => ({
 describe('구루 보유 개수 노출 (Recommendations 통합)', () => {
   it('구루 보유 종목 카드는 "구루 N명 보유"로 표시(칩 제자리 교체)', async () => {
     api.get.mockImplementation((url) => {
-      if (url === '/api/watchlist') return Promise.resolve({ data: [] })
+      if (url === '/api/stocks') return Promise.resolve({ data: [] })
       if (url === '/api/guru/managers') return Promise.resolve({ data: makeGuruManagers() })
       return Promise.resolve({ data: makeRecDataGuru() })
     })
@@ -191,7 +238,7 @@ describe('구루 보유 개수 노출 (Recommendations 통합)', () => {
 
   it('구루 데이터 fetch 실패 시 원본 "구루 신규 매수" 칩 유지(graceful)', async () => {
     api.get.mockImplementation((url) => {
-      if (url === '/api/watchlist') return Promise.resolve({ data: [] })
+      if (url === '/api/stocks') return Promise.resolve({ data: [] })
       if (url === '/api/guru/managers') return Promise.reject(new Error('fail'))
       return Promise.resolve({ data: makeRecDataGuru() })
     })

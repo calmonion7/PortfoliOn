@@ -3627,7 +3627,7 @@ KR 랭킹 종목 수급 추이를 백그라운드로 갱신한다 (스케줄러 
 
 ### `POST /api/events`
 
-사용자 행동 이벤트를 수집해 `user_events` 테이블에 비동기 저장(BackgroundTask). `event_name`은 화이트리스트(`VALID_EVENTS`)로 검증하며, **허용 외 이벤트는 저장 없이 조용히 `{ "ok": true }` 반환**(에러 아님). 허용 이벤트: `nav_portfolio`, `nav_research`, `nav_market`, `nav_guru`, `nav_settings`, `tab_holdings`, `tab_watch`, `tab_analysis`, `tab_dash`, `tab_reports`, `tab_digest`, `tab_calendar`, `tab_ranking`, `report_view_open`, `report_tab_switch`, `ranking_row_click`, `stock_search`.
+사용자 행동 이벤트를 수집해 `user_events` 테이블에 비동기 저장(BackgroundTask). `event_name`은 화이트리스트(`VALID_EVENTS`)로 검증하며, **허용 외 이벤트는 저장 없이 조용히 `{ "ok": true }` 반환**(에러 아님). 허용 이벤트: `nav_portfolio`, `nav_research`, `nav_market`, `nav_guru`, `nav_settings`, `tab_holdings`, `tab_watch`, `tab_analysis`, `tab_dash`, `tab_reports`, `tab_digest`, `tab_calendar`, `tab_ranking`, `tab_compare`, `report_view_open`, `report_tab_switch`, `ranking_row_click`, `ranking_watch_toggle`, `stock_search`.
 
 **Auth:** Bearer token 필요
 
