@@ -15,11 +15,11 @@ describe('SegmentAnalysisSection — task#275 렌더 계약', () => {
         { name: '시스템반도체', period: '2024', revenue_share_pct: 20, market: { size: 300, unit: '억달러' }, share_pct: 10 },
       ],
     }
-    const { getByText } = render(<SegmentAnalysisSection market_outlook={mo} financialsAnnual={FIN} />)
+    const { getByText, getAllByText } = render(<SegmentAnalysisSection market_outlook={mo} financialsAnnual={FIN} />)
 
-    expect(getByText('메모리')).toBeTruthy()
-    expect(getByText('파운드리')).toBeTruthy()
-    expect(getByText('시스템반도체')).toBeTruthy()
+    expect(getAllByText('메모리').length).toBeGreaterThan(0)
+    expect(getAllByText('파운드리').length).toBeGreaterThan(0)
+    expect(getAllByText('시스템반도체').length).toBeGreaterThan(0)
     expect(getByText('1,200억달러 × 12.0% = 144억달러')).toBeTruthy()
     expect(getByText('500억달러 × 20.0% = 100억달러')).toBeTruthy()
     expect(getByText('300억달러 × 10.0% = 30억달러')).toBeTruthy()
@@ -32,12 +32,12 @@ describe('SegmentAnalysisSection — task#275 렌더 계약', () => {
         { name: 'B사업부', period: '2024', revenue_share_pct: 45, market: { size: 500, unit: '억달러', cagr_pct: 5 } },
       ],
     }
-    const { container, getByText } = render(<SegmentAnalysisSection market_outlook={mo} financialsAnnual={FIN} />)
+    const { container, getByText, getAllByText } = render(<SegmentAnalysisSection market_outlook={mo} financialsAnnual={FIN} />)
 
     // 산식은 "×"를 포함하는 유일한 문자열 형태 — 전체 미노출로 부재를 확인
     expect(container.textContent).not.toMatch(/×/)
-    expect(getByText('A사업부')).toBeTruthy()
-    expect(getByText('B사업부')).toBeTruthy()
+    expect(getAllByText('A사업부').length).toBeGreaterThan(0)
+    expect(getAllByText('B사업부').length).toBeGreaterThan(0)
     // 시장 수치(규모)는 재무 게이트와 무관하게 남는다
     expect(getByText('1,000억달러')).toBeTruthy()
     expect(getByText('500억달러')).toBeTruthy()
@@ -54,7 +54,7 @@ describe('SegmentAnalysisSection — task#275 렌더 계약', () => {
         { name: '메모리', period: '2024', revenue_share_pct: 58.3, share_pct: 12.0 },
       ],
     }
-    const { getByText } = render(<SegmentAnalysisSection market_outlook={mo} financialsAnnual={FIN} />)
+    const { getByText, getAllByText } = render(<SegmentAnalysisSection market_outlook={mo} financialsAnnual={FIN} />)
 
     expect(getByText('자사 점유율')).toBeTruthy()
     expect(getByText('12.0%')).toBeTruthy()

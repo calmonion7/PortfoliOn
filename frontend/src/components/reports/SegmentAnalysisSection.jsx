@@ -63,8 +63,13 @@ function StackedBarRow({ label, items, colorMap }) {
             {it.w >= LABEL_MIN_PCT && (
               // --data-N은 라이트=진한 잉크/다크=밝은 톤이라 고정 흰 글자는 다크테마에서 대비 ~2.2~2.7:1(WCAG AA 미달).
               // var(--bg)는 테마별로 반전(다크=거의 검정/라이트=크림)돼 양쪽 다 4.5:1+ 확보.
-              <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--bg)', whiteSpace: 'nowrap', padding: '0 4px' }}>
-                {it.name} {it.pct.toFixed(0)}%
+              //
+              // 폭 규율(가토 ⑦): LABEL_MIN_PCT는 %라 좁은 뷰포트에서 px로는 모자랄 수 있다(모바일 390px에서
+              // 긴 부문명이 조각을 125>86으로 넘겨 ellipsis 없이 잘리던 것을 라이브 프로브가 포착).
+              // 줄어도 되는 것(부문명)만 ellipsis 상자에 넣고, 줄면 안 되는 수치는 flexShrink:0으로 고정한다.
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, minWidth: 0, maxWidth: '100%', padding: '0 4px', fontSize: 9, fontWeight: 700, color: 'var(--bg)' }}>
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>
+                <span style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>{it.pct.toFixed(0)}%</span>
               </span>
             )}
           </div>
