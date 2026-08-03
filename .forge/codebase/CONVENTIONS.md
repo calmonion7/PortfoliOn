@@ -285,13 +285,24 @@ starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 NaN/inf가 있�
    `market_indicators/sentiment.py`, `indices.py`, `kospi_futures.py`)에 함께 쓴다.
 3. **입력 가드** — Pydantic float은 기본 `allow_inf_nan=True`이므로 raw JSON의 `NaN` 토큰이
    통과하고, NaN 비교는 항상 False라 범위 검증도 못 잡는다.
-   → `Field(..., allow_inf_nan=False)`를 명시한다(`backend/routers/analyst_reports.py:31,44,45`,
-   근거 주석 `:42-43`). 거부하면 FastAPI 기본 422 detail이 입력 NaN을 echo해 다시 500이 되므로
+   → **요청 모델의 모든 float 필드는 `allow_inf_nan=False`**(모델 수준 `model_config = ConfigDict(allow_inf_nan=False)`
+   또는 필드 수준 `Field(..., allow_inf_nan=False)`)를 명시한다 — `backend/routers/analyst_reports.py:31,44,45`
+   (근거 주석 `:42-43`), `portfolio.py`의 `Stock`·`set_rebalance_targets`, `watchlist.py`의 `PromotePayload`.
+   **`backend/tests/test_nan_input_guards.py`가 이를 열거로 단언한다** — `routers/` 패키지의 각 모듈이
+   직접 정의한 `BaseModel` 서브클래스를 수집하고 float을 포함하는 필드 애너테이션을 재귀 탐지해
+   가드 여부를 확인하므로, 신규 float 필드를 무가드로 추가하면 이 테스트가 즉시 실패한다(더 이상
+   "몇 개 파일·몇 개 필드"로 셀 수 있는 상태가 아니라 스위트가 전수 커버).
+   거부하면 FastAPI 기본 422 detail이 입력 NaN을 echo해 다시 500이 되므로
    **전역 핸들러**가 막는다: `backend/main.py:253-259` `RequestValidationError` →
    `JSONResponse(422, {"detail": sanitize(jsonable_encoder(exc.errors()))})`.
-   등록된 예외 핸들러는 이것뿐이다.
+   등록된 예외 핸들러는 이것뿐이다. ⚠️ 이 핸들러는 **`main.app`에만 배선**돼 있다 — 자체 `FastAPI()`를
+   만드는 라우터 테스트(`test_portfolio_router.py`·`test_watchlist_router.py` 등)는 이 핸들러가 없어
+   422 detail의 NaN echo가 그대로 500이 되니, **NaN 거부 422 행동을 확인하는 테스트는 conftest의
+   `client`(=`main.app`)로 돌릴 것.**
 
-가드 회귀: `backend/tests/test_nan_serialization_guards.py`.
+가드 회귀: `backend/tests/test_nan_serialization_guards.py`(출력)·`test_nan_input_guards.py`(입력 드리프트,
+전 라우터 float 필드 열거)·`test_nan_input_behavior.py`(3표면 422 행동 핀)·`test_utils_sanitize_decimal.py`
+(Decimal NaN/Infinity)·`test_consensus_target_nan.py`(컨센서스 파이프라인 정규화 초크포인트).
 프론트 짝: 문자열 `"nan"`·빈 문자열이 LLM enrich로 들어오면 `Number('')===0`이라 `0`으로
 오표시되므로 표시 계층에도 가드가 필요하다(`frontend/src/components/reports/MarketOutlookSection.jsx`,
 회귀 `MarketOutlookSection.test.jsx`).
@@ -689,6 +700,9 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
 | `backend/tests/test_api_doc_sync.py` | 문서 없는 신규 엔드포인트 / 삭제 누락 (§10) |
 | `backend/tests/test_batches_router.py` 외 3파일 | 배치 id/개수 드리프트, `source` 누락 (§8) |
 | `backend/tests/test_nan_serialization_guards.py` | NaN/inf 응답 오염 → 직렬화 500 (§5.2) |
+| `backend/tests/test_nan_input_guards.py` | 라우터 신규 float 필드가 `allow_inf_nan=False` 무가드로 추가되는 것 (§5.2) |
+| `backend/tests/test_utils_sanitize_decimal.py` | `sanitize`가 `Decimal('NaN')`/`Decimal('Infinity')`를 통과시키는 회귀 (§5.2) |
+| `backend/tests/test_consensus_target_nan.py` | NaN/Infinity `target_price`가 컨센서스 마트로 전파되는 회귀 (§5.2) |
 | `backend/tests/test_consensus_asof_batch.py::test_values_placeholder_shape` | `VALUES` 괄호 감싸기 회귀 (§7) |
 | `backend/tests/conftest.py` `_block_real_db` | 테스트의 실 DB 접촉 (TESTING.md §3) |
 | `backend/tests/_routes.py` `walk_routes` | FastAPI 버전차로 라우트 열거가 조용히 0개가 되는 것 |

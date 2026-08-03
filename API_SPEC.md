@@ -562,7 +562,10 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
   "stop_price": 140.0,
   "competitors": ["MSFT", "GOOGL"],
   "moat": "생태계 락인",
-  "growth_plan": "서비스 매출 확대"
+  "growth_plan": "서비스 매출 확대",
+  "market": "US",
+  "exchange": "",
+  "security_type": "EQUITY"
 }
 ```
 
@@ -577,6 +580,9 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 | `competitors` | string[] | ❌ | 경쟁사 티커 목록 (기본값: `[]`) |
 | `moat` | string | ❌ | 경제적 해자 설명 (기본값: `""`) |
 | `growth_plan` | string | ❌ | 성장 계획 메모 (기본값: `""`) |
+| `market` | string | ❌ | 시장 구분 `US`\|`KR` (기본값: `"US"`) |
+| `exchange` | string | ❌ | KR 거래소 접미사 `KS`\|`KQ`(yfinance/키움 심볼용, 기본값: `""`) |
+| `security_type` | string | ❌ | 증권 유형 `EQUITY`\|`ETF` (기본값: `"EQUITY"`) — `ETF`면 컨센서스 백필 없이 리포트만 생성 |
 
 **Response `201`**
 ```json
@@ -586,16 +592,21 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
   "avg_cost": 150.0,
   "target_price": 220.0,
   "stop_price": 140.0,
+  "market": "US",
+  "exchange": "",
   "name": "Apple Inc.",
   "competitors": ["MSFT", "GOOGL"],
   "moat": "생태계 락인",
-  "growth_plan": "서비스 매출 확대"
+  "growth_plan": "서비스 매출 확대",
+  "report_queued": true
 }
 ```
 
+`report_queued` — 해당 시장의 기대 리포트 날짜(`expected_report_date`)에 스냅샷이 이미 있으면 `false`(신규 생성 큐잉 안 함), 없으면 `true`.
+
 **Error `400`** — 이미 보유 중인 ticker
 
-**Error `422`** — `ticker`가 `^[A-Za-z0-9.\-]{1,15}$` 형식이 아닌 경우 (공백/잡문자/빈값/과길이)
+**Error `422`** — `ticker`가 `^[A-Za-z0-9.\-]{1,15}$` 형식이 아닌 경우 (공백/잡문자/빈값/과길이) · `quantity`/`avg_cost`/`target_price`/`stop_price`가 NaN/Infinity인 경우 · KR 상장폐지 종목(등록 불가)
 
 ---
 
@@ -856,6 +867,8 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 }
 ```
 
+**Error `422`** — 목표 비중 값이 NaN/Infinity인 경우(`null`은 삭제 의미로 허용, 그 외 값은 유한해야 함)
+
 ---
 
 ### `PATCH /api/portfolio/{ticker}/pin`
@@ -1002,7 +1015,8 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 ```
 
 **Error `404`** — watchlist에 없는 ticker  
-**Error `400`** — 이미 보유종목에 존재
+**Error `400`** — 이미 보유종목에 존재  
+**Error `422`** — `quantity`/`avg_cost`가 0 이하이거나 NaN/Infinity인 경우
 
 ---
 

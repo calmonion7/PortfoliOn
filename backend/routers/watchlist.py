@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List
 from services import storage, errors, cache as cache_svc, report_generator, consensus_pipeline as _pipeline
 from services import market as market_svc
@@ -49,6 +49,8 @@ class WatchlistStock(BaseModel):
 
 
 class PromotePayload(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
     quantity: float = Field(..., gt=0)
     avg_cost: float = Field(..., gt=0)
 

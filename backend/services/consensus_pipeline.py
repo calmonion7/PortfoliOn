@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import date, timedelta
 import logging
+import math
 from services.db import execute, query, get_connection
 from services.utils import today_kst
 
@@ -214,9 +215,25 @@ def _fetch_us_raw(ticker: str, days: int = 7) -> list[dict]:
 # UPSERT raw_reports
 # ---------------------------------------------------------------------------
 def upsert_raw_reports(ticker: str, market: str, days: int = 7) -> int:
+    """
+    NaN 초크포인트(task B4): `_fetch_us_raw`의 `float(row.get("currentPriceTarget") or 0) or None`
+    (:184)과 `apt.get("mean")` 진위 체크(:197·203)는 NaN이 truthy라 그대로 통과시킬 수 있다.
+    fetcher(_fetch_kr_fnguide·_fetch_kr_raw·_fetch_us_raw) 3곳을 개별로 고치지 않고 INSERT가
+    거치는 이 단일 통로에서 한 번에 정규화한다 — 산발적 가드는 다음 사람이 정본을 헷갈리게 한다.
+
+    순서 중요: 정규화는 아래 opinion/target 필터 *이전*에 적용한다. 필터 뒤에 두면
+    "정보가 0인 행"(opinion 없고 target=nan)이 target=None으로 필터를 통과해 살아남는다.
+    """
     upper = ticker.upper()
     rows = _fetch_kr_raw(upper, days) if market == "KR" else _fetch_us_raw(upper, days)
-    # opinion 없는 실패 행 제외
+
+    # 비유한 target → None (버리지 않음: opinion은 살아있을 수 있다, wrong<missing)
+    for r in rows:
+        tp = r.get("target_price")
+        if tp is not None and not math.isfinite(tp):
+            r["target_price"] = None
+
+    # opinion 없는 실패 행 제외 (정규화 뒤에 평가 — 정보 0인 행을 여기서 걸러낸다)
     rows = [r for r in rows if r["raw_opinion"] or r["target_price"] is not None]
 
     inserted = 0

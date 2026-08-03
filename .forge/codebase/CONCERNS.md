@@ -37,9 +37,6 @@ mapped: 2026-07-31
 | # | 결함 | 위치 | 도달 조건 |
 |---|---|---|---|
 | B1 | KR 랭킹 빈응답이 전 KR 행을 DELETE | `services/ranking_service.py:109-110` → `:162` | Naver 200 + 빈/개명 페이로드 |
-| B2 | `sanitize`가 `Decimal('NaN')`을 통과시킨다 | `services/utils.py:37` | NUMERIC 컬럼에 NaN 존재 시 |
-| B3 | `POST /api/portfolio`가 raw JSON `NaN`을 저장 → `GET /api/portfolio` 영구 500 | `routers/portfolio.py:40-43` → `:249` → `:62` | 본문에 `NaN` 토큰 |
-| B4 | NaN이 컨센서스 마트까지 전파 | `services/consensus_pipeline.py:184` → `:237` | yfinance가 NaN target 제공 |
 | B5 | 사용자 삭제가 6개 트랜잭션 — 중간 실패 시 반쯤 삭제된 사용자 | `routers/admin.py:111-119` | 루프 중 DB 오류 |
 
 ### 무음 미동작 / 오값
@@ -96,6 +93,9 @@ mapped: 2026-07-31
 | B28 | 구루 명부의 부분 열화가 '은퇴'로 오분류돼 생존 매니저가 통째 drop | `services/storage/schedule.py`의 `_ROSTER_MIN_COVERAGE = 0.8` — 명부가 직전 저장분의 80% 미만이면 그 회차 드롭을 보류(`held`) (task#274) |
 | B29 | 구루 크롤 `dropped`를 읽는 코드가 0건 — 매니저 삭제가 초록 "완료" | `routers/guru.py`·`scheduler/jobs.py` 두 경로가 `held`→`partial`+warning, `dropped`→초록 유지+숫자 보고로 분기 (task#274) |
 | B31 | 구루 크롤의 스킵·부분·실패가 `job_runs`에 항상 `success` | `services/job_runs.py`의 `Run` 핸들(`set_status`)로 본문이 종료 상태를 지정 — 구루 2경로 배선(skipped/partial/failed) (task#274) |
+| B2 | `sanitize`가 `Decimal('NaN')`을 통과시킨다 | `services/utils.py:37`에 `isinstance(obj, Decimal) and (obj.is_nan() or obj.is_infinite())` 가드 추가 — float과 동일하게 `None`화, 기존 sanitize 호출처 전부 소급 강화(`tests/test_utils_sanitize_decimal.py`) (task#278) |
+| B3 | `POST /api/portfolio`가 raw JSON `NaN`을 저장 → `GET /api/portfolio` 영구 500 | `routers/portfolio.py` `Stock`/`set_rebalance_targets` + `routers/watchlist.py` `PromotePayload`에 `allow_inf_nan=False` 입력 가드 + `main.py`의 기존 `RequestValidationError` sanitizing 핸들러가 422 detail echo를 방지. 드리프트 가드 `tests/test_nan_input_guards.py`가 라우터 전수 float 필드를 열거로 단언 (task#278) |
+| B4 | NaN이 컨센서스 마트까지 전파 | `services/consensus_pipeline.py`의 `upsert_raw_reports`(단일 INSERT 통로)에 `math.isfinite` 정규화 초크포인트 추가 — NaN/Infinity `target_price`를 필터 앞에서 `None`화(`tests/test_consensus_target_nan.py`) (task#278) |
 
 ---
 
@@ -259,33 +259,36 @@ task#242·#243 감사는 `market_cache`와 delete-rewrite만 봤고 아래는 �
 
 ## 3. NaN/Inf·수치 타입
 
-### 3.1 `sanitize`가 `Decimal('NaN')`을 통과시킨다 — **확인된 버그** (B2)
-- `services/utils.py:37`이 `isinstance(obj, float)`만 검사한다. PostgreSQL `numeric`은 **NaN을 저장한다**(psycopg2가 `Decimal('NaN')`으로 되돌린다).
-- 순서가 결정적이다: `sanitize`가 Decimal NaN을 그대로 통과 → 그 뒤 `jsonable_encoder`가 Decimal→float 변환 → starlette `allow_nan=False`에서 **500**. 즉 **`sanitize`를 부른 지점도 안전하지 않다** — 대표적으로 `routers/stocks.py:673`(`get_dashboard`)이 sanitize하지만 `:573-586`의 `avg_cost`/`quantity`/`target_mean`은 raw Decimal이다.
-- 수정: `Decimal`을 `d.is_nan() or d.is_infinite()`로 함께 검사. **한 줄로 기존 sanitize 호출처 전부를 소급 강화한다.**
-- 부수: `sanitize`는 tuple·set을 순회하지 않는다(현재 응답에 그 타입이 없어 무해).
+### 3.1 `sanitize`가 `Decimal('NaN')`을 통과시킨다 — **해소** (B2, task#278)
+- `services/utils.py:37`이 `isinstance(obj, float)`만 검사하던 문제. PostgreSQL `numeric`은 **NaN을 저장한다**(psycopg2가 `Decimal('NaN')`으로 되돌린다).
+- 수정: `isinstance(obj, Decimal) and (obj.is_nan() or obj.is_infinite())`를 float 검사에 나란히 추가 → `None`화. **한 줄로 기존 sanitize 호출처 전부가 소급 강화됐다**(`routers/stocks.py:673`의 `get_dashboard` 등 raw Decimal이 섞여 있던 지점 포함).
+- 정상 `Decimal` 값은 float으로 캐스트되지 않고 타입 그대로 통과한다(`type(v) is Decimal` 확인).
+- 부수: `sanitize`는 여전히 tuple·set을 순회하지 않는다(현재 응답에 그 타입이 없어 무해, 미변경).
+- 회귀: `tests/test_utils_sanitize_decimal.py`(5건).
 
-### 3.2 NaN이 컨센서스 마트까지 전파 — **확인된 버그** (B4)
-- `services/consensus_pipeline.py:184` — `tp = float(row.get("currentPriceTarget") or 0) or None`. **NaN은 truthy**라 `nan or 0` → `nan`, `nan or None` → `nan`.
-- `:237`이 그 값을 `raw_reports.target_price`에 INSERT하고 `AVG()`가 `daily_consensus_mart.avg_target_price`로 전파한다. 목표가 정본(ADR-0008)이 오염되는 경로다.
+### 3.2 NaN이 컨센서스 마트까지 전파 — **해소** (B4, task#278)
+- `services/consensus_pipeline.py:184` — `tp = float(row.get("currentPriceTarget") or 0) or None`. **NaN은 truthy**라 `nan or 0` → `nan`, `nan or None` → `nan`이던 문제.
+- 수정: 같은 파일의 `upsert_raw_reports`(개별 fetcher 3개가 아니라 그 앞의 **단일 INSERT 통로**)에 `math.isfinite` 정규화 초크포인트를 추가 — NaN/Infinity `target_price`를 `None`화하고, 그 정규화를 `opinion 있거나 target 있으면 통과` 필터 **앞**에 배치(순서를 docstring에 명시). `raw_reports.target_price`→`AVG()`→`daily_consensus_mart.avg_target_price`(ADR-0008 정본) 경로가 더 이상 NaN에 오염되지 않는다.
+- 회귀: `tests/test_consensus_target_nan.py`(NaN·Infinity 정규화, 정상값·기존 None 불변 확인 3건).
 
-### 3.3 입력 경로 Pydantic float 가드 누락 — **확인된 버그** (B3)
-`allow_inf_nan=False`를 설정한 곳은 리포지토리 전체에서 **한 파일·두 모델·세 필드**다: `routers/analyst_reports.py:31`(`PointMetric.change_pct`, task#250에 `Optional[float]`화), `:44`·`:45`(`fair_value_low`/`high`) + 밴드 validator `:50-56`. 나머지는 무가드:
+### 3.3 입력 경로 Pydantic float 가드 누락 — **해소** (B3, task#278)
+`allow_inf_nan=False`를 설정한 곳이 **한 파일·두 모델·세 필드**(`analyst_reports.py`만)였던 상태가 해소됐다. 현재:
 
 | 필드 | 위치 | 상태 |
 |---|---|---|
-| `Stock.quantity`/`.avg_cost`/`.target_price`/`.stop_price` | `routers/portfolio.py:40-43` | **무가드** (유일한 validator는 `_validate_ticker` `:51-57`) |
-| `weights: Dict[str, Optional[float]]` | `routers/portfolio.py:168` | 무가드 |
-| `PromotePayload.quantity`/`.avg_cost` | `routers/watchlist.py:52-53` | `Field(gt=0)`이 NaN은 우연히 거부, **`+Infinity`는 통과** |
-| enrich 16개 `Optional[Any]` | `routers/stocks.py:131-138,144-151` | 타입 자체가 Any |
+| `PointMetric.change_pct`/`fair_value_low`/`high` | `routers/analyst_reports.py:31,44,45` | 가드(task#250, 밴드 validator `:50-56`) |
+| `Stock.quantity`/`.avg_cost`/`.target_price`/`.stop_price` | `routers/portfolio.py` `Stock`(`model_config = ConfigDict(allow_inf_nan=False)`) | 가드 |
+| `weights: Dict[str, Optional[float]]` | `routers/portfolio.py` `set_rebalance_targets`(`Annotated[float, Field(allow_inf_nan=False)]`) | 가드 |
+| `PromotePayload.quantity`/`.avg_cost` | `routers/watchlist.py` (`model_config = ConfigDict(allow_inf_nan=False)`, 기존 `Field(gt=0)` 유지) | 가드 |
+| enrich 16개 `Optional[Any]` | `routers/stocks.py:131-138,144-151` | 타입 자체가 Any — 스코프 밖, 무가드 잔존 |
 
-- 재현 경로: `POST /api/portfolio {"quantity": NaN}` → Pydantic 통과 → `user_stocks`에 기록(`portfolio.py:249`) → `:274-276` echo에서 500. **그리고 그 뒤로 `GET /api/portfolio`(`:62` → `services/storage/portfolio.py:232`, raw Decimal, sanitize 없음)가 영구 500이 된다.** 같은 형태가 `set_rebalance_targets`(`:172-175`)에도 있다.
-- `main.py:253-259`의 `RequestValidationError` 핸들러는 **거부 경로만** 덮는다(task#211). 위 필드들은 검증이 *성공*하므로 이 핸들러를 거치지 않고, 500은 나중에 다른 엔드포인트에서 터진다.
-- **선택 필드 관용구 규칙**: `x: float = Field(None)`은 *키 생략은 통과·명시적 `null`만 422*가 되는 비대칭을 만든다(task#250). 현재 리포지토리에 `= Field(None`은 `analyst_reports.py:31` 한 곳이고 이미 `Optional[float]`이다 — 신규 선택 필드는 반드시 `Optional[X]`로.
+- **드리프트 가드 신설**: `tests/test_nan_input_guards.py`가 `routers/` 패키지를 순회해 각 모듈이 직접 정의한(임포트 아닌) `BaseModel` 서브클래스를 수집하고, `typing.get_args`로 float을 포함하는 필드 애너테이션을 재귀 탐지해 `allow_inf_nan=False`(모델 `ConfigDict` 또는 필드 `Field(...)` 메타데이터, 속성으로 확인)로 가드됐는지 열거로 단언한다. **신규 float 필드가 무가드로 추가되면 이 테스트가 즉시 실패**하므로, 표 갱신을 잊어도 재발은 스위트가 막는다.
+- ⚠️ **422 행동 테스트는 자체-app(`FastAPI()`)이 아니라 conftest의 `client`(=`main.app`)로 돌려야 한다** — `main.py:272` 근처의 `RequestValidationError` sanitizing 핸들러가 그 안에만 배선돼 있고, 자체-app 테스트(`test_portfolio_router.py:9-12`·`test_watchlist_router.py:9-12`)엔 없어 422 detail의 NaN echo가 500으로 재발한다.
+- 회귀: `tests/test_nan_input_behavior.py`(3표면 행동 핀 + 모델 레벨 핀, 12건).
 
 ### 3.4 sanitize가 없는 응답 경로 — **잠재 위험**
 - `routers/report.py:474` — `_read_snapshot`이 `:152/:157`에서 sanitize하지만 `apply_asof`(`:466`)가 **그 뒤에** 마트 Decimal을 주입한다.
-- `routers/report.py:306,326,510,562`, `routers/portfolio.py:62,148`, `routers/analysis.py:23,39`, `routers/digest.py:20,25`.
+- `routers/report.py:306,326,510,562`, `routers/analysis.py:23,39`, `routers/digest.py:20,25`. (`routers/portfolio.py:62,148`는 task#278에서 `sanitize()`로 감싸 §3.5로 이동 — `get_portfolio`/`get_portfolio_prices`.)
 - `routers/guru.py` — sanitize 없는 핸들러 **6개**: `:23`, `:35`, `:44`, `:50`, `:56-61`, `:65`.
 - `routers/market_indicators.py` — **`@router.get` 17개 전부 sanitize 0회**(`:33,41,49,57,65,73,81,89,97,105,113,122,143,214,222,244,250`). 지난 판의 "핸들러 9개"는 과소집계였다.
 - `routers/rankings.py:66`·`routers/investor.py:58`·`routers/short_sell.py:39` — bare `float()` 헬퍼에 `isfinite` 없음(`rankings.py:13`, `investor.py:9`, `short_sell.py:9`).
@@ -294,15 +297,15 @@ task#242·#243 감사는 `market_cache`와 delete-rewrite만 봤고 아래는 �
 - `services/utils.py:36-43` `sanitize`(단, §3.1의 Decimal 구멍).
 - `routers/stocks.py:483-498` `_usdkrw_rate`의 `math.isfinite` 가드(`:498`) — NaN≠None이라 `if fx is None`을 통과하던 task#104 근본.
 - `routers/stocks.py:673` `_build_all` 전체 sanitize; `:233-239` `_f`가 비교값 float+`isfinite` 정규화(`:237`).
-- 확인된 정상 가드: `recommendations.py:151,210`, `analytics.py:47-49`, `analysis_service.py:124,127`, `portfolio.py:164,208`, `analyst_reports.py:69,87,107,120`(`services/analyst_reports.py:121-122`가 sanitize *전에* Decimal→float 캐스트하므로 §3.1 구멍에 안 걸린다), `indicators.py`, `report_generator.py:507,683`.
+- 확인된 정상 가드: `recommendations.py:151,210`, `analytics.py:47-49`, `analysis_service.py:124,127`, `portfolio.py:168,212`, `analyst_reports.py:69,87,107,120`(`services/analyst_reports.py:121-122`가 sanitize *전에* Decimal→float 캐스트하므로 §3.1 구멍에 안 걸린다), `indicators.py`, `report_generator.py:507,683`.
 - ⚠️ **정정 — `market_indicators` 서브모듈이 "전부" 가드된 게 아니다**: sanitize를 하는 것은 **12개 중 4개**(`kospi_futures.py:50`, `indices.py:138`, `kospi_signal.py:248,278`, `sentiment.py:70`). `commodities.py`·`earnings.py`·`econ.py`·`exports.py`·`fx.py`·`macro.py`·`cache.py`는 `_mc_save` 전에 sanitize하지 않는다. 나눗셈은 전부 `if prev else 0.0`으로 가드되고(`fx.py:30,39`, `commodities.py:25`) 소스는 `dropna`를 타므로 **현재 라이브 위험은 낮다** — 고칠 것은 코드가 아니라 이 문장이다.
 - 회귀: `tests/test_nan_serialization_guards.py`(task#109).
 
 ### 3.6 Decimal ↔ float — **이미 가드됨(잔여 위험만)**
 - 수치 어댑터를 등록하는 코드가 없다(`register_type`/`DEC2FLOAT`/`new_type` 0건) → NUMERIC은 진짜 `Decimal`로 오고 모든 캐스트가 load-bearing이다. NUMERIC을 읽는 산술 ~30곳 전부 `float()`/`int()`/`pd.to_numeric`을 먼저 통과한다.
 - 역사적 결함 지점이 주석(`:546`)과 함께 고쳐져 있다: `routers/stocks.py:549-552`(`float(annual_div) / float(avg_cost)`).
-- **잔여 A**: `services/exposure.py:74` `e["weight"] * beta_map[...]`는 캐스트를 안 한다 — 두 호출자(`routers/portfolio.py:205`, `routers/stocks.py:295`)가 밖에서 캐스트한다. **세 번째 호출자가 원래 버그 형태를 그대로 재도입한다.**
-- **잔여 B**: `routers/portfolio.py:108` `amt * qty`가 `services/dividends.py:352`가 `amount_per_share`를 float화했음에 의존한다(`:73-74` 주석이 *다른 모듈*의 사실을 단언한다).
+- **잔여 A**: `services/exposure.py:74` `e["weight"] * beta_map[...]`는 캐스트를 안 한다 — 두 호출자(`routers/portfolio.py:209`, `routers/stocks.py:295`)가 밖에서 캐스트한다. **세 번째 호출자가 원래 버그 형태를 그대로 재도입한다.**
+- **잔여 B**: `routers/portfolio.py:110` `amt * qty`가 `services/dividends.py:352`가 `amount_per_share`를 float화했음에 의존한다(`:75-76` 주석이 *다른 모듈*의 사실을 단언한다).
 - **잔여 C**: 규약이 사이트마다 수동이고 자동 가드가 없다. 회귀 테스트는 **Decimal**로 써야 한다 — fixture가 float이면 라이브에서만 깨지는 fixture-pass-live-fail이 된다.
 
 ### 3.7 최소카드 폴백이 근본원인을 마스킹한다 — **설계상 트레이드오프**

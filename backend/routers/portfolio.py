@@ -1,8 +1,8 @@
 import logging
 from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Body
-from pydantic import BaseModel, field_validator
-from typing import List, Optional, Dict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import List, Optional, Dict, Annotated
 from services import storage, errors, report_generator, consensus_pipeline as _pipeline
 from services import cache as cache_svc, market as market_svc, kr_sector_service
 from services import dividends as dividends_svc
@@ -35,6 +35,8 @@ def _generate_etf_report(stock_dict: dict):
 
 
 class Stock(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
     ticker: str
     name: str
     quantity: float
@@ -59,7 +61,7 @@ class Stock(BaseModel):
 
 @router.get("")
 def get_portfolio(user_id: str = Depends(get_current_user)):
-    return storage.get_full_portfolio(user_id)
+    return sanitize(storage.get_full_portfolio(user_id))
 
 
 @router.get("/dividends")
@@ -145,7 +147,9 @@ def get_portfolio_prices(user_id: str = Depends(get_current_user)):
             }
             for s in all_stocks
         }
-    return cache_svc.get_live_prices(user_id, _compute)
+    # sanitize는 응답 시점에만 적용 — 캐시(get_live_prices, 15s TTL) 안에는 NaN이 그대로 남는다.
+    # 여기 목적은 응답 직렬화 안전이지 캐시 정화가 아니다.
+    return sanitize(cache_svc.get_live_prices(user_id, _compute))
 
 
 @router.get("/rebalance")
@@ -165,7 +169,7 @@ def get_rebalance(user_id: str = Depends(get_current_user)):
 
 
 @router.put("/rebalance/targets")
-def set_rebalance_targets(weights: Dict[str, Optional[float]] = Body(...), user_id: str = Depends(get_current_user)):
+def set_rebalance_targets(weights: Dict[str, Optional[Annotated[float, Field(allow_inf_nan=False)]]] = Body(...), user_id: str = Depends(get_current_user)):
     """보유 종목별 목표 비중(%) 배치 저장. 값 null이면 타겟 삭제(컬럼 NULL). 보유 중이 아닌 티커는 무시(스코프=보유 종목만)."""
     holdings = storage.get_holdings(user_id)
     holding_tickers = {h["ticker"].upper() for h in holdings}
