@@ -121,6 +121,7 @@ PC는 **좌측 사이드바** 5섹션(리서치·포트폴리오·시장·일정
 | 리포트 | 종목별 4탭(요약·심층분석·리포트·이력), 주가·RSI 차트, 목표가 컨센서스·괴리율, 수주잔고, 공매도·수급 추이(수급 종합 밴드·근거 헤더, KR 종목만), 내부자·5% 지분변동(신호 배지, KR), 최신 공시(DART), 상대 밸류에이션(종목·경쟁사 PER/PBR/PSR/EV·EBITDA 비교 + peer 중앙값 대비 지표별 할인/할증 칩); 심층분석 탭은 시장&경쟁(시장 전망 — 시장 규모·CAGR·자사 매출 CAGR 대조·경쟁사 비교축·사업부문 시장 분석: 부문별 매출비중 증감·시장규모·자사 점유율→금액 환산, `market_outlook.segments`)·경쟁우위(해자·핵심 자원 — 업종별 핵심자원 지표·유지동력, Cowork 작성)·성장&리스크·이벤트 4그룹으로 구성; 심층분석 지표 탭 → 기술·수급 서브탭에 52주 고/저·EMA 20/50/200·추세 요약·베타·역사적 변동성(HV) 표시, US 종목에 공매도 비중(유통주식 대비·Days to Cover·잔량)·기관 보유 상위(보유비중·전분기 대비)·내부자 거래(Form4: 6개월 순매수 요약 + 거래 목록)·보유 구루 드릴다운(13F 역인덱스: 운용역명·운용사·포트폴리오 비중·Top10 순위, /api/guru/managers 재사용) 추가. 즉시 생성·과거 백필(admin). 보유/관심 종목 관리(라이브 P&L·편집·삭제·승격·추가)도 여기서 하며, 종목별 고정핀으로 리포트 목록 맨 위에 고정할 수 있다. admin은 "그외" 탭(타 사용자 종목)에서 전체 사용자 제거도 가능 |
 | 랭킹 | 거래대금·거래량·등락률 상위(KR/US) + 외국인/기관/개인 수급(랭킹·리포트 상세 공유) |
 | 심층 리포트 | 애널리스트 리포트 허브(`/analyst-reports`) — 발행물 목록(전 사용자, **종목당 최신 1건**만 표시, 클릭 시 문서 페이지 `/analyst-report/:ticker/:date` 진입; 과거 판은 문서 헤더의 "이전 판" 링크로 이동; admin은 종목 단위 발행물 삭제) + 자동 발행 대상 관리(admin: 지정 종목 **전역** 목록 — `analyst_target`은 종목 공유 마스터 플래그라 타 사용자 보유분도 노출되며 `미보유` 라벨로 구분 — 해제·즉시 발행 지시; 신규 추가는 내 보유·관심에서 선택). 문서는 발행물 누적형(ADR-0027) 증권사 리포트식 단일 스크롤(투자의견·적정주가 밴드·한줄 논지·투자 포인트·사업부문 시장 분석(`market_outlook.segments` 있을 때만)·밸류에이션(산정방식+PER 밴드 차트+피어 멀티플)·실적 추정 테이블·리스크) — 판단·서사는 루틴이 발행(ADR-0028), 숫자 블록은 서버가 발행 시점 스냅샷에서 자동 박제. 발행물 있는 종목은 리포트 상세 헤더에도 문서 링크 노출 |
+| 선도기술 | 선도기술 리포트 허브(`/tech-reports`) — **종목이 아니라 기술 단위**의 발행물(ADR-0033). 대상 4종(재사용 로켓·전고체 배터리·SMR·로봇, 백엔드 상수가 정본)의 목록(기술당 최신 1건 — 표시명·한줄 제목·발행일·기술난이도·업체 수·시장 규모 요약) → 상세(`/tech-report/:slug`)에서 상세 기술설명·기술난이도·주요업체 표(국가·정부주도 배지·기술 성숙 단계 1~5·선두 대비 격차 년수·시장점유율·보유/관심 티커 배지 — 비상장·국영 업체도 포함)·기술 난제·시장 규모/CAGR 텍스트 요약·출처를 보여준다. 애널리스트 리포트와 달리 서버가 발행 시점에 자동 첨부하는 숫자가 전혀 없어(전방 시장 데이터 소스 부재) 판단·수치 전부를 루틴이 조사해 발행한다 |
 | 추천 | 보유 액션(추매/익절/홀딩 신호·평가손익·비중), 관심 재정렬(점수순), 발굴 종목 카드(합성 점수·근거 플래그·딥다이브로 관심 추가). US 종목 카드는 근거 플래그에 "구루 N명 보유"(13F 보유 구루 수, /api/guru/managers 역인덱스) 표시 |
 | 비교 | 보유·관심 종목 2~4개 다중선택 → 밸류에이션(PER·PBR·PSR·EV/EBITDA·목표가·상승여력)·재무(ROE·영업이익률·부채비율·FCF)·기술(RSI·52주 위치·HV·베타) 지표를 종목=열로 나란히 비교, 방향 자명 지표는 최적값 하이라이트. 최신 스냅샷 재활용(신규 수집 없음) |
 
@@ -209,7 +210,8 @@ Browser (React 19 / Vite 8 :5173)
 FastAPI (:8000)
  ├─ routers/    portfolio, watchlist, stocks, report, guru, calendar,
  │              digest, market_indicators, analytics, analysis, auth,
- │              admin, events, batches, rankings, investor, short_sell
+ │              admin, events, batches, rankings, investor, short_sell,
+ │              tech_reports
  ├─ services/   market(yfinance+키움/KIS+Naver), charts, indicators,
  │              report_generator(시장데이터 스냅샷·LLM 미호출),
  │              consensus / consensus_pipeline, digest_service,
@@ -217,7 +219,7 @@ FastAPI (:8000)
  │              leverage_service, lending_service, ranking_service,
  │              investor_service, short_sell_service, supply_score, backlog, disclosures, insider_trades,
  │              dividends, analysis_service, kr_sector_service, us_sector_service,
- │              guru_scraper / guru_stats, batch_registry, job_runs,
+ │              guru_scraper / guru_stats, batch_registry, job_runs, tech_reports(비-티커 발행물),
  │              kiwoom/, kis/, auth_service, cache, db, errors, parallel, progress
  ├─ scheduler.py  APScheduler 배치(시장별 분리 포함)
  │
@@ -230,7 +232,8 @@ FastAPI (:8000)
      ├─ calendar_cache / market_cache
      ├─ user_menu_permissions / default_menu_permissions   (권한)
      ├─ user_events                              (행동 로그)
-     └─ market_leverage_indicators / market_lending_balance   (수급지표)
+     ├─ market_leverage_indicators / market_lending_balance   (수급지표)
+     └─ tech_reports                             (선도기술 리포트, 비-티커 발행물)
 ```
 
 > AI 분석 텍스트는 백엔드가 생성하지 않는다 — 외부 Cowork 클라이언트가 enrich API로 작성한다.

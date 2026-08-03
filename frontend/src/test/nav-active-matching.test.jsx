@@ -23,6 +23,8 @@ import { ToastProvider } from '../components/Toast'
 // jsdom은 여기서 블라인드가 아니다 — 레이아웃이 아니라 className 존재 여부를 본다.
 const LIST = '/analyst-reports'
 const DETAIL = '/analyst-report/000660/2026-07-30'
+const TECH_LIST = '/tech-reports'
+const TECH_DETAIL = '/tech-report/smr'
 
 const noop = () => {}
 
@@ -47,10 +49,27 @@ describe('Masthead 서브바 — 심층 리포트', () => {
   })
 })
 
+// task#276 S5 — 선도기술 리포트 탭 추가(navSections.js 단일 소스 한 줄). analyst-report와 동형으로
+// 단수 match('/tech-report')가 목록·상세를 함께 덮어야 세 표면 모두 "지금 어디인가"를 유지한다.
+describe('Masthead 서브바 — 선도기술', () => {
+  it.each([
+    ['목록', TECH_LIST],
+    ['상세', TECH_DETAIL],
+  ])('%s(%s)에서 리서치 서브바가 뜨고 "선도기술"이 active다', (_label, path) => {
+    const { container } = renderAt(path, <Masthead theme="light" setTheme={noop} onLogout={noop} />)
+    const subbar = container.querySelector('.masthead-subbar')
+    expect(subbar, '리서치 서브바 노드').not.toBeNull()
+    const link = screen.getByRole('link', { name: '선도기술' })
+    expect(link.className).toContain('is-active')
+  })
+})
+
 describe('MobileNav 하단 탭바 — 리서치', () => {
   it.each([
     ['목록', LIST],
     ['상세', DETAIL],
+    ['선도기술 목록', TECH_LIST],
+    ['선도기술 상세', TECH_DETAIL],
   ])('%s(%s)에서 "리서치" 탭이 active다', (_label, path) => {
     renderAt(path, <MobileNav />)
     const tab = screen.getByRole('link', { name: '리서치' })
@@ -65,6 +84,17 @@ describe('ResearchShell seg — 심층 리포트', () => {
   ])('%s(%s)에서 seg "심층 리포트"가 active다', (_label, path) => {
     renderAt(path, <ResearchShell><div>CHILD</div></ResearchShell>)
     const tab = screen.getByRole('link', { name: '심층 리포트' })
+    expect(tab.className).toContain('is-active')
+  })
+})
+
+describe('ResearchShell seg — 선도기술', () => {
+  it.each([
+    ['목록', TECH_LIST],
+    ['상세', TECH_DETAIL],
+  ])('%s(%s)에서 seg "선도기술"이 active다', (_label, path) => {
+    renderAt(path, <ResearchShell><div>CHILD</div></ResearchShell>)
+    const tab = screen.getByRole('link', { name: '선도기술' })
     expect(tab.className).toContain('is-active')
   })
 })

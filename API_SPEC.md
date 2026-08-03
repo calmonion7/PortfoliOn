@@ -16,6 +16,7 @@
 - [Stocks (종목 정보)](#stocks-종목-정보)
 - [Report (리포트)](#report-리포트)
 - [Analyst Reports (애널리스트 리포트 발행물)](#analyst-reports-애널리스트-리포트-발행물)
+- [Tech Reports (선도기술 리포트)](#tech-reports-선도기술-리포트)
 - [Consensus (컨센서스)](#consensus-컨센서스)
 - [Calendar (이벤트 캘린더)](#calendar-이벤트-캘린더)
 - [Digest (일일 다이제스트)](#digest-일일-다이제스트)
@@ -2255,6 +2256,128 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 `data.market_outlook` — 스냅샷 `market_outlook.segments`가 있을 때만 첨부(발행 시점 박제). 없으면 `data`에 이 키 자체가 없음(구발행물 포함 — 프론트는 이때 "사업부문 시장 분석" 섹션을 생략). **수주잔고의 「사업부문 분해」(`GET /api/report/{ticker}/backlog`의 `segments`)와는 별개 개념** — 이쪽은 시장 전망 하위 부문별 매출비중·시장규모·자사 점유율이다. 필드 상세는 위 enrich `market_outlook.segments` 표 참조.
 
 **Error `404`** — 해당 ticker+date 발행물 없음
+
+---
+
+## Tech Reports (선도기술 리포트)
+
+기술 단위 발행물 (ADR-0033) — 종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇) 단위로 발행한다. 대상 4종은 백엔드 상수 `TECH_TOPICS`가 정본(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`) — 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. 발행물은 불변, 같은 `(slug, published_date)` 재발행만 그날 판을 교체(analyst-reports와 동형).
+
+### `POST /api/tech-reports/{slug}`
+
+선도기술 리포트 발행.
+
+**Auth:** `X-API-Key` 또는 admin Bearer token (`require_admin_or_api_key`)
+
+**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` (그 밖의 값은 `422`)
+
+**Request Body**
+```json
+{
+  "published_date": "2026-08-03",
+  "title": "재사용 발사체, 궤도당 비용을 다시 쓴다",
+  "description": "1단 재사용이 발사비를 낮추는 구조를 설명한다.",
+  "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
+  "players": [
+    { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
+      "tech_level": 5, "gap_years": 0, "leader_name": "Elon Musk",
+      "share_pct": 60.0, "note": "재사용 1위" }
+  ],
+  "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성." } ],
+  "related": { "prerequisites": ["정밀 유도항법"], "derivatives": [], "complements": [], "competitors": [] },
+  "market": {
+    "history": [ { "year": 2024, "size": { "value": 12.5, "currency": "USD", "unit": "bn" } } ],
+    "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
+    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
+  },
+  "sources": [ { "title": "NASA", "url": null } ]
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `published_date` | string | ✅ | `YYYY-MM-DD` |
+| `title` | string | ✅ | 한줄 제목 |
+| `description` | string | | 상세 기술설명 (생략 시 `""`) |
+| `difficulty` | object | ✅ | `{score: 1~5, rationale}` — 기술 난이도 |
+| `players` | array | | 주요업체 `{name, country, state_led, ticker?, tech_level: 1~5, gap_years?, leader_name?, share_pct?, note?}` — `share_pct`를 실으면 `market.share_basis`가 반드시 있어야 함(교차검증, 없으면 `422`) |
+| `challenges` | array | | 기술 난제 `{title, body}` |
+| `related` | object | | 관계 티커/기술 `{prerequisites, derivatives, complements, competitors}`(각 문자열 배열) |
+| `market` | object | ✅ | `{history: [{year, size}], forecast: [{year, size}], cagr_pct?, share_basis?, as_of}` — `size`는 `{value, currency: USD\|KRW, unit: mn\|bn\|tn}`. `history`(실측)와 `forecast`(예상)는 별개 배열 |
+| `sources` | array | ✅ | 출처 `{title, url?}` **최소 1개** |
+
+`value`(`MoneyValue`)·`cagr_pct`·`share_pct`는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
+
+**Response `201`**
+```json
+{ "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
+```
+
+**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit` · NaN/Infinity 값 · `sources` 0개 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락
+
+---
+
+각 조회 응답의 발행물 행(`report`)은 **발행 요청 필드 전체(위 표) + 서버 부여 필드 2개**로 구성된다 — `id`(내부 PK, 정렬·비교 용도 외 의미 없음)와 `created_at`(그 판이 저장·갱신된 시각, 재발행 시 갱신).
+
+### `GET /api/tech-reports`
+
+목록 — **기술당 최신 1건**(요약, 발행일 최신순).
+
+**Auth:** Bearer token 또는 `X-API-Key`
+
+**Response `200`**
+```json
+{ "reports": [ { "id": 4, "slug": "smr", "published_date": "2026-08-03", "title": "...", "...": "...", "created_at": "2026-08-03T09:00:00" } ] }
+```
+
+---
+
+### `GET /api/tech-reports/{slug}`
+
+그 기술의 발행 판 **전체** 목록(최신순, dedup 없음 — 문서 상세 이력 네비게이션용).
+
+**Auth:** Bearer token 또는 `X-API-Key`
+
+**Path Parameter:** `slug` — `422` if 미등록
+
+**Response `200`**
+```json
+{ "slug": "smr", "reports": [ { "id": 4, "published_date": "2026-08-03", "title": "...", "...": "...", "created_at": "2026-08-03T09:00:00" } ] }
+```
+
+---
+
+### `GET /api/tech-reports/{slug}/{published_date}`
+
+발행물 단건 — 발행 시 제출된 필드 전체(`title`·`description`·`difficulty`·`players`·`challenges`·`related`·`market`·`sources`) + `id`·`created_at`.
+
+**Auth:** Bearer token 또는 `X-API-Key`
+
+**Path Parameters:** `slug` — `422` if 미등록, `published_date` — `YYYY-MM-DD`
+
+**Response `200`**
+```json
+{
+  "id": 4, "slug": "smr", "published_date": "2026-08-03",
+  "title": "재사용 발사체, 궤도당 비용을 다시 쓴다",
+  "description": "1단 재사용이 발사비를 낮추는 구조를 설명한다.",
+  "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
+  "players": [ { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
+                 "tech_level": 5, "gap_years": 0, "leader_name": "Elon Musk",
+                 "share_pct": 60.0, "note": "재사용 1위" } ],
+  "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성." } ],
+  "related": { "prerequisites": ["정밀 유도항법"], "derivatives": [], "complements": [], "competitors": [] },
+  "market": {
+    "history": [ { "year": 2024, "size": { "value": 12.5, "currency": "USD", "unit": "bn" } } ],
+    "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
+    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
+  },
+  "sources": [ { "title": "NASA", "url": null } ],
+  "created_at": "2026-08-03T09:00:00"
+}
+```
+
+**Error `404`** — 해당 slug+date 발행물 없음, 또는 `published_date`가 `YYYY-MM-DD` 형식이 아님(DB 캐스트 500 방지, `analyst-reports` 관용구와 동형)
 
 ---
 

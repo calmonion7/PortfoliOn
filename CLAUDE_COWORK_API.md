@@ -40,6 +40,16 @@
    - 발행물 삭제는 admin 세션 전용(API key 불가) — Cowork/루틴은 삭제하지 않는다
 ```
 
+### 선도기술 리포트 발행 (tech-reports)
+```
+0. (조건 확인) GET /api/tech-reports  → **기술당 최신 1건**만 반환(대상 4종의 최신 발행일 판단용)
+1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처)
+2. POST /api/tech-reports/{slug}  → 발행
+   - 종목 발행물과 달리 **서버가 자동 첨부하는 숫자가 없다** — 통화·단위·점유율·척도까지 전부 이 본문에 조사해 채운다
+   - 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — 틀린 값보다 없는 값이 낫다)
+   - 대상 4종 밖 slug·통화·단위 enum 밖 값은 422로 거부된다
+```
+
 ---
 
 ## 인증
@@ -651,6 +661,90 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `401` | API Key 누락/불일치 |
 | `409` | 해당 종목 스냅샷 없음 — `POST /api/report/generate?tickers={ticker}`로 먼저 생성 |
 | `422` | rating enum·points 개수·밴드 역전·필수 필드 누락 |
+
+---
+
+### `GET /api/tech-reports`
+
+선도기술 리포트 목록 — **기술당 최신 1건**. 발행 전 조건 확인(그 기술의 최신 발행일이 30일 이상 지났는지 판단)에 사용.
+
+**Auth:** `X-API-Key` 헤더
+
+**Response `200`**
+```json
+{ "reports": [ { "slug": "smr", "published_date": "2026-07-01", "title": "SMR, 원자력의 두 번째 곡선" } ] }
+```
+
+> 대상 4종(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`) 중 이 목록에 없는 slug는 미발행 상태.
+
+---
+
+### `POST /api/tech-reports/{slug}`
+
+선도기술 리포트 발행 (ADR-0033). 종목이 아니라 **기술 하나**를 단위로 발행한다. 애널리스트 리포트와 달리 서버가 발행 시점에 자동 첨부하는 숫자가 전혀 없으므로, 기술설명·난이도·업체·시장 수치를 **전부 이 요청 본문에** 조사해 채운다. 문서는 발행 후 불변 — 같은 날 재발행만 그날 판을 교체, 다른 날 발행은 새 판으로 누적.
+
+**Auth:** `X-API-Key` 헤더
+
+**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` (그 밖의 값은 `422`)
+
+**Request Body**
+```json
+{
+  "published_date": "2026-08-03",
+  "title": "재사용 발사체, 궤도당 비용을 다시 쓴다",
+  "description": "1단 재사용이 발사비를 낮추는 구조를 설명한다(3~5문장).",
+  "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
+  "players": [
+    { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
+      "tech_level": 5, "gap_years": 0, "leader_name": "SpaceX",
+      "share_pct": 60.0, "note": "재사용 1위" },
+    { "name": "Rosatom", "country": "RU", "state_led": true, "tech_level": 2,
+      "gap_years": 8, "leader_name": "SpaceX" }
+  ],
+  "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성 확보가 관건." } ],
+  "related": { "prerequisites": ["정밀 유도항법"], "derivatives": ["eVTOL"], "complements": [], "competitors": [] },
+  "market": {
+    "history": [ { "year": 2024, "size": { "value": 12.5, "currency": "USD", "unit": "bn" } } ],
+    "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
+    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
+  },
+  "sources": [ { "title": "NASA" }, { "title": "SpaceX 공개 발표자료", "url": null } ]
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `published_date` | string | ✅ | `YYYY-MM-DD` |
+| `title` | string | ✅ | 한줄 제목 |
+| `description` | string | | 상세 기술설명(생략 시 `""`) |
+| `difficulty` | object | ✅ | `{score, rationale}` — **기술 자체**의 진입 난이도(업체별 기술수준과는 별개 축, 아래 참고) |
+| `players` | array | | 주요업체(상장 여부 무관 — SpaceX·Rosatom·CASC처럼 비상장·국영이 선두인 기술이 있다) |
+| `players[].tech_level` | int 1~5 | ✅ | 그 **업체의** 기술 성숙 단계 — `1 기초연구 · 2 시제품 · 3 실증 · 4 초기상용 · 5 양산상용`(공통 5단계 이산 척도, 0~100 점수 금지) |
+| `players[].gap_years` | int\|생략 | | 선두 대비 격차 **정수 년수**(`0`=선두 자신). `leader_name`을 함께 채워 무엇 대비인지 명시 |
+| `players[].share_pct` | number\|생략 | | 시장점유율(%). 채우면 `market.share_basis`가 반드시 있어야 함(없으면 422) |
+| `challenges` | array | | 기술 난제 `{title, body}` |
+| `related` | object | | `{prerequisites, derivatives, complements, competitors}`(문자열 배열) — 전제·파생·보완·경합 기술/티커 |
+| `market` | object | ✅ | `{history, forecast, cagr_pct, share_basis, as_of}` |
+| `market.history[]` | array | | **실측만**. `{year, size: {value, currency, unit}}` |
+| `market.forecast[]` | array | | **예상만**. history와 같은 배열에 섞지 말 것 — 화면이 실선(실측)/점선(예상)을 이 구분으로 가른다 |
+| `sources` | array | ✅ | 출처 `{title, url?}` **최소 1개**. 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — **틀린 값 < 누락**) |
+
+**통화·단위 enum(필수, 자유 텍스트·환산 금지)** — `currency`: `USD` \| `KRW`. `unit`: `mn`(백만) \| `bn`(십억) \| `tn`(조). 렌더러가 절대 추측·환산하지 않으므로 enum 밖 값은 `422`.
+
+> **기술수준 vs 기술난이도 vs 기술격차** — 세 축을 섞지 마세요. `players[].tech_level`은 *그 업체가* 지금 어느 단계인지, `difficulty`는 *그 기술 자체가* 얼마나 어려운지(기술 단위 필드 하나, 업체별이 아님), `gap_years`는 *선두 대비 몇 년 뒤인지*입니다.
+> **상용 시장이 아직 형성되지 않은 기술**(예: SMR·재사용 로켓 일부 세그먼트)은 점유율 근거를 댈 수 없으면 `share_pct`를 생략하세요(업체 표는 그대로, 점유율 칸만 빔).
+
+**Response `201`**
+```json
+{ "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
+```
+
+**Errors**
+
+| 상태 | 설명 |
+|------|------|
+| `401` | API Key 누락/불일치 |
+| `422` | 미등록 slug · currency/unit enum 위반 · NaN/Infinity 값 · `sources` 0개 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 |
 
 ---
 

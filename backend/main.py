@@ -42,6 +42,7 @@ from routers.short_sell import router as short_sell_router
 from routers.batches import router as batches_router
 from routers.recommendations import router as recommendations_router
 from routers.analyst_reports import router as analyst_reports_router
+from routers.tech_reports import router as tech_reports_router
 from middleware.event_tracker import EventTrackerMiddleware
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
@@ -236,6 +237,24 @@ def _migrate():
             UNIQUE (ticker, published_date))""")
     except Exception as e:
         logger.warning(f"[Migrate] analyst_reports 생성 실패: {e}")
+    try:
+        from services.db import execute
+        execute("""CREATE TABLE IF NOT EXISTS tech_reports (
+            id               BIGSERIAL PRIMARY KEY,
+            slug             TEXT NOT NULL,
+            published_date   DATE NOT NULL,
+            title            TEXT NOT NULL,
+            description      TEXT NOT NULL DEFAULT '',
+            difficulty       JSONB,
+            players          JSONB DEFAULT '[]'::jsonb,
+            challenges       JSONB DEFAULT '[]'::jsonb,
+            related          JSONB DEFAULT '{}'::jsonb,
+            market           JSONB DEFAULT '{}'::jsonb,
+            sources          JSONB DEFAULT '[]'::jsonb,
+            created_at       TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE (slug, published_date))""")
+    except Exception as e:
+        logger.warning(f"[Migrate] tech_reports 생성 실패: {e}")
 
 
 @asynccontextmanager
@@ -288,6 +307,7 @@ app.include_router(short_sell_router)
 app.include_router(batches_router)
 app.include_router(recommendations_router)
 app.include_router(analyst_reports_router)
+app.include_router(tech_reports_router)
 app.include_router(admin_router)
 
 

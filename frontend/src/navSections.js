@@ -18,6 +18,7 @@ export const NAV_SECTIONS = [
       { to: '/ranking', label: '랭킹', evt: 'tab_ranking' },
       { to: '/compare', label: '비교', evt: 'tab_compare' },
       { to: '/analyst-reports', label: '심층 리포트', match: '/analyst-report' },
+      { to: '/tech-reports', label: '선도기술', match: '/tech-report' },
     ],
   },
   {

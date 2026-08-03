@@ -405,3 +405,22 @@ CREATE TABLE IF NOT EXISTS analyst_reports (
     created_at       TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE (ticker, published_date)
 );
+
+-- 선도기술 리포트 발행물 (ADR-0033, task#276) — 종목이 아니라 기술 단위 발행물.
+-- 대상은 백엔드 상수 TECH_TOPICS 4종(재사용 로켓·전고체 배터리·SMR·로봇)이 정본.
+-- 같은 (slug, published_date) 재발행은 upsert(그날 판 교체), 다른 날은 누적.
+CREATE TABLE IF NOT EXISTS tech_reports (
+    id               BIGSERIAL PRIMARY KEY,
+    slug             TEXT NOT NULL,
+    published_date   DATE NOT NULL,
+    title            TEXT NOT NULL,
+    description      TEXT NOT NULL DEFAULT '',
+    difficulty       JSONB,                        -- {score, rationale}
+    players          JSONB DEFAULT '[]'::jsonb,     -- 주요업체 [{name, country, state_led, ...}]
+    challenges       JSONB DEFAULT '[]'::jsonb,     -- 난제 [{title, body}]
+    related          JSONB DEFAULT '{}'::jsonb,     -- {prerequisites, derivatives, complements, competitors}
+    market           JSONB DEFAULT '{}'::jsonb,     -- {history, forecast, cagr_pct, share_basis, as_of}
+    sources          JSONB DEFAULT '[]'::jsonb,     -- [{title, url}]
+    created_at       TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (slug, published_date)
+);

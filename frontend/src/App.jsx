@@ -16,6 +16,8 @@ import Digest from './pages/Digest'
 import MarketHub from './pages/MarketHub'
 import AnalystReport from './pages/AnalystReport'
 import AnalystReports from './pages/AnalystReports'
+import TechReport from './pages/TechReport'
+import TechReports from './pages/TechReports'
 import Guru from './pages/Guru'
 import GuruDetail from './pages/GuruDetail'
 import Settings from './pages/Settings'
@@ -94,6 +96,8 @@ function AppShell({ theme, setTheme, setSession }) {
               <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
               <Route path="/analyst-reports" element={<ResearchShell><AnalystReports /></ResearchShell>} />
               <Route path="/analyst-report/:ticker/:date" element={<ResearchShell><AnalystReport /></ResearchShell>} />
+              <Route path="/tech-reports" element={<ResearchShell><TechReports /></ResearchShell>} />
+              <Route path="/tech-report/:slug" element={<ResearchShell><TechReport /></ResearchShell>} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
               <Route path="/market/flow" element={<MarketHub tab="flow" />} />
