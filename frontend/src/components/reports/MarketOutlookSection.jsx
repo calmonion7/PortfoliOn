@@ -1,5 +1,6 @@
 import { SectionTitle, computeRevenueCagr } from './reportUtils.jsx'
 import { GlossaryText } from '../Glossary.jsx'
+import SegmentAnalysisSection from './SegmentAnalysisSection.jsx'
 
 // 시장 전망 — summary.market_outlook (AI 기입, 결측·부분결측 흔함 → 전 필드 optional graceful)
 // { market_name, size_current:{value,unit,year}, size_forecast:{value,unit,year}, cagr_pct,
@@ -30,8 +31,10 @@ export default function MarketOutlookSection({ market_outlook, financialsAnnual 
   const fcSize = fmtSize(mo.size_forecast)
   const hasCagr = typeof mo.cagr_pct === 'number' && Number.isFinite(mo.cagr_pct)
   const hasShare = typeof mo.company_share_pct === 'number' && Number.isFinite(mo.company_share_pct)
+  // task#275: segments만 있고 나머지 필드가 전부 결측이어도 부문 섹션은 떠야 하므로 early-return에 함께 반영.
+  const hasSegments = Array.isArray(mo.segments) && mo.segments.length > 0
 
-  if (!mo.market_name && !curSize && !fcSize && !hasCagr && !hasShare && !mo.one_liner) return null
+  if (!mo.market_name && !curSize && !fcSize && !hasCagr && !hasShare && !mo.one_liner && !hasSegments) return null
 
   // 매출 시계열 2개년 미만이면 대조 생략(wrong<missing) — computeRevenueCagr가 그 경우 null 반환
   const revCagr = computeRevenueCagr(financialsAnnual)
@@ -88,6 +91,7 @@ export default function MarketOutlookSection({ market_outlook, financialsAnnual 
       {mo.sources?.length > 0 && (
         <div style={{ fontSize: 10, color: 'var(--text-3)' }}>출처: {mo.sources.join(', ')}</div>
       )}
+      <SegmentAnalysisSection market_outlook={mo} financialsAnnual={financialsAnnual} />
     </div>
   )
 }

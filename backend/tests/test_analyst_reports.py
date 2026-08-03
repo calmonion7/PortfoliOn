@@ -4,6 +4,7 @@
 무인증 401은 override 없는 fresh app으로 검증(test_security_auth_gaps 패턴).
 DB는 services.analyst_reports.query/execute를 mock(conftest _block_real_db 가드).
 """
+import json
 from unittest.mock import patch
 
 from fastapi import FastAPI
@@ -82,6 +83,55 @@ def test_build_data_block():
     assert "price" not in block["competitors"][0]
     assert block["competitors"][0]["rd_intensity"] == 9.5
     assert block["per_band"]["current"] == 13.0
+
+
+def test_build_data_block_market_outlook_segments_included_when_present():
+    """segments 있는 스냅샷 → data["market_outlook"]["segments"] 반환 (task#275 S3ⓒ)."""
+    snap = {**SNAPSHOT, "market_outlook": {
+        "market_name": "메모리 반도체",
+        "segments": [{"name": "메모리", "period": "2024", "revenue_share_pct": 58.3}],
+    }}
+    block = svc.build_data_block(snap, "2026-07-25")
+    assert block["market_outlook"]["segments"] == [
+        {"name": "메모리", "period": "2024", "revenue_share_pct": 58.3}
+    ]
+
+
+def test_build_data_block_market_outlook_segments_omitted_when_absent():
+    """segments 없는 스냅샷 → "market_outlook" 키 자체 부재(구발행물 섹션 자연 생략)."""
+    assert "market_outlook" not in svc.build_data_block(SNAPSHOT, "2026-07-25")
+    # market_outlook 필드는 있으나 segments가 없거나 빈 배열인 경우도 동일
+    no_segments = {**SNAPSHOT, "market_outlook": {"market_name": "메모리 반도체"}}
+    assert "market_outlook" not in svc.build_data_block(no_segments, "2026-07-25")
+    empty_segments = {**SNAPSHOT, "market_outlook": {"segments": []}}
+    assert "market_outlook" not in svc.build_data_block(empty_segments, "2026-07-25")
+
+
+def test_build_data_block_market_outlook_segments_parses_json_string():
+    """tickers.market_outlook은 text 컬럼 — JSON 문자열로 온 경우도 파싱."""
+    snap = {**SNAPSHOT, "market_outlook": json.dumps({
+        "segments": [{"name": "파운드리", "period": "2024", "revenue_share_pct": 20.0}]
+    })}
+    block = svc.build_data_block(snap, "2026-07-25")
+    assert block["market_outlook"]["segments"][0]["name"] == "파운드리"
+    # 파싱 실패(깨진 JSON 문자열)도 키 부재로 graceful
+    broken = {**SNAPSHOT, "market_outlook": "{not json"}
+    assert "market_outlook" not in svc.build_data_block(broken, "2026-07-25")
+
+
+def test_build_data_block_market_outlook_segments_sanitizes_nan_inf():
+    """NaN/Infinity 입력이 다른 필드를 오염시키지 않고 그 필드만 null (JSONB 저장·직렬화 500 방지)."""
+    snap = {**SNAPSHOT, "market_outlook": {"segments": [
+        {"name": "메모리", "period": "2024", "revenue_share_pct": float("nan"),
+         "market": {"size": float("inf"), "cagr_pct": 8.0}},
+    ]}}
+    block = svc.build_data_block(snap, "2026-07-25")
+    seg = block["market_outlook"]["segments"][0]
+    assert seg["name"] == "메모리"
+    assert seg["revenue_share_pct"] is None
+    assert seg["market"]["size"] is None
+    assert seg["market"]["cagr_pct"] == 8.0
+    json.dumps(block)  # NaN/Infinity 잔존이면 여기서 ValueError(allow_nan 기본 True라도 이건 소거 확인용)
 
 
 # ── 발행 API ──────────────────────────────────────────────────────────

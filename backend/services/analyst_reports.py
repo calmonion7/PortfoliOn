@@ -15,6 +15,7 @@ import math
 from typing import Optional
 
 from services.db import query, execute
+from services.utils import sanitize
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,28 @@ def per_band(financials_annual: list, current_per=None, forward_per=None) -> Opt
     }
 
 
+def _market_outlook_segments(snapshot: dict) -> Optional[list]:
+    """스냅샷 market_outlook.segments[] 발췌 (task#275 S3ⓒ).
+
+    market_outlook은 dict·JSON 문자열·None 중 하나일 수 있다(tickers.market_outlook
+    text 컬럼 유래, _parse_json_field 계열). segments가 없거나 비었거나 파싱 실패면
+    None — build_data_block이 그 경우 market_outlook 키 자체를 생략해 구발행물과
+    동일하게 프론트 섹션이 자연 생략된다. NaN/Infinity는 sanitize로 그 필드만 null화
+    (starlette allow_nan=False 직렬화 500·JSONB NaN 저장 실패 방지)."""
+    mo = snapshot.get("market_outlook")
+    if isinstance(mo, str):
+        try:
+            mo = json.loads(mo)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    if not isinstance(mo, dict):
+        return None
+    segments = mo.get("segments")
+    if not isinstance(segments, list) or not segments:
+        return None
+    return sanitize(segments)
+
+
 def build_data_block(snapshot: dict, snapshot_date: str) -> dict:
     """최신 스냅샷에서 발행 시점 데이터 블록 발췌·계산 (ADR-0027 하이브리드 생산).
 
@@ -61,7 +84,7 @@ def build_data_block(snapshot: dict, snapshot_date: str) -> dict:
     consensus_rows = [f for f in annual if f.get("is_consensus")]
     excerpt = sorted(actual + consensus_rows, key=lambda f: str(f.get("period") or ""))
     fields = ("period", "revenue", "operating_income", "eps", "per", "is_consensus")
-    return {
+    result = {
         "snapshot_date": snapshot_date,
         "price": snapshot.get("price"),
         "market": snapshot.get("market"),
@@ -79,6 +102,10 @@ def build_data_block(snapshot: dict, snapshot_date: str) -> dict:
         ],
         "per_band": per_band(annual, snapshot.get("per"), snapshot.get("forward_per")),
     }
+    segments = _market_outlook_segments(snapshot)
+    if segments:
+        result["market_outlook"] = {"segments": segments}
+    return result
 
 
 def _fnum(v):

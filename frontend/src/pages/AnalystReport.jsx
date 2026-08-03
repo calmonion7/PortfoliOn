@@ -8,10 +8,11 @@ import Card from '../components/ui/Card'
 import Stat from '../components/ui/Stat'
 import Skeleton from '../components/ui/Skeleton'
 import { SectionTitle } from '../components/reports/reportUtils.jsx'
+import SegmentAnalysisSection from '../components/reports/SegmentAnalysisSection.jsx'
 import { GlossaryTerm, GlossaryText } from '../components/Glossary.jsx'
 
 // 증권사 리포트식 단일 문서 페이지 (task#212, 에디토리얼 재설계 task#216, ADR-0026/0027)
-// 헤더(스탯 스트립+밴드 게이지) → 한줄 논지 → 투자 포인트 → 밸류에이션 → 실적 추정 → 리스크
+// 헤더(스탯 스트립+밴드 게이지) → 한줄 논지 → 투자 포인트 → 사업부문 시장 분석(구발행물엔 없음, task#275) → 밸류에이션 → 실적 추정 → 리스크
 
 export const RATING_META = {
   buy: { label: '매수', variant: 'success' },      // 의미 배지 — 가격색(up/down) 교차 사용 금지(task#194)
@@ -487,6 +488,9 @@ export default function AnalystReport() {
           </Card>
         ))}
       </div>
+
+      {/* ── 사업부문 시장 분석 (구발행물엔 data.market_outlook 없음 → 자연 생략, task#275) ── */}
+      <SegmentAnalysisSection market_outlook={d.market_outlook} financialsAnnual={annual} />
 
       {/* ── 밸류에이션 ───────────────────────────────────── */}
       <SectionTitle>밸류에이션</SectionTitle>

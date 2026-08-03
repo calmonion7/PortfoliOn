@@ -72,3 +72,23 @@ describe('MarketOutlookSection 결측 표시 가드 (task#254)', () => {
     expect(container.textContent).not.toMatch(/0조원/)
   })
 })
+
+// task#275 — segments만 있고 나머지 필드가 전부 결측이어도 early-return에 걸려 부문 섹션까지
+// 통째로 사라지지 않는지 잠근다(34행 조건에 hasSegments 반영).
+describe('MarketOutlookSection 사업부문 시장 분석 배선 (task#275)', () => {
+  it('시장 전망 필드가 전부 결측이어도 segments가 있으면 부문 섹션이 렌더된다', () => {
+    const { queryByText, getByText } = render(
+      <MarketOutlookSection market_outlook={{
+        segments: [{ name: '반도체', period: '2024', revenue_share_pct: 60 }],
+      }} />
+    )
+    // 시장 규모/CAGR/점유율 stat 블록은 여전히 결측이라 미표시 — 부문 섹션만 뜬다
+    expect(queryByText('시장 규모(현재)')).toBeNull()
+    expect(getByText('🧩 사업부문 시장 분석')).toBeTruthy()
+  })
+
+  it('market_outlook 자체가 없으면 완전 미렌더(기존 동작 보존)', () => {
+    const { container } = render(<MarketOutlookSection market_outlook={null} />)
+    expect(container.innerHTML).toBe('')
+  })
+})

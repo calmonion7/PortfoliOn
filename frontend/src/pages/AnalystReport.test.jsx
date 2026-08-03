@@ -116,6 +116,40 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     expect(screen.queryByText('영업이익')).toBeNull()
   })
 
+  it('구발행물(data.market_outlook 부재)은 사업부문 시장 분석 섹션이 나타나지 않는다(task#275)', async () => {
+    api.get.mockResolvedValue({ data: REPORT })
+    renderPage()
+    await screen.findByText('한줄 논지 테스트')
+    expect(screen.queryByText('🧩 사업부문 시장 분석')).toBeNull()
+  })
+
+  it('data.market_outlook.segments 있으면 사업부문 시장 분석 섹션이 밸류에이션 앞에 렌더된다(task#275)', async () => {
+    const withSegments = {
+      ...REPORT,
+      data: {
+        ...REPORT.data,
+        market_outlook: {
+          segments: [
+            { name: '반도체', period: '2024', revenue_share_pct: 60 },
+            { name: '가전', period: '2024', revenue_share_pct: 40 },
+          ],
+        },
+      },
+    }
+    api.get.mockResolvedValue({ data: withSegments })
+    const { container } = renderPage()
+    await screen.findByText('한줄 논지 테스트')
+    expect(screen.getByText('🧩 사업부문 시장 분석')).toBeTruthy()
+    // 투자 포인트 다음 · 밸류에이션 앞 위치 확인
+    const titles = [...container.querySelectorAll('.rpt-title__text')].map(el => el.textContent)
+    const pointsIdx = titles.findIndex(t => t.includes('투자 포인트'))
+    const segIdx = titles.findIndex(t => t.includes('사업부문 시장 분석'))
+    const valIdx = titles.findIndex(t => t.includes('밸류에이션'))
+    expect(pointsIdx).toBeGreaterThanOrEqual(0)
+    expect(segIdx).toBeGreaterThan(pointsIdx)
+    expect(valIdx).toBeGreaterThan(segIdx)
+  })
+
   it('404면 에러 상태 표시(silent catch 금지)', async () => {
     api.get.mockRejectedValue({ response: { status: 404 } })
     renderPage()

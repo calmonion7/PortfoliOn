@@ -1097,6 +1097,7 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 | `market_outlook.position` | string | ❌ | 시장 내 위치 (예: `"1위"`) |
 | `market_outlook.sources` | string[] | ✅(값 포함 시) | 근거 출처 목록. **출처 없는 값은 저장하지 말 것** |
 | `market_outlook.one_liner` | string | ❌ | 한 줄 종합 요약 |
+| `market_outlook.segments` | `{name,period,revenue_share_pct,...}[]` | ❌ | 부문별 매출 비중·시장 규모·자사 점유율 분해("사업부문 시장 분석"). 필드 상세·기입 지침은 `CLAUDE_COWORK_API.md` 참조. **`GET /api/report/{ticker}/backlog`의 `segments`(수주잔고 「사업부문 분해」, `{sector,entity,amount}[]`)와는 별개 개념** |
 | `competitors` | string[] | ❌ | 경쟁사 티커 목록 |
 
 > 최소 1개 이상의 필드를 포함해야 함.
@@ -2232,7 +2233,14 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     "competitors": [
       { "ticker": "000660", "name": "SK하이닉스", "is_self": false, "per": 8.2, "pbr": 2.1, "psr": 3.5, "ev_ebitda": 5.9, "rd_intensity": 10.2 }
     ],
-    "per_band": { "min": 8.9, "max": 21.2, "avg": 13.4, "current": 12.1, "forward": 9.8 }
+    "per_band": { "min": 8.9, "max": 21.2, "avg": 13.4, "current": 12.1, "forward": 9.8 },
+    "market_outlook": {
+      "segments": [
+        { "name": "메모리", "period": "2024", "revenue_share_pct": 58.3, "prev_period": "2023", "prev_revenue_share_pct": 51.0,
+          "market": { "size": 1200, "unit": "억달러", "year": 2024, "size_forecast": 1900, "forecast_year": 2030, "cagr_pct": 8.0 },
+          "share_pct": 12.0, "share_pct_forecast": 14.0, "note": "HBM 수요 확대", "sources": ["Gartner 2024"] }
+      ]
+    }
   }
 }
 ```
@@ -2244,6 +2252,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 `data.consensus_detail.brokerages` — 발행 순간 raw_reports 90일 창(마트 base_date 앵커) `DISTINCT ON(brokerage_code)` 최신 의견, 최신순. US 집계 sentinel `__consensus__`는 제외. 파이프라인 미커버 종목(구발행물 포함)은 `consensus_detail` 자체가 없음 — 프론트는 이때 컨센서스 섹션을 생략(graceful).
 `data.financials_annual` — 비컨센서스 최근 3개년 + forward 컨센서스 행(`is_consensus: true`), `period` 오름차순. US는 `operating_income`이 `null`일 수 있음(yfinance forward 미제공 — graceful).
 `data.per_band` — 과거 연간 PER(비컨센서스, 최근 최대 6개)의 min/max/avg + 현재/forward PER. 재료 부족(<2개)이면 `null`.
+`data.market_outlook` — 스냅샷 `market_outlook.segments`가 있을 때만 첨부(발행 시점 박제). 없으면 `data`에 이 키 자체가 없음(구발행물 포함 — 프론트는 이때 "사업부문 시장 분석" 섹션을 생략). **수주잔고의 「사업부문 분해」(`GET /api/report/{ticker}/backlog`의 `segments`)와는 별개 개념** — 이쪽은 시장 전망 하위 부문별 매출비중·시장규모·자사 점유율이다. 필드 상세는 위 enrich `market_outlook.segments` 표 참조.
 
 **Error `404`** — 해당 ticker+date 발행물 없음
 

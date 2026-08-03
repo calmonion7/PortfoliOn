@@ -259,7 +259,15 @@ X-API-Key: {COWORK_API_KEY}
     "company_share_pct": 55.0,
     "position": "1위",
     "sources": ["Goldman Sachs Research (2026-02)", "회사 IR 발표자료"],
-    "one_liner": "비만치료제 시장은 연 33% 고성장 중이며 당사가 점유율 1위"
+    "one_liner": "비만치료제 시장은 연 33% 고성장 중이며 당사가 점유율 1위",
+    "segments": [
+      { "name": "당뇨치료제", "period": "2025", "revenue_share_pct": 62.0, "prev_period": "2024", "prev_revenue_share_pct": 68.0,
+        "market": { "size": 55, "unit": "십억달러", "year": 2025, "size_forecast": 80, "forecast_year": 2030, "cagr_pct": 7.8 },
+        "share_pct": 40.0, "sources": ["IQVIA (2026-01)"] },
+      { "name": "비만치료제", "period": "2025", "revenue_share_pct": 38.0, "prev_period": "2024", "prev_revenue_share_pct": 32.0,
+        "market": { "size": 24, "unit": "십억달러", "year": 2025, "size_forecast": 100, "forecast_year": 2030, "cagr_pct": 33.0 },
+        "share_pct": 55.0, "share_pct_forecast": 60.0, "note": "경구용 치료제 승인 이후 처방 확대 국면", "sources": ["Goldman Sachs Research (2026-02)"] }
+    ]
   },
   "competitors": ["NVO", "AMGN"]
 }
@@ -383,8 +391,38 @@ X-API-Key: {COWORK_API_KEY}
 | `position` | string\|null | 시장 내 위치 (예: `"1위"`) |
 | `sources` | string[] | **필수 — 출처 없는 값은 저장하지 말 것.** 근거 출처 목록 (예: `["TrendForce (2026-03)", "회사 IR 자료"]`) |
 | `one_liner` | string | 한 줄 종합 요약 |
+| `segments` | `{name,period,revenue_share_pct,...}[]` | 회사 단위 전망 아래 **부문별** 매출비중·시장·점유율 분해 (「사업부문 시장 분석」). 상세는 바로 아래 참조 |
 
 > **`growth_plan`과 혼동 금지** — `growth_plan`은 *회사의* 전략·이니셔티브이고, `market_outlook`은 *시장 자체*의 규모·성장입니다. 시장 규모/성장률의 무료 자동 수집 소스가 없어 Cowork 조사·기입이 유일한 수단이므로, 수치가 불확실하면 `market_outlook` 자체를 생략하세요(**틀린 값 < 누락**) — `sources`가 비어있는 값은 저장하지 마세요.
+
+**`market_outlook.segments[]` 필드** — 사업부문별 매출 비중·시장 규모·자사 점유율 (「사업부문 시장 분석」). **수주잔고의 「사업부문 분해」(`PUT /api/report/{ticker}/backlog`의 `segments`, `{sector,entity,amount}[]`)와는 별개 개념** — 그건 수주잔고를 부문·법인으로 나눈 것이고, 이건 *매출과 시장*을 부문으로 나눈 것입니다.
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `name` | string | ✅ | 부문명 — **사업보고서/10-K 부문 표기 그대로** |
+| `period` | string | ✅ | 당기 매출 비중의 기준 기간. **`financials_annual`의 `period`와 문자열이 정확히 일치해야** 서버가 부문 매출 금액을 환산합니다 (예: `"2024"`) |
+| `revenue_share_pct` | number | ✅ | 당기 매출 비중(%) |
+| `prev_period` | string | ❌ | 전기 기준 기간 |
+| `prev_revenue_share_pct` | number | ❌ | 전기 매출 비중(%). 없으면 매출 증감·비중 변화(%p)가 표시되지 않습니다 |
+| `market` | object | ❌ | 그 부문이 속한 시장 — `{size, unit, year, size_forecast, forecast_year, cagr_pct}` |
+| `market.size` | number | ❌ | 현재 시장 규모 |
+| `market.unit` | string | ❌ | 규모 단위 (예: `"억달러"`) |
+| `market.year` | number | ❌ | 규모 기준 연도 |
+| `market.size_forecast` | number | ❌ | 전망 시장 규모 |
+| `market.forecast_year` | number | ❌ | 전망 기준 연도 |
+| `market.cagr_pct` | number | ❌ | 그 시장의 연평균 성장률(%) |
+| `share_pct` | number | ❌ | 그 시장에서 자사 점유율(%) |
+| `share_pct_forecast` | number | ❌ | 미래 시점 점유율 전망(%). 있으면 화면 시나리오 라벨이 "회사 전망"(없으면 "점유율 유지 가정")으로 표시 |
+| `note` | string | ❌ | 서술 (예: 수요 배경) |
+| `sources` | string[] | ❌ | 근거 출처 목록 |
+
+> **기입 지침**
+> - 부문명은 **사업보고서/10-K 부문 표기 그대로** 쓰세요(임의로 재명명하지 마세요).
+> - **최대 5개 부문**만 기입하고, 그 이상은 '기타'로 묶거나 생략하세요.
+> - 비중은 **매출 기준**입니다(자산·이익 기준이 아닙니다).
+> - `period`를 반드시 명시하세요 — `financials_annual`의 그 기간과 **문자열이 정확히 일치**해야 서버가 부문 매출 금액을 환산합니다. 불일치하면 그 부문은 비중·시장 수치만 남고 금액은 표시되지 않습니다.
+> - **금액은 절대 쓰지 마세요** — %만 기입하면 서버가 금액(부문 매출·시장 기회)을 환산합니다(수주잔고 단위 오저장 계열의 함정을 원천 차단하기 위함).
+> - 그 부문의 근거를 확인할 수 없으면 그 부문 자체를 생략하세요(**틀린 값 < 누락**).
 
 > 모든 객체 필드는 선택적입니다. 최소 1개 이상의 최상위 필드를 포함해야 합니다.
 >
@@ -635,5 +673,5 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 - **`insights`** — 리포트 "권고 인사이트(진입/회피 가이드)" 섹션에 표시
 - **`key_resource`** — 리포트 "핵심 자원" 섹션(심층분석 탭)에 표시
 - **`competitor_edge`** — 리포트 "경쟁사 기술·경쟁력 비교" 섹션(심층분석 탭)에 표시
-- **`market_outlook`** — 리포트 "시장 전망" 섹션(심층분석 탭)에 표시
+- **`market_outlook`** — 리포트 "시장 전망" 섹션(심층분석 탭)에 표시. `segments`가 있으면 그 안에 "사업부문 시장 분석"이 함께 표시됨(부문별 매출비중 증감·시장 규모·자사 점유율→금액 환산)
 - **`competitors`** — 경쟁사 비교 섹션에 반영

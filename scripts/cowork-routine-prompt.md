@@ -8,7 +8,7 @@ BASE URL: https://portfolion.taebro.com
 1. GET /api/stocks → 각 항목의 enriched_at 확인. 대상 = enriched_at이 null이거나 7일 초과 경과한 종목만, null 우선 → 오래된 순으로 최대 5종목. 대상이 없으면 이 단계는 건너뛴다.
 2. 각 종목: GET /api/report/list 에서 그 종목 최신 리포트 날짜 확인 → GET /api/report/{ticker}/{date} 로 스냅샷(재무·컨센서스·기술지표·수급) 참조 → 심층 분석 작성. 웹 검색이 가능하면 최근 뉴스·공시로 보강한다.
 3. PUT /api/stocks/enrich/batch 로 일괄 저장. body 예시(항목당 이 필드들을 한국어로 채움):
-[{"ticker":"005930","moat":"<경제적 해자 분석 2~4문장>","growth_plan":"<장기 성장 계획>","risks":"<리스크>","recent_disclosures":"<최근 공시·이슈가 주가에 주는 영향>","insights":"<권고 인사이트: 스탠스(매수/관망/회피)와 진입·회피 가이드 한줄>","key_resource":"<업종 핵심 자원 지표와 유지 동력>","competitor_edge":"<경쟁사 대비 기술·경쟁력>","market_outlook":"<시장 전망: 시장 규모·성장률과 자사 위치>"}]
+[{"ticker":"005930","moat":"<경제적 해자 분석 2~4문장>","growth_plan":"<장기 성장 계획>","risks":"<리스크>","recent_disclosures":"<최근 공시·이슈가 주가에 주는 영향>","insights":"<권고 인사이트: 스탠스(매수/관망/회피)와 진입·회피 가이드 한줄>","key_resource":"<업종 핵심 자원 지표와 유지 동력>","competitor_edge":"<경쟁사 대비 기술·경쟁력>","market_outlook":"<시장 전망: 시장 규모·성장률과 자사 위치. 사업부문별 매출비중 증감·시장규모·점유율은 market_outlook.segments[]로 추가 기입 — 부문명은 사업보고서 표기 그대로, period 필수(financials_annual과 문자열 일치), 금액은 쓰지 말고 %만, 최대 5개 부문만(그 이상은 생략)>"}]
 4. 저장 후 반드시 POST /api/report/generate?tickers={쉼표구분목록} 호출(리포트 재생성).
 
 == 2) 애널리스트 리포트 발행 (재량 + 가드레일) ==
