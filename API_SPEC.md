@@ -2280,7 +2280,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
   "players": [
     { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
-      "tech_level": 5, "gap_years": 0, "leader_name": "Elon Musk",
+      "tech_level": 5, "gap_years": 0, "leader_name": "SpaceX",
       "share_pct": 60.0, "note": "재사용 1위" }
   ],
   "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성." } ],
@@ -2363,7 +2363,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "description": "1단 재사용이 발사비를 낮추는 구조를 설명한다.",
   "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
   "players": [ { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
-                 "tech_level": 5, "gap_years": 0, "leader_name": "Elon Musk",
+                 "tech_level": 5, "gap_years": 0, "leader_name": "SpaceX",
                  "share_pct": 60.0, "note": "재사용 1위" } ],
   "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성." } ],
   "related": { "prerequisites": ["정밀 유도항법"], "derivatives": [], "complements": [], "competitors": [] },

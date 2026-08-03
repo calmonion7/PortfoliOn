@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import TechReport from './TechReport'
 import api from '../api'
@@ -12,7 +12,9 @@ const REPORT = {
   description: '1단 재사용이 발사비를 낮추는 구조를 설명한다.',
   difficulty: { score: 4, rationale: '극저온 추진제 재점화가 어렵다.' },
   players: [
-    { name: 'SpaceX', country: 'US', state_led: false, ticker: null, tech_level: 5, gap_years: 0, leader_name: 'Elon Musk', share_pct: 60.0, note: '재사용 1위' },
+    // leader_name은 "무엇 대비인지" = 선두 **업체명**이다(CLAUDE_COWORK_API.md 정의). 인명을 넣으면
+    // `선두 대비 5년 · Elon Musk`처럼 오표기가 된다 — 이 픽스처의 옛 인명 값이 실제로 오도를 낳았다(task#277).
+    { name: 'SpaceX', country: 'US', state_led: false, ticker: null, tech_level: 5, gap_years: 0, leader_name: 'SpaceX', share_pct: 60.0, note: '재사용 1위' },
     { name: 'CASC', country: 'CN', state_led: true, ticker: null, tech_level: 3, gap_years: 5, leader_name: 'SpaceX', share_pct: null, note: null },
   ],
   challenges: [{ title: '재점화 신뢰성', body: '다회 재점화 엔진 내구성.' }],
@@ -50,14 +52,18 @@ describe('선도기술 리포트 상세 (task#276 S5)', () => {
     expect(screen.getByText('1단 재사용이 발사비를 낮추는 구조를 설명한다.')).toBeTruthy()
     expect(screen.getByText('극저온 추진제 재점화가 어렵다.')).toBeTruthy()
 
-    // 업체 표 — 기술 성숙 단계는 텍스트로만(5칸 밴드는 2/2 몫)
-    expect(screen.getByText('SpaceX')).toBeTruthy()
-    expect(screen.getByText('5단계 · 양산상용')).toBeTruthy()
-    expect(screen.getByText('현재 선두')).toBeTruthy()   // gap_years === 0
-    expect(screen.getByText('CASC')).toBeTruthy()
-    expect(screen.getByText('3단계 · 실증')).toBeTruthy()
-    expect(screen.getByText('선두 대비 5년 · SpaceX')).toBeTruthy()
-    expect(screen.getByText('정부주도')).toBeTruthy()     // CASC만 state_led
+    // 업체 표 — 기술 성숙 단계는 텍스트로만(5칸 밴드는 별도 시각화)
+    // task#277 S5가 TechLevelBand·ShareChart를 배선해 업체명·"현재 선두"가 페이지에 다시
+    // 등장한다(정당한 중복 — 비교 섹션이라 같은 이름을 또 보여줘야 한다). 이 축(표를 특정)을
+    // 결정한 문서는 없다(부수적 단언) — within(tech-report-players)로 표 자체를 스코프한다.
+    const playersTable = within(screen.getByTestId('tech-report-players'))
+    expect(playersTable.getByText('SpaceX')).toBeTruthy()
+    expect(playersTable.getByText('5단계 · 양산상용')).toBeTruthy()
+    expect(playersTable.getByText('현재 선두')).toBeTruthy()   // gap_years === 0
+    expect(playersTable.getByText('CASC')).toBeTruthy()
+    expect(playersTable.getByText('3단계 · 실증')).toBeTruthy()
+    expect(playersTable.getByText('선두 대비 5년 · SpaceX')).toBeTruthy()
+    expect(playersTable.getByText('정부주도')).toBeTruthy()     // CASC만 state_led
     expect(screen.getByText('점유율 기준: 발사 횟수 기준')).toBeTruthy()
 
     expect(screen.getByText('재점화 신뢰성')).toBeTruthy()
@@ -93,7 +99,24 @@ describe('선도기술 리포트 상세 (task#276 S5)', () => {
         ? Promise.resolve({ data: { reports: [withTicker] } })
         : Promise.resolve({ data: [{ ticker: 'RKLB', name: 'Rocket Lab', type: 'holding', market: 'US' }] }))
     renderAt('reusable-rocket')
-    await screen.findByText('SpaceX')
+    // task#277 S5: TechLevelBand·ShareChart도 SpaceX를 표시하므로 표 스코프로 특정한다.
+    await within(await screen.findByTestId('tech-report-players')).findByText('SpaceX')
     expect(await screen.findByText('보유')).toBeTruthy()
+  })
+
+  it('gap_years 음수는 표시하지 않는다 — 표와 밴드가 같은 규율을 쓴다', async () => {
+    // backend Player.gap_years에 ge=0 제약이 없어 음수가 발행될 수 있고, 그러면 `선두 대비 -2년`이라는
+    // 무의미한 문구가 렌더됐다(적대적 리뷰 렌즈1). TechLevelBand는 고쳐졌는데 이 표는 안 고쳐져
+    // **같은 필드가 같은 페이지에서 두 거동**을 갖고 있었다 — 한쪽 테스트가 다른 쪽을 보호하지 않는다.
+    const negative = { ...REPORT, players: [{ ...REPORT.players[1], gap_years: -2 }] }
+    api.get.mockImplementation((url) =>
+      url === '/api/tech-reports/reusable-rocket'
+        ? Promise.resolve({ data: { reports: [negative] } })
+        : Promise.resolve({ data: [] }))
+    renderAt('reusable-rocket')
+    const table = within(await screen.findByTestId('tech-report-players'))
+    expect(await table.findByText('CASC')).toBeTruthy()
+    expect(table.queryByText(/-2년/)).toBeNull()
+    expect(table.queryByText(/선두 대비/)).toBeNull()
   })
 })

@@ -6,12 +6,17 @@ import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { SectionTitle } from '../components/reports/reportUtils.jsx'
 import { TECH_NAMES, TECH_LEVEL_LABELS, formatMarketSummary } from '../components/reports/techReportUtils'
+import MarketGrowthChart from '../components/tech/MarketGrowthChart'
+import ShareChart from '../components/tech/ShareChart'
+import TechLevelBand from '../components/tech/TechLevelBand'
+import TechGraph from '../components/tech/TechGraph'
 
-// 선도기술 리포트 상세 (ADR-0033, task#276 S5) — 기술 단위 발행물. 목록은 기술당 최신 1건이라
-// 여기도 이력 없이 최신 판만 보여준다(과거 판 UI는 이번 비목표, ADR-0033 결정 1).
-// 순서는 CONTEXT.md 정의 구성을 따른다: 기술설명 → 난이도 → 주요 업체 → 난제 → 시장 규모 → 출처.
-// 연관기술 관계도(전제→대상→파생 3열 SVG)·5칸 밴드 시각화·성장 곡선 차트는 2/2(task#277)의 몫 —
-// 여기서 recharts나 그래프를 미리 만들면 두 파트가 같은 표면을 두 번 고친다.
+// 선도기술 리포트 상세 (ADR-0033, task#276 S5 + task#277 S5) — 기술 단위 발행물. 목록은 기술당
+// 최신 1건이라 여기도 이력 없이 최신 판만 보여준다(과거 판 UI는 이번 비목표, ADR-0033 결정 1).
+// 순서는 CONTEXT.md 정의 구성을 따른다: 기술설명 → 난이도 → 주요 업체 → 기술수준 밴드 →
+// 점유율 → 난제 → 시장 규모(요약+성장곡선) → 연관기술(관계도) → 출처.
+// components/tech/* 4종은 순수 표시 컴포넌트 — 데이터가 없으면 조용히 생략한다(TechLevelBand는
+// 예외 — 업체가 있으면 항상 표시하고 결측 행은 "—", ShareChart/TechGraph는 섹션째 생략).
 
 export default function TechReport() {
   const { slug } = useParams()
@@ -67,6 +72,9 @@ export default function TechReport() {
   const challenges = report.challenges || []
   const sources = report.sources || []
   const summary = formatMarketSummary(report.market)
+  const related = report.related || {}
+  const hasRelated = ['prerequisites', 'derivatives', 'complements', 'competitors']
+    .some((k) => Array.isArray(related[k]) && related[k].length > 0)
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '20px 16px 64px' }}>
@@ -107,7 +115,7 @@ export default function TechReport() {
               const stockType = p.ticker ? holdings[p.ticker] : null
               const gapText = p.gap_years === 0
                 ? '현재 선두'
-                : p.gap_years != null
+                : p.gap_years != null && p.gap_years > 0
                   ? `선두 대비 ${p.gap_years}년${p.leader_name ? ` · ${p.leader_name}` : ''}`
                   : null
               return (
@@ -143,9 +151,22 @@ export default function TechReport() {
               )
             })}
           </div>
-          {report.market?.share_basis && (
-            <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '8px 0 0' }}>점유율 기준: {report.market.share_basis}</p>
-          )}
+        </div>
+      )}
+
+      {/* ── 기술수준 비교 (업체 × 5단계 밴드, task#277 S3) ── */}
+      {players.length > 0 && (
+        <div style={{ marginBottom: 30 }}>
+          <SectionTitle>기술수준 비교</SectionTitle>
+          <TechLevelBand players={players} />
+        </div>
+      )}
+
+      {/* ── 점유율 (share_pct 전무 시 컴포넌트가 조용히 생략, task#277 S2) ── */}
+      {players.some(p => Number.isFinite(p.share_pct)) && (
+        <div style={{ marginBottom: 30 }}>
+          <SectionTitle>점유율</SectionTitle>
+          <ShareChart players={players} shareBasis={report.market?.share_basis} />
         </div>
       )}
 
@@ -164,9 +185,9 @@ export default function TechReport() {
         </div>
       )}
 
-      {/* ── 시장 규모 (텍스트 요약만 — 성장 곡선 차트는 2/2 몫) ── */}
+      {/* ── 시장 규모 (텍스트 요약 + 그 아래 성장 곡선 차트, task#277 S1) ── */}
       <SectionTitle>시장 규모</SectionTitle>
-      <Card padding="md" style={{ marginBottom: 30 }}>
+      <Card padding="md" style={{ marginBottom: 16 }}>
         {summary ? (
           <p className="mono tnum" data-testid="tech-report-market-summary" style={{ color: 'var(--text)', fontSize: 15, fontWeight: 700, margin: 0 }}>{summary}</p>
         ) : (
@@ -176,6 +197,17 @@ export default function TechReport() {
           <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '8px 0 0' }}>{report.market.as_of} 기준</p>
         )}
       </Card>
+      <div style={{ marginBottom: 30 }}>
+        <MarketGrowthChart market={report.market} sources={sources} />
+      </div>
+
+      {/* ── 연관 기술 (전제→대상→파생 관계도, 관계 데이터 전무 시 조용히 생략, task#277 S4) ── */}
+      {hasRelated && (
+        <div style={{ marginBottom: 30 }}>
+          <SectionTitle>연관 기술</SectionTitle>
+          <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug} />
+        </div>
+      )}
 
       {/* ── 출처 ─────────────────────────────────────────── */}
       {sources.length > 0 && (

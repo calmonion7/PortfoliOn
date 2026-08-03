@@ -1,0 +1,30 @@
+.tech-level-band { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* 상단 범례 "1 기초연구 … 5 양산상용" — 좁은 화면에서 접히지 않고 다음 줄로 흐른다(축3 정석 조합) */
+.tech-level-band__legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+.tech-level-band__legend-item { font-size: var(--font-size-xs); color: var(--text-3); white-space: nowrap; }
+
+.tech-level-band__row { display: flex; align-items: center; gap: var(--space-2); }
+
+/* 이름만 줄어도 되는 요소 — ellipsis 상자(축2) */
+.tech-level-band__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text);
+}
+
+/* 칸 수는 줄면 안 되는 형제 — flex-shrink:0(축2) */
+.tech-level-band__cells { display: flex; flex-shrink: 0; gap: 2px; }
+.tech-level-band__cell { width: 18px; height: 10px; border-radius: 2px; background: var(--border); }
+.tech-level-band__cell--filled { background: var(--data-2); }
+
+.tech-level-band__meta { display: flex; flex-shrink: 0; align-items: center; white-space: nowrap; font-size: var(--font-size-xs); }
+.tech-level-band__leader { color: var(--accent); font-weight: var(--font-weight-semibold); }
+.tech-level-band__gap { color: var(--text-3); }
+
+.tech-level-band__empty { flex-shrink: 0; color: var(--text-3); font-size: var(--font-size-sm); }
