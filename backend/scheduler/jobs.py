@@ -37,10 +37,7 @@ def _generate_all(market: str, job_id: str):
             logger.warning(f"[Scheduler] Pipeline run_daily failed: {e}")
     # 배치 완료 → 루틴 fire (best-effort, ADR-0028) — job_runs 컨텍스트 밖(배치 성패와 무관)
     from services import cowork_trigger
-    cowork_trigger.fire(
-        f"{market} 일일 리포트 배치 완료 — enrich rolling(오래된 순 최대 5종목)과 "
-        f"애널리스트 리포트 재량 발행(가드레일: 7일+ 경과 또는 유의미 변화, 최대 2종목) 정책을 수행하라."
-    )
+    cowork_trigger.fire(cowork_trigger.daily_text(market))
 
 
 def _generate_kr():

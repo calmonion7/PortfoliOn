@@ -320,7 +320,7 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 
 ### `POST /api/admin/cowork/fire`
 
-Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인). 일일 배치 완료 시 자동 fire되는 것과 같은 루틴을 즉시 깨운다. `text` 생략/빈값이면 기본 정책 지시문(enrich rolling + 재량 발행) 사용.
+Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인). 일일 배치 완료 시 자동 fire되는 것과 같은 루틴을 즉시 깨운다. `text` 생략/빈값이면 기본 본문 사용 — **정책을 여기 열거하지 않고** "프롬프트(`scripts/cowork-routine-prompt.md`)에 정의된 전 정책을 순서대로 검토해 수행하라"만 지시한다(task#279 — 트리거 본문이 정책을 열거하면 프롬프트의 "트리거 우선" 규칙 때문에 stale 목록이 정본을 이겨버린다). 정책 정본(enrich 회전 갱신·애널리스트 리포트 발행·선도기술 리포트 발행 3종의 조건·상한)은 프롬프트 파일에만 있다.
 
 **Auth:** admin Bearer token 또는 `X-API-Key` (`require_admin_or_api_key`)
 
@@ -333,6 +333,7 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 ```json
 { "ok": true, "text": "005930 enrich 후 애널리스트 리포트 발행" }
 ```
+(`text` 생략/빈값이면 응답은 `{ "ok": true, "text": "수동 트리거 — 프롬프트에 정의된 전 정책을 순서대로 검토해 수행하라." }`)
 
 **Error `503`** — `COWORK_ROUTINE_FIRE_URL`/`COWORK_ROUTINE_FIRE_TOKEN` 미설정 (휴면)
 **Error `502`** — fire POST 실패 (서버 로그 확인)

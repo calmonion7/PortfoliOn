@@ -79,12 +79,15 @@ def test_admin_fire_ok(monkeypatch):
 
 
 def test_admin_fire_default_text(monkeypatch):
+    # task#279: 이 단언은 "기본 문구가 사용된다"는 부수적 확인이었지 정책 열거가
+    # 결정된 것이 아니었다(task#264 절차로 판별 완료 — ADR-0028은 트리거의 정책
+    # 열거를 결정한 바 없음). 빌더가 유일한 산지이므로 exact-equality로 강화.
     monkeypatch.setenv("COWORK_ROUTINE_FIRE_URL", "https://example.com/fire")
     monkeypatch.setenv("COWORK_ROUTINE_FIRE_TOKEN", "tok")
     with patch("services.cowork_trigger.fire", return_value=True) as mock_fire:
         resp = client.post("/api/admin/cowork/fire", json={})
     assert resp.status_code == 200
-    assert "enrich" in mock_fire.call_args.args[0]
+    assert mock_fire.call_args.args[0] == cowork_trigger.manual_text()
 
 
 def test_admin_fire_unauthenticated_401():
