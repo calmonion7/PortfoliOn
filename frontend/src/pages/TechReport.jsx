@@ -1,21 +1,34 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api'
-import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { SectionTitle } from '../components/reports/reportUtils.jsx'
-import { TECH_NAMES, TECH_LEVEL_LABELS, formatMarketSummary } from '../components/reports/techReportUtils'
+import { TECH_NAMES, formatMarketSummary, sortPlayers } from '../components/reports/techReportUtils'
 import MarketGrowthChart from '../components/tech/MarketGrowthChart'
 import ShareChart from '../components/tech/ShareChart'
 import TechLevelBand from '../components/tech/TechLevelBand'
 import TechGraph from '../components/tech/TechGraph'
+import TechKpiStrip from '../components/tech/TechKpiStrip'
+import PlayerTable from '../components/tech/PlayerTable'
+import ProseSections from '../components/tech/ProseSections'
 
-// 선도기술 리포트 상세 (ADR-0033, task#276 S5 + task#277 S5) — 기술 단위 발행물. 목록은 기술당
-// 최신 1건이라 여기도 이력 없이 최신 판만 보여준다(과거 판 UI는 이번 비목표, ADR-0033 결정 1).
-// 순서는 CONTEXT.md 정의 구성을 따른다: 기술설명 → 난이도 → 주요 업체 → 기술수준 밴드 →
-// 점유율 → 난제 → 시장 규모(요약+성장곡선) → 연관기술(관계도) → 출처.
-// components/tech/* 4종은 순수 표시 컴포넌트 — 데이터가 없으면 조용히 생략한다(TechLevelBand는
+// 선도기술 리포트 상세 (ADR-0033, task#276 S5 + task#277 S5 + task#280 S1) — 기술 단위 발행물.
+// 목록은 기술당 최신 1건이라 여기도 이력 없이 최신 판만 보여준다(과거 판 UI는 비목표, 결정 1).
+//
+// 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로 재구성. CONTEXT.md 구성 서사도 이 순서다):
+//   기술명 h1 → 리드 문단 → KPI 스트립 → (2/2 핵심 포인트) → (2/2 진척 타임라인) → 주요 업체 표
+//   → 기술수준 밴드 → (2/2 계보 분류) → 점유율 → 난제 → 시장 규모 → 연관 기술
+//   → 상세 설명(접힘) → 출처.
+// 괄호 자리는 2/2(신규 필드 의존)가 채운다 — 자리를 비워 둬야 2/2가 배치를 다시 흔들지 않는다.
+//
+// ⚠️ 이 파일은 배선만 한다 — 업체 표시 규율(gap_years·share_pct·기술수준 라벨)은 PlayerTable이
+// 단독 소유한다. 여기에 같은 필드의 두 번째 거동을 두면 한 페이지에서 한 필드가 두 얼굴을
+// 갖게 된다(task#277 이탈 7 실사례).
+// 같은 이유로 **업체 순서도 여기서 한 번만 정한다**(sortPlayers 1회 → 전 소비처 공유). 표만
+// 정렬하고 밴드에 원배열을 넘기면 30px 간격의 두 섹션이 같은 9곳을 다른 순서로 나열한다
+// (task#280 적대 리뷰 F1 실측: 4·5번째가 뒤바뀜). 재정렬은 멱등이라 소비처가 또 정렬해도 안전하다.
+// components/tech/* 는 전부 순수 표시 컴포넌트 — 데이터가 없으면 조용히 생략한다(TechLevelBand는
 // 예외 — 업체가 있으면 항상 표시하고 결측 행은 "—", ShareChart/TechGraph는 섹션째 생략).
 
 export default function TechReport() {
@@ -69,6 +82,8 @@ export default function TechReport() {
   )
 
   const players = report.players || []
+  // 표·밴드·점유율이 공유하는 단일 순서(F1). 비파괴 정렬이라 report.players는 그대로 남는다.
+  const ordered = sortPlayers(players)
   const challenges = report.challenges || []
   const sources = report.sources || []
   const summary = formatMarketSummary(report.market)
@@ -83,74 +98,31 @@ export default function TechReport() {
         <span style={{ color: 'var(--text-3)', fontSize: 11, letterSpacing: '0.12em', fontWeight: 600 }}>TECH REPORT</span>
         <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 'auto' }}>{report.published_date} 발행</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '8px 0 4px' }}>
-        <span style={{ color: 'var(--text-3)', fontSize: 13, fontWeight: 600 }}>{TECH_NAMES[report.slug] || report.slug}</span>
-        {report.difficulty?.score != null && <Badge variant="neutral">난이도 {report.difficulty.score}/5</Badge>}
-      </div>
-      <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, margin: '0 0 16px' }}>
-        {report.title}
+      <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, margin: '6px 0 6px' }}>
+        {TECH_NAMES[report.slug] || report.slug}
       </h1>
-
-      {/* ── 상세 기술설명 ────────────────────────────────── */}
-      {report.description && (
-        <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: '0 0 20px' }}>
-          {report.description}
+      {/* 리드 문단 — 제목(141자)은 이미 핵심 결론이라 자르지 않고 격을 바꾼다. ellipsis·line-clamp
+          금지(가토 ⑦ — 잘림은 문자열 *끝*을 먹어 결론의 뒷부분부터 사라진다). 줄바꿈은 허용. */}
+      {report.title && (
+        <p data-testid="tech-report-lead"
+           style={{ fontFamily: 'var(--font-serif)', fontSize: 17, lineHeight: 1.55, color: 'var(--text-2, var(--text))', margin: '0 0 20px' }}>
+          {report.title}
         </p>
       )}
 
-      {/* ── 기술난이도 근거 ──────────────────────────────── */}
-      {report.difficulty?.rationale && (
-        <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--border-strong)', background: 'var(--bg-elev-2)', borderRadius: '0 6px 6px 0', marginBottom: 30 }}>
-          <div style={{ color: 'var(--text-3)', fontSize: 11, marginBottom: 4 }}>기술난이도 근거</div>
-          <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0 }}>{report.difficulty.rationale}</p>
-        </div>
-      )}
+      {/* ── KPI 스트립 (난이도 배지는 여기 흡수 — 중복 표시하지 않는다) ── */}
+      <div style={{ marginBottom: 30 }}>
+        <TechKpiStrip report={report} />
+      </div>
 
-      {/* ── 주요 업체 ────────────────────────────────────── */}
+      {/* 2/2 자리: 핵심 포인트 카드(key_points) */}
+      {/* 2/2 자리: 진척 타임라인(milestones) */}
+
+      {/* ── 주요 업체 (표시 규율은 PlayerTable 단독 소유) ── */}
       {players.length > 0 && (
         <div style={{ marginBottom: 30 }}>
           <SectionTitle>주요 업체</SectionTitle>
-          <div data-testid="tech-report-players" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {players.map((p, i) => {
-              const stockType = p.ticker ? holdings[p.ticker] : null
-              const gapText = p.gap_years === 0
-                ? '현재 선두'
-                : p.gap_years != null && p.gap_years > 0
-                  ? `선두 대비 ${p.gap_years}년${p.leader_name ? ` · ${p.leader_name}` : ''}`
-                  : null
-              return (
-                <Card key={i} padding="sm" data-testid="tech-report-player-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {/* 업체명만 ellipsis(줄어도 되는 것) — 티커·배지는 flex-shrink:0 형제(task#275) */}
-                    <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {p.name}
-                    </span>
-                    <span style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {p.ticker && <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.ticker}</span>}
-                      {stockType && (
-                        <Badge
-                          variant="neutral" size="sm"
-                          style={stockType === 'holding'
-                            ? { background: 'var(--tag-hold-bg)', color: 'var(--tag-hold-color)', borderColor: 'var(--tag-hold-border)' }
-                            : { background: 'var(--tag-watch-bg)', color: 'var(--tag-watch-color)', borderColor: 'var(--tag-watch-border)' }}
-                        >
-                          {stockType === 'holding' ? '보유' : '관심'}
-                        </Badge>
-                      )}
-                      {p.state_led && <Badge variant="info" size="sm">정부주도</Badge>}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 4, fontSize: 11.5, color: 'var(--text-3)' }}>
-                    <span style={{ whiteSpace: 'nowrap' }}>{p.country}</span>
-                    <span style={{ whiteSpace: 'nowrap' }}>{p.tech_level}단계 · {TECH_LEVEL_LABELS[p.tech_level]}</span>
-                    {gapText && <span style={{ whiteSpace: 'nowrap' }}>{gapText}</span>}
-                    {p.share_pct != null && <span className="mono tnum" style={{ whiteSpace: 'nowrap' }}>점유율 {p.share_pct}%</span>}
-                  </div>
-                  {p.note && <p style={{ color: 'var(--text-3)', fontSize: 11.5, margin: '6px 0 0' }}>{p.note}</p>}
-                </Card>
-              )
-            })}
-          </div>
+          <PlayerTable players={ordered} holdings={holdings} />
         </div>
       )}
 
@@ -158,15 +130,18 @@ export default function TechReport() {
       {players.length > 0 && (
         <div style={{ marginBottom: 30 }}>
           <SectionTitle>기술수준 비교</SectionTitle>
-          <TechLevelBand players={players} />
+          <TechLevelBand players={ordered} />
         </div>
       )}
 
-      {/* ── 점유율 (share_pct 전무 시 컴포넌트가 조용히 생략, task#277 S2) ── */}
-      {players.some(p => Number.isFinite(p.share_pct)) && (
+      {/* 2/2 자리: 계보 분류(players[].category) */}
+
+      {/* ── 점유율 ── 게이트는 ShareChart 자신의 채택 조건(유한·음수 아님)과 같은 식이어야 한다.
+          느슨하면(예: isFinite만) 전 업체가 음수인 판에서 제목만 남고 차트가 사라진다(task#277 S2). */}
+      {players.some(p => Number.isFinite(p.share_pct) && p.share_pct >= 0) && (
         <div style={{ marginBottom: 30 }}>
           <SectionTitle>점유율</SectionTitle>
-          <ShareChart players={players} shareBasis={report.market?.share_basis} />
+          <ShareChart players={ordered} shareBasis={report.market?.share_basis} />
         </div>
       )}
 
@@ -206,6 +181,16 @@ export default function TechReport() {
         <div style={{ marginBottom: 30 }}>
           <SectionTitle>연관 기술</SectionTitle>
           <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug} />
+        </div>
+      )}
+
+      {/* ── 상세 설명 (산문 전문 — 첫 화면이 아니라 본문 끝, 출처 앞. 손실 0으로 접기만 한다) ──
+          가드는 description·rationale 둘 다 봐야 한다 — rationale만 있는 판에서 제목이 dangling
+          되거나(전자만 보면) 제목 없이 근거만 뜨는(후자만 보면) 일이 없게. */}
+      {(report.description || report.difficulty?.rationale) && (
+        <div style={{ marginBottom: 30 }}>
+          <SectionTitle>상세 설명</SectionTitle>
+          <ProseSections description={report.description} rationale={report.difficulty?.rationale} />
         </div>
       )}
 
