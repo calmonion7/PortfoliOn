@@ -141,6 +141,11 @@ function truncateLabel(label, maxWidth, fontSize) {
   return lo > 0 ? label.slice(0, lo) + '…' : '…'
 }
 
+// 3열 DAG는 본질적으로 넓다. `width:100%`만 주면 고정 viewBox가 컨테이너 폭에 비례해 **텍스트까지**
+// 축소돼 350px에서 라벨이 6px로 렌더된다(실측) — 기하는 전부 경계 안이라 넘침·잘림·겹침 축이 원리적으로
+// 못 잡는다. 넓은 콘텐츠는 자체 스크롤러에 담는 것이 이 앱 관례이므로 `minWidth`로 설계 크기를 지켜
+// 라벨을 12px로 유지하고, 좁은 화면에서는 가로 스크롤한다(페이지 본문은 가로 스크롤하지 않는다).
+const GRAPH_SCROLL_STYLE = { overflowX: 'auto', overflowY: 'hidden' }
 const SVG_STYLE = { width: '100%', height: 'auto', display: 'block' }
 const EDGE_STYLE = { fill: 'none', stroke: 'var(--border-strong)', strokeWidth: 1.25 }
 const NODE_RECT_STYLE = { fill: 'var(--bg-elev)', stroke: 'var(--border)', strokeWidth: 1 }
@@ -172,10 +177,11 @@ export default function TechGraph({ related, target, width = 640, height = 260 }
   return (
     <div data-testid="tech-graph">
       {hasGraph && (
+        <div style={GRAPH_SCROLL_STYLE}>
         <svg
           data-testid="tech-graph-svg"
           viewBox={`0 0 ${width} ${height}`}
-          style={SVG_STYLE}
+          style={{ ...SVG_STYLE, minWidth: width }}
           role="img"
           aria-label="연관기술 관계도"
         >
@@ -202,6 +208,7 @@ export default function TechGraph({ related, target, width = 640, height = 260 }
             )
           })}
         </svg>
+        </div>
       )}
       {hasChips && (
         <div style={CHIP_WRAP_STYLE}>
