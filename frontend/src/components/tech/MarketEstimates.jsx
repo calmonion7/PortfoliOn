@@ -30,11 +30,23 @@ export default function MarketEstimates({ estimates }) {
   const { rows, year, max, multiplierTxt } = marketEstimatesLayout(estimates)
   if (rows.length === 0) return null
 
+  // ⚠️ 트랙(flex:1)이 흡수하는 잔여폭이 행마다 다르면 `width:N%`의 기준이 행마다 달라져 **더 작은 값이
+  // 더 긴 막대**가 된다 — 라이브 실측에서 정확히 그랬다($12.5B→75.98px vs $9B→84.86px, 트랙
+  // [153,103,160,146,160]). 원인은 ① 값 문자열의 자연폭이 행마다 다르고($9B < $12.5B) ② `기준` 마커가
+  // 한 행에만 있다는 것. 그래서 값·마커가 먹는 폭을 **행 전체에서 균일하게 예약**한다.
+  // 폭은 상수로 추정하지 않고 데이터에서 파생한다(task#281 COL_W 처방) — 서버가 배열 내 currency·unit
+  // 동일을 강제하므로(Market._estimates_consistency) 값 문자열은 자릿수만 다르고, mono 폰트에서 1글자=1ch다.
+  // jsdom엔 레이아웃이 없어 vitest는 이 px 불변식을 원리적으로 못 잰다 — 게이트는 라이브 프로브의
+  // est-bar-monotonic이고, vitest는 그 구조적 대리지표(폭 선언이 행마다 동일 · 마커 슬롯이 전 행에 존재)를 본다.
+  const sizeTexts = rows.map((e) => formatMarketSize(e.size) ?? '—')
+  const valueCh = Math.max(...sizeTexts.map((s) => s.length))
+  const anyBasis = rows.some((e) => e.is_basis === true)
+
   return (
     <div data-testid="market-estimates" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {rows.map((e, i) => {
         const label = e.scope ? `${e.institution} · ${e.scope}` : e.institution
-        const sizeTxt = formatMarketSize(e.size) ?? '—'
+        const sizeTxt = sizeTexts[i]
         const widthPct = max > 0 ? (e.size.value / max) * 100 : 0
         return (
           <div key={`${e.institution}-${i}`} data-testid="market-estimate-row" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -45,14 +57,21 @@ export default function MarketEstimates({ estimates }) {
             <div style={{ flex: 1, minWidth: 0, height: 14, background: 'var(--bg-elev-2)', borderRadius: 3, overflow: 'hidden' }}>
               <div data-testid="market-estimate-bar" style={{ width: `${widthPct}%`, height: '100%', background: 'var(--data-1)', borderRadius: 3 }} />
             </div>
-            <span className="mono tnum" style={{ flexShrink: 0, whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+            {/* 값·마커는 flexShrink:0 + **행마다 동일한 예약폭** — 자연폭에 맡기면 트랙 기준이 흔들린다(위 주석) */}
+            <span className="mono tnum" data-testid="market-estimate-value" style={{ flexShrink: 0, width: `${valueCh}ch`, textAlign: 'right', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
               {sizeTxt}
             </span>
-            {e.is_basis === true && (
+            {anyBasis && (
               <span
-                data-testid="market-estimate-basis-marker"
-                title="성장 곡선이 채택한 기관"
-                style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 3, padding: '0 4px', whiteSpace: 'nowrap' }}
+                data-testid={e.is_basis === true ? 'market-estimate-basis-marker' : 'market-estimate-basis-slot'}
+                title={e.is_basis === true ? '성장 곡선이 채택한 기관' : undefined}
+                aria-hidden={e.is_basis === true ? undefined : 'true'}
+                style={{
+                  flexShrink: 0, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', borderRadius: 3, padding: '0 4px',
+                  // 마커 없는 행도 같은 폭을 예약한다(visibility:hidden은 박스를 유지한다 — display:none이면 폭이 사라져 원인이 재발).
+                  visibility: e.is_basis === true ? 'visible' : 'hidden',
+                  color: 'var(--accent)', border: '1px solid var(--accent)',
+                }}
               >
                 기준
               </span>

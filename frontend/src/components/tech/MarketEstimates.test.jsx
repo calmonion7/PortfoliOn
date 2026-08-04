@@ -116,4 +116,36 @@ describe('MarketEstimates — task#282 렌더 계약', () => {
     const valueSpan = [...row.querySelectorAll('span')].find((s) => s.textContent.includes('$'))
     expect(valueSpan.style.flexShrink).toBe('0')
   })
+
+  // ⚠️ 라이브에서만 잡힌 결함의 구조적 대리지표(task#282 UAT). 트랙은 flex:1로 **잔여폭**을 먹으므로
+  // 값·마커의 폭이 행마다 다르면 `width:N%`의 기준이 행마다 달라져 **더 작은 값이 더 긴 막대**가 된다
+  // (실측: $12.5B→75.98px vs $9B→84.86px, 트랙 [153,103,160,146,160] — 모바일 4조합 FAIL).
+  // jsdom엔 레이아웃이 없어 렌더 px 단조성은 **원리적으로 못 잰다** — 실제 게이트는 라이브 프로브의
+  // est-bar-monotonic이고, 여기서는 그 원인이 되는 두 구조 조건만 못박는다.
+  it('⚠️ 회귀 잠금: 값 예약폭이 행마다 동일하고 마커 슬롯이 전 행에 존재한다(막대 비교 가능성의 전제)', () => {
+    const estimates = [
+      { institution: 'A사', year: 2030, size: usd(30.5) }, // '$30.5B' 6자
+      { institution: 'B사', year: 2030, size: usd(12.5), is_basis: true }, // 마커 보유 행
+      { institution: 'C사', year: 2030, size: usd(9) }, // '$9B' 3자 — 자연폭이면 이 행 트랙이 넓어진다
+    ]
+    const { getAllByTestId, queryAllByTestId } = render(<MarketEstimates estimates={estimates} />)
+    const rows = getAllByTestId('market-estimate-row')
+    expect(rows).toHaveLength(3)
+
+    // ① 값 span의 예약폭이 3행 모두 동일 + 자연폭에 맡기지 않았음(width 선언 존재)
+    const widths = getAllByTestId('market-estimate-value').map((el) => el.style.width)
+    expect(widths).toHaveLength(3)
+    expect(widths[0]).not.toBe('')
+    expect(new Set(widths).size).toBe(1)
+
+    // ② 마커를 가진 행이 하나라도 있으면 마커 칸은 전 행에 존재해야 한다(한 행만 있으면 그 행 트랙이 좁아진다).
+    //    숨김은 visibility로 — display:none이면 박스가 사라져 원인이 그대로 재발한다.
+    const cells = [...queryAllByTestId('market-estimate-basis-marker'), ...queryAllByTestId('market-estimate-basis-slot')]
+    expect(cells).toHaveLength(3)
+    expect(queryAllByTestId('market-estimate-basis-marker')).toHaveLength(1)
+    for (const c of queryAllByTestId('market-estimate-basis-slot')) {
+      expect(c.style.visibility).toBe('hidden')
+      expect(c.style.display).not.toBe('none')
+    }
+  })
 })
