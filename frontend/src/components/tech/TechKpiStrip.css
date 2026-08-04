@@ -1,0 +1,51 @@
+/* 선도기술 리포트 KPI 스트립(task#280 S2 배치 · 모바일 압축).
+   PC  = 2단 적층(라벨 위 / 값 아래) 칩 6개가 한 줄.
+   모바일 = 인라인 압축(`라벨 값`을 한 줄에) — 리드 문단 + 스트립이 첫 화면에 함께 들어가야 하는데
+   적층형 1행(43.6px) × 3~4행 = 159~216px가 가용 높이를 4~57px 초과했다(라이브 실측 4조합 전부 FAIL).
+   리드는 자를 수 없고(제목이 곧 결론) 칩 수·값 문자열도 줄일 수 없으므로 남은 레버가 스트립 높이다.
+
+   ⚠️ 분기는 **CSS 미디어쿼리로만** 한다 — JS `window.innerWidth` 분기·리사이즈 리스너는
+   하이드레이션 불일치와 리스너 누수의 원천이다. 이 프로젝트는 plain CSS(Tailwind 없음). */
+
+/* 내용 주도 flex-wrap. **고정 트랙 그리드(minmax)로 되돌리지 말 것** — 값보다 좁은 상자가
+   생기는 순간 값이 2줄로 접힌다(task#280 적대리뷰 F2의 원인 그 자체). basis auto = max-content라
+   칩 폭을 값에서 받는다. 폭 하한도 주지 않는다(하한 = 값보다 좁은 상자). */
+.tech-kpi-strip { display: flex; flex-wrap: wrap; gap: 14px; }
+.tech-kpi-strip__chip { flex: 1 1 auto; }
+
+@media (max-width: 768px) {
+  /* 카드 여백도 첫 화면 예산이다. 세로·가로를 **비대칭**으로 준다 — 두 방향의 비용이 다르기 때문:
+     세로 여백(16→8)은 순수 비용이라 칩을 8px 끌어올리고, 가로 여백(16→12)은 줄이면 스트립
+     가용폭이 +8px 늘어 한 줄에 칩이 하나 더 들어간다(= 줄 수가 준다).
+     ⚠️ `.card` 없이 쓰면 `.card--p-md`(0,1,0)와 특정도가 같고, Card.css가 이 파일보다 **뒤에**
+     로드되므로(JSX가 CSS를 먼저 import → Card 모듈이 나중) 동점에서 진다. */
+  .card.tech-kpi-strip-card { padding: var(--space-2) var(--space-3); }
+
+  /* 줄 간격(6) < 칩 간격(10) < 없음 — 짝(라벨↔값)은 4px로 가장 가깝게 묶인다(가토 ⑩:
+     간격이 곧 의미). 줄은 들쭉날쭉해 세로로 열이 서지 않으므로 세로 오독은 생기지 않는다. */
+  .tech-kpi-strip { gap: 6px 10px; }
+  /* 모바일에서는 늘리지 않는다 — 늘리면 남는 폭이 칩마다 분배돼 줄마다 칩 간격이 달라진다. */
+  .tech-kpi-strip__chip { flex: 0 1 auto; }
+
+  /* 적층 → 인라인. 칩이 줄 폭을 넘으면 **칩 안에서 라벨/값이 갈라질 뿐** 값 자체는 접히지 않는다
+     (축3 정석: 컨테이너 wrap + 자식은 자기 폭 유지). 값에 nowrap을 걸지 않는 것은 의도적이다 —
+     걸면 병리적으로 긴 값이 접히는 대신 카드를 넘쳐 페이지가 가로 스크롤한다(더 나쁜 실패). */
+  .tech-kpi-strip__chip .stat {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--space-1);
+  }
+  /* 라벨은 짧고 절대 접히면 안 되는 형제 → nowrap. 색·굵기(--text-3 / medium)는 Stat 그대로라
+     12px 값(--text / semibold)과의 위계가 크기 축소 뒤에도 유지된다. */
+  .tech-kpi-strip__chip .stat .stat__label {
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-tight);
+    white-space: nowrap;
+  }
+  /* 값 18px → 12px. 한 줄 높이가 43.6 → 14.4px가 되고, 칩이 좁아져 한 줄에 2~3개가 들어간다. */
+  .tech-kpi-strip__chip .stat.stat--sm .stat__value {
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-tight);
+  }
+}

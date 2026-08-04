@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import TechKpiStrip from './TechKpiStrip'
+
+// 반응형 분기가 CSS로 내려갔으므로 스타일시트 원문도 단언 대상이다 — jsdom은 스타일시트를 적용하지
+// 않아 "클래스는 붙었는데 규칙이 없다"를 렌더로는 원리적으로 볼 수 없다(가토 ⑪: 접미사·클래스가
+// 조립돼도 아무도 죽지 않고 스타일만 조용히 사라진다). 클래스 이름을 한쪽만 바꾸면 여기서 red가 된다.
+// ⚠️ 주석을 걷어내고 **선언만** 판정한다 — 주석은 "왜 이렇게 하면 안 되는지"를 반례로 설명하므로
+// (`minmax`·`min-width`가 경고문에 등장한다) 원문 그대로 검사하면 좋은 주석이 체크를 깨뜨린다(가토 ⑧ⓜ).
+// ⚠️ CSS는 fs로 읽는다 — vitest는 `css: false`라 `?raw`·`?inline` 쿼리까지 전부 빈 문자열로 스텁하고
+// (실측), `new URL('./x.css', import.meta.url)`은 Vite의 에셋 변환에 걸려 file 스킴이 아니게 된다.
+const CSS = readFileSync(join(import.meta.dirname, 'TechKpiStrip.css'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+const MOBILE_CSS = CSS.slice(CSS.indexOf('@media (max-width: 768px)'))
 
 // task#280 S2 — KPI 스트립 렌더. 파생 로직 자체는 techReportUtils.test.js가 덮으므로 여기서는
 // *배선*(6칩이 순서대로 Stat에 실리는가)과 *결측/실값 두 분기*, 그리고 색 variant 회귀를 잠근다.
@@ -82,20 +95,39 @@ describe('TechKpiStrip', () => {
     expect(getByTestId('tech-report-kpis').children.length).toBe(6)
   })
 
-  // ⚠️ 아래 두 축은 **인라인 선언**만 잠근다 — jsdom은 레이아웃도 스타일시트도 적용하지 않으므로
+  // ⚠️ 아래 세 축은 **선언**만 잠근다 — jsdom은 레이아웃도 스타일시트도 적용하지 않으므로
   //    "실제로 접히지 않는가"는 원리적으로 여기서 잴 수 없고 라이브 프로브가 최종 판정한다(가토 ⑪).
   //    그래도 잠글 값이 있다: 고정 트랙 그리드로 되돌아가면 값보다 좁은 상자가 다시 생겨 접힘이
   //    복구되므로(F2의 원인 그 자체), 그 되돌림만은 여기서 red가 되게 한다.
-  it('F2 회귀 잠금: 고정 트랙 그리드가 아니라 내용 주도 flex-wrap이고, 칩에 폭 하한이 없다', () => {
-    const { getByTestId } = render(<TechKpiStrip report={SMR} />)
+  it('반응형 분기 클래스가 실제로 붙는다 — 인라인 스타일이 아니라 CSS 미디어쿼리로 분기한다', () => {
+    const { getByTestId, container } = render(<TechKpiStrip report={SMR} />)
     const strip = getByTestId('tech-report-kpis')
-    expect(strip.style.display).toBe('flex')
-    expect(strip.style.flexWrap).toBe('wrap')
-    expect(strip.style.gridTemplateColumns).toBe('')   // minmax 트랙 복귀 차단
+    expect(strip.className).toBe('tech-kpi-strip')
+    expect(container.querySelector('.card.tech-kpi-strip-card')).toBeTruthy()
     ;[...strip.children].forEach((chip) => {
-      expect(chip.style.flex).toBe('1 1 auto')          // basis auto = max-content(값 폭을 받는다)
+      expect(chip.className).toBe('tech-kpi-strip__chip')
       expect(chip.style.minWidth).toBe('')              // 하한을 주면 값보다 좁은 상자가 생긴다
     })
+  })
+
+  it('F2 회귀 잠금: 고정 트랙 그리드가 아니라 내용 주도 flex-wrap이고, 폭 하한이 없다', () => {
+    expect(CSS).toMatch(/\.tech-kpi-strip\s*\{[^}]*display:\s*flex/)
+    expect(CSS).toMatch(/\.tech-kpi-strip\s*\{[^}]*flex-wrap:\s*wrap/)
+    expect(CSS).toMatch(/\.tech-kpi-strip__chip\s*\{[^}]*flex:\s*1 1 auto/)  // basis auto = max-content
+    expect(CSS).not.toMatch(/grid-template-columns|minmax\(|min-width:/)     // 값보다 좁은 상자 복귀 차단
+  })
+
+  it('모바일 압축 분기: JSX가 붙이는 클래스마다 인라인화 규칙이 실제로 존재한다', () => {
+    expect(CSS).toContain('@media (max-width: 768px)')
+    // 적층(column) → 인라인(row). 이 한 줄이 사라지면 스트립 높이가 라이브에서 2배로 돌아간다.
+    expect(MOBILE_CSS).toMatch(/\.tech-kpi-strip__chip \.stat\s*\{[^}]*flex-direction:\s*row/)
+    // 칩이 줄 폭을 넘으면 라벨/값이 갈라질 뿐 값은 접히지 않는다(축3: 컨테이너 wrap + 라벨 nowrap)
+    expect(MOBILE_CSS).toMatch(/\.tech-kpi-strip__chip \.stat\s*\{[^}]*flex-wrap:\s*wrap/)
+    expect(MOBILE_CSS).toMatch(/\.stat__label\s*\{[^}]*white-space:\s*nowrap/)
+    // 값 축소는 `.stat--sm`(0,2,0)을 이겨야 적용된다 — 특정도를 낮추면 조용히 무효가 된다
+    expect(MOBILE_CSS).toMatch(/\.tech-kpi-strip__chip \.stat\.stat--sm \.stat__value\s*\{[^}]*font-size/)
+    // 카드 패딩 축소는 `.card--p-md`(0,1,0)와 동점이면 나중 로드되는 Card.css에 진다
+    expect(MOBILE_CSS).toMatch(/\.card\.tech-kpi-strip-card\s*\{[^}]*padding/)
   })
 
   it('F13: 회사명 칩만 일반 폰트로 덮는다 — 수치 칩 5개는 Stat의 mono 계약 유지', () => {
