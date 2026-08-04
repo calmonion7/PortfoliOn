@@ -1,0 +1,88 @@
+/* 진척 타임라인(task#282) — 세로 HTML 목록. SVG를 쓰지 않는다.
+   가로 SVG(연도=열)였을 때 설계폭이 최장 문장에 끌려 4,479~7,027px가 됐고(라이브 실측),
+   PC 748px는 약 1.5열·모바일 278px는 약 0.6열만 보여 사실상 첫 이벤트 하나만 읽혔다.
+   근본 원인은 SVG <text>가 줄바꿈을 못 한다는 것 — event가 짧은 라벨이 아니라 한국어 완성 문장이다.
+   세로로 내리면 텍스트가 자연 줄바꿈하고 Ctrl+F·스크린리더·폰트 스케일이 함께 살아난다.
+   ⚠️ 자르지 않는다 — ellipsis·line-clamp 금지(가토 ⑦: 한국어는 동사가 끝에 와 사건 종류가 먼저 사라진다). */
+
+.mstone { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* 좌측 24px은 마커·연결선 전용 gutter */
+.mstone__list { position: relative; list-style: none; margin: 0; padding: 0 0 0 24px; }
+
+/* 마커를 잇는 세로 연결선(장식) — 전 구간을 한 줄로 이어 타임라인으로 읽힌다 */
+.mstone__list::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--border);
+}
+
+.mstone__group + .mstone__group { margin-top: var(--space-3); }
+
+.mstone__year {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-2);
+  margin-bottom: var(--space-1);
+}
+
+.mstone__events { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+
+.mstone__event { position: relative; }
+
+/* 이벤트 문장 — 자연 줄바꿈. keep-all이 한국어 어절을 지키고, anywhere가 긴 무공백 토큰에서
+   가로 넘침을 막는다(본문도 컴포넌트도 가로 스크롤 0). */
+.mstone__event-text {
+  display: block;
+  font-size: var(--font-size-base);
+  line-height: 1.55;
+  color: var(--text);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.mstone__actor { display: block; font-size: var(--font-size-xs); color: var(--text-3); margin-top: 1px; }
+
+/* 상태 마커 — 의미 상태(success/warn/neutral)다. 가격 방향 --up/--down 교차 사용 금지.
+   ⚠️ 배경은 --bg-elev가 아니라 --bg다: 이 컴포넌트의 조상은 Card가 아니라 TechReport 루트 div라
+   실제 지면이 --bg이고, 두 토큰이 달라 "비어 보여야 할 원"이 다른 색 원반이 된다. */
+.mstone__marker {
+  display: inline-block;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-3);
+  background: var(--bg);
+}
+
+.mstone__event > .mstone__marker { position: absolute; left: -24px; top: 5px; }
+
+.mstone__marker--done { border-color: var(--color-success); background: var(--color-success); }
+
+/* 반채움 — 채움/외곽선만으로는 3단계를 구분할 수 없다 */
+.mstone__marker--in_progress {
+  border-color: var(--warn);
+  background: linear-gradient(90deg, var(--warn) 0 50%, var(--bg) 50% 100%);
+}
+
+.mstone__marker--planned { border-color: var(--text-3); background: var(--bg); }
+
+.mstone__legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+
+.mstone__legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
