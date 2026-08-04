@@ -359,6 +359,14 @@ const numeralStyle = {
   color: 'var(--accent)', opacity: 0.85, flexShrink: 0, width: 38,
 }
 
+// 지표 칩 증감 값 표기 — 부호는 화살표가 대신하므로 값은 항상 |v|다(정본 `ui/Badge.jsx` ChangeBadge와
+// 같은 계약: `▼ 12.5%`). 세 자리 이상만 반올림, 그 미만은 소수 1자리 고정(전엔 `▼-12.5%` 이중 부호 +
+// 소수 자릿수 무제한이었다).
+// ⚠️ components/tech/KeyPointCards.jsx의 fmtChangePct와 **같은 식**이다(그쪽이 이 블록의 미러) —
+//    한쪽만 고치면 두 표면 표기가 갈라진다. 양쪽에 회귀 테스트가 쌍으로 있다(task#281 F5).
+const fmtChangePct = (v) =>
+  (Math.abs(v) >= 100 ? String(Math.round(Math.abs(v))) : Math.abs(v).toFixed(1))
+
 export default function AnalystReport() {
   const { ticker, date } = useParams()
   const [report, setReport] = useState(null)
@@ -475,7 +483,7 @@ export default function AnalystReport() {
                         <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 15, lineHeight: 1.15 }}>{m.value}</div>
                         {m.change_pct != null && (
                           <div className="mono tnum" style={{ fontSize: 11, marginTop: 2, color: m.change_pct >= 0 ? 'var(--up)' : 'var(--down)' }}>
-                            {m.change_pct >= 0 ? '▲+' : '▼'}{Math.abs(m.change_pct) >= 100 ? Math.round(m.change_pct) : m.change_pct}%
+                            {m.change_pct >= 0 ? '▲+' : '▼'}{fmtChangePct(m.change_pct)}%
                           </div>
                         )}
                       </div>

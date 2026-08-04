@@ -251,10 +251,19 @@ def _migrate():
             related          JSONB DEFAULT '{}'::jsonb,
             market           JSONB DEFAULT '{}'::jsonb,
             sources          JSONB DEFAULT '[]'::jsonb,
+            key_points       JSONB,
+            milestones       JSONB,
             created_at       TIMESTAMPTZ DEFAULT NOW(),
             UNIQUE (slug, published_date))""")
     except Exception as e:
         logger.warning(f"[Migrate] tech_reports 생성 실패: {e}")
+    try:
+        # 라이브 DB는 이미 CREATE TABLE을 지났으므로 위 DDL이 아니라 이 ALTER만 탄다(ADR-0006).
+        from services.db import execute
+        execute("ALTER TABLE tech_reports ADD COLUMN IF NOT EXISTS key_points JSONB")
+        execute("ALTER TABLE tech_reports ADD COLUMN IF NOT EXISTS milestones JSONB")
+    except Exception as e:
+        logger.warning(f"[Migrate] tech_reports 요약 레이어 컬럼 추가 실패: {e}")
 
 
 @asynccontextmanager

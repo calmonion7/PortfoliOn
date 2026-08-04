@@ -78,6 +78,26 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     }
   })
 
+  it('지표 칩 증감은 이중 부호가 되지 않고 소수 자릿수도 정본을 따른다(task#281 F5)', async () => {
+    // 정본 ChangeBadge = `▼ 12.5%`(화살표가 부호를 대신, toFixed(1)). 전엔 `▼-12.5%`로 음수 두 번.
+    // ⚠️ 선도기술 KeyPointCards.jsx가 이 블록을 미러링한다 — 한쪽만 고치면 두 표면 표기가 갈라진다.
+    //    양쪽에 같은 케이스의 회귀 테스트를 쌍으로 둔다.
+    api.get.mockResolvedValue({ data: { ...REPORT, points: [{
+      title: '포인트A', body: '근거A',
+      metrics: [
+        { label: 'L0', value: 'V0', change_pct: -12.5 },
+        { label: 'L1', value: 'V1', change_pct: -150 },
+        { label: 'L2', value: 'V2', change_pct: 22.123456789 },
+        { label: 'L3', value: 'V3', change_pct: 233.33 },
+      ],
+    }] } })
+    const { container } = renderPage()
+    await screen.findByText('한줄 논지 테스트')
+    const chips = [...container.querySelectorAll('div.mono.tnum')].map(d => d.textContent)
+    for (const want of ['▼12.5%', '▼150%', '▲+22.1%', '▲+233%']) expect(chips).toContain(want)
+    expect(chips.some(t => /[▲▼][+-]?-/.test(t))).toBe(false)   // 이중 부호 0건
+  })
+
   it('문서 하단 복귀 링크 제거 + 플로팅 목록 pill(task#225)', async () => {
     api.get.mockResolvedValue({ data: REPORT })
     const { container } = renderPage()

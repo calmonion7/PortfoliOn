@@ -43,11 +43,12 @@
 ### 선도기술 리포트 발행 (tech-reports)
 ```
 0. (조건 확인) GET /api/tech-reports  → **기술당 최신 1건**만 반환(대상 4종의 최신 발행일 판단용)
-1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처)
+1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·계보 분류**)
 2. POST /api/tech-reports/{slug}  → 발행
    - 종목 발행물과 달리 **서버가 자동 첨부하는 숫자가 없다** — 통화·단위·점유율·척도까지 전부 이 본문에 조사해 채운다
    - 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — 틀린 값보다 없는 값이 낫다)
-   - 대상 4종 밖 slug·통화·단위 enum 밖 값은 422로 거부된다
+   - 대상 4종 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
+   - **요약 레이어 3필드는 산문이 아니라 구조 필드로 싣는다**(ADR-0034) — `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(계보 분류). 채우지 않으면 화면에서 그 섹션이 통째로 생략되므로, `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다
 ```
 
 ---
@@ -672,10 +673,10 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 
 **Response `200`**
 ```json
-{ "reports": [ { "slug": "smr", "published_date": "2026-07-01", "title": "SMR, 원자력의 두 번째 곡선" } ] }
+{ "reports": [ { "slug": "smr", "published_date": "2026-07-01", "title": "SMR, 원자력의 두 번째 곡선", "...": "발행 필드 전체" } ] }
 ```
 
-> 대상 4종(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`) 중 이 목록에 없는 slug는 미발행 상태.
+> 대상 4종(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`) 중 이 목록에 없는 slug는 미발행 상태. 각 행은 발행 시 제출한 필드 전체 + `id`·`created_at`을 담는다(위 예시는 조건 확인에 쓰는 3개만 발췌). 담지 않고 발행한 선택 필드는 `null`로 나온다(`key_points`·`milestones` 등 — 빈 배열이 아니다).
 
 ---
 
@@ -697,9 +698,9 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
   "players": [
     { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
       "tech_level": 5, "gap_years": 0, "leader_name": "SpaceX",
-      "share_pct": 60.0, "note": "재사용 1위" },
+      "share_pct": 60.0, "note": "재사용 1위", "category": "궤도급 완전재사용" },
     { "name": "Rosatom", "country": "RU", "state_led": true, "tech_level": 2,
-      "gap_years": 8, "leader_name": "SpaceX" }
+      "gap_years": 8, "leader_name": "SpaceX", "category": "소모형 개량" }
   ],
   "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성 확보가 관건." } ],
   "related": { "prerequisites": ["정밀 유도항법"], "derivatives": ["eVTOL"], "complements": [], "competitors": [] },
@@ -708,7 +709,21 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
     "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
     "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
   },
-  "sources": [ { "title": "NASA" }, { "title": "SpaceX 공개 발표자료", "url": null } ]
+  "sources": [ { "title": "NASA" }, { "title": "SpaceX 공개 발표자료", "url": null } ],
+  "key_points": [
+    { "title": "발사비가 한 자릿수로 내려왔다",
+      "metrics": [ { "label": "kg당 발사비", "value": "2,700달러", "change_pct": -22.0 },
+                   { "label": "연간 발사", "value": "134회" } ],
+      "body": "1단 회수 성공률이 안정되며 단위비용이 소모형 대비 1/5 수준이 됐다." },
+    { "title": "경쟁자는 아직 실증 단계",
+      "metrics": [ { "label": "재사용 성공 기업", "value": "1곳" } ],
+      "body": "유럽·중국 모두 1단 회수 실증 중이며 상업 운용까지는 수년이 남았다." }
+  ],
+  "milestones": [
+    { "year": 2015, "actor": "SpaceX", "event": "1단 지상 회수 성공", "status": "done" },
+    { "year": 2026, "actor": "SpaceX", "event": "Starship 궤도 재사용 실증", "status": "in_progress" },
+    { "year": 2030, "actor": null, "event": "완전 재사용 상업 운용", "status": "planned" }
+  ]
 }
 ```
 
@@ -722,14 +737,22 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `players[].tech_level` | int 1~5 | ✅ | 그 **업체의** 기술 성숙 단계 — `1 기초연구 · 2 시제품 · 3 실증 · 4 초기상용 · 5 양산상용`(공통 5단계 이산 척도, 0~100 점수 금지) |
 | `players[].gap_years` | int\|생략 | | 선두 대비 격차 **정수 년수**(`0`=선두 자신). `leader_name`을 함께 채워 무엇 대비인지 명시 |
 | `players[].share_pct` | number\|생략 | | 시장점유율(%). 채우면 `market.share_basis`가 반드시 있어야 함(없으면 422) |
+| `players[].category` | string\|생략 | | **계보 분류**(자유 문자열) — 같은 계열끼리 묶는 이름(SMR의 노형: 경수형·비등수형·고온가스로·소듐냉각고속로). 기술마다 분류 체계가 다르므로 그 기술의 통용 분류를 쓰고, **없는 기술이면 전 업체에서 생략**한다(억지 분류 금지 — 어느 업체에도 없으면 화면이 그 섹션을 통째로 생략한다) |
 | `challenges` | array | | 기술 난제 `{title, body}` |
 | `related` | object | | `{prerequisites, derivatives, complements, competitors}`(문자열 배열) — 전제·파생·보완·경합 기술/티커 |
 | `market` | object | ✅ | `{history, forecast, cagr_pct, share_basis, as_of}` |
 | `market.history[]` | array | | **실측만**. `{year, size: {value, currency, unit}}` |
 | `market.forecast[]` | array | | **예상만**. history와 같은 배열에 섞지 말 것 — 화면이 실선(실측)/점선(예상)을 이 구분으로 가른다 |
 | `sources` | array | ✅ | 출처 `{title, url?}` **최소 1개**. 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — **틀린 값 < 누락**) |
+| `key_points` | array\|생략 | | **핵심 포인트 카드** `{title, body, metrics?}` 3~4개 — 이 기술을 처음 보는 사람이 카드만 읽고 결론을 잡을 수 있게. `body`는 **1~2문장**, 정량 근거는 문장에 늘어놓지 말고 `metrics` 칩으로 분리(애널리스트 리포트 `points[]`와 같은 규약) |
+| `key_points[].metrics[]` | array | | 지표 칩 **최대 4개**(초과 시 422). `{label: ≤40자, value: ≤40자, change_pct?}`. `value`는 **표시용 문자열**("1.1조원"·"22%"·"134회") — 단위·통화를 문자열에 그대로 쓴다. `change_pct`만 숫자(양수=상승 색·음수=하락 색), 증감이 없으면 생략 |
+| `milestones` | array\|생략 | | **진척 타임라인** `{year, actor?, event, status}` — "언제 무엇이 가동/착공/실증됐나"를 산문에 묻지 말고 여기에 싣는다. `year`는 정수, `event`는 그 해에 무슨 일이 있었는지 한 구절, `actor`는 주체(국가·기업, 특정 주체가 없으면 생략) |
+| `milestones[].status` | enum | ✅ | `done`(이미 일어남) \| `in_progress`(진행 중) \| `planned`(계획·전망) **3값만** — 그 밖은 422. 구체 단계명("착공"·"계통연결")은 기술마다 다르므로 `event`가 담고, 색·마커는 이 3값이 정한다 |
 
 **통화·단위 enum(필수, 자유 텍스트·환산 금지)** — `currency`: `USD` \| `KRW`. `unit`: `mn`(백만) \| `bn`(십억) \| `tn`(조). 렌더러가 절대 추측·환산하지 않으므로 enum 밖 값은 `422`.
+
+> **문자열 수치는 요약 칩에만** — `key_points[].metrics[].value`가 표시용 문자열인 것은 그 칩이 **그래프를 그리지 않기 때문**이다(ADR-0034). 차트를 그리는 수치(`market` 금액·`milestones[].year`·`tech_level`·`share_pct`)는 **절대 문자열로 쓰지 말 것** — 구조 데이터여야 곡선·축·밴드를 그릴 수 있다(ADR-0033).
+> **모르면 생략** — 세 필드는 전부 선택이다. 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(화면이 그 섹션째 생략한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
 
 > **기술수준 vs 기술난이도 vs 기술격차** — 세 축을 섞지 마세요. `players[].tech_level`은 *그 업체가* 지금 어느 단계인지, `difficulty`는 *그 기술 자체가* 얼마나 어려운지(기술 단위 필드 하나, 업체별이 아님), `gap_years`는 *선두 대비 몇 년 뒤인지*입니다.
 > **상용 시장이 아직 형성되지 않은 기술**(예: SMR·재사용 로켓 일부 세그먼트)은 점유율 근거를 댈 수 없으면 `share_pct`를 생략하세요(업체 표는 그대로, 점유율 칸만 빔).
@@ -744,7 +767,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | 상태 | 설명 |
 |------|------|
 | `401` | API Key 누락/불일치 |
-| `422` | 미등록 slug · currency/unit enum 위반 · NaN/Infinity 값 · `sources` 0개 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 |
+| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 |
 
 ---
 

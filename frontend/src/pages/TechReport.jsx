@@ -12,15 +12,19 @@ import TechGraph from '../components/tech/TechGraph'
 import TechKpiStrip from '../components/tech/TechKpiStrip'
 import PlayerTable from '../components/tech/PlayerTable'
 import ProseSections from '../components/tech/ProseSections'
+import KeyPointCards from '../components/tech/KeyPointCards'
+import MilestoneTimeline, { milestoneTimelineLayout } from '../components/tech/MilestoneTimeline'
+import CategoryGroups, { groupByCategory } from '../components/tech/CategoryGroups'
 
 // 선도기술 리포트 상세 (ADR-0033, task#276 S5 + task#277 S5 + task#280 S1) — 기술 단위 발행물.
 // 목록은 기술당 최신 1건이라 여기도 이력 없이 최신 판만 보여준다(과거 판 UI는 비목표, 결정 1).
 //
 // 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로 재구성. CONTEXT.md 구성 서사도 이 순서다):
-//   기술명 h1 → 리드 문단 → KPI 스트립 → (2/2 핵심 포인트) → (2/2 진척 타임라인) → 주요 업체 표
-//   → 기술수준 밴드 → (2/2 계보 분류) → 점유율 → 난제 → 시장 규모 → 연관 기술
+//   기술명 h1 → 리드 문단 → KPI 스트립 → 핵심 포인트 → 진척 타임라인 → 주요 업체 표
+//   → 기술수준 밴드 → 계보 분류 → 점유율 → 난제 → 시장 규모 → 연관 기술
 //   → 상세 설명(접힘) → 출처.
-// 괄호 자리는 2/2(신규 필드 의존)가 채운다 — 자리를 비워 둬야 2/2가 배치를 다시 흔들지 않는다.
+// task#281(2/2)이 신규 3필드(key_points·milestones·players[].category)로 그 예약 자리를 채웠다.
+// 셋 다 **선택 필드**이고 구발행물엔 없다 — 없으면 조용히 생략되어 화면이 이전과 동일해야 한다.
 //
 // ⚠️ 이 파일은 배선만 한다 — 업체 표시 규율(gap_years·share_pct·기술수준 라벨)은 PlayerTable이
 // 단독 소유한다. 여기에 같은 필드의 두 번째 거동을 두면 한 페이지에서 한 필드가 두 얼굴을
@@ -90,6 +94,13 @@ export default function TechReport() {
   const related = report.related || {}
   const hasRelated = ['prerequisites', 'derivatives', 'complements', 'competitors']
     .some((k) => Array.isArray(related[k]) && related[k].length > 0)
+  // 신규 3필드 게이트 — 제목을 페이지가 소유하는 두 섹션은 게이트가 **컴포넌트 자신의 채택 조건과
+  // 같은 식**이어야 한다. 느슨하면(예: milestones.length > 0) year·event가 결측인 항목만 담긴 판에서
+  // 제목만 남고 본문이 사라진다(점유율 섹션이 task#277 S2에서 겪은 함정). 그래서 판정을 추측하지 않고
+  // 각 컴포넌트가 export한 순수함수를 그대로 호출한다. 핵심 포인트는 제목까지 컴포넌트가 소유하므로
+  // 게이트가 없다(자기 데이터가 없으면 스스로 null을 반환한다).
+  const hasMilestones = milestoneTimelineLayout({ milestones: report.milestones }).items.length > 0
+  const hasCategories = groupByCategory(ordered).length > 0
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '20px 16px 64px' }}>
@@ -115,8 +126,18 @@ export default function TechReport() {
         <TechKpiStrip report={report} />
       </div>
 
-      {/* 2/2 자리: 핵심 포인트 카드(key_points) */}
-      {/* 2/2 자리: 진척 타임라인(milestones) */}
+      {/* ── 핵심 포인트 (task#281 S2) ── 여기만 SectionTitle·바깥 여백을 컴포넌트가 소유한다.
+          래퍼(<div marginBottom:30>)로 감싸면 데이터가 없어 null을 반환한 자리에 30px 유령 간격이
+          남으므로 감싸지 않는다. */}
+      <KeyPointCards points={report.key_points} />
+
+      {/* ── 진척 타임라인 (task#281 S3) ── */}
+      {hasMilestones && (
+        <div style={{ marginBottom: 30 }}>
+          <SectionTitle>진척 타임라인</SectionTitle>
+          <MilestoneTimeline milestones={report.milestones} />
+        </div>
+      )}
 
       {/* ── 주요 업체 (표시 규율은 PlayerTable 단독 소유) ── */}
       {players.length > 0 && (
@@ -134,7 +155,15 @@ export default function TechReport() {
         </div>
       )}
 
-      {/* 2/2 자리: 계보 분류(players[].category) */}
+      {/* ── 계보 분류 (task#281 S4) ── 업체 순서는 여기서 이미 정한 `ordered` 하나뿐이다. 새 소비처가
+          report.players(API 원순서)를 쓰면 같은 업체 집합이 한 화면에서 두 순서로 나열된다
+          (task#280 적대 리뷰 F1 실측 — 표·밴드가 그렇게 갈렸다). */}
+      {hasCategories && (
+        <div style={{ marginBottom: 30 }}>
+          <SectionTitle>계보 분류</SectionTitle>
+          <CategoryGroups players={ordered} />
+        </div>
+      )}
 
       {/* ── 점유율 ── 게이트는 ShareChart 자신의 채택 조건(유한·음수 아님)과 같은 식이어야 한다.
           느슨하면(예: isFinite만) 전 업체가 음수인 판에서 제목만 남고 차트가 사라진다(task#277 S2). */}

@@ -421,6 +421,8 @@ CREATE TABLE IF NOT EXISTS tech_reports (
     related          JSONB DEFAULT '{}'::jsonb,     -- {prerequisites, derivatives, complements, competitors}
     market           JSONB DEFAULT '{}'::jsonb,     -- {history, forecast, cagr_pct, share_basis, as_of}
     sources          JSONB DEFAULT '[]'::jsonb,     -- [{title, url}]
+    key_points       JSONB,                         -- 핵심 포인트 [{title, metrics[≤4], body}] (nullable=미수록)
+    milestones       JSONB,                         -- 진척 타임라인 [{year, actor, event, status}] (nullable=미수록)
     created_at       TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE (slug, published_date)
 );

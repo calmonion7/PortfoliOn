@@ -54,6 +54,60 @@ def test_save_report_defaults_missing_optional_collections():
     assert json.loads(params[9]) == []  # sources
 
 
+def test_save_report_persists_key_points_and_milestones():
+    """신규 컬럼 2개가 INSERT 컬럼 목록·VALUES 자리표시자·DO UPDATE SET **세 곳 모두**에
+    실려야 한다 — 한 곳만 고치면 재발행(upsert) 경로에서 조용히 유실된다(task#281 S1)."""
+    payload = dict(PAYLOAD)
+    payload["key_points"] = [{"title": "t", "metrics": [{"label": "l", "value": "v", "change_pct": -2.0}], "body": "b"}]
+    payload["milestones"] = [{"year": 2030, "actor": None, "event": "e", "status": "planned"}]
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", payload)
+    sql, params = mock_exec.call_args.args
+    head = sql.split("VALUES")[0]
+    for col in ("key_points", "milestones"):
+        assert col in head, f"INSERT 컬럼 목록에 {col} 누락"
+        assert f"{col} = EXCLUDED.{col}" in sql, f"DO UPDATE SET에 {col} 누락"
+    assert sql.count("%s") == len(params)   # VALUES 자리표시자 ↔ 파라미터 개수 일치
+    assert json.loads(params[10]) == payload["key_points"]
+    assert json.loads(params[11]) == payload["milestones"]
+
+
+def test_save_report_new_fields_absent_stores_null():
+    """구 판 payload(신규 2필드 전무)는 **SQL NULL**로 저장 — 조회 시 None이라 프론트가 섹션째 생략한다.
+
+    ⚠️ 단언이 `json.loads(params[i]) is None`에서 `params[i] is None`으로 바뀌었다(task#281 F7).
+    전엔 `json.dumps(None)`을 그대로 넘겨 파라미터가 파이썬 문자열 `"null"`이었고, jsonb 컬럼에
+    캐스트되면 SQL NULL이 아니라 **JSON null 스칼라**로 저장됐다(라이브 읽기전용 실측:
+    `%s::jsonb IS NULL` → False). 같은 컬럼에 두 종류의 NULL이 공존해 `IS NULL` 질의·문서 서술과
+    어긋난다. `json.loads`를 거치면 두 표현이 똑같이 None으로 보여 이 차이를 **원리적으로 못 본다**.
+    """
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", PAYLOAD)
+    _, params = mock_exec.call_args.args
+    assert params[10] is None, "key_points 부재는 SQL NULL이어야 한다(문자열 'null' 금지)"
+    assert params[11] is None, "milestones 부재는 SQL NULL이어야 한다(문자열 'null' 금지)"
+
+
+def test_save_report_new_fields_explicit_none_also_stores_sql_null():
+    """키가 **있고 값이 None**인 판(pydantic Optional 기본값 경로)도 같은 SQL NULL로 간다.
+
+    라우터 모델이 `Optional[List[...]] = Field(None)`이라 model_dump는 키를 담고 값만 None으로 준다 —
+    키 부재 경로만 단언하면 실제 발행 경로(값 None)를 못 본다.
+    """
+    payload = dict(PAYLOAD, key_points=None, milestones=None)
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", payload)
+    _, params = mock_exec.call_args.args
+    assert params[10] is None and params[11] is None
+    # 값이 있으면 여전히 JSON 문자열이다(가드가 정상 경로를 삼키지 않는다는 이빨 단언)
+    payload2 = dict(PAYLOAD, key_points=[{"title": "t", "metrics": [], "body": "b"}], milestones=[])
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", payload2)
+    _, params2 = mock_exec.call_args.args
+    assert json.loads(params2[10]) == payload2["key_points"]
+    assert json.loads(params2[11]) == []          # 빈 배열은 NULL이 아니다(구분 유지)
+
+
 def test_latest_all_uses_distinct_on_slug():
     with patch.object(svc, "query", return_value=[{"slug": "smr"}]) as mock_q:
         rows = svc.latest_all()

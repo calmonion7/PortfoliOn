@@ -65,6 +65,39 @@ class Player(BaseModel):
     leader_name: Optional[str] = Field(None)
     share_pct: Optional[float] = Field(None, allow_inf_nan=False)
     note: Optional[str] = Field(None)
+    # 계보 분류(선택) — 노형 계열 등 기술별 묶음. 기술마다 분류 체계가 다르므로 자유 문자열이고,
+    # 전무하면 프론트가 섹션째 생략한다(로봇·배터리엔 "노형" 개념이 없다).
+    category: Optional[str] = Field(None)
+
+
+class PointMetric(BaseModel):
+    """핵심 포인트의 지표 칩 — value는 **표시용 문자열**("1.1조원"·"22%").
+
+    ADR-0033 결정 3이 기각한 "표시용 문자열로 받기"는 *그래프를 그리는 수치*(시장규모) 이야기다.
+    요약 칩은 애초에 그릴 대상이 아니므로 경계 안에 있다 — 그래프를 그리는 수치는 여전히
+    구조 데이터(MoneyValue·Milestone.year·tech_level)로만 받는다.
+    """
+    label: str = Field(..., min_length=1, max_length=40)
+    value: str = Field(..., min_length=1, max_length=40)
+    # 증감%(선택) — 프론트가 up/down 색. Optional 필수: pydantic v2는 validate_default=False라
+    # 키 생략은 통과하지만 명시적 null은 타입 검증을 타서, float이면 발행 전체가 422로 죽는다(task#250).
+    change_pct: Optional[float] = Field(None, allow_inf_nan=False)
+
+
+class KeyPoint(BaseModel):
+    """핵심 포인트 카드 — 애널리스트 리포트 points[] 미러(task#218 한눈 구조화)."""
+    title: str = Field(..., min_length=1)
+    body: str = Field(..., min_length=1)
+    metrics: Optional[List[PointMetric]] = Field(None, max_length=4)
+
+
+class Milestone(BaseModel):
+    """진척 타임라인 항목. status는 추상 3단계 — 기술마다 구체 단계명이 다르므로(로봇엔 "착공"이
+    없다) 구체 내용은 event 자유 문자열이 담고, 색·마커는 이 enum이 결정론적으로 정한다."""
+    year: int
+    actor: Optional[str] = Field(None)
+    event: str = Field(..., min_length=1)
+    status: Literal["done", "in_progress", "planned"]
 
 
 class Difficulty(BaseModel):
@@ -87,6 +120,10 @@ class TechReportIn(BaseModel):
     related: Related = Related()
     market: Market
     sources: List[Source] = Field(..., min_length=1)
+    # 요약 레이어(선택·additive, task#281) — 루틴이 못 채우면 프론트가 섹션째 생략한다.
+    # Optional 필수: 루틴이 "없음"을 명시적 null로 표현해도 발행 전체가 422로 죽지 않아야 한다.
+    key_points: Optional[List[KeyPoint]] = Field(None)
+    milestones: Optional[List[Milestone]] = Field(None)
 
     @field_validator("published_date")
     @classmethod

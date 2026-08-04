@@ -155,6 +155,136 @@ def test_republish_same_day_replaces_not_appends():
         assert "ON CONFLICT (slug, published_date) DO UPDATE" in call.args[0]
 
 
+# ── 요약 레이어 3필드 (task#281 S1) ───────────────────────────────────
+
+KEY_POINTS = [
+    {"title": "발사비 하락", "body": "1단 회수가 궤도당 비용을 낮춘다.",
+     "metrics": [{"label": "발사비", "value": "1.1조원", "change_pct": -22.0},
+                 {"label": "재사용 횟수", "value": "22회", "change_pct": None}]},
+    {"title": "발사 주기 단축", "body": "재정비 기간이 짧아졌다."},
+]
+MILESTONES = [
+    {"year": 2020, "actor": "로사톰", "event": "로모노소프 상업운전", "status": "done"},
+    {"year": 2026, "actor": None, "event": "링룽 계통연결", "status": "in_progress"},
+    {"year": 2034, "actor": "한수원", "event": "i-SMR 실증", "status": "planned"},
+]
+
+
+def test_publish_with_key_points_milestones_category_201():
+    """① 3필드 전부 담은 정상 본문 → 201, 그리고 저장 payload에 그대로 실린다."""
+    body = copy.deepcopy(VALID_BODY)
+    body["key_points"] = copy.deepcopy(KEY_POINTS)
+    body["milestones"] = copy.deepcopy(MILESTONES)
+    body["players"][0]["category"] = "경수형"
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 201
+    payload = mock_save.call_args.args[1]
+    assert payload["key_points"][0]["metrics"][0]["change_pct"] == -22.0
+    assert payload["key_points"][0]["metrics"][1]["change_pct"] is None
+    assert payload["key_points"][1]["metrics"] is None          # metrics 생략 → None
+    assert [m["status"] for m in payload["milestones"]] == ["done", "in_progress", "planned"]
+    assert payload["milestones"][1]["actor"] is None
+    assert payload["players"][0]["category"] == "경수형"
+
+
+def test_publish_new_fields_omitted_is_null_201():
+    """구 판(3필드 전무) 본문도 그대로 201 — additive. 생략 시 None으로 실린다."""
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 201
+    payload = mock_save.call_args.args[1]
+    assert payload["key_points"] is None
+    assert payload["milestones"] is None
+    assert payload["players"][0]["category"] is None
+
+
+def test_publish_explicit_null_new_fields_not_422():
+    """② metrics·actor·category에 **명시적 null** → 422가 아니다(task#250 전체차단 함정의 핀).
+
+    pydantic v2는 validate_default=False라 키 생략은 검증을 안 타지만 클라이언트가 보낸
+    null은 선언 타입 검증을 탄다 — `List[X] = Field(None)`/`str = Field(None)`로 쓰면
+    칩 하나 때문에 발행 요청 **전체**가 422로 막힌다. Optional[...]가 유일한 차단선.
+    """
+    body = copy.deepcopy(VALID_BODY)
+    body["key_points"] = [{"title": "t", "body": "b", "metrics": None}]
+    body["milestones"] = [{"year": 2030, "actor": None, "event": "e", "status": "planned"}]
+    body["players"][0]["category"] = None
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 201, resp.text
+    payload = mock_save.call_args.args[1]
+    assert payload["key_points"][0]["metrics"] is None
+    assert payload["milestones"][0]["actor"] is None
+    assert payload["players"][0]["category"] is None
+    # 최상위 3필드 자체에 명시적 null을 보내도 통과해야 한다(루틴이 "없음"을 null로 표현할 수 있다)
+    body2 = copy.deepcopy(VALID_BODY)
+    body2["key_points"] = None
+    body2["milestones"] = None
+    with patch.object(svc, "save_report"):
+        assert client.post("/api/tech-reports/smr", json=body2).status_code == 201
+
+
+def test_publish_nan_in_key_point_metric_422():
+    """③ metrics의 NaN/Infinity 토큰 → 422.
+
+    수정 전에도 통과하므로 red-first가 원리적으로 불가하다(목적은 미래 회귀 차단) —
+    change_pct의 `allow_inf_nan=False`를 일시 제거하면 실제로 실패함을 이빨 검증했다.
+    raw NaN 토큰은 json.loads를 통과하고 422 detail이 그 NaN을 echo해 직렬화 500이 되므로
+    (main.app 커스텀 핸들러가 차단) self-app이 아니라 main.app을 태운다.
+    """
+    from main import app as main_app
+    main_app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
+    try:
+        c = TestClient(main_app)
+        for token, needle in (("NaN", '"change_pct": -22.0'), ("Infinity", '"change_pct": -22.0')):
+            body = copy.deepcopy(VALID_BODY)
+            body["key_points"] = copy.deepcopy(KEY_POINTS)
+            raw = json.dumps(body).replace(needle, f'"change_pct": {token}')
+            assert f'"change_pct": {token}' in raw  # sanity: replace가 실제로 매치됐는지
+            with patch.object(svc, "save_report") as mock_save:
+                resp = c.post("/api/tech-reports/smr", content=raw,
+                              headers={"Content-Type": "application/json"})
+            assert resp.status_code == 422, f"{token} → {resp.status_code}"
+            mock_save.assert_not_called()
+        # 표시용 문자열 value에 NaN 토큰이 와도 통과하지 않는다(str 타입 거부).
+        # ensure_ascii=False 필수 — 기본 True면 "1.1조원"이 \uXXXX로 이스케이프돼 replace가
+        # 조용히 no-op하고 이 케이스가 원본 본문으로 201을 받는다(무음 스킵).
+        body = copy.deepcopy(VALID_BODY)
+        body["key_points"] = copy.deepcopy(KEY_POINTS)
+        raw = json.dumps(body, ensure_ascii=False).replace('"value": "1.1조원"', '"value": NaN')
+        assert '"value": NaN' in raw  # sanity: replace가 실제로 매치됐는지
+        with patch.object(svc, "save_report") as mock_save:
+            resp = c.post("/api/tech-reports/smr", content=raw,
+                          headers={"Content-Type": "application/json"})
+        assert resp.status_code == 422
+        mock_save.assert_not_called()
+    finally:
+        main_app.dependency_overrides.pop(require_admin_or_api_key, None)
+
+
+def test_publish_milestone_status_enum_violation_422():
+    """④ status가 enum 밖 → 422. 색·마커가 3단계 enum으로 결정론적이므로 자유문자열을 막는다."""
+    for bad in ("완료", "cancelled", "DONE", ""):
+        body = copy.deepcopy(VALID_BODY)
+        body["milestones"] = [{"year": 2030, "event": "e", "status": bad}]
+        with patch.object(svc, "save_report") as mock_save:
+            resp = client.post("/api/tech-reports/smr", json=body)
+        assert resp.status_code == 422, f"{bad!r} → {resp.status_code}"
+        mock_save.assert_not_called()
+
+
+def test_publish_key_point_metrics_max_4_422():
+    """칩은 최대 4개(레이아웃 계약 — 열 수가 칩 수로 결정된다)."""
+    body = copy.deepcopy(VALID_BODY)
+    body["key_points"] = [{"title": "t", "body": "b", "metrics": [
+        {"label": f"l{i}", "value": f"v{i}"} for i in range(5)]}]
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 422
+    mock_save.assert_not_called()
+
+
 # ── 조회 API(추가) ────────────────────────────────────────────────────
 
 def test_list_by_slug():

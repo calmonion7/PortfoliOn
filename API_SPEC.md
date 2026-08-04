@@ -2296,7 +2296,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "players": [
     { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
       "tech_level": 5, "gap_years": 0, "leader_name": "SpaceX",
-      "share_pct": 60.0, "note": "재사용 1위" }
+      "share_pct": 60.0, "note": "재사용 1위", "category": "궤도급 완전재사용" }
   ],
   "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성." } ],
   "related": { "prerequisites": ["정밀 유도항법"], "derivatives": [], "complements": [], "competitors": [] },
@@ -2305,7 +2305,18 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
     "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
   },
-  "sources": [ { "title": "NASA", "url": null } ]
+  "sources": [ { "title": "NASA", "url": null } ],
+  "key_points": [
+    { "title": "발사비가 한 자릿수로 내려왔다",
+      "metrics": [ { "label": "kg당 발사비", "value": "2,700달러", "change_pct": -22.0 },
+                   { "label": "연간 발사", "value": "134회" } ],
+      "body": "1단 회수 성공률이 안정되며 단위비용이 소모형 대비 1/5 수준이 됐다." }
+  ],
+  "milestones": [
+    { "year": 2015, "actor": "SpaceX", "event": "1단 지상 회수 성공", "status": "done" },
+    { "year": 2026, "actor": "SpaceX", "event": "Starship 궤도 재사용 실증", "status": "in_progress" },
+    { "year": 2030, "actor": null, "event": "완전 재사용 상업 운용", "status": "planned" }
+  ]
 }
 ```
 
@@ -2315,28 +2326,33 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `title` | string | ✅ | 한줄 제목 |
 | `description` | string | | 상세 기술설명 (생략 시 `""`) |
 | `difficulty` | object | ✅ | `{score: 1~5, rationale}` — 기술 난이도 |
-| `players` | array | | 주요업체 `{name, country, state_led, ticker?, tech_level: 1~5, gap_years?, leader_name?, share_pct?, note?}` — `share_pct`를 실으면 `market.share_basis`가 반드시 있어야 함(교차검증, 없으면 `422`) |
+| `players` | array | | 주요업체 `{name, country, state_led, ticker?, tech_level: 1~5, gap_years?, leader_name?, share_pct?, note?, category?}` — `share_pct`를 실으면 `market.share_basis`가 반드시 있어야 함(교차검증, 없으면 `422`) |
+| `players[].category` | string\|생략 | | 계보 분류(자유 문자열) — 노형 계열 등 기술별 묶음. 화면이 「계보 분류」 그룹 칩으로 렌더하며, 어느 업체에도 없으면 그 섹션이 통째로 생략된다 |
 | `challenges` | array | | 기술 난제 `{title, body}` |
 | `related` | object | | 관계 티커/기술 `{prerequisites, derivatives, complements, competitors}`(각 문자열 배열) |
 | `market` | object | ✅ | `{history: [{year, size}], forecast: [{year, size}], cagr_pct?, share_basis?, as_of}` — `size`는 `{value, currency: USD\|KRW, unit: mn\|bn\|tn}`. `history`(실측)와 `forecast`(예상)는 별개 배열 |
 | `sources` | array | ✅ | 출처 `{title, url?}` **최소 1개** |
+| `key_points` | array\|생략 | | 핵심 포인트 카드 `{title, body, metrics?}` — `metrics`는 **최대 4개**(초과 시 `422`)이고 각 항목은 `{label: ≤40자, value: ≤40자, change_pct?}`. `value`는 **표시용 문자열**("1.1조원"·"22%")이고 `change_pct`만 숫자(양수=상승·음수=하락 색, `0`도 유효값이라 무표기와 다르다). 그래프를 그리는 수치가 아니므로 문자열이다(ADR-0034) |
+| `milestones` | array\|생략 | | 진척 타임라인 `{year: int, actor?, event, status}` — `status`는 `done` \| `in_progress` \| `planned` **3값 enum**(그 밖은 `422`). 구체 단계명은 기술마다 다르므로 `event` 자유 문자열이 담고 색·마커는 이 enum이 정한다 |
 
-`value`(`MoneyValue`)·`cagr_pct`·`share_pct`는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
+`value`(`MoneyValue`)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
 
 **Response `201`**
 ```json
 { "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
 ```
 
-**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit` · NaN/Infinity 값 · `sources` 0개 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락
+**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락
 
 ---
 
 각 조회 응답의 발행물 행(`report`)은 **발행 요청 필드 전체(위 표) + 서버 부여 필드 2개**로 구성된다 — `id`(내부 PK, 정렬·비교 용도 외 의미 없음)와 `created_at`(그 판이 저장·갱신된 시각, 재발행 시 갱신).
 
+⚠️ **선택 필드는 응답에서 `null`로 나온다 — 빈 배열이 아니다.** `key_points`·`milestones`를 담지 않고 발행한 판(2026-08-04 이전 전 판 포함)은 컬럼이 SQL NULL이라 `"key_points": null`·`"milestones": null`이고, `metrics`를 생략한 포인트도 `"metrics": null`이다. 소비자는 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `players[].category`는 그보다 앞서 발행된 판에는 **키 자체가 없다**(JSONB에 박제된 옛 형태 — `undefined`).
+
 ### `GET /api/tech-reports`
 
-목록 — **기술당 최신 1건**(요약, 발행일 최신순).
+목록 — **기술당 최신 1건**(발행일 최신순). 요약본이 아니라 위 발행물 행 **전체**를 반환한다.
 
 **Auth:** Bearer token 또는 `X-API-Key`
 
@@ -2364,7 +2380,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/tech-reports/{slug}/{published_date}`
 
-발행물 단건 — 발행 시 제출된 필드 전체(`title`·`description`·`difficulty`·`players`·`challenges`·`related`·`market`·`sources`) + `id`·`created_at`.
+발행물 단건 — 발행 시 제출된 필드 전체(`title`·`description`·`difficulty`·`players`·`challenges`·`related`·`market`·`sources`·`key_points`·`milestones`) + `id`·`created_at`.
 
 **Auth:** Bearer token 또는 `X-API-Key`
 
@@ -2379,7 +2395,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
   "players": [ { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
                  "tech_level": 5, "gap_years": 0, "leader_name": "SpaceX",
-                 "share_pct": 60.0, "note": "재사용 1위" } ],
+                 "share_pct": 60.0, "note": "재사용 1위", "category": "궤도급 완전재사용" } ],
   "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성." } ],
   "related": { "prerequisites": ["정밀 유도항법"], "derivatives": [], "complements": [], "competitors": [] },
   "market": {
@@ -2388,6 +2404,12 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
   },
   "sources": [ { "title": "NASA", "url": null } ],
+  "key_points": [ { "title": "발사비가 한 자릿수로 내려왔다",
+                    "metrics": [ { "label": "kg당 발사비", "value": "2,700달러", "change_pct": -22.0 },
+                                 { "label": "연간 발사", "value": "134회", "change_pct": null } ],
+                    "body": "1단 회수 성공률이 안정되며 단위비용이 소모형 대비 1/5 수준이 됐다." } ],
+  "milestones": [ { "year": 2015, "actor": "SpaceX", "event": "1단 지상 회수 성공", "status": "done" },
+                  { "year": 2030, "actor": null, "event": "완전 재사용 상업 운용", "status": "planned" } ],
   "created_at": "2026-08-03T09:00:00"
 }
 ```

@@ -54,6 +54,48 @@ const SMR_REPORT = {
   sources: [{ title: 'IAEA', url: null }],
 }
 
+// ── task#281(2/2) 신규 3필드 픽스처 ─────────────────────────────────────────
+// players는 SMR_REPORT를 그대로 재사용해 sortPlayers가 4·5번째(두산·GE히타치)를 실제로 뒤바꾸게 두고,
+// 그 두 곳에 **같은 분류**를 달았다 — 계보 칩이 API 원순서를 쓰면 그룹 안에서 순서가 어긋난다(F1 이빨).
+// 롤스로이스만 분류를 비워 「미분류」 보존까지 같은 픽스처에서 함께 잰다.
+const CATEGORY_OF = {
+  'CNNC': '경수형', 'NuScale': '경수형', '롤스로이스SMR': null,
+  '두산에너빌리티': '비등수형', 'GE히타치': '비등수형',
+}
+const KEY_POINTS = [
+  {
+    title: '2026~28년 현금은 주기기 공급망에서 난다',
+    body: '노형 경쟁의 승자보다 주기기 납품이 먼저 매출로 바뀐다.',
+    metrics: [
+      { label: '착공', value: '2건', change_pct: null },          // 무표기
+      { label: '평균 공기', value: '54개월', change_pct: -12.5 },  // 하락색
+      { label: '수주잔고', value: '1.1조원', change_pct: 22.0 },   // 상승색
+      { label: '가동 호기', value: '3기', change_pct: 0 },         // 0도 유효값(무표기 아님)
+    ],
+  },
+  { title: '1호는 중국 링룽', body: '세계 최초 상업 SMR이다.', metrics: null },
+]
+const MILESTONES = [
+  { year: 2023, actor: 'CNNC', event: 'HTR-PM 상업운전', status: 'done' },
+  { year: 2026, actor: null, event: '링룽1호 계통연결', status: 'in_progress' },
+  { year: 2029, actor: 'GE히타치', event: 'BWRX-300 가동', status: 'planned' },
+]
+const FULL_REPORT = {
+  ...SMR_REPORT,
+  key_points: KEY_POINTS,
+  milestones: MILESTONES,
+  players: SMR_REPORT.players.map((p) => ({ ...p, category: CATEGORY_OF[p.name] })),
+}
+
+function mockReport(rep) {
+  api.get.mockImplementation((url) =>
+    url.startsWith('/api/tech-reports/')
+      ? Promise.resolve({ data: { slug: rep.slug, reports: [rep] } })
+      : Promise.resolve({ data: [] }))
+}
+
+const titlesOf = (container) => [...container.querySelectorAll('.rpt-title__text')].map((e) => e.textContent)
+
 function renderAt(slug) {
   return render(
     <MemoryRouter initialEntries={[`/tech-report/${slug}`]}>
@@ -217,5 +259,104 @@ describe('선도기술 리포트 상세 (task#276 S5)', () => {
     // 이빨 — 픽스처가 실제로 재정렬을 유발해야 위 단언이 판별력을 갖는다.
     // API 순서와 렌더 순서가 같은 픽스처였다면 정렬을 통째로 지워도 통과한다(공허한 초록).
     expect(tableNames).not.toEqual(rep.players.map((p) => p.name))
+  })
+})
+
+// ── task#281 (2/2) — 예약 자리에 신규 3섹션 배선 ─────────────────────────────
+// 세 섹션 모두 **선택 필드 의존**이라 라이브 발행물 2건(smr·reusable-rocket)에는 데이터가 없다.
+// 그러므로 "있으면 렌더"보다 "없으면 화면이 이전과 완전히 동일"이 더 중요한 완료기준이다.
+describe('선도기술 리포트 상세 — 핵심 포인트·진척 타임라인·계보 분류 (task#281)', () => {
+  it('세 필드가 다 있는 판 — 세 섹션이 확정 순서대로 렌더', async () => {
+    mockReport(FULL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+
+    // 개별 존재 단언은 순서가 뒤집혀도 전부 통과한다(판정축이 대상과 독립 — 가토 ⑧ⓘ).
+    // SMR 형태라 점유율(share_pct 전무)·난제(빈)·연관 기술(빈)은 정상 생략된다.
+    expect(titlesOf(container)).toEqual(
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계보 분류', '시장 규모', '상세 설명', '출처'])
+
+    const anchors = ['tech-report-kpis', 'tech-key-points', 'milestone-timeline', 'tech-report-players', 'tech-report-categories']
+      .map((t) => screen.getByTestId(t))
+    // 4 = Node.DOCUMENT_POSITION_FOLLOWING
+    anchors.slice(1).forEach((node, i) => expect(anchors[i].compareDocumentPosition(node) & 4).toBeTruthy())
+
+    // 껍데기만 렌더되고 내용이 비는 경우를 막는다 — 세 섹션의 대표 값 1개씩.
+    expect(within(screen.getByTestId('tech-key-points')).getByText('1.1조원')).toBeTruthy()
+    expect(screen.getByTestId('milestone-timeline').querySelectorAll('[data-testid="milestone-item"]').length).toBe(MILESTONES.length)
+    expect(screen.getAllByTestId('tech-report-category-chip').length).toBe(FULL_REPORT.players.length)
+  })
+
+  // 라이브 두 판은 신규 키가 **아예 없고**(구 JSONB 박제), 신규 컬럼은 SQL NULL이라 `null`로 온다.
+  // 배열 자리의 null에 .map/.length를 부르면 섹션이 아니라 페이지가 통째로 터지므로 두 형태를 함께 잰다.
+  it.each([
+    ['reusable-rocket 실판(키 부재)', REPORT,
+      ['주요 업체', '기술수준 비교', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
+    ['smr 실판(키 부재)', SMR_REPORT,
+      ['주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처']],
+    ['smr 실판(신규 키가 명시적 null)',
+      { ...SMR_REPORT, key_points: null, milestones: null, players: SMR_REPORT.players.map((p) => ({ ...p, category: null })) },
+      ['주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처']],
+  ])('구발행물 graceful — 세 섹션 부재 + 기존 섹션 무변화: %s', async (_label, rep, expected) => {
+    mockReport(rep)
+    const { container } = renderAt(rep.slug)
+    await screen.findByTestId('tech-report-kpis')
+
+    expect(screen.queryByTestId('tech-key-points')).toBeNull()
+    expect(screen.queryByTestId('milestone-timeline')).toBeNull()
+    expect(screen.queryByTestId('tech-report-categories')).toBeNull()
+    // 제목까지 함께 사라져야 한다 — 본문 없이 제목만 남는 유령 섹션 금지.
+    expect(titlesOf(container)).toEqual(expected)
+  })
+
+  it.each([
+    ['key_points만', { key_points: KEY_POINTS }, 'tech-key-points'],
+    ['milestones만', { milestones: MILESTONES }, 'milestone-timeline'],
+    ['category만', { players: FULL_REPORT.players }, 'tech-report-categories'],
+  ])('일부 필드만 있는 판 — 그것만 렌더: %s', async (_label, patch, present) => {
+    mockReport({ ...SMR_REPORT, ...patch })
+    renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(screen.getByTestId(present)).toBeTruthy()
+    ;['tech-key-points', 'milestone-timeline', 'tech-report-categories']
+      .filter((t) => t !== present)
+      .forEach((t) => expect(screen.queryByTestId(t)).toBeNull())
+  })
+
+  // 제목을 페이지가 소유하는 두 섹션의 게이트는 **컴포넌트 자신의 채택 조건과 같은 식**이어야 한다.
+  // 느슨한 게이트(milestones.length > 0 / players.some(p => p.category))를 쓰면 아래 입력에서
+  // 제목만 남고 본문이 사라진다(점유율 섹션이 task#277 S2에서 겪은 함정).
+  it.each([
+    ['year·event가 결측인 마일스톤만', { milestones: [{ year: null, event: '', status: 'done' }] }, 'milestone-timeline', '진척 타임라인'],
+    ['공백 문자열 분류만', { players: SMR_REPORT.players.map((p) => ({ ...p, category: '   ' })) }, 'tech-report-categories', '계보 분류'],
+  ])('본문이 채택하지 않는 값 → 제목까지 생략: %s', async (_label, patch, testid, title) => {
+    mockReport({ ...SMR_REPORT, ...patch })
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(screen.queryByTestId(testid)).toBeNull()
+    expect(titlesOf(container)).not.toContain(title)
+  })
+
+  it('계보 칩도 표와 같은 단일 순서를 쓴다 (F1 확장)', async () => {
+    // 새 소비처가 report.players(API 원순서)를 쓰면 같은 업체 집합이 한 화면에서 두 순서로 나열된다.
+    // task#280에서 표·밴드가 정확히 그렇게 갈렸고, 개별 섹션 단언은 두 순서가 갈려도 전부 통과한다.
+    mockReport(FULL_REPORT)
+    const { container } = renderAt('smr')
+    const table = within(await screen.findByTestId('tech-report-players'))
+    const tableNames = table.getAllByTestId('tech-report-player-name').map((e) => e.textContent)
+
+    let chipTotal = 0
+    ;[...container.querySelectorAll('[data-testid="tech-report-category-group"]')].forEach((g) => {
+      const chips = [...g.querySelectorAll('[data-testid="tech-report-category-chip"]')].map((e) => e.textContent)
+      chipTotal += chips.length
+      const idx = chips.map((n) => tableNames.indexOf(n))
+      expect(idx).not.toContain(-1)                        // 표에 없는 업체 0
+      expect(idx).toEqual([...idx].sort((a, b) => a - b))  // 그룹 안 상대 순서 == 표 순서
+    })
+    expect(chipTotal).toBe(tableNames.length)              // 분류 없는 업체도 미분류로 보존(유실 0)
+
+    // 이빨 — 픽스처가 실제로 재정렬을 유발해야 위 단언이 판별력을 갖는다. 같은 분류(비등수형) 안에서
+    // API 원순서(두산→GE)와 정렬 순서(GE→두산)가 갈리므로, ordered 대신 report.players를 넘기면 깨진다.
+    expect(tableNames).not.toEqual(FULL_REPORT.players.map((p) => p.name))
   })
 })
