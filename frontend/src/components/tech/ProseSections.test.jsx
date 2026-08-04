@@ -29,7 +29,9 @@ describe('ProseSections — task#280 S4 산문 접기', () => {
     const sections = getAllByTestId('tech-prose-section')
     expect(sections).toHaveLength(4)
     expect(titles(container)).toEqual(['기술 개요', '어디까지 왔나', '시장 규모', '투자 관점'])
-    expect(sections.map((d) => d.open)).toEqual([true, false, false, false])
+    // task#280 S4 뒤집음: 완료기준엔 이 열림상태가 없었고(파싱 4케이스만) 근거는
+    // "접혀도 소제목 4줄이 목차로 읽힌다"였다 — 전부 접기는 그 의도를 밀어붙이는 것(부수적 단언, #264).
+    expect(sections.map((d) => d.open)).toEqual([false, false, false, false])
   })
 
   it('① 손실 0: 접힌 섹션의 본문까지 전부 DOM에 남고 원문 줄바꿈(pre-wrap)이 보존된다', () => {
@@ -67,7 +69,8 @@ describe('ProseSections — task#280 S4 산문 접기', () => {
     const sections = getAllByTestId('tech-prose-section')
     expect(sections).toHaveLength(1)
     expect(titles(container)).toEqual(['기술난이도 근거'])
-    expect(sections[0].open).toBe(true)
+    // task#280 S4 뒤집음: 소제목 있는 섹션은 전부 접힘으로 시작 — rationale도 예외 아님(#264).
+    expect(sections[0].open).toBe(false)
     expect(sections[0].textContent).toContain('핵심 난제는 규제 승인이다.')
     expect(queryAllByTestId('tech-prose-plain')).toHaveLength(0)
   })
@@ -78,10 +81,11 @@ describe('ProseSections — task#280 S4 산문 접기', () => {
     const sections = getAllByTestId('tech-prose-section')
     expect(sections).toHaveLength(5)
     expect(titles(container)[4]).toBe('기술난이도 근거')
-    expect(sections.map((d) => d.open)).toEqual([true, false, false, false, false])
+    // task#280 S4 뒤집음: 첫 섹션도 더 이상 예외로 펼쳐지지 않는다(#264, 위 이유 동일).
+    expect(sections.map((d) => d.open)).toEqual([false, false, false, false, false])
   })
 
-  it('첫 헤딩 앞 선행 문단은 버려지지 않고 접히지도 않는다(항상 보이는 문단) — 첫 *소제목* 섹션이 펼쳐진다', () => {
+  it('첫 헤딩 앞 선행 문단은 버려지지 않고 접히지도 않는다(항상 보이는 문단) — 소제목 섹션은 접힌다', () => {
     const { getByTestId, getAllByTestId } = render(
       <ProseSections description={'서두 문단이다.\n\n[본론]\n본론 내용.'} />
     )
@@ -89,7 +93,8 @@ describe('ProseSections — task#280 S4 산문 접기', () => {
     expect(getByTestId('tech-prose-plain').textContent).toBe('서두 문단이다.')
     const sections = getAllByTestId('tech-prose-section')
     expect(sections).toHaveLength(1)
-    expect(sections[0].open).toBe(true)
+    // task#280 S4 뒤집음: 선행 문단은 여전히 항상 보이는 <p>지만, 소제목 있는 섹션은 이제 접힌다(#264).
+    expect(sections[0].open).toBe(false)
   })
 })
 

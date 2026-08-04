@@ -35,6 +35,17 @@ class YearPoint(BaseModel):
     size: MoneyValue
 
 
+class MarketEstimate(BaseModel):
+    """시장규모 추정치 발행 기관별 1건. 렌더러가 환산하지 않으므로(ADR-0033 결정 3) 배열 내
+    currency/unit/year는 전부 동일해야 한다 — 단위 혼합은 막대 길이를 1000배 틀리게 하고,
+    연도 혼합은 「최대·최소 N배」 비교를 무의미하게 만든다(Market._estimates_consistency)."""
+    institution: str = Field(..., min_length=1, max_length=40)
+    year: int
+    size: MoneyValue
+    scope: Optional[str] = Field(None, max_length=40)  # 집계 범위 차이 표시 문자열
+    is_basis: Optional[bool] = Field(None)  # 성장 곡선이 채택한 기관(최대 1개)
+
+
 class Source(BaseModel):
     title: str = Field(..., min_length=1)
     url: Optional[str] = Field(None)
@@ -53,6 +64,25 @@ class Market(BaseModel):
     cagr_pct: Optional[float] = Field(None, allow_inf_nan=False)
     share_basis: Optional[str] = Field(None)
     as_of: str
+    # 기관별 시장규모 추정치(선택·additive, task#282). Optional[List] = Field(None) 필수 —
+    # List[X] = Field([])로 두면 루틴이 보낸 명시적 null 하나가 발행 전체를 422로 막는다(task#250).
+    estimates: Optional[List[MarketEstimate]] = Field(None, max_length=6)
+
+    @model_validator(mode="after")
+    def _estimates_consistency(self):
+        """estimates 배열 내 currency/unit/year 동일성 + is_basis 최대 1개.
+        원소가 1개 이하면 집합 크기가 애초에 1 이하라 검증이 자연히 통과한다."""
+        if not self.estimates:
+            return self
+        if len({e.size.currency for e in self.estimates}) > 1:
+            raise ValueError("estimates의 currency는 전부 동일해야 합니다")
+        if len({e.size.unit for e in self.estimates}) > 1:
+            raise ValueError("estimates의 unit은 전부 동일해야 합니다")
+        if len({e.year for e in self.estimates}) > 1:
+            raise ValueError("estimates의 year는 전부 동일해야 합니다")
+        if sum(1 for e in self.estimates if e.is_basis is True) > 1:
+            raise ValueError("estimates의 is_basis=True는 최대 1개여야 합니다")
+        return self
 
 
 class Player(BaseModel):

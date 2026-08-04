@@ -43,12 +43,13 @@
 ### 선도기술 리포트 발행 (tech-reports)
 ```
 0. (조건 확인) GET /api/tech-reports  → **기술당 최신 1건**만 반환(대상 4종의 최신 발행일 판단용)
-1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·계보 분류**)
+1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·계보 분류·기관별 시장 추정치**)
 2. POST /api/tech-reports/{slug}  → 발행
    - 종목 발행물과 달리 **서버가 자동 첨부하는 숫자가 없다** — 통화·단위·점유율·척도까지 전부 이 본문에 조사해 채운다
    - 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — 틀린 값보다 없는 값이 낫다)
    - 대상 4종 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
    - **요약 레이어 3필드는 산문이 아니라 구조 필드로 싣는다**(ADR-0034) — `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(계보 분류). 채우지 않으면 화면에서 그 섹션이 통째로 생략되므로, `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다
+   - **기관별 시장 추정치(`market.estimates`, 선택·최대 6건, ADR-0034 개정)**는 조사기관마다 다르게 추정한 시장 규모를 나란히 보여준다 — 배열 내 `currency`·`unit`·`year`는 전부 같아야 하고(다르면 422), 성장 곡선(`market.history`/`forecast`)이 채택한 기관은 `is_basis: true`로 표시(최대 1건, 2건 이상이면 422)
 ```
 
 ---
@@ -707,7 +708,11 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
   "market": {
     "history": [ { "year": 2024, "size": { "value": 12.5, "currency": "USD", "unit": "bn" } } ],
     "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
-    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
+    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03",
+    "estimates": [
+      { "institution": "Morgan Stanley", "year": 2030, "size": { "value": 33.5, "currency": "USD", "unit": "bn" }, "scope": null, "is_basis": true },
+      { "institution": "McKinsey", "year": 2030, "size": { "value": 32.0, "currency": "USD", "unit": "bn" }, "scope": "발사 서비스만", "is_basis": null }
+    ]
   },
   "sources": [ { "title": "NASA" }, { "title": "SpaceX 공개 발표자료", "url": null } ],
   "key_points": [
@@ -740,9 +745,13 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `players[].category` | string\|생략 | | **계보 분류**(자유 문자열) — 같은 계열끼리 묶는 이름(SMR의 노형: 경수형·비등수형·고온가스로·소듐냉각고속로). 기술마다 분류 체계가 다르므로 그 기술의 통용 분류를 쓰고, **없는 기술이면 전 업체에서 생략**한다(억지 분류 금지 — 어느 업체에도 없으면 화면이 그 섹션을 통째로 생략한다) |
 | `challenges` | array | | 기술 난제 `{title, body}` |
 | `related` | object | | `{prerequisites, derivatives, complements, competitors}`(문자열 배열) — 전제·파생·보완·경합 기술/티커 |
-| `market` | object | ✅ | `{history, forecast, cagr_pct, share_basis, as_of}` |
+| `market` | object | ✅ | `{history, forecast, cagr_pct, share_basis, as_of, estimates}` |
 | `market.history[]` | array | | **실측만**. `{year, size: {value, currency, unit}}` |
 | `market.forecast[]` | array | | **예상만**. history와 같은 배열에 섞지 말 것 — 화면이 실선(실측)/점선(예상)을 이 구분으로 가른다 |
+| `market.estimates[]` | array\|생략 | | **기관별 시장 추정치**(ADR-0034 개정) 최대 6건 — 조사기관마다 추정이 다를 때 나란히 보여준다(같은 기술의 시장 규모가 조사기관마다 2~3배 벌어지는 것이 드문 일이 아니다). `{institution: ≤40자, year, size: {value, currency, unit}, scope?: ≤40자, is_basis?}` |
+| `market.estimates[].size` | object | ✅ | `market.history`와 같은 구조 필드(`{value, currency, unit}`) — **문자열로 쓰지 말 것**. 배열 내 `size.currency`·`size.unit`·`year`는 **전부 동일**해야 함(다르면 422 — 통화·단위·연도가 섞이면 막대 길이·최대/최소 배수 비교가 거짓말한다) |
+| `market.estimates[].scope` | string\|생략 | | 그 기관이 잡은 **집계 범위**를 짧게 적는 표시 문자열("발사 서비스만"·"기체 제조 포함") — 같은 시장인데 숫자가 다른 이유를 설명. `size`와 달리 이 필드만 자유 텍스트 |
+| `market.estimates[].is_basis` | boolean\|생략 | | 성장 곡선(`market.history`/`forecast`)이 **채택한 기관**임을 표시. 배열 내 **최대 1건**만 `true`(2건 이상이면 422) — 어느 기관 추정을 곡선으로 그렸는지 문자열·값 일치로 추론시키지 않는다 |
 | `sources` | array | ✅ | 출처 `{title, url?}` **최소 1개**. 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — **틀린 값 < 누락**) |
 | `key_points` | array\|생략 | | **핵심 포인트 카드** `{title, body, metrics?}` 3~4개 — 이 기술을 처음 보는 사람이 카드만 읽고 결론을 잡을 수 있게. `body`는 **1~2문장**, 정량 근거는 문장에 늘어놓지 말고 `metrics` 칩으로 분리(애널리스트 리포트 `points[]`와 같은 규약) |
 | `key_points[].metrics[]` | array | | 지표 칩 **최대 4개**(초과 시 422). `{label: ≤40자, value: ≤40자, change_pct?}`. `value`는 **표시용 문자열**("1.1조원"·"22%"·"134회") — 단위·통화를 문자열에 그대로 쓴다. `change_pct`만 숫자(양수=상승 색·음수=하락 색), 증감이 없으면 생략 |
@@ -751,8 +760,8 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 
 **통화·단위 enum(필수, 자유 텍스트·환산 금지)** — `currency`: `USD` \| `KRW`. `unit`: `mn`(백만) \| `bn`(십억) \| `tn`(조). 렌더러가 절대 추측·환산하지 않으므로 enum 밖 값은 `422`.
 
-> **문자열 수치는 요약 칩에만** — `key_points[].metrics[].value`가 표시용 문자열인 것은 그 칩이 **그래프를 그리지 않기 때문**이다(ADR-0034). 차트를 그리는 수치(`market` 금액·`milestones[].year`·`tech_level`·`share_pct`)는 **절대 문자열로 쓰지 말 것** — 구조 데이터여야 곡선·축·밴드를 그릴 수 있다(ADR-0033).
-> **모르면 생략** — 세 필드는 전부 선택이다. 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(화면이 그 섹션째 생략한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
+> **문자열 수치는 요약 칩에만** — `key_points[].metrics[].value`가 표시용 문자열인 것은 그 칩이 **그래프를 그리지 않기 때문**이다(ADR-0034). 차트를 그리는 수치(`market` 금액 — `history`·`forecast`·`estimates[].size` 전부 포함·`milestones[].year`·`tech_level`·`share_pct`)는 **절대 문자열로 쓰지 말 것** — 구조 데이터여야 곡선·축·밴드를 그릴 수 있다(ADR-0033). `market.estimates[].scope`만 예외(자유 텍스트) — 그건 그 기관의 집계 범위를 설명하는 요약 칩이지 그래프 좌표가 아니다.
+> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates` 네 필드는 전부 선택이다. 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(화면이 그 섹션째 생략한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
 
 > **기술수준 vs 기술난이도 vs 기술격차** — 세 축을 섞지 마세요. `players[].tech_level`은 *그 업체가* 지금 어느 단계인지, `difficulty`는 *그 기술 자체가* 얼마나 어려운지(기술 단위 필드 하나, 업체별이 아님), `gap_years`는 *선두 대비 몇 년 뒤인지*입니다.
 > **상용 시장이 아직 형성되지 않은 기술**(예: SMR·재사용 로켓 일부 세그먼트)은 점유율 근거를 댈 수 없으면 `share_pct`를 생략하세요(업체 표는 그대로, 점유율 칸만 빔).
@@ -767,7 +776,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | 상태 | 설명 |
 |------|------|
 | `401` | API Key 누락/불일치 |
-| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 |
+| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 |
 
 ---
 

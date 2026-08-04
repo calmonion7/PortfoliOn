@@ -6,7 +6,7 @@ import { parseDescriptionSections } from '../reports/techReportUtils'
 //
 // eco: 접기는 네이티브 <details>/<summary>다 — JS 상태 0, 키보드·스크린리더·Ctrl+F 검색이 전부 공짜고
 // 닫힌 섹션의 텍스트도 DOM에 남는다(정보 손실 0의 절반이 플랫폼에서 온다).
-// 첫 소제목 섹션만 open으로 시작 — 나머지는 접혀 소제목들이 목차로 읽힌다.
+// 소제목 있는 섹션은 전부 접힌 채 시작 — 소제목들이 5줄 목차로 읽힌다(task#280 S4, 산문 wall 제거).
 //
 // ⚠️ 정보 손실 0이 절대 조건이다(대괄호 규약은 데이터 계약이 아니라 루틴의 자발적 습관이므로
 // 파싱 실패가 정상 입력이다). 그래서 ① 소제목 없는 선행 문단은 접지 않고 항상 보이는 <p>로 남기고
@@ -44,15 +44,13 @@ export default function ProseSections({ description, rationale }) {
   }
   if (items.length === 0) return null
 
-  const firstTitled = items.findIndex((s) => s.title != null)
-
   return (
     <div data-testid="tech-report-prose">
       {items.map((s, i) => (s.title == null ? (
         // 소제목이 없으면 접을 라벨도 없다 — 접으면 목차도 못 되고 내용만 숨는다.
         <p key={i} data-testid="tech-prose-plain" style={PROSE_BODY}>{s.body}</p>
       ) : (
-        <details key={i} data-testid="tech-prose-section" open={i === firstTitled} style={ITEM}>
+        <details key={i} data-testid="tech-prose-section" style={ITEM}>
           <summary style={PROSE_SUMMARY}>{s.title}</summary>
           <p style={PROSE_BODY}>{s.body}</p>
         </details>

@@ -1,10 +1,13 @@
-// 선도기술 리포트 시장 성장 차트(ADR-0033, task#277 S1) — 순수 표시 컴포넌트, fetch 없음.
-// props: { market: { history:[{year,size}], forecast:[{year,size}], cagr_pct, as_of }, sources?: [{title,url}] }
+// 선도기술 리포트 시장 성장 차트(ADR-0033, task#277 S1 + task#282 S3) — 순수 표시 컴포넌트, fetch 없음.
+// props: { market: { history:[{year,size}], forecast:[{year,size}], cagr_pct, as_of } }
 // size = {value, currency:"USD"|"KRW", unit:"mn"|"bn"|"tn"} — formatMarketSize가 이름에 입력 단위를
 // 지니므로(ADR-0031) 여기서 값을 직접 포맷하지 않고 항상 그 함수를 통과시킨다.
+// task#282 S3 — 캡션의 "출처 {제목 join}"과 별도 CAGR 배지를 제거했다: 출처는 페이지 하단 「출처」
+// 섹션과 순중복이었고(source 제목을 여기·거기 두 번), CAGR은 formatMarketSummary가 이미
+// `, CAGR N%`로 문자열 끝에 붙이므로 배지가 같은 수치를 또 보여줬다. sources prop도 그래서 함께
+// 제거한다(이 파일 유일 소비처가 없어졌다).
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { splitSeries, formatMarketSize, formatMarketSummary } from '../reports/techReportUtils.js'
-import Badge from '../ui/Badge.jsx'
 
 // history/forecast를 연도 기준 단일 배열로 병합한다. 경계 연도(history 마지막 해)는 hist·fcst 양쪽에
 // 같은 값을 채워 실선(hist)→점선(fcst)이 끊기지 않고 이어지게 한다
@@ -31,7 +34,7 @@ export function buildGrowthSeries(market) {
   return [...rows.values()].sort((a, b) => a.year - b.year)
 }
 
-export default function MarketGrowthChart({ market, sources = [] }) {
+export default function MarketGrowthChart({ market }) {
   const { history, forecast } = splitSeries(market)
 
   if (!history.length && !forecast.length) {
@@ -55,14 +58,10 @@ export default function MarketGrowthChart({ market, sources = [] }) {
   const summary = formatMarketSummary(market)
   if (summary) captionParts.push(summary)
   if (market?.as_of) captionParts.push(`기준 ${market.as_of}`)
-  if (sources.length > 0) captionParts.push(`출처 ${sources.map(s => s.title).join(', ')}`)
 
   return (
     <div className="chartbox" data-testid="market-growth-chart">
       <div className="sub" data-testid="market-growth-caption">{captionParts.join(' · ')}</div>
-      {market?.cagr_pct != null && (
-        <Badge variant="info" data-testid="market-growth-cagr">CAGR {market.cagr_pct}%</Badge>
-      )}
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={series} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

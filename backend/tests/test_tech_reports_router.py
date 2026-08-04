@@ -285,6 +285,141 @@ def test_publish_key_point_metrics_max_4_422():
     mock_save.assert_not_called()
 
 
+# ── market.estimates[] (task#282 S1) ──────────────────────────────────
+
+ESTIMATES = [
+    {"institution": "Morgan Stanley", "year": 2030,
+     "size": {"value": 33.5, "currency": "USD", "unit": "bn"}, "scope": None, "is_basis": True},
+    {"institution": "Goldman Sachs", "year": 2030,
+     "size": {"value": 28.0, "currency": "USD", "unit": "bn"}, "scope": None, "is_basis": None},
+    {"institution": "McKinsey", "year": 2030,
+     "size": {"value": 32.0, "currency": "USD", "unit": "bn"}, "scope": "발사 서비스만", "is_basis": None},
+    {"institution": "Citi", "year": 2030,
+     "size": {"value": 27.5, "currency": "USD", "unit": "bn"}, "scope": None, "is_basis": None},
+    {"institution": "BofA", "year": 2030,
+     "size": {"value": 29.0, "currency": "USD", "unit": "bn"}, "scope": None, "is_basis": None},
+]
+
+
+def test_publish_estimates_five_institutions_201():
+    """① 5기관 정상 통과 → 201, 저장 payload에 그대로 실린다."""
+    body = copy.deepcopy(VALID_BODY)
+    body["market"]["estimates"] = copy.deepcopy(ESTIMATES)
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 201, resp.text
+    payload = mock_save.call_args.args[1]
+    assert len(payload["market"]["estimates"]) == 5
+    assert payload["market"]["estimates"][0]["institution"] == "Morgan Stanley"
+    assert payload["market"]["estimates"][0]["is_basis"] is True
+
+
+def test_publish_estimates_unit_mismatch_422():
+    """② unit 혼합(bn+mn) → 422."""
+    body = copy.deepcopy(VALID_BODY)
+    ests = copy.deepcopy(ESTIMATES)
+    ests[1]["size"]["unit"] = "mn"
+    body["market"]["estimates"] = ests
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 422
+    mock_save.assert_not_called()
+
+
+def test_publish_estimates_currency_mismatch_422():
+    """③ currency 혼합(USD+KRW) → 422."""
+    body = copy.deepcopy(VALID_BODY)
+    ests = copy.deepcopy(ESTIMATES)
+    ests[1]["size"]["currency"] = "KRW"
+    body["market"]["estimates"] = ests
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 422
+    mock_save.assert_not_called()
+
+
+def test_publish_estimates_year_mismatch_422():
+    """④ year 혼합 → 422."""
+    body = copy.deepcopy(VALID_BODY)
+    ests = copy.deepcopy(ESTIMATES)
+    ests[1]["year"] = 2031
+    body["market"]["estimates"] = ests
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 422
+    mock_save.assert_not_called()
+
+
+def test_publish_estimates_two_basis_422():
+    """⑤ is_basis=True 2개 이상 → 422."""
+    body = copy.deepcopy(VALID_BODY)
+    ests = copy.deepcopy(ESTIMATES)
+    ests[1]["is_basis"] = True
+    body["market"]["estimates"] = ests
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 422
+    mock_save.assert_not_called()
+
+
+def test_publish_estimates_max_6_422():
+    """⑥ 7개(초과, max_length=6) → 422."""
+    body = copy.deepcopy(VALID_BODY)
+    body["market"]["estimates"] = [
+        {**copy.deepcopy(ESTIMATES[0]), "institution": f"Inst{i}", "is_basis": None}
+        for i in range(7)
+    ]
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 422
+    mock_save.assert_not_called()
+
+
+def test_publish_estimates_omitted_is_null_201():
+    """⑦ market.estimates 키 생략 → 201, None으로 저장(additive)."""
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 201
+    payload = mock_save.call_args.args[1]
+    assert payload["market"]["estimates"] is None
+
+
+def test_publish_estimates_explicit_null_201():
+    """⑧ market.estimates: null 명시 → 201(422 아님), None으로 저장(task#250 함정의 핀 —
+    Optional[List[...]] = Field(None)이어야 통과한다)."""
+    body = copy.deepcopy(VALID_BODY)
+    body["market"]["estimates"] = None
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 201, resp.text
+    payload = mock_save.call_args.args[1]
+    assert payload["market"]["estimates"] is None
+
+
+def test_publish_estimates_nan_value_rejected_422():
+    """⑨ estimates[].size.value에 NaN(raw JSON 토큰) → 422.
+
+    MoneyValue를 재사용하므로 allow_inf_nan=False가 이미 상속돼 있다 — 수정 전에도 통과하므로
+    red-first가 원리적으로 불가하다(이빨 검증: MoneyValue.value의 allow_inf_nan=False를 일시
+    제거해 실제로 실패함을 확인 후 원복, 결과는 완료 보고에 기록).
+    """
+    from main import app as main_app
+    main_app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
+    try:
+        c = TestClient(main_app)
+        body = copy.deepcopy(VALID_BODY)
+        body["market"]["estimates"] = copy.deepcopy(ESTIMATES)
+        raw = json.dumps(body).replace('"value": 33.5', '"value": NaN')
+        assert '"value": NaN' in raw  # sanity: replace가 실제로 매치됐는지
+        with patch.object(svc, "save_report") as mock_save:
+            resp = c.post("/api/tech-reports/smr", content=raw,
+                          headers={"Content-Type": "application/json"})
+        assert resp.status_code == 422
+        mock_save.assert_not_called()
+    finally:
+        main_app.dependency_overrides.pop(require_admin_or_api_key, None)
+
+
 # ── 조회 API(추가) ────────────────────────────────────────────────────
 
 def test_list_by_slug():

@@ -3,7 +3,9 @@ import { render, screen } from '@testing-library/react'
 import MarketGrowthChart, { buildGrowthSeries } from './MarketGrowthChart.jsx'
 
 // task#277 S1 — jsdom에서 recharts는 렌더되지 않으므로(ResponsiveContainer 0크기) 단언 대상은
-// SVG·틱이 아니라 캡션·CAGR 배지·빈상태 문구다(가토).
+// SVG·틱이 아니라 캡션·빈상태 문구다(가토).
+// task#282 S3 — CAGR 배지·출처 join을 캡션에서 제거했다(formatMarketSummary가 이미 `, CAGR N%`로
+// 끝나 배지는 순중복, 출처는 페이지 하단 「출처」 섹션과 순중복).
 const size = (value, currency = 'USD', unit = 'bn') => ({ value, currency, unit })
 
 const market = (over = {}) => ({
@@ -15,12 +17,13 @@ const market = (over = {}) => ({
 })
 
 describe('MarketGrowthChart (task#277 S1)', () => {
-  it('history+forecast 둘 다 있으면 → 화살표 요약 + CAGR 배지 + as_of 캡션', () => {
+  it('history+forecast 둘 다 있으면 → 화살표 요약(CAGR 포함) + as_of 캡션, 별도 CAGR 배지는 없다', () => {
     render(<MarketGrowthChart market={market()} />)
     expect(screen.queryByTestId('market-growth-empty')).toBeNull()
     expect(screen.getByTestId('market-growth-caption').textContent).toMatch(/→/)
     expect(screen.getByTestId('market-growth-caption').textContent).toMatch(/기준 2026-06/)
-    expect(screen.getByTestId('market-growth-cagr').textContent).toMatch(/12\.3%/)
+    expect(screen.getByTestId('market-growth-caption').textContent).toMatch(/CAGR 12\.3%/)
+    expect(screen.queryByTestId('market-growth-cagr')).toBeNull()
   })
 
   it('history만 있으면 → 화살표 없이 현재값만 요약, 차트는 그린다', () => {
@@ -46,9 +49,13 @@ describe('MarketGrowthChart (task#277 S1)', () => {
     expect(screen.queryByTestId('market-growth-cagr')).toBeNull()
   })
 
-  it('sources가 있으면 캡션에 출처 제목을 표기한다', () => {
+  // task#282 S3 — 캡션의 출처 join을 제거했다(#264 판별 절차: 이 단언의 근거는 task#277 S1 계획의
+  // *기록된 결정*이 아니라 "jsdom에서 recharts가 렌더되지 않으니 캡션을 검증 대상으로 쓴다"는 검증
+  // 편의였다(당시 fixture 출처 2건, 라이브는 29건) — 부수적 단언이라 뒤집는다. sources prop 자체도
+  // 컴포넌트에서 제거됐지만, 넘겨도 무시됨(React 미소비 prop)을 함께 확인한다.
+  it('sources를 넘겨도 캡션에 출처 제목을 표기하지 않는다', () => {
     render(<MarketGrowthChart market={market()} sources={[{ title: '삼성증권 리서치' }, { title: 'IEA' }]} />)
-    expect(screen.getByTestId('market-growth-caption').textContent).toMatch(/삼성증권 리서치, IEA/)
+    expect(screen.getByTestId('market-growth-caption').textContent).not.toMatch(/삼성증권 리서치|IEA/)
   })
 
   it('cagr_pct가 없으면 배지를 생략한다', () => {

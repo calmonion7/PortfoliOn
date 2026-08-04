@@ -143,6 +143,30 @@ describe('TechGraph — 렌더', () => {
     expect(getAllByText('+2개').length).toBeGreaterThan(0)
   })
 
+  it('svg는 role="img"가 아니라 aria-hidden — 자손 텍스트를 접근성 트리에서 프루닝하지 않는다(task#282)', () => {
+    const related = { prerequisites: ['리튬 정제'], derivatives: ['전고체 셀'] }
+    const { container } = render(<TechGraph related={related} target="전고체 배터리" />)
+    expect(container.querySelectorAll('[role="img"]')).toHaveLength(0)
+    const svgs = container.querySelectorAll('svg[aria-hidden="true"]')
+    expect(svgs).toHaveLength(1)
+  })
+
+  it('sr-only 목록은 SVG가 5개로 캡한 열의 초과분까지 전부 텍스트로 싣는다(task#282)', () => {
+    const related = { prerequisites: ['a', 'b', 'c', 'd', 'e', 'f'], derivatives: ['g', 'h'] }
+    const { container } = render(<TechGraph related={related} target="T" />)
+    const svgNodes = container.querySelectorAll('[data-col="0"]')
+    expect(svgNodes).toHaveLength(5) // 4개 개별 + 폴드 1개 — 초과분 f는 SVG에 없음
+
+    const srList = container.querySelector('[data-testid="tech-graph-sr-list"]')
+    expect(srList).toBeTruthy()
+    expect(srList.className).toContain('sr-only')
+    const srText = srList.textContent
+    ;['a', 'b', 'c', 'd', 'e', 'f'].forEach((label) => expect(srText).toContain(label))
+    expect(srText).toContain('T')
+    expect(srText).toContain('g')
+    expect(srText).toContain('h')
+  })
+
   it('보완/경합 기술은 칩 그룹으로 렌더된다(그래프 노드가 아님)', () => {
     const related = { complements: ['냉매 기술'], competitors: ['화학전지'] }
     const { getByText, queryByTestId } = render(<TechGraph related={related} target="SMR" />)

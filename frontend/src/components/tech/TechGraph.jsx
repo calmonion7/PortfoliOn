@@ -11,9 +11,14 @@ const NODE_H_MAX = 56 // 노드 높이 상한(px) — maxN이 작을 때(열당 
 const FONT_SIZE = 12
 const PAD_X = 10 // 노드 안 텍스트 좌우 패딩(px) — truncateLabel 가용폭 계산에 사용
 
+// 유효 문자열 라벨만 남긴다(capColumn과 동일 필터) — sr-only 전체 목록에 재사용, 캡은 적용 안 함.
+function validLabels(items) {
+  return Array.isArray(items) ? items.filter((v) => typeof v === 'string' && v.trim()) : []
+}
+
 // 열 하나를 최대 5칸으로 접는다: 5개 이하면 전부 개별 노드, 넘으면 앞 4개 + 마지막 슬롯을 "+N개" 폴드로.
 function capColumn(items) {
-  const list = Array.isArray(items) ? items.filter((v) => typeof v === 'string' && v.trim()) : []
+  const list = validLabels(items)
   if (list.length <= MAX_PER_COL) return { shown: list, overflow: 0 }
   return { shown: list.slice(0, MAX_PER_COL - 1), overflow: list.length - (MAX_PER_COL - 1) }
 }
@@ -166,9 +171,14 @@ export default function TechGraph({ related, target, width = 640, height = 260 }
   const derivatives = related?.derivatives
   const complements = Array.isArray(related?.complements) ? related.complements : []
   const competitors = Array.isArray(related?.competitors) ? related.competitors : []
+  const hasTarget = typeof target === 'string' && target.trim().length > 0
 
   // eco: 노드 최대 ~11개짜리 배치 계산이라 렌더마다 다시 돌려도 비용이 없다 — useMemo 생략(YAGNI).
   const { nodes, edges } = techGraphLayout({ prerequisites, target, derivatives, width, height })
+
+  // sr-only 전체 목록용 — SVG는 열당 5개로 캡하지만(MAX_PER_COL) 텍스트는 캡할 이유가 없어 원본을 그대로 쓴다.
+  const preLabels = validLabels(prerequisites)
+  const derLabels = validLabels(derivatives)
 
   const hasGraph = nodes.length > 0
   const hasChips = complements.length > 0 || competitors.length > 0
@@ -177,13 +187,13 @@ export default function TechGraph({ related, target, width = 640, height = 260 }
   return (
     <div data-testid="tech-graph">
       {hasGraph && (
+        <>
         <div style={GRAPH_SCROLL_STYLE}>
         <svg
           data-testid="tech-graph-svg"
           viewBox={`0 0 ${width} ${height}`}
           style={{ ...SVG_STYLE, minWidth: width }}
-          role="img"
-          aria-label="연관기술 관계도"
+          aria-hidden="true"
         >
           <defs>
             <marker id="tech-graph-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -209,6 +219,29 @@ export default function TechGraph({ related, target, width = 640, height = 260 }
           })}
         </svg>
         </div>
+        {/* svg가 aria-hidden(role="img"는 ARIA leaf role이라 자손 텍스트를 접근성 트리에서 통째 프루닝한다,
+            task#282) — 같은 값을 열 그룹 구조로 다시 노출한다. SVG는 열당 5개로 캡하지만(preLabels/derLabels는
+            원본 raw 배열) 텍스트는 캡할 이유가 없어 폴드로 접힌 초과분도 전부 싣는다. */}
+        <ul className="sr-only" data-testid="tech-graph-sr-list">
+          {preLabels.length > 0 && (
+            <li>
+              전제·선행
+              <ul>
+                {preLabels.map((label, i) => <li key={`sr-pre-${i}-${label}`}>{label}</li>)}
+              </ul>
+            </li>
+          )}
+          {hasTarget && <li>대상: {target}</li>}
+          {derLabels.length > 0 && (
+            <li>
+              파생·응용
+              <ul>
+                {derLabels.map((label, i) => <li key={`sr-der-${i}-${label}`}>{label}</li>)}
+              </ul>
+            </li>
+          )}
+        </ul>
+        </>
       )}
       {hasChips && (
         <div style={CHIP_WRAP_STYLE}>

@@ -2303,7 +2303,11 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "market": {
     "history": [ { "year": 2024, "size": { "value": 12.5, "currency": "USD", "unit": "bn" } } ],
     "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
-    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
+    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03",
+    "estimates": [
+      { "institution": "Morgan Stanley", "year": 2030, "size": { "value": 33.5, "currency": "USD", "unit": "bn" }, "scope": null, "is_basis": true },
+      { "institution": "McKinsey", "year": 2030, "size": { "value": 32.0, "currency": "USD", "unit": "bn" }, "scope": "발사 서비스만", "is_basis": null }
+    ]
   },
   "sources": [ { "title": "NASA", "url": null } ],
   "key_points": [
@@ -2330,25 +2334,26 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `players[].category` | string\|생략 | | 계보 분류(자유 문자열) — 노형 계열 등 기술별 묶음. 화면이 「계보 분류」 그룹 칩으로 렌더하며, 어느 업체에도 없으면 그 섹션이 통째로 생략된다 |
 | `challenges` | array | | 기술 난제 `{title, body}` |
 | `related` | object | | 관계 티커/기술 `{prerequisites, derivatives, complements, competitors}`(각 문자열 배열) |
-| `market` | object | ✅ | `{history: [{year, size}], forecast: [{year, size}], cagr_pct?, share_basis?, as_of}` — `size`는 `{value, currency: USD\|KRW, unit: mn\|bn\|tn}`. `history`(실측)와 `forecast`(예상)는 별개 배열 |
+| `market` | object | ✅ | `{history: [{year, size}], forecast: [{year, size}], cagr_pct?, share_basis?, as_of, estimates?}` — `size`는 `{value, currency: USD\|KRW, unit: mn\|bn\|tn}`. `history`(실측)와 `forecast`(예상)는 별개 배열 |
+| `market.estimates` | array\|생략 | | 기관별 시장 추정치(ADR-0034 개정) **최대 6건**(초과 시 `422`) — `{institution: ≤40자, year, size, scope?: ≤40자, is_basis?}`. `size`는 `market.history`와 같은 구조 필드(문자열 금지)이고, 배열 내 `size.currency`·`size.unit`·`year`는 전부 동일해야 함(다르면 `422` — 섞이면 막대 길이·배수 비교가 거짓말한다). `scope`만 집계 범위 차이를 적는 **표시용 문자열**. `is_basis: true`(성장 곡선이 채택한 기관)는 배열 내 **최대 1건**(2건 이상 `422`) |
 | `sources` | array | ✅ | 출처 `{title, url?}` **최소 1개** |
 | `key_points` | array\|생략 | | 핵심 포인트 카드 `{title, body, metrics?}` — `metrics`는 **최대 4개**(초과 시 `422`)이고 각 항목은 `{label: ≤40자, value: ≤40자, change_pct?}`. `value`는 **표시용 문자열**("1.1조원"·"22%")이고 `change_pct`만 숫자(양수=상승·음수=하락 색, `0`도 유효값이라 무표기와 다르다). 그래프를 그리는 수치가 아니므로 문자열이다(ADR-0034) |
 | `milestones` | array\|생략 | | 진척 타임라인 `{year: int, actor?, event, status}` — `status`는 `done` \| `in_progress` \| `planned` **3값 enum**(그 밖은 `422`). 구체 단계명은 기술마다 다르므로 `event` 자유 문자열이 담고 색·마커는 이 enum이 정한다 |
 
-`value`(`MoneyValue`)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
+`value`(`MoneyValue` — `market.history`/`forecast`/`estimates[].size` 전부 포함)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones`·`market.estimates` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
 
 **Response `201`**
 ```json
 { "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
 ```
 
-**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락
+**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락
 
 ---
 
 각 조회 응답의 발행물 행(`report`)은 **발행 요청 필드 전체(위 표) + 서버 부여 필드 2개**로 구성된다 — `id`(내부 PK, 정렬·비교 용도 외 의미 없음)와 `created_at`(그 판이 저장·갱신된 시각, 재발행 시 갱신).
 
-⚠️ **선택 필드는 응답에서 `null`로 나온다 — 빈 배열이 아니다.** `key_points`·`milestones`를 담지 않고 발행한 판(2026-08-04 이전 전 판 포함)은 컬럼이 SQL NULL이라 `"key_points": null`·`"milestones": null`이고, `metrics`를 생략한 포인트도 `"metrics": null`이다. 소비자는 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `players[].category`는 그보다 앞서 발행된 판에는 **키 자체가 없다**(JSONB에 박제된 옛 형태 — `undefined`).
+⚠️ **선택 필드는 응답에서 `null`로 나온다 — 빈 배열이 아니다.** `key_points`·`milestones`를 담지 않고 발행한 판(2026-08-04 이전 전 판 포함)은 컬럼이 SQL NULL이라 `"key_points": null`·`"milestones": null`이고, `metrics`를 생략한 포인트도 `"metrics": null`이다. 소비자는 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `players[].category`는 그보다 앞서 발행된 판에는 **키 자체가 없다**(JSONB에 박제된 옛 형태 — `undefined`). `market.estimates`도 같은 함정이다 — 이 필드가 스키마에 생기기 **이전**에 발행된 판(2026-08-04 이전 전 판 포함)은 JSONB `market`에 이 키 자체가 없어(`undefined`, `players[].category`와 동일 케이스) `null`과 구분해야 한다. 반면 그 **이후** 발행된 판은 요청에서 생략해도 서버가 `"estimates": null`을 채워 저장하므로(다른 선택 필드와 동일) 키는 늘 있다.
 
 ### `GET /api/tech-reports`
 
@@ -2401,7 +2406,11 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "market": {
     "history": [ { "year": 2024, "size": { "value": 12.5, "currency": "USD", "unit": "bn" } } ],
     "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
-    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03"
+    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03",
+    "estimates": [
+      { "institution": "Morgan Stanley", "year": 2030, "size": { "value": 33.5, "currency": "USD", "unit": "bn" }, "scope": null, "is_basis": true },
+      { "institution": "McKinsey", "year": 2030, "size": { "value": 32.0, "currency": "USD", "unit": "bn" }, "scope": "발사 서비스만", "is_basis": null }
+    ]
   },
   "sources": [ { "title": "NASA", "url": null } ],
   "key_points": [ { "title": "발사비가 한 자릿수로 내려왔다",

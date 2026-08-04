@@ -4,8 +4,9 @@ import api from '../api'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { SectionTitle } from '../components/reports/reportUtils.jsx'
-import { TECH_NAMES, formatMarketSummary, sortPlayers } from '../components/reports/techReportUtils'
+import { TECH_NAMES, sortPlayers } from '../components/reports/techReportUtils'
 import MarketGrowthChart from '../components/tech/MarketGrowthChart'
+import MarketEstimates, { marketEstimatesLayout } from '../components/tech/MarketEstimates'
 import ShareChart from '../components/tech/ShareChart'
 import TechLevelBand from '../components/tech/TechLevelBand'
 import TechGraph from '../components/tech/TechGraph'
@@ -90,7 +91,6 @@ export default function TechReport() {
   const ordered = sortPlayers(players)
   const challenges = report.challenges || []
   const sources = report.sources || []
-  const summary = formatMarketSummary(report.market)
   const related = report.related || {}
   const hasRelated = ['prerequisites', 'derivatives', 'complements', 'competitors']
     .some((k) => Array.isArray(related[k]) && related[k].length > 0)
@@ -189,21 +189,20 @@ export default function TechReport() {
         </div>
       )}
 
-      {/* ── 시장 규모 (텍스트 요약 + 그 아래 성장 곡선 차트, task#277 S1) ── */}
+      {/* ── 시장 규모 (task#282 S3 — 텍스트 요약 카드를 제거했다. formatMarketSummary가
+          history/forecast에서 파생되므로 차트가 빈 상태면 요약도 항상 null이었다(둘은 항상 같이
+          있거나 같이 없다) — 구조적으로 100% 중복. 유일한 고유 정보였던 as_of는 이제
+          MarketGrowthChart 캡션이 받는다. 기관별 추정치(MarketEstimates)는 같은 절 안의
+          하위 표시라 별도 SectionTitle을 두지 않는다. ── */}
       <SectionTitle>시장 규모</SectionTitle>
-      <Card padding="md" style={{ marginBottom: 16 }}>
-        {summary ? (
-          <p className="mono tnum" data-testid="tech-report-market-summary" style={{ color: 'var(--text)', fontSize: 15, fontWeight: 700, margin: 0 }}>{summary}</p>
-        ) : (
-          <p style={{ color: 'var(--text-3)', fontSize: 13, margin: 0 }}>시장 규모 데이터가 없습니다.</p>
-        )}
-        {report.market?.as_of && (
-          <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '8px 0 0' }}>{report.market.as_of} 기준</p>
-        )}
-      </Card>
       <div style={{ marginBottom: 30 }}>
-        <MarketGrowthChart market={report.market} sources={sources} />
+        <MarketGrowthChart market={report.market} />
       </div>
+      {marketEstimatesLayout(report.market?.estimates).rows.length > 0 && (
+        <div style={{ marginBottom: 30 }}>
+          <MarketEstimates estimates={report.market.estimates} />
+        </div>
+      )}
 
       {/* ── 연관 기술 (전제→대상→파생 관계도, 관계 데이터 전무 시 조용히 생략, task#277 S4) ── */}
       {hasRelated && (

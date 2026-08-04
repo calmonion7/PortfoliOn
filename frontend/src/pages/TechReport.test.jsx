@@ -156,8 +156,11 @@ describe('선도기술 리포트 상세 (task#276 S5)', () => {
     expect(screen.getByText('재점화 신뢰성')).toBeTruthy()
     expect(screen.getByText('다회 재점화 엔진 내구성.')).toBeTruthy()
 
-    expect(screen.getByTestId('tech-report-market-summary').textContent).toBe('$12.5B (2024) → $30.5B (2030), CAGR 12.3%')
-    expect(screen.getByText('2026-08-03 기준')).toBeTruthy()
+    // task#282 S3 — 요약 카드를 제거했다(formatMarketSummary가 history/forecast에서 파생돼 차트와
+    // 항상 함께 있거나 함께 없는 구조적 100% 중복). MarketGrowthChart 캡션이 요약+기준을 흡수한다.
+    // #264 판별 절차: 이 단언의 근거는 task#276 S6 스냅샷용 값 확인이지 기록된 결정이 아니다 —
+    // 부수적 단언이라 뒤집는다.
+    expect(screen.getByTestId('market-growth-caption').textContent).toBe('$12.5B (2024) → $30.5B (2030), CAGR 12.3% · 기준 2026-08-03')
     expect(screen.getByText('NASA')).toBeTruthy()
   })
 
