@@ -64,9 +64,17 @@ P(new Set([BASE, IDP, START]).size === 3, '오리진-이빨',
 
 // 앱의 diag.js와 *독립*인 접지선 — BASE 오리진 문서 로드마다 +1(오리진 스코프라 IDP/START 방문은
 // 안 섞인다). 앱 자신의 doc 로그 개수와 대조해 "로거가 빠뜨리지 않았는가"를 검증한다.
+// ⚠️ /api/* 경로는 제외한다 — §7.2의 302 인터셉트 한계 때문에 이 프로브가 `/api/auth/oauth/google`을
+// (진짜 302 대신) location.replace HTML로 fulfill하는데, 그 응답은 BASE 오리진 "문서"라
+// addInitScript는 타지만 SPA(App.jsx→useAuthBootstrap)는 마운트되지 않는다(React 앱이 아니라
+// 인라인 스크립트 한 줄짜리 스텁이므로). 실제 프로덕션에서 이 경로는 진짜 HTTP 302라 브라우저가
+// 문서를 만들거나 스크립트를 실행하지 않고 즉시 다음 URL로 넘어간다 — 이 스텁은 실사용자 흐름엔
+// 존재하지 않는 프로브 전용 인공물이다. 필터 없이 두면 "앱이 doc 로깅을 빠뜨렸다"는 거짓 신호가
+// 된다(실측: 1차 실행에서 접지선 4 vs 앱 doc 3 — 4번째가 url=/api/auth/oauth/google인 이 스텁이었다).
 const GROUND_INIT = `
 (() => {
   try {
+    if (location.pathname.startsWith('/api/')) return;
     const K = '__uat284_loads';
     const a = JSON.parse(sessionStorage.getItem(K) || '[]');
     const nav = performance.getEntriesByType ? performance.getEntriesByType('navigation')[0] : null;
@@ -217,7 +225,8 @@ P(!!oauthLandingDoc, 'target-oauth-landing-doc',
 // 일치하는가. 어긋나면 로거가 빠뜨렸거나(무음 스킵) 중복 기록한 것이다.
 bump('ground-truth');
 P(groundLoads.length === docs.length, 'ground-truth-cross-check',
-  `독립 접지선 로드 수=${groundLoads.length} vs 앱 자체 doc 로그=${docs.length} (${groundLoads.map(g => g.navType).join(',')})`);
+  `독립 접지선 로드 수=${groundLoads.length} vs 앱 자체 doc 로그=${docs.length} ` +
+  `(${groundLoads.map(g => `${g.navType}:${g.url}`).join(' | ')})`);
 
 // ── 2) rewind 항목 1건, base/len/delta/path 필드·값 출력 ─────────────
 assertDomain('rewind', rewinds);
