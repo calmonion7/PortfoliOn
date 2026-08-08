@@ -91,17 +91,43 @@ describe('useBfcacheAuthGuard — bfcache 복원 시 토큰 유무와 화면 상
   })
 
   // task#283 — 이 작업의 본체. 리로드가 아니라 pruning + 상태 뒤집기다.
-  it('토큰 있는데 로그인 화면이 복원되면 forward를 자르고 세션만 뒤집는다 (리로드 0)', () => {
+  it('토큰 있는데 로그인 화면이 복원되면 forward를 자르고, popstate 착지 *뒤에* 세션을 뒤집는다', () => {
     localStorage.setItem('access_token', 't')
     const resolve = vi.fn()
     renderHook(() => useBfcacheAuthGuard(false, resolve))
     firePageShow(true)
-    expectCalls({ push: 1, back: 1, resolve: 1 }, resolve)
-    // push 인자 = 현재 URL. URL을 바꾸면 사용자가 눈치채고, Router 마운트 위치도 흔들린다.
+
+    // 히스토리부터 정리하고, 뒤집기는 아직 하지 않는다. 먼저 뒤집으면 Router가 마운트된 뒤
+    // popstate가 도착해 '/'→'/reports' 재리다이렉트가 돌고 AppShell이 페이지를 재마운트한다.
+    expectCalls({ push: 1, back: 1, resolve: 0 }, resolve)
+    // push 인자 = 현재 URL. URL을 바꾸면 사용자가 눈치채고 Router 마운트 위치도 흔들린다.
     expect(pushStateSpy).toHaveBeenCalledWith({}, '', window.location.href)
-    expect(resolve).toHaveBeenCalledWith({ access_token: 't' })
     // back()이 pushState보다 뒤에 와야 트랩이 안 생긴다 — 순서가 곧 계약이다.
     expect(pushStateSpy.mock.invocationCallOrder[0]).toBeLessThan(backSpy.mock.invocationCallOrder[0])
+
+    window.dispatchEvent(new Event('popstate'))
+    expectCalls({ push: 1, back: 1, resolve: 1 }, resolve)
+    expect(resolve).toHaveBeenCalledWith({ access_token: 't' })
+
+    // 뒤집기는 정확히 1회 — popstate가 또 와도 다시 뒤집지 않는다.
+    window.dispatchEvent(new Event('popstate'))
+    expectCalls({ push: 1, back: 1, resolve: 1 }, resolve)
+  })
+
+  it('popstate가 오지 않아도 안전망이 뒤집는다 — 토큰을 쥔 채 로그인 화면에 갇히지 않는다', () => {
+    vi.useFakeTimers()
+    try {
+      localStorage.setItem('access_token', 't')
+      const resolve = vi.fn()
+      renderHook(() => useBfcacheAuthGuard(false, resolve))
+      firePageShow(true)
+      expectCalls({ push: 1, back: 1, resolve: 0 }, resolve)
+      vi.advanceTimersByTime(300)
+      expectCalls({ push: 1, back: 1, resolve: 1 }, resolve)
+      expect(resolve).toHaveBeenCalledWith({ access_token: 't' })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('토큰 없는데 앱 화면이 복원되면 세션만 비운다 — 이 방향엔 자를 IdP 엔트리가 없다', () => {

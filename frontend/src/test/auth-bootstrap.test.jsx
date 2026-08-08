@@ -93,10 +93,15 @@ describe('useAuthBootstrap — 에러·실패 착지는 저장 토큰으로 세�
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: async () => ({ access_token: 'a', refresh_token: 'r' }),
     }))
-    renderHook(() => useAuthBootstrap())
+    const { result } = renderHook(() => useAuthBootstrap())
     await waitFor(() => expect(returnFromOAuth).toHaveBeenCalled())
     expect(localStorage.getItem('access_token')).toBe('a')
     expect(localStorage.getItem('refresh_token')).toBe('r')
+    // task#283 — 성공 분기도 이 문서의 세션을 해석해야 한다(나머지 세 분기와 대칭).
+    // 빠뜨리면 authLoading이 영원히 true라 App이 null을 반환하고, 이 문서가 나중에
+    // forward로 되짚어져 bfcache 복원되면 새로고침 전까지 못 빠져나오는 백지가 된다.
+    // 되감기가 곧 떠나므로 화면엔 안 보이지만 문서 상태로는 남는다.
+    expect((await settled(result)).session).toEqual({ access_token: 'a' })
   })
 
   // ── task#264 — 실패 3분기도 성공 분기와 대칭으로 되감는다 (6차 리포트 L1) ──

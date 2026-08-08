@@ -5,7 +5,8 @@
 // 랜딩에서 그 증분(delta)만큼 history.go(-delta) 해 IdP 엔트리를 히스토리의 '앞'으로 밀어낸다.
 // 되감기 착지점은 로그인 화면이 떴던 우리 문서이고, 그 문서는 이제 토큰을 갖고 있으므로 재평가되면
 // 앱을 렌더한다(라이브 `/`는 no-store라 리로드가 기본 경로 — 예외적으로 bfcache로 복원되면
-// useBfcacheAuthGuard가 replace로 이어받는다).
+// useBfcacheAuthGuard가 같은 문서 안에서 세션 상태를 뒤집어 이어받는다. 예전엔 그 가드가
+// replace('/')로 문서를 다시 불렀는데, 그 리로드 시간 내내 복원된 로그인 화면이 보였다 — task#283).
 //
 // 착지점이 필요하므로 OAuth 시작은 replace가 아니라 push여야 한다(task#245 D6의 의도적 되돌림).
 const KEY = 'oauth_hist_len'

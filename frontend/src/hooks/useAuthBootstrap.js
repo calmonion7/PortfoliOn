@@ -49,6 +49,12 @@ export default function useAuthBootstrap() {
           if (data?.access_token) {
             localStorage.setItem('access_token', data.access_token)
             localStorage.setItem('refresh_token', data.refresh_token)
+            // 되감기 전에 이 문서의 세션도 해석한다 — 나머지 세 분기와 대칭(task#283).
+            // 빠뜨리면 이 문서는 authLoading=true에 영원히 머물러 App이 null을 반환한다.
+            // 되감기가 곧 떠나므로 평소엔 안 보이지만, 이 문서가 나중에 forward로 되짚어져
+            // bfcache 복원되면 **새로고침 전까지 빠져나올 수 없는 백지**가 된다. 예전엔
+            // 가드의 전체 리로드가 그걸 우연히 치료했는데, 리로드를 없애며 노출됐다.
+            resolveStored()
             // IdP 엔트리를 뒤가 아니라 앞으로 밀어낸다 — 되감기 불가 시 replace('/')로 폴백(task#252)
             returnFromOAuth()
           } else {
