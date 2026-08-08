@@ -119,7 +119,7 @@ export default function App() {
   const [theme, setTheme] = useTheme()
   const { session, setSession, authLoading } = useAuthBootstrap()
 
-  useBfcacheAuthGuard(!!session)
+  useBfcacheAuthGuard(!!session, setSession)
 
   if (authLoading) return null
   if (!session) return <LoginPage />
