@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { flushSync } from 'react-dom'
+import { logDiag } from '../utils/diag'
 
 // bfcache 복원 가드.
 // 뒤로가기로 되살아난 문서는 JS가 재실행되지 않아 복원 시점의 DOM을 그대로 보여준다.
@@ -35,22 +36,38 @@ import { flushSync } from 'react-dom'
 export default function useBfcacheAuthGuard(isLoggedIn, resolveSession) {
   useEffect(() => {
     const onPageShow = (e) => {
-      if (!e.persisted) return
       const token = localStorage.getItem('access_token')
+      // task#284 진단 — 아래 두 early return *이전*에 무조건 기록한다(가토 ⑧ⓑ).
+      // persisted=false·일치 케이스도 (가)bfcache/(나)재요청 판정에 필요한 데이터다.
+      logDiag('pageshow', {
+        persisted: e.persisted, isTrusted: e.isTrusted, hasToken: !!token, isLoggedIn: !!isLoggedIn,
+      })
+      if (!e.persisted) return
       if (!!token === !!isLoggedIn) return
-      const flip = () => flushSync(() => resolveSession(token ? { access_token: token } : null))
-      if (!token) { flip(); return }
 
+      // via가 있을 때만 flip 이벤트를 남긴다 — 즉시분기(로그아웃 방향)는 popstate/timeout
+      // 어느 메커니즘도 거치지 않으므로 그 계약(via: popstate|timeout)에 해당 값이 없다.
+      const flip = (via) => {
+        flushSync(() => resolveSession(token ? { access_token: token } : null))
+        if (via) logDiag('flip', { via })
+      }
+      if (!token) {
+        logDiag('guard', { dir: 'logout' })
+        flip()
+        return
+      }
+
+      logDiag('guard', { dir: 'login' })
       let timer
-      const flipOnce = () => {
+      const flipOnce = (fromTimeout) => {
         window.removeEventListener('popstate', flipOnce)
         clearTimeout(timer)
-        flip()
+        flip(fromTimeout === true ? 'timeout' : 'popstate')
       }
       window.addEventListener('popstate', flipOnce)
       window.history.pushState({}, '', window.location.href)
       window.history.back()
-      timer = setTimeout(flipOnce, 300)
+      timer = setTimeout(() => flipOnce(true), 300)
     }
     window.addEventListener('pageshow', onPageShow)
     return () => window.removeEventListener('pageshow', onPageShow)

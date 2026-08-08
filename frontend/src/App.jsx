@@ -30,6 +30,7 @@ import InstallPrompt from './components/InstallPrompt'
 import GlobalSearch from './components/GlobalSearch'
 import { Sun, Moon, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
+import DiagLog from './components/DiagLog'
 import './App.css'
 import AdminAnalytics from './pages/AdminAnalytics'
 import { REDIRECTS } from './routes'
@@ -120,6 +121,10 @@ export default function App() {
   const { session, setSession, authLoading } = useAuthBootstrap()
 
   useBfcacheAuthGuard(!!session, setSession)
+
+  // task#284 진단 진입점 A(브라우저) — 로그인 여부와 무관하게 보여야 관심 구간(로그인 화면
+  // 잔상 구간)의 로그가 읽힌다. authLoading/session 분기보다 먼저 두는 이유가 그것이다.
+  if (new URLSearchParams(window.location.search).get('diag') === '1') return <DiagLog />
 
   if (authLoading) return null
   if (!session) return <LoginPage />

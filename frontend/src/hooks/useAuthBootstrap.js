@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { returnFromOAuth } from '../utils/oauthHistory'
+import { logDiag } from '../utils/diag'
 
 // 인증 부트스트랩 — 첫 로드에서 세션을 해석한다(URL의 OAuth 결과 → localStorage 토큰).
 // App에서 훅으로 뺀 이유: 이 코드베이스는 테스트에서 App을 import하지 않는 관례라(로그인 시
@@ -10,6 +11,14 @@ export default function useAuthBootstrap() {
   const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
+    // task#284 진단 — 이 문서가 어떻게 열렸는지(일반 로드/bfcache 복원 후 재요청 등)를
+    // 분기 판정 *이전에* 무조건 남긴다(가토 ⑧ⓑ — 조건부 기록은 무음 스킵 장치다).
+    logDiag('doc', {
+      url: window.location.pathname + window.location.search,
+      hasToken: !!localStorage.getItem('access_token'),
+      nav: performance.getEntriesByType?.('navigation')?.[0]?.type,
+    })
+
     // 저장 토큰으로 세션을 해석한다. 에러·소진 코드 착지도 정상 경로와 **같은 규칙**을 쓴다 —
     // "OAuth가 실패했다"는 "세션이 없다"를 뜻하지 않는다(task#253).
     // 지배적 트리거는 사용자가 거절한 경우가 아니라 뒤로가기로 콜백 엔트리가 재실행된 경우다:
@@ -36,6 +45,7 @@ export default function useAuthBootstrap() {
     if (oauthError) {
       window.history.replaceState({}, '', '/')
       resolveStored()
+      logDiag('boot', { branch: 'error', session: !!localStorage.getItem('access_token') })
       returnFromOAuth()
       return
     }
@@ -55,17 +65,20 @@ export default function useAuthBootstrap() {
             // bfcache 복원되면 **새로고침 전까지 빠져나올 수 없는 백지**가 된다. 예전엔
             // 가드의 전체 리로드가 그걸 우연히 치료했는데, 리로드를 없애며 노출됐다.
             resolveStored()
+            logDiag('boot', { branch: 'oauth-ok', session: !!localStorage.getItem('access_token') })
             // IdP 엔트리를 뒤가 아니라 앞으로 밀어낸다 — 되감기 불가 시 replace('/')로 폴백(task#252)
             returnFromOAuth()
           } else {
             // 코드 교환 실패(소진·만료 코드는 400) — 저장 토큰이 있으면 그대로 유지한다.
             resolveStored()
+            logDiag('boot', { branch: 'oauth-fail', session: !!localStorage.getItem('access_token') })
             returnFromOAuth()
           }
         })
         .catch(() => {
           // 네트워크 실패도 세션 부재의 근거가 아니다.
           resolveStored()
+          logDiag('boot', { branch: 'oauth-net', session: !!localStorage.getItem('access_token') })
           returnFromOAuth()
         })
       return
@@ -78,6 +91,10 @@ export default function useAuthBootstrap() {
     }
 
     resolveStored()
+    logDiag('boot', {
+      branch: token && refresh ? 'token' : 'stored',
+      session: !!localStorage.getItem('access_token'),
+    })
   }, [])
 
   return { session, setSession, authLoading }

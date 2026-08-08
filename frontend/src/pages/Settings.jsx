@@ -9,6 +9,7 @@ import useIsMobile from '../hooks/useIsMobile'
 import { useAuth } from '../contexts/AuthContext'
 import PermissionManager from '../components/PermissionManager'
 import Skeleton from '../components/ui/Skeleton'
+import DiagLog from '../components/DiagLog'
 
 const CATEGORIES = [
   { key: 'report', label: '리포트·분석' },
@@ -288,6 +289,11 @@ export default function Settings() {
         {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} />}
         {activeTab === 'account' && showAccount && <PermissionManager />}
       </div>
+
+      <div style={{ padding: '0 20px 20px' }}>
+        <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0 }}>진단 로그</div>
+        <DiagLog />
+      </div>
     </>
   )
 
@@ -306,6 +312,11 @@ export default function Settings() {
 
       {activeTab === 'batch'   && <BatchHub isAdmin={isAdmin} />}
       {activeTab === 'account' && showAccount && <PermissionManager />}
+
+      <div style={{ marginTop: 24 }}>
+        <div className="s-group-h" style={{ paddingLeft: 0, paddingRight: 0 }}>진단 로그</div>
+        <DiagLog />
+      </div>
     </div>
   )
 }

@@ -9,6 +9,8 @@
 // replace('/')로 문서를 다시 불렀는데, 그 리로드 시간 내내 복원된 로그인 화면이 보였다 — task#283).
 //
 // 착지점이 필요하므로 OAuth 시작은 replace가 아니라 push여야 한다(task#245 D6의 의도적 되돌림).
+import { logDiag } from './diag'
+
 const KEY = 'oauth_hist_len'
 
 // history.length는 50에서 캡되므로 오래 쓴 탭에서는 기준값이 밀려 delta가 음수·과대가 될 수 있다.
@@ -25,7 +27,11 @@ export function markOAuthStart() {
 export function returnFromOAuth() {
   const base = Number(sessionStorage.getItem(KEY) || 0)
   sessionStorage.removeItem(KEY)
-  const delta = base > 0 ? window.history.length - base : 0
-  if (delta > 0 && delta <= MAX_REWIND) window.history.go(-delta)
+  const len = window.history.length
+  const delta = base > 0 ? len - base : 0
+  const path = delta > 0 && delta <= MAX_REWIND ? 'go' : 'replace'
+  // 호출 직전에 기록한다 — 호출 후엔 이 문서가 떠나 기록이 유실될 수 있다.
+  logDiag('rewind', { base, len, delta, path })
+  if (path === 'go') window.history.go(-delta)
   else window.location.replace('/')
 }
