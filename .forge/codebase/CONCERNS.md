@@ -431,7 +431,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 - **잔여 D** — access token은 최대 1시간 폐기 불가(stateless, `jti`/denylist 없음). 표준 트레이드오프.
 - **잔여 E** — `_oauth_codes`(`routers/auth.py:24`)가 인메모리 dict다. 현재 uvicorn 단일 워커(`backend/Dockerfile:10`, `--workers` 없음)라 무해하나 워커를 늘리면 token 교환이 깨진다. 같은 형태의 인프로세스 상태가 `services/progress.py`(락은 있음)·키움/KIS 토큰 싱글톤에도 있다.
 - **설계상 트레이드오프** — Google `id_token` 서명을 검증하지 않는다(`routers/auth.py:175-177`이 payload를 base64 직접 디코딩; `iss`/`aud`/`exp`/`at_hash` 미검사). client secret으로 인증된 code 교환 응답을 TLS로 받기 때문에만 안전하다(`jose` at_hash 실패 우회의 산물). 클라이언트가 준 `id_token`을 받는 형태로 리팩터되면 즉시 취약.
-- **설계상 트레이드오프** — 토큰을 `localStorage`에 보관. XSS 노출 대신 CSRF 면역을 택한 것. **쓰기 경로가 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:45,62` + `frontend/src/pages/LoginPage.jsx:33-34`(`App.jsx`는 이제 refresh read `:36`와 clear `:44-45`만). 읽는 곳: `api.js:8`, `utils/analytics.js:2`, `hooks/useBfcacheAuthGuard.js:14`.
+- **설계상 트레이드오프** — 토큰을 `localStorage`에 보관. XSS 노출 대신 CSRF 면역을 택한 것. **쓰기 경로가 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:55,73` + `frontend/src/pages/LoginPage.jsx:33-34`(`App.jsx`는 이제 refresh read `:37`와 clear `:45-46`만). 읽는 곳: `api.js:8`, `utils/analytics.js:2`, `hooks/useBfcacheAuthGuard.js:39`.
 
 ### 5.8 이벤트 트래커 미들웨어 — **잠재 위험**
 - `middleware/event_tracker.py:75` `asyncio.create_task(_save_event(...))`가 **블로킹 psycopg2 `execute`(`:44-47`)를 이벤트 루프에서** 실행한다. 부하 시 전 요청이 직렬화된다. 게다가 task 참조를 보관하지 않아 GC로 사라져 이벤트가 조용히 유실될 수 있다.
@@ -449,8 +449,8 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 
 ### 5.11 메뉴 권한은 보안 경계가 아니다 — **설계상 트레이드오프**(의도 확인 필요)
 - 필터: `components/Masthead.jsx:46` `NAV_SECTIONS.filter(s => menuPermissions.includes(s.perm))`, `components/MobileNav.jsx:21`, `components/MobileTopActions.jsx:14`. 출처는 `contexts/AuthContext.jsx:18-22` ← `GET /api/auth/me`.
-- **`frontend/src/App.jsx:84-105`은 모든 라우트를 무조건 등록한다 — 라우트 가드가 전무하다.** 백엔드에도 메뉴 권한 의존성이 없다(`ALL_MENUS`는 `routers/auth.py:108` read와 `routers/admin.py` CRUD에만 등장). `guru`가 거부된 사용자가 `/guru`를 직접 입력하면 페이지가 마운트되고 데이터도 정상 로드된다.
-- **정직한 심각도: 권한 상승이 아니다.** `role === 'admin'` 게이트(`pages/Settings.jsx:257`, `pages/ReportManualGen.jsx:12`, `pages/AnalystReports.jsx:20`, `components/StockModal.jsx:18`, `components/PermissionManager.jsx`)는 전부 서버 `require_admin`이 뒷받침하고, 게이트 없는 메뉴로 도달하는 데이터는 전역/공유(구루·시장지표)이거나 이미 `get_current_user`로 사용자 스코프다. 노출되는 건 "운영자가 숨기기로 한 기능"이지 타인 데이터가 아니다.
+- **`frontend/src/App.jsx:85-106`은 모든 라우트를 무조건 등록한다 — 라우트 가드가 전무하다.** 백엔드에도 메뉴 권한 의존성이 없다(`ALL_MENUS`는 `routers/auth.py:108` read와 `routers/admin.py` CRUD에만 등장). `guru`가 거부된 사용자가 `/guru`를 직접 입력하면 페이지가 마운트되고 데이터도 정상 로드된다.
+- **정직한 심각도: 권한 상승이 아니다.** `role === 'admin'` 게이트(`pages/Settings.jsx:258`, `pages/ReportManualGen.jsx:12`, `pages/AnalystReports.jsx:20`, `components/StockModal.jsx:18`, `components/PermissionManager.jsx`)는 전부 서버 `require_admin`이 뒷받침하고, 게이트 없는 메뉴로 도달하는 데이터는 전역/공유(구루·시장지표)이거나 이미 `get_current_user`로 사용자 스코프다. 노출되는 건 "운영자가 숨기기로 한 기능"이지 타인 데이터가 아니다.
 - 결정 필요: 메뉴 권한이 민감한 것을 가려야 한다면 서버 측 의존성과 라우트 가드가 필요하다.
 
 ### 5.12 CORS — **이미 가드됨(잔여 위험만)**
@@ -525,7 +525,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 ## 7. 프론트엔드
 
 ### 7.1 access token 갱신 경로가 없다 — **확인된 버그** (B9)
-- `frontend/src/api.js:15-26`이 401에 **무조건** 두 토큰을 지우고 `window.location.replace('/')`(`:22`)로 하드 리다이렉트한다. **`POST /api/auth/refresh`를 호출하는 코드가 프론트 전체에 없다**(`grep auth/refresh src/` = 0) — `refresh_token`의 유일한 read 소비처는 로그아웃(`App.jsx:35-47` `doLogout`)이고 write는 `useAuthBootstrap.js:46,63`이다.
+- `frontend/src/api.js:15-26`이 401에 **무조건** 두 토큰을 지우고 `window.location.replace('/')`(`:22`)로 하드 리다이렉트한다. **`POST /api/auth/refresh`를 호출하는 코드가 프론트 전체에 없다**(`grep auth/refresh src/` = 0) — `refresh_token`의 유일한 read 소비처는 로그아웃(`App.jsx:36-48` `doLogout`)이고 write는 `useAuthBootstrap.js:56,75`이다.
 - 서버는 access 1h / refresh 30d(`backend/services/auth_service.py:14-15`)로 회전 인프라를 다 갖췄는데 클라이언트가 안 쓴다 → **1시간마다 전 사용자 강제 로그아웃**.
 - ADR-0029가 read까지 401을 내게 만들어 반경이 더 넓어졌다(ADR 본문도 이 부수를 인정한다). 백그라운드 폴링의 401도 세션을 끊는다.
 - **부분 진전**: 지난 판의 "`api.js` 커버 테스트 0"은 이제 거짓 — `test/back-to-login-guard.test.jsx:118-132`가 응답 인터셉터를 직접 단언한다(401/비401 2케이스). **요청 인터셉터(`api.js:7-13`)는 여전히 미커버.**
@@ -536,7 +536,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 - **`components/GlobalSearch.jsx:19-26`** — `fetchTracked`가 실패 시 `new Set()`을 반환한다(`:24`). `handleSelect:32`의 `if (tracked.has(t))`가 false가 되어 **이미 추적 중인 종목이 리포트(`:33`) 대신 "관심 추가" 프리필 모달(`:35`)로** 간다. `:31` 주석은 stale 캐시 오판을 *피하려고* 재fetch한다고 하는데, 실패 경로가 정확히 그 오판을 재도입한다.
 - **`pages/GuruDetail.jsx:114-120`, `pages/GuruManagers.jsx:52-58`** — `loadStockMap`이 `() => { api.get('/api/stocks').then(...) }` 형태로 **`.catch`도 없고 promise를 반환하지도 않아** 호출자가 붙일 수도 없다(호출부 `GuruDetail.jsx:133,164`·`GuruManagers.jsx:64,77` 전부 bare) → **unhandled promise rejection**, `stockMap`이 `{}`로 남아 모든 보유 배지가 미추적으로 렌더된다. 형제 구현 `GuruStats.jsx:87-92`(`:106`)·`GuruAllocation.jsx:59-64`(`:68`)는 `async`이고 잡힌다. **4개 복제 중 2개가 무가드.**
 - **잠재 위험** — `contexts/AuthContext.jsx:23-26`: `/api/auth/me` 실패가 조용히 `role:'user'`, `menuPermissions:[]`가 된다. 일시 장애와 실제 무권한 계정이 구별되지 않아 **에러도 재시도도 없이 nav 전체가 사라진다.** 테스트 없음(39줄).
-- **잠재 위험 — 무계 진행률 폴링 5곳**: `hooks/useReportGeneration.js:22`(`catch {}`, `:23` 1.5s), `pages/ReportManualGen.jsx:98,136`, `pages/ConsensusSettings.jsx:28`, `pages/GuruCrawlNow.jsx:28`(2s). `setInterval` 안의 `catch {}`라 지속 실패해도 타이머가 안 걷힌다. 올바른 패턴이 **이미 리포지토리에 있다** — `hooks/useStockManagement.js:18-19`가 `maxAttempts = 6`에서 멈추고 토스트를 띄운다.
+- **잠재 위험 — 무계 진행률 폴링 5곳**: `hooks/useReportGeneration.js:22`(`catch {}`, `:23` 1.5s), `pages/ReportManualGen.jsx:98,136`, `pages/ConsensusSettings.jsx:29`, `pages/GuruCrawlNow.jsx:28`(2s). `setInterval` 안의 `catch {}`라 지속 실패해도 타이머가 안 걷힌다. 올바른 패턴이 **이미 리포지토리에 있다** — `hooks/useStockManagement.js:18-19`가 `maxAttempts = 6`에서 멈추고 토스트를 띄운다.
 - **"에러를 빈 상태로 위장" 7곳**: `components/StockSearchBox.jsx:38`, `components/reports/DetailTab.jsx:666`, `pages/Ranking.jsx:463`, `pages/AdminAnalytics.jsx:64`, `components/reports/HistoryTab.jsx:36,43`. 의도적·문서화된 형제(`SupplySection.jsx:17`, `ReportDetailTabs.jsx:54-61`, `Recommendations.jsx:83-85`)가 있으므로 일관성 격차다.
 - **이미 가드됨(참조)**: 대시보드는 `hooks/usePortfolioData.js:48`이 마커 warn을 남기고 `pages/Portfolio.jsx`의 `DashboardGrid`가 `stocks>0`이면 빈 상태 대신 Skeleton을 보이며 유계 재시도(최대 3)를 한다(task#102). **다른 화면엔 이 헤더↔본문 모순 방어가 없다.**
 
@@ -553,7 +553,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 **남는 잔여 4가지:**
 1. **접두사 매칭이 세그먼트 경계를 안 본다** — `navSections.js:48` `pathname.startsWith(item.match ?? item.to)`. 현재 5섹션에 형제 접두사 쌍은 없고(`'/analyst-reports'.startsWith('/reports')`는 false) `:8-11` 주석이 그 천장을 선언하지만, **강제하는 단언이 없다.** 새 형제가 접두사 관계로 들어오면 조용히 두 탭이 동시 active가 된다.
 2. **드리프트 표면이 소멸한 게 아니라 "경로 목록"에서 "key→아이콘 매핑"으로 이동했다** — 아이콘은 소비처별 2중 복제다(`Masthead.jsx:12-18` sketches / `MobileNav.jsx:10-16` ui/icons, 의도적 분기이고 각 파일 주석이 근거를 담는다). **폴백이 없어** `NAV_SECTIONS`에 섹션을 추가하고 한쪽 `ICONS`를 빠뜨리면 `Icon`이 `undefined`가 되어 `Masthead.jsx:29`/`MobileNav.jsx:30`에서 **렌더 throw**한다.
-3. **라우트↔nav 커버리지 게이트가 없다** — `nav-active-matching.test.jsx`는 `/analyst-report(s)` 2경로만 고정한다. `App.jsx:88-104`의 신규 라우트가 `NAV_SECTIONS`에서 빠지는 B16 **원형**은 여전히 무가드(현재는 전 라우트 커버, 의도적 예외는 `/dev/showcase` `App.jsx:104`).
+3. **라우트↔nav 커버리지 게이트가 없다** — `nav-active-matching.test.jsx`는 `/analyst-report(s)` 2경로만 고정한다. `App.jsx:89-105`의 신규 라우트가 `NAV_SECTIONS`에서 빠지는 B16 **원형**은 여전히 무가드(현재는 전 라우트 커버, 의도적 예외는 `/dev/showcase` `App.jsx:105`).
 4. **`settings`·`admin-analytics`는 `NAV_SECTIONS` 밖의 4번째 목록**이다(`Masthead.jsx:78-84`, `MobileTopActions.jsx:14-15`가 각자 하드코딩). `navSections.js:35` schedule 섹션은 `perm: 'research'`라 일정·인컴에 독립 권한을 줄 수 없다.
 
 ### 7.5 이벤트 화이트리스트 탈락 — **확인된 버그** (B24)
@@ -565,11 +565,11 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 ### 7.6 Service Worker가 `/api/*`를 가로챈다 — **설계상 트레이드오프** + 프라이버시 잔여
 - `frontend/vite.config.js:39-48`(빌드 산출 `dist/sw.js`): `urlPattern`(`:40`)이 `/api/`를 포함하고 `/api/auth/`를 제외한 **모든 GET**을 `NetworkFirst`(`:44` `networkTimeoutSeconds: 10`)로 `api-cache`(`:45` maxEntries 50, maxAgeSeconds 300)에 넣는다.
 - 파생 1: 네트워크 실패 **또는 10초 초과** 시 **최대 5분 오래된 API 응답**이 stale 표시 없이 서빙된다.
-- 파생 2 (**프라이버시 잔여**): `api-cache`가 URL만으로 키를 잡아 `Authorization` 헤더가 키에 안 들어가고, 로그아웃(`App.jsx:35-47`)이 캐시를 지우지 않는다(`caches.*` 호출이 프론트 전체 **0건**). 같은 브라우저에서 5분 안에 계정 B가 로그인하고 요청이 실패/타임아웃하면 **B가 A의 캐시된 `/api/portfolio` 본문을 받을 수 있다.** 좁은 창이지만 실제 교차 사용자 누출 경로다.
+- 파생 2 (**프라이버시 잔여**): `api-cache`가 URL만으로 키를 잡아 `Authorization` 헤더가 키에 안 들어가고, 로그아웃(`App.jsx:36-48`)이 캐시를 지우지 않는다(`caches.*` 호출이 프론트 전체 **0건**). 같은 브라우저에서 5분 안에 계정 B가 로그인하고 요청이 실패/타임아웃하면 **B가 A의 캐시된 `/api/portfolio` 본문을 받을 수 있다.** 좁은 창이지만 실제 교차 사용자 누출 경로다.
 - 파생 3: `:46` `cacheableResponse.statuses: [0, 200]`이 opaque(status 0) 응답까지 캐시한다.
 - 파생 4: `maxEntries: 50` vs ~70개 구별 엔드포인트 → 상시 LRU 스래싱(비효율, 오류 아님).
 - 파생 5 (테스트 하니스): 이 인터셉트 때문에 Playwright `page.route` 응답 주입이 안 먹는다 — 응답 주입 UAT는 컨텍스트를 `serviceWorkers: 'block'`으로 만들어야 한다.
-- **이미 가드됨 — OAuth 콜백**: `vite.config.js:19` `navigateFallback: null`로 내비게이션 라우트가 등록되지 않는다(`dist/sw.js`에 `NavigationRoute`/`createHandlerBoundToURL` 없음). 독립적으로 `/api/auth/*`가 `api-cache`에서 제외되므로 `useAuthBootstrap.js:41` 토큰 교환도 캐시되지 않는다.
+- **이미 가드됨 — OAuth 콜백**: `vite.config.js:19` `navigateFallback: null`로 내비게이션 라우트가 등록되지 않는다(`dist/sw.js`에 `NavigationRoute`/`createHandlerBoundToURL` 없음). 독립적으로 `/api/auth/*`가 `api-cache`에서 제외되므로 `useAuthBootstrap.js:51` 토큰 교환도 캐시되지 않는다.
 - **이미 가드됨 — 배포 후 stale JS**: `skipWaiting`/`clientsClaim`(`:17-18`), `cleanupOutdatedCaches()`, `BUILD_DATE`를 실은 `cacheId`(`:15`), `sw-cache-bust` 플러그인(`:63-92`, name `:64`)이 `registerSW.js`/`sw.js`/`manifest.webmanifest`에 `?BUILD_DATE`를 붙이고, `nginx.conf:39-44`가 `sw.js`/`workbox-*.js`에 no-store를 준다. 그리고 **`src/`에 `React.lazy`·동적 `import()`가 0건**이라 `skipWaiting`의 통상 위험(열린 탭이 삭제된 lazy 청크를 요청)이 발생할 수 없다.
 - 참고: `vite.config.js:66-67`이 플러그인의 `dist` 하드코딩이 throwaway 빌드로 라이브 디렉터리를 오염시켰던 과거 버그(task#191)를 문서화한다.
 
@@ -600,12 +600,12 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 - 정합 확인됨: `KrTop2Section.jsx:52,59,67,96,99,102,106`(억원, `earnings.py:240` `"unit": "억원"`), `Ranking.jsx:47` `krFmt(v / 1e8)`(raw 원, `backend/tests/test_ranking_service.py:51-53` 확인), `ShortSellSection.jsx:21` `wonFmt`(명시적 `/1e8`).
 
 ### 7.9 API base URL 불일치 — **확인된 버그**(조건부)
-- `frontend/src/utils/analytics.js:4`가 bare `fetch('/api/events')`를 쓰고 **`VITE_API_BASE_URL` 프리픽스가 없다**. 다른 4개 소비처(`api.js:4`, `App.jsx:38`, `useAuthBootstrap.js:40`, `LoginPage.jsx:9`)는 붙인다. `VITE_API_BASE_URL`이 절대 origin으로 설정되면(그게 문서화된 용도다) 분석 이벤트가 프론트 origin으로 POST돼 조용히 404한다. 토큰 헤더도 손으로 만들어(`:2,8`) api 클라이언트의 401 인터셉터를 우회한다.
+- `frontend/src/utils/analytics.js:4`가 bare `fetch('/api/events')`를 쓰고 **`VITE_API_BASE_URL` 프리픽스가 없다**. 다른 4개 소비처(`api.js:4`, `App.jsx:39`, `useAuthBootstrap.js:50`, `LoginPage.jsx:9`)는 붙인다. `VITE_API_BASE_URL`이 절대 origin으로 설정되면(그게 문서화된 용도다) 분석 이벤트가 프론트 origin으로 POST돼 조용히 404한다. 토큰 헤더도 손으로 만들어(`:2,8`) api 클라이언트의 401 인터셉터를 우회한다.
 - env 읽기가 `api.js`에서 한 번 export되지 않고 4번 중복된다.
 - `src/`에 하드코딩 API 호스트·localhost 없음. 유일한 절대 URL은 `index.html:9-13`의 폰트 CDN.
 
 ### 7.10 죽은 레거시 경로·설정 — **잠재 위험**(현재 비활성)
-- `?token=`/`?refresh=` URL 쿼리에서 토큰을 읽어 `localStorage`에 넣는 경로가 살아 있다 — **파일이 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:27-28`(파싱) + `:61-65`(`setItem` 2회 + `replaceState`). URL 토큰은 브라우저 이력·리퍼러·서버 로그에 남는다. **백엔드는 더 이상 그 형태를 발행하지 않는다** — 두 콜백 모두 `?oauth={code}`(120초 일회용, `routers/auth.py:183,230`)만 리다이렉트한다. 죽은 코드지만 되살리면 즉시 노출.
+- `?token=`/`?refresh=` URL 쿼리에서 토큰을 읽어 `localStorage`에 넣는 경로가 살아 있다 — **파일이 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:36-37`(파싱) + `:61-65`(`setItem` 2회 + `replaceState`). URL 토큰은 브라우저 이력·리퍼러·서버 로그에 남는다. **백엔드는 더 이상 그 형태를 발행하지 않는다** — 두 콜백 모두 `?oauth={code}`(120초 일회용, `routers/auth.py:183,230`)만 리다이렉트한다. 죽은 코드지만 되살리면 즉시 노출.
 - **`frontend/vercel.json`이 여전히 tracked** — Vercel은 Docker 이전에서 제거됐다.
 - `frontend/.env`(untracked)에 `VITE_SUPABASE_URL`·`VITE_SUPABASE_ANON_KEY`가 남아 있다. **누출 아님** — `src/` 참조 0, `dist/`에도 없다(Vite는 정적 참조된 변수만 인라인). 로컬 잡동사니.
 
@@ -629,12 +629,12 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 - 참고: 성능 프로브는 **회귀 게이트가 아니다**(머신·부하 의존, 파일 상단 주석이 명시).
 
 ### 7.14 OAuth 되감기가 완료를 관측하지 않는다 — **잠재 위험**(cross-layer 결합)
-- `frontend/src/utils/oauthHistory.js:28` `window.history.go(-delta)`는 비동기이고 성공/실패 콜백이 없다. 착지 문서가 재평가되는 근거는 **"라이브 `/`가 no-store"**라는 전제(`:6-8` 주석)이고, 그 전제는 `nginx/nginx.conf:31-36`(`location = /index.html` no-store, `/`는 `:52-55` `try_files`의 내부 리다이렉트로 그 블록을 탄다)에 종속된다. **프론트 정확성이 nginx 설정에 걸려 있고 이를 검증하는 테스트가 없다.**
-- bfcache로 복원되면 `hooks/useBfcacheAuthGuard.js:15`가 replace로 이어받지만, **둘 다 불발하는 브라우저 조합에서는 화면이 로그인 상태로 멈출 수 있다**(task#253 회고가 이 잔여를 명시). 그리고 **Playwright로는 bfcache 복원을 검증할 수 없다**(3엔진 대조군으로 확정, task#246) — 이 분기는 합성 `pageshow` 또는 실기기 확인만 가능하다.
-- `useAuthBootstrap.js:39`이 `history.replaceState({}, '', '/')`를 **fetch(`:41`) 이전에** 실행하므로, 코드 교환이 400(`:50-52`)이나 네트워크 실패(`:54-57`)로 끝나면 코드가 이미 URL에서 사라져 **재시도가 원리적으로 불가**하다(현재 UX는 로그인 화면 복귀로 수렴하므로 오동작은 아니고 무음 실패다 — `:30-31` 주석이 통지 제외를 의도로 명시).
+- `frontend/src/utils/oauthHistory.js:35` `window.history.go(-delta)`는 비동기이고 성공/실패 콜백이 없다. 착지 문서가 재평가되는 근거는 **"라이브 `/`가 no-store"**라는 전제(`:6-8` 주석)이고, 그 전제는 `nginx/nginx.conf:31-36`(`location = /index.html` no-store, `/`는 `:52-55` `try_files`의 내부 리다이렉트로 그 블록을 탄다)에 종속된다. **프론트 정확성이 nginx 설정에 걸려 있고 이를 검증하는 테스트가 없다.**
+- bfcache로 복원되면 `hooks/useBfcacheAuthGuard.js:16`가 replace로 이어받지만, **둘 다 불발하는 브라우저 조합에서는 화면이 로그인 상태로 멈출 수 있다**(task#253 회고가 이 잔여를 명시). 그리고 **Playwright로는 bfcache 복원을 검증할 수 없다**(3엔진 대조군으로 확정, task#246) — 이 분기는 합성 `pageshow` 또는 실기기 확인만 가능하다.
+- `useAuthBootstrap.js:49`이 `history.replaceState({}, '', '/')`를 **fetch(`:41`) 이전에** 실행하므로, 코드 교환이 400(`:50-52`)이나 네트워크 실패(`:54-57`)로 끝나면 코드가 이미 URL에서 사라져 **재시도가 원리적으로 불가**하다(현재 UX는 로그인 화면 복귀로 수렴하므로 오동작은 아니고 무음 실패다 — `:30-31` 주석이 통지 제외를 의도로 명시).
 
 ### 7.15 배치 '지금 실행' 결과 판정이 프론트 휴리스틱 — **잠재 위험**
-- `pages/Settings.jsx:104`가 `Object.entries(result||{}).filter(([k]) => k !== 'ok')`로 응답 필드를 순회하고 `isWeak(v) = v === false || v === 0`(`:75`)을 **24개 manual endpoint 전부에** 일괄 적용한다. `:72-74` 주석이 "이 24개의 응답 필드는 전부 saved/건수 의미"라고 근거를 대지만, **그 불변식을 지키는 백엔드 게이트가 없다** — 새 manual endpoint가 `skipped: 0`처럼 "0이 정상"인 필드를 반환하면 조용히 경고색이 된다. `Settings.test.jsx`(88줄)는 `ManualRunButton`만 커버한다(그 목적으로 `Settings.jsx:82`에 `export`가 추가됐다).
+- `pages/Settings.jsx:105`가 `Object.entries(result||{}).filter(([k]) => k !== 'ok')`로 응답 필드를 순회하고 `isWeak(v) = v === false || v === 0`(`:75`)을 **24개 manual endpoint 전부에** 일괄 적용한다. `:72-74` 주석이 "이 24개의 응답 필드는 전부 saved/건수 의미"라고 근거를 대지만, **그 불변식을 지키는 백엔드 게이트가 없다** — 새 manual endpoint가 `skipped: 0`처럼 "0이 정상"인 필드를 반환하면 조용히 경고색이 된다. `Settings.test.jsx`(88줄)는 `ManualRunButton`만 커버한다(그 목적으로 `Settings.jsx:83`에 `export`가 추가됐다).
 
 ---
 

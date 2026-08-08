@@ -350,7 +350,7 @@ HTTP는 `frontend/src/api.js` axios 인스턴스 하나: `baseURL = VITE_API_BAS
 | 구루 | `pages/Guru.jsx` | **로컬 `useState`**. `GuruManagers`·`GuruStats(view=)`·`GuruAllocation` |
 | 포트폴리오 | `pages/Portfolio.jsx` | 로컬 `useState` 2탭(`dash`/`analysis`). 분석탭이 `SectorTab`·`MacroTab`·`Analytics`·`RebalanceTab`·`ExposureTab`를 품는다 |
 
-`ReportsRoute`(`App.jsx:50`)는 `location.state.ticker` 딥링크를 `Reports`에 `initialTicker`로 넘기고 `navKey={location.key}`로 같은 라우트 재네비게이션도 반영한다.
+`ReportsRoute`(`App.jsx:53`)는 `location.state.ticker` 딥링크를 `Reports`에 `initialTicker`로 넘기고 `navKey={location.key}`로 같은 라우트 재네비게이션도 반영한다.
 
 ### 10.3 nav IA 단일 소스 — `frontend/src/navSections.js`
 

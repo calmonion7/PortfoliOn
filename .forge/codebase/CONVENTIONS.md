@@ -53,7 +53,7 @@ re-export해 호출 표면을 보존한다. 근거·규칙 6항은 `.forge/adr/0
   (`stale` 마커 + `saved` 플래그 — `backend/services/market_indicators/exports.py`,
   `backend/routers/market_indicators.py` refresh-monthly). `job_runs`는 본문이 예외를 전파할 때만
   `failed`를 기록하므로 스킵을 초록으로 남긴다(`backend/services/job_runs.py:17-31` docstring).
-  **그 응답을 화면에 흘려야** 사용자가 구분할 수 있다 — `frontend/src/pages/Settings.jsx:83`
+  **그 응답을 화면에 흘려야** 사용자가 구분할 수 있다 — `frontend/src/pages/Settings.jsx:84`
   `ManualRunButton`이 응답 dict를 `key: value`로 렌더하고 `saved=false`·`0`을 `--warn`으로 약하게
   표시한다(`ok`는 항상 true라 숨긴다). 회귀 가드 `frontend/src/pages/Settings.test.jsx`.
 
@@ -248,8 +248,8 @@ AST 집계로 docstring 423개 중 **412개가 한글**이다. 영문 docstring 
 - **자동 가드 없음.** `frontend/eslint.config.js`(23줄)에는 `rules` 블록이 아예 없고 `no-console`도
   미설정이며, lint는 CI/훅에 연결돼 있지 않다(§9.8). 관례 + 리뷰 의존.
 - 로그를 아예 안 남기는 침묵 catch는 규약 위반은 아니지만 알아둘 것:
-  `frontend/src/App.jsx:42`(로그아웃 fetch), `frontend/src/utils/analytics.js:11`,
-  `frontend/src/hooks/useAuthBootstrap.js:54`, `frontend/src/hooks/useReportGeneration.js:23`,
+  `frontend/src/App.jsx:43`(로그아웃 fetch), `frontend/src/utils/analytics.js:11`,
+  `frontend/src/hooks/useAuthBootstrap.js:64`, `frontend/src/hooks/useReportGeneration.js:23`,
   `frontend/src/contexts/AuthContext.jsx:23-26`, 각 market/report 섹션의
   `.catch(() => setError(true))`.
 
@@ -436,13 +436,13 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   훅은 `useXxx.js`(never `.jsx`) 기본 export. 예외는 1줄 re-export shim
   `frontend/src/hooks/useAuth.js:1`.
 - **테스트 접근을 위한 named export가 관례다** — 페이지 파일이 default 컴포넌트와 함께
-  순수 헬퍼·하위 컴포넌트를 named export한다(`frontend/src/pages/Settings.jsx:83`
+  순수 헬퍼·하위 컴포넌트를 named export한다(`frontend/src/pages/Settings.jsx:84`
   `ManualRunButton`, `frontend/src/pages/AnalystReport.jsx:16,42,54,94,115,212`,
   `frontend/src/pages/GuruDetail.jsx:32,65,73,84`, `frontend/src/pages/Compare.jsx:27`,
   `frontend/src/pages/GuruStats.jsx:11`). 이 코드베이스는 **테스트에서 `App`을 import하지 않는
   관례**(로그인 셸 전체를 렌더해 모킹 비용이 크다)라, App 안에 있는 분기는 단위테스트가
   원리적으로 닿지 못한다 → 그래서 인증 부트스트랩을 훅으로 뺐다
-  (`frontend/src/hooks/useAuthBootstrap.js:4-7` 주석이 그 판단을 적어둔다).
+  (`frontend/src/hooks/useAuthBootstrap.js:5-8` 주석이 그 판단을 적어둔다).
   **테스트 가능성이 배치를 결정한다.**
 - JSX를 담은 유틸은 `.jsx` — `frontend/src/components/market/marketUtils.jsx`,
   `frontend/src/components/reports/reportUtils.jsx`(**`.js` 파일은 없다**).
@@ -454,7 +454,7 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   `Stat.jsx:1` 등). 전역 로드 순서는 `frontend/src/main.jsx:3-5`(tokens → motion → index) +
   `frontend/src/index.css:1-4`(tokens → pc → mobile → guru)로 나뉘어 있다.
 - TypeScript 0파일, `propTypes` 0건 — props는 인라인 주석으로만 문서화한다.
-- `data-testid`는 소수 표면에만 둔다(`frontend/src/pages/Settings.jsx:118`,
+- `data-testid`는 소수 표면에만 둔다(`frontend/src/pages/Settings.jsx:119`,
   `frontend/src/pages/GuruDetail.jsx:270,278,287,309,338,344`). **테스트·프로브 앵커이므로
   스타일 변경 시 유지**하라는 주석이 붙어 있다(`GuruDetail.jsx:286`).
 
@@ -467,7 +467,7 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   shadow·`--transition-fast`. 전역 유틸 클래스·`:focus-visible`도 같은 파일 하단에 있다.
 - **테마는 `<html data-theme="dark">` 속성 하나**로 갈린다(`tokens.css:123-201`에 다크 오버라이드).
   토글은 `frontend/src/hooks/useTheme.js:5-18`(+`<meta theme-color>` 동기, localStorage 영속).
-  컨텍스트 없이 props로 내린다(`frontend/src/App.jsx:64,74,127`).
+  컨텍스트 없이 props로 내린다(`frontend/src/App.jsx:65,75,132`).
   `prefers-color-scheme` 미디어쿼리는 쓰지 않는다.
 - **가격 색과 의미 색은 전용 변형으로 분리돼 있다 — 교차 사용 금지.**
   - `frontend/src/components/ui/Badge.css`: `.badge--up`(`:43`)/`.badge--down`(`:49`)은
@@ -504,7 +504,7 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   (`marketUtils.jsx:19,21,30,37`, `reportUtils.jsx:6,7`).
 - 모션은 `frontend/src/styles/motion.css`. 긴 주석(`:12-17`)이 하드 제약을 담는다 —
   transform `fill: both`가 `position: fixed` 자손을 깨뜨리고, opacity `both`가 모달 z-index를
-  가둔다(그래서 라우트 전환은 transform 없는 `.anim-fade`만 쓴다 — `App.jsx:81-82` 주석).
+  가둔다(그래서 라우트 전환은 transform 없는 `.anim-fade`만 쓴다 — `App.jsx:82-83` 주석).
   `prefers-reduced-motion` 블록 `:62`.
 
 ### 9.3 데이터 fetch
@@ -515,8 +515,8 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   재로그인 후 뒤로가기 재진입을 막는다(주석 `:20`, 회귀
   `frontend/src/test/back-to-login-guard.test.jsx:118`).
   호출은 `/api` prefix를 포함한 전체 경로로 한다(`api.get('/api/market/vix')`).
-- **raw `fetch`는 인증·애널리틱스에만** 쓴다(`frontend/src/App.jsx:38` 로그아웃,
-  `frontend/src/pages/LoginPage.jsx:26,45`, `frontend/src/hooks/useAuthBootstrap.js:41`,
+- **raw `fetch`는 인증·애널리틱스에만** 쓴다(`frontend/src/App.jsx:39` 로그아웃,
+  `frontend/src/pages/LoginPage.jsx:26,45`, `frontend/src/hooks/useAuthBootstrap.js:51`,
   `frontend/src/utils/analytics.js:4`) — `api.js`의 401 인터셉터가 로그인 중 리다이렉트를
   일으키기 때문이다. `VITE_API_BASE_URL`을 읽는 곳은 이들 + `api.js`이고 전부 `|| ''` 폴백이다.
 - 에러 처리 3계층: ① fire-and-forget `.catch(() => {})` ② 지역 error state → 전용 에러 UI
@@ -552,14 +552,14 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   `location.replace('/')`).
 - 컨텍스트는 2개뿐: `frontend/src/contexts/AuthContext.jsx`(`{role, menuPermissions, loading}`,
   실패 시 `role:'user'`로 degrade하며 **로그 없음** `:23-26`)와 `components/Toast.jsx`.
-  중첩 순서는 `frontend/src/App.jsx:124-130` ToastProvider → AuthProvider → BrowserRouter.
+  중첩 순서는 `frontend/src/App.jsx:129-135` ToastProvider → AuthProvider → BrowserRouter.
   Redux/Zustand/React Query 없음 — 서버 상태는 훅/페이지의 `useState`에 있다.
 
 ### 9.5 라우팅 — nav IA는 `navSections.js` 단일 소스
-- 라우트는 `frontend/src/App.jsx:84-105`. **리다이렉트는 공유 상수로 추출**돼 있다:
-  `frontend/src/routes.js:2-7` `REDIRECTS`를 `App.jsx:85-87`와
+- 라우트는 `frontend/src/App.jsx:85-106`. **리다이렉트는 공유 상수로 추출**돼 있다:
+  `frontend/src/routes.js:2-7` `REDIRECTS`를 `App.jsx:86-88`와
   `frontend/src/test/route-redirects.test.jsx:4`가 함께 읽는다.
-  `*`(404) 라우트는 없다. 인증 게이트는 라우트가 아니라 라우터 앞 분기(`App.jsx:120-121`).
+  `*`(404) 라우트는 없다. 인증 게이트는 라우트가 아니라 라우터 앞 분기(`App.jsx:129-130`).
 - **마스트헤드 IA 5섹션의 경로·라벨 목록은 `frontend/src/navSections.js` 단일 소스다 —
   탭 추가·개명·삭제는 거기 한 곳만 고친다.** export는 `NAV_SECTIONS`(섹션 5개 ×
   `items[{to, label, evt, match?}]`) + 매칭 헬퍼 `matchesItem`/`matchesSection`(`:48,50`,
