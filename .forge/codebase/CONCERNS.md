@@ -245,7 +245,7 @@ task#242·#243 감사는 `market_cache`와 delete-rewrite만 봤고 아래는 �
 | Naver 시총 페이지 (euc-kr) | `market_indicators/earnings.py:135,143` | `range(1,50)` 최대 49콜 |
 | Finviz | `services/scraper.py:19` | `{}`, 부분 무음 |
 | UN Comtrade preview | `market_indicators/exports.py:13,84-89` | **가드됨** — task#243 last-good + `stale` 마커 |
-| Google Fonts / jsdelivr | `frontend/index.html:33-37` | 자체호스팅 앱의 외부 의존(첫 로드 후 SW CacheFirst로 완화, `vite.config.js:22-38`) |
+| Google Fonts / jsdelivr | `frontend/index.html:45-49` | 자체호스팅 앱의 외부 의존(첫 로드 후 SW CacheFirst로 완화, `vite.config.js:22-38`) |
 
 - 하드코딩 URL 중복: `market/kr.py:626`과 `consensus_pipeline.py:125`가 같은 FnGuide JSON 경로를 독립 조립한다 — 한쪽만 고치면 다른 쪽이 깨진 채 남는다.
 - `requests.get/post` — **47개 호출 지점**(지난 판 "28개"는 stale). 스팟 확인한 다중행 호출은 전부 `timeout=`을 갖지만, 개수가 늘어 **한 줄 grep으로 "전부 가드됨"을 재확인할 수 없다** — 새 호출을 추가할 때 `timeout=`을 눈으로 확인할 것.
@@ -602,7 +602,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 ### 7.9 API base URL 불일치 — **확인된 버그**(조건부)
 - `frontend/src/utils/analytics.js:4`가 bare `fetch('/api/events')`를 쓰고 **`VITE_API_BASE_URL` 프리픽스가 없다**. 다른 4개 소비처(`api.js:4`, `App.jsx:40`, `useAuthBootstrap.js:50`, `LoginPage.jsx:11`)는 붙인다. `VITE_API_BASE_URL`이 절대 origin으로 설정되면(그게 문서화된 용도다) 분석 이벤트가 프론트 origin으로 POST돼 조용히 404한다. 토큰 헤더도 손으로 만들어(`:2,8`) api 클라이언트의 401 인터셉터를 우회한다.
 - env 읽기가 `api.js`에서 한 번 export되지 않고 4번 중복된다.
-- `src/`에 하드코딩 API 호스트·localhost 없음. 유일한 절대 URL은 `index.html:33-37`의 폰트 CDN.
+- `src/`에 하드코딩 API 호스트·localhost 없음. 유일한 절대 URL은 `index.html:45-49`의 폰트 CDN.
 
 ### 7.10 죽은 레거시 경로·설정 — **잠재 위험**(현재 비활성)
 - `?token=`/`?refresh=` URL 쿼리에서 토큰을 읽어 `localStorage`에 넣는 경로가 살아 있다 — **파일이 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:40-41`(파싱) + `:61-65`(`setItem` 2회 + `replaceState`). URL 토큰은 브라우저 이력·리퍼러·서버 로그에 남는다. **백엔드는 더 이상 그 형태를 발행하지 않는다** — 두 콜백 모두 `?oauth={code}`(120초 일회용, `routers/auth.py:183,230`)만 리다이렉트한다. 죽은 코드지만 되살리면 즉시 노출.
