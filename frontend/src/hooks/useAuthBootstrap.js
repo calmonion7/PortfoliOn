@@ -7,11 +7,11 @@ import { logDiag } from '../utils/diag'
 // 죽은 필드가 된다(task#287의 죽은 가드와 같은 부류).
 const round = (v) => (Number.isFinite(v) ? Math.round(v) : undefined)
 
-// 문서 부팅 구간 계측 — 0→req(리다이렉트·연결) / req→resp(서버 처리) / resp→di(HTML 파싱) /
-// di→마운트(번들 다운로드·실행)를 가른다. 콜백 문서 SPA 부팅이 로그인 체감 지연의 89.6%
-// (2251ms/2513ms, task#284 실기기 실측)라 그 덩어리를 성분으로 쪼개는 것이 목적이다.
-// ⚠️ domContentLoadedEventEnd는 쓰지 않는다 — type="module"은 defer라 모듈 실행(=React 마운트)
-// 이후에 발화하므로 이 시점의 값은 늘 0이다. 대신 di(마운트 시점에 확정됨)와 번들 responseEnd를 쓴다.
+// 문서 부팅 구간 계측 — 0→req(리다이렉트·연결) / req→resp(서버 처리) / resp→di(HTML 수신·파싱
+// 「+ 번들 다운로드」— uat288 8회 실측에서 js가 di보다 124~209ms 먼저 온다) / di→마운트(모듈 실행
+// 꼬리 + 첫 렌더, 14~31ms). 콜백 문서 SPA 부팅이 로그인 체감 지연의 89.6%(2251ms/2513ms,
+// task#284 실기기)라 그 덩어리를 쪼개는 것이 목적이다. ⚠️ domContentLoadedEventEnd는 쓰지 않는다 —
+// type="module"은 defer라 모듈 실행(=마운트) 이후 발화해 이 시점 값이 늘 0이다(죽은 계측).
 // perf 조회 전체를 try로 감싼다: 이 훅은 앱의 진입 경로라 여기서 throw하면 화면이 통째로 빈다.
 function bootTimings() {
   try {
