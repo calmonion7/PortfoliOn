@@ -13,10 +13,14 @@ export default function useAuthBootstrap() {
   useEffect(() => {
     // task#284 진단 — 이 문서가 어떻게 열렸는지(일반 로드/bfcache 복원 후 재요청 등)를
     // 분기 판정 *이전에* 무조건 남긴다(가토 ⑧ⓑ — 조건부 기록은 무음 스킵 장치다).
+    // task#285 S5 — resp(=responseStart)로 서버·리다이렉트 구간과 번들·마운트 구간을 가른다.
+    // 엔트리가 없으면(jsdom·구형 브라우저) 키 자체를 넣지 않는다.
+    const navEntry = performance.getEntriesByType?.('navigation')?.[0]
     logDiag('doc', {
       url: window.location.pathname + window.location.search,
       hasToken: !!localStorage.getItem('access_token'),
-      nav: performance.getEntriesByType?.('navigation')?.[0]?.type,
+      nav: navEntry?.type,
+      ...(navEntry ? { resp: Math.round(navEntry.responseStart) } : {}),
     })
 
     // 저장 토큰으로 세션을 해석한다. 에러·소진 코드 착지도 정상 경로와 **같은 규칙**을 쓴다 —

@@ -181,13 +181,29 @@ const run = async (label, control) => {
   P(landing.appShell && !landing.loginForm && landing.hasToken,
     `${label}/랜딩`, `로그인 완료·앱 렌더 (appShell=${landing.appShell}, loginForm=${landing.loginForm}, url=${landing.url})`);
 
-  // 목표 축 — 뒤로가기 1회
-  await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => null);
-  await page.waitForTimeout(1200); // 착지 문서의 리다이렉트/렌더가 끝나기를 기다린다
-  const back = await snapshot(page);
-  trail.push(back.url);
-  await page.screenshot({ path: `${OUT}/${control ? 'control' : 'rewind'}-2-after-back.png` });
-
+  // 목표 축 — 뒤로가기로 로그인 이전 지점까지 이탈한다.
+  // ⚠️ task#285에서 `markOAuthStart`가 기준값을 기록하기 *전에* forward 잡음을 절단하려고
+  // `pushState(LANDING)`을 하면서, 되감기 착지 슬롯이 원 로그인 엔트리 **뒤**에 하나 더 생겼다.
+  // 그래서 이탈에 뒤로가기가 2회 필요하다(1회째는 같은 문서 안 재리다이렉트라 화면상 무동작).
+  // 이 비용은 그릴링에서 명시 수용했다. task#252 계획서의 라이브 완료기준은 (a) IdP 아님
+  // (b) 로그인 폼 없음 **두 축뿐**이고(그 plan.md의 라이브 슬라이스 판정 2축), 'PROBE START로
+  // 1회에 정확 복귀'는 계획에 없던 부수 단언이었다. 그래서 여기서 *의도 기준*으로 다시 쓴다 —
+  // 매 착지가 IdP가 아니고 로그인 폼도 없으며, 2회 이내에 로그인 이전 지점으로 이탈한다.
+  // (IdP 축은 첫 착지만 보던 것에서 **모든 중간 착지**로 넓어져 오히려 엄격해진다.)
+  const MAX_BACK = 2;
+  const backs = [];
+  for (let i = 0; i < MAX_BACK; i++) {
+    await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => null);
+    await page.waitForTimeout(1200); // 착지 문서의 리다이렉트/렌더가 끝나기를 기다린다
+    const s = await snapshot(page);
+    backs.push(s);
+    trail.push(s.url);
+    await page.screenshot({ path: `${OUT}/${control ? 'control' : 'rewind'}-2-after-back${i + 1}.png` });
+    if (s.h1 === 'PROBE START') break;
+    if (control) break; // 대조군은 1회만 — 되감기가 없으면 그 자리에서 IdP여야 한다
+  }
+  const back = backs[0];
+  const last = backs[backs.length - 1];
   const onIdp = back.url.startsWith(IDP);
 
   if (control) {
@@ -196,10 +212,14 @@ const run = async (label, control) => {
     P(onIdp, `${label}/관측가능성`,
       `되감기 없으면 뒤로가기가 IdP로 간다 (url=${back.url}, h1=${back.h1}) — 프로브가 실패를 볼 수 있다`);
   } else {
-    P(!onIdp, `${label}/목표-IdP아님`, `뒤로가기 착지가 IdP가 아니다 (url=${back.url})`);
-    P(!back.loginForm, `${label}/목표-로그인폼없음`, `뒤로가기 착지에 로그인 폼이 없다 (loginForm=${back.loginForm})`);
-    P(back.h1 === 'PROBE START', `${label}/목표-이전지점복귀`,
-      `로그인 이전 지점으로 정확히 복귀했다 (h1=${back.h1})`);
+    const idpHits = backs.filter(s => s.url.startsWith(IDP));
+    P(idpHits.length === 0, `${label}/목표-IdP아님`,
+      `뒤로가기 착지 ${backs.length}회 모두 IdP가 아니다 (${backs.map(s => s.url).join(' → ')})`);
+    const formHits = backs.filter(s => s.loginForm);
+    P(formHits.length === 0, `${label}/목표-로그인폼없음`,
+      `뒤로가기 착지 ${backs.length}회 모두 로그인 폼이 없다 (발견 ${formHits.length}건)`);
+    P(last.h1 === 'PROBE START', `${label}/목표-이전지점복귀`,
+      `뒤로가기 ${backs.length}회(상한 ${MAX_BACK}) 이내에 로그인 이전 지점으로 이탈했다 (h1=${last.h1})`);
   }
 
   INFO(`${label}/커버리지`,

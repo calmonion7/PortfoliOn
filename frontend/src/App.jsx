@@ -34,6 +34,7 @@ import DiagLog from './components/DiagLog'
 import './App.css'
 import AdminAnalytics from './pages/AdminAnalytics'
 import { REDIRECTS } from './routes'
+import { SPLASH_HTML } from './oauthSplash'
 
 async function doLogout(setSession) {
   const refresh = localStorage.getItem('refresh_token')
@@ -119,6 +120,10 @@ function AppShell({ theme, setTheme, setSession }) {
 export default function App() {
   const [theme, setTheme] = useTheme()
   const { session, setSession, authLoading } = useAuthBootstrap()
+  // 콜백 착지(/?oauth= 또는 ?error=) 여부를 마운트 시점에 한 번만 고정한다 — index.html
+  // 인라인 스크립트와 동일한 판정. authLoading 동안 이 값을 유지해야 코드교환 fetch를
+  // 기다리는 창에서 index.html 스플래시가 지워진 자리가 blank로 남지 않는다.
+  const [isOAuthLanding] = useState(() => /[?&](oauth|error)=/.test(window.location.search))
 
   useBfcacheAuthGuard(!!session, setSession)
 
@@ -126,7 +131,11 @@ export default function App() {
   // 잔상 구간)의 로그가 읽힌다. authLoading/session 분기보다 먼저 두는 이유가 그것이다.
   if (new URLSearchParams(window.location.search).get('diag') === '1') return <DiagLog />
 
-  if (authLoading) return null
+  if (authLoading) {
+    return isOAuthLanding
+      ? <div dangerouslySetInnerHTML={{ __html: SPLASH_HTML }} />
+      : null
+  }
   if (!session) return <LoginPage />
 
   return (

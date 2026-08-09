@@ -6,6 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PortfoliOn</title>
     <meta name="theme-color" content="#f6f1e7" />
+    <!-- OAuth 이탈~복귀 스플래시(task#285) — 번들 CSS가 로드되기 전에 떠야 하므로 여기 한 벌만
+         두고 LoginPage(oauthSplash.js)도 같은 클래스를 재사용한다. data-theme 대신
+         prefers-color-scheme를 쓰는 건 이 스플래시에 한정된 예외다(§9.2 참조, 번들 토큰 미가용). -->
+    <style>
+      #oauth-splash[hidden] { display: none; }
+      .oauth-splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+        background: #f6f1e7; color: #201b13;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      }
+      .oauth-splash__mark { width: 40px; height: 40px; }
+      .oauth-splash__spinner {
+        width: 24px; height: 24px; border-radius: 50%;
+        border: 3px solid #1d5f58; border-top-color: transparent;
+        animation: oauth-splash-spin 0.6s linear infinite;
+      }
+      .oauth-splash__text { margin: 0; font-size: 14px; }
+      @keyframes oauth-splash-spin { to { transform: rotate(360deg); } }
+      @media (prefers-color-scheme: dark) {
+        .oauth-splash { background: #171310; color: #ece4d4; }
+        .oauth-splash__spinner { border-color: #62b3a4; border-top-color: transparent; }
+      }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
@@ -13,7 +37,14 @@
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div id="oauth-splash" hidden>
+<!-- oauth-splash:start -->
+<div class="oauth-splash"><img src="/favicon.svg" class="oauth-splash__mark" alt="" /><div class="oauth-splash__spinner" aria-hidden="true"></div><p class="oauth-splash__text">로그인 중…</p></div>
+<!-- oauth-splash:end -->
+    </div></div>
+    <!-- 콜백 착지(/?oauth= 또는 ?error=)에서만 스플래시를 드러낸다 — 일반 로드에는 절대 안 뜬다.
+         React가 마운트하며 #root를 통째로 비우므로 제거 코드는 불필요하다. -->
+    <script>if(/[?&](oauth|error)=/.test(location.search)){document.getElementById('oauth-splash').hidden=false}</script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

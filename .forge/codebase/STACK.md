@@ -157,7 +157,7 @@ KST는 2026-07-30). KR 시장-날짜 판정은 bare `date.today()` 대신
 요청 인터셉터가 `localStorage.access_token`을 `Authorization: Bearer`로 주입하고,
 응답 인터셉터가 **401이면 두 토큰을 지우고 `window.location.href = '/'`로 강제 이동**한다.
 `api.js`를 우회해 `fetch`를 직접 쓰는 곳(`frontend/src/App.jsx:37,138`,
-`frontend/src/pages/LoginPage.jsx:8`)은 이 인터셉터 혜택을 못 받는다.
+`frontend/src/pages/LoginPage.jsx:11`)은 이 인터셉터 혜택을 못 받는다.
 
 ### 3.2 외부 폰트 (CSP/오프라인 표면)
 
@@ -281,7 +281,7 @@ GH Actions 러너(`~/actions-runner-portfolion`), Cowork fire 리스너.
 
 | 변수 | 읽는 위치 | 용도 |
 |------|-----------|------|
-| `VITE_API_BASE_URL` | `frontend/src/api.js:4`, `frontend/src/App.jsx:37,138`, `frontend/src/pages/LoginPage.jsx:8` | API 베이스. **미설정 시 빈 문자열 = 상대경로**(nginx 동일 오리진 서빙 전제) |
+| `VITE_API_BASE_URL` | `frontend/src/api.js:4`, `frontend/src/App.jsx:37,138`, `frontend/src/pages/LoginPage.jsx:11` | API 베이스. **미설정 시 빈 문자열 = 상대경로**(nginx 동일 오리진 서빙 전제) |
 
 `frontend/.env`에는 `VITE_SUPABASE_URL`·`VITE_SUPABASE_ANON_KEY`도 있으나
 `frontend/src/`에서 읽는 코드가 0건이다 — **Supabase 시절 데드 변수**.

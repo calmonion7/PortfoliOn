@@ -10,6 +10,7 @@
 //
 // 착지점이 필요하므로 OAuth 시작은 replace가 아니라 push여야 한다(task#245 D6의 의도적 되돌림).
 import { logDiag } from './diag'
+import { REDIRECTS } from '../routes'
 
 const KEY = 'oauth_hist_len'
 
@@ -17,9 +18,26 @@ const KEY = 'oauth_hist_len'
 // 그때는 되감기를 포기하고 기존 동작(replace('/'))으로 폴백한다 — 회귀가 아니라 현상 유지다.
 const MAX_REWIND = 20
 
+// 되감기 착지 슬롯 URL. '/'의 리다이렉트 목적지(REDIRECTS 파생, 현재 '/reports')로 곧장 pushState해
+// 두면 가드가 세션을 뒤집을 때 BrowserRouter가 처음부터 그 경로에 서 있어 '/'→'/reports' 리다이렉트와
+// 그에 딸린 key={pathname} 재마운트(페이드 재생 + 데이터 2회 fetch)가 사라진다(task#283 적대적 리뷰 MED).
+const LANDING = REDIRECTS.find(([from]) => from === '/')?.[1] || '/'
+
 // OAuth로 떠나기 직전 호출. sessionStorage는 오리진·탭별이라 IdP 우회 중에도 살아남는다.
+//
+// 부작용(그릴링에서 명시 수용, task#285): 이 pushState가 '/' 중복 엔트리 1개를 착지 슬롯 뒤에
+// 남긴다 — 로그인 완료 후 뒤로가기 1회는 같은 문서 안 재리다이렉트라 사실상 무동작이 된다.
+// useBfcacheAuthGuard가 이미 forward 엔트리를 1개 남기고 있어(task#283) 같은 등급의 부작용이다.
 export function markOAuthStart() {
-  sessionStorage.setItem(KEY, String(window.history.length))
+  const before = window.history.length
+  // 기록 전에 forward 잡음을 잘라낸다 — pushState 직후의 length는 항상 '현재 인덱스+1'이라
+  // 클릭 시점에 forward 엔트리가 몇 개였든 기준값이 정확해진다. 이 순서가 틀려(길이를 먼저
+  // 읽고 그 다음 location.href로 이동) forward 잡음 J개가 있으면 delta가 J만큼 과소해져
+  // /api/auth/oauth/google(302만 뱉는 엔드포인트)에 착지하던 게 이번 결함이었다(task#285).
+  window.history.pushState({}, '', LANDING)
+  const base = window.history.length
+  sessionStorage.setItem(KEY, String(base))
+  logDiag('oauth-start', { base, junk: before - (base - 1) })
 }
 
 // 로그인 성공 랜딩에서 호출. 기준값은 어느 분기에서도 제거한다 — 남기면 다음 일반 로드가

@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import useIsMobile from '../hooks/useIsMobile'
 import { markOAuthStart } from '../utils/oauthHistory'
 import Input from '../components/ui/Input'
 import { SketchHero } from '../components/sketches'
+import { SPLASH_HTML } from '../oauthSplash'
 import '../components/ui/Button.css'
 import './LoginPage.css'
 
@@ -16,6 +18,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  // OAuth로 떠나는 순간부터 콜백 문서와 픽셀 동일한 스플래시를 보여준다(task#285 S4) —
+  // bfcache가 복원하는 건 '떠나기 직전 DOM'이라 이 상태가 그대로 되살아난다.
+  const [leaving, setLeaving] = useState(false)
+
+  // 취소 복귀 가드 — 구글에서 취소하고 뒤로가기로 돌아오면 이 스플래시가 bfcache로 복원된다.
+  // 토큰이 없으면(=취소) 로그인 폼으로 되돌린다. 토큰이 있으면(=성공) 손대지 않는다 — App의
+  // useBfcacheAuthGuard가 곧 세션을 뒤집어 이 화면 자체를 교체할 몫이라, 여기서 먼저 걷으면
+  // 로그인 폼이 한 프레임 다시 보인다(원래 버그 재발, 레이스 방지를 위해 토큰 유무로만 가른다).
+  useEffect(() => {
+    const onPageShow = () => {
+      if (!localStorage.getItem('access_token')) setLeaving(false)
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   const switchMode = (m) => { setMode(m); setError(null); setSuccess(null) }
 
@@ -58,6 +75,9 @@ export default function LoginPage() {
   // 지울 수 없으므로, 로그인 성공 랜딩에서 returnFromOAuth()가 되감아 그것들을 앞으로 밀어낸다.
   // replace로 떠나면 착지점이 IdP 엔트리가 되어 되감기가 성립하지 않는다.
   const startOAuth = (provider) => {
+    // flushSync로 스플래시를 동기 페인트한 뒤에 떠난다 — 그래야 bfcache 복원 프레임이
+    // 로그인 폼이 아니라 스플래시다(task#285 S4, 설계 근거는 위 leaving 상태 주석).
+    flushSync(() => setLeaving(true))
     markOAuthStart()
     window.location.href = `${API}/api/auth/oauth/${provider}`
   }
@@ -65,6 +85,8 @@ export default function LoginPage() {
   const handleGithub = () => startOAuth('github')
 
   const isLogin = mode === 'login'
+
+  if (leaving) return <div dangerouslySetInnerHTML={{ __html: SPLASH_HTML }} />
 
   if (isMobile) return (
     <div className="m-login">

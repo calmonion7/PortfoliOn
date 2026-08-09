@@ -315,7 +315,7 @@ FastAPI util 경로(`/openapi.json`·`/docs`·`/redoc`·`/docs/oauth2-redirect`)
 6. **`location`은 객체째 `vi.stubGlobal('location', {...})`로 갈아끼운다.**
    jsdom에서 `location.replace`는 non-writable이라 `spyOn`이 `TypeError: Cannot redefine property`로
    막히지만 `window.location` 자체는 configurable이다
-   (`frontend/src/test/back-to-login-guard.test.jsx:20-31` 주석 + `auth-bootstrap.test.jsx:17-24`의
+   (`frontend/src/test/back-to-login-guard.test.jsx:20-31` 주석 + `auth-bootstrap.test.jsx:18-25`의
    `atUrl(search)` 헬퍼). 정리는 `afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })`
    + `localStorage.clear()`/`sessionStorage.clear()`.
 7. **훅은 `renderHook`으로 직접 검증**한다(`@testing-library/react`) —

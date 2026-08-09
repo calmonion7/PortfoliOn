@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 import useAuthBootstrap from '../hooks/useAuthBootstrap'
 import { returnFromOAuth } from '../utils/oauthHistory'
+import { readDiag, clearDiag } from '../utils/diag'
 
 vi.mock('../utils/oauthHistory', () => ({ returnFromOAuth: vi.fn() }))
 
@@ -25,6 +26,7 @@ const atUrl = (search) => {
 
 beforeEach(() => {
   localStorage.clear()
+  clearDiag()
   vi.spyOn(window.history, 'replaceState').mockImplementation(() => {})
   // vi.mock 팩토리가 만든 vi.fn()은 restoreAllMocks 대상이 아니라 호출이 **누적**된다.
   // 안 지우면 returnFromOAuth 단언이 실행 순서에 의존한다(옛 `not.toHaveBeenCalled()`가
@@ -154,5 +156,32 @@ describe('useAuthBootstrap — 에러·실패 착지는 저장 토큰으로 세�
     const { result } = renderHook(() => useAuthBootstrap())
     expect((await settled(result)).session).toEqual({ access_token: 't' })
     expect(localStorage.getItem('refresh_token')).toBe('r')
+  })
+
+  // ── task#285 S5 — `doc` 로그에 `resp`(responseStart) 추가. 서버·리다이렉트 구간과
+  // 번들·마운트 구간을 가르기 위한 필드다. 두 경로(엔트리 있음/없음)를 쌍으로 단언한다 —
+  // 성공 경로만 스텁한 테스트는 부재 경로(jsdom·구형 브라우저)에 원리적으로 블라인드하다.
+  describe('doc 로그 — resp(responseStart) (task#285 S5)', () => {
+    it('navigation 엔트리가 있으면 resp가 반올림되어 실린다', async () => {
+      vi.spyOn(performance, 'getEntriesByType').mockReturnValue([
+        { type: 'navigate', responseStart: 123.7 },
+      ])
+      atUrl('')
+      const { result } = renderHook(() => useAuthBootstrap())
+      await settled(result)
+      const doc = readDiag().find(e => e.ev === 'doc')
+      expect(doc.resp).toBe(124)
+      expect(doc.nav).toBe('navigate') // 기존 필드 의미는 불변
+    })
+
+    it('navigation 엔트리가 없으면 resp 키 자체가 없다', async () => {
+      vi.spyOn(performance, 'getEntriesByType').mockReturnValue([])
+      atUrl('')
+      const { result } = renderHook(() => useAuthBootstrap())
+      await settled(result)
+      const doc = readDiag().find(e => e.ev === 'doc')
+      expect('resp' in doc).toBe(false)
+      expect(doc.nav).toBeUndefined()
+    })
   })
 })
