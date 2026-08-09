@@ -442,7 +442,7 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   `frontend/src/pages/GuruStats.jsx:11`). 이 코드베이스는 **테스트에서 `App`을 import하지 않는
   관례**(로그인 셸 전체를 렌더해 모킹 비용이 크다)라, App 안에 있는 분기는 단위테스트가
   원리적으로 닿지 못한다 → 그래서 인증 부트스트랩을 훅으로 뺐다
-  (`frontend/src/hooks/useAuthBootstrap.js:5-8` 주석이 그 판단을 적어둔다).
+  (`frontend/src/hooks/useAuthBootstrap.js:33-36` 주석이 그 판단을 적어둔다).
   **테스트 가능성이 배치를 결정한다.**
 - JSX를 담은 유틸은 `.jsx` — `frontend/src/components/market/marketUtils.jsx`,
   `frontend/src/components/reports/reportUtils.jsx`(**`.js` 파일은 없다**).

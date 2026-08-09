@@ -184,4 +184,94 @@ describe('useAuthBootstrap — 에러·실패 착지는 저장 토큰으로 세�
       expect(doc.nav).toBeUndefined()
     })
   })
+
+  // ── task#288 S1 — `doc` 로그에 req(requestStart)·di(domInteractive)·js(메인 번들
+  // responseEnd)를 추가한다. 콜백 문서 SPA 부팅 2251ms(task#284 실측, 체감의 89.6%)를
+  // 0→req→resp→di→마운트로 쪼개기 위한 필드다. 위 resp와 **같은 계약** — 값이 없으면
+  // 키 자체를 넣지 않는다.
+  // ⚠️ domContentLoadedEventEnd는 쓰지 않는다: type="module"은 defer라 모듈 실행(=마운트)
+  // 이후에 DOMContentLoaded가 발화하므로 기록 시점의 그 값은 늘 0이다("필드는 있는데 늘 0"인
+  // 죽은 계측 — task#287의 죽은 가드와 같은 부류).
+  // 부재 계약(②④)은 구현 전에도 통과하지만 공허하지 않다: 구현이 값을 무조건 넣으면
+  // Math.round(undefined)=NaN이 JSON에서 null로 직렬화돼 "키는 있는데 값이 null"인
+  // 죽은 필드가 되고, 그때 이 둘이 FAIL한다(그게 이 쌍의 이빨이다).
+  describe('doc 로그 — req·di·js 부팅 구간 (task#288 S1)', () => {
+    const perfBy = (nav, resource = []) =>
+      vi.spyOn(performance, 'getEntriesByType').mockImplementation(
+        (type) => (type === 'navigation' ? nav : type === 'resource' ? resource : []),
+      )
+    const NAV = { type: 'navigate', requestStart: 12.4, responseStart: 123.7, domInteractive: 456.6 }
+    const docLog = () => readDiag().find(e => e.ev === 'doc')
+
+    it('① navigation 엔트리가 있으면 req·di가 반올림되어 실린다', async () => {
+      perfBy([NAV])
+      atUrl('')
+      const { result } = renderHook(() => useAuthBootstrap())
+      await settled(result)
+      const doc = docLog()
+      expect(doc.req).toBe(12)
+      expect(doc.di).toBe(457)
+      expect(doc.resp).toBe(124) // 기존 필드 의미는 불변
+    })
+
+    it('② navigation 엔트리가 없으면 req·di 키 자체가 없다', async () => {
+      perfBy([])
+      atUrl('')
+      const { result } = renderHook(() => useAuthBootstrap())
+      await settled(result)
+      const doc = docLog()
+      expect('req' in doc).toBe(false)
+      expect('di' in doc).toBe(false)
+    })
+
+    it('③ 메인 번들 resource 엔트리가 있으면 js에 responseEnd가 실린다', async () => {
+      perfBy([NAV], [{ name: 'https://portfolion.taebro.com/assets/index-DRkRI1jj.js', responseEnd: 789.4 }])
+      atUrl('')
+      const { result } = renderHook(() => useAuthBootstrap())
+      await settled(result)
+      expect(docLog().js).toBe(789)
+    })
+
+    it('④ 메인 번들과 매칭되는 resource 엔트리가 없으면 js 키가 없다', async () => {
+      perfBy([NAV], [{ name: 'https://portfolion.taebro.com/assets/vendor-abc.js', responseEnd: 500 }])
+      atUrl('')
+      const { result } = renderHook(() => useAuthBootstrap())
+      await settled(result)
+      expect('js' in docLog()).toBe(false)
+    })
+
+    it('⑤ perf 조회가 throw해도 부트스트랩이 완주하고 doc은 남는다', async () => {
+      // 이 훅은 앱의 진입 경로다 — 여기서 throw하면 화면이 통째로 빈다(task#283 백지 사례).
+      vi.spyOn(performance, 'getEntriesByType').mockImplementation(() => {
+        throw new Error('perf blocked')
+      })
+      localStorage.setItem('access_token', 'live')
+      atUrl('')
+      const { result } = renderHook(() => useAuthBootstrap())
+      expect((await settled(result)).session).toEqual({ access_token: 'live' })
+      const doc = docLog()
+      expect(doc.url).toBe('/')
+      expect('req' in doc).toBe(false)
+    })
+
+    it('⑥ 값이 유한한 0이면 키가 살아남는다 — "0"과 "엔트리 없음"은 다르다', async () => {
+      // 적대적 리뷰 F2(HIGH) — 두 렌즈가 독립적으로 수렴한 발견. round()를 truthy 체크
+      // `(v ? Math.round(v) : undefined)`로 쓰면 유한한 0이 조용히 드롭돼, 로그에서 "값이 0"과
+      // "엔트리가 없다"가 **구별 불가**가 된다. 위 ①~⑤와 기존 resp 계약은 fixture가 전부
+      // truthy 값이라 그 결함에 원리적으로 블라인드했다(주입 실측: 24/24 전부 통과).
+      // 하필 SW 캐시에서 즉시 응답하는 **웜 로드가 requestStart가 0으로 반올림될 수 있는 자리**이고,
+      // 이 태스크의 콜드/웜 대조가 정확히 그 케이스를 잰다 — 이 슬라이스의 목적에 직접 닿는다.
+      perfBy([{ type: 'navigate', requestStart: 0, responseStart: 12.4, domInteractive: 456.6 }],
+        [{ name: 'https://portfolion.taebro.com/assets/index-DRkRI1jj.js', responseEnd: 789.4 }])
+      atUrl('')
+      const { result } = renderHook(() => useAuthBootstrap())
+      await settled(result)
+      const doc = docLog()
+      expect(doc.req).toBe(0)
+      expect('req' in doc).toBe(true)
+      expect(doc.resp).toBe(12) // 형제 필드는 정상 반올림
+      expect(doc.di).toBe(457)
+      expect(doc.js).toBe(789)
+    })
+  })
 })

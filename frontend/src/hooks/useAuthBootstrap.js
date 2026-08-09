@@ -2,6 +2,34 @@ import { useState, useEffect } from 'react'
 import { returnFromOAuth } from '../utils/oauthHistory'
 import { logDiag } from '../utils/diag'
 
+// 유한값만 반올림해 돌려준다. 비유한(undefined·NaN)은 undefined로 남겨 JSON이 키째 떨어뜨리게
+// 한다 — Math.round(undefined)=NaN을 그대로 실으면 직렬화에서 null이 되어 "키는 있는데 늘 null"인
+// 죽은 필드가 된다(task#287의 죽은 가드와 같은 부류).
+const round = (v) => (Number.isFinite(v) ? Math.round(v) : undefined)
+
+// 문서 부팅 구간 계측 — 0→req(리다이렉트·연결) / req→resp(서버 처리) / resp→di(HTML 파싱) /
+// di→마운트(번들 다운로드·실행)를 가른다. 콜백 문서 SPA 부팅이 로그인 체감 지연의 89.6%
+// (2251ms/2513ms, task#284 실기기 실측)라 그 덩어리를 성분으로 쪼개는 것이 목적이다.
+// ⚠️ domContentLoadedEventEnd는 쓰지 않는다 — type="module"은 defer라 모듈 실행(=React 마운트)
+// 이후에 발화하므로 이 시점의 값은 늘 0이다. 대신 di(마운트 시점에 확정됨)와 번들 responseEnd를 쓴다.
+// perf 조회 전체를 try로 감싼다: 이 훅은 앱의 진입 경로라 여기서 throw하면 화면이 통째로 빈다.
+function bootTimings() {
+  try {
+    const nav = performance.getEntriesByType?.('navigation')?.[0]
+    const bundle = performance.getEntriesByType?.('resource')
+      ?.find(r => typeof r?.name === 'string' && /\/assets\/index-[^/]*\.js$/.test(r.name))
+    return {
+      nav: nav?.type,
+      req: round(nav?.requestStart),
+      resp: round(nav?.responseStart),
+      di: round(nav?.domInteractive),
+      js: round(bundle?.responseEnd),
+    }
+  } catch {
+    return {} // 계측 실패가 진입 경로를 막지 않는다(diag.logDiag와 같은 규율)
+  }
+}
+
 // 인증 부트스트랩 — 첫 로드에서 세션을 해석한다(URL의 OAuth 결과 → localStorage 토큰).
 // App에서 훅으로 뺀 이유: 이 코드베이스는 테스트에서 App을 import하지 않는 관례라(로그인 시
 // 전체 셸을 렌더하므로 모킹 비용이 크다) App 안에 있는 동안 이 분기들은 단위테스트가 원리적으로
@@ -14,13 +42,12 @@ export default function useAuthBootstrap() {
     // task#284 진단 — 이 문서가 어떻게 열렸는지(일반 로드/bfcache 복원 후 재요청 등)를
     // 분기 판정 *이전에* 무조건 남긴다(가토 ⑧ⓑ — 조건부 기록은 무음 스킵 장치다).
     // task#285 S5 — resp(=responseStart)로 서버·리다이렉트 구간과 번들·마운트 구간을 가른다.
+    // task#288 S1 — req·di·js를 더해 그 덩어리를 다시 쪼갠다(bootTimings 참조).
     // 엔트리가 없으면(jsdom·구형 브라우저) 키 자체를 넣지 않는다.
-    const navEntry = performance.getEntriesByType?.('navigation')?.[0]
     logDiag('doc', {
       url: window.location.pathname + window.location.search,
       hasToken: !!localStorage.getItem('access_token'),
-      nav: navEntry?.type,
-      ...(navEntry ? { resp: Math.round(navEntry.responseStart) } : {}),
+      ...bootTimings(),
     })
 
     // 저장 토큰으로 세션을 해석한다. 에러·소진 코드 착지도 정상 경로와 **같은 규칙**을 쓴다 —

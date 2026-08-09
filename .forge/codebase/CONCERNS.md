@@ -605,7 +605,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 - `src/`에 하드코딩 API 호스트·localhost 없음. 유일한 절대 URL은 `index.html:45-49`의 폰트 CDN.
 
 ### 7.10 죽은 레거시 경로·설정 — **잠재 위험**(현재 비활성)
-- `?token=`/`?refresh=` URL 쿼리에서 토큰을 읽어 `localStorage`에 넣는 경로가 살아 있다 — **파일이 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:40-41`(파싱) + `:61-65`(`setItem` 2회 + `replaceState`). URL 토큰은 브라우저 이력·리퍼러·서버 로그에 남는다. **백엔드는 더 이상 그 형태를 발행하지 않는다** — 두 콜백 모두 `?oauth={code}`(120초 일회용, `routers/auth.py:183,230`)만 리다이렉트한다. 죽은 코드지만 되살리면 즉시 노출.
+- `?token=`/`?refresh=` URL 쿼리에서 토큰을 읽어 `localStorage`에 넣는 경로가 살아 있다 — **파일이 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:67-68`(파싱) + `:61-65`(`setItem` 2회 + `replaceState`). URL 토큰은 브라우저 이력·리퍼러·서버 로그에 남는다. **백엔드는 더 이상 그 형태를 발행하지 않는다** — 두 콜백 모두 `?oauth={code}`(120초 일회용, `routers/auth.py:183,230`)만 리다이렉트한다. 죽은 코드지만 되살리면 즉시 노출.
 - **`frontend/vercel.json`이 여전히 tracked** — Vercel은 Docker 이전에서 제거됐다.
 - `frontend/.env`(untracked)에 `VITE_SUPABASE_URL`·`VITE_SUPABASE_ANON_KEY`가 남아 있다. **누출 아님** — `src/` 참조 0, `dist/`에도 없다(Vite는 정적 참조된 변수만 인라인). 로컬 잡동사니.
 
