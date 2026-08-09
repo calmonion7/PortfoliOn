@@ -272,12 +272,30 @@ const run = async (label, control) => {
     await page.waitForTimeout(400);
 
     // back-exits — 뒤로가기가 로그인 화면(트랩)이 아니라 우리 오리진 밖(센티넬)으로 나가야 한다.
-    await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => null);
-    await page.waitForTimeout(400);
-    const back = await snapshot(page);
+    // ⚠️ task#285 보정 — markOAuthStart가 기록 전에 pushState(LANDING)을 항상 삽입하게 되면서
+    // (junk 유무와 무관, 매 OAuth 시작마다) 히스토리 스택이 통째로 한 칸씩 밀렸다. 그래서 여기
+    // "원위치"(landed 슬롯)에서 1회 뒤로가기는 이제 그 pushState *이전* 엔트리(원래의 최초 로그인
+    // 진입점 Q0)에 착지하는데, 그 시점엔 이미 localStorage에 토큰이 써져 있어(오리진 전역 공유라
+    // 어느 문서 재요청이든 보임) Q0 재요청도 **인증된 Reports**로 뜬다 — 로그인폼도 없고 오리진도
+    // 우리 것이라 기존 단일-백 단언이 거짓 FAIL한다(실측 확정: back1={reportsMarker:true,
+    // hasToken:true, origin=BASE}, 그 다음 back2에서야 진짜 센티넬 도달). uat252가 같은 원인으로
+    // 이미 1회→최대 2회 허용으로 보정된 것과 동형 — 그 패턴을 여기도 적용한다(앱 결함 아님,
+    // 프로브의 스테일 단언 — task#285 라이브 계측 세션에서 실측 확정).
+    const MAX_BACK = 2;
+    const backs = [];
+    for (let i = 0; i < MAX_BACK; i++) {
+      await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => null);
+      await page.waitForTimeout(400);
+      const b = await snapshot(page);
+      backs.push(b);
+      if (b.origin !== new URL(BASE).origin) break;
+    }
+    const back = backs[backs.length - 1];
     bump('back-exits');
     P(!back.loginForm && back.origin !== new URL(BASE).origin, `${label}/back-exits`,
-      `뒤로가기 착지에 로그인폼이 없고 우리 오리진을 이탈했다 (loginForm=${back.loginForm}, origin=${back.origin}, url=${back.url}, h1=${back.h1})`);
+      `뒤로가기 착지(${backs.length}회, 상한 ${MAX_BACK})에 로그인폼이 없고 우리 오리진을 이탈했다 ` +
+      `(loginForm=${back.loginForm}, origin=${back.origin}, url=${back.url}, h1=${back.h1}) · ` +
+      `경로: ${backs.map(b => b.origin).join(' → ')}`);
   }
 
   const realBf = await readRealBfcache(page);
