@@ -449,7 +449,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 
 ### 5.11 메뉴 권한은 보안 경계가 아니다 — **설계상 트레이드오프**(의도 확인 필요)
 - 필터: `components/Masthead.jsx:46` `NAV_SECTIONS.filter(s => menuPermissions.includes(s.perm))`, `components/MobileNav.jsx:21`, `components/MobileTopActions.jsx:14`. 출처는 `contexts/AuthContext.jsx:18-22` ← `GET /api/auth/me`.
-- **`frontend/src/App.jsx:86-107`은 모든 라우트를 무조건 등록한다 — 라우트 가드가 전무하다.** 백엔드에도 메뉴 권한 의존성이 없다(`ALL_MENUS`는 `routers/auth.py:108` read와 `routers/admin.py` CRUD에만 등장). `guru`가 거부된 사용자가 `/guru`를 직접 입력하면 페이지가 마운트되고 데이터도 정상 로드된다.
+- **`frontend/src/App.jsx:88-109`은 모든 라우트를 무조건 등록한다 — 라우트 가드가 전무하다.** 백엔드에도 메뉴 권한 의존성이 없다(`ALL_MENUS`는 `routers/auth.py:108` read와 `routers/admin.py` CRUD에만 등장). `guru`가 거부된 사용자가 `/guru`를 직접 입력하면 페이지가 마운트되고 데이터도 정상 로드된다.
 - **정직한 심각도: 권한 상승이 아니다.** `role === 'admin'` 게이트(`pages/Settings.jsx:258`, `pages/ReportManualGen.jsx:12`, `pages/AnalystReports.jsx:20`, `components/StockModal.jsx:18`, `components/PermissionManager.jsx`)는 전부 서버 `require_admin`이 뒷받침하고, 게이트 없는 메뉴로 도달하는 데이터는 전역/공유(구루·시장지표)이거나 이미 `get_current_user`로 사용자 스코프다. 노출되는 건 "운영자가 숨기기로 한 기능"이지 타인 데이터가 아니다.
 - 결정 필요: 메뉴 권한이 민감한 것을 가려야 한다면 서버 측 의존성과 라우트 가드가 필요하다.
 
@@ -525,7 +525,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 ## 7. 프론트엔드
 
 ### 7.1 access token 갱신 경로가 없다 — **확인된 버그** (B9)
-- `frontend/src/api.js:15-26`이 401에 **무조건** 두 토큰을 지우고 `window.location.replace('/')`(`:22`)로 하드 리다이렉트한다. **`POST /api/auth/refresh`를 호출하는 코드가 프론트 전체에 없다**(`grep auth/refresh src/` = 0) — `refresh_token`의 유일한 read 소비처는 로그아웃(`App.jsx:36-49` `doLogout`)이고 write는 `useAuthBootstrap.js:56,75`이다.
+- `frontend/src/api.js:15-26`이 401에 **무조건** 두 토큰을 지우고 `window.location.replace('/')`(`:22`)로 하드 리다이렉트한다. **`POST /api/auth/refresh`를 호출하는 코드가 프론트 전체에 없다**(`grep auth/refresh src/` = 0) — `refresh_token`의 유일한 read 소비처는 로그아웃(`App.jsx:37-50` `doLogout`)이고 write는 `useAuthBootstrap.js:56,75`이다.
 - 서버는 access 1h / refresh 30d(`backend/services/auth_service.py:14-15`)로 회전 인프라를 다 갖췄는데 클라이언트가 안 쓴다 → **1시간마다 전 사용자 강제 로그아웃**.
 - ADR-0029가 read까지 401을 내게 만들어 반경이 더 넓어졌다(ADR 본문도 이 부수를 인정한다). 백그라운드 폴링의 401도 세션을 끊는다.
 - **부분 진전**: 지난 판의 "`api.js` 커버 테스트 0"은 이제 거짓 — `test/back-to-login-guard.test.jsx:118-132`가 응답 인터셉터를 직접 단언한다(401/비401 2케이스). **요청 인터셉터(`api.js:7-13`)는 여전히 미커버.**
@@ -553,7 +553,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 **남는 잔여 4가지:**
 1. **접두사 매칭이 세그먼트 경계를 안 본다** — `navSections.js:48` `pathname.startsWith(item.match ?? item.to)`. 현재 5섹션에 형제 접두사 쌍은 없고(`'/analyst-reports'.startsWith('/reports')`는 false) `:8-11` 주석이 그 천장을 선언하지만, **강제하는 단언이 없다.** 새 형제가 접두사 관계로 들어오면 조용히 두 탭이 동시 active가 된다.
 2. **드리프트 표면이 소멸한 게 아니라 "경로 목록"에서 "key→아이콘 매핑"으로 이동했다** — 아이콘은 소비처별 2중 복제다(`Masthead.jsx:12-18` sketches / `MobileNav.jsx:10-16` ui/icons, 의도적 분기이고 각 파일 주석이 근거를 담는다). **폴백이 없어** `NAV_SECTIONS`에 섹션을 추가하고 한쪽 `ICONS`를 빠뜨리면 `Icon`이 `undefined`가 되어 `Masthead.jsx:29`/`MobileNav.jsx:30`에서 **렌더 throw**한다.
-3. **라우트↔nav 커버리지 게이트가 없다** — `nav-active-matching.test.jsx`는 `/analyst-report(s)` 2경로만 고정한다. `App.jsx:90-106`의 신규 라우트가 `NAV_SECTIONS`에서 빠지는 B16 **원형**은 여전히 무가드(현재는 전 라우트 커버, 의도적 예외는 `/dev/showcase` `App.jsx:110`).
+3. **라우트↔nav 커버리지 게이트가 없다** — `nav-active-matching.test.jsx`는 `/analyst-report(s)` 2경로만 고정한다. `App.jsx:92-108`의 신규 라우트가 `NAV_SECTIONS`에서 빠지는 B16 **원형**은 여전히 무가드(현재는 전 라우트 커버, 의도적 예외는 `/dev/showcase` `App.jsx:112`).
 4. **`settings`·`admin-analytics`는 `NAV_SECTIONS` 밖의 4번째 목록**이다(`Masthead.jsx:78-84`, `MobileTopActions.jsx:14-15`가 각자 하드코딩). `navSections.js:35` schedule 섹션은 `perm: 'research'`라 일정·인컴에 독립 권한을 줄 수 없다.
 
 ### 7.5 이벤트 화이트리스트 탈락 — **확인된 버그** (B24)
@@ -565,12 +565,12 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 ### 7.6 Service Worker가 `/api/*`를 가로챈다 — **설계상 트레이드오프** + 프라이버시 잔여
 - `frontend/vite.config.js:39-48`(빌드 산출 `dist/sw.js`): `urlPattern`(`:40`)이 `/api/`를 포함하고 `/api/auth/`를 제외한 **모든 GET**을 `NetworkFirst`(`:44` `networkTimeoutSeconds: 10`)로 `api-cache`(`:45` maxEntries 50, maxAgeSeconds 300)에 넣는다.
 - 파생 1: 네트워크 실패 **또는 10초 초과** 시 **최대 5분 오래된 API 응답**이 stale 표시 없이 서빙된다.
-- 파생 2 (**프라이버시 잔여**): `api-cache`가 URL만으로 키를 잡아 `Authorization` 헤더가 키에 안 들어가고, 로그아웃(`App.jsx:36-49`)이 캐시를 지우지 않는다(`caches.*` 호출이 프론트 전체 **0건**). 같은 브라우저에서 5분 안에 계정 B가 로그인하고 요청이 실패/타임아웃하면 **B가 A의 캐시된 `/api/portfolio` 본문을 받을 수 있다.** 좁은 창이지만 실제 교차 사용자 누출 경로다.
+- 파생 2 (**프라이버시 잔여**): `api-cache`가 URL만으로 키를 잡아 `Authorization` 헤더가 키에 안 들어가고, 로그아웃(`App.jsx:37-50`)이 캐시를 지우지 않는다(`caches.*` 호출이 프론트 전체 **0건**). 같은 브라우저에서 5분 안에 계정 B가 로그인하고 요청이 실패/타임아웃하면 **B가 A의 캐시된 `/api/portfolio` 본문을 받을 수 있다.** 좁은 창이지만 실제 교차 사용자 누출 경로다.
 - 파생 3: `:46` `cacheableResponse.statuses: [0, 200]`이 opaque(status 0) 응답까지 캐시한다.
 - 파생 4: `maxEntries: 50` vs ~70개 구별 엔드포인트 → 상시 LRU 스래싱(비효율, 오류 아님).
 - 파생 5 (테스트 하니스): 이 인터셉트 때문에 Playwright `page.route` 응답 주입이 안 먹는다 — 응답 주입 UAT는 컨텍스트를 `serviceWorkers: 'block'`으로 만들어야 한다.
 - **이미 가드됨 — OAuth 콜백**: `vite.config.js:19` `navigateFallback: null`로 내비게이션 라우트가 등록되지 않는다(`dist/sw.js`에 `NavigationRoute`/`createHandlerBoundToURL` 없음). 독립적으로 `/api/auth/*`가 `api-cache`에서 제외되므로 `useAuthBootstrap.js:51` 토큰 교환도 캐시되지 않는다.
-- **이미 가드됨 — 배포 후 stale JS**: `skipWaiting`/`clientsClaim`(`:17-18`), `cleanupOutdatedCaches()`, `BUILD_DATE`를 실은 `cacheId`(`:15`), `sw-cache-bust` 플러그인(`:63-92`, name `:64`)이 `registerSW.js`/`sw.js`/`manifest.webmanifest`에 `?BUILD_DATE`를 붙이고, `nginx.conf:39-44`가 `sw.js`/`workbox-*.js`에 no-store를 준다. 그리고 **`src/`에 `React.lazy`·동적 `import()`가 0건**이라 `skipWaiting`의 통상 위험(열린 탭이 삭제된 lazy 청크를 요청)이 발생할 수 없다.
+- **이미 가드됨 — 배포 후 stale JS**: `skipWaiting`/`clientsClaim`(`:17-18`), `cleanupOutdatedCaches()`, `BUILD_DATE`를 실은 `cacheId`(`:15`), `sw-cache-bust` 플러그인(`:63-92`, name `:64`)이 `registerSW.js`/`sw.js`/`manifest.webmanifest`에 `?BUILD_DATE`를 붙이고, `nginx.conf:39-44`가 `sw.js`/`workbox-*.js`에 no-store를 준다. 그리고 **`src/`에 `React.lazy`·동적 `import()`가 0건**이라 `skipWaiting`의 통상 위험(열린 탭이 삭제된 lazy 청크를 요청)이 발생할 수 없다. **task#287 전에는 이 항목이 "삭제된 청크를 요청하지 않으니 깨지지 않는다"만 닫았고, "새 SW가 컨트롤러를 교체해도 열린 탭의 React 앱 자신은 리로드되지 않아 무기한 옛 번들을 실행한다"는 절반은 무가드였다(`registerType: 'autoUpdate'`라는 이름과 달리 앱은 갱신되지 않음).** 이제 `hooks/useSwUpdateReload.js`(`App.jsx:67`, §10.1)가 그 절반도 닫는다 — `controllerchange`(최초 설치 1회는 `hadController`로 무시) 후 **다음 라우트 전환 또는 탭 재가시화** 시점에 `window.location.reload()`로 새 번들을 집어온다(모달·인라인 입력 포커스·OAuth 콜백 `?oauth=` 중엔 미룸).
 - 참고: `vite.config.js:66-67`이 플러그인의 `dist` 하드코딩이 throwaway 빌드로 라이브 디렉터리를 오염시켰던 과거 버그(task#191)를 문서화한다.
 
 ### 7.7 동일 엔드포인트 다중 소비처 — **잠재 위험**
@@ -600,7 +600,7 @@ ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한�
 - 정합 확인됨: `KrTop2Section.jsx:52,59,67,96,99,102,106`(억원, `earnings.py:240` `"unit": "억원"`), `Ranking.jsx:47` `krFmt(v / 1e8)`(raw 원, `backend/tests/test_ranking_service.py:51-53` 확인), `ShortSellSection.jsx:21` `wonFmt`(명시적 `/1e8`).
 
 ### 7.9 API base URL 불일치 — **확인된 버그**(조건부)
-- `frontend/src/utils/analytics.js:4`가 bare `fetch('/api/events')`를 쓰고 **`VITE_API_BASE_URL` 프리픽스가 없다**. 다른 4개 소비처(`api.js:4`, `App.jsx:40`, `useAuthBootstrap.js:50`, `LoginPage.jsx:11`)는 붙인다. `VITE_API_BASE_URL`이 절대 origin으로 설정되면(그게 문서화된 용도다) 분석 이벤트가 프론트 origin으로 POST돼 조용히 404한다. 토큰 헤더도 손으로 만들어(`:2,8`) api 클라이언트의 401 인터셉터를 우회한다.
+- `frontend/src/utils/analytics.js:4`가 bare `fetch('/api/events')`를 쓰고 **`VITE_API_BASE_URL` 프리픽스가 없다**. 다른 4개 소비처(`api.js:4`, `App.jsx:41`, `useAuthBootstrap.js:50`, `LoginPage.jsx:11`)는 붙인다. `VITE_API_BASE_URL`이 절대 origin으로 설정되면(그게 문서화된 용도다) 분석 이벤트가 프론트 origin으로 POST돼 조용히 404한다. 토큰 헤더도 손으로 만들어(`:2,8`) api 클라이언트의 401 인터셉터를 우회한다.
 - env 읽기가 `api.js`에서 한 번 export되지 않고 4번 중복된다.
 - `src/`에 하드코딩 API 호스트·localhost 없음. 유일한 절대 URL은 `index.html:45-49`의 폰트 CDN.
 

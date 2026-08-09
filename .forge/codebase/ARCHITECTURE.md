@@ -334,7 +334,9 @@ App()
 
 세션을 없애는 경로 3곳이 모두 `location.replace`를 쓴다(히스토리 엔트리를 남기지 않아 뒤로가기 재진입을 차단) — `App.jsx:doLogout`은 `setSession(null)`, `api.js` 401 인터셉터와 `LoginPage.jsx` 로그인 성공은 `window.location.replace('/')`.
 
-`AppShell`(같은 파일 `:60`)이 셸 레이아웃을 그린다 — PC `Masthead`, 모바일 `.mobile-header`(brand + `GlobalSearch variant="mobile"` + `MobileTopActions` + 테마/로그아웃), `<main className="page-wrap">` 안에 `key={location.pathname}`의 `.anim-fade` 래퍼 + `InstallPrompt` + `<Routes>`, 하단 `MobileNav`.
+`AppShell`(같은 파일 `:65`)이 셸 레이아웃을 그린다 — `useSwUpdateReload(location.pathname)`(`:67`, `hooks/useSwUpdateReload.js`, task#287) 호출 후 PC `Masthead`, 모바일 `.mobile-header`(brand + `GlobalSearch variant="mobile"` + `MobileTopActions` + 테마/로그아웃), `<main className="page-wrap">` 안에 `key={location.pathname}`의 `.anim-fade` 래퍼 + `InstallPrompt` + `<Routes>`, 하단 `MobileNav`.
+
+- **`hooks/useSwUpdateReload.js`** — SW 컨트롤러 교체(`controllerchange`) 후 **다음 라우트 전환 또는 탭 재가시화**에 전체 리로드로 새 번들을 집어온다. `clientsClaim`이 **최초 방문에도** `controllerchange`를 쏘므로 마운트 시점 `hadController` 여부로 최초 설치를 구분해 오발화를 막고, 모달(`body.style.overflow==='hidden'`)·인라인 입력 포커스·OAuth 콜백(`?oauth=`)·`REDIRECTS` 출발지의 내부 리다이렉트 1회를 리로드 대상에서 제외한다.
 
 HTTP는 `frontend/src/api.js` axios 인스턴스 하나: `baseURL = VITE_API_BASE_URL || ''`, 요청 인터셉터가 `Authorization: Bearer`를 붙이고, 응답 인터셉터가 401에서 토큰을 지우고 `replace('/')`. `utils/analytics.js`와 `App.jsx:doLogout`·`LoginPage.jsx`만 raw `fetch`를 쓴다.
 
@@ -350,7 +352,7 @@ HTTP는 `frontend/src/api.js` axios 인스턴스 하나: `baseURL = VITE_API_BAS
 | 구루 | `pages/Guru.jsx` | **로컬 `useState`**. `GuruManagers`·`GuruStats(view=)`·`GuruAllocation` |
 | 포트폴리오 | `pages/Portfolio.jsx` | 로컬 `useState` 2탭(`dash`/`analysis`). 분석탭이 `SectorTab`·`MacroTab`·`Analytics`·`RebalanceTab`·`ExposureTab`를 품는다 |
 
-`ReportsRoute`(`App.jsx:54`)는 `location.state.ticker` 딥링크를 `Reports`에 `initialTicker`로 넘기고 `navKey={location.key}`로 같은 라우트 재네비게이션도 반영한다.
+`ReportsRoute`(`App.jsx:55`)는 `location.state.ticker` 딥링크를 `Reports`에 `initialTicker`로 넘기고 `navKey={location.key}`로 같은 라우트 재네비게이션도 반영한다.
 
 ### 10.3 nav IA 단일 소스 — `frontend/src/navSections.js`
 
@@ -390,11 +392,12 @@ export 4개:
 | 루트 | 셸·전역 위젯 — `Masthead`+`.css`, `MobileNav`, `MobileTopActions`, `GlobalSearch`, `StockSearchBox`, `StockModal`, `PromoteModal`, `Toast`(`ToastProvider`+`useToast`), `Glossary`+`.css`, `InstallPrompt`+`.css`, `PermissionManager`, `PermissionPanel`, `BatchScheduleEditor`, `LoadingSpinner` |
 
 ### 10.5 상태·훅
-전역 상태는 Context 하나(`contexts/AuthContext.jsx` — `menuPermissions`·`role`·`loading`)뿐이고, 나머지는 페이지-로컬 `useState` + 커스텀 훅이다. 훅 **14개**(`hooks/`):
+전역 상태는 Context 하나(`contexts/AuthContext.jsx` — `menuPermissions`·`role`·`loading`)뿐이고, 나머지는 페이지-로컬 `useState` + 커스텀 훅이다. 훅 **16개**(`hooks/`, 지난 판 "14개"는 stale — task#273 `useTrackedStocks`·task#287 `useSwUpdateReload` 누락):
 
 - 인증·부트스트랩: `useAuthBootstrap`, `useBfcacheAuthGuard`, `useAuth`(AuthContext 재수출)
-- 데이터: `usePortfolioData`(`fetchDashboard` 포함), `useReportList`, `useReportFilters`, `useStockManagement`, `useReportGeneration`
+- 데이터: `usePortfolioData`(`fetchDashboard` 포함), `useReportList`, `useReportFilters`, `useStockManagement`, `useReportGeneration`, `useTrackedStocks`(watchlist/holdings 조회 통합, task#266·#273)
 - UI/환경: `useIsMobile`, `useTheme`, `useBodyScrollLock`, `useCountUp`, `useReveal`(`motion.css .reveal`과 짝), `usePriceFlash`
+- 앱 셸 라이프사이클: `useSwUpdateReload`(SW 갱신 리로드 규율, §10.1·§10.8, task#287)
 
 ### 10.6 화면-레벨 규약 두 가지
 - **정직한 표시** — `pages/Settings.jsx:ManualRunButton`이 수동 배치 실행의 **응답 본문을 화면에 표시**한다(`data-testid="run-result"`). `job_runs`가 예외 없는 스킵도 `success`로 기록하므로 "갱신됨"과 "저장 생략·직전값 유지"를 실행이력으로는 가를 수 없기 때문. `isWeak`(`false`/`0`)는 `--warn` 색으로, `ok` 키는 항상 true라 제외. 같은 사고로 `pages/GuruAllocation.jsx`는 error 상태를 빈 상태와 분리하고(`coverageSentence`가 코호트를 실제로 좁혔을 때만 커버리지 문장을 낸다) 추정값 개수(`estimated_count`)·데이터 기준(`periods`/`last_updated`)을 접이식 설명란으로 노출한다.
@@ -406,7 +409,7 @@ export 4개:
 `styles/guru.css`에는 **되돌린 최적화 기록**이 남아 있다(`:158`) — 구루 투자금 탭 행에 `content-visibility`를 적용했다가 되돌렸다(초기 레이아웃을 스크롤로 이연할 뿐이고, `contain-intrinsic-size`는 content-box라 border-box 실측값을 넣으면 문서가 부푼다). 재시도 금지 주석.
 
 ### 10.8 빌드·PWA — `frontend/vite.config.js`
-- `VitePWA`(`registerType: 'autoUpdate'`, `cacheId: portfolion-<BUILD_DATE>`, `skipWaiting`+`clientsClaim`, `navigateFallback: null`). **runtimeCaching이 `/api/`(단 `/api/auth/` 제외)를 NetworkFirst로 가로챈다** — 그래서 Playwright `page.route` 응답 주입은 `serviceWorkers: 'block'` 컨텍스트가 필요하다. 폰트 CDN 2종은 CacheFirst.
+- `VitePWA`(`registerType: 'autoUpdate'`, `cacheId: portfolion-<BUILD_DATE>`, `skipWaiting`+`clientsClaim`, `navigateFallback: null`). **runtimeCaching이 `/api/`(단 `/api/auth/` 제외)를 NetworkFirst로 가로챈다** — 그래서 Playwright `page.route` 응답 주입은 `serviceWorkers: 'block'` 컨텍스트가 필요하다. 폰트 CDN 2종은 CacheFirst. ⚠️ `autoUpdate`는 SW만 갱신하고 앱 자신은 갱신하지 않는다 — 갱신 후 앱 리로드는 `hooks/useSwUpdateReload.js`(§10.1, task#287)가 담당한다.
 - 커스텀 플러그인 `sw-cache-bust`가 `closeBundle`에서 `index.html`의 `registerSW.js`·`manifest.webmanifest`와 `registerSW.js`의 `/sw.js`에 `?<BUILD_DATE>` 쿼리를 붙인다. `configResolved`로 실제 `build.outDir`을 잡아 `--outDir` 빌드가 라이브 `dist`를 오염시키지 않게 한다.
 - `manualChunks(id)` — **함수 형식만**(Vite 8 = rolldown). `recharts`/`/d3-`/`victory-vendor` → `charts`, 그 외 `node_modules` → `vendor`.
 - `test`: vitest + jsdom + `src/test/setup.js`. `server.proxy` `/api` → `localhost:8000`.

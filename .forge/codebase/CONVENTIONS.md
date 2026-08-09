@@ -248,7 +248,7 @@ AST 집계로 docstring 423개 중 **412개가 한글**이다. 영문 docstring 
 - **자동 가드 없음.** `frontend/eslint.config.js`(23줄)에는 `rules` 블록이 아예 없고 `no-console`도
   미설정이며, lint는 CI/훅에 연결돼 있지 않다(§9.8). 관례 + 리뷰 의존.
 - 로그를 아예 안 남기는 침묵 catch는 규약 위반은 아니지만 알아둘 것:
-  `frontend/src/App.jsx:44`(로그아웃 fetch), `frontend/src/utils/analytics.js:11`,
+  `frontend/src/App.jsx:45`(로그아웃 fetch), `frontend/src/utils/analytics.js:11`,
   `frontend/src/hooks/useAuthBootstrap.js:64`, `frontend/src/hooks/useReportGeneration.js:23`,
   `frontend/src/contexts/AuthContext.jsx:23-26`, 각 market/report 섹션의
   `.catch(() => setError(true))`.
@@ -504,7 +504,7 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   (`marketUtils.jsx:19,21,30,37`, `reportUtils.jsx:6,7`).
 - 모션은 `frontend/src/styles/motion.css`. 긴 주석(`:12-17`)이 하드 제약을 담는다 —
   transform `fill: both`가 `position: fixed` 자손을 깨뜨리고, opacity `both`가 모달 z-index를
-  가둔다(그래서 라우트 전환은 transform 없는 `.anim-fade`만 쓴다 — `App.jsx:83-84` 주석).
+  가둔다(그래서 라우트 전환은 transform 없는 `.anim-fade`만 쓴다 — `App.jsx:85-86` 주석).
   `prefers-reduced-motion` 블록 `:62`.
 
 ### 9.3 데이터 fetch
@@ -515,7 +515,7 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   재로그인 후 뒤로가기 재진입을 막는다(주석 `:20`, 회귀
   `frontend/src/test/back-to-login-guard.test.jsx:118`).
   호출은 `/api` prefix를 포함한 전체 경로로 한다(`api.get('/api/market/vix')`).
-- **raw `fetch`는 인증·애널리틱스에만** 쓴다(`frontend/src/App.jsx:40` 로그아웃,
+- **raw `fetch`는 인증·애널리틱스에만** 쓴다(`frontend/src/App.jsx:41` 로그아웃,
   `frontend/src/pages/LoginPage.jsx:43,62`, `frontend/src/hooks/useAuthBootstrap.js:51`,
   `frontend/src/utils/analytics.js:4`) — `api.js`의 401 인터셉터가 로그인 중 리다이렉트를
   일으키기 때문이다. `VITE_API_BASE_URL`을 읽는 곳은 이들 + `api.js`이고 전부 `|| ''` 폴백이다.
@@ -539,7 +539,7 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   `frontend/src/pages/GuruAllocation.test.jsx:230-282`).
 
 ### 9.4 훅·컨텍스트
-- `frontend/src/hooks/` **14개**. 복합 훅은 **args 객체 구조분해**로 받고
+- `frontend/src/hooks/` **16개**(task#273 `useTrackedStocks`·task#287 `useSwUpdateReload` 추가, 지난 판 "14개"는 stale). 복합 훅은 **args 객체 구조분해**로 받고
   (`useReportFilters.js:7`, `useStockManagement.js:7`, `useReportGeneration.js:5`),
   **파생 훅은 재fetch하지 않는다**(헤더 주석이 명시 — `useReportFilters.js:4`,
   `useStockManagement.js:5-6`). 타이머·옵저버는 항상 cleanup(`usePriceFlash.js:27`,
@@ -552,14 +552,14 @@ pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 
   `location.replace('/')`).
 - 컨텍스트는 2개뿐: `frontend/src/contexts/AuthContext.jsx`(`{role, menuPermissions, loading}`,
   실패 시 `role:'user'`로 degrade하며 **로그 없음** `:23-26`)와 `components/Toast.jsx`.
-  중첩 순서는 `frontend/src/App.jsx:134-144` ToastProvider → AuthProvider → BrowserRouter.
+  중첩 순서는 `frontend/src/App.jsx:136-146` ToastProvider → AuthProvider → BrowserRouter.
   Redux/Zustand/React Query 없음 — 서버 상태는 훅/페이지의 `useState`에 있다.
 
 ### 9.5 라우팅 — nav IA는 `navSections.js` 단일 소스
-- 라우트는 `frontend/src/App.jsx:86-107`. **리다이렉트는 공유 상수로 추출**돼 있다:
-  `frontend/src/routes.js:2-7` `REDIRECTS`를 `App.jsx:87-89`와
+- 라우트는 `frontend/src/App.jsx:88-109`. **리다이렉트는 공유 상수로 추출**돼 있다:
+  `frontend/src/routes.js:2-7` `REDIRECTS`를 `App.jsx:89-91`와
   `frontend/src/test/route-redirects.test.jsx:4`가 함께 읽는다.
-  `*`(404) 라우트는 없다. 인증 게이트는 라우트가 아니라 라우터 앞 분기(`App.jsx:134-139`).
+  `*`(404) 라우트는 없다. 인증 게이트는 라우트가 아니라 라우터 앞 분기(`App.jsx:136-141`).
 - **마스트헤드 IA 5섹션의 경로·라벨 목록은 `frontend/src/navSections.js` 단일 소스다 —
   탭 추가·개명·삭제는 거기 한 곳만 고친다.** export는 `NAV_SECTIONS`(섹션 5개 ×
   `items[{to, label, evt, match?}]`) + 매칭 헬퍼 `matchesItem`/`matchesSection`(`:48,50`,

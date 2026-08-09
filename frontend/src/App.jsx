@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import useTheme from './hooks/useTheme'
 import useBfcacheAuthGuard from './hooks/useBfcacheAuthGuard'
+import useSwUpdateReload from './hooks/useSwUpdateReload'
 import useAuthBootstrap from './hooks/useAuthBootstrap'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
@@ -63,6 +64,7 @@ function ReportsRoute() {
 // BrowserRouter 내부 셸 — location.pathname을 라우트 전환 페이드업 key로 쓰려면 Router 컨텍스트가 필요하다.
 function AppShell({ theme, setTheme, setSession }) {
   const location = useLocation()
+  useSwUpdateReload(location.pathname)
   return (
     <div className="app-pc">
       <Masthead theme={theme} setTheme={setTheme} onLogout={() => doLogout(setSession)} />

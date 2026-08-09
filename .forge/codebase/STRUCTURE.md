@@ -142,7 +142,7 @@ frontend/
     ├── utils.js             fmtPrice 하나만 (KR ₩ / US $)
     ├── pages/               40 파일 (§3.1)
     ├── components/          루트 위젯 14 + 6 서브디렉터리 (§3.2)
-    ├── hooks/               14 훅 + 병치 테스트 3 (§3.3)
+    ├── hooks/               16 훅 + 병치 테스트 4 (§3.3)
     ├── contexts/            AuthContext.jsx
     ├── styles/              tokens.css pc.css mobile.css guru.css motion.css
     ├── utils/               analytics.js guruName.js marketHours.js oauthHistory.js priceFlash.js pwa.js (+ 테스트 2)
@@ -186,10 +186,10 @@ frontend/
 
 `StockActions.jsx`는 액션 버튼(수정·승격·삭제)의 **단일 소유처**다 — `StockCard`(그리드)와 `TickerListItem`(사이드바)이 `layout="card"|"list"`로 같은 컴포넌트를 쓴다.
 
-### 3.3 `frontend/src/hooks/` — 14 훅
-`useAuth.js`(AuthContext 재수출) **`useAuthBootstrap.js`** **`useBfcacheAuthGuard.js`** `usePortfolioData.js` `useReportList.js` `useReportFilters.js` `useStockManagement.js` `useReportGeneration.js` `useIsMobile.js` `useTheme.js` `useBodyScrollLock.js` `useCountUp.js` `useReveal.js` `usePriceFlash.js`
+### 3.3 `frontend/src/hooks/` — 16 훅
+`useAuth.js`(AuthContext 재수출) **`useAuthBootstrap.js`** **`useBfcacheAuthGuard.js`** `usePortfolioData.js` `useReportList.js` `useReportFilters.js` `useStockManagement.js` `useReportGeneration.js` `useTrackedStocks.js` `useIsMobile.js` `useTheme.js` `useBodyScrollLock.js` `useCountUp.js` `useReveal.js` `usePriceFlash.js` **`useSwUpdateReload.js`**(SW 갱신 리로드, task#287)
 
-병치 테스트 3: `usePortfolioData.test.js` `useReportFilters.test.js` `useStockManagement.test.js`. `useAuthBootstrap`·`useBfcacheAuthGuard`의 테스트는 `src/test/auth-bootstrap.test.jsx`·`back-to-login-guard.test.jsx`에 있다(훅 단독이 아니라 부트스트랩 시나리오라서).
+병치 테스트 4: `usePortfolioData.test.js` `useReportFilters.test.js` `useStockManagement.test.js` `useSwUpdateReload.test.js`. `useAuthBootstrap`·`useBfcacheAuthGuard`의 테스트는 `src/test/auth-bootstrap.test.jsx`·`back-to-login-guard.test.jsx`에 있다(훅 단독이 아니라 부트스트랩 시나리오라서).
 
 ### 3.4 `frontend/src/test/`
 `setup.js`(vitest setup) + 통합 테스트 11:
@@ -355,6 +355,7 @@ frontend/
 | 프론트 라우트 정의 | `frontend/src/App.jsx` (`AppShell`) |
 | 인증 부트스트랩(OAuth 분기) | `frontend/src/hooks/useAuthBootstrap.js` |
 | bfcache 인증 가드 | `frontend/src/hooks/useBfcacheAuthGuard.js` |
+| SW 갱신 리로드 규율 | `frontend/src/hooks/useSwUpdateReload.js` |
 | OAuth 히스토리 되감기 | `frontend/src/utils/oauthHistory.js` |
 | 구 URL 리다이렉트 | `frontend/src/routes.js` |
 | **nav 5섹션 경로·라벨 정본** | `frontend/src/navSections.js` |

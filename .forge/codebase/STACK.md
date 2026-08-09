@@ -176,6 +176,10 @@ KST는 2026-07-30). KR 시장-날짜 판정은 bare `date.today()` 대신
   `charts` 청크, 나머지 `node_modules` → `vendor`.
 - **PWA** (`VitePWA`): `registerType: 'autoUpdate'`, `skipWaiting`/`clientsClaim` true,
   `navigateFallback: null`. `cacheId`는 빌드시각(`portfolion-<YYYYMMDDHHmmss>`).
+  ⚠️ **`autoUpdate`가 이름과 달리 SW만 갱신하고 앱은 갱신하지 않는다** — `skipWaiting`+`clientsClaim`으로
+  새 SW가 열린 탭을 즉시 claim하지만 React 앱 자신은 리로드되지 않아 무기한 옛 번들을 실행한다.
+  `frontend/src/hooks/useSwUpdateReload.js`(task#287, CONCERNS §7.6)가 `controllerchange` 후
+  다음 라우트 전환·탭 재가시화 시점에 `window.location.reload()`로 닫는다.
 - **⚠️ 서비스워커가 `/api/*`를 가로챈다** — `runtimeCaching`의 마지막 규칙이
   `/api/`(단 `/api/auth/` 제외)를 `NetworkFirst`(타임아웃 10s, 5분·50엔트리)로 캐시한다.
   그래서 Playwright `page.route` 응답 인터셉트가 안 먹고, UAT 컨텍스트는
