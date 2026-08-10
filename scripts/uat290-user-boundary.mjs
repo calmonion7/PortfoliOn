@@ -58,6 +58,12 @@ fs.mkdirSync(OUT, { recursive: true });
 const EMAIL = 'test@portfolion.com';
 const PASSWORD = 'test1234';
 
+// 쓰기 감사(ⓗ)의 **정의역**에서 제외 — `/cdn-cgi/rum?`은 Cloudflare 엣지가 주입하는 RUM 비콘이라
+// 우리 앱의 요청이 아니다(`grep -rn 'cdn-cgi' frontend/src backend` = 0건으로 확정). 1차 실행에서
+// 이걸 세서 정상 구현이 2건 거짓 FAIL했다 — 임계 완화가 아니라 판정 *범위* 교정이다(가토 ⑧ⓒ·ⓝ:
+// FAIL의 성분을 분해했더니 3건 전부 이 비콘이었다). 앱 오리진 밖으로 넓게 열지 않고 이 경로만 뺀다.
+const EDGE_BEACON = /\/cdn-cgi\//;
+
 const AX = {
   pre: 'ⓟ 전제-비admin계정',
   ai: 'ⓐ-identity',
@@ -249,7 +255,7 @@ async function runAxisB() {
   const nonGetWrites = [];
   ctx.on('request', (req) => {
     const m = req.method();
-    if (m !== 'GET' && m !== 'HEAD') nonGetWrites.push(`${m} ${req.url()}`);
+    if (m !== 'GET' && m !== 'HEAD' && !EDGE_BEACON.test(req.url())) nonGetWrites.push(`${m} ${req.url()}`);
   });
   ctx.on('response', (res) => {
     const u = res.url();
@@ -376,7 +382,7 @@ async function runAxisC() {
   const nonGetWrites = [];
   ctx.on('request', (req) => {
     const m = req.method();
-    if (m !== 'GET' && m !== 'HEAD') nonGetWrites.push(`${m} ${req.url()}`);
+    if (m !== 'GET' && m !== 'HEAD' && !EDGE_BEACON.test(req.url())) nonGetWrites.push(`${m} ${req.url()}`);
   });
   ctx.on('response', (res) => {
     if (res.request().method() === 'DELETE' && /\/api\/stocks\/dashboard\/cache/.test(res.url())) {
