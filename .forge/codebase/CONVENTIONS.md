@@ -1,717 +1,812 @@
 ---
-last_mapped_commit: 47521121f10ac1c057fe9cf8ed5fc43ab5ca596c
-mapped: 2026-07-31
+last_mapped_commit: 20dd46eb829b05025af793b010dfe4efe2925a7d
+mapped: 2026-08-10
 ---
 
 # CONVENTIONS — 코드 규약 지도
 
-이 문서는 **구현 사실**만 담는다(도메인 용어 정의는 `CONTEXT.md` 소관). 각 규약은 가능하면
-**그 규약을 강제하는 파일**과 함께 적는다. 자동 가드가 없는 규약은 그렇게 명기한다.
+이 문서는 **구현 사실**만 담는다(도메인 용어 정의는 `.forge/CONTEXT.md` 소관). 각 규약은 가능하면
+**그 규약을 강제하는 파일**과 함께 적고, 자동 가드가 없는 규약은 그렇게 명기한다.
 테스트/가드의 실행 방법·모킹 패턴은 형제 문서 `.forge/codebase/TESTING.md`를 본다.
 
-섹션 번호는 안정적이다 — 코드·계획 문서가 `CONVENTIONS §4`(로깅), `§4.1`(방출 메커니즘),
-`§4.3`(마커 포맷)을 직접 인용한다(`backend/tests/test_no_print.py:1,35`, `backend/main.py:22`).
-번호를 재배열하지 말 것.
+⚠️ **섹션 번호는 안정적이다 — 재배열하지 말 것.** 코드·프로브·계획 문서가 이 번호를 직접 인용한다:
+`backend/tests/test_no_print.py`(docstring·assert 메시지에서 `CONVENTIONS §4`),
+`backend/tests/test_tech_reports_service.py`(`CONVENTIONS §7`), `backend/main.py`의
+`_configure_logging` docstring(`CONVENTIONS.md 참조`), `.forge/quick/LOG.md`(`§4.3`),
+`.forge/done/2026-08-04-nan-defense-3fix/`(`§5.2`).
+
+⚠️ **파일을 인용할 때 줄번호 대신 심볼명을 쓴다.** 이 저장소는 줄번호 참조 drift가 반복 문제였고
+(`.forge/done/260810-121024-oauth-boot-timing-breakdown/run.md` 8번 항목: 선재 drift 14건),
+시프트는 부위별로 균일하지 않아 산술 보정이 원리적으로 불가능하다. 이 문서는 줄번호를 쓰지 않는다.
 
 ---
 
 ## §1 핵심 원칙
 
 ### 1.1 표면 보존 리팩터 (ADR-0017)
-거대 파일을 패키지로 쪼갤 때 `__init__.py`가 **공개 + 외부참조 private 심볼 전체**를
-re-export해 호출 표면을 보존한다. 근거·규칙 6항은 `.forge/adr/0017-god-file-split-via-package-reexport.md:15-37`.
-핵심 제약 2가지: **`from .sub import *` 금지**(underscore private을 건너뛴다 — `:37`),
-**서브모듈은 패키지 루트가 아니라 leaf 모듈에서 공유 헬퍼를 import**(부분 초기화 순환 회피).
+
+god-file을 패키지로 쪼갤 때 **호출부를 한 줄도 바꾸지 않는다.** 패키지 `__init__.py`가
+서브모듈의 공개 심볼 + *외부에서 참조되는 private 심볼*까지 루트로 re-export해,
+`from services.market import X` 와 `from services import market; market.X` 두 접근을 모두 보존한다.
+
+적용된 4패키지 — `backend/services/market/`, `backend/services/storage/`,
+`backend/scheduler/`, `backend/services/market_indicators/`.
+
+`backend/services/storage/__init__.py`의 주석이 이유를 명시한다: 직접 심볼 import는 0건이지만
+**외부 소비처가 모듈 속성(`storage.X`)으로 조회**하므로 모든 심볼이 패키지 루트에 존재해야 한다.
+그래서 `_ANALYST_KEYS`·`_parse_json_field` 같은 underscore 심볼까지 re-export 목록에 들어간다.
+
+`backend/scheduler/__init__.py`는 그 함정을 한 줄로 적어 뒀다 — **`import *`는 underscore를
+건너뛰므로** `_generate_kr`·`_JOB_FUNCS` 등을 **명시 나열**해야 한다.
 
 ### 1.2 additive 우선
-엔드포인트 응답을 배열→객체처럼 **비-additive**로 바꾸면 프론트 소비처를 전수 감사해야 한다
-(`grep -rn '<경로>' frontend/src/`). 가능하면 필드 추가로 처리한다. additive 추가도
-공짜가 아니다 — 호출 *시퀀스*가 늘어나 `mock.call_args`(마지막 호출)를 단언하는 기존
-테스트를 오염시킨다(TESTING.md §4.2). 요청 본문의 additive 필드도 마찬가지로
-"구 판 호환"을 명시한다(`backend/routers/analyst_reports.py:36`
-`metrics: List[PointMetric] = Field(default_factory=list, max_length=4)  # additive — 구 판 호환`).
+
+응답·본문 스키마를 바꿀 땐 **필드 추가**를 우선하고, 형태 변경(배열→객체 등)은 최후수단이다.
+`backend/routers/tech_reports.py`의 `Market.estimates` 주석이 그 관례를 명시한다("선택·additive").
+
+additive에도 두 종류의 파장이 있다:
+
+- **소비처 파장** — 응답 형태를 바꾸면 그 엔드포인트를 fetch하는 *모든* 프론트 소비처를
+  `grep -rn '<엔드포인트 경로>' frontend/src/`로 전수 감사해야 한다(독립 fetcher가 훅과 별개로 존재).
+- **테스트 파장** — additive는 응답 shape뿐 아니라 **외부 호출 시퀀스**도 늘린다.
+  `mock.call_args`(마지막 호출)를 단언하는 기존 테스트가 조용히 오염되므로,
+  단언을 `call_args_list[i].kwargs`로 옮기거나 입력이 비면 신규 호출을 생략한다(`TESTING.md §4`).
 
 ### 1.3 wrong < missing — 빈 결과가 직전 양호값을 덮지 않는다
-외부 fetch가 빈 결과를 주면 **저장을 생략하고 직전값을 유지**한다. 틀린 값이 남는 것보다
-없는 게 낫다. **기본형은 "저장 직전 한 지점의 끝 가드"가 아니라 소스-폴백**이다:
 
-- 소스-폴백(구조적으로 안전) — `backend/services/market_indicators/fx.py:36-40`(fetch 실패 시
-  `stored_history`를 담아 반환), `backend/services/market_indicators/cache.py:69-72`
-  (`:69` `_merge_history(prev, [])`가 prev를 그대로 반환), `backend/services/dividends.py:389`
-  (`replace_schedule(ticker, fetch_dividend_schedule(...))` — **진입 전에** fetch를 평가하므로
-  fetch가 던지면 replace 자체가 안 돌아간다. 근거 docstring `:232-233`).
-- 끝 가드를 쓸 수밖에 없으면 **실패 클래스 3종을 모두** 물어야 한다:
-  (a) **예외**(try/except) (b) **성공-but-빈응답**(`rt_cd=0`·HTTP 200 with 0 items — 예외 가드를
-  그냥 통과한다) (c) **부분 페이로드**(한 payload의 일부 필드만 가드하면 나머지가 새어나간다 —
-  `backend/services/kr_sector_service.py`가 `sectors`만 보고 같은 payload의 `index`를 빠뜨린 사례.
-  대응은 `index = build_sector_index() or load_sector_index()`처럼 필드별 직전값 보존).
-- **delete-rewrite(replace) 저장은 파괴적 변형**이다 — fetch 실패를 빈 결과로 삼키면 저장 생략이
-  아니라 `DELETE`로 직전값을 지운다. fetch 함수가 예외를 전파해 호출측이 replace를 통째
-  스킵하게 하고, delete+insert는 단일 트랜잭션으로 묶는다
-  (`backend/services/recommendation/store.py:15-58` `replace_recommendations`).
-- 저장을 스킵했으면 **admin 응답·로그가 "갱신됨"과 "생략·직전값 유지"를 구분**해야 관측이 성립한다
-  (`stale` 마커 + `saved` 플래그 — `backend/services/market_indicators/exports.py`,
-  `backend/routers/market_indicators.py` refresh-monthly). `job_runs`는 본문이 예외를 전파할 때만
-  `failed`를 기록하므로 스킵을 초록으로 남긴다(`backend/services/job_runs.py:17-31` docstring).
-  **그 응답을 화면에 흘려야** 사용자가 구분할 수 있다 — `frontend/src/pages/Settings.jsx:84`
-  `ManualRunButton`이 응답 dict를 `key: value`로 렌더하고 `saved=false`·`0`을 `--warn`으로 약하게
-  표시한다(`ok`는 항상 true라 숨긴다). 회귀 가드 `frontend/src/pages/Settings.test.jsx`.
+**틀린 값보다 없는 값이 낫다.** 외부 fetch가 실패했을 때 축소·공백 결과를 저장소에 박제하지 않는다.
 
-회귀 가드: `backend/tests/test_empty_result_overwrite_guards.py`,
-`backend/tests/test_empty_result_guards_exports_krsector.py`,
-`backend/tests/test_rankings_empty_guard.py`, `backend/tests/test_us_supply_empty_guard.py`,
-`backend/tests/test_fx_partial_failure.py`.
+**가드의 기본형은 "저장 직전 한 지점"이 아니라 *소스-폴백*이다.** 구조적으로 안전한 3형태:
+
+| 파일·심볼 | 방식 |
+|---|---|
+| `backend/services/market_indicators/fx.py` `_fetch_fx` | fetch 실패 시 `stored_history`를 담아 **반환**한다 |
+| `backend/services/market_indicators/cache.py` `_merge_history` | `_merge_history(prev, [])`는 **prev를 그대로** 돌려준다 |
+| `backend/services/dividends.py` | `fetch_dividend_schedule(...)`를 `replace_schedule` **진입 전에** 평가한다 |
+
+빈 결과가 각 필드에 닿기 전에 이미 직전값으로 채워져 있으므로, 마지막 저장이 무엇을 쓰든 잃을 게 없다.
+
+**끝 가드를 쓸 수밖에 없으면 실패 클래스 3종을 모두 물어야 한다:**
+
+1. **예외** — `try/except`
+2. **성공-but-빈응답** — 외부 API가 `rt_cd=0`/200을 주면서 0건. 예외 가드를 그냥 통과한다.
+   `backend/services/market_indicators/kospi_futures.py`가 값 수준 가드(price None·빈 history면
+   fetch 실패 취급)를 두는 이유.
+3. **부분 페이로드** — 한 payload의 *일부 필드*만 가드. `backend/services/kr_sector_service.py`가
+   `sectors`만 보고 같은 payload의 `index`를 빠뜨려 보유→업종 매핑을 지운 사례.
+
+**처방도 집합의 성격으로 3갈래다:**
+
+| 집합 성격 | 처방 | 구현 |
+|---|---|---|
+| 고정 명명 집합의 합(M7 7종·KR Top2 2종) | **완전성** 요구 | `backend/services/market_indicators/earnings.py` |
+| 유동적 대규모 집합(S&P500 나머지 ~490종) | **커버리지 임계** | 같은 파일 `_REST_MIN_COVERAGE = 0.5` |
+| 독립 항목(구루 매니저·원자재 심볼·업종) | **실패분만 개별 백필** | `backend/services/storage/schedule.py` `save_guru_managers` |
+
+`if not X:` all-or-nothing 게이트는 셋 중 어디에도 해당하지 않는다 — 유동 집합에 그것만 걸면
+83명 중 40명 성공을 "비어있지 않음"으로 통과시켜 43명을 소멸시킨다(`save_guru_managers` docstring).
+
+**⚠️ 판정 순서: 전량실패 판정은 반드시 백필 *앞*이다.** 뒤로 가면 백필이 목록을 채워 그 분기가
+영영 발동하지 않는다. `save_guru_managers`가 이 함정을 주석으로 못박아 두었고,
+`backend/services/market_indicators/commodities.py`의 `get_treasury()`가 반대 순서(백필 → 판정)로
+남아 있어 그 가드가 사실상 죽어 있다 — **"동형 이식"의 참조 구현으로 `get_treasury`를 고르지 말 것**
+(형제 `get_commodities()`가 올바른 순서다).
+
+**delete-rewrite(replace) 갱신은 더 위험하다** — 저장을 `DELETE+INSERT`로 하는 store에서
+fetch 실패를 빈 결과로 삼키면 save 생략이 아니라 **직전 양호값 파괴**가 된다. fetch 함수는
+예외를 삼키지 말고 *전파*해 호출측이 replace를 통째 스킵하게 한다.
+
+**저장을 스킵할 땐 로그·응답이 "갱신됨"과 "생략·직전값 유지"를 구분해야 한다.**
+`backend/services/job_runs.py`의 `record`는 본문이 예외를 *전파*할 때만 `failed`로 기록하므로,
+스킵은 그냥 두면 초록으로 남는다 → `run.set_status("skipped"|"partial", err)`로 직접 말할 것.
 
 ### 1.3.1 `wrong < missing`은 면제부가 아니다
-이 교리는 "**틀린 값** vs **없는 값**"의 선택 규칙이고, "**정상값을 지우기** vs 보여주기"에는
-적용되지 않는다. 지표가 통째 사라지면 규칙상 합격이어도 사용자 가치로는 손실이다.
-실사례: 피어 멀티플 이상치 가드가 leave-one-out 표본을 쓰던 판(task#248)에서
-peer 3개일 때 정상 peer가 결측돼 **PBR 비교 칩이 통째 사라졌다**. 그 한계는 셀프 리뷰가
-"과보수적일 뿐 틀리지 않다 · 실측 005930은 peer 4개라 해당 없음"으로 자진 기록해두고 미뤘고,
-경쟁사 목록에서 1종목이 빠지자 4일 뒤 라이브에서 발동했다(task#249로 재수정, ADR-0030).
 
-실천 3가지:
-- 심각도는 `wrong<missing` 합격 여부가 아니라 **"그 케이스에서 사용자가 무엇을 잃는가"** 로 판정.
-- 트리거가 **사용자가 바꿀 수 있는 데이터**(경쟁사 목록·보유 종목 등)면 "지금 실측엔 해당 없음"을
-  면제 근거로 쓰지 않는다.
-- 한계를 테스트로 못박을 때 **"의도된 트레이드오프"인지 "미룬 결함"인지 이름·주석에 구분**해 남긴다
-  (`backend/tests/test_report_valuation_multiples.py:319-327`이 판정축 교체 경위를 그렇게 적어둔다).
+이 교리는 "**틀린 값을 보여주기 vs 안 보여주기**"의 선택 규칙이고, "**정상값을 지우기 vs
+보여주기**"에는 적용되지 않는다. 지표가 통째 사라지면 규칙상 합격이어도 사용자 가치로는 손실이다.
+
+셀프 리뷰가 한계를 찾으면 `wrong < missing` 합격 여부가 아니라 **"그 케이스에서 사용자가 무엇을
+잃는가"**로 심각도를 판정한다. 그리고 트리거가 **사용자가 바꿀 수 있는 데이터**(경쟁사 목록·보유
+종목 수 등)이면 "실측엔 해당 없음"을 면제 근거로 쓰지 않는다. 실사례: 피어 멀티플 이상치 가드가
+peer 3개일 때 정상 peer를 결측시키는 한계를 알고도 "과보수적일 뿐 틀리지 않다"로 미뤘다가,
+사용자가 경쟁사 하나를 빼자 PBR 비교 칩이 통째 사라졌다(ADR-0030).
+
+한계를 테스트로 못박을 때는 **"의도된 트레이드오프"인지 "미룬 결함"인지 이름·주석에 구분**해 남긴다.
 
 ### 1.4 graceful degradation — 부가기능은 본문을 깨뜨리지 않는다
-계측·캐시·부가 read는 실패해도 주 경로를 중단시키지 않는다. 대표 구현:
 
-- `backend/services/job_runs.py` — DB 접촉 전부를 개별 try/except로 감싸고 `run_id=None`을
-  센티널로 쓴다(`:19` *"계측은 관측 전용 — 본문(배치)을 절대 깨뜨리지 않는다"*).
-- `backend/main.py:60-238` `_migrate()` — 테이블 단위로 try/except, 실패는
-  `logger.warning(f"[Migrate] ...")`만 하고 기동을 계속한다(마커 `[Migrate]` 18건).
-- `backend/routers/stocks.py` `_build_all` — 카드당 `_safe` 래핑으로 per-card 실패가 전체 500이
-  되지 않게 한다(`_minimal_card` 폴백).
+계측·캐시 워밍·enrichment 같은 부가 경로는 실패해도 본문을 통과시킨다.
 
-단, **graceful이 "조용히"여서는 안 된다** — §4.2의 warning 레벨로 반드시 담화를 남긴다.
-broad `except Exception: pass`는 기능이 조용히 꺼지는 원인이며, 현재 잔존은
-`backend/middleware/event_tracker.py:48-49,70-71` 등 소수다.
+- `backend/services/job_runs.py` `record` — "계측은 관측 전용, 본문(배치)을 절대 깨뜨리지 않는다".
+  enter INSERT 실패 시 경고만 남기고 `run_id=None` 센티넬로 본문을 그대로 실행하며,
+  종료 UPDATE 실패도 삼킨다. `recent`/`recent_map`은 예외 시 `[]`/빈 map을 돌려준다.
+- `backend/main.py` `_migrate` — DDL마다 개별 `try/except` + `logger.warning("[Migrate] …")`.
+  하나가 실패해도 나머지 마이그레이션과 기동이 진행된다.
+- `backend/main.py` `_warm_market_cache` — 데몬 스레드에서 bare `except: pass`.
+  (앱 전체에서 몇 안 되는 bare pass. 신규 코드에는 쓰지 말 것 — §4.2)
+- `backend/routers/stocks.py`의 대시보드 빌드 — 카드당 `_safe`가 예외를 잡아 `_minimal_card`로
+  폴백하고 `logger.warning("[Dashboard] … 최소카드 폴백: …")`을 남긴다.
+  불변식은 **holdings=N → 항상 N카드**(500-to-empty 금지).
+
+⚠️ **폴백은 근본원인을 마스킹한다.** `_minimal_card` 폴백은 500도 안 내고 토스트도 없이
+enrichment만 조용히 사라지므로, 증상이 보이면 컨테이너 로그의 `최소카드 폴백` 마커가 유일한 단서다.
+그래서 §4의 마커 규약이 이 관용구와 짝을 이룬다.
+
+⚠️ **무거운 복구 동작을 가벼운 것으로 바꿀 땐 "그게 부수적으로 무엇을 고쳐주고 있었나"를 먼저 묻는다.**
+전체 리로드·프로세스 재시작·캐시 전량 무효화는 겨냥한 문제 하나만 고치지 않고 그 시점의 *모든*
+상태 결함을 함께 리셋한다. bfcache 인증 가드의 `location.replace('/')`를 in-place `setSession`
+뒤집기로 바꾸자(ADR-0035), 리로드가 매번 세탁하던 `useAuthBootstrap`의 `authLoading` 데드엔드가
+처음으로 드러났다. 반대로 **덮개를 새로 넣을 때는 "그 덮개가 언제·누구에 의해 걷히는가"를 센다** —
+`frontend/index.html`의 정적 스플래시는 React `createRoot().render()` 첫 커밋에서 지워지므로
+`frontend/src/App.jsx`의 early-return과 `frontend/src/oauthSplash.js`가 인계를 이어받아야 한다.
 
 ### 1.5 중복 제거·단일 소스화 전에 "겸직 필드"를 센다
-필드를 합치는 리팩터에서는 각 필드의 소비처를 grep해 **역할 수**를 먼저 센다.
-`frontend/src/components/MobileNav.jsx`의 `key`는 **권한 필터**(`menuPermissions.includes`) 겸
-**이벤트명 소스**(`trackEvent('nav_' + key)`)로 두 역할을 겸직 중이었고, 공유 모듈에서
-자연스러워 보이는 `section.key`로 파생했다면 이벤트명이 바뀌어 백엔드
-`backend/routers/events.py`의 `VALID_EVENTS` 화이트리스트에서 **조용히 탈락**했을 것이다
-(요청은 성공하고 이벤트만 사라진다). 실제 구현은 `section.perm`으로 파생해 5탭 전부
-기존 이벤트명을 바이트 동일하게 유지했다. **vitest·빌드·라이브 프로브 어느 것도 이걸 안 잡는다**
-— 이벤트명을 단언하는 테스트가 없고 화면은 정상으로 보인다. 파생 소스는 "이름이 비슷한 것"이
-아니라 **소비처가 요구하는 값**으로 고른다. 같은 가족: `batch_registry`의 `source`(§8) vs
-`usage`, `tickers.name` vs `snapshots.data.name` dual-source.
+
+같아 보이는 필드를 합치기 전에 **그 필드가 겸하던 역할 수**를 소비처 grep으로 센다.
+
+관측된 겸직 3쌍:
+
+- `frontend/src/navSections.js` — 섹션의 `key`(React key·아이콘 매핑) vs `perm`(권한 필터)
+  vs 항목의 `evt`(analytics 이벤트명). `MobileNav`가 예전에 `key` 하나로 권한 필터와 이벤트명을
+  겸했고, 단일 소스화 때 `section.key`를 골랐으면 이벤트명이 바뀌어 백엔드
+  `backend/routers/events.py`의 `VALID_EVENTS` 화이트리스트에서 조용히 탈락했을 자리다
+  (요청은 성공하고 이벤트만 사라진다). 실제 파생 소스는 `section.perm`이다.
+- `backend/services/batch_registry.py` — `source`(데이터 fetch 출처) vs `usage`(소비 UI).
+  방향이 반대인데 이름이 비슷하다.
+- `tickers.name`(공유 마스터) vs `snapshots.data.name`(리포트 생성 시 박제) — dual-source.
+
+파생 소스는 "이름이 비슷한 것"이 아니라 **소비처가 요구하는 값**으로 고른다.
+이 클래스는 vitest·빌드·라이브 프로브 어느 것도 안 잡는다(화면은 정상으로 보인다).
+
+같은 "세라" 가족의 다른 표면 — **레이스 가드를 한 함수에 넣으면 그 훅·모듈의 *형제 비동기
+경로*를 전수 센다.** `frontend/src/pages/Ranking.jsx`의 `fetchPage`에 세대 가드를 넣을 때
+`frontend/src/hooks/useTrackedStocks.js`의 `reload()`에 같은 결함이 남아 있었다.
 
 ---
 
 ## §2 백엔드 모듈·패키지 구조
 
 ### 2.1 `__init__.py` re-export 3스타일
-| 스타일 | 예 | 특징 |
+
+| 스타일 | 패키지 | 형태 |
 |---|---|---|
-| A. 표면 보존 re-export(`__all__` 없음) | `backend/services/market/__init__.py:8-39`, `backend/services/storage/__init__.py:1-44`, `backend/scheduler/__init__.py:3-60` | 헤더 주석에 ADR 인용. private 심볼까지 명시 named import. `scheduler/__init__.py:10-50`은 private 잡 함수 + `_JOB_FUNCS`를 열거 |
-| B. `__all__` 선언형 | `backend/services/market_indicators/__init__.py:13-25`, `backend/services/recommendation/__init__.py:16-24` | 백엔드 전체에서 `__all__`을 쓰는 파일은 이 2개뿐 |
-| C. re-export 없음(경계 문서용 1줄) | `backend/services/kiwoom/__init__.py:1`, `backend/services/kis/__init__.py:1` | 소비처가 서브모듈을 직접 import하며 함수 내부 지연 import + 짧은 alias(`from services.kiwoom import client, quote as kq` — `backend/services/market/kr.py:74`) |
+| **전 심볼 평탄 re-export**(표면 보존형, ADR-0017) | `services/storage/`, `services/market/` | private 포함 전 심볼 나열, `__all__` 없음 |
+| **공개 API + `__all__`** | `services/recommendation/`, `services/market_indicators/` | 소비처가 쓰는 것만 |
+| **명시 나열(underscore 포함)** | `scheduler/` | `import *`가 underscore를 건너뛰므로 개별 나열 |
 
-`backend/services/__init__.py`·`routers/__init__.py`·`middleware/__init__.py`는 0바이트다.
-leaf 공유 상태는 별도 모듈로 뺀다 — `backend/scheduler/_state.py:5`(스케줄러 싱글톤),
-`backend/services/market/format.py:1-14`(`_SECTOR_NORM`/`_norm_sector`).
+`services/market/__init__.py`와 `services/storage/__init__.py`는 파일 상단 주석에 그 이유를 적어 둔다.
+`services/market_indicators/__init__.py`는 `__all__`에 `_fetch_and_save_*`·`_mc_delete`·`_cache`처럼
+**배치와 테스트가 쓰는 private**도 명시적으로 포함한다.
 
-### 2.2 지연 import
-무겁거나 순환 위험이 있는 의존은 **함수 안에서** import한다
-(`backend/routers/report.py:115,331,342,...`, `backend/main.py:53,63,257-258`,
-`backend/scheduler/jobs.py:18,39,55,...`, `backend/services/market_indicators/cache.py:44,86`).
-→ 테스트 patch 타깃이 달라진다(TESTING.md §4.2).
+### 2.2 지연 import (함수 안 import)
+
+순환참조 회피와 기동 비용 절감을 위해 **함수 본문 안에서 import**하는 관용구가 흔하다.
+
+- `backend/services/cache.py` `invalidate_portfolio_caches` — `from routers import calendar as
+  calendar_router`(services→routers 역방향 순환 회피).
+- `backend/main.py` `_migrate` — 각 `try` 블록 안에서 `from services.db import execute`.
+- `backend/services/market_indicators/cache.py` `_mc_save` — 함수 안에서 `datetime` import.
+- `backend/services/storage/names.py` 계열 — storage→cache 무효화가 지연 import로 순환을 끊는다.
+
+⚠️ **지연 import는 테스트 patch 타깃을 바꾼다** — 모듈 상단 import면 `patch("소비모듈.심볼")`이
+먹지만, 함수 안 import면 원본 모듈(`patch("services.db.execute")`)을 잡아야 한다(`TESTING.md §4`).
 
 ### 2.3 모듈 레벨 import + dotted 호출 (patch 가능성 확보)
-라우터는 `from services import storage`처럼 모듈을 잡고 `storage.get_holdings(...)`로 부른다
-(`backend/routers/portfolio.py:6-13`, `backend/routers/watchlist.py:4-7`). alias는
-`_svc`/`_pipeline` 접미로 통일(`market as market_svc`, `cache as cache_svc`,
-`consensus_pipeline as _pipeline`). 그래서 테스트가
-`patch("routers.portfolio.storage.get_holdings")`로 끊을 수 있다.
+
+라우터는 보통 **모듈을 import해서 dotted로 호출**한다(`from services import storage` →
+`storage.get_full_portfolio(...)`). 그래야 테스트가 `patch("routers.stocks.storage.get_full_portfolio")`로
+소비처 경로를 잡을 수 있다. 실제 patch 타깃 상위 항목이 전부 이 형태다:
+`routers.recommendations.storage.get_full_portfolio`(30회), `routers.stocks.query`(21회),
+`services.digest_service.get_quotes_batch`(19회).
+
+심볼을 직접 import한 경우(`from services.db import query`)에는 **소비 모듈 경로**로 patch한다
+(`patch("services.consensus.query")` 27회 · `patch("routers.report.query")` 24회).
+
+**모듈에서 심볼을 제거·개명하면 그 심볼을 patch하는 테스트를 파일 불문 전수 grep**한다
+(`grep -rn "모듈경로.심볼" backend/tests/`) — mock 타깃은 "그 기능의 주 테스트 파일"에만 있지 않다.
 
 ### 2.4 ADR·task 역참조 주석
-코드 주석에 `ADR-0008`(`backend/routers/report.py:464`), `.forge/adr/0015`
-(`backend/services/recommendation/__init__.py:1`), `task#NNN`, `CONCERNS §N`
-(`backend/services/db.py:24`, `backend/main.py:256`)을 직접 인용하는 것이 관례다.
-새 결정 코드에도 근거 포인터를 남긴다. **"다시 시도하지 말 것"류 되돌림 기록도 코드에 남긴다** —
-`frontend/src/styles/guru.css:158-163`이 `content-visibility` 도입→되돌림 실측 수치와 함께
-재시도 금지를 적어둔다.
+
+코드 주석에 **결정 근거를 역참조**하는 것이 이 저장소의 강한 관례다(앱+테스트 합쳐 `task#NNNN`
+참조 602건). 형태는 `(ADR-0033)`, `(task#251)`, `(CONCERNS §4.2)`, `(CLAUDE.md gotcha/task#157)`.
+ADR 정본은 `.forge/adr/0001-…` ~ `0035-…`.
+
+특히 **"왜 이 순서인가", "왜 이 값이 아닌가"**를 적는다 — `save_guru_managers`의 docstring이
+전형(임계가 아니라 개별 백필인 이유, 보류에 탈출구를 두지 않는 이유까지).
 
 ---
 
 ## §3 명명·타입 규약
 
-### 3.1 식별자는 영문 snake_case, 주석·docstring은 한국어
-AST 집계로 docstring 423개 중 **412개가 한글**이다. 영문 docstring 11개는 순수 계산/파싱
-헬퍼에 남아 있다(`backend/services/indicators.py`, `backend/services/market/format.py`,
-`backend/routers/calendar.py`). docstring은 1줄 요약형
-(`backend/services/db.py:45` `"""단일 SELECT — 결과를 dict 리스트로 반환."""`)
-또는 규약·함정을 길게 적는 형(`backend/services/job_runs.py:17-31`,
-`backend/services/report_generator.py:157-179`) 둘 다 쓰인다. 후자는 **판정축과
-"왜 다른 설계를 안 썼는가"** 를 함께 적는 것이 관례다.
+### 3.1 식별자는 영문, 주석·docstring·사용자 문자열은 한국어
+
+- 파이썬 식별자 snake_case, 클래스 PascalCase. JS 변수·함수 camelCase, 컴포넌트 PascalCase.
+- **docstring·주석은 한국어**가 지배적이며, 길고 서술적이다(결정 근거·함정·반례 포함).
+- 사용자 대면 문자열은 한국어 리터럴로 소스에 직접 박는다(i18n 라이브러리 없음 — §9.9).
+- 로그 메시지도 한국어(`logger.warning(f"[Earnings] M7 rest 성공률 미달(...) — 저장 생략, 저장값 유지")`).
+- 테스트 함수명은 영문 snake_case(`test_save_guru_managers_skips_execute_on_empty`),
+  vitest `describe`/`it` 설명문은 한국어.
 
 ### 3.2 접두 관례
-| 접두 | 뜻 | 예 |
-|---|---|---|
-| `_` | 모듈 private(함수·상수·싱글톤) | `_slim_summary`(`backend/routers/report.py:35`), `_BY_ID`(`backend/services/batch_registry.py`), `_pool`/`_lock`(`backend/services/db.py:12-13`) |
-| `_get_cache`/`_set_cache` | 인메모리 캐시 | `backend/services/market_indicators/cache.py:18,25` |
-| `_mc_load`/`_mc_save`/`_mc_delete` | PostgreSQL `market_cache` I/O | `backend/services/market_indicators/cache.py:33,43,56` (타 패키지도 이 private을 import — `backend/services/kr_sector_service.py:15`) |
-| `_fetch_*` | 외부 데이터 획득 | `backend/services/market_indicators/fx.py:12,23` 등. **주의**: `backend/scheduler/jobs.py`에선 같은 접두가 *스케줄러 잡 래퍼*를 뜻한다 |
-| `_run_*` | 라우터의 백그라운드 태스크 진입점 | `backend/routers/report.py:69,124,...` |
-| `_refresh_*` / `_seed_*` / `_upsert_*` | 스케줄 갱신 잡 / 기동 시드 / DB 쓰기 | `backend/scheduler/jobs.py`, `backend/services/leverage_service.py:125` |
-| `_guard_*` | 저장·응답 직전 이상치 배제 | `backend/services/report_generator.py:156` `_guard_peer_multiples` |
-| `_<NAME>_BAND` | 이상치 판정용 대칭 배수 밴드(절대 임계값 추정 금지) | `backend/services/report_generator.py:144` `_PEER_MULTIPLE_BAND = 5`, `backend/services/guru_stats.py:9` `_VALUE_EST_BAND = 5` |
 
-화이트리스트 집합은 `frozenset`으로 둔다(`backend/services/storage/portfolio.py:5-6`,
-`backend/tests/test_no_public_reads.py:28`).
+**백엔드**
+
+| 접두/접미 | 뜻 | 예 |
+|---|---|---|
+| `_` | 모듈 private (단, 패키지 re-export 대상이면 외부도 씀) | `_mc_load`, `_build_all` |
+| `get_` / `save_` / `replace_` | 읽기 / 쓰기 / 전량 교체 | `get_holdings`, `save_stocks`, `replace_recommendations` |
+| `_fetch_and_save_` | 외부 fetch + 저장(배치·수동 갱신 진입점) | `_fetch_and_save_m7_earnings` |
+| `_mc_` | `market_cache` 테이블 접근 | `_mc_load`, `_mc_save`, `_mc_delete` |
+| `_run_` / `_fetch_` / `_refresh_` / `_seed_` | 스케줄러 잡 함수 | `_run_guru_crawl`, `_fetch_dividends`, `_seed_rankings_if_empty` |
+| `_yf_` / `_naver_` / `_kr_` | 소스별 어댑터 | `_yf_sym`, `_naver_get`, `_kr_basic_kis` |
+
+**프론트엔드**
+
+| 접두 | 뜻 | 위치 |
+|---|---|---|
+| `use*` | 훅 | `frontend/src/hooks/` |
+| `fmt*` | 표시 포매터 — **이름에 입력 단위를 박는다**(ADR-0031) | `frontend/src/utils.js` |
+| `Sketch*` / `Icon*` | 손그림 일러스트 / 아이콘 컴포넌트 | `frontend/src/components/sketches/` |
+| `*Section` | 화면 한 절 단위 컴포넌트 | `components/market/`, `components/reports/` |
+| `*Tab` | 허브 내부 탭 페이지 | `frontend/src/pages/SectorTab.jsx` 등 |
+
+`frontend/src/utils.js` 헤더 주석이 ADR-0031의 근거를 적는다 — `fmtEokWon`(억원)·`fmtSharesKr`(주)·
+`fmtUsdCompact`(USD 원단위)처럼 **단위를 이름에 박아 호출부에서 단위 오적용이 문법적으로 눈에
+걸리게** 한다. 빈값은 5종 모두 `—`(em dash)로 통일.
 
 ### 3.3 타입 어노테이션 — 로컬 3.9.6 / 배포 3.12 발산이 하드 제약
-- 배포 이미지는 `backend/Dockerfile:1` `python:3.12-slim`, 로컬 검증 인터프리터는
-  `backend/.venv/bin/python` = **3.9.6**. `backend/requirements.txt`엔 버전 핀이 없다
-  (`fastapi>=0.104.0`; 로컬 설치본은 0.128.8).
-- **런타임 평가되는 어노테이션에 PEP604 `X | None`을 쓰려면 그 파일에
-  `from __future__ import annotations`가 있어야 한다.** 현재 앱 파일 107개 중 **67개**가 이 import를
-  갖고 있고, PEP604 `| None`은 **123곳**에 쓰인다. 없는 파일(모든 라우터, `main.py`, `auth.py`,
-  `backend/services/storage/*.py` 등)에서는 `Optional[X]`(**62곳**) 또는 **문자열 인용 어노테이션**
-  으로 우회한다(`backend/routers/stocks.py:242,483,600,607`).
-- 결론: **Pydantic 모델·FastAPI 시그니처에 unquoted `X | None`을 넣기 전에 그 파일의
-  `__future__` import를 확인**할 것. 자동 가드는 없고 로컬 pytest가 사실상의 게이트다.
-- `list[dict]`류 PEP585 builtin 제네릭은 3.9에서 합법이라 `__future__` 없이도 쓰인다.
-- **선택 필드는 `x: float = Field(None)`이 아니라 반드시 `Optional[float] = Field(None, ...)`**
-  — 상세는 §5.4.
+
+로컬 `backend/.venv`는 **Python 3.9.6**, Docker 컨테이너는 **3.12**다. 로컬 pytest가 게이트이므로
+3.9에서 깨지는 문법은 사실상 금지다.
+
+**규칙:**
+
+- **런타임 평가되는 어노테이션에 PEP604 `X | None` 금지 → `Optional[X]` 사용.**
+  Pydantic 모델 필드, FastAPI 엔드포인트 시그니처가 여기 해당한다(3.9는 `TypeError`).
+  현재 `backend/routers/*.py`의 PEP604 사용 0건, `Optional[...]` 44건.
+- **`from __future__ import annotations`가 있는 모듈**에서는 어노테이션이 문자열로 남아 평가되지
+  않으므로 PEP604·builtin generic이 안전하다. 앱 코드 106개 파일 중 68개가 이 import를 갖는다.
+  예: `backend/services/db.py`의 `_pool: ThreadedConnectionPool | None`,
+  `def query(...) -> list[dict]`; `backend/services/market_indicators/cache.py`의 `-> dict | None`.
+- ⚠️ **문자열 주석(`"dict | None"`)은 평가되지 않아 3.9에서도 통과하므로 더 헷갈린다** —
+  "동작한다"가 "3.9 안전"을 뜻하지 않는다. 판단 기준은 **그 자리가 런타임 평가되는가**다.
+- 로컬 `.venv` ≠ Docker는 *패키지 유무*로도 갈린다: `lxml`은 `requirements.txt`에 있고 이미지엔
+  있지만 로컬 venv엔 없다 → HTML 파싱은 `BeautifulSoup(html, "html.parser")`(stdlib)를 쓴다.
+- 버전차는 *같은 패키지의 API 형태*도 바꾼다: 배포 FastAPI(0.138+)는 `include_router` 라우트를
+  `_IncludedRouter`로 감싸 `app.routes` 평탄 순회가 **0개를 세며 조용히 통과**한다.
+  `requirements.txt`가 핀 없는 `fastapi>=0.104.0`이라 이 발산은 계속된다 →
+  라우트 열거는 반드시 `backend/tests/_routes.py`의 `walk_routes`를 거친다(§11).
+
+**타입 어노테이션의 커버리지 자체는 부분적이다** — 서비스 계층 함수 시그니처엔 붙어 있지만
+전면 강제는 아니고, mypy 등 정적 타입 검사기는 도입돼 있지 않다.
 
 ---
 
 ## §4 로깅 방출 규약
 
-> **버그를 드러내기 위한 로그 패턴.** 이 절을 코드·계획이 `CONVENTIONS §4`로 인용한다.
-
 ### 4.1 방출 메커니즘 — 모듈 `logger` 통일, `print` 금지
-- 앱 코드는 `logger = logging.getLogger(__name__)`을 모듈 상단에 둔다(**57개 파일**).
-  `print()`는 신규 금지이며 현재 0건이다.
-- **강제 가드**: `backend/tests/test_no_print.py` — `main.py`·`routers`·`services`·`scheduler`·
-  `middleware`를 AST로 훑어 `print()` 호출 노드를 잡는다(문자열/주석/`pprint` 오탐 없음).
-  `tests/`·`scripts/`·`data/`는 대상 외. 실패 메시지가 `CONVENTIONS §4`를 인용한다.
-- 이름 편차 1건: `backend/services/job_runs.py:10`은 `log = logging.getLogger(__name__)`이고
-  그 6곳만 lazy `%s` 포매팅 + `exc_info=True`를 쓴다.
-- **`print`→`logger` 전환 스윕은 `capsys`로 stdout/stderr를 검사하던 테스트를 깨뜨린다.**
-  전환 전에 `grep -rn capsys backend/tests/`로 그 테스트를 찾아 **`caplog` 마이그레이션을
-  슬라이스에 미리 넣을 것**(사후 수복 6건 발생 이력). 현재 `caplog` 사용 7파일, `capsys` 1파일.
-- `scripts/*.py`(프로브·리스너)는 앱 코드가 아니므로 `print`가 허용된다.
+
+앱 코드(`backend/main.py`·`routers/`·`services/`·`scheduler/`·`middleware/`)는 **모듈 레벨
+`logger = logging.getLogger(__name__)`**로 통일한다. 현재 61개 모듈이 이 선언을 갖는다.
+
+- **`print(` 신규 금지** — 앱 코드 `print(` 0건이며 `backend/tests/test_no_print.py`가 ast로
+  `print()` 호출 노드만 탐지해 단언한다(문자열·주석·`pprint` 오탐 없음).
+  `tests/`·`scripts/`·`data/`는 대상 외.
+- 변수명은 `logger`가 표준. 유일한 예외가 `backend/services/job_runs.py`의 `log` —
+  신규 코드는 `logger`를 쓴다.
 
 ### 4.2 레벨 의미
-| 레벨 | 언제 | 비고 |
-|---|---|---|
-| `logger.info` | 배치·라이프사이클 | config 없으면 root lastResort가 WARNING+만 내보내 docker logs에 **안 뜬다** → §4.4 |
-| `logger.warning` | graceful degradation의 담화(폴백·스킵·부분 실패·이상치 결측) | 가장 흔한 레벨 |
-| `logger.error` | 예상치 못함·데이터 손실 | 아껴 쓴다 |
 
-값을 결측 처리하는 가드는 **어느 행·어느 필드를 왜 버렸는지**까지 남긴다 —
-`backend/services/report_generator.py:198-201`
-`logger.warning(f"[Valuation] 피어 멀티플 이상치 — 결측 처리 ({ticker} {metric}: value=… median=… ratio=…)")`.
-이 로그가 "조용히 사라진 지표"의 유일한 사후 단서다.
+| 레벨 | 언제 | 예 |
+|---|---|---|
+| `warning` | **graceful 담화** — 폴백했다·저장을 생략했다·부분 실패다 | `[Cache] _mc_load key=… 실패`, `[Earnings] … 저장 생략, 저장값 유지`, `[Dashboard] … 최소카드 폴백` |
+| `error` | 예상치 못함·데이터 손실. **아껴 쓴다** | 드묾 |
+| `info` | 배치·라이프사이클 | 스케줄러 잡 시작/종료 |
+
+- 스택트레이스가 필요하면 `exc_info=True`(`job_runs.py`가 `log.warning(..., exc_info=True)` 사용).
+- **broad `except: pass`는 지양** — 외부 정렬·파싱 실패를 삼키면 기능이 예외 없이 조용히 꺼진다.
+  최소한 진단 로그를 남기거나 좁은 예외만 잡는다(현재 bare pass는 `main._warm_market_cache` 등 극소수).
 
 ### 4.3 포맷·마커
-표준형: `logger.x(f"[Component] <무엇> (<ids>): {e}")`.
-예: `backend/services/market_indicators/cache.py:39`
-`logger.warning(f"[Cache] _mc_load key={key} 실패: {e}")`.
 
-- 마커는 **PascalCase**, **개념당 1스펠링**. formatter에 컴포넌트 프리픽스가 없으므로
-  메시지 안의 마커가 **유일한 grep 앵커**다.
-- 현황: 문자열 리터럴로 시작하는 logger 호출 **287개가 전부 `[Marker]`로 시작**(위반 0).
-  공백 포함·소문자 마커도 0. 마커 종류는 68개.
-- 남은 편차는 "개념당 1스펠링" 쪽이다(기능 결함 아님, 신규 코드에서 재생산 금지):
-  시세 계열 `[Quote]`/`[KRQuote]`/`[KiwoomQuote]`/`[KISQuote]`/`[BatchQuote]`/`[KiwoomCloses]`/
-  `[BatchClose]`, 애널리스트 계열 `[Analyst]`/`[AnalystData]`/`[AnalystReport]`,
-  섹터 `[Sector]`/`[KrSector]`/`[UsSector]`, 추천 `[Recommendations]`/`[Funnel]`/`[Universe]`.
-  `Service` 접미가 붙은 유일 사례는 `[LeverageService]`(`backend/services/leverage_service.py:252`).
-  `[Scheduler]`는 74건으로 최다인데 모듈 단위 마커라 잡 개별 식별은 메시지 본문에만 있다.
+```python
+logger.warning(f"[Component] <무엇> (<ids>): {e}")
+```
+
+- `[Component]`는 **PascalCase, 개념당 1스펠링**. 공백을 넣지 않는다
+  (`[KIS Quote]` → `[KISQuote]`로 통일한 전례가 `.forge/quick/LOG.md`에 있다).
+- 마커는 **모듈명이 아니라 개념명**이다 — 한 모듈이 여러 마커를 낼 수 있다
+  (`services/market_indicators/commodities.py`가 `[Commodities]`·`[Treasury]` 둘 다 방출).
+  그래서 로그 grep의 개념 앵커가 된다.
+- 현재 방출량 상위: `[Scheduler]` 77 · `[Migrate]` 20 · `[Earnings]` 16 · `[Any]` 16 ·
+  `[Report]` 13 · `[Guru]` 11 · `[Funnel]` 11.
+- 포매터 자체는 `%(levelname)s %(name)s: %(message)s`이므로 **레벨과 모듈 경로는 이미 붙는다** —
+  `[Component]`는 그 위에 얹는 *개념* 축이다(모듈≠개념일 때 값을 한다).
+- 자동 가드는 "print 금지"뿐이다. **마커 유무·스펠링을 강제하는 테스트는 없다**(리뷰 의존).
 
 ### 4.4 노이즈 제어 — 루트 로거 1회 배선
-`backend/main.py:18-30` `_configure_logging()`가 **라우터 import보다 먼저**(`:32` 이전) 호출된다.
-`basicConfig(level=INFO, format="%(levelname)s %(name)s: %(message)s")`(`:23`) +
-`urllib3`/`yfinance`/`apscheduler`/`asyncio`를 WARNING으로 억제 +
-`uvicorn*.propagate = False`로 root 핸들러 중복 emit 차단(`:26-27`).
+
+`backend/main.py`의 `_configure_logging()`이 import 시점에 1회 호출된다(라우터 import보다 먼저).
+
+- `logging.basicConfig(level=INFO, format="%(levelname)s %(name)s: %(message)s")`
+  — config가 없으면 root `lastResort`가 WARNING+만 내보내 `logger.info`가 `docker logs`에 안 뜬다.
+- `urllib3`·`yfinance`·`apscheduler`·`asyncio` → `WARNING`으로 억제.
+- `uvicorn`·`uvicorn.error`·`uvicorn.access` → `propagate = False`로 double-emit 방지.
 
 ### 4.5 프론트 로깅 (`console.*`)
-- 마커는 **소스 모듈/훅명 실명**이다(백엔드의 개념명과 다르다) → 훅은 camelCase
-  (`[usePortfolioData]`, `[useReportList]`), 컴포넌트·페이지는 PascalCase
-  (`[GuruAllocation]`, `[AnalystReports]`, `[PermissionPanel]` 등).
-- 레벨: `console.warn` = graceful(부가 fetch 실패, 섹션만 숨김 — `frontend/src/pages/Reports.jsx:110`
-  주석이 그 판단을 적어둔다), `console.error` = 예상외·주 로드/사용자 mutation 실패.
-- 현황: `frontend/src`(테스트 제외) `console.warn` 13 + `console.error` 13 = **26건이 전부 마커
-  보유**, `console.log`/`info`/`debug` 0건. 메시지는 한국어.
-  두 하위 스타일이 공존한다 — 훅·`AdminAnalytics`는 `(<엔드포인트>) 조회 실패`,
-  Guru/Analyst 페이지는 콜론 접미 + 경로 없음.
-- **자동 가드 없음.** `frontend/eslint.config.js`(23줄)에는 `rules` 블록이 아예 없고 `no-console`도
-  미설정이며, lint는 CI/훅에 연결돼 있지 않다(§9.8). 관례 + 리뷰 의존.
-- 로그를 아예 안 남기는 침묵 catch는 규약 위반은 아니지만 알아둘 것:
-  `frontend/src/App.jsx:45`(로그아웃 fetch), `frontend/src/utils/analytics.js:11`,
-  `frontend/src/hooks/useAuthBootstrap.js:64`, `frontend/src/hooks/useReportGeneration.js:23`,
-  `frontend/src/contexts/AuthContext.jsx:23-26`, 각 market/report 섹션의
-  `.catch(() => setError(true))`.
+
+- 레벨 의미는 백엔드와 같은 축: **`console.warn` = graceful 폴백/예상된 실패**,
+  **`console.error` = 예상외**. 현재 `frontend/src` 기준 `console.warn` 18건 · `console.error` 12건 ·
+  **`console.log` 0건**(신규도 지양).
+- 마커는 **소스 모듈/훅 실명**을 대괄호로 — hook은 camelCase 그대로, 컴포넌트/페이지는 PascalCase.
+  실사용: `[usePortfolioData]`(5) · `[AnalystReports]`(6) · `[useTrackedStocks]`(2) ·
+  `[useReportList]` · `[GlobalSearch]` · `[PermissionPanel]` 등.
+  **백엔드의 개념명 마커와 달리 여기선 파일/훅 이름 그대로**다.
+- 사용자 대면 실패는 로그와 별개로 **토스트**를 함께 낸다
+  (`frontend/src/components/Toast.jsx`의 `useToast().showToast(msg, 'error')`).
+- **자동 가드 없음** — eslint 설정(`frontend/eslint.config.js`)에 `no-console` 규칙이 없다.
 
 ---
 
 ## §5 에러 처리·직렬화 방어 (백엔드)
 
 ### 5.1 예외 팩토리와 `HTTPException`
-- `backend/services/errors.py:4,9` — `not_found(ticker, context="")`(404),
-  `already_exists(...)`(400). **return**이므로 호출측이 `raise errors.x(...)`.
-  소비처는 `backend/routers/watchlist.py`·`portfolio.py` 2개뿐이고 나머지는 인라인 raise다.
-- 항상 키워드형 `raise HTTPException(status_code=..., detail=...)`.
-  `status.HTTP_401_UNAUTHORIZED` 심볼형은 `backend/auth.py:22,32,47,58`만 쓴다.
-- **detail 언어가 혼재**한다(단일 규칙 없음): 개발자향은 영문(`"Admin only"`,
-  `"market must be KR or US"`), 사용자향은 한국어(`"리포트를 먼저 생성하세요"`,
-  `"어드민 계정은 삭제할 수 없습니다"`). `backend/routers/stocks.py:286,288`처럼 인접 줄에서
-  영문·한국어가 섞이는 곳도 있다.
-- `backend/routers/market_indicators.py`는 GET 27곳이
-  `except Exception as e: raise HTTPException(status_code=500, detail=str(e))` 복붙 패턴이라
-  원문 예외가 클라이언트로 새어나간다(알려진 성질).
-- `ValueError` → 400 번역은 라우터 경계에서 한다(`backend/routers/batches.py:86-87`).
+
+- `backend/services/errors.py`가 `not_found(ticker, context)` / `already_exists(ticker, context)`
+  두 팩토리를 제공한다(404 / 400). 그 외에는 라우터에서 `HTTPException`을 직접 raise한다.
+- 실사용 상태코드: 201(발행 생성) · 202(비동기 배치 시작) · 400 · 403 · 404 · 409 · 422 ·
+  500 · 502 · 503.
+- **`response_model`은 앱 전체에서 0건** — 엔드포인트는 평문 dict를 반환하고, 직렬화 방어는
+  §5.2의 `sanitize`로 한다. 응답 스키마의 정본은 코드가 아니라 `API_SPEC.md`다(§10).
 
 ### 5.2 NaN/inf 3중 방어 (출력·입력·전역)
-starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 NaN/inf가 있으면 **500**이 난다.
 
-1. **소스 가드** — `math.isfinite` 후 None으로 떨구는 지역 헬퍼가 ~45곳
-   (`backend/services/beta.py:27`, `report_generator.py`(`_fin_num`), `indicators.py:32,61,131`,
-   `market/format.py:46,58` …). 규약을 docstring에 적어둔 예:
-   `backend/services/recommendation/funnel.py:151`.
-2. **출력 sanitize** — `backend/services/utils.py:36` `sanitize(obj)`가 float NaN/inf를 재귀적으로
-   None화한다. 소비처 24곳 — 응답 경계(`backend/routers/stocks.py`, `portfolio.py`, `report.py`,
-   `analyst_reports.py`)와 **저장 직전**(`backend/services/report_generator.py`,
-   `market_indicators/sentiment.py`, `indices.py`, `kospi_futures.py`)에 함께 쓴다.
-3. **입력 가드** — Pydantic float은 기본 `allow_inf_nan=True`이므로 raw JSON의 `NaN` 토큰이
-   통과하고, NaN 비교는 항상 False라 범위 검증도 못 잡는다.
-   → **요청 모델의 모든 float 필드는 `allow_inf_nan=False`**(모델 수준 `model_config = ConfigDict(allow_inf_nan=False)`
-   또는 필드 수준 `Field(..., allow_inf_nan=False)`)를 명시한다 — `backend/routers/analyst_reports.py:31,44,45`
-   (근거 주석 `:42-43`), `portfolio.py`의 `Stock`·`set_rebalance_targets`, `watchlist.py`의 `PromotePayload`.
-   **`backend/tests/test_nan_input_guards.py`가 이를 열거로 단언한다** — `routers/` 패키지의 각 모듈이
-   직접 정의한 `BaseModel` 서브클래스를 수집하고 float을 포함하는 필드 애너테이션을 재귀 탐지해
-   가드 여부를 확인하므로, 신규 float 필드를 무가드로 추가하면 이 테스트가 즉시 실패한다(더 이상
-   "몇 개 파일·몇 개 필드"로 셀 수 있는 상태가 아니라 스위트가 전수 커버).
-   거부하면 FastAPI 기본 422 detail이 입력 NaN을 echo해 다시 500이 되므로
-   **전역 핸들러**가 막는다: `backend/main.py:253-259` `RequestValidationError` →
-   `JSONResponse(422, {"detail": sanitize(jsonable_encoder(exc.errors()))})`.
-   등록된 예외 핸들러는 이것뿐이다. ⚠️ 이 핸들러는 **`main.app`에만 배선**돼 있다 — 자체 `FastAPI()`를
-   만드는 라우터 테스트(`test_portfolio_router.py`·`test_watchlist_router.py` 등)는 이 핸들러가 없어
-   422 detail의 NaN echo가 그대로 500이 되니, **NaN 거부 422 행동을 확인하는 테스트는 conftest의
-   `client`(=`main.app`)로 돌릴 것.**
+starlette `JSONResponse`는 `allow_nan=False`라 응답 dict에 `NaN`/`inf`가 있으면 직렬화에서 **500**이
+난다. 방어는 세 층이다.
 
-가드 회귀: `backend/tests/test_nan_serialization_guards.py`(출력)·`test_nan_input_guards.py`(입력 드리프트,
-전 라우터 float 필드 열거)·`test_nan_input_behavior.py`(3표면 422 행동 핀)·`test_utils_sanitize_decimal.py`
-(Decimal NaN/Infinity)·`test_consensus_target_nan.py`(컨센서스 파이프라인 정규화 초크포인트).
-프론트 짝: 문자열 `"nan"`·빈 문자열이 LLM enrich로 들어오면 `Number('')===0`이라 `0`으로
-오표시되므로 표시 계층에도 가드가 필요하다(`frontend/src/components/reports/MarketOutlookSection.jsx`,
-회귀 `MarketOutlookSection.test.jsx`).
+**① 출력 — `services/utils.sanitize`**
+
+`backend/services/utils.py`의 `sanitize(obj)`가 dict/list를 재귀 순회해 비유한 `float`**과 `Decimal`**을
+`None`으로 바꾼다. Decimal까지 보는 이유가 docstring에 있다 — PostgreSQL `numeric`은 NaN을 저장할
+수 있고 psycopg2가 그걸 `Decimal`로 돌려주므로 float만 검사하면 안전하지 않다.
+정상 `Decimal`은 float 캐스트하지 않고 보존한다(정밀도 손실 방지).
+
+적용 지점(라우터 반환 감싸기): `routers/portfolio.py`(포트폴리오·prices·rebalance·exposure),
+`routers/stocks.py`(dashboard·metrics), `routers/analyst_reports.py`, `routers/tech_reports.py`,
+`routers/recommendations.py`, `routers/report.py`(모듈 로컬 `_sanitize`).
+
+**시세/합산을 응답에 싣는 엔드포인트는 sanitize 또는 소스 `math.isfinite` 가드가 필수**다.
+가드는 소스에서 하는 쪽이 깨끗하다(예: FX 비유한값을 "시세 없음"으로 처리).
+
+**② 입력 — Pydantic `allow_inf_nan=False`**
+
+raw JSON 본문의 `NaN`/`Infinity` 토큰은 ⓐ `json.loads`가 허용하고 ⓑ Pydantic v2 float 필드가
+기본 `allow_inf_nan=True`로 통과시키고 ⓒ `low <= high` 같은 범위 검증이 NaN에서 **항상 False**라
+조건을 뒤집어도 안 걸린다 — 3중으로 새어 불변 문서에 NaN이 저장된다.
+
+현재 명시된 필드: `routers/analyst_reports.py`의 `PublishBody.fair_value_low/high`,
+`PointMetric.change_pct`; `routers/tech_reports.py`의 `MoneyValue.value`, `Market.cagr_pct`,
+`Player.share_pct`, `PointMetric.change_pct`; `routers/watchlist.py`의 `PromotePayload`는
+`model_config = ConfigDict(allow_inf_nan=False)`로 모델 단위 적용.
+
+**③ 전역 — 422 detail sanitize**
+
+NaN을 거부하면 FastAPI 기본 검증 에러 응답이 **입력 NaN을 그대로 echo**하고, starlette가
+`allow_nan=False`라 422가 **500**으로 터진다. `backend/main.py`의
+`@app.exception_handler(RequestValidationError)` `_validation_error_handler`가
+`sanitize(jsonable_encoder(exc.errors()))`로 앱 전역에서 막는다 — 엔드포인트별 문제가 아니다.
+
+**폴백이 다르게 가린다는 점도 기억할 것** — PostgreSQL은 `json` 컬럼에 NaN을 거부하지만
+파이썬 `json.dumps`는 기본 `allow_nan=True`라 파일 폴백은 통과한다.
+그래서 "DB 저장 실패 → 파일 성공 → 응답 직렬화 실패"로 증상이 엇갈린다.
 
 ### 5.3 "best-effort, 절대 호출자를 깨지 않는다" 관용구
-`try: ... except Exception as e: logger.warning(...); return <empty>`가 서비스 계층 지배형이다
-(`backend/routers/stocks.py:79-84,358-360`, `backend/services/market_indicators/cache.py:38-40,52-53,59-60`,
-`backend/services/job_runs.py:38-39,49-50`). §1.4와 함께 읽을 것.
+
+```python
+try:
+    ...
+except Exception as e:
+    logger.warning(f"[Component] <무엇> (<ids>): {e}")
+    return <직전값 또는 빈 기본값>
+```
+
+`job_runs.recent`(→`[]`), `market_indicators/cache._mc_load`(→`None`),
+`_mc_save`/`_mc_delete`(→ 무시) 전부 이 형태다.
+**단, 빈 기본값을 *저장*에 쓰면 §1.3 위반**이 되니 "읽기 실패의 빈값"과 "쓰기 대상의 빈값"을 구분한다.
 
 ### 5.4 선택 필드는 `Optional[X] = Field(None)` — 생략/명시적 null의 비대칭
-pydantic v2는 **`validate_default=False`가 기본**이라 기본값 `None`은 검증을 타지 않지만,
-클라이언트가 **명시적으로 보낸 `null`** 은 선언 타입(`float`)의 검증을 타서 `float_type` 422가 된다.
-그래서 `x: float = Field(None)`은 **키 생략은 통과하고 `"x": null`만 죽는** 비대칭을 만들고,
-그 필드가 중첩 배열 안에 있으면 **요소 하나 때문에 요청 전체가 422**로 막힌다
-(발행물 지표 칩 → 발행 전체 차단, task#250). 현재 형태:
-`backend/routers/analyst_reports.py:31` `change_pct: Optional[float] = Field(None, allow_inf_nan=False)`
-(주석 `:29-30`이 이유를 적어둔다).
 
-- `Optional`로 바꿔도 `allow_inf_nan=False`의 NaN 차단은 유지된다(로컬 3.9 + 컨테이너 3.12 양쪽 실측).
-- 회귀 테스트는 **명시적 null 케이스**와 **NaN 거부 핀**을 쌍으로 둔다. 후자는 red-first가
-  원리적으로 불가하니(수정 전에도 통과) `allow_inf_nan=False`를 일시 제거해 실제로 실패하는지
-  이빨 검증하고 원복한다.
-- 동종 패턴 탐지: `grep -rn "= Field(None\|= Field(default=None" backend/routers/ backend/services/`.
+pydantic v2는 `validate_default=False`가 기본이라 기본값 `None`은 검증을 안 타지만,
+클라이언트가 **명시적으로 보낸 `null`**은 선언 타입(`float`)의 검증을 탄다 →
+`float_type` 422. 그래서 `x: float = Field(None)`은 **키 생략은 통과하고 명시적 `null`만 422**가
+되며, 그 필드가 중첩 배열 안에 있으면 **칩 하나 때문에 요청 전체가 막힌다.**
+
+→ 선택 필드는 반드시 `Optional[X] = Field(None, ...)`.
+`routers/tech_reports.py`의 `Market.estimates` 주석이 이 규칙을 인용한다
+("`Optional[List] = Field(None)` 필수").
+
+`Optional`로 바꿔도 `allow_inf_nan=False`의 NaN 차단은 유지된다(생략→None · `null`→None ·
+`NaN`/`Infinity`→422 `finite_number`).
+
+동종 패턴 탐지: `grep -rn "= Field(None\|= Field(default=None" backend/routers/ backend/services/`.
 
 ---
 
 ## §6 라우터·API 규약
 
-- 파일당 라우터 1개, 모듈 상단에 `router = APIRouter(prefix=..., tags=[...])`(19개).
-  prefix는 도메인형(`/api/stocks`)과 bare `"/api"`형(`backend/routers/report.py:22`,
-  `calendar.py:55`, `batches.py:13` …)이 공존한다. 등록은 `backend/main.py:273-291`의 평탄한
-  `app.include_router(...)` 목록(19개, prefix 인자 미사용).
-- **인증은 항상 파라미터 단위 `Depends(...)`** — 라우트 수준 `dependencies=[...]`는 0건.
-  `Depends(get_current_user)` 72 / `require_admin` 42 / `get_current_user_or_api_key` 10 /
-  `require_admin_or_api_key` 6. 결과를 안 쓰면 `_: str = Depends(...)`, 쓰면
-  `user_id`/`admin_id`. 정의는 `backend/auth.py:18,37,61,68`.
-  `require_admin`은 API 키를 **거부**한다(키로 호출 시 401).
-  **강제 가드**: `backend/tests/test_no_public_reads.py`(무인증 `/api` == `ALLOWED_PUBLIC` 9개,
-  양방향 exact-match, ADR-0029).
-- **`response_model=`은 코드베이스 전체에서 0건** — 핸들러는 plain dict/list를 반환한다.
-  Pydantic `BaseModel`은 **요청 본문에만** 쓴다. bare `list`/`dict` 본문은 `Body(...)` 필수
-  (`backend/routers/batches.py:77`, `report.py:582`, `portfolio.py:168`).
-  ticker 정규화는 `@field_validator` + `@classmethod`(`backend/routers/watchlist.py:42-48`,
-  `portfolio.py:51-57` — 두 곳에 동일 검증자가 중복). 상호 필드 검증도 같은 데코레이터로
-  (`backend/routers/analyst_reports.py:50` `fair_value_high`가 low보다 큰지 — NaN 배제가 선행돼야
-  의미가 있다, §5.2).
-  쓰기는 `status_code=202`(백그라운드 잡, 18곳)·`201`(생성, 4곳)을 명시한다.
-- **라우트 순서: 정적 하위경로를 `{param}` catch-all보다 먼저 등록한다.**
-  `backend/routers/report.py`가 `/report/{ticker}/{date_str}` 앞에 5개를 두고 각각
-  경고 주석을 달아뒀다(`:395,416,425,433,442` — *"5번째 재발 방지"*).
-  `backend/routers/analyst_reports.py:3-4`는 이 함정을 **새 prefix를 만든 이유**로 기록한다(ADR-0027).
-  같은 위험이 `backend/routers/stocks.py`의 `PUT /enrich/batch` → `PUT /{ticker}/enrich`,
-  `/search`·`/compare` → `/{ticker}/news`에도 있지만 **주석은 없다**. 자동 가드 없음.
+**라우터 1모듈 = `APIRouter(prefix=..., tags=[...])` 1개.** 20개 라우터가 모두 이 형태다.
+
+| prefix | 라우터 |
+|---|---|
+| `/api/admin` `/api/auth` `/api/analysis` `/api/analytics` `/api/events` `/api/guru` `/api/portfolio` `/api/recommendations` `/api/stocks` `/api/watchlist` `/api/analyst-reports` `/api/tech-reports` | 동명 모듈 |
+| `/api/market` | `routers/market_indicators.py` — ⚠️ **`/api/market-indicators`는 존재하지 않는다** |
+| `/api`(경로를 함수에서 완성) | `calendar` `batches` `investor` `digest` `rankings` `short_sell` `report` |
+
+- `backend/main.py`의 `include_router`는 **`prefix` 인자를 쓰지 않는다** → 라우터가 선언한 경로가
+  최종 경로다(`backend/tests/_routes.py` 주석이 이 사실에 의존).
+- **라우트 순서: 리터럴 경로가 파라미터 경로보다 먼저.**
+  `PUT /api/stocks/enrich/batch`는 `PUT /api/stocks/{ticker}/enrich`보다 **먼저** 선언해야
+  FastAPI가 `enrich`를 ticker 값으로 라우팅하지 않는다.
+- **인증 게이팅** — 모든 `/api` 엔드포인트는 `backend/auth.py`의 4개 의존성 중 하나를 단다:
+  `get_current_user`(72) · `require_admin`(42) · `get_current_user_or_api_key`(13) ·
+  `require_admin_or_api_key`(7). 예외는 `routers/auth.py`의 공개 9개뿐(ADR-0029).
+  `backend/tests/test_no_public_reads.py`가 양방향 exact-match로 강제한다.
+  ⚠️ `require_admin`은 **API 키를 거부**한다 — Cowork/스크립트가 키로 호출해야 하면
+  게이트가 `require_admin_or_api_key`여야 한다.
+- **경로 파라미터 검증** — 열거형은 `Literal` 별칭(`routers/tech_reports.py`의 `SlugPath`),
+  날짜는 pydantic `field_validator`로 ISO 강제. `routers/tech_reports.py`의 `_iso_date_only`
+  docstring이 이유를 적는다: plain `str`이면 psycopg2 바인딩 시 서버 `DateStyle`(기본 MDY)이
+  `"03/08/2026"`을 8월 3일로 해석해 **불변 발행물에 잘못된 날짜가 조용히 저장**된다.
+- **모델 간 제약은 `@model_validator(mode="after")`** — 예: `share_pct`가 있으면
+  `market.share_basis`가 있어야 그 수치가 해석 가능하다(ADR-0033).
+- **티커 정규화**: 경로 티커는 `.upper()`, 형식 검증은 `services/utils.is_valid_ticker`
+  (strip·upper 후 `^[A-Za-z0-9.\-]{1,15}$`).
+- **비동기 시작은 202 + progress 폴링** — `services/progress.py`의 `ProgressTracker`
+  (`running`/`done`/`total`/`current`/`failed`, 락 보호)를 GET 진행 엔드포인트가 노출한다.
+  ⚠️ `done`은 *시도* 총계다(저장 건수 아님) — 응답 필드 의미를 문서 표에 명시한다(§10).
 
 ---
 
 ## §7 DB·SQL 규약
 
-- 진입점은 `backend/services/db.py` 3개: `query(sql, params=None) -> list[dict]`(`:44`,
-  `RealDictCursor`), `execute(sql, params=None) -> int`(`:52`, rowcount),
-  `execute_many(sql, params_list)`(`:60`, 빈 리스트 no-op → `execute_batch`).
-  풀은 `ThreadedConnectionPool(minconn=1, maxconn=20)`(`:16-28`) — 주석 `:23-24`가 워커 수보다
-  크게 잡는 이유(소진 시 블록이 아니라 `PoolError`)를 적어둔다.
-- **플레이스홀더는 `%s` + 튜플 전용.** 배열은 `= ANY(%s)`(psycopg2가 리스트를 PG 배열로 적응).
-  **uuid 컬럼에 파이썬 `str` 리스트를 넘길 때는 `ANY(%s::uuid[])` 명시 캐스트 필수** —
-  단건 `= %s`는 암묵 캐스트로 동작하지만 배열화하면 `operator does not exist: uuid = text`로
-  라이브 즉사한다. 현재 캐스트 사용처는 `backend/routers/admin.py:32` 1곳.
-- **동적 SQL은 구조만 문자열 조립**(값은 절대 아님) — `backend/services/consensus.py:81-85`
-  `_values_placeholder`. docstring이 함정을 못박는다: **바깥 괄호를 추가로 감싸면
-  `VALUES ((a,b),(c,d))`가 N행이 아니라 record 1행이 돼 `AS v(ticker, d)` 매핑이 깨진다.**
-  형태 가드: `backend/tests/test_consensus_asof_batch.py:111` `test_values_placeholder_shape`.
-- UPSERT는 `ON CONFLICT (...) DO UPDATE SET x = EXCLUDED.x` / `DO NOTHING`.
-  **덮어쓰기 방지 조건은 SQL 안에** 둔다 — `backend/services/storage/portfolio.py:58`
-  (`name=CASE WHEN EXCLUDED.name IS NULL OR EXCLUDED.name = EXCLUDED.ticker THEN tickers.name ELSE EXCLUDED.name END`),
-  `:63`(`is_etf=tickers.is_etf OR EXCLUDED.is_etf`).
-- 다중 문장 트랜잭션은 헬퍼를 우회해 `with get_connection() as conn: with conn.cursor() as cur:`
-  로 직접 쓴다(`backend/services/recommendation/store.py:25-58`, `storage/portfolio.py:49-85`).
-- JSONB 파라미터는 호출측 `json.dumps(...)` + SQL `%s::jsonb`(`store.py:33,51-52`).
-- **신규 컬럼은 `backend/app_schema.sql`만으론 배포에 반영되지 않는다** — 라이브 DB는 기동
-  idempotent 마이그레이션만 탄다(ADR-0006). `backend/main.py:60-238` `_migrate()`에
-  `ADD COLUMN IF NOT EXISTS`를 **쌍으로** 추가하는 것이 DoD다. `_migrate()` 구조 관례:
-  논리 테이블당 try/except 1블록 + 블록마다 `from services.db import execute` 지역 import(18회) +
-  실패는 `logger.warning(f"[Migrate] ...")`만. 예외: `job_runs`는 `_migrate` 대응이 없고
-  `backend/app_schema.sql`이 수동 적용을 지시한다(ADR-0001). 자동 가드 없음(수동 DoD).
+**접근은 `backend/services/db.py` 3함수로만** — `query(sql, params) -> list[dict]`(RealDictCursor),
+`execute(sql, params) -> rowcount`, `execute_many(sql, params_list)`(psycopg2 `execute_batch`,
+빈 리스트는 no-op).
+
+- 커넥션은 `ThreadedConnectionPool(minconn=1, maxconn=20)`. `get_connection()` 컨텍스트매니저가
+  성공 시 commit·예외 시 rollback·항상 putconn. **maxconn=20은 최대 ThreadPool 동시성보다 크게**
+  잡은 값이다(psycopg2 풀은 소진 시 블록이 아니라 `PoolError`를 던진다) — 새 ThreadPool을 늘릴 땐
+  이 값과 대조할 것(현재 최대 워커: calendar 15 · ranking 12 · earnings 20).
+- **파라미터는 항상 `%s` 바인딩.** f-string으로 SQL에 값을 끼워 넣지 않는다.
+- **JSONB 파라미터는 호출측에서 `json.dumps(..., ensure_ascii=False)`**
+  (`services/analyst_reports.py`, `services/backlog.py`, `services/supply_score.py`,
+  `services/us_supply.py`, `services/report_generator.py`).
+  `backend/tests/test_tech_reports_service.py`가 이 규약을 `CONVENTIONS §7`로 인용한다.
+- **upsert는 `ON CONFLICT (…) DO UPDATE SET …=EXCLUDED.…`** (services 10여 곳).
+  클로버 방지가 필요하면 `CASE WHEN`으로 기존값 보존을 넣는다(`tickers.name` 패턴).
+- **리스트 조건은 `= ANY(%s)`.** ⚠️ **uuid 컬럼엔 반드시 캐스트** —
+  `= ANY(%s::uuid[])`(`routers/admin.py`의 `user_menu_permissions` 조회).
+  캐스트 없이 파이썬 `str` 리스트를 넘기면 `text[]`가 돼 `operator does not exist: uuid = text`로
+  라이브에서 즉사한다(단건 `= %s`는 암묵 캐스트돼 *동작하던* 것이 배치화에서 깨진다).
+- **VALUES 다행은 바깥 괄호로 감싸지 않는다** — `VALUES ((a,b),(c,d))`는 N행이 아니라
+  record 컬럼 1행이 된다. 행별 `(a,b), (c,d)` 나열만.
+- **replace(=delete+insert)는 단일 트랜잭션** + fetch 실패 시 delete 자체를 스킵(§1.3).
+
+**스키마 변경 (ADR-0006)**
+
+신규 컬럼·테이블은 **`backend/app_schema.sql`과 `backend/main.py`의 `_migrate()` 두 곳에 쌍으로**
+넣는다. 스키마 파일은 신규 설치용이고 **라이브 DB는 기동 idempotent 마이그레이션만 탄다** —
+한쪽만 고치면 배포 직후 그 컬럼을 쓰는 SQL이 깨진다.
+
+`_migrate()` 형태: DDL마다 개별 `try/except` + `logger.warning("[Migrate] … 실패: {e}")`,
+DDL은 `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE … ADD COLUMN IF NOT EXISTS` /
+`CREATE INDEX IF NOT EXISTS`만. 이미 `CREATE TABLE`을 지난 라이브 테이블에 컬럼을 더할 땐
+**ALTER를 따로** 넣어야 반영된다(`tech_reports`의 `key_points`·`milestones`가 그 주석과 함께 있다).
+
+인증 스키마는 `backend/auth_schema.sql`을 `app_schema.sql`보다 **먼저** 실행한다.
 
 ---
 
 ## §8 배치·스케줄러 규약
 
-- 정적 메타 테이블 `backend/services/batch_registry.py`의 `BATCHES`에 **29개** 엔트리.
-  필수 필드 11개(`id`, `label`, `category`, `schedule_desc`, `usage`, `source`, `editable`,
-  `trigger_kinds`, `manual_endpoint`, `scheduler_job_id`, `market`) + `timezone`·
-  `default_schedule` + `misfire_grace_time`. `category` ∈ {report, market, guru},
-  `market` ∈ {KR, US, 공통}(출처국 기준 — ADR-0013). 모듈 docstring `:2-10`이 불변식을
-  적어두지만 "**20개 배치**"는 stale이다(실제 29).
-- **`source`(fetch 출처) ↔ `usage`(소비 UI)는 반대 방향**이다. 배치의 fetch 체인을 바꾸면
-  `source`도 같이 고치는 것이 DoD — `GET /api/batches`가 그대로 노출하므로 안 고치면 배치 현황이
-  틀린 출처를 보인다. 가드: `backend/tests/test_batches_router.py:52-65`가 `source` **비어있지 않음**만
-  단언한다(정확성은 검증 못 함).
-- `job_id` == 스케줄러 잡 id == `job_runs.record(id, ...)` 호출 id.
-  `with job_runs.record("<batch_id>", "auto"|"manual"):`로 본문 전체를 감싼다
-  (auto: `backend/scheduler/jobs.py` / manual: `backend/routers/report.py:72,343,...`).
-- **배치 id를 은퇴시키면 4표면을 전수 grep**: ① 스케줄 소비처 read ② 표시 문자열
-  ③ **`job_runs.record` 모든 lane(auto·manual·backfill)** ④ 그 id를 단언하는 테스트.
-  단 옛 id를 *읽는* 시드 마이그레이션은 정당한 잔존이다.
-- **id를 추가할 때는 count/set 하드코딩 단언 4곳을 함께 고친다** —
-  `backend/tests/test_batches_router.py`(`EXPECTED_IDS` + `== 29`),
-  `backend/tests/test_batch_market_split.py:54`, `backend/tests/test_macro_signals_batch.py:37`,
-  `backend/tests/test_scheduler_seed.py:82`(`editable` 파생).
-  탐색: `grep -rn "BATCHES) ==\|len(data) ==\|EXPECTED_IDS" backend/tests/`.
-- 잡 함수 배선: `backend/scheduler/jobs.py:485` `_JOB_FUNCS`(**28개** = BATCHES − `consensus`),
-  소비는 `backend/scheduler/schedule.py:36`. **`editable: True`인데 `_JOB_FUNCS` 키가 없으면
-  기동 시 `KeyError`**다.
-- `misfire_grace_time`은 `None`을 넘기지 말고 **인자를 생략**한다 — APScheduler가 None을
-  "유예 무제한"으로 해석해 거동이 바뀐다(`backend/scheduler/schedule.py:30-31` 주석).
-- 스펙 검증·설명은 `backend/services/schedule_spec.py`(4타입, `validate_schedule_spec`가
-  `ValueError`, int 필드에 `isinstance(x, bool)` 거부까지).
-- **배치-백킹 뷰는 요청·기동 경로에서 외부 API를 라이브 호출하지 않는다** — 배치가 사전계산해
-  `market_cache`/테이블에 저장하고 요청은 저장값만 읽는다. 기동 시 빈 캐시 적재는
-  `_seed_*_if_empty` 패턴(`backend/scheduler/__init__.py:63-72`).
-- KR 시장-날짜 판정은 `datetime.now(ZoneInfo("Asia/Seoul")).date()` 또는
-  `services.utils.today_kst()` — bare `date.today()` 금지(컨테이너 UTC).
-  **강제 가드**: `backend/tests/test_no_bare_today.py`(AST 스윕).
+**레지스트리 = `backend/services/batch_registry.py`의 `BATCHES`** — 현재 **29개** 배치의 정적
+메타데이터 리스트(⚠️ 파일 docstring은 "20개"라고 적혀 있어 stale하다).
+
+각 항목 키: `id` · `label` · `category` · `schedule_desc` · `usage`(소비 UI) · `source`(fetch 출처) ·
+`editable` · `trigger_kinds` · `manual_endpoint` · `scheduler_job_id` · `timezone` ·
+`misfire_grace_time` · `market`(`KR`/`US`/`공통`, 출처국 기준 — ADR-0013) · `default_schedule`.
+
+**규약:**
+
+- `id`는 **스케줄러 잡 id 및 `services/job_runs.record(id, …)` 호출 id와 반드시 일치**한다.
+- **fetch 소스를 바꾸면 `source`도 같은 변경에서 갱신**한다(DoD). `GET /api/batches`가 그대로
+  노출하므로 안 고치면 현황 카드가 stale 출처를 보인다. `usage`와 방향이 반대임에 주의(§1.5).
+- **id를 은퇴시키면 그 id를 쓰는 모든 표면을 전수 grep**한다 — ① 스케줄 소비처 ② 표시 문자열
+  (`schedule_desc`) ③ **`job_runs.record` 모든 lane(auto·manual·backfill)** ④ 그 id를 단언하는 테스트.
+  한 곳이라도 옛 id면 배치 현황 실행이력에서 조용히 사라진다.
+  단 **옛 id를 읽는 시드 마이그레이션은 정당한 잔존**이다("잔존 0"은 stale *소비* 기준).
+- **id를 추가할 때도** count/set 하드코딩 단언을 전수 확인한다 — 현재 3곳이 `29`를 박고 있다
+  (`tests/test_batch_market_split.py`, `tests/test_batches_router.py`(+`EXPECTED_IDS` 집합),
+  `tests/test_macro_signals_batch.py`).
+
+**스케줄러 패키지 = `backend/scheduler/`**(단일 파일 아님)
+
+| 모듈 | 역할 |
+|---|---|
+| `__init__.py` | 심볼 배선 + `start()`/`stop()`/`reload(job_id)` |
+| `jobs.py` | 잡 함수 전체 + `_JOB_FUNCS` 매핑 |
+| `schedule.py` | `_build_trigger`·`_reschedule_job`·`_seed_batch_schedules`·누락복구(`_check_missed_report`) |
+| `_state.py` | 공유 `_scheduler` 인스턴스·상수(leaf 모듈 — 부분초기화 순환 회피) |
+
+`start()`는 `_seed_batch_schedules()` → `editable` 배치 재스케줄 → `_check_missed_report()` →
+`_seed_*_if_empty()` 3종 → `_scheduler.start()` 순.
+
+**실행 계측 = `backend/services/job_runs.py`의 `record(job_id, trigger)` 컨텍스트매니저**
+
+```python
+with job_runs.record("daily_report_kr", "auto") as run:
+    ...
+    run.set_status("partial", err)   # 선택 — 미지정이면 success
+```
+
+- yield 값은 `Run` 핸들(`run_id`·`status`·`error`, `set_status`)이다. 상태 어휘:
+  `running` | `success` | `partial` | `skipped` | `failed`.
+- **본문이 예외를 전파하면 `failed`가 지정 상태를 이긴다.**
+- ⚠️ **예외를 삼키고 정상 종료하는 잡은 부분/전체 실패여도 `success`로 기록된다** —
+  `record`의 docstring이 그런 잡을 이름으로 나열해 둔다(`_refresh_monthly_*`·`_fetch_leverage`·
+  `_run_digest` 등). 그 잡들의 success를 "내부 오류 없음"으로 읽지 말 것.
+  구루 크롤 2경로만 `set_status`로 배선돼 예외다.
+- job_id별 최근 **20건**만 보관(enter 시 prune).
+
+**시각·타임존**
+
+- KR 시장-날짜 판정은 `backend/services/utils.py`의 `today_kst()`
+  (`datetime.now(ZoneInfo("Asia/Seoul")).date()`). 컨테이너에 TZ env가 없어 bare `date.today()`는
+  UTC라 00:00~09:00 KST에 하루 어긋난다.
+- **bare `.today()` 호출은 `backend/tests/test_no_bare_today.py`가 ast로 금지**한다(앱 코드 전체).
+- 모듈 상수 `_KST = ZoneInfo("Asia/Seoul")` 패턴도 병용(`services/market_indicators/kospi_signal.py`).
+
+**요청경로 vs 배치경로**
+
+배치-백킹 뷰(랭킹·KR/US 업종 모멘텀 등)는 **배치가 사전계산해 저장하고 요청은 저장값만 읽는다.**
+요청·기동 경로에서 외부 API를 N콜 직렬 호출하지 않는다.
+기동 시 빈 캐시는 `_seed_*_if_empty` 패턴으로 채운다.
+
+반면 fx·vix·commodities·indices는 **요청경로 증분**(TTL캐시 → `_mc_load` → 라이브 fetch →
+`_mc_save`)이라 스케줄 배치가 없다 — `batch_registry`에도 없다.
+
+⚠️ `services/market_indicators/cache.py`의 `get_or_refresh(key, fetch_fn, ttl)`에서 **`ttl`은
+저장값에 걸리지 않는다** — `_mc_load`가 행을 주면 나이 불문 그대로 반환하고 `ttl`은 인메모리
+캐시 수명만 지배한다. 즉 한 번 `market_cache`에 저장되면 `force=True`가 올 때까지 영구 서빙이다.
+"TTL 만료 → 요청 경로가 재조회한다"를 전제로 설계·심각도를 판단하지 말 것.
 
 ---
 
 ## §9 프론트엔드 규약
 
+React 19 + Vite 8(rolldown) + react-router-dom 7 + recharts 3 + axios. **plain CSS**
+(TailwindCSS·CSS-in-JS 없음). TypeScript 아님(`.js`/`.jsx`).
+
 ### 9.1 파일·명명
-- 컴포넌트 PascalCase `.jsx`, 파일당 `export default function X()` 1개.
-  훅은 `useXxx.js`(never `.jsx`) 기본 export. 예외는 1줄 re-export shim
-  `frontend/src/hooks/useAuth.js:1`.
-- **테스트 접근을 위한 named export가 관례다** — 페이지 파일이 default 컴포넌트와 함께
-  순수 헬퍼·하위 컴포넌트를 named export한다(`frontend/src/pages/Settings.jsx:84`
-  `ManualRunButton`, `frontend/src/pages/AnalystReport.jsx:16,42,54,94,115,212`,
-  `frontend/src/pages/GuruDetail.jsx:32,65,73,84`, `frontend/src/pages/Compare.jsx:27`,
-  `frontend/src/pages/GuruStats.jsx:11`). 이 코드베이스는 **테스트에서 `App`을 import하지 않는
-  관례**(로그인 셸 전체를 렌더해 모킹 비용이 크다)라, App 안에 있는 분기는 단위테스트가
-  원리적으로 닿지 못한다 → 그래서 인증 부트스트랩을 훅으로 뺐다
-  (`frontend/src/hooks/useAuthBootstrap.js:33-36` 주석이 그 판단을 적어둔다).
-  **테스트 가능성이 배치를 결정한다.**
-- JSX를 담은 유틸은 `.jsx` — `frontend/src/components/market/marketUtils.jsx`,
-  `frontend/src/components/reports/reportUtils.jsx`(**`.js` 파일은 없다**).
-- 배럴은 사실상 사문화: `frontend/src/components/ui/index.js`를 import하는 파일은
-  `frontend/src/pages/Showcase.jsx` 하나이고, 나머지 ~70곳은 프리미티브 파일을 직접 import한다.
-- 동명 컴포넌트 충돌 주의: `frontend/src/components/ui/Badge.jsx:25`의 `MarketBadge({market, exchange})`와
-  `frontend/src/components/ui/icons.jsx:108`의 `MarketBadge({mkt, exchange})`가 별개다.
-- 프리미티브는 자기 CSS를 **1행에서** import한다(`frontend/src/components/ui/Badge.jsx:1`,
-  `Stat.jsx:1` 등). 전역 로드 순서는 `frontend/src/main.jsx:3-5`(tokens → motion → index) +
-  `frontend/src/index.css:1-4`(tokens → pc → mobile → guru)로 나뉘어 있다.
-- TypeScript 0파일, `propTypes` 0건 — props는 인라인 주석으로만 문서화한다.
-- `data-testid`는 소수 표면에만 둔다(`frontend/src/pages/Settings.jsx:119`,
-  `frontend/src/pages/GuruDetail.jsx:270,278,287,309,338,344`). **테스트·프로브 앵커이므로
-  스타일 변경 시 유지**하라는 주석이 붙어 있다(`GuruDetail.jsx:286`).
+
+```
+frontend/src/
+  api.js               axios 인스턴스(인터셉터 2개)
+  App.jsx              라우팅 + 셸(Masthead·MobileNav·Toast·InstallPrompt·DiagLog)
+  navSections.js       nav IA 단일 소스 (§9.5)
+  routes.js            구 URL 리다이렉트 맵(REDIRECTS, ADR-0025)
+  utils.js             표시 포매터 정본 (ADR-0031)
+  themeBoot.js         index.html 인라인 사본의 정본 (twin 테스트로 동일성 강제)
+  oauthSplash.js       index.html 스플래시 사본의 정본 (동일)
+  pages/               라우트 단위 화면 (PascalCase.jsx)
+  components/          ui/ · market/ · reports/ · tech/ · portfolio/ · recommendations/ · sketches/
+  hooks/               use*.js
+  contexts/            AuthContext.jsx
+  utils/               analytics · diag · guruName · marketHours · oauthHistory · priceFlash · pwa
+  glossary/            terms.js + match.js
+  styles/              tokens.css · pc.css · mobile.css · guru.css · motion.css
+  test/                교차관심사 테스트 (§TESTING §2)
+```
+
+- 컴포넌트 전용 CSS는 **컴포넌트 옆에 콜로케이트**하고 컴포넌트가 직접 `import './X.css'`한다
+  (`ui/Badge.css`, `portfolio/DashboardCard.css`, `tech/TechKpiStrip.css`).
+  화면 전역 스타일만 `styles/`에 둔다.
+- `components/ui/index.js`가 프리미티브 배럴을 제공한다(`Button`·`Card`/`CardHeader`·`Badge`/
+  `MarketBadge`/`ChangeBadge`·`Stat` + `icons` 전량 re-export).
 
 ### 9.2 스타일·디자인 토큰
-- plain CSS(Tailwind·CSS-in-JS 없음). 토큰 정본은 `frontend/src/styles/tokens.css`(261줄,
-  헤더 `:1-5`가 ADR-0026 에디토리얼 아이덴티티와 "light가 기본" 원칙을 적어둔다).
-  폰트 `:8-10`, 타입 스케일 `:13-22`, 표면/텍스트 `:25-34`, 액센트 `:36-39`, 버튼 필 `:43-45`,
-  **가격 방향 `:48-52`(`--up` #b3372b 상승, `--down` #2b5c9e 하락)**,
-  데이터 팔레트 `:55-59`, `--warn` `:61`, **의미 상태 `:65-78`**, radius·spacing(4px step)·
-  shadow·`--transition-fast`. 전역 유틸 클래스·`:focus-visible`도 같은 파일 하단에 있다.
-- **테마는 `<html data-theme="dark">` 속성 하나**로 갈린다(`tokens.css:123-201`에 다크 오버라이드).
-  토글은 `frontend/src/hooks/useTheme.js:5-18`(+`<meta theme-color>` 동기, localStorage 영속).
-  컨텍스트 없이 props로 내린다(`frontend/src/App.jsx:65,75,132`).
-  `prefers-color-scheme` 미디어쿼리는 쓰지 않는다.
-- **가격 색과 의미 색은 전용 변형으로 분리돼 있다 — 교차 사용 금지.**
-  - `frontend/src/components/ui/Badge.css`: `.badge--up`(`:43`)/`.badge--down`(`:49`)은
-    `--up`/`--down` 바인딩이며 `ChangeBadge` 전용(`Badge.jsx:35-37`, 주석이 "KR 가격색 관례 —
-    의미색(success/danger) 아님"을 명시), `.badge--success`(`:29`)/`.badge--danger`(`:35`)/
-    `.badge--warning`(`:55`)은 `--color-success`/`--color-error`/`--warn`으로 **통념(Western)대로**
-    동작한다.
-  - `frontend/src/components/ui/Stat.css`도 같은 규칙으로 정렬됐다 — **`.stat__value--up`/
-    `--down`만 존재하고 의미 상태 variant는 두지 않는다**(주석 `:16-17`이 이유를 적어둔다).
-    과거에는 `.stat__value--success` = `var(--up)`로 Badge와 반대 명명을 썼고, 그 어긋남이
-    task#254의 "색이 조용히 사라지는" 결함을 만들었다(아래).
-- **⚠️ 접미사 문자열 조립 컴포넌트는 CSS에 없는 값을 받아도 죽지 않는다.**
-  `frontend/src/components/ui/Stat.jsx:14` `stat__value--${valueColor}`는 어떤 문자열이든
-  클래스를 만든다 → 소비처가 `'up'`을 넘기는데 CSS엔 `--success`만 있으면 **색이 무채색으로
-  사라지고 아무 게이트에도 안 걸린다**(vitest는 클래스명을 단언하니 수정 전에도 통과, jsdom은
-  스타일시트를 적용하지 않고, 빌드는 미사용 CSS 클래스를 모른다). variant 이름을 바꿀 때는
-  **CSS 규칙과 소비처를 같은 커밋에서 대조**하라. 현재 `ui/Stat` 소비처는 2곳
-  (`frontend/src/pages/AnalystReport.jsx:332`, `frontend/src/pages/Showcase.jsx:75`)이라
-  화이트리스트는 YAGNI로 두었다. 판정축은 라이브 `getComputedStyle().color`
-  (`scripts/uat254-analyst-upside-color.mjs`, TESTING.md §7).
-  ※ 같은 이름 `valueColor`가 `frontend/src/components/reports/reportUtils.jsx:104` `MetricCard`와
-  `frontend/src/components/reports/DetailTab.jsx:582` `StatRow`에서는 **CSS var 문자열**
-  (`"var(--up)"`)을 받는다 — 두 계약이 다르니 혼용 금지.
-- **공용 배지/색 variant의 의미를 바꿀 때는 소비처 전수 grep 선행** — vitest·빌드는 색 의미에
-  블라인드다(TESTING.md §9).
-- 클래스 명명은 `ui/`에선 BEM-ish(`.badge`, `.badge__icon`, `.badge--up`), 전역 스타일시트에선
-  평탄 kebab + `.is-active` 상태 클래스.
-  **선택자 충돌 주의**: `frontend/src/styles/pc.css`의 전역 `.btn`/`.card`가
-  `ui/Button.css`·`ui/Card.css`와 같은 선택자이며, 단일 대시 `.btn-primary`가 `Button.css`의
-  `.btn--primary`와 공존한다.
-- **인라인 스타일이 물량으로 우세**하다(`style={{` 1495 vs `className=` 987).
-  단, 인라인 안의 색도 항상 `var(--token)` 참조이고 하드코딩 hex는 쓰지 않는다.
-  재사용 인라인 객체는 모듈 상수로 호이스팅해 export한다
-  (`marketUtils.jsx:19,21,30,37`, `reportUtils.jsx:6,7`).
-- 모션은 `frontend/src/styles/motion.css`. 긴 주석(`:12-17`)이 하드 제약을 담는다 —
-  transform `fill: both`가 `position: fixed` 자손을 깨뜨리고, opacity `both`가 모달 z-index를
-  가둔다(그래서 라우트 전환은 transform 없는 `.anim-fade`만 쓴다 — `App.jsx:85-86` 주석).
-  `prefers-reduced-motion` 블록 `:62`.
+
+- `frontend/src/index.css`가 `styles/tokens.css` → `pc.css` → `mobile.css` → `guru.css` 순으로
+  import한다. `App.css`는 `App.jsx`가 따로 import.
+- **토큰 정본은 `styles/tokens.css`** — 에디토리얼 아이덴티티(ADR-0026). light가 기본 테마,
+  dark는 warm night-print 변형. 토큰군: 폰트(`--font-sans/-mono/-serif`)·타이포 스케일 ·
+  배경/표면(`--bg`·`--bg-elev`·`--bg-elev-2`·`--surface-hover`) · 텍스트(`--text`·`--text-2`·`--text-3`) ·
+  악센트 · 반경 · 그림자.
+- **KR 색 관례가 의미색과 분리돼 있다:**
+
+  | 축 | 토큰 | 컴포넌트 변형 |
+  |---|---|---|
+  | 가격 방향 | `--up`(#b3372b 버밀리온) / `--down`(#2b5c9e 프러시안) | `.badge--up` / `.badge--down`, `.stat__value--up` / `--down` |
+  | 의미 상태 | `--color-success` / `--color-error`(=`--color-danger`) / `--warn` / `--color-info` | `.badge--success` / `--danger` / `--warning` / `--info` |
+
+  `ui/Badge.jsx`의 `ChangeBadge`가 `value >= 0 ? 'up' : 'down'`을 고르며 주석으로 못박는다 —
+  **의미색(success/danger)과 교차 사용 금지.**
+  ⚠️ 공용 배지 variant의 색 의미를 바꿀 땐 **소비처 전수 grep 선행**(vitest·빌드는 색 의미에 블라인드).
+- 클래스 명명은 **BEM 유사** — 블록 `badge`/`stat`, 요소 `stat__label`·`badge__icon`,
+  변형 `badge--success`·`stat--md`.
+- ⚠️ **variant 클래스를 문자열로 조립하는 컴포넌트는 오타가 조용히 무색이 된다.**
+  `ui/Stat.jsx`가 `stat__value--${valueColor}`를 만드는데 `Stat.css`엔 `--up`/`--down`만 있다 —
+  CSS에 없는 값을 넘기면 클래스만 붙고 **아무도 죽지 않는다**. variant 이름을 바꿀 땐 CSS 규칙과
+  소비처를 같은 커밋에서 대조할 것(§9.7 ⑪).
+- 일회성 레이아웃은 `style={{ … }}` 인라인을 쓴다(`App.jsx`의 헤더 flex 등). 재사용되면 CSS로 승격.
 
 ### 9.3 데이터 fetch
-- 공용 axios 클라이언트 `frontend/src/api.js`(28줄, **77파일**이 import):
-  `baseURL: import.meta.env.VITE_API_BASE_URL || ''`, 요청 인터셉터가 Bearer 토큰 부착,
-  응답 인터셉터가 **401에서 토큰 삭제 + `window.location.replace('/')`**(`:21`).
-  `href`가 아니라 **`replace`** 인 것이 load-bearing이다 — 만료 시점 딥링크 엔트리를 남기지 않아
-  재로그인 후 뒤로가기 재진입을 막는다(주석 `:20`, 회귀
-  `frontend/src/test/back-to-login-guard.test.jsx:118`).
-  호출은 `/api` prefix를 포함한 전체 경로로 한다(`api.get('/api/market/vix')`).
-- **raw `fetch`는 인증·애널리틱스에만** 쓴다(`frontend/src/App.jsx:41` 로그아웃,
-  `frontend/src/pages/LoginPage.jsx:43,62`, `frontend/src/hooks/useAuthBootstrap.js:51`,
-  `frontend/src/utils/analytics.js:4`) — `api.js`의 401 인터셉터가 로그인 중 리다이렉트를
-  일으키기 때문이다. `VITE_API_BASE_URL`을 읽는 곳은 이들 + `api.js`이고 전부 `|| ''` 폴백이다.
-- 에러 처리 3계층: ① fire-and-forget `.catch(() => {})` ② 지역 error state → 전용 에러 UI
-  (`frontend/src/components/market/VixSection.jsx:12-20`의 loading/error/data 3분기가
-  `market/*Section.jsx` 표준형) ③ 마커 붙인 `console.warn`/`console.error`(§4.5).
-  **토스트는 사용자 개시 mutation용**이고 배경 fetch엔 쓰지 않는다.
-- **에러 정직성**: `.then().finally()`로 로딩만 내리면 rejection이 잡히지 않아
-  `loading=false·data=null`이 되고 **빈 상태 문구(=행동 지시)** 가 뜬다. 실패는 실패로 표시하고
-  빈 상태와 구별해야 한다(회귀 `frontend/src/pages/GuruAllocation.test.jsx:201-217`).
-- 토스트: `frontend/src/components/Toast.jsx` — `ToastProvider`(`:5`) + `showToast(msg, type)`
-  (`:8-12`, `prev.slice(-2)`로 최근 3개만 유지·3초 자동 소멸), 타입 `success|error|warning`
-  (`:26-28` 토큰 색), 컨테이너는 `position:fixed; bottom:150; zIndex:9999; pointerEvents:none`
-  (`:17-23`, `:18-19` 주석이 150인 이유 = 플로팅 버튼 띠 회피를 적어둔다).
-  `useToast()`(`:42-44`)는 **null 가드가 없다**.
-  훅 안에서 재파생하지 않고 **부모가 `showToast`를 인자로 내려준다**
-  (`frontend/src/hooks/useStockManagement.js:5-7`).
-- 로딩 UI 기본은 `ui/Skeleton`(19파일). `LoadingSpinner`는 Guru/Ranking 4곳의 레거시 경로.
-- **스코프/필터 전환 fetch는 경합을 막는다** — 늦게 도착한 이전 요청 응답이 최신 선택을 덮지
-  않게 하고, 전환 실패 시 표시 중인 데이터를 지우지 않는다(회귀
-  `frontend/src/pages/GuruAllocation.test.jsx:230-282`).
+
+- **`frontend/src/api.js`의 axios 인스턴스가 정본.** `baseURL = import.meta.env.VITE_API_BASE_URL || ''`
+  (미설정 시 상대경로 → nginx/Vite proxy).
+- 요청 인터셉터: `localStorage.access_token` → `Authorization: Bearer`.
+- 응답 인터셉터: **401이면 토큰 2종 제거 + `window.location.replace('/')`**.
+  `replace`인 이유가 주석에 있다 — 만료 시점 딥링크 엔트리를 히스토리에 남기지 않아
+  재로그인 후 뒤로가기 재진입을 차단한다.
+- 로그아웃만 `fetch`를 직접 쓴다(`App.jsx`의 `doLogout`, `.catch(() => {})`로 best-effort).
+- **fetch는 훅이 소유하고 컴포넌트는 소비한다** — `useTrackedStocks`·`usePortfolioData`·
+  `useReportList`·`useReportGeneration` 등. 실패는 `console.warn` + 토스트(§4.5).
 
 ### 9.4 훅·컨텍스트
-- `frontend/src/hooks/` **16개**(task#273 `useTrackedStocks`·task#287 `useSwUpdateReload` 추가, 지난 판 "14개"는 stale). 복합 훅은 **args 객체 구조분해**로 받고
-  (`useReportFilters.js:7`, `useStockManagement.js:7`, `useReportGeneration.js:5`),
-  **파생 훅은 재fetch하지 않는다**(헤더 주석이 명시 — `useReportFilters.js:4`,
-  `useStockManagement.js:5-6`). 타이머·옵저버는 항상 cleanup(`usePriceFlash.js:27`,
-  `useStockManagement.js:14`, `useReveal.js:24`, `useBfcacheAuthGuard.js`).
-  훅 본문 위에 한국어 의도 + task 번호를 적는다.
-- 인증 관련 훅 2개가 App에서 분리돼 있다:
-  `frontend/src/hooks/useAuthBootstrap.js`(첫 로드 세션 해석 — URL의 OAuth 결과 → localStorage;
-  **에러·소진 코드·네트워크 실패도 "세션 없음"을 뜻하지 않는다**가 핵심 규약, `:13-17` 주석),
-  `frontend/src/hooks/useBfcacheAuthGuard.js`(`pageshow.persisted`에서 토큰↔화면 불일치면
-  `location.replace('/')`).
-- 컨텍스트는 2개뿐: `frontend/src/contexts/AuthContext.jsx`(`{role, menuPermissions, loading}`,
-  실패 시 `role:'user'`로 degrade하며 **로그 없음** `:23-26`)와 `components/Toast.jsx`.
-  중첩 순서는 `frontend/src/App.jsx:136-146` ToastProvider → AuthProvider → BrowserRouter.
-  Redux/Zustand/React Query 없음 — 서버 상태는 훅/페이지의 `useState`에 있다.
+
+- 컨텍스트 2개 — `contexts/AuthContext.jsx`(세션·메뉴 권한), `components/Toast.jsx`
+  (`ToastProvider` + `useToast`).
+- **레이스 가드 관용구**(`hooks/useTrackedStocks.js`가 전형):
+  - `reloadGenRef` **세대 번호** — 호출마다 `++`, 응답은 자기 세대가 최신일 때만 상태 반영.
+    ⚠️ `.then`뿐 아니라 **`.finally`도 게이트**해야 낡은 응답이 로딩 플래그를 열지 않는다.
+  - `pendingRef`(Set) **같은 틱 중복 클릭 가드** — state는 리렌더 후에야 반영돼 못 막는다.
+  - ⚠️ **뮤텍스(`if (loadingRef.current) return`)는 레이스 가드가 아니다** — 리셋 호출을
+    no-op시켜 오히려 옛 응답이 화면을 소유하게 만든다. reset은 뮤텍스를 우회하고 세대를 올려야 한다.
+- **"모름"을 1급 상태로 둔다** — `useTrackedStocks`는 보유/관심/미추적 외에 `unknown`을 별도로
+  들고, 모름이면 액션을 제시하지 않는다(`wrong < missing`의 어포던스 판).
+  **조회 성공 + 빈 결과는 미추적이지 모름이 아니다.**
+- 토글 성공 후 재조회가 실패해도 `trusted` ref로 `unknown` 복귀를 막는다 — 방금 사용자가 한
+  행동의 결과를 화면에서 잃지 않기 위함.
+- 실패는 **re-throw하지 않고 토스트 + `false` 반환**(호출부 계약).
 
 ### 9.5 라우팅 — nav IA는 `navSections.js` 단일 소스
-- 라우트는 `frontend/src/App.jsx:88-109`. **리다이렉트는 공유 상수로 추출**돼 있다:
-  `frontend/src/routes.js:2-7` `REDIRECTS`를 `App.jsx:89-91`와
-  `frontend/src/test/route-redirects.test.jsx:4`가 함께 읽는다.
-  `*`(404) 라우트는 없다. 인증 게이트는 라우트가 아니라 라우터 앞 분기(`App.jsx:136-141`).
-- **마스트헤드 IA 5섹션의 경로·라벨 목록은 `frontend/src/navSections.js` 단일 소스다 —
-  탭 추가·개명·삭제는 거기 한 곳만 고친다.** export는 `NAV_SECTIONS`(섹션 5개 ×
-  `items[{to, label, evt, match?}]`) + 매칭 헬퍼 `matchesItem`/`matchesSection`(`:48,50`,
-  판정 = `pathname.startsWith(item.match ?? item.to)`) + `sectionByKey`(`:52`).
-  세 소비처가 **파생**한다 — `frontend/src/components/Masthead.jsx:7,46,47,94`(PC 카테고리+서브바),
-  `frontend/src/components/MobileNav.jsx:5,21,29`(모바일 하단 탭바),
-  `frontend/src/pages/ResearchShell.jsx:5,11,12,17,33`(모바일 seg).
-  아이콘 셋은 소비처마다 다르므로(`sketches` vs `ui/icons`) 각자 `ICONS[section.key]`로 매핑하고
-  **공유 모듈엔 순수 경로·라벨 데이터만** 둔다(`navSections.js:5-6` 주석).
-- 경위: 예전엔 같은 IA가 **세 곳에 수기 복제**돼 있었고 그중 한 곳 누락이 실질 재발 경로였다
-  (탭 추가 시 PC 진입 불가 task#215 / 심층 리포트 상세에서 서브바·탭바·seg가 모두 "지금 어디인가"를
-  잃음 task#251). 단일 소스화가 그 경로를 구조적으로 제거했다.
-- **단수/복수 접두사 주의**: `'/analyst-reports'.startsWith('/analyst-report')`가 true라
-  `items`에 `match: '/analyst-report'`(단수) 하나를 달아 목록·상세를 함께 덮는다 —
-  상세에서 부모 탭을 강조하는 게 앱 관례다(`/guru/:id`와 동일). 형제 항목끼리 접두사 관계가
-  생기면 그때 세그먼트 경계 매칭으로 올린다(`navSections.js:8-11` 천장 기록).
-- **회귀 가드(신설)**: `frontend/src/test/nav-active-matching.test.jsx` — 3소비처 × 목록·상세
-  6케이스로 active 표시를 단언한다. 주석 `:23`이 "jsdom은 여기서 블라인드가 아니다 — 레이아웃이
-  아니라 className 존재 여부를 본다"를 명시한다.
-- 내비는 `NavLink`/`Link` + `is-active` 클래스, 애널리틱스는 `trackEvent(item.evt)`
-  (`ResearchShell.jsx`, `MobileNav.jsx`). 권한 필터는 `menuPermissions.includes(section.perm)`,
-  PC 서브바는 `items.length >= 2`일 때만 렌더.
-  **이벤트명은 `section.perm`에서 파생**한다(§1.5의 겸직 필드 주의).
+
+`frontend/src/navSections.js`가 5섹션(`research`·`portfolio`·`market`·`schedule`·`guru`)의
+경로·라벨 데이터와 매칭 헬퍼(`matchesItem`·`matchesSection`·`sectionByKey`)를 export한다.
+
+- **소비처 3곳이 파생한다** — `components/Masthead.jsx`(PC 카테고리+서브바),
+  `components/MobileNav.jsx`(모바일 하단 탭바), `pages/ResearchShell.jsx`(모바일 seg).
+  탭 추가·개명·삭제는 **`navSections.js` 한 곳만** 고친다.
+- 아이콘 셋이 소비처마다 다르므로(`sketches` vs `ui/icons`) 공유 모듈엔 **순수 경로·라벨만** 둔다.
+- 매칭은 **접두사**(`pathname.startsWith(item.match ?? item.to)`). `match`는 `to`와 다를 때만 단다 —
+  `/analyst-report`(단수) 하나가 목록 `/analyst-reports`와 상세를 함께 덮는 것이 **의도**다
+  (상세에서 부모 탭을 강조하는 게 앱 관례, `/guru/:id`와 동일).
+  천장: 형제 항목끼리 접두사 관계가 생기면 그때 세그먼트 경계 매칭으로 올린다.
+- 구 URL은 `frontend/src/routes.js`의 `REDIRECTS`(ADR-0025)로 처리하고 `App.jsx`와 회귀 테스트가 공유.
+- 회귀 가드: `frontend/src/test/nav-active-matching.test.jsx`(3소비처 × 목록·상세).
 
 ### 9.6 차트 (recharts)
-- 표준형: `ResponsiveContainer width="100%"` + **고정 숫자 height** →
-  `CartesianGrid stroke="var(--border)"` → 축 `tick={{fontSize:10, fill:'var(--text-3)'}}` +
-  명시 `width`(레이아웃 안정화) → `Tooltip contentStyle`에 토큰 → 밀집 계열은 `dot={false}`.
-  기준 예: `frontend/src/components/market/VixSection.jsx:47-58`.
-  모든 색은 `var(--data-1..5)` 등 토큰. focus outline은 `frontend/src/index.css:6-11`에서 전역 억제.
-- **recharts 반지름은 `min(폭, 높이)/2`로 캡된다** — 도넛을 키우려면 폭만 넓혀선 안 되고
-  `height`도 같이 올려야 한다. 그리고 **크기를 바꾸면 라벨 자동 임계값이 내려가 라벨 수가
-  늘어나므로**(outerR 130→164에서 라벨 370→497개) 새로 등장하는 라벨의 넘침을 전수 재검증한다.
-- **dual Y축은 좌=금액(억/조원·십억달러), 우=비중 %**(점선, `--data-3`)로 고정
-  (`KrExportsSection.jsx`, `KrTop2Section.jsx`, `M7EarningsSection.jsx`, `LeverageSection.jsx`,
-  `reports/ShortSellSection.jsx`, `ConsensusChart.jsx`, `FinancialsChart.jsx`).
-- 용어 범례 어댑터: `frontend/src/components/Glossary.jsx:104` `GlossaryRechartsLegend`를
-  `<Legend content={<GlossaryRechartsLegend />} />`로 끼운다.
-- 공용 헬퍼: `frontend/src/components/market/marketUtils.jsx` — `krFmt`(`:6`, **입력 '억원' 단위
-  가정**, 10,000억↑ 조), `isEstimated`(`:12`), `SECTION_*_STYLE`(`:19-37`), `SectionCard`(`:50`),
-  `SectionCardLoading`(`:96`), `SectionCardError`(`:108`), `LoadingBox`(`:120`), `ErrorBox`(`:124`),
-  `EmptyNote`(`:134`).
-  `frontend/src/components/reports/reportUtils.jsx` — `TH`/`TD`(`:6,7`), `fmtN`(`:9`),
-  `rsiColor`(`:10`), `fmtGap`(`:17`), `computePeerPremiums`(`:30`), `computeRevenueCagr`(`:58`),
-  `overallWeather`(`:81`), `MetricCard`(`:104`), `SectionTitle`(`:112`), `GapCell`(`:123`),
-  `TargetTooltip`(`:132`).
-  **중앙값 정의는 프론트·백엔드가 같아야 한다** — `computePeerPremiums`(짝수면 중간 두 값 평균)와
-  `backend/services/report_generator.py:148` `_peer_median`이 서로를 docstring에서 참조한다.
-  두 곳이 다른 정의를 쓰면 화면 기준과 가드 기준이 어긋난다.
-- recharts + `d3-*` + `victory-vendor`는 `charts` 청크로 분리(`frontend/vite.config.js:100-107`
-  `manualChunks`). **Vite 8(rolldown)은 `manualChunks`를 함수로만 받는다** — 객체형은 빌드 실패
-  (주석 `:102`).
 
-### 9.7 레이아웃·시각은 추정하지 않는다 — 5개의 독립 판정축
-`minmax`·열 수·폭 임계값을 정하는 변경은 배포 전에 `getBoundingClientRect()` 실측 1회를 근거로
-삼는다. **가용폭을 "카드 폭 − 패딩"으로 추정하면 flex 형제가 먹는 폭을 놓친다**(295px 추정 vs
-237px 실측). 열 수를 **줄이면** 남는 열이 넓어져 반대 뷰포트의 밀도가 내려가고, **늘리면** 좁은
-트랙에서 label이 접혀 오히려 카드가 커지는 역전 지점이 있다. 완료기준은 대리지표(열 수)가 아니라
-목표 자체(카드 높이·label 줄수)로 쓴다.
+- 수익/수출 계열(`components/market/M7EarningsSection.jsx`·`KrTop2Section.jsx`·`KrExportsSection.jsx`)은
+  **dual Y-axis** — 좌 `yAxisId="left"`(금액), 우 `yAxisId="right"`(비중 %).
+- 축소 포맷은 `frontend/src/utils.js`의 `fmt*` 사용 — **입력 단위 확인 필수**
+  (`fmtEokWon`은 억원 입력, 원 단위를 그대로 넘기면 1e8배 오표기).
+- `index.css`가 `.recharts-wrapper`/`.recharts-surface`의 `outline`·tap-highlight를 제거한다.
+- 청크: `vite.config.js`의 `manualChunks(id)`가 `recharts`/`/d3-`/`victory-vendor`를 `charts`로 분리.
+  ⚠️ **Vite 8(rolldown)은 `manualChunks`를 함수로만 받는다**(객체형은 빌드 실패).
+- ⚠️ **jsdom에서 recharts는 렌더되지 않는다**(`ResponsiveContainer` 0크기) → 단위 테스트의 관측점은
+  SVG가 아니라 **캡션·testid·주변 DOM**이다(`TESTING.md §6`). 시각 속성은 라이브 프로브 몫.
+- 퍼센트를 폭으로 쓰는 비율 막대(`components/tech/MarketEstimates.jsx` 계열)는 **트랙 폭이 행마다
+  같아야** 의미가 성립한다 — 값·배지 같은 비축약 요소의 폭을 행 전체에서 예약하고(`max(len)ch`),
+  숨김은 `visibility: hidden`으로(`display: none`이면 박스가 사라져 원인이 재발).
 
-시각 결함은 **서로 잡히지 않는 5개 축**으로 갈린다 — 하나만 재면 나머지 4개에서 ALL PASS한다:
+### 9.7 레이아웃·시각은 추정하지 않는다 — 6개의 독립 판정축
 
-| # | 결함 클래스 | 왜 다른 축이 못 잡나 | 판정축 |
-|---|---|---|---|
-| 1 | **넘침** — 박스가 컨테이너를 벗어남 | — | `getBoundingClientRect()` 교차 |
-| 2 | **잘림** — `text-overflow: ellipsis`·`line-clamp` | 박스를 넘는 게 아니라 **박스 안에서 내용을 지운다** | `scrollWidth > clientWidth`(세로면 `scrollHeight`) |
-| 3 | **접힘** — flex가 자식을 압축해 텍스트가 여러 줄로 | 박스는 컨테이너 안에 머물고 **높이만** 2배가 된다. `right`가 부모와 *정확히* 일치하면(330.0 vs 330.0) "딱 맞았다"가 아니라 "압축됐다"는 신호 | 텍스트 노드에 `Range`를 걸어 `range.getClientRects().length === 1` |
-| 4 | **간격** — 요소 *간* 거리가 의미를 왜곡(붙어야 할 게 떨어지고, 떨어져야 할 게 붙음) | 축 1~3은 전부 "단일 요소가 *자기* 상자 안에 있는가"를 묻는다 | 쌍의 `left − right` 거리 단언(예: `칩.left − 캡션.right ≤ 24px`) |
-| 5 | **미적용 스타일** — 클래스는 붙었는데 CSS 규칙이 없어 색이 사라짐 | 축 1~4는 전부 *기하*를 잰다 | 라이브 `getComputedStyle(el).color` vs `:root` 토큰 실측값 |
+레이아웃 수치는 **실측**한다(`getBoundingClientRect()`). `minmax`·열 수·폭 임계값을 정하는
+변경은 배포 전 실측 1회를 근거로 삼는다 — flex 형제가 먹는 폭을 놓쳐 295px로 추정한 가용폭이
+실제 237px이었던 전례가 있다.
+
+**아래 6축은 서로 독립이다 — 하나가 통과해도 나머지는 아무 말도 하지 않는다:**
+
+| 축 | 결함 형태 | 계측 |
+|---|---|---|
+| ① 넘침 | 자식이 컨테이너를 벗어남 | `getBoundingClientRect()` 교차 |
+| ② 잘림 | `text-overflow: ellipsis`가 **박스 안에서** 내용을 지움 | `scrollWidth > clientWidth` — **텍스트 leaf**와 **`overflow:hidden` 컨테이너** 두 계열 |
+| ③ 접힘 | flex 압축으로 텍스트가 **박스 안에서** 여러 줄이 됨 | 실제 렌더 줄 수 = 서로 다른 `top` 값의 개수 |
+| ④ 간격 | 박스는 정상인데 **요소 *간* 거리**가 의미를 왜곡 | 쌍 간 `left − right` 임계 |
+| ⑤ 색 | 클래스는 붙었는데 CSS 규칙이 없어 색이 사라짐 | 라이브 `getComputedStyle(el).color` |
+| ⑥ 좌표계 | SVG `viewBox` 좌표는 맞는데 화면 픽셀이 읽을 수 없이 작음 | `getBoundingClientRect().height ≥ 10px` |
 
 구현 쪽 짝:
-- 축2 — **ellipsis는 문자열 *끝*을 먹으므로 중요한 수치를 끝에 두지 않는다.** 줄어도 되는 것(이름)만
-  ellipsis 상자에 넣고, 줄면 안 되는 것(수치)은 `flex-shrink: 0` 형제 span으로 고정한다.
-- 축3 — **`flex-wrap: wrap`(컨테이너) + `white-space: nowrap`(자식)**: 폭이 모자라면 줄바꿈으로
-  흐르되 텍스트 자체는 접히지 않는다.
-- 축4 — 정렬을 `margin-left: auto`·`space-between` 같은 "남는 공간" 규칙에 맡기지 않는다.
-  같은 규칙이 310px에선 "우측 정렬"이고 1400px에선 "1,000px 유기"다. 인접해야 할 쌍은 `gap`으로
-  직접 묶고, 분리해야 할 쌍은 **그 요소 앞에만** margin을 준다(컨테이너 gap을 키우면 무관한 쌍까지
-  늘어져 스캔선이 흐려진다).
-- 축5 — §9.2의 접미사 조립 주의.
 
-검증 방법·프로브 규약은 TESTING.md §7·§9. **육안으로 잡은 결함은 반드시 축으로 승격**시켜
-다음번엔 육안에 기대지 않는다.
+- **ellipsis는 문자열 *끝*을 먹는다** → 줄어도 되는 것(이름)만 ellipsis 상자에 넣고, 줄면 안 되는
+  것(수치·배지)은 `flex-shrink: 0` 형제로 고정한다. **한국어 자유 서술 필드(event·note·title)는
+  자르지 않는다** — 한국어는 술어가 끝에 와서 잘리면 "무슨 일이 일어났는가"가 먼저 사라진다.
+- 접힘 방지는 **`flex-wrap: wrap`(컨테이너) + `white-space: nowrap`(자식)** 조합.
+- **정렬을 `margin-left:auto`·`space-between` 같은 "남는 공간"에 맡기지 않는다** —
+  같은 규칙이 310px에선 "우측 정렬"이고 1400px에선 "1,000px 유기"가 된다.
+  인접해야 할 쌍은 `gap`으로 직접 묶는다.
+- **넓은 다이어그램은 축소하지 말고** `minWidth`로 설계 크기를 지키고 자체 `overflow-x: auto`
+  스크롤러에 담는다(페이지 본문은 가로 스크롤하지 않는다).
+- **열 수를 건드리는 변경은 양쪽 뷰포트가 반대로 움직인다** — 모바일에서 열을 줄이면 PC에서
+  카드가 넓어져 밀도가 내려간다. PC/모바일을 같이 캡처할 것.
+
+**검증 방법·프로브 규약은 `TESTING.md §7`·`§9`.** vitest·빌드는 이 6축 전부에 블라인드하다.
+**육안으로 잡은 결함은 반드시 축으로 승격**시켜 다음번엔 프로브가 잡게 한다.
 
 ### 9.8 Lint
-`frontend/eslint.config.js`(flat, 23줄) 전체가 `globalIgnores(['dist'])` +
-`js.configs.recommended` / `reactHooks.configs.flat.recommended` / `reactRefresh.configs.vite`
-3프리셋 + `languageOptions`뿐이다. **`rules` 블록이 없고 `no-console`도 미설정**이며
-`eslint-plugin-react`·`jsx-a11y`는 설치돼 있지 않다. 억제는 소수(모두 `exhaustive-deps`).
-`npm run lint` 스크립트는 있으나 **lint는 어디에도 연결돼 있지 않다** —
-`.github/workflows/deploy.yml`(16줄)은 lint/test/build 잡이 없고, `deploy.sh`는 프론트
-`npm install && npm run build`만 돌리며, `.husky/`·비-sample git hook도 없다.
+
+`frontend/eslint.config.js`(flat config) — `js.configs.recommended` +
+`eslint-plugin-react-hooks` flat recommended + `eslint-plugin-react-refresh` vite 프리셋.
+`globalIgnores(['dist'])`, 브라우저 globals, JSX 파서 옵션. 실행은 `npm run lint`.
+
+**커스텀 규칙 없음** — `no-console`도 없고(§4.5), 테스트 파일 전용 설정도 없다.
+백엔드에는 린터·포매터가 없다(black/ruff/flake8 미도입).
 
 ### 9.9 i18n·접근성
-- i18n 라이브러리·로케일 파일 없음. **UI 텍스트는 전부 한국어 인라인**이다.
-  단 enum 값은 locale-독립 저장값으로 두고 label/색만 표시용으로 매핑한다
-  (`frontend/src/components/ui/SupplyBadge.jsx:2-3`, `InsiderBadge.jsx:2`).
-  `frontend/index.html:2`는 `<html lang="en">`인데 PWA manifest는 `lang: 'ko'`(불일치, 알려진 성질).
-- `aria-*`는 희소하고 편중돼 있다 — 지배 관례는 장식 SVG의 `aria-hidden`
-  (`frontend/src/components/ui/icons.jsx` 아이콘 전부, `Skeleton.jsx`,
-  `GuruDetail.jsx:369`의 0×0 문자폭 측정용 SVG). `aria-label`은 한국어, `aria-expanded`·`role`은
-  각 2곳. **모달은 `role="dialog"`·포커스 트랩 없이 `useBodyScrollLock`만 쓴다**
-  (`StockModal.jsx`, `PromoteModal.jsx`, `GlobalSearch.jsx`).
-- 툴팁 기본 수단은 `title` 속성(`aria-describedby` 0건)이며, market 섹션마다 3~4개씩 있다.
-  **`title`은 Playwright 셀렉터로도 load-bearing**하다(TESTING.md §7).
-  풍부한 대안은 용어 팝오버 `frontend/src/components/Glossary.jsx`
-  (`GlossaryTerm`, `GlossaryText`, 매칭 규칙은 `frontend/src/glossary/terms.js:1-3`).
-- 포커스 링은 `frontend/src/styles/tokens.css`에 중앙화. reduced-motion은 3곳에서 존중
-  (`motion.css:62`, `useCountUp.js:16`, `useReveal.js:12`).
+
+- **i18n 라이브러리 없음.** UI 문자열은 한국어 리터럴로 JSX에 직접 박는다.
+  숫자·통화는 `toLocaleString('ko-KR'|'en-US')`로 시장별 분기(`utils.js`의 `fmtPrice`).
+- PWA 매니페스트 `lang: 'ko'`(`vite.config.js`).
+- 접근성:
+  - 장식용 이미지·아이콘은 `alt=""`.
+  - ⚠️ **SVG에 `role="img"`를 걸면 자손 `<text>`가 접근성 트리에서 통째로 프루닝된다**
+    (ARIA leaf role). 데이터를 SVG로 그리는 컴포넌트는 `role="list"` + 항목 `aria-label`을 쓰거나
+    시각적으로 숨긴 `<ul>`을 병행한다.
+  - **접기는 네이티브 `<details>`로** — JS 상태로 접으면 닫힌 본문이 DOM에서 사라져
+    Ctrl+F·스크린리더가 못 찾는다.
+  - 자동 접근성 가드는 없다(axe 등 미도입).
 
 ---
 
 ## §10 문서 동기 의무 (코드 변경에 딸린 DoD)
 
-| 트리거 | 갱신 대상 | 강제 수단 |
+| 변경 | 함께 고칠 문서 | 강제 |
 |---|---|---|
-| 엔드포인트 추가·삭제·개명 | `API_SPEC.md`(전체 REST 레퍼런스, 현재 `### \`METHOD /path\`` 헤더 **140개**) | **자동** — `backend/tests/test_api_doc_sync.py`가 라이브 `app.routes` ↔ 문서 헤더를 exact-match 대조. `KNOWN_UNDOCUMENTED`는 현재 **빈 frozenset**(`:50`)이라 미문서 엔드포인트 1개도 허용되지 않는다 |
-| Cowork(외부 enrich/backlog 워크플로우) 대상 엔드포인트 | `CLAUDE_COWORK_API.md`(현재 헤더 **9개**) | **부분 자동** — stale(문서에 있는데 라이브에 없음)만 검출. "2문서 모두"는 **Cowork 스코프에 한한다** — 사용자 대면 read·admin refresh는 `API_SPEC.md`만 |
-| 요청/응답 스키마·인증 게이팅 산문 | 위 두 문서의 본문 | **없음(수동 DoD)** — doc-sync는 엔드포인트 *존재*만 본다. 인증 게이팅을 바꾸는 슬라이스는 착수 시 `grep -n '\*\*Auth:\*\* 불필요' API_SPEC.md`를 먼저 돌릴 것(현재 잔존 **1건** — `auth.py` 공개 엔드포인트, ADR-0029) |
-| 기능 표면(화면 구성·환경변수·기술 스택·아키텍처·배치) | `README.md` 해당 절 | 없음(수동). overview 레벨만 — 엔드포인트/스키마 세부는 `API_SPEC.md`에만 |
-| 배치 fetch 소스 변경 | `backend/services/batch_registry.py`의 `source` | 존재만 자동(`test_batches_router.py:52-65`) |
-| 신규 DB 컬럼 | `backend/app_schema.sql` **+** `backend/main.py:_migrate()` 쌍 | 없음(수동) |
-| nav 탭 추가·개명·삭제 | `frontend/src/navSections.js`만 | 부분 자동 — `frontend/src/test/nav-active-matching.test.jsx`가 active 매칭을 단언(§9.5) |
-| 규약·함정 학습 | 루트 `CLAUDE.md` Gotchas + 이 문서 | 없음(수동) |
+| 엔드포인트 추가/삭제/개명 | `API_SPEC.md`(전 엔드포인트) | `backend/tests/test_api_doc_sync.py`(존재 drift 자동검출) |
+| Cowork enrich/backlog 워크플로우 관련 엔드포인트 | + `CLAUDE_COWORK_API.md` | 부분 자동(stale만) |
+| 요청/응답 스키마·인증 게이팅 | 위 문서의 산문 | **수동** — 테스트는 존재만 본다 |
+| 기능 표면(화면 구성·env·스택·아키텍처·배치) | `README.md`의 해당 절 | 수동 |
+| 비가역 결정 | `.forge/adr/NNNN-*.md` | 수동 |
+| 도메인 용어 | `.forge/CONTEXT.md` | 수동 |
+| 소스 줄 수 변경 | `.forge/codebase/*.md`의 `file:NNN` 참조 | 수동 (`grep -n '<파일명>:[0-9]' .forge/codebase/*.md`) |
 
-`.forge/codebase/`는 **구현 사실** 전용이다. 도메인 용어 정의는 `CONTEXT.md`, 결정 기록은
-`.forge/adr/`에 둔다(이 문서에 중복 서술하지 말 것).
+**"2문서 모두"는 Cowork 관련 엔드포인트에 한한다** — `CLAUDE_COWORK_API.md`는 외부 Cowork
+전용 스코프라 사용자 대면 read 엔드포인트는 `API_SPEC.md`에만 넣는다.
+
+**인증 게이팅을 바꾸는 변경은 착수 시 `grep -n '불필요' API_SPEC.md`를 먼저 돌린다.**
+⚠️ **패턴을 좁히지 말 것** — `**Auth:** 불필요`(콜론 독립 줄)로 좁히면 문장 중간형
+`**Auth 불필요.**`를 원리적으로 볼 수 없고, 그 형태가 같은 섹션 안에서
+`**Auth:** Bearer token 필요`와 문자 그대로 모순인 채 생존한 전례가 있다.
+남아도 되는 `불필요`는 `routers/auth.py`의 공개 엔드포인트뿐이다(ADR-0029).
+
+**문서 슬라이스에 착수하면 고칠 필드만 보지 말고 그 절 전체를 실응답과 한 번 대조**한다 —
+"필드 N개 추가"로 범위를 잡으면 그 절이 *이미* 두 세대 뒤처져 있는지는 안 보이고,
+`test_api_doc_sync.py`는 응답 스키마 drift에 원리적으로 블라인드다.
+
+⚠️ **줄번호 참조 보정 시 산술 추정 금지** — 시프트는 부위별로 다르다(같은 파일에서 +2와 +4가
+공존). `git show HEAD:<file>`로 옛 줄을 읽어 **의미로** 확정할 것. 그리고 **선재 drift**
+(내 변경과 무관하게 이미 어긋난 참조)와 시프트는 별개 축이니, 전자에 시프트를 적용하면
+오차가 세탁된다 — 선재 drift는 건수만 보고하고 `fg-map` 재생성으로 처리한다.
 
 ---
 
 ## §11 규약을 강제하는 자동 가드 (요약)
 
-| 가드 | 무엇을 막는가 |
-|---|---|
-| `backend/tests/test_no_print.py` | 앱 코드의 신규 `print()` (§4.1) |
-| `backend/tests/test_no_bare_today.py` | bare `date.today()`/`datetime.today()` — 컨테이너 UTC라 00~09 KST에 하루 어긋난다. `services.utils.today_kst()` 사용 (§8) |
-| `backend/tests/test_no_public_reads.py` | 무인증 `/api` 엔드포인트 신규 추가 + 허용목록 stale (ADR-0029, §6) |
-| `backend/tests/test_api_doc_sync.py` | 문서 없는 신규 엔드포인트 / 삭제 누락 (§10) |
-| `backend/tests/test_batches_router.py` 외 3파일 | 배치 id/개수 드리프트, `source` 누락 (§8) |
-| `backend/tests/test_nan_serialization_guards.py` | NaN/inf 응답 오염 → 직렬화 500 (§5.2) |
-| `backend/tests/test_nan_input_guards.py` | 라우터 신규 float 필드가 `allow_inf_nan=False` 무가드로 추가되는 것 (§5.2) |
-| `backend/tests/test_utils_sanitize_decimal.py` | `sanitize`가 `Decimal('NaN')`/`Decimal('Infinity')`를 통과시키는 회귀 (§5.2) |
-| `backend/tests/test_consensus_target_nan.py` | NaN/Infinity `target_price`가 컨센서스 마트로 전파되는 회귀 (§5.2) |
-| `backend/tests/test_consensus_asof_batch.py::test_values_placeholder_shape` | `VALUES` 괄호 감싸기 회귀 (§7) |
-| `backend/tests/conftest.py` `_block_real_db` | 테스트의 실 DB 접촉 (TESTING.md §3) |
-| `backend/tests/_routes.py` `walk_routes` | FastAPI 버전차로 라우트 열거가 조용히 0개가 되는 것 |
-| `backend/tests/test_cowork_fire_listener.py` | fire 리스너의 workdir 충돌 + API 키 argv 노출 |
-| `frontend/src/test/nav-active-matching.test.jsx` | nav 단일 소스의 active 매칭 회귀 (§9.5) |
-| `frontend/src/test/route-redirects.test.jsx` | `routes.js` `REDIRECTS`와 라우트 배선 드리프트 |
-| `frontend/src/test/back-to-login-guard.test.jsx` | 전체이동 진입점의 히스토리 취급(replace vs push) 회귀 (§9.3) |
-| `scripts/uat254-analyst-upside-color.mjs` | 클래스는 붙었는데 CSS 규칙이 없어 색이 사라지는 것 (§9.2·§9.7 축5) |
+| 가드 | 위치 | 무엇을 막나 |
+|---|---|---|
+| zero-print | `backend/tests/test_no_print.py` | 앱 코드 `print(` (§4.1) |
+| bare today | `backend/tests/test_no_bare_today.py` | `date.today()`/`datetime.today()` (§8) |
+| 무인증 엔드포인트 | `backend/tests/test_no_public_reads.py` | ADR-0029 위반 (§6) — 양방향 exact-match |
+| API 문서 drift | `backend/tests/test_api_doc_sync.py` | 엔드포인트 *존재* 불일치 (§10) |
+| 라우트 열거 비공허 | `test_no_public_reads.py::test_route_walk_is_not_silently_empty` | FastAPI 버전차로 0개를 세며 통과 (§3.3) |
+| 라우트 평탄화 헬퍼 | `backend/tests/_routes.py` `walk_routes` | 위 두 테스트의 공통 기반 |
+| 실 DB 접근 | `backend/tests/conftest.py` `_block_real_db` | 테스트가 prod DB에 쓰는 사고 |
+| 배치 레지스트리 | `test_batch_market_split.py` · `test_batches_router.py` · `test_macro_signals_batch.py` | 배치 추가/은퇴 시 count·id 집합 (§8) |
+| nav 활성 매칭 | `frontend/src/test/nav-active-matching.test.jsx` | 3소비처 × 목록·상세 (§9.5) |
+| 쌍둥이 사본 동일성 | `frontend/src/test/theme-boot-twin.test.js` · `oauth-splash-twin.test.js` | `index.html` 인라인 사본 ↔ 모듈 정본 drift |
+| ADR-0029 감사 스크립트 | `scripts/audit_unauth_endpoints.py` | 라이브 배선 기준 무인증 열거(종료코드 0/1) |
 
-**자동 가드가 없는 규약**(리뷰·수동 검증 의존): 프론트 로깅 마커(§4.5),
-라우트 순서(§6), `_migrate` 쌍(§7), 배지/`Stat` 색 의미(§9.2), 레이아웃 수치(§9.7),
-겸직 필드 파생(§1.5), 프론트 이벤트명 화이트리스트 정합, README·스키마 산문 동기(§10).
+**자동 가드가 없는 규약**(리뷰·관례 의존): 로그 마커 스펠링(§4.3) · 프론트 `console.*` 마커(§4.5) ·
+`source`/`usage` 갱신(§8) · API 문서의 **스키마·인증 산문**(§10) · README 동기(§10) ·
+레이아웃·색·간격·접근성(§9.7·§9.9 — 라이브 프로브가 유일한 계층, `TESTING.md §7`).

@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 47521121f10ac1c057fe9cf8ed5fc43ab5ca596c
-mapped: 2026-07-31
+last_mapped_commit: 20dd46eb829b05025af793b010dfe4efe2925a7d
+mapped: 2026-08-10
 ---
 
 # CONCERNS — 기술부채·버그·리스크 지도
@@ -15,902 +15,958 @@ mapped: 2026-07-31
 | **잠재 위험** | 지금 깨져 있지는 않으나, 특정 입력·외부 변화·재실행에서 깨진다. |
 | **설계상 트레이드오프** | 의도된 선택(대개 ADR 근거 있음). 비용을 알고 쓰라는 뜻. |
 | **이미 가드됨(잔여 위험만)** | 과거 사고가 코드로 막혔다. **재제기 금지** — 남는 잔여만 적었다. |
+| **미확인** | 이번 패스에서 코드로 확정하지 못했다. 근거 부족인지 도구 범위 밖인지 함께 적었다. |
 
-`CLAUDE.md`는 *역사* 문서라 이미 고쳐진 항목·나중에 정정된 항목이 섞여 있다. 이 문서는 **HEAD `4752112` 시점의 코드 상태**를 기준으로 전 항목을 재검증한 결과다. 어긋나는 곳은 §13에 모았다.
+이 판은 **HEAD `20dd46e` 시점의 코드에서 전면 재작성**했다. 직전 판(`4752112`, 07-31)을 베이스라인으로 쓰지 않았고, `CLAUDE.md`의 Gotchas 산문은 *리드 목록*으로만 썼다 — 각 항목을 코드로 재확인해 확인된 것만 실었고, 확인되지 않은 것은 §13에 "미확인"으로 분리했다.
 
-> ⚠️ **섹션 번호를 함부로 바꾸지 말 것.** 코드 주석 8곳과 `API_SPEC.md`가 `CONCERNS §N`을 직접 인용하며, 그중 절반이 이미 옛 번호를 가리키고 있다(§12.6). 항목 추가는 하위번호(§N.M)로, 대분류(§0~§14) 번호는 고정으로 유지한다.
+> ⚠️ **섹션 번호를 함부로 바꾸지 말 것.** 코드 주석 8곳과 `API_SPEC.md`가 `CONCERNS §N`을 직접 인용한다. 이번 판은 대분류(§0~§14) 번호를 직전 판과 **동일하게 유지**했다. 인용 중 어느 것이 이미 stale한지는 §12.6에 실측으로 정리했다. 항목 추가는 하위번호(§N.M)로.
 
-> 🔒 **이 문서는 git 추적 대상이다** — 실제 키·토큰·비밀번호 **값**은 쓰지 않는다. 환경변수 *이름*만 적는다. (지난 판이 `docker-compose.yml`의 폴백 비밀번호 값을 인라인했던 자리는 이번에 마스킹했다 — §10.2.)
+> 🔒 **이 문서는 git 추적 대상이다** — 실제 키·토큰·비밀번호 **값**은 쓰지 않는다. 환경변수 *이름*만 적는다.
+
+**이번 판에서 반증된 전제 3건** (지시문·직전 판이 참으로 놓았으나 코드가 다르게 말한다):
+1. `services/db.py::get_connection`은 **롤백 경로가 있다**(`except Exception: conn.rollback(); raise`). "정상 종료 시 커밋한다"는 맞지만 "롤백 전제 코드가 성립하지 않는다"는 **틀렸다** — §4.3.
+2. `short_sell_service`·`investor_service`·`lending_service`·`leverage_service`는 **delete-rewrite가 아니다**(전부 append-only upsert). 빈 fetch가 이미 안전한 no-op이다 — §1.4.
+3. 무인증 엔드포인트는 여전히 **정확히 9개**이고 전부 `routers/auth.py` 소속이며, `tests/test_no_public_reads.py`의 allowlist와 **양방향으로 일치**한다(드리프트 0) — §5.1.
 
 ---
 
 ## 0. 지금 열려 있는 확인된 버그
 
-번호는 지난 매핑(`91bac67`)과 **연속**이다 — 해소된 것은 아래 "해소" 표로 내리고 번호를 재사용하지 않는다.
-
-> **재검증: 2026-08-02 (task#272) — 이 절만 갱신됨.** 8차 버그 헌트가 기존 "열림" 21건을 전수 재검증해 5건(B10~B14)을 해소로 내리고, 새로 확정된 13건(B27~B39)을 추가했다. 판정 근거·현재 코드 인용은 `.forge/bug-report.md`(8차)의 「B목록 재검증」 절에 있다.
-> **문서의 나머지 절(§1~§14)은 여전히 `last_mapped_commit: 4752112`(07-31) 기준**이며 이번에 검증되지 않았다.
->
-> **갱신: 2026-08-02 (task#273·#274) — §0의 표만.** task#273이 B27·B32를 닫고 B24를 절반 닫았고(`ranking_watch_toggle`만 등록, `nav_analytics`는 잔존), task#274가 구루 크롤 3건(B28·B29·B31)을 닫았다. 아래 §1~§14 본문의 해당 절 서술은 **아직 옛 코드 기준**이다.
+번호는 지난 매핑과 **연속**이다(해소된 것의 번호는 재사용하지 않는다). 이번 판은 아래 표의 전 항목을 `20dd46e` 코드로 **직접 재확인**했다. 직전 판에 있었으나 이번에 재검증하지 못한 항목은 §13.2에 "미확인"으로 분리했다 — 표에서 사라졌다고 해소된 것이 아니다.
 
 ### 데이터 손실·오염
-| # | 결함 | 위치 | 도달 조건 |
+
+| # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| B1 | KR 랭킹 빈응답이 전 KR 행을 DELETE | `services/ranking_service.py:109-110` → `:162` | Naver 200 + 빈/개명 페이로드 |
-| B5 | 사용자 삭제가 6개 트랜잭션 — 중간 실패 시 반쯤 삭제된 사용자 | `routers/admin.py:111-119` | 루프 중 DB 오류 |
+| **B1** | KR 랭킹 빈응답이 전 KR 행을 DELETE 후 0행 삽입 | `services/ranking_service.py::_fetch_naver_market` → `::replace_market_rankings` | Naver 200 + `totalCount:0` |
+| **B40** | `_mc_load` 실패를 "저장값 없음"으로 읽어 365일 시계열을 1건으로 덮어씀 | `market_indicators/kospi_signal.py::refresh_kospi_signal` | 배치 중 DB read 1회 실패(PoolError 포함) |
+| **B41** | `market_cache` 키 `fx`에 **배치가 없다** — 포트폴리오 KRW 환산 전체가 무기한 stale | `market_indicators/fx.py::get_fx` (소비: `routers/stocks.py::_usdkrw_rate`) | 아무도 시장지표 탭을 안 열면 항상 |
+| B5 | 사용자 삭제가 6개 독립 트랜잭션 — 중간 실패 시 반쯤 삭제된 사용자 | `routers/admin.py::delete_user` | 루프 중 DB 오류 |
 
 ### 무음 미동작 / 오값
-| # | 결함 | 위치 | 도달 조건 |
-|---|---|---|---|
-| B6 | 키 미설정 배치가 "성공"으로 기록 | `market_indicators/econ.py:13-15`, `macro.py:59-61`, `scheduler/jobs.py:76,87,431` | `FRED_API_KEY`/키움 미설정 |
-| B7 | KR 배당 기준연도가 1년 어긋남 | `services/dividends.py:101-102` | 4월 1일 00:00–09:00 KST |
-| B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | `services/consensus_pipeline.py:173` → `:188` | US/Eastern 저녁 발행 리포트 |
-| B9 | 프론트에 access token 갱신 경로가 없다 | `frontend/src/api.js:15-26` | 1시간 경과 (항상) |
-| **B24** | (**부분 해소**, task#273) `nav_analytics`가 아직 백엔드 화이트리스트에 없어 **200 OK로 무음 폐기** — `ranking_watch_toggle`은 등록됨(`events.py:16`) | `routers/events.py:11-18,45-46` ← `components/Masthead.jsx:84`·`MobileTopActions.jsx:15` | 항상 |
-| **B25** | FX 저장 payload가 `usdkrw` history만 담아 `usdjpy`/`eurusd`의 last-good 폴백이 **원리적으로 발동 불가** | `services/market_indicators/fx.py:79` (폴백은 `:36-40`) | 항상(+매 실행 1y 전량 재조회) |
-| **B30** | 티커 유니버스 캐시가 **축소된**(빈 것은 아닌) 스크레이프를 무검증 저장 → rest 커버리지 임계가 **이미 틀린 분모**로 통과 | `market_indicators/earnings.py:94-117`(`:110` `if tickers:`) → `:205`,`:225`,`:269` | `_scrape_kospi`의 `if not codes: break`(`:149-150`) 조기종료 등 예외 없는 부분 축소 |
-| **B33** | `any(snap_dist.values())`가 스냅샷의 **진짜 0/0/0**을 결측으로 보고 mart 값으로 대체 → `base_date` 귀속 불일치 | `routers/analyst_reports.py:79` (귀속은 `:102-103`) | `market/kr.py:639-647`에서 `RECOM_CD`만 전량 파싱 실패 |
 
-### 표시 오류
-| # | 결함 | 위치 |
-|---|---|---|
-| **B34** | `fmtSharesUs`가 음수에서 축약 없이 전액 표기 — 형제 `fmtSharesKr`(`:32-40`)의 부호보존이 US판에 미적용 | `frontend/src/utils.js:43-50` ← `components/reports/UsInsiderSection.jsx:90` |
+| # | 결함 | 위치 (심볼) | 도달 조건 |
+|---|---|---|---|
+| B6 | 키 미설정 배치가 "성공"으로 기록 — `_refresh_monthly_us`는 "refreshed" 로그까지 남긴다 | `market_indicators/econ.py::_fetch_and_save_econ_indicators`, `macro.py::_fetch_and_save_macro_signals`, `scheduler/jobs.py::_refresh_monthly_us` | `FRED_API_KEY` 미설정 |
+| B7 | KR 배당 기준연도가 1년 어긋남 | `services/dividends.py::_recent_business_year` | 4월 1일 00:00–09:00 KST |
+| B9 | 프론트에 access token 갱신 경로가 없다 — 백엔드 `/api/auth/refresh`는 **존재하는데** 아무도 안 부른다 | `frontend/src/api.js` 응답 인터셉터 | 1시간 경과(항상) |
+| B24 | `nav_analytics`가 백엔드 화이트리스트에 없어 **200 OK로 무음 폐기** | `routers/events.py::VALID_EVENTS` ← `components/Masthead.jsx`·`MobileTopActions.jsx` | admin이 '행동 분석' 진입 시 항상 |
+| **B42** | `insider_trades`·`disclosures`의 DART 조회 창이 UTC 기준 — 하루 밀림 | `services/insider_trades.py::fetch_insider_trades`, `services/disclosures.py::fetch_disclosures` | 00:00–09:00 KST 실행 |
+| **B43** | US 섹터 모멘텀에 부분 페이로드 백필이 없다(KR에는 있다) | `services/us_sector_service.py::refresh` | 11개 ETF 중 일부만 실패 |
 
 ### 계약·보안
-| # | 결함 | 위치 |
-|---|---|---|
-| B19 | 하드코딩 폴백 시크릿(OAuth state 서명 키) | `backend/routers/auth.py:45` |
-| B20 | 레이트리밋 전무 (로그인·회원가입·리포트 생성) | `main.py`, `nginx/nginx.conf` 전역 |
-| B21 | Postgres가 tracked 폴백 비밀번호로 호스트 전 인터페이스에 발행 | `docker-compose.yml:9` + `:10-11` |
-| B23 | `pages/Portfolio.jsx`를 vitest에서 마운트할 수 없다 | `frontend/src/test/setup.js` (1줄, 폴리필 0) |
-| **B26** | tracked UAT 스크립트 **16개**가 라이브 테스트 계정 크리덴셜을 평문 하드코딩 (task#272 실측 — 이전 표기 15는 과소) | `scripts/uat*.mjs` 다수 (값은 이 문서에 인용하지 않음) |
 
-### 검증장치·문서
+| # | 결함 | 위치 (심볼) | 도달 조건 |
+|---|---|---|---|
+| **B44** | 프론트가 **URL 쿼리의 `token`·`refresh`를 그대로 localStorage에 심는다** — 세션 고정 | `frontend/src/hooks/useAuthBootstrap.js::useAuthBootstrap` | 피해자가 `?token=…&refresh=…` 링크 1회 클릭 |
+| B19 | `SESSION_SECRET` 하드코딩 폴백 (모듈 import 시점에 고정) | `routers/auth.py` `_HMAC_SECRET` | `main.py` 밖 진입점(스크립트·테스트·워커) |
+| B20 | 레이트리밋 전무 — bcrypt 로그인이 곧 CPU 고갈 DoS | `routers/auth.py::login` | 무인증·무계정 |
+| B21 | Postgres가 tracked 폴백 비밀번호로 호스트 5432에 발행 | `docker-compose.yml` (`POSTGRES_PASSWORD`) | 호스트 접근 가능한 누구나 |
+| **B45** | 임의 인증 사용자가 **전역 공유** 수주잔고를 덮어쓴다 | `routers/report.py::put_backlog` | 가입만 하면(가입은 열려 있다) |
+| **B46** | 임의 인증 사용자가 **전역** 대시보드 캐시를 flush | `routers/stocks.py::clear_dashboard_cache` | 가입만 하면 |
+| **B47** | SW `api-cache`가 사용자별로 분리되지 않고 로그아웃 시에도 안 지워진다 | `vite.config.js` VitePWA `runtimeCaching` ← `frontend/src/App.jsx::doLogout` | 같은 브라우저 계정 전환 5분 내 |
 
-| # | 결함 | 위치 |
-|---|---|---|
-| **B35** | 구루 크롤 완전성 경로(`guru_scraper.py`·`routers/guru.py`·`services/storage/`)를 **소유한 에이전트 카드가 없다** + `batch-cache-guard`가 적은 `schedule.py`는 **동명이인**(`backend/scheduler/schedule.py` ≠ `backend/services/storage/schedule.py`) | `.claude/agents/batch-cache-guard.md:15-16` (7개 카드 전수 grep 0건) |
-| **B36** | 날짜 스코프 회귀 테스트가 `call_args`를 안 봐서 스코프가 아니라 "`get_report`가 None이면"만 검증 — 라우터가 다른 날짜로 조회해도 green | `backend/tests/test_analyst_reports.py:473-484` |
-| **B37** | `CLAUDE.md` 가토의 예시 코드 인용이 실제 리터럴과 다름(`'완료: 갱신됨'` ≠ `'완료: 매니저 데이터 갱신됨'`) — 승급 시점부터 부정확 | `CLAUDE.md:127` ↔ `pages/GuruCrawlNow.jsx:35` |
-| **B38** | 에이전트 카드가 읽기전용 표방을 `tools` 프론트매터로 강제하지 않음(키 자체 부재 → Edit/Write 상속). ADR-0024 개정문이 지목한 실패 양식의 재발 | `.claude/agents/live-forensics.md` (프론트매터) |
-| **B39** | 애니메이션 게이팅(`isFirstLoad`)에 회귀 테스트 **0건** — 유일하게 클래스명을 아는 스크립트는 애니메이션을 *무효화*하는 성능 프로브다 | `pages/GuruAllocation.jsx:55`,`:212`,`:214` |
+### 표시 오류 / 크래시
 
-### 지난 매핑 이후 **해소**된 확인된 버그 (재제기 금지)
-| 옛 # | 결함 | 무엇이 닫았나 |
+| # | 결함 | 위치 (심볼) |
 |---|---|---|
-| B15 | 상승여력 색상이 항상 무채색 | `components/ui/Stat.css:18-19`에 `.stat__value--up`/`--down` 신설, `Showcase.jsx:75`도 `up`으로 이관 (task#254) |
-| B16 | 심층 리포트 라우트가 PC 서브바·모바일 탭에서 누락 | `frontend/src/navSections.js` 단일 소스 + `match: '/analyst-report'`, 회귀 게이트 `test/nav-active-matching.test.jsx` (task#251) |
-| B17 | `PointMetric.change_pct`가 명시적 `null`을 422로 거부 | `routers/analyst_reports.py:31` `Optional[float]`화 (`allow_inf_nan=False` 유지, task#250) |
-| B18 | `COWORK_API_KEY`가 `argv`로 노출 | `scripts/cowork-fire-listener.py:47-55` — 프롬프트를 argv에서 빼고 **stdin**으로 전달 (task#254) |
-| B22 | fire 워크디렉터리 초 단위 충돌 → `run.log` truncate | `scripts/cowork-fire-listener.py:44-46` `mkdtemp(prefix=ts+"-", dir=RUN_DIR)` (task#254) |
-| B10 | 관심종목 토글이 POST/DELETE를 반대로 고른다 | `pages/Ranking.jsx:149-162`(`watchUnknown` 도입)·`:214-224` — 토글이 fetch 결과가 아니라 *알려진 상태*로 결정 (task#266, 재검증 task#272) |
-| B11 | 이미 추적 중인 종목이 "추가" 모달로 라우팅 | `components/GlobalSearch.jsx:19-29`(`fetchTracked`가 실패 시 null 반환)·`:31-45` — 라우팅이 unknown을 별도 분기 (task#266, 재검증 task#272) |
-| B12 | `loadStockMap`에 catch 없음 → unhandled rejection | 옛 인라인 로직 소멸, `hooks/useTrackedStocks.js:29-45`의 `reload()`로 **이동하며 닫힘** — `try/catch`(`:30`,`:38`)로 감싸 내부 처리 후 `false` 반환이라 reject 불가 (task#266, 재검증 task#272) |
-| B13 | 수급 추이 Y축이 주(株)를 억원으로 포맷 → "541.4조" | `components/reports/InvestorTrendSection.jsx:55-56` — 주(株) 입력에 `fmtSharesKr` 적용 (task#271, 재검증 task#272) |
-| B14 | 구루 총 투자금에 T 단위가 없어 `$1,077.0B` | `pages/GuruAllocation.jsx:10`,`:148`,`:176`,`:219` — T 티어를 가진 `fmtUsdCompact`로 교체 (task#271, 재검증 task#272) |
-| B27 | 랭킹 마켓 토글 레이스 — 원화가 `$` 포맷으로 고착 | `pages/Ranking.jsx:79-81`(`genRef`)·`:104-105`·`:114`,`:123`,`:128` — 세대번호 가드로 낡은 응답의 `setItems`·`finally`를 함께 차단(reset은 뮤텍스 우회) (task#273) |
-| B32 | `Recommendations.jsx` 관심목록 조회 실패가 성공-빈배열로 위장 | `pages/Recommendations.jsx:9`,`:90` — 조회·pending·실패 표시를 `hooks/useTrackedStocks`로 통합해 unknown을 별도 상태로 노출 (task#273) |
-| B28 | 구루 명부의 부분 열화가 '은퇴'로 오분류돼 생존 매니저가 통째 drop | `services/storage/schedule.py`의 `_ROSTER_MIN_COVERAGE = 0.8` — 명부가 직전 저장분의 80% 미만이면 그 회차 드롭을 보류(`held`) (task#274) |
-| B29 | 구루 크롤 `dropped`를 읽는 코드가 0건 — 매니저 삭제가 초록 "완료" | `routers/guru.py`·`scheduler/jobs.py` 두 경로가 `held`→`partial`+warning, `dropped`→초록 유지+숫자 보고로 분기 (task#274) |
-| B31 | 구루 크롤의 스킵·부분·실패가 `job_runs`에 항상 `success` | `services/job_runs.py`의 `Run` 핸들(`set_status`)로 본문이 종료 상태를 지정 — 구루 2경로 배선(skipped/partial/failed) (task#274) |
-| B2 | `sanitize`가 `Decimal('NaN')`을 통과시킨다 | `services/utils.py:37`에 `isinstance(obj, Decimal) and (obj.is_nan() or obj.is_infinite())` 가드 추가 — float과 동일하게 `None`화, 기존 sanitize 호출처 전부 소급 강화(`tests/test_utils_sanitize_decimal.py`) (task#278) |
-| B3 | `POST /api/portfolio`가 raw JSON `NaN`을 저장 → `GET /api/portfolio` 영구 500 | `routers/portfolio.py` `Stock`/`set_rebalance_targets` + `routers/watchlist.py` `PromotePayload`에 `allow_inf_nan=False` 입력 가드 + `main.py`의 기존 `RequestValidationError` sanitizing 핸들러가 422 detail echo를 방지. 드리프트 가드 `tests/test_nan_input_guards.py`가 라우터 전수 float 필드를 열거로 단언 (task#278) |
-| B4 | NaN이 컨센서스 마트까지 전파 | `services/consensus_pipeline.py`의 `upsert_raw_reports`(단일 INSERT 통로)에 `math.isfinite` 정규화 초크포인트 추가 — NaN/Infinity `target_price`를 필터 앞에서 `None`화(`tests/test_consensus_target_nan.py`) (task#278) |
+| B34 | `fmtSharesUs`가 음수에서 축약 없이 전액 표기(형제 `fmtSharesKr`은 부호 보존) | `frontend/src/utils.js` ← `components/reports/UsInsiderSection.jsx` |
+| **B48** | **에러 바운더리가 트리 어디에도 없다** — 렌더 throw 1건이 전체 백지 | `frontend/src/` 전역 (grep 결과 0건) |
+| **B49** | 리포트 상세 fetch에 staleness 가드가 없어 **A 종목 수치가 B 종목 화면에 렌더** | `frontend/src/pages/Reports.jsx` 상세 fetch 이펙트 |
 
 ---
 
 ## 1. 데이터 무결성 — 빈/실패 fetch가 양호값을 덮어씀
 
-이 프로젝트 최대 반복 결함군. task#242·#243·#244가 19개 저장 지점을 전수 감사하며 **실패 클래스 3종**(a 예외 / b 성공-but-빈응답 / c 부분 페이로드)을 정리했다. 아래는 그 감사 **이후 남은** 것들이다.
+이 저장소에서 가장 잘 이해된 결함 가족이고, **정답 형태가 코드 안에 이미 존재한다**(§1.7). 남은 위험은 그 형태를 안 쓴 자리들이다.
 
 ### 1.1 `get_kr_rankings` wipe-on-empty — **확인된 버그** (B1)
-- `services/ranking_service.py:129-137`. `_fetch_naver_market`은 부분 페이지 실패를 `raise`하고(`:120-123`), HTTP 오류는 `raise_for_status()`(`:104`)로 잡는다. 그러나 **200 + `totalCount:0`/`stocks:[]`** 이면 `pages<=1` → `return stocks`(`:109-110`)로 빈 리스트를 정상 반환한다.
-- 형제 `get_us_rankings:144-145`는 정확히 이 문을 `raise RuntimeError("… returned empty quotes — skipping replace")`로 막았고, `tests/test_rankings_empty_guard.py`가 **US만** 못박았다(`:1` docstring·`:10`·`:17`·`:24` 세 테스트 전부 `get_us_rankings`만 언급 — 가드 범위가 곧 결함 범위).
-- 결과: `replace_market_rankings("KR", …)`의 단일 트랜잭션 `DELETE FROM market_rankings WHERE market='KR'`(`:162`)이 돌고 INSERT가 0건. **단일 트랜잭션은 부분 상태를 막지만 "전부 지우고 전부 안 넣는 것"은 정상 커밋된다.**
-- **blast radius가 랭킹 탭을 넘는다** — `services/investor_service.py:140`(`read_screening`, def는 `:132`)과 `scheduler/jobs.py:269`가 유니버스를 `market_rankings`에서 파생한다.
 
-### 1.2 `ON CONFLICT DO UPDATE SET x = EXCLUDED.x`가 양호 컬럼을 NULL로 덮음 — **잠재 위험** (재실행·백필에서 확정적)
-task#242·#243 감사는 `market_cache`와 delete-rewrite만 봤고 아래는 스코프 밖이었다. 이번 전수 스윕으로 **4곳 → 6곳**으로 늘었다.
+`services/ranking_service.py::_fetch_naver_market`의 docstring은 *"한 페이지라도 실패하면 RuntimeError를 던진다 — 잘린 데이터가 정상 스냅샷을 DELETE-덮어쓰는 것을 막기 위함"* 이라고 의도를 명시하지만, **0페이지 케이스에 구멍이 있다**:
 
-| 위치 | None이 들어오는 경로 |
-|---|---|
-| `services/leverage_service.py:125-153` + `:167-180` | credit·fund·cap **3개 독립 fetch**를 `by_date`로 머지. cap이 빠지면 `row.get("kospi_market_cap")`(`:147`) = None → 9컬럼 전부 같은 형태 |
-| `services/leverage_service.py:116-121` + `:176-177` | **더 날카로운 트리거** — `_parse_market_cap`이 각 날짜를 `{"kospi_market_cap": None, "kosdaq_market_cap": None}`로 선-시드(`:117`)하고 **한글 지수명 substring 일치**로만 채운다(`:118-121`). KOFIA가 지수 문자열을 개명하면 `cap_rows`는 **비어 있지 않은데** 두 값이 명시적 None이고, `:177` `update(row)`가 머지 dict를 그 None으로 덮고 `if by_date:`(`:179`)를 통과한다. **빈 응답이 아니라 라벨 드리프트만으로도 충분하다** |
-| `services/lending_service.py:72-85` | 단일 소스라 확률 낮음, `_safe_int` 파싱 실패가 트리거 |
-| `services/investor_service.py:92-112` | `foreign_hold_ratio`는 키움 전용. Naver 폴백(`:59-69`)이 None을 주면 양호 ratio를 지운다 |
-| `services/short_sell_service.py:25-42` | 동일 형태 |
-| **`services/dividends.py:151-163`** (`:160`) | **신규 발견 — 5번째.** `fetch_us_dividend`가 `dividendRate`는 있고 `dividendYield`가 없거나 파싱 실패면(`:63-67`) `"dividend_yield": None`(`:70`)을 반환 → 부분적인 yfinance `t.info`가 직전 양호 수익률을 지운다 |
-| **`services/supply_score.py:181`** (def `:168`) | **신규 발견 — 낮은 심각도.** `as_of = EXCLUDED.as_of`에 `as_of: dict | None`이 None이면 양호 JSONB를 덮는다(`band`/`flags`는 필수라 영향 제한) |
-| `services/agm.py:223` | `meeting_date = EXCLUDED.meeting_date` — None 산출 경로를 추적하진 못했다. 스윕에 남은 미감사 지점으로만 기록 |
+```python
+total = int(body.get("totalCount", 0))
+stocks = list(body.get("stocks", []))
+pages = math.ceil(total / _PAGE_SIZE)
+if pages <= 1:
+    return stocks          # totalCount==0 → pages==0 → 예외 없이 [] 반환
+```
 
-- 수정 형태: `SET x = COALESCE(EXCLUDED.x, table.x)`.
-- **정상으로 확인된 곳(재제기 금지)**: `services/beta.py:93-94`(호출측 `:134` `if beta is not None` 가드), `services/storage/portfolio.py:58,124,139`(이미 `CASE WHEN`/`COALESCE`), `services/backlog.py:228`(`CASE WHEN`).
+형제 경로 `get_us_rankings`는 같은 자리에 가드가 있다 — `raise RuntimeError("ranking: US fetch returned empty quotes — skipping replace")`. **비대칭이 결함이다.**
+
+도달: Naver `marketvalue`가 200 + `totalCount:0`(스키마 변경·소프트 레이트리밋)을 KOSPI·KOSDAQ 양쪽에 반환 → `replace_market_rankings("KR", …)`가 `DELETE FROM market_rankings WHERE market='KR'` 후 0행 삽입, 트랜잭션은 정상 커밋. 파장은 랭킹 탭 공백에 그치지 않는다 — `investor_trend_fetch`의 유니버스 쿼리가 `market_rankings`를 읽으므로 **수급 배치의 대상 집합까지 함께 사라진다**. 복구는 프로세스 재기동 시 `_seed_rankings_if_empty`뿐.
+
+### 1.2 `_mc_load` 실패가 "저장값 없음"과 구별되지 않는다 — **확인된 버그** (B40)
+
+`market_indicators/cache.py::_mc_load`는 예외를 경고 로그 후 `None`으로 삼킨다:
+
+```python
+except Exception as e:
+    logger.warning(f"[Cache] _mc_load key={key} 실패: {e}")
+return None            # DB 오류와 "한 번도 저장 안 됨"이 같은 값
+```
+
+이 모호성이 실제 데이터 손실이 되는 자리가 `market_indicators/kospi_signal.py::refresh_kospi_signal`이다:
+
+```python
+stored = _mc_load("kospi_signal")
+stored_data = (stored["data"] if stored else None) or {}
+series: list[dict] = list(stored_data.get("series", []))     # DB 오류 → []
+...
+if changed:
+    _mc_save("kospi_signal", data)                            # 누적 이력을 1건으로 덮어씀
+```
+
+도달: 07:30 `kospi_signal_fetch` 중 그 `SELECT` 한 번이 실패(§4.5의 `PoolError` 포함)하면서 yfinance 드라이버는 성공(`fetch_ok=True` ⇒ `changed=True`) → `_MAX_DAYS` 누적 신호·적중률 이력이 소멸한다. **재구성 불가**(같은 날 갭·종가 대사로 파생되는 값이다). `job_runs`는 success로 기록한다.
+
+같은 클래스·낮은 폭발반경: `macro.py`·`econ.py`는 `today_kst().year - 3`부터 시계열을 다시 시작하고, `kr_sector_service.refresh`는 부분 백필을 조용히 건너뛴다.
 
 ### 1.3 부분 페이로드가 완전한 값을 대체 — **잠재 위험**
-`_mc_save`를 하는 17개 키 중 whole-empty 가드는 붙었으나 **per-key/per-item** 가드가 없는 곳:
-- `services/market_indicators/commodities.py:27-29,58` — per-key 예외가 `None`이 되어 payload에서 그 키가 사라진다. 형제 `treasury`(`:91-95`)는 per-key stored merge를 하는데 `commodities`만 안 한다(같은 파일 내 비대칭).
-- `services/market_indicators/earnings.py:217,251` — `_merge_quarters`(호출 `:205-206`, `:232-233`)가 **살아남은 티커만** 합산해 M7/KR Top2 실적 총계가 조용히 과소계상된다.
-- `services/kr_sector_service.py:62-65` — per-sector all-None 엔트리가 저장된다. `build_sector_index`(`:104-106`)가 실패 업종을 스킵하므로 "비어 있지 않지만 불완전한" 인덱스가 완전한 것을 덮는다(task#243은 *전체* 빈 경우(`:83-86`)만 막았다).
-- `services/us_sector_service.py:33` — per-ETF all-None(`services/analysis_service.py:50-53`)이 저장된다.
-- `services/market_indicators/sentiment.py:71` — score는 있고 `history`가 빈 응답이면 저장된 60포인트 시계열을 덮는다.
-- `services/guru_scraper.py:378-408` + `services/storage/schedule.py:23-35` — `save_guru_managers`는 **전체 빈 경우만** 게이트한다. 83명 중 40명만 성공한 부분 크롤이 저장되어 나머지 43명을 지운다. `:408`이 비율을 로그로 남기지만 아무도 그 값으로 분기하지 않는다.
-- 회귀 테스트(`tests/test_empty_result_overwrite_guards.py`, `test_empty_result_guards_exports_krsector.py`)는 **all-empty만** 단언한다 — 남은 구멍이 정확히 그 사각에 있다.
 
-### 1.4 배당 스케줄 delete-rewrite — **설계상 트레이드오프**(판별 불가한 실패 클래스)
-- task#160이 클래스 (a)를 닫았다: `services/dividends.py:228-233`이 fetch 예외를 **전파**하고 `:389`가 fetch를 `replace_schedule` 진입 *전에* 평가한다(소스-폴백 구조).
-- 남는 것: yfinance는 실패를 예외가 아니라 **빈 Series**로 주는 일이 흔하고, `:235-236`이 `len(s)==0 → []`, `:260-261`이 `len(hist)<2 → []` → `replace_schedule(ticker, [])` → `DELETE`(`:314`). `:310` docstring이 "rows 비면 삭제만(genuine 무배당 정리)"라고 이 판별 불가를 명시 수용한다.
-- 즉 "진짜 무배당"과 "빈 응답"을 구분할 신호가 소스에 없다. 닫으려면 fetch 성공 여부를 별도 플래그로 올려야 한다.
+전 `_mc_save` 호출자(17개)를 실패 클래스 3종 — (a) 예외 (b) 성공-but-빈응답 (c) 부분 페이로드 — 으로 감사한 결과, **(c)를 안 막는 곳이 4개** 남아 있다.
 
-### 1.5 `_filter_outliers`가 저장 시계열을 영구 손상 — **잠재 위험**
-- `services/market_indicators/cache.py:75-82`, 호출 `:91,97,107`. `max_ratio=5.0`으로 중앙값 5배 밖 포인트를 버리는데, 이 필터가 신규 포인트뿐 아니라 **저장된 stored 시계열에도 매 저장마다** 적용된다.
-- `^VIX`(`fx.py:99`)처럼 평시 중앙값 ~15에 스파이크 60~80이 정상인 시계열은 진짜 스파이크가 영구 제거된다. `commodities`/`indices`/`kospi_signal` 드라이버도 같은 경로.
+| 심볼 | (a) | (b) | (c) |
+|---|---|---|---|
+| `us_sector_service.py::refresh` | ✅ | ✅ | ❌ **B43** |
+| `market_indicators/econ.py::_fetch_and_save_econ_indicators` | ✅ | ❌ | ❌ |
+| `market_indicators/macro.py::_fetch_and_save_macro_signals` | ✅ | ❌ | ❌ |
+| `market_indicators/sentiment.py::get_fear_greed` | ✅ | ✅ | ❌ |
+| `market_indicators/exports.py::_fetch_customs_exports` | ✅ | ✅(월 목록) | ❌(월별 0 드롭) |
 
-### 1.6 `econ_indicators` 고착 — **잠재 위험**
-- `services/market_indicators/econ.py:72-75`가 저장 행을 **나이 검사 없이** 서빙하고 `_is_valid_econ_data({})`(`:55-60`)가 `True`다. `:49-50`에서 FRED가 0 observation을 준 채 한번 `{"cpi":[],"unemployment":[]}`가 저장되면 **영구히** 그 값이 서빙된다.
-- 추가로 `:78`의 `_mc_delete`가 **재fetch 이전에** 실행된다(오염 데이터 의도적 폐기지만, 이후 FRED 불통이면 키가 없는 상태로 남는 파괴적 순서).
+- **B43 `us_sector_service::refresh`** — all-None만 막고 부분은 안 막는다. 형제 `kr_sector_service::refresh`는 per-sector 백필 + `index` 보존까지 한다. 11개 `SECTOR_ETFS` 중 10개가 실패하면 "좋은 1개 + all-None 10개"가 직전 양호값을 덮고 다음 07:20 배치까지 서빙된다. `tests/test_us_sector_batch.py`는 has-data와 all-None 두 케이스만 덮는다.
+- **`econ`/`macro`** — 예외 경로는 `return stored_data`로 막혀 있으나 FRED가 200 + `observations: []`를 주면 통과한다. `econ`의 `_is_valid_econ_data`는 빈 배열을 **유효로 판정**한다(`unemp[-1] > 50`만 거부).
+- **`sentiment::get_fear_greed`** — `score`만 파싱되면 dict를 반환하므로 `fear_and_greed_historical`이 빠진 응답에서 `history: []`가 저장돼 60일 이력을 덮는다.
+- **`exports`** — `all_months = sorted(m for m in months if total_by_month.get(m, 0) > 0)`가 총계 0인 달을 드롭한다. 호출부 가드는 `if not data.get("months")`뿐이라 12개월 중 2개월만 살아남아도 통과한다.
 
-### 1.7 소스-폴백이 정답 형태다 — **이미 가드됨(참조 패턴)**
-빈 결과 가드의 기본형은 "저장 직전 한 지점 판정"이 아니라 **fetch 계층에 last-good을 실어 소스에서 폴백**시키는 것이다. 참조 구현:
-- `services/market_indicators/fx.py:36-40` — fetch 실패 시 `stored_history`를 담아 *반환*. **단 B25 참조 — `usdkrw` 외 2키는 stored가 항상 비어 이 분기가 죽어 있다.**
-- `services/market_indicators/cache.py:69-72` — `_merge_history(prev, [])`가 prev를 그대로 반환.
-- `services/market_indicators/indices.py:31-37,133-134,143` — per-key stored 폴백 + `if any(...)` persist 게이트. **17개 키 중 형태가 가장 좋다.**
-- `services/market_indicators/macro.py:70-73,76,79` — per-key stored merge + 실패 시 stored 반환. (지난 판이 §1.3 구멍 목록에 잘못 넣었던 곳 — **참조 목록이 맞다.**)
-- `services/market_indicators/kospi_futures.py:21-23,55-58` — 값 수준 가드(`price is None or not history` → last-good), task#157.
-- `services/market_indicators/kospi_signal.py:189,197,233-234,243,249` — `fetch_ok` 플래그 + `changed` 게이트(`_mc_save`는 `:250`).
-- `services/us_supply.py:231-241,259-262` — `_is_all_empty` + skip-save.
-- `services/recommendation/store.py:15` + `funnel.py:459` — 단일 트랜잭션 + 호출자 게이트.
+### 1.4 delete-rewrite 인벤토리 — **대부분 이미 가드됨**
+
+delete-then-insert 5곳은 전부 **단일 `get_connection()` 트랜잭션**이라 원자적이다(§4.3의 롤백이 창을 덮는다): `dividends.py::replace_schedule`, `recommendation/store.py::replace_recommendations`, `ranking_service.py::replace_market_rankings`, `consensus_pipeline.py::backfill`(`force=True` 분기), `storage/portfolio.py::save_watchlist_tickers`.
+
+`replace_market_rankings`의 트랜잭션 자체는 정상이다 — **입력이 버그다**(§1.1).
+
+> ⚠️ **지시문·직전 판이 delete-rewrite로 지목한 4개 서비스는 실제로 append-only다.** `short_sell_service.py::upsert_trend`·`investor_service.py::upsert_trend`·`lending_service.py::_upsert`·`leverage_service.py::_upsert_rows`에 `DELETE`는 없고, `db.execute_many`가 빈 리스트에 no-op이라 **빈 fetch가 이미 안전하다**. 이 오귀속을 근거로 가드를 추가하지 말 것.
+
+### 1.5 `_mc_save` 자체엔 가드가 없다 — **설계상 트레이드오프**
+
+`market_indicators/cache.py::_mc_save`는 무조건 `INSERT … ON CONFLICT DO UPDATE`다. 모든 판단이 호출자에 산다. 이 배치가 §1.3의 비대칭을 구조적으로 허용한다 — 새 저장 지점을 추가하는 사람은 3종 실패 클래스를 스스로 다시 발명해야 한다.
+
+### 1.6 소스-폴백이 정답 형태다 — **이미 가드됨(참조 패턴)**
+
+가드가 **저장 직전 한 지점**이 아니라 **fetch 계층**에 있는 구현은 구조적으로 안전하다. 신규 증분 저장을 짤 때 베낄 대상:
+
+- `market_indicators/fx.py::_fetch_fx` — 실패 시 `stored_history`를 담아 *반환*한다(빈 값이 필드에 도달하지 않는다).
+- `market_indicators/cache.py::_merge_history` — `_merge_history(prev, [])`가 `prev`를 그대로 돌려준다.
+- `services/dividends.py` — `fetch_dividend_schedule(...)`를 `replace_schedule` **진입 전에** 평가한다.
+- `market_indicators/exports.py` — KITA → UN Comtrade → last-good + `stale: True` 마커의 3단 폴백. **이 저장소에서 가장 완성된 형태이고, 나머지 12개 소스가 베껴야 할 템플릿이다.**
+- `storage/schedule.py::save_guru_managers` — per-manager 백필 + `_ROSTER_MIN_COVERAGE` 커버리지 임계.
+- `market_indicators/earnings.py::_fetch_and_save_m7_earnings` — 고정 명명 집합엔 완전성(`m7_ok < len(M7)`), 유동 대규모 집합엔 커버리지 임계(`_REST_MIN_COVERAGE`).
+
+### 1.7 `commodities.get_treasury`의 판정 순서 — **이미 가드됨(단, 형제와 순서가 다르다)**
+
+`get_treasury`는 **백필 → 전량실패 판정** 순서라 저장값이 있으면 전 심볼이 백필돼 `if not rates:`가 사실상 발동하지 않는다. 형제 `get_commodities`는 판정이 백필 *앞*에 있어 옳다. `get_treasury`를 "동형 이식" 참조 구현으로 지목하지 말 것 — 그 순서를 베끼면 가드가 원리적으로 죽는다.
 
 ---
 
 ## 2. 외부 소스 파싱 취약성
 
-### 2.1 Naver 재무를 **위치 인덱스**로 읽는다 — **잠재 위험** (이 군에서 가장 위험)
-- `services/market/kr.py:45-54` `_naver_row_val(rows, row_idx, key)`; 소비 `:333,349-354,362,373-377`(분기) / `:422,429-434,436,447-451`(연간).
-- 행 순서가 곧 계약이다: `rows[0]`=매출, `[1]`=영업이익, `[2]`=순이익, `[5]`=영업이익률, `[6]`=순이익률, `[7]`=ROE, `[8]`=부채비율, `[9]`=당좌비율, `[11]`=EPS, `[12]`=PER, `[13]`=BPS, `[14]`=PBR.
-- Naver가 `financeInfo.rowList`에 한 행만 삽입/재배열하면 **모든 필드가 밀려 "그럴듯한 오값"**이 된다 — 흔한 silent-None보다 나쁘고 로그에도 안 남는다. `pbr`은 심지어 밀린 `per*eps/bps`에서 *파생*된다(`:359-360`).
-- 가드 없음. `tests/test_financials_kr.py`·`test_financials_kr_cashflow.py`의 fixture가 같은 순서를 쓰므로 라이브 재배열에도 green으로 남는다. `trTitleList`/행 제목과의 라벨 교차검증이 없다.
+40여 개 `requests.*` 호출 전부에 **명시적 `timeout=`이 있다**(무타임아웃 `requests` 호출 0건 — 이 저장소의 강점). 취약성은 다른 축에 있다: **HTML 스크레이프에 재시도가 하나도 없고**, 실패가 일률적으로 빈 값/last-good으로 변환돼 배치 계층에 안 보인다.
 
-### 2.2 `_table_unit`의 억원 기본값 폴백 — **잠재 위험** (×100 대형 오저장 클래스)
-- `services/backlog_parser.py:211-220`. 세 갈래 중 **`단위` 문자열을 아예 못 찾으면 `_DEFAULT_UNIT="억원"`**(`:220`)으로 떨어진다. "추출 실패는 기본값이 아니라 pending"(wrong<missing) 규칙의 남은 한 다리.
-- 가중 1: `table.find_previous(string=re.compile("단위"))`(`:216`)가 **범위 무제한**이라 앞쪽 무관한 표의 캡션을 집어 다른 표에 적용할 수 있다.
-- 가중 2: 검산이 **단위 맹목**이다 — `_parse_susu_table`이 raw 값으로 `_reconcile`(`:183`)한 *뒤* `_to_eok`(`:185`)로 스케일한다. `수주총액 − 기납품 ≈ 잔고`는 어떤 단위에서도 성립하므로 틀린 단위가 검산을 통과해 `source='dart'`로 ×100/÷100 저장된다.
-- 참조 정답: `services/market/kr.py:529-536` `_rd_unit`은 캡션 없으면 `None`을 반환하고 `:603`에서 `continue`한다 — 주석이 `backlog._table_unit`과 다르다고 명시한다.
-- 부수: `backlog_parser.py:22` `_UNIT_KEYWORDS`가 `천원`/`원`을 빠뜨려(`_EOK_FACTOR:29`와 `_table_unit` 정규식은 지원) 천원 표가 억원으로 떨어진다. pending 경로 전용이라 영향 작음.
+### 2.1 소스별 취약성 인벤토리
 
-### 2.3 숫자 파서가 드리프트에 `0`을 반환하고 그 0이 저장된다 — **잠재 위험**
-- `services/kiwoom/investor.py:15-24` `_signed_int` → `0`, 소비 `:61-64`.
-- `services/kiwoom/shortsell.py:19-28` `_int` → `0`, 소비 `:61-65`.
-- `services/investor_service.py:11-21` `_parse_signed_int` → `0`, 소비 `:51-55`.
-- 필드가 개명되면 `0`(None 아님)이 나와 `upsert_trend`가 저장한다 → "수급 0인 날"과 "필드 소실"을 구분할 수 없다. **같은 파일의 `_pct` 헬퍼들은 None을 반환**해 규칙을 지킨다(`investor.py:27-36`, `shortsell.py:31-40` — 비대칭).
-- 참조 정답: `services/insider_trades.py:65-78` `_num`은 None을 반환하고 `:98-99`가 그 행을 스킵한다.
+| 소스 | fetch 심볼 | 타임아웃 | 재시도 | 폴백 | 실패 시 | 스크레이프? |
+|---|---|---|---|---|---|---|
+| multpl.com CAPE | `market_indicators/indices.py::_fetch_cape` | 10s | ❌ | last-good | `None` → 저장 CAPE | **HTML — 최고 취약** |
+| dataroma 구루 | `guru_scraper.py::scrape_manager_ids`/`scrape_holdings`/`scrape_activity` | 15s | ❌ | ❌ | 명부는 전파, per-manager는 스킵 | **HTML** |
+| Finviz 컨센서스 | `scraper.py::scrape_finviz_consensus` | 10s | ❌ | ❌ | `{}` 무음 | **HTML** |
+| DART 원문 | `backlog.py::_get_document_text` + `backlog_parser` | 20s | ❌ | ❌ | `""` 무음 | **HTML(XML을 html.parser로)** |
+| FnGuide | `market/kr.py` | 8s | ❌ | Naver/DART | per-source except | **HTML** |
+| Naver KR | `market/kr.py`, `scraper.py::get_news_kr`, `ranking_service.py` | 8–15s | ref price만 1회 | KIS(ref price만) | `[]`/`{}` | JSON |
+| CNN F&G | `market_indicators/sentiment.py::_fetch_fear_greed` | 15s | ❌ | last-good | `None` | 비공식 JSON |
+| FRED | `econ.py::_fetch_series`, `macro.py::_fetch_series` | 10s | ❌ | last-good | `stored_data` | JSON |
+| KOFIA | `leverage_service.py::_kofia_get`, `lending_service.py::_api_get` | 30s | ❌ | ❌ | raise → 잡이 삼킴 → **success** | JSON |
+| 관세청 KITA | `exports.py::_fetch_customs_exports` | 15/30s | ❌ | **UN Comtrade → last-good+stale** | 3단 폴백 | JSON/XML |
+| 키움 | `kiwoom/client.py::_request` | 8s | 401/403 → 토큰 재발급 1회 | `configured()` 게이트 | `KiwoomError` | REST |
+| KIS | `kis/client.py::_request` | 8s | 401/403 → 1회(60s 재발급 가드) | `configured()` 게이트 | `KisError` | REST |
+| yfinance | `cache.py::_yf_close_history`, `beta.py`, `scraper.py`, `consensus_pipeline.py` | **명시 없음** | ❌ | 일부 last-good | 다양 | 라이브러리 |
 
-### 2.4 DART status 코드가 전 경로에서 무시된다 — **잠재 위험**
-- 6곳 전부 `status != "000"`을 코드 없이 삼킨다: `services/backlog.py:114`, `:317`, `disclosures.py:66`, `insider_trades.py:140`, `agm.py:139`, `market/kr.py:573`.
-- DART는 `013`(무데이터, 정상) 외에 `020`(레이트리밋 초과)·`011`/`012`(키 무효/미인가)를 준다. 전부 `continue`/`[]`/`{}`로 수렴하므로 **일일 쿼터 소진이나 키 회전이 "성공했는데 데이터가 없음"으로 보인다** — KR 배치 5종(수주잔고·공시·내부자·주총·배당)이 동시에 무음 미동작. `disclosures`·`insider_trades`·`backlog`·`dividends`는 `DART_API_KEY` 존재를 검사조차 안 한다.
-- 참조 정답: `services/agm.py:163`만 `"[AGM] DART_API_KEY 미설정 — skip"`을 로그한다.
+### 2.2 `scrape_manager_ids`의 무음 절단 — **확인된 버그**(관측 불가 클래스)
 
-### 2.5 완전 무음 fetch 실패 — **확인된 버그**(진단 불가)
-외부 fetch 경로는 대체로 잘 로깅된다. 로그도 재전파도 없는 곳만:
+`guru_scraper.py::scrape_manager_ids`의 `r.raise_for_status()`는 HTTP 오류만 잡는다. **HTTP 200 + 마크업 변경이면 예외 없이 짧은 명부가 내려온다** — 코드 자신의 docstring(`scrape_all_managers`)이 이 성질을 명시한다. 하류 `storage/schedule.py::save_guru_managers`의 `_ROSTER_MIN_COVERAGE`가 완화하지만 **제거하지는 않는다**. 도달: dataroma가 `a[href*='holdings.php?m=']` 마크업을 바꾸는 순간.
 
-| 위치 | 삼키는 것 |
-|---|---|
-| `services/guru_scraper.py:23-39` `get_name_kr`(`pass`는 `:37-38`) | 모든 `name_kr`이 `""` |
-| `services/market/us.py:171-173` `_us_quote_kis` | `return None` — KR 쌍둥이(`kr.py:79-81,95-97`)는 같은 실패를 로그한다 |
-| `services/scraper.py:23-25` | Finviz `snapshot-table2` 클래스 변경 → `{}` |
-| `services/guru_scraper.py:198-199` | dataroma `table#grid` 재구조화 → `num_stocks=0`, 빈 holdings |
-| `services/market/kr.py:639-647`(`:642-643`, `:646-647`) | FnGuide `TARGET_PRC`/`RECOM_CD` 개명 시 전 행 스킵 → `_empty`(`:622`, buy/hold/sell=0)를 "커버리지 없음"처럼 반환 |
-| `services/market/kr.py:30-42` `_fnguide_market_cap` | 정규식 무매치 → None, `raise_for_status()` 없음(`:34`) |
-| `services/market/kr.py:308-319` | `get_quote_kr` 최상위 except → error dict(응답엔 뜨나 서버 로그엔 흔적 없음) |
-| `backend/main.py:51-57` `_warm_market_cache` | `except Exception: pass` — 프로젝트 자체 "silent except 금지" 규약 위반 |
+### 2.3 `_fetch_cape`에 stale 마커가 없다 — **잠재 위험**
 
-앱 코드 전체에서 로그 없는 `except … : pass`는 **14곳**: `routers/calendar.py:162`, `scraper.py:34`, `scraper.py:39`, `guru_scraper.py:38`, `report_generator.py:47`, `market_indicators/earnings.py:192`, `storage/portfolio.py:20`, `market_indicators/indices.py:57`, `indices.py:86`, `market/kr.py:643`, `kr.py:647`, `main.py:57`, `middleware/event_tracker.py:49`, `event_tracker.py:71`.
+`indices.py::_fetch_cape`가 markup 변경으로 `None`을 반환하면 `get_indices`가 저장 CAPE로 대체하는데, 응답이 **fresh와 구별되지 않는다**. 형제 `exports.py`는 같은 상황에 `{**stored["data"], "stale": True}`를 싣는다. 몇 달째 얼어붙은 CAPE가 정상값으로 표시될 수 있다.
 
-### 2.6 퍼센트 스케일 계약이 갈려 있다 — **잠재 위험**
-동일 DB에 두 규약이 공존하고 판정 주체가 **프론트**다. 인제스트 경계에 정규화도 범위 단언도 없다.
+### 2.4 완전 무음 fetch 실패 — **확인된 버그**(진단 불가)
 
-| 필드 | 저장 | 프론트 | 스케일 |
-|---|---|---|---|
-| `short_pct_float` | `services/us_supply.py:119` | `market/UsSupplySection.jsx:82` `(v*100)` | 소수분수 |
-| `pct_held`/`pct_change` | `us_supply.py:129,131` | `UsSupplySection.jsx:125,129` | 소수분수 |
-| `pct_buy`/`pct_sell` | `us_supply.py:78-83` | `UsInsiderSection.jsx:107,113` | 소수분수 |
-| **`dividend_yield`(US)** | `services/dividends.py:63-66` | `portfolio/DashboardCard.jsx:146` **×100 없음** | 퍼센트 |
-| `dividend_yield`(KR) | `dividends.py:143` (DART `%`) | 같음 | 퍼센트(진짜) |
+`services/` 전체에 bare `except:`는 **0건**이고, 대부분의 `except Exception … pass`는 앞에 `logger.warning`이 있다(`pass`는 죽은 코드). 로그가 **전혀 없는** 곳은 3군데:
 
-- **모순이 문서 두 곳에 박혀 있다**: `services/dividends.py:46`(및 `:4`)은 "현 yfinance는 퍼센트 스케일"이라 단언하는데, `CLAUDE.md:233`은 `info.dividendYield`를 **소수분수(0~1)** 목록에 명시 포함한다. **둘 중 하나는 stale이고 코드에 가드가 없다.** `requirements.txt:4`는 `yfinance>=0.2.40` 범위 핀이고 이 필드의 스케일은 그 범위 안에서 바뀐 이력이 있다 → 버전 범프가 전 US 수익률을 100배 틀리게 만들 수 있다.
-- 나머지 `*100` 사용처는 정합함을 확인했다(`hv`는 `reports/DetailTab.jsx:650`·`Compare.jsx:89` 양쪽에서 곱함). `us_supply.py:78-83`은 DataFrame 행 라벨 exact 문자열(`:75` `"Net Shares Purchased (Sold)"`, `:78` `"% Buy Shares"`)에 의존한다.
+- **`guru_scraper.py`의 종목명 조회** (MED) — 두 코드(`ticker`, `{ticker}.O`) 시도를 `except Exception: pass`로 삼키고 `""`를 반환한다. 스크레이프 파손과 "Naver에 이름이 없음"이 구별되지 않고, 그 `""`가 구루 보유 종목에 저장된다. `save_guru_managers`의 가드는 *매니저* 단위라 **빈 종목명은 보지 못한다**.
+- **`middleware/event_tracker.py::_save_event`** (LOW) — `user_events` INSERT를 완전 무음으로 삼킨다. 추적 사이드채널이라 방어 가능하나 DB 장애 시 신호가 0이다.
+- **`main.py::_warm_market_cache`** (LOW) — `get_econ_indicators()`·`get_kr_exports()` 양쪽을 무음으로 감싼다. §3의 TTL 성질과 겹쳐, warm-up 실패는 월배치까지 콜드로 남는다.
 
-### 2.7 단위 배수 하드코딩 — **설계상 트레이드오프**(일회성 라이브 프로브가 유일한 근거)
-`kiwoom/quote.py:47`(억원→×1e8) · `kis/quote.py:51`(×1e8) · `kiwoom/shortsell.py:62`(천원→×1000) · `market/kr.py:365-366,372,439,446`(×1e8) · `backlog.py:291`(÷1e8) · `leverage_service.py:339-345` · `lending_service.py:145-148` · `exports.py:75-76,98-99`. 벤더가 단위를 바꾸면 100~1000× 무음 오류.
-- **죽은 코드지만 함정**: `services/market/format.py:26-32` `_to_won`은 크기로 단위을 추론한다(`v*1e8 if abs(v) < 1e10 else v`). 호출처 0(`market/__init__.py:13`에서 re-export만). 진짜 100억 미만 원 값이 들어오면 1e8배 부풀린다.
+좁지만 손실이 있는 것: `earnings.py::_get_naver_quarterly_net_income`의 `except (ValueError, IndexError): pass` — 분기 하나가 무음으로 빠지고 `_merge_quarters`가 짧은 시계열을 합산한다. `_REST_MIN_COVERAGE`는 *데이터가 있는 티커 수*를 세므로 8분기 중 3분기를 잃은 티커도 성공으로 계수된다.
 
-### 2.8 무한 루프 가능 페이지네이션 — **잠재 위험**
-- `services/lending_service.py:24-35` `_fetch_all`: `while True`가 `len(items) < page_size`로만 탈출한다. 형제 `leverage_service.py:45`은 `totalCount`도 본다. 포털이 `pageNo`를 무시하고 계속 1000행을 주면 배치 안에서 무한 누적.
-- `services/kiwoom/client.py:114-130` `request_paged`: 페이지 카운터 없음(break는 `:128`). `list_key`가 드리프트하면 `items`가 안 늘어 `max_items` 브레이크가 무력화된다.
+### 2.5 yfinance에 애플리케이션 레벨 타임아웃이 없다 — **잠재 위험**
 
-### 2.9 응답 봉투·상태 검사 누락 — **잠재 위험**(낮음)
-- `services/kiwoom/client.py:71,153`·`kis/client.py:129` — `rc not in (0, None)`이라 **`return_code`/`rt_cd`가 아예 없으면 성공으로 취급**한다. 프록시/봉투 변경 시 에러 본문이 정규화기로 흘러 all-None이 된다. 하류 `price is None` 검사(`market/kr.py:82-84,98-100`)만이 가드.
-- `.json()` 앞에 상태 검사가 없는 6곳 — 요청은 `disclosures.py:50`, `insider_trades.py:125`, `backlog.py:102`, `:306`, `agm.py:126`, `dividends.py:114`이고 실제 파싱은 각각 `:61`, `:135`, `:113`, `:316`, `:135`, `:124`. 전부 try/except 안이라 HTTP 오류가 "파싱 실패"로 보고되는 정도.
-- `services/market_indicators/exports.py:143-145` — 레거시 파일 캐시를 try/except 없이 `json.load`한다. `:128-130`의 비원자적 write로 잘린 파일이 남으면 엔드포인트가 500.
-
-### 2.10 취약·비공식 소스 인벤토리
-| 소스 | 위치 | 차단 시 |
-|---|---|---|
-| CNN F&G | `market_indicators/sentiment.py:10,27-58` | **가드됨** — VIX식 수동 last-good(`:75-78`) |
-| `multpl.com/shiller-pe` | `market_indicators/indices.py:98-109,42-95` | **가드됨** — 저장 CAPE 폴백(`:133-134`) |
-| **dataroma** | `services/guru_scraper.py:10,116,175,308` | **가장 취약** — 위치 인덱스 `cells[1]/[2]/[3]/[6]`(`:135-163`), CSS id `div#f_name`/`p#p2`/`table#grid`, `_ACT_ROW_TDS=5`(`:222`), `weight_pct` 기본 `0.0`(`:148`), `portfolio_value` 기본 `0`(`:184`, `_parse_portfolio_value:50,54`). `scrape_holdings`에 빈 결과 가드·로그 없음 |
-| Naver 모바일 API | `market/kr.py:16,19-22` 외 6곳 | 시세는 2-of-N 다수결로 보호. **재무 경로(§2.1)가 노출면** |
-| Naver US API | `guru_scraper.py:11,31` | 무음 `""` |
-| FnGuide (HTML + 비공식 JSON) | `market/kr.py:33,626`, `consensus_pipeline.py:125` | 컨센서스는 Naver Research 폴백. 시총 경로 무음 |
-| Wikipedia S&P500 표 | `market_indicators/earnings.py:117,121` | `table id=constituents` 의존, 시드 파일 폴백 있음 |
-| Naver 시총 페이지 (euc-kr) | `market_indicators/earnings.py:135,143` | `range(1,50)` 최대 49콜 |
-| Finviz | `services/scraper.py:19` | `{}`, 부분 무음 |
-| UN Comtrade preview | `market_indicators/exports.py:13,84-89` | **가드됨** — task#243 last-good + `stale` 마커 |
-| Google Fonts / jsdelivr | `frontend/index.html:45-49` | 자체호스팅 앱의 외부 의존(첫 로드 후 SW CacheFirst로 완화, `vite.config.js:22-38`) |
-
-- 하드코딩 URL 중복: `market/kr.py:626`과 `consensus_pipeline.py:125`가 같은 FnGuide JSON 경로를 독립 조립한다 — 한쪽만 고치면 다른 쪽이 깨진 채 남는다.
-- `requests.get/post` — **47개 호출 지점**(지난 판 "28개"는 stale). 스팟 확인한 다중행 호출은 전부 `timeout=`을 갖지만, 개수가 늘어 **한 줄 grep으로 "전부 가드됨"을 재확인할 수 없다** — 새 호출을 추가할 때 `timeout=`을 눈으로 확인할 것.
-- BeautifulSoup 10곳 전부 `"html.parser"`. 로컬 `.venv`에 `lxml`이 없으므로 이게 정답. **이미 가드됨.**
-
-### 2.11 중립 기본값이 실패를 정상값으로 둔갑시킨다 — **잠재 위험 + 설계상 트레이드오프**
-- **잠재 위험** — `services/consensus_pipeline.py:40` `_score`가 정확맵(`:12-27`)→부분문자열(`:36-39`) 실패 시 **`3.0`(중립)**을 반환한다. 같은 형태가 `:145-147`(`recom = 3`)·`:148`(`_RECOM_TO_OPINION.get(…, "중립")`)에도 있다. 새 증권사 표현이나 벤더 언어 변경이 조용히 중립 점수를 `raw_reports.opinion_score` → `daily_consensus_mart.avg_opinion_score`와 buy/hold/sell 버킷(`_MART_SQL` `:246`, 버킷 `:269-271`)에 희석시킨다. "매핑 안 된 의견" 로그가 없어 관측 불가.
-- **설계상 트레이드오프(ADR-0016)** — `services/recommendation/scoring.py:23` `_NEUTRAL = 0.5`을 결측군에 채운다(`:44`, `:136-139`, `:144`). 재정규화 대신 중립 채움을 택해 "근거 완전성이 점수에 반영"되게 한 의도된 선택이고 `:136-138` 주석이 근거를 담는다. 비용: 데이터가 거의 없는 종목이 중간 점수를 받는다.
+`cache.py::_yf_close_history`, `beta.py`의 `yf.Ticker(...).info`/`.history(...)` 어느 호출에도 명시 타임아웃이 없다. yfinance 내부 기본값(30s)에 의존하며 `requirements.txt`가 `yfinance>=0.2.40`으로 **상한 없이** 열려 있어(§10.7) 그 기본값이 바뀌면 애플리케이션 쪽 상한이 0이 된다. §6.4의 "잡 타임아웃 없음"과 결합하면 한 번의 hang이 배치 전체를 무기한 잡는다.
 
 ---
 
 ## 3. NaN/Inf·수치 타입
 
-### 3.1 `sanitize`가 `Decimal('NaN')`을 통과시킨다 — **해소** (B2, task#278)
-- `services/utils.py:37`이 `isinstance(obj, float)`만 검사하던 문제. PostgreSQL `numeric`은 **NaN을 저장한다**(psycopg2가 `Decimal('NaN')`으로 되돌린다).
-- 수정: `isinstance(obj, Decimal) and (obj.is_nan() or obj.is_infinite())`를 float 검사에 나란히 추가 → `None`화. **한 줄로 기존 sanitize 호출처 전부가 소급 강화됐다**(`routers/stocks.py:673`의 `get_dashboard` 등 raw Decimal이 섞여 있던 지점 포함).
-- 정상 `Decimal` 값은 float으로 캐스트되지 않고 타입 그대로 통과한다(`type(v) is Decimal` 확인).
-- 부수: `sanitize`는 여전히 tuple·set을 순회하지 않는다(현재 응답에 그 타입이 없어 무해, 미변경).
-- 회귀: `tests/test_utils_sanitize_decimal.py`(5건).
+> 코드 주석 4곳(`main.py`, `routers/stocks.py`×2, `tests/test_stocks_router.py`)이 이 절을 `CONCERNS §3`으로 인용한다 — **번호 유지 필수**.
 
-### 3.2 NaN이 컨센서스 마트까지 전파 — **해소** (B4, task#278)
-- `services/consensus_pipeline.py:184` — `tp = float(row.get("currentPriceTarget") or 0) or None`. **NaN은 truthy**라 `nan or 0` → `nan`, `nan or None` → `nan`이던 문제.
-- 수정: 같은 파일의 `upsert_raw_reports`(개별 fetcher 3개가 아니라 그 앞의 **단일 INSERT 통로**)에 `math.isfinite` 정규화 초크포인트를 추가 — NaN/Infinity `target_price`를 `None`화하고, 그 정규화를 `opinion 있거나 target 있으면 통과` 필터 **앞**에 배치(순서를 docstring에 명시). `raw_reports.target_price`→`AVG()`→`daily_consensus_mart.avg_target_price`(ADR-0008 정본) 경로가 더 이상 NaN에 오염되지 않는다.
-- 회귀: `tests/test_consensus_target_nan.py`(NaN·Infinity 정규화, 정상값·기존 None 불변 확인 3건).
+### 3.1 입력 경로 — **이미 가드됨**
 
-### 3.3 입력 경로 Pydantic float 가드 누락 — **해소** (B3, task#278)
-`allow_inf_nan=False`를 설정한 곳이 **한 파일·두 모델·세 필드**(`analyst_reports.py`만)였던 상태가 해소됐다. 현재:
+- `main.py::_validation_error_handler`가 422 본문을 `sanitize`한다 → 입력 NaN이 echo돼 직렬화 500이 되는 연쇄가 앱 전역에서 닫혔다.
+- Pydantic 스윕: `= Field(None` / `= Field(default=None` **19건 전부 이미 `Optional[...]`** — `x: float = Field(None)` 오선언은 **0건**이다(명시적 `null`만 422가 되는 비대칭 함정 없음).
+- 외부 NaN 토큰을 받을 수 있는 float 필드에 `allow_inf_nan=False`가 붙어 있다(`routers/tech_reports.py`, `routers/analyst_reports.py`).
 
-| 필드 | 위치 | 상태 |
-|---|---|---|
-| `PointMetric.change_pct`/`fair_value_low`/`high` | `routers/analyst_reports.py:31,44,45` | 가드(task#250, 밴드 validator `:50-56`) |
-| `Stock.quantity`/`.avg_cost`/`.target_price`/`.stop_price` | `routers/portfolio.py` `Stock`(`model_config = ConfigDict(allow_inf_nan=False)`) | 가드 |
-| `weights: Dict[str, Optional[float]]` | `routers/portfolio.py` `set_rebalance_targets`(`Annotated[float, Field(allow_inf_nan=False)]`) | 가드 |
-| `PromotePayload.quantity`/`.avg_cost` | `routers/watchlist.py` (`model_config = ConfigDict(allow_inf_nan=False)`, 기존 `Field(gt=0)` 유지) | 가드 |
-| enrich 16개 `Optional[Any]` | `routers/stocks.py:131-138,144-151` | 타입 자체가 Any — 스코프 밖, 무가드 잔존 |
+### 3.2 `sanitize`는 `Decimal('NaN')`을 처리한다 — **이미 가드됨**
 
-- **드리프트 가드 신설**: `tests/test_nan_input_guards.py`가 `routers/` 패키지를 순회해 각 모듈이 직접 정의한(임포트 아닌) `BaseModel` 서브클래스를 수집하고, `typing.get_args`로 float을 포함하는 필드 애너테이션을 재귀 탐지해 `allow_inf_nan=False`(모델 `ConfigDict` 또는 필드 `Field(...)` 메타데이터, 속성으로 확인)로 가드됐는지 열거로 단언한다. **신규 float 필드가 무가드로 추가되면 이 테스트가 즉시 실패**하므로, 표 갱신을 잊어도 재발은 스위트가 막는다.
-- ⚠️ **422 행동 테스트는 자체-app(`FastAPI()`)이 아니라 conftest의 `client`(=`main.app`)로 돌려야 한다** — `main.py:272` 근처의 `RequestValidationError` sanitizing 핸들러가 그 안에만 배선돼 있고, 자체-app 테스트(`test_portfolio_router.py:9-12`·`test_watchlist_router.py:9-12`)엔 없어 422 detail의 NaN echo가 500으로 재발한다.
-- 회귀: `tests/test_nan_input_behavior.py`(3표면 행동 핀 + 모델 레벨 핀, 12건).
+`services/utils.py::sanitize`가 float뿐 아니라 PostgreSQL `NUMERIC`에서 오는 `Decimal('NaN')`도 잡는다. `NUMERIC` 컬럼이 NaN을 저장할 수 있고 psycopg2가 그대로 왕복시키므로 이 처리가 옳다.
 
-### 3.4 sanitize가 없는 응답 경로 — **잠재 위험**
-- `routers/report.py:474` — `_read_snapshot`이 `:152/:157`에서 sanitize하지만 `apply_asof`(`:466`)가 **그 뒤에** 마트 Decimal을 주입한다.
-- `routers/report.py:306,326,510,562`, `routers/analysis.py:23,39`, `routers/digest.py:20,25`. (`routers/portfolio.py:62,148`는 task#278에서 `sanitize()`로 감싸 §3.5로 이동 — `get_portfolio`/`get_portfolio_prices`.)
-- `routers/guru.py` — sanitize 없는 핸들러 **6개**: `:23`, `:35`, `:44`, `:50`, `:56-61`, `:65`.
-- `routers/market_indicators.py` — **`@router.get` 17개 전부 sanitize 0회**(`:33,41,49,57,65,73,81,89,97,105,113,122,143,214,222,244,250`). 지난 판의 "핸들러 9개"는 과소집계였다.
-- `routers/rankings.py:66`·`routers/investor.py:58`·`routers/short_sell.py:39` — bare `float()` 헬퍼에 `isfinite` 없음(`rankings.py:13`, `investor.py:9`, `short_sell.py:9`).
+### 3.3 sanitize가 없는 응답 경로 — **잠재 위험**
 
-### 3.5 응답 경로 — **이미 가드됨(잔여 위험만)**
-- `services/utils.py:36-43` `sanitize`(단, §3.1의 Decimal 구멍).
-- `routers/stocks.py:483-498` `_usdkrw_rate`의 `math.isfinite` 가드(`:498`) — NaN≠None이라 `if fx is None`을 통과하던 task#104 근본.
-- `routers/stocks.py:673` `_build_all` 전체 sanitize; `:233-239` `_f`가 비교값 float+`isfinite` 정규화(`:237`).
-- 확인된 정상 가드: `recommendations.py:151,210`, `analytics.py:47-49`, `analysis_service.py:124,127`, `portfolio.py:168,212`, `analyst_reports.py:69,87,107,120`(`services/analyst_reports.py:121-122`가 sanitize *전에* Decimal→float 캐스트하므로 §3.1 구멍에 안 걸린다), `indicators.py`, `report_generator.py:507,683`.
-- ⚠️ **정정 — `market_indicators` 서브모듈이 "전부" 가드된 게 아니다**: sanitize를 하는 것은 **12개 중 4개**(`kospi_futures.py:50`, `indices.py:138`, `kospi_signal.py:248,278`, `sentiment.py:70`). `commodities.py`·`earnings.py`·`econ.py`·`exports.py`·`fx.py`·`macro.py`·`cache.py`는 `_mc_save` 전에 sanitize하지 않는다. 나눗셈은 전부 `if prev else 0.0`으로 가드되고(`fx.py:30,39`, `commodities.py:25`) 소스는 `dropna`를 타므로 **현재 라이브 위험은 낮다** — 고칠 것은 코드가 아니라 이 문장이다.
-- 회귀: `tests/test_nan_serialization_guards.py`(task#109).
+| 라우터 | 상태 |
+|---|---|
+| `routers/portfolio.py` | ✅ 전 응답 경로 sanitize + `ConfigDict(allow_inf_nan=False)` |
+| `routers/stocks.py` | ✅ `compare_stocks`·대시보드 sanitize, `_usdkrw_rate`에 `math.isfinite` |
+| `routers/analysis.py` | ⚠️ `sector`·`macro_correlation`이 sanitize 없음(내부 `isfinite` 가드에 의존) |
+| `routers/market_indicators.py` | ⚠️ **14개 GET 중 어느 것도 sanitize 안 함** — 내부 가드가 있는 것(`indices`·`fear_greed`·`kospi_futures`·`kospi_signal`·`leverage`·`lending`)과 없는 것(`treasury`·`commodities`·`fx`·`vix`·`econ`·`macro`·`m7`·`kr_top2`·`kr_exports`)이 섞여 있다 |
+| `routers/rankings.py`·`investor.py`·`short_sell.py` | ⚠️ `_serialize`가 bare `_to_float`, sanitize 없음 |
 
-### 3.6 Decimal ↔ float — **이미 가드됨(잔여 위험만)**
-- 수치 어댑터를 등록하는 코드가 없다(`register_type`/`DEC2FLOAT`/`new_type` 0건) → NUMERIC은 진짜 `Decimal`로 오고 모든 캐스트가 load-bearing이다. NUMERIC을 읽는 산술 ~30곳 전부 `float()`/`int()`/`pd.to_numeric`을 먼저 통과한다.
-- 역사적 결함 지점이 주석(`:546`)과 함께 고쳐져 있다: `routers/stocks.py:549-552`(`float(annual_div) / float(avg_cost)`).
-- **잔여 A**: `services/exposure.py:74` `e["weight"] * beta_map[...]`는 캐스트를 안 한다 — 두 호출자(`routers/portfolio.py:209`, `routers/stocks.py:295`)가 밖에서 캐스트한다. **세 번째 호출자가 원래 버그 형태를 그대로 재도입한다.**
-- **잔여 B**: `routers/portfolio.py:110` `amt * qty`가 `services/dividends.py:352`가 `amount_per_share`를 float화했음에 의존한다(`:75-76` 주석이 *다른 모듈*의 사실을 단언한다).
-- **잔여 C**: 규약이 사이트마다 수동이고 자동 가드가 없다. 회귀 테스트는 **Decimal**로 써야 한다 — fixture가 float이면 라이브에서만 깨지는 fixture-pass-live-fail이 된다.
+### 3.4 NaN이 `market_rankings`에 저장돼 랭킹 500을 낼 수 있다 — **잠재 위험**
 
-### 3.7 최소카드 폴백이 근본원인을 마스킹한다 — **설계상 트레이드오프**
-- `routers/stocks.py:661-667` `_safe`가 카드당 예외를 `_minimal_card`(`:631`)로 흡수한다. "holdings=N → 항상 N카드" 불변식(task#102)을 위한 의도된 선택이다.
-- **비용**: 결함이 500도 토스트도 없이 "enrichment만 조용히 사라짐"으로 나타난다. 유일한 단서는 `docker logs portfolion-backend-1 | grep '최소카드 폴백'`(`:666`).
-- 추가 잔여: 열화된 카드셋이 `_dashboard_cache`(TTL 300s, `services/cache.py:34`)에 **5분간 캐시**된다.
+`services/ranking_service.py::_us_row`:
+
+```python
+"change_pct": _parse_float(quote.get("regularMarketChangePercent")),
+```
+
+`_parse_float`는 `float(str(val).strip())`이라 **`float("nan")`이 성공한다**. `price`/`trading_value`는 `int()`를 거쳐 NaN이면 배치가 죽지만 `change_pct`는 통과한다 → `market_rankings.change_pct`(`NUMERIC`) → `Decimal('NaN')` → `routers/rankings.py::_serialize`의 sanitize 없는 `_to_float` → starlette `allow_nan=False` → **랭킹 페이지 전체 500**. 미확인 부분은 yfinance `most_actives`가 실제로 그 필드에 NaN을 내는지 여부다.
+
+### 3.5 최소카드 폴백이 근본원인을 마스킹한다 — **설계상 트레이드오프**
+
+`routers/stocks.py`의 대시보드 빌드는 per-card `_safe`로 throw를 `_minimal_card`로 흡수한다 — 500-to-empty를 막는 올바른 설계지만, **enrichment가 조용히 사라지는 형태**로 실패한다(에러 토스트 없음). 헤더·시세는 정상인데 RSI·컨센서스·매물대·배당만 일괄 blank면 `docker logs portfolion-backend-1 | grep '최소카드 폴백'`이 유일한 단서다.
 
 ---
 
 ## 4. DB·스키마·트랜잭션·커넥션 풀
 
-### 4.1 `app_schema.sql` ↔ `main._migrate` 미짝 — **잠재 위험**(프로세스 부채, 라이브 장애 아님)
-ADR-0006: `_migrate`(`backend/main.py:60-238`)만이 라이브 DB에 도달한다. `app_schema.sql`은 빈 pgdata initdb 때만 실행되고, 그 파일 스스로 `:359-363`에서 이 사실을 문서화한다.
+### 4.1 `app_schema.sql` ↔ `main._migrate` 미짝 — **잠재 위험**(프로세스 부채)
 
-**`_migrate` 짝이 없는 컬럼 6개** (전부 `app_schema.sql`에만 존재):
+`app_schema.sql`은 **빈 `pgdata` 초기화 시에만** 적용된다(`docker-compose.yml`의 `/docker-entrypoint-initdb.d/02-app.sql`). `backend/migrations/001_user_events.sql`·`002_backlog_history.sql`은 **어떤 스크립트·compose·모듈도 참조하지 않는다**(죽은 수동 파일). 따라서 `_migrate()`가 유일한 자동 경로다(ADR-0006).
 
-| 컬럼 | 스키마 | 소비처 |
-|---|---|---|
-| `tickers.recent_disclosures` | `:15` | `services/storage/portfolio.py:55`(INSERT), `:223`(read) |
-| `tickers.insights` | `:16` | `storage/portfolio.py:224` |
-| `tickers.enriched_at` | `:20` | `routers/report.py:468`(SELECT), `storage/portfolio.py:293`(write) |
-| `tickers.is_etf` | `:21` | `report.py:468`, `storage/portfolio.py:55,204,228` |
-| `consensus_history.target_high` | `:87` | `services/consensus.py:18,69,99,106` |
-| `consensus_history.target_low` | `:89` | `services/consensus.py:18,69,99,108` |
+**`_migrate`에 `CREATE TABLE IF NOT EXISTS`가 없는 후발 테이블** — 라이브 DB엔 수동 `psql`로만 존재한다:
 
-근접 미스: `tickers`의 baseline 이후 컬럼 8개 중 `_migrate`는 정확히 4개만 덮는다(`key_resource :17`→`main.py:203`·`competitor_edge :18`→`:208`·`market_outlook :19`→`:213`·`analyst_target :22`→`:218`). `report.py:468`은 `enriched_at, is_etf, analyst_target`을 한 문장에서 SELECT하는데 그중 하나만 마이그레이션돼 있다.
-
-**⚠️ 테이블 쪽 규모를 정정한다 — 11개가 아니라 21개다.** `app_schema.sql`은 **32테이블**을 선언하고 `_migrate`의 `CREATE TABLE IF NOT EXISTS`는 **11개**뿐이다(`batch_schedules main.py:69`·`market_short_sell :74`·`stock_disclosures :84`·`stock_dividends :94`·`stock_dividend_schedule :105`·`stock_beta :120`·`stock_supply_score :129`·`stock_insider_trades :140`·`stock_recommendations :162`·`us_supply_snapshot :181`·`analyst_reports :223`).
-
-- `_migrate` 규율(06-14경) **이후** 추가돼 짝이 없는 것: 없음 — 규율은 지켜지고 있다.
-- 규율 **이전** 시기(2026-05-30~06-07)라 짝이 없는 것 11개: `user_menu_permissions`(`:112`) · `default_menu_permissions`+시드(`:120-127`) · `raw_reports`(`:130`) · `daily_consensus_mart`(`:142`) · `user_events`(`:158`) · `market_leverage_indicators`(`:176`) · `market_lending_balance`(`:190`) · `backlog_history`(`:202` — `segments` ALTER만 `main.py:64`에 있다) · `market_rankings`(`:215`) · `market_investor_trend`(`:234`) · `job_runs`(`:364`).
-- 그보다 더 이전의 **baseline 10개**도 CREATE가 없다: `tickers :6` · `snapshots :26` · `user_stocks :34` · `schedules :48` · `guru_managers :56` · `guru_schedules :63` · `digests :76` · `consensus_history :84` · `calendar_cache :97` · `market_cache :105`.
-- 지난 판이 baseline 10개를 목록에서 뺀 것은 "ADR-0006 이전"이라 방어할 수 있으나, **실패 모드를 과소평가하게 만든다** — 복구/재구축된 pgdata에서 `_migrate`만 돌면 **21테이블 6컬럼**이 없는 채로 기동한다. 부채의 본질은 `_migrate`가 자가치유형이 아니라는 것이다.
-
-**그리고 검출 수단이 없다**: `app_schema` 문자열을 참조하는 테스트가 **0개**다. `tests/test_dividends.py:205`·`test_beta.py:160`처럼 **기능별** 테스트가 개별 테이블 DDL 발행만 단언하고, 짝을 **전수 대조하는 테스트는 없다**. DoD가 문서에만 있다.
-
-### 4.2 `_migrate` 실패가 fail-open — **잠재 위험**
-- `backend/main.py:60-238`이 **18개** 블록을 각각 `try/except` + `logger.warning`으로 감싼다(지난 판 "20개"는 stale). 마이그레이션이 실패해도 앱은 기동하고 그 테이블/컬럼을 쓰는 엔드포인트가 요청 시점에 깨진다. ADR-0006이 기대한 "lifespan yield 이전 완료" 보장이 실패 시엔 성립하지 않는다.
-
-### 4.3 원자성 — 한 곳이 깨져 있다
-`services/db.py`의 `query`/`execute`/`execute_many`(`:46`/`:54`/`:67`)는 **각자 자기 커넥션을 연다** → 한 호출 = 한 트랜잭션. `execute()` 두 번은 절대 원자적이지 않다.
-- **확인된 버그 (B5)** — `routers/admin.py:111-119`: 6개 `execute()` = **6개 트랜잭션**. 루프 중간에 실패하면 반쯤 삭제된 사용자(포트폴리오는 지워졌고 `users` 행은 남아 여전히 로그인 가능)가 된다. **게다가 완전히 중복**이다 — 5개 자식 테이블 전부 `users(id)`에 `ON DELETE CASCADE`가 걸려 있으므로(`auth_schema.sql:17`, `app_schema.sql:35,77,98,113`) `:119` 한 줄로 충분하고 그게 원자적이다.
-- **이미 가드됨** — delete-rewrite 4곳 전부 단일 공유 커서로 원자적이다: `dividends.py:312-331`, `ranking_service.py:160-178`, `recommendation/store.py:25-58`, `consensus_pipeline.py:354-363`. (단 원자성이 §1.1·§1.4의 "빈 결과가 정상 커밋되는" 문제를 막지는 않는다.)
-- **잠재 위험** — `services/auth_service.py:56-61` `create_user`에 `users.email UNIQUE` 대한 `ON CONFLICT`가 없고, 두 트랜잭션에 걸친 check-then-insert(`routers/auth.py:77`→`:79`)로만 보호된다 → 동시 이중 제출이 400 대신 500을 낸다.
-
-### 4.4 SQL 인젝션·배열 캐스트 — **거의 클린**
-- 식별자 f-string 보간 2곳 모두 화이트리스트: `routers/admin.py:118`(`:111-117`의 하드코딩 5튜플만 순회), `services/storage/portfolio.py:295`(`:288`이 `fields.keys() <= _ENRICH_KEYS`를 단언하고 아니면 `:289` `ValueError`; `_ENRICH_KEYS`는 `:283` frozenset). 값은 파라미터 바인딩.
-- `= ANY(%s)` **16곳** 중 uuid 컬럼은 하나이고 캐스트가 있다(`routers/admin.py:32` `%s::uuid[]`). 나머지는 `text` 컬럼이라 `text[]`가 맞다.
-- **잠재 위험**: `routers/report.py:208` `date = ANY(%s)`에 `::date[]`가 없다. `latest_dates`(`:206`)가 `datetime.date`를 담아 지금은 동작하나 ISO 문자열을 먹이면 `operator does not exist: date = text`. `services/consensus.py:85`는 이미 per-element 캐스트를 한다.
-- 다행 VALUES 형태: `services/consensus.py:81-85`가 `", ".join("(%s,%s::date)" …)`로 N행을 만든다(바깥 괄호 없음). `:83-84` docstring이 그 실패 모드를 경고한다.
-- WHERE 없는 DELETE 하나 — `routers/calendar.py:63`, 순수 캐시이고 upsert로 재생성(`:118`), 의도적·문서화됨.
-- `ON CONFLICT`는 **40개 문장 / 25개 모듈**에 있다(지난 판 "INSERT 25개"는 *모듈* 수였다). conflict target 정합성은 이번에 재검증하지 않았다 — 신규 upsert를 추가할 땐 실제 PK/UNIQUE와 대조할 것.
-
-### 4.5 커넥션 풀 vs ThreadPool 적층 — **잠재 위험**
-- 풀: `services/db.py:21-27` `ThreadedConnectionPool(minconn=1(:22), maxconn=20(:25))`. `get_connection`(`:31-41`)은 정상 종료 시 commit, 예외 시 rollback, `putconn`이 `finally`에 있어 **커넥션은 항상 반환된다**.
-- **느린 외부 HTTP 호출을 걸친 채 풀 커넥션을 잡는 곳은 없다** — `with get_connection()` 블록 9곳(`auth_service.py:66`, `dividends.py:312`, `ranking_service.py:160`, `store.py:25`, `storage/portfolio.py:49,102,147,174`, `consensus_pipeline.py:354`) 모두 순수 SQL이고 fetch는 사전 평가된다.
-- **문제는 적층이다** — DB를 만지는 워커:
-
-| 위치 | max_workers |
+| 테이블 | 근거 |
 |---|---|
-| `routers/calendar.py:106` | **15** |
-| `routers/stocks.py:669` (대시보드 `_build_all`, 카드당 다중 read — task#102 핫스팟) | 10 |
-| `routers/analytics.py:39` (`parallel_map`) | 10 |
-| `services/analysis_service.py:84` (`parallel_map`) | 10 |
-| `routers/stocks.py:428` (이름 백필, 워커당 write 2회) | 8 |
-| `scheduler/jobs.py:299` · `:427` | 8 |
-| `services/report_generator.py:253` | 8 |
-| `routers/report.py:142` (`parallel_map`) | 5 |
-| `services/consensus_pipeline.py:107` | 5 |
-| `services/kr_sector_service.py:71` (`parallel_map`) | 4 |
+| `market_rankings` | 랭킹 Phase 3에서 추가, `_migrate` 무등록 |
+| `market_investor_trend` | 수급 Phase 4에서 추가, `_migrate` 무등록 |
+| `market_leverage_indicators` | `_migrate` 무등록 |
+| `job_runs` | `app_schema.sql` 자신이 수동 단계임을 주석으로 명시 |
+| `raw_reports`·`daily_consensus_mart`·`user_events`·`backlog_history` | `_migrate`에 `ALTER`만 있고 `CREATE`는 없음(`backlog_history.segments`) |
 
-  대시보드(10)와 캘린더(15)가 동시에 오면 이미 20을 넘고, psycopg2 풀은 소진 시 **블록이 아니라 `PoolError`**를 던진다(`db.py:23-24` 주석).
-- `scheduler/_state.py:5`가 `AsyncIOScheduler`를 executor 사이징 없이 만들어 APScheduler 기본 10워커가 각자 4~15 스레드를 띄운다. 배치 기본 시각도 겹친다(`batch_registry.py:188,204,419` 일요일 03:00에 `earnings_kr`·`earnings_us`·`guru_crawl`).
-- 외부 fetch 전용(풀 무관·레이트리밋 관련): `market_indicators/earnings.py:202`·`:229`=**20**(~500·~900티커 순차 2회), `ranking_service.py:112`=12, `us_sector_service.py:28`=11, `exports.py:68`=6, `commodities.py:85`=4·`:43`=3, `fx.py:62`=3. `services/parallel.py:5` 기본값=10.
-- **스테일 주석 4곳**이 틀린 불변식을 심는다: `db.py:23-24`(사이징 근거를 "calendar 15·analysis 11"로 적었으나 전체 최대 fan-out은 20 — 게다가 `CONCERNS §4.2`를 인용하는데 이 내용은 §4.5다), `routers/stocks.py:427`·`scheduler/jobs.py:298`·`:426`(`maxconn=10` — 실제 20).
+`market_lending_balance`는 안전하다 — `lending_service.py::_ensure_table`이 매 호출 자가 생성한다.
 
-### 4.6 N+1 쿼리 — **설계상 트레이드오프**
-- `routers/stocks.py:510`이 카드마다 `_latest_snapshot(ticker)`를 단건 조회한다. 배치 헬퍼 `_latest_snapshots`(`:60-85`)가 같은 파일에 이미 있는데 `/compare`(`:290`)만 쓴다.
+**`tickers` 컬럼 중 `_migrate`에 짝이 없는 것**: `_migrate`가 덮는 것은 `key_resource`·`competitor_edge`·`market_outlook`·`analyst_target` 4개뿐. 누락: **`enriched_at`**(`routers/stocks.py::_enriched_at_map`가 읽음), **`is_etf`**(`storage/portfolio.py::get_full_portfolio`), **`insights`**(`storage/portfolio.get_stocks`) — 셋 다 초기 스키마 이후 추가분이다. 나머지(`exchange`·`competitors`·`moat`·`growth_plan`·`risks`·`recent_disclosures`)는 초기 스키마 소속이라 위험이 낮다.
+
+`user_stocks`(`target_price`·`stop_price`·`target_weight`·`pinned`)는 **올바르게 짝지어져 있다**.
+
+심각도 주석: 앱이 지금 돌고 있으므로 라이브 DB엔 이미 수동 반영돼 있을 가능성이 높다. 노출은 **옛 덤프에서의 재구축**이나 **두 번째 환경**이고, 위반되는 것은 명시된 DoD다.
+
+### 4.2 커넥션 풀 vs ThreadPool 적층 — **잠재 위험**
+
+> `services/db.py`의 주석이 이 항목을 `CONCERNS §4.2`로 인용한다.
+
+`_get_pool()`은 `ThreadedConnectionPool(minconn=1, maxconn=20)`이고, **psycopg2 풀은 소진 시 블록하지 않고 `PoolError`를 던진다**(코드 주석이 이 성질을 명시).
+
+| 사이트(심볼) | 워커 | DB 접근 |
+|---|---|---|
+| `routers/calendar.py::get_calendar_events` (`_fetch_stock`) | 15 | ❌ yfinance만 |
+| `services/ranking_service.py::_fetch_naver_market` | 12 | ❌ HTTP만 |
+| `routers/stocks.py` 대시보드 (`_build_all`→`_build_card`) | 10 | ✅ 카드당 `dividends.get_dividend` |
+| `services/analysis_service.py::get_macro_correlation` | 10 | 혼합 |
+| `scheduler/jobs.py::_investor_trend_work` / `_short_sell_work` | 8 | ✅ `upsert_trend` |
+| `routers/stocks.py::backfill_names` (`_one`) | 8 | ✅ 쓰기 2회 |
+| `services/report_generator.py` | 8 | ✅ |
+| `market_indicators/earnings.py` | 20 | ❌ |
+| `services/consensus_pipeline.py` | 5 | ✅ |
+
+도달: 동시 대시보드 요청 2건(10+10=20=`maxconn`) + 스케줄러 배치 1개 → `PoolError`. 부하 실증은 없어 **미확정**이지만, 이 위험이 데이터 손실로 승격되는 경로가 §1.2다 — `_mc_load` 안의 `PoolError`가 "저장값 없음"으로 변환된다.
+
+**스테일 주석 3곳**(LOW, 확인): `scheduler/jobs.py`(2곳)·`routers/stocks.py`가 풀을 `maxconn=10`으로 서술한다(실제 20). 다음 사람이 읽을 사이징 근거이므로 정정 대상.
+
+### 4.3 트랜잭션 원자성 — **이미 가드됨**(지시문의 전제가 틀렸다)
+
+`services/db.py::get_connection`은 **커밋과 롤백을 모두** 한다:
+
+```python
+conn = _get_pool().getconn()
+try:
+    yield conn
+    conn.commit()
+except Exception:
+    conn.rollback()
+    raise
+finally:
+    _get_pool().putconn(conn)
+```
+
+따라서 "정상 종료 시 커밋한다 → 롤백 전제 코드가 성립하지 않는다"는 **반증됐다**. §1.4의 delete-rewrite 5곳은 이 롤백에 정당하게 의존한다.
+
+**진짜 잔여 위험은 다른 곳이다** — `query()`/`execute()`는 **각각 자기 커넥션·자기 트랜잭션**을 연다. 따라서 `execute()` 루프에는 문장 간 원자성이 없다: `leverage_service.py::_upsert_rows`, `lending_service.py::_upsert`. 멱등 `ON CONFLICT` upsert라 실무상 무해하지만 루프 중 크래시는 부분 날짜 범위를 남긴다.
+
+### 4.4 SQL 인젝션 — **이미 가드됨(클린)**
+
+동적 SQL 3곳 전부 안전하다:
+- `routers/admin.py::delete_user` — `f"DELETE FROM {table} WHERE {col} = %s"`의 `table`/`col`은 **하드코딩 리터럴 리스트** 순회, `user_id`는 파라미터화.
+- `storage/portfolio.py::enrich_stock` — `set_clause`를 키에서 만들지만 그 앞에 `if not fields.keys() <= _ENRICH_KEYS: raise ValueError`(frozenset allowlist). 올바른 allowlist-then-interpolate.
+- `services/analyst_reports.py` — `_COLS`가 모듈 상수.
+
+나머지 전 DB 호출은 `%s` 파라미터화. `.format()`이 SQL에 닿는 곳은 없다(4건 전부 DART 뷰어 URL 템플릿).
+
+### 4.5 N+1 — **설계상 트레이드오프**
+
+대시보드가 카드당 개별 read(`dividends.get_dividend` 등)를 한다. 10워커 병렬로 완화하지만 그 병렬성이 §4.2의 풀 압력을 만든다 — 두 문제가 서로의 완화책이다.
 
 ---
 
 ## 5. 인증·보안 노출
 
-### 5.1 무인증 엔드포인트 — **이미 가드됨(잔여 위험만)**
-- ADR-0029 3부작(task#230·231·232)이 무인증 read 37개를 전부 닫았다. 현재 `/api` **139개** 중 무인증은 `routers/auth.py`의 **9개**뿐: `register`(`:75`)·`login`(`:84`)·`refresh`(`:94`)·`logout`(`:102`)·OAuth 4개(`:139,153,186,199`)·token 교환(`:232`). 무인증 쓰기·IDOR 없음(사용자 스코프 핸들러는 전부 토큰에서 `user_id`를 파생).
-- 회귀 게이트: `backend/tests/test_no_public_reads.py:28-38`이 `ALLOWED_PUBLIC` 9개를 양방향 exact-match로 못박고, `tests/_routes.py`의 `walk_routes`로 FastAPI `_IncludedRouter` 버전 발산까지 흡수한다.
-- **잔여 1**: 게이트가 `/api` 프리픽스만 본다(`test_no_public_reads.py:62`). `/health`(`main.py:294`) 같은 비-`/api` 라우트는 게이트에 보이지 않는다(현재 무해).
-- **잔여 2 (구조적)**: ADR-0029는 **authn만** 강제하고 authz는 안 한다(명시적 결정). `POST /api/auth/register`가 인터넷에 열려 있어 누구나 계정을 만들어 ~130개 `get_current_user` 엔드포인트를 직접 호출할 수 있다. 초대코드·이메일 검증·allowlist 없음. 부분 완화: `app_schema.sql:124-127`이 신규 사용자 기본 권한을 전부 `false`로 시드해 UI가 비어 보인다. → §5.11 참조.
+### 5.1 무인증 엔드포인트 — **이미 가드됨(드리프트 0)**
 
-### 5.2 Cowork API 키의 폭발반경 — **설계상 트레이드오프**(키 유출 경로 자체는 §11에서 닫혔다)
-- ⚠️ **B18 해소** — `scripts/cowork-fire-listener.py`는 프롬프트를 argv에서 빼고 **stdin**으로 넘긴다(`:39-42` 조립 → `:47-52` `Popen`(프롬프트 없음) → `:54` `proc.stdin.write` → `:55` `close`). `ps -ww` 노출은 사라졌다.
-- **남는 폭발반경은 그대로다**: `backend/auth.py:73-74`가 API 키를 **admin 등가로 즉시 통과**시키므로 이 키 하나로 admin급 쓰기(`PUT /api/stocks/enrich/batch` `stocks.py:379`, `POST /api/analyst-reports/{ticker}`, `PUT /api/admin/analyst-targets/{ticker}` `admin.py:225`, `POST /api/admin/cowork/fire` `admin.py:239-240`)가 되고, `__api_key__` 센티넬이 `storage.get_global_portfolio()`로 라우팅되어(`routers/stocks.py:365`, `routers/report.py:175-176`) **교차 사용자 read**까지 된다.
-- **잔여 위험**: 키는 여전히 `.env.docker`에서 읽혀(`:31-35`, `:39`) 메모리상 프롬프트 문자열에 렌더되고, `run.log`(`:46`)가 자식 stdout을 파일로 받으므로 자식이 키를 에코하면 디스크에 남는다.
-- ADR-0028 §4가 "유출 시 피해 = 분석 필드 쓰기 수준"으로 수용했으나, 교차 사용자 read와 무계 프로세스 스폰(§11.2)은 그 평가에 포함되지 않았다.
+전 22개 라우터의 route 데코레이터를 파싱해 4종 auth 의존성(`get_current_user`·`get_current_user_or_api_key`·`require_admin`·`require_admin_or_api_key`)과 대조한 결과 — **무인증 `/api` 엔드포인트는 정확히 9개, 전부 `routers/auth.py` 소속**이다:
 
-### 5.3 하드코딩 폴백 시크릿 — **확인된 버그**(현 배포에선 우연히 fail-closed) (B19)
-- `backend/routers/auth.py:45` — `SESSION_SECRET` 미설정 시 tracked 소스에 적힌 폴백 문자열로 떨어진다(값은 여기 인용하지 않음). OAuth CSRF `state`를 서명한다(`:49,57`).
-- 지금은 도달 불가: `main.py:36`이 이 모듈을 import한 뒤 `main.py:262`가 `os.environ["SESSION_SECRET"]`을 무가드로 읽어 미설정 시 기동이 죽는다. **가드가 다른 파일의 무관한 한 줄이다** — `main.py:262`를 순서 변경/삭제하면 즉시 공개된 문자열로 state 위조가 가능해진다.
+`POST /api/auth/register`·`login`·`refresh`·`logout`, `GET /api/auth/oauth/google`·`google/callback`·`github`·`github/callback`·`token`. (+ `/api` 밖의 `GET|HEAD /health`.)
 
-### 5.4 OAuth `state`가 세션 바인딩·일회용이 아니다 — **잠재 위험**
-- `backend/routers/auth.py:47-58`. `_make_state()`가 nonce를 HMAC하지만 **아무것도 저장하지 않고**, `_verify_state`는 "이 서버가 발급한 state인가"만 증명한다. nonce 저장소·만료·재사용 방지 전부 없다.
-- `GET /api/auth/oauth/google`이 공개이므로 **공격자가 스스로 유효 state를 발급받아 재사용**할 수 있다 → CSRF/강제 로그인 방어가 실질적으로 성립하지 않는다.
-- `SessionMiddleware`는 `main.py:262`에 설치돼 있으나 **어디서도 쓰이지 않는다**(`request.session` 참조 0) — state를 브라우저 세션에 묶을 재료가 이미 있는데 미사용.
-- 부수: GitHub 콜백(`:199-203`)에는 Google(`:155-157`)에 있는 `error` 단락 처리가 없다.
+**사용자·포트폴리오 데이터를 노출하는 무인증 엔드포인트는 0건이다.**
 
-### 5.5 레이트리밋 전무 — **확인된 버그**(ADR 근거 없는 순수 공백) (B20)
-- `slowapi`/`limits`(requirements)·미들웨어(`main.py`)·`limit_req_zone`/`limit_conn`(`nginx/nginx.conf`) — **세 파일 전체에서 0 매치**. 보안 헤더(HSTS/CSP/X-Frame-Options/X-Content-Type-Options)와 `client_max_body_size` 조정도 0(기본 1MB).
-- 가장 급한 표면: `POST /api/auth/login`(`routers/auth.py:84`) — 인터넷 노출 호스트에 무제한 크리덴셜 스터핑, bcrypt work factor만이 제동. `POST /api/auth/register` — 무제한 계정 생성 + `users` 무한 증가.
-- 비-admin + 외부 fetch + 무제한: `POST /api/report/generate/{ticker}`(`report.py:114`, 본인 종목 스코프지만 관심종목 선등록으로 임의 티커 가능), `POST /api/report/{ticker}/refresh-analyst`(`:514`), `POST /api/consensus/{ticker}/backfill`(`:566`), `POST /api/digest/generate`(`digest.py:24`), `GET /api/stocks/search`(`stocks.py:156`), `GET /api/stocks/{ticker}/news`(`:321`), `GET /api/stocks/compare`(`:282`).
-- `POST /api/admin/cowork/fire`(`admin.py:239-240`)는 호출당 `claude -p` 프로세스를 스폰하고 스로틀·동시성 상한이 없다(`cowork-fire-listener.py:47-52`, `:14` docstring이 무계 병행을 명시 수용) — §5.2의 admin 등가 키 뒤에 있는 무계 fork 레버.
+`tests/test_no_public_reads.py`의 `ALLOWED_PUBLIC` frozenset이 정확히 이 9개이고, **양방향으로 강제한다**(신규 공개 라우트 금지 + stale 엔트리 금지). 게다가 `test_route_walk_is_not_silently_empty`가 `len(api_routes) > 100`을 단언해 **FastAPI 버전차로 route walk가 0건이 되며 게이트가 거짓 통과하는 실패 모드**(§9)까지 막는다. `tests/test_security_auth_gaps.py`가 override 없는 fresh app으로 실제 401을 확인한다(API 키 positive/negative 포함). ADR-0029.
 
-### 5.6 상수시간 비교 아님 — **잠재 위험**(낮음)
-- `backend/auth.py:45` `api_key == expected`. 같은 코드베이스 `routers/auth.py:58`은 `hmac.compare_digest`를 쓰므로 의도적 차이가 아니다.
-- `scripts/cowork-fire-listener.py:65` `auth != f"Bearer {token}"` — 127.0.0.1 바인드(`:91`)로 완화.
+**이 절은 재제기 금지 대상이다.** 아래 5.2~5.10은 게이팅이 아닌 축의 문제다.
 
-### 5.7 토큰·세션 — 대부분 **이미 가드됨**
-- HS256이 4개 decode 지점 전부에 명시 고정(`auth.py:27,53`, `auth_service.py:111`, `middleware/event_tracker.py:35`) → alg-confusion 표면 없음.
-- `JWT_SECRET`은 폴백 없는 `os.environ[...]`.
-- refresh는 불투명 `secrets.token_urlsafe(64)`(`auth_service.py:101`) + **일회용 회전**(사용 시 행 DELETE, `:129`) + tz 정규화 만료검사(`:123-126`). 로그아웃 per-token 폐기(`:134`), 사용자 삭제 시 CASCADE.
-- **잔여 A** — refresh 토큰이 **평문 저장**(`auth_schema.sql:15-21`, `:18` `token TEXT UNIQUE`). §10.2의 호스트 공개 5432와 겹치면 DB read 한 번이 30일짜리 재생 가능 크리덴셜이 된다.
-- **잔여 B** — 만료된 refresh 행이 회수되지 않는다(`auth_service.py:126-127`). 테이블 무한 증가.
-- **잔여 C** — `auth.py:30,56`의 `except (JWTError, KeyError)`가 `os.environ["JWT_SECRET"]`의 KeyError까지 삼켜 치명적 설정 오류를 일괄 401로 바꾼다(fail-closed지만 진단 불가). `event_tracker.py:37`도 같은 형태.
-- **잔여 D** — access token은 최대 1시간 폐기 불가(stateless, `jti`/denylist 없음). 표준 트레이드오프.
-- **잔여 E** — `_oauth_codes`(`routers/auth.py:24`)가 인메모리 dict다. 현재 uvicorn 단일 워커(`backend/Dockerfile:10`, `--workers` 없음)라 무해하나 워커를 늘리면 token 교환이 깨진다. 같은 형태의 인프로세스 상태가 `services/progress.py`(락은 있음)·키움/KIS 토큰 싱글톤에도 있다.
-- **설계상 트레이드오프** — Google `id_token` 서명을 검증하지 않는다(`routers/auth.py:175-177`이 payload를 base64 직접 디코딩; `iss`/`aud`/`exp`/`at_hash` 미검사). client secret으로 인증된 code 교환 응답을 TLS로 받기 때문에만 안전하다(`jose` at_hash 실패 우회의 산물). 클라이언트가 준 `id_token`을 받는 형태로 리팩터되면 즉시 취약.
-- **설계상 트레이드오프** — 토큰을 `localStorage`에 보관. XSS 노출 대신 CSRF 면역을 택한 것. **쓰기 경로가 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:55,73` + `frontend/src/pages/LoginPage.jsx:50-51`(`App.jsx`는 이제 refresh read `:40`와 clear `:48-49`만). 읽는 곳: `api.js:8`, `utils/analytics.js:2`, `hooks/useBfcacheAuthGuard.js:39`.
+### 5.2 프론트가 URL 쿼리의 토큰을 신뢰한다 — **확인된 버그**(B44, 이 절 최고 심각도)
 
-### 5.8 이벤트 트래커 미들웨어 — **잠재 위험**
-- `middleware/event_tracker.py:75` `asyncio.create_task(_save_event(...))`가 **블로킹 psycopg2 `execute`(`:44-47`)를 이벤트 루프에서** 실행한다. 부하 시 전 요청이 직렬화된다. 게다가 task 참조를 보관하지 않아 GC로 사라져 이벤트가 조용히 유실될 수 있다.
-- `:48-49` `except Exception: pass` — 이벤트 쓰기 실패가 완전 무음(로깅 규약 위반). `:70-71`도 동일.
-- `:31-38`이 `auth.py`와 **별개로 JWT를 다시 디코딩**한다 — auth에 audience/issuer 검사나 알고리즘 변경이 생기면 드리프트한다.
+`frontend/src/hooks/useAuthBootstrap.js::useAuthBootstrap`:
 
-### 5.9 admin 역할 — **이미 가드됨**
-- 매 요청 DB 조회(`backend/auth.py:61-65,68-78` → `auth_service.get_user_by_id` → `users.role`). JWT에 role 클레임이 없어(`auth_service.py:97`은 `sub`만) 위조 불가. `register`로 role 설정 불가(`auth_service.py:57-60`이 `email`·`password_hash`만 INSERT). 자기보호: `admin.py:108,110`이 admin·OAuth 계정 삭제를 거부.
-- 잔여: admin 엔드포인트마다 요청당 DB read 1회(캐시 없음).
+```js
+const token = params.get('token')
+const refresh = params.get('refresh')
+...
+if (token && refresh) {
+  localStorage.setItem('access_token', token)
+  localStorage.setItem('refresh_token', refresh)
+  window.history.replaceState({}, '', '/')
+}
+```
 
-### 5.10 `/docs`·OpenAPI — **이미 가드됨(우연히)**
-- `main.py:250`은 `docs_url=None` 등을 주지 않아 `/docs`·`/redoc`·`/openapi.json`이 켜져 있다.
-- 그러나 `nginx/nginx.conf`는 `/health`(`:16-20`)와 `/api/`(`:22-28`)만 백엔드로 프록시하고 나머지는 정적 SPA로 떨어뜨린다(`:52-55`). 백엔드 컨테이너는 호스트 포트를 발행하지 않는다(`deploy.sh`의 backend `docker run`에 `-p` 없음).
-- **잔여**: 명시적 결정이 아니라 **암묵적 경로 화이트리스트**다. catch-all 프록시 location이 추가되거나 8000이 발행되면 전체 API 스키마가 즉시 공개된다.
+**어떤 백엔드 경로도 이 형태를 더는 만들지 않는다** — 콜백은 `?oauth=<code>`를 낸다(`routers/auth.py::oauth_google_callback`/`oauth_github_callback`). 즉 이 분기는 **레거시인데 살아 있다**.
 
-### 5.11 메뉴 권한은 보안 경계가 아니다 — **설계상 트레이드오프**(의도 확인 필요)
-- 필터: `components/Masthead.jsx:46` `NAV_SECTIONS.filter(s => menuPermissions.includes(s.perm))`, `components/MobileNav.jsx:21`, `components/MobileTopActions.jsx:14`. 출처는 `contexts/AuthContext.jsx:18-22` ← `GET /api/auth/me`.
-- **`frontend/src/App.jsx:88-109`은 모든 라우트를 무조건 등록한다 — 라우트 가드가 전무하다.** 백엔드에도 메뉴 권한 의존성이 없다(`ALL_MENUS`는 `routers/auth.py:108` read와 `routers/admin.py` CRUD에만 등장). `guru`가 거부된 사용자가 `/guru`를 직접 입력하면 페이지가 마운트되고 데이터도 정상 로드된다.
-- **정직한 심각도: 권한 상승이 아니다.** `role === 'admin'` 게이트(`pages/Settings.jsx:258`, `pages/ReportManualGen.jsx:12`, `pages/AnalystReports.jsx:20`, `components/StockModal.jsx:18`, `components/PermissionManager.jsx`)는 전부 서버 `require_admin`이 뒷받침하고, 게이트 없는 메뉴로 도달하는 데이터는 전역/공유(구루·시장지표)이거나 이미 `get_current_user`로 사용자 스코프다. 노출되는 건 "운영자가 숨기기로 한 기능"이지 타인 데이터가 아니다.
-- 결정 필요: 메뉴 권한이 민감한 것을 가려야 한다면 서버 측 의존성과 라우트 가드가 필요하다.
+도달: 공격자가 피해자에게 `https://<앱>/?token=<공격자JWT>&refresh=<공격자refresh>`를 보내고 1회 클릭 → 피해자 브라우저가 **공격자 계정에 조용히 묶인다**. 이후 피해자가 입력한 보유종목·관심종목·목표가가 공격자가 읽을 수 있는 계정에 쌓인다. 전형적 세션 고정이며, CSRF 토큰 우회조차 필요 없어 로그인-CSRF보다 강하다. 수정은 삭제다.
 
-### 5.12 CORS — **이미 가드됨(잔여 위험만)**
-- `main.py:265-271`: 와일드카드 없음(`:268` `allow_origins`), `allow_credentials` 미지정(기본 False) — Bearer 헤더 인증이라 훔칠 ambient credential이 없어 `allow_methods=["*"]`/`allow_headers=["*"]`의 영향이 낮다.
-- **잔여**: `http://localhost:3000`·`http://localhost:5173` 개발 origin이 프로덕션에서도 무조건 허용된다.
+### 5.3 OAuth `state`가 세션 바인딩·일회용이 아니다 — **잠재 위험**
 
-### 5.13 시크릿·크리덴셜 커밋 — **부분 가드됨**
-- **가드됨**: tracked 파일 전수 스캔 결과 API 키·토큰 실값 0건. `.env`(`.gitignore:6`)·`backend/.env.docker`(`.gitignore:63`)·`backend/.env`·`certbot/conf/` 모두 무시되고, `git log --all -- .env backend/.env.docker`가 비어 있어 **커밋 이력도 없다**. tracked 유일 env 파일 `backend/.env.docker.example`은 placeholder만(단 §12.3 드리프트).
-- **확인된 버그 (B26)** — tracked UAT 스크립트 **15개**(`scripts/uat*.mjs`)가 라이브 테스트 계정의 이메일·비밀번호를 **평문 하드코딩**한다(값은 이 문서에 인용하지 않음). 그 계정은 프로덕션 인스턴스에 실제로 로그인되는 계정이고, 스크립트는 공개 리포지토리에 커밋된다. 완화 형태: env 변수(`UAT_EMAIL`/`UAT_PASSWORD`)로 빼고 미설정 시 즉시 exit. 참고로 `scripts/ddns_update.sh:8`은 이미 env 방식(`CF_API_TOKEN`)이라 같은 파일 트리에 정답 선례가 있다.
+`routers/auth.py::_make_state`/`_verify_state`는 순수 HMAC이다 — `_make_state`가 `nonce.hmac_sha256(nonce)[:20]`을 만들고 `_verify_state`는 HMAC을 재계산할 뿐이다.
+
+- **서버측 저장소 없음, 재사용 방지 없음, 만료 없음**(state TTL = 무한).
+- **세션 바인딩 없음** — `SessionMiddleware`가 설치돼 있지만 `oauth_google`/`oauth_github`가 nonce를 `request.session`에 쓰지 않는다.
+- **PKCE 미사용**(`code_challenge`/`code_verifier` 없음).
+
+서명 검사가 증명하는 것은 "이 서버가 언젠가 어떤 state를 발행했다"이지 "이 브라우저가 이 플로우를 시작했다"가 아니다. 도달: 공격자가 `/api/auth/oauth/google`을 한 번 눌러 만료되지 않는 state를 확보한 뒤, 자기 `code` + 그 state로 만든 콜백 URL을 피해자에게 먹인다(로그인-CSRF). HMAC 20 hex(80비트) 절단 자체는 약점이 아니다 — **nonce 저장소 부재가 약점이다**. B19(§5.5)와 겹치면 서명 자체가 위조 가능해진다.
+
+### 5.4 OAuth 코드가 URL 쿼리로 전달된다 — **설계상 트레이드오프**(완화 있음)
+
+콜백이 `f"{frontend}/?oauth={code}"`로 리다이렉트하고 프론트가 `GET /api/auth/oauth/token?code=…`로 교환한다. 완화는 실재한다: 120초 TTL + `_pop_oauth_tokens`의 단일 사용 `pop`, `_no_cache_redirect`의 `Cache-Control: no-store`, 프론트의 즉시 `history.replaceState`. 그럼에도 코드는 브라우저 히스토리·서드파티 서브리소스의 `Referer`·중간 접근 로그에 남는다. 120초 안에 그것을 읽는 자는 1시간 access token + 30일 refresh token을 얻는다.
+
+부수(LOW): `_oauth_codes`는 프로세스 로컬 dict라 uvicorn 워커가 2개 이상이면 콜백과 교환이 다른 프로세스에 떨어져 로그인이 간헐 실패한다(현재는 단일 워커라 미발현 — §6.6).
+
+### 5.5 하드코딩 폴백 시크릿 — **확인된 버그**(현 배포에선 우연히 fail-closed) (B19)
+
+`routers/auth.py`: `_HMAC_SECRET = os.environ.get("SESSION_SECRET", "<리터럴 기본값>").encode()`.
+
+백엔드에서 **유일한** 하드코딩 시크릿 기본값이다(`JWT_SECRET`은 `os.environ[...]` fail-fast를 3곳 모두 지킨다). 회의적으로 볼 것: `main.py`가 `os.environ["SESSION_SECRET"]`으로 import 시 KeyError를 내므로 `main.py`를 거친 서버는 기본값으로 뜨지 못한다. **그러나 import 순서상 `routers.auth`가 먼저 평가되고 `_HMAC_SECRET`은 import 시점에 고정된다** — `main`을 거치지 않는 진입점(테스트 하니스·스크립트·향후 워커)은 공개적으로 알려진 키로 OAuth state를 서명한다. §5.3과 결합하면 state 위조가 성립한다.
+
+### 5.6 레이트리밋 전무 — **확인된 버그**(ADR 근거 없는 순수 공백) (B20)
+
+`backend/`에 `slowapi|ratelimit|rate_limit|limiter|throttle` 계열 애플리케이션 레이트리밋이 **하나도 없다**(발견되는 것은 외부 제공자 보호용 아웃바운드 스로틀뿐: `agm.py::_DART_THROTTLE`, KIS/키움 sleep). `login`·`register`·`refresh`·`oauth_token_exchange` 어디에도 없다.
+
+- **`POST /api/auth/login`** — 무제한 크리덴셜 스터핑(락아웃·백오프·CAPTCHA 없음). 더 나쁜 것은 `verify_password`가 **의도적으로 비싼 bcrypt**라는 점이다: 같은 무제한 엔드포인트가 CPU 고갈 DoS가 된다. FastAPI가 sync 핸들러를 유계 스레드풀에서 돌리므로 수백 건 동시 위조 로그인이면 API 전체가 정지한다. **계정 없이 가능한, 이 저장소에서 가장 싼 가용성 공격이다.**
+- `POST /api/auth/refresh`·`GET /api/auth/oauth/token` — 토큰이 `secrets.token_urlsafe(64)`/`(24)`라 추측은 비현실적. 노출은 DB 부하다.
+
+### 5.7 admin 게이팅 공백 3건 — **확인된 버그**
+
+전역 상태를 바꾸는데 `require_admin`이 없는 자리:
+
+- **B45 `routers/report.py::put_backlog`** (MED) — `PUT /report/{ticker}/backlog`가 `get_current_user_or_api_key`만 요구하는데, `save_llm_backlog(ticker, entries)`는 **ticker 스코프(전역 공유)**다. 바인딩된 `user_id`는 **사용되지 않는다**. 형제 `refresh_backlog`는 `require_admin`이라 이 라우트가 이례다. 가입이 열려 있으므로(§5.9) 임의 사용자가 아무 티커의 수주잔고를 덮어쓰고 그것이 전 사용자의 정본이 된다. `entries: list = Body(...)`에 `max_length`도 없어 무제한 배열이 행당 쓰기를 유발한다.
+- **B46 `routers/stocks.py::clear_dashboard_cache`** (MED) — `DELETE /dashboard/cache`가 `get_current_user`만 요구하는데 `cache_svc.invalidate_dashboard()`는 **인자 없는 프로세스 전역**이다. 대조군: `routers/calendar.py::delete_calendar_cache`는 `WHERE user_id = %s AND month = %s`로 올바르게 스코프한다. 한 계정이 이 엔드포인트를 반복 호출하면 전 사용자 대시보드가 매 요청 외부 API에서 재계산된다(자체 할당량에 대한 증폭 DoS).
+- `routers/report.py::backfill_consensus` (LOW-MED) — `days: int = 180`이 **`Query(..., le=…)` 상한 없는 bare int**다(형제 `short_sell.py`·`investor.py`는 `Query(252, ge=1, le=1000)`으로 규율돼 있다). `get_current_user`만 요구하면서 외부 제공자를 향한 `_pipeline.backfill(...)`을 돌린다.
+
+반대로 **비싼 배치 엔드포인트 28/31은 올바르게 `require_admin`이다** — 게이팅 규율 자체는 좋고, 위 3건이 예외다. `POST /api/admin/cowork/fire`는 고정 env URL(`COWORK_ROUTINE_FIRE_URL`)로만 POST하므로 **SSRF 없음**.
+
+### 5.8 API 키 비교가 상수시간이 아니다 — **잠재 위험**(낮음)
+
+`backend/auth.py::get_current_user_or_api_key`: `if expected and api_key == expected:` — 평문 `==`(첫 불일치 바이트에서 단락). 같은 저장소의 `routers/auth.py::_verify_state`는 `hmac.compare_digest`를 올바르게 쓰므로 프리미티브를 모르는 게 아니라 여기 적용을 빠뜨린 것이다. HTTP 상의 원격 타이밍 오라클은 지터에 묻혀 실 exploit이 어려워 MED가 아닌 LOW-MED. 수정은 한 줄.
+
+**fail-closed는 올바르다** — `expected and …` 가드 덕에 `COWORK_API_KEY` 미설정 시 모든 키 시도가 401이지 `""` 매치가 아니다.
+
+**`require_admin`은 API 키를 거부한다** — `Depends(get_current_user)`만 선언하고 `get_current_user`는 `X-API-Key`를 보지 않는다(CLAUDE.md의 서술이 맞다). 분리는 의도적이고 깨끗하다.
+
+### 5.9 가입이 열려 있고 비밀번호 정책이 없다 — **잠재 위험**
+
+`routers/auth.py::RegisterRequest`는 `email: str` / `password: str` — **`EmailStr`이 아니고 `min_length`도 `Field` 제약도 없다**. 이메일 검증·초대 게이트·레이트리밋 없음. 빈 문자열 비밀번호가 통과한다. 신규 계정은 즉시 `apply_default_permissions`를 받는다. §5.6(로그인 레이트리밋 부재)과 결합하면 약한 비밀번호가 직접 브루트포스 가능하고, §5.7의 두 전역 표면이 계정 하나당 지렛대가 된다.
+
+### 5.10 토큰 수명·저장 — **설계상 트레이드오프 + 잔여**
+
+- **해싱은 올바르다** — `auth_service.py::hash_password`/`verify_password`가 bcrypt + per-hash `gensalt()`. 커스텀 암호 없음.
+- **JWT는 깨끗하다** — `algorithms=["HS256"]`이 **4개 decode 지점 전부**에 고정, `verify=False`·options override 없음. alg=none/혼동 클래스는 닫혀 있다.
+- **리프레시 회전은 있다** — `auth_service.py::consume_refresh_token`이 반환 전 `DELETE`하고 테스트가 못박는다. 만료도 강제한다(naive→UTC 보정 포함).
+- **잔여 1: 재사용 탐지 없음** — 회전된 토큰이 재생되면 `None`을 반환할 뿐 그 사용자의 토큰 패밀리를 무효화하지 않는다(RFC 6819의 표준 대응은 전량 폐기).
+- **잔여 2: access token 폐기 불가** — `jti` 없음·denylist 없음이라 `logout` 후에도 탈취된 access token이 최대 1시간 산다.
+- **잔여 3: `localStorage` 저장** — access/refresh 둘 다. HttpOnly 쿠키 미사용(콜백이 `Set-Cookie`를 아예 안 낸다). XSS 1건이 세션이 아니라 **30일 지속 계정 탈취**가 된다.
+- 로그인 사용자 열거(LOW): 미존재 사용자 분기가 bcrypt를 **돌리지 않고** 반환해 응답 시간이 갈린다(메시지는 동일).
+
+### 5.11 CORS — **이미 가드됨**
+
+`main.py`가 명시 origin 리스트를 쓰고 wildcard가 없으며 falsy 필터가 빈 `FRONTEND_URL` 주입을 막는다. **`allow_credentials`를 설정하지 않아 기본 `False`** — wildcard+credentials 문제 없음. 인증이 `localStorage`의 `Authorization` 헤더로 타므로 credentialed CORS가 불필요하다는 점에서 아키텍처적으로도 일관된다. (사소: 두 `localhost` 개발 origin이 프로덕션 allowlist에 실려 있다.)
+
+### 5.12 Google `id_token`을 서명 검증 없이 파싱 — **잠재 위험**(현재 미도달)
+
+`routers/auth.py::oauth_google_callback`가 `id_token`을 `.split(".")[1]` + base64 디코드로 읽는다 — `jwt.decode` 없음, `aud`/`iss`/`exp` 검증 없음. **지금은 exploit 불가**다: 토큰이 `GOOGLE_CLIENT_SECRET`로 인증된 서버-대-서버 POST(TLS)로 오므로 전송 자체가 신뢰 앵커다. 누군가 이것을 클라이언트가 준 `id_token`을 받도록 리팩터하는 순간 실 취약점이 된다 — 불변식을 주석으로 못박을 자리다.
+
+### 5.13 이벤트 화이트리스트 — **잔여 2건**
+
+`routers/events.py::VALID_EVENTS`(19개)는 `Depends(get_current_user)`로 게이트되고 비화이트리스트 이름은 **200 OK + 무음 폐기**다(fail-silent 설계).
+
+- **B24**: 프론트가 보내는데 화이트리스트에 없는 이벤트는 **정확히 1개 — `nav_analytics`**(`components/Masthead.jsx`, `components/MobileTopActions.jsx`). 결과는 텔레메트리 무음 손실. 200을 돌려주므로 **이 교차 대조 없이는 관측 불가**하다.
+- 스테일 엔트리(LOW): `tab_holdings`·`tab_watch`·`stock_search`는 `pages/AdminAnalytics.jsx`의 표시 라벨로만 등장하고 emit 하는 `trackEvent` 호출부가 없다.
+- 동적 emit은 안전하다 — `MobileNav.jsx`의 `trackEvent('nav_' + section.perm)`이 내는 5개 perm 값이 전부 화이트리스트에 있다(§7.4의 "필드 역할 겸직" 함정을 `perm`으로 파생해 피한 자리).
+- **화이트리스트가 `user_events`의 완전한 인벤토리가 아니다**: `middleware/event_tracker.py::EventTrackerMiddleware`가 `stock_add`·`stock_delete`·`stock_promote`·`report_generate`·`guru_crawl`을 `_save_event`로 직접 INSERT하며 화이트리스트를 우회한다(이름이 `_TRACKED`에 하드코딩이라 취약점은 아니다).
 
 ---
 
 ## 6. 배치·스케줄러·관측성
 
-### 6.1 키 미설정이 "성공"으로 기록된다 — **확인된 버그** (B6)
-- `scheduler/jobs.py:71-78` `_refresh_monthly_us` → `market_indicators/econ.py:13-15`가 **로그 없이** `{"error": "FRED_API_KEY…"}`를 반환하고, 잡은 `"Econ indicators refreshed"`(`:76`)를 로그하며 `job_runs`에 **success**를 남긴다.
-- `scheduler/jobs.py:81-88` `_refresh_macro_signals` → `macro.py:59-61`, 동일.
-- `scheduler/jobs.py:400-431` `_short_sell_work` → `short_sell_service.fetch_trend:13-22`가 키움 미설정 시 **로그 없이** `[]` → `upsert_trend([])` → `execute_many` no-op(`db.py:64-66`) → 잡은 `"Short-sell fetched for N KR tickers"`(`:431`)를 로그하고 0행을 썼다.
-- 참조 정답: `services/agm.py:163`.
+### 6.1 키 미설정·실패가 "성공"으로 기록된다 — **확인된 버그** (B6)
+
+`_JOB_FUNCS`(28개)를 `Run.set_status` 사용과 대조한 결과 — **`set_status`를 부르는 잡은 `_run_guru_crawl` 하나뿐이다.** 나머지 27개는 본문을 `try/except Exception: logger.warning(...)`로 감싼 채 `with job_runs.record(...)` 안에 있어 **항상 `_finish("success")`가 돈다**. `services/job_runs.py`의 docstring이 이 성질을 스스로 명시한다.
+
+가장 나쁜 형태는 예외조차 안 나는 경우다 — `scheduler/jobs.py::_refresh_monthly_us`:
+
+```python
+with job_runs.record("monthly_us", "auto"):
+    try:
+        _fetch_and_save_econ_indicators()
+        logger.info("[Scheduler] Econ indicators refreshed")     # ← 실패해도 이 줄이 찍힌다
+    except Exception as e:
+        logger.warning(...)
+```
+
+`_fetch_and_save_econ_indicators`는 키가 없으면 **예외 없이 `{"error": ...}` dict를 반환**하므로 `warning` 분기조차 타지 않는다. 반환값은 아무도 검사하지 않는다.
+
+키 미설정 → 초록 배치 + 데이터 0의 조합(전수):
+
+| 환경변수 | fetch 심볼 | 잡 |
+|---|---|---|
+| `FRED_API_KEY` | `econ.py::_fetch_and_save_econ_indicators`, `macro.py::_fetch_and_save_macro_signals` | `_refresh_monthly_us`, `_refresh_macro_signals` |
+| `DART_API_KEY` | `disclosures.py`, `backlog.py::_get_corp_code_map`, `agm.py`, `dividends.py`, `insider_trades.py` | `_fetch_disclosures`·`_fetch_backlog`·`_fetch_agm`·`_fetch_dividends`·`_fetch_insider` |
+| `KOFIA_API_KEY` | `leverage_service.py::_kofia_get`, `lending_service.py::_api_get` | `_fetch_leverage`·`_fetch_lending` |
+| `TELEGRAM_BOT_TOKEN`/`_CHAT_ID` | `digest_service.py::send_telegram`(bare `return`) | `_run_digest` — 다이제스트는 생성·저장되고 **발송만 안 된다** |
+
+도달: `backend/.env.docker`가 재생성·절단되는 모든 배포. `.env.docker`가 gitignored이므로 **새 클론 + `deploy.sh`가 정확히 이 상태를 만든다** — 전 배치 초록, 데이터 0. 이번 판에서 가장 가치 높은 운영 발견이다.
 
 ### 6.2 `job_runs`에 "스킵" 상태가 없다 — **설계상 트레이드오프**(관측 공백)
-- `services/job_runs.py:15-72`. `failed`는 **본문이 예외를 전파할 때만** 기록된다(`:54-63`). 스케줄러 래퍼들이 자기 예외를 직접 잡으므로(`jobs.py:77-78,87-88,396-397` …) 부분·전체 실패가 `success`로 남는다. docstring(`:25-30`)이 이 성질과 해당 11개 잡을 정확히 문서화한다.
-- `routers/batches.py:51`이 `job_runs.recent(id)`를 그대로 노출하므로 배치 현황 허브는 `running|success|failed`만 보여줄 수 있다 — "돌았지만 직전값 유지"가 보이지 않는다.
-- 표면화한 예외: `refresh-monthly?market=KR`이 `"saved": not exports.get("stale")`(`routers/market_indicators.py:204-206`, task#243), `refresh-kr` 섹터가 index 크기를 반환. 나머지는 구분 불가 — `refresh-earnings`는 `len(kr["quarters"])`(`:174`)를 반환해 갱신이든 저장값 반환이든 같은 숫자다. `refresh-econ`/`refresh-monthly?market=US`(`:188,209`)는 `{"error": …}` dict에서도 `cpi_points`를 계산해 `0`과 `ok: True`를 낸다.
-- `_mc_save`도 자기 DB 오류를 삼키므로(`market_indicators/cache.py:52-53`) 저장 실패가 success로 기록된다.
-- **부분 완화(task#243 이월 해소)**: 프론트 `pages/Settings.jsx`의 배치 '지금 실행'이 이제 응답 본문을 화면에 표시해 "갱신됨↔저장 생략"을 눈으로 구분할 수 있다 — 단 그 판정이 프론트 휴리스틱이다(§7.13).
+
+§1의 가드들이 발동하면 저장을 건너뛰는데, 잡 본문이 예외를 전파하지 않으므로 `job_runs`는 **success로 기록한다**. 즉 "갱신됨"과 "생략·직전값 유지"가 관측상 구별되지 않는다. `_run_guru_crawl`만 `partial`/`skipped`/`failed`를 쓰는 올바른 형태이고, 나머지 27개가 채택해야 할 패턴이다.
 
 ### 6.3 `get_or_refresh`의 `ttl`은 저장값에 안 걸린다 — **설계상 트레이드오프**(오해 유발 시그니처)
-- `services/market_indicators/cache.py:110-120`. `ttl`은 `_set_cache(key, stored["data"], ttl)`(`:118`)로 **인메모리 캐시에만** 전달된다. `_mc_load`(`:116-117`)는 행을 **나이 불문** 그대로 반환하고 `fetched_at` 비교가 함수 어디에도 없다. **`market_cache`에 행이 한 번 생기면 `force=True`가 올 때까지 `fetch_fn`은 절대 안 돈다.**
-- `:120`은 `return fetch_fn()` 그대로 — last-good 폴백도 없고 예외는 호출자로 전파된다.
-- 패키지 내 유일한 실제 나이 검사는 `earnings._is_fresh:61-76`(7일, `fetched_at` 기준)이고 이건 `get_or_refresh`를 우회한다.
-- **위험한 파생 2가지**: ① "TTL 만료 → 요청 경로가 재조회"를 전제로 심각도를 판단하면 안 된다. ② 행이 없어지면 **요청 1회가** `_scrape_sp500` + ~500 yfinance 호출을 20스레드로 동기 실행한다(`earnings.py:200-204`, `routers/market_indicators.py:44,52`에서 도달).
 
-### 6.4 기동이 이벤트 루프를 블록한다 — **잠재 위험**
-- `backend/main.py:242-244`가 async `lifespan` 안에서 `sched.start()`를 **동기** 호출한다. 그 안에서 `_check_missed_report`(`scheduler/schedule.py:137-141` — 전 종목 리포트 재생성 가능), `_seed_rankings_if_empty`(KOSPI+KOSDAQ 전 페이지, 12스레드), `_seed_kr_sector_if_empty`(~100 스로틀 키움 콜), `_seed_us_sector_if_empty`가 서빙 시작 전에 돈다. `_warm_market_cache`만 스레드로 분리됐다(`:245`).
-- 관측된 증상: 배포 직후 컨테이너가 `Up`이고 로그도 활발한데 포트 8000이 수 분간 `Connection refused`. 실측 총 ~5분 15초(기동 배치가 예정 시각과 겹칠 때 증폭). **정확한 메커니즘(GIL/이벤트 루프 기아)은 미확정** — lifespan 자체는 0.6초로 끝난다. 배포 후 라이브 스모크는 포트 바인딩을 폴링한 뒤 실행할 것.
+```python
+def get_or_refresh(key, fetch_fn, ttl, force=False):
+    if not force:
+        cached = _get_cache(key)
+        if cached: return cached
+        stored = _mc_load(key)
+        if stored:
+            _set_cache(key, stored["data"], ttl)   # ttl → 인메모리 만료 전용
+            return stored["data"]
+    return fetch_fn()
+```
 
-### 6.5 KST vs 컨테이너 UTC — **부분 가드**
-- 가드: `services/utils.py:11-13` `today_kst()`(~25 호출처)와 `backend/tests/test_no_bare_today.py`.
-- **게이트 구멍**: `tests/test_no_bare_today.py:29-33`의 AST 술어가 `node.func.attr == "today"`만 매칭한다 → **`now()`/`utcnow()` 계열은 전부 미가드**이고, 남은 위반이 정확히 그 계열이다. `utils.py:12` docstring도 `date.today()`만 언급해 이 구멍을 문서화하지 않는다.
-- **확인된 버그 (B7)** — `services/dividends.py:101-102`: `now = datetime.now()` 후 `now.year - (2 if now.month < 4 else 1)`이 DART `bsns_year`로 간다. **4월 1일 00:00–09:00 KST**엔 UTC가 3월이라 `year-2`를 골라 **작작년 DPS/수익률**을 가져온다 — missing이 아니라 wrong. 올바른 헬퍼가 **같은 파일 `:198-200`(`_today_kst`)에 이미 있고 `:271,346`에서 쓰인다**(비대칭).
-- **잠재 위험** — `services/insider_trades.py:121`: `end_de = datetime.now().strftime("%Y%m%d")`가 DART 조회 창의 *끝*이다. 00:00–09:00 KST엔 어제라 당일 접수 공시가 빠진다(실질 노출 ~07:00–09:00 KST).
-- **잠재 위험(표시)** — `routers/guru.py:86` + `scheduler/jobs.py:61`: naive `datetime.now().isoformat(...)`로 `last_updated`를 찍어 저장 문자열이 KST−9h·오프셋 없음. 구루 크롤 기본이 03:00(`scheduler/schedule.py:70`)로 나쁜 창 안이라 **사실상 모든 예정 실행이 오표기**된다. 둘을 함께 고칠 것.
-- 무해(창의 *시작*이라 넓어질 뿐): `disclosures.py:46`, `insider_trades.py:120`, `backlog.py:108`, `market/kr.py:566`. 무해(경과/TTL): `backlog.py:68`, 모든 `time.time()`/`monotonic()`.
-- 정답 사례: `services/kis/futures.py:62,77`(코드베이스에서 가장 중요한 KR 날짜 판정)은 tz-aware다.
+`stored["fetched_at"]`은 로드되고 **어디와도 비교되지 않는다**. 어떤 나이의 DB 행이든 이긴다.
 
-### 6.6 tz-naive ↔ tz-aware 정렬 — **이미 가드됨** + off-by-one 하나
-- KR beta 버그는 **두 호출처 모두 고쳐져 있다** — `services/beta.py:78`(strip은 `:58`·`:76`)과 `services/report_generator.py:311`(strip은 `:304`·`:310`)이 단일 `pd.concat`(`services/indicators.py:108`) 전에 양쪽 tz를 strip한다.
-- **잔여**: `calc_beta`(`indicators.py:105`) 자체는 정규화를 안 하고 두 호출자가 `except Exception → beta = None`(로그 있음)으로 감싼다 → **세 번째 호출자가 조용히 재도입한다.** `indicators.py:108`에 `tz_localize(None)` 한 줄을 넣으면 구조적으로 불가능해진다.
-  - ⚠️ 지난 판의 "이상적 헬퍼가 미사용으로 있다"는 **stale**이다 — `report_generator.py:541-546` `_normalize_index`는 이제 `:571-577`에서 **6회 사용**된다. 남은 격차는 그 헬퍼가 **beta 경로엔 적용되지 않았다**는 것뿐(`:304`·`:310`이 손으로 strip).
-- **확인된 버그 (B8)** — `services/consensus_pipeline.py:173`이 `idx.tz_convert(None)`을 쓴다(UTC로 변환 후 tz 제거). 코드베이스 관용구는 `tz_localize(None)`(wall-clock 보존)이다. US/Eastern **저녁** 발행 리포트가 다음 UTC 날짜로 밀리고, 그 날짜가 `:188`에서 `report_date`로 **영속화**된다. 게다가 `:177`의 cutoff는 `today_kst()` 파생이라 `:180`이 **두 기준계를 비교**한다.
+**그리고 `force=True` 탈출구는 사실상 존재하지 않는다** — 비테스트 `backend/` 전체에서 `force=True`는 `kis/client.py`·`kiwoom/client.py`의 OAuth 토큰 재발급 2건뿐이다. **어떤 배치·라우터·스케줄러도 `get_or_refresh`에 `force=True`를 넘기지 않는다.** 배치들은 `_fetch_and_save_*`를 직접 불러 우회하므로 동작은 하지만, 결과적으로 `get_or_refresh`의 실사용 소비자는 read 경로 2개(`get_m7_earnings`·`get_kr_top2_earnings`)뿐이다.
 
-### 6.7 배치 레지스트리 정합 — **이미 가드됨**
-- `BATCHES` **29개** id, `_JOB_FUNCS` **28개**(`scheduler/jobs.py:485-514`, 엔트리 `:486-513`). `set(_JOB_FUNCS) − ids = ∅`, `ids − _JOB_FUNCS = {"consensus"}`(의도적 `scheduler_job_id: None`, `batch_registry.py:66`), 모든 `scheduler_job_id == id`.
-- 리터럴 `job_runs.record("…")`는 **50개 호출 지점 / 27개 distinct id**이고 27개 전부 `BATCHES`에 존재 — **고아 0**. 동적 id 4곳(`routers/rankings.py:10`→`:42`, `report.py:71`→`:72`, `report.py:140`→`:141`, `recommendations.py:220`→`:223`)도 해석된다.
-- 잔여(무해): `batch_registry.py:2` 주석이 "20개 배치"(실제 29).
+### 6.4 `market_cache` 16개 키의 신선도 경계 — **§6.3의 실측 귀결**
 
-### 6.8 시드가 불완전 값을 고착시킬 수 있다 — **잠재 위험**
-- `_seed_rankings_if_empty`(`jobs.py:434-447`)는 §1.1의 KR 구멍을 상속한다. 빈 테이블이라 잃을 건 없지만 0행으로 "성공"하고 다음 cron/재기동까지 재시도하지 않는다.
-- `_seed_kr_sector_if_empty`(`:472-482`)는 all-None 저장은 막지만(`kr_sector_service.py:83-86`) `index: {}`는 저장할 수 있다(`:87-90`). `map_holdings_to_sectors:117-119`가 graceful 열화하고 16:00 배치가 자가치유한다.
-- 두 시드 모두 **per-item** all-None은 저장 가능하고(§1.3), `load_momentum()` 진리값으로 "시드됨"을 판정하므로 그런 행이 이후 시드를 억제한다.
+| 키 | 신선도를 실제로 묶는 것 |
+|---|---|
+| `commodities`·`treasury`·`indices`·`vix`·`fear_greed`·`kospi_futures` | 인메모리 3600s 만료 후 **요청 경로 재fetch**(소비자가 곧 갱신자라 자가치유) |
+| `econ_indicators`·`kr_exports`·`macro_signals`·`kospi_signal`·`m7_earnings`·`kr_top2_earnings`·`kr_sector_momentum`·`us_sector_momentum` | 스케줄러 배치 |
+| `sp500_tickers`·`kospi_tickers` | 자체 `_is_fresh()` — **이 모듈의 유일한 나이 검사**이고 파일 mtime이 아닌 `fetched_at`을 올바르게 쓴다 |
+| **`fx`** | **아무것도 없다** ← B41 |
 
-### 6.9 `misfire_grace_time` — **설계상 트레이드오프**
-- `scheduler/schedule.py:30-34`가 `None`일 때 인자를 생략해 APScheduler 기본 **1초**가 적용된다. `daily_report_kr/us`만 82800을 명시한다(`batch_registry.py:26`·`:47`). 주간·월간 잡은 기동 타이밍이 1초 어긋나면 그 회차를 건너뛴다.
+**B41 — 키 `fx`에 배치도 나이 검사도 없다.** 작성자 `market_indicators/fx.py::get_fx`는 `routers/market_indicators.py`의 `GET /api/market/fx`와 admin refresh에서만 도달한다(`_JOB_FUNCS`에 fx 잡 없음, `main._warm_market_cache`는 econ·exports만 warm). 그런데 소비자는 나이 검사 없는 raw `_mc_load("fx")` 3곳이다:
 
-### 6.10 FOMC 날짜가 하드코딩 정적 목록 — **설계상 트레이드오프**(소진 경고는 있음)
-- `routers/calendar.py:30-36` `_FOMC_DATES`가 **2027-12-08까지**만 담는다(현재 기준 잔여 ~16개월). 소진되면 FOMC 이벤트가 무음 미표시(`:29` 주석이 명시).
-- 완화: `:41-45` `_fomc_coverage`가 마지막 날짜와 today를 비교해 `GET /api/batches`(`routers/batches.py:60`)로 '갱신 필요'를 노출한다 → 배치 허브가 경고를 띄운다. **자동 크롤은 없고 연 1회 수동 갱신 전제.**
+- `routers/stocks.py::_usdkrw_rate` → 대시보드 `totals`
+- `routers/portfolio.py` — `get_dividends`·`get_rebalance`·`get_exposure` 전부 `_usdkrw_rate()` 경유
+- `services/digest_service.py` — 일일 텔레그램 다이제스트
+- (+ `routers/recommendations.py`)
+
+도달: 일주일간 아무도 시장지표 탭을 안 열면 포트폴리오 KRW 환산 총액·리밸런싱 비중·익스포저·배당 추정·일일 다이제스트가 전부 **일주일 된 환율**로 계산되고, 응답 어디에도 stale 마커가 없다. `_usdkrw_rate` 자체는 잘 짜여 있다(`math.isfinite` 가드 보유) — 결함은 순수하게 신선도다.
+
+부수(§12.5): 그 함수의 docstring이 **존재하지 않는 배치를 단언한다** — *"FX 배치(get_fx)가 채운 영구 캐시를 읽는다."*
+
+### 6.5 FX 저장 payload가 `usdkrw` history만 담는다 — **잠재 위험** (B25)
+
+`fx.py::get_fx`:
+
+```python
+history = {"usdkrw": results["usdkrw"]["history"]} if results.get("usdkrw") else {}
+```
+
+`usdjpy`/`eurusd`의 history는 **한 번도 저장되지 않는다**. 결과: (a) `_fetch_fx`가 그 두 키에 대해 항상 `stored_history=[]`로 호출돼 **매 실행 1년치를 전량 재조회**하고, (b) `_fetch_fx` 안의 `stored_history` 기반 폴백 경로가 그 둘에겐 **원리적으로 발동 불가**하다. `rates` 수준 폴백(`failed` 리스트 ← `stored_rates`)은 정상 동작하므로 값이 사라지지는 않는다 — 비용과 죽은 폴백 경로가 문제다.
+
+### 6.6 기동이 이벤트 루프를 블록한다 — **잠재 위험**
+
+`main.py::lifespan`은 `_migrate()` → `sched.start()`를 **동기로** 부르고, `scheduler/__init__.py::start`는 `_scheduler.start()` **이전에** 다음을 순차 실행한다:
+
+```python
+_check_missed_report()      # 누락 티커마다 generate_report_with_retry (라이브 yfinance/Naver/KIS/DART)
+_seed_rankings_if_empty()   # KR·US 라이브 Naver 랭킹 fetch
+_seed_kr_sector_if_empty()  # 라이브 키움
+_seed_us_sector_if_empty()  # 라이브 yfinance
+_scheduler.start()
+```
+
+전부 이벤트 루프 스레드에서 돈다 → 그동안 `/health`가 응답하지 못한다. `deploy.sh`의 배포 후 `curl -s http://localhost/health`(고정 `sleep 2` 뒤)는 리포트 백필이 밀려 있는 배포마다 **"WARNING: health check failed"**를 찍지만, 그 curl이 `|| echo`라 배포는 그대로 완료로 보고된다(§10.5).
+
+⚠️ **원인 귀속 주의**: CLAUDE.md에 기록된 "배포 후 API 5분+ 무응답"의 정확한 메커니즘은 **미확정**으로 남아 있다(lifespan 자체는 0.6초로 실측됐고 배치는 스케줄러 스레드다). 위 `sched.start()` 블로킹은 **코드로 확인된 별개 경로**이며, 그 5분 현상의 확정 원인이라고 단정하지 말 것.
+
+### 6.7 잡 타임아웃·중복·종료 — **잠재 위험**
+
+- **중복 실행은 불가능하나 스킵이 안 보인다**: `schedule.py`가 `coalesce=True, replace_existing=True`를 주고 `max_instances`를 생략해 APScheduler 기본 `max_instances=1`이 적용된다. 초과 실행은 *거부*되는데 APScheduler 내부 WARNING만 남고 **`job_runs` 행이 아예 안 생긴다** — 운영자는 직전 success만 보고 다음 발화가 드롭된 증거를 못 본다.
+- **잡 타임아웃 없음**: `_investor_trend_work`·`_short_sell_work`가 `ThreadPoolExecutor(max_workers=8)`의 `future.result()`를 **`timeout=` 없이** 부른다. §2.5(yfinance 무타임아웃)와 겹치면 멈춘 HTTP 하나가 잡 전체를 무기한 잡는다. `AsyncIOScheduler`가 sync 잡을 `run_in_executor(None, …)`로 던지므로 기본 스레드풀을 점유한다.
+- **종료**: `_scheduler.shutdown(wait=False)`. 진행 중 배치가 쓰기 도중 버려지고, `deploy.sh`의 `docker stop`(SIGTERM 10s)과 겹치면 `job_runs`에 **영구 `running` 행**이 남는다(`_finish`가 영영 안 돈다).
+- **다중 스케줄러**: uvicorn 워커에서 오는 위험은 없다(`Dockerfile` CMD에 `--workers` 없음, compose에도 `command` 없음 → 단일 프로세스). 진짜 위험은 **컨테이너 이름 충돌**이다 — §10.3.
+
+### 6.8 KST vs 컨테이너 UTC — **부분 가드**
+
+`services/utils.py::today_kst`가 하우스 규칙이고 `tests/test_no_bare_today.py`가 강제한다. 하지만 그 가드는 AST에서 **`node.func.attr == "today"`만** 매칭하므로 **`datetime.now()`/`utcnow()`는 못 잡는다**. 시장 날짜 판정에 흘러드는 잔존 UTC 호출:
+
+- **B42 `services/insider_trades.py::fetch_insider_trades`** (MED) — `bgn_de`/`end_de`를 `datetime.now()`로 만든다. `insider_fetch`는 KST 스케줄이라 00:00–09:00 KST엔 컨테이너 UTC가 전일이고, `end_de`가 **당일 DART 공시를 통째로 배제**한다.
+- **B42 `services/disclosures.py::fetch_disclosures`** (MED) — `bgn_de` 시작점 동일 드리프트. 공시 피드와 AGM `meeting_date` 추출의 DART `list.json` 범위를 먹인다.
+- **B7 `services/dividends.py::_recent_business_year`** (MED) — `now = datetime.now()` → `year - (2 if now.month < 4 else 1)`. **월 경계 판정**이라 4월 1일 00:00–09:00 KST(UTC 3월 31일)엔 `month==3`이 되어 `year-2`를 반환, 그 창의 모든 KR 배당이 틀린 사업연도로 조회된다. 아이러니하게 같은 파일이 올바른 `_today_kst()`를 따로 정의한다.
+- LOW: `backlog.py`·`market/kr.py`의 `utcnow() - timedelta(days=730)`은 2년 룩백이라 하루 시프트가 무의미. `backlog.py::_get_corp_code_map`의 `utcnow()`는 *상대* TTL 비교라 올바름.
+- LOW(사용자 노출): `scheduler/jobs.py::_run_guru_crawl`·`routers/guru.py`가 `datetime.now().isoformat()`으로 `last_updated`를 쓴다 — naive 로컬(=UTC)이라 한국 사용자에게 크롤 시각이 **9시간 과거로** 표시된다.
+
+### 6.9 배치 레지스트리 정합 — **이미 가드됨 + 테스트 취약**
+
+`batch_registry.BATCHES`는 29개, `_JOB_FUNCS`는 28개로 **의도적으로 하나 어긋나 있다**(`consensus`가 레지스트리에만 있다). 이 둘을 순진하게 동기화하려는 수정은 실패한다. 테스트 쪽 취약성은 §9.4.
 
 ---
 
 ## 7. 프론트엔드
 
 ### 7.1 access token 갱신 경로가 없다 — **확인된 버그** (B9)
-- `frontend/src/api.js:15-26`이 401에 **무조건** 두 토큰을 지우고 `window.location.replace('/')`(`:22`)로 하드 리다이렉트한다. **`POST /api/auth/refresh`를 호출하는 코드가 프론트 전체에 없다**(`grep auth/refresh src/` = 0) — `refresh_token`의 유일한 read 소비처는 로그아웃(`App.jsx:37-50` `doLogout`)이고 write는 `useAuthBootstrap.js:56,75`이다.
-- 서버는 access 1h / refresh 30d(`backend/services/auth_service.py:14-15`)로 회전 인프라를 다 갖췄는데 클라이언트가 안 쓴다 → **1시간마다 전 사용자 강제 로그아웃**.
-- ADR-0029가 read까지 401을 내게 만들어 반경이 더 넓어졌다(ADR 본문도 이 부수를 인정한다). 백그라운드 폴링의 401도 세션을 끊는다.
-- **부분 진전**: 지난 판의 "`api.js` 커버 테스트 0"은 이제 거짓 — `test/back-to-login-guard.test.jsx:118-132`가 응답 인터셉터를 직접 단언한다(401/비401 2케이스). **요청 인터셉터(`api.js:7-13`)는 여전히 미커버.**
 
-### 7.2 삼켜진 fetch가 제어 흐름을 뒤집는다 — **확인된 버그** (B10·B11·B12)
-프론트 비테스트 `catch` **128개** 중 ~72개는 토스트/에러 상태를 띄우고 16개는 console만, ~25개가 완전 무음이다. 그중 **결과가 오동작으로 나타나는 것**:
-- **`pages/Ranking.jsx:154-156`** — `api.get('/api/watchlist')`(`:154`)에 `.catch(() => {})`(`:156`)로 `watched`(`:95`)가 빈 Set으로 남는다. `toggleWatch`(`:210`)가 `watched.has(t)`(`:214`)로 동사를 고르고 `:217-218`이 `isWatched ? api.delete(...) : api.post(...)`다 → **실패 후엔 모든 별이 미등록으로 렌더되고, 이미 등록된 종목의 별을 누르면 DELETE 대신 POST가 나간다**(삭제를 요청했는데 중복 추가 오류).
-- **`components/GlobalSearch.jsx:19-26`** — `fetchTracked`가 실패 시 `new Set()`을 반환한다(`:24`). `handleSelect:32`의 `if (tracked.has(t))`가 false가 되어 **이미 추적 중인 종목이 리포트(`:33`) 대신 "관심 추가" 프리필 모달(`:35`)로** 간다. `:31` 주석은 stale 캐시 오판을 *피하려고* 재fetch한다고 하는데, 실패 경로가 정확히 그 오판을 재도입한다.
-- **`pages/GuruDetail.jsx:114-120`, `pages/GuruManagers.jsx:52-58`** — `loadStockMap`이 `() => { api.get('/api/stocks').then(...) }` 형태로 **`.catch`도 없고 promise를 반환하지도 않아** 호출자가 붙일 수도 없다(호출부 `GuruDetail.jsx:133,164`·`GuruManagers.jsx:64,77` 전부 bare) → **unhandled promise rejection**, `stockMap`이 `{}`로 남아 모든 보유 배지가 미추적으로 렌더된다. 형제 구현 `GuruStats.jsx:87-92`(`:106`)·`GuruAllocation.jsx:59-64`(`:68`)는 `async`이고 잡힌다. **4개 복제 중 2개가 무가드.**
-- **잠재 위험** — `contexts/AuthContext.jsx:23-26`: `/api/auth/me` 실패가 조용히 `role:'user'`, `menuPermissions:[]`가 된다. 일시 장애와 실제 무권한 계정이 구별되지 않아 **에러도 재시도도 없이 nav 전체가 사라진다.** 테스트 없음(39줄).
-- **잠재 위험 — 무계 진행률 폴링 5곳**: `hooks/useReportGeneration.js:22`(`catch {}`, `:23` 1.5s), `pages/ReportManualGen.jsx:98,136`, `pages/ConsensusSettings.jsx:29`, `pages/GuruCrawlNow.jsx:28`(2s). `setInterval` 안의 `catch {}`라 지속 실패해도 타이머가 안 걷힌다. 올바른 패턴이 **이미 리포지토리에 있다** — `hooks/useStockManagement.js:18-19`가 `maxAttempts = 6`에서 멈추고 토스트를 띄운다.
-- **"에러를 빈 상태로 위장" 7곳**: `components/StockSearchBox.jsx:38`, `components/reports/DetailTab.jsx:666`, `pages/Ranking.jsx:463`, `pages/AdminAnalytics.jsx:64`, `components/reports/HistoryTab.jsx:36,43`. 의도적·문서화된 형제(`SupplySection.jsx:17`, `ReportDetailTabs.jsx:54-61`, `Recommendations.jsx:83-85`)가 있으므로 일관성 격차다.
-- **이미 가드됨(참조)**: 대시보드는 `hooks/usePortfolioData.js:48`이 마커 warn을 남기고 `pages/Portfolio.jsx`의 `DashboardGrid`가 `stocks>0`이면 빈 상태 대신 Skeleton을 보이며 유계 재시도(최대 3)를 한다(task#102). **다른 화면엔 이 헤더↔본문 모순 방어가 없다.**
+`frontend/src/api.js`의 응답 인터셉터가 전부다:
 
-### 7.3 단위 포매터 오적용 — **확인된 버그** (B13·B14)
-- **`components/reports/InvestorTrendSection.jsx:56`** — `tickFormatter={v => krFmt(v)}`가 걸린 Y축 값은 `:28-30`에서 `foreign_net`/`organ_net`/`individual_net`을 누적한 것, 즉 **주(株) 수**다(백엔드 3곳이 단언: `services/kiwoom/investor.py:4`, `services/investor_service.py:78`, `tests/test_kiwoom_investor.py:40` `== 2906596  # 수량(주)`). `krFmt`(`components/market/marketUtils.jsx:6-10`)는 억원 입력을 가정하므로 5,414,215주가 **"541.4조"**로 렌더된다.
-  - 의도적이지 않음의 증거 둘: ⓐ 형제 차트 `components/reports/ShortSellSection.jsx:11-18`이 **정확히 이 이유로** 전용 `fmtShares`를 두고(`// krFmt는 '억원' 입력 가정이라 주 단위엔 부적합`) 동일 축 역할에 `:87`에서 쓴다 — InvestorTrendSection이 미이관 형제다. ⓑ 내부 불일치 — 같은 컴포넌트 `:60` 툴팁은 같은 값을 `toLocaleString('ko-KR')`로 raw 출력해 축은 "541.4조", 툴팁은 "5,414,215"다.
-  - 폭발반경: 리포트 상세 **및** 랭킹 모달(`pages/Ranking.jsx:2`가 import).
-- **`pages/GuruAllocation.jsx:24-29`** `fmtUsd`의 최상단 티어가 `v >= 1e9 → B`(`:26`)로 **T 티어가 없다**. `:173`(총 투자금)·`:201`(설명란 분모)·`:244`(행 값)가 이걸 쓰고, 총계는 구루 ~83명 합계(`services/guru_stats.py` raw USD)라 **`$1,077.0B`**가 나온다 — 그 실측 문자열이 `GuruAllocation.jsx:166-167` 주석에 라이브 근거로 박혀 있다(현상은 확인됐고 수정은 안 됐다). 형제 `formatValue`(`GuruManagers.jsx:22-28` ≡ `GuruDetail.jsx:94-100`, byte-identical)는 T 티어를 가진다.
-- **잠재 위험** — `components/market/LendingSection.jsx:44,60,66`이 조원으로 라벨하고 `${v.toFixed(0)}조`로 포맷하지만 `backend/services/lending_service.py:145-148`은 `1_000_000`으로 나누고 `API_SPEC.md:2931`은 백만 단위로 문서화한다. 둘 중 하나가 1e6 틀렸다. fixture 없음(`grep forgBrwBal tests/` = 0) → `GET /api/market/lending` 실값 크기로 판별(~60–80이면 UI 맞고 문서 stale, ~6e7이면 UI가 1e6배 어긋남).
+```js
+if (err.response?.status === 401) {
+  localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token')
+  window.location.replace('/')
+}
+```
 
-### 7.4 내비게이션 단일 소스 — **이미 가드됨(잔여 위험만)**
-지난 판의 §7.4(B16 심층 리포트 라우트 누락)·§7.5(nav 목록 3중 복제)는 **둘 다 닫혔다**. `frontend/src/navSections.js`(52줄)가 `NAV_SECTIONS`(5섹션) + `matchesItem`(`:48`)·`matchesSection`(`:50`)·`sectionByKey`(`:52`)를 export하고 세 소비처가 파생한다: `Masthead.jsx:7,46,94`, `MobileNav.jsx:21,29`, `ResearchShell.jsx:11-12,17-20`. 회귀 게이트 `frontend/src/test/nav-active-matching.test.jsx`(70줄)가 목록 `/analyst-reports`·상세 `/analyst-report/000660/2026-07-30` × 3소비처 6케이스를 단언한다.
+`refresh_token`은 **4곳에서 쓰이고 정확히 1곳에서 읽힌다** — `App.jsx`가 `/api/auth/logout`에 POST할 때뿐. `/api/auth/refresh` 호출은 **프론트 전체에 0건**인데 **백엔드 엔드포인트는 존재한다**(`routers/auth.py::refresh`). 즉 회전·만료가 제대로 구현된 서버측 리프레시가 통째로 미사용이고, 30일 refresh token은 `localStorage`에 순수 공격 표면으로 앉아 있다.
 
-**남는 잔여 4가지:**
-1. **접두사 매칭이 세그먼트 경계를 안 본다** — `navSections.js:48` `pathname.startsWith(item.match ?? item.to)`. 현재 5섹션에 형제 접두사 쌍은 없고(`'/analyst-reports'.startsWith('/reports')`는 false) `:8-11` 주석이 그 천장을 선언하지만, **강제하는 단언이 없다.** 새 형제가 접두사 관계로 들어오면 조용히 두 탭이 동시 active가 된다.
-2. **드리프트 표면이 소멸한 게 아니라 "경로 목록"에서 "key→아이콘 매핑"으로 이동했다** — 아이콘은 소비처별 2중 복제다(`Masthead.jsx:12-18` sketches / `MobileNav.jsx:10-16` ui/icons, 의도적 분기이고 각 파일 주석이 근거를 담는다). **폴백이 없어** `NAV_SECTIONS`에 섹션을 추가하고 한쪽 `ICONS`를 빠뜨리면 `Icon`이 `undefined`가 되어 `Masthead.jsx:29`/`MobileNav.jsx:30`에서 **렌더 throw**한다.
-3. **라우트↔nav 커버리지 게이트가 없다** — `nav-active-matching.test.jsx`는 `/analyst-report(s)` 2경로만 고정한다. `App.jsx:92-108`의 신규 라우트가 `NAV_SECTIONS`에서 빠지는 B16 **원형**은 여전히 무가드(현재는 전 라우트 커버, 의도적 예외는 `/dev/showcase` `App.jsx:112`).
-4. **`settings`·`admin-analytics`는 `NAV_SECTIONS` 밖의 4번째 목록**이다(`Masthead.jsx:78-84`, `MobileTopActions.jsx:14-15`가 각자 하드코딩). `navSections.js:35` schedule 섹션은 `perm: 'research'`라 일정·인컴에 독립 권한을 줄 수 없다.
+**부작용이 더 아프다**: 이 401 핸들러는 **전역 하드 내비게이션**이라 백그라운드 폴러에도 발동한다 — `usePortfolioData`(KR 장중 15초마다 `/api/portfolio/prices`)·`useReportGeneration`(1.5초마다 `/api/report/progress`). 도달: `StockModal`을 반쯤 채운 상태에서 토큰이 만료 → 폴러가 401 → **입력 중에 로그인 화면으로 순간이동**, 만료 안내 토스트도 복귀 경로도 없다(`location.replace`가 딥링크를 의도적으로 버린다).
 
-### 7.5 이벤트 화이트리스트 탈락 — **확인된 버그** (B24)
-- `backend/routers/events.py:45-46`은 `VALID_EVENTS`(`:11-18`)에 없는 이벤트를 **`{"ok": True}`로 반환하고 버린다**(요청은 성공, 이벤트만 사라진다).
-- 프론트가 실제로 쏘는데 화이트리스트에 없는 이벤트 **2종**: `nav_analytics`(`components/Masthead.jsx:84`, `components/MobileTopActions.jsx:15`) · `ranking_watch_toggle`(`pages/Ranking.jsx:226`).
-- 관측 공백 추가 3건: `navSections.js`의 `/recommend`(`:17`)·`/dividends`(`:38`)·`/analyst-reports`(`:20`)에 `evt` 필드가 없어 그 탭 클릭은 아무 이벤트도 쏘지 않는다.
-- 구조적 원인: 이벤트명이 프론트 문자열 리터럴과 백엔드 집합에 **이원화**돼 있고 대조하는 테스트가 없다. task#251에서 `MobileNav`의 `key` 필드가 권한 필터 겸 이벤트명 소스로 **겸직**하던 것을 `section.perm` 파생으로 바꿔 5탭 이벤트명을 바이트 동일하게 보존했지만(`MobileNav.jsx:28` `trackEvent('nav_' + section.perm)`), 그 보존을 지키는 게이트도 없다.
+### 7.2 에러 바운더리가 없다 — **확인된 버그** (B48)
 
-### 7.6 Service Worker가 `/api/*`를 가로챈다 — **설계상 트레이드오프** + 프라이버시 잔여
-- `frontend/vite.config.js:39-48`(빌드 산출 `dist/sw.js`): `urlPattern`(`:40`)이 `/api/`를 포함하고 `/api/auth/`를 제외한 **모든 GET**을 `NetworkFirst`(`:44` `networkTimeoutSeconds: 10`)로 `api-cache`(`:45` maxEntries 50, maxAgeSeconds 300)에 넣는다.
-- 파생 1: 네트워크 실패 **또는 10초 초과** 시 **최대 5분 오래된 API 응답**이 stale 표시 없이 서빙된다.
-- 파생 2 (**프라이버시 잔여**): `api-cache`가 URL만으로 키를 잡아 `Authorization` 헤더가 키에 안 들어가고, 로그아웃(`App.jsx:37-50`)이 캐시를 지우지 않는다(`caches.*` 호출이 프론트 전체 **0건**). 같은 브라우저에서 5분 안에 계정 B가 로그인하고 요청이 실패/타임아웃하면 **B가 A의 캐시된 `/api/portfolio` 본문을 받을 수 있다.** 좁은 창이지만 실제 교차 사용자 누출 경로다.
-- 파생 3: `:46` `cacheableResponse.statuses: [0, 200]`이 opaque(status 0) 응답까지 캐시한다.
-- 파생 4: `maxEntries: 50` vs ~70개 구별 엔드포인트 → 상시 LRU 스래싱(비효율, 오류 아님).
-- 파생 5 (테스트 하니스): 이 인터셉트 때문에 Playwright `page.route` 응답 주입이 안 먹는다 — 응답 주입 UAT는 컨텍스트를 `serviceWorkers: 'block'`으로 만들어야 한다.
-- **이미 가드됨 — OAuth 콜백**: `vite.config.js:19` `navigateFallback: null`로 내비게이션 라우트가 등록되지 않는다(`dist/sw.js`에 `NavigationRoute`/`createHandlerBoundToURL` 없음). 독립적으로 `/api/auth/*`가 `api-cache`에서 제외되므로 `useAuthBootstrap.js:51` 토큰 교환도 캐시되지 않는다.
-- **이미 가드됨 — 배포 후 stale JS**: `skipWaiting`/`clientsClaim`(`:17-18`), `cleanupOutdatedCaches()`, `BUILD_DATE`를 실은 `cacheId`(`:15`), `sw-cache-bust` 플러그인(`:63-92`, name `:64`)이 `registerSW.js`/`sw.js`/`manifest.webmanifest`에 `?BUILD_DATE`를 붙이고, `nginx.conf:39-44`가 `sw.js`/`workbox-*.js`에 no-store를 준다. 그리고 **`src/`에 `React.lazy`·동적 `import()`가 0건**이라 `skipWaiting`의 통상 위험(열린 탭이 삭제된 lazy 청크를 요청)이 발생할 수 없다. **task#287 전에는 이 항목이 "삭제된 청크를 요청하지 않으니 깨지지 않는다"만 닫았고, "새 SW가 컨트롤러를 교체해도 열린 탭의 React 앱 자신은 리로드되지 않아 무기한 옛 번들을 실행한다"는 절반은 무가드였다(`registerType: 'autoUpdate'`라는 이름과 달리 앱은 갱신되지 않음).** 이제 `hooks/useSwUpdateReload.js`(`App.jsx:67`, §10.1)가 그 절반도 닫는다 — `controllerchange`(최초 설치 1회는 `hadController`로 무시) 후 **다음 라우트 전환 또는 탭 재가시화** 시점에 `window.location.reload()`로 새 번들을 집어온다(모달·인라인 입력 포커스·OAuth 콜백 `?oauth=` 중엔 미룸).
-- 참고: `vite.config.js:66-67`이 플러그인의 `dist` 하드코딩이 throwaway 빌드로 라이브 디렉터리를 오염시켰던 과거 버그(task#191)를 문서화한다.
+`grep -rn "ErrorBoundary|componentDidCatch|getDerivedStateFromError" frontend/src/` → **0건**. 렌더 중 throw가 루트까지 전파되면 React 19가 트리 전체를 언마운트하고 `#root`가 비며, 내비게이션도 새로고침 유도도 없다(`useSwUpdateReload`도 함께 언마운트된다). `index.html`의 테마 부팅 CSS 때문에 사용자는 단색 사각형을 본다.
 
-### 7.7 동일 엔드포인트 다중 소비처 — **잠재 위험**
-19개 엔드포인트가 2개 이상 파일에서 fetch된다. 결합도 상위:
+이 부재가 아래 크래시 사이트들을 전부 **백지**로 증폭한다:
 
-| 엔드포인트 | 파일 수 | 위치 |
+| 심각도 | 파일 · 심볼 | 던지는 조건 |
 |---|---|---|
-| `/api/watchlist` | 8 | `GlobalSearch.jsx:41`, `useStockManagement.js:100`, `Ranking.jsx:155,197,217,218`, `Recommendations.jsx:83,135`, `GuruStats.jsx:112,114`, `GuruAllocation.jsx:115,117`, `GuruManagers.jsx:73,75`, `GuruDetail.jsx:160,162` |
-| `/api/stocks` | 6 | `GlobalSearch.jsx:21`, `GuruStats.jsx:88`, `GuruDetail.jsx:115`, `GuruManagers.jsx:53`, `GuruAllocation.jsx:60`, `AnalystReports.jsx:39` |
-| `/api/guru/managers` | 5 | `GuruHoldersSection.jsx:28`, `Recommendations.jsx:85`, `GuruDetail.jsx:126`, `GuruManagers.jsx:61`, `GuruCrawlNow.jsx:14,26` |
-| `/api/report/list` | 4 | `useReportList.js:28`, `useReportGeneration.js:20`, `Reports.jsx:99`, `ReportManualGen.jsx:42` |
-| `/api/analyst-reports` | 3 | `Reports.jsx:108`, `AnalystReport.jsx:261,272`, `AnalystReports.jsx:29,71` |
-| `/api/market/fx` | 3 | `FxSection.jsx:13`, `usePortfolioData.js:90`, `Analytics.jsx:289` |
-| `/api/stocks/dashboard` | 2 | `usePortfolioData.js:42`, `Analytics.jsx:286` |
+| HIGH | `pages/GuruDetail.jsx::GuruDetail` — `splitManagerName(manager.name)` | `setManager(data)`가 null/빈 200 본문을 받으면 `loading=false`·`error=null`로 통과해 `manager.name` 접근 |
+| HIGH | `pages/AnalystReport.jsx::AnalystReport` — `report.data \|\| {}` | `setReport(data)`에 null 가드 없음 |
+| HIGH | `pages/Calendar.jsx` → `MonthGrid` — `setEvents(r.data.events)` 후 `for (const e of events)` | `events` 키 없는 응답 → not iterable |
+| HIGH | `pages/Analytics.jsx::CorrelationHeatmap` — `!data.tickers.length`, `matrix.map(row => row.map(...))` | `tickers` 없는 200, 또는 비정형 matrix |
+| MED | `pages/GuruManagers.jsx::GuruManagers` — `data.managers.filter(...)` | `setData(data)`가 기본값을 통째 교체(형제 `GuruHoldersSection`은 `data.managers \|\| []`로 올바름) |
+| MED | `pages/GuruStats.jsx::StatRow` — `row.score.toFixed(3)` | 같은 파일의 다른 필드는 전부 `?? '-'`인데 여기만 무가드 |
+| MED | `pages/Settings.jsx::BatchHub` — `batches.filter(...)` | `batches.length === 0` 검사가 객체에선 false라 `.filter`까지 도달 |
 
-- **이미 가드됨**: task#52의 `/api/stocks/dashboard` 배열→객체 파손은 `Analytics.jsx:287`이 `r.data?.holdings ?? r.data ?? []`로 두 형태를 받고 `usePortfolioData.js:44-45`가 객체 형태를 읽어 닫혔다. **잔여**: 소비처가 여전히 2곳이라 다음 비-additive reshape에 재발한다.
-- **미가드**: `/api/stocks` 소비처 6곳 중 5곳이 bare array를 가정한다(`data.forEach`). `AnalystReports.jsx:40`만 `data || []`로 방어한다 → `{stocks:[...]}`로 reshape하면 5곳이 throw한다.
-- 구조적 원인: **엔드포인트별 데이터 계층이 없다.** `/api/stocks` + `/api/watchlist` 토글 로직이 구루 4페이지에 복붙돼 있고(`GuruStats.jsx:87-121`, `GuruAllocation.jsx:59-124`(handleToggle이 `:112`로 분리), `GuruManagers.jsx:52-80`, `GuruDetail.jsx:114-166`) `Ranking.jsx:210-233`에 5번째 변형이 있다. **5중 복제 그대로.**
+### 7.3 비동기 레이스 — **일부 가드됨, 7곳 미가드**
 
-### 7.8 포매터 중복 15종 — **잠재 위험**(§7.3의 온상)
-공유 헬퍼는 `utils.js:fmtPrice` 하나뿐인데 컴팩트 금액 포매터가 15개 근중복이다.
-- `formatValue` byte-identical: `GuruManagers.jsx:22-28` ≡ `GuruDetail.jsx:94-100`. 세 번째 변형 `fmtUsd`(`GuruAllocation.jsx:24-29`)는 T 티어 누락(§7.3).
-- `fmtShares`가 한 이름으로 3번 정의되고 **래더가 2종 비호환**: `ShortSellSection.jsx:12` KR 억/만 vs `UsSupplySection.jsx:22`·`UsInsiderSection.jsx:23` US B/M/K.
-- `krFmt`가 `fmtAmt`로 복제: `BacklogChart.jsx:11-15`.
-- `pages/Ranking.jsx:22-26`이 `fmtPrice`를 로컬 재구현해 `utils.js:1`을 가린다.
-- **15번째(신규)**: `components/reports/MarketOutlookSection.jsx:14-24`의 `_blank` 헬퍼(`:15`)가 `Number(null) === 0`·`Number('') === 0` 함정을 막지만 **로컬 정의**다 — 같은 함정을 가진 위 14종에 미이관.
-- 정합 확인됨: `KrTop2Section.jsx:52,59,67,96,99,102,106`(억원, `earnings.py:240` `"unit": "억원"`), `Ranking.jsx:47` `krFmt(v / 1e8)`(raw 원, `backend/tests/test_ranking_service.py:51-53` 확인), `ShortSellSection.jsx:21` `wonFmt`(명시적 `/1e8`).
+**참조 구현(그대로 둘 것)** — 세대 카운터를 `.then`·`.catch`·**`.finally`까지** 검사하는 올바른 형태:
 
-### 7.9 API base URL 불일치 — **확인된 버그**(조건부)
-- `frontend/src/utils/analytics.js:4`가 bare `fetch('/api/events')`를 쓰고 **`VITE_API_BASE_URL` 프리픽스가 없다**. 다른 4개 소비처(`api.js:4`, `App.jsx:41`, `useAuthBootstrap.js:50`, `LoginPage.jsx:11`)는 붙인다. `VITE_API_BASE_URL`이 절대 origin으로 설정되면(그게 문서화된 용도다) 분석 이벤트가 프론트 origin으로 POST돼 조용히 404한다. 토큰 헤더도 손으로 만들어(`:2,8`) api 클라이언트의 401 인터셉터를 우회한다.
-- env 읽기가 `api.js`에서 한 번 export되지 않고 4번 중복된다.
-- `src/`에 하드코딩 API 호스트·localhost 없음. 유일한 절대 URL은 `index.html:45-49`의 폰트 CDN.
+- `pages/Ranking.jsx::fetchPage` — `genRef`를 세 핸들러 전부에서 비교하고, `if (!reset && loadingRef.current) return` 뮤텍스는 무한스크롤 재진입에만 걸며 `reset`이 뮤텍스를 우회해 세대를 올린다. **B27은 여기서 닫혔다.**
+- `hooks/useTrackedStocks.js::reload` — `reloadGenRef` 3핸들러 검사.
+- `pages/GuruAllocation.jsx` 스코프 이펙트 · `Compare.jsx` · `Recommendations.jsx` 마운트 이펙트 · `components/market/*Section.jsx` — `cancelled` 플래그 + cleanup.
 
-### 7.10 죽은 레거시 경로·설정 — **잠재 위험**(현재 비활성)
-- `?token=`/`?refresh=` URL 쿼리에서 토큰을 읽어 `localStorage`에 넣는 경로가 살아 있다 — **파일이 이동했다**: `frontend/src/hooks/useAuthBootstrap.js:67-68`(파싱) + `:61-65`(`setItem` 2회 + `replaceState`). URL 토큰은 브라우저 이력·리퍼러·서버 로그에 남는다. **백엔드는 더 이상 그 형태를 발행하지 않는다** — 두 콜백 모두 `?oauth={code}`(120초 일회용, `routers/auth.py:183,230`)만 리다이렉트한다. 죽은 코드지만 되살리면 즉시 노출.
-- **`frontend/vercel.json`이 여전히 tracked** — Vercel은 Docker 이전에서 제거됐다.
-- `frontend/.env`(untracked)에 `VITE_SUPABASE_URL`·`VITE_SUPABASE_ANON_KEY`가 남아 있다. **누출 아님** — `src/` 참조 0, `dist/`에도 없다(Vite는 정적 참조된 변수만 인라인). 로컬 잡동사니.
+**미가드(확인)**:
 
-### 7.11 렌더 정체성·거대 컴포넌트 — **잠재 위험**(낮음)
-- `components/reports/DetailTab.jsx:582`의 `StatRow`가 부모 렌더 함수 **내부**에서 정의돼 매 렌더마다 새 타입이 되어 서브트리가 리마운트된다. `pages/GuruStats.jsx:58`에 같은 이름의 다른 컴포넌트가 별개로 존재한다. 게다가 `ui/Stat`의 `valueColor`와 이름은 같고 **계약이 다르다**(`DetailTab.jsx:585,599-600,629`는 raw CSS 값 `"var(--up)"`, `ui/Stat`은 토큰명 `'up'`) — §7.12의 혼동원이고 §7.12가 닫혀도 이 이중 계약은 남는다.
-- 500줄 초과 3개 + 400줄대 4개: `components/reports/DetailTab.jsx`(690), `pages/Ranking.jsx`(527), `components/reports/Sections.jsx`(516), `ConsensusChart.jsx`(447)·`FinancialsChart.jsx`(434)·`AnalystReport.jsx`(422)·`GuruDetail.jsx`(404). 프론트 비-테스트 총 **~17,195줄**(지난 판 16,850 → +345, `GuruAllocation.jsx` 118→270 등).
-- **이미 가드됨**: 액션 버튼 중복은 `components/reports/StockActions.jsx`로 단일화되고 가시성을 `is_mine`으로 게이트한다(`:14`, 근거 주석 `:5-6`) — `StockCard.jsx`·`TickerListItem.jsx`가 이걸 쓴다. task#97의 "그외 탭 삭제 404"는 닫혀 있다.
+| 심각도 | 파일 · 심볼 | 증상 |
+|---|---|---|
+| **HIGH (B49)** | `pages/Reports.jsx` 상세 fetch 이펙트 | 티커 A → B를 빠르게 누르면 A 응답이 나중에 착지해 **헤더는 B, 수치는 A**. `.catch`가 없어 실패 시 `detail`이 이전 티커 값을 유지 → B 화면에 A의 목표가·RSI·컨센서스가 렌더된다 |
+| HIGH | `pages/Ranking.jsx::onRowClick` | 세대 카운터 없음. (a) 모달을 닫아도 나중 착지한 응답이 **닫은 모달을 다시 연다**, (b) A→B 연속 클릭 시 B 모달 안에 A 리포트. 60줄 위에 올바른 패턴이 있는데 여기 적용만 빠졌다 |
+| HIGH | `pages/Calendar.jsx` 월 이펙트 | `›`를 두 번 빠르게 → 헤더는 새 달, 셀은 옛 달의 실적·배당일 |
+| MED | `pages/Recommendations.jsx::handleChip` | 마운트 이펙트엔 `cancelled` 가드가 있는데 칩 토글 재fetch엔 없다 |
+| MED | `components/StockSearchBox.jsx` 검색 이펙트 | 디바운스(350ms)는 레이스 가드가 아니다 — 느린 1차 응답이 나중 착지해 `삼성전자` 텍스트 아래 `삼성` 결과가 뜨고, 행을 고르면 **틀린 티커**가 관심종목에 들어간다 |
+| MED | `components/reports/HistoryTab.jsx` `snapshotA`/`snapshotB` 이펙트 | 비교 날짜를 빠르게 두 번 바꾸면 한 날짜의 값이 다른 날짜 헤더 아래 표시 |
+| MED | `hooks/usePortfolioData.js::fetchAll`/`fetchDashboard` | 5개 호출 지점(마운트·bounded heal 루프·탭 클릭 2곳·↺ 버튼)이 경쟁하고 `finally`가 무조건 스피너를 끈다 |
+| MED | `hooks/useReportList.js::fetchList` | 가드도 `.catch`도 없다 |
 
-### 7.12 접미사 조립 클래스에 화이트리스트가 없다 — **이미 가드됨(잔여 위험만)**
-- ⚠️ **B15 해소** — `components/ui/Stat.css`에 이제 `.stat__value--up`(`:18`)·`.stat__value--down`(`:19`)이 존재하고, 옛 `--success`/`--danger`는 **삭제**됐다(그 자리 `:16-17`은 "의미 상태 variant는 두지 않는다"는 사유 주석). `pages/AnalystReport.jsx:332`가 넘기는 `'up'`/`'down'`이 이제 매칭되고(+`upside == null` 가드), 유일한 옛 소비처 `pages/Showcase.jsx:75`도 `valueColor="up"`으로 함께 이관돼 고아 소비처가 없다.
-- **잔여 위험(구조적)**: `components/ui/Stat.jsx:14`가 여전히 `` `stat__value--${valueColor}` ``로 **문자열 조립**하고 **허용값 화이트리스트가 없다**. `up`/`down` 밖의 값은 예외 없이 존재하지 않는 클래스가 되어 **조용한 무채색**으로 회귀한다. 어떤 자동 게이트도 이걸 못 본다 — vitest는 클래스명을 단언하니 수정 전에도 통과하고, jsdom은 스타일시트를 적용하지 않으며, 빌드는 미사용 CSS 클래스를 모른다. 라이브 `getComputedStyle`(`scripts/uat254-analyst-upside-color.mjs`)이 유일한 검출 수단이고, 소비처 2곳 모두 vitest에서 색을 단언하지 않는다.
-- task#254 회고가 화이트리스트 도입을 "소비처 2곳뿐이라 YAGNI"로 명시 보류했다 — **소비처가 늘면 재검토할 자리.**
-- 같은 부류의 "색 의미가 두 곳에 분산": `pages/GuruStats.jsx:38-43`이 배경은 CSS로 옮기고 `color`(`:41`)는 JSX 인라인에 남겼다.
-- 배경: 리디자인(task#194) 이후 가격 방향은 `.badge--up`/`.badge--down` 전용 변형, 의미 상태는 `.badge--success`/`--danger`/`--warning`으로 통념대로 동작한다. 공용 배지 variant의 색 의미를 바꿀 땐 소비처 전수 grep 선행 — vitest·빌드는 색 의미에 블라인드다.
+### 7.4 삼켜진 fetch가 "데이터 없음"으로 위장한다 — **확인된 버그**
 
-### 7.13 구루 투자금 탭 전량 렌더 — **잠재 위험**(계측 완료·처방 미적용)
-- `pages/GuruAllocation.jsx:238-265`가 `rows.map`으로 **전 행(전체 스코프 1,723행)을 무조건 렌더**하고, 각 행이 `WatchlistBtn`(`GuruStats.jsx:11-13`, 인스턴스마다 `useState` 2개)을 포함한다 → **~1,723개 상태 보유 컴포넌트**. `GuruAllocation.jsx`·`GuruStats.jsx`에 `useMemo`/`React.memo`/윈도잉 **0건**이고, `:143-150` 검색 필터는 매 키입력마다 `data.rows` 전량 재map/filter를 한다.
-- **실측(task#255, CPU 4x·전체 스코프, `scripts/uat255-guru-alloc-perf.mjs`)**: 스코프 전환 **596ms**(임계 200ms) — 내부 분해 `Script 109 vs RecalcStyle 120 + Layout 155`. 즉 지배 비용은 JS 재조정이 아니라 **초기 레이아웃**이다.
-- **`content-visibility`는 적용했다 되돌렸다 — 재시도 금지**: `frontend/src/styles/guru.css:158-167`이 그 자리에 수치와 이유를 남긴다. ② 596→332ms(여전히 임계 미달)인데 ③ 스크롤 최장 longtask가 71→**132ms**로 임계 100ms를 **초과 회귀**했다(끝까지 스크롤 1,101→2,961ms) → 오프스크린 스킵은 비용을 *제거*하지 않고 **스크롤로 이연**한다. FAIL 축이 1→2로 늘어 순손실. 곁가지: `contain-intrinsic-size`는 content-box라 border-box 실측(68.8px)을 넣으면 문서가 33,545→42,389px로 부푼다(재시도 시 PC 46.8·모바일 54.1).
-- **남은 수단은 가상화(윈도잉)뿐**이고, 그건 「화면 행 수 == 코호트 크기」계약 3종(`GuruAllocation.test.jsx:112`, `scripts/uat247-guru-cohort.mjs:271`, `scripts/uat-guru-row-ux.mjs` 111단언)을 정면으로 깬다 — 그 재설계가 도입 비용의 절반이다. 계획된 후속: §14.
-- 참고: 성능 프로브는 **회귀 게이트가 아니다**(머신·부하 의존, 파일 상단 주석이 명시).
+**`.catch`가 아예 없는 곳**(미처리 rejection + 오류를 빈 상태로 렌더):
 
-### 7.14 OAuth 되감기가 완료를 관측하지 않는다 — **잠재 위험**(cross-layer 결합)
-- `frontend/src/utils/oauthHistory.js:53` `window.history.go(-delta)`는 비동기이고 성공/실패 콜백이 없다. 착지 문서가 재평가되는 근거는 **"라이브 `/`가 no-store"**라는 전제(`:6-8` 주석)이고, 그 전제는 `nginx/nginx.conf:31-36`(`location = /index.html` no-store, `/`는 `:52-55` `try_files`의 내부 리다이렉트로 그 블록을 탄다)에 종속된다. **프론트 정확성이 nginx 설정에 걸려 있고 이를 검증하는 테스트가 없다.**
-- bfcache로 복원되면 `hooks/useBfcacheAuthGuard.js:16`가 replace로 이어받지만, **둘 다 불발하는 브라우저 조합에서는 화면이 로그인 상태로 멈출 수 있다**(task#253 회고가 이 잔여를 명시). 그리고 **Playwright로는 bfcache 복원을 검증할 수 없다**(3엔진 대조군으로 확정, task#246) — 이 분기는 합성 `pageshow` 또는 실기기 확인만 가능하다.
-- `useAuthBootstrap.js:49`이 `history.replaceState({}, '', '/')`를 **fetch(`:41`) 이전에** 실행하므로, 코드 교환이 400(`:50-52`)이나 네트워크 실패(`:54-57`)로 끝나면 코드가 이미 URL에서 사라져 **재시도가 원리적으로 불가**하다(현재 UX는 로그인 화면 복귀로 수렴하므로 오동작은 아니고 무음 실패다 — `:30-31` 주석이 통지 제외를 의도로 명시).
+- **HIGH `pages/GuruManagers.jsx`** — `api.get('/api/guru/managers').then(...).finally(...)`. 실패 시 `데이터 없음 — 설정 > 구루 탭의 "즉시 크롤링"에서 데이터를 가져오세요.`가 뜬다. **fetch 실패가 사용자에게 크롤을 실행하라고 지시한다.** 형제 `GuruStats.jsx`·`GuruAllocation.jsx`는 둘 다 *"실패를 '크롤링을 먼저'로 위장하지 않는다"* 주석과 함께 올바르게 처리한다 — 이 파일만 놓쳤다.
+- **HIGH `hooks/useReportList.js::fetchList`** — 실패 시 `reportList`가 `{}`로 남아 `리포트가 없습니다. 설정 페이지에서 '지금 생성' 버튼을…`이 뜬다. **앱의 주 화면이 백엔드 blip을 "리포트가 없다"로 표시한다.**
+- **HIGH `hooks/useReportGeneration.js::_startPoll`** — 1.5초 `setInterval` 안의 bare `catch {}`. `/api/report/progress`가 계속 실패하면 인터벌이 영원히 안 걷히고 `generating`이 non-null로 남아 **진행률이 얼어붙은 "생성 중"**이 지속된다. 탈출은 언마운트뿐.
+- MED: `pages/Reports.jsx`의 `?scope=all`(admin '그외' 탭 공백), `components/PermissionManager.jsx`(권한 관리 화면에 빈 사용자 표).
 
-### 7.15 배치 '지금 실행' 결과 판정이 프론트 휴리스틱 — **잠재 위험**
-- `pages/Settings.jsx:105`가 `Object.entries(result||{}).filter(([k]) => k !== 'ok')`로 응답 필드를 순회하고 `isWeak(v) = v === false || v === 0`(`:75`)을 **24개 manual endpoint 전부에** 일괄 적용한다. `:72-74` 주석이 "이 24개의 응답 필드는 전부 saved/건수 의미"라고 근거를 대지만, **그 불변식을 지키는 백엔드 게이트가 없다** — 새 manual endpoint가 `skipped: 0`처럼 "0이 정상"인 필드를 반환하면 조용히 경고색이 된다. `Settings.test.jsx`(88줄)는 `ManualRunButton`만 커버한다(그 목적으로 `Settings.jsx:83`에 `export`가 추가됐다).
+**삼키는 `.catch`**(오류와 "없음"이 구별 불가): `Ranking.jsx`의 리포트 모달 `.catch(() => {})`(500이 "아직 리포트 없음"으로 보여 사용자가 이미 있는 종목을 또 추가한다)·뉴스 `.catch(() => setNews([]))`, `StockSearchBox`의 `.catch(() => setResults([]))`. 의도적이고 문서화된 것: `ReportDetailTabs`·`DetailTab`(backlog)·`SupplySection`·`GuruHoldersSection`(`// eco: silent`)·`utils/analytics.js`·`utils/pwa.js`·`App.jsx` 로그아웃 비콘·`Calendar.jsx` 인접월 프리페치.
+
+**MED `contexts/AuthContext.jsx`** — `/api/auth/me` 실패 시 `.catch(() => { setRole('user'); setMenuPermissions([]) })`. 재시도도 사용자 피드백도 없어 **admin이 blip 한 번에 일반 사용자로 조용히 강등**되고, admin 버튼·'그외' 탭·권한 화면이 사라진 것이 실제 권한 변경과 구별되지 않는다.
+
+### 7.5 `authLoading` 데드엔드 — **잠재 위험**
+
+`hooks/useAuthBootstrap.js`의 OAuth 분기가 쓰는 bare `fetch`에 **`AbortSignal`도 타임아웃도 없다**(`api.js`에도 axios `timeout` 설정이 없어 기본 0=무한). 모든 *정착* 경로는 `resolveStored()`로 `authLoading`을 내리므로 rejection은 덮여 있다 — 그러나 **영영 정착하지 않는 연결**(캡티브 포털, 조용히 끊긴 TCP)은 `authLoading=true`에 머물고 `App.jsx`가 스플래시를 무한 렌더한다. 수동 새로고침 외 탈출 없음. 같은 파일의 주석이 형제 실패 모드("새로고침 전까지 빠져나올 수 없는 백지")를 이미 문서화하고 있는데, **이것이 그 미덮인 변종**이다.
+
+### 7.6 Service Worker가 `/api/*`를 가로챈다 — **확인된 버그**(B47) + 설계 잔여
+
+`vite.config.js`의 VitePWA `runtimeCaching`:
+
+```js
+registerRoute(({url}) => /\/api\//i.test(url.pathname) && !/\/api\/auth\//i.test(url.pathname),
+  new NetworkFirst({cacheName:"api-cache", networkTimeoutSeconds:10,
+    plugins:[new ExpirationPlugin({maxEntries:50, maxAgeSeconds:300}), ...]}), "GET")
+```
+
+- **B47 — `api-cache`가 사용자별로 분리되지 않고 로그아웃에도 안 지워진다.** Workbox는 URL만으로 키를 잡고 `Authorization` 헤더(`api.js`가 주입)는 키에 안 들어가며 `Vary` 처리도 없다. `grep -rn "caches\." frontend/src/` → **0건**이라 `App.jsx::doLogout`은 `localStorage`만 지운다. 도달: 사용자 A 로그아웃 → 5분 내 같은 브라우저에서 B 로그인 → `/api/portfolio`·`/api/stocks`·`/api/stocks/dashboard` 중 하나가 실패하거나 10초 네트워크 타임아웃을 넘기면 **A의 보유종목이 B에게 서빙된다**. `/api/auth/*`가 제외돼 있어 **신원은 맞고 데이터만 틀린** 최악의 조합이 된다.
+- **MED — 10초 `networkTimeoutSeconds`가 stale 금융 데이터를 무표시로 서빙한다.** 느린 모바일에서 `/api/portfolio/prices`가 최대 5분 된 캐시로 폴백하는데, `PriceFreshness`가 읽는 `lastUpdated`는 `usePortfolioData`가 **클라이언트 수신 시각**으로 찍은 값이라 5분 된 가격이 "방금"으로 표시된다.
+- **앱 셸 stale 위험은 없다(확인)** — `globPatterns`가 `.html`을 제외하고 `navigateFallback: null`, 프리캐시 목록에 `index.html`이 없다. 내비게이션은 항상 네트워크를 탄다.
+- **업데이트 리로드 루프는 유계**(`hadControllerRef`가 최초 설치를 억제, `attemptReload`가 `pendingRef`를 리로드 *전에* 내린다). LOW 잔여: `isBusy()`가 `document.body.style.overflow === 'hidden'`을 바쁜 것으로 보므로, 어떤 경로가 스크롤 락을 남기면 탭이 옛 번들에 **무기한 고정**된다(폴백 타이머 없음).
+
+### 7.7 동일 엔드포인트 다중 소비처 — **잠재 위험**(이미 드리프트 발생)
+
+| 엔드포인트 | 소비처 | 실제 드리프트 |
+|---|---|---|
+| `/api/guru/managers` | `GuruManagers.jsx`·`GuruHoldersSection.jsx`·`Recommendations.jsx`·`GuruCrawlNow.jsx` | **있음** — `setData(data)`(무가드) vs `data.managers \|\| []` vs `guru.data?.managers` vs `.catch(() => ({data:{managers:[]}}))`. 한 엔드포인트에 **4개의 서로 다른 형태 계약** |
+| `/api/stocks/dashboard` | `usePortfolioData.js`·`Analytics.jsx` | **있음** — `res.data?.holdings \|\| []`(객체 전용) vs `r.data?.holdings ?? r.data ?? []`(객체 *또는* 배열). 둘 중 하나는 계약을 잘못 알고 있다 |
+| `/api/report/{ticker}/history` | `HistoryTab.jsx`·`useStockManagement.js`·`Ranking.jsx` | **있음** — `data.filter(...)`(무가드) vs `(data \|\| []).filter(...)` |
+| `/api/report/list` | `useReportList.js`·`Reports.jsx`·`ReportManualGen.jsx`·`useReportGeneration.js` | `data.stocks ?? data` 이중 형태가 4곳 중 2곳에만 |
+| `/api/stocks` | `useTrackedStocks.js`·`GlobalSearch.jsx`·`TechReport.jsx`·`AnalystReports.jsx` | `ticker→type` 맵 빌드가 3곳에서 독립 재구현(2곳은 바이트 동일) |
+| `/api/market/fx` | `usePortfolioData.js`·`Analytics.jsx`·`FxSection.jsx` | `data?.rates?.usdkrw?.current` 경로 + 하드코딩 폴백값이 2곳에 복제 |
+| `/api/consensus/{ticker}` | `ConsensusChart.jsx`·`AnalystReport.jsx` | `AnalystReport`는 `Array.isArray(data)` 가드, `ConsensusChart`는 없음 |
+
+`components/reports/LatestDisclosuresSection.jsx`의 `Array.isArray(data) ? data : []`가 **저장소에서 유일하게 올바른 형태**다.
+
+### 7.8 죽은 코드 — **잠재 위험**(낮음)
+
+- **`components/Glossary.jsx` + `glossary/terms.js` + `glossary/match.js` + `Glossary.css`** — importer 0건. `terms.js`/`match.js`는 `Glossary.jsx`만 import하고 `Glossary.jsx`는 아무도 import하지 않는다. 용어집 기능 전체가 도달 불가이며, `glossary/match.test.js`가 초록을 유지해 생존했다.
+- **`hooks/useAuth.js`** — `export { useAuth } from '../contexts/AuthContext'` 한 줄. 9개 소비처가 전부 `contexts/AuthContext`를 직접 import한다. importer 0건.
+- **`hooks/usePortfolioData.js`가 만들고 아무도 안 읽는 값 3개** — `dashboardError`·`events7d`·`refreshLivePrices`. 3개 소비처(`Portfolio.jsx`·`Reports.jsx`·`Compare.jsx`) 중 어느 것도 구조분해하지 않는다. 특히 `events7d`는 **세 페이지 마운트마다 `GET /api/digest/latest`를 비용으로 치르고 결과를 버린다**. `dashboardError`가 안 읽히는 탓에 `Portfolio.jsx`는 재시도 *횟수*로 실패를 추정해, 진짜 0-보유 응답과 하드 실패가 같은 카드로 렌더된다.
+- `hooks/useSwUpdateReload.js`의 `if (window.location.search.includes('oauth=')) return true` — 파일 자신의 주석이 현 배선에서 도달 불가임을 명시.
+
+### 7.9 중복 렌더러 — **잠재 위험**(이미 드리프트)
+
+- **`pages/GuruManagers.jsx`** 모바일 블록 vs 데스크톱 블록 — 정규화 64줄 중 **60줄 동일**. 이미 갈라졌다: 데스크톱 배지 툴팁만 `'\n[클릭하여 관심종목 추가]'`를 덧붙여 **같은 컨트롤이 뷰포트마다 다른 어포던스를 광고한다**.
+- **`buildGuruCounts`** — `pages/GuruManagers.jsx`와 `pages/Recommendations.jsx`에 바이트 동일 정의(후자에 "앞의 것과 같다"는 주석까지 있다).
+- `pages/Portfolio.jsx` 모바일/데스크톱이 5버튼 `analysisTab` 바를 그대로 복제.
+
+`components/reports/StockActions.jsx`는 반대 사례다 — 과거 두 렌더러의 중복이었던 액션 버튼을 단일 컴포넌트로 통합했다.
+
+### 7.10 접근성 — **일부 확인, `role="img"`는 클린**
+
+**`role="img"` 3개 사이트는 전부 올바르다 — 고치지 말 것**: `components/sketches/*.jsx`(장식 라인아트 + `<title>`), `components/tech/TechLevelBand.jsx`(빈 장식 `<span>` 격자, 데이터는 `aria-label`과 형제 노드가 운반 — 자손 프루닝이 의도), `components/tech/TechGraph.jsx`(SVG가 `aria-hidden="true"`이고 같은 라벨을 `<ul className="sr-only">`로 재노출, 주석이 leaf-role 근거를 명시).
+
+**MED — DOM에 없는 접기 3곳**(Ctrl+F·스크린리더 브라우즈·인쇄가 놓친다): `pages/GuruDetail.jsx`의 `expanded ? listRows : listRows.slice(0, DEFAULT_ROWS)`(21번째 이후 보유종목이 DOM에 없음), `pages/Recommendations.jsx::ExpandableGrid`의 `items.slice(0, count)`, `pages/AnalystReport.jsx::ConsensusSection`의 `brokerages.slice(0, 10)`. 저장소는 이미 반대로 판정한 바 있다 — `components/tech/ProseSections.jsx`의 주석: *"접기는 네이티브 `<details>`/`<summary>`다 — JS 상태 0, 키보드·스크린리더·Ctrl+F 검색이 전부 공짜"*.
+
+**MED — 복구 수단 없는 한국어 절단**: `overflow:hidden; textOverflow:ellipsis; whiteSpace:nowrap`을 한국어 종목명에 걸면서 **`title` 속성이 없어** 전체 문자열에 어떤 경로로도 닿을 수 없다 — `pages/GuruDetail.jsx`(보유 행·전량매도 칩), `pages/Ranking.jsx` 데스크톱 분기(모바일 분기는 `WebkitLineClamp: 2`로 올바르다), `components/StockSearchBox.jsx`(이름이 유사 티커 간 주 판별자인 자리). `pages/GuruAllocation.jsx`가 올바른 대조군이다(수치를 별도 `<span>`으로 분리).
+
+**MED — `guru-badge`가 클릭 전용이고 `role="button"` 안에 중첩**: `pages/GuruManagers.jsx`의 `<span onClick={…}>`에 `role`·`tabIndex`·`onKeyDown`이 없어 키보드·스위치 사용자가 토글할 수 없고, 그 span이 카드 `<div role="button" tabIndex={0}>` 안에 있어 인터랙티브 중첩이다. `GuruStats.jsx::WatchlistBtn`이 저장소 표준(진짜 `<button>`)이며 이 두 블록만 이례다.
+
+### 7.11 거대 컴포넌트 — **잠재 위험**(낮음)
+
+`components/reports/DetailTab.jsx`(690줄)·`pages/Ranking.jsx`(550)·`pages/AnalystReport.jsx`(547)·`components/reports/Sections.jsx`(516)·`ConsensusChart.jsx`(447)·`FinancialsChart.jsx`(434).
 
 ---
 
 ## 8. 캐시·무효화
 
-### 8.1 인메모리 캐시가 스레드 안전하지 않다 — **잠재 위험**
-- `services/cache.py:6-29` `TTLCache`가 락 없는 평문 dict다. FastAPI 스레드풀 + APScheduler 워커 + 대시보드 ThreadPool이 동시에 접근한다.
-  - `:19-20` — 다른 스레드가 삽입하는 동안 `self._store.items()`를 컴프리헨션으로 순회하면 `RuntimeError: dictionary changed size during iteration`.
-  - `:14-22` — check-then-act이라 동시 미스에서 `loader()`가 중복 실행된다(thundering herd; 콜드 대시보드/랭킹처럼 비싼 로더에서 실질 비용).
-- `services/market_indicators/cache.py:15,27-29` `_set_cache`도 같은 형태(`_cache.items()` 순회 중 삭제).
-- `services/cache.py:32,52-55` `_snapshots` OrderedDict도 락 없음(삭제 목록을 먼저 리스트화해 순회 중 변경은 피했으나 동시 `del`은 KeyError 가능).
-- **참조 정답이 같은 리포지토리에 있다**: `services/progress.py`의 `ProgressTracker`는 전 메서드를 `threading.Lock`으로 감싼다.
+### 8.1 인메모리 캐시 6종 — **잠재 위험**(스레드 안전성)
 
-### 8.2 무효화 대칭성 — **잠재 위험**(낮음, 현재 도달 안 함)
-- `services/cache.py:52-61` `invalidate(ticker)`는 list·dashboard·correlation·sector·macro·live_prices 6종을 지우지만 **rebalance·exposure는 안 지운다**. `:156-166` `invalidate_portfolio_caches`는 지운다.
-- 실제 호출 패턴상 문제되지 않는다 — `invalidate(ticker)`는 스냅샷 변경(`routers/portfolio.py:24,34`, `report.py:81,131,561`, `storage/names.py:14`)에만 쓰이고 보유 구성 변경은 전부 `invalidate_portfolio_caches`를 쓴다. rebalance/exposure는 스냅샷이 아니라 보유+라이브 시세 의존이라 누락이 무해하다.
-- 다만 **비대칭 자체가 함정**이다 — 새 캐시를 추가할 때 어느 쪽에 넣을지의 근거가 코드에 없다.
+`services/cache.py`: snapshot(LRU 200)·list(TTL 5s)·dashboard(300s)·correlation(300s)·sector(300s)·macro(300s). 종목 추가·수정·삭제 시 dashboard·correlation·sector·macro가 자동 무효화된다. 이 dict들이 ThreadPool 워커(§4.2의 8~20 워커)에서 동시 접근되지만 락이 없다 — CPython GIL 덕에 개별 dict 연산은 원자적이라 실사고는 관측되지 않았다.
 
-### 8.3 캐시 실측값 — **문서 드리프트**(코드는 정상)
-`CLAUDE.md`는 "snapshot LRU 200, list TTL 5s, 6종"이라고 적었으나 실제(`services/cache.py`)는 **9종**이고 값도 다르다. (`TTLCache` 기본 `maxsize=200`(`:7`)이 "LRU 200"의 출처로 보인다.)
+### 8.2 `market_cache` 신선도 — §6.3·§6.4 참조
 
-| 캐시 | 실제 | 위치 |
-|---|---|---|
-| snapshot LRU | **50** (200 아님) | `:36` `_MAX = 50` |
-| list | **60.0s** (5s 아님) | `:33` |
-| dashboard / correlation / sector / macro | 300.0s | `:34,35,88,89` |
-| quote | 60.0s | `:110` |
-| live_prices | 15.0s | `:124` |
-| rebalance / exposure | 300.0s | `:136,137` |
+키별 경계와 `fx`의 무배치 문제는 배치 절에 모았다(작성자가 스케줄러이므로).
+
+### 8.3 캐시 무효화 대칭성 — **이미 가드됨**
+
+캘린더는 종목 추가·삭제·승격 시 `invalidate_portfolio_caches(user_id)` → `calendar.clear_cache(user_id)`로 DB 행까지 지운다(과거 파일만 지워 DB가 stale이던 문제는 닫혔다).
 
 ---
 
 ## 9. 테스트·검증 게이트의 사각
 
-현재 규모: 백엔드 **131파일 / 22,736줄**, 프론트 **30파일 / 3,444줄**.
+**규모**: 백엔드 테스트 141개 파일, 프론트 63개.
 
-### 9.1 실 DB 차단 — **이미 가드됨(잔여 위험만)**
-- `backend/tests/conftest.py:26-37` `_block_real_db`가 `db_svc._get_pool`을 patch한다. 이게 `get_connection`/`query`/`execute`/`execute_many`의 **단일 초크포인트**라 **read·write 양쪽**을 덮고, `_pool`이 이미 채워져 있어도 작동한다. task#169(로컬 pytest가 prod `snapshots`를 fixture 값으로 덮고 prod `calendar_cache`를 전삭제)의 해법.
-- **잔여 A — 로컬 `.env`가 여전히 prod를 가리킨다**: `backend/.env`의 `DATABASE_URL`이 `@localhost:5432`(= 라이브 Docker Postgres, `docker-compose.yml:10-11`이 호스트 발행). pytest는 가드되지만 **ad-hoc 스크립트·`python -c`는 무가드로 프로덕션에 쓴다.** 근본은 열려 있다.
-- **잔여 B — `backend/run_backfill.py:139`가 `psycopg2.connect(DB_DSN)`으로 `services.db`를 통째 우회한다** → `_block_real_db`가 볼 수 없다. 현재 테스트가 그 함수를 타지는 않으나 무가드 라이브 DB 경로다.
-- **잔여 C — 네트워크 격리 없음**: conftest에 `requests`/`httpx`/`socket` 차단이 없다. 외부 호출 모킹을 잊은 테스트는 **실제 yfinance/DART/Naver**를 때린다(flaky·레이트리밋·느림).
-- **잔여 D — 전역 auth override 누출**: `conftest.py:10`이 **모듈 임포트 시점에** `app.dependency_overrides[get_current_user]`를 걸고 되돌리지 않는다. 그래서 `main.app`을 쓰는 어떤 테스트도 401 동작을 검증할 수 없고, 무인증 거부 검증은 override 없는 fresh app이 필요하다(`tests/test_security_auth_gaps.py` 패턴).
-- **잔여 E — tracked 파일 write 경로가 하나 남아 있다**: `services/digest_service.py:163-164`가 `DIGEST_DIR / f"{user_id}-{date}.json"`을 쓰고 `DIGEST_DIR = backend/data/digest`(`:37`)는 **gitignore 대상이 아니며 tracked 파일 `backend/data/digest/2026-05-24.json`을 담고 있다**(`git ls-files backend/data/`가 이 파일 + 두 시드 티커 JSON만 반환). 이건 DB 실패 *폴백* 경로이고 `_block_real_db`가 `execute`를 raise시키므로 **테스트가 정확히 그 경로를 탄다.** 지금 안전한 유일한 이유는 각 테스트가 `patch.object(ds, "DIGEST_DIR", tmp_path)`를 기억하기 때문이다(`test_digest_service.py:41`, `test_disclosure_endpoint_digest.py:89`) — autouse 가드가 아니라 **관례**다.
-- **task#234로 닫힌 것**: `backend/data/sp500_tickers.json`·`kospi_tickers.json` 오염. `services/market_indicators/earnings.py:25-31`이 시드를 **read-only**로 격하하고(`_SP500_SEED`) 7일 캐시를 `market_cache`(`_SP500_KEY`)로 옮겼으며, 신선도 판정을 파일 mtime이 아니라 `fetched_at`으로 바꿨다(`:61-76`). `services/recommendation/universe.py:39`는 read만 한다. 나머지 백엔드 파일 write는 `exports.py:129`(gitignore)·`report_generator.py`(`backend/snapshots/`, gitignore)뿐이다.
-- **습관 유지**: 전체 스위트 실행 후 `git status`로 부수효과를 확인할 것.
+### 9.1 실 DB 차단 — **이미 가드됨(잔여만)**
 
-### 9.2 프론트 테스트 하니스에 폴리필이 없다 — **확인된 버그** (B23)
-- `frontend/vite.config.js:94-98`의 `test` 설정은 3키(`:95` jsdom·`:96` globals·`:97` setupFiles)뿐이고 `coverage`도 `restoreMocks`도 없다. **`frontend/src/test/setup.js`는 한 줄**(`import '@testing-library/jest-dom'`)로 **폴리필이 0개**다.
-- jsdom 29에는 `matchMedia`·`ResizeObserver`·`IntersectionObserver`가 없다. 따라서 아래가 마운트에서 throw한다:
-  - `hooks/useIsMobile.js:6` bare `window.matchMedia` — **39 호출처 / 20 파일**
-  - `hooks/useCountUp.js:16`, `hooks/useReveal.js:12,17`
-  - `pages/Ranking.jsx:144`, `components/PermissionManager.jsx:45` (`new IntersectionObserver`)
-- **결과: `pages/Portfolio.jsx`(자산·손익 화면)를 오늘 아예 마운트할 수 없다.** **6개** 테스트 파일이 `useIsMobile`을 손으로 모킹해 우회한다(`GuruDetail.test.jsx:11`, `GuruManagers.test.jsx:11`, `GuruAllocation.test.jsx:7`, `reports-deep-link-navkey.test.jsx:9`, `back-to-login-guard.test.jsx:14`, `nav-active-matching.test.jsx:13`) — 우회 사본이 4개→6개로 **늘고 있다**. setup.js에 3줄이면 ~40개 파일이 열린다.
-- `package.json`에 coverage 도구가 없어 **커버리지 측정 자체가 불가능**하다.
+`tests/conftest.py`의 autouse `_block_real_db`가 `db_svc._get_pool`을 raise로 교체한다. 기원은 주석에 있다 — 라이브 DB `generate_report` 테스트가 실 `005930` 스냅샷을 덮은 사고.
 
-### 9.3 recharts는 jsdom에서 **SVG 자체가 없다** — **설계상 트레이드오프**(기계적 확인)
-- `ResponsiveContainer`가 `ResizeObserver` 부재 시 조기 return → 치수가 `{-1,-1}` → 루트가 `null` 반환. **`<svg class="recharts-surface">`가 통째로 없다** — 축·틱·막대·파이 조각·라벨 전부. `ResizeObserver`만 스텁해도 안 된다(`getBoundingClientRect()`를 읽고 jsdom은 전부 0).
-- **27개 파일이 recharts를 import하는데 3개만 테스트가 있고** 어느 것도 차트 내부를 단언하지 않는다 — 의도적으로 주변만 본다: `AnalystReport.test.jsx:60`은 손으로 만든 HTML 범례를 단언, `GuruDetail.test.jsx:204-205`는 조각이 렌더되지 않는다고 주석하고 HTML 오버레이 + `fitsSliceLabel`을 순수함수로 단언, `KeyResourceChart.test.js`는 렌더를 안 한다. 전 테스트에서 `recharts-`·`querySelector('svg')`·`tspan` 검색 결과 **0건**.
-- 따라서 라벨 겹침·정렬 같은 시각 속성은 **라이브 Playwright + `getBoundingClientRect()`**가 유일한 게이트다. 그 프로브 자체의 함정(기준 상자도 실측 대상 / 판정 축 누락 / `text-overflow: ellipsis`는 overflow 검사에 원리적으로 안 잡혀 `scrollWidth > clientWidth`가 별도 축으로 필요 / flex 압축은 `Range.getClientRects().length`로 재야 함 / 요소 *간* 간격은 넘침·잘림·접힘 어느 축에도 안 잡힘 / 적용 안 된 스타일은 `getComputedStyle`만 잡음 / 커버리지 카운터 없는 `ALL PASS`는 무의미 / 조건부 단언은 무음 스킵 장치 / 시각 변경은 프로브 통과 후에도 스크린샷 육안 확인 필요)은 `CLAUDE.md`에 상세히 축적돼 있다.
-- 관련 사각: `getComputedStyle`·`getBoundingClientRect`·`scrollWidth`/`clientWidth`가 프론트 테스트 3,444줄에서 **0회** 등장하고, 23개 CSS 파일이 어떤 테스트에도 참조되지 않는다.
+**잔여(LOW-MED)**: 가드가 **DSN이 아니라 초크포인트를 막는다**. `backend/run_backfill.py`의 `psycopg2.connect(DB_DSN)`은 `_get_pool`을 거치지 않아 원리적으로 우회다(현재 그 경로를 부르는 테스트는 없다). 또 테스트가 autouse 이후 `_get_pool`을 되돌리는 것을 막는 장치는 없다. 완화: `pytest.ini`의 `testpaths = tests`가 `backend/scripts/`·`run_backfill.py` 수집을 막는다.
 
-### 9.4 테스트 없는 핵심 파일
-**여전히 무테스트(현재 줄수 기준)**: `DetailTab.jsx`(690) · `Ranking.jsx`(527) · `Sections.jsx`(516 — `Sections.test.jsx`가 3섹션만 import, **부분**) · `ConsensusChart.jsx`(447) · `FinancialsChart.jsx`(434) · `PermissionManager.jsx`(351) · `ReportManualGen.jsx`(346) · **`Analytics.jsx`(312)** · **`Portfolio.jsx`(294 — `:115-121`에 클라이언트 자산 계산)** · `Calendar.jsx`(267) · `Digest.jsx`(261) · **`ReportDetailTabs.jsx`(229)** · `StockModal.jsx`(197) · **`KospiSignalSection.jsx`(197)** · **`BatchScheduleEditor.jsx`(196)** · **`StockCard.jsx`(190)** · `BacklogChart.jsx`(185) · **`DashboardCard.jsx`(170 — `:40-41`에 손익)** · **`AuthContext.jsx`(39)** · **`ui/Badge.jsx`(44 — task#194에서 깨진 up/down 매핑)**.
-- **해소/부분 해소**: `api.js`(28, 응답 인터셉터만) · `LoginPage.jsx`(167) · `Settings.jsx`(301, `ManualRunButton`만 — **부분**).
-- 편중이 심하다 — GuruDetail(471) + GuruAllocation(373) + GuruManagers(219) + GuruStats(97) + AnalystReport(236) = 1,396줄 = 전체의 **40.5%**(지난 판 48%에서 완화)이고 전부 task#226~#255 산물이다.
-- 에러 분기: 128개 catch 중 ~12개(**~11%**)만 테스트된다. "실패가 빈 상태로 위장하지 않는다" 불변식은 정확히 2페이지에서만 단언된다(`GuruStats.test.jsx:65-73`, `GuruAllocation.test.jsx:124-132`).
+**파일시스템·네트워크는 클린(확인)**: 파일을 쓰는 테스트는 전부 `tmp_path` + 대상 상수 patch를 쓴다(`test_digest_service.py`의 `patch.object(ds, "DIGEST_DIR", tmp_path)` 등) — **tracked 경로에 쓰는 테스트 0건**. `backend/tests/` 어느 파일도 최상위 `import requests`/`import yfinance`를 하지 않으며, mock이 전혀 없는 21개 파일은 전부 순수 함수·메타 테스트라 소켓을 열지 않는다.
 
-### 9.5 존재하는 자동 게이트 (재발 방지 자산)
-| 게이트 | 무엇을 막는가 |
+### 9.2 recharts는 jsdom에서 SVG 자체가 없다 — **설계상 트레이드오프**
+
+> `scripts/uat271-formatter.mjs`가 이 항목을 `CONCERNS §9.3`으로 인용한다 — 하위번호 유지.
+
+`ResponsiveContainer`가 jsdom에서 0크기라 축·틱·마커·막대가 전혀 렌더되지 않는다. vitest에서는 범례 텍스트·캡션·데이터 유무 분기·표 부재만 단언 가능하고, 라벨 겹침·정렬 같은 시각 속성은 **라이브 Playwright의 `getBoundingClientRect()`**가 유일한 관측 수단이다.
+
+### 9.3 존재하는 자동 게이트(재발 방지 자산)
+
+| 게이트 | 무엇을 막나 |
 |---|---|
-| `tests/test_no_print.py` | 앱 코드의 신규 `print(` (CONVENTIONS §4) |
-| `tests/test_no_bare_today.py` | bare `date.today()`/`datetime.today()` — 단 `now()`/`utcnow()`는 못 본다(§6.5) |
-| `tests/test_no_public_reads.py` + `tests/_routes.py` | 무인증 `/api` 신설(ADR-0029), FastAPI 버전 발산 내성 |
-| `tests/test_api_doc_sync.py` | 엔드포인트 *존재* drift (`:50` `KNOWN_UNDOCUMENTED = frozenset()` — 베이스라인 0) |
-| `tests/test_nan_serialization_guards.py` | NaN이 응답에 새어 500 |
-| `tests/test_empty_result_overwrite_guards.py`, `test_empty_result_guards_exports_krsector.py`, `test_rankings_empty_guard.py`, `test_us_supply_empty_guard.py` | 빈 결과 덮어쓰기 (all-empty만, KR 랭킹 제외) |
-| `tests/test_public_api_empty_items.py` | 공공데이터포털 빈응답 AttributeError |
-| `tests/test_security_auth_gaps.py` | 무인증 mutation + refresh 일회용 |
-| `tests/test_cowork_fire_listener.py` | fire workdir 격리·키 stdin 전달 (task#254) |
-| `tests/test_report_valuation_multiples.py` | 피어 멀티플 가드 기준 표본(ADR-0030) |
-| `frontend/src/test/nav-active-matching.test.jsx` | nav 3소비처 × 목록·상세 active 판정 (task#251) |
-| `frontend/src/utils/oauthHistory.test.js`, `test/auth-bootstrap.test.jsx`, `test/back-to-login-guard.test.jsx` | OAuth 되감기·세션 부트스트랩 분기 (task#252·253) |
+| `tests/test_no_public_reads.py` | 무인증 라우트 신설·stale allowlist **양방향** + route walk가 0건이 되는 거짓 통과 |
+| `tests/test_security_auth_gaps.py` | override 없는 fresh app으로 실제 401(API 키 positive/negative 포함) |
+| `tests/test_api_doc_sync.py` | 라이브 `app.routes` ↔ `API_SPEC.md`/`CLAUDE_COWORK_API.md`의 엔드포인트 **존재** |
+| `tests/test_no_print.py` | 앱 코드의 `print()` |
+| `tests/test_no_bare_today.py` | bare `date.today()` (⚠️ `datetime.now()`는 못 잡는다 — §6.8) |
+| `conftest._block_real_db` | 테스트의 prod DB 오염 |
 
-### 9.6 게이트가 **못** 보는 것
-- `app_schema.sql` ↔ `main._migrate` **컬럼/테이블 짝**(§4.1) — 문서 DoD만 존재. `app_schema` 문자열을 참조하는 테스트 0개.
-- naive `datetime.now()`/`utcnow()`의 KST 오판(§6.5) — AST 술어가 `today`만 매칭.
-- 요청/응답 **스키마**와 **인증 게이팅 산문**의 문서 동기 — `test_api_doc_sync.py`는 존재만 본다(prose 미파싱). **현재 `API_SPEC.md`의 `**Auth:** 불필요`는 1곳이고 그건 정당한 `GET /api/auth/oauth/token`이며 `CLAUDE_COWORK_API.md`엔 0곳이다** — 3부작이 남긴 8곳 오표기는 청소됐다. 다만 게이트가 없으므로 **인증 게이팅을 바꾸는 작업은 착수 시 `grep -n '\*\*Auth:\*\* 불필요' API_SPEC.md`를 직접 돌릴 것.**
-- **per-key/per-item** 빈 결과(§1.3) — 회귀 테스트가 all-empty만 단언.
-- Naver 재무 **행 위치** 계약(§2.1) — fixture가 같은 순서라 라이브 재배열에 green.
-- 퍼센트 **스케일**(§2.6, §7.3) — 렌더 %를 단언하는 테스트가 없다.
-- 프론트 **이벤트명 ↔ 백엔드 `VALID_EVENTS`**(§7.5) — 대조하는 테스트가 없고, 탈락은 200 OK로 무음이다.
-- `ui/Stat` 같은 **접미사 조립 클래스의 허용값**(§7.12) — vitest·jsdom·빌드 전부 블라인드.
-- 레이아웃·색 의미·`ellipsis` 잘림·flex 압축·요소 간 간격(§9.3) — jsdom 블라인드.
-- 외부 소스 **라벨** 정합 — mock 응답이 라벨 불일치를 못 잡는다(yfinance `get_income_stmt()` 메서드의 무공백 라벨 vs `.income_stmt` 프로퍼티의 공백 라벨이 대표 예. `_yf_val`(`market/format.py:61-65`)은 exact 매칭이라 어긋나면 조용히 None). **외부소스 파싱 슬라이스는 라이브 1종목 추출 대조를 DoD에 넣을 것.**
-- SQL 신규/개작 — query-mock 테스트가 라이브 정합(`uuid = text`, `VALUES` 형태)을 못 잡는다. 배포 후 **라이브 스모크**가 필요.
-- eslint: `eslint.config.js:11-15`가 `js.recommended` + `reactHooks.flat.recommended` + `reactRefresh.vite`만 확장하고 **`rules:` override가 없다** → `no-console` **off**, `react-hooks/exhaustive-deps` **warn**(비차단). `npm run lint`가 어떤 CI 게이트에도 없다.
+### 9.4 정확한 개수 단언이 다음 배치 추가에서 깨진다 — **확인된 버그**(개발 마찰)
 
-### 9.7 무의미한 테스트 + 미선언 의존성 — **확인된 버그**(테스트 품질)
-- `backend/tests/test_auth.py:20-36`의 세 테스트는 **PyJWT 라이브러리 자체만** 검증한다. `get_current_user`를 호출하지 않고, 죽은 `SUPABASE_JWT_SECRET`(`:22`)을 세팅하며, 앱이 쓰는 `python-jose`(`requirements.txt:15`)가 아니라 `jwt`(PyJWT)를 임포트한다(`:3`). 인증 커버리지에 대한 거짓 신뢰를 준다.
-- **PyJWT는 `requirements.txt`에 없다** — 로컬 `.venv`에만 있어 Docker 이미지에서는 `ModuleNotFoundError`가 난다. `lxml`(요구사항엔 있고 로컬엔 없음)의 **거울상**이다. 실무 영향은 제한적 — `backend/.dockerignore:9`가 `tests/`를 이미지에서 제외한다.
+`batch_registry.BATCHES`에 **항목 하나를 더하면 3개 파일의 단언 3건이 동시에 깨진다**:
 
-### 9.8 admin 표면은 원리적으로 라이브 UAT 불가 — **설계상 트레이드오프**
-- 라이브 UAT 계정은 비-admin이라 admin 화면과 `require_admin` 엔드포인트를 Playwright로 열 수 없다. `require_admin`은 API 키를 **거부**하는 설계이므로 키로 우회할 수도 없다(`backend/auth.py:61-65`).
-- 계획 단계에서 넷 중 하나를 골라 DoD에 적어야 한다: 게이트를 `require_admin_or_api_key`로 열어 키로 positive 검증 / vitest + 기능경로 API로 닫고 버튼 렌더는 사용자 화면 확인으로 이월 / admin 크레덴셜 수령 / **in-container 자체 호출**(컨테이너가 자기 env의 키로 `127.0.0.1:8000`을 때려 시크릿을 세션에 노출하지 않는다 — 무쓰기 게이트와 짝지을 것). task#214·215·222·224에서 4회 반복됐다.
+- `tests/test_batch_market_split.py` — `assert len(batch_registry.BATCHES) == 29`
+- `tests/test_macro_signals_batch.py` — `assert len(batch_registry.BATCHES) == 29`
+- `tests/test_batches_router.py` — `assert len(data) == 29` **그리고** `assert {b["id"] for b in data} == EXPECTED_IDS`(29원소 하드코딩 집합)
 
-### 9.9 리뷰 자체를 게이트로 삼지 말 것 — **프로세스 위험**
-- 적대적 리뷰가 6렌즈·effort high로 **0건**을 반환한 변경에서 워크플로우의 **계획 범위 임의 축소**(DoD 목적 미달)를 놓쳤고 메인 세션의 표적 검증이 잡았다. CSS 이전·토큰 제거·범위 축소가 섞인 변경은 리뷰와 **별개로** 표적 검증을 돌릴 것.
-- 구현자의 "비용 우려로 인한 범위 축소"는 추정이 아니라 **실측**으로 검증할 것. 축소 여부는 슬라이스 문구가 아니라 **DoD의 목적**으로 판정해야 "형식상 통과·목적 미달"을 잡는다.
-- 폴백 경로만 UAT하고 실데이터 경로를 이월하면, 두 경로의 **필드 집합 차이**가 결함을 숨긴다.
-- **셀프 리뷰가 자진 기록한 한계를 "후속 후보"로 강등하지 말 것** — task#248이 "peer 3개면 정상 행까지 결측된다… 실측은 peer 4개라 해당 없음"으로 미뤘고 4일 뒤 사용자가 경쟁사를 하나 빼자 정확히 그 케이스가 라이브에서 발동했다(task#249, ADR-0030). 트리거가 **사용자가 바꿀 수 있는 데이터**면 "실측엔 해당 없음"은 면제 근거가 아니다.
+그 테스트 함수 이름이 아직 `test_lists_sixteen_batches_with_required_fields`인 채 29를 단언한다 — 이름이 배치 13개만큼 뒤처져 있고, **이 함정이 이미 반복적으로 발동했다는 직접 증거**다. 주의: `EXPECTED_IDS`엔 `consensus`가 들어 있는데 이는 `_JOB_FUNCS`(28개)엔 없다(§6.9) — 둘을 순진하게 동기화하는 수정은 실패한다.
 
-### 9.10 프로브 자산 자체가 부채 — **잠재 위험**(낮음)
-- `scripts/`에 tracked 23개(그중 `uat*.mjs` 13개 + `probe*.py` 2개), untracked **97개**. UAT 프로브는 성격상 일회성인데 회귀 게이트로 재사용되는 것(`uat247-guru-cohort.mjs`·`uat-guru-row-ux.mjs`·`uat255-guru-alloc-perf.mjs`)과 그렇지 않은 것이 파일명으로 구별되지 않고, 어떤 CI에도 연결돼 있지 않다 — **재실행 책임이 사람 기억에 있다.**
-- 성능 프로브는 리터럴 임계값을 봉인하지 않는다(머신·부하 의존, 파일 상단 주석) → "회귀 게이트가 아니다"가 문서에만 있다.
-- B26(테스트 계정 크리덴셜 하드코딩)이 이 자산 전반에 걸쳐 있다(§5.13).
+### 9.5 게이트가 **못** 보는 것
+
+- **레이아웃 수치·잘림·접힘·요소 간 간격·색 적용** — jsdom에 레이아웃이 없다. 라이브 프로브가 유일한 게이트다.
+- **응답 스키마·인증 산문 드리프트** — `test_api_doc_sync.py`는 엔드포인트 *존재*만 본다.
+- **줄번호 참조 드리프트** — 아무도 단언하지 않는다(§12.6).
+- **판정축을 바꿔 통과하면서 거짓이 된 주석·docstring** — 스위트가 원리적으로 초록이다.
+- **bfcache 복원** — Playwright 3엔진 전부 `pageshow.persisted`를 못 만든다(대조군으로 확정). chromium은 CDP로 물으면 `BackForwardCacheDisabledForDelegate`를 답한다 — 플래그 제거로 뚫리지 않는다.
+
+### 9.6 admin 표면은 라이브 UAT가 원리적으로 불가 — **설계상 트레이드오프**
+
+라이브 UAT 계정이 비admin이라 admin 화면·`require_admin` 엔드포인트를 Playwright로 열 수 없다. 대안 4축(게이트를 `require_admin_or_api_key`로 열기 / vitest+기능경로로 닫고 버튼 렌더는 이월 / admin 크레덴셜 수령 / **in-container 자체 호출**)을 착수 전에 골라야 한다.
+
+### 9.7 프로브 자산 자체가 부채 — **잠재 위험**(낮음)
+
+`scripts/`에 143개 항목이 쌓였고 루트에 `screenshots-uat*` 디렉터리가 90여 개 있다(전부 untracked). 어느 프로브가 현재 계약을 단언하고 어느 것이 스테일인지 구분하는 인덱스가 없다.
 
 ---
 
 ## 10. 배포·인프라·운영
 
-### 10.1 자동배포 폴러가 작업 체크아웃을 hard reset한다 — **설계상 트레이드오프**(운영 위험 큼)
-- `scripts/auto-deploy-poll.sh:24-36`: `LOCAL != REMOTE`면 방향 무관하게 `git reset --hard origin/main`(`:35`) 후 `deploy.sh`(`:36`). launchd로 2분마다.
-- `.github/workflows/deploy.yml:15`도 같은 디렉터리에서 `git reset --hard origin/main`을 한다. **개발자·에이전트가 작업하는 그 체크아웃이 배포 대상**이다.
-- 결과: 커밋 안 한 tracked 편집과 **push 안 한 로컬 커밋**이 ≤2분 안에 사라진다. `.forge/` 등 untracked는 안전.
-- **판정 함정**: `commit && push`를 한 체인으로 묶어도 그 사이 폴이 끼면 폴러가 앞서 fetch해 둔 낡은 `origin/main`으로 reset해 순간적으로 되돌아간 것처럼 보인다. 실제로는 push가 성공했고 다음 폴이 자가복구한다(reflog에 `commit → reset → reset`). 판정은 **`git rev-parse HEAD` vs `origin/main` + `gh run list`**로 할 것 — `git log -1`로 판정해 2연속 오판한 이력이 있다(task#238·#239).
-- **파생 규칙**: 프론트 라이브 UAT를 포함하는 계획은 **commit+push → build → 프로브** 순서여야 한다. nginx가 `frontend/dist`를 직접 서빙하므로 빌드 전 프로브는 옛 번들을 재고(task#253 D1), commit+push를 build보다 먼저 묶어야 폴러 reset 창이 줄어든다.
-- 락 경합: `deploy.sh:6-8`(check)과 `:32`(`touch`)가 TOCTOU이고 폴러(`:14-17`)도 같은 `/tmp/portfolion-deploy.lock`을 본다. `deploy.sh`는 락이 있으면 `exit 1`(Actions 잡 실패), 폴러는 `exit 0`.
+### 10.1 두 개의 비동기화된 `git reset --hard origin/main` — **설계상 트레이드오프**(운영 위험 큼)
 
-### 10.2 Postgres가 tracked 폴백 비밀번호로 호스트에 발행돼 있다 — **확인된 버그** (B21)
-- `docker-compose.yml:9`이 `POSTGRES_PASSWORD`에 **소스에 적힌 폴백 기본값**을 쓰고(값은 이 문서에 인용하지 않음) `:10-11`이 `5432:5432`를 발행한다.
-- **루트 `.env`에 `POSTGRES_PASSWORD` 키가 없다**(현재 정의된 건 `FRED_API_KEY`·`KITA_API_KEY` 둘뿐) → tracked 소스의 폴백이 **실제로 유효**하다.
-- Docker는 `0.0.0.0`에 발행하고 macOS 애플리케이션 방화벽을 우회한다. §5.7 잔여 A(평문 refresh 토큰)와 §9.1 잔여 A(로컬 스크립트가 prod에 쓰기)가 여기에 겹친다.
-- 권장: `127.0.0.1:5432:5432` + 폴백 기본값 제거 + 루트 `.env`에 강한 값 정의.
+- `scripts/auto-deploy-poll.sh` — launchd 2분 주기
+- `.github/workflows/deploy.yml` — self-hosted 러너
 
-### 10.3 `docker-compose.yml`과 `deploy.sh`가 갈라졌다 — **잠재 위험**
-- compose는 `backend`·`nginx` 서비스를 정의하지만 실제 배포는 `deploy.sh`가 `docker run`으로 컨테이너를 직접 만든다(`portfolion-backend-1`/`portfolion-nginx-1`, 네트워크 `portfolion_default`).
-- 차이: compose의 nginx는 `./certbot/conf`·`./certbot/www`를 마운트하지만(`docker-compose.yml:39-40`) `deploy.sh:50-53`의 nginx run은 **안 한다**(`nginx.conf` + `dist`만). `docker compose up`으로 올린 컨테이너와 `deploy.sh` 산출물이 다르고, `/.well-known/acme-challenge/`(`nginx.conf:12-14`)가 후자에서 동작하지 않는다.
-- 참고: 백엔드는 `docker run`이라 `docker compose ps`에 안 잡힌다 — 컨테이너 uptime 확인은 `docker ps`로.
+**둘 다 개발자의 라이브 작업 디렉터리에서 돈다**(이 감사가 도는 바로 그 경로). `/tmp/portfolion-deploy.lock`은 *동시 배포*는 막지만 작업트리를 보호하지 않는다 — 폴러는 lock 이후에 reset하는 반면 **Actions 워크플로우는 lock을 아예 확인하지 않고** `deploy.sh` 호출 전에 reset한다.
 
-### 10.4 TLS 설정이 죽은 채 남아 있다 — **잠재 위험**(오판 유발)
-- `nginx/nginx.conf:58-78`의 `listen 443 ssl` 서버 블록이 **전부 주석**이다. 외부 HTTPS는 Cloudflare Tunnel 엣지 종단(→ `localhost:80`)이 담당한다.
-- 그런데 `docker-compose.yml:33-35`와 `deploy.sh:53`은 여전히 **443을 발행**하고(리스너 없음), `certbot` 컨테이너(`docker-compose.yml:45-50`)는 **아무도 안 쓰는 인증서를 12시간마다 갱신**한다. "TLS가 어디서 끝나는가"를 오판하게 만드는 죽은 설정.
+부수: 락이 PID도 staleness 검사도 없는 bare `/tmp` 파일이라 **크래시한 배포가 락을 남기면 이후 모든 배포가 영구 정지**한다(`deploy.sh`는 `exit 1`, 폴러는 `exit 0`).
 
-### 10.5 배포 검증이 비차단이고 롤백이 없다 — **잠재 위험**
-- `deploy.sh`는 `set -e`지만 마지막 헬스체크(`:63`)가 `curl … && echo OK || echo WARNING`이라 **실패해도 스크립트가 성공(exit 0)**한다. 깨진 배포가 초록으로 끝난다. 롤백 경로 없음.
-- `deploy.sh:25`가 `npm install`(not `npm ci`)을 쓴다 — `frontend/package-lock.json`이 있는데도 재현 불가한 설치.
-- 프론트는 nginx가 `frontend/dist`(gitignore)를 직접 볼륨 마운트하므로 로컬 `npm run build`가 **즉시 라이브**다. 반면 **백엔드 변경은 폴러/러너 재배포 후에야 라이브** — 프론트만 먼저 빌드하면 백엔드 의존 기능이 미동작한다.
-- 배포 직후 라이브 스모크는 포트 바인딩을 폴링한 뒤 실행할 것(§6.4).
-- ⚠️ 지난 판의 "`.dockerignore`가 없어 `.venv`가 빌드 컨텍스트로 간다"는 **사실이 아니었다** — `backend/.dockerignore`는 2026-05-30부터 tracked이고 `.venv`(`:3`)·`.env`(`:4`)·`tests/`(`:9`)를 제외한다. 이 주장은 폐기.
+### 10.2 컨테이너가 compose 밖에서 돈다 — **잠재 위험**
 
-### 10.6 self-hosted 러너 = 호스트 RCE — **설계상 트레이드오프**(가드가 미문서)
-- `.github/workflows/deploy.yml:9`이 `runs-on: self-hosted`로 개인 Mac에서 `git reset --hard` + `bash deploy.sh`를 실행한다. `main` push 권한 ⇒ 호스트 코드 실행.
-- 현재 방어는 트리거가 `:3-5` `on: push: branches: [main]`뿐이라는 것(fork PR은 트리거 못 함). **이 워크플로우에 `pull_request` 트리거를 추가하면 임의 fork 작성자가 Mac에서 코드를 실행하게 된다** — 파일에 그 경고가 없다.
-- 러너 격리 실사고: PortfoliOn 전용 러너 디렉터리(`~/actions-runner-portfolion`)가 타 프로젝트 세팅에 재등록돼 5일간 무음 미배포. **백엔드가 옛 코드로 보이면 폴러 footgun 단정 전에 러너부터** 확인: `gh run list`(잡이 `queued`/`cancelled(24h)`면 러너 부재) + `gh api repos/calmonion7/PortfoliOn/actions/runners`.
+`deploy.sh`는 `docker compose`를 전혀 쓰지 않고 `portfolion-backend-1`·`portfolion-nginx-1`을 손으로 `docker run`한다 — **compose가 생성할 이름과 정확히 같다**(프로젝트 `portfolion` + 서비스 `backend`). 결과:
 
-### 10.7 의존성 버전이 고정되지 않았다 — **잠재 위험**
-- `backend/requirements.txt` 18개 항목 중 17개가 `>=`이고 **`:18` `python-dotenv`는 버전 지정자가 아예 없다**. lockfile도 없다. 이 코드베이스는 **yfinance의 정확한 index 라벨과 FastAPI의 라우트 트리 구조에 의존**한다.
-- 이미 실측된 발산: `backend/tests/_routes.py` docstring — "로컬 `.venv`(0.128.x)는 `app.routes`에 평탄하게 들어오지만 배포 이미지(0.138+)는 `_IncludedRouter`로 감싸 `original_router`만 준다 … `requirements.txt`가 핀 없는 `fastapi>=0.104.0`이라 이 발산은 계속 진행된다."
-- 부수: `pytest>=7.4.0`(`:11`)이 프로덕션 requirements에 있어 배포 이미지에 테스트 프레임워크가 들어간다(테스트 *파일*은 `.dockerignore`로 빠진다).
+- **`postgres`는 `deploy.sh`가 기동·재기동하지 않는다** — 사전 `docker compose up`으로 이미 떠 있어야 한다.
+- compose의 `depends_on: postgres: condition: service_healthy` 게이트가 **배포 경로에서 통째로 우회**된다(백엔드가 DB 없는 상태로 뜰 수 있다).
+- 배포된 nginx가 compose의 **certbot 볼륨 마운트를 누락**한다. 현재는 `nginx/nginx.conf`의 `listen 443 ssl` 블록이 전부 주석이라 치명적이지 않으나, `location /.well-known/acme-challenge/ { root /var/www/certbot; }`는 **살아 있고 마운트 안 된 경로를 가리킨다** → deploy.sh가 띄운 nginx로는 ACME 갱신이 불가하다. 443 블록의 주석을 풀면 그 nginx는 아예 기동에 실패한다.
+- 이후 누군가 `docker compose up -d`를 돌리면 자기가 만들지 않은 컨테이너를 보고 재생성하며, 손으로 띄운 컨테이너가 살아 있는 동안 그것을 돌리면 **같은 network-alias에 스케줄러 프로세스가 2개** 생길 수 있다(§6.7).
+
+### 10.3 헬스체크·재시작 정책 — **잠재 위험**
+
+- `docker-compose.yml`에 healthcheck가 있는 서비스는 **`postgres`뿐**(`pg_isready`).
+- **`backend`엔 healthcheck가 없다** — compose에도 `deploy.sh`의 `docker run`에도. `--restart unless-stopped`는 *프로세스 종료*에만 반응하므로 **hang한 uvicorn은 영영 재시작되지 않는다**(§6.6·§6.7의 무타임아웃과 결합).
+- **`certbot`엔 재시작 정책이 없다** — `while :; do certbot renew; sleep 12h; done` 루프가 호스트 재시작·컨테이너 크래시 시 영구 종료되고 인증서 갱신이 조용히 멈춘다.
+
+### 10.4 배포 검증이 비차단이고 롤백이 없다 — **잠재 위험**
+
+유일한 검증이 고정 `sleep 2` 뒤의 `curl -s http://localhost/health && echo " <- /health OK" || echo "WARNING: health check failed"`다 — **구조적으로 비차단**이다. 롤백 경로 없음. §6.6과 겹쳐 기동 백필이 있는 배포마다 이 경고가 뜨지만 배포는 성공으로 보고된다.
+
+### 10.5 시크릿 폴백 — **확인된 버그** (B21·B19)
+
+| 환경변수 | 파일 | 형태 |
+|---|---|---|
+| `POSTGRES_PASSWORD` | `docker-compose.yml` | `${POSTGRES_PASSWORD:-<리터럴 기본값>}` — 호스트 env가 없으면 tracked 파일에 박힌 약한 비밀번호로 조용히 뜬다 |
+| `SESSION_SECRET` | `backend/routers/auth.py` | 모듈 레벨 `os.environ.get(..., "<리터럴 기본값>")` (§5.5) |
+
+둘 다 저장소에 커밋돼 있다. 그 외 리터럴 시크릿 폴백은 없다. `backend/.env.docker`(실 시크릿 저장소)와 루트 `.env`는 올바르게 gitignored.
+
+추가 노출: `docker-compose.yml`이 postgres를 `"5432:5432"`로 **호스트에 발행**한다. self-hosted 러너 머신에서 이는 호스트 인터페이스에 닿는 DB다.
+
+### 10.6 볼륨 권한 — **잠재 위험**(낮음)
+
+compose의 postgres 서비스가 `./backend/auth_schema.sql`·`./backend/app_schema.sql`을 **`:ro` 없이** `/docker-entrypoint-initdb.d/`에 마운트한다. 엔트리포인트는 읽기만 하지만 컨테이너가 tracked 소스 파일 2개에 쓰기 권한을 갖는다(그 파일들은 §10.1의 폴러가 `reset --hard`하는 대상이기도 하다). nginx 마운트는 compose·`deploy.sh` 양쪽에서 올바르게 `:ro`다.
+
+부수(LOW): `deploy.sh`가 `TMP_DOCKER_CONFIG=$(mktemp -d)`를 만들고 지우지 않는다(`trap`은 락만 정리) — 배포마다 `/tmp` 디렉터리 누수.
+
+### 10.7 의존성이 고정되지 않았다 — **잠재 위험**
+
+`backend/requirements.txt` 18줄 전부 `>=` 또는 제약 없음(`python-dotenv`는 무제약), **락파일 없음**. `Dockerfile`이 `pip install -r requirements.txt`를 매 빌드 실행하고 `deploy.sh`가 매 배포 재빌드한다 → **같은 커밋의 두 배포가 서로 다른 `yfinance`·`pandas`·`fastapi`를 설치할 수 있다**. `yfinance>=0.2.40`은 `.info`/`.history` 형태 변경과 Yahoo 엔드포인트 이동 이력이 있는 라이브러리라, "어제는 됐는데" 클래스 장애의 가장 유력한 출처다.
+
+프론트: `package.json`은 caret이지만 `package-lock.json`이 tracked다. 다만 `deploy.sh`가 `npm ci`가 아니라 **`npm install`**을 돌려 배포 중 락파일이 재작성될 수 있다.
 
 ### 10.8 로컬 `.venv`(3.9.6) ≠ Docker(3.12) — **설계상 트레이드오프**(사실상 하드 제약)
-| 축 | 로컬 | Docker | 결과 |
-|---|---|---|---|
-| Python | 3.9.6 (`backend/.venv/pyvenv.cfg:3`) | 3.12 (`backend/Dockerfile:1`) | 런타임 평가 어노테이션에 PEP604 `X \| None` 금지 → `Optional[X]` 필수 |
-| `lxml` | 없음 | 있음 | HTML 파싱은 `"html.parser"`만 (현재 10곳 전부 준수) |
-| `PyJWT` | 있음 | 없음 | `tests/test_auth.py:3` (§9.7) |
-| FastAPI | 0.128.x | 0.138+ | 라우트 트리 순회 방식 발산 (§10.7) |
 
-**로컬 pytest가 사실상 유일한 게이트**이므로 로컬 쪽 제약이 이긴다.
-- **잠재 함정 — 문자열 주석 우회가 4곳에 쓰이고 있다**: `routers/stocks.py`는 `from __future__ import annotations`가 **없는데** `| None`을 쓴다 — `:242`, `:483`, `:600`, `:607`이 전부 **인용부호로 감싼 문자열 주석**(`"dict | None"` 등)이라 런타임 평가를 피한다. 넷 다 private 헬퍼라 `get_type_hints`를 타지 않아 현재 안전하지만, **누가 "정리"하며 인용부호를 지우면 로컬 py3.9가 즉시 `TypeError`**를 낸다. 나머지 백엔드 파일은 전부 `from __future__ import annotations`를 갖는다.
+`backend/.venv/pyvenv.cfg`가 `version = 3.9.6`(macOS 시스템 파이썬), `backend/Dockerfile`이 `FROM python:3.12-slim`. **마이너 3개 차이**다. 코드는 3.10+ 문법(`str | None`)을 쓰면서 모듈마다 `from __future__ import annotations`로만 3.9에서 버틴다 — 그 import를 빠뜨리거나 어노테이션이 *런타임 평가*되는 자리(Pydantic 모델·FastAPI 시그니처)에 `X | Y`를 쓰면 컨테이너는 통과하고 로컬 pytest가 `TypeError`를 낸다. 로컬 pytest가 게이트이므로 실질적 하드 제약이다.
+
+**`lxml`은 이미지엔 있고 로컬엔 없다** — `requirements.txt`에 `lxml>=4.9.0`이 있지만 `.venv`(228 패키지)에 없다. 코드는 이 괴리를 **손으로 견뎌 왔다**: 모든 `BeautifulSoup` 호출이 `"html.parser"`를 명시적으로 넘기고, `backlog_parser.py`가 `XMLParsedAsHTMLWarning`을 그 이유와 함께 억제한다. 즉 오늘의 일치는 **구조가 아니라 관례**다 — 누군가 두 번째 인자 없이 `BeautifulSoup(html)`을 쓰는 순간 컨테이너는 `lxml`, 로컬은 `html.parser`를 자동 선택해 파스 트리가 갈린다(특히 비정형 DART HTML에서).
+
+**같은 패키지의 버전차도 형태를 바꾼다**: 배포 이미지의 FastAPI는 `include_router`로 들어온 라우트를 감싸 `.routes`를 평탄하게 노출하지 않을 수 있다. `app.routes`를 순회하는 코드는 로컬에서 100+개를 세고 컨테이너에서 0개를 셀 수 있다 — `tests/test_no_public_reads.py`가 이 실패 모드를 `len(api_routes) > 100` 단언으로 막고 있는 이유다(§5.1).
+
+### 10.9 규모·복잡도 핫스팟
+
+**백엔드 최대 파일**: `services/report_generator.py`(757)·`routers/stocks.py`(675)·`services/market/kr.py`(664)·`routers/report.py`(592)·`scheduler/jobs.py`(534)·`services/recommendation/funnel.py`(475)·`services/batch_registry.py`(473, 선언형 표)·`services/backlog.py`(438)·`services/consensus_pipeline.py`(424)·`services/guru_scraper.py`(421).
+
+**150줄 초과 함수 2개**:
+- **`report_generator.py::generate_report` — 322줄.** 동시에 (a) 최대 함수 (b) 가장 뜨거운 외부 I/O 경로 (c) §6.6에 따라 **기동 시 이벤트 루프에서 동기 실행**되는 함수다.
+- **`routers/stocks.py::get_dashboard` — 173줄.** 단일 요청 경로 핸들러.
+
+**프론트 최대 파일**은 §7.11. 백엔드 비테스트 19,287줄 / `frontend/src` 비테스트 19,709줄.
+
+부수(LOW): `frontend/src/api.js`의 공유 axios 인스턴스가 `baseURL`만 설정하고 **`timeout`이 없다**(axios 기본 0=무한) — §6.6·§2.5의 hang이 UI를 무기한 스피너로 묶는다.
 
 ---
 
 ## 11. Cowork fire 파이프라인 (ADR-0028)
 
-### 11.1 워크디렉터리 격리 — **이미 가드됨(잔여 위험만)**
-- ⚠️ **B22 해소** — `scripts/cowork-fire-listener.py:45`가 `Path(tempfile.mkdtemp(prefix=ts + "-", dir=str(RUN_DIR)))`로 **원자적 고유 디렉터리**를 만든다(`:44` `RUN_DIR.mkdir(parents=True, exist_ok=True)`가 부모 보장, `:46` `run.log` open, `:50` `cwd=workdir`). `:9-11` docstring이 옛 실패 모드를 기록한다. 초 단위 충돌로 실행 중 프로세스의 `run.log`가 truncate되는 일은 사라졌다.
-  - 계획이 제안했던 `f"{ts}-{os.getpid()}"`는 **무효였다** — 리스너가 launchd 장수 단일 프로세스라 PID가 늘 같다. 버그리포트의 "제안 수정"은 증상 관찰과 신뢰도가 다르다는 사례.
-- **잔여**: 프론트 잠금은 여전히 종목 단위다(`pages/AnalystReports.jsx:165` `disabled={firing === s.ticker}`, state `:25`, POST `:83`) — 다른 티커는 즉시 통과하므로 동시 fire는 그대로 가능하다. `run.log` 유실 결과는 없어졌지만 §11.2의 무계 스폰은 남는다.
+### 11.1 게이팅·SSRF — **이미 가드됨**
 
-### 11.2 무계 프로세스 스폰 — **잠재 위험**
-- `:14` docstring이 "동시 fire는 그대로 병행 스폰(중복 enrich 가능하나 무해)"로 명시 수용했으나, 스로틀·동시성 상한이 파일 어디에도 없어 §5.2의 admin 등가 키와 결합하면 무계 fork 레버가 된다.
+`POST /api/admin/cowork/fire`는 `require_admin_or_api_key`다. `services/cowork_trigger.py`는 **고정 env URL**(`COWORK_ROUTINE_FIRE_URL`)로만 POST하고 목적지가 사용자 입력을 받지 않는다 — **SSRF 없음**. `enabled()`가 `COWORK_ROUTINE_FIRE_URL`+`COWORK_ROUTINE_FIRE_TOKEN` 양쪽을 요구하는 both-required 게이트라 키 미설정 시 휴면이다.
 
-### 11.3 fire 훅은 best-effort — **이미 가드됨**
-- `services/cowork_trigger.py`: `configured()`(`:21`)가 env 미설정 시 휴면(dormant-safe), 실패는 `logger.warning`(`:38`, `:43`)만 하고 예외를 전파하지 않아 배치 본문을 깨뜨리지 않는다. 타임아웃 명시(`:35`).
-- `scripts/cowork-fire-listener.py:63-66`: 토큰 미설정 시 401(fail-closed), 127.0.0.1 바인드(`:91`).
-- `:31-35` `_env_value`가 `.env.docker`를 직접 파싱한다 — 인용부호·`export` 접두를 처리하지 않는다(잠재, 낮음).
-- **관측 한계(ADR-0028 §명시 수용)**: fire-and-forget이라 루틴 실행 *결과*를 실시간으로 알 수 없다. 사후 관측은 `enriched_at`(`GET /api/stocks`에 additive 노출, `Reports.jsx`·`Ranking.jsx`가 표시)과 발행물이다 — 이건 **기록된 트레이드오프**이고 5차 버그헌트에서 결함으로 오분류돼 기각(R1)됐다. 재제기 금지.
+### 11.2 best-effort 성격 — **설계상 트레이드오프**
+
+fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2와 같다 — 실패가 관측면에 안 나타난다.
 
 ---
 
 ## 12. 문서·설정 드리프트
 
-### 12.1 `docs/*.md`가 실존하지 않는 구조를 설명한다 — **확인된 버그**(문서)
-- `docs/ARCHITECTURE.md`·`API.md`·`CONFIGURATION.md`·`DEVELOPMENT.md`·`GETTING-STARTED.md`·`TESTING.md` 모두 마지막 커밋이 `fab3f1f`(2026-05-24).
-- `docs/ARCHITECTURE.md`가 설명하는 것들: `scheduler.py`(`:35`)·`storage.py`(`:69`)·`market.py`(`:70`)·`market_indicators_service.py`(`:74`) — 전부 ADR-0017로 패키지 분리돼 **단일 파일로 존재하지 않는다**. `:69`·`:120`은 `backend/data/*.json`을 "single source of truth"라고 하는데 실제 정본은 PostgreSQL이다.
-- `README.md:261-267`의 참고 문서 목록에 `docs/`가 **없다** — 링크되지 않은 채 남은 오해 유발 문서다. `.gitignore:30`에 `docs/superpowers/`가 있지만 5개 파일이 이미 tracked라 무효.
+### 12.1 부채 마커는 사실상 없다 — **관찰**
 
-### 12.2 `ALL_MENUS`가 두 파일로 갈라지고 한쪽에 죽은 키가 있다 — **잠재 위험**(현재 무해)
-- `routers/auth.py:108` = 6개(`portfolio, research, market, **analysis**, guru, settings`), `routers/admin.py:10` = 5개(`analysis` 없음), `app_schema.sql:124-127` 시드 = 5개.
-- `admin.py:20,42,48,50,67,82,96`이 자기 목록 밖 메뉴를 `continue`/필터하므로 `analysis`는 **부여 자체가 불가능**하다. 프론트에서 `analysis`를 권한 키로 쓰는 곳이 **0곳**(nav perms는 `navSections.js:14,24,28,35,43` = research/portfolio/market/research/guru)이므로 현재는 기능 영향 없는 **죽은 키 + 목록 이원화**다.
+`TODO`/`FIXME`/`HACK` **0건**. 전 저장소(테스트 포함, `node_modules`·`.venv`·`dist` 제외)에서 10건이 걸리는데 그중 진짜 표시된 지름길은 **`components/PermissionManager.jsx` 1건뿐**("임시로 `selectedIds.length`를 `pendingPerms`에 붙인다")이고 나머지는 서술·환경 주석·`\uXXXX` 오탐이다.
 
-### 12.3 `.env.docker.example`이 실제 필요 키와 어긋난다 — **잠재 위험**(드리프트가 지난 판의 2배)
-- `backend/.env.docker.example`은 13개 키를 담고, `README.md:51-79` 대비 **12개**가 빠져 있다: `POSTGRES_PASSWORD`, `KIWOOM_APP_KEY`, `KIWOOM_SECRET_KEY`, `KIWOOM_BASE_URL`, `KIS_BASE_URL`, `KOFIA_API_KEY`, `DART_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `COWORK_API_KEY`, `COWORK_ROUTINE_FIRE_URL`, `COWORK_ROUTINE_FIRE_TOKEN`. 그중 백엔드가 실제로 읽는 것은 `COWORK_ROUTINE_FIRE_TOKEN`·`DART_API_KEY`·`KIWOOM_APP_KEY`·`KIWOOM_SECRET_KEY`·`KOFIA_API_KEY`다 → 새 환경 부트스트랩 시 **조용히 휴면 기능**이 생긴다.
-- `backend/.env`(로컬)에 `SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·`SUPABASE_ANON_KEY`·`SUPABASE_JWT_SECRET` 4개가 남아 있다 — 마이그레이션 이전 잔재. 코드 참조는 `tests/test_auth.py:22`뿐(§9.7).
-- `ANTHROPIC_API_KEY`가 example에 남아 있으나 백엔드에서 미사용(`requirements.txt`에 anthropic 없음 — 백엔드 무LLM 원칙).
+**함의**: 이 저장소의 설계 의도는 마커가 아니라 **매우 긴 한국어 docstring**에 실린다. 따라서 실제 부채는 *주석되지 않은 구조적 부채*이며, 그것이 이 문서 §1~§11의 내용이다. 마커 grep으로 부채를 찾으려 하지 말 것.
 
-### 12.4 리포지토리 위생 — **잠재 위험**(낮음, 악화 중)
-- untracked **169개**(지난 판 152), 그중 `screenshots-uat*` **63개**(54 → 63) + `screenshots-guru-row-ux/` 1개, `scripts/` untracked 97개(`scripts/package.json`·`package-lock.json` 포함). `.gitignore:59`는 `screenshots/`(단수)만, `:60`은 `scripts/node_modules/`만 무시하므로 나머지는 영구히 `git status` 노이즈다. `.gitignore:41`은 `.claude/settings.local.json`만 무시해 `.claude/` 나머지도 노이즈다.
-- 이 노이즈가 §9.1의 "전체 스위트 후 `git status`로 부수효과 확인" 습관을 실질적으로 방해한다.
-- `CLAUDE.md` **131KB** · `API_SPEC.md` **121KB**. 후자는 수동 동기 대상이고 존재 drift만 자동 검출된다(§9.6).
-- `.gitignore:14` 주석이 "Supabase is source of truth"라고 적혀 있다 — Supabase는 제거됐다.
+### 12.2 `deploy.sh` 안의 죽은 TLS 설정 — **잠재 위험**(오판 유발)
 
-### 12.5 스테일 주석 (틀린 불변식을 심는다)
-- `services/db.py:23-24` — 사이징 근거를 "calendar 15·analysis 11"로 적었으나 전체 최대 fan-out은 20.
-- `routers/stocks.py:427`·`scheduler/jobs.py:298`·`:426` — `maxconn=10`(실제 20).
-- `services/batch_registry.py:2` — "20개 배치"(실제 29).
-- `services/dividends.py:46`(및 `:4`) — yfinance `dividendYield`가 퍼센트 스케일이라고 단언(`CLAUDE.md:233`은 소수분수, §2.6).
-- `components/GlobalSearch.jsx:31` — stale 캐시 오판을 피하려 재fetch한다고 하는데 실패 경로가 그 오판을 재도입한다(§7.2).
-- ⚠️ **폐기**: `market_indicators/kospi_futures.py:4`의 "fx.py의 VIX식 폴백" 서술은 이제 없다 — `:3-5`가 "sentiment.py 방식으로 직전 저장값 폴백(get_or_refresh는 stale-fallback 안 함)"으로 정정됐고 코드도 `:55-58`에서 실제로 그렇게 한다.
+`nginx/nginx.conf`의 `listen 443 ssl` 블록이 전부 주석 상태인데 ACME challenge location은 살아 있다(§10.2). "HTTPS가 설정돼 있다"는 오독을 유발한다 — 실제 TLS 종단은 Cloudflare Tunnel이다.
 
-### 12.6 코드 주석이 이 문서의 섹션 번호를 인용하고 절반이 stale — **잠재 위험**(신규)
-9곳이 `CONCERNS §N`을 직접 인용한다. **번호가 시대별로 달라 이미 어긋나 있다.**
+### 12.3 스테일 주석 — **잠재 위험**(틀린 불변식을 심는다)
 
-| 위치 | 인용 | 현재 |
+| 위치(심볼) | 주장 | 실제 |
 |---|---|---|
-| `backend/main.py:256` | §3 | ✅ NaN = §3 |
-| `backend/routers/stocks.py:497` | §3 | ✅ |
-| `backend/routers/stocks.py:672` | §3 | ✅ |
-| `backend/tests/test_stocks_router.py:638` | §3 | ✅ |
-| `backend/routers/recommendations.py:209` | §1 | ❌ NaN은 §3 |
-| `backend/routers/calendar.py:43` | §7 | ❌ FOMC 커버리지·무음 미표시는 §6.10(§7은 프론트) |
-| `backend/routers/batches.py:60` | §7 | ❌ 위와 동일 |
-| `backend/services/db.py:24` | §4.2 | ❌ 풀/ThreadPool은 §4.5 |
-| `API_SPEC.md:2285` | §7 | ❌ 위와 동일 |
+| `routers/stocks.py::_usdkrw_rate` docstring | "FX 배치(get_fx)가 채운 영구 캐시를 읽는다" | **그 배치는 존재하지 않는다**(§6.4) |
+| `scheduler/jobs.py`(2곳)·`routers/stocks.py` | 풀이 `maxconn=10` | 실제 20(§4.2) |
+| `tests/test_batches_router.py` 함수명 | `test_lists_sixteen_batches...` | 29를 단언(§9.4) |
+| `services/ranking_service.py::_fetch_naver_market` docstring | "한 페이지라도 실패하면 RuntimeError" | 0페이지 케이스엔 안 던진다(§1.1) |
 
-→ **대분류 번호(§0~§14)를 고정으로 유지**하고, 새 주제는 하위번호로 추가한다. 위 5곳은 다음 손댈 때 함께 고칠 것.
+### 12.4 리포지토리 위생 — **잠재 위험**(악화 중)
 
----
+루트에 `screenshots-uat*` 디렉터리 90여 개 + `screenshots-*` 변형이 전부 untracked로 쌓여 있다. `.forge/` 산출물, `.planning/`, `.superpowers/`, `.worktrees/`, `supabase/`(제거된 인프라의 잔재)도 공존한다. `git status`가 사실상 판독 불가라 **§10.1의 폴러가 무엇을 날릴지 눈으로 확인하기 어렵다**.
 
-## 13. `CLAUDE.md`·지난 판의 서술 중 지금과 다른 것
+### 12.5 `backend/migrations/`가 죽었다 — **확인된 버그**(문서·구조)
 
-`CLAUDE.md`는 역사 문서다. 아래는 HEAD `4752112`에서 재검증한 **현재 사실**이다.
+`001_user_events.sql`·`002_backlog_history.sql`을 참조하는 스크립트·compose·모듈이 **하나도 없다**. 마이그레이션 디렉터리의 존재가 "마이그레이션 체계가 있다"는 오해를 만들지만 실제 자동 경로는 `main._migrate()`뿐이다(ADR-0006).
 
-| 서술 | 현재 사실 |
-|---|---|
-| 005930이 "정확히 70000.0"으로 박제된 건 KRX/NXT 피드 글리치 | task#170 정정대로 **로컬 pytest → prod DB 오염**이 유력. 실제 해결은 `conftest.py:26-37` `_block_real_db`(task#169). ADR-0020의 2-of-N 다수결과 박제-시 독립 ref 게이트는 유효하나 **관측된 70k엔 발동한 적 없다**(테스트가 게이트를 우회). 라운드 70k가 또 보이면 피드 글리치 전에 **테스트 오염부터** 의심하라 |
-| `test_api_doc_sync.py`의 미문서화 23개가 `KNOWN_UNDOCUMENTED`로 동결 | `:50` = `frozenset()` — task#100에서 전수 문서화 완료, **베이스라인 0** |
-| `API_SPEC.md`에 `**Auth:** 불필요` 오표기 8곳 | **청소됐다** — 현재 1곳이고 그건 정당한 `GET /api/auth/oauth/token`(`API_SPEC.md:178`). `CLAUDE_COWORK_API.md`는 0곳. 자동 게이트는 여전히 없다(§9.6) |
-| `backend/data/sp500_tickers.json` 오염이 전체 스위트 실행 시 발생 | task#234가 닫음(`earnings.py:25-31,61-76`). **단 write 경로가 0이 된 것은 아니다** — `digest_service.py:163-164`가 **tracked** `backend/data/digest/`에 쓴다(§9.1 잔여 E) |
-| `services/recommendation/universe.py`가 그 파일의 writer | **아니다** — `:39`는 `open()` read만 |
-| `market_indicators.py` 라우터에 `/api/market-indicators` prefix가 있다 | prefix는 `/api/market` **하나뿐** |
-| 캐시 6종, snapshot LRU 200, list TTL 5s | **9종**, LRU **50**, list **60s** (§8.3) |
-| task#104 "per-card throw가 근본" | 근본은 `_portfolio_totals` NaN→직렬화 500이었고 세 번째 트리거는 배당 `float/Decimal` TypeError였다. 셋 다 가드됨 — **단 `sanitize`에 Decimal NaN 구멍이 남아 있다**(§3.1) |
-| task#97 "그외 탭 삭제 404" | 닫혔다 — `components/reports/StockActions.jsx:14`가 `is_mine`으로 게이트(§7.11) |
-| KR beta tz 정렬 버그 | **두 호출처 모두 고쳐졌다**(`beta.py:78`, `report_generator.py:311`). 잔여는 `calc_beta`/`indicators.py:108` 자체가 정규화를 안 한다는 것이고, **"이상적 헬퍼가 미사용"은 stale** — `_normalize_index`(`report_generator.py:541-546`)는 이제 6회 쓰인다(beta 경로만 미적용, §6.6) |
-| 배지 색: success=빨강/danger=파랑, warning 깨짐 | **리디자인 전 기준**. 현재는 통념대로(success=녹, danger=빨, warning=오커)이고 가격 방향은 `.badge--up`/`--down` 전용 변형(§7.12) |
-| `nav` 경로 목록이 "PC/모바일 두 곳"에 이원화 | **세 곳이었고(그 부정확이 결함 원인이었다) 이제 한 곳이다** — `frontend/src/navSections.js`(§7.4). 남는 것은 접두사 매칭·아이콘 맵 2중 복제·라우트 커버리지 게이트 부재 |
-| `.forge/bug-report.md`(5차, task#221) 8건 중 6건 미해결 | **8건 전부 해소** — H1→task#250, M1+M3→#251, M2·M4·L3→#254, L2→#254, L1→#222. 루트 `bug-report.md`는 아직 5차 내용이고 6차(task#256)가 덮어쓸 예정(§14) |
-| 지난 판 §10.5 "`.dockerignore`가 없다" | **틀렸다** — `backend/.dockerignore`가 tracked이고 `.venv`·`.env`·`tests/`를 제외한다(§10.5) |
-| 지난 판 §1.7 "`kospi_futures.py:4` 주석이 fx.py를 잘못 인용" | **정정됐다** — 지금은 sentiment.py 방식을 정확히 서술하고 코드도 일치(§12.5) |
-| 지난 판 §3.5 "`market_indicators` 서브모듈 전부 sanitize 가드됨" | **12개 중 4개만** 한다. 나눗셈 가드·`dropna` 덕에 라이브 위험은 낮다(§3.5) |
-| 지난 판 §4.1 "`_migrate` CREATE 없는 테이블 11개" | **21개**다(11 + baseline 10). 재구축 pgdata 실패 반경이 그만큼 넓다(§4.1) |
-| 지난 판 §2.10 "`requests` 28개 전부 timeout" | 호출 지점이 **47개**로 늘어 한 줄 grep으로 재확인할 수 없다(스팟 확인은 통과, §2.10) |
+### 12.6 코드 주석이 이 문서의 섹션 번호를 인용하고 **절반이 stale** — **잠재 위험**(신규 실측)
 
----
+`CONCERNS §N` 인용은 코드 8곳 + `API_SPEC.md` 1곳 = **9건**이다. 이번 판에서 각각이 실제로 가리키는 절과 대조한 결과:
 
-## 14. 계획됐지만 미실행인 것 (`.forge/backlog/`)
-
-아래 4건은 **이미 계획서가 있다** — 같은 문제를 새로 발굴하지 말고 그 계획을 먼저 읽을 것.
-
-| task | slug | 무엇 | 이 문서의 어디 |
+| 인용 위치 | 인용 번호 | 이번 판의 실제 절 | 상태 |
 |---|---|---|---|
-| #256 | `bug-hunt-cycle6` | `4393dde..4752112`(78커밋) 5렌즈 버그 헌트. 루트 `bug-report.md`를 6차로 덮어쓴다 | 전 섹션 |
-| #257 | `guru-alloc-scope-switch-animation-cost` | 스코프 전환 596ms 중 `.anim-fade-up` 1,723개 동시 시작 몫을 대조군으로 분리, ≥50ms면 첫 진입 1회로 게이팅 | §7.13 |
-| #258 | `self-multiple-timeseries-observation` | 자사 멀티플을 자기 과거 스냅샷 중앙값과 대조해 **로그만** 남기는 관측 장치(ADR-0030의 50% breakdown 전제 실증) | §1·§9.9 |
-| #259 | `mobile-tabbar-overlap-axis` | `uat-guru-row-ux.mjs`에서 통째로 빠진 하단 탭바 겹침 축을 `.tabbar` 실측으로 복원 | §9.3·§9.10 |
+| `backend/main.py` (`_validation_error_handler`) | §3 | §3 NaN/Inf | ✅ |
+| `backend/routers/stocks.py` (`_usdkrw_rate`) | §3 | §3 | ✅ |
+| `backend/routers/stocks.py` (`_build_all` sanitize) | §3 | §3 | ✅ |
+| `backend/tests/test_stocks_router.py` | §3 | §3 | ✅ |
+| `scripts/uat271-formatter.mjs` | §9.3 | §9.2(recharts/jsdom) | ⚠️ 하위번호 이동 |
+| `backend/services/db.py` (`_get_pool`) | §4.2 | §4.2 커넥션 풀 | ✅ (이번 판에서 §4.5→§4.2로 **정렬시킴**) |
+| `backend/routers/recommendations.py` | §1 | §3 NaN/Inf | ❌ stale |
+| `backend/routers/calendar.py` | §7 | §6.9/§12(FOMC 정적 목록) | ❌ stale |
+| `backend/routers/batches.py` | §7 | §6.9 | ❌ stale |
+| `API_SPEC.md` (FOMC 커버리지) | §7 | §6.9 | ❌ stale |
 
-`#257`·`#259`의 계획서에는 이 문서가 담지 않은 **실측 수치와 재시도 금지 조건**이 들어 있다(예: `content-visibility` 재시도 금지 근거, 「화면 행 수 == 코호트 크기」계약 3종의 파일·행). 가상화 착수 전 필독.
+**대분류(§0~§14) 번호는 이번 판에서 바꾸지 않았다.** 커넥션 풀은 직전 판의 §4.5에 있었는데 `db.py`가 §4.2로 인용하고 있어, **문서 쪽을 인용에 맞춰 §4.2로 옮겼다**(코드를 건드리지 않고 참조 1건을 복구). 남은 stale 4건은 코드·문서 수정이 필요하며 이 문서 단독으로는 닫을 수 없다.
+
+⚠️ **줄번호 참조는 이 문서에서 가장 드리프트가 심한 축이다.** 이번 판은 그 위험을 낮추기 위해 **줄번호를 거의 쓰지 않고 심볼명으로만 지목**했다. 백엔드 코드에 줄을 넣고 빼는 슬라이스는 시프트가 부위별로 달라 산술 추정이 틀리므로, 참조를 갱신할 땐 `git show HEAD:<file>`로 옛 줄을 읽어 **의미로** 재확정할 것.
+
+---
+
+## 13. `CLAUDE.md`·직전 판의 서술 중 지금과 다른 것
+
+### 13.1 이번 패스에서 **반증**된 것
+
+| 서술 | 실제 |
+|---|---|
+| "`get_connection()`이 정상 종료 시 커밋한다 — 롤백 전제 코드가 성립하지 않는다" | **롤백 경로가 있다**(`except Exception: conn.rollback(); raise`). 진짜 잔여는 `execute()` 루프의 문장 간 원자성 부재다 — §4.3 |
+| `short_sell_service`·`investor_service`·`lending_service`·`leverage_service`가 delete-rewrite | 전부 **append-only upsert**, `DELETE` 없음. 빈 fetch가 이미 안전한 no-op — §1.4 |
+| `services/guru_scraper.py::save_guru_managers` | 그 심볼은 **존재하지 않는다**. 실제 writer는 `services/storage/schedule.py::save_guru_managers`이고 저장소에서 가드가 가장 촘촘한 함수다 |
+| `market_cache`는 `force=True` 배치 전까지 영구 서빙 | 전제는 맞으나 **어떤 배치도 `get_or_refresh`에 `force=True`를 넘기지 않는다** — 배치는 `_fetch_and_save_*`를 직접 부른다 — §6.3 |
+| "B27 랭킹 마켓 토글 레이스" | **닫혔다** — `Ranking.jsx::fetchPage`가 `genRef`를 `.then`·`.catch`·`.finally` 전부에서 검사한다 — §7.3 |
+| 무인증 엔드포인트가 리스크 표면 | 정확히 9개, 전부 `auth.py`, 사용자 데이터 노출 0건, allowlist 테스트와 드리프트 0 — §5.1 |
+| `services/analysis_service.py`가 NaN을 흘린다 | 내부에 `math.isfinite` 가드가 있다. 잔여는 sanitize 안전망 부재뿐(낮음) — §3.3 |
+
+### 13.2 이번 패스에서 **재검증하지 못한 것** — 미확인
+
+직전 판의 §0에 있었으나 `20dd46e` 코드로 확정하지 못한 항목. **해소된 것이 아니라 확인하지 않은 것**이다.
+
+| # | 항목 | 미확인 사유 |
+|---|---|---|
+| B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | 근거 부족 — `consensus_pipeline`의 tz 경로를 이번 패스에서 직독하지 않았다 |
+| B30 | 티커 유니버스 캐시가 **축소된** 스크레이프를 무검증 저장 | 부분 확인 — `earnings.py::_tickers_with_cache`에 `if tickers:` 가드와 stale→seed 사다리가 있음은 확인했으나, `_scrape_kospi`의 조기종료가 실제로 부분 축소를 만드는지는 라이브 실행이 필요하다(도구 범위 밖) |
+| B33 | `any(snap_dist.values())`가 진짜 0/0/0을 결측으로 오판 | 근거 부족 — `routers/analyst_reports.py`의 귀속 로직을 직독하지 않았다 |
+| — | `_filter_outliers`가 저장 시계열을 영구 손상 | 근거 부족 — 해당 심볼을 이번 패스 대상에 넣지 않았다 |
+| — | Naver 재무를 **위치 인덱스**로 읽는다(직전 판 §2.1이 "이 군에서 가장 위험"으로 지목) | 근거 부족 — `market/kr.py`의 파싱부를 라인 단위로 직독하지 않았다. **다음 매핑의 우선 대상** |
+| — | `_table_unit`의 억원 기본값 폴백(×100 오저장 클래스) | 근거 부족 — `backlog_parser.py` 미직독 |
+| — | 프론트 포매터 중복 15종 | 부분 확인 — 중복 자체(§7.7·§7.9)는 확인했으나 15종이라는 수는 재계수하지 않았다 |
+| — | 인메모리 캐시 스레드 안전성의 실제 사고 가능성 | 도구 범위 밖 — 동시성 재현이 필요하다 |
+
+### 13.3 원인 귀속을 **단정하지 말 것**으로 남는 것
+
+- **"배포 후 백엔드가 `Up`인데 API가 5분+ 무응답"** — lifespan 자체는 0.6초로 실측됐고 배치는 스케줄러 스레드라 비블로킹이다. 정확한 메커니즘(GIL/이벤트 루프 기아 등)은 **미확정**이다. §6.6의 `sched.start()` 블로킹은 코드로 확인된 *별개* 경로이며 그 현상의 확정 원인으로 귀속하지 말 것.
+- **"005930이 정확히 70000.0으로 박제"** — 피드 글리치가 아니라 **로컬 pytest가 prod DB에 쓴 오염**이 유력하고, 실제로 멈춘 것은 `conftest._block_real_db`(§9.1)였다. 박제-시 독립피드 게이트와 2-of-N 다수결은 **미래 글리치 보험으로 유효**하나, 관측된 70k에 발동한 적은 없다. 라운드 70k가 또 보이면 피드보다 **테스트 오염을 먼저 의심**할 것.
+
+---
+
+## 14. 계획됐지만 미실행인 것
+
+`.forge/backlog/`는 **비어 있다** — 대기 중인 계획 0건.
+
+`.forge/adr/`엔 ADR 35건이 활성(`0001`~`0035`)이고 `retired/`는 없다.
+
+이 문서가 식별한 **후속 후보**(계획으로 승격되지 않은 것):
+
+| 우선순위 | 항목 | 절 |
+|---|---|---|
+| 1 | `useAuthBootstrap`의 `?token=&refresh=` 분기 삭제(세션 고정) — 수정이 *삭제*라 비용이 가장 낮고 심각도가 가장 높다 | §5.2 |
+| 2 | 에러 바운더리 신설 — §7.2의 크래시 7곳이 현재 전부 백지다 | §7.2 |
+| 3 | `doLogout`에서 `caches.delete('api-cache')` — 계정 전환 시 교차 사용자 데이터 유출 | §7.6 |
+| 4 | `_fetch_naver_market`의 0페이지 가드(형제 US 경로와 대칭화) | §1.1 |
+| 5 | `fx` 배치 신설 또는 `_usdkrw_rate`에 나이 검사 | §6.4 |
+| 6 | 로그인 레이트리밋(bcrypt CPU 고갈 DoS) | §5.6 |
+| 7 | `put_backlog`·`clear_dashboard_cache`를 `require_admin`으로 | §5.7 |
+| 8 | `Reports.jsx`·`Ranking.jsx::onRowClick` 세대 가드(잘못된 종목 수치 렌더) | §7.3 |
+| 9 | 27개 잡을 `Run.set_status` 패턴으로(키 미설정이 success로 기록되는 문제) | §6.1 |
+| 10 | `_migrate`에 후발 테이블 4개 + `tickers` 컬럼 3개 추가 | §4.1 |
+| 11 | `test_no_bare_today.py`를 `datetime.now()`까지 확장 | §6.8 |
+| 12 | `BATCHES` 개수 단언 3곳을 구조 단언으로 교체 | §9.4 |
+| 13 | §13.2의 미확인 7건 재검증(특히 Naver 재무 위치 인덱스 파싱) | §13.2 |
