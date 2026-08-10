@@ -404,7 +404,7 @@ def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(require_
 
 @router.delete("/dashboard/cache")
 def clear_dashboard_cache(user_id: str = Depends(get_current_user)):
-    cache_svc.invalidate_dashboard()
+    cache_svc.invalidate_dashboard(user_id)
     return {"cleared": True}
 
 

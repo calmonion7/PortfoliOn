@@ -64,8 +64,6 @@ export default function useAuthBootstrap() {
     const params = new URLSearchParams(window.location.search)
     const oauthCode = params.get('oauth')
     const oauthError = params.get('error')
-    const token = params.get('token')
-    const refresh = params.get('refresh')
 
     // 에러 사유(oauth_denied·oauth_failed)는 표시하지 않는다 — 이 경로의 지배적 상황에서
     // 사용자는 로그인을 시도한 게 아니므로 알림이 노이즈다(그릴링에서 통지 제외 선택).
@@ -115,15 +113,9 @@ export default function useAuthBootstrap() {
       return
     }
 
-    if (token && refresh) {
-      localStorage.setItem('access_token', token)
-      localStorage.setItem('refresh_token', refresh)
-      window.history.replaceState({}, '', '/')
-    }
-
     resolveStored()
     logDiag('boot', {
-      branch: token && refresh ? 'token' : 'stored',
+      branch: 'stored',
       session: !!localStorage.getItem('access_token'),
     })
   }, [])

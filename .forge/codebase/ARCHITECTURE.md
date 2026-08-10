@@ -484,10 +484,12 @@ App.jsx
 
 ### 6.2 인증 부트스트랩 (`hooks/useAuthBootstrap.js`)
 
-URL 쿼리 4분기 — `error=` / `oauth=`(코드 교환 fetch) / `token`+`refresh` / 없음.
-**네 분기 모두 `resolveStored()`를 부른다**: "OAuth가 실패했다"는 "세션이 없다"를 뜻하지 않는다
+URL 쿼리 3분기 — `error=` / `oauth=`(코드 교환 fetch) / 없음(stored).
+**세 분기 모두 `resolveStored()`를 부른다**: "OAuth가 실패했다"는 "세션이 없다"를 뜻하지 않는다
 (뒤로가기로 콜백 엔트리가 재실행되면 1회용 코드가 400을 내는 게 지배적 상황).
 성공/실패 모두 `returnFromOAuth()`(`utils/oauthHistory.js`)로 IdP 히스토리 엔트리를 대칭으로 되감는다.
+네 번째 분기였던 `token`+`refresh`(URL 쿼리 토큰을 그대로 `localStorage`에 심던 것)는 **task#290에서 삭제**됐다 —
+백엔드에 생산자가 없는데 세션 고정 취약점만 만들던 레거시다(B47이 아니라 B44).
 
 `bootTimings()`가 Navigation Timing에서 `0→req→resp→di→js` 구간을 뽑아 `logDiag('doc', …)`로
 남긴다(`utils/diag.js` — localStorage 링버퍼 50건). `?diag=1`로 `components/DiagLog.jsx`가 읽는다.

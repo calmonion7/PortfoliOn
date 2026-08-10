@@ -161,7 +161,7 @@ Google OAuth 로그인 시작. Google 로그인 페이지로 리다이렉트.
 
 ### `GET /api/auth/oauth/google/callback`
 
-Google OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트.
+Google OAuth 콜백. 처리 후 `?oauth=<code>` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트(토큰은 실리지 않는다 — 프론트가 그 code를 `GET /api/auth/oauth/token`으로 교환한다, 아래 참조).
 
 ---
 
@@ -173,7 +173,7 @@ GitHub OAuth 로그인 시작. GitHub 로그인 페이지로 리다이렉트.
 
 ### `GET /api/auth/oauth/github/callback`
 
-GitHub OAuth 콜백. 처리 후 `?access_token=...&refresh_token=...` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트.
+GitHub OAuth 콜백. 처리 후 `?oauth=<code>` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트(토큰은 실리지 않는다 — 프론트가 그 code를 `GET /api/auth/oauth/token`으로 교환한다, 아래 참조).
 
 
 ### `GET /api/auth/oauth/token`
@@ -1339,7 +1339,7 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 
 ### `DELETE /api/stocks/dashboard/cache`
 
-대시보드 인메모리 캐시 강제 초기화.
+호출자 자신의 대시보드 인메모리 캐시를 초기화(user_id 스코프 — 전역이 아니다).
 
 **Auth:** Bearer token 필요 (`get_current_user`, task#108)
 
@@ -1830,7 +1830,7 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 ### `PUT /api/report/{ticker}/backlog`
 
-Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm'`인 행만 갱신(`'dart'` 보호). **Auth:** `X-API-Key` 또는 로그인.
+Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm'`인 행만 갱신(`'dart'` 보호). **Auth:** admin 로그인 또는 `X-API-Key`.
 
 **Request Body** — 분기별 배열
 ```json

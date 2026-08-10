@@ -549,7 +549,7 @@ Claude Cowork가 `raw_text`에서 추출한 수주잔고 수치를 저장합니�
 
 > **다중엔티티 연결 종목(예: 한화에어로 012450)은 코드가 자동으로 `source='dart'` + `segments`를 채우므로 pending에 뜨지 않습니다.** 아래 `segments` 예시는 **형식 참고용**이며, Cowork의 수동 `segments` PUT은 자동추출이 안 된 잔여 케이스(검산 실패·비표준 표 등)에 사용합니다.
 
-**Auth:** `X-API-Key` 헤더
+**Auth:** `X-API-Key` 헤더 또는 admin 로그인(task#290 — 임의 인증 사용자가 전역 공유 수주잔고를 덮어쓰던 게이팅 공백을 닫으며 admin으로 좁혔다)
 
 **Path Parameter:** `ticker` — 종목 코드 (예: `012450`)
 

@@ -795,3 +795,32 @@ def test_compare_endpoint_uses_mart_asof_for_target_and_upside():
     assert target_metric["best"] == []                 # 목표가는 방향 애매 → 하이라이트 없음
     assert upside_metric["values"]["AAPL"] == 50.0      # (150-100)/100*100
 
+
+# ── DELETE /api/stocks/dashboard/cache: 사용자별 스코프 (B46) ──
+
+def test_dashboard_cache_clear_does_not_leak_across_users():
+    """사용자 A의 캐시 삭제 요청이 사용자 B의 대시보드 캐시까지 지우면 안 된다.
+    쌍으로: A 자신의 캐시는 여전히 무효화되어야 한다."""
+    import services.cache as cache_svc
+
+    current_user = {"id": "user-a"}
+    a_app = FastAPI()
+    a_app.include_router(router)
+    a_app.dependency_overrides[get_current_user] = lambda: current_user["id"]
+    a_client = TestClient(a_app)
+
+    calls = {"a": 0, "b": 0}
+    cache_svc.get_dashboard("user-a", lambda: (calls.__setitem__("a", calls["a"] + 1), {"h": "a"})[1])
+    cache_svc.get_dashboard("user-b", lambda: (calls.__setitem__("b", calls["b"] + 1), {"h": "b"})[1])
+
+    resp = a_client.delete("/api/stocks/dashboard/cache")
+    assert resp.status_code == 200
+
+    # B는 여전히 캐시 히트여야 한다 (loader 재호출 없음)
+    cache_svc.get_dashboard("user-b", lambda: (calls.__setitem__("b", calls["b"] + 1), {"h": "b"})[1])
+    assert calls["b"] == 1, "사용자 A의 캐시 삭제가 사용자 B의 캐시까지 지웠다"
+
+    # A는 무효화되어 캐시 미스여야 한다 (loader 재호출됨)
+    cache_svc.get_dashboard("user-a", lambda: (calls.__setitem__("a", calls["a"] + 1), {"h": "a"})[1])
+    assert calls["a"] == 2, "사용자 A 자신의 캐시는 여전히 무효화되어야 한다"
+

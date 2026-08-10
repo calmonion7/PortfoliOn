@@ -58,13 +58,10 @@ mapped: 2026-08-10
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| **B44** | 프론트가 **URL 쿼리의 `token`·`refresh`를 그대로 localStorage에 심는다** — 세션 고정 | `frontend/src/hooks/useAuthBootstrap.js::useAuthBootstrap` | 피해자가 `?token=…&refresh=…` 링크 1회 클릭 |
 | B19 | `SESSION_SECRET` 하드코딩 폴백 (모듈 import 시점에 고정) | `routers/auth.py` `_HMAC_SECRET` | `main.py` 밖 진입점(스크립트·테스트·워커) |
 | B20 | 레이트리밋 전무 — bcrypt 로그인이 곧 CPU 고갈 DoS | `routers/auth.py::login` | 무인증·무계정 |
 | B21 | Postgres가 tracked 폴백 비밀번호로 호스트 5432에 발행 | `docker-compose.yml` (`POSTGRES_PASSWORD`) | 호스트 접근 가능한 누구나 |
-| **B45** | 임의 인증 사용자가 **전역 공유** 수주잔고를 덮어쓴다 | `routers/report.py::put_backlog` | 가입만 하면(가입은 열려 있다) |
-| **B46** | 임의 인증 사용자가 **전역** 대시보드 캐시를 flush | `routers/stocks.py::clear_dashboard_cache` | 가입만 하면 |
-| **B47** | SW `api-cache`가 사용자별로 분리되지 않고 로그아웃 시에도 안 지워진다 | `vite.config.js` VitePWA `runtimeCaching` ← `frontend/src/App.jsx::doLogout` | 같은 브라우저 계정 전환 5분 내 |
+| **B50** | 임의 인증 사용자가 **자기 포트폴리오 밖 ticker**의 전역 공유 스냅샷·컨센서스 마트를 뮤테이션 (형제 `generate_one`은 소유권 검사가 있다) | `routers/report.py::refresh_analyst`, `::backfill_consensus` | 가입만 하면 |
 
 ### 표시 오류 / 크래시
 
@@ -348,24 +345,9 @@ finally:
 
 **이 절은 재제기 금지 대상이다.** 아래 5.2~5.10은 게이팅이 아닌 축의 문제다.
 
-### 5.2 프론트가 URL 쿼리의 토큰을 신뢰한다 — **확인된 버그**(B44, 이 절 최고 심각도)
+### 5.2 프론트가 URL 쿼리의 토큰을 신뢰한다 — **닫혔다**(구 B44)
 
-`frontend/src/hooks/useAuthBootstrap.js::useAuthBootstrap`:
-
-```js
-const token = params.get('token')
-const refresh = params.get('refresh')
-...
-if (token && refresh) {
-  localStorage.setItem('access_token', token)
-  localStorage.setItem('refresh_token', refresh)
-  window.history.replaceState({}, '', '/')
-}
-```
-
-**어떤 백엔드 경로도 이 형태를 더는 만들지 않는다** — 콜백은 `?oauth=<code>`를 낸다(`routers/auth.py::oauth_google_callback`/`oauth_github_callback`). 즉 이 분기는 **레거시인데 살아 있다**.
-
-도달: 공격자가 피해자에게 `https://<앱>/?token=<공격자JWT>&refresh=<공격자refresh>`를 보내고 1회 클릭 → 피해자 브라우저가 **공격자 계정에 조용히 묶인다**. 이후 피해자가 입력한 보유종목·관심종목·목표가가 공격자가 읽을 수 있는 계정에 쌓인다. 전형적 세션 고정이며, CSRF 토큰 우회조차 필요 없어 로그인-CSRF보다 강하다. 수정은 삭제다.
+`frontend/src/hooks/useAuthBootstrap.js::useAuthBootstrap`가 URL 쿼리의 `token`·`refresh`를 그대로 `localStorage`에 심던 레거시 분기(어떤 백엔드 경로도 만들지 않는 형태 — 콜백은 `?oauth=<code>`만 낸다)를 **분기 자체를 삭제**해 닫았다(task#290 S1). 분기는 `oauthCode`(정상 교환)·`oauthError`·그 외(`resolveStored` 고정) 3갈래만 남는다. 세션 고정 경로 자체가 없어졌으므로 잔여 위험 없음.
 
 ### 5.3 OAuth `state`가 세션 바인딩·일회용이 아니다 — **잠재 위험**
 
@@ -396,15 +378,16 @@ if (token && refresh) {
 - **`POST /api/auth/login`** — 무제한 크리덴셜 스터핑(락아웃·백오프·CAPTCHA 없음). 더 나쁜 것은 `verify_password`가 **의도적으로 비싼 bcrypt**라는 점이다: 같은 무제한 엔드포인트가 CPU 고갈 DoS가 된다. FastAPI가 sync 핸들러를 유계 스레드풀에서 돌리므로 수백 건 동시 위조 로그인이면 API 전체가 정지한다. **계정 없이 가능한, 이 저장소에서 가장 싼 가용성 공격이다.**
 - `POST /api/auth/refresh`·`GET /api/auth/oauth/token` — 토큰이 `secrets.token_urlsafe(64)`/`(24)`라 추측은 비현실적. 노출은 DB 부하다.
 
-### 5.7 admin 게이팅 공백 3건 — **확인된 버그**
+### 5.7 admin 게이팅 공백 — **2건 닫힘(구 B45·B46), 1건 잔존**
 
-전역 상태를 바꾸는데 `require_admin`이 없는 자리:
+전역 상태를 바꾸는데 게이팅이 약했던 자리:
 
-- **B45 `routers/report.py::put_backlog`** (MED) — `PUT /report/{ticker}/backlog`가 `get_current_user_or_api_key`만 요구하는데, `save_llm_backlog(ticker, entries)`는 **ticker 스코프(전역 공유)**다. 바인딩된 `user_id`는 **사용되지 않는다**. 형제 `refresh_backlog`는 `require_admin`이라 이 라우트가 이례다. 가입이 열려 있으므로(§5.9) 임의 사용자가 아무 티커의 수주잔고를 덮어쓰고 그것이 전 사용자의 정본이 된다. `entries: list = Body(...)`에 `max_length`도 없어 무제한 배열이 행당 쓰기를 유발한다.
-- **B46 `routers/stocks.py::clear_dashboard_cache`** (MED) — `DELETE /dashboard/cache`가 `get_current_user`만 요구하는데 `cache_svc.invalidate_dashboard()`는 **인자 없는 프로세스 전역**이다. 대조군: `routers/calendar.py::delete_calendar_cache`는 `WHERE user_id = %s AND month = %s`로 올바르게 스코프한다. 한 계정이 이 엔드포인트를 반복 호출하면 전 사용자 대시보드가 매 요청 외부 API에서 재계산된다(자체 할당량에 대한 증폭 DoS).
-- `routers/report.py::backfill_consensus` (LOW-MED) — `days: int = 180`이 **`Query(..., le=…)` 상한 없는 bare int**다(형제 `short_sell.py`·`investor.py`는 `Query(252, ge=1, le=1000)`으로 규율돼 있다). `get_current_user`만 요구하면서 외부 제공자를 향한 `_pipeline.backfill(...)`을 돌린다.
+- **닫힘(구 B45) `routers/report.py::put_backlog`** — `PUT /report/{ticker}/backlog`의 게이트를 `get_current_user_or_api_key`→**`require_admin_or_api_key`**로 좁혔다(task#290 S2). `save_llm_backlog(ticker, entries)`가 ticker 스코프(전역 공유)라는 사실은 그대로지만, 이제 admin 로그인 또는 API 키만 도달한다. 형제 `refresh_backlog`(`require_admin`)와 정합됨. `entries: list = Body(...)`에 `max_length` 상한이 없는 것은 그대로 남는다 — task#290의 비목표.
+- **닫힘(구 B46) `routers/stocks.py::clear_dashboard_cache`** — 게이트(`get_current_user`)는 유지하되 `cache_svc.invalidate_dashboard(user_id)`로 **호출자 자신의 캐시만** 무효화하도록 스코프를 좁혔다(task#290 S3, `_dashboard_cache.invalidate`는 이미 `user_id` 인자를 받고 있었다 — 호출부만 무인자였다). 대조군 `routers/calendar.py::delete_calendar_cache`와 이제 동형.
+- **신규 B50 `routers/report.py::refresh_analyst`(`:514`)·`::backfill_consensus`(`:566`)** (MED) — 둘 다 `user_id: str = Depends(get_current_user)`를 받아놓고 **본문에서 쓰지 않는다.** 형제 `generate_one`(`:114-118`)은 `find_ticker(storage.get_all_stocks(user_id), ticker)`로 소유권을 검사해 404를 내는데 이 둘은 곧장 ticker로 전역 공유 `snapshots`를 읽고 UPDATE한다(`backfill_consensus`는 `daily_consensus_mart`·`raw_reports`까지). 도달: 로그인만 하면 자기 포트폴리오 **밖** 임의 종목의 리포트 데이터를 갱신시킬 수 있다 — 외부 API(yfinance) 비용 남용 + 전 사용자가 보는 데이터의 신선도 왜곡. **구 B45(`put_backlog`)와 동형이지만 별개 위치·별개 결함**이라 task#290(B44·B45·B46·B47 4건 한정)의 스코프 밖으로 두고 등재만 했다 — task#290 적대적 리뷰가 형제 감사에서 발견(코드 직독 확인). 처방 후보: `generate_one`과 같은 소유권 검사, 또는 admin `scope=all` 정책에 맞는 멤버십 검사.
+- **잔존 `routers/report.py::backfill_consensus`** (LOW-MED) — `days: int = 180`이 **`Query(..., le=…)` 상한 없는 bare int**다(형제 `short_sell.py`·`investor.py`는 `Query(252, ge=1, le=1000)`으로 규율돼 있다). `get_current_user`만 요구하면서 외부 제공자를 향한 `_pipeline.backfill(...)`을 돌린다. task#290의 비목표.
 
-반대로 **비싼 배치 엔드포인트 28/31은 올바르게 `require_admin`이다** — 게이팅 규율 자체는 좋고, 위 3건이 예외다. `POST /api/admin/cowork/fire`는 고정 env URL(`COWORK_ROUTINE_FIRE_URL`)로만 POST하므로 **SSRF 없음**.
+반대로 **비싼 배치 엔드포인트 28/31은 올바르게 `require_admin`이다** — 게이팅 규율 자체는 좋고, 위 잔존 1건이 예외다. `POST /api/admin/cowork/fire`는 고정 env URL(`COWORK_ROUTINE_FIRE_URL`)로만 POST하므로 **SSRF 없음**.
 
 ### 5.8 API 키 비교가 상수시간이 아니다 — **잠재 위험**(낮음)
 
@@ -639,19 +622,15 @@ if (err.response?.status === 401) {
 
 `hooks/useAuthBootstrap.js`의 OAuth 분기가 쓰는 bare `fetch`에 **`AbortSignal`도 타임아웃도 없다**(`api.js`에도 axios `timeout` 설정이 없어 기본 0=무한). 모든 *정착* 경로는 `resolveStored()`로 `authLoading`을 내리므로 rejection은 덮여 있다 — 그러나 **영영 정착하지 않는 연결**(캡티브 포털, 조용히 끊긴 TCP)은 `authLoading=true`에 머물고 `App.jsx`가 스플래시를 무한 렌더한다. 수동 새로고침 외 탈출 없음. 같은 파일의 주석이 형제 실패 모드("새로고침 전까지 빠져나올 수 없는 백지")를 이미 문서화하고 있는데, **이것이 그 미덮인 변종**이다.
 
-### 7.6 Service Worker가 `/api/*`를 가로챈다 — **확인된 버그**(B47) + 설계 잔여
+### 7.6 Service Worker가 `/api/*`를 가로챈다 — **닫혔다**(구 B47) + 설계 잔여
 
-`vite.config.js`의 VitePWA `runtimeCaching`:
+`vite.config.js`의 VitePWA `runtimeCaching`에서 `/api/*` 항목이 **통째로 제거**됐다(task#290 S4, ADR-0036) — 남는 `runtimeCaching`은 `google-fonts`·`cdn-fonts` 2건뿐이고 인증된 API 응답은 더는 캐시되지 않는다. 이미 기기에 남아있는 `api-cache` 저장소는 **삭제 지점 2곳**이 정리한다: 부팅 1회(`frontend/src/main.jsx`)와 `App.jsx::doLogout` — 둘 다 `apiCachePurge.js::purgeApiCache`(`caches.delete('api-cache')`)를 부른다.
 
-```js
-registerRoute(({url}) => /\/api\//i.test(url.pathname) && !/\/api\/auth\//i.test(url.pathname),
-  new NetworkFirst({cacheName:"api-cache", networkTimeoutSeconds:10,
-    plugins:[new ExpirationPlugin({maxEntries:50, maxAgeSeconds:300}), ...]}), "GET")
-```
-
-- **B47 — `api-cache`가 사용자별로 분리되지 않고 로그아웃에도 안 지워진다.** Workbox는 URL만으로 키를 잡고 `Authorization` 헤더(`api.js`가 주입)는 키에 안 들어가며 `Vary` 처리도 없다. `grep -rn "caches\." frontend/src/` → **0건**이라 `App.jsx::doLogout`은 `localStorage`만 지운다. 도달: 사용자 A 로그아웃 → 5분 내 같은 브라우저에서 B 로그인 → `/api/portfolio`·`/api/stocks`·`/api/stocks/dashboard` 중 하나가 실패하거나 10초 네트워크 타임아웃을 넘기면 **A의 보유종목이 B에게 서빙된다**. `/api/auth/*`가 제외돼 있어 **신원은 맞고 데이터만 틀린** 최악의 조합이 된다.
-- **MED — 10초 `networkTimeoutSeconds`가 stale 금융 데이터를 무표시로 서빙한다.** 느린 모바일에서 `/api/portfolio/prices`가 최대 5분 된 캐시로 폴백하는데, `PriceFreshness`가 읽는 `lastUpdated`는 `usePortfolioData`가 **클라이언트 수신 시각**으로 찍은 값이라 5분 된 가격이 "방금"으로 표시된다.
-- **앱 셸 stale 위험은 없다(확인)** — `globPatterns`가 `.html`을 제외하고 `navigateFallback: null`, 프리캐시 목록에 `index.html`이 없다. 내비게이션은 항상 네트워크를 탄다.
+- **닫힘(구 B47) — `api-cache`가 사용자별로 분리되지 않고 로그아웃에도 안 지워지는 문제.** 캐싱 자체가 없어졌으므로 교차사용자 데이터 서빙 경로가 사라졌다.
+- ⚠️ **단, "닫혔다"는 새 SW가 활성화된 뒤의 이야기다.** 옛 SW가 아직 살아 있는 전환 창에서는 옛 SW가 계속 캐시하므로 위 삭제 2지점이 그 창의 방어선이다. `doLogout`이 SPA 전용(리로드 없음)이라 부팅 퍼지만으로는 **B47의 주 도달 경로("A 로그아웃 → 5분 내 같은 브라우저에서 B 로그인")가 같은 문서 안에서 일어나 안 덮인다** — 그래서 `doLogout`에도 퍼지를 넣었다(ADR-0036 결정절 보정). 그 창에 남는 잔여는 **로그아웃을 거치지 않는 계정 전환** 하나이고, 근본 처방은 삭제 지점 추가가 아니라 **SW 활성화를 앞당기는 것**이다(`injectRegister: 'auto'`가 만드는 `registerSW.js`가 등록을 `window.load`에 게이팅한다 — ADR-0036 후속 후보, 창 길이 미측정).
+- **함께 닫힘 — 무표시 stale 금융 데이터(MED).** 10초 `networkTimeoutSeconds` 폴백이 최대 5분 된 캐시를 "방금"으로 보이게 하던 경로도 캐싱 제거로 동시에 사라졌다(`PriceFreshness`가 읽는 `lastUpdated` 자체의 계산 방식은 무변경 — 캐시가 없으니 그 오차가 발동할 입력이 없다).
+- **앱 셸 stale 위험은 없다(확인, 무변경)** — `globPatterns`가 `.html`을 제외하고 `navigateFallback: null`, 프리캐시 목록에 `index.html`이 없다. 내비게이션은 항상 네트워크를 탄다.
+- ⚠️ **다시 넣지 말 것** — API 캐싱을 되살리려면 캐시 키에 신원이 들어가야 한다(ADR-0036이 기각한 대안 2). 그 배선 없이 규칙만 되돌리면 이 항목이 그대로 재발한다.
 - **업데이트 리로드 루프는 유계**(`hadControllerRef`가 최초 설치를 억제, `attemptReload`가 `pendingRef`를 리로드 *전에* 내린다). LOW 잔여: `isBusy()`가 `document.body.style.overflow === 'hidden'`을 바쁜 것으로 보므로, 어떤 경로가 스크롤 락을 남기면 탭이 옛 번들에 **무기한 고정**된다(폴백 타이머 없음).
 
 ### 7.7 동일 엔드포인트 다중 소비처 — **잠재 위험**(이미 드리프트 발생)
@@ -957,16 +936,13 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 | 우선순위 | 항목 | 절 |
 |---|---|---|
-| 1 | `useAuthBootstrap`의 `?token=&refresh=` 분기 삭제(세션 고정) — 수정이 *삭제*라 비용이 가장 낮고 심각도가 가장 높다 | §5.2 |
-| 2 | 에러 바운더리 신설 — §7.2의 크래시 7곳이 현재 전부 백지다 | §7.2 |
-| 3 | `doLogout`에서 `caches.delete('api-cache')` — 계정 전환 시 교차 사용자 데이터 유출 | §7.6 |
-| 4 | `_fetch_naver_market`의 0페이지 가드(형제 US 경로와 대칭화) | §1.1 |
-| 5 | `fx` 배치 신설 또는 `_usdkrw_rate`에 나이 검사 | §6.4 |
-| 6 | 로그인 레이트리밋(bcrypt CPU 고갈 DoS) | §5.6 |
-| 7 | `put_backlog`·`clear_dashboard_cache`를 `require_admin`으로 | §5.7 |
-| 8 | `Reports.jsx`·`Ranking.jsx::onRowClick` 세대 가드(잘못된 종목 수치 렌더) | §7.3 |
-| 9 | 27개 잡을 `Run.set_status` 패턴으로(키 미설정이 success로 기록되는 문제) | §6.1 |
-| 10 | `_migrate`에 후발 테이블 4개 + `tickers` 컬럼 3개 추가 | §4.1 |
-| 11 | `test_no_bare_today.py`를 `datetime.now()`까지 확장 | §6.8 |
-| 12 | `BATCHES` 개수 단언 3곳을 구조 단언으로 교체 | §9.4 |
-| 13 | §13.2의 미확인 7건 재검증(특히 Naver 재무 위치 인덱스 파싱) | §13.2 |
+| 1 | 에러 바운더리 신설 — §7.2의 크래시 7곳이 현재 전부 백지다 | §7.2 |
+| 2 | `_fetch_naver_market`의 0페이지 가드(형제 US 경로와 대칭화) | §1.1 |
+| 3 | `fx` 배치 신설 또는 `_usdkrw_rate`에 나이 검사 | §6.4 |
+| 4 | 로그인 레이트리밋(bcrypt CPU 고갈 DoS) | §5.6 |
+| 5 | `Reports.jsx`·`Ranking.jsx::onRowClick` 세대 가드(잘못된 종목 수치 렌더) | §7.3 |
+| 6 | 27개 잡을 `Run.set_status` 패턴으로(키 미설정이 success로 기록되는 문제) | §6.1 |
+| 7 | `_migrate`에 후발 테이블 4개 + `tickers` 컬럼 3개 추가 | §4.1 |
+| 8 | `test_no_bare_today.py`를 `datetime.now()`까지 확장 | §6.8 |
+| 9 | `BATCHES` 개수 단언 3곳을 구조 단언으로 교체 | §9.4 |
+| 10 | §13.2의 미확인 7건 재검증(특히 Naver 재무 위치 인덱스 파싱) | §13.2 |

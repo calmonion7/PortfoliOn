@@ -151,11 +151,21 @@ describe('useAuthBootstrap — 에러·실패 착지는 저장 토큰으로 세�
     expect((await settled(result)).session).toEqual({ access_token: 'live' })
   })
 
-  it('레거시 ?token=&refresh= 분기는 이동만 하고 동작 그대로 (non-goal)', async () => {
+  // task#290 S1 (B44) — 이 케이스는 원래 "이동만 하고 동작 그대로"를 단언했다. 그건
+  // *기록된 결정*이 아니라 *부수적 단언*이었다 — 그 테스트를 만든 task#253의
+  // plan.md:85가 비목표로 "?token=&refresh= 레거시 분기 — 백엔드에 생산자가 없다
+  // (auth.py grep 0건). 이동만 하고 손대지 않는다"고 적었다. 즉 그 태스크의 스코프
+  // 밖이었을 뿐 영구 보존 결정이 아니므로 뒤집는다(task#264 판별 절차).
+  // 세션 고정(session fixation) 취약점: 어떤 백엔드 경로도 ?token=&refresh= 형태를
+  // 만들지 않는데(OAuth 콜백은 ?oauth=<code>) 이 분기가 URL 쿼리를 곧이곧대로
+  // localStorage에 심어, 공격자 JWT가 담긴 링크 1회 클릭으로 피해자가 공격자 계정에
+  // 묶인다. 수정은 삭제다 — URL 쿼리의 token·refresh는 세션을 확립하지 않는다.
+  it('URL 쿼리의 ?token=&refresh=는 세션을 확립하지 않는다 (B44, 세션 고정 방지)', async () => {
     atUrl('?token=t&refresh=r')
     const { result } = renderHook(() => useAuthBootstrap())
-    expect((await settled(result)).session).toEqual({ access_token: 't' })
-    expect(localStorage.getItem('refresh_token')).toBe('r')
+    expect((await settled(result)).session).toBeNull()
+    expect(localStorage.getItem('access_token')).toBeNull()
+    expect(localStorage.getItem('refresh_token')).toBeNull()
   })
 
   // ── task#285 S5 — `doc` 로그에 `resp`(responseStart) 추가. 서버·리다이렉트 구간과

@@ -16,8 +16,9 @@
 //   이 저장소 관례는 'block'이지만(SW가 /api/*를 NetworkFirst로 가로채 응답 주입을 무력화하므로),
 //   **SW 설치 여부가 콜드/웜 축 그 자체**라 block하면 웜 arm이 원리적으로 존재하지 않는다.
 //   그 대가로 응답 주입에 의존하는 축은 하나도 쓰지 않는다(전부 라이브 실응답).
-//   참고: `/api/auth/*`는 vite.config.js runtimeCaching 패턴에서 **명시적으로 제외**돼 있어
-//   (`!/\/api\/auth\//`) 코드교환 호출은 SW 라우트를 타지 않는다 → 400 관측이 SW에 오염되지 않는다.
+//   참고: task#290(ADR-0036)부터 vite.config.js runtimeCaching에 `/api/*` 패턴 자체가 없다
+//   (기존 `!/\/api\/auth\//` 제외 규칙째로 제거) — `/api/*` 전체가 SW 라우트를 안 타므로
+//   코드교환 호출도 당연히 SW에 오염되지 않는다.
 //
 // 측정 대상 — 진짜 콜백 문서 부팅:
 //   `/?oauth=<무효코드>`로 진입하면 백엔드 `auth.py:232 oauth_token_exchange`가

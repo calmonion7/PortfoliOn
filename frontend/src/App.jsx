@@ -36,6 +36,7 @@ import './App.css'
 import AdminAnalytics from './pages/AdminAnalytics'
 import { REDIRECTS } from './routes'
 import { SPLASH_HTML } from './oauthSplash'
+import { purgeApiCache } from './apiCachePurge'
 
 async function doLogout(setSession) {
   const refresh = localStorage.getItem('refresh_token')
@@ -48,6 +49,12 @@ async function doLogout(setSession) {
   }
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
+  // 이 함수는 SPA 전용이다(리로드·내비게이션 없음) → main.jsx의 부팅 1회 퍼지가 재실행되지
+  // 않는다. 그런데 B47의 문서화된 주 도달 경로가 정확히 "A 로그아웃 → 5분 내 같은 브라우저에서
+  // B 로그인"이라 같은 문서 안에서 일어난다. 새 SW가 활성화된 뒤에는 아무도 api-cache를 채우지
+  // 않아 no-op이지만, 옛 SW가 아직 살아 있는 전환 창에서는 이 한 줄이 그 경로의 유일한 방어선이다
+  // (ADR-0036 결과절). await하지 않는다 — 로그아웃 반응성을 캐시 IO에 묶지 않는다.
+  purgeApiCache()
   setSession(null)
 }
 

@@ -579,7 +579,7 @@ def backfill_consensus(ticker: str, days: int = 180, force: bool = False, user_i
 
 
 @router.put("/report/{ticker}/backlog")
-def put_backlog(ticker: str, entries: list = Body(...), user_id: str = Depends(get_current_user_or_api_key)):
+def put_backlog(ticker: str, entries: list = Body(...), user_id: str = Depends(require_admin_or_api_key)):
     from services.backlog import save_llm_backlog
     save_llm_backlog(ticker, entries)
     return {"ticker": ticker.upper(), "saved": len(entries)}

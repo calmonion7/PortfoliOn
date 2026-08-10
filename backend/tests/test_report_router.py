@@ -359,6 +359,19 @@ def test_backfill_blocked_for_non_admin():
     assert resp.status_code == 403
 
 
+def test_put_backlog_blocked_for_non_admin():
+    with patch("auth.auth_service.get_user_by_id", return_value={"role": "user"}):
+        resp = _nonadmin_client.put("/api/report/AAPL/backlog", json=[])
+    assert resp.status_code == 403
+
+
+def test_put_backlog_allowed_for_admin():
+    with patch("services.backlog.save_llm_backlog", return_value=None) as mock_save:
+        resp = client.put("/api/report/AAPL/backlog", json=[{"period": "2026Q1"}])
+    assert resp.status_code == 200
+    mock_save.assert_called_once_with("AAPL", [{"period": "2026Q1"}])
+
+
 # ── get_report: ETF 플래그(is_etf) 노출 ──────────────────────────────────────
 # detail 응답의 summary.is_etf는 tickers.is_etf에서 읽어 주입한다(스냅샷 재생성 불필요).
 # query 호출: routers.report.query = ① _read_snapshot ② tickers(enriched_at,is_etf).
