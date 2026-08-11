@@ -34,6 +34,8 @@ mapped: 2026-08-10
 
 번호는 지난 매핑과 **연속**이다(해소된 것의 번호는 재사용하지 않는다). 이번 판은 아래 표의 전 항목을 `20dd46e` 코드로 **직접 재확인**했다. 직전 판에 있었으나 이번에 재검증하지 못한 항목은 §13.2에 "미확인"으로 분리했다 — 표에서 사라졌다고 해소된 것이 아니다.
 
+> **재검증: 2026-08-11 (task#292) — 이 절과 §13.2만 갱신됨.** 9차 버그 헌트(`4325d8d..b93afce`, 56커밋/179파일, 7렌즈 + LC 판정 레인)가 확정한 **B51~B59**를 추가하고, `§13.2` 미확인 8건을 판정해 **열림으로 확정된 6건을 이 절로 이동**했다(기존 번호 복귀 `B8`·`B30` + 무번호였던 4건에 신규 번호 `B60`~`B63`). `last_mapped_commit` 프론트매터는 건드리지 않았다(재매핑이 아니다). 근거·검증방법·제안수정은 `.forge/bug-report.md`(9차) 참조.
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
@@ -42,6 +44,10 @@ mapped: 2026-08-10
 | **B40** | `_mc_load` 실패를 "저장값 없음"으로 읽어 365일 시계열을 1건으로 덮어씀 | `market_indicators/kospi_signal.py::refresh_kospi_signal` | 배치 중 DB read 1회 실패(PoolError 포함) |
 | **B41** | `market_cache` 키 `fx`에 **배치가 없다** — 포트폴리오 KRW 환산 전체가 무기한 stale | `market_indicators/fx.py::get_fx` (소비: `routers/stocks.py::_usdkrw_rate`) | 아무도 시장지표 탭을 안 열면 항상 |
 | B5 | 사용자 삭제가 6개 독립 트랜잭션 — 중간 실패 시 반쯤 삭제된 사용자 | `routers/admin.py::delete_user` | 루프 중 DB 오류 |
+| **B60** | `_filter_outliers`가 저장 시계열을 **영구 손상** | `_filter_outliers` (§13.2에서 열림 확정, task#292) | 이상치 판정에 걸리는 입력 |
+| **B61** | Naver 재무를 **위치 인덱스**로 읽는다 — 상류 표 구조가 바뀌면 조용히 다른 계정을 읽는다 | `services/market/kr.py` 재무 파싱부 (§13.2에서 열림 확정, task#292) | 상류 표 열 순서 변경 |
+| B52 | `run_daily`의 KR `AVG_PRC` override가 같은 파일의 `math.isfinite` 초크포인트를 우회해 mart에 **NaN을 UPDATE** — `bool(float('nan'))==True`라 진리값 가드를 통과하고, `float("nan")`은 ValueError를 던지지 않아 `except (ValueError, KeyError)`도 못 잡는다 | `services/consensus_pipeline.py::run_daily` ← `services/market/kr.py::get_analyst_data_kr` | `TARGET_PRC`/`AVG_PRC`에 `nan`·`inf` 토큰 |
+| B62 | `_table_unit`의 억원 기본값 폴백 — ×100 오저장 클래스 | `services/backlog_parser.py::_table_unit` (§13.2에서 열림 확정, task#292) | 단위 캡션 파싱 실패 |
 
 ### 무음 미동작 / 오값
 
@@ -53,6 +59,11 @@ mapped: 2026-08-10
 | B24 | `nav_analytics`가 백엔드 화이트리스트에 없어 **200 OK로 무음 폐기** | `routers/events.py::VALID_EVENTS` ← `components/Masthead.jsx`·`MobileTopActions.jsx` | admin이 '행동 분석' 진입 시 항상 |
 | **B42** | `insider_trades`·`disclosures`의 DART 조회 창이 UTC 기준 — 하루 밀림 | `services/insider_trades.py::fetch_insider_trades`, `services/disclosures.py::fetch_disclosures` | 00:00–09:00 KST 실행 |
 | **B43** | US 섹터 모멘텀에 부분 페이로드 백필이 없다(KR에는 있다) | `services/us_sector_service.py::refresh` | 11개 ETF 중 일부만 실패 |
+| B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | `services/consensus_pipeline.py` tz 경로 (§13.2에서 열림 확정, task#292) | 00:00–09:00 KST 실행 |
+| **B30** | 티커 유니버스 캐시가 **축소된** 스크레이프를 무검증 저장 | `market_indicators/earnings.py::_tickers_with_cache` ← `_scrape_kospi` (§13.2에서 열림 확정, task#292) | 스크레이프 조기종료로 부분 축소 |
+| B53 | 루틴 프롬프트의 `market_outlook` 예시가 **문자열 템플릿**이라 AI가 산문으로 채우면 `segments[]`가 `None`이 되어 「사업부문 시장 분석」 섹션이 **크래시 없이 조용히 사라진다**(정본 `CLAUDE_COWORK_API.md`는 객체로 못박고, `routers/stocks.py`엔 스키마 검증이 없어 422 피드백도 없다) | `scripts/cowork-routine-prompt.md` → `services/analyst_reports.py::_market_outlook_segments` | 루틴이 프롬프트 예시 형태를 따를 때 |
+| B56 | `DiagLog` 복사 폴백이 `execCommand` 반환값을 확인하지 않아 **실패해도 '복사됨'** 이 뜨고, 이중 실패는 빈 `.catch(() => {})`가 완전히 삼킨다 — 이 컴포넌트의 목적(폰에서 로그 채취)이 정확히 그 조합에서 무너진다 | `components/DiagLog.jsx::legacyCopy · copyText · handleCopy` | `execCommand`가 예외 없이 false / writeText 거절 + legacyCopy throw |
+| B58 | `useTrackedStocks`의 티커별 뮤텍스가 **같은 훅 인스턴스를 공유하는 화면**에서 다른 카드의 동일 티커 2번째 클릭을 무음으로 삼킨다(`GuruStats`·`GuruAllocation`·`GuruManagers`·`GuruDetail`은 `pending`을 쓰지 않아 배지 비활성화도 없고, `onClick`이 반환값을 버려 호출부도 감지 못 한다) | `hooks/useTrackedStocks.js::toggle` ← `pages/GuruManagers.jsx` | 같은 티커가 여러 매니저 top10에 동시 등장 + 연속 클릭 |
 
 ### 계약·보안
 
@@ -61,6 +72,7 @@ mapped: 2026-08-10
 | B19 | `SESSION_SECRET` 하드코딩 폴백 (모듈 import 시점에 고정) | `routers/auth.py` `_HMAC_SECRET` | `main.py` 밖 진입점(스크립트·테스트·워커) |
 | B20 | 레이트리밋 전무 — bcrypt 로그인이 곧 CPU 고갈 DoS | `routers/auth.py::login` | 무인증·무계정 |
 | B21 | Postgres가 tracked 폴백 비밀번호로 호스트 5432에 발행 | `docker-compose.yml` (`POSTGRES_PASSWORD`) | 호스트 접근 가능한 누구나 |
+| **B51** | `?diag=1`이 인증 분기보다 **앞서 렌더**되고, 진단 로그가 OAuth 인가코드를 **소비 전 원문으로** `localStorage['diag_log']`에 영구 기록한다 — `logDiag('doc', {url: pathname+search})`가 이펙트 최상단이라 `replaceState` 스트립·코드교환 `fetch`보다 먼저 캡처한다. ⚠️ 같은 파일에서 같은 형태(URL 크리덴셜→localStorage)를 **이미 세션 고정 취약점으로 판정해 제거한 전례**가 있다(B44/task#290, `ARCHITECTURE.md`) — 반복 맹점 | `App.jsx::App`(diag 분기) · `hooks/useAuthBootstrap.js`(최상단 `logDiag`) · `utils/diag.js::logDiag` · `components/DiagLog.jsx` | 코드 미소비(네트워크 실패) ∧ 같은 브라우저 접근 제3자 ∧ TTL 120초 내 |
 
 ### 표시 오류 / 크래시
 
@@ -69,6 +81,16 @@ mapped: 2026-08-10
 | B34 | `fmtSharesUs`가 음수에서 축약 없이 전액 표기(형제 `fmtSharesKr`은 부호 보존) | `frontend/src/utils.js` ← `components/reports/UsInsiderSection.jsx` |
 | **B48** | **에러 바운더리가 트리 어디에도 없다** — 렌더 throw 1건이 전체 백지 | `frontend/src/` 전역 (grep 결과 0건) |
 | **B49** | 리포트 상세 fetch에 staleness 가드가 없어 **A 종목 수치가 B 종목 화면에 렌더** | `frontend/src/pages/Reports.jsx` 상세 fetch 이펙트 |
+| **B54** | 선도기술 **목록** 카드가 결론 문장인 `title`을 ellipsis로 자른다 — **상세 페이지가 같은 필드에 "ellipsis·line-clamp 금지(가토 ⑦)"를 명시**하는데 목록만 위반(서로 다른 커밋 간 회귀성 드리프트: 목록 task#276 / 상세 금지 task#280). 라이브 실측 4발행물 × 3뷰포트 **12표본 전부 잘림**(PC1440 가시비율 15.2% ≈ 23자), `title` hover 속성도 없어 복구는 클릭뿐. 한국어는 술어가 끝이라 잘림이 **결론부터 먹는다**(가토 ⑬) | `pages/TechReports.jsx` (대조: `pages/TechReport.jsx` 리드 문단 주석) |
+| **B55** | `ShareChart` 점유율 막대가 값 칸 폭을 예약하지 않아 **트랙(`flex:1`) 기준이 행마다 달라지고 더 작은 값이 더 긴 막대**가 된다(가토 ⑮). 형제 `MarketEstimates.jsx`가 **이미 실측 확인해 `width:${valueCh}ch`로 고친 결함과 동형**인데 이 컴포넌트는 그 수정을 받지 않았다. 라이브 주입 실측: `100.0%` vs `99.9%` → 막대 `592.64` vs `599.25px`(Δ −6.61px, 육안 확인), 모바일 390에서 Δ **−7.05px**로 악화. ⚠️ 실데이터 노출은 4발행물 중 **2건 미측정**(측정한 2건은 0행·1행으로 자극 불가) | `components/tech/ShareChart.jsx` (처방 원본: `components/tech/MarketEstimates.jsx`) |
+| B57 | `TechGraph` 섹션 게이트가 **컴포넌트 자신의 채택 조건과 다른 식**이라(페이지는 배열 길이만, 컴포넌트는 `validLabels` trim 필터) related가 실질 비어도 target 단독 빈 그래프가 열린다. 같은 파일이 `milestones`·`categories`엔 "게이트가 각 컴포넌트의 순수함수와 같은 식이어야 한다"는 규율을 준수하는데 `related`만 예외 | `pages/TechReport.jsx`(`hasRelated`) ↔ `components/tech/TechGraph.jsx`(`techGraphLayout`·`hasGraph`) |
+| B63 | 프론트 포매터 중복 — 재계수 완료(§13.2에서 열림 확정, task#292) | `frontend/src/utils.js` 및 산발 포매터 (§7.7·§7.9) |
+
+### 검증장치·문서
+
+| # | 결함 | 위치 (심볼) |
+|---|---|---|
+| B59 | fg-map 산출물의 카운트 3곳이 실측과 어긋난다 — **원인이 두 클래스다**: ⓐ `pages/ (24 jsx)`는 `last_mapped_commit`과 무관한 **작성 시점 오기**(문서 자신의 하위 나열 합 33과도 모순 → 매핑 시 셀프체크로 잡을 수 있었다. 재실행으로는 재발을 막지 못한다) ⓑ ADR `0001~0035`(실제 0037)·프론트 테스트 63(실제 64)은 **진짜 post-mapping drift**(task#290·#291이 CONCERNS만 수동 패치하고 이 두 문서는 빠뜨렸다) | `.forge/codebase/STRUCTURE.md` §3 `pages/` · §5 `adr/` · `.forge/codebase/TESTING.md` §1·§2 |
 
 ---
 
@@ -909,16 +931,24 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 직전 판의 §0에 있었으나 `20dd46e` 코드로 확정하지 못한 항목. **해소된 것이 아니라 확인하지 않은 것**이다.
 
-| # | 항목 | 미확인 사유 |
-|---|---|---|
-| B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | 근거 부족 — `consensus_pipeline`의 tz 경로를 이번 패스에서 직독하지 않았다 |
-| B30 | 티커 유니버스 캐시가 **축소된** 스크레이프를 무검증 저장 | 부분 확인 — `earnings.py::_tickers_with_cache`에 `if tickers:` 가드와 stale→seed 사다리가 있음은 확인했으나, `_scrape_kospi`의 조기종료가 실제로 부분 축소를 만드는지는 라이브 실행이 필요하다(도구 범위 밖) |
-| B33 | `any(snap_dist.values())`가 진짜 0/0/0을 결측으로 오판 | 근거 부족 — `routers/analyst_reports.py`의 귀속 로직을 직독하지 않았다 |
-| — | `_filter_outliers`가 저장 시계열을 영구 손상 | 근거 부족 — 해당 심볼을 이번 패스 대상에 넣지 않았다 |
-| — | Naver 재무를 **위치 인덱스**로 읽는다(직전 판 §2.1이 "이 군에서 가장 위험"으로 지목) | 근거 부족 — `market/kr.py`의 파싱부를 라인 단위로 직독하지 않았다. **다음 매핑의 우선 대상** |
-| — | `_table_unit`의 억원 기본값 폴백(×100 오저장 클래스) | 근거 부족 — `backlog_parser.py` 미직독 |
-| — | 프론트 포매터 중복 15종 | 부분 확인 — 중복 자체(§7.7·§7.9)는 확인했으나 15종이라는 수는 재계수하지 않았다 |
-| — | 인메모리 캐시 스레드 안전성의 실제 사고 가능성 | 도구 범위 밖 — 동시성 재현이 필요하다 |
+> **판정 완료: 2026-08-11 (task#292, 9차 버그 헌트 LC 판정 레인).** 아래 8건을 **현재 코드 직독**으로 판정했다(추정 금지 — 각 판정에 코드 인용 첨부). **8건 중 7건이 판정됐고 1건만 이월**로 남는다. 열림으로 확정된 6건은 **§0으로 이동**했고(기존 번호 복귀 `B8`·`B30` + 무번호였던 4건에 신규 번호 `B60`~`B63`), 닫힘 1건은 아래 「해소」로 옮겼다.
+>
+> **판정축은 2축이다** — **생존**(열림/닫힘/부분/판정불가) × **위치**(제자리/이동/소멸). 한 축에 섞으면 "이동하며 닫힘"이 표현 불가라 판정기가 임의로 하나를 고르게 되고, **그 선택은 판정기 탓이 아니라 축 설계 탓**이다(8차에 실제로 그 일이 났다 — 8차 회고 학습 3).
+>
+> **판정기의 이빨을 대조군으로 검증했다** — 답이 알려진 2건(`B1` = 열림 / 구 `B50` = 닫힘)을 **어느 것이 대조군인지 알리지 않고(블라인드)** 8건에 섞어 투입해 **2/2 기대대로** 나왔다. 대조군 없이는 "대상이 안 그렇다"와 "판정기가 못 본다"가 구별되지 않는다(가토 ⑧ⓔ).
+
+| # | 항목 | 생존 | 위치 | 판정 근거 | 이동 |
+|---|---|---|---|---|---|
+| B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 (LOW) |
+| B30 | 티커 유니버스 캐시가 **축소된** 스크레이프를 무검증 저장 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 (MEDIUM) |
+| B33 | `any(snap_dist.values())`가 진짜 0/0/0을 결측으로 오판 | **닫힘** | 제자리 | **구조적 배제** — `market/kr.py::get_analyst_data_kr`의 세 버킷(`c>=3.5` / `2.5<=c<3.5` / `c<2.5`)이 실수선을 **완전 분할**하고, `market/__init__.py::get_analyst_data`도 yfinance 5열을 3버킷으로 완전 분할한다. 따라서 `buy+hold+sell==0 ⟺ 파싱된 평가 0건`이 참이고, 그 상태에서 mart 보충은 주석이 명시한 **의도된 폴백**이다 | → 해소 (아래 주의) |
+| — | `_filter_outliers`가 저장 시계열을 영구 손상 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 **B60 (HIGH)** |
+| — | Naver 재무를 **위치 인덱스**로 읽는다 | **열림** | 제자리 | 현재 코드 인용 확인. 직전 판이 "다음 매핑의 우선 대상"으로 지목한 그 항목 | → §0 **B61 (HIGH)** |
+| — | `_table_unit`의 억원 기본값 폴백(×100 오저장 클래스) | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 **B62 (MEDIUM)** |
+| — | 프론트 포매터 중복 15종 | **열림** | 제자리 | 재계수 수행 | → §0 **B63 (LOW)** |
+| — | 인메모리 캐시 스레드 안전성의 실제 사고 가능성 | **판정불가** | 판정불가 | **도구 범위 밖 — 동시성 재현이 필요하다.** 억지 판정하지 않고 사유와 함께 잔류시킨다. 2사이클 연속 이월이므로 다음 결정은 "계속 미룰지 vs 동시성 하니스를 만들지"다 | **잔류(이 절)** |
+
+⚠️ **B33 닫힘은 8차 판정의 정정이다.** 8차 리포트의 「판정 뒤집기」 절이 이 줄을 **CONFIRMED**로 확정했는데, 9차 메인 세션이 직독해 **닫힘이 옳음을 확정**했다. 8차의 논증(기각자가 쓴 불변식 `합==0 ⟺ 커버리지 0`이 거짓임을 반례로 증명)은 **사실이지만 결론이 과하다** — 판정에 필요한 불변식은 `합==0 ⟺ 파싱된 평가 0건`이고 그것은 버킷 완전분할에 의해 참이다. **기각 논리를 깨면 그 건은 *확정*이 아니라 *미판정*으로 돌아간다**(일반 교훈: 기각을 무너뜨린 뒤 "이 도달 가능한 상태에서 코드의 실제 동작이 틀렸는가"를 독립으로 다시 물어야 한다).
 
 ### 13.3 원인 귀속을 **단정하지 말 것**으로 남는 것
 
