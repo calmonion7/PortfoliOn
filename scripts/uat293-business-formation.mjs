@@ -19,8 +19,10 @@
 //     데이터 유무에 따라 앱이 조건부로 렌더하는 슬롯이라(BusinessFormationSection.jsx:60,
 //     chg==null이면 렌더 안 함) 정의역에서 뺀다. 이건 "무음 스킵"이 아니라 앱 설계상의 정의역
 //     제외다(TESTING §7.3 ⓛ) — 코드에 이유를 명시했으니 여기 적어둔다.
-//  6. leaf-lines — 접힘(CONVENTIONS §9.7③): 같은 6슬롯의 실제 렌더 줄 수(서로 다른 top 값의
-//     개수, `range.getClientRects().length` 아님 — TESTING §9②).
+//  6. leaf-lines — 접힘(CONVENTIONS §9.7③): 같은 6슬롯의 실제 렌더 줄 수. `getClientRects().length`가
+//     아닌 것은 물론이고, **서로 다른 top 개수도 아니다** — 한 줄에 폰트 크기가 섞이면(값 22px +
+//     `3MA` 배지 10px) 같은 줄인데 top이 갈려 거짓 FAIL한다(task#293 배포 후 8건 실측).
+//     줄 = **세로로 겹치지 않는 rect 묶음**으로 센다(measureLeaf 주석에 실측 좌표).
 //  7. 뷰포트 4종 — PC 1440×900 · PC 1440×1000 · 모바일 390×844 · 모바일 350×700(최협 케이스).
 //     ※ 프롬프트 문구가 "PC 1440 · 모바일 390 · 모바일 350"(3폭) + "4뷰포트"로 개수가 어긋나
 //     있어, TESTING §7.1의 실사용 상수(1440×900/1440×1000·390×844·350×700)에서 PC 두 높이를
@@ -152,8 +154,25 @@ async function measure(page) {
       const clipped = scrollW > clientW + 1;
       const range = document.createRange();
       range.selectNodeContents(el);
-      const rects = [...range.getClientRects()];
-      const lines = rects.length ? new Set(rects.map(r => Math.round(r.top))).size : 0;
+      // 진짜 줄 수 = **세로로 겹치지 않는 rect 묶음의 개수**.
+      // ⚠️ `new Set(rects.map(r => Math.round(r.top))).size`(TESTING §9②의 관용구)는 **한 줄에
+      //    폰트 크기가 섞이면 깨진다** — 작은 글자는 같은 baseline에서 더 아래에 앉아 top이 달라진다.
+      //    task#293 실측(PC 1440, 배포 후): `.v`의 `12,510`(22px, top 689.2~715.2) 옆에 `3MA`
+      //    (10px, top 700.2~712.2)가 left 140.5→145.9로 **나란히** 있는데 top이 11px 달라
+      //    4뷰포트 × 2부문 = 8건이 전부 거짓 FAIL했다(박스 높이 33px == line-height 33px로
+      //    한 줄임이 확정됐다). 세로 겹침으로 묶으면 이 아티팩트가 사라지고, 진짜 줄바꿈은
+      //    줄끼리 세로로 겹치지 않으므로 여전히 FAIL한다(완화가 아니라 의도 기준 재작성).
+      const rects = [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0);
+      const groups = [];
+      for (const r of [...rects].sort((a, b) => a.top - b.top)) {
+        const g = groups.find((g) => {
+          const ov = Math.min(g.bottom, r.bottom) - Math.max(g.top, r.top);
+          return ov > 0.3 * Math.min(g.bottom - g.top, r.bottom - r.top);
+        });
+        if (g) { g.top = Math.min(g.top, r.top); g.bottom = Math.max(g.bottom, r.bottom); }
+        else groups.push({ top: r.top, bottom: r.bottom });
+      }
+      const lines = groups.length;
       let hiddenAncestorFound = false, hiddenAncestorClipped = false, cur = el.parentElement, depth = 0;
       while (cur && depth < 40) {
         const cs = getComputedStyle(cur);
