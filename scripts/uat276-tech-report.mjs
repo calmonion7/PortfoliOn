@@ -37,6 +37,18 @@
 //     10px·6px을 각각 판정한다 — 임계 24는 그대로다(둘 다 옛 임계보다 오히려 타이트하다).
 // 도메인 수치는 정확일치가 아니라 **하한 + 실측 출력**으로 둔다 — 이전 사이클에서 정확일치 sentinel이
 // 정당한 증가(24→46)에 거짓 FAIL을 냈다.
+//
+// ── task#296 S6 갱신 ──────────────────────────────────────────────────────
+// PlayerTable이 열을 techReportUtils.playerColumns(현재 픽스처는 gap·share 둘 다 존재 → name·level·
+// gap·share 4열)로 줄이고 **국가·티커를 열에서 빼 이름 셀 내부 메타줄로 옮겼다**(스크롤러도 함께 제거).
+// 그래서 옛 6열 고정 인덱스(`cellTxt[2]`=level·`[3]`=gap, TABLE_COLS=6)는 렌더 실측 헤더 라벨로
+// 교체한다(리터럴 인덱스가 아니라 실제 렌더된 `<th>` 텍스트로 찾는다 — 열 순서가 바뀌어도 안 깨진다).
+// ProseSections도 `<details>/<summary>` 접기를 전부 제거하고 `<h3>` + 상시 노출로 바뀌었다 — 옛
+// `detailsTotal`/`detailsOpen` 기반 `prose-total`/`prose-open`/`prose-collapsed`는 **뒤집는다**:
+// 이제 `<details>` 자체가 0개여야 정상이고, 소제목 수는 `<h3>` 개수로 잰다. 뒤집는 근거는 task#280 S4의
+// 기록(전부 접힘)이 아니라 task#296 계획(사용자 결정 — 스크롤+전역 목차가 항해를 대신한다, §7.4.6/task#264
+// 절차)이다. **표의 스크롤러 제거는 이 파일의 정의역 밖이다** — 여기는 픽스처(무쓰기) 전용이고 표
+// 스크롤러 존재/부재는 uat280(실데이터)·uat296(신규, 목차·note·스크롤러 전담)이 잰다.
 // ⚠️ 이 스크립트는 **픽스처 전용**이다(page.route 주입). 실발행 데이터 측정은 scripts/uat280-tech-report.mjs가
 //    담당한다 — 두 프로브는 상보적이다: 여기 픽스처는 실데이터에 **없는** 입력(대괄호 헤딩 앞 선행 문단,
 //    gap_years null 업체, 보유/관심 배지)을 일부러 만들어 그 분기를 덮고, uat280은 실발행물이 그 축을
@@ -82,6 +94,17 @@ const LIST_SLUGS = ['reusable-rocket', 'solid-state-battery', 'smr', 'robotics']
 // 표시명 미러 — frontend/src/components/reports/techReportUtils.js TECH_NAMES(백엔드는 응답에 안 싣는다).
 // 1/2에서 h1이 제목 → 기술명으로 바뀌었으므로 이 맵이 h1 identity 단언의 기대값 소스다.
 const TECH_NAMES = { 'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇' };
+
+// playerColumns 미러(techReportUtils.js와 동일 로직, task#296) — 열 수를 리터럴로 박지 않고 픽스처
+// 입력에서 유도한다. name·level 항상 + gap·share는 전 행 결측이면 제외(share는 `>= 0`이 게이트 —
+// 0은 결측이 아니라 값이다).
+function mirrorPlayerColumns(players) {
+  const list = Array.isArray(players) ? players : [];
+  const cols = ['name', 'level'];
+  if (list.some(p => p?.gap_years != null)) cols.push('gap');
+  if (list.some(p => Number.isFinite(p?.share_pct) && p.share_pct >= 0)) cols.push('share');
+  return cols;
+}
 
 // ── formatMarketSize/formatMarketSummary 미러(frontend techReportUtils.js와 바이트 동일 로직) ──
 // 리터럴 문자열을 하드코딩하지 않고 픽스처 입력에서 기대값을 "계산"한다(리터럴이 아니라 불변식 규율).
@@ -159,8 +182,7 @@ const DETAIL_REPORT = {
   difficulty: { score: 5, rationale: RATIONALE },
   players: PLAYERS, challenges: CHALLENGES, related: {}, market: MARKET, sources: SOURCES,
 };
-// 접힘 항목 수 = 소제목 섹션 수 + 난이도 근거 1 (ProseSections는 task#280 S4에서 전부 접힘으로
-// 뒤집혔다 — firstTitled만 open이던 구동작은 폐기, #264 판별 근거는 위 prose-open 단언부 참조).
+// <h3> 소제목 수 = 소제목 섹션 수 + 난이도 근거 1(task#296 — 전부 상시 노출, 접기 자체가 없다).
 // 픽스처 리터럴이 아니라 픽스처 **입력에서 계산**한다 — 입력을 바꾸면 기대값이 따라온다.
 const TITLED_ITEMS = DESCRIPTION.split('\n').filter((l) => /^\[[^\]]+\]$/.test(l.trim())).length
   + (RATIONALE.trim() !== '' ? 1 : 0);
@@ -256,6 +278,13 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
   const clippers = [...root.querySelectorAll('*')].filter(e => cs(e).overflow === 'hidden' && txt(e).length > 0)
     .map(e => ({ t: txt(e).slice(0, 40), scrollW: e.scrollWidth, clientW: e.clientWidth, isEllipsis: cs(e).textOverflow === 'ellipsis' }));
 
+  // task#296 — 열 집합이 playerColumns(픽스처는 4열: 업체·기술수준·선두 대비·점유율)로 줄고 국가·티커는
+  // 열이 아니라 이름 셀 내부로 옮겼다. 고정 인덱스(옛 cellTxt[2]=level·[3]=gap, 6열 가정)는 렌더된
+  // `<th>` 라벨로 찾는다 — 열 순서·개수가 데이터에 따라 바뀌어도 안 깨진다(리터럴 인덱스 금지).
+  const headLabels = [...playersEl.querySelectorAll('thead th')].map(th => txt(th));
+  const levelIdx = headLabels.indexOf('기술수준');
+  const gapIdx = headLabels.indexOf('선두 대비');
+
   // 업체 행 단위(1/2에서 카드 → <tr>) — 셀 인접 간격, ellipsis 규율, 배지 색, 정렬 불변식 입력.
   const rows = [...playersEl.querySelectorAll('[data-testid="tech-report-player-row"]')].map(row => {
     const nameEl = row.querySelector('[data-testid="tech-report-player-name"]');
@@ -282,13 +311,15 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
       const s = cs(td);
       return { i: ci, ws: s.whiteSpace, sw: td.scrollWidth, cw: td.clientWidth, w: Math.round(td.getBoundingClientRect().width) };
     });
-    // 옛 축(이름행 ↔ 메타행 세로 간격)의 표 등가물 — 이름 셀과 국가 셀은 한 행의 인접 열이므로
-    // 그 사이가 벌어지면 같은 업체의 정보가 두 덩어리로 읽힌다(가토 ⑩: 붙어야 할 것이 떨어짐).
+    // 옛 축(이름행 ↔ 메타행 세로 간격)의 표 등가물 — 이름 셀과 그 다음 셀(task#296: 국가 → 기술수준)은
+    // 한 행의 인접 열이므로 그 사이가 벌어지면 같은 업체의 정보가 두 덩어리로 읽힌다(가토 ⑩).
     const gap = cells.length >= 2
       ? Math.round(cells[1].getBoundingClientRect().left - cells[0].getBoundingClientRect().right)
       : null;
-    const lvM = (cellTxt[2] || '').match(/^(\d+)단계/);
-    const gapM = (cellTxt[3] || '').match(/^선두 대비 (\d+)년/);
+    const lvM = (cellTxt[levelIdx] || '').match(/^(\d+)단계/);
+    // gap 셀은 이제 "선두 대비" 접두 없이 격차만 담는다(leader_name이 표 위 캡션으로 승격된 task#280
+    // S3부터 이미 그랬다 — 옛 `/^선두 대비 (\d+)년/`은 그 시점부터 스테일이었다).
+    const gapM = gapIdx >= 0 ? (cellTxt[gapIdx] || '').match(/^(\d+)년$/) : null;
     const holdBadge = [...row.querySelectorAll('span')].find(e => e.children.length === 0 && txt(e) === '보유');
     const watchBadge = [...row.querySelectorAll('span')].find(e => e.children.length === 0 && txt(e) === '관심');
     const stateBadge = [...row.querySelectorAll('span')].find(e => e.children.length === 0 && txt(e) === '정부주도');
@@ -296,7 +327,7 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
       name: nameEl ? txt(nameEl) : null, nameCs, flexSibs, cellInfo, gap, cellCount: cells.length,
       level: lvM ? Number(lvM[1]) : null,
       // '현재 선두' = gap 0(0은 유효값 — falsy로 흘리면 선두를 놓친다), '—' = null
-      gapYears: cellTxt[3] === '현재 선두' ? 0 : (gapM ? Number(gapM[1]) : null),
+      gapYears: gapIdx >= 0 && cellTxt[gapIdx] === '현재 선두' ? 0 : (gapM ? Number(gapM[1]) : null),
       holdColor: holdBadge ? cs(holdBadge).color : null,
       watchColor: watchBadge ? cs(watchBadge).color : null,
       stateColor: stateBadge ? cs(stateBadge).color : null,
@@ -308,7 +339,10 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
   const leadEl = root.querySelector('[data-testid="tech-report-lead"]');
   const kpiEl = root.querySelector('[data-testid="tech-report-kpis"]');
   const proseEl = root.querySelector('[data-testid="tech-report-prose"]');
+  // task#296 — <details>/<summary> 접기 완전 제거, 소제목은 <h3>로 상시 노출. detailsEls는
+  // "제거됐는가"를 잡는 회귀 축으로 남기고(0이어야 정상), 소제목 수는 h3Els로 잰다.
   const detailsEls = proseEl ? [...proseEl.querySelectorAll('details')] : [];
+  const h3Els = proseEl ? [...proseEl.querySelectorAll('h3')] : [];
   const all = [...root.querySelectorAll('*')];
   const idxOf = (sel) => { const el = root.querySelector(sel); return el ? all.indexOf(el) : -1; };
   const order = {
@@ -375,6 +409,10 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
     proseFound: !!proseEl,
     detailsTotal: detailsEls.length,
     detailsOpen: detailsEls.filter(d => d.open).length,
+    h3Total: h3Els.length,
+    // 클릭 없이 이미 보이는가(task#296의 핵심 주장) — closed <details> 자손은 rect가 0이 아닌 값을
+    // 반환하는 함정이 실측으로 확인됐다(uat296 헤더 주석 참조) → closest('details')로 먼저 걸러낸다.
+    h3Hidden: h3Els.filter(h => { const d = h.closest('details'); return d && !d.open; }).length,
     plainCount: proseEl ? proseEl.querySelectorAll('[data-testid="tech-prose-plain"]').length : 0,
     plainText: proseEl ? [...proseEl.querySelectorAll('[data-testid="tech-prose-plain"]')].map(p => txt(p)).join('\n') : '',
     allText: root.textContent, accentRgb, tagHoldRgb, tagWatchRgb,
@@ -536,7 +574,8 @@ for (const V of VIEWS) {
             if (s.shrink !== '0') viol.push(`sib/${id}/${s.t}:shrink=${s.shrink}`);
             if (s.ws !== 'nowrap') viol.push(`sib/${id}/${s.t}:ws=${s.ws}`);
           }
-          // ⓒ 이름 열 밖의 셀(국가·기술수준·선두 대비·점유율·티커) = 수치 열 → nowrap + 잘림 0
+          // ⓒ 이름 열 밖의 셀(task#296: 국가·티커는 이름 셀 내부로 이동 — 이제 기술수준·선두 대비·
+          //    점유율만 남는다) = 수치 열 → nowrap + 잘림 0
           for (const c of r.cellInfo.filter(c => c.i > 0)) {
             cellN++;
             if (c.ws !== 'nowrap') viol.push(`cell/${id}/#${c.i}:ws=${c.ws}`);
@@ -550,13 +589,14 @@ for (const V of VIEWS) {
           `유연 이름 ${m.rows.length}(sw/cw ${nameW}) · 고정 형제 ${sibN} · 고정 셀 ${cellN}(폭 ${fixedW})`);
         bump('shrink-discipline', m.rows.length + sibN + cellN);
         // 정의역 sentinel — 세 계열 중 하나라도 조용히 0이 되면 위 단언이 공허하게 통과한다(⑧ⓐ).
-        // 기대값은 리터럴이 아니라 픽스처 입력에서 계산한다. TABLE_COLS만 소스 상수(thead 6열).
-        const TABLE_COLS = 6; // 업체·국가·기술수준·선두 대비·점유율·티커 (PlayerTable.jsx thead 직독)
+        // 기대값은 리터럴이 아니라 픽스처 입력에서 계산한다 — TABLE_COLS는 하드코딩 6이 아니라
+        // playerColumns 미러(task#296: 국가·티커가 열에서 빠져 name·level·gap·share만 남을 수 있다).
+        const TABLE_COLS = mirrorPlayerColumns(PLAYERS).length;
         const expSib = PLAYERS.filter(p => p.state_led).length; // 정부주도 배지 = 이름의 유일한 flex 형제
         eq(`shrink-discipline-domain:${tag}`,
           [m.headCols, m.rows.length, sibN, cellN],
           [TABLE_COLS, PLAYERS.length, expSib, PLAYERS.length * (TABLE_COLS - 1)],
-          '[헤더 열, 행, 고정 형제, 고정 셀] — 픽스처 입력에서 계산');
+          `[헤더 열, 행, 고정 형제, 고정 셀] — 픽스처 입력에서 계산(playerColumns=${JSON.stringify(mirrorPlayerColumns(PLAYERS))})`);
       }
 
       // ── 줄 수 축 — 도메인은 whiteSpace:nowrap 선언 leaf(이 컴포넌트의 "1줄 강제" 신호).
@@ -661,15 +701,19 @@ for (const V of VIEWS) {
         eq(`kpi-count:${tag}`, m.kpiCount, 6, `값=${JSON.stringify(m.kpiValues)}`);
         bump('kpi', m.kpiCount);
 
-        // ── 산문 접기 — task#280 S4에서 전부 접힘으로 뒤집힘(#264 판별: 완료기준에 열림상태가
-        //    없었던 부수적 단언 — ProseSections.jsx/test.jsx 참조). 접힌 수 = 전체(0개 열림).
-        eq(`prose-total:${tag}`, m.detailsTotal, TITLED_ITEMS, '소제목 섹션 + 난이도 근거(픽스처 입력에서 계산)');
-        eq(`prose-open:${tag}`, m.detailsOpen, 0, '소제목 섹션은 전부 접힘으로 시작(task#280 S4)');
-        eq(`prose-collapsed:${tag}`, m.detailsTotal - m.detailsOpen, TITLED_ITEMS);
+        // ── 산문 — task#296 S6에서 뒤집음(#264 절차: 그 태스크의 계획서 완료기준·비목표에 "열림
+        //    상태"가 이름으로 등장하지 않았던 부수적 단언이라 뒤집는다, 근거는 task#296 plan.md —
+        //    사용자 결정: 스크롤+전역 목차가 항해를 대신하므로 접기 자체를 없앤다).
+        //    옛 `prose-total`/`prose-open`/`prose-collapsed`(detailsTotal 기반)는 이제 **부재**를
+        //    요구하는 축으로 교체한다 — 완화가 아니라 더 엄격하다: 예전엔 "0개 열림"만 봤지만
+        //    이제 "그 메커니즘 자체가 없다"(details 0)와 "클릭 없이 이미 보인다"(h3Hidden 0)를 본다.
+        eq(`prose-details:${tag}`, m.detailsTotal, 0, '<details> 메커니즘 완전 제거');
+        eq(`prose-h3-count:${tag}`, m.h3Total, TITLED_ITEMS, '소제목 섹션 + 난이도 근거를 <h3>로 렌더(픽스처 입력에서 계산)');
+        eq(`prose-h3-visible:${tag}`, m.h3Hidden, 0, '클릭 없이 전부 가시(닫힌 <details> 자손이면 hidden으로 잡힌다)');
         // 실데이터엔 없는 분기(실발행 2건은 첫 줄이 헤딩이다) — 헤딩 앞 선행 문단은 접지 않고 보존.
         eq(`prose-plain:${tag}`, m.plainCount, 1, '소제목 없는 선행 문단은 <p>로 항상 보인다');
         eq(`prose-plain-text:${tag}`, m.plainText, LEAD_PARA, '선행 문단 원문 보존(정보 손실 0)');
-        bump('prose', m.detailsTotal + m.plainCount);
+        bump('prose', m.h3Total + m.plainCount);
 
         // ── 표 정렬 불변식 — 리터럴 순서를 박지 않는다(기술수준 비증가 · 동값 구간 격차 비감소 · null 최후).
         const lv = (r) => (r.level == null ? -Infinity : r.level);

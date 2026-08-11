@@ -16,16 +16,22 @@ import ProseSections from '../components/tech/ProseSections'
 import KeyPointCards from '../components/tech/KeyPointCards'
 import MilestoneTimeline, { milestoneTimelineLayout } from '../components/tech/MilestoneTimeline'
 import CategoryGroups, { groupByCategory } from '../components/tech/CategoryGroups'
+import './TechReport.css'
 
 // 선도기술 리포트 상세 (ADR-0033, task#276 S5 + task#277 S5 + task#280 S1) — 기술 단위 발행물.
 // 목록은 기술당 최신 1건이라 여기도 이력 없이 최신 판만 보여준다(과거 판 UI는 비목표, 결정 1).
 //
 // 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로 재구성. CONTEXT.md 구성 서사도 이 순서다):
-//   기술명 h1 → 리드 문단 → KPI 스트립 → 핵심 포인트 → 진척 타임라인 → 주요 업체 표
+//   기술명 h1 → 리드 문단 → 전역 목차 → KPI 스트립 → 핵심 포인트 → 진척 타임라인 → 주요 업체 표
 //   → 기술수준 밴드 → 계보 분류 → 점유율 → 난제 → 시장 규모 → 연관 기술
-//   → 상세 설명(접힘) → 출처.
+//   → 상세 설명(상시 노출) → 출처.
 // task#281(2/2)이 신규 3필드(key_points·milestones·players[].category)로 그 예약 자리를 채웠다.
 // 셋 다 **선택 필드**이고 구발행물엔 없다 — 없으면 조용히 생략되어 화면이 이전과 동일해야 한다.
+//
+// task#296: <details> 섹션 접기를 전부 제거하고(스크롤만으로 전문을 읽는다, ADR-0034 결정 1) 대신
+// 리드 문단 아래 정적 전역 목차를 둔다. 목차·본문 SectionTitle은 **SECTIONS 배열 하나**에서 파생한다
+// (DOM을 훑어 제목을 수집하지 않는다) — show는 각 섹션의 기존 렌더 게이트 식을 그대로 옮긴 것이라
+// 느슨하게 하면 목차 칩만 남고 본문이 사라지는 함정(아래 여러 주석이 경고)이 목차에도 옮는다.
 //
 // ⚠️ 이 파일은 배선만 한다 — 업체 표시 규율(gap_years·share_pct·기술수준 라벨)은 PlayerTable이
 // 단독 소유한다. 여기에 같은 필드의 두 번째 거동을 두면 한 페이지에서 한 필드가 두 얼굴을
@@ -97,10 +103,39 @@ export default function TechReport() {
   // 신규 3필드 게이트 — 제목을 페이지가 소유하는 두 섹션은 게이트가 **컴포넌트 자신의 채택 조건과
   // 같은 식**이어야 한다. 느슨하면(예: milestones.length > 0) year·event가 결측인 항목만 담긴 판에서
   // 제목만 남고 본문이 사라진다(점유율 섹션이 task#277 S2에서 겪은 함정). 그래서 판정을 추측하지 않고
-  // 각 컴포넌트가 export한 순수함수를 그대로 호출한다. 핵심 포인트는 제목까지 컴포넌트가 소유하므로
-  // 게이트가 없다(자기 데이터가 없으면 스스로 null을 반환한다).
+  // 각 컴포넌트가 export한 순수함수를 그대로 호출한다. 핵심 포인트는 제목까지 컴포넌트가 소유해
+  // 예전엔 페이지 게이트가 없었지만, 목차 칩이 그 섹션도 가리켜야 하므로(task#296) `hasKeyPoints`를
+  // 둔다 — 식은 KeyPointCards가 null을 반환하는 조건과 **같아야** 한다(어긋나면 죽은 칩이 생긴다).
   const hasMilestones = milestoneTimelineLayout({ milestones: report.milestones }).items.length > 0
   const hasCategories = groupByCategory(ordered).length > 0
+  const hasPlayers = players.length > 0
+  const hasKeyPoints = Array.isArray(report.key_points) && report.key_points.length > 0
+  const hasShare = players.some((p) => Number.isFinite(p.share_pct) && p.share_pct >= 0)
+  const hasChallenges = challenges.length > 0
+  const hasSources = sources.length > 0
+  // ⚠️ truthy 검사가 아니라 **공백 제외 비어있지 않음**이다(적대 리뷰 렌즈1 발견 3). ProseSections는
+  // 내부에서 `trim() !== ''`로 판정해 공백만이면 null을 반환하는데, 페이지 게이트가 truthy면
+  // `"   "`에서 **제목만 남은 유령 섹션 + 그것을 가리키는 죽은 목차 칩**이 생긴다. 게이트는 컴포넌트
+  // 자신의 채택 조건과 같은 식이어야 한다는 이 페이지의 규율(위 주석)이 산문 섹션에도 적용된다.
+  const nonBlank = (v) => typeof v === 'string' && v.trim() !== ''
+  const hasProse = nonBlank(report.description) || nonBlank(report.difficulty?.rationale)
+
+  // 목차·본문 제목 단일 소스(task#296 S4) — 순서는 기존 렌더 순서 그대로(수술적 변경 금지), show는
+  // 각 섹션의 기존 게이트 식을 그대로 옮긴 것이다(느슨화 금지 — 아래 각 섹션 주석 참조).
+  const SECTIONS = [
+    { id: 'key-points', label: '핵심 포인트', show: hasKeyPoints },
+    { id: 'milestones', label: '진척 타임라인', show: hasMilestones },
+    { id: 'players', label: '주요 업체', show: hasPlayers },
+    { id: 'levels', label: '기술수준 비교', show: hasPlayers },
+    { id: 'categories', label: '계보 분류', show: hasCategories },
+    { id: 'share', label: '점유율', show: hasShare },
+    { id: 'challenges', label: '해결해야 할 난제', show: hasChallenges },
+    { id: 'market', label: '시장 규모', show: true },
+    { id: 'related', label: '연관 기술', show: hasRelated },
+    { id: 'prose', label: '상세 설명', show: hasProse },
+    { id: 'sources', label: '출처', show: hasSources },
+  ]
+  const tocItems = SECTIONS.filter((s) => s.show)
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '20px 16px 64px' }}>
@@ -121,6 +156,20 @@ export default function TechReport() {
         </p>
       )}
 
+      {/* ── 전역 목차 (task#296 S4) — sticky 아님. 항목 1개 이하면 렌더하지 않는다(유령 UI 금지).
+          칩 스타일은 출처 칩 관례 재사용(아래 「출처」 섹션 참조). gap으로만 정렬해 한 덩어리로
+          읽히게 하고(가토 ⑩), flexWrap으로 좁은 폭에서 줄바꿈시키되 칩 텍스트는 접지 않는다(가토 ⑨). */}
+      {tocItems.length > 1 && (
+        <nav data-testid="tech-report-toc" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 30 }}>
+          {tocItems.map((s) => (
+            <a key={s.id} href={`#${s.id}`} data-testid="tech-toc-chip" className="mono"
+               style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              {s.label}
+            </a>
+          ))}
+        </nav>
+      )}
+
       {/* ── KPI 스트립 (난이도 배지는 여기 흡수 — 중복 표시하지 않는다) ── */}
       <div style={{ marginBottom: 30 }}>
         <TechKpiStrip report={report} />
@@ -129,27 +178,27 @@ export default function TechReport() {
       {/* ── 핵심 포인트 (task#281 S2) ── 여기만 SectionTitle·바깥 여백을 컴포넌트가 소유한다.
           래퍼(<div marginBottom:30>)로 감싸면 데이터가 없어 null을 반환한 자리에 30px 유령 간격이
           남으므로 감싸지 않는다. */}
-      <KeyPointCards points={report.key_points} />
+      <KeyPointCards points={report.key_points} sectionId="key-points" />
 
       {/* ── 진척 타임라인 (task#281 S3) ── */}
       {hasMilestones && (
-        <div style={{ marginBottom: 30 }}>
+        <div id="milestones" data-tech-section="milestones" style={{ marginBottom: 30 }}>
           <SectionTitle>진척 타임라인</SectionTitle>
           <MilestoneTimeline milestones={report.milestones} />
         </div>
       )}
 
       {/* ── 주요 업체 (표시 규율은 PlayerTable 단독 소유) ── */}
-      {players.length > 0 && (
-        <div style={{ marginBottom: 30 }}>
+      {hasPlayers && (
+        <div id="players" data-tech-section="players" style={{ marginBottom: 30 }}>
           <SectionTitle>주요 업체</SectionTitle>
           <PlayerTable players={ordered} holdings={holdings} />
         </div>
       )}
 
       {/* ── 기술수준 비교 (업체 × 5단계 밴드, task#277 S3) ── */}
-      {players.length > 0 && (
-        <div style={{ marginBottom: 30 }}>
+      {hasPlayers && (
+        <div id="levels" data-tech-section="levels" style={{ marginBottom: 30 }}>
           <SectionTitle>기술수준 비교</SectionTitle>
           <TechLevelBand players={ordered} />
         </div>
@@ -159,7 +208,7 @@ export default function TechReport() {
           report.players(API 원순서)를 쓰면 같은 업체 집합이 한 화면에서 두 순서로 나열된다
           (task#280 적대 리뷰 F1 실측 — 표·밴드가 그렇게 갈렸다). */}
       {hasCategories && (
-        <div style={{ marginBottom: 30 }}>
+        <div id="categories" data-tech-section="categories" style={{ marginBottom: 30 }}>
           <SectionTitle>계보 분류</SectionTitle>
           <CategoryGroups players={ordered} />
         </div>
@@ -167,16 +216,16 @@ export default function TechReport() {
 
       {/* ── 점유율 ── 게이트는 ShareChart 자신의 채택 조건(유한·음수 아님)과 같은 식이어야 한다.
           느슨하면(예: isFinite만) 전 업체가 음수인 판에서 제목만 남고 차트가 사라진다(task#277 S2). */}
-      {players.some(p => Number.isFinite(p.share_pct) && p.share_pct >= 0) && (
-        <div style={{ marginBottom: 30 }}>
+      {hasShare && (
+        <div id="share" data-tech-section="share" style={{ marginBottom: 30 }}>
           <SectionTitle>점유율</SectionTitle>
           <ShareChart players={ordered} shareBasis={report.market?.share_basis} />
         </div>
       )}
 
       {/* ── 해결해야 할 난제 ─────────────────────────────── */}
-      {challenges.length > 0 && (
-        <div style={{ marginBottom: 30 }}>
+      {hasChallenges && (
+        <div id="challenges" data-tech-section="challenges" style={{ marginBottom: 30 }}>
           <SectionTitle>해결해야 할 난제</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {challenges.map((c, i) => (
@@ -194,37 +243,40 @@ export default function TechReport() {
           있거나 같이 없다) — 구조적으로 100% 중복. 유일한 고유 정보였던 as_of는 이제
           MarketGrowthChart 캡션이 받는다. 기관별 추정치(MarketEstimates)는 같은 절 안의
           하위 표시라 별도 SectionTitle을 두지 않는다. ── */}
-      <SectionTitle>시장 규모</SectionTitle>
-      <div style={{ marginBottom: 30 }}>
-        <MarketGrowthChart market={report.market} />
-      </div>
-      {marketEstimatesLayout(report.market?.estimates).rows.length > 0 && (
+      <div id="market" data-tech-section="market">
+        <SectionTitle>시장 규모</SectionTitle>
         <div style={{ marginBottom: 30 }}>
-          <MarketEstimates estimates={report.market.estimates} />
+          <MarketGrowthChart market={report.market} />
         </div>
-      )}
+        {marketEstimatesLayout(report.market?.estimates).rows.length > 0 && (
+          <div style={{ marginBottom: 30 }}>
+            <MarketEstimates estimates={report.market.estimates} />
+          </div>
+        )}
+      </div>
 
       {/* ── 연관 기술 (전제→대상→파생 관계도, 관계 데이터 전무 시 조용히 생략, task#277 S4) ── */}
       {hasRelated && (
-        <div style={{ marginBottom: 30 }}>
+        <div id="related" data-tech-section="related" style={{ marginBottom: 30 }}>
           <SectionTitle>연관 기술</SectionTitle>
           <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug} />
         </div>
       )}
 
-      {/* ── 상세 설명 (산문 전문 — 첫 화면이 아니라 본문 끝, 출처 앞. 손실 0으로 접기만 한다) ──
+      {/* ── 상세 설명 (산문 전문 — 첫 화면이 아니라 본문 끝, 출처 앞. task#296: <details> 접기를
+          없애고 스크롤로 전문을 읽는다 — 항해는 위 전역 목차가 대신한다) ──
           가드는 description·rationale 둘 다 봐야 한다 — rationale만 있는 판에서 제목이 dangling
           되거나(전자만 보면) 제목 없이 근거만 뜨는(후자만 보면) 일이 없게. */}
-      {(report.description || report.difficulty?.rationale) && (
-        <div style={{ marginBottom: 30 }}>
+      {hasProse && (
+        <div id="prose" data-tech-section="prose" style={{ marginBottom: 30 }}>
           <SectionTitle>상세 설명</SectionTitle>
           <ProseSections description={report.description} rationale={report.difficulty?.rationale} />
         </div>
       )}
 
       {/* ── 출처 ─────────────────────────────────────────── */}
-      {sources.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
+      {hasSources && (
+        <div id="sources" data-tech-section="sources" style={{ marginBottom: 8 }}>
           <SectionTitle>출처</SectionTitle>
           <div data-testid="tech-report-sources" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {sources.map((s, i) => (

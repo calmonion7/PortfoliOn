@@ -32,6 +32,20 @@
 // 길어진 캡션은 접히거나(정상) 잘리거나(결함) 본문을 가로로 밀 수 있다(결함). 그래서 여기서 잰다.
 // 사슬 측정 관용구·임계(0~24px)는 uat276에서 그대로 가져왔다(완화 0) — 옛날 "33px 간격"은 빈 공간이
 // 아니라 10px 여백 + 17px 캡션 텍스트 + 6px 여백이었고, 링크별로 재면 실제 여백은 임계보다 타이트하다.
+//
+// ── task#296 S6 갱신(적대적 리뷰 렌즈2 지목분 F1·표 + 렌즈1 직독으로 추가 확인분) ──────────────
+// PlayerTable이 표 스크롤러(SCROLLER, overflowX:auto)와 note 접기(<details>/<summary>)를 전부
+// 제거했다. 그래서 이 파일의 다음 축을 **뒤집는다**(버리지 않는다 — 없는 축은 다음 사람이 존재를
+// 모른다):
+//  · 행 파서(cells[2]=level·[3]=gap·[4]=share·[5]=ticker·[1]=country 고정 인덱스) → 렌더된 `<th>`
+//    라벨로 찾는다. 국가·티커는 이제 열이 아니라 이름 셀 내부 메타줄이라 열 인덱스로 못 잡는다
+//    (이 파일은 그 값을 애초에 단언하지 않으므로 제거 — 죽은 필드를 남기지 않는다).
+//  · `table-scroller-domain`/`table-no-overflow`(PC만 스크롤러 *존재*를 요구) → 스크롤러가 완전히
+//    없어졌으므로 **전 뷰포트**에서 "스크롤러 조상 0개 + table 자신 scrollW<=clientW"로 교체.
+//  · `noteBtns`/`NOTE_TOGGLE_SEL`(summary 클릭 카운트) → note는 이제 클릭 없이 상시 렌더 —
+//    `note-open`(클릭 1회 → 펼침 1개) 사이클을 통째로 없애고 `role="group"`을 직접 잰다.
+//  · `detailsTotal`/`detailsOpen` 기반 prose-total/open/collapsed → `<details>` 0개 + `<h3>` 개수.
+// 뒤집는 근거는 task#280 S4의 기록이 아니라 task#296 계획(사용자 결정, task#264 절차)이다.
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
 
@@ -109,6 +123,15 @@ if (KPI_CONTROL) console.log(`⚠ 대조군 실행 — KPI_CONTROL=${KPI_CONTROL
 const bracketHeadings = (text) =>
   (typeof text === 'string' ? text.split('\n') : []).filter((l) => /^\[[^\]]+\]$/.test(l.trim())).length;
 
+// playerColumns 미러(techReportUtils.js와 동일 로직, task#296) — 열 수·순서를 리터럴로 박지 않고
+// 실응답에서 유도한다. 국가·티커는 이제 열이 아니라 이름 셀 내부 메타줄이라 이 배열엔 없다.
+const mirrorPlayerColumns = (players) => {
+  const list = Array.isArray(players) ? players : [];
+  const cols = ['name', 'level'];
+  if (list.some((p) => p?.gap_years != null)) cols.push('gap');
+  if (list.some((p) => Number.isFinite(p?.share_pct) && p.share_pct >= 0)) cols.push('share');
+  return cols;
+};
 const DATA = {};
 for (const slug of SLUGS) {
   const res = await fetch(`${BASE}/api/tech-reports/${slug}`, { headers: { Authorization: `Bearer ${access_token}` } });
@@ -129,7 +152,7 @@ for (const slug of SLUGS) {
     title: rep.title,
     titledItems: titled,
     rationale: (rationale || '').trim(),
-    // 손실 0 대조용 — 헤딩 줄은 <summary>로 승격되며 대괄호가 벗겨지므로 대상에서 뺀다.
+    // 손실 0 대조용 — 헤딩 줄은 <h3>로 승격되며 대괄호가 벗겨지므로 대상에서 뺀다.
     proseLines: (rep.description || '').split('\n').map((l) => l.trim())
       .filter((l) => l !== '' && !/^\[[^\]]+\]$/.test(l)),
     // 점유율 섹션 게이트 — TechReport.jsx의 채택식과 같은 식(ShareChart의 필터와도 동일).
@@ -141,6 +164,10 @@ for (const slug of SLUGS) {
     // 고유값)을 **실응답에 그대로 적용**해 계산한다. 리터럴 0. 정렬(sortPlayers)은 집합을 바꾸지 않으므로
     // 여기선 순서를 쓰지 않고 집합으로만 대조한다(순서 리터럴을 박으면 정당한 정렬 변경에 거짓 FAIL한다).
     leaders: [...new Set(players.filter((p) => p.gap_years > 0 && p.leader_name).map((p) => p.leader_name))],
+    // task#296 — 열 집합(리터럴 아님, 실응답에서 유도) + note 있는 업체(name으로 식별 — 렌더는
+    // sortPlayers로 API 순서와 달라지므로 note 행 순서를 index로 API players에 대응시키면 안 된다).
+    cols: mirrorPlayerColumns(players),
+    notedPlayers: players.filter((p) => typeof p.note === 'string' && p.note.trim() !== ''),
   };
   console.log(`  [실응답] ${slug}: title ${rep.title.length}자 · players ${players.length} · 소제목항목 ${titled}` +
     ` · cagr ${rep.market?.cagr_pct} · challenges ${(rep.challenges || []).length} · share섹션 ${DATA[slug].hasShare}` +
@@ -152,11 +179,6 @@ for (const slug of SLUGS) {
 // 범위: ResearchShell이 PC는 `.page`, 모바일은 `.m-page`로 **children만** 감싼다(소스 확인) — 그 안쪽을
 // 루트로 잡아야 모바일 seg 탭바·마스트헤드가 표본에 섞이지 않는다(uat276에서 실측으로 확정한 관용구).
 const ROOT_SEL = 'main.page-wrap .page, main.page-wrap .m-page';
-// note 토글용 Playwright 로케이터 셀렉터. 접기는 네이티브 <details>/<summary>이고 note 행은 접힌
-// 상태에서도 DOM에 남는다(PlayerTable 규율) — 그래서 "펼쳐진 개수"는 details[open]으로 센다.
-// ⚠️ ROOT_SEL은 **셀렉터 리스트**(콤마)라 뒤에 자손을 이어 붙이면 첫 항에는 안 걸리고 둘째 항에만
-// 걸린다(`A, B X` = `A` 또는 `B X`). 그래서 본문 루트를 재사용하지 않고 표를 직접 지목한다.
-const NOTE_TOGGLE_SEL = 'main.page-wrap [data-testid="tech-report-player-note"] summary';
 
 const measure = (page) => page.evaluate((ROOT_SEL) => {
   const root = document.querySelector(ROOT_SEL);
@@ -236,20 +258,28 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
                    srOnly: e.classList.contains('sr-only') || (parseFloat(cs(e).width) <= 1 && cs(e).overflow === 'hidden') }));
 
   // ── 업체 표 행 — 화면에 실제로 렌더된 순서/값을 읽는다(API 순서가 아니라) ──
+  // task#296 — 국가·티커가 열에서 빠져 이름 셀 내부로 이동했고 열 수도 데이터에 따라 3~4개로 변한다.
+  // 고정 인덱스(cells[2]=level·[3]=gap·[4]=share·[5]=ticker·[1]=country)는 렌더된 `<th>` 라벨로
+  // 찾는다 — 이 파일은 country/ticker 값을 애초에 단언하지 않으므로(그 필드는 죽은 코드였다) 제거한다.
+  const headLabels = [...playersEl.querySelectorAll('thead th')].map((th) => txt(th));
+  const levelIdx = headLabels.indexOf('기술수준');
+  const gapIdx = headLabels.indexOf('선두 대비');
+  const shareIdx = headLabels.indexOf('점유율');
   const rows = [...playersEl.querySelectorAll('[data-testid="tech-report-player-row"]')].map((tr) => {
     const cells = [...tr.children].map((td) => txt(td));
     const nameEl = tr.querySelector('[data-testid="tech-report-player-name"]');
-    const lvM = (cells[2] || '').match(/^(\d+)단계/);
+    const lvM = (cells[levelIdx] || '').match(/^(\d+)단계/);
     // 「선두 대비」 셀은 격차만 담는다(`5년`). leader_name은 표 위 캡션으로 올라갔으므로 옛
     // `선두 대비 N년 · {이름}` 패턴으로 파싱하면 **전 행의 gap이 null**이 되어 정렬 불변식이
     // 거짓 FAIL한다(파서가 화면을 못 읽는 것을 구현 결함으로 오귀속하는 자리다).
-    const gapM = (cells[3] || '').match(/^(\d+)년$/);
+    const gapM = gapIdx >= 0 ? (cells[gapIdx] || '').match(/^(\d+)년$/) : null;
     return {
       name: nameEl ? txt(nameEl) : null,
       level: lvM ? Number(lvM[1]) : null,
       // '현재 선두' = gap 0(0은 유효값이다 — falsy로 흘리면 선두를 통째 놓친다), '—' = null
-      gap: cells[3] === '현재 선두' ? 0 : (gapM ? Number(gapM[1]) : null),
-      share: cells[4], ticker: cells[5], country: cells[1],
+      gap: gapIdx >= 0 && cells[gapIdx] === '현재 선두' ? 0 : (gapM ? Number(gapM[1]) : null),
+      share: shareIdx >= 0 ? cells[shareIdx] : null,
+      cellCount: cells.length,
       ellCount: [...tr.querySelectorAll('span, div')].filter((e) => e.children.length === 0 && cs(e).textOverflow === 'ellipsis' && cs(e).overflow !== 'visible').length,
     };
   });
@@ -268,17 +298,28 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
     };
   }) : [];
 
-  // ── 산문(상세 설명) ──
+  // ── 산문(상세 설명) — task#296: <details>/<summary> 완전 제거, 소제목은 <h3> + 상시 노출 ──
+  // detailsEls/summaryEls는 이제 "메커니즘이 정말 사라졌는가"(0개여야 정상)를 재는 회귀 축이고,
+  // 소제목 수·본문 텍스트는 h3/새 구조로 잰다.
   const proseEl = root.querySelector('[data-testid="tech-report-prose"]');
   const detailsEls = proseEl ? [...proseEl.querySelectorAll('details')] : [];
-  // 본문 = details 안의 <p>(summary 제외) + 소제목 없는 선행 문단
+  const summaryEls = proseEl ? [...proseEl.querySelectorAll('summary')] : [];
+  const h3Els = proseEl ? [...proseEl.querySelectorAll('h3')] : [];
+  const proseSectionEls = proseEl ? [...proseEl.querySelectorAll('[data-testid="tech-prose-section"]')] : [];
+  const proseAnchors = proseSectionEls.map((el) => ({ id: el.id, dataAttr: el.getAttribute('data-tech-section') }));
+  // 본문 = 소제목 섹션 안의 <p>(task#296: 더 이상 <details> 안이 아니다) + 소제목 없는 선행 문단.
   const bodyEls = proseEl ? [
-    ...proseEl.querySelectorAll('details > p'),
+    ...proseEl.querySelectorAll('[data-testid="tech-prose-section"] p'),
     ...proseEl.querySelectorAll('[data-testid="tech-prose-plain"]'),
   ] : [];
+  // ⚠️ 닫힌 <details> 자손은 getBoundingClientRect()가 0이 아닌 값을 반환하는 페인트 억제 함정이
+  // 있다(uat296 헤더 주석·실측 — content-visibility류 메커니즘) → closest('details')로 먼저 걸러낸다.
+  const isDisclosureHidden = (el) => { const d = el.closest('details'); return !!(d && !d.open); };
   const firstScreen = bodyEls.map((el) => {
     const b = el.getBoundingClientRect();
-    const visible = b.height > 0 && b.width > 0 && b.bottom > 0 && b.top < vh;
+    // top은 진단용 실측값이라 disclosure-hidden이어도 실제 기하를 남긴다(Math.min 집계가 null로
+    // 오염되지 않게) — 가시성 판정만 강제로 false로 덮는다.
+    const visible = !isDisclosureHidden(el) && b.height > 0 && b.width > 0 && b.bottom > 0 && b.top < vh;
     return { chars: txt(el).length, visible, top: Math.round(b.top) };
   });
 
@@ -314,15 +355,40 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
         .map((r) => { const n = r.querySelector('.tech-level-band__name'); return n ? txt(n) : null; })
     : [];
 
-  // ── 표 스크롤러(표의 부모 = 자체 overflow-x:auto). 모바일은 설계폭(minWidth)을 지킨 채 여기서
-  //    **의도적으로** 가로 스크롤하고, PC는 콘텐츠 폭이 설계폭보다 넓어 스크롤이 없어야 한다.
-  const scrollerEl = playersEl.parentElement;
-  const scroller = scrollerEl
-    ? { scrollW: scrollerEl.scrollWidth, clientW: scrollerEl.clientWidth, ox: cs(scrollerEl).overflowX }
-    : null;
-  // note 토글(summary) 수 — note-width 축의 정의역 sentinel. 접힌 note 행도 DOM에 남으므로
-  // 이 수는 "note 있는 업체 수"와 같아야 한다(다르면 접기 구조가 바뀐 것 → 로그로 드러난다).
-  const noteBtns = playersEl.querySelectorAll('[data-testid="tech-report-player-note"] summary').length;
+  // ── task#296 — 표 스크롤러(overflowX:auto 래퍼)가 완전히 제거됐다. "조상에 그 메커니즘이 남아
+  //    있는가"(회귀 감지, 0개여야 한다)와 "표 자신이 넘치는가"를 **전 뷰포트**에서 잰다 — 모바일도
+  //    이제 열 생략(playerColumns)·줄바꿈 허용으로 폭에 맞추므로 스크롤이 필요 없어야 한다(옛날엔
+  //    모바일만 "스크롤러가 있고 넘치는 것"이 정상이었지만 그 정의역 자체가 없어졌다).
+  const scrollAncestors = [];
+  for (let p = playersEl.parentElement; p && p !== document.body; p = p.parentElement) {
+    const ox = cs(p).overflowX;
+    if (ox === 'auto' || ox === 'scroll') scrollAncestors.push({ tag: p.tagName.toLowerCase(), testid: p.getAttribute('data-testid') || null });
+  }
+  const tableScrollW = playersEl.scrollWidth, tableClientW = playersEl.clientWidth;
+
+  // ── note — task#296: 접기 제거, role="group"으로 상시 렌더. 클릭 없이 바로 잰다. 업체 식별은
+  //    DOM 인접관계(바로 앞 행)로 한다 — sortPlayers가 렌더 순서를 API 순서와 다르게 만들므로 index
+  //    매칭은 오탐을 낸다(uat296에서 실측으로 확정 — 이 파일도 옛 noteBtns 카운트만 쓰고 식별은
+  //    안 했어서 노출은 안 됐지만, 새로 이름 대조를 넣으므로 같은 함정을 피해야 한다).
+  //    ⚠️ 닫힌 <details> 자손은 getBoundingClientRect()가 0이 아닌 값을 반환하는 페인트 억제
+  //    함정이 있다(uat296 헤더 주석·실측) → closest('details')로 먼저 걸러낸 뒤에만 rect를 믿는다.
+  const noteRows = [...playersEl.querySelectorAll('[data-testid="tech-report-player-note"]')];
+  const notes = noteRows.map((tr) => {
+    const prevRow = tr.previousElementSibling;
+    const prevNameEl = prevRow ? prevRow.querySelector('[data-testid="tech-report-player-name"]') : null;
+    const group = tr.querySelector('[role="group"]');
+    const bodyEl = group || tr.querySelector('div');
+    const disclosureHidden = !!(bodyEl && bodyEl.closest('details') && !bodyEl.closest('details').open);
+    const b = bodyEl && !disclosureHidden ? bodyEl.getBoundingClientRect() : null;
+    return {
+      playerName: prevNameEl ? txt(prevNameEl) : null,
+      hasGroup: !!group, groupAriaLabel: group ? group.getAttribute('aria-label') : null,
+      hasSummary: !!tr.querySelector('summary'), hasDetails: !!tr.querySelector('details'),
+      visible: !!(bodyEl && !disclosureHidden && bodyEl.getClientRects().length > 0),
+      bodyText: bodyEl ? bodyEl.textContent : '',
+      bodyWidth: b ? Math.round(b.width) : null,
+    };
+  });
 
   // ── 「주요 업체」 제목 → 선두 캡션 → 표 사슬(uat276의 관용구를 그대로 재사용) ──────────────
   //    S3의 F3 수정이 leader_name을 표 위 캡션으로 승격해 이 자리가 2단이 됐다. 제목 bottom과 표 top을
@@ -354,12 +420,12 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
 
   return {
     found: true, items, clippers, rows, chips, firstScreen, order, svgTexts,
-    bandNames, scroller, noteBtns,
+    bandNames, scrollAncestors, tableScrollW, tableClientW, notes, headCols: headLabels.length,
     titleChain, caption, capTitleFound: !!playersCap,
     tabbarH, visibleBottom, bannerH, bannerFound: !!bannerEl,
     leadBox: box(leadEl), stripBox: box(kpiEl),
-    detailsTotal: detailsEls.length,
-    detailsOpen: detailsEls.filter((d) => d.open).length,
+    detailsTotal: detailsEls.length, summaryTotal: summaryEls.length, h3Total: h3Els.length,
+    proseAnchors,
     // 접힌 <details>의 본문도 DOM에 남는다(네이티브 접기) — 손실 0 대조는 이 문자열로 한다.
     proseAllText: proseEl ? proseEl.textContent : '',
     proseFound: !!proseEl,
@@ -378,26 +444,8 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   };
 }, ROOT_SEL);
 
-// 펼친 note 본문 측정 — 접힌 상태에선 대상이 DOM에 아예 없으므로 **펼치는 동작이 이 축의 일부**다.
-// 측정은 클릭과 분리한다(React 리렌더가 마이크로태스크라 같은 evaluate 안에서 재면 옛 DOM을 잰다).
-const measureNote = (page) => page.evaluate((ROOT_SEL) => {
-  const root = document.querySelector(ROOT_SEL);
-  const playersEl = root && root.querySelector('[data-testid="tech-report-players"]');
-  if (!playersEl) return { found: false };
-  const scrollerEl = playersEl.parentElement;
-  // 접힌 행도 DOM에 남으므로(네이티브 details) "펼쳐진 것"만 센다 — 행 수를 세면 항상 N개다.
-  const openDetails = [...playersEl.querySelectorAll('[data-testid="tech-report-player-note"] details[open]')];
-  const body = openDetails[0] ? openDetails[0].querySelector(':scope > div') : null;
-  return {
-    found: true,
-    openRows: openDetails.length,
-    width: body ? Math.round(body.getBoundingClientRect().width) : null,
-    left: body ? Math.round(body.getBoundingClientRect().left) : null,
-    chars: body ? body.textContent.trim().length : 0,
-    scrollerClientW: scrollerEl ? scrollerEl.clientWidth : null,
-    scrollerScrollW: scrollerEl ? scrollerEl.scrollWidth : null,
-  };
-}, ROOT_SEL);
+// task#296 — note가 클릭 없이 상시 렌더되므로 별도 measureNote(클릭→펼침→재측정) 사이클이
+// 필요 없다. 위 measure()의 `notes` 필드가 이미 role="group" 본문을 직접 담는다.
 
 // ── 실행 ──────────────────────────────────────────────────────────────────
 // 4조합 = 3폭 × 2테마(가장 좁은 폭에 다크를 물려 최악 조합을 반드시 포함시킨다).
@@ -544,6 +592,11 @@ for (const V of VIEWS) {
       eq(`table-rowcount:${tag}`, m.rows.length, D.players.length, '표에서 사라진 업체 0');
       const renderedNames = [...m.rows.map((r) => r.name)].sort();
       eq(`table-names:${tag}`, renderedNames, [...D.names].sort(), '렌더 업체명 집합 = API 업체명 집합');
+      // 열 수(playerColumns 미러) — 헤더·행마다 렌더된 셀 수가 전부 같은 열 집합을 따르는가.
+      eq(`table-cols:${tag}`, m.headCols, D.cols.length, `playerColumns=${JSON.stringify(D.cols)}`);
+      const badColSpan = m.rows.map((r, i) => (r.cellCount === m.headCols ? null : `#${i}:${r.cellCount}`)).filter(Boolean);
+      eq(`table-cols-per-row:${tag}`, badColSpan, [], `행 ${m.rows.length}개 · 헤더 열 ${m.headCols}`);
+      bump('table-cols', m.rows.length + 1);
       const lv = (r) => (r.level == null ? -Infinity : r.level);
       const viol = [];
       for (let i = 1; i < m.rows.length; i++) {
@@ -575,25 +628,17 @@ for (const V of VIEWS) {
       // 통과한다(공허한 초록). 전 표본 합산으로 아래 band-order-teeth가 판별력을 게이트한다.
       if (JSON.stringify(m.rows.map((r) => r.name)) !== JSON.stringify(D.names)) bump('band-order-reordered');
 
-      // ── (5c) table-no-overflow — 표 스크롤러가 **PC에선** 가로로 넘치지 않는다(F3 재발 차단).
-      //  ⚠️ 이건 **축의 정의역**이지 무음 스킵이 아니다: 모바일은 표를 축소하지 않고 설계폭(minWidth)을
-      //     지킨 채 자체 스크롤러에서 **의도적으로** 가로 스크롤하는 관용구다(가토 ⑫ — 축소하면 한글이
-      //     6~7px가 되어 기하 축은 전부 통과하면서 읽을 수 없게 된다). 거기서 scrollW>clientW는 정상
-      //     동작이므로 같은 단언을 걸면 옳은 구현이 거짓 FAIL한다. 정의역은 뷰포트 폭으로 **실행 전에**
-      //     결정되며(측정 실패가 아니다), 정의역 밖이라는 사실은 NOTE로 항상 출력한다.
-      if (V.key.startsWith('pc')) {
-        eq(`table-scroller-domain:${tag}`,
-          m.scroller && m.scroller.clientW > 0 ? 'OK' : `SCROLLER_MISSING(${JSON.stringify(m.scroller)})`, 'OK',
-          `스크롤러 ${JSON.stringify(m.scroller)}`);
-        eq(`table-no-overflow:${tag}`,
-          m.scroller && m.scroller.scrollW <= m.scroller.clientW + 1
-            ? 'OK' : `TABLE_OVERFLOW(${m.scroller && m.scroller.scrollW}>${m.scroller && m.scroller.clientW})`, 'OK',
-          `PC 콘텐츠 폭이 표 설계폭보다 넓어야 한다 · overflowX=${m.scroller && m.scroller.ox}`);
-        bump('table-no-overflow');
-      } else {
-        NOTE(`${tag} — table-no-overflow 정의역 밖(모바일은 설계폭 유지 + 의도적 가로 스크롤). ` +
-          `실측 scrollW=${m.scroller && m.scroller.scrollW} clientW=${m.scroller && m.scroller.clientW}. 무음 스킵이 아니다.`);
-      }
+      // ── (5c) table-no-scroller — task#296 뒤집음: 표 스크롤러(overflowX:auto 래퍼)가 완전히
+      //     제거됐다. 옛 축은 "PC에서만 스크롤러가 존재하고 안 넘친다"를 요구했지만(모바일은 스크롤러가
+      //     흡수하는 게 정상이라 정의역 밖) 이제 그 정의역 자체가 없다 — **전 뷰포트**에서 "스크롤러
+      //     조상 0개 + 표 자신이 안 넘친다"로 교체한다(뒤집는 근거는 task#280 S4/F3의 기록이 아니라
+      //     task#296 계획 — 모바일도 이제 열 생략(playerColumns)·줄바꿈 허용으로 폭에 맞춘다).
+      eq(`table-no-scroller-ancestor:${tag}`, m.scrollAncestors, [],
+        `표 조상 중 overflowX auto/scroll 0개 기대 — 실측 ${JSON.stringify(m.scrollAncestors)}`);
+      eq(`table-no-scroller-self:${tag}`,
+        m.tableScrollW <= m.tableClientW + 1 ? 'OK' : `TABLE_OVERFLOW(${m.tableScrollW}>${m.tableClientW})`, 'OK',
+        `표 자신 scrollW=${m.tableScrollW}/clientW=${m.tableClientW}(전 뷰포트 무조건 — 모바일도 이제 스크롤 불필요)`);
+      bump('table-no-scroller', 2);
 
       // ── (5d) 선두 캡션 계열 — S3(F3)이 **새로 만든 UI 요소**를 잰다 ──────────────────────────
       //  형제 프로브 uat276이 같은 사슬을 재지만 픽스처의 고유 선두는 1개라 **다중 선두 캡션을 원리적으로
@@ -659,16 +704,22 @@ for (const V of VIEWS) {
           `축 자체가 없는 판이며 무음 스킵이 아니다.`);
       }
 
-      // ── (6) prose-collapsed — task#280 S4에서 전부 접힘으로 뒤집힘(#264 판별: 완료기준에
-      //    열림상태가 없었던 부수적 단언 — ProseSections.jsx/test.jsx 참조). 접힌 수 = 전체(0개 열림).
-      //    이 분기는 **축의 정의역**이지 무음 스킵이 아니다: 소제목 항목이 0개면 details가 0개다.
+      // ── (6) 산문 — task#296 뒤집음(#264 절차: task#280 S4의 "전부 접힘" 기록이 아니라 task#296
+      //    plan.md의 사용자 결정 — 스크롤+전역 목차가 항해를 대신하므로 접기 자체를 없앤다).
+      //    이 분기는 **축의 정의역**이지 무음 스킵이 아니다: 소제목 항목이 0개면 h3가 0개다.
       //    정의역은 실행 *전에* API 응답으로 결정되며(뷰포트처럼), 그 사실은 아래 NOTE로 항상 출력한다.
       if (D.titledItems >= 1) {
-        eq(`prose-total:${tag}`, m.detailsTotal, D.titledItems, '소제목 섹션 + 난이도 근거(응답에서 계산)');
-        eq(`prose-open:${tag}`, m.detailsOpen, 0, '소제목 섹션은 전부 접힘으로 시작(task#280 S4)');
-        eq(`prose-collapsed:${tag}`, m.detailsTotal - m.detailsOpen, D.titledItems);
-        bump('prose', m.detailsTotal);
-        // 손실 0이 S4의 절대 조건이다 — "접었다"와 "지웠다"를 접힘 *개수*만으로는 구별할 수 없다.
+        eq(`prose-details:${tag}`, m.detailsTotal, 0, '<details> 메커니즘 완전 제거');
+        eq(`prose-summaries:${tag}`, m.summaryTotal, 0, '<summary> 0개');
+        eq(`prose-h3-count:${tag}`, m.h3Total, D.titledItems, '소제목 섹션 + 난이도 근거를 <h3>로 렌더(응답에서 계산)');
+        bump('prose-mech', 3);
+        // 산문 앵커 계약 — id·data-tech-section 동일값·유일성(ProseSections.test.jsx⑤의 라이브 짝).
+        eq(`prose-anchor-domain:${tag}`, m.proseAnchors.length, D.titledItems, 'h3 섹션 수 == 소제목 항목 수');
+        const badAnchors = m.proseAnchors.map((a, i) => (a.id && a.id === a.dataAttr) ? null : `#${i}:id=${a.id},data=${a.dataAttr}`).filter(Boolean);
+        eq(`prose-anchor:${tag}`, badAnchors, [], `${m.proseAnchors.length}개 대조`);
+        bump('prose-anchor', m.proseAnchors.length);
+        bump('prose', m.h3Total);
+        // 손실 0이 S4/S2의 절대 조건이다 — "접었다"와 "지웠다"를 개수만으로는 구별할 수 없다.
         // 응답 산문의 모든 비-헤딩 줄 + 난이도 근거가 산문 블록 textContent 안에 그대로 있어야 한다.
         eq(`prose-lossless:${tag}`, D.proseLines.filter((l) => !m.proseAllText.includes(l)).map((l) => l.slice(0, 24) + '…'), [],
           `본문 ${D.proseLines.length}줄 대조 · 산문 DOM ${m.proseAllText.length}자`);
@@ -676,7 +727,7 @@ for (const V of VIEWS) {
           m.proseAllText.includes(D.rationale) ? 'OK' : 'RATIONALE_LOST', 'OK', `근거 ${D.rationale.length}자`);
         bump('prose-lossless', D.proseLines.length + 1);
       } else {
-        NOTE(`${tag} — prose-collapsed 정의역 밖(소제목 항목 ${D.titledItems}개). 축 자체가 없는 판이며 무음 스킵이 아니다.`);
+        NOTE(`${tag} — prose-* 세부 축 정의역 밖(소제목 항목 ${D.titledItems}개). 축 자체가 없는 판이며 무음 스킵이 아니다.`);
       }
 
       // ── (7) 점유율 섹션 게이트 — slug마다 다른 실데이터로 양쪽 분기를 덮는다
@@ -690,7 +741,13 @@ for (const V of VIEWS) {
       const clipped = clipDomain.filter((i) => i.scrollW > i.clientW + 1);
       eq(`clip:${tag}`, clipped.map((c) => `${c.t}(${c.scrollW}>${c.clientW})`), [], `검사 ${clipDomain.length}건`);
       bump('clip', clipDomain.length);
-      const clipMin = D.players.length * 4; // 행당 최소 4개(국가·기술수준·선두대비·점유율 셀)
+      // task#296 — 국가·티커가 열에서 빠져 이름 셀 내부 메타줄(리프이긴 하다)로 이동했다. 하한을
+      // 리터럴 4가 아니라 실제 렌더 규칙(playerColumns + 국가 유무)에서 유도한다: level은 항상 렌더,
+      // gap·share는 그 열이 있을 때만(전 행 렌더, DASH 포함), 국가는 값이 있는 행만.
+      const clipMin = D.players.length // 기술수준 셀(항상)
+        + (D.cols.includes('gap') ? D.players.length : 0)
+        + (D.cols.includes('share') ? D.players.length : 0)
+        + D.players.filter((p) => p.country).length; // 이름 셀 내부 국가 메타(리프)
       eq(`clip-domain:${tag}`, clipDomain.length >= clipMin ? 'OK' : `CLIP_DOMAIN_TOO_SMALL(${clipDomain.length}<${clipMin})`, 'OK',
         `실측 ${clipDomain.length}건 · 하한 ${clipMin}`);
 
@@ -711,7 +768,13 @@ for (const V of VIEWS) {
       eq(`line-visible:${tag}`, folded.map((f) => `${f.t}(${f.lines}줄)`), [], `검사 ${nowrapDomain.length}건`);
       bump('line-visible', nowrapDomain.length);
       // 하한(정확일치 아님) — 표 열이 늘거나 배지가 붙으면 정당하게 증가한다. 줄면 측정 실패다.
-      const nowrapMin = D.players.length * 4 + 6; // 행당 텍스트 전용 nowrap 셀 4 + 헤더 6열
+      // task#296 — 기술수준 셀은 이제 whiteSpace:normal(TD_LEVEL, 줄바꿈 허용)이라 nowrap 도메인에서
+      // **빠진다**. 대신 국가 메타 span이 nowrap으로 새로 들어온다(META_TEXT). 배지·티커 구분자는
+      // 하한에서 뺀다(비동기 holdings 로드·데이터 유무에 따라 변동 — 실제 값은 항상 이 하한 이상이다).
+      const nowrapMin = D.cols.length // 헤더 <th> 전부 nowrap
+        + (D.cols.includes('gap') ? D.players.length : 0)
+        + (D.cols.includes('share') ? D.players.length : 0)
+        + D.players.filter((p) => p.country).length; // 이름 셀 내부 국가 메타(nowrap)
       eq(`line-visible-domain:${tag}`,
         nowrapDomain.length >= nowrapMin ? 'OK' : `DOMAIN_SHRANK(${nowrapDomain.length}<${nowrapMin})`, 'OK',
         `실측 ${nowrapDomain.length}건 · 하한 ${nowrapMin}`);
@@ -751,37 +814,50 @@ for (const V of VIEWS) {
       eq(`ellipsis-discipline:${tag}`, badEll, [], `행 ${m.rows.length}개 · 잘리는 요소 0 기대`);
       bump('ellipsis-discipline', m.rows.length);
 
-      // ── (14b) note-width — 펼친 note 본문이 스크롤러 **가시폭** 안에 들어온다(F4 재발 차단).
-      //        note는 산문이라 표 설계폭(minWidth)으로 흘리면 좁은 화면에서 줄마다 가로 스크롤해야 읽힌다.
-      //        접힌 상태에선 대상이 DOM에 없으므로 **펼치는 동작이 이 축의 일부**다.
+      // ── (14b) note — task#296 뒤집음: 접기 완전 제거, 클릭 없이 role="group"으로 상시 렌더.
+      //        옛 축은 "클릭 1회 → 펼침 1개"(펼치는 동작 자체가 축의 일부)였다 — 이제 그 동작이
+      //        없다는 것 자체가 주장이므로 **부재**를 무조건 단언하고, 본문은 클릭 없이 바로 잰다.
       //  ⚠️ 정의역: note가 있는 업체가 0곳인 판(축 자체가 없다). API 응답으로 **실행 전에** 결정되며
-      //     무음 스킵이 아니다 — 정의역 안에서는 토글 수를 sentinel로 못박아 표본 부재를 FAIL로 만든다.
-      const expectNoteBtns = D.players.filter((p) => typeof p.note === 'string' && p.note.trim() !== '').length;
-      if (expectNoteBtns > 0) {
-        eq(`note-width-domain:${tag}`, m.noteBtns, expectNoteBtns, 'note 토글 수 = note 있는 업체 수(응답에서 계산)');
-        const noteBtn = page.locator(NOTE_TOGGLE_SEL).first();
-        // 짧은 타임아웃 — 토글이 없으면 기본 30s를 조합마다 까먹는다. 부재 자체는 위 domain sentinel이 FAIL시킨다.
-        await noteBtn.click({ timeout: 8000 }).catch((e) => errs.push(`note-click:${String(e).split('\n')[0]}`));
-        await page.waitForTimeout(300);
-        const nm = await measureNote(page);
-        eq(`note-open:${tag}`, nm.openRows, 1, '토글 1회 → 펼쳐진 note 1개(대상이 실제로 생겼는가)');
-        eq(`note-width:${tag}`,
-          nm.width != null && nm.scrollerClientW != null && nm.width <= nm.scrollerClientW + 1
-            ? 'OK' : `NOTE_TOO_WIDE(${nm.width}>${nm.scrollerClientW})`, 'OK',
-          `본문 ${nm.chars}자 · width=${nm.width}(left=${nm.left}) · 스크롤러 가시폭=${nm.scrollerClientW}(scrollW=${nm.scrollerScrollW})`);
+      //     무음 스킵이 아니다.
+      eq(`note-domain:${tag}`, m.notes.length, D.notedPlayers.length, 'note 행 수 = note 있는 업체 수(응답에서 계산)');
+      bump('note');
+      if (D.notedPlayers.length > 0) {
+        const noDetails = m.notes.map((n, i) => n.hasDetails ? `#${i}` : null).filter(Boolean);
+        eq(`note-no-details:${tag}`, noDetails, [], `${m.notes.length}건 — <details> 완전 제거`);
+        const noSummary = m.notes.map((n, i) => n.hasSummary ? `#${i}` : null).filter(Boolean);
+        eq(`note-no-summary:${tag}`, noSummary, [], '<summary> 토글 완전 제거');
+        const notVisible = m.notes.map((n, i) => n.visible ? null : `#${i}`).filter(Boolean);
+        eq(`note-visible-without-click:${tag}`, notVisible, [], `${m.notes.length}건 — 클릭 0회로 전부 가시`);
+        bump('note-mech', m.notes.length * 3);
+
+        // 업체 식별은 이름으로(렌더 순서가 sortPlayers로 API 순서와 다르므로 index 매칭은 오탐을 낸다).
+        const noteByName = new Map(m.notes.map((n) => [n.playerName, n]));
+        eq(`note-name-domain:${tag}`, D.notedPlayers.filter((p) => !noteByName.has(p.name)).map((p) => p.name), [],
+          'note-name 매칭 실패 0건');
+        const badAccessName = D.notedPlayers.map((p) => {
+          const n = noteByName.get(p.name);
+          if (!n || !n.hasGroup) return `${p.name.slice(0, 12)}:GROUP_MISSING`;
+          return n.groupAriaLabel && n.groupAriaLabel.includes(p.name) ? null : `${p.name.slice(0, 12)}:label=${n.groupAriaLabel}`;
+        }).filter(Boolean);
+        eq(`note-access-name:${tag}`, badAccessName, [], `${D.notedPlayers.length}건 대조 · role="group" aria-label에 업체명 포함`);
+        bump('note-access', D.notedPlayers.length);
+
+        // 손실 0 — 원문 note 텍스트가 렌더에 그대로 있는가.
+        const noteLoss = D.notedPlayers.map((p) => {
+          const n = noteByName.get(p.name);
+          return n && n.bodyText.includes(p.note) ? null : `${p.name.slice(0, 12)}:NOTE_LOST`;
+        }).filter(Boolean);
+        eq(`note-lossless:${tag}`, noteLoss, [], `${D.notedPlayers.length}건 대조`);
+        bump('note-lossless', D.notedPlayers.length + 1);
+
+        // note-width(F4 재발 차단, task#296 갱신) — 스크롤러가 없어졌으므로 기준은 **표 자신의
+        // clientWidth**다(옛 스크롤러 100cqi 기준은 더 이상 존재하지 않는다).
+        const overWidth = m.notes.map((n, i) => (n.bodyWidth != null && n.bodyWidth > m.tableClientW + 1)
+          ? `#${i}:${n.bodyWidth}>${m.tableClientW}` : null).filter(Boolean);
+        eq(`note-width:${tag}`, overWidth, [], `표 clientW=${m.tableClientW}px · 본문폭 ${JSON.stringify(m.notes.map((n) => n.bodyWidth))}`);
         bump('note-width');
-        // 원복 — 이후 스크린샷이 펼친 상태로 오염되지 않게(첫 화면 캡처는 "스크롤 0·기본 상태" 주장이다)
-        await noteBtn.click({ timeout: 8000 }).catch(() => {});
-        // 클릭은 Playwright의 auto-scroll을 유발한다 — 스크롤 위치(세로·표 가로 둘 다)를 되돌리지
-        // 않으면 아래 `-top.png`가 "스크롤 0의 첫 화면"이라는 주장을 더 이상 만족하지 않는다.
-        await page.evaluate((sel) => {
-          window.scrollTo(0, 0);
-          const t = document.querySelector(sel);
-          if (t && t.parentElement) t.parentElement.scrollLeft = 0;
-        }, '[data-testid="tech-report-players"]');
-        await page.waitForTimeout(200);
       } else {
-        NOTE(`${tag} — note-width 정의역 밖(note 있는 업체 0곳). 축의 정의역이며 무음 스킵이 아니다.`);
+        NOTE(`${tag} — note-* 세부 축 정의역 밖(note 있는 업체 0곳). 축의 정의역이며 무음 스킵이 아니다.`);
       }
 
       // ── (15) 콘솔 에러 ──

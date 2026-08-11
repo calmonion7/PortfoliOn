@@ -117,6 +117,19 @@ export function sortPlayers(players) {
   })
 }
 
+// 업체 표에 렌더할 열(task#296 S1ⓐ). name·level은 항상 포함하고, gap·share는 전 행이 결측이면
+// 통째로 뺀다(못 미더운 열을 채우지 않는다 — wrong < missing). share_pct === 0 / gap_years === 0은
+// 값이다(0%도 유효 점유율·gap 0은 선두 자신) — falsy로 흘리면 그 행 하나만으로도 열을 잘못 지운다.
+// ⚠️ share 게이트는 `>= 0`이다(`> 0` 아님) — 같은 페이지의 점유율 섹션·ShareChart와 같은 식을 써야
+// 한 필드가 페이지 안에서 두 판정을 갖지 않는다. 국가·티커는 열이 아니라 업체 셀 내부로 들어간다.
+export function playerColumns(players) {
+  const list = Array.isArray(players) ? players : []
+  const cols = ['name', 'level']
+  if (list.some((p) => p?.gap_years != null)) cols.push('gap')
+  if (list.some((p) => Number.isFinite(p?.share_pct) && p.share_pct >= 0)) cols.push('share')
+  return cols
+}
+
 // description의 대괄호 헤딩([기술 개요] 등)을 [{title, body}]로 분해(task#280 S4).
 // ⚠️ 대괄호 규약은 데이터 계약이 아니라 루틴의 자발적 습관이다 — 파싱 실패는 *정상 입력*이고
 // 정보 손실 0이 절대 조건이다. 그래서 ① 헤딩은 "그 줄 전체가 [..]"일 때만 인정하고(줄 중간

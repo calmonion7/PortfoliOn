@@ -208,10 +208,14 @@ describe('선도기술 리포트 상세 (task#276 S5)', () => {
     expect(await table.findByText('CASC')).toBeTruthy()
     expect(table.queryByText(/-2년/)).toBeNull()
     // task#280 S3 — 카드형에선 `선두 대비`가 값에만 등장해 전역 부재를 단언할 수 있었으나,
-    // 표에서는 그 문자열이 **열 머리글**이라 항상 존재한다(정상). 단언을 값 셀로 좁힌다:
-    // 4번째 열(업체·국가·기술수준·**선두 대비**·점유율·티커)이 결측 표시 —여야 한다.
-    const row = within(screen.getByTestId('tech-report-players')).getByTestId('tech-report-player-row')
-    expect(row.cells[3].textContent).toBe('—')
+    // 표에서는 그 문자열이 **열 머리글**이라 항상 존재한다(정상). 단언을 값 셀로 좁힌다.
+    // ⚠️ task#296 S3(playerColumns)가 열 집합을 가변으로 바꿨다 — 이 픽스처(단일 업체·share_pct
+    // null)는 점유율 열이 빠져 열이 [업체,기술수준,선두 대비] 3개뿐이다. 고정 인덱스(옛 3번째)는
+    // 그 전제가 깨진 낡은 축이라(가토 ⑧ⓝ) 헤더 텍스트로 열을 찾아 흔들리지 않게 한다.
+    const playersTable = screen.getByTestId('tech-report-players')
+    const gapColIdx = [...playersTable.querySelectorAll('th')].map((th) => th.textContent).indexOf('선두 대비')
+    const row = within(playersTable).getByTestId('tech-report-player-row')
+    expect(row.cells[gapColIdx].textContent).toBe('—')
   })
 
   it('섹션 순서 — 지표·표가 산문보다 먼저 온다 (task#280 확정 순서)', async () => {
@@ -361,5 +365,82 @@ describe('선도기술 리포트 상세 — 핵심 포인트·진척 타임라�
     // 이빨 — 픽스처가 실제로 재정렬을 유발해야 위 단언이 판별력을 갖는다. 같은 분류(비등수형) 안에서
     // API 원순서(두산→GE)와 정렬 순서(GE→두산)가 갈리므로, ordered 대신 report.players를 넘기면 깨진다.
     expect(tableNames).not.toEqual(FULL_REPORT.players.map((p) => p.name))
+  })
+})
+
+// ── task#296 S4 — 전역 목차 (SECTIONS 단일 소스에서 파생) ───────────────────────
+// `[data-tech-section]`은 **상위 섹션 전용**이라 필터가 필요 없다 — 산문 소제목은 `data-tech-anchor`를
+// 쓴다(처음엔 두 곳이 같은 속성을 재사용해 소비처마다 11-id 리터럴로 걸러야 했고, 그 목록이 이 파일·
+// 페이지·프로브 3곳에 바이트 동일로 복제됐다. 섹션을 늘릴 때 한 곳만 고치는 재발 경로라 속성을 갈랐다).
+describe('선도기술 리포트 상세 — 전역 목차 (task#296 S4)', () => {
+  // 구발행물(REPORT)·전 필드(FULL_REPORT) 쌍 — 완료기준 "섹션이 조건부로 사라지면 칩도 사라진다"를
+  // 두 형태로 함께 잰다. 라벨·순서는 기존 titlesOf 단언(줄 229-230·279-280)과 바이트 동일해야 한다
+  // (목차와 본문 SectionTitle이 같은 SECTIONS 배열에서 파생하므로 어긋나면 둘 중 하나가 잘못됐다는 뜻).
+  it.each([
+    ['구발행물(REPORT) — 7섹션', REPORT, 'reusable-rocket',
+      ['주요 업체', '기술수준 비교', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
+    ['전 필드(FULL_REPORT) — 8섹션', FULL_REPORT, 'smr',
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계보 분류', '시장 규모', '상세 설명', '출처']],
+  ])('목차 칩 수 == 렌더된 섹션 수, 라벨·순서 일치: %s', async (_label, rep, slug, expectedLabels) => {
+    mockReport(rep)
+    const { container } = renderAt(slug)
+    await screen.findByTestId('tech-report-toc')
+
+    const chipEls = screen.getAllByTestId('tech-toc-chip')
+    const chips = chipEls.map((a) => a.textContent)
+    const sections = [...container.querySelectorAll('[data-tech-section]')]
+    expect(chips).toEqual(expectedLabels)
+    expect(chips.length).toBe(sections.length)
+
+    // ⚠️ 개수·라벨만 단언하면 **재정렬을 원리적으로 못 잡는다**(적대 리뷰 렌즈2 F2, MED): SECTIONS가
+    // 라벨·id·show를 주지만 JSX는 각 섹션을 손으로 배치하므로 두 순서의 일치는 구조가 아니라 손이
+    // 지킨다. 한쪽만 재정렬하면 칩 순서와 시각 순서가 갈려 이 태스크의 목적(일관된 항해)이 조용히
+    // 깨지는데, `chips === expectedLabels`(SECTIONS 파생)와 개수 단언은 둘 다 그대로 통과한다.
+    // 그래서 리터럴이 아니라 **두 순서를 서로** 대조한다.
+    expect(chipEls.map((a) => a.getAttribute('href').slice(1)))
+      .toEqual(sections.map((el) => el.getAttribute('data-tech-section')))
+  })
+
+  it('칩 href는 문서 내 유일 요소로 해석된다 — id 중복 0', async () => {
+    mockReport(FULL_REPORT)
+    const { container } = renderAt('smr')
+    const chips = await screen.findAllByTestId('tech-toc-chip')
+
+    const ids = [...container.querySelectorAll('[data-tech-section]')].map((el) => el.id)
+    expect(new Set(ids).size).toBe(ids.length)   // id 중복 0
+    chips.forEach((a) => {
+      const id = a.getAttribute('href').slice(1)
+      expect(container.querySelectorAll(`#${id}`).length).toBe(1)
+    })
+  })
+
+  it('섹션이 1개뿐이면(핵심 포인트·업체·산문 등 전부 결측, 시장 규모만 상시 렌더) 목차를 렌더하지 않는다', async () => {
+    const minimal = {
+      slug: 'robotics', published_date: '2026-08-05', title: null,
+      description: null, difficulty: {}, players: [], challenges: [],
+      related: { prerequisites: [], derivatives: [], complements: [], competitors: [] },
+      market: { history: [], forecast: [], cagr_pct: null, share_basis: null, as_of: null },
+      sources: [],
+    }
+    mockReport(minimal)
+    renderAt('robotics')
+    await screen.findByTestId('market-growth-chart')   // 유일한 상시 섹션이 렌더됐음을 먼저 확인
+    expect(screen.queryByTestId('tech-report-toc')).toBeNull()
+  })
+
+  it('핵심 포인트 섹션에 목차 앵커가 정확히 배선된다 — id/data-tech-section == key-points', async () => {
+    mockReport(FULL_REPORT)
+    renderAt('smr')
+    const kp = await screen.findByTestId('tech-key-points')
+    expect(kp.id).toBe('key-points')
+    expect(kp.getAttribute('data-tech-section')).toBe('key-points')
+  })
+
+  it('구발행물(key_points 없음)에는 그 칩도 유령 앵커도 없다', async () => {
+    mockReport(REPORT)
+    renderAt('reusable-rocket')
+    await screen.findByTestId('tech-report-toc')
+    expect(screen.queryByTestId('tech-key-points')).toBeNull()
+    expect(screen.getAllByTestId('tech-toc-chip').map((a) => a.textContent)).not.toContain('핵심 포인트')
   })
 })

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatMarketSize, splitSeries, formatMarketSummary, TECH_NAMES, TECH_LEVEL_LABELS,
-  deriveTechKpis, sortPlayers, parseDescriptionSections,
+  deriveTechKpis, sortPlayers, parseDescriptionSections, playerColumns,
 } from './techReportUtils'
 
 // 선도기술 리포트(ADR-0033, task#276 S5) 순수 헬퍼 — red-first(TDD 대상은 formatMarketSize·splitSeries).
@@ -266,6 +266,55 @@ describe('sortPlayers — 기술수준 ↓ → 격차 ↑ → gap_years null 최
     expect(sortPlayers([])).toEqual([])
     expect(sortPlayers(null)).toEqual([])
     expect(sortPlayers(undefined)).toEqual([])
+  })
+})
+
+describe('playerColumns — 업체 표 열 게이트(task#296 S1ⓐ): 전 행 결측이면 그 열이 없다', () => {
+  it('name·level은 항상 포함(비배열·빈 배열·객체도 예외 없이)', () => {
+    expect(playerColumns([])).toEqual(['name', 'level'])
+    expect(playerColumns(null)).toEqual(['name', 'level'])
+    expect(playerColumns(undefined)).toEqual(['name', 'level'])
+    expect(playerColumns({})).toEqual(['name', 'level'])
+  })
+
+  it('실측 SMR 형태(gap_years 9행·share_pct 전무) → gap 있음·share 없음', () => {
+    expect(playerColumns(SMR.players)).toEqual(['name', 'level', 'gap'])
+  })
+
+  it('실측 reusable-rocket 형태(share_pct 1건 존재) → gap·share 모두 있음', () => {
+    expect(playerColumns(RR.players)).toEqual(['name', 'level', 'gap', 'share'])
+  })
+
+  it('gap_years가 전 행 null/undefined면 gap 열이 없다', () => {
+    const players = [{ name: 'A', gap_years: null }, { name: 'B' }]
+    expect(playerColumns(players)).toEqual(['name', 'level'])
+  })
+
+  it('gap_years === 0(선두 자신)은 값이다 — 그 한 행만으로도 gap 열이 생긴다', () => {
+    expect(playerColumns([{ name: 'A', gap_years: 0 }, { name: 'B' }])).toEqual(['name', 'level', 'gap'])
+  })
+
+  it('share_pct === 0은 값이다 — 그 한 행만으로도 share 열이 생긴다(결측 아님)', () => {
+    expect(playerColumns([{ name: 'A', share_pct: 0 }, { name: 'B' }])).toEqual(['name', 'level', 'share'])
+  })
+
+  it('share_pct: -1 · NaN · null · undefined는 전부 결측 취급(share 열 없음)', () => {
+    const players = [
+      { name: 'A', share_pct: -1 },
+      { name: 'B', share_pct: NaN },
+      { name: 'C', share_pct: null },
+      { name: 'D' },
+    ]
+    expect(playerColumns(players)).toEqual(['name', 'level'])
+  })
+
+  it('나머지가 전부 결측이어도 1행만 유효값이면 그 열이 존재한다', () => {
+    const players = [{ name: 'A' }, { name: 'B' }, { name: 'C', share_pct: 12.5 }]
+    expect(playerColumns(players)).toEqual(['name', 'level', 'share'])
+  })
+
+  it('gap 없이 share만 있어도 순서는 name→level→share(중간 열만 빠지고 순서는 유지)', () => {
+    expect(playerColumns([{ name: 'A', share_pct: 5 }])).toEqual(['name', 'level', 'share'])
   })
 })
 

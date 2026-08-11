@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
-import PlayerTable, { SCROLLER, NAME_TEXT, NOTE_BODY, NOTE_SUMMARY } from './PlayerTable'
+import PlayerTable, { NAME_TEXT, NOTE_BODY } from './PlayerTable'
 
-// task#280 S3 — 업체 카드 → 표. 정렬은 리터럴 순서가 아니라 **불변식**으로 단언한다
-// (정당한 데이터 변경/타이브레이크 추가에 거짓 실패하지 않게).
+// task#280 S3 → task#296 S3(스크롤러 제거·note 상시 노출·열 재구성). 정렬은 리터럴 순서가 아니라
+// **불변식**으로 단언한다(정당한 데이터 변경/타이브레이크 추가에 거짓 실패하지 않게).
 //
 // 픽스처는 라이브 두 판을 모두 덮는다 — 한쪽만 보면 놓친다(실제로 그래서 놓쳤다).
 //   SMR    : players 9 · cagr_pct null · leader_name 짧음 · share_pct 0/음수/null 혼재
 //   ROCKET : players 8 · leader_name에 부연 괄호(`SpaceX (Grasshopper 호핑 2013년)`) · 선두 2종
+//
+// ⚠️ 열 인덱스 표기 — playerColumns(PLAYERS)와 playerColumns(ROCKET)은 둘 다 gap_years·share_pct가
+// 일부 행에 유효값을 가져 4열(['name','level','gap','share'])로 렌더된다. 국가·티커가 별도 열이던
+// 시절의 옛 인덱스(gap=3·share=4)는 국가·티커가 업체 셀 내부로 옮겨가며 gap=2·share=3으로 당겨졌다.
 const PLAYERS = [
   { name: '두산에너빌리티', country: 'KR', ticker: '034020', tech_level: 4, gap_years: null, leader_name: 'NuScale', share_pct: null, state_led: false, note: '주기기 공급망의 핵심.' },
   { name: 'NuScale', country: 'US', ticker: 'SMR', tech_level: 5, gap_years: 0, leader_name: 'NuScale', share_pct: 22.5, state_led: false, note: '설계인증 취득.' },
@@ -33,6 +37,18 @@ const ROCKET = [
   { name: 'JAXA/MHI', country: 'JP', ticker: null, tech_level: 2, gap_years: null, leader_name: null, share_pct: null, state_led: true, note: '재사용 실증 착수.' },
 ]
 
+// task#296 S3 완료기준 — 열 게이트가 실제로 열 수를 바꾸는지 라이브 두 형태로 확인.
+//   SMR_SHAPE     : ticker·share_pct 전 행 결측 → gap만 조건부 포함 → name+level+gap = 3열
+//   ROBOTICS_SHAPE: ticker·share_pct 둘 다 유효값 존재            → name+level+gap+share = 4열
+const SMR_SHAPE = [
+  { name: 'A사', country: 'KR', ticker: null, tech_level: 5, gap_years: 0, leader_name: null, share_pct: null, state_led: false, note: 'A사 노트.' },
+  { name: 'B사', country: 'US', ticker: null, tech_level: 3, gap_years: 4, leader_name: 'A사', share_pct: null, state_led: false, note: null },
+]
+const ROBOTICS_SHAPE = [
+  { name: 'C사', country: 'KR', ticker: '005930', tech_level: 5, gap_years: 0, leader_name: null, share_pct: 12.3, state_led: false, note: 'C사 노트.' },
+  { name: 'D사', country: 'US', ticker: 'IRBT', tech_level: 4, gap_years: 2, leader_name: 'C사', share_pct: 4.5, state_led: false, note: null },
+]
+
 const byName = Object.fromEntries(PLAYERS.map((p) => [p.name, p]))
 
 function renderedOrder() {
@@ -50,7 +66,11 @@ function noteRowOf(name) {
   return next?.getAttribute('data-testid') === 'tech-report-player-note' ? next : null
 }
 
-describe('PlayerTable (task#280 S3)', () => {
+function headerLabels() {
+  return within(screen.getByTestId('tech-report-players')).getAllByRole('columnheader').map((th) => th.textContent)
+}
+
+describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   it('업체 수만큼 행을 렌더하고 루트 data-testid를 유지한다 — 두 판 모두', () => {
     const { unmount } = render(<PlayerTable players={PLAYERS} />)
     // 기존 TechReport.test.jsx가 within()으로 이 앵커를 쓴다 — 스타일이 바뀌어도 유지 대상
@@ -85,19 +105,16 @@ describe('PlayerTable (task#280 S3)', () => {
     expect(PLAYERS.map((p) => p.name)).toEqual(snapshot)
   })
 
-  // ── 적대 리뷰 F9 회귀 ─────────────────────────────────────────────────────
-  // ⚠️ 옛 테스트('note는 기본 접힘이고, 토글로 펼쳤다 다시 접을 수 있다')를 대체한다.
-  // 옛 구현은 접히면 note 행을 DOM에서 통째 제거해 Ctrl+F·스크린리더·프로브가 못 찾았고,
-  // 그 테스트는 `queryAllByTestId(...).length === 0`으로 **그 소멸을 잠그고** 있었다.
-  // 접기는 네이티브 <details>로 옮겼다(ProseSections.jsx가 못박은 규율). jsdom은 details를
-  // 숨기지 않으므로 "보이는가"는 여기서 못 잰다 — 열림은 details.open, 손실 0은 textContent로.
-  it('F9 — 접힌 note도 DOM에 남는다(details 닫힘 + 본문 텍스트 존재)', () => {
+  // ── 적대 리뷰 F9 회귀 → task#296 S3에서 재차 뒤집는다 ────────────────────────
+  // ⚠️ F9는 원래 "접어도(details 닫힘) DOM에 남는다"를 확인했다(그 이전 구현은 접히면 note를
+  // DOM에서 통째 제거해 Ctrl+F·스크린리더·프로브가 못 찾았다). task#296은 접기 자체를 없앤다 —
+  // note가 처음부터 항상 렌더되므로 details가 없어도 "감출 여지가 없다"는 더 강한 성질을 갖는다.
+  it('note는 접힘 없이 상시 렌더된다(details 부재 · 본문 텍스트 항상 존재)', () => {
     render(<PlayerTable players={PLAYERS} />)
     const noteRow = noteRowOf('NuScale')
     expect(noteRow).toBeTruthy()
-    expect(noteRow.querySelector('details').open).toBe(false)   // 기본 접힘(표의 목적은 비교)
-    expect(noteRow.textContent).toContain('설계인증 취득.')       // 접혀도 검색·스크린리더가 닿는다
-    // 다른 업체의 note도 마찬가지 — 하나만 사는 구조가 아니다
+    expect(noteRow.querySelector('details')).toBeNull()          // 접기 메커니즘 자체가 없다
+    expect(noteRow.textContent).toContain('설계인증 취득.')        // 처음부터 보인다
     expect(noteRowOf('두산에너빌리티').textContent).toContain('주기기 공급망의 핵심.')
     expect(screen.getAllByTestId('tech-report-player-note').length)
       .toBe(PLAYERS.filter((p) => p.note).length)
@@ -109,18 +126,18 @@ describe('PlayerTable (task#280 S3)', () => {
     expect(within(rowOf('GE Hitachi')).queryByRole('button')).toBeNull()
   })
 
-  // ── 적대 리뷰 F10 회귀 ────────────────────────────────────────────────────
-  it('F10 — note 펼치기 컨트롤은 summary이고 히트영역 하한 24px + 접근 이름에 업체명', () => {
+  // ── 적대 리뷰 F10 회귀 → task#296 S3에서 무효화, 접근 이름 이관으로 대체 ──────
+  // ⚠️ F10은 옛 <summary> 히트영역(24px 하한)을 확인했다. summary·details가 없으니 히트영역
+  // 자체가 무의미해졌다 — 시각 라벨 "설명"이 사라진 대신 role="group" + aria-label로 9개 note가
+  // 여전히 접근 이름으로 구별되는지를 확인한다(getByRole 매칭 성공 자체가 "role 없는 aria-label은
+  // 접근성 트리에 노출되지 않는다"의 반증이다).
+  it('note 컨테이너는 summary/details 없이 role="group" + 업체명 접근 이름을 갖는다', () => {
     render(<PlayerTable players={PLAYERS} />)
-    // 옛 ▸ 버튼은 실측 5×11px(WCAG 최소 24×24의 1/10)이었다. summary는 블록이라 폭은 행 전체,
-    // 높이는 minHeight로 하한한다(패딩은 그 위에 더해진다).
-    expect(NOTE_SUMMARY.minHeight).toBeGreaterThanOrEqual(24)
-    const summary = noteRowOf('NuScale').querySelector('summary')
-    expect(summary.style.minHeight).toBe('24px')
-    // 9개 summary의 시각 라벨이 전부 '설명'이라 접근 이름으로 구별돼야 한다
-    expect(summary.getAttribute('aria-label')).toBe('NuScale 설명')
-    expect(noteRowOf('두산에너빌리티').querySelector('summary').getAttribute('aria-label'))
-      .toBe('두산에너빌리티 설명')
+    const noteRow = noteRowOf('NuScale')
+    expect(noteRow.querySelector('summary')).toBeNull()
+    expect(noteRow.querySelector('details')).toBeNull()
+    expect(within(noteRow).getByRole('group', { name: 'NuScale 설명' })).toBeTruthy()
+    expect(within(noteRowOf('두산에너빌리티')).getByRole('group', { name: '두산에너빌리티 설명' })).toBeTruthy()
   })
 
   // ── 적대 리뷰 F3 회귀 ─────────────────────────────────────────────────────
@@ -128,10 +145,11 @@ describe('PlayerTable (task#280 S3)', () => {
     render(<PlayerTable players={ROCKET} />)
     // 옛 렌더는 매 행 `선두 대비 13년 · SpaceX (Grasshopper 호핑 2013년)`을 nowrap으로 담아
     // 이 열이 302px까지 부풀었고 표가 PC 1440(콘텐츠 748px)에서 891px로 넘쳤다.
-    expect(rowOf('SpaceX').cells[3].textContent).toBe('현재 선두')   // gap 0은 유효값
-    expect(rowOf('Blue Origin').cells[3].textContent).toBe('6년')
-    expect(rowOf('JAXA/MHI').cells[3].textContent).toBe('—')        // null
-    expect(rowOf('Roscosmos').cells[3].textContent).toBe('14년')
+    // cells[2] = 「선두 대비」(국가·티커가 업체 셀 내부로 옮겨 인덱스가 3→2로 당겨졌다)
+    expect(rowOf('SpaceX').cells[2].textContent).toBe('현재 선두')   // gap 0은 유효값
+    expect(rowOf('Blue Origin').cells[2].textContent).toBe('6년')
+    expect(rowOf('JAXA/MHI').cells[2].textContent).toBe('—')        // null
+    expect(rowOf('Roscosmos').cells[2].textContent).toBe('14년')
     // 표 안 어디에도 leader_name 문자열이 없다(캡션은 표 밖이라 이 스코프에 안 잡힌다)
     expect(within(screen.getByTestId('tech-report-players')).queryByText(new RegExp('Grasshopper'))).toBeNull()
     expect(screen.getByTestId('tech-report-players').textContent).not.toContain('선두 대비 6년')
@@ -156,11 +174,11 @@ describe('PlayerTable (task#280 S3)', () => {
 
   it('선두 대비 4케이스 — 0=현재 선두 · 양수=N년 · null과 음수는 표시하지 않는다', () => {
     render(<PlayerTable players={PLAYERS} />)
-    expect(rowOf('NuScale').cells[3].textContent).toBe('현재 선두')
-    expect(rowOf('GE Hitachi').cells[3].textContent).toBe('1년')
+    expect(rowOf('NuScale').cells[2].textContent).toBe('현재 선두')
+    expect(rowOf('GE Hitachi').cells[2].textContent).toBe('1년')
     // null(격차 미산정) · 음수(백엔드에 ge=0 제약 없음) 둘 다 추정하지 않고 —
-    expect(rowOf('두산에너빌리티').cells[3].textContent).toBe('—')
-    expect(rowOf('Rosatom').cells[3].textContent).toBe('—')
+    expect(rowOf('두산에너빌리티').cells[2].textContent).toBe('—')
+    expect(rowOf('Rosatom').cells[2].textContent).toBe('—')
   })
 
   // ── 적대 리뷰 F7 회귀 ─────────────────────────────────────────────────────
@@ -170,29 +188,36 @@ describe('PlayerTable (task#280 S3)', () => {
   // 변경 전 카드는 `점유율 0%`를 보였으므로 0에 한해 회귀였다.
   it('F7 — 점유율은 0을 값으로 표시하고 음수·비유한·결측만 —', () => {
     const { unmount } = render(<PlayerTable players={PLAYERS} />)
-    expect(rowOf('NuScale').cells[4].textContent).toBe('22.5%')
-    expect(rowOf('X-energy').cells[4].textContent).toBe('0%')            // 0 = 값
-    expect(rowOf('Rolls-Royce SMR').cells[4].textContent).toBe('—')      // 음수
-    expect(rowOf('TerraPower').cells[4].textContent).toBe('—')           // null
+    // cells[3] = 「점유율」(국가·티커 이동으로 인덱스가 4→3으로 당겨졌다)
+    expect(rowOf('NuScale').cells[3].textContent).toBe('22.5%')
+    expect(rowOf('X-energy').cells[3].textContent).toBe('0%')            // 0 = 값
+    expect(rowOf('Rolls-Royce SMR').cells[3].textContent).toBe('—')      // 음수
+    expect(rowOf('TerraPower').cells[3].textContent).toBe('—')           // null
     unmount()
 
     render(<PlayerTable players={ROCKET} />)
-    expect(rowOf('SpaceX').cells[4].textContent).toBe('50.9%')
-    expect(rowOf('CASC').cells[4].textContent).toBe('0%')
-    expect(rowOf('ArianeGroup').cells[4].textContent).toBe('—')
+    expect(rowOf('SpaceX').cells[3].textContent).toBe('50.9%')
+    expect(rowOf('CASC').cells[3].textContent).toBe('0%')
+    expect(rowOf('ArianeGroup').cells[3].textContent).toBe('—')
   })
 
-  // ── 적대 리뷰 F4 회귀 ─────────────────────────────────────────────────────
-  it('F4 — note 본문 폭은 뷰포트가 아니라 스크롤러에 묶인다(100cqi)', () => {
-    // 옛 `width: min(100%, calc(100vw - 32px))`는 "페이지 인셋 좌우 16px"을 가정했는데
-    // 모바일 래퍼(.m-page)가 20px을 더해 전 뷰포트에서 40~123px씩 잘렸다. 뷰포트 기준
-    // 하드코딩은 이 레이아웃에서 원리적으로 맞출 수 없다 — 컨테이너(스크롤러) 기준으로만 맞는다.
-    expect(SCROLLER.containerType).toBe('inline-size')   // 이게 없으면 cqi가 뷰포트로 폴백한다
-    expect(NOTE_BODY.width).toBe('100cqi')
-    expect(JSON.stringify(NOTE_BODY)).not.toContain('vw')
-    // 가시폭에 정확히 맞추려면 셀 패딩이 폭을 밀지 않아야 한다(패딩은 본문 안쪽으로)
-    expect(NOTE_BODY.boxSizing).toBe('border-box')
-    expect(NOTE_BODY.position).toBe('sticky')            // 가로 스크롤해도 화면 안에 머문다
+  // ── 적대 리뷰 F4 회귀 → task#296 S3에서 뒤집는다(스크롤러·컨테이너쿼리 자체를 제거) ─────
+  // ⚠️ F4는 "note 본문 폭이 뷰포트가 아니라 스크롤러(컨테이너쿼리)에 묶인다"를 확인했다. 표에
+  // 이제 자체 overflow-x 스크롤러가 없으므로(옆으로 안 스크롤한다) 그 기준자 자체가 무의미해졌다 —
+  // note는 표 폭을 그대로 따르고, containerType·100cqi·sticky·left는 전부 정리 대상 고아다.
+  it('F4 대체 — note 본문은 스크롤러·컨테이너쿼리 없이 표 폭을 그대로 따른다', () => {
+    expect(NOTE_BODY.width).toBeUndefined()
+    expect(JSON.stringify(NOTE_BODY)).not.toContain('cqi')
+    expect(NOTE_BODY.position).toBeUndefined()          // 가로 스크롤이 없으니 sticky도 불필요
+    expect(NOTE_BODY.left).toBeUndefined()
+    expect(NOTE_BODY.boxSizing).toBe('border-box')       // 패딩이 폭을 밀지 않게는 여전히 유효
+  })
+
+  it('표에는 자체 가로 스크롤러가 없다(overflowX 선언 0 · minWidth 0)', () => {
+    render(<PlayerTable players={PLAYERS} />)
+    const table = screen.getByTestId('tech-report-players')
+    expect(table.parentElement.style.overflowX).toBe('')
+    expect(table.style.minWidth).toBe('')
   })
 
   // ── 적대 리뷰 F14 회귀 ────────────────────────────────────────────────────
@@ -203,13 +228,22 @@ describe('PlayerTable (task#280 S3)', () => {
     expect(NAME_TEXT.maxWidth).toBeUndefined()
     expect(NAME_TEXT.textOverflow).toBeUndefined()
     expect(NAME_TEXT.overflowWrap).toBe('break-word')
-    // 접히려면 셀이 nowrap이 아니어야 한다(다른 열은 nowrap 유지 — 수치는 접히면 안 된다)
+    // 접히려면 이름 셀이 nowrap이 아니어야 한다. 수치 열(선두 대비, cells[2])은 nowrap 유지.
     expect(rowOf('Rolls-Royce SMR').cells[0].style.whiteSpace).toBe('normal')
-    expect(rowOf('Rolls-Royce SMR').cells[3].style.whiteSpace).toBe('nowrap')
+    expect(rowOf('Rolls-Royce SMR').cells[2].style.whiteSpace).toBe('nowrap')
     // 이름 문자열 자체는 온전하고 title 앵커도 유지된다
     const nameEl = within(rowOf('Rolls-Royce SMR')).getByTestId('tech-report-player-name')
     expect(nameEl.textContent).toBe('Rolls-Royce SMR')
     expect(nameEl.getAttribute('title')).toBe('Rolls-Royce SMR')
+  })
+
+  // task#296 S3ⓒ — 기술수준 셀만 별도로 줄바꿈을 허용한다(278px 4열에서 "5단계 · 양산상용" 14자가
+  // 넘친다). 수치 열(점유율)은 여전히 nowrap이라 이 완화는 기술수준 하나에만 적용된다.
+  it('기술수준 셀만 nowrap을 풀어 2줄을 허용한다(수치 열은 그대로 nowrap)', () => {
+    render(<PlayerTable players={PLAYERS} />)
+    expect(rowOf('NuScale').cells[1].style.whiteSpace).toBe('normal')
+    expect(rowOf('NuScale').cells[1].textContent).toBe('5단계 · 양산상용')
+    expect(rowOf('NuScale').cells[3].style.whiteSpace).toBe('nowrap')  // 점유율(수치)
   })
 
   it('기술수준 결측 행은 —를 렌더한다(추정 금지)', () => {
@@ -238,5 +272,33 @@ describe('PlayerTable (task#280 S3)', () => {
     unmount()
     render(<PlayerTable />)
     expect(screen.getByTestId('tech-report-players')).toBeTruthy()
+  })
+
+  // ── task#296 S3 완료기준 — 열 게이트(playerColumns) 연동 ────────────────────
+  describe('열 게이트 — smr 형태 vs robotics 형태(ADR-0034)', () => {
+    it('smr 형태(ticker·share 전 행 결측)에서 열이 3개다(점유율 헤더 없음) + colSpan 3 + 티커 미노출', () => {
+      render(<PlayerTable players={SMR_SHAPE} />)
+      expect(headerLabels()).toEqual(['업체', '기술수준', '선두 대비'])
+      expect(noteRowOf('A사').querySelector('td').getAttribute('colspan')).toBe('3')
+      // ticker가 전 행 null이므로 표 어디에도 티커 문자열이 나타나지 않는다
+      expect(screen.getByTestId('tech-report-players').textContent).not.toMatch(/005930|IRBT/)
+    })
+
+    it('robotics 형태(ticker·share 둘 다 유효)에서 열이 4개다(점유율 헤더 있음) + colSpan 4 + 티커 렌더', () => {
+      render(<PlayerTable players={ROBOTICS_SHAPE} />)
+      expect(headerLabels()).toEqual(['업체', '기술수준', '선두 대비', '점유율'])
+      expect(noteRowOf('C사').querySelector('td').getAttribute('colspan')).toBe('4')
+      expect(rowOf('C사').textContent).toContain('005930')
+      expect(rowOf('D사').textContent).toContain('IRBT')
+      expect(rowOf('C사').cells[3].textContent).toBe('12.3%')
+    })
+
+    it('국가·티커는 더 이상 별도 열이 아니다 — 업체 셀 내부로 이동(정보 손실 0)', () => {
+      render(<PlayerTable players={PLAYERS} />)
+      expect(headerLabels()).not.toContain('국가')
+      expect(headerLabels()).not.toContain('티커')
+      expect(rowOf('두산에너빌리티').textContent).toContain('KR')
+      expect(rowOf('두산에너빌리티').textContent).toContain('034020')
+    })
   })
 })

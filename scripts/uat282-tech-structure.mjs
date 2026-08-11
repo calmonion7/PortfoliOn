@@ -70,7 +70,9 @@
 // ── 대조군(기본 꺼짐) — 0건 축이 이빨을 가졌는지 실증. 게이트 아님 ────────────────────────────
 //   CONTROL=capclip   : 캡션을 nowrap+80px로 → `caption-clip`이 FAIL해야 정상.
 //   CONTROL=srctitle  : 캡션에 **실제 출처 제목 1건**을 덧붙임 → `market-no-src-titles`·`caption-exact` FAIL.
-//   CONTROL=proseopen : 산문 details를 전부 open → `prose-open`이 FAIL해야 정상.
+//   CONTROL=proseopen : (task#296 갱신) h3 소제목을 강제로 숨김(display:none) → `prose-open`이
+//                       FAIL해야 정상. 옛 버전(details를 강제 open)은 <details> 자체가 없어져
+//                       조용히 no-op하는 상태였다 — 대상을 h3로 재지정했다(완화가 아니라 대상 교체).
 //   CONTROL=estbar    : 막대 폭을 전부 100%로 → `est-bar-pct`·`est-bar-monotonic`이 FAIL해야 정상.
 //   CONTROL=roleimg   : 관계도 svg에 role="img"를 되돌림 → `graph-role-img`·`graph-svg-aria` FAIL.
 //   ⚠️ 주입이 조용히 no-op하지 않았는지는 **측정값 이동**으로 먼저 확인한다(원시 실측 로그에 실린다).
@@ -103,6 +105,10 @@ const CONTROL = process.env.CONTROL || '';
 const CONTROL_CSS = {
   capclip: '[data-testid="market-growth-caption"]{white-space:nowrap !important;overflow:hidden !important;max-width:80px !important;display:block !important}',
   estbar: '[data-testid="market-estimate-bar"]{width:100% !important}',
+  // task#296 — 옛 `proseopen`(details를 강제로 open)은 이제 <details> 자체가 없어 대상이 사라져
+  // **조용히 no-op**한다(헤더 주석이 스스로 경고한 실패 모드, F1 대상 지목). 새 메커니즘(h3 상시
+  // 노출)을 무효화하려면 h3를 직접 숨겨야 한다 — 이러면 `prose-open`(클릭 없는 가시성)이 FAIL해야 정상.
+  proseopen: '[data-testid="tech-prose-section"] h3{display:none !important}',
 };
 const CONTROL_DOM = {
   // 캡션에 실제 출처 제목을 덧붙인다 — S3이 제거한 "출처 join" 상태의 최소 재현.
@@ -110,7 +116,6 @@ const CONTROL_DOM = {
     const c = document.querySelector('[data-testid="market-growth-caption"]');
     if (c) c.textContent = `${c.textContent} · 출처 ${title}`;
   },
-  proseopen: () => document.querySelectorAll('[data-testid="tech-report-prose"] details').forEach((d) => { d.open = true; }),
   roleimg: () => {
     const s = document.querySelector('[data-testid="tech-graph-svg"]');
     if (s) { s.setAttribute('role', 'img'); s.removeAttribute('aria-hidden'); }
@@ -283,9 +288,13 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   // .sr-only는 `width:1px;overflow:hidden`이 **메커니즘 자체**라 잘림 축의 정의역 밖이다(의도된 은폐).
   // 자손까지 제외해야 한다 — ul.sr-only 안의 li는 클래스를 갖지 않으므로 closest로 판정한다.
   const isSR = (el) => !!(el.closest && el.closest('.sr-only'));
-  // display:none(닫힌 details 본문 등)은 rect가 0개 — 보이지 않는 것을 잘림 축의 표본으로 세면
-  // 커버리지가 부풀고 실제로는 아무것도 안 본 것이 된다.
-  const shown = (el) => el.getClientRects().length > 0;
+  // display:none은 rect가 0개 — 보이지 않는 것을 잘림 축의 표본으로 세면 커버리지가 부풀고
+  // 실제로는 아무것도 안 본 것이 된다.
+  // ⚠️ 단 **닫힌 `<details>` 자손은 예외다** — Chromium이 페인트만 억제하고 자손 자신의
+  // `getClientRects()`는 0이 아닌(페인트 이전 마지막 레이아웃) 값을 반환하는 함정이 실측으로
+  // 확인됐다(uat296 헤더 주석). `closest('details')`로 먼저 걸러낸 뒤에만 rect를 믿는다.
+  const isDisclosureHidden = (el) => { const d = el.closest('details'); return !!(d && !d.open); };
+  const shown = (el) => !isDisclosureHidden(el) && el.getClientRects().length > 0;
   // 진짜 줄 수 = 서로 다른 top 개수(rect 개수가 아니다 — 텍스트 노드마다 rect가 나온다).
   const lineCount = (el) => {
     const r = document.createRange(); r.selectNodeContents(el);
@@ -377,13 +386,21 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
     competitors: graphEl.querySelector('[data-testid="tech-graph-competitors"]') ? 1 : 0,
   } : null;
 
-  // ── 산문 ──
+  // ── 산문 — task#296: <details>/<summary> 완전 제거, 소제목은 <h3> + 상시 노출 ──
+  // detailsEls/summaryEls는 "메커니즘이 정말 사라졌는가"(0개여야 정상)를 재는 회귀 축이고,
+  // 소제목 수·가시성은 h3로 잰다(옛 total은 detailsEls.length였다 — 배포 후 그건 항상 0이 되어
+  // D.titledItems(>0)와 어긋나 공허하지 않은 진짜 FAIL을 낸다. 이 파일이 그걸 놓치고 있었다).
   const proseEl = root.querySelector('[data-testid="tech-report-prose"]');
   const detailsEls = proseEl ? [...proseEl.querySelectorAll('details')] : [];
+  const summaryEls = proseEl ? [...proseEl.querySelectorAll('summary')] : [];
+  const h3Els = proseEl ? [...proseEl.querySelectorAll('h3')] : [];
+  // shown()이 이미 disclosure-hidden(페인트 억제 함정)과 display:none(CONTROL=proseopen이 만드는
+  // 상태)을 둘 다 걸러낸다 — 위 정의를 재사용해 판정 메커니즘을 하나로 유지한다.
+  const h3Hidden = h3Els.filter((h) => !shown(h)).length;
   const prose = {
     found: !!proseEl,
-    total: detailsEls.length,
-    open: detailsEls.filter((d) => d.open).length,
+    detailsTotal: detailsEls.length, summaryTotal: summaryEls.length,
+    total: h3Els.length, hidden: h3Hidden,
     plain: proseEl ? proseEl.querySelectorAll('[data-testid="tech-prose-plain"]').length : 0,
     // 닫힌 details의 본문도 DOM에 남는다(네이티브 접기) — 손실 0 대조는 이 문자열로 한다.
     allText: proseEl ? proseEl.textContent : '',
@@ -624,16 +641,23 @@ for (const V of VIEWS) {
       }
       if (m.caption) { capWidths.add(m.caption.clientW); capTexts[`${R.mode}:${R.slug}`] = m.caption.text; }
 
-      // ══ ⓑ 산문 — 소제목 섹션이 **전부 접힌** 상태로 시작 ═════════════════════════════
-      // domain: 접을 대상이 실제로 있는가(기대값은 응답에서 유도 — 대괄호 헤딩 + 난이도 근거).
+      // ══ ⓑ 산문 — task#296 뒤집음(#264 절차: task#280 S4의 "전부 접힘" 기록이 아니라 task#296
+      //    plan.md의 사용자 결정 — 스크롤+전역 목차가 항해를 대신하므로 접기 자체를 없앤다).
+      //    옛 `prose.total`이 detailsEls.length였던 시절엔 이 축이 D.titledItems와 우연히 일치했지만
+      //    (같은 수의 <details>가 있었으므로), 배포 후 detailsEls는 항상 0이 되어 이 domain 단언이
+      //    **공허하지 않은 진짜 FAIL**을 내게 돼 있었다 — h3 기반으로 교체한다(완화가 아니라 더
+      //    엄격: 메커니즘 부재 + 소제목 존재 + 클릭 없는 가시성을 모두 본다).
       eq(`prose-domain:${tag}`, m.prose.found ? m.prose.total : 'PROSE_MISSING', D.titledItems,
         `소제목 ${D.titledItems}항목(대괄호 헤딩 + 난이도 근거) · plain ${m.prose.plain}개`);
-      eq(`prose-open:${tag}`, m.prose.open, 0, '전 섹션 접힘 시작 — 상세 설명이 목차로 읽힌다');
+      eq(`prose-details:${tag}`, m.prose.detailsTotal, 0, '<details> 메커니즘 완전 제거');
+      eq(`prose-summaries:${tag}`, m.prose.summaryTotal, 0, '<summary> 0개');
+      eq(`prose-open:${tag}`, m.prose.hidden, 0, '클릭 없이 전부 가시 — 닫힌 <details> 자손이면 hidden으로 잡힌다');
       // 손실 0 — "접었다"와 "지웠다"는 접힘 개수만으로 구별되지 않는다(닫힌 본문도 DOM에 남는다).
       eq(`prose-lossless:${tag}`, D.proseLines.filter((l) => !m.prose.allText.includes(l)).map((l) => l.slice(0, 24) + '…'), [],
         `본문 ${D.proseLines.length}줄 대조 · 산문 DOM ${m.prose.allText.length}자`);
       eq(`prose-lossless-rationale:${tag}`, m.prose.allText.includes(D.rationale) ? 'OK' : 'RATIONALE_LOST', 'OK',
         `근거 ${D.rationale.length}자`);
+      bump('prose-mech', 3);
       bump('prose', m.prose.total + 2);
       bump('prose-lossless', D.proseLines.length + 1);
 
@@ -775,7 +799,7 @@ for (const V of VIEWS) {
 
       rawLog.push(`${tag.padEnd(34)} 캡션 ${m.caption ? `${m.caption.lines}줄 need=${m.caption.needW}px/avail=${m.caption.clientW}px h=${m.caption.h}` : 'MISSING'}` +
         ` · CAGR kpi${m.cagrInKpi}/절${m.cagrInMarket}/전체${m.cagrInContainer}` +
-        ` · 산문 ${m.prose.total}개(open ${m.prose.open}) · body details[open] ${m.bodyDetailsOpen}` +
+        ` · 산문 h3 ${m.prose.total}개(hidden ${m.prose.hidden}) · details ${m.prose.detailsTotal}/summary ${m.prose.summaryTotal} · body details[open] ${m.bodyDetailsOpen}` +
         ` · est ${m.estPresent ? `${(m.estRows || []).length}행 트랙${JSON.stringify((m.estRows || []).map((r) => r.trackW))} 막대${JSON.stringify((m.estRows || []).map((r) => r.barW))} 라벨잘림${(m.estRows || []).filter((r) => r.labelClipped).length}` : '부재'}` +
         ` · graph ${m.graphPresent ? `노드${(m.graph.nodes || []).length}/sr${m.graph.srLabels.length}/roleImg${m.graph.roleImg}` : '부재'}` +
         ` · leaf ${m.leaves.length}(ell ${m.leaves.filter((e) => e.ell).length})/clip ${m.clippers.length}/vclip ${m.vclipCount}` +

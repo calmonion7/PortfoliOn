@@ -29,12 +29,12 @@ export const KP_CHIP = { background: 'var(--bg-elev-2)', borderRadius: 6, paddin
 export const fmtChangePct = (v) =>
   (Math.abs(v) >= 100 ? String(Math.round(Math.abs(v))) : Math.abs(v).toFixed(1))
 
-export default function KeyPointCards({ points }) {  // points: report.key_points (null·undefined 허용)
+export default function KeyPointCards({ points, sectionId }) {  // points: report.key_points (null·undefined 허용) · sectionId: 목차 앵커(task#296 S4, 페이지가 준다)
   const list = Array.isArray(points) ? points : []
   if (list.length === 0) return null   // 구발행물 graceful — 제목까지 포함해 섹션째 생략
 
   return (
-    <div data-testid="tech-key-points" style={{ marginBottom: 30 }}>
+    <div id={sectionId} data-tech-section={sectionId} data-testid="tech-key-points" style={{ marginBottom: 30 }}>
       <SectionTitle>핵심 포인트</SectionTitle>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {list.map((p, i) => {
