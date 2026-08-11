@@ -183,9 +183,13 @@ const measure = (page) => page.evaluate(([ROOT_SEL]) => {
   const proseSummaries = proseEl ? proseEl.querySelectorAll('summary').length : 0;
   const proseSectionEls = proseEl ? [...proseEl.querySelectorAll('[data-testid="tech-prose-section"]')] : [];
   const h3s = proseEl ? [...proseEl.querySelectorAll('h3')] : [];
+  // 산문 소제목은 `data-tech-anchor`다(목차 항목이 아니므로 `data-tech-section`이 아니다 — 두 속성의
+  // 역할 분리는 TechReport.css 주석 참조). ⚠️ 이 축이 `data-tech-section`을 읽던 것을 고쳤다: 속성을
+  // 가르면서 목차 필터만 갱신하고 여기를 놓쳐 배포 후 12건이 `data=null`로 FAIL했다(가토 ⑧ⓟ의
+  // 자기적용 — 바뀐 *동작*을 단언하는 축을 전수로 찾아야 하고, 하나를 고친 것으로 끝이 아니다).
   const proseSubAnchors = proseSectionEls.map((el) => ({
-    id: el.id, dataAttr: el.getAttribute('data-tech-section'),
-    hasId: !!el.id, matches: el.id === el.getAttribute('data-tech-section'),
+    id: el.id, dataAttr: el.getAttribute('data-tech-anchor'),
+    hasId: !!el.id, matches: el.id === el.getAttribute('data-tech-anchor'),
   }));
   // h3+그 뒤 문단들이 클릭 없이 이미 보이는가(post의 핵심 주장) — 각 섹션의 h3와 그 형제 <p> 전부.
   const h3Visible = h3s.map((h) => ({ t: txt(h).slice(0, 20), visible: rectVisible(h) }));

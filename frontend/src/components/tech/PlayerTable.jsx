@@ -66,13 +66,21 @@ const NAME_META = { display: 'flex', alignItems: 'center', gap: 'var(--space-1)'
 // 쪼갤 수 없는 한 덩어리로 **표 최소폭**에 반영된다. task#280 시절엔 그게 국가 *열*이었고 스크롤러
 // (overflowX:auto)가 흡수했지만 이번에 그 안전망을 없앴다 → 그 최소폭이 곧 페이지 가로 스크롤이다.
 // 국가는 산문성 값이라 접혀도 문자를 잃지 않는다(가토 ⑦: 줄어도 되는 것만 접는 상자에 넣는다).
-const META_TEXT = { minWidth: 0, overflowWrap: 'break-word', fontSize: 'var(--font-size-xs)', color: 'var(--text-3)' }
+const META_TEXT = { minWidth: 0, overflowWrap: 'anywhere', fontSize: 'var(--font-size-xs)', color: 'var(--text-3)' }
 // 업체명은 자르지 않고 접는다(적대 리뷰 F14). 옛 `maxWidth:190 + ellipsis`는 표가 전혀 넘치지 않는
 // PC에서도 무조건 잘랐고 복구 수단이 title뿐이라 터치 기기엔 전체 이름을 볼 방법이 없었다.
-// overflowWrap:break-word는 min-content를 "가장 긴 단어"로 두므로, 폭이 남으면 한 줄로 온전히 보이고
-// 모자랄 때만 접힌다 — 어느 폭에서도 문자가 사라지지 않는다. 고정 상한(매직넘버)을 두지 않는다.
+//
+// ⚠️⚠️ `break-word`가 아니라 **`anywhere`**여야 한다 — 스크롤러를 없앤 뒤 이 차이가 결정적이다.
+// 둘은 *렌더*가 같지만(폭이 모자랄 때만 단어 안에서 끊는다) **min-content 기여가 다르다**:
+//   `break-word`는 스펙상 min-content 크기에 영향을 주지 않는다 → 최소폭이 여전히 "최장 단어"다.
+//   `anywhere`는 그 끊김 기회가 min-content 계산에 **포함된다** → 표가 실제로 좁아질 수 있다.
+// 표 자동 레이아웃은 min-content로 열 폭을 정하므로, `break-word`만으론 "문자를 잃지 않는다"는
+// 만족시키면서도 표를 좁히지 못한다. 라이브 실측(reusable-rocket, m350): `ArianeGroup·ESA`(공백 없는
+// 15자 ≈ 101px) + `정부주도` 배지가 같은 flex 줄에서 합산돼 업체 열 min-content가 **181px**이 되고,
+// 4열 합계 360px > 가용 278px → 문서가 396px로 가로 스크롤했다(page-h-scroll 회귀방지축이 포착).
+// 고정 상한(매직넘버)은 두지 않는다.
 export const NAME_TEXT = {
-  minWidth: 0, overflowWrap: 'break-word',
+  minWidth: 0, overflowWrap: 'anywhere',
   fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)',
 }
 // 배지·티커는 줄면 안 되는 형제 — flex-shrink:0 + nowrap으로 고정(task#275)
@@ -89,9 +97,10 @@ const NOTE_TD = { padding: 0, borderBottom: '1px solid var(--border)' }
 // ⚠️ overflowWrap은 지우지 말 것(적대 리뷰 렌즈2 F1, MED). 옛 스크롤러가 note 폭을 `100cqi`로 못박아
 // 표의 min-content 계산에서 떼어놨는데 그 메커니즘이 사라졌다 — 이제 colSpan note <td>가 표 자동
 // 레이아웃에 직접 참여하므로, 끊을 수 없는 긴 토큰(URL·영문 합성어) 하나가 표와 **페이지**를 가로로
-// 밀어낸다(pre-wrap은 공백에서만 접는다). 산문이라 break-word로 접어도 문자를 잃지 않는다.
+// 밀어낸다(pre-wrap은 공백에서만 접는다). 산문이라 접어도 문자를 잃지 않는다.
+// `anywhere`인 이유는 위 NAME_TEXT 주석과 같다 — `break-word`는 min-content를 줄이지 못한다.
 export const NOTE_BODY = {
-  boxSizing: 'border-box', padding: '8px 10px 10px', overflowWrap: 'break-word',
+  boxSizing: 'border-box', padding: '8px 10px 10px', overflowWrap: 'anywhere',
   whiteSpace: 'pre-wrap', fontSize: 'var(--font-size-xs)', lineHeight: 1.7, color: 'var(--text-2)',
 }
 const HOLD_BADGE = { background: 'var(--tag-hold-bg)', color: 'var(--tag-hold-color)', borderColor: 'var(--tag-hold-border)' }

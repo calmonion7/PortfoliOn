@@ -227,7 +227,13 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     // 복구 수단이 title뿐이라 터치 기기에선 전체 이름을 볼 방법이 없었다.
     expect(NAME_TEXT.maxWidth).toBeUndefined()
     expect(NAME_TEXT.textOverflow).toBeUndefined()
-    expect(NAME_TEXT.overflowWrap).toBe('break-word')
+    // ⚠️ `break-word` → `anywhere`로 강화(task#296 배포 후 라이브 회귀). 둘은 렌더가 같지만
+    // **min-content 기여가 다르다**: `break-word`는 스펙상 min-content에 영향이 없어 최소폭이
+    // "최장 단어"로 남는다. 표 자동 레이아웃이 그 값으로 열 폭을 정하므로, 스크롤러를 없앤 뒤에는
+    // `break-word`만으론 표가 좁아지지 못해 문서가 가로 스크롤했다(라이브 reusable-rocket m350:
+    // 업체 열 181px → 4열 360px > 가용 278px → doc 396px). jsdom엔 레이아웃이 없어 이 차이를
+    // 원리적으로 볼 수 없으므로, 여기서는 **선언값을 못박고** 실제 폭은 uat296 page-h-scroll이 잰다.
+    expect(NAME_TEXT.overflowWrap).toBe('anywhere')
     // 접히려면 이름 셀이 nowrap이 아니어야 한다. 수치 열(선두 대비, cells[2])은 nowrap 유지.
     expect(rowOf('Rolls-Royce SMR').cells[0].style.whiteSpace).toBe('normal')
     expect(rowOf('Rolls-Royce SMR').cells[2].style.whiteSpace).toBe('nowrap')
