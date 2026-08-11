@@ -313,17 +313,17 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   const titleTextOf = (el) => { const t = el.querySelector('.rpt-title__text'); return t ? t.textContent.trim() : null; };
 
   // ── 시장 규모 섹션 블록 ──
-  // TechReport.jsx는 이 절의 SectionTitle을 **컨테이너 직속 자식**으로 두고(래퍼 없음) 차트·추정치
-  // 블록을 형제로 잇는다. 다음 절(연관 기술·상세 설명)은 자기 SectionTitle을 래퍼 안에 품으므로,
-  // "`.rpt-title`을 포함하는 형제를 만나면 멈춘다"가 절 경계가 된다.
-  const marketTitle = [...container.children].find((c) => c.classList.contains('rpt-title') && titleTextOf(c) === '시장 규모') || null;
-  const marketBlocks = [];
-  if (marketTitle) {
-    for (let e = marketTitle.nextElementSibling; e; e = e.nextElementSibling) {
-      if (e.classList.contains('rpt-title') || e.querySelector('.rpt-title')) break;
-      marketBlocks.push(e);
-    }
-  }
+  // ⚠️ 옛 스코핑은 "이 절의 SectionTitle이 **컨테이너 직속 자식**이고(래퍼 없음) 차트·추정치 블록이
+  // 형제로 이어진다"를 전제해 형제를 순회하며 `.rpt-title`을 만나면 멈추는 휴리스틱이었다. task#296이
+  // 전역 목차 앵커를 걸려고 이 절의 제목+두 블록을 래퍼 `<div id="market" data-tech-section="market">`
+  // 로 감싸면서 그 전제가 깨졌다(직속 자식에 `.rpt-title`이 없어 marketTitle=null → 66건 FAIL).
+  // 임계를 완화하는 대신 **절 경계를 명시 앵커로 재지정**한다 — 형제 순회 휴리스틱보다 엄격하다
+  // (다음 절이 래퍼를 갖는지에 의존하지 않고, 절의 시작·끝이 DOM에 선언돼 있다).
+  const marketWrap = container.querySelector('[data-tech-section="market"]');
+  const marketTitle = marketWrap
+    ? [...marketWrap.children].find((c) => c.classList.contains('rpt-title') && titleTextOf(c) === '시장 규모') || null
+    : null;
+  const marketBlocks = marketWrap ? [...marketWrap.children].filter((c) => c !== marketTitle) : [];
   const marketEls = marketTitle ? [marketTitle, ...marketBlocks] : [];
   const marketText = marketEls.map((e) => e.textContent).join('\n');
 

@@ -307,9 +307,10 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
         return { t: txt(e).slice(0, 16), shrink: s.flexShrink, ws: s.whiteSpace };
       })
       : [];
+    // label을 함께 싣는다 — 열 집합이 데이터 파생(playerColumns)이라 인덱스로 분류하면 판마다 어긋난다.
     const cellInfo = cells.map((td, ci) => {
       const s = cs(td);
-      return { i: ci, ws: s.whiteSpace, sw: td.scrollWidth, cw: td.clientWidth, w: Math.round(td.getBoundingClientRect().width) };
+      return { i: ci, label: headLabels[ci] ?? null, ws: s.whiteSpace, sw: td.scrollWidth, cw: td.clientWidth, w: Math.round(td.getBoundingClientRect().width) };
     });
     // 옛 축(이름행 ↔ 메타행 세로 간격)의 표 등가물 — 이름 셀과 그 다음 셀(task#296: 국가 → 기술수준)은
     // 한 행의 인접 열이므로 그 사이가 벌어지면 같은 업체의 정보가 두 덩어리로 읽힌다(가토 ⑩).
@@ -575,11 +576,15 @@ for (const V of VIEWS) {
             if (s.ws !== 'nowrap') viol.push(`sib/${id}/${s.t}:ws=${s.ws}`);
           }
           // ⓒ 이름 열 밖의 셀(task#296: 국가·티커는 이름 셀 내부로 이동 — 이제 기술수준·선두 대비·
-          //    점유율만 남는다) = 수치 열 → nowrap + 잘림 0
+          //    점유율만 남는다). ⚠️ 셋을 한 규칙으로 묶지 말 것 — **기술수준만 줄바꿈이 의도**다
+          //    (task#296 S3ⓒ: `5단계 · 양산상용` 14자가 278px 4열에서 넘쳐 2줄을 허용했다). 수치 열은
+          //    여전히 nowrap이어야 한다(수치는 접히면 안 된다). 인덱스가 아니라 **헤더 라벨로 분류**
+          //    한다 — 열 집합이 playerColumns 파생이라 판마다 인덱스가 달라진다.
           for (const c of r.cellInfo.filter(c => c.i > 0)) {
             cellN++;
-            if (c.ws !== 'nowrap') viol.push(`cell/${id}/#${c.i}:ws=${c.ws}`);
-            if (c.sw > c.cw + 1) viol.push(`cell/${id}/#${c.i}:CLIPPED(${c.sw}>${c.cw})`);
+            const wantWs = c.label === '기술수준' ? 'normal' : 'nowrap';
+            if (c.ws !== wantWs) viol.push(`cell/${id}/#${c.i}(${c.label}):ws=${c.ws} want=${wantWs}`);
+            if (c.sw > c.cw + 1) viol.push(`cell/${id}/#${c.i}(${c.label}):CLIPPED(${c.sw}>${c.cw})`);
           }
         }
         // 실측치를 PASS 메시지에 싣는다 — 이름 폭은 뷰포트마다 줄고(유연) 수치 열 폭은 안 줄어야 한다(고정).

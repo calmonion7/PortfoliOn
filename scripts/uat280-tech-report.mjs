@@ -306,7 +306,9 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   const summaryEls = proseEl ? [...proseEl.querySelectorAll('summary')] : [];
   const h3Els = proseEl ? [...proseEl.querySelectorAll('h3')] : [];
   const proseSectionEls = proseEl ? [...proseEl.querySelectorAll('[data-testid="tech-prose-section"]')] : [];
-  const proseAnchors = proseSectionEls.map((el) => ({ id: el.id, dataAttr: el.getAttribute('data-tech-section') }));
+  // 산문 소제목은 `data-tech-anchor`다(목차 항목이 아니다 — `data-tech-section`은 전역 목차가
+  // 가리키는 상위 섹션 전용, TechReport.css 주석 참조).
+  const proseAnchors = proseSectionEls.map((el) => ({ id: el.id, dataAttr: el.getAttribute('data-tech-anchor') }));
   // 본문 = 소제목 섹션 안의 <p>(task#296: 더 이상 <details> 안이 아니다) + 소제목 없는 선행 문단.
   const bodyEls = proseEl ? [
     ...proseEl.querySelectorAll('[data-testid="tech-prose-section"] p'),
