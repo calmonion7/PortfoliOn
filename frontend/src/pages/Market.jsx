@@ -7,6 +7,7 @@ import FearGreedSection from '../components/market/FearGreedSection'
 import CommoditiesSection from '../components/market/CommoditiesSection'
 import EconIndicatorsSection from '../components/market/EconIndicatorsSection'
 import MacroSignalsSection from '../components/market/MacroSignalsSection'
+import LaborSurveySection from '../components/market/LaborSurveySection'
 import BusinessFormationSection from '../components/market/BusinessFormationSection'
 import KospiSignalSection from '../components/market/KospiSignalSection'
 import M7EarningsSection from '../components/market/M7EarningsSection'
@@ -30,6 +31,7 @@ export default function Market({ tab = 'indicators' }) {
           <CommoditiesSection />
           <EconIndicatorsSection />
           <MacroSignalsSection />
+          <LaborSurveySection />
           <BusinessFormationSection />
           <KospiSignalSection />
           <M7EarningsSection />

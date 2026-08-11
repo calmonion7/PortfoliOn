@@ -31,6 +31,7 @@ EXPECTED_IDS = {
     "kr_sector_fetch", "us_sector_fetch", "disclosure_fetch", "agm_fetch", "dividend_fetch", "supply_score_fetch",
     "insider_fetch", "recommendation_kr", "recommendation_us",
     "us_supply_fetch", "beta_fetch", "kospi_signal_fetch", "business_formation_fetch",
+    "labor_surveys_fetch",
 }
 
 
@@ -42,7 +43,7 @@ def test_lists_sixteen_batches_with_required_fields():
         resp = client.get("/api/batches")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 30
+    assert len(data) == 31
     assert {b["id"] for b in data} == EXPECTED_IDS
     for b in data:
         assert REQUIRED_FIELDS.issubset(b.keys()), b["id"]

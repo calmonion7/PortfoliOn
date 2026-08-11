@@ -126,6 +126,24 @@ def _refresh_business_formation():
             logger.warning(f"[Scheduler] Business formation refresh failed: {e}")
 
 
+def _refresh_labor_surveys():
+    from services.market_indicators import _fetch_and_save_labor_surveys
+    with job_runs.record("labor_surveys_fetch", "auto") as run:
+        try:
+            data = _fetch_and_save_labor_surveys()
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                logger.warning(f"[Scheduler] Labor surveys skipped: {data['error']}")
+            elif data.get("_status"):
+                run.set_status(data["_status"])
+                logger.warning(f"[Scheduler] Labor surveys {data['_status']}")
+            else:
+                logger.info("[Scheduler] Labor surveys refreshed")
+        except Exception as e:
+            run.set_status("failed", str(e))
+            logger.warning(f"[Scheduler] Labor surveys refresh failed: {e}")
+
+
 def _refresh_kospi_signal():
     from services.market_indicators import kospi_signal
     with job_runs.record("kospi_signal_fetch", "auto"):
@@ -531,6 +549,7 @@ _JOB_FUNCS = {
     "monthly_us": _refresh_monthly_us,
     "macro_signals_fetch": _refresh_macro_signals,
     "business_formation_fetch": _refresh_business_formation,
+    "labor_surveys_fetch": _refresh_labor_surveys,
     "kospi_signal_fetch": _refresh_kospi_signal,
     "leverage_fetch": _fetch_leverage,
     "lending_fetch": _fetch_lending,

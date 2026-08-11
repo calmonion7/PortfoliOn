@@ -2871,6 +2871,41 @@ FRED 신규 창업 신청(Business Formation Statistics) 2개 부문(정보·전
 
 ---
 
+### `GET /api/market/labor-surveys`
+
+미국 고용 조사 2종의 월별 시계열 + 최신값 + 12개월 전 대비 변화. 기업조사(`establishment`, FRED `PAYEMS` 비농업 임금근로자)와 가계조사(`household`, FRED `CE16OV` 16세 이상 취업자)는 같은 고용 규모를 서로 다른 방법론으로 재는 별개 시계열이라(가계=자영업·농업 포함, 기업=재직 복수면 중복집계) 절대 수준 차는 상시 존재하며 그 자체로 신호가 아니다 — 같은 기간 증감 부호가 갈리는 추이의 발산이 신호다. `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 FRED 호출은 없다(데이터는 `labor_surveys_fetch` 일배치/수동 refresh가 채운다). 저장값이 없으면 각 조사의 `history`는 빈 배열, `latest`·`latest_date`·`change_12m`은 `null`.
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "establishment": {
+    "history": [{ "date": "2026-05-01", "value": 158858.0 }],
+    "latest": 158858.0,
+    "latest_date": "2026-05-01",
+    "change_12m": 1858.0
+  },
+  "household": {
+    "history": [{ "date": "2026-05-01", "value": 162720.0 }],
+    "latest": 162720.0,
+    "latest_date": "2026-05-01",
+    "change_12m": 620.0
+  }
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `establishment` | object | 기업조사(FRED `PAYEMS`, 계절조정·천 명) |
+| `household` | object | 가계조사(FRED `CE16OV`, 계절조정·천 명) |
+| `*.history` | object[] | 월별 시계열(`{ "date": "YYYY-MM-DD", "value": number }`) |
+| `*.latest` | number \| null | 최신 값 |
+| `*.latest_date` | string \| null | 최신 관측월 |
+| `*.change_12m` | number \| null | 최신값 − 12개월 전 값(날짜 매칭, 결손 시 `null`) |
+
+---
+
 ### `GET /api/market/indices`
 
 글로벌 주요 지수(S&P 500·KOSPI·KOSDAQ) 최근 시계열 + S&P 500 Shiller CAPE 밸류에이션. `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 외부 호출은 없다(데이터는 `indices_fetch` 일배치가 채운다). 저장값이 없으면 `indices`는 `{}`, `valuation`은 `{}`.
@@ -3017,10 +3052,10 @@ FRED 신규 창업 신청 2개 부문 수동 재수집. 부문별 독립 fetch �
 }
 ```
 
-**Response `200`** (한 부문만 실패 — `status: "partial"`, `ok: true` 유지. 실패 부문은 직전 저장값 그대로라 `_points`는 두 부문 다 채워져 보인다)
+**Response `200`** (한 부문만 실패 — `status: "partial"`, `ok: false`. 실패 부문은 직전 저장값 그대로라 `_points`는 두 부문 다 채워져 보인다)
 ```json
 {
-  "ok": true,
+  "ok": false,
   "status": "partial",
   "information_points": 72,
   "professional_points": 71
@@ -3035,6 +3070,45 @@ FRED 신규 창업 신청 2개 부문 수동 재수집. 부문별 독립 fetch �
   "error": "FRED_API_KEY 환경변수가 필요합니다."
 }
 ```
+
+---
+
+### `POST /api/market/refresh-labor-surveys`
+
+미국 고용 조사 2종(`PAYEMS`·`CE16OV`) 수동 재수집. 조사별 독립 fetch — 한 조사가 실패해도 다른 조사는 갱신되고, 실패한 조사는 직전 저장값을 그대로 보존한다. 실행이력은 일배치와 동일한 `labor_surveys_fetch` id로 기록한다. `status`가 `ok`와 별도로 실리는 이유: `ok`만 보면 부분성공·스킵도 "갱신됨"으로 오인하기 쉽다.
+
+**Auth:** admin 권한 필요
+
+**Response `200`** (전부 갱신)
+```json
+{
+  "ok": true,
+  "status": "success",
+  "establishment_points": 65,
+  "household_points": 65
+}
+```
+
+**Response `200`** (한 조사만 실패 — `status: "partial"`, `ok: false`. 실패 조사는 직전 저장값 그대로라 `_points`는 두 조사 다 채워져 보인다)
+```json
+{
+  "ok": false,
+  "status": "partial",
+  "establishment_points": 65,
+  "household_points": 64
+}
+```
+
+**Response `200`** (`FRED_API_KEY` 미설정 — 저장 생략, `status: "skipped"`, `ok: false`)
+```json
+{
+  "ok": false,
+  "status": "skipped",
+  "error": "FRED_API_KEY 환경변수가 필요합니다."
+}
+```
+
+전 조사 실패(키는 설정됐으나 양쪽 fetch 모두 실패)도 저장 생략·`status: "skipped"`이지만 이 경우 `error` 필드 없이 `_points`가 직전 저장값 기준으로 실린다.
 
 ---
 

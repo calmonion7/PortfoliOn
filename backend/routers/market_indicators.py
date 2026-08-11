@@ -19,12 +19,14 @@ from services.market_indicators import (
     get_fear_greed,
     get_kospi_futures,
     get_business_formation,
+    get_labor_surveys,
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
     _fetch_and_save_kr_exports,
     _fetch_and_save_macro_signals,
     _fetch_and_save_business_formation,
+    _fetch_and_save_labor_surveys,
     _mc_delete,
     _cache,
 )
@@ -171,6 +173,39 @@ def refresh_business_formation(_: str = Depends(require_admin)):
             return {"ok": status == "success", "status": status,
                     "information_points": len(data.get("information", [])),
                     "professional_points": len(data.get("professional", []))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/labor-surveys")
+def labor_surveys(_: str = Depends(get_current_user)):
+    """FRED 고용 조사 2종(기업조사 PAYEMS·가계조사 CE16OV) 저장 시계열+12개월 변화. 요청경로 라이브 FRED 0."""
+    try:
+        return get_labor_surveys()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-labor-surveys")
+def refresh_labor_surveys(_: str = Depends(require_admin)):
+    """고용 조사 2종(FRED) 수동 갱신 — labor_surveys_fetch로 기록.
+
+    `status`: success(전부 갱신)/partial(일부 조사 실패, 직전값 유지)/skipped(FRED_API_KEY
+    미설정 또는 전 조사 실패, 저장 생략) — `ok`만 보면 실패해도 갱신된 것으로 오인하기
+    쉬워 함께 반환한다.
+    """
+    try:
+        with job_runs.record("labor_surveys_fetch", "manual") as run:
+            data = _fetch_and_save_labor_surveys()
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                return {"ok": False, "status": "skipped", "error": data["error"]}
+            status = data.get("_status") or "success"
+            if status != "success":
+                run.set_status(status)
+            return {"ok": status == "success", "status": status,
+                    "establishment_points": len(data.get("establishment", [])),
+                    "household_points": len(data.get("household", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
