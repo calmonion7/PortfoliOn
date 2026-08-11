@@ -477,3 +477,85 @@ def test_backlog_route_not_shadowed_by_date_str():
         resp = client.get("/api/report/012450/backlog")
     assert resp.status_code == 200
     assert resp.json() == sample
+
+
+# ── 소유권 OR admin 게이트 (task#291, B50) ──────────────────────────────────
+# 두 엔드포인트(refresh_analyst · backfill_consensus)가 공통 헬퍼
+# report._require_owner_or_admin을 쓴다: find_ticker(storage.get_all_stocks(user_id),
+# upper)가 없고 동시에 caller가 admin이 아니면 403.
+# 각 엔드포인트마다 4케이스를 둔다 — 거부(비소유·caller=None) 2건 + 통과 2건(소유·admin).
+# 통과 케이스는 query를 []로 목해 "게이트를 지나면 무엇이 나오는지"를 코드로 고정한다
+# (refresh_analyst는 404, backfill_consensus는 400 — 둘 다 403이 아니라는 것이 판정축).
+# 게이트가 없으면 거부 2건이 통과 코드를 내며 FAIL하고, 게이트가 무조건 403이면
+# 통과 2건이 FAIL한다(양방향 이빨).
+
+def test_refresh_analyst_blocked_for_non_owner():
+    with patch("routers.report.storage.get_all_stocks", return_value=[]), \
+         patch("routers.report._auth_svc.get_user_by_id", return_value={"role": "user"}), \
+         patch("routers.report.query", return_value=[]):
+        resp = client.post("/api/report/AAPL/refresh-analyst")
+    assert resp.status_code == 403
+
+
+def test_refresh_analyst_allowed_for_owner_when_no_snapshot():
+    with patch("routers.report.storage.get_all_stocks", return_value=[{"ticker": "AAPL"}]), \
+         patch("routers.report.query", return_value=[]):
+        resp = client.post("/api/report/AAPL/refresh-analyst")
+    assert resp.status_code == 404
+
+
+def test_refresh_analyst_allowed_for_admin_non_owner():
+    with patch("routers.report.storage.get_all_stocks", return_value=[]), \
+         patch("routers.report._auth_svc.get_user_by_id", return_value={"role": "admin"}), \
+         patch("routers.report.query", return_value=[]):
+        resp = client.post("/api/report/AAPL/refresh-analyst")
+    assert resp.status_code == 404
+
+
+def test_refresh_analyst_blocked_when_caller_lookup_fails():
+    # caller=None(사용자 조회 실패·계정 삭제)은 fail-closed로 403이어야 한다. 위 세
+    # 테스트는 get_user_by_id가 늘 dict를 주는 경로만 커버하므로, 이 분기를 단언하지
+    # 않으면 `if not caller or caller.get(...) != "admin"` → `if caller and ...`처럼
+    # 동치로 보이는 리팩터가 caller=None에서 게이트를 우회시켜도 스위트가 초록으로
+    # 남는다 (task#291 적대적 리뷰 L3).
+    with patch("routers.report.storage.get_all_stocks", return_value=[]), \
+         patch("routers.report._auth_svc.get_user_by_id", return_value=None), \
+         patch("routers.report.query", return_value=[]):
+        resp = client.post("/api/report/AAPL/refresh-analyst")
+    assert resp.status_code == 403
+
+
+# backfill_consensus도 같은 헬퍼를 쓴다. 처음엔 require_admin으로 좁혔다가 되돌렸다 —
+# ConsensusChart.jsx:54의 「백필」 버튼에 role 게이팅이 없어서, admin 전용으로 만들면
+# 전 비admin 사용자가 자기 보유 종목에서도 403을 받는 기능 회귀였다 (task#291 fork).
+# 통과 시 코드가 404가 아니라 400인 것이 refresh_analyst와의 유일한 차이다.
+
+def test_backfill_consensus_blocked_for_non_owner():
+    with patch("routers.report.storage.get_all_stocks", return_value=[]), \
+         patch("routers.report._auth_svc.get_user_by_id", return_value={"role": "user"}), \
+         patch("routers.report.query", return_value=[]):
+        resp = client.post("/api/consensus/AAPL/backfill")
+    assert resp.status_code == 403
+
+
+def test_backfill_consensus_allowed_for_owner_when_no_snapshot():
+    with patch("routers.report.storage.get_all_stocks", return_value=[{"ticker": "AAPL"}]), \
+         patch("routers.report.query", return_value=[]):
+        resp = client.post("/api/consensus/AAPL/backfill")
+    assert resp.status_code == 400
+
+
+def test_backfill_consensus_allowed_for_admin_non_owner():
+    with patch("routers.report.storage.get_all_stocks", return_value=[]), \
+         patch("routers.report._auth_svc.get_user_by_id", return_value={"role": "admin"}), \
+         patch("routers.report.query", return_value=[]):
+        resp = client.post("/api/consensus/AAPL/backfill")
+    assert resp.status_code == 400
+
+
+def test_backfill_consensus_blocked_when_caller_lookup_fails():
+    with patch("routers.report.storage.get_all_stocks", return_value=[]), \
+         patch("routers.report._auth_svc.get_user_by_id", return_value=None), \
+         patch("routers.report.query", return_value=[]):
+        resp = client.post("/api/consensus/AAPL/backfill")
+    assert resp.status_code == 403

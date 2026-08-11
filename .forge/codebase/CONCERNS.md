@@ -61,7 +61,6 @@ mapped: 2026-08-10
 | B19 | `SESSION_SECRET` 하드코딩 폴백 (모듈 import 시점에 고정) | `routers/auth.py` `_HMAC_SECRET` | `main.py` 밖 진입점(스크립트·테스트·워커) |
 | B20 | 레이트리밋 전무 — bcrypt 로그인이 곧 CPU 고갈 DoS | `routers/auth.py::login` | 무인증·무계정 |
 | B21 | Postgres가 tracked 폴백 비밀번호로 호스트 5432에 발행 | `docker-compose.yml` (`POSTGRES_PASSWORD`) | 호스트 접근 가능한 누구나 |
-| **B50** | 임의 인증 사용자가 **자기 포트폴리오 밖 ticker**의 전역 공유 스냅샷·컨센서스 마트를 뮤테이션 (형제 `generate_one`은 소유권 검사가 있다) | `routers/report.py::refresh_analyst`, `::backfill_consensus` | 가입만 하면 |
 
 ### 표시 오류 / 크래시
 
@@ -378,16 +377,18 @@ finally:
 - **`POST /api/auth/login`** — 무제한 크리덴셜 스터핑(락아웃·백오프·CAPTCHA 없음). 더 나쁜 것은 `verify_password`가 **의도적으로 비싼 bcrypt**라는 점이다: 같은 무제한 엔드포인트가 CPU 고갈 DoS가 된다. FastAPI가 sync 핸들러를 유계 스레드풀에서 돌리므로 수백 건 동시 위조 로그인이면 API 전체가 정지한다. **계정 없이 가능한, 이 저장소에서 가장 싼 가용성 공격이다.**
 - `POST /api/auth/refresh`·`GET /api/auth/oauth/token` — 토큰이 `secrets.token_urlsafe(64)`/`(24)`라 추측은 비현실적. 노출은 DB 부하다.
 
-### 5.7 admin 게이팅 공백 — **2건 닫힘(구 B45·B46), 1건 잔존**
+### 5.7 admin 게이팅 공백 — **3건 닫힘(구 B45·B46·B50), 1건 잔존(`days` 상한) + 알려진 UI 비일관 1건**
 
 전역 상태를 바꾸는데 게이팅이 약했던 자리:
 
 - **닫힘(구 B45) `routers/report.py::put_backlog`** — `PUT /report/{ticker}/backlog`의 게이트를 `get_current_user_or_api_key`→**`require_admin_or_api_key`**로 좁혔다(task#290 S2). `save_llm_backlog(ticker, entries)`가 ticker 스코프(전역 공유)라는 사실은 그대로지만, 이제 admin 로그인 또는 API 키만 도달한다. 형제 `refresh_backlog`(`require_admin`)와 정합됨. `entries: list = Body(...)`에 `max_length` 상한이 없는 것은 그대로 남는다 — task#290의 비목표.
 - **닫힘(구 B46) `routers/stocks.py::clear_dashboard_cache`** — 게이트(`get_current_user`)는 유지하되 `cache_svc.invalidate_dashboard(user_id)`로 **호출자 자신의 캐시만** 무효화하도록 스코프를 좁혔다(task#290 S3, `_dashboard_cache.invalidate`는 이미 `user_id` 인자를 받고 있었다 — 호출부만 무인자였다). 대조군 `routers/calendar.py::delete_calendar_cache`와 이제 동형.
-- **신규 B50 `routers/report.py::refresh_analyst`(`:514`)·`::backfill_consensus`(`:566`)** (MED) — 둘 다 `user_id: str = Depends(get_current_user)`를 받아놓고 **본문에서 쓰지 않는다.** 형제 `generate_one`(`:114-118`)은 `find_ticker(storage.get_all_stocks(user_id), ticker)`로 소유권을 검사해 404를 내는데 이 둘은 곧장 ticker로 전역 공유 `snapshots`를 읽고 UPDATE한다(`backfill_consensus`는 `daily_consensus_mart`·`raw_reports`까지). 도달: 로그인만 하면 자기 포트폴리오 **밖** 임의 종목의 리포트 데이터를 갱신시킬 수 있다 — 외부 API(yfinance) 비용 남용 + 전 사용자가 보는 데이터의 신선도 왜곡. **구 B45(`put_backlog`)와 동형이지만 별개 위치·별개 결함**이라 task#290(B44·B45·B46·B47 4건 한정)의 스코프 밖으로 두고 등재만 했다 — task#290 적대적 리뷰가 형제 감사에서 발견(코드 직독 확인). 처방 후보: `generate_one`과 같은 소유권 검사, 또는 admin `scope=all` 정책에 맞는 멤버십 검사.
-- **잔존 `routers/report.py::backfill_consensus`** (LOW-MED) — `days: int = 180`이 **`Query(..., le=…)` 상한 없는 bare int**다(형제 `short_sell.py`·`investor.py`는 `Query(252, ge=1, le=1000)`으로 규율돼 있다). `get_current_user`만 요구하면서 외부 제공자를 향한 `_pipeline.backfill(...)`을 돌린다. task#290의 비목표.
+- **닫힘(구 B50) `routers/report.py::refresh_analyst`·`::backfill_consensus`** (task#291) — 둘 다 `user_id: str = Depends(get_current_user)`를 받아놓고 본문에서 안 쓰던 것이 결함이었다(형제 `::generate_one`은 `find_ticker(storage.get_all_stocks(user_id), ticker)`로 소유권 검사가 있었는데 이 둘엔 없었다). **두 엔드포인트는 이제 같은 가드를 공유한다** — `routers/report.py::_require_owner_or_admin`(소유권 OR admin, caller 조회 실패는 fail-closed)를 본문 선두, 스냅샷 `query`보다 **먼저** 호출한다. 거부는 둘 다 403이고 DB에 닿지 않으므로 무쓰기다. admin이 소유권을 우회해야 하는 이유는 리포트 목록 `scope=all`("그외" 탭)로 남의 종목 상세를 열기 때문이다(`list_reports`의 role 판정과 같은 패턴).
+  - ⚠️ **`require_admin`으로 좁히지 말 것 — 실제로 그렇게 구현했다가 배포 전에 되돌렸다.** 두 엔드포인트 모두 프론트 소비처가 있고(`components/reports/DetailTab.jsx`의 「데이터 갱신」 · `components/reports/ConsensusChart.jsx`의 「백필」) **둘 다 role 게이팅이 없다**(grep 0). admin 전용으로 좁히면 전 비admin 사용자가 **자기 보유 종목에서도** 403을 받는 **기능 회귀**다. task#291 계획은 `backfill_consensus`에 대해 "프론트 소비처 없음(grep 0)"이라는 **틀린 전제**로 `require_admin`을 채택했고(같은 계획이 `refresh_analyst`에는 정확히 반대 논리를 적었다), 적대적 리뷰가 배포 전에 잡았다. **게이트를 조이는 변경은 그 엔드포인트의 프론트 소비처를 직접 grep해 role 게이팅 유무를 대조할 것** — pytest·vitest·빌드 어느 것도 이 경로를 원리적으로 못 본다.
+- **알려진 UI 비일관(닫지 않음 — task#291 결정)** — 비admin이 **랭킹**(`pages/Ranking.jsx::onRowClick` → 모달 → `ReportDetailTabs`)에서 **비소유** 종목 상세를 여는 것은 지원되는 내비게이션인데, 그 화면의 「데이터 갱신」·「백필」 버튼은 소유권·role을 보지 않으므로 누르면 403이 뜬다. 실패는 `refreshError`로 graceful하고 공유 데이터는 보호되므로 **게이트 결함이 아니라 버튼 가시성 문제**다. 프론트에서 숨기려면 `GET /report/{ticker}/{date}` 응답(현재 소유권 필드 없음)에 `is_mine`을 additive로 추가하고 admin 판정까지 내려야 해서 계약이 늘어난다 → 별도 태스크로 남긴다. task#97/#103의 "버튼은 보이는데 핸들러가 거부"와 같은 가족.
+- **잔존 `routers/report.py::backfill_consensus`의 `days` 상한** (LOW) — `days: int = 180`은 여전히 **`Query(..., le=…)` 상한 없는 bare int**다(형제 `short_sell.py`·`investor.py`는 `Query(252, ge=1, le=1000)`으로 규율돼 있다). 소유권 게이트가 붙어 **남의 종목으로는 못 부르지만, 자기 보유·관심 종목에는 임의 인증 사용자가 큰 `days`로 외부 제공자를 호출시킬 수 있다** — 도달성은 **좁아졌을 뿐 닫히지 않았다**(옛 판의 "도달성만 닫힘" 서술은 `require_admin`을 전제한 것이라 무효). 상한 추가는 task#290·#291 둘 다 비목표.
 
-반대로 **비싼 배치 엔드포인트 28/31은 올바르게 `require_admin`이다** — 게이팅 규율 자체는 좋고, 위 잔존 1건이 예외다. `POST /api/admin/cowork/fire`는 고정 env URL(`COWORK_ROUTINE_FIRE_URL`)로만 POST하므로 **SSRF 없음**.
+반대로 **비싼 배치 엔드포인트 다수는 올바르게 `require_admin`이다** — 게이팅 규율 자체는 좋고, 위 잔존 1건(days 상한 코드 자체)만 예외다. ⚠️ 이 절 이전 판의 "28/31" 분모·분자는 산출 방법이 문서에 남아 있지 않아 `backfill_consensus`의 게이트 교체를 반영해 그대로 갱신하지 않았다(task#291 S3 — 추정 대신 재감사가 필요한 수치로 남겨둔다). `POST /api/admin/cowork/fire`는 고정 env URL(`COWORK_ROUTINE_FIRE_URL`)로만 POST하므로 **SSRF 없음**.
 
 ### 5.8 API 키 비교가 상수시간이 아니다 — **잠재 위험**(낮음)
 

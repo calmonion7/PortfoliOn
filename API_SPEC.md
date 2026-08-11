@@ -1758,11 +1758,11 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 특정 종목의 최신 애널리스트 데이터를 yfinance에서 즉시 갱신.
 
-**Auth:** Bearer token 필요 (`get_current_user`, task#108)
+**Auth:** Bearer token 필요 — **호출자의 보유·관심 목록에 있는 종목 또는 admin**만 허용(`get_current_user` + 본문 소유권 검사, task#291, B50 닫힘). `POST /consensus/{ticker}/backfill`과 같은 헬퍼(`report._require_owner_or_admin`)를 쓴다. 검사는 스냅샷 조회보다 먼저라 미소유·비admin 호출은 DB에 닿지 않는다.
 
 **Path Parameter:** `ticker` — 종목 코드
 
-**Response `200`**
+**Response `200`** — 응답은 yfinance에서 실제로 갱신된 필드만 담는다(전부 결측이면 `502`)
 ```json
 {
   "target_mean": 210.0,
@@ -1775,6 +1775,9 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
   "drop_from_high_20d": -3.2
 }
 ```
+
+**Error `403`** — 해당 종목이 호출자의 보유·관심 목록에 없고 admin도 아님
+**Error `404`** — 해당 종목의 스냅샷 없음 (리포트를 먼저 생성해야 함)
 
 ---
 
@@ -2081,7 +2084,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 특정 종목의 컨센서스 데이터를 정본 `daily_consensus_mart`로 백필 (raw_reports upsert 후 마트 재계산, ADR-0008). snapshot에서 market을 읽어 파이프라인을 호출한다.
 
-**Auth:** Bearer token 필요 (`get_current_user`, task#108)
+**Auth:** Bearer token 필요 — **호출자의 보유·관심 목록에 있는 종목 또는 admin**만 허용(`get_current_user` + 본문 소유권 검사, task#291, B50 닫힘 — 이전엔 인증만 하면 자기 포트폴리오 밖 임의 종목을 백필할 수 있었다). `POST /report/{ticker}/refresh-analyst`와 같은 헬퍼(`report._require_owner_or_admin`)를 쓴다. 검사는 스냅샷 조회보다 먼저라 미소유·비admin 호출은 DB에 닿지 않는다. 프론트 소비처는 `ConsensusChart.jsx`의 「백필」 버튼이며 role 게이팅이 없으므로 admin 전용으로 좁히지 않았다.
 
 **Path Parameter:** `ticker` — 종목 코드
 
@@ -2096,6 +2099,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 }
 ```
 `added` — 파이프라인이 upsert한 raw_reports 행 수.
+
+**Error `403`** — 해당 종목이 호출자의 보유·관심 목록에 없고 admin도 아님
+**Error `400`** — 해당 종목의 스냅샷 없음 (리포트를 먼저 생성해야 함)
 
 ---
 

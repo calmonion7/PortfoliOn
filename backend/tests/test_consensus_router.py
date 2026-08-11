@@ -8,7 +8,9 @@ from auth import get_current_user
 
 app = FastAPI()
 app.include_router(router)
-# backfill_consensus는 get_current_user로 게이트(task#108) — 인증된 호출자로 오버라이드.
+# backfill_consensus는 get_current_user + 본문 소유권 검사로 게이트(task#291, B50).
+# 아래 backfill 테스트들은 소유자 경로를 재므로 storage.get_all_stocks도 함께 목한다
+# (거부 경로 4케이스는 test_report_router.py가 담당).
 app.dependency_overrides[get_current_user] = lambda: "test-user-id"
 client = TestClient(app)
 
@@ -36,7 +38,8 @@ def test_get_consensus_returns_data():
 
 
 def test_backfill_no_report():
-    with patch("routers.report.query", return_value=[]):
+    with patch("routers.report.storage.get_all_stocks", return_value=[{"ticker": "AAPL"}]), \
+         patch("routers.report.query", return_value=[]):
         r = client.post("/api/consensus/AAPL/backfill")
     assert r.status_code == 400
 
@@ -51,7 +54,8 @@ def test_backfill_uses_pipeline_targets_mart():
     snapshot_data = {"market": "KR", "target_mean": 80000}
     router_query_result = [{"date": date.today().isoformat(), "data": snapshot_data}]
 
-    with patch("routers.report.query", return_value=router_query_result), \
+    with patch("routers.report.storage.get_all_stocks", return_value=[{"ticker": "005930"}]), \
+         patch("routers.report.query", return_value=router_query_result), \
          patch("routers.report._pipeline.backfill", return_value=7) as mock_pipeline:
         r = client.post("/api/consensus/005930/backfill")
 
@@ -66,7 +70,8 @@ def test_backfill_uses_pipeline_targets_mart():
 def test_backfill_market_defaults_us_when_missing():
     from datetime import date
     router_query_result = [{"date": date.today().isoformat(), "data": {}}]
-    with patch("routers.report.query", return_value=router_query_result), \
+    with patch("routers.report.storage.get_all_stocks", return_value=[{"ticker": "AAPL"}]), \
+         patch("routers.report.query", return_value=router_query_result), \
          patch("routers.report._pipeline.backfill", return_value=0) as mock_pipeline:
         r = client.post("/api/consensus/AAPL/backfill")
     assert r.status_code == 200

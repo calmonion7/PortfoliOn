@@ -510,10 +510,28 @@ def get_consensus(ticker: str, _: str = Depends(get_current_user)):
     return consensus_svc.get_history(ticker)
 
 
+def _require_owner_or_admin(user_id: str, upper: str) -> None:
+    """호출자의 보유·관심 목록에 없고 admin도 아니면 403 (B50, task#291).
+
+    전역 공유 snapshots·daily_consensus_mart를 바꾸는 엔드포인트의 공통 가드.
+    admin은 리포트 목록 scope=all("그외" 탭)로 남의 종목 상세를 열 수 있으므로
+    소유권만으로 게이트하면 그 경로가 깨진다(list_reports의 role 판정과 같은 패턴).
+    caller 조회 실패는 fail-closed. 호출부는 스냅샷 query보다 먼저 부를 것 —
+    거부가 DB에 닿지 않아야 무쓰기 게이트가 성립한다.
+    """
+    from services.utils import find_ticker
+    if find_ticker(storage.get_all_stocks(user_id), upper):
+        return
+    caller = _auth_svc.get_user_by_id(user_id)
+    if not caller or caller.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="권한이 없습니다")
+
+
 @router.post("/report/{ticker}/refresh-analyst")
 def refresh_analyst(ticker: str, user_id: str = Depends(get_current_user)):
     import yfinance as yf
     upper = ticker.upper()
+    _require_owner_or_admin(user_id, upper)
     rows = query(
         "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
         (upper,),
@@ -565,6 +583,7 @@ def refresh_analyst(ticker: str, user_id: str = Depends(get_current_user)):
 @router.post("/consensus/{ticker}/backfill")
 def backfill_consensus(ticker: str, days: int = 180, force: bool = False, user_id: str = Depends(get_current_user)):
     upper = ticker.upper()
+    _require_owner_or_admin(user_id, upper)
     rows = query(
         "SELECT date, data FROM snapshots WHERE ticker = %s ORDER BY date DESC LIMIT 1",
         (upper,),
