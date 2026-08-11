@@ -2906,6 +2906,50 @@ FRED 신규 창업 신청(Business Formation Statistics) 2개 부문(정보·전
 
 ---
 
+### `GET /api/market/trimmed-inflation`
+
+미국 절사평균 물가 4종의 월별 시계열, YoY % 단위로 통일. 코어 PCE(`core_pce`, FRED `PCEPILFE`)·헤드라인 PCE(`headline_pce`, FRED `PCEPI`)는 지수라 응답에서 YoY %로 파생하고, Dallas Fed 절사평균(`dallas_trimmed`, FRED `PCETRIM12M159SFRBDAL`)·Cleveland Fed 16% 절사평균(`cleveland_trimmed`, FRED `TRMMEANCPIM159SFRBCLE`)은 FRED가 이미 YoY %로 발행해 원값 그대로 노출한다(두 번 YoY 적용 안 함). 코어는 *식품·에너지라는 정해진 범주*를 항상 빼고, 절사평균은 *그 달에 극단이었던 품목*을 그때그때 빼는 서로 다른 방법론이다 — 코어가 오르는데 절사평균이 안 오르면 소수 품목 탓이라는 해석이 나온다. `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 FRED 호출은 없다(데이터는 `trimmed_inflation_fetch` 일배치/수동 refresh가 채운다). 저장값이 없으면 각 계열의 `history`는 빈 배열, `latest`·`latest_date`는 `null`.
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "core_pce": {
+    "history": [{ "date": "2026-05-01", "value": 2.72 }],
+    "latest": 2.72,
+    "latest_date": "2026-05-01"
+  },
+  "headline_pce": {
+    "history": [{ "date": "2026-05-01", "value": 2.64 }],
+    "latest": 2.64,
+    "latest_date": "2026-05-01"
+  },
+  "dallas_trimmed": {
+    "history": [{ "date": "2026-05-01", "value": 2.9 }],
+    "latest": 2.9,
+    "latest_date": "2026-05-01"
+  },
+  "cleveland_trimmed": {
+    "history": [{ "date": "2026-05-01", "value": 3.1 }],
+    "latest": 3.1,
+    "latest_date": "2026-05-01"
+  }
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `core_pce` | object | 코어 PCE(FRED `PCEPILFE`, 지수→YoY % 파생) |
+| `headline_pce` | object | 헤드라인 PCE(FRED `PCEPI`, 지수→YoY % 파생) |
+| `dallas_trimmed` | object | Dallas Fed 절사평균 PCE(FRED `PCETRIM12M159SFRBDAL`, 원천 YoY %) |
+| `cleveland_trimmed` | object | Cleveland Fed 16% 절사평균 CPI(FRED `TRMMEANCPIM159SFRBCLE`, 원천 YoY %) |
+| `*.history` | object[] | 월별 시계열(`{ "date": "YYYY-MM-DD", "value": number }`), 4종 모두 단위는 YoY % |
+| `*.latest` | number \| null | 최신 YoY % 값 |
+| `*.latest_date` | string \| null | 최신 관측월 |
+
+---
+
 ### `GET /api/market/indices`
 
 글로벌 주요 지수(S&P 500·KOSPI·KOSDAQ) 최근 시계열 + S&P 500 Shiller CAPE 밸류에이션. `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 외부 호출은 없다(데이터는 `indices_fetch` 일배치가 채운다). 저장값이 없으면 `indices`는 `{}`, `valuation`은 `{}`.
@@ -3109,6 +3153,49 @@ FRED 신규 창업 신청 2개 부문 수동 재수집. 부문별 독립 fetch �
 ```
 
 전 조사 실패(키는 설정됐으나 양쪽 fetch 모두 실패)도 저장 생략·`status: "skipped"`이지만 이 경우 `error` 필드 없이 `_points`가 직전 저장값 기준으로 실린다.
+
+---
+
+### `POST /api/market/refresh-trimmed-inflation`
+
+절사평균 물가 4종(`PCEPILFE`·`PCEPI`·`PCETRIM12M159SFRBDAL`·`TRMMEANCPIM159SFRBCLE`) 수동 재수집. 계열별 독립 fetch — 한 계열이 실패해도 다른 계열은 갱신되고, 실패한 계열은 직전 저장값을 그대로 보존한다. 실행이력은 일배치와 동일한 `trimmed_inflation_fetch` id로 기록한다. `status`가 `ok`와 별도로 실리는 이유: `ok`만 보면 부분성공·스킵도 "갱신됨"으로 오인하기 쉽다.
+
+**Auth:** admin 권한 필요
+
+**Response `200`** (전부 갱신)
+```json
+{
+  "ok": true,
+  "status": "success",
+  "core_pce_points": 105,
+  "headline_pce_points": 105,
+  "dallas_trimmed_points": 65,
+  "cleveland_trimmed_points": 65
+}
+```
+
+**Response `200`** (일부 계열만 실패 — `status: "partial"`, `ok: false`. 실패 계열은 직전 저장값 그대로라 `_points`는 4종 다 채워져 보인다)
+```json
+{
+  "ok": false,
+  "status": "partial",
+  "core_pce_points": 105,
+  "headline_pce_points": 105,
+  "dallas_trimmed_points": 65,
+  "cleveland_trimmed_points": 64
+}
+```
+
+**Response `200`** (`FRED_API_KEY` 미설정 — 저장 생략, `status: "skipped"`, `ok: false`)
+```json
+{
+  "ok": false,
+  "status": "skipped",
+  "error": "FRED_API_KEY 환경변수가 필요합니다."
+}
+```
+
+전 계열 실패(키는 설정됐으나 4종 fetch 모두 실패)도 저장 생략·`status: "skipped"`이지만 이 경우 `error` 필드 없이 `_points`가 직전 저장값 기준으로 실린다.
 
 ---
 

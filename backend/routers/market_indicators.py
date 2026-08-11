@@ -20,6 +20,7 @@ from services.market_indicators import (
     get_kospi_futures,
     get_business_formation,
     get_labor_surveys,
+    get_trimmed_inflation,
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
@@ -27,6 +28,7 @@ from services.market_indicators import (
     _fetch_and_save_macro_signals,
     _fetch_and_save_business_formation,
     _fetch_and_save_labor_surveys,
+    _fetch_and_save_trimmed_inflation,
     _mc_delete,
     _cache,
 )
@@ -206,6 +208,41 @@ def refresh_labor_surveys(_: str = Depends(require_admin)):
             return {"ok": status == "success", "status": status,
                     "establishment_points": len(data.get("establishment", [])),
                     "household_points": len(data.get("household", []))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/trimmed-inflation")
+def trimmed_inflation(_: str = Depends(get_current_user)):
+    """절사평균 물가 4종(코어/헤드라인 PCE·Dallas/Cleveland 절사평균) 저장 시계열, YoY % 통일. 요청경로 라이브 FRED 0."""
+    try:
+        return get_trimmed_inflation()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-trimmed-inflation")
+def refresh_trimmed_inflation(_: str = Depends(require_admin)):
+    """절사평균 물가 4종(FRED) 수동 갱신 — trimmed_inflation_fetch로 기록.
+
+    `status`: success(전부 갱신)/partial(일부 계열 실패, 직전값 유지)/skipped(FRED_API_KEY
+    미설정 또는 전 계열 실패, 저장 생략) — `ok`만 보면 실패해도 갱신된 것으로 오인하기
+    쉬워 함께 반환한다.
+    """
+    try:
+        with job_runs.record("trimmed_inflation_fetch", "manual") as run:
+            data = _fetch_and_save_trimmed_inflation()
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                return {"ok": False, "status": "skipped", "error": data["error"]}
+            status = data.get("_status") or "success"
+            if status != "success":
+                run.set_status(status)
+            return {"ok": status == "success", "status": status,
+                    "core_pce_points": len(data.get("core_pce", [])),
+                    "headline_pce_points": len(data.get("headline_pce", [])),
+                    "dallas_trimmed_points": len(data.get("dallas_trimmed", [])),
+                    "cleveland_trimmed_points": len(data.get("cleveland_trimmed", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

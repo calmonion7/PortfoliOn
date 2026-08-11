@@ -139,7 +139,7 @@ PC는 **좌측 사이드바** 5섹션(리서치·포트폴리오·시장·일정
 
 | 탭 | 설명 |
 |------|------|
-| 시장지표 | 국채, FX, VIX(변동성지수), CNN Fear & Greed(시장 투자심리 지수, US 전용), 원자재, 경제지표(FRED), 매크로 신호(금리차·HY 스프레드·M2·기준금리 + 신호 해석), 신규 창업 신청(FRED Business Formation Statistics, 정보·전문/과학/기술서비스 2부문 월별 시계열 + 3개월 이동평균, US 전용 — 창업 *신청* 건수이며 실제 창업 여부와는 다름), 고용 조사 격차(기업조사 PAYEMS·가계조사 CE16OV 월별 시계열 + 최신값 + 12개월 전 대비 변화, US 전용 — 두 조사는 방법론이 달라 절대 수준 차가 상시 존재하고 그 자체는 신호가 아니며 증감 부호의 발산이 신호), 코스피 방향 신호(S&P500·나스닥·USD/KRW·SOX 가중 합성 오버나잇 프록시, 적응형 밴드 + 적중률 누적, 1년 백테스트로 재조정), M7/KR Top2 실적, KR 수출, 글로벌 지수(S&P 500·KOSPI·KOSDAQ 레벨·등락률·시계열) + S&P 500 Shiller CAPE 밸류에이션, 코스피200 선물(최근월물 현재가·등락률·베이시스 + 일봉 시계열, KIS) |
+| 시장지표 | 국채, FX, VIX(변동성지수), CNN Fear & Greed(시장 투자심리 지수, US 전용), 원자재, 경제지표(FRED), 매크로 신호(금리차·HY 스프레드·M2·기준금리 + 신호 해석), 신규 창업 신청(FRED Business Formation Statistics, 정보·전문/과학/기술서비스 2부문 월별 시계열 + 3개월 이동평균, US 전용 — 창업 *신청* 건수이며 실제 창업 여부와는 다름), 고용 조사 격차(기업조사 PAYEMS·가계조사 CE16OV 월별 시계열 + 최신값 + 12개월 전 대비 변화, US 전용 — 두 조사는 방법론이 달라 절대 수준 차가 상시 존재하고 그 자체는 신호가 아니며 증감 부호의 발산이 신호), 절사평균 물가(코어/헤드라인 PCE + Dallas Fed 절사평균 PCE·Cleveland Fed 16% 절사평균 CPI, YoY % 통일, US 전용 — 코어는 식품·에너지라는 고정 범주를 항상 제외하고 절사평균은 그 달 극단 품목을 그때그때 제외하는 별개 방법론), 코스피 방향 신호(S&P500·나스닥·USD/KRW·SOX 가중 합성 오버나잇 프록시, 적응형 밴드 + 적중률 누적, 1년 백테스트로 재조정), M7/KR Top2 실적, KR 수출, 글로벌 지수(S&P 500·KOSPI·KOSDAQ 레벨·등락률·시계열) + S&P 500 Shiller CAPE 밸류에이션, 코스피200 선물(최근월물 현재가·등락률·베이시스 + 일봉 시계열, KIS) |
 | 수급지표 | 신용잔고·반대매매, 내외국인 대차잔고 |
 
 ### 구루 (Guru)
@@ -215,7 +215,7 @@ FastAPI (:8000)
  ├─ services/   market(yfinance+키움/KIS+Naver), charts, indicators,
  │              report_generator(시장데이터 스냅샷·LLM 미호출),
  │              consensus / consensus_pipeline, digest_service,
- │              market_indicators/(fx·vix·commodities·earnings·econ·exports·macro·formation·labor),
+ │              market_indicators/(fx·vix·commodities·earnings·econ·exports·macro·formation·labor·inflation),
  │              leverage_service, lending_service, ranking_service,
  │              investor_service, short_sell_service, supply_score, backlog, disclosures, insider_trades,
  │              dividends, analysis_service, kr_sector_service, us_sector_service,
@@ -250,7 +250,7 @@ PortfoliOn/
 │   ├── app_schema.sql         # 앱 스키마
 │   ├── routers/
 │   ├── services/
-│   │   ├── market_indicators/ # fx·vix·commodities·earnings·econ·exports·macro·formation·labor
+│   │   ├── market_indicators/ # fx·vix·commodities·earnings·econ·exports·macro·formation·labor·inflation
 │   │   ├── kiwoom/            # 키움 REST(KR 시세, 읽기전용)
 │   │   └── kis/               # 한국투자증권 REST(KR+US 백업 시세)
 │   └── data/                  # sp500_tickers.json, kospi_tickers.json (정적 참조)

@@ -6,6 +6,7 @@ from .exports import get_kr_exports, _fetch_and_save_kr_exports
 from .macro import get_macro_signals, _fetch_and_save_macro_signals
 from .formation import get_business_formation, _fetch_and_save_business_formation
 from .labor import get_labor_surveys, _fetch_and_save_labor_surveys
+from .inflation import get_trimmed_inflation, _fetch_and_save_trimmed_inflation
 from .kospi_signal import get_kospi_signal, refresh_kospi_signal
 from .indices import get_indices
 from .sentiment import get_fear_greed
@@ -19,6 +20,7 @@ __all__ = [
     "get_macro_signals", "_fetch_and_save_macro_signals",
     "get_business_formation", "_fetch_and_save_business_formation",
     "get_labor_surveys", "_fetch_and_save_labor_surveys",
+    "get_trimmed_inflation", "_fetch_and_save_trimmed_inflation",
     "get_kospi_signal", "refresh_kospi_signal",
     "_fetch_and_save_m7_earnings", "_fetch_and_save_kr_top2_earnings",
     "_fetch_and_save_econ_indicators", "_fetch_and_save_kr_exports",

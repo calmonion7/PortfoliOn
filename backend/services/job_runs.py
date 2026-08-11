@@ -53,8 +53,10 @@ def record(job_id: str, trigger: str):
     구루 크롤 2경로(routers/guru._run_crawl · scheduler/jobs._run_guru_crawl)와 신규 창업
     신청 2경로(scheduler/jobs._refresh_business_formation ·
     routers/market_indicators.refresh_business_formation)·고용 조사 2경로
-    (scheduler/jobs._refresh_labor_surveys · routers/market_indicators.refresh_labor_surveys)는
-    set_status로 배선돼 있어 이 주의의 예외다.
+    (scheduler/jobs._refresh_labor_surveys · routers/market_indicators.refresh_labor_surveys)·
+    절사평균 물가 2경로(scheduler/jobs._refresh_trimmed_inflation ·
+    routers/market_indicators.refresh_trimmed_inflation)는 set_status로 배선돼 있어
+    이 주의의 예외다.
     """
     try:
         rows = query(

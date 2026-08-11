@@ -144,6 +144,24 @@ def _refresh_labor_surveys():
             logger.warning(f"[Scheduler] Labor surveys refresh failed: {e}")
 
 
+def _refresh_trimmed_inflation():
+    from services.market_indicators import _fetch_and_save_trimmed_inflation
+    with job_runs.record("trimmed_inflation_fetch", "auto") as run:
+        try:
+            data = _fetch_and_save_trimmed_inflation()
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                logger.warning(f"[Scheduler] Trimmed inflation skipped: {data['error']}")
+            elif data.get("_status"):
+                run.set_status(data["_status"])
+                logger.warning(f"[Scheduler] Trimmed inflation {data['_status']}")
+            else:
+                logger.info("[Scheduler] Trimmed inflation refreshed")
+        except Exception as e:
+            run.set_status("failed", str(e))
+            logger.warning(f"[Scheduler] Trimmed inflation refresh failed: {e}")
+
+
 def _refresh_kospi_signal():
     from services.market_indicators import kospi_signal
     with job_runs.record("kospi_signal_fetch", "auto"):
@@ -550,6 +568,7 @@ _JOB_FUNCS = {
     "macro_signals_fetch": _refresh_macro_signals,
     "business_formation_fetch": _refresh_business_formation,
     "labor_surveys_fetch": _refresh_labor_surveys,
+    "trimmed_inflation_fetch": _refresh_trimmed_inflation,
     "kospi_signal_fetch": _refresh_kospi_signal,
     "leverage_fetch": _fetch_leverage,
     "lending_fetch": _fetch_lending,

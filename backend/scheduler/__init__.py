@@ -18,6 +18,7 @@ from .jobs import (
     _refresh_macro_signals,
     _refresh_business_formation,
     _refresh_labor_surveys,
+    _refresh_trimmed_inflation,
     _refresh_kospi_signal,
     _refresh_monthly_kr,
     _refresh_earnings_us,
