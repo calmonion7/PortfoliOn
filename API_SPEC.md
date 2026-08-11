@@ -2830,6 +2830,47 @@ FRED 매크로 신호 4종 시계열 + 핵심 신호 플래그. `market_cache`�
 
 ---
 
+### `GET /api/market/business-formation`
+
+FRED 신규 창업 신청(Business Formation Statistics) 2개 부문(정보·전문/과학/기술서비스) 월별 시계열 + 3개월 이동평균(3MA). `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 FRED 호출은 없다(데이터는 `business_formation_fetch` 일배치/수동 refresh가 채운다). ⚠️ 창업 **신청** 건수이며 실제 창업 여부와는 다르다. 저장값이 없으면 각 부문의 `history`/`ma3`는 빈 배열, `latest_*`·`prev_raw`는 `null`.
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "information": {
+    "history": [{ "date": "2026-05-01", "value": 4200.0 }],
+    "ma3": [{ "date": "2026-05-01", "value": 4150.33 }],
+    "latest_raw": 4200.0,
+    "latest_ma3": 4150.33,
+    "latest_date": "2026-05-01",
+    "prev_raw": 4080.0
+  },
+  "professional": {
+    "history": [{ "date": "2026-05-01", "value": 12500.0 }],
+    "ma3": [{ "date": "2026-05-01", "value": 12310.67 }],
+    "latest_raw": 12500.0,
+    "latest_ma3": 12310.67,
+    "latest_date": "2026-05-01",
+    "prev_raw": 12200.0
+  }
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `information` | object | 정보 부문(NAICS 51, FRED `BABANAICS51SAUS`) |
+| `professional` | object | 전문·과학·기술서비스 부문(NAICS 54, FRED `BABANAICS54SAUS`) |
+| `*.history` | object[] | 월별 원계열(계절조정, `{ "date": "YYYY-MM-DD", "value": number }`) |
+| `*.ma3` | object[] | 원계열의 3개월 단순이동평균(앞 2개월은 값 부족으로 제외) |
+| `*.latest_raw` | number \| null | 최신 원계열 값 |
+| `*.latest_ma3` | number \| null | 최신 3MA 값 |
+| `*.latest_date` | string \| null | 최신 관측월 |
+| `*.prev_raw` | number \| null | 전월 원계열 값(전월대비 계산용) |
+
+---
+
 ### `GET /api/market/indices`
 
 글로벌 주요 지수(S&P 500·KOSPI·KOSDAQ) 최근 시계열 + S&P 500 Shiller CAPE 밸류에이션. `market_cache`에 저장된 값만 반환하며 요청 경로에서 라이브 외부 호출은 없다(데이터는 `indices_fetch` 일배치가 채운다). 저장값이 없으면 `indices`는 `{}`, `valuation`은 `{}`.
@@ -2957,6 +2998,43 @@ FRED 매크로 신호 4종(`T10Y2Y`/`BAMLH0A0HYM2`/`M2SL`/`DFF`) 수동 재수�
 ```
 
 > `FRED_API_KEY` 미설정 시 수집은 실패하며 저장값은 변경되지 않는다.
+
+---
+
+### `POST /api/market/refresh-business-formation`
+
+FRED 신규 창업 신청 2개 부문 수동 재수집. 부문별 독립 fetch — 한 부문이 실패해도 다른 부문은 갱신되고, 실패한 부문은 직전 저장값을 그대로 보존한다. 실행이력은 일배치와 동일한 `business_formation_fetch` id로 기록한다. `status`가 `ok`와 별도로 실리는 이유: `ok`만 보면 부분성공·스킵도 "갱신됨"으로 오인하기 쉽다.
+
+**Auth:** admin 권한 필요
+
+**Response `200`** (전부 갱신)
+```json
+{
+  "ok": true,
+  "status": "success",
+  "information_points": 72,
+  "professional_points": 72
+}
+```
+
+**Response `200`** (한 부문만 실패 — `status: "partial"`, `ok: true` 유지. 실패 부문은 직전 저장값 그대로라 `_points`는 두 부문 다 채워져 보인다)
+```json
+{
+  "ok": true,
+  "status": "partial",
+  "information_points": 72,
+  "professional_points": 71
+}
+```
+
+**Response `200`** (`FRED_API_KEY` 미설정 또는 전 부문 실패 — 저장 생략, `status: "skipped"`, `ok: false`)
+```json
+{
+  "ok": false,
+  "status": "skipped",
+  "error": "FRED_API_KEY 환경변수가 필요합니다."
+}
+```
 
 ---
 

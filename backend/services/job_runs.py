@@ -50,8 +50,10 @@ def record(job_id: str, trigger: str):
     일부 워커(report._run_*/leverage_service.backfill_with_progress)는 내부 예외를 try/except로
     삼키고 정상 종료하므로, 부분/전체 실패여도 success로 기록된다. 즉 그 잡들의 success를
     '내부 오류 없음'으로 과신하면 안 된다(잡 본문 로그를 함께 확인).
-    구루 크롤 2경로(routers/guru._run_crawl · scheduler/jobs._run_guru_crawl)는 set_status로
-    배선돼 있어 이 주의의 예외다.
+    구루 크롤 2경로(routers/guru._run_crawl · scheduler/jobs._run_guru_crawl)와 신규 창업
+    신청 2경로(scheduler/jobs._refresh_business_formation ·
+    routers/market_indicators.refresh_business_formation)는 set_status로 배선돼 있어
+    이 주의의 예외다.
     """
     try:
         rows = query(

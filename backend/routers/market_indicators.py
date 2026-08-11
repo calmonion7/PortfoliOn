@@ -18,11 +18,13 @@ from services.market_indicators import (
     get_indices,
     get_fear_greed,
     get_kospi_futures,
+    get_business_formation,
     _fetch_and_save_m7_earnings,
     _fetch_and_save_kr_top2_earnings,
     _fetch_and_save_econ_indicators,
     _fetch_and_save_kr_exports,
     _fetch_and_save_macro_signals,
+    _fetch_and_save_business_formation,
     _mc_delete,
     _cache,
 )
@@ -136,6 +138,39 @@ def refresh_macro_signals(_: str = Depends(require_admin)):
             data = _fetch_and_save_macro_signals()
         return {"ok": True, "yield_curve_points": len(data.get("yield_curve", [])),
                 "signals": data.get("signals", {})}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/business-formation")
+def business_formation(_: str = Depends(get_current_user)):
+    """FRED 신규 창업 신청(정보·전문서비스 부문) 저장 시계열+3MA. 요청경로 라이브 FRED 0."""
+    try:
+        return get_business_formation()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-business-formation")
+def refresh_business_formation(_: str = Depends(require_admin)):
+    """신규 창업 신청(FRED 2부문) 수동 갱신 — business_formation_fetch로 기록.
+
+    `status`: success(전부 갱신)/partial(일부 부문 실패, 직전값 유지)/skipped(FRED_API_KEY
+    미설정 또는 전 부문 실패, 저장 생략) — `ok`만 보면 실패해도 갱신된 것으로 오인하기
+    쉬워 함께 반환한다.
+    """
+    try:
+        with job_runs.record("business_formation_fetch", "manual") as run:
+            data = _fetch_and_save_business_formation()
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                return {"ok": False, "status": "skipped", "error": data["error"]}
+            status = data.get("_status") or "success"
+            if status != "success":
+                run.set_status(status)
+            return {"ok": status == "success", "status": status,
+                    "information_points": len(data.get("information", [])),
+                    "professional_points": len(data.get("professional", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

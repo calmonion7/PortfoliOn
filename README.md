@@ -139,7 +139,7 @@ PC는 **좌측 사이드바** 5섹션(리서치·포트폴리오·시장·일정
 
 | 탭 | 설명 |
 |------|------|
-| 시장지표 | 국채, FX, VIX(변동성지수), CNN Fear & Greed(시장 투자심리 지수, US 전용), 원자재, 경제지표(FRED), 매크로 신호(금리차·HY 스프레드·M2·기준금리 + 신호 해석), 코스피 방향 신호(S&P500·나스닥·USD/KRW·SOX 가중 합성 오버나잇 프록시, 적응형 밴드 + 적중률 누적, 1년 백테스트로 재조정), M7/KR Top2 실적, KR 수출, 글로벌 지수(S&P 500·KOSPI·KOSDAQ 레벨·등락률·시계열) + S&P 500 Shiller CAPE 밸류에이션, 코스피200 선물(최근월물 현재가·등락률·베이시스 + 일봉 시계열, KIS) |
+| 시장지표 | 국채, FX, VIX(변동성지수), CNN Fear & Greed(시장 투자심리 지수, US 전용), 원자재, 경제지표(FRED), 매크로 신호(금리차·HY 스프레드·M2·기준금리 + 신호 해석), 신규 창업 신청(FRED Business Formation Statistics, 정보·전문/과학/기술서비스 2부문 월별 시계열 + 3개월 이동평균, US 전용 — 창업 *신청* 건수이며 실제 창업 여부와는 다름), 코스피 방향 신호(S&P500·나스닥·USD/KRW·SOX 가중 합성 오버나잇 프록시, 적응형 밴드 + 적중률 누적, 1년 백테스트로 재조정), M7/KR Top2 실적, KR 수출, 글로벌 지수(S&P 500·KOSPI·KOSDAQ 레벨·등락률·시계열) + S&P 500 Shiller CAPE 밸류에이션, 코스피200 선물(최근월물 현재가·등락률·베이시스 + 일봉 시계열, KIS) |
 | 수급지표 | 신용잔고·반대매매, 내외국인 대차잔고 |
 
 ### 구루 (Guru)
@@ -215,7 +215,7 @@ FastAPI (:8000)
  ├─ services/   market(yfinance+키움/KIS+Naver), charts, indicators,
  │              report_generator(시장데이터 스냅샷·LLM 미호출),
  │              consensus / consensus_pipeline, digest_service,
- │              market_indicators/(fx·vix·commodities·earnings·econ·exports·macro),
+ │              market_indicators/(fx·vix·commodities·earnings·econ·exports·macro·formation),
  │              leverage_service, lending_service, ranking_service,
  │              investor_service, short_sell_service, supply_score, backlog, disclosures, insider_trades,
  │              dividends, analysis_service, kr_sector_service, us_sector_service,
@@ -250,7 +250,7 @@ PortfoliOn/
 │   ├── app_schema.sql         # 앱 스키마
 │   ├── routers/
 │   ├── services/
-│   │   ├── market_indicators/ # fx·vix·commodities·earnings·econ·exports
+│   │   ├── market_indicators/ # fx·vix·commodities·earnings·econ·exports·macro·formation
 │   │   ├── kiwoom/            # 키움 REST(KR 시세, 읽기전용)
 │   │   └── kis/               # 한국투자증권 REST(KR+US 백업 시세)
 │   └── data/                  # sp500_tickers.json, kospi_tickers.json (정적 참조)
