@@ -444,3 +444,117 @@ describe('선도기술 리포트 상세 — 전역 목차 (task#296 S4)', () => 
     expect(screen.getAllByTestId('tech-toc-chip').map((a) => a.textContent)).not.toContain('핵심 포인트')
   })
 })
+
+// ── task#298 S4(2/2) — 「계열 비교」(계보 분류 바로 앞) + 「확인할 지표」(난제 바로 뒤) 배선.
+// ⚠️ 두 섹션은 **같은 SECTIONS 배열**에서 목차 칩과 함께 파생된다 — 배열과 JSX를 한쪽만 고치면
+// 위 task#296 순서 단언(칩 href 순서 == DOM data-tech-section 순서)이 잡는다.
+const VARIANTS = [
+  {
+    axis_label: '재사용 방식',
+    options: [
+      { name: '수직 착륙 회수', examples: ['Falcon 9'], strength: '정비 후 재사용 왕복 단축', tradeoff: '착륙 추진제 예비량 필요' },
+      { name: '낙하산 회수', examples: null, strength: '착륙 연료가 필요 없다', tradeoff: null },
+    ],
+  },
+]
+// FULL_REPORT(8섹션, task#281)에 variants만 추가 — key_points·milestones·players[].category는 그대로
+// 두어 8섹션 기준선을 재사용하고 「계열 비교」 삽입 효과만 격리한다.
+const FULL_WITH_VARIANTS = { ...FULL_REPORT, variants: VARIANTS }
+const WATCH_ITEMS = [
+  { label: '링룽 1호의 계통연결이 IAEA에 등재되는가', detail: '등재 시각이 상업운전 기준점이다.',
+    not_signal: '파일럿 라인 준공·샘플 공개는 일정 유지 신호일 뿐이다.' },
+  { label: '회전율 — 같은 기체를 몇 번 돌리는가', detail: null, not_signal: null },
+]
+const FULL_WITH_BOTH = { ...FULL_REPORT, variants: VARIANTS, watch_items: WATCH_ITEMS }
+
+describe('선도기술 리포트 상세 — 계열 비교 (task#298 S4)', () => {
+  it('계보 분류 바로 앞에 삽입 — 형제 제목과의 DOM 순서 + 확정 순서 배열', async () => {
+    mockReport(FULL_WITH_VARIANTS)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+
+    expect(titlesOf(container)).toEqual(
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계열 비교', '계보 분류', '시장 규모', '상세 설명', '출처'])
+
+    const variantsNode = screen.getByTestId('tech-report-variants')
+    const categoriesNode = screen.getByTestId('tech-report-categories')
+    // 4 = Node.DOCUMENT_POSITION_FOLLOWING — variants가 categories보다 앞(=categories가 variants의 뒤)
+    expect(variantsNode.compareDocumentPosition(categoriesNode) & 4).toBeTruthy()
+  })
+
+  it('variants가 null/undefined(구발행물)면 섹션·제목·목차 칩이 전부 부재 — 기존 8섹션 목록 무변화', async () => {
+    mockReport({ ...FULL_REPORT, variants: null })
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(screen.queryByTestId('tech-report-variants')).toBeNull()
+    expect(titlesOf(container)).not.toContain('계열 비교')
+    expect(titlesOf(container)).toEqual(
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계보 분류', '시장 규모', '상세 설명', '출처'])
+    expect(screen.getAllByTestId('tech-toc-chip').map((a) => a.textContent)).not.toContain('계열 비교')
+  })
+
+  it('확인할 지표 — 난제 바로 뒤·시장 규모 앞에 삽입(전체 체인 순서)', async () => {
+    mockReport({ ...FULL_WITH_BOTH, challenges: [{ title: '난제 A', body: 'b' }] })
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+
+    // 확정 순서 — 난제 < 확인할 지표 < 시장 규모가 이 배열 안에서 함께 드러난다.
+    expect(titlesOf(container)).toEqual(
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계열 비교', '계보 분류',
+       '해결해야 할 난제', '확인할 지표', '시장 규모', '상세 설명', '출처'])
+
+    // DOM 순서로도 못박는다(제목 배열은 텍스트라 래퍼 배치가 어긋나도 통과할 수 있다).
+    const watch = screen.getByTestId('tech-report-watch-items')
+    const market = container.querySelector('[data-tech-section="market"]')
+    const challenges = container.querySelector('[data-tech-section="challenges"]')
+    expect(challenges.compareDocumentPosition(watch) & 4).toBeTruthy()   // 난제 → 확인할 지표
+    expect(watch.compareDocumentPosition(market) & 4).toBeTruthy()       // 확인할 지표 → 시장 규모
+  })
+
+  it('watch_items가 null(구발행물)이면 섹션·제목·칩 전부 부재', async () => {
+    mockReport({ ...FULL_REPORT, watch_items: null })
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(screen.queryByTestId('tech-report-watch-items')).toBeNull()
+    expect(titlesOf(container)).not.toContain('확인할 지표')
+    expect(screen.getAllByTestId('tech-toc-chip').map((a) => a.textContent)).not.toContain('확인할 지표')
+  })
+
+  it('두 필드가 함께 있으면 목차 칩이 정확히 2개 늘어난다 — 칩과 섹션이 같은 배열에서 파생', async () => {
+    mockReport(FULL_REPORT)
+    const base = renderAt('smr')
+    const baseScope = within(base.container)
+    await baseScope.findByTestId('tech-report-toc')
+    const baseCount = baseScope.getAllByTestId('tech-toc-chip').length
+    base.unmount()
+
+    mockReport(FULL_WITH_BOTH)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-toc')
+    const chipEls = screen.getAllByTestId('tech-toc-chip')
+    expect(chipEls.length).toBe(baseCount + 2)
+    expect(chipEls.map((a) => a.textContent)).toContain('계열 비교')
+    expect(chipEls.map((a) => a.textContent)).toContain('확인할 지표')
+    // 칩 수 == 섹션 수, 그리고 순서까지 일치(task#296 단언을 두 섹션 추가 후에도 재확인)
+    const sections = [...container.querySelectorAll('[data-tech-section]')]
+    expect(chipEls.length).toBe(sections.length)
+    expect(chipEls.map((a) => a.getAttribute('href').slice(1)))
+      .toEqual(sections.map((el) => el.getAttribute('data-tech-section')))
+  })
+
+  it('목차 칩 수 — FULL_REPORT(8) 대비 variants 추가 판(9)에서 정확히 1개 늘어난다', async () => {
+    mockReport(FULL_REPORT)
+    const base = renderAt('smr')
+    const baseScope = within(base.container)
+    await baseScope.findByTestId('tech-report-toc')
+    const baseCount = baseScope.getAllByTestId('tech-toc-chip').length
+    base.unmount()
+
+    mockReport(FULL_WITH_VARIANTS)
+    renderAt('smr')
+    await screen.findByTestId('tech-report-toc')
+    const chips = screen.getAllByTestId('tech-toc-chip')
+    expect(chips.length).toBe(baseCount + 1)
+    expect(chips.map((a) => a.textContent)).toContain('계열 비교')
+  })
+})
