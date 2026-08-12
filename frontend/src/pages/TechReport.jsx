@@ -4,7 +4,7 @@ import api from '../api'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { SectionTitle } from '../components/reports/reportUtils.jsx'
-import { TECH_NAMES, sortPlayers } from '../components/reports/techReportUtils'
+import { TECH_NAMES, sortPlayers, groupByCategory } from '../components/reports/techReportUtils'
 import MarketGrowthChart from '../components/tech/MarketGrowthChart'
 import MarketEstimates, { marketEstimatesLayout } from '../components/tech/MarketEstimates'
 import ShareChart from '../components/tech/ShareChart'
@@ -100,7 +100,15 @@ export default function TechReport() {
 
   const players = report.players || []
   // 표·밴드·점유율이 공유하는 단일 순서(F1). 비파괴 정렬이라 report.players는 그대로 남는다.
-  const ordered = sortPlayers(players)
+  // ⚠️ task#301: 업체 표가 분류 축별로 묶이면서 **화면 순서 = 그룹 평탄화 순서**가 됐다. 여기서
+  // 그 순서를 확정해 세 섹션에 같은 배열을 넘기지 않으면, 30px 간격의 표와 밴드가 같은 업체 11곳을
+  // 서로 다른 순서로 나열해 화면이 자기모순이 된다(라이브 uat280 `band-order`가 실측으로 포착 —
+  // 적대 리뷰 두 렌즈는 "ordered 배열 하나만 넘기는가"라는 *문자*만 보고 통과시켰다).
+  // 각 컴포넌트는 여전히 자기 입력을 스스로 정렬·그룹화한다(계약 무변경) — 여기서는 그 결과와
+  // 같은 순서를 만들어 밴드에도 넘길 뿐이다.
+  const sorted = sortPlayers(players)
+  const orderGroups = groupByCategory(sorted)
+  const ordered = orderGroups.length > 0 ? orderGroups.flatMap((g) => g.players) : sorted
   const challenges = report.challenges || []
   const sources = report.sources || []
   const related = report.related || {}

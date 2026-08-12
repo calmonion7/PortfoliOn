@@ -265,6 +265,18 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   const levelIdx = headLabels.indexOf('기술수준');
   const gapIdx = headLabels.indexOf('선두 대비');
   const shareIdx = headLabels.indexOf('점유율');
+  // task#301: 표가 분류 축별 소제목 행으로 묶이면서 **행 순서가 그룹 순서**가 됐다. 정렬 불변식은
+  // 이제 전역이 아니라 그룹 안에서 성립하므로, 각 행이 어느 그룹에 속하는지 DOM 순서로 추적한다
+  // (그룹 없는 판은 group=null 하나뿐이라 옛 전역 판정과 동일하게 동작한다).
+  const groupOf = new Map();
+  {
+    let cur = null;
+    for (const tr of playersEl.querySelectorAll('tr')) {
+      const tid = tr.getAttribute('data-testid');
+      if (tid === 'tech-report-player-group') cur = txt(tr);
+      else if (tid === 'tech-report-player-row') groupOf.set(tr, cur);
+    }
+  }
   const rows = [...playersEl.querySelectorAll('[data-testid="tech-report-player-row"]')].map((tr) => {
     const cells = [...tr.children].map((td) => txt(td));
     const nameEl = tr.querySelector('[data-testid="tech-report-player-name"]');
@@ -275,6 +287,7 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
     const gapM = gapIdx >= 0 ? (cells[gapIdx] || '').match(/^(\d+)년$/) : null;
     return {
       name: nameEl ? txt(nameEl) : null,
+      group: groupOf.get(tr) ?? null,
       level: lvM ? Number(lvM[1]) : null,
       // '현재 선두' = gap 0(0은 유효값이다 — falsy로 흘리면 선두를 통째 놓친다), '—' = null
       gap: gapIdx >= 0 && cells[gapIdx] === '현재 선두' ? 0 : (gapM ? Number(gapM[1]) : null),
@@ -600,9 +613,14 @@ for (const V of VIEWS) {
       eq(`table-cols-per-row:${tag}`, badColSpan, [], `행 ${m.rows.length}개 · 헤더 열 ${m.headCols}`);
       bump('table-cols', m.rows.length + 1);
       const lv = (r) => (r.level == null ? -Infinity : r.level);
+      // task#301: 정렬 불변식은 **그룹 안에서** 성립한다. 표가 분류 축별로 묶이면서 그룹 경계를 넘는
+      // level 증가는 결함이 아니라 설계다(경수형 L3 다음에 고온가스로 L5가 오는 것이 정상). 축을
+      // 삭제하지 않고 판정 범위를 그룹으로 좁혀 뒤집는다 — 그룹 없는 판(group=null 하나)에서는
+      // 옛 전역 판정과 완전히 동일하게 동작하므로 검출력이 줄지 않는다.
       const viol = [];
       for (let i = 1; i < m.rows.length; i++) {
         const a = m.rows[i - 1], b = m.rows[i];
+        if (a.group !== b.group) continue;   // 그룹 경계 — 불변식의 정의역 밖
         if (lv(b) > lv(a)) viol.push(`level↑ ${a.name}(${a.level})→${b.name}(${b.level})`);
         else if (lv(b) === lv(a)) {
           if (a.gap == null && b.gap != null) viol.push(`null선행 ${a.name}(null)→${b.name}(${b.gap})`);
@@ -610,8 +628,13 @@ for (const V of VIEWS) {
         }
       }
       eq(`table-order:${tag}`, viol, [],
-        `실측 ${JSON.stringify(m.rows.map((r) => `${r.name}:L${r.level}/G${r.gap}`))}`);
-      bump('table-order', Math.max(0, m.rows.length - 1));
+        `실측 ${JSON.stringify(m.rows.map((r) => `${r.group ?? '-'}/${r.name}:L${r.level}/G${r.gap}`))}`);
+      // 비교 쌍 수 = 그룹 내 인접쌍만(그룹 경계는 제외) — 커버리지가 그룹 수만큼 줄어드는 것이 정상이다.
+      const inGroupPairs = m.rows.reduce((n, r, i) => (i > 0 && m.rows[i - 1].group === r.group ? n + 1 : n), 0);
+      bump('table-order', inGroupPairs);
+      // 정의역 sentinel — 그룹핑으로 비교쌍이 0이 되면(전 업체가 각자 다른 그룹) 위 단언은 아무것도
+      // 안 보면서 통과한다. 실측 판에서 그런 일이 없음을 축으로 못박는다.
+      eq(`table-order-domain:${tag}`, inGroupPairs > 0 ? 'OK' : `NO_IN_GROUP_PAIRS(rows=${m.rows.length})`, 'OK');
       // 이빨 단언 — 전 행의 level·gap이 동일하면 위 불변식은 아무것도 안 보면서 통과한다.
       eq(`table-order-teeth:${tag}`,
         new Set(m.rows.map((r) => `${r.level}/${r.gap}`)).size > 1 ? 'OK' : 'ALL_ROWS_IDENTICAL', 'OK',

@@ -237,9 +237,25 @@ describe('주요기술 리포트 상세 (task#276 S5)', () => {
   // **서로 다른 순서**로 나열됐다. 표만 sortPlayers를 태우고 밴드엔 API 원배열을 넘긴 탓이고, 변경 전에는
   // 둘 다 API 순서라 일치했으므로 task#280이 만든 회귀다. 개별 섹션의 존재·정렬 단언은 두 순서가 갈려도
   // 전부 통과하므로(판정축이 대상과 독립 — 가토 ⑧ⓘ) "두 소비처가 같은 배열을 본다"를 별도 축으로 세운다.
+  // ⚠️ 위 두 픽스처는 category가 없어 groupByCategory가 []를 반환한다 — 즉 **그룹핑 경로에 원리적으로
+  // 블라인드**하다. task#301이 업체 표를 분류 축별로 묶었을 때 이 테스트는 이빨 단언까지 갖춘 채로
+  // 통과했고, 표와 밴드가 같은 업체를 서로 다른 순서로 나열하는 회귀는 **라이브 uat280 band-order가
+  // 잡았다**(fixture-pass-live-fail). 그래서 분류 있는 픽스처를 세 번째 케이스로 못박는다.
+  // 이 픽스처는 그룹 순서(경수형 2곳 → 고온가스로 1곳)가 평면 정렬(L5·L4·L3)과 **어긋나도록** 짰다 —
+  // 어긋나지 않으면 그룹핑을 통째로 지워도 통과한다(공허한 초록).
+  const CATEGORIZED_REPORT = {
+    ...SMR_REPORT,
+    players: [
+      { ...SMR_REPORT.players[0], name: 'CNNC', tech_level: 5, gap_years: 0, category: '경수형' },
+      { ...SMR_REPORT.players[1], name: '중국핵공업 HTR', tech_level: 4, gap_years: 1, category: '고온가스로' },
+      { ...SMR_REPORT.players[2], name: 'NuScale', tech_level: 3, gap_years: 3, category: '경수형' },
+    ],
+  }
+
   it.each([
     ['smr 형태(동단계 안에서 격차 null이 API 선행)', SMR_REPORT],
     ['reusable-rocket 형태(API 순서 역전)', { ...REPORT, players: [REPORT.players[1], REPORT.players[0]] }],
+    ['분류 있는 형태(그룹 순서 ≠ 평면 정렬 — task#301)', CATEGORIZED_REPORT],
   ])('표 행 순서 == 밴드 행 순서 — %s', async (_label, rep) => {
     api.get.mockImplementation((url) =>
       url.startsWith('/api/tech-reports/')
