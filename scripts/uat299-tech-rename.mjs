@@ -60,6 +60,7 @@ const eq = (tag, got, want, note = '') => {
   P(ok, tag, `${ok ? 'PASS' : 'FAIL'} — got=${JSON.stringify(got)} want=${JSON.stringify(want)}${note ? ' · ' + note : ''}`);
 };
 const rawLog = [];
+const sectionRaw = [];
 
 // ── 로그인(추정 폴백 없음) ────────────────────────────────────────────────────
 const login = await fetch(`${BASE}/api/auth/login`, {
@@ -174,6 +175,18 @@ const measureDetail = (page) => page.evaluate(([ROOT_SEL]) => {
     h1Text: h1 ? h1.textContent.trim() : null,
     leadText: lead ? lead.textContent.trim() : null,
     dateMatches, headerStamp,
+    // 요구 섹션 5종 — KPI 스트립(testid) + SECTIONS 앵커 4개(data-tech-section).
+    // 「존재」만이 아니라 **가시 높이 > 0**까지 본다(빈 컨테이너만 렌더된 경우를 배제).
+    sectionsPresent: Object.fromEntries([
+      ['kpis', '[data-testid="tech-report-kpis"]'],
+      ['players', '[data-tech-section="players"]'],
+      ['variants', '[data-tech-section="variants"]'],
+      ['watch-items', '[data-tech-section="watch-items"]'],
+      ['market', '[data-tech-section="market"]'],
+    ].map(([k, sel]) => {
+      const el = root.querySelector(sel);
+      return [k, el ? (el.getBoundingClientRect().height > 0 ? 'OK' : 'ZERO_HEIGHT') : 'MISSING'];
+    })),
     leafDomain: leafCandidates.length, leafOver,
     hiddenDomain: hiddenCandidates.length, hiddenOver,
     docScrollW: document.documentElement.scrollWidth, docClientW: document.documentElement.clientWidth,
@@ -312,6 +325,17 @@ for (const V of VIEWS) {
         `헤더 도장 = API published_date + 「갱신」`);
       bump('date-stamp', 3 + m.dateMatches.length);
 
+      // (4b) required-sections — 갱신 발행이 「빈 갱신」이 아니라 실제 구조를 담았는지.
+      // 단언은 목표(data-center = 이번에 신규로 발행된 판)에만 걸고, 출력은 5종 전부 남긴다
+      // (계열 전체를 찍어두면 예상 외 이동의 설명 근거가 된다 — 가토 ⑧ⓗ).
+      const badSections = Object.entries(m.sectionsPresent).filter(([, v]) => v !== 'OK');
+      if (slug === 'data-center') {
+        eq(`required-sections:${tag}`, badSections.map(([k, v]) => `${k}=${v}`), [],
+          `KPI·주요업체·계열비교·확인할지표·시장규모 5섹션 가시 · 실측=${JSON.stringify(m.sectionsPresent)}`);
+        bump('required-sections');
+      }
+      sectionRaw.push(`${tag.padEnd(16)} ${Object.entries(m.sectionsPresent).map(([k, v]) => `${k}:${v}`).join(' ')}`);
+
       // (6) page-h-scroll (detail)
       eq(`page-h-scroll:${tag}`, m.docScrollW <= m.docClientW + 1 ? 'OK' : `HSCROLL(${m.docScrollW}>${m.docClientW})`, 'OK');
       bump('page-h-scroll');
@@ -361,6 +385,10 @@ console.log(`\n단언 총계: ${results.length}건 · PASS ${results.length - fa
 console.log(`뷰 ${VIEWS.length}조합 × (목록 1 + 상세 ${REPORTS.length}) = ${VIEWS.length * (1 + REPORTS.length)}페이지`);
 console.log('\n원시 실측(단언 아님):');
 for (const l of rawLog) console.log(`  ${l}`);
+if (sectionRaw.length) {
+  console.log('\n요구 섹션 실측(단언은 data-center에만 — 나머지는 근거용 출력):');
+  for (const l of sectionRaw) console.log(`  ${l}`);
+}
 console.log(`\n※ 육안 캡처 ${OUT}/ — {view}-{list|slug}.png`);
 console.log('═'.repeat(78));
 fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ cov, results, reportsAtRun: REPORTS.map((r) => r.slug) }, null, 2));
