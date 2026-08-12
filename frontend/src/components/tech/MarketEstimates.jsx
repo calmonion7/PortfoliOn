@@ -1,4 +1,4 @@
-// 선도기술 리포트(ADR-0033, task#282 S2) — 기관별 시장규모 추정치 가로 막대.
+// 주요기술 리포트(ADR-0033, task#282 S2) — 기관별 시장규모 추정치 가로 막대.
 // 순수 표시 컴포넌트(fetch 없음). props: estimates(report.market?.estimates 배열 그대로).
 // 백엔드 MarketEstimate 계약(routers/tech_reports.py): institution·year·size{value,currency,unit}·scope?·is_basis?
 // — currency/unit/year는 배열 내 전부 동일하도록 서버가 이미 강제하므로 프론트는 환산하지 않는다

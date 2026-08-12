@@ -80,7 +80,7 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
 
   it('지표 칩 증감은 이중 부호가 되지 않고 소수 자릿수도 정본을 따른다(task#281 F5)', async () => {
     // 정본 ChangeBadge = `▼ 12.5%`(화살표가 부호를 대신, toFixed(1)). 전엔 `▼-12.5%`로 음수 두 번.
-    // ⚠️ 선도기술 KeyPointCards.jsx가 이 블록을 미러링한다 — 한쪽만 고치면 두 표면 표기가 갈라진다.
+    // ⚠️ 주요기술 KeyPointCards.jsx가 이 블록을 미러링한다 — 한쪽만 고치면 두 표면 표기가 갈라진다.
     //    양쪽에 같은 케이스의 회귀 테스트를 쌍으로 둔다.
     api.get.mockResolvedValue({ data: { ...REPORT, points: [{
       title: '포인트A', body: '근거A',

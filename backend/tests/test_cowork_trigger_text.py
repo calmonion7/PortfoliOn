@@ -1,8 +1,8 @@
 """루틴 트리거 본문 단일 소스화 + 정책 열거 제거 (task#279).
 
-trigger 본문이 정책(enrich·애널리스트·선도기술)을 열거하면, 루틴 프롬프트가 실제로
+trigger 본문이 정책(enrich·애널리스트·주요기술)을 열거하면, 루틴 프롬프트가 실제로
 지정한 정책과 드리프트해 프롬프트 정본을 트리거 문구가 이겨버리는 결함이 있었다
-(선도기술 리포트 0건 발행의 근본원인). daily_text/manual_text가 유일한 산지이고
+(주요기술 리포트 0건 발행의 근본원인). daily_text/manual_text가 유일한 산지이고
 정책명을 담지 않음을 못박는다.
 """
 from unittest.mock import patch, MagicMock
@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from services import cowork_trigger
 
-_POLICY_WORDS = ("enrich", "애널리스트", "선도기술")
+_POLICY_WORDS = ("enrich", "애널리스트", "주요기술")
 
 
 # ── (b) 반환 문자열에 정책명이 없다 ──────────────────────────────────

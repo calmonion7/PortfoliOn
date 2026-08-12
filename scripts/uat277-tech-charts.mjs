@@ -1,4 +1,4 @@
-// task#277 S5 라이브 UAT — 선도기술 리포트 상세: 시장 성장 차트 · 점유율 · 기술수준 밴드 · 3열 관계도.
+// task#277 S5 라이브 UAT — 주요기술 리포트 상세: 시장 성장 차트 · 점유율 · 기술수준 밴드 · 3열 관계도.
 //
 // ⚠️ 착수 시점 실측: frontend/dist(로컬)와 라이브 index-BBU0cTEJ.js가 바이트 동일하고, 그 번들엔
 // `market-growth-chart`/`tech-graph-svg`/`tech-level-band`/`tech-share-chart` 문자열이 전무하다

@@ -1,13 +1,13 @@
-"""선도기술 리포트 발행·조회 API (ADR-0033, task#276 S2).
+"""주요기술 리포트 발행·조회 API (ADR-0033, 개명·저장모델 개정 ADR-0038).
 
 기술 단위 발행물 — analyst_reports.py(ADR-0027)와 동형 인증 게이팅. 발행은
-require_admin_or_api_key(루틴), 조회 3종은 get_current_user_or_api_key
+require_admin_or_api_key(루틴), 조회 2종은 get_current_user_or_api_key
 (ADR-0029 — 무인증 read 없음).
 """
 from datetime import date
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from auth import get_current_user_or_api_key, require_admin_or_api_key
@@ -207,8 +207,7 @@ class TechReportIn(BaseModel):
     def _iso_date_only(cls, v: str) -> str:
         """ISO(YYYY-MM-DD)만 허용. plain str로 두면 psycopg2가 DATE 컬럼에 바인딩할 때
         서버 DateStyle(기본 MDY)이 "03/08/2026"을 8월 3일로 해석해 **불변 발행물에
-        잘못된 날짜가 조용히 저장**된다(wrong < missing 위반). 조회 경로(get_detail)가
-        이미 쓰는 가드를 입력에도 대칭으로 둔다."""
+        잘못된 날짜가 조용히 저장**된다(wrong < missing 위반)."""
         try:
             date.fromisoformat(v)
         except ValueError:
@@ -252,18 +251,5 @@ def list_all(_: str = Depends(get_current_user_or_api_key)):
 
 @router.get("/{slug}")
 def list_by_slug(slug: SlugPath, _: str = Depends(get_current_user_or_api_key)):
-    """그 기술의 전 판(최신순, 문서 상세 이력 네비게이션용)."""
-    return sanitize({"slug": slug, "reports": svc.list_by_slug(slug)})
-
-
-@router.get("/{slug}/{published_date}")
-def get_detail(slug: SlugPath, published_date: str, _: str = Depends(get_current_user_or_api_key)):
-    """발행물 단건."""
-    try:
-        date.fromisoformat(published_date)  # 비정상 date 문자열의 DB 캐스트 500 방지
-    except ValueError:
-        raise HTTPException(status_code=404, detail="발행물 없음")
-    report = svc.get_report(slug, published_date)
-    if report is None:
-        raise HTTPException(status_code=404, detail="발행물 없음")
-    return sanitize(report)
+    """그 기술의 현재 판 1건(없으면 빈 배열)."""
+    return sanitize({"slug": slug, "reports": svc.get_by_slug(slug)})

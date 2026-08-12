@@ -1,7 +1,7 @@
 import Card from '../ui/Card'
 import { SectionTitle } from '../reports/reportUtils.jsx'
 
-// 선도기술 리포트 핵심 포인트 카드(ADR-0033, task#281 S2) — 지금까지 description 산문에만 있던
+// 주요기술 리포트 핵심 포인트 카드(ADR-0033, task#281 S2) — 지금까지 description 산문에만 있던
 // 결론을 발행 필드 key_points[]{title, metrics[≤4]{label,value,change_pct?}, body}로 받아 렌더한다.
 // AnalystReport.jsx의 「투자 포인트」 블록을 그대로 미러링한다(task#218 "한눈 구조화"의 원형).
 // 순수 표시 컴포넌트 — fetch 0, 산문 요약·추출 0(루틴이 쓴 것만 표시한다, wrong < missing).

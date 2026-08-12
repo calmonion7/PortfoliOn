@@ -49,17 +49,18 @@ describe('Masthead 서브바 — 심층 리포트', () => {
   })
 })
 
-// task#276 S5 — 선도기술 리포트 탭 추가(navSections.js 단일 소스 한 줄). analyst-report와 동형으로
-// 단수 match('/tech-report')가 목록·상세를 함께 덮어야 세 표면 모두 "지금 어디인가"를 유지한다.
-describe('Masthead 서브바 — 선도기술', () => {
+// task#276 S5 — 주요기술 리포트 탭 추가(navSections.js 단일 소스 한 줄). analyst-report와
+// 동형으로 단수 match('/tech-report')가 목록·상세를 함께 덮어야 세 표면 모두 "지금
+// 어디인가"를 유지한다.
+describe('Masthead 서브바 — 주요기술', () => {
   it.each([
     ['목록', TECH_LIST],
     ['상세', TECH_DETAIL],
-  ])('%s(%s)에서 리서치 서브바가 뜨고 "선도기술"이 active다', (_label, path) => {
+  ])('%s(%s)에서 리서치 서브바가 뜨고 "주요기술"이 active다', (_label, path) => {
     const { container } = renderAt(path, <Masthead theme="light" setTheme={noop} onLogout={noop} />)
     const subbar = container.querySelector('.masthead-subbar')
     expect(subbar, '리서치 서브바 노드').not.toBeNull()
-    const link = screen.getByRole('link', { name: '선도기술' })
+    const link = screen.getByRole('link', { name: '주요기술' })
     expect(link.className).toContain('is-active')
   })
 })
@@ -68,8 +69,8 @@ describe('MobileNav 하단 탭바 — 리서치', () => {
   it.each([
     ['목록', LIST],
     ['상세', DETAIL],
-    ['선도기술 목록', TECH_LIST],
-    ['선도기술 상세', TECH_DETAIL],
+    ['주요기술 목록', TECH_LIST],
+    ['주요기술 상세', TECH_DETAIL],
   ])('%s(%s)에서 "리서치" 탭이 active다', (_label, path) => {
     renderAt(path, <MobileNav />)
     const tab = screen.getByRole('link', { name: '리서치' })
@@ -88,13 +89,13 @@ describe('ResearchShell seg — 심층 리포트', () => {
   })
 })
 
-describe('ResearchShell seg — 선도기술', () => {
+describe('ResearchShell seg — 주요기술', () => {
   it.each([
     ['목록', TECH_LIST],
     ['상세', TECH_DETAIL],
-  ])('%s(%s)에서 seg "선도기술"이 active다', (_label, path) => {
+  ])('%s(%s)에서 seg "주요기술"이 active다', (_label, path) => {
     renderAt(path, <ResearchShell><div>CHILD</div></ResearchShell>)
-    const tab = screen.getByRole('link', { name: '선도기술' })
+    const tab = screen.getByRole('link', { name: '주요기술' })
     expect(tab.className).toContain('is-active')
   })
 })

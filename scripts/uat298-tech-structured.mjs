@@ -1,4 +1,4 @@
-// task#298 S6 라이브 UAT(신규) — 선도기술 리포트 상세의 「계열 비교」(VariantTable) + 「확인할 지표」
+// task#298 S6 라이브 UAT(신규) — 주요기술 리포트 상세의 「계열 비교」(VariantTable) + 「확인할 지표」
 // (WatchItems) 두 섹션을 잰다.
 //
 // ⚠️⚠️ 순서 경고 — commit+push(+build) **전에** 돌릴 것. push ~20초 뒤 새 번들이 라이브가 되므로

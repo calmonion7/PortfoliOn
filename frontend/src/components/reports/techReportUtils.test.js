@@ -4,7 +4,7 @@ import {
   deriveTechKpis, sortPlayers, parseDescriptionSections, playerColumns,
 } from './techReportUtils'
 
-// 선도기술 리포트(ADR-0033, task#276 S5) 순수 헬퍼 — red-first(TDD 대상은 formatMarketSize·splitSeries).
+// 주요기술 리포트(ADR-0033, task#276 S5, 개명 ADR-0038) 순수 헬퍼 — red-first(TDD 대상은 formatMarketSize·splitSeries).
 
 describe('formatMarketSize — 통화·단위 그대로 표시(환산 없음, ADR-0033)', () => {
   it('USD bn → $12.5B', () => {
@@ -378,8 +378,8 @@ describe('parseDescriptionSections — 대괄호 헤딩 분해(파싱 실패는 
 })
 
 describe('TECH_NAMES / TECH_LEVEL_LABELS — 표시명·척도 라벨 상수', () => {
-  it('백엔드 TECH_TOPICS 4종과 슬러그가 일치', () => {
-    expect(Object.keys(TECH_NAMES).sort()).toEqual(['reusable-rocket', 'robotics', 'smr', 'solid-state-battery'])
+  it('백엔드 TECH_TOPICS 5종과 슬러그가 일치(data-center 추가, ADR-0038)', () => {
+    expect(Object.keys(TECH_NAMES).sort()).toEqual(['data-center', 'reusable-rocket', 'robotics', 'smr', 'solid-state-battery'])
   })
   it('기술 성숙 단계 1~5 라벨(CONTEXT.md 공통 5단계)', () => {
     expect(TECH_LEVEL_LABELS[1]).toBe('기초연구')

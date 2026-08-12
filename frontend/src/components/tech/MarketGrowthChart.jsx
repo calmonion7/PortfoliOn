@@ -1,4 +1,4 @@
-// 선도기술 리포트 시장 성장 차트(ADR-0033, task#277 S1 + task#282 S3) — 순수 표시 컴포넌트, fetch 없음.
+// 주요기술 리포트 시장 성장 차트(ADR-0033, task#277 S1 + task#282 S3) — 순수 표시 컴포넌트, fetch 없음.
 // props: { market: { history:[{year,size}], forecast:[{year,size}], cagr_pct, as_of } }
 // size = {value, currency:"USD"|"KRW", unit:"mn"|"bn"|"tn"} — formatMarketSize가 이름에 입력 단위를
 // 지니므로(ADR-0031) 여기서 값을 직접 포맷하지 않고 항상 그 함수를 통과시킨다.

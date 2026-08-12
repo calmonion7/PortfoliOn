@@ -1,6 +1,6 @@
 import { parseDescriptionSections } from '../reports/techReportUtils'
 
-// 선도기술 리포트 상세(ADR-0033) — description 산문을 대괄호 헤딩 기준으로 소제목 분해 + 문단별 렌더.
+// 주요기술 리포트 상세(ADR-0033) — description 산문을 대괄호 헤딩 기준으로 소제목 분해 + 문단별 렌더.
 // 순수 표시 컴포넌트(fetch 없음). props: description(report.description) · rationale(report.difficulty?.rationale)
 //
 // task#296 S2: task#280 S4의 <details>/<summary> 섹션별 접기를 제거했다 — 사용자 결정(스크롤만으로

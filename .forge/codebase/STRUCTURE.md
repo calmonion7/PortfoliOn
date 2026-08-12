@@ -63,7 +63,7 @@ backend/
 │   ├── report.py           스냅샷 목록·상세·히스토리 · 생성/백필 · 컨센서스 · 수주잔고 ·
 │   │                       공시 · 내부자 · US수급 · AGM
 │   ├── analyst_reports.py  심층 리포트 발행/조회 (ADR-0027)
-│   ├── tech_reports.py     선도기술 리포트 (ADR-0033/0034)
+│   ├── tech_reports.py     주요기술 리포트 (ADR-0033/0034/0038)
 │   ├── recommendations.py  추천 read + refresh
 │   ├── rankings.py         /rankings · /rankings/refresh
 │   ├── investor.py         수급 추이 · 스크리닝
@@ -154,7 +154,7 @@ backend/
     ├── consensus.py        as-of 읽기 정본 (get_asof · apply_asof · get_asof_batch)
     ├── indicators.py       RSI · EMA · 52주 · HV · 매물대
     ├── analyst_reports.py  발행물 저장/조회 + per_band · build_data_block · consensus_basis
-    ├── tech_reports.py     선도기술 발행물 저장/조회
+    ├── tech_reports.py     주요기술 발행물 저장/조회 (slug당 1행)
     ├── cowork_trigger.py   배치 완료 fire (ADR-0028) — daily_text · manual_text · fire
     ├── digest_service.py   일일 다이제스트 생성 · 텔레그램 발송
     ├── dividends.py        US yfinance / KR DART 배당 + 배당 스케줄(replace_schedule)

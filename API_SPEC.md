@@ -16,7 +16,7 @@
 - [Stocks (종목 정보)](#stocks-종목-정보)
 - [Report (리포트)](#report-리포트)
 - [Analyst Reports (애널리스트 리포트 발행물)](#analyst-reports-애널리스트-리포트-발행물)
-- [Tech Reports (선도기술 리포트)](#tech-reports-선도기술-리포트)
+- [Tech Reports (주요기술 리포트)](#tech-reports-주요기술-리포트)
 - [Consensus (컨센서스)](#consensus-컨센서스)
 - [Calendar (이벤트 캘린더)](#calendar-이벤트-캘린더)
 - [Digest (일일 다이제스트)](#digest-일일-다이제스트)
@@ -320,7 +320,7 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 
 ### `POST /api/admin/cowork/fire`
 
-Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인). 일일 배치 완료 시 자동 fire되는 것과 같은 루틴을 즉시 깨운다. `text` 생략/빈값이면 기본 본문 사용 — **정책을 여기 열거하지 않고** "프롬프트(`scripts/cowork-routine-prompt.md`)에 정의된 전 정책을 순서대로 검토해 수행하라"만 지시한다(task#279 — 트리거 본문이 정책을 열거하면 프롬프트의 "트리거 우선" 규칙 때문에 stale 목록이 정본을 이겨버린다). 정책 정본(enrich 회전 갱신·애널리스트 리포트 발행·선도기술 리포트 발행 3종의 조건·상한)은 프롬프트 파일에만 있다.
+Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인). 일일 배치 완료 시 자동 fire되는 것과 같은 루틴을 즉시 깨운다. `text` 생략/빈값이면 기본 본문 사용 — **정책을 여기 열거하지 않고** "프롬프트(`scripts/cowork-routine-prompt.md`)에 정의된 전 정책을 순서대로 검토해 수행하라"만 지시한다(task#279 — 트리거 본문이 정책을 열거하면 프롬프트의 "트리거 우선" 규칙 때문에 stale 목록이 정본을 이겨버린다). 정책 정본(enrich 회전 갱신·애널리스트 리포트 발행·주요기술 리포트 발행 3종의 조건·상한)은 프롬프트 파일에만 있다.
 
 **Auth:** admin Bearer token 또는 `X-API-Key` (`require_admin_or_api_key`)
 
@@ -2280,17 +2280,17 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
-## Tech Reports (선도기술 리포트)
+## Tech Reports (주요기술 리포트)
 
-기술 단위 발행물 (ADR-0033) — 종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇) 단위로 발행한다. 대상 4종은 백엔드 상수 `TECH_TOPICS`가 정본(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`) — 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. 발행물은 불변, 같은 `(slug, published_date)` 재발행만 그날 판을 교체(analyst-reports와 동형).
+기술 단위 발행물 (ADR-0033, 저장모델 개정 ADR-0038) — 종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇·데이터 센터) 단위로 발행한다. 대상 5종은 백엔드 상수 `TECH_TOPICS`가 정본(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`·`data-center`) — 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음, ADR-0038).** analyst-reports와 달리 과거 판이 누적되지 않는다.
 
 ### `POST /api/tech-reports/{slug}`
 
-선도기술 리포트 발행.
+주요기술 리포트 발행(갱신) — 같은 slug로 다시 POST하면 기존 행을 덮어쓴다.
 
 **Auth:** `X-API-Key` 또는 admin Bearer token (`require_admin_or_api_key`)
 
-**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` (그 밖의 값은 `422`)
+**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `data-center` (그 밖의 값은 `422`)
 
 **Request Body**
 ```json
@@ -2378,7 +2378,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/tech-reports`
 
-목록 — **기술당 최신 1건**(발행일 최신순). 요약본이 아니라 위 발행물 행 **전체**를 반환한다.
+목록 — **기술당 1행**(slug당 최대 1건, 이력 없음 — ADR-0038). 요약본이 아니라 위 발행물 행 **전체**를 반환한다. `published_date`는 최초 발행일이 아니라 **그 기술이 마지막으로 갱신된 날짜**다(재발행 시 이 값도 갱신되고 정렬도 이 값 기준 최신순).
 
 **Auth:** Bearer token 또는 `X-API-Key`
 
@@ -2391,7 +2391,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/tech-reports/{slug}`
 
-그 기술의 발행 판 **전체** 목록(최신순, dedup 없음 — 문서 상세 이력 네비게이션용).
+그 기술의 **현재 판 1건**(없으면 빈 배열) — 과거 판은 존재하지 않는다(ADR-0038, 이력 네비게이션 없음).
 
 **Auth:** Bearer token 또는 `X-API-Key`
 
@@ -2401,58 +2401,6 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 ```json
 { "slug": "smr", "reports": [ { "id": 4, "published_date": "2026-08-03", "title": "...", "...": "...", "created_at": "2026-08-03T09:00:00" } ] }
 ```
-
----
-
-### `GET /api/tech-reports/{slug}/{published_date}`
-
-발행물 단건 — 발행 시 제출된 필드 전체(`title`·`description`·`difficulty`·`players`·`challenges`·`related`·`market`·`sources`·`key_points`·`milestones`·`variants`·`watch_items`) + `id`·`created_at`.
-
-**Auth:** Bearer token 또는 `X-API-Key`
-
-**Path Parameters:** `slug` — `422` if 미등록, `published_date` — `YYYY-MM-DD`
-
-**Response `200`**
-```json
-{
-  "id": 4, "slug": "smr", "published_date": "2026-08-03",
-  "title": "재사용 발사체, 궤도당 비용을 다시 쓴다",
-  "description": "1단 재사용이 발사비를 낮추는 구조를 설명한다.",
-  "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
-  "players": [ { "name": "SpaceX", "country": "US", "state_led": false, "ticker": null,
-                 "tech_level": 5, "gap_years": 0, "leader_name": "SpaceX",
-                 "share_pct": 60.0, "note": "재사용 1위", "category": "궤도급 완전재사용" } ],
-  "challenges": [ { "title": "재점화 신뢰성", "body": "다회 재점화 엔진 내구성." } ],
-  "related": { "prerequisites": ["정밀 유도항법"], "derivatives": [], "complements": [], "competitors": [] },
-  "market": {
-    "history": [ { "year": 2024, "size": { "value": 12.5, "currency": "USD", "unit": "bn" } } ],
-    "forecast": [ { "year": 2030, "size": { "value": 30.5, "currency": "USD", "unit": "bn" } } ],
-    "cagr_pct": 12.3, "share_basis": "발사 횟수 기준", "as_of": "2026-08-03",
-    "estimates": [
-      { "institution": "Morgan Stanley", "year": 2030, "size": { "value": 33.5, "currency": "USD", "unit": "bn" }, "scope": null, "is_basis": true },
-      { "institution": "McKinsey", "year": 2030, "size": { "value": 32.0, "currency": "USD", "unit": "bn" }, "scope": "발사 서비스만", "is_basis": null }
-    ]
-  },
-  "sources": [ { "title": "NASA", "url": null } ],
-  "key_points": [ { "title": "발사비가 한 자릿수로 내려왔다",
-                    "metrics": [ { "label": "kg당 발사비", "value": "2,700달러", "change_pct": -22.0 },
-                                 { "label": "연간 발사", "value": "134회", "change_pct": null } ],
-                    "body": "1단 회수 성공률이 안정되며 단위비용이 소모형 대비 1/5 수준이 됐다." } ],
-  "milestones": [ { "year": 2015, "actor": "SpaceX", "event": "1단 지상 회수 성공", "status": "done" },
-                  { "year": 2030, "actor": null, "event": "완전 재사용 상업 운용", "status": "planned" } ],
-  "variants": [ { "axis_label": "회수 방식",
-                  "options": [
-                    { "name": "추진 수직착륙", "examples": ["SpaceX Falcon 9"], "strength": "정밀 착지, 재정비가 빠르다.", "tradeoff": "역분사 추진제만큼 탑재량이 줄어든다." },
-                    { "name": "그물 포획", "examples": ["Rocket Lab Electron"], "strength": "소형기체에 추진제 손실이 없다.", "tradeoff": "포획 성공률이 낮고 대형기체엔 부적합." }
-                  ] } ],
-  "watch_items": [ { "label": "같은 1단 기체의 회전율(재사용 횟수/년)이 늘어나는가",
-                      "detail": "정비 없이 재발사까지 걸리는 시간이 짧아져야 단가가 실제로 내려간다.",
-                      "not_signal": "발사 횟수 자체의 증가는 신규 기체 생산 확대일 수도 있어 회전율과 다르다." } ],
-  "created_at": "2026-08-03T09:00:00"
-}
-```
-
-**Error `404`** — 해당 slug+date 발행물 없음, 또는 `published_date`가 `YYYY-MM-DD` 형식이 아님(DB 캐스트 500 방지, `analyst-reports` 관용구와 동형)
 
 ---
 

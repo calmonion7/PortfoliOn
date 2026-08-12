@@ -1,4 +1,4 @@
-"""선도기술 리포트 저장 계층 (ADR-0033, task#276 S1).
+"""주요기술 리포트 저장 계층 (ADR-0033, task#276 S1, 개명·저장모델 개정 ADR-0038).
 
 analyst_reports.py(ADR-0027)와 동형 — query/execute를 mock한다(conftest _block_real_db 가드,
 실 DB 접근 금지). 단언은 SQL 리터럴만이 아니라 파라미터(call_args[0][1])도 함께 본다.
@@ -25,12 +25,14 @@ PAYLOAD = {
 }
 
 
-def test_save_report_upserts_by_slug_and_published_date():
+def test_save_report_upserts_by_slug():
+    """slug당 1행(ADR-0038 결정 2) — 충돌키는 slug 단독이고 published_date는 EXCLUDED로 갱신된다."""
     with patch.object(svc, "execute") as mock_exec:
         svc.save_report("reusable-rocket", PAYLOAD)
     sql, params = mock_exec.call_args.args
     assert "INSERT INTO tech_reports" in sql
-    assert "ON CONFLICT (slug, published_date) DO UPDATE" in sql
+    assert "ON CONFLICT (slug) DO UPDATE" in sql
+    assert "published_date = EXCLUDED.published_date" in sql
     assert params[0] == "reusable-rocket"
     assert params[1] == "2026-08-03"
     assert params[2] == PAYLOAD["title"]
@@ -38,6 +40,26 @@ def test_save_report_upserts_by_slug_and_published_date():
     assert json.loads(params[4]) == PAYLOAD["difficulty"]
     assert json.loads(params[5]) == PAYLOAD["players"]
     assert json.loads(params[9]) == PAYLOAD["sources"]
+
+
+def test_save_report_upsert_updates_published_date_on_resave():
+    """같은 slug를 다른 published_date로 2회 저장 → 1행만 남고 published_date가 최신으로
+    갱신된다(ADR-0038 결정 2). 충돌키가 slug 단독이라 DB `UNIQUE(slug)`가 1행을 보장하고
+    (마이그레이션 S2), 이 테스트는 그 보장 위에서 `DO UPDATE SET published_date =
+    EXCLUDED.published_date` 한 줄이 실제로 실려 있는지 SQL·파라미터 수준에서 못박는다 —
+    이 한 줄이 빠지면 갱신일이 옛 값에 고착한다."""
+    payload1 = dict(PAYLOAD, published_date="2026-08-01")
+    payload2 = dict(PAYLOAD, published_date="2026-08-10")
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", payload1)
+        svc.save_report("smr", payload2)
+    assert mock_exec.call_count == 2
+    for call, expected_date in zip(mock_exec.call_args_list, ("2026-08-01", "2026-08-10")):
+        sql, params = call.args
+        assert "ON CONFLICT (slug) DO UPDATE" in sql
+        assert "published_date = EXCLUDED.published_date" in sql
+        assert params[0] == "smr"
+        assert params[1] == expected_date
 
 
 def test_save_report_defaults_missing_optional_collections():
@@ -159,22 +181,29 @@ def test_save_report_variants_watch_items_explicit_none_also_stores_sql_null():
     assert json.loads(params2[13]) == []
 
 
-def test_latest_all_uses_distinct_on_slug():
+def test_latest_all_no_longer_needs_distinct_on():
+    """slug당 1행이라 DISTINCT ON이 불필요(ADR-0038) — 그냥 전체를 갱신일 최신순으로 정렬."""
     with patch.object(svc, "query", return_value=[{"slug": "smr"}]) as mock_q:
         rows = svc.latest_all()
     sql = mock_q.call_args.args[0]
-    assert "DISTINCT ON (slug)" in sql
-    assert "ORDER BY slug, published_date DESC" in sql
+    assert "DISTINCT ON" not in sql
+    assert "ORDER BY published_date DESC, slug" in sql
     assert rows == [{"slug": "smr"}]
 
 
-def test_list_by_slug_orders_latest_first():
-    with patch.object(svc, "query", return_value=[{"published_date": "2026-08-03"}]) as mock_q:
-        rows = svc.list_by_slug("robotics")
+def test_get_by_slug_returns_the_single_current_row_or_empty():
+    """get_by_slug 계약은 「그 slug의 현재 1건」이다(ADR-0038) — slug당 1행이라 「최신 우선
+    정렬」이라는 옛 축(list_by_slug)은 더 이상 의미가 없다(정렬할 대상이 0 또는 1건뿐).
+    그래서 이 테스트는 정렬이 아니라 존재/부재 두 경로를 단언한다."""
+    with patch.object(svc, "query", return_value=[{"slug": "robotics", "published_date": "2026-08-03"}]) as mock_q:
+        rows = svc.get_by_slug("robotics")
     sql, params = mock_q.call_args.args
-    assert "WHERE slug = %s ORDER BY published_date DESC" in sql
+    assert "WHERE slug = %s" in sql
     assert params == ("robotics",)
-    assert rows == [{"published_date": "2026-08-03"}]
+    assert rows == [{"slug": "robotics", "published_date": "2026-08-03"}]
+
+    with patch.object(svc, "query", return_value=[]):
+        assert svc.get_by_slug("robotics") == []
 
 
 def test_get_report_found_and_not_found():
@@ -187,10 +216,12 @@ def test_get_report_found_and_not_found():
         assert svc.get_report("smr", "2099-01-01") is None
 
 
-def test_tech_topics_has_exactly_the_four_slugs():
+def test_tech_topics_has_exactly_the_five_slugs():
     slugs = {t["slug"] for t in svc.TECH_TOPICS}
-    assert slugs == {"reusable-rocket", "solid-state-battery", "smr", "robotics"}
-    assert len(svc.TECH_TOPICS) == 4
+    assert slugs == {"reusable-rocket", "solid-state-battery", "smr", "robotics", "data-center"}
+    assert len(svc.TECH_TOPICS) == 5
     # 각 항목이 표시명·정렬순서를 갖는다
     for t in svc.TECH_TOPICS:
         assert t["name"] and isinstance(t["order"], int)
+    data_center = next(t for t in svc.TECH_TOPICS if t["slug"] == "data-center")
+    assert data_center["name"] == "데이터 센터"

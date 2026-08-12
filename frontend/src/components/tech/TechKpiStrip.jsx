@@ -3,7 +3,7 @@ import Card from '../ui/Card'
 import Stat from '../ui/Stat'
 import { deriveTechKpis } from '../reports/techReportUtils'
 
-// 선도기술 리포트 KPI 스트립(task#280 S2) — 헤더 직하에서 결론·지표가 첫 화면에 잡히게 하는 요약 레이어.
+// 주요기술 리포트 KPI 스트립(task#280 S2) — 헤더 직하에서 결론·지표가 첫 화면에 잡히게 하는 요약 레이어.
 // 파생은 전부 deriveTechKpis가 한다(결측은 —, 산문에서 수치를 긁지 않는다 — ADR-0033 결정 3).
 // 여기는 표시만 하며 값 계산을 두지 않는다(폰트 분기도 파생값의 `text` 플래그가 지시한다).
 //

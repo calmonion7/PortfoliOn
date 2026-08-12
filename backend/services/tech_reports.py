@@ -1,8 +1,8 @@
-"""선도기술 리포트 — 기술 단위 발행물 (ADR-0033, task#276).
+"""주요기술 리포트 — 기술 단위 발행물 (ADR-0033, 개명·저장모델 개정 ADR-0038).
 
-종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇) 단위 발행물. `analyst_reports.py`
-(ADR-0027)와 동형 저장 계층 — 같은 (slug, published_date) 재발행은 upsert(그날 판 교체),
-다른 날은 누적. TECH_TOPICS가 대상 4종의 정본(백엔드 상수, ADR-0033 결정 2).
+종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇·데이터 센터) 단위 발행물. slug당 1행으로
+고정(ADR-0038 결정 2) — 재발행은 그 행을 덮어쓰기만 하고, 과거 판은 누적하지 않는다.
+TECH_TOPICS가 대상 5종의 정본(백엔드 상수, ADR-0038 결정 1).
 """
 from __future__ import annotations
 
@@ -11,11 +11,14 @@ from typing import Optional
 
 from services.db import query, execute
 
+# name은 프론트 frontend/src/components/reports/techReportUtils.js의 TECH_NAMES와
+# dual-source다(API가 표시명을 안 준다) — slug 추가/개명 시 그쪽도 함께 갱신할 것.
 TECH_TOPICS = [
     {"slug": "reusable-rocket", "name": "재사용 로켓", "order": 1},
     {"slug": "solid-state-battery", "name": "전고체 배터리", "order": 2},
     {"slug": "smr", "name": "SMR", "order": 3},
     {"slug": "robotics", "name": "로봇", "order": 4},
+    {"slug": "data-center", "name": "데이터 센터", "order": 5},
 ]
 
 
@@ -30,14 +33,15 @@ def _json_or_null(value):
 
 
 def save_report(slug: str, payload: dict) -> None:
-    """발행 저장 — 같은 (slug, published_date)는 upsert(그날 판 교체), 다른 날은 누적."""
+    """발행 저장 — slug당 1행(ADR-0038 결정 2). 재발행은 그 행을 덮어쓴다."""
     execute(
         """INSERT INTO tech_reports
                (slug, published_date, title, description, difficulty, players,
                 challenges, related, market, sources, key_points, milestones,
                 variants, watch_items)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-           ON CONFLICT (slug, published_date) DO UPDATE SET
+           ON CONFLICT (slug) DO UPDATE SET
+               published_date = EXCLUDED.published_date,
                title = EXCLUDED.title, description = EXCLUDED.description,
                difficulty = EXCLUDED.difficulty, players = EXCLUDED.players,
                challenges = EXCLUDED.challenges, related = EXCLUDED.related,
@@ -64,15 +68,12 @@ def save_report(slug: str, payload: dict) -> None:
 
 
 def latest_all() -> list:
-    """기술당 최신 1건(발행일 최신순) — 목록의 정체성(ADR-0027 개정 원칙과 동형)."""
-    return query(
-        "SELECT * FROM (SELECT DISTINCT ON (slug) * FROM tech_reports"
-        " ORDER BY slug, published_date DESC) t ORDER BY published_date DESC, slug"
-    )
+    """기술별 1건씩, 갱신일 최신순 — slug당 1행이라 DISTINCT ON이 불필요하다(ADR-0038)."""
+    return query("SELECT * FROM tech_reports ORDER BY published_date DESC, slug")
 
 
-def list_by_slug(slug: str) -> list:
-    """그 slug의 전 판, 최신순(문서 상세 이력 네비게이션용)."""
+def get_by_slug(slug: str) -> list:
+    """그 slug의 행 — slug당 1행이라 0 또는 1건(ADR-0038). 응답 봉투는 리스트로 유지."""
     return query(
         "SELECT * FROM tech_reports WHERE slug = %s ORDER BY published_date DESC",
         (slug,),

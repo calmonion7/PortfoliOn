@@ -1,4 +1,4 @@
-// 선도기술 리포트 상세 「계열 비교」(task#298 S1ⓐ+S2, ADR-0034) — variants[]{axis_label, options[]}를
+// 주요기술 리포트 상세 「계열 비교」(task#298 S1ⓐ+S2, ADR-0034) — variants[]{axis_label, options[]}를
 // 축별 2열 표(계열/특징)로 렌더한다. layout 순수함수 export 패턴은 MilestoneTimeline.jsx를 따른다.
 //
 // 축은 최대 2개(스키마 제약)이지만 여기서 상한을 세지 않는다 — 드리프트로 더 와도 있는 만큼 그린다

@@ -1,7 +1,7 @@
 import Badge from '../ui/Badge'
 import { TECH_LEVEL_LABELS, sortPlayers, playerColumns } from '../reports/techReportUtils'
 
-// 선도기술 리포트 상세 「주요 업체」(task#280 S3, task#296 S3) — 세로 카드 N장 → 행=업체 표(스크롤러 없음).
+// 주요기술 리포트 상세 「주요 업체」(task#280 S3, task#296 S3) — 세로 카드 N장 → 행=업체 표(스크롤러 없음).
 // 카드형은 업체 간 비교가 성립하지 않았다(같은 축의 값이 세로로 흩어짐). 표는 열이 축이라
 // 9곳을 한 화면에서 비교할 수 있다. 정렬은 techReportUtils.sortPlayers 단일 소스
 // (기술수준 내림차순 → 동단계 내 격차 오름차순 → gap_years null 최후).

@@ -110,7 +110,7 @@ services/db.py        psycopg2 ThreadedConnectionPool (minconn=1, maxconn=20)
 | `routers/stocks.py` | `/api/stocks` | 검색·비교·대시보드·enrich(Cowork)·이름/배당/베타/수급 백필 |
 | `routers/report.py` | `/api` | 스냅샷 리포트 목록·상세·히스토리, 생성/백필, 컨센서스, 수주잔고·공시·내부자·US수급 |
 | `routers/analyst_reports.py` | `/api/analyst-reports` | 심층 리포트 발행/조회(ADR-0027) |
-| `routers/tech_reports.py` | `/api/tech-reports` | 선도기술 리포트(비-티커 리소스, ADR-0033/0034) |
+| `routers/tech_reports.py` | `/api/tech-reports` | 주요기술 리포트(비-티커 리소스, ADR-0033/0034/0038) |
 | `routers/recommendations.py` | `/api/recommendations` | 추천 점수 read + refresh |
 | `routers/rankings.py` | `/api` | `/rankings`, `/rankings/refresh` |
 | `routers/investor.py` | `/api` | 수급 추이·스크리닝 |

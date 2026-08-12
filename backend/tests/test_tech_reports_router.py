@@ -1,8 +1,10 @@
-"""선도기술 리포트 발행·조회 API (ADR-0033, task#276 S2).
+"""주요기술 리포트 발행·조회 API (ADR-0033, task#276 S2, 개명·저장모델 개정 ADR-0038).
 
 라우터 테스트는 self-app + dependency override(conftest는 main.app 한정),
 무인증 401은 override 없는 fresh app으로 검증(test_security_auth_gaps 패턴).
 DB는 services.tech_reports.query/execute를 mock(conftest _block_real_db 가드).
+조회 표면은 2종(목록·slug별 현재 판) — 단건(이력) 조회 `GET /{slug}/{published_date}`는
+ADR-0038 결정 3으로 제거됐다.
 """
 import copy
 import json
@@ -17,7 +19,7 @@ from services import tech_reports as svc
 
 app = FastAPI()
 app.include_router(router)
-# 발행은 require_admin_or_api_key(루틴), 조회 3종은 get_current_user_or_api_key(ADR-0029)
+# 발행은 require_admin_or_api_key(루틴), 조회 2종은 get_current_user_or_api_key(ADR-0029)
 app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
 app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
 client = TestClient(app)
@@ -127,7 +129,8 @@ def test_publish_sources_empty_422():
 
 
 def test_list_all_one_row_per_slug():
-    """목록 GET ""이 slug당 1행 (S1 latest_all의 DISTINCT ON (slug) 위임 확인)."""
+    """목록 GET ""이 slug당 1행 (S1 latest_all이 slug당 1행이라 DISTINCT ON을 안 쓰는 위임 확인,
+    ADR-0038)."""
     rows = [
         {"slug": "smr", "published_date": "2026-08-02", "title": "t2"},
         {"slug": "robotics", "published_date": "2026-08-01", "title": "t1"},
@@ -139,12 +142,12 @@ def test_list_all_one_row_per_slug():
     assert len(reports) == 2
     assert {r["slug"] for r in reports} == {"smr", "robotics"}
     sql = mock_q.call_args.args[0]
-    assert "DISTINCT ON (slug)" in sql
+    assert "ORDER BY published_date DESC" in sql
 
 
-def test_republish_same_day_replaces_not_appends():
-    """같은 (slug, published_date) 재발행이 행을 늘리지 않고 교체 — 두 호출 모두
-    ON CONFLICT (slug, published_date) DO UPDATE SQL을 태우는지(router→service 배선 확인,
+def test_republish_replaces_not_appends():
+    """slug당 1행(ADR-0038) — 재발행이 행을 늘리지 않고 교체. 두 호출 모두
+    ON CONFLICT (slug) DO UPDATE SQL을 태우는지(router→service 배선 확인,
     실제 upsert 보장은 S1 test_tech_reports_service.py가 SQL 단위로 이미 못박았다)."""
     with patch.object(svc, "execute") as mock_exec:
         r1 = client.post("/api/tech-reports/smr", json=VALID_BODY)
@@ -152,7 +155,7 @@ def test_republish_same_day_replaces_not_appends():
     assert r1.status_code == 201 and r2.status_code == 201
     assert mock_exec.call_count == 2
     for call in mock_exec.call_args_list:
-        assert "ON CONFLICT (slug, published_date) DO UPDATE" in call.args[0]
+        assert "ON CONFLICT (slug) DO UPDATE" in call.args[0]
 
 
 # ── 요약 레이어 3필드 (task#281 S1) ───────────────────────────────────
@@ -582,16 +585,14 @@ def test_list_by_slug_unregistered_422():
     mock_q.assert_not_called()
 
 
-def test_get_detail_found_and_404():
-    row = {"slug": "smr", "published_date": "2026-08-01", "title": "t"}
-    with patch.object(svc, "query", return_value=[row]):
+def test_detail_route_removed_404_or_405():
+    """단건(이력) 조회 `GET /{slug}/{published_date}`는 ADR-0038 결정 3으로 제거됐다 —
+    소비처가 0(프론트·프로브 7종·루틴 어디서도 호출 안 함)이고, 이력 자체가 폐기됐으므로
+    조회할 과거 판이 없다. 그 경로가 조용히 되살아나지 않았음을 핀으로 못박는다."""
+    with patch.object(svc, "query") as mock_q:
         resp = client.get("/api/tech-reports/smr/2026-08-01")
-    assert resp.status_code == 200
-    assert resp.json()["title"] == "t"
-    with patch.object(svc, "query", return_value=[]):
-        assert client.get("/api/tech-reports/smr/2099-01-01").status_code == 404
-    # 비정상 date 문자열의 DB 캐스트 500 방지(analyst_reports 관용구와 동형)
-    assert client.get("/api/tech-reports/smr/not-a-date").status_code == 404
+    assert resp.status_code in (404, 405)
+    mock_q.assert_not_called()
 
 
 # ── auth 게이팅 (ADR-0029) ────────────────────────────────────────────
@@ -610,11 +611,12 @@ def test_publish_blocked_for_non_admin():
 
 
 def test_unauthenticated_401():
-    """무인증 read/write 전부 거부(override 없는 fresh app — ADR-0029)."""
+    """무인증 read/write 전부 거부(override 없는 fresh app — ADR-0029).
+
+    조회 표면은 2종뿐(단건 조회 경로는 ADR-0038 결정 3으로 제거 — 위 test_detail_route_removed_404_or_405)."""
     fresh = FastAPI()
     fresh.include_router(router)
     c = TestClient(fresh)
     assert c.get("/api/tech-reports").status_code == 401
     assert c.get("/api/tech-reports/smr").status_code == 401
-    assert c.get("/api/tech-reports/smr/2026-08-01").status_code == 401
     assert c.post("/api/tech-reports/smr", json=VALID_BODY).status_code == 401

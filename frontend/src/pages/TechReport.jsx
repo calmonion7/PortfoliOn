@@ -20,8 +20,9 @@ import VariantTable, { variantTableLayout } from '../components/tech/VariantTabl
 import WatchItems, { watchItemsLayout } from '../components/tech/WatchItems'
 import './TechReport.css'
 
-// 선도기술 리포트 상세 (ADR-0033, task#276 S5 + task#277 S5 + task#280 S1) — 기술 단위 발행물.
-// 목록은 기술당 최신 1건이라 여기도 이력 없이 최신 판만 보여준다(과거 판 UI는 비목표, 결정 1).
+// 주요기술 리포트 상세 (ADR-0033, task#276 S5 + task#277 S5 + task#280 S1, 개명·저장모델
+// ADR-0038) — 기술 단위 발행물. slug당 1행으로 고정돼 있어(ADR-0038 결정 2) 과거 판이 원천적으로
+// 없다 — 재발행은 그 행을 덮어쓰기만 한다(과거 판 UI는 비목표, 결정 1).
 //
 // 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로 재구성. CONTEXT.md 구성 서사도 이 순서다):
 //   기술명 h1 → 리드 문단 → KPI 스트립 → 전역 목차 → 핵심 포인트 → 진척 타임라인 → 주요 업체 표
@@ -85,7 +86,7 @@ export default function TechReport() {
   if (error) return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '48px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
       <p>{error}</p>
-      <Link to="/tech-reports" style={{ color: 'var(--accent)' }}>← 선도기술 리포트로 돌아가기</Link>
+      <Link to="/tech-reports" style={{ color: 'var(--accent)' }}>← 주요기술 리포트로 돌아가기</Link>
     </div>
   )
 
@@ -94,7 +95,7 @@ export default function TechReport() {
   if (report === null) return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '48px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
       <p>{(TECH_NAMES[slug] || slug)} — 아직 발행된 리포트가 없습니다.</p>
-      <Link to="/tech-reports" style={{ color: 'var(--accent)' }}>← 선도기술 리포트로 돌아가기</Link>
+      <Link to="/tech-reports" style={{ color: 'var(--accent)' }}>← 주요기술 리포트로 돌아가기</Link>
     </div>
   )
 
@@ -152,7 +153,7 @@ export default function TechReport() {
       {/* ── 헤더 ─────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ color: 'var(--text-3)', fontSize: 11, letterSpacing: '0.12em', fontWeight: 600 }}>TECH REPORT</span>
-        <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 'auto' }}>{report.published_date} 발행</span>
+        <span className="mono" style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 'auto' }}>{report.published_date} 갱신</span>
       </div>
       <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, margin: '6px 0 6px' }}>
         {TECH_NAMES[report.slug] || report.slug}
@@ -334,7 +335,7 @@ export default function TechReport() {
       )}
 
       <div style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-        <span style={{ color: 'var(--text-3)', fontSize: 11 }}>본 문서는 발행 시점 조사 내용으로 박제된 판단 문서입니다 · 투자 판단의 책임은 투자자 본인에게 있습니다</span>
+        <span style={{ color: 'var(--text-3)', fontSize: 11 }}>본 문서는 갱신 시점 조사 내용입니다 · 투자 판단의 책임은 투자자 본인에게 있습니다</span>
       </div>
 
       {/* 목록 복귀 — 우하단 플로팅 pill(analyst-report와 동형). fixed이므로 조상에 transform 금지(task#195) */}

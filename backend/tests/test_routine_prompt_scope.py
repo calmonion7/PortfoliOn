@@ -1,7 +1,7 @@
 """트리거 해석 규칙(범위:)이 프롬프트 파일에 정밀화돼 있는지 확인 (task S2).
 
 배경: 트리거 지시가 정책을 일부만 열거하면 그 열거가 곧 범위로 오독돼
-나머지 정책(예: 선도기술)이 통째 스킵되는 버그가 있었다. 고칠 것은
+나머지 정책(예: 주요기술)이 통째 스킵되는 버그가 있었다. 고칠 것은
 "트리거 우선" 문구를 "특정 정책 명시가 없으면 전부 검토"로 정밀화하는 것.
 """
 import re
@@ -45,7 +45,7 @@ _SECTION_HEADER_RE = re.compile(r"^==\s*\d+\)\s*.+?==\s*$", re.MULTILINE)
 
 
 def test_policy_sections_sentinel_at_least_three_including_tech_report():
-    """(b) sentinel — '== N) ... ==' 정책 섹션이 3개 이상이고 그중 하나가 선도기술을 담는다.
+    """(b) sentinel — '== N) ... ==' 정책 섹션이 3개 이상이고 그중 하나가 주요기술을 담는다.
 
     하한(>=3)으로 판정 — 정확일치면 정당한 섹션 추가에 거짓 FAIL한다.
     섹션이 사라지거나 파싱이 깨지면 이 단언이 실패해야 한다.
@@ -53,14 +53,14 @@ def test_policy_sections_sentinel_at_least_three_including_tech_report():
     text = _read_prompt()
     headers = _SECTION_HEADER_RE.findall(text)
     assert len(headers) >= 3, f"정책 섹션이 3개 미만이다: {headers!r}"
-    assert any("선도기술" in h for h in headers), (
-        f"선도기술 섹션이 없다: {headers!r}"
+    assert any("주요기술" in h for h in headers), (
+        f"주요기술 섹션이 없다: {headers!r}"
     )
 
 
 def test_policy_section_regex_has_teeth():
     """(b)의 sentinel이 이빨을 가짐을 실증 — 섹션 헤더 형식이 깨지면 실패해야 한다."""
-    broken = "1) enrich\n2) 애널리스트\n3) 선도기술\n"  # '==' 없는 형태
+    broken = "1) enrich\n2) 애널리스트\n3) 주요기술\n"  # '==' 없는 형태
     headers = _SECTION_HEADER_RE.findall(broken)
     assert len(headers) < 3, (
         "섹션 헤더 정규식이 '==' 없는 파손 형태도 통과시킨다 — sentinel이 이빨이 없다"

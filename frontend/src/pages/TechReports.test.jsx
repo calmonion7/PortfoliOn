@@ -25,15 +25,15 @@ function renderPage() {
 
 beforeEach(() => vi.clearAllMocks())
 
-describe('선도기술 리포트 목록 (task#276 S5)', () => {
-  it('목록 카드 렌더 — 표시명·제목·발행일·난이도·업체 수·시장 요약', async () => {
+describe('주요기술 리포트 목록 (task#276 S5, 개명 ADR-0038)', () => {
+  it('목록 카드 렌더 — 표시명·제목·갱신일·난이도·업체 수·시장 요약', async () => {
     api.get.mockResolvedValue({ data: { reports: REPORTS } })
     renderPage()
     expect(await screen.findByText('SMR, 원전의 다음 세대')).toBeTruthy()
     expect(screen.getByText('SMR')).toBeTruthy()
     expect(screen.getByText('4/5')).toBeTruthy()
     expect(screen.getByText('2개')).toBeTruthy()
-    expect(screen.getByText('2026-08-03 발행')).toBeTruthy()
+    expect(screen.getByText('2026-08-03 갱신')).toBeTruthy()
     expect(screen.getByText('$5.2B (2024) → $40B (2035), CAGR 20.1%')).toBeTruthy()
     const card = screen.getByTestId('tech-report-card')
     expect(card.getAttribute('href')).toBe('/tech-report/smr')
@@ -42,13 +42,13 @@ describe('선도기술 리포트 목록 (task#276 S5)', () => {
   it('빈 목록 — 빈 상태 문구', async () => {
     api.get.mockResolvedValue({ data: { reports: [] } })
     renderPage()
-    expect(await screen.findByText('발행된 선도기술 리포트가 없습니다.')).toBeTruthy()
+    expect(await screen.findByText('발행된 주요기술 리포트가 없습니다.')).toBeTruthy()
   })
 
   it('조회 실패 — 에러 문구(빈 상태와 구별, 에러 정직성)', async () => {
     api.get.mockRejectedValue(new Error('network'))
     renderPage()
     await waitFor(() => expect(screen.getByText('목록을 불러오지 못했습니다.')).toBeTruthy())
-    expect(screen.queryByText('발행된 선도기술 리포트가 없습니다.')).toBeNull()
+    expect(screen.queryByText('발행된 주요기술 리포트가 없습니다.')).toBeNull()
   })
 })

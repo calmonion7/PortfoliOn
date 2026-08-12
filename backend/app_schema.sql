@@ -406,9 +406,9 @@ CREATE TABLE IF NOT EXISTS analyst_reports (
     UNIQUE (ticker, published_date)
 );
 
--- 선도기술 리포트 발행물 (ADR-0033, task#276) — 종목이 아니라 기술 단위 발행물.
--- 대상은 백엔드 상수 TECH_TOPICS 4종(재사용 로켓·전고체 배터리·SMR·로봇)이 정본.
--- 같은 (slug, published_date) 재발행은 upsert(그날 판 교체), 다른 날은 누적.
+-- 주요기술 리포트 발행물 (ADR-0033, task#276; 개명·이력 폐기는 ADR-0038, task#299) — 종목이 아니라 기술 단위 발행물.
+-- 대상은 백엔드 상수 TECH_TOPICS 5종(재사용 로켓·전고체 배터리·SMR·로봇·데이터센터)이 정본.
+-- slug당 1행(ADR-0038) — 갱신은 그 행을 덮어쓴다(ON CONFLICT (slug) DO UPDATE). published_date는 마지막 갱신일.
 CREATE TABLE IF NOT EXISTS tech_reports (
     id               BIGSERIAL PRIMARY KEY,
     slug             TEXT NOT NULL,
@@ -426,5 +426,5 @@ CREATE TABLE IF NOT EXISTS tech_reports (
     variants         JSONB,                         -- 계보 비교축 [{axis_label, options[{name,...}]}] (nullable=미수록, task#297)
     watch_items      JSONB,                         -- 관찰 체크리스트 [{label, detail, not_signal}] (nullable=미수록, task#297)
     created_at       TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (slug, published_date)
+    UNIQUE (slug)
 );

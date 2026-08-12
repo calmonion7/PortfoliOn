@@ -1,4 +1,4 @@
-// 선도기술 리포트(ADR-0033, task#277 S2) — 업체별 시장점유율(share_pct) 가로 막대.
+// 주요기술 리포트(ADR-0033, task#277 S2) — 업체별 시장점유율(share_pct) 가로 막대.
 // 순수 표시 컴포넌트(fetch 없음). props: players(report.players 배열 그대로) · shareBasis(report.market?.share_basis).
 // SegmentAnalysisSection.jsx의 막대·색·잘림 규율(task#275)을 그대로 따른다 — 새 디자인 언어를 만들지 않는다.
 

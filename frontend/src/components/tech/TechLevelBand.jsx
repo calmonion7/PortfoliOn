@@ -3,7 +3,7 @@ import { TECH_LEVEL_LABELS } from '../reports/techReportUtils'
 
 const LEVELS = [1, 2, 3, 4, 5]
 
-// 선도기술 리포트 상세(task#277 S3) — 업체 × 5단계 기술수준 가로 밴드. div 기반(recharts 아님).
+// 주요기술 리포트 상세(task#277 S3) — 업체 × 5단계 기술수준 가로 밴드. div 기반(recharts 아님).
 // props: players: [{ name, tech_level: 1~5|null, gap_years: int|null, leader_name: str|null }]
 // 선두 판정은 CLAUDE_COWORK_API.md의 gap_years 정의("0=선두 자신")를 정본으로 쓴다 —
 // leader_name은 리더 본인 행에서는 CEO 등 인명으로 채워지는 실사례가 있어(TechReport.jsx 픽스처

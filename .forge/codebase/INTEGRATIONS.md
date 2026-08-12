@@ -452,7 +452,7 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 
 - 자격: `X-API-Key: <COWORK_API_KEY>` (`backend/auth.py`의 `get_current_user_or_api_key` / `require_admin_or_api_key`). sentinel user_id `"__api_key__"`.
 - ⚠️ **`require_admin`은 API 키를 거부한다**(admin JWT 전용) — Cowork가 호출해야 하는 엔드포인트는 반드시 `require_admin_or_api_key`여야 한다.
-- 대표 표면: 종목 enrich(`PUT /api/stocks/{ticker}/enrich`, `PUT /api/stocks/enrich/batch` — **batch를 먼저 등록**해야 `enrich`가 티커로 라우팅되지 않는다), 수주잔고 채움(`PUT /api/report/{ticker}/backlog`), 애널리스트 리포트 발행(`/api/analyst-reports`), 선도기술 리포트 발행(`/api/tech-reports`).
+- 대표 표면: 종목 enrich(`PUT /api/stocks/{ticker}/enrich`, `PUT /api/stocks/enrich/batch` — **batch를 먼저 등록**해야 `enrich`가 티커로 라우팅되지 않는다), 수주잔고 채움(`PUT /api/report/{ticker}/backlog`), 애널리스트 리포트 발행(`/api/analyst-reports`), 주요기술 리포트 발행(`/api/tech-reports`).
 - 계약 정본: `CLAUDE_COWORK_API.md`(Cowork 스코프 전용) + `API_SPEC.md`(전체). Cowork 소비 대상이 아닌 사용자 대면 read 엔드포인트는 `API_SPEC.md`에만 둔다.
 
 **발행물 저장 계층**
@@ -588,7 +588,7 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 | `market_cache`(15키) | FRED·yfinance·Naver·관세청/Comtrade·CNN·multpl·KIS 선물·키움 업종 | `monthly_*`·`earnings_*`·`macro_signals_fetch`·`kospi_signal_fetch`·`kr_sector_fetch`·`us_sector_fetch` + 요청경로 7종 | 시장지표 탭, 섹터·매크로 |
 | `stock_recommendations` | Naver·키움·yfinance·DART(KR) · yfinance·dataroma(US) | `recommendation_kr`/`recommendation_us` | 추천 탭 |
 | `guru_managers` | dataroma(+Naver US 한글명) | `guru_crawl` | 구루 화면 |
-| `analyst_reports`, `tech_reports` | Cowork 제출 + 서버 스냅샷 발췌 | (fire 트리거) | 심층/선도기술 리포트 |
+| `analyst_reports`, `tech_reports` | Cowork 제출 + 서버 스냅샷 발췌 | (fire 트리거) | 심층/주요기술 리포트 |
 | `digests` | 보유종목 시세 집계 (+Telegram 발송) | `daily_digest` | 다이제스트 탭 |
 | `calendar_cache` | yfinance + FRED releases + `exchange_calendars` + `stock_disclosures.meeting_date` | (요청 시 빌드·캐시) | 캘린더 |
 | `user_events` | `EventTrackerMiddleware` + `POST /api/events` | — | admin 분석(`/api/admin/analytics`) |

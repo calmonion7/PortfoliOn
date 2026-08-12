@@ -270,6 +270,21 @@ def _migrate():
         execute("ALTER TABLE tech_reports ADD COLUMN IF NOT EXISTS watch_items JSONB")
     except Exception as e:
         logger.warning(f"[Migrate] tech_reports 계보축·체크리스트 컬럼 추가 실패: {e}")
+    try:
+        # 판 누적 폐기(ADR-0038): slug당 최신 1행만 남기고 과거 행 삭제 후 UNIQUE(slug)로 전환.
+        # 이 인덱스가 없으면 라우터의 ON CONFLICT (slug)가 런타임 500이 되므로 결과를 loud하게 남긴다.
+        from services.db import execute
+        deleted = execute("""
+            DELETE FROM tech_reports a USING tech_reports b
+            WHERE a.slug = b.slug
+              AND (a.published_date < b.published_date
+                   OR (a.published_date = b.published_date AND a.id < b.id))
+        """)
+        execute("ALTER TABLE tech_reports DROP CONSTRAINT IF EXISTS tech_reports_slug_published_date_key")
+        execute("CREATE UNIQUE INDEX IF NOT EXISTS tech_reports_slug_key ON tech_reports (slug)")
+        logger.info(f"[Migrate] tech_reports 이력 폐기: 과거 행 {deleted}건 삭제, UNIQUE(slug) 인덱스 확보")
+    except Exception as e:
+        logger.warning(f"[Migrate] tech_reports 이력 폐기 실패: {e}")
 
 
 @asynccontextmanager

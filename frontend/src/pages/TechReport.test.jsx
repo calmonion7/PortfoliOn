@@ -108,7 +108,7 @@ function renderAt(slug) {
 
 beforeEach(() => vi.clearAllMocks())
 
-describe('선도기술 리포트 상세 (task#276 S5)', () => {
+describe('주요기술 리포트 상세 (task#276 S5)', () => {
   it('전 섹션 렌더 — 헤더·업체 표·난제·시장 규모·출처', async () => {
     api.get.mockImplementation((url) =>
       url === '/api/tech-reports/reusable-rocket'
@@ -272,7 +272,7 @@ describe('선도기술 리포트 상세 (task#276 S5)', () => {
 // ── task#281 (2/2) — 예약 자리에 신규 3섹션 배선 ─────────────────────────────
 // 세 섹션 모두 **선택 필드 의존**이라 라이브 발행물 2건(smr·reusable-rocket)에는 데이터가 없다.
 // 그러므로 "있으면 렌더"보다 "없으면 화면이 이전과 완전히 동일"이 더 중요한 완료기준이다.
-describe('선도기술 리포트 상세 — 핵심 포인트·진척 타임라인·계보 분류 (task#281)', () => {
+describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라인·계보 분류 (task#281)', () => {
   it('세 필드가 다 있는 판 — 세 섹션이 확정 순서대로 렌더', async () => {
     mockReport(FULL_REPORT)
     const { container } = renderAt('smr')
@@ -372,7 +372,7 @@ describe('선도기술 리포트 상세 — 핵심 포인트·진척 타임라�
 // `[data-tech-section]`은 **상위 섹션 전용**이라 필터가 필요 없다 — 산문 소제목은 `data-tech-anchor`를
 // 쓴다(처음엔 두 곳이 같은 속성을 재사용해 소비처마다 11-id 리터럴로 걸러야 했고, 그 목록이 이 파일·
 // 페이지·프로브 3곳에 바이트 동일로 복제됐다. 섹션을 늘릴 때 한 곳만 고치는 재발 경로라 속성을 갈랐다).
-describe('선도기술 리포트 상세 — 전역 목차 (task#296 S4)', () => {
+describe('주요기술 리포트 상세 — 전역 목차 (task#296 S4)', () => {
   // 구발행물(REPORT)·전 필드(FULL_REPORT) 쌍 — 완료기준 "섹션이 조건부로 사라지면 칩도 사라진다"를
   // 두 형태로 함께 잰다. 라벨·순서는 기존 titlesOf 단언(줄 229-230·279-280)과 바이트 동일해야 한다
   // (목차와 본문 SectionTitle이 같은 SECTIONS 배열에서 파생하므로 어긋나면 둘 중 하나가 잘못됐다는 뜻).
@@ -467,7 +467,7 @@ const WATCH_ITEMS = [
 ]
 const FULL_WITH_BOTH = { ...FULL_REPORT, variants: VARIANTS, watch_items: WATCH_ITEMS }
 
-describe('선도기술 리포트 상세 — 계열 비교 (task#298 S4)', () => {
+describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => {
   it('계보 분류 바로 앞에 삽입 — 형제 제목과의 DOM 순서 + 확정 순서 배열', async () => {
     mockReport(FULL_WITH_VARIANTS)
     const { container } = renderAt('smr')

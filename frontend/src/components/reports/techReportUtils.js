@@ -1,15 +1,17 @@
-// 선도기술 리포트(ADR-0033, task#276) 프론트 순수 헬퍼 — TechReports.jsx·TechReport.jsx가 쓰고,
-// 2/2(task#277) 차트·관계도도 이 모듈에서 가져다 쓴다. formatMarketSize는 이름에 입력 단위를
-// 지닌다(ADR-0031) — currency/unit을 그대로 표시하고 절대 환산하지 않는다(수주잔고 ×100 오저장 계열
-// 단위함정 원천차단, ADR-0033 결정 3).
+// 주요기술 리포트(ADR-0033, task#276, 개명·저장모델 ADR-0038) 프론트 순수 헬퍼 —
+// TechReports.jsx·TechReport.jsx가 쓰고, 2/2(task#277) 차트·관계도도 이 모듈에서 가져다 쓴다.
+// formatMarketSize는 이름에 입력 단위를 지닌다(ADR-0031) — currency/unit을 그대로 표시하고 절대
+// 환산하지 않는다(수주잔고 ×100 오저장 계열 단위함정 원천차단, ADR-0033 결정 3).
 
 // 백엔드 TECH_TOPICS(services/tech_reports.py)의 표시명 미러 — 그 상수는 slug 검증에만 쓰이고
-// API 응답에 노출되지 않는다(ADR-0033 결정 2). slug를 늘리면 백엔드 TECH_TOPICS와 함께 갱신할 것.
+// API 응답에 노출되지 않는다(ADR-0033 결정 2). dual-source — slug를 늘리면 백엔드 TECH_TOPICS와
+// 함께 갱신할 것(한쪽만 고치면 목록 카드 소제목이 slug 원문으로 뜬다).
 export const TECH_NAMES = {
   'reusable-rocket': '재사용 로켓',
   'solid-state-battery': '전고체 배터리',
   smr: 'SMR',
   robotics: '로봇',
+  'data-center': '데이터 센터',
 }
 
 // 기술 성숙 단계 공통 5단계 라벨(CONTEXT.md) — index = tech_level(1~5). 0번은 미사용(placeholder).
