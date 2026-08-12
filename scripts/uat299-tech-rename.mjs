@@ -146,6 +146,15 @@ const measureDetail = (page) => page.evaluate(([ROOT_SEL]) => {
   const lead = root.querySelector('[data-testid="tech-report-lead"]');
   if (!h1 && !lead) return { found: false, why: 'HEADER_MISSING' };
   const dateMatches = [...(root.textContent.match(/\d{4}-\d{2}-\d{2}\s*(갱신|발행)/g) || [])];
+  // headerStamp — 도장 축을 *그 요소*에 묶는다. root.textContent 전역 매치만 쓰면 리포트 데이터가
+  // 담은 「(2026-07-13 갱신)」류 문자열(sources 제목·market.as_of에 루틴이 출처 갱신일을 적는다,
+  // reusable-rocket 실측 2건)로도 통과하므로, 헤더 도장이 통째로 사라져도 red가 안 난다
+  // (판정축이 대상과 독립이면 틀린 대상 위에서도 PASS한다 — CLAUDE.md 가토 ⑧ⓘ).
+  const stampEl = h1 && h1.parentElement
+    ? [...h1.parentElement.querySelectorAll('*')].find(
+        (el) => el.children.length === 0 && /^\d{4}-\d{2}-\d{2}\s*(갱신|발행)$/.test(el.textContent.trim()))
+    : null;
+  const headerStamp = stampEl ? stampEl.textContent.trim() : null;
   const isSrOnly = (el) => !!el.closest('.sr-only');
   const isHandled = (el) => {
     const cs = getComputedStyle(el);
@@ -164,7 +173,7 @@ const measureDetail = (page) => page.evaluate(([ROOT_SEL]) => {
     found: true,
     h1Text: h1 ? h1.textContent.trim() : null,
     leadText: lead ? lead.textContent.trim() : null,
-    dateMatches,
+    dateMatches, headerStamp,
     leafDomain: leafCandidates.length, leafOver,
     hiddenDomain: hiddenCandidates.length, hiddenOver,
     docScrollW: document.documentElement.scrollWidth, docClientW: document.documentElement.clientWidth,
@@ -297,7 +306,11 @@ for (const V of VIEWS) {
         `matches=${JSON.stringify(m.dateMatches)}`);
       const staleStamps = m.dateMatches.filter((s) => s.includes('발행'));
       eq(`date-stamp-updated:${tag}`, staleStamps, [], `「발행」 도장 0건이어야 한다 · 전체=${JSON.stringify(m.dateMatches)}`);
-      bump('date-stamp', 2 + m.dateMatches.length);
+      // 헤더 도장 자체를 API published_date와 exact 대조 — 위 두 축은 root 전역 매치라
+      // 리포트 데이터의 「… 갱신」 문자열로도 통과한다(그 느슨함을 이 축이 막는다, 가토 ⑧ⓘ).
+      eq(`date-stamp-header:${tag}`, m.headerStamp ?? 'HEADER_STAMP_MISSING', `${rep.published_date} 갱신`,
+        `헤더 도장 = API published_date + 「갱신」`);
+      bump('date-stamp', 3 + m.dateMatches.length);
 
       // (6) page-h-scroll (detail)
       eq(`page-h-scroll:${tag}`, m.docScrollW <= m.docClientW + 1 ? 'OK' : `HSCROLL(${m.docScrollW}>${m.docClientW})`, 'OK');
