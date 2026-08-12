@@ -420,6 +420,150 @@ def test_publish_estimates_nan_value_rejected_422():
         main_app.dependency_overrides.pop(require_admin_or_api_key, None)
 
 
+# ── 계보 비교축·관찰 체크리스트(task#296 S1) ──────────────────────────
+
+VARIANTS = [
+    {"axis_label": "노형", "options": [
+        {"name": "경수형", "examples": ["중국 ACP100 125MWe"],
+         "strength": "검증된 기술 기반", "tradeoff": "노심 손상 시 냉각수 필요"},
+        {"name": "고온가스형", "examples": ["중국 HTR-PM"],
+         "strength": "고온 열 공급 가능", "tradeoff": "흑연 감속재 관리 부담"},
+    ]},
+    {"axis_label": "회수 방식", "options": [
+        {"name": "추진 수직착륙", "examples": ["SpaceX Falcon 9"],
+         "strength": "재사용 실적 최다", "tradeoff": "연료 소모가 크다"},
+        {"name": "낙하산+그물", "examples": ["Rocket Lab Electron"],
+         "strength": "연료가 불필요", "tradeoff": "회수 신뢰성이 낮다"},
+    ]},
+]
+WATCH_ITEMS = [
+    {"label": "링룽 1호 계통연결이 IAEA에 등재되는가",
+     "detail": "IAEA PRIS 등재는 상업운전 근접의 공인 신호다.",
+     "not_signal": "언론 보도만으로는 진척 신호가 아니다"},
+    {"label": "차세대 SMR 실증 착공", "detail": None, "not_signal": None},
+]
+
+
+def test_publish_with_variants_watch_items_201():
+    """ⓐ 두 필드를 담은 정상 body → 201, 저장 payload에 그대로 실린다."""
+    body = copy.deepcopy(VALID_BODY)
+    body["variants"] = copy.deepcopy(VARIANTS)
+    body["watch_items"] = copy.deepcopy(WATCH_ITEMS)
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 201, resp.text
+    payload = mock_save.call_args.args[1]
+    assert len(payload["variants"]) == 2
+    assert payload["variants"][0]["axis_label"] == "노형"
+    assert payload["variants"][0]["options"][0]["name"] == "경수형"
+    assert payload["variants"][0]["options"][0]["examples"] == ["중국 ACP100 125MWe"]
+    assert len(payload["watch_items"]) == 2
+    assert payload["watch_items"][0]["label"] == WATCH_ITEMS[0]["label"]
+    assert payload["watch_items"][1]["detail"] is None
+
+
+def test_publish_variants_watch_items_omitted_and_explicit_null_201():
+    """ⓑ 키 생략과 명시적 null 둘 다 201·None(task#250 함정의 핀 — Optional[List[...]]여야 통과)."""
+    # 생략(=구발행물 형태 body, ⓔ 회귀 0)
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/smr", json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 201
+    payload = mock_save.call_args.args[1]
+    assert payload["variants"] is None
+    assert payload["watch_items"] is None
+    # 명시적 null
+    body = copy.deepcopy(VALID_BODY)
+    body["variants"] = None
+    body["watch_items"] = None
+    with patch.object(svc, "save_report") as mock_save2:
+        resp2 = client.post("/api/tech-reports/smr", json=body)
+    assert resp2.status_code == 201, resp2.text
+    payload2 = mock_save2.call_args.args[1]
+    assert payload2["variants"] is None
+    assert payload2["watch_items"] is None
+
+
+def test_publish_variants_watch_items_violations_422():
+    """ⓒⓓ 구조 위반 8케이스 → 422, detail[].loc이 그 필드를 가리킨다.
+
+    ⚠️ 옵션 픽스처에 `strength`를 넣는 것은 장식이 아니다 — `VariantOption._has_comparison_content`가
+    이점·대가 둘 다 결측인 옵션을 422로 막으므로(적대 리뷰 렌즈1 #2), 그것 없이 만든 픽스처는 각
+    케이스가 **의도한 필드가 아니라 그 부수 에러로** 422를 받아 단언이 격리되지 않는다."""
+    two_opts = [{"name": "경수형", "strength": "s"}, {"name": "고온가스형", "strength": "s"}]
+    cases = [
+        ("axis_label 누락", {"variants": [{"options": two_opts}]}, "axis_label"),
+        ("options 1개", {"variants": [{"axis_label": "노형", "options": [{"name": "경수형", "strength": "s"}]}]}, "options"),
+        ("options 7개", {"variants": [{"axis_label": "노형",
+                                       "options": [{"name": f"opt{i}", "strength": "s"} for i in range(7)]}]}, "options"),
+        ("variants 3축", {"variants": [{"axis_label": f"축{i}", "options": two_opts} for i in range(3)]},
+         "variants"),
+        ("name 빈 문자열", {"variants": [{"axis_label": "노형", "options": [{"name": "", "strength": "s"}, {"name": "b", "strength": "s"}]}]},
+         "name"),
+        ("watch_items label 61자", {"watch_items": [{"label": "가" * 61}]}, "label"),
+        ("watch_items detail 201자", {"watch_items": [{"label": "l", "detail": "가" * 201}]}, "detail"),
+        ("options[0].examples 7개", {"variants": [{"axis_label": "노형", "options": [
+            {"name": "경수형", "strength": "s", "examples": [f"e{i}" for i in range(7)]}, {"name": "b", "strength": "s"}]}]}, "examples"),
+    ]
+    for name, patch_fields, expected_field in cases:
+        body = copy.deepcopy(VALID_BODY)
+        body.update(patch_fields)
+        with patch.object(svc, "save_report") as mock_save:
+            resp = client.post("/api/tech-reports/smr", json=body)
+        assert resp.status_code == 422, f"{name} → {resp.status_code}: {resp.text}"
+        locs = [str(x) for err in resp.json()["detail"] for x in err["loc"]]
+        assert expected_field in locs, f"{name}: loc={locs}"
+        mock_save.assert_not_called()
+
+
+def test_publish_variants_duplicate_and_empty_comparison_422():
+    """적대적 리뷰 렌즈1 #1·#2 회귀 — 검증을 통과하면서 **의미가 깨지는** 입력 3종.
+
+    세 케이스 모두 이 validator들이 없을 때 **201로 통과했다**(리뷰가 TestClient로 직접 재현,
+    `save_report` mock으로 무쓰기 확인). 즉 이 테스트의 red 근거는 리뷰의 재현이다.
+      · options name 중복  → 2of2 비교표에 같은 이름의 행이 두 번 나와 서로 다른 두 계열로 읽힌다
+      · axis_label 중복    → 축마다 표+소제목을 렌더하므로 같은 제목의 표가 나란히 두 개 뜬다
+      · strength·tradeoff 둘 다 결측 → 행이 이름만 남아 「비교가 아니라 서술」이 된다
+        (축 수준의 min_length=2가 막으려던 상태를 행 수준으로 내린 것)"""
+    ok = {"name": "경수형", "strength": "검증된 기술 기반"}
+    cases = [
+        ("options name 중복",
+         {"variants": [{"axis_label": "노형", "options": [dict(ok), dict(ok)]}]}, "name"),
+        ("axis_label 중복",
+         {"variants": [{"axis_label": "노형", "options": [dict(ok), {"name": "b", "strength": "s"}]},
+                       {"axis_label": "노형", "options": [{"name": "c", "strength": "s"},
+                                                          {"name": "d", "strength": "s"}]}]}, "axis_label"),
+        ("이점·대가 둘 다 결측",
+         {"variants": [{"axis_label": "노형", "options": [{"name": "경수형"},
+                                                          {"name": "b", "strength": "s"}]}]}, "strength"),
+    ]
+    for name, patch_fields, expected_word in cases:
+        body = copy.deepcopy(VALID_BODY)
+        body.update(patch_fields)
+        with patch.object(svc, "save_report") as mock_save:
+            resp = client.post("/api/tech-reports/smr", json=body)
+        assert resp.status_code == 422, f"{name} → {resp.status_code}: {resp.text}"
+        # 메시지·loc 어느 쪽이든 그 필드를 가리켜야 한다(validator는 loc이 모델 단위로 나온다)
+        assert expected_word in resp.text, f"{name}: {resp.text}"
+        mock_save.assert_not_called()
+
+
+def test_publish_variant_option_one_side_only_201():
+    """이점·대가 중 **하나만** 있으면 통과한다 — 「최소 하나」이고 둘 다 요구하지 않는다.
+
+    이 단언이 없으면 다음 사람이 `_has_comparison_content`를 "쌍 강제"로 조여도 아무 테스트가
+    막지 않는다. 둘 다 요구하면 한쪽만 아는 계열에서 **발행 전체가 422**로 막히는데, 그 대가가
+    이득보다 크다고 판단해 하한을 하나로 둔 것이다(루틴 프롬프트는 여전히 "쌍으로"를 지시한다)."""
+    for one_side in ({"strength": "이점만 안다"}, {"tradeoff": "대가만 안다"}):
+        body = copy.deepcopy(VALID_BODY)
+        opt_a = {"name": "경수형", **one_side}
+        body["variants"] = [{"axis_label": "노형",
+                             "options": [opt_a, {"name": "고온가스형", "strength": "s"}]}]
+        with patch.object(svc, "save_report") as mock_save:
+            resp = client.post("/api/tech-reports/smr", json=body)
+        assert resp.status_code == 201, f"{one_side} → {resp.status_code}: {resp.text}"
+        mock_save.assert_called_once()
+
+
 # ── 조회 API(추가) ────────────────────────────────────────────────────
 
 def test_list_by_slug():

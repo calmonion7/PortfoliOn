@@ -34,14 +34,16 @@ def save_report(slug: str, payload: dict) -> None:
     execute(
         """INSERT INTO tech_reports
                (slug, published_date, title, description, difficulty, players,
-                challenges, related, market, sources, key_points, milestones)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                challenges, related, market, sources, key_points, milestones,
+                variants, watch_items)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            ON CONFLICT (slug, published_date) DO UPDATE SET
                title = EXCLUDED.title, description = EXCLUDED.description,
                difficulty = EXCLUDED.difficulty, players = EXCLUDED.players,
                challenges = EXCLUDED.challenges, related = EXCLUDED.related,
                market = EXCLUDED.market, sources = EXCLUDED.sources,
                key_points = EXCLUDED.key_points, milestones = EXCLUDED.milestones,
+               variants = EXCLUDED.variants, watch_items = EXCLUDED.watch_items,
                created_at = NOW()""",
         (slug, payload["published_date"], payload["title"], payload.get("description", ""),
          json.dumps(payload.get("difficulty"), ensure_ascii=False),
@@ -50,10 +52,14 @@ def save_report(slug: str, payload: dict) -> None:
          json.dumps(payload.get("related", {}), ensure_ascii=False),
          json.dumps(payload.get("market", {}), ensure_ascii=False),
          json.dumps(payload.get("sources", []), ensure_ascii=False),
-         # 요약 레이어 2종은 nullable — 없으면 SQL NULL로 저장돼 조회 시 None으로 나온다
-         # (구 판과 같은 형태라 프론트가 섹션째 생략한다). 빈 배열은 NULL이 아니다(구분 유지).
+         # 요약 레이어 2종·계보 비교축·관찰 체크리스트는 전부 nullable — 없으면 SQL NULL로
+         # 저장돼 조회 시 None으로 나온다(구 판과 같은 형태라 프론트가 섹션째 생략한다).
+         # 빈 배열은 NULL이 아니다(구분 유지). json.dumps(None) 직행은 문자열 "null"이 되므로
+         # _json_or_null을 반드시 통과시킨다(task#281 F7).
          _json_or_null(payload.get("key_points")),
-         _json_or_null(payload.get("milestones"))),
+         _json_or_null(payload.get("milestones")),
+         _json_or_null(payload.get("variants")),
+         _json_or_null(payload.get("watch_items"))),
     )
 
 

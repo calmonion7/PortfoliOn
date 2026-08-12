@@ -43,13 +43,15 @@
 ### 선도기술 리포트 발행 (tech-reports)
 ```
 0. (조건 확인) GET /api/tech-reports  → **기술당 최신 1건**만 반환(대상 4종의 최신 발행일 판단용)
-1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·계보 분류·기관별 시장 추정치**)
+1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·계보 분류·기관별 시장 추정치·계보 비교축·확인할 지표**)
 2. POST /api/tech-reports/{slug}  → 발행
    - 종목 발행물과 달리 **서버가 자동 첨부하는 숫자가 없다** — 통화·단위·점유율·척도까지 전부 이 본문에 조사해 채운다
    - 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — 틀린 값보다 없는 값이 낫다)
    - 대상 4종 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
-   - **요약 레이어 3필드는 산문이 아니라 구조 필드로 싣는다**(ADR-0034) — `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(계보 분류). 채우지 않으면 화면에서 그 섹션이 통째로 생략되므로, `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다
+   - **요약 레이어는 산문이 아니라 구조 필드로 싣는다**(ADR-0034, 아래 두 차례 개정 포함) — 지금 총 6필드: `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(계보 분류)·`market.estimates`(기관별 시장 추정치)·`variants`(계보 비교축)·`watch_items`(확인할 지표). 채우지 않으면 화면에서 그 섹션이 통째로 생략되므로, `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다
    - **기관별 시장 추정치(`market.estimates`, 선택·최대 6건, ADR-0034 개정)**는 조사기관마다 다르게 추정한 시장 규모를 나란히 보여준다 — 배열 내 `currency`·`unit`·`year`는 전부 같아야 하고(다르면 422), 성장 곡선(`market.history`/`forecast`)이 채택한 기관은 `is_basis: true`로 표시(최대 1건, 2건 이상이면 422)
+   - **계보 비교축(`variants`, 선택·최대 2축, ADR-0034 개정)**은 한 기술이 갈라지는 접근 방식을 이점·대가 쌍으로 나란히 보여준다 — 축마다 선택지(`options`)가 **최소 2개**(1개는 비교가 아니라 서술이므로 축을 생략하고 산문에 쓸 것, 2개 미만이면 422)
+   - **확인할 지표(`watch_items`, 선택·최대 5건, ADR-0034 개정)**는 "앞으로 무엇이 관측되면 진척으로 인정하는가"를 미리 못 박는다 — 파일럿 준공·샘플 공개 같은 *일정 유지 신호*를 진척으로 오독하지 않도록 항목마다 `not_signal`(이건 신호가 아니다)을 본문과 분리해 적을 것
 ```
 
 ---
@@ -728,6 +730,18 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
     { "year": 2015, "actor": "SpaceX", "event": "1단 지상 회수 성공", "status": "done" },
     { "year": 2026, "actor": "SpaceX", "event": "Starship 궤도 재사용 실증", "status": "in_progress" },
     { "year": 2030, "actor": null, "event": "완전 재사용 상업 운용", "status": "planned" }
+  ],
+  "variants": [
+    { "axis_label": "회수 방식",
+      "options": [
+        { "name": "추진 수직착륙", "examples": ["SpaceX Falcon 9"], "strength": "정밀 착지, 재정비가 빠르다.", "tradeoff": "역분사 추진제만큼 탑재량이 줄어든다." },
+        { "name": "그물 포획", "examples": ["Rocket Lab Electron"], "strength": "소형기체에 추진제 손실이 없다.", "tradeoff": "포획 성공률이 낮고 대형기체엔 부적합." }
+      ] }
+  ],
+  "watch_items": [
+    { "label": "같은 1단 기체의 회전율(재사용 횟수/년)이 늘어나는가",
+      "detail": "정비 없이 재발사까지 걸리는 시간이 짧아져야 단가가 실제로 내려간다.",
+      "not_signal": "발사 횟수 자체의 증가는 신규 기체 생산 확대일 수도 있어 회전율과 다르다." }
   ]
 }
 ```
@@ -757,11 +771,15 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `key_points[].metrics[]` | array | | 지표 칩 **최대 4개**(초과 시 422). `{label: ≤40자, value: ≤40자, change_pct?}`. `value`는 **표시용 문자열**("1.1조원"·"22%"·"134회") — 단위·통화를 문자열에 그대로 쓴다. `change_pct`만 숫자(양수=상승 색·음수=하락 색), 증감이 없으면 생략 |
 | `milestones` | array\|생략 | | **진척 타임라인** `{year, actor?, event, status}` — "언제 무엇이 가동/착공/실증됐나"를 산문에 묻지 말고 여기에 싣는다. `year`는 정수, `event`는 그 해에 무슨 일이 있었는지 한 구절, `actor`는 주체(국가·기업, 특정 주체가 없으면 생략) |
 | `milestones[].status` | enum | ✅ | `done`(이미 일어남) \| `in_progress`(진행 중) \| `planned`(계획·전망) **3값만** — 그 밖은 422. 구체 단계명("착공"·"계통연결")은 기술마다 다르므로 `event`가 담고, 색·마커는 이 3값이 정한다 |
+| `variants` | array\|생략 | | **계보 비교축**(ADR-0034 개정) 최대 2개 — 한 기술이 갈라지는 접근 방식들을 이점·대가 쌍으로 비교. `{axis_label: ≤30자, options}`. 축 이름은 자유 문자열(SMR "노형"·재사용 로켓 "회수 방식"·전고체 배터리 "고체 전해질 계열") — 이 기술에 그런 분류 축이 없으면 필드 자체를 생략한다 |
+| `variants[].options` | array | ✅ | 그 축의 선택지 **최소 2개·최대 6개** — 1개뿐이면 비교가 아니라 서술이므로 **그 축을 생략하고 산문에 쓸 것**(2개 미만이면 422). `{name: ≤40자, examples?: ≤6개 문자열, strength?: ≤120자, tradeoff?: ≤120자}`. `strength`/`tradeoff`는 반드시 **쌍으로** — 어느 계열이 우월하다는 순위를 매기지 말고 이점과 대가를 함께 적는다 |
+| `watch_items` | array\|생략 | | **확인할 지표**(ADR-0034 개정) 최대 5개 — "앞으로 무엇이 관측되면 이 기술의 진척으로 인정하는가"를 미리 못 박은 판정 신호. `{label: ≤60자, detail?: ≤200자, not_signal?: ≤200자}` |
+| `watch_items[].not_signal` | string\|생략 | | **오독 경고** — 파일럿 라인 준공·샘플 공개·양산 목표 재확인처럼 *일정이 유지된다*는 신호일 뿐 진척이 아닌 것을 명시. 해당 지표에 그런 오독 위험이 없으면 생략 가능하지만, 있으면 반드시 `label`/`detail`과 **분리해서** 적을 것(한 문장에 섞지 말 것) |
 
 **통화·단위 enum(필수, 자유 텍스트·환산 금지)** — `currency`: `USD` \| `KRW`. `unit`: `mn`(백만) \| `bn`(십억) \| `tn`(조). 렌더러가 절대 추측·환산하지 않으므로 enum 밖 값은 `422`.
 
-> **문자열 수치는 요약 칩에만** — `key_points[].metrics[].value`가 표시용 문자열인 것은 그 칩이 **그래프를 그리지 않기 때문**이다(ADR-0034). 차트를 그리는 수치(`market` 금액 — `history`·`forecast`·`estimates[].size` 전부 포함·`milestones[].year`·`tech_level`·`share_pct`)는 **절대 문자열로 쓰지 말 것** — 구조 데이터여야 곡선·축·밴드를 그릴 수 있다(ADR-0033). `market.estimates[].scope`만 예외(자유 텍스트) — 그건 그 기관의 집계 범위를 설명하는 요약 칩이지 그래프 좌표가 아니다.
-> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates` 네 필드는 전부 선택이다. 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(화면이 그 섹션째 생략한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
+> **문자열 수치는 요약 칩에만** — `key_points[].metrics[].value`가 표시용 문자열인 것은 그 칩이 **그래프를 그리지 않기 때문**이다(ADR-0034). 차트를 그리는 수치(`market` 금액 — `history`·`forecast`·`estimates[].size` 전부 포함·`milestones[].year`·`tech_level`·`share_pct`)는 **절대 문자열로 쓰지 말 것** — 구조 데이터여야 곡선·축·밴드를 그릴 수 있다(ADR-0033). `market.estimates[].scope`·`variants[].options[].examples/strength/tradeoff`는 예외(자유 텍스트) — 어느 것도 좌표를 계산하지 않는 순수 요약 칩이다.
+> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates`·`variants`·`watch_items` 여섯 필드는 전부 선택이다. 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(화면이 그 섹션째 생략한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
 
 > **기술수준 vs 기술난이도 vs 기술격차** — 세 축을 섞지 마세요. `players[].tech_level`은 *그 업체가* 지금 어느 단계인지, `difficulty`는 *그 기술 자체가* 얼마나 어려운지(기술 단위 필드 하나, 업체별이 아님), `gap_years`는 *선두 대비 몇 년 뒤인지*입니다.
 > **상용 시장이 아직 형성되지 않은 기술**(예: SMR·재사용 로켓 일부 세그먼트)은 점유율 근거를 댈 수 없으면 `share_pct`를 생략하세요(업체 표는 그대로, 점유율 칸만 빔).
@@ -776,7 +794,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | 상태 | 설명 |
 |------|------|
 | `401` | API Key 누락/불일치 |
-| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 |
+| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 |
 
 ---
 

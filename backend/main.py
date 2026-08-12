@@ -264,6 +264,12 @@ def _migrate():
         execute("ALTER TABLE tech_reports ADD COLUMN IF NOT EXISTS milestones JSONB")
     except Exception as e:
         logger.warning(f"[Migrate] tech_reports 요약 레이어 컬럼 추가 실패: {e}")
+    try:
+        from services.db import execute
+        execute("ALTER TABLE tech_reports ADD COLUMN IF NOT EXISTS variants JSONB")
+        execute("ALTER TABLE tech_reports ADD COLUMN IF NOT EXISTS watch_items JSONB")
+    except Exception as e:
+        logger.warning(f"[Migrate] tech_reports 계보축·체크리스트 컬럼 추가 실패: {e}")
 
 
 @asynccontextmanager

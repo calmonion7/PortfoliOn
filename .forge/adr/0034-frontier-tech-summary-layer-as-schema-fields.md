@@ -121,3 +121,45 @@ m350: 업체 열 181px → 4열 360px > 가용 278px). **`anywhere`**로 바꿔�
 `playerColumns(players)`의 share 판정은 `Number.isFinite(p.share_pct) && p.share_pct >= 0`이며, 같은
 페이지의 점유율 섹션 게이트·`ShareChart`의 채택 조건과 **문자 단위로 같다**. 갈리면 한 필드가 한
 페이지에서 두 얼굴을 갖는다(`share_pct === 0`은 결측이 아니라 값이다). gap 열은 `gap_years != null`.
+
+## Amendment (2026-08-12, task#297) — 다섯·여섯 번째 요약 필드: `variants[]`(계보 비교축)·`watch_items[]`(확인할 지표)
+
+`.forge/CONTEXT.md`의 [[기술 계열]]·[[확인할 지표]] 용어가 먼저 정의됐다 — 두 용어 모두 발행물 4종
+전수에서 확인된 축이라(SMR 노형·재사용 로켓 회수 방식·전고체 배터리 전해질 계열·로봇 기체 구성/형태,
+그리고 4종 모두의 진척 판정 신호), 이번에도 결정 2("세 필드는 전부 선택")·결정 5(`Optional[X] =
+Field(None)` 예외 없음)의 연장으로 스키마에 편입한다. 새 판단 4가지:
+
+**① `variants`·`watch_items`는 `market.estimates`와 달리 최상위 컬럼 후보다 — Amendment(2026-08-04)
+①의 기준을 그대로 적용한 결과다.** 그 기준은 "시장의 하위 사실이냐"였다 — `estimates`는 `market`(시장
+규모)의 부분집합이라 그 JSONB 안에 자연히 속했다. `variants`(계보 비교)와 `watch_items`(진척 판정
+신호)는 시장 규모의 하위 사실이 아니라 `key_points`·`milestones`·`players[].category`와 동렬로
+**기술 전체**에 걸리는 독립 개념이므로, 같은 기준으로 최상위 컬럼(`app_schema.sql` + `main._migrate`의
+`ADD COLUMN IF NOT EXISTS` + `save_report`의 INSERT 컬럼·VALUES·`ON CONFLICT DO UPDATE SET` 세 곳을
+쌍으로 유지)이 맞다. 이 amendment는 스키마(pydantic 모델)만 확정한다 — 세 표면의 배선은 별도 슬라이스
+소관이며, 이 ADR은 그 배선이 **어떤 모양이어야 하는지**를 못박아 둔다.
+
+**② `variants[].options[].examples`가 `{value, currency, unit}` 구조 데이터가 아니라 표시 문자열인
+것은 결정 3의 경계를 그대로 적용한 결과다 — 새 예외가 아니다.** 결정 3의 판정 기준은 "문자열이냐"가
+아니라 **"이 값으로 무엇을 그리는가"**다. `examples`(`"중국 ACP100 125MWe"`)·`strength`·`tradeoff`는
+어느 것도 축·막대·곡선 좌표를 만들지 않는다 — 비교표의 셀에 그대로 표시되는 서술이다. 구조 데이터로
+받으면(예: 각 example을 `{country, model, capacity_mw}`로 분해) 얻는 것이 없다 — 렌더러가 그 수치로
+계산하는 것이 아무것도 없고, 오히려 계보마다 그 셀에 실을 수 있는 정보의 형태가 다르다(노형은 정격
+출력, 회수 방식은 성공률, 전해질 계열은 이온전도도 — 공통 구조를 강제하면 표현 가능한 정보가 줄어든다).
+`market.estimates[].scope`·`key_points[].metrics[].value`와 같은 부류다.
+
+**③ `variants[].options`의 `min_length=2`가 `422`인 것은 "완화하면 안전"이 아니라 "완화하면 이 필드의
+존재 이유가 사라진다"는 뜻이다.** 선택지 1개는 비교가 아니라 서술이고, 서술은 이미 `description`
+산문이 담당한다. 하한을 1로 낮추면 루틴이 축 이름만 채우고 선택지를 하나만 넣는 퇴화 입력이 통과해,
+화면의 "이점·대가 쌍" 비교 UI가 비교 대상이 하나뿐인 빈 표를 그린다 — `wrong < missing`이 아니라
+`empty-comparison < missing`인 사례다. 완화 유혹이 드는 지점은 "루틴이 어차피 2개를 채우니 하한이
+무의미하다"는 생각인데, 정확히 반대다 — **하한이 있어야 루틴 프롬프트가 "2개 미만이면 필드를 생략하고
+산문에 써라"를 지시로 강제할 수 있다**(422가 그 지시의 이행을 발행 시점에 검증하는 것). 하한을 낮추면
+이 강제가 사라지고, 축은 있는데 비교가 안 되는 섹션이 화면에 남는다.
+
+**④ `axis_label`·`options[].name`의 상한(30자·40자)과 `strength`/`tradeoff`/`detail`/`not_signal`의
+상한(120자·200자)은 결정 3의 근거 문단이 이미 설명한 것과 같은 이유다 — 이 필드들은 2of2에서 2열
+비교표의 셀·체크리스트 카드에 들어간다. 상한이 없으면 모바일 278px 폭에서 한 셀이 수십 줄로 폭발한다
+(`.forge/CONTEXT.md`가 이미 이 사실을 배경으로 깔고 "축 최대 2 · 축마다 계열 2개 이상"을 서술해 뒀다 —
+그 상한들이 여기서 숫자로 확정된다). `watch_items[].not_signal`이 `label`/`detail`과 별개 필드로
+분리된 것도 같은 근거의 다른 얼굴이다 — 한 문장에 신호와 오독 경고를 섞으면(가토 "한 문장이 두 역할을
+겸하지 않게 쪼갠다") 화면이 그 둘을 시각적으로 분리해 보여줄 수 없다.

@@ -108,6 +108,57 @@ def test_save_report_new_fields_explicit_none_also_stores_sql_null():
     assert json.loads(params2[11]) == []          # 빈 배열은 NULL이 아니다(구분 유지)
 
 
+def test_save_report_persists_variants_and_watch_items():
+    """신규 컬럼 2개(variants·watch_items)도 세 곳(INSERT 컬럼 목록·VALUES 자리표시자·
+    DO UPDATE SET) 전부에 실려야 한다 — key_points·milestones와 동일 패턴(task#296)."""
+    payload = dict(PAYLOAD)
+    payload["variants"] = [{
+        "axis_label": "노형",
+        "options": [
+            {"name": "경수형", "examples": ["중국 ACP100"], "strength": "s", "tradeoff": "t"},
+            {"name": "중수형", "examples": None, "strength": None, "tradeoff": None},
+        ],
+    }]
+    payload["watch_items"] = [{"label": "계통연결 여부", "detail": "d", "not_signal": "n"}]
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", payload)
+    sql, params = mock_exec.call_args.args
+    head = sql.split("VALUES")[0]
+    for col in ("variants", "watch_items"):
+        assert col in head, f"INSERT 컬럼 목록에 {col} 누락"
+        assert f"{col} = EXCLUDED.{col}" in sql, f"DO UPDATE SET에 {col} 누락"
+    assert sql.count("%s") == len(params)   # VALUES 자리표시자 ↔ 파라미터 개수 일치
+    assert len(params) == 14                # 12 → 14 (task#296)
+    assert json.loads(params[12]) == payload["variants"]
+    assert json.loads(params[13]) == payload["watch_items"]
+
+
+def test_save_report_variants_watch_items_absent_stores_sql_null():
+    """부재 시 SQL NULL(파이썬 None) — 문자열 'null' 금지(`_json_or_null`, task#281 F7과 동일 가드)."""
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", PAYLOAD)
+    _, params = mock_exec.call_args.args
+    assert len(params) == 14
+    assert params[12] is None, "variants 부재는 SQL NULL이어야 한다(문자열 'null' 금지)"
+    assert params[13] is None, "watch_items 부재는 SQL NULL이어야 한다(문자열 'null' 금지)"
+
+
+def test_save_report_variants_watch_items_explicit_none_also_stores_sql_null():
+    """키가 있고 값이 None인 판(pydantic Optional 기본값 경로)도 같은 SQL NULL로 간다."""
+    payload = dict(PAYLOAD, variants=None, watch_items=None)
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", payload)
+    _, params = mock_exec.call_args.args
+    assert params[12] is None and params[13] is None
+    # 값이 있으면 여전히 JSON 문자열이다(가드가 정상 경로를 삼키지 않는다는 이빨 단언)
+    payload2 = dict(PAYLOAD, variants=[], watch_items=[])
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", payload2)
+    _, params2 = mock_exec.call_args.args
+    assert json.loads(params2[12]) == []
+    assert json.loads(params2[13]) == []
+
+
 def test_latest_all_uses_distinct_on_slug():
     with patch.object(svc, "query", return_value=[{"slug": "smr"}]) as mock_q:
         rows = svc.latest_all()

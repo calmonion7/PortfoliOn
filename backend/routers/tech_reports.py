@@ -130,6 +130,49 @@ class Milestone(BaseModel):
     status: Literal["done", "in_progress", "planned"]
 
 
+class VariantOption(BaseModel):
+    """계보 비교축의 선택지 1개 — "경수형"·"추진 수직착륙"·"황화물계" 등."""
+    name: str = Field(..., min_length=1, max_length=40)
+    examples: Optional[List[str]] = Field(None, max_length=6)  # 표시 문자열 — "중국 ACP100 125MWe"
+    strength: Optional[str] = Field(None, max_length=120)  # 이점 1문장
+    tradeoff: Optional[str] = Field(None, max_length=120)  # 대가 1문장
+
+    @model_validator(mode="after")
+    def _has_comparison_content(self):
+        """이점·대가 중 **최소 하나**는 있어야 한다(적대 리뷰 렌즈1 #2).
+        둘 다 결측이면 2of2의 2열 비교표에서 그 행이 이름만 남아 「비교가 아니라 서술」이 되는데,
+        그건 axis의 min_length=2가 축 수준에서 막으려던 바로 그 상태다(같은 의도를 행 수준으로 내림).
+        **둘 다 요구하지는 않는다** — 루틴이 한쪽만 아는 계열이 실제로 있고, 그때 발행 전체를 422로
+        막는 것은 대가가 이득보다 크다(프롬프트는 여전히 "쌍으로"를 지시한다)."""
+        if self.strength is None and self.tradeoff is None:
+            raise ValueError("variants 옵션은 strength·tradeoff 중 최소 하나가 필요합니다")
+        return self
+
+
+class VariantAxis(BaseModel):
+    """계보 비교축 1개 — "노형"·"회수 방식"·"고체 전해질 계열" 등. 선택지가 1개면 비교가 아니라
+    서술이므로 min_length=2(루틴 프롬프트가 "2개 미만이면 필드를 생략하고 산문에 써라"를 지시)."""
+    axis_label: str = Field(..., min_length=1, max_length=30)
+    options: List[VariantOption] = Field(..., min_length=2, max_length=6)
+
+    @model_validator(mode="after")
+    def _option_names_unique(self):
+        """한 축 안에서 계열명은 유일해야 한다(적대 리뷰 렌즈1 #1).
+        중복이면 2of2 비교표에 같은 이름의 행이 두 번 나와 독자가 서로 다른 두 계열로 읽는다.
+        형제 `Market._estimates_consistency`(is_basis 중복 방어)와 같은 성질의 검증이다."""
+        names = [o.name for o in self.options]
+        if len(set(names)) != len(names):
+            raise ValueError("variants 축의 options name은 서로 달라야 합니다")
+        return self
+
+
+class WatchItem(BaseModel):
+    """관찰 체크리스트 항목 — 진척 판단의 구체적 관측 대상."""
+    label: str = Field(..., min_length=1, max_length=60)
+    detail: Optional[str] = Field(None, max_length=200)
+    not_signal: Optional[str] = Field(None, max_length=200)  # "이건 진척 신호가 아니다"
+
+
 class Difficulty(BaseModel):
     score: int = Field(..., ge=1, le=5)
     rationale: str = Field(..., min_length=1)
@@ -154,6 +197,10 @@ class TechReportIn(BaseModel):
     # Optional 필수: 루틴이 "없음"을 명시적 null로 표현해도 발행 전체가 422로 죽지 않아야 한다.
     key_points: Optional[List[KeyPoint]] = Field(None)
     milestones: Optional[List[Milestone]] = Field(None)
+    # 계보 비교축·관찰 체크리스트(선택·additive, task#296). Optional 필수(task#250 함정) —
+    # 루틴이 "없음"을 명시적 null로 표현해도 발행 전체가 422로 죽지 않아야 한다.
+    variants: Optional[List[VariantAxis]] = Field(None, max_length=2)
+    watch_items: Optional[List[WatchItem]] = Field(None, max_length=5)
 
     @field_validator("published_date")
     @classmethod
@@ -174,6 +221,19 @@ class TechReportIn(BaseModel):
         그 수치가 해석 가능하다(ADR-0033 결정 3)."""
         if any(p.share_pct is not None for p in self.players) and self.market.share_basis is None:
             raise ValueError("share_pct가 있으면 market.share_basis가 필요합니다")
+        return self
+
+    @model_validator(mode="after")
+    def _variant_axis_labels_unique(self):
+        """축 라벨은 서로 달라야 한다(적대 리뷰 렌즈1 #1). 상한이 2축이라 중복은 곧 "같은 축을
+        두 번 그린다"는 뜻이고, 2of2는 축마다 표 1개 + 소제목 1개를 렌더하므로 같은 제목의 표가
+        나란히 두 개 뜬다. 원소가 1개 이하면 집합 크기가 1 이하라 자연히 통과한다
+        (형제 `Market._estimates_consistency`와 같은 관례)."""
+        if not self.variants:
+            return self
+        labels = [a.axis_label for a in self.variants]
+        if len(set(labels)) != len(labels):
+            raise ValueError("variants의 axis_label은 서로 달라야 합니다")
         return self
 
 

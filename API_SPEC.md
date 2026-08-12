@@ -2326,6 +2326,18 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     { "year": 2015, "actor": "SpaceX", "event": "1단 지상 회수 성공", "status": "done" },
     { "year": 2026, "actor": "SpaceX", "event": "Starship 궤도 재사용 실증", "status": "in_progress" },
     { "year": 2030, "actor": null, "event": "완전 재사용 상업 운용", "status": "planned" }
+  ],
+  "variants": [
+    { "axis_label": "회수 방식",
+      "options": [
+        { "name": "추진 수직착륙", "examples": ["SpaceX Falcon 9"], "strength": "정밀 착지, 재정비가 빠르다.", "tradeoff": "역분사 추진제만큼 탑재량이 줄어든다." },
+        { "name": "그물 포획", "examples": ["Rocket Lab Electron"], "strength": "소형기체에 추진제 손실이 없다.", "tradeoff": "포획 성공률이 낮고 대형기체엔 부적합." }
+      ] }
+  ],
+  "watch_items": [
+    { "label": "같은 1단 기체의 회전율(재사용 횟수/년)이 늘어나는가",
+      "detail": "정비 없이 재발사까지 걸리는 시간이 짧아져야 단가가 실제로 내려간다.",
+      "not_signal": "발사 횟수 자체의 증가는 신규 기체 생산 확대일 수도 있어 회전율과 다르다." }
   ]
 }
 ```
@@ -2345,21 +2357,24 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `sources` | array | ✅ | 출처 `{title, url?}` **최소 1개** |
 | `key_points` | array\|생략 | | 핵심 포인트 카드 `{title, body, metrics?}` — `metrics`는 **최대 4개**(초과 시 `422`)이고 각 항목은 `{label: ≤40자, value: ≤40자, change_pct?}`. `value`는 **표시용 문자열**("1.1조원"·"22%")이고 `change_pct`만 숫자(양수=상승·음수=하락 색, `0`도 유효값이라 무표기와 다르다). 그래프를 그리는 수치가 아니므로 문자열이다(ADR-0034) |
 | `milestones` | array\|생략 | | 진척 타임라인 `{year: int, actor?, event, status}` — `status`는 `done` \| `in_progress` \| `planned` **3값 enum**(그 밖은 `422`). 구체 단계명은 기술마다 다르므로 `event` 자유 문자열이 담고 색·마커는 이 enum이 정한다 |
+| `variants` | array\|생략 | | 계보 비교축(ADR-0034 개정, task#296) **최대 2개**(초과 시 `422`) — `{axis_label: ≤30자, options}`. 축의 이름은 기술마다 다른 자유 문자열("노형"·"회수 방식"·"고체 전해질 계열") |
+| `variants[].options` | array | ✅ | 그 축의 선택지 **최소 2개·최대 6개**(1개 이하면 `422` — 비교가 아니라 서술이므로 축 자체를 생략하고 산문에 쓸 것) — `{name: ≤40자, examples?: 문자열배열 ≤6개, strength?: ≤120자, tradeoff?: ≤120자}`. `examples`·`strength`·`tradeoff`는 전부 **표시용 문자열**(그래프를 그리지 않는다 — ADR-0034) |
+| `watch_items` | array\|생략 | | 관찰 체크리스트(ADR-0034 개정, task#296) **최대 5개**(초과 시 `422`) — `{label: ≤60자, detail?: ≤200자, not_signal?: ≤200자}`. `not_signal`은 "이건 진척 신호가 아니다"를 본문과 분리해 적는 표시용 문자열 |
 
-`value`(`MoneyValue` — `market.history`/`forecast`/`estimates[].size` 전부 포함)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones`·`market.estimates` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
+`value`(`MoneyValue` — `market.history`/`forecast`/`estimates[].size` 전부 포함)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones`·`market.estimates`·`variants`·`watch_items` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
 
 **Response `201`**
 ```json
 { "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
 ```
 
-**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락
+**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락
 
 ---
 
 각 조회 응답의 발행물 행(`report`)은 **발행 요청 필드 전체(위 표) + 서버 부여 필드 2개**로 구성된다 — `id`(내부 PK, 정렬·비교 용도 외 의미 없음)와 `created_at`(그 판이 저장·갱신된 시각, 재발행 시 갱신).
 
-⚠️ **선택 필드는 응답에서 `null`로 나온다 — 빈 배열이 아니다.** `key_points`·`milestones`를 담지 않고 발행한 판(2026-08-04 이전 전 판 포함)은 컬럼이 SQL NULL이라 `"key_points": null`·`"milestones": null`이고, `metrics`를 생략한 포인트도 `"metrics": null`이다. 소비자는 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `players[].category`는 그보다 앞서 발행된 판에는 **키 자체가 없다**(JSONB에 박제된 옛 형태 — `undefined`). `market.estimates`도 같은 함정이다 — 이 필드가 스키마에 생기기 **이전**에 발행된 판(2026-08-04 이전 전 판 포함)은 JSONB `market`에 이 키 자체가 없어(`undefined`, `players[].category`와 동일 케이스) `null`과 구분해야 한다. 반면 그 **이후** 발행된 판은 요청에서 생략해도 서버가 `"estimates": null`을 채워 저장하므로(다른 선택 필드와 동일) 키는 늘 있다.
+⚠️ **선택 필드는 응답에서 `null`로 나온다 — 빈 배열이 아니다.** `key_points`·`milestones`를 담지 않고 발행한 판(2026-08-04 이전 전 판 포함)은 컬럼이 SQL NULL이라 `"key_points": null`·`"milestones": null`이고, `metrics`를 생략한 포인트도 `"metrics": null`이다. 소비자는 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `players[].category`는 그보다 앞서 발행된 판에는 **키 자체가 없다**(JSONB에 박제된 옛 형태 — `undefined`). `market.estimates`도 같은 함정이다 — 이 필드가 스키마에 생기기 **이전**에 발행된 판(2026-08-04 이전 전 판 포함)은 JSONB `market`에 이 키 자체가 없어(`undefined`, `players[].category`와 동일 케이스) `null`과 구분해야 한다. 반면 그 **이후** 발행된 판은 요청에서 생략해도 서버가 `"estimates": null`을 채워 저장하므로(다른 선택 필드와 동일) 키는 늘 있다. `variants`·`watch_items`(ADR-0034 개정, task#296)는 아직 **모든** 라이브 발행물(2026-08-12 이전, 대상 4종 전 판)이 이 필드 도입 이전 판이라 **키 자체가 없다**(`undefined`) — 이 두 필드가 도입된 이후 발행분부터 위 규칙(생략해도 `null`로 채워짐)이 적용된다.
 
 ### `GET /api/tech-reports`
 
@@ -2391,7 +2406,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/tech-reports/{slug}/{published_date}`
 
-발행물 단건 — 발행 시 제출된 필드 전체(`title`·`description`·`difficulty`·`players`·`challenges`·`related`·`market`·`sources`·`key_points`·`milestones`) + `id`·`created_at`.
+발행물 단건 — 발행 시 제출된 필드 전체(`title`·`description`·`difficulty`·`players`·`challenges`·`related`·`market`·`sources`·`key_points`·`milestones`·`variants`·`watch_items`) + `id`·`created_at`.
 
 **Auth:** Bearer token 또는 `X-API-Key`
 
@@ -2425,6 +2440,14 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
                     "body": "1단 회수 성공률이 안정되며 단위비용이 소모형 대비 1/5 수준이 됐다." } ],
   "milestones": [ { "year": 2015, "actor": "SpaceX", "event": "1단 지상 회수 성공", "status": "done" },
                   { "year": 2030, "actor": null, "event": "완전 재사용 상업 운용", "status": "planned" } ],
+  "variants": [ { "axis_label": "회수 방식",
+                  "options": [
+                    { "name": "추진 수직착륙", "examples": ["SpaceX Falcon 9"], "strength": "정밀 착지, 재정비가 빠르다.", "tradeoff": "역분사 추진제만큼 탑재량이 줄어든다." },
+                    { "name": "그물 포획", "examples": ["Rocket Lab Electron"], "strength": "소형기체에 추진제 손실이 없다.", "tradeoff": "포획 성공률이 낮고 대형기체엔 부적합." }
+                  ] } ],
+  "watch_items": [ { "label": "같은 1단 기체의 회전율(재사용 횟수/년)이 늘어나는가",
+                      "detail": "정비 없이 재발사까지 걸리는 시간이 짧아져야 단가가 실제로 내려간다.",
+                      "not_signal": "발사 횟수 자체의 증가는 신규 기체 생산 확대일 수도 있어 회전율과 다르다." } ],
   "created_at": "2026-08-03T09:00:00"
 }
 ```
