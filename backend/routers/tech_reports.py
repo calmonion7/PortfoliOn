@@ -197,7 +197,7 @@ class TechReportIn(BaseModel):
     # Optional 필수: 루틴이 "없음"을 명시적 null로 표현해도 발행 전체가 422로 죽지 않아야 한다.
     key_points: Optional[List[KeyPoint]] = Field(None)
     milestones: Optional[List[Milestone]] = Field(None)
-    # 계보 비교축·관찰 체크리스트(선택·additive, task#296). Optional 필수(task#250 함정) —
+    # 계보 비교축·관찰 체크리스트(선택·additive, task#297). Optional 필수(task#250 함정) —
     # 루틴이 "없음"을 명시적 null로 표현해도 발행 전체가 422로 죽지 않아야 한다.
     variants: Optional[List[VariantAxis]] = Field(None, max_length=2)
     watch_items: Optional[List[WatchItem]] = Field(None, max_length=5)

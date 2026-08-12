@@ -423,8 +423,8 @@ CREATE TABLE IF NOT EXISTS tech_reports (
     sources          JSONB DEFAULT '[]'::jsonb,     -- [{title, url}]
     key_points       JSONB,                         -- 핵심 포인트 [{title, metrics[≤4], body}] (nullable=미수록)
     milestones       JSONB,                         -- 진척 타임라인 [{year, actor, event, status}] (nullable=미수록)
-    variants         JSONB,                         -- 계보 비교축 [{axis_label, options[{name,...}]}] (nullable=미수록, task#296)
-    watch_items      JSONB,                         -- 관찰 체크리스트 [{label, detail, not_signal}] (nullable=미수록, task#296)
+    variants         JSONB,                         -- 계보 비교축 [{axis_label, options[{name,...}]}] (nullable=미수록, task#297)
+    watch_items      JSONB,                         -- 관찰 체크리스트 [{label, detail, not_signal}] (nullable=미수록, task#297)
     created_at       TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE (slug, published_date)
 );
