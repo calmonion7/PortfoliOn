@@ -206,16 +206,6 @@ def test_get_by_slug_returns_the_single_current_row_or_empty():
         assert svc.get_by_slug("robotics") == []
 
 
-def test_get_report_found_and_not_found():
-    with patch.object(svc, "query", return_value=[{"slug": "smr", "title": "t"}]) as mock_q:
-        row = svc.get_report("smr", "2026-08-03")
-    assert row == {"slug": "smr", "title": "t"}
-    assert mock_q.call_args.args[1] == ("smr", "2026-08-03")
-
-    with patch.object(svc, "query", return_value=[]):
-        assert svc.get_report("smr", "2099-01-01") is None
-
-
 def test_tech_topics_has_exactly_the_five_slugs():
     slugs = {t["slug"] for t in svc.TECH_TOPICS}
     assert slugs == {"reusable-rocket", "solid-state-battery", "smr", "robotics", "data-center"}

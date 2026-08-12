@@ -7,7 +7,6 @@ TECH_TOPICS가 대상 5종의 정본(백엔드 상수, ADR-0038 결정 1).
 from __future__ import annotations
 
 import json
-from typing import Optional
 
 from services.db import query, execute
 
@@ -78,12 +77,3 @@ def get_by_slug(slug: str) -> list:
         "SELECT * FROM tech_reports WHERE slug = %s ORDER BY published_date DESC",
         (slug,),
     )
-
-
-def get_report(slug: str, published_date: str) -> Optional[dict]:
-    """단건 또는 None."""
-    rows = query(
-        "SELECT * FROM tech_reports WHERE slug = %s AND published_date = %s",
-        (slug, published_date),
-    )
-    return rows[0] if rows else None
