@@ -67,8 +67,20 @@ fg-loop 드라이브에서 회고 자동 스킵으로 봉인됐고, 2026-08-12 �
   enum·출처 필수·이산 척도)뿐이고 수치가 현실과 맞는지는 사람이 읽어야 한다 — ADR-0033 결과 절의
   미커버가 그대로 유효하며 **5종 전부 새 판이므로 이번엔 특히 크다.** 사용자에게 `data-center` 상세
   스크린샷 3장을 전달해 읽기 시작점을 만들어 뒀다.
-- `TechLevelBand.jsx`의 `.tech-level-band__name` ellipsis에 `title=` 폴백 없음(task#299 관찰, 선재 상태).
-  5종이 새 판이 되어 `leader_name` 길이 분포가 달라졌지만 잘림 2계열 4924검사에서 위반 0이었다.
+- ~~`TechLevelBand.jsx`의 `.tech-level-band__name` ellipsis에 `title=` 폴백 없음~~ → **2026-08-12 실측 후 기각**
+  (fg-ask 그릴링). 이 후보 서술 자체가 두 곳에서 틀렸다:
+  ⓐ 잘리는 것은 `leader_name`이 아니라 **`p.name`(업체명)**이다(`TechLevelBand.jsx:26`).
+  ⓑ **접근성 문제가 아니다** — `overflow:hidden`+`text-overflow:ellipsis`는 DOM에 전체 텍스트를 남기므로
+  스크린리더는 전문을 읽는다(가토 ⑭의 `role="img"` 자손 프루닝과 성질이 다르다). 순수 *시각* 손실이다.
+  **실측(5종 60행 × 2뷰포트)**: PC 1440 **0/60 잘림** · 모바일 390 **7/60**(손실 3~59px). 잘리는 7건 전부
+  괄호 꼬리(`(Themis)`·`(Callisto)`·`(유니트리)`·`(HTR-PM)`)만 잃고 **업체 식별자는 생존**한다
+  (최악 `GE Vernova Hitachi Nuclear Energy` 202→143px = 29% 손실). 게다가 **전체 이름이 같은 페이지
+  상단 「주요 업체」 표에 잘림 0으로 온전히 있다**(모바일 390 실측: 33행 전부 잘림 0 · `title` 33/33).
+  → **손대지 않는다.** 형제 관례(`PlayerTable`·`ShareChart`·`MarketEstimates`의 `title=`)를 맞추는 것은
+  **하필 안 깨진 쪽(PC, 잘림 0)만 고치고 깨진 쪽(모바일)은 hover 부재로 못 고치는** 카고컬트다
+  (가토 ⑬ — `<title>` 툴팁은 터치 기기에 hover가 없다). 이 항목이 다시 후보로 올라오면 이 문단을 읽을 것.
+- **후속 후보 2(`tech_reports.get_report` 죽은 코드)는 2026-08-12 fg-quick으로 처리 완료**(`7f805d3`) —
+  `.forge/quick/LOG.md` 참조. 이로써 이 태스크의 후속 후보 2건은 모두 닫혔다(1건 기각 · 1건 삭제).
 
 ## 문서 갱신
 
