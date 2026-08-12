@@ -135,8 +135,20 @@ Field(None)` 예외 없음)의 연장으로 스키마에 편입한다. 새 판�
 신호)는 시장 규모의 하위 사실이 아니라 `key_points`·`milestones`·`players[].category`와 동렬로
 **기술 전체**에 걸리는 독립 개념이므로, 같은 기준으로 최상위 컬럼(`app_schema.sql` + `main._migrate`의
 `ADD COLUMN IF NOT EXISTS` + `save_report`의 INSERT 컬럼·VALUES·`ON CONFLICT DO UPDATE SET` 세 곳을
-쌍으로 유지)이 맞다. 이 amendment는 스키마(pydantic 모델)만 확정한다 — 세 표면의 배선은 별도 슬라이스
-소관이며, 이 ADR은 그 배선이 **어떤 모양이어야 하는지**를 못박아 둔다.
+쌍으로 유지)이 맞다. **그 세 표면 배선은 task#297에서 함께 완료됐다**(라이브 실측: `tech_reports`
+16컬럼 · `variants`·`watch_items` 둘 다 `jsonb`). 렌더(2섹션 표시)만 2of2 = task#298 소관이다.
+
+**①-b 중복·빈 비교 방어를 스키마에 둔다(적대적 검토 CONFIRMED 2건).** `variants`는 처음에 중복 방어가
+없어 `options[].name`이 같은 옵션 2개, `axis_label`이 같은 축 2개가 **201로 통과**했다 — 형제
+`Market._estimates_consistency`(통화·단위·연도 동일성 + `is_basis` 중복)에는 있던 짝이 빠져 있었다.
+중복이 통과하면 2of2가 같은 제목의 표를 두 개, 같은 이름의 행을 두 번 그려 독자가 서로 다른 두
+계열로 읽는다 → `VariantAxis._option_names_unique` · `TechReportIn._variant_axis_labels_unique`.
+또 `strength`·`tradeoff`가 **둘 다** 결측인 옵션도 통과해, 비교표의 그 행이 이름만 남았다 —
+`options` 하한 2개가 *축* 수준에서 막으려던 「비교가 아니라 서술」 상태가 *행* 수준에서 되살아난
+것이므로 같은 의도를 내려 `VariantOption._has_comparison_content`로 막는다.
+⚠️ **최소 하나이고 둘 다 요구하지는 않는다** — 루틴이 한쪽만 아는 계열이 실제로 있고, 그때 발행
+전체를 422로 막는 대가가 이득보다 크다(프롬프트는 여전히 "쌍으로"를 지시한다). 이 하한을 "쌍 강제"로
+조이려는 다음 사람은 `test_publish_variant_option_one_side_only_201`이 왜 있는지 먼저 읽을 것.
 
 **② `variants[].options[].examples`가 `{value, currency, unit}` 구조 데이터가 아니라 표시 문자열인
 것은 결정 3의 경계를 그대로 적용한 결과다 — 새 예외가 아니다.** 결정 3의 판정 기준은 "문자열이냐"가
