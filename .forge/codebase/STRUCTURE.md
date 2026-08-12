@@ -257,9 +257,12 @@ frontend/
     │   ├── market/ (17)  Fx · Vix · Commodities · Treasury · EconIndicators · M7Earnings ·
     │   │                 KrTop2 · KrExports · Index · KospiFutures · KospiSignal ·
     │   │                 MacroSignals · FearGreed · Leverage · Lending Section + marketUtils.jsx
-    │   ├── tech/ (25)    TechGraph · TechKpiStrip · TechLevelBand · MilestoneTimeline ·
+    │   ├── tech/ (27)    TechGraph · TechKpiStrip · TechLevelBand · MilestoneTimeline ·
     │   │                 PlayerTable · ShareChart · MarketGrowthChart · MarketEstimates ·
-    │   │                 KeyPointCards · CategoryGroups · ProseSections
+    │   │                 KeyPointCards · ProseSections · VariantTable · WatchItems
+    │   │                 (CategoryGroups는 task#301에서 삭제 — 업체 분류 축은 PlayerTable·
+    │   │                  ShareChart의 그룹 렌더로 흡수, 헬퍼 groupByCategory는
+    │   │                  reports/techReportUtils.js로 이사)
     │   ├── portfolio/(6) DashboardCard · FlashValue · PriceFreshness
     │   ├── sketches/(13) 손그림 SVG 에셋 + 5섹션 아이콘 (index.js 배럴)
     │   └── recommendations/ RecCard

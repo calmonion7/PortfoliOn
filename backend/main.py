@@ -285,6 +285,15 @@ def _migrate():
         logger.info(f"[Migrate] tech_reports 이력 폐기: 과거 행 {deleted}건 삭제, UNIQUE(slug) 인덱스 확보")
     except Exception as e:
         logger.warning(f"[Migrate] tech_reports 이력 폐기 실패: {e}")
+    try:
+        # 대상 개정(ADR-0039 결정 1): data-center 1종을 폐기하고 ai-datacenter-equipment·
+        # ai-datacenter-ops 2종으로 대체. 반드시 이 slug만 지운다 — TECH_TOPICS 밖 전부 삭제 같은
+        # 일반형은 나중에 누가 slug를 일시적으로 빼는 순간 그 발행물을 조용히 지워버린다.
+        from services.db import execute
+        deleted = execute("DELETE FROM tech_reports WHERE slug = 'data-center'")
+        logger.info(f"[Migrate] tech_reports: 은퇴 slug data-center 행 {deleted}건 삭제")
+    except Exception as e:
+        logger.warning(f"[Migrate] tech_reports data-center 은퇴 실패: {e}")
 
 
 @asynccontextmanager

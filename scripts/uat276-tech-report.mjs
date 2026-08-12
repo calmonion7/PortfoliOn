@@ -88,7 +88,11 @@ const login = await fetch(`${BASE}/api/auth/login`, {
 const { access_token, refresh_token } = await login.json();
 if (!access_token) { console.error('로그인 실패 — access_token 없음. 종료.'); process.exit(1); }
 
-// ── 대상 slug — 백엔드 TECH_TOPICS(services/tech_reports.py) 정본 4종, 소스 직독으로 확인 ──
+// ── 대상 slug — 저작 당시 백엔드 TECH_TOPICS(services/tech_reports.py) 정본 4종, 소스 직독으로 확인.
+// ⚠️ task#301(ADR-0039)로 6종(data-center 은퇴 → ai-datacenter-equipment·ai-datacenter-ops 분할)이
+// 됐지만 이 목록은 카드 그리드 레이아웃용 **자립 픽스처**(page.route 주입)라 실제 종수와 무관하다 —
+// LIST_REPORTS.length가 항상 이 배열에서 자기유도되므로 하드코딩 4는 무해(카드 4장으로도 그리드
+// 축을 충분히 자극한다). 대상 identity가 라이브 종수에 의존하는 uat299가 그 축을 대신 잰다. ──
 const SLUG = 'reusable-rocket';
 const LIST_SLUGS = ['reusable-rocket', 'solid-state-battery', 'smr', 'robotics'];
 // 표시명 미러 — frontend/src/components/reports/techReportUtils.js TECH_NAMES(백엔드는 응답에 안 싣는다).

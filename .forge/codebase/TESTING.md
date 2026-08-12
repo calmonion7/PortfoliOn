@@ -14,7 +14,9 @@ Playwright/CDP 라이브 프로브(`scripts/uat*.mjs`). 세 계층은 **서로�
 `scripts/uat284-diag-breadcrumb.mjs`(`§7.3 ⓖ`·`ⓑ`·`§7.2`),
 `scripts/uat285-oauth-landing-splash.mjs`(`ⓕ`·`ⓔ`·`ⓚ`·`§7.4`),
 `scripts/uat286-theme-first-paint.mjs`(`ⓗ`·`ⓔ`·`ⓘ`),
-`frontend/src/components/tech/CategoryGroups.test.jsx`(`TESTING.md §9`).
+`frontend/src/components/tech/PlayerTable.test.jsx`(`TESTING.md §9` — 옛 `CategoryGroups.test.jsx`는
+task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `groupByCategory` 블록과
+`PlayerTable`·`ShareChart` 그룹 렌더 테스트로 이관).
 
 ⚠️ 파일 인용은 **경로 + 심볼명**으로 한다(줄번호 참조 drift 방지 — `CONVENTIONS.md` 서문).
 
@@ -399,7 +401,8 @@ api.get
 - **순수 함수를 export해 따로 단언한다** — 같은 파일이 `buildGrowthSeries`를 named export로
   꺼내 경계 연도 공유·정렬을 직접 검증한다. 차트 로직을 컴포넌트에서 분리해 두면 jsdom 한계를 우회한다.
 - 라벨 겹침·색·정렬 같은 시각 속성은 **라이브 프로브 몫**이다(§7·§9).
-  `frontend/src/components/tech/CategoryGroups.test.jsx`가 그 분담을 주석으로 인용한다.
+  `frontend/src/components/tech/PlayerTable.test.jsx`가 그 분담을 주석으로 인용한다(옛
+  `CategoryGroups.test.jsx`는 task#301에서 삭제 — 그 컴포넌트가 없어졌다).
 - 부수 함정: 표를 차트로 바꾸면 같은 텍스트가 지표당 1회씩 반복돼 `getByText`가 다중 매치로
   깨진다 → `getAllByText(...).length`.
 

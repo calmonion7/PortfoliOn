@@ -42,13 +42,13 @@
 
 ### 주요기술 리포트 발행 (tech-reports)
 ```
-0. (조건 확인) GET /api/tech-reports  → **기술당 1행**만 반환(대상 5종의 마지막 갱신일 판단용, 이력 없음 — ADR-0038)
-1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·계보 분류·기관별 시장 추정치·계보 비교축·확인할 지표**)
+0. (조건 확인) GET /api/tech-reports  → **기술당 1행**만 반환(대상 6종의 마지막 갱신일 판단용, 이력 없음 — ADR-0038)
+1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·업체 분류 축·기관별 시장 추정치·계보 비교축·확인할 지표**)
 2. POST /api/tech-reports/{slug}  → 발행(갱신) — slug당 1행이라 재발행은 기존 행을 덮어쓴다(과거 판 없음)
    - 종목 발행물과 달리 **서버가 자동 첨부하는 숫자가 없다** — 통화·단위·점유율·척도까지 전부 이 본문에 조사해 채운다
    - 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — 틀린 값보다 없는 값이 낫다)
-   - 대상 5종 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
-   - **요약 레이어는 산문이 아니라 구조 필드로 싣는다**(ADR-0034, 아래 두 차례 개정 포함) — 지금 총 6필드: `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(계보 분류)·`market.estimates`(기관별 시장 추정치)·`variants`(계보 비교축)·`watch_items`(확인할 지표). 채우지 않으면 화면에서 그 섹션이 통째로 생략되므로, `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다
+   - 대상 6종 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
+   - **요약 레이어는 산문이 아니라 구조 필드로 싣는다**(ADR-0034, 아래 두 차례 개정 포함) — 지금 총 6필드: `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(업체 분류 축)·`market.estimates`(기관별 시장 추정치)·`variants`(계보 비교축)·`watch_items`(확인할 지표). 채우지 않으면 화면에 반영되지 않으므로(대부분 그 섹션째 생략, `players[].category`는 표·점유율이 평면 렌더로 폴백) `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다
    - **기관별 시장 추정치(`market.estimates`, 선택·최대 6건, ADR-0034 개정)**는 조사기관마다 다르게 추정한 시장 규모를 나란히 보여준다 — 배열 내 `currency`·`unit`·`year`는 전부 같아야 하고(다르면 422), 성장 곡선(`market.history`/`forecast`)이 채택한 기관은 `is_basis: true`로 표시(최대 1건, 2건 이상이면 422)
    - **계보 비교축(`variants`, 선택·최대 2축, ADR-0034 개정)**은 한 기술이 갈라지는 접근 방식을 이점·대가 쌍으로 나란히 보여준다 — 축마다 선택지(`options`)가 **최소 2개**(1개는 비교가 아니라 서술이므로 축을 생략하고 산문에 쓸 것, 2개 미만이면 422)
    - **확인할 지표(`watch_items`, 선택·최대 5건, ADR-0034 개정)**는 "앞으로 무엇이 관측되면 진척으로 인정하는가"를 미리 못 박는다 — 파일럿 준공·샘플 공개 같은 *일정 유지 신호*를 진척으로 오독하지 않도록 항목마다 `not_signal`(이건 신호가 아니다)을 본문과 분리해 적을 것
@@ -679,7 +679,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 { "reports": [ { "slug": "smr", "published_date": "2026-07-01", "title": "SMR, 원자력의 두 번째 곡선", "...": "발행 필드 전체" } ] }
 ```
 
-> 대상 5종(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`·`data-center`) 중 이 목록에 없는 slug는 미발행 상태. 각 행은 발행 시 제출한 필드 전체 + `id`·`created_at`을 담는다(위 예시는 조건 확인에 쓰는 3개만 발췌). 담지 않고 발행한 선택 필드는 `null`로 나온다(`key_points`·`milestones` 등 — 빈 배열이 아니다).
+> 대상 6종(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`·`ai-datacenter-equipment`·`ai-datacenter-ops`) 중 이 목록에 없는 slug는 미발행 상태. 각 행은 발행 시 제출한 필드 전체 + `id`·`created_at`을 담는다(위 예시는 조건 확인에 쓰는 3개만 발췌). 담지 않고 발행한 선택 필드는 `null`로 나온다(`key_points`·`milestones` 등 — 빈 배열이 아니다).
 
 ---
 
@@ -689,7 +689,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 
 **Auth:** `X-API-Key` 헤더
 
-**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `data-center` (그 밖의 값은 `422`)
+**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `ai-datacenter-equipment` \| `ai-datacenter-ops` (그 밖의 값은 `422`)
 
 **Request Body**
 ```json
@@ -756,7 +756,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `players[].tech_level` | int 1~5 | ✅ | 그 **업체의** 기술 성숙 단계 — `1 기초연구 · 2 시제품 · 3 실증 · 4 초기상용 · 5 양산상용`(공통 5단계 이산 척도, 0~100 점수 금지) |
 | `players[].gap_years` | int\|생략 | | 선두 대비 격차 **정수 년수**(`0`=선두 자신). `leader_name`을 함께 채워 무엇 대비인지 명시 |
 | `players[].share_pct` | number\|생략 | | 시장점유율(%). 채우면 `market.share_basis`가 반드시 있어야 함(없으면 422) |
-| `players[].category` | string\|생략 | | **계보 분류**(자유 문자열) — 같은 계열끼리 묶는 이름(SMR의 노형: 경수형·비등수형·고온가스로·소듐냉각고속로). 기술마다 분류 체계가 다르므로 그 기술의 통용 분류를 쓰고, **없는 기술이면 전 업체에서 생략**한다(억지 분류 금지 — 어느 업체에도 없으면 화면이 그 섹션을 통째로 생략한다) |
+| `players[].category` | string\|생략 | | **업체 분류 축**(자유 문자열, ADR-0039 결정 4) — 같은 계열·섹터끼리 묶는 이름(SMR의 노형: 경수형·비등수형·고온가스로·소듐냉각고속로 / AI 데이터센터의 공급망 섹터: 전력·냉각·가속기·메모리 등). 기술마다 분류 체계가 다르므로 그 기술의 통용 분류를 쓰고, **없는 기술이면 전 업체에서 생략**한다(억지 분류 금지 — 채워지면 업체 표가 축별 소제목 행으로 묶이고 점유율도 축별 막대 그룹이 되며, 어느 업체에도 없으면 표·차트 모두 기존 평면 렌더 그대로다. 별도 「계보 분류」 칩 섹션은 더 이상 없음 — 표·차트가 묶이는 순간 중복이라 제거됨) |
 | `challenges` | array | | 기술 난제 `{title, body}` |
 | `related` | object | | `{prerequisites, derivatives, complements, competitors}`(문자열 배열) — 전제·파생·보완·경합 기술/티커 |
 | `market` | object | ✅ | `{history, forecast, cagr_pct, share_basis, as_of, estimates}` |
@@ -779,7 +779,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 **통화·단위 enum(필수, 자유 텍스트·환산 금지)** — `currency`: `USD` \| `KRW`. `unit`: `mn`(백만) \| `bn`(십억) \| `tn`(조). 렌더러가 절대 추측·환산하지 않으므로 enum 밖 값은 `422`.
 
 > **문자열 수치는 요약 칩에만** — `key_points[].metrics[].value`가 표시용 문자열인 것은 그 칩이 **그래프를 그리지 않기 때문**이다(ADR-0034). 차트를 그리는 수치(`market` 금액 — `history`·`forecast`·`estimates[].size` 전부 포함·`milestones[].year`·`tech_level`·`share_pct`)는 **절대 문자열로 쓰지 말 것** — 구조 데이터여야 곡선·축·밴드를 그릴 수 있다(ADR-0033). `market.estimates[].scope`·`variants[].options[].examples/strength/tradeoff`는 예외(자유 텍스트) — 어느 것도 좌표를 계산하지 않는 순수 요약 칩이다.
-> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates`·`variants`·`watch_items` 여섯 필드는 전부 선택이다. 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(화면이 그 섹션째 생략한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
+> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates`·`variants`·`watch_items` 여섯 필드는 전부 선택이다. 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(대부분 화면이 그 섹션째 생략하고, `players[].category`만 예외로 표·점유율이 평면 렌더로 폴백한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
 
 > **기술수준 vs 기술난이도 vs 기술격차** — 세 축을 섞지 마세요. `players[].tech_level`은 *그 업체가* 지금 어느 단계인지, `difficulty`는 *그 기술 자체가* 얼마나 어려운지(기술 단위 필드 하나, 업체별이 아님), `gap_years`는 *선두 대비 몇 년 뒤인지*입니다.
 > **상용 시장이 아직 형성되지 않은 기술**(예: SMR·재사용 로켓 일부 세그먼트)은 점유율 근거를 댈 수 없으면 `share_pct`를 생략하세요(업체 표는 그대로, 점유율 칸만 빔).

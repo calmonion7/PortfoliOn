@@ -54,14 +54,7 @@ const SMR_REPORT = {
   sources: [{ title: 'IAEA', url: null }],
 }
 
-// ── task#281(2/2) 신규 3필드 픽스처 ─────────────────────────────────────────
-// players는 SMR_REPORT를 그대로 재사용해 sortPlayers가 4·5번째(두산·GE히타치)를 실제로 뒤바꾸게 두고,
-// 그 두 곳에 **같은 분류**를 달았다 — 계보 칩이 API 원순서를 쓰면 그룹 안에서 순서가 어긋난다(F1 이빨).
-// 롤스로이스만 분류를 비워 「미분류」 보존까지 같은 픽스처에서 함께 잰다.
-const CATEGORY_OF = {
-  'CNNC': '경수형', 'NuScale': '경수형', '롤스로이스SMR': null,
-  '두산에너빌리티': '비등수형', 'GE히타치': '비등수형',
-}
+// ── task#281(2/2) 신규 필드 픽스처 ─────────────────────────────────────────
 const KEY_POINTS = [
   {
     title: '2026~28년 현금은 주기기 공급망에서 난다',
@@ -84,7 +77,6 @@ const FULL_REPORT = {
   ...SMR_REPORT,
   key_points: KEY_POINTS,
   milestones: MILESTONES,
-  players: SMR_REPORT.players.map((p) => ({ ...p, category: CATEGORY_OF[p.name] })),
 }
 
 function mockReport(rep) {
@@ -269,11 +261,13 @@ describe('주요기술 리포트 상세 (task#276 S5)', () => {
   })
 })
 
-// ── task#281 (2/2) — 예약 자리에 신규 3섹션 배선 ─────────────────────────────
-// 세 섹션 모두 **선택 필드 의존**이라 라이브 발행물 2건(smr·reusable-rocket)에는 데이터가 없다.
+// ── task#281 (2/2) — 예약 자리에 신규 섹션 배선 ─────────────────────────────
+// (계보 분류는 task#301 S3에서 제거됐다 — groupByCategory 자체는 techReportUtils.js로 옮겨
+// 존속하지만 이 페이지는 더 이상 소비하지 않는다. 계약 테스트는 techReportUtils.test.js로 이동.)
+// 두 섹션 모두 **선택 필드 의존**이라 라이브 발행물 2건(smr·reusable-rocket)에는 데이터가 없다.
 // 그러므로 "있으면 렌더"보다 "없으면 화면이 이전과 완전히 동일"이 더 중요한 완료기준이다.
-describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라인·계보 분류 (task#281)', () => {
-  it('세 필드가 다 있는 판 — 세 섹션이 확정 순서대로 렌더', async () => {
+describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라인 (task#281)', () => {
+  it('두 필드가 다 있는 판 — 두 섹션이 확정 순서대로 렌더', async () => {
     mockReport(FULL_REPORT)
     const { container } = renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
@@ -281,17 +275,16 @@ describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라�
     // 개별 존재 단언은 순서가 뒤집혀도 전부 통과한다(판정축이 대상과 독립 — 가토 ⑧ⓘ).
     // SMR 형태라 점유율(share_pct 전무)·난제(빈)·연관 기술(빈)은 정상 생략된다.
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계보 분류', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처'])
 
-    const anchors = ['tech-report-kpis', 'tech-key-points', 'milestone-timeline', 'tech-report-players', 'tech-report-categories']
+    const anchors = ['tech-report-kpis', 'tech-key-points', 'milestone-timeline', 'tech-report-players']
       .map((t) => screen.getByTestId(t))
     // 4 = Node.DOCUMENT_POSITION_FOLLOWING
     anchors.slice(1).forEach((node, i) => expect(anchors[i].compareDocumentPosition(node) & 4).toBeTruthy())
 
-    // 껍데기만 렌더되고 내용이 비는 경우를 막는다 — 세 섹션의 대표 값 1개씩.
+    // 껍데기만 렌더되고 내용이 비는 경우를 막는다 — 두 섹션의 대표 값 1개씩.
     expect(within(screen.getByTestId('tech-key-points')).getByText('1.1조원')).toBeTruthy()
     expect(screen.getByTestId('milestone-timeline').querySelectorAll('[data-testid="milestone-item"]').length).toBe(MILESTONES.length)
-    expect(screen.getAllByTestId('tech-report-category-chip').length).toBe(FULL_REPORT.players.length)
   })
 
   // 라이브 두 판은 신규 키가 **아예 없고**(구 JSONB 박제), 신규 컬럼은 SQL NULL이라 `null`로 온다.
@@ -302,16 +295,15 @@ describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라�
     ['smr 실판(키 부재)', SMR_REPORT,
       ['주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처']],
     ['smr 실판(신규 키가 명시적 null)',
-      { ...SMR_REPORT, key_points: null, milestones: null, players: SMR_REPORT.players.map((p) => ({ ...p, category: null })) },
+      { ...SMR_REPORT, key_points: null, milestones: null },
       ['주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처']],
-  ])('구발행물 graceful — 세 섹션 부재 + 기존 섹션 무변화: %s', async (_label, rep, expected) => {
+  ])('구발행물 graceful — 두 섹션 부재 + 기존 섹션 무변화: %s', async (_label, rep, expected) => {
     mockReport(rep)
     const { container } = renderAt(rep.slug)
     await screen.findByTestId('tech-report-kpis')
 
     expect(screen.queryByTestId('tech-key-points')).toBeNull()
     expect(screen.queryByTestId('milestone-timeline')).toBeNull()
-    expect(screen.queryByTestId('tech-report-categories')).toBeNull()
     // 제목까지 함께 사라져야 한다 — 본문 없이 제목만 남는 유령 섹션 금지.
     expect(titlesOf(container)).toEqual(expected)
   })
@@ -319,52 +311,25 @@ describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라�
   it.each([
     ['key_points만', { key_points: KEY_POINTS }, 'tech-key-points'],
     ['milestones만', { milestones: MILESTONES }, 'milestone-timeline'],
-    ['category만', { players: FULL_REPORT.players }, 'tech-report-categories'],
   ])('일부 필드만 있는 판 — 그것만 렌더: %s', async (_label, patch, present) => {
     mockReport({ ...SMR_REPORT, ...patch })
     renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
     expect(screen.getByTestId(present)).toBeTruthy()
-    ;['tech-key-points', 'milestone-timeline', 'tech-report-categories']
+    ;['tech-key-points', 'milestone-timeline']
       .filter((t) => t !== present)
       .forEach((t) => expect(screen.queryByTestId(t)).toBeNull())
   })
 
-  // 제목을 페이지가 소유하는 두 섹션의 게이트는 **컴포넌트 자신의 채택 조건과 같은 식**이어야 한다.
-  // 느슨한 게이트(milestones.length > 0 / players.some(p => p.category))를 쓰면 아래 입력에서
-  // 제목만 남고 본문이 사라진다(점유율 섹션이 task#277 S2에서 겪은 함정).
-  it.each([
-    ['year·event가 결측인 마일스톤만', { milestones: [{ year: null, event: '', status: 'done' }] }, 'milestone-timeline', '진척 타임라인'],
-    ['공백 문자열 분류만', { players: SMR_REPORT.players.map((p) => ({ ...p, category: '   ' })) }, 'tech-report-categories', '계보 분류'],
-  ])('본문이 채택하지 않는 값 → 제목까지 생략: %s', async (_label, patch, testid, title) => {
-    mockReport({ ...SMR_REPORT, ...patch })
+  // 제목을 페이지가 소유하는 섹션의 게이트는 **컴포넌트 자신의 채택 조건과 같은 식**이어야 한다.
+  // 느슨한 게이트(milestones.length > 0)를 쓰면 아래 입력에서 제목만 남고 본문이 사라진다
+  // (점유율 섹션이 task#277 S2에서 겪은 함정).
+  it('본문이 채택하지 않는 값 → 제목까지 생략: year·event가 결측인 마일스톤만', async () => {
+    mockReport({ ...SMR_REPORT, milestones: [{ year: null, event: '', status: 'done' }] })
     const { container } = renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
-    expect(screen.queryByTestId(testid)).toBeNull()
-    expect(titlesOf(container)).not.toContain(title)
-  })
-
-  it('계보 칩도 표와 같은 단일 순서를 쓴다 (F1 확장)', async () => {
-    // 새 소비처가 report.players(API 원순서)를 쓰면 같은 업체 집합이 한 화면에서 두 순서로 나열된다.
-    // task#280에서 표·밴드가 정확히 그렇게 갈렸고, 개별 섹션 단언은 두 순서가 갈려도 전부 통과한다.
-    mockReport(FULL_REPORT)
-    const { container } = renderAt('smr')
-    const table = within(await screen.findByTestId('tech-report-players'))
-    const tableNames = table.getAllByTestId('tech-report-player-name').map((e) => e.textContent)
-
-    let chipTotal = 0
-    ;[...container.querySelectorAll('[data-testid="tech-report-category-group"]')].forEach((g) => {
-      const chips = [...g.querySelectorAll('[data-testid="tech-report-category-chip"]')].map((e) => e.textContent)
-      chipTotal += chips.length
-      const idx = chips.map((n) => tableNames.indexOf(n))
-      expect(idx).not.toContain(-1)                        // 표에 없는 업체 0
-      expect(idx).toEqual([...idx].sort((a, b) => a - b))  // 그룹 안 상대 순서 == 표 순서
-    })
-    expect(chipTotal).toBe(tableNames.length)              // 분류 없는 업체도 미분류로 보존(유실 0)
-
-    // 이빨 — 픽스처가 실제로 재정렬을 유발해야 위 단언이 판별력을 갖는다. 같은 분류(비등수형) 안에서
-    // API 원순서(두산→GE)와 정렬 순서(GE→두산)가 갈리므로, ordered 대신 report.players를 넘기면 깨진다.
-    expect(tableNames).not.toEqual(FULL_REPORT.players.map((p) => p.name))
+    expect(screen.queryByTestId('milestone-timeline')).toBeNull()
+    expect(titlesOf(container)).not.toContain('진척 타임라인')
   })
 })
 
@@ -379,8 +344,8 @@ describe('주요기술 리포트 상세 — 전역 목차 (task#296 S4)', () => 
   it.each([
     ['구발행물(REPORT) — 7섹션', REPORT, 'reusable-rocket',
       ['주요 업체', '기술수준 비교', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
-    ['전 필드(FULL_REPORT) — 8섹션', FULL_REPORT, 'smr',
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계보 분류', '시장 규모', '상세 설명', '출처']],
+    ['전 필드(FULL_REPORT) — 7섹션', FULL_REPORT, 'smr',
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처']],
   ])('목차 칩 수 == 렌더된 섹션 수, 라벨·순서 일치: %s', async (_label, rep, slug, expectedLabels) => {
     mockReport(rep)
     const { container } = renderAt(slug)
@@ -445,7 +410,7 @@ describe('주요기술 리포트 상세 — 전역 목차 (task#296 S4)', () => 
   })
 })
 
-// ── task#298 S4(2/2) — 「계열 비교」(계보 분류 바로 앞) + 「확인할 지표」(난제 바로 뒤) 배선.
+// ── task#298 S4(2/2) — 「계열 비교」(점유율 바로 앞) + 「확인할 지표」(난제 바로 뒤) 배선.
 // ⚠️ 두 섹션은 **같은 SECTIONS 배열**에서 목차 칩과 함께 파생된다 — 배열과 JSX를 한쪽만 고치면
 // 위 task#296 순서 단언(칩 href 순서 == DOM data-tech-section 순서)이 잡는다.
 const VARIANTS = [
@@ -457,8 +422,8 @@ const VARIANTS = [
     ],
   },
 ]
-// FULL_REPORT(8섹션, task#281)에 variants만 추가 — key_points·milestones·players[].category는 그대로
-// 두어 8섹션 기준선을 재사용하고 「계열 비교」 삽입 효과만 격리한다.
+// FULL_REPORT(7섹션, task#281)에 variants만 추가 — key_points·milestones는 그대로
+// 두어 7섹션 기준선을 재사용하고 「계열 비교」 삽입 효과만 격리한다.
 const FULL_WITH_VARIANTS = { ...FULL_REPORT, variants: VARIANTS }
 const WATCH_ITEMS = [
   { label: '링룽 1호의 계통연결이 IAEA에 등재되는가', detail: '등재 시각이 상업운전 기준점이다.',
@@ -468,28 +433,28 @@ const WATCH_ITEMS = [
 const FULL_WITH_BOTH = { ...FULL_REPORT, variants: VARIANTS, watch_items: WATCH_ITEMS }
 
 describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => {
-  it('계보 분류 바로 앞에 삽입 — 형제 제목과의 DOM 순서 + 확정 순서 배열', async () => {
+  it('시장 규모 바로 앞에 삽입 — 형제 제목과의 DOM 순서 + 확정 순서 배열', async () => {
     mockReport(FULL_WITH_VARIANTS)
     const { container } = renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
 
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계열 비교', '계보 분류', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계열 비교', '시장 규모', '상세 설명', '출처'])
 
     const variantsNode = screen.getByTestId('tech-report-variants')
-    const categoriesNode = screen.getByTestId('tech-report-categories')
-    // 4 = Node.DOCUMENT_POSITION_FOLLOWING — variants가 categories보다 앞(=categories가 variants의 뒤)
-    expect(variantsNode.compareDocumentPosition(categoriesNode) & 4).toBeTruthy()
+    const marketNode = container.querySelector('[data-tech-section="market"]')
+    // 4 = Node.DOCUMENT_POSITION_FOLLOWING — variants가 market보다 앞
+    expect(variantsNode.compareDocumentPosition(marketNode) & 4).toBeTruthy()
   })
 
-  it('variants가 null/undefined(구발행물)면 섹션·제목·목차 칩이 전부 부재 — 기존 8섹션 목록 무변화', async () => {
+  it('variants가 null/undefined(구발행물)면 섹션·제목·목차 칩이 전부 부재 — 기존 7섹션 목록 무변화', async () => {
     mockReport({ ...FULL_REPORT, variants: null })
     const { container } = renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
     expect(screen.queryByTestId('tech-report-variants')).toBeNull()
     expect(titlesOf(container)).not.toContain('계열 비교')
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계보 분류', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처'])
     expect(screen.getAllByTestId('tech-toc-chip').map((a) => a.textContent)).not.toContain('계열 비교')
   })
 
@@ -500,7 +465,7 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
 
     // 확정 순서 — 난제 < 확인할 지표 < 시장 규모가 이 배열 안에서 함께 드러난다.
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계열 비교', '계보 분류',
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계열 비교',
        '해결해야 할 난제', '확인할 지표', '시장 규모', '상세 설명', '출처'])
 
     // DOM 순서로도 못박는다(제목 배열은 텍스트라 래퍼 배치가 어긋나도 통과할 수 있다).
@@ -542,7 +507,7 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
       .toEqual(sections.map((el) => el.getAttribute('data-tech-section')))
   })
 
-  it('목차 칩 수 — FULL_REPORT(8) 대비 variants 추가 판(9)에서 정확히 1개 늘어난다', async () => {
+  it('목차 칩 수 — FULL_REPORT(7) 대비 variants 추가 판(8)에서 정확히 1개 늘어난다', async () => {
     mockReport(FULL_REPORT)
     const base = renderAt('smr')
     const baseScope = within(base.container)

@@ -503,19 +503,20 @@ for (const V of VIEWS) {
       bump('toc', wantLabels.length * 2);
 
       // ⓓ section-order — 시장 규모는 항상 렌더(show:true)라 무조건 앵커로 쓴다.
-      // categories/challenges는 실행 전 데이터에 의존하는 정의역(있으면 추가로 대조, 없으면 NOTE).
+      // challenges는 실행 전 데이터에 의존하는 정의역(있으면 추가로 대조, 없으면 NOTE).
       const idxOf = (id) => ids.indexOf(id);
       if (wantLay.axes.length > 0) {
-        const iVar = idxOf('variants'), iMkt = idxOf('market'), iCat = idxOf('categories');
+        const iVar = idxOf('variants'), iMkt = idxOf('market');
         eq(`section-order-variants-before-market:${tag}`, (iVar !== -1 && iMkt !== -1 && iVar < iMkt) ? 'OK' : `variants@${iVar} market@${iMkt}`, 'OK');
         bump('order');
-        if (iCat !== -1) {
-          eq(`section-order-variants-before-categories:${tag}`, (iVar !== -1 && iVar < iCat) ? 'OK' : `variants@${iVar} categories@${iCat}`, 'OK');
-          bump('order');
-        } else {
-          NOTE(`${tag} — categories 정의역 밖(이 발행물엔 계보 분류 섹션이 없다). market 앵커로 이미 대조했다.`);
-        }
       }
+      // task#301: 「계보 분류」 섹션은 데이터 의존 정의역이 아니라 **구조적으로 제거**됐다(업체 분류 축은
+      // PlayerTable·ShareChart의 그룹 렌더로 흡수). 옛 `section-order-variants-before-categories` 축은
+      // iCat이 영구히 -1이라 else NOTE로만 흘러 **조용히 죽은 축**이 됐다(적대 리뷰 렌즈2) — 삭제하지 않고
+      // 「부재」를 단언하는 축으로 뒤집는다. 없는 축은 다음 사람이 존재 자체를 모르고, 이 형태는 섹션이
+      // 되살아나는 회귀까지 잡는다. 정의역 의존이 없으므로 **무조건** 단언한다.
+      eq(`section-categories-removed:${tag}`, idxOf('categories') === -1 ? 'ABSENT' : `RESURRECTED@${idxOf('categories')}`, 'ABSENT');
+      bump('order');
       if (wantWatchLay.items.length > 0) {
         const iWi = idxOf('watch-items'), iMkt = idxOf('market'), iChal = idxOf('challenges');
         eq(`section-order-watchitems-before-market:${tag}`, (iWi !== -1 && iMkt !== -1 && iWi < iMkt) ? 'OK' : `watch-items@${iWi} market@${iMkt}`, 'OK');

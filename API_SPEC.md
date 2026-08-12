@@ -2282,7 +2282,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ## Tech Reports (주요기술 리포트)
 
-기술 단위 발행물 (ADR-0033, 저장모델 개정 ADR-0038) — 종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇·데이터 센터) 단위로 발행한다. 대상 5종은 백엔드 상수 `TECH_TOPICS`가 정본(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`·`data-center`) — 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음, ADR-0038).** analyst-reports와 달리 과거 판이 누적되지 않는다.
+기술 단위 발행물 (ADR-0033, 저장모델 개정 ADR-0038, 대상 개정 ADR-0039) — 종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇·AI 데이터센터 설비·AI 데이터센터 운영) 단위로 발행한다. 대상 6종은 백엔드 상수 `TECH_TOPICS`가 정본(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`·`ai-datacenter-equipment`·`ai-datacenter-ops`) — 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음, ADR-0038).** analyst-reports와 달리 과거 판이 누적되지 않는다. (구 `data-center` 1종은 ADR-0039로 폐기됐다 — 여섯 요소가 한 문서에 담기지 않아 매출 성격 축으로 2종 분할.)
 
 ### `POST /api/tech-reports/{slug}`
 
@@ -2290,7 +2290,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **Auth:** `X-API-Key` 또는 admin Bearer token (`require_admin_or_api_key`)
 
-**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `data-center` (그 밖의 값은 `422`)
+**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `ai-datacenter-equipment` \| `ai-datacenter-ops` (그 밖의 값은 `422`)
 
 **Request Body**
 ```json
@@ -2349,7 +2349,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `description` | string | | 상세 기술설명 (생략 시 `""`) |
 | `difficulty` | object | ✅ | `{score: 1~5, rationale}` — 기술 난이도 |
 | `players` | array | | 주요업체 `{name, country, state_led, ticker?, tech_level: 1~5, gap_years?, leader_name?, share_pct?, note?, category?}` — `share_pct`를 실으면 `market.share_basis`가 반드시 있어야 함(교차검증, 없으면 `422`) |
-| `players[].category` | string\|생략 | | 계보 분류(자유 문자열) — 노형 계열 등 기술별 묶음. 화면이 「계보 분류」 그룹 칩으로 렌더하며, 어느 업체에도 없으면 그 섹션이 통째로 생략된다 |
+| `players[].category` | string\|생략 | | 업체 분류 축(자유 문자열, ADR-0039 결정 4) — 노형 계열(SMR)·공급망 섹터(AI 데이터센터) 등 기술별 묶음. 채워지면 업체 표가 축별 소제목 행으로 묶이고 점유율 차트도 축별 막대 그룹으로 나뉜다(Σ 100% 초과 경고도 그룹 단위 판정). 어느 업체에도 없으면 표·차트 모두 기존 평면 렌더를 그대로 쓴다(별도 「계보 분류」 칩 섹션은 더 이상 없음 — 표·차트가 묶이는 순간 같은 정보를 두 번 그리는 것이라 제거됨) |
 | `challenges` | array | | 기술 난제 `{title, body}` |
 | `related` | object | | 관계 티커/기술 `{prerequisites, derivatives, complements, competitors}`(각 문자열 배열) |
 | `market` | object | ✅ | `{history: [{year, size}], forecast: [{year, size}], cagr_pct?, share_basis?, as_of, estimates?}` — `size`는 `{value, currency: USD\|KRW, unit: mn\|bn\|tn}`. `history`(실측)와 `forecast`(예상)는 별개 배열 |

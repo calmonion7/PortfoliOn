@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import ShareChart from './ShareChart'
+import { groupByCategory } from '../reports/techReportUtils'
 
 // task#277 S2 — 렌더 계약: 정상 렌더 · share_pct 전무 시 섹션 부재 · share_basis 없음 시 값 생략.
 
@@ -82,5 +83,65 @@ describe('ShareChart — task#277 렌더 계약', () => {
 
     const pctSpan = [...row.querySelectorAll('span')].find((s) => s.textContent === '12.3%')
     expect(pctSpan.style.flexShrink).toBe('0')
+  })
+})
+
+// task#301 S2 — players[].category가 있으면 groupByCategory로 묶어 그룹별 렌더 + 그룹별 Σ 판정.
+describe('ShareChart — task#301 S2 분류 그룹화', () => {
+  const CATEGORIZED = [
+    { name: 'CNNC', category: '경수형', share_pct: 30 },
+    { name: 'NuScale', category: '경수형', share_pct: 20 },
+    { name: 'GE Hitachi', category: '비등수형', share_pct: 15 },
+    { name: 'X-energy', category: '고온가스로', share_pct: 10 },
+    { name: 'Kairos Power', category: '고온가스로', share_pct: 5 },
+  ]
+
+  it('그룹 수가 groupByCategory(share 보유 players) 그룹 수와 같다', () => {
+    const expectedGroups = groupByCategory(CATEGORIZED)
+    const { getAllByTestId } = render(<ShareChart players={CATEGORIZED} shareBasis="기준" />)
+    expect(getAllByTestId('tech-share-chart-group')).toHaveLength(expectedGroups.length)
+  })
+
+  it('각 그룹의 막대 수가 그 그룹의 share 보유 수와 같다', () => {
+    const expectedGroups = groupByCategory(CATEGORIZED)
+    const { getAllByTestId } = render(<ShareChart players={CATEGORIZED} shareBasis="기준" />)
+    const groupEls = getAllByTestId('tech-share-chart-group')
+    groupEls.forEach((el, i) => {
+      expect(el.querySelectorAll('[data-testid="tech-share-chart-row"]')).toHaveLength(expectedGroups[i].players.length)
+    })
+  })
+
+  it('한 그룹만 Σ가 100%를 초과하면 그 그룹에만 경고가 붙는다', () => {
+    const players = [
+      // 그룹A: 70+60=130 > 100.5 → 초과
+      { name: 'A1', category: '그룹A', share_pct: 70 },
+      { name: 'A2', category: '그룹A', share_pct: 60 },
+      // 그룹B: 30+20=50 ≤ 100.5 → 정상
+      { name: 'B1', category: '그룹B', share_pct: 30 },
+      { name: 'B2', category: '그룹B', share_pct: 20 },
+    ]
+    const { getAllByTestId } = render(<ShareChart players={players} shareBasis="기준" />)
+    const [groupA, groupB] = getAllByTestId('tech-share-chart-group')
+    expect(groupA.textContent).toContain('100% 초과')
+    expect(groupB.textContent).not.toContain('100% 초과')
+  })
+
+  it('분류가 전무하면 그룹 컨테이너 없이 기존 평면 렌더가 보존된다', () => {
+    const players = [
+      { name: 'A사', share_pct: 20.5 },
+      { name: 'B사', share_pct: 45.2 },
+    ]
+    const { queryAllByTestId, getAllByTestId } = render(<ShareChart players={players} shareBasis="기준" />)
+    expect(queryAllByTestId('tech-share-chart-group')).toHaveLength(0)
+    expect(getAllByTestId('tech-share-chart-row')).toHaveLength(2)
+  })
+
+  it('category가 있어도 필터 결과가 0행이면 여전히 null을 반환한다', () => {
+    const players = [
+      { name: 'A사', category: '경수형', share_pct: null },
+      { name: 'B사', category: '경수형', share_pct: -5 },
+    ]
+    const { container } = render(<ShareChart players={players} shareBasis="기준" />)
+    expect(container.firstChild).toBeNull()
   })
 })

@@ -15,7 +15,6 @@ import PlayerTable from '../components/tech/PlayerTable'
 import ProseSections from '../components/tech/ProseSections'
 import KeyPointCards from '../components/tech/KeyPointCards'
 import MilestoneTimeline, { milestoneTimelineLayout } from '../components/tech/MilestoneTimeline'
-import CategoryGroups, { groupByCategory } from '../components/tech/CategoryGroups'
 import VariantTable, { variantTableLayout } from '../components/tech/VariantTable'
 import WatchItems, { watchItemsLayout } from '../components/tech/WatchItems'
 import './TechReport.css'
@@ -26,11 +25,11 @@ import './TechReport.css'
 //
 // 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로 재구성. CONTEXT.md 구성 서사도 이 순서다):
 //   기술명 h1 → 리드 문단 → KPI 스트립 → 전역 목차 → 핵심 포인트 → 진척 타임라인 → 주요 업체 표
-//   → 기술수준 밴드 → 계열 비교 → 계보 분류 → 점유율 → 난제 → 확인할 지표 → 시장 규모 → 연관 기술
+//   → 기술수준 밴드 → 계열 비교 → 점유율 → 난제 → 확인할 지표 → 시장 규모 → 연관 기술
 //   → 상세 설명(상시 노출) → 출처.
 // task#281(2/2)이 신규 3필드(key_points·milestones·players[].category)로 그 예약 자리를 채웠다.
 // task#297(1/2)이 발행 스키마에 2필드(variants·watch_items)를 추가하고 task#298(2/2)이 그것으로
-// 「계열 비교」(계보 분류 바로 앞)·「확인할 지표」(난제 바로 뒤)를 렌더한다. 다섯 필드 전부
+// 「계열 비교」(점유율 바로 앞)·「확인할 지표」(난제 바로 뒤)를 렌더한다. 다섯 필드 전부
 // **선택 필드**이고 구발행물엔 없다(라이브 4종 전부 두 필드 `null`) — 없으면 조용히 생략되어
 // 화면이 이전과 동일해야 하고, 그 사실 자체가 회귀 축이다.
 //
@@ -116,7 +115,6 @@ export default function TechReport() {
   const hasMilestones = milestoneTimelineLayout({ milestones: report.milestones }).items.length > 0
   const hasVariants = variantTableLayout(report.variants).axes.length > 0
   const hasWatchItems = watchItemsLayout(report.watch_items).items.length > 0
-  const hasCategories = groupByCategory(ordered).length > 0
   const hasPlayers = players.length > 0
   const hasKeyPoints = Array.isArray(report.key_points) && report.key_points.length > 0
   const hasShare = players.some((p) => Number.isFinite(p.share_pct) && p.share_pct >= 0)
@@ -137,7 +135,6 @@ export default function TechReport() {
     { id: 'players', label: '주요 업체', show: hasPlayers },
     { id: 'levels', label: '기술수준 비교', show: hasPlayers },
     { id: 'variants', label: '계열 비교', show: hasVariants },
-    { id: 'categories', label: '계보 분류', show: hasCategories },
     { id: 'share', label: '점유율', show: hasShare },
     { id: 'challenges', label: '해결해야 할 난제', show: hasChallenges },
     { id: 'watch-items', label: '확인할 지표', show: hasWatchItems },
@@ -223,23 +220,13 @@ export default function TechReport() {
         </div>
       )}
 
-      {/* ── 계열 비교 (task#298 S4) ── 계보 분류 바로 앞. 계열의 *성질*을 담는다(업체의 *소속*을
+      {/* ── 계열 비교 (task#298 S4) ── 점유율 바로 앞. 계열의 *성질*을 담는다(업체의 *소속*을
           담는 계보 분류와는 다른 사실 — 병존, 흡수하지 않는다). 게이트는 VariantTable 자신의
           채택 조건과 같은 식(variantTableLayout(...).axes.length > 0). ── */}
       {hasVariants && (
         <div id="variants" data-tech-section="variants" style={{ marginBottom: 30 }}>
           <SectionTitle>계열 비교</SectionTitle>
           <VariantTable variants={report.variants} />
-        </div>
-      )}
-
-      {/* ── 계보 분류 (task#281 S4) ── 업체 순서는 여기서 이미 정한 `ordered` 하나뿐이다. 새 소비처가
-          report.players(API 원순서)를 쓰면 같은 업체 집합이 한 화면에서 두 순서로 나열된다
-          (task#280 적대 리뷰 F1 실측 — 표·밴드가 그렇게 갈렸다). */}
-      {hasCategories && (
-        <div id="categories" data-tech-section="categories" style={{ marginBottom: 30 }}>
-          <SectionTitle>계보 분류</SectionTitle>
-          <CategoryGroups players={ordered} />
         </div>
       )}
 

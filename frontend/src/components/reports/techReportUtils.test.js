@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatMarketSize, splitSeries, formatMarketSummary, TECH_NAMES, TECH_LEVEL_LABELS,
-  deriveTechKpis, sortPlayers, parseDescriptionSections, playerColumns,
+  deriveTechKpis, sortPlayers, parseDescriptionSections, playerColumns, groupByCategory,
 } from './techReportUtils'
 
 // 주요기술 리포트(ADR-0033, task#276 S5, 개명 ADR-0038) 순수 헬퍼 — red-first(TDD 대상은 formatMarketSize·splitSeries).
@@ -378,12 +378,89 @@ describe('parseDescriptionSections — 대괄호 헤딩 분해(파싱 실패는 
 })
 
 describe('TECH_NAMES / TECH_LEVEL_LABELS — 표시명·척도 라벨 상수', () => {
-  it('백엔드 TECH_TOPICS 5종과 슬러그가 일치(data-center 추가, ADR-0038)', () => {
-    expect(Object.keys(TECH_NAMES).sort()).toEqual(['data-center', 'reusable-rocket', 'robotics', 'smr', 'solid-state-battery'])
+  it('백엔드 TECH_TOPICS 6종과 슬러그가 일치(data-center → 설비/운영 분할, ADR-0039)', () => {
+    expect(Object.keys(TECH_NAMES).sort()).toEqual(
+      ['ai-datacenter-equipment', 'ai-datacenter-ops', 'reusable-rocket', 'robotics', 'smr', 'solid-state-battery'])
   })
   it('기술 성숙 단계 1~5 라벨(CONTEXT.md 공통 5단계)', () => {
     expect(TECH_LEVEL_LABELS[1]).toBe('기초연구')
     expect(TECH_LEVEL_LABELS[3]).toBe('실증')
     expect(TECH_LEVEL_LABELS[5]).toBe('양산상용')
+  })
+})
+
+// ── groupByCategory (task#281 S4에서 CategoryGroups.jsx 소유, task#301 S2가 여기로 이동) ──
+// 원래 CategoryGroups(계보 분류 UI)가 페이지 게이트와 공유하던 순수 판정 함수. UI 자체는
+// task#301 S3에서 제거됐지만 함수는 계약이 유효해 존속한다 — PlayerTable·ShareChart가 이어서
+// 소비한다(다음 wave). 여기 남기는 케이스는 CategoryGroups.test.jsx에서 컴포넌트 렌더가 아니라
+// 함수 자체를 검증하던 것만 옮긴 것이다(DOM 단언·React key 충돌 검사는 컴포넌트와 함께 폐기).
+describe('groupByCategory — 분류 그룹화(버킷 키 Symbol · 미분류 항상 마지막 · 전무 시 빈 배열)', () => {
+  // SMR 노형 계열을 본뜬 3분류 × 9곳
+  const NINE = [
+    { name: 'CNNC', category: '경수형' },
+    { name: 'NuScale', category: '경수형' },
+    { name: 'Rolls-Royce', category: '경수형' },
+    { name: 'GE Hitachi', category: '비등수형' },
+    { name: '두산에너빌리티', category: '비등수형' },
+    { name: 'X-energy', category: '고온가스로' },
+    { name: 'USNC', category: '고온가스로' },
+    { name: 'Kairos Power', category: '고온가스로' },
+    { name: 'TerraPower', category: '고온가스로' },
+  ]
+
+  it('3분류 × 업체 9곳 → 그룹 3개, 칩(업체) 합계 == 9, 라벨 순서 == 입력 순서', () => {
+    const groups = groupByCategory(NINE)
+    expect(groups.length).toBe(3)
+    expect(groups.reduce((a, g) => a + g.players.length, 0)).toBe(NINE.length)
+    expect(groups.map((g) => g.category)).toEqual(['경수형', '비등수형', '고온가스로'])
+  })
+
+  it('일부만 category를 가지면 나머지가 버려지지 않고 미분류 그룹으로 보존된다(맨 뒤)', () => {
+    // 미분류 3형태를 한 입력에 섞는다 — 구발행물(키 없음) · 명시적 null · 공백 문자열
+    const players = [
+      { name: 'CNNC', category: '경수형' },
+      { name: 'NuScale' },                      // 구발행물: category 키 자체가 없다(undefined)
+      { name: 'X-energy', category: '고온가스로' },
+      { name: 'TerraPower', category: null },
+      { name: 'Kairos', category: '   ' },
+    ]
+    const groups = groupByCategory(players)
+    expect(groups.length).toBe(3)
+    // 업체 총계 == 입력 수 — 한 곳도 사라지지 않는다
+    expect(groups.reduce((a, g) => a + g.players.length, 0)).toBe(players.length)
+
+    const last = groups[groups.length - 1]
+    expect(last.category).toBe('미분류')
+    expect(last.players.map((p) => p.name)).toEqual(['NuScale', 'TerraPower', 'Kairos'])
+  })
+
+  it('category 전무면 빈 배열(키 없음·null·공백 3형태 모두)', () => {
+    const shapes = [
+      [{ name: 'A' }, { name: 'B' }],                                  // 구발행물 실데이터 형태
+      [{ name: 'A', category: null }, { name: 'B', category: null }],
+      [{ name: 'A', category: '' }, { name: 'B', category: '  ' }],
+    ]
+    for (const players of shapes) expect(groupByCategory(players)).toEqual([])
+  })
+
+  it('players 미전달·비배열이어도 죽지 않고 빈 배열', () => {
+    expect(groupByCategory()).toEqual([])
+    expect(groupByCategory(null)).toEqual([])
+    expect(groupByCategory(undefined)).toEqual([])
+  })
+
+  it('루틴이 실제로 category="미분류"를 써도 분류 없는 버킷과 합쳐지지 않는다(task#281 F6)', () => {
+    // category는 자유 문자열이라 루틴이 표시 라벨과 같은 값을 쓸 수 있다. 센티넬을 리터럴로 두면
+    // 그때 두 버킷이 같은 Map 키를 공유해 **조용히** 합쳐진다(업체 수는 맞아서 총계로도 안 잡힌다).
+    const players = [{ name: 'A', category: '미분류' }, { name: 'B' }]
+    const groups = groupByCategory(players)
+    expect(groups.length).toBe(2)                       // 합쳐지면 1
+    expect(groups.map((g) => g.players.map((p) => p.name))).toEqual([['A'], ['B']])
+    expect(groups[groups.length - 1].category).toBe('미분류')   // 미분류 버킷은 항상 맨 뒤
+  })
+
+  it('빈 분류(공백)만 있으면 빈 배열, 유효 분류가 있으면 그 수만큼 그룹화된다', () => {
+    expect(groupByCategory([{ name: 'A', category: '  ' }])).toEqual([])
+    expect(groupByCategory(NINE).length).toBe(3)
   })
 })

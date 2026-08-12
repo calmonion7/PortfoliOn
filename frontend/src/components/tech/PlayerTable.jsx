@@ -1,5 +1,5 @@
 import Badge from '../ui/Badge'
-import { TECH_LEVEL_LABELS, sortPlayers, playerColumns } from '../reports/techReportUtils'
+import { TECH_LEVEL_LABELS, sortPlayers, playerColumns, groupByCategory } from '../reports/techReportUtils'
 
 // 주요기술 리포트 상세 「주요 업체」(task#280 S3, task#296 S3) — 세로 카드 N장 → 행=업체 표(스크롤러 없음).
 // 카드형은 업체 간 비교가 성립하지 않았다(같은 축의 값이 세로로 흩어짐). 표는 열이 축이라
@@ -106,17 +106,88 @@ export const NOTE_BODY = {
 const HOLD_BADGE = { background: 'var(--tag-hold-bg)', color: 'var(--tag-hold-color)', borderColor: 'var(--tag-hold-border)' }
 const WATCH_BADGE = { background: 'var(--tag-watch-bg)', color: 'var(--tag-watch-color)', borderColor: 'var(--tag-watch-border)' }
 
+// 분류 소제목 행(task#301 S2) — groupByCategory 그룹마다 colSpan 전체폭 1셀. 그룹 경계의 세로 분리가
+// 그룹 내 행 간 분리(위아래 8px씩)보다 커야 한다(§9.7 축④) — top padding을 행 기본값(8px)의 2배로
+// 줘서 앞 그룹 마지막 행과의 간격을 그룹 내 행 간격보다 크게 만든다(추가 CSS 규칙 없이 패딩만으로).
+// 텍스트는 anywhere로 표 최소폭에 기여하지 않는다(NAME_TEXT·NOTE_BODY와 같은 이유).
+const GROUP_TD = {
+  padding: '16px 10px 8px', background: 'var(--bg-elev-2)', overflowWrap: 'anywhere',
+  fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-2)',
+  borderBottom: '1px solid var(--border)',
+}
+
 const DASH = '—'
 const COL_LABEL = { name: '업체', level: '기술수준', gap: '선두 대비', share: '점유율' }
 
 export default function PlayerTable({ players = [], holdings = {} }) {
   const rows = sortPlayers(players)
   const cols = playerColumns(players)
+  // 분류 소제목 행(task#301 S2) — sortPlayers 뒤에 그룹화해 페이지의 단일 정렬 순서를 바꾸지
+  // 않는다. 그룹 순서·그룹 안 순서 둘 다 rows 순서를 그대로 따른다(groupByCategory 자체 계약).
+  const groups = groupByCategory(rows)
 
   // 셀에서 뺀 leader_name을 캡션으로 승격 — 원래 셀에 이름이 보이던 행(gap_years > 0)의 고유값만
   // 모은다(0=선두 자신·null·음수 행의 leader_name은 옛 렌더에서도 표시되지 않았다). 판마다 선두가
   // 갈릴 수 있어 고유값이 2개 이상이면 전부 잇는다 — 하나를 고르면 그게 정보 손실이다.
   const leaders = [...new Set(rows.filter((p) => p.gap_years > 0 && p.leader_name).map((p) => p.leader_name))]
+
+  // 업체 1명 → [행, note행(있으면)] — 평면·그룹 두 렌더 경로가 공유한다(task#301 S2 전엔 rows.map
+  // 안에 인라인이었다).
+  // ⚠️ fallbackKey는 **형제 전체에서 고유**해야 한다(task#301 적대 리뷰 렌즈1·2 독립 확증). 그룹 렌더는
+  // g.players.flatMap의 인덱스가 그룹마다 0부터 재시작하므로, 그걸 그대로 넘기면 ticker 없고 name이
+  // 빈 문자열인 업체가 두 그룹에 하나씩만 있어도 두 <tr>이 같은 key를 갖는다(React 중복 key → 오재조정).
+  // 백엔드 Player.name엔 min_length 제약이 없어 빈 이름이 422 없이 통과하므로 스키마상 도달 가능하다.
+  // 그룹핑 전에는 이 인덱스가 rows.map의 전역 인덱스라 항상 고유했다 — 그룹핑이 만든 회귀다.
+  function renderPlayerRow(p, fallbackKey) {
+    const key = p.ticker || p.name || fallbackKey
+    const label = TECH_LEVEL_LABELS[p.tech_level]
+    const stockType = p.ticker ? holdings[p.ticker] : null
+    // gap_years === 0은 유효값이다(선두 자신) — falsy로 흘리면 선두를 통째 놓친다.
+    const gapText = p.gap_years === 0 ? '현재 선두' : p.gap_years > 0 ? `${p.gap_years}년` : DASH
+    const hasShare = Number.isFinite(p.share_pct) && p.share_pct >= 0
+
+    const cellFor = {
+      name: (
+        <td key="name" style={TD_NAME}>
+          <div style={NAME_CELL}>
+            <div style={NAME_INNER}>
+              <span style={NAME_TEXT} data-testid="tech-report-player-name" title={p.name}>{p.name}</span>
+              {p.state_led && <span style={SHRINK0}><Badge variant="info" size="sm">정부주도</Badge></span>}
+            </div>
+            {(p.country || p.ticker || stockType) && (
+              <div style={NAME_META}>
+                {p.country && <span style={META_TEXT}>{p.country}</span>}
+                {p.country && p.ticker && <span style={META_TEXT}>·</span>}
+                {p.ticker && <span style={TICKER}>{p.ticker}</span>}
+                {stockType && (
+                  <Badge variant="neutral" size="sm" style={stockType === 'holding' ? HOLD_BADGE : WATCH_BADGE}>
+                    {stockType === 'holding' ? '보유' : '관심'}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        </td>
+      ),
+      // 라벨이 없는 단계 값(스키마 드리프트)은 추정하지 않고 —
+      level: <td key="level" style={TD_LEVEL}>{label ? `${p.tech_level}단계 · ${label}` : DASH}</td>,
+      gap: <td key="gap" style={TD_MUTED}>{gapText}</td>,
+      share: <td key="share" style={TD_NUM}>{hasShare ? `${p.share_pct}%` : DASH}</td>,
+    }
+
+    return [
+      <tr key={key} data-testid="tech-report-player-row">
+        {cols.map((c) => cellFor[c])}
+      </tr>,
+      p.note && (
+        <tr key={`${key}-note`} data-testid="tech-report-player-note">
+          <td colSpan={cols.length} style={NOTE_TD}>
+            <div role="group" aria-label={`${p.name} 설명`} style={NOTE_BODY}>{p.note}</div>
+          </td>
+        </tr>
+      ),
+    ]
+  }
 
   return (
     <div>
@@ -132,56 +203,17 @@ export default function PlayerTable({ players = [], holdings = {} }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((p, i) => {
-            const key = p.ticker || p.name || i
-            const label = TECH_LEVEL_LABELS[p.tech_level]
-            const stockType = p.ticker ? holdings[p.ticker] : null
-            // gap_years === 0은 유효값이다(선두 자신) — falsy로 흘리면 선두를 통째 놓친다.
-            const gapText = p.gap_years === 0 ? '현재 선두' : p.gap_years > 0 ? `${p.gap_years}년` : DASH
-            const hasShare = Number.isFinite(p.share_pct) && p.share_pct >= 0
-
-            const cellFor = {
-              name: (
-                <td key="name" style={TD_NAME}>
-                  <div style={NAME_CELL}>
-                    <div style={NAME_INNER}>
-                      <span style={NAME_TEXT} data-testid="tech-report-player-name" title={p.name}>{p.name}</span>
-                      {p.state_led && <span style={SHRINK0}><Badge variant="info" size="sm">정부주도</Badge></span>}
-                    </div>
-                    {(p.country || p.ticker || stockType) && (
-                      <div style={NAME_META}>
-                        {p.country && <span style={META_TEXT}>{p.country}</span>}
-                        {p.country && p.ticker && <span style={META_TEXT}>·</span>}
-                        {p.ticker && <span style={TICKER}>{p.ticker}</span>}
-                        {stockType && (
-                          <Badge variant="neutral" size="sm" style={stockType === 'holding' ? HOLD_BADGE : WATCH_BADGE}>
-                            {stockType === 'holding' ? '보유' : '관심'}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </td>
-              ),
-              // 라벨이 없는 단계 값(스키마 드리프트)은 추정하지 않고 —
-              level: <td key="level" style={TD_LEVEL}>{label ? `${p.tech_level}단계 · ${label}` : DASH}</td>,
-              gap: <td key="gap" style={TD_MUTED}>{gapText}</td>,
-              share: <td key="share" style={TD_NUM}>{hasShare ? `${p.share_pct}%` : DASH}</td>,
-            }
-
-            return [
-              <tr key={key} data-testid="tech-report-player-row">
-                {cols.map((c) => cellFor[c])}
-              </tr>,
-              p.note && (
-                <tr key={`${key}-note`} data-testid="tech-report-player-note">
-                  <td colSpan={cols.length} style={NOTE_TD}>
-                    <div role="group" aria-label={`${p.name} 설명`} style={NOTE_BODY}>{p.note}</div>
-                  </td>
-                </tr>
-              ),
-            ]
-          })}
+          {groups.length > 0
+            // 분류가 하나라도 있으면 그룹별 소제목 행 + 그 아래 업체 행. 데이터가 가르는 분기라
+            // slug 조건문이 없다 — 분류 없는 발행물은 항상 아래 평면 경로를 그대로 탄다.
+            ? groups.flatMap((g, gi) => [
+                <tr key={`group-${gi}`} data-testid="tech-report-player-group">
+                  <td colSpan={cols.length} style={GROUP_TD}>{g.category}</td>
+                </tr>,
+                // 그룹 인덱스로 한정한다 — 로컬 i만 넘기면 그룹 간 key가 충돌한다(위 renderPlayerRow 주석).
+                ...g.players.flatMap((p, i) => renderPlayerRow(p, `${gi}-${i}`)),
+              ])
+            : rows.flatMap((p, i) => renderPlayerRow(p, i))}
         </tbody>
       </table>
     </div>

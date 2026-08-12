@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import PlayerTable, { NAME_TEXT, NOTE_BODY } from './PlayerTable'
+import { groupByCategory } from '../reports/techReportUtils'
 
 // task#280 S3 → task#296 S3(스크롤러 제거·note 상시 노출·열 재구성). 정렬은 리터럴 순서가 아니라
 // **불변식**으로 단언한다(정당한 데이터 변경/타이브레이크 추가에 거짓 실패하지 않게).
@@ -47,6 +48,15 @@ const SMR_SHAPE = [
 const ROBOTICS_SHAPE = [
   { name: 'C사', country: 'KR', ticker: '005930', tech_level: 5, gap_years: 0, leader_name: null, share_pct: 12.3, state_led: false, note: 'C사 노트.' },
   { name: 'D사', country: 'US', ticker: 'IRBT', tech_level: 4, gap_years: 2, leader_name: 'C사', share_pct: 4.5, state_led: false, note: null },
+]
+
+// task#301 S2 — 분류 소제목 행. 2개 분류(경수형 2명 · 고온가스형 1명) + 분류 없는 1명(미분류로
+// 흡수). gap_years·share_pct가 일부 유효값을 가져 열은 4개([name,level,gap,share])다.
+const CATEGORIZED = [
+  { name: 'A사', country: 'KR', ticker: null, tech_level: 5, gap_years: 0, leader_name: null, share_pct: 20, state_led: false, note: null, category: '경수형' },
+  { name: 'B사', country: 'US', ticker: null, tech_level: 4, gap_years: 2, leader_name: 'A사', share_pct: 10, state_led: false, note: null, category: '경수형' },
+  { name: 'C사', country: 'CN', ticker: null, tech_level: 3, gap_years: 5, leader_name: 'A사', share_pct: null, state_led: true, note: '고온가스 실증 중.', category: '고온가스형' },
+  { name: 'D사', country: 'RU', ticker: null, tech_level: 3, gap_years: 6, leader_name: 'A사', share_pct: null, state_led: true, note: null },
 ]
 
 const byName = Object.fromEntries(PLAYERS.map((p) => [p.name, p]))
@@ -305,6 +315,60 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
       expect(headerLabels()).not.toContain('티커')
       expect(rowOf('두산에너빌리티').textContent).toContain('KR')
       expect(rowOf('두산에너빌리티').textContent).toContain('034020')
+    })
+  })
+
+  // ── task#301 S2 완료기준 — 분류 소제목 행(groupByCategory 연동) ──────────────
+  describe('분류 소제목 행(groupByCategory 연동)', () => {
+    it('그룹 있는 입력 — 소제목 행 수 == groupByCategory 그룹 수, 업체 행 총수 == players.length(미분류 포함)', () => {
+      render(<PlayerTable players={CATEGORIZED} />)
+      const expectedGroups = groupByCategory(CATEGORIZED).length
+      // 이빨 — 픽스처가 실제로 3그룹(경수형·고온가스형·미분류)을 만들어야 위 단언이 판별력을 갖는다.
+      expect(expectedGroups).toBe(3)
+      expect(screen.getAllByTestId('tech-report-player-group').length).toBe(expectedGroups)
+      expect(screen.getAllByTestId('tech-report-player-group').map((r) => r.textContent))
+        .toEqual(['경수형', '고온가스형', '미분류'])
+      // 미분류(D사)도 사라지지 않는다 — 업체 총수는 그룹핑과 무관하게 보존된다.
+      expect(screen.getAllByTestId('tech-report-player-row').length).toBe(CATEGORIZED.length)
+    })
+
+    it('소제목 행 colSpan은 헤더 열 수와 같다', () => {
+      render(<PlayerTable players={CATEGORIZED} />)
+      expect(headerLabels().length).toBe(4)   // CATEGORIZED는 gap·share가 일부 유효값을 가져 4열
+      for (const r of screen.getAllByTestId('tech-report-player-group')) {
+        expect(r.querySelector('td').getAttribute('colspan')).toBe('4')
+      }
+    })
+
+    it('분류 전무 입력에서는 소제목 행이 0개이고 평면 표가 그대로 보존된다', () => {
+      render(<PlayerTable players={PLAYERS} />)
+      expect(groupByCategory(PLAYERS)).toEqual([])   // 이빨 — PLAYERS엔 category 필드가 없다
+      expect(screen.queryAllByTestId('tech-report-player-group').length).toBe(0)
+      expect(screen.getAllByTestId('tech-report-player-row').length).toBe(PLAYERS.length)
+    })
+
+    // 삭제된 CategoryGroups.test.jsx가 갖고 있던 중복 key 가드(task#281 F6)를 새 소비처로 이식한다.
+    // 그룹 렌더는 인덱스가 그룹마다 0부터 재시작하므로 ticker 없고 name이 빈 업체가 두 그룹에 하나씩만
+    // 있어도 key가 충돌한다 — 백엔드 Player.name엔 min_length가 없어 스키마상 도달 가능한 입력이다.
+    it('행 key는 그룹을 가로질러 고유하다 — 빈 이름·티커 없는 업체가 두 그룹에 있어도 중복 key 경고 0', () => {
+      const NAMELESS = [
+        { name: '', ticker: null, tech_level: 4, category: '전력' },
+        { name: '있는이름A', ticker: null, tech_level: 4, category: '전력' },
+        { name: '', ticker: null, tech_level: 3, category: '냉각' },
+        { name: '있는이름B', ticker: null, tech_level: 3, category: '냉각' },
+      ]
+      expect(groupByCategory(NAMELESS).length).toBe(2)   // 이빨 — 실제로 두 그룹이다
+
+      const errors = []
+      const orig = console.error
+      console.error = (...args) => { errors.push(args.join(' ')) }
+      try {
+        render(<PlayerTable players={NAMELESS} />)
+      } finally {
+        console.error = orig
+      }
+      expect(errors.filter((m) => /same key|duplicate key/i.test(m))).toEqual([])
+      expect(screen.getAllByTestId('tech-report-player-row').length).toBe(NAMELESS.length)
     })
   })
 })

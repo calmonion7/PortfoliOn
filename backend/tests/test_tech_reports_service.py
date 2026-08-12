@@ -206,12 +206,21 @@ def test_get_by_slug_returns_the_single_current_row_or_empty():
         assert svc.get_by_slug("robotics") == []
 
 
-def test_tech_topics_has_exactly_the_five_slugs():
+def test_tech_topics_has_exactly_the_six_slugs():
+    """대상 개정(ADR-0039) — data-center 1종이 ai-datacenter-equipment·ai-datacenter-ops
+    2종으로 대체돼 TECH_TOPICS는 6종이다."""
     slugs = {t["slug"] for t in svc.TECH_TOPICS}
-    assert slugs == {"reusable-rocket", "solid-state-battery", "smr", "robotics", "data-center"}
-    assert len(svc.TECH_TOPICS) == 5
+    assert slugs == {
+        "reusable-rocket", "solid-state-battery", "smr", "robotics",
+        "ai-datacenter-equipment", "ai-datacenter-ops",
+    }
+    assert len(svc.TECH_TOPICS) == 6
     # 각 항목이 표시명·정렬순서를 갖는다
     for t in svc.TECH_TOPICS:
         assert t["name"] and isinstance(t["order"], int)
-    data_center = next(t for t in svc.TECH_TOPICS if t["slug"] == "data-center")
-    assert data_center["name"] == "데이터 센터"
+    equipment = next(t for t in svc.TECH_TOPICS if t["slug"] == "ai-datacenter-equipment")
+    assert equipment["name"] == "AI 데이터센터 설비"
+    assert equipment["order"] == 5
+    ops = next(t for t in svc.TECH_TOPICS if t["slug"] == "ai-datacenter-ops")
+    assert ops["name"] == "AI 데이터센터 운영"
+    assert ops["order"] == 6

@@ -11,7 +11,8 @@ export const TECH_NAMES = {
   'solid-state-battery': '전고체 배터리',
   smr: 'SMR',
   robotics: '로봇',
-  'data-center': '데이터 센터',
+  'ai-datacenter-equipment': 'AI 데이터센터 설비',
+  'ai-datacenter-ops': 'AI 데이터센터 운영',
 }
 
 // 기술 성숙 단계 공통 5단계 라벨(CONTEXT.md) — index = tech_level(1~5). 0번은 미사용(placeholder).
@@ -130,6 +131,36 @@ export function playerColumns(players) {
   if (list.some((p) => p?.gap_years != null)) cols.push('gap')
   if (list.some((p) => Number.isFinite(p?.share_pct) && p.share_pct >= 0)) cols.push('share')
   return cols
+}
+
+// ⚠️ 버킷 키와 표시 라벨을 분리한다 — category는 자유 문자열이고 루틴 프롬프트도 "통용 분류를 쓰라"만
+//    지시하므로 루틴이 실제로 '미분류'를 쓸 수 있다. 리터럴을 Map 키로 겸용하면 그때 분류를 못 붙인
+//    버킷과 **조용히 합쳐진다**(업체 총계는 그대로라 칩 수 단언으로도 안 잡힌다, task#281 F6).
+//    Symbol은 어떤 데이터 문자열과도 같아질 수 없다.
+const UNCLASSIFIED = Symbol('unclassified')   // 버킷 키 — 데이터와 충돌 불가
+const UNCLASSIFIED_LABEL = '미분류'            // 표시 라벨(렌더 전용)
+
+// 분류가 하나도 없으면 [] — 그래야 컴포넌트와 페이지 게이트가 같은 판정을 공유한다.
+// 분류 순서는 입력 순서(= sortPlayers 결과)를 따르고, 미분류만 항상 마지막으로 민다.
+export function groupByCategory(players) {
+  const list = Array.isArray(players) ? players : []
+  const name = (p) => (typeof p?.category === 'string' && p.category.trim() !== '' ? p.category.trim() : null)
+  if (!list.some((p) => name(p) != null)) return []
+
+  const groups = new Map()
+  for (const p of list) {
+    const key = name(p) ?? UNCLASSIFIED
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(p)
+  }
+  // 분류 없는 업체는 버리지 않는다 — 목록에 있는데 이 섹션에서만 사라지면 업체 수가 표와 어긋난다.
+  const rest = groups.get(UNCLASSIFIED)
+  if (rest) { groups.delete(UNCLASSIFIED); groups.set(UNCLASSIFIED, rest) }
+
+  return [...groups].map(([key, members]) => ({
+    category: key === UNCLASSIFIED ? UNCLASSIFIED_LABEL : key,
+    players: members,
+  }))
 }
 
 // description의 대괄호 헤딩([기술 개요] 등)을 [{title, body}]로 분해(task#280 S4).

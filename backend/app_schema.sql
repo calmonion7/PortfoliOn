@@ -407,7 +407,8 @@ CREATE TABLE IF NOT EXISTS analyst_reports (
 );
 
 -- 주요기술 리포트 발행물 (ADR-0033, task#276; 개명·이력 폐기는 ADR-0038, task#299) — 종목이 아니라 기술 단위 발행물.
--- 대상은 백엔드 상수 TECH_TOPICS 5종(재사용 로켓·전고체 배터리·SMR·로봇·데이터센터)이 정본.
+-- 대상은 백엔드 상수 TECH_TOPICS 6종(재사용 로켓·전고체 배터리·SMR·로봇·AI 데이터센터 설비·
+-- AI 데이터센터 운영)이 정본(ADR-0039).
 -- slug당 1행(ADR-0038) — 갱신은 그 행을 덮어쓴다(ON CONFLICT (slug) DO UPDATE). published_date는 마지막 갱신일.
 CREATE TABLE IF NOT EXISTS tech_reports (
     id               BIGSERIAL PRIMARY KEY,

@@ -2,6 +2,12 @@
 // (ADR-0038 결정 1~3)을 GET만으로 검증한다. POST/PUT/DELETE 없음 — 라이브 프로덕션 쓰기 0.
 // 옛 코드에 대고 돌려도 안전하다(순수 조회).
 //
+// ⚠️ 갱신(task#301 S1, ADR-0039) — 대상이 5종→6종으로 개정됐다. `data-center`가 은퇴하고
+// `ai-datacenter-equipment`·`ai-datacenter-ops` 2종으로 분할됐다(백엔드 마이그레이션이 옛 slug 행을
+// 삭제). 아래 TECH_NAMES 미러와 required-sections 목표 slug 조건을 그에 맞춰 갱신했다 — 이 파일의
+// 다른 부분(카드/대상 개수)은 처음부터 REPORTS.length를 라이브 API에서 유도해 하드코딩이 없었으므로
+// 무변경이다.
+//
 // 실행: node scripts/uat299-tech-rename.mjs
 // ⚠️ 순서 — commit + push(+ 자동 배포) **전에** 1회 돌려 red를 확보하고, 배포 후(포트 바인딩 확인 후)
 //   재실행해 green을 확인한다(CLAUDE.md 가토 §「배포 직후 API 무응답」 참조 — Up이어도 수분간 무응답
@@ -38,8 +44,9 @@
 //    0건)는 반대로 document.body 전체에서 더 넓게 재 안전망을 둔다 — 부재 확인은 나브 사본이 여러
 //    곳(마스트헤드·모바일 하단 탭바)에 동시 존재해도 거짓 FAIL을 만들지 않는다(존재/개수 단언만
 //    다중 사본에 취약하다, 가토 ⑧ⓒ의 실제 우려는 그쪽).
-//  · 대상 slug는 하드코딩하지 않고 GET /api/tech-reports 응답에서 받아 전수로 돌린다(2/2가 5종째를
-//    발행하면 자동으로 포함된다).
+//  · 대상 slug는 하드코딩하지 않고 GET /api/tech-reports 응답에서 받아 전수로 돌린다(당시 대상 5종 중
+//    미발행이던 5번째가 발행되면 자동으로 포함된다는 뜻으로 쓴 예시 — task#301로 대상이 6종으로
+//    개정된 지금도 원리는 같다: 신규 slug가 발행되면 TECH_NAMES 미러만 갱신하면 된다).
 //  · identity를 판정축보다 먼저(대상이 틀려도 통과하는 축을 만들지 않는다, §7.3⑧ⓘ).
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
@@ -72,10 +79,12 @@ if (!access_token) { console.error('로그인 실패 — access_token 없음. �
 const AUTH = { Authorization: `Bearer ${access_token}` };
 
 // TECH_NAMES 미러 — techReportUtils.js(백엔드는 표시명을 응답에 싣지 않는다, ADR-0033 결정 2).
-// data-center 포함(작업트리 직독으로 이미 반영됨 확인, 2/2가 발행하기 전엔 목록에 안 보여도 무해).
+// task#301(ADR-0039)로 data-center가 은퇴하고 ai-datacenter-equipment·ai-datacenter-ops로 분할됐다
+// (아직 발행되지 않아 목록에 안 보여도 무해 — 발행되면 이 미러가 없으면 즉시 exit한다, 추정 폴백 금지).
 const TECH_NAMES = {
   'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리',
-  smr: 'SMR', robotics: '로봇', 'data-center': '데이터 센터',
+  smr: 'SMR', robotics: '로봇',
+  'ai-datacenter-equipment': 'AI 데이터센터 설비', 'ai-datacenter-ops': 'AI 데이터센터 운영',
 };
 
 // ── 목록 실응답(GET만) — 대상 slug는 여기서 전수로 유도한다(하드코딩 금지) ──────────────────────
@@ -326,10 +335,12 @@ for (const V of VIEWS) {
       bump('date-stamp', 3 + m.dateMatches.length);
 
       // (4b) required-sections — 갱신 발행이 「빈 갱신」이 아니라 실제 구조를 담았는지.
-      // 단언은 목표(data-center = 이번에 신규로 발행된 판)에만 걸고, 출력은 5종 전부 남긴다
-      // (계열 전체를 찍어두면 예상 외 이동의 설명 근거가 된다 — 가토 ⑧ⓗ).
+      // 단언은 목표(task#301: data-center 은퇴 후 그 후속 2종 ai-datacenter-equipment·ai-datacenter-ops
+      // 가 발행되면 그 판)에만 걸고, 출력은 대상 전 종 남긴다(계열 전체를 찍어두면 예상 외 이동의
+      // 설명 근거가 된다 — 가토 ⑧ⓗ). 두 후속 slug가 아직 미발행이면 REPORTS 자체가 걔들을 안
+      // 포함하므로(위 실응답 유도) 이 분기는 자연히 도달 불가 — 무음 스킵이 아니라 축의 정의역이다.
       const badSections = Object.entries(m.sectionsPresent).filter(([, v]) => v !== 'OK');
-      if (slug === 'data-center') {
+      if (slug === 'ai-datacenter-equipment' || slug === 'ai-datacenter-ops') {
         eq(`required-sections:${tag}`, badSections.map(([k, v]) => `${k}=${v}`), [],
           `KPI·주요업체·계열비교·확인할지표·시장규모 5섹션 가시 · 실측=${JSON.stringify(m.sectionsPresent)}`);
         bump('required-sections');
@@ -386,7 +397,7 @@ console.log(`뷰 ${VIEWS.length}조합 × (목록 1 + 상세 ${REPORTS.length}) 
 console.log('\n원시 실측(단언 아님):');
 for (const l of rawLog) console.log(`  ${l}`);
 if (sectionRaw.length) {
-  console.log('\n요구 섹션 실측(단언은 data-center에만 — 나머지는 근거용 출력):');
+  console.log('\n요구 섹션 실측(단언은 ai-datacenter-equipment·ai-datacenter-ops에만 — 나머지는 근거용 출력):');
   for (const l of sectionRaw) console.log(`  ${l}`);
 }
 console.log(`\n※ 육안 캡처 ${OUT}/ — {view}-{list|slug}.png`);

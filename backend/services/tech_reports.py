@@ -1,8 +1,8 @@
-"""주요기술 리포트 — 기술 단위 발행물 (ADR-0033, 개명·저장모델 개정 ADR-0038).
+"""주요기술 리포트 — 기술 단위 발행물 (ADR-0033, 개명·저장모델 개정 ADR-0038, 대상 개정 ADR-0039).
 
-종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇·데이터 센터) 단위 발행물. slug당 1행으로
-고정(ADR-0038 결정 2) — 재발행은 그 행을 덮어쓰기만 하고, 과거 판은 누적하지 않는다.
-TECH_TOPICS가 대상 5종의 정본(백엔드 상수, ADR-0038 결정 1).
+종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇·AI 데이터센터 설비·AI 데이터센터 운영) 단위
+발행물. slug당 1행으로 고정(ADR-0038 결정 2) — 재발행은 그 행을 덮어쓰기만 하고, 과거 판은
+누적하지 않는다. TECH_TOPICS가 대상 6종의 정본(백엔드 상수, ADR-0038 결정 1 · ADR-0039 개정).
 """
 from __future__ import annotations
 
@@ -17,7 +17,8 @@ TECH_TOPICS = [
     {"slug": "solid-state-battery", "name": "전고체 배터리", "order": 2},
     {"slug": "smr", "name": "SMR", "order": 3},
     {"slug": "robotics", "name": "로봇", "order": 4},
-    {"slug": "data-center", "name": "데이터 센터", "order": 5},
+    {"slug": "ai-datacenter-equipment", "name": "AI 데이터센터 설비", "order": 5},
+    {"slug": "ai-datacenter-ops", "name": "AI 데이터센터 운영", "order": 6},
 ]
 
 

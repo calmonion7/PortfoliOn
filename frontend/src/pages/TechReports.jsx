@@ -6,9 +6,9 @@ import Stat from '../components/ui/Stat'
 import Skeleton from '../components/ui/Skeleton'
 import { TECH_NAMES, formatMarketSummary } from '../components/reports/techReportUtils'
 
-// 주요기술 리포트 목록 (ADR-0033, task#276 S5, 개명·저장모델 ADR-0038) — 기술 단위 발행물,
-// 기술당 최신 1행(slug당 1행 고정, 이력 누적 없음). 대상 5종 고정(백엔드 TECH_TOPICS 정본)이라
-// 페이지네이션 없음. /analyst-reports 목록과 동형 구조.
+// 주요기술 리포트 목록 (ADR-0033, task#276 S5, 개명·저장모델 ADR-0038, 설비/운영 분할 ADR-0039) —
+// 기술 단위 발행물, 기술당 최신 1행(slug당 1행 고정, 이력 누적 없음). 대상 6종 고정(백엔드
+// TECH_TOPICS 정본)이라 페이지네이션 없음. /analyst-reports 목록과 동형 구조.
 
 export default function TechReports() {
   const [reports, setReports] = useState(null)  // null=로딩, []=없음
