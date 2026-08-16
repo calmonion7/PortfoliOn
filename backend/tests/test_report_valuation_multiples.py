@@ -93,10 +93,17 @@ def test_real_kr_psr_non_finite():
     assert rg._kr_psr(1_000_000_000_000, float("nan")) is None
 
 
+_ROW_TITLES = [
+    "매출액", "영업이익", "당기순이익", "지배주주순이익", "비지배주주순이익",
+    "영업이익률", "순이익률", "ROE", "부채비율", "당좌비율", "유보율",
+    "EPS", "PER", "BPS", "PBR", "주당배당금",
+]  # 실 Naver rowList 순서·title(B61, task#303)
+
+
 def _naver_quarter_response(quarters):
     """quarters: [{key, revenue(억원), per, pbr, is_consensus}], 순서 무관(함수가 key desc 정렬)."""
     metas = [{"key": q["key"], "isConsensus": "Y" if q.get("is_consensus") else "N"} for q in quarters]
-    rows = [{"columns": {}} for _ in range(15)]
+    rows = [{"title": t, "columns": {}} for t in _ROW_TITLES]
     rows[0]["columns"] = {q["key"]: {"value": str(q["revenue"])} for q in quarters}
     rows[12]["columns"] = {q["key"]: {"value": str(q["per"])} for q in quarters if q.get("per") is not None}
     rows[14]["columns"] = {q["key"]: {"value": str(q["pbr"])} for q in quarters if q.get("pbr") is not None}

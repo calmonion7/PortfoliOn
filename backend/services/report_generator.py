@@ -106,15 +106,20 @@ def _comp_valuation(ticker: str, market: str) -> dict:
             if not key:
                 return {"per": None, "pbr": None, "_ttm_revenue": None, "ev_ebitda": _kr_ev_ebitda(),
                         "rd_intensity": get_rd_intensity_kr(ticker)}
-            rev_q = [_fin(_naver_row_val(rows, 0, k)) for k in non_consensus_keys[:4]]
+            missing: set = set()
+            rev_q = [_fin(_naver_row_val(rows, "매출액", k, missing=missing)) for k in non_consensus_keys[:4]]
             ttm_revenue = (
                 sum(rev_q) * 1e8
                 if len(rev_q) >= 4 and all(v is not None for v in rev_q)
                 else None
             )
+            per = _fin(_naver_row_val(rows, "PER", key, missing=missing))
+            pbr = _fin(_naver_row_val(rows, "PBR", key, missing=missing))
+            if missing:
+                logger.warning(f"[MarketKR] rowList title 미발견 (ticker={ticker}, title={sorted(missing)})")
             return {
-                "per": _fin(_naver_row_val(rows, 12, key)),
-                "pbr": _fin(_naver_row_val(rows, 14, key)),
+                "per": per,
+                "pbr": pbr,
                 "_ttm_revenue": ttm_revenue,
                 "ev_ebitda": _kr_ev_ebitda(),
                 "rd_intensity": get_rd_intensity_kr(ticker),

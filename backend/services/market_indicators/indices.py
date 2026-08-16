@@ -4,7 +4,7 @@ import math
 import re
 import requests
 from bs4 import BeautifulSoup
-from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history
+from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history, _filter_outliers, _public
 
 logger = logging.getLogger(__name__)
 
@@ -17,24 +17,28 @@ _INDEX_SYMBOLS = {
 
 def _fetch_index(key: str, sym: str, stored_history: list) -> tuple[str, dict | None]:
     try:
-        history = _yf_close_history(sym, stored_history, precision=2)
-        if history:
+        raw_history = _yf_close_history(sym, stored_history, precision=2)
+        if raw_history:
+            history = _filter_outliers(raw_history)
             current = history[-1]["value"]
             prev = history[-2]["value"] if len(history) > 1 else current
             change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
             if not math.isfinite(change_pct):
                 change_pct = None
-            return key, {"current": current, "change_pct": change_pct, "history": history}
+            return key, {"current": current, "change_pct": change_pct, "history": history,
+                         "_raw_history": raw_history}
     except Exception as e:
         logger.warning("[Index] %s yfinance fetch 실패, stored 폴백: %s", sym, e)
 
     if stored_history:
-        current = stored_history[-1]["value"]
-        prev = stored_history[-2]["value"] if len(stored_history) > 1 else current
+        display = _filter_outliers(stored_history)
+        current = display[-1]["value"]
+        prev = display[-2]["value"] if len(display) > 1 else current
         change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
         if not math.isfinite(change_pct):
             change_pct = None
-        return key, {"current": current, "change_pct": change_pct, "history": stored_history}
+        return key, {"current": current, "change_pct": change_pct, "history": display,
+                     "_raw_history": stored_history}
 
     return key, None
 
@@ -121,11 +125,19 @@ def get_indices() -> dict:
     stored_histories: dict[str, list] = {}
     if stored_data:
         for k in _INDEX_SYMBOLS:
-            stored_histories[k] = (stored_data.get("indices") or {}).get(k, {}).get("history", [])
+            # 배포 직후 창(구버전 blob엔 _raw_history 없음) → 구조가 다르므로
+            # indices[k].history 로 폴백한다(여기선 history가 심볼별 dict가 아니다).
+            stored_histories[k] = ((stored_data.get("_raw_history") or {}).get(k)
+                                   or ((stored_data.get("indices") or {}).get(k) or {}).get("history")
+                                   or [])
 
     indices: dict[str, dict | None] = {}
+    raw_history: dict[str, list] = {}
     for k, sym in _INDEX_SYMBOLS.items():
         _, result = _fetch_index(k, sym, stored_histories.get(k, []))
+        if result:
+            # `.pop` 기본값 필수 — _fetch_index를 몽키패치하는 테스트가 구 형태를 반환한다.
+            raw_history[k] = result.pop("_raw_history", None) or result.get("history") or []
         indices[k] = result
 
     # --- S2: US CAPE ---
@@ -138,10 +150,12 @@ def get_indices() -> dict:
     data = sanitize({
         "indices": indices,
         "valuation": {"sp500_cape": cape},
+        "_raw_history": raw_history,
     })
 
+    public = _public(data)
     if any(v is not None for v in indices.values()):
         _mc_save("indices", data)
-        _set_cache("indices", data, ttl=3600)
+        _set_cache("indices", public, ttl=3600)
 
-    return data
+    return public

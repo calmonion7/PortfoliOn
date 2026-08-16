@@ -4,27 +4,27 @@ account_nm은 일부러 변형해 account_id 기반 매칭만 동작함을 증�
 """
 from unittest.mock import patch, MagicMock
 
-# Naver 연간 픽스처 (1 period, 억원 단위)
+# Naver 연간 픽스처 (1 period, 억원 단위) — title은 실 Naver 응답 구조와 정합(B61, task#303)
 _NAVER_ANNUAL = {
     "financeInfo": {
         "trTitleList": [{"key": "2023", "isConsensus": "N"}],
         "rowList": [
-            {"columns": {"2023": {"value": "100000"}}},  # 0 revenue
-            {"columns": {"2023": {"value": "10000"}}},   # 1 op_income
-            {"columns": {"2023": {"value": "8000"}}},    # 2 net_income
-            {"columns": {"2023": {"value": "7000"}}},    # 3
-            {"columns": {"2023": {"value": "1000"}}},    # 4
-            {"columns": {"2023": {"value": "10.00"}}},   # 5 op_margin
-            {"columns": {"2023": {"value": "8.00"}}},    # 6 net_margin
-            {"columns": {"2023": {"value": "12.00"}}},   # 7 ROE
-            {"columns": {"2023": {"value": "50.00"}}},   # 8 debt_ratio
-            {"columns": {"2023": {"value": "120.00"}}},  # 9 quick_ratio
-            {"columns": {"2023": {"value": "300"}}},     # 10
-            {"columns": {"2023": {"value": "5000"}}},    # 11 EPS
-            {"columns": {"2023": {"value": "10.0"}}},    # 12 PER
-            {"columns": {"2023": {"value": "50000"}}},   # 13 BPS
-            {"columns": {"2023": {"value": "1.0"}}},     # 14 PBR
-            {"columns": {"2023": {"value": "500"}}},     # 15
+            {"title": "매출액",         "columns": {"2023": {"value": "100000"}}},
+            {"title": "영업이익",       "columns": {"2023": {"value": "10000"}}},
+            {"title": "당기순이익",     "columns": {"2023": {"value": "8000"}}},
+            {"title": "지배주주순이익", "columns": {"2023": {"value": "7000"}}},
+            {"title": "비지배주주순이익", "columns": {"2023": {"value": "1000"}}},
+            {"title": "영업이익률",     "columns": {"2023": {"value": "10.00"}}},
+            {"title": "순이익률",       "columns": {"2023": {"value": "8.00"}}},
+            {"title": "ROE",           "columns": {"2023": {"value": "12.00"}}},
+            {"title": "부채비율",       "columns": {"2023": {"value": "50.00"}}},
+            {"title": "당좌비율",       "columns": {"2023": {"value": "120.00"}}},
+            {"title": "유보율",         "columns": {"2023": {"value": "300"}}},
+            {"title": "EPS",           "columns": {"2023": {"value": "5000"}}},
+            {"title": "PER",           "columns": {"2023": {"value": "10.0"}}},
+            {"title": "BPS",           "columns": {"2023": {"value": "50000"}}},
+            {"title": "PBR",           "columns": {"2023": {"value": "1.0"}}},
+            {"title": "주당배당금",     "columns": {"2023": {"value": "500"}}},
         ],
     }
 }

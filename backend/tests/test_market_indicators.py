@@ -681,3 +681,155 @@ def test_yf_merge_history_empty_new():
     stored = [{"date": "2026-01-01", "value": 1.0}]
     result = _merge_history(stored, [])
     assert result == stored
+
+
+# ── _filter_outliers / _yf_close_history 저장·표시 분리 (B60, task#303, ADR-0040) ──
+# 회귀 고정 4축. 판정축을 「중앙값 배수」→「고립 스파이크」로 교체하기 *전*에 신설하고,
+# 구현 전 실제 FAIL(단언 실패, import 파손 아님)을 확인한 뒤에만 구현으로 넘어간다.
+
+def test_filter_outliers_removes_isolated_oldest_spike():
+    """원 버그 재현(9dedc01/f7b5a21, "구리·금·WTI 차트 첫 값 스파이크") — 가장 오래된 점
+    하나만 이웃과 자릿수가 다르면 그 점만 표시에서 빠지고 나머지는 살아남는다."""
+    from services.market_indicators.cache import _filter_outliers
+    pts = [{"date": "2025-01-01", "value": 0.01}] + [
+        {"date": f"2025-02-{i + 1:02d}", "value": 100.0 + i * 0.5} for i in range(20)
+    ]
+    result = _filter_outliers(pts)
+    dates = [p["date"] for p in result]
+    print(f"[coverage] isolated_spike n={len(pts)} kept={len(result)}")
+    assert "2025-01-01" not in dates
+    assert len(result) == len(pts) - 1
+
+
+def test_filter_outliers_survives_sustained_multiyear_move():
+    """^IRX형 — 0.03에서 4.5까지 250점에 걸쳐 단조 상승하는 지속 이동은 한 점도 지워지면
+    안 된다. 이빨: 옛 판정(중앙값 5배)이면 중앙값≈0.37·밴드≈[0.074,1.86]로 약 90점이
+    잘리는 입력이라, 구현 전 이 축은 red여야 한다."""
+    import math
+    from services.market_indicators.cache import _filter_outliers
+    n = 250
+    start, end = 0.03, 4.5
+    pts = [
+        {"date": f"2025-{1 + i // 28:02d}-{1 + i % 28:02d}",
+         "value": round(start * math.exp(i / (n - 1) * math.log(end / start)), 6)}
+        for i in range(n)
+    ]
+    vals = sorted(p["value"] for p in pts)
+    median = vals[len(vals) // 2]
+    print(f"[coverage] sustained_move n={n} median={median:.4f} "
+          f"old_band=[{median / 5:.4f},{median * 5:.4f}]")
+    result = _filter_outliers(pts)
+    assert len(result) == n
+
+
+def test_filter_outliers_never_drops_latest_point():
+    """최신 점은 직전 대비 아무리 튀어도 제거되지 않는다 — current/change_pct의 출처.
+    이빨: 옛 판정(중앙값 5배, median=4.2)이면 500.0(밴드 상한 21 초과)이 잘리는 입력이다."""
+    from services.market_indicators.cache import _filter_outliers
+    pts = [{"date": f"2025-03-{i + 1:02d}", "value": 4.2} for i in range(20)]
+    pts.append({"date": "2025-04-01", "value": 500.0})
+    result = _filter_outliers(pts)
+    dates = [p["date"] for p in result]
+    print(f"[coverage] latest_point_spike n={len(pts)} kept={len(result)}")
+    assert "2025-04-01" in dates
+    assert result[-1]["value"] == 500.0
+
+
+def test_yf_close_history_storage_return_keeps_all_points_incl_spike():
+    """저장용 반환값은 raw다 — 표시 필터에 걸릴 스파이크도 `_yf_close_history`가
+    저장용으로 내주는 값에는 그대로 남아 있어야 병합·트림 도중 영구 손실이 없다."""
+    from services.market_indicators.cache import _yf_close_history
+    values = [0.01] + [100.0 + i * 0.5 for i in range(20)]
+    with patch("services.market_indicators.cache.yf.Ticker") as mock_t:
+        mock_t.return_value.history.return_value = _make_hist(values)
+        result = _yf_close_history("TEST", stored=[])
+    dates = [p["date"] for p in result]
+    print(f"[coverage] storage_lossless n={len(values)} returned={len(result)}")
+    assert len(result) == len(values)
+    assert result[0]["value"] == pytest.approx(0.01, abs=1e-6)
+
+
+# ── 적대 검토 확증 결함의 회귀 잠금 (task#303 in-run fix, CONFIRMED HIGH x3 + MED) ──
+
+def _pts(vals):
+    return [{"date": f"2025-{1 + i // 28:02d}-{1 + i % 28:02d}", "value": float(v)}
+            for i, v in enumerate(vals)]
+
+
+def test_filter_outliers_drops_nonpositive_points():
+    """0·음수 점은 어느 위치에서도 이상치다. 옛 중앙값 필터는 median>0인 한 v<=0을 항상
+    배제했으므로, 새 국소 판정이 이를 놓치면 **신규 사각**이 된다(적대 검토 HIGH).
+    yfinance 결측이 0.0으로 들어오는 경로가 실재한다."""
+    from services.market_indicators.cache import _filter_outliers
+    cases = {
+        "leading_zero": _pts([0.0] + [100.0 + i * 0.5 for i in range(20)]),
+        "mid_zero": _pts([100.0 + i * 0.5 for i in range(10)] + [0.0] + [105.0 + i * 0.5 for i in range(10)]),
+        "mid_negative": _pts([100.0 + i * 0.5 for i in range(10)] + [-50.0] + [105.0 + i * 0.5 for i in range(10)]),
+    }
+    for name, pts in cases.items():
+        kept = _filter_outliers(pts)
+        vals = [p["value"] for p in kept]
+        print(f"[coverage] nonpositive:{name} n={len(pts)} kept={len(kept)}")
+        assert all(v > 0 for v in vals), f"{name}: 비양수 점이 살아남았다 -> {[v for v in vals if v <= 0]}"
+        assert len(kept) == len(pts) - 1, f"{name}: {len(pts)} -> {len(kept)} (기대 {len(pts) - 1})"
+
+
+def test_filter_outliers_drops_leading_garbage_run():
+    """선두 쓰레기가 **2점 연속**이면 그 둘이 서로 정합해버려 '이웃 정합' 조건이 무력화된다
+    — 원 버그(9dedc01·f7b5a21)가 정확히 이 변형으로 재발한다(적대 검토 HIGH).
+    선두 런 판정(_LEAD_ABSURD_RATIO)이 그것을 막는다."""
+    from services.market_indicators.cache import _filter_outliers
+    pts = _pts([0.01, 0.01] + [100.0 + i * 0.5 for i in range(20)])
+    kept = _filter_outliers(pts)
+    print(f"[coverage] leading_run n={len(pts)} kept={len(kept)}")
+    assert len(kept) == 20, f"선두 쓰레기 2점이 생존했다: {[p['value'] for p in kept[:3]]}"
+    assert min(p["value"] for p in kept) >= 100.0
+
+
+def test_filter_outliers_lead_guard_spares_sustained_move():
+    """선두 런 판정이 지속 이동의 첫 점을 먹지 않는다 — ^IRX는 중앙값 대비 12배까지
+    벌어지므로 임계 50배가 그 사이에 있어야 한다(이 축이 없으면 위 가드가 B60을 재발시킨다)."""
+    from services.market_indicators.cache import _filter_outliers
+    pts = _pts([0.03 * (150 ** (i / 249)) for i in range(250)])
+    kept = _filter_outliers(pts)
+    print(f"[coverage] lead_guard_vs_ramp n={len(pts)} kept={len(kept)}")
+    assert len(kept) == 250, f"지속 이동에서 {250 - len(kept)}점이 잘렸다"
+
+
+def test_raw_history_never_leaks_into_api_response():
+    """저장 전용 raw 필드는 응답에 실리지 않는다 — 라우터가 이 dict를 그대로 반환하므로
+    새면 ADR-0040이 가리기로 한 쓰레기 점이 공개 API로 나가고 응답 shape도 바뀐다
+    (계획 비목표 위반, 적대 검토 HIGH). treasury의 _raw_histories는 **기존 키**라 대상이 아니다."""
+    from services.market_indicators import fx as fx_mod
+    from services.market_indicators import commodities as com_mod
+    checked = 0
+    with patch.object(fx_mod, "_get_cache", return_value=None), \
+         patch.object(fx_mod, "_mc_load", return_value=None), \
+         patch.object(fx_mod, "_mc_save"), patch.object(fx_mod, "_set_cache"), \
+         patch.object(fx_mod, "_yf_close_history",
+                      return_value=_pts([0.01] + [1300.0 + i for i in range(20)])):
+        resp = fx_mod.get_fx()
+        checked += 1
+        assert "_raw_history" not in resp, f"get_fx 응답에 raw 누출: {sorted(resp)}"
+        assert all(p["value"] > 1.0 for p in resp["history"]["usdkrw"]), "표시본에 쓰레기 점이 남았다"
+        vix = fx_mod.get_vix()
+        checked += 1
+        assert "_raw_history" not in vix, f"get_vix 응답에 raw 누출: {sorted(vix)}"
+    with patch.object(com_mod, "_get_cache", return_value=None), \
+         patch.object(com_mod, "_mc_load", return_value=None), \
+         patch.object(com_mod, "_mc_save"), patch.object(com_mod, "_set_cache"), \
+         patch.object(com_mod, "_yf_close_history",
+                      return_value=_pts([0.01] + [100.0 + i for i in range(20)])):
+        resp = com_mod.get_commodities()
+        checked += 1
+        assert "_raw_history" not in resp, f"get_commodities 응답에 raw 누출: {sorted(resp)}"
+    print(f"[coverage] raw_leak endpoints={checked}")
+    assert checked == 3
+
+
+def test_public_strips_only_new_raw_key():
+    """_public은 신규 키(_raw_history)만 벗긴다 — 기존 키(_raw_histories)를 없애는 것도
+    응답 shape 변경이다."""
+    from services.market_indicators.cache import _public
+    out = _public({"rates": 1, "history": 2, "_raw_history": 3, "_raw_histories": 4})
+    assert out == {"rates": 1, "history": 2, "_raw_histories": 4}

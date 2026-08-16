@@ -456,10 +456,17 @@ def test_generate_report_wires_peer_multiple_guard(tmp_path):
     assert [rows[t]["pbr"] for t in ("COMP2", "COMP3", "COMP4")] == [3.0, 3.5, 4.0]
 
 
+_ROW_TITLES = [
+    "매출액", "영업이익", "당기순이익", "지배주주순이익", "비지배주주순이익",
+    "영업이익률", "순이익률", "ROE", "부채비율", "당좌비율", "유보율",
+    "EPS", "PER", "BPS", "PBR", "주당배당금",
+]  # 실 Naver rowList 순서·title(B61, task#303)
+
+
 def _naver_quarter_response_4q(revenue_each, per=8.0, pbr=1.1):
     """4개 non-consensus 분기(키 "4">"3">"2">"1")의 finance/quarter 응답 fixture."""
     keys = ["4", "3", "2", "1"]
-    rows = [{"columns": {}} for _ in range(15)]
+    rows = [{"title": t, "columns": {}} for t in _ROW_TITLES]
     rows[0]["columns"] = {k: {"value": str(revenue_each)} for k in keys}
     rows[12]["columns"] = {keys[0]: {"value": str(per)}}
     rows[14]["columns"] = {keys[0]: {"value": str(pbr)}}

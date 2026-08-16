@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 import requests
 from concurrent.futures import ThreadPoolExecutor
-from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history
+from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history, _filter_outliers, _public
 
 logger = logging.getLogger(__name__)
 
@@ -21,28 +21,33 @@ def _fetch_usdkrw_current() -> float | None:
 
 
 def _fetch_fx(args: tuple) -> tuple:
-    key, sym, stored_history = args
+    key, sym, stored_raw = args
     try:
-        history = _yf_close_history(sym, stored_history, precision=4)
+        raw_history = _yf_close_history(sym, stored_raw, precision=4)
+        history = _filter_outliers(raw_history)
         if history:
             current = round(history[-1]["value"], 4)
             prev = round(history[-2]["value"], 4) if len(history) > 1 else current
             change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
-            return key, {"current": current, "change_pct": change_pct, "history": history}
+            return key, {"current": current, "change_pct": change_pct, "history": history,
+                         "_raw_history": raw_history}
     except Exception as e:
         logger.warning(f"[FX] _fetch_fx({key}) yfinance 실패: {e}")
         pass
 
-    if stored_history:
-        current = round(stored_history[-1]["value"], 4)
-        prev = round(stored_history[-2]["value"], 4) if len(stored_history) > 1 else current
-        change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
-        return key, {"current": current, "change_pct": change_pct, "history": stored_history}
+    if stored_raw:
+        history = _filter_outliers(stored_raw)
+        if history:
+            current = round(history[-1]["value"], 4)
+            prev = round(history[-2]["value"], 4) if len(history) > 1 else current
+            change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
+            return key, {"current": current, "change_pct": change_pct, "history": history,
+                         "_raw_history": stored_raw}
 
     if key == "usdkrw":
         current = _fetch_usdkrw_current()
         if current:
-            return key, {"current": current, "change_pct": 0.0, "history": []}
+            return key, {"current": current, "change_pct": 0.0, "history": [], "_raw_history": []}
 
     return key, None
 
@@ -57,7 +62,9 @@ def get_fx() -> dict:
     stored_rates = (stored["data"].get("rates") or {}) if stored else {}
     if stored:
         for k in _FX_SYMBOLS:
-            stored_histories[k] = (stored["data"].get("history") or {}).get(k, [])
+            # 배포 직후 창(구버전 blob엔 _raw_history 없음) → 구키 history로 폴백.
+            stored_histories[k] = ((stored["data"].get("_raw_history")
+                                    or stored["data"].get("history") or {}).get(k, []))
 
     with ThreadPoolExecutor(max_workers=3) as ex:
         results = dict(ex.map(
@@ -77,14 +84,18 @@ def get_fx() -> dict:
             rates[k] = stored_rates[k]
 
     history = {"usdkrw": results["usdkrw"]["history"]} if results.get("usdkrw") else {}
+    # `.get` 폴백 — _fetch_fx를 몽키패치하는 기존 테스트가 구 형태를 반환한다(적대 검토 HIGH).
+    _u = results.get("usdkrw")
+    raw_history = {"usdkrw": (_u.get("_raw_history") or _u.get("history") or [])} if _u else {}
 
     if not rates:
         return {"rates": {}, "history": {}}
 
-    data = {"rates": rates, "history": history}
+    data = {"rates": rates, "history": history, "_raw_history": raw_history}
     _mc_save("fx", data)
-    _set_cache("fx", data, ttl=3600)
-    return data
+    public = _public(data)
+    _set_cache("fx", public, ttl=3600)
+    return public
 
 
 def get_vix() -> dict:
@@ -93,19 +104,23 @@ def get_vix() -> dict:
         return cached
 
     stored = _mc_load("vix")
-    stored_history = (stored["data"].get("history") or []) if stored else []
+    # 배포 직후 창(구버전 blob엔 _raw_history 없음) → 구키 history로 폴백.
+    stored_raw = ((stored["data"].get("_raw_history") or stored["data"].get("history") or [])
+                  if stored else [])
 
     try:
-        history = _yf_close_history("^VIX", stored_history, precision=2)
-        if not history:
+        raw_history = _yf_close_history("^VIX", stored_raw, precision=2)
+        if not raw_history:
             return {"current": None, "change": None, "history": []}
+        history = _filter_outliers(raw_history)
         current = round(history[-1]["value"], 2)
         prev = round(history[-2]["value"], 2) if len(history) > 1 else current
         change = round(current - prev, 2)
-        data = {"current": current, "change": change, "history": history}
+        data = {"current": current, "change": change, "history": history, "_raw_history": raw_history}
         _mc_save("vix", data)
-        _set_cache("vix", data, ttl=3600)
-        return data
+        public = _public(data)
+        _set_cache("vix", public, ttl=3600)
+        return public
     except Exception as e:
         logger.warning(f"[VIX] get_vix 실패: {e}")
         return {"current": None, "change": None, "history": []}

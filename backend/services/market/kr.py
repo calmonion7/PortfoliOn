@@ -42,10 +42,16 @@ def _fnguide_market_cap(ticker: str) -> float | None:
     return None
 
 
-def _naver_row_val(rows: list, row_idx: int, key: str) -> float | None:
-    if row_idx >= len(rows):
+def _naver_row_val(rows: list, title: str, key: str, *, missing: set | None = None) -> float | None:
+    """rowList에서 title(계정명)로 행을 찾아 값을 읽는다 — 위치 인덱스는 상류가 행
+    순서를 바꾸면 조용히 다른 계정을 읽으므로 title 매칭으로 고정한다(B61, task#303).
+    title 미발견 시 None + `missing` 집합에 적재(호출자가 티커당 1회로 묶어 경고)."""
+    row = next((r for r in rows if r.get("title") == title), None)
+    if row is None:
+        if missing is not None:
+            missing.add(title)
         return None
-    val = rows[row_idx].get("columns", {}).get(key, {}).get("value", "-")
+    val = row.get("columns", {}).get(key, {}).get("value", "-")
     if not val or val == "-":
         return None
     try:
@@ -330,12 +336,13 @@ def get_financials_kr(ticker: str) -> list[dict]:
             return []
 
         sorted_meta = sorted(period_meta, key=lambda t: t["key"], reverse=True)
-        rv = lambda idx, k: _naver_row_val(rows, idx, k)
+        missing: set = set()
+        rv = lambda title, k: _naver_row_val(rows, title, k, missing=missing)
 
         latest_actual_bps = None
         for meta in sorted_meta[:6]:
             if meta.get("isConsensus") != "Y":
-                v = rv(13, meta["key"])
+                v = rv("BPS", meta["key"])
                 if v is not None:
                     latest_actual_bps = v
                     break
@@ -346,12 +353,12 @@ def get_financials_kr(ticker: str) -> list[dict]:
             period_str = f"{key[:4]}-{key[4:]}"
             is_consensus = meta.get("isConsensus") == "Y"
 
-            revenue   = rv(0,  key)
-            op_income = rv(1,  key)
-            eps       = rv(11, key)
-            per       = rv(12, key)
-            bps       = rv(13, key)
-            pbr       = rv(14, key)
+            revenue   = rv("매출액", key)
+            op_income = rv("영업이익", key)
+            eps       = rv("EPS", key)
+            per       = rv("PER", key)
+            bps       = rv("BPS", key)
+            pbr       = rv("PBR", key)
 
             if is_consensus and bps is None and latest_actual_bps is not None:
                 bps = latest_actual_bps
@@ -359,7 +366,7 @@ def get_financials_kr(ticker: str) -> list[dict]:
             if pbr is None and per is not None and eps is not None and bps and bps > 0:
                 pbr = round(per * eps / bps, 2)
 
-            ni_raw = rv(2, key)
+            ni_raw = rv("당기순이익", key)
             results.append({
                 "period": period_str,
                 "revenue":          int(revenue   * 1e8) if revenue   is not None else None,
@@ -370,12 +377,14 @@ def get_financials_kr(ticker: str) -> list[dict]:
                 "pbr": round(pbr, 2) if pbr is not None else None,
                 "is_consensus": is_consensus,
                 "net_income":        int(ni_raw * 1e8) if ni_raw is not None else None,
-                "operating_margin":  round(rv(5, key), 2) if rv(5, key) is not None else None,
-                "net_margin":        round(rv(6, key), 2) if rv(6, key) is not None else None,
-                "roe":               round(rv(7, key), 2) if rv(7, key) is not None else None,
-                "debt_ratio":        round(rv(8, key), 2) if rv(8, key) is not None else None,
-                "quick_ratio":       round(rv(9, key), 2) if rv(9, key) is not None else None,
+                "operating_margin":  round(rv("영업이익률", key), 2) if rv("영업이익률", key) is not None else None,
+                "net_margin":        round(rv("순이익률", key), 2) if rv("순이익률", key) is not None else None,
+                "roe":               round(rv("ROE", key), 2) if rv("ROE", key) is not None else None,
+                "debt_ratio":        round(rv("부채비율", key), 2) if rv("부채비율", key) is not None else None,
+                "quick_ratio":       round(rv("당좌비율", key), 2) if rv("당좌비율", key) is not None else None,
             })
+        if missing:
+            logger.warning(f"[MarketKR] rowList title 미발견 (ticker={ticker}, title={sorted(missing)})")
         return results
     except Exception as e:
         logger.warning(f"[Financials] 분기 재무 조회 실패 ({ticker}): {e}")
@@ -419,21 +428,22 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
             return []
 
         sorted_meta = sorted(period_meta, key=lambda t: t["key"], reverse=True)
-        rv = lambda idx, k: _naver_row_val(rows, idx, k)
+        missing: set = set()
+        rv = lambda title, k: _naver_row_val(rows, title, k, missing=missing)
 
         results = []
         for meta in sorted_meta[:4]:
             key = meta["key"]
             is_consensus = meta.get("isConsensus") == "Y"
 
-            revenue   = rv(0,  key)
-            op_income = rv(1,  key)
-            eps       = rv(11, key)
-            bps       = rv(13, key)
-            per       = rv(12, key)
-            pbr       = rv(14, key)
+            revenue   = rv("매출액", key)
+            op_income = rv("영업이익", key)
+            eps       = rv("EPS", key)
+            bps       = rv("BPS", key)
+            per       = rv("PER", key)
+            pbr       = rv("PBR", key)
 
-            ni_raw = rv(2, key)
+            ni_raw = rv("당기순이익", key)
             results.append({
                 "period": key[:4],
                 "revenue":          int(revenue   * 1e8) if revenue   is not None else None,
@@ -444,14 +454,16 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
                 "pbr": round(pbr, 2) if pbr is not None else None,
                 "is_consensus": is_consensus,
                 "net_income":        int(ni_raw * 1e8) if ni_raw is not None else None,
-                "operating_margin":  round(rv(5, key), 2) if rv(5, key) is not None else None,
-                "net_margin":        round(rv(6, key), 2) if rv(6, key) is not None else None,
-                "roe":               round(rv(7, key), 2) if rv(7, key) is not None else None,
-                "debt_ratio":        round(rv(8, key), 2) if rv(8, key) is not None else None,
-                "quick_ratio":       round(rv(9, key), 2) if rv(9, key) is not None else None,
+                "operating_margin":  round(rv("영업이익률", key), 2) if rv("영업이익률", key) is not None else None,
+                "net_margin":        round(rv("순이익률", key), 2) if rv("순이익률", key) is not None else None,
+                "roe":               round(rv("ROE", key), 2) if rv("ROE", key) is not None else None,
+                "debt_ratio":        round(rv("부채비율", key), 2) if rv("부채비율", key) is not None else None,
+                "quick_ratio":       round(rv("당좌비율", key), 2) if rv("당좌비율", key) is not None else None,
                 "fcf": None,
                 "interest_coverage": None,
             })
+        if missing:
+            logger.warning(f"[MarketKR] rowList title 미발견 (ticker={ticker}, title={sorted(missing)})")
 
         # DART 증강: FCF + 이자보상 (연간 전용)
         try:

@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import yfinance as yf
 from services.utils import sanitize
-from .cache import _mc_load, _mc_save, _yf_close_history
+from .cache import _mc_load, _mc_save, _yf_close_history, _filter_outliers
 
 logger = logging.getLogger(__name__)
 
@@ -203,12 +203,16 @@ def refresh_kospi_signal() -> dict:
 
     if fetch_ok:
         drivers_history = new_hist
+        # drivers_history(저장·다음 회 incremental 커서)는 raw다(ADR-0040) — 신호 계산은
+        # 표시본(_filter_outliers 적용)을 별도로 만들어 쓴다. 드라이버가 ^GSPC/^IXIC/
+        # USDKRW=X/^SOX라 배수 이동이 불가능해 실질 차이는 없지만, 동작 보존을 위해 유지.
+        display_hist = {k: _filter_outliers(v) for k, v in drivers_history.items()}
         band = _adaptive_band(kospi_rows, today_str)
         composite, signal = compute_signal(
-            _chg_pct(drivers_history["sp500"]),
-            _chg_pct(drivers_history["nasdaq"]),
-            _chg_pct(drivers_history["usdkrw"]),
-            _chg_pct(drivers_history["sox"]),
+            _chg_pct(display_hist["sp500"]),
+            _chg_pct(display_hist["nasdaq"]),
+            _chg_pct(display_hist["usdkrw"]),
+            _chg_pct(display_hist["sox"]),
             band,
         )
         record = {
@@ -217,10 +221,10 @@ def refresh_kospi_signal() -> dict:
             "composite_pct": composite,
             "band": band,
             "drivers": {
-                "sp500": _chg_pct(drivers_history["sp500"]),
-                "nasdaq": _chg_pct(drivers_history["nasdaq"]),
-                "usdkrw": _chg_pct(drivers_history["usdkrw"]),
-                "sox": _chg_pct(drivers_history["sox"]),
+                "sp500": _chg_pct(display_hist["sp500"]),
+                "nasdaq": _chg_pct(display_hist["nasdaq"]),
+                "usdkrw": _chg_pct(display_hist["usdkrw"]),
+                "sox": _chg_pct(display_hist["sox"]),
             },
             "actual_gap_pct": None,
             "actual_close_pct": None,

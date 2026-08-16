@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history
+from .cache import _get_cache, _set_cache, _mc_load, _mc_save, _yf_close_history, _filter_outliers, _public
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +17,15 @@ def _fetch_commodity(args: tuple) -> tuple:
     key, sym_unit, stored_history = args
     sym, unit = sym_unit
     try:
-        history = _yf_close_history(sym, stored_history, precision=2)
-        if not history:
+        raw_history = _yf_close_history(sym, stored_history, precision=2)
+        if not raw_history:
             return key, None
+        history = _filter_outliers(raw_history)
         current = round(history[-1]["value"], 2)
         prev = round(history[-2]["value"], 2) if len(history) > 1 else current
         change_pct = round((current - prev) / prev * 100, 2) if prev else 0.0
-        return key, {"current": current, "change_pct": change_pct, "unit": unit, "history": history}
+        return key, {"current": current, "change_pct": change_pct, "unit": unit,
+                     "history": history, "_raw_history": raw_history}
     except Exception as e:
         logger.warning(f"[Commodities] {key} fetch 실패: {e}")
         return key, None
@@ -38,7 +40,11 @@ def get_commodities() -> dict:
     stored_histories = {}
     if stored:
         for k in _COMMODITY_SYMBOLS:
-            stored_histories[k] = (stored["data"].get("history") or {}).get(k, [])
+            # 배포 직후 창: 구버전 blob엔 _raw_history가 없다. 그때 빈 리스트를 잡으면
+            # 개별 백필의 `stored_h` 조건이 falsy가 되어 그 심볼이 응답에서 통째로 사라진다
+            # ('직전 양호값 보존' 규약 위반, 적대 검토 MED) → 구키 history로 폴백한다.
+            stored_histories[k] = ((stored["data"].get("_raw_history")
+                                    or stored["data"].get("history") or {}).get(k, []))
 
     with ThreadPoolExecutor(max_workers=3) as ex:
         results = dict(ex.map(
@@ -48,36 +54,44 @@ def get_commodities() -> dict:
 
     if not any(results.values()):
         logger.warning("[Commodities] 전 심볼 fetch 실패 — 저장 생략, 저장값 반환")
-        return stored["data"] if stored else {"prices": {}, "history": {}}
+        return _public(stored["data"]) if stored else {"prices": {}, "history": {}}
 
     # 개별 백필 — gold만 실패해도 그 항목의 직전 price·history를 채워 전체 blob 소멸을 막는다.
     for k, stored_h in stored_histories.items():
         if results.get(k) is None and stored_h:
-            last = stored_h[-1]["value"]
-            prev = stored_h[-2]["value"] if len(stored_h) > 1 else last
+            display_h = _filter_outliers(stored_h)
+            last = display_h[-1]["value"]
+            prev = display_h[-2]["value"] if len(display_h) > 1 else last
             change_pct = round((last - prev) / prev * 100, 2) if prev else 0.0
             results[k] = {"current": last, "change_pct": change_pct,
-                          "unit": _COMMODITY_SYMBOLS[k][1], "history": stored_h}
+                          "unit": _COMMODITY_SYMBOLS[k][1], "history": display_h,
+                          "_raw_history": stored_h}
 
     prices = {k: {"current": v["current"], "change_pct": v["change_pct"], "unit": v["unit"]}
               for k, v in results.items() if v}
     history = {k: v["history"] for k, v in results.items() if v}
+    # `.get` 폴백 필수 — _fetch_commodity를 몽키패치하는 기존 테스트가 구 형태(_raw_history 없음)를
+    # 반환하므로 bare 인덱싱이면 KeyError로 죽는다(적대 검토 HIGH, 실측 5건 파손).
+    raw_history = {k: (v.get("_raw_history") or v.get("history") or []) for k, v in results.items() if v}
 
-    data = {"prices": prices, "history": history}
+    data = {"prices": prices, "history": history, "_raw_history": raw_history}
     _mc_save("commodities", data)
-    _set_cache("commodities", data, ttl=3600)
-    return data
+    public = _public(data)
+    _set_cache("commodities", public, ttl=3600)
+    return public
 
 
 def _fetch_treasury(args: tuple) -> tuple:
     key, sym, stored_history = args
     try:
-        history = _yf_close_history(sym, stored_history, precision=3)
-        if not history:
+        raw_history = _yf_close_history(sym, stored_history, precision=3)
+        if not raw_history:
             return key, None
+        history = _filter_outliers(raw_history)
         current = round(history[-1]["value"], 3)
         prev = round(history[-2]["value"], 3) if len(history) > 1 else current
-        return key, {"current": current, "change_bp": round((current - prev) * 100, 1), "history": history}
+        return key, {"current": current, "change_bp": round((current - prev) * 100, 1),
+                     "history": history, "_raw_history": raw_history}
     except Exception as e:
         logger.warning(f"[Treasury] {key} fetch 실패: {e}")
         return key, None
@@ -108,9 +122,11 @@ def get_treasury() -> dict:
     # 개별 백필 — 10y만 실패해도 그 만기의 직전 current·history를 채워 전체 blob 소멸을 막는다.
     for k, stored_h in stored_raw.items():
         if results.get(k) is None and stored_h:
-            last = stored_h[-1]["value"]
-            prev = stored_h[-2]["value"] if len(stored_h) > 1 else last
-            results[k] = {"current": last, "change_bp": round((last - prev) * 100, 1), "history": stored_h}
+            display_h = _filter_outliers(stored_h)
+            last = display_h[-1]["value"]
+            prev = display_h[-2]["value"] if len(display_h) > 1 else last
+            results[k] = {"current": last, "change_bp": round((last - prev) * 100, 1),
+                          "history": display_h, "_raw_history": stored_h}
 
     rates = {k: {"current": v["current"], "change_bp": v["change_bp"]}
              for k, v in results.items() if v}
@@ -124,7 +140,7 @@ def get_treasury() -> dict:
         spread = [{"date": dt, "value": round(h10[dt] - h3m[dt], 3)}
                   for dt in sorted(set(h10) & set(h3m))]
 
-    raw_histories = {k: v["history"] for k, v in results.items() if v}
+    raw_histories = {k: (v.get("_raw_history") or v.get("history") or []) for k, v in results.items() if v}
     data = {"rates": rates, "history": history, "spread": spread, "_raw_histories": raw_histories}
     _mc_save("treasury", data)
     _set_cache("treasury", data, ttl=3600)
