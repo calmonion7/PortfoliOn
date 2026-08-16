@@ -8,7 +8,6 @@ import { TECH_NAMES, sortPlayers, groupByCategory } from '../components/reports/
 import MarketGrowthChart from '../components/tech/MarketGrowthChart'
 import MarketEstimates, { marketEstimatesLayout } from '../components/tech/MarketEstimates'
 import ShareChart from '../components/tech/ShareChart'
-import TechLevelBand from '../components/tech/TechLevelBand'
 import TechGraph from '../components/tech/TechGraph'
 import TechKpiStrip from '../components/tech/TechKpiStrip'
 import PlayerTable from '../components/tech/PlayerTable'
@@ -25,8 +24,9 @@ import './TechReport.css'
 //
 // 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로 재구성. CONTEXT.md 구성 서사도 이 순서다):
 //   기술명 h1 → 리드 문단 → KPI 스트립 → 전역 목차 → 핵심 포인트 → 진척 타임라인 → 주요 업체 표
-//   → 기술수준 밴드 → 계열 비교 → 점유율 → 난제 → 확인할 지표 → 시장 규모 → 연관 기술
+//   → 계열 비교 → 점유율 → 난제 → 확인할 지표 → 시장 규모 → 연관 기술
 //   → 상세 설명(상시 노출) → 출처.
+// ADR-0041: 「기술수준 비교」 밴드 섹션은 업체 표의 「기술수준」 셀로 흡수돼 별도 섹션이 아니다.
 // task#281(2/2)이 신규 3필드(key_points·milestones·players[].category)로 그 예약 자리를 채웠다.
 // task#297(1/2)이 발행 스키마에 2필드(variants·watch_items)를 추가하고 task#298(2/2)이 그것으로
 // 「계열 비교」(점유율 바로 앞)·「확인할 지표」(난제 바로 뒤)를 렌더한다. 다섯 필드 전부
@@ -42,11 +42,12 @@ import './TechReport.css'
 // ⚠️ 이 파일은 배선만 한다 — 업체 표시 규율(gap_years·share_pct·기술수준 라벨)은 PlayerTable이
 // 단독 소유한다. 여기에 같은 필드의 두 번째 거동을 두면 한 페이지에서 한 필드가 두 얼굴을
 // 갖게 된다(task#277 이탈 7 실사례).
-// 같은 이유로 **업체 순서도 여기서 한 번만 정한다**(sortPlayers 1회 → 전 소비처 공유). 표만
-// 정렬하고 밴드에 원배열을 넘기면 30px 간격의 두 섹션이 같은 9곳을 다른 순서로 나열한다
-// (task#280 적대 리뷰 F1 실측: 4·5번째가 뒤바뀜). 재정렬은 멱등이라 소비처가 또 정렬해도 안전하다.
-// components/tech/* 는 전부 순수 표시 컴포넌트 — 데이터가 없으면 조용히 생략한다(TechLevelBand는
-// 예외 — 업체가 있으면 항상 표시하고 결측 행은 "—", ShareChart/TechGraph는 섹션째 생략).
+// 같은 이유로 **업체 순서도 여기서 한 번만 정한다**(sortPlayers 1회 → 전 소비처 공유). ADR-0041로
+// 「기술수준 비교」 밴드가 표 셀로 흡수돼 표↔밴드 순서 불일치 위험(task#280 적대 리뷰 F1, 같은 업체를
+// 두 섹션이 다른 순서로 나열)은 같은 <tr>이라 원리적으로 사라졌다. 남은 별도 섹션은 점유율
+// (ShareChart)뿐이라 여전히 같은 `ordered`를 공유해야 한다. 재정렬은 멱등이라 소비처가 또 정렬해도
+// 안전하다. components/tech/* 는 전부 순수 표시 컴포넌트 — 데이터가 없으면 조용히 생략한다
+// (ShareChart/TechGraph는 섹션째 생략).
 
 export default function TechReport() {
   const { slug } = useParams()
@@ -141,7 +142,6 @@ export default function TechReport() {
     { id: 'key-points', label: '핵심 포인트', show: hasKeyPoints },
     { id: 'milestones', label: '진척 타임라인', show: hasMilestones },
     { id: 'players', label: '주요 업체', show: hasPlayers },
-    { id: 'levels', label: '기술수준 비교', show: hasPlayers },
     { id: 'variants', label: '계열 비교', show: hasVariants },
     { id: 'share', label: '점유율', show: hasShare },
     { id: 'challenges', label: '해결해야 할 난제', show: hasChallenges },
@@ -217,14 +217,6 @@ export default function TechReport() {
         <div id="players" data-tech-section="players" style={{ marginBottom: 30 }}>
           <SectionTitle>주요 업체</SectionTitle>
           <PlayerTable players={ordered} holdings={holdings} />
-        </div>
-      )}
-
-      {/* ── 기술수준 비교 (업체 × 5단계 밴드, task#277 S3) ── */}
-      {hasPlayers && (
-        <div id="levels" data-tech-section="levels" style={{ marginBottom: 30 }}>
-          <SectionTitle>기술수준 비교</SectionTitle>
-          <TechLevelBand players={ordered} />
         </div>
       )}
 

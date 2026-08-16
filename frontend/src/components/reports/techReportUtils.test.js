@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatMarketSize, splitSeries, formatMarketSummary, TECH_NAMES, TECH_LEVEL_LABELS,
-  deriveTechKpis, sortPlayers, parseDescriptionSections, playerColumns, groupByCategory,
+  deriveTechKpis, sortPlayers, parseDescriptionSections, playerColumns, groupByCategory, isLeader,
 } from './techReportUtils'
 
 // 주요기술 리포트(ADR-0033, task#276 S5, 개명 ADR-0038) 순수 헬퍼 — red-first(TDD 대상은 formatMarketSize·splitSeries).
@@ -462,5 +462,31 @@ describe('groupByCategory — 분류 그룹화(버킷 키 Symbol · 미분류 �
   it('빈 분류(공백)만 있으면 빈 배열, 유효 분류가 있으면 그 수만큼 그룹화된다', () => {
     expect(groupByCategory([{ name: 'A', category: '  ' }])).toEqual([])
     expect(groupByCategory(NINE).length).toBe(3)
+  })
+})
+
+describe('isLeader — 선두 판정 단일 소스 (task#304)', () => {
+  it('gap_years===0 이거나 leader_name이 자기 이름과 같으면 선두다', () => {
+    expect(isLeader({ name: 'A', gap_years: 0, leader_name: 'B' })).toBe(true)
+    expect(isLeader({ name: 'A', gap_years: null, leader_name: 'A' })).toBe(true)
+  })
+
+  it('그 외는 선두가 아니다 — 음수·양수 격차, 이름 불일치, CEO 인명', () => {
+    expect(isLeader({ name: 'A', gap_years: 3, leader_name: 'B' })).toBe(false)
+    expect(isLeader({ name: 'A', gap_years: -1, leader_name: 'B' })).toBe(false)
+    expect(isLeader({ name: 'A', gap_years: null, leader_name: 'B' })).toBe(false)
+    // leader_name이 CEO 인명으로 채워지는 실사례 — 자기 이름과 같을 때만 인정하므로 매치되지 않는다
+    expect(isLeader({ name: 'SpaceX', gap_years: 2, leader_name: 'Elon Musk' })).toBe(false)
+  })
+
+  it('결측·빈 문자열이 아무나 선두로 만들지 않는다 (적대 검토 MED)', () => {
+    // 백엔드 Player 모델의 name·leader_name엔 길이 제약이 없어 빈 문자열이 422 없이 통과한다.
+    // null 체크만으로는 `'' === ''`가 참이 되어 그 행이 「현재 선두」로 뜬다.
+    expect(isLeader({ name: '', gap_years: null, leader_name: '' })).toBe(false)
+    expect(isLeader({ name: '   ', gap_years: null, leader_name: '   ' })).toBe(false)
+    expect(isLeader({ name: null, gap_years: null, leader_name: null })).toBe(false)
+    expect(isLeader({ gap_years: null })).toBe(false)
+    expect(isLeader(null)).toBe(false)
+    expect(isLeader(undefined)).toBe(false)
   })
 })

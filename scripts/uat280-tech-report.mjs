@@ -46,6 +46,31 @@
 //    `note-open`(클릭 1회 → 펼침 1개) 사이클을 통째로 없애고 `role="group"`을 직접 잰다.
 //  · `detailsTotal`/`detailsOpen` 기반 prose-total/open/collapsed → `<details>` 0개 + `<h3>` 개수.
 // 뒤집는 근거는 task#280 S4의 기록이 아니라 task#296 계획(사용자 결정, task#264 절차)이다.
+//
+// ── task#304 S3 갱신(ADR-0041 — 「기술수준 비교」 밴드가 「주요 업체」 표의 셀로 흡수됐다) ────────
+// 이 커밋이 바꾼 **동작**은 넷이다: ① 기술수준이 텍스트(`5단계 · 양산상용`)가 아니라 5칸 밴드로
+// 렌더된다 ② 밴드 섹션이 없다 ③ 목차가 한 칩 줄었다 ④ 분야 소제목에 선두가 병기된다.
+// 갱신 대상은 testid가 아니라 그 동작을 단언하는 **모든 축**이다(가토 ⑧ⓟ).
+//  · 행 파서 `cellTxt[levelIdx].match(/^(\d+)단계/)` → **원리적으로 항상 null**이 된다(셀 텍스트가
+//    단계 숫자 하나뿐). 그대로 뒀으면 전 행 level=null → table-order 불변식이 통째로 거짓 FAIL했다.
+//    새 파서는 **화면의 진실**인 채움 칸 수를 읽고, aria-label 값과 교차 대조한다.
+//  · `band-order` 3축(밴드 행 이름 == 표 행 이름) → 밴드 섹션이 사라져 **도달 불가**. 삭제·완화가
+//    아니라 판정 대상을 옮긴다(가토 ⑧ⓝ). 그 축이 지킨 계약은 "같은 업체 집합이 한 화면에서 두
+//    순서로 나열되지 않는다"였고, 남은 형태는 둘이다:
+//      (A) 표 렌더 순서 == 페이지의 **단일 정렬**(TechReport.jsx `ordered` = groupByCategory(
+//          sortPlayers(players)) 평탄화). 옛 축은 *불변식*(그룹 안 단조)만 봤는데 이건 **정확 일치**라
+//          더 엄격하다 → `single-order`.
+//      (B) 표↔점유율 **분류 소속 일치** → `cross-category`.
+//      ⚠️ (B)에 *순서* 동치를 요구하면 안 된다 — ShareChart는 자신이 받은 배열을 `share_pct` 내림
+//         차순으로 **재정렬**하므로(ShareChart.jsx:40 직독) 두 섹션의 행 순서는 설계상 다르다. 그룹
+//         순서도 각 섹션의 정렬 결과에서 파생되므로 마찬가지다. 요구했으면 정상 구현이 거짓 FAIL한다.
+//         실측 순서 차이는 단언하지 않고 **출력**한다(출력은 넓게, 단언은 목표에만 — 가토 ⑧ⓗ).
+//  · 신규 축: `level-band-*`(칸 5개 · 채움 수 == API tech_level · 칸 렌더 폭 · 채움색≠미채움색 이빨) ·
+//    `legend`(표 위 5단계 범례) · `levels-section-absent`/`toc-no-levels`(②③) · `group-leader`(④).
+//  · SLUGS 2 → **4**. 결함의 가시성이 판마다 갈린다(task#280은 reusable-rocket에서만 나는 넘침을
+//    겪었고 task#296은 최장 문자열 판에서만 나는 가로 스크롤을 겪었다). 4종은 최다 행·최다 분류
+//    (ai-datacenter-equipment) · 최장 leader_name(solid-state-battery) · 최장 country
+//    (reusable-rocket) · **부분 분류**(smr — 분류 없는 업체가 섞인 판)를 각각 덮는다.
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
 
@@ -64,6 +89,9 @@ const capLog = [];
 // 둘 다 **무조건** 출력한다(개별 PASS 메시지는 FAIL이 하나라도 있으면 안 찍히는 구조라서).
 const kpiState = {};
 const fvLog = [];
+// task#304 — 표↔점유율의 **순서** 차이 실측 로그(단언 아님, 출력 전용). 두 섹션은 정렬 축이 다르므로
+// 순서 동치는 계약이 아니다 — 그래도 실측을 남겨야 "왜 안 재는가"의 근거가 다음 사람에게 보인다.
+const crossLog = [];
 const cov = {};
 const bump = (k, n = 1) => { cov[k] = (cov[k] || 0) + n; };
 const eq = (tag, got, want, note = '') => {
@@ -83,9 +111,17 @@ if (!access_token) { console.error('로그인 실패 — access_token 없음. �
 
 // TECH_NAMES 미러 — frontend/src/components/reports/techReportUtils.js 의 표시명 맵(백엔드는 이 이름을
 // 응답에 싣지 않는다, ADR-0033 결정 2). h1 identity 단언의 기대값 소스이므로 슬러그가 없으면 즉시 exit.
-const TECH_NAMES = { 'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇' };
+const TECH_NAMES = {
+  'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇',
+  'ai-datacenter-equipment': 'AI 데이터센터 설비', 'ai-datacenter-ops': 'AI 데이터센터 운영',
+};
+// 기술 성숙 단계 5단계 라벨 미러(techReportUtils.TECH_LEVEL_LABELS) — 범례·aria-label 기대값 소스.
+const TECH_LEVEL_LABELS = ['', '기초연구', '시제품', '실증', '초기상용', '양산상용'];
 
-const SLUGS = ['smr', 'reusable-rocket'];
+// task#304 — 2 → 4. 착수 실측(2026-08-16, GET /api/tech-reports): 발행 6종 중
+//   ai-datacenter-equipment 25업체·25분류·7축 / solid-state-battery 12·12·2(최장 leader_name)
+//   reusable-rocket 9·9·3(최장 country `프랑스·독일·일본`) / smr 11업체·**9분류**(부분 분류)
+const SLUGS = ['ai-datacenter-equipment', 'solid-state-battery', 'reusable-rocket', 'smr'];
 
 // ── 이빨 실증용 fault-injection(대조군) — 기본 꺼짐. `CAPTION_CONTROL=gap|clip` 으로 켠다 ──────
 // 앱은 건드리지 않고 **처방만 무효화**하는 대조군이다(가토 ⑧ⓚ). 켠 실행은 캡션 축이 FAIL해야 정상이며
@@ -132,6 +168,50 @@ const mirrorPlayerColumns = (players) => {
   if (list.some((p) => Number.isFinite(p?.share_pct) && p.share_pct >= 0)) cols.push('share');
   return cols;
 };
+
+// ── 페이지의 **단일 정렬** 미러(TechReport.jsx:110-112 직독) ─────────────────────────────────
+//   sorted  = sortPlayers(players)                       — 기술수준 내림 → 동단계 격차 오름 → null 최후
+//   ordered = groupByCategory(sorted).flatMap(g=>g.players)  — 분류 있으면 그룹 평탄화, 없으면 sorted
+// PlayerTable은 이 `ordered`를 받아 다시 sortPlayers+groupByCategory 하지만 멱등이라 렌더 순서 == ordered.
+// 그래서 이 미러가 표 렌더 순서의 **정확한** 기대값이 된다(옛 band-order가 지키던 계약의 후신).
+const mirrorSortPlayers = (players) => {
+  const lv = (p) => (Number.isFinite(p?.tech_level) ? p.tech_level : -Infinity);
+  return [...(Array.isArray(players) ? players : [])].sort((a, b) => {
+    if (lv(b) !== lv(a)) return lv(b) - lv(a);
+    const ga = a?.gap_years, gb = b?.gap_years;
+    if (ga == null && gb == null) return 0;
+    if (ga == null) return 1;
+    if (gb == null) return -1;
+    return ga - gb;
+  });
+};
+// 미분류 버킷은 **항상 마지막**(techReportUtils.groupByCategory) — Symbol 키라 데이터 문자열과 충돌 불가.
+const UNCLASSIFIED_LABEL = '미분류';
+const UNCLASSIFIED_SYM = Symbol('unclassified');
+const catNameOf = (p) => (typeof p?.category === 'string' && p.category.trim() !== '' ? p.category.trim() : null);
+const mirrorGroupByCategory = (players) => {
+  const list = Array.isArray(players) ? players : [];
+  if (!list.some((p) => catNameOf(p) != null)) return [];
+  const groups = new Map();
+  for (const p of list) {
+    const key = catNameOf(p) ?? UNCLASSIFIED_SYM;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p);
+  }
+  const rest = groups.get(UNCLASSIFIED_SYM);
+  if (rest) { groups.delete(UNCLASSIFIED_SYM); groups.set(UNCLASSIFIED_SYM, rest); }
+  return [...groups].map(([k, members]) => ({ category: k === UNCLASSIFIED_SYM ? UNCLASSIFIED_LABEL : k, players: members }));
+};
+// 화면에 보여야 할 분류 라벨(분류 없는 업체는 '미분류' 버킷) — 표·점유율 두 섹션의 공통 기대값.
+const expectedCatOf = (p) => catNameOf(p) ?? UNCLASSIFIED_LABEL;
+// isLeader 미러(techReportUtils.isLeader, ADR-0041 결정 3) — 합집합. leader_name != null을 반드시
+// 함께 본다(둘 다 null이면 `leader_name === name`이 참이 되어 아무나 선두가 된다).
+const isLeaderMirror = (p) => p?.gap_years === 0 || (p?.leader_name != null && p.leader_name === p?.name);
+// ShareChart.jsx:38-45 직독 — 유한·음수아님 필터 → share_pct 내림차순 → groupByCategory.
+const shareRowsOf = (players) => (players || [])
+  .filter((p) => p && Number.isFinite(p.share_pct) && p.share_pct >= 0)
+  .sort((a, b) => b.share_pct - a.share_pct);
+
 const DATA = {};
 for (const slug of SLUGS) {
   const res = await fetch(`${BASE}/api/tech-reports/${slug}`, { headers: { Authorization: `Bearer ${access_token}` } });
@@ -145,6 +225,11 @@ for (const slug of SLUGS) {
   // 접힘으로 뒤집혔다(firstTitled만 open이던 구동작은 폐기) — 접힌 수 = 총 details 전체.
   const rationale = rep.difficulty?.rationale;
   const titled = bracketHeadings(rep.description) + (typeof rationale === 'string' && rationale.trim() !== '' ? 1 : 0);
+
+  // 페이지 단일 정렬 미러 — 표 렌더 순서·그룹 소제목의 기대값 소스.
+  const sortedPlayers = mirrorSortPlayers(players);
+  const playerGroups = mirrorGroupByCategory(sortedPlayers);
+  const orderedNames = (playerGroups.length > 0 ? playerGroups.flatMap((g) => g.players) : sortedPlayers).map((p) => p.name);
 
   DATA[slug] = {
     rep, players,
@@ -168,11 +253,27 @@ for (const slug of SLUGS) {
     // sortPlayers로 API 순서와 달라지므로 note 행 순서를 index로 API players에 대응시키면 안 된다).
     cols: mirrorPlayerColumns(players),
     notedPlayers: players.filter((p) => typeof p.note === 'string' && p.note.trim() !== ''),
+    // ── task#304 — 옛 band-order의 후신(위 헤더 (A)(B)) ──
+    // (A) 표 렌더 순서의 **정확한** 기대값.
+    ordered: orderedNames,
+    // 그룹 소제목 라벨 순서(분류 없으면 []) + 그룹별 선두 병기 기대값(ADR-0041 결정 4 · isLeader 미러).
+    groupLabels: playerGroups.map((g) => g.category),
+    groupLeaderText: playerGroups.map((g) => {
+      const names = [...new Set(g.players.filter(isLeaderMirror).map((p) => p.name))];
+      return `${g.category}${names.length > 0 ? ` · 선두 ${names.join(' · ')}` : ''}`;
+    }),
+    // (B) 표↔점유율 교차 대조용 — 업체명 → 화면에 보여야 할 분류 라벨.
+    catByName: Object.fromEntries(players.map((p) => [p.name, expectedCatOf(p)])),
+    shareOrdered: shareRowsOf(players).map((p) => p.name),
+    // 밴드 축 기대값 — 업체명 → tech_level(라벨 없는 값은 셀 자체가 렌더되지 않으므로 null).
+    levelByName: Object.fromEntries(players.map((p) => [p.name, TECH_LEVEL_LABELS[p.tech_level] ? p.tech_level : null])),
   };
   console.log(`  [실응답] ${slug}: title ${rep.title.length}자 · players ${players.length} · 소제목항목 ${titled}` +
     ` · cagr ${rep.market?.cagr_pct} · challenges ${(rep.challenges || []).length} · share섹션 ${DATA[slug].hasShare}` +
     ` · sources ${(rep.sources || []).length} · 연도 ${DATA[slug].years}` +
-    ` · 고유선두 ${DATA[slug].leaders.length}명 ${JSON.stringify(DATA[slug].leaders)}`);
+    ` · 고유선두 ${DATA[slug].leaders.length}명 ${JSON.stringify(DATA[slug].leaders)}` +
+    ` · 분류그룹 ${DATA[slug].groupLabels.length}개 · 점유율행 ${DATA[slug].shareOrdered.length}` +
+    ` · 표순서≠API순서 ${JSON.stringify(orderedNames) !== JSON.stringify(players.map((p) => p.name))}`);
 }
 
 // ── 브라우저 안 측정기 ────────────────────────────────────────────────────
@@ -269,18 +370,45 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   // 이제 전역이 아니라 그룹 안에서 성립하므로, 각 행이 어느 그룹에 속하는지 DOM 순서로 추적한다
   // (그룹 없는 판은 group=null 하나뿐이라 옛 전역 판정과 동일하게 동작한다).
   const groupOf = new Map();
+  const groupRowLabels = [];
   {
     let cur = null;
     for (const tr of playersEl.querySelectorAll('tr')) {
       const tid = tr.getAttribute('data-testid');
-      if (tid === 'tech-report-player-group') cur = txt(tr);
+      if (tid === 'tech-report-player-group') { cur = txt(tr); groupRowLabels.push(cur); }
       else if (tid === 'tech-report-player-row') groupOf.set(tr, cur);
     }
   }
   const rows = [...playersEl.querySelectorAll('[data-testid="tech-report-player-row"]')].map((tr) => {
     const cells = [...tr.children].map((td) => txt(td));
     const nameEl = tr.querySelector('[data-testid="tech-report-player-name"]');
-    const lvM = (cells[levelIdx] || '').match(/^(\d+)단계/);
+    // ── task#304 — 기술수준은 텍스트가 아니라 5칸 밴드다. 옛 파서 `/^(\d+)단계/`는 셀 텍스트가
+    //    단계 숫자 하나로 줄어 **원리적으로 항상 null**이 된다 → 화면의 진실인 **채움 칸 수**로 읽고
+    //    aria-label(`N단계 · 라벨`)과 교차 대조한다(둘이 어긋나면 화면과 AT가 다른 값을 말하는 것).
+    const levelTd = levelIdx >= 0 ? tr.children[levelIdx] : null;
+    const cellsEl = levelTd ? levelTd.querySelector('.tech-level-band__cells') : null;
+    const bandCells = cellsEl ? [...cellsEl.querySelectorAll('.tech-level-band__cell')] : [];
+    const filledEls = bandCells.filter((c) => c.classList.contains('tech-level-band__cell--filled'));
+    const unfilledEl = bandCells.find((c) => !c.classList.contains('tech-level-band__cell--filled')) || null;
+    const gaugeEl = filledEls[0] || bandCells[0] || null;
+    const gb = gaugeEl ? gaugeEl.getBoundingClientRect() : null;
+    const ariaM = cellsEl ? (cellsEl.getAttribute('aria-label') || '').match(/^(\d+)단계 · (.+)$/) : null;
+    const band = cellsEl ? {
+      total: bandCells.length,
+      filled: filledEls.length,
+      aria: cellsEl.getAttribute('aria-label'),
+      ariaLevel: ariaM ? Number(ariaM[1]) : null,
+      ariaLabelText: ariaM ? ariaM[2] : null,
+      role: cellsEl.getAttribute('role'),
+      // 칸 하나의 **화면** 렌더 폭·높이(가토 ⑫ — 선언값이 아니라 화면 픽셀).
+      cw: gb ? Math.round(gb.width * 10) / 10 : null,
+      ch: gb ? Math.round(gb.height * 10) / 10 : null,
+      // 칸 묶음이 접혔는가 — 직속 자식(5칸 + 단계 숫자)의 서로 다른 top 개수(가토 ⑨ 정정판).
+      lines: new Set([...cellsEl.children].map((c) => Math.round(c.getBoundingClientRect().top))).size,
+      filledColor: filledEls[0] ? cs(filledEls[0]).backgroundColor : null,
+      unfilledColor: unfilledEl ? cs(unfilledEl).backgroundColor : null,
+      digit: txt(cellsEl),
+    } : null;
     // 「선두 대비」 셀은 격차만 담는다(`5년`). leader_name은 표 위 캡션으로 올라갔으므로 옛
     // `선두 대비 N년 · {이름}` 패턴으로 파싱하면 **전 행의 gap이 null**이 되어 정렬 불변식이
     // 거짓 FAIL한다(파서가 화면을 못 읽는 것을 구현 결함으로 오귀속하는 자리다).
@@ -288,7 +416,10 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
     return {
       name: nameEl ? txt(nameEl) : null,
       group: groupOf.get(tr) ?? null,
-      level: lvM ? Number(lvM[1]) : null,
+      band,
+      // 정렬 불변식의 입력 — 화면의 진실(채움 칸 수). 밴드가 없는 행(tech_level 결측 → `—`)은 null.
+      level: band ? band.filled : null,
+      levelText: cells[levelIdx] ?? null,
       // '현재 선두' = gap 0(0은 유효값이다 — falsy로 흘리면 선두를 통째 놓친다), '—' = null
       gap: gapIdx >= 0 && cells[gapIdx] === '현재 선두' ? 0 : (gapM ? Number(gapM[1]) : null),
       share: shareIdx >= 0 ? cells[shareIdx] : null,
@@ -362,13 +493,31 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
     };
   });
 
-  // ── 기술수준 밴드 행 이름 — 표와 **같은 순서**여야 한다(F1). 밴드는 자체 정렬을 하지 않으므로
-  //    받은 배열 순서가 그대로 화면 순서다.
-  const bandEl = root.querySelector('[data-testid="tech-level-band"]');
-  const bandNames = bandEl
-    ? [...bandEl.querySelectorAll('[data-testid="tech-level-band-row"]')]
-        .map((r) => { const n = r.querySelector('.tech-level-band__name'); return n ? txt(n) : null; })
-    : [];
+  // ── task#304 — 옛 「기술수준 비교」 섹션의 **부재**(②)와 목차 칩 감소(③) ────────────────────
+  //    섹션 컴포넌트·testid·앵커가 전부 사라졌는지 세 표면에서 각각 센다(하나만 남아도 유령 UI다).
+  const levelsSection = root.querySelectorAll('[data-tech-section="levels"]').length;
+  const bandSectionEl = root.querySelectorAll('[data-testid="tech-level-band"]').length;
+  const levelsAnchor = root.querySelectorAll('#levels').length;
+  const tocLabels = [...root.querySelectorAll('[data-testid="tech-toc-chip"]')].map((a) => txt(a));
+
+  // ── 표 위 5단계 범례(ADR-0041 결정 1) — 밴드 섹션이 맨 위에 두던 관례를 표로 승계했다.
+  const legendEl = root.querySelector('.tech-level-band__legend');
+  const legendItems = legendEl ? [...legendEl.querySelectorAll('.tech-level-band__legend-item')].map((e) => txt(e)) : null;
+  // 범례 ↔ 표 간격은 아래 titleChain의 한 링크로 잰다(가토 ⑩) — 별도 필드를 두지 않는다.
+
+  // ── 점유율 차트 행 + 그룹 라벨 — 표↔점유율 **분류 소속** 대조용(옛 band-order (B)) ──────────
+  //    ⚠️ 순서는 대조하지 않는다(ShareChart가 share_pct 내림차순으로 재정렬 — 헤더 주석 참조).
+  const shareEl = root.querySelector('[data-testid="tech-share-chart"]');
+  const shareGroupEls = shareEl ? [...shareEl.querySelectorAll('[data-testid="tech-share-chart-group"]')] : [];
+  const shareRowName = (r) => { const s = r.querySelector('span'); return s ? txt(s) : null; };
+  const shareRowsFlat = shareEl ? [...shareEl.querySelectorAll('[data-testid="tech-share-chart-row"]')].map(shareRowName) : [];
+  // 그룹 라벨 = 그룹 div의 첫 자식(초과 경고 span은 그 안의 자식이라 텍스트에 섞인다 → 자식 span 제외분만).
+  const shareGroups = shareGroupEls.map((g) => {
+    const head = g.firstElementChild;
+    const warn = head ? head.querySelector('span') : null;
+    const label = head ? txt(head).replace(warn ? txt(warn) : '', '').trim() : null;
+    return { label, names: [...g.querySelectorAll('[data-testid="tech-share-chart-row"]')].map(shareRowName) };
+  });
 
   // ── task#296 — 표 스크롤러(overflowX:auto 래퍼)가 완전히 제거됐다. "조상에 그 메커니즘이 남아
   //    있는가"(회귀 감지, 0개여야 한다)와 "표 자신이 넘치는가"를 **전 뷰포트**에서 잰다 — 모바일도
@@ -409,14 +558,16 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   //    S3의 F3 수정이 leader_name을 표 위 캡션으로 승격해 이 자리가 2단이 됐다. 제목 bottom과 표 top을
   //    **한 번에** 재면 그 사이에 낀 캡션의 렌더 높이까지 "간격"으로 세게 된다(uat276 실측 33px 중
   //    17px이 캡션 자신의 텍스트다 — 빈 공간이 아니다) → 사슬을 캡션을 **통과해 링크별로** 잰다.
+  //    ⚠️ task#304 — 사슬에 **범례**가 새로 끼었다(제목 → 캡션 → 범례 → 표). 링크를 늘리지 않고
+  //    옛 `caption→table`을 그대로 재면 그 33px과 같은 함정에 다시 빠진다(범례 텍스트 자신의 높이가
+  //    "간격"으로 계상돼 임계를 넘는다) — 임계를 올리는 게 아니라 사슬을 링크로 쪼갠다(가토 ⑧ⓝ).
   const playersCap = [...root.querySelectorAll('.rpt-title')].find((t) => txt(t).includes('주요 업체'));
   const leaderEl = root.querySelector('[data-testid="tech-report-players-leader"]');
   const gapPx = (aEl, bEl) => Math.round(bEl.getBoundingClientRect().top - aEl.getBoundingClientRect().bottom);
+  const chainNodes = [['title', playersCap], ['caption', leaderEl], ['legend', legendEl], ['table', playersEl]]
+    .filter(([, el]) => el);
   const titleChain = !playersCap ? null
-    : leaderEl
-      ? [{ from: 'title', to: 'caption', px: gapPx(playersCap, leaderEl) },
-        { from: 'caption', to: 'table', px: gapPx(leaderEl, playersEl) }]
-      : [{ from: 'title', to: 'table', px: gapPx(playersCap, playersEl) }];
+    : chainNodes.slice(1).map(([k, el], i) => ({ from: chainNodes[i][0], to: k, px: gapPx(chainNodes[i][1], el) }));
   const capB = leaderEl ? leaderEl.getBoundingClientRect() : null;
   const caption = leaderEl ? {
     text: txt(leaderEl),
@@ -435,7 +586,9 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
 
   return {
     found: true, items, clippers, rows, chips, firstScreen, order, svgTexts,
-    bandNames, scrollAncestors, tableScrollW, tableClientW, notes, headCols: headLabels.length,
+    levelsSection, bandSectionEl, levelsAnchor, tocLabels, legendItems,
+    groupRowLabels, shareGroups, shareRowsFlat,
+    scrollAncestors, tableScrollW, tableClientW, notes, headCols: headLabels.length,
     titleChain, caption, capTitleFound: !!playersCap,
     tabbarH, visibleBottom, bannerH, bannerFound: !!bannerEl,
     leadBox: box(leadEl), stripBox: box(kpiEl),
@@ -448,7 +601,6 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
     h1Text: h1 ? txt(h1) : null,
     leadText: leadEl ? txt(leadEl) : null,
     hasShareChart: !!root.querySelector('[data-testid="tech-share-chart"]'),
-    hasBand: !!root.querySelector('[data-testid="tech-level-band"]'),
     // task#282 S3 — 요약 카드 제거, MarketGrowthChart 캡션이 새 위치다(이 필드는 어느 eq()도 단언
     // 대상으로 쓰지 않는 정보성 캡처라 그대로 두면 항상 null이 되어 로그가 misleading해진다).
     marketSummary: (() => { const e = root.querySelector('[data-testid="market-growth-chart"] [data-testid="market-growth-caption"]'); return e ? txt(e) : null; })(),
@@ -640,18 +792,128 @@ for (const V of VIEWS) {
         new Set(m.rows.map((r) => `${r.level}/${r.gap}`)).size > 1 ? 'OK' : 'ALL_ROWS_IDENTICAL', 'OK',
         `구별되는 (level,gap) 조합 ${new Set(m.rows.map((r) => `${r.level}/${r.gap}`)).size}종`);
 
-      // ── (5b) band-order — 표와 밴드가 **같은 순서**로 같은 업체를 나열한다(F1 재발 차단).
-      //        30px 간격의 두 섹션이 같은 축을 다른 순서로 보이면 화면이 자기모순이다. 위 table-order는
-      //        표 하나만 보므로 이 결함에 **원리적으로 블라인드**하다(판정축이 대상과 독립 — 가토 ⑧ⓘ).
-      eq(`band-order-domain:${tag}`,
-        m.bandNames.length === D.players.length && m.rows.length === D.players.length
-          ? 'OK' : `BAND_DOMAIN(band=${m.bandNames.length},table=${m.rows.length},api=${D.players.length})`, 'OK',
-        '밴드·표 행 수가 API 업체 수와 같아야 순서 비교가 성립한다');
-      eq(`band-order:${tag}`, m.bandNames, m.rows.map((r) => r.name), '밴드 행 이름 == 표 행 이름(순서 포함)');
-      bump('band-order', m.bandNames.length);
+      // ── (5b) single-order — 옛 band-order의 후신 (A). 밴드 섹션이 표로 흡수돼 「표↔밴드 순서」는
+      //        도달 불가해졌지만, 그 축이 지킨 계약("같은 업체 집합이 한 화면에서 두 순서로 나열되지
+      //        않는다")의 뿌리는 **페이지가 단일 정렬을 쓴다**는 것이다. 위 table-order는 *불변식*
+      //        (그룹 안 단조)만 보므로 "표가 제 나름대로 재정렬했다"에 블라인드하다 — 여기서 렌더
+      //        순서를 TechReport.jsx의 `ordered` 미러와 **정확 일치**로 대조한다(옛 축보다 엄격).
+      eq(`single-order-domain:${tag}`,
+        m.rows.length === D.players.length && D.ordered.length === D.players.length
+          ? 'OK' : `ORDER_DOMAIN(table=${m.rows.length},mirror=${D.ordered.length},api=${D.players.length})`, 'OK',
+        '표 행 수·미러 길이가 API 업체 수와 같아야 순서 비교가 성립한다');
+      eq(`single-order:${tag}`, m.rows.map((r) => r.name), D.ordered,
+        '표 렌더 순서 == groupByCategory(sortPlayers(players)) 평탄화(TechReport.jsx ordered 미러)');
+      bump('single-order', m.rows.length);
       // 이 표본에서 정렬이 API 순서를 실제로 바꿨는가 — 안 바꾸면 위 단언은 정렬을 통째로 지워도
-      // 통과한다(공허한 초록). 전 표본 합산으로 아래 band-order-teeth가 판별력을 게이트한다.
-      if (JSON.stringify(m.rows.map((r) => r.name)) !== JSON.stringify(D.names)) bump('band-order-reordered');
+      // 통과한다(공허한 초록). 전 표본 합산으로 아래 single-order-teeth가 판별력을 게이트한다.
+      if (JSON.stringify(D.ordered) !== JSON.stringify(D.names)) bump('single-order-reordered');
+
+      // ── (5b-2) cross-category — 옛 band-order의 후신 (B). 표와 점유율은 30px 간격의 두 섹션인데
+      //        같은 `players[].category`를 각자 읽는다. 같은 업체가 두 섹션에서 다른 분류로 뜨면
+      //        화면이 자기모순이다(task#301 F1이 막으려던 것의 살아남은 형태).
+      //        ⚠️ **순서**는 대조하지 않는다 — ShareChart가 share_pct 내림차순으로 재정렬하므로
+      //           (ShareChart.jsx:40) 두 섹션의 행 순서·그룹 순서는 설계상 다르다. 요구하면 정상
+      //           구현이 거짓 FAIL한다. 실측 차이는 아래 crossLog로 **출력만** 한다(가토 ⑧ⓗ).
+      const shareSeen = m.shareGroups.flatMap((g) => g.names.map((n) => ({ n, label: g.label })));
+      const grouped = D.groupLabels.length > 0;
+      // 점유율 막대가 API 적격 수와 같고, 분류 있는 판이면 그 막대가 전부 그룹 안에 들어 있어야
+      // 교차 대조가 성립한다. 기대값은 데이터가 정한다(분류 없는 판은 'FLAT' — 축의 정의역이지
+      // 무음 스킵이 아니다, 가토 ⑧ⓛ).
+      const domainOk = m.shareRowsFlat.length === D.shareOrdered.length
+        && (!grouped || shareSeen.length === D.shareOrdered.length);
+      eq(`cross-category-domain:${tag}`,
+        domainOk ? (grouped ? 'OK' : 'FLAT') : `DOMAIN(막대=${m.shareRowsFlat.length}/${D.shareOrdered.length},그룹내=${shareSeen.length})`,
+        grouped ? 'OK' : 'FLAT',
+        `점유율 막대 ${m.shareRowsFlat.length} · API share적격 ${D.shareOrdered.length} · 분류그룹 ${D.groupLabels.length}`);
+      // 표 쪽 소속(그룹 소제목 행에서 상속) + 점유율 쪽 소속을 **같은 기대값**(API category)과 대조한다.
+      const catViol = [
+        ...m.rows.filter((r) => D.catByName[r.name] != null && (r.group ?? '').split(' · 선두 ')[0] !== D.catByName[r.name])
+          .map((r) => `표/${r.name}:${(r.group ?? '(없음)').split(' · 선두 ')[0]}≠${D.catByName[r.name]}`),
+        ...shareSeen.filter((s) => D.catByName[s.n] != null && s.label !== D.catByName[s.n])
+          .map((s) => `점유율/${s.n}:${s.label}≠${D.catByName[s.n]}`),
+      ];
+      eq(`cross-category:${tag}`, grouped ? catViol : 'FLAT', grouped ? [] : 'FLAT',
+        `표 ${m.rows.length}행 + 점유율 ${shareSeen.length}행 대조`);
+      bump('cross-category', grouped ? m.rows.length + shareSeen.length : 0);
+      if (grouped && new Set(Object.values(D.catByName)).size > 1) bump('cross-category-multi');
+      crossLog.push(`${tag} · 표 그룹순서 ${JSON.stringify(m.groupRowLabels.map((g) => g.split(' · 선두 ')[0]))}` +
+        ` · 점유율 그룹순서 ${JSON.stringify(m.shareGroups.map((g) => g.label))}` +
+        ` · 두 섹션 행 순서 동일 ${JSON.stringify(m.rows.map((r) => r.name).filter((n) => D.shareOrdered.includes(n))) === JSON.stringify(D.shareOrdered)}(동치는 계약이 아니다 — 출력만)`);
+
+      // ── (5b-3) group-leader — 분야 소제목에 그 분야의 선두가 병기된다(ADR-0041 결정 4, 동작 ④).
+      //        기대값은 리터럴이 아니라 isLeader 미러를 API에 적용해 계산한다. 선두가 없는 그룹은
+      //        병기가 **생략**되는 것이 설계이므로 그 경우까지 기대값이 담고 있다(조건부 아님).
+      eq(`group-leader-domain:${tag}`, m.groupRowLabels.length, D.groupLabels.length,
+        `소제목 행 ${m.groupRowLabels.length}개 vs 미러 그룹 ${D.groupLabels.length}개(분류 없는 판은 0==0)`);
+      eq(`group-leader:${tag}`, m.groupRowLabels, D.groupLeaderText,
+        `병기 있는 그룹 ${D.groupLeaderText.filter((t) => t.includes(' · 선두 ')).length}/${D.groupLabels.length}`);
+      bump('group-leader', m.groupRowLabels.length);
+      if (D.groupLeaderText.some((t) => t.includes(' · 선두 '))) bump('group-leader-suffixed');
+      // ⚠️ 관측 전용 커버리지(단언 아님) — ADR-0041 결정 4는 "분야 소제목에 선두를 병기하면 **캡션 한
+      //    줄이 사라진다**"고 적었고 계획 S2도 "캡션 leaders는 **분류 없는 판에서만** 렌더"를 지시했다.
+      //    현재 구현(PlayerTable.jsx)은 `leaders.length > 0`이면 분류 유무와 무관하게 캡션을 렌더한다 →
+      //    분류 있는 판에서 같은 정보가 캡션과 소제목에 **둘 다** 뜬다. 이건 프로덕션 판단이라 여기서
+      //    단언하지 않고(구현을 무고하지 않는다) 수치로만 남긴다 — 이 값이 0이 아니면 결정 4 미이행이다.
+      if (grouped && m.caption) bump('caption-and-group-suffix-both');
+
+      // ── (5b-4) level-band — 신규 축 ⓐ. 기술수준이 **화면에서 읽히는가**(ADR-0041 결정 1).
+      //        기하(칸 5개·채움 수)와 화면(칸 렌더 폭·채움색≠미채움색)을 나눠 잰다 — 클래스는 붙었는데
+      //        CSS 규칙이 없으면 색만 조용히 사라지고 기하 축은 전부 통과한다(가토 ⑪).
+      //        정의역: `TECH_LEVEL_LABELS[tech_level]`이 있는 행만 밴드가 렌더된다(없으면 `—`).
+      //        조건부가 아니다 — 기대값이 API에서 계산되므로 **같은 단언이 두 방향을 모두 게이트**한다.
+      const bandViol = [];
+      for (const r of m.rows) {
+        const want = D.levelByName[r.name];        // null = 밴드 없어야 함
+        if (want == null) { if (r.band) bandViol.push(`${r.name}:UNEXPECTED_BAND`); continue; }
+        if (!r.band) { bandViol.push(`${r.name}:BAND_MISSING(want L${want})`); continue; }
+        if (r.band.total !== 5) bandViol.push(`${r.name}:cells=${r.band.total}`);
+        if (r.band.filled !== want) bandViol.push(`${r.name}:filled=${r.band.filled}!=${want}`);
+        if (r.band.ariaLevel !== want) bandViol.push(`${r.name}:aria=${JSON.stringify(r.band.aria)}!=L${want}`);
+        if (r.band.ariaLabelText !== TECH_LEVEL_LABELS[want]) bandViol.push(`${r.name}:ariaLabel=${r.band.ariaLabelText}`);
+        if (r.band.role !== 'img') bandViol.push(`${r.name}:role=${r.band.role}`);
+        if (r.band.lines !== 1) bandViol.push(`${r.name}:LINES=${r.band.lines}(칸 묶음이 접혔다)`);
+        // 화면 실측 — 칸이 사라지거나(0px) 실선처럼 보이면 밴드가 정보를 전달하지 못한다.
+        if (!(r.band.cw >= 4)) bandViol.push(`${r.name}:cellW=${r.band.cw}(<4px)`);
+        if (!(r.band.ch >= 6)) bandViol.push(`${r.name}:cellH=${r.band.ch}(<6px)`);
+        if (r.band.digit !== String(want)) bandViol.push(`${r.name}:digit=${JSON.stringify(r.band.digit)}!=${want}`);
+      }
+      const banded = m.rows.filter((r) => r.band);
+      eq(`level-band-domain:${tag}`,
+        banded.length === Object.values(D.levelByName).filter((v) => v != null).length && banded.length > 0
+          ? 'OK' : `BAND_DOMAIN(rendered=${banded.length},api=${Object.values(D.levelByName).filter((v) => v != null).length})`, 'OK');
+      eq(`level-band:${tag}`, bandViol, [], `밴드 렌더 행 ${banded.length}/${m.rows.length}`);
+      bump('level-band', banded.length);
+      // 이빨 — 채움색과 미채움색이 같아지면 위 축들은 아무것도 안 보면서 통과한다(토큰 하드코딩 없이
+      // computed 값끼리 대조한다). 미채움 칸이 없는 행(L5)은 정의역 밖이라 첫 관측분으로 잰다.
+      const colorPair = banded.map((r) => r.band).find((b) => b.filledColor && b.unfilledColor) || null;
+      eq(`level-band-color-domain:${tag}`, colorPair ? 'OK' : 'NO_MIXED_ROW(전 행이 L5거나 색 미검출)', 'OK');
+      eq(`level-band-color-teeth:${tag}`,
+        colorPair && colorPair.filledColor !== colorPair.unfilledColor
+          ? 'OK' : `SAME_COLOR(${colorPair ? colorPair.filledColor : 'NA'})`, 'OK',
+        colorPair ? `채움 ${colorPair.filledColor} vs 미채움 ${colorPair.unfilledColor}` : '');
+
+      // ── (5b-5) legend / levels-section-absent / toc — 동작 ①②③ ─────────────────────────────
+      eq(`legend:${tag}`, m.legendItems, TECH_LEVEL_LABELS.slice(1).map((l, i) => `${i + 1} ${l}`),
+        '표 위 5단계 범례 1줄(밴드 섹션이 맨 위에 두던 관례 승계)');
+      bump('legend', m.legendItems ? m.legendItems.length : 0);
+
+      // ── 제목 → (캡션) → 범례 → 표 사슬 — **무조건**. 옛 caption-gap은 캡션이 있을 때만 돌아
+      //    "선두가 없는 판"에서 이 간격을 통째로 못 봤다. task#304에서 범례가 사슬에 끼면서 링크가
+      //    하나 늘었으므로, 이 참에 정의역을 캡션 유무와 분리한다(임계 0~24px은 uat276과 동일 — 완화 0).
+      const chain = m.titleChain || [];
+      const wantChain = ['title', ...(D.leaders.length > 0 ? ['caption'] : []), 'legend', 'table'];
+      eq(`chain-gap-domain:${tag}`,
+        m.capTitleFound ? ['title', ...chain.map((l) => l.to)] : 'PLAYERS_TITLE_MISSING', wantChain,
+        `사슬 ${JSON.stringify(chain)} · 노드는 데이터가 정한다(선두 ${D.leaders.length}명)`);
+      eq(`chain-gap:${tag}`, chain.filter((l) => !(l.px >= 0 && l.px <= 24)).map((l) => `${l.from}→${l.to}:${l.px}px`), [],
+        `실측 ${chain.map((l) => `${l.from}→${l.to} ${l.px}px`).join(' · ') || '사슬 없음'} · 임계 0~24px`);
+      bump('chain-gap', chain.length);
+
+      eq(`levels-section-absent:${tag}`, [m.levelsSection, m.bandSectionEl, m.levelsAnchor], [0, 0, 0],
+        '[data-tech-section="levels"] · [data-testid="tech-level-band"] · #levels 앵커');
+      eq(`toc-no-levels:${tag}`, m.tocLabels.filter((t) => t.includes('기술수준')), [],
+        `목차 칩 ${m.tocLabels.length}개 = ${JSON.stringify(m.tocLabels)}`);
+      bump('section-absent', 2);
 
       // ── (5c) table-no-scroller — task#296 뒤집음: 표 스크롤러(overflowX:auto 래퍼)가 완전히
       //     제거됐다. 옛 축은 "PC에서만 스크롤러가 존재하고 안 넘친다"를 요구했지만(모바일은 스크롤러가
@@ -692,15 +954,6 @@ for (const V of VIEWS) {
           `실측 캡션=${JSON.stringify(capText)} · 기대는 gap_years>0 행의 고유 leader_name 집합(실응답에서 계산)`);
         bump('caption');
         bump('caption-names', capNames ? capNames.length : 0);
-
-        // 사슬 — 링크별로 잰다. 임계 0~24px은 uat276과 동일(완화 0).
-        const chain = m.titleChain || [];
-        eq(`caption-gap-domain:${tag}`, m.capTitleFound ? chain.length : 'PLAYERS_TITLE_MISSING', 2,
-          `사슬 ${JSON.stringify(chain)} · 캡션이 있으면 링크는 반드시 2개(제목→캡션→표)`);
-        const farLinks = chain.filter((l) => !(l.px >= 0 && l.px <= 24)).map((l) => `${l.from}→${l.to}:${l.px}px`);
-        eq(`caption-gap:${tag}`, farLinks, [],
-          `실측 ${chain.map((l) => `${l.from}→${l.to} ${l.px}px`).join(' · ') || '사슬 없음'} · 임계 0~24px`);
-        bump('caption-gap', chain.length);
 
         // 줄 수는 **FAIL 조건이 아니다** — 캡션은 표 스크롤러 *밖*이라 좁은 폭에서 접히는 것이 정상이고
         // 다중 선두면 더 길어진다. 실측치는 출력만 하고, 단언은 ⓐ 잘리지 않는가 ⓑ 본문을 가로로 밀지
@@ -769,7 +1022,12 @@ for (const V of VIEWS) {
       // task#296 — 국가·티커가 열에서 빠져 이름 셀 내부 메타줄(리프이긴 하다)로 이동했다. 하한을
       // 리터럴 4가 아니라 실제 렌더 규칙(playerColumns + 국가 유무)에서 유도한다: level은 항상 렌더,
       // gap·share는 그 열이 있을 때만(전 행 렌더, DASH 포함), 국가는 값이 있는 행만.
-      const clipMin = D.players.length // 기술수준 셀(항상)
+      // task#304 — 기술수준 셀은 이제 밴드다: 라벨 있는 행은 `<td>`가 자식(div)을 가져 leaf에서 빠지고
+      // 대신 **단계 숫자 span**이 leaf로 들어온다(빈 칸 span은 텍스트가 없어 정의역 밖). 라벨 없는 행은
+      // `—` 텍스트라 `<td>` 자신이 leaf다 → 어느 쪽이든 행당 1개로 **하한은 그대로**다. 범례 5개가 새로
+      // 더해지므로 하한에 명시한다(늘어난 이유를 기록해야 다음 사람이 baseline을 비교할 수 있다).
+      const clipMin = D.players.length // 기술수준: 단계 숫자 span 또는 `—` 셀(행당 1)
+        + 5                            // 표 위 5단계 범례 항목(ADR-0041)
         + (D.cols.includes('gap') ? D.players.length : 0)
         + (D.cols.includes('share') ? D.players.length : 0)
         + D.players.filter((p) => p.country).length; // 이름 셀 내부 국가 메타(리프)
@@ -793,10 +1051,13 @@ for (const V of VIEWS) {
       eq(`line-visible:${tag}`, folded.map((f) => `${f.t}(${f.lines}줄)`), [], `검사 ${nowrapDomain.length}건`);
       bump('line-visible', nowrapDomain.length);
       // 하한(정확일치 아님) — 표 열이 늘거나 배지가 붙으면 정당하게 증가한다. 줄면 측정 실패다.
-      // task#296 — 기술수준 셀은 이제 whiteSpace:normal(TD_LEVEL, 줄바꿈 허용)이라 nowrap 도메인에서
-      // **빠진다**. 대신 국가 메타 span이 nowrap으로 새로 들어온다(META_TEXT). 배지·티커 구분자는
-      // 하한에서 뺀다(비동기 holdings 로드·데이터 유무에 따라 변동 — 실제 값은 항상 이 하한 이상이다).
+      // task#296은 기술수준 셀이 whiteSpace:normal(줄바꿈 허용)이라 이 도메인에서 **빠져 있었다**.
+      // task#304에서 TD_LEVEL이 다시 nowrap(TD 동일값)이 되고 그 안의 단계 숫자 span이 nowrap을
+      // 상속하므로 **행당 1개가 도메인에 되돌아온다**(총계 증가는 이 줄이 이유다 — 가토 ⑧ⓛ 부수항).
+      // 범례 항목 5개(.tech-level-band__legend-item{white-space:nowrap})도 새로 들어온다.
       const nowrapMin = D.cols.length // 헤더 <th> 전부 nowrap
+        + D.players.length             // 기술수준: 단계 숫자 span 또는 `—` 셀(행당 1, task#304 복귀)
+        + 5                            // 5단계 범례 항목(task#304 신규)
         + (D.cols.includes('gap') ? D.players.length : 0)
         + (D.cols.includes('share') ? D.players.length : 0)
         + D.players.filter((p) => p.country).length; // 이름 셀 내부 국가 메타(nowrap)
@@ -961,11 +1222,28 @@ for (const V of VIEWS) {
 
 await browser.close();
 
-// ── 전역 이빨 단언 — band-order가 판별력을 갖는가 ─────────────────────────
-// 정렬이 API 순서를 한 번도 바꾸지 않았다면 `밴드==표`는 정렬 배선을 통째로 지워도 통과한다
-// (둘 다 API 순서가 되므로). 최소 1표본에서 재정렬이 실제로 일어나야 이 축이 F1을 잡는다.
-eq('band-order-teeth', (cov['band-order-reordered'] || 0) > 0 ? 'OK' : 'ORDER_NEVER_DIFFERS_FROM_API', 'OK',
-  `재정렬이 관측된 표본 ${cov['band-order-reordered'] || 0}건 / 전체 ${cov['band-order'] ? VIEWS.length * SLUGS.length : 0}조합`);
+// ── 전역 이빨 단언 — single-order가 판별력을 갖는가(옛 band-order-teeth의 후신) ────────────
+// 정렬이 API 순서를 한 번도 바꾸지 않았다면 `표 == ordered 미러`는 정렬·그룹핑 배선을 통째로 지워도
+// 통과한다(둘 다 API 순서가 되므로). 최소 1 slug에서 재정렬이 실제로 일어나야 이 축이 F1을 잡는다.
+eq('single-order-teeth', (cov['single-order-reordered'] || 0) > 0 ? 'OK' : 'ORDER_NEVER_DIFFERS_FROM_API', 'OK',
+  `재정렬이 관측된 표본 ${cov['single-order-reordered'] || 0}건 / 전체 ${cov['single-order'] ? VIEWS.length * SLUGS.length : 0}조합 · ` +
+  SLUGS.map((s) => `${s}=${JSON.stringify(DATA[s].ordered) !== JSON.stringify(DATA[s].names)}`).join(' / '));
+
+// ── 전역 이빨 단언 — cross-category / group-leader가 판별력을 갖는가 ─────────
+// ⓐ 분류가 1종뿐이면 "모든 업체가 같은 라벨"이라 cross-category는 라벨을 통째로 잘못 붙여도 통과한다.
+// ⓑ 어느 판에서도 선두 병기가 한 번도 나오지 않으면 group-leader는 병기 코드를 지워도 통과한다.
+eq('cross-category-teeth', (cov['cross-category-multi'] || 0) > 0 ? 'OK' : 'SINGLE_CATEGORY_ONLY', 'OK',
+  `분류 2종 이상 표본 ${cov['cross-category-multi'] || 0}건 · ` +
+  SLUGS.map((s) => `${s}=${DATA[s].groupLabels.length}그룹`).join(' / '));
+eq('group-leader-teeth', (cov['group-leader-suffixed'] || 0) > 0 ? 'OK' : 'NO_GROUP_EVER_HAS_LEADER', 'OK',
+  `선두 병기가 실제로 붙은 표본 ${cov['group-leader-suffixed'] || 0}건 · ` +
+  SLUGS.map((s) => `${s}=${DATA[s].groupLeaderText.filter((t) => t.includes(' · 선두 ')).length}/${DATA[s].groupLabels.length}`).join(' / '));
+
+// ── 전역 이빨 단언 — level-band가 실제로 **여러 단계**를 봤는가 ──────────────
+// 전 업체가 같은 tech_level이면 「채움 수 == tech_level」은 채움 로직을 상수로 바꿔도 통과한다.
+const lvSet = new Set(SLUGS.flatMap((s) => Object.values(DATA[s].levelByName).filter((v) => v != null)));
+eq('level-band-teeth', lvSet.size >= 2 ? 'OK' : `SINGLE_LEVEL_ONLY(${[...lvSet].join(',')})`, 'OK',
+  `관측 대상 tech_level ${lvSet.size}종 = ${JSON.stringify([...lvSet].sort())}`);
 
 // ── 전역 이빨 단언 — 캡션 계열이 실제로 **다중 선두**를 봤는가 ─────────────
 // 이 계열의 존재 이유가 "픽스처(고유 선두 1개)가 원리적으로 못 보는 판을 덮는 것"이므로, 다중 선두
@@ -986,13 +1264,15 @@ console.log(`대상: ${SLUGS.map((s) => `${s}(players ${DATA[s].players.length}�
 console.log(`선두 캡션: ${SLUGS.map((s) => `${s} → 고유 ${DATA[s].leaders.length}명 「선두 = ${DATA[s].leaders.join(' · ')}」`).join(' / ')}`);
 console.log('\n선두 캡션 실측(단언 아님 — 조합별 원시 수치):');
 for (const l of capLog) console.log(`  ${l}`);
+console.log('\n표↔점유율 순서 실측(단언 아님 — 두 섹션은 정렬 축이 달라 순서 동치가 계약이 아니다):');
+for (const l of crossLog) console.log(`  ${l}`);
 console.log('\nkpi-visible-firstvisit — 첫 방문 프로모 배너 포함, **게이트 아님**(실측 보고 전용):');
 console.log('  ※ 게이트(kpi-visible)는 배너를 닫은 정상 상태로 잰다. 배너는 앱 전역·첫 방문 한정·닫으면');
 console.log('    14일 영속되는 프로모라 이 페이지의 레이아웃이 아니다(pwa.js·mobile.css:344 직독).');
 for (const l of fvLog) console.log(`  ${l}`);
 if (CONTROL) console.log(`⚠ 이 실행은 대조군이다(CAPTION_CONTROL=${CONTROL}) — 캡션 축 FAIL이 정상이며 게이트 결과가 아니다.`);
 console.log('※ 실데이터 — page.route 주입 0. prod tech_reports 무쓰기(GET만).');
-console.log(`※ 육안 캡처 ${OUT}/ — {view}-{slug}-{top|table|caption|full}.png (4조합 × 2 slug × 4장)`);
+console.log(`※ 육안 캡처 ${OUT}/ — {view}-{slug}-{top|table|caption|full}.png (${VIEWS.length}조합 × ${SLUGS.length} slug × 4장)`);
 console.log('═'.repeat(72));
 if (fails.length) {
   console.log('\nFAIL 상세:');

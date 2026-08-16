@@ -27,6 +27,14 @@
 //   9. 회귀 — 본문 가로스크롤 0(4뷰포트) / 잘림 2계열(텍스트 leaf·overflow:hidden 컨테이너) 0건
 //   10. 육안 캡처 4뷰포트(top + 업체표 scrollIntoView, fullPage 없음)
 //
+// ── task#304 S3 갱신(ADR-0041 — 「기술수준 비교」 밴드가 표의 셀로 흡수) ────────────────────────
+// 이 파일에서 **스테일해진 축은 소제목 라벨 계열**이다: ADR-0041 결정 4가 분야 소제목을
+// `{분류} · 선두 {이름}`으로 바꾸면서 `player-group-labelset`·`player-assign`이 분류 문자열과
+// 대조하던 값이 더 길어졌다 → 라벨을 **분류부/병기부로 쪼개** 각각 잰다(신규 `group-leader`).
+// 계획·프롬프트의 스테일 목록엔 이 파일이 없었다 — 이 축은 `tech-level-band`도 `levels`도 쓰지 않고
+// **성질(소제목 텍스트)만** 재기 때문이다(task#301이 uat280을 놓친 것과 같은 형태, 가토 ⑧ⓟ 3번째 관측).
+// SLUGS 목록은 없다 — 이 프로브는 대상을 API에서 유도한다(그룹 최다 판 = ai-datacenter-equipment).
+//
 // ── 대상 slug 선택(추정 금지) ──────────────────────────────────────────────────
 // GET /api/tech-reports를 1콜 찍어 실제로 category가 채워진 판을 찾는다(리터럴 slug 하드코딩 금지).
 // 후보가 여럿이면 groupByCategory 그룹 수가 가장 많은 판을 고른다(다축 커버리지 최대화, 동수면 slug
@@ -130,6 +138,11 @@ function mirrorGroupByCategory(players) {
   return [...groups].map(([key, members]) => ({ category: key === UNCLASSIFIED_SYM ? UNCLASSIFIED_LABEL : key, players: members }));
 }
 const expectedLabelOf = (p) => (typeof p?.category === 'string' && p.category.trim() !== '' ? p.category.trim() : UNCLASSIFIED_LABEL);
+// isLeader 미러(techReportUtils.isLeader, ADR-0041 결정 3) — 합집합. leader_name != null을 반드시 함께
+// 본다(둘 다 null이면 `leader_name === name`이 참이 되어 아무나 선두가 된다).
+const isLeaderMirror = (p) => p?.gap_years === 0 || (p?.leader_name != null && p.leader_name === p?.name);
+// 분야 소제목의 선두 병기 기대값(PlayerTable.groupLeaderSuffix 미러) — 그룹에 선두가 없으면 빈 배열.
+const groupLeadersOf = (members) => [...new Set((members || []).filter(isLeaderMirror).map((p) => p.name))];
 const shareRowsOf = (players) => (players || []).filter((p) => p && Number.isFinite(p.share_pct) && p.share_pct >= 0).sort((a, b) => b.share_pct - a.share_pct);
 const OVERFLOW_THRESHOLD = 100.5;
 const overflowTextOf = (total) => ` · 합계 ${total.toFixed(1)}%(100% 초과 — 기준 상이 가능)`;
@@ -205,8 +218,18 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
     const testid = tr.getAttribute('data-testid');
     if (testid === 'tech-report-player-group') {
       const td = tr.children[0];
-      curGroupLabel = td ? td.textContent.trim() : '';
-      groupRows.push({ label: curGroupLabel, colSpan: td ? td.colSpan : null, tr });
+      const full = td ? td.textContent.trim() : '';
+      // task#304(ADR-0041 결정 4) — 소제목이 `{분류} · 선두 {이름}`이 됐다. 분류부와 병기부를 쪼개
+      // 각각 별도 축으로 잰다. 쪼개지 않으면 기존 라벨 집합·배정 축이 **전부 거짓 FAIL**한다(축이
+      // 낡은 렌더 형태를 박제하던 자리 — 가토 ⑧ⓝ). 구분자가 분류 문자열 안에 있으면 파싱이
+      // 모호해지므로 아래 group-leader-parse-safe가 그 전제를 먼저 못박는다.
+      const sepAt = full.indexOf(' · 선두 ');
+      curGroupLabel = sepAt >= 0 ? full.slice(0, sepAt) : full;
+      groupRows.push({
+        label: curGroupLabel, full,
+        leaders: sepAt >= 0 ? full.slice(sepAt + ' · 선두 '.length).split(' · ') : [],
+        colSpan: td ? td.colSpan : null, tr,
+      });
     } else if (testid === 'tech-report-player-row') {
       const nameEl = tr.querySelector('[data-testid="tech-report-player-name"]');
       const name = nameEl ? nameEl.textContent.trim() : null;
@@ -265,7 +288,7 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
     hasCategoriesSection: !!catEl,
     tocChips,
     theadThCount,
-    groupRows: groupRows.map((g) => ({ label: g.label, colSpan: g.colSpan })),
+    groupRows: groupRows.map((g) => ({ label: g.label, full: g.full, leaders: g.leaders, colSpan: g.colSpan })),
     playerRows: playerRowAssign.map((p) => ({ name: p.name, group: p.group })),
     orphanCount,
     groupPadTops, normalPadTops, styleDiffs,
@@ -382,7 +405,21 @@ for (const V of VIEWS) {
   eq(`player-group-domain:${tag}`, m.groupRows.length > 0 ? 'OK' : 'GROUP_ROWS_EMPTY', 'OK', `소제목행 ${m.groupRows.length}개`);
   eq(`player-group-count:${tag}`, m.groupRows.length, PLAYER_TARGET.groups.length,
     `렌더 라벨=${JSON.stringify(m.groupRows.map((g) => g.label))} · 기대 라벨=${JSON.stringify([...catExpectedLabels])}`);
-  eq(`player-group-labelset:${tag}`, [...new Set(m.groupRows.map((g) => g.label))].sort(), [...catExpectedLabels].sort(), '렌더 라벨 집합 == 기대 라벨 집합');
+  eq(`player-group-labelset:${tag}`, [...new Set(m.groupRows.map((g) => g.label))].sort(), [...catExpectedLabels].sort(),
+    '렌더 분류부 집합 == 기대 라벨 집합(선두 병기는 아래 별도 축)');
+  // ── task#304 신규 — 분야 소제목의 선두 병기(ADR-0041 결정 4). 기대값은 리터럴이 아니라 isLeader
+  //    미러를 API에 적용해 계산한다. 선두가 없는 그룹은 병기가 **생략**되는 것이 설계이고, 그 경우까지
+  //    기대값이 담고 있으므로 조건부가 아니다(같은 단언이 두 방향을 모두 게이트한다).
+  eq(`group-leader-parse-safe:${tag}`, [...catExpectedLabels].filter((c) => c.includes(' · 선두 ')), [],
+    '분류 문자열 안에 구분자가 없어야 소제목 파싱이 성립한다(축의 정직한 전제)');
+  eq(`group-leader:${tag}`, m.groupRows.map((g) => g.full),
+    PLAYER_TARGET.groups.map((g) => {
+      const names = groupLeadersOf(g.players);
+      return `${g.category}${names.length > 0 ? ` · 선두 ${names.join(' · ')}` : ''}`;
+    }),
+    `병기 있는 그룹 ${PLAYER_TARGET.groups.filter((g) => groupLeadersOf(g.players).length > 0).length}/${PLAYER_TARGET.groups.length}`);
+  bump('group-leader', m.groupRows.length + 1);
+  if (PLAYER_TARGET.groups.some((g) => groupLeadersOf(g.players).length > 0)) bump('group-leader-suffixed');
   eq(`player-group-colspan:${tag}`, m.groupRows.filter((g) => g.colSpan !== m.theadThCount).map((g) => `${g.label}:colSpan=${g.colSpan}`), [],
     `헤더 th ${m.theadThCount}개`);
   bump('player-group', m.groupRows.length + 3);
@@ -403,7 +440,7 @@ for (const V of VIEWS) {
   bump('player-assign', 2);
 
   // ══ 축 8(업체 표 부분) — 시각 ══
-  const emptyGroupLabels = m.groupRows.filter((g) => g.label.trim() === '').length;
+  const emptyGroupLabels = m.groupRows.filter((g) => g.full.trim() === '').length;
   eq(`visual-player-empty-label:${tag}`, emptyGroupLabels, 0, `소제목 ${m.groupRows.length}개 중 빈 텍스트`);
   const styleUndiffed = m.styleDiffs.filter((d) => d.diffs.length === 0).map((d) => `${d.label}(${d.reason || 'NO_DIFF'})`);
   eq(`visual-player-style-diff:${tag}`, styleUndiffed, [], `${m.styleDiffs.length}개 그룹 · 실측=${JSON.stringify(m.styleDiffs)}`);
@@ -545,6 +582,11 @@ await browser.close();
 eq('player-group-teeth', PLAYER_TARGET.groups.length >= 2 ? 'OK' : `TOO_FEW_GROUPS(${PLAYER_TARGET.groups.length})`, 'OK',
   `PLAYER_TARGET(${PLAYER_TARGET.rep.slug}) 그룹 ${PLAYER_TARGET.groups.length}개`);
 bump('player-group-teeth');
+// task#304 — 어느 그룹에도 선두가 없으면 group-leader 축은 병기 코드를 통째로 지워도 통과한다(공허).
+eq('group-leader-teeth', (cov['group-leader-suffixed'] || 0) > 0 ? 'OK' : 'NO_GROUP_EVER_HAS_LEADER', 'OK',
+  `선두 병기가 붙은 그룹 ${PLAYER_TARGET.groups.filter((g) => groupLeadersOf(g.players).length > 0).length}/${PLAYER_TARGET.groups.length}` +
+  ` · 관측 표본 ${cov['group-leader-suffixed'] || 0}건`);
+bump('group-leader-teeth');
 
 // ── 보고 ──────────────────────────────────────────────────────────────────────
 const fails = results.filter((r) => !r.ok);

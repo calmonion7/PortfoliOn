@@ -88,14 +88,24 @@ const { access_token, refresh_token } = await login.json();
 if (!access_token) { console.error('로그인 실패 — access_token 없음. 종료.'); process.exit(1); }
 
 // TECH_NAMES 미러 — techReportUtils.js(백엔드는 표시명을 응답에 싣지 않는다, ADR-0033 결정 2).
-const TECH_NAMES = { 'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇' };
+const TECH_NAMES = {
+  'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇',
+  'ai-datacenter-equipment': 'AI 데이터센터 설비', 'ai-datacenter-ops': 'AI 데이터센터 운영',
+};
 // slug 3종 — 열 조합과 폭 최악값을 함께 덮는다(라이브 DB 실측, 2026-08-12):
 //   smr             = share·ticker 전 행 결측 → 3열(생략 판)
 //   robotics        = share 5·ticker 4 → 4열 + 난제·연관 존재
 //   reusable-rocket = share 1(SpaceX 50.9%) → **4열이고** country가 `프랑스·독일·일본`(9자)로 최장이다.
 //     ⚠️ 이 판이 폭 최악값이다 — 적대 리뷰 렌즈1이 "전 열은 robotics뿐"이라는 계획 정정 자체를 정정했다.
 //     스크롤러를 없앤 뒤 국가 문자열의 min-content가 곧 페이지 가로 스크롤이 되므로 반드시 포함한다.
-const SLUGS = ['smr', 'robotics', 'reusable-rocket'];
+// ⚠️ task#304 S3에서 이 3종 중 **robotics가 빠졌다**(아래 4종). robotics 커버리지가 통째로 사라지는
+//    것은 아니다 — uat299-tech-rename.mjs가 발행 slug 전수(현재 6종)를 API에서 유도해 돌린다.
+//    대신 들어온 두 판이 폭·행 수에서 더 가혹하다(equipment 25업체·7분류 · ssb 최장 leader_name).
+// task#304 S3 — 대상 slug를 **4종**으로 맞춘다(결함의 가시성이 판마다 갈린다). 착수 실측
+// (2026-08-16, GET /api/tech-reports): ai-datacenter-equipment 25업체·25분류(최다 행·최다 분류) ·
+// solid-state-battery 12·12(최장 leader_name) · reusable-rocket 9·9(최장 country, tech_level 1~5 전 단계) ·
+// smr 11업체·**9분류**(부분 분류 — 분류 없는 업체가 groupByCategory 마지막 그룹으로 모인다).
+const SLUGS = ['ai-datacenter-equipment', 'solid-state-battery', 'reusable-rocket', 'smr'];
 const bracketHeadings = (t) => (typeof t === 'string' ? t.split('\n') : []).filter((l) => /^\[[^\]]+\]$/.test(l.trim())).length;
 
 // ── 실응답 수집(GET만) ───────────────────────────────────────────────────────

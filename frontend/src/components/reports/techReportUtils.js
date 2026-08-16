@@ -68,9 +68,9 @@ export function deriveTechKpis(report) {
   const market = report?.market
   const { history, forecast } = splitSeries(market)
 
-  // 선두 = gap_years === 0(0은 유효값이다 — falsy로 흘리면 선두를 통째 놓친다).
-  // leader_name은 "무엇 대비인지"를 나타내는 이름이지 판정 근거가 아니다.
-  const leaders = players.filter((p) => p.gap_years === 0)
+  // 선두 = isLeader(단일 소스, ADR-0041 결정 3). task#280 당시 이 자리엔 반대 근거("leader_name은
+  // 판정 근거가 아니다")가 있었다 — 오탐 위험이 닫혀 있어(isLeader 주석 참조) 의도적으로 뒤집는다.
+  const leaders = players.filter(isLeader)
   const leaderTxt = leaders.length === 0
     ? DASH
     : leaders.length === 1 ? leaders[0].name : `${leaders[0].name} +${leaders.length - 1}`
@@ -103,6 +103,23 @@ export function deriveTechKpis(report) {
     // 업체가 있으면 0곳도 실측값(결측 아님) — 업체가 아예 없을 때만 —
     { label: '양산상용', value: players.length > 0 ? `${players.filter((p) => p.tech_level === 5).length}곳` : DASH },
   ]
+}
+
+// 선두 판정 단일 소스(ADR-0041 결정 3) — 소비처 3곳(표의 「현재 선두」· 분야 소제목의 선두 병기 ·
+// KPI 칩 「선두 업체」)이 공유한다. 정본은 gap_years===0(CLAUDE_COWORK_API.md "0=선두 자신")이고
+// leader_name===name은 보조 신호다. 정본만 쓰면 gap_years가 결측인데 leader_name이 자기 이름인
+// 업체가 병합 전 밴드에선 「현재 선두」였다가 병합 후 표에서 「—」로 사라지는 표시 정보 회지가 생긴다
+// (wrong<missing은 틀린 값과 없는 값의 선택 규칙이지, 정상 표시를 지우는 근거가 아니다).
+// leader_name이 CEO 등 인명으로 채워지는 실사례(`Elon Musk`)가 있으나 그 필드가 *자기 이름과 같을
+// 때만* 인정하므로 인명은 어떤 업체명과도 매칭되지 않아 오탐이 닫혀 있다.
+// ⚠️ 둘 다 결측이면 `leader_name === name`이 참이 되어 아무나 선두가 된다. null 체크만으론
+// 부족하다 — 백엔드 Player 모델의 `name: str`·`leader_name: Optional[str]`엔 길이 제약이 없어
+// `{name: "", leader_name: ""}`가 422 없이 통과하고, 그 행이 「현재 선두」로 뜬다(적대 검토 MED,
+// 직접 호출로 재현). 그래서 **비어 있지 않은 문자열**임을 요구한다(공백만인 값도 배제).
+const _nonEmpty = (s) => typeof s === 'string' && s.trim() !== ''
+export function isLeader(p) {
+  return p?.gap_years === 0
+    || (_nonEmpty(p?.leader_name) && _nonEmpty(p?.name) && p.leader_name.trim() === p.name.trim())
 }
 
 // 업체 표 정렬(task#280 S3) — 기술수준 내림차순 → 동단계 내 격차 오름차순 → gap_years null 최후

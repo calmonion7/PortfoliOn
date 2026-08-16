@@ -1,5 +1,6 @@
+import './TechLevelBand.css'
 import Badge from '../ui/Badge'
-import { TECH_LEVEL_LABELS, sortPlayers, playerColumns, groupByCategory } from '../reports/techReportUtils'
+import { TECH_LEVEL_LABELS, sortPlayers, playerColumns, groupByCategory, isLeader } from '../reports/techReportUtils'
 
 // 주요기술 리포트 상세 「주요 업체」(task#280 S3, task#296 S3) — 세로 카드 N장 → 행=업체 표(스크롤러 없음).
 // 카드형은 업체 간 비교가 성립하지 않았다(같은 축의 값이 세로로 흩어짐). 표는 열이 축이라
@@ -12,8 +13,15 @@ import { TECH_LEVEL_LABELS, sortPlayers, playerColumns, groupByCategory } from '
 //   players  [{ name, country, ticker, tech_level, gap_years, leader_name, share_pct, state_led, note }]
 //   holdings { [ticker]: 'holding' | 'watchlist' }  — 보유/관심 배지용(없으면 배지 생략)
 //
+// ADR-0041 — 「기술수준 비교」 밴드(구 별도 섹션 컴포넌트)를 이 표의 「기술수준」 셀로 흡수했다
+// (5칸 밴드 + 단계 숫자, 표 위 범례 1줄). 밴드·표가 별개 섹션일 때 같은 업체를 다른 순서로 나열하던
+// 회귀(task#280 F1)는 이제 같은 <tr>이라 원리적으로 성립하지 않는다. CSS 클래스명(tech-level-band__*)
+// 은 개명하지 않고 유지한다(첫 줄 import 참조) — uat277 라이브 프로브가 그 클래스로 칸 채움 수·대비를
+// 단언한다.
+//
 // 표시 규율(TechReport.jsx 카드 렌더에서 승계 — 같은 필드가 한 페이지에서 두 거동을 갖지 않게):
-//   gap_years === 0 → '현재 선두' / > 0 → 'N년' / null·음수 → '—'
+//   isLeader(p) → '현재 선두'(techReportUtils.isLeader 단일 소스, ADR-0041 결정 3 — gap_years===0
+//     ∪ leader_name===name) / gap_years > 0 → 'N년' / 그 외(null·음수, 선두 아님) → '—'
 //     ⚠️ leader_name은 셀에 넣지 않는다(적대 리뷰 F3 실측) — 매 행 반복되는 nowrap 문자열이라
 //     「선두 대비」 열이 302px까지 부풀어 PC 1440(콘텐츠 748px)에서 표가 891px로 넘쳤고 점유율·
 //     티커 정보가 초기 화면 밖으로 밀렸다. 열 머리글이 이미 "선두 대비"이므로 셀에는 격차만 남기고,
@@ -23,11 +31,13 @@ import { TECH_LEVEL_LABELS, sortPlayers, playerColumns, groupByCategory } from '
 //     ShareChart가 `Number.isFinite && >= 0`을 쓴다 — 한 필드가 한 페이지에서 두 얼굴을 갖지 않는다.
 //   결측은 추정하지 않고 '—'(wrong < missing, ADR-0033 결정 3).
 //
-// ⚠️ task#296: 자체 overflow-x 스크롤러(옛 SCROLLER)와 TABLE.minWidth(600)를 제거했다 — 표는 이제
-// 열 생략(playerColumns)과 기술수준 셀의 줄바꿈 허용으로 278px 모바일 폭에 맞춘다. 이건 task#277이
-// 금지한 "폰트·좌표 축소"가 아니다(글자 크기는 그대로, 열 수·줄바꿈만 바뀐다) — 표는 표고 SVG처럼
-// 좌표계를 갖지 않으니 그 가토는 이 표면에 적용되지 않는다.
+// ⚠️ task#296: 자체 overflow-x 스크롤러(옛 SCROLLER)와 TABLE.minWidth(600)를 제거했다 — 표는 열
+// 생략(playerColumns)으로 278px 모바일 폭에 맞춘다. 이건 task#277이 금지한 "폰트·좌표 축소"가
+// 아니다(글자 크기는 그대로, 열 수만 바뀐다) — 표는 표고 SVG처럼 좌표계를 갖지 않으니 그 가토는
+// 이 표면에 적용되지 않는다. 기술수준 열의 줄바꿈 허용(옛 task#296 S3ⓒ)은 ADR-0041에서 5칸 밴드로
+// 바뀌며 대신 칸 폭·gap을 예산(task#304 S0 실측)에 맞춰 축소하는 쪽으로 옮겼다 — 아래 TD_LEVEL 참조.
 const TABLE = { width: '100%', borderCollapse: 'collapse' }
+const LEVELS = [1, 2, 3, 4, 5]
 
 // 캡션은 표 밖이다 — nowrap을 주면 페이지 본문이 가로로 넘친다(가토 ⑦·⑨). 접히게 둔다.
 const CAPTION = {
@@ -50,9 +60,12 @@ const TD = {
 const TD_MUTED = { ...TD, color: 'var(--text-3)' }
 // 업체명만 접힐 수 있어야 한다 — 나머지 열은 원칙적으로 nowrap(수치는 접히면 안 된다)
 const TD_NAME = { ...TD, whiteSpace: 'normal' }
-// 기술수준만 별도로 줄바꿈을 허용한다(task#296 S3ⓒ) — "5단계 · 양산상용"(14자)이 278px 4열에서
-// 넘친다. 수치 열(선두 대비·점유율)은 nowrap을 유지한다 — 수치는 접히면 안 된다.
-const TD_LEVEL = { ...TD, whiteSpace: 'normal' }
+// 기술수준은 이제 5칸 밴드다(ADR-0041) — 밴드는 flex-shrink:0 고정 요소라 접히지 않으므로 nowrap을
+// 그대로 쓴다(TD와 동일값). 폭 예산은 task#304 S0 실측(reusable-rocket m350 여유 8.3px)에서 역산했다
+// — 아래 .tech-level-band__cells 사용부·CSS 파일(첫 줄 import) 주석 참조.
+const TD_LEVEL = TD
+// 단계 숫자는 CSS 클래스(.tech-level-band__digit)로 옮겼다 — 인라인 marginLeft로 두면 flex gap과
+// 합쳐진 실제 min-content를 코드에서 읽어낼 수 없고, 글리프 폭 추정에 의존하게 된다(적대 검토 MED).
 // 수치 열은 tnum 고정폭 — 행 간 자릿수 비교가 목적이다
 const TD_NUM = { ...TD, textAlign: 'right', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }
 
@@ -119,6 +132,14 @@ const GROUP_TD = {
 const DASH = '—'
 const COL_LABEL = { name: '업체', level: '기술수준', gap: '선두 대비', share: '점유율' }
 
+// 분야 소제목에 그 분야의 선두를 병기(ADR-0041 결정 4) — `▸ 가속기 · 선두 NVIDIA`. 값이 없으면
+// (그 그룹에 isLeader인 업체가 없으면) 병기를 생략한다. 최상단 leaders 캡션과 같은 방식으로
+// 고유값이 2개 이상이면 전부 잇는다(손실 0).
+function groupLeaderSuffix(members) {
+  const names = [...new Set(members.filter(isLeader).map((p) => p.name))]
+  return names.length > 0 ? ` · 선두 ${names.join(' · ')}` : ''
+}
+
 export default function PlayerTable({ players = [], holdings = {} }) {
   const rows = sortPlayers(players)
   const cols = playerColumns(players)
@@ -142,8 +163,8 @@ export default function PlayerTable({ players = [], holdings = {} }) {
     const key = p.ticker || p.name || fallbackKey
     const label = TECH_LEVEL_LABELS[p.tech_level]
     const stockType = p.ticker ? holdings[p.ticker] : null
-    // gap_years === 0은 유효값이다(선두 자신) — falsy로 흘리면 선두를 통째 놓친다.
-    const gapText = p.gap_years === 0 ? '현재 선두' : p.gap_years > 0 ? `${p.gap_years}년` : DASH
+    // isLeader 단일 소스(ADR-0041 결정 3, techReportUtils) — gap_years===0 ∪ leader_name===name.
+    const gapText = isLeader(p) ? '현재 선두' : p.gap_years > 0 ? `${p.gap_years}년` : DASH
     const hasShare = Number.isFinite(p.share_pct) && p.share_pct >= 0
 
     const cellFor = {
@@ -169,8 +190,20 @@ export default function PlayerTable({ players = [], holdings = {} }) {
           </div>
         </td>
       ),
-      // 라벨이 없는 단계 값(스키마 드리프트)은 추정하지 않고 —
-      level: <td key="level" style={TD_LEVEL}>{label ? `${p.tech_level}단계 · ${label}` : DASH}</td>,
+      // 라벨이 없는 단계 값(스키마 드리프트)은 추정하지 않고 —. 값이 있으면 5칸 밴드(ADR-0041) —
+      // 칸은 빈 span이라 AT엔 텍스트가 없으므로 role="img"+aria-label로 값을 노출한다(가토 ⑭ 계열).
+      level: (
+        <td key="level" style={TD_LEVEL}>
+          {label ? (
+            <div className="tech-level-band__cells" role="img" aria-label={`${p.tech_level}단계 · ${label}`}>
+              {LEVELS.map((lv) => (
+                <span key={lv} className={`tech-level-band__cell${lv <= p.tech_level ? ' tech-level-band__cell--filled' : ''}`} />
+              ))}
+              <span className="tech-level-band__digit">{p.tech_level}</span>
+            </div>
+          ) : DASH}
+        </td>
+      ),
       gap: <td key="gap" style={TD_MUTED}>{gapText}</td>,
       share: <td key="share" style={TD_NUM}>{hasShare ? `${p.share_pct}%` : DASH}</td>,
     }
@@ -191,9 +224,19 @@ export default function PlayerTable({ players = [], holdings = {} }) {
 
   return (
     <div>
-      {leaders.length > 0 && (
+      {/* ⚠️ 분류가 있으면 이 평면 캡션을 렌더하지 않는다(ADR-0041 결정 4·계획 S2). 분야별 소제목이
+          이미 「그 분야의 선두」를 말하고 있으므로, 페이지 전체를 대상으로 한 이 한 줄이 함께 뜨면
+          한 화면에서 선두 주장이 서로 모순된다 — 적대 검토가 재현했다: 캡션 「선두 = Z」와
+          소제목 「가 · 선두 A」·「나 · 선두 B」가 동시에 떠 세 주장이 충돌했다. */}
+      {groups.length === 0 && leaders.length > 0 && (
         <p style={CAPTION} data-testid="tech-report-players-leader">선두 = {leaders.join(' · ')}</p>
       )}
+      {/* 기술수준 범례 — 표 위 1줄(ADR-0041 결정 1, 구 별도 섹션 컴포넌트 최상단 관례 승계) */}
+      <div className="tech-level-band__legend" aria-hidden="true">
+        {LEVELS.map((lv) => (
+          <span key={lv} className="tech-level-band__legend-item">{lv} {TECH_LEVEL_LABELS[lv]}</span>
+        ))}
+      </div>
       <table style={TABLE} data-testid="tech-report-players">
         <thead>
           <tr>
@@ -208,7 +251,7 @@ export default function PlayerTable({ players = [], holdings = {} }) {
             // slug 조건문이 없다 — 분류 없는 발행물은 항상 아래 평면 경로를 그대로 탄다.
             ? groups.flatMap((g, gi) => [
                 <tr key={`group-${gi}`} data-testid="tech-report-player-group">
-                  <td colSpan={cols.length} style={GROUP_TD}>{g.category}</td>
+                  <td colSpan={cols.length} style={GROUP_TD}>{g.category}{groupLeaderSuffix(g.players)}</td>
                 </tr>,
                 // 그룹 인덱스로 한정한다 — 로컬 i만 넘기면 그룹 간 key가 충돌한다(위 renderPlayerRow 주석).
                 ...g.players.flatMap((p, i) => renderPlayerRow(p, `${gi}-${i}`)),

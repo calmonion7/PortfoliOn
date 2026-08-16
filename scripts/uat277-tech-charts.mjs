@@ -1,5 +1,18 @@
 // task#277 S5 라이브 UAT — 주요기술 리포트 상세: 시장 성장 차트 · 점유율 · 기술수준 밴드 · 3열 관계도.
 //
+// ── task#304 S3 갱신(ADR-0041) ─────────────────────────────────────────────────────────────
+// 「기술수준 비교」 밴드가 **별도 섹션에서 「주요 업체」 표의 셀로 흡수**됐다. 이 파일의 밴드 축은
+// 삭제하지 않고 **컨테이너 선택자만 표 셀로 재지향**했다 — CSS 클래스명(tech-level-band__cells /
+// __cell / __cell--filled / __legend)이 유지됐기 때문에(ADR-0041 결정 5가 정확히 이 비용을 아끼려고
+// 내린 결정) 칸 수·채움 수·채움색 대조·토큰 이빨 축이 **그대로 살아 있다**.
+// 옮긴 것: ① `[data-testid="tech-level-band"]` → `[data-testid="tech-report-players"]`
+//          ② `.tech-level-band__name` → `[data-testid="tech-report-player-name"]`
+//          ③ `.tech-level-band__empty` → 「기술수준」 셀 텍스트 `—`
+//          ④ `.tech-level-band__leader`/`__gap` → 「선두 대비」 셀(둘이 같은 셀이 됐다 — 아래 색 축 주석)
+//          ⑤ 범례 간격 대상: (범례 → 첫 밴드 행) → (범례 → 표)
+// 추가: `section-band-absent`·`toc-no-levels`(옛 섹션·목차 칩 부재) · `level-band`(칸 5개 · 채움 수 ==
+//       픽스처 tech_level · role/aria · 칸 **화면** 렌더 폭 · 접힘 0) · `legend-items`.
+//
 // ⚠️ 착수 시점 실측: frontend/dist(로컬)와 라이브 index-BBU0cTEJ.js가 바이트 동일하고, 그 번들엔
 // `market-growth-chart`/`tech-graph-svg`/`tech-level-band`/`tech-share-chart` 문자열이 전무하다
 // (grep 0건, dist mtime 20:24:19 < TechReport.jsx 소스 mtime 20:54:11 — dist가 S1~S4 배선보다 먼저
@@ -42,6 +55,9 @@ const eq = (tag, got, want, note = '') => {
   P(ok, tag, `${ok ? 'PASS' : 'FAIL'} — got=${JSON.stringify(got)} want=${JSON.stringify(want)}${note ? ' · ' + note : ''}`);
 };
 const NOTE = (msg) => console.log(`  ℹ ${msg}`);
+// 실측 원시 로그(단언 아님, 무조건 출력) — 개별 PASS 메시지는 FAIL이 하나라도 있으면 안 찍히므로
+// "단언하지 않지만 다음 사람이 봐야 하는 사실"은 여기로 모은다(출력은 넓게, 단언은 목표에만).
+const rawLog = [];
 
 // ── 로그인 (추정 폴백 없음) ──────────────────────────────────────────────────
 const login = await fetch(`${BASE}/api/auth/login`, {
@@ -85,6 +101,8 @@ function fmtGrowthCaption(market) {
   return parts.join(' · ');
 }
 const TECH_NAMES = { 'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇' };
+// 기술 성숙 단계 5단계 라벨 미러(techReportUtils.TECH_LEVEL_LABELS) — 범례·aria-label 기대값 소스.
+const TECH_LEVEL_LABELS = ['', '기초연구', '시제품', '실증', '초기상용', '양산상용'];
 
 // ── 픽스처 A — 메인(6뷰포트×테마 조합에서 재사용): 관계도 접힘(전제 6개→+2개) 포함 ──────
 const SLUG = 'reusable-rocket';
@@ -199,32 +217,58 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
     tagHold: readToken('--tag-hold-color'), tagWatch: readToken('--tag-watch-color'),
   };
 
-  // ── ① 기술수준 밴드 (S3) ──────────────────────────────────────────────
-  const bandEl = root.querySelector('[data-testid="tech-level-band"]');
-  const bandRows = bandEl ? [...bandEl.querySelectorAll('[data-testid="tech-level-band-row"]')].map(row => {
-    const nameEl = row.querySelector('.tech-level-band__name');
-    const cellsEl = row.querySelector('.tech-level-band__cells');
+  // ── ① 기술수준 밴드 (S3 → task#304/ADR-0041: 별도 섹션이 아니라 「주요 업체」 표의 셀이다) ─────
+  //    컨테이너 선택자만 표 셀로 재지향한다 — 클래스명(tech-level-band__cell*)을 유지했으므로
+  //    칸 수·채움 수·채움색 대비·이빨 축은 **그대로 살아 있다**(ADR-0041 결정 5가 노린 것이 이것이다).
+  //    행/선두/격차/결측 축은 표 등가물(<tr> · 「현재 선두」 · `N년` · `—`)로 옮겼다.
+  const bandEl = root.querySelector('[data-testid="tech-report-players"]');
+  const headLabels = bandEl ? [...bandEl.querySelectorAll('thead th')].map(th => txt(th)) : [];
+  const levelIdx = headLabels.indexOf('기술수준');
+  const gapIdx = headLabels.indexOf('선두 대비');
+  const bandRows = bandEl ? [...bandEl.querySelectorAll('[data-testid="tech-report-player-row"]')].map(row => {
+    const nameEl = row.querySelector('[data-testid="tech-report-player-name"]');
+    const levelTd = levelIdx >= 0 ? row.children[levelIdx] : null;
+    const gapTd = gapIdx >= 0 ? row.children[gapIdx] : null;
+    const cellsEl = levelTd ? levelTd.querySelector('.tech-level-band__cells') : null;
     const filled = cellsEl ? cellsEl.querySelectorAll('.tech-level-band__cell--filled').length : null;
     const totalCells = cellsEl ? cellsEl.querySelectorAll('.tech-level-band__cell').length : null;
-    const emptyEl = row.querySelector('.tech-level-band__empty');
-    const leaderEl = row.querySelector('.tech-level-band__leader');
-    const gapEl = row.querySelector('.tech-level-band__gap');
-    const filledCellColor = filled > 0 ? cs(cellsEl.querySelector('.tech-level-band__cell--filled')).backgroundColor : null;
+    // 결측(tech_level 없음)의 표 등가물 — 옛 `.tech-level-band__empty` 대신 셀 텍스트 `—`.
+    const isEmpty = !cellsEl && !!levelTd && txt(levelTd) === '—';
+    // 「현재 선두」/격차는 이제 별도 span이 아니라 「선두 대비」 셀의 텍스트다(표는 열이 축이다).
+    const gapText = gapTd ? txt(gapTd) : null;
+    const filledEl = cellsEl ? cellsEl.querySelector('.tech-level-band__cell--filled') : null;
     const unfilledCellEl = cellsEl ? cellsEl.querySelector('.tech-level-band__cell:not(.tech-level-band__cell--filled)') : null;
+    const fb = filledEl ? filledEl.getBoundingClientRect() : null;
     return {
       name: nameEl ? txt(nameEl) : null,
-      filled, totalCells, isEmpty: !!emptyEl,
-      leaderColor: leaderEl ? cs(leaderEl).color : null,
-      gapColor: gapEl ? cs(gapEl).color : null,
-      filledCellColor, unfilledCellColor: unfilledCellEl ? cs(unfilledCellEl).backgroundColor : null,
+      filled, totalCells, isEmpty,
+      aria: cellsEl ? cellsEl.getAttribute('aria-label') : null,
+      role: cellsEl ? cellsEl.getAttribute('role') : null,
+      // 화면 실측(가토 ⑫) — 칸이 CSS 선언대로 실제 픽셀을 갖는가.
+      cellW: fb ? Math.round(fb.width * 10) / 10 : null,
+      cellH: fb ? Math.round(fb.height * 10) / 10 : null,
+      // 칸 묶음이 접히지 않는가 — 직속 자식(5칸 + 단계 숫자)의 서로 다른 top 개수(가토 ⑨ 정정판).
+      cellLines: cellsEl ? new Set([...cellsEl.children].map(c => Math.round(c.getBoundingClientRect().top))).size : null,
+      gapText,
+      isLeaderRow: gapText === '현재 선두',
+      // 옛 `.tech-level-band__leader`(--accent) / `.tech-level-band__gap`(--text-3) 두 색을 재던 자리.
+      // 표에서는 둘 다 같은 셀(TD_MUTED)이라 **색이 하나다** — 아래 color-gap-cell이 그 사실을 잰다.
+      gapColor: gapTd ? cs(gapTd).color : null,
+      filledCellColor: filledEl ? cs(filledEl).backgroundColor : null,
+      unfilledCellColor: unfilledCellEl ? cs(unfilledCellEl).backgroundColor : null,
     };
   }) : null;
-  const bandLegendEl = bandEl ? bandEl.querySelector('.tech-level-band__legend') : null;
-  let bandLegendGap = null;
-  if (bandLegendEl && bandRows && bandRows.length) {
-    const firstRowEl = bandEl.querySelector('[data-testid="tech-level-band-row"]');
-    bandLegendGap = Math.round(firstRowEl.getBoundingClientRect().top - bandLegendEl.getBoundingClientRect().bottom);
-  }
+  // 범례는 이제 밴드 섹션 안이 아니라 **표 위**다(ADR-0041 결정 1) — 간격 축의 대상도 표로 옮긴다.
+  const bandLegendEl = root.querySelector('.tech-level-band__legend');
+  const bandLegendItems = bandLegendEl ? [...bandLegendEl.querySelectorAll('.tech-level-band__legend-item')].map(e => txt(e)) : null;
+  const bandLegendGap = (bandLegendEl && bandEl)
+    ? Math.round(bandEl.getBoundingClientRect().top - bandLegendEl.getBoundingClientRect().bottom) : null;
+  // 옛 섹션이 정말 사라졌는가(동작 ②) — 하나라도 남으면 유령 UI다.
+  const bandSectionGone = [
+    root.querySelectorAll('[data-testid="tech-level-band"]').length,
+    root.querySelectorAll('[data-tech-section="levels"]').length,
+  ];
+  const tocLabels = [...root.querySelectorAll('[data-testid="tech-toc-chip"]')].map(a => txt(a));
 
   // ── ② 점유율 차트 (S2) ────────────────────────────────────────────────
   const shareEl = root.querySelector('[data-testid="tech-share-chart"]');
@@ -360,7 +404,7 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
   return {
     found: true, rootRight: Math.round(rr.right),
     items, clippers, allText: root.textContent, tokens,
-    bandFound: !!bandEl, bandRows, bandLegendGap,
+    bandFound: !!bandEl, bandRows, bandLegendGap, bandLegendItems, bandSectionGone, tocLabels,
     shareFound: !!shareEl, shareRows, shareCaptionGap,
     growthFound: !!growthEl, growthEmpty: !!growthEmptyEl,
     growthCaptionText: growthCaptionEl ? txt(growthCaptionEl) : null,
@@ -442,8 +486,15 @@ for (const V of VIEWS) {
       }
 
       // ── task#277 신규 섹션 존재 sentinel (무조건, 미배포면 여기서 FAIL하는 게 정상) ──
-      eq(`section-band:${tag}`, m.bandFound ? 'PRESENT' : 'BAND_MISSING', 'PRESENT');
+      // task#304 — 「기술수준」은 이제 표의 셀이므로 이 sentinel의 대상은 **표**다. 그리고 옛 밴드
+      // 섹션이 정말 사라졌는지를 **짝 축**으로 함께 못박는다(하나만 두면 흡수가 반쪽인 상태를 통과시킨다).
+      eq(`section-band:${tag}`, m.bandFound ? 'PRESENT' : 'PLAYERS_TABLE_MISSING', 'PRESENT', '기술수준 셀의 컨테이너 = 주요 업체 표');
       bump('section');
+      eq(`section-band-absent:${tag}`, m.bandSectionGone, [0, 0],
+        '[data-testid="tech-level-band"] · [data-tech-section="levels"] 둘 다 0');
+      eq(`toc-no-levels:${tag}`, m.tocLabels.filter(t => t.includes('기술수준')), [],
+        `목차 칩 ${m.tocLabels.length}개 = ${JSON.stringify(m.tocLabels)}`);
+      bump('section', 2);
       eq(`section-share:${tag}`, m.shareFound ? 'PRESENT' : 'SHARE_MISSING', 'PRESENT', 'players 전원 share_pct 有 → 섹션 필수');
       bump('section');
       eq(`section-growth:${tag}`, m.growthFound ? 'PRESENT' : 'GROWTH_MISSING', 'PRESENT');
@@ -483,9 +534,14 @@ for (const V of VIEWS) {
       bump('bbox', m.items.length);
 
       // ═══ 간격 축 — 신규 섹션 4쌍 ══════════════════════════════════════════
+      // task#304 — 범례가 밴드 섹션 최상단에서 **표 위**로 옮겨졌다. 측정 쌍도 (범례 → 첫 밴드 행)에서
+      // (범례 → 표)로 옮긴다. 임계는 그대로(완화 0). 범례 내용도 여기서 함께 못박는다(축 ③ 이관).
       eq(`gap-band-domain:${tag}`, m.bandLegendGap != null ? 'OK' : 'GAP_BAND_DOMAIN_EMPTY', 'OK');
       if (m.bandLegendGap != null) eq(`gap-band:${tag}`, m.bandLegendGap >= -2 && m.bandLegendGap <= 24 ? 'OK' : `${m.bandLegendGap}px`, 'OK', `실측 ${m.bandLegendGap}px`);
+      eq(`legend-items:${tag}`, m.bandLegendItems, TECH_LEVEL_LABELS.slice(1).map((l, i) => `${i + 1} ${l}`),
+        '표 위 5단계 범례 1줄(ADR-0041 결정 1)');
       bump('gap');
+      bump('legend', m.bandLegendItems ? m.bandLegendItems.length : 0);
       eq(`gap-share-domain:${tag}`, m.shareCaptionGap != null ? 'OK' : 'GAP_SHARE_DOMAIN_EMPTY', 'OK');
       if (m.shareCaptionGap != null) eq(`gap-share:${tag}`, m.shareCaptionGap >= -2 && m.shareCaptionGap <= 24 ? 'OK' : `${m.shareCaptionGap}px`, 'OK', `실측 ${m.shareCaptionGap}px`);
       bump('gap');
@@ -501,6 +557,33 @@ for (const V of VIEWS) {
         eq(`ellipsis-band:${tag}`, bandBad, [], `밴드 행 ${m.bandRows.length}개`);
         bump('ellipsis-discipline', m.bandRows.length);
       }
+
+      // ═══ 신규 축 ⓐ(task#304) — 기술수준 밴드가 **화면에서 읽히는가** ══════════════════════
+      //   기대값은 리터럴이 아니라 픽스처(PLAYERS)에서 계산한다. 픽스처엔 tech_level 결측 행이 없으므로
+      //   `—` 분기는 이 프로브의 정의역 밖이고(실데이터 판은 uat280이 덮는다) 그 사실을 sentinel로 남긴다.
+      const wantLevel = new Map(PLAYERS.map(p => [p.name, p.tech_level]));
+      eq(`level-band-domain:${tag}`,
+        m.bandRows ? [m.bandRows.length, m.bandRows.filter(r => r.filled != null).length] : 'BAND_ROWS_NULL',
+        [PLAYERS.length, PLAYERS.length], '픽스처 전 행이 tech_level을 가지므로 밴드도 전 행 렌더');
+      const lvViol = (m.bandRows || []).flatMap(r => {
+        const want = wantLevel.get(r.name);
+        if (want == null) return [`${r.name}:NOT_IN_FIXTURE`];
+        const bad = [];
+        if (r.totalCells !== 5) bad.push(`${r.name}:cells=${r.totalCells}`);
+        if (r.filled !== want) bad.push(`${r.name}:filled=${r.filled}!=${want}`);
+        if (r.role !== 'img') bad.push(`${r.name}:role=${r.role}`);
+        if (r.aria !== `${want}단계 · ${TECH_LEVEL_LABELS[want]}`) bad.push(`${r.name}:aria=${JSON.stringify(r.aria)}`);
+        if (r.cellLines !== 1) bad.push(`${r.name}:LINES=${r.cellLines}(칸 묶음이 접혔다)`);
+        // 화면 실측 — 선언값(6×10px)이 아니라 렌더 픽셀. 0px면 기하 축은 전부 통과하면서 화면엔 없다.
+        if (!(r.cellW >= 4)) bad.push(`${r.name}:cellW=${r.cellW}(<4px)`);
+        if (!(r.cellH >= 6)) bad.push(`${r.name}:cellH=${r.cellH}(<6px)`);
+        return bad;
+      });
+      eq(`level-band:${tag}`, lvViol, [], `행 ${(m.bandRows || []).length}개 · 폭 ${JSON.stringify((m.bandRows || []).map(r => r.cellW))}`);
+      bump('level-band', (m.bandRows || []).length);
+      // 이빨 — 픽스처의 tech_level이 전부 같으면 위 단언은 채움 로직을 상수로 바꿔도 통과한다.
+      eq(`level-band-teeth:${tag}`, new Set(PLAYERS.map(p => p.tech_level)).size >= 2 ? 'OK' : 'SINGLE_LEVEL_FIXTURE', 'OK',
+        `픽스처 tech_level ${JSON.stringify(PLAYERS.map(p => p.tech_level))}`);
       eq(`ellipsis-share-domain:${tag}`, (m.shareRows && m.shareRows.length) ? 'OK' : 'SHARE_ROWS_EMPTY', 'OK');
       if (m.shareRows && m.shareRows.length) {
         const shareBad = m.shareRows.map((r, i) => r.name != null && r.pctText != null ? null : `row${i}`).filter(Boolean);
@@ -519,15 +602,24 @@ for (const V of VIEWS) {
         if (filledColors.length) eq(`color-band-filled:${tag}`, filledColors[0], m.tokens.data2, `--data-2=${m.tokens.data2}`);
         if (unfilledColors.length) eq(`color-band-unfilled:${tag}`, unfilledColors[0], m.tokens.border, `--border=${m.tokens.border}`);
         bump('color', filledColors.length + unfilledColors.length);
-        const leaderRow = m.bandRows.find(r => r.leaderColor);
-        const gapRow = m.bandRows.find(r => r.gapColor);
-        eq(`color-band-meta-domain:${tag}`, [!!leaderRow, !!gapRow].every(Boolean) ? 'OK' : `EMPTY(leader=${!!leaderRow},gap=${!!gapRow})`, 'OK');
-        if (leaderRow) eq(`color-band-leader:${tag}`, leaderRow.leaderColor, m.tokens.accent, `--accent=${m.tokens.accent}`);
+        // task#304 — 옛 밴드는 「현재 선두」를 `.tech-level-band__leader`(--accent)로, 격차를
+        // `.tech-level-band__gap`(--text-3)으로 **서로 다른 색**으로 그렸다. 표에서는 둘 다 같은
+        // 「선두 대비」 셀(TD_MUTED = --text-3)이라 **선두의 강조색이 사라졌다**. ADR-0041은 이 색 변화를
+        // 논의하지 않았다 — 여기서는 현재 구현을 그대로 잰다(구현을 무고하지 않는다). 두 색이 같아진
+        // 사실 자체는 아래 rawLog로 출력해 다음 사람이 의도인지 판단할 수 있게 남긴다.
+        const leaderRow = m.bandRows.find(r => r.isLeaderRow);
+        const gapRow = m.bandRows.find(r => r.gapText && r.gapText !== '현재 선두' && r.gapText !== '—');
+        eq(`color-band-meta-domain:${tag}`, [!!leaderRow, !!gapRow].every(Boolean) ? 'OK' : `EMPTY(leader=${!!leaderRow},gap=${!!gapRow})`, 'OK',
+          `「선두 대비」 셀 텍스트 ${JSON.stringify(m.bandRows.map(r => r.gapText))}`);
+        if (leaderRow) eq(`color-band-leader:${tag}`, leaderRow.gapColor, m.tokens.text3, `--text-3=${m.tokens.text3}(표에서는 선두도 격차와 같은 셀 = 같은 색)`);
         if (gapRow) eq(`color-band-gap:${tag}`, gapRow.gapColor, m.tokens.text3, `--text-3=${m.tokens.text3}`);
         bump('color', (leaderRow ? 1 : 0) + (gapRow ? 1 : 0));
-        // 이빨 — 4토큰이 서로 다름(같으면 위 단언들이 아무것도 안 보면서 통과한다).
-        const bandTokenSet = new Set([m.tokens.data2, m.tokens.border, m.tokens.accent, m.tokens.text3]);
-        eq(`color-band-tokens-differ:${tag}`, bandTokenSet.size, 4, `data2=${m.tokens.data2} border=${m.tokens.border} accent=${m.tokens.accent} text3=${m.tokens.text3}`);
+        rawLog.push(`${tag} · 선두 셀 색 ${leaderRow ? leaderRow.gapColor : 'n/a'} vs 격차 셀 색 ${gapRow ? gapRow.gapColor : 'n/a'}` +
+          ` · --accent=${m.tokens.accent}(옛 밴드의 선두 강조색 — 표 흡수 후 미사용)`);
+        // 이빨 — 밴드가 실제로 대조하는 3토큰이 서로 다름(같으면 위 단언들이 아무것도 안 보면서 통과한다).
+        // accent는 이 계열에서 더는 비교 상대가 아니므로 4 → 3으로 줄인다(느슨화가 아니라 정의역 정정).
+        const bandTokenSet = new Set([m.tokens.data2, m.tokens.border, m.tokens.text3]);
+        eq(`color-band-tokens-differ:${tag}`, bandTokenSet.size, 3, `data2=${m.tokens.data2} border=${m.tokens.border} text3=${m.tokens.text3}`);
       } else {
         NOTE(`${tag} — 밴드 색 축 미검사(섹션 자체가 없음, 위 section-band sentinel이 이미 FAIL 처리)`);
       }
@@ -744,8 +836,8 @@ for (const V of VIEWS) {
       eq(`console:${tag}`, errs, [], '주입 화면');
       bump('console');
 
-      // ── 육안 스크린샷 — 밴드(대비 위험, S3 DoD) + 관계도(scrollIntoView 후 전용, 프레임 밖 무의미) ──
-      await page.evaluate(() => document.querySelector('[data-testid="tech-level-band"]')?.scrollIntoView({ block: 'center' }));
+      // ── 육안 스크린샷 — 밴드 셀(대비 위험, S3 DoD → task#304: 대상이 표다) + 관계도(전용 캡처) ──
+      await page.evaluate(() => document.querySelector('[data-testid="tech-report-players"]')?.scrollIntoView({ block: 'center' }));
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${OUT}/${V.key}-${THEME}-band.png`, fullPage: false });
       await page.evaluate(() => document.querySelector('[data-testid="tech-graph"]')?.scrollIntoView({ block: 'center' }));
@@ -796,8 +888,13 @@ for (const V of VIEWS) {
     if (m.found) {
       eq(`identity:${tag}`, m.allText.includes(DETAIL_REPORT2.title) ? 'FOUND' : 'TITLE_MISSING', 'FOUND');
       bump('identity');
-      // 대조 먼저 — 같은 픽스처에서 tech_level은 그대로라 밴드/성장차트는 여전히 있어야 한다(share_pct와 무관).
-      eq(`band-still-present:${tag}`, m.bandFound ? 'PRESENT' : 'BAND_MISSING', 'PRESENT', '대조 — share_pct와 무관한 섹션');
+      // 대조 먼저 — 같은 픽스처에서 tech_level은 그대로라 기술수준 밴드 셀/성장차트는 여전히 있어야
+      // 한다(share_pct와 무관). task#304 — 대조 대상이 「밴드 섹션 존재」에서 「표에 밴드 셀이 렌더됨」
+      // 으로 옮겼다. 섹션 존재만 보면 흡수 후 그 대조가 영원히 FAIL해 share 부재 판정이 통째로
+      // CANNOT_VERIFY가 된다(대조군이 죽으면 목표 단언도 죽는다 — 가토 ⑧ⓔ).
+      const bandCellsAlive = !!m.bandRows && m.bandRows.length > 0 && m.bandRows.every(r => r.totalCells === 5);
+      eq(`band-still-present:${tag}`, bandCellsAlive ? 'PRESENT' : `BAND_CELLS_MISSING(${JSON.stringify((m.bandRows || []).map(r => r.totalCells))})`, 'PRESENT',
+        '대조 — share_pct와 무관한 표면(기술수준 밴드 셀)');
       eq(`growth-still-present:${tag}`, m.growthFound ? 'PRESENT' : 'GROWTH_MISSING', 'PRESENT', '대조 — share_pct와 무관한 섹션');
       bump('section', 2);
       // 목표 단언(plan S2 완료기준 ②) — share_pct 전무면 ShareChart 섹션 자체가 없어야 한다.
@@ -805,14 +902,14 @@ for (const V of VIEWS) {
       // 미배포라 아무 섹션도 없는 상태에서는 shareFound=false가 "옳게 생략됨"과 구별되지 않는다.
       // 대조(band/growth still-present)가 실제로 PASS해야만("컨트롤이 살아있다") 이 판정이 의미를 가진다 —
       // 그래서 대조가 실패 중이면 이 단언도 검증불가로 FAIL시켜 공허통과를 막는다.
-      const controlsOk = m.bandFound && m.growthFound;
+      const controlsOk = bandCellsAlive && m.growthFound;
       const shareAbsentGot = !controlsOk ? 'CANNOT_VERIFY_CONTROLS_MISSING' : (m.shareFound ? 'UNEXPECTEDLY_PRESENT' : 'ABSENT');
       eq(`share-section-absent:${tag}`, shareAbsentGot, 'ABSENT',
         'players 전원 share_pct=null → ShareChart는 null을 반환해야 함(코드: rows.length===0 → return null)');
       bump('section');
       eq(`console:${tag}`, errs, [], '주입 화면');
       bump('console');
-      await page.evaluate(() => document.querySelector('[data-testid="tech-level-band"]')?.scrollIntoView({ block: 'center' }));
+      await page.evaluate(() => document.querySelector('[data-testid="tech-report-players"]')?.scrollIntoView({ block: 'center' }));
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${OUT}/pc-light-no-share.png`, fullPage: false });
     } else {
@@ -835,6 +932,8 @@ console.log('\n' + '═'.repeat(72));
 console.log('커버리지 (계열별 검사 수 — 재실행 간 비교용):');
 for (const [k, v] of Object.entries(cov).sort()) console.log(`  ${k.padEnd(26)} ${v}`);
 console.log(`\n단언 총계: ${results.length}건 · PASS ${results.length - fails.length} · FAIL ${fails.length}`);
+console.log('\n실측 원시 로그(단언 아님 — 밴드 흡수로 색 구분이 사라진 자리 등):');
+for (const l of rawLog) console.log(`  ${l}`);
 console.log('※ OR로 묶은 단언 없음(모든 축이 독립 단언 또는 명시적 domain sentinel).');
 console.log('※ 주입 화면 — 실발행 아님. prod tech_reports 무쓰기(이 스크립트는 GET만 호출).');
 console.log('═'.repeat(72));

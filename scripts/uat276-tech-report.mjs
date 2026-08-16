@@ -55,6 +55,21 @@
 //    통과하는지를 덮는다. `first-screen-prose`는 uat280에만 둔다 — 픽스처 페이지 길이는 제품 성질이 아니라
 //    프로브 아티팩트라 여기서 재면 그 자체가 거짓 판정이 된다.
 //
+// ── task#304 S3 갱신(ADR-0041 — 「기술수준 비교」 밴드가 「주요 업체」 표의 셀로 흡수) ──────────
+//  · 행 파서 `cellTxt[levelIdx].match(/^(\d+)단계/)` → **원리적으로 항상 null**이 된다(셀 텍스트가
+//    단계 숫자 하나뿐). 채움 칸 수(화면의 진실)로 읽고 aria-label과 교차 대조하도록 교체했다.
+//    그대로 뒀으면 전 행 level=null → table-order 불변식이 통째로 거짓 FAIL했다.
+//  · `shrink-discipline`의 「기술수준만 줄바꿈이 의도」 예외를 **제거**했다 — 그 예외는 task#296이
+//    `5단계 · 양산상용` 14자를 278px 4열에 넣으려고 준 것인데 그 텍스트 자체가 사라졌다(축이 낡은
+//    메커니즘을 박제하던 자리, 가토 ⑧ⓝ). 이제 수치 열은 전부 nowrap이고, 대신 **밴드 셀이 실제로
+//    한 줄인가**(칸 묶음 자식들의 distinct-top == 1)를 별도로 잰다 — nowrap 선언만으론 flex 자식의
+//    wrap을 못 본다(가토 ⑨: 넘치지 않는 줄바꿈).
+//  · 제목→표 사슬에 **범례**가 끼어 링크가 2→3이 됐다(임계 24px은 그대로 — 완화 0).
+//  · 신규: `level-band`(칸 5개·채움 수 == 픽스처 tech_level·role/aria·칸 **화면** 렌더 폭) ·
+//    `legend` · `levels-section-absent` · `toc-no-levels`.
+//  · 텍스트 leaf 표본 구성이 바뀐다(기술수준 `<td>`가 leaf에서 빠지고 단계 숫자 span이 들어오며
+//    범례 5개가 추가) — 총계 변동의 원인을 `rawLog` 회계 줄로 출력한다.
+//
 // 판정축 4계열(+identity·console) — 각 축에 정의역 sentinel을 짝짓는다. 신뢰성 규칙(무조건 단언·
 // sentinel FAIL·이빨 단언)은 scripts/uat275-segment.mjs의 관용구를 재사용. 범위는 그 스크립트의 실제
 // 관용구(제목 텍스트에서 섹션 루트로 좁혀 재는 것)를 따라, `main.page-wrap` 그대로가 아니라 더 좁힌
@@ -79,6 +94,9 @@ const eq = (tag, got, want, note = '') => {
 };
 // 정보성 로그(단언 아님) — "정의역이 설계상 부재"처럼 FAIL로 만들면 안 되는 사실을 남길 때만 쓴다.
 const NOTE = (msg) => console.log(`  ℹ ${msg}`);
+// 실측 원시 로그(단언 아님, 무조건 출력) — 개별 PASS 메시지는 FAIL이 하나라도 있으면 안 찍히므로,
+// 총계 변동의 **원인**처럼 다음 사람이 반드시 봐야 하는 수치는 여기로 모은다(가토 ⑧ⓐ/ⓗ).
+const rawLog = [];
 
 // ── 로그인 (추정 폴백 없음 — 실패 시 즉시 exit) ──────────────────────────────
 const login = await fetch(`${BASE}/api/auth/login`, {
@@ -98,6 +116,8 @@ const LIST_SLUGS = ['reusable-rocket', 'solid-state-battery', 'smr', 'robotics']
 // 표시명 미러 — frontend/src/components/reports/techReportUtils.js TECH_NAMES(백엔드는 응답에 안 싣는다).
 // 1/2에서 h1이 제목 → 기술명으로 바뀌었으므로 이 맵이 h1 identity 단언의 기대값 소스다.
 const TECH_NAMES = { 'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇' };
+// 기술 성숙 단계 5단계 라벨 미러(techReportUtils.TECH_LEVEL_LABELS) — 범례·aria-label 기대값 소스.
+const TECH_LEVEL_LABELS = ['', '기초연구', '시제품', '실증', '초기상용', '양산상용'];
 
 // playerColumns 미러(techReportUtils.js와 동일 로직, task#296) — 열 수를 리터럴로 박지 않고 픽스처
 // 입력에서 유도한다. name·level 항상 + gap·share는 전 행 결측이면 제외(share는 `>= 0`이 게이트 —
@@ -321,7 +341,25 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
     const gap = cells.length >= 2
       ? Math.round(cells[1].getBoundingClientRect().left - cells[0].getBoundingClientRect().right)
       : null;
-    const lvM = (cellTxt[levelIdx] || '').match(/^(\d+)단계/);
+    // task#304(ADR-0041) — 기술수준 셀이 텍스트(`5단계 · 양산상용`)에서 **5칸 밴드**로 바뀌었다.
+    // 옛 파서 `/^(\d+)단계/`는 셀 텍스트가 단계 숫자 하나로 줄어 **원리적으로 항상 null**이 된다
+    // (그대로 두면 전 행 level=null → 아래 table-order 불변식이 통째로 거짓 FAIL한다). 화면의 진실인
+    // **채움 칸 수**를 읽고 aria-label과 교차 대조한다.
+    const levelTd = levelIdx >= 0 ? cells[levelIdx] : null;
+    const cellsEl = levelTd ? levelTd.querySelector('.tech-level-band__cells') : null;
+    const bandCells = cellsEl ? [...cellsEl.querySelectorAll('.tech-level-band__cell')] : [];
+    const filledEl = cellsEl ? cellsEl.querySelector('.tech-level-band__cell--filled') : null;
+    const fb = filledEl ? filledEl.getBoundingClientRect() : null;
+    const band = cellsEl ? {
+      total: bandCells.length,
+      filled: bandCells.filter(c => c.classList.contains('tech-level-band__cell--filled')).length,
+      aria: cellsEl.getAttribute('aria-label'), role: cellsEl.getAttribute('role'),
+      cellW: fb ? Math.round(fb.width * 10) / 10 : null,
+      cellH: fb ? Math.round(fb.height * 10) / 10 : null,
+      // 칸 묶음이 접히지 않는가 — 직속 자식(5칸 + 단계 숫자)의 서로 다른 top 개수(가토 ⑨ 정정판).
+      lines: new Set([...cellsEl.children].map(c => Math.round(c.getBoundingClientRect().top))).size,
+      digit: txt(cellsEl),
+    } : null;
     // gap 셀은 이제 "선두 대비" 접두 없이 격차만 담는다(leader_name이 표 위 캡션으로 승격된 task#280
     // S3부터 이미 그랬다 — 옛 `/^선두 대비 (\d+)년/`은 그 시점부터 스테일이었다).
     const gapM = gapIdx >= 0 ? (cellTxt[gapIdx] || '').match(/^(\d+)년$/) : null;
@@ -330,7 +368,8 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
     const stateBadge = [...row.querySelectorAll('span')].find(e => e.children.length === 0 && txt(e) === '정부주도');
     return {
       name: nameEl ? txt(nameEl) : null, nameCs, flexSibs, cellInfo, gap, cellCount: cells.length,
-      level: lvM ? Number(lvM[1]) : null,
+      band,
+      level: band ? band.filled : null,
       // '현재 선두' = gap 0(0은 유효값 — falsy로 흘리면 선두를 놓친다), '—' = null
       gapYears: gapIdx >= 0 && cellTxt[gapIdx] === '현재 선두' ? 0 : (gapM ? Number(gapM[1]) : null),
       holdColor: holdBadge ? cs(holdBadge).color : null,
@@ -368,11 +407,21 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
   // 캡션 유무 = 축의 **정의역**이지 무음 스킵이 아니다(가토 ⑧ⓛ): 전 업체의 gap_years가 0/null이면
   // PlayerTable이 캡션을 렌더하지 않아(leaders 빈 배열) 사슬이 1링크가 된다. 링크 수 자체를 호출측에서
   // 픽스처 입력과 대조해 못박으므로, 링크가 조용히 사라지면 통과가 아니라 FAIL이 된다.
+  // ⚠️ task#304 — 사슬에 **5단계 범례**가 새로 끼었다(제목 → 캡션 → 범례 → 표). 링크를 늘리지 않으면
+  //    위 33px과 **똑같은 함정**에 다시 빠진다(범례 텍스트 자신의 높이가 "간격"으로 계상된다) —
+  //    임계를 올리는 게 아니라 사슬을 링크로 쪼개는 것이 원래 의도다(가토 ⑧ⓝ).
+  const legendEl = root.querySelector('.tech-level-band__legend');
+  const chainNodes = [['title', playersCap], ['caption', leaderEl], ['legend', legendEl], ['table', playersEl]]
+    .filter(([, el]) => el);
   const titleChain = !playersCap ? null
-    : leaderEl
-      ? [{ from: 'title', to: 'caption', px: gapPx(playersCap, leaderEl) },
-        { from: 'caption', to: 'table', px: gapPx(leaderEl, playersEl) }]
-      : [{ from: 'title', to: 'table', px: gapPx(playersCap, playersEl) }];
+    : chainNodes.slice(1).map(([k, el], i) => ({ from: chainNodes[i][0], to: k, px: gapPx(chainNodes[i][1], el) }));
+  const legendItems = legendEl ? [...legendEl.querySelectorAll('.tech-level-band__legend-item')].map(e => txt(e)) : null;
+  // 옛 「기술수준 비교」 섹션·목차 칩의 부재(동작 ②③) — 하나라도 남으면 유령 UI다.
+  const bandSectionGone = [
+    root.querySelectorAll('[data-testid="tech-level-band"]').length,
+    root.querySelectorAll('[data-tech-section="levels"]').length,
+  ];
+  const tocLabels = [...root.querySelectorAll('[data-testid="tech-toc-chip"]')].map(a => txt(a));
 
   // 출처 섹션 — "출처" 캡션(.rpt-title) ↔ 첫 칩
   const sourcesEl = root.querySelector('[data-testid="tech-report-sources"]');
@@ -405,6 +454,7 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
   return {
     found: true, items, clippers, rows, sourceGap, sourcesTexts, order,
     titleChain, leaderText: leaderEl ? txt(leaderEl) : null,
+    legendItems, bandSectionGone, tocLabels,
     headCols: playersEl.querySelectorAll('thead th').length,
     marketSummaryText: marketSummaryEl ? txt(marketSummaryEl) : null,
     h1Text: h1 ? txt(h1) : null,
@@ -586,9 +636,20 @@ for (const V of VIEWS) {
           //    한다 — 열 집합이 playerColumns 파생이라 판마다 인덱스가 달라진다.
           for (const c of r.cellInfo.filter(c => c.i > 0)) {
             cellN++;
-            const wantWs = c.label === '기술수준' ? 'normal' : 'nowrap';
-            if (c.ws !== wantWs) viol.push(`cell/${id}/#${c.i}(${c.label}):ws=${c.ws} want=${wantWs}`);
+            if (c.ws !== 'nowrap') viol.push(`cell/${id}/#${c.i}(${c.label}):ws=${c.ws} want=nowrap`);
             if (c.sw > c.cw + 1) viol.push(`cell/${id}/#${c.i}(${c.label}):CLIPPED(${c.sw}>${c.cw})`);
+          }
+          // ⓓ task#304 — 밴드 셀 자신이 접히지 않는가. 옛 규칙("기술수준만 줄바꿈이 의도")은
+          //    task#296이 `5단계 · 양산상용` 14자를 278px 4열에 넣으려고 준 예외인데, ADR-0041이 그
+          //    텍스트를 5칸 밴드로 바꾸면서 **예외의 근거 자체가 사라졌다**(밴드는 flex-shrink:0 고정
+          //    요소라 접히지 않고, 폭은 칸 크기로 맞춘다). 그래서 위 규칙을 「수치 열은 전부 nowrap」
+          //    으로 되돌리고, 밴드가 실제로 한 줄인지를 **별도 축**으로 잰다 — nowrap 선언만으로는
+          //    flex 자식들이 wrap되는 것을 못 본다(가토 ⑨: 넘치지 않는 줄바꿈).
+          if (r.band) {
+            if (r.band.lines !== 1) viol.push(`band/${id}:LINES=${r.band.lines}(칸 묶음이 접혔다)`);
+            if (r.band.total !== 5) viol.push(`band/${id}:cells=${r.band.total}`);
+          } else if (r.level != null) {
+            viol.push(`band/${id}:BAND_MISSING(level=${r.level})`);
           }
         }
         // 실측치를 PASS 메시지에 싣는다 — 이름 폭은 뷰포트마다 줄고(유연) 수치 열 폭은 안 줄어야 한다(고정).
@@ -631,10 +692,25 @@ for (const V of VIEWS) {
       // 줄면 FAIL이고, 실측치는 아래 note로 항상 출력해 재실행 간 드리프트를 눈으로 비교할 수 있다.
       // task#280 1/2에서 nowrap 선언이 span → <td>로 옮겨갔다: 행당 **텍스트 전용** nowrap 셀 4개
       // (국가·기술수준·선두 대비·점유율 — 이름/티커 셀은 자식 요소가 있어 leaf가 아니다) + 헤더 6열.
-      const minNowrap = SCREEN === 'list' ? LIST_REPORTS.length : PLAYERS.length * 4 + 6 + badgeCount;
+      // ⚠️ task#304 — 표본 구성이 **바뀌었다(총계는 그대로거나 늘어난다)**. 기술수준 `<td>`는 이제
+      //    자식(칸 묶음 div)을 가져 **텍스트 leaf에서 빠지고**, 대신 그 안의 **단계 숫자 span**이
+      //    nowrap을 상속해 leaf로 들어온다 → 행당 1개는 유지된다. 여기에 5단계 범례 항목 5개
+      //    (.tech-level-band__legend-item{white-space:nowrap})가 **새로 더해진다**. 빈 칸 span 5개는
+      //    텍스트가 없어 정의역 밖이다. 총계 변동의 원인을 이 주석과 아래 회계 로그로 못박는다
+      //    (총계가 조용히 움직이면 통과가 아니라 측정 실패다 — 가토 ⑧ⓑ).
+      const LEGEND_ITEMS = 5;
+      const minNowrap = SCREEN === 'list' ? LIST_REPORTS.length : PLAYERS.length * 4 + 6 + badgeCount + LEGEND_ITEMS;
       eq(`line-visible-domain:${tag}`,
         nowrapDomain.length >= minNowrap ? 'OK' : `DOMAIN_SHRANK(${nowrapDomain.length} < ${minNowrap})`, 'OK',
-        `실측 ${nowrapDomain.length}건 · 1/2 하한 ${minNowrap} · badgeCount=${badgeCount}`);
+        `실측 ${nowrapDomain.length}건 · 1/2 하한 ${minNowrap} · badgeCount=${badgeCount} · 범례 ${LEGEND_ITEMS}`);
+      // 기술수준 셀이 텍스트 leaf 계열에서 어떻게 재구성됐는지 **수치로** 남긴다(before/after 비교용).
+      if (SCREEN === 'detail') {
+        const digitLeaves = m.items.filter(i => /^[1-5]$/.test(i.t)).length;
+        const legendLeaves = m.items.filter(i => /^[1-5] (기초연구|시제품|실증|초기상용|양산상용)$/.test(i.t)).length;
+        const stageTextLeaves = m.items.filter(i => /단계 · /.test(i.t)).length;
+        rawLog.push(`${tag} · leaf 총 ${m.items.length} · nowrap ${nowrapDomain.length}(하한 ${minNowrap})` +
+          ` · 단계숫자 leaf ${digitLeaves} · 범례 leaf ${legendLeaves} · 옛 「N단계 · 라벨」 leaf ${stageTextLeaves}(0이 정상)`);
+      }
 
       // ── bbox — 가로 넘침(전체 leaf, ellipsis 포함 — 시각적 박스는 ellipsis도 넘지 않는다).
       // 단 자체 overflow-x 스크롤러 안쪽은 정의역 밖 — 표는 축소하지 않고 설계폭을 지킨 채 스크롤한다(가토 ⑫).
@@ -682,10 +758,13 @@ for (const V of VIEWS) {
         // 재는 것이 원래 의도를 그대로 지키는 형태다(임계 24는 그대로 두었다 — 완화 0).
         // 캡션 유무는 축의 정의역이다(위 measureDetail 주석 참조) — 링크 수를 픽스처에서 계산해 못박는다.
         const expLeaders = [...new Set(PLAYERS.filter(p => p.gap_years > 0 && p.leader_name).map(p => p.leader_name))];
-        const expLinks = expLeaders.length > 0 ? 2 : 1;
+        // task#304 — 범례가 끼어 링크가 하나 늘었다(캡션 있으면 3, 없으면 2). 기대값은 리터럴이
+        // 아니라 픽스처에서 계산한다.
+        const expLinks = expLeaders.length > 0 ? 3 : 2;
         const chain = m.titleChain || [];
-        eq(`gap-title-table-domain:${tag}`, chain.length || 'GAP_TITLE_DOMAIN_EMPTY', expLinks,
-          `사슬 ${JSON.stringify(chain)}`);
+        eq(`gap-title-table-domain:${tag}`, chain.length ? ['title', ...chain.map(l => l.to)] : 'GAP_TITLE_DOMAIN_EMPTY',
+          ['title', ...(expLeaders.length > 0 ? ['caption'] : []), 'legend', 'table'],
+          `사슬 ${JSON.stringify(chain)} · 링크 ${chain.length}(기대 ${expLinks})`);
         // 대상 유효성(⑧ⓘ) — 캡션은 이 축의 **새 측정 대상**이다. 간격만 재면 엉뚱한(빈·오조립) 캡션
         // 위에서도 통과한다. 기대 문자열은 PlayerTable의 조립 규칙을 픽스처 입력에 적용해 계산.
         eq(`gap-title-caption-identity:${tag}`, m.leaderText ?? 'CAPTION_ABSENT',
@@ -723,6 +802,48 @@ for (const V of VIEWS) {
         eq(`prose-plain:${tag}`, m.plainCount, 1, '소제목 없는 선행 문단은 <p>로 항상 보인다');
         eq(`prose-plain-text:${tag}`, m.plainText, LEAD_PARA, '선행 문단 원문 보존(정보 손실 0)');
         bump('prose', m.h3Total + m.plainCount);
+
+        // ── task#304 신규 축 ⓐ — 기술수준 밴드가 **화면에서 읽히는가**(ADR-0041 결정 1) ─────────
+        //    기대값은 리터럴이 아니라 픽스처(PLAYERS)에서 계산한다. 픽스처엔 tech_level 결측 행이
+        //    없으므로 `—` 분기는 이 프로브의 정의역 밖이고(실데이터 판은 uat280이 덮는다) 그 사실을
+        //    아래 domain 축이 수치로 못박는다.
+        const wantLv = new Map(PLAYERS.map(p => [p.name, p.tech_level]));
+        eq(`level-band-domain:${tag}`,
+          [m.rows.length, m.rows.filter(r => r.band).length],
+          [PLAYERS.length, PLAYERS.filter(p => TECH_LEVEL_LABELS[p.tech_level]).length],
+          '픽스처 전 행이 tech_level을 가지므로 밴드도 전 행 렌더(결측 분기는 정의역 밖)');
+        const lvViol = m.rows.flatMap(r => {
+          const want = wantLv.get(r.name);
+          if (want == null) return [`${r.name}:NOT_IN_FIXTURE`];
+          if (!r.band) return [`${r.name}:BAND_MISSING(want L${want})`];
+          const bad = [];
+          if (r.band.total !== 5) bad.push(`${r.name}:cells=${r.band.total}`);
+          if (r.band.filled !== want) bad.push(`${r.name}:filled=${r.band.filled}!=${want}`);
+          if (r.band.role !== 'img') bad.push(`${r.name}:role=${r.band.role}`);
+          if (r.band.aria !== `${want}단계 · ${TECH_LEVEL_LABELS[want]}`) bad.push(`${r.name}:aria=${JSON.stringify(r.band.aria)}`);
+          if (r.band.digit !== String(want)) bad.push(`${r.name}:digit=${JSON.stringify(r.band.digit)}`);
+          // 화면 실측(가토 ⑫) — 선언값 6×10px이 아니라 렌더 픽셀. 0px면 기하 축은 전부 통과하면서
+          // 화면엔 아무것도 없다.
+          if (!(r.band.cellW >= 4)) bad.push(`${r.name}:cellW=${r.band.cellW}(<4px)`);
+          if (!(r.band.cellH >= 6)) bad.push(`${r.name}:cellH=${r.band.cellH}(<6px)`);
+          return bad;
+        });
+        eq(`level-band:${tag}`, lvViol, [],
+          `행 ${m.rows.length}개 · 칸 폭 ${JSON.stringify(m.rows.map(r => r.band && r.band.cellW))}`);
+        bump('level-band', m.rows.length);
+        // 이빨 — 픽스처의 tech_level이 전부 같으면 위 단언은 채움 로직을 상수로 바꿔도 통과한다.
+        eq(`level-band-teeth:${tag}`, new Set(PLAYERS.map(p => p.tech_level)).size >= 2 ? 'OK' : 'SINGLE_LEVEL_FIXTURE', 'OK',
+          `픽스처 tech_level ${JSON.stringify(PLAYERS.map(p => p.tech_level))}`);
+
+        // ── task#304 동작 ①②③ — 범례 존재 · 옛 섹션 부재 · 목차 칩 감소 ────────────────────
+        eq(`legend:${tag}`, m.legendItems, TECH_LEVEL_LABELS.slice(1).map((l, i) => `${i + 1} ${l}`),
+          '표 위 5단계 범례 1줄(밴드 섹션 최상단 관례 승계)');
+        bump('legend', m.legendItems ? m.legendItems.length : 0);
+        eq(`levels-section-absent:${tag}`, m.bandSectionGone, [0, 0],
+          '[data-testid="tech-level-band"] · [data-tech-section="levels"] 둘 다 0');
+        eq(`toc-no-levels:${tag}`, m.tocLabels.filter(t => t.includes('기술수준')), [],
+          `목차 칩 ${m.tocLabels.length}개 = ${JSON.stringify(m.tocLabels)}`);
+        bump('section-absent', 2);
 
         // ── 표 정렬 불변식 — 리터럴 순서를 박지 않는다(기술수준 비증가 · 동값 구간 격차 비감소 · null 최후).
         const lv = (r) => (r.level == null ? -Infinity : r.level);
@@ -789,6 +910,8 @@ console.log('\n' + '═'.repeat(72));
 console.log('커버리지 (계열별 검사 수 — 재실행 간 비교용):');
 for (const [k, v] of Object.entries(cov).sort()) console.log(`  ${k.padEnd(24)} ${v}`);
 console.log(`\n단언 총계: ${results.length}건 · PASS ${results.length - fails.length} · FAIL ${fails.length}`);
+console.log('\n텍스트 leaf 회계(단언 아님 — task#304 밴드 흡수로 표본 구성이 바뀐 자리):');
+for (const l of rawLog) console.log(`  ${l}`);
 console.log('※ OR로 묶은 단언 없음(전 축이 독립 단언) — 항별 실측치 출력 규칙은 이 스크립트엔 해당 없음.');
 console.log('※ ⓑ 주입 화면 — 실발행 아님. prod tech_reports 무쓰기(이 스크립트는 GET만 호출).');
 console.log('═'.repeat(72));

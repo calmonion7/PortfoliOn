@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import PlayerTable, { NAME_TEXT, NOTE_BODY } from './PlayerTable'
-import { groupByCategory } from '../reports/techReportUtils'
+import { groupByCategory, TECH_LEVEL_LABELS } from '../reports/techReportUtils'
 
 // task#280 S3 → task#296 S3(스크롤러 제거·note 상시 노출·열 재구성). 정렬은 리터럴 순서가 아니라
 // **불변식**으로 단언한다(정당한 데이터 변경/타이브레이크 추가에 거짓 실패하지 않게).
@@ -253,18 +253,82 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     expect(nameEl.getAttribute('title')).toBe('Rolls-Royce SMR')
   })
 
-  // task#296 S3ⓒ — 기술수준 셀만 별도로 줄바꿈을 허용한다(278px 4열에서 "5단계 · 양산상용" 14자가
-  // 넘친다). 수치 열(점유율)은 여전히 nowrap이라 이 완화는 기술수준 하나에만 적용된다.
-  it('기술수준 셀만 nowrap을 풀어 2줄을 허용한다(수치 열은 그대로 nowrap)', () => {
+  // ── ADR-0041 S1 — 「기술수준 비교」 밴드가 표 셀로 흡수된다. 텍스트 "5단계 · 양산상용"은
+  // 5칸 밴드(+ 단계 숫자)로 교체되고, 그 값은 aria-label로 접근성 트리에 노출된다(아래 축1·7).
+  it('축1 — 기술수준 셀은 칸 5개를 렌더하고 채워진 칸 수가 tech_level과 일치한다', () => {
     render(<PlayerTable players={PLAYERS} />)
-    expect(rowOf('NuScale').cells[1].style.whiteSpace).toBe('normal')
-    expect(rowOf('NuScale').cells[1].textContent).toBe('5단계 · 양산상용')
-    expect(rowOf('NuScale').cells[3].style.whiteSpace).toBe('nowrap')  // 점유율(수치)
+    const nuscale = within(rowOf('NuScale')).getByRole('img')   // tech_level 5
+    expect(nuscale.querySelectorAll('.tech-level-band__cell').length).toBe(5)
+    expect(nuscale.querySelectorAll('.tech-level-band__cell--filled').length).toBe(5)
+    const terra = within(rowOf('TerraPower')).getByRole('img')  // tech_level 3
+    expect(terra.querySelectorAll('.tech-level-band__cell--filled').length).toBe(3)
+    expect(rowOf('NuScale').cells[1].style.whiteSpace).toBe('nowrap')  // 밴드는 접히지 않는다
   })
 
-  it('기술수준 결측 행은 —를 렌더한다(추정 금지)', () => {
+  it('축2 — 기술수준 결측 행은 칸이 0개이고 —를 렌더한다(추정 금지)', () => {
     render(<PlayerTable players={PLAYERS} />)
-    expect(within(rowOf('한국원자력연구원')).queryByText(/단계/)).toBeNull()
+    const cell = rowOf('한국원자력연구원').cells[1]
+    expect(within(cell).queryByRole('img')).toBeNull()
+    expect(cell.querySelectorAll('.tech-level-band__cell').length).toBe(0)
+    expect(cell.textContent).toBe('—')
+  })
+
+  it('축3 — 표 위에 5단계 라벨 범례가 전수 렌더된다', () => {
+    render(<PlayerTable players={PLAYERS} />)
+    for (let lv = 1; lv <= 5; lv++) expect(screen.getByText(`${lv} ${TECH_LEVEL_LABELS[lv]}`)).toBeTruthy()
+    const legend = screen.getByText(`1 ${TECH_LEVEL_LABELS[1]}`).closest('.tech-level-band__legend')
+    expect(legend).toBeTruthy()
+    // 4 = Node.DOCUMENT_POSITION_FOLLOWING — 표가 범례 뒤에 온다("표 위" 배치)
+    expect(legend.compareDocumentPosition(screen.getByTestId('tech-report-players')) & 4).toBeTruthy()
+  })
+
+  it('축4 — 선두 합집합: gap_years:null이면서 leader_name===name인 행은 「현재 선두」다', () => {
+    // 정본(gap_years===0)만 썼다면 A사는 여전히 —다. B사가 gap_years 유효값을 가져 gap 열 자체는
+    // 생긴다(playerColumns 게이트, A사만 있으면 열이 아예 안 생겨 판별력이 없다).
+    const players = [
+      { name: 'A사', country: 'KR', ticker: null, tech_level: 5, gap_years: null, leader_name: 'A사', share_pct: null, state_led: false, note: null },
+      { name: 'B사', country: 'US', ticker: null, tech_level: 3, gap_years: 4, leader_name: 'A사', share_pct: null, state_led: false, note: null },
+    ]
+    render(<PlayerTable players={players} />)
+    expect(rowOf('A사').cells[2].textContent).toBe('현재 선두')
+    expect(rowOf('B사').cells[2].textContent).toBe('4년')
+  })
+
+  it('축5 — 음수 격차는 leader_name 일치가 없으면 아무 문구도 보이지 않는다(wrong<missing)', () => {
+    const players = [
+      { name: 'C사', country: 'RU', ticker: null, tech_level: 3, gap_years: -2, leader_name: 'A사', share_pct: null, state_led: false, note: null },
+    ]
+    render(<PlayerTable players={players} />)
+    expect(rowOf('C사').cells[2].textContent).toBe('—')
+    expect(screen.queryByText(/-2년/)).toBeNull()
+  })
+
+  it('축6 — 분야 소제목에 그 분야의 선두가 병기되고, 분류 없는 판은 기존 캡션이 그대로다', () => {
+    const grouped = [
+      { name: 'A사', country: 'KR', ticker: null, tech_level: 5, gap_years: 0, leader_name: 'A사', share_pct: null, state_led: false, note: null, category: '경수형' },
+      { name: 'B사', country: 'US', ticker: null, tech_level: 4, gap_years: 2, leader_name: 'A사', share_pct: null, state_led: false, note: null, category: '경수형' },
+      { name: 'C사', country: 'CN', ticker: null, tech_level: 3, gap_years: 5, leader_name: 'D사', share_pct: null, state_led: true, note: null, category: '고온가스형' },
+      { name: 'D사', country: 'RU', ticker: null, tech_level: 5, gap_years: 0, leader_name: 'D사', share_pct: null, state_led: false, note: null, category: '고온가스형' },
+    ]
+    // 이빨 — 픽스처가 실제로 그룹핑 분기를 탄다(task#301 재발 방지 가토)
+    expect(groupByCategory(grouped)).not.toEqual([])
+    const { unmount } = render(<PlayerTable players={grouped} />)
+    const groups = screen.getAllByTestId('tech-report-player-group')
+    expect(groups.map((g) => g.textContent)).toEqual(['경수형 · 선두 A사', '고온가스형 · 선두 D사'])
+    unmount()
+
+    // 분류 없는 판은 기존 캡션(그룹 병기 도입 이전부터 있던 것)이 그대로 렌더된다.
+    render(<PlayerTable players={PLAYERS} />)
+    expect(groupByCategory(PLAYERS)).toEqual([])
+    expect(screen.getByTestId('tech-report-players-leader')).toBeTruthy()
+    expect(screen.queryAllByTestId('tech-report-player-group').length).toBe(0)
+  })
+
+  it('축7 — 기술수준 칸 묶음은 role="img"+aria-label("N단계 · 라벨")로 값을 접근성 트리에 노출한다', () => {
+    render(<PlayerTable players={PLAYERS} />)
+    expect(within(rowOf('NuScale')).getByRole('img').getAttribute('aria-label')).toBe('5단계 · 양산상용')
+    expect(within(rowOf('중국핵공업집단')).getByRole('img').getAttribute('aria-label')).toBe('5단계 · 양산상용')
+    expect(within(rowOf('TerraPower')).getByRole('img').getAttribute('aria-label')).toBe('3단계 · 실증')
   })
 
   it('보유·관심 배지는 holdings 맵에 있는 티커에만 붙는다', () => {
@@ -326,8 +390,10 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
       // 이빨 — 픽스처가 실제로 3그룹(경수형·고온가스형·미분류)을 만들어야 위 단언이 판별력을 갖는다.
       expect(expectedGroups).toBe(3)
       expect(screen.getAllByTestId('tech-report-player-group').length).toBe(expectedGroups)
+      // ADR-0041 결정 4 — 소제목에 그 그룹의 선두가 병기된다. 경수형=A사(gap0)만 선두, 고온가스형·
+      // 미분류는 gap_years>0뿐이라 선두가 없어 병기가 생략된다(값 없으면 생략).
       expect(screen.getAllByTestId('tech-report-player-group').map((r) => r.textContent))
-        .toEqual(['경수형', '고온가스형', '미분류'])
+        .toEqual(['경수형 · 선두 A사', '고온가스형', '미분류'])
       // 미분류(D사)도 사라지지 않는다 — 업체 총수는 그룹핑과 무관하게 보존된다.
       expect(screen.getAllByTestId('tech-report-player-row').length).toBe(CATEGORIZED.length)
     })
@@ -369,6 +435,49 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
       }
       expect(errors.filter((m) => /same key|duplicate key/i.test(m))).toEqual([])
       expect(screen.getAllByTestId('tech-report-player-row').length).toBe(NAMELESS.length)
+    })
+  })
+
+  // ── 적대 검토 확증 결함의 회귀 잠금 (task#304 in-run fix) ──
+  describe('선두 주장이 한 화면에서 충돌하지 않는다 (적대 검토 HIGH)', () => {
+    // 분류가 있으면 분야별 소제목이 이미 「그 분야의 선두」를 말한다. 페이지 전체를 대상으로 한
+    // 평면 캡션이 함께 뜨면 서로 모순되는 선두 주장이 동시에 보인다.
+    const TWO_LEADERS = [
+      { name: 'A사', tech_level: 5, gap_years: 0, leader_name: null, category: '가' },
+      { name: '뒤처진1', tech_level: 3, gap_years: 4, leader_name: 'Z사', category: '가' },
+      { name: 'B사', tech_level: 5, gap_years: 0, leader_name: null, category: '나' },
+      { name: '뒤처진2', tech_level: 3, gap_years: 6, leader_name: 'Z사', category: '나' },
+    ]
+
+    it('분류가 있으면 평면 캡션을 렌더하지 않는다', () => {
+      // 픽스처가 그룹핑 분기를 실제로 타는지 먼저 증명한다(task#301의 실패 형태 — 이빨 있는
+      // 단언이 분기를 안 타고 초록으로 통과했다).
+      expect(groupByCategory(TWO_LEADERS)).not.toEqual([])
+      render(<PlayerTable players={TWO_LEADERS} />)
+      expect(screen.queryByTestId('tech-report-players-leader')).toBeNull()
+    })
+
+    it('분류가 없으면 평면 캡션이 그대로 남는다 (게이트가 캡션을 통째로 죽이지 않았다)', () => {
+      const FLAT = TWO_LEADERS.map(({ category, ...rest }) => rest)
+      expect(groupByCategory(FLAT)).toEqual([])   // 정의역 확인 — 이 픽스처는 그룹핑을 타지 않는다
+      render(<PlayerTable players={FLAT} />)
+      expect(screen.getByTestId('tech-report-players-leader').textContent).toContain('Z사')
+    })
+  })
+
+  describe('단계 숫자는 고정폭 클래스를 쓴다 (적대 검토 MED — 폭 결정론)', () => {
+    // jsdom은 레이아웃에 블라인드하므로 실제 폭은 라이브 프로브가 잰다. 여기서는 글리프 폭
+    // 추정에 기대지 않는다는 **구조 조건**만 못박는다: 숫자가 인라인 style이 아니라 고정폭
+    // 클래스를 쓴다. 인라인 marginLeft로 되돌리면 flex gap과 합쳐진 min-content를 코드에서
+    // 읽을 수 없게 되고, 그 추정 위에서 여유가 1.3px까지 얇아졌던 것이 이 결함이었다.
+    it('숫자 span이 .tech-level-band__digit 이고 인라인 폭 스타일이 없다', () => {
+      const { container } = render(<PlayerTable players={PLAYERS} />)
+      const digits = [...container.querySelectorAll('.tech-level-band__digit')]
+      expect(digits.length).toBe(PLAYERS.filter((p) => TECH_LEVEL_LABELS[p.tech_level]).length)
+      for (const d of digits) {
+        expect(d.getAttribute('style')).toBeNull()
+        expect(d.textContent).toMatch(/^[1-5]$/)
+      }
     })
   })
 })

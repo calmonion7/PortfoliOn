@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import TechReport from './TechReport'
+import { groupByCategory } from '../components/reports/techReportUtils'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn() } }))
@@ -127,16 +128,17 @@ describe('주요기술 리포트 상세 (task#276 S5)', () => {
     expect(prose.getByText('1단 재사용이 발사비를 낮추는 구조를 설명한다.')).toBeTruthy()
     expect(prose.getByText('극저온 추진제 재점화가 어렵다.')).toBeTruthy()
 
-    // 업체 표 — 기술 성숙 단계는 텍스트로만(5칸 밴드는 별도 시각화)
-    // task#277 S5가 TechLevelBand·ShareChart를 배선해 업체명·"현재 선두"가 페이지에 다시
-    // 등장한다(정당한 중복 — 비교 섹션이라 같은 이름을 또 보여줘야 한다). 이 축(표를 특정)을
-    // 결정한 문서는 없다(부수적 단언) — within(tech-report-players)로 표 자체를 스코프한다.
+    // 업체 표 — 기술수준은 ADR-0041로 표 셀 안 5칸 밴드가 됐다(구 밴드 섹션 흡수, 별도 섹션 아님).
+    // task#277 S5가 점유율 차트를 배선해 업체명·"현재 선두"가 페이지에 다시 등장한다(정당한 중복 —
+    // 비교 섹션이라 같은 이름을 또 보여줘야 한다). 이 축(표를 특정)을 결정한 문서는 없다(부수적
+    // 단언) — within(tech-report-players)로 표 자체를 스코프한다.
     const playersTable = within(screen.getByTestId('tech-report-players'))
     expect(playersTable.getByText('SpaceX')).toBeTruthy()
-    expect(playersTable.getByText('5단계 · 양산상용')).toBeTruthy()
+    // ADR-0041 — 기술수준은 텍스트가 아니라 5칸 밴드(role="img")다. 값은 aria-label로 노출된다.
+    expect(playersTable.getByRole('img', { name: '5단계 · 양산상용' })).toBeTruthy()
     expect(playersTable.getByText('현재 선두')).toBeTruthy()   // gap_years === 0
     expect(playersTable.getByText('CASC')).toBeTruthy()
-    expect(playersTable.getByText('3단계 · 실증')).toBeTruthy()
+    expect(playersTable.getByRole('img', { name: '3단계 · 실증' })).toBeTruthy()
     // 적대 리뷰 F3 — 「선두 대비」 셀은 이제 격차만 담고 leader_name은 표 위 캡션으로 올라갔다.
     // 매 행 반복되던 `선두 대비 5년 · {leader_name}` nowrap 문자열이 이 열을 302px까지 부풀려
     // PC 1440(콘텐츠 748px)에서 표가 891px로 넘쳤다(점유율·티커 열이 초기 화면 밖).
@@ -181,14 +183,14 @@ describe('주요기술 리포트 상세 (task#276 S5)', () => {
         ? Promise.resolve({ data: { reports: [withTicker] } })
         : Promise.resolve({ data: [{ ticker: 'RKLB', name: 'Rocket Lab', type: 'holding', market: 'US' }] }))
     renderAt('reusable-rocket')
-    // task#277 S5: TechLevelBand·ShareChart도 SpaceX를 표시하므로 표 스코프로 특정한다.
+    // task#277 S5: 점유율 차트도 SpaceX를 표시하므로 표 스코프로 특정한다.
     await within(await screen.findByTestId('tech-report-players')).findByText('SpaceX')
     expect(await screen.findByText('보유')).toBeTruthy()
   })
 
   it('gap_years 음수는 표시하지 않는다 — 표와 밴드가 같은 규율을 쓴다', async () => {
     // backend Player.gap_years에 ge=0 제약이 없어 음수가 발행될 수 있고, 그러면 `선두 대비 -2년`이라는
-    // 무의미한 문구가 렌더됐다(적대적 리뷰 렌즈1). TechLevelBand는 고쳐졌는데 이 표는 안 고쳐져
+    // 무의미한 문구가 렌더됐다(적대적 리뷰 렌즈1). 구 밴드 섹션은 고쳐졌는데 이 표는 안 고쳐져
     // **같은 필드가 같은 페이지에서 두 거동**을 갖고 있었다 — 한쪽 테스트가 다른 쪽을 보호하지 않는다.
     const negative = { ...REPORT, players: [{ ...REPORT.players[1], gap_years: -2 }] }
     api.get.mockImplementation((url) =>
@@ -223,7 +225,7 @@ describe('주요기술 리포트 상세 (task#276 S5)', () => {
 
     // related가 전 분류 0건인 픽스처라 「연관 기술」은 생략된다(조용한 생략이 정상 동작).
     expect([...container.querySelectorAll('.rpt-title__text')].map((e) => e.textContent))
-      .toEqual(['주요 업체', '기술수준 비교', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처'])
+      .toEqual(['주요 업체', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처'])
 
     const anchors = ['tech-report-lead', 'tech-report-kpis', 'tech-report-players', 'tech-report-prose', 'tech-report-sources']
       .map((t) => screen.getByTestId(t))
@@ -233,47 +235,68 @@ describe('주요기술 리포트 상세 (task#276 S5)', () => {
     })
   })
 
-  // 적대 리뷰 F1 — 같은 업체 집합이 30px 간격의 두 섹션(「주요 업체」 표 · 「기술수준 비교」 밴드)에서
-  // **서로 다른 순서**로 나열됐다. 표만 sortPlayers를 태우고 밴드엔 API 원배열을 넘긴 탓이고, 변경 전에는
-  // 둘 다 API 순서라 일치했으므로 task#280이 만든 회귀다. 개별 섹션의 존재·정렬 단언은 두 순서가 갈려도
-  // 전부 통과하므로(판정축이 대상과 독립 — 가토 ⑧ⓘ) "두 소비처가 같은 배열을 본다"를 별도 축으로 세운다.
-  // ⚠️ 위 두 픽스처는 category가 없어 groupByCategory가 []를 반환한다 — 즉 **그룹핑 경로에 원리적으로
-  // 블라인드**하다. task#301이 업체 표를 분류 축별로 묶었을 때 이 테스트는 이빨 단언까지 갖춘 채로
-  // 통과했고, 표와 밴드가 같은 업체를 서로 다른 순서로 나열하는 회귀는 **라이브 uat280 band-order가
-  // 잡았다**(fixture-pass-live-fail). 그래서 분류 있는 픽스처를 세 번째 케이스로 못박는다.
-  // 이 픽스처는 그룹 순서(경수형 2곳 → 고온가스로 1곳)가 평면 정렬(L5·L4·L3)과 **어긋나도록** 짰다 —
-  // 어긋나지 않으면 그룹핑을 통째로 지워도 통과한다(공허한 초록).
-  const CATEGORIZED_REPORT = {
+  // F1 재지정(ADR-0041 결정 1·S1 지시) — 「기술수준 비교」 밴드가 표 셀로 흡수되며 표↔밴드 쌍은
+  // 이제 같은 <tr>이라 원리적으로 성립한다(더 이상 검증 대상이 아니다, ADR-0041 결과절). 그 계약
+  // ("같은 업체 집합이 한 화면에서 서로 다른 걸로 나열되지 않는다")이 여전히 남는 쌍은 표↔점유율
+  // (ShareChart, ADR-0041 결정 2가 범위 밖으로 남긴 섹션)이다.
+  // ⚠️ 이 쌍엔 "순서" 동치를 그대로 옮길 수 없다 — ShareChart는 랭킹 시각화라 share_pct 내림차순으로
+  // *스스로* 재정렬한다(정당한 설계, task#277 S2). 표는 sortPlayers(기술수준 내림차순) 순서다. 그래서
+  // 재지정한 계약은 "순서"가 아니라 **"분류 소속"**이다 — 표와 점유율 차트가 각자 groupByCategory를
+  // 독립 호출하므로, 같은 업체가 표에서는 분류 A인데 점유율 차트에서는 분류 B로 갈리는 자기모순이
+  // 없는가를 확인한다(현재 둘 다 같은 `category` 필드를 그대로 읽으므로 회귀 방지 락에 가깝다).
+  const CATEGORIZED_WITH_SHARE_REPORT = {
     ...SMR_REPORT,
     players: [
-      { ...SMR_REPORT.players[0], name: 'CNNC', tech_level: 5, gap_years: 0, category: '경수형' },
-      { ...SMR_REPORT.players[1], name: '중국핵공업 HTR', tech_level: 4, gap_years: 1, category: '고온가스로' },
-      { ...SMR_REPORT.players[2], name: 'NuScale', tech_level: 3, gap_years: 3, category: '경수형' },
+      { ...SMR_REPORT.players[0], name: 'CNNC', tech_level: 5, gap_years: 0, category: '경수형', share_pct: 31 },
+      { ...SMR_REPORT.players[1], name: '중국핵공업 HTR', tech_level: 4, gap_years: 1, category: '고온가스로', share_pct: 5 },
+      { ...SMR_REPORT.players[2], name: 'NuScale', tech_level: 3, gap_years: 3, category: '경수형', share_pct: 22.5 },
     ],
   }
 
-  it.each([
-    ['smr 형태(동단계 안에서 격차 null이 API 선행)', SMR_REPORT],
-    ['reusable-rocket 형태(API 순서 역전)', { ...REPORT, players: [REPORT.players[1], REPORT.players[0]] }],
-    ['분류 있는 형태(그룹 순서 ≠ 평면 정렬 — task#301)', CATEGORIZED_REPORT],
-  ])('표 행 순서 == 밴드 행 순서 — %s', async (_label, rep) => {
+  // 표: tbody 행을 순서대로 훑어 group 행을 만나면 "현재 분류"를 갱신하고 player 행을 그 분류에
+  // 배정한다. 카테고리 텍스트에 ADR-0041 축6의 선두 병기(" · 선두 X")가 섞여 있을 수 있어 잘라낸다.
+  function tableCategoryMap(playersTableEl) {
+    const map = {}
+    let current = null
+    for (const tr of playersTableEl.querySelectorAll('tbody > tr')) {
+      const testid = tr.getAttribute('data-testid')
+      if (testid === 'tech-report-player-group') { current = tr.textContent.split(' · 선두 ')[0]; continue }
+      if (testid === 'tech-report-player-row') {
+        map[tr.querySelector('[data-testid="tech-report-player-name"]').textContent] = current
+      }
+    }
+    return map
+  }
+
+  // 점유율 차트: 그룹 div의 첫 자식이 분류 라벨(Σ 초과 경고가 붙으면 뒤에 이어지므로 잘라낸다).
+  function shareCategoryMap(container) {
+    const map = {}
+    for (const g of container.querySelectorAll('[data-testid="tech-share-chart-group"]')) {
+      const category = g.children[0].textContent.split(' · 합계')[0]
+      for (const row of g.querySelectorAll('[data-testid="tech-share-chart-row"] span[title]')) {
+        map[row.textContent] = category
+      }
+    }
+    return map
+  }
+
+  it('F1 재지정 — 표와 점유율 차트가 같은 업체를 서로 다른 분류로 나열하지 않는다', async () => {
+    // 이빨 — 픽스처가 실제로 2개 분류 × 점유율 유효값을 가져야 판별력이 있다(공허한 초록 방지).
+    expect(groupByCategory(CATEGORIZED_WITH_SHARE_REPORT.players).length).toBe(2)
     api.get.mockImplementation((url) =>
       url.startsWith('/api/tech-reports/')
-        ? Promise.resolve({ data: { slug: rep.slug, reports: [rep] } })
+        ? Promise.resolve({ data: { slug: CATEGORIZED_WITH_SHARE_REPORT.slug, reports: [CATEGORIZED_WITH_SHARE_REPORT] } })
         : Promise.resolve({ data: [] }))
-    const { container } = renderAt(rep.slug)
+    const { container } = renderAt(CATEGORIZED_WITH_SHARE_REPORT.slug)
+    await screen.findByTestId('tech-report-players')
+    await screen.findByTestId('tech-share-chart')
 
-    const table = within(await screen.findByTestId('tech-report-players'))
-    const tableNames = table.getAllByTestId('tech-report-player-name').map((e) => e.textContent)
-    const bandNames = [...container.querySelectorAll('[data-testid="tech-level-band-row"] .tech-level-band__name')]
-      .map((e) => e.textContent)
+    const tableMap = tableCategoryMap(screen.getByTestId('tech-report-players'))
+    const shareMap = shareCategoryMap(container)
 
-    expect(bandNames).toEqual(tableNames)
-    expect(tableNames.length).toBe(rep.players.length)   // 표에서 사라진 업체 0
-    expect(bandNames.length).toBe(rep.players.length)    // 밴드에서 사라진 업체 0
-    // 이빨 — 픽스처가 실제로 재정렬을 유발해야 위 단언이 판별력을 갖는다.
-    // API 순서와 렌더 순서가 같은 픽스처였다면 정렬을 통째로 지워도 통과한다(공허한 초록).
-    expect(tableNames).not.toEqual(rep.players.map((p) => p.name))
+    const shareNames = Object.keys(shareMap)
+    expect(shareNames.length).toBeGreaterThan(0)   // 이빨 — 표본이 있어야 아래 단언이 뭔가를 본다
+    shareNames.forEach((name) => expect(shareMap[name]).toBe(tableMap[name]))
   })
 })
 
@@ -291,7 +314,7 @@ describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라�
     // 개별 존재 단언은 순서가 뒤집혀도 전부 통과한다(판정축이 대상과 독립 — 가토 ⑧ⓘ).
     // SMR 형태라 점유율(share_pct 전무)·난제(빈)·연관 기술(빈)은 정상 생략된다.
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '시장 규모', '상세 설명', '출처'])
 
     const anchors = ['tech-report-kpis', 'tech-key-points', 'milestone-timeline', 'tech-report-players']
       .map((t) => screen.getByTestId(t))
@@ -307,12 +330,12 @@ describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라�
   // 배열 자리의 null에 .map/.length를 부르면 섹션이 아니라 페이지가 통째로 터지므로 두 형태를 함께 잰다.
   it.each([
     ['reusable-rocket 실판(키 부재)', REPORT,
-      ['주요 업체', '기술수준 비교', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
+      ['주요 업체', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
     ['smr 실판(키 부재)', SMR_REPORT,
-      ['주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처']],
+      ['주요 업체', '시장 규모', '상세 설명', '출처']],
     ['smr 실판(신규 키가 명시적 null)',
       { ...SMR_REPORT, key_points: null, milestones: null },
-      ['주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처']],
+      ['주요 업체', '시장 규모', '상세 설명', '출처']],
   ])('구발행물 graceful — 두 섹션 부재 + 기존 섹션 무변화: %s', async (_label, rep, expected) => {
     mockReport(rep)
     const { container } = renderAt(rep.slug)
@@ -359,9 +382,9 @@ describe('주요기술 리포트 상세 — 전역 목차 (task#296 S4)', () => 
   // (목차와 본문 SectionTitle이 같은 SECTIONS 배열에서 파생하므로 어긋나면 둘 중 하나가 잘못됐다는 뜻).
   it.each([
     ['구발행물(REPORT) — 7섹션', REPORT, 'reusable-rocket',
-      ['주요 업체', '기술수준 비교', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
+      ['주요 업체', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
     ['전 필드(FULL_REPORT) — 7섹션', FULL_REPORT, 'smr',
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처']],
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '시장 규모', '상세 설명', '출처']],
   ])('목차 칩 수 == 렌더된 섹션 수, 라벨·순서 일치: %s', async (_label, rep, slug, expectedLabels) => {
     mockReport(rep)
     const { container } = renderAt(slug)
@@ -455,7 +478,7 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
     await screen.findByTestId('tech-report-kpis')
 
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계열 비교', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '계열 비교', '시장 규모', '상세 설명', '출처'])
 
     const variantsNode = screen.getByTestId('tech-report-variants')
     const marketNode = container.querySelector('[data-tech-section="market"]')
@@ -470,7 +493,7 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
     expect(screen.queryByTestId('tech-report-variants')).toBeNull()
     expect(titlesOf(container)).not.toContain('계열 비교')
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '시장 규모', '상세 설명', '출처'])
     expect(screen.getAllByTestId('tech-toc-chip').map((a) => a.textContent)).not.toContain('계열 비교')
   })
 
@@ -481,7 +504,7 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
 
     // 확정 순서 — 난제 < 확인할 지표 < 시장 규모가 이 배열 안에서 함께 드러난다.
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '기술수준 비교', '계열 비교',
+      ['핵심 포인트', '진척 타임라인', '주요 업체', '계열 비교',
        '해결해야 할 난제', '확인할 지표', '시장 규모', '상세 설명', '출처'])
 
     // DOM 순서로도 못박는다(제목 배열은 텍스트라 래퍼 배치가 어긋나도 통과할 수 있다).

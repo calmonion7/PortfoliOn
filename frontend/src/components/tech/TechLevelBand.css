@@ -1,30 +1,30 @@
-.tech-level-band { display: flex; flex-direction: column; gap: var(--space-3); }
+/* 「기술수준」 밴드 셀 — task#277이 별도 섹션 컴포넌트로 도입했으나 ADR-0041이 그 섹션을
+   PlayerTable.jsx의 「기술수준」 표 셀로 흡수했다(중복 제거 + 표↔밴드 순서 불일치 회귀 task#280 F1
+   원천 차단). 옛 컴포넌트는 삭제됐고 그 컴포넌트·행 전용 클래스(__row·__name·__meta·__leader·__gap·
+   __empty)도 여기서 함께 삭제했다 — PlayerTable이 표 셀 마크업(td·NAME_TEXT 등)을 이미 갖고 있어
+   필요 없다. 남은 넷(__legend·__cells·__cell·__cell--filled)은 개명하지 않고 유지한다 — uat277 라이브
+   프로브가 이 클래스명으로 칸 채움 수·채움색 대비를 단언한다(ADR-0041 결정 5). "그 컴포넌트가 없는데
+   왜 이 CSS가 있나"에서 멈추지 않도록 이 주석을 남긴다. 소비처는 PlayerTable.jsx 하나뿐이다(첫 줄
+   import). */
 
-/* 상단 범례 "1 기초연구 … 5 양산상용" — 좁은 화면에서 접히지 않고 다음 줄로 흐른다(축3 정석 조합) */
-.tech-level-band__legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+/* 범례 "1 기초연구 … 5 양산상용" — 표 위 1줄. 좁은 화면에서 접히지 않고 다음 줄로 흐른다(축3 정석 조합) */
+.tech-level-band__legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0 0 8px; }
 .tech-level-band__legend-item { font-size: var(--font-size-xs); color: var(--text-3); white-space: nowrap; }
 
-.tech-level-band__row { display: flex; align-items: center; gap: var(--space-2); }
+/* 칸 묶음(role="img", PlayerTable.jsx가 aria-label을 붙인다) — 폭 예산은 task#304 S0 라이브 실측
+   (reusable-rocket m350 여유 8.3px)에서 역산했다: 이 묶음의 min-content가 46.3px를 넘으면
+   그 폭에서 표가 가로 스크롤한다(TD 패딩 20px 제외 예산).
 
-/* 이름만 줄어도 되는 요소 — ellipsis 상자(축2) */
-.tech-level-band__name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--text);
-}
+   ⚠️ 계산에서 두 번 틀렸으니 그대로 두지 말 것(둘 다 적대 검토가 잡았다):
+   ① flex `gap`은 **인접한 모든 자식 사이**에 적용된다. 자식은 칸 5 + 숫자 1 = 6개이므로
+      간격은 4개가 아니라 **5개**다(마지막 칸↔숫자 사이에도 붙는다).
+   ② 숫자 글리프 폭을 추정치(≈7px)로 두면 폰트 렌더 편차가 곧 가로 스크롤이 된다 —
+      그 추정 위에서 실제 여유는 1.3px뿐이었다. 그래서 숫자에 **고정폭**을 준다(레벨은 1~5
+      단일 자릿수라 안전하다). 이제 min-content가 결정론적이다.
 
-/* 칸 수는 줄면 안 되는 형제 — flex-shrink:0(축2) */
-.tech-level-band__cells { display: flex; flex-shrink: 0; gap: 2px; }
-.tech-level-band__cell { width: 18px; height: 10px; border-radius: 2px; background: var(--border); }
+   현재 합계: 칸 6px×5 = 30 + gap 1px×5 = 5 + 숫자 고정폭 7 = **42px** (예산 대비 여유 4.3px). */
+.tech-level-band__cells { display: flex; align-items: center; gap: 1px; }
+.tech-level-band__cell { width: 6px; height: 10px; border-radius: 1px; background: var(--border); }
 .tech-level-band__cell--filled { background: var(--data-2); }
-
-.tech-level-band__meta { display: flex; flex-shrink: 0; align-items: center; white-space: nowrap; font-size: var(--font-size-xs); }
-.tech-level-band__leader { color: var(--accent); font-weight: var(--font-weight-semibold); }
-.tech-level-band__gap { color: var(--text-3); }
-
-.tech-level-band__empty { flex-shrink: 0; color: var(--text-3); font-size: var(--font-size-sm); }
+/* 단계 숫자 — 칸 채움만으론 흐릿한 값을 보완한다. flex 고정폭이라 글리프 폭에 의존하지 않는다. */
+.tech-level-band__digit { flex: 0 0 7px; text-align: center; font-size: var(--font-size-xs); color: var(--text-3); }

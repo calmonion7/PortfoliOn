@@ -137,8 +137,15 @@ if (!access_token) { console.error('로그인 실패 — access_token 없음. �
 
 // TECH_NAMES 미러 — frontend/src/components/reports/techReportUtils.js(백엔드는 표시명을 응답에 싣지
 // 않는다, ADR-0033 결정 2). h1 identity 단언의 기대값 소스이므로 슬러그가 없으면 즉시 exit(추정 금지).
-const TECH_NAMES = { 'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇' };
-const SLUGS = ['smr', 'reusable-rocket'];
+const TECH_NAMES = {
+  'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇',
+  'ai-datacenter-equipment': 'AI 데이터센터 설비', 'ai-datacenter-ops': 'AI 데이터센터 운영',
+};
+// task#304 S3 — 대상 slug를 **4종**으로 맞춘다(결함의 가시성이 판마다 갈린다). 착수 실측
+// (2026-08-16, GET /api/tech-reports): ai-datacenter-equipment 25업체·25분류(최다 행·최다 분류) ·
+// solid-state-battery 12·12(최장 leader_name) · reusable-rocket 9·9(최장 country, tech_level 1~5 전 단계) ·
+// smr 11업체·**9분류**(부분 분류 — 분류 없는 업체가 groupByCategory 마지막 그룹으로 모인다).
+const SLUGS = ['ai-datacenter-equipment', 'solid-state-battery', 'reusable-rocket', 'smr'];
 
 // ── 소스 직독 미러(순수함수) — 기대값을 리터럴로 박지 않기 위한 것 ────────────────────────────
 // techReportUtils.js: formatMarketSize / splitSeries / formatMarketSummary
@@ -439,8 +446,10 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
     srOwners[own] = (srOwners[own] || 0) + 1;
   }
   const srExcluded = srLeaves.length;
-  // role="img" 소유자 내역 — 본문에는 **정당한** role="img"가 이미 있다(TechLevelBand.jsx:33의 행별
-  // 막대 SVG). 그래서 "본문 전체 0"은 정상 구현을 거짓 FAIL시킨다 → 게이트는 관계도로 좁히고,
+  // role="img" 소유자 내역 — 본문에는 **정당한** role="img"가 이미 있다. task#304(ADR-0041) 전에는
+  // TechLevelBand의 행별 막대였고, 지금은 PlayerTable의 「기술수준」 셀(칸 묶음 div, 업체 행마다 1개)
+  // 이다. 소유자는 바뀌었지만 "본문 전체 0"이 정상 구현을 거짓 FAIL시킨다는 사실은 그대로다 →
+  // 게이트는 관계도로 좁히고,
   // 전역 내역은 출력해 형제 표면의 회귀가 눈에 보이게 남긴다(출력은 넓게, 단언은 목표에만).
   const roleImgOwners = {};
   for (const e of root.querySelectorAll('[role="img"]')) {
@@ -670,9 +679,10 @@ for (const V of VIEWS) {
         `소스 related ${JSON.stringify(RELATED_KEYS.map((k) => relOf(k).length))}`);
       // 관계도의 role="img" 0건은 **두 모드 모두** 무조건 잰다(관계도가 없으면 0이 자명하게 참이지만,
       // 그래야 실데이터 판에서 회귀가 되살아나는 것도 이 축이 잡는다).
-      // ⚠️ 본문 전체 0을 요구하면 안 된다 — TechLevelBand.jsx:33의 행별 막대 SVG가 **정당한**
-      //    role="img"를 갖고 있어(업체가 있으면 항상 렌더) 정상 구현이 거짓 FAIL한다. 전역 내역은
-      //    아래 원시 로그에 소유자별로 출력해 형제 표면의 회귀가 눈에 보이게 남긴다.
+      // ⚠️ 본문 전체 0을 요구하면 안 된다 — PlayerTable의 「기술수준」 밴드 셀이 **정당한**
+      //    role="img"를 갖고 있어(업체 행마다 1개, task#304 이후 소유자가 tech-report-player-row다)
+      //    정상 구현이 거짓 FAIL한다. 전역 내역은 아래 원시 로그에 소유자별로 출력해 형제 표면의
+      //    회귀가 눈에 보이게 남긴다 — 이 태스크에서 소유자 이름이 바뀌므로 그 변화도 여기서 보인다.
       eq(`graph-role-img-anywhere:${tag}`, m.graphRoleImgAnywhere, 0,
         `본문 전체 role="img" 내역 ${JSON.stringify(m.roleImgOwners)} — 관계도 소유분만 0을 요구한다`);
       bump('gate', 4);

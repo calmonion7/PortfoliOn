@@ -115,8 +115,9 @@ const ROOT_SEL = 'main.page-wrap .page, main.page-wrap .m-page';
 //      요소를 "잘림"으로 재면 접근성 장치를 결함으로 오탐한다(예: `span:"완료"(24>1)`).
 //   ② `text-overflow: ellipsis` 또는 `overflow-wrap: anywhere|break-word`가 걸린 요소는 넘침을
 //      스스로 처리하도록 설계된 것이다(ShareChart.jsx·MarketEstimates.jsx의 `title=` 툴팁 폴백,
-//      PlayerTable.jsx `NAME_TEXT`의 `overflowWrap:'anywhere'`, TechLevelBand.jsx `__name`의
-//      ellipsis) — 전부 이 태스크가 건드리지 않는 파일의 기존 설계다. 이 처리 없이 그냥 넘치는
+//      PlayerTable.jsx `NAME_TEXT`의 `overflowWrap:'anywhere'`) — 전부 이 태스크가 건드리지 않는
+//      파일의 기존 설계다. (task#304 정정: 옛 `TechLevelBand.jsx __name`의 ellipsis는 그 컴포넌트가
+//      삭제되며 사라졌다 — 이 필터의 대상에서 빠졌을 뿐 필터 자체는 그대로 유효하다.) 이 처리 없이 그냥 넘치는
 //      요소만 "잘림"으로 잡는다(진짜 대상: 아무 CSS 처리 없이 박스 밖으로 새는 경우).
 // 두 필터 다 page.evaluate 콜백 안에서 다시 선언해야 한다(직렬화 경계 — 모듈 스코프 함수를 참조
 // 못 한다).
