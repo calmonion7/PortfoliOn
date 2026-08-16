@@ -22,9 +22,18 @@
       그 추정 위에서 실제 여유는 1.3px뿐이었다. 그래서 숫자에 **고정폭**을 준다(레벨은 1~5
       단일 자릿수라 안전하다). 이제 min-content가 결정론적이다.
 
-   현재 합계: 칸 6px×5 = 30 + gap 1px×5 = 5 + 숫자 고정폭 7 = **42px** (예산 대비 여유 4.3px). */
+   ③ 예산 상한(46.3px)만 보고 정하면 안 된다 — **이 셀이 대체한 옛 텍스트보다 넓으면 그 차이가
+      업체 열에서 빠져나간다.** 옛 「N단계 · 라벨」의 min-content는 `양산상용` 4자 = 38px(패딩 제외)
+      이었고, 42px로 두자 m350에서 업체 열이 95.7→93.3px로 줄어 `ArianeGroup·ESA (Themis)` 이름이
+      216→324px 높이로 더 잘게 쪼개졌다(대조군 실측: 밴드를 display:none 하면 216px로 돌아온다).
+      ⚠️ 그 쪼개짐 자체는 **선재 결함**이다(task#296이 넣은 overflow-wrap:anywhere + 52px 정부주도
+      배지가 같은 flex 줄을 먹는다 — 밴드 없이도 2자/줄이다). 여기서는 **내 변경이 더한 비용만**
+      되돌린다: 칸을 5px로 줄여 37px로 맞췄다(옛 38px보다 1px 좁다).
+
+   현재 합계: 칸 5px×5 = 25 + gap 1px×5 = 5 + 숫자 고정폭 7 = **37px**
+   (예산 46.3px 대비 여유 9.3px · 옛 텍스트 38px 대비 −1px = 업체 열을 더 좁히지 않는다). */
 .tech-level-band__cells { display: flex; align-items: center; gap: 1px; }
-.tech-level-band__cell { width: 6px; height: 10px; border-radius: 1px; background: var(--border); }
+.tech-level-band__cell { width: 5px; height: 10px; border-radius: 1px; background: var(--border); }
 .tech-level-band__cell--filled { background: var(--data-2); }
 /* 단계 숫자 — 칸 채움만으론 흐릿한 값을 보완한다. flex 고정폭이라 글리프 폭에 의존하지 않는다. */
 .tech-level-band__digit { flex: 0 0 7px; text-align: center; font-size: var(--font-size-xs); color: var(--text-3); }

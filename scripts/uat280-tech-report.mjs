@@ -404,7 +404,22 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
       cw: gb ? Math.round(gb.width * 10) / 10 : null,
       ch: gb ? Math.round(gb.height * 10) / 10 : null,
       // 칸 묶음이 접혔는가 — 직속 자식(5칸 + 단계 숫자)의 서로 다른 top 개수(가토 ⑨ 정정판).
-      lines: new Set([...cellsEl.children].map((c) => Math.round(c.getBoundingClientRect().top))).size,
+      // ⚠️ 줄 수는 **세로로 겹치지 않는 rect 묶음의 개수**로 센다(가토 ⑨ 2차 정정판). `서로 다른 top
+      // 개수`로 세면 칸(10px)과 단계 숫자(16.5px)가 align-items:center로 같은 줄에 놓이면서 top이
+      // 갈려 **정상 구현이 전 뷰포트에서 거짓 FAIL**한다(실측: 컨테이너 높이 16.5 == 숫자 높이,
+      // 자식 6개가 left 723→758로 가로 일렬인데 top 집합은 2였다). 겹침 기준이 오히려 더 엄격하다.
+      lines: (() => {
+        const ks = [...cellsEl.children].map((c) => c.getBoundingClientRect())
+          .map((r) => ({ top: r.top, bottom: r.bottom })).sort((a, b) => a.top - b.top);
+        const ls = [];
+        for (const k of ks) {
+          const hit = ls.find((L) => (Math.min(L.bottom, k.bottom) - Math.max(L.top, k.top))
+            > 0.3 * Math.min(L.bottom - L.top, k.bottom - k.top));
+          if (hit) { hit.top = Math.min(hit.top, k.top); hit.bottom = Math.max(hit.bottom, k.bottom); }
+          else ls.push({ top: k.top, bottom: k.bottom });
+        }
+        return ls.length;
+      })(),
       filledColor: filledEls[0] ? cs(filledEls[0]).backgroundColor : null,
       unfilledColor: unfilledEl ? cs(unfilledEl).backgroundColor : null,
       digit: txt(cellsEl),
@@ -847,6 +862,9 @@ for (const V of VIEWS) {
         `소제목 행 ${m.groupRowLabels.length}개 vs 미러 그룹 ${D.groupLabels.length}개(분류 없는 판은 0==0)`);
       eq(`group-leader:${tag}`, m.groupRowLabels, D.groupLeaderText,
         `병기 있는 그룹 ${D.groupLeaderText.filter((t) => t.includes(' · 선두 ')).length}/${D.groupLabels.length}`);
+      // 전역 group-leader-teeth 의 입력 — 이 계열이 공허하지 않음을 게이트한다.
+      bump('group-leader-with-name', D.groupLeaderText.filter((t) => t.includes(' · 선두 ')).length);
+      if (D.groupLabels.length >= 2) bump('group-multi');
       bump('group-leader', m.groupRowLabels.length);
       if (D.groupLeaderText.some((t) => t.includes(' · 선두 '))) bump('group-leader-suffixed');
       // ⚠️ 관측 전용 커버리지(단언 아님) — ADR-0041 결정 4는 "분야 소제목에 선두를 병기하면 **캡션 한
@@ -900,8 +918,13 @@ for (const V of VIEWS) {
       // ── 제목 → (캡션) → 범례 → 표 사슬 — **무조건**. 옛 caption-gap은 캡션이 있을 때만 돌아
       //    "선두가 없는 판"에서 이 간격을 통째로 못 봤다. task#304에서 범례가 사슬에 끼면서 링크가
       //    하나 늘었으므로, 이 참에 정의역을 캡션 유무와 분리한다(임계 0~24px은 uat276과 동일 — 완화 0).
+      // ⚠️ 캡션 노드는 **분류가 없을 때만** 사슬에 낀다(task#304 in-run fix, 적대 검토 HIGH).
+      // 분류가 있으면 분야 소제목이 이미 「그 분야의 선두」를 말하므로 페이지 전체를 대상으로 한
+      // 평면 캡션을 함께 렌더하면 한 화면에서 선두 주장이 서로 모순된다 → PlayerTable이 렌더하지 않는다.
+      const capGrouped = D.groupLabels.length > 0;
+      const capExpected = !capGrouped && D.leaders.length > 0;
       const chain = m.titleChain || [];
-      const wantChain = ['title', ...(D.leaders.length > 0 ? ['caption'] : []), 'legend', 'table'];
+      const wantChain = ['title', ...(capExpected ? ['caption'] : []), 'legend', 'table'];
       eq(`chain-gap-domain:${tag}`,
         m.capTitleFound ? ['title', ...chain.map((l) => l.to)] : 'PLAYERS_TITLE_MISSING', wantChain,
         `사슬 ${JSON.stringify(chain)} · 노드는 데이터가 정한다(선두 ${D.leaders.length}명)`);
@@ -935,9 +958,16 @@ for (const V of VIEWS) {
       //     **실행 전에** API 응답으로 결정된다 — 측정이 사라지는 무음 스킵이 아니다. 정의역 **안에서는**
       //     대상 부재를 sentinel FAIL로 만들어 총계를 구조적으로 고정한다. 지금 두 발행물은 각각
       //     고유 선두 1명·2명이라 **둘 다 정의역 안**이며, 그 사실은 아래 caption-teeth가 게이트한다.
-      if (D.leaders.length > 0) {
+      // ⚠️ 정의역이 하나 더 있다(task#304): **분류가 있으면 캡션이 아예 렌더되지 않는다.** 그 경우를
+      //    그냥 스킵하면 측정이 사라지므로 부재 자체를 축으로 승격시킨다(아래 else).
+      if (capGrouped) {
+        eq(`caption-absent-when-grouped:${tag}`, m.caption ? `PRESENT(${JSON.stringify(m.caption.text)})` : 'ABSENT',
+          'ABSENT',
+          `분류 ${D.groupLabels.length}개 → 분야 소제목이 선두를 말하므로 평면 캡션은 없어야 한다(ADR-0041 결정 4)`);
+        bump('caption-absent');
+      } else if (D.leaders.length > 0) {
         eq(`caption-domain:${tag}`, m.caption ? 'PRESENT' : 'CAPTION_MISSING', 'PRESENT',
-          `API 고유 선두 ${D.leaders.length}명 → 캡션이 반드시 있어야 한다`);
+          `API 고유 선두 ${D.leaders.length}명 · 분류 없음 → 캡션이 반드시 있어야 한다`);
         // 파싱 전제 — 이름 자체에 구분자가 들어 있으면 아래 split 파싱이 모호해진다(축의 정직한 한계).
         eq(`caption-parse-safe:${tag}`, D.leaders.filter((n) => n.includes(' · ')), [],
           '구분자 " · "가 이름 안에 없어야 split identity 파싱이 성립한다');
@@ -1249,10 +1279,22 @@ eq('level-band-teeth', lvSet.size >= 2 ? 'OK' : `SINGLE_LEVEL_ONLY(${[...lvSet].
 // 이 계열의 존재 이유가 "픽스처(고유 선두 1개)가 원리적으로 못 보는 판을 덮는 것"이므로, 다중 선두
 // 표본이 한 번도 측정되지 않았다면 이 계열은 uat276과 같은 것만 재면서 초록을 내는 셈이다(공허한 통과).
 // 단일 선두 표본도 함께 요구한다 — 두 조립 분기(이름 1개 / ' · '로 이은 N개)가 모두 실측돼야 한다.
+// ⚠️ **판정 대상 재지정(task#304)** — 옛 이빨은 「다중/단일 선두 캡션을 둘 다 실측했는가」였다.
+// 그런데 ADR-0041 결정 4로 그 평면 캡션은 **분류 없는 판 전용**이 됐고, 실측상 발행물 6종이
+// 전부 분류를 가지므로 그 경로엔 **라이브 대표 표본이 없다** — 옛 이빨은 도달 불가해졌다.
+// 완화(삭제·조건부화)가 아니라 대상을 옮긴다: 지금 실재하는 것은 **분야 소제목의 선두 병기**이고,
+// 그 계열이 공허하지 않으려면 ⓐ 병기가 실제로 붙은 그룹을 봤고 ⓑ 그룹이 2개 이상인 판을 봤어야 한다
+// (그룹 1개짜리 판만 보면 "축별로 다르게 병기된다"를 원리적으로 못 본다).
 const capMulti = cov['caption-multi'] || 0, capSingle = cov['caption-single'] || 0;
-eq('caption-teeth', capMulti > 0 && capSingle > 0 ? 'OK' : `CAPTION_VARIETY_MISSING(multi=${capMulti},single=${capSingle})`, 'OK',
-  `다중 선두(고유 2+) 표본 ${capMulti}건 · 단일 선두 표본 ${capSingle}건 · ` +
-  SLUGS.map((s) => `${s}=${DATA[s].leaders.length}명`).join(' / '));
+const grpLeader = cov['group-leader-with-name'] || 0, grpMulti = cov['group-multi'] || 0;
+eq('group-leader-teeth',
+  grpLeader > 0 && grpMulti > 0 ? 'OK' : `GROUP_VARIETY_MISSING(withLeader=${grpLeader},multiGroup=${grpMulti})`, 'OK',
+  `선두 병기된 그룹 ${grpLeader}건 · 그룹 2+ 판 ${grpMulti}건 · ` +
+  SLUGS.map((s) => `${s}=그룹${DATA[s].groupLabels.length}/선두${DATA[s].leaders.length}명`).join(' / '));
+// 평면 캡션 경로의 커버리지는 **은폐하지 않고 그대로 보고**한다(0이 현재의 사실이다 — 라이브에
+// 분류 없는 발행물이 생기면 자동으로 채워지고, 그때 위 caption-* 축들이 정의역 안으로 들어온다).
+console.log(`  [커버리지 갭] 평면 캡션 표본 multi=${capMulti} single=${capSingle}` +
+  ` — 발행물 6종이 전부 분류를 가져 그 경로엔 라이브 대표 표본이 없다(무음 스킵 아님, 사실 보고).`);
 
 // ── 보고 ──────────────────────────────────────────────────────────────────
 const fails = results.filter((r) => !r.ok);

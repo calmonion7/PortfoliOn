@@ -356,8 +356,23 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
       aria: cellsEl.getAttribute('aria-label'), role: cellsEl.getAttribute('role'),
       cellW: fb ? Math.round(fb.width * 10) / 10 : null,
       cellH: fb ? Math.round(fb.height * 10) / 10 : null,
-      // 칸 묶음이 접히지 않는가 — 직속 자식(5칸 + 단계 숫자)의 서로 다른 top 개수(가토 ⑨ 정정판).
-      lines: new Set([...cellsEl.children].map(c => Math.round(c.getBoundingClientRect().top))).size,
+      // 칸 묶음이 접히지 않는가 — **세로로 겹치지 않는 rect 묶음의 개수**(가토 ⑨ 2차 정정판).
+      // ⚠️ `서로 다른 top 개수`로 세면 안 된다: 칸(10px)과 단계 숫자(16.5px)는 align-items:center로
+      // 같은 줄에 놓이면서도 top이 갈리므로 **정상 구현이 전 뷰포트에서 거짓 FAIL**한다(실측: 컨테이너
+      // 높이 16.5 == 숫자 높이, 자식 6개가 left 723→758로 가로 일렬, 그런데 top 집합은 2였다).
+      // 진짜 줄바꿈은 줄끼리 세로로 겹치지 않으므로 이 축이 오히려 더 엄격하다.
+      lines: (() => {
+        const ks = [...cellsEl.children].map(c => c.getBoundingClientRect())
+          .map(r => ({ top: r.top, bottom: r.bottom })).sort((a, b) => a.top - b.top);
+        const ls = [];
+        for (const k of ks) {
+          const hit = ls.find(L => (Math.min(L.bottom, k.bottom) - Math.max(L.top, k.top))
+            > 0.3 * Math.min(L.bottom - L.top, k.bottom - k.top));
+          if (hit) { hit.top = Math.min(hit.top, k.top); hit.bottom = Math.max(hit.bottom, k.bottom); }
+          else ls.push({ top: k.top, bottom: k.bottom });
+        }
+        return ls.length;
+      })(),
       digit: txt(cellsEl),
     } : null;
     // gap 셀은 이제 "선두 대비" 접두 없이 격차만 담는다(leader_name이 표 위 캡션으로 승격된 task#280

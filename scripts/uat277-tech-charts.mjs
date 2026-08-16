@@ -247,8 +247,21 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
       // 화면 실측(가토 ⑫) — 칸이 CSS 선언대로 실제 픽셀을 갖는가.
       cellW: fb ? Math.round(fb.width * 10) / 10 : null,
       cellH: fb ? Math.round(fb.height * 10) / 10 : null,
-      // 칸 묶음이 접히지 않는가 — 직속 자식(5칸 + 단계 숫자)의 서로 다른 top 개수(가토 ⑨ 정정판).
-      cellLines: cellsEl ? new Set([...cellsEl.children].map(c => Math.round(c.getBoundingClientRect().top))).size : null,
+      // 칸 묶음이 접히지 않는가 — **세로로 겹치지 않는 rect 묶음의 개수**(가토 ⑨ 2차 정정판).
+      // ⚠️ `서로 다른 top 개수`는 정상 구현을 거짓 FAIL시킨다 — 칸(10px)과 단계 숫자(16.5px)가
+      // align-items:center로 같은 줄에 놓이면서 top이 갈리기 때문(실측 확인). uat276과 동일 관용구.
+      cellLines: cellsEl ? (() => {
+        const ks = [...cellsEl.children].map(c => c.getBoundingClientRect())
+          .map(r => ({ top: r.top, bottom: r.bottom })).sort((a, b) => a.top - b.top);
+        const ls = [];
+        for (const k of ks) {
+          const hit = ls.find(L => (Math.min(L.bottom, k.bottom) - Math.max(L.top, k.top))
+            > 0.3 * Math.min(L.bottom - L.top, k.bottom - k.top));
+          if (hit) { hit.top = Math.min(hit.top, k.top); hit.bottom = Math.max(hit.bottom, k.bottom); }
+          else ls.push({ top: k.top, bottom: k.bottom });
+        }
+        return ls.length;
+      })() : null,
       gapText,
       isLeaderRow: gapText === '현재 선두',
       // 옛 `.tech-level-band__leader`(--accent) / `.tech-level-band__gap`(--text-3) 두 색을 재던 자리.
