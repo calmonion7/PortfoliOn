@@ -1,0 +1,14 @@
+# frontend/ — 빌드·토큰·nav 규약
+
+`frontend/` 아래 작업 시 자동 로드된다. 루트 `CLAUDE.md`의 Gotchas에서 분리해 온 항목들이며,
+**시각 검증(프로브·육안) 규율은 `.claude/skills/live-uat-probes` 스킬에 있다.**
+
+- Vite proxies `/api/*` to `http://localhost:8000` (로컬). 배포 환경에서는 `VITE_API_BASE_URL`로 nginx 직접 호출 (미설정 시 상대경로 사용).
+
+- **Vite 8 = rolldown 번들러**: 청크 분할 시 `vite.config.js`의 `build.rollupOptions.output.manualChunks`는 **함수 형식만** 받는다 — rollup식 객체형(`{name: [pkgs]}`)을 쓰면 `Expected Function but received Object`로 빌드가 깨진다. `manualChunks(id)`에서 id substring(`node_modules` 경로)으로 분기하고, 거대 의존성(recharts+d3 등)은 트랜지티브까지 매처에 포함해야 의도한 청크가 생성된다. (task 28 retro)
+
+- `frontend/src/components/market/` 의 수익/수출 차트(`M7EarningsSection`, `KrTop2Section`, `KrExportsSection`)는 모두 dual Y-axis 구조: 좌측(`yAxisId="left"`) — 억/조 원 또는 십억달러, 우측(`yAxisId="right"`) — 비중 %. `krFmt` 헬퍼(`marketUtils.jsx`)는 억/조 단위 포매팅 (임계값: 10,000억 = 1조). **입력은 '억원' 단위 가정** — 원은 `/1e8` 변환 후 넘기고, 주(count) 등 다른 단위 값엔 부적합(전용 포매터 사용). raw 원/주를 그대로 넘기면 1e8배 오표기(공매도 차트 "35조경원" 사례, f9594f2b).
+
+- **KR 색 관례 토큰 — 가격 배지와 의미 배지는 전용 변형으로 분리돼 있다(에디토리얼 리디자인 이후, task#194)**: 가격 방향은 `.badge--up`(상승=버밀리온 `--up` #b3372b)·`.badge--down`(하락=프러시안 `--down` #2b5c9e) **전용 변형**(`ChangeBadge`가 사용), 의미 상태는 `.badge--success`(녹 `--color-success`)·`.badge--danger`(빨 `--color-error`)·`.badge--warning`(오커 `--warn`)로 **이제 통념(Western)대로 동작**한다(`ui/Badge.css`·`tokens.css`). 과거 서술(success=빨강/danger=파랑, warning 깨짐)은 리디자인 전 기준 — 그 전제로 작업하지 말 것. **남는 함정**: 공용 배지 variant의 색 의미를 바꿀 땐 **소비처 전수 grep 선행** — "규칙 위반처럼 보이는 배선"이 의도된 소비일 수 있다(에디토리얼 감사에서 success/danger 의미색 교체가 ChangeBadge 가격색을 서구식으로 반전시킨 차단급 회귀 — vitest·빌드는 색 의미에 블라인드, fix 후 스팟 시각 재캡처가 유일하게 포착). 가격 방향엔 up/down, 의미 상태엔 success/danger/warning — 교차 사용 금지.
+
+- **nav IA 5섹션의 경로·라벨 목록은 `frontend/src/navSections.js` 단일 소스다 — 탭 추가·개명·삭제는 거기 한 곳만(task#251)**: `NAV_SECTIONS`(섹션 5개 × `items[{to,label,evt,match?}]`)와 매칭 헬퍼 `matchesSection`/`matchesItem`(판정=`pathname.startsWith(item.match ?? item.to)`)를 export하고, 세 소비처가 **파생**한다 — `Masthead.jsx`(PC 카테고리+서브바), `MobileNav.jsx`(모바일 하단 탭바), `ResearchShell.jsx`(모바일 seg). 아이콘은 소비처마다 셋이 달라(`sketches` vs `ui/icons`) 각자 `ICONS[section.key]`로 매핑하므로 **공유 모듈엔 순수 경로·라벨 데이터만** 둔다. ⚠️ **경위 — 이 항목은 원래 "PC/모바일 *두 곳*에 이원화"라고 적혀 있었고, 그 "두 곳"이 부정확했던 게 결함의 원인이었다**: 실제 복제는 **세 곳**(위 셋)이었는데 `MobileNav`가 목록에서 빠져 있었다. 그래서 ① 심층 리포트 탭 추가 때 `ResearchShell`만 고쳐 PC 진입 불가(task#215, c577383으로 보완) ② 심층 리포트 **상세** `/analyst-report/{ticker}/{date}`에서 PC 서브바가 통째로 사라지고 모바일 탭바·seg가 전부 비활성(task#251, 버그리포트 M1+M3) — 세 표면 모두 "지금 어디인가"를 잃었다. 단일 소스화가 "세 목록 중 한 곳 누락"이라는 **실질 재발 경로를 구조적으로 제거**한다. **단수/복수 경로 주의**: `'/analyst-reports'.startsWith('/analyst-report')`가 true라 `items`에 `match: '/analyst-report'`(단수) 하나를 달아 목록·상세를 함께 덮는다 — 상세에서 부모 탭을 강조하는 게 앱 관례다(`/guru/:id`와 동일). 형제 항목끼리 접두사 관계가 생기면 그때 세그먼트 경계 매칭으로 올려야 한다(현재 5섹션엔 그런 쌍 없음). 회귀 가드: `frontend/src/test/nav-active-matching.test.jsx`(3소비처 × 목록·상세 6케이스).

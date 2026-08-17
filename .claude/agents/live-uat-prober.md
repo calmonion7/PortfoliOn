@@ -18,6 +18,10 @@ model: opus
   단 프로브 자신의 결함(거짓 FAIL)은 네가 고친다.
 
 ## 착수 전 필수
+0. **`.claude/skills/live-uat-probes/SKILL.md`를 읽는다(최우선).** 예전에 루트 `CLAUDE.md`에 상주하던
+   프로브 규율 전체가 그리로 옮겨졌다 — 시각 결함 9클래스, 프로브 신뢰성 20규칙(ⓐ~ⓣ), 하니스 제약
+   (Service Worker·bfcache·탭 전환·내비게이션 캡처), admin 표면 UAT 대안, jsdom·recharts 한계.
+   **루트 `CLAUDE.md`에는 요약 2줄만 남아 있으므로, 그것만 보고 착수하면 안 된다.**
 1. **`.forge/codebase/TESTING.md` §7 전체와 §9를 읽는다.** 이 카드는 요약일 뿐이고 정본은 그쪽이다.
    시각 축을 다루면 `CONVENTIONS.md` §9.7(5개 판정축)도 읽는다.
 2. **프론트 프로브는 `cd frontend && npm run build` 이후에 돌린다.** nginx가 `frontend/dist`를 직접
