@@ -742,7 +742,32 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
     { "label": "같은 1단 기체의 회전율(재사용 횟수/년)이 늘어나는가",
       "detail": "정비 없이 재발사까지 걸리는 시간이 짧아져야 단가가 실제로 내려간다.",
       "not_signal": "발사 횟수 자체의 증가는 신규 기체 생산 확대일 수도 있어 회전율과 다르다." }
-  ]
+  ],
+  "composition": {
+    "tech": [
+      { "name": "재점화 엔진", "share_pct": 40, "leaders": ["SpaceX"],
+        "rationale": "다회 재점화 내구성이 재사용 횟수의 상한을 정한다." },
+      { "name": "정밀 착륙 제어", "share_pct": 35, "leaders": ["SpaceX"],
+        "rationale": "착륙 오차가 회수 성공률을 직접 좌우한다." },
+      { "name": "열보호 소재", "share_pct": 25, "leaders": [],
+        "rationale": "재진입 열부하가 정비 비용을 지배한다." }
+    ],
+    "minerals": [
+      { "name": "니오븀", "share_pct": 45, "rationale": "고온 합금의 대체 불가 첨가원소다.",
+        "top_source_country": "브라질", "top_source_pct": 88, "used_in": ["재점화 엔진"],
+        "producers": [ { "name": "CBMM", "country": "브라질", "ticker": null, "share_pct": 78 } ] },
+      { "name": "탄소섬유", "share_pct": 30, "rationale": "동체 경량화 원가의 다수를 차지한다.",
+        "top_source_country": "일본", "top_source_pct": 62, "used_in": ["열보호 소재"], "producers": [] },
+      { "name": "헬륨", "share_pct": 25, "rationale": "추진제 가압에 상용 대체재가 없다.",
+        "top_source_country": "US", "top_source_pct": 55, "used_in": [], "producers": [] }
+    ],
+    "minerals_share_basis": "세계 생산량 기준",
+    "experts": [
+      { "name": "추진 시스템 설계", "share_pct": 50, "rationale": "재점화 사이클 설계 경험자가 가장 희소하다." },
+      { "name": "유도항법 제어", "share_pct": 30, "rationale": "착륙 유도 알고리즘 실증 인력이 소수다." },
+      { "name": "재진입 열역학", "share_pct": 20, "rationale": "실비행 열데이터를 다뤄본 인력이 극소수다." }
+    ]
+  }
 }
 ```
 
@@ -775,11 +800,18 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `variants[].options` | array | ✅ | 그 축의 선택지 **최소 2개·최대 6개** — 1개뿐이면 비교가 아니라 서술이므로 **그 축을 생략하고 산문에 쓸 것**(2개 미만이면 422). `{name: ≤40자, examples?: ≤6개 문자열, strength?: ≤120자, tradeoff?: ≤120자}`. `strength`/`tradeoff`는 반드시 **쌍으로** — 어느 계열이 우월하다는 순위를 매기지 말고 이점과 대가를 함께 적는다 |
 | `watch_items` | array\|생략 | | **확인할 지표**(ADR-0034 개정) 최대 5개 — "앞으로 무엇이 관측되면 이 기술의 진척으로 인정하는가"를 미리 못 박은 판정 신호. `{label: ≤60자, detail?: ≤200자, not_signal?: ≤200자}` |
 | `watch_items[].not_signal` | string\|생략 | | **오독 경고** — 파일럿 라인 준공·샘플 공개·양산 목표 재확인처럼 *일정이 유지된다*는 신호일 뿐 진척이 아닌 것을 명시. 해당 지표에 그런 오독 위험이 없으면 생략 가능하지만, 있으면 반드시 `label`/`detail`과 **분리해서** 적을 것(한 문장에 섞지 말 것) |
+| `composition` | object\|생략 | | **기술 해부** — 자가 서로 다른 지분 축 3개(ADR-0042). `{tech?, minerals?, experts?, minerals_share_basis?}`. 「이 기술이 무엇으로 만들어지나 · 어디가 병목인가 · 원가가 어디에 노출되나」에 답한다. **세 축을 합쳐 하나로 읽으면 안 된다** — 분모가 각각 남은 난제 총량 · 원재료비 · 인력 병목 총량으로 다르다. 축은 전부 선택이되 **최소 한 축**은 있어야 한다(`{}`는 422 — 「해부 없음」은 필드 생략으로 표현) |
+| `composition.tech[]` | array\|생략 | | **필요기술 축**(자 = 남은 난제 총량) **3~7개** — `{name: ≤40자, share_pct, rationale: ≤200자, leaders?: ≤6개}`. `leaders[]`엔 업체 **이름만** 싣는다(기술수준·점유율·티커는 화면이 `players[]`에서 끌어온다) — 그래서 **`players[].name`과 바이트 동일**해야 하고 없는 이름은 422로 거부된다(그 이름이 에러 메시지에 실린다) |
+| `composition.minerals[]` | array\|생략 | | **핵심 광물 축**(자 = 원재료비) **3~7개** — `{name, share_pct, rationale, top_source_country?, top_source_pct?, used_in?: ≤6개, producers?: ≤6개}`. `producers[]`(`{name, country, ticker?, share_pct?}`)는 채굴·정제 업체라 **`players[]`와 별개 목록**이고 기술수준을 붙이지 않는다 — 리튬을 캐는 회사에 "양산상용 단계"란 없다 |
+| `composition.experts[]` | array\|생략 | | **전문가 축**(자 = 인력 병목 총량) **3~7개** — `{name, share_pct, rationale}`. **업체를 붙이지 마라** — 인력 병목은 특정 회사가 소유한 것이 아니고, 붙이면 기술 축의 선도기업과 중복되거나 대학·규제기관이 섞여 축이 무너진다 |
+| `composition.minerals_share_basis` | string\|생략 | | 광물 점유의 **기준 문구**(≤60자, 예: `"세계 생산량 기준"`). 어느 `producers[].share_pct`라도 실으면 **필수**(없으면 422) — 이 점유는 *그 광물 세계 생산* 기준이라 `market.share_basis`(그 **기술 시장**의 점유)와 자가 다르다 |
+| `composition.*[].share_pct` | number | ✅ | 그 축 안에서의 지분(%) — **5의 배수만**(37·32.5는 422)이고 **축마다 합이 정확히 100**(95·105는 422). 잔여는 숨기지 말고 **「기타」 항목**으로 명시하라. ⚠️ 이 그리드는 **축 지분에만** 적용된다 — `producers[].share_pct`·`top_source_pct`는 출처 있는 외부 통계라 반올림하지 마라 |
+| `composition.*[].rationale` | string | ✅ | **그 지분이 왜 그 몫인지 1문장**(≤200자, 공백만이면 422). 이 축엔 출처를 달 자리가 없으므로 판단 근거가 그 역할을 한다 — 근거를 못 쓰면 **그 항목을 발행하지 마라**(틀린 값 < 누락) |
 
 **통화·단위 enum(필수, 자유 텍스트·환산 금지)** — `currency`: `USD` \| `KRW`. `unit`: `mn`(백만) \| `bn`(십억) \| `tn`(조). 렌더러가 절대 추측·환산하지 않으므로 enum 밖 값은 `422`.
 
 > **문자열 수치는 요약 칩에만** — `key_points[].metrics[].value`가 표시용 문자열인 것은 그 칩이 **그래프를 그리지 않기 때문**이다(ADR-0034). 차트를 그리는 수치(`market` 금액 — `history`·`forecast`·`estimates[].size` 전부 포함·`milestones[].year`·`tech_level`·`share_pct`)는 **절대 문자열로 쓰지 말 것** — 구조 데이터여야 곡선·축·밴드를 그릴 수 있다(ADR-0033). `market.estimates[].scope`·`variants[].options[].examples/strength/tradeoff`는 예외(자유 텍스트) — 어느 것도 좌표를 계산하지 않는 순수 요약 칩이다.
-> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates`·`variants`·`watch_items` 여섯 필드는 전부 선택이다. 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(대부분 화면이 그 섹션째 생략하고, `players[].category`만 예외로 표·점유율이 평면 렌더로 폴백한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
+> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates`·`variants`·`watch_items`·`composition` 일곱 필드는 전부 선택이다(`composition`은 **축 단위로도** 생략 가능 — 아는 축만 싣는다). 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(대부분 화면이 그 섹션째 생략하고, `players[].category`만 예외로 표·점유율이 평면 렌더로 폴백한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
 
 > **기술수준 vs 기술난이도 vs 기술격차** — 세 축을 섞지 마세요. `players[].tech_level`은 *그 업체가* 지금 어느 단계인지, `difficulty`는 *그 기술 자체가* 얼마나 어려운지(기술 단위 필드 하나, 업체별이 아님), `gap_years`는 *선두 대비 몇 년 뒤인지*입니다.
 > **상용 시장이 아직 형성되지 않은 기술**(예: SMR·재사용 로켓 일부 세그먼트)은 점유율 근거를 댈 수 없으면 `share_pct`를 생략하세요(업체 표는 그대로, 점유율 칸만 빔).
@@ -794,7 +826,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | 상태 | 설명 |
 |------|------|
 | `401` | API Key 누락/불일치 |
-| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 |
+| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · `composition` 축 항목 2개 이하/8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 또는 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `producers[].share_pct` 있고 `minerals_share_basis` 없음 · `composition: {}` · 필수 필드 누락 |
 
 ---
 

@@ -2338,7 +2338,32 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     { "label": "같은 1단 기체의 회전율(재사용 횟수/년)이 늘어나는가",
       "detail": "정비 없이 재발사까지 걸리는 시간이 짧아져야 단가가 실제로 내려간다.",
       "not_signal": "발사 횟수 자체의 증가는 신규 기체 생산 확대일 수도 있어 회전율과 다르다." }
-  ]
+  ],
+  "composition": {
+    "tech": [
+      { "name": "재점화 엔진", "share_pct": 40, "leaders": ["SpaceX"],
+        "rationale": "다회 재점화 내구성이 재사용 횟수의 상한을 정한다." },
+      { "name": "정밀 착륙 제어", "share_pct": 35, "leaders": ["SpaceX"],
+        "rationale": "착륙 오차가 회수 성공률을 직접 좌우한다." },
+      { "name": "열보호 소재", "share_pct": 25, "leaders": [],
+        "rationale": "재진입 열부하가 정비 비용을 지배한다." }
+    ],
+    "minerals": [
+      { "name": "니오븀", "share_pct": 45, "rationale": "고온 합금의 대체 불가 첨가원소다.",
+        "top_source_country": "브라질", "top_source_pct": 88, "used_in": ["재점화 엔진"],
+        "producers": [ { "name": "CBMM", "country": "브라질", "ticker": null, "share_pct": 78 } ] },
+      { "name": "탄소섬유", "share_pct": 30, "rationale": "동체 경량화 원가의 다수를 차지한다.",
+        "top_source_country": "일본", "top_source_pct": 62, "used_in": ["열보호 소재"], "producers": [] },
+      { "name": "헬륨", "share_pct": 25, "rationale": "추진제 가압에 상용 대체재가 없다.",
+        "top_source_country": "US", "top_source_pct": 55, "used_in": [], "producers": [] }
+    ],
+    "minerals_share_basis": "세계 생산량 기준",
+    "experts": [
+      { "name": "추진 시스템 설계", "share_pct": 50, "rationale": "재점화 사이클 설계 경험자가 가장 희소하다." },
+      { "name": "유도항법 제어", "share_pct": 30, "rationale": "착륙 유도 알고리즘 실증 인력이 소수다." },
+      { "name": "재진입 열역학", "share_pct": 20, "rationale": "실비행 열데이터를 다뤄본 인력이 극소수다." }
+    ]
+  }
 }
 ```
 
@@ -2360,21 +2385,34 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `variants` | array\|생략 | | 계보 비교축(ADR-0034 개정, task#296) **최대 2개**(초과 시 `422`) — `{axis_label: ≤30자, options}`. 축의 이름은 기술마다 다른 자유 문자열("노형"·"회수 방식"·"고체 전해질 계열") |
 | `variants[].options` | array | ✅ | 그 축의 선택지 **최소 2개·최대 6개**(1개 이하면 `422` — 비교가 아니라 서술이므로 축 자체를 생략하고 산문에 쓸 것) — `{name: ≤40자, examples?: 문자열배열 ≤6개, strength?: ≤120자, tradeoff?: ≤120자}`. `examples`·`strength`·`tradeoff`는 전부 **표시용 문자열**(그래프를 그리지 않는다 — ADR-0034) |
 | `watch_items` | array\|생략 | | 관찰 체크리스트(ADR-0034 개정, task#296) **최대 5개**(초과 시 `422`) — `{label: ≤60자, detail?: ≤200자, not_signal?: ≤200자}`. `not_signal`은 "이건 진척 신호가 아니다"를 본문과 분리해 적는 표시용 문자열 |
+| `composition` | object\|생략 | | **기술 해부** 3축(ADR-0042, task#305) — `{tech?, minerals?, experts?, minerals_share_basis?}`. 세 축은 **자(분모)가 서로 다르다**(필요기술=남은 난제 총량 · 광물=원재료비 · 전문가=인력 병목 총량) — 합쳐 하나로 읽으면 안 되고 화면도 축마다 별도 100% 막대로 그린다. 축은 전부 선택이되 **최소 한 축**은 있어야 한다(`{}`는 `422` — 「해부 없음」의 표현은 `null` 하나여야 하므로) |
+| `composition.tech[]` | array\|생략 | | 필요기술 축 **3~7개**(2개 이하·8개 이상 `422`) — `{name: ≤40자, share_pct, rationale: ≤200자, leaders?: 문자열배열 ≤6개}`. `leaders[]`의 모든 이름은 **`players[].name`에 바이트 동일하게 실재**해야 한다(없으면 `422`이고 그 이름이 메시지에 실린다) — 화면이 이름으로 조인해 기술수준·점유율을 끌어오므로 문자열 일치로 조용히 결측시키지 않는다 |
+| `composition.minerals[]` | array\|생략 | | 핵심 광물 축 **3~7개** — `{name, share_pct, rationale, top_source_country?: ≤30자, top_source_pct?, used_in?: 문자열배열 ≤6개, producers?: ≤6개}`. `producers[]`는 `{name: ≤40자, country: ≤30자, ticker?, share_pct?}`로 **`players[]`와 별개 목록**이고 `tech_level`이 없다 — 광산기업에 1~5 성숙 단계는 의미가 없다(ADR-0042 결정 4) |
+| `composition.experts[]` | array\|생략 | | 전문가 축 **3~7개** — `{name, share_pct, rationale}`. **업체를 붙이지 않는다** — 붙이면 기술 축의 선도기업과 중복되거나 대학·규제기관이 섞여 축이 무너진다(인력 병목은 특정 회사가 소유한 것이 아니다) |
+| `composition.minerals_share_basis` | string\|생략 | | 광물 점유의 기준 문구(≤60자, 예: `"세계 생산량 기준"`) — 어느 `producers[].share_pct`라도 실으면 **필수**(없으면 `422`). *그 광물 세계 생산*의 점유라 `market.share_basis`(그 기술 **시장**의 점유)와 **자가 다르다** |
+| `composition.*[].share_pct` | number | ✅ | 그 축 안에서의 지분(%) — **5의 배수만**(`37`·`32.5`는 `422`)이고 **축마다 합이 정확히 100**(`95`·`105`는 `422`). 허위정밀 차단(ADR-0042 결정 3)이며 잔여는 숨기지 말고 **「기타」 항목**으로 명시한다. ⚠️ 5% 그리드는 **이 축 지분에만** 적용된다 — `producers[].share_pct`·`top_source_pct`는 USGS류 *출처 있는* 외부 사실이라 그리드를 강제하지 않는다(반올림하면 오히려 정확도가 깎인다) |
+| `composition.*[].rationale` | string | ✅ | 그 지분이 왜 그 몫인지 **1문장**(≤200자, 공백만이면 `422`). 출처가 없는 수치의 유일한 대체 규율 — ADR-0033이 "출처 필수"로 지킨 자리를 이 축에서는 판단 근거가 지킨다. 근거를 못 쓰면 그 항목을 발행하지 않는다(`wrong < missing`) |
 
-`value`(`MoneyValue` — `market.history`/`forecast`/`estimates[].size` 전부 포함)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones`·`market.estimates`·`variants`·`watch_items` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
+`value`(`MoneyValue` — `market.history`/`forecast`/`estimates[].size` 전부 포함)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`·`composition` 안의 모든 퍼센트 필드(`*[].share_pct`·`producers[].share_pct`·`top_source_pct`)는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones`·`market.estimates`·`variants`·`watch_items`·`composition` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
 
 **Response `201`**
 ```json
 { "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
 ```
 
-**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락
+**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 · `composition` 축 항목 2개 이하 또는 8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 · `composition` 축 `share_pct` 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `composition.minerals[].producers[].share_pct` 있고 `composition.minerals_share_basis` 없음 · `composition: {}`(축 0개)
 
 ---
 
 각 조회 응답의 발행물 행(`report`)은 **발행 요청 필드 전체(위 표) + 서버 부여 필드 2개**로 구성된다 — `id`(내부 PK, 정렬·비교 용도 외 의미 없음)와 `created_at`(그 판이 저장·갱신된 시각, 재발행 시 갱신).
 
-⚠️ **선택 필드는 응답에서 `null`로 나온다 — 빈 배열이 아니다.** `key_points`·`milestones`를 담지 않고 발행한 판(2026-08-04 이전 전 판 포함)은 컬럼이 SQL NULL이라 `"key_points": null`·`"milestones": null`이고, `metrics`를 생략한 포인트도 `"metrics": null`이다. 소비자는 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `players[].category`는 그보다 앞서 발행된 판에는 **키 자체가 없다**(JSONB에 박제된 옛 형태 — `undefined`). `market.estimates`도 같은 함정이다 — 이 필드가 스키마에 생기기 **이전**에 발행된 판(2026-08-04 이전 전 판 포함)은 JSONB `market`에 이 키 자체가 없어(`undefined`, `players[].category`와 동일 케이스) `null`과 구분해야 한다. 반면 그 **이후** 발행된 판은 요청에서 생략해도 서버가 `"estimates": null`을 채워 저장하므로(다른 선택 필드와 동일) 키는 늘 있다. `variants`·`watch_items`(ADR-0034 개정, task#296)는 아직 **모든** 라이브 발행물(2026-08-12 이전, 대상 4종 전 판)이 이 필드 도입 이전 판이라 **키 자체가 없다**(`undefined`) — 이 두 필드가 도입된 이후 발행분부터 위 규칙(생략해도 `null`로 채워짐)이 적용된다.
+⚠️ **선택 필드의 부재는 `null`이다 — 빈 배열이 아니다. 그리고 `null`과 `undefined`는 저장 위치로 갈린다.**
+
+- **전용 컬럼**(`key_points`·`milestones`·`variants`·`watch_items`·`composition`)은 `SELECT *`가 늘 그 컬럼을 반환하므로 **키는 항상 있고, 미수록이면 값이 `null`**이다. 도입 이전에 발행된 판도 마찬가지다(컬럼이 나중에 생겨도 그 행의 값이 `NULL`일 뿐). 소비자는 `composition == null`을 「아직 해부되지 않음」으로 읽으면 된다.
+- **JSONB 안에 중첩된 키**(`market.estimates`·`players[].category`)는 다르다 — 그 키가 스키마에 생기기 **이전**에 발행된 판은 JSONB에 박제된 옛 형태라 **키 자체가 없다**(`undefined`). 이후 발행분은 생략해도 서버가 `null`을 채워 저장하므로 키가 늘 있다.
+- 어느 쪽이든 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `metrics`를 생략한 포인트도 `"metrics": null`이다.
+
+현재 라이브 6종은 `key_points`·`milestones`·`variants`·`watch_items`·`market.estimates`가 **전부 채워져 있고**, `composition`은 ADR-0042 도입 직후라 아직 미수록 판이 있다(값 `null`).
 
 ### `GET /api/tech-reports`
 

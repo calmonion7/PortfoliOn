@@ -620,3 +620,291 @@ def test_unauthenticated_401():
     assert c.get("/api/tech-reports").status_code == 401
     assert c.get("/api/tech-reports/smr").status_code == 401
     assert c.post("/api/tech-reports/smr", json=VALID_BODY).status_code == 401
+
+
+# ── 기술 해부 composition 3축 (ADR-0042, task#305 S1·S2) ──────────────
+#
+# 검증 6종 각각에 「위반 → 422 · 경계 → 201」 쌍을 둔다. 422는 *그 규칙 때문에* 난 것이어야
+# 의미가 있으므로(무관한 필드 오류로도 422가 나므로) detail의 식별 문자열까지 단언한다.
+
+COMPOSITION = {
+    "tech": [
+        {"name": "재점화 엔진", "share_pct": 40.0, "leaders": ["SpaceX"],
+         "rationale": "다회 재점화 내구성이 재사용 횟수의 상한을 정한다."},
+        {"name": "정밀 착륙 제어", "share_pct": 35.0, "leaders": [],
+         "rationale": "착륙 오차가 회수 성공률을 직접 좌우한다."},
+        {"name": "열보호 소재", "share_pct": 25.0, "leaders": ["SpaceX"],
+         "rationale": "재진입 열부하가 정비 비용을 지배한다."},
+    ],
+    "minerals": [
+        {"name": "니오븀", "share_pct": 45.0, "rationale": "고온 합금의 대체 불가 첨가원소다.",
+         "top_source_country": "브라질", "top_source_pct": 88.0, "used_in": ["재점화 엔진"],
+         "producers": [{"name": "CBMM", "country": "브라질", "ticker": None, "share_pct": 78.0}]},
+        {"name": "탄소섬유", "share_pct": 30.0, "rationale": "동체 경량화 원가의 다수를 차지한다.",
+         "top_source_country": "일본", "top_source_pct": 62.0, "used_in": ["열보호 소재"],
+         "producers": []},
+        {"name": "헬륨", "share_pct": 25.0, "rationale": "추진제 가압에 상용 대체재가 없다.",
+         "top_source_country": "US", "top_source_pct": 55.0, "used_in": [], "producers": []},
+    ],
+    "minerals_share_basis": "원재료비 기준",
+    "experts": [
+        {"name": "추진 시스템 설계", "share_pct": 50.0,
+         "rationale": "재점화 사이클 설계 경험자가 가장 희소하다."},
+        {"name": "유도항법 제어", "share_pct": 30.0,
+         "rationale": "착륙 유도 알고리즘 실증 인력이 소수다."},
+        {"name": "재진입 열역학", "share_pct": 20.0,
+         "rationale": "실비행 열데이터를 다뤄본 인력이 극소수다."},
+    ],
+}
+
+
+def _body_with_composition(comp):
+    """VALID_BODY에 composition을 얹은 사본 — 원본 오염 방지(형제 테스트 관례)."""
+    body = copy.deepcopy(VALID_BODY)
+    body["composition"] = copy.deepcopy(comp)
+    return body
+
+
+def _detail(resp):
+    return json.dumps(resp.json(), ensure_ascii=False)
+
+
+# ── S1. additive 3케이스 ─────────────────────────────────────────────
+
+def test_publish_composition_key_omitted_201():
+    """composition 키 생략 → 201 (기존 발행 회귀 0)."""
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket", json=VALID_BODY)
+    assert resp.status_code == 201
+    mock_exec.assert_called_once()
+
+
+def test_publish_composition_explicit_null_201():
+    """명시적 `"composition": null` → 201.
+
+    `Composition = Field(None)`(Optional 누락)으로 쓰면 pydantic v2가 선언 타입 검증을 태워
+    **키 생략은 통과하는데 명시적 null만 422**가 된다(task#250). 루틴이 "없음"을 null로 표현하면
+    리포트 발행 전체가 막히므로 Optional[...]이 필수다.
+    """
+    body = copy.deepcopy(VALID_BODY)
+    body["composition"] = None
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket", json=body)
+    assert resp.status_code == 201, _detail(resp)
+    mock_exec.assert_called_once()
+
+
+def test_publish_composition_three_axes_201():
+    """3축을 채운 페이로드 → 201, 저장 파라미터에 composition이 실린다."""
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(COMPOSITION))
+    assert resp.status_code == 201, _detail(resp)
+    mock_exec.assert_called_once()
+
+
+# ── S2. 검증 6종 (위반 422 · 경계 201) ────────────────────────────────
+
+def test_composition_share_pct_not_multiple_of_five_422():
+    """① 5% 그리드 — 37.0·32.5 모두 422 (ADR-0042 결정 3)."""
+    for bad, rest in ((37.0, 63.0), (32.5, 67.5)):
+        comp = copy.deepcopy(COMPOSITION)
+        comp["experts"] = [
+            {"name": "A", "share_pct": bad, "rationale": "근거."},
+            {"name": "B", "share_pct": rest, "rationale": "근거."},
+            {"name": "기타", "share_pct": 0.0, "rationale": "잔여."},
+        ]
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket",
+                               json=_body_with_composition(comp))
+        assert resp.status_code == 422, f"{bad}: {_detail(resp)}"
+        assert "5의 배수" in _detail(resp), _detail(resp)
+        mock_exec.assert_not_called()
+
+
+def test_composition_share_pct_multiple_of_five_201():
+    """① 경계 — 35.0/5.0 같은 5의 배수는 통과한다."""
+    comp = copy.deepcopy(COMPOSITION)
+    comp["experts"] = [
+        {"name": "A", "share_pct": 35.0, "rationale": "근거."},
+        {"name": "B", "share_pct": 60.0, "rationale": "근거."},
+        {"name": "기타", "share_pct": 5.0, "rationale": "잔여."},
+    ]
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(comp))
+    assert resp.status_code == 201, _detail(resp)
+
+
+def test_composition_axis_sum_not_100_422():
+    """② Σ=100 정확히 — 95·105 둘 다 422."""
+    for items in (
+        [{"name": "A", "share_pct": 50.0, "rationale": "근거."},
+         {"name": "B", "share_pct": 30.0, "rationale": "근거."},
+         {"name": "C", "share_pct": 15.0, "rationale": "근거."}],   # 95
+        [{"name": "A", "share_pct": 50.0, "rationale": "근거."},
+         {"name": "B", "share_pct": 35.0, "rationale": "근거."},
+         {"name": "C", "share_pct": 20.0, "rationale": "근거."}],   # 105
+    ):
+        comp = copy.deepcopy(COMPOSITION)
+        comp["experts"] = items
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket",
+                               json=_body_with_composition(comp))
+        assert resp.status_code == 422, _detail(resp)
+        assert "합이 정확히 100" in _detail(resp), _detail(resp)
+        mock_exec.assert_not_called()
+
+
+def test_composition_axis_sum_exactly_100_201():
+    """② 경계 — 합이 정확히 100이면 통과(기본 픽스처가 세 축 모두 100)."""
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(COMPOSITION))
+    assert resp.status_code == 201, _detail(resp)
+
+
+def test_composition_axis_item_count_out_of_range_422():
+    """③ 항목 수 3~7 — 2개·8개 모두 422."""
+    two = [{"name": "A", "share_pct": 50.0, "rationale": "근거."},
+           {"name": "B", "share_pct": 50.0, "rationale": "근거."}]
+    eight = [{"name": f"E{i}", "share_pct": s, "rationale": "근거."}
+             for i, s in enumerate([15.0, 15.0, 15.0, 15.0, 10.0, 10.0, 10.0, 10.0])]
+    for items, marker in ((two, "too_short"), (eight, "too_long")):
+        comp = copy.deepcopy(COMPOSITION)
+        comp["experts"] = items
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket",
+                               json=_body_with_composition(comp))
+        assert resp.status_code == 422, _detail(resp)
+        assert marker in _detail(resp), _detail(resp)
+        mock_exec.assert_not_called()
+
+
+def test_composition_axis_item_count_boundaries_201():
+    """③ 경계 — 정확히 3개·7개는 통과한다."""
+    seven = [{"name": f"E{i}", "share_pct": s, "rationale": "근거."}
+             for i, s in enumerate([20.0, 20.0, 15.0, 15.0, 10.0, 10.0, 10.0])]
+    for items in ([{"name": "A", "share_pct": 50.0, "rationale": "근거."},
+                   {"name": "B", "share_pct": 30.0, "rationale": "근거."},
+                   {"name": "C", "share_pct": 20.0, "rationale": "근거."}], seven):
+        comp = copy.deepcopy(COMPOSITION)
+        comp["experts"] = items
+        with patch.object(svc, "execute"):
+            resp = client.post("/api/tech-reports/reusable-rocket",
+                               json=_body_with_composition(comp))
+        assert resp.status_code == 201, _detail(resp)
+
+
+def test_composition_blank_rationale_422():
+    """④ 근거 1문장 필수 — 공백만인 rationale은 422 (min_length=1을 공백이 통과한다)."""
+    comp = copy.deepcopy(COMPOSITION)
+    comp["experts"][0]["rationale"] = "   "
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(comp))
+    assert resp.status_code == 422, _detail(resp)
+    assert "근거" in _detail(resp), _detail(resp)
+    mock_exec.assert_not_called()
+
+
+def test_composition_dangling_leader_422():
+    """⑤ leaders[]는 players[].name에 실재해야 한다 — 오타 이름은 422이고 그 이름을 메시지에 싣는다."""
+    comp = copy.deepcopy(COMPOSITION)
+    comp["tech"][0]["leaders"] = ["SpceX"]
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(comp))
+    assert resp.status_code == 422, _detail(resp)
+    assert "SpceX" in _detail(resp), _detail(resp)
+    assert "players" in _detail(resp), _detail(resp)
+    mock_exec.assert_not_called()
+
+
+def test_composition_leader_matching_player_201():
+    """⑤ 경계 — players[]에 실재하는 이름은 통과(바이트 동일 요구)."""
+    comp = copy.deepcopy(COMPOSITION)
+    comp["tech"][0]["leaders"] = ["SpaceX"]
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(comp))
+    assert resp.status_code == 201, _detail(resp)
+
+
+def test_composition_producer_share_without_basis_422():
+    """⑥ producers[].share_pct가 있으면 minerals_share_basis 필수(_share_pct_requires_basis 동형).
+
+    이 축의 점유는 *그 광물 세계 생산* 기준이라 market.share_basis(그 기술 시장 점유)와 자가 다르다
+    — 그래서 별도 기준 문구를 요구한다(ADR-0042 결정 4).
+    """
+    comp = copy.deepcopy(COMPOSITION)
+    comp.pop("minerals_share_basis")
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(comp))
+    assert resp.status_code == 422, _detail(resp)
+    assert "minerals_share_basis" in _detail(resp), _detail(resp)
+    mock_exec.assert_not_called()
+
+
+def test_composition_producer_without_share_needs_no_basis_201():
+    """⑥ 경계 — 어느 producer도 share_pct를 안 실으면 기준 문구 없이도 통과한다."""
+    comp = copy.deepcopy(COMPOSITION)
+    comp.pop("minerals_share_basis")
+    for m in comp["minerals"]:
+        for p in m.get("producers", []):
+            p.pop("share_pct", None)
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(comp))
+    assert resp.status_code == 201, _detail(resp)
+
+
+def test_composition_nan_share_pct_422():
+    """NaN 토큰은 422 — raw JSON의 NaN은 json.loads를 통과하고 NaN 비교는 **항상 False**라
+    5% 그리드도 Σ=100도 조용히 통과한다(task#211). allow_inf_nan=False가 유일한 차단선이다.
+
+    self-app이 아니라 `main.app`을 쓰는 이유: 422 detail이 입력 NaN을 echo하면 starlette
+    allow_nan=False 직렬화가 **500**을 낸다 — 그걸 막는 RequestValidationError 핸들러는
+    main.app에만 있다(형제 test_publish_estimates_nan_value_rejected_422와 같은 관례).
+
+    ⚠️ red-first가 원리적으로 불가하다(수정 전에도 통과). 이빨 검증: CompositionItem.share_pct의
+    allow_inf_nan=False를 일시 제거해 실제로 실패함을 확인한 뒤 원복했다(task#250 관례).
+    """
+    from main import app as main_app
+    main_app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
+    try:
+        c = TestClient(main_app)
+        for token in ("NaN", "Infinity"):
+            raw = json.dumps(_body_with_composition(COMPOSITION)).replace(
+                '"share_pct": 40.0', f'"share_pct": {token}', 1)
+            assert f'"share_pct": {token}' in raw  # sanity: replace가 실제로 매치됐는지
+            with patch.object(svc, "save_report") as mock_save:
+                resp = c.post("/api/tech-reports/reusable-rocket", content=raw,
+                              headers={"Content-Type": "application/json"})
+            assert resp.status_code == 422, f"{token}: {_detail(resp)}"
+            mock_save.assert_not_called()
+    finally:
+        main_app.dependency_overrides.pop(require_admin_or_api_key, None)
+
+
+def test_composition_empty_object_422():
+    """축이 하나도 없는 `composition: {}`는 422.
+
+    빈 객체를 허용하면 「해부 없음」의 표현이 null과 {} 둘이 되고, 2/2의 빈 상태 분기가
+    두 형태를 각각 다뤄야 한다. 없으면 필드를 생략(=null)하는 것이 이 저장소의 관례다.
+    """
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket", json=_body_with_composition({}))
+    assert resp.status_code == 422, _detail(resp)
+    assert "최소 한 축" in _detail(resp), _detail(resp)
+    mock_exec.assert_not_called()
+
+
+def test_composition_single_axis_only_201():
+    """경계 — 축 하나만 채운 부분 발행은 통과한다(루틴이 모르는 축은 통째로 생략)."""
+    comp = {"experts": copy.deepcopy(COMPOSITION["experts"])}
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket",
+                           json=_body_with_composition(comp))
+    assert resp.status_code == 201, _detail(resp)

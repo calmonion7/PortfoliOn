@@ -426,6 +426,7 @@ CREATE TABLE IF NOT EXISTS tech_reports (
     milestones       JSONB,                         -- 진척 타임라인 [{year, actor, event, status}] (nullable=미수록)
     variants         JSONB,                         -- 계보 비교축 [{axis_label, options[{name,...}]}] (nullable=미수록, task#297)
     watch_items      JSONB,                         -- 관찰 체크리스트 [{label, detail, not_signal}] (nullable=미수록, task#297)
+    composition      JSONB,                         -- 기술 해부 3축 {tech[], minerals[], experts[], minerals_share_basis} (nullable=미수록, ADR-0042 task#305)
     created_at       TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE (slug)
 );

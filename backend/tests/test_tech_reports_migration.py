@@ -45,3 +45,25 @@ def test_migrate_retires_data_center_surgically(monkeypatch):
     # 일반형 금지 — slug 목록/부정 조건으로 쓸어담는 형태가 아님을 못박는다.
     banned = ("NOT IN", "!=", "<>", "NOT LIKE")
     assert not any(b in retire[0].upper() for b in banned), f"일반형 삭제 금지: {retire[0]}"
+
+
+def test_migrate_and_schema_both_declare_composition_column(monkeypatch):
+    """신규 컬럼은 `app_schema.sql`과 `main._migrate` **양쪽**에 있어야 한다 (CLAUDE.md 컬럼 추가 DoD).
+
+    스키마 파일은 신규 설치용이고 라이브 DB는 기동 idempotent 마이그레이션(ADR-0006)만 탄다 —
+    한쪽만 고치면 배포 직후 그 컬럼을 쓰는 INSERT가 컬럼 부재로 깨진다(task#130 실사례).
+    그래서 두 파일을 한 테스트에서 함께 단언한다(한쪽만 고치면 여기서 실패해야 한다).
+    """
+    import pathlib
+    import main
+    import services.db as db
+
+    ddl = []
+    monkeypatch.setattr(db, "execute", lambda sql, *a, **k: ddl.append(sql))
+    main._migrate()
+    assert any("ADD COLUMN IF NOT EXISTS composition JSONB" in s and "tech_reports" in s
+               for s in ddl), f"_migrate에 composition ALTER 누락: {[s for s in ddl if 'composition' in s]}"
+
+    schema = pathlib.Path(main.__file__).parent.joinpath("app_schema.sql").read_text()
+    block = schema.split("CREATE TABLE IF NOT EXISTS tech_reports (")[1].split(");")[0]
+    assert "composition" in block, "app_schema.sql의 tech_reports 블록에 composition 컬럼 누락"

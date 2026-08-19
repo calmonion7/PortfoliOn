@@ -150,7 +150,7 @@ def test_save_report_persists_variants_and_watch_items():
         assert col in head, f"INSERT 컬럼 목록에 {col} 누락"
         assert f"{col} = EXCLUDED.{col}" in sql, f"DO UPDATE SET에 {col} 누락"
     assert sql.count("%s") == len(params)   # VALUES 자리표시자 ↔ 파라미터 개수 일치
-    assert len(params) == 14                # 12 → 14 (task#296)
+    assert len(params) == 15                # 12 → 14 (task#296) → 15 (task#305 composition)
     assert json.loads(params[12]) == payload["variants"]
     assert json.loads(params[13]) == payload["watch_items"]
 
@@ -160,7 +160,7 @@ def test_save_report_variants_watch_items_absent_stores_sql_null():
     with patch.object(svc, "execute") as mock_exec:
         svc.save_report("smr", PAYLOAD)
     _, params = mock_exec.call_args.args
-    assert len(params) == 14
+    assert len(params) == 15
     assert params[12] is None, "variants 부재는 SQL NULL이어야 한다(문자열 'null' 금지)"
     assert params[13] is None, "watch_items 부재는 SQL NULL이어야 한다(문자열 'null' 금지)"
 
@@ -224,3 +224,51 @@ def test_tech_topics_has_exactly_the_six_slugs():
     ops = next(t for t in svc.TECH_TOPICS if t["slug"] == "ai-datacenter-ops")
     assert ops["name"] == "AI 데이터센터 운영"
     assert ops["order"] == 6
+
+
+# ── 기술 해부 composition (ADR-0042, task#305 S3) ─────────────────────
+
+COMPOSITION = {
+    "tech": [
+        {"name": "재점화 엔진", "share_pct": 40.0, "leaders": ["SpaceX"], "rationale": "근거."},
+        {"name": "정밀 착륙 제어", "share_pct": 35.0, "leaders": None, "rationale": "근거."},
+        {"name": "열보호 소재", "share_pct": 25.0, "leaders": [], "rationale": "근거."},
+    ],
+    "minerals_share_basis": "원재료비 기준",
+}
+
+
+def test_save_report_persists_composition():
+    """composition도 세 곳(INSERT 컬럼 목록·VALUES 자리표시자·DO UPDATE SET) 전부에 실려야 한다
+    — variants·watch_items와 동일 패턴(task#296)."""
+    payload = dict(PAYLOAD, composition=COMPOSITION)
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("reusable-rocket", payload)
+    sql, params = mock_exec.call_args.args
+    head = sql.split("VALUES")[0]
+    assert "composition" in head, "INSERT 컬럼 목록에 composition 누락"
+    assert "composition = EXCLUDED.composition" in sql, "DO UPDATE SET에 composition 누락"
+    assert sql.count("%s") == len(params)   # VALUES 자리표시자 ↔ 파라미터 개수 일치
+    assert len(params) == 15                # 14 → 15 (task#305)
+    assert json.loads(params[14]) == COMPOSITION
+
+
+def test_save_report_composition_absent_stores_sql_null():
+    """부재 시 SQL NULL — `json.dumps(None)`의 문자열 'null'은 `IS NULL`과 어긋난다(task#281 F7)."""
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("reusable-rocket", PAYLOAD)
+    _, params = mock_exec.call_args.args
+    assert params[14] is None, "composition 부재는 SQL NULL이어야 한다(문자열 'null' 금지)"
+
+
+def test_save_report_composition_explicit_none_also_stores_sql_null():
+    """키가 있고 값이 None인 판(pydantic Optional 기본값 경로)도 같은 SQL NULL로 간다."""
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("reusable-rocket", dict(PAYLOAD, composition=None))
+    _, params = mock_exec.call_args.args
+    assert params[14] is None
+    # 이빨 — 가드가 정상 경로를 삼키지 않는다(빈 dict는 NULL이 아니라 JSON으로 간다)
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("reusable-rocket", dict(PAYLOAD, composition={}))
+    _, params2 = mock_exec.call_args.args
+    assert json.loads(params2[14]) == {}

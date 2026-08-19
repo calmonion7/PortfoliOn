@@ -271,6 +271,13 @@ def _migrate():
     except Exception as e:
         logger.warning(f"[Migrate] tech_reports 계보축·체크리스트 컬럼 추가 실패: {e}")
     try:
+        # 기술 해부 3축(ADR-0042). app_schema.sql은 신규 설치용이라 라이브 DB는 이 ALTER만 탄다
+        # — 한쪽만 고치면 배포 직후 composition을 쓰는 INSERT가 컬럼 부재로 깨진다(task#130).
+        from services.db import execute
+        execute("ALTER TABLE tech_reports ADD COLUMN IF NOT EXISTS composition JSONB")
+    except Exception as e:
+        logger.warning(f"[Migrate] tech_reports 기술 해부 컬럼 추가 실패: {e}")
+    try:
         # 판 누적 폐기(ADR-0038): slug당 최신 1행만 남기고 과거 행 삭제 후 UNIQUE(slug)로 전환.
         # 이 인덱스가 없으면 라우터의 ON CONFLICT (slug)가 런타임 500이 되므로 결과를 loud하게 남긴다.
         from services.db import execute

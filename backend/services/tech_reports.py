@@ -38,8 +38,8 @@ def save_report(slug: str, payload: dict) -> None:
         """INSERT INTO tech_reports
                (slug, published_date, title, description, difficulty, players,
                 challenges, related, market, sources, key_points, milestones,
-                variants, watch_items)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                variants, watch_items, composition)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            ON CONFLICT (slug) DO UPDATE SET
                published_date = EXCLUDED.published_date,
                title = EXCLUDED.title, description = EXCLUDED.description,
@@ -48,6 +48,7 @@ def save_report(slug: str, payload: dict) -> None:
                market = EXCLUDED.market, sources = EXCLUDED.sources,
                key_points = EXCLUDED.key_points, milestones = EXCLUDED.milestones,
                variants = EXCLUDED.variants, watch_items = EXCLUDED.watch_items,
+               composition = EXCLUDED.composition,
                created_at = NOW()""",
         (slug, payload["published_date"], payload["title"], payload.get("description", ""),
          json.dumps(payload.get("difficulty"), ensure_ascii=False),
@@ -63,7 +64,9 @@ def save_report(slug: str, payload: dict) -> None:
          _json_or_null(payload.get("key_points")),
          _json_or_null(payload.get("milestones")),
          _json_or_null(payload.get("variants")),
-         _json_or_null(payload.get("watch_items"))),
+         _json_or_null(payload.get("watch_items")),
+         # 기술 해부 3축(ADR-0042) — 미수록 판은 SQL NULL(프론트가 빈 상태 안내를 렌더한다).
+         _json_or_null(payload.get("composition"))),
     )
 
 

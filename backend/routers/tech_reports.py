@@ -4,6 +4,7 @@
 require_admin_or_api_key(루틴), 조회 2종은 get_current_user_or_api_key
 (ADR-0029 — 무인증 read 없음).
 """
+import math
 from datetime import date
 from typing import List, Literal, Optional
 
@@ -173,6 +174,122 @@ class WatchItem(BaseModel):
     not_signal: Optional[str] = Field(None, max_length=200)  # "이건 진척 신호가 아니다"
 
 
+class MineralProducer(BaseModel):
+    """광물 축의 채굴·정제 업체 — `players[]`와 **별개 목록**이고 [[기술 성숙 단계]]가 없다.
+
+    간펑리튬·앨버말은 그 기술의 참여자가 아니라 원료 공급사이고, 광산기업에 1~5 성숙 단계란
+    의미가 없다(ADR-0042 결정 4). 이름·국가·티커(선택)·생산 점유율만 싣는다.
+    """
+    name: str = Field(..., min_length=1, max_length=40)
+    country: str = Field(..., min_length=1, max_length=30)
+    ticker: Optional[str] = Field(None)
+    share_pct: Optional[float] = Field(None, allow_inf_nan=False, ge=0, le=100)
+
+
+class CompositionItem(BaseModel):
+    """지분 축 항목의 공통 3필드 — 이름·지분·근거.
+
+    `share_pct`는 **5의 배수만**(ADR-0042 결정 3): 이 수치는 출처가 없는 판단값이라 37%처럼
+    설명할 수 없는 정밀도를 허용하면 허위정밀이 된다. 20단계면 정보량은 유지된다.
+    근거 1문장은 필수 — ADR-0033이 "출처 필수"로 지킨 자리를 이 축에서는 판단 근거가 지킨다.
+
+    ⚠️ 5% 그리드는 **축 항목의 share_pct에만** 적용한다. `MineralProducer.share_pct`·
+    `MineralItem.top_source_pct`는 USGS류 *출처 있는* 외부 사실이라 그리드를 강제하면
+    정확한 값(브라질 88%)을 반올림해 오히려 정직성을 깎는다(task#305 판단).
+    """
+    name: str = Field(..., min_length=1, max_length=40)
+    share_pct: float = Field(..., allow_inf_nan=False, ge=0, le=100)
+    rationale: str = Field(..., min_length=1, max_length=200)
+
+    @field_validator("share_pct")
+    @classmethod
+    def _five_pct_grid(cls, v: float) -> float:
+        # 비유한값을 명시적으로 먼저 배제한다 — allow_inf_nan=False가 이미 막지만, 이 가드가
+        # 없으면 `round(inf)`가 **OverflowError**를 던지고 pydantic이 그건 안 잡아 422가 아니라
+        # **500**이 된다(`round(nan)`은 ValueError라 우연히 422가 된다 — 두 비유한값의 운명이
+        # 갈리는 것 자체가 이 경로를 암묵 의존으로 두면 안 되는 이유다, CLAUDE.md B52).
+        if not math.isfinite(v):
+            raise ValueError("share_pct는 유한한 수여야 합니다")
+        # float 나눗셈 오차를 허용치로 흡수 — 35.0/5=7.0은 정확하지만 입력 표현에 기대지 않는다.
+        if abs(v / 5.0 - round(v / 5.0)) > 1e-9:
+            raise ValueError(f"share_pct는 5의 배수여야 합니다(받은 값 {v})")
+        return v
+
+    @field_validator("rationale")
+    @classmethod
+    def _rationale_not_blank(cls, v: str) -> str:
+        """min_length=1은 공백 한 칸을 통과시킨다 — 근거는 실제 문장이어야 한다."""
+        if not v.strip():
+            raise ValueError("항목의 근거(rationale)는 비어있을 수 없습니다")
+        return v
+
+
+class TechItem(CompositionItem):
+    """필요기술 축 — 남은 난제 총량이 자. leaders는 이름만 싣고 기술수준·점유율·티커는
+    화면이 `players[]`에서 끌어온다(ADR-0042 결정 4). 참조 실재는 TechReportIn이 검증한다."""
+    leaders: Optional[List[str]] = Field(None, max_length=6)
+
+
+class MineralItem(CompositionItem):
+    """핵심 광물 축 — 원재료비가 자."""
+    top_source_country: Optional[str] = Field(None, max_length=30)
+    top_source_pct: Optional[float] = Field(None, allow_inf_nan=False, ge=0, le=100)
+    used_in: Optional[List[str]] = Field(None, max_length=6)  # 이 광물이 쓰이는 필요기술 이름
+    producers: Optional[List[MineralProducer]] = Field(None, max_length=6)
+
+
+class ExpertItem(CompositionItem):
+    """전문가 축 — 인력 병목 총량이 자. **업체를 붙이지 않는다**(ADR-0042 결정 4):
+    붙이면 기술 축의 선도기업과 중복되거나 대학·규제기관이 섞여 축이 무너진다."""
+
+
+class Composition(BaseModel):
+    """기술 해부 — 자가 서로 다른 [[지분 축]] 3개(ADR-0042).
+
+    세 축은 분모가 달라 **합쳐서 하나로 읽으면 안 된다**. 각 축은 독립적으로 Σ=100이고,
+    항목 3~7개(2개면 분해가 아니고 8개를 넘으면 각 %가 더 지어낸 값이 된다).
+    루틴이 모르는 축은 **통째로 생략**한다(부분 발행 가능) — 그래서 세 축이 전부 Optional이다.
+    """
+    tech: Optional[List[TechItem]] = Field(None, min_length=3, max_length=7)
+    minerals: Optional[List[MineralItem]] = Field(None, min_length=3, max_length=7)
+    experts: Optional[List[ExpertItem]] = Field(None, min_length=3, max_length=7)
+    # 광물 점유의 기준 문구 — *그 광물 세계 생산* 기준이라 market.share_basis(그 기술 시장의
+    # 점유)와 자가 다르다. 그래서 별도 필드로 둔다(ADR-0042 결정 4).
+    minerals_share_basis: Optional[str] = Field(None, min_length=1, max_length=60)
+
+    @model_validator(mode="after")
+    def _at_least_one_axis(self):
+        """빈 객체 금지 — 「해부 없음」의 표현은 null 하나여야 한다.
+        {}를 허용하면 2/2의 빈 상태 분기가 null과 {} 두 형태를 각각 다뤄야 한다."""
+        if not (self.tech or self.minerals or self.experts):
+            raise ValueError("composition은 최소 한 축(tech·minerals·experts)을 담아야 합니다")
+        return self
+
+    @model_validator(mode="after")
+    def _axes_sum_to_100(self):
+        """축마다 Σ=100 정확히 — 안 걸면 이건 지분이 아니라 떠다니는 점수다(ADR-0042 결정 3).
+        잔여분은 숨기지 않고 「기타」 항목으로 명시한다."""
+        for label, items in (("tech", self.tech), ("minerals", self.minerals),
+                             ("experts", self.experts)):
+            if not items:
+                continue
+            total = sum(i.share_pct for i in items)
+            if abs(total - 100.0) > 1e-9:
+                raise ValueError(
+                    f"composition.{label}의 share_pct 합이 정확히 100이어야 합니다(받은 합 {total:g})")
+        return self
+
+    @model_validator(mode="after")
+    def _producer_share_requires_basis(self):
+        """어느 producer든 점유율을 실으면 기준 문구가 있어야 그 수치가 해석 가능하다
+        (TechReportIn._share_pct_requires_basis와 동형)."""
+        if any(p.share_pct is not None
+               for m in (self.minerals or []) for p in (m.producers or [])):
+            if not (self.minerals_share_basis or "").strip():
+                raise ValueError("producers[].share_pct가 있으면 minerals_share_basis가 필요합니다")
+        return self
+
+
 class Difficulty(BaseModel):
     score: int = Field(..., ge=1, le=5)
     rationale: str = Field(..., min_length=1)
@@ -201,6 +318,10 @@ class TechReportIn(BaseModel):
     # 루틴이 "없음"을 명시적 null로 표현해도 발행 전체가 422로 죽지 않아야 한다.
     variants: Optional[List[VariantAxis]] = Field(None, max_length=2)
     watch_items: Optional[List[WatchItem]] = Field(None, max_length=5)
+    # 기술 해부 3축(선택·additive, task#305). Optional 필수(task#250 함정) — 루틴이 "없음"을
+    # 명시적 null로 표현해도 발행 전체가 422로 죽지 않아야 한다. 검증 실패는 리포트 발행
+    # **전체**를 막으므로(ADR-0042 결과) 실제로 비정합한 것만 건다.
+    composition: Optional[Composition] = Field(None)
 
     @field_validator("published_date")
     @classmethod
@@ -233,6 +354,25 @@ class TechReportIn(BaseModel):
         labels = [a.axis_label for a in self.variants]
         if len(set(labels)) != len(labels):
             raise ValueError("variants의 axis_label은 서로 달라야 합니다")
+        return self
+
+    @model_validator(mode="after")
+    def _composition_leaders_exist_in_players(self):
+        """composition.tech[].leaders는 전부 players[].name에 실재해야 한다(ADR-0042 결정 4).
+
+        화면이 이름으로 조인해 기술수준·점유율을 끌어오므로, 없는 이름은 조용히 결측된 칩이 된다.
+        문자열 일치로 대충 이어붙이지 않고 발행 시점에 422로 막는다(ADR-0034가 is_basis 추론을
+        금지한 것과 같은 성질). 이 검증은 axis 단위가 아니라 **발행 단위**여야 성립한다 —
+        Composition만으로는 players[]를 볼 수 없다.
+        """
+        if not self.composition or not self.composition.tech:
+            return self
+        known = {p.name for p in self.players}
+        missing = sorted({n for item in self.composition.tech
+                          for n in (item.leaders or []) if n not in known})
+        if missing:
+            raise ValueError(
+                "composition.tech[].leaders에 players에 없는 이름이 있습니다: " + ", ".join(missing))
         return self
 
 
