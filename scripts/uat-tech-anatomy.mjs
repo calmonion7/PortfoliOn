@@ -52,7 +52,7 @@ const AXIS_KEYS = ['tech', 'minerals', 'experts'];
 // 통째로 사라질 수 있는데, 그때 화면은 조용히 「미작성」으로 돌아가고 나머지 축은 **전부 통과**한다
 // (잴 대상이 사라지면 축이 안 도니까). 그 소실을 드러내는 유일한 축이 이 하한이다.
 // 백필로 slug을 채울 때마다 이 수를 함께 올린다(task#308).
-const MIN_WITH_ANATOMY = 1;
+const MIN_WITH_ANATOMY = 6;
 eq('anatomy-count-floor', WITH.length >= MIN_WITH_ANATOMY, true,
    `해부 보유 ${WITH.length}종 · 하한 ${MIN_WITH_ANATOMY} · 미작성 ${WITHOUT.length}종`);
 bump('floor');
