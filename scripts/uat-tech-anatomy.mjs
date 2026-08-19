@@ -258,6 +258,25 @@ for (const V of VIEWS) {
   bump('chip', 2);
   rawLog.push(`${V.name} 칩 ${chips.length}개 검사`);
 
+  // ── ⓘ 목록 복귀 pill (task#309) ─────────────────────────────────────────────
+  // 「실재」만 재면 부족하다 — fixed 요소는 조상 transform·overflow로 화면 밖에 놓여도
+  // DOM엔 남으므로(task#195) boundingBox가 뷰포트 안인지 함께 본다. 클릭 도달은 ⓗ에서.
+  const pill = await page.evaluate(() => {
+    const els = [...document.querySelectorAll('.list-pill')];
+    if (!els.length) return { n: 0 };
+    const r = els[0].getBoundingClientRect();
+    return { n: els.length, href: els[0].getAttribute('href'), text: els[0].textContent.trim(),
+             box: [r.left, r.top, r.right, r.bottom].map((v) => Math.round(v)),
+             vw: innerWidth, vh: innerHeight };
+  });
+  eq(`pill-domain:${V.name}`, pill.n > 0 ? 'OK' : 'PILL_MISSING(0)', 'OK');
+  eq(`pill-count:${V.name}`, pill.n, 1);            // 중복 렌더 방지
+  eq(`pill-href:${V.name}`, pill.href ?? 'NO_PILL', '/tech-reports');
+  eq(`pill-inview:${V.name}`,
+     pill.n ? (pill.box[0] >= 0 && pill.box[1] >= 0 && pill.box[2] <= pill.vw && pill.box[3] <= pill.vh) : 'NO_PILL',
+     true, `box=${JSON.stringify(pill.box)} vp=${pill.vw}x${pill.vh}`);
+  bump('pill', 4);
+
   await page.screenshot({ path: `${OUT}/${V.name}-anatomy.png`, fullPage: true });
 
   // ══ ⓖ 대조군 — **page.route 주입**으로 합성한다 ══════════════════════════
@@ -302,8 +321,37 @@ for (const V of VIEWS) {
   await page.goto(`${BASE}/tech-reports`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-testid="tech-report-card"]', { timeout: 20000 }).catch(() => {});
   await page.waitForTimeout(500);
+  // ── ⓙⓚ 카드 진입점 (task#309) — 전 카드 전수 ────────────────────────────────
+  // ⓚ 앵커는 **개수가 아니라 href 집합**을 본다: 본문 Link가 사라지고 해부 버튼이 2개인
+  //    판에서도 개수 단언은 통과한다.
+  // ⓙ 탭 타깃은 높이 하한만 재면 라벨이 두 줄로 접힌 판이 **높이 증가로 통과**하므로
+  //    줄 수(`__lines` — 겹치지 않는 rect 묶음)와 넘침(scrollWidth)을 쌍으로 둔다.
+  const cards = await page.evaluate(() => [...document.querySelectorAll('[data-testid="tech-report-card"]')].map((c) => {
+    const slug = c.getAttribute('data-slug');
+    const btn = c.querySelector('[data-testid="card-link-anatomy"]');
+    const r = btn ? btn.getBoundingClientRect() : null;
+    return {
+      slug,
+      hrefs: [...c.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')).sort(),
+      h: r ? Math.round(r.height * 10) / 10 : -1,
+      lines: btn ? window.__lines(btn) : -1,
+      over: btn ? btn.scrollWidth > btn.clientWidth : null,
+      label: btn ? btn.textContent.trim() : null,
+    };
+  }));
+  eq(`card-domain:${V.name}`, cards.length > 0 ? 'OK' : 'DOMAIN_TOO_SMALL(0)', 'OK');
+  eq(`card-anchors:${V.name}`,
+     cards.filter((c) => JSON.stringify(c.hrefs) !== JSON.stringify([`/tech-anatomy/${c.slug}`, `/tech-report/${c.slug}`].sort()))
+          .map((c) => `${c.slug}=${JSON.stringify(c.hrefs)}`), []);
+  eq(`card-tap-h:${V.name}`, cards.filter((c) => !(c.h >= 32)).map((c) => `${c.slug}=${c.h}px`), []);
+  eq(`card-tap-1line:${V.name}`, cards.filter((c) => c.lines !== 1).map((c) => `${c.slug}=${c.lines}줄`), []);
+  eq(`card-tap-nooverflow:${V.name}`, cards.filter((c) => c.over !== false).map((c) => `${c.slug}=넘침`), []);
+  bump('card', 4 * cards.length);
+  rawLog.push(`${V.name} 카드 ${cards.length}장 · 해부버튼 h=${[...new Set(cards.map((c) => c.h))].join('/')}px · 라벨=${[...new Set(cards.map((c) => c.label))].join(' | ')}`);
+  await page.screenshot({ path: `${OUT}/${V.name}-list.png`, fullPage: true });
+
   const cardLink = page.locator(`[data-testid="tech-report-card"][data-slug="${TARGET.slug}"] [data-testid="card-link-anatomy"]`);
-  const navOk = { list2anatomy: false, anatomy2report: false, report2anatomy: false, back: false };
+  const navOk = { list2anatomy: false, anatomy2report: false, report2anatomy: false, back: false, anatomy2list: false };
   if (await cardLink.count() > 0) {
     await cardLink.first().click();
     await page.waitForTimeout(900);
@@ -321,7 +369,16 @@ for (const V of VIEWS) {
       }
     }
   }
-  eq(`nav-roundtrip:${V.name}`, navOk, { list2anatomy: true, anatomy2report: true, report2anatomy: true, back: true });
+  // 해부 → 목록 (pill 클릭 도달) — ⓘ의 「실재·뷰포트 내」에 도달까지 붙여 왕복을 닫는다.
+  await page.goto(`${BASE}/tech-anatomy/${TARGET.slug}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-testid="tech-anatomy"]', { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(700);
+  const pillLoc = page.locator('.list-pill');
+  if (await pillLoc.count() > 0) {
+    await pillLoc.first().click(); await page.waitForTimeout(900);
+    navOk.anatomy2list = new URL(page.url()).pathname === '/tech-reports';
+  }
+  eq(`nav-roundtrip:${V.name}`, navOk, { list2anatomy: true, anatomy2report: true, report2anatomy: true, back: true, anatomy2list: true });
   bump('nav');
 
   await ctx.close();
@@ -337,7 +394,7 @@ console.log(`  ${'(합계)'.padEnd(20)} ${Object.values(cov).reduce((a, b) => a 
 console.log(`\n단언 총계: ${results.length}건 · PASS ${results.length - fails.length} · FAIL ${fails.length}`);
 console.log('\n원시 실측(단언 아님):');
 for (const l of rawLog) console.log(`  ${l}`);
-console.log(`\n※ 육안 캡처 ${OUT}/ — {view}-{anatomy|control}.png`);
+console.log(`\n※ 육안 캡처 ${OUT}/ — {view}-{anatomy|control|list}.png`);
 console.log('═'.repeat(78));
 fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ cov, results, target: TARGET.slug, control: `injected:${TARGET.slug}`,
   withAnatomy: WITH.map((r) => r.slug), minFloor: MIN_WITH_ANATOMY, API_COUNTS }, null, 2));

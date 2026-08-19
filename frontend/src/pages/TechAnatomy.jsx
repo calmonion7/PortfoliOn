@@ -172,6 +172,11 @@ export default function TechAnatomy() {
           <Axis key={axis.key} axis={axis} players={report.players || []} mineralsBasis={report.composition?.minerals_share_basis} />
         ))
       )}
+
+      {/* 목록 복귀 — 우하단 플로팅 pill(tech-report·analyst-report·guru-detail과 바이트 동형).
+          fixed이므로 조상에 transform 금지(task#195). 이 return 안이라 축이 있는 판과 빈 상태
+          둘 다에 따라오고, 에러/로딩 분기는 위에서 일찍 반환하므로 pill이 없다(TechReport 동형). */}
+      <Link to="/tech-reports" className="list-pill">☰ 목록</Link>
     </div>
   )
 }

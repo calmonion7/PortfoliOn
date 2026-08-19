@@ -69,16 +69,23 @@ export default function TechReports() {
                 )}
                 <div className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{r.published_date} 갱신</div>
                 </Link>
-                {/* 「리포트 / 해부」 두 진입점. 해부 미작성이면 링크를 숨기지 않고 배지를 단다 —
-                    숨기면 그런 화면이 있는 줄도 모르고, 해부 페이지는 빈 상태를 안내로 렌더하므로
-                    고장난 링크가 아니다(ADR-0042 결정 6 · S4). 폭이 모자라면 줄바꿈으로 흐르되
-                    링크 텍스트 자체는 접히지 않는다(flex-wrap + nowrap, task#247 정석 조합). */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 10, marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 12 }}>
-                  <Link to={`/tech-report/${r.slug}`} data-testid="card-link-report" style={{ color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>리포트</Link>
-                  <Link to={`/tech-anatomy/${r.slug}`} data-testid="card-link-anatomy" style={{ color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>해부</Link>
-                  {!r.composition && (
-                    <span data-testid="card-anatomy-pending" style={{ color: 'var(--text-3)', fontSize: 11, whiteSpace: 'nowrap' }}>해부 미작성</span>
-                  )}
+                {/* 진입점은 「해부」 하나다(task#309). 옛 판의 「리포트」 링크는 본문 Link와 목적지가
+                    같은 두 번째 앵커였으므로 제거했다 — 카드를 눌러 리포트로 가는 동선은 그대로다.
+                    해부 미작성이면 링크를 숨기지 않고 톤만 흐린다 — 숨기면 그런 화면이 있는 줄도
+                    모르고, 해부 페이지는 빈 상태를 안내로 렌더하므로 고장난 링크가 아니다
+                    (ADR-0042 결정 6 · task#306 S4). 폭이 모자라면 줄바꿈으로 흐르되 라벨 자체는
+                    접히지 않는다(flex-wrap + nowrap, task#247 정석 조합).
+                    스타일은 TechReport 목차 칩과 같은 계열(border 1px · radius 12 · accent)이고
+                    padding만 4px 10px → 7px 12px로 키웠다. 탭 타깃 = 7+7+18(lineHeight)+2(border)
+                    = 34px ≥ 32px — lineHeight를 명시하지 않으면 mono 11.5px의 normal이 ~14px이라
+                    30px로 떨어진다. */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 12 }}>
+                  <Link to={`/tech-anatomy/${r.slug}`} data-testid="card-link-anatomy" className="mono"
+                        style={{ fontSize: 11.5, lineHeight: '18px', padding: '7px 12px', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                    {r.composition
+                      ? '해부 보기 →'
+                      : <span data-testid="card-anatomy-pending" style={{ color: 'var(--text-3)' }}>해부 미작성</span>}
+                  </Link>
                 </div>
               </Card>
             )

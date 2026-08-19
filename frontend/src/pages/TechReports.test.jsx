@@ -44,24 +44,36 @@ describe('주요기술 리포트 목록 (task#276 S5, 개명 ADR-0038)', () => {
     expect(within(card).getByTestId('card-to-report').getAttribute('href')).toBe('/tech-report/smr')
   })
 
-  it('카드에 「리포트 / 해부」 두 진입점 — 해부 미기입이면 배지가 붙는다 (task#306)', async () => {
+  it('카드 앵커는 정확히 2개 — 본문(리포트) + 「해부」 버튼, 미작성이면 라벨이 흐려진다 (task#309)', async () => {
     api.get.mockResolvedValue({ data: { reports: REPORTS } })
     renderPage()
     const card = await screen.findByTestId('tech-report-card')
-    expect(within(card).getByTestId('card-link-report').getAttribute('href')).toBe('/tech-report/smr')
+    // ⚠️ task#309: 옛 판은 하단에 「리포트」 링크(`card-link-report`)를 따로 뒀고 이 테스트가 그것을
+    // 단언했다. 본문 Link(`card-to-report`)와 목적지가 같은 두 번째 앵커라 제거했고, 그래서 그
+    // 단언도 뒤집는다 — task#306 계획의 완료기준은 "목록 → 해부 → 리포트 → 해부 왕복이 라이브에서
+    // 동작"이고 비목표 어디에도 「두 링크」가 없다(부수적 단언이지 기록된 결정이 아님, task#264 판별).
+    // 개수만 세면 본문 Link가 사라지고 해부 버튼이 2개인 판에서도 통과하므로 href **집합**을 본다.
+    const hrefs = [...card.querySelectorAll('a[href]')].map((a) => a.getAttribute('href'))
+    expect(hrefs.length).toBe(2)
+    expect(new Set(hrefs)).toEqual(new Set(['/tech-report/smr', '/tech-anatomy/smr']))
     expect(within(card).getByTestId('card-link-anatomy').getAttribute('href')).toBe('/tech-anatomy/smr')
-    // 픽스처에 composition이 없으므로 미작성 배지가 뜬다 — 이 픽스처가 그 분기를 실제로 타는지
+    // 픽스처에 composition이 없으므로 미작성 라벨이 뜬다 — 이 픽스처가 그 분기를 실제로 타는지
     // 게이트 식을 직접 적용해 못박는다(이빨과 분기 커버리지는 다른 축, task#301).
     expect(REPORTS[0].composition == null).toBe(true)
-    expect(within(card).getByTestId('card-anatomy-pending')).toBeTruthy()
+    const pending = within(card).getByTestId('card-anatomy-pending')
+    expect(pending.textContent).toBe('해부 미작성')
+    expect(pending.style.color).toBe('var(--text-3)')
+    // 톤만 흐려질 뿐 **여전히 클릭 가능**하다(ADR-0042 결정 6 — 숨기지 않는다).
+    expect(within(card).getByTestId('card-link-anatomy').getAttribute('href')).toBeTruthy()
   })
 
-  it('composition이 있으면 미작성 배지가 없다 (반대 분기)', async () => {
+  it('composition이 있으면 라벨이 「해부 보기 →」이고 미작성 표기가 없다 (반대 분기)', async () => {
     api.get.mockResolvedValue({ data: { reports: [{ ...REPORTS[0], composition: { experts: [] } }] } })
     renderPage()
     const card = await screen.findByTestId('tech-report-card')
-    expect(within(card).getByTestId('card-link-anatomy')).toBeTruthy()
+    expect(within(card).getByTestId('card-link-anatomy').textContent).toBe('해부 보기 →')
     expect(within(card).queryByTestId('card-anatomy-pending')).toBeNull()
+    expect([...card.querySelectorAll('a[href]')].length).toBe(2)
   })
 
   it('빈 목록 — 빈 상태 문구', async () => {
