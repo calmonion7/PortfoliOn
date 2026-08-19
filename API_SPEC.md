@@ -2282,7 +2282,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ## Tech Reports (주요기술 리포트)
 
-기술 단위 발행물 (ADR-0033, 저장모델 개정 ADR-0038, 대상 개정 ADR-0039) — 종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇·AI 데이터센터 설비·AI 데이터센터 운영) 단위로 발행한다. 대상 6종은 백엔드 상수 `TECH_TOPICS`가 정본(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`·`ai-datacenter-equipment`·`ai-datacenter-ops`) — 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음, ADR-0038).** analyst-reports와 달리 과거 판이 누적되지 않는다. (구 `data-center` 1종은 ADR-0039로 폐기됐다 — 여섯 요소가 한 문서에 담기지 않아 매출 성격 축으로 2종 분할.)
+기술 단위 발행물 (ADR-0033, 저장모델 개정 ADR-0038, 대상 개정 ADR-0039·2차 개정 ADR-0044) — 종목이 아니라 **기술** 단위로 발행한다. 대상 slug의 정본은 백엔드 상수 `TECH_TOPICS`이고(15종 — 전체 목록은 바로 아래 Path Parameter), 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. 편입 판정은 「지금 투자 지형에서 중요한가」이며, 넓은 이름은 한 문서가 감당할 범위로 좁혀 등재한다(ADR-0044 결정 2·3 — 예: 양자는 **컴퓨팅만**, 태양광은 **셀·모듈만**). **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음, ADR-0038).** analyst-reports와 달리 과거 판이 누적되지 않는다. (구 `data-center` 1종은 ADR-0039로 폐기됐다 — 여섯 요소가 한 문서에 담기지 않아 매출 성격 축으로 2종 분할.)
 
 ### `POST /api/tech-reports/{slug}`
 
@@ -2290,7 +2290,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **Auth:** `X-API-Key` 또는 admin Bearer token (`require_admin_or_api_key`)
 
-**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `ai-datacenter-equipment` \| `ai-datacenter-ops` (그 밖의 값은 `422`)
+**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `ai-datacenter-equipment` \| `ai-datacenter-ops` \| `autonomous-driving` \| `space-comms` \| `quantum-computing` \| `nuclear-fusion` \| `solar-pv` \| `semiconductor-equipment` \| `on-device-ai` \| `obesity-drugs` \| `unmanned-defense` (그 밖의 값은 `422`)
 
 **Request Body**
 ```json
@@ -2413,7 +2413,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 - **JSONB 안에 중첩된 키**(`market.estimates`·`players[].category`)는 다르다 — 그 키가 스키마에 생기기 **이전**에 발행된 판은 JSONB에 박제된 옛 형태라 **키 자체가 없다**(`undefined`). 이후 발행분은 생략해도 서버가 `null`을 채워 저장하므로 키가 늘 있다.
 - 어느 쪽이든 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `metrics`를 생략한 포인트도 `"metrics": null`이다.
 
-현재 라이브 6종은 `key_points`·`milestones`·`variants`·`watch_items`·`market.estimates`가 **전부 채워져 있고**, `composition`은 ADR-0042 도입 직후라 아직 미수록 판이 있다(값 `null`).
+**발행된 종만** `key_points`·`milestones`·`variants`·`watch_items`·`market.estimates`가 채워져 있고, `composition`은 ADR-0042 도입 이후 기입분만 있다(미수록은 `null`). 대상 slug이라도 **아직 발행되지 않은 종은 목록에 나타나지 않고** `GET /api/tech-reports/{slug}`가 `{slug, reports: []}`를 준다(빈 배열이며 `404`가 아니다) — ADR-0044로 대상이 늘어난 직후가 그 상태다. 개수는 발행이 진행될수록 바뀌므로 여기에 박지 않는다.
 
 ### `GET /api/tech-reports`
 
@@ -2432,7 +2432,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **경량 인덱스** — 종목 → 기술 역방향 연결용(ADR-0043). 포트폴리오 「기술 노출」 카드와 종목 상세 헤더의 기술 칩이 소비한다.
 
-산문(`description`·`key_points`·`challenges`·`players` 본문)을 **싣지 않는다** — 소비처는 티커 교차만 필요한데 6종 전문을 실으면 화면이 수백 KB를 받는다.
+산문(`description`·`key_points`·`challenges`·`players` 본문)을 **싣지 않는다** — 소비처는 티커 교차만 필요한데 전 발행물의 전문을 실으면 화면이 수백 KB를 받는다(대상이 늘수록 커진다).
 
 ⚠️ 이 경로는 라우터에서 **`/{slug}`보다 먼저 선언**돼 있다. `slug`가 `Literal`이라 catch-all이 먼저 잡으면 `index`는 등록 slug이 아니어서 **`422`로 죽는다**(다른 라우트로 흘러가지 않는다).
 
@@ -2455,7 +2455,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 | 필드 | 뜻 |
 |---|---|
-| `slug` | 기술 slug(6종 고정) |
+| `slug` | 기술 slug(`TECH_TOPICS` 등재 slug — 그 밖은 애초에 발행될 수 없다) |
 | `name` | 표시명(`TECH_TOPICS`) — `title`은 150자 헤드라인 문장이라 칩 라벨로 못 쓴다 |
 | `title` | 그 판의 헤드라인 |
 | `tickers` | `players[].ticker`의 **non-null 집합**(정렬·중복 제거) |

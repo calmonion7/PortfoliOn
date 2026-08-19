@@ -206,15 +206,23 @@ def test_get_by_slug_returns_the_single_current_row_or_empty():
         assert svc.get_by_slug("robotics") == []
 
 
-def test_tech_topics_has_exactly_the_six_slugs():
-    """대상 개정(ADR-0039) — data-center 1종이 ai-datacenter-equipment·ai-datacenter-ops
-    2종으로 대체돼 TECH_TOPICS는 6종이다."""
+def test_tech_topics_has_exactly_the_fifteen_slugs():
+    """대상 2차 개정(ADR-0044) — 1차 개정(ADR-0039)의 6종에 9종을 더해 TECH_TOPICS는 15종이다.
+    (1차: data-center 1종이 ai-datacenter-equipment·ai-datacenter-ops 2종으로 대체.)
+    함수명이 계약을 서술하므로 개수가 바뀌면 이름도 함께 고친다 — 통과하면서 거짓이 되는
+    테스트를 남기지 않는다."""
     slugs = {t["slug"] for t in svc.TECH_TOPICS}
     assert slugs == {
         "reusable-rocket", "solid-state-battery", "smr", "robotics",
         "ai-datacenter-equipment", "ai-datacenter-ops",
+        "autonomous-driving", "space-comms", "quantum-computing", "nuclear-fusion",
+        "solar-pv", "semiconductor-equipment", "on-device-ai", "obesity-drugs",
+        "unmanned-defense",
     }
-    assert len(svc.TECH_TOPICS) == 6
+    assert len(svc.TECH_TOPICS) == 15
+    # order는 1~15 중복 없이 유일하다(신규 9종은 7~15)
+    orders = [t["order"] for t in svc.TECH_TOPICS]
+    assert sorted(orders) == list(range(1, 16))
     # 각 항목이 표시명·정렬순서를 갖는다
     for t in svc.TECH_TOPICS:
         assert t["name"] and isinstance(t["order"], int)

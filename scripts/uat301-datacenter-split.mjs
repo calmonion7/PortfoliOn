@@ -95,6 +95,12 @@ const TECH_NAMES = {
   'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리',
   smr: 'SMR', robotics: '로봇',
   'ai-datacenter-equipment': 'AI 데이터센터 설비', 'ai-datacenter-ops': 'AI 데이터센터 운영',
+  // 2차 개정 9종 (ADR-0044 결정 1) — 미러 가드는 *발행된* slug만 만나므로 이 9종의 이빨은 첫 발행 시점(task#311)에 생긴다.
+  'autonomous-driving': '자율주행', 'space-comms': '우주통신',
+  'quantum-computing': '양자컴퓨팅', 'nuclear-fusion': '핵융합',
+  'solar-pv': '태양광', 'semiconductor-equipment': '반도체 장비',
+  'on-device-ai': '온디바이스 AI', 'obesity-drugs': '비만·대사 치료제',
+  'unmanned-defense': '무인 방산체계',
 };
 
 // ══ 축 1 — API ════════════════════════════════════════════════════════════════

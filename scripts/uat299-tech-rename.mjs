@@ -85,6 +85,13 @@ const TECH_NAMES = {
   'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리',
   smr: 'SMR', robotics: '로봇',
   'ai-datacenter-equipment': 'AI 데이터센터 설비', 'ai-datacenter-ops': 'AI 데이터센터 운영',
+  // 2차 개정 9종 (ADR-0044 결정 1) — 아래 「미러 갱신 필요」 가드는 *발행된* slug만 만나므로,
+  // 이 9종이 실제로 그 가드를 통과하는지는 첫 발행 시점(task#311)에 처음 검증된다.
+  'autonomous-driving': '자율주행', 'space-comms': '우주통신',
+  'quantum-computing': '양자컴퓨팅', 'nuclear-fusion': '핵융합',
+  'solar-pv': '태양광', 'semiconductor-equipment': '반도체 장비',
+  'on-device-ai': '온디바이스 AI', 'obesity-drugs': '비만·대사 치료제',
+  'unmanned-defense': '무인 방산체계',
 };
 
 // ── 목록 실응답(GET만) — 대상 slug는 여기서 전수로 유도한다(하드코딩 금지) ──────────────────────

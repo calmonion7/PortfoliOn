@@ -378,9 +378,12 @@ describe('parseDescriptionSections — 대괄호 헤딩 분해(파싱 실패는 
 })
 
 describe('TECH_NAMES / TECH_LEVEL_LABELS — 표시명·척도 라벨 상수', () => {
-  it('백엔드 TECH_TOPICS 6종과 슬러그가 일치(data-center → 설비/운영 분할, ADR-0039)', () => {
-    expect(Object.keys(TECH_NAMES).sort()).toEqual(
-      ['ai-datacenter-equipment', 'ai-datacenter-ops', 'reusable-rocket', 'robotics', 'smr', 'solid-state-battery'])
+  it('백엔드 TECH_TOPICS 15종과 슬러그가 일치(2차 개정 ADR-0044 — 1차 ADR-0039의 6종 + 9종)', () => {
+    expect(Object.keys(TECH_NAMES).sort()).toEqual([
+      'ai-datacenter-equipment', 'ai-datacenter-ops', 'autonomous-driving', 'nuclear-fusion',
+      'obesity-drugs', 'on-device-ai', 'quantum-computing', 'reusable-rocket', 'robotics',
+      'semiconductor-equipment', 'smr', 'solar-pv', 'solid-state-battery', 'space-comms',
+      'unmanned-defense'])
   })
   it('기술 성숙 단계 1~5 라벨(CONTEXT.md 공통 5단계)', () => {
     expect(TECH_LEVEL_LABELS[1]).toBe('기초연구')

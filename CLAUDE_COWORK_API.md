@@ -42,12 +42,12 @@
 
 ### 주요기술 리포트 발행 (tech-reports)
 ```
-0. (조건 확인) GET /api/tech-reports  → **기술당 1행**만 반환(대상 6종의 마지막 갱신일 판단용, 이력 없음 — ADR-0038)
+0. (조건 확인) GET /api/tech-reports  → **기술당 1행**만 반환(대상 slug의 마지막 갱신일 판단용, 이력 없음 — ADR-0038). 미발행 종은 이 목록에 아예 없다
 1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·업체 분류 축·기관별 시장 추정치·계보 비교축·확인할 지표**)
 2. POST /api/tech-reports/{slug}  → 발행(갱신) — slug당 1행이라 재발행은 기존 행을 덮어쓴다(과거 판 없음)
    - 종목 발행물과 달리 **서버가 자동 첨부하는 숫자가 없다** — 통화·단위·점유율·척도까지 전부 이 본문에 조사해 채운다
    - 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — 틀린 값보다 없는 값이 낫다)
-   - 대상 6종 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
+   - 대상 slug(`TECH_TOPICS` 등재분, 아래 Path Parameter) 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
    - **요약 레이어는 산문이 아니라 구조 필드로 싣는다**(ADR-0034, 아래 두 차례 개정 포함) — 지금 총 6필드: `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(업체 분류 축)·`market.estimates`(기관별 시장 추정치)·`variants`(계보 비교축)·`watch_items`(확인할 지표). 채우지 않으면 화면에 반영되지 않으므로(대부분 그 섹션째 생략, `players[].category`는 표·점유율이 평면 렌더로 폴백) `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다
    - **기관별 시장 추정치(`market.estimates`, 선택·최대 6건, ADR-0034 개정)**는 조사기관마다 다르게 추정한 시장 규모를 나란히 보여준다 — 배열 내 `currency`·`unit`·`year`는 전부 같아야 하고(다르면 422), 성장 곡선(`market.history`/`forecast`)이 채택한 기관은 `is_basis: true`로 표시(최대 1건, 2건 이상이면 422)
    - **계보 비교축(`variants`, 선택·최대 2축, ADR-0034 개정)**은 한 기술이 갈라지는 접근 방식을 이점·대가 쌍으로 나란히 보여준다 — 축마다 선택지(`options`)가 **최소 2개**(1개는 비교가 아니라 서술이므로 축을 생략하고 산문에 쓸 것, 2개 미만이면 422)
@@ -679,7 +679,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 { "reports": [ { "slug": "smr", "published_date": "2026-07-01", "title": "SMR, 원자력의 두 번째 곡선", "...": "발행 필드 전체" } ] }
 ```
 
-> 대상 6종(`reusable-rocket`·`solid-state-battery`·`smr`·`robotics`·`ai-datacenter-equipment`·`ai-datacenter-ops`) 중 이 목록에 없는 slug는 미발행 상태. 각 행은 발행 시 제출한 필드 전체 + `id`·`created_at`을 담는다(위 예시는 조건 확인에 쓰는 3개만 발췌). 담지 않고 발행한 선택 필드는 `null`로 나온다(`key_points`·`milestones` 등 — 빈 배열이 아니다).
+> 대상 slug(아래 `POST` 절의 Path Parameter가 정본 열거) 중 이 목록에 없는 slug는 미발행 상태 — ADR-0044로 대상이 15종으로 늘어난 직후엔 미발행 종이 다수다. 각 행은 발행 시 제출한 필드 전체 + `id`·`created_at`을 담는다(위 예시는 조건 확인에 쓰는 3개만 발췌). 담지 않고 발행한 선택 필드는 `null`로 나온다(`key_points`·`milestones` 등 — 빈 배열이 아니다).
 
 ---
 
@@ -689,7 +689,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 
 **Auth:** `X-API-Key` 헤더
 
-**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `ai-datacenter-equipment` \| `ai-datacenter-ops` (그 밖의 값은 `422`)
+**Path Parameter:** `slug` — `reusable-rocket` \| `solid-state-battery` \| `smr` \| `robotics` \| `ai-datacenter-equipment` \| `ai-datacenter-ops` \| `autonomous-driving` \| `space-comms` \| `quantum-computing` \| `nuclear-fusion` \| `solar-pv` \| `semiconductor-equipment` \| `on-device-ai` \| `obesity-drugs` \| `unmanned-defense` (그 밖의 값은 `422`. 좁힌 이름의 범위는 ADR-0044 결정 3 — 루틴 프롬프트 §3이 지시문으로 담는다)
 
 **Request Body**
 ```json

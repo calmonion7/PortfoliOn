@@ -1,8 +1,10 @@
-"""주요기술 리포트 — 기술 단위 발행물 (ADR-0033, 개명·저장모델 개정 ADR-0038, 대상 개정 ADR-0039).
+"""주요기술 리포트 — 기술 단위 발행물 (ADR-0033, 개명·저장모델 개정 ADR-0038, 대상 개정 ADR-0039·ADR-0044).
 
-종목이 아니라 기술(재사용 로켓·전고체 배터리·SMR·로봇·AI 데이터센터 설비·AI 데이터센터 운영) 단위
-발행물. slug당 1행으로 고정(ADR-0038 결정 2) — 재발행은 그 행을 덮어쓰기만 하고, 과거 판은
-누적하지 않는다. TECH_TOPICS가 대상 6종의 정본(백엔드 상수, ADR-0038 결정 1 · ADR-0039 개정).
+종목이 아니라 **기술** 단위 발행물이다(개별 기술 목록은 여기 열거하지 않는다 — 정본은 아래 상수다).
+slug당 1행으로 고정(ADR-0038 결정 2) — 재발행은 그 행을 덮어쓰기만 하고, 과거 판은 누적하지 않는다.
+TECH_TOPICS가 대상 15종의 정본(백엔드 상수, ADR-0038 결정 1 · ADR-0039 1차 개정 · ADR-0044 2차 개정).
+편입 판정은 「지금 투자 지형에서 중요한가」이며, 넓은 이름은 한 문서가 감당할 범위로 좁혀 등재한다
+(ADR-0044 결정 2·3 — 예: 양자「컴퓨팅」, 태양광은 셀·모듈).
 """
 from __future__ import annotations
 
@@ -19,6 +21,16 @@ TECH_TOPICS = [
     {"slug": "robotics", "name": "로봇", "order": 4},
     {"slug": "ai-datacenter-equipment", "name": "AI 데이터센터 설비", "order": 5},
     {"slug": "ai-datacenter-ops", "name": "AI 데이터센터 운영", "order": 6},
+    # 2차 개정 9종(ADR-0044 결정 1) — 좁힌 이름은 그 범위가 정본이다(결정 3, 루틴 프롬프트 §3이 지시문으로 담는다).
+    {"slug": "autonomous-driving", "name": "자율주행", "order": 7},
+    {"slug": "space-comms", "name": "우주통신", "order": 8},
+    {"slug": "quantum-computing", "name": "양자컴퓨팅", "order": 9},
+    {"slug": "nuclear-fusion", "name": "핵융합", "order": 10},
+    {"slug": "solar-pv", "name": "태양광", "order": 11},
+    {"slug": "semiconductor-equipment", "name": "반도체 장비", "order": 12},
+    {"slug": "on-device-ai", "name": "온디바이스 AI", "order": 13},
+    {"slug": "obesity-drugs", "name": "비만·대사 치료제", "order": 14},
+    {"slug": "unmanned-defense", "name": "무인 방산체계", "order": 15},
 ]
 
 

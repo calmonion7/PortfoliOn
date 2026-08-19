@@ -13,6 +13,16 @@ export const TECH_NAMES = {
   robotics: '로봇',
   'ai-datacenter-equipment': 'AI 데이터센터 설비',
   'ai-datacenter-ops': 'AI 데이터센터 운영',
+  // 2차 개정 9종 (ADR-0044 결정 1)
+  'autonomous-driving': '자율주행',
+  'space-comms': '우주통신',
+  'quantum-computing': '양자컴퓨팅',
+  'nuclear-fusion': '핵융합',
+  'solar-pv': '태양광',
+  'semiconductor-equipment': '반도체 장비',
+  'on-device-ai': '온디바이스 AI',
+  'obesity-drugs': '비만·대사 치료제',
+  'unmanned-defense': '무인 방산체계',
 }
 
 // 기술 성숙 단계 공통 5단계 라벨(CONTEXT.md) — index = tech_level(1~5). 0번은 미사용(placeholder).
