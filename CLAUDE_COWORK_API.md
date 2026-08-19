@@ -807,6 +807,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `composition.minerals_share_basis` | string\|생략 | | 광물 점유의 **기준 문구**(≤60자, 예: `"세계 생산량 기준"`). 어느 `producers[].share_pct`라도 실으면 **필수**(없으면 422) — 이 점유는 *그 광물 세계 생산* 기준이라 `market.share_basis`(그 **기술 시장**의 점유)와 자가 다르다 |
 | `composition.*[].share_pct` | number | ✅ | 그 축 안에서의 지분(%) — **5의 배수만**(37·32.5는 422)이고 **축마다 합이 정확히 100**(95·105는 422). 잔여는 숨기지 말고 **「기타」 항목**으로 명시하라. ⚠️ 이 그리드는 **축 지분에만** 적용된다 — `producers[].share_pct`·`top_source_pct`는 출처 있는 외부 통계라 반올림하지 마라 |
 | `composition.*[].rationale` | string | ✅ | **그 지분이 왜 그 몫인지 1문장**(≤200자, 공백만이면 422). 이 축엔 출처를 달 자리가 없으므로 판단 근거가 그 역할을 한다 — 근거를 못 쓰면 **그 항목을 발행하지 마라**(틀린 값 < 누락) |
+| `composition.*[].name` | string | ✅ | 항목명(≤40자). **한 축 안에서는 서로 다른 이름을 써라** — 같으면 422다(같은 이름의 행이 두 번 그려지면 독자가 서로 다른 둘로 읽는다). **다른 축에 같은 이름은 괜찮다** — 「리튬」이 광물 축과 기술 축에 함께 나오는 것은 정당하다 |
 
 **통화·단위 enum(필수, 자유 텍스트·환산 금지)** — `currency`: `USD` \| `KRW`. `unit`: `mn`(백만) \| `bn`(십억) \| `tn`(조). 렌더러가 절대 추측·환산하지 않으므로 enum 밖 값은 `422`.
 
@@ -826,7 +827,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | 상태 | 설명 |
 |------|------|
 | `401` | API Key 누락/불일치 |
-| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · `composition` 축 항목 2개 이하/8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 또는 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `producers[].share_pct` 있고 `minerals_share_basis` 없음 · `composition: {}` · 필수 필드 누락 |
+| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · `composition` 축 항목 2개 이하/8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 또는 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `producers[].share_pct` 있고 `minerals_share_basis` 없음 · `composition: {}` · `composition` 한 축 안의 항목 `name` 중복 · 필수 필드 누락 |
 
 ---
 

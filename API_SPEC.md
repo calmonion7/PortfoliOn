@@ -2392,6 +2392,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `composition.minerals_share_basis` | string\|생략 | | 광물 점유의 기준 문구(≤60자, 예: `"세계 생산량 기준"`) — 어느 `producers[].share_pct`라도 실으면 **필수**(없으면 `422`). *그 광물 세계 생산*의 점유라 `market.share_basis`(그 기술 **시장**의 점유)와 **자가 다르다** |
 | `composition.*[].share_pct` | number | ✅ | 그 축 안에서의 지분(%) — **5의 배수만**(`37`·`32.5`는 `422`)이고 **축마다 합이 정확히 100**(`95`·`105`는 `422`). 허위정밀 차단(ADR-0042 결정 3)이며 잔여는 숨기지 말고 **「기타」 항목**으로 명시한다. ⚠️ 5% 그리드는 **이 축 지분에만** 적용된다 — `producers[].share_pct`·`top_source_pct`는 USGS류 *출처 있는* 외부 사실이라 그리드를 강제하지 않는다(반올림하면 오히려 정확도가 깎인다) |
 | `composition.*[].rationale` | string | ✅ | 그 지분이 왜 그 몫인지 **1문장**(≤200자, 공백만이면 `422`). 출처가 없는 수치의 유일한 대체 규율 — ADR-0033이 "출처 필수"로 지킨 자리를 이 축에서는 판단 근거가 지킨다. 근거를 못 쓰면 그 항목을 발행하지 않는다(`wrong < missing`) |
+| `composition.*[].name` | string | ✅ | 항목명(≤40자) — **한 축 안에서 서로 달라야 한다**(중복이면 `422`). 중복이면 화면이 같은 이름의 행을 두 번 그려 독자가 서로 다른 둘로 읽는다(형제 `variants[].options[].name`과 같은 규율). **다른 축에 같은 이름은 허용**된다 — 축이 서로 독립이므로 「리튬」이 광물 축과 기술 축에 함께 나오는 것은 정당하다 |
 
 `value`(`MoneyValue` — `market.history`/`forecast`/`estimates[].size` 전부 포함)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`·`composition` 안의 모든 퍼센트 필드(`*[].share_pct`·`producers[].share_pct`·`top_source_pct`)는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones`·`market.estimates`·`variants`·`watch_items`·`composition` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
 
@@ -2400,7 +2401,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 { "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
 ```
 
-**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 · `composition` 축 항목 2개 이하 또는 8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 · `composition` 축 `share_pct` 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `composition.minerals[].producers[].share_pct` 있고 `composition.minerals_share_basis` 없음 · `composition: {}`(축 0개)
+**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 · `composition` 축 항목 2개 이하 또는 8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 · `composition` 축 `share_pct` 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `composition.minerals[].producers[].share_pct` 있고 `composition.minerals_share_basis` 없음 · `composition: {}`(축 0개) · `composition` 한 축 안의 항목 `name` 중복
 
 ---
 
