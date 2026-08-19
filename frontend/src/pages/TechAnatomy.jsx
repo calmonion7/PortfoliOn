@@ -76,10 +76,10 @@ function Axis({ axis, players, mineralsBasis }) {
       <p className="tech-anatomy__basis" data-testid="anatomy-basis">{axis.basis}</p>
 
       <div className="tech-anatomy__bar" role="img" aria-label={label} data-testid="anatomy-bar">
-        {items.map((it) => (
+        {items.map((it, idx) => (
           // 조각 안에 텍스트 없음 — 라벨은 전부 아래 목록에 있다(CSS 헤더 주석 참조).
           <span
-            key={it.name}
+            key={`${it.name}-${idx}`}
             className="tech-anatomy__seg"
             data-testid="anatomy-seg"
             style={{ flex: `0 0 ${it.share_pct}%`, background: it.color }}
@@ -88,8 +88,8 @@ function Axis({ axis, players, mineralsBasis }) {
       </div>
 
       <ul className="tech-anatomy__items">
-        {items.map((it) => (
-          <li key={it.name} className="tech-anatomy__item" data-testid="anatomy-item">
+        {items.map((it, idx) => (
+          <li key={`${it.name}-${idx}`} className="tech-anatomy__item" data-testid="anatomy-item">
             <div className="tech-anatomy__head">
               <span className="tech-anatomy__swatch" style={{ background: it.color }} aria-hidden="true" />
               <span className="tech-anatomy__name" data-testid="anatomy-item-name">{it.name}</span>

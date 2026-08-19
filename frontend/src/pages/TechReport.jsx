@@ -172,11 +172,22 @@ export default function TechReport() {
         </p>
       )}
 
+      {/* ── KPI 스트립 (난이도 배지는 여기 흡수 — 중복 표시하지 않는다) ── */}
+      <div style={{ marginBottom: 30 }}>
+        <TechKpiStrip report={report} />
+      </div>
+
       {/* 기술 해부로 가는 상호링크 (ADR-0042 결정 6 — 해부는 리포트의 두 번째 시선이지 여섯 번째
-          nav 섹션이 아니다). 자기 줄에 둔다 — 위 헤더 행은 `marginLeft:auto`로 폭을 나눠 쓰고 있어
-          거기에 끼우면 그 비용이 날짜·라벨로 이전된다(task#304 ⑰). 해부가 없어도 링크는 남기고
-          배지로 표시한다 — 링크를 숨기면 "그런 화면이 있는 줄도 모르는" 상태가 되고, 해부 페이지는
-          빈 상태를 안내로 렌더하므로 고장난 링크가 아니다. */}
+          nav 섹션이 아니다).
+
+          ⚠️ **위치가 계약이다.** 처음엔 리드 문단 바로 아래(= KPI 스트립 *위*)에 뒀는데, 그 한 줄이
+          세로 ~37px(줄 17 + 여백 20)을 먹어 **모바일에서 KPI 스트립이 첫 화면 밖으로 밀렸다**
+          (uat280 `kpi-visible` 선재 3 → 5+로 증가). task#280이 목차를 리드 밑이 아니라 스트립
+          *아래*에 둔 것과 같은 이유이고, 가토 ⑰ 「비용이 이웃으로 이전된다」의 세로판이다.
+          여기(스트립 아래·목차 위)로 옮기면 그 비용이 첫 화면 예산에서 빠진다.
+
+          해부가 없어도 링크는 남기고 배지로 표시한다 — 링크를 숨기면 "그런 화면이 있는 줄도
+          모르는" 상태가 되고, 해부 페이지는 빈 상태를 안내로 렌더하므로 고장난 링크가 아니다. */}
       <p style={{ margin: '0 0 20px', fontSize: 'var(--font-size-xs)' }}>
         <Link to={`/tech-anatomy/${report.slug}`} data-testid="report-to-anatomy" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
           이 기술의 해부 →
@@ -185,11 +196,6 @@ export default function TechReport() {
           <span data-testid="report-anatomy-pending" style={{ marginLeft: 6, color: 'var(--text-3)' }}>미작성</span>
         )}
       </p>
-
-      {/* ── KPI 스트립 (난이도 배지는 여기 흡수 — 중복 표시하지 않는다) ── */}
-      <div style={{ marginBottom: 30 }}>
-        <TechKpiStrip report={report} />
-      </div>
 
       {/* ── 전역 목차 (task#296 S4) — sticky 아님. 항목 1개 이하면 렌더하지 않는다(유령 UI 금지).
           칩 스타일은 출처 칩 관례 재사용(아래 「출처」 섹션 참조). gap으로만 정렬해 한 덩어리로

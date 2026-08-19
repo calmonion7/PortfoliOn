@@ -280,6 +280,25 @@ class Composition(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _item_names_unique(self):
+        """한 축 안에서 항목명은 유일해야 한다 (형제 `VariantAxis._option_names_unique`와 동형).
+
+        중복이면 화면이 같은 이름의 행을 두 번 그려 독자가 서로 다른 둘로 읽는다 — task#297이
+        `variants`에서 HIGH로 잡은 바로 그 클래스인데, `composition`을 만들 때 그 형제의
+        validator 목록을 전부 열거하지 않아 짝을 빠뜨렸다(task#306 자체 검토가 포착).
+        부수로 2/2 렌더러가 `key={item.name}`을 쓰므로 중복은 React key 충돌도 만든다.
+        """
+        for label, items in (("tech", self.tech), ("minerals", self.minerals),
+                             ("experts", self.experts)):
+            if not items:
+                continue
+            names = [i.name for i in items]
+            if len(set(names)) != len(names):
+                dup = sorted({n for n in names if names.count(n) > 1})
+                raise ValueError(f"composition.{label}의 항목 name은 서로 달라야 합니다: {', '.join(dup)}")
+        return self
+
+    @model_validator(mode="after")
     def _producer_share_requires_basis(self):
         """어느 producer든 점유율을 실으면 기준 문구가 있어야 그 수치가 해석 가능하다
         (TechReportIn._share_pct_requires_basis와 동형)."""

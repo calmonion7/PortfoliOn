@@ -908,3 +908,38 @@ def test_composition_single_axis_only_201():
         resp = client.post("/api/tech-reports/reusable-rocket",
                            json=_body_with_composition(comp))
     assert resp.status_code == 201, _detail(resp)
+
+
+def test_composition_duplicate_item_names_422():
+    """한 축 안의 항목명 중복은 422 (형제 `_option_names_unique`와 동형).
+
+    중복이면 화면이 같은 이름의 행을 두 번 그려 독자가 서로 다른 둘로 읽고, 2/2 렌더러의
+    React key도 충돌한다. task#297이 `variants`에서 HIGH로 잡은 클래스인데 `composition`을
+    만들 때 형제의 validator 목록을 전부 열거하지 않아 짝이 빠져 있었다(task#306 자체 검토).
+    """
+    comp = copy.deepcopy(COMPOSITION)
+    comp["experts"] = [
+        {"name": "같은이름", "share_pct": 50.0, "rationale": "근거."},
+        {"name": "같은이름", "share_pct": 30.0, "rationale": "근거."},
+        {"name": "C", "share_pct": 20.0, "rationale": "근거."},
+    ]
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket", json=_body_with_composition(comp))
+    assert resp.status_code == 422, _detail(resp)
+    assert "같은이름" in _detail(resp), _detail(resp)
+    mock_exec.assert_not_called()
+
+
+def test_composition_same_name_across_different_axes_201():
+    """경계 — **다른 축**에 같은 이름은 통과한다(축이 서로 독립이라 정당하다).
+
+    이 양성 테스트가 없으면 나중에 누가 유일성을 전 축 통합으로 넓혀도 아무도 못 잡는다
+    (음성 테스트만으론 "축 단위"라는 결정이 표현되지 않는다 — task#297의 완화 판단 교훈).
+    """
+    comp = copy.deepcopy(COMPOSITION)
+    comp["tech"][0]["name"] = "리튬"          # minerals[0]과 같은 이름
+    comp["tech"][0]["leaders"] = []
+    comp["minerals"][0]["name"] = "리튬"
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket", json=_body_with_composition(comp))
+    assert resp.status_code == 201, _detail(resp)
