@@ -44,17 +44,61 @@ const listRes = await fetch(`${BASE}/api/tech-reports`, { headers: AUTH });
 const REPORTS = (await listRes.json()).reports || [];
 const WITH = REPORTS.filter((r) => r.composition);
 const WITHOUT = REPORTS.filter((r) => !r.composition);
-if (WITH.length === 0) { console.error('composition이 있는 발행물이 0건 — 이 프로브는 게이트가 될 수 없다. 종료.'); process.exit(1); }
-if (WITHOUT.length === 0) { console.error('대조군(composition 없는 slug)이 0건 — 대조 없이 판정할 수 없다. 종료.'); process.exit(1); }
-const TARGET = WITH[0];
-const CONTROL = WITHOUT[0];
-rawLog.push(`대상 slug=${TARGET.slug} (composition 있음) · 대조군 slug=${CONTROL.slug} (composition 없음)`);
-rawLog.push(`발행물 ${REPORTS.length}건 중 해부 ${WITH.length}건 · 미작성 ${WITHOUT.length}건`);
 
-// API가 말하는 축별 항목 수 — 화면 카운트를 이것과 대조한다(커버리지 카운터의 기준선).
 const AXIS_KEYS = ['tech', 'minerals', 'experts'];
+
+// ── ⓒ 해부 보유 slug 수의 **하한 래칫** ──────────────────────────────────────
+// 루틴 upsert의 현재 계약은 「키 생략 = 삭제」다. 그래서 루틴이 한 번 돌면 `composition`이
+// 통째로 사라질 수 있는데, 그때 화면은 조용히 「미작성」으로 돌아가고 나머지 축은 **전부 통과**한다
+// (잴 대상이 사라지면 축이 안 도니까). 그 소실을 드러내는 유일한 축이 이 하한이다.
+// 백필로 slug을 채울 때마다 이 수를 함께 올린다(task#308).
+const MIN_WITH_ANATOMY = 1;
+eq('anatomy-count-floor', WITH.length >= MIN_WITH_ANATOMY, true,
+   `해부 보유 ${WITH.length}종 · 하한 ${MIN_WITH_ANATOMY} · 미작성 ${WITHOUT.length}종`);
+bump('floor');
+
+if (WITH.length === 0) { console.error('해부 보유 slug 0건 — 잴 대상이 없다. 종료.'); process.exit(1); }
+
+// ── ⓐ 데이터 규율 **전수** — composition을 가진 모든 slug에 건다 ─────────────
+// 옛 판은 WITH[0] 하나만 쟀다. 그러면 나중에 채운 slug이 규율을 어겨도 프로브는 통과한다
+// (대상이 틀려도 통과하는 축 = ⑧ⓘ). 규율은 데이터 성질이라 목록 응답 하나로 전수 검사된다.
+for (const R of WITH) {
+  const pnames = new Set((R.players || []).map((p) => p.name));
+  let axesSeen = 0;
+  for (const k of AXIS_KEYS) {
+    const items = R.composition[k];
+    if (!items) continue;   // 성립하지 않는 축의 통째 생략은 정당하다(ADR-0042 결정 2)
+    axesSeen += 1;
+    const sum = items.reduce((s, i) => s + i.share_pct, 0);
+    eq(`rule-sum100:${R.slug}:${k}`, Math.abs(sum - 100) <= 1e-9, true, `Σ=${sum}`);
+    eq(`rule-grid5:${R.slug}:${k}`,
+       items.filter((i) => Math.abs(i.share_pct / 5 - Math.round(i.share_pct / 5)) > 1e-9)
+            .map((i) => `${i.name}=${i.share_pct}`), []);
+    eq(`rule-len:${R.slug}:${k}`, items.length >= 3 && items.length <= 7, true, `items=${items.length}`);
+    eq(`rule-rationale:${R.slug}:${k}`,
+       items.filter((i) => !String(i.rationale || '').trim()).map((i) => i.name), []);
+    const ns = items.map((i) => i.name);
+    eq(`rule-uniq:${R.slug}:${k}`, ns.length - new Set(ns).size, 0, `names=${ns.length}`);
+    bump('rule', 5);
+  }
+  eq(`rule-axes:${R.slug}`, axesSeen >= 1, true, `축 ${axesSeen}개`);
+  // tech 축 선도기업은 그 리포트 players[].name에 실재해야 한다(ADR-0042 결정 4)
+  const missing = (R.composition.tech || []).flatMap((t) => (t.leaders || []).filter((n) => !pnames.has(n)));
+  eq(`rule-leaders:${R.slug}`, missing, [], `players=${pnames.size}명`);
+  bump('rule', 2);
+}
+
+// ── DOM 대상 = 항목 수가 가장 많은 slug ──────────────────────────────────────
+// 목록 순서(WITH[0])가 아니라 **가장 무거운 판**을 고른다: 7항목 축이 생기면 278px에서 조각 폭이
+// 가장 좁아지고, 그 최악 케이스가 곧 시각 회귀의 관측 지점이기 때문이다. 동률은 slug 사전순으로
+// 깨서 재실행 간 대상이 흔들리지 않게 한다(대상이 바뀌면 커버리지 비교가 무의미해진다).
+const weight = (r) => AXIS_KEYS.reduce((s, k) => s + (r.composition[k] || []).length, 0);
+const TARGET = [...WITH].sort((a, b) => weight(b) - weight(a) || a.slug.localeCompare(b.slug))[0];
+const TARGET_AXES = AXIS_KEYS.filter((k) => (TARGET.composition[k] || []).length > 0);
+
 const API_COUNTS = {};
-for (const k of AXIS_KEYS) API_COUNTS[k] = (TARGET.composition[k] || []).length;
+for (const k of TARGET_AXES) API_COUNTS[k] = TARGET.composition[k].length;
+rawLog.push(`해부 보유 ${WITH.length}종 / 발행물 ${REPORTS.length}종 · DOM 대상=${TARGET.slug}(항목 ${weight(TARGET)}개)`);
 rawLog.push(`API 축별 항목 수: ${JSON.stringify(API_COUNTS)}`);
 
 const VIEWS = [
@@ -137,7 +181,9 @@ for (const V of VIEWS) {
     });
   });
   eq(`axes-domain:${V.name}`, axes && axes.length > 0 ? 'OK' : `DOMAIN_TOO_SMALL(${axes ? axes.length : 'null'})`, 'OK');
-  eq(`axes-count:${V.name}`, axes ? axes.map((a) => a.key) : null, AXIS_KEYS);
+  // 축이 생략된 slug도 정당하므로(ADR-0042 결정 2) 기대값은 3축 고정이 아니라 **그 대상이 실제로
+  // 가진 축**이다. AXIS_KEYS로 고정하면 광물 축을 생략한 리포트가 옳은데도 FAIL이 된다.
+  eq(`axes-count:${V.name}`, axes ? axes.map((a) => a.key) : null, TARGET_AXES);
   bump('axes', 2);
 
   for (const a of axes || []) {
@@ -214,10 +260,27 @@ for (const V of VIEWS) {
 
   await page.screenshot({ path: `${OUT}/${V.name}-anatomy.png`, fullPage: true });
 
-  // ══ ⓖ 대조군 — composition 없는 slug ══════════════════════════════════════
-  await page.goto(`${BASE}/tech-anatomy/${CONTROL.slug}`, { waitUntil: 'domcontentloaded' });
+  // ══ ⓖ 대조군 — **page.route 주입**으로 합성한다 ══════════════════════════
+  // 옛 판은 "composition이 없는 실제 slug"을 대조군으로 썼다. 그 설계는 백필이 끝나 빈 slug이
+  // 0개가 되는 순간 대조군이 소멸해 프로브가 통째로 죽는다(uat298이 데이터 상태 전제로 스테일해진
+  // 것과 같은 구조). 주입은 데이터 상태와 무관하므로 규율이 데이터에 인질로 잡히지 않는다.
+  // ⚠️ 응답 가로채기일 뿐이다 — 프로덕션에 아무것도 쓰지 않는다(이 프로브는 GET만 한다).
+  // 대상은 **같은 TARGET slug**이다: 3축이 실재하는 판을 null로 덮으므로, 축 0개가 관측되면
+  // 그것은 "데이터가 원래 없어서"가 아니라 **화면이 빈 상태를 옳게 그린다**는 증거가 된다.
+  let injected = 0;
+  await page.route('**/api/tech-reports/**', async (route) => {
+    const res = await route.fetch();
+    let body;
+    try { body = await res.json(); } catch { return route.fulfill({ response: res }); }
+    if (Array.isArray(body?.reports)) {
+      body.reports = body.reports.map((r) => ({ ...r, composition: null }));
+      injected += 1;
+    }
+    await route.fulfill({ response: res, body: JSON.stringify(body), contentType: 'application/json' });
+  });
+  await page.goto(`${BASE}/tech-anatomy/${TARGET.slug}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-testid="tech-anatomy"]', { timeout: 20000 }).catch(() => {});
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(900);
   const ctrl = await page.evaluate(() => {
     const root = document.querySelector('[data-testid="tech-anatomy"]');
     return {
@@ -226,11 +289,14 @@ for (const V of VIEWS) {
       emptyText: (root?.querySelector('[data-testid="anatomy-empty"]')?.textContent || '').trim().slice(0, 40),
     };
   });
+  // 계측기가 실제로 작동했는가 — 주입 0건이면 아래 "축 0개"는 앱의 성질이 아니라 측정 실패다.
+  eq(`control-injected:${V.name}`, injected > 0, true, `가로챈 응답 ${injected}건`);
   // 축이 0개여야 한다 — 이게 없으면 "3축이 보인다"는 단언이 무엇을 봤는지 증명되지 않는다
   eq(`control-axes0:${V.name}`, ctrl.axes, 0);
   eq(`control-empty:${V.name}`, ctrl.empty, true, `text="${ctrl.emptyText}"`);
-  bump('control', 2);
+  bump('control', 3);
   await page.screenshot({ path: `${OUT}/${V.name}-control.png`, fullPage: true });
+  await page.unroute('**/api/tech-reports/**');
 
   // ══ ⓗ 왕복 내비 — 목록 → 해부 → 리포트 → 해부 → 뒤로가기 ═══════════════
   await page.goto(`${BASE}/tech-reports`, { waitUntil: 'domcontentloaded' });
@@ -273,7 +339,8 @@ console.log('\n원시 실측(단언 아님):');
 for (const l of rawLog) console.log(`  ${l}`);
 console.log(`\n※ 육안 캡처 ${OUT}/ — {view}-{anatomy|control}.png`);
 console.log('═'.repeat(78));
-fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ cov, results, target: TARGET.slug, control: CONTROL.slug, API_COUNTS }, null, 2));
+fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ cov, results, target: TARGET.slug, control: `injected:${TARGET.slug}`,
+  withAnatomy: WITH.map((r) => r.slug), minFloor: MIN_WITH_ANATOMY, API_COUNTS }, null, 2));
 if (fails.length) {
   console.log('\nFAIL 상세:');
   for (const f of fails) console.log(`  ✗ ${f.tag}\n      ${f.msg}`);
