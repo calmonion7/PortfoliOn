@@ -43,14 +43,16 @@ export default function TechReports() {
             return (
               <Card
                 key={r.slug}
-                as={Link}
-                to={`/tech-report/${r.slug}`}
                 hover
                 padding="md"
                 data-testid="tech-report-card"
                 data-slug={r.slug}
-                style={{ textDecoration: 'none', display: 'block' }}
+                style={{ display: 'block' }}
               >
+                {/* ⚠️ 카드 전체가 <Link>였는데 해부 링크가 추가되며 풀었다 — 앵커 중첩은 무효
+                    마크업이고 중첩된 링크는 브라우저마다 다르게 동작한다. 본문(제목·지표)은
+                    여전히 하나의 큰 Link라 "카드를 눌러 리포트로" 동선은 그대로다. */}
+                <Link to={`/tech-report/${r.slug}`} data-testid="card-to-report" style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{ color: 'var(--text-3)', fontSize: 11, letterSpacing: '0.06em', fontWeight: 600 }}>
                   {TECH_NAMES[r.slug] || r.slug}
                 </div>
@@ -66,6 +68,18 @@ export default function TechReports() {
                   <div className="mono tnum" style={{ color: 'var(--text-2, var(--text))', fontSize: 12, marginBottom: 8 }}>{summary}</div>
                 )}
                 <div className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{r.published_date} 갱신</div>
+                </Link>
+                {/* 「리포트 / 해부」 두 진입점. 해부 미작성이면 링크를 숨기지 않고 배지를 단다 —
+                    숨기면 그런 화면이 있는 줄도 모르고, 해부 페이지는 빈 상태를 안내로 렌더하므로
+                    고장난 링크가 아니다(ADR-0042 결정 6 · S4). 폭이 모자라면 줄바꿈으로 흐르되
+                    링크 텍스트 자체는 접히지 않는다(flex-wrap + nowrap, task#247 정석 조합). */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 10, marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 12 }}>
+                  <Link to={`/tech-report/${r.slug}`} data-testid="card-link-report" style={{ color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>리포트</Link>
+                  <Link to={`/tech-anatomy/${r.slug}`} data-testid="card-link-anatomy" style={{ color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>해부</Link>
+                  {!r.composition && (
+                    <span data-testid="card-anatomy-pending" style={{ color: 'var(--text-3)', fontSize: 11, whiteSpace: 'nowrap' }}>해부 미작성</span>
+                  )}
+                </div>
               </Card>
             )
           })}

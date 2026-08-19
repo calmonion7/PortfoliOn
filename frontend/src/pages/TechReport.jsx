@@ -172,6 +172,20 @@ export default function TechReport() {
         </p>
       )}
 
+      {/* 기술 해부로 가는 상호링크 (ADR-0042 결정 6 — 해부는 리포트의 두 번째 시선이지 여섯 번째
+          nav 섹션이 아니다). 자기 줄에 둔다 — 위 헤더 행은 `marginLeft:auto`로 폭을 나눠 쓰고 있어
+          거기에 끼우면 그 비용이 날짜·라벨로 이전된다(task#304 ⑰). 해부가 없어도 링크는 남기고
+          배지로 표시한다 — 링크를 숨기면 "그런 화면이 있는 줄도 모르는" 상태가 되고, 해부 페이지는
+          빈 상태를 안내로 렌더하므로 고장난 링크가 아니다. */}
+      <p style={{ margin: '0 0 20px', fontSize: 'var(--font-size-xs)' }}>
+        <Link to={`/tech-anatomy/${report.slug}`} data-testid="report-to-anatomy" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+          이 기술의 해부 →
+        </Link>
+        {!report.composition && (
+          <span data-testid="report-anatomy-pending" style={{ marginLeft: 6, color: 'var(--text-3)' }}>미작성</span>
+        )}
+      </p>
+
       {/* ── KPI 스트립 (난이도 배지는 여기 흡수 — 중복 표시하지 않는다) ── */}
       <div style={{ marginBottom: 30 }}>
         <TechKpiStrip report={report} />

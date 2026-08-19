@@ -19,6 +19,7 @@ import AnalystReport from './pages/AnalystReport'
 import AnalystReports from './pages/AnalystReports'
 import TechReport from './pages/TechReport'
 import TechReports from './pages/TechReports'
+import TechAnatomy from './pages/TechAnatomy'
 import Guru from './pages/Guru'
 import GuruDetail from './pages/GuruDetail'
 import Settings from './pages/Settings'
@@ -109,6 +110,7 @@ function AppShell({ theme, setTheme, setSession }) {
               <Route path="/analyst-report/:ticker/:date" element={<ResearchShell><AnalystReport /></ResearchShell>} />
               <Route path="/tech-reports" element={<ResearchShell><TechReports /></ResearchShell>} />
               <Route path="/tech-report/:slug" element={<ResearchShell><TechReport /></ResearchShell>} />
+              <Route path="/tech-anatomy/:slug" element={<ResearchShell><TechAnatomy /></ResearchShell>} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
               <Route path="/market/flow" element={<MarketHub tab="flow" />} />

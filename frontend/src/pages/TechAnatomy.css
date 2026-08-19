@@ -1,0 +1,85 @@
+/* 기술 해부 화면 (ADR-0042 결정 5, task#306 S2).
+   축마다 [제목 + 기준 문구] → [100% 누적 가로 막대 1줄] → [항목 목록]이고 세로로 3개가 쌓인다.
+
+   ⚠️ 이 화면은 **자체 가로 스크롤러를 두지 않는다**(task#296이 업체 표에서 확립한 규율 — 넘침을
+   스크롤로 덮지 않는다). 그래서 좁아지는 책임이 전부 여기 있고, 규율은 둘로 갈린다:
+     · 줄어도 되는 것(이름·근거·쓰임) = `overflow-wrap: anywhere`
+       → `break-word`가 아니다. break-word는 렌더에서만 접고 **min-content를 줄이지 못해**
+         컨테이너가 좁아지지 못한다(task#296 실측: 문서가 396px로 가로 스크롤).
+     · 줄면 안 되는 것(퍼센트·단계 숫자) = `flex-shrink: 0` + `white-space: nowrap`
+       → ellipsis는 문자열 *끝*을 먹으므로 수치를 같은 상자에 넣으면 수치부터 사라진다(task#275).
+
+   ⚠️ 막대 조각 안에는 **텍스트를 넣지 않는다.** 조각은 `overflow: hidden`이라 nowrap 라벨을
+   ellipsis 없이 잘라내는데, 그 잘림은 leaf `scrollWidth` 검사에 원리적으로 안 잡힌다(task#275).
+   ADR-0042 결정 5가 라벨을 전부 아래 목록으로 내린 이유이기도 하다. */
+
+.tech-anatomy { max-width: 780px; margin: 0 auto; }
+
+.tech-anatomy__axis { margin: 0 0 28px; }
+.tech-anatomy__axis:last-child { margin-bottom: 0; }
+
+.tech-anatomy__axis-title {
+  font-family: var(--font-serif);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* 「기준」 문구 — 접기·툴팁이 아니라 **상시 텍스트**다. 이게 없으면 독자가 광물 32%와
+   기술 32%를 같은 뜻으로 읽는다(ADR-0042 결정 2가 이 표기를 *결정*으로 넣은 이유). */
+.tech-anatomy__basis {
+  color: var(--text-3);
+  font-size: var(--font-size-xs);
+  margin: 2px 0 8px;
+  overflow-wrap: anywhere;
+}
+
+/* 100% 누적 가로 막대 — 컨테이너 폭 100%라 어느 폭에서도 넘치지 않고,
+   막대가 꽉 차는 것 자체가 Σ=100의 시각적 진술이다. */
+.tech-anatomy__bar {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--border);
+}
+/* 조각 경계 — inset 그림자라 **레이아웃 영향이 0**이다(조각 폭 합 == 컨테이너 폭 유지).
+   border를 쓰면 box-sizing에 따라 합이 흔들려 「퍼센트는 옳고 픽셀이 틀린」 클래스가 열린다. */
+.tech-anatomy__seg { height: 100%; }
+.tech-anatomy__seg:not(:last-child) { box-shadow: inset -1px 0 0 var(--bg); }
+
+.tech-anatomy__items { list-style: none; margin: 10px 0 0; padding: 0; }
+.tech-anatomy__item { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.tech-anatomy__item:last-child { border-bottom: 0; }
+
+/* 항목 머리줄 — [색 · 이름 ....... 퍼센트] */
+.tech-anatomy__head { display: flex; align-items: baseline; gap: var(--space-2); }
+.tech-anatomy__swatch { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 2px; align-self: center; }
+.tech-anatomy__name {
+  flex: 1 1 auto; min-width: 0;
+  color: var(--text); font-size: var(--font-size-sm); font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.tech-anatomy__pct {
+  flex: 0 0 auto; white-space: nowrap;
+  color: var(--text); font-size: var(--font-size-sm); font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tech-anatomy__rationale { color: var(--text-2, var(--text)); font-size: var(--font-size-xs); margin: 4px 0 0 16px; overflow-wrap: anywhere; }
+.tech-anatomy__meta { color: var(--text-3); font-size: var(--font-size-xs); margin: 4px 0 0 16px; overflow-wrap: anywhere; }
+
+/* 칩 줄 — 폭이 모자라면 **줄바꿈으로 흐르되 칩 텍스트 자체는 접히지 않는다**
+   (flex-wrap:wrap 컨테이너 + nowrap 자식, task#247의 정석 조합). */
+.tech-anatomy__chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 6px 0 0 16px; }
+.tech-anatomy__chip {
+  white-space: nowrap; font-size: var(--font-size-xs);
+  color: var(--text-2, var(--text)); background: var(--bg-2, var(--border));
+  border-radius: 3px; padding: 1px 6px;
+}
+.tech-anatomy__chip-lv { color: var(--text-3); margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+.tech-anatomy__nav { margin: 0 0 12px; font-size: var(--font-size-xs); }
+.tech-anatomy__nav a { color: var(--accent); text-decoration: none; }
