@@ -2428,6 +2428,41 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ---
 
+### `GET /api/tech-reports/index`
+
+**경량 인덱스** — 종목 → 기술 역방향 연결용(ADR-0043). 포트폴리오 「기술 노출」 카드와 종목 상세 헤더의 기술 칩이 소비한다.
+
+산문(`description`·`key_points`·`challenges`·`players` 본문)을 **싣지 않는다** — 소비처는 티커 교차만 필요한데 6종 전문을 실으면 화면이 수백 KB를 받는다.
+
+⚠️ 이 경로는 라우터에서 **`/{slug}`보다 먼저 선언**돼 있다. `slug`가 `Literal`이라 catch-all이 먼저 잡으면 `index`는 등록 slug이 아니어서 **`422`로 죽는다**(다른 라우트로 흘러가지 않는다).
+
+**Auth:** Bearer token 또는 `X-API-Key`
+
+**Response `200`**
+```json
+{
+  "index": [
+    {
+      "slug": "ai-datacenter-equipment",
+      "name": "AI 데이터센터 설비",
+      "title": "NERC가 5월 4일 대형부하 Level 3 경보를 낸 뒤...",
+      "tickers": ["000660", "005930", "010120", "015760", "028260", "298040"],
+      "players_total": 25
+    }
+  ]
+}
+```
+
+| 필드 | 뜻 |
+|---|---|
+| `slug` | 기술 slug(6종 고정) |
+| `name` | 표시명(`TECH_TOPICS`) — `title`은 150자 헤드라인 문장이라 칩 라벨로 못 쓴다 |
+| `title` | 그 판의 헤드라인 |
+| `tickers` | `players[].ticker`의 **non-null 집합**(정렬·중복 제거) |
+| `players_total` | 업체 **총수**. `players_total - tickers.length`가 곧 화면의 「미상장·미매칭 N개 제외」다 |
+
+---
+
 ### `GET /api/tech-reports/{slug}`
 
 그 기술의 **현재 판 1건**(없으면 빈 배열) — 과거 판은 존재하지 않는다(ADR-0038, 이력 네비게이션 없음).

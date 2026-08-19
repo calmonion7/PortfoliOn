@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { fmtPrice as fmt } from '../../utils'
+import useTechIndex, { techsForTicker } from '../../hooks/useTechIndex'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
 import { SketchCircleMark } from '../sketches'
 import './ReportDetail.css'
@@ -13,6 +14,10 @@ export default function ReportDetailHeader({
   detail, selected, setSelected, setView, isAdmin, generating, genProgress, generateOne, guruMap, reportList,
   publications = [], // 애널리스트 리포트 발행물(task#212) — 없으면 링크 숨김
 }) {
+  // 이 종목이 등장하는 기술 리포트(ADR-0043) — 6종뿐이라 상한이 필요 없다.
+  // 조회 실패는 훅이 빈 배열로 붕괴시키므로 칩만 사라지고 본문은 그대로 렌더된다.
+  const { techIndex } = useTechIndex()
+  const techs = techsForTicker(techIndex, selected.ticker)
   return (
     <div className="detail-header" style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
       {/* 행1: 네비 버튼 */}
@@ -54,6 +59,18 @@ export default function ReportDetailHeader({
             애널리스트 리포트 →
           </Link>
         )}
+        {/* 기술 리포트 역방향 연결 — 등장 0이면 칩 영역 자체를 렌더하지 않는다(빈 배지 잔존 0) */}
+        {techs.map(t => (
+          <Link
+            key={t.slug}
+            to={`/tech-report/${t.slug}`}
+            data-testid="header-tech-chip"
+            data-slug={t.slug}
+            style={{ color: 'var(--accent)', fontSize: 11, marginLeft: 6, background: 'var(--bg-elev-2)', padding: '2px 7px', borderRadius: 3, textDecoration: 'none', border: '1px solid var(--border)', whiteSpace: 'nowrap' }}
+          >
+            {t.name} →
+          </Link>
+        ))}
       </div>
       {/* 행3: 날짜 + 현재가 + 고점대비 */}
       <div className="detail-header-price">

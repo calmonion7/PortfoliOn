@@ -408,6 +408,41 @@ def list_all(_: str = Depends(get_current_user_or_api_key)):
     return sanitize({"reports": svc.latest_all()})
 
 
+@router.get("/index")
+def ticker_index(_: str = Depends(get_current_user_or_api_key)):
+    """종목 → 기술 역방향 연결용 **경량 인덱스**(ADR-0043).
+
+    ⚠️ 이 경로는 **반드시 `/{slug}`보다 먼저 선언**돼야 한다. `SlugPath`가 `Literal`이라
+    `/{slug}`가 먼저 잡으면 "index"는 허용 slug이 아니어서 **422로 죽고** 이 핸들러까지
+    오지도 못한다 — 다른 라우트로 흘러가는 것이 아니라 그 자리에서 실패한다(이 저장소의
+    `GET /{ticker}/backlog`가 catch-all에 가려 500 나던 것과 같은 계열). 라우트 순서
+    회귀 테스트(`test_tech_reports_index.py`)가 이 순서를 못박는다.
+
+    **산문을 싣지 않는다** — 소비처(포트폴리오 노출 카드·종목 상세 칩)는 티커 교차만
+    필요한데 6종 전문을 실으면 화면이 수백 KB를 받는다. `description`·`key_points`·
+    `challenges`·`players` 본문은 전부 제외하고 티커 집합과 개수만 준다.
+
+    `name`은 `TECH_TOPICS`의 표시명이다. 리포트 `title`은 150자짜리 헤드라인 문장이라
+    칩 라벨로 못 쓰고, 프론트 `techReportUtils.js`의 `TECH_NAMES` 미러를 새 소비처가
+    또 참조하면 dual-source 노출만 넓어지므로 여기서 직접 준다.
+    """
+    names = {t["slug"]: t["name"] for t in svc.TECH_TOPICS}
+    out = []
+    for r in svc.latest_all():
+        players = r.get("players") or []
+        # ticker 없는 업체(비상장·미매칭)는 집합에서 빠지지만 players_total에는 남는다 —
+        # 그 차이가 곧 화면의 「미매칭 N개 제외」 부기다.
+        tickers = sorted({p["ticker"] for p in players if p.get("ticker")})
+        out.append({
+            "slug": r["slug"],
+            "name": names.get(r["slug"], r["slug"]),
+            "title": r.get("title") or "",
+            "tickers": tickers,
+            "players_total": len(players),
+        })
+    return sanitize({"index": out})
+
+
 @router.get("/{slug}")
 def list_by_slug(slug: SlugPath, _: str = Depends(get_current_user_or_api_key)):
     """그 기술의 현재 판 1건(없으면 빈 배열)."""

@@ -5,6 +5,8 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Skeleton from '../components/ui/Skeleton'
 import useIsMobile from '../hooks/useIsMobile'
+import { Link } from 'react-router-dom'
+import useTechIndex from '../hooks/useTechIndex'
 
 const pctText = (v) => v == null ? '—' : `${v.toFixed(1)}%`
 
@@ -50,8 +52,40 @@ function WeightBar({ label, weight, color = 'var(--accent)', warn = false }) {
   )
 }
 
+
+/**
+ * 기술 노출 **상한** 계산 (ADR-0043) — 보유 종목만, 관심은 넣지 않는다.
+ *
+ * 값 = 그 기술 `players[].ticker`에 실린 내 **보유** 종목의 포트폴리오 비중 합.
+ * 한 종목이 여러 기술에 등장하면 **양쪽 모두에 계상**되므로 기술 간 합은 100%를 넘는다 —
+ * 그것이 오류가 아니라 이 지표의 정의다(분모가 기술마다 다르다).
+ *
+ * ⚠️ 관심종목은 `quantity`가 없어 비중을 만들 수 없다. 0으로 섞으면 "노출 0"과
+ * 구별되지 않으므로 **막대에서 통째로 제외**하고 개수만 부기로 알린다.
+ */
+export function computeTechExposure(techIndex, holdings, watchTickers = []) {
+  const wByTicker = new Map((holdings || []).map(h => [h.ticker, h.weight || 0]))
+  const watch = new Set(watchTickers || [])
+  const rows = (techIndex || []).map(t => {
+    const tickers = t.tickers || []
+    const mine = tickers.filter(k => wByTicker.has(k))
+    return {
+      slug: t.slug,
+      name: t.name || t.slug,
+      weight: mine.reduce((sum, k) => sum + wByTicker.get(k), 0),
+      holdingCount: mine.length,
+      watchCount: tickers.filter(k => watch.has(k) && !wByTicker.has(k)).length,
+      // 미매칭 = 티커가 아예 없는 업체(비상장·미기재). 내 보유와의 불일치가 아니다.
+      unmatched: Math.max((t.players_total || 0) - tickers.length, 0),
+    }
+  })
+  return rows.sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name))
+}
+
 export default function ExposureTab() {
   const isMobile = useIsMobile()
+  const { techIndex, ready: techReady, failed: techFailed } = useTechIndex()
+  const [watchTickers, setWatchTickers] = useState([])
   const [open, setOpen] = useState(true)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -66,6 +100,16 @@ export default function ExposureTab() {
 
   useEffect(load, [load])
 
+  // 관심종목은 막대에 넣지 않지만(비중 없음) 「관심 N종목」 부기에는 필요하다.
+  // 실패해도 부기만 사라지고 카드는 그대로 — 본문을 막지 않는다.
+  useEffect(() => {
+    let alive = true
+    api.get('/api/watchlist')
+      .then(r => { if (alive) setWatchTickers((Array.isArray(r.data) ? r.data : []).map(w => w.ticker).filter(Boolean)) })
+      .catch(e => { console.warn('[ExposureTab] 관심목록 조회 실패 — 관심 부기만 생략한다:', e.message) })
+    return () => { alive = false }
+  }, [])
+
   if (loading) return <Skeleton variant="card" count={3} />
   if (error) return <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
   if (!data || !data.holdings.length) return (
@@ -75,6 +119,14 @@ export default function ExposureTab() {
   const { currency, sector, holdings, concentration, warnings, no_fx, portfolio_beta, beta_coverage_pct, beta_missing } = data
   const sectorEntries = Object.entries(sector).sort((a, b) => b[1].weight - a[1].weight)
   const otherSector = sectorEntries.find(([name]) => name === '기타')
+
+  const techRows = computeTechExposure(techIndex, holdings, watchTickers)
+  const techExposed = techRows.filter(r => r.weight > 0)
+  const techZero = techRows.filter(r => r.weight <= 0)
+  // 부기 2종은 **노출된 기술** 기준으로만 센다 — 노출 0인 기술의 미매칭까지 더하면
+  // 화면에 없는 막대의 각주가 되어 독자가 무엇에 대한 수인지 알 수 없다.
+  const techWatchCount = techExposed.reduce((n, r) => n + r.watchCount, 0)
+  const techUnmatched = techExposed.reduce((n, r) => n + r.unmatched, 0)
 
   const body = (
     <>
@@ -152,6 +204,46 @@ export default function ExposureTab() {
           </p>
         )}
       </Card>
+
+      {techReady && !techFailed && (
+        <Card padding="sm" style={{ marginTop: 12 }} data-testid="tech-exposure-card">
+          <h3 style={{ color: 'var(--text)', fontSize: 14, marginBottom: 4 }}>기술 노출</h3>
+          {/* ⚠️ 기준 문구 2문장은 지표의 *구성요소*다 — 빠지면 지표가 거짓이 된다(ADR-0043).
+              값이 상한이라는 것과 기술 간 합이 100%를 넘는다는 것을 함께 말해야 해석이 성립한다. */}
+          <p data-testid="tech-exposure-basis" style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 10 }}>
+            해당 업체의 전사 비중을 더한 값이라 실제 기술 노출의 <strong>상한</strong>입니다.
+            한 종목이 여러 기술에 들어가므로 <strong>기술 간 합은 100%를 넘을 수 있습니다.</strong>
+          </p>
+          {techRows.filter(r => r.weight > 0).map((r, i) => (
+            <WeightBar
+              key={r.slug}
+              label={r.name}
+              weight={r.weight}
+              color={DATA_COLORS[i % DATA_COLORS.length]}
+            />
+          ))}
+          {techExposed.length === 0 && (
+            <p data-testid="tech-exposure-empty" style={{ color: 'var(--text-3)', fontSize: 12 }}>
+              보유 종목과 겹치는 기술이 없습니다. <Link to="/tech-reports" style={{ color: 'var(--accent)' }}>기술 리포트 목록 →</Link>
+            </p>
+          )}
+          {techZero.length > 0 && (
+            <p data-testid="tech-exposure-zero" style={{ color: 'var(--text-3)', fontSize: 11, marginTop: 4 }}>
+              나머지 {techZero.length}개 기술엔 노출 없음 · <Link to="/tech-reports" style={{ color: 'var(--accent)' }}>목록 →</Link>
+            </p>
+          )}
+          {techWatchCount > 0 && (
+            <p data-testid="tech-exposure-watch" style={{ color: 'var(--text-3)', fontSize: 11, marginTop: 4 }}>
+              관심 {techWatchCount}종목 — 보유수량이 없어 막대에서 제외
+            </p>
+          )}
+          {techUnmatched > 0 && (
+            <p data-testid="tech-exposure-unmatched" style={{ color: 'var(--text-3)', fontSize: 11, marginTop: 4 }}>
+              미상장·미매칭 {techUnmatched}개 제외 — 업체 표에 티커가 없는 곳
+            </p>
+          )}
+        </Card>
+      )}
     </>
   )
 
