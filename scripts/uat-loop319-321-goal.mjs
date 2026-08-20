@@ -106,6 +106,30 @@ const contrast = (aStr, bStr, pageBgStr) => {
 // DoD 3종의 slug 합집합 — #319{robotics,ssb,adc-eq} ∪ #320{semi-eq,ssb,robotics} ∪ #321{robotics,ssb,adc-eq}
 const SLUGS = ['semiconductor-equipment', 'solid-state-battery', 'robotics', 'ai-datacenter-equipment'];
 
+// ── 발행물 이름 집합 — 링크 칩의 정본 ────────────────────────────────────────
+// ⚠️ **2026-08-21 계약 정정(사용자 승인)**: 이 축의 첫 판은 「related 항목이 있으면 링크가 있어야 한다」
+// 였는데 그것은 **도달 불가한 게이트**였다(task#317 결함을 이 프로브가 그대로 재현했다). 실측:
+//   semiconductor-equipment 등록일치 3건이지만 **발행된 것 1건** · ai-datacenter-equipment 2 ·
+//   ai-datacenter-ops 3 · smr 등록일치 1건이나 발행 **0** · reusable-rocket·robotics·
+//   solid-state-battery **0건**.
+// 즉 4/7 판은 링크가 **원리적으로 0**이라 구현이 완벽해도 옛 축은 영원히 FAIL한다.
+// 정확한 계약은 「**발행물**과 이름이 일치하는 것만 링크」다(계획 Goal · S4가 `useTechIndex`로 발행물
+// 집합을 받는다고 적은 그대로). 그래서 기대값을 **일치 수 == 링크 수**로 못박는다 — 느슨화가 아니다:
+// 없어야 할 링크를 만들어도 FAIL하고(과잉) 있어야 할 링크를 빼도 FAIL한다(누락). 양방향 이빨이다.
+// 등록됐지만 미발행인 기술로도 링크를 걸자는 안은 **설계 확장**이라 기각했다(계획 Goal 밖).
+const listBody = await (async () => {
+  for (let i = 1; i <= 3; i++) {
+    try { return await (await fetch(`${BASE}/api/tech-reports`, { headers: { Authorization: `Bearer ${access_token}` } })).json(); }
+    catch (e) { console.log(`  (목록 재시도 ${i}/3) ${e}`); await new Promise((s) => setTimeout(s, 1500)); }
+  }
+  return null;
+})();
+if (!listBody) { console.error('목록 조회 3회 실패 — 계측 불가(판정 아님). 종료.'); process.exit(2); }
+const PUB_SLUGS = new Set((listBody.reports || []).map((r) => r.slug));
+const NAME_TO_PUB_SLUG = {};
+for (const t of (listBody.topics || [])) { if (PUB_SLUGS.has(t.slug)) NAME_TO_PUB_SLUG[t.name] = t.slug; }
+console.log(`  [목록] 발행 ${PUB_SLUGS.size}종 · 등록 ${(listBody.topics || []).length}종 · 링크 가능 이름 ${Object.keys(NAME_TO_PUB_SLUG).length}개`);
+
 // ── 실응답 수집(GET만·무쓰기) ────────────────────────────────────────────────
 const DATA = {};
 for (const slug of SLUGS) {
@@ -334,10 +358,18 @@ for (const V of VIEWS) {
         `doc scrollW=${m.docScroll.sw}/clientW=${m.docScroll.cw}`);
 
       // ═══ G5 (task#320) 경계 링크 칩 ════════════════════════════════════
-      const relCount = Object.values(D.related).reduce((a, v) => a + (v || []).length, 0);
-      bump('g5-domain', m.relLinks.length ? 1 : 0);
-      ok_(`g5-domain:${tag}`, relCount === 0 || m.relLinks.length > 0,
-        `related 항목 ${relCount}개 중 발행물 링크 칩 ${m.relLinks.length}개(발행 7종과 이름 일치분)`);
+      const relNames = Object.values(D.related).flatMap((v) => v || []);
+      const expLinkNames = [...new Set(relNames.filter((n) => NAME_TO_PUB_SLUG[n]))];
+      // 정의역 = related 데이터가 있다(칩 자체가 렌더될 수 있다). 링크가 0인 판도 **정의역 안**이며
+      // 그 경우의 기대값은 「링크 0」이다 — 그것이 이 축을 도달 가능하게 만드는 정정의 핵심이다.
+      bump('g5-domain', relNames.length > 0 ? 1 : 0);
+      ok_(`g5-domain:${tag}`, relNames.length > 0,
+        `related 항목 ${relNames.length}개(칩의 정의역) · 발행물 일치 ${expLinkNames.length}개 [${expLinkNames.join(' · ')}]`);
+      // 이빨 양방향 — 과잉(없어야 할 링크)도 누락(있어야 할 링크)도 잡는다
+      eq(`g5-link-count:${tag}`, m.relLinks.length, expLinkNames.length,
+        `링크 칩 수 == 발행물 일치 이름 수 · 렌더된 링크 [${m.relLinks.map((l) => l.text).join(' · ')}]`);
+      const missing = expLinkNames.filter((n) => !m.relLinks.some((l) => l.text.includes(n)));
+      eq(`g5-link-names:${tag}`, missing, [], '발행물 일치 이름은 전부 링크로 렌더돼야 한다');
       const smallTap = m.relLinks.filter((l) => l.h < 32).map((l) => `${l.text}:${l.h}px`);
       eq(`g5-tap-target:${tag}`, smallTap, [], '링크 칩 탭 타깃 32px 이상');
 

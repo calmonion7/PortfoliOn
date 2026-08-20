@@ -9,6 +9,8 @@ import MarketGrowthChart from '../components/tech/MarketGrowthChart'
 import MarketEstimates, { marketEstimatesLayout } from '../components/tech/MarketEstimates'
 import ShareChart from '../components/tech/ShareChart'
 import TechGraph from '../components/tech/TechGraph'
+import { rampPositions } from '../components/tech/shareRamp'
+import useTechIndex from '../hooks/useTechIndex'
 import TechKpiStrip from '../components/tech/TechKpiStrip'
 import PlayerTable from '../components/tech/PlayerTable'
 import ProseSections from '../components/tech/ProseSections'
@@ -25,7 +27,7 @@ import './TechReport.css'
 // 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로, **task#319에서 독자 질문 순서 + 4장 위계**로
 // 재구성. CONTEXT.md 구성 서사도 이 순서다. ADR-0045):
 //   기술명 h1 → 리드 문단 → KPI 스트립 → 해부 링크 → 전역 목차   ← 여기까지 불변(장 밖)
-//   장 1 개요        핵심 포인트 → 계열 비교 → 연관 기술
+//   장 1 개요        핵심 포인트 → 계열 비교 → 구성과 연관
 //   장 2 시장·경쟁    시장 규모 → 주요 업체 → 점유율
 //   장 3 진척·리스크  진척 타임라인 → 해결해야 할 난제 → 확인할 지표
 //   장 4 근거        상세 설명(상시 노출) → 출처
@@ -61,6 +63,9 @@ export default function TechReport() {
   const [report, setReport] = useState(undefined)  // undefined=로딩, null=발행물 없음(빈), object=있음
   const [error, setError] = useState(null)          // 실패는 빈 상태와 구별(에러 정직성)
   const [holdings, setHoldings] = useState({})      // ticker -> 'holding'|'watchlist' (보유/관심 배지용)
+  // 「구성과 연관」의 경계 칩을 발행물로 잇기 위한 경량 인덱스(ADR-0043). 부가 연결이라 실패해도
+  // 본문을 막지 않는다 — 실패는 `failed`로 내려가 칩은 그대로 렌더되고 링크만 빠진다(task#307).
+  const { techIndex, failed: techIndexFailed } = useTechIndex()
 
   useEffect(() => {
     let ignore = false
@@ -122,6 +127,11 @@ export default function TechReport() {
   const related = report.related || {}
   const hasRelated = ['prerequisites', 'derivatives', 'complements', 'competitors']
     .some((k) => Array.isArray(related[k]) && related[k].length > 0)
+  // 「구성과 연관」(task#320) — 한 섹션이 두 반쪽을 담으므로 게이트도 둘의 합집합이다.
+  // 게이트 식은 **TechGraph 자신의 채택 조건과 같아야** 한다(느슨하면 제목만 남는다):
+  // 구성 반쪽은 `rampPositions`가 항목을 하나라도 내놓을 때, 경계 반쪽은 4키 중 하나라도 비지 않을 때.
+  const hasComposition = rampPositions(report.composition?.tech).length > 0
+  const hasConnections = hasComposition || hasRelated
   // 신규 3필드 게이트 — 제목을 페이지가 소유하는 두 섹션은 게이트가 **컴포넌트 자신의 채택 조건과
   // 같은 식**이어야 한다. 느슨하면(예: milestones.length > 0) year·event가 결측인 항목만 담긴 판에서
   // 제목만 남고 본문이 사라진다(점유율 섹션이 task#277 S2에서 겪은 함정). 그래서 판정을 추측하지 않고
@@ -155,7 +165,7 @@ export default function TechReport() {
   const SECTIONS = [
     { id: 'key-points', label: '핵심 포인트', show: hasKeyPoints, chapter: 'overview' },
     { id: 'variants', label: '계열 비교', show: hasVariants, chapter: 'overview' },
-    { id: 'related', label: '연관 기술', show: hasRelated, chapter: 'overview' },
+    { id: 'related', label: '구성과 연관', show: hasConnections, chapter: 'overview' },
     { id: 'market', label: '시장 규모', show: true, chapter: 'market-competition' },
     { id: 'players', label: '주요 업체', show: hasPlayers, chapter: 'market-competition' },
     { id: 'share', label: '점유율', show: hasShare, chapter: 'market-competition' },
@@ -323,11 +333,16 @@ export default function TechReport() {
 
 
       <Chap id="related" />
-      {/* ── 연관 기술 (전제→대상→파생 관계도, 관계 데이터 전무 시 조용히 생략, task#277 S4) ── */}
-      {hasRelated && (
+      {/* ── 구성과 연관 (task#320 · ADR-0046) — 한 섹션에 소제목 2개.
+          「무엇으로 이뤄졌나」= composition.tech 지분 분해(안쪽) · 「무엇과 이어지나」= related 4분류
+          경계 포인터(바깥, 발행물이면 링크). 두 필드의 **방향이 반대**라 합치지 않고 가른다.
+          게이트는 두 반쪽의 합집합이며 TechGraph 자신의 채택 조건과 같은 식이다. ── */}
+      {hasConnections && (
         <div id="related" data-tech-section="related" style={{ marginBottom: 30 }}>
-          <SectionTitle>연관 기술</SectionTitle>
-          <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug} />
+          <SectionTitle>구성과 연관</SectionTitle>
+          <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug}
+                     composition={report.composition} slug={report.slug}
+                     techIndex={techIndex} indexFailed={techIndexFailed} />
         </div>
       )}
 

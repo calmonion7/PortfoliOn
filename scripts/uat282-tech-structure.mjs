@@ -761,8 +761,12 @@ for (const V of VIEWS) {
       bump('gate', 4);
 
       // ── ⓓ 레인 C 본체 · ⓒ 관계도 접근성 ─────────────────────────────────────────────
-      // ⚠️ 이 두 축의 정의역은 **주입 모드**다: 라이브 두 판 모두 `market.estimates` 키가 없고
-      //    `related` 4키가 빈 배열이라 실데이터에는 대상이 존재하지 않는다(착수 시 1콜로 재확인).
+      // ⚠️ 이 블록의 정의역은 **주입 모드**이고 근거는 **`market.estimates` 키 부재 하나뿐**이다
+      //    (라이브 7 slug 전부 그 키가 없다 — 2026-08-21 재확인).
+      //    ⚠️ **옛 주석은 `related` 4키가 빈 배열이라는 것도 근거로 들었는데 그것은 거짓이 됐고**
+      //    (7 slug 전부 8~20개), 그래서 task#317이 관계도 축을 이 블록 *밖으로* 옮겼다. 그 근거를
+      //    여기 남겨 두면 다음 사람이 「관계도도 inject 전용」으로 되읽는다 — 주석이 코드 경로를
+      //    가두고 있으면 그 주석은 코드다(테스트가 없는 코드다). 그래서 문장을 지운다.
       //    데이터로 실행 전에 결정되는 축의 정의역이며 무음 스킵이 아니다 — 정의역 **안에서는**
       //    아래 전 단언이 무조건이고 미검출을 sentinel 기대값으로 FAIL시킨다.
       if (R.mode === 'inject') {
@@ -1011,6 +1015,22 @@ const REFLOW_SLUGS = ['semiconductor-equipment', 'ai-datacenter-equipment', 'ai-
           chips: chips.map((c) => ({ t: c.textContent.trim(), sw: c.scrollWidth, cw: c.clientWidth,
             fs: Math.round(parseFloat(getComputedStyle(c).fontSize) * 10) / 10,
             ws: getComputedStyle(c).whiteSpace })),
+          // task#320 — 발행물 일치 칩은 `.badge`가 아니라 `<a>`(탭 타깃 34px 핀을 쓰려면 전역
+          // `line-height: 1`을 피해야 한다). 그래서 칩 총계는 badge + link로 센다.
+          links: [...g.querySelectorAll('[data-testid="tech-graph-link-item"]')].map((a) => ({
+            t: a.textContent.replace(/\s*\u2192\s*$/, '').trim(), href: a.getAttribute('href'),
+            h: Math.round(a.getBoundingClientRect().height), sw: a.scrollWidth, cw: a.clientWidth })),
+          // 구성 계층 — 뿌리 노드·항목·막대. C1 프로브가 4 slug를 재고 여기는 **7 slug 전부**를 잰다.
+          comp: [...g.querySelectorAll('[data-tech-comp-item]')].map((el) => {
+            const bar = el.querySelector('[data-tech-comp-bar]');
+            return { share: Number(el.dataset.share), kind: el.dataset.compKind, name: el.dataset.compName,
+              barW: bar ? bar.style.width : null,
+              trackDisplay: bar && bar.parentElement ? getComputedStyle(bar.parentElement).display : null,
+              trackCW: bar && bar.parentElement ? bar.parentElement.clientWidth : -1 };
+          }),
+          compRootText: (() => { const r = g.querySelector('[data-tech-comp-root]'); return r ? r.textContent.trim() : null; })(),
+          anatomyLink: !!g.querySelector('[data-testid="tech-graph-anatomy-link"]'),
+          subTitles: [...g.querySelectorAll('h4')].map((h) => h.textContent.trim()),
           scrollers: [g, ...g.querySelectorAll('*')].filter((e) => !isSR2(e))
             .filter((e) => getComputedStyle(e).overflowX !== 'visible' && e.scrollWidth > e.clientWidth + 1)
             .map((e) => `${e.tagName.toLowerCase()}[${e.dataset.testid || ''}](${e.scrollWidth}>${e.clientWidth})`),
@@ -1021,9 +1041,53 @@ const REFLOW_SLUGS = ['semiconductor-equipment', 'ai-datacenter-equipment', 'ai-
         };
       });
       // 커버리지 sentinel — 칩 수가 소스와 다르면 아래 축들이 공허해진다(대상 1개는 target이라 +1).
-      eq(`sweep-domain:${tag}`, m.present && m.chips.length === names.length + 1
-        ? 'OK' : `DOMAIN(present=${m.present},chips=${m.present ? m.chips.length : 'n/a'}/${names.length + 1})`, 'OK',
-        `related 합 ${names.length}개 + 대상 1 · 섹션 높이 ${m.height}px`);
+      // ⚠️ task#320 정정 — 칩 총계 = `.badge` + **링크 칩**(`<a>`)이다. 발행물과 이름이 일치하는
+      //    경계 칩이 `<a>`로 승격되므로 `.badge`만 세면 그 수만큼 부족해져 정상 구현이 거짓 FAIL한다
+      //    (실측: semiconductor-equipment 1 · ai-datacenter-equipment 2 · ai-datacenter-ops 3).
+      const chipTotal = (m.chips || []).length + (m.links || []).length;
+      eq(`sweep-domain:${tag}`, m.present && chipTotal === names.length + 1
+        ? 'OK' : `DOMAIN(present=${m.present},chips=${m.present ? chipTotal : 'n/a'}/${names.length + 1})`, 'OK',
+        `related 합 ${names.length}개 + 대상 1 · badge ${(m.chips || []).length} + link ${(m.links || []).length} · 섹션 높이 ${m.height}px`);
+
+      // ══ 구성 계층 (task#320) — 7 slug 전수. C1 프로브는 4 slug만 잰다 ═══════════════
+      {
+        const wantComp = ((sweepData[slug].composition || {}).tech || [])
+          .filter((t) => t && typeof t.name === 'string' && t.name.trim() !== '' && t.share_pct != null && Number.isFinite(Number(t.share_pct)));
+        const got = m.comp || [];
+        // 정의역 sentinel — 응답이 주는 항목 수와 렌더 수가 같아야 아래가 공허해지지 않는다.
+        eq(`comp-domain:${tag}`, got.length, wantComp.length,
+          `실응답 composition.tech ${wantComp.length}항목 → 렌더 ${got.length}개`);
+        // 지분 내림차순 + 「기타」는 항상 마지막(잔여는 분류가 아니다)
+        const ramp = got.filter((c) => c.kind === 'ramp');
+        eq(`comp-desc:${tag}`, ramp.every((c, i) => i === 0 || ramp[i - 1].share >= c.share) ? 'OK' : `OUT_OF_ORDER(${ramp.map((c) => c.share).join('>')})`, 'OK');
+        const wantOther = wantComp.filter((t) => String(t.name).trim().startsWith('기타')).length;
+        eq(`comp-residual-count:${tag}`, got.filter((c) => c.kind === 'other').length, wantOther,
+          '「기타」 접두일치 항목 수(정확일치면 어긋난다)');
+        eq(`comp-residual-last:${tag}`, wantOther === 0 || (got.length > 0 && got[got.length - 1].kind === 'other'), true);
+        // 분모 상시 노출 — 같은 화면 위쪽 업체 표에 시장점유율 열이 있어 없으면 35%를 그것으로 읽는다
+        eq(`comp-basis:${tag}`, got.length === 0 || /100% 기준/.test(m.compRootText || ''), true,
+          `뿌리 노드 ${JSON.stringify((m.compRootText || '').slice(0, 40))}`);
+        // 막대 폭이 지분과 같은 말을 하는가 — % 문자열로만 표현되고 지분과 일치
+        const wrongW = got.filter((c) => c.barW !== `${c.share}%`).map((c) => `${c.share}→${c.barW}`);
+        eq(`comp-bar-width:${tag}`, wrongW, [], '막대 폭 == 지분 %');
+        // ⚠️ 트랙이 넘침 축의 정의역 안에 있는가 — 순수 인라인이면 clientWidth가 0이라 그 축이
+        //    원리적으로 무의미해진다(frontend/CLAUDE.md). 계산된 display를 실측해 못박는다.
+        const badTrack = got.filter((c) => c.trackCW <= 0).map((c) => `${c.name}:cw=${c.trackCW},display=${c.trackDisplay}`);
+        eq(`comp-track-measurable:${tag}`, badTrack, [], `트랙 clientWidth > 0 (display 실측 ${JSON.stringify([...new Set(got.map((c) => c.trackDisplay))])})`);
+        // 구성 부재면 안내가 그 자리를 지킨다(무음 생략 금지) — 현재 7/7 보유라 dormant 분기다
+        eq(`comp-fallback:${tag}`, wantComp.length === 0 ? m.anatomyLink : !m.anatomyLink, true,
+          `구성 ${wantComp.length}항목 · 해부 안내 ${m.anatomyLink}`);
+        // 소제목 — 구성은 상시, 경계는 데이터 있을 때만(유령 소제목 금지)
+        eq(`comp-subtitles:${tag}`, m.subTitles || [],
+          names.length > 0 ? ['무엇으로 이뤄졌나', '무엇과 이어지나'] : ['무엇으로 이뤄졌나']);
+        bump('comp', 8 + got.length);
+        // 링크 칩 — 탭 타깃 34px 핀 + href가 그 slug
+        const badTap = (m.links || []).filter((l) => l.h < 32).map((l) => `${l.t}:${l.h}px`);
+        eq(`link-chip-tap:${tag}`, badTap, [], `링크 칩 ${(m.links || []).length}개 높이 ${JSON.stringify((m.links || []).map((l) => l.h))}`);
+        const badHref = (m.links || []).filter((l) => !/^\/tech-report\/[a-z0-9-]+$/.test(l.href || '')).map((l) => l.href);
+        eq(`link-chip-href:${tag}`, badHref, [], '링크 칩 href 형태');
+        bump('link', 2);
+      }
       eq(`sweep-no-scroller:${tag}`, m.scrollers || [], []);
       eq(`sweep-no-ellipsis:${tag}`, [m.ellipsis || [], (m.chips || []).filter((c) => c.sw > c.cw + 1).map((c) => `${c.t}(${c.sw}>${c.cw})`)], [[], []]);
       const longest = names.slice().sort((a, b) => b.length - a.length)[0] || null;
