@@ -67,12 +67,23 @@ export default function TechReport() {
   // 「구성과 연관」의 경계 칩을 발행물로 잇기 위한 경량 인덱스(ADR-0043). 부가 연결이라 실패해도
   // 본문을 막지 않는다 — 실패는 `failed`로 내려가 칩은 그대로 렌더되고 링크만 빠진다(task#307).
   const { techIndex, failed: techIndexFailed } = useTechIndex()
-  // 정적 목차가 화면 밖으로 나갔는가 — **0높이 sentinel**을 목차 직후에 두고 IO로 관찰한다
-  // (스크롤 리스너로 좌표를 폴링하지 않는다). 밖이면 플로팅 항해 바를 렌더한다.
-  const tocSentinelRef = useRef(null)
+  // 정적 목차가 화면 밖으로 나갔는가 — **목차 자체를 IO로 관찰**한다(스크롤 좌표 폴링 없음).
+  // 밖이면 플로팅 항해 바를 렌더한다.
+  //
+  // ⚠️ **계획은 「목차 직후 0높이 sentinel」을 지시했는데 라이브 실측이 그것을 반박했다**(2026-08-21):
+  //    sentinel은 목차의 *끝*에 있으므로 「목차 끝이 화면 밖」에서 트리거된다. 그런데 모바일은
+  //    목차 bottom(768·794)이 뷰포트 높이(m390 **664** · m350 700)를 처음부터 넘어서, 스크롤 0에서
+  //    **목차가 부분 가시인 채로 바가 함께 떠** 두 항해 UI가 겹쳤다.
+  //    목차 **자체**를 관찰하면 `isIntersecting`이 「어느 부분이라도 보이는가」라서 바는 목차가
+  //    **완전히** 화면 밖일 때만 뜬다 — 설계 취지(「목차가 화면 밖으로 나간 뒤」)와 계획 DoD 1번
+  //    (「스크롤 0에서 바가 없다」)을 **동시에** 만족한다. sentinel도 함께 사라져 요소가 하나 준다.
+  //    ⚠️ 「목차가 없으면 바가 영영 안 뜨지 않나」 — 그 조합은 **원리적으로 불가능하다**: 목차 게이트는
+  //    `tocItems.length > 1`이고 바 게이트는 장 2개 이상인데, 장이 2개면 표시 섹션이 2개 이상이라
+  //    목차가 반드시 렌더된다. 역은 성립하지 않지만(목차 있고 장 1개) 그때는 바가 `[]`로 닫힌다.
+  const tocRef = useRef(null)
   const [tocOut, setTocOut] = useState(false)
   useEffect(() => {
-    const el = tocSentinelRef.current
+    const el = tocRef.current
     if (!el || typeof IntersectionObserver === 'undefined') return undefined
     const io = new IntersectionObserver(([e]) => setTocOut(!e.isIntersecting), { threshold: 0 })
     io.observe(el)
@@ -314,7 +325,7 @@ export default function TechReport() {
           **34px를 정확히 고정**해 프로브가 `=== 34`로 단언할 수 있게 하는 핀이다(폰트 폴백 보험 겸).
           전역 `body` line-height를 바꾸면 lineHeight 미선언 칩들의 높이가 조용히 따라 움직인다. */}
       {tocItems.length > 1 && (
-        <nav data-testid="tech-report-toc" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 30 }}>
+        <nav ref={tocRef} data-testid="tech-report-toc" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 30 }}>
           {tocItems.map((s) => (
             <a key={s.id} href={`#${s.id}`} data-testid="tech-toc-chip" className="mono"
                style={{ fontSize: 11.5, padding: '7px 12px', lineHeight: '18px', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
@@ -324,9 +335,6 @@ export default function TechReport() {
         </nav>
       )}
 
-      {/* 정적 목차가 화면 밖으로 나갔는지 재는 **0높이 sentinel**. 스크롤 좌표를 폴링하지 않고
-          IO 하나로 판정한다. 높이가 0이므로 레이아웃에 영향이 없다(기록된 결정 1·2 불변). */}
-      <div ref={tocSentinelRef} data-testid="tech-toc-sentinel" style={{ height: 0 }} aria-hidden="true" />
       <TechChapterNav items={navItems} visible={tocOut} />
 
       <Chap id="key-points" />

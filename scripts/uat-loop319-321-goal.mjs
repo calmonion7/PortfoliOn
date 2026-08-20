@@ -234,11 +234,15 @@ const measureNav = async (page) => page.evaluate(() => {
   const nav = document.querySelector('[data-tech-chapter-nav]');
   const chrome = [...document.querySelectorAll('.mobile-header, .masthead-sticky')].filter(vis);
   const chromeBottom = chrome.length ? Math.max(...chrome.map((e) => Math.round(e.getBoundingClientRect().bottom))) : 0;
-  if (!nav || !vis(nav)) return { present: false, chromeBottom };
+  // 정적 목차가 지금 뷰포트 안에 있는가 — 바의 존재는 **그것의 부정**과 등가여야 한다.
+  const toc = document.querySelector('[data-testid="tech-report-toc"]');
+  const tr = toc ? toc.getBoundingClientRect() : null;
+  const tocVisible = !!tr && tr.bottom > 0 && tr.top < window.innerHeight;
+  if (!nav || !vis(nav)) return { present: false, chromeBottom, tocVisible, tocBottom: tr ? Math.round(tr.bottom) : null, vh: window.innerHeight };
   const r = nav.getBoundingClientRect();
   const chips = [...nav.querySelectorAll('[data-tech-chapter-nav-chip]')].filter(vis);
   return {
-    present: true, chromeBottom,
+    present: true, chromeBottom, tocVisible, tocBottom: tr ? Math.round(tr.bottom) : null, vh: window.innerHeight,
     top: Math.round(r.top), height: Math.round(r.height),
     chipCount: chips.length,
     chipTops: [...new Set(chips.map((c) => Math.round(c.getBoundingClientRect().top)))],
@@ -377,7 +381,15 @@ for (const V of VIEWS) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForTimeout(400);
       const nav0 = await measureNav(page);
-      ok_(`g6-absent-at-top:${tag}`, nav0.present === false, `스크롤 0에서 바가 없어야 한다 (present=${nav0.present})`);
+      // ⚠️ **2026-08-21 계약 정정(사용자 승인, 2번째)**: 첫 판은 「스크롤 0에서 바가 없다」였는데
+      //    그것은 **「정적 목차가 첫 화면 안에 있다」는 거짓 전제**에 기댄 대리지표였다. 실측 —
+      //    m390(vh 664)·m350(vh 700)에서 목차 bottom이 768·794라 **애초에 첫 화면 밖**이고
+      //    (`TechReport.jsx` 목차 주석이 「변경 *전부터* 그렇고 요구사항이 아니다」로 이미 기록),
+      //    그래서 바가 뜨는 것이 설계 취지(「목차가 화면 밖이면 뜬다」)대로 정상이다.
+      //    faithful한 축은 **등가**다 — 목차가 보이는데 바가 떠도, 밖인데 안 떠도 FAIL한다
+      //    (느슨화가 아니라 양방향 이빨이다).
+      eq(`g6-visibility-matches-toc:${tag}`, nav0.present, !nav0.tocVisible,
+        `스크롤 0 — 목차 가시=${nav0.tocVisible}(bottom=${nav0.tocBottom}/vh=${nav0.vh}) → 바 존재는 그 부정이어야 한다`);
 
       // 정적 목차가 화면 밖으로 나갈 만큼 내린 뒤
       const sh = await page.evaluate(() => document.documentElement.scrollHeight);
