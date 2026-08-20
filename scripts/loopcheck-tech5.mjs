@@ -60,10 +60,25 @@ const want = (id) => (sel.length === 0 || sel.includes(id)) && !(NO_SLOW && id =
 const sh = (cmd, opts = {}) => execSync(cmd, { encoding: 'utf8', cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], ...opts })
 const shSoft = (cmd, opts = {}) => { try { return sh(cmd, opts) } catch (e) { return `${e.stdout || ''}${e.stderr || ''}` } }
 
+// ⚠️ 라이브 fetch는 **유계 재시도**를 한다. C7이 프로브 5종을 돌리며 뷰포트마다 로그인하므로,
+//    그 직후 C8의 새 로그인이 `fetch failed`로 거부되는 것이 재현됐다(단독 실행은 3/3 PASS).
+//    「대상에 닿지도 못한 것」을 FAIL로 읽는 것은 오분류다 — 역량 프리체크 규율과 같은 이유로,
+//    계측 실패와 판정 실패를 가른다. 게이트는 약해지지 않는다: 재시도가 다 실패하면 여전히 FAIL이고,
+//    데이터가 틀리면 재시도가 몇 번이든 FAIL이다.
+const RETRY = 4
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+async function fetchRetry(url, opts, label) {
+  let last
+  for (let i = 0; i < RETRY; i++) {
+    try { return await fetch(url, opts) } catch (e) { last = e; await sleep(400 * (i + 1)) }
+  }
+  throw new Error(`${label || url} — ${RETRY}회 재시도 후에도 도달 불가: ${last && last.message}`)
+}
+
 async function auth() {
-  const r = await fetch(`${BASE}/api/auth/login`, {
+  const r = await fetchRetry(`${BASE}/api/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(CRED),
-  })
+  }, 'login')
   const { access_token } = await r.json()
   if (!access_token) throw new Error('로그인 실패 — access_token 없음')
   return { Authorization: `Bearer ${access_token}` }
@@ -73,7 +88,7 @@ const apiKey = () => {
   if (!m || !m[1].trim()) throw new Error('COWORK_API_KEY 없음')
   return m[1].trim()   // 값은 어떤 출력에도 싣지 않는다
 }
-const reportsOf = async (AUTH) => (await (await fetch(`${BASE}/api/tech-reports`, { headers: AUTH })).json()).reports || []
+const reportsOf = async (AUTH) => (await (await fetchRetry(`${BASE}/api/tech-reports`, { headers: AUTH }, 'tech-reports')).json()).reports || []
 const countMin = (c) => (c?.minerals || []).reduce((s, m) => s + (m.producers || []).length, 0)
 const countPct = (c) => (c?.minerals || []).reduce((s, m) => s + (m.producers || []).filter((p) => p.share_pct != null).length, 0)
 
