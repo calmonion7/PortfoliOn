@@ -54,7 +54,11 @@
 .tech-anatomy__item { padding: 8px 0; border-bottom: 1px solid var(--border); }
 .tech-anatomy__item:last-child { border-bottom: 0; }
 
-/* 항목 머리줄 — [색 · 이름 ....... 퍼센트] */
+/* 항목 머리줄 — [색 · 이름 ....... 교차배지 · 퍼센트], 자녀 **4개**(task#315).
+   교차배지(`anatomy-item-cross`)는 `flex: 0 0 auto` + nowrap인 3번째 자녀이고,
+   **퍼센트가 항상 마지막**이어야 축 안에서 % 열이 오른쪽 끝에 정렬된다 — 배지를 퍼센트
+   뒤에 두면 배지 있는 항목만 %가 배지폭만큼 왼쪽으로 밀려 열이 지그재그가 된다
+   (축 하나가 Σ=100이라 사용자는 이 값들을 세로로 비교한다). */
 .tech-anatomy__head { display: flex; align-items: baseline; gap: var(--space-2); }
 .tech-anatomy__swatch { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 2px; align-self: center; }
 .tech-anatomy__name {

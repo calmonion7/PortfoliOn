@@ -14,12 +14,31 @@
 //    쪼개지면 한 줄인데 여러 rect가 나오고(task#275), 같은 줄에 폰트 크기가 섞이면 top이
 //    갈린다(task#293). 겹침 기준이라 둘 다 흡수한다.
 //  · 이 화면은 막대 조각 안에 텍스트가 없다(ADR-0042 결정 5) — 그 사실 자체를 축으로 둔다.
+//
+// ── task#315 추가 축: 보유·관심 교차 마커 ────────────────────────────────────────────────
+//  · 기대값을 **화면이 아니라 API에서 독립 재계산**한다(`crossExpect`) — 화면 숫자를 화면에서
+//    읽어 자기 자신과 비교하면 아무것도 검증되지 않는다.
+//  · `xc-*` 대상은 **실행 시점에** 고른다: TARGET + 보유 마커가 있는 판 + 관심 마커가 있는 판 +
+//    겹침 0인 판 + 전문가 축이 있는 판. 「2026-08-20엔 X였다」는 스냅샷이므로 코드에 박지 않는다.
+//  · **광물 축 마커는 라이브에서 dormant**다(producers 티커 ∩ 보유·관심 = 0). 그 사실은
+//    `mineral-live-pin`이 **핀 단언**으로 박제한다 — 0이면 「통과」가 아니라 **「미검증」**이고,
+//    누군가 그 티커를 추적하는 날 이 단언이 FAIL하며 축의 승격을 요구한다. 종목을 추가해 억지로
+//    밟지 않는다(사용자 확정) — 렌더 경로는 `minj-*`가 `/api/stocks` **GET 응답 합성 주입**으로
+//    밟는다(쓰기 0). `minj-*`의 PASS는 「라이브 겹침이 있다」가 아니라 「겹침이 생기면 광물 칩이
+//    마커를 받는다」다.
+//  · 대조군 둘 다 **주입으로 합성**한다 — 「빈 slug」·「전문가 축만 있는 판」을 실데이터로 쓰면
+//    백필 한 번에 대조군이 소멸한다(task#307 ①). 주입 대상은 고유 마커로 함께 단언한다.
+//  · ⚠️ **이 축들은 프론트 빌드 이후에만 통과한다.** nginx가 `frontend/dist`를 직접 서빙하므로
+//    빌드 전 라이브 번들에는 마커·배지·요약이 아예 없다 → 배포 전 실행은 **red-first 확보용**이다
+//    (2026-08-20 실측: 선재축 265/265 PASS · 신규축 81 FAIL).
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
 
 const BASE = 'https://portfolion.taebro.com';
 const OUT = '/Users/calmonion/Project/PortfoliOn/screenshots-tech-anatomy';
 fs.mkdirSync(OUT, { recursive: true });
+// 옛 실행의 PNG를 지운다 — 아래 캡처 열거가 **이번 실행**만 반영해야 빠진 화면이 눈에 띈다.
+for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png')) fs.unlinkSync(`${OUT}/${f}`);
 
 const results = [];
 const cov = {};
@@ -111,6 +130,167 @@ for (const k of TARGET_AXES) API_COUNTS[k] = TARGET.composition[k].length;
 rawLog.push(`해부 보유 ${WITH.length}종 / 발행물 ${REPORTS.length}종 · DOM 대상=${TARGET.slug}(항목 ${weight(TARGET)}개)`);
 rawLog.push(`API 축별 항목 수: ${JSON.stringify(API_COUNTS)}`);
 
+
+// ══ 교차 마커(보유·관심) — 기대값을 **API에서 독립 재계산**한다 (task#315) ═══════════
+// 화면 숫자를 화면에서 읽어 자기 자신과 비교하면 아무것도 검증되지 않는다. 아래는
+// `techAnatomyUtils.js`의 계약(buildCompanyIndex · itemCompanies · matchableTicker ·
+// trackedState · crossHoldings · itemCross)을 프로브가 **독립으로 다시 구현한 것**이고,
+// 구현과 여기가 어긋나면 그 자체가 FAIL이다.
+//
+// `/api/stocks` 봉투는 **1콜 찍어 확인했다**(2026-08-20): 최상위가 **배열**이고 항목은
+//   {ticker, name, type:'holding'|'watchlist', market, enriched_at, analyst_target}
+// `useTrackedStocks`가 `map[s.ticker] = s.type`으로 그대로 싣는다(hooks/useTrackedStocks.js:48).
+// 추정 폴백은 만들지 않는다 — 봉투가 배열이 아니면 즉시 종료한다(⑧ⓘ: 필드를 추정하면 틀린
+// 대상 위에서도 통과한다).
+const STOCKS_RAW = await (await fetch(`${BASE}/api/stocks`, { headers: AUTH })).json();
+if (!Array.isArray(STOCKS_RAW)) { console.error('/api/stocks 봉투가 배열이 아니다 — 폴백 없이 종료.'); process.exit(1); }
+const SMAP = {};
+for (const s of STOCKS_RAW) if (s?.ticker) SMAP[s.ticker] = s.type;
+const TRACKED_N = Object.keys(SMAP).length;
+
+// 이 앱의 추적 티커 공간은 KR(6자리 숫자) · US(알파벳) 둘뿐 → 6자리는 곧 KR 종목코드다.
+// 그래서 선전·상하이의 같은 형태 코드(간펑리튬 `002460`)는 **대조 대상이 아니다**.
+const KR_CODE = /^\d{6}$/;
+const isKorean = (c) => {
+  const s = String(c ?? '');
+  return s.includes('한국') || s.includes('대한민국') || /^KR|KOREA/i.test(s.toUpperCase());
+};
+const matchable = (t, c) => (!t ? null : (KR_CODE.test(t) && !isKorean(c) ? null : t));
+
+const axisItems = (rep, k) => (rep.composition?.[k] || []).filter((i) => i && Number.isFinite(i.share_pct));
+const buildIdx = (rep) => {   // 판 전역 이름→{ticker,country}. players 우선, 티커 가진 것만.
+  const idx = new Map();
+  const put = (c) => { if (c?.name && c?.ticker && !idx.has(c.name)) idx.set(c.name, { ticker: c.ticker, country: c.country ?? null }); };
+  for (const p of rep.players || []) put(p);
+  for (const k of AXIS_KEYS) for (const it of axisItems(rep, k)) for (const pr of it.producers || []) put(pr);
+  return idx;
+};
+const companiesOf = (k, item, rep, idx) => {
+  if (k === 'tech') {
+    const byName = new Map((rep.players || []).filter((p) => p?.name).map((p) => [p.name, p]));
+    return (item.leaders || []).map((n) => {
+      const p = byName.get(n);
+      const e = p?.ticker ? null : (idx.get(n) || null);
+      return p
+        ? { name: n, ticker: p.ticker ?? e?.ticker ?? null, country: p.country ?? e?.country ?? null }
+        : { name: n, ticker: e?.ticker ?? null, country: e?.country ?? null };
+    });
+  }
+  if (k === 'minerals') {
+    return (item.producers || []).filter((p) => p?.name).map((p) => {
+      const e = p.ticker ? null : (idx.get(p.name) || null);
+      return { name: p.name, ticker: p.ticker ?? e?.ticker ?? null, country: p.country ?? e?.country ?? null };
+    });
+  }
+  return [];   // 전문가 축은 업체를 붙이지 않는다(ADR-0042 결정 4) — 0이 아니라 «못 잼»
+};
+const AX_TITLE = { tech: '필요 기술', minerals: '핵심 광물', experts: '전문가' };
+
+/** 판 하나의 기대 교차. `smap`을 **인자로** 받는다 — 합성 주입 대조군이 같은 함수를 쓴다. */
+function crossExpect(rep, smap) {
+  const idx = buildIdx(rep);
+  const axisKeys = AXIS_KEYS.filter((k) => axisItems(rep, k).length > 0);
+  const markers = [];   // 칩 마커 — **칩 등장마다 하나**(중복 이름도 각각). 화면 칩과 1:1이다.
+  const badges = [];    // 항목 배지 — `axis|item|hN|wN`. 배지는 항목 안에서 **티커 Set**으로 센다.
+  const hold = new Set(), watch = new Set(), tickered = new Set(), nameless = new Set();
+  const hits = { tech: 0, minerals: 0 };
+  let anyTicker = false;
+  for (const k of ['tech', 'minerals']) {
+    if (!axisKeys.includes(k)) continue;
+    for (const item of axisItems(rep, k)) {
+      const counts = { holding: 0, watchlist: 0 };
+      const seen = new Set();
+      let itemHit = false;
+      for (const c of companiesOf(k, item, rep, idx)) {
+        const t = matchable(c.ticker, c.country);
+        if (!t) { nameless.add(c.name); continue; }
+        tickered.add(c.name); anyTicker = true;
+        const st = smap[t];
+        if (st !== 'holding' && st !== 'watchlist') continue;
+        markers.push({ axis: k, state: st, name: c.name });
+        itemHit = true;
+        (st === 'holding' ? hold : watch).add(t);
+        if (!seen.has(t)) { seen.add(t); counts[st] += 1; }
+      }
+      if (itemHit) hits[k] += 1;
+      if (counts.holding + counts.watchlist > 0) badges.push(`${k}|${item.name}|h${counts.holding}|w${counts.watchlist}`);
+    }
+  }
+  for (const n of tickered) nameless.delete(n);
+  const found = [];
+  if (hold.size > 0) found.push(`◆ 보유 ${hold.size}`);
+  if (watch.size > 0) found.push(`◇ 관심 ${watch.size}`);
+  const where = [];
+  if (hits.tech > 0) where.push(`${AX_TITLE.tech} ${hits.tech}곳`);
+  if (hits.minerals > 0) where.push(`${AX_TITLE.minerals} ${hits.minerals}곳`);
+  const scope = ['tech', 'minerals'].filter((k) => axisKeys.includes(k)).map((k) => AX_TITLE[k]);
+  const notes = [where.length > 0 ? `${where.join(' · ')} 등장` : `${scope.join('·')} 축 전체 대조`];
+  if (axisKeys.includes('experts')) notes.push(`${AX_TITLE.experts} 축 제외 — 업체 없음`);
+  if (nameless.size > 0) notes.push(`대조할 수 없는 업체 ${nameless.size}곳 제외`);
+  // 칩 텍스트에서 업체명을 되찾기 위한 사전 — 긴 이름 우선(부분일치 오귀속 방지).
+  const names = [...new Set([
+    ...(rep.players || []).map((p) => p?.name),
+    ...AXIS_KEYS.flatMap((k) => axisItems(rep, k).flatMap((it) => [...(it.leaders || []), ...(it.producers || []).map((p) => p?.name)])),
+  ].filter(Boolean))].sort((a, b) => b.length - a.length);
+  return { axisKeys, markers, badges, holdN: hold.size, watchN: watch.size,
+           techHits: hits.tech, minHits: hits.minerals, unmatched: nameless.size,
+           measurable: anyTicker, found, notes, names };
+}
+
+// 대상 선정 — TARGET(항목 최대)에 ⓐ 보유 마커가 있는 판 · ⓑ 관심 마커가 있는 판 · ⓒ 겹침 0인 판 ·
+// ⓓ 전문가 축이 있는 판을 더한다. **기존 265단언의 대상(TARGET·PROD_TARGET)은 바꾸지 않는다.**
+const XREPS = WITH.map((r) => ({ r, x: crossExpect(r, SMAP) }));
+const byMarks = (a, b) => b.x.markers.length - a.x.markers.length || a.r.slug.localeCompare(b.r.slug);
+const CROSS_LIST = [];
+const addX = (e) => { if (e && !CROSS_LIST.some((c) => c.r.slug === e.r.slug)) CROSS_LIST.push(e); };
+addX(XREPS.find((e) => e.r.slug === TARGET.slug));
+addX(XREPS.filter((e) => e.x.markers.some((m) => m.state === 'holding')).sort(byMarks)[0]);
+addX(XREPS.filter((e) => e.x.markers.some((m) => m.state === 'watchlist')).sort(byMarks)[0]);
+addX(XREPS.filter((e) => e.x.measurable && e.x.markers.length === 0).sort(byMarks)[0]);
+addX(XREPS.filter((e) => e.x.axisKeys.includes('experts')).sort(byMarks)[0]);
+
+// 정의역 sentinel — 표본 부재를 **FAIL로** 만든다(⑧ⓐ). 조건부 단언을 쓰지 않으므로 아래
+// 슬러그별 단언은 기대값이 0이어도 무조건 돈다(0 기대 판은 「거짓 마커가 없다」를 검사한다).
+const XTOT = CROSS_LIST.reduce((s, e) => ({ marks: s.marks + e.x.markers.length, badges: s.badges + e.x.badges.length }), { marks: 0, badges: 0 });
+eq('xc-mark-domain', XTOT.marks > 0 ? 'OK' : `MARK_DOMAIN_EMPTY(${XTOT.marks})`, 'OK', `대상 ${CROSS_LIST.map((e) => e.r.slug).join(', ')}`);
+eq('xc-badge-domain', XTOT.badges > 0 ? 'OK' : `BADGE_DOMAIN_EMPTY(${XTOT.badges})`, 'OK');
+eq('xc-state-domain', [...new Set(CROSS_LIST.flatMap((e) => e.x.markers.map((m) => m.state)))].sort(), ['holding', 'watchlist'],
+   '보유·관심 두 상태를 모두 밟았는가 — 한쪽만 밟으면 글리프·색 매핑이 절반만 검증된다');
+eq('xc-none-domain', CROSS_LIST.some((e) => e.x.measurable && e.x.markers.length === 0) ? 'OK' : 'NONE_BRANCH_NOT_COVERED', 'OK');
+eq('xc-experts-domain-any', CROSS_LIST.some((e) => e.x.axisKeys.includes('experts')) ? 'OK' : 'EXPERTS_AXIS_NOT_COVERED', 'OK');
+bump('xc-domain', 5);
+
+// 광물 축 마커의 **라이브** 겹침 — 핀 단언. 지금은 0이고 그건 「통과」가 아니라 **「미검증」**이다.
+// 사용자가 producers 티커 중 하나를 보유·관심에 넣는 날 이 단언이 FAIL하며 축의 승격을 요구한다
+// (도구·데이터 한계를 want로 박제하는 기법 — live-uat-probes ⑩). 억지로 밟으려고 종목을
+// 추가하지 않는다(사용자 확정) — 렌더 경로는 아래 `minj-*` 합성 주입이 밟는다.
+const PROD_TICKERS = [...new Set(WITH.flatMap((r) => axisItems(r, 'minerals').flatMap((m) => (m.producers || []).map((p) => p?.ticker).filter(Boolean))))];
+const MIN_LIVE = XREPS.flatMap((e) => e.x.markers.filter((m) => m.axis === 'minerals').map((m) => `${e.r.slug}:${m.name}`));
+eq('mineral-live-pin', MIN_LIVE.length === 0 ? 'UNVERIFIED_IN_LIVE' : `COVERED(${JSON.stringify(MIN_LIVE)})`, 'UNVERIFIED_IN_LIVE',
+   `producers 티커 ${PROD_TICKERS.length}종 ∩ 추적 ${TRACKED_N}종 = ${MIN_LIVE.length}건 → 라이브 dormant. 광물 마커는 minj-* 합성 대조군과 vitest 픽스처가 유일한 검증 수단이다`);
+bump('mineral-pin');
+
+// 합성 주입용 티커 — PROD_TARGET의 producers 중 **대조 가능하고 아직 추적하지 않는** 티커에서
+// 칩 등장 수가 최대인 것(동률은 티커 사전순). 데이터에서 파생하므로 producers가 바뀌어도 산다.
+const MINJ = (() => {
+  const idx = buildIdx(PROD_TARGET);
+  const cnt = new Map();
+  for (const it of axisItems(PROD_TARGET, 'minerals')) {
+    for (const c of companiesOf('minerals', it, PROD_TARGET, idx)) {
+      const t = matchable(c.ticker, c.country);
+      if (!t || SMAP[t]) continue;
+      cnt.set(t, (cnt.get(t) || 0) + 1);
+    }
+  }
+  const best = [...cnt.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return best ? { ticker: best[0], chips: best[1] } : null;
+})();
+const MINJ_X = crossExpect(PROD_TARGET, MINJ ? { ...SMAP, [MINJ.ticker]: 'watchlist' } : SMAP);
+
+rawLog.push(`추적 종목 ${TRACKED_N}종(보유 ${STOCKS_RAW.filter((s) => s.type === 'holding').length} · 관심 ${STOCKS_RAW.filter((s) => s.type === 'watchlist').length})`);
+rawLog.push(`교차 대상 ${CROSS_LIST.length}판: ${CROSS_LIST.map((e) => `${e.r.slug}(마커 ${e.x.markers.length}·배지 ${e.x.badges.length}·측정가능 ${e.x.measurable}·미대조 ${e.x.unmatched})`).join(' / ')}`);
+rawLog.push(`광물 합성 주입: ${MINJ ? `${MINJ.ticker}→watchlist (칩 ${MINJ.chips}개, 기대 광물마커 ${MINJ_X.markers.filter((m) => m.axis === 'minerals').length}개)` : '주입 가능 티커 없음'}`);
+
 const VIEWS = [
   { name: 'm278', opts: { ...devices['iPhone SE'], viewport: { width: 278, height: 800 }, isMobile: true, hasTouch: true } },
   { name: 'm768', opts: { viewport: { width: 768, height: 1000 } } },
@@ -141,6 +321,76 @@ window.__lines = function (el) {
     else lines.push({ top: r.top, bottom: r.bottom });
   }
   return lines.length;
+};
+// 교차 마커·배지·요약 판독기 (task#315) — 브라우저 안에서 한 번에 모은다.
+// names는 프로브가 API에서 만든 업체명 사전(긴 이름 우선)이다. 칩 텍스트는 마커·이름·단계가
+// 구분자 없이 붙으므로(「◆SK하이닉스4단계」) 사전 역참조로 이름을 되찾는다 — 못 찾으면
+// UNRESOLVED(...)를 반환해 **기대 다중집합과 어긋나 FAIL**이 된다(무음 스킵 금지).
+window.__readCross = function (names) {
+  const root = document.querySelector('[data-testid="tech-anatomy"]');
+  if (!root) return null;
+  const nameOf = (txt) => (names || []).find((n) => txt.includes(n)) || ('UNRESOLVED(' + txt.slice(0, 24) + ')');
+  const marks = [...root.querySelectorAll('[data-testid="anatomy-chip-owned"]')].map((el) => {
+    const chip = el.closest('[data-testid="anatomy-leader-chip"], [data-testid="anatomy-producer-chip"]');
+    const ax = el.closest('[data-testid="anatomy-axis"]');
+    return {
+      axis: ax ? ax.getAttribute('data-axis') : 'NO_AXIS',
+      state: el.getAttribute('data-owned'),
+      glyph: (el.textContent || '').trim(),
+      role: el.getAttribute('role'),
+      aria: el.getAttribute('aria-label'),
+      color: getComputedStyle(el).color,
+      name: chip ? nameOf(chip.textContent.trim()) : 'NO_CHIP',
+    };
+  });
+  const badges = [...root.querySelectorAll('[data-testid="anatomy-item-cross"]')].map((el) => {
+    const item = el.closest('[data-testid="anatomy-item"]');
+    const ax = el.closest('[data-testid="anatomy-axis"]');
+    return {
+      axis: ax ? ax.getAttribute('data-axis') : 'NO_AXIS',
+      item: item ? (item.querySelector('[data-testid="anatomy-item-name"]')?.textContent || '').trim() : 'NO_ITEM',
+      h: Number(el.getAttribute('data-holding')), w: Number(el.getAttribute('data-watchlist')),
+      lines: window.__lines(el),
+      boxW: Math.round(el.getBoundingClientRect().width),
+      aria: el.getAttribute('aria-label'),
+    };
+  });
+  // 토큰 실측 — 기준값을 하드코딩하지 않는다(테마별로 다르다). 「:root」에서 읽어 rgb 정규화.
+  const probe = document.createElement('span');
+  probe.style.position = 'absolute'; probe.style.visibility = 'hidden';
+  document.body.appendChild(probe);
+  const tok = (v) => { probe.style.color = 'var(' + v + ')'; return getComputedStyle(probe).color; };
+  const tokens = { hold: tok('--tag-hold-color'), watch: tok('--tag-watch-color'), text: tok('--text') };
+  probe.remove();
+  const pcts = [...root.querySelectorAll('[data-testid="anatomy-axis"]')].map((ax) => ({
+    key: ax.getAttribute('data-axis'),
+    rights: [...ax.querySelectorAll('[data-testid="anatomy-item-pct"]')].map((e) => Math.round(e.getBoundingClientRect().right)),
+    nameW: [...ax.querySelectorAll('[data-testid="anatomy-item-name"]')].map((e) => Math.round(e.getBoundingClientRect().width)),
+  }));
+  const sm = root.querySelector('[data-testid="anatomy-cross-summary"]');
+  const bar = root.querySelector('[data-testid="anatomy-bar"]');
+  const br = bar ? bar.getBoundingClientRect() : null;
+  const de = document.documentElement;
+  const main = document.querySelector('main.page-wrap') || de;
+  return {
+    h1: (root.querySelector('h1')?.textContent || '').trim(),
+    axes: [...root.querySelectorAll('[data-testid="anatomy-axis"]')].map((a) => a.getAttribute('data-axis')),
+    itemNames: [...root.querySelectorAll('[data-testid="anatomy-item-name"]')].map((e) => e.textContent.trim()),
+    expertsItems: root.querySelectorAll('[data-axis="experts"] [data-testid="anatomy-item"]').length,
+    expertsMarks: root.querySelectorAll('[data-axis="experts"] [data-testid="anatomy-chip-owned"]').length,
+    expertsBadges: root.querySelectorAll('[data-axis="experts"] [data-testid="anatomy-item-cross"]').length,
+    marks, badges, pcts, tokens,
+    summary: !!sm,
+    summaryLines: sm ? window.__lines(sm) : -1,
+    found: sm ? (sm.querySelector('[data-testid="anatomy-cross-found"]')?.textContent || '').trim() : null,
+    none: sm ? !!sm.querySelector('[data-testid="anatomy-cross-none"]') : null,
+    note: sm ? (sm.querySelectorAll('p')[1]?.textContent || '').trim() : null,
+    legend: !!root.querySelector('[data-testid="anatomy-cross-legend"]'),
+    firstBarBottom: br ? Math.round(br.bottom) : -1,
+    vh: innerHeight,
+    docOver: de.scrollWidth - de.clientWidth,
+    mainOver: main.scrollWidth - main.clientWidth,
+  };
 };
 `;
 
@@ -349,6 +599,171 @@ for (const V of VIEWS) {
     bump('producer');
   }
 
+  // ══ ⓐ~ⓓ 교차 마커·항목 배지·요약 (task#315) ═════════════════════════════════
+  // 기대값은 화면이 아니라 **API에서 독립 재계산**한 것이다(위 crossExpect). 판마다 마커/배지
+  // 기대가 0일 수도 있는데 그 경우도 단언은 **무조건** 돈다 — 0 기대 판은 「거짓 마커가 없다」를
+  // 검사한다(조건부 단언을 쓰면 총계가 데이터 상태에 따라 흔들려 측정 실패가 통과로 보인다).
+  for (const CS of CROSS_LIST) {
+    const slug = CS.r.slug, X = CS.x, P0 = `${V.name}:${slug}`;
+    await page.goto(`${BASE}/tech-anatomy/${slug}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-testid="tech-anatomy"]', { timeout: 20000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelectorAll('.skeleton-block').length === 0).catch(() => {});
+    await page.waitForTimeout(900);
+    const D = await page.evaluate((n) => window.__readCross(n), X.names);
+
+    // identity를 판정축보다 **먼저** — 마커·배지 축은 페이지 내용과 독립이라 틀린 판 위에서도
+    // 통과한다(⑧ⓘ). URL과 h1을 함께 본다.
+    eq(`xc-identity:${P0}`, !!D && /해부$/.test(D.h1) && page.url().includes(`/tech-anatomy/${slug}`), true,
+       `h1="${D?.h1}" url=${page.url()}`);
+    // 이빨 — 보유·관심·본문 세 색이 서로 다름. 같아지면 아래 색 단언은 아무것도 안 본다.
+    eq(`xc-token-teeth:${P0}`, D ? new Set([D.tokens.hold, D.tokens.watch, D.tokens.text]).size : -1, 3,
+       JSON.stringify(D?.tokens));
+
+    // ── ⓐ 칩 마커: 개수 · (축|상태|이름) 다중집합 · 글리프 · 접근성 이름 · 색 ──
+    eq(`xc-mark-count:${P0}`, D ? D.marks.length : -1, X.markers.length, `기대 ${JSON.stringify(X.markers)}`);
+    eq(`xc-mark-pairs:${P0}`, (D?.marks || []).map((m) => `${m.axis}|${m.state}|${m.name}`).sort(),
+       X.markers.map((m) => `${m.axis}|${m.state}|${m.name}`).sort());
+    eq(`xc-mark-glyph:${P0}`,
+       (D?.marks || []).filter((m) => m.glyph !== (m.state === 'holding' ? '◆' : '◇')).map((m) => `${m.name}=${m.glyph}`), []);
+    // 기하·색이 옳아도 AT에서 프루닝되면 이 화면의 핵심 정보가 통째로 사라진다(⑭).
+    eq(`xc-mark-a11y:${P0}`,
+       (D?.marks || []).filter((m) => m.role !== 'img' || m.aria !== `${m.state === 'holding' ? '보유' : '관심'} 종목`)
+                       .map((m) => `${m.name}=${m.role}/${m.aria}`), []);
+    // ⑪ 색 미적용 클래스 — 클래스는 붙었는데 규칙이 없으면 무채색으로 조용히 사라진다.
+    eq(`xc-mark-color:${P0}`,
+       (D?.marks || []).filter((m) => m.color !== (m.state === 'holding' ? D.tokens.hold : D.tokens.watch))
+                       .map((m) => `${m.name}=${m.color}`), []);
+    bump('xcross', 7);
+
+    // ── 항목 배지: 개수 == techItemHits+mineralItemHits · **오배치까지** 잡는 집합 대조 ──
+    eq(`xc-badge-count:${P0}`, D ? D.badges.length : -1, X.techHits + X.minHits,
+       `techHits=${X.techHits} minHits=${X.minHits}`);
+    eq(`xc-badge-set:${P0}`, (D?.badges || []).map((b) => `${b.axis}|${b.item}|h${b.h}|w${b.w}`).sort(), [...X.badges].sort());
+    eq(`xc-badge-1line:${P0}`, (D?.badges || []).filter((b) => b.lines !== 1).map((b) => `${b.item}=${b.lines}줄`), []);
+    bump('xcross', 3);
+
+    // ── ⓒ 전문가 축 배지·마커 0 — 「그 축이 실재하는 판을 검사했다」를 sentinel로 함께 둔다 ──
+    // sentinel 없이 0을 단언하면 전문가 축이 없는 판에서도 통과해 아무것도 증언하지 않는다.
+    eq(`xc-experts-domain:${P0}`, D ? (D.expertsItems > 0) : null, X.axisKeys.includes('experts'),
+       `API experts=${X.axisKeys.includes('experts')} DOM items=${D?.expertsItems}`);
+    eq(`xc-experts-zero:${P0}`, D ? [D.expertsMarks, D.expertsBadges] : null, [0, 0]);
+    bump('xcross', 2);
+
+    // ── ⓑ 요약 블록: 존재/부재가 그 판의 실제 교차와 일치하는가 ──
+    // 「없음」은 조회 성공 + 대조 완료에서만 할 수 있는 말이다(task#307의 3상태 규율).
+    eq(`xc-summary-present:${P0}`, D ? D.summary : null, X.measurable, `measurable=${X.measurable}`);
+    eq(`xc-summary-found:${P0}`, D ? (D.summary ? (D.none ? 'NONE' : D.found) : 'NO_SUMMARY') : 'NO_ROOT',
+       X.measurable ? (X.found.length > 0 ? X.found.join(' · ') : 'NONE') : 'NO_SUMMARY');
+    // 부기 — 필수 조각 전부 포함. 문구 전체 동일성이 아니라 **수치를 실은 조각**을 본다.
+    eq(`xc-summary-note:${P0}`,
+       X.measurable ? X.notes.filter((n) => !(D?.note || '').includes(n)) : (D?.summary ? ['SUMMARY_SHOULD_BE_ABSENT'] : []),
+       [], `note="${(D?.note || '').slice(0, 100)}"`);
+    eq(`xc-legend:${P0}`, D ? D.legend : null, X.measurable && (X.holdN + X.watchN) > 0);
+    bump('xcross', 4);
+
+    // ── ⓓ 가로 스크롤 0 — 배지가 이름 트랙에서 폭을 빼앗는 판이 관측 지점이다(⑰) ──
+    eq(`xc-hscroll-doc:${P0}`, D ? D.docOver <= 0 : null, true, `scrollWidth-clientWidth=${D?.docOver}`);
+    eq(`xc-hscroll-main:${P0}`, D ? D.mainOver <= 0 : null, true, `diff=${D?.mainOver}`);
+    // 축 내 % 열 우측 정렬 — 배지가 끼어도 값 열이 지그재그가 되지 않아야 한다(⑩ 간격 축).
+    const pctD = (D?.pcts || []).filter((p) => p.rights.length >= 2);
+    eq(`xc-pct-domain:${P0}`, pctD.length > 0 ? 'OK' : `PCT_DOMAIN_TOO_SMALL(${pctD.length})`, 'OK');
+    eq(`xc-pct-right:${P0}`, pctD.filter((p) => new Set(p.rights).size !== 1).map((p) => `${p.key}=${JSON.stringify([...new Set(p.rights)])}`), []);
+    // 첫 화면 세로 예산 — 요약 한 덩어리가 첫 막대를 화면 밖으로 밀지 않았는가(⑰ 세로판).
+    // 요약 **줄 수**는 대리지표라 단언에서 뺀다(출력만 — ⑧ⓗ). 단언은 목표 자체다.
+    eq(`xc-firstbar-inview:${P0}`, D ? (D.firstBarBottom > 0 && D.firstBarBottom <= D.vh) : null, true,
+       `barBottom=${D?.firstBarBottom} vh=${D?.vh} · 요약 ${D?.summaryLines}줄`);
+    bump('xcross', 5);
+    rawLog.push(`${P0} 마커 ${D?.marks.length}/기대 ${X.markers.length} · 배지 ${D?.badges.length}/기대 ${X.badges.length} · 요약 ${D?.summary}(${D?.summaryLines}줄) · 첫막대 ${D?.firstBarBottom}/${D?.vh} · 이름폭 ${JSON.stringify((D?.pcts || []).map((p) => p.nameW))}`);
+    await page.screenshot({ path: `${OUT}/${V.name}-cross-${slug}.png`, fullPage: true });
+
+    // ── 배지 숨김 대조군 — 라이브를 되돌리지 않고 **처방만 무효화**한다(⑧ⓚ②) ──
+    // 목적 둘: ① % 열 정렬이 배지와 무관함을 확인 ② 배지가 이름 트랙에서 가져간 폭을 실측해
+    // 「이웃 열 비용 이전」(⑰)의 크기를 남긴다(출력만 — 정당한 변경에 거짓 실패하지 않게).
+    await page.addStyleTag({ content: '[data-testid="anatomy-item-cross"]{display:none !important}' });
+    await page.waitForTimeout(200);
+    const D2 = await page.evaluate((n) => window.__readCross(n), X.names);
+    eq(`xc-nobadge-applied:${P0}`, (D2?.badges || []).filter((b) => b.boxW !== 0).map((b) => `${b.item}=${b.boxW}px`), [],
+       `대조군 대상 배지 ${D2?.badges.length}개`);
+    eq(`xc-nobadge-pct-right:${P0}`,
+       (D2?.pcts || []).filter((p) => p.rights.length >= 2 && new Set(p.rights).size !== 1).map((p) => p.key), []);
+    bump('xcross', 2);
+    rawLog.push(`${P0} 배지숨김 대조: 이름폭 ${JSON.stringify((D?.pcts || []).map((p) => p.nameW))} → ${JSON.stringify((D2?.pcts || []).map((p) => p.nameW))}`);
+  }
+
+  // ══ 대조군 A — **measurable=false 합성**: 전문가 축만 남긴 composition을 주입한다 ══════
+  // 실데이터에도 「전문가 축만 있는 판」이 지금은 있지만(ai-datacenter-ops) 그건 **데이터 상태**다.
+  // 대조군이 데이터에 인질로 잡히면 백필 한 번에 소멸한다(task#307 ①) → 주입으로 합성한다.
+  // 주입 대상의 **고유 마커**(합성 항목명)를 함께 단언한다 — 대조군 자체의 대상도 검증 대상이다(⑧ⓔ).
+  const XCTRL_ITEMS = ['ZZ대조군-전문가A', 'ZZ대조군-전문가B'];
+  let xinj = 0;
+  await page.route('**/api/tech-reports/**', async (route) => {
+    const res = await route.fetch();
+    let body; try { body = await res.json(); } catch { return route.fulfill({ response: res }); }
+    if (Array.isArray(body?.reports)) {
+      body.reports = body.reports.map((r) => ({ ...r, composition: {
+        experts: XCTRL_ITEMS.map((n, i) => ({ name: n, share_pct: i === 0 ? 60 : 40, rationale: '대조군 — 업체를 붙이지 않는 축' })),
+      } }));
+      xinj += 1;
+    }
+    await route.fulfill({ response: res, body: JSON.stringify(body), contentType: 'application/json' });
+  });
+  await page.goto(`${BASE}/tech-anatomy/${TARGET.slug}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-testid="tech-anatomy"]', { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(800);
+  const XC = await page.evaluate((n) => window.__readCross(n), XCTRL_ITEMS);
+  eq(`xctrl-injected:${V.name}`, xinj > 0, true, `가로챈 응답 ${xinj}건`);
+  eq(`xctrl-target:${V.name}`, XC ? XC.axes : null, ['experts'], '주입이 실제로 그 판을 덮었는가');
+  eq(`xctrl-item:${V.name}`, XC ? XC.itemNames : null, XCTRL_ITEMS, '대조군의 대상도 고유 마커로 단언한다');
+  eq(`xctrl-summary-absent:${V.name}`, XC ? XC.summary : null, false,
+     'measurable=false에서 요약이 나오면 화면이 「없음」이라는 거짓 진술을 한다(task#307)');
+  eq(`xctrl-marks0:${V.name}`, XC ? [XC.marks.length, XC.badges.length, XC.legend] : null, [0, 0, false]);
+  bump('xctrl', 5);
+  await page.screenshot({ path: `${OUT}/${V.name}-xctrl.png`, fullPage: true });
+  await page.unroute('**/api/tech-reports/**');
+
+  // ══ 대조군 B — **광물 축 마커 경로의 합성 검증** ═══════════════════════════════
+  // ⚠️ 라이브 실측: producers 티커 ∩ 보유·관심 = 0건(위 `mineral-live-pin`). 이 경로는 라이브에서
+  // **원리적으로 dormant**다. 종목을 추가해 억지로 밟지 않고(사용자 확정) `/api/stocks` **GET
+  // 응답에 한 종목을 합성 주입**해 렌더 경로를 밟는다 — 응답 가로채기라 프로덕션 쓰기 0이다.
+  // 이 축의 PASS는 「라이브 겹침이 있다」가 아니라 **「겹침이 생기면 광물 칩이 마커를 받는다」**다.
+  // 카운터를 **둘로** 쪼갠다: 라우트 발화(sreq)와 주입 적용(sinj). 하나로 두면 0이 「화면이
+  // 그 훅을 안 쓴다」와 「프로브 패턴이 틀렸다」를 구별하지 못한다(⑧ⓔ의 자기적용).
+  // 패턴 자체의 관측가능성은 별도 실측으로 확인했다: 같은 `**/api/stocks`가 `/tech-report/:slug`
+  // 에서는 1건 발화한다(그 화면은 인라인 fetch로 같은 엔드포인트를 쓴다).
+  let sreq = 0, sinj = 0;
+  await page.route('**/api/stocks', async (route) => {
+    sreq += 1;
+    const res = await route.fetch();
+    let body; try { body = await res.json(); } catch { return route.fulfill({ response: res }); }
+    if (Array.isArray(body) && MINJ) {
+      body.push({ ticker: MINJ.ticker, name: `합성-${MINJ.ticker}`, type: 'watchlist', market: 'US', enriched_at: null, analyst_target: false });
+      sinj += 1;
+    }
+    await route.fulfill({ response: res, body: JSON.stringify(body), contentType: 'application/json' });
+  });
+  await page.goto(`${BASE}/tech-anatomy/${PROD_TARGET.slug}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-testid="tech-anatomy"]', { timeout: 20000 }).catch(() => {});
+  await page.waitForFunction(() => document.querySelectorAll('.skeleton-block').length === 0).catch(() => {});
+  await page.waitForTimeout(900);
+  const MD = await page.evaluate((n) => window.__readCross(n), MINJ_X.names);
+  eq(`minj-domain:${V.name}`, MINJ ? 'OK' : 'NO_INJECTABLE_PRODUCER_TICKER', 'OK',
+     MINJ ? `${MINJ.ticker} 칩 ${MINJ.chips}개 · ${PROD_TARGET.slug}` : '');
+  eq(`minj-route-fired:${V.name}`, sreq > 0, true,
+     `/api/stocks 요청 ${sreq}건 — 0이면 화면이 그 훅을 쓰지 않는다는 뜻이다(패턴 블라인드가 아니다)`);
+  eq(`minj-injected:${V.name}`, sinj > 0, true, `가로챈 /api/stocks ${sinj}건`);
+  eq(`minj-mark-mineral:${V.name}`, (MD?.marks || []).filter((m) => m.axis === 'minerals').length,
+     MINJ_X.markers.filter((m) => m.axis === 'minerals').length, '광물 축 마커 — 라이브 dormant 경로의 합성 검증');
+  eq(`minj-mark-pairs:${V.name}`, (MD?.marks || []).map((m) => `${m.axis}|${m.state}|${m.name}`).sort(),
+     MINJ_X.markers.map((m) => `${m.axis}|${m.state}|${m.name}`).sort());
+  eq(`minj-badge-set:${V.name}`, (MD?.badges || []).map((b) => `${b.axis}|${b.item}|h${b.h}|w${b.w}`).sort(), [...MINJ_X.badges].sort());
+  eq(`minj-summary:${V.name}`, MD ? (MD.summary ? (MD.none ? 'NONE' : MD.found) : 'NO_SUMMARY') : 'NO_ROOT',
+     MINJ_X.measurable ? (MINJ_X.found.length > 0 ? MINJ_X.found.join(' · ') : 'NONE') : 'NO_SUMMARY');
+  eq(`minj-hscroll:${V.name}`, MD ? MD.docOver <= 0 : null, true, `diff=${MD?.docOver}`);
+  bump('minj', 8);
+  rawLog.push(`${V.name} 광물 합성 주입: 마커 ${(MD?.marks || []).filter((m) => m.axis === 'minerals').length}/기대 ${MINJ_X.markers.filter((m) => m.axis === 'minerals').length} · 배지 ${MD?.badges.length}/기대 ${MINJ_X.badges.length}`);
+  await page.screenshot({ path: `${OUT}/${V.name}-minj.png`, fullPage: true });
+  await page.unroute('**/api/stocks');
+
   // ══ ⓖ 대조군 — **page.route 주입**으로 합성한다 ══════════════════════════
   // 옛 판은 "composition이 없는 실제 slug"을 대조군으로 썼다. 그 설계는 백필이 끝나 빈 slug이
   // 0개가 되는 순간 대조군이 소멸해 프로브가 통째로 죽는다(uat298이 데이터 상태 전제로 스테일해진
@@ -464,10 +879,16 @@ console.log(`  ${'(합계)'.padEnd(20)} ${Object.values(cov).reduce((a, b) => a 
 console.log(`\n단언 총계: ${results.length}건 · PASS ${results.length - fails.length} · FAIL ${fails.length}`);
 console.log('\n원시 실측(단언 아님):');
 for (const l of rawLog) console.log(`  ${l}`);
-console.log(`\n※ 육안 캡처 ${OUT}/ — {view}-{anatomy|control|list}.png`);
+console.log('\n※ 육안 캡처 — 이 실행이 남긴 전수(각 축을 재는 그 지점에서 찍었다):');
+// 캡처는 각 축을 **재는 그 지점**에서 찍는다 — 그러면 시점과 대상이 동시에 맞는다(스킬 규율 1).
+for (const f of fs.readdirSync(OUT).filter((f) => f.endsWith('.png')).sort()) console.log(`  ${OUT}/${f}`);
 console.log('═'.repeat(78));
 fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ cov, results, target: TARGET.slug, control: `injected:${TARGET.slug}`,
-  withAnatomy: WITH.map((r) => r.slug), minFloor: MIN_WITH_ANATOMY, API_COUNTS }, null, 2));
+  withAnatomy: WITH.map((r) => r.slug), minFloor: MIN_WITH_ANATOMY, API_COUNTS,
+  crossTargets: CROSS_LIST.map((e) => ({ slug: e.r.slug, markers: e.x.markers.length, badges: e.x.badges.length,
+    measurable: e.x.measurable, unmatched: e.x.unmatched, holdN: e.x.holdN, watchN: e.x.watchN })),
+  trackedN: TRACKED_N, mineralLiveOverlap: MIN_LIVE.length,
+  mineralInjected: MINJ ? MINJ.ticker : null }, null, 2));
 if (fails.length) {
   console.log('\nFAIL 상세:');
   for (const f of fails) console.log(`  ✗ ${f.tag}\n      ${f.msg}`);
