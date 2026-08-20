@@ -41,7 +41,15 @@ const measure = (slug) => {
     kp: (r.key_points || []).length,
     ms: (r.milestones || []).length,
     ch: (r.challenges || []).length,
-    rel: Object.keys(r.related || {}).length,
+    // ⚠️ `Object.keys(related).length` 를 기준으로 쓰면 **구조적으로 항상 4**다 — 백엔드 `Related`
+    // 모델이 4키를 전부 `[]` 기본값으로 채우므로 어떤 발행물에서도 실패할 수 없다(실측 12/12 판 전부
+    // keys=4). 「위반 0건」이 빈 정의역에서 공허하게 참이 되는 것과 같은 가족의 결함이라
+    // (live-uat-probes ⓩ), 기준을 **채워진 키 수 + 총 항목 수**로 옮긴다.
+    // 임계는 실측 분포에서 골랐다: 채워진 키 3~4 · 총 항목 7~20 → 3 / 6 이면 선재 8종 전부 도달
+    // 가능하면서도 관계도가 빈 판은 실제로 FAIL한다(양방향 확인 — task#317 도달불가 / #318 이미도달).
+    relKeys: Object.keys(r.related || {}).length,
+    rel: Object.values(r.related || {}).filter((v) => Array.isArray(v) && v.length > 0).length,
+    relN: Object.values(r.related || {}).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0),
     src: (r.sources || []).length,
     host: hosts(r).length,
     mkt: r.market != null,
@@ -56,7 +64,8 @@ const judge = (m, { needTicker }) => {
   if (!(m.kp >= 3 && m.kp <= 4)) bad.push(`key_points ${m.kp}(3~4)`);
   if (!(m.ms >= 1)) bad.push(`milestones ${m.ms}(≥1)`);
   if (!(m.ch >= 2 && m.ch <= 4)) bad.push(`challenges ${m.ch}(2~4)`);
-  if (m.rel !== 4) bad.push(`related ${m.rel}키(=4)`);
+  if (!(m.rel >= 3)) bad.push(`related 채워진 키 ${m.rel}개(≥3)`);
+  if (!(m.relN >= 6)) bad.push(`related 총 항목 ${m.relN}개(≥6)`);
   if (!(m.src >= 1)) bad.push(`sources ${m.src}(≥1)`);
   if (!(m.host >= 3)) bad.push(`출처 호스트 ${m.host}종(≥3)`);
   if (!m.mkt) bad.push('market 없음');
@@ -67,7 +76,7 @@ const judge = (m, { needTicker }) => {
 };
 
 const line = (m, v) => `  ${v.ok ? 'OK ' : 'BAD'} ${m.slug.padEnd(24)} ` +
-  (m.missing ? '미발행' : `kp=${m.kp} ms=${m.ms} ch=${m.ch} rel=${m.rel} src=${m.src} host=${m.host} tick=${m.tick} comp=${JSON.stringify(m.comp)}`) +
+  (m.missing ? '미발행' : `kp=${m.kp} ms=${m.ms} ch=${m.ch} rel=${m.rel}/${m.relKeys}키·${m.relN}항 src=${m.src} host=${m.host} tick=${m.tick} comp=${JSON.stringify(m.comp)}`) +
   (v.ok ? '' : `  ← ${v.why}`);
 
 // ── C1. 차집합 0 ────────────────────────────────────────────────────────────

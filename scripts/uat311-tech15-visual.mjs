@@ -38,7 +38,11 @@ const UNPUB = NEW9.filter((s) => !REPORTS.some((r) => r.slug === s));
 // 대기 칩(tech-pending-section)의 기대 집합 — TOPICS 가 null 이면 계산 불능이라 그대로 null 전파.
 const PENDING_TOPICS = TOPICS === null ? null : TOPICS.filter((t) => !REPORTS.some((r) => r.slug === t.slug));
 
-P(REPORTS.length >= 7, 'identity:rows', `발행물 ${REPORTS.length}종(하한 7) · 해부보유 ${WITH.length} · 미작성 ${WITHOUT.length}`);
+// ⚠️ task#322 S4 — 하한 래칫 7 → 15(TECH_TOPICS 전 종 발행 완료 시점의 진값).
+//    「데이터를 채우는 작업은 하한 래칫을 진값으로 올리는 것까지가 그 작업의 일부다」(task#308).
+//    안 올리면 리포트가 조용히 사라져도(루틴 upsert의 「키 생략 = 삭제」 계약이 실재한다) 이 축이
+//    통과한다 — 재는 대상이 사라지면 프로브는 실패하지 않고 **침묵한다**.
+P(REPORTS.length >= 15, 'identity:rows', `발행물 ${REPORTS.length}종(하한 15) · 해부보유 ${WITH.length} · 미작성 ${WITHOUT.length}`);
 P(NEW_PUB.length >= 1, 'identity:new-published', `신규 9종 중 발행 ${NEW_PUB.length}건 [${NEW_PUB.map((r) => r.slug).join(',')}]`);
 // ⚠️ task#322 S1 — 옛 축 `identity:unpublished-exists`(미발행 >= 1)를 **교체**했다.
 //    그 축은 「미발행 slug이 실재한다」를 요구했으므로, 15종을 전부 발행하는 순간 원리적으로 FAIL하고
