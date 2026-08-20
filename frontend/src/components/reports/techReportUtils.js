@@ -217,3 +217,34 @@ export function parseDescriptionSections(text) {
   flush()
   return sections
 }
+
+// ── 4장 위계 (task#319 ADR-0045 · task#321이 두 번째 소비처) ──────────────────
+// **여기 두는 이유**: 장 라벨은 이제 **두 표면**이 소비한다 — 본문 장 라벨(TechReport.jsx)과
+// 플로팅 항해 바(TechChapterNav.jsx). 두 곳에 배열을 복제하면 라벨 하나를 고칠 때 한 곳만 고치는
+// 재발 경로가 생긴다(`navSections.js` 단일 소스화와 같은 이유 — task#251).
+export const TECH_CHAPTERS = [
+  { key: 'overview', label: '개요' },
+  { key: 'market-competition', label: '시장·경쟁' },
+  { key: 'progress-risk', label: '진척·리스크' },
+  { key: 'evidence', label: '근거' },
+]
+
+/**
+ * SECTIONS(`{id, label, show, chapter}[]`) → 플로팅 항해 바가 그릴 `[{ chapter, label, targetId }]`.
+ *
+ * - `show: true`인 섹션만 본다. 각 장의 **첫 표시 섹션 id**가 점프 타깃이다.
+ * - 장 순서는 `TECH_CHAPTERS` 순서를 따른다(SECTIONS 배열 순서와 일치해야 하며, 어긋나면
+ *   본문 장 라벨과 바 칩이 다른 순서를 가리킨다 — 그 정합은 테스트가 잰다).
+ * - ⚠️ **결과 길이 < 2면 `[]`** — 칩 1개는 항해가 아니다(유령 UI 금지, 이 페이지의 기존 규율).
+ *   이 게이트는 정적 목차의 `tocItems.length > 1`과 **다른 식**이다: 표시 섹션이 3개여도 전부
+ *   같은 장이면 칩은 1개이므로, 섹션 수로 판정하면 칩 하나만 뜬 바가 생긴다.
+ */
+export function chapterNavItems(sections) {
+  const list = Array.isArray(sections) ? sections : []
+  const items = []
+  for (const c of TECH_CHAPTERS) {
+    const first = list.find((s) => s && s.chapter === c.key && s.show)
+    if (first) items.push({ chapter: c.key, label: c.label, targetId: first.id })
+  }
+  return items.length > 1 ? items : []
+}

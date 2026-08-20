@@ -736,3 +736,33 @@ describe('주요기술 리포트 상세 — 4장 위계 라벨 (task#319 S3)', (
     expect(keys.length).toBe(3)
   })
 })
+
+// ── task#321 — 플로팅 항해 바 배선(페이지 레벨) ──────────────────────────────
+// 바 자체의 계약(칩 수·순서·활성 전이·유령 가드)은 `components/tech/TechChapterNav.test.jsx`가
+// 잰다. 여기서 재는 것은 **페이지가 그것을 옳게 배선했는가**다 — sentinel의 위치와 초기 상태.
+describe('주요기술 리포트 상세 — 플로팅 항해 바 배선 (task#321 S3)', () => {
+  it('목차 직후에 0높이 sentinel이 있고, 초기(sentinel 가시)에는 바가 없다', async () => {
+    mockReport(ALL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-toc')
+    const sentinel = screen.getByTestId('tech-toc-sentinel')
+    // 레이아웃에 영향이 없어야 한다 — 기록된 결정 1(KPI 스트립 첫 화면)·2(목차 위치)를 지키는 메커니즘
+    expect(sentinel.style.height).toBe('0px')
+    expect(sentinel.getAttribute('aria-hidden')).toBe('true')
+    // 목차 **직후**다(그 사이에 다른 섹션이 끼면 바가 뜨는 시점이 어긋난다)
+    const toc = screen.getByTestId('tech-report-toc')
+    expect(toc.nextElementSibling).toBe(sentinel)
+    // IO 스텁이 콜백을 부르지 않으므로 초기 상태는 「목차 화면 안」 = 바 부재다
+    expect(container.querySelector('[data-tech-chapter-nav]')).toBeNull()
+  })
+
+  it('sentinel은 SECTIONS와 무관하게 항상 있다 — 바 게이트는 chapterNavItems가 소유한다', async () => {
+    // 섹션이 1개뿐이면 목차는 렌더되지 않지만(tocItems.length > 1) sentinel은 남아야 한다.
+    // 두 게이트가 **다른 식**이므로, sentinel을 목차 게이트 안에 넣으면 장이 2개 이상인데도
+    // 목차가 없는 판에서 바가 영영 뜨지 않는다.
+    mockReport({ ...SMR_REPORT, players: [], sources: [], description: '', difficulty: {} })
+    renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(screen.getByTestId('tech-toc-sentinel')).toBeTruthy()
+  })
+})

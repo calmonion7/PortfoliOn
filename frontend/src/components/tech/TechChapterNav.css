@@ -1,0 +1,59 @@
+/* 4장 플로팅 항해 바 (task#321).
+
+   ⚠️ **배경은 불투명 `var(--bg)`다 — 반투명 금지.** `mobile.css`가 이미 「배경이 92% 반투명이라
+      아래 콘텐츠가 비친다」를 실측으로 기록했다. 스크롤 중 본문이 칩 뒤로 흐르면 라벨을 읽을 수 없다.
+
+   ⚠️ **`top` 값은 sticky 크롬 높이 실측값이다**(2026-08-21): `.mobile-header` **53px**(sticky, z50) ·
+      `.masthead-sticky` **80px**(sticky, z50). 두 값이 드리프트하면 바가 크롬에 겹치거나 틈이 생기는데,
+      `scripts/uat321-tech-toc-float.mjs`의 `below-chrome` 축이 **그 실행에서 잰 크롬 bottom과 등식**으로
+      대조하므로(계획의 숫자가 아니라 실측값) 드리프트가 그 축에서 잡힌다.
+
+   ⚠️ **z-index 40** — 페이지 레이어(appbar 20 · fab 25 · tabbar 30) 위, 크롬(50) 아래. 크롬 아래에
+      두는 것이 맞다: 바는 크롬을 가려서는 안 되고 크롬 *바로 밑*에 붙는다. 대장은 `App.css` 참조. */
+.toc-float {
+  position: fixed;
+  top: 53px;              /* .mobile-header 실측 h */
+  left: 0; right: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+@media (min-width: 769px) {
+  .toc-float {
+    top: 80px;            /* .masthead-sticky 실측 h */
+    justify-content: center;
+  }
+}
+
+/* 칩은 정적 목차 칩과 **같은 핀**을 쓴다 — `padding: 7px 12px` + `line-height: 18px` = 34px
+   (task#309·#316이 확정한 탭 타깃 핀, 기록된 결정 5). 두 목록이 같은 항해 어포던스이므로
+   높이가 갈리면 화면이 둘을 다른 격으로 말한다. */
+.toc-float__chip {
+  font-size: 11.5px;
+  padding: 7px 12px;
+  line-height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+/* 활성 칩 — `--accent`는 **중립**이다. KR 색 관례(가격 up/down · 의미 success/danger)를 쓰지 않는다:
+   「지금 보는 장」은 방향도 상태도 아니다. */
+.toc-float__chip.is-active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toc-float__chip { transition: none; }
+}

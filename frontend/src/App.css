@@ -66,7 +66,9 @@
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
-    /* 페이지 레이어(appbar 20·fab 25·tabbar 30) 위, 모달(1000) 아래 —
+    /* z 레이어 대장: appbar 20 · fab 25 · tabbar 30 · **toc-float 40**(task#321 플로팅 장 바 —
+       페이지 레이어 위, 크롬 50 아래: 바는 크롬을 가리지 않고 그 *바로 밑*에 붙는다) · 크롬 50 · 모달 1000.
+       페이지 레이어(appbar 20·fab 25·tabbar 30) 위, 모달(1000) 아래 —
        그래야 헤더 안의 드롭다운(.more-pop)이 갇힌 stacking context 천장을 넘어 탭 위로 뜬다 (task#188) */
     position: sticky; top: 0; z-index: 50;
   }

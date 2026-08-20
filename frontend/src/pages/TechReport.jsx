@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { SectionTitle } from '../components/reports/reportUtils.jsx'
-import { TECH_NAMES, sortPlayers, groupByCategory } from '../components/reports/techReportUtils'
+import { TECH_NAMES, sortPlayers, groupByCategory, TECH_CHAPTERS, chapterNavItems } from '../components/reports/techReportUtils'
 import MarketGrowthChart from '../components/tech/MarketGrowthChart'
 import MarketEstimates, { marketEstimatesLayout } from '../components/tech/MarketEstimates'
 import ShareChart from '../components/tech/ShareChart'
 import TechGraph from '../components/tech/TechGraph'
+import TechChapterNav from '../components/tech/TechChapterNav'
 import { rampPositions } from '../components/tech/shareRamp'
 import useTechIndex from '../hooks/useTechIndex'
 import TechKpiStrip from '../components/tech/TechKpiStrip'
@@ -66,6 +67,17 @@ export default function TechReport() {
   // 「구성과 연관」의 경계 칩을 발행물로 잇기 위한 경량 인덱스(ADR-0043). 부가 연결이라 실패해도
   // 본문을 막지 않는다 — 실패는 `failed`로 내려가 칩은 그대로 렌더되고 링크만 빠진다(task#307).
   const { techIndex, failed: techIndexFailed } = useTechIndex()
+  // 정적 목차가 화면 밖으로 나갔는가 — **0높이 sentinel**을 목차 직후에 두고 IO로 관찰한다
+  // (스크롤 리스너로 좌표를 폴링하지 않는다). 밖이면 플로팅 항해 바를 렌더한다.
+  const tocSentinelRef = useRef(null)
+  const [tocOut, setTocOut] = useState(false)
+  useEffect(() => {
+    const el = tocSentinelRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined
+    const io = new IntersectionObserver(([e]) => setTocOut(!e.isIntersecting), { threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [report])
 
   useEffect(() => {
     let ignore = false
@@ -176,6 +188,9 @@ export default function TechReport() {
     { id: 'sources', label: '출처', show: hasSources, chapter: 'evidence' },
   ]
   const tocItems = SECTIONS.filter((s) => s.show)
+  // 플로팅 항해 바가 그릴 4장 칩(task#321). ⚠️ 게이트가 `tocItems.length > 1`과 **다른 식**이다 —
+  //    표시 섹션이 3개여도 전부 같은 장이면 칩은 1개이고, 칩 1개는 항해가 아니다(순수함수가 []를 준다).
+  const navItems = chapterNavItems(SECTIONS)
 
   // 4장 위계(task#319 S3) — 11섹션을 전부 동급으로 나열하면 무엇이 결론이고 무엇이 근거인지 화면이
   // 말하지 않는다. 장 라벨 한 줄 + 얇은 구분선으로 위계를 만든다(공유 프리미티브 `SectionTitle`의
@@ -184,14 +199,10 @@ export default function TechReport() {
   //    장의 섹션이 전부 결측이면 그 장은 키가 없어 라벨도 렌더되지 않는다(이 페이지의 기존 규율
   //    「게이트는 컴포넌트 자신의 채택 조건과 같은 식」의 장 라벨판). `show`를 무시하면 데이터 없는
   //    판에서 라벨만 남는다.
-  const CHAPTERS = [
-    { key: 'overview', label: '개요' },
-    { key: 'market-competition', label: '시장·경쟁' },
-    { key: 'progress-risk', label: '진척·리스크' },
-    { key: 'evidence', label: '근거' },
-  ]
+  // ⚠️ 장 목록은 `techReportUtils.TECH_CHAPTERS` **단일 소스**다(task#321) — 본문 장 라벨과
+  //    플로팅 항해 바가 **둘 다** 소비하므로 여기 복제하면 한 곳만 고치는 재발 경로가 생긴다.
   const chapterHeadAt = {}
-  for (const c of CHAPTERS) {
+  for (const c of TECH_CHAPTERS) {
     const first = SECTIONS.find((s) => s.chapter === c.key && s.show)
     if (first) chapterHeadAt[first.id] = c
   }
@@ -312,6 +323,11 @@ export default function TechReport() {
           ))}
         </nav>
       )}
+
+      {/* 정적 목차가 화면 밖으로 나갔는지 재는 **0높이 sentinel**. 스크롤 좌표를 폴링하지 않고
+          IO 하나로 판정한다. 높이가 0이므로 레이아웃에 영향이 없다(기록된 결정 1·2 불변). */}
+      <div ref={tocSentinelRef} data-testid="tech-toc-sentinel" style={{ height: 0 }} aria-hidden="true" />
+      <TechChapterNav items={navItems} visible={tocOut} />
 
       <Chap id="key-points" />
       {/* ── 핵심 포인트 (task#281 S2) ── 여기만 SectionTitle·바깥 여백을 컴포넌트가 소유한다.

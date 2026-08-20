@@ -7,10 +7,23 @@
    처음엔 산문 소제목도 data-tech-section을 재사용했는데, 그러면 `[data-tech-section]` 개수가
    목차 칩 수와 달라져 테스트·프로브가 각각 11-id 리터럴로 걸러내야 했다(같은 목록이 3곳에
    바이트 동일로 복제 → 섹션을 늘릴 때 한 곳만 고치는 재발 경로). 속성을 갈라 그 필터를 없앴다. */
+/* ⚠️ task#321 — 값을 **플로팅 항해 바 bottom 아래**로 올렸다. 실측(2026-08-21):
+     크롬 `.mobile-header` 53 / `.masthead-sticky` 80 · 바 1줄 46(= 칩 34 + padding 12).
+       모바일 = 53 + 46 + 8 = 107 · PC = 80 + 46 + 8 = 134
+     ⚠️ m278에서는 4칩이 **2줄**이라(실측 폭합 272 > 가용 238) 바가 88px이 되므로 별도 브레이크포인트를
+        둔다(53 + 88 + 8 = 149). 랩 임계는 컨테이너 폭 ~312px이므로 320px 이하로 잡는다.
+     ⚠️ **알고 감수하는 대가**: `scroll-margin`은 CSS 정적 값이라 **바가 안 뜬 상태의 점프에도 적용**된다
+        → 정적 목차에서 첫 섹션으로 점프할 때 여분 여백이 생긴다. 대안(앵커 클릭을 JS로 가로채 동적
+        오프셋)은 네이티브 앵커·해시 직접 진입·뒤로가기 복원을 전부 다시 구현해야 하므로 기각했다. */
 [data-tech-section],
-[data-tech-anchor] { scroll-margin-top: 12px; }
+[data-tech-anchor] { scroll-margin-top: 107px; }
+
+@media (max-width: 320px) {
+  [data-tech-section],
+  [data-tech-anchor] { scroll-margin-top: 149px; }
+}
 
 @media (min-width: 769px) {
   [data-tech-section],
-  [data-tech-anchor] { scroll-margin-top: 88px; }
+  [data-tech-anchor] { scroll-margin-top: 134px; }
 }
