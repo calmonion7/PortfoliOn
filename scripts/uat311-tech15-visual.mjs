@@ -133,9 +133,14 @@ for (const V of VIEWS) {
   //    (1.5 × 11.5 = 17.25)로 떨어져 7+7+17.25+2 = 33.25px 가 되는데, 33.25 >= 32 이므로 이 축은
   //    **그대로 통과한다**. 즉 이 축을 「34px 핀이 지켜지는 증거」로 읽지 말 것 — 문턱만 지킨다.
   //    (핀 자체를 지키려면 h === 34 정밀 단언이 필요하나, 폰트·토큰 변경에 취약해 문턱으로 둔다.)
+  //    ⚠️ 정의역 sentinel(fault injection 실측으로 발견) — 셀렉터를 깨뜨려 칩 0개로 만들었을 때
+  //    ⓐⓑ는 6축 FAIL로 반응했는데 **이 축만 통과**했다: `filter(h<32)` 가 빈 배열에서 길이 0이라
+  //    「32px 미만 0건」이 **공허하게 참**이 되기 때문이다. 즉 구역이 통째로 사라지는 회귀에
+  //    이 축은 눈이 멀어 있었다. 기대 표본이 있는데 칩이 0개면 그것 자체를 FAIL로 읽는다.
   const shortChips = pendChips.filter((c) => c.h < 32);
-  P(shortChips.length === 0, `${V.key}/list:pending-chip-height`,
-    `대기 칩 ${pendChips.length}개 중 32px 미만 ${shortChips.length}건 · 높이=[${pendChips.map((c) => c.h).join(',')}]`
+  const heightOk = shortChips.length === 0 && (pendWant === 0 || pendChips.length > 0);
+  P(heightOk, `${V.key}/list:pending-chip-height`,
+    `대기 칩 ${pendChips.length}개(기대 ${pendWant}) 중 32px 미만 ${shortChips.length}건 · 높이=[${pendChips.map((c) => c.h).join(',')}]`
     + ' (32px 문턱 — 34px 핀 보증 아님)' + domainNote);
 
   // ── ② 상세 — 신규 종은 스크린샷, 278px에서는 **전 종의 넘침 집합**을 baseline과 대조 ──
