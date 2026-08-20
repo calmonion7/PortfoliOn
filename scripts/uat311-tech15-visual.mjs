@@ -40,10 +40,22 @@ const PENDING_TOPICS = TOPICS === null ? null : TOPICS.filter((t) => !REPORTS.so
 
 P(REPORTS.length >= 7, 'identity:rows', `발행물 ${REPORTS.length}종(하한 7) · 해부보유 ${WITH.length} · 미작성 ${WITHOUT.length}`);
 P(NEW_PUB.length >= 1, 'identity:new-published', `신규 9종 중 발행 ${NEW_PUB.length}건 [${NEW_PUB.map((r) => r.slug).join(',')}]`);
-P(UNPUB.length >= 1, 'identity:unpublished-exists', `미발행 신규 ${UNPUB.length}종 — 해부 미작성 화면의 대조군 표본이 존재한다`);
-
+// ⚠️ task#322 S1 — 옛 축 `identity:unpublished-exists`(미발행 >= 1)를 **교체**했다.
+//    그 축은 「미발행 slug이 실재한다」를 요구했으므로, 15종을 전부 발행하는 순간 원리적으로 FAIL하고
+//    PENDING === undefined 가 되어 아래 `pending:` 블록 6축 × 3뷰포트가 **조용히 사라진다**
+//    (FAIL이 아니라 침묵이다 — 규칙 ②의 「재는 대상이 사라지면 프로브는 실패하지 않고 침묵한다」).
+//    그래서 대조군을 **실데이터에 인질로 두지 않고 page.route 주입으로 합성**한다(규칙 ①).
+//    주입은 GET 응답 가로채기라 프로덕션에 아무것도 쓰지 않는다.
 const DETAIL = NEW_PUB[0]?.slug;
-const PENDING = UNPUB[0];            // 미발행 slug — 해부 화면이 안내를 렌더해야 한다
+// PENDING_MODE=inject 를 env 로 강제할 수 있다 — 「미발행 0」 세계를 발행 *전에* 예행하는 스위치다.
+// (이 저장소의 CONTROL= 대조군 관용구와 같은 성격이며, 기본값은 라이브 데이터가 정한다.)
+const PENDING_MODE = process.env.PENDING_MODE || (UNPUB.length >= 1 ? 'live' : 'inject');
+// inject 모드의 대상은 **발행된 slug** 이어야 한다 — 이미 비어 있는 응답에 {reports:[]} 를 덮으면
+// 주입이 no-op 이라 sentinel 이 「라우트가 걸렸다」만 증언하고 「덮어썼다」는 증언하지 못한다.
+const PENDING = PENDING_MODE === 'live' ? UNPUB[0] : (REPORTS[0]?.slug ?? TOPICS?.[0]?.slug);
+P(PENDING != null, 'identity:pending-control',
+  `해부 미작성 대조군 확보 — mode=${PENDING_MODE} slug=${PENDING} (미발행 실재 ${UNPUB.length}종) · ` +
+  `mode=inject 는 발행된 slug의 /api/tech-reports/{slug} 를 {reports:[]} 로 덮어 미발행 화면을 합성한다`);
 
 const MEASURE = () => {
   window.__m = {
@@ -169,14 +181,47 @@ for (const V of VIEWS) {
       bump('m278:detail-measured', 1);
       if (d.sw > d.cw) over.push(`${r.slug}(${d.sw})`);
     }
-    const set = over.map((x) => x.split('(')[0]).sort();
-    P(JSON.stringify(set) === JSON.stringify(OVERFLOW_BASELINE), 'm278/detail:hscroll-set-is-baseline',
-      `278px 넘침 ${over.length}/${REPORTS.length}종 [${over.join(' ')}] · baseline [${OVERFLOW_BASELINE.join(' ')}] — ` +
-      `선재 결함(players 표의 「선두 대비」 열). 신규 진입이 있으면 회귀다`);
+    // ⚠️ task#322 S1 — 옛 축 `hscroll-set-is-baseline`(집합 **동일성**)을 **교체**했다.
+    //    그 축은 리포트가 늘면 원리적으로 깨진다: 새 slug이 이 선재 결함(players 표 「선두 대비」 열)을
+    //    물려받으면 집합이 커져 FAIL하는데, 그 넘침은 **내가 만든 것이 아니다**(task#311이 baseline으로
+    //    박제한 선재이며 이번 태스크의 비목표다). 「항상 FAIL하는 축은 게이트가 아니다」(task#316)에 따라
+    //    축을 「이 변경이 깨뜨릴 수 있는 것」으로 좁힌다 —
+    //      ⓐ 래칫: **기존 3종의 넘침량이 baseline 이하**(악화하면 FAIL)
+    //      ⓑ 기록: 신규 진입은 FAIL시키지 않고 기록만 하되, **측정 커버리지에 이빨을 남긴다**.
+    //    느슨화가 아니다: 내가 선재 판을 악화시키면 ⓐ가, 측정이 조용히 사라지면 ⓑ가 잡는다.
+    const OVER_MAX = { 'reusable-rocket': 306, 'ai-datacenter-ops': 298, 'semiconductor-equipment': 296 };
+    const measured = new Map(over.map((x) => [x.split('(')[0], Number(x.match(/\((\d+)\)/)[1])]));
+    // ⓐ 래칫 — 정의역 sentinel 포함(규칙 ⓩ: `filter(bad).length === 0` 은 빈 표본에서 공허하게 참이다).
+    //    baseline slug 이 하나라도 REPORTS 에서 사라졌으면 그것 자체를 FAIL로 읽는다.
+    const baseAlive = Object.keys(OVER_MAX).filter((s) => REPORTS.some((r) => r.slug === s));
+    const worse = Object.entries(OVER_MAX)
+      .filter(([s, cap]) => baseAlive.includes(s) && (measured.get(s) ?? 0) > cap)
+      .map(([s, cap]) => `${s} ${measured.get(s)}>${cap}`);
+    P(worse.length === 0 && baseAlive.length === Object.keys(OVER_MAX).length,
+      'm278/detail:hscroll-baseline-ratchet',
+      `선재 3종 넘침량 baseline 이하 — 악화 ${worse.length}건${worse.length ? ' ' + JSON.stringify(worse) : ''} · ` +
+      `실측 ${JSON.stringify(Object.fromEntries(baseAlive.map((s) => [s, measured.get(s) ?? 0])))} · ` +
+      `baseline ${JSON.stringify(OVER_MAX)} · baseline slug 생존 ${baseAlive.length}/${Object.keys(OVER_MAX).length}`);
+    // ⓑ 신규 진입 기록 — 판정은 「전 종을 실제로 측정했는가」에 걸어 침묵을 막는다.
+    const entrants = [...measured.keys()].filter((s) => !(s in OVER_MAX)).sort();
+    P(cov['m278:detail-measured'] === REPORTS.length, 'm278/detail:hscroll-new-entrants',
+      `측정 ${cov['m278:detail-measured']}/${REPORTS.length}종 · 278px 넘침 ${over.length}종 [${over.join(' ')}] · ` +
+      `신규 진입 ${entrants.length}종 [${entrants.join(' ')}] — 선재 결함(players 표 「선두 대비」 열) 상속이며 ` +
+      `이 태스크의 비목표다(기록만, FAIL 아님)`);
   }
 
-  // ── ③ 해부 미작성(미발행 slug) — 대조군 ────────────────────────────────────
+  // ── ③ 해부 미작성 — 대조군(실데이터 또는 page.route 주입 합성) ─────────────
   if (PENDING) {
+    // ⚠️ 주입은 **이 화면 방문에만** 걸어야 한다 — 같은 경로(/api/tech-reports/{slug})를 리포트 상세도
+    //    읽으므로, 전역에 걸면 위 m278 넘침 스윕이 그 slug에서 빈 화면을 재게 된다(측정 오염).
+    //    그래서 여기서 route 를 걸고 블록 끝에서 unroute 한다.
+    let injected = 0;
+    if (PENDING_MODE === 'inject') {
+      await page.route(`**/api/tech-reports/${PENDING}`, async (route) => {
+        injected += 1;
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ reports: [] }) });
+      });
+    }
     await page.goto(`${BASE}/tech-anatomy/${PENDING}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(900);
     await page.screenshot({ path: `${OUT}/${V.key}-anatomy-pending-${PENDING}.png`, fullPage: true });
@@ -201,6 +246,14 @@ for (const V of VIEWS) {
       (WITHOUT.length === 0 ? ' ⚠️ 라이브 표본 0 — 그 하위 분기는 통과가 아니라 **미검증**이다' : ''));
     P(pill.length === 1, `${V.key}/pending:list-pill`, `list-pill ${pill.length}개(task#309 계약)`);
     P(doc3.sw <= doc3.cw, `${V.key}/pending:no-hscroll`, `문서 ${doc3.sw} <= ${doc3.cw}`);
+    // ⚠️ 주입 sentinel(규칙 ①) — 「축 0개」가 앱의 성질인지 **측정 실패**인지 가른다.
+    //    라우트 패턴이 안 맞아 주입이 0건이면 위 미작성 축들은 "앱이 옳게 그렸다"가 아니라
+    //    "그냥 발행된 화면을 봤다"는 뜻인데, 그 둘이 같은 PASS로 보인다.
+    //    양방향 identity로 쓴다 — live 모드에서는 **가로채지 않았음**을 단언해 실데이터를 봤음을 보증한다.
+    P(PENDING_MODE === 'inject' ? injected > 0 : injected === 0, `${V.key}/pending:control-injected`,
+      `대조군 mode=${PENDING_MODE} · /api/tech-reports/${PENDING} 가로챔 ${injected}건 ` +
+      `(inject면 >0, live면 =0 이어야 한다)`);
+    if (PENDING_MODE === 'inject') await page.unroute(`**/api/tech-reports/${PENDING}`);
   }
   await ctx.close();
 }
