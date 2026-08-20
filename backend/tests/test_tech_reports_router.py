@@ -10,10 +10,11 @@ import copy
 import json
 from unittest.mock import patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from routers.tech_reports import router
+from routers.tech_reports import Composition, router
 from auth import get_current_user_or_api_key, require_admin_or_api_key
 from services import tech_reports as svc
 
@@ -23,6 +24,17 @@ app.include_router(router)
 app.dependency_overrides[get_current_user_or_api_key] = lambda: "test-user-id"
 app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _no_stored_row():
+    """발행 핸들러가 **보존분 재검증**(task#313 S2)을 위해 기존 행을 read하므로, 파일 전역
+    기본값을 「직전 판 없음」으로 고정한다 — 안 하면 그 read가 conftest `_block_real_db`
+    가드에 걸려 발행 테스트 전부가 500이 된다. 직전 판이 필요한 테스트는 자기
+    `patch.object(svc, "query", ...)`로 안쪽에서 덮는다(중첩 patch는 내부가 이긴다).
+    """
+    with patch.object(svc, "query", return_value=[]):
+        yield
 
 
 VALID_BODY = {
@@ -466,7 +478,11 @@ def test_publish_with_variants_watch_items_201():
 
 
 def test_publish_variants_watch_items_omitted_and_explicit_null_201():
-    """ⓑ 키 생략과 명시적 null 둘 다 201·None(task#250 함정의 핀 — Optional[List[...]]여야 통과)."""
+    """ⓑ 키 생략과 명시적 null 둘 다 201·None(task#250 함정의 핀 — Optional[List[...]]여야 통과).
+
+    ⚠️ 두 경로가 같은 것은 **model_dump 값**뿐이다 — 저장 시맨틱은 생략=보존 / null=삭제로
+    갈리며 그 구별은 `omitted`가 진다(위 `test_omitted_wiring_...`이 그 축을 잰다, task#313).
+    """
     # 생략(=구발행물 형태 body, ⓔ 회귀 0)
     with patch.object(svc, "save_report") as mock_save:
         resp = client.post("/api/tech-reports/smr", json=copy.deepcopy(VALID_BODY))
@@ -940,6 +956,256 @@ def test_composition_same_name_across_different_axes_201():
     comp["tech"][0]["name"] = "리튬"          # minerals[0]과 같은 이름
     comp["tech"][0]["leaders"] = []
     comp["minerals"][0]["name"] = "리튬"
+    # tech 항목을 개명했으므로 그것을 가리키던 used_in도 함께 옮긴다 — task#313 S3가 그 참조
+    # 실재를 강제하므로, 안 옮기면 이 픽스처가 「축 단위 유일성」이 아니라 dangling used_in으로
+    # 422가 나 결정이 아니라 픽스처 사정 때문에 실패한다(축은 그대로 유지된다).
+    comp["minerals"][0]["used_in"] = ["리튬"]
     with patch.object(svc, "execute"):
         resp = client.post("/api/tech-reports/reusable-rocket", json=_body_with_composition(comp))
     assert resp.status_code == 201, _detail(resp)
+
+
+# ── 재발행 보존분 재검증 · used_in 실재 (task#313 S2·S3) ───────────────
+#
+# S1이 「키 생략 = 보존」을 만들면서 새 경로가 열린다: 옛 판의 composition이 보존되는데
+# 새 판 players[]에서 그 업체가 빠지면 참조가 조용히 끊긴다(ADR-0042 결정 1의 근거 문장이
+# 전용 엔드포인트에 대해 예고한 바로 그 경로가 단일 엔드포인트 안에서 열린 것). S2가 그것을
+# 발행 시점 422로 막고, S3는 같은 가족의 남은 공백(minerals[].used_in → tech[].name)을 닫는다.
+
+
+def _stored(comp):
+    """기존 행 1건 — 이 경로가 읽는 것은 그 판의 composition뿐이다(jsonb는 dict로 디코드된다)."""
+    return [{"slug": "reusable-rocket", "published_date": "2026-08-01",
+             "title": "옛 판", "composition": comp}]
+
+
+def test_omitted_wiring_passes_preservable_names_to_save_report():
+    """배선 — 생략한 선택 필드명이 그대로 `omitted`로 넘어간다.
+
+    이 배선이 없으면 S1의 보존 기능이 **한 번도 호출되지 않는다**(SQL은 늘 full SET).
+    명시적 null은 「삭제」이므로 omitted에 들지 않는다 — 그 비대칭이 계약 전체를 지탱한다.
+    """
+    with patch.object(svc, "save_report") as mock_save:
+        resp = client.post("/api/tech-reports/reusable-rocket", json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 201, _detail(resp)
+    assert mock_save.call_args.kwargs["omitted"] == frozenset(svc._PRESERVABLE)
+
+    body = copy.deepcopy(VALID_BODY)
+    body["composition"] = None
+    body["variants"] = None
+    with patch.object(svc, "save_report") as mock_save2:
+        assert client.post("/api/tech-reports/reusable-rocket", json=body).status_code == 201
+    assert mock_save2.call_args.kwargs["omitted"] == (
+        frozenset(svc._PRESERVABLE) - {"composition", "variants"})
+
+
+def test_preserved_leaders_dangling_when_players_shrink_422():
+    """① 보존될 composition.tech[].leaders가 새 players[]에 없으면 422.
+
+    red-first: S1(생략=보존)만 있으면 이 요청은 **201로 통과**해 모순이 저장된다 —
+    옛 판이 참조하는 업체가 새 판 players[]에 없는 상태가 조용히 살아남는다.
+    """
+    stored = copy.deepcopy(COMPOSITION)
+    stored["tech"][0]["leaders"] = ["SpaceX", "Blue Origin"]
+    body = copy.deepcopy(VALID_BODY)                 # players는 SpaceX 하나뿐
+    assert "composition" not in body                 # 정의역 sentinel: 생략 경로를 실제로 탄다
+    with patch.object(svc, "query", return_value=_stored(stored)):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket", json=body)
+    assert resp.status_code == 422, _detail(resp)
+    d = _detail(resp)
+    assert "Blue Origin" in d, d
+    # 해법 2가지가 메시지에 있어야 한다(결정 3) — 없으면 루틴이 같은 422를 30일마다 반복한다
+    assert "players" in d, d
+    assert "composition" in d, d
+    mock_exec.assert_not_called()
+
+
+def test_preserved_leaders_all_present_201():
+    """① 대조군 — 보존될 leaders가 새 players[]에 전부 있으면 통과한다.
+
+    이 축이 없으면 위 422가 「무조건 거부」로도 통과하므로 판별력이 0이다.
+    """
+    stored = copy.deepcopy(COMPOSITION)
+    stored["tech"][0]["leaders"] = ["SpaceX"]
+    with patch.object(svc, "query", return_value=_stored(stored)):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket", json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 201, _detail(resp)
+    mock_exec.assert_called_once()
+
+
+def test_explicit_null_composition_skips_revalidation_201():
+    """② 명시적 `"composition": null`은 이 경로를 타지 않는다 — 삭제 의도라 보존할 것이 없다.
+
+    read 자체를 안 하는 것까지 단언한다(하면 「삭제인데 옛 판을 근거로 거부」가 된다).
+    """
+    stored = copy.deepcopy(COMPOSITION)
+    stored["tech"][0]["leaders"] = ["SpaceX", "Blue Origin"]   # 새 players엔 없다
+    body = copy.deepcopy(VALID_BODY)
+    body["composition"] = None
+    with patch.object(svc, "query", return_value=_stored(stored)) as mock_q:
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket", json=body)
+    assert resp.status_code == 201, _detail(resp)
+    mock_q.assert_not_called()
+    mock_exec.assert_called_once()
+
+
+def test_new_slug_has_nothing_to_preserve_201():
+    """③ 기존 행이 없는 신규 slug — 보존할 판이 없으므로 통과한다."""
+    with patch.object(svc, "query", return_value=[]):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/quantum-computing",
+                               json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 201, _detail(resp)
+    mock_exec.assert_called_once()
+
+
+def test_stored_row_without_composition_201():
+    """③ 경계 — 직전 판이 있어도 composition이 NULL이면 대조할 참조가 없다."""
+    with patch.object(svc, "query", return_value=_stored(None)):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket",
+                               json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 201, _detail(resp)
+    mock_exec.assert_called_once()
+
+
+def test_used_in_dangling_422():
+    """S3 — minerals[].used_in의 이름은 tech[].name에 실재해야 한다(못 찾은 이름을 메시지에 싣는다).
+
+    이 참조가 끊기면 해부 화면이 광물을 존재하지 않는 필요기술에 연결해 그린다.
+    """
+    comp = copy.deepcopy(COMPOSITION)
+    comp["minerals"][0]["used_in"] = ["재점화 엔진", "없는기술"]
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/reusable-rocket", json=_body_with_composition(comp))
+    assert resp.status_code == 422, _detail(resp)
+    assert "없는기술" in _detail(resp), _detail(resp)
+    mock_exec.assert_not_called()
+
+
+def test_used_in_all_present_201():
+    """S3 대조군 — 기본 픽스처의 used_in은 전부 tech[].name에 실재한다(무조건 거부가 아님)."""
+    comp = copy.deepcopy(COMPOSITION)
+    assert [m.get("used_in") for m in comp["minerals"]] != [[], [], []]   # 빈 표본 아님
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket", json=_body_with_composition(comp))
+    assert resp.status_code == 201, _detail(resp)
+
+
+def test_used_in_without_tech_axis_201():
+    """S3 — tech 축이 없으면 검증을 **생략**한다(광물 축만 실은 부분 발행이 합법).
+
+    ⚠️ 라이브 7종엔 「tech 부재 + used_in 있음」 판이 0건이라(S0 baseline) 이 생략 분기는
+    픽스처로만 덮인다. 그래서 픽스처가 실제로 그 분기를 *타는지* 아래에서 별도로 증명한다 —
+    이빨 단언은 분기 커버리지를 보장하지 않는다(task#301).
+
+    이 201은 **직전 판이 없는(또는 tech 축이 없던) 경우**의 계약이다. 직전 판에 tech가 있던
+    재발행에서 광물만 싣는 요청은 `_reject_dropped_axes`가 축 소실로 먼저 422를 낸다
+    (적대검토 #2·#15 — dangling used_in이 저장되는 유해 경로는 그쪽에서 닫혔다).
+    """
+    comp = {"minerals": copy.deepcopy(COMPOSITION["minerals"]),
+            "minerals_share_basis": COMPOSITION["minerals_share_basis"]}
+    parsed = Composition(**copy.deepcopy(comp))
+    assert parsed.tech is None                                  # 생략 분기의 게이트 조건
+    assert any(m.used_in for m in parsed.minerals)               # 그리고 검사할 참조가 실재한다
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket", json=_body_with_composition(comp))
+    assert resp.status_code == 201, _detail(resp)
+
+
+# ── 축 단위 부분 발행 (적대검토 #1·#14) ────────────────────────────────
+#
+# 보존 입도는 **컬럼 단위**다 — `composition`을 실으면 컬럼이 통째 치환되므로, 루틴이
+# 프롬프트 §3의 「모르는 축은 통째로 생략하라」를 따라 광물만 실은 재발행 하나가 직전 판의
+# tech·experts 두 축(각 3~7항목의 판단값)을 경고 없이 지운다. 필드 수준의 「생략=보존」과
+# 같은 계약을 축 수준으로 내린다: **축 생략 = 유지 요구(422) / 명시적 null = 삭제 허용**.
+
+
+def _minerals_only():
+    return {"minerals": copy.deepcopy(COMPOSITION["minerals"]),
+            "minerals_share_basis": COMPOSITION["minerals_share_basis"]}
+
+
+def test_composition_axis_dropped_on_republish_422():
+    """직전 판에 있던 축을 새 composition이 말없이 빼면 422(사라지는 축 이름을 메시지에 싣는다).
+
+    red-first: 이 가드가 없으면 201이고 저장값은 `{"tech": null, "experts": null, ...}`가 된다
+    — 게이트 0(leaders·used_in 검증은 tech가 None이라 skip)·테스트 0의 데이터 손실 경로였다.
+    """
+    with patch.object(svc, "query", return_value=_stored(copy.deepcopy(COMPOSITION))):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket",
+                               json=_body_with_composition(_minerals_only()))
+    assert resp.status_code == 422, _detail(resp)
+    d = _detail(resp)
+    assert "tech" in d and "experts" in d, d
+    mock_exec.assert_not_called()
+
+
+def test_composition_axis_explicit_null_deletes_201():
+    """축 삭제는 **명시적 null**로만 — 그때는 통과한다(필드 수준 계약과 같은 비대칭)."""
+    comp = _minerals_only()
+    comp["tech"] = None
+    comp["experts"] = None
+    with patch.object(svc, "query", return_value=_stored(copy.deepcopy(COMPOSITION))):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket",
+                               json=_body_with_composition(comp))
+    assert resp.status_code == 201, _detail(resp)
+    mock_exec.assert_called_once()
+
+
+def test_composition_all_axes_reincluded_201():
+    """대조군 — 세 축을 다시 실으면 통과한다(가드가 「composition 실으면 무조건 거부」가 아님)."""
+    with patch.object(svc, "query", return_value=_stored(copy.deepcopy(COMPOSITION))):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/reusable-rocket",
+                               json=_body_with_composition(COMPOSITION))
+    assert resp.status_code == 201, _detail(resp)
+    mock_exec.assert_called_once()
+
+
+def test_new_slug_partial_axis_201():
+    """대조군 — 직전 판이 없으면 광물 축만 실은 부분 발행이 합법이다(잃을 축이 없다)."""
+    with patch.object(svc, "query", return_value=[]):
+        with patch.object(svc, "execute") as mock_exec:
+            resp = client.post("/api/tech-reports/quantum-computing",
+                               json=_body_with_composition(_minerals_only()))
+    assert resp.status_code == 201, _detail(resp)
+    mock_exec.assert_called_once()
+
+
+def test_publish_response_reports_preserved_fields():
+    """관측 — 보존이 일어난 필드를 응답에 싣는다.
+
+    `published_date`·`created_at`은 **항상** 갱신되는데 보존분은 그대로이므로, 응답에
+    아무 것도 안 실으면 「stale이 fresh로 보인다」를 사후에 셀 수단이 없다(적대검토 #4·#9·#17).
+    """
+    with patch.object(svc, "execute"):
+        resp = client.post("/api/tech-reports/reusable-rocket", json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 201, _detail(resp)
+    assert resp.json()["preserved"] == sorted(svc._PRESERVABLE)
+    # 이빨 — 전부 실은 판은 보존이 0이다(무조건 5개를 되돌리는 것이 아님)
+    body = _body_with_composition(COMPOSITION)
+    body.update(key_points=None, milestones=None, variants=None, watch_items=None)
+    with patch.object(svc, "query", return_value=[]):
+        with patch.object(svc, "execute"):
+            resp2 = client.post("/api/tech-reports/reusable-rocket", json=body)
+    assert resp2.status_code == 201, _detail(resp2)
+    assert resp2.json()["preserved"] == []
+
+
+def test_preserved_leaders_message_offers_resend_before_deletion():
+    """422 메시지는 **되싣기**를 먼저 제시해야 한다 — 삭제가 첫 해법이면 201을 최적화하는
+    루틴에게 가장 값싼 경로가 「해부 삭제」가 된다(적대검토 #5·#8).
+    """
+    stored = copy.deepcopy(COMPOSITION)
+    stored["tech"][0]["leaders"] = ["SpaceX", "Blue Origin"]
+    with patch.object(svc, "query", return_value=_stored(stored)):
+        resp = client.post("/api/tech-reports/reusable-rocket", json=copy.deepcopy(VALID_BODY))
+    assert resp.status_code == 422, _detail(resp)
+    d = resp.json()["detail"]
+    assert d.index("다시 실어") < d.index('"composition": null'), d

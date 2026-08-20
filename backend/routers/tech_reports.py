@@ -4,16 +4,19 @@
 require_admin_or_api_key(루틴), 조회 2종은 get_current_user_or_api_key
 (ADR-0029 — 무인증 read 없음).
 """
+import logging
 import math
 from datetime import date
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from auth import get_current_user_or_api_key, require_admin_or_api_key
 from services import tech_reports as svc
 from services.utils import sanitize
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/tech-reports", tags=["tech-reports"])
 
@@ -394,12 +397,126 @@ class TechReportIn(BaseModel):
                 "composition.tech[].leaders에 players에 없는 이름이 있습니다: " + ", ".join(missing))
         return self
 
+    @model_validator(mode="after")
+    def _minerals_used_in_exist_in_tech(self):
+        """composition.minerals[].used_in은 전부 composition.tech[].name에 실재해야 한다.
+
+        형제 `_composition_leaders_exist_in_players`와 같은 dangling-reference 클래스인데,
+        이쪽은 **같은 composition 안의 상호참조**라 요청 본문만으로 닫힌다(ADR-0042 결정 1의
+        참조 원자성). 끊긴 이름은 해부 화면이 그 문서에 없는 필요기술을 광물의 「쓰임」으로
+        적는다(`TechAnatomy.jsx::MineralMeta`는 조인 없이 텍스트로 렌더하므로 결측 칩이 아니라
+        **없는 이름을 사실처럼 적은 문구**가 된다).
+
+        ⚠️ **tech 축이 없으면 검증을 생략한다.** 광물 축만 실은 부분 발행이 합법이고
+        (Composition의 세 축 전부 Optional), 참조 대상 집합 자체가 없으면 「없는 이름」이라
+        판정할 근거가 없다 — 여기서 422를 내면 광물만 아는 판의 발행 전체가 막힌다.
+        라이브 7종엔 그런 판이 0건이라(task#313 S0) 이 분기는 픽스처로만 덮인다.
+        생략이 위험해지는 경우(직전 판엔 tech가 있었는데 이번 판이 광물만 싣는 재발행)는
+        `_reject_dropped_axes`가 축 소실 단계에서 먼저 422로 막는다(적대검토 #2·#15).
+
+        ⚠️ **이 검증은 요청 본문만 본다.** composition이 보존되는 경로에서는 실행되지 않으므로,
+        이 축을 앞으로 조여도 **이미 저장된 행에는 도달하지 않는다** — 저장 blob 전체를
+        현재 스키마로 재검증하는 것은 별개 수단이 필요하다(적대검토 #11, 후속 후보로 남긴다:
+        「보존 blob의 `Composition` 재검증」. 지금 넣으면 미측정 라이브 행이 422로 굳어
+        그 기술의 발행이 무기한 동결될 수 있다).
+        """
+        if not self.composition or not self.composition.tech:
+            return self
+        known = {i.name for i in self.composition.tech}
+        missing = sorted({n for m in (self.composition.minerals or [])
+                          for n in (m.used_in or []) if n not in known})
+        if missing:
+            raise ValueError(
+                "composition.minerals[].used_in에 composition.tech에 없는 이름이 있습니다: "
+                + ", ".join(missing))
+        return self
+
+
+_AXES = ("tech", "minerals", "experts")
+
+
+def _stored_composition(slug: str) -> dict:
+    """직전 판의 composition(없으면 빈 dict). 발행은 admin·루틴 전용 저빈도 경로라
+    요청당 SELECT 1회는 감당한다 — 두 게이트가 이 한 번의 read를 공유한다."""
+    rows = svc.get_by_slug(slug)
+    return (rows[0].get("composition") if rows else None) or {}
+
+
+def _reject_dangling_preserved_leaders(stored: dict, body: TechReportIn) -> None:
+    """보존될 직전 판 composition의 leaders를 **새** players[]로 재검증한다(task#313 S2).
+
+    S1의 「키 생략 = 보존」이 참조자(옛 composition)와 피참조자(새 players)를 **시점 분리**시켜,
+    ADR-0042 결정 1이 전용 엔드포인트에 대해 예고한 dangling 경로를 단일 엔드포인트 안에서
+    열어 버린다. 그래서 보존이 일어나는 그 요청에서 바로 대조한다 — 통과시키면 화면이
+    존재하지 않는 업체 칩을 그리고, 조용히 제거하면 데이터가 소리 없이 줄어든다.
+
+    ⚠️ 메시지는 **되싣기를 먼저** 제시한다. 삭제 안내를 앞세우면 201을 최적화하는 루틴에게
+    가장 값싼 탈출구가 「해부 삭제」가 되어, 이 게이트가 지키려던 3축을 그 자리에서 지운다
+    (적대검토 #5·#8). 발동 사실은 `logger.warning`으로 남긴다 — 이 경로는 job_runs를 타지
+    않아 로그가 유일한 사후 관측 수단이다(루틴 로그는 끝난 뒤에만 읽힌다, task#300).
+    """
+    known = {p.name for p in body.players}
+    missing = sorted({n for item in (stored.get("tech") or [])
+                      for n in (item.get("leaders") or []) if n not in known})
+    if missing:
+        logger.warning("[TechReport] 보존분 leaders 끊김으로 발행 거부 (missing=%s)", missing)
+        raise HTTPException(
+            status_code=422,
+            detail="composition을 생략하면 직전 판이 보존되는데, 그 composition.tech[].leaders가 "
+                   "새 players[]에 없습니다: " + ", ".join(missing)
+                   + " — GET /api/tech-reports/{slug}의 composition을 이 요청에 그대로 다시 실어"
+                     " 주세요(또는 그 업체를 players[]에 유지하세요)."
+                     ' 해부를 지우려는 것이면 "composition": null.',
+        )
+
+
+def _reject_dropped_axes(stored: dict, comp: Composition) -> None:
+    """새 composition이 직전 판의 축을 **말없이** 빼면 422(적대검토 #1·#14).
+
+    보존 입도는 **컬럼 단위**다 — `composition`을 실으면 그 컬럼이 통째 치환되므로, 루틴이
+    프롬프트 §3의 「모르는 축은 통째로 생략하라」를 따라 광물만 실은 재발행 하나가 직전 판의
+    tech·experts 두 축(각 3~7항목의 share_pct+rationale 판단값)을 경고 없이 지운다. 그 경로엔
+    게이트가 하나도 없었다(leaders·used_in 검증은 tech가 None이라 skip). 그래서 필드 수준의
+    계약을 축 수준으로 내린다: **축 생략 = 유지 요구(422) / 명시적 null = 삭제 허용**.
+
+    축 단위 자동 병합은 하지 않는다 — 「조용히 합쳐진다」는 이 저장소가 기각한 형태다
+    (ADR-0034가 is_basis 추론을 금지한 것과 같은 성질).
+    """
+    dropped = [a for a in _AXES
+               if stored.get(a) and not getattr(comp, a) and a not in comp.model_fields_set]
+    if dropped:
+        logger.warning("[TechReport] 축 소실로 발행 거부 (dropped=%s)", dropped)
+        raise HTTPException(
+            status_code=422,
+            detail="composition을 실으면 그 컬럼이 통째 치환되므로 직전 판의 축이 사라집니다: "
+                   + ", ".join(dropped)
+                   + " — 그 축을 이 요청에 함께 다시 실어 주세요(GET /api/tech-reports/{slug}의"
+                     " composition을 그대로 복사해도 됩니다)."
+                     ' 정말 지우려는 것이면 그 축에 명시적 null을 실으세요(예 "tech": null).',
+        )
+
 
 @router.post("/{slug}", status_code=201)
 def publish_report(slug: SlugPath, body: TechReportIn, _: str = Depends(require_admin_or_api_key)):
-    """발행 — 같은 (slug, published_date) 재발행은 upsert(그날 판 교체)."""
-    svc.save_report(slug, body.model_dump())
-    return {"ok": True, "slug": slug, "published_date": body.published_date}
+    """발행 — slug당 1행 upsert(ADR-0038). 선택 5필드는 **키 생략 = 보존 / 명시적 null = 삭제**.
+
+    `model_fields_set`은 명시적 null도 포함하므로 그 케이스는 `omitted`에 들지 않고 컬럼이
+    SET에 남아 NULL이 저장된다(= 삭제) — 계약이 여기서 분기 없이 성립한다(task#313).
+    필드 목록은 `svc._PRESERVABLE`이 정본이다(여기 다시 적으면 dual-source가 된다).
+
+    ⚠️ `published_date`·`created_at`은 **항상** 갱신되지만 보존분은 그대로다 — 그래서 행은
+    여러 발행 시점의 모자이크가 되고 화면의 「YYYY-MM-DD 갱신」은 *본문* 갱신일이다
+    (적대검토 #4·#9·#17). 응답 `preserved`가 그 사실의 유일한 관측 수단이다(필드별 vintage는
+    ADR-0038의 slug당 1행 아래선 저장할 자리가 없다 — 알고도 미룬 한계로 기록).
+    """
+    omitted = frozenset(svc._PRESERVABLE) - body.model_fields_set
+    if "composition" in omitted:                       # 보존 경로 — 옛 참조 ↔ 새 players
+        _reject_dangling_preserved_leaders(_stored_composition(slug), body)
+    elif body.composition is not None:                 # 치환 경로 — 축 소실
+        _reject_dropped_axes(_stored_composition(slug), body.composition)
+    svc.save_report(slug, body.model_dump(), omitted=omitted)
+    return {"ok": True, "slug": slug, "published_date": body.published_date,
+            "preserved": sorted(omitted)}
 
 
 @router.get("")

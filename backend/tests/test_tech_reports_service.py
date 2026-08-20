@@ -5,6 +5,8 @@ analyst_reports.py(ADR-0027)와 동형 — query/execute를 mock한다(conftest 
 """
 import json
 
+import pytest
+
 from unittest.mock import patch
 
 from services import tech_reports as svc
@@ -94,8 +96,13 @@ def test_save_report_persists_key_points_and_milestones():
     assert json.loads(params[11]) == payload["milestones"]
 
 
-def test_save_report_new_fields_absent_stores_null():
-    """구 판 payload(신규 2필드 전무)는 **SQL NULL**로 저장 — 조회 시 None이라 프론트가 섹션째 생략한다.
+def test_save_report_new_fields_absent_binds_sql_null_param():
+    """구 판 payload(신규 2필드 전무)는 파라미터로 **SQL NULL**을 바인딩한다.
+
+    ⚠️ 재고 있는 것은 *파라미터 바인딩*이다 — 실제 저장 결과는 아니다. 라우터는 키 부재를
+    `omitted`로 넘기므로 그 컬럼은 `DO UPDATE SET`에서 빠지고 **이 파라미터가 쓰이지 않는다**
+    (= 직전 판 보존, task#313). 이 NULL이 실제로 저장되는 것은 INSERT 경로(신규 행)와
+    명시적 null뿐이다.
 
     ⚠️ 단언이 `json.loads(params[i]) is None`에서 `params[i] is None`으로 바뀌었다(task#281 F7).
     전엔 `json.dumps(None)`을 그대로 넘겨 파라미터가 파이썬 문자열 `"null"`이었고, jsonb 컬럼에
@@ -111,10 +118,11 @@ def test_save_report_new_fields_absent_stores_null():
 
 
 def test_save_report_new_fields_explicit_none_also_stores_sql_null():
-    """키가 **있고 값이 None**인 판(pydantic Optional 기본값 경로)도 같은 SQL NULL로 간다.
+    """키가 **있고 값이 None**인 판도 같은 SQL NULL을 바인딩한다.
 
-    라우터 모델이 `Optional[List[...]] = Field(None)`이라 model_dump는 키를 담고 값만 None으로 준다 —
-    키 부재 경로만 단언하면 실제 발행 경로(값 None)를 못 본다.
+    라우터 모델이 `Optional[List[...]] = Field(None)`이라 model_dump는 두 경우 모두 값 None을
+    준다 — 그래서 이 계층에서 둘은 구별되지 않고, **보존/삭제의 구별은 `omitted`에만 있다**
+    (task#313). 명시적 null은 `omitted`에 안 들어가므로 이 NULL이 실제로 저장돼 삭제된다.
     """
     payload = dict(PAYLOAD, key_points=None, milestones=None)
     with patch.object(svc, "execute") as mock_exec:
@@ -155,8 +163,11 @@ def test_save_report_persists_variants_and_watch_items():
     assert json.loads(params[13]) == payload["watch_items"]
 
 
-def test_save_report_variants_watch_items_absent_stores_sql_null():
-    """부재 시 SQL NULL(파이썬 None) — 문자열 'null' 금지(`_json_or_null`, task#281 F7과 동일 가드)."""
+def test_save_report_variants_watch_items_absent_binds_sql_null_param():
+    """부재 시 파라미터가 SQL NULL(파이썬 None) — 문자열 'null' 금지(`_json_or_null`, task#281 F7).
+
+    저장 결과가 아니라 바인딩을 잰다 — 재발행에서 키 부재는 `omitted`로 넘어가 보존된다(task#313).
+    """
     with patch.object(svc, "execute") as mock_exec:
         svc.save_report("smr", PAYLOAD)
     _, params = mock_exec.call_args.args
@@ -166,7 +177,7 @@ def test_save_report_variants_watch_items_absent_stores_sql_null():
 
 
 def test_save_report_variants_watch_items_explicit_none_also_stores_sql_null():
-    """키가 있고 값이 None인 판(pydantic Optional 기본값 경로)도 같은 SQL NULL로 간다."""
+    """키가 있고 값이 None인 판도 같은 SQL NULL — 그리고 이쪽은 `omitted`에 안 들어가 실제로 삭제된다."""
     payload = dict(PAYLOAD, variants=None, watch_items=None)
     with patch.object(svc, "execute") as mock_exec:
         svc.save_report("smr", payload)
@@ -261,8 +272,11 @@ def test_save_report_persists_composition():
     assert json.loads(params[14]) == COMPOSITION
 
 
-def test_save_report_composition_absent_stores_sql_null():
-    """부재 시 SQL NULL — `json.dumps(None)`의 문자열 'null'은 `IS NULL`과 어긋난다(task#281 F7)."""
+def test_save_report_composition_absent_binds_sql_null_param():
+    """부재 시 파라미터가 SQL NULL — `json.dumps(None)`의 문자열 'null'은 `IS NULL`과 어긋난다(F7).
+
+    저장 결과가 아니라 바인딩을 잰다 — 재발행에서 키 부재는 `omitted`로 넘어가 보존된다(task#313).
+    """
     with patch.object(svc, "execute") as mock_exec:
         svc.save_report("reusable-rocket", PAYLOAD)
     _, params = mock_exec.call_args.args
@@ -270,7 +284,7 @@ def test_save_report_composition_absent_stores_sql_null():
 
 
 def test_save_report_composition_explicit_none_also_stores_sql_null():
-    """키가 있고 값이 None인 판(pydantic Optional 기본값 경로)도 같은 SQL NULL로 간다."""
+    """키가 있고 값이 None인 판도 같은 SQL NULL — 그리고 이쪽은 `omitted`에 안 들어가 실제로 삭제된다."""
     with patch.object(svc, "execute") as mock_exec:
         svc.save_report("reusable-rocket", dict(PAYLOAD, composition=None))
     _, params = mock_exec.call_args.args
@@ -280,3 +294,130 @@ def test_save_report_composition_explicit_none_also_stores_sql_null():
         svc.save_report("reusable-rocket", dict(PAYLOAD, composition={}))
     _, params2 = mock_exec.call_args.args
     assert json.loads(params2[14]) == {}
+
+
+# ── 「생략=보존」 (task#313 S1) ─────────────────────────────────────────
+#
+# 계약: 요청이 선택 5필드 중 하나를 **생략**하면 그 컬럼만 `DO UPDATE SET`에서 빠져
+# 직전 판의 값이 보존된다. 값이 **명시적 None**이면(생략이 아님) 컬럼은 SET에 남고
+# NULL이 저장돼 삭제된다. `INSERT` 컬럼 목록은 어느 경우에도 full 유지 —
+# 신규 행은 보존할 직전 판이 없다.
+#
+# ⚠️ 이 테스트들은 execute를 mock하므로 「조회 시 값이 살아 있다」를 DB 왕복으로 재지 않고
+# **생성된 SQL의 구조**로 잰다(conftest _block_real_db). SET 목록에서 그 컬럼이 빠지는 것이
+# 곧 「그 컬럼을 덮어쓰지 않는다」이고, 라이브 왕복 확인은 S6 스모크가 진다.
+
+_SQL_AT_HEAD = (
+    'INSERT INTO tech_reports\n'
+    '               (slug, published_date, title, description, difficulty, players,\n'
+    '                challenges, related, market, sources, key_points, milestones,\n'
+    '                variants, watch_items, composition)\n'
+    '           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)\n'
+    '           ON CONFLICT (slug) DO UPDATE SET\n'
+    '               published_date = EXCLUDED.published_date,\n'
+    '               title = EXCLUDED.title, description = EXCLUDED.description,\n'
+    '               difficulty = EXCLUDED.difficulty, players = EXCLUDED.players,\n'
+    '               challenges = EXCLUDED.challenges, related = EXCLUDED.related,\n'
+    '               market = EXCLUDED.market, sources = EXCLUDED.sources,\n'
+    '               key_points = EXCLUDED.key_points, milestones = EXCLUDED.milestones,\n'
+    '               variants = EXCLUDED.variants, watch_items = EXCLUDED.watch_items,\n'
+    '               composition = EXCLUDED.composition,\n'
+    '               created_at = NOW()'
+)
+
+_PARAM_INDEX = {"key_points": 10, "milestones": 11, "variants": 12, "watch_items": 13, "composition": 14}
+_NON_PRESERVABLE_SETS = (
+    "published_date", "title", "description", "difficulty", "players",
+    "challenges", "related", "market", "sources",
+)
+
+
+def _norm(sql: str) -> str:
+    return " ".join(sql.split())
+
+
+def _sql_for(omitted):
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", PAYLOAD, omitted=omitted)
+    return mock_exec.call_args.args
+
+
+def test_empty_omitted_yields_the_sql_that_head_produced():
+    """대조군 — `omitted`가 빈 집합이면 SQL이 변경 전과 같다(기존 호출자 회귀 0의 증거).
+
+    이 테스트가 없으면 아래 red-first 5축의 실패가 「보존이 안 됨」인지 「테스트가 잘못된
+    컬럼을 보고 있음」인지 가릴 수 없다. 공백만 정규화해 비교한다 — SET 목록을 런타임에
+    조립하게 되면서 줄바꿈 폭(전엔 한 줄에 2개씩 묶여 있었다)만 달라지고 **컬럼 집합과
+    순서·나머지 절은 전부 동일**해야 한다. 기본 인자 경로(`omitted` 미전달)도 같은 SQL이다.
+    """
+    sql, params = _sql_for(frozenset())
+    assert _norm(sql) == _norm(_SQL_AT_HEAD)
+    assert len(params) == 15 and sql.count("%s") == len(params)
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", PAYLOAD)          # 기본 인자 = frozenset()
+    assert _norm(mock_exec.call_args.args[0]) == _norm(_SQL_AT_HEAD)
+
+
+@pytest.mark.parametrize("col", ["key_points", "milestones", "variants", "watch_items", "composition"])
+def test_omitted_field_is_not_overwritten_on_resave(col):
+    """red-first 5축 — 그 컬럼만 `DO UPDATE SET`에서 빠진다(= 재발행 시 직전 판 보존).
+
+    수정 전에는 전 컬럼이 무조건 `EXCLUDED.*`로 덮여 생략분이 NULL이 됐다.
+    """
+    sql, params = _sql_for(frozenset({col}))
+    assert f"{col} = EXCLUDED.{col}" not in sql, f"{col}이 여전히 덮어써진다(보존 실패)"
+    # 형제 4필드와 본문 컬럼은 그대로 덮어써야 한다 — 생략 하나가 다른 컬럼을 데려가지 않는다
+    for other in set(_PARAM_INDEX) - {col}:
+        assert f"{other} = EXCLUDED.{other}" in sql, f"{col} 생략이 {other}까지 SET에서 빼앗았다"
+    for other in _NON_PRESERVABLE_SETS:
+        assert f"{other} = EXCLUDED.{other}" in sql
+    assert "created_at = NOW()" in sql
+    # INSERT 컬럼 목록은 full 유지(신규 행은 보존할 직전 판이 없다) + 자리표시자 정합
+    head = sql.split("VALUES")[0]
+    assert col in head, f"INSERT 컬럼 목록에서 {col}이 빠졌다"
+    assert len(params) == 15 and sql.count("%s") == len(params)
+
+
+@pytest.mark.parametrize("col", ["key_points", "milestones", "variants", "watch_items", "composition"])
+def test_explicit_none_still_deletes(col):
+    """양성 5축 — 명시적 `null`은 생략이 아니다: 컬럼이 SET에 남고 파라미터가 SQL NULL이라 삭제된다.
+
+    음성 테스트(위 red-first)만으론 「생략과 null이 갈린다」가 표현되지 않는다(task#297 ⓑ).
+    라우터는 `model_fields_set`에 있는 키를 `omitted`에 넣지 않으므로 이 경로가 실제 발행 경로다.
+    """
+    sql, params = _sql_for(frozenset())          # 명시적 null → omitted에 안 들어간다
+    assert f"{col} = EXCLUDED.{col}" in sql
+    payload = dict(PAYLOAD, **{col: None})
+    with patch.object(svc, "execute") as mock_exec:
+        svc.save_report("smr", payload, omitted=frozenset())
+    sql2, params2 = mock_exec.call_args.args
+    assert f"{col} = EXCLUDED.{col}" in sql2, f"명시적 null이 {col}을 보존해버렸다"
+    assert params2[_PARAM_INDEX[col]] is None
+
+
+def test_omitted_ignores_names_outside_the_whitelist():
+    """화이트리스트 — `_PRESERVABLE` 밖의 값은 `omitted`에 들어와도 무시한다(결정 5).
+
+    `DO UPDATE SET` 목록을 런타임에 조립하므로 컬럼명은 모듈 상수에서만 와야 한다. 본문 4필드
+    (`description`·`players`·`challenges`·`related`)는 생략이 곧 오류 신호라 보존 대상이 아니고
+    (비목표), `created_at`·`slug` 같은 이름이나 SQL 조각이 SET 목록을 흔들어서도 안 된다.
+    """
+    sql, _ = _sql_for(frozenset({"description", "players", "challenges", "related",
+                                 "created_at", "slug", "title = 'x'", "*"}))
+    assert _norm(sql) == _norm(_SQL_AT_HEAD)
+
+
+def test_preservable_is_exactly_the_five_optional_fields():
+    """보존 대상 정본 — 본문 4필드는 여기 없다(비목표: 생략은 부분 갱신이 아니라 잘못된 발행)."""
+    assert svc._PRESERVABLE == ("key_points", "milestones", "variants", "watch_items", "composition")
+
+
+def test_omitted_string_is_rejected_not_silently_ignored():
+    """`omitted`에 컬럼명 **문자열 하나**를 넘기면 보존이 조용히 꺼지지 않고 TypeError다.
+
+    `{c for c in "composition" if c in _PRESERVABLE}`는 문자를 순회해 빈 집합이 되므로
+    보존을 의도한 호출이 **예외 없이 전량 덮어쓰기로 강하**한다 — 컬럼명 주입은 allowlist가
+    막으니 SQL 오류로도 안 드러난다(적대검토 #6). 데이터 보존 가드의 무음 강하는 금지다.
+    """
+    with pytest.raises(TypeError):
+        svc._upsert_sql("composition")

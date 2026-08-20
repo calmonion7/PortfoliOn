@@ -44,11 +44,11 @@
 ```
 0. (조건 확인) GET /api/tech-reports  → **기술당 1행**만 반환(대상 slug의 마지막 갱신일 판단용, 이력 없음 — ADR-0038). 미발행 종은 이 목록에 아예 없다
 1. (AI가 웹 검색으로 그 기술 조사 — 상세 설명·기술난이도·주요업체(상장 여부 무관)·기술수준·격차·시장 규모/CAGR·난제·출처 + **핵심 포인트·진척 타임라인·업체 분류 축·기관별 시장 추정치·계보 비교축·확인할 지표**)
-2. POST /api/tech-reports/{slug}  → 발행(갱신) — slug당 1행이라 재발행은 기존 행을 덮어쓴다(과거 판 없음)
+2. POST /api/tech-reports/{slug}  → 발행(갱신) — slug당 1행이라 재발행은 기존 행을 덮어쓴다(과거 판 없음). 단 **선택 5필드는 키를 생략하면 직전 판이 보존**된다(`key_points`·`milestones`·`variants`·`watch_items`·`composition`, 지우려면 명시적 `null`) — 아래 POST 절 「생략 vs 명시적 null」
    - 종목 발행물과 달리 **서버가 자동 첨부하는 숫자가 없다** — 통화·단위·점유율·척도까지 전부 이 본문에 조사해 채운다
    - 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — 틀린 값보다 없는 값이 낫다)
    - 대상 slug(`TECH_TOPICS` 등재분, 아래 Path Parameter) 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
-   - **요약 레이어는 산문이 아니라 구조 필드로 싣는다**(ADR-0034, 아래 두 차례 개정 포함) — 지금 총 6필드: `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(업체 분류 축)·`market.estimates`(기관별 시장 추정치)·`variants`(계보 비교축)·`watch_items`(확인할 지표). 채우지 않으면 화면에 반영되지 않으므로(대부분 그 섹션째 생략, `players[].category`는 표·점유율이 평면 렌더로 폴백) `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다
+   - **요약 레이어는 산문이 아니라 구조 필드로 싣는다**(ADR-0034, 이후 개정 포함) — `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(업체 분류 축)·`market.estimates`(기관별 시장 추정치)·`variants`(계보 비교축)·`watch_items`(확인할 지표)·`composition`(기술 해부 3축, ADR-0042). 채우지 않으면 화면에 반영되지 않으므로(대부분 그 섹션째 생략, `players[].category`는 표·점유율이 평면 렌더로 폴백) `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다 — 단 **재발행에서는 생략이 「직전 판 유지」**를 뜻하는 필드가 있다(아래 POST 절)
    - **기관별 시장 추정치(`market.estimates`, 선택·최대 6건, ADR-0034 개정)**는 조사기관마다 다르게 추정한 시장 규모를 나란히 보여준다 — 배열 내 `currency`·`unit`·`year`는 전부 같아야 하고(다르면 422), 성장 곡선(`market.history`/`forecast`)이 채택한 기관은 `is_basis: true`로 표시(최대 1건, 2건 이상이면 422)
    - **계보 비교축(`variants`, 선택·최대 2축, ADR-0034 개정)**은 한 기술이 갈라지는 접근 방식을 이점·대가 쌍으로 나란히 보여준다 — 축마다 선택지(`options`)가 **최소 2개**(1개는 비교가 아니라 서술이므로 축을 생략하고 산문에 쓸 것, 2개 미만이면 422)
    - **확인할 지표(`watch_items`, 선택·최대 5건, ADR-0034 개정)**는 "앞으로 무엇이 관측되면 진척으로 인정하는가"를 미리 못 박는다 — 파일럿 준공·샘플 공개 같은 *일정 유지 신호*를 진척으로 오독하지 않도록 항목마다 `not_signal`(이건 신호가 아니다)을 본문과 분리해 적을 것
@@ -685,7 +685,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 
 ### `POST /api/tech-reports/{slug}`
 
-주요기술 리포트 발행(갱신) (ADR-0033, 저장모델 개정 ADR-0038). 종목이 아니라 **기술 하나**를 단위로 발행한다. 애널리스트 리포트와 달리 서버가 발행 시점에 자동 첨부하는 숫자가 전혀 없으므로, 기술설명·난이도·업체·시장 수치를 **전부 이 요청 본문에** 조사해 채운다. **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음)**, 애널리스트 리포트와 달리 과거 판이 누적되지 않는다.
+주요기술 리포트 발행(갱신) (ADR-0033, 저장모델 개정 ADR-0038). 종목이 아니라 **기술 하나**를 단위로 발행한다. 애널리스트 리포트와 달리 서버가 발행 시점에 자동 첨부하는 숫자가 전혀 없으므로, 기술설명·난이도·업체·시장 수치를 **전부 이 요청 본문에** 조사해 채운다. **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음)**, 애널리스트 리포트와 달리 과거 판이 누적되지 않는다. 단 **덮어쓰기의 입도는 컬럼 단위**다 — 선택 5필드는 키를 생략하면 직전 판이 보존된다(아래 「생략 vs 명시적 `null`」).
 
 **Auth:** `X-API-Key` 헤더
 
@@ -802,7 +802,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `watch_items[].not_signal` | string\|생략 | | **오독 경고** — 파일럿 라인 준공·샘플 공개·양산 목표 재확인처럼 *일정이 유지된다*는 신호일 뿐 진척이 아닌 것을 명시. 해당 지표에 그런 오독 위험이 없으면 생략 가능하지만, 있으면 반드시 `label`/`detail`과 **분리해서** 적을 것(한 문장에 섞지 말 것) |
 | `composition` | object\|생략 | | **기술 해부** — 자가 서로 다른 지분 축 3개(ADR-0042). `{tech?, minerals?, experts?, minerals_share_basis?}`. 「이 기술이 무엇으로 만들어지나 · 어디가 병목인가 · 원가가 어디에 노출되나」에 답한다. **세 축을 합쳐 하나로 읽으면 안 된다** — 분모가 각각 남은 난제 총량 · 원재료비 · 인력 병목 총량으로 다르다. 축은 전부 선택이되 **최소 한 축**은 있어야 한다(`{}`는 422 — 「해부 없음」은 필드 생략으로 표현) |
 | `composition.tech[]` | array\|생략 | | **필요기술 축**(자 = 남은 난제 총량) **3~7개** — `{name: ≤40자, share_pct, rationale: ≤200자, leaders?: ≤6개}`. `leaders[]`엔 업체 **이름만** 싣는다(기술수준·점유율·티커는 화면이 `players[]`에서 끌어온다) — 그래서 **`players[].name`과 바이트 동일**해야 하고 없는 이름은 422로 거부된다(그 이름이 에러 메시지에 실린다) |
-| `composition.minerals[]` | array\|생략 | | **핵심 광물 축**(자 = 원재료비) **3~7개** — `{name, share_pct, rationale, top_source_country?, top_source_pct?, used_in?: ≤6개, producers?: ≤6개}`. `producers[]`(`{name, country, ticker?, share_pct?}`)는 채굴·정제 업체라 **`players[]`와 별개 목록**이고 기술수준을 붙이지 않는다 — 리튬을 캐는 회사에 "양산상용 단계"란 없다 |
+| `composition.minerals[]` | array\|생략 | | **핵심 광물 축**(자 = 원재료비) **3~7개** — `{name, share_pct, rationale, top_source_country?, top_source_pct?, used_in?: ≤6개, producers?: ≤6개}`. `used_in[]`은 **같은 요청의 `composition.tech[].name`과 바이트 동일**해야 하고 없는 이름은 422로 거부된다(`leaders`와 같은 규율 — 해부 화면이 그 이름을 조인 없이 「쓰임」 문구로 렌더하므로 끊긴 참조는 *없는 기술을 사실처럼 적은 문구*가 된다. 같은 요청에 `tech` 축이 없으면 참조 대상이 없어 이 검증은 생략된다). `producers[]`(`{name, country, ticker?, share_pct?}`)는 채굴·정제 업체라 **`players[]`와 별개 목록**이고 기술수준을 붙이지 않는다 — 리튬을 캐는 회사에 "양산상용 단계"란 없다 |
 | `composition.experts[]` | array\|생략 | | **전문가 축**(자 = 인력 병목 총량) **3~7개** — `{name, share_pct, rationale}`. **업체를 붙이지 마라** — 인력 병목은 특정 회사가 소유한 것이 아니고, 붙이면 기술 축의 선도기업과 중복되거나 대학·규제기관이 섞여 축이 무너진다 |
 | `composition.minerals_share_basis` | string\|생략 | | 광물 점유의 **기준 문구**(≤60자, 예: `"세계 생산량 기준"`). 어느 `producers[].share_pct`라도 실으면 **필수**(없으면 422) — 이 점유는 *그 광물 세계 생산* 기준이라 `market.share_basis`(그 **기술 시장**의 점유)와 자가 다르다 |
 | `composition.*[].share_pct` | number | ✅ | 그 축 안에서의 지분(%) — **5의 배수만**(37·32.5는 422)이고 **축마다 합이 정확히 100**(95·105는 422). 잔여는 숨기지 말고 **「기타」 항목**으로 명시하라. ⚠️ 이 그리드는 **축 지분에만** 적용된다 — `producers[].share_pct`·`top_source_pct`는 출처 있는 외부 통계라 반올림하지 마라 |
@@ -812,22 +812,44 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 **통화·단위 enum(필수, 자유 텍스트·환산 금지)** — `currency`: `USD` \| `KRW`. `unit`: `mn`(백만) \| `bn`(십억) \| `tn`(조). 렌더러가 절대 추측·환산하지 않으므로 enum 밖 값은 `422`.
 
 > **문자열 수치는 요약 칩에만** — `key_points[].metrics[].value`가 표시용 문자열인 것은 그 칩이 **그래프를 그리지 않기 때문**이다(ADR-0034). 차트를 그리는 수치(`market` 금액 — `history`·`forecast`·`estimates[].size` 전부 포함·`milestones[].year`·`tech_level`·`share_pct`)는 **절대 문자열로 쓰지 말 것** — 구조 데이터여야 곡선·축·밴드를 그릴 수 있다(ADR-0033). `market.estimates[].scope`·`variants[].options[].examples/strength/tradeoff`는 예외(자유 텍스트) — 어느 것도 좌표를 계산하지 않는 순수 요약 칩이다.
-> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates`·`variants`·`watch_items`·`composition` 일곱 필드는 전부 선택이다(`composition`은 **축 단위로도** 생략 가능 — 아는 축만 싣는다). 조사로 확인되지 않으면 억지로 채우지 말고 생략한다(대부분 화면이 그 섹션째 생략하고, `players[].category`만 예외로 표·점유율이 평면 렌더로 폴백한다). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
+> **모르면 생략** — `key_points`·`milestones`·`players[].category`·`market.estimates`·`variants`·`watch_items`·`composition` 일곱 필드는 전부 선택이다(`composition`은 **축 단위로도** 생략 가능 — 아는 축만 싣는다. 단 재발행에서는 아래 축 소실 규칙이 걸린다). 조사로 확인되지 않으면 억지로 채우지 말고 생략한다 — **첫 발행에서는** 화면이 그 섹션째 생략하고(`players[].category`만 예외로 표·점유율이 평면 렌더로 폴백) **재발행에서는 생략의 뜻이 필드마다 갈린다**(바로 아래). 다만 `description` 산문에는 썼는데 필드를 비우면 **독자가 그 정보를 화면에서 못 본다** — 산문에 쓸 내용이 있으면 필드에도 싣는다.
+
+#### 생략 vs 명시적 `null` — 재발행의 필드 보존 (task#313)
+
+**선택 5필드 `key_points`·`milestones`·`variants`·`watch_items`·`composition`은 키를 생략하면 직전 판의 값이 그대로 보존된다.** 지우려면 **명시적 `null`**을 실어야 한다(`"composition": null`). 신규 slug(첫 발행)에서는 둘 다 결과가 같다.
+
+그래서 **재발행에서 생략은 「조사 안 했다」가 아니라 「직전 판을 계속 쓰겠다」는 선언**이다. 세 갈래로 갈린다:
+
+| 필드 | 키를 생략하면 |
+|---|---|
+| `key_points`·`milestones`·`variants`·`watch_items`·`composition` | **직전 판 보존** (지우려면 명시적 `null`) |
+| `challenges`·`related`·`players[].category` | **사라진다** — 리포트 본문이라 생략을 부분 갱신으로 다루지 않는다 |
+| `market.estimates` | **사라진다** — `market`이 통째 치환되므로 그 안의 선택 키도 함께 |
+
+⚠️ `market`·`description`의 수치를 갱신했으면 **그 수치를 인용하는 `key_points`·`milestones`도 같은 요청에 다시 실어라** — 보존된 옛 카드가 새 본문과 어긋난 채 남는다.
+
+⚠️ **`composition`의 보존 입도는 필드 하나(컬럼)다.** `composition`을 실으면 그 필드가 통째 치환되므로 **직전 판에 있던 축(`tech`/`minerals`/`experts`)을 말없이 빼면 422**다 — 그 축을 함께 다시 싣거나(`GET /api/tech-reports/{slug}`에서 복사), 정말 지울 때만 축에 명시적 `null`(`"tech": null`)을 실어라. 축 단위 자동 병합은 하지 않는다.
+
+⚠️ **`published_date`·`created_at`은 항상 갱신된다** — 그래서 행은 여러 발행 시점의 모자이크가 될 수 있고 화면의 「YYYY-MM-DD 갱신」은 *본문* 갱신일이다. 응답 `preserved`가 그 요청에서 무엇이 오늘 값이 아닌지 알려주는 유일한 수단이다.
 
 > **기술수준 vs 기술난이도 vs 기술격차** — 세 축을 섞지 마세요. `players[].tech_level`은 *그 업체가* 지금 어느 단계인지, `difficulty`는 *그 기술 자체가* 얼마나 어려운지(기술 단위 필드 하나, 업체별이 아님), `gap_years`는 *선두 대비 몇 년 뒤인지*입니다.
 > **상용 시장이 아직 형성되지 않은 기술**(예: SMR·재사용 로켓 일부 세그먼트)은 점유율 근거를 댈 수 없으면 `share_pct`를 생략하세요(업체 표는 그대로, 점유율 칸만 빔).
 
 **Response `201`**
 ```json
-{ "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
+{ "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03", "preserved": [] }
 ```
+
+`preserved` — 이 요청이 **키를 생략해 보존된** 선택 필드 이름(사전순). 전부 실은 판은 `[]`, `composition`·`watch_items`를 생략했으면 `["composition", "watch_items"]`. 명시적 `null`(삭제)은 여기 들어오지 않는다.
 
 **Errors**
 
 | 상태 | 설명 |
 |------|------|
 | `401` | API Key 누락/불일치 |
-| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · `composition` 축 항목 2개 이하/8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 또는 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `producers[].share_pct` 있고 `minerals_share_basis` 없음 · `composition: {}` · `composition` 한 축 안의 항목 `name` 중복 · 필수 필드 누락 |
+| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · `composition` 축 항목 2개 이하/8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 또는 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `producers[].share_pct` 있고 `minerals_share_basis` 없음 · `composition: {}` · `composition` 한 축 안의 항목 `name` 중복 · 필수 필드 누락 · **`composition.minerals[].used_in[]`이 같은 요청의 `composition.tech[].name`에 없음** · **`composition`을 생략해 보존되는 직전 판의 `tech[].leaders`가 새 `players[]`에 없음** · **`composition`을 실었는데 직전 판에 있던 축이 빠짐**(축 소실) |
+
+> **422 봉투가 두 형태다.** 스키마 검증(위 대부분 + `used_in`)은 표준 `{"detail": [{...}]}`(**배열**)이고, 직전 판을 읽어 판정하는 마지막 둘(**보존분 `leaders` 끊김**·**축 소실**)은 `{"detail": "<문자열>"}`이다. 두 문자열 메시지는 어느 이름·어느 축이 문제인지와 해법(그 값을 다시 싣기 / 그 업체를 `players[]`에 유지하기 / 정말 지울 때의 명시적 `null`)을 담으므로 **`detail`을 읽고 고쳐 재시도할 수 있다**. 해부를 지워서 422를 회피하지 말 것.
 
 ---
 
@@ -836,6 +858,8 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 ```json
 { "detail": "에러 메시지" }
 ```
+
+단 **스키마 검증 실패(`422`)의 `detail`은 문자열이 아니라 객체 배열**이다(FastAPI/pydantic 기본 — `[{"loc": [...], "msg": "...", "type": "..."}]`). 핸들러가 던지는 오류(`401`·`409`·핸들러 내부 `422`)만 위 문자열 형태다. `detail`을 로그에 찍을 때 문자열로 가정하지 말 것.
 
 ---
 

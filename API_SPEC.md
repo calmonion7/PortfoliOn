@@ -2282,11 +2282,11 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ## Tech Reports (주요기술 리포트)
 
-기술 단위 발행물 (ADR-0033, 저장모델 개정 ADR-0038, 대상 개정 ADR-0039·2차 개정 ADR-0044) — 종목이 아니라 **기술** 단위로 발행한다. 대상 slug의 정본은 백엔드 상수 `TECH_TOPICS`이고(15종 — 전체 목록은 바로 아래 Path Parameter), 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. 편입 판정은 「지금 투자 지형에서 중요한가」이며, 넓은 이름은 한 문서가 감당할 범위로 좁혀 등재한다(ADR-0044 결정 2·3 — 예: 양자는 **컴퓨팅만**, 태양광은 **셀·모듈만**). **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음, ADR-0038).** analyst-reports와 달리 과거 판이 누적되지 않는다. (구 `data-center` 1종은 ADR-0039로 폐기됐다 — 여섯 요소가 한 문서에 담기지 않아 매출 성격 축으로 2종 분할.)
+기술 단위 발행물 (ADR-0033, 저장모델 개정 ADR-0038, 대상 개정 ADR-0039·2차 개정 ADR-0044) — 종목이 아니라 **기술** 단위로 발행한다. 대상 slug의 정본은 백엔드 상수 `TECH_TOPICS`이고(15종 — 전체 목록은 바로 아래 Path Parameter), 그 밖의 slug는 경로 검증 단계(핸들러 진입 전)에서 `422`. 편입 판정은 「지금 투자 지형에서 중요한가」이며, 넓은 이름은 한 문서가 감당할 범위로 좁혀 등재한다(ADR-0044 결정 2·3 — 예: 양자는 **컴퓨팅만**, 태양광은 **셀·모듈만**). **slug당 1행 — 재발행(갱신)은 그 행을 덮어쓴다(이력 없음, ADR-0038).** analyst-reports와 달리 과거 판이 누적되지 않는다. 단 **덮어쓰기의 입도는 컬럼 단위**다 — 선택 5필드(`key_points`·`milestones`·`variants`·`watch_items`·`composition`)는 요청이 키를 **생략하면 직전 판이 보존**되고 명시적 `null`일 때만 지워진다(아래 발행 절 「생략 vs 명시적 null」). (구 `data-center` 1종은 ADR-0039로 폐기됐다 — 여섯 요소가 한 문서에 담기지 않아 매출 성격 축으로 2종 분할.)
 
 ### `POST /api/tech-reports/{slug}`
 
-주요기술 리포트 발행(갱신) — 같은 slug로 다시 POST하면 기존 행을 덮어쓴다.
+주요기술 리포트 발행(갱신) — 같은 slug로 다시 POST하면 기존 행을 덮어쓴다(단 선택 5필드는 키를 생략하면 보존 — 아래 「생략 vs 명시적 null」).
 
 **Auth:** `X-API-Key` 또는 admin Bearer token (`require_admin_or_api_key`)
 
@@ -2387,21 +2387,35 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `watch_items` | array\|생략 | | 관찰 체크리스트(ADR-0034 개정, task#296) **최대 5개**(초과 시 `422`) — `{label: ≤60자, detail?: ≤200자, not_signal?: ≤200자}`. `not_signal`은 "이건 진척 신호가 아니다"를 본문과 분리해 적는 표시용 문자열 |
 | `composition` | object\|생략 | | **기술 해부** 3축(ADR-0042, task#305) — `{tech?, minerals?, experts?, minerals_share_basis?}`. 세 축은 **자(분모)가 서로 다르다**(필요기술=남은 난제 총량 · 광물=원재료비 · 전문가=인력 병목 총량) — 합쳐 하나로 읽으면 안 되고 화면도 축마다 별도 100% 막대로 그린다. 축은 전부 선택이되 **최소 한 축**은 있어야 한다(`{}`는 `422` — 「해부 없음」의 표현은 `null` 하나여야 하므로) |
 | `composition.tech[]` | array\|생략 | | 필요기술 축 **3~7개**(2개 이하·8개 이상 `422`) — `{name: ≤40자, share_pct, rationale: ≤200자, leaders?: 문자열배열 ≤6개}`. `leaders[]`의 모든 이름은 **`players[].name`에 바이트 동일하게 실재**해야 한다(없으면 `422`이고 그 이름이 메시지에 실린다) — 화면이 이름으로 조인해 기술수준·점유율을 끌어오므로 문자열 일치로 조용히 결측시키지 않는다 |
-| `composition.minerals[]` | array\|생략 | | 핵심 광물 축 **3~7개** — `{name, share_pct, rationale, top_source_country?: ≤30자, top_source_pct?, used_in?: 문자열배열 ≤6개, producers?: ≤6개}`. `producers[]`는 `{name: ≤40자, country: ≤30자, ticker?, share_pct?}`로 **`players[]`와 별개 목록**이고 `tech_level`이 없다 — 광산기업에 1~5 성숙 단계는 의미가 없다(ADR-0042 결정 4) |
+| `composition.minerals[]` | array\|생략 | | 핵심 광물 축 **3~7개** — `{name, share_pct, rationale, top_source_country?: ≤30자, top_source_pct?, used_in?: 문자열배열 ≤6개, producers?: ≤6개}`. `used_in[]`의 모든 이름은 **같은 요청의 `composition.tech[].name`에 바이트 동일하게 실재**해야 한다(없으면 `422`이고 그 이름이 메시지에 실린다) — 해부 화면이 그 이름을 조인 없이 「쓰임」 문구로 렌더하므로 끊긴 참조는 결측 칩이 아니라 *없는 기술을 사실처럼 적은 문구*가 된다. ⚠️ 같은 요청에 `tech` 축이 **없으면** 이 검증은 생략된다(참조 대상 집합 자체가 없어 판정 근거가 없다 — 광물 축만 실은 부분 발행이 합법이므로). 재발행에서 그 상황(직전 판엔 `tech`가 있었는데 이번 판이 광물만 싣는 경우)은 아래 축 소실 `422`가 먼저 막는다. `producers[]`는 `{name: ≤40자, country: ≤30자, ticker?, share_pct?}`로 **`players[]`와 별개 목록**이고 `tech_level`이 없다 — 광산기업에 1~5 성숙 단계는 의미가 없다(ADR-0042 결정 4) |
 | `composition.experts[]` | array\|생략 | | 전문가 축 **3~7개** — `{name, share_pct, rationale}`. **업체를 붙이지 않는다** — 붙이면 기술 축의 선도기업과 중복되거나 대학·규제기관이 섞여 축이 무너진다(인력 병목은 특정 회사가 소유한 것이 아니다) |
 | `composition.minerals_share_basis` | string\|생략 | | 광물 점유의 기준 문구(≤60자, 예: `"세계 생산량 기준"`) — 어느 `producers[].share_pct`라도 실으면 **필수**(없으면 `422`). *그 광물 세계 생산*의 점유라 `market.share_basis`(그 기술 **시장**의 점유)와 **자가 다르다** |
 | `composition.*[].share_pct` | number | ✅ | 그 축 안에서의 지분(%) — **5의 배수만**(`37`·`32.5`는 `422`)이고 **축마다 합이 정확히 100**(`95`·`105`는 `422`). 허위정밀 차단(ADR-0042 결정 3)이며 잔여는 숨기지 말고 **「기타」 항목**으로 명시한다. ⚠️ 5% 그리드는 **이 축 지분에만** 적용된다 — `producers[].share_pct`·`top_source_pct`는 USGS류 *출처 있는* 외부 사실이라 그리드를 강제하지 않는다(반올림하면 오히려 정확도가 깎인다) |
 | `composition.*[].rationale` | string | ✅ | 그 지분이 왜 그 몫인지 **1문장**(≤200자, 공백만이면 `422`). 출처가 없는 수치의 유일한 대체 규율 — ADR-0033이 "출처 필수"로 지킨 자리를 이 축에서는 판단 근거가 지킨다. 근거를 못 쓰면 그 항목을 발행하지 않는다(`wrong < missing`) |
 | `composition.*[].name` | string | ✅ | 항목명(≤40자) — **한 축 안에서 서로 달라야 한다**(중복이면 `422`). 중복이면 화면이 같은 이름의 행을 두 번 그려 독자가 서로 다른 둘로 읽는다(형제 `variants[].options[].name`과 같은 규율). **다른 축에 같은 이름은 허용**된다 — 축이 서로 독립이므로 「리튬」이 광물 축과 기술 축에 함께 나오는 것은 정당하다 |
 
-`value`(`MoneyValue` — `market.history`/`forecast`/`estimates[].size` 전부 포함)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`·`composition` 안의 모든 퍼센트 필드(`*[].share_pct`·`producers[].share_pct`·`top_source_pct`)는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones`·`market.estimates`·`variants`·`watch_items`·`composition` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피).
+`value`(`MoneyValue` — `market.history`/`forecast`/`estimates[].size` 전부 포함)·`cagr_pct`·`share_pct`·`key_points[].metrics[].change_pct`·`composition` 안의 모든 퍼센트 필드(`*[].share_pct`·`producers[].share_pct`·`top_source_pct`)는 `NaN`/`Infinity` 거부(`422`) — 불변 문서 오염 방지. `gap_years`·`category`·`key_points`·`milestones`·`market.estimates`·`variants`·`watch_items`·`composition` 등 선택 필드는 키 생략과 명시적 `null` 모두 허용(`Optional`, task#250 함정 회피) — 단 **재발행에서 그 둘의 뜻이 갈린다**(바로 아래).
+
+#### 생략 vs 명시적 `null` — 재발행의 필드 보존 (task#313)
+
+**선택 5필드 `key_points`·`milestones`·`variants`·`watch_items`·`composition`은 키를 생략하면 직전 판의 값이 보존된다.** 그 컬럼이 `DO UPDATE SET` 목록에서 빠져 갱신 대상이 아니게 되기 때문이다. 지우려면 **명시적 `null`**(`"composition": null`)을 실어야 한다. 신규 slug(직전 판이 없는 첫 발행)에서는 둘 다 결과가 같다(`null` 저장).
+
+나머지 필드는 보존되지 않는다 — `description`·`players`·`challenges`·`related`·`market`·`sources`는 리포트 **본문**이라 생략이 부분 갱신이 아니라 잘못된 발행이므로 보존해 숨기지 않고 그대로 덮어쓴다(`market.estimates`·`players[].category`처럼 JSONB **안에** 중첩된 선택 키도 상위 필드와 함께 치환된다). `published_date`·`created_at`은 **항상** 갱신된다.
+
+⚠️ **그래서 행은 여러 발행 시점의 모자이크가 될 수 있고, 화면의 「YYYY-MM-DD 갱신」은 *본문* 갱신일이다** — 보존된 필드는 그보다 오래된 판의 값일 수 있다(필드별 vintage는 slug당 1행 모델에 저장할 자리가 없다 — ADR-0038). 응답의 `preserved`가 그 사실을 세는 유일한 수단이다.
+
+⚠️ **`composition`의 보존 입도는 필드가 아니라 컬럼 하나다.** `composition`을 실으면 그 필드가 통째 치환되므로, 직전 판에 있던 축(`tech`/`minerals`/`experts`)을 **말없이 빼면 `422`**다(그 축을 함께 다시 싣거나, 정말 지울 때만 `"tech": null`처럼 축에 명시적 `null`). 축 단위 자동 병합은 하지 않는다.
 
 **Response `201`**
 ```json
-{ "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03" }
+{ "ok": true, "slug": "reusable-rocket", "published_date": "2026-08-03", "preserved": [] }
 ```
 
-**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 · `composition` 축 항목 2개 이하 또는 8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 · `composition` 축 `share_pct` 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `composition.minerals[].producers[].share_pct` 있고 `composition.minerals_share_basis` 없음 · `composition: {}`(축 0개) · `composition` 한 축 안의 항목 `name` 중복
+`preserved` — 이 요청이 **키를 생략해 보존된** 선택 필드 이름(사전순). 전부 실은 판은 `[]`이고, 예를 들어 `composition`·`watch_items`를 생략했으면 `["composition", "watch_items"]`. 명시적 `null`은 삭제이므로 여기 들어오지 않는다.
+
+**Error `422`** — 미등록 slug · enum 밖 `currency`/`unit`/`milestones[].status` · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 `currency`/`unit`/`year` 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · 필수 필드 누락 · `composition` 축 항목 2개 이하 또는 8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 · `composition` 축 `share_pct` 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `composition.minerals[].producers[].share_pct` 있고 `composition.minerals_share_basis` 없음 · `composition: {}`(축 0개) · `composition` 한 축 안의 항목 `name` 중복 · **`composition.minerals[].used_in[]`이 같은 요청의 `composition.tech[].name`에 없음** · **`composition`을 생략해 보존되는 직전 판의 `tech[].leaders`가 새 `players[]`에 없음** · **`composition`을 실었는데 직전 판에 있던 축이 빠짐**(축 소실)
+
+> **에러 봉투가 두 형태다.** pydantic 검증(위 목록 대부분 + `used_in`)은 표준 `{"detail": [{...}]}`(배열)이고, 발행 핸들러가 직전 판을 읽어 판정하는 **보존분 `leaders` 끊김**과 **축 소실** 두 가지는 `HTTPException`이라 `{"detail": "<문자열>"}`이다. 두 문자열 메시지는 어느 이름·어느 축이 문제인지와 해법(그 값을 다시 싣기 / 업체를 `players[]`에 유지하기 / 정말 지울 때의 명시적 `null`)을 담는다. 이 두 판정은 발행 요청당 `SELECT` 1회를 쓴다 — `composition`을 생략했을 때(보존분 검증) 또는 값으로 실었을 때(축 소실 검증)만이고, 명시적 `null`은 읽지 않는다.
 
 ---
 
