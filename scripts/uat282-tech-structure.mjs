@@ -444,13 +444,16 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
         key: li.getAttribute('data-group'),
         label: txt(labelEl),
         labelAriaHidden: labelEl ? labelEl.getAttribute('aria-hidden') : 'LABEL_MISSING',
-        items: [...li.querySelectorAll('[data-testid="tech-graph-item"]')].map(chipBox),
+        // ⚠️ task#320 — 발행물 일치 칩은 `<a data-testid="tech-graph-link-item">`로 승격된다.
+        //    `tech-graph-item`만 세면 그 수만큼 부족해져 `graph-domain`이 정상 구현을 거짓 FAIL시킨다
+        //    (실측: ai-datacenter-equipment 2건 · pc1440·m390·m350 3뷰포트에서 FAIL했다).
+        items: [...li.querySelectorAll('[data-testid="tech-graph-item"],[data-testid="tech-graph-link-item"]')].map(chipBox),
         arrow: arrowEl ? { t: txt(arrowEl), hidden: arrowEl.getAttribute('aria-hidden') } : null,
       };
     }) : [],
     chipGroups: ['complements', 'competitors'].map((k) => {
       const el = graphEl.querySelector(`[data-testid="tech-graph-${k}"]`);
-      return { k, present: !!el, chips: el ? [...el.querySelectorAll('.badge')].map(chipBox) : [] };
+      return { k, present: !!el, chips: el ? [...el.querySelectorAll('.badge,[data-testid="tech-graph-link-item"]')].map(chipBox) : [] };
     }),
     // 섹션 안의 자체 가로 스크롤러. ⚠️ `.sr-only`는 `width:1px`라 **구조적으로** scrollWidth>clientWidth이므로
     // (실측 157~268 > 1) 정의역에서 제외한다 — 안 그러면 이 축이 원리적으로 FAIL한다(task#316의 「항상
