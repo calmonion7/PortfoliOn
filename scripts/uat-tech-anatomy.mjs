@@ -31,6 +31,44 @@
 //  · ⚠️ **이 축들은 프론트 빌드 이후에만 통과한다.** nginx가 `frontend/dist`를 직접 서빙하므로
 //    빌드 전 라이브 번들에는 마커·배지·요약이 아예 없다 → 배포 전 실행은 **red-first 확보용**이다
 //    (2026-08-20 실측: 선재축 265/265 PASS · 신규축 81 FAIL).
+//
+// ── task#316 추가 축: 카드 히트 오버레이(클릭 목적지) + 탭 타깃 칩 높이 ──────────────────
+//  · **클릭 목적지는 목표 자체다.** S3의 vitest는 `position/zIndex`가 *선언됐는지*만 쟀고(jsdom엔
+//    z축·히트테스트·레이아웃이 없다), 「오버레이가 「해부」 칩을 삼키는가」는 원리적으로 못 본다.
+//    그래서 ⓐ 카드 padding 4점 클릭 → 리포트 · ⓑ 「해부」 칩 클릭 → 해부를 **쌍으로** 잰다.
+//    ⓑ가 없으면 오버레이가 칩을 삼켜도 ⓐ가 통과해 판별력이 0이 된다.
+//  · **칩 경계 +3px**도 잰다 — 오버레이 도입의 대가는 「해부」 칩이 리포트 링크에 포위되는 것이라
+//    중앙만 재는 축은 그 밴드에 블라인드하다(`TechReports.jsx` 주석의 대가 ⓑ가 요구한 축).
+//  · `card-anchors`(href 집합)·`card-anchor-count`는 **오버레이가 `<span>`이라 도입 여부와 무관하게
+//    통과한다** — 회귀 가드이고 새 기능의 증거가 **아니다**(단언 메시지에도 그렇게 적었다).
+//  · 칩 높이는 **34px 정확히**(목차) / **≥34px**(출처 링크)로 가른다. 출처 칩은 `whiteSpace: nowrap`이
+//    없어 긴 제목이 여러 줄이 되고, 컨테이너가 `align-items: stretch`(기본값)라 **같은 flex 줄의 칩이
+//    가장 높은 칩에 맞춰 늘어난다** → 「모든 출처 칩 == 34」는 원리적으로 FAIL한다. 그래서
+//    ⓐ 전 칩 하한(≥34) ⓑ **1줄 칩만 있는 flex 줄**의 칩은 정확히 34 두 축으로 쪼갠다(후자는 폭마다
+//    정의역이 다르므로 「그런 줄이 하나라도 있었는가」를 **전 폭 합산 sentinel**로 못박는다).
+//  · **34px는 부모가 flex인 동안만 참이다** — block이면 인라인 요소의 세로 padding이 줄 상자에
+//    반영되지 않아 축이 조용히 무의미해진다(task#309). 그래서 두 컨테이너의 computed display를
+//    판정축으로 함께 둔다.
+//  · 목차 nav 높이는 리터럴이 아니라 **불변식**으로 잰다: `navH == 줄수*칩높이 + (줄수-1)*rowGap`.
+//    줄 수·gap·칩 높이 전부 실측이라 정당한 데이터 변화(칩 수 증감)에 거짓 실패하지 않는다.
+//  · 칩 성장이 KPI 스트립을 밀지 않는 **메커니즘**(목차가 스트립 *아래*)은 두 축으로 못박는다:
+//    ⓐ `tocNav.top >= strip.bottom`(순서 계약) ⓑ **처방-무효화 대조군**(칩을 `4px 10px`·line-height
+//    1.5로 되돌리는 `!important` 주입)에서 스트립 bottom이 **바이트 동일**한지. ⓑ는 baseline 리터럴에
+//    의존하지 않는 직접 증거이고, 동시에 「칩 높이 축이 상수를 재고 있지 않다」는 이빨이기도 하다
+//    (대조군 칩 높이 < 34가 관측돼야 한다 — 옛 실측 27px를 재현하면 대조군 자체가 검증된다).
+//  · ⚠️ 이 축들의 측정 slug은 기존 `TARGET`(항목 최대 = 목차 칩 최다)이다. `smr` ·
+//    `ai-datacenter-equipment`는 `uat280 kpi-visible`의 **선재 FAIL 대상**이므로 여기서 재지 않는다
+//    — 선재 결함을 이 프로브로 수입하면 증감 귀속이 불가능해진다(baseline 표 대조가 유일한 수단이다).
+//  · ⚠️ **선재 FAIL 2건(`chip-hscroll-doc:m278`·`chip-hscroll-main:m278`) — task#316과 무관하다.**
+//    2026-08-20 배포 *전*(라이브 번들 칩이 아직 `4px 10px`) 실측: 문서 넘침 **18px**·본문 **17px**.
+//    범인은 칩이 아니라 **`tech-report-players` 표의 min-content 259px**다(우변 295 > 278; 스크롤러
+//    바깥 요소만 남기고 재서 확정 — 위 `wide` 진단이 그 목록을 FAIL 메시지에 싣는다). 가토 ⑯의
+//    그 클래스이고, `uat280`은 최협 폭이 **350px**이라 이 결함을 원리적으로 못 본다(350에선 맞는다).
+//    → **완화하지 않는다**(프로브가 우회해 통과시킨 현상은 앱 결함이다 — task#272). 이 2건은 표를
+//    소유한 슬라이스의 몫이고, 그때까지 이 프로브의 기대값은 `FAIL 2 · 그 둘뿐`이다.
+//    2026-08-20 배포 전 전체 실측: **단언 728 · PASS 687 · FAIL 41**(2런 동일) —
+//    선재축 586 **전부 PASS** · 신규축 142 중 FAIL 41(= 목차칩 4 · 출처칩 4 · 대조군 이빨 4 ·
+//    오버레이 12 · 클릭 15 · m278 표 넘침 2).
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
 
@@ -835,6 +873,120 @@ for (const V of VIEWS) {
   rawLog.push(`${V.name} 카드 ${cards.length}장 · 해부버튼 h=${[...new Set(cards.map((c) => c.h))].join('/')}px · 라벨=${[...new Set(cards.map((c) => c.label))].join(' | ')}`);
   await page.screenshot({ path: `${OUT}/${V.name}-list.png`, fullPage: true });
 
+  // ══ ⓛ 카드 히트 오버레이 — 기하 (task#316) ═══════════════════════════════════
+  // S3의 vitest는 `position: absolute` + 롱핸드 오프셋이 **선언됐는지**만 쟀다. 그 선언이 실제로
+  // 카드 상자(padding 포함) 전체를 덮는지는 라이브 rect만이 확인한다 — 조상이 static이면 오버레이가
+  // 딴 조상에 붙어 히트 영역이 통째로 어긋나는데 jsdom에선 둘이 구별되지 않는다.
+  const ov = await page.evaluate(() => {
+    const box = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 }; };
+    return [...document.querySelectorAll('[data-testid="tech-report-card"]')].map((c) => {
+      const o = c.querySelector('[data-testid="card-hit-overlay"]');
+      const lk = c.querySelector('[data-testid="card-link-anatomy"]');
+      const body = c.querySelector('[data-testid="card-to-report"]');
+      const os = o ? getComputedStyle(o) : null;
+      const ls = lk ? getComputedStyle(lk) : null;
+      return {
+        slug: c.getAttribute('data-slug'),
+        cardPos: getComputedStyle(c).position,
+        card: box(c),
+        body: body ? box(body) : null,
+        ov: o ? { tag: o.tagName, aria: o.getAttribute('aria-hidden'), pos: os.position, pe: os.pointerEvents, box: box(o) } : null,
+        lk: lk ? { pos: ls.position, z: ls.zIndex, box: box(lk) } : null,
+      };
+    });
+  });
+  eq(`overlay-domain:${V.name}`, ov.length > 0 ? 'OK' : 'DOMAIN_TOO_SMALL(0)', 'OK');
+  // 오버레이의 오프셋 기준이 되는 positioned 조상 — static이면 `top/right/bottom/left:0`이 딴 상자를 잡는다
+  eq(`overlay-card-relative:${V.name}`, ov.filter((c) => c.cardPos !== 'relative').map((c) => `${c.slug}=${c.cardPos}`), []);
+  eq(`overlay-present:${V.name}`, ov.filter((c) => !c.ov).map((c) => c.slug), []);
+  eq(`overlay-shape:${V.name}`,
+     ov.filter((c) => c.ov && (c.ov.tag !== 'SPAN' || c.ov.aria !== 'true' || c.ov.pos !== 'absolute'))
+       .map((c) => `${c.slug}=${c.ov.tag}/${c.ov.aria}/${c.ov.pos}`), []);
+  // 히트 영역 = 카드 상자와 **동일**해야 한다(S1 실측 죽은 영역: m278 padBottom 68 · pc1280 86)
+  eq(`overlay-covers-card:${V.name}`,
+     ov.filter((c) => !c.ov || ['l', 't', 'r', 'b'].some((k) => Math.abs(c.ov.box[k] - c.card[k]) > 0.5))
+       .map((c) => `${c.slug}=${c.ov ? JSON.stringify([c.ov.box.w, c.ov.box.h]) : 'NO_OVERLAY'} vs card ${JSON.stringify([c.card.w, c.card.h])}`), []);
+  // `pointerEvents: none`이면 오버레이는 존재하는데 클릭을 안 받는다 — 무음 no-op의 두 번째 경로
+  eq(`overlay-hittable:${V.name}`, ov.filter((c) => c.ov && c.ov.pe !== 'auto').map((c) => `${c.slug}=${c.ov.pe}`), []);
+  // 「해부」 칩이 오버레이 **위**에 있는가 — 이 쌍이 끊기면 해부 진입점이 통째로 가려진다
+  eq(`overlay-chip-above:${V.name}`,
+     ov.filter((c) => !c.lk || c.lk.pos !== 'relative' || c.lk.z !== '1').map((c) => `${c.slug}=${c.lk ? c.lk.pos + '/' + c.lk.z : 'NO_LINK'}`), []);
+  // ⓓ 앵커 수 — ⚠️ 오버레이는 `<span>`이라 이 축은 **도입 여부와 무관하게 통과한다**. 회귀 가드이고
+  //    새 기능의 증거가 아니다(오버레이를 `<a>`로 잘못 바꾸면 여기서 걸린다).
+  eq(`card-anchor-count:${V.name}`, cards.filter((c) => c.hrefs.length !== 2).map((c) => `${c.slug}=${c.hrefs.length}개`), [],
+     '회귀 가드 — 오버레이가 span인 한 이 축은 오버레이 유무에 블라인드하다');
+  bump('overlay', 8);
+  for (const c of ov) {
+    if (c.slug !== TARGET.slug) continue;
+    rawLog.push(`${V.name} 카드 죽은영역 실측(${c.slug}): 카드 ${c.card.w}x${c.card.h} · 본문 ${c.body ? `${c.body.w}x${c.body.h}` : 'NONE'} · padTop ${c.body ? Math.round(c.body.t - c.card.t) : '?'} padBottom ${c.body ? Math.round(c.card.b - c.body.b) : '?'} padLeft ${c.body ? Math.round(c.body.l - c.card.l) : '?'} · 오버레이 ${c.ov ? `${c.ov.box.w}x${c.ov.box.h}` : 'NONE'}`);
+  }
+
+  // ══ ⓐⓑⓒ 클릭 목적지 — **쌍으로** 잰다 (task#316) ═══════════════════════════
+  // ⓐ 카드 padding 4점 → 리포트 / ⓒ 칩 경계 +3px → 리포트 / ⓑ 칩 중앙 → 해부.
+  // ⓑ가 없으면 오버레이가 칩을 삼켜도 ⓐ가 전부 통과해 판별력이 0이 된다.
+  // 클릭 실패는 프로브를 죽이지 않고 `CLICK_BLOCKED`를 **축의 값**으로 만든다(무음 스킵 금지).
+  const HIT_KINDS = ['tl', 'tr', 'bl', 'br', 'rightOfChip', 'chip'];
+  const hitWant = (k) => (k === 'chip' ? `/tech-anatomy/${TARGET.slug}` : `/tech-report/${TARGET.slug}`);
+  for (const kind of HIT_KINDS) {
+    await page.goto(`${BASE}/tech-reports`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-testid="tech-report-card"]', { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    // 좌표는 **스크롤 후에** 잰다 — 스크롤 전 좌표로 클릭하면 딴 곳을 누르고 그 실패가 앱 결함처럼 보인다.
+    const P = await page.evaluate(([slug, k]) => {
+      const c = document.querySelector(`[data-testid="tech-report-card"][data-slug="${slug}"]`);
+      if (!c) return { err: 'NO_CARD' };
+      c.scrollIntoView({ block: 'center' });
+      const lk = c.querySelector('[data-testid="card-link-anatomy"]');
+      if (!lk) return { err: 'NO_ANATOMY_LINK' };
+      const cr = c.getBoundingClientRect(), lr = lk.getBoundingClientRect();
+      const IN = 8;   // radius 12 코너 원 안쪽(중심 (12,12)에서 거리 8.49 < 12)이라 카드 히트 영역이다
+      const map = {
+        tl: [cr.left + IN, cr.top + IN], tr: [cr.right - IN, cr.top + IN],
+        bl: [cr.left + IN, cr.bottom - IN], br: [cr.right - IN, cr.bottom - IN],
+        rightOfChip: [lr.right + 3, (lr.top + lr.bottom) / 2],
+        chip: [(lr.left + lr.right) / 2, (lr.top + lr.bottom) / 2],
+      };
+      const [x, y] = map[k];
+      const el = document.elementFromPoint(x, y);
+      return {
+        x, y,
+        top: el ? (el.closest('[data-testid]')?.getAttribute('data-testid') || el.tagName) : 'NONE',
+        inCard: x > cr.left && x < cr.right && y > cr.top && y < cr.bottom,
+        inChip: x >= lr.left && x <= lr.right && y >= lr.top && y <= lr.bottom,
+        inView: x >= 0 && y >= 0 && x <= innerWidth && y <= innerHeight,
+        card: [cr.left, cr.top, cr.right, cr.bottom].map((v) => Math.round(v)),
+        chipBox: [lr.left, lr.top, lr.right, lr.bottom].map((v) => Math.round(v)),
+      };
+    }, [TARGET.slug, kind]);
+    let dest;
+    if (P.err) dest = `SETUP_FAIL(${P.err})`;
+    else {
+      try {
+        await page.mouse.click(P.x, P.y);
+        await page.waitForTimeout(900);
+        dest = new URL(page.url()).pathname;
+      } catch (e) { dest = `CLICK_BLOCKED(${String(e.message).split('\n')[0].slice(0, 48)})`; }
+    }
+    // 대상 유효성을 목적지보다 **먼저** — 좌표가 카드 밖·화면 밖이거나 코너가 칩 위면 이 축은 딴 것을 잰다
+    eq(`hit-point-domain:${V.name}:${kind}`,
+       P.err ? `SETUP(${P.err})` : [P.inCard, P.inView, kind === 'chip' ? P.inChip : !P.inChip],
+       [true, true, true],
+       P.err ? '' : `pt=(${Math.round(P.x)},${Math.round(P.y)}) card=${JSON.stringify(P.card)} chip=${JSON.stringify(P.chipBox)}`);
+    eq(`hit-dest:${V.name}:${kind}`, dest, hitWant(kind),
+       P.err ? '' : `topmost=${P.top} · pt=(${Math.round(P.x)},${Math.round(P.y)})`);
+    bump('hit', 2);
+    rawLog.push(`${V.name} 클릭 ${kind}: pt=(${P.err ? P.err : Math.round(P.x) + ',' + Math.round(P.y)}) topmost=${P.top ?? '?'} → ${dest}`);
+    // 육안 증거는 **착지 화면**이다(그 축이 재는 것이 목적지이므로) — 쌍의 양쪽만 남긴다:
+    // padding 클릭(tl)과 칩 클릭(chip). 6종 전부 찍으면 파일이 18장 늘어 빠진 화면이 안 보인다.
+    if (kind === 'tl' || kind === 'chip') {
+      await page.screenshot({ path: `${OUT}/${V.name}-hit-${kind}.png` });
+    }
+  }
+  // 뒤이은 왕복 내비 블록은 목록 화면을 전제한다 — 클릭 축이 떠난 자리를 되돌려 놓는다.
+  await page.goto(`${BASE}/tech-reports`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-testid="tech-report-card"]', { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(400);
+
   const cardLink = page.locator(`[data-testid="tech-report-card"][data-slug="${TARGET.slug}"] [data-testid="card-link-anatomy"]`);
   const navOk = { list2anatomy: false, anatomy2report: false, report2anatomy: false, back: false, anatomy2list: false };
   if (await cardLink.count() > 0) {
@@ -868,6 +1020,218 @@ for (const V of VIEWS) {
 
   await ctx.close();
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// task#316 ⓔⓕ — 리포트 상세 `/tech-report/:slug`의 탭 타깃 칩 높이 + 목차 nav·스트립 세로 예산
+// ──────────────────────────────────────────────────────────────────────────────
+// 위 VIEWS 루프(3뷰)는 **건드리지 않는다** — 뷰포트를 하나 더 끼우면 선재 축 전부의 총계가 움직여
+// 재실행 간 커버리지 비교가 무의미해진다(⑧ⓑ). 이 계열만 4폭(278/390/768/1280)으로 따로 돈다.
+// 측정 대상은 기존 `TARGET`(= 목차 칩 최다 판, 2026-08-20 실측 `semiconductor-equipment` 11칩)이다.
+// ══════════════════════════════════════════════════════════════════════════════
+const CHIP_VIEWS = [
+  { name: 'm278', opts: { ...devices['iPhone SE'], viewport: { width: 278, height: 800 }, isMobile: true, hasTouch: true } },
+  { name: 'm390', opts: { ...devices['iPhone 13'] } },
+  { name: 'm768', opts: { viewport: { width: 768, height: 1000 } } },
+  { name: 'pc1280', opts: { viewport: { width: 1280, height: 1000 } } },
+];
+const SRC_URL_N = (TARGET.sources || []).filter((s) => s && s.url).length;
+const SRC_NOURL_N = (TARGET.sources || []).filter((s) => s && !s.url).length;
+rawLog.push(`칩 축 대상=${TARGET.slug} · 출처 ${(TARGET.sources || []).length}종(URL ${SRC_URL_N} · 무URL ${SRC_NOURL_N})`);
+
+// 브라우저 안 판독기. 줄 수는 위 MEASURE의 `__lines`(겹치지 않는 rect 묶음)를 그대로 쓴다.
+const CHIP_READ = `
+window.__readChips = function (pubDate) {
+  const box = (e) => { const r = e.getBoundingClientRect();
+    return { l: r.left, t: r.top, r: r.right, b: r.bottom,
+             w: Math.round(r.width * 100) / 100, h: Math.round(r.height * 100) / 100 }; };
+  const chip = (e) => ({ text: e.textContent.trim().slice(0, 20), box: box(e), lines: window.__lines(e),
+                         sw: e.scrollWidth, cw: e.clientWidth,
+                         pad: getComputedStyle(e).padding, lh: getComputedStyle(e).lineHeight });
+  const nav = document.querySelector('[data-testid="tech-report-toc"]');
+  const srcWrap = document.querySelector('[data-testid="tech-report-sources"]');
+  const strip = document.querySelector('[data-testid="tech-report-kpis"]');
+  const tabbar = document.querySelector('nav.tabbar');
+  const tabbarH = tabbar ? Math.round(tabbar.getBoundingClientRect().height) : 0;
+  const de = document.documentElement;
+  const main = document.querySelector('main.page-wrap') || de;
+  return {
+    h1: (document.querySelector('h1')?.textContent || '').trim(),
+    dateFound: document.body.textContent.includes(pubDate),
+    nav: nav ? { box: box(nav), display: getComputedStyle(nav).display,
+                 gap: parseFloat(getComputedStyle(nav).rowGap) || 0,
+                 align: getComputedStyle(nav).alignItems } : null,
+    toc: nav ? [...nav.querySelectorAll('[data-testid="tech-toc-chip"]')].map(chip) : [],
+    src: srcWrap ? [...srcWrap.querySelectorAll('a[href]')].map(chip) : [],
+    srcNoUrl: srcWrap ? [...srcWrap.querySelectorAll('span')].length : -1,
+    srcWrapper: srcWrap ? { display: getComputedStyle(srcWrap).display,
+                            align: getComputedStyle(srcWrap).alignItems,
+                            gap: parseFloat(getComputedStyle(srcWrap).rowGap) || 0 } : null,
+    strip: strip ? box(strip) : null,
+    scrollY: Math.round(window.scrollY),
+    vh: innerHeight, tabbarH, avail: innerHeight - tabbarH,
+    docOver: de.scrollWidth - de.clientWidth,
+    mainOver: main.scrollWidth - main.clientWidth,
+    // 넘침 축이 FAIL할 때 **무엇이** 넘쳤는지 함께 남긴다 — 안 남기면 다음 사람이 임계를 건드리는
+    // 쪽으로 간다(⑧ⓝ). 판정은 위 두 수치가 하고, 이건 진단 자료다(단언 아님).
+    wide: (() => {
+      const lim = main.getBoundingClientRect().right + 1;
+      // ⚠️ 자기 스크롤러(overflow-x auto|scroll)·클리퍼(hidden) 안의 요소는 **문서를 밀지 못한다**
+      //    — 그걸 안 걸러내면 의도된 가로 스크롤 다이어그램(TechGraph의 SVG)이 목록을 통째로 삼켜
+      //    진짜 범인이 안 보인다(1차 실행에서 실제로 그랬다). 이 문자열은 템플릿 리터럴 안이므로
+      //    백틱을 쓰지 않는다(쓰면 문자열이 끊겨 프로브가 로드 파손된다).
+      const inScroller = (e) => {
+        for (let p = e.parentElement; p && p !== main; p = p.parentElement) {
+          const ox = getComputedStyle(p).overflowX;
+          if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') return true;
+        }
+        return false;
+      };
+      const out = [];
+      for (const e of main.querySelectorAll('*')) {
+        const r = e.getBoundingClientRect();
+        if (r.width <= 0 || r.right <= lim || inScroller(e)) continue;
+        out.push({ tid: e.getAttribute('data-testid') || '', tag: e.tagName,
+                   cls: String(e.className || '').slice(0, 24),
+                   w: Math.round(r.width), over: Math.round(r.right - lim),
+                   txt: (e.textContent || '').trim().slice(0, 18) });
+      }
+      return out.sort((a, b) => b.over - a.over).slice(0, 5);
+    })(),
+  };
+};
+`;
+
+// 줄 = 서로 다른 top 값의 묶음(0.5px 허용). flex 줄 판정에 쓴다 — align-items:stretch면 같은 줄의
+// 칩들이 가장 높은 칩에 맞춰 늘어나므로, 「1줄 칩만 있는 줄」을 골라야 34px 정확성을 물을 수 있다.
+const flexRows = (chips) => {
+  const rows = [];
+  for (const c of chips) {
+    const hit = rows.find((r) => Math.abs(r.top - c.box.t) <= 0.5);
+    if (hit) hit.chips.push(c); else rows.push({ top: c.box.t, chips: [c] });
+  }
+  return rows.sort((a, b) => a.top - b.top);
+};
+
+let srcPureRowsAll = 0;          // 전 폭 합산 — 「1줄 칩만 있는 줄」을 한 번이라도 밟았는가
+const srcPureByView = [];
+const tocCountByView = [];
+
+for (const W of CHIP_VIEWS) {
+  const ctx = await browser.newContext({ ...W.opts, serviceWorkers: 'block' });
+  await ctx.addInitScript(([a, r]) => {
+    localStorage.setItem('access_token', a);
+    localStorage.setItem('refresh_token', r);
+    localStorage.setItem('theme', 'light');
+    localStorage.setItem('pwa-install-dismissed-at', String(Date.now()));
+  }, [access_token, refresh_token]);
+  const page = await ctx.newPage();
+  await page.addInitScript(MEASURE);
+  await page.addInitScript(CHIP_READ);
+  await page.goto(`${BASE}/tech-report/${TARGET.slug}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-testid="tech-report-toc"]', { timeout: 20000 }).catch(() => {});
+  await page.waitForFunction(() => document.querySelectorAll('.skeleton-block').length === 0).catch(() => {});
+  await page.waitForTimeout(900);
+  const C = await page.evaluate((d) => window.__readChips(d), TARGET.published_date);
+
+  // ── identity를 판정축보다 먼저 — 칩 높이 축은 페이지 내용과 독립이라 틀린 문서에서도 통과한다(⑧ⓘ)
+  eq(`chip-identity:${W.name}`,
+     [page.url().includes(`/tech-report/${TARGET.slug}`), (C?.h1 || '').length > 0, !!C?.dateFound],
+     [true, true, true], `h1="${C?.h1}" date=${TARGET.published_date} url=${page.url()}`);
+  // 스트립 세로 예산 축은 **스크롤 0에서만** 성립한다
+  eq(`chip-scroll0:${W.name}`, C ? C.scrollY : -1, 0);
+  bump('chipident', 2);
+
+  // ── ⓔ-1 목차 칩: 34px **정확히** (nowrap이라 전 칩이 1줄 → 전 칩이 같은 줄 높이) ──
+  eq(`toc-domain:${W.name}`, (C?.toc.length || 0) >= 8 ? 'OK' : `TOC_DOMAIN_TOO_SMALL(${C?.toc.length})`, 'OK',
+     `목차 칩 ${C?.toc.length}개 · gap ${C?.nav?.gap}px`);
+  // 34px는 **부모가 flex인 동안만** 참이다 — block이면 인라인 요소의 세로 padding이 줄 상자에
+  // 반영되지 않아 이 축이 조용히 무의미해진다(task#309).
+  eq(`toc-parent-flex:${W.name}`, C?.nav?.display ?? 'NO_NAV', 'flex');
+  eq(`toc-chip-h:${W.name}`, (C?.toc || []).filter((c) => Math.abs(c.box.h - 34) > 0.5).map((c) => `${c.text}=${c.box.h}px`), [],
+     `실측 높이 ${JSON.stringify([...new Set((C?.toc || []).map((c) => c.box.h))])} · padding ${JSON.stringify([...new Set((C?.toc || []).map((c) => c.pad))])} · line-height ${JSON.stringify([...new Set((C?.toc || []).map((c) => c.lh))])}`);
+  eq(`toc-chip-1line:${W.name}`, (C?.toc || []).filter((c) => c.lines !== 1).map((c) => `${c.text}=${c.lines}줄`), []);
+  // 줄 수 축은 nowrap이 걸린 동안 공허하다 → 넘침 축과 **쌍으로** 둔다(가토 ⑨ 거울상, task#309).
+  eq(`toc-chip-nooverflow:${W.name}`, (C?.toc || []).filter((c) => c.sw > c.cw + 1).map((c) => `${c.text}=${c.sw}>${c.cw}`), []);
+  bump('toc', 5);
+
+  // ── ⓕ 목차 nav 높이 — 리터럴이 아니라 **불변식**(줄 수·gap·칩 높이 전부 실측) ──
+  const tocRows = flexRows(C?.toc || []);
+  const tocChipH = Math.max(0, ...(C?.toc || []).map((c) => c.box.h));
+  const navExp = tocRows.length > 0 ? tocRows.length * tocChipH + (tocRows.length - 1) * (C?.nav?.gap || 0) : -1;
+  eq(`toc-nav-h:${W.name}`, C?.nav ? Math.abs(C.nav.box.h - navExp) <= 0.6 : 'NO_NAV', true,
+     `navH=${C?.nav?.box.h} 기대=${navExp.toFixed(2)} (${tocRows.length}줄 × ${tocChipH}px + ${tocRows.length - 1} × gap ${C?.nav?.gap})`);
+  // 칩 성장이 스트립을 밀지 않는 **메커니즘** — 목차가 스트립 아래라는 순서 계약
+  eq(`toc-below-strip:${W.name}`, (C?.nav && C?.strip) ? C.nav.box.t >= C.strip.b : 'MISSING', true,
+     `tocTop=${C?.nav?.box.t} stripBottom=${C?.strip?.b}`);
+  // 첫 화면 세로 예산 — 유효 바닥은 vh가 아니라 vh − 탭바다(uat280과 같은 자)
+  eq(`strip-inview:${W.name}`, C?.strip ? (C.strip.b > 0 && C.strip.b <= C.avail) : 'NO_STRIP', true,
+     `stripBottom=${C?.strip?.b} 가용=${C?.avail}(vh ${C?.vh} − 탭바 ${C?.tabbarH}) · 여유 ${C?.strip ? Math.round(C.avail - C.strip.b) : '?'}px`);
+  bump('tocnav', 3);
+
+  // ── ⓔ-2 출처 링크 칩: 하한 ≥34 + 「1줄 칩만 있는 flex 줄」은 정확히 34 ──
+  // 컨테이너가 align-items:stretch(기본값)라 같은 줄의 칩이 가장 높은 칩에 맞춰 늘어난다 →
+  // 「모든 칩 == 34」는 원리적으로 FAIL한다. 하한과 정확성을 **다른 축**으로 가른다.
+  eq(`src-domain:${W.name}`, C ? C.src.length : -1, SRC_URL_N, `API URL 보유 출처 ${SRC_URL_N}종`);
+  eq(`src-parent-flex:${W.name}`, C?.srcWrapper?.display ?? 'NO_WRAP', 'flex');
+  eq(`src-chip-hmin:${W.name}`, (C?.src || []).filter((c) => c.box.h < 33.5).map((c) => `${c.text}=${c.box.h}px`), [],
+     `높이 분포 ${JSON.stringify([...new Set((C?.src || []).map((c) => c.box.h))].sort((a, b) => a - b))} · align-items=${C?.srcWrapper?.align}`);
+  const srcRows = flexRows(C?.src || []);
+  const pureRows = srcRows.filter((r) => r.chips.every((c) => c.lines === 1));
+  srcPureRowsAll += pureRows.length;
+  srcPureByView.push(`${W.name}:${pureRows.length}/${srcRows.length}줄`);
+  eq(`src-oneline-exact:${W.name}`,
+     pureRows.flatMap((r) => r.chips).filter((c) => Math.abs(c.box.h - 34) > 0.5).map((c) => `${c.text}=${c.box.h}px`), [],
+     `1줄 전용 flex 줄 ${pureRows.length}개 / 전체 ${srcRows.length}개 — 0이면 이 폭엔 정의역이 없다(전 폭 합산 sentinel이 게이트다)`);
+  // 가로 padding 10→12px로 칩 안 가용폭이 4px 줄어 넘침 임계가 내려갔다(TechReport.jsx 주석)
+  eq(`src-chip-nooverflow:${W.name}`, (C?.src || []).filter((c) => c.sw > c.cw + 1).map((c) => `${c.text}=${c.sw}>${c.cw}`), []);
+  bump('src', 5);
+
+  // ── 문서 가로 스크롤 0 (칩 가로 padding 증가의 이웃 비용 — 가토 ⑰) ──
+  const wideTxt = JSON.stringify(C?.wide || []);
+  eq(`chip-hscroll-doc:${W.name}`, C ? C.docOver <= 0 : 'NO_READ', true, `scrollWidth-clientWidth=${C?.docOver} · 넘친 요소 ${wideTxt}`);
+  eq(`chip-hscroll-main:${W.name}`, C ? C.mainOver <= 0 : 'NO_READ', true, `diff=${C?.mainOver} · 넘친 요소 ${wideTxt}`);
+  bump('chip-hscroll', 2);
+
+  tocCountByView.push(`${W.name}:${C?.toc.length}칩/${tocRows.length}줄`);
+  rawLog.push(`${W.name} 목차: 칩 ${C?.toc.length}개 · ${tocRows.length}줄 · 칩h ${JSON.stringify([...new Set((C?.toc || []).map((c) => c.box.h))])} · navH ${C?.nav?.box.h} · 스트립 bottom ${C?.strip?.b}/가용 ${C?.avail}`);
+  rawLog.push(`${W.name} 출처: 칩 ${C?.src.length}개 · ${srcRows.length}줄(1줄전용 ${pureRows.length}) · 높이 ${JSON.stringify([...new Set((C?.src || []).map((c) => c.box.h))].sort((a, b) => a - b))} · 줄수 ${JSON.stringify([...new Set((C?.src || []).map((c) => c.lines))].sort())}`);
+
+  // 캡처는 **재는 그 지점**에서 — 스크롤 0 측정 상태의 전면 캡처(목차·스트립) + 출처 근접 캡처
+  await page.screenshot({ path: `${OUT}/${W.name}-report-chips.png`, fullPage: true });
+  await page.evaluate(() => document.querySelector('[data-testid="tech-report-sources"]')?.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${OUT}/${W.name}-report-sources.png` });
+
+  // ── 처방-무효화 대조군 — 라이브를 되돌리지 않고 칩만 옛 값으로 되돌린다(⑧ⓚ②) ──
+  // 목적 셋: ① 칩 높이 축이 상수를 재고 있지 않음(이빨) ② 옛 실측 27px 재현으로 대조군 자체 검증
+  // ③ **스트립 bottom이 바이트 동일**함을 직접 증명한다(= 칩 성장이 스트립을 밀지 않았다는 증거로,
+  //    baseline 리터럴에 의존하지 않는다). `!important`가 필요하다 — 인라인 스타일을 이겨야 한다.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.addStyleTag({ content: '[data-testid="tech-toc-chip"],[data-testid="tech-report-sources"] a{padding:4px 10px !important;line-height:1.5 !important}' });
+  await page.waitForTimeout(300);
+  const C2 = await page.evaluate((d) => window.__readChips(d), TARGET.published_date);
+  const c2h = [...new Set((C2?.toc || []).map((c) => c.box.h))];
+  eq(`chipctrl-applied:${W.name}`, (C2?.toc || []).length > 0 && c2h.every((h) => h < 33.5), true,
+     `대조군 목차 칩 높이 ${JSON.stringify(c2h)} — 옛 실측 27px를 재현하면 대조군 자체가 검증된다`);
+  eq(`chipctrl-nav-shrank:${W.name}`, (C2?.nav && C?.nav) ? C2.nav.box.h < C.nav.box.h : 'MISSING', true,
+     `navH ${C?.nav?.box.h} → ${C2?.nav?.box.h}`);
+  eq(`chipctrl-strip-same:${W.name}`, (C2?.strip && C?.strip) ? Math.abs(C2.strip.b - C.strip.b) <= 0.5 : 'MISSING', true,
+     `stripBottom ${C?.strip?.b} → ${C2?.strip?.b} (목차는 스트립 *아래*라 칩 높이가 스트립을 밀지 못한다)`);
+  bump('chipctrl', 3);
+  rawLog.push(`${W.name} 칩 대조군: 목차 칩 ${JSON.stringify([...new Set((C?.toc || []).map((c) => c.box.h))])} → ${JSON.stringify(c2h)} · navH ${C?.nav?.box.h} → ${C2?.nav?.box.h} · 스트립 bottom ${C?.strip?.b} → ${C2?.strip?.b}`);
+  await page.screenshot({ path: `${OUT}/${W.name}-report-chipctrl.png` });
+  await ctx.close();
+}
+
+// 전 폭 합산 sentinel — 「1줄 칩만 있는 flex 줄」을 한 번도 못 밟았으면 `src-oneline-exact`는
+// 전 폭에서 빈 배열끼리 비교돼 **공허하게 통과**한다(⑧ⓐ). 정의역 부재를 FAIL로 만든다.
+eq('src-oneline-global-domain', srcPureRowsAll > 0 ? 'OK' : `NO_ONELINE_SOURCE_ROW(${srcPureRowsAll})`, 'OK',
+   `폭별 1줄전용 줄 수 ${srcPureByView.join(' · ')}`);
+// 목차 칩 수는 폭과 무관해야 한다 — 폭에 따라 달라지면 렌더가 무음으로 칩을 빠뜨린 것이다
+eq('toc-count-consistent', [...new Set(tocCountByView.map((s) => s.split(':')[1].split('칩')[0]))].length, 1,
+   `폭별 ${tocCountByView.join(' · ')}`);
+bump('chip-global', 2);
+
 await browser.close();
 
 // ── 보고 ──────────────────────────────────────────────────────────────────────
@@ -888,7 +1252,10 @@ fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ cov, results, target: TA
   crossTargets: CROSS_LIST.map((e) => ({ slug: e.r.slug, markers: e.x.markers.length, badges: e.x.badges.length,
     measurable: e.x.measurable, unmatched: e.x.unmatched, holdN: e.x.holdN, watchN: e.x.watchN })),
   trackedN: TRACKED_N, mineralLiveOverlap: MIN_LIVE.length,
-  mineralInjected: MINJ ? MINJ.ticker : null }, null, 2));
+  mineralInjected: MINJ ? MINJ.ticker : null,
+  chipTarget: TARGET.slug, chipViews: CHIP_VIEWS.map((w) => w.name),
+  tocByView: tocCountByView, srcPureRowsByView: srcPureByView, srcUrlN: SRC_URL_N, srcNoUrlN: SRC_NOURL_N },
+  null, 2));
 if (fails.length) {
   console.log('\nFAIL 상세:');
   for (const f of fails) console.log(`  ✗ ${f.tag}\n      ${f.msg}`);

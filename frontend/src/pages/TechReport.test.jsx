@@ -449,6 +449,46 @@ describe('주요기술 리포트 상세 — 전역 목차 (task#296 S4)', () => 
   })
 })
 
+// ── task#316 — 상호작용 칩(목차·출처 링크)의 탭 타깃 선언 핀 ────────────────────────────
+// 이 태스크를 만든 회귀는 「padding만 키우고 lineHeight를 빠뜨려 약속한 34px이 조용히 미달」이었다
+// (task#309). 그 회귀는 **어느 자동 게이트에도 안 걸렸다** — jsdom은 레이아웃이 없어 높이를 못 재고,
+// 라이브 프로브에는 칩 높이 축이 없었고, 빌드는 인라인 스타일을 모른다. 그래서 여기서 재는 것은
+// 높이가 아니라 **선언값**이고, 실제 34px은 라이브 프로브가 닫는다(frontend/CLAUDE.md 처방:
+// 「vitest는 선언값을 못박고 실폭은 라이브 프로브가 잰다」).
+// ⚠️ 부모의 `display: flex`도 함께 못박는다 — 34px 성립의 **전제**다. 부모가 block이 되면 칩이
+// 순수 인라인이 되어 세로 padding이 줄 상자에 반영되지 않고(높이 미달) `clientWidth`가 0이 되어
+// 프로브의 넘침 축까지 무의미해진다(task#309 짝). 그 리팩터는 여기서만 red가 된다.
+describe('주요기술 리포트 상세 — 상호작용 칩 탭 타깃 (task#316)', () => {
+  const WITH_SOURCE_URL = {
+    ...FULL_REPORT,
+    // 라이브 발행 7종의 출처 214개는 **전부 URL을 갖는다**(무URL 칩은 dormant) — 픽스처에
+    // 링크 칩이 없으면 이 핀이 원리적으로 대상을 못 만나므로 URL 있는 출처를 넣는다.
+    sources: [{ title: 'IAEA', url: 'https://www.iaea.org/' }, { title: '무URL', url: null }],
+  }
+
+  it('목차 칩·출처 링크 칩 — padding 7px 12px + lineHeight 18px, 부모는 flex', async () => {
+    mockReport(WITH_SOURCE_URL)
+    renderAt('smr')
+    const chips = await screen.findAllByTestId('tech-toc-chip')
+    chips.forEach((a) => {
+      expect(a.style.padding).toBe('7px 12px')
+      expect(a.style.lineHeight).toBe('18px')
+    })
+    expect(screen.getByTestId('tech-report-toc').style.display).toBe('flex')
+
+    const sourceBox = screen.getByTestId('tech-report-sources')
+    expect(sourceBox.style.display).toBe('flex')
+    const links = [...sourceBox.querySelectorAll('a[href]')]
+    expect(links.length).toBe(1)                       // 커버리지 sentinel — 0이면 이 핀은 공허하다
+    expect(links[0].style.padding).toBe('7px 12px')
+    expect(links[0].style.lineHeight).toBe('18px')
+    // 무URL 칩은 상호작용 요소가 아니라 대상이 아니다(계획 비목표) — 그래서 옛 값 그대로임을
+    // 못박아 「형제라서 같이 키웠다」는 표류를 막는다.
+    const plain = [...sourceBox.querySelectorAll('span')].find((s) => s.textContent === '무URL')
+    expect(plain.style.padding).toBe('4px 10px')
+  })
+})
+
 // ── task#298 S4(2/2) — 「계열 비교」(점유율 바로 앞) + 「확인할 지표」(난제 바로 뒤) 배선.
 // ⚠️ 두 섹션은 **같은 SECTIONS 배열**에서 목차 칩과 함께 파생된다 — 배열과 JSX를 한쪽만 고치면
 // 위 task#296 순서 단언(칩 href 순서 == DOM data-tech-section 순서)이 잡는다.

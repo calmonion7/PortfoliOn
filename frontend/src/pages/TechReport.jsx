@@ -187,7 +187,17 @@ export default function TechReport() {
           여기(스트립 아래·목차 위)로 옮기면 그 비용이 첫 화면 예산에서 빠진다.
 
           해부가 없어도 링크는 남기고 배지로 표시한다 — 링크를 숨기면 "그런 화면이 있는 줄도
-          모르는" 상태가 되고, 해부 페이지는 빈 상태를 안내로 렌더하므로 고장난 링크가 아니다. */}
+          모르는" 상태가 되고, 해부 페이지는 빈 상태를 안내로 렌더하므로 고장난 링크가 아니다.
+
+          ⚠️ **알고도 미룬 결함(task#316) — 의도된 트레이드오프가 아니다.** 이 링크의 탭 타깃은
+          `--font-size-xs` 11px × 상속 line-height 1.5 = **16.5px**로 기준 32px의 절반이고,
+          task#316이 34px로 키운 칩들의 *수정 전* 높이(27px)보다도 작다. 하필 해부로 가는 1차
+          진입점이다(ADR-0042 결정 6). 닫으려면 padding만으로는 안 되고(인라인 요소의 세로 padding은
+          줄 상자에 반영되지 않는다 — task#309) `display: inline-block` + padding으로 바꿔야 하는데
+          그건 이 문단의 레이아웃을 바꾸는 시각 변경이라 라이브 실측·육안이 필요해 범위 밖으로 뒀다.
+          ⚠️ 이 결함은 `grep 'padding: 4px 10px'`류 **리터럴 감사에 원리적으로 안 걸린다**(padding이
+          아예 없다) — 탭 타깃 감사는 리터럴이 아니라 성질로 셀 것: 「32px 미달 상호작용 요소 집합」
+          (`document.querySelectorAll('a,button,[role=button]')`의 rect 높이). */}
       <p style={{ margin: '0 0 20px', fontSize: 'var(--font-size-xs)' }}>
         <Link to={`/tech-anatomy/${report.slug}`} data-testid="report-to-anatomy" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
           이 기술의 해부 →
@@ -205,14 +215,41 @@ export default function TechReport() {
           리드 밑에 두면 목차가 128px(높이 98 + 여백 30)을 먹어 KPI 스트립이 첫 화면 밖으로 밀린다
           (라이브 실측: m390 스트립 bottom 686 > 가용 603 · m350 733 > 639 → uat280 `kpi-visible` 4건 FAIL).
           그 축은 task#280이 스트립을 압축해 어렵게 green으로 만든 **기록된 결정**이라 뒤집을 수 없고
-          (task#264 절차), 8~11칩은 278px에서 3줄이라 목차를 34px까지 줄이는 것도 원리적으로 불가하다.
-          스트립 아래로 옮기면 스트립이 task#280 당시 좌표로 돌아가 두 결정이 함께 성립한다
-          (m390 bottom 549 < 603). 목차는 여전히 본문 섹션 전체보다 위이므로 항해 목적은 유지된다. */}
+          (task#264 절차), **리드 밑 대안**은 목차가 여러 줄이라 목차 자체를 34px 한 줄로 줄여 비용을
+          상쇄하는 것도 원리적으로 불가하다 — 즉 그 문장은 *위치 대안*의 기각 근거이지 칩 높이의
+          상한이 아니다. 스트립 아래로 옮기면 스트립이 task#280 당시 좌표로 돌아가 두 결정이
+          함께 성립한다 (m390 bottom 549 < 603). 목차는 여전히 본문 섹션 전체보다 위이므로 항해 목적은
+          유지된다.
+          ⚠️ 그 축은 **현재 green이 아니다** — 2026-08-20 실측 선재 FAIL 3건(`m390-light/smr` ·
+          `m390-light/ai-datacenter-equipment` · `m350-dark/smr`). *결정*은 유지되나 증감 판정은
+          총계가 아니라 이 내역과 대조할 것(선재를 내 회귀로, 내 회귀를 선재로 오귀속하는 것을
+          막는 유일한 수단이다).
+
+          그래서 task#316이 칩을 탭 타깃 34px(padding 7·12 + lineHeight 18 + border 1·2)로 키운 것은
+          이 결정과 충돌하지 않는다 — 근거는 **하나뿐이다**: 목차가 스트립 *아래*라 칩이 커져도
+          `kpi-visible`이 재는 스트립 bottom이 움직이지 않는다. ⚠️ 스트립 여유(2026-08-20 실측
+          m278 +209 · m390 +97 · m768 +453 · pc1280 +444)를 **목차 성장의 예산으로 읽지 말 것** —
+          목차는 그 여유의 소비자가 아니고, 애초에 첫 화면에 들어가지도 않는다(m390: 목차 top ≈ 573
+          + nav 133 = 706 > 가용 603 — 변경 *전부터* 그렇고 요구사항이 아니다).
+          줄 수도 추정하지 말 것: 최다 칩 slug(`semiconductor-equipment`, 11칩)의 nav 실측 높이는
+          m278 168 · m390 133 · m768·pc1280 63이고, 칩 27.25px·gap 8로 역산하면 **5 · 4 · 2줄**이다
+          (옛 주석의 "278px에서 3줄"은 실측과 다르다). 34px 칩이면 같은 줄 수에서 202 · 160 · 76이고,
+          칩이 4px 넓어져 m278에서 줄이 하나 늘면 244가 된다 → **배포 후 라이브 재측정으로 닫는다.**
+          목차를 스트립 *위*로 되돌리면 이 상쇄가 사라지니 위치와 칩 높이는 함께 봐야 한다.
+
+          칩 높이의 메커니즘 — `frontend/CLAUDE.md`(task#309)의 「content 높이는 폰트 메트릭에서
+          나온다(mono 11.5px normal ≈ 14px)」는 실측에 반증됐다. 실제 출처는 **상속된 line-height**다:
+          `styles/tokens.css`의 `body { line-height: 1.5 }`가 단위 없는 값이라 11.5px 칩의 used
+          line-height는 17.25px이고, `4px 10px` 칩의 실측 27px = 4+4+17.25+2이 그것을 확증한다
+          (폰트 메트릭 모델이면 24px이었어야 한다). 따라서 `padding: 7px 12px`만으로도
+          7+7+17.25+2 = **33.25px ≥ 32px**이고, `lineHeight: '18px'`은 32px 임계의 조건이 아니라
+          **34px를 정확히 고정**해 프로브가 `=== 34`로 단언할 수 있게 하는 핀이다(폰트 폴백 보험 겸).
+          전역 `body` line-height를 바꾸면 lineHeight 미선언 칩들의 높이가 조용히 따라 움직인다. */}
       {tocItems.length > 1 && (
         <nav data-testid="tech-report-toc" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 30 }}>
           {tocItems.map((s) => (
             <a key={s.id} href={`#${s.id}`} data-testid="tech-toc-chip" className="mono"
-               style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+               style={{ fontSize: 11.5, padding: '7px 12px', lineHeight: '18px', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
               {s.label}
             </a>
           ))}
@@ -320,7 +357,17 @@ export default function TechReport() {
         </div>
       )}
 
-      {/* ── 출처 ─────────────────────────────────────────── */}
+      {/* ── 출처 ───────────────────────────────────────────
+          ⚠️ 이 컨테이너는 `alignItems`를 지정하지 않으므로 기본 **stretch**다 — 제목이 길어 여러 줄이
+          된 칩(2026-08-20 m278 실측 148/114/79px)이 같은 wrap 줄에 있으면 짧은 칩도 그 줄 높이로
+          늘어난다. 그래서 「출처 칩 34px」류 라이브 축은 **1줄 칩 표본에만** 유효하다: 1줄 표본이
+          없으면 PASS가 아니라 미검증(FAIL)으로 보고해야 하고, 하한 `>= 34`는 stretch에 끌려간 칩에서
+          이빨이 0이다(padding을 되돌려도 통과한다).
+          ⚠️ task#316이 가로 padding을 10→12px로 키운 만큼 칩 안 텍스트 가용폭이 4px 줄어 **넘침
+          임계가 내려갔다** — 이 칩엔 `whiteSpace: nowrap`이 없어 한글은 접히지만 공백 없는 라틴
+          토큰(기관 약어·URL 조각)은 끊기지 않는다. uat280 `clip` 건수와 m278 h-scroll 집합을
+          baseline과 대조할 것(트립하면 padding 완화가 아니라 `overflowWrap: 'anywhere'`가 정석 —
+          task#296 선례). */}
       {hasSources && (
         <div id="sources" data-tech-section="sources" style={{ marginBottom: 8 }}>
           <SectionTitle>출처</SectionTitle>
@@ -328,7 +375,7 @@ export default function TechReport() {
             {sources.map((s, i) => (
               s.url ? (
                 <a key={i} href={s.url} target="_blank" rel="noreferrer" className="mono"
-                   style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--accent)', textDecoration: 'none' }}>
+                   style={{ fontSize: 11.5, padding: '7px 12px', lineHeight: '18px', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--accent)', textDecoration: 'none' }}>
                   {s.title}
                 </a>
               ) : (
