@@ -85,7 +85,7 @@ mapped: 2026-08-10
 | **B49** | 리포트 상세 fetch에 staleness 가드가 없어 **A 종목 수치가 B 종목 화면에 렌더** | `frontend/src/pages/Reports.jsx` 상세 fetch 이펙트 |
 | **B54** | 주요기술 **목록** 카드가 결론 문장인 `title`을 ellipsis로 자른다 — **상세 페이지가 같은 필드에 "ellipsis·line-clamp 금지(가토 ⑦)"를 명시**하는데 목록만 위반(서로 다른 커밋 간 회귀성 드리프트: 목록 task#276 / 상세 금지 task#280). 라이브 실측 4발행물 × 3뷰포트 **12표본 전부 잘림**(PC1440 가시비율 15.2% ≈ 23자), `title` hover 속성도 없어 복구는 클릭뿐. 한국어는 술어가 끝이라 잘림이 **결론부터 먹는다**(가토 ⑬) | `pages/TechReports.jsx` (대조: `pages/TechReport.jsx` 리드 문단 주석) |
 | **B55** | `ShareChart` 점유율 막대가 값 칸 폭을 예약하지 않아 **트랙(`flex:1`) 기준이 행마다 달라지고 더 작은 값이 더 긴 막대**가 된다(가토 ⑮). 형제 `MarketEstimates.jsx`가 **이미 실측 확인해 `width:${valueCh}ch`로 고친 결함과 동형**인데 이 컴포넌트는 그 수정을 받지 않았다. 라이브 주입 실측: `100.0%` vs `99.9%` → 막대 `592.64` vs `599.25px`(Δ −6.61px, 육안 확인), 모바일 390에서 Δ **−7.05px**로 악화. ⚠️ 실데이터 노출은 4발행물 중 **2건 미측정**(측정한 2건은 0행·1행으로 자극 불가) | `components/tech/ShareChart.jsx` (처방 원본: `components/tech/MarketEstimates.jsx`) |
-| B57 | `TechGraph` 섹션 게이트가 **컴포넌트 자신의 채택 조건과 다른 식**이라(페이지는 배열 길이만, 컴포넌트는 `validLabels` trim 필터) related가 실질 비어도 target 단독 빈 그래프가 열린다. 같은 파일이 `milestones`·`categories`엔 "게이트가 각 컴포넌트의 순수함수와 같은 식이어야 한다"는 규율을 준수하는데 `related`만 예외 | `pages/TechReport.jsx`(`hasRelated`) ↔ `components/tech/TechGraph.jsx`(`techGraphLayout`·`hasGraph`) |
+| B57 | `TechGraph` 섹션 게이트가 **컴포넌트 자신의 채택 조건과 다른 식**이라(페이지는 배열 길이만, 컴포넌트는 `validLabels` trim 필터) related가 실질 비어도 target 단독 빈 그래프가 열린다. 같은 파일이 `milestones`·`categories`엔 "게이트가 각 컴포넌트의 순수함수와 같은 식이어야 한다"는 규율을 준수하는데 `related`만 예외 | `pages/TechReport.jsx`(`hasRelated`) ↔ `components/tech/TechGraph.jsx`(`validLabels`·`groups`) — task#317이 SVG를 세로 흐름으로 재작성하며 `techGraphLayout`·`hasGraph`가 사라졌으나 **결함은 그대로다**(페이지 게이트는 여전히 배열 길이만 보고, 컴포넌트는 여전히 `trim()` 필터를 쓴다) |
 | B63 | 프론트 포매터 중복 — 재계수 완료(§13.2에서 열림 확정, task#292) | `frontend/src/utils.js` 및 산발 포매터 (§7.7·§7.9) |
 
 ### 검증장치·문서
@@ -689,7 +689,7 @@ if (err.response?.status === 401) {
 
 ### 7.10 접근성 — **일부 확인, `role="img"`는 클린**
 
-**`role="img"` 3개 사이트는 전부 올바르다 — 고치지 말 것**: `components/sketches/*.jsx`(장식 라인아트 + `<title>`), `components/tech/TechLevelBand.jsx`(빈 장식 `<span>` 격자, 데이터는 `aria-label`과 형제 노드가 운반 — 자손 프루닝이 의도), `components/tech/TechGraph.jsx`(SVG가 `aria-hidden="true"`이고 같은 라벨을 `<ul className="sr-only">`로 재노출, 주석이 leaf-role 근거를 명시).
+**`role="img"` 2개 사이트는 전부 올바르다 — 고치지 말 것**: `components/sketches/*.jsx`(장식 라인아트 + `<title>`), `components/tech/TechLevelBand.jsx`(빈 장식 `<span>` 격자, 데이터는 `aria-label`과 형제 노드가 운반 — 자손 프루닝이 의도). ⚠️ **세 번째였던 `components/tech/TechGraph.jsx`는 목록에서 빠졌다(task#317)** — SVG를 세로 흐름 HTML로 재작성해 `aria-hidden` svg와 그것을 보상하던 `<ul className="sr-only">` 이중 목록이 **둘 다 사라졌다**. 칩이 진짜 DOM 텍스트이므로 재노출이 필요 없고, 남겨두면 스크린리더가 같은 이름을 두 번 읽는다.
 
 **MED — DOM에 없는 접기 3곳**(Ctrl+F·스크린리더 브라우즈·인쇄가 놓친다): `pages/GuruDetail.jsx`의 `expanded ? listRows : listRows.slice(0, DEFAULT_ROWS)`(21번째 이후 보유종목이 DOM에 없음), `pages/Recommendations.jsx::ExpandableGrid`의 `items.slice(0, count)`, `pages/AnalystReport.jsx::ConsensusSection`의 `brokerages.slice(0, 10)`. 저장소는 이미 반대로 판정한 바 있다 — `components/tech/ProseSections.jsx`의 주석: *"접기는 네이티브 `<details>`/`<summary>`다 — JS 상태 0, 키보드·스크린리더·Ctrl+F 검색이 전부 공짜"*.
 

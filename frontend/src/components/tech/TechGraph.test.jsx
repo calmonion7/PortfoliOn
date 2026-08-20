@@ -1,184 +1,105 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
-import TechGraph, { techGraphLayout } from './TechGraph'
+import TechGraph from './TechGraph'
 
-// task#277 S4 — 3열 연관기술 관계도. TDD 대상은 techGraphLayout(좌표 계약을 리터럴이 아니라
-// 불변식으로 단언 — 정당한 크기 변경에 거짓 실패하지 않게). 렌더 테스트는 TechGraph가 그 결과를
-// 실제로 그리는지만 얕게 확인한다(jsdom은 SVG geometry가 아니라 DOM 구조·텍스트만 신뢰할 수 있다).
+// task#317 — 3열 SVG DAG를 **세로 흐름 HTML**로 재작성(ADR-0033 결정4 · ADR-0034 보정④ 뒤집기).
+// 옛 테스트 16건 중 10건(techGraphLayout 좌표 불변식)과 3건(폴드·aria-hidden svg·sr-only 목록)은
+// 대상 자체가 사라져 삭제, 1건(title 폴백)은 「말줄임이 없다」로 재작성, 2건(칩·null)은 유지.
+//
+// ⚠️ jsdom의 한계를 알고 짠다 — CSS import는 vitest에서 스텁이라 `.badge{white-space:nowrap}`이
+//    적용되지 않고, 레이아웃이 없어 실제 줄바꿈·min-content·넘침은 **원리적으로 못 본다**.
+//    그래서 ④는 「인라인 선언이 존재한다」까지만 잴 수 있다(이 저장소의 fixture-pass-live-fail 가족).
+//    실제 리플로우는 scripts/uat282-tech-structure.mjs의 라이브 4축이 잰다 — 그것이 그 축의 존재 이유다.
 
-const WIDTH = 600
-const HEIGHT = 300
+// 라이브 최장 기술명(2026-08-20 실측, robotics) — 26자. 133.6px 노드에서 11자로 잘리던 바로 그 이름.
+const LONGEST = '전신제어(loco-manipulation) 정책'
 
-describe('techGraphLayout — 좌표 불변식', () => {
-  it('① 같은 열 x는 동일, 열 간 x는 단조 증가', () => {
-    const { nodes } = techGraphLayout({
-      prerequisites: ['전제1', '전제2'],
-      target: '대상기술',
-      derivatives: ['파생1', '파생2', '파생3'],
-      width: WIDTH, height: HEIGHT,
-    })
-    const xsByCol = [0, 1, 2].map((col) => nodes.filter((n) => n.col === col).map((n) => n.x))
-    xsByCol.forEach((xs) => {
-      if (xs.length > 1) expect(new Set(xs).size).toBe(1) // 같은 열은 x 동일
-    })
-    const colX = xsByCol.map((xs) => xs[0])
-    expect(colX[0]).toBeLessThan(colX[1])
-    expect(colX[1]).toBeLessThan(colX[2])
+const FULL = {
+  prerequisites: ['리튬 정제', '황화물계 고체전해질(Li6PS5Cl 등) 합성'],
+  derivatives: ['전고체 셀', LONGEST],
+  complements: ['냉매 기술'],
+  competitors: ['화학전지'],
+}
+
+const chipsOf = (c) => [...c.querySelectorAll('.badge')]
+const countIn = (text, needle) => text.split(needle).length - 1
+
+describe('TechGraph — 세로 흐름 리플로우 계약', () => {
+  it('① 자체 가로 스크롤러가 없다 — overflowX 선언 0 · minWidth 0', () => {
+    const { container } = render(<TechGraph related={FULL} target="전고체 배터리" />)
+    const all = [...container.querySelectorAll('*')]
+    expect(all.length).toBeGreaterThan(0) // 커버리지 sentinel — 정의역이 비면 아래가 공허하게 통과한다
+    expect(all.filter((el) => el.style.overflowX)).toEqual([])
+    expect(all.filter((el) => el.style.overflowY)).toEqual([])
+    expect(all.filter((el) => el.style.minWidth)).toEqual([])
+    // 적대 리뷰 LOW-1: minWidth만 보면 `width:'640px'` 고정폭을 통과시킨다. 현재 인라인 width 선언은 0건.
+    expect(all.filter((el) => el.style.width)).toEqual([])
   })
 
-  it('② 같은 열 노드 bbox는 서로 겹치지 않는다(y 간격 ≥ h)', () => {
-    const { nodes } = techGraphLayout({
-      prerequisites: ['a', 'b', 'c', 'd'],
-      target: 'T',
-      derivatives: ['e', 'f'],
-      width: WIDTH, height: HEIGHT,
-    })
-    ;[0, 1, 2].forEach((col) => {
-      const rows = nodes.filter((n) => n.col === col).sort((a, b) => a.y - b.y)
-      for (let i = 1; i < rows.length; i++) {
-        expect(rows[i].y - rows[i - 1].y).toBeGreaterThanOrEqual(rows[i - 1].h - 1e-6)
-      }
-    })
+  it('② DOM 순서 = 전제·선행 → 대상 → 파생·응용 → 보완 → 경합', () => {
+    const { container } = render(<TechGraph related={FULL} target="전고체 배터리" />)
+    const order = [...container.querySelectorAll('[data-group],[data-testid="tech-graph-complements"],[data-testid="tech-graph-competitors"]')]
+      .map((el) => el.dataset.group || el.dataset.testid.replace('tech-graph-', ''))
+    expect(order).toEqual(['prerequisites', 'target', 'derivatives', 'complements', 'competitors'])
   })
 
-  it('③ 모든 노드가 0 ≤ x,y 및 x+w ≤ width, y+h ≤ height 안에 있다', () => {
-    const { nodes } = techGraphLayout({
-      prerequisites: ['a', 'b', 'c', 'd', 'e'],
-      target: '대상기술',
-      derivatives: ['f'],
-      width: WIDTH, height: HEIGHT,
-    })
-    nodes.forEach((n) => {
-      expect(n.x).toBeGreaterThanOrEqual(0)
-      expect(n.y).toBeGreaterThanOrEqual(0)
-      expect(n.x + n.w).toBeLessThanOrEqual(WIDTH + 1e-6)
-      expect(n.y + n.h).toBeLessThanOrEqual(HEIGHT + 1e-6)
-    })
-  })
-
-  it('④ 빈 열(전제 0개)에서도 대상·파생이 정상 배치된다', () => {
-    const { nodes } = techGraphLayout({
-      prerequisites: [],
-      target: '대상기술',
-      derivatives: ['파생1', '파생2'],
-      width: WIDTH, height: HEIGHT,
-    })
-    expect(nodes.filter((n) => n.col === 0)).toHaveLength(0)
-    const target = nodes.find((n) => n.id === 'target')
-    expect(target).toBeTruthy()
-    expect(Number.isFinite(target.x)).toBe(true)
-    expect(Number.isFinite(target.y)).toBe(true)
-    expect(nodes.filter((n) => n.col === 2)).toHaveLength(2)
-  })
-
-  it('⑤ 열당 최대 5노드 — 6개 입력이면 앞 4개 + 마지막 슬롯이 "+2개" 폴드로 접혀 총 5노드', () => {
-    const { nodes } = techGraphLayout({
-      prerequisites: ['a', 'b', 'c', 'd', 'e', 'f'],
-      target: 'T',
-      derivatives: [],
-      width: WIDTH, height: HEIGHT,
-    })
-    const col0 = nodes.filter((n) => n.col === 0)
-    expect(col0).toHaveLength(5)
-    const fold = col0[col0.length - 1]
-    expect(fold.fold).toBe(true)
-    expect(fold.label).toBe('+2개')
-    expect(col0.slice(0, 4).every((n) => !n.fold)).toBe(true)
-  })
-
-  it('5개 이하 입력은 폴드 없이 전부 개별 노드', () => {
-    const { nodes } = techGraphLayout({
-      prerequisites: ['a', 'b', 'c', 'd', 'e'],
-      target: 'T',
-      derivatives: [],
-      width: WIDTH, height: HEIGHT,
-    })
-    const col0 = nodes.filter((n) => n.col === 0)
-    expect(col0).toHaveLength(5)
-    expect(col0.every((n) => !n.fold)).toBe(true)
-  })
-
-  it('target 없이도 예외 없이 배치되고, 엣지는 생성되지 않는다', () => {
-    const { nodes, edges } = techGraphLayout({
-      prerequisites: ['a'], target: undefined, derivatives: ['b'], width: WIDTH, height: HEIGHT,
-    })
-    expect(nodes.find((n) => n.id === 'target')).toBeUndefined()
-    expect(edges).toHaveLength(0)
-  })
-
-  it('prerequisites→target, target→derivatives 엣지가 각 개수만큼 생성된다', () => {
-    const { edges } = techGraphLayout({
-      prerequisites: ['a', 'b'], target: 'T', derivatives: ['c', 'd', 'e'], width: WIDTH, height: HEIGHT,
-    })
-    expect(edges.filter((e) => e.to === 'target')).toHaveLength(2)
-    expect(edges.filter((e) => e.from === 'target')).toHaveLength(3)
-  })
-
-  it('입력이 전부 비면(target도 없음) 빈 nodes/edges', () => {
-    expect(techGraphLayout({})).toEqual({ nodes: [], edges: [] })
-  })
-
-  it('⑥ maxN=1(열마다 노드 1개뿐인 흔한 케이스)이어도 노드 높이가 SVG 전체 높이로 늘어나지 않는다(적대 리뷰 [high])', () => {
-    const { nodes } = techGraphLayout({
-      prerequisites: ['리튬 정제'], target: '전고체 배터리', derivatives: ['전고체 셀'],
-      width: 640, height: 260,
-    })
-    expect(nodes.length).toBeGreaterThan(0)
-    nodes.forEach((n) => expect(n.h).toBeLessThanOrEqual(60))
-  })
-})
-
-describe('TechGraph — 렌더', () => {
-  it('전제·대상·파생 라벨이 title로 노출된다(ellipsis 대비 원문은 title에 보존)', () => {
-    const related = { prerequisites: ['리튬 정제'], derivatives: ['전고체 셀'] }
-    const { container } = render(<TechGraph related={related} target="전고체 배터리" />)
-    const titles = [...container.querySelectorAll('title')].map((t) => t.textContent)
-    expect(titles).toEqual(expect.arrayContaining(['리튬 정제', '전고체 배터리', '전고체 셀']))
-  })
-
-  it('6개 입력 열은 "+2개" 폴드 노드를 렌더한다', () => {
-    const related = { prerequisites: ['a', 'b', 'c', 'd', 'e', 'f'] }
-    const { getAllByText } = render(<TechGraph related={related} target="T" />)
-    // title·text 양쪽에 같은 문자열이 실려 매치가 2건 이상 — 존재만 확인
-    expect(getAllByText('+2개').length).toBeGreaterThan(0)
-  })
-
-  it('svg는 role="img"가 아니라 aria-hidden — 자손 텍스트를 접근성 트리에서 프루닝하지 않는다(task#282)', () => {
-    const related = { prerequisites: ['리튬 정제'], derivatives: ['전고체 셀'] }
-    const { container } = render(<TechGraph related={related} target="전고체 배터리" />)
-    expect(container.querySelectorAll('[role="img"]')).toHaveLength(0)
-    const svgs = container.querySelectorAll('svg[aria-hidden="true"]')
-    expect(svgs).toHaveLength(1)
-  })
-
-  it('sr-only 목록은 SVG가 5개로 캡한 열의 초과분까지 전부 텍스트로 싣는다(task#282)', () => {
-    const related = { prerequisites: ['a', 'b', 'c', 'd', 'e', 'f'], derivatives: ['g', 'h'] }
+  it('③ 캡·폴드·말줄임이 없다 — 6개 입력은 6개 전부 렌더되고 26자 이름이 전문 그대로 나온다', () => {
+    const related = { prerequisites: ['a', 'b', 'c', 'd', 'e', 'f'], derivatives: [LONGEST] }
     const { container } = render(<TechGraph related={related} target="T" />)
-    const svgNodes = container.querySelectorAll('[data-col="0"]')
-    expect(svgNodes).toHaveLength(5) // 4개 개별 + 폴드 1개 — 초과분 f는 SVG에 없음
-
-    const srList = container.querySelector('[data-testid="tech-graph-sr-list"]')
-    expect(srList).toBeTruthy()
-    expect(srList.className).toContain('sr-only')
-    const srText = srList.textContent
-    ;['a', 'b', 'c', 'd', 'e', 'f'].forEach((label) => expect(srText).toContain(label))
-    expect(srText).toContain('T')
-    expect(srText).toContain('g')
-    expect(srText).toContain('h')
+    const preGroup = container.querySelector('[data-group="prerequisites"]')
+    expect(preGroup.querySelectorAll('[data-testid="tech-graph-item"]')).toHaveLength(6)
+    expect(container.textContent).not.toMatch(/\+\d+개/)
+    expect(container.textContent).not.toContain('…')
+    expect(container.textContent).toContain(LONGEST) // 전문 — 잘린 접두사가 아니다
   })
 
-  it('보완/경합 기술은 칩 그룹으로 렌더된다(그래프 노드가 아님)', () => {
+  it('④ 모든 칩이 줄바꿈 가능하다 — whiteSpace가 nowrap이 아니고 overflowWrap이 anywhere', () => {
+    const { container } = render(<TechGraph related={FULL} target="전고체 배터리" />)
+    const chips = chipsOf(container)
+    expect(chips.length).toBe(7) // sentinel: 전제2 + 대상1 + 파생2 + 보완1 + 경합1 (라벨 span은 .badge가 아니다)
+    chips.forEach((chip) => {
+      expect(chip.style.whiteSpace).toBe('normal')
+      expect(chip.style.overflowWrap).toBe('anywhere')
+    })
+  })
+
+  it('⑤ 같은 기술명이 문서에 두 번 나오지 않는다(sr-only 이중 목록 제거)', () => {
+    const { container } = render(<TechGraph related={FULL} target="전고체 배터리" />)
+    const text = container.textContent
+    const names = [...FULL.prerequisites, ...FULL.derivatives, ...FULL.complements, ...FULL.competitors, '전고체 배터리']
+    // 「전고체 셀」은 「전고체 배터리」의 부분문자열이 아니므로 부분일치 오계수가 없다(직접 확인).
+    // ⚠️ 이 축이 금지하는 것은 **sr-only 이중 노출**이며, *다른 키 사이* 중복은 아니다 — 라이브에는
+    //    `prerequisites` ↔ `complements`에 같은 이름이 정당하게 있다(2026-08-20 실측 2건: ai-datacenter-ops
+    //    「AI 데이터센터 설비」· solid-state-battery 「건식 전극 공정」). 픽스처는 그 교차 중복을 담지 않는다.
+    names.forEach((n) => expect(countIn(text, n)).toBe(1))
+  })
+
+  it('⑥ related·target 전부 비면 아무것도 렌더하지 않는다(null)', () => {
+    const { container } = render(<TechGraph related={{}} />)
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('⑦ 방향 마커는 aria-hidden이고 접근 가능 텍스트를 만들지 않는다', () => {
+    const { container } = render(<TechGraph related={FULL} target="전고체 배터리" />)
+    const arrows = [...container.querySelectorAll('[aria-hidden="true"]')]
+    expect(arrows.length).toBeGreaterThan(0) // sentinel — 마커가 하나도 없으면 아래가 공허하다
+    arrows.forEach((el) => expect(el.textContent).toMatch(/^[↓\s]*$/))
+    // 그룹 라벨은 장식이 아니라 구조 정보이므로 aria-hidden이 아니어야 한다.
+    // ⚠️ 적대 리뷰 MED-3: `textContent`는 aria-hidden을 무시하므로 텍스트 존재만으로는 이걸 못 잰다
+    //    (라벨에 실수로 aria-hidden이 붙어도 통과한다). 라벨 엘리먼트의 속성을 직접 단언한다.
+    // `> span`만 쓰면 화살표 span까지 잡힌다(둘 다 그룹 li의 직계 자식) — 라벨은 첫 자식이다.
+    const labels = [...container.querySelectorAll('[data-group] > span:first-child')]
+    expect(labels.map((el) => el.textContent)).toEqual(['전제·선행', '대상 기술', '파생·응용'])
+    labels.forEach((el) => expect(el.getAttribute('aria-hidden')).not.toBe('true'))
+  })
+
+  it('보완/경합 기술은 별도 칩 그룹으로 남는다(방향 없는 관계 — ADR-0033 결정4의 구별은 유지)', () => {
     const related = { complements: ['냉매 기술'], competitors: ['화학전지'] }
     const { getByText, queryByTestId } = render(<TechGraph related={related} target="SMR" />)
     expect(getByText('보완 기술')).toBeTruthy()
     expect(getByText('냉매 기술')).toBeTruthy()
     expect(getByText('경합 기술')).toBeTruthy()
     expect(getByText('화학전지')).toBeTruthy()
-    expect(queryByTestId('tech-graph-svg')).toBeTruthy() // target만 있어도 그래프는 그려진다
-  })
-
-  it('related·target 전부 비면 아무것도 렌더하지 않는다(null)', () => {
-    const { container } = render(<TechGraph related={{}} />)
-    expect(container.firstChild).toBeNull()
+    expect(queryByTestId('tech-graph-flow')).toBeTruthy() // target만 있어도 흐름은 그려진다
   })
 })

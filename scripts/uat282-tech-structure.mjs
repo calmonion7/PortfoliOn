@@ -9,6 +9,29 @@
 //            ★ 실발행 아님 — prod tech_reports는 GET조차 이 경로로 가지 않는다(라우트가 가로챈다). 쓰기 0.
 //            레인 C 막대와 관계도 접근성(ⓒ)이 여기서만 측정된다(아래 정의역 참조).
 //
+// ── task#317 갱신 (ADR-0033 결정4 · ADR-0034 보정④ 뒤집기) ────────────────────────────────
+// 「연관 기술」 관계도가 **3열 SVG DAG → 세로 흐름 HTML**로 재작성됐다. 이 파일의 graph 축을 전면 교체했다.
+//   사라진 계약: `tech-graph-svg` · `tech-graph-node` · `tech-graph-sr-list` · `data-col` · `<title>` ·
+//               엣지 `<path>` · `+N개` 폴드 · `capColumn(MAX_PER_COL=5)` 미러.
+//   새 계약: `tech-graph-flow`(ol) · `tech-graph-group`(li + `data-group=prerequisites|target|derivatives`) ·
+//           `tech-graph-item`(흐름 안 칩) · 그룹 첫 span=라벨 · 그룹 사이 `aria-hidden` `↓` ·
+//           `tech-graph-complements`/`-competitors`(유지).
+//   ★ 세 사실이 이 갱신의 판정축을 지배한다(전부 2026-08-20 실측):
+//     ① **graph 축이 `if (R.mode === 'inject')` 안에 있었다.** 근거는 헤더의 「라이브 두 판 모두 related 4키가
+//        빈 배열」이었는데 지금 라이브는 7 slug 전부 8~20개다 → 그 축들은 **픽스처만 재고 라이브를 안 쟀다.**
+//        그래서 관계도 축을 양 모드로 끌어냈다(이것이 이번 갱신의 가장 큰 변화다).
+//     ② **`.sr-only`는 `width:1px`라 구조적으로 `scrollWidth > clientWidth`다**(157~268 > 1). 「섹션 하위
+//        넘침 0」류 축은 sr-only를 정의역에서 빼야 원리적 FAIL을 피한다. 실제로 uat277의 `clip-container`
+//        선재 FAIL 6건이 정확히 이것이었고, sr-only 제거로 함께 해소된다.
+//     ③ **대조군은 nowrap만으로 이빨이 없다.** 라이브 최장 칩이 m350에서 179.8px < 가용 278px라 nowrap이어도
+//        안 넘친다 → `CONTROL=chipnowrap`은 nowrap + **장문 라벨**을 함께 주입한다(초장문 nowrap 467px →
+//        문서 153px 초과 실측). 옛 `CONTROL=roleimg`는 대상(svg)이 사라져 조용히 no-op하므로 삭제했다.
+//   신규 4축(이 태스크의 목표): `graph-no-scroller` · `graph-no-ellipsis`(+`graph-longest-verbatim`) ·
+//     `graph-font-size`(>=11px, 「폰트를 줄여 통과」 구멍 차단) · `body-no-hscroll`(문구 갱신 — 관계도가
+//     자체 스크롤러를 잃었으므로 그 최소폭이 곧 문서 폭이다). 3뷰포트 × **라이브 7 slug**는 본 루프의
+//     SLUGS를 늘리는 대신 **별도 리플로우 스윕**으로 돌린다(slug를 늘리면 무관한 선재 FAIL을 수입해
+//     exit 코드가 영구히 죽는다 — task#316).
+//
 // ⚠️ SW가 /api/*를 가로채므로 컨텍스트는 **serviceWorkers:'block'** 필수(안 하면 page.route가 무음 no-op).
 //
 // ── 응답 봉투·필드명은 추정하지 않았다. 착수 시 1콜 실측(2026-08-04) ─────────────────────────
@@ -105,6 +128,11 @@ const CONTROL = process.env.CONTROL || '';
 const CONTROL_CSS = {
   capclip: '[data-testid="market-growth-caption"]{white-space:nowrap !important;overflow:hidden !important;max-width:80px !important;display:block !important}',
   estbar: '[data-testid="market-estimate-bar"]{width:100% !important}',
+  // task#317 — `graph-font-size`/`sweep-font-size`는 **배포 전에도 통과했다**(옛 구현에도 보완·경합 칩이
+  // 11px로 있었다). 즉 그 축은 red-first로 판별력이 증명되지 않은 「회귀 가드」이고, 대조군이 없으면
+  // 「아무도 지키지 않는 축」과 구별되지 않는다(task#315·#316: 여러 축에 같은 주입을 돌려 0 fail 축을 찾아라).
+  // 이 대조군은 말줄임·넘침을 「폰트를 줄여」 통과시키는 구멍을 재현한다 → 두 font-size 축이 FAIL해야 정상.
+  chipsmall: '[data-testid="tech-graph"] .badge{font-size:9px !important}',
   // task#296 — 옛 `proseopen`(details를 강제로 open)은 이제 <details> 자체가 없어 대상이 사라져
   // **조용히 no-op**한다(헤더 주석이 스스로 경고한 실패 모드, F1 대상 지목). 새 메커니즘(h3 상시
   // 노출)을 무효화하려면 h3를 직접 숨겨야 한다 — 이러면 `prose-open`(클릭 없는 가시성)이 FAIL해야 정상.
@@ -116,9 +144,24 @@ const CONTROL_DOM = {
     const c = document.querySelector('[data-testid="market-growth-caption"]');
     if (c) c.textContent = `${c.textContent} · 출처 ${title}`;
   },
-  roleimg: () => {
-    const s = document.querySelector('[data-testid="tech-graph-svg"]');
-    if (s) { s.setAttribute('role', 'img'); s.removeAttribute('aria-hidden'); }
+  // task#317 — 옛 `roleimg`(관계도 svg에 role="img"를 되돌림)는 **대상 자체가 사라져** 조용히 no-op한다
+  // (`proseopen`이 겪은 것과 같은 실패 모드). 새 메커니즘(칩 줄바꿈)을 무효화하는 대조군으로 교체한다.
+  // ⚠️ nowrap **만** 주입하면 FAIL하지 않는다 — 라이브 최장 칩이 m350에서 179.8px < 가용 278px라
+  //    현재 데이터로는 넘치지 않는다(실측). 그래서 nowrap + **장문 라벨**을 함께 주입해야 이빨이 생긴다
+  //    (초장문 nowrap 실측 467px → 문서 153px 초과). 이러면 `body-no-hscroll`이 FAIL해야 정상.
+  chipnowrap: () => {
+    const st = document.createElement('style');
+    st.textContent = '[data-testid="tech-graph"] .badge{white-space:nowrap !important;overflow-wrap:normal !important}';
+    document.head.appendChild(st);
+    const ul = document.querySelector('[data-testid="tech-graph-group"] ul');
+    if (ul) {
+      const li = document.createElement('li');
+      const sp = document.createElement('span');
+      sp.className = 'badge badge--neutral badge--sm';
+      sp.setAttribute('data-testid', 'tech-graph-item');
+      sp.textContent = '대조군 초장문 기술명 abcdefghijklmnopqrstuvwxyz0123456789 계속';
+      li.appendChild(sp); ul.appendChild(li);
+    }
   },
 };
 if (CONTROL && !CONTROL_CSS[CONTROL] && !CONTROL_DOM[CONTROL]) {
@@ -196,9 +239,8 @@ const estLayout = (estimates) => {
 const estCaptionOf = (lay) => `기관별 ${lay.year}년 추정${lay.multiplierTxt ? ` · 최대·최소 ${lay.multiplierTxt}` : ''}`;
 // techReportUtils.js: parseDescriptionSections 규칙 — "그 줄 전체가 [..]"인 줄만 헤딩
 const bracketHeadings = (t) => (typeof t === 'string' ? t.split('\n') : []).filter((l) => /^\[[^\]]+\]$/.test(l.trim())).length;
-// TechGraph.jsx: capColumn(MAX_PER_COL=5) — 5 초과면 앞 4개 + "+N개" 폴드 1칸
-const MAX_PER_COL = 5;
-const nodeCountOf = (list) => (list.length <= MAX_PER_COL ? list.length : MAX_PER_COL);
+// task#317 — TechGraph.jsx의 `capColumn(MAX_PER_COL=5)`·`+N개` 폴드 미러는 **삭제됐다**(대상이 사라졌다).
+// 세로 흐름은 들어온 만큼 전부 그리므로 기대 칩 수 = 소스 개수 그대로이고, 그래서 미러 함수가 필요 없다.
 
 // ── 실응답 수집 + 기대값 계산 ─────────────────────────────────────────────────
 const RELATED_KEYS = ['prerequisites', 'derivatives', 'complements', 'competitors'];
@@ -258,11 +300,13 @@ const EST = [
   { institution: 'SNS Insider', year: EST_YEAR, size: { value: 7.2, currency: 'USD', unit: 'bn' } },
   { institution: 'Mordor Intelligence', year: EST_YEAR, size: { value: 9.0, currency: 'USD', unit: 'bn' }, scope: '신규 착공분만 집계' },
 ];
-// prerequisites는 **6개** — MAX_PER_COL(5)을 넘겨 "+2개" 폴드를 자극한다. sr-only 목록은 캡하지
-// 않으므로(전수 노출이 S5의 목표) 폴드로 SVG에서 사라진 2개가 텍스트에 남는지가 이 픽스처의 존재 이유다.
+// task#317 — prerequisites **6개**는 원래 옛 캡(MAX_PER_COL=5)을 넘겨 "+2개" 폴드를 자극하려던 것이고,
+// 이제는 **캡이 사라졌음을 잡는 픽스처**다(6개 입력 → 6개 전부 렌더돼야 한다. 5개로 줄이면 이 픽스처가
+// 캡 회귀를 원리적으로 못 잡는다). derivatives의 마지막 항목은 라이브 최장(26자)급 이름으로,
+// `graph-longest-verbatim`·`graph-chip-wrap`이 주입 모드에서도 긴 이름을 실제로 지나가게 한다.
 const REL = {
   prerequisites: ['고온 합금', '피복입자 연료', '헬륨 순환기', '디지털 I&C', '모듈 제작 공정', '규제 표준화'],
-  derivatives: ['수소 생산', '해수 담수화', '산업 공정열'],
+  derivatives: ['수소 생산', '해수 담수화', '고온 전기분해(SOEC) 수소 생산 연계'],
   complements: ['소형 터빈', '축열 저장'],
   competitors: ['대형 경수로', '가스 복합'],
 };
@@ -274,8 +318,8 @@ const injectedRep = (slug) => {
   const lay = estLayout(EST);
   console.log(`  [주입 픽스처] estimates ${EST.length}건 · 기대 캡션 ${JSON.stringify(estCaptionOf(lay))}` +
     ` · 값 ${JSON.stringify(lay.rows.map((e) => fmtSize(e.size)))} · 기준마커 ${EST.filter((e) => e.is_basis === true).length}개` +
-    ` · related ${JSON.stringify(RELATED_KEYS.map((k) => REL[k].length))} → SVG 노드 ${nodeCountOf(REL.prerequisites) + 1 + nodeCountOf(REL.derivatives)}개` +
-    ` · 폴드로 SVG에서 접히는 라벨 ${REL.prerequisites.length - (MAX_PER_COL - 1)}개`);
+    ` · related ${JSON.stringify(RELATED_KEYS.map((k) => REL[k].length))} → 칩 ${RELATED_KEYS.reduce((a, k) => a + REL[k].length, 0) + 1}개(대상 1 포함, 캡 없음)` +
+    ` · 최장 이름 ${Math.max(...RELATED_KEYS.flatMap((k) => REL[k]).map((n) => n.length))}자`);
 }
 
 // ── 브라우저 안 측정기 ────────────────────────────────────────────────────────
@@ -373,24 +417,52 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   }) : null;
   const estCaption = estEl ? txt(estEl.querySelector('[data-testid="market-estimates-caption"]')) : null;
 
-  // ── 관계도 ──
+  // ── 관계도 (task#317: 3열 SVG DAG → 세로 흐름 HTML. 좌표·title·엣지·폴드·sr-only가 전부 사라졌다) ──
   const graphEl = root.querySelector('[data-testid="tech-graph"]');
-  const svgEl = root.querySelector('[data-testid="tech-graph-svg"]');
-  const srListEl = graphEl ? graphEl.querySelector('[data-testid="tech-graph-sr-list"]') : null;
+  const flowEl = graphEl ? graphEl.querySelector('[data-testid="tech-graph-flow"]') : null;
+  // 칩 하나의 상자·타이포 실측. clientWidth는 `inline-flex` 배지에서 **유효하다**(실측 178·276, 0이 아니다)
+  // — frontend/CLAUDE.md의 「인라인은 clientWidth가 0」 경고는 순수 `display:inline`에만 걸린다.
+  const chipBox = (el) => {
+    const c = cs(el); const r = el.getBoundingClientRect();
+    return {
+      t: txt(el), sw: el.scrollWidth, cw: el.clientWidth,
+      w: +r.width.toFixed(1), h: +r.height.toFixed(1),
+      fs: Math.round(parseFloat(c.fontSize) * 10) / 10,
+      ws: c.whiteSpace, ow: c.overflowWrap, color: c.color,
+    };
+  };
   const graph = graphEl ? {
     roleImg: graphEl.querySelectorAll('[role="img"]').length,
-    svgCount: graphEl.querySelectorAll('[data-testid="tech-graph-svg"]').length,
-    svgAria: svgEl ? svgEl.getAttribute('aria-hidden') : 'SVG_MISSING',
-    svgAriaLabel: svgEl ? svgEl.getAttribute('aria-label') : null,
-    nodes: [...graphEl.querySelectorAll('[data-testid="tech-graph-node"]')].map((g) => ({
-      id: g.getAttribute('data-node-id'), col: g.getAttribute('data-col'),
-      text: txt(g.querySelector('text')), title: txt(g.querySelector('title')),
-    })),
-    srPresent: !!srListEl,
-    // 잎 li만(그룹 li는 중첩 ul을 자식으로 가진다) → 문서 순서로 전제·대상·파생
-    srLabels: srListEl ? [...srListEl.querySelectorAll('li')].filter((li) => li.children.length === 0).map((li) => txt(li)) : [],
-    complements: graphEl.querySelector('[data-testid="tech-graph-complements"]') ? 1 : 0,
-    competitors: graphEl.querySelector('[data-testid="tech-graph-competitors"]') ? 1 : 0,
+    svgCount: graphEl.querySelectorAll('svg').length,           // 0 기대 — SVG를 통째로 버렸다
+    srCount: graphEl.querySelectorAll('.sr-only').length,       // 0 기대 — 이중 목록 제거(칩이 진짜 텍스트다)
+    flowPresent: !!flowEl,
+    groups: flowEl ? [...flowEl.querySelectorAll('[data-testid="tech-graph-group"]')].map((li) => {
+      const own = [...li.children].filter((e) => e.tagName === 'SPAN');
+      const labelEl = own[0] || null;                            // 라벨 = 그룹 li의 첫 span
+      const arrowEl = own.length > 1 ? own[own.length - 1] : null; // 화살표 = 마지막 span(마지막 그룹엔 없다)
+      return {
+        key: li.getAttribute('data-group'),
+        label: txt(labelEl),
+        labelAriaHidden: labelEl ? labelEl.getAttribute('aria-hidden') : 'LABEL_MISSING',
+        items: [...li.querySelectorAll('[data-testid="tech-graph-item"]')].map(chipBox),
+        arrow: arrowEl ? { t: txt(arrowEl), hidden: arrowEl.getAttribute('aria-hidden') } : null,
+      };
+    }) : [],
+    chipGroups: ['complements', 'competitors'].map((k) => {
+      const el = graphEl.querySelector(`[data-testid="tech-graph-${k}"]`);
+      return { k, present: !!el, chips: el ? [...el.querySelectorAll('.badge')].map(chipBox) : [] };
+    }),
+    // 섹션 안의 자체 가로 스크롤러. ⚠️ `.sr-only`는 `width:1px`라 **구조적으로** scrollWidth>clientWidth이므로
+    // (실측 157~268 > 1) 정의역에서 제외한다 — 안 그러면 이 축이 원리적으로 FAIL한다(task#316의 「항상
+    // FAIL하는 축은 게이트가 아니다」). 이번 구현엔 sr-only가 없지만 축 문구는 그 사실에 의존하지 않게 짠다.
+    scrollers: [graphEl, ...graphEl.querySelectorAll('*')]
+      .filter((e) => !isSR(e))
+      .filter((e) => cs(e).overflowX !== 'visible' && e.scrollWidth > e.clientWidth + 1)
+      .map((e) => `${e.tagName.toLowerCase()}[${e.dataset.testid || ''}](${e.scrollWidth}>${e.clientWidth})`),
+    ellipsisText: [...graphEl.querySelectorAll('*')]
+      .filter((e) => e.children.length === 0 && (e.textContent || '').includes('\u2026')).map((e) => txt(e)),
+    allText: graphEl.textContent,
+    height: Math.round(graphEl.getBoundingClientRect().height),
   } : null;
 
   // ── 산문 — task#296: <details>/<summary> 완전 제거, 소제목은 <h3> + 상시 노출 ──
@@ -440,8 +512,9 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
   const srLeaves = allLeaves.filter((e) => isSR(e));
   const srOwners = {};
   for (const e of srLeaves) {
-    const own = e.closest('[data-testid="tech-graph-sr-list"]') ? 'graph-sr-list'
-      : e.closest('[data-testid="milestone-timeline"]') ? 'milestone-timeline'
+    // task#317 — 옛 `graph-sr-list` 분기는 제거했다. 관계도에 sr-only가 되살아나면 여기서
+    // UNKNOWN으로 잡혀 `overflow-sronly-owners`가 FAIL한다(분기를 남기는 것보다 이빨이 강하다).
+    const own = e.closest('[data-testid="milestone-timeline"]') ? 'milestone-timeline'
         : `UNKNOWN:${e.closest('[data-testid]') ? e.closest('[data-testid]').getAttribute('data-testid') : e.tagName.toLowerCase()}`;
     srOwners[own] = (srOwners[own] || 0) + 1;
   }
@@ -736,34 +809,73 @@ for (const V of VIEWS) {
         eq(`est-row-bbox:${tag}`, rows.filter((r) => r.right > m.containerRight + 1).map((r) => `${r.label}(right=${r.right}>${m.containerRight})`), []);
         bump('est', rows.length * 6 + 6);
 
-        // ── 관계도 접근성(S5) ──
-        const g = m.graph || {};
-        eq(`graph-domain:${tag}`, m.graphPresent && g.svgCount === 1 ? 'OK' : `GRAPH_MISSING(present=${m.graphPresent},svg=${g.svgCount})`, 'OK',
-          `노드 ${(g.nodes || []).length}개 · sr 목록 ${g.srPresent}`);
-        eq(`graph-role-img:${tag}`, g.roleImg, 0, 'role="img"는 ARIA leaf role — 자손 <text>가 접근성 트리에서 통째 프루닝된다(가토 ⑭)');
-        eq(`graph-svg-aria:${tag}`, g.svgAria, 'true', 'svg는 aria-hidden — 값은 sr-only 목록이 노출한다');
-        eq(`graph-svg-no-label:${tag}`, g.svgAriaLabel, null, 'aria-label 한 줄로 대체하던 옛 구조가 남아 있지 않은가');
-        // SVG는 열당 5개로 캡하지만 sr 목록은 캡하지 않는다 — 폴드로 접힌 초과분까지 **전수** 있어야 한다.
-        const wantNodes = nodeCountOf(pre) + 1 + nodeCountOf(der);
-        eq(`graph-node-cap:${tag}`, (g.nodes || []).length, wantNodes,
-          `capColumn 미러(MAX_PER_COL=${MAX_PER_COL}) — 전제 ${pre.length}→${nodeCountOf(pre)} · 대상 1 · 파생 ${der.length}→${nodeCountOf(der)}`);
-        const wantSr = [...pre, `대상: ${D.techName}`, ...der];
-        eq(`graph-sr-labels:${tag}`, g.srLabels, wantSr, `전제 ${pre.length} + 대상 1 + 파생 ${der.length} = ${wantSr.length}건`);
-        // 이빨 — 폴드가 실제로 일어난 판인가. 안 일어나면 「전수 노출」은 SVG와 같은 것만 세면서 통과한다.
-        const foldedAway = pre.slice(MAX_PER_COL - 1);
-        eq(`graph-fold-teeth:${tag}`, foldedAway.length > 0 ? 'OK' : `NO_FOLD(pre=${pre.length})`, 'OK',
-          `SVG에서 접힌 라벨 ${JSON.stringify(foldedAway)} — 이것이 sr 목록에 있어야 S5의 목적이 성립한다`);
-        eq(`graph-folded-in-sr:${tag}`, foldedAway.filter((l) => !g.srLabels.includes(l)), []);
-        // 보완·경합 칩은 SVG 밖 진짜 DOM Badge라 접근성 프루닝과 무관하다(S5가 손대지 않은 부분) —
-        // 그래도 함께 잰다: 관계도 섹션의 값 중 절반이 여기 있고, 기대값은 픽스처에서 유도된다.
-        eq(`graph-chips:${tag}`, [g.complements, g.competitors],
-          [relOf('complements').length > 0 ? 1 : 0, relOf('competitors').length > 0 ? 1 : 0],
-          `보완 ${relOf('complements').length}개 · 경합 ${relOf('competitors').length}개`);
-        bump('graph', (g.nodes || []).length + g.srLabels.length + 8);
       } else {
-        NOTE(`${tag} — est/graph 본체 정의역 밖(실데이터: market.estimates 키 없음 · related 4키 전부 빈 배열). ` +
-          `대상이 존재하지 않는 판이며 무음 스킵이 아니다. 두 축의 부재는 est-gate·graph-gate가 무조건 단언한다.`);
+        NOTE(`${tag} — est 본체 정의역 밖(실데이터에 market.estimates 키 없음). 대상이 존재하지 않는 판이며 ` +
+          `무음 스킵이 아니다 — 부재는 est-gate가 무조건 단언한다. ⚠️ 관계도는 더 이상 여기 없다: ` +
+          `2026-08-20 실측으로 라이브 related가 7 slug 전부 8~20개로 채워져 있어(옛 주석의 「4키 전부 빈 배열」은 ` +
+          `틀렸다) 관계도 축은 real·inject 양 모드에서 무조건 돈다.`);
       }
+
+      // ══ 관계도 — 세로 흐름 리플로우 + 접근성 (task#317) ══════════════════════════════
+      // ⚠️ 이 축들은 **두 모드 모두** 돈다. 옛 구현에서는 inject 전용이었는데, 그 근거였던
+      //    「라이브 related 4키가 전부 빈 배열」이 2026-08-20 실측으로 **거짓**이 됐다(7 slug 합 8~20개).
+      //    inject 전용으로 두면 이 게이트는 픽스처만 재고 **라이브 렌더를 전혀 재지 않는다.**
+      const g = m.graph || {};
+      const gItems = (g.groups || []).flatMap((x) => x.items || []);
+      const gChips = (g.chipGroups || []).flatMap((x) => x.chips || []);
+      const allChips = [...gItems, ...gChips];
+      const wantChips = pre.length + (D.techName ? 1 : 0) + der.length
+        + relOf('complements').length + relOf('competitors').length;
+      // 커버리지 sentinel — 칩이 기대 수와 다르면 아래 축들이 빈 배열끼리 비교돼 공허하게 통과한다.
+      // 캡·폴드가 사라졌으므로 기대값은 **소스 개수 그대로**이며, 이 축 하나가 캡 부재를 함께 잡는다.
+      eq(`graph-domain:${tag}`, m.graphPresent && g.flowPresent && allChips.length === wantChips
+        ? 'OK' : `GRAPH_DOMAIN(present=${m.graphPresent},flow=${g.flowPresent},chips=${allChips.length}/${wantChips})`, 'OK',
+        `흐름 ${gItems.length} + 칩 ${gChips.length} = ${allChips.length}개 · 섹션 높이 ${g.height}px`);
+      // SVG를 통째로 버렸다 — svg·role="img"·sr-only 잔존은 모두 옛 구조의 회귀다.
+      eq(`graph-no-svg:${tag}`, [g.roleImg, g.svgCount], [0, 0], '좌표계가 없어야 글자가 비례 축소되지 않는다');
+      eq(`graph-sronly-gone:${tag}`, g.srCount, 0, '이중 목록 제거 — 칩이 진짜 DOM 텍스트라 재노출은 중복 낭독이다');
+      // 그룹 구성·순서·라벨은 소스에서 유도(리터럴 금지 — 라이브 개수는 판마다 다르다)
+      const wantGroups = [['prerequisites', pre], ['target', D.techName ? [D.techName] : []], ['derivatives', der]]
+        .filter(([, v]) => v.length > 0).map(([k]) => k);
+      const GLABEL = { prerequisites: '전제·선행', target: '대상 기술', derivatives: '파생·응용' };
+      eq(`graph-groups:${tag}`, (g.groups || []).map((x) => x.key), wantGroups,
+        `소스 related ${JSON.stringify(RELATED_KEYS.map((k) => relOf(k).length))}`);
+      eq(`graph-labels:${tag}`, (g.groups || []).map((x) => x.label), wantGroups.map((k) => GLABEL[k]));
+      // 라벨은 구조 정보다 — 장식(aria-hidden)은 화살표뿐이어야 한다.
+      eq(`graph-label-not-hidden:${tag}`, (g.groups || []).filter((x) => x.labelAriaHidden === 'true').map((x) => x.key), []);
+      const arrows = (g.groups || []).map((x) => x.arrow).filter(Boolean);
+      const wantArrows = Math.max(0, wantGroups.length - 1);
+      eq(`graph-arrows:${tag}`,
+        [arrows.length, arrows.map((a) => a.t).join(''), [...new Set(arrows.map((a) => a.hidden))].join(',')],
+        [wantArrows, '↓'.repeat(wantArrows), wantArrows > 0 ? 'true' : ''],
+        '방향 마커는 그룹 사이에만 있고 접근 가능 텍스트를 만들지 않는다');
+
+      // ⓐ 자체 가로 스크롤러 0 — 이 태스크의 목표 자체(옛 구현은 minWidth:640 스크롤러였다)
+      eq(`graph-no-scroller:${tag}`, g.scrollers, [], 'sr-only 제외(width:1px라 구조적으로 넘친다) · 섹션 하위 전수');
+      // ⓑ 말줄임 0 · 칩 넘침 0 · 최장 이름 전문 렌더. 기대값은 실응답에서 **유도**한다 —
+      //    26자 `전신제어(loco-manipulation) 정책`을 리터럴로 박으면 그 이름이 없는 판에서 무의미해지고,
+      //    하필 그 이름은 complements에 있어 옛 구현에서도 잘리지 않았다(red-first가 성립하지 않는다).
+      const longest = [...pre, ...der, ...relOf('complements'), ...relOf('competitors')]
+        .slice().sort((a, b) => b.length - a.length)[0] || null;
+      eq(`graph-no-ellipsis:${tag}`,
+        [g.ellipsisText || [], allChips.filter((c) => c.sw > c.cw + 1).map((c) => `${c.t}(${c.sw}>${c.cw})`)], [[], []],
+        `칩 ${allChips.length}개 · 최장 이름 ${longest ? longest.length : 0}자`);
+      eq(`graph-longest-verbatim:${tag}`, longest ? (g.allText || '').includes(longest) : 'NO_NAMES',
+        longest ? true : 'NO_NAMES', `최장 ${JSON.stringify(longest)} — 잘린 접두사가 아니라 전문이어야 한다`);
+      // ⓒ 글자 축소 회귀 가드 — ADR-0034 근거절의 「비례 축소 금지」를 새 구현에서 못박는 핀.
+      //    말줄임·넘침을 「폰트를 줄여」 통과시키는 구멍을 막는다(--font-size-xs = 11px가 설계값).
+      const minFs = allChips.length ? Math.min(...allChips.map((c) => c.fs)) : null;
+      eq(`graph-font-size:${tag}`, minFs !== null && minFs >= 11 ? 'OK' : `TOO_SMALL(${minFs})`, 'OK',
+        `칩 실측 font-size ${JSON.stringify([...new Set(allChips.map((c) => c.fs))])}px · 하한 11`);
+      // 줄바꿈 허용의 라이브판(vitest는 선언 유무만 본다). nowrap이 남으면 min-content가 밀려
+      // 페이지가 가로 스크롤한다 — 실측: 초장문 라벨 nowrap 467px → doc 153px 초과.
+      eq(`graph-chip-wrap:${tag}`,
+        allChips.filter((c) => c.ws === 'nowrap' || c.ow !== 'anywhere').map((c) => `${c.t}(ws=${c.ws},ow=${c.ow})`), []);
+      // 방향 없는 관계는 흐름 밖 칩으로 남는다(ADR-0033 결정4의 **구별**은 유지 — 구현만 뒤집혔다)
+      eq(`graph-chips:${tag}`, (g.chipGroups || []).map((x) => (x.present ? 1 : 0)),
+        ['complements', 'competitors'].map((k) => (relOf(k).length > 0 ? 1 : 0)),
+        `보완 ${relOf('complements').length}개 · 경합 ${relOf('competitors').length}개`);
+      bump('graph', allChips.length + (g.groups || []).length + 12);
 
       // ══ ⓕ 잘림 2계열 ════════════════════════════════════════════════════════════
       // 하한은 표 셀 수에서 유도(리터럴 아님) — 행당 최소 4셀. 늘면 정당, 줄면 측정 실패다.
@@ -795,14 +907,19 @@ for (const V of VIEWS) {
         `제외 ${m.srExcluded}건 · 마일스톤 ${(D.milestones || []).length}건(항목당 상태 sr 텍스트 1개)`);
       eq(`overflow-sronly-owners:${tag}`, Object.keys(m.srOwners).filter((k) => k.startsWith('UNKNOWN')), [],
         `제외 ${m.srExcluded}건 내역 ${JSON.stringify(m.srOwners)}`);
-      eq(`overflow-sronly-graph:${tag}`, m.srOwners['graph-sr-list'] || 0, R.mode === 'inject' ? pre.length + 1 + der.length : 0,
-        '관계도 sr 목록의 잎 li 수(소스에서 유도)');
+      // task#317 — 옛 축은 「관계도 sr 목록의 잎 li 수」를 inject 모드에서 pre+1+der로 기대했다. 그 기대는
+      // 두 번 틀렸다: ⓐ 라이브 related가 채워지며 real 모드 기대값 0이 깨져 **선재 FAIL 12건**이 돼 있었고
+      // ⓑ 이제 sr-only 목록 자체가 없다. 그래서 「관계도 소유분은 항상 0」으로 바꾼다 — 되살아나면 위
+      // UNKNOWN 축이 잡고, 여기서는 소유자 사전에 관계도 키가 아예 없어야 한다.
+      eq(`overflow-sronly-graph:${tag}`, Object.keys(m.srOwners).filter((k) => k.includes('tech-graph')), [],
+        `sr-only 소유자 내역 ${JSON.stringify(m.srOwners)} — 관계도 소유분은 0이어야 한다`);
       bump('overflow-leaf', leafDomain.length + 1);
       bump('overflow-clip', hardClip.length + 1);
 
       // ── 공통: 본문 가로 스크롤 · 콘솔 ──
       eq(`body-no-hscroll:${tag}`, m.docScrollW <= m.docClientW + 1 ? 'OK' : `HSCROLL(${m.docScrollW}>${m.docClientW})`, 'OK',
-        `doc ${m.docScrollW}/${m.docClientW} · vw ${m.vw} · 관계도는 자체 스크롤러에 담기므로 본문은 밀리지 않아야 한다`);
+        `doc ${m.docScrollW}/${m.docClientW} · vw ${m.vw} · task#317 이후 관계도는 자체 스크롤러가 **없다** — ` +
+        `그 최소폭이 곧 문서 폭이 되므로 이 축이 관계도 리플로우의 최종 판정이다(칩 nowrap이 살아나면 여기서 죽는다)`);
       eq(`console:${tag}`, errs, []);
       bump('body-no-hscroll');
       bump('console');
@@ -811,7 +928,7 @@ for (const V of VIEWS) {
         ` · CAGR kpi${m.cagrInKpi}/절${m.cagrInMarket}/전체${m.cagrInContainer}` +
         ` · 산문 h3 ${m.prose.total}개(hidden ${m.prose.hidden}) · details ${m.prose.detailsTotal}/summary ${m.prose.summaryTotal} · body details[open] ${m.bodyDetailsOpen}` +
         ` · est ${m.estPresent ? `${(m.estRows || []).length}행 트랙${JSON.stringify((m.estRows || []).map((r) => r.trackW))} 막대${JSON.stringify((m.estRows || []).map((r) => r.barW))} 라벨잘림${(m.estRows || []).filter((r) => r.labelClipped).length}` : '부재'}` +
-        ` · graph ${m.graphPresent ? `노드${(m.graph.nodes || []).length}/sr${m.graph.srLabels.length}/roleImg${m.graph.roleImg}` : '부재'}` +
+        ` · graph ${m.graphPresent ? `그룹${(m.graph.groups || []).length}/칩${(m.graph.groups || []).reduce((a, x) => a + x.items.length, 0) + (m.graph.chipGroups || []).reduce((a, x) => a + x.chips.length, 0)}/svg${m.graph.svgCount}/sr${m.graph.srCount}/높이${m.graph.height}px/스크롤러${(m.graph.scrollers || []).length}` : '부재'}` +
         ` · leaf ${m.leaves.length}(ell ${m.leaves.filter((e) => e.ell).length})/clip ${m.clippers.length}/vclip ${m.vclipCount}` +
         ` · sr제외 ${m.srExcluded}${JSON.stringify(m.srOwners)} · role=img ${m.rootRoleImg}${JSON.stringify(m.roleImgOwners)}` +
         ` · doc ${m.docScrollW}/${m.docClientW}`);
@@ -853,6 +970,79 @@ for (const V of VIEWS) {
   }
   await ctx.close();
 }
+// ── 리플로우 스윕: 3뷰포트 × 라이브 7 slug (task#317) ──────────────────────────
+// ⚠️ 왜 SLUGS를 4→7로 늘리지 않고 별도 스윕인가: 본 루프의 축 대부분(캡션·추정 편차·업체 표·산문)은
+//    4 slug의 실측 특성에 맞춰 짜여 있어, slug를 늘리면 **무관한 선재 FAIL을 수입**해 이 프로브의
+//    exit 코드가 영구히 죽는다(task#316 「항상 FAIL하는 축은 게이트가 아니다」). 그래서 새 slug는
+//    이 태스크가 책임지는 4축(스크롤러·말줄임·글자크기·문서 가로스크롤)에만 노출한다.
+//    real 모드만 돈다 — 주입은 본 루프가 이미 덮는다.
+const REFLOW_SLUGS = ['semiconductor-equipment', 'ai-datacenter-equipment', 'ai-datacenter-ops',
+  'reusable-rocket', 'robotics', 'smr', 'solid-state-battery'];
+{
+  const sweepData = {};
+  for (const slug of REFLOW_SLUGS) {
+    const res = await fetch(`${BASE}/api/tech-reports/${slug}`, { headers: { Authorization: `Bearer ${access_token}` } });
+    const rep0 = ((await res.json()).reports || [])[0];
+    if (!rep0) { console.error(`스윕: 발행물 없음 — ${slug}. 종료.`); process.exit(1); }
+    sweepData[slug] = rep0;
+  }
+  const b2 = await chromium.launch();
+  for (const V of VIEWS) {
+    const ctx = await b2.newContext({ ...V.opts, serviceWorkers: 'block' });
+    await ctx.addInitScript(([a, r, th]) => {
+      localStorage.setItem('access_token', a); localStorage.setItem('refresh_token', r);
+      localStorage.setItem('theme', th); localStorage.setItem('pwa-install-dismissed-at', String(Date.now()));
+    }, [access_token, refresh_token, V.theme]);
+    const page = await ctx.newPage();
+    for (const slug of REFLOW_SLUGS) {
+      const tag = `sweep/${V.key}:${slug}`;
+      const rel = sweepData[slug].related || {};
+      const names = RELATED_KEYS.flatMap((k) => (Array.isArray(rel[k]) ? rel[k].filter((v) => typeof v === 'string' && v.trim()) : []));
+      await page.goto(`${BASE}/tech-report/${slug}`, { waitUntil: 'networkidle' }).catch((e) => eq(`sweep-goto:${tag}`, String(e), ''));
+      if (CONTROL && CONTROL_CSS[CONTROL]) { await page.addStyleTag({ content: CONTROL_CSS[CONTROL] }); await page.waitForTimeout(300); }
+      if (CONTROL && CONTROL_DOM[CONTROL]) { await page.evaluate(CONTROL_DOM[CONTROL], ''); await page.waitForTimeout(300); }
+      const m = await page.evaluate(() => {
+        const g = document.querySelector('[data-testid="tech-graph"]');
+        const isSR2 = (el) => !!(el.closest && el.closest('.sr-only'));
+        if (!g) return { present: false, docScrollW: document.documentElement.scrollWidth, docClientW: document.documentElement.clientWidth };
+        const chips = [...g.querySelectorAll('.badge')];
+        return {
+          present: true,
+          chips: chips.map((c) => ({ t: c.textContent.trim(), sw: c.scrollWidth, cw: c.clientWidth,
+            fs: Math.round(parseFloat(getComputedStyle(c).fontSize) * 10) / 10,
+            ws: getComputedStyle(c).whiteSpace })),
+          scrollers: [g, ...g.querySelectorAll('*')].filter((e) => !isSR2(e))
+            .filter((e) => getComputedStyle(e).overflowX !== 'visible' && e.scrollWidth > e.clientWidth + 1)
+            .map((e) => `${e.tagName.toLowerCase()}[${e.dataset.testid || ''}](${e.scrollWidth}>${e.clientWidth})`),
+          ellipsis: [...g.querySelectorAll('*')].filter((e) => e.children.length === 0 && (e.textContent || '').includes('…')).map((e) => e.textContent.trim()),
+          allText: g.textContent,
+          height: Math.round(g.getBoundingClientRect().height),
+          docScrollW: document.documentElement.scrollWidth, docClientW: document.documentElement.clientWidth,
+        };
+      });
+      // 커버리지 sentinel — 칩 수가 소스와 다르면 아래 축들이 공허해진다(대상 1개는 target이라 +1).
+      eq(`sweep-domain:${tag}`, m.present && m.chips.length === names.length + 1
+        ? 'OK' : `DOMAIN(present=${m.present},chips=${m.present ? m.chips.length : 'n/a'}/${names.length + 1})`, 'OK',
+        `related 합 ${names.length}개 + 대상 1 · 섹션 높이 ${m.height}px`);
+      eq(`sweep-no-scroller:${tag}`, m.scrollers || [], []);
+      eq(`sweep-no-ellipsis:${tag}`, [m.ellipsis || [], (m.chips || []).filter((c) => c.sw > c.cw + 1).map((c) => `${c.t}(${c.sw}>${c.cw})`)], [[], []]);
+      const longest = names.slice().sort((a, b) => b.length - a.length)[0] || null;
+      eq(`sweep-longest-verbatim:${tag}`, longest ? (m.allText || '').includes(longest) : 'NO_NAMES', longest ? true : 'NO_NAMES',
+        `최장 ${longest ? longest.length : 0}자 ${JSON.stringify(longest)}`);
+      const fsList = [...new Set((m.chips || []).map((c) => c.fs))];
+      eq(`sweep-font-size:${tag}`, fsList.length && Math.min(...fsList) >= 11 ? 'OK' : `TOO_SMALL(${JSON.stringify(fsList)})`, 'OK',
+        `칩 font-size ${JSON.stringify(fsList)}px · 하한 11`);
+      eq(`sweep-doc-hscroll:${tag}`, m.docScrollW <= m.docClientW + 1 ? 'OK' : `HSCROLL(${m.docScrollW}>${m.docClientW})`, 'OK',
+        `doc ${m.docScrollW}/${m.docClientW}`);
+      bump('sweep', 6);
+      rawLog.push(`${tag.padEnd(40)} 칩 ${(m.chips || []).length}개 · 높이 ${m.height}px · 스크롤러 ${(m.scrollers || []).length} · 말줄임 ${(m.ellipsis || []).length} · doc ${m.docScrollW}/${m.docClientW}`);
+    }
+    await page.close();
+    await ctx.close();
+  }
+  await b2.close();
+}
+
 await browser.close();
 
 // ── 전역 이빨 단언 ────────────────────────────────────────────────────────────
@@ -877,7 +1067,8 @@ console.log('커버리지 (계열별 검사 수 — 재실행 간 비교용, 줄
 for (const [k, v] of Object.entries(cov).sort()) console.log(`  ${k.padEnd(26)} ${v}`);
 console.log(`  ${'(합계)'.padEnd(26)} ${Object.values(cov).reduce((a, b) => a + b, 0)}`);
 console.log(`\n단언 총계: ${results.length}건 · PASS ${results.length - fails.length} · FAIL ${fails.length}`);
-console.log(`뷰 ${VIEWS.length}조합 × ${SLUGS.length} slug × 2모드(real+inject) = ${VIEWS.length * SLUGS.length * 2} 페이지`);
+console.log(`뷰 ${VIEWS.length}조합 × ${SLUGS.length} slug × 2모드(real+inject) = ${VIEWS.length * SLUGS.length * 2} 페이지` +
+  ` + 리플로우 스윕 ${VIEWS.length}×${REFLOW_SLUGS.length} = ${VIEWS.length * REFLOW_SLUGS.length} 페이지`);
 console.log('\n원시 실측(단언 아님 — 조합별):');
 for (const l of rawLog) console.log(`  ${l}`);
 console.log('\n※ (inject)는 **실발행 아님 — page.route 주입 응답**이다. prod tech_reports 쓰기 0, GET도 가로채졌다.');

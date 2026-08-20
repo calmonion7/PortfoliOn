@@ -27,16 +27,45 @@
 // 새 컴포넌트 4종(소스 직독, frontend/src/components/tech/*.jsx)의 데이터 계약을 이 스크립트가
 // **미러**한다(uat276 관용구 — import하지 않고 리터럴 로직을 복제하되 근거를 주석에 남긴다):
 //   - formatMarketSize/formatMarketSummary: techReportUtils.js와 바이트 동일 로직(uat276에서 이미 검증).
-//   - techGraphLayout의 capColumn: MAX_PER_COL=5 → shown=slice(0,4), overflow=len-4.
-//     **⚠️ 계획 문서(.forge/plan.md S4 완료기준 서술 "6노드 입력에서 5노드 + `+1개` 접힘")는 부정확하다.**
-//     TechGraph.test.jsx:74-87(이미 vitest green)이 못박은 실제 값은 "6개 입력 → 4개 노출 + 폴드 1개
-//     = 5노드, 폴드 라벨 `+2개`"다(overflow = 6 - 4 = 2, "+1개"가 아니라 "+2개"). 이 스크립트는
-//     **코드/테스트 쪽 진실("+2개")을 기준으로 픽스처·단언을 짠다** — 계획 문서의 오기를 따라가지 않는다.
+//   - TechGraph(관계도)의 계약은 아래 task#317 갱신 절과 「새 DOM 계약」을 참조 — 캡·폴드가 없어
+//     옛 techGraphLayout/capColumn(MAX_PER_COL=5·"+2개" 폴드) 미러는 더 이상 유효하지 않다(삭제).
 //
 // 판정축 — 재사용 4계열(uat276 관용구 그대로: 잘림 2계열·줄 수·간격·색, 각 정의역 sentinel과 짝) +
-// task#277 신규 4계열(①관계도 기하 ②CJK 실측(getComputedTextLength, jsdom 폴백 아닌 라이브 실측)
-// ③recharts 대상은 기하(x-클러스터)로 특정 ④실선/점선). 신뢰성 규칙(⑧ⓑ 무조건 단언·sentinel FAIL,
-// ⑧ⓐ 커버리지, ⑧ⓘ 대상 identity 우선, ⑧ⓛ 정의역 명시)은 uat275/276과 동형.
+// task#277 신규 2계열(③recharts 대상은 기하(x-클러스터)로 특정 ④실선/점선 — 관계도와 무관, 불변) +
+// task#317 신규 6계열(관계도: graph-groups·graph-items-set·graph-chips-set·graph-labels·
+// color-graph-*·graph-no-clip — 전부 DOM 구조·집합·색이고, 대상이 사라진 SVG 기하·CJK 절단측정은
+// 삭제됨). 신뢰성 규칙(⑧ⓑ 무조건 단언·sentinel FAIL, ⑧ⓐ 커버리지, ⑧ⓘ 대상 identity 우선, ⑧ⓛ
+// 정의역 명시)은 uat275/276과 동형.
+//
+// ── task#317 갱신 ───────────────────────────────────────────────────────────────────────────
+// 「연관 기술」 관계도가 3열 계층 SVG DAG → **세로 흐름 HTML**로 재작성됐다(TechGraph.jsx, ADR-0033
+// 결정4를 뒤집음 — 근거는 그 파일 헤더: 모바일 2배 가로 스크롤 + 26자 이름 말줄임 + 완전 팬 엣지가
+// 0비트 정보). 이 프로브의 graph 축은 SVG 좌표계(viewBox·<path>·<rect>) 전제였으므로 통째로 스테일.
+//
+// 삭제한 것: graphNodes/graphEdges/graphViewBox 수집 블록(옛 :367-413, svgEl·측정용 숨은 <text>
+// 포함) · graph-geometry-domain·graph-bounds·graph-text-legible·graph-col-overlap·
+// graph-edge-node-overlap·graph-edge-domain(SVG 기하 축 6종 — 대상 자체가 없다) ·
+// cjk-section-domain·cjk-fit·cjk-truncation-consistency·cjk-domain(getComputedTextLength 절단
+// 축 — 세로 흐름은 자연 줄바꿈이라 절단이 없다) · fold-section-domain·fold-invariant·
+// fold-node-count·der-no-fold(캡·폴드 자체가 사라졌다, TechGraph.jsx:51 "eco: 상한이 없다") ·
+// identity-pre·identity-pre-folded·identity-der·identity-complement·identity-competitor(개별
+// FOUND 루프 — 아래 graph-items-set/graph-chips-set의 집합비교가 대체한다. 캡이 없으니 "접혀서
+// 안 보임" 판정 자체가 무의미해졌다).
+//
+// 신설한 것(전부 기하가 아니라 DOM 구조·집합·색으로 재구성):
+//   graph-groups     렌더된 data-group 집합·순서 == prerequisites→target→derivatives
+//   graph-items-set  그룹별 [data-testid="tech-graph-item"] 텍스트 집합 == related[key] 집합
+//                    (개수 리터럴 없음 — 캡·폴드·말줄임 부재를 이 한 축이 한번에 잡는다)
+//   graph-chips-set  보완/경합 칩 텍스트 집합 == related.complements/competitors 집합
+//   graph-labels     그룹 라벨 3종이 접근 가능 텍스트(aria-hidden 아님) + 화살표만 aria-hidden="true"
+//   color-graph-*    재작성 — SVG <text> fill 대신 칩 getComputedStyle(chip).color
+//                    (대상=인라인 var(--accent), 일반=.badge--neutral의 var(--text-2))
+//   graph-no-clip    흐름 안 전 칩이 scrollWidth<=clientWidth+1(줄바꿈으로 흡수, 잘림 없음)
+// 유지한 것: section-graph(루트 존재) — 그대로.
+//
+// ⚠️ 착수 시점 실측(2026-08-20, 옛 번들): 단언 541 · PASS 535 · FAIL 6(전부 clip-container, 원인은
+// `.sr-only` 목록 172>1 — 이 태스크와 무관, sr-only가 사라지면 자동 해소). 신규 축은 라이브가 아직
+// 옛 SVG 번들이므로 배포 전엔 FAIL이 정상이다(red-first).
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
 
@@ -213,6 +242,7 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
   };
   const tokens = {
     accent: readToken('--accent'), text: readToken('--text'), text3: readToken('--text-3'),
+    text2: readToken('--text-2'), // task#317 — 관계도 일반 칩(.badge--neutral) 색 대조용
     data2: readBgToken('--data-2'), border: readBgToken('--border'),
     tagHold: readToken('--tag-hold-color'), tagWatch: readToken('--tag-watch-color'),
   };
@@ -364,55 +394,42 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
   const growthCaptionColor = growthCaptionEl ? cs(growthCaptionEl).color : null;
   const growthRootRect = growthEl ? growthEl.getBoundingClientRect() : null;
 
-  // ── ⑤ 관계도 (S4) — 노드 rect/text 실측(px 변환 없이 SVG 로컬 좌표 그대로) ──────
+  // ── ⑤ 관계도 (task#317 — 3열 SVG DAG → 세로 흐름 HTML, TechGraph.jsx 직독 100줄) ──────────
+  //    SVG 좌표계·엣지·폴드·절단이 전부 사라졌다 — 세로 흐름은 자연 줄바꿈이라 절단 메커니즘이
+  //    없고, 캡도 없어 related 배열 전량이 그대로 렌더된다(TechGraph.jsx:51 "eco: 상한이 없다").
+  //    판정은 기하가 아니라 **집합 동일성과 색**으로 재구성한다(아래 판정 코드 참조).
   const graphEl = root.querySelector('[data-testid="tech-graph"]');
-  const svgEl = graphEl ? graphEl.querySelector('[data-testid="tech-graph-svg"]') : null;
-  let graphNodes = null, graphEdges = null, graphViewBox = null;
-  if (svgEl) {
-    const vb = svgEl.getAttribute('viewBox').split(/\s+/).map(Number);
-    graphViewBox = { x: vb[0], y: vb[1], w: vb[2], h: vb[3] };
-    // 숨은 SVG <text>로 "완전한(미절단)" 라벨의 실제 렌더 폭을 잰다(컴포넌트 자신의 truncateLabel과
-    // 같은 기법 — 라이브 브라우저이므로 getComputedTextLength가 실측된다, jsdom 폴백 경로 아님).
-    const measureEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    measureEl.setAttribute('font-size', '12');
-    svgEl.appendChild(measureEl);
-    const fullTextLen = (str) => { measureEl.textContent = str; return measureEl.getComputedTextLength(); };
-    graphNodes = [...svgEl.querySelectorAll('[data-testid="tech-graph-node"]')].map(g => {
-      const rect = g.querySelector('rect');
-      const textEl = g.querySelector('text');
-      const titleEl = g.querySelector('title');
-      const x = +rect.getAttribute('x'), y = +rect.getAttribute('y'), w = +rect.getAttribute('width'), h = +rect.getAttribute('height');
-      const visibleLabel = txt(textEl);
-      const fullLabel = titleEl ? txt(titleEl) : visibleLabel;
-      return {
-        id: g.getAttribute('data-node-id'), col: Number(g.getAttribute('data-col')),
-        x, y, w, h,
-        visibleLabel, fullLabel,
-        wasTruncated: visibleLabel !== fullLabel,
-        visibleLen: textEl.getComputedTextLength(),
-        fullLen: fullTextLen(fullLabel),
-        textFill: cs(textEl).fill,
-        // ⚠️ 위 x/y/w/h·visibleLen은 전부 **viewBox 좌표계**다 — `width:100%` + 고정 viewBox면
-        // 화면 픽셀은 컨테이너 폭에 비례해 줄어드는데 viewBox 좌표는 그대로라, 기존 기하·잘림 축이
-        // **전부 통과하면서 모바일에서 못 읽는** 상태가 성립한다(실측 task#277: 350px에서 6px).
-        // → 화면 실측 높이를 별도로 싣는다(bbox는 viewBox 스케일이 반영된다).
-        renderedTextH: +textEl.getBoundingClientRect().height.toFixed(1),
-        isFold: g.getAttribute('data-node-id')?.endsWith('-more') ?? false,
-        isTarget: g.getAttribute('data-node-id') === 'target',
-      };
-    });
-    measureEl.remove();
-    graphEdges = [...svgEl.children].filter(c => c.tagName === 'path').map(p => {
-      const d = p.getAttribute('d');
-      const nums = (d.match(/-?\d+\.?\d*/g) || []).map(Number);
-      // d = "M x1,y1 C mx,y1 mx,y2 x2,y2" → 8 numbers: [x1,y1, mx,y1, mx,y2, x2,y2]
-      const xs = [nums[0], nums[2], nums[4], nums[6]];
-      const ys = [nums[1], nums[3], nums[5], nums[7]];
-      return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
-    });
-  }
-  const complementsEl = graphEl ? graphEl.querySelector('[data-testid="tech-graph-complements"]') : null;
-  const competitorsEl = graphEl ? graphEl.querySelector('[data-testid="tech-graph-competitors"]') : null;
+  const graphFlowEl = graphEl ? graphEl.querySelector('[data-testid="tech-graph-flow"]') : null;
+  const graphGroups = graphFlowEl ? [...graphFlowEl.querySelectorAll('[data-testid="tech-graph-group"]')].map(li => {
+    // 그룹 라벨 = li의 첫 자식 <span>(li.children는 element만 — 공백 텍스트노드는 안 섞인다).
+    const labelEl = li.children[0];
+    // 화살표 = li의 직계 자식 span[aria-hidden](라벨 span엔 aria-hidden이 없어 :scope>span[aria-hidden]로 구분).
+    const arrowEl = li.querySelector(':scope > span[aria-hidden]');
+    const itemEls = [...li.querySelectorAll('[data-testid="tech-graph-item"]')];
+    return {
+      key: li.getAttribute('data-group'),
+      labelText: labelEl ? txt(labelEl) : null,
+      labelAriaHidden: labelEl ? labelEl.hasAttribute('aria-hidden') : false,
+      arrowText: arrowEl ? txt(arrowEl) : null,
+      arrowAriaHidden: arrowEl ? arrowEl.getAttribute('aria-hidden') : null,
+      items: itemEls.map(chip => ({
+        text: txt(chip), scrollW: chip.scrollWidth, clientW: chip.clientWidth, color: cs(chip).color,
+      })),
+    };
+  }) : [];
+  // 보완/경합 칩 그룹(방향 없는 관계, 흐름 밖) — 칩은 `.badge`이고 `tech-graph-item` testid는 없다.
+  // 라벨 span은 `.badge` 클래스가 없는 첫 span으로 구분(순서 의존 없이 안전하게 특정).
+  const readChipRow = (testid) => {
+    const el = graphEl ? graphEl.querySelector(`[data-testid="${testid}"]`) : null;
+    if (!el) return null;
+    const labelEl = el.querySelector('span:not(.badge)');
+    return {
+      labelText: labelEl ? txt(labelEl) : null,
+      items: [...el.querySelectorAll('.badge')].map(chip => ({ text: txt(chip), scrollW: chip.scrollWidth, clientW: chip.clientWidth })),
+    };
+  };
+  const graphComplements = readChipRow('tech-graph-complements');
+  const graphCompetitors = readChipRow('tech-graph-competitors');
 
   return {
     found: true, rootRight: Math.round(rr.right),
@@ -425,9 +442,7 @@ const measureDetail = (page) => page.evaluate((ROOT_SEL) => {
     growthAxis, growthLines, growthGap,
     growthRootRight: growthRootRect ? Math.round(growthRootRect.right) : null,
     growthRootLeft: growthRootRect ? Math.round(growthRootRect.left) : null,
-    graphFound: !!graphEl, graphNodes, graphEdges, graphViewBox,
-    complementsText: complementsEl ? txt(complementsEl) : null,
-    competitorsText: competitorsEl ? txt(competitorsEl) : null,
+    graphFound: !!graphEl, graphGroups, graphComplements, graphCompetitors,
   };
 }, ROOT_SEL);
 
@@ -637,19 +652,20 @@ for (const V of VIEWS) {
         NOTE(`${tag} — 밴드 색 축 미검사(섹션 자체가 없음, 위 section-band sentinel이 이미 FAIL 처리)`);
       }
 
-      // TechGraph: target/일반/폴드 노드 텍스트 fill(3 토큰) + 이빨.
-      eq(`color-graph-section-domain:${tag}`, (m.graphNodes && m.graphNodes.length) ? 'OK' : 'GRAPH_MISSING_FOR_COLOR', 'OK');
-      if (m.graphNodes && m.graphNodes.length) {
-        const targetNode = m.graphNodes.find(n => n.isTarget);
-        const foldNode = m.graphNodes.find(n => n.isFold);
-        const regularNode = m.graphNodes.find(n => !n.isTarget && !n.isFold);
-        eq(`color-graph-domain:${tag}`, [!!targetNode, !!foldNode, !!regularNode].every(Boolean) ? 'OK' : `EMPTY(target=${!!targetNode},fold=${!!foldNode},regular=${!!regularNode})`, 'OK');
-        if (targetNode) eq(`color-graph-target:${tag}`, targetNode.textFill, m.tokens.accent, `--accent=${m.tokens.accent}`);
-        if (regularNode) eq(`color-graph-regular:${tag}`, regularNode.textFill, m.tokens.text, `--text=${m.tokens.text}`);
-        if (foldNode) eq(`color-graph-fold:${tag}`, foldNode.textFill, m.tokens.text3, `--text-3=${m.tokens.text3}`);
-        bump('color', [targetNode, regularNode, foldNode].filter(Boolean).length);
-        const graphTokenSet = new Set([m.tokens.accent, m.tokens.text, m.tokens.text3]);
-        eq(`color-graph-tokens-differ:${tag}`, graphTokenSet.size, 3, `accent=${m.tokens.accent} text=${m.tokens.text} text3=${m.tokens.text3}`);
+      // TechGraph(task#317 재작성) — SVG <text> fill 3토큰(대상/일반/폴드) 대신 **칩 색** 2토큰.
+      // 폴드 칩이 사라졌으므로 그 색 축은 없다(캡·폴드 삭제, 위 갱신 절 참조).
+      const flowChips = m.graphGroups.flatMap(g => g.items.map(i => ({ ...i, isTarget: g.key === 'target' })));
+      eq(`color-graph-section-domain:${tag}`, flowChips.length ? 'OK' : 'GRAPH_MISSING_FOR_COLOR', 'OK');
+      if (flowChips.length) {
+        const targetChip = flowChips.find(c => c.isTarget);
+        const regularChip = flowChips.find(c => !c.isTarget);
+        eq(`color-graph-domain:${tag}`, [!!targetChip, !!regularChip].every(Boolean) ? 'OK' : `EMPTY(target=${!!targetChip},regular=${!!regularChip})`, 'OK');
+        if (targetChip) eq(`color-graph-target:${tag}`, targetChip.color, m.tokens.accent, `--accent=${m.tokens.accent}(인라인 CHIP_TARGET_STYLE)`);
+        if (regularChip) eq(`color-graph-regular:${tag}`, regularChip.color, m.tokens.text2, `--text-2=${m.tokens.text2}(.badge--neutral)`);
+        bump('color', [targetChip, regularChip].filter(Boolean).length);
+        // 이빨 — 두 토큰이 실제로 다름(같으면 위 두 단언이 아무것도 안 보면서 통과한다).
+        const graphTokenSet = new Set([m.tokens.accent, m.tokens.text2]);
+        eq(`color-graph-tokens-differ:${tag}`, graphTokenSet.size, 2, `accent=${m.tokens.accent} text2=${m.tokens.text2}`);
       } else {
         NOTE(`${tag} — 관계도 색 축 미검사(섹션 자체가 없음)`);
       }
@@ -665,83 +681,123 @@ for (const V of VIEWS) {
         : 'CAPTION_MISSING', 'OK', `실측 ${m.growthCaptionColor}`);
       bump('color');
 
-      // ═══════════════════════ task#277 신규 축 ①②③④ ═══════════════════════
+      // ═══════════════════════ task#317 신규 축(관계도, SVG 기하 대체) ═══════════════════════
 
-      // ① 관계도 기하 — 4모서리가 viewBox 안 · 같은 열 노드 교차 0 · 엣지 bbox가 무관노드와 교차 0.
-      // 무조건 단언(⑧ⓑ) — 그래프 부재 자체를 sentinel로 등록한다(section-graph와 별개로, 이 축 전용).
-      eq(`graph-geometry-domain:${tag}`, (m.graphViewBox && m.graphNodes && m.graphNodes.length > 0) ? 'OK' : 'GRAPH_MISSING_FOR_GEOMETRY', 'OK');
-      if (m.graphViewBox && m.graphNodes) {
-        const vb = m.graphViewBox;
-        const EPS = 0.5;
-        const outOfBounds = m.graphNodes.filter(n =>
-          n.x < -EPS || n.y < -EPS || n.x + n.w > vb.w + EPS || n.y + n.h > vb.h + EPS);
-        eq(`graph-bounds:${tag}`, outOfBounds.map(n => `${n.id}(x=${n.x},y=${n.y},x+w=${n.x + n.w},y+h=${n.y + n.h})`), [],
-          `검사 ${m.graphNodes.length}노드 · viewBox=${vb.w}x${vb.h}`);
-        bump('graph-bounds', m.graphNodes.length);
-
-        // ⭐ 가독성 축 — 기하가 아니라 **화면 픽셀**을 잰다. 위 bounds·잘림·겹침 축은 전부 viewBox
-        // 좌표계라 `width:100%`+고정 viewBox의 축소를 원리적으로 못 본다(499단언 ALL PASS인데
-        // 350px에서 6px로 렌더돼 육안이 유일한 포착 수단이었다 — 가토 ⑩의 5번째 발생).
-        // 육안으로 잡은 결함은 축으로 승격한다: 다음번엔 육안에 기대지 않는다.
-        const MIN_TEXT_H = 10;   // 한글 라벨이 읽히는 실질 하한(12px 선언 기준 스케일 0.83)
-        const tooSmall = m.graphNodes
-          .filter(n => n.renderedTextH != null && n.renderedTextH < MIN_TEXT_H)
-          .map(n => `${n.id}(${n.renderedTextH}px)`);
-        eq(`graph-text-legible:${tag}`, tooSmall, [],
-          `실측 높이 ${JSON.stringify(m.graphNodes.map(n => n.renderedTextH))} · 하한 ${MIN_TEXT_H}px`);
-        bump('graph-text-legible', m.graphNodes.length);
-
-        const cols = [0, 1, 2];
-        const overlapsByCol = [];
-        for (const col of cols) {
-          const rows = m.graphNodes.filter(n => n.col === col).sort((a, b) => a.y - b.y);
-          for (let i = 1; i < rows.length; i++) {
-            if (rows[i].y < rows[i - 1].y + rows[i - 1].h - EPS) overlapsByCol.push(`col${col}:${rows[i - 1].id}~${rows[i].id}`);
-          }
-        }
-        eq(`graph-col-overlap:${tag}`, overlapsByCol, [], `검사 ${m.graphNodes.length}노드(3열)`);
-        bump('graph-col-overlap', m.graphNodes.length);
-
-        // 엣지 라벨은 이 구현엔 없다(techGraphLayout 소스 확인 — edges:{from,to,path}뿐, label 필드 없음).
-        // 대신 엣지 path의 bbox(베지어는 항상 자기 제어점의 convex hull 안 — 안전한 초과-근사)가
-        // 자신과 무관한 노드(from/to가 아닌 노드) rect와 겹치지 않는지를 잰다(더 실질적인 대체 축).
-        if (m.graphEdges && m.graphEdges.length) {
-          const edgeOverlaps = [];
-          m.graphEdges.forEach((e, i) => {
-            m.graphNodes.forEach(n => {
-              const xOverlap = e.minX < n.x + n.w - EPS && n.x < e.maxX - EPS;
-              const yOverlap = e.minY < n.y + n.h - EPS && n.y < e.maxY - EPS;
-              if (xOverlap && yOverlap) edgeOverlaps.push(`edge${i}~${n.id}`);
-            });
-          });
-          eq(`graph-edge-node-overlap:${tag}`, edgeOverlaps, [], `검사 엣지${m.graphEdges.length}×노드${m.graphNodes.length}`);
-          bump('graph-edge-overlap', m.graphEdges.length);
-        }
-        eq(`graph-edge-domain:${tag}`, m.graphEdges && m.graphEdges.length > 0 ? 'OK' : 'GRAPH_EDGE_DOMAIN_EMPTY', 'OK');
-      } else {
-        NOTE(`${tag} — ① 관계도 기하 미검사(그래프 섹션 자체가 없음)`);
+      // ① graph-groups — 렌더된 data-group 집합·순서 == prerequisites→target→derivatives.
+      // 무조건 단언(⑧ⓑ) — 그래프 부재 자체를 sentinel로 등록한다(section-graph와 별개, 이 축 전용).
+      eq(`graph-groups-domain:${tag}`, m.graphFound ? 'OK' : 'GRAPH_MISSING_FOR_GROUPS', 'OK');
+      if (m.graphFound) {
+        const expectedKeys = [PREREQ.length > 0 ? 'prerequisites' : null, 'target', DERIV.length > 0 ? 'derivatives' : null].filter(Boolean);
+        const gotKeys = m.graphGroups.map(g => g.key);
+        eq(`graph-groups:${tag}`, gotKeys, expectedKeys, '항목 0개인 그룹은 렌더 안 됨(정의역), target은 항상 렌더');
+        bump('graph-groups', gotKeys.length);
       }
 
-      // ② CJK 실측 — 라이브 브라우저 getComputedTextLength(추정 아님). 시각 폭 <= 가용폭(w-2*PAD_X)
-      //    + 절단 여부(fullLen>avail ⇔ wasTruncated)까지 뒤집어 확인(과잉절단·누락절단 둘 다 잡는다).
-      // 무조건 단언(⑧ⓑ).
-      eq(`cjk-section-domain:${tag}`, (m.graphNodes && m.graphNodes.length > 0) ? 'OK' : 'GRAPH_MISSING_FOR_CJK', 'OK');
-      if (m.graphNodes && m.graphNodes.length) {
-        const PAD_X = 10; // TechGraph.jsx의 PAD_X 상수 미러
-        const TOL = 2; // 서브픽셀 라운딩 여유
-        const overflowing = m.graphNodes.filter(n => n.visibleLen > (n.w - 2 * PAD_X) + TOL);
-        eq(`cjk-fit:${tag}`, overflowing.map(n => `${n.id}(len=${n.visibleLen.toFixed(1)}>avail=${(n.w - 2 * PAD_X).toFixed(1)})`), [],
-          `검사 ${m.graphNodes.length}노드`);
-        bump('cjk-fit', m.graphNodes.length);
-        const inconsistent = m.graphNodes.filter(n => n.wasTruncated !== (n.fullLen > (n.w - 2 * PAD_X) + TOL));
-        eq(`cjk-truncation-consistency:${tag}`, inconsistent.map(n => `${n.id}(wasTruncated=${n.wasTruncated},fullLen=${n.fullLen.toFixed(1)},avail=${(n.w - 2 * PAD_X).toFixed(1)})`), [],
-          '절단 여부가 실측 폭과 정합하는가(과잉·누락 절단 둘 다 검출)');
-        bump('cjk-truncation', m.graphNodes.length);
-        // CASC(전각 다수 포함, 아주 긴 이름)와 대응하는 pre* 픽스처는 노드 라벨이 아니라 플레이어명 —
-        // 실제 CJK 폭 자극은 6개 전제 라벨 자체가 전부 한글이라는 사실만으로 충분(라틴 폴백 없음).
-        eq(`cjk-domain:${tag}`, m.graphNodes.length >= 5 ? 'OK' : `CJK_DOMAIN_TOO_SMALL(${m.graphNodes.length})`, 'OK');
+      // ② graph-items-set — 그룹별 칩 텍스트 집합 == related[key] 집합(리터럴 개수 없음).
+      // 이 축이 캡·폴드·말줄임 부재를 한 번에 잡는다 — 잘리면 텍스트가 달라 집합이 안 맞는다.
+      // missing/extra를 별도 단언으로 쪼갠다(⑧ⓕ — 어느 쪽으로 깨졌는지 실측치를 바로 읽게).
+      // 무조건 단언(⑧ⓑ) — 도메인 sentinel을 그룹별로 둔다.
+      const EXPECTED_GRAPH_ITEMS = { prerequisites: PREREQ, target: [TARGET_LABEL], derivatives: DERIV };
+      for (const key of ['prerequisites', 'target', 'derivatives']) {
+        const want = EXPECTED_GRAPH_ITEMS[key];
+        eq(`graph-items-set-domain:${tag}:${key}`, want.length > 0 ? 'OK' : `EMPTY_EXPECTED(${key})`, 'OK');
+        const group = m.graphFound ? m.graphGroups.find(g => g.key === key) : null;
+        const got = group ? group.items.map(i => i.text) : [];
+        const gotSet = new Set(got), wantSet = new Set(want);
+        const missing = want.filter(w => !gotSet.has(w));
+        const extra = got.filter(g => !wantSet.has(g));
+        eq(`graph-items-missing:${tag}:${key}`, missing, [], `렌더 ${got.length}개 vs 기대 ${want.length}개`);
+        eq(`graph-items-extra:${tag}:${key}`, extra, [], `렌더 ${JSON.stringify(got)}`);
+        bump('graph-items-set', want.length);
+      }
+
+      // ③ graph-chips-set — 보완/경합 칩 텍스트 집합 == related.complements/competitors 집합.
+      const EXPECTED_GRAPH_CHIPS = { complements: COMPLEMENTS, competitors: COMPETITORS };
+      const GOT_GRAPH_CHIPS = { complements: m.graphComplements, competitors: m.graphCompetitors };
+      for (const key of ['complements', 'competitors']) {
+        const want = EXPECTED_GRAPH_CHIPS[key];
+        eq(`graph-chips-set-domain:${tag}:${key}`, want.length > 0 ? 'OK' : `EMPTY_EXPECTED(${key})`, 'OK');
+        const row = m.graphFound ? GOT_GRAPH_CHIPS[key] : null;
+        const got = row ? row.items.map(i => i.text) : [];
+        const gotSet = new Set(got), wantSet = new Set(want);
+        const missing = want.filter(w => !gotSet.has(w));
+        const extra = got.filter(g => !wantSet.has(g));
+        eq(`graph-chips-missing:${tag}:${key}`, missing, [], `렌더 ${got.length}개 vs 기대 ${want.length}개 · 라벨="${row ? row.labelText : null}"`);
+        eq(`graph-chips-extra:${tag}:${key}`, extra, [], `렌더 ${JSON.stringify(got)}`);
+        bump('graph-chips-set', want.length);
+      }
+
+      // ── 연관기술 identity(task#317 적응 — 캡·폴드가 없어 「접혀서 안 보임」 개념이 사라졌고,
+      //    전 항목을 개별 FOUND로 검사한다. 위 graph-items-set/graph-chips-set의 집합비교와
+      //    중복이지만 실패 시 "어느 항목인지"를 바로 짚는 세분 진단이다). 무조건 단언(⑧ⓑ) —
+      //    graphGroups가 비어도(옛 번들) 각 항목이 sentinel로 FAIL해 총계를 고정한다.
+      const groupItemTexts = (key) => {
+        const g = m.graphFound ? m.graphGroups.find(x => x.key === key) : null;
+        return g ? g.items.map(i => i.text) : [];
+      };
+      const preTexts = groupItemTexts('prerequisites');
+      for (const p of PREREQ) {
+        eq(`identity-pre:${tag}:${p.slice(0, 8)}`, preTexts.includes(p) ? 'FOUND' : 'PREREQ_MISSING', 'FOUND');
+        bump('identity');
+      }
+      const targetTexts = groupItemTexts('target');
+      eq(`identity-graph-target:${tag}`, targetTexts.includes(TARGET_LABEL) ? 'FOUND' : 'TARGET_MISSING', 'FOUND');
+      bump('identity');
+      const derTexts = groupItemTexts('derivatives');
+      for (const d of DERIV) {
+        eq(`identity-der:${tag}:${d.slice(0, 8)}`, derTexts.includes(d) ? 'FOUND' : 'DERIV_MISSING', 'FOUND');
+        bump('identity');
+      }
+      const compTexts = (m.graphFound && m.graphComplements) ? m.graphComplements.items.map(i => i.text) : [];
+      for (const c of COMPLEMENTS) {
+        eq(`identity-complement:${tag}:${c.slice(0, 8)}`, compTexts.includes(c) ? 'FOUND' : 'MISSING', 'FOUND');
+        bump('identity');
+      }
+      const competTexts = (m.graphFound && m.graphCompetitors) ? m.graphCompetitors.items.map(i => i.text) : [];
+      for (const c of COMPETITORS) {
+        eq(`identity-competitor:${tag}:${c.slice(0, 8)}`, competTexts.includes(c) ? 'FOUND' : 'MISSING', 'FOUND');
+        bump('identity');
+      }
+
+      // ④ graph-labels — 그룹 라벨 3종이 접근 가능 텍스트(aria-hidden 아님) + 화살표만 aria-hidden="true"
+      //    이고 그 텍스트는 "↓"뿐. 마지막 그룹 뒤에는 화살표가 없어야 한다(짝 축).
+      eq(`graph-labels-domain:${tag}`, (m.graphFound && m.graphGroups.length > 0) ? 'OK' : 'GRAPH_MISSING_FOR_LABELS', 'OK');
+      if (m.graphFound && m.graphGroups.length > 0) {
+        const LABEL_MAP = { prerequisites: '전제·선행', target: '대상 기술', derivatives: '파생·응용' };
+        const labelBad = m.graphGroups.flatMap(g => {
+          const bad = [];
+          if (g.labelText !== LABEL_MAP[g.key]) bad.push(`${g.key}:label="${g.labelText}"`);
+          if (g.labelAriaHidden) bad.push(`${g.key}:label-aria-hidden`);
+          return bad;
+        });
+        eq(`graph-labels:${tag}`, labelBad, [], `그룹 ${m.graphGroups.length}개 라벨=${JSON.stringify(m.graphGroups.map(g => g.labelText))}`);
+        bump('graph-labels', m.graphGroups.length);
+
+        const nonLastGroups = m.graphGroups.slice(0, -1);
+        const arrowBad = nonLastGroups.flatMap(g => {
+          const bad = [];
+          if (g.arrowText !== '↓') bad.push(`${g.key}:arrow-text="${g.arrowText}"`);
+          if (g.arrowAriaHidden !== 'true') bad.push(`${g.key}:arrow-aria-hidden="${g.arrowAriaHidden}"`);
+          return bad;
+        });
+        eq(`graph-arrow:${tag}`, arrowBad, [], `화살표 검사 ${nonLastGroups.length}개(마지막 그룹 제외)`);
+        bump('graph-labels', nonLastGroups.length);
+        const lastGroup = m.graphGroups[m.graphGroups.length - 1];
+        eq(`graph-arrow-last-none:${tag}`, lastGroup.arrowText, null, '마지막 그룹 뒤에는 화살표가 없어야 한다');
+        bump('graph-labels');
       } else {
-        NOTE(`${tag} — ② CJK 실측 미검사(그래프 섹션 자체가 없음)`);
+        NOTE(`${tag} — ④ graph-labels 미검사(그래프 섹션 자체가 없음)`);
+      }
+
+      // ⑥ graph-no-clip — 흐름 안 전 칩이 잘리지 않는가(줄바꿈으로 흡수, 절단 메커니즘 자체가 없다).
+      const allFlowChips = m.graphFound ? m.graphGroups.flatMap(g => g.items) : [];
+      eq(`graph-no-clip-domain:${tag}`, allFlowChips.length > 0 ? 'OK' : 'GRAPH_NO_CLIP_DOMAIN_EMPTY', 'OK');
+      if (allFlowChips.length > 0) {
+        const clipped = allFlowChips.filter(c => c.scrollW > c.clientW + 1);
+        eq(`graph-no-clip:${tag}`, clipped.map(c => `${c.text}(${c.scrollW}>${c.clientW})`), [], `검사 ${allFlowChips.length}개 칩`);
+        bump('graph-no-clip', allFlowChips.length);
+      } else {
+        NOTE(`${tag} — ⑥ graph-no-clip 미검사(그래프 섹션 자체가 없음)`);
       }
 
       // ③ recharts 대상 특정은 기하(x-클러스터)로 — 클래스 계층 의존 금지. 무조건 단언(⑧ⓑ).
@@ -788,55 +844,10 @@ for (const V of VIEWS) {
         bump('line-style', 3);
       }
 
-      // ── 연관기술 접힘 불변식 — 전제 6개 = 노출 4 + 폴드라벨의 숫자(리터럴 "+2개" 아니라 불변식) ──
-      // 무조건 단언(⑧ⓑ).
-      eq(`fold-section-domain:${tag}`, (m.graphNodes && m.graphNodes.length > 0) ? 'OK' : 'GRAPH_MISSING_FOR_FOLD', 'OK');
-      if (m.graphNodes && m.graphNodes.length) {
-        const col0 = m.graphNodes.filter(n => n.col === 0);
-        const foldNode = col0.find(n => n.isFold);
-        const shownCount = col0.filter(n => !n.isFold).length;
-        const foldMatch = foldNode ? foldNode.visibleLabel.match(/^\+(\d+)개$/) : null;
-        const hiddenCount = foldMatch ? Number(foldMatch[1]) : null;
-        eq(`fold-invariant:${tag}`, shownCount + (hiddenCount ?? 0), PREREQ.length,
-          `shown=${shownCount} hidden=${hiddenCount} foldLabel="${foldNode?.visibleLabel}"`);
-        bump('fold');
-        eq(`fold-node-count:${tag}`, col0.length, 5, '열당 최대 5노드(4노출+폴드1)');
-        // 파생(3개, fold 없음) — 대조.
-        const col2 = m.graphNodes.filter(n => n.col === 2);
-        eq(`der-no-fold:${tag}`, col2.length, DERIV.length, 'derivatives는 3개뿐이라 fold 없음(대조)');
-      }
-
-      // ── 연관기술 identity — 노출된 4개 전제 + 3개 파생 + 칩(보완/경합) 전부 FOUND, 접힌 2개는 부재 확인 ──
-      // 무조건 단언(⑧ⓑ) — graphNodes가 null이어도 각 항목이 sentinel로 FAIL해 총계를 고정한다.
-      for (const p of PREREQ.slice(0, 4)) {
-        const found = m.graphNodes ? m.graphNodes.some(n => n.fullLabel === p) : false;
-        eq(`identity-pre:${tag}:${p.slice(0, 8)}`, found ? 'FOUND' : 'PREREQ_MISSING', 'FOUND');
-        bump('identity');
-      }
-      for (const p of PREREQ.slice(4)) {
-        // ⚠️ "부재 확인"은 그래프 자체가 없어도 공허하게 통과한다(m.graphNodes=null이면 foundAsNode는
-        // 항상 false) — graph-geometry-domain이 OK일 때만 의미 있는 판정으로 좁힌다(share-section-absent와
-        // 동일한 함정: 무언가의 부재를 확인하는 축은 "전부 안 그려짐"과 "정확히 그 항목만 없음"을
-        // 구별하지 못하면 배포 전에도 거짓으로 통과한다).
-        const domainOk = !!(m.graphNodes && m.graphNodes.length);
-        const got = !domainOk ? 'CANNOT_VERIFY_GRAPH_MISSING' : (m.graphNodes.some(n => n.fullLabel === p) ? 'UNEXPECTEDLY_SHOWN' : 'CORRECTLY_HIDDEN');
-        eq(`identity-pre-folded:${tag}:${p.slice(0, 8)}`, got, 'CORRECTLY_HIDDEN',
-          '6번째 전제 초과분 — 폴드에 접혀 개별 노드로 안 보여야 한다(그래프 부재 시엔 검증 불가로 FAIL, 공허통과 방지)');
-        bump('identity');
-      }
-      for (const d of DERIV) {
-        const found = m.graphNodes ? m.graphNodes.some(n => n.fullLabel === d) : false;
-        eq(`identity-der:${tag}:${d.slice(0, 8)}`, found ? 'FOUND' : 'DERIV_MISSING', 'FOUND');
-        bump('identity');
-      }
-      for (const c of COMPLEMENTS) {
-        eq(`identity-complement:${tag}:${c.slice(0, 8)}`, (m.complementsText ?? '').includes(c) ? 'FOUND' : 'MISSING', 'FOUND');
-        bump('identity');
-      }
-      for (const c of COMPETITORS) {
-        eq(`identity-competitor:${tag}:${c.slice(0, 8)}`, (m.competitorsText ?? '').includes(c) ? 'FOUND' : 'MISSING', 'FOUND');
-        bump('identity');
-      }
+      // task#317 — 옛 "연관기술 접힘 불변식"(fold-section-domain·fold-invariant·fold-node-count·
+      // der-no-fold)은 여기 있었고 **완전 삭제**했다 — 캡·폴드 자체가 사라져 "shown+hidden==total"
+      // 같은 불변식이 성립할 대상이 없다(hidden이 항상 0). "연관기술 identity"는 위 ②(graph-items-set)
+      // 블록 안으로 옮기고 **적응**했다(캡이 없으므로 PREREQ.slice(0,4) 같은 부분슬라이스 없이 전 항목).
 
       // ── 시장 요약 캡션 — 리터럴 대신 픽스처에서 계산한 기대값(uat276 관용구). 무조건 단언(⑧ⓑ).
       eq(`growth-caption:${tag}`, m.growthCaptionText ?? 'CAPTION_MISSING', GROWTH_CAPTION_EXPECTED);
@@ -911,7 +922,7 @@ for (const V of VIEWS) {
       eq(`growth-still-present:${tag}`, m.growthFound ? 'PRESENT' : 'GROWTH_MISSING', 'PRESENT', '대조 — share_pct와 무관한 섹션');
       bump('section', 2);
       // 목표 단언(plan S2 완료기준 ②) — share_pct 전무면 ShareChart 섹션 자체가 없어야 한다.
-      // ⚠️ "부재 확인"은 그래프 부재와 같은 함정(위 identity-pre-folded 주석) — 페이지 자체가 아직
+      // ⚠️ "부재 확인"은 그래프 부재와 같은 함정(위 graph-items-set 등 domain sentinel과 같은 원리) — 페이지 자체가 아직
       // 미배포라 아무 섹션도 없는 상태에서는 shareFound=false가 "옳게 생략됨"과 구별되지 않는다.
       // 대조(band/growth still-present)가 실제로 PASS해야만("컨트롤이 살아있다") 이 판정이 의미를 가진다 —
       // 그래서 대조가 실패 중이면 이 단언도 검증불가로 FAIL시켜 공허통과를 막는다.
