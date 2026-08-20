@@ -7,17 +7,34 @@ import Skeleton from '../components/ui/Skeleton'
 import { TECH_NAMES, formatMarketSummary } from '../components/reports/techReportUtils'
 
 // 주요기술 리포트 목록 (ADR-0033, task#276 S5, 개명·저장모델 ADR-0038, 설비/운영 분할 ADR-0039) —
-// 기술 단위 발행물, 기술당 최신 1행(slug당 1행 고정, 이력 누적 없음). 대상 6종 고정(백엔드
-// TECH_TOPICS 정본)이라 페이지네이션 없음. /analyst-reports 목록과 동형 구조.
+// 기술 단위 발행물, 기술당 최신 1행(slug당 1행 고정, 이력 누적 없음). 백엔드 TECH_TOPICS 등록
+// 15종 중 발행된 것만 이 그리드에 실리고(실측 7종, 2026-08-20), 미발행 나머지는 아래 「발행 대기」
+// 구역에 칩으로 뜬다(S3) — "대상 6종 고정"은 옛 서술이었다. /analyst-reports 목록과 동형 구조.
+
+// 발행 대기 칩 — TechReport.jsx 목차/출처 칩과 동일 스타일(task#316, 34px 탭 타깃 핀). 모듈
+// 상수로 호이스팅해 매 렌더·매 칩마다 새 객체를 만들지 않는다.
+const PENDING_CHIP_STYLE = {
+  fontSize: 11.5, lineHeight: '18px', padding: '7px 12px',
+  border: '1px solid var(--border)', borderRadius: 12,
+  color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap',
+}
+const PENDING_TITLE_STYLE = { fontFamily: 'var(--font-serif)', color: 'var(--text)', fontSize: 14, margin: '0 0 10px' }
 
 export default function TechReports() {
   const [reports, setReports] = useState(null)  // null=로딩, []=없음
+  // null=모름(로딩 중이거나 topics 키 없는 옛 백엔드), 배열=응답에서 받음(길이 0 포함) — 조회
+  // 실패/미확인을 빈 결과로 붕괴시키지 않는다(task#307 교훈, 이 파일 적용).
+  const [topics, setTopics] = useState(null)
   const [error, setError] = useState(null)       // 실패는 빈 상태와 구별(에러 정직성)
 
   useEffect(() => {
     let ignore = false
     api.get('/api/tech-reports')
-      .then(({ data }) => { if (!ignore) setReports(data.reports || []) })
+      .then(({ data }) => {
+        if (ignore) return
+        setReports(data.reports || [])
+        setTopics(Array.isArray(data.topics) ? data.topics : null)
+      })
       .catch((e) => {
         if (ignore) return
         console.error('[TechReports] 목록 조회 실패:', e)
@@ -25,6 +42,12 @@ export default function TechReports() {
       })
     return () => { ignore = true }
   }, [])
+
+  // 대기 = topics 중 발행물(reports)에 없는 slug. topics가 배열일 때만 계산(모름이면 []).
+  const publishedSlugs = new Set((reports || []).map(r => r.slug))
+  const pendingTopics = Array.isArray(topics)
+    ? topics.filter(t => !publishedSlugs.has(t.slug)).sort((a, b) => a.order - b.order)
+    : []
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -128,6 +151,22 @@ export default function TechReports() {
               </Card>
             )
           })}
+        </div>
+      )}
+      {/* 발행 대기 구역 — 발행물 그리드와 독립. topics 가 배열이 아니면(모름·옛 백엔드) 렌더하지
+          않고, 대기 0건이어도 빈 구역을 렌더하지 않는다(계약). */}
+      {pendingTopics.length > 0 && (
+        <div data-testid="tech-pending-section" style={{ marginTop: 24 }}>
+          <h4 style={PENDING_TITLE_STYLE}>발행 대기 ({pendingTopics.length})</h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {pendingTopics.map(t => (
+              <Link key={t.slug} to={`/tech-report/${t.slug}`}
+                    data-testid="tech-pending-chip" data-slug={t.slug}
+                    className="mono" style={PENDING_CHIP_STYLE}>
+                {t.name}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -125,4 +125,47 @@ describe('주요기술 리포트 목록 (task#276 S5, 개명 ADR-0038)', () => {
     await waitFor(() => expect(screen.getByText('목록을 불러오지 못했습니다.')).toBeTruthy())
     expect(screen.queryByText('발행된 주요기술 리포트가 없습니다.')).toBeNull()
   })
+
+  // S3: 발행 대기 구역 (task#317 후속) — topics 는 등록 15종, reports 는 발행 7종의 부분집합.
+  // ⚠️ 배열 삽입 순서를 order 와 **일부러 어긋나게** 둔다(3,1,2). 오름차순으로 두면
+  // filter 가 원 배열 순서를 보존하므로 `.sort((a,b)=>a.order-b.order)` 를 통째로 지워도
+  // 기대 출력과 같아져 이 테스트가 계속 통과한다 — 즉 정렬 회귀에 눈이 먼 축이 된다
+  // (적대 검토가 그 거짓 안심을 포착했다). 어긋나게 두면 정렬이 실제로 실행돼야만 통과한다.
+  const TOPICS_15 = [
+    { slug: 'autonomous-driving', name: '자율주행', order: 3 },
+    { slug: 'quantum-computing', name: '양자컴퓨팅', order: 1 },
+    { slug: 'smr', name: 'SMR', order: 2 },
+  ]
+
+  it('대기 칩 — order 순서를 따르고(배열·reports 순서 아님) 이름·slug·href가 정확하다', async () => {
+    // 이빨 2겹: ⓐ 픽스처 배열 순서(autonomous→quantum)가 기대 출력(quantum→autonomous)과
+    // 반대라 정렬을 지우면 FAIL 한다 ⓑ reports 순서(smr 하나뿐)와도 달라 "reports 순서 그대로"
+    // 나 "topics 전부 렌더" 오구현도 통과할 수 없다.
+    api.get.mockResolvedValue({ data: { reports: REPORTS, topics: TOPICS_15 } })
+    renderPage()
+    const section = await screen.findByTestId('tech-pending-section')
+    const chips = within(section).getAllByTestId('tech-pending-chip')
+    expect(chips.length).toBe(2)
+    expect(chips.map(c => c.dataset.slug)).toEqual(['quantum-computing', 'autonomous-driving'])
+    expect(chips.map(c => c.textContent)).toEqual(['양자컴퓨팅', '자율주행'])
+    expect(chips[0].getAttribute('href')).toBe('/tech-report/quantum-computing')
+    expect(chips[1].getAttribute('href')).toBe('/tech-report/autonomous-driving')
+  })
+
+  it('대기 0건 — topics 와 reports 가 같은 집합이면 구역 자체가 렌더되지 않는다', async () => {
+    api.get.mockResolvedValue({
+      data: { reports: REPORTS, topics: [{ slug: 'smr', name: 'SMR', order: 1 }] },
+    })
+    renderPage()
+    await screen.findByTestId('tech-report-card')
+    expect(screen.queryByTestId('tech-pending-section')).toBeNull()
+  })
+
+  it('응답에 topics 키가 없으면(옛 백엔드) 구역 미렌더 + 발행물 카드 수는 그대로', async () => {
+    api.get.mockResolvedValue({ data: { reports: REPORTS } })
+    renderPage()
+    const cards = await screen.findAllByTestId('tech-report-card')
+    expect(cards.length).toBe(1)
+    expect(screen.queryByTestId('tech-pending-section')).toBeNull()
+  })
 })

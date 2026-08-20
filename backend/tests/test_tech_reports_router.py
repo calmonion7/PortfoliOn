@@ -157,6 +157,35 @@ def test_list_all_one_row_per_slug():
     assert "ORDER BY published_date DESC" in sql
 
 
+def test_list_all_topics_len_matches_tech_topics():
+    """topics 길이가 svc.TECH_TOPICS 정본 길이와 같다(리터럴 15를 박지 않고 상수에서 파생)."""
+    with patch.object(svc, "query", return_value=[]):
+        resp = client.get("/api/tech-reports")
+    assert resp.status_code == 200
+    assert len(resp.json()["topics"]) == len(svc.TECH_TOPICS)
+
+
+def test_list_all_topics_order_and_keys():
+    """topics는 order 엄격 오름차순이고 각 항목 키 집합이 정확히 {slug, name, order}."""
+    with patch.object(svc, "query", return_value=[]):
+        resp = client.get("/api/tech-reports")
+    topics = resp.json()["topics"]
+    orders = [t["order"] for t in topics]
+    assert orders == sorted(orders)
+    assert len(set(orders)) == len(orders)
+    for t in topics:
+        assert set(t.keys()) == {"slug", "name", "order"}
+
+
+def test_list_all_reports_unchanged_by_topics_addition():
+    """reports 키가 여전히 존재하고 topics 추가 전과 내용이 동일(순수 additive)."""
+    rows = [{"slug": "smr", "published_date": "2026-08-02", "title": "t2"}]
+    with patch.object(svc, "query", return_value=rows):
+        resp = client.get("/api/tech-reports")
+    assert resp.status_code == 200
+    assert resp.json()["reports"] == rows
+
+
 def test_republish_replaces_not_appends():
     """slug당 1행(ADR-0038) — 재발행이 행을 늘리지 않고 교체. 두 호출 모두
     ON CONFLICT (slug) DO UPDATE SQL을 태우는지(router→service 배선 확인,

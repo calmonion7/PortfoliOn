@@ -2427,17 +2427,29 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 - **JSONB 안에 중첩된 키**(`market.estimates`·`players[].category`)는 다르다 — 그 키가 스키마에 생기기 **이전**에 발행된 판은 JSONB에 박제된 옛 형태라 **키 자체가 없다**(`undefined`). 이후 발행분은 생략해도 서버가 `null`을 채워 저장하므로 키가 늘 있다.
 - 어느 쪽이든 배열 자리의 `null`을 그대로 `.map()`·`.length`에 넘기지 말 것. `metrics`를 생략한 포인트도 `"metrics": null`이다.
 
-**발행된 종만** `key_points`·`milestones`·`variants`·`watch_items`·`market.estimates`가 채워져 있고, `composition`은 ADR-0042 도입 이후 기입분만 있다(미수록은 `null`). 대상 slug이라도 **아직 발행되지 않은 종은 목록에 나타나지 않고** `GET /api/tech-reports/{slug}`가 `{slug, reports: []}`를 준다(빈 배열이며 `404`가 아니다) — ADR-0044로 대상이 늘어난 직후가 그 상태다. 개수는 발행이 진행될수록 바뀌므로 여기에 박지 않는다.
+**발행된 종만** `key_points`·`milestones`·`variants`·`watch_items`·`market.estimates`가 채워져 있고, `composition`은 ADR-0042 도입 이후 기입분만 있다(미수록은 `null`). 대상 slug이라도 아직 발행되지 않은 종은 **`reports[]`에는 없고 `topics[]`에 있다**(`GET /api/tech-reports`가 등록 정본 목록을 함께 내린다 — 아래 절). 그 slug로 `GET /api/tech-reports/{slug}`를 부르면 `{slug, reports: []}`를 준다(빈 배열이며 `404`가 아니다) — ADR-0044로 대상이 늘어난 직후가 그 상태다. 개수는 발행이 진행될수록 바뀌므로 여기에 박지 않는다.
 
 ### `GET /api/tech-reports`
 
 목록 — **기술당 1행**(slug당 최대 1건, 이력 없음 — ADR-0038). 요약본이 아니라 위 발행물 행 **전체**를 반환한다. `published_date`는 최초 발행일이 아니라 **그 기술이 마지막으로 갱신된 날짜**다(재발행 시 이 값도 갱신되고 정렬도 이 값 기준 최신순).
 
+응답은 **서로 다른 두 집합**을 함께 싣는다 — `reports[]`는 *발행물*이고 `topics[]`는 *등록 대상*이다. 둘의 차집합이 「발행 대기」이며, 목록 화면이 그 이름들을 칩으로 보인다(등록됐지만 아직 발행되지 않은 기술이 화면에서 통째로 존재하지 않는 것처럼 보이던 것을 없애기 위한 필드다).
+
+| 필드 | 무엇 |
+|---|---|
+| `reports[]` | **발행물** — 발행된 기술만. 각 행은 발행 필드 전체 + `id`·`created_at`. `published_date` 최신순. |
+| `topics[]` | **등록 정본** — 백엔드 상수 `TECH_TOPICS` 파생(ADR-0044로 15종). `slug`·`name`·`order` 세 키만이고 **발행 여부와 무관**하게 전 종이 실린다. `order` 오름차순. |
+
+⚠️ `topics[]`에는 **발행 여부 플래그가 없다** — 발행 판정은 소비자가 `reports[]`와의 차집합으로 한다. 「발행됐다」를 말하는 숫자를 `reports[]` 하나로 유지해 두 값이 엇갈리지 않게 한 의도적 설계다.
+
 **Auth:** Bearer token 또는 `X-API-Key`
 
 **Response `200`**
 ```json
-{ "reports": [ { "id": 4, "slug": "smr", "published_date": "2026-08-03", "title": "...", "...": "...", "created_at": "2026-08-03T09:00:00" } ] }
+{
+  "reports": [ { "id": 4, "slug": "smr", "published_date": "2026-08-03", "title": "...", "...": "...", "created_at": "2026-08-03T09:00:00" } ],
+  "topics": [ { "slug": "reusable-rocket", "name": "재사용 로켓", "order": 1 }, { "slug": "solid-state-battery", "name": "전고체 배터리", "order": 2 } ]
+}
 ```
 
 ---

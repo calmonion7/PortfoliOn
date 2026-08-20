@@ -521,8 +521,9 @@ def publish_report(slug: SlugPath, body: TechReportIn, _: str = Depends(require_
 
 @router.get("")
 def list_all(_: str = Depends(get_current_user_or_api_key)):
-    """목록 — 기술당 최신 1건."""
-    return sanitize({"reports": svc.latest_all()})
+    """목록 — 기술당 최신 1건 + topics(등록 정본 15종, 발행 여부 무관, additive)."""
+    topics = [{"slug": t["slug"], "name": t["name"], "order": t["order"]} for t in svc.TECH_TOPICS]
+    return sanitize({"reports": svc.latest_all(), "topics": topics})
 
 
 @router.get("/index")
