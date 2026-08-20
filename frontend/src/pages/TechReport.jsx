@@ -22,10 +22,17 @@ import './TechReport.css'
 // ADR-0038) — 기술 단위 발행물. slug당 1행으로 고정돼 있어(ADR-0038 결정 2) 과거 판이 원천적으로
 // 없다 — 재발행은 그 행을 덮어쓰기만 한다(과거 판 UI는 비목표, 결정 1).
 //
-// 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로 재구성. CONTEXT.md 구성 서사도 이 순서다):
-//   기술명 h1 → 리드 문단 → KPI 스트립 → 전역 목차 → 핵심 포인트 → 진척 타임라인 → 주요 업체 표
-//   → 계열 비교 → 점유율 → 난제 → 확인할 지표 → 시장 규모 → 연관 기술
-//   → 상세 설명(상시 노출) → 출처.
+// 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로, **task#319에서 독자 질문 순서 + 4장 위계**로
+// 재구성. CONTEXT.md 구성 서사도 이 순서다. ADR-0045):
+//   기술명 h1 → 리드 문단 → KPI 스트립 → 해부 링크 → 전역 목차   ← 여기까지 불변(장 밖)
+//   장 1 개요        핵심 포인트 → 계열 비교 → 연관 기술
+//   장 2 시장·경쟁    시장 규모 → 주요 업체 → 점유율
+//   장 3 진척·리스크  진척 타임라인 → 해결해야 할 난제 → 확인할 지표
+//   장 4 근거        상세 설명(상시 노출) → 출처
+// task#319가 옮긴 것 4건: 연관 기술 ⑨→③ · 계열 비교 ④→② · 시장 규모 ⑧→④ · 진척 타임라인 ②→⑦.
+// 근거는 독자의 질문 순서다 — 전체 파이(시장 규모)를 모른 채 분할(점유율)을 볼 수 없고, 맥락(연관
+// 기술)은 앞쪽 성격인데 9번째였다. 「계열 비교」의 옛 위치 근거(「계보 분류 바로 앞」)는 그 계보 분류가
+// ADR-0041로 업체 표에 흡수돼 **낡았다**.
 // ADR-0041: 「기술수준 비교」 밴드 섹션은 업체 표의 「기술수준」 셀로 흡수돼 별도 섹션이 아니다.
 // task#281(2/2)이 신규 3필드(key_points·milestones·players[].category)로 그 예약 자리를 채웠다.
 // task#297(1/2)이 발행 스키마에 2필드(variants·watch_items)를 추가하고 task#298(2/2)이 그것으로
@@ -136,22 +143,62 @@ export default function TechReport() {
   const nonBlank = (v) => typeof v === 'string' && v.trim() !== ''
   const hasProse = nonBlank(report.description) || nonBlank(report.difficulty?.rationale)
 
-  // 목차·본문 제목 단일 소스(task#296 S4) — 순서는 기존 렌더 순서 그대로(수술적 변경 금지), show는
-  // 각 섹션의 기존 게이트 식을 그대로 옮긴 것이다(느슨화 금지 — 아래 각 섹션 주석 참조).
+  // 목차·본문 제목 단일 소스(task#296 S4) — show는 각 섹션의 기존 게이트 식을 그대로 옮긴 것이다
+  // (느슨화 금지 — 아래 각 섹션 주석 참조).
+  // ⚠️ **배열 순서 == JSX 렌더 순서**여야 한다(task#319 S2). 둘이 어긋나면 목차 칩이 본문과 다른
+  //    순서를 가리키는데, 개수·라벨 단언은 둘 다 통과하므로 조용히 깨진다. 그래서 테스트가 두 순서를
+  //    서로 대조한다(칩 href 순서 === DOM data-tech-section 순서).
+  // 순서는 task#319에서 **독자 질문 순서**로 재배열했다 — 전체 파이(시장 규모)를 분할(점유율)보다
+  // 앞에 두고, 맥락(연관 기술)을 앞쪽으로 올린다. 이동 4건: 연관 ⑨→③ · 계열 ④→② · 시장 ⑧→④ ·
+  // 타임라인 ②→⑦. 뒤집지 않은 것: KPI 스트립 첫 화면 · 목차는 스트립 아래 · 상세 설명은 본문 끝 ·
+  // 난제→확인할 지표 인접(장 3 안에서 유지).
   const SECTIONS = [
-    { id: 'key-points', label: '핵심 포인트', show: hasKeyPoints },
-    { id: 'milestones', label: '진척 타임라인', show: hasMilestones },
-    { id: 'players', label: '주요 업체', show: hasPlayers },
-    { id: 'variants', label: '계열 비교', show: hasVariants },
-    { id: 'share', label: '점유율', show: hasShare },
-    { id: 'challenges', label: '해결해야 할 난제', show: hasChallenges },
-    { id: 'watch-items', label: '확인할 지표', show: hasWatchItems },
-    { id: 'market', label: '시장 규모', show: true },
-    { id: 'related', label: '연관 기술', show: hasRelated },
-    { id: 'prose', label: '상세 설명', show: hasProse },
-    { id: 'sources', label: '출처', show: hasSources },
+    { id: 'key-points', label: '핵심 포인트', show: hasKeyPoints, chapter: 'overview' },
+    { id: 'variants', label: '계열 비교', show: hasVariants, chapter: 'overview' },
+    { id: 'related', label: '연관 기술', show: hasRelated, chapter: 'overview' },
+    { id: 'market', label: '시장 규모', show: true, chapter: 'market-competition' },
+    { id: 'players', label: '주요 업체', show: hasPlayers, chapter: 'market-competition' },
+    { id: 'share', label: '점유율', show: hasShare, chapter: 'market-competition' },
+    { id: 'milestones', label: '진척 타임라인', show: hasMilestones, chapter: 'progress-risk' },
+    { id: 'challenges', label: '해결해야 할 난제', show: hasChallenges, chapter: 'progress-risk' },
+    { id: 'watch-items', label: '확인할 지표', show: hasWatchItems, chapter: 'progress-risk' },
+    { id: 'prose', label: '상세 설명', show: hasProse, chapter: 'evidence' },
+    { id: 'sources', label: '출처', show: hasSources, chapter: 'evidence' },
   ]
   const tocItems = SECTIONS.filter((s) => s.show)
+
+  // 4장 위계(task#319 S3) — 11섹션을 전부 동급으로 나열하면 무엇이 결론이고 무엇이 근거인지 화면이
+  // 말하지 않는다. 장 라벨 한 줄 + 얇은 구분선으로 위계를 만든다(공유 프리미티브 `SectionTitle`의
+  // 격은 건드리지 않는다 — 파장이 이 페이지 밖으로 나간다).
+  // ⚠️ **유령 UI 금지** — 라벨은 그 장의 **첫 *표시* 섹션**에만 붙는다. 아래 map이 `show`를 보므로,
+  //    장의 섹션이 전부 결측이면 그 장은 키가 없어 라벨도 렌더되지 않는다(이 페이지의 기존 규율
+  //    「게이트는 컴포넌트 자신의 채택 조건과 같은 식」의 장 라벨판). `show`를 무시하면 데이터 없는
+  //    판에서 라벨만 남는다.
+  const CHAPTERS = [
+    { key: 'overview', label: '개요' },
+    { key: 'market-competition', label: '시장·경쟁' },
+    { key: 'progress-risk', label: '진척·리스크' },
+    { key: 'evidence', label: '근거' },
+  ]
+  const chapterHeadAt = {}
+  for (const c of CHAPTERS) {
+    const first = SECTIONS.find((s) => s.chapter === c.key && s.show)
+    if (first) chapterHeadAt[first.id] = c
+  }
+  // 섹션 블록마다 앞에 놓인다 — 그 섹션이 자기 장의 첫 표시 섹션일 때만 라벨이 된다(그 외엔 null).
+  // 섹션의 게이트 *밖*에 두어도 안전하다: 표시되지 않는 섹션은 chapterHeadAt의 키가 될 수 없다.
+  const Chap = ({ id }) => {
+    const c = chapterHeadAt[id]
+    if (!c) return null
+    return (
+      <div data-tech-chapter={c.key}
+           style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)', marginBottom: 'var(--space-3)',
+                    fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--text-3)', letterSpacing: '0.08em' }}>
+        {c.label}
+      </div>
+    )
+  }
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '20px 16px 64px' }}>
@@ -256,27 +303,14 @@ export default function TechReport() {
         </nav>
       )}
 
+      <Chap id="key-points" />
       {/* ── 핵심 포인트 (task#281 S2) ── 여기만 SectionTitle·바깥 여백을 컴포넌트가 소유한다.
           래퍼(<div marginBottom:30>)로 감싸면 데이터가 없어 null을 반환한 자리에 30px 유령 간격이
           남으므로 감싸지 않는다. */}
       <KeyPointCards points={report.key_points} sectionId="key-points" />
 
-      {/* ── 진척 타임라인 (task#281 S3) ── */}
-      {hasMilestones && (
-        <div id="milestones" data-tech-section="milestones" style={{ marginBottom: 30 }}>
-          <SectionTitle>진척 타임라인</SectionTitle>
-          <MilestoneTimeline milestones={report.milestones} />
-        </div>
-      )}
 
-      {/* ── 주요 업체 (표시 규율은 PlayerTable 단독 소유) ── */}
-      {hasPlayers && (
-        <div id="players" data-tech-section="players" style={{ marginBottom: 30 }}>
-          <SectionTitle>주요 업체</SectionTitle>
-          <PlayerTable players={ordered} holdings={holdings} />
-        </div>
-      )}
-
+      <Chap id="variants" />
       {/* ── 계열 비교 (task#298 S4) ── 점유율 바로 앞. 계열의 *성질*을 담는다(업체의 *소속*을
           담는 계보 분류와는 다른 사실 — 병존, 흡수하지 않는다). 게이트는 VariantTable 자신의
           채택 조건과 같은 식(variantTableLayout(...).axes.length > 0). ── */}
@@ -287,40 +321,18 @@ export default function TechReport() {
         </div>
       )}
 
-      {/* ── 점유율 ── 게이트는 ShareChart 자신의 채택 조건(유한·음수 아님)과 같은 식이어야 한다.
-          느슨하면(예: isFinite만) 전 업체가 음수인 판에서 제목만 남고 차트가 사라진다(task#277 S2). */}
-      {hasShare && (
-        <div id="share" data-tech-section="share" style={{ marginBottom: 30 }}>
-          <SectionTitle>점유율</SectionTitle>
-          <ShareChart players={ordered} shareBasis={report.market?.share_basis} />
+
+      <Chap id="related" />
+      {/* ── 연관 기술 (전제→대상→파생 관계도, 관계 데이터 전무 시 조용히 생략, task#277 S4) ── */}
+      {hasRelated && (
+        <div id="related" data-tech-section="related" style={{ marginBottom: 30 }}>
+          <SectionTitle>연관 기술</SectionTitle>
+          <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug} />
         </div>
       )}
 
-      {/* ── 해결해야 할 난제 ─────────────────────────────── */}
-      {hasChallenges && (
-        <div id="challenges" data-tech-section="challenges" style={{ marginBottom: 30 }}>
-          <SectionTitle>해결해야 할 난제</SectionTitle>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {challenges.map((c, i) => (
-              <Card key={i} padding="md">
-                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{c.title}</div>
-                <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{c.body}</p>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* ── 확인할 지표 (task#298 S4) ── 난제 바로 뒤·시장 규모 앞. 난제(*지금 무엇이 안 풀렸나*)
-          → 확인할 지표(*무엇을 지켜보면 풀렸는지 아는가*)가 논리 순서다. 게이트는 WatchItems 자신의
-          채택 조건과 같은 식이어야 한다 — 느슨하면 label이 전부 빈 판에서 제목만 남는다. */}
-      {hasWatchItems && (
-        <div id="watch-items" data-tech-section="watch-items" style={{ marginBottom: 30 }}>
-          <SectionTitle>확인할 지표</SectionTitle>
-          <WatchItems watchItems={report.watch_items} />
-        </div>
-      )}
-
+      <Chap id="market" />
       {/* ── 시장 규모 (task#282 S3 — 텍스트 요약 카드를 제거했다. formatMarketSummary가
           history/forecast에서 파생되므로 차트가 빈 상태면 요약도 항상 null이었다(둘은 항상 같이
           있거나 같이 없다) — 구조적으로 100% 중복. 유일한 고유 정보였던 as_of는 이제
@@ -338,14 +350,68 @@ export default function TechReport() {
         )}
       </div>
 
-      {/* ── 연관 기술 (전제→대상→파생 관계도, 관계 데이터 전무 시 조용히 생략, task#277 S4) ── */}
-      {hasRelated && (
-        <div id="related" data-tech-section="related" style={{ marginBottom: 30 }}>
-          <SectionTitle>연관 기술</SectionTitle>
-          <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug} />
+
+      <Chap id="players" />
+      {/* ── 주요 업체 (표시 규율은 PlayerTable 단독 소유) ── */}
+      {hasPlayers && (
+        <div id="players" data-tech-section="players" style={{ marginBottom: 30 }}>
+          <SectionTitle>주요 업체</SectionTitle>
+          <PlayerTable players={ordered} holdings={holdings} />
         </div>
       )}
 
+
+      <Chap id="share" />
+      {/* ── 점유율 ── 게이트는 ShareChart 자신의 채택 조건(유한·음수 아님)과 같은 식이어야 한다.
+          느슨하면(예: isFinite만) 전 업체가 음수인 판에서 제목만 남고 차트가 사라진다(task#277 S2). */}
+      {hasShare && (
+        <div id="share" data-tech-section="share" style={{ marginBottom: 30 }}>
+          <SectionTitle>점유율</SectionTitle>
+          <ShareChart players={ordered} shareBasis={report.market?.share_basis} />
+        </div>
+      )}
+
+
+      <Chap id="milestones" />
+      {/* ── 진척 타임라인 (task#281 S3) ── */}
+      {hasMilestones && (
+        <div id="milestones" data-tech-section="milestones" style={{ marginBottom: 30 }}>
+          <SectionTitle>진척 타임라인</SectionTitle>
+          <MilestoneTimeline milestones={report.milestones} />
+        </div>
+      )}
+
+
+      <Chap id="challenges" />
+      {/* ── 해결해야 할 난제 ─────────────────────────────── */}
+      {hasChallenges && (
+        <div id="challenges" data-tech-section="challenges" style={{ marginBottom: 30 }}>
+          <SectionTitle>해결해야 할 난제</SectionTitle>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {challenges.map((c, i) => (
+              <Card key={i} padding="md">
+                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{c.title}</div>
+                <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{c.body}</p>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+
+      <Chap id="watch-items" />
+      {/* ── 확인할 지표 (task#298 S4) ── 난제 바로 뒤·시장 규모 앞. 난제(*지금 무엇이 안 풀렸나*)
+          → 확인할 지표(*무엇을 지켜보면 풀렸는지 아는가*)가 논리 순서다. 게이트는 WatchItems 자신의
+          채택 조건과 같은 식이어야 한다 — 느슨하면 label이 전부 빈 판에서 제목만 남는다. */}
+      {hasWatchItems && (
+        <div id="watch-items" data-tech-section="watch-items" style={{ marginBottom: 30 }}>
+          <SectionTitle>확인할 지표</SectionTitle>
+          <WatchItems watchItems={report.watch_items} />
+        </div>
+      )}
+
+
+      <Chap id="prose" />
       {/* ── 상세 설명 (산문 전문 — 첫 화면이 아니라 본문 끝, 출처 앞. task#296: <details> 접기를
           없애고 스크롤로 전문을 읽는다 — 항해는 위 전역 목차가 대신한다) ──
           가드는 description·rationale 둘 다 봐야 한다 — rationale만 있는 판에서 제목이 dangling
@@ -357,6 +423,8 @@ export default function TechReport() {
         </div>
       )}
 
+
+      <Chap id="sources" />
       {/* ── 출처 ───────────────────────────────────────────
           ⚠️ 이 컨테이너는 `alignItems`를 지정하지 않으므로 기본 **stretch**다 — 제목이 길어 여러 줄이
           된 칩(2026-08-20 m278 실측 148/114/79px)이 같은 wrap 줄에 있으면 짧은 칩도 그 줄 높이로

@@ -607,12 +607,15 @@ for (const V of VIEWS) {
         // ── 섹션 배치 순서(확정 순서) ── task#301 S2: 계보(categories) 앵커가 사라져 시퀀스에서 뺐다 —
         // 그대로 두면 앵커가 영원히 없어 order-domain이 구조적으로 항상 FAIL한다(뒤집을 축이 아니라
         // 고쳐야 할 버그였다). 부재 자체는 바로 위 section-absent-categories가 이미 단언한다.
-        const seq = ['lead', 'kpis', 'keyPoints', 'timeline', 'players', 'prose', 'sources'];
+        // ⚠️ task#319가 진척 타임라인을 ②→⑦(장 3)로 옮겼다 — 이제 **업체 뒤**다. 이 시퀀스는 그
+        //    재배열을 반영한다. 두 섹션의 *인접*은 task#281의 요구사항이 아니었다(그 계획은 두 섹션의
+        //    존재와 내용만 못박았다) — 즉 부수 단언이지 기록된 결정이 아니다(task#264 판별).
+        const seq = ['lead', 'kpis', 'keyPoints', 'players', 'timeline', 'prose', 'sources'];
         const miss = seq.filter((k) => m.order[k] < 0);
         eq(`order-domain:${tag}`, miss.length ? `ANCHOR_MISSING(${miss.join(',')})` : 'OK', 'OK', JSON.stringify(m.order));
         const idxs = seq.map((k) => m.order[k]);
         eq(`order:${tag}`, idxs.every((v, i) => i === 0 || (v > idxs[i - 1] && idxs[i - 1] >= 0)) ? 'OK' : `OUT_OF_ORDER(${JSON.stringify(m.order)})`, 'OK',
-          'lead→kpis→핵심포인트→타임라인→업체→산문→출처(task#304: 밴드 섹션 제거)');
+          'lead→kpis→핵심포인트→업체→타임라인→산문→출처(task#304: 밴드 제거 · task#319: 타임라인 ②→⑦)');
         bump('order', seq.length);
 
         // ── 핵심 포인트 내용 = 소스와 일치 ──

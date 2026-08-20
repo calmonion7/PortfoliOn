@@ -212,10 +212,15 @@ describe('주요기술 리포트 상세 (task#276 S5)', () => {
     expect(row.cells[gapColIdx].textContent).toBe('—')
   })
 
-  it('섹션 순서 — 지표·표가 산문보다 먼저 온다 (task#280 확정 순서)', async () => {
+  it('섹션 순서 — 지표·표가 산문보다 먼저 온다 (task#319 재배열 후)', async () => {
     // 이 재구성의 목적 자체를 못박는다. 개별 섹션의 존재 단언은 순서가 뒤집혀도 전부 통과하므로
-    // (판정축이 대상과 독립 — 가토 ⑧ⓘ) DOM 순서를 별도 축으로 세운다. 2/2가 핵심 포인트·
-    // 타임라인·계보를 끼워 넣을 때 이 순서를 흔들면 여기서 걸린다.
+    // (판정축이 대상과 독립 — 가토 ⑧ⓘ) DOM 순서를 별도 축으로 세운다.
+    // ⚠️ **task#319가 이 배열을 갱신했다.** 옛 값은 task#280의 순서였는데, 그 순서는 「삽입 지점
+    //    외에는 바꾸지 않는다」(수술적 변경)로만 정당화된 **상속물**이고 *이 순서가 옳다*고 논증된
+    //    적이 없다(task#264 판별 절차: 계획서의 완료기준·비목표에 이름으로 등장하지 않는 부수 단언).
+    //    task#319는 이것을 독자 질문 순서로 재배열했다 — 전체 파이(시장 규모)가 분할(점유율) 앞.
+    //    **뒤집지 않은 것**: 「지표·표가 산문보다 먼저」라는 이 테스트의 *취지*는 그대로다
+    //    (상세 설명은 여전히 본문 끝, 출처 앞 — task#280 S4·#296의 기록된 결정).
     api.get.mockImplementation((url) =>
       url === '/api/tech-reports/reusable-rocket'
         ? Promise.resolve({ data: { reports: [REPORT] } })
@@ -225,7 +230,7 @@ describe('주요기술 리포트 상세 (task#276 S5)', () => {
 
     // related가 전 분류 0건인 픽스처라 「연관 기술」은 생략된다(조용한 생략이 정상 동작).
     expect([...container.querySelectorAll('.rpt-title__text')].map((e) => e.textContent))
-      .toEqual(['주요 업체', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처'])
+      .toEqual(['시장 규모', '주요 업체', '점유율', '해결해야 할 난제', '상세 설명', '출처'])
 
     const anchors = ['tech-report-lead', 'tech-report-kpis', 'tech-report-players', 'tech-report-prose', 'tech-report-sources']
       .map((t) => screen.getByTestId(t))
@@ -313,10 +318,12 @@ describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라�
 
     // 개별 존재 단언은 순서가 뒤집혀도 전부 통과한다(판정축이 대상과 독립 — 가토 ⑧ⓘ).
     // SMR 형태라 점유율(share_pct 전무)·난제(빈)·연관 기술(빈)은 정상 생략된다.
+    // ⚠️ task#319 재배열 — 진척 타임라인이 장 3으로 내려가 **주요 업체 뒤**에 온다(옛 배열은 ②였다).
+    //    두 섹션의 *인접*은 task#281의 요구사항이 아니었다(그 계획은 두 섹션의 존재와 내용만 못박았다).
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '시장 규모', '주요 업체', '진척 타임라인', '상세 설명', '출처'])
 
-    const anchors = ['tech-report-kpis', 'tech-key-points', 'milestone-timeline', 'tech-report-players']
+    const anchors = ['tech-report-kpis', 'tech-key-points', 'tech-report-players', 'milestone-timeline']
       .map((t) => screen.getByTestId(t))
     // 4 = Node.DOCUMENT_POSITION_FOLLOWING
     anchors.slice(1).forEach((node, i) => expect(anchors[i].compareDocumentPosition(node) & 4).toBeTruthy())
@@ -329,13 +336,14 @@ describe('주요기술 리포트 상세 — 핵심 포인트·진척 타임라�
   // 라이브 두 판은 신규 키가 **아예 없고**(구 JSONB 박제), 신규 컬럼은 SQL NULL이라 `null`로 온다.
   // 배열 자리의 null에 .map/.length를 부르면 섹션이 아니라 페이지가 통째로 터지므로 두 형태를 함께 잰다.
   it.each([
+    // 기대 배열은 task#319 재배열을 반영한다(시장 규모가 주요 업체 앞).
     ['reusable-rocket 실판(키 부재)', REPORT,
-      ['주요 업체', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
+      ['시장 규모', '주요 업체', '점유율', '해결해야 할 난제', '상세 설명', '출처']],
     ['smr 실판(키 부재)', SMR_REPORT,
-      ['주요 업체', '시장 규모', '상세 설명', '출처']],
+      ['시장 규모', '주요 업체', '상세 설명', '출처']],
     ['smr 실판(신규 키가 명시적 null)',
       { ...SMR_REPORT, key_points: null, milestones: null },
-      ['주요 업체', '시장 규모', '상세 설명', '출처']],
+      ['시장 규모', '주요 업체', '상세 설명', '출처']],
   ])('구발행물 graceful — 두 섹션 부재 + 기존 섹션 무변화: %s', async (_label, rep, expected) => {
     mockReport(rep)
     const { container } = renderAt(rep.slug)
@@ -382,9 +390,9 @@ describe('주요기술 리포트 상세 — 전역 목차 (task#296 S4)', () => 
   // (목차와 본문 SectionTitle이 같은 SECTIONS 배열에서 파생하므로 어긋나면 둘 중 하나가 잘못됐다는 뜻).
   it.each([
     ['구발행물(REPORT) — 7섹션', REPORT, 'reusable-rocket',
-      ['주요 업체', '점유율', '해결해야 할 난제', '시장 규모', '상세 설명', '출처']],
+      ['시장 규모', '주요 업체', '점유율', '해결해야 할 난제', '상세 설명', '출처']],
     ['전 필드(FULL_REPORT) — 7섹션', FULL_REPORT, 'smr',
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '시장 규모', '상세 설명', '출처']],
+      ['핵심 포인트', '시장 규모', '주요 업체', '진척 타임라인', '상세 설명', '출처']],
   ])('목차 칩 수 == 렌더된 섹션 수, 라벨·순서 일치: %s', async (_label, rep, slug, expectedLabels) => {
     mockReport(rep)
     const { container } = renderAt(slug)
@@ -512,13 +520,17 @@ const WATCH_ITEMS = [
 const FULL_WITH_BOTH = { ...FULL_REPORT, variants: VARIANTS, watch_items: WATCH_ITEMS }
 
 describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => {
-  it('시장 규모 바로 앞에 삽입 — 형제 제목과의 DOM 순서 + 확정 순서 배열', async () => {
+  // ⚠️ task#319가 이 섹션을 ④→②(장 1 개요)로 옮겼다. task#298이 「점유율 바로 앞」에 둔 근거는
+  //    「계보 분류 바로 앞」이었는데 **그 계보 분류가 ADR-0041로 업체 표에 흡수돼 더 이상 별도 섹션이
+  //    아니다** — 근거가 낡았다(task#319가 명시적으로 뒤집은 1건). 여전히 참인 것은 「계열 비교가
+  //    시장 규모보다 앞」이며 아래 DOM 단언이 그것을 계속 지킨다.
+  it('계열 비교는 시장 규모보다 앞 — 형제 제목과의 DOM 순서 + 확정 순서 배열', async () => {
     mockReport(FULL_WITH_VARIANTS)
     const { container } = renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
 
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '계열 비교', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '계열 비교', '시장 규모', '주요 업체', '진척 타임라인', '상세 설명', '출처'])
 
     const variantsNode = screen.getByTestId('tech-report-variants')
     const marketNode = container.querySelector('[data-tech-section="market"]')
@@ -533,26 +545,30 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
     expect(screen.queryByTestId('tech-report-variants')).toBeNull()
     expect(titlesOf(container)).not.toContain('계열 비교')
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '시장 규모', '주요 업체', '진척 타임라인', '상세 설명', '출처'])
     expect(screen.getAllByTestId('tech-toc-chip').map((a) => a.textContent)).not.toContain('계열 비교')
   })
 
-  it('확인할 지표 — 난제 바로 뒤·시장 규모 앞에 삽입(전체 체인 순서)', async () => {
+  // ⚠️ task#319 재배열 — 시장 규모가 장 2로 올라가 이제 **확인할 지표보다 앞**이다(옛 배열에선 뒤).
+  //    task#298의 두 요구 중 **「난제 바로 뒤」는 기록된 결정으로 그대로 지킨다**(task#298: "안 풀린
+  //    관문 → 지켜볼 신호"가 논리 순서 — task#319 비목표 4에 이름으로 등장한다). 뒤집힌 것은
+  //    「시장 규모 앞」쪽이며, 그건 시장 규모의 *위치* 이동에서 파생된 결과다.
+  it('확인할 지표 — 난제 바로 뒤(인접 유지) · 시장 규모는 이제 그보다 앞(전체 체인 순서)', async () => {
     mockReport({ ...FULL_WITH_BOTH, challenges: [{ title: '난제 A', body: 'b' }] })
     const { container } = renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
 
-    // 확정 순서 — 난제 < 확인할 지표 < 시장 규모가 이 배열 안에서 함께 드러난다.
+    // 확정 순서 — 난제 < 확인할 지표 인접이 이 배열 안에서 드러나고, 시장 규모는 장 2에 있다.
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '진척 타임라인', '주요 업체', '계열 비교',
-       '해결해야 할 난제', '확인할 지표', '시장 규모', '상세 설명', '출처'])
+      ['핵심 포인트', '계열 비교', '시장 규모', '주요 업체', '진척 타임라인',
+       '해결해야 할 난제', '확인할 지표', '상세 설명', '출처'])
 
     // DOM 순서로도 못박는다(제목 배열은 텍스트라 래퍼 배치가 어긋나도 통과할 수 있다).
     const watch = screen.getByTestId('tech-report-watch-items')
     const market = container.querySelector('[data-tech-section="market"]')
     const challenges = container.querySelector('[data-tech-section="challenges"]')
-    expect(challenges.compareDocumentPosition(watch) & 4).toBeTruthy()   // 난제 → 확인할 지표
-    expect(watch.compareDocumentPosition(market) & 4).toBeTruthy()       // 확인할 지표 → 시장 규모
+    expect(challenges.compareDocumentPosition(watch) & 4).toBeTruthy()   // 난제 → 확인할 지표 (인접 유지)
+    expect(market.compareDocumentPosition(watch) & 4).toBeTruthy()       // 시장 규모 → 확인할 지표 (재배열)
   })
 
   it('watch_items가 null(구발행물)이면 섹션·제목·칩 전부 부재', async () => {
@@ -600,5 +616,123 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
     const chips = screen.getAllByTestId('tech-toc-chip')
     expect(chips.length).toBe(baseCount + 1)
     expect(chips.map((a) => a.textContent)).toContain('계열 비교')
+  })
+})
+
+// ── task#319 — 섹션 IA 재배열 + 4장 위계 ─────────────────────────────────────
+// 확정된 새 배열(계획서 「확정된 새 배열」):
+//   장 1 개요       ① 핵심 포인트 ② 계열 비교 ③ 연관 기술
+//   장 2 시장·경쟁   ④ 시장 규모   ⑤ 주요 업체 ⑥ 점유율
+//   장 3 진척·리스크 ⑦ 진척 타임라인 ⑧ 해결해야 할 난제 ⑨ 확인할 지표
+//   장 4 근거       ⑩ 상세 설명   ⑪ 출처
+const TARGET_SECTION_ORDER = ['key-points', 'variants', 'related', 'market', 'players', 'share',
+  'milestones', 'challenges', 'watch-items', 'prose', 'sources']
+const OLD_SECTION_ORDER = ['key-points', 'milestones', 'players', 'variants', 'share', 'challenges',
+  'watch-items', 'market', 'related', 'prose', 'sources']
+
+// 11섹션이 **전부** 표시되는 픽스처 — 기존 픽스처(REPORT 6섹션 · FULL_REPORT 6섹션)로는 재배열이
+// 옮기는 4건(연관 ⑨→③ · 계열 ④→② · 시장 ⑧→④ · 타임라인 ②→⑦) 중 일부만 관측된다.
+// ⚠️ 게이트는 각 컴포넌트의 채택 조건과 같은 식이므로 픽스처도 그 조건을 실제로 만족해야 한다
+//    (variants는 axis_label + options 2개 이상, watch_items는 label 존재, share는 유한 share_pct).
+const ALL_REPORT = {
+  ...FULL_REPORT,
+  players: [
+    { ...SMR_REPORT.players[0], share_pct: 40.0 },
+    { ...SMR_REPORT.players[1], share_pct: 25.0 },
+    ...SMR_REPORT.players.slice(2),
+  ],
+  challenges: [{ title: '규제 인허가', body: '비경수형 운전허가 선례가 없다.' }],
+  variants: [{
+    axis_label: '냉각 방식',
+    options: [
+      { name: '경수형', examples: ['NuScale'], strength: '규제 선례', tradeoff: '출력밀도 낮음' },
+      { name: '용융염형', examples: ['TerraPower'], strength: '고온 열공급', tradeoff: '소재 미검증' },
+    ],
+  }],
+  watch_items: [{ label: '착공 건수', detail: '연간 신규 착공', not_signal: 'MOU 체결' }],
+  related: { prerequisites: ['고순도 석영·특수소재'], derivatives: [], complements: [], competitors: [] },
+}
+// 장 3(진척 타임라인·난제·확인할 지표)이 통째로 결측인 판 — 「유령 라벨 0」을 재기 위한 대조 픽스처.
+const NO_CHAPTER3_REPORT = {
+  ...ALL_REPORT,
+  milestones: [], challenges: [], watch_items: [],
+}
+
+const sectionIdsOf = (container) =>
+  [...container.querySelectorAll('[data-tech-section]')].map((el) => el.getAttribute('data-tech-section'))
+
+describe('주요기술 리포트 상세 — 섹션 IA 재배열 (task#319 S2)', () => {
+  it('① 표시 섹션의 DOM 순서가 새 배열과 정확히 일치한다 (11섹션 전부 표시)', async () => {
+    mockReport(ALL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(sectionIdsOf(container)).toEqual(TARGET_SECTION_ORDER)
+  })
+
+  it('② 목차 칩 href 순서가 섹션 DOM 순서와 일치한다', async () => {
+    mockReport(ALL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-toc')
+    expect(screen.getAllByTestId('tech-toc-chip').map((a) => a.getAttribute('href').slice(1)))
+      .toEqual(sectionIdsOf(container))
+  })
+
+  // ③ 이빨 — 이 픽스처에서 목표 순서와 옛 순서가 실제로 다름을 못박는다. 두 배열이 같은 픽스처였다면
+  //    SECTIONS를 옛 순서로 되돌려도 위 ①이 통과한다(판정축이 대상과 독립 — 가토 ⑧ⓘ).
+  //    **실측 확인(2026-08-20, 구현 전 red-first 실행)**: ①은 옛 순서를 받아 FAIL했다.
+  //    ⚠️ 그런데 **②는 그때 통과했다** — 목차와 본문이 *둘 다* `SECTIONS`에서 파생하므로 옛 순서에서도
+  //    서로 *일치*하기 때문이다. 즉 ②는 순서의 **값**을 재는 축이 아니라 목차↔본문의 **정합**을 재는
+  //    축이고, 그래서 ①이 따로 필요하다(②만 있으면 배열을 어떻게 재배열해도 통과한다).
+  //    이 구별을 적어 두지 않으면 다음 사람이 ②를 순서 게이트로 오인한다.
+  it('③ 이빨 — 이 픽스처에서 새 배열과 옛 배열이 서로 다르다', () => {
+    expect(TARGET_SECTION_ORDER).not.toEqual(OLD_SECTION_ORDER)
+    expect(TARGET_SECTION_ORDER.slice().sort()).toEqual(OLD_SECTION_ORDER.slice().sort())
+  })
+})
+
+describe('주요기술 리포트 상세 — 4장 위계 라벨 (task#319 S3)', () => {
+  const chapterEls = (container) => [...container.querySelectorAll('[data-tech-chapter]')]
+  // 라벨의 문서상 **다음** 섹션 = 그 장의 첫 표시 섹션이어야 한다(라벨이 장 앞에 온다는 계약).
+  const followedBy = (container) => {
+    const nodes = [...container.querySelectorAll('[data-tech-section],[data-tech-chapter]')]
+    return nodes.filter((n) => n.hasAttribute('data-tech-chapter')).map((el) => {
+      for (let i = nodes.indexOf(el) + 1; i < nodes.length; i++) {
+        if (nodes[i].hasAttribute('data-tech-section')) return nodes[i].getAttribute('data-tech-section')
+      }
+      return null
+    })
+  }
+
+  it('① 4장이 모두 표시되는 판 — 라벨 4개가 각 장 첫 섹션 직전에 온다', async () => {
+    mockReport(ALL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(chapterEls(container).map((e) => e.getAttribute('data-tech-chapter')))
+      .toEqual(['overview', 'market-competition', 'progress-risk', 'evidence'])
+    expect(chapterEls(container).map((e) => e.textContent))
+      .toEqual(['개요', '시장·경쟁', '진척·리스크', '근거'])
+    expect(followedBy(container)).toEqual(['key-points', 'market', 'milestones', 'prose'])
+  })
+
+  it('② 장 3의 세 섹션이 전부 결측이면 그 장 라벨이 렌더되지 않는다 — 유령 UI 금지', async () => {
+    mockReport(NO_CHAPTER3_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(chapterEls(container).map((e) => e.getAttribute('data-tech-chapter')))
+      .toEqual(['overview', 'market-competition', 'evidence'])
+    expect(followedBy(container)).toEqual(['key-points', 'market', 'prose'])
+    expect(sectionIdsOf(container)).not.toContain('milestones')
+  })
+
+  // ③ 이빨 — 유령 가드(첫 *표시* 섹션에만 라벨)를 「장의 첫 섹션 id에 무조건 라벨」로 느슨하게 바꾸면
+  //    ②가 실패해야 한다. 실측 확인(2026-08-20): 가드를 제거해 chapterHeadAt을 show 무시로 만들면
+  //    ②의 기대 3개가 4개('progress-risk' 추가)로 나와 FAIL한다.
+  it('③ 장 라벨은 장 안에 표시 섹션이 하나라도 있을 때만 존재한다', async () => {
+    mockReport(NO_CHAPTER3_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    const keys = chapterEls(container).map((e) => e.getAttribute('data-tech-chapter'))
+    expect(keys).not.toContain('progress-risk')
+    expect(keys.length).toBe(3)
   })
 })

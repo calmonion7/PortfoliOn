@@ -106,6 +106,16 @@ const TECH_NAMES = {
 // solid-state-battery 12·12(최장 leader_name) · reusable-rocket 9·9(최장 country, tech_level 1~5 전 단계) ·
 // smr 11업체·**9분류**(부분 분류 — 분류 없는 업체가 groupByCategory 마지막 그룹으로 모인다).
 const SLUGS = ['ai-datacenter-equipment', 'solid-state-battery', 'reusable-rocket', 'smr'];
+// ── 4장 위계 계약(task#319 S3) — 어느 장에 어느 섹션이 속하는지는 *설계*이므로 여기 둔다.
+// 다만 「어느 장이 렌더돼야 하는가」는 리터럴로 박지 않고 **관측된 표시 섹션에서 유도**한다
+// (판이 달라 섹션 집합이 다르므로 리터럴은 정상 구현을 거짓 FAIL시킨다).
+const CHAPTER_DEF = [
+  { key: 'overview', label: '개요', ids: ['key-points', 'variants', 'related'] },
+  { key: 'market-competition', label: '시장·경쟁', ids: ['market', 'players', 'share'] },
+  { key: 'progress-risk', label: '진척·리스크', ids: ['milestones', 'challenges', 'watch-items'] },
+  { key: 'evidence', label: '근거', ids: ['prose', 'sources'] },
+];
+
 const bracketHeadings = (t) => (typeof t === 'string' ? t.split('\n') : []).filter((l) => /^\[[^\]]+\]$/.test(l.trim())).length;
 
 // ── 실응답 수집(GET만) ───────────────────────────────────────────────────────
@@ -187,6 +197,24 @@ const measure = (page) => page.evaluate(([ROOT_SEL]) => {
   const anchorIds = anchorEls.map((el) => el.id);
   const anchorAlsoSection = anchorEls.filter((el) => el.hasAttribute('data-tech-section')).map((el) => el.id);
 
+  // ── 4장 위계 라벨(task#319 S3) ────────────────────────────────────────────
+  // 라벨의 문서상 **다음** 섹션을 함께 잰다 — 「라벨 4개가 존재한다」만 재면 라벨이 엉뚱한 자리에
+  // 있어도 통과한다(판정축이 대상과 독립). 유령 라벨(표시 섹션 0인 장의 라벨)은 그 반대 방향의
+  // 결함이라 별도 축으로 센다.
+  const chapterEls = [...root.querySelectorAll('[data-tech-chapter]')];
+  const docNodes = [...root.querySelectorAll('[data-tech-section],[data-tech-chapter]')];
+  const chapters = chapterEls.map((el) => {
+    let next = null;
+    for (let i = docNodes.indexOf(el) + 1; i < docNodes.length; i++) {
+      if (docNodes[i].hasAttribute('data-tech-section')) { next = docNodes[i].getAttribute('data-tech-section'); break; }
+    }
+    const cs = getComputedStyle(el);
+    return {
+      key: el.getAttribute('data-tech-chapter'), text: txt(el), next,
+      borderTopWidth: cs.borderTopWidth, color: cs.color, fontSize: cs.fontSize,
+    };
+  });
+
   // ── 산문 — h3 기반(post) vs details 기반(pre) 둘 다 잰다 ──
   const proseEl = root.querySelector('[data-testid="tech-report-prose"]');
   const proseDetails = proseEl ? proseEl.querySelectorAll('details').length : 0;
@@ -250,7 +278,7 @@ const measure = (page) => page.evaluate(([ROOT_SEL]) => {
     found: true,
     h1Text: h1 ? txt(h1) : null, leadText: leadEl ? txt(leadEl) : null,
     mastheadH,
-    tocFound: !!tocEl, chips, sectionInfo, allDtsIds, anchorIds, anchorAlsoSection,
+    tocFound: !!tocEl, chips, sectionInfo, allDtsIds, anchorIds, anchorAlsoSection, chapters,
     proseFound: !!proseEl, proseDetails, proseSummaries, proseH3Count: h3s.length,
     proseSubAnchors, h3Visible, proseParaCount: proseParas.length, proseParasVisible,
     proseAllText: proseEl ? proseEl.textContent : '',
@@ -338,6 +366,37 @@ for (const V of VIEWS) {
       eq(`masthead:${tag}`, V.pc ? (m.mastheadH > 0 ? 'PC_VISIBLE' : `PC_HIDDEN(${m.mastheadH})`) : (m.mastheadH === 0 ? 'MOBILE_HIDDEN' : `MOBILE_VISIBLE(${m.mastheadH})`),
         V.pc ? 'PC_VISIBLE' : 'MOBILE_HIDDEN', `실측 h=${m.mastheadH}px`);
       bump('masthead');
+
+      // ══ ⓐ' 4장 위계 라벨(task#319 S3) — 신규 표면 ═══════════════════════════════════════
+      // ⚠️ 이 배터리는 **최상위(무조건)** 에 둔다. 아래 목차 배터리는 `if (m.tocFound)` 안인데,
+      //    장 라벨은 목차 존재와 무관하므로 그 안에 넣으면 목차가 없는 판에서 조용히 미검증이 된다
+      //    (task#317: 축을 블록 안에 넣기 전에 그 블록의 진입 조건을 읽을 것 — 그 조건이 이 축의
+      //    정의역과 다르면 축이 침묵한다).
+      {
+        const obsIds = m.sectionInfo.map((s) => s.dataAttr);
+        const expChapters = CHAPTER_DEF.filter((c) => c.ids.some((id) => obsIds.includes(id)));
+        eq(`chapter-domain:${tag}`, m.chapters.length > 0 ? 'PRESENT' : 'CHAPTERS_MISSING(신규 기능 — 배포 전 정상 RED)', 'PRESENT',
+          `표시 섹션 ${obsIds.length}개 → 기대 장 ${expChapters.length}개`);
+        bump('chapter');
+        // 라벨 4개 존재 + 장 순서
+        eq(`chapter-labels:${tag}`, m.chapters.map((c) => c.text), expChapters.map((c) => c.label),
+          '표시 섹션이 1개 이상인 장의 라벨만, 장 순서대로');
+        eq(`chapter-order:${tag}`, m.chapters.map((c) => c.key), expChapters.map((c) => c.key), '라벨 DOM 순서 == 장 순서');
+        bump('chapter-order', m.chapters.length);
+        // 라벨이 그 장의 **첫 표시 섹션 직전**에 오는가 — 「존재한다」만 재면 엉뚱한 자리도 통과한다
+        eq(`chapter-position:${tag}`, m.chapters.map((c) => c.next),
+          expChapters.map((c) => c.ids.filter((id) => obsIds.includes(id))[0]),
+          '각 라벨의 문서상 다음 섹션 = 그 장의 첫 표시 섹션');
+        bump('chapter-position', m.chapters.length);
+        // 유령 라벨 0 — 표시 섹션이 0인 장의 라벨은 렌더되지 않아야 한다
+        eq(`chapter-no-ghost:${tag}`, m.chapters.filter((c) => !expChapters.some((e) => e.key === c.key)).map((c) => c.key), [],
+          `표시 섹션 0인 장의 라벨(기대 장 ${JSON.stringify(expChapters.map((c) => c.key))})`);
+        bump('chapter-ghost');
+        // 시각 — 얇은 구분선 + --text-3. 라벨이 SectionTitle 격으로 커지면 위계가 뒤집힌다.
+        eq(`chapter-divider:${tag}`, [...new Set(m.chapters.map((c) => c.borderTopWidth))], m.chapters.length ? ['1px'] : [],
+          `상단 구분선 1px (got=${JSON.stringify(m.chapters.map((c) => c.borderTopWidth))})`);
+        bump('chapter-style', m.chapters.length);
+      }
 
       // ══ ⓐ 전역 목차 — 신규 표면. 배포 전엔 존재 자체가 없어 그 사실이 RED다 ══════════════════
       eq(`toc-domain:${tag}`, m.tocFound ? 'PRESENT' : 'TOC_MISSING(신규 기능 — 배포 전 정상 RED)', 'PRESENT');

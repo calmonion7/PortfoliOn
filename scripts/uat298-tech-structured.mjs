@@ -519,7 +519,12 @@ for (const V of VIEWS) {
       bump('order');
       if (wantWatchLay.items.length > 0) {
         const iWi = idxOf('watch-items'), iMkt = idxOf('market'), iChal = idxOf('challenges');
-        eq(`section-order-watchitems-before-market:${tag}`, (iWi !== -1 && iMkt !== -1 && iWi < iMkt) ? 'OK' : `watch-items@${iWi} market@${iMkt}`, 'OK');
+        // ⚠️ **task#319가 이 축을 뒤집었다** — 시장 규모가 ⑧→④(장 2)로 올라가 이제 확인할 지표보다
+        //    **앞**이다. task#298의 두 요구 중 「난제 바로 뒤」는 기록된 결정이라 아래에서 그대로 지키고
+        //    (task#298: "안 풀린 관문 → 지켜볼 신호"가 논리 순서 · task#319 비목표 4에 이름으로 등장),
+        //    뒤집힌 것은 「시장 규모 앞」쪽뿐이다 — 그건 시장 규모의 *위치* 이동에서 파생된 결과다.
+        //    축을 버리지 않고 방향을 뒤집어 남긴다(없는 축은 다음 사람이 존재를 모른다).
+        eq(`section-order-market-before-watchitems:${tag}`, (iWi !== -1 && iMkt !== -1 && iMkt < iWi) ? 'OK' : `market@${iMkt} watch-items@${iWi}`, 'OK');
         bump('order');
         if (iChal !== -1) {
           eq(`section-order-watchitems-after-challenges:${tag}`, (iWi !== -1 && iChal < iWi) ? 'OK' : `challenges@${iChal} watch-items@${iWi}`, 'OK');
