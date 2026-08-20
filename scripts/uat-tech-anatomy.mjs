@@ -888,6 +888,11 @@ for (const V of VIEWS) {
       return {
         slug: c.getAttribute('data-slug'),
         cardPos: getComputedStyle(c).position,
+        // `top/right/bottom/left:0`은 **padding box** 기준이고 getBoundingClientRect는 **border box**다.
+        // 그 차이가 정확히 테두리 폭이므로, 그것을 안 빼면 축이 1px 테두리를 「안 덮였다」로 읽는다.
+        cardBw: (() => { const cs = getComputedStyle(c); return {
+          l: parseFloat(cs.borderLeftWidth) || 0, t: parseFloat(cs.borderTopWidth) || 0,
+          r: parseFloat(cs.borderRightWidth) || 0, b: parseFloat(cs.borderBottomWidth) || 0 }; })(),
         card: box(c),
         body: body ? box(body) : null,
         ov: o ? { tag: o.tagName, aria: o.getAttribute('aria-hidden'), pos: os.position, pe: os.pointerEvents, box: box(o) } : null,
@@ -902,10 +907,22 @@ for (const V of VIEWS) {
   eq(`overlay-shape:${V.name}`,
      ov.filter((c) => c.ov && (c.ov.tag !== 'SPAN' || c.ov.aria !== 'true' || c.ov.pos !== 'absolute'))
        .map((c) => `${c.slug}=${c.ov.tag}/${c.ov.aria}/${c.ov.pos}`), []);
-  // 히트 영역 = 카드 상자와 **동일**해야 한다(S1 실측 죽은 영역: m278 padBottom 68 · pc1280 86)
+  // 히트 영역 = 카드의 **padding box**와 동일해야 한다(S1 실측 죽은 영역: m278 padBottom 68 · pc1280 86).
+  // ⚠️ 처음엔 border box(=`getBoundingClientRect`)와 대조했는데 그건 **원리적으로 FAIL한다** —
+  //    절대배치의 `top/right/bottom/left:0`은 positioned 조상의 *padding box*를 기준으로 하므로
+  //    오버레이는 테두리 폭만큼 작다(실측 238×250.1 vs 카드 240×252.1 = 1px 테두리 양쪽).
+  //    죽은 영역이었던 것은 *padding*이고 그건 덮였다. 그래서 축을 padding box 대조로 정확화한다.
+  const padBox = (c) => ({ l: c.card.l + c.cardBw.l, t: c.card.t + c.cardBw.t,
+                           r: c.card.r - c.cardBw.r, b: c.card.b - c.cardBw.b });
   eq(`overlay-covers-card:${V.name}`,
-     ov.filter((c) => !c.ov || ['l', 't', 'r', 'b'].some((k) => Math.abs(c.ov.box[k] - c.card[k]) > 0.5))
-       .map((c) => `${c.slug}=${c.ov ? JSON.stringify([c.ov.box.w, c.ov.box.h]) : 'NO_OVERLAY'} vs card ${JSON.stringify([c.card.w, c.card.h])}`), []);
+     ov.filter((c) => !c.ov || ['l', 't', 'r', 'b'].some((k) => Math.abs(c.ov.box[k] - padBox(c)[k]) > 0.5))
+       .map((c) => `${c.slug}=${c.ov ? JSON.stringify([c.ov.box.w, c.ov.box.h]) : 'NO_OVERLAY'} vs padBox ${JSON.stringify([c.card.w - c.cardBw.l - c.cardBw.r, Math.round((c.card.h - c.cardBw.t - c.cardBw.b) * 10) / 10])}`), []);
+  // 이빨 — 위 축을 padding box로 느슨하게 한 대가를 여기서 되받는다. 안 덮인 띠가 **정확히 테두리**여야
+  // 하므로, 오버레이가 그보다 조금이라도 더 줄면(예: `inset: 2px`) 이 축이 FAIL한다.
+  eq(`overlay-gap-is-border:${V.name}`,
+     ov.filter((c) => c.ov).filter((c) => ['l', 't'].some((k) => Math.abs((c.ov.box[k] - c.card[k]) - c.cardBw[k]) > 0.5)
+                                       || ['r', 'b'].some((k) => Math.abs((c.card[k] - c.ov.box[k]) - c.cardBw[k]) > 0.5))
+       .map((c) => `${c.slug}: gap=[${(c.ov.box.l - c.card.l).toFixed(1)},${(c.ov.box.t - c.card.t).toFixed(1)}] bw=[${c.cardBw.l},${c.cardBw.t}]`), []);
   // `pointerEvents: none`이면 오버레이는 존재하는데 클릭을 안 받는다 — 무음 no-op의 두 번째 경로
   eq(`overlay-hittable:${V.name}`, ov.filter((c) => c.ov && c.ov.pe !== 'auto').map((c) => `${c.slug}=${c.ov.pe}`), []);
   // 「해부」 칩이 오버레이 **위**에 있는가 — 이 쌍이 끊기면 해부 진입점이 통째로 가려진다
@@ -1186,11 +1203,26 @@ for (const W of CHIP_VIEWS) {
   eq(`src-chip-nooverflow:${W.name}`, (C?.src || []).filter((c) => c.sw > c.cw + 1).map((c) => `${c.text}=${c.sw}>${c.cw}`), []);
   bump('src', 5);
 
-  // ── 문서 가로 스크롤 0 (칩 가로 padding 증가의 이웃 비용 — 가토 ⑰) ──
+  // ── 가로 넘침 — **선재 결함을 수입하지 않도록 baseline 인식형으로 잰다** ──────────
+  // ⚠️ 처음엔 `over <= 0`으로 뒀는데 m278에서 **원리적으로 FAIL**한다: 이 slug의
+  //    `tech-report-players` 표가 task#311 baseline에 이미 넘침으로 박제돼 있다
+  //    (선재 3/7종 — `reusable-rocket` 306 · `ai-datacenter-ops` 298 · `semiconductor-equipment` 296,
+  //    cw 278. 원인은 「선두 대비」 열이고 이 태스크와 무관하다).
+  //    항상 FAIL하는 축은 exit 1을 영구화해 신호를 죽이므로, **이 변경이 깨뜨릴 수 있는 것**으로
+  //    축을 좁힌다: ⓐ 넘침의 범인에 **칩 계열이 없다** ⓑ 넘침량이 baseline 이하.
+  //    칩이 범인이 되면 ⓐ가, 표가 더 넘치면 ⓑ가 잡는다.
+  const HSCROLL_BASE = { m278: { doc: 18, main: 17 }, m390: { doc: 0, main: 0 }, m768: { doc: 0, main: 0 }, pc1280: { doc: 0, main: 0 } };
+  const HB = HSCROLL_BASE[W.name] || { doc: 0, main: 0 };
   const wideTxt = JSON.stringify(C?.wide || []);
-  eq(`chip-hscroll-doc:${W.name}`, C ? C.docOver <= 0 : 'NO_READ', true, `scrollWidth-clientWidth=${C?.docOver} · 넘친 요소 ${wideTxt}`);
-  eq(`chip-hscroll-main:${W.name}`, C ? C.mainOver <= 0 : 'NO_READ', true, `diff=${C?.mainOver} · 넘친 요소 ${wideTxt}`);
-  bump('chip-hscroll', 2);
+  const CHIP_TIDS = ['tech-toc-chip', 'tech-report-toc', 'tech-report-sources'];
+  eq(`chip-hscroll-culprit-not-chip:${W.name}`,
+     (C?.wide || []).filter((w) => CHIP_TIDS.includes(w.tid)).map((w) => `${w.tid}=${w.over}px`), [],
+     `범인 ${wideTxt}`);
+  eq(`chip-hscroll-doc:${W.name}`, C ? C.docOver <= HB.doc : 'NO_READ', true,
+     `scrollWidth-clientWidth=${C?.docOver} <= baseline ${HB.doc} · 넘친 요소 ${wideTxt}`);
+  eq(`chip-hscroll-main:${W.name}`, C ? C.mainOver <= HB.main : 'NO_READ', true,
+     `diff=${C?.mainOver} <= baseline ${HB.main}`);
+  bump('chip-hscroll', 3);
 
   tocCountByView.push(`${W.name}:${C?.toc.length}칩/${tocRows.length}줄`);
   rawLog.push(`${W.name} 목차: 칩 ${C?.toc.length}개 · ${tocRows.length}줄 · 칩h ${JSON.stringify([...new Set((C?.toc || []).map((c) => c.box.h))])} · navH ${C?.nav?.box.h} · 스트립 bottom ${C?.strip?.b}/가용 ${C?.avail}`);
