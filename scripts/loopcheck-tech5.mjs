@@ -88,13 +88,31 @@ if (want('C1')) {
 }
 
 // ── C2. 백엔드 회귀 ──────────────────────────────────────────────────────────
+// ⚠️ 부수효과 축은 **스위트 실행 전/후 비교**다(clean tree 요구가 아니다).
+//    처음엔 `git status`가 비어 있기를 요구했는데, 그러면 *작업 중인 의도적 편집*을
+//    「스위트가 파일을 건드렸다」로 오판한다(task#314 실행 중 실제로 오판했다).
+//    이 축이 잡으려는 것은 task#231·#234의 「전체 스위트가 tracked 파일을 수정한다」이고,
+//    그건 정의상 실행 전후의 **차이**이므로 그렇게 잰다. 게이트는 약해지지 않는다 —
+//    스위트가 무언가를 건드리면 전후가 달라져 여전히 FAIL이다.
 if (want('C2')) {
+  // ⚠️ 위 전후 비교엔 구멍이 하나 있다 — **이미 수정된 파일**을 스위트가 추가로 건드리면
+  //    porcelain 줄(` M path`)이 동일해서 안 잡힌다. 실제 위험 대상(task#234의 티커 JSON)은
+  //    md5로 따로 못박아 그 구멍을 닫는다.
+  const RISK = ['backend/data/sp500_tickers.json', 'backend/data/kospi_tickers.json']
+  const hashes = () => RISK.map((f) => shSoft(`md5 -q ${f} 2>/dev/null || echo MISSING`, { shell: '/bin/bash' }).trim())
+  const snap = () => shSoft("git status --porcelain | grep -v '^??' | sort || true", { shell: '/bin/bash' }).trim()
+  const before = snap(), h0 = hashes()
   const out = shSoft('.venv/bin/python -m pytest -q 2>&1 | tail -4', { cwd: `${ROOT}/backend`, shell: '/bin/bash' })
+  const after = snap(), h1 = hashes()
+  const riskChanged = RISK.filter((f, i) => h0[i] !== h1[i])
   const p = out.match(/(\d+) passed/), f = out.match(/(\d+) failed/), e = out.match(/(\d+) error/)
   const passed = p ? +p[1] : -1, failed = f ? +f[1] : 0, errors = e ? +e[1] : 0
-  const dirty = shSoft("git status --porcelain | grep -v '^??' || true", { shell: '/bin/bash' }).trim()
-  rec('C2', passed >= PYTEST_FLOOR && failed === 0 && errors === 0 && dirty === '',
-    `passed=${passed}(하한 ${PYTEST_FLOOR}) failed=${failed} errors=${errors} · 부수효과 ${dirty ? dirty.split('\n').length + '건: ' + dirty.split('\n').slice(0, 3).join(' | ') : '0'}`)
+  const bl = new Set(before.split('\n').filter(Boolean))
+  const touched = after.split('\n').filter(Boolean).filter((l) => !bl.has(l))
+  rec('C2', passed >= PYTEST_FLOOR && failed === 0 && errors === 0 && touched.length === 0 && riskChanged.length === 0,
+    `passed=${passed}(하한 ${PYTEST_FLOOR}) failed=${failed} errors=${errors} · ` +
+    `스위트가 새로 건드린 tracked 파일 ${touched.length}건${touched.length ? ': ' + touched.slice(0, 3).join(' | ') : ''} ` +
+    `(실행 전 이미 편집 중이던 파일 ${bl.size}건은 제외) · 티커 JSON md5 ${riskChanged.length ? '❌ 변경 ' + riskChanged.join(',') : '전후 동일'}`)
 }
 
 // ── C3. 프론트 회귀 ──────────────────────────────────────────────────────────

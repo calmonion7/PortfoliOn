@@ -96,6 +96,16 @@ const weight = (r) => AXIS_KEYS.reduce((s, k) => s + (r.composition[k] || []).le
 const TARGET = [...WITH].sort((a, b) => weight(b) - weight(a) || a.slug.localeCompare(b.slug))[0];
 const TARGET_AXES = AXIS_KEYS.filter((k) => (TARGET.composition[k] || []).length > 0);
 
+// ── 광물 축 producers 대상 (task#314) ────────────────────────────────────────
+// TARGET은 *항목 수* 최대인 판이라 producers가 0개일 수 있고(실측: semiconductor-equipment는
+// 17항목·producers 0), 그러면 아래 chip 축이 producer 칩을 **한 번도 만나지 않고 통과**한다
+// (⑧ⓐ 정의역 sentinel). 그래서 producers가 가장 많은 판을 **따로** 잡아 그 경로를 밟는다.
+const prodCount = (r) => (r.composition?.minerals || []).reduce((n, m) => n + (m.producers || []).length, 0);
+const PROD_TARGET = [...WITH].sort((a, b) => prodCount(b) - prodCount(a) || a.slug.localeCompare(b.slug))[0];
+const PROD_API = (PROD_TARGET.composition?.minerals || []).flatMap((m) => (m.producers || []));
+const PROD_BASIS = PROD_TARGET.composition?.minerals_share_basis ?? null;
+rawLog.push(`producers 대상=${PROD_TARGET.slug}(칩 ${PROD_API.length}개 · %표기 ${PROD_API.filter((p) => p.share_pct != null).length}개) · basis=${PROD_BASIS ? '있음' : 'null'}`);
+
 const API_COUNTS = {};
 for (const k of TARGET_AXES) API_COUNTS[k] = TARGET.composition[k].length;
 rawLog.push(`해부 보유 ${WITH.length}종 / 발행물 ${REPORTS.length}종 · DOM 대상=${TARGET.slug}(항목 ${weight(TARGET)}개)`);
@@ -278,6 +288,66 @@ for (const V of VIEWS) {
   bump('pill', 4);
 
   await page.screenshot({ path: `${OUT}/${V.name}-anatomy.png`, fullPage: true });
+
+  // ══ ⓙ 광물 축 producers 칩 (task#314) — 이 화면 경로는 라이브에서 처음 렌더된다 ══
+  // `anatomy-minerals-basis`는 `minerals_share_basis`가 있을 때만 렌더되므로, 채우기 전에는
+  // 그 요소가 DOM에 아예 없었다. 즉 이 축은 「통과」가 아니라 「처음 도달」이다.
+  if (PROD_API.length > 0) {
+    await page.goto(`${BASE}/tech-anatomy/${PROD_TARGET.slug}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-testid="tech-anatomy"]', { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(700);
+    const pr = await page.evaluate(() => {
+      const root = document.querySelector('[data-testid="tech-anatomy"]');
+      if (!root) return null;
+      const chips = [...root.querySelectorAll('[data-testid="anatomy-producer-chip"]')].map((e) => {
+        const lv = e.querySelector('.tech-anatomy__chip-lv');
+        return {
+          text: e.textContent.trim(),
+          pct: lv ? lv.textContent.trim() : null,
+          lines: window.__lines(e),
+          sw: e.scrollWidth, cw: e.clientWidth,
+        };
+      });
+      const mb = root.querySelector('[data-testid="anatomy-minerals-basis"]');
+      const wrap = root.querySelector('[data-testid="anatomy-producer-chips"]');
+      return {
+        chips,
+        basisText: mb ? mb.textContent.trim() : null,
+        parentDisplay: wrap ? getComputedStyle(wrap).display : null,
+        docSw: document.documentElement.scrollWidth, docCw: document.documentElement.clientWidth,
+      };
+    });
+    // 정의역 sentinel — DOM 칩 수가 API 수와 같아야 「검사했다」가 성립한다
+    eq(`prod-domain:${V.name}`, pr ? pr.chips.length : -1, PROD_API.length,
+       `${PROD_TARGET.slug} · API ${PROD_API.length}개`);
+    // 부모가 flex여야 clientWidth가 유효하다(task#309 — block이면 넘침 축이 원리적으로 무의미)
+    eq(`prod-parent-flex:${V.name}`, pr?.parentDisplay ?? 'MISSING', 'flex');
+    // 「이름(국가)」 패턴 — 국가 괄호가 없는 칩은 위반
+    eq(`prod-name-country:${V.name}`,
+       (pr?.chips || []).filter((c) => !/\([A-Z]{2}\)/.test(c.text)).map((c) => c.text), []);
+    // %표기 — 있는 칩/없는 칩을 **둘 다** 센다(한쪽만 재면 판별력이 없다)
+    eq(`prod-pct-count:${V.name}`, (pr?.chips || []).filter((c) => c.pct).length,
+       PROD_API.filter((p) => p.share_pct != null).length);
+    eq(`prod-nopct-count:${V.name}`, (pr?.chips || []).filter((c) => !c.pct).length,
+       PROD_API.filter((p) => p.share_pct == null).length);
+    eq(`prod-pct-format:${V.name}`,
+       (pr?.chips || []).filter((c) => c.pct && !/^\d+(\.\d)?%$/.test(c.pct)).map((c) => c.pct), []);
+    // basis — share_pct가 하나라도 있으면 이 문구가 실재해야 한다(스키마가 요구하는 그 짝)
+    eq(`prod-basis-present:${V.name}`, !!pr?.basisText, PROD_BASIS != null,
+       `basis=${JSON.stringify((pr?.basisText || '').slice(0, 40))}`);
+    eq(`prod-basis-text:${V.name}`,
+       PROD_BASIS ? (pr?.basisText || '').includes(PROD_BASIS) : 'NO_BASIS', PROD_BASIS ? true : 'NO_BASIS');
+    // 한 칩이 한 덩어리로 유지되는가 + 문서 넘침 0
+    eq(`prod-chip-1line:${V.name}`, (pr?.chips || []).filter((c) => c.lines !== 1).map((c) => `${c.text}=${c.lines}줄`), []);
+    eq(`prod-no-hscroll:${V.name}`, pr ? pr.docSw <= pr.docCw : 'NO_ROOT', true, `${pr?.docSw} <= ${pr?.docCw}`);
+    bump('producer', 9);
+    rawLog.push(`${V.name} producers 칩 ${pr?.chips.length}개(%표기 ${(pr?.chips || []).filter((c) => c.pct).length}) · ${PROD_TARGET.slug}`);
+    await page.screenshot({ path: `${OUT}/${V.name}-producers.png`, fullPage: true });
+  } else {
+    eq(`prod-domain:${V.name}`, 'NO_PRODUCERS_IN_LIVE', 'OK',
+       '⚠️ 라이브에 producers가 0개다 — 이 축은 통과가 아니라 미검증이다');
+    bump('producer');
+  }
 
   // ══ ⓖ 대조군 — **page.route 주입**으로 합성한다 ══════════════════════════
   // 옛 판은 "composition이 없는 실제 slug"을 대조군으로 썼다. 그 설계는 백필이 끝나 빈 slug이
