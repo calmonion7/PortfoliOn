@@ -17,6 +17,9 @@ import fs from 'fs';
 const BASE = 'https://portfolion.taebro.com';
 const OUT = '/Users/calmonion/Project/PortfoliOn/screenshots-tech-exposure';
 fs.mkdirSync(OUT, { recursive: true });
+// task#323 육안 증거 전용 디렉터리(완료기준이 경로를 명시한다)
+const OUT323 = '/Users/calmonion/Project/PortfoliOn/screenshots-uat323';
+fs.mkdirSync(OUT323, { recursive: true });
 
 const results = [];
 const cov = {};
@@ -79,6 +82,40 @@ eq('domain-chip', chipTicker ? 'OK' : 'DOMAIN_TOO_SMALL(칩 대상 종목 없음
 bump('domain');
 rawLog.push(`칩 대상 종목=${chipTicker} → 기술 [${chipTechs.join(', ')}]`);
 
+// ══ task#323 — 「안 가진 업체」 후보 칩의 기대치를 **API에서 독립 재계산** ══════════
+// 화면 숫자를 화면에서 읽어 자기 자신과 비교하면 아무것도 검증하지 않는다(가토 ④).
+// 프론트 computeTechCandidates와 같은 규칙을 여기서 다시 구현해 대조한다.
+const MAX_CHIPS = 3;
+const expCand = new Map();
+for (const t of INDEX) {
+  const row = rows.find((r) => r.slug === t.slug);
+  if (!row || row.weight <= 0) continue;           // 노출 0 기술은 후보를 내지 않는다
+  const pool = (t.listed || []).filter((p) => p.ticker && !wBy.has(p.ticker) && !watchSet.has(p.ticker));
+  pool.sort((a, b) => {
+    const ga = a.gap_years ?? Number.MAX_SAFE_INTEGER;
+    const gb = b.gap_years ?? Number.MAX_SAFE_INTEGER;
+    return (b.tech_level || 0) - (a.tech_level || 0) || ga - gb
+      // 로케일 명시 — 인자 없으면 Node와 Chrome이 갈려 이 기대치가 라이브와 어긋난다(실측).
+      || String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+  });
+  if (!pool.length) continue;
+  expCand.set(t.slug, {
+    chips: pool.slice(0, MAX_CHIPS).map((p) => p.ticker),
+    names: pool.slice(0, MAX_CHIPS).map((p) => p.name),
+    more: Math.max(pool.length - MAX_CHIPS, 0),
+    total: pool.length,
+  });
+}
+// ⚠️ 정의역 sentinel — 후보가 0이면 아래 축 전부가 **공허하게 통과**한다(가토 ⓩ).
+//    이 계정의 보유 구성에 종속되므로 표본 부재를 FAIL로 만든다.
+eq('domain-cand', expCand.size >= 1 ? 'OK' : 'DOMAIN_TOO_SMALL(후보 있는 노출 기술 0종)', 'OK');
+eq('domain-cand-more', [...expCand.values()].some((v) => v.more > 0) ? 'OK'
+   : 'DOMAIN_TOO_SMALL(+N 배지 표본 없음)', 'OK');
+eq('domain-cand-kr', [...expCand.values()].some((v) => v.chips.some((t) => /^\d{6}$/.test(t))) ? 'OK'
+   : 'DOMAIN_TOO_SMALL(KR 6자리 칩 표본 없음)', 'OK');
+bump('domain', 3);
+rawLog.push(`후보 기대 — ${[...expCand.entries()].map(([k, v]) => `${k}:${v.chips.length}칩+${v.more}`).join(' · ')}`);
+
 const VIEWS = [
   { name: 'm278', opts: { ...devices['iPhone SE'], viewport: { width: 278, height: 800 }, isMobile: true, hasTouch: true } },
   { name: 'm768', opts: { viewport: { width: 768, height: 1000 } } },
@@ -130,11 +167,10 @@ for (const V of VIEWS) {
   const card = await page.evaluate(() => {
     const c = document.querySelector('[data-testid="tech-exposure-card"]');
     if (!c) return null;
-    // WeightBar 한 줄 = label span + 값 span
-    const bars = [...c.querySelectorAll('div')].filter(d => {
-      const inner = d.querySelector(':scope > div');
-      return inner && /%$/.test((d.querySelector('span:last-child')?.textContent || '').trim());
-    });
+    // 막대는 **전용 testid**로 센다(task#323). 옛 구조 휴리스틱(「자식 div + % span」)은
+    // 후보 칩 래퍼가 생기면서 기술당 2개를 세어 거짓 FAIL을 냈다 — 앱은 정상이었고
+    // 셀렉터가 DOM 구조에 결합돼 있던 것이 원인이다. testid는 그 결합을 끊는다.
+    const bars = [...c.querySelectorAll('[data-testid="tech-exposure-bar"]')];
     const labels = [...c.querySelectorAll('span')].map(s => s.textContent.trim());
     return {
       text: c.textContent,
@@ -144,12 +180,15 @@ for (const V of VIEWS) {
       unmatched: (c.querySelector('[data-testid="tech-exposure-unmatched"]')?.textContent || '').trim(),
       empty: !!c.querySelector('[data-testid="tech-exposure-empty"]'),
       barCount: bars.length,
+      barSlugs: bars.map((b) => b.getAttribute('data-slug')),
       labels,
     };
   });
   eq(`card-domain:${V.name}`, card ? 'OK' : 'DOMAIN_TOO_SMALL(카드 없음)', 'OK');
   eq(`bar-count:${V.name}`, card?.barCount, exposed.length, `노출>0 ${exposed.length}종`);
-  bump('bar', 2);
+  // 개수만 세면 「어느 기술의 막대인가」를 모른다 — slug 순서까지 못박는다(노출% 내림차순).
+  eq(`bar-slugs:${V.name}`, card?.barSlugs, exposed.map((r) => r.slug));
+  bump('bar', 3);
 
   // 각 기술 이름이 실제로 카드에 있는가(커버리지 — 이름 하나라도 누락되면 렌더가 빠뜨린 것)
   for (const r of exposed) {
@@ -204,7 +243,97 @@ for (const V of VIEWS) {
   eq(`clip-box:${V.name}`, clip?.box || null, []);
   bump('clip', 3);
 
+  // ══ task#323 후보 칩 — 노출>0 기술마다 최대 3칩 + 「+N」 ═════════════════════
+  const cand = await page.evaluate(() => {
+    const c = document.querySelector('[data-testid="tech-exposure-card"]');
+    if (!c) return null;
+    const rows = [...c.querySelectorAll('[data-testid="tech-cand-row"]')].map((r) => {
+      const chips = [...r.querySelectorAll('[data-testid="tech-cand-chip"]')].map((b) => {
+        const bb = b.getBoundingClientRect();
+        return {
+          ticker: b.getAttribute('data-ticker'),
+          market: b.getAttribute('data-market'),
+          text: (b.textContent || '').trim(),
+          h: Math.round(bb.height * 10) / 10,
+          w: Math.round(bb.width * 10) / 10,
+          // 넘침 — 칩은 flex 자식이라 clientWidth가 유효하다(frontend/CLAUDE.md 경계 정정)
+          over: b.scrollWidth - b.clientWidth,
+          // 가격 방향 토큰을 쓰지 않았는가(KR 색 관례)
+          priceToken: /--up|--down/.test(b.outerHTML),
+        };
+      });
+      const more = r.querySelector('[data-testid="tech-cand-more"]');
+      return { slug: r.getAttribute('data-slug'), chips, more: more ? (more.textContent || '').trim() : null,
+               label: !!r.querySelector('[data-testid="tech-cand-label"]') };
+    });
+    return { rows, cardRight: Math.round(c.getBoundingClientRect().right) };
+  });
+
+  // 어느 기술에 칩 구역이 붙었는가 — 노출>0 & 후보>0인 기술과 **정확히** 일치해야 한다.
+  eq(`cand-rows:${V.name}`, (cand?.rows || []).map((r) => r.slug).sort(), [...expCand.keys()].sort());
+  bump('cand');
+
+  // 기술별 칩 티커·「+N」이 API 파생 기대와 일치하는가(귀속 + 정렬 + 상한을 한 번에 잰다)
+  for (const [slug, exp] of expCand) {
+    const got = (cand?.rows || []).find((r) => r.slug === slug);
+    eq(`cand-chips:${V.name}:${slug}`, got ? got.chips.map((c) => c.ticker) : null, exp.chips,
+       `총 후보 ${exp.total}종`);
+    eq(`cand-more:${V.name}:${slug}`, got ? got.more : null, exp.more > 0 ? `+${exp.more}` : null);
+    bump('cand', 2);
+  }
+
+  const allChips = (cand?.rows || []).flatMap((r) => r.chips);
+  // ⚠️ 아래 3축은 `filter(위반).length === 0` 형태라 **표본 0에서 공허하게 참**이다(가토 ⓩ).
+  //    그래서 술어에 정의역을 함께 넣는다 — 「위반 0건 AND 관측 > 0」.
+  const domOK = allChips.length > 0;
+  eq(`cand-tap:${V.name}`, domOK && allChips.filter((c) => c.h < 32).length === 0, true,
+     `표본 ${allChips.length} · 최소높이 ${Math.min(...allChips.map((c) => c.h), Infinity)}`);
+  eq(`cand-no-overflow:${V.name}`, domOK && allChips.filter((c) => c.over > 1).length === 0, true,
+     `표본 ${allChips.length} · 최대넘침 ${Math.max(...allChips.map((c) => c.over), -1)}`);
+  eq(`cand-no-price-token:${V.name}`, domOK && allChips.filter((c) => c.priceToken).length === 0, true,
+     `표본 ${allChips.length}`);
+  bump('cand', 3);
+
+  // 시장 추론이 티커 형태와 일치하는가(6자리=KR / 그 외=US) — country가 아니라 형태가 규칙이다.
+  const mkBad = allChips.filter((c) => c.market !== (/^\d{6}$/.test(c.ticker) ? 'KR' : 'US'));
+  eq(`cand-market:${V.name}`, domOK && mkBad.length === 0, true,
+     `표본 ${allChips.length} · 불일치 ${mkBad.map((c) => `${c.ticker}=${c.market}`).join(',')}`);
+  bump('cand');
+
+  // 메타줄 — `tech_level`이 있는 업체는 칩 본문에 `Lv<n>`이 실재해야 한다.
+  // ⚠️ 섹터가 빠지면 tech_level 비교가 조용히 거짓이 되므로(기술 전체를 통짜 정렬한다)
+  //    섹터 보유 업체는 그 문자열도 함께 단언한다.
+  const metaExp = [];
+  for (const [slug, exp] of expCand) {
+    const t = INDEX.find((x) => x.slug === slug);
+    for (const tk of exp.chips) {
+      const p = (t.listed || []).find((x) => x.ticker === tk);
+      if (p) metaExp.push({ slug, tk, lv: p.tech_level, cat: p.category });
+    }
+  }
+  const metaBad = [];
+  for (const m of metaExp) {
+    const chip = allChips.find((c) => c.ticker === m.tk);
+    if (!chip) { metaBad.push(`${m.tk}:칩없음`); continue; }
+    if (m.lv != null && !chip.text.includes(`Lv${m.lv}`)) metaBad.push(`${m.tk}:Lv${m.lv}없음`);
+    if (m.cat && !chip.text.includes(m.cat)) metaBad.push(`${m.tk}:섹터"${m.cat}"없음`);
+  }
+  eq(`cand-meta-domain:${V.name}`, metaExp.length >= 2 ? 'OK' : `DOMAIN_TOO_SMALL(${metaExp.length})`, 'OK');
+  eq(`cand-meta:${V.name}`, metaBad, []);
+  bump('cand', 2);
+
+  // 라벨 — 칩이 무엇인지 말해 주는 한 줄이 각 구역에 있는가
+  eq(`cand-label:${V.name}`, (cand?.rows || []).filter((r) => !r.label).length === 0 && domOK, true);
+  bump('cand');
+
   await page.screenshot({ path: `${OUT}/${V.name}-exposure.png`, fullPage: true });
+
+  // ── 육안 증거 — **칩이 화면에 있는 순간** 찍는다(가토 1: 단언 통과 ≠ 증거 확보) ──
+  if (cand?.rows?.length) {
+    await page.locator('[data-testid="tech-cand-row"]').first().scrollIntoViewIfNeeded().catch(() => {});
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: `${OUT323}/${V.name}-exposure-candidates.png`, fullPage: false });
+  }
 
   // ══ ⓖ 대조군 — 매칭 0을 **주입**으로 합성 ══════════════════════════════════
   // 실계정의 보유를 바꿀 수 없고(프로덕션 쓰기 금지), 실데이터 의존 대조군은 데이터가
@@ -293,6 +422,7 @@ console.log(`\n단언 총계: ${results.length}건 · PASS ${results.length - fa
 console.log('\n원시 실측(단언 아님):');
 for (const l of rawLog) console.log(`  ${l}`);
 console.log(`\n※ 육안 캡처 ${OUT}/ — {view}-{exposure|control}.png · pc1280-chip.png`);
+console.log(`※ 후보 칩 캡처 ${OUT323}/ — {view}-exposure-candidates.png (${fs.readdirSync(OUT323).join(', ') || '없음'})`);
 console.log('═'.repeat(78));
 fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ cov, results, exposed, zero, expWatch, expUnmatched }, null, 2));
 if (fails.length) {

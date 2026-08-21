@@ -291,6 +291,12 @@ describe('computeTechCandidates — 후보 산출', () => {
     expect(m.size).toBe(0)
   })
 
+  // ⚠️ **로케일 고정(`localeCompare(x, 'ko')`)은 vitest가 원리적으로 못 지킨다.**
+  //    라이브 동률 쌍('HD현대일렉트릭' vs '효성중공업')에서 Node의 기본 로케일은 'ko'와
+  //    **같은 값(+1)**을 주고 Chrome만 -1로 갈린다(실측). 즉 Node에서는 두 구현이
+  //    구별되지 않으므로 여기에 그 축을 두면 「선언만 재는 테스트」가 된다.
+  //    실제 게이트는 `scripts/uat-tech-exposure.mjs`의 `cand-chips`이고, 그 축이 이
+  //    결함을 실제로 잡았다(Node 기대 298040-first vs Chrome 렌더 267260-first).
   it('name tiebreaker — tech_level·gap_years가 **동일**할 때 이름 오름차순으로 갈린다', () => {
     // ⚠️ 이 픽스처가 없으면 name 키는 **한 번도 실행되지 않는다**(위 축들은 tech_level·gap_years로
     //    이미 갈리므로 name을 0으로 무력화해도 전부 통과한다 — 실제로 그것을 fault injection으로

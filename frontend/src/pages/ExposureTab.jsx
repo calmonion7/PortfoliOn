@@ -132,7 +132,12 @@ export function computeTechCandidates(techIndex, holdings, watchTickers = []) {
       const gb = b.gap_years ?? Number.MAX_SAFE_INTEGER
       return (b.tech_level || 0) - (a.tech_level || 0)
         || ga - gb
-        || String(a.name || '').localeCompare(String(b.name || ''))
+        // ⚠️ 로케일을 **반드시 명시**한다. 인자 없는 localeCompare는 런타임 기본 로케일에
+        // 의존해 **Node와 Chrome이 갈린다**(실측: 'HD현대일렉트릭' vs '효성중공업' →
+        // Node +1 · Chrome -1). 그러면 vitest(Node)가 단언한 순서와 프로덕션(Chrome)이
+        // 렌더하는 순서가 달라져 «fixture는 통과하고 라이브만 다른» 상태가 된다.
+        // 'ko'는 두 런타임이 일치함을 실측으로 확인했다(둘 다 +1).
+        || String(a.name || '').localeCompare(String(b.name || ''), 'ko')
     })
     if (!pool.length) continue
     out.set(t.slug, {
@@ -378,7 +383,9 @@ export default function ExposureTab() {
             한 종목이 여러 기술에 들어가므로 <strong>기술 간 합은 100%를 넘을 수 있습니다.</strong>
           </p>
           {techRows.filter(r => r.weight > 0).map((r, i) => (
-            <div key={r.slug}>
+            // data-testid는 프로브가 막대를 **구조 휴리스틱 없이** 세도록 준다 —
+            // 이 래퍼가 생기면서 「자식 div + % span」 방식이 기술당 2개를 세게 됐다.
+            <div key={r.slug} data-testid="tech-exposure-bar" data-slug={r.slug}>
               <WeightBar
                 label={r.name}
                 weight={r.weight}
