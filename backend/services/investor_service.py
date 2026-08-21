@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import math
 import requests
 from datetime import date
 from services.market import _NAVER_HEADERS, _NAVER_BASE
@@ -9,7 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_signed_int(val) -> int:
-    """부호+콤마 정수 파싱: '+5,414,215'->5414215, '-4,240,844'->-4240844, 'N/A'/'-'/''->0."""
+    """순매수 3필드 전용 — '+5,414,215'->5414215, '-4,240,844'->-4240844, 'N/A'/'-'/''->0.
+
+    0 폴백은 의도적이다(순매수 0은 '순매수 없음'이라는 유효값).
+    ⚠️ 시세(close_price)에는 쓰지 말 것: 가격 필드는 _parse_close_price(실패 → None)."""
     if val is None:
         return 0
     s = str(val).replace(",", "").strip()
@@ -19,6 +23,36 @@ def _parse_signed_int(val) -> int:
         return int(s)
     except ValueError:
         return 0
+
+
+def _parse_close_price(val) -> int | None:
+    """종가 전용 엄격 파서 — 파싱 실패는 0이 아니라 None('wrong < missing').
+
+    ⚠️ 같은 `market_investor_trend.close_price` 컬럼에 쓰는 **형제 writer가 셋**이다:
+    `services.kiwoom.investor._close_price` · `services.kiwoom.shortsell._close_price` ·
+    이 함수. 이 규약(센티널 목록·0 판정·비유한 처리)을 바꾸면 **셋을 함께** 고칠 것 —
+    소스별로 0과 None이 섞이면 어느 쪽이 결함인지 코드로 판정할 수 없게 된다.
+    비유한값도 None — float("nan")/float("Infinity")는 ValueError를 던지지 않는다.
+    리터럴 0도 None이다(소스가 결측을 "0"으로 채우는 경우 — 0원 종가는 존재하지 않는다)."""
+    if val is None:
+        return None
+    s = str(val).replace(",", "").strip()
+    if s in ("", "-", "+", "N/A"):
+        return None
+    try:
+        f = float(s)
+    except ValueError:
+        logger.warning(f"[InvestorTrend] close_price 파싱 실패 (closePrice={val!r})")
+        return None
+    if not math.isfinite(f):
+        logger.warning(f"[InvestorTrend] close_price 비유한값 (closePrice={val!r})")
+        return None
+    iv = abs(int(f))
+    if iv == 0:
+        # 리터럴 0은 유효 시세가 아니다(싱크층 `tm > 0`과 같은 판정). 형제 2곳 동일.
+        logger.warning(f"[InvestorTrend] close_price 0원 — 결측 처리 (closePrice={val!r})")
+        return None
+    return iv
 
 
 def _parse_percent(val) -> float | None:
@@ -52,7 +86,7 @@ def _map_row(raw: dict) -> dict | None:
         "organ_net": _parse_signed_int(raw.get("organPureBuyQuant")),
         "individual_net": _parse_signed_int(raw.get("individualPureBuyQuant")),
         "foreign_hold_ratio": _parse_percent(raw.get("foreignerHoldRatio")),
-        "close_price": _parse_signed_int(raw.get("closePrice")),
+        "close_price": _parse_close_price(raw.get("closePrice")),
     }
 
 
@@ -75,8 +109,10 @@ def fetch_trend(ticker: str, bizdate: str | None = None) -> list[dict]:
 
     bizdate=None  -> 최신.
     bizdate='YYYYMMDD' -> 그 날짜 이전 (후진 백필용).
-    각 행: base_date(date), foreign_net/organ_net/individual_net(int, 주식 수량),
-    foreign_hold_ratio(float|None, %), close_price(int)."""
+    각 행: base_date(date), foreign_net/organ_net/individual_net(int, 주식 수량 —
+    실패·센티널은 0, 순매수 0이 유효값), foreign_hold_ratio(float|None, %),
+    close_price(int|None — 파싱 실패는 0이 아니라 None, 'wrong < missing').
+    키움·Naver 두 경로 모두 같은 close_price 규약을 지킨다."""
     try:
         from services.kiwoom import investor as kinv, client as kclient
         if kclient.configured():

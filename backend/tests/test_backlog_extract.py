@@ -17,13 +17,21 @@ FIX = Path(__file__).parent / "fixtures" / "backlog"
 
 
 def _load(tk):
-    """fixture 파일 → (table Tag, unit). 단위는 첫 줄 주석에서 추출(금액 통화만)."""
+    """fixture 파일 → (table Tag, unit). 단위는 첫 줄 주석의 unit_hint에서 추출(금액 통화만).
+
+    hint를 못 읽으면 **'억원'으로 가정하지 않고 시끄럽게 실패**한다 — 프로덕션에서
+    제거한 억원 폴백(B62)이 테스트 하니스에 남으면, 단위 힌트 없는 fixture가 추가되는
+    순간 그 fixture가 "억원으로 가정하고 추출 성공"을 단언하게 되어 고친 판정축과
+    정반대를 증언한다. 현재 fixture 11종은 모두 hint를 갖는다(실측).
+    """
     raw = (FIX / f"{tk}.html").read_text()
     comment, html = raw.split("-->", 1)
     m = re.search(r"단위[^)]*?(조원|억원|백만원|천원|달러|원)", comment)
-    unit = m.group(1) if m else "억원"
+    if not m:
+        pytest.fail(f"{tk} fixture에 금액 통화 unit_hint가 없다 — 억원 폴백 금지, "
+                    f"hint를 fixture 첫 줄에 명시할 것: {comment.strip()[:80]!r}")
     table = BeautifulSoup(html, "html.parser").find("table")
-    return table, unit
+    return table, m.group(1)
 
 
 # ── _classify_table ──
@@ -124,8 +132,15 @@ def _doc(tk, caption):
     return f"<p>{caption}</p>{html}"
 
 
-def test_table_unit_foreign_or_missing_is_not_krw():
-    # 캡션은 있으나 KRW 통화 토큰 없음 → 비KRW(기타), 억원 폴백 금지(×100 오저장 방지)
+def test_table_unit_foreign_caption_is_not_krw():
+    """캡션은 **있고** KRW 통화 토큰만 없는 경우 → 비KRW('기타'), 억원 폴백 금지.
+
+    ⚠️ 이 테스트의 정의역은 '캡션 존재 + KRW 토큰 부재'뿐이다. 옛 이름
+    (`..._foreign_or_missing_...`)의 'missing'은 '캡션 부재'로 읽히지만 아래 케이스는
+    모두 캡션을 붙여 주므로 그 분기를 덮지 않았고, 그 과대 주장이 곧 B62가 오래
+    생존한 사각이었다("`_table_unit`엔 폴백 금지 테스트가 이미 있다"로 읽힘).
+    캡션 부재·원거리 캡션 축은 `test_table_unit_no_default_fallback.py`에 있다.
+    """
     from services import backlog as svc
     for cap in ("(단위 : USD천)", "(단위 : 백만 달러)", "(단위 :", "(단위 : 천달러)"):
         soup = BeautifulSoup(f"<p>{cap}</p><table><tr><td>x</td></tr></table>", "html.parser")
@@ -133,6 +148,10 @@ def test_table_unit_foreign_or_missing_is_not_krw():
     # KRW는 정상 검출
     soup = BeautifulSoup("<p>(단위 : 백만원)</p><table><tr><td>x</td></tr></table>", "html.parser")
     assert svc._table_unit(soup.find("table")) == "백만원"
+    # 캡션 부재는 '확정된 비KRW'가 아니라 **미확정(None)** — 호출측이 더 약한 소스
+    # (본문 통화 키워드)를 시도할 수 있게 두 상태를 구별한다.
+    soup = BeautifulSoup("<table><tr><td>x</td></tr></table>", "html.parser")
+    assert svc._table_unit(soup.find("table")) is None
 
 
 def test_auto_backlog_none_foreign_usd_thousand():

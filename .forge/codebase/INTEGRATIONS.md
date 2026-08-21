@@ -219,6 +219,11 @@ list 60s · dashboard 300s · correlation 300s · sector 300s · macro 300s · q
 
 **정규화 주의**: `ka10001` 값은 **부호 포함 문자열**이고 시총은 **억원 단위** → `cur_prc` 절대값·`mac × 1e8`. 업종 종가도 부호 절대값(`normalize_closes`).
 
+**파서는 필드 성격으로 갈린다 — 수량·금액은 `0` 폴백, 시세는 `None`.** `_signed_int`(`ka10059` 순매수)·`_int`(`ka10014` 거래량·거래대금·잔량)는 센티널(`""`·`-`·`+`·`N/A`)·`ValueError`·비유한을 **0**으로 접는다(순매수·거래량 0이 유효값). 시세는 전용 파서 `_close_price`가 같은 입력을 **`None`**으로 둔다 — 리터럴 `0`도 `None`이다(0원 종가는 존재하지 않으므로 소스가 결측을 `"0"`으로 채운 경우다). 형제 `_pct`(`short_ratio`·외국인 보유율)가 원래부터 이 규약이었고 `close_price`만 예외였다(`wrong < missing` 위반, B66/B67).
+- ⚠️ **`int(float("Infinity"))`는 `ValueError`가 아니라 `OverflowError`**다 — `except ValueError`만 두면 `parse_rows`/`fetch_flows`가 raise되고 호출측 broad except가 그 종목 이력을 조용히 비운다.
+- `close_price` 규약의 writer는 **셋**이다: `kiwoom/investor.py::_close_price`·`kiwoom/shortsell.py::_close_price`·`investor_service.py::_parse_close_price`(Naver 폴백 경로). **셋을 함께** 고칠 것 — 소스별로 0과 None이 섞이면 어느 쪽이 결함인지 코드로 판정할 수 없다.
+- 전 행이 결측이면 `logger.warning`으로 **응답 필드 키 부재·개명**(가장 개연성 높은 실패 클래스)을 경보한다. 일부 결측은 정상적인 데이터 공백이라 경보하지 않는다.
+
 **tz**: 키움 `daily_df` 인덱스는 **tz-naive**, yfinance(`^KS11` 등)는 **tz-aware(Asia/Seoul)** → `pd.concat(axis=1)`이 `TypeError`. KR series를 yfinance 지수와 정렬하는 계산(베타·상관·상대강도)은 한쪽을 `tz_localize(None)`해야 한다.
 
 **경계**: 조회 TR만. 계좌·주문 미연동, 실시간 WebSocket(0B/0D) 미착수. 카탈로그는 루트 `KIWOOM_API.md`.
@@ -385,8 +390,12 @@ DART에 수주잔고 전용 구조화 API가 없어 `document.xml` 원문을 파
 흐름: corp_code → `list.json`으로 사업/반기/분기보고서 rcept_no → `document.xml`(ZIP, 전 멤버 디코드·결합) → "수주" 포함 표/문단 추출 → 유형 판정.
 
 - **유형1(기납품+수주잔고 컬럼)**: `_expand_grid`(rowspan/colspan 전개)로 헤더 컬럼을 매핑해 금액을 뽑고 `수주총액 − 기납품 ≈ 잔고`(또는 `기초+신규−기납품 ≈ 기말`) **상대 1% 검산**(`_reconcile`)을 통과하면 `source='dart'` + 억원 정규화 금액으로 자동 저장.
-- 검산 실패·다중엔티티(`회사` 컬럼/종속회사)·외화(`USD천` 등)·무합계 다중행은 **`source='pending'`, amount=None**으로 두고 외부 Cowork가 `PUT /api/report/{ticker}/backlog`로 채운다.
-- **단위 캡션 파싱 실패 시 '안전한 기본값(억원)' 폴백 금지** — ×100 대형 오저장을 만든다. 추출 실패는 기본값이 아니라 누락(`wrong < missing`).
+- 검산 실패·다중엔티티(`회사` 컬럼/종속회사)·외화(`USD천` 등)·무합계 다중행·**단위 미확정**은 **`source='pending'`, amount=None**으로 두고 외부 Cowork가 `PUT /api/report/{ticker}/backlog`로 채운다.
+- **단위 캡션 파싱 실패 시 '안전한 기본값(억원)' 폴백 금지** — ×100 대형 오저장을 만든다. 추출 실패는 기본값이 아니라 누락(`wrong < missing`). **구현됨**: `_table_unit`의 기본값 상수는 `_UNKNOWN_UNIT = "기타"`(비KRW이므로 `_is_krw`가 False → 자동추출 차단 → pending)이고 `_DEFAULT_UNIT`은 존재하지 않는다.
+- **캡션 탐색은 거리 유계다** — `_table_unit`이 표 직전 **비공백 문자열 노드 `_UNIT_CAPTION_LOOKBACK = 3`개**까지만 캡션을 믿는다. 실문서 캡션은 `<table><tr><td>(단위 : 백만원)</td></tr></table>` 1셀 표로 수주표 바로 위에 오므로 "직전 형제" 규칙으로는 잡히지 않는다(캡션이 *다른 표 안*에 있다). 라이브 근거는 `_table_unit` docstring — 정기보고서 123건/16종목·수주표 159개에서 **올바른 캡션까지 거리 `{1: 158, 3: 1}`**, 그 앞 무관 섹션 캡션은 **14~132**. ⚠️ **상한 3은 관측 최대값과 같아 위쪽 여유가 0이다**(줄이면 실문서가 pending으로 강하, 늘리면 무관 섹션 단위를 확정). 바꾸려면 `scripts/probe327-*`을 다시 돌릴 것.
+- **`_table_unit`은 3-상태를 반환한다**: 확정 KRW 단위 / `"기타"`(캡션은 있으나 확정 실패 — **호출측의 본문 텍스트 폴백을 막는다**) / `None`(캡션 자체가 없음 — 이때만 `_UNIT_KEYWORDS` 본문 폴백 허용). 둘을 뭉치면 문서가 단위를 말하는데 산문의 무관한 통화 낱말을 채택해 *미확정*이 아니라 **틀린 확정**이 된다.
+- **단위 매칭은 `_EOK_FACTOR` 화이트리스트 exact(공백 제거 후)** — 부분·접미사 매칭 금지. 옛 `단위[^)]*?(조원|억원|백만원|천원|원)`은 lazy 확장이라 복합 단위의 **접미사**에 걸려 `십억원`→`억원`(×1/10)·`만원`→`원`(×1/10,000,000)을 `_is_krw` True로 **자신 있게 틀리게** 저장했다. `십억원`은 실 DART에 29건 실재하므로 화이트리스트에 정확한 factor(10.0)로 넣었고, 그 밖의 복합단위(`만원`·`천만원`·`백억원`)는 미확정으로 떨어뜨린다.
+- **`market/kr.py::_rd_unit`(R&D 집중도)은 이 함수를 재사용한다** — 캡션 규약을 재구현하지 말 것. 옛 `_rd_unit`은 무제한 역탐색이라 `get_rd_intensity_kr`의 「None = 표 오인식」 필터를 무력화했다.
 - `segments` JSONB에 부문>법인 누적 구조를 담는다(`_segments_from_susu`/`_auto_backlog_multi`, Σ==합계 검산).
 
 ### 7.6 주총 일시 파싱 (`agm.py`)

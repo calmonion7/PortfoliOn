@@ -1,9 +1,13 @@
 from __future__ import annotations
 import logging
+import math
 import re
 import yfinance as yf
 import requests
 
+from typing import Optional
+
+from services.backlog_parser import _is_krw, _table_unit
 from services.market.format import _norm_sector, _n, _safe_ratio, _safe_pct
 
 logger = logging.getLogger(__name__)
@@ -535,17 +539,22 @@ def get_annual_financials_kr(ticker: str) -> list[dict]:
         return []
 
 
-_RD_UNIT_RE = re.compile(r"단위[^)]*?(조원|억원|백만원|천원|원)")
+def _rd_unit(table) -> Optional[str]:
+    """표 **근거리**(비공백 문자열 노드 `_UNIT_CAPTION_LOOKBACK`개 이내) '(단위 …)'
+    캡션에서 KRW 단위 추출. 캡션 없음 / 원거리 / 비KRW / 화이트리스트 밖 복합단위 → None.
 
+    캡션 규약은 `backlog_parser._table_unit`이 **단일 정본**이다(재구현하지 말 것) —
+    거리 상한의 라이브 근거·`_EOK_FACTOR` 화이트리스트·복합단위(`십억원`↔`억원`) 함정이
+    전부 그 docstring에 있다. 여기서 필요한 것은 그 3-상태를 "KRW로 확정됐나"라는
+    2-상태로 좁힌 것뿐이다.
 
-def _rd_unit(table) -> "str | None":
-    """표 직전 '(단위 ...)' 캡션에서 KRW 단위 추출. 캡션 없음/비KRW → None
-    (backlog._table_unit과 달리 안전 기본값 폴백 없음 — wrong<missing)."""
-    node = table.find_previous(string=re.compile("단위"))
-    if not node:
-        return None
-    m = _RD_UNIT_RE.search(str(node))
-    return m.group(1) if m else None
+    ⚠️ 옛 구현은 무제한 `table.find_previous(string=re.compile("단위"))`로 문서 전체를
+    거슬러 올라가 임의 거리(라이브 실측 14~132노드)의 무관 섹션 캡션을 주워 왔다.
+    `get_rd_intensity_kr`는 이 함수의 None을 **표 오인식 필터**로 쓰므로, 원거리 채택은
+    그 필터를 무력화해 R&D 표가 아닌 표를 계산 경로에 통과시킨다(wrong < missing).
+    """
+    unit = _table_unit(table)
+    return unit if _is_krw(unit) else None
 
 
 def get_rd_intensity_kr(ticker: str) -> float | None:
@@ -647,19 +656,28 @@ def get_analyst_data_kr(ticker: str) -> dict:
         if not items:
             return _empty
 
+        # 파싱 원천 가드 — 이 층이 막는 것: 외부 문자열의 비유한 토큰.
+        # float("nan")/float("inf")/float("Infinity")는 ValueError를 던지지 않아 아래 except를
+        # 그냥 통과하므로 math.isfinite를 쌍으로 둔다. 하나라도 새면 target_mean(폴백 평균)·
+        # target_high(max)·target_low(min)가 통째로 비유한값이 되고, 그 dict는 마트뿐 아니라
+        # report_generator·routers/report(스냅샷)로도 흘러간다 — wrong < missing.
         prices, recom_codes = [], []
         for item in items:
             try:
-                prices.append(float(item["TARGET_PRC"].replace(",", "")))
+                tp = float(item["TARGET_PRC"].replace(",", ""))
             except (ValueError, KeyError):
-                pass
+                tp = None
+            if tp is not None and math.isfinite(tp):
+                prices.append(tp)
             try:
                 recom_codes.append(float(item["RECOM_CD"]))
             except (ValueError, KeyError):
                 pass
 
         avg_str = items[0].get("AVG_PRC", "")
-        target_mean = float(avg_str.replace(",", "")) if avg_str else (sum(prices) / len(prices) if prices else None)
+        avg = float(avg_str.replace(",", "")) if avg_str else None
+        target_mean = (avg if avg is not None and math.isfinite(avg)
+                       else (sum(prices) / len(prices) if prices else None))
 
         buy  = sum(1 for c in recom_codes if c >= 3.5)
         hold = sum(1 for c in recom_codes if 2.5 <= c < 3.5)

@@ -4,6 +4,12 @@ _fetch_us_raw:184의 `float(row.get("currentPriceTarget") or 0) or None`과 :197
 `apt.get("mean")` 진위 체크는 NaN이 truthy라 그대로 통과시켜 raw_reports.target_price에
 nan이 실릴 수 있다(AVG()가 daily_consensus_mart.avg_target_price로 전파, ADR-0008).
 초크포인트는 fetcher 개별이 아니라 upsert_raw_reports 단일 INSERT 통로.
+
+⚠️ 단 이 파일이 지키는 것은 마트에 이르는 **두 경로 중 하나**다 —
+① raw_reports INSERT → _MART_SQL의 AVG()(여기) ② run_daily의 KR AVG_PRC override가
+daily_consensus_mart를 직접 UPDATE(이 통로를 우회). ②의 핀은
+tests/test_consensus_nan_override_guard.py이며, 이 파일 3축은 ②가 무가드로 되돌아가도
+전부 초록이므로 "단일 통로가 정본까지 닫는다"로 읽지 말 것(B52).
 """
 from unittest.mock import patch
 import math

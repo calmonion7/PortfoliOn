@@ -139,10 +139,19 @@ def test_us_row_computes_trading_value_price_times_volume():
 
 
 def test_us_row_handles_missing_price_or_volume():
+    """시세 부재는 **None**, 수량은 0 — 두 필드의 실패 규약이 다르다.
+
+    ⚠️ 이 축은 원래 `price == 0.0`·`trading_value == 0`을 단언했다. 그 단언은 당시
+    `or 0` 폴백을 그대로 박제한 **부수적** 서술이었고(기록된 결정이 아니다 — 계획·ADR
+    어디에도 「시세 부재를 0으로 표시한다」는 결정이 없다), 실제로는 랭킹 카드에
+    「$0.00」이 현재가로 렌더되는 `wrong < missing` 위반이었다. 적대 검토 F6에서
+    `market_investor_trend.close_price`와 같은 규약(실패 → None)으로 뒤집었다.
+    `trading_volume`은 수량 필드이므로 0 폴백을 유지한다(거래량 0은 유효값).
+    """
     from services.ranking_service import _us_row
     row = _us_row({"symbol": "X", "shortName": "X Corp"})
-    assert row["price"] == pytest.approx(0.0)
-    assert row["trading_value"] == 0
+    assert row["price"] is None
+    assert row["trading_value"] is None   # 시세를 모르면 거래대금도 모른다
     assert row["trading_volume"] == 0
 
 

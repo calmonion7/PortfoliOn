@@ -1467,7 +1467,8 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 }
 ```
 
-- `short_volume` 공매도 거래량(주) · `short_value` 공매도 거래대금(원) · `short_ratio` 공매도 비중(%) · `short_balance` 공매도 잔량(주, 미상환) · `close_price` 종가(원).
+- `short_volume` 공매도 거래량(주) · `short_value` 공매도 거래대금(원) · `short_ratio` 공매도 비중(%, **nullable**) · `short_balance` 공매도 잔량(주, 미상환) · `close_price` 종가(원, **nullable**).
+- ⚠️ `short_ratio`·`close_price`는 **`null`일 수 있다** — 소스 파싱 실패·필드 부재·리터럴 `0`을 0으로 접지 않고 결측으로 둔다(`wrong < missing`: 0원 종가는 실패를 유효 시세로 위장한다). 수량·금액 필드(`short_volume`·`short_value`·`short_balance`)는 0 폴백을 유지한다(거래량 0은 「공매도 없음」이라는 유효값). 같은 `close_price` 규약이 `GET /api/stocks/{ticker}/investor-trend`·`GET /api/investor/screening`에도 적용된다. 예시 응답의 숫자는 정상 케이스이며 nullable을 부정하지 않는다.
 
 ---
 
@@ -1511,6 +1512,9 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
   ]
 }
 ```
+
+- `foreign_net`·`organ_net`·`individual_net` 순매수(주). **실패·센티널은 0** — 순매수 0은 「순매수 없음」이라는 유효값이다.
+- `foreign_hold_ratio`(%, **nullable**) · `close_price` 종가(원, **nullable**). ⚠️ `close_price`는 파싱 실패·필드 부재·리터럴 `0`에서 **`null`**이다(`wrong < missing`: 0원 종가는 실패를 유효 시세로 위장한다). 키움(ka10059)·Naver 두 소스 경로가 같은 규약을 지키므로 소스에 따라 0/`null`이 섞이지 않는다. 예시의 숫자는 정상 케이스이며 nullable을 부정하지 않는다.
 
 ### `GET /api/stocks/{ticker}/news`
 
@@ -1783,6 +1787,8 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 }
 ```
 
+- ⚠️ 「갱신된 필드」의 판정은 **유한값**이다 — 소스(yfinance `analyst_price_targets` / KR FnGuide)가 `target_mean`·`target_high`·`target_low`에 `NaN`·`Infinity`를 실어 보내면 그 필드는 **결측으로 취급해 응답과 스냅샷에서 빠진다**(`wrong < missing`). 세 필드가 모두 비유한이고 나머지도 결측이면 `502`. 비유한값을 그대로 실으면 `snapshots.data`(jsonb) 저장이 거부되거나 응답 직렬화가 500이 된다.
+
 **Error `403`** — 해당 종목이 호출자의 보유·관심 목록에 없고 admin도 아님
 **Error `404`** — 해당 종목의 스냅샷 없음 (리포트를 먼저 생성해야 함)
 
@@ -1807,7 +1813,7 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 |------|------|------|
 | `quarter` | string | 분기 (`YYYYQn`) |
 | `amount` | number\|null | 수주잔고 총액(억원). `pending`이면 null |
-| `unit` | string | 원본 표 단위(저장은 억원 정규화) |
+| `unit` | string | 원본 표 단위(저장은 억원 정규화). 확정된 KRW 단위(`조원`·`십억원`·`억원`·`백만원`·`천원`·`원`) 또는 `"기타"`(**단위 미확정** — 외화·캡션 부재·원거리 캡션·화이트리스트 밖 복합단위). `"기타"`는 자동추출 대상이 아니므로 그 분기는 `source="pending"`으로 온다 |
 | `source` | string | `"dart"`(코드 자동추출·검산 통과) \| `"llm"`(Cowork 수기) \| `"pending"`(미채움) |
 | `segments` | `{sector,entity,amount}[]`\|null | 다중엔티티 연결 종목의 사업부문>법인별 분해(억원). 없으면 null |
 
@@ -1832,7 +1838,9 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `prompt` | string | 수주잔고 추출 지침(단위 정규화·외화·다중엔티티·공사진행·"틀린 값<누락") |
-| `items[]` | array | 대기 항목 (`ticker`, `quarter`, `raw_text`=재무 컨텍스트+수주 원문 결합, `unit`=원본 단위 — KRW 외 외화 표 캡션이면 `"기타"`) |
+| `items[]` | array | 대기 항목 (`ticker`, `quarter`, `raw_text`=재무 컨텍스트+수주 원문 결합, `unit`=원본 단위 — 확정된 KRW 단위(`조원`·`십억원`·`억원`·`백만원`·`천원`·`원`) 또는 `"기타"`) |
+
+> ⚠️ `unit == "기타"`는 **「단위 미확정」**이며 「외화」만을 뜻하지 않는다 — 외화 캡션·캡션 부재·원거리 캡션·화이트리스트 밖 복합단위(`만원` 등)가 모두 여기로 온다. 소비자(Cowork)는 이 경우 `raw_text`의 표 캡션에서 단위를 직접 판정해야 한다. 상세는 `CLAUDE_COWORK_API.md`의 같은 절.
 
 > 다중엔티티 연결 종목은 코드가 `dart`+segments로 자동 채워 pending에 없음. `items` 빈 배열이면 대기 없음.
 
@@ -2084,6 +2092,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   }
 ]
 ```
+
+- `target_mean`·`target_high`·`target_low`는 **nullable**(정본 `daily_consensus_mart`, 없으면 legacy `consensus_history` 폴백 — ADR-0008). 집계 대상 `raw_reports.target_price`에 비유한값이 섞이면 그 행만 제외하고 나머지로 평균·최대·최소를 낸다(전 행이 오염이면 `null`).
+- ⚠️ KR 종목의 `target_mean`은 파이프라인이 FnGuide `AVG_PRC`로 덮어쓰는데, 그 값이 **비유한·0·음수면 덮어쓰기를 생략**하고 `raw_reports` 평균으로 계산된 **직전 값을 유지**한다(`wrong < missing`). 즉 이 필드는 항상 「그날 FnGuide 값」이 아니라 「그날 확보된 가장 신뢰 가능한 값」이다.
 
 ---
 
@@ -4094,6 +4105,8 @@ KR/US 시장 랭킹 조회. 배치가 사전계산해 `market_rankings` 테이�
 ```
 `base_ts`는 데이터 기준 시각 ISO 문자열(데이터 없으면 `null`).
 
+- ⚠️ `price`·`change_pct`·`trading_value`는 **`null`일 수 있다** — 소스(Naver marketvalue / yfinance quote) 시세 파싱 실패·비유한값을 0으로 접지 않고 결측으로 둔다(`wrong < missing`: 「0원」·「$0.00」이 현재가로 렌더되던 것을 막는다. 시세를 모르면 `trading_value`도 `null`이다). 수량 필드(`trading_volume`·`market_cap`)는 0 폴백을 유지한다(거래량 0은 유효값). 프론트는 `fmtPrice`가 `null`/비유한을 `'—'`로 표시한다.
+
 ### `POST /api/rankings/refresh`
 
 해당 시장 랭킹을 즉시 재수집해 `market_rankings` 테이블을 교체한다 (KR=키움, US 소스). `job_runs`에 시장별 id(`kr_rankings_fetch`/`us_rankings_fetch`)로 manual 실행 기록.
@@ -4148,7 +4161,7 @@ KR 랭킹 universe 종목별 최신 수급(외국인/기관/개인 순매수 + �
   "latest_date": "2026-06-20"
 }
 ```
-`latest_date`는 반환 items 중 가장 최근 `base_date`(없으면 `null`). 순매수/종가는 정수, 보유율은 float, 결측은 `null`.
+`latest_date`는 반환 items 중 가장 최근 `base_date`(없으면 `null`). 순매수 3필드는 정수이며 **실패·센티널을 0으로 접는다**(순매수 0이 유효값). `foreign_hold_ratio`(float)와 `close_price`(정수)는 **nullable** — `close_price`는 파싱 실패·리터럴 `0`이 `null`이다(`wrong < missing`, `GET /api/stocks/{ticker}/short-sell` 절의 같은 규약).
 
 ### `POST /api/investor/refresh`
 

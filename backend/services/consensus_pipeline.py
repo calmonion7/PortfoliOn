@@ -221,6 +221,18 @@ def upsert_raw_reports(ticker: str, market: str, days: int = 7) -> int:
     fetcher(_fetch_kr_fnguide·_fetch_kr_raw·_fetch_us_raw) 3곳을 개별로 고치지 않고 INSERT가
     거치는 이 단일 통로에서 한 번에 정규화한다 — 산발적 가드는 다음 사람이 정본을 헷갈리게 한다.
 
+    ⚠️ 단 이 통로는 `raw_reports`만 덮는다. 정본 `daily_consensus_mart`에 이르는 경로는 둘이고
+    (① 여기 INSERT → _MART_SQL의 AVG() ② `run_daily`의 KR AVG_PRC override가 mart를 직접
+    UPDATE) ②는 이 초크포인트를 우회하므로 소스(`services/market/kr.py::get_analyst_data_kr`)와
+    `run_daily` 게이트에서 별도로 막는다(B52). 회귀 핀은 tests/test_consensus_target_nan.py(①)와
+    tests/test_consensus_nan_override_guard.py(②).
+
+    ⚠️ 그리고 ①의 커버리지는 **시간 비대칭**이다 — 이 정규화는 *이번 실행이 다시 INSERT하는
+    행*에만 걸리는데(`run_daily`는 `days=7`) `_MART_SQL`은 **90일 윈도우**를 집계한다. 이
+    초크포인트 도입(2026-08-04) 이전에 적재된 행은 여기를 지나가지 않으므로, `_MART_SQL`의
+    3집계를 `NULLIF(target_price,'NaN')`로 감싸 두었다(tests/test_mart_nan_isolation.py).
+    즉 ①은 "새 행"을, NULLIF는 "이미 있는 행"을 막는다 — 둘 다 필요하다.
+
     순서 중요: 정규화는 아래 opinion/target 필터 *이전*에 적용한다. 필터 뒤에 두면
     "정보가 0인 행"(opinion 없고 target=nan)이 target=None으로 필터를 통과해 살아남는다.
     """
@@ -278,9 +290,15 @@ WITH latest_per_brokerage AS (
 SELECT
   %s,
   %s,
-  ROUND(AVG(target_price),             0),
-  ROUND(MAX(target_price),             0),
-  ROUND(MIN(target_price),             0),
+  -- NULLIF는 **오염 행만** 제외한다(행 전체를 버리지 않는다 — wrong < missing).
+  -- 왜 필요한가: 위 `upsert_raw_reports`의 isfinite 초크포인트는 *이번 실행이 다시
+  -- INSERT하는 행*(days=7)만 정규화하는데 이 윈도우는 **90일**이다. 초크포인트 도입
+  -- (2026-08-04) 이전에 적재된 행이 아직 윈도우 안에 있고, PostgreSQL numeric은 NaN을
+  -- 저장한다. 라이브 실측: AVG/MAX/MIN over {NaN,100,200} = (NaN, NaN, 100) — MIN만
+  -- 무해하므로(numeric NaN이 최대값으로 정렬) 셋을 함께 감싼다.
+  ROUND(AVG(NULLIF(target_price, 'NaN'::numeric)), 0),
+  ROUND(MAX(NULLIF(target_price, 'NaN'::numeric)), 0),
+  ROUND(MIN(NULLIF(target_price, 'NaN'::numeric)), 0),
   ROUND(AVG(opinion_score),            2),
   COUNT(DISTINCT brokerage_code),
   SUM(CASE WHEN opinion_score >= 4.0 THEN 1 ELSE 0 END),
@@ -327,11 +345,28 @@ def run_daily(stocks: list) -> None:
             try:
                 from services.market import get_analyst_data_kr
                 kr = get_analyst_data_kr(ticker)
-                if kr.get("target_mean"):
+                tm = kr.get("target_mean")
+                # 마트 정본 게이트 — 이 UPDATE는 upsert_raw_reports의 isfinite 초크포인트를
+                # *타지 않는다*(mart 직접 UPDATE)므로 여기서 따로 막아야 한다.
+                # 이 층이 막는 것: ① 옛 `if kr.get("target_mean"):`는 bool(nan)==True라 NaN을
+                # 통과시켰고 PostgreSQL numeric은 NaN을 저장하므로 행이 영구 오염된다(+ 응답
+                # 직렬화 500). ② 0·음수는 목표가로 성립하지 않는 실패 표식이라 함께 배제한다
+                # (옛 가드는 0만 막고 음수는 truthy라 통과시켰다).
+                # 배제 시 override를 생략해 raw_reports AVG()로 계산된 직전 값을 유지한다.
+                # 비유한값 자체는 소스층(services/market/kr.py::get_analyst_data_kr)에서도
+                # 걸러진다 — 2겹이며, 이 층은 provider가 바뀌어도 정본을 지킨다.
+                if tm is not None and math.isfinite(tm) and tm > 0:
                     execute(
                         "UPDATE daily_consensus_mart SET avg_target_price = %s "
                         "WHERE ticker = %s AND base_date = %s",
-                        (kr["target_mean"], ticker.upper(), today),
+                        (tm, ticker.upper(), today),
+                    )
+                elif tm is not None:
+                    # tm is None = FnGuide 컨센서스 없음(정상적인 무데이터)이라 로그 없음.
+                    # 값이 왔는데 못 쓰는 경우만 시끄럽게 — 갱신됨과 생략을 로그로 가른다.
+                    logger.warning(
+                        f"[Pipeline] AVG_PRC override 생략 — 비정상 target_mean, "
+                        f"직전 마트값 유지 {ticker}: {tm!r}"
                     )
             except Exception as e:
                 logger.warning(f"[Pipeline] AVG_PRC override failed {ticker}: {e}")

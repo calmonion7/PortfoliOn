@@ -408,6 +408,16 @@ def fetch_and_save_backlog(ticker: str) -> list[dict]:
                 else:
                     block = _financials_block(get_financials(corp_code, quarter))
                     combined = (block + "\n\n" + raw_text) if block else raw_text
+                    if not _is_krw(unit):
+                        # 관측 앵커 — 단위 미확정 강하는 예외를 내지 않으므로
+                        # `job_runs`가 계속 success로 기록한다. 이 마커가 없으면 캡션
+                        # 상한이 실문서군을 놓쳐 dart→pending 커버리지가 회귀해도
+                        # 「Cowork 대기가 왜 늘었지」로만 드러난다(배포 후 docker logs
+                        # 1콜로 발생률을 세려면 grep 앵커가 필요하다).
+                        logger.info(
+                            f"[Backlog] 단위 미확정 — pending {ticker} {quarter} "
+                            f"(unit={unit!r})"
+                        )
                     _save_pending(ticker, quarter, unit, combined)
             seen_quarters.add(quarter)
 

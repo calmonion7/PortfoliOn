@@ -4,6 +4,7 @@ import math
 import requests
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
 
 from services.db import query, get_connection
 
@@ -25,21 +26,72 @@ _ETF_END_TYPES = {"etf", "etn"}
 # ── 순수 변환 (유닛 테스트 대상) ──
 
 def _parse_int(val) -> int:
-    """콤마/공백 제거 후 정수 파싱. 빈값·N/A는 0."""
+    """**수량·금액 필드 전용** 정수 파싱(거래대금·거래량·시총). 실패·비유한은 0.
+
+    0 폴백은 의도적이다(거래량 0은 '거래 없음'이라는 유효값). ⚠️ **시세(price)에는 쓰지
+    말 것** — 0원 현재가는 실패를 유효 시세로 위장해 화면에 「0원」으로 렌더된다.
+    가격 필드는 `_parse_price`(실패 → None)를 쓴다.
+
+    `OverflowError`가 except에 있는 이유: `int(float("Infinity"))`는 ValueError가 아니라
+    **OverflowError**를 내므로 옛 `except (ValueError, TypeError)`를 그냥 통과해 전파됐다.
+    `math.isfinite`는 그 앞단에서 `nan`·`inf`를 정상 실패로 접는다."""
     try:
         v = str(val).replace(",", "").strip()
-        return int(float(v)) if v not in ("", "-", "N/A") else 0
-    except (ValueError, TypeError):
+        if v in ("", "-", "N/A"):
+            return 0
+        f = float(v)
+        return int(f) if math.isfinite(f) else 0
+    except (ValueError, TypeError, OverflowError):
         return 0
 
 
-def _parse_float(val) -> float | None:
-    """콤마/공백 제거 후 실수 파싱. 빈값·N/A는 None (등락률 등)."""
+def _parse_float(val) -> Optional[float]:
+    """콤마/공백 제거 후 실수 파싱. 빈값·N/A·비유한은 None (등락률 등).
+
+    비유한값을 통과시키면 `market_rankings.change_pct`(numeric)에 NaN이 영구 저장되고
+    응답 직렬화에서 500이 된다(starlette `allow_nan=False`)."""
     try:
         v = str(val).replace(",", "").strip()
-        return float(v) if v not in ("", "-", "N/A") else None
+        if v in ("", "-", "N/A"):
+            return None
+        f = float(v)
+        return f if math.isfinite(f) else None
     except (ValueError, TypeError):
         return None
+
+
+def _parse_price(val) -> Optional[float]:
+    """**시세 전용 엄격 파서** — 파싱 실패·비유한은 0이 아니라 None('wrong < missing').
+
+    `market_investor_trend.close_price`(키움 2경로 + Naver)와 같은 규약이다. 이쪽이 더
+    중요한 이유: `price`는 랭킹 카드·상세 행에 **그대로 렌더**되고(`Ranking.jsx`), 저장이
+    전량 DELETE+INSERT라 직전 양호값 폴백이 없다 — 「0원」/「$0.00」이 사용자에게
+    현재가로 보인다. 표시측 `fmtPrice`는 null·비유한을 '—'로 처리한다(utils.js).
+
+    US 경로의 옛 `quote.get("regularMarketPrice") or 0`은 **`bool(nan) is True`**라 NaN을
+    통과시켜 뒤이은 `int(price * volume)`가 ValueError로 US 랭킹 배치를 통째로 죽였다."""
+    if val is None:
+        return None
+    try:
+        v = str(val).replace(",", "").strip()
+        if v in ("", "-", "+", "N/A"):
+            return None
+        f = float(v)
+    except (ValueError, TypeError):
+        logger.warning(f"[Ranking] 현재가 파싱 실패 (price={val!r})")
+        return None
+    if not math.isfinite(f):
+        logger.warning(f"[Ranking] 현재가 비유한값 (price={val!r})")
+        return None
+    if f == 0:
+        # 리터럴 0은 유효 시세가 아니다 — 파싱은 성공하므로 위 가드를 모두 통과한다.
+        # **라이브 실측(probe327b, 2026-08-22)**: KOSPI 2478행 중 **54행**이
+        # `closePriceRaw='0'`으로 온다(전부 거래 0인 채권형 ETF·ETN이고 같은 응답의
+        # `fluctuationsRatio`도 그 0에서 파생된 `-100.00`이다). 이것을 통과시키면
+        # 랭킹 카드 현재가가 「0원」으로 렌더된다. 로그는 내지 않는다 — 54행/일이면
+        # 배치 로그가 오염되고, 이 값은 결측이 정상 상태이기 때문이다.
+        return None
+    return f
 
 
 def _is_etf(stock_end_type: str) -> bool:
@@ -48,10 +100,12 @@ def _is_etf(stock_end_type: str) -> bool:
 
 def _kr_row(stock: dict) -> dict:
     exch = (stock.get("stockExchangeType") or {}).get("code", "")
+    _kr_price = _parse_price(stock.get("closePriceRaw"))
     return {
         "ticker": stock.get("itemCode", ""),
         "name": stock.get("stockName", ""),
-        "price": _parse_int(stock.get("closePriceRaw")),
+        # KR 시세는 원 단위 정수. 실패는 0이 아니라 None(_parse_price 규약).
+        "price": None if _kr_price is None else int(_kr_price),
         "change_pct": _parse_float(stock.get("fluctuationsRatio")),
         "trading_value": _parse_int(stock.get("accumulatedTradingValueRaw")),
         "trading_volume": _parse_int(stock.get("accumulatedTradingVolumeRaw")),
@@ -62,15 +116,16 @@ def _kr_row(stock: dict) -> dict:
 
 
 def _us_row(quote: dict) -> dict:
-    price = quote.get("regularMarketPrice") or 0
-    volume = quote.get("regularMarketVolume") or 0
+    price = _parse_price(quote.get("regularMarketPrice"))
+    volume = _parse_int(quote.get("regularMarketVolume"))
     return {
         "ticker": quote.get("symbol", ""),
         "name": quote.get("shortName") or quote.get("longName") or quote.get("symbol", ""),
-        "price": float(price),
+        "price": price,
         "change_pct": _parse_float(quote.get("regularMarketChangePercent")),
-        "trading_value": int(price * volume),
-        "trading_volume": int(volume),
+        # 시세를 모르면 거래대금도 모른다 — 0으로 접으면 랭킹에서 「거래대금 0」이 된다.
+        "trading_value": None if price is None else int(price * volume),
+        "trading_volume": volume,
         "market_cap": _parse_int(quote.get("marketCap")),
         "is_etf": False,
         "exchange": "US",

@@ -56,6 +56,14 @@ mapped: 2026-08-10
 >
 > ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이 파트의 비목표가 「계기를 복구한 뒤 새로 드러나는 FAIL을 고치지 않는다 — 그것은 성과이고 부채가 아니다」였고, 실제로 **새로 도달한 축 36개 + S5 신설 전역 sentinel 5개 = 41개 전부 PASS라 인계 FAIL은 0건**이다(`.forge/handoff-327-to-331.md`에 그 사실과 근거를 기록했다 — 「인계 0건」과 「목록을 안 만들었다」는 다르다). 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63`은 **행을 그대로 유지**했다(task#333). 이 파트는 프로브·문서만 만졌으므로 프론트·백엔드 결함은 하나도 닫히지 않았다.
 
+> **해소: 2026-08-22 (task#328) — B52·B62·B64·B66·B67 닫힘.** 10차 확정분 수정 3/7(**외부 파싱 실패가 오값으로 위장되는 경로 5건**). 다섯은 한 클래스였다 — **실패를 `None`이 아니라 *그럴듯한 값*으로 접는다**(`wrong < missing` 위반). **B62+B64**(`_table_unit`의 두 실패 경로)는 함께 닫혔다: 기본값 상수를 `_DEFAULT_UNIT="억원"` → `_UNKNOWN_UNIT="기타"`(비KRW이므로 `_is_krw` False → 자동추출 차단 → pending)로 바꾸고, 무제한 `find_previous`를 **비공백 문자열 노드 3개 유계 탐색**(`_UNIT_CAPTION_LOOKBACK`)으로 좁혔다. 반환은 **3-상태**가 됐다 — 확정 KRW / `"기타"`(캡션은 있으나 확정 실패, 호출측 산문 폴백을 **막는다**) / `None`(캡션 부재, 이때만 폴백 허용). ⚠️ 그 구별이 없으면 옛 코드가 *정확한* 단위를 냈던 입력에서 새 코드가 본문 산문의 무관한 통화 낱말을 채택해 **B62 클래스가 pending 라벨 경로로 재도입**된다. 부수로 **접미사 매칭 함정**을 함께 닫았다: 옛 `단위[^)]*?(조원|억원|…)`은 lazy 확장이라 `십억원`→`억원`(×1/10)·`만원`→`원`(×1/10,000,000)을 `_is_krw` True로 **자신 있게 틀리게** 저장했다(실 DART에 `십억원` 29건 실재 → 화이트리스트 `_EOK_FACTOR`에 factor 10.0으로 정식 추가, 그 밖 복합단위는 미확정). `market/kr.py::_rd_unit`도 같은 무제한 역탐색이었고 `_table_unit` 재사용으로 전환했다. **B66+B67**은 시세 전용 파서 `_close_price`(실패·비유한·**리터럴 0** → `None`)를 분리해 닫혔다 — 수량·금액은 `0` 폴백을 유지한다(순매수·거래량 0이 유효값). 같은 컬럼 writer가 셋이라 **Naver 폴백 경로(`investor_service.py::_parse_close_price`)까지 함께** 고쳤다(소스별로 0과 None이 섞이면 어느 쪽이 결함인지 코드로 판정할 수 없다). **B52**는 `run_daily`의 KR `AVG_PRC` override 게이트를 `if kr.get("target_mean"):` → `if tm is not None and math.isfinite(tm) and tm > 0:`으로 바꿔 닫혔다(`bool(float('nan'))==True`라 진리값 가드는 NaN을 통과시키고 음수도 truthy였다) + 소스층 `get_analyst_data_kr`의 `TARGET_PRC`/`AVG_PRC` 파싱에 `math.isfinite` 쌍 가드 = 2겹. **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
+>
+> ⚠️ **`upsert_raw_reports`의 초크포인트는 시간 비대칭이라 그것만으로 부족했다.** 그 정규화는 *이번 실행이 다시 INSERT하는 행*(`days=7`)에만 걸리는데 `_MART_SQL`은 **90일 윈도우**를 집계하고, PostgreSQL `numeric`은 `NaN`을 저장한다 → 초크포인트 도입(2026-08-04) 이전 적재분이 아직 윈도우 안에 있다. 그래서 마트 3집계를 `NULLIF(target_price,'NaN'::numeric)`로 감쌌다(라이브 실측 `AVG/MAX/MIN over {NaN,100,200} = (NaN, NaN, 100)` — numeric NaN이 최대값으로 정렬돼 MIN만 무해하므로 셋을 함께 감싼다). **초크포인트는 「새 행」을, `NULLIF`는 「이미 있는 행」을 막는다 — 둘 다 필요하다.**
+>
+> ⚠️ **적대적 검토가 in-run으로 인접 2건을 더 닫았다**(둘 다 §0 번호가 없던 항목이라 표에는 없다). ⓐ **랭킹 `price`** — `_parse_int`가 시세에도 쓰여 실패를 `0`으로 접고 US 경로의 `quote.get("regularMarketPrice") or 0`은 `bool(nan) is True`라 NaN을 통과시켰다(뒤이은 `int(price*volume)`가 US 랭킹 배치를 통째로 죽였다) → 시세 전용 `_parse_price`(실패·비유한·리터럴 0 → `None`)를 분리. `§3.4`가 서술한 위험도 이때 함께 닫혔다. ⓑ **US 애널리스트 목표가** — `get_analyst_data`가 yfinance `analyst_price_targets`의 비유한값을 그대로 실어 mart뿐 아니라 **스냅샷**(`snapshots.data` jsonb)으로도 흘려보냈다 → `_finite()` 필드별 가드.
+>
+> ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63`은 **행을 그대로 유지**했고 이번 파트가 하나도 건드리지 않았다(task#333/#334). 특히 `B63`(프론트 포매터 중복)은 이 파트가 「표시측 `fmtPrice`가 null을 `'—'`로 처리한다」를 문서에 인용했으므로 「같이 정리됐겠지」로 읽히기 쉬운데, 포매터 중복 자체는 손대지 않았다.
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
@@ -64,12 +72,7 @@ mapped: 2026-08-10
 | **B40** | `_mc_load` 실패를 "저장값 없음"으로 읽어 365일 시계열을 1건으로 덮어씀 | `market_indicators/kospi_signal.py::refresh_kospi_signal` | 배치 중 DB read 1회 실패(PoolError 포함) |
 | **B41** | `market_cache` 키 `fx`에 **배치가 없다** — 포트폴리오 KRW 환산 전체가 무기한 stale | `market_indicators/fx.py::get_fx` (소비: `routers/stocks.py::_usdkrw_rate`) | 아무도 시장지표 탭을 안 열면 항상 |
 | B5 | 사용자 삭제가 6개 독립 트랜잭션 — 중간 실패 시 반쯤 삭제된 사용자 | `routers/admin.py::delete_user` | 루프 중 DB 오류 |
-| B52 | `run_daily`의 KR `AVG_PRC` override가 같은 파일의 `math.isfinite` 초크포인트를 우회해 mart에 **NaN을 UPDATE** — `bool(float('nan'))==True`라 진리값 가드를 통과하고, `float("nan")`은 ValueError를 던지지 않아 `except (ValueError, KeyError)`도 못 잡는다 | `services/consensus_pipeline.py::run_daily` ← `services/market/kr.py::get_analyst_data_kr` | `TARGET_PRC`/`AVG_PRC`에 `nan`·`inf` 토큰 |
-| B62 | `_table_unit`의 억원 기본값 폴백 — ×100 오저장 클래스 | `services/backlog_parser.py::_table_unit` (§13.2에서 열림 확정, task#292) | 단위 캡션 파싱 실패 |
-| **B64** | `_table_unit`이 「단위」 캡션을 **거리 제한 없이 문서 전체를 거슬러** 탐색해 **무관한 섹션의 단위를 이 표의 것으로 확정**한다 — `B62`와 **같은 함수의 다른 실패 경로**다(B62=캡션을 *못 찾아* 억원 가정 / B64=캡션을 *찾았는데 엉뚱한 것*). 10차 dedup이 둘을 동일 결함으로 병합했으나 메인 세션이 코드 직독으로 기각했다. **두 경로를 한 슬라이스에서 함께 고칠 것** | `services/backlog_parser.py::_table_unit` (`table.find_previous(string=re.compile("단위"))`) | 표에 자기 캡션이 없고 문서 앞쪽에 다른 섹션의 `(단위: …)`가 있을 때 |
 | **B65** | 추천 배치 전량 재계산이 **「전부 실패」만 막고 「대폭 축소」는 무검증 저장**한다 — 유일한 가드가 `if scored: replace_recommendations(...)` 한 줄(all-or-nothing)이고 **커버리지 임계가 없다**. US 후보의 momentum 4필드·`value.upside_pct`가 전부 동일 `df`(=`_fetch_history`)에 의존하므로 히스토리 fetch가 광범위 실패하면 후보 대다수가 신호를 잃고 탈락하는데 한 건만 남아도 전량 교체된다. 처방은 **커버리지 임계**(`commodities`의 `_REST_MIN_COVERAGE=0.5` 선례) + `job_runs.set_status("partial"\|"skipped")` | `services/recommendation/funnel.py::run_recommendation_batch`, `::_has_signal` | yfinance 광범위 장애·레이트리밋 중 배치 실행 |
-| **B66** | 키움 순매수 `close_price`가 파싱 실패 시 `None`이 아니라 **0** — `_signed_int`가 None·빈값·`-`·`+`·`N/A`·ValueError를 전부 0으로 접는다. **같은 파일의 형제 `_pct`는 이미 올바르게 `None`을 반환**하는 대조군이다(`wrong < missing` 위반). `'N/A'`가 필터셋에 있다는 것 자체가 키움 ka10059가 그 센티널을 보낸 이력의 코드 내 증거다 | `services/kiwoom/investor.py::_signed_int` (`fetch_flows`의 `close_price`) | ka10059가 `cur_prc`에 `N/A`·`-`·빈값 반환 |
-| **B67** | 공매도 추이 `close_price`도 **동일하게 실패 시 0** — `B66`이 **형제 파일로 복제**된 것이다. 형제 필드 `short_ratio`는 `_pct`(실패 시 `None`)를 쓰므로 `close_price`만 예외적으로 실패를 유효 시세로 위장한다. `short_sell_service.py::upsert_trend`가 필터 없이 INSERT하므로 **DB에 영구 잔존**한다. **B66과 한 슬라이스에서 함께 고칠 것** | `services/kiwoom/shortsell.py::_int` (`parse_rows`의 `close_price`) | ka10014가 `close_pric`에 `N/A`·`-` 반환 |
 | **B68** | `save_guru_managers`의 **읽기-계산-쓰기가 트랜잭션·락 없이** 돌아 동시 크롤이 서로의 병합결과(드롭/백필 판정)를 덮는다 — `db.py`의 `query()`/`execute()`가 각각 **독립 커넥션·트랜잭션**을 열고 `SELECT … FOR UPDATE`가 없다. docstring이 「드롭은 영구 삭제가 아니다 — 다음 정상 크롤이 복원」이라 자기치유를 명시하나 이는 **클로버가 안 난다는 보장이 아니다**. `§4.3`은 leverage/lending 루프만 잔여위험으로 인정하고 이 함수는 언급하지 않는다(= 기록된 트레이드오프가 아니다) | `services/storage/schedule.py::save_guru_managers` | 자동 배치 + 수동 트리거(또는 이중 클릭)의 근접 타이밍 겹침 |
 | **B69** | `TTLCache`/모듈 전역 `_snapshots`가 **무잠금**이라 동시 `invalidate()`가 진행 중인 `get()`/삭제를 **KeyError로 깨뜨린다**. `§8.1`이 2사이클 연속 「판정불가 — 도구 범위 밖」으로 이월했던 항목이며, 10차가 `threading.Barrier` 하니스로 **강제 인터리빙해 실제 재현**해 확정했다(창이 연속 두 바이트코드로 매우 좁아 LOW). 처방: `get`/`invalidate`를 `threading.Lock`으로 감싼다 | `services/cache.py::TTLCache.get` / `::invalidate` / `get_snapshot` / 모듈 전역 `_snapshots` | 동시 요청 중 한쪽이 `invalidate()`를 호출 |
 
@@ -283,15 +286,15 @@ delete-then-insert 5곳은 전부 **단일 `get_connection()` 트랜잭션**이�
 | `routers/market_indicators.py` | ⚠️ **14개 GET 중 어느 것도 sanitize 안 함** — 내부 가드가 있는 것(`indices`·`fear_greed`·`kospi_futures`·`kospi_signal`·`leverage`·`lending`)과 없는 것(`treasury`·`commodities`·`fx`·`vix`·`econ`·`macro`·`m7`·`kr_top2`·`kr_exports`)이 섞여 있다 |
 | `routers/rankings.py`·`investor.py`·`short_sell.py` | ⚠️ `_serialize`가 bare `_to_float`, sanitize 없음 |
 
-### 3.4 NaN이 `market_rankings`에 저장돼 랭킹 500을 낼 수 있다 — **잠재 위험**
+### 3.4 NaN이 `market_rankings`에 저장돼 랭킹 500을 낼 수 있다 — **이미 가드됨**(task#328)
 
-`services/ranking_service.py::_us_row`:
+**닫힘.** `services/ranking_service.py::_parse_float`가 `math.isfinite` 가드를 거쳐 비유한값을 `None`으로 떨어뜨리므로 `market_rankings.change_pct`(`NUMERIC`)에 `NaN`이 들어가는 경로가 없다. 즉 이 절이 서술한 연쇄(저장 → `Decimal('NaN')` → sanitize 없는 `routers/rankings.py::_serialize` → starlette `allow_nan=False` → 랭킹 500)의 **첫 고리가 끊겼다**.
 
-```python
-"change_pct": _parse_float(quote.get("regularMarketChangePercent")),
-```
+같은 라운드에서 인접 2건을 함께 닫았다(적대적 검토):
+- `price`는 시세 전용 `_parse_price`로 분리했다 — 실패·비유한·**리터럴 `0`**을 `None`으로 둔다(수량 필드는 `_parse_int`의 `0` 폴백 유지, `CONVENTIONS §1.3.2`). 옛 US 경로 `quote.get("regularMarketPrice") or 0`은 `bool(nan) is True`라 NaN을 통과시켜 뒤이은 `int(price * volume)`가 US 랭킹 배치를 통째로 죽였다.
+- `_parse_int`의 except에 `OverflowError`를 넣었다 — `int(float("Infinity"))`는 `ValueError`가 아니다.
 
-`_parse_float`는 `float(str(val).strip())`이라 **`float("nan")`이 성공한다**. `price`/`trading_value`는 `int()`를 거쳐 NaN이면 배치가 죽지만 `change_pct`는 통과한다 → `market_rankings.change_pct`(`NUMERIC`) → `Decimal('NaN')` → `routers/rankings.py::_serialize`의 sanitize 없는 `_to_float` → starlette `allow_nan=False` → **랭킹 페이지 전체 500**. 미확인 부분은 yfinance `most_actives`가 실제로 그 필드에 NaN을 내는지 여부다.
+**남는 잔여 위험은 §3.3의 sanitize 부재 자체다** — `routers/rankings.py`·`investor.py`·`short_sell.py`의 `_serialize`는 여전히 bare `_to_float`라, 이 소스 가드를 우회해 다른 경로로 들어온 `Decimal('NaN')`은 그대로 500이 된다. 소스 가드가 있다고 §3.3 행을 지우지 말 것.
 
 ### 3.5 최소카드 폴백이 근본원인을 마스킹한다 — **설계상 트레이드오프**
 
@@ -974,7 +977,7 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 | B33 | `any(snap_dist.values())`가 진짜 0/0/0을 결측으로 오판 | **닫힘** | 제자리 | **구조적 배제** — `market/kr.py::get_analyst_data_kr`의 세 버킷(`c>=3.5` / `2.5<=c<3.5` / `c<2.5`)이 실수선을 **완전 분할**하고, `market/__init__.py::get_analyst_data`도 yfinance 5열을 3버킷으로 완전 분할한다. 따라서 `buy+hold+sell==0 ⟺ 파싱된 평가 0건`이 참이고, 그 상태에서 mart 보충은 주석이 명시한 **의도된 폴백**이다 | → 해소 (아래 주의) |
 | — | `_filter_outliers`가 저장 시계열을 영구 손상 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 **B60 (HIGH)** → **해소**(task#303, ADR-0040) |
 | — | Naver 재무를 **위치 인덱스**로 읽는다 | **열림** | 제자리 | 현재 코드 인용 확인. 직전 판이 "다음 매핑의 우선 대상"으로 지목한 그 항목 | → §0 **B61 (HIGH)** → **해소**(task#303, ADR-0040) |
-| — | `_table_unit`의 억원 기본값 폴백(×100 오저장 클래스) | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 **B62 (MEDIUM)** |
+| — | `_table_unit`의 억원 기본값 폴백(×100 오저장 클래스) | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 **B62 (MEDIUM)** → **해소**(task#328, `B64`와 함께) |
 | — | 프론트 포매터 중복 15종 | **열림** | 제자리 | 재계수 수행 | → §0 **B63 (LOW)** |
 | — | 인메모리 캐시 스레드 안전성의 실제 사고 가능성 | ~~판정불가~~ → **열림** | 제자리 | ~~도구 범위 밖 — 동시성 재현이 필요하다~~ → **판정 완료(2026-08-21, task#325).** 「계속 미룰지 vs 하니스를 만들지」의 답으로 **하니스를 만들었다** — `threading.Barrier` + monkeypatch로 강제 인터리빙을 주입해 로컬 `.venv`(py3.9, DB 미접촉, 라이브 쓰기 0)에서 재현했다. 산출 4건: `TTLCache.get`/`invalidate` 무잠금 **KeyError 재현**(→ B69) · `TTLCache.get` single-flight 부재 → `loader() call_count: 2` 재현(단 `§4.2`의 기지 위험이라 REFUTED) · `ProgressTracker` 비원자적 start → `done(2) > total(1)` 불변식 위반 재현(→ B77) · `save_guru_managers` RMW 락 부재(→ B68). **비용은 하니스 몇 줄이었다** — 「도구 범위 밖」이라는 문구가 2사이클을 버틴 것에 비해 훨씬 싸다 | → §0 **B69 (LOW)** · 파생 **B68**·**B77** |
 

@@ -113,6 +113,30 @@ peer 3개일 때 정상 peer를 결측시키는 한계를 알고도 "과보수�
 
 한계를 테스트로 못박을 때는 **"의도된 트레이드오프"인지 "미룬 결함"인지 이름·주석에 구분**해 남긴다.
 
+### 1.3.2 파싱 실패의 폴백은 **필드 성격**이 정한다 — 시세는 `None`, 수량은 `0`
+
+`0`은 어떤 필드에서는 유효값이고 어떤 필드에서는 **실패의 위장**이다. 그래서 "실패 → 0"을
+파일 단위·함수 단위로 정하면 반드시 한쪽이 틀린다.
+
+| 필드 성격 | 폴백 | 이유 |
+|---|---|---|
+| 수량·금액·건수(순매수·거래량·거래대금·잔량·시총) | **`0`** | 「거래 없음」·「순매수 없음」이 실제로 0이다 |
+| 시세·비율·단가(현재가·종가·비중·목표가) | **`None`** | 0원 종가·0% 비중은 존재하지 않는다 → 0은 실패의 위장 |
+
+- **한 함수가 두 성격을 겸하게 두지 말 것.** `kiwoom/investor.py::_signed_int`는 순매수 3필드(0 폴백)와
+  `close_price`(None이어야 함)를 함께 파싱하고 있었다 → 시세 전용 `_close_price`를 분리했다.
+  같은 결함이 `kiwoom/shortsell.py::_int`(형제 파일 복제)·`ranking_service.py::_parse_int`(랭킹 `price`)에도 있었다.
+- **리터럴 `0`도 결측으로 볼 것** — 소스가 결측을 `"0"`으로 채우면 파싱은 *성공*하므로 센티널·예외·
+  비유한 가드를 **전부 통과**한다. 라이브 실측: Naver KOSPI 응답 2478행 중 **54행**이
+  `closePriceRaw='0'`(거래 0인 채권형 ETF·ETN)이고 같은 응답의 `fluctuationsRatio`도 그 0에서 파생된 `-100.00`이다.
+- **같은 컬럼에 쓰는 writer를 전수 세라.** `market_investor_trend.close_price`의 writer는 셋이다
+  (`kiwoom/investor.py::_close_price`·`kiwoom/shortsell.py::_close_price`·`investor_service.py::_parse_close_price`).
+  하나만 고치면 소스별로 0과 None이 섞여 **어느 쪽이 결함인지 코드로 판정할 수 없게 된다.**
+- **`except`만으로는 비유한값을 못 막는다** — `float("nan")`·`float("Infinity")`는 `ValueError`를 던지지 않고
+  `bool(float("nan")) is True`라 진리값 가드도 통과한다. `math.isfinite`를 쌍으로 둘 것(§3).
+  그리고 `int(float("Infinity"))`는 `ValueError`가 아니라 **`OverflowError`**다 — `except ValueError`만
+  두면 파싱 함수가 raise되고 호출측 broad except가 그 대상의 데이터를 조용히 비운다.
+
 ### 1.4 graceful degradation — 부가기능은 본문을 깨뜨리지 않는다
 
 계측·캐시 워밍·enrichment 같은 부가 경로는 실패해도 본문을 통과시킨다.

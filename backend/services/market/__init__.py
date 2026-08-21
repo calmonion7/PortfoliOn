@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import math
 import yfinance as yf
 import pandas as pd
 
@@ -325,6 +326,14 @@ def get_annual_financials(ticker: str, market: str = "US", exchange: str = "") -
     return get_annual_financials_us(ticker, exchange)
 
 
+def _finite(v):
+    """숫자면 유한값만 통과, 그 외/비유한은 None. `bool(nan) is True`라 진리값 가드로는
+    막히지 않으므로 `math.isfinite`를 명시한다."""
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return v if math.isfinite(v) else None
+    return None
+
+
 def get_analyst_data(ticker: str, market: str = "US", exchange: str = "", _t=None) -> dict:
     if market == "KR":
         return get_analyst_data_kr(ticker)
@@ -340,10 +349,17 @@ def get_analyst_data(ticker: str, market: str = "US", exchange: str = "", _t=Non
             buy  = int(row.get("strongBuy", 0)) + int(row.get("buy", 0))
             hold = int(row.get("hold", 0))
             sell = int(row.get("sell", 0)) + int(row.get("strongSell", 0))
+        # 소스층 비유한값 가드 — KR 분기(`get_analyst_data_kr`)와 같은 규약.
+        # yfinance `analyst_price_targets`는 NaN을 실을 수 있고(consensus_pipeline의
+        # 초크포인트 docstring이 같은 `apt`를 두고 단언한 사실), 이 dict는 mart가 아니라
+        # **스냅샷**으로도 흘러간다(`routers/report.refresh_analyst`·`report_generator`).
+        # `json.dumps`는 기본 `allow_nan=True`라 리터럴 NaN을 만들지만 `snapshots.data`는
+        # jsonb NOT NULL이라 PostgreSQL이 거부한다 → 500 / 배치 스냅샷 조용한 누락.
+        # 비유한 필드만 떨구고 형제 필드는 남긴다(wrong < missing).
         return {
-            "target_mean": targets.get("mean"),
-            "target_high": targets.get("high"),
-            "target_low":  targets.get("low"),
+            "target_mean": _finite(targets.get("mean")),
+            "target_high": _finite(targets.get("high")),
+            "target_low":  _finite(targets.get("low")),
             "buy": buy, "hold": hold, "sell": sell,
         }
     except Exception as e:
