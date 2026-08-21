@@ -85,11 +85,21 @@ const detailTabs = (page) => page.evaluate((re) =>
   [...document.querySelectorAll('button.tab-btn')].map(b => b.textContent.trim()).filter(t => new RegExp(re).test(t)),
   DETAIL_TAB_RE.source);
 
+// ⚠️ 목록은 폭·뷰에 따라 사이드바(.report-item)와 카드(.stock-card) 중 한쪽이 `display:none`이다
+// (pc.css: [data-view=list] .reports-sidebar / [data-view=detail] 반대). DOM에는 둘 다 있으므로
+// **가시 요소를 골라** 클릭해야 한다 — .first()는 숨은 쪽을 집어 30초 타임아웃으로 죽는다.
+async function clickFirstVisible(loc) {
+  const n = await loc.count();
+  for (let i = 0; i < n; i++) {
+    const el = loc.nth(i);
+    if (await el.isVisible().catch(() => false)) { await el.click(); return true; }
+  }
+  return false;
+}
 async function openDetail(page, ticker) {
-  const item = page.locator('.report-item', { hasText: ticker }).first();
-  if (await item.count() > 0) { await item.click(); await settle(page); return true; }
-  const card = page.locator('.stock-card-grid').getByText(ticker, { exact: false }).first();
-  if (await card.count() > 0) { await card.click(); await settle(page); return true; }
+  for (const sel of ['.report-item', '.stock-card']) {
+    if (await clickFirstVisible(page.locator(sel, { hasText: ticker }))) { await settle(page); return true; }
+  }
   return false;
 }
 
@@ -108,11 +118,13 @@ async function run(label, ctxOpts) {
   await page.goto(`${BASE}/reports`, { waitUntil: 'domcontentloaded' });
   await settle(page);
   const badge = await page.evaluate(([pt, npt]) => {
-    const rowOf = (t) => [...document.querySelectorAll('.report-item')].find(el => el.textContent.includes(t));
-    const has = (t) => { const r = rowOf(t); return r ? r.textContent.includes('심층') : null; };
-    return { pub: has(pt), noPub: has(npt) };
+    // 사이드바 행·카드 둘 다 같은 hasPub 계약을 진다 — 렌더된 쪽 전부를 본다(하나만 보면
+    // 폭에 따라 축이 조용히 다른 렌더러를 재게 된다).
+    const nodes = (t) => [...document.querySelectorAll('.report-item, .stock-card')].filter(el => el.textContent.includes(t));
+    const has = (t) => { const ns = nodes(t); return ns.length === 0 ? null : ns.some(el => el.textContent.includes('심층')); };
+    return { pub: has(pt), noPub: has(npt), n: nodes(pt).length };
   }, [PUB_T, NOPUB_T]);
-  ok(`[${label}] 배지:발행물-있는-종목에-붙는다`, badge.pub === true, `${PUB_T} → ${badge.pub}`);
+  ok(`[${label}] 배지:발행물-있는-종목에-붙는다`, badge.pub === true, `${PUB_T} → ${badge.pub} (노드 ${badge.n}개)`);
   ok(`[${label}] 배지:없는-종목엔-안-붙는다(대조군)`, badge.noPub === false, `${NOPUB_T} → ${badge.noPub}`);
 
   // ── ⓐⓑⓓ 발행물 있는 종목 = 5탭 + 본문 렌더 ──────────────────────────────
