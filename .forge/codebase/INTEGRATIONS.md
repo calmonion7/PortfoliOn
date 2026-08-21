@@ -505,7 +505,9 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 
 **배치-백킹 뷰(랭킹·업종 모멘텀·수급·공매도·배당·베타·공시 등)는 요청·기동 경로에서 외부 API를 라이브 호출하지 않는다.** 배치가 사전계산해 `market_cache`/전용 테이블에 저장하고, 요청은 저장값만 읽는다.
 
-예외(요청경로 증분 fetch, 스케줄 배치 없음 = `batch_registry` 무등록): `fx` · `vix` · `commodities` · `treasury` · `indices` · `kospi_futures` · `fear_greed`. 패턴은 동일하다 — 인메모리 TTL 캐시 → `_mc_load` → 라이브 fetch → `_mc_save` + 폴백.
+예외(요청경로 증분 fetch, 스케줄 배치 없음 = `batch_registry` 무등록): `vix` · `commodities` · `treasury` · `indices` · `kospi_futures` · `fear_greed`. 패턴은 동일하다 — 인메모리 TTL 캐시 → `_mc_load` → 라이브 fetch → `_mc_save` + 폴백.
+
+⚠️ **`fx`는 2026-08 이후 이 목록에서 빠졌다** — 요청경로 증분(`get_fx`)을 그대로 유지하면서 배치 `fx_fetch`(매일 06:40 KST, `scheduler/jobs._refresh_fx` → `market_indicators/fx._fetch_and_save_fx`, 수동 `POST /api/market/refresh-fx`)를 **함께** 갖는다. 소비자가 시장지표 탭 밖에도 있고(`routers/stocks.py::_usdkrw_rate` · `services/digest_service.py`) 그쪽은 나이 검사 없는 raw `_mc_load("fx")`라, 배치가 없으면 아무도 탭을 안 열 때 포트폴리오 KRW 환산이 무기한 stale해진다(`get_or_refresh`의 `ttl`은 저장값에 걸리지 않는다).
 
 기동 시 빈 캐시 시드: `_seed_rankings_if_empty` · `_seed_kr_sector_if_empty` · `_seed_us_sector_if_empty`(`scheduler/jobs.py`).
 
@@ -530,7 +532,7 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 - **유동적 대규모 집합**(S&P500/KOSPI 나머지 ~490종목) → **커버리지 임계** `_REST_MIN_COVERAGE = 0.5`.
 - **독립 항목**(원자재 심볼·업종처럼 서로 합산되지 않는 것) → 실패분만 개별 백필.
 - ⚠️ `if not X:` all-or-nothing 게이트는 이 셋 중 어디에도 해당하지 않는다 — 유동 집합에 그것만 걸면 절반이 조용히 소실된다.
-- ⚠️ **백필과 전량실패 판정의 순서**가 중요하다 — 백필을 먼저 하면 저장값이 있는 한 판정이 영원히 발동하지 않는다(`commodities.get_treasury()`가 그 형태). 판정은 백필 *전* raw fetch 결과로(`if not any(results.values())` — `get_commodities()`가 옳은 순서).
+- ⚠️ **백필과 전량실패 판정의 순서**가 중요하다 — 백필을 먼저 하면 저장값이 있는 한 판정이 영원히 발동하지 않는다. 판정은 백필 *전* raw fetch 결과로(`if not any(results.values())`). `commodities.get_treasury()`가 한때 그 반례였으나 **task#269(BH7-L1, `e88e9c2`)에서 교정**돼 지금은 `get_commodities()`와 같은 순서다 — 둘 다 참조 구현으로 쓸 수 있다(옛 판의 "`get_treasury`가 그 형태" 서술은 stale이니 인용하지 말 것).
 
 관측 규약: 저장 스킵 시 admin 응답·로그가 **"갱신됨"과 "생략·직전값 유지"를 구분**해야 한다. `job_runs`는 본문이 예외를 전파할 때만 `failed`라, 스킵은 기본적으로 초록으로 기록된다.
 

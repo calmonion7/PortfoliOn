@@ -7,7 +7,8 @@ import pandas as pd
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from .cache import _mc_load, _mc_save, _cache, get_or_refresh, _BASE_DIR, _DATA_DIR
+from .cache import (_mc_load, _mc_load_strict, _mc_save, _cache, get_or_refresh,
+                    _BASE_DIR, _DATA_DIR)
 from services.utils import today_kst
 import logging
 
@@ -33,6 +34,20 @@ _KOSPI_SEED = os.path.join(_DATA_DIR, "kospi_tickers.json")
 _SP500_KEY = "sp500_tickers"
 _KOSPI_KEY = "kospi_tickers"
 _TICKER_TTL_SEC = 86400 * 7
+# 티커 유니버스 축소 하한 — 스크레이프 결과가 **기준의 90% 미만**이면 저장하지 않는다(B30).
+# 옛 게이트 `if tickers:`는 빈 목록만 막아, 503종목 중 3종목만 긁힌 결과가 7일간 박제됐다
+# (실패 클래스 (b) 성공-but-빈응답의 *부분*판 — try/except 예외 가드를 그냥 통과한다).
+# **기준 = 직전 저장값의 길이**(신선/만료 무관). 정적 시드를 기준으로 쓰지 않는 이유:
+#   ① 시드는 곧 이 함수의 최종 폴백이라, 기준으로 쓰면 「가드가 막고 시드를 반환」이 반복돼
+#      market_cache가 영영 warm되지 않고 매 호출이 재스크레이프(KOSPI는 페이지 수십 회)를 한다.
+#   ② 시드는 저장소 스냅샷이라 라이브 유니버스와 규모가 어긋난다 — 실측 `kospi_tickers.json`은
+#      2182건인데 `_scrape_kospi`(sosok=0=KOSPI만)의 라이브 규모는 그보다 훨씬 작다. 그 차이면
+#      **정상 스크레이프가 90% 하한을 영구히 통과하지 못해** 첫 실행이 영영 차단된다(자기교착).
+#   ③ 저장값 기준은 자기치유적이다 — 축소값이 한 번 박제돼도 이후 정상 스크레이프는 항상 통과해
+#      회복된다. 저장값이 없으면(첫 실행·DB 공백) 기준이 0이라 가드는 원리적으로 발동하지 않는다.
+# 10% 여유의 근거: S&P500은 분기당 수 종목 교체로 상시 500~503이고 KOSPI 상장 수도 천천히
+# 변한다 — 정당한 변동은 죽이지 않고 대량 절단만 잡는 폭이다.
+_TICKER_MIN_RETAIN = 0.9
 
 
 def _quarter_ended(q: str) -> bool:
@@ -96,8 +111,24 @@ def _tickers_with_cache(key: str, seed_path: str, scrape) -> list[str]:
 
     스크레이프 실패 시 `_mc_save`를 호출하지 않는다 — 빈/부분 목록을 박제하면 이후 7일간
     그 목록으로 실적을 계산한다(CLAUDE.md "빈/실패 결과 캐시 박제 금지", wrong < missing).
+    이 docstring의 "**부분**" 절반은 옛 게이트(`if tickers:`)가 구현하지 않아 문서가 코드보다
+    앞서 있었고, 이제 `_TICKER_MIN_RETAIN` 축소 가드가 그 절반을 맡는다(task#234 결정의 미완
+    부분을 좁힌 것이며 뒤집은 것이 아니다, B30).
     """
-    stored = _mc_load(key)
+    # ⚠️ **엄격 로더**로 읽는다 — 관용 `_mc_load`는 조회 예외를 None으로 접으므로
+    # 「DB 오류」와 「한 번도 저장 안 됨」이 같은 값이 되고, 그러면 아래 `baseline`이 0으로
+    # 붕괴해 축소 가드가 **통째로 꺼진다**(`_mc_save`는 execute·`_mc_load`는 query라 SELECT만
+    # 일시 실패하고 INSERT는 성공하는 조합이 실제로 성립한다 → 3종목이 503종목을 덮는다).
+    # 여기서는 예외를 전파하지 않고 `baseline_known=False`로 내려 **저장만 생략**한다 —
+    # 이 함수는 폴백 체인(만료 저장값 → 정적 시드)을 가진 read 경로이므로, 전파하면
+    # 일시 DB 오류가 실적 배치를 통째로 죽인다(가드가 정상 동작을 지우면 그것도 손실).
+    try:
+        stored = _mc_load_strict(key)
+        baseline_known = True
+    except Exception as e:
+        logger.warning(f"[Earnings] 티커 저장값 조회 실패 key={key}: {e}")
+        stored = None
+        baseline_known = False
     if _is_fresh(stored):
         fresh = _stored_tickers(stored)
         if fresh:
@@ -107,12 +138,25 @@ def _tickers_with_cache(key: str, seed_path: str, scrape) -> list[str]:
     except Exception as e:
         logger.warning(f"[Earnings] 티커 스크레이프 실패 key={key}: {e}")
         tickers = []
+    # 축소 판정은 저장 직전이 아니라 여기서 — 미채택 결과를 빈 목록으로 접어 아래 폴백 체인
+    # (만료 저장값 → 정적 시드)을 예외 경로와 그대로 공유한다.
+    baseline = len(_stored_tickers(stored))
+    if tickers and not baseline_known:
+        logger.warning(
+            f"[Earnings] 티커 축소 판정 불가(저장값 조회 실패) — 저장 생략 key={key}")
+        tickers = []
+    elif tickers and len(tickers) < baseline * _TICKER_MIN_RETAIN:
+        logger.warning(
+            f"[Earnings] 티커 유니버스 축소({len(tickers)}/{baseline}, "
+            f"하한 {_TICKER_MIN_RETAIN:.0%}) — 저장 생략, 직전값 유지 key={key}")
+        tickers = []
     if tickers:
         _mc_save(key, {"tickers": tickers})
         return tickers
     stale = _stored_tickers(stored)
     if stale:
-        logger.warning(f"[Earnings] 티커 스크레이프 실패 — 만료된 저장값 사용 key={key}")
+        logger.warning(
+            f"[Earnings] 티커 스크레이프 결과 미채택(실패·축소) — 만료된 저장값 사용 key={key}")
         return stale
     return _read_seed(seed_path)
 

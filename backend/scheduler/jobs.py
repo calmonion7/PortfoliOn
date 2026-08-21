@@ -90,12 +90,36 @@ def _run_guru_crawl():
 
 def _refresh_monthly_us():
     from services.market_indicators import _fetch_and_save_econ_indicators
-    with job_runs.record("monthly_us", "auto"):
+    with job_runs.record("monthly_us", "auto") as run:
         try:
-            _fetch_and_save_econ_indicators()
-            logger.info("[Scheduler] Econ indicators refreshed")
+            # `or {}` — 이 잡을 스텁하는 기존 테스트가 None을 반환한다(반환 검사 도입 전 형태).
+            data = _fetch_and_save_econ_indicators() or {}
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                logger.warning(f"[Scheduler] Econ indicators skipped: {data['error']}")
+            elif data.get("_status"):
+                run.set_status(data["_status"])
+                logger.warning(f"[Scheduler] Econ indicators {data['_status']} — 직전값 유지")
+            else:
+                logger.info("[Scheduler] Econ indicators refreshed")
         except Exception as e:
+            run.set_status("failed", str(e))
             logger.warning(f"[Scheduler] Econ indicators refresh failed: {e}")
+
+
+def _refresh_fx():
+    from services.market_indicators import fx
+    with job_runs.record("fx_fetch", "auto") as run:
+        try:
+            data = fx._fetch_and_save_fx() or {}
+            if data.get("_status"):
+                run.set_status(data["_status"])
+                logger.warning(f"[Scheduler] FX {data['_status']} — 직전 저장값 유지")
+            else:
+                logger.info("[Scheduler] FX refreshed")
+        except Exception as e:
+            run.set_status("failed", str(e))
+            logger.warning(f"[Scheduler] FX refresh failed: {e}")
 
 
 def _refresh_macro_signals():
@@ -163,12 +187,15 @@ def _refresh_trimmed_inflation():
 
 
 def _refresh_kospi_signal():
+    """누적 series 저장 경로 — `_mc_load_strict`가 조회 실패를 전파해 이력을 보존한다.
+    그 예외를 삼키면 「보존이 발동했다」가 무음이 되므로 failed로 기록한다."""
     from services.market_indicators import kospi_signal
-    with job_runs.record("kospi_signal_fetch", "auto"):
+    with job_runs.record("kospi_signal_fetch", "auto") as run:
         try:
             kospi_signal.refresh_kospi_signal()
             logger.info("[Scheduler] KOSPI signal refreshed")
         except Exception as e:
+            run.set_status("failed", str(e))
             logger.warning(f"[Scheduler] KOSPI signal refresh failed: {e}")
 
 
@@ -183,22 +210,28 @@ def _refresh_monthly_kr():
 
 
 def _refresh_earnings_us():
+    # ⚠️ 예외만 기록한다 — 본문의 **저장 생략 4경로**(M7 불완전·rest 유니버스 공백·rest 커버리지
+    # 미달·마감분기 없음)는 직전 저장값을 그대로 반환하므로 반환값으로 구별할 수 없다. 그 절반은
+    # 선재 부채로 남는다(`services/job_runs.py` docstring의 예외 목록 참조).
     from services.market_indicators import _fetch_and_save_m7_earnings
-    with job_runs.record("earnings_us", "auto"):
+    with job_runs.record("earnings_us", "auto") as run:
         try:
             _fetch_and_save_m7_earnings()
             logger.info("[Scheduler] M7 earnings refreshed")
         except Exception as e:
+            run.set_status("failed", str(e))
             logger.warning(f"[Scheduler] M7 earnings refresh failed: {e}")
 
 
 def _refresh_earnings_kr():
+    # `_refresh_earnings_us`와 동일 — 예외는 기록하고, 저장 생략 4경로는 선재 부채다.
     from services.market_indicators import _fetch_and_save_kr_top2_earnings
-    with job_runs.record("earnings_kr", "auto"):
+    with job_runs.record("earnings_kr", "auto") as run:
         try:
             _fetch_and_save_kr_top2_earnings()
             logger.info("[Scheduler] KR Top2 earnings refreshed")
         except Exception as e:
+            run.set_status("failed", str(e))
             logger.warning(f"[Scheduler] KR Top2 earnings refresh failed: {e}")
 
 
@@ -301,22 +334,29 @@ def _fetch_betas():
 
 
 def _fetch_kr_rankings():
+    """랭킹 스냅샷 전량 교체. fetch 가드가 **예외로** DELETE를 막으므로 그 예외를 삼키면
+    「replace를 통째로 건너뜀」이 배치현황에서 초록이 된다 — skipped로 기록한다.
+    (랭킹 크론은 잦아서 장애가 계속되면 `market_rankings`가 무기한 stale해지는데, 나이 신호는
+    `GET /api/rankings`의 `base_ts`뿐이고 현황 대시보드엔 없다.)"""
     from services import ranking_service
-    with job_runs.record("kr_rankings_fetch", "auto"):
+    with job_runs.record("kr_rankings_fetch", "auto") as run:
         try:
             ranking_service.replace_market_rankings("KR", ranking_service.get_kr_rankings())
             logger.info("[Scheduler] KR rankings refreshed")
         except Exception as e:
+            run.set_status("skipped", str(e))
             logger.warning(f"[Scheduler] KR rankings refresh failed: {e}")
 
 
 def _fetch_us_rankings():
+    """`_fetch_kr_rankings`와 동일 — fetch 가드의 예외를 skipped로 기록한다."""
     from services import ranking_service
-    with job_runs.record("us_rankings_fetch", "auto"):
+    with job_runs.record("us_rankings_fetch", "auto") as run:
         try:
             ranking_service.replace_market_rankings("US", ranking_service.get_us_rankings())
             logger.info("[Scheduler] US rankings refreshed")
         except Exception as e:
+            run.set_status("skipped", str(e))
             logger.warning(f"[Scheduler] US rankings refresh failed: {e}")
 
 
@@ -428,27 +468,40 @@ def _supply_score_work():
 
 
 def _fetch_recommendation_kr():
-    with job_runs.record("recommendation_kr", "auto"):
-        _recommendation_work("KR")
+    with job_runs.record("recommendation_kr", "auto") as run:
+        _recommendation_work("KR", run)
 
 
 def _fetch_recommendation_us():
-    with job_runs.record("recommendation_us", "auto"):
-        _recommendation_work("US")
+    with job_runs.record("recommendation_us", "auto") as run:
+        _recommendation_work("US", run)
 
 
-def _recommendation_work(market: str):
+def _recommendation_work(market: str, run=None):
     """발굴 유니버스 추천 점수 사전계산 배치(.forge/adr/0015).
 
     2단 깔때기로 점수를 계산해 stock_recommendations에 통째 교체 저장 —
     요청·기동 경로 라이브 호출 0(이 함수만 외부 fetch). 산출 불가(전부 None)면
-    save 생략+로깅(silent except 금지, all-None 박제 금지)."""
+    save 생략+로깅(silent except 금지, all-None 박제 금지).
+
+    `run`(job_runs 핸들)을 받으면 배치 결과를 실행이력에 반영한다 — 이 함수는 예외를 삼키고
+    정상 종료하므로 **배선하지 않으면 partial·skipped·실패가 전부 success로 기록**되고,
+    커버리지 가드가 전량 교체를 생략해도 배치 현황이 계속 초록이다(가드가 데이터는 지켜도
+    발동 사실이 무음이 된다). auto·manual 두 레인이 모두 이 함수를 지나므로 매핑을 여기 한 곳에
+    둔다. 반환은 stats(실패 시 None)."""
     from services import recommendation
     try:
         stats = recommendation.run_recommendation_batch(market)
         logger.info(f"[Scheduler] Recommendation {market} computed: {stats}")
+        status = (stats or {}).get("status")
+        if run is not None and status and status != "success":
+            run.set_status(status)
+        return stats
     except Exception as e:
         logger.warning(f"[Scheduler] Recommendation {market} failed: {e}")
+        if run is not None:
+            run.set_status("failed", str(e))
+        return None
 
 
 def _fetch_us_supply():
@@ -522,12 +575,19 @@ def _seed_rankings_if_empty():
 
 
 def _fetch_us_sector():
+    """전 ETF all-None이면 `refresh()`가 저장을 생략하고 그 결과를 그대로 돌려준다 — 반환값을
+    보지 않으면 그 스킵이 success로 기록된다. 직전값 조회 실패(백필 불가)는 예외로 전파된다."""
     from services import us_sector_service
-    with job_runs.record("us_sector_fetch", "auto"):
+    with job_runs.record("us_sector_fetch", "auto") as run:
         try:
             sectors = us_sector_service.refresh()
-            logger.info(f"[Scheduler] US sector momentum refreshed: {len(sectors)} sectors")
+            if us_sector_service.save_was_skipped(sectors):
+                run.set_status("skipped", "all-None momentum")
+                logger.warning("[Scheduler] US sector momentum all-None — 저장 생략, 직전값 유지")
+            else:
+                logger.info(f"[Scheduler] US sector momentum refreshed: {len(sectors)} sectors")
         except Exception as e:
+            run.set_status("failed", str(e))
             logger.warning(f"[Scheduler] US sector momentum refresh failed: {e}")
 
 
@@ -565,6 +625,7 @@ _JOB_FUNCS = {
     "earnings_us": _refresh_earnings_us,
     "monthly_kr": _refresh_monthly_kr,
     "monthly_us": _refresh_monthly_us,
+    "fx_fetch": _refresh_fx,
     "macro_signals_fetch": _refresh_macro_signals,
     "business_formation_fetch": _refresh_business_formation,
     "labor_surveys_fetch": _refresh_labor_surveys,

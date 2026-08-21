@@ -130,7 +130,7 @@ backend/
 | `progress.py` | `ProgressTracker` — `threading.Lock` 보호 dict(`running/done/total/current/failed`), 장기 크롤 진행률 |
 | `errors.py` | `not_found()`/`already_exists()` `HTTPException` 팩토리 |
 | `job_runs.py` | 배치 실행로그. `record(job_id, trigger)` 컨텍스트매니저가 **`Run` 핸들을 yield**(`.run_id` + `.set_status()`). 상태 어휘 `running\|success\|partial\|skipped\|failed`, 본문이 예외를 전파하면 `failed`가 지정을 이긴다. job_id별 최근 `KEEP=20`건 보관 |
-| `batch_registry.py` | `BATCHES` 정적 리스트 **29개** — `id`/`label`/`category`/`schedule_desc`/`usage`/`source`/`market`/`editable`/`trigger_kinds`/`manual_endpoint`/`scheduler_job_id`/`timezone`/`default_schedule`. `job_id`는 스케줄러 잡 id 및 `job_runs.record` 인자와 반드시 일치 |
+| `batch_registry.py` | `BATCHES` 정적 리스트 **33개** — `id`/`label`/`category`/`schedule_desc`/`usage`/`source`/`market`/`editable`/`trigger_kinds`/`manual_endpoint`/`scheduler_job_id`/`timezone`/`default_schedule`. `job_id`는 스케줄러 잡 id 및 `job_runs.record` 인자와 반드시 일치 |
 | `schedule_spec.py` | 스케줄 스펙 dict → APScheduler `CronTrigger` kwargs |
 | `storage/` | 포트폴리오·종목명·스케줄·기대일자 (DB 접근) |
 

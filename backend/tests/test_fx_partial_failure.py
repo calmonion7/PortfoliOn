@@ -58,8 +58,13 @@ def test_all_fx_fetches_fail_keeps_stored_data_untouched():
          patch("services.market_indicators.fx._mc_save") as mock_save:
         result = get_fx()
 
-    saved_data = mock_save.call_args[0][1]
-    assert saved_data["rates"] == stored_data["rates"]
+    # 전 심볼 실패 → **저장 자체를 하지 않는다.** 이 단언은 예전엔 "저장된 rates가 직전값과
+    # 같다"였는데, 그 경로의 payload는 rates만 직전값을 복사하고 `history`·`_raw_history`는
+    # `{}`였다 — 즉 "untouched"라는 이름과 달리 usdkrw 히스토리를 **지우는** 저장이었다.
+    # 저장을 생략하면 이 테스트의 이름이 말하는 것이 실제로 성립한다(그리고 `fetched_at`도
+    # 갱신되지 않아 나이 신호가 거짓이 되지 않는다).
+    assert not mock_save.called
+    # 응답은 여전히 직전 저장값으로 채워진다(소스-폴백은 그대로 동작한다)
     assert result["rates"]["usdkrw"]["current"] == 1350.0
     assert result["rates"]["usdjpy"]["current"] == 155.32
     assert result["rates"]["eurusd"]["current"] == 1.08

@@ -216,12 +216,15 @@ def refresh_recommendations(
     market: str = Query(..., pattern="^(KR|US)$"),
     _: str = Depends(require_admin),
 ):
-    """추천 점수 갱신(scheduler._recommendation_work, admin 전용). market=KR|US."""
+    """추천 점수 갱신(scheduler._recommendation_work, admin 전용). market=KR|US.
+
+    BackgroundTask라 응답은 무조건 202다 — 결과는 `job_runs` 실행이력으로만 관측되므로
+    핸들을 넘겨 partial/skipped/failed를 기록한다(auto 레인과 같은 매핑을 공유한다)."""
     job_id = "recommendation_kr" if market == "KR" else "recommendation_us"
 
     def _run():
-        with job_runs.record(job_id, "manual"):
-            scheduler._recommendation_work(market)
+        with job_runs.record(job_id, "manual") as run:
+            scheduler._recommendation_work(market, run)
 
     background_tasks.add_task(_run)
     return {"ok": True}

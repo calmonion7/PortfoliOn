@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import yfinance as yf
 from services.utils import sanitize
-from .cache import _mc_load, _mc_save, _yf_close_history, _filter_outliers
+from .cache import _mc_load, _mc_load_strict, _mc_save, _yf_close_history, _filter_outliers
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,9 @@ def _reconcile_actuals(series: list[dict], kospi_rows=_UNSET) -> list[dict]:
 
 
 def refresh_kospi_signal() -> dict:
-    stored = _mc_load("kospi_signal")
+    # 엄격 로더 — 조회 실패를 「저장값 없음」으로 읽으면 아래 append가 누적 series를
+    # 오늘 1건으로 덮는다(_mc_load_strict docstring). 실패는 전파해 저장에 도달하지 않는다.
+    stored = _mc_load_strict("kospi_signal")
     stored_data = (stored["data"] if stored else None) or {}
     series: list[dict] = list(stored_data.get("series", []))
     drivers_history: dict = dict(stored_data.get("drivers_history", {}))

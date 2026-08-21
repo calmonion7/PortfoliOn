@@ -1,5 +1,5 @@
 # backend/services/batch_registry.py
-"""배치 레지스트리 — 현황 허브가 노출하는 20개 배치의 정적 메타데이터.
+"""배치 레지스트리 — 현황 허브가 노출하는 33개 배치의 정적 메타데이터.
 
 job_id는 스케줄러 잡 id 및 services.job_runs.record 호출 id와 반드시 일치한다.
 consensus는 자체 스케줄러 잡이 없고(daily_report_kr/us에 내장) next_run이 null이다.
@@ -294,6 +294,23 @@ BATCHES = [
         "timezone": "Asia/Seoul",
         "market": "US",
         "default_schedule": {"enabled": True, "type": "daily", "time": "06:30"},
+    },
+    {
+        "id": "fx_fetch",
+        "label": "환율 수집",
+        "category": "market",
+        "schedule_desc": "매일 06:40",
+        "usage": ["Market Hub 시장지표", "포트폴리오 KRW 환산", "일일 다이제스트"],
+        "source": ["yfinance", "open.er-api.com"],
+        "editable": True,
+        "trigger_kinds": ["auto", "manual"],
+        "manual_endpoint": "/api/market/refresh-fx",
+        "scheduler_job_id": "fx_fetch",
+        "timezone": "Asia/Seoul",
+        # 교차통화(USD/KRW·USD/JPY·EUR/USD)이고 소비도 다시장이라 공통 —
+        # 다시장 소비 배치인 beta_fetch·dividend_fetch와 같은 분류(ADR-0013).
+        "market": "공통",
+        "default_schedule": {"enabled": True, "type": "daily", "time": "06:40"},
     },
     {
         "id": "kospi_signal_fetch",

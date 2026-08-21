@@ -138,6 +138,17 @@ def build_universe(market: str | None = None) -> list[dict]:
 
     외부 fetch(Naver/dataroma) 실패는 로깅(silent except 금지). 일부 소스가 비어도
     가용 소스만으로 유니버스를 구성한다(graceful degrade).
+
+    ⚠️ **단, 요청한 시장의 *유일한 대량 소스*가 실패하면 전파한다.** 이 유니버스의 유일한
+    소비처는 `funnel.run_recommendation_batch`이고 그 끝은 `replace_recommendations`
+    (DELETE+INSERT)다 — graceful degrade가 유니버스를 tracked-only로 붕괴시키면 저장 *생략*이
+    아니라 **직전 추천 전량이 DELETE되고 보유·관심 몇 건으로 대체**된다(소멸이라 토스트도 없다).
+    funnel의 커버리지 가드는 분모가 `len(candidates)`라 이 붕괴를 원리적으로 못 본다(붕괴한
+    유니버스에서도 커버리지는 100%다) — 그래서 근본 신호인 fetch 성공 여부를 소스에서 전파해
+    호출측이 replace를 통째 스킵하게 한다.
+      · `market="KR"` → KR 스냅샷(`_fetch_kr_rows`)이 유일한 대량 소스다(sp500·guru는 스킵).
+      · `market="US"` → sp500이 유일한 대량 소스다(guru는 수십 건 규모의 보조 소스).
+      · `market=None`(레거시 양시장) → 반대편 시장 소스가 살아 있으므로 종래 graceful degrade.
     """
     kr_rows: list[dict] = []
     if market != "US":
@@ -145,6 +156,8 @@ def build_universe(market: str | None = None) -> list[dict]:
             kr_rows = _fetch_kr_rows()
         except Exception as e:
             logger.warning(f"[Universe] recommendation.universe: KR fetch failed: {e}")
+            if market == "KR":
+                raise
 
     sp500: list[str] = []
     guru: list[str] = []
@@ -153,6 +166,8 @@ def build_universe(market: str | None = None) -> list[dict]:
             sp500 = _load_sp500()
         except Exception as e:
             logger.warning(f"[Universe] recommendation.universe: sp500 load failed: {e}")
+            if market == "US":
+                raise
 
         try:
             guru = _fetch_guru_tickers()

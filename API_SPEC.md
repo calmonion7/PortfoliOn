@@ -2549,9 +2549,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(22종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(33종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
 
-> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 내부자·5%지분 공시 신호 수집 `insider_fetch`(매일 07:45 KST, `market="KR"` — DART 출처)는 수동 트리거 `POST /api/report/insider-trades/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다.
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 내부자·5%지분 공시 신호 수집 `insider_fetch`(매일 07:45 KST, `market="KR"` — DART 출처)는 수동 트리거 `POST /api/report/insider-trades/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다. 환율 수집 `fx_fetch`(매일 06:40 KST, `market="공통"` — 교차통화·다시장 소비)는 수동 트리거 `POST /api/market/refresh-fx`를 가지며, 이 배치가 없으면 `market_cache`의 `fx` 키를 갱신하는 주체가 없어 포트폴리오 KRW 환산이 무기한 stale해진다(요청경로 증분은 시장지표 탭을 열어야 돌고, `get_or_refresh`의 ttl은 저장값에 걸리지 않는다).
 
 **Auth:** Bearer token 필요
 
@@ -3417,18 +3417,66 @@ FRED 신규 창업 신청 2개 부문 수동 재수집. 부문별 독립 fetch �
 
 ### `POST /api/market/refresh-econ`
 
-FRED 경제지표(CPI, 실업률) 단독 재수집. 별도 배치 id 없이 해외 월간 배치 `monthly_us`로 흡수 기록한다(`refresh-monthly?market=US`와 동일 동작).
+FRED 경제지표(CPI, 실업률) 단독 재수집. 별도 배치 id 없이 해외 월간 배치 `monthly_us`로 흡수 기록한다(`refresh-monthly?market=US`와 동일 동작). 계열별 독립 fetch — 한 계열이 실패해도 다른 계열은 갱신되고, 실패한 계열은 직전 저장값을 그대로 보존한다. `status`가 `ok`와 별도로 실리는 이유: 실패한 계열도 직전값이 살아 있어 `*_points`는 채워져 보이므로, 건수만으로는 갱신 여부를 알 수 없다.
 
 **Auth:** admin 권한 필요
 
-**Response `200`**
+**Response `200`** (전 계열 갱신)
 ```json
 {
   "ok": true,
+  "status": "success",
   "cpi_points": 36,
   "unemp_points": 36
 }
 ```
+
+**Response `200`** (한 계열만 실패 — `status: "partial"`, `ok: false`. 실패 계열은 직전 저장값 그대로)
+```json
+{
+  "ok": false,
+  "status": "partial",
+  "cpi_points": 36,
+  "unemp_points": 35
+}
+```
+
+**Response `200`** (`FRED_API_KEY` 미설정 또는 전 계열 실패 — 저장 생략, `status: "skipped"`, `ok: false`)
+```json
+{
+  "ok": false,
+  "status": "skipped",
+  "error": "FRED_API_KEY 환경변수가 필요합니다."
+}
+```
+
+---
+
+### `POST /api/market/refresh-fx`
+
+환율 3종(USD/KRW·USD/JPY·EUR/USD) 수동 재수집 — 일배치와 동일한 `fx_fetch` id로 실행이력을 기록한다. 인메모리 TTL(3600s)을 비운 뒤 마지막 저장일 이후만 증분 조회해 `market_cache`의 `fx` 키에 병합 저장한다. 저장값은 **지우지 않는다** — 소스-폴백의 baseline이라 지우면 fetch 실패 시 폴백할 것이 없어진다(초기화 후 전 구간 재조회는 `POST /api/market/refresh-market`).
+
+**Auth:** admin 권한 필요
+
+**Response `200`** (전 심볼 신선)
+```json
+{
+  "ok": true,
+  "status": "success",
+  "rate_count": 3,
+  "usdkrw_points": 252
+}
+```
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `status` | string | `success`(전 심볼 신선) \| `partial`(일부 심볼이 직전 저장값) \| `skipped`(신선한 심볼 0개 — **저장 자체를 생략**한다. 내용이 직전값과 동일한데 쓰면 `fetched_at`만 갱신돼 나이 신호가 거짓이 된다) |
+| `rate_count` | number | 응답에 실린 통화쌍 수. **갱신 여부와 무관하다** — fetch 실패 시에도 직전 저장값으로 채워지므로 3이 나온다 |
+| `usdkrw_points` | number | USD/KRW 히스토리 점 수 |
+
+> `ok`/`rate_count`만 보면 실패해도 "갱신됨"으로 오인하기 쉬워 `status`를 함께 반환한다.
+> 신선도 판정 축은 **새 종가가 붙은 심볼 수**다 — yfinance의 지배적 실패 모드는 예외가 아니라
+> **빈 DataFrame**이라 예외 가드를 그냥 통과하기 때문이다(휴장일·같은 날 재실행도 `skipped`가 된다).
 
 ---
 
@@ -3449,10 +3497,12 @@ FRED 경제지표(CPI, 실업률) 단독 재수집. 별도 배치 id 없이 해�
 { "ok": true, "market": "KR", "export_points": 12, "saved": true }
 ```
 ```json
-{ "ok": true, "market": "US", "cpi_points": 36, "unemp_points": 36 }
+{ "ok": true, "market": "US", "status": "success", "cpi_points": 36, "unemp_points": 36 }
 ```
 
 `market=KR`의 `export_points`는 수집된 **월 수**(`months` 길이)다. `saved`는 실제 저장 여부 — 외부 API가 빈 결과(항목 0건)를 주면 직전 양호값을 보존하기 위해 저장을 생략하고 `saved: false`와 함께 **직전 저장값의** 월 수를 반환한다(task#243).
+
+`market=US`의 `status`는 KR의 `saved`와 같은 역할이다 — `success`(전 계열 갱신) / `partial`(일부 계열 실패, 직전값 유지) / `skipped`(`FRED_API_KEY` 미설정 또는 전 계열 실패, 저장 생략 + `error` 동봉). `partial`·`skipped`면 `ok: false`다(`POST /api/market/refresh-econ` 참조).
 
 **Error `400`** — `market`이 `KR`/`US`가 아님
 
@@ -3924,15 +3974,21 @@ US 섹터 모멘텀 수동 갱신. 11개 섹터 ETF(XLK·XLF 등)의 yfinance �
 
 **Response `200`**
 ```json
-{ "ok": true, "sectors": 11 }
+{ "ok": true, "status": "success", "sectors": 11 }
+```
+```json
+{ "ok": false, "status": "skipped", "sectors": 11 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `ok` | boolean | 성공 여부 |
-| `sectors` | int | 갱신·저장된 섹터 수 |
+| `ok` | boolean | `status === "success"`와 동의어 |
+| `status` | string | `success`(저장됨) \| `skipped`(전 ETF 모멘텀이 all-None이라 **저장 생략**, 직전 양호값 유지) |
+| `sectors` | int | fetch한 섹터 ETF 수. **저장 여부와 무관하다** — 전량 실패에도 11이 나오므로 건수만 보면 실패가 성공으로 읽힌다 |
 
-**Error `500`** — yfinance 조회/저장 실패 시 `detail`에 사유 포함
+> 일부 ETF만 all-None인 부분 실패는 그 ETF만 직전 저장값으로 백필한 뒤 저장하므로 `status: "success"`다. 직전 저장값 조회 자체가 실패하면(백필 불가) 저장하지 않고 **500**을 낸다 — all-None을 저장해 어제 값을 지우는 것보다 낫다(`wrong < missing`).
+
+**Error `500`** — yfinance 조회/저장 실패 또는 직전 저장값 조회 실패 시 `detail`에 사유 포함
 
 ---
 

@@ -15,7 +15,9 @@ def _stub_job_runs(monkeypatch):
 
     @contextmanager
     def _noop(job_id, trigger):
-        yield 1
+        # 실제 핸들(Run)을 yield한다 — 잡이 `run.set_status(...)`를 부르므로 `yield 1`이면
+        # AttributeError로 죽는다(가짜 CM은 계약 변경 시 함께 마이그레이션해야 한다).
+        yield job_runs.Run(1)
 
     monkeypatch.setattr(job_runs, "record", _noop)
 

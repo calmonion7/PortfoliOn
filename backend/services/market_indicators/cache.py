@@ -30,11 +30,32 @@ def _set_cache(key: str, data: dict, ttl: int) -> None:
     _cache[key] = {"data": data, "expires": now + ttl}
 
 
+def _mc_load_strict(key: str) -> dict | None:
+    """`_mc_load`의 엄격판 — **조회 실패를 전파**한다. 행 부재는 종래대로 None.
+
+    `_mc_load`는 예외를 warning 후 None으로 접으므로 「DB 오류」와 「한 번도 저장 안 됨」이
+    같은 값이 된다. 저장값을 읽어 **그 위에 누적**하는 경로에서는 그 붕괴가 곧 이력 파괴다
+    (`kospi_signal`: SELECT 한 번의 실패 + 드라이버 fetch 성공 → 180일 신호·적중률이
+    오늘 1건으로 치환된다. 그날의 갭·종가 대사에서 파생되므로 재구성 불가).
+    누적 저장 경로만 이 함수를 쓴다 — 예외가 전파되면 `_mc_save`에 도달하지 못해 이력이
+    보존되고, `job_runs.record`가 스스로 `failed`를 기록해 관측성까지 함께 얻는다
+    (이 한 건에서는 예외 전파가 `set_status` 배선보다 정확한 신호다).
+
+    ⚠️ **additive다.** 기존 `_mc_load`(앱 36곳·18모듈 + patch하는 테스트 17파일)의
+    반환 계약은 건드리지 않는다 — 그중 다수가 이 wave의 소유 밖이다.
+    """
+    rows = query("SELECT data, fetched_at FROM market_cache WHERE key = %s", (key,))
+    if rows:
+        return {"data": rows[0]["data"], "fetched_at": rows[0]["fetched_at"]}
+    return None
+
+
 def _mc_load(key: str) -> dict | None:
+    """관용 로더 — 조회 실패를 warning 후 None으로 접는다(동작 불변).
+
+    누적 저장 경로에서는 이 붕괴가 위험하니 `_mc_load_strict`를 쓸 것."""
     try:
-        rows = query("SELECT data, fetched_at FROM market_cache WHERE key = %s", (key,))
-        if rows:
-            return {"data": rows[0]["data"], "fetched_at": rows[0]["fetched_at"]}
+        return _mc_load_strict(key)
     except Exception as e:
         logger.warning(f"[Cache] _mc_load key={key} 실패: {e}")
     return None

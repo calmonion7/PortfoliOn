@@ -6,7 +6,8 @@ Stage-2(후보 한정): OHLC 히스토리(market.get_history_df; KR 키움→yfi
   (insider_trades, 기존 저장값 재사용, 없으면 결측), US 후보 구루 신규매수(멤버십).
   → scoring.score_stock → store.replace_recommendations.
 
-외부 fetch 실패는 로깅(silent except 금지). 전부 None이면 save 생략(all-None 박제 금지).
+외부 fetch 실패는 로깅(silent except 금지). 전부 None이면 save 생략(all-None 박제 금지)
++ 산출 커버리지가 MIN_SCORED_COVERAGE 미만이면 대폭 축소로 보고 전량 교체 생략(B65).
 요청·기동 경로 라이브 호출 0 — 이 함수는 배치(scheduler._recommendation_work)에서만 호출.
 
 외부/DB I/O는 모듈 함수로 분리(테스트는 patch.object로 mock — universe.py와 동일 패턴).
@@ -35,6 +36,18 @@ _RETURN_WINDOW = 20
 # 저유동성 필터(#68) — native 통화(USD/KRW) 일평균 거래대금 하한.
 MIN_DOLLAR_VOLUME = {"US": 1_000_000, "KR": 1_000_000_000}
 _LIQUIDITY_WINDOW = 20  # 거래대금 평균 윈도(거래일)
+
+# 전량 교체 최소 커버리지(B65) — scored/candidates가 이 값 미만이면 replace를 생략하고
+# 직전 저장값을 유지한다. 발굴 유니버스는 **유동적 대규모 집합**이라 완전성 요구는
+# 비현실적이고, 처방은 커버리지 임계다.
+#   · 분모는 반드시 len(candidates)다 — len(universe)로 잡으면 Stage-1 top-K 절단
+#     (CANDIDATE_TOP_K)만으로 정상 실행이 상시 임계 미달이 된다.
+#   · 0.5의 근거: `if not scored:`(all-or-nothing)만 두면 티커당 실패율 2%에서
+#     「후보 전부 실패」 확률이 사실상 0이라 그 가드는 영원히 발동하지 않고
+#     1~99% 축소가 전부 통과한다. 반대로 0.8은 평시에도 스킵이 잦아 추천이 stale해진다.
+#     0.5는 정상 운영에서 무반응이고 광범위 장애에서만 켜지는 값이다.
+#   · 경계는 `<` — 커버리지가 정확히 0.5면 저장한다(가드가 정상 데이터를 지우지 않게).
+MIN_SCORED_COVERAGE = 0.5
 
 # yfinance 이름·목표가 fetch 직렬 스로틀(task#132 S2) — 대량 연속 콜 rate-limit 방어
 # (키움 client 직렬 throttle 관례의 yfinance판). 결측분에만 걸리므로 carry/정본이
@@ -404,10 +417,12 @@ def run_recommendation_batch(market: str) -> dict:
     2) Stage-1 싼 스크린으로 후보 top-K(CANDIDATE_TOP_K) 선별.
     3) Stage-2 후보 한정 리치 enrich → 팩터 dict 구성.
     4) scoring.score_stock으로 점수·플래그 산출.
-    5) store.replace_recommendations(market, rows)로 통째 교체(전부 None이면 생략).
+    5) store.replace_recommendations(market, rows)로 통째 교체
+       — 단 산출 커버리지(scored/candidates)가 MIN_SCORED_COVERAGE 미만이면 생략.
 
-    반환 통계: {"market", "universe": int, "candidates": int, "scored": int}.
-    종목별 fetch 실패는 로깅(부분 결과 저장), 전부 산출 불가면 replace 생략."""
+    반환 통계: {"market", "universe", "candidates", "scored", "low_liquidity", "status"}.
+    종목별 fetch 실패는 로깅(부분 결과 저장). 저장 판정은 3상태 —
+    "success"(교체) / "partial"(대폭 축소라 생략·직전값 유지) / "skipped"(전부 산출 불가)."""
     t0 = time.monotonic()
     universe = [u for u in build_universe(market) if (u.get("market") or "US") == market]
 
@@ -454,16 +469,30 @@ def run_recommendation_batch(market: str) -> dict:
     for i, r in enumerate(scored):
         r["rank"] = i + 1
 
-    # 전부 산출 불가면 save 생략(all-None 박제 금지)
-    if scored:
+    # 저장 판정 — 전부 산출 불가(skipped) / 대폭 축소(partial) / 정상(success)
+    coverage = (len(scored) / len(candidates)) if candidates else 0.0
+    if not scored:
+        # 전부 산출 불가면 save 생략(all-None 박제 금지)
+        status = "skipped"
+    elif coverage < MIN_SCORED_COVERAGE:
+        # 대폭 축소 — 전량 교체하면 직전 양호값이 소실된다(B65)
+        status = "partial"
+        logger.warning(
+            f"[Funnel] recommendation.funnel: {market} coverage "
+            f"{len(scored)}/{len(candidates)}={coverage:.0%} "
+            f"< {MIN_SCORED_COVERAGE:.0%} — replace 생략·직전 저장값 유지"
+        )
+    else:
         replace_recommendations(market, scored)
+        status = "success"
 
     n_low = sum(1 for r in scored if r["low_liquidity"])
     elapsed = round(time.monotonic() - t0, 1)
     logger.info(
         f"[Funnel] recommendation.funnel: {market} "
         f"universe={len(universe)} candidates={len(candidates)} "
-        f"scored={len(scored)} low_liquidity={n_low} elapsed={elapsed}s"
+        f"scored={len(scored)} coverage={coverage:.0%} status={status} "
+        f"low_liquidity={n_low} elapsed={elapsed}s"
     )
 
     return {
@@ -472,4 +501,8 @@ def run_recommendation_batch(market: str) -> dict:
         "candidates": len(candidates),
         "scored": len(scored),
         "low_liquidity": n_low,
+        # 관측성 — 호출측(scheduler/jobs.py·수동 라우터)이 job_runs.record(...) as run 으로
+        # 받아 run.set_status(status)를 명시해야 「갱신됨」과 「생략」이 구분된다.
+        # 이 함수는 실패를 삼키고 정상 종료하므로 status 없이는 전부 success로 기록된다.
+        "status": status,
     }

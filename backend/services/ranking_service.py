@@ -18,6 +18,11 @@ _NAVER_HEADERS = {
 _NAVER_MARKETVALUE = "https://m.stock.naver.com/api/stocks/marketValue"
 _PAGE_SIZE = 100
 _TOP_N = 200
+# 페이지 커버리지 하한 — `totalCount` 대비 이 비율보다 적게 모이면 fetch 실패로 본다.
+# `if not stocks:` all-or-nothing 게이트만 두면 「5페이지 중 4페이지가 200+빈배열」이
+# 예외도 없이 통과해 전 종목 목록이 조용히 축소된 채 직전 스냅샷을 DELETE로 덮는다.
+# 0.5는 페이지네이션 drift(마지막 페이지가 totalCount보다 적게 옴)와는 여유가 크다.
+_MIN_PAGE_COVERAGE = 0.5
 
 # stockEndType: "stock" = 보통주, "etf"/"etn" = ETF/ETN (둘 다 ETF로 취급)
 _ETF_END_TYPES = {"etf", "etn"}
@@ -149,8 +154,23 @@ def _fetch_naver_page(market: str, page: int) -> list[dict]:
 
 def _fetch_naver_market(market: str) -> list[dict]:
     """단일 시장(KOSPI|KOSDAQ) 전체 페이지를 병렬 fetch 후 raw stock 리스트 반환.
-    한 페이지라도 실패하면 RuntimeError를 던진다 — 잘린 데이터가 정상 스냅샷을
-    DELETE-덮어쓰는 것을 막기 위함(호출부 스케줄러가 catch해 replace를 건너뜀)."""
+
+    **실패는 반환값이 아니라 예외로 알린다.** 저장이 `replace_market_rankings`
+    (DELETE+INSERT)라 빈 리스트를 반환하면 저장 *생략*이 아니라 직전 양호값 **DELETE**가
+    된다 — 소멸이라 토스트조차 없다. 근본 신호는 fetch 성공 여부이므로, 여기서 전파해
+    호출측(스케줄러 2잡·수동 라우터·발굴 유니버스)이 replace를 통째로 건너뛰게 한다.
+    delete-rewrite 경로에는 담아둘 last-good이 없으므로 이것이 소스-폴백의 대응물이다.
+
+    실패 클래스 3종을 각각 문다:
+      (a) 예외 — 1페이지 `raise_for_status` + 뒷 페이지 future 실패 집계(`failed`).
+      (b) 성공-but-빈응답 — Naver는 200에 `totalCount:0`·`stocks:[]`를 줄 수 있고 (a)를
+          그냥 통과한다. genuine-empty는 clear하지 않는다 — KOSPI/KOSDAQ 전 종목 목록이
+          *진짜로* 0건인 시장 상태는 없어(휴장일에도 목록은 온다) 이 소스에서 무데이터와
+          장애를 구별할 수 없고, 비용이 비대칭이다(잘못 보존=다음 크론까지 stale·`base_ts`가
+          나이를 노출 / 잘못 삭제=랭킹 탭 + `investor_trend_fetch` 유니버스 동시 소멸).
+      (c) 부분 페이로드 — 일부 페이지가 200에 빈 배열을 주면 예외도 `failed`도 없이 목록이
+          조용히 잘린다. 유동 대규모 집합이므로 완전성이 아니라 커버리지 임계로 문다.
+    """
     first = requests.get(
         f"{_NAVER_MARKETVALUE}/{market}?page=1&pageSize={_PAGE_SIZE}",
         headers=_NAVER_HEADERS,
@@ -160,21 +180,28 @@ def _fetch_naver_market(market: str) -> list[dict]:
     body = first.json()
     total = int(body.get("totalCount", 0))
     stocks = list(body.get("stocks", []))
-    pages = math.ceil(total / _PAGE_SIZE)
-    if pages <= 1:
-        return stocks
-    failed: list[int] = []
-    with ThreadPoolExecutor(max_workers=12) as executor:
-        futures = {executor.submit(_fetch_naver_page, market, p): p for p in range(2, pages + 1)}
-        for future in as_completed(futures):
-            try:
-                stocks.extend(future.result())
-            except Exception as e:
-                failed.append(futures[future])
-                logger.warning(f"[Ranking] {market} page {futures[future]} failed: {e}")
-    if failed:
+    if not stocks:
         raise RuntimeError(
-            f"ranking: {market} fetch incomplete — {len(failed)} page(s) failed: {sorted(failed)}"
+            f"ranking: {market} fetch returned empty stocks (totalCount={total}) — skipping replace"
+        )
+    pages = math.ceil(total / _PAGE_SIZE)
+    if pages > 1:
+        failed: list[int] = []
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            futures = {executor.submit(_fetch_naver_page, market, p): p for p in range(2, pages + 1)}
+            for future in as_completed(futures):
+                try:
+                    stocks.extend(future.result())
+                except Exception as e:
+                    failed.append(futures[future])
+                    logger.warning(f"[Ranking] {market} page {futures[future]} failed: {e}")
+        if failed:
+            raise RuntimeError(
+                f"ranking: {market} fetch incomplete — {len(failed)} page(s) failed: {sorted(failed)}"
+            )
+    if total > 0 and len(stocks) < total * _MIN_PAGE_COVERAGE:
+        raise RuntimeError(
+            f"ranking: {market} fetch coverage too low — {len(stocks)}/{total} rows — skipping replace"
         )
     return stocks
 

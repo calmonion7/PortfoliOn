@@ -32,6 +32,9 @@ from services.market_indicators import (
     _mc_delete,
     _cache,
 )
+# 배치용 강제 갱신은 패키지 재수출을 거치지 않고 서브모듈에서 직접 가져온다
+# (jobs.py가 `from services.market_indicators import kospi_signal`을 쓰는 것과 같은 관용구).
+from services.market_indicators.fx import _fetch_and_save_fx
 
 router = APIRouter(prefix="/api/market", tags=["market"])
 
@@ -288,18 +291,56 @@ def refresh_earnings(market: str = Query("KR"), _: str = Depends(require_admin))
 
 @router.post("/refresh-econ")
 def refresh_econ(_: str = Depends(require_admin)):
-    """FRED 경제지표 단독 갱신(고아 엔드포인트) — monthly_us(해외 월간)로 흡수 기록."""
+    """FRED 경제지표 단독 갱신(고아 엔드포인트) — monthly_us(해외 월간)로 흡수 기록.
+
+    `status`: success(전 계열 갱신)/partial(일부 계열 실패, 직전값 유지)/skipped(FRED_API_KEY
+    미설정 또는 전 계열 실패, 저장 생략) — `ok`만 보면 실패해도 갱신된 것으로 오인하기 쉬워
+    함께 반환한다(`*_points`는 직전값이 살아 있어 실패해도 채워져 보인다).
+    """
     try:
-        with job_runs.record("monthly_us", "manual"):
+        with job_runs.record("monthly_us", "manual") as run:
             data = _fetch_and_save_econ_indicators()
-        return {"ok": True, "cpi_points": len(data.get("cpi", [])), "unemp_points": len(data.get("unemployment", []))}
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                return {"ok": False, "status": "skipped", "error": data["error"]}
+            status = data.get("_status") or "success"
+            if status != "success":
+                run.set_status(status)
+            return {"ok": status == "success", "status": status,
+                    "cpi_points": len(data.get("cpi", [])),
+                    "unemp_points": len(data.get("unemployment", []))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-fx")
+def refresh_fx(_: str = Depends(require_admin)):
+    """환율 3종(USD/KRW·USD/JPY·EUR/USD) 수동 갱신 — fx_fetch로 기록.
+
+    `status`: success(전 심볼 신선)/partial(일부 심볼이 직전 저장값)/skipped(신선한 심볼 0개).
+    `_fetch_fx`가 소스-폴백이라 실패해도 `rates`는 채워져 오므로, 건수만으로는 갱신 여부를
+    알 수 없다 — 그래서 status를 함께 반환한다.
+    """
+    try:
+        with job_runs.record("fx_fetch", "manual") as run:
+            data = _fetch_and_save_fx()
+            status = data.get("_status") or "success"
+            if status != "success":
+                run.set_status(status)
+            return {"ok": status == "success", "status": status,
+                    "rate_count": len(data.get("rates") or {}),
+                    "usdkrw_points": len((data.get("history") or {}).get("usdkrw", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/refresh-monthly")
 def refresh_monthly(market: str = Query("US"), _: str = Depends(require_admin)):
-    """시장별 월간 지표 갱신: KR=KR 수출(monthly_kr) / US=FRED 경제지표(monthly_us). 각자 자기 id로 기록."""
+    """시장별 월간 지표 갱신: KR=KR 수출(monthly_kr) / US=FRED 경제지표(monthly_us). 각자 자기 id로 기록.
+
+    US는 `status`(success/partial/skipped)를 함께 반환한다 — KR의 `saved`와 같은 역할로,
+    「갱신됨」과 「생략·직전값 유지」를 구분한다.
+    """
     if market not in ("KR", "US"):
         raise HTTPException(status_code=400, detail="market must be KR or US")
     try:
@@ -311,9 +352,17 @@ def refresh_monthly(market: str = Query("US"), _: str = Depends(require_admin)):
             return {"ok": True, "market": "KR",
                     "export_points": len(exports.get("months", [])),
                     "saved": not exports.get("stale")}
-        with job_runs.record("monthly_us", "manual"):
+        with job_runs.record("monthly_us", "manual") as run:
             econ = _fetch_and_save_econ_indicators()
-        return {"ok": True, "market": "US", "cpi_points": len(econ.get("cpi", [])), "unemp_points": len(econ.get("unemployment", []))}
+            if "error" in econ:
+                run.set_status("skipped", econ["error"])
+                return {"ok": False, "market": "US", "status": "skipped", "error": econ["error"]}
+            status = econ.get("_status") or "success"
+            if status != "success":
+                run.set_status(status)
+            return {"ok": status == "success", "market": "US", "status": status,
+                    "cpi_points": len(econ.get("cpi", [])),
+                    "unemp_points": len(econ.get("unemployment", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

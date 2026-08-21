@@ -325,18 +325,26 @@ def walk_routes(routes):  # routes·original_router를 재귀 하강해 .path를
 ⚠️ **검출 범위는 엔드포인트 *존재*뿐이다** — 요청/응답 스키마·인증 게이팅 산문 drift는
 원리적으로 못 본다(수동 DoD, `CONVENTIONS.md §10`).
 
-### 5.6 배치 레지스트리 count/set 단언 3곳
+### 5.6 배치 레지스트리 count/set 단언 — **4파일 8지점**
 
-`batch_registry.BATCHES`의 개수(**현재 29**)를 하드코딩한 파일이 흩어져 있다:
+`batch_registry.BATCHES`의 개수(**현재 33** — KR 16 · US 11 · 공통 6)와 id 집합을 하드코딩한 지점:
 
-| 파일 | 단언 |
-|---|---|
-| `backend/tests/test_batch_market_split.py` | `len(batch_registry.BATCHES) == 29` |
-| `backend/tests/test_macro_signals_batch.py` | `len(batch_registry.BATCHES) == 29` |
-| `backend/tests/test_batches_router.py` | `len(data) == 29` + `{b["id"] for b in data} == EXPECTED_IDS` |
+| 파일 | 지점 | 단언 |
+|---|---|---|
+| `backend/tests/test_batch_market_split.py` | 3 | `len(batch_registry.BATCHES) == 33` · **`_MARKET_BY_ID`**(id→market 완전 매핑 dict) · **시장별 개수 dict** `{"KR": 16, "US": 11, "공통": 6}` |
+| `backend/tests/test_batches_router.py` | 2 | `len(data) == 33` · **`EXPECTED_IDS`** 집합 |
+| `backend/tests/test_macro_signals_batch.py` | 1 | `len(batch_registry.BATCHES) == 33` |
+| `backend/tests/test_scheduler_seed.py` | 2 | `test_all_editable_jobs`의 **`set(editable) == {…}`** · `test_seed_only_fills_missing_rows`의 **`expected_seeded` `set(…) ==`** |
 
-배치를 추가·은퇴시키면 **세 곳을 함께** 고친다. 탐지:
-`grep -rn "BATCHES) ==\|len(data) ==\|EXPECTED_IDS" backend/tests/`.
+배치를 추가·은퇴시키면 **여덟 곳을 함께** 고친다(새 배치의 `market`에 해당하는 개수 값도 +1).
+
+> ⚠️ **옛 판이 못박은 탐지 grep은 절반을 원리적으로 못 본다.**
+> `grep -rn "BATCHES) ==\|len(data) ==\|EXPECTED_IDS" backend/tests/`는 세 리터럴만 보므로
+> **`set(…) ==` 형태와 dict 리터럴에 블라인드**하다 — 위 8지점 중 `_MARKET_BY_ID`·시장별 개수
+> dict·`test_scheduler_seed.py` 2곳(총 **4지점**)을 놓친다. 그래서 옛 판의 "3곳"은 파일 목록만
+> 맞고 지점 수가 틀렸다. **실제 게이트는 grep이 아니라 전체 스위트**이고, grep은 "어느 파일을
+> 볼지"만 좁히는 용도다 — 그 4파일은 열어서 직접 읽을 것.
+> (「감사 패턴을 좁히면 그 감사는 통과해도 무의미하다」의 배치 id판.)
 
 ### 5.7 그 외 규약 가드
 

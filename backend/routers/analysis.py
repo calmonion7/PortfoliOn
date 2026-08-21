@@ -56,12 +56,21 @@ def refresh_kr_sector(_: str = Depends(require_admin)):
 
 @router.post("/sector/refresh-us")
 def refresh_us_sector(_: str = Depends(require_admin)):
-    """US 섹터 모멘텀 수동 갱신(us_sector_fetch). 전 ETF series fetch→momentum 저장."""
+    """US 섹터 모멘텀 수동 갱신(us_sector_fetch). 전 ETF series fetch→momentum 저장.
+
+    `status`: success(저장됨) / skipped(전 ETF all-None이라 저장 생략·직전값 유지).
+    `sectors`는 fetch한 ETF 수라 **저장 여부와 무관**하다 — 전량 실패에도 11이 나오므로
+    건수만 돌려주면 실패가 성공으로 읽힌다(auto 레인 `_fetch_us_sector`와 같은 판정).
+    """
     try:
-        with job_runs.record("us_sector_fetch", "manual"):
+        with job_runs.record("us_sector_fetch", "manual") as run:
             sectors = us_sector_service.refresh()
+            skipped = us_sector_service.save_was_skipped(sectors)
+            if skipped:
+                run.set_status("skipped", "all-None momentum")
         cache_svc.invalidate_sector()
-        return {"ok": True, "sectors": len(sectors)}
+        return {"ok": not skipped, "status": "skipped" if skipped else "success",
+                "sectors": len(sectors)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

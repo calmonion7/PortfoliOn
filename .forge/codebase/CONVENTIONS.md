@@ -66,6 +66,22 @@ additive에도 두 종류의 파장이 있다:
 
 빈 결과가 각 필드에 닿기 전에 이미 직전값으로 채워져 있으므로, 마지막 저장이 무엇을 쓰든 잃을 게 없다.
 
+**⚠️ 가드의 *baseline*을 관용 로더로 읽으면 그 가드가 스스로 꺼진다(2026-08 신설 규약).**
+`market_indicators/cache.py::_mc_load`는 조회 예외를 warning 후 `None`으로 접으므로
+**「DB 오류」와 「한 번도 저장 안 됨」이 같은 값**이 된다. 완전성·커버리지·축소 가드는 전부
+직전 저장값을 기준으로 판정하는데, 그 읽기가 조용히 `None`이 되면 **기준이 0으로 붕괴해 판정이
+항상 통과**한다 — 가드가 있는데 없는 것과 같아진다. `_mc_save`는 `execute`, `_mc_load`는 `query`라
+**SELECT만 일시 실패하고 INSERT는 성공하는 조합이 실제로 성립**한다.
+
+→ 누적·기준 읽기는 **`_mc_load_strict`**(같은 파일, 조회 실패를 *전파*하고 행 부재만 `None`)를 쓴다.
+전파된 예외는 `_mc_save`에 도달하지 못하게 만들어 직전값을 보존하고, `job_runs.record`가 스스로
+`failed`를 기록해 관측성까지 함께 준다. 현재 사용처: `kospi_signal.refresh_kospi_signal`(누적
+series 파괴 방지) · `econ._fetch_and_save_econ_indicators`(`_merge_history` 누적) ·
+`us_sector_service._load_momentum_strict`(백필 baseline) · `earnings._tickers_with_cache`(축소 판정
+baseline — 단 이쪽만은 **전파하지 않고** `baseline_known=False`로 내려 *저장만 생략*한다. 폴백
+체인을 가진 read 경로라 전파하면 일시 DB 오류가 배치를 통째로 죽인다).
+`_mc_load`는 **additive로 보존**됐다(앱 36곳·18모듈 + patch하는 테스트 17파일의 계약 불변).
+
 **끝 가드를 쓸 수밖에 없으면 실패 클래스 3종을 모두 물어야 한다:**
 
 1. **예외** — `try/except`
@@ -86,11 +102,13 @@ additive에도 두 종류의 파장이 있다:
 `if not X:` all-or-nothing 게이트는 셋 중 어디에도 해당하지 않는다 — 유동 집합에 그것만 걸면
 83명 중 40명 성공을 "비어있지 않음"으로 통과시켜 43명을 소멸시킨다(`save_guru_managers` docstring).
 
-**⚠️ 판정 순서: 전량실패 판정은 반드시 백필 *앞*이다.** 뒤로 가면 백필이 목록을 채워 그 분기가
-영영 발동하지 않는다. `save_guru_managers`가 이 함정을 주석으로 못박아 두었고,
-`backend/services/market_indicators/commodities.py`의 `get_treasury()`가 반대 순서(백필 → 판정)로
-남아 있어 그 가드가 사실상 죽어 있다 — **"동형 이식"의 참조 구현으로 `get_treasury`를 고르지 말 것**
-(형제 `get_commodities()`가 올바른 순서다).
+**⚠️ 판정 순서: 전량실패 판정은 반드시 백필 *앞*이고, 판정 대상은 백필 후 결과가 아니라 raw
+fetch 결과다.** 뒤로 가면 백필이 목록을 채워 그 분기가 영영 발동하지 않는다. `save_guru_managers`가
+이 함정을 주석으로 못박아 두었다. `backend/services/market_indicators/commodities.py`의
+`get_treasury()`는 **한때 반대 순서(백필 → 판정)라 가드가 죽어 있었으나 task#269(BH7-L1, `e88e9c2`)에서
+교정됐다** — 지금은 형제 `get_commodities()`와 **같은 순서**이고 둘 다 `if not any(results.values())`로
+raw 결과를 본다. 즉 이제 어느 쪽을 "동형 이식" 참조로 골라도 된다(옛 판이 `get_treasury`를 반례로
+지목했으니 그 서술을 인용하지 말 것).
 
 **delete-rewrite(replace) 갱신은 더 위험하다** — 저장을 `DELETE+INSERT`로 하는 store에서
 fetch 실패를 빈 결과로 삼키면 save 생략이 아니라 **직전 양호값 파괴**가 된다. fetch 함수는
@@ -533,8 +551,8 @@ DDL은 `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE … ADD COLUMN IF NOT EXISTS`
 
 ## §8 배치·스케줄러 규약
 
-**레지스트리 = `backend/services/batch_registry.py`의 `BATCHES`** — 현재 **29개** 배치의 정적
-메타데이터 리스트(⚠️ 파일 docstring은 "20개"라고 적혀 있어 stale하다).
+**레지스트리 = `backend/services/batch_registry.py`의 `BATCHES`** — 현재 **33개** 배치의 정적
+메타데이터 리스트.
 
 각 항목 키: `id` · `label` · `category` · `schedule_desc` · `usage`(소비 UI) · `source`(fetch 출처) ·
 `editable` · `trigger_kinds` · `manual_endpoint` · `scheduler_job_id` · `timezone` ·
@@ -596,8 +614,12 @@ with job_runs.record("daily_report_kr", "auto") as run:
 요청·기동 경로에서 외부 API를 N콜 직렬 호출하지 않는다.
 기동 시 빈 캐시는 `_seed_*_if_empty` 패턴으로 채운다.
 
-반면 fx·vix·commodities·indices는 **요청경로 증분**(TTL캐시 → `_mc_load` → 라이브 fetch →
+반면 vix·commodities·indices는 **요청경로 증분**(TTL캐시 → `_mc_load` → 라이브 fetch →
 `_mc_save`)이라 스케줄 배치가 없다 — `batch_registry`에도 없다.
+⚠️ **fx는 2026-08 이후 예외다** — 요청경로 증분을 유지하면서 `fx_fetch` 배치(매일 06:40 KST)를
+함께 갖는다. 소비자가 시장지표 탭 밖에도 있고(`routers/stocks.py::_usdkrw_rate` ·
+`services/digest_service.py`) 그쪽은 나이 검사 없는 raw `_mc_load("fx")`라, 배치가 없으면
+아무도 탭을 안 열 때 포트폴리오 KRW 환산이 무기한 stale해진다.
 
 ⚠️ `services/market_indicators/cache.py`의 `get_or_refresh(key, fetch_fn, ttl)`에서 **`ttl`은
 저장값에 걸리지 않는다** — `_mc_load`가 행을 주면 나이 불문 그대로 반환하고 `ttl`은 인메모리

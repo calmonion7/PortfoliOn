@@ -158,12 +158,15 @@ def test_recommendation_entries_have_source_and_usage():
 def spy(monkeypatch):
     calls = []
 
+    import services.job_runs as job_runs
+
     @contextmanager
     def fake_record(job_id, trigger):
         calls.append((job_id, trigger))
-        yield 1
+        # 실제 핸들(Run)을 yield한다 — 본문이 `run.set_status(...)`를 부르므로 `yield 1`이면
+        # AttributeError로 죽는다(계약 변경 시 가짜 CM을 함께 마이그레이션해야 하는 사례).
+        yield job_runs.Run(1)
 
-    import services.job_runs as job_runs
     monkeypatch.setattr(job_runs, "record", fake_record)
     return calls
 

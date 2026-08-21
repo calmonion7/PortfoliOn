@@ -15,6 +15,7 @@ from .jobs import (
     _generate_us,
     _run_guru_crawl,
     _refresh_monthly_us,
+    _refresh_fx,
     _refresh_macro_signals,
     _refresh_business_formation,
     _refresh_labor_surveys,

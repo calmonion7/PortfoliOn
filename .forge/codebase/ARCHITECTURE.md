@@ -212,7 +212,7 @@ patch 경로가 조용히 깨진다.
 
 ### 3.1 배치 레지스트리 — 정적 메타데이터
 
-`services/batch_registry.py`의 `BATCHES` 리스트가 **배치의 정본 목록**이다(현재 29개 항목).
+`services/batch_registry.py`의 `BATCHES` 리스트가 **배치의 정본 목록**이다(현재 33개 항목 — `market` 기준 KR 16 · US 11 · 공통 6).
 항목 하나의 필드:
 
 | 필드 | 의미 |

@@ -483,7 +483,10 @@ def _run_supply_score_all():
 def _usdkrw_rate() -> "float | None":
     """저장된 USD/KRW 환율(market_cache 'fx')만 읽는다 — 요청 경로 라이브 FX 호출 0.
 
-    FX 배치(get_fx)가 채운 영구 캐시를 읽는다. 없으면 None(US 배당은 KRW 환산서 제외)."""
+    작성자는 FX 배치 `fx_fetch`(매일 06:40 KST, `scheduler/jobs._refresh_fx` →
+    `market_indicators/fx._fetch_and_save_fx`)와 요청경로 `fx.get_fx`(시장지표 탭) 둘이다 —
+    `get_fx`는 배치가 아니므로 `_JOB_FUNCS`에서 그 이름을 찾지 말 것.
+    없으면 None(US 배당은 KRW 환산서 제외)."""
     stored = _mc_load("fx")
     if not stored:
         return None

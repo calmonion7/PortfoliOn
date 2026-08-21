@@ -88,7 +88,7 @@ def test_all_editable_jobs():
         "kr_sector_fetch", "us_sector_fetch", "disclosure_fetch", "agm_fetch", "dividend_fetch",
         "supply_score_fetch", "insider_fetch", "recommendation_kr", "recommendation_us", "us_supply_fetch",
         "beta_fetch", "kospi_signal_fetch", "business_formation_fetch", "labor_surveys_fetch",
-        "trimmed_inflation_fetch",
+        "trimmed_inflation_fetch", "fx_fetch",
     }
 
 
@@ -173,7 +173,7 @@ def test_seed_only_fills_missing_rows(monkeypatch):
         "kr_sector_fetch", "us_sector_fetch", "disclosure_fetch", "agm_fetch", "dividend_fetch",
         "supply_score_fetch", "insider_fetch", "recommendation_kr", "recommendation_us", "us_supply_fetch",
         "beta_fetch", "kospi_signal_fetch", "business_formation_fetch", "labor_surveys_fetch",
-        "trimmed_inflation_fetch",
+        "trimmed_inflation_fetch", "fx_fetch",
     }
     assert set(saved) == expected_seeded
     assert "consensus" not in store

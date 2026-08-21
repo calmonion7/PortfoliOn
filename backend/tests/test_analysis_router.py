@@ -165,17 +165,24 @@ def test_refresh_us_records_manual_and_invalidates_cache():
     from contextlib import contextmanager
     recorded = []
 
+    import services.job_runs as job_runs
+
     @contextmanager
     def fake_record(job_id, trigger):
         recorded.append((job_id, trigger))
-        yield 1
+        # 실제 핸들(Run) — 라우터가 저장 생략 시 `run.set_status("skipped")`를 부른다.
+        yield job_runs.Run(1)
 
+    # 수익률 필드를 실제 형태로 채운다 — `{"name": ...}`만 있으면 `_is_all_none`이 True라
+    # (세 키가 전부 결측) 성공 경로를 테스트하려던 이 케이스가 skipped 판정으로 넘어간다.
+    ok_sectors = [{"name": "Technology", "etf": "XLK",
+                   "return_1w": 1.0, "return_1mo": 2.0, "return_3mo": 3.0}]
     with patch("routers.analysis.job_runs.record", fake_record), \
-         patch("routers.analysis.us_sector_service.refresh", return_value=[{"name": "Technology"}]) as mock_refresh, \
+         patch("routers.analysis.us_sector_service.refresh", return_value=ok_sectors) as mock_refresh, \
          patch("routers.analysis.cache_svc.invalidate_sector") as mock_inv:
         resp = admin_client.post("/api/analysis/sector/refresh-us")
     assert resp.status_code == 200
-    assert resp.json() == {"ok": True, "sectors": 1}
+    assert resp.json() == {"ok": True, "status": "success", "sectors": 1}
     assert ("us_sector_fetch", "manual") in recorded
     mock_refresh.assert_called_once()
     mock_inv.assert_called_once()

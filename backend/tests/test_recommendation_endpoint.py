@@ -314,7 +314,11 @@ def test_refresh_triggers_batch():
         resp = client.post("/api/recommendations/refresh?market=KR")
     assert resp.status_code == 202
     assert resp.json() == {"ok": True}
-    mock_work.assert_called_once_with("KR")
+    # 두 번째 인자는 job_runs 핸들 — 수동 레인도 partial/skipped/failed를 실행이력에 반영한다
+    # (BackgroundTask라 응답은 무조건 202이므로 결과 관측 경로가 job_runs뿐이다).
+    assert mock_work.call_count == 1
+    assert mock_work.call_args[0][0] == "KR"
+    assert len(mock_work.call_args[0]) == 2
 
 
 # --- holdings 섹션 (part 4/4) ---

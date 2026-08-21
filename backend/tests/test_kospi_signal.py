@@ -341,13 +341,16 @@ def test_get_kospi_signal_empty_when_no_stored(monkeypatch):
 
 
 # ── refresh_kospi_signal: 드라이버 fetch 실패 시 저장값 보존 ──────────────────
+# refresh는 누적 series 위에 append하므로 조회 실패를 「저장값 없음」으로 읽으면
+# 이력이 1건으로 덮인다 → `_mc_load_strict`(실패 전파)를 쓴다. 아래 patch 대상이
+# get_kospi_signal 쪽(`_mc_load`)과 다른 이유다.
 
 def test_refresh_preserves_stored_series_when_driver_fetch_fails(monkeypatch):
     from services.market_indicators import kospi_signal as ks
     stored = {"series": [{"date": "2026-07-01", "signal": "bullish", "composite_pct": 0.8,
                            "drivers": {}, "actual_gap_pct": 0.1, "actual_close_pct": 0.6, "hit": True}],
               "drivers_history": {"sp500": [], "nasdaq": [], "usdkrw": []}}
-    monkeypatch.setattr(ks, "_mc_load", lambda key: {"data": stored, "fetched_at": "x"})
+    monkeypatch.setattr(ks, "_mc_load_strict", lambda key: {"data": stored, "fetched_at": "x"})
     saved = {}
     monkeypatch.setattr(ks, "_mc_save", lambda key, data: saved.update(data))
     monkeypatch.setattr(ks, "_yf_close_history", lambda sym, stored_h, precision=4: [])
@@ -366,7 +369,7 @@ def test_refresh_saves_retro_fixed_hit_even_when_driver_fetch_fails(monkeypatch)
     stored = {"series": [{"date": "2026-07-01", "signal": "bullish", "composite_pct": 0.8,
                            "drivers": {}, "actual_gap_pct": 0.1, "actual_close_pct": 0.3, "hit": False}],
               "drivers_history": {"sp500": [], "nasdaq": [], "usdkrw": [], "sox": []}}
-    monkeypatch.setattr(ks, "_mc_load", lambda key: {"data": stored, "fetched_at": "x"})
+    monkeypatch.setattr(ks, "_mc_load_strict", lambda key: {"data": stored, "fetched_at": "x"})
     saved = {}
     monkeypatch.setattr(ks, "_mc_save", lambda key, data: saved.update(data))
     monkeypatch.setattr(ks, "_yf_close_history", lambda sym, stored_h, precision=4: [])
@@ -385,7 +388,7 @@ class _EmptyKospiHist:
 
 def test_refresh_appends_todays_record_on_success(monkeypatch):
     from services.market_indicators import kospi_signal as ks
-    monkeypatch.setattr(ks, "_mc_load", lambda key: None)
+    monkeypatch.setattr(ks, "_mc_load_strict", lambda key: None)
     saved = {}
     monkeypatch.setattr(ks, "_mc_save", lambda key, data: saved.update(data))
 
@@ -414,7 +417,7 @@ def test_refresh_appends_todays_record_on_success(monkeypatch):
 
 def test_refresh_uses_adaptive_band_from_kospi_history(monkeypatch):
     from services.market_indicators import kospi_signal as ks
-    monkeypatch.setattr(ks, "_mc_load", lambda key: None)
+    monkeypatch.setattr(ks, "_mc_load_strict", lambda key: None)
     saved = {}
     monkeypatch.setattr(ks, "_mc_save", lambda key, data: saved.update(data))
     monkeypatch.setattr(ks, "_yf_close_history", lambda sym, stored_h, precision=4: [

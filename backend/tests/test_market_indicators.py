@@ -104,7 +104,7 @@ _SP500_HTML = """
 def test_get_sp500_tickers_uses_db_cache():
     """신선한 저장값이 있으면 스크레이프 0회."""
     from services.market_indicators.earnings import _get_sp500_tickers
-    with patch("services.market_indicators.earnings._mc_load",
+    with patch("services.market_indicators.earnings._mc_load_strict",
                return_value=_fresh(["AAPL", "MSFT"])), \
          patch("services.market_indicators.earnings.requests.get") as mock_get:
         tickers = _get_sp500_tickers()
@@ -115,7 +115,7 @@ def test_get_sp500_tickers_uses_db_cache():
 def test_get_sp500_tickers_expired_cache_rescrapes():
     """TTL(7일) 초과 저장값은 신선하지 않다 — fetched_at 기준 판정(파일 mtime 아님)."""
     from services.market_indicators.earnings import _get_sp500_tickers
-    with patch("services.market_indicators.earnings._mc_load",
+    with patch("services.market_indicators.earnings._mc_load_strict",
                return_value=_aged(["STALE"], days=8)), \
          patch("services.market_indicators.earnings._mc_save"), \
          patch("services.market_indicators.earnings.requests.get") as mock_get:
@@ -127,7 +127,7 @@ def test_get_sp500_tickers_expired_cache_rescrapes():
 def test_get_sp500_tickers_parses_wikipedia_and_saves_to_db():
     """미스 시 스크레이프 후 market_cache에 `{"tickers": [...]}`로 저장."""
     from services.market_indicators.earnings import _get_sp500_tickers
-    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+    with patch("services.market_indicators.earnings._mc_load_strict", return_value=None), \
          patch("services.market_indicators.earnings._mc_save") as mock_save, \
          patch("services.market_indicators.earnings.requests.get") as mock_get:
         mock_get.return_value.text = _SP500_HTML
@@ -147,12 +147,12 @@ def test_ticker_fetch_never_writes_seed_files():
         m.content = b"code=005930" if "sise" in url else b""
         return m
 
-    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+    with patch("services.market_indicators.earnings._mc_load_strict", return_value=None), \
          patch("services.market_indicators.earnings._mc_save"), \
          patch("services.market_indicators.earnings.requests.get") as mock_get:
         mock_get.return_value.text = _SP500_HTML
         _get_sp500_tickers()
-    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+    with patch("services.market_indicators.earnings._mc_load_strict", return_value=None), \
          patch("services.market_indicators.earnings._mc_save"), \
          patch("services.market_indicators.earnings.requests.get", side_effect=kospi_get):
         _get_kospi_tickers()
@@ -164,7 +164,7 @@ def test_ticker_fetch_never_writes_seed_files():
 def test_get_sp500_tickers_scrape_failure_does_not_save():
     """스크레이프 실패 시 빈 목록 박제 금지 — `_mc_save` 미호출 + 시드 폴백."""
     from services.market_indicators.earnings import _get_sp500_tickers
-    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+    with patch("services.market_indicators.earnings._mc_load_strict", return_value=None), \
          patch("services.market_indicators.earnings._mc_save") as mock_save, \
          patch("services.market_indicators.earnings.requests.get",
                side_effect=RuntimeError("boom")):
@@ -176,7 +176,7 @@ def test_get_sp500_tickers_scrape_failure_does_not_save():
 def test_get_sp500_tickers_scrape_failure_prefers_stale_over_seed():
     """실패 시 만료된 직전 저장값이 있으면 그것을 쓴다(시드보다 최신)."""
     from services.market_indicators.earnings import _get_sp500_tickers
-    with patch("services.market_indicators.earnings._mc_load",
+    with patch("services.market_indicators.earnings._mc_load_strict",
                return_value=_aged(["OLD1", "OLD2"], days=9)), \
          patch("services.market_indicators.earnings._mc_save") as mock_save, \
          patch("services.market_indicators.earnings.requests.get",
@@ -234,7 +234,7 @@ def test_get_kospi200_tickers_parses_krx_and_saves_to_db():
             m.content = b""  # no codes → stop pagination
         call_count[0] += 1
         return m
-    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+    with patch("services.market_indicators.earnings._mc_load_strict", return_value=None), \
          patch("services.market_indicators.earnings._mc_save") as mock_save, \
          patch("services.market_indicators.earnings.requests.get", side_effect=mock_get):
         tickers = _get_kospi_tickers()
@@ -245,7 +245,7 @@ def test_get_kospi200_tickers_parses_krx_and_saves_to_db():
 
 def test_get_kospi200_tickers_uses_db_cache():
     from services.market_indicators.earnings import _get_kospi_tickers
-    with patch("services.market_indicators.earnings._mc_load",
+    with patch("services.market_indicators.earnings._mc_load_strict",
                return_value=_fresh(["005930", "000660", "005380"])), \
          patch("services.market_indicators.earnings.requests.get") as mock_get:
         tickers = _get_kospi_tickers()
@@ -255,7 +255,7 @@ def test_get_kospi200_tickers_uses_db_cache():
 
 def test_get_kospi_tickers_scrape_failure_does_not_save():
     from services.market_indicators.earnings import _get_kospi_tickers
-    with patch("services.market_indicators.earnings._mc_load", return_value=None), \
+    with patch("services.market_indicators.earnings._mc_load_strict", return_value=None), \
          patch("services.market_indicators.earnings._mc_save") as mock_save, \
          patch("services.market_indicators.earnings.requests.get",
                side_effect=RuntimeError("boom")):
@@ -572,6 +572,7 @@ def test_get_econ_indicators_returns_cpi_and_unemployment(monkeypatch):
     _cache.clear()
     monkeypatch.setenv("FRED_API_KEY", "test-key")
     monkeypatch.setattr("services.market_indicators.econ._mc_load", lambda key: None)
+    monkeypatch.setattr("services.market_indicators.econ._mc_load_strict", lambda key: None)
 
     fake_obs = [
         {"date": "2024-01-01", "value": "308.5"},
@@ -595,6 +596,7 @@ def test_get_econ_indicators_skips_missing_values(monkeypatch):
     _cache.clear()
     monkeypatch.setenv("FRED_API_KEY", "test-key")
     monkeypatch.setattr("services.market_indicators.econ._mc_load", lambda key: None)
+    monkeypatch.setattr("services.market_indicators.econ._mc_load_strict", lambda key: None)
 
     fake_obs = [
         {"date": "2024-01-01", "value": "308.5"},
@@ -614,6 +616,12 @@ def test_get_econ_indicators_caches_result(monkeypatch):
     from services.market_indicators import get_econ_indicators, _cache
     _cache.clear()
     monkeypatch.setenv("FRED_API_KEY", "test-key")
+    # 저장값 조회를 명시적으로 대역한다 — 전엔 관용 `_mc_load`가 `_block_real_db` 예외를
+    # 삼켜 우연히 통과했다. 엄격 로더는 그 예외를 전파하므로(누적 시계열 파괴 방지) 이 테스트가
+    # 실 DB에 닿고 있었다는 사실이 드러난 것이다.
+    monkeypatch.setattr("services.market_indicators.econ._mc_load", lambda key: None)
+    monkeypatch.setattr("services.market_indicators.econ._mc_load_strict", lambda key: None)
+    monkeypatch.setattr("services.market_indicators.econ._mc_save", lambda key, data: None)
 
     fake_response = MagicMock()
     fake_response.json.return_value = {"observations": [{"date": "2024-01-01", "value": "3.7"}]}

@@ -45,18 +45,30 @@ def record(job_id: str, trigger: str):
     종료 상태를 직접 말할 수 있다 — 예외를 삼키는 잡이 자기 결과를 정확히 기록하는 통로다(B31).
 
     실패 가시성 주의: 상태를 지정하지 않는 잡은 failed가 본문이 예외를 '전파'할 때만 기록된다.
-    다수의 스케줄러 잡(_refresh_monthly_kr/_refresh_monthly_us/_refresh_earnings_kr/_refresh_earnings_us/
-    _fetch_leverage/_fetch_lending/_fetch_kr_rankings/_fetch_us_rankings/_run_digest/_fetch_investor_trend)과
+    다수의 스케줄러 잡(_refresh_monthly_kr/
+    _refresh_macro_signals/
+    _fetch_leverage/_fetch_lending/_run_digest/_fetch_investor_trend)과
     일부 워커(report._run_*/leverage_service.backfill_with_progress)는 내부 예외를 try/except로
     삼키고 정상 종료하므로, 부분/전체 실패여도 success로 기록된다. 즉 그 잡들의 success를
     '내부 오류 없음'으로 과신하면 안 된다(잡 본문 로그를 함께 확인).
+    ⚠️ _refresh_earnings_kr/_refresh_earnings_us는 **예외만** 배선돼 있다 — 본문의 저장 생략
+    4경로(고정집합 불완전·rest 유니버스 공백·rest 커버리지 미달·마감분기 없음)는 직전 저장값을
+    그대로 반환하므로 반환값으로 구별할 수 없고, 그 절반은 여전히 success로 기록된다(선재 부채).
     구루 크롤 2경로(routers/guru._run_crawl · scheduler/jobs._run_guru_crawl)와 신규 창업
     신청 2경로(scheduler/jobs._refresh_business_formation ·
     routers/market_indicators.refresh_business_formation)·고용 조사 2경로
     (scheduler/jobs._refresh_labor_surveys · routers/market_indicators.refresh_labor_surveys)·
     절사평균 물가 2경로(scheduler/jobs._refresh_trimmed_inflation ·
-    routers/market_indicators.refresh_trimmed_inflation)는 set_status로 배선돼 있어
-    이 주의의 예외다.
+    routers/market_indicators.refresh_trimmed_inflation)·FRED 경제지표 3경로
+    (scheduler/jobs._refresh_monthly_us · routers/market_indicators.refresh_econ ·
+    routers/market_indicators.refresh_monthly 의 US 분기)·환율 2경로
+    (scheduler/jobs._refresh_fx · routers/market_indicators.refresh_fx)·발굴 추천 2경로
+    (scheduler/jobs._fetch_recommendation_kr|us · routers/recommendations.refresh_recommendations
+    — 둘 다 scheduler._recommendation_work(market, run)에 핸들을 넘겨 매핑을 공유한다)·
+    랭킹 2경로(scheduler/jobs._fetch_kr_rankings · _fetch_us_rankings, fetch 가드의 예외를
+    skipped로)·다음날 코스피 신호(scheduler/jobs._refresh_kospi_signal)·US 섹터 모멘텀
+    (scheduler/jobs._fetch_us_sector, all-None 저장 생략을 skipped로)는
+    set_status로 배선돼 있어 이 주의의 예외다.
     """
     try:
         rows = query(

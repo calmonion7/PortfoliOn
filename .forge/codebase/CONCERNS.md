@@ -64,15 +64,23 @@ mapped: 2026-08-10
 >
 > ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63`은 **행을 그대로 유지**했고 이번 파트가 하나도 건드리지 않았다(task#333/#334). 특히 `B63`(프론트 포매터 중복)은 이 파트가 「표시측 `fmtPrice`가 null을 `'—'`로 처리한다」를 문서에 인용했으므로 「같이 정리됐겠지」로 읽히기 쉬운데, 포매터 중복 자체는 손대지 않았다.
 
+> **해소: 2026-08-22 (task#329) — B1·B30·B40·B41·B43·B65 닫힘 + B6 부분.** 10차 확정분 수정 4/7(**빈 결과 가드가 없거나 스스로 꺼지는 저장 경로 6건 + 관측성**). 여섯은 한 클래스였다 — **`if not X:` all-or-nothing 게이트만 두어 「전부 실패」는 막고 「대폭 축소」는 무검증 저장**한다(실패율 2%에서 전부 실패 확률이 사실상 0이므로 그 가드는 **발동하지 않는다**). 처방을 집합 성격으로 갈랐다: **B65**(추천 배치)·**B1**(KR 랭킹 페이지)은 **유동 대규모 집합 → 커버리지 임계**(`MIN_SCORED_COVERAGE=0.5` 분모는 반드시 `len(candidates)` / `_MIN_PAGE_COVERAGE=0.5`), **B43**(US 섹터 11 ETF)은 **독립 항목 → 실패분 개별 백필**(형제 `kr_sector` 미러, 매칭 키는 `code`가 아니라 `etf`), **B30**(티커 유니버스)은 **축소 하한** `_TICKER_MIN_RETAIN=0.9`(기준을 정적 시드가 아니라 직전 저장값으로 잡았다 — 시드 기준은 라이브 규모와 어긋나 정상 스크레이프가 하한을 영구히 통과 못 하는 **자기교착**을 만든다). **B1은 delete-rewrite라 담아둘 last-good이 없어** 소스-폴백의 대응물로 **예외 전파**를 썼다(호출측이 `replace`를 통째로 건너뛴다). **B41**은 `fx_fetch` 배치 신설(매일 06:40 KST, `market="공통"`, 수동 `POST /api/market/refresh-fx`)로 닫혔다 — 신선도 판정 축은 rates 커버리지가 아니라 **새 종가가 붙은 심볼 수**다(`_fetch_fx`가 소스-폴백이라 전멸에도 rates는 채워진다). **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
+>
+> ⚠️ **네 번째 실패 표면을 찾았다 — 가드의 *baseline*을 관용 로더로 읽으면 그 가드가 스스로 꺼진다(B40의 일반형, §1.8 신설).** `cache.py::_mc_load`가 조회 예외를 `None`으로 접으므로 **「DB 오류」와 「저장 없음」이 같은 값**이 되고, 완전성·커버리지·축소 가드는 전부 직전 저장값을 기준으로 판정하니 **기준이 0으로 붕괴해 판정이 항상 통과**한다. 가상의 위험이 아니다 — `_mc_save`는 `execute`·`_mc_load`는 `query`라 **SELECT만 실패하고 INSERT는 성공하는 조합이 성립**한다(그러면 3종목이 503종목을 덮는다). 처방은 `_mc_load_strict`(조회 실패 전파, 행 부재만 `None`)이고 `_mc_load`는 **additive로 보존**했다(앱 36곳·18모듈 + patch하는 테스트 17파일의 계약 불변). 소비 4곳 중 `earnings._tickers_with_cache`만 전파하지 않고 `baseline_known=False`로 **저장만 생략**한다 — 폴백 체인을 가진 read 경로라 전파하면 일시 DB 오류가 배치를 죽인다(**가드가 정상 동작을 지우면 그것도 손실**이다).
+>
+> ⚠️ **관측성을 함께 배선하지 않으면 이 가드들은 전부 무음이다.** 소스-폴백 가드가 든 함수는 **설계상 절대 raise하지 않으므로** `with job_runs.record(id, trigger):`와 그대로 붙이면 전 계열 실패도 매 실행 `success`로 기록된다. 그래서 상태를 **반환값에 실어**(`_status`/`status`) auto·manual **두 레인 모두** `as run`으로 받게 했다 — **배선 1개 → 14개**(미배선 18, §6.1에 job id 전수). 메타는 `_mc_save` *뒤에* 새 dict로 붙여(`{**merged, "_status": …}`) 저장 캐시를 오염시키지 않는다. admin 응답도 `ok = (status == "success")`로 「갱신됨」과 「생략」을 구분한다(`sectors: 11`·`rate_count: 3`은 **저장 여부와 무관**하게 채워지므로 건수만 돌려주면 실패가 성공으로 읽힌다).
+>
+> ⚠️ **B6은 닫지 않았다 — 3위치 중 2곳만 닫혀 행을 *축소해* 남겼다.** `econ.py` + `_refresh_monthly_us`(+수동 2레인)는 닫혔으나 **`macro.py::_fetch_and_save_macro_signals`는 무변경**이고 그 두 레인(`_refresh_macro_signals` · `refresh_macro_signals`)은 **`as run` 미배선**이라, `FRED_API_KEY` 미설정 시 `macro_signals_fetch`는 **지금도 매 실행 success**다. 같은 wave가 형제 `econ.py`를 참조 구현으로 만들어 두었으니 이식 비용은 작다(§6.1 · 우선순위 6). **「같은 결함 가족을 고쳤으니 형제도 고쳐졌겠지」로 읽지 말 것** — 이 행이 남은 이유가 정확히 그것이다.
+>
+> ⚠️ **선재 stale 3건을 함께 정정했다**(이 wave가 만든 것이 아니다). ⓐ **`commodities.get_treasury()`의 「백필 → 판정」 순서 결함은 task#269(`e88e9c2`)에 이미 교정됐는데** `§1.7`·`CONVENTIONS §1.3`·`INTEGRATIONS §10.2` 세 곳이 옛 서술을 유지해 **「참조 구현으로 고르지 말 것」이라는 *지시*가 근거 없이 살아 있었다** — 실측 결과 `commodities.py::get_commodities`·`::get_treasury` 둘 다 백필 앞에서 raw 결과를 판정한다. ⓑ 배치 개수 서술이 문서 5곳에서 `20`·`29`로 갈렸다 → 전부 **33**(KR 16 · US 11 · 공통 6), `_JOB_FUNCS`는 **32**(차집합이 정확히 `{consensus}`). ⓒ `TESTING.md §5.6`·`§9.4`가 개수 단언을 **「3파일 3지점」**이라 적었으나 실측은 **「4파일 8지점」**이고, 그 절이 못박은 탐지 grep은 `set(…) ==`·dict 리터럴에 블라인드해 **4지점을 원리적으로 못 본다**(「감사 패턴을 좁히면 그 감사는 통과해도 무의미하다」의 배치 id판).
+>
+> ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63`은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다(전건 잔존 확인). 특히 `B9`(access token 갱신 경로 부재)는 이 파트가 관측성·인증 문서를 만졌으므로 「같이 됐겠지」로 읽히기 쉬운데, 프론트 인터셉터는 손대지 않았다.
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| **B1** | KR 랭킹 빈응답이 전 KR 행을 DELETE 후 0행 삽입 | `services/ranking_service.py::_fetch_naver_market` → `::replace_market_rankings` | Naver 200 + `totalCount:0` |
-| **B40** | `_mc_load` 실패를 "저장값 없음"으로 읽어 365일 시계열을 1건으로 덮어씀 | `market_indicators/kospi_signal.py::refresh_kospi_signal` | 배치 중 DB read 1회 실패(PoolError 포함) |
-| **B41** | `market_cache` 키 `fx`에 **배치가 없다** — 포트폴리오 KRW 환산 전체가 무기한 stale | `market_indicators/fx.py::get_fx` (소비: `routers/stocks.py::_usdkrw_rate`) | 아무도 시장지표 탭을 안 열면 항상 |
 | B5 | 사용자 삭제가 6개 독립 트랜잭션 — 중간 실패 시 반쯤 삭제된 사용자 | `routers/admin.py::delete_user` | 루프 중 DB 오류 |
-| **B65** | 추천 배치 전량 재계산이 **「전부 실패」만 막고 「대폭 축소」는 무검증 저장**한다 — 유일한 가드가 `if scored: replace_recommendations(...)` 한 줄(all-or-nothing)이고 **커버리지 임계가 없다**. US 후보의 momentum 4필드·`value.upside_pct`가 전부 동일 `df`(=`_fetch_history`)에 의존하므로 히스토리 fetch가 광범위 실패하면 후보 대다수가 신호를 잃고 탈락하는데 한 건만 남아도 전량 교체된다. 처방은 **커버리지 임계**(`commodities`의 `_REST_MIN_COVERAGE=0.5` 선례) + `job_runs.set_status("partial"\|"skipped")` | `services/recommendation/funnel.py::run_recommendation_batch`, `::_has_signal` | yfinance 광범위 장애·레이트리밋 중 배치 실행 |
 | **B68** | `save_guru_managers`의 **읽기-계산-쓰기가 트랜잭션·락 없이** 돌아 동시 크롤이 서로의 병합결과(드롭/백필 판정)를 덮는다 — `db.py`의 `query()`/`execute()`가 각각 **독립 커넥션·트랜잭션**을 열고 `SELECT … FOR UPDATE`가 없다. docstring이 「드롭은 영구 삭제가 아니다 — 다음 정상 크롤이 복원」이라 자기치유를 명시하나 이는 **클로버가 안 난다는 보장이 아니다**. `§4.3`은 leverage/lending 루프만 잔여위험으로 인정하고 이 함수는 언급하지 않는다(= 기록된 트레이드오프가 아니다) | `services/storage/schedule.py::save_guru_managers` | 자동 배치 + 수동 트리거(또는 이중 클릭)의 근접 타이밍 겹침 |
 | **B69** | `TTLCache`/모듈 전역 `_snapshots`가 **무잠금**이라 동시 `invalidate()`가 진행 중인 `get()`/삭제를 **KeyError로 깨뜨린다**. `§8.1`이 2사이클 연속 「판정불가 — 도구 범위 밖」으로 이월했던 항목이며, 10차가 `threading.Barrier` 하니스로 **강제 인터리빙해 실제 재현**해 확정했다(창이 연속 두 바이트코드로 매우 좁아 LOW). 처방: `get`/`invalidate`를 `threading.Lock`으로 감싼다 | `services/cache.py::TTLCache.get` / `::invalidate` / `get_snapshot` / 모듈 전역 `_snapshots` | 동시 요청 중 한쪽이 `invalidate()`를 호출 |
 
@@ -80,14 +88,12 @@ mapped: 2026-08-10
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| B6 | 키 미설정 배치가 "성공"으로 기록 — `_refresh_monthly_us`는 "refreshed" 로그까지 남긴다 | `market_indicators/econ.py::_fetch_and_save_econ_indicators`, `macro.py::_fetch_and_save_macro_signals`, `scheduler/jobs.py::_refresh_monthly_us` | `FRED_API_KEY` 미설정 |
+| B6 | 키 미설정 배치가 "성공"으로 기록 · **부분(도달조건 축소, 재판정 task#329)**: 원 서술이 지목한 3위치 중 **2곳이 닫혔다** — `econ.py::_fetch_and_save_econ_indicators`는 계열별 소스-폴백 + `_status`(partial/skipped)를 반환하고, `scheduler/jobs.py::_refresh_monthly_us`는 `as run`으로 그것을 받아 `set_status`한다(수동 2레인 `refresh-econ`·`refresh-monthly?market=US`도 함께). **남은 도달 경로는 `macro.py` 하나뿐이다** — `_fetch_and_save_macro_signals`가 키 미설정 시 예외 없이 `{"error": …}`를 반환하는데 `_status`가 없고, 두 레인(`scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals`) **모두 `as run` 미배선**이라 반환값을 아무도 검사하지 않는다. 형제 `econ.py`가 참조 구현이다(§6.1) | `market_indicators/macro.py::_fetch_and_save_macro_signals` → `scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals` | `FRED_API_KEY` 미설정 |
 | B7 | KR 배당 기준연도가 1년 어긋남 | `services/dividends.py::_recent_business_year` | 4월 1일 00:00–09:00 KST |
 | B9 | 프론트에 access token 갱신 경로가 없다 — 백엔드 `/api/auth/refresh`는 **존재하는데** 아무도 안 부른다 | `frontend/src/api.js` 응답 인터셉터 | 1시간 경과(항상) |
 | B24 | `nav_analytics`가 백엔드 화이트리스트에 없어 **200 OK로 무음 폐기** | `routers/events.py::VALID_EVENTS` ← `components/Masthead.jsx`·`MobileTopActions.jsx` | admin이 '행동 분석' 진입 시 항상 |
 | **B42** | `insider_trades`·`disclosures`의 DART 조회 창이 UTC 기준 — 하루 밀림 | `services/insider_trades.py::fetch_insider_trades`, `services/disclosures.py::fetch_disclosures` | 00:00–09:00 KST 실행 |
-| **B43** | US 섹터 모멘텀에 부분 페이로드 백필이 없다(KR에는 있다) | `services/us_sector_service.py::refresh` | 11개 ETF 중 일부만 실패 |
 | B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | `services/consensus_pipeline.py` tz 경로 (§13.2에서 열림 확정, task#292) | 00:00–09:00 KST 실행 |
-| **B30** | 티커 유니버스 캐시가 **축소된** 스크레이프를 무검증 저장 | `market_indicators/earnings.py::_tickers_with_cache` ← `_scrape_kospi` (§13.2에서 열림 확정, task#292) | 스크레이프 조기종료로 부분 축소 |
 | B53 | 루틴 프롬프트의 `market_outlook` 예시가 **문자열 템플릿**이라 AI가 산문으로 채우면 `segments[]`가 `None`이 되어 「사업부문 시장 분석」 섹션이 **크래시 없이 조용히 사라진다**(정본 `CLAUDE_COWORK_API.md`는 객체로 못박고, `routers/stocks.py`엔 스키마 검증이 없어 422 피드백도 없다) | `scripts/cowork-routine-prompt.md` → `services/analyst_reports.py::_market_outlook_segments` | 루틴이 프롬프트 예시 형태를 따를 때 |
 | B56 | `DiagLog` 복사 폴백이 `execCommand` 반환값을 확인하지 않아 **실패해도 '복사됨'** 이 뜨고, 이중 실패는 빈 `.catch(() => {})`가 완전히 삼킨다 — 이 컴포넌트의 목적(폰에서 로그 채취)이 정확히 그 조합에서 무너진다 | `components/DiagLog.jsx::legacyCopy · copyText · handleCopy` | `execCommand`가 예외 없이 false / writeText 거절 + legacyCopy throw |
 | B58 | `useTrackedStocks`의 티커별 뮤텍스가 **같은 훅 인스턴스를 공유하는 화면**에서 다른 카드의 동일 티커 2번째 클릭을 무음으로 삼킨다(`GuruStats`·`GuruAllocation`·`GuruManagers`·`GuruDetail`은 `pending`을 쓰지 않아 배지 비활성화도 없고, `onClick`이 반환값을 버려 호출부도 감지 못 한다) | `hooks/useTrackedStocks.js::toggle` ← `pages/GuruManagers.jsx` | 같은 티커가 여러 매니저 top10에 동시 등장 + 연속 클릭 |
@@ -129,9 +135,11 @@ mapped: 2026-08-10
 
 이 저장소에서 가장 잘 이해된 결함 가족이고, **정답 형태가 코드 안에 이미 존재한다**(§1.7). 남은 위험은 그 형태를 안 쓴 자리들이다.
 
-### 1.1 `get_kr_rankings` wipe-on-empty — **확인된 버그** (B1)
+### 1.1 `get_kr_rankings` wipe-on-empty — **해소(task#329)** (B1)
 
-`services/ranking_service.py::_fetch_naver_market`의 docstring은 *"한 페이지라도 실패하면 RuntimeError를 던진다 — 잘린 데이터가 정상 스냅샷을 DELETE-덮어쓰는 것을 막기 위함"* 이라고 의도를 명시하지만, **0페이지 케이스에 구멍이 있다**:
+> ✅ **해소.** 아래는 옛 상태 기록이다. 현재 `_fetch_naver_market`은 **① 1페이지 빈 `stocks`**(200 + `totalCount:0`) **② 뒷 페이지 future 실패** **③ 커버리지 `_MIN_PAGE_COVERAGE = 0.5` 미달** 셋을 각각 `RuntimeError`로 던져 호출측(스케줄러 2잡·수동 라우터·발굴 유니버스)이 `replace`를 통째로 건너뛰게 한다. delete-rewrite 경로에는 담아둘 last-good이 없으므로 **예외 전파가 소스-폴백의 대응물**이다. genuine-empty를 clear하지 않는 이유도 docstring에 있다 — 전 종목 목록이 *진짜로* 0건인 시장 상태는 없어 무데이터와 장애를 구별할 수 없고, 비용이 비대칭이다(잘못 보존 = 다음 크론까지 stale / 잘못 삭제 = 랭킹 탭 + `investor_trend_fetch` 유니버스 동시 소멸). 형제 `get_us_rankings`와의 비대칭도 사라졌다.
+
+`services/ranking_service.py::_fetch_naver_market`의 (옛) docstring은 *"한 페이지라도 실패하면 RuntimeError를 던진다 — 잘린 데이터가 정상 스냅샷을 DELETE-덮어쓰는 것을 막기 위함"* 이라고 의도를 명시하지만, **0페이지 케이스에 구멍이 있다**:
 
 ```python
 total = int(body.get("totalCount", 0))
@@ -145,9 +153,11 @@ if pages <= 1:
 
 도달: Naver `marketvalue`가 200 + `totalCount:0`(스키마 변경·소프트 레이트리밋)을 KOSPI·KOSDAQ 양쪽에 반환 → `replace_market_rankings("KR", …)`가 `DELETE FROM market_rankings WHERE market='KR'` 후 0행 삽입, 트랜잭션은 정상 커밋. 파장은 랭킹 탭 공백에 그치지 않는다 — `investor_trend_fetch`의 유니버스 쿼리가 `market_rankings`를 읽으므로 **수급 배치의 대상 집합까지 함께 사라진다**. 복구는 프로세스 재기동 시 `_seed_rankings_if_empty`뿐.
 
-### 1.2 `_mc_load` 실패가 "저장값 없음"과 구별되지 않는다 — **확인된 버그** (B40)
+### 1.2 `_mc_load` 실패가 "저장값 없음"과 구별되지 않는다 — **해소(task#329)** (B40)
 
-`market_indicators/cache.py::_mc_load`는 예외를 경고 로그 후 `None`으로 삼킨다:
+> ✅ **해소.** 아래는 옛 상태 기록이다. `cache.py::_mc_load_strict`(조회 실패를 *전파*, 행 부재만 `None`)가 신설되고 `refresh_kospi_signal`이 그것으로 전환됐다 — 예외가 전파되면 `_mc_save`에 도달하지 못해 누적 `series`·적중률이 보존되고, `scheduler/jobs.py::_refresh_kospi_signal`이 `as run`으로 받아 `failed`를 기록한다(이 한 건에서는 예외 전파가 `set_status`보다 정확한 신호다). `_mc_load` 자체는 **additive로 보존**됐다(앱 36곳·18모듈 + patch하는 테스트 17파일의 반환 계약 불변). 이 모호성의 **일반형**(가드의 baseline이 붕괴해 가드가 스스로 꺼지는 문제)은 §1.8에 별도로 정리했다. 아래 "같은 클래스" 목록 중 `econ.py`도 함께 닫혔고 `macro.py`·`kr_sector_service`는 열려 있다.
+
+`market_indicators/cache.py::_mc_load`는 (관용 경로에서) 예외를 경고 로그 후 `None`으로 삼킨다:
 
 ```python
 except Exception as e:
@@ -172,18 +182,19 @@ if changed:
 
 ### 1.3 부분 페이로드가 완전한 값을 대체 — **잠재 위험**
 
-전 `_mc_save` 호출자(17개)를 실패 클래스 3종 — (a) 예외 (b) 성공-but-빈응답 (c) 부분 페이로드 — 으로 감사한 결과, **(c)를 안 막는 곳이 4개** 남아 있다.
+전 `_mc_save` 호출자(17개)를 실패 클래스 3종 — (a) 예외 (b) 성공-but-빈응답 (c) 부분 페이로드 — 으로 감사한 결과, **(c)를 안 막는 곳이 3개** 남아 있다(2026-08-22 재판정: 옛 판의 4개 중 `us_sector`·`econ` 2개가 닫혔고 새로 생긴 곳은 없다).
 
 | 심볼 | (a) | (b) | (c) |
 |---|---|---|---|
-| `us_sector_service.py::refresh` | ✅ | ✅ | ❌ **B43** |
-| `market_indicators/econ.py::_fetch_and_save_econ_indicators` | ✅ | ❌ | ❌ |
+| ~~`us_sector_service.py::refresh`~~ | ✅ | ✅ | ✅ **B43 해소** |
+| ~~`market_indicators/econ.py::_fetch_and_save_econ_indicators`~~ | ✅ | ✅ | ✅ **해소** |
 | `market_indicators/macro.py::_fetch_and_save_macro_signals` | ✅ | ❌ | ❌ |
 | `market_indicators/sentiment.py::get_fear_greed` | ✅ | ✅ | ❌ |
 | `market_indicators/exports.py::_fetch_customs_exports` | ✅ | ✅(월 목록) | ❌(월별 0 드롭) |
 
-- **B43 `us_sector_service::refresh`** — all-None만 막고 부분은 안 막는다. 형제 `kr_sector_service::refresh`는 per-sector 백필 + `index` 보존까지 한다. 11개 `SECTOR_ETFS` 중 10개가 실패하면 "좋은 1개 + all-None 10개"가 직전 양호값을 덮고 다음 07:20 배치까지 서빙된다. `tests/test_us_sector_batch.py`는 has-data와 all-None 두 케이스만 덮는다.
-- **`econ`/`macro`** — 예외 경로는 `return stored_data`로 막혀 있으나 FRED가 200 + `observations: []`를 주면 통과한다. `econ`의 `_is_valid_econ_data`는 빈 배열을 **유효로 판정**한다(`unemp[-1] > 50`만 거부).
+- ~~**B43 `us_sector_service::refresh`**~~ — **해소(task#329).** 옛 판: all-None만 막고 부분은 안 막아, 11개 `SECTOR_ETFS` 중 10개가 실패하면 "좋은 1개 + all-None 10개"가 직전 양호값을 덮고 다음 07:20 배치까지 서빙됐다. 이제 형제 `kr_sector_service::refresh`처럼 **실패 ETF만 직전 저장값으로 개별 백필**한다(매칭 키는 KR의 `code`가 아니라 **`etf`**). ETF 11종은 서로 합산되지 않는 **독립 항목**이라 커버리지 임계가 아니라 개별 백필이 맞는 처방이다. 전량실패 판정은 백필 *앞*이고 baseline은 엄격 로더 `_load_momentum_strict`다(관용 `load_momentum`은 조회 실패를 `[]`로 접어 백필 0건 → all-None 저장이라는 fail-open destructive를 만든다). KR의 `index` 같은 동반 필드는 없음이 확인됐다(저장 payload가 `sectors` 단일 필드). 회귀는 `tests/test_us_sector_partial_backfill.py` 신설.
+- ~~**`econ`**~~ — **해소(task#329).** 계열별(`cpi`·`unemployment`) 독립 try + `if not new_pts: raise ValueError`로 (b)를, 계열 단위 직전값 폴백으로 (c)를 막는다. 누적 baseline은 `_mc_load_strict`(§1.8). 부수로 `get_econ_indicators`의 `_mc_delete`가 **오염 판정 시에만** 돌게 좁혀졌다 — 옛 코드는 `_mc_load`가 조회 실패로 `None`을 준 경우에도 삭제해, `default_start`가 항상 「올해−3년」이므로 그 이전 구간이 **영구 소실**될 수 있었다. `_is_valid_econ_data`가 빈 배열을 유효로 판정하는 성질(`unemp[-1] > 50`만 거부)은 그대로지만, 이제 빈 배열이 저장까지 도달하지 않는다.
+- **`macro`** — 예외 경로는 `return stored_data`로 막혀 있으나 FRED가 200 + `observations: []`를 주면 통과한다. **형제 `econ`이 같은 wave에서 고쳐졌으므로 그 파일이 그대로 참조 구현이다**(계열별 독립 try + 빈응답 raise + `_status` + `_mc_load_strict`). 관측성도 함께 열려 있다 — 두 레인 모두 `as run` 미배선(§6.1, B6 잔존 절반).
 - **`sentiment::get_fear_greed`** — `score`만 파싱되면 dict를 반환하므로 `fear_and_greed_historical`이 빠진 응답에서 `history: []`가 저장돼 60일 이력을 덮는다.
 - **`exports`** — `all_months = sorted(m for m in months if total_by_month.get(m, 0) > 0)`가 총계 0인 달을 드롭한다. 호출부 가드는 `if not data.get("months")`뿐이라 12개월 중 2개월만 살아남아도 통과한다.
 
@@ -210,9 +221,26 @@ delete-then-insert 5곳은 전부 **단일 `get_connection()` 트랜잭션**이�
 - `storage/schedule.py::save_guru_managers` — per-manager 백필 + `_ROSTER_MIN_COVERAGE` 커버리지 임계.
 - `market_indicators/earnings.py::_fetch_and_save_m7_earnings` — 고정 명명 집합엔 완전성(`m7_ok < len(M7)`), 유동 대규모 집합엔 커버리지 임계(`_REST_MIN_COVERAGE`).
 
-### 1.7 `commodities.get_treasury`의 판정 순서 — **이미 가드됨(단, 형제와 순서가 다르다)**
+**2026-08 추가(task#329) — 세 처방이 각자 자기 집합 성격에 맞게 이식됐다:**
 
-`get_treasury`는 **백필 → 전량실패 판정** 순서라 저장값이 있으면 전 심볼이 백필돼 `if not rates:`가 사실상 발동하지 않는다. 형제 `get_commodities`는 판정이 백필 *앞*에 있어 옳다. `get_treasury`를 "동형 이식" 참조 구현으로 지목하지 말 것 — 그 순서를 베끼면 가드가 원리적으로 죽는다.
+- `services/recommendation/funnel.py::run_recommendation_batch` — **유동 대규모 집합 → 커버리지 임계** `MIN_SCORED_COVERAGE = 0.5`. 분모가 `len(candidates)`인 것이 핵심이다(`len(universe)`로 잡으면 Stage-1 top-K 절단만으로 정상 실행이 상시 임계 미달이 된다). 경계는 `<`라 정확히 0.5면 저장한다.
+- `services/us_sector_service.py::refresh` — **독립 항목 → 실패분만 개별 백필**(ETF 11종은 서로 합산되지 않는다). 전량실패 판정이 백필 *앞*이고, 백필 baseline은 `_load_momentum_strict`(엄격)다.
+- `market_indicators/earnings.py::_tickers_with_cache` — **축소 하한** `_TICKER_MIN_RETAIN = 0.9`. 기준을 정적 시드가 아니라 **직전 저장값**으로 잡은 근거가 주석에 3항으로 적혀 있다(시드 기준은 자기교착을 만든다 — 실측 `kospi_tickers.json` 2182건 vs 라이브 KOSPI-only 스크레이프 규모).
+- `services/ranking_service.py::_fetch_naver_market` — **delete-rewrite 경로의 소스-폴백 대응물**: 담아둘 last-good이 없으므로 실패를 **예외로 전파**해 호출측이 `replace`를 통째로 건너뛰게 한다. 0페이지(200+`totalCount:0`)와 `_MIN_PAGE_COVERAGE = 0.5` 미달을 각각 문다.
+
+### 1.7 `commodities.get_treasury`의 판정 순서 — **해소(task#269), 형제와 순서가 같아졌다**
+
+⚠️ **아래 옛 서술은 2026-08 재확인에서 거짓으로 판정됐다.** 옛 판은 `get_treasury`가 **백필 → 전량실패 판정** 순서라 저장값이 있으면 전 심볼이 백필돼 판정이 사실상 발동하지 않는다고 적었고, 그래서 "동형 이식" 참조 구현으로 고르지 말라고 경고했다. 그 결함은 **task#269(BH7-L1, `e88e9c2` "도달하지 못하는 가드 2건 — 백필이 판정을 앞지름")에서 교정**됐다.
+
+현재(실측): `commodities.py::get_commodities`·`commodities.py::get_treasury`가 **둘 다 개별 백필 루프 앞**에서 `if not any(results.values())`로 raw fetch 결과를 판정한다. 두 함수의 순서가 같고 둘 다 참조 구현으로 쓸 수 있다. 판정 대상이 백필 *후* `rates`가 아니라 **raw `results`**인 것이 핵심이며, 그 이유가 두 함수 모두 주석으로 박혀 있다.
+
+> 이 항목은 **문서가 코드보다 오래 stale하게 남을 수 있음**을 보여주는 표본이다 — 결함은 task#269에 닫혔는데 이 절·`CONVENTIONS §1.3`·`INTEGRATIONS §10.2`가 전부 옛 서술을 유지해, 「참조로 고르지 말 것」이라는 *지시*가 근거 없이 살아 있었다(자동 게이트는 이 클래스에 원리적으로 블라인드하다).
+
+### 1.8 가드의 baseline을 관용 로더로 읽으면 가드가 스스로 꺼진다 — **이미 가드됨(`_mc_load_strict`, task#329)**
+
+실패 클래스 3종(예외·성공-but-빈응답·부분 페이로드) 밖에 있는 **네 번째 표면**이다. 완전성·커버리지·축소 가드는 전부 직전 저장값을 기준으로 판정하는데, `cache.py::_mc_load`가 조회 예외를 `None`으로 접으므로 **「DB 오류」와 「저장 없음」이 같은 값**이 되고 그러면 기준이 0으로 붕괴해 **판정이 항상 통과**한다. `_mc_save`는 `execute`·`_mc_load`는 `query`라 **SELECT만 실패하고 INSERT는 성공하는 조합이 실제로 성립**하므로 가상의 위험이 아니다.
+
+처방은 `cache.py::_mc_load_strict`(조회 실패를 전파, 행 부재만 `None`)이고 `_mc_load`는 additive로 보존됐다. 소비 4곳과 각각의 선택은 `CONVENTIONS §1.3`에 정리돼 있다 — 그중 `earnings._tickers_with_cache`만 예외를 전파하지 않고 `baseline_known=False`로 **저장만 생략**한다(폴백 체인을 가진 read 경로라 전파하면 일시 DB 오류가 배치를 죽인다 = 가드가 정상 동작을 지우는 형태).
 
 ---
 
@@ -488,28 +516,29 @@ finally:
 
 ## 6. 배치·스케줄러·관측성
 
-### 6.1 키 미설정·실패가 "성공"으로 기록된다 — **확인된 버그** (B6)
+### 6.1 키 미설정·실패가 "성공"으로 기록된다 — **부분 해소** (B6, task#329)
 
-`_JOB_FUNCS`(28개)를 `Run.set_status` 사용과 대조한 결과 — **`set_status`를 부르는 잡은 `_run_guru_crawl` 하나뿐이다.** 나머지 27개는 본문을 `try/except Exception: logger.warning(...)`로 감싼 채 `with job_runs.record(...)` 안에 있어 **항상 `_finish("success")`가 돈다**. `services/job_runs.py`의 docstring이 이 성질을 스스로 명시한다.
+**실측(2026-08-22): `_JOB_FUNCS` 32개 중 `set_status` 배선 14개 · 미배선 18개.** 미배선 잡은 본문을 `try/except Exception: logger.warning(...)`로 감싼 채 `with job_runs.record(...)` 안에 있어 **항상 `_finish("success")`가 돈다**. `services/job_runs.py`의 docstring이 이 성질과 배선 예외 목록을 스스로 명시한다(그 목록이 정본이다).
 
-가장 나쁜 형태는 예외조차 안 나는 경우다 — `scheduler/jobs.py::_refresh_monthly_us`:
+미배선 18개(job id): `daily_report_kr`·`daily_report_us`·`daily_digest`·`monthly_kr`·**`macro_signals_fetch`**·`leverage_fetch`·`lending_fetch`·`investor_trend_fetch`·`short_sell_fetch`·`supply_score_fetch`·`backlog_fetch`·`kr_sector_fetch`·`disclosure_fetch`·`agm_fetch`·`dividend_fetch`·`beta_fetch`·`insider_fetch`·`us_supply_fetch`.
+
+옛 판이 인용한 최악 형태(`_refresh_monthly_us`가 키 미설정 `{"error": …}`를 검사하지 않아 "refreshed" 로그까지 찍던 것)는 **해소됐다** — 지금은 auto·manual 3레인이 모두 반환값을 검사해 `run.set_status("skipped", …)`를 기록한다:
 
 ```python
-with job_runs.record("monthly_us", "auto"):
-    try:
-        _fetch_and_save_econ_indicators()
-        logger.info("[Scheduler] Econ indicators refreshed")     # ← 실패해도 이 줄이 찍힌다
-    except Exception as e:
-        logger.warning(...)
+with job_runs.record("monthly_us", "auto") as run:          # ← as run 배선
+    data = _fetch_and_save_econ_indicators() or {}
+    if "error" in data:            run.set_status("skipped", data["error"])
+    elif data.get("_status"):      run.set_status(data["_status"])   # partial|skipped
+    else:                          logger.info("[Scheduler] Econ indicators refreshed")
 ```
 
-`_fetch_and_save_econ_indicators`는 키가 없으면 **예외 없이 `{"error": ...}` dict를 반환**하므로 `warning` 분기조차 타지 않는다. 반환값은 아무도 검사하지 않는다.
+> ⚠️ **B6의 나머지 절반은 열려 있다 — `macro.py::_fetch_and_save_macro_signals`.** 그 함수는 키 미설정 시 여전히 예외 없이 `{"error": …}`를 반환하고 `_status`를 실지 않으며, 두 레인 **모두** 반환값을 검사하지 않는다(`scheduler/jobs.py::_refresh_macro_signals` — `as run` 없음 · `routers/market_indicators.py::refresh_macro_signals` — `as run` 없음). 즉 `FRED_API_KEY`가 없으면 `macro_signals_fetch`는 지금도 **매 실행 success**로 기록된다. 형제 `econ.py`가 같은 wave에서 계열별 소스-폴백 + `_status` 3상태로 고쳐졌으므로 **그 파일이 그대로 참조 구현**이다.
 
 키 미설정 → 초록 배치 + 데이터 0의 조합(전수):
 
 | 환경변수 | fetch 심볼 | 잡 |
 |---|---|---|
-| `FRED_API_KEY` | `econ.py::_fetch_and_save_econ_indicators`, `macro.py::_fetch_and_save_macro_signals` | `_refresh_monthly_us`, `_refresh_macro_signals` |
+| `FRED_API_KEY` | ~~`econ.py::_fetch_and_save_econ_indicators`~~(해소) · `macro.py::_fetch_and_save_macro_signals`(**열림**) | ~~`_refresh_monthly_us`~~(배선됨) · `_refresh_macro_signals`(**미배선**) |
 | `DART_API_KEY` | `disclosures.py`, `backlog.py::_get_corp_code_map`, `agm.py`, `dividends.py`, `insider_trades.py` | `_fetch_disclosures`·`_fetch_backlog`·`_fetch_agm`·`_fetch_dividends`·`_fetch_insider` |
 | `KOFIA_API_KEY` | `leverage_service.py::_kofia_get`, `lending_service.py::_api_get` | `_fetch_leverage`·`_fetch_lending` |
 | `TELEGRAM_BOT_TOKEN`/`_CHAT_ID` | `digest_service.py::send_telegram`(bare `return`) | `_run_digest` — 다이제스트는 생성·저장되고 **발송만 안 된다** |
@@ -518,7 +547,11 @@ with job_runs.record("monthly_us", "auto"):
 
 ### 6.2 `job_runs`에 "스킵" 상태가 없다 — **설계상 트레이드오프**(관측 공백)
 
-§1의 가드들이 발동하면 저장을 건너뛰는데, 잡 본문이 예외를 전파하지 않으므로 `job_runs`는 **success로 기록한다**. 즉 "갱신됨"과 "생략·직전값 유지"가 관측상 구별되지 않는다. `_run_guru_crawl`만 `partial`/`skipped`/`failed`를 쓰는 올바른 형태이고, 나머지 27개가 채택해야 할 패턴이다.
+§1의 가드들이 발동하면 저장을 건너뛰는데, 잡 본문이 예외를 전파하지 않으므로 `job_runs`는 **success로 기록한다**. 즉 "갱신됨"과 "생략·직전값 유지"가 관측상 구별되지 않는다.
+
+**진척(2026-08-22, task#329): 배선 1 → 14, 미배선 18.** `_run_guru_crawl` 외에 FRED 경제지표 3레인·환율 2레인·발굴 추천 2레인·랭킹 2레인·US 섹터·코스피 신호·실적 2종(예외만)이 `partial`/`skipped`/`failed`를 쓴다. 남은 18개가 채택해야 할 패턴이며, `_status`를 반환값에 실어 auto·manual **두 레인 모두**에서 받는 형태가 정본이다(`econ.py` + `scheduler/jobs.py::_refresh_monthly_us` + `routers/market_indicators.py::refresh_econ`/`refresh_monthly` 3쌍).
+
+⚠️ **"배선됨"이 "완전"을 뜻하지 않는다** — `_refresh_earnings_kr`/`_refresh_earnings_us`는 **예외만** 배선돼 있고, 본문의 저장 생략 4경로(고정집합 불완전·rest 유니버스 공백·rest 커버리지 미달·마감분기 없음)는 직전 저장값을 그대로 반환하므로 반환값으로 구별할 수 없어 여전히 success로 기록된다(선재 부채).
 
 ### 6.3 `get_or_refresh`의 `ttl`은 저장값에 안 걸린다 — **설계상 트레이드오프**(오해 유발 시그니처)
 
@@ -545,9 +578,9 @@ def get_or_refresh(key, fetch_fn, ttl, force=False):
 | `commodities`·`treasury`·`indices`·`vix`·`fear_greed`·`kospi_futures` | 인메모리 3600s 만료 후 **요청 경로 재fetch**(소비자가 곧 갱신자라 자가치유) |
 | `econ_indicators`·`kr_exports`·`macro_signals`·`kospi_signal`·`m7_earnings`·`kr_top2_earnings`·`kr_sector_momentum`·`us_sector_momentum` | 스케줄러 배치 |
 | `sp500_tickers`·`kospi_tickers` | 자체 `_is_fresh()` — **이 모듈의 유일한 나이 검사**이고 파일 mtime이 아닌 `fetched_at`을 올바르게 쓴다 |
-| **`fx`** | **아무것도 없다** ← B41 |
+| `fx` | 스케줄러 배치 `fx_fetch`(매일 06:40 KST) ← **B41 해소(2026-08)**. 나이 검사는 여전히 없고, 대신 배치가 「신선한 심볼 수」로 `job_runs` 상태(success/partial/skipped)를 기록한다 |
 
-**B41 — 키 `fx`에 배치도 나이 검사도 없다.** 작성자 `market_indicators/fx.py::get_fx`는 `routers/market_indicators.py`의 `GET /api/market/fx`와 admin refresh에서만 도달한다(`_JOB_FUNCS`에 fx 잡 없음, `main._warm_market_cache`는 econ·exports만 warm). 그런데 소비자는 나이 검사 없는 raw `_mc_load("fx")` 3곳이다:
+**B41 — 키 `fx`에 배치도 나이 검사도 없었다(해소).** ⚠️ **아래 서술은 2026-08 이전 상태다.** 지금은 `fx_fetch` 배치가 `_JOB_FUNCS`에 있고 `batch_registry.BATCHES`에도 등록돼 있다(`market="공통"`). 나이 검사(소비 시점의 stale 마커)는 아직 없으므로 소비자 목록 자체는 유효하다. — 옛 서술: 작성자 `market_indicators/fx.py::get_fx`는 `routers/market_indicators.py`의 `GET /api/market/fx`와 admin refresh에서만 도달한다(`_JOB_FUNCS`에 fx 잡 없음, `main._warm_market_cache`는 econ·exports만 warm). 그런데 소비자는 나이 검사 없는 raw `_mc_load("fx")` 3곳이다:
 
 - `routers/stocks.py::_usdkrw_rate` → 대시보드 `totals`
 - `routers/portfolio.py` — `get_dividends`·`get_rebalance`·`get_exposure` 전부 `_usdkrw_rate()` 경유
@@ -556,7 +589,7 @@ def get_or_refresh(key, fetch_fn, ttl, force=False):
 
 도달: 일주일간 아무도 시장지표 탭을 안 열면 포트폴리오 KRW 환산 총액·리밸런싱 비중·익스포저·배당 추정·일일 다이제스트가 전부 **일주일 된 환율**로 계산되고, 응답 어디에도 stale 마커가 없다. `_usdkrw_rate` 자체는 잘 짜여 있다(`math.isfinite` 가드 보유) — 결함은 순수하게 신선도다.
 
-부수(§12.5): 그 함수의 docstring이 **존재하지 않는 배치를 단언한다** — *"FX 배치(get_fx)가 채운 영구 캐시를 읽는다."*
+부수(§12.5): 그 함수의 docstring이 **존재하지 않는 배치를 단언했다** — *"FX 배치(get_fx)가 채운 영구 캐시를 읽는다."* → 해소(2026-08): 작성자 둘(배치 `fx_fetch` / 요청경로 `get_fx`)을 구별해 다시 썼다.
 
 ### 6.5 FX 저장 payload가 `usdkrw` history만 담는다 — **잠재 위험** (B25)
 
@@ -603,7 +636,7 @@ _scheduler.start()
 
 ### 6.9 배치 레지스트리 정합 — **이미 가드됨 + 테스트 취약**
 
-`batch_registry.BATCHES`는 29개, `_JOB_FUNCS`는 28개로 **의도적으로 하나 어긋나 있다**(`consensus`가 레지스트리에만 있다). 이 둘을 순진하게 동기화하려는 수정은 실패한다. 테스트 쪽 취약성은 §9.4.
+`batch_registry.BATCHES`는 33개, `_JOB_FUNCS`는 32개로 **의도적으로 하나 어긋나 있다**(`consensus`가 레지스트리에만 있다 — 실측 차집합이 정확히 `{consensus}`이고 `_JOB_FUNCS`에만 있는 id는 0개다). 이 둘을 순진하게 동기화하려는 수정은 실패한다. 테스트 쪽 취약성은 §9.4.
 
 ---
 
@@ -781,13 +814,16 @@ if (err.response?.status === 401) {
 
 ### 9.4 정확한 개수 단언이 다음 배치 추가에서 깨진다 — **확인된 버그**(개발 마찰)
 
-`batch_registry.BATCHES`에 **항목 하나를 더하면 3개 파일의 단언 3건이 동시에 깨진다**:
+`batch_registry.BATCHES`에 **항목 하나를 더하면 4개 파일의 단언 8건이 동시에 깨진다**(2026-08-22 실측 — 옛 판은 "3파일 3건"이라 적었으나 지점 수가 틀렸다):
 
-- `tests/test_batch_market_split.py` — `assert len(batch_registry.BATCHES) == 29`
-- `tests/test_macro_signals_batch.py` — `assert len(batch_registry.BATCHES) == 29`
-- `tests/test_batches_router.py` — `assert len(data) == 29` **그리고** `assert {b["id"] for b in data} == EXPECTED_IDS`(29원소 하드코딩 집합)
+- `tests/test_batch_market_split.py` — **3지점**: `assert len(batch_registry.BATCHES) == 33` · `_MARKET_BY_ID`(id→market 완전 매핑 dict) · 시장별 개수 dict `{"KR": 16, "US": 11, "공통": 6}`
+- `tests/test_batches_router.py` — **2지점**: `assert len(data) == 33` · `assert {b["id"] for b in data} == EXPECTED_IDS`(33원소 하드코딩 집합)
+- `tests/test_macro_signals_batch.py` — **1지점**: `assert len(batch_registry.BATCHES) == 33`
+- `tests/test_scheduler_seed.py` — **2지점**: `test_all_editable_jobs`의 `set(editable) == {…}` · `test_seed_only_fills_missing_rows`의 `expected_seeded` 집합
 
-그 테스트 함수 이름이 아직 `test_lists_sixteen_batches_with_required_fields`인 채 29를 단언한다 — 이름이 배치 13개만큼 뒤처져 있고, **이 함정이 이미 반복적으로 발동했다는 직접 증거**다. 주의: `EXPECTED_IDS`엔 `consensus`가 들어 있는데 이는 `_JOB_FUNCS`(28개)엔 없다(§6.9) — 둘을 순진하게 동기화하는 수정은 실패한다.
+⚠️ **옛 판이 못박은 탐지 grep(`"BATCHES) ==\|len(data) ==\|EXPECTED_IDS"`)은 이 8지점 중 4개를 원리적으로 못 본다** — `set(…) ==` 형태와 dict 리터럴에 블라인드하다. 실제 게이트는 grep이 아니라 **전체 스위트**이고, grep은 "어느 파일을 볼지"만 좁힌다(`TESTING.md §5.6`).
+
+그 라우터 테스트 함수 이름이 아직 `test_lists_sixteen_batches_with_required_fields`인 채 33을 단언한다 — 이름이 배치 17개만큼 뒤처져 있고, **이 함정이 이미 반복적으로 발동했다는 직접 증거**다. 주의: `EXPECTED_IDS`엔 `consensus`가 들어 있는데 이는 `_JOB_FUNCS`(32개)엔 없다(§6.9) — 둘을 순진하게 동기화하는 수정은 실패한다(실측 차집합이 정확히 `{consensus}`다).
 
 ### 9.5 게이트가 **못** 보는 것
 
@@ -910,10 +946,10 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 | 위치(심볼) | 주장 | 실제 |
 |---|---|---|
-| `routers/stocks.py::_usdkrw_rate` docstring | "FX 배치(get_fx)가 채운 영구 캐시를 읽는다" | **그 배치는 존재하지 않는다**(§6.4) |
+| ~~`routers/stocks.py::_usdkrw_rate` docstring~~ | ~~"FX 배치(get_fx)가 채운 영구 캐시를 읽는다"~~ | **해소(2026-08)** — 배치 `fx_fetch`가 실재하고 docstring이 배치/요청경로 두 작성자를 구별한다 |
 | `scheduler/jobs.py`(2곳)·`routers/stocks.py` | 풀이 `maxconn=10` | 실제 20(§4.2) |
-| `tests/test_batches_router.py` 함수명 | `test_lists_sixteen_batches...` | 29를 단언(§9.4) |
-| `services/ranking_service.py::_fetch_naver_market` docstring | "한 페이지라도 실패하면 RuntimeError" | 0페이지 케이스엔 안 던진다(§1.1) |
+| `tests/test_batches_router.py` 함수명 | `test_lists_sixteen_batches...` | 33을 단언(§9.4) |
+| ~~`services/ranking_service.py::_fetch_naver_market` docstring~~ | ~~"한 페이지라도 실패하면 RuntimeError"~~ | **해소(2026-08)** — 0페이지(200+`totalCount:0`)와 커버리지 미달을 실제로 던지고 docstring이 실패 클래스 3종을 명시한다 |
 
 ### 12.4 리포지토리 위생 — **잠재 위험**(악화 중)
 
@@ -1009,12 +1045,12 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 | 우선순위 | 항목 | 절 |
 |---|---|---|
 | 1 | 에러 바운더리 신설 — §7.2의 크래시 7곳이 현재 전부 백지다 | §7.2 |
-| 2 | `_fetch_naver_market`의 0페이지 가드(형제 US 경로와 대칭화) | §1.1 |
-| 3 | `fx` 배치 신설 또는 `_usdkrw_rate`에 나이 검사 | §6.4 |
+| ~~2~~ | ~~`_fetch_naver_market`의 0페이지 가드(형제 US 경로와 대칭화)~~ → **완료(2026-08)** | §1.1 |
+| ~~3~~ | ~~`fx` 배치 신설~~ → **완료(2026-08, `fx_fetch`)**. 잔존: `_usdkrw_rate`에 **나이 검사·stale 마커는 여전히 없다** | §6.4 |
 | 4 | 로그인 레이트리밋(bcrypt CPU 고갈 DoS) | §5.6 |
 | 5 | `Reports.jsx`·`Ranking.jsx::onRowClick` 세대 가드(잘못된 종목 수치 렌더) | §7.3 |
-| 6 | 27개 잡을 `Run.set_status` 패턴으로(키 미설정이 success로 기록되는 문제) | §6.1 |
+| 6 | **남은 18개 잡**을 `Run.set_status` 패턴으로(키 미설정이 success로 기록되는 문제) — 배선 1→14 진척(task#329). **최우선은 `macro_signals_fetch`**(B6 잔존 절반, `FRED_API_KEY` 미설정이 지금도 초록) | §6.1 |
 | 7 | `_migrate`에 후발 테이블 4개 + `tickers` 컬럼 3개 추가 | §4.1 |
 | 8 | `test_no_bare_today.py`를 `datetime.now()`까지 확장 | §6.8 |
-| 9 | `BATCHES` 개수 단언 3곳을 구조 단언으로 교체 | §9.4 |
+| 9 | `BATCHES` 개수·집합 단언 **4파일 8지점**을 구조 단언으로 교체(옛 판의 "3곳"은 지점 수가 틀렸다 — `TESTING.md §5.6`) | §9.4 |
 | 10 | §13.2의 미확인 7건 재검증(특히 Naver 재무 위치 인덱스 파싱) | §13.2 |

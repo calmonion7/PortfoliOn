@@ -50,8 +50,12 @@ def test_batch_func_records_auto():
     """배치 본문이 us_sector_fetch id로 auto 기록 + refresh 호출."""
     recorded = []
 
+    import services.job_runs as job_runs
+
     class _Ctx:
-        def __enter__(self): return None
+        # 실제 핸들(Run)을 넘긴다 — 잡이 저장 생략 시 `run.set_status("skipped")`를 부른다
+        # (None을 넘기던 옛 형태는 그 호출에서 AttributeError로 죽는다).
+        def __enter__(self): return job_runs.Run(1)
         def __exit__(self, *a): return False
 
     def fake_record(job_id, trigger):
