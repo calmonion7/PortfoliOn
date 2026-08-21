@@ -219,7 +219,14 @@ export default function ReportDetailTabs({
 
   return (
     <>
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 16, marginTop: 4 }}>
+      {/* 탭이 5개가 되면 m278(가용 238px)에서 한 줄에 안 들어간다. 기본 flex는 그때 라벨을
+          **글자 단위로 세로 적층**시켜 바 높이가 49→109px로 뛴다(실측 task#324).
+          라벨을 줄이면 탭 바와 본문 제목이 다른 말을 하게 되므로, 대신 **낱자 분해만 막는다** —
+          `wordBreak: keep-all`은 어절 경계(공백) 줄바꿈은 허용하고 한 단어를 글자로 쪼개는 것만
+          금지한다. `nowrap`으로 막으면 4탭 케이스가 49→69px로 **악화**된다(원래 「이모지/글자」
+          2줄로 4열에 들어맞던 것이 한 줄이 되며 열이 넘쳐 2행이 된다 — 이웃 케이스로 비용 이전).
+          flexWrap은 그래도 넘칠 때의 안전망이고, 넓은 폭은 한 줄이라 무영향이다(랭킹 모달 포함). */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', rowGap: 2, borderBottom: '1px solid var(--border)', marginBottom: 16, marginTop: 4 }}>
         {[
           { key: 'summary', label: '📊 요약' },
           { key: 'analysis', label: '📈 지표' },
@@ -232,7 +239,7 @@ export default function ReportDetailTabs({
             key={key}
             onClick={() => { setTab(key); onTabChange?.(key) }}
             className={`tab-btn${detailTab === key ? ' active' : ''}`}
-            style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1 }}
+            style={{ padding: '6px 16px', fontSize: 12, marginBottom: -1, wordBreak: 'keep-all' }}
           >
             {label}
           </button>
