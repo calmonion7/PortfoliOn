@@ -7,6 +7,8 @@ import Skeleton from '../components/ui/Skeleton'
 import useIsMobile from '../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
 import useTechIndex from '../hooks/useTechIndex'
+import StockModal from '../components/StockModal'
+import { useToast } from '../components/Toast'
 
 const pctText = (v) => v == null ? '—' : `${v.toFixed(1)}%`
 
@@ -82,10 +84,156 @@ export function computeTechExposure(techIndex, holdings, watchTickers = []) {
   return rows.sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name))
 }
 
+const MAX_CHIPS = 3
+
+/**
+ * 「내가 안 가진 업체」 후보 (task#323) — **노출>0 기술마다** 그 기술의 상장 업체 중
+ * 내 보유·관심 **둘 다에 없는** 곳. 진단(자본이 이 기술에 얼마나 걸렸나)에서
+ * 행동(그럼 무엇을 더 볼까)으로 한 걸음만 잇는다.
+ *
+ * ⚠️ **노출 0인 기술은 후보를 내지 않는다** — 그건 「보강」이 아니라 「미개척 기술 확장」이고
+ * 노출 *진단* 카드의 성격을 넘는다(현행 「나머지 N개 기술엔 노출 없음」 한 줄로 남긴다).
+ *
+ * ⚠️ 관심종목도 제외한다 — 카드가 이미 「관심 N종목」으로 부기하므로 「이미 알고 있음」으로
+ * 다뤄지고, 그래서 칩의 액션이 「관심 추가」 하나로 단순해진다.
+ *
+ * 정렬은 `tech_level↓ → gap_years↑(결측 맨 뒤) → name↑`. **마지막 키가 결정적**이라
+ * 같은 입력이 늘 같은 순서를 낸다(이 저장소의 페이지네이션 tiebreaker 교훈).
+ * `share_pct`는 채움률 9%라 정렬 축으로 쓰지 않고, `players` 게재 순서도 쓰지 않는다
+ * (루틴 프롬프트가 나열 순서를 규정하지 않으므로 근거가 없다).
+ */
+export function computeTechCandidates(techIndex, holdings, watchTickers = []) {
+  const mine = new Set([
+    ...(holdings || []).map(h => h.ticker),
+    ...(watchTickers || []),
+  ].filter(Boolean))
+  // 노출 판정은 computeTechExposure **하나**에만 둔다 — 비중 계산을 두 벌 두면 조용히 갈라진다.
+  const exposed = new Set(
+    computeTechExposure(techIndex, holdings, watchTickers)
+      .filter(r => r.weight > 0)
+      .map(r => r.slug)
+  )
+  const out = new Map()
+  for (const t of techIndex || []) {
+    if (!exposed.has(t.slug)) continue
+    // `listed`가 없는 옛 응답(프론트 먼저 라이브 ↔ 백엔드 재배포 전 창)에도 죽지 않는다.
+    // 옛 필드로 폴백하지 않는다 — 후보 0으로 비우고, 화면은 「없음」이라 말하지 않는다.
+    const pool = (t.listed || []).filter(p => p.ticker && !mine.has(p.ticker))
+    pool.sort((a, b) => {
+      // 결측 gap_years는 맨 뒤로 밀어야 하므로 큰 sentinel을 쓴다.
+      // ⚠️ `Infinity`가 아니라 MAX_SAFE_INTEGER인 이유를 정확히 적어 둔다(실측으로 확인):
+      //    Infinity면 둘 다 결측일 때 `Infinity-Infinity=NaN`이 되는데, **NaN은 falsy라
+      //    `||` 체인이 그것을 삼키고 다음 키(name)로 그냥 넘어간다** — 즉 이 위치에서는
+      //    관측 결과가 같고 비교자가 불안정해지지도 않는다(주입 실측: 0 fail).
+      //    MAX_SAFE_INTEGER는 그 우연한 falsy 폴스루에 기대지 않고 gap_years 키가
+      //    **끝까지 유효한 수 비교로 남게** 하려는 것이다. 훗날 `||` 체인을 명시 return으로
+      //    바꾸면 Infinity판은 NaN을 그대로 반환해 순서가 엔진 의존이 된다.
+      const ga = a.gap_years ?? Number.MAX_SAFE_INTEGER
+      const gb = b.gap_years ?? Number.MAX_SAFE_INTEGER
+      return (b.tech_level || 0) - (a.tech_level || 0)
+        || ga - gb
+        || String(a.name || '').localeCompare(String(b.name || ''))
+    })
+    if (!pool.length) continue
+    out.set(t.slug, {
+      chips: pool.slice(0, MAX_CHIPS).map(p => ({
+        ticker: p.ticker,
+        name: p.name || p.ticker,
+        techLevel: p.tech_level ?? null,
+        category: p.category || null,
+        // 시장은 **티커 형태**로 추론한다(`country`가 아니라) — 루틴 프롬프트가 못박은 규칙이 그것이다.
+        market: /^\d{6}$/.test(p.ticker) ? 'KR' : 'US',
+      })),
+      more: Math.max(pool.length - MAX_CHIPS, 0),
+    })
+  }
+  return out
+}
+
+/**
+ * 노출>0 기술 막대 아래의 「안 가진 업체」 후보 칩 (task#323).
+ *
+ * ⚠️ **후보가 없으면 구역 자체를 그리지 않는다** — 「후보 없음」이라 말하지 않는다.
+ * 조회 실패(`techFailed`)면 이 컴포넌트가 있는 카드 자체가 렌더되지 않으므로
+ * (task#307 결정 — `useTechIndex` docstring) 실패와 0건이 화면에서 구별된다.
+ *
+ * ⚠️ 업체명은 **말줄임하지 않는다**(실측 최대 35자). 278px에서 2~3줄로 접히는 것은
+ * 정상 동작이다 — 잘라내면 어느 업체인지 알 수 없어지고, 「잘림 ellipsis」는 이
+ * 저장소 시각 결함 9클래스 중 하나다.
+ *
+ * ⚠️ 색은 의미 토큰만 쓴다 — 가격 방향 토큰(`--up`/`--down`)을 쓰지 않는다(KR 색 관례).
+ */
+function TechCandidateChips({ entry, slug, onPick }) {
+  // eco: `!entry`만으로 충분하다 — computeTechCandidates가 pool이 비면 키를 만들지 않으므로
+  // chips.length===0인 entry는 현재 **발생하지 않는다**(주입 실측 0 fail = 이 절은 도달 불가).
+  // 미래에 호출자가 빈 chips를 넘길 때의 크래시 보험으로만 남긴다 — load-bearing이 아니다.
+  if (!entry || !entry.chips.length) return null
+  return (
+    <div
+      data-testid="tech-cand-row"
+      data-slug={slug}
+      style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', margin: '0 0 12px' }}
+    >
+      <span data-testid="tech-cand-label" style={{ color: 'var(--text-3)', fontSize: 11 }}>
+        안 가진 업체
+      </span>
+      {entry.chips.map(c => {
+        // 메타줄 = `섹터 · Lv3`. 섹터(category)는 실측 88% 채움이라 없을 수 있고,
+        // 그때는 Lv만 쓴다(빈 `—` 구멍을 만들지 않는다).
+        // ⚠️ 섹터가 빠지면 이 지표가 조용히 거짓이 된다 — `tech_level`은 섹터 안에서만
+        //    비교 가능한데 우리는 기술 전체를 통짜로 정렬하므로, 섹터 표기가 그 사실을
+        //    독자에게 넘기는 유일한 장치다(계획서의 「정직한 한계」).
+        const meta = [c.category, c.techLevel != null ? `Lv${c.techLevel}` : null]
+          .filter(Boolean).join(' · ')
+        return (
+          <button
+            key={c.ticker}
+            type="button"
+            data-testid="tech-cand-chip"
+            data-ticker={c.ticker}
+            data-market={c.market}
+            aria-label={`${c.name} 관심종목 추가`}
+            onClick={() => onPick({
+              ticker: c.ticker, name: c.name, market: c.market,
+              // 거래소는 비워 사용자가 모달에서 고르게 한다(KR은 KOSPI/KOSDAQ 선택이 뜬다).
+              exchange: '', security_type: 'EQUITY',
+            })}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+              // 탭 타깃 — 인라인이 아닌 flex 자식이라 세로 padding이 실제 높이에 반영된다.
+              padding: '7px 12px',
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+              maxWidth: '100%',
+            }}
+          >
+            <span style={{
+              color: 'var(--text)', fontSize: 12, fontWeight: 600, lineHeight: '18px',
+              // 말줄임 금지 — 긴 이름은 접힌다.
+              whiteSpace: 'normal', overflowWrap: 'anywhere',
+            }}>{c.name}</span>
+            {meta && (
+              <span style={{ color: 'var(--text-3)', fontSize: 11, lineHeight: '16px' }}>{meta}</span>
+            )}
+          </button>
+        )
+      })}
+      {entry.more > 0 && (
+        <span data-testid="tech-cand-more" style={{ color: 'var(--text-3)', fontSize: 11 }}>
+          +{entry.more}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export default function ExposureTab() {
   const isMobile = useIsMobile()
+  const { showToast } = useToast()
   const { techIndex, ready: techReady, failed: techFailed } = useTechIndex()
   const [watchTickers, setWatchTickers] = useState([])
+  // 후보 칩 → 관심 추가 프리필(task#323). null이면 모달을 그리지 않는다.
+  const [candPrefill, setCandPrefill] = useState(null)
   const [open, setOpen] = useState(true)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -102,13 +250,27 @@ export default function ExposureTab() {
 
   // 관심종목은 막대에 넣지 않지만(비중 없음) 「관심 N종목」 부기에는 필요하다.
   // 실패해도 부기만 사라지고 카드는 그대로 — 본문을 막지 않는다.
-  useEffect(() => {
-    let alive = true
+  const loadWatch = useCallback(() => (
     api.get('/api/watchlist')
-      .then(r => { if (alive) setWatchTickers((Array.isArray(r.data) ? r.data : []).map(w => w.ticker).filter(Boolean)) })
+      .then(r => setWatchTickers((Array.isArray(r.data) ? r.data : []).map(w => w.ticker).filter(Boolean)))
       .catch(e => { console.warn('[ExposureTab] 관심목록 조회 실패 — 관심 부기만 생략한다:', e.message) })
-    return () => { alive = false }
-  }, [])
+  ), [])
+
+  useEffect(() => { loadWatch() }, [loadWatch])
+
+  // 후보를 관심에 담으면 그 칩은 더 이상 후보가 아니다 — 저장 후 관심목록을 재조회해
+  // 칩이 사라지는 것까지가 이 흐름의 끝이다(화면이 방금 한 일을 반영하지 않으면 또 누른다).
+  const saveCandidate = async (payload) => {
+    try {
+      await api.post('/api/watchlist', payload)
+      showToast(`${payload.ticker} 관심종목에 추가됐습니다`)
+      setCandPrefill(null)
+      await loadWatch()
+    } catch (err) {
+      showToast(err?.response?.data?.detail || '추가 실패', 'error')
+      throw err
+    }
+  }
 
   if (loading) return <Skeleton variant="card" count={3} />
   if (error) return <div style={{ color: 'var(--color-error)' }}>오류: {error}</div>
@@ -121,6 +283,7 @@ export default function ExposureTab() {
   const otherSector = sectorEntries.find(([name]) => name === '기타')
 
   const techRows = computeTechExposure(techIndex, holdings, watchTickers)
+  const techCandidates = computeTechCandidates(techIndex, holdings, watchTickers)
   const techExposed = techRows.filter(r => r.weight > 0)
   const techZero = techRows.filter(r => r.weight <= 0)
   // 부기 2종은 **노출된 기술** 기준으로만 센다 — 노출 0인 기술의 미매칭까지 더하면
@@ -215,12 +378,18 @@ export default function ExposureTab() {
             한 종목이 여러 기술에 들어가므로 <strong>기술 간 합은 100%를 넘을 수 있습니다.</strong>
           </p>
           {techRows.filter(r => r.weight > 0).map((r, i) => (
-            <WeightBar
-              key={r.slug}
-              label={r.name}
-              weight={r.weight}
-              color={DATA_COLORS[i % DATA_COLORS.length]}
-            />
+            <div key={r.slug}>
+              <WeightBar
+                label={r.name}
+                weight={r.weight}
+                color={DATA_COLORS[i % DATA_COLORS.length]}
+              />
+              <TechCandidateChips
+                entry={techCandidates.get(r.slug)}
+                slug={r.slug}
+                onPick={setCandPrefill}
+              />
+            </div>
           ))}
           {techExposed.length === 0 && (
             <p data-testid="tech-exposure-empty" style={{ color: 'var(--text-3)', fontSize: 12 }}>
@@ -243,6 +412,14 @@ export default function ExposureTab() {
             </p>
           )}
         </Card>
+      )}
+      {candPrefill && (
+        <StockModal
+          mode="watchlist"
+          prefill={candPrefill}
+          onSave={saveCandidate}
+          onClose={() => setCandPrefill(null)}
+        />
       )}
     </>
   )

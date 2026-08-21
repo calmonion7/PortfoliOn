@@ -526,6 +526,12 @@ def list_all(_: str = Depends(get_current_user_or_api_key)):
     return sanitize({"reports": svc.latest_all(), "topics": topics})
 
 
+# 후보 칩(task#323)이 쓰는 축약 필드 — `note`(산문, 실측 최대 507자)·`share_pct`(채움률 9%라
+# 정렬·표시 축으로 못 쓴다)·`leader_name`은 **싣지 않는다**. 이 상한이 「산문을 싣지 않는다」
+# (ADR-0043)의 기계적 보증이며 `test_index_excludes_prose_fields`가 원소 수준에서 못박는다.
+_LISTED_FIELDS = ("ticker", "name", "tech_level", "gap_years", "country", "state_led", "category")
+
+
 @router.get("/index")
 def ticker_index(_: str = Depends(get_current_user_or_api_key)):
     """종목 → 기술 역방향 연결용 **경량 인덱스**(ADR-0043).
@@ -551,11 +557,20 @@ def ticker_index(_: str = Depends(get_current_user_or_api_key)):
         # ticker 없는 업체(비상장·미매칭)는 집합에서 빠지지만 players_total에는 남는다 —
         # 그 차이가 곧 화면의 「미매칭 N개 제외」 부기다.
         tickers = sorted({p["ticker"] for p in players if p.get("ticker")})
+        # `listed`는 ticker 기준 dedupe 후 `tickers` 순서로 세우므로
+        # `tickers == [p["ticker"] for p in listed]`가 **항등으로** 성립한다.
+        # 한 리포트에 같은 티커가 두 번 등장해도 `tickers`(집합)와 갈라지지 않는다.
+        by_ticker = {}
+        for p in players:
+            tk = p.get("ticker")
+            if tk and tk not in by_ticker:
+                by_ticker[tk] = {k: p.get(k) for k in _LISTED_FIELDS}
         out.append({
             "slug": r["slug"],
             "name": names.get(r["slug"], r["slug"]),
             "title": r.get("title") or "",
             "tickers": tickers,
+            "listed": [by_ticker[tk] for tk in tickers],
             "players_total": len(players),
         })
     return sanitize({"index": out})
