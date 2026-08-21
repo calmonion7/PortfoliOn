@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import PlayerTable, { NAME_TEXT, NOTE_BODY } from './PlayerTable'
 import { groupByCategory, TECH_LEVEL_LABELS } from '../reports/techReportUtils'
 
@@ -82,24 +83,24 @@ function headerLabels() {
 
 describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   it('업체 수만큼 행을 렌더하고 루트 data-testid를 유지한다 — 두 판 모두', () => {
-    const { unmount } = render(<PlayerTable players={PLAYERS} />)
+    const { unmount } = render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     // 기존 TechReport.test.jsx가 within()으로 이 앵커를 쓴다 — 스타일이 바뀌어도 유지 대상
     expect(screen.getByTestId('tech-report-players')).toBeTruthy()
     expect(screen.getAllByTestId('tech-report-player-row').length).toBe(9)
     unmount()
 
-    render(<PlayerTable players={ROCKET} />)
+    render(<MemoryRouter><PlayerTable players={ROCKET} /></MemoryRouter>)
     expect(screen.getAllByTestId('tech-report-player-row').length).toBe(8)
   })
 
   it('정렬 불변식 ① 기술수준이 비증가한다(결측은 최하단)', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     const levels = renderedOrder().map((n) => byName[n].tech_level ?? -Infinity)
     for (let i = 1; i < levels.length; i++) expect(levels[i]).toBeLessThanOrEqual(levels[i - 1])
   })
 
   it('정렬 불변식 ② 같은 기술수준 구간 안에서 격차가 비감소하고 null이 그 구간의 마지막이다', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     const order = renderedOrder().map((n) => byName[n])
     for (let i = 1; i < order.length; i++) {
       if ((order[i].tech_level ?? null) !== (order[i - 1].tech_level ?? null)) continue // 구간 경계
@@ -111,7 +112,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
 
   it('정렬은 원본 배열을 변형하지 않는다', () => {
     const snapshot = PLAYERS.map((p) => p.name)
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     expect(PLAYERS.map((p) => p.name)).toEqual(snapshot)
   })
 
@@ -120,7 +121,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   // DOM에서 통째 제거해 Ctrl+F·스크린리더·프로브가 못 찾았다). task#296은 접기 자체를 없앤다 —
   // note가 처음부터 항상 렌더되므로 details가 없어도 "감출 여지가 없다"는 더 강한 성질을 갖는다.
   it('note는 접힘 없이 상시 렌더된다(details 부재 · 본문 텍스트 항상 존재)', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     const noteRow = noteRowOf('NuScale')
     expect(noteRow).toBeTruthy()
     expect(noteRow.querySelector('details')).toBeNull()          // 접기 메커니즘 자체가 없다
@@ -131,7 +132,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   })
 
   it('note가 없는 업체는 note 행 자체가 없다', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     expect(noteRowOf('GE Hitachi')).toBeNull()
     expect(within(rowOf('GE Hitachi')).queryByRole('button')).toBeNull()
   })
@@ -142,7 +143,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   // 여전히 접근 이름으로 구별되는지를 확인한다(getByRole 매칭 성공 자체가 "role 없는 aria-label은
   // 접근성 트리에 노출되지 않는다"의 반증이다).
   it('note 컨테이너는 summary/details 없이 role="group" + 업체명 접근 이름을 갖는다', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     const noteRow = noteRowOf('NuScale')
     expect(noteRow.querySelector('summary')).toBeNull()
     expect(noteRow.querySelector('details')).toBeNull()
@@ -152,7 +153,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
 
   // ── 적대 리뷰 F3 회귀 ─────────────────────────────────────────────────────
   it('F3 — 「선두 대비」 셀은 격차만 담는다(leader_name 미포함)', () => {
-    render(<PlayerTable players={ROCKET} />)
+    render(<MemoryRouter><PlayerTable players={ROCKET} /></MemoryRouter>)
     // 옛 렌더는 매 행 `선두 대비 13년 · SpaceX (Grasshopper 호핑 2013년)`을 nowrap으로 담아
     // 이 열이 302px까지 부풀었고 표가 PC 1440(콘텐츠 748px)에서 891px로 넘쳤다.
     // cells[2] = 「선두 대비」(국가·티커가 업체 셀 내부로 옮겨 인덱스가 3→2로 당겨졌다)
@@ -166,24 +167,24 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   })
 
   it('F3 — leader_name은 표 위 캡션으로 승격되고 고유값이 2개 이상이면 전부 잇는다(손실 0)', () => {
-    const { unmount } = render(<PlayerTable players={ROCKET} />)
+    const { unmount } = render(<MemoryRouter><PlayerTable players={ROCKET} /></MemoryRouter>)
     expect(screen.getByTestId('tech-report-players-leader').textContent)
       .toBe(`선두 = ${LEADER_LONG} · 중국항천과기집단`)
     unmount()
 
     // SMR 판은 격차 양수 행의 leader_name이 한 종류 — 캡션 한 줄
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     expect(screen.getByTestId('tech-report-players-leader').textContent).toBe('선두 = NuScale')
   })
 
   it('F3 — 격차가 양수인 행이 없으면 캡션 자체를 렌더하지 않는다', () => {
     // gap_years가 0·null·음수뿐이면 옛 셀에도 leader_name이 안 보였다 — 캡션도 없어야 한다
-    render(<PlayerTable players={PLAYERS.filter((p) => !(p.gap_years > 0))} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS.filter((p) => !(p.gap_years > 0))} /></MemoryRouter>)
     expect(screen.queryByTestId('tech-report-players-leader')).toBeNull()
   })
 
   it('선두 대비 4케이스 — 0=현재 선두 · 양수=N년 · null과 음수는 표시하지 않는다', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     expect(rowOf('NuScale').cells[2].textContent).toBe('현재 선두')
     expect(rowOf('GE Hitachi').cells[2].textContent).toBe('1년')
     // null(격차 미산정) · 음수(백엔드에 ge=0 제약 없음) 둘 다 추정하지 않고 —
@@ -197,7 +198,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   // 표만 `> 0`이라 share_pct === 0이 한 페이지에서 두 얼굴이었고(차트엔 0.0% 막대, 표엔 —),
   // 변경 전 카드는 `점유율 0%`를 보였으므로 0에 한해 회귀였다.
   it('F7 — 점유율은 0을 값으로 표시하고 음수·비유한·결측만 —', () => {
-    const { unmount } = render(<PlayerTable players={PLAYERS} />)
+    const { unmount } = render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     // cells[3] = 「점유율」(국가·티커 이동으로 인덱스가 4→3으로 당겨졌다)
     expect(rowOf('NuScale').cells[3].textContent).toBe('22.5%')
     expect(rowOf('X-energy').cells[3].textContent).toBe('0%')            // 0 = 값
@@ -205,7 +206,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     expect(rowOf('TerraPower').cells[3].textContent).toBe('—')           // null
     unmount()
 
-    render(<PlayerTable players={ROCKET} />)
+    render(<MemoryRouter><PlayerTable players={ROCKET} /></MemoryRouter>)
     expect(rowOf('SpaceX').cells[3].textContent).toBe('50.9%')
     expect(rowOf('CASC').cells[3].textContent).toBe('0%')
     expect(rowOf('ArianeGroup').cells[3].textContent).toBe('—')
@@ -224,7 +225,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   })
 
   it('표에는 자체 가로 스크롤러가 없다(overflowX 선언 0 · minWidth 0)', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     const table = screen.getByTestId('tech-report-players')
     expect(table.parentElement.style.overflowX).toBe('')
     expect(table.style.minWidth).toBe('')
@@ -232,7 +233,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
 
   // ── 적대 리뷰 F14 회귀 ────────────────────────────────────────────────────
   it('F14 — 업체명은 자르지 않고 접는다(어느 폭에서도 문자 손실 0)', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     // 옛 `maxWidth: 190 + ellipsis`는 표가 전혀 넘치지 않는 PC에서도 무조건 잘랐고,
     // 복구 수단이 title뿐이라 터치 기기에선 전체 이름을 볼 방법이 없었다.
     expect(NAME_TEXT.maxWidth).toBeUndefined()
@@ -256,7 +257,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   // ── ADR-0041 S1 — 「기술수준 비교」 밴드가 표 셀로 흡수된다. 텍스트 "5단계 · 양산상용"은
   // 5칸 밴드(+ 단계 숫자)로 교체되고, 그 값은 aria-label로 접근성 트리에 노출된다(아래 축1·7).
   it('축1 — 기술수준 셀은 칸 5개를 렌더하고 채워진 칸 수가 tech_level과 일치한다', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     const nuscale = within(rowOf('NuScale')).getByRole('img')   // tech_level 5
     expect(nuscale.querySelectorAll('.tech-level-band__cell').length).toBe(5)
     expect(nuscale.querySelectorAll('.tech-level-band__cell--filled').length).toBe(5)
@@ -266,7 +267,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   })
 
   it('축2 — 기술수준 결측 행은 칸이 0개이고 —를 렌더한다(추정 금지)', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     const cell = rowOf('한국원자력연구원').cells[1]
     expect(within(cell).queryByRole('img')).toBeNull()
     expect(cell.querySelectorAll('.tech-level-band__cell').length).toBe(0)
@@ -274,7 +275,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   })
 
   it('축3 — 표 위에 5단계 라벨 범례가 전수 렌더된다', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     for (let lv = 1; lv <= 5; lv++) expect(screen.getByText(`${lv} ${TECH_LEVEL_LABELS[lv]}`)).toBeTruthy()
     const legend = screen.getByText(`1 ${TECH_LEVEL_LABELS[1]}`).closest('.tech-level-band__legend')
     expect(legend).toBeTruthy()
@@ -289,7 +290,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
       { name: 'A사', country: 'KR', ticker: null, tech_level: 5, gap_years: null, leader_name: 'A사', share_pct: null, state_led: false, note: null },
       { name: 'B사', country: 'US', ticker: null, tech_level: 3, gap_years: 4, leader_name: 'A사', share_pct: null, state_led: false, note: null },
     ]
-    render(<PlayerTable players={players} />)
+    render(<MemoryRouter><PlayerTable players={players} /></MemoryRouter>)
     expect(rowOf('A사').cells[2].textContent).toBe('현재 선두')
     expect(rowOf('B사').cells[2].textContent).toBe('4년')
   })
@@ -298,7 +299,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     const players = [
       { name: 'C사', country: 'RU', ticker: null, tech_level: 3, gap_years: -2, leader_name: 'A사', share_pct: null, state_led: false, note: null },
     ]
-    render(<PlayerTable players={players} />)
+    render(<MemoryRouter><PlayerTable players={players} /></MemoryRouter>)
     expect(rowOf('C사').cells[2].textContent).toBe('—')
     expect(screen.queryByText(/-2년/)).toBeNull()
   })
@@ -312,52 +313,52 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     ]
     // 이빨 — 픽스처가 실제로 그룹핑 분기를 탄다(task#301 재발 방지 가토)
     expect(groupByCategory(grouped)).not.toEqual([])
-    const { unmount } = render(<PlayerTable players={grouped} />)
+    const { unmount } = render(<MemoryRouter><PlayerTable players={grouped} /></MemoryRouter>)
     const groups = screen.getAllByTestId('tech-report-player-group')
     expect(groups.map((g) => g.textContent)).toEqual(['경수형 · 선두 A사', '고온가스형 · 선두 D사'])
     unmount()
 
     // 분류 없는 판은 기존 캡션(그룹 병기 도입 이전부터 있던 것)이 그대로 렌더된다.
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     expect(groupByCategory(PLAYERS)).toEqual([])
     expect(screen.getByTestId('tech-report-players-leader')).toBeTruthy()
     expect(screen.queryAllByTestId('tech-report-player-group').length).toBe(0)
   })
 
   it('축7 — 기술수준 칸 묶음은 role="img"+aria-label("N단계 · 라벨")로 값을 접근성 트리에 노출한다', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     expect(within(rowOf('NuScale')).getByRole('img').getAttribute('aria-label')).toBe('5단계 · 양산상용')
     expect(within(rowOf('중국핵공업집단')).getByRole('img').getAttribute('aria-label')).toBe('5단계 · 양산상용')
     expect(within(rowOf('TerraPower')).getByRole('img').getAttribute('aria-label')).toBe('3단계 · 실증')
   })
 
   it('보유·관심 배지는 holdings 맵에 있는 티커에만 붙는다', () => {
-    render(<PlayerTable players={PLAYERS} holdings={{ SMR: 'holding', '034020': 'watchlist' }} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} holdings={{ SMR: 'holding', '034020': 'watchlist' }} /></MemoryRouter>)
     expect(within(rowOf('NuScale')).getByText('보유')).toBeTruthy()
     expect(within(rowOf('두산에너빌리티')).getByText('관심')).toBeTruthy()
     expect(within(rowOf('X-energy')).queryByText(/보유|관심/)).toBeNull()  // 티커 없음
   })
 
   it('정부주도 배지는 state_led 업체에만 붙는다', () => {
-    render(<PlayerTable players={PLAYERS} />)
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
     expect(within(rowOf('중국핵공업집단')).getByText('정부주도')).toBeTruthy()
     expect(within(rowOf('NuScale')).queryByText('정부주도')).toBeNull()
   })
 
   it('빈 입력·비배열에도 헤더만 렌더하고 예외가 없다', () => {
-    const { unmount } = render(<PlayerTable players={[]} />)
+    const { unmount } = render(<MemoryRouter><PlayerTable players={[]} /></MemoryRouter>)
     expect(screen.getByTestId('tech-report-players')).toBeTruthy()
     expect(screen.queryAllByTestId('tech-report-player-row').length).toBe(0)
     expect(screen.queryByTestId('tech-report-players-leader')).toBeNull()
     unmount()
-    render(<PlayerTable />)
+    render(<MemoryRouter><PlayerTable /></MemoryRouter>)
     expect(screen.getByTestId('tech-report-players')).toBeTruthy()
   })
 
   // ── task#296 S3 완료기준 — 열 게이트(playerColumns) 연동 ────────────────────
   describe('열 게이트 — smr 형태 vs robotics 형태(ADR-0034)', () => {
     it('smr 형태(ticker·share 전 행 결측)에서 열이 3개다(점유율 헤더 없음) + colSpan 3 + 티커 미노출', () => {
-      render(<PlayerTable players={SMR_SHAPE} />)
+      render(<MemoryRouter><PlayerTable players={SMR_SHAPE} /></MemoryRouter>)
       expect(headerLabels()).toEqual(['업체', '기술수준', '선두 대비'])
       expect(noteRowOf('A사').querySelector('td').getAttribute('colspan')).toBe('3')
       // ticker가 전 행 null이므로 표 어디에도 티커 문자열이 나타나지 않는다
@@ -365,7 +366,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     })
 
     it('robotics 형태(ticker·share 둘 다 유효)에서 열이 4개다(점유율 헤더 있음) + colSpan 4 + 티커 렌더', () => {
-      render(<PlayerTable players={ROBOTICS_SHAPE} />)
+      render(<MemoryRouter><PlayerTable players={ROBOTICS_SHAPE} /></MemoryRouter>)
       expect(headerLabels()).toEqual(['업체', '기술수준', '선두 대비', '점유율'])
       expect(noteRowOf('C사').querySelector('td').getAttribute('colspan')).toBe('4')
       expect(rowOf('C사').textContent).toContain('005930')
@@ -374,7 +375,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     })
 
     it('국가·티커는 더 이상 별도 열이 아니다 — 업체 셀 내부로 이동(정보 손실 0)', () => {
-      render(<PlayerTable players={PLAYERS} />)
+      render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
       expect(headerLabels()).not.toContain('국가')
       expect(headerLabels()).not.toContain('티커')
       expect(rowOf('두산에너빌리티').textContent).toContain('KR')
@@ -385,7 +386,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
   // ── task#301 S2 완료기준 — 분류 소제목 행(groupByCategory 연동) ──────────────
   describe('분류 소제목 행(groupByCategory 연동)', () => {
     it('그룹 있는 입력 — 소제목 행 수 == groupByCategory 그룹 수, 업체 행 총수 == players.length(미분류 포함)', () => {
-      render(<PlayerTable players={CATEGORIZED} />)
+      render(<MemoryRouter><PlayerTable players={CATEGORIZED} /></MemoryRouter>)
       const expectedGroups = groupByCategory(CATEGORIZED).length
       // 이빨 — 픽스처가 실제로 3그룹(경수형·고온가스형·미분류)을 만들어야 위 단언이 판별력을 갖는다.
       expect(expectedGroups).toBe(3)
@@ -399,7 +400,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     })
 
     it('소제목 행 colSpan은 헤더 열 수와 같다', () => {
-      render(<PlayerTable players={CATEGORIZED} />)
+      render(<MemoryRouter><PlayerTable players={CATEGORIZED} /></MemoryRouter>)
       expect(headerLabels().length).toBe(4)   // CATEGORIZED는 gap·share가 일부 유효값을 가져 4열
       for (const r of screen.getAllByTestId('tech-report-player-group')) {
         expect(r.querySelector('td').getAttribute('colspan')).toBe('4')
@@ -407,7 +408,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     })
 
     it('분류 전무 입력에서는 소제목 행이 0개이고 평면 표가 그대로 보존된다', () => {
-      render(<PlayerTable players={PLAYERS} />)
+      render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
       expect(groupByCategory(PLAYERS)).toEqual([])   // 이빨 — PLAYERS엔 category 필드가 없다
       expect(screen.queryAllByTestId('tech-report-player-group').length).toBe(0)
       expect(screen.getAllByTestId('tech-report-player-row').length).toBe(PLAYERS.length)
@@ -429,7 +430,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
       const orig = console.error
       console.error = (...args) => { errors.push(args.join(' ')) }
       try {
-        render(<PlayerTable players={NAMELESS} />)
+        render(<MemoryRouter><PlayerTable players={NAMELESS} /></MemoryRouter>)
       } finally {
         console.error = orig
       }
@@ -453,14 +454,14 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
       // 픽스처가 그룹핑 분기를 실제로 타는지 먼저 증명한다(task#301의 실패 형태 — 이빨 있는
       // 단언이 분기를 안 타고 초록으로 통과했다).
       expect(groupByCategory(TWO_LEADERS)).not.toEqual([])
-      render(<PlayerTable players={TWO_LEADERS} />)
+      render(<MemoryRouter><PlayerTable players={TWO_LEADERS} /></MemoryRouter>)
       expect(screen.queryByTestId('tech-report-players-leader')).toBeNull()
     })
 
     it('분류가 없으면 평면 캡션이 그대로 남는다 (게이트가 캡션을 통째로 죽이지 않았다)', () => {
       const FLAT = TWO_LEADERS.map(({ category, ...rest }) => rest)
       expect(groupByCategory(FLAT)).toEqual([])   // 정의역 확인 — 이 픽스처는 그룹핑을 타지 않는다
-      render(<PlayerTable players={FLAT} />)
+      render(<MemoryRouter><PlayerTable players={FLAT} /></MemoryRouter>)
       expect(screen.getByTestId('tech-report-players-leader').textContent).toContain('Z사')
     })
   })
@@ -471,7 +472,7 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     // 클래스를 쓴다. 인라인 marginLeft로 되돌리면 flex gap과 합쳐진 min-content를 코드에서
     // 읽을 수 없게 되고, 그 추정 위에서 여유가 1.3px까지 얇아졌던 것이 이 결함이었다.
     it('숫자 span이 .tech-level-band__digit 이고 인라인 폭 스타일이 없다', () => {
-      const { container } = render(<PlayerTable players={PLAYERS} />)
+      const { container } = render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
       const digits = [...container.querySelectorAll('.tech-level-band__digit')]
       expect(digits.length).toBe(PLAYERS.filter((p) => TECH_LEVEL_LABELS[p.tech_level]).length)
       for (const d of digits) {
@@ -479,5 +480,53 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
         expect(d.textContent).toMatch(/^[1-5]$/)
       }
     })
+  })
+})
+
+// ── task#324 S5 (ADR-0047) — 기술 축은 N:M이라 화면을 합치지 않고 **연결**한다.
+// 업체 표의 상장 티커가 그 종목 리포트 상세로 가는 진입점이 된다.
+// `/reports` 딥링크 관례는 쿼리파라미터가 아니라 location.state.ticker이므로(task#131),
+// href만 재면 관례 위반을 못 잡는다 → 클릭 후 착지 화면에서 state를 읽어 단언한다.
+function LandedReports() {
+  const loc = useLocation()
+  return <div data-testid="landed">{loc.state?.ticker ?? 'NO_STATE'}</div>
+}
+
+describe('업체 표 티커 → 종목 리포트 딥링크 (task#324)', () => {
+  const renderRouted = () => render(
+    <MemoryRouter initialEntries={['/tech-report/smr']}>
+      <Routes>
+        <Route path="/tech-report/:slug" element={<PlayerTable players={PLAYERS} holdings={{ '034020': 'holding', SMR: 'watchlist' }} />} />
+        <Route path="/reports" element={<LandedReports />} />
+      </Routes>
+    </MemoryRouter>
+  )
+
+  it('상장 티커는 링크이고 클릭하면 state.ticker를 싣고 종목 리포트로 간다', () => {
+    renderRouted()
+    const link = screen.getByRole('link', { name: '034020' })
+    expect(link.getAttribute('href')).toBe('/reports')
+    fireEvent.click(link)
+    expect(screen.getByTestId('landed').textContent).toBe('034020')
+  })
+
+  it('대조군 — 티커 없는 업체 행에는 링크가 없다', () => {
+    renderRouted()
+    // 픽스처의 비상장 업체(중국핵공업집단·X-energy 등)는 ticker=null이다
+    const links = screen.getAllByRole('link')
+    expect(links.length).toBe(2)                                  // 034020·SMR 두 행만
+    expect(links.map(a => a.textContent.trim()).sort()).toEqual(['034020', 'SMR'])
+    expect(screen.getByText('중국핵공업집단')).toBeTruthy()          // 그 행 자체는 렌더된다
+  })
+
+  it('보유/관심 배지는 링크 밖에 있다 — 배지는 상태 표시이지 진입점이 아니다', () => {
+    renderRouted()
+    for (const [tk, badge] of [['034020', '보유'], ['SMR', '관심']]) {
+      const link = screen.getByRole('link', { name: tk })
+      expect(link.textContent).not.toContain(badge)
+      expect(link.querySelector('*')).toBeNull()                  // 링크 안에 자식 요소가 없다
+    }
+    expect(screen.getByText('보유')).toBeTruthy()                   // 배지 자체는 살아 있다
+    expect(screen.getByText('관심')).toBeTruthy()
   })
 })

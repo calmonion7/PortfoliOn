@@ -4,7 +4,7 @@ import { SectionTitle } from './reportUtils.jsx'
 
 // 종목 최신 공시 목록 (DART, 최신순). KR 전용.
 // GET /api/report/{ticker}/disclosures → [{rcept_dt, report_nm, pblntf_ty, rcept_no, corp_name, dart_url}]
-// 심층분석 탭의 'AI 최근 공시 & 뉴스'(RecentDisclosuresSection) 아래에 원본 공시 링크 목록으로 배치.
+// 사업분석 탭의 'AI 최근 공시 & 뉴스'(RecentDisclosuresSection) 아래에 원본 공시 링크 목록으로 배치.
 
 // DART pblntf_ty 단일문자 코드 → 한글 배지 라벨/색.
 const _TY_CFG = {

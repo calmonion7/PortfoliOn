@@ -36,16 +36,32 @@ function renderAt(path, ui) {
   )
 }
 
-describe('Masthead 서브바 — 심층 리포트', () => {
+// task#324(ADR-0047): 「심층 리포트」 nav 항목이 제거되고 그 경로들이 「리포트」 항목에 흡수됐다.
+// 위 task#251의 계약(세 표면 모두 "지금 어디인가"를 유지한다)은 그대로다 — 강조되는 항목만 바뀌었다.
+// 이것은 축의 **완화가 아니라 등가 재작성**이다: 아래 부정 대조군이 「모든 경로에서 리포트가 active」인
+// 구현을 배제하므로 판별력이 줄지 않는다.
+describe('Masthead 서브바 — 리포트가 심층 경로를 흡수', () => {
   it.each([
-    ['목록', LIST],
-    ['상세', DETAIL],
-  ])('%s(%s)에서 리서치 서브바가 뜨고 "심층 리포트"가 active다', (_label, path) => {
+    ['목록(=admin 발행 관리)', LIST],
+    ['문서 상세', DETAIL],
+    ['종목 리포트', '/reports'],
+  ])('%s(%s)에서 리서치 서브바가 뜨고 "리포트"가 active다', (_label, path) => {
     const { container } = renderAt(path, <Masthead theme="light" setTheme={noop} onLogout={noop} />)
     const subbar = container.querySelector('.masthead-subbar')
     expect(subbar, '리서치 서브바 노드').not.toBeNull()
-    const link = screen.getByRole('link', { name: '심층 리포트' })
+    const link = screen.getByRole('link', { name: '리포트' })
     expect(link.className).toContain('is-active')
+  })
+
+  it('「심층 리포트」 항목은 nav에 더 이상 없다', () => {
+    renderAt(DETAIL, <Masthead theme="light" setTheme={noop} onLogout={noop} />)
+    expect(screen.queryByRole('link', { name: '심층 리포트' })).toBeNull()
+  })
+
+  it('부정 대조군 — 주요기술 상세에서는 "리포트"가 active가 아니다', () => {
+    renderAt(TECH_DETAIL, <Masthead theme="light" setTheme={noop} onLogout={noop} />)
+    expect(screen.getByRole('link', { name: '주요기술' }).className).toContain('is-active')
+    expect(screen.getByRole('link', { name: '리포트' }).className).not.toContain('is-active')
   })
 })
 
@@ -78,14 +94,21 @@ describe('MobileNav 하단 탭바 — 리서치', () => {
   })
 })
 
-describe('ResearchShell seg — 심층 리포트', () => {
+describe('ResearchShell seg — 리포트가 심층 경로를 흡수', () => {
   it.each([
-    ['목록', LIST],
-    ['상세', DETAIL],
-  ])('%s(%s)에서 seg "심층 리포트"가 active다', (_label, path) => {
+    ['목록(=admin 발행 관리)', LIST],
+    ['문서 상세', DETAIL],
+    ['종목 리포트', '/reports'],
+  ])('%s(%s)에서 seg "리포트"가 active다', (_label, path) => {
     renderAt(path, <ResearchShell><div>CHILD</div></ResearchShell>)
-    const tab = screen.getByRole('link', { name: '심층 리포트' })
+    const tab = screen.getByRole('link', { name: '리포트' })
     expect(tab.className).toContain('is-active')
+  })
+
+  it('부정 대조군 — 주요기술 상세에서는 seg "리포트"가 active가 아니다', () => {
+    renderAt(TECH_DETAIL, <ResearchShell><div>CHILD</div></ResearchShell>)
+    expect(screen.getByRole('link', { name: '주요기술' }).className).toContain('is-active')
+    expect(screen.getByRole('link', { name: '리포트' }).className).not.toContain('is-active')
   })
 })
 

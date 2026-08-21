@@ -5,7 +5,7 @@ import StockActions from './StockActions.jsx'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
 
 export default function TickerListItem({
-  ticker, info, selected, view, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
+  ticker, info, hasPub = false, selected, view, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
   openDetail, generateOne, openEdit, handleDelete, handleGlobalDelete, setPromoteTarget, handlePinToggle,
 }) {
   const isSelected = selected.ticker === ticker && view === 'detail'
@@ -29,6 +29,9 @@ export default function TickerListItem({
           <span className="mono" style={{ color: isSelected ? 'var(--accent)' : 'var(--text)', fontWeight: 600, fontSize: 13 }}>{ticker}</span>
           {(() => { const w = overallWeather(s); return w ? <span title={w.label} style={{ fontSize: 12, lineHeight: 1 }}>{w.icon}</span> : null })()}
           {market && <MarketBadge market={market} exchange={info.exchange} />}
+          {hasPub && (
+            <span title="심층 리포트 발행물 있음" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 3, padding: '0 3px', lineHeight: '13px' }}>심층</span>
+          )}
         </span>
         {s?.name && (
           <div style={{ color: 'var(--text-3)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>

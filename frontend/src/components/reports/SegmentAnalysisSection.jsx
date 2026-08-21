@@ -2,7 +2,7 @@ import { deriveSegments } from './segmentUtils.js'
 import { SectionTitle } from './reportUtils.jsx'
 
 // 사업부문 시장 분석(task#275) — market_outlook.segments[]를 보여주는 단일 렌더러.
-// 일반 리포트 「심층분석」 탭과 애널리스트 리포트(발행 시점 박제)가 이 컴포넌트 하나를 공유한다.
+// 일반 리포트 「사업분석」 탭과 애널리스트 리포트(발행 시점 박제)가 이 컴포넌트 하나를 공유한다.
 // 계산은 전부 segmentUtils.deriveSegments가 하고, 여기선 렌더만 한다(AI %입력 → 금액은 그 모듈이 환산).
 
 // MarketOutlookSection.jsx의 스타일 패턴을 그대로 따른다(새 디자인 언어를 만들지 않음).

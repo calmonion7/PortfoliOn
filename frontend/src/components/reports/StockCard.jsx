@@ -5,7 +5,7 @@ import StockActions from './StockActions.jsx'
 import { MarketBadge, ChangeBadge } from '../ui/Badge'
 
 export default function StockCard({
-  ticker, info, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
+  ticker, info, hasPub = false, pnl, guruMap, isAdmin, generating, genProgress, touchStyle,
   openDetail, generateOne, openEdit, handleDelete, handleGlobalDelete, setPromoteTarget, handlePinToggle,
 }) {
   const s = info.summary
@@ -79,6 +79,9 @@ export default function StockCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
           <span className="mono" style={{ fontSize: 11, color: 'var(--text-3)' }}>{ticker}</span>
           {market && <MarketBadge market={market} exchange={info.exchange} />}
+          {hasPub && (
+            <span title="심층 리포트 발행물 있음" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 3, padding: '0 3px', lineHeight: '13px' }}>심층</span>
+          )}
           {guruMap[ticker] && <span style={{ fontSize: 9, color: 'var(--warn)' }}>구루{guruMap[ticker]}명</span>}
         </div>
         {s?.sector && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sector}</div>}

@@ -1,4 +1,5 @@
 import './TechLevelBand.css'
+import { Link } from 'react-router-dom'
 import Badge from '../ui/Badge'
 import { TECH_LEVEL_LABELS, sortPlayers, playerColumns, groupByCategory, isLeader } from '../reports/techReportUtils'
 
@@ -101,6 +102,11 @@ const SHRINK0 = { flexShrink: 0, display: 'inline-flex', alignItems: 'center', g
 // 티커는 식별자다 — 쪼개지면 다른 티커로 읽힌다. 옛 코드는 SHRINK0 안에 있어 nowrap을 상속했는데
 // 메타줄로 옮기며 그 래퍼를 잃었다(적대 리뷰 렌즈1 발견 2) → 명시적으로 되돌린다.
 const TICKER = { flexShrink: 0, whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)', color: 'var(--text-3)' }
+// 상장 업체의 티커는 그 종목 리포트 상세로 가는 진입점이다(task#324, ADR-0047 — 기술 축은 N:M이라
+// 화면을 합치지 않고 **연결**한다). 폭 성질은 TICKER와 동일하게 유지한다 — 같은 글자·같은 폰트라
+// 업체 열의 min-content가 변하지 않는다(task#275의 「배지·티커는 줄면 안 되는 형제」 계약).
+// `/reports` 딥링크 관례는 쿼리파라미터가 아니라 location.state.ticker다(task#131).
+const TICKER_LINK = { ...TICKER, color: 'var(--accent)', textDecoration: 'none' }
 
 const NOTE_TD = { padding: 0, borderBottom: '1px solid var(--border)' }
 // note는 이제 접기 없이 상시 렌더한다(task#296 S3 — 전문을 스크롤로 읽게 하는 방향 전환, ADR-0034
@@ -179,7 +185,11 @@ export default function PlayerTable({ players = [], holdings = {} }) {
               <div style={NAME_META}>
                 {p.country && <span style={META_TEXT}>{p.country}</span>}
                 {p.country && p.ticker && <span style={META_TEXT}>·</span>}
-                {p.ticker && <span style={TICKER}>{p.ticker}</span>}
+                {p.ticker && (
+                  <Link to="/reports" state={{ ticker: p.ticker }} style={TICKER_LINK} title={`${p.name} 종목 리포트`}>
+                    {p.ticker}
+                  </Link>
+                )}
                 {stockType && (
                   <Badge variant="neutral" size="sm" style={stockType === 'holding' ? HOLD_BADGE : WATCH_BADGE}>
                     {stockType === 'holding' ? '보유' : '관심'}

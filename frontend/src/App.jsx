@@ -3,6 +3,7 @@ import useTheme from './hooks/useTheme'
 import useBfcacheAuthGuard from './hooks/useBfcacheAuthGuard'
 import useSwUpdateReload from './hooks/useSwUpdateReload'
 import useAuthBootstrap from './hooks/useAuthBootstrap'
+import AnalystReportsRoute from './routes/AnalystReportsRoute'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Portfolio from './pages/Portfolio'
@@ -16,7 +17,6 @@ import Dividends from './pages/Dividends'
 import Digest from './pages/Digest'
 import MarketHub from './pages/MarketHub'
 import AnalystReport from './pages/AnalystReport'
-import AnalystReports from './pages/AnalystReports'
 import TechReport from './pages/TechReport'
 import TechReports from './pages/TechReports'
 import TechAnatomy from './pages/TechAnatomy'
@@ -106,7 +106,7 @@ function AppShell({ theme, setTheme, setSession }) {
               <Route path="/calendar" element={<ResearchShell><Calendar /></ResearchShell>} />
               <Route path="/dividends" element={<ResearchShell><Dividends /></ResearchShell>} />
               <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
-              <Route path="/analyst-reports" element={<ResearchShell><AnalystReports /></ResearchShell>} />
+              <Route path="/analyst-reports" element={<ResearchShell><AnalystReportsRoute /></ResearchShell>} />
               <Route path="/analyst-report/:ticker/:date" element={<ResearchShell><AnalystReport /></ResearchShell>} />
               <Route path="/tech-reports" element={<ResearchShell><TechReports /></ResearchShell>} />
               <Route path="/tech-report/:slug" element={<ResearchShell><TechReport /></ResearchShell>} />

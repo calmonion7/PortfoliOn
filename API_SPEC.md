@@ -1094,17 +1094,17 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 | `growth_plan` | string | ❌ | 성장 계획 |
 | `risks` | string | ❌ | 리스크 요인 |
 | `recent_disclosures` | string | ❌ | 최근 공시/뉴스 요약 |
-| `key_resource` | object | ❌ | 업종별 핵심 자원(인력/생산능력/파이프라인 등) + 분기별 지표 추이 + 유지 동력. 저장 후 리포트 심층분석 탭 "핵심 자원" 섹션에 표시 |
+| `key_resource` | object | ❌ | 업종별 핵심 자원(인력/생산능력/파이프라인 등) + 분기별 지표 추이 + 유지 동력. 저장 후 리포트 사업분석 탭 "핵심 자원" 섹션에 표시 |
 | `key_resource.resource` | string | ❌ | 핵심자원 라벨 (예: `"인력 (Human Capital)"`) |
 | `key_resource.thesis` | string | ❌ | 왜 이 자원이 경쟁력인지 한줄 논지 |
 | `key_resource.metrics` | `{label, unit, series}[]` | ❌ | 분기별 지표 목록. `series`는 `{period, value}[]`, `period` 형식 `YYYYQn`(예: `"2025Q1"`) |
 | `key_resource.drivers` | `{title, description}[]` | ❌ | 자원 유지 동력(리텐션 인센티브) 목록 |
 | `key_resource.one_liner` | string | ❌ | 한 줄 종합 요약 |
-| `competitor_edge` | object | ❌ | 경쟁사 대비 사업 경쟁력의 상대 위치(업종별 비교축 기준). 저장 후 리포트 심층분석 탭 "경쟁사 기술·경쟁력 비교" 섹션에 표시. **Peer 할인/할증**(밸류에이션 멀티플 기반 자동 계산 상대위치)**과는 별개** |
+| `competitor_edge` | object | ❌ | 경쟁사 대비 사업 경쟁력의 상대 위치(업종별 비교축 기준). 저장 후 리포트 사업분석 탭 "경쟁사 기술·경쟁력 비교" 섹션에 표시. **Peer 할인/할증**(밸류에이션 멀티플 기반 자동 계산 상대위치)**과는 별개** |
 | `competitor_edge.axis` | string | ❌ | 업종에 맞는 비교축 라벨 (예: `"원가경쟁력"`) |
 | `competitor_edge.one_liner` | string | ❌ | 한 줄 종합 요약 |
 | `competitor_edge.entries` | `{ticker, name, edge, position}[]` | ❌ | 경쟁사별 비교 목록. `ticker`로 `competitors_data`와 조인 |
-| `market_outlook` | object | ❌ | 회사가 속한 전방시장의 규모·성장 전망. 저장 후 리포트 심층분석 탭 "시장 전망" 섹션에 표시. `growth_plan`(회사 전략)**과는 별개** |
+| `market_outlook` | object | ❌ | 회사가 속한 전방시장의 규모·성장 전망. 저장 후 리포트 사업분석 탭 "시장 전망" 섹션에 표시. `growth_plan`(회사 전략)**과는 별개** |
 | `market_outlook.market_name` | string | ❌ | 시장 정의 (예: `"글로벌 HBM 시장"`) |
 | `market_outlook.size_current` | `{value, unit, year}` | ❌ | 현재 시장 규모 |
 | `market_outlook.size_forecast` | `{value, unit, year}` | ❌ | 전망 시장 규모 |

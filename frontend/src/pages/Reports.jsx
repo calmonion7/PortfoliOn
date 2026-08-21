@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import useReportList from '../hooks/useReportList'
+import { Link } from 'react-router-dom'
 import useReportFilters from '../hooks/useReportFilters'
 import useStockManagement from '../hooks/useStockManagement'
 import useReportGeneration from '../hooks/useReportGeneration'
@@ -178,6 +179,13 @@ export default function Reports({ initialTicker = null, navKey = null }) {
       <div className="reports-sidebar">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ color: 'var(--text)', margin: 0 }}>리포트 목록</h3>
+          {/* nav에서 「심층 리포트」가 빠진 대신 admin의 발행 관리 화면 도달 경로를 여기 하나 둔다
+              (task#324, ADR-0047). 관리 수단 3종은 그 화면에 그대로 있다 — ADR-0027 ② 유지. */}
+          {isAdmin && (
+            <Link to="/analyst-reports" style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
+              심층 발행 관리 →
+            </Link>
+          )}
         </div>
         {(activeTab === 'others' ? othersLoading : listLoading)
           ? <Skeleton variant="row" count={8} />
@@ -191,6 +199,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
               key={t}
               ticker={t}
               info={info}
+              hasPub={!!pubsByTicker[t?.toUpperCase()]}
               selected={selected}
               view={view}
               pnl={pnlOf(t, info.summary?.market || info.market)}
@@ -245,6 +254,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
                         key={t}
                         ticker={t}
                         info={info}
+                        hasPub={!!pubsByTicker[t?.toUpperCase()]}
                         pnl={pnlOf(t, info.summary?.market || info.market)}
                         guruMap={guruMap}
                         isAdmin={isAdmin}
@@ -306,6 +316,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
                 fetchList()
               }}
               onTabChange={(t) => trackEvent('report_tab_switch', { tab: t })}
+              publications={pubsByTicker[selected.ticker?.toUpperCase()] || []}
             />
           </div>
         )}

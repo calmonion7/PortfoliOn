@@ -367,8 +367,13 @@ const numeralStyle = {
 const fmtChangePct = (v) =>
   (Math.abs(v) >= 100 ? String(Math.round(Math.abs(v))) : Math.abs(v).toFixed(1))
 
-export default function AnalystReport() {
-  const { ticker, date } = useParams()
+// props가 있으면 그것을, 없으면 URL params를 쓴다 — 같은 본문을 ⓐ 독립 문서 라우트와
+// ⓑ 리포트 상세의 「심층 리포트」 탭(embedded) 두 곳에서 렌더한다 (task#324, ADR-0047).
+// embedded=true면 페이지 전용 크롬(복귀 pill)을 감추고, 이전 판은 라우팅 대신 onSelectDate로 탭 안에서 바꾼다.
+export default function AnalystReport({ ticker: tickerProp, date: dateProp, embedded = false, onSelectDate = null }) {
+  const params = useParams()
+  const ticker = tickerProp ?? params.ticker
+  const date = dateProp ?? params.date
   const [report, setReport] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -402,7 +407,7 @@ export default function AnalystReport() {
   if (error) return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '48px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
       <p>{error}</p>
-      <Link to="/analyst-reports" style={{ color: 'var(--accent)' }}>← 심층 리포트로 돌아가기</Link>
+      {!embedded && <Link to="/reports" state={{ ticker }} style={{ color: 'var(--accent)' }}>← 종목 리포트</Link>}
     </div>
   )
 
@@ -417,7 +422,7 @@ export default function AnalystReport() {
   const upside = (bandMid != null && d.price) ? (bandMid / d.price - 1) * 100 : null
 
   return (
-    <div style={{ maxWidth: 780, margin: '0 auto', padding: '20px 16px 64px' }}>
+    <div style={embedded ? { padding: 0 } : { maxWidth: 780, margin: '0 auto', padding: '20px 16px 64px' }}>
       {/* ── 헤더 ─────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ color: 'var(--text-3)', fontSize: 11, letterSpacing: '0.12em', fontWeight: 600 }}>ANALYST REPORT</span>
@@ -426,8 +431,9 @@ export default function AnalystReport() {
       {olderDates.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 3, fontSize: 11, color: 'var(--text-3)' }}>
           <span>이전 판</span>
-          {olderDates.map(d => (
-            <Link key={d} to={`/analyst-report/${ticker}/${d}`} className="mono" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{d}</Link>
+          {olderDates.map(d => (embedded && onSelectDate
+            ? <button key={d} type="button" onClick={() => onSelectDate(d)} className="mono" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--accent)', fontSize: 11 }}>{d}</button>
+            : <Link key={d} to={`/analyst-report/${ticker}/${d}`} className="mono" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{d}</Link>
           ))}
         </div>
       )}
@@ -540,8 +546,10 @@ export default function AnalystReport() {
         <span style={{ color: 'var(--text-3)', fontSize: 11 }}>본 문서는 발행 시점 데이터로 박제된 판단 문서입니다 · 투자 판단의 책임은 투자자 본인에게 있습니다</span>
       </div>
 
-      {/* 목록 복귀 — 우하단 플로팅 pill(task#225). fixed이므로 조상에 transform 금지(task#195) */}
-      <Link to="/analyst-reports" className="list-pill">☰ 목록</Link>
+      {/* 복귀 — 우하단 플로팅 pill(task#225). fixed이므로 조상에 transform 금지(task#195).
+          목적지는 admin 발행 관리 목록이 아니라 그 종목의 리포트 상세다(task#324 — nav에서 「심층 리포트」가 빠졌다).
+          `/reports` 딥링크 관례는 쿼리파라미터가 아니라 location.state.ticker다(task#131). */}
+      {!embedded && <Link to="/reports" state={{ ticker }} className="list-pill">← 종목 리포트</Link>}
     </div>
   )
 }

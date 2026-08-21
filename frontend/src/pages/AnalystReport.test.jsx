@@ -98,13 +98,46 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     expect(chips.some(t => /[▲▼][+-]?-/.test(t))).toBe(false)   // 이중 부호 0건
   })
 
-  it('문서 하단 복귀 링크 제거 + 플로팅 목록 pill(task#225)', async () => {
+  it('문서 하단 복귀 링크 제거 + 플로팅 복귀 pill(task#225 → 목적지 task#324)', async () => {
     api.get.mockResolvedValue({ data: REPORT })
     const { container } = renderPage()
     await screen.findByText('한줄 논지 테스트')
     expect([...container.querySelectorAll('a')].some(a => a.textContent.trim() === '← 심층 리포트')).toBe(false)
     const pill = container.querySelector('.list-pill')
-    expect(pill?.getAttribute('href')).toBe('/analyst-reports')
+    // task#225의 결정(하단 링크 제거·플로팅 pill 유지)은 그대로다. 바뀐 것은 *목적지*뿐 —
+    // nav에서 「심층 리포트」가 빠지고 /analyst-reports가 admin 발행 관리 화면이 되었으므로
+    // 일반 사용자의 복귀 지점은 그 종목의 리포트 상세다(task#324, ADR-0047).
+    expect(pill?.getAttribute('href')).toBe('/reports')
+    expect(pill?.textContent.trim()).toBe('← 종목 리포트')
+  })
+
+  // ── task#324 S1 — 같은 본문을 탭 안에서도 렌더한다 ────────────────────────────
+  it('props로 렌더하면 라우트 없이도 같은 본문이 나온다(task#324)', async () => {
+    api.get.mockResolvedValue({ data: REPORT })
+    render(
+      <MemoryRouter>
+        <AnalystReport ticker="005930" date="2026-07-25" />
+      </MemoryRouter>
+    )
+    expect(await screen.findByText('한줄 논지 테스트')).toBeTruthy()
+    expect(screen.getByText('투자 포인트')).toBeTruthy()
+    expect(screen.getByText('적정주가 밴드')).toBeTruthy()
+    expect(screen.getByText('리스크 요인')).toBeTruthy()
+    // props가 URL params를 대신했다는 증거 — 그 ticker/date로 조회했다
+    expect(api.get).toHaveBeenCalledWith('/api/analyst-reports/005930/2026-07-25')
+  })
+
+  it('embedded면 페이지 전용 크롬(복귀 pill)이 없다(task#324)', async () => {
+    api.get.mockResolvedValue({ data: REPORT })
+    const { container } = render(
+      <MemoryRouter>
+        <AnalystReport ticker="005930" date="2026-07-25" embedded />
+      </MemoryRouter>
+    )
+    await screen.findByText('한줄 논지 테스트')
+    expect(container.querySelector('.list-pill')).toBeNull()
+    // 대조군 — 크롬만 사라지고 본문은 그대로다(크롬을 지우려다 본문을 지우면 이 축이 잡는다)
+    expect(screen.getByText('투자 포인트')).toBeTruthy()
   })
 
   it('용어집 배선 — 지표 라벨·본문에 glossary-term 버튼(task#220)', async () => {

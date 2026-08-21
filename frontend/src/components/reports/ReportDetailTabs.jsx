@@ -15,18 +15,23 @@ import UsSupplySection from './UsSupplySection'
 import UsInsiderSection from './UsInsiderSection'
 import GuruHoldersSection from './GuruHoldersSection'
 import MarketOutlookSection from './MarketOutlookSection'
+import AnalystReport from '../../pages/AnalystReport'
 
 const noop = () => {}
 
-// 심층분석 탭 그룹 헤더 — SectionTitle(세리프+언더라인, 섹션당)보다 한 단 위의 가벼운 구분선. 하위탭 아님(정적 라벨만).
+// 사업분석 탭 그룹 헤더 — SectionTitle(세리프+언더라인, 섹션당)보다 한 단 위의 가벼운 구분선. 하위탭 아님(정적 라벨만).
 const GroupHeader = ({ children }) => (
   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, marginBottom: 10 }}>
     {children}
   </div>
 )
 
-// 리포트 상세 탭(요약/지표/심층분석/히스토리) 공통 렌더. Reports.jsx 상세 뷰와 Ranking.jsx 모달이 공유.
-// ETF는 표시 가능한 데이터만: 요약·심층분석 탭과 컨센서스/재무 서브탭 숨김 → 지표(기술·수급)+히스토리.
+// 리포트 상세 탭(요약/지표/사업분석/심층 리포트/히스토리) 공통 렌더. Reports.jsx 상세 뷰와 Ranking.jsx 모달이 공유.
+// ETF는 표시 가능한 데이터만: 요약·사업분석 탭과 컨센서스/재무 서브탭 숨김 → 지표(기술·수급)+히스토리.
+// 「심층 리포트」 탭은 발행물이 있을 때만 뜬다 — 채택 조건을 이 컴포넌트가 스스로 판정하므로
+// publications를 넘기지 않는 호출부(Ranking.jsx 모달)는 손대지 않아도 4탭이 유지된다(task#324, ADR-0047).
+// 탭 key 'report'는 개명하지 않았다 — 그 key는 상태·className·trackEvent 페이로드를 겸직하므로
+// 개명하면 사용자 대면 라벨이 아니라 분석 데이터가 갈린다(task#251의 「역할 수를 세라」).
 // 헤더·스크롤 컨테이너·로딩 위치는 호출부가 관리하고, 두 화면의 차이는 props로 흡수한다.
 export default function ReportDetailTabs({
   summary,
@@ -37,12 +42,17 @@ export default function ReportDetailTabs({
   historyMarket,
   onConsensusRefresh = noop,
   onTabChange,
+  publications = [],
 }) {
   const [tab, setTab] = useState('summary')
+  // 「심층 리포트」 탭이 보여 줄 판 — 기본은 최신, 이전 판은 탭 안에서 갈아탄다(라우팅하면 탭을 벗어난다)
+  const [deepDateSel, setDeepDateSel] = useState(null)
   const [analysisSubTab, setAnalysisSubTab] = useState('consensus')
   // 라이브 뉴스 — null=아직 없음(스냅샷 news로 폴백), 배열=fetch 성공(빈 배열이면 폴백 유지)
   const [liveNews, setLiveNews] = useState(null)
 
+  const hasDeep = publications.length > 0
+  const deepDate = deepDateSel ?? publications[0]?.published_date
   const isEtf = !!summary?.is_etf
   const analysisSub = isEtf ? 'technical' : analysisSubTab
   const detailTab = isEtf && tab === 'summary' ? 'analysis' : tab
@@ -196,7 +206,10 @@ export default function ReportDetailTabs({
               <InsiderTradesSection ticker={ticker} market={market} />
             </div>
           )
-          : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>심층분석 데이터가 없습니다.</p>
+          : <p style={{ color: 'var(--text-3)', fontSize: 13 }}>사업분석 데이터가 없습니다.</p>
+      )}
+      {!loading && detailTab === 'deep' && hasDeep && (
+        <AnalystReport embedded ticker={ticker} date={deepDate} onSelectDate={setDeepDateSel} />
       )}
       {!loading && detailTab === 'history' && (
         <HistoryTab ticker={ticker} dates={historyDates} market={histMarket} />
@@ -210,9 +223,11 @@ export default function ReportDetailTabs({
         {[
           { key: 'summary', label: '📊 요약' },
           { key: 'analysis', label: '📈 지표' },
-          { key: 'report', label: '📝 심층분석' },
+          { key: 'report', label: '📝 사업분석' },
+          { key: 'deep', label: '🎯 심층 리포트' },
           { key: 'history', label: '📅 히스토리' },
-        ].filter(({ key }) => !(isEtf && (key === 'report' || key === 'summary'))).map(({ key, label }) => (
+        ].filter(({ key }) => !(isEtf && (key === 'report' || key === 'summary')))
+         .filter(({ key }) => key !== 'deep' || hasDeep).map(({ key, label }) => (
           <button
             key={key}
             onClick={() => { setTab(key); onTabChange?.(key) }}

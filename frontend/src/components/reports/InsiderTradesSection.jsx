@@ -8,7 +8,7 @@ import { SectionTitle } from './reportUtils.jsx'
 //   { trades: [{rcept_no, rcept_dt(ISO|null), report_kind('insider'|'major5'),
 //               repror, rel, shares_change(int|null,+/−), shares_after, rate_after(%), dart_url}],
 //     signal: {direction('buy'|'sell'|'neutral'), net_shares, count, window_days} }
-// 심층분석 탭의 LatestDisclosuresSection 직후에 배치. LatestDisclosuresSection 형제 패턴(self-fetch).
+// 사업분석 탭의 LatestDisclosuresSection 직후에 배치. LatestDisclosuresSection 형제 패턴(self-fetch).
 
 // report_kind → 한글 라벨/색.
 const _KIND_CFG = {
