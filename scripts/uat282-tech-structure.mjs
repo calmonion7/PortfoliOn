@@ -7,7 +7,9 @@
 //   (real)   주입 0 — 라이브 실데이터 GET만. 레인 A·B(산문)와 구데이터 graceful(ⓔ)을 잰다.
 //   (inject) page.route로 `market.estimates` + `related`를 얹은 응답을 fulfill.
 //            ★ 실발행 아님 — prod tech_reports는 GET조차 이 경로로 가지 않는다(라우트가 가로챈다). 쓰기 0.
-//            레인 C 막대와 관계도 접근성(ⓒ)이 여기서만 측정된다(아래 정의역 참조).
+//            inject가 단독으로 소유하는 것은 **픽스처 고유 형태**(값 순서 섞기·scope 유/무 혼재·is_basis를
+//            2번째 행에 두기·prerequisites 6개)뿐이다. 레인 C 막대와 관계도 축 자체는 **양 모드**에서
+//            런타임 표본 조건으로 돈다(아래 task#331 S4 갱신 참조).
 //
 // ── task#317 갱신 (ADR-0033 결정4 · ADR-0034 보정④ 뒤집기) ────────────────────────────────
 // 「연관 기술」 관계도가 **3열 SVG DAG → 세로 흐름 HTML**로 재작성됐다. 이 파일의 graph 축을 전면 교체했다.
@@ -39,23 +41,50 @@
 //     difficulty:{score,rationale}, players:[…], challenges:[], related:{prerequisites,derivatives,
 //     complements,competitors}, market:{as_of,cagr_pct,forecast,history,share_basis},
 //     sources:[{title,url}], created_at, key_points:[…], milestones:[…] } ] }
-//   실측 요지 —
-//     smr             : market.as_of='2026-03 (Precedence Research)' · cagr_pct=8.78 · history 1점(2025 $7.49B)
-//                       · forecast 2점(2026 $8.16B · 2035 $17.37B) · estimates **키 없음** · sources 21건
-//                       · related 4키 모두 [] · challenges 0 · 대괄호 헤딩 4개 + rationale 545자
-//     reusable-rocket : as_of='2026-07 (Fortune Business Insights, 2026-07-13 갱신)' · cagr_pct=12.97
-//                       · history 1점(2025 $8.44B) · forecast 2점(2026 $12.09B · 2034 $32.08B)
-//                       · estimates **키 없음** · sources 29건 · related 4키 모두 [] · challenges 0
-//                       · 대괄호 헤딩 4개 + rationale 559자
-//   ★ 세 사실이 이 프로브의 축 설계를 지배한다 —
+//   ⚠️ 판별 스냅샷(slug별 as_of·cagr·건수)을 이 주석에 박제하지 않는다 — 루틴이 계속 재발행하므로
+//      반드시 드리프트하고, 드리프트한 주석이 정의역을 가두면 축이 조용히 무력화된다(task#331 S4 실사례).
+//      매 실행이 `[실응답]` 로그로 slug별 market 키·cagr·as_of·estimates·sources·related·기대캡션을
+//      **실측 출력**하므로 근거는 그 출력이다. 아래 두 사실은 데이터 값이 아니라 **필드의 성질**이라
+//      재발행에도 유지된다(그래서 축 설계 근거로 쓸 수 있다) —
 //     ① `as_of`는 날짜가 아니라 **자유 서술 문자열**이고 기관명을 품는다(`… (Fortune Business Insights, …)`).
 //        그 기관명은 **출처 제목의 접두어와 같다**. 그래서 「출처 제목 0건」 축은 반드시 **전체 제목**으로
 //        대조해야 한다 — 기관명·단어 조각으로 세면 정당한 as_of가 거짓 FAIL한다(실측 최소 제목 길이 35·61자).
 //     ② rr의 출처 제목 1번에 `CAGR 12.97%`가 들어 있고 description에도 `CAGR`이 1회 있다. 그래서
 //        「CAGR ≤2회」는 **문서 전체가 아니라 KPI 스트립 + 시장 규모 섹션**으로 범위를 좁혀야 성립한다
 //        (전역으로 세면 정상 구현이 4회로 읽힌다 — 판정 범위를 좁히라는 규율의 실사례).
-//     ③ 두 판 모두 `related` 4키가 빈 배열이고 `estimates` 키가 없다 → ⓒ·ⓓ는 **실데이터 정의역 밖**이고
-//        inject 모드가 그 축의 유일한 정의역이다(무음 스킵이 아니라 데이터로 실행 전에 결정되는 정의역).
+//
+// ── task#331 S4 갱신 (모드 게이트 → 런타임 데이터 게이트) ─────────────────────────────────
+//   레인 C 본체 **13축**이 `if (R.mode === 'inject')` 안에 갇혀 **픽스처만 재고 라이브 렌더를 전혀
+//   재지 않는 상태**였다. 그 게이트의 근거 주석은 「라이브 전 slug에 `market.estimates` 키가 없다」였고,
+//   작성 시점엔 참이었으나 루틴이 그 필드를 채워 **거짓이 됐다**. 프로브는 계속 초록이고 단언 총계도
+//   줄지 않으므로 **어떤 자동 신호도 이것을 알리지 않는다**(스킬 ⓧ — 주석이 코드 경로를 가두면 그
+//   주석은 코드다). task#317이 관계도 축에 대해 같은 블록에서 이미 한 번 고친 결함의 재발이다.
+//   → 게이트를 **런타임 표본 조건**(`wantEst = estLayout(소스.estimates).rows.length > 0`)으로 바꿨다.
+//     새 근거는 데이터 상태를 *주장*하지 않고 **판정 방식**만 적는다: 이 실행의 소스(real=실응답 /
+//     inject=픽스처)에 표본이 있으면 잰다. 표본 부재는 `est-gate`가 무조건 단언하므로 무음 스킵이 아니다.
+//   ★ 12축이 양 모드로 나왔고 `est-sort-teeth`만 **픽스처 정의역**에 남았다 — 실데이터의 입력 순서는
+//     앱이 바꿀 수 없어 real에 걸면 「어떤 수정으로도 통과 불가한 축」이 된다(task#316). 대신 라이브
+//     표본의 정렬 여부를 rawLog에 싣고 전역 `est-sort-teeth-live`로 게이트한다(완화가 아니라 등가 재작성).
+//   ★ 정의역이 조용히 비는 것을 막는 전역 sentinel을 쌍으로 둔다 — `est-real-domain`이 real 모드 실행
+//     판수를 실데이터 census와 대조한다(줄면 통과가 아니라 측정 실패다).
+//   ★ **real 모드 이빨 실측**(스킬 ⓤ — red-first를 통과한 축은 판별력이 증명되지 않은 축이다. 이 12축은
+//     프로브만 고친 것이라 배포 전/후 구분이 없어 red-first가 원리적으로 불가하다 → 결함 주입으로 잰다.
+//     주입본은 `scripts/` 안에 두고 끝나면 지웠다):
+//       · `CONTROL=estbar`(막대 width 100% CSS)          → est-bar-monotonic **real 12건 FAIL**
+//       · 임시 주입 `droprow`(라이브 마지막 행을 DOM 제거) → est-domain·est-labels·est-values·est-bar-pct·
+//                                                          est-marker-position **real FAIL**
+//       · 임시 주입 `teethall`(마커 제거 + 캡션 문구 교체  → est-marker-count·est-marker-position·est-caption·
+//         + 라벨/값 폭·wrap 붕괴 + 행 min-width 2400px)     est-label-lines·est-shrink-discipline·est-row-bbox **real FAIL**
+//     → 12축 중 11축이 real 모드에서 실제로 물었다. ⚠️ **task#331 S5 정정 — 남은 하나
+//       `est-value-lines`도 공허하지 않다.** 옛 서술은 「값 span이 nowrap + 끊김 기회 없는 문자열($8.2B)
+//       이라 **구조적으로** 1줄이다(주입 3회로도 안 깨진다)」였는데, 4번째 형태에서 **real 4판 전부 FAIL**
+//       했다. 갈림은 임계였다(스킬 ⓥ — 대조군의 이빨은 코드가 아니라 데이터·임계가 결정한다):
+//         · `nowrap` 해제 + `word-break:break-all` **만** → 0 FAIL(값 칼럼 자연폭이 넓어 여전히 1줄)
+//         · `nowrap` 해제 + `break-all` + 값 칼럼 폭 9px → **4 FAIL**
+//       즉 이 축의 트리거는 **「nowrap 상실 AND 값 칼럼이 좁아짐」의 복합**이고, 후자는 `flexShrink:0`
+//       규율이 깨질 때 발생한다(그 자체는 `est-shrink-discipline`이 별도로 잡는다). 판별력이 낮을 뿐
+//       0은 아니므로 스킬 ⑨(task#309)대로 쌍으로 남긴다 — 「안 깨진다」로 적어 두면 다음 사람이 이 축을
+//       삭제 후보로 읽는다.
 //
 // ── 계획 지시에서의 이탈 1건(가토 ⑥ 역산 — 지시가 완료기준을 실제로 달성하는지 대조) ────────────
 //   계획 S8ⓐ는 「캡션이 **1줄**(Set(top) 실측)」을 지시했다. 착수 시 산술로 대조하니 **그 지시를 전
@@ -96,7 +125,14 @@
 //   CONTROL=proseopen : (task#296 갱신) h3 소제목을 강제로 숨김(display:none) → `prose-open`이
 //                       FAIL해야 정상. 옛 버전(details를 강제 open)은 <details> 자체가 없어져
 //                       조용히 no-op하는 상태였다 — 대상을 h3로 재지정했다(완화가 아니라 대상 교체).
-//   CONTROL=estbar    : 막대 폭을 전부 100%로 → `est-bar-pct`·`est-bar-monotonic`이 FAIL해야 정상.
+//   CONTROL=estbar    : 막대 폭을 전부 100%로 → **`est-bar-monotonic`만** FAIL해야 정상.
+//                       ⚠️ task#331 S5 실측 정정 — 옛 서술은 `est-bar-pct`도 FAIL한다고 적었으나 **아니다.**
+//                       그 축은 렌더 폭이 아니라 **인라인 `style.width` 문자열**(구현이 계산한 %)을 읽으므로
+//                       CSS `!important` 주입으로는 값이 안 바뀐다. 전량 실측(2026-08-22, 3뷰×4slug×2모드):
+//                       **est-bar-monotonic 24 FAIL · est-bar-pct 0 FAIL**(총 1885 중 28 FAIL = 24 + 선재 4).
+//                       est-bar-pct의 이빨은 인라인 값을 직접 바꿔야 증명된다 — 사본에 `bar.style.width='50%'`
+//                       를 주입하니 est-bar-pct·est-bar-monotonic이 함께 FAIL했다(FAST 1뷰 각 4건).
+//                       「대조군이 어느 축을 죽이는가」를 추정으로 적으면 그 축은 검증된 것처럼 보인다.
 //   CONTROL=roleimg   : 관계도 svg에 role="img"를 되돌림 → `graph-role-img`·`graph-svg-aria` FAIL.
 //   ⚠️ 주입이 조용히 no-op하지 않았는지는 **측정값 이동**으로 먼저 확인한다(원시 실측 로그에 실린다).
 //      인라인 스타일을 이기려면 `!important`가 필요하다.
@@ -579,7 +615,16 @@ const VIEWS = [
   { key: 'm350-dark', theme: 'dark', pc: false, opts: { viewport: { width: 350, height: 700 } } },
 ];
 
+// task#331 S4 — est 축의 **라이브 정의역 census**. 전역 sentinel `est-real-domain`의 기대값 소스이며,
+// 「real 모드에서 est 본체가 몇 판 돌아야 하는가」를 데이터에서 유도한다(리터럴 금지).
+const REAL_EST_COUNTS = SLUGS.map((s) => [s, estLayout((DATA[s].rep.market || {}).estimates).rows.length]);
+const REAL_EST_SLUGS = REAL_EST_COUNTS.filter(([, n]) => n > 0).map(([s]) => s);
+console.log(`  [est 정의역] 실데이터 estimates 보유 ${REAL_EST_SLUGS.length}/${SLUGS.length} slug ` +
+  `${JSON.stringify(REAL_EST_COUNTS)} → real 모드 est 본체 실행 기대 ${VIEWS.length} × ${REAL_EST_SLUGS.length} = ` +
+  `${VIEWS.length * REAL_EST_SLUGS.length}판 (0판이면 이 파일의 est 13축은 라이브를 재지 않는다)`);
+
 const capWidths = new Set();       // 전역 이빨 — 기하 축이 서로 다른 제약 아래에서 돌았는가
+const estSortLive = {};            // 라이브 표본별 「입력 순서 ≠ 렌더 순서」 — 전역 est-sort-teeth-live의 소스
 const capTexts = {};               // 전역 이빨 — 두 슬러그가 서로 다른 캡션을 렌더했는가
 const browser = await chromium.launch();
 
@@ -763,19 +808,18 @@ for (const V of VIEWS) {
         `본문 전체 role="img" 내역 ${JSON.stringify(m.roleImgOwners)} — 관계도 소유분만 0을 요구한다`);
       bump('gate', 4);
 
-      // ── ⓓ 레인 C 본체 · ⓒ 관계도 접근성 ─────────────────────────────────────────────
-      // ⚠️ 이 블록의 정의역은 **주입 모드**이고 근거는 **`market.estimates` 키 부재 하나뿐**이다
-      //    (라이브 7 slug 전부 그 키가 없다 — 2026-08-21 재확인).
-      //    ⚠️ **옛 주석은 `related` 4키가 빈 배열이라는 것도 근거로 들었는데 그것은 거짓이 됐고**
-      //    (7 slug 전부 8~20개), 그래서 task#317이 관계도 축을 이 블록 *밖으로* 옮겼다. 그 근거를
-      //    여기 남겨 두면 다음 사람이 「관계도도 inject 전용」으로 되읽는다 — 주석이 코드 경로를
-      //    가두고 있으면 그 주석은 코드다(테스트가 없는 코드다). 그래서 문장을 지운다.
-      //    데이터로 실행 전에 결정되는 축의 정의역이며 무음 스킵이 아니다 — 정의역 **안에서는**
-      //    아래 전 단언이 무조건이고 미검출을 sentinel 기대값으로 FAIL시킨다.
-      if (R.mode === 'inject') {
+      // ── ⓓ 레인 C 본체(기관별 추정 편차) ───────────────────────────────────────────
+      // 정의역 = **런타임 표본**: 이 실행의 소스(real=실응답 / inject=픽스처)에 estimates가 있으면 잰다.
+      //   판정 방식만 적는다 — 데이터 상태를 주장하는 근거 주석은 드리프트하며, 드리프트한 순간
+      //   이 블록이 픽스처만 재는 상태로 조용히 전환된다(task#331 S4가 고친 것이 정확히 그 상태다.
+      //   헤더의 「task#331 S4 갱신」 절 참조). 실측 건수는 위 `[실응답]`·`[est 정의역]` 로그에 실린다.
+      // ⚠️ 모드가 아니라 데이터가 정의역을 가르므로, 표본이 있는 판에서는 아래 전 단언이 **무조건**이고
+      //    미검출은 sentinel 기대값으로 FAIL시킨다. 표본 부재 자체는 위 `est-gate`가 무조건 단언한다.
+      if (wantEst) {
+        bump(R.mode === 'inject' ? 'est-run-inject' : 'est-run-real');
         // ── 기관별 추정 편차 ──
         eq(`est-domain:${tag}`, m.estRows ? m.estRows.length : 'EST_MISSING', srcEstLay.rows.length,
-          `픽스처 ${srcEstLay.rows.length}건 → 막대 행 수`);
+          `소스(${R.mode}) ${srcEstLay.rows.length}건 → 막대 행 수`);
         const rows = m.estRows || [];
         // identity — 어떤 기관이 어떤 값으로 렌더됐는가. 숫자만 찍으면 "막대 5개 PASS"로 조용히 지나간다.
         const wantLabels = srcEstLay.rows.map((e) => (e.scope ? `${e.institution} · ${e.scope}` : e.institution));
@@ -784,12 +828,24 @@ for (const V of VIEWS) {
         //    화면에는 일부만 보인다. 그래서 텍스트 일치는 DOM 기준으로 단언하고, 잘림 규모는 아래에서 출력한다.
         eq(`est-labels:${tag}`, rows.map((r) => r.label), wantLabels, 'scope 있으면 `기관 · scope`, 없으면 기관명만(빈 노드 0)');
         eq(`est-values:${tag}`, rows.map((r) => r.val), wantVals, 'formatMarketSize 미러 — 환산 0(ADR-0033 결정 3) · 순서는 값 내림차순');
-        // 이빨 — 픽스처 입력 순서가 이미 정렬돼 있으면 위 두 축은 정렬 배선을 **통째로 지워도** 통과한다.
-        // 입력을 일부러 섞어 두었고, 그 사실을 여기서 실측으로 못박는다(공허한 초록 차단).
-        eq(`est-sort-teeth:${tag}`,
-          JSON.stringify((srcMarket.estimates || []).map((e) => e.size.value)) !== JSON.stringify(srcEstLay.rows.map((e) => e.size.value))
-            ? 'OK' : 'FIXTURE_ALREADY_SORTED', 'OK',
-          `입력 ${JSON.stringify((srcMarket.estimates || []).map((e) => e.size.value))} → 렌더 ${JSON.stringify(srcEstLay.rows.map((e) => e.size.value))}`);
+        // 이빨 — 입력 순서가 이미 값 내림차순이면 위 두 축은 정렬 배선을 **통째로 지워도** 통과한다.
+        // ⚠️ 이 축의 정의역은 **픽스처**다(real이 아니다). 실데이터의 입력 순서는 앱이 바꿀 수 없으므로
+        //    real에 걸면 「어떤 수정으로도 통과할 수 없는 축」이 된다(task#316 — 착수 실측에서 라이브
+        //    4 slug 중 3종이 이미 내림차순이었다). 완화가 아니라 **등가 재작성**으로 처리한다:
+        //    per-run은 픽스처만 단언하고, 라이브 표본의 정렬 여부는 ⓐ 아래 NOTE·rawLog에 실측 출력하고
+        //    ⓑ 전역 `est-sort-teeth-live`가 「라이브 표본 중 최소 1종이 정렬 배선을 실제로 지나간다」를
+        //    게이트한다. 그래야 real 모드 `est-values`가 정렬에 대해 공허하지 않음이 증언된다.
+        const srcOrder = JSON.stringify((srcMarket.estimates || []).map((e) => e.size.value));
+        const renOrder = JSON.stringify(srcEstLay.rows.map((e) => e.size.value));
+        if (R.mode === 'inject') {
+          eq(`est-sort-teeth:${tag}`, srcOrder !== renOrder ? 'OK' : 'FIXTURE_ALREADY_SORTED', 'OK',
+            `입력 ${srcOrder} → 렌더 ${renOrder}`);
+        } else {
+          estSortLive[R.slug] = srcOrder !== renOrder;
+          NOTE(`${tag} — est-sort-teeth 정의역 밖(픽스처 전용 축, 앱이 바꿀 수 없는 입력 순서를 잰다).` +
+            ` 라이브 입력 ${srcOrder} → 렌더 ${renOrder}` +
+            ` (${srcOrder !== renOrder ? '정렬 배선을 실제로 지나간다' : '이미 내림차순 — 이 판의 est-values는 정렬을 검증하지 않는다'}).`);
+        }
         // 폭 = value/max — 리터럴이 아니라 불변식. 인라인 %와 실제 렌더 px을 둘 다 본다.
         const wantPct = srcEstLay.rows.map((e) => (srcEstLay.max > 0 ? (e.size.value / srcEstLay.max) * 100 : 0));
         eq(`est-bar-pct:${tag}`, rows.map((r) => Math.round((r.barPct ?? -1) * 100)), wantPct.map((p) => Math.round(p * 100)),
@@ -817,10 +873,10 @@ for (const V of VIEWS) {
         bump('est', rows.length * 6 + 6);
 
       } else {
-        NOTE(`${tag} — est 본체 정의역 밖(실데이터에 market.estimates 키 없음). 대상이 존재하지 않는 판이며 ` +
-          `무음 스킵이 아니다 — 부재는 est-gate가 무조건 단언한다. ⚠️ 관계도는 더 이상 여기 없다: ` +
-          `2026-08-20 실측으로 라이브 related가 7 slug 전부 8~20개로 채워져 있어(옛 주석의 「4키 전부 빈 배열」은 ` +
-          `틀렸다) 관계도 축은 real·inject 양 모드에서 무조건 돈다.`);
+        // 정의역 밖 = **이 실행의 소스에 표본이 0건**. 모드가 아니라 데이터가 가른다 — 부재 자체는
+        // est-gate가 무조건 단언하므로 무음 스킵이 아니다. real 판이 여기로 오면 전역
+        // `est-real-domain`이 실행 판수를 census와 대조해 FAIL시킨다(조용한 정의역 소실 차단).
+        NOTE(`${tag} — est 본체 정의역 밖(소스 estimates 0건, 모드 무관). 부재는 est-gate가 무조건 단언한다.`);
       }
 
       // ══ 관계도 — 세로 흐름 리플로우 + 접근성 (task#317) ══════════════════════════════
@@ -958,9 +1014,12 @@ for (const V of VIEWS) {
         await page.screenshot({ path: `${OUT}/${V.key}-${R.slug}-${R.mode}-${name}.png`, fullPage: false });
       };
       if (R.mode === 'real') {
-        // ★ 1차 육안 대상(2 slug × 3 뷰포트 = 6장) — 레인 A의 결과가 여기 있다.
+        // ★ 1차 육안 대상 — 레인 A의 결과가 여기 있다.
         await shot('market', '[data-testid="market-growth-chart"]');
         await shot('prose', '[data-testid="tech-report-prose"]');
+        // task#331 S4 — est 13축이 real 모드에서도 도므로 **그 축을 측정하는 지점에서** 찍는다.
+        // 단언 통과와 증거 확보는 다른 문제다(스킬 1항: 각 축을 측정하는 바로 그 지점에서 캡처).
+        await shot('estimates', '[data-testid="market-estimates"]');
       } else {
         await shot('estimates', '[data-testid="market-estimates"]');
         await shot('graph', '[data-testid="tech-graph"]');
@@ -1120,8 +1179,35 @@ eq('geom-teeth', capWidths.size >= 2 ? 'OK' : `SINGLE_WIDTH(${[...capWidths].joi
 // ② 두 슬러그가 서로 다른 캡션을 렌더했는가 — 같다면 캡션 정확일치 축은 상수를 비교한 것이다.
 eq('content-teeth', new Set(Object.values(capTexts)).size >= SLUGS.length,
   true, `캡션 시그니처 ${Object.keys(capTexts).length}종 수집 · 고유 ${new Set(Object.values(capTexts)).size}종`);
-// ③ 레인 C·관계도 축이 한 번이라도 실제 표본을 봤는가(실데이터엔 대상이 없다 — 주입이 유일한 정의역).
+// ③ 레인 C·관계도 축이 한 번이라도 실제 표본을 봤는가.
+//    ⚠️ task#331 S4 — 옛 주석은 「실데이터엔 대상이 없다 — 주입이 유일한 정의역」이었고 그것이 거짓이
+//    되어 est 13축이 픽스처만 재고 있었다. 이제 양 모드에서 런타임 표본 조건으로 돈다.
 eq('est-teeth', (cov.est || 0) > 0 ? 'OK' : 'EST_NEVER_RENDERED', 'OK', `est 계열 검사 ${cov.est || 0}건`);
+// ③-a **하한** — 라이브 표본이 통째로 사라졌는가. ⚠️ task#331 S5 실측 정정: 아래 `est-real-domain`의
+//     옛 주석은 「이게 없으면 라이브 estimates가 사라져도 전부 통과한다」고 적었지만 **그 축은 그것을
+//     잡지 못한다** — 기대값(`VIEWS × REAL_EST_SLUGS`)이 같은 라이브 census에서 파생되므로 소실 시
+//     양변이 0으로 degenerate하고 관측 0과 일치해 **통과**한다(주입 실측 `INJ=live_loss`: 응답과 기대값
+//     에서 estimates를 동시에 지우니 총계 263 → 239, est-real-domain **PASS**. 그때 유일하게 FAIL한
+//     것은 `est-sort-teeth-live`였고 그것도 `some([])===false`의 **우연**이었다 — 메시지는 「정렬이
+//     검증되지 않았다」라 원인을 오진하게 한다). 소실을 잡는 것은 census 대조가 아니라 **하한**이다.
+//     「몇 개」가 아니라 「하나라도 있는가」를 묻는다 — 발행 수는 정당하게 변한다.
+eq('est-live-sample', REAL_EST_SLUGS.length >= 1 ? 'OK' : `NO_LIVE_EST_SAMPLE(${JSON.stringify(REAL_EST_COUNTS)})`, 'OK',
+  `라이브 estimates 보유 ${REAL_EST_SLUGS.length}/${SLUGS.length} slug ${JSON.stringify(REAL_EST_COUNTS)}`);
+// ③-b 게이트 드리프트 — real 판이 est 본체를 **실제로 돌았는가**. 조건부 스킵·모드 게이트가 다시
+//     들어오면(B79·S4가 고친 그 결함) 여기서 죽는다. 주입 실측 `INJ=gate_drift`(real 한 판만 건너뛰게
+//     만듦)에서 이 축이 FAIL했다 — 즉 이 축의 판별력은 **드리프트**에 있고 데이터 소실에는 없다(위 ③-a).
+eq('est-real-domain', cov['est-run-real'] || 0, VIEWS.length * REAL_EST_SLUGS.length,
+  `real 모드 est 본체 ${cov['est-run-real'] || 0}판 / 기대 ${VIEWS.length}뷰 × ${REAL_EST_SLUGS.length}slug` +
+  ` · 실데이터 estimates ${JSON.stringify(REAL_EST_COUNTS)} · inject 판 ${cov['est-run-inject'] || 0}`);
+// ③-c real 모드 est-values가 정렬 배선을 실제로 지나갔는가(per-run 픽스처 이빨의 라이브 등가물).
+//     전 라이브 표본이 이미 내림차순이면 real 판의 est-values·est-labels는 정렬에 대해 공허하다.
+//     이빨 실증(task#331 S5): SLUGS를 이미 내림차순인 두 판(reusable-rocket·smr)으로 바꿔 돌리니
+//     `ALL_LIVE_PRESORTED` FAIL — 도달 가능한 축이다. ⚠️ 단 이 축은 표본이 **비어도** FAIL하므로
+//     (`some([]) === false`) 그 FAIL은 「정렬 미검증」과 「표본 소실」을 동시에 뜻한다 — 후자는 위
+//     `est-live-sample`이 이름으로 구별해 준다.
+eq('est-sort-teeth-live',
+  Object.values(estSortLive).some(Boolean) ? 'OK' : `ALL_LIVE_PRESORTED(${JSON.stringify(estSortLive)})`, 'OK',
+  `라이브 표본별 「입력≠렌더 순서」 ${JSON.stringify(estSortLive)} — 최소 1종이 참이어야 정렬이 검증된다`);
 eq('graph-teeth', (cov.graph || 0) > 0 ? 'OK' : 'GRAPH_NEVER_RENDERED', 'OK', `graph 계열 검사 ${cov.graph || 0}건`);
 // ④ CAGR 축이 실제로 "캡션에 1회 있는" 표본을 봤는가 — 전 표본이 cagr null이었다면 그 축은 0==0만 봤다.
 eq('cagr-teeth', SLUGS.some((s) => (DATA[s].rep.market || {}).cagr_pct != null) ? 'OK' : 'ALL_CAGR_NULL', 'OK',
@@ -1143,7 +1229,8 @@ console.log('※ (real)은 주입 0 · 라이브 실데이터 GET만.');
 console.log('※ caption-lines는 PC(폭 1000+)에서만 게이트한다 — 모바일 접힘은 정당하며 실측 줄 수·1줄 필요폭을 위에 출력했다.');
 console.log('※ 세로 잘림(line-clamp)은 이 4표면에 메커니즘이 없어 축을 두지 않았다 — vclip 실측 수를 출력해 그 주장을 검증 가능하게 남겼다.');
 if (CONTROL) console.log(`⚠ 이 실행은 대조군이다(CONTROL=${CONTROL}) — 해당 축 FAIL이 정상이며 게이트 결과가 아니다.`);
-console.log(`※ 육안 캡처 ${OUT}/ — {view}-{slug}-{real|inject}-{market|prose|estimates|graph|full}.png`);
+console.log(`※ 육안 캡처 ${OUT}/ — {view}-{slug}-{real|inject}-{market|prose|estimates|graph|full}.png` +
+  ` (real 판도 estimates를 찍는다 — est 13축이 그 판에서 돌기 때문이다)`);
 console.log('═'.repeat(78));
 fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ control: CONTROL || null, cov, results }, null, 2));
 if (fails.length) {

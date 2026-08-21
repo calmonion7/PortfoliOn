@@ -1,34 +1,43 @@
-// task#298 S6 라이브 UAT(신규) — 주요기술 리포트 상세의 「계열 비교」(VariantTable) + 「확인할 지표」
-// (WatchItems) 두 섹션을 잰다.
+// task#298 S6 라이브 UAT — 주요기술 리포트 상세의 「계열 비교」(VariantTable) + 「확인할 지표」
+// (WatchItems) 두 섹션을 잰다. **task#331 B79에서 계기 복구**(아래 「실측 갱신」 절).
 //
-// ⚠️⚠️ 순서 경고 — commit+push(+build) **전에** 돌릴 것. push ~20초 뒤 새 번들이 라이브가 되므로
-// 그 순간 "지금 FAIL이 정상"이라는 이 파일의 전제가 무효화된다. 이 스크립트는 GET + page.route
-// 주입뿐(POST 0) — 배포 전 실행이 안전하다.
+// 쓰기 0 — GET + page.route 응답 가로채기뿐이다(POST 0, prod tech_reports 무접촉). 그래서 배포 전·후
+// 어느 시점에 돌려도 안전하다.
 //
-// ── 착수 시 실측(2026-08-12, GET만, 무쓰기) ─────────────────────────────────────────────────────
-//   frontend/src/pages/TechReport.jsx 직독 확인:
-//     · 「계열 비교」(VariantTable, id="variants")는 **이미 배선됨**(S1~S4 완료) — 계보 분류 바로 앞,
-//       게이트 `variantTableLayout(report.variants).axes.length > 0`.
-//     · 「확인할 지표」는 **SECTIONS 배열에 없다** — `grep -rn "watch_items|watchItemsLayout|WatchItems"
-//       frontend/src` 매치 0(주석 제외), `components/tech/WatchItems.jsx` 파일 자체가 없다(find 확인).
-//       즉 이 섹션은 "배포 전이라 안 보이는" 것이 아니라 **이 체크아웃에 아직 존재하지 않는다**.
-//       ⚠️ 이 사실은 배포와 무관하게 참이다 — 배포해도 watch-items 관련 축은 계속 RED로 남는다.
-//       그것 자체가 신호다(구현 완료의 게이트). 아래 watch-item-* 셀렉터는 VariantTable.jsx의 testid
-//       관례(`tech-report-variant-name`/`-examples`/`-feature`)를 그대로 확장한 **가정**이며,
-//       실제 구현이 다른 testid를 쓰면 배포 후에도 이 축들은 DOMAIN_MISSING으로 남는다 — 구현 시
-//       아래 셀렉터에 맞추거나 이 프로브를 갱신할 것(가정: 컨테이너 `tech-report-watch-items` · 항목
-//       `tech-report-watch-item` · 라벨 `tech-report-watch-item-label` · 상세 `tech-report-watch-item-detail`
-//       · 신호아님 배지(고정 문구, 1줄) `tech-report-watch-item-not-signal-badge` · 신호아님 문장(자유
-//       서술, 다줄 허용) `tech-report-watch-item-not-signal-text`).
-//   라이브 발행물 4종(reusable-rocket·robotics·smr·solid-state-battery) 전부 variants·watch_items가
-//   NULL(메인 세션 확인 사실, 아래 실행에서 real 모드로 재확인) → absent-when-null 축의 근거.
+// ── 실측 갱신(2026-08-22, task#331 B79 — GET만, 무쓰기) ────────────────────────────────────────
+//   ⚠️ 옛 real-모드 축 3개(absent-variants·absent-watch-items·absent-toc-chips)는 「실발행물엔
+//   variants·watch_items가 NULL이다」를 **하드 전제**로 ABSENT를 단언했다. 그 서술은 작성 시점
+//   (2026-08-12, 발행 4종)엔 참이었으나 그 뒤 루틴이 두 필드를 채워 **거짓이 됐다** — 라이브 census
+//   (2026-08-22, 목록 GET + slug 15개 개별 GET 대조): 발행 **15종 전부** `variants` 채워짐(축 1개 판
+//   6종 · 2개 판 9종) · `watch_items` **15/15 전부 정확히 5건**(항목 키 label·detail·not_signal).
+//   그래서 그 3축이 상시 거짓 FAIL 24건(4뷰 × 2 slug × 3축)을 냈고, 더 나쁘게는 블록 끝의 `continue`가
+//   **상세 렌더 검증 블록을 real 모드에서 영원히 도달 불가**로 만들었다(총계 284 중 real 몫 9/run뿐).
+//   → 3축을 「NULL이어야 한다」가 아니라 **「렌더가 그 발행물의 *실제* 데이터와 일치한다」(양방향)**로
+//   재작성하고 `continue`를 제거했다.
+//
+//   ⭐ 게이트가 **모드가 아니라 런타임 데이터**인 이유: 데이터가 어느 방향으로 진화해도 축이 따라간다.
+//   비면 want=ABSENT가 되어 「섹션이 안 뜬다」를, 채워지면 같은 축이 「뜬다 + 내용이 일치한다」를
+//   단언한다. 옛 판이 스테일해진 원인은 코드가 아니라 **주석에 적힌 정당화**였다 — 「실행 전에 결정되는
+//   정의역이니 조건부 스킵이 아니다」가 *데이터 상태에 대한 주장*에 기대고 있었고 그 주장이 썩었다.
+//   주석이 코드 경로를 가두면 그 주석은 **테스트 없는 코드**다. 낡은 근거는 지웠고 이 근거를 남긴다.
+//
+//   구현 확인(소스 직독, 2026-08-22 — 옛 주석의 「가정」이 아니다):
+//     · `components/tech/WatchItems.jsx` **존재**. testid `tech-report-watch-items` / `-watch-item` /
+//       `-watch-item-label` / `-watch-item-not-signal-badge`(고정 문구 「신호 아님」, `whiteSpace:nowrap`,
+//       `color: var(--warn)`) / `-watch-item-not-signal-text` — 아래 셀렉터와 일치.
+//     · `watchItemsLayout`·`variantTableLayout`은 아래 미러 2종과 같은 판정을 한다(직독 대조).
+//     · `TechReport.jsx` SECTIONS 실측 순서: key-points ① · **variants ②** · related ③ ·
+//       **market ④**(show:true 고정) · players ⑤ · share ⑥ · milestones ⑦ ·
+//       **challenges ⑧** · **watch-items ⑨** · prose ⑩ · sources ⑪.
 //   콘텐츠 폭(실측): PC 1440 748px · m390 318px · m350 278px.
 //   VariantTable.jsx 소스 직독(테이블 규율 계승): NAME_TEXT/EXAMPLES_TEXT/FEATURE_LINE 전부
 //   `overflowWrap:'anywhere'`(`break-word` 아님, task#296 정정 준수) · minWidth/overflowX/nowrap 선언 0.
 //
 // ── 판정 규율(TESTING.md §7.3) ──────────────────────────────────────────────────────────────────
-//  · 조건부 단언 금지 — 무조건 단언 + sentinel FAIL로 총계를 구조적으로 고정. mode(real/inject)는
-//    실행 전에 결정되는 축의 정의역이라 조건부 스킵이 아니다(§7.3ⓛ) — 이유를 주석으로 명시.
+//  · 조건부 단언 금지 — 무조건 단언 + sentinel FAIL로 총계를 구조적으로 고정.
+//  · **정의역 분기는 데이터에서 유도한 값만 쓴다**(`wantLay.axes.length` 등). 모드로 축을 가르지
+//    않는다 — 그것이 B79의 결함이었다. 모드가 정하는 것은 *기대값의 출처*(`SRC`)뿐이다.
+//  · 양방향 축의 두 방향 표본 수를 커버리지에 남긴다 — 한 방향이 0이면 「통과」가 아니라 「미검증」이다.
 //  · 축마다 `*-domain` sentinel, 리터럴 금지(기대값은 VariantTable.jsx를 그대로 미러링한 순수함수로
 //    유도), 판정 범위는 본문 컨테이너로 한정, identity를 판정축보다 먼저.
 //  · 진짜 줄 수 = 세로로 겹치지 않는 rect 묶음(task#293 measureLeaf 관용구 — top 동일성이 아니다).
@@ -37,8 +46,37 @@
 //   CONTROL=nowrap    : 계열 표 셀에 white-space:nowrap !important → page-h-scroll·
 //                        variant-table-no-scroller가 FAIL해야 정상.
 //   CONTROL=flatcolor : 신호아님 배지 색을 var(--text)로 강제 → not-signal-color가 FAIL해야 정상.
-//                        ⚠️ WatchItems 미구현이므로 대상 셀렉터가 없다 — 이 실행은 지금 DOMAIN_MISSING만
-//                        내고 이빨을 증명하지 못한다(구현 후에만 의미 있음, 헤더에 이미 경고).
+//                        (WatchItems.jsx가 구현·배포돼 있으므로 이 대조군은 이제 실제로 이빨을 낸다.)
+//   ※ 상시 대조군은 CONTROL이 아니라 **empty 모드**다 — 두 필드를 null로 주입해 「데이터가 없으면
+//     섹션이 안 뜬다」 방향에 표본을 만든다(라이브 15종이 전부 채워져 있어 실데이터로는 불가).
+//
+// ── 이빨 실측(task#331 S5, FAST 1뷰 × 2 slug × 3모드 = 단언 139건 baseline) ──────────────────────
+//   주입은 전부 **프로브 사본**에서 했고(원본 무변경) 프로덕션 코드는 건드리지 않았다. testid 개명은
+//   「셀렉터가 깨진 상태」와 동형이라 셀렉터 주입 대용으로 썼다. 죽은 축 = 그 주입이 잡은 축:
+//     축 제거(DOM)            → variant-axis-count 4 · variant-row-fidelity 4
+//     계열명 텍스트 교체       → variant-row-fidelity 4
+//     축 div overflowX:auto   → variant-table-no-scroller-ancestor 4
+//     표를 block+120px+nowrap → variant-table-no-scroller-self 4 · variant-container-clip 4
+//     leaf testid 개명         → variant-leaf-domain 4 · variant-row-fidelity 4
+//     계열명 nowrap+32px       → variant-leaf-clip 4 · variant-container-clip 4
+//     축 div hidden + 셀 420px → variant-container-clip 4
+//     축 랩 gap:0              → variant-spacing 3(정의역 = 축 ≥2인 판 3개와 정확히 일치)
+//     항목 1개 제거            → watch-item-count 4
+//     배지 testid 개명          → watch-notsignal-domain 4
+//     --warn := var(--text)    → watch-warn-token-teeth 4 · not-signal-color 4
+//     배지 색 var(--text)       → not-signal-color 4
+//     배지 normal+18px          → not-signal-badge-1line 4
+//     칩이 가리키는 id 복제     → toc-href-unique 4
+//     섹션 순서 역전            → section-order-{variants-before-market, market-before-watchitems,
+//                                watchitems-after-challenges} 각 4
+//     #categories 부활          → section-categories-removed 6
+//     라우트 미등록/역등록      → route-injected 4 / 2 (양방향)
+//     컨테이너 testid 뒤집기    → variants-render 6 · watch-items-render 6 (PRESENT 4 + ABSENT 2)
+//     목차 칩 뒤집기            → toc-new-chips 6 (제거 4 + 가짜 추가 2)
+//   ⚠️ **첫 시도가 0 FAIL이었던 축이 하나 있다** — `toc-href-unique`. **첫** 섹션(key-points) id를
+//     복제했는데 이 축의 정의역은 「새 칩 2개가 가리키는 id」뿐이라 주입이 대상에 닿지 않았다.
+//     0 FAIL을 「무이빨」로 읽지 말고 **주입이 임계·정의역에 도달했는지** 먼저 볼 것(스킬 ⓥ).
+//     부수 사실: 이 축은 문서 **다른 곳**의 중복 id는 잡지 않는다(판정 범위를 좁힌 대가, 의도됨).
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
 
@@ -46,8 +84,8 @@ const BASE = 'https://portfolion.taebro.com';
 const OUT = '/Users/calmonion/Project/PortfoliOn/screenshots-uat298';
 fs.mkdirSync(OUT, { recursive: true });
 
-console.log('※ 배포 전 실행 — red가 정상: variants-*(미배포)·watch-items-*(미구현, 배포 후에도 계속 RED 예상).');
-console.log('※ inject 모드 = 실발행 아님 — page.route 주입 응답(prod tech_reports 쓰기 0). real 모드 = 실데이터 GET만.');
+console.log('※ 3모드 — real(실데이터 GET) · inject(픽스처 주입) · empty(두 필드를 null로 주입한 대조군).');
+console.log('※ 쓰기 0 — GET + page.route 응답 가로채기뿐이다(실발행 아님, prod tech_reports 무접촉).');
 
 const results = [];
 const P = (ok, tag, msg) => results.push({ ok, tag, msg });
@@ -59,6 +97,7 @@ const eq = (tag, got, want, note = '') => {
 };
 const NOTE = (msg) => console.log(`  ℹ ${msg}`);
 const rawLog = [];
+const shotLog = [];
 
 // ── 대조군 ────────────────────────────────────────────────────────────────────
 const CONTROL = process.env.CONTROL || '';
@@ -78,7 +117,9 @@ const { access_token, refresh_token } = await login.json();
 if (!access_token) { console.error('로그인 실패 — access_token 없음. 종료.'); process.exit(1); }
 
 const TECH_NAMES = { 'reusable-rocket': '재사용 로켓', 'solid-state-battery': '전고체 배터리', smr: 'SMR', robotics: '로봇' };
-const SLUGS = ['smr', 'robotics']; // 축 1개 판(smr) · 축 2개 판(robotics) — 계약대로.
+// 픽스처가 축 1개(smr)·2개(robotics)로 갈린다. 라이브는 2026-08-22 census에서 **둘 다 2축**이므로
+// 기대값을 여기 리터럴로 적지 않고 런타임에 유도한다(census 값이 또 변해도 축이 따라간다).
+const SLUGS = ['smr', 'robotics'];
 
 // ── 미러 1: VariantTable.jsx 소스 직독 그대로(리터럴 금지 — 기대값을 이 순수함수로 유도) ──────────
 function buildRow(o) {
@@ -127,8 +168,26 @@ for (const slug of SLUGS) {
   if (!TECH_NAMES[slug]) { console.error(`TECH_NAMES 미러에 ${slug} 없음. 종료.`); process.exit(1); }
   if (!rep.title) { console.error(`${slug}: title 부재 — identity 기대값 소스 없음. 종료.`); process.exit(1); }
   DATA[slug] = { rep, techName: TECH_NAMES[slug], title: rep.title, challenges: (rep.challenges || []).length };
-  console.log(`  [실응답] ${slug}: title ${rep.title.length}자 · variants=${JSON.stringify(rep.variants)} · watch_items=${JSON.stringify(rep.watch_items)} · challenges ${DATA[slug].challenges}건`);
+  const lv = variantTableLayoutMirror(rep.variants);
+  const lw = watchItemsLayoutMirror(rep.watch_items);
+  const cnt = (v) => (Array.isArray(v) ? `${v.length}건` : String(v));
+  console.log(`  [실응답] ${slug}: title ${rep.title.length}자 · variants ${cnt(rep.variants)} → 유효 축 ${lv.axes.length}개(행 ${lv.axes.map((a) => a.rows.length).join(',') || '-'}) · watch_items ${cnt(rep.watch_items)} → 유효 ${lw.items.length}건(신호아님 ${lw.items.filter((i) => i.notSignal).length}건) · challenges ${DATA[slug].challenges}건`);
 }
+
+// ── 라이브 정의역 census — 아래 전역 sentinel 2쌍의 **기대값 소스**(리터럴 금지) ──────────────────
+// task#331 S5 실측으로 이 census가 필요해졌다. 주입 2종을 돌려 보니 이 프로브에는 두 개의 무음 구멍이
+// 있었다(둘 다 **FAIL 0 · exit 0**으로 지나갔고 총계만 조용히 줄었다):
+//   ⓐ 게이트 드리프트 — real 모드에서 세부 축 블록을 건너뛰게 만들자(B79의 `continue`와 동형)
+//      총계 135 → 109, FAIL 0. 즉 이 파일이 방금 고쳐진 그 결함이 **재발해도 아무 신호가 없다.**
+//   ⓑ 라이브 소실 — 응답과 기대값에서 두 필드를 동시에 비우자(루틴 upsert의 키 생략 = 삭제)
+//      총계 135 → 103, 진짜 FAIL 0. 양방향 축이 want=ABSENT로 따라가 **전부 옳게 통과**한다.
+// 두 구멍은 **다른 sentinel**을 요구한다: ⓐ는 census 대조(실행 판수), ⓑ는 **하한**이다.
+// ⓑ에 census 대조를 쓰면 기대값이 0으로 degenerate해 관측 0과 일치한다(스킬 ⓨ의 그 형태다).
+const LIVE_VAR_SLUGS = SLUGS.filter((s) => variantTableLayoutMirror(DATA[s].rep.variants).axes.length > 0);
+const LIVE_WATCH_SLUGS = SLUGS.filter((s) => watchItemsLayoutMirror(DATA[s].rep.watch_items).items.length > 0);
+console.log(`  [라이브 정의역] variants 유효 ${LIVE_VAR_SLUGS.length}/${SLUGS.length} slug ${JSON.stringify(LIVE_VAR_SLUGS)}` +
+  ` · watch_items 유효 ${LIVE_WATCH_SLUGS.length}/${SLUGS.length} slug ${JSON.stringify(LIVE_WATCH_SLUGS)}` +
+  ` → real 모드 세부 축 실행 기대 ${LIVE_VAR_SLUGS.length}·${LIVE_WATCH_SLUGS.length} × 뷰수`);
 
 // ── 주입 픽스처(자립 — 라이브에서 상속하지 않는다) ────────────────────────────────────────────────
 // smr = 축 1개(4옵션: 둘다있음·strength만·tradeoff만·둘다없음 — 「한쪽만 있는 행」 축의 표본).
@@ -180,7 +239,11 @@ for (const slug of SLUGS) {
   const wLay = watchItemsLayoutMirror(FIXTURES[slug].watchItems);
   console.log(`  [주입 픽스처] ${slug}: 축 ${lay.axes.length}개(행 ${lay.axes.map((a) => a.rows.length).join(',')}) · 확인할 지표 ${wLay.items.length}건(신호아님 ${wLay.items.filter((i) => i.notSignal).length}건)`);
 }
-const injectedRep = (slug) => ({ ...DATA[slug].rep, variants: FIXTURES[slug].variants, watch_items: FIXTURES[slug].watchItems });
+// inject = 픽스처 주입 · empty = 두 필드만 null로 덮은 대조군(그 외 필드는 실응답 그대로 — 대상
+// 동일성이 보장되므로 「데이터가 원래 없어서」와 「화면이 빈 상태를 옳게 그린다」가 구별된다).
+const injectedRep = (mode, slug) => (mode === 'inject'
+  ? { ...DATA[slug].rep, variants: FIXTURES[slug].variants, watch_items: FIXTURES[slug].watchItems }
+  : { ...DATA[slug].rep, variants: null, watch_items: null });
 
 // ── 브라우저 안 측정기 ────────────────────────────────────────────────────────
 const ROOT_SEL = 'main.page-wrap .page, main.page-wrap .m-page';
@@ -265,7 +328,7 @@ const measure = (page) => page.evaluate((ROOT_SEL) => {
     .filter((e) => cs(e).overflowX === 'hidden' && txt(e).length > 0)
     .map((e) => ({ scrollW: e.scrollWidth, clientW: e.clientWidth })) : [];
 
-  // ── 확인할 지표(watch-items) — 가정 셀렉터(헤더 주석 참조, 미구현이면 전부 null/0) ──
+  // ── 확인할 지표(watch-items) — 셀렉터는 WatchItems.jsx 직독으로 확인한 실제 testid다(헤더 주석).
   const watchRoot = root.querySelector('[data-testid="tech-report-watch-items"]');
   const watchItemEls = watchRoot ? [...watchRoot.querySelectorAll('[data-testid="tech-report-watch-item"]')] : [];
   const watchItems = watchItemEls.map((it) => {
@@ -319,7 +382,10 @@ for (const V of VIEWS) {
     localStorage.setItem('pwa-install-dismissed-at', String(Date.now()));
   }, [access_token, refresh_token, V.theme]);
 
-  const RUNS = SLUGS.flatMap((slug) => [{ mode: 'real', slug }, { mode: 'inject', slug }]);
+  // 3모드 — real(실데이터) · inject(픽스처) · empty(두 필드 null 주입 대조군).
+  // empty가 없으면 양방향 축의 ABSENT 방향이 표본 0이 되어 「통과」가 아니라 「미검증」이 된다
+  // (라이브 15종 전부 두 필드가 채워져 있어 실데이터로는 그 방향을 만들 수 없다 — 주입으로 합성한다).
+  const RUNS = SLUGS.flatMap((slug) => [{ mode: 'real', slug }, { mode: 'inject', slug }, { mode: 'empty', slug }]);
 
   for (const R of RUNS) {
     const tag = `${V.key}/${R.mode}:${R.slug}`;
@@ -330,9 +396,11 @@ for (const V of VIEWS) {
     page.on('pageerror', (e) => errs.push(String(e)));
 
     try {
-      if (R.mode === 'inject') {
+      let injectedCount = 0;
+      if (R.mode !== 'real') {
         await page.route(`**/api/tech-reports/${R.slug}`, async (route) => {
-          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ slug: R.slug, reports: [injectedRep(R.slug)] }) });
+          injectedCount += 1;
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ slug: R.slug, reports: [injectedRep(R.mode, R.slug)] }) });
         });
       }
 
@@ -368,30 +436,52 @@ for (const V of VIEWS) {
         `doc scrollW=${m.docScrollW}/clientW=${m.docClientW} · vw=${m.vw}`);
       bump('page-h-scroll');
 
-      if (R.mode === 'real') {
-        // ══ absent-when-null — 실행 전에 결정되는 정의역(mode='real'), 조건부 스킵 아님 ══
-        eq(`absent-variants:${tag}`, m.variantsFound ? 'PRESENT(회귀!)' : 'ABSENT', 'ABSENT', 'variants=NULL인 실발행물 위 렌더');
-        eq(`absent-watch-items:${tag}`, m.watchFound ? 'PRESENT(회귀!)' : 'ABSENT', 'ABSENT', 'watch_items=NULL인 실발행물 위 렌더');
-        const chipLabels = m.chips.map((c) => c.label);
-        eq(`absent-toc-chips:${tag}`, chipLabels.filter((l) => l === '계열 비교' || l === '확인할 지표'), [], `목차 칩 ${chipLabels.length}개`);
-        bump('absent', 3);
-        eq(`console:${tag}`, errs, [], 'real 실데이터 화면');
-        bump('console');
-        rawLog.push(`${tag.padEnd(24)} variants=ABSENT(${!m.variantsFound}) watch=ABSENT(${!m.watchFound}) chips=${JSON.stringify(chipLabels)}`);
-        await page.screenshot({ path: `${OUT}/${V.key}-${R.slug}-real.png`, fullPage: false });
-        await page.close();
-        continue;
-      }
+      // ══ 기대값의 출처 — 모드가 아니라 **런타임 데이터**다 ══════════════════════════════════════
+      // 옛 판은 여기서 `if (R.mode === 'real')`로 갈라 「두 필드가 NULL이어야 한다」를 단언하고
+      // `continue`했다. 그 전제가 거짓이 되자 3축이 상시 거짓 FAIL이 되고 아래 상세 렌더 검증이
+      // real 모드에서 영원히 도달 불가가 됐다(헤더 「실측 갱신」 절). 데이터에서 기대값을 유도하면
+      // **데이터가 어느 방향으로 진화해도 축이 따라간다** — 그래서 같은 방식으로 다시 스테일해지지
+      // 않는다. 모드는 *어느 데이터를 보는가*만 정하고, 판정은 그 데이터가 정한다.
+      const SRC = R.mode === 'real'
+        ? { variants: D.rep.variants, watchItems: D.rep.watch_items, src: 'live' }
+        : R.mode === 'inject'
+          ? { variants: FIXTURES[R.slug].variants, watchItems: FIXTURES[R.slug].watchItems, src: 'fixture' }
+          : { variants: null, watchItems: null, src: 'fixture-null(대조군)' };
+      const wantLay = variantTableLayoutMirror(SRC.variants);
+      const wantWatchLay = watchItemsLayoutMirror(SRC.watchItems);
+      const srcLen = (v) => (Array.isArray(v) ? `${v.length}건` : String(v));
+      // 정의역 표본 카운터 — 두 방향의 표본 수를 커버리지에 남긴다(한 방향이 0이면 미검증이다).
+      bump(wantLay.axes.length > 0 ? 'domain:variants-present' : 'domain:variants-absent');
+      bump(wantWatchLay.items.length > 0 ? 'domain:watch-present' : 'domain:watch-absent');
 
-      // ══ inject 모드 — 신규 축(배포 전 red 정상) ══════════════════════════════════════════════
-      const wantLay = variantTableLayoutMirror(FIXTURES[R.slug].variants);
-      const wantWatchLay = watchItemsLayoutMirror(FIXTURES[R.slug].watchItems);
+      // 주입이 실제로 걸렸는가 — 양방향(real은 0건이어야 하고 주입 모드는 1건 이상이어야 한다).
+      // 이 축이 없으면 「대조군이 옳게 통과했다」와 「라우트가 안 걸려 실데이터를 봤다」가 구별되지 않는다.
+      eq(`route-injected:${tag}`, injectedCount > 0 ? 'FIRED' : 'NONE', R.mode === 'real' ? 'NONE' : 'FIRED',
+        `가로챈 /api/tech-reports/${R.slug} 응답 ${injectedCount}건`);
+      bump('route');
 
-      // ⓐ 계열 비교 — domain sentinel
-      eq(`variants-domain:${tag}`, m.variantsFound ? 'PRESENT' : 'VARIANTS_MISSING(배포 전 — 정상 RED)', 'PRESENT');
-      bump('variants');
+      // ══ 렌더 ↔ 데이터 일치(양방향) — 3축 무조건 단언 ══════════════════════════════════════════
+      // 데이터가 있으면 렌더돼야 하고, 없으면 렌더되지 않아야 한다. 한 방향만 재면 이빨이 절반이다.
+      eq(`variants-render:${tag}`, m.variantsFound ? 'PRESENT' : 'ABSENT', wantLay.axes.length > 0 ? 'PRESENT' : 'ABSENT',
+        `${SRC.src} variants=${srcLen(SRC.variants)} → 유효 축 ${wantLay.axes.length}개`);
+      eq(`watch-items-render:${tag}`, m.watchFound ? 'PRESENT' : 'ABSENT', wantWatchLay.items.length > 0 ? 'PRESENT' : 'ABSENT',
+        `${SRC.src} watch_items=${srcLen(SRC.watchItems)} → 유효 항목 ${wantWatchLay.items.length}건`);
+      // 목차 칩도 양방향 — 집합 동일성으로 단언한다(옛 `absent-toc-chips`(부재만)와
+      // `toc-includes-new`(존재만)를 하나로 합친 것이며, 둘보다 엄격하다).
+      const NEW_LABELS = ['계열 비교', '확인할 지표'];
+      const wantLabels = [
+        ...(wantLay.axes.length > 0 ? ['계열 비교'] : []),
+        ...(wantWatchLay.items.length > 0 ? ['확인할 지표'] : []),
+      ];
+      const chipLabels = m.chips.map((c) => c.label);
+      eq(`toc-new-chips:${tag}`, NEW_LABELS.filter((l) => chipLabels.includes(l)), wantLabels,
+        `목차 칩 ${chipLabels.length}개 = ${JSON.stringify(chipLabels)}`);
+      bump('render-matches-data', 3);
+
+      // ⓐ 계열 비교 세부 — 컨테이너가 있을 때만 정의역이 선다(부재는 위 variants-render가 이미 판정).
       if (m.variantsFound) {
-        eq(`variant-axis-count:${tag}`, m.axisCount, wantLay.axes.length, `픽스처 축 ${wantLay.axes.length}개`);
+        if (R.mode === 'real') bump('detail-run-real:variants');   // 전역 sentinel의 관측값
+        eq(`variant-axis-count:${tag}`, m.axisCount, wantLay.axes.length, `${SRC.src} 기준 유효 축 ${wantLay.axes.length}개`);
         bump('variant-axis');
 
         // table-no-scroller — 각 축마다 표 조상에 overflowX auto/scroll 0개 · 표 자신 넘침 0.
@@ -416,8 +506,8 @@ for (const V of VIEWS) {
         eq(`variant-container-clip:${tag}`, clippedContainers, [], `overflow:hidden 컨테이너 ${m.variantsHiddenClippers.length}개 중 잘림`);
         bump('variant-leaf', leafDomain.length + m.variantsHiddenClippers.length);
 
-        // 한쪽만 있는 행 — 픽스처에서 유도(리터럴 금지). featChildren == (strength?1:0)+(tradeoff?1:0),
-        // 둘 다 없으면 DASH 텍스트.
+        // 한쪽만 있는 행 — 기대값을 SRC에서 유도한다(리터럴 금지 · 픽스처 전제 금지).
+        // featChildren == (strength?1:0)+(tradeoff?1:0), 둘 다 없으면 DASH 텍스트.
         const rowMismatch = [];
         wantLay.axes.forEach((axis, ai) => {
           const gotAx = m.axisMetrics[ai];
@@ -437,11 +527,11 @@ for (const V of VIEWS) {
             if (!wantEx && gr.exLeaf) rowMismatch.push(`axis${ai}/row${ri}(${wr.name}):examples 유령렌더(want null)`);
           });
         });
-        eq(`variant-row-fidelity:${tag}`, rowMismatch, [], `픽스처 행 ${wantLay.axes.reduce((a, x) => a + x.rows.length, 0)}개 대조(한쪽만 있는 행 포함)`);
+        eq(`variant-row-fidelity:${tag}`, rowMismatch, [], `${SRC.src} 행 ${wantLay.axes.reduce((a, x) => a + x.rows.length, 0)}개 대조(한쪽만 있는 행 포함)`);
         bump('variant-row', wantLay.axes.reduce((a, x) => a + x.rows.length, 0));
 
         // 간격 축(가토 ⑩) — 축이 2개 이상인 판에서만: 축 사이 간격 > 소제목↔표 간격.
-        // (실행 전에 결정되는 정의역 — 이 픽스처 조합에서 robotics만 해당, 조건부 스킵 아님)
+        // 정의역을 **데이터에서 유도**한다(모드가 아니다) — 축이 1개면 「축 사이」가 존재하지 않는다.
         if (wantLay.axes.length >= 2) {
           const spacingViol = [];
           for (let i = 0; i < m.axisMetrics.length; i++) {
@@ -458,17 +548,16 @@ for (const V of VIEWS) {
           eq(`variant-spacing:${tag}`, spacingViol, [], `축 ${m.axisMetrics.length}개 — 축간격 > 소제목↔표간격이어야 한 덩어리로 안 읽힌다`);
           bump('variant-spacing', Math.max(m.axisMetrics.length - 1, 0));
         } else {
-          NOTE(`${tag} — variant-spacing 정의역 밖(축 1개, 비교 대상 없음). smr 픽스처는 애초에 1축이다.`);
+          NOTE(`${tag} — variant-spacing 정의역 밖(${SRC.src} 유효 축 ${wantLay.axes.length}개, 「축 사이」가 없다).`);
         }
       } else {
-        NOTE(`${tag} — variant-* 세부 축 정의역 밖(컨테이너 자체가 없다). variants-domain이 이미 FAIL시켰다.`);
+        NOTE(`${tag} — variant-* 세부 축 정의역 밖(컨테이너 없음). variants-render가 데이터와 대조해 이미 판정했다(기대 축 ${wantLay.axes.length}개).`);
       }
 
-      // ⓑ 확인할 지표 — domain sentinel(WatchItems.jsx 미구현이므로 지금은 항상 MISSING이 정상)
-      eq(`watch-items-domain:${tag}`, m.watchFound ? 'PRESENT' : 'WATCH_ITEMS_MISSING(미구현 — 정상 RED, 헤더 주석 참조)', 'PRESENT');
-      bump('watch');
+      // ⓑ 확인할 지표 세부 — 부재 판정은 위 watch-items-render가 이미 양방향으로 했다.
       if (m.watchFound) {
-        eq(`watch-item-count:${tag}`, m.watchItemCount, wantWatchLay.items.length, `픽스처 항목 ${wantWatchLay.items.length}개`);
+        if (R.mode === 'real') bump('detail-run-real:watch-items');
+        eq(`watch-item-count:${tag}`, m.watchItemCount, wantWatchLay.items.length, `${SRC.src} 기준 유효 항목 ${wantWatchLay.items.length}건`);
         bump('watch-item', m.watchItemCount);
         const nsItems = m.watchItems.filter((it) => it.hasBadge);
         const wantNs = wantWatchLay.items.filter((i) => i.notSignal).length;
@@ -482,16 +571,13 @@ for (const V of VIEWS) {
         eq(`not-signal-badge-1line:${tag}`, badgeLineViol, [], `배지 ${nsItems.length}개 — 「신호 아님」 고정 라벨은 1줄`);
         bump('watch-notsignal', nsItems.length * 3);
       } else {
-        NOTE(`${tag} — watch-item-* 세부 축 정의역 밖(컨테이너 자체가 없다). watch-items-domain이 이미 FAIL시켰다.`);
+        NOTE(`${tag} — watch-item-* 세부 축 정의역 밖(컨테이너 없음). watch-items-render가 데이터와 대조해 이미 판정했다(기대 항목 ${wantWatchLay.items.length}건).`);
       }
 
-      // ⓒ 목차 — 두 라벨이 있고 href가 문서 내 유일 요소로 해석되는가.
-      const wantLabels = [];
-      if (wantLay.axes.length > 0) wantLabels.push('계열 비교');
-      if (wantWatchLay.items.length > 0) wantLabels.push('확인할 지표');
+      // ⓒ 목차 href — 칩 존재/부재는 위 toc-new-chips가 양방향으로 단언했다. 여기선 href가 문서 내
+      //   유일 요소로 해석되는지만 본다(정의역이 비면 위반 목록도 비므로 표본 수를 메시지에 싣는다 —
+      //   `filter(위반).length === 0`은 빈 컬렉션에서 공허하게 참이다).
       const chipMap = new Map(m.chips.map((c) => [c.label, c.href]));
-      const tocMissing = wantLabels.filter((l) => !chipMap.has(l));
-      eq(`toc-includes-new:${tag}`, tocMissing, [], `기대 라벨 ${JSON.stringify(wantLabels)} · 실제 칩 ${JSON.stringify(m.chips.map((c) => c.label))}`);
       const ids = m.sectionInfo.map((s) => s.id);
       const dupIds = wantLabels.map((l) => {
         const href = chipMap.get(l); if (!href) return null;
@@ -499,8 +585,8 @@ for (const V of VIEWS) {
         const count = ids.filter((x) => x === id).length;
         return count === 1 ? null : `${l}:${id} count=${count}`;
       }).filter(Boolean);
-      eq(`toc-href-unique:${tag}`, dupIds, [], `href가 가리키는 id의 문서 내 유일성`);
-      bump('toc', wantLabels.length * 2);
+      eq(`toc-href-unique:${tag}`, dupIds, [], `href가 가리키는 id의 문서 내 유일성 — 대조 대상 ${wantLabels.length}개 ${JSON.stringify(wantLabels)}`);
+      bump('toc', wantLabels.length);
 
       // ⓓ section-order — 시장 규모는 항상 렌더(show:true)라 무조건 앵커로 쓴다.
       // challenges는 실행 전 데이터에 의존하는 정의역(있으면 추가로 대조, 없으면 NOTE).
@@ -534,19 +620,34 @@ for (const V of VIEWS) {
         }
       }
 
-      eq(`console:${tag}`, errs, [], 'inject 화면');
+      eq(`console:${tag}`, errs, [], `${R.mode} 화면`);
       bump('console');
 
-      rawLog.push(`${tag.padEnd(24)} axisCount=${m.axisCount}(want ${wantLay.axes.length}) watchFound=${m.watchFound} chips=${JSON.stringify(m.chips.map((c) => c.label))} ids=${JSON.stringify(ids)}`);
+      rawLog.push(`${tag.padEnd(26)} axes=${m.axisCount}(want ${wantLay.axes.length}) watchItems=${m.watchItemCount}(want ${wantWatchLay.items.length}) chips=${JSON.stringify(chipLabels)} ids=${JSON.stringify(ids)}`);
 
-      // ── 육안 캡처 ──
-      await page.screenshot({ path: `${OUT}/${V.key}-${R.slug}-inject-top.png`, fullPage: false });
-      await page.evaluate(() => document.querySelector('[data-tech-section="variants"]')?.scrollIntoView({ block: 'center' }));
-      await page.waitForTimeout(250);
-      await page.screenshot({ path: `${OUT}/${V.key}-${R.slug}-inject-variants.png`, fullPage: false });
+      // ── 육안 캡처 — **각 축을 측정하는 그 지점에서** 찍는다(모드마다 파일이 갈린다).
+      //   옛 판은 파일명에 'inject'가 박혀 있어 real 모드 증거가 남지 않았다.
+      const shots = [];
+      const shot = async (name, full = false) => {
+        const path = `${OUT}/${V.key}-${R.slug}-${R.mode}-${name}.png`;
+        await page.screenshot({ path, fullPage: full });
+        shots.push(path.split('/').pop());
+      };
+      await shot('top');
+      if (m.variantsFound) {
+        await page.evaluate(() => document.querySelector('[data-tech-section="variants"]')?.scrollIntoView({ block: 'center' }));
+        await page.waitForTimeout(250);
+        await shot('variants');
+      }
+      if (m.watchFound) {
+        await page.evaluate(() => document.querySelector('[data-tech-section="watch-items"]')?.scrollIntoView({ block: 'center' }));
+        await page.waitForTimeout(250);
+        await shot('watch-items');
+      }
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForTimeout(150);
-      await page.screenshot({ path: `${OUT}/${V.key}-${R.slug}-inject-full.png`, fullPage: true });
+      await shot('full', true);
+      shotLog.push(`${tag.padEnd(26)} ${shots.join(' · ')}`);
     } catch (e) {
       eq(`exception:${tag}`, `THROWN:${e && e.message}`, 'NO_EXCEPTION');
       bump('exception');
@@ -557,6 +658,20 @@ for (const V of VIEWS) {
 }
 await browser.close();
 
+// ── 전역 sentinel (task#331 S5 — 위 census 주석의 두 구멍을 각각 막는다) ────────────────────────
+// ⓐ 하한 — 라이브 표본이 통째로 사라지면 ⓑ의 기대값이 0으로 degenerate해 조용히 통과한다.
+//    「몇 개」가 아니라 「하나라도 있는가」를 묻는다(발행 수는 정당하게 변하므로 정확일치는 거짓 FAIL한다).
+eq('live-sample-variants', LIVE_VAR_SLUGS.length >= 1 ? 'OK' : `NO_LIVE_VARIANTS(${SLUGS.length}slug 전부 0)`, 'OK',
+  `라이브 variants 유효 ${LIVE_VAR_SLUGS.length}/${SLUGS.length} slug ${JSON.stringify(LIVE_VAR_SLUGS)}`);
+eq('live-sample-watch-items', LIVE_WATCH_SLUGS.length >= 1 ? 'OK' : `NO_LIVE_WATCH_ITEMS(${SLUGS.length}slug 전부 0)`, 'OK',
+  `라이브 watch_items 유효 ${LIVE_WATCH_SLUGS.length}/${SLUGS.length} slug ${JSON.stringify(LIVE_WATCH_SLUGS)}`);
+// ⓑ census 대조 — real 판에서 세부 축이 **실제로 돌았는가**. 조건부 스킵·`continue`·게이트 드리프트가
+//    다시 들어오면 여기서 죽는다(주입 실측: 세부 블록을 real에서 건너뛰게 하니 이 축만 FAIL했다).
+eq('real-detail-runs-variants', cov['detail-run-real:variants'] || 0, VIEWS.length * LIVE_VAR_SLUGS.length,
+  `real 판 계열비교 세부 축 ${cov['detail-run-real:variants'] || 0}판 / 기대 ${VIEWS.length}뷰 × ${LIVE_VAR_SLUGS.length}slug`);
+eq('real-detail-runs-watch-items', cov['detail-run-real:watch-items'] || 0, VIEWS.length * LIVE_WATCH_SLUGS.length,
+  `real 판 확인할지표 세부 축 ${cov['detail-run-real:watch-items'] || 0}판 / 기대 ${VIEWS.length}뷰 × ${LIVE_WATCH_SLUGS.length}slug`);
+
 // ── 보고 ──────────────────────────────────────────────────────────────────────
 const fails = results.filter((r) => !r.ok);
 console.log('\n' + '═'.repeat(78));
@@ -564,13 +679,17 @@ console.log('커버리지 (계열별 검사 수 — 재실행 간 비교용, 줄
 for (const [k, v] of Object.entries(cov).sort()) console.log(`  ${k.padEnd(24)} ${v}`);
 console.log(`  ${'(합계)'.padEnd(24)} ${Object.values(cov).reduce((a, b) => a + b, 0)}`);
 console.log(`\n단언 총계: ${results.length}건 · PASS ${results.length - fails.length} · FAIL ${fails.length}`);
-console.log(`뷰 ${VIEWS.length}조합 × slug ${SLUGS.length} × mode 2 = ${VIEWS.length * SLUGS.length * 2}페이지`);
+console.log(`뷰 ${VIEWS.length}조합 × slug ${SLUGS.length} × mode 3(real·inject·empty) = ${VIEWS.length * SLUGS.length * 3}페이지`);
 console.log('\n원시 실측(단언 아님):');
 for (const l of rawLog) console.log(`  ${l}`);
 if (CONTROL) console.log(`⚠ 이 실행은 대조군이다(CONTROL=${CONTROL}) — 해당 축 FAIL이 정상이며 게이트 결과가 아니다.`);
-console.log('※ 배포 전 실행이면 variants-*(전부 배포 전 RED)와 watch-items-*(WatchItems.jsx 미구현으로');
-console.log('  배포 후에도 계속 RED — 헤더 주석 참조)가 FAIL하는 것이 정상이다. absent-*·page-h-scroll은 지금도 PASS해야 한다.');
-console.log(`※ 육안 캡처 ${OUT}/`);
+const dom = (k) => cov[k] || 0;
+console.log('\n양방향 축의 정의역 표본(한 방향이 0이면 그 방향은 「통과」가 아니라 「미검증」이다):');
+console.log(`  variants     PRESENT ${dom('domain:variants-present')} · ABSENT ${dom('domain:variants-absent')}`);
+console.log(`  watch_items  PRESENT ${dom('domain:watch-present')} · ABSENT ${dom('domain:watch-absent')}`);
+console.log('  (ABSENT 표본은 empty 모드가 만든다 — 라이브 15종은 전부 두 필드가 채워져 있어 실데이터로는 그 방향을 만들 수 없다.)');
+console.log(`\n※ 육안 캡처 ${OUT}/`);
+for (const l of shotLog) console.log(`  ${l}`);
 console.log('═'.repeat(78));
 fs.writeFileSync(`${OUT}/result.json`, JSON.stringify({ control: CONTROL || null, cov, results }, null, 2));
 if (fails.length) {
