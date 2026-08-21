@@ -324,7 +324,49 @@ async def _validation_error_handler(request, exc):
     return JSONResponse(status_code=422, content={"detail": sanitize(jsonable_encoder(exc.errors()))})
 
 
-app.add_middleware(SessionMiddleware, secret_key=os.environ["SESSION_SECRET"])
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request, exc):
+    """미포착 예외를 스택·내부 메시지 없는 구조화 JSON 500으로 바꾼다 (B72 부수, S3).
+
+    핸들러가 없으면 starlette 기본 경로가 `text/plain` raw 500을 내고, 디버그 설정·프레임워크
+    버전에 따라 내부 메시지나 스택 흔적이 응답으로 새어나갈 수 있다(클라이언트도 JSON을
+    기대하는데 plain-text를 받아 파싱에 실패한다). 대신 고정 본문만 내보내고 원인은 서버
+    로그에만 남긴다 — `wrong < missing`의 응답판: 클라이언트에겐 없는 정보가 위험한 정보보다 낫다.
+
+    제약 3가지:
+      ⓐ `HTTPException`을 삼키지 않는다 — starlette는 `Exception`/500 키의 핸들러만
+        ServerErrorMiddleware로 보내고 HTTPException·RequestValidationError는
+        ExceptionMiddleware에 남긴다(`build_middleware_stack`). 그래서 404·401·403의
+        상태코드·본문 계약이 보존된다.
+      ⓑ 본문은 `sanitize` 경유 — `JSONResponse`는 `allow_nan=False`라 본문에 NaN/inf가 섞이면
+        **이 핸들러 자신이 500을 낸다**(핸들러가 핸들러를 필요로 하는 상태). 지금 본문은 정적
+        문자열이라 sanitize는 no-op이지만, 나중에 예외 컨텍스트에서 온 값을 본문에 실을 때
+        그 상태로 빠지는 것을 원리적으로 막는 래퍼다 — 이 래퍼를 빼지 말 것.
+      ⓒ 위 `RequestValidationError` 핸들러(422, CONCERNS §3)는 별도 키라 우선순위가 겹치지
+        않는다 — 422 경로는 이 핸들러에 도달하지 않는다.
+
+    ServerErrorMiddleware는 이 핸들러 호출 *뒤에도* 예외를 재raise하므로(errors.py
+    "We always continue to raise the exception") uvicorn의 스택 로그와 TestClient의 예외
+    전파 동작은 그대로다. 검증: tests/test_global_exception_handler.py.
+    """
+    from services.utils import sanitize
+    logger.error(
+        f"[UnhandledError] {request.method} {request.url.path} 처리 중 미포착 예외 "
+        f"{type(exc).__name__}: {exc}",
+        exc_info=True,
+    )
+    return JSONResponse(status_code=500, content=sanitize({"detail": "Internal Server Error"}))
+
+
+_session_secret = os.environ.get("SESSION_SECRET") or ""
+if not _session_secret:
+    # bare `os.environ[...]`는 키가 *부재*할 때만 KeyError를 내고 **빈 문자열은 통과시킨다**.
+    # 그러면 컨테이너는 정상 기동하고 헬스체크도 통하는데(access/refresh는 JWT_SECRET이라
+    # 무영향) `routers/auth.py::_hmac_secret`만 RuntimeError를 던져 **신규·재로그인만 전면
+    # 불가**해진다 — 배포 스모크에 안 잡히는 무음 고장이다(시크릿 회전 중 `SESSION_SECRET=`가
+    # 남는 것이 실제 도달 경로). 부재와 빈 값을 같은 기동 실패로 수렴시킨다.
+    raise RuntimeError("SESSION_SECRET is not set (missing or empty) — refusing to start")
+app.add_middleware(SessionMiddleware, secret_key=_session_secret)
 app.add_middleware(EventTrackerMiddleware)
 
 _frontend_url = os.getenv("FRONTEND_URL", "")

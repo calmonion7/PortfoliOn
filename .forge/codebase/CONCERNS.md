@@ -44,6 +44,10 @@ mapped: 2026-08-10
 >
 > ⚠️ **이 사이클이 비목표의 전제를 반증했다** — 계획은 「프론트 시각 렌즈를 두지 않는다(그 21파일은 프로브가 덮었다)」를 비목표로 두고 **그 전제를 A4 렌즈가 직접 재도록** 설계했는데, 전제가 **부분적으로 거짓**이었다(`B78`·`B79`). 즉 `components/tech/*` 일부는 「사각인데 사각이 아닌 척하는 상태」에 가깝다. 또 `§8.1` 인메모리 캐시 스레드 안전성의 **3사이클 연속 이월이 끊겼다** — `threading.Barrier` 하니스를 실제로 만들어 재현해 `B69`로 확정했다(비용은 몇 줄이었다).
 
+> **해소: 2026-08-22 (task#326) — B19·B72·B73·B74 닫힘.** 10차 확정분 수정 1/7(계약·보안 4건). **B19**는 `routers/auth.py::_hmac_secret`으로 임포트타임 바인딩 + 리터럴 폴백을 없애고 *호출 시점* 해석으로 바꿔 닫혔다 — 미설정이면 서명하지 않고 `RuntimeError`로 실패한다(임포트타임 raise는 하지 않는다: `main.py` 밖 진입점의 임포트를 통째로 막기 때문). 백엔드에 하드코딩 시크릿 폴백 잔존 **0건**(§5.5·§10.5 갱신). **B72**는 GitHub 콜백에 ⓐ 최상단 `error` 파라미터 체크 ⓑ `access_token` 부재 ⓒ 프로필 응답 형태 ⓓ 이메일 확정 실패 4가드를 넣어 전부 `?error=oauth_denied|oauth_failed`로 프론트에 되돌리고, `main.py`에 전역 `Exception` 핸들러를 신설해 raw `text/plain` 500을 `{"detail": "Internal Server Error"}` 고정 본문으로 바꿨다(`HTTPException`·`RequestValidationError`는 별도 키라 삼키지 않는다). ⚠️ **종단(실제 GitHub 인가 화면 «취소») 확인은 라이브 OAuth라 이 루프가 실행하지 않았다 — 사용자 확인 대기.** **B73**은 `backend/auth.py::get_current_user_or_api_key`를 진짜 OR로 바꿔 닫혔다(둘 다 유효하면 키 우선, 키만 틀리면 기존 `detail="Invalid API key"` 유지). **B74**는 `routers/auth.py`의 `ALL_MENUS`에서 6번째 키 `analysis`를 제거해 4소스(`routers/admin.py`·`PermissionPanel.jsx`·`app_schema.sql` 시드)를 일치시켜 닫혔다(ADR-0025 「5키 불변」). **번호는 재사용하지 않는다** — 아래 표에서 행만 제거한다.
+>
+> ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 같은 파트가 비목표로 남긴 `B9`·`B20`·`B21`·`B48`·`B51`·`B63`은 **행을 그대로 유지**했다(task#333/#334로 이월). 특히 `B20`(레이트리밋)은 이 파트가 같은 파일 `routers/auth.py`를 만졌으므로 「같이 고쳐졌겠지」로 읽히기 쉬운데, 고치지 않았다.
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
@@ -83,13 +87,9 @@ mapped: 2026-08-10
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| B19 | `SESSION_SECRET` 하드코딩 폴백 (모듈 import 시점에 고정) | `routers/auth.py` `_HMAC_SECRET` | `main.py` 밖 진입점(스크립트·테스트·워커) |
 | B20 | 레이트리밋 전무 — bcrypt 로그인이 곧 CPU 고갈 DoS | `routers/auth.py::login` | 무인증·무계정 |
 | B21 | Postgres가 tracked 폴백 비밀번호로 호스트 5432에 발행 | `docker-compose.yml` (`POSTGRES_PASSWORD`) | 호스트 접근 가능한 누구나 |
 | **B51** | `?diag=1`이 인증 분기보다 **앞서 렌더**되고, 진단 로그가 OAuth 인가코드를 **소비 전 원문으로** `localStorage['diag_log']`에 영구 기록한다 — `logDiag('doc', {url: pathname+search})`가 이펙트 최상단이라 `replaceState` 스트립·코드교환 `fetch`보다 먼저 캡처한다. ⚠️ 같은 파일에서 같은 형태(URL 크리덴셜→localStorage)를 **이미 세션 고정 취약점으로 판정해 제거한 전례**가 있다(B44/task#290, `ARCHITECTURE.md`) — 반복 맹점 | `App.jsx::App`(diag 분기) · `hooks/useAuthBootstrap.js`(최상단 `logDiag`) · `utils/diag.js::logDiag` · `components/DiagLog.jsx` | 코드 미소비(네트워크 실패) ∧ 같은 브라우저 접근 제3자 ∧ TTL 120초 내 |
-| **B72** | **GitHub OAuth 콜백이 실패·거절에서 raw 500으로 크래시**한다 — 구글 콜백은 ⓐ 최상단 `error` 쿼리파라미터 체크( → `?error=oauth_denied`) ⓑ `id_token` 부재 가드( → `?error=oauth_failed`)를 **둘 다** 갖추지만 GitHub 콜백은 `state` 검증 외에 **이 두 가드가 전혀 없이** 토큰교환·프로필 조회로 직행한다. `main.py`엔 `RequestValidationError` 핸들러만 있고 **일반 `Exception` 핸들러가 없어** 예외가 raw 500으로 노출된다. **휴면이 아니다** — `.env.docker`에 두 키가 있고 `auth.py`이 `os.environ["GITHUB_CLIENT_ID"]`를 bare subscript로 읽으며(미설정이면 KeyError) `LoginPage.jsx`에 버튼이 실재한다. 「기능 있음」 체크는 *부재* 처리이지 *실패* 처리가 아니다 | `routers/auth.py::oauth_github_callback` (대조: `::oauth_google_callback`) · `main.py`(일반 예외 핸들러 부재) | 사용자가 GitHub 인가 화면에서 **취소**(→ `?error=access_denied`, `code` 없음) |
-| **B73** | `get_current_user_or_api_key`가 **잘못된 `X-API-Key`가 있으면 유효한 Bearer JWT를 검사하지 않고 거부**한다 — `if api_key:`가 truthy면 진입해 그 분기 안에서 즉시 `raise`하므로 아래 `if creds:`가 평가되지 않는다. `X-API-Key`는 nginx 필터 규칙이 없어(grep 0건) 외부에서 임의 값 주입 가능. 재현: 유효 Bearer만 → 200 / 같은 Bearer + 틀린 키 → **401**. 처방: 두 자격증명을 **OR**로 평가 | `backend/auth.py::get_current_user_or_api_key` (, 소비: Cowork 표면 `get_current_user_or_api_key` 13곳 · `require_admin_or_api_key` 7곳, ADR-0029) | 클라이언트가 stale·오타 `X-API-Key`를 유효 Bearer와 함께 보냄 |
-| **B74** | `ALL_MENUS`가 **4소스로 드리프트** — `routers/auth.py`(6항목, `analysis` 포함) vs `routers/admin.py`(5) vs `PermissionPanel.jsx`(5) vs `app_schema.sql` 시드(5). 현재 `navSections.js`에 `analysis` perm 소비처가 없어 **즉각 오염은 없으나**, 어느 것이 정본인지 코드로 알 수 없어 다음 메뉴 추가 때 갈린다 | `routers/auth.py::me` (`ALL_MENUS`) · `routers/admin.py` · `components/PermissionPanel.jsx` · `app_schema.sql::default_menu_permissions` | 메뉴 추가·권한 변경 시 |
 | **B75** | `variants` 신규 검증 **3종이 `API_SPEC.md`·`CLAUDE_COWORK_API.md`의 422 목록·필드표 어디에도 없다** — 스키마는 올바르게 강제 중이고 테스트도 있으나(`test_tech_reports_router.py`·:598), **외부 Cowork 클라이언트가 그 422의 사유를 문서에서 알 수 없다**. `test_api_doc_sync.py`는 엔드포인트 *존재*만 보므로 원리적으로 못 잡는다 | `routers/tech_reports.py::VariantOption._has_comparison_content` · `::VariantAxis._option_names_unique` · `::TechReportIn._variant_axis_labels_unique` → 두 명세서 | Cowork가 중복 축 라벨·중복 옵션명·이점/대가 전무로 발행 시도 |
 
 ### 표시 오류 / 크래시
@@ -400,7 +400,7 @@ finally:
 - **세션 바인딩 없음** — `SessionMiddleware`가 설치돼 있지만 `oauth_google`/`oauth_github`가 nonce를 `request.session`에 쓰지 않는다.
 - **PKCE 미사용**(`code_challenge`/`code_verifier` 없음).
 
-서명 검사가 증명하는 것은 "이 서버가 언젠가 어떤 state를 발행했다"이지 "이 브라우저가 이 플로우를 시작했다"가 아니다. 도달: 공격자가 `/api/auth/oauth/google`을 한 번 눌러 만료되지 않는 state를 확보한 뒤, 자기 `code` + 그 state로 만든 콜백 URL을 피해자에게 먹인다(로그인-CSRF). HMAC 20 hex(80비트) 절단 자체는 약점이 아니다 — **nonce 저장소 부재가 약점이다**. B19(§5.5)와 겹치면 서명 자체가 위조 가능해진다.
+서명 검사가 증명하는 것은 "이 서버가 언젠가 어떤 state를 발행했다"이지 "이 브라우저가 이 플로우를 시작했다"가 아니다. 도달: 공격자가 `/api/auth/oauth/google`을 한 번 눌러 만료되지 않는 state를 확보한 뒤, 자기 `code` + 그 state로 만든 콜백 URL을 피해자에게 먹인다(로그인-CSRF). HMAC 20 hex(80비트) 절단 자체는 약점이 아니다 — **nonce 저장소 부재가 약점이다**. (전에는 B19(§5.5)와 겹쳐 서명 자체가 위조 가능했다. B19은 task#326에서 닫혔으므로 **지금 남은 것은 nonce 저장소 부재 하나**다 — 이 절을 「키를 모르는 공격자도 state를 만들 수 있다」로 읽지 말 것.)
 
 ### 5.4 OAuth 코드가 URL 쿼리로 전달된다 — **설계상 트레이드오프**(완화 있음)
 
@@ -408,11 +408,13 @@ finally:
 
 부수(LOW): `_oauth_codes`는 프로세스 로컬 dict라 uvicorn 워커가 2개 이상이면 콜백과 교환이 다른 프로세스에 떨어져 로그인이 간헐 실패한다(현재는 단일 워커라 미발현 — §6.6).
 
-### 5.5 하드코딩 폴백 시크릿 — **확인된 버그**(현 배포에선 우연히 fail-closed) (B19)
+### 5.5 하드코딩 폴백 시크릿 — **해소**(task#326, 구 B19)
 
-`routers/auth.py`: `_HMAC_SECRET = os.environ.get("SESSION_SECRET", "<리터럴 기본값>").encode()`.
+**옛 형태**: `routers/auth.py`의 모듈 레벨 `_HMAC_SECRET = os.environ.get("SESSION_SECRET", "<리터럴 기본값>").encode()`.
 
-백엔드에서 **유일한** 하드코딩 시크릿 기본값이다(`JWT_SECRET`은 `os.environ[...]` fail-fast를 3곳 모두 지킨다). 회의적으로 볼 것: `main.py`가 `os.environ["SESSION_SECRET"]`으로 import 시 KeyError를 내므로 `main.py`를 거친 서버는 기본값으로 뜨지 못한다. **그러나 import 순서상 `routers.auth`가 먼저 평가되고 `_HMAC_SECRET`은 import 시점에 고정된다** — `main`을 거치지 않는 진입점(테스트 하니스·스크립트·향후 워커)은 공개적으로 알려진 키로 OAuth state를 서명한다. §5.3과 결합하면 state 위조가 성립한다.
+백엔드에서 **유일한** 하드코딩 시크릿 기본값이었다(`JWT_SECRET`은 `os.environ[...]` fail-fast를 3곳 모두 지킨다). `main.py`가 `os.environ["SESSION_SECRET"]`으로 import 시 KeyError를 내므로 `main.py`를 거친 서버는 기본값으로 뜨지 못했으나, **import 순서상 `routers.auth`가 먼저 평가되고 `_HMAC_SECRET`이 import 시점에 고정**되므로 `main`을 거치지 않는 진입점(테스트 하니스·스크립트·향후 워커)은 공개적으로 알려진 키로 OAuth state를 서명했다.
+
+**현 형태**: `routers/auth.py::_hmac_secret`이 **호출 시점**에 `os.environ.get("SESSION_SECRET")`을 읽고 미설정이면 `RuntimeError`를 던진다 — 리터럴 폴백이 없다. 임포트타임 raise는 **일부러 하지 않았다**(그러면 `main.py` 밖 진입점의 임포트가 통째로 막힌다). 그래서 이 모듈은 여전히 어디서든 임포트되지만, 서명·검증을 *실제로 시도할 때* 비밀이 없으면 조용히 약한 키로 서명하는 대신 실패한다(`wrong < missing`). 가드: `backend/tests/test_session_secret_no_fallback.py`. **잔여**: §5.3의 nonce 저장소 부재는 이 변경과 무관하게 그대로다.
 
 ### 5.6 레이트리밋 전무 — **확인된 버그**(ADR 근거 없는 순수 공백) (B20)
 
@@ -826,14 +828,14 @@ if (err.response?.status === 401) {
 
 유일한 검증이 고정 `sleep 2` 뒤의 `curl -s http://localhost/health && echo " <- /health OK" || echo "WARNING: health check failed"`다 — **구조적으로 비차단**이다. 롤백 경로 없음. §6.6과 겹쳐 기동 백필이 있는 배포마다 이 경고가 뜨지만 배포는 성공으로 보고된다.
 
-### 10.5 시크릿 폴백 — **확인된 버그** (B21·B19)
+### 10.5 시크릿 폴백 — **확인된 버그** (B21) · B19은 해소
 
 | 환경변수 | 파일 | 형태 |
 |---|---|---|
 | `POSTGRES_PASSWORD` | `docker-compose.yml` | `${POSTGRES_PASSWORD:-<리터럴 기본값>}` — 호스트 env가 없으면 tracked 파일에 박힌 약한 비밀번호로 조용히 뜬다 |
-| `SESSION_SECRET` | `backend/routers/auth.py` | 모듈 레벨 `os.environ.get(..., "<리터럴 기본값>")` (§5.5) |
+| ~~`SESSION_SECRET`~~ | `backend/routers/auth.py` | **해소**(task#326) — 모듈 레벨 리터럴 폴백을 `::_hmac_secret`의 호출 시점 해석 + `RuntimeError`로 교체 (§5.5) |
 
-둘 다 저장소에 커밋돼 있다. 그 외 리터럴 시크릿 폴백은 없다. `backend/.env.docker`(실 시크릿 저장소)와 루트 `.env`는 올바르게 gitignored.
+**남은 것은 `POSTGRES_PASSWORD` 하나**이고 저장소에 커밋돼 있다(B21 — task#334로 이월). 그 외 리터럴 시크릿 폴백은 없다. `backend/.env.docker`(실 시크릿 저장소)와 루트 `.env`는 올바르게 gitignored.
 
 추가 노출: `docker-compose.yml`이 postgres를 `"5432:5432"`로 **호스트에 발행**한다. self-hosted 러너 머신에서 이는 호스트 인터페이스에 닿는 DB다.
 

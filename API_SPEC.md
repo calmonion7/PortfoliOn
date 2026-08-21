@@ -149,6 +149,8 @@ Access token 갱신.
 }
 ```
 
+> `menu_permissions`는 `role: "user"`면 `user_menu_permissions`에 enabled로 저장된 메뉴만 담고, `role: "admin"`이면 `ALL_MENUS` **전체 5키**(`portfolio`·`research`·`market`·`guru`·`settings`)를 담는다 — Admin 절의 목록과 같은 집합이다.
+
 **Error `401`** — 인증 필요
 
 ---
@@ -163,6 +165,8 @@ Google OAuth 로그인 시작. Google 로그인 페이지로 리다이렉트.
 
 Google OAuth 콜백. 처리 후 `?oauth=<code>` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트(토큰은 실리지 않는다 — 프론트가 그 code를 `GET /api/auth/oauth/token`으로 교환한다, 아래 참조).
 
+**실패 경로** — 프론트엔드로 `?error=<사유>` 리다이렉트하며 500을 내지 않는다. 사용자가 인가 화면에서 **취소**하면 `?error=oauth_denied`, 토큰교환이 `id_token`을 주지 못하거나 그 값이 JWT 형태가 아니면 `?error=oauth_failed`. `state` 서명 검증 실패만 `400`을 던진다.
+
 ---
 
 ### `GET /api/auth/oauth/github`
@@ -174,6 +178,8 @@ GitHub OAuth 로그인 시작. GitHub 로그인 페이지로 리다이렉트.
 ### `GET /api/auth/oauth/github/callback`
 
 GitHub OAuth 콜백. 처리 후 `?oauth=<code>` 쿼리 파라미터와 함께 프론트엔드로 리다이렉트(토큰은 실리지 않는다 — 프론트가 그 code를 `GET /api/auth/oauth/token`으로 교환한다, 아래 참조).
+
+**실패 경로** — 구글 콜백과 같은 파라미터로 프론트엔드에 되돌리며 500을 내지 않는다. 인가 화면 **취소**는 `?error=oauth_denied`(이 판정이 `state` 검증보다 **먼저**다 — 취소 콜백엔 `code`가 없다). 토큰교환이 `access_token`을 주지 못한 경우 · 프로필 조회 응답이 성공 본문 형태가 아닌 경우 · 인증된 이메일을 확정하지 못한 경우는 모두 `?error=oauth_failed`. `state` 서명 검증 실패만 `400`을 던진다.
 
 
 ### `GET /api/auth/oauth/token`
@@ -206,7 +212,9 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
 > **Prefix:** `/api/admin`  
 > **Auth:** 모든 엔드포인트에 admin role 필요
 
-허용 메뉴 목록: `portfolio`, `research`, `market`, `analysis`, `guru`, `settings`
+허용 메뉴 목록(`ALL_MENUS`): `portfolio`, `research`, `market`, `guru`, `settings`
+
+> `ALL_MENUS`에 없는 키는 `PUT .../permissions`에서 **조용히 무시**된다(200 `{"ok": true}`를 반환하되 그 키는 저장되지 않는다). 과거 이 절은 `analysis`를 포함한 6키로 적혀 있었으나 서버가 받는 집합은 5키다. 이 5키는 `routers/admin.py`·`routers/auth.py`·`components/PermissionPanel.jsx`·`app_schema.sql` 시드가 **같은 집합**을 갖는다(ADR-0025 「`ALL_MENUS` 5키 불변」 — task#326이 `routers/auth.py`에만 남아 있던 6번째 키 `analysis`를 제거해 4소스를 일치시켰다).
 
 ### `GET /api/admin/users`
 
@@ -219,11 +227,11 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
     "id": "uuid",
     "email": "user@example.com",
     "role": "user",
+    "oauth_provider": null,
     "permissions": {
       "portfolio": true,
       "research": false,
       "market": true,
-      "analysis": false,
       "guru": false,
       "settings": false
     }
@@ -246,7 +254,6 @@ OAuth 로그인 콜백 후 프론트가 전달받은 일회성 `code`를 실제 
     "portfolio": true,
     "research": true,
     "market": true,
-    "analysis": false,
     "guru": false,
     "settings": false
   }
@@ -4217,7 +4224,7 @@ KR 랭킹 종목 수급 추이를 백그라운드로 갱신한다 (스케줄러 
 
 ## 공통 에러 응답
 
-모든 에러는 아래 형식으로 반환됩니다.
+모든 에러는 아래 형식으로 반환됩니다 — **미포착 예외로 인한 `500`도 포함**한다(`main.py`의 전역 `Exception` 핸들러가 `text/plain` raw 500을 구조화 JSON으로 바꾸고, 스택·내부 메시지는 응답에 싣지 않고 서버 로그에만 남긴다).
 
 ```json
 { "detail": "에러 메시지" }
@@ -4231,3 +4238,5 @@ KR 랭킹 종목 수급 추이를 백그라운드로 갱신한다 (스케줄러 
 | `404` | 리소스 없음 |
 | `409` | 충돌 (이미 진행 중인 작업 등) |
 | `422` | 요청 바디 유효성 검사 실패 (FastAPI 기본) |
+| `500` | 서버 내부 오류 — 본문은 항상 고정 문자열 `{"detail": "Internal Server Error"}`이고 원인은 서버 로그에만 남는다. ⚠️ 앱이 내는 500은 `application/json`이지만 nginx/게이트웨이가 내는 500은 `text/html`이므로, 소비자는 본문 파싱 전에 `Content-Type`을 확인할 것 |
+| `500` | 서버 내부 오류 — 본문은 항상 `{ "detail": "Internal Server Error" }` 고정 문자열(원인은 서버 로그의 `[UnhandledError]` 마커로만 확인) |

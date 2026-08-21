@@ -132,7 +132,10 @@ list 60s · dashboard 300s · correlation 300s · sector 300s · macro 300s · q
 - `POST /api/auth/refresh` → `consume_refresh_token`(1회용) → 재발급.
 - `POST /api/auth/logout` → `revoke_refresh_token`.
 - `GET /api/auth/me` → `{user_id, email, role, menu_permissions}`. **admin이면 `ALL_MENUS`를 통째로** 반환하고, 일반 사용자는 `user_menu_permissions`에서 `enabled = true`인 행만.
-  `ALL_MENUS = ["portfolio", "research", "market", "analysis", "guru", "settings"]` (`routers/auth.py` 모듈 상수).
+  `ALL_MENUS = ["portfolio", "research", "market", "guru", "settings"]` (`routers/auth.py` 모듈 상수 —
+  `routers/admin.py`·`PermissionPanel.jsx`·`app_schema.sql` 시드와 같은 5키 집합이어야 한다. 6번째 키
+  `analysis`가 이 상수에만 남아 있던 드리프트는 해소됐다 — admin의 `/me`는 **5키**를 반환한다.
+  드리프트 감시: `backend/tests/test_all_menus_single_source.py`).
 
 토큰: HS256 / `JWT_SECRET` / access `1시간` · refresh `30일`(`services/auth_service.py`의 `_ACCESS_EXPIRE`·`_REFRESH_EXPIRE`).
 
@@ -167,7 +170,13 @@ list 60s · dashboard 300s · correlation 300s · sector 300s · macro 300s · q
 
 이메일은 `primary && verified`인 것을 우선하고 없으면 `profile.email`로 폴백. 이후 흐름은 Google과 동일(`upsert_oauth_user(..., "github", str(profile["id"]))` → 코드 발급 → `/?oauth={code}`).
 
-⚠️ Google 콜백과 달리 **`error` 쿼리 분기가 없다** — GitHub에서 거부하면 state 검증 단계에서 400이 난다.
+실패 경로는 **전부 `?error=...`로 프론트에 되돌린다**(Google 콜백과 동형, B72 해소):
+`error` 쿼리 → `?error=oauth_denied`(state 검증보다 **먼저** 판정) · `access_token` 부재 → `?error=oauth_failed` ·
+`/user` 본문이 dict가 아니거나 `id`가 없음 → `?error=oauth_failed` · 이메일 확정 실패 → `?error=oauth_failed`.
+⚠️ 이전 판은 「Google 콜백과 달리 `error` 쿼리 분기가 없다 — 거부하면 state 검증 단계에서 400이 난다」로 적혀 있었는데
+**지금은 거짓**이다. 판정은 응답 `status_code`가 아니라 **본문 형태**로 한다 — `/user/emails`만 실패하고 프로필
+이메일이 공개된 사용자는 여전히 로그인해야 하기 때문이다(그 폴백이 위 `next()`의 설계 의도).
+가드: `backend/tests/test_oauth_github_callback_guards.py`.
 
 ### 2.4 프론트 쪽 세션 처리
 

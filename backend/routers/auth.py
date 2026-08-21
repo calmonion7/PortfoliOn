@@ -42,11 +42,23 @@ def _pop_oauth_tokens(code: str) -> dict | None:
         return None
     return tokens
 
-_HMAC_SECRET = os.environ.get("SESSION_SECRET", "dev-secret").encode()
+def _hmac_secret() -> bytes:
+    """OAuth state 서명키를 *호출 시점*에 해석한다 — 하드코딩 폴백 없음.
+
+    임포트타임 바인딩 + 리터럴 폴백을 쓰면, main.py를 거치지 않는 진입점
+    (스크립트·워커·테스트)이 load_dotenv 이전에 이 모듈을 임포트할 때
+    그 리터럴이 실제 서명키로 박혀 누구나 state를 위조할 수 있다.
+    미설정이면 조용히 서명하지 않고 명확히 실패한다 (wrong < missing).
+    임포트타임 raise는 하지 않는다 — main 밖 진입점의 임포트를 통째로 막기 때문.
+    """
+    secret = os.environ.get("SESSION_SECRET")
+    if not secret:
+        raise RuntimeError("SESSION_SECRET is not set — cannot sign/verify OAuth state")
+    return secret.encode()
 
 def _make_state() -> str:
     nonce = secrets.token_urlsafe(16)
-    sig = hmac.new(_HMAC_SECRET, nonce.encode(), hashlib.sha256).hexdigest()[:20]
+    sig = hmac.new(_hmac_secret(), nonce.encode(), hashlib.sha256).hexdigest()[:20]
     return f"{nonce}.{sig}"
 
 def _verify_state(state: str) -> bool:
@@ -54,7 +66,7 @@ def _verify_state(state: str) -> bool:
     if len(parts) != 2:
         return False
     nonce, sig = parts
-    expected = hmac.new(_HMAC_SECRET, nonce.encode(), hashlib.sha256).hexdigest()[:20]
+    expected = hmac.new(_hmac_secret(), nonce.encode(), hashlib.sha256).hexdigest()[:20]
     return hmac.compare_digest(sig, expected)
 
 
@@ -105,7 +117,9 @@ def logout(req: RefreshRequest):
     return {"message": "Logged out"}
 
 
-ALL_MENUS = ["portfolio", "research", "market", "analysis", "guru", "settings"]
+# 메뉴 권한 키 정본 — admin.py·PermissionPanel.jsx·app_schema.sql 시드와 같은 집합이어야 한다
+# (ADR-0025 "ALL_MENUS 5키 불변"). 드리프트 감시: tests/test_all_menus_single_source.py.
+ALL_MENUS = ["portfolio", "research", "market", "guru", "settings"]
 
 
 @router.get("/me")
@@ -198,6 +212,11 @@ async def oauth_github(request: Request):
 
 @router.get("/oauth/github/callback")
 async def oauth_github_callback(request: Request):
+    # 거절/에러 콜백엔 code가 없다 — state 검증보다 먼저 판정해 프론트로 되돌린다
+    # (구글 콜백과 같은 순서·같은 에러 파라미터).
+    if request.query_params.get("error"):
+        frontend = os.environ.get("FRONTEND_URL", "")
+        return _no_cache_redirect(f"{frontend}/?error=oauth_denied")
     state = request.query_params.get("state", "")
     if not _verify_state(state):
         raise HTTPException(status_code=400, detail="Invalid state")
@@ -213,15 +232,39 @@ async def oauth_github_callback(request: Request):
         )
         token_data = token_resp.json()
         access_token = token_data.get("access_token")
+        if not access_token:
+            # 토큰교환 실패(만료 code·client_secret 불일치 등) — 프로필 조회로 진행하면
+            # 401 응답을 파싱하다 raw 500이 된다.
+            frontend = os.environ.get("FRONTEND_URL", "")
+            return _no_cache_redirect(f"{frontend}/?error=oauth_failed")
         headers = {"Authorization": f"token {access_token}", "Accept": "application/json"}
         profile_resp = await client.get("https://api.github.com/user", headers=headers)
         emails_resp = await client.get("https://api.github.com/user/emails", headers=headers)
     profile = profile_resp.json()
     emails = emails_resp.json()
+    frontend = os.environ.get("FRONTEND_URL", "")
+    # 토큰교환 *이후* 두 콜의 에러 본문을 성공 본문처럼 파싱하면 미포착 500이 된다:
+    #   ⓐ `/user`가 에러 dict면 `profile["id"]` → KeyError
+    #   ⓑ `/user/emails`가 리스트가 아닌 에러 dict면 `for e in emails`가 키 문자열을 순회 →
+    #      AttributeError('str' object has no attribute 'get')
+    #   ⓒ primary+verified도 프로필 이메일도 없으면 email=None이 upsert까지 도달 →
+    #      `users.email TEXT UNIQUE NOT NULL` 위반(IntegrityError)
+    # 판정은 status_code가 아니라 **본문 형태**로 한다 — `/user/emails`만 실패하고 프로필
+    # 이메일이 공개된 사용자는 여전히 로그인할 수 있어야 하며(그 폴백이 아래 next()의 설계
+    # 의도다), status_code 일괄 검사는 성공 가능한 로그인을 막는다.
+    if not isinstance(profile, dict) or not profile.get("id"):
+        return _no_cache_redirect(f"{frontend}/?error=oauth_failed")
     email = next(
-        (e["email"] for e in emails if e.get("primary") and e.get("verified")),
+        (
+            e["email"]
+            for e in (emails if isinstance(emails, list) else [])
+            if isinstance(e, dict) and e.get("primary") and e.get("verified") and e.get("email")
+        ),
         profile.get("email"),
     )
+    if not email:
+        # 이메일을 확정하지 못했다 — 여기서 멈추지 않으면 NOT NULL 위반으로 raw 500이 된다.
+        return _no_cache_redirect(f"{frontend}/?error=oauth_failed")
     user = auth_service.upsert_oauth_user(email, "github", str(profile["id"]))
     auth_service.apply_default_permissions(str(user["id"]))
     tokens = auth_service.issue_tokens(str(user["id"]))

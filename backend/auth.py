@@ -38,13 +38,17 @@ def get_current_user_or_api_key(
     request: Request,
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> str:
-    """JWT Bearer token 또는 X-API-Key 헤더 중 하나로 인증."""
+    """JWT Bearer token 또는 X-API-Key 헤더 중 하나로 인증(진짜 OR).
+
+    한쪽 자격증명이 무효여도 다른 한쪽이 유효하면 통과한다 — 전에는 키 헤더가 *있지만 틀리면*
+    유효한 Bearer를 검사하지도 않고 401을 던져 사실상 「키가 있으면 키만」이었다(B73).
+    둘 다 유효하면 키를 우선한다(기존 동작 보존).
+    """
     api_key = request.headers.get(_API_KEY_HEADER)
     if api_key:
         expected = os.environ.get("COWORK_API_KEY", "")
         if expected and api_key == expected:
             return _API_KEY_USER_ID
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
     if creds:
         try:
             payload = jwt.decode(
@@ -55,6 +59,9 @@ def get_current_user_or_api_key(
             return payload["sub"]
         except (JWTError, KeyError):
             pass
+    if api_key:
+        # 키를 보냈는데 둘 다 실패한 경우엔 기존 진단 문구를 유지한다(Cowork가 키 오류를 구별).
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
 

@@ -115,7 +115,7 @@ backend/
 
 - JWT는 `python-jose`, 알고리즘 **HS256**, 시크릿 `JWT_SECRET`. `HTTPBearer(auto_error=False)`라 미인증은 핸들러에서 401을 던진다.
 - 토큰 수명은 `services/auth_service.py`: access `timedelta(hours=1)`, refresh `timedelta(days=30)`.
-- `X-API-Key`가 **존재하면** 값이 틀릴 때 즉시 401 — JWT로 폴백하지 않는다.
+- `get_current_user_or_api_key`는 **진짜 OR**다 — 한쪽 자격증명이 무효여도 다른 한쪽이 유효하면 통과한다(둘 다 유효하면 키 우선). 실측: 유효 Bearer + 틀린 키 → 200 · 비-admin Bearer + 틀린 키 → 403(`require_admin_or_api_key`) · 키만 틀림 → 401 `detail="Invalid API key"` · 둘 다 없음 → 401 `detail="Not authenticated"`. ⚠️ 이전 판은 「키 헤더가 존재하면 값이 틀릴 때 즉시 401 — JWT로 폴백하지 않는다」로 적혀 있었는데, 그것이 바로 제거된 결함(B73)이다 — 그 서술을 근거로 폴스루를 「회귀」로 판정하지 말 것. 가드: `backend/tests/test_api_key_bearer_or_eval.py`.
 
 ### 1.6 서비스 계층 (`backend/services/`)
 
