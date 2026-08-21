@@ -2460,6 +2460,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 산문(`description`·`key_points`·`challenges`·`players` 본문)을 **싣지 않는다** — 소비처는 티커 교차만 필요한데 전 발행물의 전문을 실으면 화면이 수백 KB를 받는다(대상이 늘수록 커진다).
 
+`listed[]`는 그 규칙을 지키면서 「내가 안 가진 업체」 후보 칩(task#323)에 필요한 **축약 필드만** 나른다 — 산문 `note`(실측 최대 507자)·`share_pct`(채움률 9%)·`leader_name`은 **제외**한다. 전문 배열 키인 `players`는 여전히 싣지 않으며, 그 금지는 `test_index_excludes_prose_fields`가 항목·원소 두 수준에서 단언한다.
+
 ⚠️ 이 경로는 라우터에서 **`/{slug}`보다 먼저 선언**돼 있다. `slug`가 `Literal`이라 catch-all이 먼저 잡으면 `index`는 등록 slug이 아니어서 **`422`로 죽는다**(다른 라우트로 흘러가지 않는다).
 
 **Auth:** Bearer token 또는 `X-API-Key`
@@ -2473,6 +2475,17 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
       "name": "AI 데이터센터 설비",
       "title": "NERC가 5월 4일 대형부하 Level 3 경보를 낸 뒤...",
       "tickers": ["000660", "005930", "010120", "015760", "028260", "298040"],
+      "listed": [
+        {
+          "ticker": "000660",
+          "name": "SK하이닉스",
+          "tech_level": 5,
+          "gap_years": 0,
+          "country": "한국",
+          "state_led": false,
+          "category": "메모리"
+        }
+      ],
       "players_total": 25
     }
   ]
@@ -2485,7 +2498,17 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `name` | 표시명(`TECH_TOPICS`) — `title`은 150자 헤드라인 문장이라 칩 라벨로 못 쓴다 |
 | `title` | 그 판의 헤드라인 |
 | `tickers` | `players[].ticker`의 **non-null 집합**(정렬·중복 제거) |
+| `listed` | 티커 **보유** 업체의 축약 레코드 배열. `[p["ticker"] for p in listed] == tickers`가 **항등으로** 성립한다(ticker 기준 dedupe 후 `tickers` 순서로 세운다) — 한 판에 같은 티커가 두 번 등장해도 갈라지지 않는다. 티커 **없는** 업체(비상장·미기재)는 여기 없고 `players_total`에만 남는다 |
+| `listed[].ticker` | 종목 티커(KR 6자리 / 그 외) |
+| `listed[].name` | 업체명. 실측 최대 35자 — 소비처는 **말줄임하지 않는다** |
+| `listed[].tech_level` | 기술 수준 1~5. ⚠️ **섹터 안에서만 비교 가능**하다(다부문 판은 섹터가 섞여 있다) → 화면은 `category`를 함께 보여 그 사실을 독자에게 넘긴다 |
+| `listed[].gap_years` | 선두와의 격차(년). 실측 채움률 **86%**(90/105) — 없으면 `null` |
+| `listed[].country` | 소재국 |
+| `listed[].state_led` | 국영·국가주도 여부 |
+| `listed[].category` | 계보/부문 분류. 실측 채움률 **88%**(92/105) — 없으면 `null`이고 화면은 `Lv<n>`만 쓴다 |
 | `players_total` | 업체 **총수**. `players_total - tickers.length`가 곧 화면의 「미상장·미매칭 N개 제외」다 |
+
+**소비처** — 포트폴리오 「기술 노출」 카드가 `tickers`로 노출%를 계산하고, `listed[]`로 **노출>0 기술마다** 보유·관심 둘 다에 없는 업체를 최대 3칩 + 「+N」으로 보인다(정렬 `tech_level↓ → gap_years↑(결측 뒤) → name↑`). 종목 상세 헤더 기술 칩은 `tickers`만 쓴다.
 
 ---
 

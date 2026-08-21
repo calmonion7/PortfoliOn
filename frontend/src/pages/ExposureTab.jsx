@@ -81,7 +81,12 @@ export function computeTechExposure(techIndex, holdings, watchTickers = []) {
       unmatched: Math.max((t.players_total || 0) - tickers.length, 0),
     }
   })
-  return rows.sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name))
+  // ⚠️ 로케일 고정 — 인자 없는 localeCompare는 Node와 Chrome이 갈린다(실측:
+  // 'AI 데이터센터 설비' vs '온디바이스 AI' → Node +1 · **Chrome -1** · 'ko'는 둘 다 +1).
+  // 라이브에서 두 기술이 56.9%로 **동률**이라 이 tiebreaker가 실제로 순서를 결정하며,
+  // 고정하지 않으면 Node 기반 테스트·프로브가 단언하는 순서와 화면이 어긋난다
+  // (선재 결함이었고 task#323의 `bar-slugs` 축이 드러냈다 — 아래 후보 정렬과 같은 규약).
+  return rows.sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name, 'ko'))
 }
 
 const MAX_CHIPS = 3
