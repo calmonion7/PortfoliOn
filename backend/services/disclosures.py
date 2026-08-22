@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import requests
 
 from services.backlog import _get_corp_code_map
 from services.db import execute, execute_many, query
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,9 @@ def fetch_disclosures(corp_code: str, days: int = 30) -> list[dict]:
     유형별로 list.json을 호출하고 각 항목에 질의한 pblntf_ty를 stamp한다.
     반환: [{rcept_dt, report_nm, pblntf_ty, rcept_no, corp_name, dart_url}]
     """
-    bgn_de = (datetime.now() - timedelta(days=days)).strftime("%Y%m%d")
+    # 조회 창은 KST 달력일 기준 — bare datetime.now()는 컨테이너 UTC라 00~09시 KST에
+    # 하루 뒤처져 창 전체가 밀린다(B42). 배치가 07:30 KST에 도는 정확히 그 구간이다.
+    bgn_de = (today_kst() - timedelta(days=days)).strftime("%Y%m%d")
     out: list[dict] = []
     for ty in _CORE_TYPES:
         try:

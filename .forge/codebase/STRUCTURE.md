@@ -94,7 +94,8 @@ backend/
     ├── utils.py            today_kst · sanitize · TICKER_RE · find_ticker*
     ├── errors.py           not_found / already_exists
     ├── parallel.py         parallel_map(max_workers=10)
-    ├── progress.py         ProgressTracker (장시간 배치 진행률)
+    ├── progress.py         ProgressTracker (try_start 이중실행 거부 + 고착 회수)
+    │                       · ProgressRegistry (사용자별 트래커, 상한 64)
     ├── job_runs.py         record() 컨텍스트매니저 + Run.set_status · recent · recent_map
     ├── batch_registry.py   BATCHES 정적 메타데이터 (배치 정본 목록)
     ├── schedule_spec.py    스펙 검증 · CronTrigger kwargs 변환 · 사람이 읽는 문구

@@ -128,18 +128,23 @@ def test_fetch_one_sector_logs_on_empty_closes(monkeypatch, caplog):
     """ka20006이 빈 종가를 주면 조용히 삼키지 않고 로깅한다(all-None 진단 가능)."""
     import logging
     caplog.set_level(logging.WARNING)
-    monkeypatch.setattr(svc.kw_sector, "fetch_sector_closes", lambda code, max_items=100: [])
+    # ⚠️ 스텁 시그니처는 실제 함수와 맞춰야 한다 — `empty_dts`(휴장 공유 메모, task#330)를
+    #    빠뜨리면 TypeError가 나고 `_fetch_one_sector`의 **예외 분기**가 대신 돌아
+    #    이 축이 "빈 종가"가 아니라 "잘못된 스텁"을 재게 된다(그 예외 메시지에도
+    #    "empty_dts"가 들어 있어 아래 단언이 **거짓 통과**한다 — 실측 확인).
+    monkeypatch.setattr(svc.kw_sector, "fetch_sector_closes",
+                        lambda code, max_items=100, empty_dts=None: [])
     out = svc._fetch_one_sector({"code": "008", "name": "화학"})
     assert out["return_1w"] is None and out["return_1mo"] is None and out["return_3mo"] is None
     log = caplog.text
-    assert "008" in log and ("empty" in log.lower() or "빈" in log)
+    assert "008" in log and ("empty closes" in log or "빈 종가" in log)
 
 
 def test_fetch_one_sector_logs_on_exception(monkeypatch, caplog):
     """fetch 예외도 조용히 삼키지 않고 로깅한다(조용한 삼킴 제거)."""
     import logging
     caplog.set_level(logging.WARNING)
-    def boom(code, max_items=100):
+    def boom(code, max_items=100, empty_dts=None):
         raise RuntimeError("kiwoom timeout")
     monkeypatch.setattr(svc.kw_sector, "fetch_sector_closes", boom)
     out = svc._fetch_one_sector({"code": "008", "name": "화학"})

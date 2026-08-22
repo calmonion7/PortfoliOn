@@ -534,6 +534,47 @@ pydantic v2는 `validate_default=False`가 기본이라 기본값 `None`은 검�
   record 컬럼 1행이 된다. 행별 `(a,b), (c,d)` 나열만.
 - **replace(=delete+insert)는 단일 트랜잭션** + fetch 실패 시 delete 자체를 스킵(§1.3).
 
+**동시성 — 읽기-계산-쓰기 (task#330)**
+
+`query()`·`execute()`는 **호출마다 독립 커넥션·트랜잭션**을 열고 즉시 커밋한다. 그래서
+`query`로 읽고 계산해 `execute`로 쓰는 형태는 두 호출 **사이**에 다른 요청·배치가 끼어들면
+둘 다 같은 직전값을 읽고 나중 쓰기가 앞선 신선분을 되돌린다(**lost update**). 함수 하나가
+「원자적으로 보인다」는 것은 보장이 아니다 — 문장 수만큼 트랜잭션이 있다.
+
+- **다중 문장이 원자적이어야 하면 `get_connection()` 하나로 감싼다**(성공 시 commit·예외 시
+  전체 rollback). 예: `routers/admin.py::delete_user`는 DELETE 6문장 — 예전엔 확인 `query` 1 +
+  `execute` 6 = **독립 트랜잭션 7개**였고, 중간 실패가 「로그인은 되는데 종목·권한이 사라진
+  계정」이나 고아 행을 영구히 남겼다.
+- **가드 read가 그 판정으로 쓰기를 좌우하면 같은 트랜잭션에 넣고 `FOR UPDATE`로 행을 잠근다.**
+  확인과 쓰기가 다른 트랜잭션이면 그 틈의 권한 변경(admin 승격 등)이 `403` 가드를 **우회**한다.
+- **단일 JSONB 행을 읽기-병합-쓰기하는 경로는 프로세스 내 락으로 직렬화**한다
+  (`services/storage/schedule.py::_guru_save_lock` — `guru_managers`는 id=1 단일 행이라 한 번의
+  쓰기가 명부 전체를 치환한다). 겹치는 호출자를 셀 것: 수동 크롤은 `BackgroundTasks` 스레드,
+  자동 크롤은 APScheduler 스레드이고 **자동 경로는 라우터의 409 가드를 보지 않는다.**
+  ⚠️ 락은 **프로세스 내** 상호배제다 — 현재 배선(`uvicorn main:app`, 워커 1)에서만 전체
+  상호배제이고 `--workers N`으로 가면 **DB advisory lock**이 필요해진다.
+- ⚠️ **커넥션 모델 자체(호출당 커넥션)는 바꾸지 않는다** — 소비처가 전면적이라 범위가
+  통제 불가로 커진다. 원자성이 필요한 자리에서 `get_connection()`으로 감싸는 것이 정석이다.
+- **동시성 축의 회귀 테스트는 `threading.Barrier`로 강제 인터리빙**해 재현한다
+  (`backend/tests/test_concurrency_locks.py`). 「운 좋게 안 겹쳤다」로 통과하는 축은 이빨이 없다.
+
+**동시성 — 프로세스 내 공유 상태 (락 규율, task#330)**
+
+- **락은 dict·리스트 조작 구간만 감싼다. 느린 `loader()`는 락 밖에서 돈다** — 대시보드 loader는
+  카드당 10-워커 ThreadPool을 쓰는 수 초짜리 작업이라 락 안에 넣으면 다른 사용자의 조회와
+  `invalidate()`가 그만큼 막힌다(`services/cache.py::TTLCache`).
+- **그 대가는 세대 카운터로 되받는다** — loader 실행 중 들어온 `invalidate()`를 감지해 적재를
+  건너뛴다. 무효화가 조용히 no-op이 되는 것은 **stale 값을 되살리는 정합 결함**이다.
+- **만료 정리는 in-place 삭제**(`del`)로 한다. `self._store = {…}` **재바인딩은 금지** —
+  그 창에 실행된 `invalidate(key)`가 버려질 dict에 적용돼 유실된다.
+- **락은 다른 락을 잡은 채 획득하지 않는다**(중첩 0 → 데드락 불가). `cache.invalidate(ticker)`도
+  `_snap_lock`을 놓은 뒤에 파생 캐시를 무효화한다.
+- **진행상태처럼 「이미 실행 중」을 거부하는 상태는 회수 경로를 함께 둔다** —
+  `ProgressTracker.try_start`는 무활동 상한(`_STALE_AFTER`)을 넘긴 `running=True`를 고착으로
+  보고 회수한다. 판정은 경과시간이 아니라 **무활동 시간**이라 오래 걸리는 정상 작업은 영향받지
+  않는다(⑷ 대조군). 회수 경로가 없으면 백그라운드가 시작조차 못 한 호출자가 **프로세스 재시작
+  전까지 영구 409**가 된다.
+
 **스키마 변경 (ADR-0006)**
 
 신규 컬럼·테이블은 **`backend/app_schema.sql`과 `backend/main.py`의 `_migrate()` 두 곳에 쌍으로**

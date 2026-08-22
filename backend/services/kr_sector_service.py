@@ -53,9 +53,10 @@ def load_sector_index() -> dict[str, str]:
     return (stored.get("data") or {}).get("index") or {}
 
 
-def _fetch_one_sector(entry: dict) -> dict:
+def _fetch_one_sector(entry: dict, empty_dts: set = None) -> dict:
     try:
-        closes = kw_sector.fetch_sector_closes(entry["code"], max_items=100)
+        closes = kw_sector.fetch_sector_closes(entry["code"], max_items=100,
+                                               empty_dts=empty_dts)
         if not closes:
             logger.warning(f"[KrSector] {entry['code']} {entry['name']}: empty closes (ka20006 빈 종가)")
         return momentum_from_closes(entry["name"], entry["code"], closes)
@@ -67,8 +68,16 @@ def _fetch_one_sector(entry: dict) -> dict:
 
 def compute_momentum() -> list[dict]:
     """전 KOSPI 업종 series fetch → 모멘텀 계산. 키움 client는 직렬 throttle이라
-    과도한 동시성은 무의미·max_workers는 보수적으로 4(DB 풀 압박 회피)."""
-    return parallel_map(_fetch_one_sector, kw_sector.KOSPI_SECTORS, max_workers=4)
+    과도한 동시성은 무의미·max_workers는 보수적으로 4(DB 풀 압박 회피).
+
+    `empty_dts`는 **이 refresh 1회 안에서만** 공유되는 휴장 메모다 — 24개 업종이 같은
+    휴일을 각각 되짚으면 재조회가 24배 중복되고, 이 함수는 `scheduler.start()`가
+    **동기로** 호출하는 기동 경로라 그 중복이 그대로 기동 지연이 된다(상세는
+    `kw_sector.fetch_sector_closes` docstring). 모듈 전역이 아니라 지역 변수라 날짜가
+    바뀌면 자연히 사라지고 테스트 간 오염도 없다."""
+    empty_dts: set = set()
+    return parallel_map(lambda e: _fetch_one_sector(e, empty_dts),
+                        kw_sector.KOSPI_SECTORS, max_workers=4)
 
 
 def _is_all_none(s: dict) -> bool:

@@ -76,29 +76,37 @@ mapped: 2026-08-10
 >
 > ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63`은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다(전건 잔존 확인). 특히 `B9`(access token 갱신 경로 부재)는 이 파트가 관측성·인증 문서를 만졌으므로 「같이 됐겠지」로 읽히기 쉬운데, 프론트 인터셉터는 손대지 않았다.
 
+> **해소: 2026-08-22 (task#330) — B5·B7·B8·B42·B68·B69·B70·B71·B77 닫힘 (9건).** 10차 확정분 수정 5/7(**시간대 3 · 폴백·검증 2 · 동시성 3 · 트랜잭션 1**). **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
+>
+> **시간대 3건** — 정본은 `services/utils.py::today_kst`(달력일)이고, 이번에 **타임스탬프용 `now_kst`를 형제로 신설**했다(구루 명부 `last_updated`가 UTC라 관리자 화면에 9시간 뒤처져 표시되던 것을 적대 검토가 잡았다 — 수동 `routers/guru.py`·자동 `scheduler/jobs.py` **두 레인 쌍**). 회귀 축은 **한 순간(instant)을 고정하고 그것을 어느 시간대로 읽는지만** 보는 하니스다(`tests/test_kst_date_boundaries.py::_freeze`) — 기존 `test_disclosures.py`·`test_insider_trades.py`의 「프로덕션과 같은 식으로 기대값을 재계산하는」 축은 시간대 결함을 **원리적으로 탐지할 수 없었다**. ⚠️ `test_no_bare_today.py`는 `.today()`만 보므로 `now()`/`utcnow()`는 **ast 감사 축**(`test_owned_modules_have_no_naive_now_or_utcnow`)이 담당하는데, 그 감사는 **열거된 파일만** 훑는다 → 새 타임스탬프 writer를 만들면 그 목록에 추가할 것(현재 6파일). 선재 잔존 4곳(`routers/analyst_reports.py`·`services/kis/futures.py`·`services/report_generator.py`·`market_indicators/kospi_signal.py`)은 `_KST` 자체 재구현 상태이며 이 파트 범위 밖이다. ⚠️ **「시간대 3건」이 전부 KST라고 읽지 말 것 — B8만 기준 시간대가 다르다.** B7(배당 기준연도)·B42(공시 조회 창)는 **KST 달력일**이 정답이라 `today_kst`로 접었지만, **B8은 US 애널리스트 액션의 `report_date`**이고 정답은 **시장 시간대(`America/New_York`)**다 — yfinance가 주는 epoch를 naive UTC로 읽으면 미 동부 20:00 이후 액션이 하루 앞선 날짜로 박제된다(라이브 실측: MSFT 929행 중 **7행** 어긋남). 그래서 `consensus_pipeline.py`는 `_US_MARKET_TZ` 상수를 따로 두고 `tz_localize("UTC")` → `tz_convert(_US_MARKET_TZ).date`로 환산한다. **이 자리를 `today_kst`류로 「통일」하면 B8이 되살아난다** — 「어느 달력일이냐」의 정답은 그 값이 속한 **시장**이 정하며 KST는 KR 시장·서버 배치 판정에만 정본이다(같은 함수의 수집 창 하한 cutoff는 계속 KST 기준이다 — 창의 하한이라 시장일과 최대 1일 어긋나도 「최근 N일」 의도를 해치지 않는다).
+>
+> **B70/B71(폴백·검증)** — 되짚기를 유계 루프(`_MAX_FETCH_ATTEMPTS=10`)로 바꾸되 **무계 루프는 금지**했다. 적대 검토가 그 유계 루프의 대가를 잡았다: 24개 업종이 **같은 휴일을 각각 되짚어** 기동 경로(`scheduler.start` → `_seed_kr_sector_if_empty` → `compute_momentum`, **동기**)의 키움 콜이 최대 240콜 = throttle만 60초가 됐다 → `fetch_sector_closes(empty_dts=…)`로 **refresh 1회 안에서만 공유되는 휴장 메모**를 도입(장기 휴장 144 → 27콜, 전 구간 장애 240 → 10콜). B71은 **판정 게이트를 `validate_schedule_spec`이 아니라 `_build_trigger`(빌드+CronTrigger 생성)로** 확정했다 — validator는 *새 입력*용이라 더 엄격해서, 그것을 기동 게이트로 쓰면 **변경 전에는 정상 등록·실행되던** 스펙 4형태(`time:'7:00'` · `enabled:1` · `day_of_month:'15'` · `every_minutes:3`)가 조용히 미등록되고 그 배치가 **영구히 안 돈다**(`GET /api/batches`의 `enabled=true`+`next_run=null`은 disabled와 구별되지 않아 며칠 stale해질 때까지 무음). validator 실패는 **경고로만** 남긴다. 시드 폴백은 `enabled`를 **승계**한다 — 레지스트리 기본값이 전부 `enabled: True`라 통째 교체하면 사용자가 옛 UI에서 꺼 둔 배치 4종이 조용히 켜진다.
+>
+> ⚠️ **B71에서 배운 것 — 잡 단위 가드는 기동 완주를 보장하지 않는다.** `scheduler.start()`는 `_reschedule_job` 루프 **뒤에** `_check_missed_report()`를 호출하고 `_scheduler.start()`는 그 다음이다. `_check_missed_report_for`가 **같은 저장 스펙을 독립적으로 다시 읽어** `int(cfg['time'].split(':')[0])`을 하므로, 깨진 `daily_report_kr`/`_us` 행은 잡 가드를 통과해도 **앱을 죽였다**(실측 재현). 게다가 `days`에 오늘 요일이 없으면 조기 return으로 **우연히 통과**해 날짜 의존 결함이 된다 — 그래서 red-first 픽스처가 `leverage_fetch`(= 이 함수가 읽지 않는 배치)를 깨뜨렸던 원래 축은 32개 배치 중 2개에 **원리적으로 블라인드**했다. 처방은 ⓐ `_parse_hhmm` 판정 ⓑ 시장 단위 try/except(누락복구는 부가 기능, 기동은 필수) ⓒ 픽스처의 `days`에 7요일 전부. **또 하나** — B71ⓐ가 기동을 살리자 **그 상태에서 `GET /api/batches`가 확정 500**이 되는 경로가 처음 도달 가능해졌다(`describe_schedule`이 `spec["type"]`·`spec["day_of_month"]`를 직접 인덱싱 → 깨진 행 하나가 응답 전체를 죽이고 **그 행을 수리할 유일한 화면**이 빈다). `routers/batches.py::_describe` 폴백으로 닫았다. task#283 렌즈(「무거운 실패를 걷어내면 그것이 가리고 있던 파손이 드러난다」)의 이 저장소 4번째 사례다.
+>
+> **동시성 3건** — 락 규율은 **「dict 조작 구간만 감싸고 `loader()`는 락 밖」**이고, 그 대가로 loader 실행 중 들어온 `invalidate()`를 **세대 카운터**로 감지해 캐시를 건너뛴다(`TTLCache._gen` · 모듈 전역 `_snap_gen`). 만료 정리는 **in-place 삭제**다 — 옛 구현의 `self._store = {...}` **재바인딩**은 그 창의 `invalidate(key)`를 버려질 dict에 적용해 유실시켰다. 락 중첩 0이 데드락 불가 근거이므로 `cache.invalidate(ticker)`는 `_snap_lock`을 **놓은 뒤** 파생 캐시를 무효화한다. ⚠️ 적대 검토가 **`_snap_gen` 가드의 이빨이 전 스위트에서 0**임을 잡았다(`if True:`로 무력화해도 실패 0) — 쌍둥이 `TTLCache`엔 축이 있는데 이쪽엔 **아예 없었다**. 같은 규율을 두 곳에 넣으면 **축도 두 곳에** 둘 것.
+>
+> ⚠️ **B77의 처방이 「이중 클릭이 자기치유하던」 성질을 제거했다 — 그 대가를 두 곳에서 되받아야 했다.** ⓐ **백엔드**: `running=True`를 회수하는 경로가 `finish()` 하나뿐인데 starlette는 응답 body flush **뒤** background를 호출하므로, flush 중 클라이언트가 끊기면 `_run_generation`이 시작조차 않고 그 사용자가 **프로세스 재시작 전까지 영구 409**가 된다 → **무활동 15분 회수**(`ProgressTracker._STALE_AFTER`, 판정은 경과시간이 아니라 무활동 시간이라 오래 걸리는 정상 생성은 영향 없음. `ProgressRegistry._evict_locked`도 고착 트래커를 유휴로 본다 — 아니면 그 슬롯이 상한을 영구 잠식한다). ⓑ **프론트**: 두 진입점이 POST **전에** 폴러를 끊고 bare catch가 「리포트 생성 실패」만 띄워, 409에서 **거짓 진술 + 진행 중 생성의 폴링 소실**이 됐다(트래커 키가 user_id 하나라 「전체 생성 → 개별 재생성」이라는 흔한 admin 흐름에서 **상시** 발생한다) → `useReportGeneration.js::_handleConflict`가 warning 토스트 + **폴링 재개**를 하고 완료 문구는 거부된 종목명을 주장하지 않는다(`ReportManualGen.jsx::handleGenerate`도 같은 처리). 두 명세서에 409·`failed`·호출자 한정 서술도 함께 넣었다 — `test_api_doc_sync.py`는 엔드포인트 *존재*만 보므로 이 drift는 자동 게이트가 원리적으로 못 잡는다.
+>
+> **B5(트랜잭션)** — 정확한 규모는 「DELETE 6문장 / 독립 트랜잭션 7개」다(확인 `query` 1 + `execute` 6 — `db.execute`가 호출마다 커넥션을 얻어 커밋한다). `.forge/bug-report.md`가 「5개 테이블」로 적어 CONCERNS와 수치가 갈려 있었다. 한 커넥션의 단일 트랜잭션으로 접고, **가드 read를 같은 트랜잭션에 `FOR UPDATE`로** 넣었다 — 확인과 삭제가 다른 트랜잭션이면 그 틈의 admin 승격이 403 가드를 우회한다.
+>
+> ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63` + `B6`(부분)은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다(전건 잔존 확인). 특히 `B69`가 `services/cache.py`를 통째로 만졌으므로 `B63`(프론트 포매터 중복)·`B48`(에러 바운더리 부재)이 「캐시·렌더를 정리하며 같이 됐겠지」로 읽히기 쉬운데, 프론트는 `useReportGeneration.js`·`ReportManualGen.jsx` 두 파일의 409 처리만 손댔다.
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| B5 | 사용자 삭제가 6개 독립 트랜잭션 — 중간 실패 시 반쯤 삭제된 사용자 | `routers/admin.py::delete_user` | 루프 중 DB 오류 |
-| **B68** | `save_guru_managers`의 **읽기-계산-쓰기가 트랜잭션·락 없이** 돌아 동시 크롤이 서로의 병합결과(드롭/백필 판정)를 덮는다 — `db.py`의 `query()`/`execute()`가 각각 **독립 커넥션·트랜잭션**을 열고 `SELECT … FOR UPDATE`가 없다. docstring이 「드롭은 영구 삭제가 아니다 — 다음 정상 크롤이 복원」이라 자기치유를 명시하나 이는 **클로버가 안 난다는 보장이 아니다**. `§4.3`은 leverage/lending 루프만 잔여위험으로 인정하고 이 함수는 언급하지 않는다(= 기록된 트레이드오프가 아니다) | `services/storage/schedule.py::save_guru_managers` | 자동 배치 + 수동 트리거(또는 이중 클릭)의 근접 타이밍 겹침 |
-| **B69** | `TTLCache`/모듈 전역 `_snapshots`가 **무잠금**이라 동시 `invalidate()`가 진행 중인 `get()`/삭제를 **KeyError로 깨뜨린다**. `§8.1`이 2사이클 연속 「판정불가 — 도구 범위 밖」으로 이월했던 항목이며, 10차가 `threading.Barrier` 하니스로 **강제 인터리빙해 실제 재현**해 확정했다(창이 연속 두 바이트코드로 매우 좁아 LOW). 처방: `get`/`invalidate`를 `threading.Lock`으로 감싼다 | `services/cache.py::TTLCache.get` / `::invalidate` / `get_snapshot` / 모듈 전역 `_snapshots` | 동시 요청 중 한쪽이 `invalidate()`를 호출 |
 
 ### 무음 미동작 / 오값
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
 | B6 | 키 미설정 배치가 "성공"으로 기록 · **부분(도달조건 축소, 재판정 task#329)**: 원 서술이 지목한 3위치 중 **2곳이 닫혔다** — `econ.py::_fetch_and_save_econ_indicators`는 계열별 소스-폴백 + `_status`(partial/skipped)를 반환하고, `scheduler/jobs.py::_refresh_monthly_us`는 `as run`으로 그것을 받아 `set_status`한다(수동 2레인 `refresh-econ`·`refresh-monthly?market=US`도 함께). **남은 도달 경로는 `macro.py` 하나뿐이다** — `_fetch_and_save_macro_signals`가 키 미설정 시 예외 없이 `{"error": …}`를 반환하는데 `_status`가 없고, 두 레인(`scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals`) **모두 `as run` 미배선**이라 반환값을 아무도 검사하지 않는다. 형제 `econ.py`가 참조 구현이다(§6.1) | `market_indicators/macro.py::_fetch_and_save_macro_signals` → `scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals` | `FRED_API_KEY` 미설정 |
-| B7 | KR 배당 기준연도가 1년 어긋남 | `services/dividends.py::_recent_business_year` | 4월 1일 00:00–09:00 KST |
 | B9 | 프론트에 access token 갱신 경로가 없다 — 백엔드 `/api/auth/refresh`는 **존재하는데** 아무도 안 부른다 | `frontend/src/api.js` 응답 인터셉터 | 1시간 경과(항상) |
 | B24 | `nav_analytics`가 백엔드 화이트리스트에 없어 **200 OK로 무음 폐기** | `routers/events.py::VALID_EVENTS` ← `components/Masthead.jsx`·`MobileTopActions.jsx` | admin이 '행동 분석' 진입 시 항상 |
-| **B42** | `insider_trades`·`disclosures`의 DART 조회 창이 UTC 기준 — 하루 밀림 | `services/insider_trades.py::fetch_insider_trades`, `services/disclosures.py::fetch_disclosures` | 00:00–09:00 KST 실행 |
-| B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | `services/consensus_pipeline.py` tz 경로 (§13.2에서 열림 확정, task#292) | 00:00–09:00 KST 실행 |
 | B53 | 루틴 프롬프트의 `market_outlook` 예시가 **문자열 템플릿**이라 AI가 산문으로 채우면 `segments[]`가 `None`이 되어 「사업부문 시장 분석」 섹션이 **크래시 없이 조용히 사라진다**(정본 `CLAUDE_COWORK_API.md`는 객체로 못박고, `routers/stocks.py`엔 스키마 검증이 없어 422 피드백도 없다) | `scripts/cowork-routine-prompt.md` → `services/analyst_reports.py::_market_outlook_segments` | 루틴이 프롬프트 예시 형태를 따를 때 |
 | B56 | `DiagLog` 복사 폴백이 `execCommand` 반환값을 확인하지 않아 **실패해도 '복사됨'** 이 뜨고, 이중 실패는 빈 `.catch(() => {})`가 완전히 삼킨다 — 이 컴포넌트의 목적(폰에서 로그 채취)이 정확히 그 조합에서 무너진다 | `components/DiagLog.jsx::legacyCopy · copyText · handleCopy` | `execCommand`가 예외 없이 false / writeText 거절 + legacyCopy throw |
 | B58 | `useTrackedStocks`의 티커별 뮤텍스가 **같은 훅 인스턴스를 공유하는 화면**에서 다른 카드의 동일 티커 2번째 클릭을 무음으로 삼킨다(`GuruStats`·`GuruAllocation`·`GuruManagers`·`GuruDetail`은 `pending`을 쓰지 않아 배지 비활성화도 없고, `onClick`이 반환값을 버려 호출부도 감지 못 한다) | `hooks/useTrackedStocks.js::toggle` ← `pages/GuruManagers.jsx` | 같은 티커가 여러 매니저 top10에 동시 등장 + 연속 클릭 |
-| **B70** | KR 업종 모멘텀 fetch가 **다일(多日) 연휴 2일차 이후엔 24개 업종 전부 빈 배열**을 낸다 — `_last_completed_trading_day`가 **주말만** 보정(`while d.weekday() >= 5`)하고 `fetch_sector_closes`는 빈 결과 시 **1회만** 하루 전으로 재조회한다. 설날·추석처럼 평일 공휴일이 3일 연속이면 base_dt와 1회 폴백이 모두 휴일이라 전량 실패. 처방: 폴백을 유계 루프(최대 N일)로 | `services/kiwoom/sector.py::_last_completed_trading_day` / `::fetch_sector_closes` (호출: `kr_sector_service.py::_fetch_one_sector`, 배치 `kr_sector_fetch` 매일 16:00 KST) | 평일 공휴일 3일 연속의 마지막 날 배치 실행 |
-| **B71** | 스케줄 **auto-seed가 검증을 안 거치고**, 리스케줄 루프가 **예외를 안 잡아** 배치 하나의 깨진 스펙이 **앱 기동 전체를 막을 수 있다** — `validate_schedule_spec`은 `routers/batches.py`의 PUT에서만 호출된다(grep 확인). 재현: `build_trigger_kwargs({'type':'weekly','days':['sun'],'time':''})` → `ValueError`. 처방: seed도 같은 validator를 타게 하고 리스케줄 루프는 잡 단위로 예외를 잡는다 | `scheduler/schedule.py::_seed_batch_schedules` / `::_reschedule_job` · `services/schedule_spec.py::validate_schedule_spec` | 저장된 스케줄 스펙에 빈 `time` 등 잘못된 값이 들어간 상태로 기동 |
 
 ### 계약·보안
 
@@ -121,7 +129,6 @@ mapped: 2026-08-10
 | B57 | `TechGraph` 섹션 게이트가 **컴포넌트 자신의 채택 조건과 다른 식**이라(페이지는 배열 길이만, 컴포넌트는 `validLabels` trim 필터) related가 실질 비어도 target 단독 빈 그래프가 열린다. 같은 파일이 `milestones`·`categories`엔 "게이트가 각 컴포넌트의 순수함수와 같은 식이어야 한다"는 규율을 준수하는데 `related`만 예외 | `pages/TechReport.jsx`(`hasRelated`) ↔ `components/tech/TechGraph.jsx`(`validLabels`·`groups`) — task#317이 SVG를 세로 흐름으로 재작성하며 `techGraphLayout`·`hasGraph`가 사라졌으나 **게이트 식 불일치 자체는 그대로다**(페이지 게이트는 여전히 배열 길이만 보고, 컴포넌트는 여전히 `trim()` 필터를 쓴다) · **부분(도달조건 축소, 재판정 task#325)**: 원 서술의 「`target` 단독 빈 그래프 박스」는 **더는 생기지 않는다** — task#317 재작성 후 `groups`는 `prerequisites.length>0 \|\| derivatives.length>0`일 때만 채워지고(`target` 단독으로는 그룹이 안 생긴다) 컴포넌트가 `!hasComposition && !hasBoundary`면 통째로 `return null`한다. 남은 도달 경로는 **task#320이 도입한 페이지 레벨 `hasConnections = hasComposition \|\| …`** 하나뿐이다 | 백엔드 `routers/tech_reports.py::Related`가 `List[str] = []`에 **항목별 non-empty 제약이 없어** 공백 문자열 원소가 통과할 때 |
 | B63 | 프론트 포매터 중복 — 재계수 완료(§13.2에서 열림 확정, task#292) | `frontend/src/utils.js` 및 산발 포매터 (§7.7·§7.9) |
 | **B76** | 관심목록 조회 **실패가 「후보 업체」 오추천으로 전파**된다 — `loadWatch`가 `GET /api/watchlist` 실패를 `.catch(console.warn)`로 삼키고 `watchTickers`를 초기값 `[]`로 방치하는데, `computeTechCandidates`는 `mine = new Set([...holdings, ...watchTickers])`를 **후보 풀 제외집합**으로 쓴다 → **이미 관심목록에 있는 종목이 「내가 안 가진 후보」로 추천**된다. 조회 실패는 「관심목록이 비어 있다」는 *사실이 아닌데* 화면이 그것을 사실로 취급해 **행동을 권한다**(task#307 3상태 규율: 미조회/0건/**실패**가 훅 반환값에서 구별돼야 한다). ⚠️ 코드 주석 `:261-262`은 「실패해도 부기만 사라지고 카드는 그대로」라고 적었는데 **`computeTechCandidates`의 제외집합 역할을 놓쳤다** — 주석이 자기 영향범위를 과소 서술한 사례. 데이터 오염은 없다(`routers/watchlist.py,83`이 중복 추가를 거부) | `pages/ExposureTab.jsx::loadWatch` → `::computeTechCandidates` → 호출부 | `GET /api/watchlist` 실패(네트워크·401·5xx) |
-| **B77** | 리포트 진행상태가 **사용자 무관 전역 싱글턴이고 시작이 비원자적**이라 동시 요청이 서로의 진행상태를 덮는다 — `start()`가 **무조건 상태 리셋**이고 진행 중 체크가 전혀 없다. **admin 한정이 아니다**: `generate_one`은 `Depends(get_current_user)`로 소유권만 검사하고 프론트도 `StockCard.jsx`·`TickerListItem.jsx`이 `isAdmin` 게이트 없이 호출한다. 재현: 두 스레드 인터리빙 → `{'running': False, 'done': 2, 'total': 1}`로 **`done > total` 불변식 위반** + 먼저 끝난 쪽이 남의 진행을 종료시킴. 최소 조치는 `start()`를 락 안에서 「이미 running이면 거부」로 | `services/progress.py::ProgressTracker` (전역 `_progress`: `routers/report.py` ← `::generate_one`/`::generate_all`, `routers/guru.py::start_crawl`) | 두 사용자 동시 생성 또는 한 사용자의 이중 클릭 |
 
 ### 검증장치·문서
 
@@ -396,10 +403,15 @@ finally:
 
 **진짜 잔여 위험은 다른 곳이다** — `query()`/`execute()`는 **각각 자기 커넥션·자기 트랜잭션**을 연다. 따라서 `execute()` 루프에는 문장 간 원자성이 없다: `leverage_service.py::_upsert_rows`, `lending_service.py::_upsert`. 멱등 `ON CONFLICT` upsert라 실무상 무해하지만 루프 중 크래시는 부분 날짜 범위를 남긴다.
 
+**같은 성질에서 나온 결함 2건은 닫혔다**(task#330). 이 절이 leverage/lending 루프만 잔여위험으로 인정했던 것이 그 둘을 「기록된 트레이드오프」로 오독시키는 토양이었다:
+
+- ~~`routers/admin.py::delete_user`~~ (B5) — 확인 `query` 1 + `execute` 6 = **독립 트랜잭션 7개**라 중간 실패가 「로그인은 되는데 종목·권한이 전부 사라진 계정」이나 고아 행을 영구히 남겼다. 멱등 upsert와 달리 **되돌릴 수 없는 DELETE**라 실무상 무해하지 않다. 한 커넥션의 단일 트랜잭션 + 가드 read `FOR UPDATE`(확인과 삭제가 다른 트랜잭션이면 그 틈의 admin 승격이 403을 우회한다).
+- ~~`storage/schedule.py::save_guru_managers`~~ (B68) — 읽기-병합-쓰기가 트랜잭션·락 없이 돌아 동시 크롤이 서로의 병합결과(드롭/백필 판정)를 덮었다. docstring의 「드롭은 영구 삭제가 아니다 — 다음 정상 크롤이 복원」은 **클로버가 안 난다는 보장이 아니다**.
+
 ### 4.4 SQL 인젝션 — **이미 가드됨(클린)**
 
 동적 SQL 3곳 전부 안전하다:
-- `routers/admin.py::delete_user` — `f"DELETE FROM {table} WHERE {col} = %s"`의 `table`/`col`은 **하드코딩 리터럴 리스트** 순회, `user_id`는 파라미터화.
+- `routers/admin.py::delete_user` — `f"DELETE FROM {table} WHERE {col} = %s"`의 `table`/`col`은 **하드코딩 리터럴 리스트**(`_USER_DELETE_TARGETS` 모듈 상수) 순회, `user_id`는 파라미터화. 그 상수에 외부 입력을 넣지 말 것 — 안전성의 근거가 전부 「리터럴이다」에 걸려 있다.
 - `storage/portfolio.py::enrich_stock` — `set_clause`를 키에서 만들지만 그 앞에 `if not fields.keys() <= _ENRICH_KEYS: raise ValueError`(frozenset allowlist). 올바른 allowlist-then-interpolate.
 - `services/analyst_reports.py` — `_COLS`가 모듈 상수.
 
@@ -624,15 +636,19 @@ _scheduler.start()
 - **종료**: `_scheduler.shutdown(wait=False)`. 진행 중 배치가 쓰기 도중 버려지고, `deploy.sh`의 `docker stop`(SIGTERM 10s)과 겹치면 `job_runs`에 **영구 `running` 행**이 남는다(`_finish`가 영영 안 돈다).
 - **다중 스케줄러**: uvicorn 워커에서 오는 위험은 없다(`Dockerfile` CMD에 `--workers` 없음, compose에도 `command` 없음 → 단일 프로세스). 진짜 위험은 **컨테이너 이름 충돌**이다 — §10.3.
 
-### 6.8 KST vs 컨테이너 UTC — **부분 가드**
+### 6.8 KST vs 컨테이너 UTC — **부분 가드** (B7·B8·B42 해소, task#330)
 
-`services/utils.py::today_kst`가 하우스 규칙이고 `tests/test_no_bare_today.py`가 강제한다. 하지만 그 가드는 AST에서 **`node.func.attr == "today"`만** 매칭하므로 **`datetime.now()`/`utcnow()`는 못 잡는다**. 시장 날짜 판정에 흘러드는 잔존 UTC 호출:
+`services/utils.py::today_kst`(달력일)·`::now_kst`(타임스탬프)가 하우스 규칙이고 `tests/test_no_bare_today.py`가 강제한다. 하지만 그 가드는 AST에서 **`node.func.attr == "today"`만** 매칭하므로 **`datetime.now()`/`utcnow()`는 못 잡는다** → `tests/test_kst_date_boundaries.py::test_owned_modules_have_no_naive_now_or_utcnow`가 그 둘을 담당한다. ⚠️ 그 축은 **열거된 파일만** 훑는다(현재 6파일: `dividends.py`·`consensus_pipeline.py`·`disclosures.py`·`insider_trades.py`·`routers/guru.py`·`scheduler/jobs.py`) — 새 타임스탬프·날짜 writer를 만들면 그 목록에 추가해야 감사가 성립한다.
 
-- **B42 `services/insider_trades.py::fetch_insider_trades`** (MED) — `bgn_de`/`end_de`를 `datetime.now()`로 만든다. `insider_fetch`는 KST 스케줄이라 00:00–09:00 KST엔 컨테이너 UTC가 전일이고, `end_de`가 **당일 DART 공시를 통째로 배제**한다.
-- **B42 `services/disclosures.py::fetch_disclosures`** (MED) — `bgn_de` 시작점 동일 드리프트. 공시 피드와 AGM `meeting_date` 추출의 DART `list.json` 범위를 먹인다.
-- **B7 `services/dividends.py::_recent_business_year`** (MED) — `now = datetime.now()` → `year - (2 if now.month < 4 else 1)`. **월 경계 판정**이라 4월 1일 00:00–09:00 KST(UTC 3월 31일)엔 `month==3`이 되어 `year-2`를 반환, 그 창의 모든 KR 배당이 틀린 사업연도로 조회된다. 아이러니하게 같은 파일이 올바른 `_today_kst()`를 따로 정의한다.
-- LOW: `backlog.py`·`market/kr.py`의 `utcnow() - timedelta(days=730)`은 2년 룩백이라 하루 시프트가 무의미. `backlog.py::_get_corp_code_map`의 `utcnow()`는 *상대* TTL 비교라 올바름.
-- LOW(사용자 노출): `scheduler/jobs.py::_run_guru_crawl`·`routers/guru.py`가 `datetime.now().isoformat()`으로 `last_updated`를 쓴다 — naive 로컬(=UTC)이라 한국 사용자에게 크롤 시각이 **9시간 과거로** 표시된다.
+**해소된 것** (전부 `today_kst`/`now_kst` 또는 `ZoneInfo` 명시로 교체, task#330):
+
+- ~~**B42 `services/insider_trades.py::fetch_insider_trades`**~~ (MED) — `bgn_de`/`end_de`를 `datetime.now()`로 만들어, KST 스케줄인 `insider_fetch`가 00:00–09:00 KST에 UTC 전일을 보고 `end_de`가 **당일 DART 공시를 통째로 배제**했다.
+- ~~**B42 `services/disclosures.py::fetch_disclosures`**~~ (MED) — `bgn_de` 시작점 동일 드리프트. 공시 피드와 AGM `meeting_date` 추출의 DART `list.json` 범위를 먹였다.
+- ~~**B7 `services/dividends.py::_recent_business_year`**~~ (MED) — `now = datetime.now()` → `year - (2 if now.month < 4 else 1)`. **월 경계 판정**이라 4월 1일 00:00–09:00 KST(UTC 3월 31일)엔 `month==3`이 되어 `year-2`를 반환, 그 창의 모든 KR 배당이 틀린 사업연도로 조회됐다. 아이러니하게 같은 파일이 올바른 `_today_kst()`를 따로 정의하고 있었다(그 중복 몸통은 정본 헬퍼로 접었다).
+- ~~**B8 `services/consensus_pipeline.py`**~~ (LOW) — 컨센서스 `report_date`. 실측된 결함은 tz-aware 변환이 아니라 **naive UTC 인덱스를 미 시장일로 착각해 `.date`를 취한 것**이었다(yfinance `upgrades_downgrades` 인덱스는 항상 naive UTC라 `if idx.tz is not None` 분기는 dormant다) — 미 동부 20:00 이후 액션이 하루 앞선 날짜로 저장됐다.
+- ~~**LOW(사용자 노출): `scheduler/jobs.py::_run_guru_crawl`·`routers/guru.py::_run_crawl`**~~ — `datetime.now().isoformat()`으로 쓴 명부 `last_updated`가 naive UTC라 `GuruCrawlNow.jsx`가 크롤 시각을 **9시간 과거로** 표시했다(00~09시 KST엔 날짜까지 하루 뒤). `now_kst()`로 교체 — **두 레인 쌍**이라 한쪽만 고치면 값이 레인마다 엇갈린다.
+
+**잔존** — LOW: `backlog.py`·`market/kr.py`의 `utcnow() - timedelta(days=730)`은 2년 룩백이라 하루 시프트가 무의미. `backlog.py::_get_corp_code_map`의 `utcnow()`는 *상대* TTL 비교라 올바름. `routers/analyst_reports.py`·`services/kis/futures.py`·`services/report_generator.py`·`market_indicators/kospi_signal.py` 4곳은 `_KST = ZoneInfo(...)`를 **자체 재구현**한 상태다(동작은 맞지만 정본 헬퍼를 안 쓴다 — 그 형태가 정확히 B7을 만든 토양이다).
 
 ### 6.9 배치 레지스트리 정합 — **이미 가드됨 + 테스트 취약**
 
@@ -769,9 +785,18 @@ if (err.response?.status === 401) {
 
 ## 8. 캐시·무효화
 
-### 8.1 인메모리 캐시 6종 — **잠재 위험**(스레드 안전성)
+### 8.1 인메모리 캐시 6종 — **가드됨** (B69 해소, task#330)
 
-`services/cache.py`: snapshot(LRU 200)·list(TTL 5s)·dashboard(300s)·correlation(300s)·sector(300s)·macro(300s). 종목 추가·수정·삭제 시 dashboard·correlation·sector·macro가 자동 무효화된다. 이 dict들이 ThreadPool 워커(§4.2의 8~20 워커)에서 동시 접근되지만 락이 없다 — CPython GIL 덕에 개별 dict 연산은 원자적이라 실사고는 관측되지 않았다.
+`services/cache.py`: snapshot(LRU 200)·list(TTL 5s)·dashboard(300s)·correlation(300s)·sector(300s)·macro(300s). 종목 추가·수정·삭제 시 dashboard·correlation·sector·macro가 자동 무효화된다.
+
+3사이클 이월 뒤 task#325가 `threading.Barrier` 하니스로 재현하고 task#330이 닫았다. **락 규율 4항**(`TTLCache` docstring이 정본):
+
+1. `_lock`은 **dict 조작 구간만** 감싼다 — `loader()`는 락 **밖**에서 돈다(`_dashboard_cache`의 loader는 카드당 10-워커 ThreadPool을 쓰는 수 초짜리 작업이라 락 안에 넣으면 다른 사용자의 조회와 `invalidate()`가 그만큼 막힌다).
+2. 그 대가로 loader 실행 중 들어온 `invalidate()`를 **세대 카운터**(`_gen` / 모듈 전역 `_snap_gen`)로 감지해 캐시 적재를 건너뛴다 — 무효화가 조용히 no-op이 되는 것은 stale 값을 되살리는 정합 결함이다. 세대는 캐시 단위라 다른 키의 무효화도 in-flight 적재를 취소한다(보수적인 쪽).
+3. 만료 정리는 **in-place 삭제**다. 옛 구현은 `self._store = {...}`로 dict를 **재바인딩**해, 그 창의 `invalidate(key)`가 버려질 dict에 적용돼 유실됐다.
+4. 이 락은 **다른 락을 잡은 채로 획득하지 않는다**(중첩 0 → 데드락 불가). `cache.invalidate(ticker)`도 `_snap_lock`을 놓은 뒤 파생 캐시를 무효화한다.
+
+⚠️ **축은 두 캐시에 각각 둘 것.** 같은 규율을 `TTLCache`와 모듈 전역 `_snapshots` 양쪽에 넣었는데 초기엔 회귀 축이 `TTLCache`에만 있어 `_snap_gen` 가드가 **전 스위트에서 이빨 0**이었다(`if True:`로 무력화해도 실패 0 — 적대 검토가 잡았다). 현재는 `tests/test_concurrency_locks.py`에 `test_ttlcache_invalidate_during_loader_is_not_lost`와 `test_get_snapshot_invalidate_during_loader_is_not_lost`가 쌍으로 있다.
 
 ### 8.2 `market_cache` 신선도 — §6.3·§6.4 참조
 
@@ -1008,14 +1033,14 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 | # | 항목 | 생존 | 위치 | 판정 근거 | 이동 |
 |---|---|---|---|---|---|
-| B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 (LOW) |
-| B30 | 티커 유니버스 캐시가 **축소된** 스크레이프를 무검증 저장 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 (MEDIUM) |
+| B8 | 컨센서스 `report_date`가 UTC 변환으로 하루 밀림 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 (LOW) → **해소**(task#330) |
+| B30 | 티커 유니버스 캐시가 **축소된** 스크레이프를 무검증 저장 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 (MEDIUM) → **해소**(task#329) |
 | B33 | `any(snap_dist.values())`가 진짜 0/0/0을 결측으로 오판 | **닫힘** | 제자리 | **구조적 배제** — `market/kr.py::get_analyst_data_kr`의 세 버킷(`c>=3.5` / `2.5<=c<3.5` / `c<2.5`)이 실수선을 **완전 분할**하고, `market/__init__.py::get_analyst_data`도 yfinance 5열을 3버킷으로 완전 분할한다. 따라서 `buy+hold+sell==0 ⟺ 파싱된 평가 0건`이 참이고, 그 상태에서 mart 보충은 주석이 명시한 **의도된 폴백**이다 | → 해소 (아래 주의) |
 | — | `_filter_outliers`가 저장 시계열을 영구 손상 | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 **B60 (HIGH)** → **해소**(task#303, ADR-0040) |
 | — | Naver 재무를 **위치 인덱스**로 읽는다 | **열림** | 제자리 | 현재 코드 인용 확인. 직전 판이 "다음 매핑의 우선 대상"으로 지목한 그 항목 | → §0 **B61 (HIGH)** → **해소**(task#303, ADR-0040) |
 | — | `_table_unit`의 억원 기본값 폴백(×100 오저장 클래스) | **열림** | 제자리 | 현재 코드 인용 확인 | → §0 **B62 (MEDIUM)** → **해소**(task#328, `B64`와 함께) |
 | — | 프론트 포매터 중복 15종 | **열림** | 제자리 | 재계수 수행 | → §0 **B63 (LOW)** |
-| — | 인메모리 캐시 스레드 안전성의 실제 사고 가능성 | ~~판정불가~~ → **열림** | 제자리 | ~~도구 범위 밖 — 동시성 재현이 필요하다~~ → **판정 완료(2026-08-21, task#325).** 「계속 미룰지 vs 하니스를 만들지」의 답으로 **하니스를 만들었다** — `threading.Barrier` + monkeypatch로 강제 인터리빙을 주입해 로컬 `.venv`(py3.9, DB 미접촉, 라이브 쓰기 0)에서 재현했다. 산출 4건: `TTLCache.get`/`invalidate` 무잠금 **KeyError 재현**(→ B69) · `TTLCache.get` single-flight 부재 → `loader() call_count: 2` 재현(단 `§4.2`의 기지 위험이라 REFUTED) · `ProgressTracker` 비원자적 start → `done(2) > total(1)` 불변식 위반 재현(→ B77) · `save_guru_managers` RMW 락 부재(→ B68). **비용은 하니스 몇 줄이었다** — 「도구 범위 밖」이라는 문구가 2사이클을 버틴 것에 비해 훨씬 싸다 | → §0 **B69 (LOW)** · 파생 **B68**·**B77** |
+| — | 인메모리 캐시 스레드 안전성의 실제 사고 가능성 | ~~판정불가~~ → **열림** → **해소**(task#330: B69·B68·B77 전건) | 제자리 | ~~도구 범위 밖 — 동시성 재현이 필요하다~~ → **판정 완료(2026-08-21, task#325).** 「계속 미룰지 vs 하니스를 만들지」의 답으로 **하니스를 만들었다** — `threading.Barrier` + monkeypatch로 강제 인터리빙을 주입해 로컬 `.venv`(py3.9, DB 미접촉, 라이브 쓰기 0)에서 재현했다. 산출 4건: `TTLCache.get`/`invalidate` 무잠금 **KeyError 재현**(→ B69) · `TTLCache.get` single-flight 부재 → `loader() call_count: 2` 재현(단 `§4.2`의 기지 위험이라 REFUTED) · `ProgressTracker` 비원자적 start → `done(2) > total(1)` 불변식 위반 재현(→ B77) · `save_guru_managers` RMW 락 부재(→ B68). **비용은 하니스 몇 줄이었다** — 「도구 범위 밖」이라는 문구가 2사이클을 버틴 것에 비해 훨씬 싸다 | → §0 **B69 (LOW)** · 파생 **B68**·**B77** |
 
 > **재판정: 2026-08-21 (task#325, 10차 버그 헌트 C 판정 레인).** 위 8건이 아니라 **`§0`의 열린 29건 전수**를 재판정했다(분모 31 = 29 + 표에서 제거된 `B60`·`B61`). 결과: **열림 28 · 닫힘 2 · 부분 1 · 판정불가 0**, 위치 전건 제자리 — **닫힌 것이 0건**이다. `B57`만 도달조건이 축소돼 재서술했다(§0 참조).
 >

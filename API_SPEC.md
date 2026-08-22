@@ -361,7 +361,7 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 
 ### `DELETE /api/admin/users/{user_id}`
 
-관리자 전용. 특정 사용자를 삭제한다. 삭제 전 `user_stocks`·`user_menu_permissions`·`refresh_tokens`·`digests`·`calendar_cache`의 연관 행을 먼저 제거한 뒤 `users` 행을 삭제한다. 어드민 계정(`403`)·소셜 로그인 계정(`403`)은 삭제할 수 없고, 존재하지 않는 사용자는 `404`.
+관리자 전용. 특정 사용자를 삭제한다. `user_stocks`·`user_menu_permissions`·`refresh_tokens`·`digests`·`calendar_cache`의 연관 행을 먼저 제거한 뒤 `users` 행을 삭제하며, **6개 DELETE 전체가 단일 트랜잭션**이다 — 어느 단계가 실패해도 전체 롤백되므로 부분 삭제(「로그인은 되는데 종목·권한이 사라진 계정」·고아 행)가 남지 않는다. 어드민 계정(`403`)·소셜 로그인 계정(`403`)은 삭제할 수 없고, 존재하지 않는 사용자는 `404`. 이 세 가드의 조회는 삭제와 **같은 트랜잭션에서 행을 잠근 뒤** 수행하므로, 확인과 삭제 사이에 그 사용자가 admin으로 승격되어도 `403` 가드를 우회할 수 없다.
 
 **Auth:** admin 권한 필요 (`403` if not admin)
 
@@ -373,6 +373,10 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 ```json
 { "ok": true }
 ```
+
+**Error `500`** — `{"detail": "사용자 삭제 실패 — <단계> 단계에서 롤백됨(변경된 행 없음)"}`.
+`<단계>`는 실패 지점(`select` 또는 테이블명)이다. 이 응답은 **아무것도 삭제되지 않았음을 보장**하므로
+클라이언트는 목록을 되돌리지 말고 그대로 재시도하면 된다(부분 삭제 상태는 존재하지 않는다).
 
 ### `GET /api/admin/analytics/events`
 
@@ -1550,7 +1554,11 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 ### `GET /api/report/progress`
 
-리포트 생성 진행 상황 조회. 생성 중일 때 폴링용으로 사용.
+**호출자 자신의** 리포트 생성 진행 상황 조회. 생성 중일 때 폴링용으로 사용.
+
+진행상태는 **호출자별로 분리**돼 있다 — 다른 사용자의 생성은 여기 나타나지 않으며,
+한 번도 생성한 적 없는 호출자는 초기 상태(`running:false · done:0 · total:0`)를 받는다.
+API 키 레인은 `_API_KEY_USER_ID` 하나를 공유하므로 그 레인 안에서는 단일 진행상태다.
 
 **Auth:** Bearer token 필요
 
@@ -1560,22 +1568,29 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
   "running": true,
   "done": 2,
   "total": 5,
-  "current": "AAPL"
+  "current": "AAPL",
+  "failed": [{ "ticker": "TSLA", "error": "quote fetch failed" }]
 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `running` | boolean | 생성 진행 중 여부 |
-| `done` | integer | 완료된 종목 수 |
+| `done` | integer | **처리 시도**가 끝난 종목 수 (실패 포함 — 저장 성공 수가 아니다) |
 | `total` | integer | 전체 대상 종목 수 |
 | `current` | string | 현재 처리 중인 ticker (완료 시 `""`) |
+| `failed` | array | 실패 종목 `{ticker, error}` 목록 (없으면 `[]`) |
+
+> 완료 판정은 `running === false && total > 0 && done >= total`. `done`이 시도 총계이므로
+> 성공 수는 `done - failed.length`로 계산할 것.
 
 ---
 
 ### `GET /api/report/backfill/progress`
 
-리포트 백필 진행 상황 조회.
+리포트 백필 진행 상황 조회. **이 진행상태는 프로세스 전역 단일 트래커**다 — 형제
+`GET /api/report/progress`(호출자별로 분리)와 달리, 백필은 admin 전용 단일 작업이라
+누가 조회해도 같은 상태를 본다.
 
 **Auth:** Bearer token 필요
 
@@ -1585,9 +1600,20 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
   "running": true,
   "done": 10,
   "total": 60,
-  "current": "AAPL (2026-03-15)"
+  "current": "AAPL (2026-03-15)",
+  "created": 137,
+  "failed": []
 }
 ```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `running` | boolean | 백필 진행 중 여부 |
+| `done` | integer | **처리 시도**가 끝난 종목 수 (실패 포함 — 저장 성공 수가 아니다) |
+| `total` | integer | 전체 대상 종목 수 |
+| `current` | string | 현재 처리 중인 `ticker` (완료 시 `""`) |
+| `created` | integer | 누적 **생성된 스냅샷 수**(종목 수가 아니다 — 종목당 여러 날짜가 생성된다) |
+| `failed` | array | 진행상태 트래커 공용 필드. **이 엔드포인트에서는 항상 `[]`** — 백필 루프는 종목별 실패를 서버 로그(`[Backfill] Failed for …`)에만 남기고 이 목록을 채우지 않는다. 실패 종목을 여기서 읽으려 하지 말 것 |
 
 ---
 
@@ -1623,6 +1649,14 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 
 **Error `400`** — 포트폴리오와 관심종목 모두 비어있을 때
 
+**Error `409`** — `{"detail": "리포트 생성이 이미 진행 중입니다"}`. 진행상태 트래커는
+**호출자(user_id)당 하나**이므로, 같은 호출자의 생성이 진행 중이면 `/generate`와
+`/generate/{ticker}`가 **서로를 거부한다**(전체 생성 직후 개별 재생성도 여기 걸린다).
+거부는 진행 중인 생성에 **아무 영향을 주지 않는다** — 진행률은 `GET /api/report/progress`로
+계속 확인 가능하고, 완료를 기다린 뒤 재요청하면 된다. 클라이언트는 이 응답을 「생성 실패」로
+표시하지 말 것(실제로는 앞선 생성이 정상 진행 중이다). 응답 flush 실패로 백그라운드가
+아예 시작되지 않은 경우엔 **무활동 15분** 뒤 자동 회수되어 재요청이 가능해진다.
+
 ---
 
 ### `POST /api/report/generate/{ticker}`
@@ -1639,6 +1673,9 @@ KR 종목의 일자별 투자자별 수급 추이(외국인/기관/개인 순매
 ```
 
 **Error `404`** — 포트폴리오 또는 관심종목에 없는 ticker
+
+**Error `409`** — `{"detail": "리포트 생성이 이미 진행 중입니다"}`. 조건·의미는
+`POST /api/report/generate`의 409와 같다(트래커가 호출자당 하나라 두 엔드포인트가 공유).
 
 ---
 
@@ -2041,7 +2078,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/consensus/batch/progress`
 
-컨센서스 일괄 수집 진행 상황 조회.
+컨센서스 일괄 수집 진행 상황 조회. **프로세스 전역 단일 트래커**다(형제
+`GET /api/report/progress`만 호출자별로 분리돼 있다).
 
 **Auth:** Bearer token 필요
 
@@ -2051,9 +2089,13 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "running": true,
   "done": 3,
   "total": 10,
-  "current": "AAPL"
+  "current": "AAPL",
+  "failed": []
 }
 ```
+
+> `done`은 **처리 시도** 기준(실패 포함)이다. `failed`는 진행상태 트래커 공용 필드로
+> **이 엔드포인트에서는 항상 `[]`** — 일괄 수집 루프는 이 목록을 채우지 않는다.
 
 ---
 

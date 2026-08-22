@@ -1,35 +1,63 @@
+import threading
 import time
 from collections import OrderedDict
 from typing import Optional
 
 
 class TTLCache:
+    """스레드 안전 TTL 캐시 (B69).
+
+    락 규율:
+    - `_lock`은 **dict 조작 구간만** 감싼다. `loader()`는 락 **밖**에서 돈다 —
+      `_dashboard_cache`의 loader는 카드당 10-워커 ThreadPool을 쓰는 수 초짜리 작업이라
+      락 안에 넣으면 다른 사용자의 조회와 `invalidate()`가 그만큼 막힌다.
+    - 그 대가로 loader 실행 중 들어온 `invalidate()`를 **세대 카운터**로 감지해 캐시를
+      건너뛴다. 무효화가 조용히 no-op이 되는 것은 stale 값을 되살리는 정합 결함이다
+      (세대는 캐시 단위라, 다른 키의 무효화도 in-flight 적재를 취소한다 — 보수적인 쪽).
+    - 만료 정리는 **in-place 삭제**다. 옛 구현은 `self._store = {...}`로 dict를
+      **재바인딩**해서, 그 창에 실행된 `invalidate(key)`가 버려질 dict에 적용돼 유실됐다.
+    - 이 락은 **다른 락을 잡은 채로 획득하지 않는다**(중첩 0 → 데드락 불가).
+      `cache.invalidate(ticker)`도 `_snap_lock`을 놓은 뒤에 파생 캐시를 무효화한다.
+    """
+
     def __init__(self, ttl: float, maxsize: int = 200):
         self._ttl = ttl
         self._maxsize = maxsize
         self._store: dict = {}  # key -> (data, timestamp)
+        self._lock = threading.Lock()
+        self._gen = 0  # invalidate 호출마다 증가 — loader 실행 중 무효화 감지용
 
     def get(self, key: str, loader):
         now = time.time()
-        if key in self._store:
-            data, ts = self._store[key]
-            if now - ts < self._ttl:
-                return data
-        # 만료 항목 정리 (maxsize 초과 시)
-        if len(self._store) >= self._maxsize:
-            self._store = {k: v for k, v in self._store.items() if now - v[1] < self._ttl}
+        with self._lock:
+            if key in self._store:
+                data, ts = self._store[key]
+                if now - ts < self._ttl:
+                    return data
+            # 만료 항목 정리 (maxsize 초과 시) — 재바인딩 금지, in-place 삭제
+            if len(self._store) >= self._maxsize:
+                for k in [k for k, v in self._store.items() if now - v[1] >= self._ttl]:
+                    del self._store[k]
+            gen = self._gen
         data = loader()
-        self._store[key] = (data, now)
+        with self._lock:
+            if gen == self._gen:
+                self._store[key] = (data, now)
         return data
 
     def invalidate(self, key: str = None):
-        if key is None:
-            self._store.clear()
-        else:
-            self._store.pop(key, None)
+        with self._lock:
+            self._gen += 1
+            if key is None:
+                self._store.clear()
+            else:
+                self._store.pop(key, None)
 
 
 _snapshots: OrderedDict[str, dict] = OrderedDict()
+# 모듈 전역 `_snapshots`용 락·세대 (TTLCache와 같은 규율 — loader는 락 밖).
+_snap_lock = threading.Lock()
+_snap_gen = 0
 _list_cache = TTLCache(60.0)
 _dashboard_cache = TTLCache(300.0)
 _correlation_cache = TTLCache(300.0)
@@ -38,21 +66,30 @@ _MAX = 50
 
 def get_snapshot(ticker: str, date: str, loader) -> Optional[dict]:
     key = f"{ticker.upper()}/{date}"
-    if key in _snapshots:
-        _snapshots.move_to_end(key)
-        return _snapshots[key]
+    with _snap_lock:
+        if key in _snapshots:
+            _snapshots.move_to_end(key)
+            return _snapshots[key]
+        gen = _snap_gen
     data = loader()
     if data is not None:
-        if len(_snapshots) >= _MAX:
-            _snapshots.popitem(last=False)
-        _snapshots[key] = data
+        with _snap_lock:
+            if gen == _snap_gen:  # 적재 중 무효화가 들어왔으면 되살리지 않는다
+                if len(_snapshots) >= _MAX:
+                    _snapshots.popitem(last=False)
+                _snapshots[key] = data
     return data
 
 
 def invalidate(ticker: str) -> None:
+    global _snap_gen
     prefix = f"{ticker.upper()}/"
-    for k in [k for k in _snapshots if k.startswith(prefix)]:
-        del _snapshots[k]
+    with _snap_lock:
+        _snap_gen += 1
+        for k in [k for k in _snapshots if k.startswith(prefix)]:
+            del _snapshots[k]
+    # ⚠️ 파생 캐시 무효화는 `_snap_lock`을 **놓은 뒤에** 한다 — 락 중첩을 만들지 않는
+    #    것이 이 파일의 데드락 불가 근거다(TTLCache 클래스 docstring 참조).
     invalidate_list()
     invalidate_dashboard()  # clear all users' dashboards
     invalidate_correlation()

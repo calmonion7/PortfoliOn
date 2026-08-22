@@ -11,7 +11,7 @@ from services import consensus_pipeline as _pipeline
 from services import cache as cache_svc
 from services import job_runs
 from services.utils import sanitize as _sanitize
-from services.progress import ProgressTracker
+from services.progress import ProgressTracker, ProgressRegistry
 from services.parallel import parallel_map
 from services.db import query, execute
 from auth import get_current_user, require_admin, get_current_user_or_api_key, require_admin_or_api_key, _API_KEY_USER_ID
@@ -42,13 +42,19 @@ def _slim_summary(data: dict) -> dict:
     s["volume_profile"] = {"poc": vp["poc"]} if vp.get("poc") is not None else None
     return _sanitize(s)
 
+# 리포트 생성 진행상태는 **호출자별**로 분리한다 — 전역 싱글턴 하나였을 때는 두 사용자의
+# 생성이 서로의 진행상태를 덮었고(진행률이 남의 종목을 가리킴), 겹친 두 실행의 increment가
+# 합산돼 done > total 이 됐다(B77). generate_one은 require_admin이 아니라 get_current_user
+# 게이트라 일반 사용자 둘이 실제로 부딪힌다.
+_progress_by_user = ProgressRegistry()
+# 진행상태 인자 없이 호출되는 경로(_run_generation 직접 호출)의 폴백 트래커.
 _progress = ProgressTracker()
 _backfill_progress = ProgressTracker(created=0)
 
 
 @router.get("/report/progress")
-def get_progress(_: str = Depends(get_current_user)):
-    return _progress.get()
+def get_progress(user_id: str = Depends(get_current_user)):
+    return _progress_by_user.peek(user_id)
 
 
 @router.get("/report/backfill/progress")
@@ -97,16 +103,17 @@ def generate_all(background_tasks: BackgroundTasks, tickers: Optional[str] = Non
         stocks = all_stocks
     if not stocks:
         raise HTTPException(status_code=400, detail="No stocks in portfolio or watchlist")
-    _progress.start(len(stocks))
+    tracker = _progress_by_user.for_key(user_id)
+    if not tracker.try_start(len(stocks)):
+        raise HTTPException(status_code=409, detail="리포트 생성이 이미 진행 중입니다")
     if date:
-        background_tasks.add_task(_run_generation, stocks, date)
+        background_tasks.add_task(_run_generation, stocks, date, tracker)
     else:
         # 명시 날짜가 없으면 종목 market별 기대날짜로 분리 생성(KR/US 기준일이 다름).
         by_market: dict = {}
         for s in stocks:
             by_market.setdefault((s.get("market") or "US") == "KR" and "KR" or "US", []).append(s)
-        for market, group in by_market.items():
-            background_tasks.add_task(_run_generation, group, storage.expected_report_date(market))
+        background_tasks.add_task(_run_generation_by_market, by_market, tracker)
     return {"message": f"Generating reports for {len(stocks)} stock(s)"}
 
 
@@ -116,31 +123,54 @@ def generate_one(ticker: str, background_tasks: BackgroundTasks, user_id: str = 
     stock = find_ticker(storage.get_all_stocks(user_id), ticker)
     if not stock:
         raise HTTPException(status_code=404, detail=f"{ticker} not found in portfolio or watchlist")
-    _progress.start(1)
-    background_tasks.add_task(_run_generation, [stock])
+    tracker = _progress_by_user.for_key(user_id)
+    if not tracker.try_start(1):
+        raise HTTPException(status_code=409, detail="리포트 생성이 이미 진행 중입니다")
+    background_tasks.add_task(_run_generation, [stock], None, tracker)
     return {"message": f"Generating report for {ticker.upper()}"}
 
 
-def _run_generation(stocks: list, target_date: str = None):
+def _run_generation_by_market(by_market: dict, progress: Optional[ProgressTracker] = None):
+    """market별 기대날짜로 그룹을 나눠 생성한다.
+
+    finish()는 마지막 그룹 뒤 한 번만 호출한다 — 그룹마다 finish하면 첫 그룹이 끝나는 순간
+    running=False가 되어 그 창의 재요청이 try_start를 통과하고, 남은 그룹의 increment와
+    합산돼 다시 done > total 이 된다(B77).
+    """
+    p = progress or _progress
+    try:
+        for market, group in by_market.items():
+            _run_generation(group, storage.expected_report_date(market), p, finish=False)
+    finally:
+        p.finish()
+
+
+def _run_generation(stocks: list, target_date: str = None,
+                    progress: Optional[ProgressTracker] = None, finish: bool = True):
     # start()는 호출한 엔드포인트에서 이미 호출함 — 여기서 이중 호출 금지
+    p = progress or _progress
 
     def _process_one(stock):
-        _progress.set(current=stock["ticker"])
+        p.set(current=stock["ticker"])
         try:
             report_generator.generate_report_with_retry(stock, target_date=target_date)
             cache_svc.invalidate(stock["ticker"])
             _pipeline.run_daily([stock])
         except Exception as e:
             logger.warning(f"[Report] Failed for {stock['ticker']}: {e}")
-            _progress.add_failed(stock["ticker"], str(e))
+            p.add_failed(stock["ticker"], str(e))
         finally:
-            _progress.increment()
+            p.increment()
 
     # 그룹이 전부 KR이면 daily_report_kr, 그 외(혼합·US 포함)는 daily_report_us로 기록.
     _batch_id = "daily_report_kr" if stocks and all(s.get("market") == "KR" for s in stocks) else "daily_report_us"
     with job_runs.record(_batch_id, "manual"):
-        parallel_map(_process_one, stocks, max_workers=5)
-        _progress.finish()
+        try:
+            parallel_map(_process_one, stocks, max_workers=5)
+        finally:
+            # finish를 빠뜨리면 running=True가 남아 그 사용자가 영구히 409를 받는다.
+            if finish:
+                p.finish()
 
 
 def _read_snapshot(ticker: str, date_str: str) -> Optional[dict]:

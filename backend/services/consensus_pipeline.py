@@ -159,6 +159,11 @@ def _fetch_kr_fnguide(ticker: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 원천 수집: US (yfinance)
 # ---------------------------------------------------------------------------
+# US 애널리스트 리포트의 report_date 기준 시장 시간대. yfinance가 주는 epoch를 UTC로
+# 읽으면 장 마감 후 액션이 하루 앞선 날짜가 되므로 ET로 환산해 시장일을 얻는다.
+_US_MARKET_TZ = "America/New_York"
+
+
 def _fetch_us_raw(ticker: str, days: int = 7) -> list[dict]:
     try:
         import yfinance as yf
@@ -169,12 +174,19 @@ def _fetch_us_raw(ticker: str, days: int = 7) -> list[dict]:
         if ud is None or ud.empty:
             return []
 
+        # yfinance는 GradeDate를 epoch초로 받아 `pd.to_datetime(..., unit='s')`로 만든다
+        # (1.2.0 `scrapers/quote.py:554`) → 인덱스는 **naive UTC**이고 tz-aware가 아니다.
+        # 그것을 그대로 `.date`로 읽으면 미 동부 20:00 이후에 나온 애널리스트 액션이
+        # 하루 앞선 report_date로 박제된다(라이브 실측: MSFT 929행 중 7행이 어긋났다).
+        # 시장일(ET) 기준으로 통일한다 — tz-aware를 주는 버전도 같은 곳으로 수렴시킨다
+        # (그 분기는 1.2.0에서 dormant이지만 코드에 실재하므로 함께 맞춘다).
         idx = pd.to_datetime(ud.index)
-        if idx.tz is not None:
-            idx = idx.tz_convert(None)
+        idx = idx.tz_localize("UTC") if idx.tz is None else idx
         ud = ud.copy()
-        ud.index = idx.date
+        ud.index = idx.tz_convert(_US_MARKET_TZ).date
 
+        # cutoff는 KST 달력일 기준(today_kst) — 창의 하한이라 시장일과 최대 1일 어긋나도
+        # 「최근 N일」 수집 의도를 해치지 않는다. 상한은 없다.
         cutoff = today_kst() - timedelta(days=days)
         results = []
         for d, row in ud.iterrows():

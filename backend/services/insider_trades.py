@@ -17,12 +17,13 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import requests
 
 from services.backlog import _get_corp_code_map
 from services.db import execute, execute_many, query
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +118,11 @@ def fetch_insider_trades(corp_code: str, days: int = 30) -> list[dict]:
 
     elestock.json + majorstock.json을 각각 호출해 정규화·결합한다.
     status != "000"(예: 013 무데이터)은 빈 결과로 graceful 처리."""
-    bgn_de = (datetime.now() - timedelta(days=days)).strftime("%Y%m%d")
-    end_de = datetime.now().strftime("%Y%m%d")
+    # 조회 창은 KST 달력일 기준. end_de는 창의 *상한*이라 bare datetime.now()(=컨테이너 UTC)로
+    # 하루 뒤처지면 그날 접수된 보고가 통째로 창 밖으로 떨어진다(B42).
+    today = today_kst()
+    bgn_de = (today - timedelta(days=days)).strftime("%Y%m%d")
+    end_de = today.strftime("%Y%m%d")
     out: list[dict] = []
     for spec in _REPORTS:
         try:

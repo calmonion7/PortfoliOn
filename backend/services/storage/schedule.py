@@ -1,5 +1,6 @@
 # backend/services/storage/schedule.py
 import json
+import threading
 from typing import Optional
 from services.db import query, execute
 
@@ -24,6 +25,16 @@ def get_guru_managers() -> dict:
 # 0.8인 이유: 정상 은퇴는 회차당 한 자릿수이고(83명 중 17명 동시 은퇴는 비현실적),
 # 마크업 변경으로 인한 열화는 대개 그보다 훨씬 크게 깎인다(관측된 사례는 83→40).
 _ROSTER_MIN_COVERAGE = 0.8
+
+# `save_guru_managers`의 읽기-병합-쓰기를 직렬화한다(B68).
+# `db.py`의 `query()`/`execute()`는 **각각 독립 커넥션·트랜잭션**이라 그 사이에 다른 크롤이
+# 끼어들면 둘 다 같은 직전값을 읽고 나중 쓰기가 앞선 신선분을 되돌린다(lost update).
+# `guru_managers`는 id=1 단일 JSONB 행이라 그 한 번이 명부 전체를 치환한다.
+# 겹치는 경로가 실재한다 — 수동 크롤은 `routers/guru.py`의 BackgroundTasks 스레드,
+# 자동 크롤은 APScheduler 스레드이고 **자동 경로는 `_progress`의 409 가드를 보지 않는다**.
+# ⚠️ 이 락은 **프로세스 내** 상호배제다. 배포는 `uvicorn main:app`(워커 1)이라 현재 배선에서는
+#    이것이 곧 전체 상호배제지만, `--workers N`으로 가면 DB advisory lock이 필요해진다.
+_guru_save_lock = threading.Lock()
 
 
 def save_guru_managers(data: dict) -> dict:
@@ -52,6 +63,12 @@ def save_guru_managers(data: dict) -> dict:
     보류 중에도 데이터는 온전하고, 보류는 매 회차 경고로 **눈에 보인다**. 명부가 진짜로 임계
     밑까지 줄면 사람이 보고 판단한다. 그리고 **드롭은 영구 삭제가 아니다** — 다음 정상 크롤이
     같은 계산을 다시 해서 복원하므로, 한 회차 보류의 비용은 '은퇴 반영이 1회 늦어짐'뿐이다.
+
+    ⚠️ 위 "드롭은 영구 삭제가 아니다"는 *보류(held)* 의 자기치유 서술이고 **클로버가 안 난다는
+    보장이 아니다**(B68). 동시 크롤의 lost update로 `stored`가 83→40이 되면 ⓐ 다음 회차의
+    백필 소스가 40이라 사라진 43명을 복원할 길이 없고 ⓑ `_ROSTER_MIN_COVERAGE` 판정의 분모가
+    40으로 오염돼 임계가 함께 낮아진다 — 즉 자기치유가 성립하지 않고 가드 자신이 무력화된다.
+    그래서 읽기-병합-쓰기는 `_guru_save_lock`으로 직렬화한다.
     """
     fresh = data.get("managers") or []
     # ⚠️ 전량실패 판정은 반드시 백필 **앞**이다. 뒤로 가면 백필이 목록을 채워 이 분기가
@@ -60,42 +77,45 @@ def save_guru_managers(data: dict) -> dict:
         return {"saved": False, "fresh": 0, "stale": 0, "dropped": 0, "held": 0}
 
     fresh_by_id = {m["id"]: m for m in fresh if m.get("id")}
-    stored_by_id = {m["id"]: m for m in (get_guru_managers().get("managers") or []) if m.get("id")}
-    roster_ids = [r["id"] for r in (data.get("roster") or []) if r.get("id")]
-    held = 0
-    if not roster_ids:
-        # 명부 미제공 — 신선분을 앞에 두고 저장분을 보존하되, 은퇴 판단은 하지 않는다.
-        roster_ids = list(fresh_by_id) + [i for i in stored_by_id if i not in fresh_by_id]
-    elif stored_by_id and len(roster_ids) < _ROSTER_MIN_COVERAGE * len(stored_by_id):
-        # ⚠️ 판정은 merged 구성 **앞**이다 — 뒤로 가면 백필이 목록을 채워 영영 발동하지 않는다
-        #    (BH7-L1의 get_treasury()가 정확히 그 순서로 죽어 있다).
-        # 명부가 짧다 = 명부를 못 믿는다 → 이 회차의 드롭을 보류한다. 명부 미제공 폴백과
-        # 같은 shape(명부 순서 앞, 보존분 뒤)을 재사용하므로 결과적으로 dropped == 0이 된다.
-        missing = [i for i in stored_by_id if i not in roster_ids]
-        held = len(missing)
-        roster_ids = roster_ids + missing
+    # 이 아래 전체가 읽기-병합-쓰기 임계구간이다. 다른 락을 잡은 채 들어오지 않는다(중첩 0).
+    with _guru_save_lock:
+        stored_by_id = {m["id"]: m
+                        for m in (get_guru_managers().get("managers") or []) if m.get("id")}
+        roster_ids = [r["id"] for r in (data.get("roster") or []) if r.get("id")]
+        held = 0
+        if not roster_ids:
+            # 명부 미제공 — 신선분을 앞에 두고 저장분을 보존하되, 은퇴 판단은 하지 않는다.
+            roster_ids = list(fresh_by_id) + [i for i in stored_by_id if i not in fresh_by_id]
+        elif stored_by_id and len(roster_ids) < _ROSTER_MIN_COVERAGE * len(stored_by_id):
+            # ⚠️ 판정은 merged 구성 **앞**이다 — 뒤로 가면 백필이 목록을 채워 영영 발동하지 않는다
+            #    (BH7-L1의 get_treasury()가 정확히 그 순서로 죽어 있다).
+            # 명부가 짧다 = 명부를 못 믿는다 → 이 회차의 드롭을 보류한다. 명부 미제공 폴백과
+            # 같은 shape(명부 순서 앞, 보존분 뒤)을 재사용하므로 결과적으로 dropped == 0이 된다.
+            missing = [i for i in stored_by_id if i not in roster_ids]
+            held = len(missing)
+            roster_ids = roster_ids + missing
 
-    merged, stale = [], 0
-    for mid in roster_ids:
-        if mid in fresh_by_id:
-            merged.append(fresh_by_id[mid])
-        elif mid in stored_by_id:
-            merged.append(stored_by_id[mid])
-            stale += 1
+        merged, stale = [], 0
+        for mid in roster_ids:
+            if mid in fresh_by_id:
+                merged.append(fresh_by_id[mid])
+            elif mid in stored_by_id:
+                merged.append(stored_by_id[mid])
+                stale += 1
 
-    payload = {k: v for k, v in data.items() if k != "roster"}
-    payload["managers"] = merged
-    execute(
-        "INSERT INTO guru_managers (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
-        (json.dumps(payload),),
-    )
-    return {
-        "saved": True,
-        "fresh": len(fresh_by_id),
-        "stale": stale,
-        "dropped": sum(1 for i in stored_by_id if i not in set(roster_ids)),
-        "held": held,
-    }
+        payload = {k: v for k, v in data.items() if k != "roster"}
+        payload["managers"] = merged
+        execute(
+            "INSERT INTO guru_managers (id, data) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data",
+            (json.dumps(payload),),
+        )
+        return {
+            "saved": True,
+            "fresh": len(fresh_by_id),
+            "stale": stale,
+            "dropped": sum(1 for i in stored_by_id if i not in set(roster_ids)),
+            "held": held,
+        }
 
 
 def get_guru_schedule() -> dict:

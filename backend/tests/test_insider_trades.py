@@ -116,8 +116,14 @@ def test_fetch_graceful_on_status_013_and_error(monkeypatch):
 
 
 def test_fetch_passes_recent_window(monkeypatch):
-    """bgn_de는 days 전, end_de는 오늘."""
-    from datetime import datetime, timedelta
+    """bgn_de는 days 전, end_de는 오늘 — 기준은 **KST 달력일**(B42).
+
+    기대값을 `datetime.now()`로 재계산하면 프로덕션과 같은 식이라 동어반복이 되고, 게다가
+    컨테이너(UTC)에서는 00~09시 KST에 프로덕션(KST)과 하루 어긋나 실패한다. 시간대 경계
+    자체를 재는 축은 tests/test_kst_date_boundaries.py가 시각을 고정해 담당한다.
+    """
+    from datetime import timedelta
+    from services.utils import today_kst
     from services import insider_trades as svc
     captured = {}
 
@@ -129,8 +135,8 @@ def test_fetch_passes_recent_window(monkeypatch):
 
     monkeypatch.setattr(svc.requests, "get", fake_get)
     svc.fetch_insider_trades("00164742", days=30)
-    assert captured["bgn_de"] == (datetime.now() - timedelta(days=30)).strftime("%Y%m%d")
-    assert captured["end_de"] == datetime.now().strftime("%Y%m%d")
+    assert captured["bgn_de"] == (today_kst() - timedelta(days=30)).strftime("%Y%m%d")
+    assert captured["end_de"] == today_kst().strftime("%Y%m%d")
     assert captured["corp_code"] == "00164742"
 
 

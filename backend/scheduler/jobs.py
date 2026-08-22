@@ -50,14 +50,16 @@ def _generate_us():
 
 def _run_guru_crawl():
     from services.guru_scraper import scrape_all_managers
-    from datetime import datetime
+    from services.utils import now_kst
     # 수동 경로(routers/guru._run_crawl)와 **같은 분기**다 — 한쪽만 고치면 다른 쪽이 그대로
     # 남는 게 B29의 본질이었다. 분류를 바꿀 땐 두 곳을 함께 볼 것.
     with job_runs.record("guru_crawl", "auto") as run:
         try:
             managers, roster = scrape_all_managers()
             stats = storage.save_guru_managers({
-                "last_updated": datetime.now().isoformat(timespec="seconds"),
+                # 컨테이너 UTC라 bare `datetime.now()`는 화면에 9시간 뒤처진 시각을 남긴다
+                # (수동 레인 `routers/guru.py`와 쌍 — 한쪽만 고치면 레인마다 값이 엇갈린다).
+                "last_updated": now_kst().isoformat(timespec="seconds"),
                 "managers": managers,
                 "roster": roster,
             })

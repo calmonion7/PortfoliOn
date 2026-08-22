@@ -1,11 +1,15 @@
 # backend/routers/admin.py
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List
 
 from auth import require_admin, require_admin_or_api_key
-from services.db import query, execute
+from services.db import query, execute, get_connection
 from services import cache as cache_svc
+
+logger = logging.getLogger(__name__)
 
 ALL_MENUS = ["portfolio", "research", "market", "guru", "settings"]
 
@@ -99,24 +103,57 @@ def get_default_permissions(admin_id: str = Depends(require_admin)):
     return base
 
 
+# 사용자 삭제 대상·순서. users를 마지막에 두는 것은 자식 테이블이 users(id)를 FK로
+# 참조하기 때문이다. 테이블·컬럼명은 이 코드 내 리터럴이라 f-string 조립이 주입 불가다 —
+# 외부 입력을 여기 넣지 말 것(값은 항상 %s 바인딩으로).
+_USER_DELETE_TARGETS = [
+    ("user_stocks", "user_id"),
+    ("user_menu_permissions", "user_id"),
+    ("refresh_tokens", "user_id"),
+    ("digests", "user_id"),
+    ("calendar_cache", "user_id"),
+    ("users", "id"),
+]
+
+
 @router.delete("/users/{user_id}")
 def delete_user(user_id: str, admin_id: str = Depends(require_admin)):
-    rows = query("SELECT role, oauth_provider FROM users WHERE id = %s", (user_id,))
-    if not rows:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
-    if rows[0]["role"] == "admin":
-        raise HTTPException(status_code=403, detail="어드민 계정은 삭제할 수 없습니다")
-    if rows[0]["oauth_provider"]:
-        raise HTTPException(status_code=403, detail="소셜 로그인 계정은 삭제할 수 없습니다")
-    for table, col in [
-        ("user_stocks", "user_id"),
-        ("user_menu_permissions", "user_id"),
-        ("refresh_tokens", "user_id"),
-        ("digests", "user_id"),
-        ("calendar_cache", "user_id"),
-    ]:
-        execute(f"DELETE FROM {table} WHERE {col} = %s", (user_id,))
-    execute("DELETE FROM users WHERE id = %s", (user_id,))
+    """사용자와 그 소유 행을 **단일 트랜잭션**으로 삭제한다 (B5).
+
+    `db.execute`는 호출마다 커넥션을 새로 얻어 커밋하므로 예전 구현(확인 query 1 + 삭제
+    execute 6)은 7개 독립 트랜잭션이었다 — 중간 실패가 「로그인은 되는데 종목·권한이 전부
+    사라진 계정」이나 고아 행을 영구히 남겼다. 한 커넥션에서 순차 실행하면 어느 단계가
+    실패해도 `get_connection`이 전체를 롤백한다(부분 삭제 0).
+    """
+    stage = "select"
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                # 가드 read를 삭제와 같은 트랜잭션에 두고 FOR UPDATE로 행을 잠근다 —
+                # 확인과 삭제가 다른 트랜잭션이면 그 틈의 admin 승격이 아래 403을 우회한다.
+                cur.execute(
+                    "SELECT role, oauth_provider FROM users WHERE id = %s FOR UPDATE",
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+                role, oauth_provider = row
+                if role == "admin":
+                    raise HTTPException(status_code=403, detail="어드민 계정은 삭제할 수 없습니다")
+                if oauth_provider:
+                    raise HTTPException(status_code=403, detail="소셜 로그인 계정은 삭제할 수 없습니다")
+                for table, col in _USER_DELETE_TARGETS:
+                    stage = table
+                    cur.execute(f"DELETE FROM {table} WHERE {col} = %s", (user_id,))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Admin] 사용자 삭제 롤백 ({user_id}, 단계={stage}): {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"사용자 삭제 실패 — {stage} 단계에서 롤백됨(변경된 행 없음)",
+        )
     return {"ok": True}
 
 

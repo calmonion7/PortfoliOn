@@ -125,9 +125,9 @@ backend/
 |---|---|
 | `db.py` | psycopg2 `ThreadedConnectionPool(minconn=1, maxconn=20)` 싱글톤(+`threading.Lock` 이중검사). `get_connection()` 컨텍스트매니저(성공 시 commit·예외 시 rollback·항상 putconn), `query`(RealDictCursor→dict 리스트), `execute`(rowcount), `execute_many`(`execute_batch`, 빈 리스트는 no-op). `maxconn=20`은 최대 ThreadPool 동시성(calendar 15·analysis 11)보다 크게 잡은 값 — psycopg2 풀은 소진 시 블록이 아니라 `PoolError`를 던진다 |
 | `cache.py` | 인메모리 캐시 전용 모듈. `TTLCache(ttl, maxsize=200)` 클래스 + 스냅샷 LRU(`OrderedDict`, `_MAX=50`). 인스턴스: list 60s · dashboard 300s · correlation 300s · sector 300s · macro 300s · quote 60s · live_prices 15s · rebalance 300s · exposure 300s. `invalidate_portfolio_caches(user_id)`가 묶음 무효화 |
-| `utils.py` | `today_kst()`(컨테이너가 UTC라 bare `date.today()` 금지), `sanitize()`(NaN/inf 재귀 제거 — **float뿐 아니라 `Decimal`도 검사**), `is_valid_ticker()`(`^[A-Za-z0-9.\-]{1,15}$`), `find_ticker*` 헬퍼 |
+| `utils.py` | `today_kst()`(달력일 — 컨테이너가 UTC라 bare `date.today()` 금지)·`now_kst()`(사용자 노출 타임스탬프, bare `datetime.now()` 금지), `sanitize()`(NaN/inf 재귀 제거 — **float뿐 아니라 `Decimal`도 검사**), `is_valid_ticker()`(`^[A-Za-z0-9.\-]{1,15}$`), `find_ticker*` 헬퍼 |
 | `parallel.py` | `parallel_map(func, items, max_workers=10)` — `ThreadPoolExecutor`, 빈 리스트는 즉시 `[]` |
-| `progress.py` | `ProgressTracker` — `threading.Lock` 보호 dict(`running/done/total/current/failed`), 장기 크롤 진행률 |
+| `progress.py` | `ProgressTracker` — `threading.Lock` 보호 dict(`running/done/total/current/failed`), 장기 크롤 진행률. `try_start(total)`은 진행 중이면 **상태를 건드리지 않고 False**(이중 실행 거부; `start()`는 무조건 리셋이라 `done > total`을 만든다)이되 **무활동 `_STALE_AFTER`(15분)** 를 넘긴 트래커는 회수한다(백그라운드가 시작조차 못 한 경우의 영구 409 탈출구). `ProgressRegistry`는 키(=사용자)별 트래커 보관소 — `for_key`(등록)·`peek`(등록 없이 읽기, 없으면 초기 상태), 상한 `_MAX=64`이고 축출은 **유휴 또는 고착** 트래커만 |
 | `errors.py` | `not_found()`/`already_exists()` `HTTPException` 팩토리 |
 | `job_runs.py` | 배치 실행로그. `record(job_id, trigger)` 컨텍스트매니저가 **`Run` 핸들을 yield**(`.run_id` + `.set_status()`). 상태 어휘 `running\|success\|partial\|skipped\|failed`, 본문이 예외를 전파하면 `failed`가 지정을 이긴다. job_id별 최근 `KEEP=20`건 보관 |
 | `batch_registry.py` | `BATCHES` 정적 리스트 **33개** — `id`/`label`/`category`/`schedule_desc`/`usage`/`source`/`market`/`editable`/`trigger_kinds`/`manual_endpoint`/`scheduler_job_id`/`timezone`/`default_schedule`. `job_id`는 스케줄러 잡 id 및 `job_runs.record` 인자와 반드시 일치 |

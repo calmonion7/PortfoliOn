@@ -19,6 +19,8 @@
    또는
    PUT /api/stocks/{ticker}/enrich  → 종목 1개 저장
 6. POST /api/report/generate     → 전체 리포트 재생성 (enrich 후 반드시 실행)
+                                   409 = "이미 진행 중"(실패 아님) → GET /api/report/progress로
+                                   완료를 기다린 뒤 재시도. 상세는 엔드포인트 절 참조
 ```
 
 ### 수주잔고 분석 (backlog)
@@ -39,6 +41,9 @@
 2. (AI가 심층 분석 수행 — 투자의견·한줄 논지·적정주가 밴드·산정방식·투자포인트 2~3개·리스크 작성)
 3. POST /api/analyst-reports/{ticker}  → 발행 (숫자 데이터 블록은 서버가 최신 스냅샷에서 자동 첨부)
    - 스냅샷 없는 종목은 409 거부 → 먼저 POST /api/report/generate?tickers={ticker} 후 재시도
+     ⚠️ generate도 409를 낼 수 있다(진행상태 트래커가 호출자당 1개 — API 키 레인 공유).
+        그 409는 "이미 진행 중"이라 실패가 아니다 → GET /api/report/progress가 완료를
+        보고할 때까지 기다린 뒤 재시도할 것. 여러 종목은 tickers=A,B,C로 한 번에 묶는다.
    - 발행물 삭제는 admin 세션 전용(API key 불가) — Cowork/루틴은 삭제하지 않는다
 ```
 
@@ -616,7 +621,17 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 { "message": "Generating reports for 92 stock(s)" }
 ```
 
-> 생성 완료까지 수 분 소요. 완료 여부는 `GET /api/report/progress`로 확인 가능.
+**Error `409`** — `{"detail": "리포트 생성이 이미 진행 중입니다"}`
+
+> 생성 완료까지 수 분 소요. 완료 여부는 `GET /api/report/progress`로 확인 가능
+> (`running === false && total > 0 && done >= total`).
+>
+> ⚠️ **409는 실패가 아니다.** 진행상태 트래커가 **호출자당 하나**이고 API 키 레인은
+> 단일 호출자(`_API_KEY_USER_ID`)를 공유하므로, 앞선 generate가 아직 돌고 있으면
+> 다음 요청이 409로 거부된다 — **앞선 생성은 정상 진행 중**이다. 재시도 예산을 태우거나
+> 발행을 중단하지 말고, `GET /api/report/progress`가 완료를 보고할 때까지 폴링한 뒤
+> 이어서 진행할 것. 이 엔드포인트는 202 즉시반환 비동기이므로 **여러 종목을 연속으로
+> 쏘지 말고 한 번에 `tickers=A,B,C`로 묶는 것**이 정석이다.
 
 ---
 

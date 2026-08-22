@@ -9,9 +9,23 @@ from zoneinfo import ZoneInfo
 TICKER_RE = re.compile(r"^[A-Za-z0-9.\-]{1,15}$")
 
 
+_KST = ZoneInfo("Asia/Seoul")
+
+
 def today_kst():
     """KR/KST 시장-날짜 판정용 — 컨테이너 UTC라 bare date.today() 금지, CLAUDE.md gotcha/task#157."""
-    return datetime.now(ZoneInfo("Asia/Seoul")).date()
+    return datetime.now(_KST).date()
+
+
+def now_kst():
+    """사용자에게 보여줄 **타임스탬프**용 KST aware datetime.
+
+    `today_kst`가 「어느 달력일이냐」(스칼라 날짜)를 담당한다면 이것은 「몇 시냐」다.
+    bare `datetime.now()`는 컨테이너 UTC라 화면에 9시간 뒤처진 시각이 뜨고, 00~09시 KST엔
+    날짜까지 하루 뒤로 보여 「배치가 안 돌았다」는 오판을 만든다(구루 명부 `last_updated`
+    실사례). 재구현 금지 — 새 타임스탬프 writer는 이 헬퍼를 쓸 것.
+    """
+    return datetime.now(_KST)
 
 
 def is_valid_ticker(ticker: str) -> bool:

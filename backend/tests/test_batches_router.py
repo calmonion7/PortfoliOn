@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
 from routers.batches import router
+from services.batch_registry import get_batch
 from auth import get_current_user, require_admin
 
 app = FastAPI()
@@ -275,3 +276,58 @@ def test_fomc_coverage_endpoint_shape():
     data = resp.json()
     assert set(data) >= {"last_date", "months_left", "needs_update", "threshold_months"}
     assert isinstance(data["needs_update"], bool)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 적대 검토 수복 (task#330 review) — 깨진 스케줄 행이 배치 현황을 통째로 죽인다
+# ══════════════════════════════════════════════════════════════════════════════
+# B71ⓐ가 「깨진 행이 있어도 기동한다」를 달성하면서, 그 상태에서 `GET /api/batches`가
+# 확정적으로 500이 되는 경로를 처음으로 **도달 가능**하게 만들었다(task#283 계열 —
+# 무거운 실패를 걷어내니 숨어 있던 파손이 드러난다). `describe_schedule`은
+# `spec["type"]`·`spec["day_of_month"]`를 직접 인덱싱하므로 편집 배치 31개 중 한 행만
+# 깨져도 응답 전체가 KeyError로 죽고, **깨진 행을 진단·수리할 유일한 화면**이 빈다.
+
+_LEGACY_NO_TYPE = {"enabled": True, "days": ["sun"], "time": "03:00"}
+_MONTHLY_NO_DOM = {"enabled": True, "type": "monthly", "time": "03:00"}
+
+
+def _list_with_stored(stored: dict):
+    with patch("routers.batches.job_runs.recent", return_value=[]), \
+         patch("routers.batches.storage.get_batch_schedule",
+               side_effect=lambda jid: stored.get(jid)), \
+         patch.object(__import__("scheduler"), "_scheduler") as mock_sched:
+        mock_sched.get_job.return_value = None
+        return client.get("/api/batches")
+
+
+def test_list_batches_survives_legacy_spec_without_type():
+    """통합 스펙 이전 형태(type 키 없음) 행이 있어도 200이고, 그 배치만 정적 문자열로 폴백."""
+    resp = _list_with_stored({"leverage_fetch": dict(_LEGACY_NO_TYPE)})
+
+    assert resp.status_code == 200
+    data = {b["id"]: b for b in resp.json()}
+    assert len(data) == 33
+    broken = data["leverage_fetch"]
+    assert broken["schedule_desc"] == get_batch("leverage_fetch")["schedule_desc"]
+    # 저장 스펙 자체는 그대로 노출한다 — 운영자가 무엇이 깨졌는지 보고 PUT으로 고친다.
+    assert broken["schedule"] == _LEGACY_NO_TYPE
+
+
+def test_list_batches_survives_monthly_spec_without_day_of_month():
+    """`type`은 있고 `day_of_month`만 없는 두 번째 실패 shape도 200이다."""
+    resp = _list_with_stored({"backlog_fetch": dict(_MONTHLY_NO_DOM)})
+
+    assert resp.status_code == 200
+    data = {b["id"]: b for b in resp.json()}
+    assert data["backlog_fetch"]["schedule_desc"] == get_batch("backlog_fetch")["schedule_desc"]
+
+
+def test_list_batches_still_derives_desc_from_valid_spec():
+    """대조군 — 정상 스펙은 종전대로 저장 스펙에서 주기설명을 파생한다."""
+    resp = _list_with_stored(
+        {"leverage_fetch": {"enabled": True, "type": "weekly", "days": ["sun"], "time": "03:00"}}
+    )
+
+    assert resp.status_code == 200
+    data = {b["id"]: b for b in resp.json()}
+    assert data["leverage_fetch"]["schedule_desc"] == "매주 일 03:00"

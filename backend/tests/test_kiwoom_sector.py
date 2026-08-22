@@ -97,7 +97,10 @@ def test_fetch_sector_closes_default_base_dt_is_trading_day(monkeypatch):
 
 
 def test_fetch_sector_closes_falls_back_when_empty(monkeypatch):
-    """오늘 base_dt가 빈 series면 직전 거래일로 1회 폴백해 종가를 채운다."""
+    """오늘 base_dt가 빈 series면 직전 거래일로 폴백해 종가를 채운다.
+
+    첫 폴백에서 데이터가 오는 케이스. 다일 연휴(폴백 2회 이상)는
+    tests/test_holiday_fallback_and_seed_validation.py가 덮는다."""
     import datetime as _dt
 
     monkeypatch.setattr(sector, "today_kst", lambda: _dt.date(2026, 6, 16))  # 화요일(거래중)

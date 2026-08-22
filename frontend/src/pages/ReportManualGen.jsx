@@ -111,6 +111,14 @@ export default function ReportManualGen() {
       startPolling(loadStockList)
     } catch (err) {
       setGenMsg(err.response?.data?.detail || '생성 실패')
+      if (err.response?.status === 409) {
+        // 409 = 진행상태 트래커(user_id 단위)가 이미 running — 요청은 거부됐지만 **앞선
+        // 생성은 정상 진행 중**이다. 여기서 폴링을 세우지 않으면 진행률·완료 문구·목록
+        // 갱신이 영구히 오지 않는다(서버는 계속 생성해 스냅샷을 갱신한다).
+        // `generating`은 이 화면에선 「생성이 돌고 있다」는 페이지 단위 boolean이라 true 유지가 정확하다.
+        startPolling(loadStockList)
+        return
+      }
       setGenerating(false)
     }
   }

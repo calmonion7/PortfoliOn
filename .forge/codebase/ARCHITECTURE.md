@@ -245,12 +245,25 @@ patch 경로가 조용히 깨진다.
    `_seed_spec_for(job_id)`가 마이그레이션 규칙을 담는다(구 `daily_report`/`schedules` →
    `daily_report_kr/us`, 구 `guru_schedules` → `guru_crawl`, 은퇴한 `earnings_refresh`/
    `monthly_refresh` → 시장별 형제로 승계).
+   시드 스펙이 검증을 통과하지 못하면(레거시 verbatim 승계가 통합 스펙 이전 형태일 때)
+   레지스트리 기본값으로 폴백하되 **`enabled`는 승계**한다 — 기본값이 전부 `enabled: True`라
+   통째 교체하면 사용자가 꺼 둔 배치가 조용히 켜진다. 예외 폭은 `Exception`이다
+   (`validate_schedule_spec`은 `ValueError` 외에 `TypeError`도 낸다: `days:[['mon']]`).
 2. `editable` 배치마다 `_reschedule_job(id)` — 저장 스펙이 `enabled`면
    `_build_trigger(spec, tz)`로 CronTrigger를 만들어 `_JOB_FUNCS[id]`를 등록.
+   **판정 게이트는 그 `_build_trigger` 성공 여부다**(빌드 + CronTrigger 생성) — 실패하면
+   그 잡만 건너뛰고 ERROR를 남긴다(예외를 전파하면 행 하나 때문에 앱이 뜨지 않는다).
+   판정은 `remove_job` **앞에** 둬서 reload 실패가 이미 도는 잡을 죽이지 않는다.
+   `validate_schedule_spec`은 **경고용으로만** 호출한다 — PUT 경계용 validator라 더 엄격해서
+   게이트로 쓰면 `time:'7:00'`·`enabled:1`·`day_of_month:'15'`·`every_minutes:3`처럼
+   **종전에 정상 등록·실행되던** 스펙이 조용히 미등록돼 그 배치가 영구히 안 돈다.
    `misfire_grace_time`은 **None이면 인자를 빼서** 넘긴다(None을 넘기면 APScheduler가
    '유예 무제한'으로 해석해 거동이 바뀐다).
 3. `_check_missed_report()` — KR/US 각각, 오늘 스케줄 시각이 지났는데 **그 종목의 오늘
-   스냅샷이 없으면** 그 종목만 즉시 생성(부분 누락 복구).
+   스냅샷이 없으면** 그 종목만 즉시 생성(부분 누락 복구). ⚠️ 이 단계는 2단계의 잡 가드를
+   **공유하지 않는다** — `_check_missed_report_for`가 같은 저장 스펙을 독립적으로 다시 읽으므로
+   자체 `_parse_hhmm` 판정 + 시장 단위 try/except를 갖는다(없으면 깨진 `daily_report_*` 행이
+   2단계를 통과한 뒤 5단계 전에 앱을 죽인다).
 4. `_seed_rankings_if_empty()` / `_seed_kr_sector_if_empty()` / `_seed_us_sector_if_empty()` —
    저장소가 비어 있으면(장외 시간 배포 등) 즉시 1회 적재.
 5. `_scheduler.start()`.

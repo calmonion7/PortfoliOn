@@ -34,6 +34,24 @@ def _schedule_for(entry):
     return storage.get_batch_schedule(entry["id"]) or entry["default_schedule"]
 
 
+def _describe(entry, sched):
+    """저장 스펙에서 주기설명을 파생. 스펙이 깨져 있으면 레지스트리 정적 문자열로 폴백.
+
+    `describe_schedule`은 `spec["type"]`·`spec["day_of_month"]`를 직접 인덱싱하므로
+    통합 스펙 이전 형태(`type` 키 없음) 행이 하나라도 있으면 **응답 전체가 KeyError로
+    500**이 된다 — 그러면 깨진 행을 진단·수리할 **유일한 화면**이 죽고, 판별 단서
+    (`enabled=true` + `next_run=null`)도 볼 수 없다. 스케줄러 기동 가드가 그런 행에서도
+    앱을 띄우게 된 이상 이 경로는 실제로 도달 가능하다(task#283 계열 — 무거운 실패를
+    걷어내면 그것이 가리고 있던 파손이 드러난다)."""
+    if not (entry.get("editable") and sched):
+        return entry["schedule_desc"]
+    try:
+        return describe_schedule(sched)
+    except Exception as e:
+        logger.warning(f"[Batches] 스케줄 스펙 해석 실패 job={entry['id']} spec={sched!r}: {e}")
+        return entry["schedule_desc"]
+
+
 @router.get("/batches")
 def list_batches(user_id: str = Depends(get_current_user)):
     """배치 현황: 레지스트리 + 다음 실행 시각 + 최근 실행로그 + (편집가능 시) 스케줄.
@@ -43,7 +61,7 @@ def list_batches(user_id: str = Depends(get_current_user)):
     out = []
     for b in BATCHES:
         sched = _schedule_for(b)
-        desc = describe_schedule(sched) if (b.get("editable") and sched) else b["schedule_desc"]
+        desc = _describe(b, sched)
         out.append({
             **b,
             "schedule_desc": desc,

@@ -63,8 +63,14 @@ def test_fetch_disclosures_queries_core_types_and_stamps(monkeypatch):
 
 
 def test_fetch_disclosures_passes_recent_window(monkeypatch):
-    """bgn_de를 days 전으로 계산해 넘긴다."""
-    from datetime import datetime, timedelta
+    """bgn_de를 days 전으로 계산해 넘긴다 — 기준은 **KST 달력일**(B42).
+
+    기대값을 `datetime.now()`로 재계산하면 프로덕션과 같은 식이라 동어반복이 되고, 게다가
+    컨테이너(UTC)에서는 00~09시 KST에 프로덕션(KST)과 하루 어긋나 실패한다. 시간대 경계
+    자체를 재는 축은 tests/test_kst_date_boundaries.py가 시각을 고정해 담당한다.
+    """
+    from datetime import timedelta
+    from services.utils import today_kst
     from services import disclosures as svc
 
     captured = {}
@@ -77,7 +83,7 @@ def test_fetch_disclosures_passes_recent_window(monkeypatch):
     monkeypatch.setattr(svc.requests, "get", fake_get)
     svc.fetch_disclosures("00164742", days=45)
 
-    expected = (datetime.now() - timedelta(days=45)).strftime("%Y%m%d")
+    expected = (today_kst() - timedelta(days=45)).strftime("%Y%m%d")
     assert captured["bgn_de"] == expected
     assert captured["corp_code"] == "00164742"
 

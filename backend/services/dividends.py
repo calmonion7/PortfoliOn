@@ -15,16 +15,28 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import datetime, date, timedelta
-from zoneinfo import ZoneInfo
+from datetime import date, timedelta
 
 import requests
 import yfinance as yf
 
 from services.backlog import _get_corp_code_map
 from services.db import execute, query, get_connection
+from services.utils import today_kst
 
 logger = logging.getLogger(__name__)
+
+
+def _today_kst() -> date:
+    """KR 시장-날짜 판정용 오늘 — **정본은 `services.utils.today_kst`**이고 여기선 위임만 한다.
+
+    이름을 남기는 이유: `routers/portfolio.py:100`이 `dividends_svc._today_kst()`로 호출하고
+    tests/test_dividends.py(3곳)·tests/test_portfolio_router.py(2곳)가 이 심볼을 patch 시드로
+    쓴다(전수 grep 5곳). 로컬 재구현을 지우면 그 5곳이 깨지므로 껍데기만 남기고 몸통을
+    정본으로 옮겼다 — 시간대 계산이 두 벌 존재하는 상태(어느 쪽이 정본인지 모호함)는 해소된다.
+    """
+    return today_kst()
+
 
 _DART_BASE = "https://opendart.fss.or.kr/api"
 # 사업보고서(연간) — 배당은 연 1회 확정이므로 사업보고서 당기값을 쓴다.
@@ -97,9 +109,11 @@ def _corp_code(ticker: str) -> "str | None":
 def _recent_business_year() -> str:
     """최근 사업연도. 사업보고서는 보통 3월 공시되므로 1Q 동안은 전년도가 안전.
 
-    현재 월이 4월 이전이면 전전년도, 그 외엔 전년도(작년 확정 배당)를 쓴다."""
-    now = datetime.now()
-    return str(now.year - (2 if now.month < 4 else 1))
+    **KST 기준** 현재 월이 4월 이전이면 전전년도, 그 외엔 전년도(작년 확정 배당)를 쓴다.
+    bare `datetime.now()`는 컨테이너 UTC라 00~09시 KST에 달력일이 하루 뒤처지고, 그러면
+    4/1·1/1 경계에서 기준연도가 통째로 1년 어긋난다(B7)."""
+    today = _today_kst()
+    return str(today.year - (2 if today.month < 4 else 1))
 
 
 def fetch_kr_dividend(ticker: str) -> "dict | None":
@@ -191,14 +205,6 @@ def get_dividend(ticker: str) -> "dict | None":
 # ── 배당 스케줄 (다가오는 배당락 예상, stock_dividend_schedule) ─────────
 # t.dividends 이력에서 주기를 추론해 향후 N개월 배당락을 투영(예상). US는 t.calendar로
 # 최근접 건을 확정(confirmed)+지급일 보강. KR/그 외는 전부 예상(projected). ADR-0023.
-
-_KST = ZoneInfo("Asia/Seoul")
-
-
-def _today_kst() -> date:
-    """KR 시장-날짜 판정용 오늘 (컨테이너 UTC라 bare date.today() 금지 — CLAUDE.md)."""
-    return datetime.now(_KST).date()
-
 
 def _as_date(v) -> "date | None":
     """yfinance calendar 값(Timestamp·date·list·None)을 date로 정규화."""

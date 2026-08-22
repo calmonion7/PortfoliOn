@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Query
-from datetime import datetime
+from services.utils import now_kst
 from services import storage
 from services import job_runs
 from services.guru_scraper import scrape_all_managers
@@ -95,7 +95,11 @@ def _run_crawl():
         try:
             managers, roster = scrape_all_managers(on_progress=on_progress)
             stats = storage.save_guru_managers({
-                "last_updated": datetime.now().isoformat(timespec="seconds"),
+                # 화면(`GuruCrawlNow.jsx`)이 이 문자열을 그대로 표시한다 — bare
+                # `datetime.now()`는 컨테이너 UTC라 방금 돈 크롤이 9시간 전으로 보이고
+                # 00~09시 KST엔 날짜까지 하루 뒤로 보인다. 자동 레인
+                # (`scheduler/jobs.py::_run_guru_crawl`)과 **쌍**이므로 함께 고칠 것.
+                "last_updated": now_kst().isoformat(timespec="seconds"),
                 "managers": managers,
                 "roster": roster,
             })
