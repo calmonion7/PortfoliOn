@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import TechReport from './TechReport'
-import { groupByCategory } from '../components/reports/techReportUtils'
+import { groupByCategory, TECH_NAMES } from '../components/reports/techReportUtils'
+import TechGraph from '../components/tech/TechGraph'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn() } }))
@@ -761,5 +762,112 @@ describe('주요기술 리포트 상세 — 플로팅 항해 바 배선 (task#32
     const { container } = renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
     expect(container.querySelector('[data-tech-chapter-nav]')).toBeNull()
+  })
+})
+
+
+// ── task#331 — 「구성과 연관」 게이트 ⇔ TechGraph 채택 조건의 등가 (B57) ───────────────
+// 이 페이지의 규율은 「섹션 게이트 식 == 그 섹션 컴포넌트의 채택 조건」이다. 어긋나면 방향에 따라
+// 서로 다른 방식으로 조용히 깨진다 — 게이트가 **느슨**하면 제목만 남은 유령 섹션 + 그것을 가리키는
+// 죽은 목차 칩이 생기고, 게이트가 **빡빡**하면 컴포넌트가 그릴 수 있는 내용이 화면에서 통째로 사라진다.
+//
+// ⚠️ **그래서 양방향으로 잰다. 한 방향만 재면 이빨이 절반이다.**
+//    방향 A (게이트 참 → 컴포넌트가 그린다) : 섹션이 렌더되면 그 안에 `tech-graph`가 있어야 한다.
+//    방향 B (게이트 거짓 → 그릴 것이 없다)  : 섹션이 없으면 **같은 props로 TechGraph를 단독 렌더**해도
+//      아무것도 나오지 않아야 한다. 이 방향은 페이지 안에서 원리적으로 관측할 수 없다 — 게이트가
+//      거짓이면 컴포넌트가 애초에 마운트되지 않으므로 「그릴 것이 없었다」와 「그릴 게 있었는데 막혔다」가
+//      구별되지 않는다. 그래서 컴포넌트를 페이지 밖으로 꺼내 같은 입력으로 다시 묻는다.
+//
+// B57의 실제 결함: 페이지 게이트가 `related[k].length > 0`이고 TechGraph는 `validLabels`(문자열 ∧
+// `trim()` 남음)로 걸렀다. 그래서 `['   ']`·`[null]`에서 게이트만 참이 되어 ④⑤가 유령 섹션을 만든다.
+const REL_EMPTY = { prerequisites: [], derivatives: [], complements: [], competitors: [] }
+const relatedOf = (partial) => ({ ...REL_EMPTY, ...partial })
+const COMPOSITION = { tech: [{ name: '연료 농축', share_pct: 35 }] }
+
+// 페이지가 TechGraph에 넘기는 것과 **같은 props**로 컴포넌트를 단독 렌더한다.
+// ⚠️ `target`을 일부러 비우지 않는다 — 페이지는 `TECH_NAMES[slug] || slug`를 넘기므로 라이브에서
+//    **항상 채워져 있다**. 그래서 이 방향은 「대상 노드는 경계의 정의역에 들지 않는다」(TechGraph의
+//    `hasBoundary` 주석)까지 함께 잰다: target이 채워져 있어도 채택되지 않아야 한다.
+function renderGraphAlone(rep) {
+  return render(
+    <MemoryRouter>
+      <TechGraph related={rep.related} target={TECH_NAMES[rep.slug] || rep.slug}
+                 composition={rep.composition} slug={rep.slug} techIndex={[]} indexFailed={false} />
+    </MemoryRouter>
+  )
+}
+
+// 유령 섹션 일반형 — 표시된 섹션은 제목(`rpt-title`) 외에 본문 노드를 하나라도 가져야 한다.
+// (자식이 0개인 섹션도 `[].every`가 true라 유령으로 잡힌다.)
+const ghostSections = (container) => [...container.querySelectorAll('[data-tech-section]')]
+  .filter((el) => [...el.children].every((c) => c.classList.contains('rpt-title')))
+  .map((el) => el.getAttribute('data-tech-section'))
+
+const chipLabelsOf = (container) =>
+  [...container.querySelectorAll('[data-testid="tech-toc-chip"]')].map((a) => a.textContent)
+
+describe('주요기술 리포트 상세 — 「구성과 연관」 게이트 등가 (task#331 · B57)', () => {
+  it.each([
+    ['① 경계 실값 1개', { related: relatedOf({ prerequisites: ['고순도 석영·특수소재'] }) }, true],
+    ['② 구성만 실값', { related: relatedOf({}), composition: COMPOSITION }, true],
+    ['③ 둘 다 결측', { related: relatedOf({}) }, false],
+    ['④ 경계가 공백 문자열뿐 (B57)', { related: relatedOf({ prerequisites: ['   ', '\t\n'] }) }, false],
+    ['⑤ 경계가 비문자열뿐 (B57)', { related: relatedOf({ competitors: [null, 42, {}] }) }, false],
+    ['⑥ 공백 + 실값 혼합', { related: relatedOf({ derivatives: ['  ', '재사용 상단'] }) }, true],
+    ['⑦ 경계는 공백뿐이나 구성 실값', { related: relatedOf({ complements: ['   '] }), composition: COMPOSITION }, true],
+    ['⑧ related 키 자체 부재(구발행물)', { related: undefined }, false],
+  ])('게이트 ⇔ 채택 양방향 등가: %s', async (_label, override, shown) => {
+    const rep = { ...SMR_REPORT, ...override }
+    mockReport(rep)
+    const { container, unmount } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+
+    const section = container.querySelector('[data-tech-section="related"]')
+    expect(!!section).toBe(shown)
+    // 목차 칩은 섹션과 **정확히 같이** 나타나고 사라진다(죽은 칩 0 · 사라진 칩 0).
+    expect(chipLabelsOf(container).includes('구성과 연관')).toBe(shown)
+
+    if (shown) {
+      // 방향 A — 게이트가 참이면 컴포넌트가 실제로 그린다(제목만 남지 않는다).
+      expect(section.querySelector('[data-testid="tech-graph"]')).toBeTruthy()
+    } else {
+      // 방향 B — 게이트가 거짓이면 같은 props로 단독 렌더해도 그릴 것이 없다.
+      unmount()
+      const { container: alone } = renderGraphAlone(rep)
+      expect(alone.querySelector('[data-testid="tech-graph"]')).toBeNull()
+      expect(alone.textContent).toBe('')
+    }
+  })
+
+  it('유령 섹션 0 — 11섹션 전부 표시되는 판에서 모든 섹션이 제목 외 본문을 가진다', async () => {
+    mockReport(ALL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(ghostSections(container)).toEqual([])
+  })
+
+  it('유령 섹션 0 — 경계가 공백뿐인 판(B57)에서도 유지되고 related 섹션이 아예 없다', async () => {
+    mockReport({ ...ALL_REPORT, related: relatedOf({ prerequisites: ['   '] }), composition: undefined })
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(ghostSections(container)).toEqual([])
+    expect(sectionIdsOf(container)).not.toContain('related')
+  })
+
+  // 대조군(회귀 가드) — 이미 등가인 두 게이트가 그대로 남아 있는지. 이쪽은 컴포넌트가 export한
+  // 순수함수(`milestoneTimelineLayout`)를 페이지가 그대로 호출하므로 구조적으로 등가다. 그 구조를
+  // 깨뜨리는 리팩터(예: `milestones.length > 0`으로 되돌리기)를 이 축이 잡는다.
+  it('대조군 — milestones·key_points 게이트의 기존 등가가 유지된다', async () => {
+    // year 결측 + event 공백뿐인 항목만 담긴 판: layout이 []를 주므로 섹션·칩 모두 부재여야 한다.
+    mockReport({ ...ALL_REPORT, milestones: [{ year: null, event: '   ', status: 'done' }], key_points: [] })
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    const ids = sectionIdsOf(container)
+    expect(ids).not.toContain('milestones')
+    expect(ids).not.toContain('key-points')
+    const labels = chipLabelsOf(container)
+    expect(labels).not.toContain('진척 타임라인')
+    expect(labels).not.toContain('핵심 포인트')
+    expect(ghostSections(container)).toEqual([])
   })
 })

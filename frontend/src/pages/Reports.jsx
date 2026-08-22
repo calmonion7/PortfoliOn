@@ -69,6 +69,9 @@ export default function Reports({ initialTicker = null, navKey = null }) {
   // 애널리스트 리포트 발행물(task#212) — 상세 헤더 문서 링크용 ticker→판 목록 맵(목록 화면은 심층 리포트 탭, task#215)
   const [pubs, setPubs] = useState([])
   const [loading, setLoading] = useState(false)
+  // 상세 조회 실패 — 「요약 데이터가 없습니다」(0건)와 구별한다. 실패를 빈 상태로 붕괴시키면
+  // 화면이 「없음」이라는 거짓 진술을 하고, 낡은 티커 값을 남기면 오값이 사실처럼 굳는다(B49).
+  const [detailError, setDetailError] = useState(null)
   const [activeTab, setActiveTab] = useState('holdings')
   const [othersData, setOthersData] = useState(null)
   const [othersLoading, setOthersLoading] = useState(false)
@@ -114,12 +117,28 @@ export default function Reports({ initialTicker = null, navKey = null }) {
   const pubsByTicker = {}
   for (const p of pubs) (pubsByTicker[p.ticker] ||= []).push(p)
 
+  // ⚠️ 레이스 성립 조건 (B49 주 인스턴스) — 목록에서 A→B를 빠르게 누르면 같은 마운트에서 이 이펙트가
+  // 재실행되고 같은 상태(`detail`)를 쓰는 호출 2개가 겹친다. `selected`는 **이 컴포넌트 자신의 상태**라
+  // 자식의 `key={selected.ticker}` 재마운트는 이 fetch를 덮지 못한다 — 늦게 착지한 A가 B 화면의
+  // 목표가·RSI·컨센서스를 A 값으로 덮고, 무게이트 `.finally`가 스피너까지 꺼서 그 오값이 **다음 선택까지
+  // 확정된 사실처럼 남는다**. `.then`·`.catch`·`.finally`를 전부 게이트한다(§9.4).
+  // ⚠️ `.catch`가 없으면 B 요청이 실패해도 `detail`이 A 값을 그대로 유지한다 — 실패는 실패로 표시하고
+  // 「옛 종목 수치」로 위장하지 않는다(`wrong < missing`).
   useEffect(() => {
-    if (!selected.ticker || !selected.date) return
+    if (!selected.ticker || !selected.date) return undefined
+    let cancelled = false
     setLoading(true)
+    setDetailError(null)
     api.get(`/api/report/${selected.ticker}/${selected.date}`)
-      .then(({ data }) => setDetail({ summary: data.summary, enriched_at: data.enriched_at || null }))
-      .finally(() => setLoading(false))
+      .then(({ data }) => { if (!cancelled) setDetail({ summary: data.summary, enriched_at: data.enriched_at || null }) })
+      .catch((e) => {
+        if (cancelled) return
+        console.warn('[Reports] 리포트 상세 조회 실패:', e)
+        setDetail({ summary: null, enriched_at: null })
+        setDetailError('리포트 상세를 불러오지 못했습니다.')
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [selected, detailRefreshKey])
 
   const openDetail = (ticker, date) => {
@@ -303,6 +322,14 @@ export default function Reports({ initialTicker = null, navKey = null }) {
               reportList={reportList}
               publications={pubsByTicker[selected.ticker?.toUpperCase()] || []}
             />
+            {detailError && (
+              <div role="alert" data-testid="report-detail-error"
+                   style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '10px 0', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--color-error)', fontSize: 13 }}>
+                <span>{detailError}</span>
+                <button className="btn" style={{ flexShrink: 0 }}
+                        onClick={() => setSelected(prev => ({ ...prev }))}>다시 시도</button>
+              </div>
+            )}
             <ReportDetailTabs
               key={selected.ticker}
               summary={detail.summary}

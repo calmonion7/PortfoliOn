@@ -14,33 +14,48 @@ export default function HistoryTab({ ticker, market }) {
   const [snapshotA, setSnapshotA] = useState(null)
   const [snapshotB, setSnapshotB] = useState(null)
 
+  // ⚠️ 레이스 성립 조건 (B49) — **아래 세 이펙트는 모두 같은 마운트에서 재실행된다.**
+  // 비교 날짜 select를 빠르게 두 번 바꾸면 같은 상태(`snapshotA`/`snapshotB`)를 쓰는
+  // 비동기 호출이 2개 이상 겹치고, 먼저 보낸 요청이 늦게 도착하면 **낡은 날짜의 수치가
+  // 사용자가 고른 날짜 칼럼에 렌더된다**(표 헤더는 새 날짜, 값은 옛 날짜 — 조용한 오표시).
+  // 티커 전환은 부모가 `key={ticker}`로 재마운트해 구조적으로 차단되지만(Reports.jsx·
+  // Ranking.jsx) 그 `key`를 떼는 리팩터 한 번으로 되살아나므로 여기서 직접 막는다.
+  // 세대 가드 관용구는 §9.4 — `.then`뿐 아니라 **`.finally`도 게이트**한다.
   useEffect(() => {
     if (!ticker) return
+    let cancelled = false
     setHistLoading(true)
     setHistError(null)
     api.get(`/api/report/${ticker}/history`)
       .then(({ data }) => {
+        if (cancelled) return
         setHistory(data)
         const snapDates = data.filter(h => h.has_snapshot)
         if (snapDates.length > 0) setCompareA(snapDates[snapDates.length - 1].date)
         if (snapDates.length > 1) setCompareB(snapDates[snapDates.length - 2].date)
       })
-      .catch(() => setHistError('히스토리 데이터를 불러올 수 없습니다.'))
-      .finally(() => setHistLoading(false))
+      .catch(() => { if (!cancelled) setHistError('히스토리 데이터를 불러올 수 없습니다.') })
+      // 낡은 응답이 로딩 플래그를 열면 그 사이 도착한 새 응답과 겹쳐 화면이 깜빡인다.
+      .finally(() => { if (!cancelled) setHistLoading(false) })
+    return () => { cancelled = true }
   }, [ticker])
 
   useEffect(() => {
     if (!ticker || !compareA) return
+    let cancelled = false
     api.get(`/api/report/${ticker}/${compareA}`)
-      .then(({ data }) => setSnapshotA(data.summary))
-      .catch(() => setSnapshotA(null))
+      .then(({ data }) => { if (!cancelled) setSnapshotA(data.summary) })
+      .catch(() => { if (!cancelled) setSnapshotA(null) })
+    return () => { cancelled = true }
   }, [ticker, compareA])
 
   useEffect(() => {
     if (!ticker || !compareB) return
+    let cancelled = false
     api.get(`/api/report/${ticker}/${compareB}`)
-      .then(({ data }) => setSnapshotB(data.summary))
-      .catch(() => setSnapshotB(null))
+      .then(({ data }) => { if (!cancelled) setSnapshotB(data.summary) })
+      .catch(() => { if (!cancelled) setSnapshotB(null) })
+    return () => { cancelled = true }
   }, [ticker, compareB])
 
   if (histLoading) return <p style={{ color: 'var(--text-3)', fontSize: 13 }}>로딩 중...</p>

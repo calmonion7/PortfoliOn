@@ -8,7 +8,10 @@ import '../components/ui/Button.css'
 
 const WEIGHT_LEGEND = [1,2,3,4,5,6,7,8,9,10].map(r => ({ rank: r, score: (1/r).toFixed(3) }))
 
-export function WatchlistBtn({ ticker, name, stockMap, onToggle, unknown = false }) {
+// pending은 훅(`useTrackedStocks`)의 **티커 단위** in-flight Set이다. 로컬 loading은 *자기
+// 버튼*만 잠그므로, 같은 티커가 한 화면에 두 번 이상 렌더되면 형제 버튼이 열린 채로 남고
+// 그 클릭은 훅의 뮤텍스에 조용히 삼켜진다(B58) — pending까지 봐야 형제도 함께 잠긴다.
+export function WatchlistBtn({ ticker, name, stockMap, onToggle, unknown = false, pending }) {
   const [loading, setLoading] = useState(false)
   // 분기 순서는 unknown → holding → watchlist → none이다. 모름을 먼저 걸러야 하는 이유:
   // stockMap이 빈 맵이면 그 아래 분기가 전부 "미추적"으로 떨어져 이미 관심에 있는 종목에
@@ -29,6 +32,7 @@ export function WatchlistBtn({ ticker, name, stockMap, onToggle, unknown = false
     return <span className="guru-wl-held">보유중</span>
   }
   const inWatchlist = entry === 'watchlist'
+  const busy = loading || pending?.has(ticker) === true
 
   const handleClick = async () => {
     setLoading(true)
@@ -47,18 +51,19 @@ export function WatchlistBtn({ ticker, name, stockMap, onToggle, unknown = false
     <span className="guru-wl">
       <button
         onClick={handleClick}
-        disabled={loading}
+        disabled={busy}
+        aria-busy={busy || undefined}
         className="guru-wl-btn"
         style={{
           // 배경 채움은 CSS에서 제거했다(테두리형) — 채운 빨강 「★ 삭제」가 행마다 반복되며
           // 카드에서 가장 강한 요소가 돼 티커·값보다 부차 액션이 앞서 읽혔다.
           // 색 의미(추가=success·삭제=error)는 그대로 유지한다.
-          cursor: loading ? 'progress' : 'pointer',
+          cursor: busy ? 'progress' : 'pointer',
           color: inWatchlist ? 'var(--color-error)' : 'var(--color-success)',
-          opacity: loading ? 0.7 : 1,
+          opacity: busy ? 0.7 : 1,
         }}
       >
-        {loading
+        {busy
           ? <span className="btn__spinner guru-wl-spinner" aria-hidden />
           : (inWatchlist ? '★ 삭제' : '☆ 추가')
         }
@@ -68,7 +73,7 @@ export function WatchlistBtn({ ticker, name, stockMap, onToggle, unknown = false
 }
 
 // 인기순(count/명)·가중치(score/소수3자리) 뷰가 공유하는 행 카드 — 지표값·단위만 props로 받는다(task#227 S3).
-function StatRow({ index, row, value, unit, stockMap, onToggle, unknown }) {
+function StatRow({ index, row, value, unit, stockMap, onToggle, unknown, pending }) {
   return (
     <div className="anim-fade-up guru-stat-row">
       <span className="guru-stat-rank">{index + 1}</span>
@@ -80,13 +85,13 @@ function StatRow({ index, row, value, unit, stockMap, onToggle, unknown }) {
         </div>
         <div className="guru-stat-name">{row.name_kr || row.name || '-'}</div>
       </div>
-      <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={onToggle} unknown={unknown} />
+      <WatchlistBtn ticker={row.ticker} name={row.name_kr || row.name} stockMap={stockMap} onToggle={onToggle} unknown={unknown} pending={pending} />
     </div>
   )
 }
 
 export default function GuruStats({ view }) {
-  const { stockMap, unknown, toggle } = useTrackedStocks()
+  const { stockMap, unknown, pending, toggle } = useTrackedStocks()
   const [popularity, setPopularity] = useState([])
   const [weighted, setWeighted]     = useState([])
   const [loading, setLoading]       = useState(true)
@@ -166,6 +171,7 @@ export default function GuruStats({ view }) {
             stockMap={stockMap}
             onToggle={toggle}
             unknown={unknown}
+            pending={pending}
           />
         ))}
       </div>

@@ -379,28 +379,43 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
   const [loading, setLoading] = useState(true)
   const [olderDates, setOlderDates] = useState([])  // 이전 판(이력) — 목록은 종목당 최신 1건이라 여기서 이동 (task#222)
 
+  // ⚠️ 레이스 성립 조건 (B49) — 이 컴포넌트는 `ReportDetailTabs.jsx`가 **`key` 없이** 렌더하고
+  // 「이전 판」 버튼이 부모의 `deepDate`만 갈아끼우므로, D1→D2를 빠르게 누르면 **같은 마운트에서**
+  // 두 이펙트가 재실행되고 같은 상태(`report`·`olderDates`)를 쓰는 호출 2개가 겹친다. 가드가 없으면
+  // 늦게 도착한 D1이 D2 화면을 통째로 덮고(헤더는 D2, 본문은 D1), 무게이트 `.finally`가 낡은 응답으로
+  // 스피너까지 끈다. 형제 `ConsensusSection`(위)은 이미 같은 관용구를 쓰고 있었고 이 둘만 빠져 있었다.
+  // `.then`·`.catch`·**`.finally`까지** 전부 게이트한다(§9.4).
   useEffect(() => {
+    let ignore = false
     setLoading(true)
     setError(null)
     api.get(`/api/analyst-reports/${ticker}/${date}`)
-      .then(({ data }) => setReport(data))
+      .then(({ data }) => { if (!ignore) setReport(data) })
       .catch((e) => {
+        if (ignore) return
         console.error('[AnalystReport] 발행물 조회 실패:', e)
         setError(e.response?.status === 404 ? '발행물을 찾을 수 없습니다.' : '발행물을 불러오지 못했습니다.')
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (!ignore) setLoading(false) })
+    return () => { ignore = true }
   }, [ticker, date])
 
-  // 이력 목록(전 판) — 실패는 graceful(섹션만 숨김), 본문 표시를 막지 않는다
+  // 이력 목록(전 판) — 실패는 graceful(섹션만 숨김), 본문 표시를 막지 않는다.
+  // `filter(d => d !== date)`의 `date`는 **이 요청을 낸 렌더의 값**이므로, 가드 없이 낡은 응답이
+  // 착지하면 지금 보고 있는 판이 「이전 판」 목록에 남는다(자기 자신으로 가는 링크).
   useEffect(() => {
+    let ignore = false
     api.get(`/api/analyst-reports/${ticker}`)
-      .then(({ data }) => setOlderDates(
-        (data.reports || []).map(r => r.published_date).filter(d => d !== date).slice(0, 5)
-      ))
+      .then(({ data }) => {
+        if (ignore) return
+        setOlderDates((data.reports || []).map(r => r.published_date).filter(d => d !== date).slice(0, 5))
+      })
       .catch((e) => {
+        if (ignore) return
         console.warn('[AnalystReport] 발행물 이력 조회 실패:', e)
         setOlderDates([])
       })
+    return () => { ignore = true }
   }, [ticker, date])
 
   if (loading) return <div style={{ maxWidth: 780, margin: '0 auto', padding: '24px 16px' }}><Skeleton variant="row" count={8} /></div>

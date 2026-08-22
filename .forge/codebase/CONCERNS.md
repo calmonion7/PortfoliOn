@@ -92,6 +92,32 @@ mapped: 2026-08-10
 >
 > ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63` + `B6`(부분)은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다(전건 잔존 확인). 특히 `B69`가 `services/cache.py`를 통째로 만졌으므로 `B63`(프론트 포매터 중복)·`B48`(에러 바운더리 부재)이 「캐시·렌더를 정리하며 같이 됐겠지」로 읽히기 쉬운데, 프론트는 `useReportGeneration.js`·`ReportManualGen.jsx` 두 파일의 409 처리만 손댔다.
 
+> **해소: 2026-08-22 (task#331) — B24·B34·B54·B55·B56·B57·B58·B76 닫힘 (8건) + B49 부분.** 10차 확정분 수정 6/7(**시각 2 · 상태 3 · 계약·표시 4**). **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다. 회귀축은 신설 프론트 테스트 **7파일**(`frontend/src/test/tech-visual-guards` · `failure-vs-empty` · `stale-response-guard` · `report-detail-stale` · `ranking-news-failure` · `tracked-mutex-and-format` · `diaglog-copy-failure`) + `backend/tests/test_valid_events_matches_frontend.py`이고, 레이아웃 수치는 jsdom이 원리적으로 못 재므로 `scripts/uat331-tech-visual.mjs`가 라이브 축을 맡는다.
+>
+> **시각 2건** — **B54**는 자르지 않고 **흐르게** 했다(`wordBreak: keep-all` + `overflowWrap: break-word`; 라이브 실측 15장 중 pc1440 10 · m390 8 · m350 9장이 잘려 있었고 최악은 2219px 중 258px = 11.6%만 보였다). **B55**는 값 칸에 `width: <최장 값 문자열>ch` + `flexShrink: 0`을 예약했다 — ⚠️ **폭은 그룹별이 아니라 전체 행 기준으로** 잡는다(그룹마다 다르게 잡으면 그룹 간 트랙 폭이 갈려 분류를 넘나드는 막대 비교가 다시 무의미해진다). 라이브 실측에서 단조성 위반은 아직 0이었는데 그건 값 문자열 길이가 다른 두 행의 값이 우연히 가깝지 않아서일 뿐이고, 형제 `MarketEstimates.jsx`는 같은 원인으로 이미 역전($12.5B 75.98px < $9B 84.86px)을 냈다 — **「지금은 안 보인다」를 「없다」로 읽지 말 것.**
+>
+> ⚠️ **B54의 안전망을 `anywhere`로 쓰지 말 것 — 그리고 형제에는 그 반대가 참이다.** 이 자리에서 `break-word`와 `anywhere`는 결과가 **완전히 동일**한데(그리드 트랙 최소가 240px **고정값**이라 min-content가 쓰이지 않는다) `anywhere`는 Safari/iOS **15.4+** 전용이라 그 미만에서는 선언만 드롭돼 `keep-all` 단독(= 페이지 가로 스크롤)으로 떨어진다. 이 앱은 iOS 설치형 PWA이고 **Chromium 프로브는 이 차이에 원리적으로 블라인드**하다(`inset` footgun과 같은 클래스). 반대로 형제 `components/tech/PlayerTable.jsx`는 `anywhere`가 **필요하다**(스크롤러가 없어 min-content가 실제로 트랙 폭을 결정한다) — 이 근거로 그쪽 값을 바꾸지 말 것.
+>
+> ⚠️ **B54가 시각 부산물을 하나 만들었고, 기존 프로브 축은 그것을 원리적으로 못 잡았다.** 제목 전문 노출의 대가로 stretch 그리드에서 한 행이 가장 긴 제목에 맞춰 커지는데 footer(구분선 + 해부 칩)는 in-flow 자연 위치에 머물러 **구분선이 카드 중간에 뜨고 그 아래가 최대 ~310px 빈다**(pc1440 실측 `card.bottom − footer.bottom` **309.5px** = 카드의 60%; 1열 모바일은 무영향). 카드를 column flex로 두고 footer에 `marginTop: auto`로 닫았다. 기존 축 `grid-row-heights-equal`은 「행 높이가 **같다**」를 *요구*하므로 이 결함이 성립하는 조건과 무모순이다 → `card-footer-at-bottom` 축을 신설했다.
+>
+> **상태 3건** — **B76**은 `watchTickers`를 3상태(`null`=모름 · `[]`=성공 0건 · 배열)로 두고 `computeTechCandidates`가 모름이면 후보를 **하나도 내지 않게** 했다(실패를 `[]`로 붕괴시키면 「내가 안 가진 후보」라는 *행동 권유*가 거짓 근거로 나온다). 같은 클래스의 형제 2건을 함께 닫았다 — `Ranking::BasicInfo` 뉴스 조회 실패(→ 「관련 뉴스가 없습니다」 거짓 단정) · `ConsensusChart` 미조회(→ 「아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요」 = 거짓 **행동 지시**). **B58**은 `pending` Set으로 그 티커의 *모든* 배지를 함께 잠그고 `aria-busy`/`cursor`로 알린다(뮤텍스는 레이스 가드가 아니고, 호출부가 반환값을 버려 무음 삼킴을 감지조차 못 했다).
+>
+> ⚠️ **B76의 초기값 `null` 자체가 한동안 무커버리지였다 — 실패 축만 있고 「아직 안 옴」 창은 안 재고 있었다.** 그쪽이 3요청 병렬이라 **매 마운트** 발생하는 더 흔한 발현면인데도 그랬다 → `failure-vs-empty.test.jsx`에 in-flight 축을 추가했다. 「3상태」를 도입하면 **세 상태 전부**에 축을 두어야 한다(실패만 재면 미조회가 사각으로 남는다).
+>
+> ⚠️ **B58의 수정이 같은 사이클에 회귀 1건을 만들었다 — React는 `undefined`를 「미지정」으로 취급하지 않는다.** `opacity: busy ? 0.6 : undefined`가 `badgeStyle`의 `opacity: 0.5`(모름 분기)를 **키 존재만으로** 덮어써 모름 배지의 흐림이 사라졌다(스프레드에서 `undefined` 값도 키를 덮는다). 조건부 스프레드로 고쳤고 `tracked-unknown-affordance.test.jsx`에 실측 축을 쌍으로 뒀다.
+>
+> ⚠️ **B49는 닫지 않았다 — 주 인스턴스 + 형제 4곳만 닫고 행을 *축소해* 남겼다.** `pages/Reports.jsx` 상세 fetch(취소 플래그 3핸들러 + `.catch` → 실패는 실패 배너로 표시해 옛 티커 수치를 유지하지 않는다) 외에 `AnalystReport.jsx` 발행물·이력 이펙트(`ReportDetailTabs`가 `key` 없이 렌더해 **같은 마운트 내** 레이스였다) · `HistoryTab` 3이펙트 · `ConsensusChart::fetchData` · `DetailTab::BacklogSection`을 함께 닫았다. **남은 미가드 6곳은 `§7.3` 표**(`Ranking::onRowClick` · `Calendar` 월 이펙트 · `Recommendations::handleChip` · `StockSearchBox` · `usePortfolioData` · `useReportList`)다.
+>
+> ⚠️ **세대 가드에서 배운 것 두 가지.** ⓐ **가드는 「늦은 착지」만 막고 「보존」은 막지 않는다** — 옛 데이터가 *이미* 착지한 뒤 식별자(prop)만 갈리면 경합 없이 결정적으로 옛 데이터가 새 화면을 소유한다. 그래서 식별자 변경 시 **상태를 `null`(미조회)로 되돌리는** 것이 쌍으로 필요하다(`[]`로 되돌리면 「0건」이라는 거짓 진술이 된다). ⓑ **`.finally` 게이트의 회귀 축은 새 요청을 in-flight로 붙잡은 채 낡은 응답을 착지시켜야 이빨이 생긴다** — 새 요청을 먼저 해소하는 픽스처는 두 `.finally`가 같은 값을 써서 관측 차이가 **원리적으로** 생기지 않는다(주입 실측: 그 순서에서는 `.finally` 게이트를 지워도 8축 전부 초록이었다).
+>
+> **계약·표시 4건** — **B24**는 `VALID_EVENTS`에 `nav_analytics`를 추가하고 `backend/tests/test_valid_events_matches_frontend.py`로 **3방향**을 대조한다(프론트 수확 ⊆ 화이트리스트 / 화이트리스트 잔여 == `RETIRED_EVENTS` 베이스라인 / `AdminAnalytics.jsx::EVENT_LABELS` ⊇ 화이트리스트 — 라벨이 없으면 원시 영문 키가 렌더되는데 graceful이라 어떤 게이트도 안 알린다). **B34**는 `fmtSharesUs`가 **절대값으로 티어를 비교하고 부호를 축약 뒤에 붙인다**(⚠️ 소비처 `UsInsiderSection.jsx`가 양수에 '+'를 직접 붙이므로 여기서 넣는 부호는 `'-'`뿐이다 — '+'까지 넣으면 `++1.20B`가 된다). **B57**은 페이지 게이트를 컴포넌트의 채택 조건과 **등가**로 맞췄다(`related[k].length > 0` → `related[k].some(nonBlank)`; `TechGraph::validLabels`가 모듈 private이라 호출할 수 없어 산문 게이트가 이미 쓰는 `nonBlank`로 등가식을 재현하고, 드리프트는 `TechReport.test.jsx`의 양방향 등가 표가 맡는다). ⚠️ **백엔드 `routers/tech_reports.py::Related`는 무변경이다** — `List[str] = []`에 항목별 non-empty 제약을 넣지 않았으므로 공백 원소는 여전히 201로 통과하고, 화면이 그것을 「없음」으로 취급한다(`wrong < missing` 방향). 즉 **요청·응답 계약이 바뀌지 않았으므로** `API_SPEC.md`·`CLAUDE_COWORK_API.md`의 `related` 필드 서술은 갱신 대상이 아니다(둘 다 필드 형태만 적고 렌더 조건을 약속하지 않는다 — 실측 확인). **B56**은 `legacyCopy`가 `execCommand` 반환값을 확인해 throw하고 화면 상태를 3값(`idle`/`copied`/`failed`)으로 두었다 — 실패 안내가 「아래 로그를 직접 선택해」이므로 「지우기」가 그 상태를 **리셋**한다(가리킬 대상이 없어지면 안내가 거짓이 된다).
+>
+> ⚠️ **B24의 수확기 정규식을 좁히지 말 것.** 인용부호는 단·쌍·백틱을 모두 받는다 — 좁히면 「새 이벤트를 쌍따옴표로 정의하고 화이트리스트 등록을 잊은 경우」에만 무음이 되어 **정확히 B24가 재발하는 방향에서만** 감사가 공허해진다. 수확 0건을 통과로 세지 않도록 `assert literals`·`assert evt_fields`·`assert prefixes and perms` sentinel을 쌍으로 뒀다.
+>
+> ⚠️ **이 절의 표기 규율 — 닫힌 행은 `~~Bnn~~`로 남기지 말고 제거할 것.** 이 파트가 처음에 취소선 형태로 8행을 남겼는데, 규정된 §0 행 수 감사(`grep -cE '^\| *\**B[0-9]'`)가 **`~~`로 시작하는 행을 원리적으로 못 센다** — 20행이 남아 있는데 감사가 **12**를 반환해 「행을 이미 제거했다」와 **글자 하나 다르지 않게** 보였다(우연히 목표값과 일치했다). 「감사 패턴을 좁히면 그 감사는 통과해도 무의미하다」의 이 절 자신에 대한 적용이다 — 표기를 바꾸려면 **감사 패턴을 먼저** 바꿔야 한다.
+>
+> ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63` + `B6`(부분) + `B80`은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다(전건 잔존 확인 — 잔존 12행). 특히 `B48`(에러 바운더리 부재)·`B63`(포매터 중복)은 이 파트가 프론트 표시 9건을 훑고 `frontend/src/utils.js`의 포매터를 직접 만졌으므로 「같이 정리됐겠지」로 읽히기 쉬운데, **둘 다 task#333의 비목표로 명시**돼 손대지 않았다(`B34` 한 함수만 고쳤다). `B51`(`?diag=1` 인가코드 기록)도 이 파트가 같은 파일 `components/DiagLog.jsx`를 만졌으므로 같은 오독 위험이 있는데, 고친 것은 복사 폴백뿐이고 진단 로그의 인가코드 기록 경로는 그대로다.
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
@@ -103,10 +129,7 @@ mapped: 2026-08-10
 |---|---|---|---|
 | B6 | 키 미설정 배치가 "성공"으로 기록 · **부분(도달조건 축소, 재판정 task#329)**: 원 서술이 지목한 3위치 중 **2곳이 닫혔다** — `econ.py::_fetch_and_save_econ_indicators`는 계열별 소스-폴백 + `_status`(partial/skipped)를 반환하고, `scheduler/jobs.py::_refresh_monthly_us`는 `as run`으로 그것을 받아 `set_status`한다(수동 2레인 `refresh-econ`·`refresh-monthly?market=US`도 함께). **남은 도달 경로는 `macro.py` 하나뿐이다** — `_fetch_and_save_macro_signals`가 키 미설정 시 예외 없이 `{"error": …}`를 반환하는데 `_status`가 없고, 두 레인(`scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals`) **모두 `as run` 미배선**이라 반환값을 아무도 검사하지 않는다. 형제 `econ.py`가 참조 구현이다(§6.1) | `market_indicators/macro.py::_fetch_and_save_macro_signals` → `scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals` | `FRED_API_KEY` 미설정 |
 | B9 | 프론트에 access token 갱신 경로가 없다 — 백엔드 `/api/auth/refresh`는 **존재하는데** 아무도 안 부른다 | `frontend/src/api.js` 응답 인터셉터 | 1시간 경과(항상) |
-| B24 | `nav_analytics`가 백엔드 화이트리스트에 없어 **200 OK로 무음 폐기** | `routers/events.py::VALID_EVENTS` ← `components/Masthead.jsx`·`MobileTopActions.jsx` | admin이 '행동 분석' 진입 시 항상 |
 | B53 | 루틴 프롬프트의 `market_outlook` 예시가 **문자열 템플릿**이라 AI가 산문으로 채우면 `segments[]`가 `None`이 되어 「사업부문 시장 분석」 섹션이 **크래시 없이 조용히 사라진다**(정본 `CLAUDE_COWORK_API.md`는 객체로 못박고, `routers/stocks.py`엔 스키마 검증이 없어 422 피드백도 없다) | `scripts/cowork-routine-prompt.md` → `services/analyst_reports.py::_market_outlook_segments` | 루틴이 프롬프트 예시 형태를 따를 때 |
-| B56 | `DiagLog` 복사 폴백이 `execCommand` 반환값을 확인하지 않아 **실패해도 '복사됨'** 이 뜨고, 이중 실패는 빈 `.catch(() => {})`가 완전히 삼킨다 — 이 컴포넌트의 목적(폰에서 로그 채취)이 정확히 그 조합에서 무너진다 | `components/DiagLog.jsx::legacyCopy · copyText · handleCopy` | `execCommand`가 예외 없이 false / writeText 거절 + legacyCopy throw |
-| B58 | `useTrackedStocks`의 티커별 뮤텍스가 **같은 훅 인스턴스를 공유하는 화면**에서 다른 카드의 동일 티커 2번째 클릭을 무음으로 삼킨다(`GuruStats`·`GuruAllocation`·`GuruManagers`·`GuruDetail`은 `pending`을 쓰지 않아 배지 비활성화도 없고, `onClick`이 반환값을 버려 호출부도 감지 못 한다) | `hooks/useTrackedStocks.js::toggle` ← `pages/GuruManagers.jsx` | 같은 티커가 여러 매니저 top10에 동시 등장 + 연속 클릭 |
 
 ### 계약·보안
 
@@ -122,14 +145,9 @@ mapped: 2026-08-10
 
 | # | 결함 | 위치 (심볼) |
 |---|---|---|
-| B34 | `fmtSharesUs`가 음수에서 축약 없이 전액 표기(형제 `fmtSharesKr`은 부호 보존) | `frontend/src/utils.js` ← `components/reports/UsInsiderSection.jsx` |
 | **B48** | **에러 바운더리가 트리 어디에도 없다** — 렌더 throw 1건이 전체 백지 | `frontend/src/` 전역 (grep 결과 0건) |
-| **B49** | 리포트 상세 fetch에 staleness 가드가 없어 **A 종목 수치가 B 종목 화면에 렌더** | `frontend/src/pages/Reports.jsx` 상세 fetch 이펙트 |
-| **B54** | 주요기술 **목록** 카드가 결론 문장인 `title`을 ellipsis로 자른다 — **상세 페이지가 같은 필드에 "ellipsis·line-clamp 금지(가토 ⑦)"를 명시**하는데 목록만 위반(서로 다른 커밋 간 회귀성 드리프트: 목록 task#276 / 상세 금지 task#280). 라이브 실측 4발행물 × 3뷰포트 **12표본 전부 잘림**(PC1440 가시비율 15.2% ≈ 23자), `title` hover 속성도 없어 복구는 클릭뿐. 한국어는 술어가 끝이라 잘림이 **결론부터 먹는다**(가토 ⑬) | `pages/TechReports.jsx` (대조: `pages/TechReport.jsx` 리드 문단 주석) |
-| **B55** | `ShareChart` 점유율 막대가 값 칸 폭을 예약하지 않아 **트랙(`flex:1`) 기준이 행마다 달라지고 더 작은 값이 더 긴 막대**가 된다(가토 ⑮). 형제 `MarketEstimates.jsx`가 **이미 실측 확인해 `width:${valueCh}ch`로 고친 결함과 동형**인데 이 컴포넌트는 그 수정을 받지 않았다. 라이브 주입 실측: `100.0%` vs `99.9%` → 막대 `592.64` vs `599.25px`(Δ −6.61px, 육안 확인), 모바일 390에서 Δ **−7.05px**로 악화. ⚠️ 실데이터 노출은 4발행물 중 **2건 미측정**(측정한 2건은 0행·1행으로 자극 불가) | `components/tech/ShareChart.jsx` (처방 원본: `components/tech/MarketEstimates.jsx`) |
-| B57 | `TechGraph` 섹션 게이트가 **컴포넌트 자신의 채택 조건과 다른 식**이라(페이지는 배열 길이만, 컴포넌트는 `validLabels` trim 필터) related가 실질 비어도 target 단독 빈 그래프가 열린다. 같은 파일이 `milestones`·`categories`엔 "게이트가 각 컴포넌트의 순수함수와 같은 식이어야 한다"는 규율을 준수하는데 `related`만 예외 | `pages/TechReport.jsx`(`hasRelated`) ↔ `components/tech/TechGraph.jsx`(`validLabels`·`groups`) — task#317이 SVG를 세로 흐름으로 재작성하며 `techGraphLayout`·`hasGraph`가 사라졌으나 **게이트 식 불일치 자체는 그대로다**(페이지 게이트는 여전히 배열 길이만 보고, 컴포넌트는 여전히 `trim()` 필터를 쓴다) · **부분(도달조건 축소, 재판정 task#325)**: 원 서술의 「`target` 단독 빈 그래프 박스」는 **더는 생기지 않는다** — task#317 재작성 후 `groups`는 `prerequisites.length>0 \|\| derivatives.length>0`일 때만 채워지고(`target` 단독으로는 그룹이 안 생긴다) 컴포넌트가 `!hasComposition && !hasBoundary`면 통째로 `return null`한다. 남은 도달 경로는 **task#320이 도입한 페이지 레벨 `hasConnections = hasComposition \|\| …`** 하나뿐이다 | 백엔드 `routers/tech_reports.py::Related`가 `List[str] = []`에 **항목별 non-empty 제약이 없어** 공백 문자열 원소가 통과할 때 |
+| **B49** | **부분(주 인스턴스 닫힘, task#331)** — `pages/Reports.jsx` 상세 fetch에 취소 플래그 + `.catch`를 넣었고(실패는 실패 배너로 표시해 옛 티커 수치를 유지하지 않는다), 형제 4곳도 함께 닫았다: `AnalystReport.jsx` 발행물·이력 이펙트(`ReportDetailTabs`가 `key` 없이 렌더해 **같은 마운트 내** 레이스였다) · `HistoryTab` 3이펙트(`.finally`까지 게이트) · `ConsensusChart::fetchData`(세대 가드 + 티커 전환 시 `null` 리셋) · `DetailTab::BacklogSection`. ⚠️ 세대 가드는 「늦은 착지」만 막고 「보존」은 막지 않는다 — 옛 데이터가 *이미* 착지한 뒤 prop만 갈리면 경합 없이 결정적으로 옛 데이터가 새 화면을 소유하므로, 식별자 변경 시 **상태를 `null`(미조회)로 되돌리는** 것이 쌍으로 필요하다(`[]`로 되돌리면 「0건」이라는 거짓 진술이 된다). **남은 미가드는 §7.3 표** — `Ranking::onRowClick` · `Calendar` 월 이펙트 · `Recommendations::handleChip` · `StockSearchBox` · `usePortfolioData` · `useReportList` 6곳 | `frontend/src/pages/Reports.jsx` 상세 fetch 이펙트(닫힘) · §7.3 표의 6곳(열림) |
 | B63 | 프론트 포매터 중복 — 재계수 완료(§13.2에서 열림 확정, task#292) | `frontend/src/utils.js` 및 산발 포매터 (§7.7·§7.9) |
-| **B76** | 관심목록 조회 **실패가 「후보 업체」 오추천으로 전파**된다 — `loadWatch`가 `GET /api/watchlist` 실패를 `.catch(console.warn)`로 삼키고 `watchTickers`를 초기값 `[]`로 방치하는데, `computeTechCandidates`는 `mine = new Set([...holdings, ...watchTickers])`를 **후보 풀 제외집합**으로 쓴다 → **이미 관심목록에 있는 종목이 「내가 안 가진 후보」로 추천**된다. 조회 실패는 「관심목록이 비어 있다」는 *사실이 아닌데* 화면이 그것을 사실로 취급해 **행동을 권한다**(task#307 3상태 규율: 미조회/0건/**실패**가 훅 반환값에서 구별돼야 한다). ⚠️ 코드 주석 `:261-262`은 「실패해도 부기만 사라지고 카드는 그대로」라고 적었는데 **`computeTechCandidates`의 제외집합 역할을 놓쳤다** — 주석이 자기 영향범위를 과소 서술한 사례. 데이터 오염은 없다(`routers/watchlist.py,83`이 중복 추가를 거부) | `pages/ExposureTab.jsx::loadWatch` → `::computeTechCandidates` → 호출부 | `GET /api/watchlist` 실패(네트워크·401·5xx) |
 
 ### 검증장치·문서
 
@@ -516,12 +534,12 @@ finally:
 
 `routers/auth.py::oauth_google_callback`가 `id_token`을 `.split(".")[1]` + base64 디코드로 읽는다 — `jwt.decode` 없음, `aud`/`iss`/`exp` 검증 없음. **지금은 exploit 불가**다: 토큰이 `GOOGLE_CLIENT_SECRET`로 인증된 서버-대-서버 POST(TLS)로 오므로 전송 자체가 신뢰 앵커다. 누군가 이것을 클라이언트가 준 `id_token`을 받도록 리팩터하는 순간 실 취약점이 된다 — 불변식을 주석으로 못박을 자리다.
 
-### 5.13 이벤트 화이트리스트 — **잔여 2건**
+### 5.13 이벤트 화이트리스트 — **B24 닫힘, 잔여 1건**
 
-`routers/events.py::VALID_EVENTS`(19개)는 `Depends(get_current_user)`로 게이트되고 비화이트리스트 이름은 **200 OK + 무음 폐기**다(fail-silent 설계).
+`routers/events.py::VALID_EVENTS`(**20개** — task#331에서 `nav_analytics` 추가)는 `Depends(get_current_user)`로 게이트되고 비화이트리스트 이름은 **200 OK + 무음 폐기**다(fail-silent 설계).
 
-- **B24**: 프론트가 보내는데 화이트리스트에 없는 이벤트는 **정확히 1개 — `nav_analytics`**(`components/Masthead.jsx`, `components/MobileTopActions.jsx`). 결과는 텔레메트리 무음 손실. 200을 돌려주므로 **이 교차 대조 없이는 관측 불가**하다.
-- 스테일 엔트리(LOW): `tab_holdings`·`tab_watch`·`stock_search`는 `pages/AdminAnalytics.jsx`의 표시 라벨로만 등장하고 emit 하는 `trackEvent` 호출부가 없다.
+- **B24 — 닫힘(task#331)**: 프론트가 보내는데 화이트리스트에 없는 이벤트는 이제 **0개**다(전엔 `nav_analytics` 1개 — `components/Masthead.jsx`, `components/MobileTopActions.jsx`). 200을 돌려주므로 이 대조 없이는 관측 불가였고, 그래서 `backend/tests/test_valid_events_matches_frontend.py`가 **3방향**을 자동 대조한다 — ⓐ 프론트 수확 ⊆ 화이트리스트 ⓑ 화이트리스트 잔여 == `RETIRED_EVENTS` 베이스라인 ⓒ **`AdminAnalytics.jsx::EVENT_LABELS` ⊇ 화이트리스트**(라벨이 없으면 `eName` 폴백이 원시 영문 키를 렌더한다 — graceful이라 어떤 게이트도 안 알린다). ⚠️ 수확기 정규식의 인용부호는 단·쌍·백틱을 모두 받는다 — 좁히면 「새 이벤트를 쌍따옴표로 정의하고 화이트리스트 등록을 잊은 경우」에만 무음이 되어 감사가 재발 방향에서만 공허해진다.
+- 스테일 엔트리(LOW): `tab_holdings`·`tab_watch`·`stock_search`는 `pages/AdminAnalytics.jsx`의 표시 라벨로만 등장하고 emit 하는 `trackEvent` 호출부가 없다. **화이트리스트에서 빼지 않는다** — 캐시된 옛 PWA 번들이 아직 쏠 수 있고, 빼는 순간 그 텔레메트리가 무음 폐기된다(= 이 절이 막으려는 바로 그 클래스). `RETIRED_EVENTS` 베이스라인이 그 셋을 exact-match로 동결한다.
 - 동적 emit은 안전하다 — `MobileNav.jsx`의 `trackEvent('nav_' + section.perm)`이 내는 5개 perm 값이 전부 화이트리스트에 있다(§7.4의 "필드 역할 겸직" 함정을 `perm`으로 파생해 피한 자리).
 - **화이트리스트가 `user_events`의 완전한 인벤토리가 아니다**: `middleware/event_tracker.py::EventTrackerMiddleware`가 `stock_add`·`stock_delete`·`stock_promote`·`report_generate`·`guru_crawl`을 `_save_event`로 직접 INSERT하며 화이트리스트를 우회한다(이름이 `_TRACKED`에 하드코딩이라 취약점은 아니다).
 
@@ -690,7 +708,7 @@ if (err.response?.status === 401) {
 | MED | `pages/GuruStats.jsx::StatRow` — `row.score.toFixed(3)` | 같은 파일의 다른 필드는 전부 `?? '-'`인데 여기만 무가드 |
 | MED | `pages/Settings.jsx::BatchHub` — `batches.filter(...)` | `batches.length === 0` 검사가 객체에선 false라 `.filter`까지 도달 |
 
-### 7.3 비동기 레이스 — **일부 가드됨, 7곳 미가드**
+### 7.3 비동기 레이스 — **일부 가드됨, 6곳 미가드**(task#331에서 5곳 닫힘)
 
 **참조 구현(그대로 둘 것)** — 세대 카운터를 `.then`·`.catch`·**`.finally`까지** 검사하는 올바른 형태:
 
@@ -702,12 +720,15 @@ if (err.response?.status === 401) {
 
 | 심각도 | 파일 · 심볼 | 증상 |
 |---|---|---|
-| **HIGH (B49)** | `pages/Reports.jsx` 상세 fetch 이펙트 | 티커 A → B를 빠르게 누르면 A 응답이 나중에 착지해 **헤더는 B, 수치는 A**. `.catch`가 없어 실패 시 `detail`이 이전 티커 값을 유지 → B 화면에 A의 목표가·RSI·컨센서스가 렌더된다 |
+| ~~HIGH (B49)~~ | ~~`pages/Reports.jsx` 상세 fetch 이펙트~~ | **닫힘(task#331)** — 취소 플래그 3핸들러 + `.catch`(실패는 `report-detail-error` 배너로 표시). 회귀 축 `frontend/src/test/report-detail-stale.test.jsx` |
+| ~~MED~~ | ~~`pages/AnalystReport.jsx` 발행물·이력 이펙트~~ | **닫힘(task#331)** — `ReportDetailTabs.jsx`가 `key` 없이 렌더하고 「이전 판」이 부모 `deepDate`만 갈아끼우므로 **같은 마운트 내** 레이스였다(형제 `ConsensusSection`은 이미 가드돼 있었다). 이력 이펙트의 `filter(d => d !== date)`는 낡은 클로저의 `date`를 쓰므로 가드 없이는 **지금 보고 있는 판이 「이전 판」 목록에 남는다** |
+| ~~MED~~ | ~~`components/reports/ConsensusChart.jsx::fetchData`~~ | **닫힘(task#331)** — 세대 가드 3핸들러(낡은 세대의 실패는 auto-retry도 예약하지 않는다 — 그 재시도가 옛 종목을 다시 부른다) + 티커 전환 시 `null` 리셋 |
+| ~~MED~~ | ~~`components/reports/DetailTab.jsx::BacklogSection`~~ | **닫힘(task#331)** — `cancelled` 플래그 + 조회 전 `null` 리셋 |
 | HIGH | `pages/Ranking.jsx::onRowClick` | 세대 카운터 없음. (a) 모달을 닫아도 나중 착지한 응답이 **닫은 모달을 다시 연다**, (b) A→B 연속 클릭 시 B 모달 안에 A 리포트. 60줄 위에 올바른 패턴이 있는데 여기 적용만 빠졌다 |
 | HIGH | `pages/Calendar.jsx` 월 이펙트 | `›`를 두 번 빠르게 → 헤더는 새 달, 셀은 옛 달의 실적·배당일 |
 | MED | `pages/Recommendations.jsx::handleChip` | 마운트 이펙트엔 `cancelled` 가드가 있는데 칩 토글 재fetch엔 없다 |
 | MED | `components/StockSearchBox.jsx` 검색 이펙트 | 디바운스(350ms)는 레이스 가드가 아니다 — 느린 1차 응답이 나중 착지해 `삼성전자` 텍스트 아래 `삼성` 결과가 뜨고, 행을 고르면 **틀린 티커**가 관심종목에 들어간다 |
-| MED | `components/reports/HistoryTab.jsx` `snapshotA`/`snapshotB` 이펙트 | 비교 날짜를 빠르게 두 번 바꾸면 한 날짜의 값이 다른 날짜 헤더 아래 표시 |
+| ~~MED~~ | ~~`components/reports/HistoryTab.jsx` 3이펙트~~ | **닫힘(task#331)** — `cancelled` 플래그, 히스토리 이펙트는 `.finally`까지 게이트. ⚠️ `.finally` 게이트의 회귀 축은 **새 요청을 in-flight로 붙잡은 채** 낡은 응답을 착지시켜야 이빨이 생긴다 — 새 요청을 먼저 해소하는 픽스처는 두 `.finally`가 같은 값을 써서 관측 차이가 원리적으로 생기지 않는다(주입 실측: 그 순서에서는 `.finally` 게이트를 지워도 8축 전부 초록) |
 | MED | `hooks/usePortfolioData.js::fetchAll`/`fetchDashboard` | 5개 호출 지점(마운트·bounded heal 루프·탭 클릭 2곳·↺ 버튼)이 경쟁하고 `finally`가 무조건 스피너를 끈다 |
 | MED | `hooks/useReportList.js::fetchList` | 가드도 `.catch`도 없다 |
 
@@ -780,7 +801,7 @@ if (err.response?.status === 401) {
 
 ### 7.11 거대 컴포넌트 — **잠재 위험**(낮음)
 
-`components/reports/DetailTab.jsx`(690줄)·`pages/Ranking.jsx`(550)·`pages/AnalystReport.jsx`(547)·`components/reports/Sections.jsx`(516)·`ConsensusChart.jsx`(447)·`FinancialsChart.jsx`(434).
+`components/reports/DetailTab.jsx`(701줄)·`pages/AnalystReport.jsx`(570)·`pages/Ranking.jsx`(563)·`components/reports/Sections.jsx`(516)·`ConsensusChart.jsx`(476)·`FinancialsChart.jsx`(434). ⚠️ 이 수치는 **길이 서술**이라 규정된 감사 grep(`파일명:NNN` 포인터)이 원리적으로 못 본다 — 줄 수를 바꾸는 변경에서 함께 갱신할 것(task#331에서 5개가 드리프트했다).
 
 ---
 

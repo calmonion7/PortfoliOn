@@ -40,7 +40,7 @@ const coverageSentence = (d) => d.manager_count >= d.all_manager_count
 
 export default function GuruAllocation() {
   const { showToast } = useToast()   // 스코프 전환 실패 토스트(토글 실패는 훅이 처리)
-  const { stockMap, unknown, toggle } = useTrackedStocks()
+  const { stockMap, unknown, pending, toggle } = useTrackedStocks()
   const cacheRef = useRef({})   // scope -> 응답(재클릭 재요청 0)
   const [data, setData]         = useState(null)
   const [loading, setLoading]   = useState(true)  // 최초 로딩(전면 스피너)만
@@ -236,6 +236,7 @@ export default function GuruAllocation() {
                 stockMap={stockMap}
                 onToggle={toggle}
                 unknown={unknown}
+                pending={pending}
               />
             </div>
           ))}

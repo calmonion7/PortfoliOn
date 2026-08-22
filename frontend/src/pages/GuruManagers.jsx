@@ -37,7 +37,7 @@ export default function GuruManagers() {
   const navigate = useNavigate()
   const [data, setData]         = useState({ last_updated: null, managers: [] })
   const [loading, setLoading]   = useState(true)
-  const { stockMap, unknown, toggle } = useTrackedStocks()
+  const { stockMap, unknown, pending, toggle } = useTrackedStocks()
   const [sort, setSort]         = useState({ key: SORT_OPTIONS[0].key, dir: SORT_OPTIONS[0].dir })
   const [query, setQuery]       = useState('')
   const guruCounts = useMemo(() => buildGuruCounts(data.managers), [data.managers])
@@ -61,6 +61,13 @@ export default function GuruManagers() {
     const name = h.name_kr || h.name || ticker
     return toggle({ ticker, name, market: 'US', exchange: '', security_type: 'EQUITY' }, type === 'watchlist')
   }
+
+  // 같은 티커는 여러 매니저 top10에 동시에 등장한다 — 그래서 배지 하나가 in-flight인 동안
+  // 다른 매니저 카드의 같은 티커 배지는 열린 채로 남고, 그 클릭은 훅의 티커 단위 뮤텍스에
+  // **조용히 삼켜졌다**(B58: 스피너도 토스트도 없어 사용자는 먹혔는지 알 수 없었다).
+  // pending으로 그 티커의 *모든* 배지를 함께 잠근다 — 삼킴을 사후에 알리는 것보다 애초에
+  // 클릭이 안 되게 하는 쪽이 근본적이다(잔여 클릭은 훅이 warn 마커를 남긴다).
+  const isBusy = (ticker) => pending.has(ticker)
 
   const badgeStyle = (ticker) => {
     // 모름을 미추적 색으로 두면 "모름"이 "미추적"으로 보인다 — 흐려서 상태 없음을 드러낸다.
@@ -181,16 +188,24 @@ export default function GuruManagers() {
               <div className="guru-badges">
                 {(m.top10 || []).map(h => {
                   const type = stockMap[h.ticker]
+                  const busy = isBusy(h.ticker)
                   return (
                     <span
                       key={h.rank}
-                      onClick={e => { e.stopPropagation(); handleBadgeClick(h) }}
+                      onClick={e => { e.stopPropagation(); if (!busy) handleBadgeClick(h) }}
                       title={`#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`}
                       className="guru-badge"
                       aria-disabled={unknown || undefined}
+                      aria-busy={busy || undefined}
                       style={{
                         ...badgeStyle(h.ticker),
-                        cursor: (unknown || type === 'holding') ? 'default' : 'pointer',
+                        cursor: busy ? 'progress' : (unknown || type === 'holding') ? 'default' : 'pointer',
+                        // ⚠️ `opacity: busy ? 0.6 : undefined`로 쓰면 안 된다 — 그 키는 값이 `undefined`여도
+                        // **존재**하므로 위 `...badgeStyle(...)`의 `opacity: 0.5`(모름 분기)를 덮어써
+                        // React가 빈 문자열로 적용한다 → 모름 배지의 흐림이 통째로 사라지고 정상
+                        // 미추적 배지와 시각적으로 같아진다(바로 위 badgeStyle 주석이 금지한 상태).
+                        // 조건부 스프레드로 써야 busy가 아닐 때 badgeStyle의 opacity가 살아남는다.
+                        ...(busy ? { opacity: 0.6 } : {}),
                       }}
                     >
                       {h.ticker}
@@ -279,18 +294,26 @@ export default function GuruManagers() {
               <div className="guru-badges">
                 {(m.top10 || []).map(h => {
                   const type = stockMap[h.ticker]
+                  const busy = isBusy(h.ticker)
                   const tooltip = `#${h.rank} ${h.name || h.ticker}${h.name_kr ? ` (${h.name_kr})` : ''} — ${h.weight_pct}%`
                     + (type === 'holding' ? '\n[보유중]' : type === 'watchlist' ? '\n[관심 — 클릭하여 삭제]' : '\n[클릭하여 관심종목 추가]')
                   return (
                     <span
                       key={h.rank}
                       title={tooltip}
-                      onClick={e => { e.stopPropagation(); handleBadgeClick(h) }}
+                      onClick={e => { e.stopPropagation(); if (!busy) handleBadgeClick(h) }}
                       className="guru-badge"
                       aria-disabled={unknown || undefined}
+                      aria-busy={busy || undefined}
                       style={{
                         ...badgeStyle(h.ticker),
-                        cursor: (unknown || type === 'holding') ? 'default' : 'pointer',
+                        cursor: busy ? 'progress' : (unknown || type === 'holding') ? 'default' : 'pointer',
+                        // ⚠️ `opacity: busy ? 0.6 : undefined`로 쓰면 안 된다 — 그 키는 값이 `undefined`여도
+                        // **존재**하므로 위 `...badgeStyle(...)`의 `opacity: 0.5`(모름 분기)를 덮어써
+                        // React가 빈 문자열로 적용한다 → 모름 배지의 흐림이 통째로 사라지고 정상
+                        // 미추적 배지와 시각적으로 같아진다(바로 위 badgeStyle 주석이 금지한 상태).
+                        // 조건부 스프레드로 써야 busy가 아닐 때 badgeStyle의 opacity가 살아남는다.
+                        ...(busy ? { opacity: 0.6 } : {}),
                       }}
                     >
                       {h.ticker}

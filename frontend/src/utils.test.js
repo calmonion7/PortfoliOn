@@ -81,4 +81,24 @@ describe('fmtSharesUs — 입력 단위: 주(株), 해외', () => {
   it('빈값은 —', () => {
     expect(fmtSharesUs(null)).toBe('—')
   })
+  // B34 — 임계 비교가 원값이면 음수가 전 티어를 통과해 전액이 찍혔다.
+  // 내부자 순매수(net_shares)는 순매도일 때 음수라 라이브에서 실제로 밟힌다.
+  it('음수도 축약되고 부호가 보존된다 (형제 fmtSharesKr와 같은 형태)', () => {
+    expect(fmtSharesUs(-1.5e9)).toBe('-1.50B')
+    expect(fmtSharesUs(-2.5e6)).toBe('-2.50M')
+    expect(fmtSharesUs(-1500)).toBe('-1.5K')
+  })
+  it('음수가 전액으로 새지 않는다 — 쉼표 표기는 1e3 미만에서만', () => {
+    expect(fmtSharesUs(-1.5e9)).not.toContain(',')
+    expect(fmtSharesUs(-999)).toBe('-999')
+  })
+  it('대조군 — 양수·0의 표기는 바뀌지 않는다', () => {
+    expect(fmtSharesUs(1.5e9)).toBe('1.50B')
+    expect(fmtSharesUs(999)).toBe('999')
+    expect(fmtSharesUs(0)).toBe('0')
+  })
+  it('대조군 — 포매터는 음수 부호만 넣는다(소비처가 +를 붙이므로 이중 부호 금지)', () => {
+    expect(fmtSharesUs(1.5e9).startsWith('+')).toBe(false)
+    expect(fmtSharesUs(0).startsWith('+')).toBe(false)
+  })
 })

@@ -1,5 +1,5 @@
 // frontend/src/pages/ExposureTab.jsx
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../api'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -64,6 +64,11 @@ function WeightBar({ label, weight, color = 'var(--accent)', warn = false }) {
  *
  * ⚠️ 관심종목은 `quantity`가 없어 비중을 만들 수 없다. 0으로 섞으면 "노출 0"과
  * 구별되지 않으므로 **막대에서 통째로 제외**하고 개수만 부기로 알린다.
+ *
+ * ⚠️ `watchTickers`가 **모름**(null)이면 `watchCount`는 0이 된다. 그 부기는 `>0`일 때만
+ * 렌더되므로 화면에서 **생략**될 뿐 「관심 0종목」이라 말하지 않는다 — 즉 여기서는
+ * 붕괴가 거짓 진술을 만들지 않는다(막대 값은 애초에 보유만 쓴다). 후보 칩은 사정이
+ * 다르다 — `computeTechCandidates` 주석 참조(B76).
  */
 export function computeTechExposure(techIndex, holdings, watchTickers = []) {
   const wByTicker = new Map((holdings || []).map(h => [h.ticker, h.weight || 0]))
@@ -106,8 +111,17 @@ const MAX_CHIPS = 3
  * 같은 입력이 늘 같은 순서를 낸다(이 저장소의 페이지네이션 tiebreaker 교훈).
  * `share_pct`는 채움률 9%라 정렬 축으로 쓰지 않고, `players` 게재 순서도 쓰지 않는다
  * (루틴 프롬프트가 나열 순서를 규정하지 않으므로 근거가 없다).
+ *
+ * ⚠️ **관심목록이 「모름」이면 후보를 하나도 내지 않는다 (B76, task#331).**
+ * `mine`은 후보 풀의 **제외집합**이라, 조회 실패를 `[]`로 붕괴시키면 *이미 관심에 있는
+ * 종목*이 「내가 안 가진 업체」로 승격한다 — 그러면 화면이 사실이 아닌 것을 근거로
+ * 「관심 추가」라는 **행동을 권한다**(누르면 중복 추가). `wrong < missing`의 어포던스 판이고
+ * `hooks/useTrackedStocks.js`의 `unknown` 규율과 같은 규칙이다 — **모름이면 액션을 제시하지 않는다.**
+ * ⚠️ 그리고 **빈 배열은 모름이 아니다** — 「조회 성공 + 관심 0건」은 *사실*이므로 후보를 낸다.
+ * 그래서 판정은 `length`가 아니라 `Array.isArray`다(null/undefined만 모름).
  */
-export function computeTechCandidates(techIndex, holdings, watchTickers = []) {
+export function computeTechCandidates(techIndex, holdings, watchTickers) {
+  if (!Array.isArray(watchTickers)) return new Map()
   const mine = new Set([
     ...(holdings || []).map(h => h.ticker),
     ...(watchTickers || []),
@@ -241,7 +255,10 @@ export default function ExposureTab() {
   const isMobile = useIsMobile()
   const { showToast } = useToast()
   const { techIndex, ready: techReady, failed: techFailed } = useTechIndex()
-  const [watchTickers, setWatchTickers] = useState([])
+  // ⚠️ 3상태다 — `null`=모름(미조회·조회실패) · `[]`=조회 성공 관심 0건 · 비어있지 않은 배열.
+  // `[]`로 초기화하면 **아직 물어보지도 않은 상태가 「관심 0건」이라는 사실 주장**이 되고,
+  // 그 주장이 후보 칩의 제외집합으로 쓰여 이미 관심에 있는 종목을 추천한다(B76).
+  const [watchTickers, setWatchTickers] = useState(null)
   // 후보 칩 → 관심 추가 프리필(task#323). null이면 모달을 그리지 않는다.
   const [candPrefill, setCandPrefill] = useState(null)
   const [open, setOpen] = useState(true)
@@ -258,13 +275,29 @@ export default function ExposureTab() {
 
   useEffect(load, [load])
 
-  // 관심종목은 막대에 넣지 않지만(비중 없음) 「관심 N종목」 부기에는 필요하다.
-  // 실패해도 부기만 사라지고 카드는 그대로 — 본문을 막지 않는다.
-  const loadWatch = useCallback(() => (
-    api.get('/api/watchlist')
-      .then(r => setWatchTickers((Array.isArray(r.data) ? r.data : []).map(w => w.ticker).filter(Boolean)))
-      .catch(e => { console.warn('[ExposureTab] 관심목록 조회 실패 — 관심 부기만 생략한다:', e.message) })
-  ), [])
+  // 관심종목은 막대에 넣지 않지만(비중 없음) 두 곳에 쓰인다 —
+  //   ① 「관심 N종목」 부기(없으면 생략될 뿐이라 실패해도 거짓 진술이 안 된다)
+  //   ② **후보 칩의 제외집합**(`computeTechCandidates`) ← 여기가 문제였다.
+  // ⚠️ 옛 주석은 「실패해도 부기만 사라지고 카드는 그대로」라고 적었는데 **②를 놓친 서술**이었다.
+  //    실패를 삼키고 `[]`를 유지하면 이미 관심에 있는 종목이 「안 가진 업체」로 추천된다(B76).
+  //    그래서 실패는 `null`(모름)로 **명시**하고, 후보 산출이 그 모름을 보고 스스로 비운다.
+  // ⚠️ 실패를 캐시하지 않는다 — 이 상태는 마운트마다 새로 조회된다.
+  // 세대 가드 — 마운트 자동 조회와 `saveCandidate` 후 재조회가 동시에 in-flight일 수 있다.
+  // 게이트하지 않으면 **낡은 실패가 방금 성공한 목록을 `null`로 지운다**(§9.4 레이스 관용구).
+  const watchGenRef = useRef(0)
+  const loadWatch = useCallback(() => {
+    const myGen = ++watchGenRef.current
+    return api.get('/api/watchlist')
+      .then(r => {
+        if (myGen !== watchGenRef.current) return
+        setWatchTickers((Array.isArray(r.data) ? r.data : []).map(w => w.ticker).filter(Boolean))
+      })
+      .catch(e => {
+        if (myGen !== watchGenRef.current) return
+        console.warn('[ExposureTab] 관심목록 조회 실패 — 모름으로 두고 후보 칩을 내지 않는다:', e.message)
+        setWatchTickers(null)
+      })
+  }, [])
 
   useEffect(() => { loadWatch() }, [loadWatch])
 

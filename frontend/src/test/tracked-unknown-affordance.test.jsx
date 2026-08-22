@@ -114,3 +114,37 @@ describe('B10 — Ranking: 관심목록 조회 실패 시 별표가 비활성이
     expect(api.delete).not.toHaveBeenCalled()
   })
 })
+
+// ── B58 수정의 회귀 — `opacity: busy ? 0.6 : undefined`가 badgeStyle의 흐림을 덮어썼다 ──
+// `{...badgeStyle(t), opacity: busy ? 0.6 : undefined}`는 값이 `undefined`여도 **키가 존재**하므로
+// 앞의 `opacity: 0.5`(모름 분기)를 덮고, React는 `undefined`를 빈 문자열로 적용한다.
+// 결과: 모름 배지가 정상 미추적 배지와 시각적으로 **동일**해지고(dashed 테두리만 남음) 클릭은
+// no-op이다 — B58이 없애려던 무음 삼킴을 다른 경로로 재생산한다. 게다가 unknown이면 클릭이
+// no-op이라 `pending`이 채워질 수 없으므로 그 상태에서 흐림은 **항상** 소실된다.
+// `GuruManagers.test.jsx`에 opacity·unknown 단언이 0건이라 어떤 축도 이것을 재지 않았다.
+describe('B58 후속 — 모름 배지는 흐려서 「상태 없음」을 드러낸다', () => {
+  const MANAGERS = { last_updated: '2026-07-01T00:00:00', managers: [
+    { id: 'brk', name: 'Warren Buffett', firm: 'Berkshire', portfolio_value: 1e9, num_stocks: 1,
+      top10: [{ rank: 1, ticker: 'AAPL', name: 'Apple', name_kr: '', weight_pct: 40 }] },
+  ] }
+
+  it('⚠️ 추적상태 모름이면 배지 opacity가 0.5로 실제 적용된다', async () => {
+    mockTrackedFailure({ '/api/guru/managers': MANAGERS })
+    render(<MemoryRouter><GuruManagers /></MemoryRouter>)
+    const badge = (await screen.findByText('AAPL')).closest('[aria-disabled]')
+    expect(badge).toHaveAttribute('aria-disabled', 'true')
+    expect(badge.style.opacity).toBe('0.5')
+  })
+
+  it('✅ 대조군 — 조회가 성공하면(미추적) 흐림을 걸지 않는다', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/api/stocks') return Promise.resolve({ data: [] })   // 성공 + 0건 = 미추적(사실)
+      if (url === '/api/guru/managers') return Promise.resolve({ data: MANAGERS })
+      return Promise.resolve({ data: [] })
+    })
+    render(<MemoryRouter><GuruManagers /></MemoryRouter>)
+    const badge = (await screen.findByText('AAPL')).closest('.guru-badge')
+    await waitFor(() => expect(badge.getAttribute('aria-disabled')).toBeNull())
+    expect(badge.style.opacity).toBe('')     // 모름이 아니므로 흐림 없음 = 두 상태가 구별된다
+  })
+})

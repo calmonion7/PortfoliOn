@@ -103,7 +103,7 @@ export default function GuruDetail() {
   // 라벨 폭 실측 캐시(task#237) — null이면 추정 폴백. 후보는 최대 11개뿐이라 마운트당 1회로 충분하다.
   const measureRef = useRef(null)
   const [labelWidths, setLabelWidths] = useState(null)
-  const { stockMap, unknown, toggle } = useTrackedStocks()
+  const { stockMap, unknown, pending, toggle } = useTrackedStocks()
 
   useEffect(() => {
     setLoading(true)
@@ -278,7 +278,7 @@ export default function GuruDetail() {
               )}
             </div>
             <span className="mono tnum" style={{ fontSize: 13, fontWeight: 600 }}>{(h.weight_pct ?? 0).toFixed(1)}%</span>
-            <WatchlistBtn ticker={h.ticker} name={h.name_kr || h.name} stockMap={stockMap} onToggle={toggle} unknown={unknown} />
+            <WatchlistBtn ticker={h.ticker} name={h.name_kr || h.name} stockMap={stockMap} onToggle={toggle} unknown={unknown} pending={pending} />
             </div>
             {/* 활동이 있는 행만 2번째 줄 — 변동없는 종목(표본 18%)은 줄을 만들지 않아 스크롤이 안 늘어난다 */}
             {h.activity && (

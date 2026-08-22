@@ -476,14 +476,25 @@ function ResearchDetail({ summary, ticker, date, enriched_at, onClose }) {
 }
 
 // 스냅샷 미보유 종목: 랭킹 행 데이터로 구성한 기본정보 + 관심추가 CTA
-function BasicInfo({ row, market, adding, onAdd, onClose }) {
-  const [news, setNews] = useState(null)  // null=로딩 중, []=없음
+// named export = 테스트 접근용(페이지 파일 관례) — 뉴스 3상태(미조회·0건·실패)를 직접 재기 위함.
+export function BasicInfo({ row, market, adding, onAdd, onClose }) {
+  // ⚠️ 상태는 셋이다 — `null`=미조회(로딩 중) · `[]`=조회 성공 0건 · `newsFailed`=조회 실패.
+  // 실패를 `[]`로 붕괴시키면 화면이 「관련 뉴스가 없습니다」라고 **단정**하는데 그것은 사실이 아니라
+  // *물어보지 못한 것*이고, 사용자는 그 종목에 뉴스가 없다고 읽어 다른 소스를 찾지 않는다(B76 동종·
+  // task#307). 실패는 캐시하지 않는다 — 다음 마운트가 재시도한다.
+  const [news, setNews] = useState(null)
+  const [newsFailed, setNewsFailed] = useState(false)
   useEffect(() => {
     let cancelled = false
     setNews(null)
+    setNewsFailed(false)
     api.get(`/api/stocks/${row.ticker}/news`, { params: { market: row.market || market || 'US' } })
       .then(({ data }) => { if (!cancelled) setNews(data.news || []) })
-      .catch(() => { if (!cancelled) setNews([]) })
+      .catch((e) => {
+        if (cancelled) return
+        console.warn('[Ranking] 뉴스 조회 실패 — 「없음」과 구별해 표시:', e)
+        setNewsFailed(true)
+      })
     return () => { cancelled = true }
   }, [row.ticker, row.market, market])
 
@@ -520,7 +531,9 @@ function BasicInfo({ row, market, adding, onAdd, onClose }) {
 
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>뉴스</div>
-        {news === null ? (
+        {newsFailed ? (
+          <p data-testid="ranking-news-error" style={{ fontSize: 12, color: 'var(--color-error)', margin: 0 }}>뉴스를 불러오지 못했습니다.</p>
+        ) : news === null ? (
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>뉴스 불러오는 중…</p>
         ) : news.length === 0 ? (
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>관련 뉴스가 없습니다.</p>

@@ -105,6 +105,36 @@ describe('useTrackedStocks — unknown을 1급 상태로', () => {
     expect(result.current.pending.has('AAPL')).toBe(false)
   })
 
+  // B58 — 뮤텍스에 걸린 클릭은 **무음이 아니어야** 한다. 반환값은 boolean 계약을 유지하므로
+  // (truthy를 추가하면 Ranking·Recommendations의 `if (ok)`가 삼킨 클릭에도 성공 토스트·
+  // 애널리틱스를 발화시킨다) 잔여 관측점은 로그 마커다. lint가 연결돼 있지 않아 이 축만이
+  // 「삼킴이 흔적을 남긴다」의 자동 가드다.
+  it('B58 — 삼킨 클릭은 훅 실명 마커와 티커를 담은 warn을 남긴다(무음 금지)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    let resolvePost
+    api.post.mockImplementation(() => new Promise(res => { resolvePost = res }))
+    const { result } = renderHook(() => useTrackedStocks())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    const payload = { ticker: 'AAPL', name: 'Apple', market: 'US', exchange: '', security_type: 'EQUITY' }
+    let firstPromise
+    act(() => { firstPromise = result.current.toggle(payload, false) })
+    await waitFor(() => expect(result.current.pending.has('AAPL')).toBe(true))
+    warn.mockClear()   // 첫 클릭이 남긴 것과 섞이지 않게
+
+    await act(async () => { await result.current.toggle(payload, false) })
+    expect(warn).toHaveBeenCalledTimes(1)
+    const [msg, ticker] = warn.mock.calls[0]
+    expect(msg).toContain('[useTrackedStocks]')
+    expect(ticker).toBe('AAPL')
+
+    // 대조군 — 정상 클릭은 warn을 남기지 않는다(마커가 노이즈가 되면 신호가 죽는다).
+    warn.mockClear()
+    await act(async () => { resolvePost({}); await firstPromise })
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
   it('S1(b) — 이미 pending인 티커는 즉시 false를 반환하고 요청을 보내지 않는다(중복 클릭 가드)', async () => {
     let resolvePost
     api.post.mockImplementation(() => new Promise(res => { resolvePost = res }))

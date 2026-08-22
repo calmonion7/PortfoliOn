@@ -11,7 +11,10 @@ export default function ConsensusChart({ ticker, market }) {
   const isMobile = useIsMobile()
   // 모바일: 툴팁이 차트 우측 뷰포트를 벗어나지 않도록 폭 제한 + 뷰박스 내 고정
   const tooltipWrapperStyle = isMobile ? { maxWidth: '60vw', zIndex: 10 } : undefined
-  const [data, setData] = useState([])
+  // ⚠️ 3상태다 — `null`=미조회(로딩 중) · `[]`=조회 성공 0건 · 비어있지 않은 배열.
+  // `[]`로 초기화·리셋하면 **아직 물어보지도 않은 상태가 「수집된 데이터가 없다」는 사실 주장**이
+  // 되고, 그 문구는 「수집 버튼을 눌러주세요」라는 **행동 지시**까지 딸려 있다(task#307 3상태 규율).
+  const [data, setData] = useState(null)
   const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState(null)
   const [fetchFailed, setFetchFailed] = useState(false)  // 조회 실패 — '데이터 없음'과 구분
@@ -19,12 +22,25 @@ export default function ConsensusChart({ ticker, market }) {
   const [period, setPeriod] = useState('3M')
   const retriedRef = useRef(false)     // 무음 auto-retry 1회 제한
   const retryTimerRef = useRef(null)   // 예약된 재시도 핸들 — 종목 전환/언마운트 시 취소
+  // 세대 가드 (B49) — 아래 이펙트 cleanup이 세대를 올려 **in-flight 응답**을 무효화한다.
+  // ⚠️ `clearTimeout`만으로는 못 막는다: 그것은 *아직 발사되지 않은 재시도*만 취소하고,
+  //    이미 날아간 `api.get`의 `.then`은 무조건 `setData`를 실행했다(옛 주석이 「스테일
+  //    fetch가 다른 종목 화면에 이전 종목 데이터를 쓰는 것 방지」라고 **없는 보호를
+  //    있다고 증언**하고 있었다 — 주석이 코드 경로를 가두면 그 주석은 코드다).
+  //    이 컴포넌트는 `market` prop으로 통화를 포맷하므로, 새는 순간 원화가 `$`로 렌더된다(B27과 동종).
+  const genRef = useRef(0)
 
   const fetchData = useCallback(() => {
     if (!ticker) return
+    const myGen = genRef.current
     api.get(`/api/consensus/${ticker}`)
-      .then(({ data }) => { setData(data); setFetchFailed(false); retriedRef.current = false })
+      .then(({ data }) => {
+        if (myGen !== genRef.current) return
+        setData(data); setFetchFailed(false); retriedRef.current = false
+      })
       .catch(() => {
+        // 낡은 세대의 실패는 재시도도 예약하지 않는다 — 그 재시도는 옛 종목을 다시 부른다.
+        if (myGen !== genRef.current) return
         // 일시적 오류(터널 520 등)는 대부분 즉시 재시도로 해소 — 1회 무음 재시도 후 실패 표시.
         if (!retriedRef.current) {
           retriedRef.current = true
@@ -40,11 +56,19 @@ export default function ConsensusChart({ ticker, market }) {
     retriedRef.current = false; setFetchFailed(false); fetchData()
   }
 
-  // 종목 전환/언마운트 시 재시도 상태 리셋 + 예약된 재시도 취소 — 이전 종목의 소진된 retry가
-  // 새 종목 auto-retry를 막거나, 스테일 fetch가 다른 종목 화면에 이전 종목 데이터를 쓰는 것 방지.
+  // 종목 전환/언마운트 시 재시도 상태 리셋 + 예약된 재시도 취소 + **세대 올리기**.
+  // 세 가지가 서로를 대체하지 않는다: 리셋은 이전 종목의 소진된 retry가 새 종목 auto-retry를
+  // 막는 것을, clearTimeout은 *예약된* 재시도를, 세대 올리기는 *이미 날아간* fetch의 착지를 막는다.
+  // ⚠️ 세대 가드는 「늦은 착지」만 막고 「보존」을 막지 않는다 — 옛 티커 데이터가 *이미* 착지한 뒤
+  // prop만 갈리면 경합 없이 **결정적으로** 옛 데이터가 새 티커 화면을 소유한다. 이 컴포넌트는
+  // `market` prop으로 통화를 포맷하므로 그 순간 원화가 `$`로 렌더된다(B27과 동종). 그래서
+  // 티커 전환 시 데이터를 `null`(미조회)로 되돌린다 — `[]`가 아니다(위 3상태 주석).
   useEffect(() => {
-    retriedRef.current = false; setFetchFailed(false); fetchData()
-    return () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current) }
+    retriedRef.current = false; setFetchFailed(false); setData(null); fetchData()
+    return () => {
+      genRef.current++
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+    }
   }, [fetchData])
 
   const backfill = async () => {
@@ -62,7 +86,7 @@ export default function ConsensusChart({ ticker, market }) {
     }
   }
 
-  const ascData = useMemo(() => [...data].reverse(), [data])
+  const ascData = useMemo(() => (data ? [...data].reverse() : []), [data])
 
   const filteredData = useMemo(() => {
     if (period === 'ALL') return ascData
@@ -330,6 +354,11 @@ export default function ConsensusChart({ ticker, market }) {
             background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)',
             borderRadius: 3, padding: '2px 10px', fontSize: 11, cursor: 'pointer',
           }}>다시 시도</button>
+        </div>
+      ) : data === null ? (
+        // 미조회 — 「없다」고 단정하지 않는다(위 3상태 주석).
+        <div style={{ color: 'var(--text-3)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
+          컨센서스 불러오는 중…
         </div>
       ) : ascData.length === 0 ? (
         <div style={{ color: 'var(--text-3)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>

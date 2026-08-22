@@ -64,7 +64,19 @@ export default function useTrackedStocks() {
 
   const toggle = useCallback(async (payload, isWatched) => {
     const { ticker } = payload
-    if (pendingRef.current.has(ticker)) return false  // 중복 클릭 가드 — 이미 in-flight
+    if (pendingRef.current.has(ticker)) {
+      // 중복 클릭 가드 — 이미 in-flight. **뮤텍스는 유지한다**(task#273 S1(b) 결정):
+      // 같은 티커에 POST/DELETE를 두 번 보내는 것을 막는 유일한 장치이고, 큐로 바꾸면
+      // 같은 액션이 두 번 적용돼 원상복귀한다(추가→추가 = 제거된 것처럼 보인다).
+      // 대신 **무음이 아니게** 만든다 — 같은 티커가 한 화면에 여러 번 렌더되면(구루
+      // 매니저별 top10) 형제 버튼 클릭이 여기 걸려 아무 일도 안 일어난 것처럼 보였다(B58).
+      // ① 소비처는 `pending`으로 그 티커의 *모든* 버튼을 함께 잠근다 → 애초에 클릭이 안 된다.
+      // ② 그래도 들어온 클릭은 이 로그가 남긴다(graceful이므로 warn, §4.5).
+      // 반환값은 boolean 계약을 유지한다 — truthy를 새로 추가하면 Ranking·Recommendations의
+      // `if (ok)`가 삼킨 클릭에도 성공 토스트·애널리틱스를 발화시킨다.
+      console.warn('[useTrackedStocks] 같은 티커 토글이 이미 진행 중 — 클릭을 무시했다:', ticker)
+      return false
+    }
     pendingRef.current.add(ticker)
     setPending(new Set(pendingRef.current))
     try {

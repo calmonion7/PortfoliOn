@@ -8,8 +8,11 @@ from services.db import execute
 
 logger = logging.getLogger(__name__)
 
+# 프론트 발신 집합과의 일치는 tests/test_valid_events_matches_frontend.py가 강제한다 —
+# 여기 없는 이름은 200 OK로 돌아가고 저장만 생략되므로(무음 폐기) 그 대조 없이는 관측 불가다.
 VALID_EVENTS = {
     "nav_portfolio", "nav_research", "nav_market", "nav_guru", "nav_settings",
+    "nav_analytics",
     "tab_holdings", "tab_watch", "tab_analysis", "tab_dash",
     "tab_reports", "tab_digest", "tab_calendar", "tab_ranking", "tab_compare",
     "report_view_open", "report_tab_switch",

@@ -4278,7 +4278,7 @@ KR 랭킹 종목 수급 추이를 백그라운드로 갱신한다 (스케줄러 
 
 ### `POST /api/events`
 
-사용자 행동 이벤트를 수집해 `user_events` 테이블에 비동기 저장(BackgroundTask). `event_name`은 화이트리스트(`VALID_EVENTS`)로 검증하며, **허용 외 이벤트는 저장 없이 조용히 `{ "ok": true }` 반환**(에러 아님). 허용 이벤트: `nav_portfolio`, `nav_research`, `nav_market`, `nav_guru`, `nav_settings`, `tab_holdings`, `tab_watch`, `tab_analysis`, `tab_dash`, `tab_reports`, `tab_digest`, `tab_calendar`, `tab_ranking`, `tab_compare`, `report_view_open`, `report_tab_switch`, `ranking_row_click`, `ranking_watch_toggle`, `stock_search`.
+사용자 행동 이벤트를 수집해 `user_events` 테이블에 비동기 저장(BackgroundTask). `event_name`은 화이트리스트(`VALID_EVENTS`)로 검증하며, **허용 외 이벤트는 저장 없이 조용히 `{ "ok": true }` 반환**(에러 아님). 허용 이벤트: `nav_portfolio`, `nav_research`, `nav_market`, `nav_guru`, `nav_settings`, `nav_analytics`, `tab_holdings`, `tab_watch`, `tab_analysis`, `tab_dash`, `tab_reports`, `tab_digest`, `tab_calendar`, `tab_ranking`, `tab_compare`, `report_view_open`, `report_tab_switch`, `ranking_row_click`, `ranking_watch_toggle`, `stock_search`.
 
 **Auth:** Bearer token 필요
 
@@ -4295,7 +4295,7 @@ KR 랭킹 종목 수급 추이를 백그라운드로 갱신한다 (스케줄러 
 ```json
 { "ok": true }
 ```
-(화이트리스트 통과 여부와 무관하게 항상 `{ "ok": true }`. 저장은 admin이 `GET /api/admin/analytics`로 집계 조회.)
+(화이트리스트 통과 여부와 무관하게 항상 `{ "ok": true }` — 허용 외 이름은 **무음 폐기**이므로 응답으로는 구별할 수 없다. 저장된 것은 admin이 `GET /api/admin/analytics/events`(일자별·이벤트명별 집계)·`/summary`로 조회한다.)
 
 ---
 

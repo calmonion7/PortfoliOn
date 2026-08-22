@@ -147,12 +147,23 @@ export default function TechReport() {
   const ordered = orderGroups.length > 0 ? orderGroups.flatMap((g) => g.players) : sorted
   const challenges = report.challenges || []
   const sources = report.sources || []
+  // ⚠️ **공백 제외 문자열이 하나라도 있는가**를 묻는 유틸 — `related` 경계 게이트와 산문 게이트가
+  //    함께 쓴다. 이 페이지의 규율은 「게이트 식 == 그 섹션 컴포넌트의 채택 조건」이고, 두 컴포넌트
+  //    (TechGraph·ProseSections)가 모두 내부에서 `trim()`으로 판정하므로 게이트도 같은 식이어야 한다.
+  const nonBlank = (v) => typeof v === 'string' && v.trim() !== ''
   const related = report.related || {}
+  // ⚠️ **배열이 비어 있지 않은가가 아니라 쓸 수 있는 이름이 하나라도 있는가**다(task#331 · B57).
+  //    TechGraph는 4키를 전부 `validLabels`(= 문자열 ∧ `trim()`이 남음)로 걸러 `hasBoundary`를 잰다.
+  //    여기가 `length > 0`만 보면 `['   ']`·`[null]` 같은 배열에서 **게이트만 참**이 되어, TechGraph가
+  //    null을 반환하는데 제목은 남는다 = **유령 섹션 + 그것을 가리키는 죽은 목차 칩**.
+  //    ⚠️ `validLabels`는 TechGraph 모듈 private이라 호출할 수 없다 — 그래서 산문 게이트가 이미 쓰는
+  //    `nonBlank`로 **등가식을 재현**하고, 드리프트 방지는 테스트가 맡는다(TechReport.test.jsx의
+  //    「게이트 ⇔ 컴포넌트 채택」 양방향 등가 표 — 두 식 중 한쪽만 바뀌면 그 표가 실패한다).
   const hasRelated = ['prerequisites', 'derivatives', 'complements', 'competitors']
-    .some((k) => Array.isArray(related[k]) && related[k].length > 0)
+    .some((k) => Array.isArray(related[k]) && related[k].some(nonBlank))
   // 「구성과 연관」(task#320) — 한 섹션이 두 반쪽을 담으므로 게이트도 둘의 합집합이다.
   // 게이트 식은 **TechGraph 자신의 채택 조건과 같아야** 한다(느슨하면 제목만 남는다):
-  // 구성 반쪽은 `rampPositions`가 항목을 하나라도 내놓을 때, 경계 반쪽은 4키 중 하나라도 비지 않을 때.
+  // 구성 반쪽은 `rampPositions`가 항목을 하나라도 내놓을 때, 경계 반쪽은 4키 중 **쓸 수 있는 이름**이 있을 때.
   const hasComposition = rampPositions(report.composition?.tech).length > 0
   const hasConnections = hasComposition || hasRelated
   // 신규 3필드 게이트 — 제목을 페이지가 소유하는 두 섹션은 게이트가 **컴포넌트 자신의 채택 조건과
@@ -173,7 +184,7 @@ export default function TechReport() {
   // 내부에서 `trim() !== ''`로 판정해 공백만이면 null을 반환하는데, 페이지 게이트가 truthy면
   // `"   "`에서 **제목만 남은 유령 섹션 + 그것을 가리키는 죽은 목차 칩**이 생긴다. 게이트는 컴포넌트
   // 자신의 채택 조건과 같은 식이어야 한다는 이 페이지의 규율(위 주석)이 산문 섹션에도 적용된다.
-  const nonBlank = (v) => typeof v === 'string' && v.trim() !== ''
+  //    (`nonBlank` 자신은 위 `related` 경계 게이트와 공유하므로 그 앞에서 한 번만 선언한다 — task#331.)
   const hasProse = nonBlank(report.description) || nonBlank(report.difficulty?.rationale)
 
   // 목차·본문 제목 단일 소스(task#296 S4) — show는 각 섹션의 기존 게이트 식을 그대로 옮긴 것이다

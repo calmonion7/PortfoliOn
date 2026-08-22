@@ -659,11 +659,22 @@ export function TechnicalStats({ summary }) {
 export function BacklogSection({ ticker, market }) {
   const [backlogData, setBacklogData] = useState(null)
 
+  // 세대 가드 (B49) — 형제 섹션 8종(UsInsider·InsiderTrades·UsSupply·LatestDisclosures·
+  // ShortSell·Supply·InvestorTrend·GuruHolders)과 같은 `cancelled` 관용구. 이 섹션만
+  // 빠져 있었다: 티커 전환 시 옛 종목의 수주잔고가 새 종목 차트로 렌더될 수 있다
+  // (지금은 부모 `key={ticker}` 재마운트가 덮고 있지만 그 `key`는 스테일 전략으로
+  //  선언된 적이 없어, 탭 상태 보존 리팩터 한 번에 사라진다).
+  // ⚠️ 취소 플래그는 「늦은 착지」만 막고 「보존」을 막지 않는다 — 옛 종목의 잔고가 *이미* 착지한 뒤
+  // ticker prop만 갈리면 경합 없이 **결정적으로** 옛 차트가 새 종목 화면에 남는다. 그래서 조회를
+  // 시작하기 전에 `null`(미조회)로 되돌린다(`[]`는 「잔고 0건」이라는 사실 주장이라 쓰지 않는다).
   useEffect(() => {
-    if (!ticker || market !== 'KR') return
+    setBacklogData(null)
+    if (!ticker || market !== 'KR') return undefined
+    let cancelled = false
     api.get(`/api/report/${ticker}/backlog`)
-      .then(({ data }) => setBacklogData(data))
-      .catch(() => setBacklogData([]))
+      .then(({ data }) => { if (!cancelled) setBacklogData(data) })
+      .catch(() => { if (!cancelled) setBacklogData([]) })
+    return () => { cancelled = true }
   }, [ticker, market])
 
   if (market !== 'KR' || !backlogData?.length) return null

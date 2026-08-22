@@ -40,11 +40,18 @@ export const fmtSharesKr = (v) => {
 }
 
 // 입력 단위: **주(株)**, 해외. B·M·K 축약.
+// 임계 비교는 **절대값**으로 한다 — 부호 있는 값(내부자 순매수/순매도 net_shares)에서
+// 원값 비교를 쓰면 음수가 전 티어를 통과해 `-1,500,000,000`처럼 전액이 찍힌다(B34).
+// 부호는 축약 뒤에 다시 붙인다(형제 `fmtSharesKr`과 같은 형태).
+// ⚠️ 소비처(`components/reports/UsInsiderSection.jsx`)가 양수에만 '+'를 직접 붙이므로
+// 여기서 넣는 부호는 '-'뿐이다 — '+'까지 넣으면 `++1.20B`로 이중 부호가 된다.
 export const fmtSharesUs = (n) => {
   if (n == null) return '—'
   const v = Number(n)
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`
-  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`
-  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`
+  const sign = v < 0 ? '-' : ''
+  const a = Math.abs(v)
+  if (a >= 1e9) return `${sign}${(a / 1e9).toFixed(2)}B`
+  if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(2)}M`
+  if (a >= 1e3) return `${sign}${(a / 1e3).toFixed(1)}K`
   return v.toLocaleString()
 }

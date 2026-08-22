@@ -26,13 +26,30 @@ const ROW_STYLE = { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }
 // 업체명만 ellipsis(줄어도 되는 것) — 수치는 flexShrink:0 형제로 고정(task#275 가토)
 const NAME_STYLE = { width: 96, flexShrink: 0, fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 const TRACK_STYLE = { flex: 1, minWidth: 0, height: 14, background: 'var(--bg-elev-2)', borderRadius: 3, overflow: 'hidden' }
-const PCT_STYLE = { flexShrink: 0, whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: 'var(--text)' }
+// ⚠️ 값 칸은 `flexShrink:0`만으로 부족하다 — 폭을 **예약**하지 않으면 자연폭이 행마다 달라
+// 트랙(flex:1)이 흡수하는 잔여폭이 갈리고, 그러면 `width:N%`의 기준이 행마다 달라진다
+// (CONVENTIONS §9.6 마지막 항 · TESTING §9 ⑦ "퍼센트는 옳고 픽셀이 틀리다").
+// 라이브 실측(2026-08-22, GET만): `ai-datacenter-equipment` 11행에서 `7.0%`(4자)만 값칸 28.92px이고
+// 나머지 10행은 36.14px → 트랙 폭이 **2종**(pc1440 607.08 / 599.86 · m390 177.08 / 169.86 ·
+// m350 137.08 / 129.86)으로 갈렸다. `robotics`(4행)도 같다. 단조성 위반은 아직 0인데, 값 문자열
+// 길이가 다른 두 행의 값이 서로 가깝지 않아서일 뿐이다 — 즉 **지금은 우연히 안 보이는 상태**이고
+// 형제 MarketEstimates.jsx는 같은 원인으로 이미 역전($12.5B 75.98px < $9B 84.86px)을 냈다.
+// 그래서 형제와 같은 처방을 쓴다: 값 문자열의 최대 길이를 데이터에서 파생해 전 행에 같은 폭을 예약.
+// 폭은 상수로 추정하지 않는다. mono 폰트에서 1글자 = 1ch이고 `%`·`.`도 같은 advance다.
+// ⚠️ valueCh는 **그룹별이 아니라 전체 rows에서** 계산한다 — 그룹마다 다르게 잡으면 그룹 간
+// 트랙 폭이 달라져 분류를 넘나드는 막대 비교가 다시 무의미해진다.
+// jsdom엔 레이아웃이 없어 vitest는 이 px 불변식을 원리적으로 못 잰다 — 게이트는 라이브 프로브의
+// `share-track-uniform`/`share-bar-monotonic`이고 vitest는 구조적 대리지표(폭 선언이 전 행 동일)를 본다.
+const PCT_STYLE = { flexShrink: 0, whiteSpace: 'nowrap', textAlign: 'right', fontSize: 12, fontWeight: 700, color: 'var(--text)' }
 const CAPTION_STYLE = { fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }
 const WARN_STYLE = { color: 'var(--warn)' }
 
 function overflowLabel(total) {
   return ` · 합계 ${total.toFixed(1)}%(100% 초과 — 기준 상이 가능)`
 }
+
+// 값 문자열의 유일한 출처 — 렌더와 폭 계산이 같은 함수를 쓴다(따로 조립하면 둘이 어긋난다).
+const pctText = (p) => `${p.share_pct.toFixed(1)}%`
 
 export default function ShareChart({ players, shareBasis }) {
   const rows = (players || [])
@@ -48,14 +65,16 @@ export default function ShareChart({ players, shareBasis }) {
   // 색 순환은 그룹 여부와 무관하게 기존 rows 순서를 그대로 따른다 — 값이 아니라 객체 참조를 키로
   // 써서(그룹으로 재배열돼도 같은 참조) 그룹화 전후로 같은 업체가 같은 색을 유지한다.
   const colorIndex = new Map(rows.map((p, i) => [p, i]))
+  // 렌더당 1개만 만들어 전 행이 공유한다(행마다 새 객체를 만들지 않는다).
+  const pctStyle = { ...PCT_STYLE, width: `${Math.max(...rows.map((p) => pctText(p).length))}ch` }
   const renderRow = (p) => (
     <div key={p.name ?? colorIndex.get(p)} data-testid="tech-share-chart-row" style={ROW_STYLE}>
       <span title={p.name} style={NAME_STYLE}>{p.name}</span>
-      <div style={TRACK_STYLE}>
-        <div style={{ width: `${Math.min(Math.max(p.share_pct, 0), 100)}%`, height: '100%', background: DATA_COLORS[colorIndex.get(p) % DATA_COLORS.length], borderRadius: 3 }} />
+      <div data-testid="tech-share-chart-track" style={TRACK_STYLE}>
+        <div data-testid="tech-share-chart-bar" style={{ width: `${Math.min(Math.max(p.share_pct, 0), 100)}%`, height: '100%', background: DATA_COLORS[colorIndex.get(p) % DATA_COLORS.length], borderRadius: 3 }} />
       </div>
-      <span className="mono tnum" style={PCT_STYLE}>
-        {p.share_pct.toFixed(1)}%
+      <span className="mono tnum" data-testid="tech-share-chart-value" style={pctStyle}>
+        {pctText(p)}
       </span>
     </div>
   )

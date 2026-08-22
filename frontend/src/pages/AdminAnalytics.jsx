@@ -6,12 +6,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 
+// ⚠️ 이 맵은 `routers/events.py::VALID_EVENTS`를 **전부 덮어야** 한다 — 빠지면 아래 `eName` 폴백이
+// 원시 영문 키를 한글 라벨 사이에 그대로 렌더한다(graceful이지만 관리 화면이 반쪽 언어가 된다).
+// `backend/tests/test_valid_events_matches_frontend.py`가 그 포함관계를 단언한다(자동 게이트).
+// 반대 방향(여기에만 있는 이름)은 정당하다 — `middleware/event_tracker.py`가 화이트리스트를 우회해
+// 직접 INSERT하는 5종(`stock_add`·`stock_delete`·`stock_promote`·`report_generate`·`guru_crawl`)이다.
 const EVENT_LABELS = {
   nav_portfolio:    '종목관리',
   nav_research:     '리서치',
   nav_market:       '시장',
   nav_guru:         '구루',
   nav_settings:     '설정',
+  nav_analytics:    '행동 분석',
   tab_holdings:     '보유 탭',
   tab_watch:        '관심 탭',
   tab_dash:         '대시보드 탭',
@@ -19,8 +25,12 @@ const EVENT_LABELS = {
   tab_reports:      '리포트 탭',
   tab_digest:       '다이제스트 탭',
   tab_calendar:     '캘린더 탭',
+  tab_ranking:      '랭킹 탭',
+  tab_compare:      '비교 탭',
   report_view_open: '리포트 열기',
   report_tab_switch:'리포트 탭전환',
+  ranking_row_click:'랭킹 행 열기',
+  ranking_watch_toggle: '랭킹 관심 토글',
   stock_search:     '종목 검색',
   stock_add:        '종목 추가',
   stock_delete:     '종목 삭제',
