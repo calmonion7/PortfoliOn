@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List, Any
 from services import storage
 from services.db import query
@@ -127,6 +127,162 @@ def _search_naver(q: str, max_results: int = 12) -> list:
         return []
 
 
+# ── market_outlook 스키마 (B53) ──────────────────────────────────────────────
+# 정본은 CLAUDE_COWORK_API.md의 `market_outlook` / `market_outlook.segments[]` 표다.
+# 이 필드는 예전에 `Optional[Any]`였고 그래서 루틴이 **산문 문자열**을 보내도 그대로 저장됐다 —
+# 프론트(MarketOutlookSection)는 문자열에서 아무 필드도 못 읽어 "시장 전망" 섹션을 통째로
+# 조용히 생략한다(크래시도 422도 없어 루틴이 같은 실수를 반복했다). 구조 모델로 바꿔 422를 낸다.
+#
+# 설계 제약 — 이 엔드포인트는 Cowork enrich **쓰기 경로**이므로 좁은 검증은 기존에 성공하던
+# 발행을 막는다. 그래서 라이브 저장값 124종(dict 119)을 전수 대입해 통과를 확인한 범위로만 좁혔다
+# (예외는 아래 별칭 오타 6종 하나뿐이다 — 그건 라이브에 실재하지만 **통과시켜도 화면에 안 나오므로**
+# 「기존에 성공하던 발행」이 아니다):
+#   · extra="allow" — 라이브에 스키마 밖 키가 실재한다(`text` 11건·`share_basis` 1건,
+#     segments의 `revenue_pct`·`change_pct` 등). 기본값 extra="ignore"면 model_dump가 그것들을
+#     **조용히 버려** 데이터 손실이 된다. 미지 키는 보존하고 아는 키만 검증한다 — 단
+#     **알려진 오타 별칭**(`_SEGMENT_KEY_ALIASES`)과 **화면이 읽는 필드가 0개인 판**은
+#     원래 결함과 증상이 같으므로(조용한 미렌더) 거부한다.
+#   · 필수는 segments[].name·period 둘뿐(라이브 102/102 존재, 정본도 필수 표기).
+#     나머지 전 필드는 Optional — 라이브에 결측·명시적 null이 흔하다(size_current 자체 null 4건,
+#     size_current.value null 12건, cagr_pct null 31건, company_share_pct null 88건).
+#   · 선택 배열도 Optional[List[X]] = Field(None) — `Field(default_factory=list)`로 두면 루틴이
+#     보낸 명시적 null 하나가 enrich 요청 전체를 422로 막는다(task#250).
+#   · 모든 float에 allow_inf_nan=False — NaN/Infinity 토큰은 json.loads와 진리값 가드를 통과하고
+#     응답 직렬화에서 500이 된다(task#211·#292).
+class MarketSize(BaseModel):
+    """market_outlook.size_current / size_forecast — {value, unit, year}.
+
+    unit은 Literal로 못박지 않는다 — 라이브에 30종의 자유 문자열이 있고 주석까지 붙는다
+    ("십억달러"·"GW (연간 신규 설치)"·"만CGT"·"톤(tU)/년")."""
+    model_config = {"extra": "allow"}
+    value: Optional[float] = Field(None, allow_inf_nan=False, ge=0)
+    unit: Optional[str] = Field(None)
+    year: Optional[int] = Field(None, ge=1900, le=2200)
+
+
+class SegmentMarket(BaseModel):
+    """market_outlook.segments[].market — 그 부문이 속한 시장."""
+    model_config = {"extra": "allow"}
+    size: Optional[float] = Field(None, allow_inf_nan=False, ge=0)
+    unit: Optional[str] = Field(None)
+    year: Optional[int] = Field(None, ge=1900, le=2200)
+    size_forecast: Optional[float] = Field(None, allow_inf_nan=False, ge=0)
+    forecast_year: Optional[int] = Field(None, ge=1900, le=2200)
+    cagr_pct: Optional[float] = Field(None, allow_inf_nan=False, ge=-100, le=1000)
+
+
+# 별칭 오타 → 정본 필드명. B53의 잔여분이고 **결함 클래스가 같다**(조용한 미렌더).
+# `extra="allow"`가 미지 키를 통과시키는데 `segmentUtils.js`는 이 6종을 하나도 읽지 않으므로,
+# 그 부문은 이름·기간만 뜨고 비중 막대가 그려지지 않는다 — 크래시도 422도 없어 루틴이 같은
+# 실수를 반복한다(라이브 102부문 실측: revenue_pct 46 · change_pct 24 · revenue_pct_change 12 ·
+# revenue_share_change_pp 2 · revenue_share_change_pct 2 · market_share_pct 1).
+# `extra="allow"` 자체는 유지한다(`text`·`share_basis` 보존이 load-bearing) — **아는 오타만**
+# 거부하고 메시지에 정본명을 실어 루틴이 스스로 고치게 한다.
+# ⚠️ 증감 계열 4종은 정본 필드가 없다 — 화면이 `prev_revenue_share_pct`에서 직접 계산한다.
+_SEGMENT_KEY_ALIASES = {
+    "revenue_pct": "revenue_share_pct",
+    "market_share_pct": "share_pct",
+    "change_pct": "prev_period + prev_revenue_share_pct(증감은 화면이 계산한다)",
+    "revenue_pct_change": "prev_period + prev_revenue_share_pct(증감은 화면이 계산한다)",
+    "revenue_share_change_pp": "prev_period + prev_revenue_share_pct(증감은 화면이 계산한다)",
+    "revenue_share_change_pct": "prev_period + prev_revenue_share_pct(증감은 화면이 계산한다)",
+}
+
+
+class MarketOutlookSegment(BaseModel):
+    """market_outlook.segments[] — 사업부문별 매출 비중·시장 규모·자사 점유율.
+
+    name·period만 필수다. period는 financials_annual의 period와 문자열이 일치해야 서버가
+    부문 매출 금액을 환산하므로(정본 기입 지침) 결측이면 금액이 통째로 사라진다 —
+    조용한 소실보다 422가 낫다."""
+    # str_strip_whitespace — 이게 없으면 min_length=1이 "   "(공백만)을 통과시켜
+    # 비중 막대에 빈 라벨을 그린다(라이브에 공백 padding 문자열은 0건이라 기존 값엔 무영향).
+    model_config = {"extra": "allow", "str_strip_whitespace": True}
+    name: str = Field(..., min_length=1)
+    period: str = Field(..., min_length=1)
+    revenue_share_pct: Optional[float] = Field(None, allow_inf_nan=False, ge=0, le=100)
+    prev_period: Optional[str] = Field(None)
+    prev_revenue_share_pct: Optional[float] = Field(None, allow_inf_nan=False, ge=0, le=100)
+    market: Optional[SegmentMarket] = Field(None)
+    share_pct: Optional[float] = Field(None, allow_inf_nan=False, ge=0, le=100)
+    share_pct_forecast: Optional[float] = Field(None, allow_inf_nan=False, ge=0, le=100)
+    note: Optional[str] = Field(None)
+    sources: Optional[List[str]] = Field(None)
+
+    @model_validator(mode="after")
+    def _no_alias_typos(self):
+        """정본 필드명의 별칭 오타를 거부한다 — 통과시키면 그 수치가 화면에 없는 것과 같다."""
+        hits = sorted(k for k in (self.model_extra or {}) if k in _SEGMENT_KEY_ALIASES)
+        if hits:
+            fixes = ", ".join("%s → %s" % (k, _SEGMENT_KEY_ALIASES[k]) for k in hits)
+            raise ValueError(
+                "segments[].%s 는 화면이 읽지 않는 필드명입니다(값이 조용히 사라집니다). "
+                "정본 필드명으로 바꿔 다시 보내세요: %s" % ("·".join(hits), fixes))
+        return self
+
+
+class MarketOutlook(BaseModel):
+    """market_outlook — 회사가 속한 전방시장의 규모·성장 전망(Cowork 조사·기입)."""
+    model_config = {"extra": "allow"}
+    market_name: Optional[str] = Field(None)
+    size_current: Optional[MarketSize] = Field(None)
+    size_forecast: Optional[MarketSize] = Field(None)
+    cagr_pct: Optional[float] = Field(None, allow_inf_nan=False, ge=-100, le=1000)
+    company_share_pct: Optional[float] = Field(None, allow_inf_nan=False, ge=0, le=100)
+    position: Optional[str] = Field(None)
+    sources: Optional[List[str]] = Field(None)
+    one_liner: Optional[str] = Field(None)
+    segments: Optional[List[MarketOutlookSegment]] = Field(None)
+
+    @model_validator(mode="after")
+    def _forecast_year_not_before_current(self):
+        """전망 연도가 현재 연도보다 앞서면 CAGR·"현재→예상" 대조가 무의미해진다.
+        (형제 Market._estimates_consistency의 year 동일성 검증에 대응하는 축.)"""
+        cur = self.size_current.year if self.size_current else None
+        fc = self.size_forecast.year if self.size_forecast else None
+        if cur is not None and fc is not None and fc < cur:
+            raise ValueError("size_forecast.year는 size_current.year보다 앞설 수 없습니다")
+        return self
+
+    @model_validator(mode="after")
+    def _segment_names_unique(self):
+        """부문명 중복은 비중 막대와 표에 같은 이름의 행을 두 번 그려 독자가 서로 다른 둘로
+        읽는다(task#297 options[].name 중복과 같은 결함)."""
+        if not self.segments:
+            return self
+        names = [s.name for s in self.segments]
+        if len(names) != len(set(names)):
+            raise ValueError("segments의 name은 서로 달라야 합니다")
+        return self
+
+    @model_validator(mode="after")
+    def _has_renderable_content(self):
+        """화면이 읽는 필드가 하나도 없으면 거부한다 — B53의 증상이 미지 키로 되살아나는 것을 막는다.
+
+        `extra="allow"`라 `{"text": "<산문>"}`은 타입 검증을 통과하는데, 그러면
+        MarketOutlookSection의 early-return 조건이 그대로 성립해 "시장 전망" 섹션이 **통째로**
+        렌더되지 않는다(산문 문자열을 보냈을 때와 증상이 같다). 그래서 이 축은 그 early-return
+        조건의 **등가**로 쓴다 — 느슨하게(선언 필드 아무거나 있으면 통과) 쓰면 판별력이 없다:
+        `position`·`sources`만 있는 판은 프론트가 아무것도 그리지 않으므로 여기서도 거부한다.
+        (`size_*`는 value가 있어야 렌더된다 — fmtSize가 값 결측을 null로 만든다.)"""
+        rendered = (
+            bool((self.market_name or "").strip())
+            or (self.size_current is not None and self.size_current.value is not None)
+            or (self.size_forecast is not None and self.size_forecast.value is not None)
+            or self.cagr_pct is not None
+            or self.company_share_pct is not None
+            or bool((self.one_liner or "").strip())
+            or bool(self.segments)
+        )
+        if not rendered:
+            raise ValueError(
+                "market_outlook에 화면이 읽는 필드가 하나도 없습니다 — market_name · "
+                "size_current.value · size_forecast.value · cagr_pct · company_share_pct · "
+                "one_liner · segments 중 최소 하나를 실으세요. 산문은 one_liner에 씁니다"
+                "(정본에 없는 키에 넣으면 '시장 전망' 섹션이 통째로 표시되지 않습니다)")
+        return self
+
+
 class EnrichBody(BaseModel):
     moat: Optional[Any] = None
     growth_plan: Optional[Any] = None
@@ -135,7 +291,7 @@ class EnrichBody(BaseModel):
     insights: Optional[Any] = None
     key_resource: Optional[Any] = None
     competitor_edge: Optional[Any] = None
-    market_outlook: Optional[Any] = None
+    market_outlook: Optional[MarketOutlook] = Field(None)
     competitors: Optional[List[str]] = None
 
 
@@ -148,7 +304,7 @@ class BatchEnrichItem(BaseModel):
     insights: Optional[Any] = None
     key_resource: Optional[Any] = None
     competitor_edge: Optional[Any] = None
-    market_outlook: Optional[Any] = None
+    market_outlook: Optional[MarketOutlook] = Field(None)
     competitors: Optional[List[str]] = None
 
 
@@ -382,7 +538,7 @@ def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(require_ad
         raise HTTPException(status_code=400, detail="No items provided")
     updated, not_found = [], []
     for item in items:
-        fields = {k: v for k, v in item.model_dump().items() if k != "ticker" and v is not None}
+        fields = {k: v for k, v in item.model_dump(exclude_none=True).items() if k != "ticker" and v is not None}
         if not fields:
             not_found.append(item.ticker.upper())
             continue
@@ -393,7 +549,7 @@ def enrich_batch(items: List[BatchEnrichItem], user_id: str = Depends(require_ad
 
 @router.put("/{ticker}/enrich")
 def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(require_admin_or_api_key)):
-    fields = {k: v for k, v in body.model_dump().items() if v is not None}
+    fields = {k: v for k, v in body.model_dump(exclude_none=True).items() if v is not None}
     if not fields:
         raise HTTPException(status_code=400, detail="No fields provided")
     ok = storage.enrich_stock(ticker, fields)

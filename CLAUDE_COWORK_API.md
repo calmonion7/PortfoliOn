@@ -16,12 +16,17 @@
 3. (선택) GET /api/report/{ticker}/{date_str}  → 기존 리포트 내용 참조
 4. (AI가 각 종목 분석 수행)
 5. PUT /api/stocks/enrich/batch  → 분석 결과 일괄 저장
+                                   422 = market_outlook 스키마 위반 → **아무것도 저장되지 않는다**
+                                   (같은 배열의 정상 종목까지). detail의 인덱스로 고쳐 재시도하거나
+                                   종목별 단건 PUT으로 분할할 것. 상세는 엔드포인트 절 참조
    또는
    PUT /api/stocks/{ticker}/enrich  → 종목 1개 저장
 6. POST /api/report/generate     → 전체 리포트 재생성 (enrich 후 반드시 실행)
                                    409 = "이미 진행 중"(실패 아님) → GET /api/report/progress로
                                    완료를 기다린 뒤 재시도. 상세는 엔드포인트 절 참조
 ```
+
+> **`market_outlook`은 구조 객체만 받는다(유일하게 스키마 검증을 타는 enrich 필드)** — 산문 문자열·숫자·배열은 `422`다. 예전엔 문자열도 저장됐고 그러면 "시장 전망" 섹션이 **크래시도 경고도 없이 통째로 사라졌다**(피드백이 없어 같은 실수가 반복됐다). 422 사유 전체는 엔드포인트 절의 에러 표에 있다.
 
 ### 수주잔고 분석 (backlog)
 ```
@@ -57,7 +62,7 @@
    - 대상 slug(`TECH_TOPICS` 등재분, 아래 Path Parameter) 밖 slug·통화·단위·`milestones[].status` enum 밖 값은 422로 거부된다
    - **요약 레이어는 산문이 아니라 구조 필드로 싣는다**(ADR-0034, 이후 개정 포함) — `key_points`(결론 카드)·`milestones`(연도별 진척)·`players[].category`(업체 분류 축)·`market.estimates`(기관별 시장 추정치)·`variants`(계보 비교축)·`watch_items`(확인할 지표)·`composition`(기술 해부 3축, ADR-0042). 채우지 않으면 화면에 반영되지 않으므로(대부분 그 섹션째 생략, `players[].category`는 표·점유율이 평면 렌더로 폴백) `description` 산문에만 쓰고 필드를 비우면 독자가 못 본다 — 단 **재발행에서는 생략이 「직전 판 유지」**를 뜻하는 필드가 있다(아래 POST 절)
    - **기관별 시장 추정치(`market.estimates`, 선택·최대 6건, ADR-0034 개정)**는 조사기관마다 다르게 추정한 시장 규모를 나란히 보여준다 — 배열 내 `currency`·`unit`·`year`는 전부 같아야 하고(다르면 422), 성장 곡선(`market.history`/`forecast`)이 채택한 기관은 `is_basis: true`로 표시(최대 1건, 2건 이상이면 422)
-   - **계보 비교축(`variants`, 선택·최대 2축, ADR-0034 개정)**은 한 기술이 갈라지는 접근 방식을 이점·대가 쌍으로 나란히 보여준다 — 축마다 선택지(`options`)가 **최소 2개**(1개는 비교가 아니라 서술이므로 축을 생략하고 산문에 쓸 것, 2개 미만이면 422)
+   - **계보 비교축(`variants`, 선택·최대 2축, ADR-0034 개정)**은 한 기술이 갈라지는 접근 방식을 이점·대가 쌍으로 나란히 보여준다 — 축마다 선택지(`options`)가 **최소 2개**(1개는 비교가 아니라 서술이므로 축을 생략하고 산문에 쓸 것, 2개 미만이면 422) · 축이 2개면 `axis_label`이, 한 축 안에서는 `options[].name`이 서로 달라야 한다(중복은 422 — 같은 제목의 표·같은 이름의 행이 두 번 그려진다) · 옵션마다 `strength`·`tradeoff` 중 **최소 하나**는 필수다(둘 다 비우면 422). 쌍으로 적는 것이 원칙이되, 한쪽만 아는 계열은 한쪽만 실어도 통과한다
    - **확인할 지표(`watch_items`, 선택·최대 5건, ADR-0034 개정)**는 "앞으로 무엇이 관측되면 진척으로 인정하는가"를 미리 못 박는다 — 파일럿 준공·샘플 공개 같은 *일정 유지 신호*를 진척으로 오독하지 않도록 항목마다 `not_signal`(이건 신호가 아니다)을 본문과 분리해 적을 것
 ```
 
@@ -410,7 +415,7 @@ X-API-Key: {COWORK_API_KEY}
 | `cagr_pct` | number | 연평균 성장률(%) |
 | `company_share_pct` | number\|null | 회사의 해당 시장 점유율(%) |
 | `position` | string\|null | 시장 내 위치 (예: `"1위"`) |
-| `sources` | string[] | **필수 — 출처 없는 값은 저장하지 말 것.** 근거 출처 목록 (예: `["TrendForce (2026-03)", "회사 IR 자료"]`) |
+| `sources` | string[] | **기입 지침상 필수 — 출처 없는 값은 저장하지 말 것.** 근거 출처 목록 (예: `["TrendForce (2026-03)", "회사 IR 자료"]`). ⚠️ **스키마는 강제하지 않는다**(없어도 `200`) — 강제하면 출처를 문장에 녹여 쓴 기존 발행이 통째로 막히기 때문이며, 라이브에 `sources` 없는 판이 1건 실재한다. 「지침이지 강제가 아님」으로 읽을 것 |
 | `one_liner` | string | 한 줄 종합 요약 |
 | `segments` | `{name,period,revenue_share_pct,...}[]` | 회사 단위 전망 아래 **부문별** 매출비중·시장·점유율 분해 (「사업부문 시장 분석」). 상세는 바로 아래 참조 |
 
@@ -422,7 +427,7 @@ X-API-Key: {COWORK_API_KEY}
 |------|------|------|------|
 | `name` | string | ✅ | 부문명 — **사업보고서/10-K 부문 표기 그대로** |
 | `period` | string | ✅ | 당기 매출 비중의 기준 기간. **`financials_annual`의 `period`와 문자열이 정확히 일치해야** 서버가 부문 매출 금액을 환산합니다 (예: `"2024"`) |
-| `revenue_share_pct` | number | ✅ | 당기 매출 비중(%) |
+| `revenue_share_pct` | number | ❌(지침상 필수) | 당기 매출 비중(%) — **0~100** 밖은 `422`. ⚠️ 스키마는 존재를 강제하지 않는다(없으면 비중 막대만 안 그려지고 `200`이며, 라이브 102부문 중 41부문이 그렇다). 다만 **이름은 정확히 이것**이어야 한다 — `revenue_pct` 등 별칭은 `422`(아래 기입 지침) |
 | `prev_period` | string | ❌ | 전기 기준 기간 |
 | `prev_revenue_share_pct` | number | ❌ | 전기 매출 비중(%). 없으면 매출 증감·비중 변화(%p)가 표시되지 않습니다 |
 | `market` | object | ❌ | 그 부문이 속한 시장 — `{size, unit, year, size_forecast, forecast_year, cagr_pct}` |
@@ -444,10 +449,11 @@ X-API-Key: {COWORK_API_KEY}
 > - `period`를 반드시 명시하세요 — `financials_annual`의 그 기간과 **문자열이 정확히 일치**해야 서버가 부문 매출 금액을 환산합니다. 불일치하면 그 부문은 비중·시장 수치만 남고 금액은 표시되지 않습니다.
 > - **금액은 절대 쓰지 마세요** — %만 기입하면 서버가 금액(부문 매출·시장 기회)을 환산합니다(수주잔고 단위 오저장 계열의 함정을 원천 차단하기 위함).
 > - 그 부문의 근거를 확인할 수 없으면 그 부문 자체를 생략하세요(**틀린 값 < 누락**).
+> - **필드명을 정본 그대로 쓰세요** — `revenue_pct`·`market_share_pct`·`change_pct`·`revenue_pct_change`·`revenue_share_change_pp`·`revenue_share_change_pct`는 화면이 읽지 않는 별칭이라 `422`로 거부되고, 응답 메시지가 정본 필드명을 알려줍니다. **비중 증감은 직접 계산해 넣지 말고** `prev_period`+`prev_revenue_share_pct`를 실으면 화면이 계산합니다. (정본에 *없는* 그 밖의 키는 거부하지 않고 그대로 보존합니다.)
 
 > 모든 객체 필드는 선택적입니다. 최소 1개 이상의 최상위 필드를 포함해야 합니다.
 >
-> **레거시 호환:** 기존 string 값도 그대로 저장/표시됩니다.
+> **레거시 호환:** 기존 string 값도 그대로 저장/표시됩니다 — **단 `market_outlook`은 예외**입니다(구조 객체만 받고 문자열은 `422`, task#332). 다른 필드(`moat`·`key_resource`·`competitor_edge`·`insights` 등)는 문자열·객체 모두 그대로 저장됩니다.
 
 **Response `200`**
 ```json
@@ -464,6 +470,22 @@ X-API-Key: {COWORK_API_KEY}
 | `400` | 업데이트할 필드가 없음 |
 | `401` | 인증 필요 |
 | `404` | 보유종목 또는 관심종목에 없는 ticker |
+| `422` | **`market_outlook` 스키마 위반**(검증을 타는 enrich 필드는 이것 하나다) — 아래 사유 표 참조 |
+
+**`422` 사유** — 봉투는 표준 pydantic `{"detail": [{...}]}`(**배열**)이고 `loc`이 어느 필드인지 말합니다. **422는 아무것도 저장하지 않으므로**(같은 요청의 `moat`·`risks`까지 버려집니다) `detail`을 읽고 고쳐 재시도하세요.
+
+| 사유 | 고치는 법 |
+|------|-----------|
+| `market_outlook`이 객체가 아님(문자열·숫자·불리언·배열) | 문장은 `one_liner`에 쓰고 나머지는 구조 필드로 나눠 담습니다 |
+| 화면이 읽는 필드가 0개 | `market_name` · `size_current.value` · `size_forecast.value` · `cagr_pct` · `company_share_pct` · `one_liner` · `segments`(비지 않은 배열) 중 **최소 하나**를 실으세요. `{}`·`position`만·`sources`만·정본에 없는 키(`text` 등)에 산문만 담은 판은 프론트가 섹션째 생략하므로 거부합니다 |
+| `segments[].name` 또는 `period` 결측·공백 | 둘은 필수입니다(`period`는 `financials_annual`의 `period`와 문자열 일치) |
+| `segments[].name` 중복 | 부문명을 서로 다르게 — 같은 이름의 행이 두 번 그려집니다 |
+| `segments[]`의 별칭 오타 키 | `revenue_pct`→`revenue_share_pct` · `market_share_pct`→`share_pct` · 증감 계열(`change_pct`·`revenue_pct_change`·`revenue_share_change_pp`·`revenue_share_change_pct`)→`prev_period`+`prev_revenue_share_pct`. 메시지가 정본명을 알려줍니다 |
+| 범위 이탈 | 비중·점유율(`company_share_pct`·`revenue_share_pct`·`prev_revenue_share_pct`·`share_pct`·`share_pct_forecast`) `0~100` · `cagr_pct`(`market.cagr_pct` 포함) `-100~1000` · 규모(`size_*.value`·`market.size`·`market.size_forecast`) 음수 불가 · 연도 `1900~2200` |
+| `NaN`·`Infinity` | 모든 숫자 필드가 거부합니다(안 걸리면 응답 직렬화에서 `500`이 됩니다) |
+| `size_forecast.year` < `size_current.year` | 전망 연도는 현재 연도보다 앞설 수 없습니다("현재→예상" 대조·CAGR이 무의미해집니다) |
+
+> **강제하지 *않는* 것**(기입 지침이지 스키마가 아님) — `sources` 존재 · 부문 5개 상한 · `Σ revenue_share_pct ≤ 100`(초과해도 `200`이고 프론트가 *금액만* 생략합니다) · `size_current`/`size_forecast`의 `unit` 동일성. 강제하면 기존에 성공하던 발행이 막히기 때문입니다.
 
 ---
 
@@ -515,6 +537,9 @@ X-API-Key: {COWORK_API_KEY}
 |------|------|
 | `400` | 배열이 비어 있음 |
 | `401` | 인증 필요 |
+| `422` | **`market_outlook` 스키마 위반** — 사유·고치는 법은 단건 enrich 절의 `422` 표와 동일. `loc`의 **첫 원소가 문제 항목의 배열 인덱스**입니다 |
+
+> ⚠️ **한 항목의 위반이 요청 전체를 되돌립니다** — 본문 검증은 핸들러 진입 *전*이라 `422`면 저장이 **0건**이고, 같은 배열의 **정상 종목 필드까지 저장되지 않습니다**(`updated`/`not_found` 응답 자체가 없습니다). 복구 순서: ① `detail`의 인덱스로 그 항목의 값을 고친다 → ② 못 고치면 그 항목에서 **문제 필드만 빼고**(종목 전체를 빼지 말고) 재시도 → ③ 그래도 실패하면 **종목별 단건 `PUT /api/stocks/{ticker}/enrich`로 분할**해 실패를 한 종목에 국한시킨다.
 
 ---
 
@@ -820,8 +845,8 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `key_points[].metrics[]` | array | | 지표 칩 **최대 4개**(초과 시 422). `{label: ≤40자, value: ≤40자, change_pct?}`. `value`는 **표시용 문자열**("1.1조원"·"22%"·"134회") — 단위·통화를 문자열에 그대로 쓴다. `change_pct`만 숫자(양수=상승 색·음수=하락 색), 증감이 없으면 생략 |
 | `milestones` | array\|생략 | | **진척 타임라인** `{year, actor?, event, status}` — "언제 무엇이 가동/착공/실증됐나"를 산문에 묻지 말고 여기에 싣는다. `year`는 정수, `event`는 그 해에 무슨 일이 있었는지 한 구절, `actor`는 주체(국가·기업, 특정 주체가 없으면 생략) |
 | `milestones[].status` | enum | ✅ | `done`(이미 일어남) \| `in_progress`(진행 중) \| `planned`(계획·전망) **3값만** — 그 밖은 422. 구체 단계명("착공"·"계통연결")은 기술마다 다르므로 `event`가 담고, 색·마커는 이 3값이 정한다 |
-| `variants` | array\|생략 | | **계보 비교축**(ADR-0034 개정) 최대 2개 — 한 기술이 갈라지는 접근 방식들을 이점·대가 쌍으로 비교. `{axis_label: ≤30자, options}`. 축 이름은 자유 문자열(SMR "노형"·재사용 로켓 "회수 방식"·전고체 배터리 "고체 전해질 계열") — 이 기술에 그런 분류 축이 없으면 필드 자체를 생략한다 |
-| `variants[].options` | array | ✅ | 그 축의 선택지 **최소 2개·최대 6개** — 1개뿐이면 비교가 아니라 서술이므로 **그 축을 생략하고 산문에 쓸 것**(2개 미만이면 422). `{name: ≤40자, examples?: ≤6개 문자열, strength?: ≤120자, tradeoff?: ≤120자}`. `strength`/`tradeoff`는 반드시 **쌍으로** — 어느 계열이 우월하다는 순위를 매기지 말고 이점과 대가를 함께 적는다 |
+| `variants` | array\|생략 | | **계보 비교축**(ADR-0034 개정) 최대 2개 — 한 기술이 갈라지는 접근 방식들을 이점·대가 쌍으로 비교. `{axis_label: ≤30자, options}`. 축 이름은 자유 문자열(SMR "노형"·재사용 로켓 "회수 방식"·전고체 배터리 "고체 전해질 계열") — 이 기술에 그런 분류 축이 없으면 필드 자체를 생략한다. **축을 2개 실으면 `axis_label`이 서로 달라야 한다** — 같으면 422다(축마다 표+소제목을 렌더하므로 같은 제목의 표가 나란히 두 개 뜬다) |
+| `variants[].options` | array | ✅ | 그 축의 선택지 **최소 2개·최대 6개** — 1개뿐이면 비교가 아니라 서술이므로 **그 축을 생략하고 산문에 쓸 것**(2개 미만이면 422). `{name: ≤40자, examples?: ≤6개 문자열, strength?: ≤120자, tradeoff?: ≤120자}`. **한 축 안에서 `name`은 서로 달라야 한다** — 같으면 422다(같은 이름의 행이 두 번 그려지면 독자가 서로 다른 두 계열로 읽는다). `strength`/`tradeoff`는 **둘 중 최소 하나가 필수**다(둘 다 비우면 422 — 행이 이름만 남아 「비교가 아니라 서술」이 된다). 원칙은 **쌍으로** 적는 것이다 — 어느 계열이 우월하다는 순위를 매기지 말고 이점과 대가를 함께 적는다. 다만 한쪽만 아는 계열은 **한쪽만 실어도 통과한다**(스키마 하한은 하나 — 둘 다 요구하면 그런 계열에서 발행 전체가 422로 막힌다) |
 | `watch_items` | array\|생략 | | **확인할 지표**(ADR-0034 개정) 최대 5개 — "앞으로 무엇이 관측되면 이 기술의 진척으로 인정하는가"를 미리 못 박은 판정 신호. `{label: ≤60자, detail?: ≤200자, not_signal?: ≤200자}` |
 | `watch_items[].not_signal` | string\|생략 | | **오독 경고** — 파일럿 라인 준공·샘플 공개·양산 목표 재확인처럼 *일정이 유지된다*는 신호일 뿐 진척이 아닌 것을 명시. 해당 지표에 그런 오독 위험이 없으면 생략 가능하지만, 있으면 반드시 `label`/`detail`과 **분리해서** 적을 것(한 문장에 섞지 말 것) |
 | `composition` | object\|생략 | | **기술 해부** — 자가 서로 다른 지분 축 3개(ADR-0042). `{tech?, minerals?, experts?, minerals_share_basis?}`. 「이 기술이 무엇으로 만들어지나 · 어디가 병목인가 · 원가가 어디에 노출되나」에 답한다. **세 축을 합쳐 하나로 읽으면 안 된다** — 분모가 각각 남은 난제 총량 · 원재료비 · 인력 병목 총량으로 다르다. 축은 전부 선택이되 **최소 한 축**은 있어야 한다(`{}`는 422 — 「해부 없음」은 필드 생략으로 표현) |
@@ -871,7 +896,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | 상태 | 설명 |
 |------|------|
 | `401` | API Key 누락/불일치 |
-| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · `composition` 축 항목 2개 이하/8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 또는 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `producers[].share_pct` 있고 `minerals_share_basis` 없음 · `composition: {}` · `composition` 한 축 안의 항목 `name` 중복 · 필수 필드 누락 · **`composition.minerals[].used_in[]`이 같은 요청의 `composition.tech[].name`에 없음** · **`composition`을 생략해 보존되는 직전 판의 `tech[].leaders`가 새 `players[]`에 없음** · **`composition`을 실었는데 직전 판에 있던 축이 빠짐**(축 소실) |
+| `422` | 미등록 slug · currency/unit/`milestones[].status` enum 위반 · NaN/Infinity 값 · `sources` 0개 · `key_points[].metrics` 5개 이상 · `market.estimates` 7건 이상 · `market.estimates` 내 currency/unit/year 불일치 · `market.estimates[].is_basis=true` 2건 이상 · `variants` 3개 이상 · `variants[].options` 1개 이하 또는 7개 이상 · `variants[].axis_label` 중복 · 같은 축 안 `variants[].options[].name` 중복 · `variants[].options[]`의 `strength`·`tradeoff` 둘 다 결측 · `watch_items` 6개 이상 · `share_pct` 있고 `share_basis` 없음 · `composition` 축 항목 2개 이하/8개 이상 · `composition` 축 `share_pct`가 5의 배수 아님 또는 합 ≠ 100 · `composition.*[].rationale` 공백 · `composition.tech[].leaders[]`가 `players[].name`에 없음 · `producers[].share_pct` 있고 `minerals_share_basis` 없음 · `composition: {}` · `composition` 한 축 안의 항목 `name` 중복 · 필수 필드 누락 · **`composition.minerals[].used_in[]`이 같은 요청의 `composition.tech[].name`에 없음** · **`composition`을 생략해 보존되는 직전 판의 `tech[].leaders`가 새 `players[]`에 없음** · **`composition`을 실었는데 직전 판에 있던 축이 빠짐**(축 소실) |
 
 > **422 봉투가 두 형태다.** 스키마 검증(위 대부분 + `used_in`)은 표준 `{"detail": [{...}]}`(**배열**)이고, 직전 판을 읽어 판정하는 마지막 둘(**보존분 `leaders` 끊김**·**축 소실**)은 `{"detail": "<문자열>"}`이다. 두 문자열 메시지는 어느 이름·어느 축이 문제인지와 해법(그 값을 다시 싣기 / 그 업체를 `players[]`에 유지하기 / 정말 지울 때의 명시적 `null`)을 담으므로 **`detail`을 읽고 고쳐 재시도할 수 있다**. 해부를 지워서 422를 회피하지 말 것.
 
