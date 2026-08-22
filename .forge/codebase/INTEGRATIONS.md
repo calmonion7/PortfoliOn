@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 20dd46eb829b05025af793b010dfe4efe2925a7d
-mapped: 2026-08-10
+last_mapped_commit: c72a7c9e0a5d11a7cf5ccbe8f6e370220a3d19b5
+mapped: 2026-08-22
 ---
 
 # INTEGRATIONS — 외부 API·데이터베이스·인증 제공자·웹훅
@@ -26,7 +26,7 @@ mapped: 2026-08-10
 | 8 | FnGuide | `comp.fnguide.com` | 없음(Referer 필요) | — | §6 |
 | 9 | Finviz | `finviz.com` | 없음 | — | `backend/services/scraper.py` |
 | 10 | DART(전자공시) | `opendart.fss.or.kr/api`, `dart.fss.or.kr` | API 키(query `crtfc_key`) | `DART_API_KEY` | §7 |
-| 11 | FRED (St. Louis Fed) | `api.stlouisfed.org` | API 키(query `api_key`) | `FRED_API_KEY` | §8.1 |
+| 11 | FRED (St. Louis Fed) | `api.stlouisfed.org` | API 키(query `api_key`) | `FRED_API_KEY` | §8.1 (모듈 6개: `econ`·`macro`·`formation`·`labor`·`inflation` + `routers/calendar.py`) |
 | 12 | 공공데이터포털 — KOFIA 통계 / 시장지수 | `apis.data.go.kr/1160100/service/...` | serviceKey | `KOFIA_API_KEY` | `backend/services/leverage_service.py` |
 | 13 | 공공데이터포털 — 금융위 대차잔고 | `apis.data.go.kr/1160100/GetStocLendBorrInfoService_V2` | serviceKey | `KOFIA_API_KEY`(동일 키 재사용) | `backend/services/lending_service.py` |
 | 14 | 공공데이터포털 — 관세청 품목별 수출입 | `apis.data.go.kr/1220000/Itemtrade` | serviceKey | `KITA_API_KEY`(**실제로는 관세청 키**) | `backend/services/market_indicators/exports.py` |
@@ -47,6 +47,8 @@ mapped: 2026-08-10
 | jsDelivr | Pretendard `v1.3.9` static CSS + preconnect | `frontend/index.html` `<head>` |
 
 둘 다 `frontend/vite.config.js`의 `VitePWA.workbox.runtimeCaching`에서 **CacheFirst / 1년 만료 / maxEntries 10**으로 캐시된다. 이 외의 외부 호출은 프론트에 없다(모든 데이터는 동일 오리진 `/api/*`).
+
+⚠️ **`runtimeCaching`은 이 둘뿐이다 — `/api/*` NetworkFirst 규칙은 ADR-0036으로 제거됐다.** Workbox 캐시 키는 URL만이라 `Authorization` 헤더가 키에 안 들어가고 `Vary`도 없어, 같은 URL이면 어느 사용자의 응답이든 같은 한 항목이었다(A 로그아웃 → 5분 내 B 로그인 → 네트워크 실패·10초 타임아웃 시 A의 보유종목이 B에게 서빙되고, `/api/auth/*`만 제외돼 있어 **신원은 B·데이터는 A**). **인증된 API 응답은 SW에 캐시하지 않는다**가 규칙이며 새 런타임 캐시 규칙을 되살리지 말 것. 잔존 저장소는 `src/apiCachePurge.js::purgeApiCache()`가 부팅(`main.jsx`)과 로그아웃(`App.jsx::doLogout`) 두 지점에서 `caches.delete('api-cache')`로 지운다(후자는 SPA 로그아웃이 부팅을 재실행하지 않기 때문 — 옛 SW 전환 창 한정 보험).
 
 ### 0.3 인바운드 (외부 → 백엔드)
 
@@ -96,26 +98,44 @@ mapped: 2026-08-10
 
 `auth_schema.sql`이 정의: `users`(role `user|admin`) · `refresh_tokens`. `CREATE EXTENSION IF NOT EXISTS "pgcrypto"`가 선행한다.
 
-`main._migrate()`가 추가로 생성/변경(라이브 반영 경로): `backlog_history.segments`(JSONB) · `batch_schedules` · `market_short_sell`(+idx) · `stock_disclosures`(+idx, +`meeting_date`) · `stock_dividends` · `stock_dividend_schedule`(+idx) · `stock_beta` · `stock_supply_score` · `stock_insider_trades`(+idx) · `stock_recommendations`(+`low_liquidity`/`exchange`/`name`, +idx) · `us_supply_snapshot`(+`insider_transactions`/`insider_net`) · `user_stocks.{target_price,stop_price,target_weight,pinned}` · `tickers.{key_resource,competitor_edge,market_outlook,analyst_target}` · `analyst_reports` · `tech_reports`(+`key_points`/`milestones`).
+`main._migrate()`가 추가로 생성/변경(라이브 반영 경로): `backlog_history.segments`(JSONB) · `batch_schedules` · `market_short_sell`(+idx) · `stock_disclosures`(+idx, +`meeting_date`) · `stock_dividends` · `stock_dividend_schedule`(+idx) · `stock_beta` · `stock_supply_score` · `stock_insider_trades`(+idx) · `stock_recommendations`(+`low_liquidity`/`exchange`/`name`, +idx) · `us_supply_snapshot`(+`insider_transactions`/`insider_net`) · `user_stocks.{target_price,stop_price,target_weight,pinned}` · `tickers.{key_resource,competitor_edge,market_outlook,analyst_target}` · `analyst_reports` · `tech_reports`(+`key_points`/`milestones`/**`variants`**/**`watch_items`**/**`composition`**).
+
+**`tech_reports`만 DDL이 아닌 마이그레이션 2건을 더 탄다**(ADR-0038/0039, 둘 다 idempotent):
+1. **판 누적 폐기** — slug당 최신 1행만 남기고 과거 행을 `DELETE ... USING`으로 지운 뒤 `UNIQUE (slug, published_date)` 제약을 드롭하고 `UNIQUE INDEX tech_reports_slug_key ON (slug)`를 만든다. 이 인덱스가 없으면 라우터의 `ON CONFLICT (slug)`가 **런타임 500**이 되므로 삭제 건수를 `logger.info`로 loud하게 남긴다. → `app_schema.sql`도 `UNIQUE (slug)`로 맞춰져 있다.
+2. **은퇴 slug 정리** — `DELETE FROM tech_reports WHERE slug = 'data-center'` 딱 그 한 slug만. `TECH_TOPICS` 밖 전부 삭제 같은 **일반형을 쓰지 말 것** — 누군가 slug를 일시적으로 빼는 순간 그 발행물을 조용히 지운다.
+가드: `backend/tests/test_tech_reports_migration.py`.
 
 ### 1.4 `market_cache` — 외부 지표의 영구 캐시
 
-`key TEXT PK, data JSONB, fetched_at TIMESTAMPTZ`. 접근 헬퍼는 `backend/services/market_indicators/cache.py`의 `_mc_load`/`_mc_save`(UPSERT `ON CONFLICT (key) DO UPDATE`)/`_mc_delete`/`clear_cache`.
+`key TEXT PK, data JSONB, fetched_at TIMESTAMPTZ`. 접근 헬퍼는 `backend/services/market_indicators/cache.py`의 `_mc_load`/**`_mc_load_strict`**/`_mc_save`(UPSERT `ON CONFLICT (key) DO UPDATE`)/`_mc_delete`/`clear_cache`.
 
-현재 사용 중인 키 **15종**: `fx` · `vix` · `commodities` · `treasury` · `econ_indicators` · `kr_exports` · `m7_earnings` · `kr_top2_earnings` · `macro_signals` · `kospi_signal` · `kospi_futures` · `indices` · `fear_greed` · `sp500_tickers` · `kospi_tickers`, 그리고 서비스 상수로 잡힌 `kr_sector_momentum`(`services/kr_sector_service.CACHE_KEY`) · `us_sector_momentum`(`services/us_sector_service.CACHE_KEY`).
+현재 사용 중인 키 **18종**: `fx` · `vix` · `commodities` · `treasury` · `econ_indicators` · `kr_exports` · `m7_earnings` · `kr_top2_earnings` · `macro_signals` · **`business_formation`** · **`labor_surveys`** · **`trimmed_inflation`** · `kospi_signal` · `kospi_futures` · `indices` · `fear_greed` · `sp500_tickers` · `kospi_tickers`, 그리고 서비스 상수로 잡힌 `kr_sector_momentum`(`services/kr_sector_service.CACHE_KEY`) · `us_sector_momentum`(`services/us_sector_service.CACHE_KEY`).
+
+**로더가 둘이고 실패 처리가 갈린다.**
+- `_mc_load` = **관용판**. 조회 예외를 `logger.warning` 후 `None`으로 접는다(동작 불변) → 「DB 오류」와 「한 번도 저장 안 됨」이 **같은 값**이 된다. 앱 36곳·18모듈이 쓰고 테스트 17파일이 patch한다.
+- `_mc_load_strict` = **엄격판(additive)**. 조회 실패를 **전파**하고 행 부재만 `None`이다. **저장값을 읽어 그 위에 누적하는 경로만** 이걸 쓴다 — 그 경로에서 위 붕괴는 곧 이력 파괴다(`kospi_signal`: SELECT 한 번의 실패 + 드라이버 fetch 성공 → 180일 신호·적중률이 오늘 1건으로 치환되고, 그날의 갭·종가 대사에서 파생되므로 재구성 불가). 예외가 전파되면 `_mc_save`에 도달하지 못해 이력이 보존되고 `job_runs.record`가 스스로 `failed`를 기록한다(이 한 건에서는 예외 전파가 `set_status` 배선보다 정확한 신호다).
 
 **`get_or_refresh(key, fetch_fn, ttl, force=False)`의 실제 의미**(이름과 어긋난다):
 - `force=False`면 ① 인메모리 `_get_cache(key)` → ② `_mc_load(key)`가 행을 주면 **나이 불문 그대로 반환**하고 인메모리에 `ttl`로 얹는다 → ③ 둘 다 없을 때만 `fetch_fn()`.
 - 즉 **`ttl`은 인메모리 수명만 지배하고 저장값에는 걸리지 않는다.** 한 번 `market_cache`에 들어가면 `force=True`가 오기 전까지 영구 서빙이다. 실제 재조회자는 `force=True`를 주는 배치뿐.
 - **fetch 실패 시 직전 저장값으로 폴백하지 않는다**(실패를 전파). 취약한 소스는 수동 폴백 패턴(§10.2)을 쓴다.
 
-`_yf_close_history(sym, stored, precision)`가 증분 fetch의 공통 구현이다 — 저장된 마지막 날짜+1일부터만 조회, 미래면 즉시 반환, 366일 컷오프로 트림, `_filter_outliers`(중앙값 대비 5배 밖 제거, 표본 5개 미만이면 무동작), `_merge_history`(날짜 키 dict 병합 — **새 값이 빈 리스트면 stored를 그대로 반환**).
+`_yf_close_history(sym, stored, precision)`가 증분 fetch의 공통 구현이다 — 저장된 마지막 날짜+1일부터만 조회, 미래면 즉시 반환, 366일 컷오프로 트림, `_merge_history`(날짜 키 dict 병합 — **새 값이 빈 리스트면 stored를 그대로 반환**).
+
+**⚠️ 이상치 필터는 저장이 아니라 표시 단계다(ADR-0040).** `_yf_close_history`의 반환값은 **raw**이고 `_filter_outliers`를 걸지 않는다 — **저장값을 직접 읽는 새 소비처는 스스로 표시 필터를 걸어야 한다.** 그리고 판정축 자체가 교체됐다:
+- 옛 축 = 중앙값 대비 5배(표본 5개 미만이면 무동작). 지속적 국면전환(`^IRX` 0.03%→4.5%)과 일시적 쓰레기 점을 구별하지 못해 **지속 이동의 양 끝을 통째로 잘랐다**.
+- 새 축 = **고립 스파이크**(하루 튀었다 정확히 제자리로 복귀) — 양 이웃과 모두 `_SPIKE_RATIO = 3.0` 이상 어긋나면서 그 **이웃끼리는 `_NEIGHBOR_AGREE_RATIO = 1.5` 이내로 정합**일 때만 제거. 국소 판정이라 지속 이동엔 원리적으로 무반응이다. 첫 점은 단일 이웃 비교, **마지막 점은 `current`/`change_pct`의 출처라 검사하지 않는다**.
+- 전역→국소 교체가 잃은 두 성질을 별도 가드로 되받았다: ⓐ **비양수 점** — 옛 축은 `median > 0`인 한 `v <= 0`을 항상 배제했으므로, 비율 함수가 한쪽만 비양수일 때 `inf`(완전 불일치)를 반환한다(둘 다 비양수면 1.0=정합). ⓑ **쓰레기 「런」** — 국소 판정은 쓰레기가 정확히 1점일 때만 성립하고 2점 연속이면 서로 정합해 무력화되므로, **선두 런 가드**(`_LEAD_ABSURD_RATIO = 50.0`, 본문 중앙값과 자릿수가 다른 동안 앞에서 벗겨냄)를 둔다. 임계는 지속 이동의 최대 이탈(`^IRX` 12배)과 실측 쓰레기(2143·10450배) 사이에서 골랐다.
+- **입력 정의역**: 엄격히 **양수인** 가격·금리 시계열만(호출처 12곳 전부). 부호가 교차하는 시계열(국채 spread 등)을 넣으면 부호 전환점이 스파이크로 오판되므로 spread는 이 필터를 타지 않는다.
+- `_public(data)`는 응답용 dict를 만들며 저장 전용 `_raw_history` 키를 벗긴다 — 벗기지 않으면 ADR-0040이 표시에서 가리기로 한 그 쓰레기 점이 공개 API로 새고 응답 shape도 바뀐다. 기존 `_raw_histories`(treasury)는 변경 *이전부터* 응답에 있던 키라 유지한다(없애는 것도 shape 변경이다).
 
 ### 1.5 인메모리 캐시 (DB 아님)
 
 `backend/services/cache.py` — `TTLCache(ttl, maxsize=200)` 인스턴스와 스냅샷 LRU(`OrderedDict`, `_MAX=50`).
 
 list 60s · dashboard 300s · correlation 300s · sector 300s · macro 300s · quote 60s · live_prices 15s · rebalance 300s · exposure 300s. `invalidate_portfolio_caches(user_id)`가 종목 변경 시 묶음 무효화하고, 캘린더는 `calendar.clear_cache(user_id)`로 **DB `calendar_cache` 행까지** 지운다.
+
+**스레드 안전 규율(B69)** — 락은 dict 조작 구간만 감싸고 `loader()`는 락 **밖**에서 돈다(dashboard loader가 카드당 10-워커 ThreadPool 수 초짜리라 락 안에 넣으면 다른 사용자의 조회와 `invalidate()`가 그만큼 막힌다). 그 대가로 **세대 카운터**(`_gen`·`_snap_gen`)가 loader 실행 중 들어온 무효화를 감지해 적재를 건너뛴다 — 무효화가 조용히 no-op이 되는 것은 stale 값을 되살리는 정합 결함이다(세대는 캐시 단위라 다른 키의 무효화도 in-flight 적재를 취소한다 — 보수적인 쪽). 만료 정리는 **in-place 삭제**다(옛 구현은 `self._store = {...}` 재바인딩이라 그 창의 `invalidate(key)`가 버려질 dict에 적용돼 유실됐다). 락 중첩은 0이라 데드락이 불가하고, `cache.invalidate(ticker)`도 `_snap_lock`을 놓은 뒤 파생 캐시를 무효화한다.
 
 `services/storage`→`services/cache` 호출은 **함수 내 지연 import**로 순환참조를 피한다.
 
@@ -420,9 +440,16 @@ DART에 수주잔고 전용 구조화 API가 없어 `document.xml` 원문을 파
 |---|---|---|
 | `market_indicators/econ.py` | `/fred/series/observations` | `CPIAUCSL`(CPI) · `UNRATE`(실업률). 3년 전부터 증분(저장 마지막 날짜부터) |
 | `market_indicators/macro.py` | `/fred/series/observations` | `T10Y2Y`(10Y-2Y 금리차) · `BAMLH0A0HYM2`(ICE BofA US HY OAS) · `M2SL` · `DFF`(연방기금 실효금리) |
+| `market_indicators/formation.py` | `/fred/series/observations` | 신규 창업 신청 2부문: `BABANAICS51SAUS`(정보) · `BABANAICS54SAUS`(전문·과학·기술서비스). 월간·계절조정 |
+| `market_indicators/labor.py` | `/fred/series/observations` | 고용 조사 2종: `PAYEMS`(기업조사=비농업 임금근로자) · `CE16OV`(가계조사=16세 이상 취업자). 월간·계절조정·천 명 |
+| `market_indicators/inflation.py` | `/fred/series/observations` | 절사평균 물가 4종: `PCEPILFE`(코어 PCE, **지수**) · `PCEPI`(헤드라인 PCE, **지수**) · `PCETRIM12M159SFRBDAL`(Dallas 절사평균, **이미 YoY %**) · `TRMMEANCPIM159SFRBCLE`(Cleveland 16% 절사평균, **이미 YoY %**) |
 | `routers/calendar.py` | `/fred/releases/dates` | 큐레이션 4종 릴리스명: Consumer Price Index · Employment Situation · Gross Domestic Product · Producer Price Index |
 
-관측치 파싱은 `"."`/None/`""`을 건너뛴다(FRED의 결측 표기).
+관측치 파싱은 `"."`/None/`""`을 건너뛴다(FRED의 결측 표기). ⚠️ 그 스킵만으로는 부족해 신규 3모듈은 `float()` 뒤에 **`math.isfinite` 검사**를 쌍으로 둔다 — `float("NaN")`/`float("Infinity")`는 `ValueError`를 던지지 않아 `except`를 예외 없이 통과한다.
+
+**세 신규 모듈은 형태가 같다**: `_SERIES` dict(내부 키 → FRED series_id) → 계열별 `_fetch_series` → `_merge_history`로 저장값에 증분 병합 → `_mc_save`. 가드는 **끝 가드가 아니라 계열 단위 소스-폴백**이다 — 한 계열의 실패(예외·빈응답)가 다른 계열의 갱신을 막지 않고, 실패한 계열만 직전 저장값을 그대로 유지한다. `inflation.py`만 추가 규약이 있다: **저장은 원계열 그대로**(지수는 지수·%는 %) 두고 **응답에서만 YoY %로 통일**한다 — 지수 값 131이 %축에 섞이면 차트가 통째로 무의미해지므로 단위 혼동이 이 섹션의 최대 위험이다.
+
+세 모듈 다 `market_indicators/__init__.py`가 `get_*`/`_fetch_and_save_*` 쌍을 re-export하고, 라우터 표면은 `GET /api/market/{business-formation,labor-surveys,trimmed-inflation}`(`get_current_user`) + `POST /api/market/refresh-{...}`(`require_admin`)이며, auto·manual 두 레인 모두 `job_runs.record(...)`를 `as run:`으로 받아 `set_status`를 명시한다(참조 구현 3쌍).
 
 `macro.evaluate_signals(data)`는 **순수함수**로 신호 2종을 판정: `inverted`(최신 금리차 < 0) · `credit_stress`(최신 HY ≥ `HY_STRESS_THRESHOLD = 5.0`). 시리즈가 없으면 각각 None. `GET /api/market/macro-signals`는 저장값만 반환(요청경로 라이브 FRED 0콜).
 
@@ -475,12 +502,19 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 
 **발행물 저장 계층**
 - `services/analyst_reports.py`(ADR-0027) — 판단·서사(rating·title·적정주가 밴드·산정방식·points·risks)는 Cowork가 제출하고, **숫자 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 서버가 최신 스냅샷에서 발췌·계산해 박제**한다. 요청경로 외부 API fetch 0. 같은 (ticker, published_date) 재발행만 upsert, 다른 날은 누적. `RATINGS = ("buy","neutral","sell")`.
-- `services/tech_reports.py`(ADR-0033/0034) — 종목이 아니라 기술 단위. `TECH_TOPICS`가 대상 4종의 정본: `reusable-rocket`·`solid-state-battery`·`smr`·`robotics`. (slug, published_date) upsert. `_json_or_null`이 `json.dumps(None)`→문자열 `"null"` 함정을 피한다.
+- `services/tech_reports.py`(ADR-0033/0034, 저장모델 개정 ADR-0038, 대상 개정 ADR-0039/0044) — 종목이 아니라 기술 단위. **`TECH_TOPICS`가 대상 15종의 정본**이고(목록은 그 상수를 읽을 것 — 여기 복제하면 다음 개정마다 드리프트한다) `name`은 프론트 `components/reports/techReportUtils.js::TECH_NAMES`와 **dual-source**다(API가 표시명을 안 줘서 — slug 추가·개명 시 양쪽을 함께 갱신).
+  **저장 입도가 세 층이다**: ⓐ **slug당 1행**(`ON CONFLICT (slug) DO UPDATE`, 이력 없음 — `published_date`는 마지막 갱신일) ⓑ `DO UPDATE SET` 컬럼 목록의 정본은 `_UPDATE_COLUMNS` 상수뿐이고 **요청 값이 컬럼명 자리에 닿는 경로가 없다**(동적 SQL은 고정 allowlist에서만 만든다) ⓒ **선택 5필드 `_PRESERVABLE`**(`key_points`·`milestones`·`variants`·`watch_items`·`composition`)은 요청이 키를 **생략**하면 SET 목록에서 빠져 직전 판이 보존되고, 지우려면 **명시적 null**을 보낸다. 본문 4필드(`description`·`players`·`challenges`·`related`)는 여기 없다 — 그쪽 생략은 부분 갱신이 아니라 잘못된 발행이므로 보존해 숨기지 않는다. `INSERT` 컬럼 목록은 full 유지(신규 slug는 보존할 직전 판이 없다).
+  `_json_or_null`이 `json.dumps(None)`→문자열 `"null"` 함정을 피한다(jsonb 캐스트 시 SQL NULL이 아니라 **JSON null 스칼라**가 되어 `IS NULL`이 False가 된다).
+  읽기 표면 3종: `GET ""`(목록 — `reports[]` + **`topics[]`**=등록 정본 15종, 발행 여부 무관. 화면이 차집합으로 「발행 대기」를 그린다) · `GET /index`(종목→기술 역인덱스, **산문 미포함** — 화이트리스트 `_LISTED_FIELDS` 7필드(`ticker`·`name`·`tech_level`·`gap_years`·`country`·`state_led`·`category`)만 실어 `note`·`share_pct`·`leader_name`을 원소 수준에서 배제한다, ADR-0043) · `GET /{slug}`. ⚠️ `/index`는 **`/{slug}`보다 먼저 선언**돼야 한다(`slug`가 `Literal`이라 순서가 뒤바뀌면 그 자리에서 422로 죽는다).
 
 **입력 검증 계약**(Pydantic v2):
 - float 필드는 `allow_inf_nan=False`를 **명시**해야 한다 — raw JSON의 `NaN` 토큰은 `json.loads`가 허용하고 기본 Pydantic float이 통과시키며, NaN 비교는 항상 False라 범위 검증도 못 잡는다.
-- 선택 필드는 `Optional[X] = Field(None, ...)` — `x: float = Field(None)`이면 **키 생략은 통과하고 명시적 `null`만 422**가 되는 비대칭이 생겨, 중첩 배열 안의 필드 하나가 요청 전체를 막는다.
-- 422가 입력 NaN을 echo하면 500이 되므로 `main.py`의 `RequestValidationError` 핸들러가 `sanitize`로 막는다.
+- 선택 필드는 `Optional[X] = Field(None, ...)` — `x: float = Field(None)`이면 **키 생략은 통과하고 명시적 `null`만 422**가 되는 비대칭이 생겨, 중첩 배열 안의 필드 하나가 요청 전체를 막는다. 같은 함정의 배열형은 `List[X] = Field(default_factory=list)`/`Field([])`이고 스칼라용 탐지 grep이 그것에 블라인드하다 — 선택 배열도 `Optional[List[X]] = Field(None)`.
+- **자유형 dict를 받지 말 것** — `routers/stocks.py`의 `market_outlook`은 `Optional[Any]`에서 **`Optional[MarketOutlook]`**(중첩 모델 4종 `MarketOutlook`·`MarketOutlookSegment`·`MarketSize`·`SegmentMarket`)으로 승격됐다(B53). 스키마 정본은 `CLAUDE_COWORK_API.md`의 `market_outlook` / `market_outlook.segments[]` 표이고, 화면이 읽는 필드가 하나도 없는 payload는 검증자가 거부한다. 가드 `backend/tests/test_market_outlook_schema.py`.
+- **교차필드 불변식은 `model_validator`로** — 신규 구조 필드를 만들 땐 가장 닮은 형제의 validator를 전부 열거해 각각 "이 필드에도 필요한가"를 물을 것(`Market._estimates_consistency`가 통화·단위·연도 동일성과 `is_basis` 최대 1개를 보는 참조 구현). 타입·상하한이 다 맞으면 pydantic은 통과시키고 `test_api_doc_sync.py`는 엔드포인트 *존재*만 보므로, 중복 이름·양쪽 결측 같은 클래스는 자동 게이트가 원리적으로 못 잡는다.
+- 422가 입력 NaN을 echo하면 500이 되므로 `main.py`의 `RequestValidationError` 핸들러가 `sanitize`로 막고, 그 밖의 미포착 예외는 전역 `@app.exception_handler(Exception)`가 고정 본문 500으로 바꾼다(`STACK.md` §1.3).
+
+**쓰는 쪽 규율** — 이 스키마들에 POST할 때는 규약 산문이 아니라 **검증기를 직독**할 것(`max_length`·`min_length`·`ge/le`·`Literal` enum·교차필드 검증은 산문에 전부 적히지 않는다). 호출 직전 로컬 사전검증(축마다 `share_pct` 합이 **정확히 100** · 축 항목의 `share_pct`는 **5의 배수**(`MineralProducer.share_pct`·`top_source_pct`는 예외) · `share_pct`를 실으면 `market.share_basis`/`minerals_share_basis` 필수 · 배열 항목수 상하한 · dangling reference 2종(`composition.tech[].leaders` ⊆ `players[].name`, `composition.minerals[].used_in` ⊆ `composition.tech[].name`) · `estimates` 전 원소의 year/currency/unit 동일성 + `is_basis` 최대 1개)이 재시도 예산보다 압도적으로 싸다 — 실측 7종 발행에서 422가 **0회**였다. 422는 아무것도 쓰지 않으므로 검증 실패가 곧 무해한 실패이고, 발행물은 slug당 1행이라 그 성질이 안전장치까지 겸한다.
 
 ### 9.2 아웃바운드 — 루틴 fire 웹훅 (`services/cowork_trigger.py`, ADR-0028)
 
@@ -507,7 +541,9 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 
 예외(요청경로 증분 fetch, 스케줄 배치 없음 = `batch_registry` 무등록): `vix` · `commodities` · `treasury` · `indices` · `kospi_futures` · `fear_greed`. 패턴은 동일하다 — 인메모리 TTL 캐시 → `_mc_load` → 라이브 fetch → `_mc_save` + 폴백.
 
-⚠️ **`fx`는 2026-08 이후 이 목록에서 빠졌다** — 요청경로 증분(`get_fx`)을 그대로 유지하면서 배치 `fx_fetch`(매일 06:40 KST, `scheduler/jobs._refresh_fx` → `market_indicators/fx._fetch_and_save_fx`, 수동 `POST /api/market/refresh-fx`)를 **함께** 갖는다. 소비자가 시장지표 탭 밖에도 있고(`routers/stocks.py::_usdkrw_rate` · `services/digest_service.py`) 그쪽은 나이 검사 없는 raw `_mc_load("fx")`라, 배치가 없으면 아무도 탭을 안 열 때 포트폴리오 KRW 환산이 무기한 stale해진다(`get_or_refresh`의 `ttl`은 저장값에 걸리지 않는다).
+2026-08 신설 3키(`business_formation` · `labor_surveys` · `trimmed_inflation`)는 이 예외가 **아니다** — 처음부터 배치-백킹(`business_formation_fetch` 06:10 · `labor_surveys_fetch` 06:20 · `trimmed_inflation_fetch` 06:30 KST)이고 요청경로는 저장값만 읽는다. 수동 갱신은 `POST /api/market/refresh-{business-formation,labor-surveys,trimmed-inflation}`(admin).
+
+⚠️ **`fx`는 2026-08 이후 이 목록에서 빠졌다** — 요청경로 증분(`get_fx`)을 그대로 유지하면서 배치 `fx_fetch`(공통, 매일 06:40 KST, `scheduler/jobs._refresh_fx` → `market_indicators/fx._fetch_and_save_fx`, 수동 `POST /api/market/refresh-fx`)를 **함께** 갖는 유일한 키다. 소비자가 시장지표 탭 밖에도 있고(`routers/stocks.py::_usdkrw_rate` · `services/digest_service.py`) 그쪽은 나이 검사 없는 raw `_mc_load("fx")`라, 배치가 없으면 아무도 탭을 안 열 때 포트폴리오 KRW 환산이 무기한 stale해진다(`get_or_refresh`의 `ttl`은 저장값에 걸리지 않는다).
 
 기동 시 빈 캐시 시드: `_seed_rankings_if_empty` · `_seed_kr_sector_if_empty` · `_seed_us_sector_if_empty`(`scheduler/jobs.py`).
 
@@ -605,13 +641,16 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 | `market_rankings` | Naver `marketValue`(KR) · `yf.screen`(US) | `kr_rankings_fetch`/`us_rankings_fetch` | 랭킹 탭 |
 | `market_leverage_indicators` | 공공데이터포털 KOFIA·시장지수 | `leverage_fetch` | 수급지표 탭 |
 | `market_lending_balance` | 공공데이터포털 금융위 | `lending_fetch` | 수급지표 탭 |
-| `market_cache`(15키) | FRED·yfinance·Naver·관세청/Comtrade·CNN·multpl·KIS 선물·키움 업종 | `monthly_*`·`earnings_*`·`macro_signals_fetch`·`kospi_signal_fetch`·`kr_sector_fetch`·`us_sector_fetch` + 요청경로 7종 | 시장지표 탭, 섹터·매크로 |
+| `market_cache`(18키) | FRED·yfinance·Naver·관세청/Comtrade·CNN·multpl·KIS 선물·키움 업종·ExchangeRate-API | `monthly_*`·`earnings_*`·`macro_signals_fetch`·`business_formation_fetch`·`labor_surveys_fetch`·`trimmed_inflation_fetch`·`fx_fetch`·`kospi_signal_fetch`·`kr_sector_fetch`·`us_sector_fetch` + 요청경로 6종 | 시장지표 탭, 섹터·매크로, 포트폴리오 KRW 환산(`fx`) |
 | `stock_recommendations` | Naver·키움·yfinance·DART(KR) · yfinance·dataroma(US) | `recommendation_kr`/`recommendation_us` | 추천 탭 |
 | `guru_managers` | dataroma(+Naver US 한글명) | `guru_crawl` | 구루 화면 |
-| `analyst_reports`, `tech_reports` | Cowork 제출 + 서버 스냅샷 발췌 | (fire 트리거) | 심층/주요기술 리포트 |
+| `analyst_reports` | Cowork 제출(판단·서사) + 서버 스냅샷 발췌(숫자 블록) | (fire 트리거) | 심층 리포트 — 종목 리포트 상세의 탭 + 문서 라우트 |
+| `tech_reports`(**slug당 1행**) | Cowork 제출 전량(서버 자동 첨부 숫자 0 — 전방 시장 데이터 소스 부재) | (fire 트리거) | 주요기술 리포트·기술 해부, 포트폴리오 「기술 노출」(`GET /index` 역인덱스) |
 | `digests` | 보유종목 시세 집계 (+Telegram 발송) | `daily_digest` | 다이제스트 탭 |
 | `calendar_cache` | yfinance + FRED releases + `exchange_calendars` + `stock_disclosures.meeting_date` | (요청 시 빌드·캐시) | 캘린더 |
 | `user_events` | `EventTrackerMiddleware` + `POST /api/events` | — | admin 분석(`/api/admin/analytics`) |
+
+⚠️ `POST /api/events`는 `routers/events.py::VALID_EVENTS` **화이트리스트**로 걸러진다 — 목록에 없는 이름은 **요청이 200으로 성공하고 이벤트만 조용히 사라진다**(현재 nav 6종 `nav_{portfolio,research,market,guru,settings,analytics}` + tab 9종 + 상호작용 5종). 그래서 프론트에서 이벤트명을 파생하는 방식을 바꾸면(예: nav 이벤트를 `section.key`에서 파생) 그 순간 이벤트가 탈락하고 화면은 정상으로 보인다. 프론트↔백 드리프트 가드: `backend/tests/test_valid_events_matches_frontend.py`.
 
 ---
 

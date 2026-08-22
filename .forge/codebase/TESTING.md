@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 20dd46eb829b05025af793b010dfe4efe2925a7d
-mapped: 2026-08-10
+last_mapped_commit: c72a7c9e0a5d11a7cf5ccbe8f6e370220a3d19b5
+mapped: 2026-08-22
 ---
 
 # TESTING — 테스트·검증 지도
@@ -14,9 +14,15 @@ Playwright/CDP 라이브 프로브(`scripts/uat*.mjs`). 세 계층은 **서로�
 `scripts/uat284-diag-breadcrumb.mjs`(`§7.3 ⓖ`·`ⓑ`·`§7.2`),
 `scripts/uat285-oauth-landing-splash.mjs`(`ⓕ`·`ⓔ`·`ⓚ`·`§7.4`),
 `scripts/uat286-theme-first-paint.mjs`(`ⓗ`·`ⓔ`·`ⓘ`),
+`scripts/uat295-trimmed-inflation.mjs`(`§7.1`·`§7.2 ⑦`·`§7.3 ⓑ`·`ⓒ`·`ⓖ`·`ⓘ`·`§10 ①` — 현행
+인용 밀도가 가장 높은 실물),
+`scripts/uat291-mutation-ownership.mjs`(`§7.5`), `scripts/probe304-baseline.mjs`(`§7.3` 전체),
 `frontend/src/components/tech/PlayerTable.test.jsx`(`TESTING.md §9` — 옛 `CategoryGroups.test.jsx`는
 task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `groupByCategory` 블록과
-`PlayerTable`·`ShareChart` 그룹 렌더 테스트로 이관).
+`PlayerTable`·`ShareChart` 그룹 렌더 테스트로 이관),
+`frontend/src/test/tech-visual-guards.test.jsx`(`§9 ①②⑦`),
+`frontend/src/components/tech/{ShareChart.jsx,VariantTable.test.jsx}`(`§9 ⑦`·`§9`),
+`frontend/src/pages/TechReports.jsx`(`§6` — testid가 vitest·프로브의 공유 앵커임).
 
 ⚠️ 파일 인용은 **경로 + 심볼명**으로 한다(줄번호 참조 drift 방지 — `CONVENTIONS.md` 서문).
 
@@ -26,14 +32,18 @@ task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `group
 
 | 계층 | 러너 | 설정 | 실행 | 규모 |
 |---|---|---|---|---|
-| 백엔드 | pytest | `backend/pytest.ini` (`testpaths = tests`, `pythonpath = .`) | `cd backend && .venv/bin/python -m pytest` | 138 테스트 파일 · `def test_*` 1,554개 |
-| 프론트 | vitest 4 + jsdom + @testing-library/react | `frontend/vite.config.js`의 `test` 블록 (ADR-0019) | `cd frontend && npm test`(= `vitest run`) | 63 테스트 파일 · `it()` 537개 |
-| 라이브 | Playwright(chromium 위주) + CDP | 없음(스크립트마다 자기 하니스) | `node scripts/uat<NNN>-<slug>.mjs` | `uat*` 112개 · `probe*` 5개 |
+| 백엔드 | pytest | `backend/pytest.ini` (`testpaths = tests`, `pythonpath = .`) | `cd backend && .venv/bin/python -m pytest` | 172 테스트 파일 · 정적 `def test_*` 2,020개 → **2,259 passed / 0 failed** |
+| 프론트 | vitest 4 + jsdom + @testing-library/react | `frontend/vite.config.js`의 `test` 블록 (ADR-0019) | `cd frontend && npm test`(= `vitest run`) | 83 테스트 파일 · 정적 `it()` 884개 → **929 passed / 0 failed** |
+| 라이브 | Playwright(chromium 위주) + CDP | 없음(스크립트마다 자기 하니스) | `node scripts/uat<NNN>-<slug>.mjs` | `uat*` 130개 · `probe*` 13개 · `loopcheck*` 3개 |
 
 **백엔드**
-- 러너는 pytest 단독 — 플러그인·마커 없음(`pytest.ini`에 마커 정의 0). `@pytest.mark.parametrize`만
-  3파일에서 쓴다(`test_backlog_extract.py`·`test_security_auth_gaps.py`·`test_ticker_validation.py`).
-  그래서 정적 `def test_*` 수(1,554)보다 실제 통과 건수가 조금 많다.
+- 러너는 pytest 단독 — 플러그인·마커 없음(`pytest.ini`에 마커 정의 0). `@pytest.mark.parametrize`는
+  **16파일**에서 쓴다(옛 3파일 → 이번 드라이브의 경계·enum 표 테스트가 대거 채택:
+  `test_kst_date_boundaries.py`·`test_table_unit_no_default_fallback.py`·
+  `test_unit_caption_compound_and_fallback.py`·`test_ranking_price_none.py`·
+  `test_kiwoom_close_price_none.py`·`test_api_key_bearer_or_eval.py` 등).
+  그래서 정적 `def test_*` 수(2,020)와 실제 통과 건수(2,259)가 **239건** 벌어진다 —
+  **"테스트 개수"를 셀 때 정적 grep과 러너 출력이 다름을 전제**할 것.
 - 커버리지 도구(`pytest-cov`)·린터(black/ruff/flake8)·타입 검사기 미도입. 게이트는 **전체 스위트 green**이다.
 - 로컬 `.venv`는 **Python 3.9.6**, 컨테이너는 3.12 → 어노테이션 제약이 사실상 하드 게이트
   (`CONVENTIONS.md §3.3`). 로컬 `.venv`엔 `lxml`이 없다.
@@ -43,13 +53,17 @@ task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `group
   setupFiles: './src/test/setup.js' }`. 설정·플러그인·alias를 Vite와 공유하는 것이 ADR-0019의 채택 근거.
 - `frontend/src/test/setup.js`는 **한 줄뿐**이다 — `import '@testing-library/jest-dom'`.
   전역 mock·polyfill 없음.
-- `globals: true`이지만 **63개 파일 전부가 `from 'vitest'`를 명시 import**한다(관례).
+- `globals: true`이지만 **83개 파일 전부가 `from 'vitest'`를 명시 import**한다(관례).
+- `it.each`/`describe.each`는 15곳 — 정적 `it()` 884개와 실제 929건의 차이가 여기서 온다.
 - 커버리지 리포터·jsdom polyfill(ResizeObserver 등) 미설정 → recharts가 렌더되지 않는 원인(§6).
 
 **라이브 프로브**
 - 의존성은 `scripts/package.json`(`playwright` 1개)이고 `scripts/node_modules`에 설치돼 있다.
   node의 모듈 해석이 스크립트 디렉터리에서 위로 올라가므로 어느 cwd에서 실행해도 된다.
-- 대상은 **프로덕션**(`const BASE = 'https://portfolion.taebro.com'`, 74개 스크립트가 동일 상수).
+  ⚠️ **그래서 프로브 사본·fault-injection 본을 프로젝트 밖에 두면 `ERR_MODULE_NOT_FOUND`로 즉사**하고,
+  출력을 `| grep '✗'`로 걸러 놓았으면 그 빈 출력이 **「FAIL 0」과 글자 하나 다르지 않게 보인다**
+  (게다가 파이프라인 exit는 마지막 명령의 것이라 `0`이다). 사본은 `scripts/` 안에 두고 끝나면 지운다.
+- 대상은 **프로덕션**(`const BASE = 'https://portfolion.taebro.com'`, 142개 스크립트가 동일 상수).
 - 스크린샷 출력은 저장소 루트의 `screenshots-uat<NNN>/`(스크립트가 `fs.mkdirSync(..., {recursive:true})`).
 - **CI는 없다** — `.github/`에 배포 워크플로만 있고 테스트를 돌리는 잡은 없다. 세 계층 모두 로컬 게이트다.
 
@@ -68,21 +82,38 @@ task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `group
   `test_no_public_reads.py` · `test_api_doc_sync.py` · `test_empty_result_overwrite_guards.py` ·
   `test_empty_result_guards_exports_krsector.py` · `test_rankings_empty_guard.py` ·
   `test_us_supply_empty_guard.py`.
+  이번 드라이브가 이 계열을 크게 늘렸다 — `test_guard_baseline_integrity.py`(가드가 스스로
+  꺼지는 것) · `test_destructive_update_guards.py`(delete-rewrite 파괴) ·
+  `test_concurrency_locks.py`·`test_progress_per_user.py`(강제 인터리빙) ·
+  `test_kst_date_boundaries.py`(시간대 경계) · `test_all_menus_single_source.py`·
+  `test_valid_events_matches_frontend.py`(다중 소스 집합 교차 대조) ·
+  `test_batch_observability.py`(배치가 실패를 말하는지) · `test_table_unit_no_default_fallback.py`·
+  `test_unit_caption_compound_and_fallback.py`(파싱 실패의 기본값 폴백 금지) ·
+  `test_ranking_price_none.py`·`test_kiwoom_close_price_none.py`(시세는 `None`, 수량은 `0`).
 - 공용 헬퍼는 `test_` 접두 없이 둔다 — `backend/tests/_routes.py`(라우트 평탄화),
-  `backend/tests/__init__.py`(패키지화 — `from tests._routes import walk_routes`가 성립하는 이유).
+  `backend/tests/__init__.py`(패키지화 — `from tests._routes import walk_routes`가 성립하는 이유),
+  `backend/tests/fixtures/backlog/`(DART 원문 fixture — 유일한 fixture 디렉터리).
 
 ### 프론트 — 콜로케이션 + 교차관심사 디렉터리 2원 구조
 
 | 위치 | 개수 | 무엇 |
 |---|---|---|
-| 소스 옆 콜로케이션 `X.test.jsx` | 38 | 그 컴포넌트/훅/유틸 하나의 계약 |
-| `frontend/src/test/` | 25 | **여러 모듈에 걸치는 것** — 라우팅·인증 부팅·테마·OAuth·레이스·쌍둥이 동일성 |
+| 소스 옆 콜로케이션 `X.test.jsx` | 47 | 그 컴포넌트/훅/유틸 하나의 계약 |
+| `frontend/src/test/` | 36 | **여러 모듈에 걸치는 것** — 라우팅·인증 부팅·테마·OAuth·레이스·쌍둥이 동일성 |
 
 콜로케이션은 ADR-0019가 정한 기본이고, `src/test/`는 "어느 컴포넌트의 테스트도 아닌 것"을 담는다:
 `nav-active-matching.test.jsx`(3소비처 × 목록·상세) · `auth-bootstrap.test.jsx` ·
 `back-to-login-guard.test.jsx` · `route-redirects.test.jsx` · `ranking-tracked-race.test.jsx` ·
 `compare-race.test.jsx` · `theme-boot-twin.test.js` · `oauth-splash-twin.test.js` ·
 `smoke.test.js`(러너 동작 확인, ADR-0019 도입 시 추가).
+이번 드라이브가 이 디렉터리에 **실패 경로 전용 파일군**을 추가했다 —
+`failure-vs-empty.test.jsx`(조회 실패를 「없음」으로 말하지 않는다) ·
+`stale-response-guard.test.jsx`·`tracked-mutex-and-format.test.jsx`(세대 가드·뮤텍스 노출) ·
+`ranking-news-failure.test.jsx`·`report-detail-stale.test.jsx`·
+`report-generation-conflict.test.jsx`·`diaglog-copy-failure.test.jsx` ·
+`api-cache-purge.test.js` · `tech-visual-guards.test.jsx`(§9의 시각 불변식 중 jsdom이 볼 수
+있는 *선언* 부분만) · `tech-exposure.test.jsx` · `report-family-boundary.test.jsx`.
+**이름이 「무엇을 재는가」가 아니라 「어떤 실패를」로 되어 있는 것이 이 계열의 표식**이다.
 
 ### 라이브 프로브 — `scripts/`
 
@@ -90,8 +121,20 @@ task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `group
   갱신하지 않고 새로 만드는** 것이 관례다(옛 프로브는 그 시점의 계약 기록으로 남는다).
   단 **기존 프로브가 스테일해지면 같은 커밋에서 고친다**(§7.3 ⓟ).
 - 변형 접두 — `probe<NNN>-*`(도구 한계 자체를 조사하는 실험), `smoke<NNN>-auth.mjs`(경량 인증 스모크),
-  `uat*-shot.mjs`(캡처 전용). 파이썬 프로브도 소수 있다(`probe248-peer-multiples.py`,
-  `uat289-oauth-handler-bench.py`).
+  `uat*-shot.mjs`(캡처 전용), `loopcheck-*.mjs`(fg-loop 정지조건 체크),
+  `check-uat<NNN>-ratchet.sh`(프로브 회귀 래칫 — §10 ⑦).
+- **파이썬 프로브가 별개 계열로 자랐다(2 → 8).** `.mjs` 프로브가 *브라우저에서 렌더된 화면*을
+  재는 반면, 이쪽은 **로컬 `backend/.venv`에서 서비스 함수를 직접 import해 외부 소스를
+  읽기전용으로 때리고 봉투 파싱까지** 확인한다 — `probe326-backlog-unit-caption.py`(DART 캡션
+  거리 분포 + 옛 로직 재구현 대조) · `probe327-unit-caption-census.py`(최근 8보고서로 확장한
+  census) · `probe327-ranking-price.py`(`closePriceRaw`/`regularMarketPrice` 원형 + 0/None으로
+  접힌 행 수) · `probe328-kst-date-boundaries.py`(실제로 어떤 파라미터가 DART로 나가는지) ·
+  `probe326-kiwoom-close-price.py`.
+  세 가지가 이 계열의 계약이고 헤더 주석이 매번 그것을 적는다:
+  ⓐ **`prod DB 무접촉`**(쓰기 함수를 호출하지 않는다고 명시) ⓑ **fetch 200이 아니라 최종 산출값**
+  ("값이 전부 None이면 측정 실패") ⓒ **옛 로직을 충실히 재구현해 같은 문서에 함께 적용**해
+  before/after가 갈리는 지점을 실측(§7.3 ⓔ의 처방-무효화형 대조군을 백엔드에서 하는 방식).
+  이것이 §8 ①의 fixture-pass-live-fail에 대한 가장 값싼 대응이다 — 컨테이너도 배포도 필요 없다.
 - 감사 스크립트는 `scripts/audit_unauth_endpoints.py`(ADR-0029 게이트, 종료코드 0/1).
 
 ---
@@ -133,13 +176,25 @@ monkeypatch.setattr(db_svc, "_get_pool", _no_real_db)   # raise RuntimeError(...
   `git status`로 부수효과를 확인**하는 습관이 필요하다(과거 `backend/data/*_tickers.json`이
   테스트 실행마다 오염됐고, 원인인 파일-캐시 겸용을 `market_cache` 테이블로 옮겨 해소했다.
   현재 `backend/data/`는 read-only 시드다 — `services/market_indicators/earnings.py` 주석 참조).
+  **2026-08-22 전체 스위트 실행에서 부수효과 0건**(tracked 변경은 문서 편집뿐)으로 재확인됐다 —
+  즉 기대값은 0이고, 0이 아니면 새 write 경로가 생긴 것이다.
 - ⚠️ **`importlib.reload()` 패턴 테스트는 모듈 자체 정의 심볼의 patch가 reload로 무효화된다** →
   하위 모듈 속성(`services.db.execute`·`services.market.kr._naver_get` 등)을 patch할 것.
+- ⚠️ **관용 로더가 이 가드의 예외를 삼키면 「실 DB에 닿는 테스트」가 초록으로 숨는다.**
+  실측: `market_indicators/cache.py::_mc_load`가 조회 예외를 warning 후 `None`으로 접으므로,
+  `_mc_load`를 대역하지 않은 테스트가 **`_block_real_db`의 `RuntimeError`를 그 로더에게 삼켜지고
+  「저장값 없음」으로 읽혀 우연히 통과**하고 있었다. 누적 시계열 파괴를 막으려고 **엄격 로더
+  `_mc_load_strict`**(예외를 전파)를 도입한 순간 그 테스트가 깨졌고, 그것이 곧 실 DB 접근의 증거였다
+  (`backend/tests/test_market_indicators.py::test_get_econ_indicators_caches_result`의 주석이 이
+  경위를 적는다 — 수정은 `_mc_load`·`_mc_load_strict`·`_mc_save` **셋 다** 대역).
+  일반화: **가드는 예외를 던지는 것으로 일을 하는데, 중간 계층의 broad except가 그 예외를 먹으면
+  가드가 조용히 무력화된다.** 가드 위에 관용 계층이 있는지 확인할 것.
 
 **`client` 픽스처는 있지만 거의 안 쓴다** — `TestClient(app)`을 주는 `client` 픽스처를 실제로
-사용하는 파일은 6개뿐이다(`test_kis_client.py`·`test_nan_input_behavior.py`·`test_nan_input_guards.py`·
+사용하는 파일은 **5개**뿐이다(`test_global_exception_handler.py`·`test_nan_input_behavior.py`·
 `test_macro_signals_batch.py`·`test_portfolio_response_sanitize.py`·`test_recommendation_batch.py`).
-지배형은 §4.1의 자체-app이다.
+지배형은 §4.1의 자체-app이다. **`main.app`을 통과해야만 관측되는 것**(전역 예외 핸들러·422 detail
+sanitize·미들웨어)이 이 픽스처의 정당한 용례다 — 자체-app에는 그 배선이 없다.
 
 ---
 
@@ -147,7 +202,7 @@ monkeypatch.setattr(db_svc, "_get_pool", _no_real_db)   # raise RuntimeError(...
 
 ### 4.1 self-app 패턴이 지배형 — conftest `client`는 거의 안 쓴다
 
-**40개 테스트 파일**이 모듈 상단에서 자기 앱을 만든다:
+**51개 테스트 파일**이 모듈 상단에서 자기 앱을 만든다:
 
 ```python
 app = FastAPI()
@@ -173,6 +228,11 @@ grep은 "어디를 볼지"를 좁히는 용도이고 게이트는 스위트다.
 **무인증 거부(401/403)는 override 없는 fresh app으로 따로 검증한다** —
 `backend/tests/test_security_auth_gaps.py`의 `_client(*routers)` 헬퍼가 매 테스트마다 새
 `FastAPI()`를 만들어 실제 auth 의존성을 태운다(docstring이 그 이유를 명시).
+`backend/tests/test_api_key_bearer_or_eval.py`도 같은 패턴을 쓰며, **조합 수를 세는 규율**을
+덧붙인다 — `X-API-Key`와 Bearer의 OR 평가를 검증할 때 "한쪽만 유효 / 둘 다 유효 / 둘 다 무효"
+4조합으로는 **「유효한 한쪽 + *무효한* 다른 쪽」 경로를 지나지 않아** 그 결함(키가 있으면 키만
+보고 401)을 원리적으로 못 잡는다 → 조합은 **6개**다. 인증 축의 정의역은 "값의 유무"가 아니라
+**"유효/무효/부재 3상태의 곱"**으로 셀 것.
 
 ### 4.2 patch 타깃은 "실제 조회 경로"
 
@@ -182,10 +242,10 @@ grep은 "어디를 볼지"를 좁히는 용도이고 게이트는 스위트다.
 | 형태 | 예 |
 |---|---|
 | 라우터가 dotted 호출하는 서비스 | `patch("routers.stocks.storage.get_full_portfolio")` (18) |
-| 라우터가 직접 import한 심볼 | `patch("routers.report.query")` (24) · `patch("routers.stocks.query")` (21) |
-| 서비스가 직접 import한 심볼 | `patch("services.consensus.query")` (27) · `patch("services.digest_service.execute")` (19) |
-| 외부 라이브러리 | `patch("services.market.yf.Ticker")` (14) · `patch("services.market_indicators.cache.yf.Ticker")` (16) |
-| 외부 HTTP 어댑터 | `patch("services.market.kr._naver_get")` (23) |
+| 라우터가 직접 import한 심볼 | `patch("routers.report.query")` (33) · `patch("routers.stocks.query")` (21) |
+| 서비스가 직접 import한 심볼 | `patch("services.consensus.query")` (28) · `patch("services.digest_service.execute")` (19) |
+| 외부 라이브러리 | `patch("services.market.yf.Ticker")` (14) · `patch("services.market_indicators.cache.yf.Ticker")` (17) |
+| 외부 HTTP 어댑터 | `patch("services.market.kr._naver_get")` (26) |
 | 설정 게이트 | `patch("services.kiwoom.client.configured")` (23) |
 
 **함정 3종:**
@@ -205,6 +265,17 @@ grep은 "어디를 볼지"를 좁히는 용도이고 게이트는 스위트다.
    나머지는 헬퍼 2곳(`test_guru_router._stub_job_runs`·`test_job_runs_instrumentation.spy`)이 만든 것이었다.
    **SQL 리터럴을 단언하던 테스트도 함께 깨진다** — 상태를 SQL 텍스트에서 파라미터로 옮기면
    `assert "success" in sql`이 원리적으로 실패하니 단언을 `call_args[0][1]`(params)로 옮긴다.
+
+   **⚠️ 이 함정은 아직 살아 있다 — `yield 1` 스텁이 18파일에 남아 있고 지금은 무해하지만
+   `set_status`를 부르는 잡을 만나는 순간 `AttributeError`로 죽는다.** 정본은
+   **`yield job_runs.Run(1)`**(실제 핸들)이고 현재 7파일이 그 형태다:
+   `test_job_runs_instrumentation.py`(주석이 이유를 적는다) · `test_guru_router.py` ·
+   `test_analysis_router.py` · `test_destructive_update_guards.py` · `test_recommendation_batch.py` ·
+   `test_scheduler_rankings.py` · `test_us_sector_batch.py`(클래스형 `__enter__`).
+   `set_status` **호출을 관측**해야 하면 `_FakeRun`(호출을 리스트에 모으는 대역)을 따로 두고
+   `record`가 그것을 yield하게 한다 — `test_batch_observability.py`·`test_guard_baseline_integrity.py`가
+   그 관용구다. **새 스텁은 `yield 1`을 복사하지 말 것**(§8 배선이 계열마다 늘고 있으므로
+   그 형태는 시한폭탄이다).
 
 ### 4.3 "red 조건"을 call_count로 관측한다 — 빈 결과 가드 계열
 
@@ -230,12 +301,13 @@ with patch("services.storage.schedule.execute") as mock_exec:
 
 ### 4.4 `caplog`·`monkeypatch`·autouse 스텁
 
-- **`caplog`(9파일)** — 경고를 *동작의 일부*로 단언한다:
+- **`caplog`(21파일)** — 경고를 *동작의 일부*로 단언한다:
   `with caplog.at_level(logging.WARNING): ...` 후 `assert any("빈 결과" in r.message for r in caplog.records)`.
   "저장을 생략했다"가 관측 가능해야 한다는 §1.3 규약의 테스트판이다.
-- **`monkeypatch`(54파일)** — 모듈 속성 치환에 쓴다(`monkeypatch.setattr(guru, "scrape_all_managers", ...)`).
+  ⚠️ **로그 단언은 부분문자열이라 특히 거짓 통과에 취약하다 — §4.8을 함께 읽을 것.**
+- **`monkeypatch`(74파일)** — 모듈 속성 치환에 쓴다(`monkeypatch.setattr(guru, "scrape_all_managers", ...)`).
   `patch`는 컨텍스트 범위가 필요할 때, `monkeypatch`는 테스트 전체 범위일 때.
-- **픽스처** — 파일 로컬 `@pytest.fixture` 9개, `@pytest.fixture(autouse=True)` 10개.
+- **픽스처** — `@pytest.fixture(autouse=True)`가 14곳.
   autouse는 주로 그 파일 전용 스텁(외부 클라이언트·시각 고정)을 깐다.
 
 ### 4.5 스케줄러·라우트 열거 테스트
@@ -264,6 +336,91 @@ sentinel 자체의 이빨도 테스트로 못박는다 — `backend/tests/test_r
 그 안전성은 *파일당 주입자가 하나*일 때만 성립한다.** 병렬 리뷰 렌즈 2개가 같은 파일에 동시에
 주입했다가 서로의 편집을 관측해 "일회성 flake"로 오귀속된 사례가 있다 — 주입하는 렌즈는 파일당
 1개로 직렬화하거나 워크트리 격리를 쓴다.
+
+**⚠️ 주입 결과가 `0 fail`일 때 결론이 둘로 갈리고, 처방이 정반대다.**
+
+| 관측 | 뜻 | 처방 |
+|---|---|---|
+| 주입해도 0 fail, 그 축을 지키는 방어가 **여럿** | 어느 하나도 단독 load-bearing이 아니다 | 방어를 **전부** 걷어내고 재주입해 확인 → 가드는 **남긴다** |
+| 주입해도 0 fail, 방어가 **그것 하나** | 그 축을 **아무 테스트도 지키지 않는다**("선언만 재는 테스트") | 대조군·핀을 **신설**한다 |
+
+두 경우는 **같은 관측**에서 나오므로 한 축만 주입해서는 구별할 수 없다 →
+**같은 파일의 인접 축에 같은 주입을 돌려 비교**한다. `0 fail이 나오는 축이 곧 사각`이다.
+실측 2형태: ⓐ 순수 함수 4종 주입에서 3종은 깨졌는데 전문가 축 필터만 0 fail(= 무방비)
+ⓑ 오버레이 신규 6축이 전부 *선언*만 재서 `pointerEvents:'none'` 주입에 6축 모두 초록.
+반대 방향의 실측: `composition.share_pct`의 `allow_inf_nan=False`를 지웠는데 계속 통과한 것은
+방어가 **셋**(`allow_inf_nan` · 5% 그리드 검증자의 `round(nan)` ValueError · `ge/le` 범위)이었기
+때문이고, 셋을 다 걷어내고 `Infinity`를 보내야 비로소 실패했다.
+부수 사실 — **`round(nan)`은 `ValueError`(→422)인데 `round(inf)`는 `OverflowError`라 pydantic이
+잡지 않아 500**이 된다. 그러니 이 경로를 암묵 의존으로 두지 말고 검증자 첫 줄에 `math.isfinite`를
+명시해 두 값을 같은 422로 수렴시킨다.
+
+### 4.7 모든 가드에는 「정상 입력은 계속 값을 낸다」 **대조군 축**을 쌍으로 둔다
+
+이번 드라이브(39결함)에서 가장 많이 반복된 규율이고, 신규 가드 테스트 파일들이 **docstring
+첫 단락에 그것을 명시**한다 — "⚠️ 이 축이 없으면 **「전부 스킵하기」가 통과한다**".
+
+이유는 단순하다. 빈 결과 가드·이상치 가드·커버리지 임계는 전부 **"저장하지 않는다"**를 단언하므로,
+`return` 한 줄을 맨 위에 넣어 **아무 것도 하지 않는 구현**이 그 축을 전부 통과한다.
+대조군이 그 퇴화를 막는 유일한 축이다. 그리고 이것은 이론이 아니다 — 이 저장소는
+**정상값을 결측시키는 가드를 실제로 배포했다**(피어 멀티플 이상치 가드가 peer 3개에서 정상
+peer를 지워 비교 칩이 통째 사라짐, ADR-0030 · `CONVENTIONS.md §1.3.1`).
+
+**축 세트의 표준형(4축):**
+
+| 축 | 예 |
+|---|---|
+| ⓐ 결함 조건 → 저장 생략 + 상태 표시 | `test_recommendation_coverage_threshold.py::test_coverage_below_threshold_skips_replace` |
+| ⓑ **대조군** — 정상 입력 → 정상 저장 + 무지정(success) | 같은 파일 `…_above_threshold_still_replaces` |
+| ⓒ 경계값 — `<`인지 `<=`인지 | 같은 파일 `…_exactly_at_threshold_replaces` |
+| ⓓ 인접 실패 클래스와의 구별 | 같은 파일 `…_zero_scored_reports_skipped_not_partial`(`skipped` ≠ `partial`) |
+
+실물 3계열 — `test_recommendation_coverage_threshold.py`(커버리지 임계) ·
+`test_ticker_universe_shrink_guard.py`(축소 판정: 대조군이 **3개** — 전량 스크레이프·경계 90%·
+*증가는 축소가 아님*) · `test_us_sector_partial_backfill.py`(독립 항목 백필: 전량 성공 시
+**직전값을 아예 읽지 않음**까지 단언). `test_guard_baseline_integrity.py`는 7계열 × 대조군 쌍을
+한 파일에 모아 이 규율의 참조 구현이다.
+
+⚠️ **대조군의 이름에 `_control`을 넣어 두면 나중에 그것이 대조군임을 알 수 있다** —
+현재 `…_control_…` 명명이 그 계열 전반에 퍼져 있다(`test_batch_observability.py`가 특히 촘촘하다).
+
+### 4.8 단언이 *다른 것*을 재게 되는 두 형태 — 동어반복과 느슨한 부분문자열
+
+둘 다 **초록이면서 결함을 원리적으로 못 잡는** 상태를 만든다.
+
+**① 동어반복 — 프로덕션과 같은 식으로 기대값을 재계산한다.**
+`assert captured["bgn_de"] == (datetime.now() - timedelta(days=30)).strftime("%Y%m%d")`는
+구현이 `datetime.now()`(UTC)든 `today_kst()`든 **똑같이 통과**하므로 시간대 결함을 볼 수 없다.
+→ 기준을 **리터럴이나 독립 계산**으로 고정한다. `backend/tests/test_kst_date_boundaries.py`가
+`freeze` 헬퍼로 UTC 전일이 되는 시각을 고정하고 `cap["bgn_de"] == "20260723"`처럼 **문자열
+리터럴**을 단언하며, 파일 첫 줄이 그 대비를 적어 둔다. 형제 파일
+(`test_disclosures.py`·`test_insider_trades.py`)의 docstring도 왜 재계산이 동어반복인지를 설명한다.
+일반화: **기대값이 구현과 같은 함수를 부르면 그 단언은 항등식이다.**
+
+**② 느슨한 부분문자열 × broad except = 거짓 통과.**
+실측: 스텁 시그니처가 실제 함수와 어긋나(`empty_dts` 누락) `TypeError`가 났고, `_fetch_one_sector`의
+**예외 분기**가 대신 돌았다. 그런데 그 `TypeError` 메시지에 `"empty_dts"`가 들어 있어
+`assert "empty closes" in log or …` 계열 단언이 **그대로 통과**했다 — 축이 "빈 종가"가 아니라
+"잘못된 스텁"을 재고 있었고 아무 신호도 없었다
+(`backend/tests/test_kr_sector_momentum.py::test_fetch_one_sector_logs_on_empty_closes` 주석).
+실천: ⓐ **스텁 시그니처를 실제 함수와 맞춘다**(기본값 인자까지)
+ⓑ 로그 단언은 **그 분기만 낼 수 있는 문구**로 좁힌다(예외 분기와 정상 폴백 분기가 같은 토큰을
+공유하면 그 토큰으로 판정하지 않는다)
+ⓒ 가능하면 **분기 식별자를 함께 단언**한다(반환값 형태·`set_status` 인자 등 로그 밖의 축).
+
+### 4.9 동시성 축은 `threading.Barrier`로 **강제 인터리빙**한다
+
+"운 좋게 안 겹쳤다"로 통과하는 축은 이빨이 없다. `query`/`execute`가 호출마다 독립 트랜잭션인
+구조(`CONVENTIONS.md §7`)에서 lost update·이중 시작을 재려면 **겹침을 강제**해야 한다.
+
+- 실물 — `backend/tests/test_concurrency_locks.py`(gate 5개: 락 경합엔 `timeout=5.0`, "겹치지
+  않아야 정상"인 대조 축엔 `timeout=0.5` + `BrokenBarrierError`를 **기대 결과로 처리**) ·
+  `backend/tests/test_progress_per_user.py`(`Barrier(3)`로 두 작업을 동시 in-flight로 붙잡고,
+  `Barrier(8)`로 8스레드 동시 `try_start` 중 **정확히 하나만** 성공함을 단언).
+- **`BrokenBarrierError`를 통과 신호로 쓰는 축**이 이 패턴의 핵심 관용구다 — "여기서는 겹칠 수
+  없다"를 단언할 때 짧은 timeout의 배리어가 깨지는 것이 곧 상호배제의 증거다.
+- 락 대상이 **프로세스 내** 상호배제임을 테스트에 적어 둘 것(워커 1 배선 전제 —
+  `--workers N`이면 DB advisory lock이 필요해진다).
 
 ---
 
@@ -325,18 +482,21 @@ def walk_routes(routes):  # routes·original_router를 재귀 하강해 .path를
 ⚠️ **검출 범위는 엔드포인트 *존재*뿐이다** — 요청/응답 스키마·인증 게이팅 산문 drift는
 원리적으로 못 본다(수동 DoD, `CONVENTIONS.md §10`).
 
-### 5.6 배치 레지스트리 count/set 단언 — **4파일 8지점**
+### 5.6 배치 레지스트리 count/set 단언 — **4파일 9지점**
 
 `batch_registry.BATCHES`의 개수(**현재 33** — KR 16 · US 11 · 공통 6)와 id 집합을 하드코딩한 지점:
 
 | 파일 | 지점 | 단언 |
 |---|---|---|
 | `backend/tests/test_batch_market_split.py` | 3 | `len(batch_registry.BATCHES) == 33` · **`_MARKET_BY_ID`**(id→market 완전 매핑 dict) · **시장별 개수 dict** `{"KR": 16, "US": 11, "공통": 6}` |
-| `backend/tests/test_batches_router.py` | 2 | `len(data) == 33` · **`EXPECTED_IDS`** 집합 |
+| `backend/tests/test_batches_router.py` | 3 | `len(data) == 33` **2곳**(목록 테스트·필터 테스트) · **`EXPECTED_IDS`** 집합 |
 | `backend/tests/test_macro_signals_batch.py` | 1 | `len(batch_registry.BATCHES) == 33` |
 | `backend/tests/test_scheduler_seed.py` | 2 | `test_all_editable_jobs`의 **`set(editable) == {…}`** · `test_seed_only_fills_missing_rows`의 **`expected_seeded` `set(…) ==`** |
 
-배치를 추가·은퇴시키면 **여덟 곳을 함께** 고친다(새 배치의 `market`에 해당하는 개수 값도 +1).
+배치를 추가·은퇴시키면 **아홉 곳을 함께** 고친다(새 배치의 `market`에 해당하는 개수 값도 +1).
+같은 파일 안에 같은 리터럴이 **두 번** 나오는 경우가 있으니(`test_batches_router.py`) 파일 단위로
+"고쳤다"고 판단하지 말고 **그 파일에서 그 리터럴을 전부** 셀 것. 가장 최근 추가는 `fx_fetch`이고
+`test_batch_observability.py`가 그 등록·`_JOB_FUNCS` 배선을 별도로 단언한다.
 
 > ⚠️ **옛 판이 못박은 탐지 grep은 절반을 원리적으로 못 본다.**
 > `grep -rn "BATCHES) ==\|len(data) ==\|EXPECTED_IDS" backend/tests/`는 세 리터럴만 보므로
@@ -354,6 +514,15 @@ def walk_routes(routes):  # routes·original_router를 재귀 하강해 .path를
 | `backend/tests/test_utils_sanitize_decimal.py` | `sanitize`가 NaN `Decimal`도 잡는지 |
 | `backend/tests/test_nan_input_guards.py` · `test_nan_input_behavior.py` · `test_nan_serialization_guards.py` | 입력 `allow_inf_nan` · 422 핸들러 · 출력 직렬화 3층(`CONVENTIONS.md §5.2`) |
 | `backend/tests/test_empty_result_overwrite_guards.py` · `test_empty_result_guards_exports_krsector.py` · `test_rankings_empty_guard.py` · `test_us_supply_empty_guard.py` | 빈 결과 박제 금지 5+곳 |
+| `backend/tests/test_guard_baseline_integrity.py` | **가드가 baseline 조회 실패로 fail-open되는 것** — 7계열(earnings 축소 · econ 소스-폴백 · econ `_mc_delete` · us_sector 백필 · fx 신선도 · 발굴 유니버스 · job_runs 배선) 각각에 대조군 쌍(§4.7) |
+| `backend/tests/test_destructive_update_guards.py` | delete-rewrite·`_mc_load` 붕괴로 직전값이 **소멸**하는 경로(랭킹 replace · kospi_signal 누적 series) + `_mc_load_strict` ↔ `_mc_load` 계약 차이 |
+| `backend/tests/test_batch_observability.py` | 배치가 실패·생략을 **스스로 말하는지**(`Run.set_status`) — auto·manual 두 레인 + `_status` 키가 read 응답에 새지 않음 |
+| `backend/tests/test_concurrency_locks.py` · `test_progress_per_user.py` · `test_user_delete_atomic.py` | lost update · 단일 JSONB 행 치환 · 진행상태 이중 시작 · 다문장 트랜잭션 원자성 (§4.9) |
+| `backend/tests/test_kst_date_boundaries.py` | UTC 전일이 되는 시각을 고정해 KR 시장-날짜 판정을 리터럴로 단언(동어반복 회피, §4.8 ①) |
+| `backend/tests/test_all_menus_single_source.py` · `test_valid_events_matches_frontend.py` | 같은 집합의 4소스·2소스 드리프트 교차 대조 (`CONVENTIONS.md §1.6`) |
+| `backend/tests/test_session_secret_no_fallback.py` · `test_api_key_bearer_or_eval.py` · `test_oauth_github_callback_guards.py` | 임포트타임 시크릿 폴백 · `or_api_key`의 OR 평가(6조합) · OAuth 콜백 크래시 |
+| `backend/tests/test_table_unit_no_default_fallback.py` · `test_unit_caption_compound_and_fallback.py` · `test_rd_unit_bounded_caption.py` | 단위 캡션 파싱: 기본값 폴백 금지 · 복합 단위 exact 매칭 · 역탐색 상한 |
+| `backend/tests/test_ranking_price_none.py` · `test_kiwoom_close_price_none.py` · `test_us_analyst_target_finite.py` · `test_consensus_nan_override_guard.py` · `test_mart_nan_isolation.py` | 파싱 실패 폴백의 필드 성격(`None` vs `0`)과 비유한값 차단 (`CONVENTIONS.md §1.3.2`·§5.2) |
 | `backend/tests/test_db_execute_many.py` | 빈 리스트 no-op 등 배치 SQL 계약 |
 | `backend/tests/test_job_runs_instrumentation.py` · `test_job_runs.py` | `record` 계측이 본문을 안 깨뜨림 · 상태 어휘 |
 | `backend/tests/test_routine_prompt_scope.py` | 프롬프트 섹션 헤더 sentinel + **그 sentinel의 이빨** |
@@ -378,11 +547,11 @@ import { renderHook, act, waitFor } from '@testing-library/react'  // 훅
 
 | 타깃 | 파일 수 | 형태 |
 |---|---|---|
-| `vi.mock('../api')` | 23 | `{ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }` |
-| `vi.mock('../components/Toast')` | 11 | `{ useToast: () => ({ showToast: vi.fn() }) }` |
-| `vi.mock('../hooks/useIsMobile')` | 10 | PC/모바일 분기 고정 |
-| `vi.mock('../contexts/AuthContext')` | 4 | 세션·권한 고정 |
-| `vi.mock('react-router-dom')` | 2 | 네비게이션 관측 |
+| `vi.mock('../api')` | 32 | `{ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }` |
+| `vi.mock('../components/Toast')` | 16 | `{ useToast: () => ({ showToast: vi.fn() }) }` |
+| `vi.mock('../hooks/useIsMobile')` | 12 | PC/모바일 분기 고정 |
+| `vi.mock('../contexts/AuthContext')` | 9 | 세션·권한 고정 |
+| `vi.mock('react-router-dom')` | 3 | 네비게이션 관측 |
 
 `beforeEach`에서 `vi.clearAllMocks()` + 기본 resolve를 깔고, 케이스별로
 `mockResolvedValueOnce`를 체인해 **호출 순서를 표현**한다:
@@ -414,8 +583,8 @@ api.get
 - 부수 함정: 표를 차트로 바꾸면 같은 텍스트가 지표당 1회씩 반복돼 `getByText`가 다중 매치로
   깨진다 → `getAllByText(...).length`.
 
-**testid 관례** — 프로덕션 JSX에 `data-testid` 78개가 박혀 있고, 테스트가
-`getByTestId`(70)·`getAllByTestId`(50)·`queryByTestId`(34)로 쓴다. 명명은 케밥케이스 도메인 접두
+**testid 관례** — 프로덕션 소스에 `data-testid` 124개가 박혀 있고, 테스트가
+`getByTestId`(123)·`getAllByTestId`(98)·`queryByTestId`(61)로 쓴다. 명명은 케밥케이스 도메인 접두
 (`tech-report-*`, `market-estimate-*`, `milestone-*`).
 **라이브 프로브도 같은 testid를 쓴다** — 그래서 testid는 vitest와 Playwright의 공유 계약이고,
 바꾸면 양쪽을 함께 고쳐야 한다(§7.3 ⓟ).
@@ -433,6 +602,25 @@ api.get
 **통과하는 테스트의 주석·docstring이 거짓**이 된다. 전수 확인 대상은 "깨지는 테스트"가 아니라
 **"그 축을 *서술하는* 테스트"**이고, `git grep`으로 축의 **옛 표현**(주석에 박힌 산식 등)을 훑어야 잡힌다.
 스위트(깨지는 것)와 grep(안 깨지면서 거짓이 된 것)을 같이 돌린다.
+
+**세 번째 사각 — 이빨(판별력)과 분기 커버리지(진입)는 다른 축이고, 전자가 후자의 알리바이가
+되지 않는다.** `not.toEqual` 같은 이빨 단언을 갖춘 테스트가 **픽스처에 그 분기의 진입 조건이
+없어 새 코드 경로를 아예 지나가지 않을 수 있다**(실측: 두 픽스처 모두 `category` 필드가 없어
+`groupByCategory`가 `[]`를 반환 → 그룹핑 분기 미진입. 그룹핑이 표·밴드 순서를 갈라놓는 회귀를
+이빨 있는 테스트가 초록으로 통과시키고 라이브 프로브만 잡았다).
+
+→ **새 분기를 만들면 「기존 픽스처가 이 분기를 *타는가*」를 별도 축으로 단언한다. 확인은 싸다 —
+그 분기의 게이트 함수를 픽스처에 직접 적용하면 된다**(`expect(groupByCategory(FIXTURE)).toEqual([])`
+한 줄이 곧 "이 픽스처는 그 경로를 안 탄다"의 증명이고, 그 줄이 없어서 놓쳤다).
+현재 그 관용구를 명시적으로 실천하는 파일 — `components/tech/techAnatomyUtils.test.js`
+(축별 "분기 진입" it 3개 + 파일 헤더에 규율 명시) · `pages/TechAnatomy.test.jsx`("아래 3줄이
+후자의 증명이다") · `components/tech/TechChapterNav.test.jsx`(⑤ 커버리지 블록) ·
+`pages/TechReports.test.jsx`(게이트 식을 직접 적용) · `backend/tests/test_tech_reports_router.py`.
+
+**부수 — jsdom 테스트는 *선언*을 재고 *결과*를 못 잰다.** `frontend/src/test/tech-visual-guards.test.jsx`가
+그 경계를 파일 헤더에 적어 둔다(레이아웃 수치는 §9 소관이고 여기서 재는 것은 그 불변식을
+성립시키는 선언 — `overflowX`·`nowrap` 유무). 선언만 재는 축은 **그 선언을 무력화하는 변경에
+블라인드**하다(§4.6의 `pointerEvents:'none'` 사례) → 무력화 주입으로 이빨을 확인할 것.
 
 ---
 
@@ -472,10 +660,10 @@ await ctx.addInitScript(([a, r]) => {
 
 - **계정** `test@portfolion.com` / `test1234` (비admin — §7.5).
 - **뷰포트 조합**은 배열로 선언하고 전 조합을 순회한다. 실사용 상수:
-  PC `1440×900`(61) / `1440×1000`(21), 모바일 `devices['iPhone 13']`(34) ·
-  `390×844`(19) · **`350×700`(5, 최협 케이스)** · `devices['Pixel 5']`(11).
-  최근 프로브는 `VIEWS = [{ key, theme, pc, opts }]` 형태로 **테마까지 조합**한다.
-- **`serviceWorkers: 'block'`가 기본**(28개 스크립트). 이유는 §7.2.
+  PC `1440×900`(69) / `1440×1000`(41), 모바일 `devices['iPhone 13']`(48) ·
+  `390×844`(39) · **`350×700`(16, 최협 케이스)** · `devices['Pixel 5']`(11).
+  `VIEWS = [{ key, theme, pc, opts }]` 형태로 **테마까지 조합**하는 것이 이제 지배형이다(25개 스크립트).
+- **`serviceWorkers: 'block'`가 기본**(49개 스크립트). 이유는 §7.2.
 - **PWA 설치 배너는 닫힌 상태로 고정**한다 — 앱 전역 프로모라 그 페이지의 레이아웃이 아니다.
   키·형식은 `frontend/src/utils/pwa.js`를 직독해 맞춘다.
 - **판정 헬퍼**는 스크립트마다 자기 것을 정의한다(공유 모듈 없음). 두 세대의 관용구:
@@ -764,8 +952,11 @@ chromium은 CDP로 사유를 물으면 **`BackForwardCacheDisabledForDelegate`**
 |---|:--:|:--:|:--:|:--:|
 | 백엔드 분기·계약·SQL 형태 | ✅ | — | — | — |
 | 규약 스윕(print·today·auth·문서) | ✅ | — | — | — |
+| **동시성 lost update·이중 시작** | ✅ `threading.Barrier` 강제 인터리빙(§4.9) | — | ❌ 재현 불가 | — |
+| **다중 소스 집합 드리프트**(권한 키·이벤트명) | ✅ 교차 대조(§5.7) | 일부 | ❌ 화면은 정상으로 보인다 | — |
 | 프론트 순수 로직·훅 상태기계 | — | ✅ | — | — |
 | 컴포넌트 분기(빈상태·조건부 섹션) | — | ✅ | — | — |
+| **비동기 실패 경로**(조회 실패 ≠ 0건) | — | ✅ 거절 스텁 필수(§6) | 일부 | — |
 | **라이브 스키마·SQL 정합** | ❌ mock이 가린다 | — | ✅ in-container 호출 | — |
 | **외부 소스 파싱(응답 봉투·라벨)** | ❌ fixture가 가린다 | — | ✅ | — |
 | **레이아웃 수치·잘림·접힘·간격** | ❌ | ❌ jsdom 무레이아웃 | ✅ | 보조 |
@@ -857,11 +1048,20 @@ jsdom엔 레이아웃이 없어 "퍼센트가 적용되는 기준 폭"을 원리
 잘린다**(뷰포트 무관 — "좁은 화면 문제"라는 직관이 여기선 틀린다).
 
 **⑨ 겸직 필드 파생 오류** — analytics 이벤트명이 백엔드 화이트리스트에서 조용히 탈락해도
-요청은 성공하고 화면은 정상이다. 이벤트명을 단언하는 테스트가 없다(`CONVENTIONS.md §1.5`).
+`track_event`가 **200 OK로 돌려주고 저장만 생략**하므로 요청·콘솔·서버로그 어디에도 신호가 없다
+(`CONVENTIONS.md §1.5`). **이 축은 이제 덮여 있다** —
+`backend/tests/test_valid_events_matches_frontend.py`가 프론트 발신부와 `VALID_EVENTS`를
+교차 대조하며, 수집기가 `section.perm` 파생 규칙까지 재현하고 **분류되지 않는 호출 형태가
+하나라도 나오면 실패**한다(`CONVENTIONS.md §1.6`). 남은 사각은 *새로운 파생 형태*이고 그것이
+바로 그 이빨이 겨냥하는 것이다.
 
-**⑩ 문서 줄번호 drift** — 코드에 줄을 넣으면 `.forge/codebase/*.md`의 `file.py:NNN` 참조가
-어긋나는데 **아무도 단언하지 않는다**. 시프트가 부위별로 달라 산술 보정도 불가능하다
-(`CONVENTIONS.md §10`).
+**⑩ 문서 줄번호 drift** — 코드에 줄을 넣으면 문서의 줄번호 참조가 어긋나는데 **아무도 단언하지
+않는다**. 시프트가 부위별로 달라 산술 보정도 불가능하다(`CONVENTIONS.md §10`).
+**현재 `.forge/codebase/*.md`는 줄번호 포인터를 0건 쓴다**(`파일::심볼`·`§N` 앵커 전용)이라
+이 클래스가 구조적으로 없어졌지만, **다른 문서·코드 주석에는 계속 생긴다** — 실측: 같은 wave의
+형제 슬라이스가 34줄을 넣어 테스트 docstring에 적힌 줄번호가 그 사이클 안에서 거짓이 됐다.
+감사는 두 패턴(`파일명:NNN`과 bare `:NNN`)을 함께 돌리고 **baseline은 「0」이 아니라 「HEAD와
+같음」**으로 잡는다(`CONVENTIONS.md §10`).
 
 ---
 
@@ -911,3 +1111,35 @@ fault-injection → 원복이나 워크트리 격리를 쓴다(§4.6의 배타�
 **⑥ 프로브는 2회 이상 돌려 총계를 비교한다** — 줄면 통과가 아니라 측정 실패다(§7.3 ⓑ).
 다만 **운 좋은 green을 게이트로 삼지 않는 것**이 요점이므로, 재실행은 탐지책이고
 실제 처방은 "조건부 단언을 쓰지 않는 것"이다.
+
+**⑦ 프로브를 게이트로 *못박을 때*는 `exit 0`이 아니라 3~4항으로 쓴다 — 그리고 쓰는 그 자리에서
+1회 돌려 두 방향을 확인한다.**
+
+`exit 0` 하나로 쓰면 두 방향으로 무의미해진다:
+
+| 착수 시 상태 | 결과 | 이름 |
+|---|---|---|
+| 선재 FAIL이 있다 | **도달 불가한 값**을 완료 조건으로 삼는다(대상을 완벽히 고쳐도 red) | 계획이 "PASS 수 baseline 이상"으로 옳게 썼는데 `exit 0`이라는 *더 단순하지만 더 나쁜 프록시*로 바꾼 실사례가 있다 |
+| 이미 전부 통과한다 | **구동력 0** — 첫 체크에서 "목표 달성"이 되어 구현 0줄로 루프가 닫힌다 | 실측: 착수 시 이미 40 PASS · 0 FAIL · exit 0 |
+
+**착수 시 1회 실행에서 물을 것 두 가지 — ⓐ 지금 FAIL이 몇 건인가 ⓑ 지금 이미 통과하고 있는가.**
+ⓑ가 참이면 그것은 정지조건이 아니라 **회귀 가드**이므로 목표를 구동할 축을 따로 세운다.
+
+**게이트 표현식(현행 실물 — `scripts/check-uat311-ratchet.sh`):**
+
+1. **책임 축 FAIL 0** — 이 변경이 깨뜨릴 수 있는 것
+2. **선재 FAIL ≤ baseline** — 선재 결함이 exit 코드를 영구히 죽이지 않게
+3. **단언 총계 ≥ baseline**(래칫 스크립트는 `49`) — 축이 조용히 사라지는 커버리지 붕괴 차단
+4. **baseline 축 태그 전부 생존** — ③만으로는 축 A가 빠지고 축 B가 둘 늘어도 통과한다.
+   그래서 태그 집합을 `scripts/uat311-baseline-tags.txt`(49행)에 박제하고 `comm -23`으로
+   유실을 센다. **다시 쓰기로 승인된 축은 `grep -vE`로 하한에서 명시 면제**한다(면제 목록이
+   곧 "사람이 승인한 계약 변경" 기록이다).
+
+⚠️ **판정을 `| grep`에 걸면 exit 코드가 삼켜진다** — 래칫 스크립트가 `out=$(…); ec=$?`로 원본
+exit를 먼저 받아 두는 이유다. 그리고 **「FAIL 0」을 신뢰하기 전에 단언 총계가 기대치인지 볼 것**
+(총계가 0이거나 없으면 그것은 통과가 아니라 미실행이다 — §1의 `ERR_MODULE_NOT_FOUND` 함정).
+
+⚠️ **정지조건 프로브는 드라이브 중 수정하지 않는다** — 계약이 틀렸으면 사람에게 올린다.
+자기가 짠 축으로 자기를 판정하는 것을 막은 것은 의지가 아니라 **문서에 적힌 금지**였고,
+그 덕에 축을 조용히 완화하는 대신 **등가로 다시 써서** 실제 UX 결함 2건을 찾았다(§7.3 ⓝ의
+"완화가 아니라 의도 기준 재작성"이 게이트 수준에서 반복된 형태).
