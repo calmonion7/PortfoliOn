@@ -29,6 +29,7 @@ import Masthead from './components/Masthead'
 import MobileNav from './components/MobileNav'
 import MobileTopActions from './components/MobileTopActions'
 import InstallPrompt from './components/InstallPrompt'
+import ErrorBoundary from './components/ErrorBoundary'
 import GlobalSearch from './components/GlobalSearch'
 import { Sun, Moon, LogOut } from './components/ui/icons'
 import { ToastProvider } from './components/Toast'
@@ -94,32 +95,44 @@ function AppShell({ theme, setTheme, setSession }) {
         <main className="page-wrap">
           {/* 라우트 전환 페이드 — transform 없는 .anim-fade만 사용(fixed 자손 컨테이닝 블록 함정, task#195) */}
           <div key={location.pathname} className="anim-fade">
-            <InstallPrompt />
-            <Routes>
-              {REDIRECTS.map(([from, to]) => (
-                <Route key={from} path={from} element={<Navigate to={to} replace />} />
-              ))}
-              <Route path="/reports" element={<ResearchShell><ReportsRoute /></ResearchShell>} />
-              <Route path="/recommend" element={<ResearchShell><Recommendations /></ResearchShell>} />
-              <Route path="/ranking" element={<ResearchShell><Ranking /></ResearchShell>} />
-              <Route path="/compare" element={<ResearchShell><Compare /></ResearchShell>} />
-              <Route path="/calendar" element={<ResearchShell><Calendar /></ResearchShell>} />
-              <Route path="/dividends" element={<ResearchShell><Dividends /></ResearchShell>} />
-              <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
-              <Route path="/analyst-reports" element={<ResearchShell><AnalystReportsRoute /></ResearchShell>} />
-              <Route path="/analyst-report/:ticker/:date" element={<ResearchShell><AnalystReport /></ResearchShell>} />
-              <Route path="/tech-reports" element={<ResearchShell><TechReports /></ResearchShell>} />
-              <Route path="/tech-report/:slug" element={<ResearchShell><TechReport /></ResearchShell>} />
-              <Route path="/tech-anatomy/:slug" element={<ResearchShell><TechAnatomy /></ResearchShell>} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
-              <Route path="/market/flow" element={<MarketHub tab="flow" />} />
-              <Route path="/guru" element={<Guru />} />
-              <Route path="/guru/:id" element={<GuruDetail />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/admin-analytics" element={<AdminAnalytics />} />
-              <Route path="/dev/showcase" element={<Showcase />} />
-            </Routes>
+            {/* B48 — InstallPrompt과 라우트 콘텐츠를 별도 경계로 나눈다. 배너의 렌더 예외가
+                현재 라우트 화면 전체를 가리지 않게(검토 지적 LOW). */}
+            <ErrorBoundary>
+              <InstallPrompt />
+            </ErrorBoundary>
+            {/* B48 — 이 key(location.pathname)는 경로가 바뀔 때만 div를 remount한다. 그런데
+                이 저장소는 같은 경로·다른 location.state로 재네비게이션하는 딥링크 패턴을 쓴다
+                (ReportsRoute, task#131 — GlobalSearch가 이미 /reports인 채로 다른 ticker를
+                navigate한다). pathname이 안 바뀌면 이 div도 안 remount되므로 경계에 별도
+                key={location.key}(내비게이션마다 새로 발급됨)를 줘서, 그 경우에도 이전 화면의
+                에러 상태가 새 화면까지 새지 않게 한다(검토 지적 HIGH — 재현 확인됨). */}
+            <ErrorBoundary key={location.key}>
+              <Routes>
+                {REDIRECTS.map(([from, to]) => (
+                  <Route key={from} path={from} element={<Navigate to={to} replace />} />
+                ))}
+                <Route path="/reports" element={<ResearchShell><ReportsRoute /></ResearchShell>} />
+                <Route path="/recommend" element={<ResearchShell><Recommendations /></ResearchShell>} />
+                <Route path="/ranking" element={<ResearchShell><Ranking /></ResearchShell>} />
+                <Route path="/compare" element={<ResearchShell><Compare /></ResearchShell>} />
+                <Route path="/calendar" element={<ResearchShell><Calendar /></ResearchShell>} />
+                <Route path="/dividends" element={<ResearchShell><Dividends /></ResearchShell>} />
+                <Route path="/digest" element={<ResearchShell><Digest /></ResearchShell>} />
+                <Route path="/analyst-reports" element={<ResearchShell><AnalystReportsRoute /></ResearchShell>} />
+                <Route path="/analyst-report/:ticker/:date" element={<ResearchShell><AnalystReport /></ResearchShell>} />
+                <Route path="/tech-reports" element={<ResearchShell><TechReports /></ResearchShell>} />
+                <Route path="/tech-report/:slug" element={<ResearchShell><TechReport /></ResearchShell>} />
+                <Route path="/tech-anatomy/:slug" element={<ResearchShell><TechAnatomy /></ResearchShell>} />
+                <Route path="/portfolio" element={<Portfolio />} />
+                <Route path="/market/indicators" element={<MarketHub tab="indicators" />} />
+                <Route path="/market/flow" element={<MarketHub tab="flow" />} />
+                <Route path="/guru" element={<Guru />} />
+                <Route path="/guru/:id" element={<GuruDetail />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/admin-analytics" element={<AdminAnalytics />} />
+                <Route path="/dev/showcase" element={<Showcase />} />
+              </Routes>
+            </ErrorBoundary>
           </div>
         </main>
         <MobileNav />

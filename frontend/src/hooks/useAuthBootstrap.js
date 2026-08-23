@@ -44,8 +44,12 @@ export default function useAuthBootstrap() {
     // task#285 S5 — resp(=responseStart)로 서버·리다이렉트 구간과 번들·마운트 구간을 가른다.
     // task#288 S1 — req·di·js를 더해 그 덩어리를 다시 쪼갠다(bootTimings 참조).
     // 엔트리가 없으면(jsdom·구형 브라우저) 키 자체를 넣지 않는다.
+    // B51 — url엔 쿼리 *값*을 싣지 않는다. ?oauth=<code>·?error=<사유>가 원문으로 남으면
+    // 인가코드가 diag_log에 평문 저장된다. 분기 자체는 이 훅이 남기는 `boot` 엔트리의
+    // `branch` 필드가 이미 말하므로 값 없이도 진단력 손실이 없다(error=oauth_denied 등도 동일).
     logDiag('doc', {
-      url: window.location.pathname + window.location.search,
+      url: window.location.pathname,
+      q: Array.from(new URLSearchParams(window.location.search).keys()).join(','),
       hasToken: !!localStorage.getItem('access_token'),
       ...bootTimings(),
     })

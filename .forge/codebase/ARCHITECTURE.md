@@ -577,6 +577,11 @@ App.jsx
 `frontend/src/themeBoot.js:THEME_BOOT_JS` ↔ `index.html`의 `theme-boot:start~end`,
 `frontend/src/oauthSplash.js:SPLASH_HTML` ↔ `index.html`의 `oauth-splash:start~end`.
 
+**에러 바운더리 2중 배선(task#335, B48 해소)**: `main.jsx`가 `<App/>` 전체(AppShell·프로바이더·
+`useAuthBootstrap`까지)를 `ErrorBoundary`로 감싸는 최외곽 안전망이고, `App.jsx`는 그 안에서
+`<InstallPrompt/>`와 `<Routes>`를 각각 별도 경계로 다시 감싼다(라우트 throw가 nav를 지우지 않게).
+Routes 쪽 경계는 `location.key`로 keyed라 같은 pathname·다른 state 재진입에도 리셋된다.
+
 ### 6.2 인증 부트스트랩 (`hooks/useAuthBootstrap.js`)
 
 URL 쿼리 3분기 — `error=` / `oauth=`(코드 교환 fetch) / 없음(stored).
@@ -588,7 +593,9 @@ URL 쿼리 3분기 — `error=` / `oauth=`(코드 교환 fetch) / 없음(stored)
 
 `bootTimings()`가 Navigation Timing에서 `0→req→resp→di→js` 구간을 뽑아 `logDiag('doc', …)`로
 남긴다(`utils/diag.js` — localStorage 링버퍼 50건). `?diag=1`로 `components/DiagLog.jsx`가 읽는다.
-계측은 전부 try로 감싸 앱을 죽이지 않는다.
+계측은 전부 try로 감싸 앱을 죽이지 않는다. **payload는 `url: pathname`(쿼리 없음) + `q: <쿼리
+키만 join>`** — 값은 절대 싣지 않는다(task#335, B51 해소: OAuth 인가코드가 원문으로 영구
+기록되던 경로를 닫음. 쿼리 키 유무 판별은 값 없이도 유지된다).
 
 ### 6.3 라우팅과 IA 단일 소스
 

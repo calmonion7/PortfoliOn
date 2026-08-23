@@ -136,6 +136,8 @@ mapped: 2026-08-22
 >
 > ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B9`·`B20`·`B21`·`B48`·`B51`·`B63` + `B6`(부분) + `B80`은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다(전건 잔존 확인 — 잔존 12행). 특히 `B48`(에러 바운더리 부재)·`B63`(포매터 중복)은 이 파트가 프론트 표시 9건을 훑고 `frontend/src/utils.js`의 포매터를 직접 만졌으므로 「같이 정리됐겠지」로 읽히기 쉬운데, **둘 다 task#333의 비목표로 명시**돼 손대지 않았다(`B34` 한 함수만 고쳤다). `B51`(`?diag=1` 인가코드 기록)도 이 파트가 같은 파일 `components/DiagLog.jsx`를 만졌으므로 같은 오독 위험이 있는데, 고친 것은 복사 폴백뿐이고 진단 로그의 인가코드 기록 경로는 그대로다.
 
+> **해소: 2026-08-23 (task#335) — B48·B51 닫힘.** task#333 스텁의 재그릴링 산출물 1/3(**프론트 복구·진단 표면**). **B48**은 `frontend/src/components/ErrorBoundary.jsx` 신설 + 2중 배선으로 닫혔다 — `main.jsx`가 `<App/>` 전체(AppShell·프로바이더·`useAuthBootstrap`)를 감싸고, `App.jsx`는 기존 `<div key={location.pathname}>` **안쪽**에서 `<InstallPrompt/>`와 `<Routes>`를 각각 별도 경계로 감싼다(적대 검토가 `location.pathname` 단독 키의 사각 — 같은 pathname·다른 `location.state`인 딥링크 재진입에서 폴백이 안 리셋되는 것 — 을 잡아 Routes 경계만 `location.key`로 승격). **B51**은 `useAuthBootstrap.js`의 `logDiag('doc', …)` payload를 `url: pathname+search` → `url: pathname` + `q: <쿼리 키만>`으로 교체해 OAuth 인가코드 등 쿼리 *값*을 완전히 제거했다(쿼리 키 유무 판별은 유지). 회귀축은 `frontend/src/components/ErrorBoundary.test.jsx`·`frontend/src/test/error-boundary-route-reset.test.jsx`(B48, red-first로 `key` 제거 시 FAIL 확인)·`frontend/src/test/auth-bootstrap.test.jsx`의 B51 케이스(red-first로 마스킹 전 `SECRETCODE` 노출 확인). **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
@@ -156,13 +158,11 @@ mapped: 2026-08-22
 | B80 | 경로 조각이 SQL `date` 캐스트로 직행해 **500**이 된다 — `GET /api/report/{ticker}/{date_str}`가 `date_str`을 검증하지 않아 `InvalidDatetimeFormat`이 미포착 예외로 올라간다. 400/404여야 하는 입력이 500이므로 ⓐ 외부 소비자가 「서버 장애」로 오독하고 ⓑ 오타 경로가 에러 로그를 오염시킨다. **선재 결함이며 task#330 라이브 스모크에서 발견**됐다 — task#326이 넣은 전역 예외 핸들러가 `[UnhandledError]` 마커로 로그를 남기기 시작해 **비로소 관측 가능해졌다**(그 전엔 로그 없는 raw 500) | `routers/report.py::get_report`(catch-all `/{ticker}/{date_str}`) | 무인증 불가(인증 필요) · 임의 경로 조각 1개 |
 | B81 | `title` 필드에 **두 모집단이 섞여 있고 스키마에 상한이 없다** — 라이브 15종 실측이 「13~24자 이름」(7종: 「태양광 — 셀·모듈 기술」)과 「93~207자 리드 문장」(8종, 전부 2026-08-21 발행: 「중국 링룽 1호의 '2026년 상반기 상업운전' 시한은…」)으로 갈린다. `TechReportIn.title`에 `max_length`·`min_length`가 없어(빈 문자열도 201) **목록 카드 높이의 상한이 발행자 규율에만 의존**하는데 그 규율이 이미 깨졌다. 결과: m390 목록 페이지 높이 **14997px**, PC 카드 높이 275~455px. ⚠️ **B54의 잘림 제거는 옳다**(상세 페이지가 같은 필드에 「ellipsis·line-clamp 금지」를 명시하고 그 근거가 「한국어는 술어가 끝에 와 잘림이 결론부터 먹는다」다) — 잘림을 되살리는 것이 처방이 **아니고**, ⓐ 스키마 상한 ⓑ 발행 루틴이 `title`에 이름을 넣도록 정정 ⓒ 카드에 별도 요약 필드 사용 중 하나다. **task#331 육안 확인에서 발견**(프로브는 「잘리지 않음」을 재므로 통과했다 — 육안이 유일한 포착 수단이었던 7번째 사례) | `routers/tech_reports.py::TechReportIn.title` · `pages/TechReports.jsx` 카드 · 발행 루틴 `scripts/cowork-routine-prompt.md` | 발행자가 `title`에 리드 문장을 넣으면(현재 8/15) |
 | B21 | Postgres가 tracked 폴백 비밀번호로 호스트 5432에 발행 | `docker-compose.yml` (`POSTGRES_PASSWORD`) | 호스트 접근 가능한 누구나 |
-| **B51** | `?diag=1`이 인증 분기보다 **앞서 렌더**되고, 진단 로그가 OAuth 인가코드를 **소비 전 원문으로** `localStorage['diag_log']`에 영구 기록한다 — `logDiag('doc', {url: pathname+search})`가 이펙트 최상단이라 `replaceState` 스트립·코드교환 `fetch`보다 먼저 캡처한다. ⚠️ 같은 파일에서 같은 형태(URL 크리덴셜→localStorage)를 **이미 세션 고정 취약점으로 판정해 제거한 전례**가 있다(B44/task#290, `ARCHITECTURE.md`) — 반복 맹점 | `App.jsx::App`(diag 분기) · `hooks/useAuthBootstrap.js`(최상단 `logDiag`) · `utils/diag.js::logDiag` · `components/DiagLog.jsx` | 코드 미소비(네트워크 실패) ∧ 같은 브라우저 접근 제3자 ∧ TTL 120초 내 |
 
 ### 표시 오류 / 크래시
 
 | # | 결함 | 위치 (심볼) |
 |---|---|---|
-| **B48** | **에러 바운더리가 트리 어디에도 없다** — 렌더 throw 1건이 전체 백지 | `frontend/src/` 전역 (grep 결과 0건) |
 | **B49** | **부분(주 인스턴스 닫힘, task#331)** — `pages/Reports.jsx` 상세 fetch에 취소 플래그 + `.catch`를 넣었고(실패는 실패 배너로 표시해 옛 티커 수치를 유지하지 않는다), 형제 4곳도 함께 닫았다: `AnalystReport.jsx` 발행물·이력 이펙트(`ReportDetailTabs`가 `key` 없이 렌더해 **같은 마운트 내** 레이스였다) · `HistoryTab` 3이펙트(`.finally`까지 게이트) · `ConsensusChart::fetchData`(세대 가드 + 티커 전환 시 `null` 리셋) · `DetailTab::BacklogSection`. ⚠️ 세대 가드는 「늦은 착지」만 막고 「보존」은 막지 않는다 — 옛 데이터가 *이미* 착지한 뒤 prop만 갈리면 경합 없이 결정적으로 옛 데이터가 새 화면을 소유하므로, 식별자 변경 시 **상태를 `null`(미조회)로 되돌리는** 것이 쌍으로 필요하다(`[]`로 되돌리면 「0건」이라는 거짓 진술이 된다). **남은 미가드는 §7.3 표** — `Ranking::onRowClick` · `Calendar` 월 이펙트 · `Recommendations::handleChip` · `StockSearchBox` · `usePortfolioData` · `useReportList` 6곳 | `frontend/src/pages/Reports.jsx` 상세 fetch 이펙트(닫힘) · §7.3 표의 6곳(열림) |
 | B63 | 프론트 포매터 중복 — 재계수 완료(§13.2에서 열림 확정, task#292) | `frontend/src/utils.js` 및 산발 포매터 (§7.7·§7.9) |
 

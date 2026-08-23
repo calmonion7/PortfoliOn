@@ -285,3 +285,19 @@ describe('useAuthBootstrap — 에러·실패 착지는 저장 토큰으로 세�
     })
   })
 })
+
+// ── B51 — logDiag('doc')가 OAuth 인가코드를 원문 기록하지 않는다 ──
+// useAuthBootstrap.js:47-48이 url: pathname+search를 그대로 실어, ?oauth=<code>로 진입하면
+// 그 인가코드가 localStorage['diag_log']에 평문으로 영구 남는다(diag.js는 링버퍼일 뿐 암호화가
+// 없다). 코드는 1회용(TTL 120초)이라 유출 자체보다 "크리덴셜급 값을 진단 로그에 싣는 습관"이
+// 문제 — 수정은 쿼리 *값*을 지우고 *키 이름*만 남긴다.
+describe('useAuthBootstrap — doc 로그가 OAuth 인가코드를 원문 기록하지 않는다 (B51)', () => {
+  it('B51 ?oauth=<code>로 진입해도 diag 로그 직렬화에 그 코드가 없다', async () => {
+    atUrl('?oauth=SECRETCODE123')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400 }))
+    const { result } = renderHook(() => useAuthBootstrap())
+    await settled(result)
+    const serialized = JSON.stringify(readDiag())
+    expect(serialized).not.toContain('SECRETCODE123')
+  })
+})
