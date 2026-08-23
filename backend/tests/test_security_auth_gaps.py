@@ -163,17 +163,31 @@ def test_report_detail_rejects_bad_api_key_232():
 
 
 def test_consume_refresh_token_is_one_time():
-    """refresh token은 사용 즉시 폐기(회전)되어 재사용 시 거부된다."""
+    """refresh token은 사용 즉시 폐기(회전)되어 재사용 시 거부된다.
+
+    구현이 SELECT+별도 execute(DELETE) 2문(TOCTOU)에서 `DELETE ... RETURNING` 단일
+    원자문(query 경로)으로 바뀌었다 — 동시 로그아웃/중복 refresh가 그 틈에서 같은 토큰을
+    지워도 SELECT 스냅샷만 보고 성공을 반환하던 결함을 닫기 위한 뒤집기(검토 지적 HIGH,
+    이 태스크의 plan.md·retro는 "회전 시 옛 토큰 row 삭제"만 결정했지 SELECT/DELETE를
+    별도 문으로 두라는 결정은 없었다). `execute` 미호출이 새 계약이다.
+    """
     from services import auth_service
     future = datetime.now(timezone.utc) + timedelta(days=1)
-    state = {"n": 0}
+    state = {"n": 0, "sql": []}
 
     def fake_query(sql, params):
         state["n"] += 1
+        state["sql"].append(sql)
         return [{"user_id": "u1", "expires_at": future}] if state["n"] == 1 else []
 
     with patch.object(auth_service, "query", side_effect=fake_query), \
          patch.object(auth_service, "execute") as mock_exec:
         assert auth_service.consume_refresh_token("tok") == "u1"
-        mock_exec.assert_called_once()  # DELETE = 1회용 폐기
+        mock_exec.assert_not_called()  # 폐기가 DELETE ... RETURNING 단일문 — execute 경로 없음
         assert auth_service.consume_refresh_token("tok") is None  # 재사용 거부
+    # ⚠️ 이빨 — 위 세 단언만으로는 「1회용」이 검증되지 않는다. fake_query가 호출 횟수만 보고
+    # 2번째에 []를 주므로, 구현이 삭제를 전혀 하지 않는 평범한 SELECT로 되돌아가도 전부 통과한다
+    # (`assert_called_once()`를 뒤집으면서 「DELETE가 발행됨」의 유일한 증거가 사라졌다).
+    # 그래서 폐기가 *그 문장 안에서* 일어남을 SQL로 못박는다 — 이것이 원자성의 계약이다.
+    assert "DELETE" in state["sql"][0].upper(), state["sql"][0]
+    assert "RETURNING" in state["sql"][0].upper(), state["sql"][0]

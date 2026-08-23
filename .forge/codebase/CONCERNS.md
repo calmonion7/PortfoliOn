@@ -138,6 +138,8 @@ mapped: 2026-08-22
 
 > **해소: 2026-08-23 (task#335) — B48·B51 닫힘.** task#333 스텁의 재그릴링 산출물 1/3(**프론트 복구·진단 표면**). **B48**은 `frontend/src/components/ErrorBoundary.jsx` 신설 + 2중 배선으로 닫혔다 — `main.jsx`가 `<App/>` 전체(AppShell·프로바이더·`useAuthBootstrap`)를 감싸고, `App.jsx`는 기존 `<div key={location.pathname}>` **안쪽**에서 `<InstallPrompt/>`와 `<Routes>`를 각각 별도 경계로 감싼다(적대 검토가 `location.pathname` 단독 키의 사각 — 같은 pathname·다른 `location.state`인 딥링크 재진입에서 폴백이 안 리셋되는 것 — 을 잡아 Routes 경계만 `location.key`로 승격). **B51**은 `useAuthBootstrap.js`의 `logDiag('doc', …)` payload를 `url: pathname+search` → `url: pathname` + `q: <쿼리 키만>`으로 교체해 OAuth 인가코드 등 쿼리 *값*을 완전히 제거했다(쿼리 키 유무 판별은 유지). 회귀축은 `frontend/src/components/ErrorBoundary.test.jsx`·`frontend/src/test/error-boundary-route-reset.test.jsx`(B48, red-first로 `key` 제거 시 FAIL 확인)·`frontend/src/test/auth-bootstrap.test.jsx`의 B51 케이스(red-first로 마스킹 전 `SECRETCODE` 노출 확인). **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
 
+> **해소: 2026-08-23 (task#336) — B9 닫힘.** task#333 스텁의 재그릴링 산출물 2/3. `frontend/src/api.js`에 401 반사적 단일비행 갱신을 넣었다 — 모듈 레벨 `refreshInFlight` promise 1개(동시 401 N건이 `/api/auth/refresh`를 정확히 1회만 호출), raw `fetch`(인터셉터 재귀 방지), `_retried` 가드로 1회 한정 재시도, 성공 시 응답의 새 `access_token`·`refresh_token` **둘 다 저장(회전 반영)**, 실패 시 기존 `logoutRedirect()`(토큰 삭제+전체 리로드) 불변. 적대 검토가 백엔드 `consume_refresh_token`의 SELECT/DELETE TOCTOU(로그아웃과 회전이 경합하면 로그아웃이 무효화됨)를 잡아 `DELETE...RETURNING` 단일 원자문으로 교체했고, 프론트에도 「진행 중이던 회전이 로그아웃의 삭제를 되살리는」 대칭 레이스를 막는 `stillCurrent` 가드를 짝으로 넣었다. 회귀축은 `frontend/src/test/api-token-refresh.test.js`(6건, red-first: 원본은 무조건 로그아웃이라 갱신 메커니즘 자체가 없어 4종 FAIL·2종은 우연한 통과였음을 fault-injection으로 확인). **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
@@ -148,7 +150,6 @@ mapped: 2026-08-22
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
 | B6 | 키 미설정 배치가 "성공"으로 기록 · **부분(도달조건 축소, 재판정 task#329)**: 원 서술이 지목한 3위치 중 **2곳이 닫혔다** — `econ.py::_fetch_and_save_econ_indicators`는 계열별 소스-폴백 + `_status`(partial/skipped)를 반환하고, `scheduler/jobs.py::_refresh_monthly_us`는 `as run`으로 그것을 받아 `set_status`한다(수동 2레인 `refresh-econ`·`refresh-monthly?market=US`도 함께). **남은 도달 경로는 `macro.py` 하나뿐이다** — `_fetch_and_save_macro_signals`가 키 미설정 시 예외 없이 `{"error": …}`를 반환하는데 `_status`가 없고, 두 레인(`scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals`) **모두 `as run` 미배선**이라 반환값을 아무도 검사하지 않는다. 형제 `econ.py`가 참조 구현이다(§6.1) | `market_indicators/macro.py::_fetch_and_save_macro_signals` → `scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals` | `FRED_API_KEY` 미설정 |
-| B9 | 프론트에 access token 갱신 경로가 없다 — 백엔드 `/api/auth/refresh`는 **존재하는데** 아무도 안 부른다 | `frontend/src/api.js` 응답 인터셉터 | 1시간 경과(항상) |
 
 ### 계약·보안
 

@@ -171,6 +171,13 @@ nav를 필터한다. **서버 게이팅이 아니라 표시 제어**다.
 `_match_route`로 잡아 `user_events`에 기록한다. Authorization 헤더에서 user_id를 직접 디코드하므로
 의존성 그래프 밖이다.
 
+**access token 갱신**(task#336, B9 닫힘): `frontend/src/api.js`가 401을 **반사적**으로(사전 갱신 아님)
+단일비행 갱신한다 — 동시 401 N건에 `/api/auth/refresh` 호출은 정확히 1회, 1회 한정 재시도.
+`POST /api/auth/refresh`(`routers/auth.py::refresh` → `auth_service.consume_refresh_token`이
+`DELETE...RETURNING` 원자문으로 검증+폐기)는 **회전**한다 — 응답의 새 `access_token`·`refresh_token`
+둘 다 저장해야 하며, 옛 refresh_token은 그 호출로 즉시 폐기된다(1회용, task#108). 갱신 실패 시 기존
+경로(토큰 삭제 + 전체 리로드)로 폴백 — in-place 상태 뒤집기로 바꾸지 않는다(task#283 함정 회피).
+
 ### 2.5 서비스 레이어의 4가지 성격
 
 `backend/services/`는 한 덩어리로 보이지만 실제로는 네 부류다.

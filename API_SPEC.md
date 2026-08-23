@@ -98,7 +98,11 @@
 
 ### `POST /api/auth/refresh`
 
-Access token 갱신.
+Access token 갱신. **회전(rotation)**: 요청에 쓴 `refresh_token`은 이 호출로 즉시 폐기되는 1회용
+토큰이다(task#108) — 응답의 `refresh_token`은 **새로 발급된 값**이므로 클라이언트는 저장된
+refresh_token을 반드시 이 값으로 덮어써야 한다. 옛 값을 계속 쓰면 다음 갱신 요청이 401을 받는다.
+프론트는 `frontend/src/api.js`에서 401 응답을 받을 때 이 엔드포인트를 반사적으로(사전 갱신 없이)
+단일비행 호출한다(task#336).
 
 **Request Body**
 ```json
@@ -113,7 +117,7 @@ Access token 갱신.
 }
 ```
 
-**Error `401`** — 유효하지 않거나 만료된 refresh token
+**Error `401`** — 유효하지 않거나 만료된 refresh token(이미 사용된 토큰도 여기 포함된다 — 폐기됐으므로)
 
 ---
 

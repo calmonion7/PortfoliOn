@@ -42,7 +42,13 @@ def get_connection():
 
 
 def query(sql: str, params=None) -> list[dict]:
-    """단일 SELECT — 결과를 dict 리스트로 반환."""
+    """단일 SELECT — 결과를 dict 리스트로 반환.
+
+    ⚠️ 행을 돌려주는 **변형문도 이 경로를 탄다** — `auth_service.consume_refresh_token`의
+    `DELETE ... RETURNING`(검증과 폐기의 원자성이 그 한 문장에 걸려 있다, task#336).
+    `get_connection`이 정상 종료 시 커밋하므로 그 삭제는 영속된다. 이 함수를 읽기전용
+    커넥션·리드 리플리카로 돌리면 **refresh token 1회용 회전이 조용히 깨진다.**
+    """
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(sql, params)

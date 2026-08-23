@@ -113,9 +113,16 @@ def verify_access_token(token: str) -> str:
 
 
 def consume_refresh_token(token: str) -> str | None:
-    """유효한 refresh token이면 user_id 반환 (만료 토큰은 None)."""
+    """유효한 refresh token이면 user_id 반환하고 그 자리에서 폐기한다 (없거나 만료면 None).
+
+    회전: refresh token은 1회용 — 사용 즉시 폐기해 탈취 토큰 재사용 차단 (task#108).
+    SELECT 후 별도 DELETE(TOCTOU)면 동시 로그아웃/중복 refresh가 그 틈에 같은 행을 지워도
+    이 함수는 SELECT 스냅샷만 보고 성공을 반환해 버린다 — 폐기된 세션이 새 토큰을 받는다
+    (검토 지적 HIGH: 로그아웃과 refresh가 경합하면 로그아웃이 무효화될 수 있었음). 검증과
+    폐기를 `DELETE ... RETURNING` 단일 원자문으로 묶어 그 틈을 없앤다.
+    """
     rows = query(
-        "SELECT user_id, expires_at FROM refresh_tokens WHERE token = %s",
+        "DELETE FROM refresh_tokens WHERE token = %s RETURNING user_id, expires_at",
         (token,),
     )
     if not rows:
@@ -125,8 +132,6 @@ def consume_refresh_token(token: str) -> str | None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at < datetime.now(timezone.utc):
         return None
-    # 회전: refresh token은 1회용 — 사용 즉시 폐기해 탈취 토큰 재사용 차단 (task#108)
-    execute("DELETE FROM refresh_tokens WHERE token = %s", (token,))
     return str(rows[0]["user_id"])
 
 
