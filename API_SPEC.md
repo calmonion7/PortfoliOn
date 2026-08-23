@@ -70,6 +70,8 @@
 
 **Error `400`** — 이미 존재하는 이메일
 
+**Error `429`** — 같은 IP(`CF-Connecting-IP`, 없으면 접속 IP)에서 1시간에 3회 초과 시. `Retry-After`(초) 헤더 포함. 근거: ADR `260823-085145-auth-rate-limit-in-process-cf-ip`.
+
 ---
 
 ### `POST /api/auth/login`
@@ -93,6 +95,8 @@
 ```
 
 **Error `401`** — 잘못된 이메일/비밀번호
+
+**Error `429`** — 같은 IP(`CF-Connecting-IP`, 없으면 접속 IP)에서 5분에 10회 초과 시. `Retry-After`(초) 헤더 포함. 근거: ADR `260823-085145-auth-rate-limit-in-process-cf-ip`.
 
 ---
 

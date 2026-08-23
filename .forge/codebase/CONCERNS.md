@@ -140,6 +140,10 @@ mapped: 2026-08-22
 
 > **해소: 2026-08-23 (task#336) — B9 닫힘.** task#333 스텁의 재그릴링 산출물 2/3. `frontend/src/api.js`에 401 반사적 단일비행 갱신을 넣었다 — 모듈 레벨 `refreshInFlight` promise 1개(동시 401 N건이 `/api/auth/refresh`를 정확히 1회만 호출), raw `fetch`(인터셉터 재귀 방지), `_retried` 가드로 1회 한정 재시도, 성공 시 응답의 새 `access_token`·`refresh_token` **둘 다 저장(회전 반영)**, 실패 시 기존 `logoutRedirect()`(토큰 삭제+전체 리로드) 불변. 적대 검토가 백엔드 `consume_refresh_token`의 SELECT/DELETE TOCTOU(로그아웃과 회전이 경합하면 로그아웃이 무효화됨)를 잡아 `DELETE...RETURNING` 단일 원자문으로 교체했고, 프론트에도 「진행 중이던 회전이 로그아웃의 삭제를 되살리는」 대칭 레이스를 막는 `stillCurrent` 가드를 짝으로 넣었다. 회귀축은 `frontend/src/test/api-token-refresh.test.js`(6건, red-first: 원본은 무조건 로그아웃이라 갱신 메커니즘 자체가 없어 4종 FAIL·2종은 우연한 통과였음을 fault-injection으로 확인). **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
 
+> **해소: 2026-08-23 (task#337) — B20 닫힘.** `routers/auth.py::login`/`::register` 본문 첫 줄에 IP 슬라이딩 윈도우 레이트리밋을 배선했다(`services/rate_limit.py` 신설) — login 10회/5분·register 3회/1시간, 키는 `CF-Connecting-IP`만 신뢰(`X-Forwarded-For`는 배제, 헤더 부재 시 `request.client.host`로 페일클로즈). bcrypt(의도적으로 비싼 CPU 연산) 직전에 판정해 초과 시 429+`Retry-After`. 근거: `.forge/adr/260823-085145-auth-rate-limit-in-process-cf-ip.md`(단일 프로세스 인메모리 카운터 — uvicorn `--workers` 미지정 가정에 의존). **적대적 검토가 배포 전 결함 2건을 추가로 잡았다** — ⓐ `check()`의 판정-후-기록이 `_lock` 없이는 경합 창(과다허용·`popleft` IndexError·기록 소실)을 만든다는 것을 스레드 barrier로 강제 재현해 `threading.Lock`으로 전체를 원자화했다 ⓑ ADR이 전제한 「공개 경로는 Cloudflare Tunnel뿐」이 `docker-compose.yml`/`deploy.sh`의 nginx 포트 게시(`0.0.0.0:80`)로는 **강제되지 않아** LAN 직접 접속이 우회로다 → **이것은 닫지 않았고 `B82`로 신규 등록했다**(아래 표). 수복 단계가 게시를 `127.0.0.1`로 좁히는 변경을 만들었으나 **오케스트레이터가 되돌렸다**: 그것은 사용자 머신의 네트워크 노출을 바꾸는 결정이고(LAN에서 직접 접속하는 습관이 있으면 조용히 깨진다) ADR이 계층 선택을 다루면서 인프라는 건드리지 않기로 한 문서라, 무인 드라이브가 단독으로 넘을 문턱이 아니다. 레이트리밋 자체는 **실사용 경로(Cloudflare 경유) 전부를 보호**하므로 부재보다 확실히 낫다. `API_SPEC.md`의 `login`/`register` 두 절에 `429`(+`Retry-After`) 응답을 문서화했다. **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
+>
+> ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B6`(부분)·`B21`·`B49`(부분)·`B63`·`B80`·`B81`은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다. 특히 `B63`(프론트 포매터 중복)은 **task#337에서 명시적 비목표로 확인** — 이 파트가 `routers/auth.py`를 만졌으므로 「인증 정리하며 포매터도 같이 됐겠지」로 오독하기 쉬운데 손대지 않았다. 근거는 task#271/ADR-0031(정본 5종을 세우고 남은 둘은 「소비처가 2곳 이상으로 늘면 재검토」로 의도적 로컬 유지) — 합치면 **기록된 결정을 조용히 되돌린다.**
+
 ### 데이터 손실·오염
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
@@ -155,10 +159,10 @@ mapped: 2026-08-22
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| B20 | 레이트리밋 전무 — bcrypt 로그인이 곧 CPU 고갈 DoS | `routers/auth.py::login` | 무인증·무계정 |
 | B80 | 경로 조각이 SQL `date` 캐스트로 직행해 **500**이 된다 — `GET /api/report/{ticker}/{date_str}`가 `date_str`을 검증하지 않아 `InvalidDatetimeFormat`이 미포착 예외로 올라간다. 400/404여야 하는 입력이 500이므로 ⓐ 외부 소비자가 「서버 장애」로 오독하고 ⓑ 오타 경로가 에러 로그를 오염시킨다. **선재 결함이며 task#330 라이브 스모크에서 발견**됐다 — task#326이 넣은 전역 예외 핸들러가 `[UnhandledError]` 마커로 로그를 남기기 시작해 **비로소 관측 가능해졌다**(그 전엔 로그 없는 raw 500) | `routers/report.py::get_report`(catch-all `/{ticker}/{date_str}`) | 무인증 불가(인증 필요) · 임의 경로 조각 1개 |
 | B81 | `title` 필드에 **두 모집단이 섞여 있고 스키마에 상한이 없다** — 라이브 15종 실측이 「13~24자 이름」(7종: 「태양광 — 셀·모듈 기술」)과 「93~207자 리드 문장」(8종, 전부 2026-08-21 발행: 「중국 링룽 1호의 '2026년 상반기 상업운전' 시한은…」)으로 갈린다. `TechReportIn.title`에 `max_length`·`min_length`가 없어(빈 문자열도 201) **목록 카드 높이의 상한이 발행자 규율에만 의존**하는데 그 규율이 이미 깨졌다. 결과: m390 목록 페이지 높이 **14997px**, PC 카드 높이 275~455px. ⚠️ **B54의 잘림 제거는 옳다**(상세 페이지가 같은 필드에 「ellipsis·line-clamp 금지」를 명시하고 그 근거가 「한국어는 술어가 끝에 와 잘림이 결론부터 먹는다」다) — 잘림을 되살리는 것이 처방이 **아니고**, ⓐ 스키마 상한 ⓑ 발행 루틴이 `title`에 이름을 넣도록 정정 ⓒ 카드에 별도 요약 필드 사용 중 하나다. **task#331 육안 확인에서 발견**(프로브는 「잘리지 않음」을 재므로 통과했다 — 육안이 유일한 포착 수단이었던 7번째 사례) | `routers/tech_reports.py::TechReportIn.title` · `pages/TechReports.jsx` 카드 · 발행 루틴 `scripts/cowork-routine-prompt.md` | 발행자가 `title`에 리드 문장을 넣으면(현재 8/15) |
 | B21 | Postgres가 tracked 폴백 비밀번호로 호스트 5432에 발행 | `docker-compose.yml` (`POSTGRES_PASSWORD`) | 호스트 접근 가능한 누구나 |
+| B82 | **레이트리밋(B20)의 신뢰 전제가 배포 구성으로 강제되지 않는다 — `CF-Connecting-IP`를 위조해 우회할 수 있다.** nginx가 호스트 포트를 `0.0.0.0:80`에 게시하고(`docker-compose.yml`·`deploy.sh`) `/api/` 블록이 `CF-Connecting-IP`를 **한 번도 참조·제거하지 않으므로**, 터널을 우회해 nginx에 직접 닿는 클라이언트가 그 헤더를 요청마다 바꿔 두 임계를 완전히 무력화한다(매 값이 새 버킷 → 항상 허용 → bcrypt 전액 지불). **역방향이 더 나쁘다** — 피해자의 실제 IP를 그 헤더에 넣어 버킷을 소진시키면, 그 사용자의 진짜 Cloudflare 트래픽이 창이 끝날 때까지 429를 받는다(B20 도입이 *새로 만든* 표적 로그인 차단 벡터. 도입 전에는 아무도 남을 잠글 수 없었다). ⚠️ **ADR `260823-085145`의 「공개 경로는 Cloudflare 전용」이 그 전제이고, 그것이 거짓임이 확인됐다** — 기록된 트레이드오프가 아니라 전제 오류다. 후보 처방 3가지: ⓐ 게시를 `127.0.0.1`로 좁힌다(가장 단순. cloudflared가 `http://localhost:80`만 쓰고 nginx 443 블록은 주석 처리돼 비활성이며 ACME는 터널을 경유하므로 기술적으로 안전하나, **LAN 직접 접속 습관을 깬다** — 사용자 결정 필요) ⓑ nginx `/api/` 블록에서 `CF-Connecting-IP`를 신뢰 출처가 아닐 때 제거한다(단 이 스택에서는 터널 트래픽과 LAN 트래픽이 nginx에게 동일하게 보여 구별 수단이 없다) ⓒ Cloudflare 대역 검증(`set_real_ip_from`)을 도입한다(ADR이 대역 갱신 부담으로 배제한 대안) | `docker-compose.yml`(nginx `ports`) · `deploy.sh`(`docker run -p`) · `nginx/nginx.conf`(`location /api/`) · `backend/services/rate_limit.py::client_ip` | LAN·호스트에서 nginx에 직접 도달 가능한 누구나 |
 
 ### 표시 오류 / 크래시
 
@@ -518,12 +522,13 @@ finally:
 
 **현 형태**: `routers/auth.py::_hmac_secret`이 **호출 시점**에 `os.environ.get("SESSION_SECRET")`을 읽고 미설정이면 `RuntimeError`를 던진다 — 리터럴 폴백이 없다. 임포트타임 raise는 **일부러 하지 않았다**(그러면 `main.py` 밖 진입점의 임포트가 통째로 막힌다). 그래서 이 모듈은 여전히 어디서든 임포트되지만, 서명·검증을 *실제로 시도할 때* 비밀이 없으면 조용히 약한 키로 서명하는 대신 실패한다(`wrong < missing`). 가드: `backend/tests/test_session_secret_no_fallback.py`. **잔여**: §5.3의 nonce 저장소 부재는 이 변경과 무관하게 그대로다.
 
-### 5.6 레이트리밋 전무 — **확인된 버그**(ADR 근거 없는 순수 공백) (B20)
+### 5.6 레이트리밋 전무 — **해소**(task#337, 구 B20)
 
-`backend/`에 `slowapi|ratelimit|rate_limit|limiter|throttle` 계열 애플리케이션 레이트리밋이 **하나도 없다**(발견되는 것은 외부 제공자 보호용 아웃바운드 스로틀뿐: `agm.py::_DART_THROTTLE`, KIS/키움 sleep). `login`·`register`·`refresh`·`oauth_token_exchange` 어디에도 없다.
+**옛 형태**: `backend/`에 `slowapi|ratelimit|rate_limit|limiter|throttle` 계열 애플리케이션 레이트리밋이 하나도 없었다(있던 것은 외부 제공자 보호용 아웃바운드 스로틀뿐: `agm.py::_DART_THROTTLE`, KIS/키움 sleep). `login`·`register`·`refresh`·`oauth_token_exchange` 어디에도 없어, `POST /api/auth/login`이 무제한 크리덴셜 스터핑(락아웃·백오프·CAPTCHA 없음)에 열려 있었고 `verify_password`의 **의도적으로 비싼 bcrypt**가 같은 무제한 엔드포인트를 CPU 고갈 DoS로 만들었다(계정 없이 가능한, 가장 싼 가용성 공격).
 
-- **`POST /api/auth/login`** — 무제한 크리덴셜 스터핑(락아웃·백오프·CAPTCHA 없음). 더 나쁜 것은 `verify_password`가 **의도적으로 비싼 bcrypt**라는 점이다: 같은 무제한 엔드포인트가 CPU 고갈 DoS가 된다. FastAPI가 sync 핸들러를 유계 스레드풀에서 돌리므로 수백 건 동시 위조 로그인이면 API 전체가 정지한다. **계정 없이 가능한, 이 저장소에서 가장 싼 가용성 공격이다.**
-- `POST /api/auth/refresh`·`GET /api/auth/oauth/token` — 토큰이 `secrets.token_urlsafe(64)`/`(24)`라 추측은 비현실적. 노출은 DB 부하다.
+**현 형태**: `services/rate_limit.py` 신설 — `routers/auth.py::login`/`::register`가 각 본문 첫 줄(bcrypt 호출 이전)에서 `_enforce_rate_limit`으로 IP 슬라이딩 윈도우를 판정한다(login 10회/5분·register 3회/1시간, 키는 `CF-Connecting-IP`만 신뢰). 초과 시 429+`Retry-After`, 판정-후-기록 전체를 `threading.Lock`으로 원자화. 근거: `.forge/adr/260823-085145-auth-rate-limit-in-process-cf-ip.md`(단일 프로세스 인메모리 가정 — `--workers` 추가 시 무효화됨을 ADR이 명시). 가드: `backend/tests/test_auth_rate_limit.py`(전체 이름에 `B20` 포함, 동시성 fault-injection 2건 포함).
+
+**잔여**: `POST /api/auth/refresh`·`GET /api/auth/oauth/token`은 여전히 무가드다 — 토큰이 `secrets.token_urlsafe(64)`/`(24)`라 추측은 비현실적이고 노출은 DB 부하뿐이라 ADR이 명시적으로 범위 밖으로 뒀다.
 
 ### 5.7 admin 게이팅 공백 — **3건 닫힘(구 B45·B46·B50), 1건 잔존(`days` 상한) + 알려진 UI 비일관 1건**
 

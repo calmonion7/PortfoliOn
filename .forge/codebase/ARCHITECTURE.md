@@ -178,6 +178,15 @@ nav를 필터한다. **서버 게이팅이 아니라 표시 제어**다.
 둘 다 저장해야 하며, 옛 refresh_token은 그 호출로 즉시 폐기된다(1회용, task#108). 갱신 실패 시 기존
 경로(토큰 삭제 + 전체 리로드)로 폴백 — in-place 상태 뒤집기로 바꾸지 않는다(task#283 함정 회피).
 
+**레이트리밋**(task#337, B20 닫힘): `services/rate_limit.py`가 `login`·`register` **두 엔드포인트에만**
+적용되는 IP 슬라이딩 윈도우다(각 라우터 본문 첫 줄, bcrypt 호출 이전에 판정) — login 10회/5분·
+register 3회/1시간, 초과 시 429+`Retry-After`. 키는 `CF-Connecting-IP`만 신뢰한다(`X-Forwarded-For`는
+공격자가 위조해 버킷을 무한 생성할 수 있어 배제, 헤더 부재 시 `request.client.host`로 페일클로즈).
+인메모리 `OrderedDict`+`deque`(상한 도달 시 LRU 축출) + `threading.Lock`으로 판정-후-기록을 원자화한
+**단일 프로세스 가정** — uvicorn에 `--workers`가 없다는 전제에 의존하며, 워커를 늘리면 각 워커가
+독립 카운터를 가져 실효 임계가 워커 수만큼 곱해진다. `refresh`·`oauth/token`은 범위 밖이다(토큰이
+`secrets.token_urlsafe`라 추측이 비현실적). 근거: `.forge/adr/260823-085145-auth-rate-limit-in-process-cf-ip.md`.
+
 ### 2.5 서비스 레이어의 4가지 성격
 
 `backend/services/`는 한 덩어리로 보이지만 실제로는 네 부류다.

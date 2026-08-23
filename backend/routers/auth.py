@@ -15,10 +15,25 @@ from starlette.requests import Request
 from auth import get_current_user
 from services import auth_service
 from services import db as db_service
+from services import rate_limit
 
 import time
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# B20 — bcrypt(login/register) DoS 방어 임계. 근거: .forge/adr/260823-085145-auth-rate-limit-in-process-cf-ip.md
+_LOGIN_LIMIT, _LOGIN_WINDOW_S = 10, 300.0
+_REGISTER_LIMIT, _REGISTER_WINDOW_S = 3, 3600.0
+
+
+def _enforce_rate_limit(request: Request, scope: str, limit: int, window_s: float) -> None:
+    retry_after = rate_limit.check(f"{scope}:{rate_limit.client_ip(request)}", limit, window_s)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests",
+            headers={"Retry-After": str(max(1, round(retry_after)))},
+        )
 
 # Temp codes for OAuth token exchange (code -> (tokens, expiry))
 _oauth_codes: dict = {}
@@ -85,7 +100,8 @@ class RefreshRequest(BaseModel):
 
 
 @router.post("/register", status_code=201)
-def register(req: RegisterRequest):
+def register(req: RegisterRequest, request: Request):
+    _enforce_rate_limit(request, "register", _REGISTER_LIMIT, _REGISTER_WINDOW_S)
     if auth_service.get_user_by_email(req.email):
         raise HTTPException(400, "Email already registered")
     user = auth_service.create_user(req.email, req.password)
@@ -94,7 +110,8 @@ def register(req: RegisterRequest):
 
 
 @router.post("/login")
-def login(req: LoginRequest):
+def login(req: LoginRequest, request: Request):
+    _enforce_rate_limit(request, "login", _LOGIN_LIMIT, _LOGIN_WINDOW_S)
     user = auth_service.get_user_by_email(req.email)
     if not user or not user.get("password_hash"):
         raise HTTPException(401, "Invalid credentials")

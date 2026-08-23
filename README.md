@@ -219,7 +219,7 @@ FastAPI (:8000)
  │              investor_service, short_sell_service, supply_score, backlog, disclosures, insider_trades,
  │              dividends, analysis_service, kr_sector_service, us_sector_service,
  │              guru_scraper / guru_stats, batch_registry, job_runs, tech_reports(비-티커 발행물),
- │              kiwoom/, kis/, auth_service, cache, db, errors, parallel, progress
+ │              kiwoom/, kis/, auth_service, cache, db, errors, parallel, progress, rate_limit(login/register IP 레이트리밋)
  ├─ scheduler.py  APScheduler 배치(시장별 분리 포함)
  │
  └─ PostgreSQL 16
