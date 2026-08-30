@@ -39,7 +39,10 @@ def _no_stored_row():
 
 VALID_BODY = {
     "published_date": "2026-08-03",
-    "title": "재사용 발사체, 궤도당 비용을 다시 쓴다",
+    # 40~120자 리드 문장(B81) — 기술 이름으로 시작하지 않는다(h1·eyebrow가 이미 말한다).
+    # ⚠️ 이 상수는 raw-JSON 변형 POST 3곳(NaN·enum 주입)도 파생시키므로, 여기가 새 상한을
+    #    어기면 `VALID_BODY`로 201을 단언하는 36건이 **엉뚱한 이유로** 일제히 깨진다.
+    "title": "1단 회수가 자리를 잡으면서 경쟁축은 발사 가격에서 재사용 횟수와 정비 주기로 옮겨갔고, 추격자는 아직 회수 실증 단계에 머물러 있다",
     "description": "1단 재사용이 발사비를 낮추는 구조를 설명한다.",
     "difficulty": {"score": 4, "rationale": "극저온 추진제 재점화가 어렵다."},
     "players": [
@@ -138,6 +141,80 @@ def test_publish_sources_empty_422():
         resp = client.post("/api/tech-reports/smr", json=body)
     assert resp.status_code == 422
     mock_exec.assert_not_called()
+
+
+# ── title 유계 리드 문장 (B81, ADR 260830-212846) ──────────────────────
+#
+# `title`은 목록 카드·상세 h1 **아래**의 리드 문단이다(기술 이름은 h1과 카드 eyebrow가 이미 말한다).
+# 상한이 없어 라이브 15종이 「13~24자 이름」 7종과 「93~207자 리드」 8종의 두 모집단으로 갈렸다.
+# 40 = 그 두 모집단의 분리선(24 ↔ 93 사이에 실측값이 하나도 없다) · 120 = 이 파일의 「1문장」 계층
+# (`VariantOption.strength`/`tradeoff`)과 같은 값.
+
+_LEAD = ("재사용 발사체가 궤도당 비용을 다시 쓰면서 경쟁축은 이미 가격에서 "
+         "재사용 횟수와 정비 주기로 옮겨갔고 추격자는 아직 1단 회수 단계에 머문다 ")
+
+
+def _title(n: int) -> str:
+    """정확히 n자인 리드 문장. 길이를 여기서 단언해 **세다 틀리는 것**을 원천 차단한다 —
+    경계 테스트는 문자열 길이가 틀리면 조용히 무의미해진다."""
+    s = (_LEAD * 4)[:n]
+    assert len(s) == n
+    return s
+
+
+def test_publish_title_too_short_422():
+    """title 39자 → 422 + 미호출. 하한 40의 red-first 축.
+
+    이름형(≤24자)을 막는 것이 목적이다 — 이름을 넣으면 바로 위 h1을 되풀이한다."""
+    body = copy.deepcopy(VALID_BODY)
+    body["title"] = _title(39)
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 422, f"39자가 {resp.status_code}"
+    mock_exec.assert_not_called()
+
+
+def test_publish_title_too_long_422():
+    """title 121자 → 422 + 미호출. 상한 120의 red-first 축.
+
+    상한이 없으면 목록 카드 높이의 상한이 발행자 규율에만 의존한다(실측 최대 207자)."""
+    body = copy.deepcopy(VALID_BODY)
+    body["title"] = _title(121)
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 422, f"121자가 {resp.status_code}"
+    mock_exec.assert_not_called()
+
+
+@pytest.mark.parametrize("n", [40, 120])
+def test_publish_title_boundary_inclusive_201(n):
+    """정확히 40자·120자 → 201 (경계 **포함**).
+
+    음성 테스트만 두면 상한을 나중에 더 조여도 통과해 **결정이 조용히 되돌려진다**(task#297 ⓑ).
+    이 축은 수정 전에도 통과하는 **회귀 가드**라 red-first를 요구하지 않는다."""
+    body = copy.deepcopy(VALID_BODY)
+    body["title"] = _title(n)
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 201, f"{n}자가 {resp.status_code}: {resp.text[:200]}"
+    mock_exec.assert_called_once()
+
+
+def test_title_bound_does_not_leak_to_sibling_title_fields_201():
+    """형제 `title` 필드 무회귀 — 이 파일엔 `title`이 **4개**다.
+
+    `TechReportIn.title`(대상) · `Source.title` · `KeyPoint.title` · `Challenge.title`.
+    상한을 엉뚱한 클래스에 얹으면 `Source.title="NASA"`(4자)가 422가 되어 **전 발행이 죽는다**.
+    짧은 중첩 title들이 201로 통과하는 것을 명시적으로 못박는다(우연한 통과가 아니라 계약이다)."""
+    body = copy.deepcopy(VALID_BODY)
+    body["title"] = _title(60)
+    body["sources"] = [{"title": "NASA", "url": None}]          # 4자
+    body["challenges"] = [{"title": "재점화", "body": "내구성."}]   # 3자
+    body["key_points"] = [{"title": "t", "body": "b"}]           # 1자
+    with patch.object(svc, "execute") as mock_exec:
+        resp = client.post("/api/tech-reports/smr", json=body)
+    assert resp.status_code == 201, f"형제 title이 막혔다 → {resp.text[:300]}"
+    mock_exec.assert_called_once()
 
 
 def test_list_all_one_row_per_slug():

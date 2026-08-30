@@ -724,7 +724,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 **Response `200`**
 ```json
 {
-  "reports": [ { "slug": "smr", "published_date": "2026-07-01", "title": "SMR, 원자력의 두 번째 곡선", "...": "발행 필드 전체" } ],
+  "reports": [ { "slug": "smr", "published_date": "2026-07-01", "title": "중국 링룽 1호의 상업운전 시한이 최초 임계도 없이 지나가면서, 경쟁축은 착공 속도에서 규제 승인과 공급망 확보로 옮겨갔다", "...": "발행 필드 전체" } ],
   "topics": [ { "slug": "reusable-rocket", "name": "재사용 로켓", "order": 1 }, { "slug": "smr", "name": "SMR", "order": 3 } ]
 }
 ```
@@ -745,7 +745,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 ```json
 {
   "published_date": "2026-08-03",
-  "title": "재사용 발사체, 궤도당 비용을 다시 쓴다",
+  "title": "1단 회수가 자리를 잡으면서 경쟁축은 발사 가격에서 재사용 횟수와 정비 주기로 옮겨갔고, 추격자는 아직 회수 실증 단계에 머물러 있다",
   "description": "1단 재사용이 발사비를 낮추는 구조를 설명한다(3~5문장).",
   "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
   "players": [
@@ -824,7 +824,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
 | `published_date` | string | ✅ | `YYYY-MM-DD` |
-| `title` | string | ✅ | 한줄 제목 |
+| `title` | string | ✅ | **결론을 담은 리드 문장, 40~120자**(미달·초과 `422`). 기술 이름을 넣지 않는다 — 상세 `<h1>`과 목록 카드 eyebrow가 이미 표시명을 말하므로 이름을 되풀이하면 같은 말이 두 번 나온다 |
 | `description` | string | | 상세 기술설명(생략 시 `""`) |
 | `difficulty` | object | ✅ | `{score, rationale}` — **기술 자체**의 진입 난이도(업체별 기술수준과는 별개 축, 아래 참고) |
 | `players` | array | | 주요업체(상장 여부 무관 — SpaceX·Rosatom·CASC처럼 비상장·국영이 선두인 기술이 있다) |

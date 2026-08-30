@@ -83,7 +83,7 @@ def test_index_excludes_prose_fields():
 
 
 def test_index_carries_short_display_name():
-    """칩 라벨용 표시명 — 리포트 title은 150자 헤드라인이라 칩에 못 쓴다."""
+    """칩 라벨용 표시명 — 리포트 title은 120자 이내 리드 문장이라 칩에 못 쓴다."""
     with patch.object(svc, "query", return_value=ROWS):
         r = client.get("/api/tech-reports/index")
     idx = {e["slug"]: e for e in r.json()["index"]}

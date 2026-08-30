@@ -2387,7 +2387,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 ```json
 {
   "published_date": "2026-08-03",
-  "title": "재사용 발사체, 궤도당 비용을 다시 쓴다",
+  "title": "1단 회수가 자리를 잡으면서 경쟁축은 발사 가격에서 재사용 횟수와 정비 주기로 옮겨갔고, 추격자는 아직 회수 실증 단계에 머물러 있다",
   "description": "1단 재사용이 발사비를 낮추는 구조를 설명한다.",
   "difficulty": { "score": 4, "rationale": "극저온 추진제 재점화가 어렵다." },
   "players": [
@@ -2461,7 +2461,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
 | `published_date` | string | ✅ | `YYYY-MM-DD` |
-| `title` | string | ✅ | 한줄 제목 |
+| `title` | string | ✅ | **결론을 담은 리드 문장, 40~120자**(미달·초과 `422`). 기술 이름을 넣지 않는다 — 상세 `<h1>`과 목록 카드 eyebrow가 이미 표시명을 말하므로 이름을 되풀이하면 같은 말이 두 번 나온다 |
 | `description` | string | | 상세 기술설명 (생략 시 `""`) |
 | `difficulty` | object | ✅ | `{score: 1~5, rationale}` — 기술 난이도 |
 | `players` | array | | 주요업체 `{name, country, state_led, ticker?, tech_level: 1~5, gap_years?, leader_name?, share_pct?, note?, category?}` — `share_pct`를 실으면 `market.share_basis`가 반드시 있어야 함(교차검증, 없으면 `422`) |
@@ -2586,7 +2586,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | 필드 | 뜻 |
 |---|---|
 | `slug` | 기술 slug(`TECH_TOPICS` 등재 slug — 그 밖은 애초에 발행될 수 없다) |
-| `name` | 표시명(`TECH_TOPICS`) — `title`은 150자 헤드라인 문장이라 칩 라벨로 못 쓴다 |
+| `name` | 표시명(`TECH_TOPICS`) — `title`은 120자 이내 리드 문장이라 칩 라벨로 못 쓴다 |
 | `title` | 그 판의 헤드라인 |
 | `tickers` | `players[].ticker`의 **non-null 집합**(정렬·중복 제거) |
 | `listed` | 티커 **보유** 업체의 축약 레코드 배열. `[p["ticker"] for p in listed] == tickers`가 **항등으로** 성립한다(ticker 기준 dedupe 후 `tickers` 순서로 세운다) — 한 판에 같은 티커가 두 번 등장해도 갈라지지 않는다. 티커 **없는** 업체(비상장·미기재)는 여기 없고 `players_total`에만 남는다 |

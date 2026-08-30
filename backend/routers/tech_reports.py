@@ -324,7 +324,14 @@ class Challenge(BaseModel):
 
 class TechReportIn(BaseModel):
     published_date: str
-    title: str
+    # `title`은 이름표가 아니라 **유계 리드 문장**이다(B81, ADR 260830-212846) — 목록 카드는
+    # eyebrow가, 상세는 h1이 이미 `TECH_TOPICS` 표시명을 말하므로 여기 이름을 넣으면 같은 말이
+    # 두 번 나온다. 상한이 없던 동안 라이브 15종이 「13~24자 이름」 7종과 「93~207자 리드」 8종의
+    # 두 모집단으로 갈렸다. 40 = 그 분리선(24↔93 사이 실측값 0개) · 120 = 이 파일의 「1문장」
+    # 계층(`VariantOption.strength`/`tradeoff`)과 같은 값.
+    # ⚠️ 이 파일엔 `title`이 4개다(여기 · `Source` · `KeyPoint` · `Challenge`) — 나머지 셋은
+    # 짧은 게 정상이므로(`"NASA"` 4자) 이 상한을 그쪽에 옮겨 얹지 말 것.
+    title: str = Field(..., min_length=40, max_length=120)
     description: str = ""
     difficulty: Difficulty
     players: List[Player] = []
@@ -546,7 +553,7 @@ def ticker_index(_: str = Depends(get_current_user_or_api_key)):
     필요한데 6종 전문을 실으면 화면이 수백 KB를 받는다. `description`·`key_points`·
     `challenges`·`players` 본문은 전부 제외하고 티커 집합과 개수만 준다.
 
-    `name`은 `TECH_TOPICS`의 표시명이다. 리포트 `title`은 150자짜리 헤드라인 문장이라
+    `name`은 `TECH_TOPICS`의 표시명이다. 리포트 `title`은 120자 이내의 리드 문장이라
     칩 라벨로 못 쓰고, 프론트 `techReportUtils.js`의 `TECH_NAMES` 미러를 새 소비처가
     또 참조하면 dual-source 노출만 넓어지므로 여기서 직접 준다.
     """
