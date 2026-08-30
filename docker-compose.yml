@@ -6,9 +6,13 @@ services:
     environment:
       POSTGRES_DB: portfolion
       POSTGRES_USER: portfolion
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portfolion}
+      # 폴백 금지 — 미설정 시 조용히 약한 기본값을 쓰는 대신 명시적으로 실패한다.
+      # 폴백값이 공개 저장소에 커밋돼 실운영 크리덴셜이 됐던 것이 B21 이다.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env 에 POSTGRES_PASSWORD 를 설정할 것 (B21)}
     ports:
-      - "5432:5432"
+      # 루프백 전용 — 백엔드는 도커 네트워크 별칭 postgres:5432 로 접속하므로
+      # 호스트 발행은 사람이 psql 로 붙을 때만 쓰인다. 0.0.0.0 이면 LAN 전체에 열린다.
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/auth_schema.sql:/docker-entrypoint-initdb.d/01-auth.sql

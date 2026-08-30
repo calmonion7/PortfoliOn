@@ -23,6 +23,9 @@ cd "$(dirname "$0")/.."
 
 PG=portfolion-postgres-1
 BE=portfolion-backend-1
+NETWORK=portfolion_default
+PGHOST=postgres          # 도커 네트워크 별칭 (백엔드가 쓰는 것과 동일 경로)
+PGIMAGE=postgres:16-alpine
 STAMP=$(date +%Y%m%d-%H%M%S)
 BAKDIR=".rotate-backup-$STAMP"
 
@@ -90,16 +93,22 @@ docker exec -i "$PG" psql -U portfolion -d portfolion -q <<SQL || die "ALTER USE
 ALTER USER portfolion WITH PASSWORD '$NEWPW';
 SQL
 
-# 새 비밀번호가 TCP(암호인증) 경로에서 실제로 통하는지 즉시 확인 — 조기 실패용
-docker exec -i "$PG" sh -c 'cat > /tmp/.pgpass && chmod 600 /tmp/.pgpass' <<PGP
-127.0.0.1:5432:portfolion:portfolion:$NEWPW
-PGP
-if ! docker exec -e PGPASSFILE=/tmp/.pgpass -i "$PG" \
-      psql -h 127.0.0.1 -U portfolion -d portfolion -q -c 'SELECT 1' >/dev/null 2>&1; then
-  docker exec -i "$PG" rm -f /tmp/.pgpass || true
-  rollback; die "새 비밀번호로 TCP 접속이 안 된다"
+# 새 비밀번호가 암호인증 경로에서 실제로 통하는지 즉시 확인 — 조기 실패용.
+#
+# ⚠️ `docker exec "$PG" psql -h 127.0.0.1` 로 재면 **아무 비밀번호로도 통과한다** —
+#    pg_hba.conf 의 `host all all 127.0.0.1/32 trust` 에 걸려 비밀번호를 아예 안 본다
+#    (실측: 빈 값·틀린 값 모두 접속 성공). 그 형태는 이빨 없는 검사다.
+#    암호인증(`host all all all scram-sha-256`)을 타려면 **컨테이너 밖**에서 와야 하므로
+#    같은 네트워크의 일회용 컨테이너로 잰다.
+if ! docker run --rm --network "$NETWORK" -e PGPASSWORD="$NEWPW" "$PGIMAGE" \
+      psql -h "$PGHOST" -U portfolion -d portfolion -q -c 'SELECT 1' >/dev/null 2>&1; then
+  rollback; die "새 비밀번호로 암호인증 접속이 안 된다"
 fi
-docker exec -i "$PG" rm -f /tmp/.pgpass || true
+# 이빨 확인 — 옛 비밀번호가 거부되는지도 함께 본다(거부되지 않으면 ALTER USER 가 안 먹은 것)
+if docker run --rm --network "$NETWORK" -e PGPASSWORD="$OLDPW" "$PGIMAGE" \
+      psql -h "$PGHOST" -U portfolion -d portfolion -q -c 'SELECT 1' >/dev/null 2>&1; then
+  rollback; die "옛 비밀번호가 아직 통한다 — 회전이 반영되지 않았다"
+fi
 
 # --- 4. env 파일 3개 갱신 ----------------------------------------------------
 echo "[2/4] env 파일 갱신..."
