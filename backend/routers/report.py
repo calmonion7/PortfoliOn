@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Body
 from pathlib import Path
+from datetime import date as _date
 from services import storage, report_generator
 from services import market as market_svc
 from services import consensus as consensus_svc
@@ -487,6 +488,13 @@ def get_us_insider_route(ticker: str, user_id: str = Depends(get_current_user_or
 
 @router.get("/report/{ticker}/{date_str}")
 def get_report(ticker: str, date_str: str, _: str = Depends(get_current_user_or_api_key)):
+    # 경로 조각을 검증 없이 넘기면 `snapshots.date`(date 컬럼) 캐스트에서 InvalidDatetimeFormat이
+    # 미포착 예외로 올라가 500이 된다(B80, 라이브 실측). 형제 analyst_reports.get_detail과 같은 가드이며,
+    # 반드시 cache_svc.get_snapshot **앞**에 있어야 한다 — 뒤에 두면 로더가 이미 DB에 닿는다.
+    try:
+        _date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Report not found")
     upper = ticker.upper()
     summary = cache_svc.get_snapshot(upper, date_str, lambda: _read_snapshot(upper, date_str))
     if summary is None:

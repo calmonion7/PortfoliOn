@@ -192,8 +192,9 @@ X-API-Key: {COWORK_API_KEY}
 ```
 
 > `summary`는 DB에 저장된 스냅샷 전체 데이터입니다. `content`(마크다운) 필드는 없습니다.
+> 최상위에 `enriched_at`(AI 분석 기록 시각, ISO 또는 `null`)이 함께 옵니다.
 
-**Error `404`** — 해당 날짜의 리포트 없음
+**Error `404`** — 해당 날짜의 리포트 없음. **`date_str`이 `YYYY-MM-DD`로 파싱되지 않으면 그것도 404**입니다(task#340) — 이전에는 500이었습니다.
 
 ---
 

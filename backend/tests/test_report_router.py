@@ -180,6 +180,57 @@ def test_get_report_404_when_not_found(tmp_path):
     assert resp.status_code == 404
 
 
+# ── B80: 경로 조각 date 검증 (미검증이면 SQL date 캐스트로 직행해 500) ─────────
+# 형제 `routers/analyst_reports.py::get_detail`가 이미 같은 가드를 갖고 있다.
+# 아래 두 축은 `query`에 DB의 실제 거절을 흉내낸 예외를 심는다 — 가드가 없으면 그 예외가
+# 그대로 올라가 500이 되고(라이브 실측과 동일: AAPL/notadate → 500), 가드가 있으면 query에
+# 닿지도 않는다. **상태코드만 재면 가드가 DB *뒤*에 있어도 통과**하므로 호출 0을 쌍으로 둔다.
+
+
+def _malformed_date_probe(path, tmp_path):
+    q = MagicMock(side_effect=Exception("invalid input syntax for type date"))
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("routers.report.query", q), \
+         patch("services.consensus.query", return_value=[]), \
+         patch("routers.report.cache_svc._snapshots", {}), \
+         patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
+        resp = client.get(path)
+    return resp, q
+
+
+def test_get_report_malformed_date_is_404_and_never_reaches_db(tmp_path):
+    resp, q = _malformed_date_probe("/api/report/LLY/notadate", tmp_path)
+    assert resp.status_code == 404
+    q.assert_not_called()
+
+
+def test_get_report_impossible_date_is_404_and_never_reaches_db(tmp_path):
+    # 날짜 *모양*이지만 존재할 수 없는 값(13월 45일).
+    # ⚠️ `20260829`(ISO basic)는 축으로 쓰지 말 것 — `date.fromisoformat`이 로컬 .venv(3.9)에서는
+    # 거절하고 컨테이너(3.12)에서는 통과해 **환경별로 결과가 갈린다**. 13월은 모든 버전이 거절한다.
+    resp, q = _malformed_date_probe("/api/report/LLY/2026-13-45", tmp_path)
+    assert resp.status_code == 404
+    q.assert_not_called()
+
+
+def test_get_report_valid_date_still_reaches_db(tmp_path):
+    """대조군 — 가드가 정상 경로까지 막지 않는다.
+
+    이 축이 없으면 위 두 축은 「무조건 404를 내고 DB를 안 부른다」는 구현으로도 통과한다.
+    """
+    q = MagicMock(return_value=[])
+    with patch("routers.report.SNAPSHOTS_DIR", tmp_path), \
+         patch("routers.report.REPORTS_DIR", tmp_path / "legacy"), \
+         patch("services.consensus.query", return_value=[]), \
+         patch("routers.report.query", q), \
+         patch("routers.report.cache_svc._snapshots", {}), \
+         patch("routers.report.cache_svc._list_cache", {"data": None, "ts": 0.0}):
+        resp = client.get("/api/report/LLY/2026-05-05")
+    assert resp.status_code == 404          # 스냅샷이 없으니 404 — 단 DB에는 닿았다
+    assert q.call_count >= 1
+
+
 SAMPLE_SUMMARY_WITH_RSI = {
     "ticker": "LLY", "name": "일라이 릴리", "date": "2026-05-05",
     "price": 890.0, "target_mean": 980.0, "target_high": 1100.0, "target_low": 850.0,

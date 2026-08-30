@@ -1804,7 +1804,7 @@ API 키 레인은 `_API_KEY_USER_ID` 하나를 공유하므로 그 레인 안에
 {
   "ticker": "AAPL",
   "date": "2024-11-15",
-  "content": "# AAPL 분석 리포트\n\n...",
+  "enriched_at": "2026-08-20T09:12:44",
   "summary": {
     "score": 85,
     "recommendation": "매수",
@@ -1820,8 +1820,8 @@ API 키 레인은 `_API_KEY_USER_ID` 하나를 공유하므로 그 레인 안에
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `content` | string | Markdown 형식의 리포트 본문 |
-| `summary` | object \| null | 요약 JSON (없으면 `null`) |
+| `enriched_at` | string \| null | AI 분석(enrich)이 마지막으로 기록된 시각(ISO). 정본은 `tickers.enriched_at` 컬럼이며 스냅샷 `data` JSON에는 없다 |
+| `summary` | object \| null | 요약 JSON (없으면 `null`). 스냅샷 `data` 전체 + `is_etf`·`analyst_target` |
 | `summary.ev_ebitda` | number \| null | 해당 종목의 EV/EBITDA 배수. KR·US 모두 yfinance `enterpriseToEbitda` 소스(KR은 task#169부터 채워짐 — 이전엔 항상 `null` 고정, ADR-0024) |
 | `summary.competitors_data` | object[] | 경쟁사 비교 데이터. 자기 종목(`is_self: true`)을 포함해 시가총액 내림차순 정렬 |
 | `summary.competitors_data[].psr` | number \| null | 주가매출비율(additive, task#169). KR=Naver TTM 계산(메인 종목과 동일 로직), US=yfinance `priceToSalesTrailing12Months` |
@@ -1829,7 +1829,7 @@ API 키 레인은 `_API_KEY_USER_ID` 하나를 공유하므로 그 레인 안에
 
 > **경쟁사(peer) 멀티플은 이상치가 `null`로 빠질 수 있습니다(task#248, 판정축 교체 task#249)** — `per`·`pbr`·`psr`·`ev_ebitda`는 외부 소스(yfinance·Naver)의 단위 혼선 오값이 파싱을 성공해 들어올 수 있어, 리포트 생성 시 **값이 있는 peer 전체와 자기 종목을 합한 중앙값(기준 표본) 대비 배수가 `[1/5, 5]` 밖인 지표만** 결측 처리합니다(종목 단위 배제가 아니라 지표 단위, wrong<missing). 자기 종목(`is_self: true`)은 **판정 대상은 아니지만 기준 표본에는 포함**되며, 기준 표본이 3개 미만이거나 중앙값이 0 이하면 판정을 생략합니다.
 
-**Error `404`** — 해당 날짜의 리포트 없음
+**Error `404`** — 해당 날짜의 리포트 없음. **`date_str`이 `YYYY-MM-DD`로 파싱되지 않는 경우도 404**다(task#340, B80) — 검증 없이 넘기면 `snapshots.date`(date 컬럼) 캐스트에서 `InvalidDatetimeFormat`이 미포착 예외로 올라가 **500**이 됐다. 가드는 DB 조회 *앞*에 있어 잘못된 조각은 DB에 닿지 않는다.
 
 ---
 
