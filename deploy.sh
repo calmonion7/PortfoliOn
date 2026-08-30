@@ -47,10 +47,14 @@ echo "      Done"
 echo "[4/4] Restarting nginx..."
 docker stop $NGINX_CONTAINER 2>/dev/null || true
 docker rm   $NGINX_CONTAINER 2>/dev/null || true
+# 게시는 루프백 전용(-p 127.0.0.1:80:80) — 공개 경로는 Cloudflare 터널뿐이다.
+# 근거·트레이드오프는 docker-compose.yml 의 nginx 주석 참조(B82).
+# ⚠️ 이 주석을 docker run 의 연속행(\) 안으로 옮기지 말 것 — 그러면 # 가 나머지 인자를
+#    통째로 삼켜 nginx 가 포트·볼륨 없이 뜬다(구문 검사 bash -n 는 통과한다).
 docker run -d \
   --name $NGINX_CONTAINER \
   --network $NETWORK \
-  -p 80:80 -p 443:443 \
+  -p 127.0.0.1:80:80 \
   -v "$PROJECT_DIR/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
   -v "$PROJECT_DIR/frontend/dist:/usr/share/nginx/html:ro" \
   --restart unless-stopped \

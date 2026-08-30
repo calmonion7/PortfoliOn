@@ -34,9 +34,12 @@ services:
 
   nginx:
     image: nginx:alpine
+    # 게시는 루프백 전용 — 공개 경로는 Cloudflare 터널뿐이다(cloudflared → http://localhost:80).
+    # 이 좁힘이 ADR 260823-085145 의 「공개 경로는 Cloudflare 전용」 전제를 배포 구성으로 강제해
+    # CF-Connecting-IP 위조에 의한 레이트리밋 우회·표적 잠금(B82)을 닫는다.
+    # 443 게시는 제거했다 — nginx.conf 의 443 server 블록이 주석 처리돼 아무 일도 하지 않았다.
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:80:80"
     volumes:
       - ./frontend/dist:/usr/share/nginx/html:ro
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
