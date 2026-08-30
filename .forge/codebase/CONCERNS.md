@@ -203,15 +203,31 @@ mapped: 2026-08-22
 > — 단, 「호스트 접근 가능한 누구나」가 여전히 도달 조건인 것은 맞고, 그 대가로 이제
 > **강한 무작위 비밀번호**가 요구된다(공개 이력의 값이 아니다).
 >
-> ⚠️ **잔여 2건(이 태스크 범위 밖, 미해소)**
-> - **포트 바인딩은 postgres 컨테이너 재생성 시점에 적용된다** — 회전 직후 시점의 실행 중
->   컨테이너는 여전히 `0.0.0.0:5432`다. 비밀번호는 이미 교체됐으므로 남은 노출은
->   「강한 비밀번호가 걸린 열린 포트」이나, 재생성 전까지 ⓒ는 파일에만 존재한다.
-> - **`com.portfolion.docker-compose` launchd 잡이 죽어 있다** — exit **127**(command not found).
->   `ProgramArguments`가 삭제된 워크트리 경로
->   (`.claude/worktrees/docker-infra-migration/scripts/start-docker-compose.sh`)를 가리킨다.
->   현재 컨테이너가 살아 있는 것은 `restart: unless-stopped` 덕분이고, 컨테이너가 제거되면
->   **자동 복구되지 않는다.** B21과 무관한 선재 결함이라 고치지 않고 기록만 한다.
+> ✅ **잔여 2건도 해소 (task#338, 2026-08-30 19:11)** — 위 각주가 「이 태스크 범위 밖」으로
+> 남긴 둘은 **같은 원인의 앞뒤**였다: 자동기동 잡이 죽어 있어 컨테이너가 재생성되지 않았고,
+> 재생성되지 않아 ⓒ(루프백 발행)가 파일에만 존재했다. 잡을 되살리자 **한 번의 기동으로 둘 다 전환**됐다.
+> - **launchd 잡 복구** — `ProgramArguments`를 삭제된 워크트리 경로에서 메인 체크아웃
+>   `scripts/start-docker-compose.sh`로 교체하고 plist에 `HOME`·`USER`·`LOGNAME`·`PATH`를 명시했다
+>   (launchd 최소환경에 `/usr/local/bin/docker`가 없다). 재적재 후 `launchctl list` 종료코드가
+>   **127 → 0**. 실행 기록: `19:11:22` 기동 → `19:11:29` 완료(`~/Library/Logs/com.portfolion.docker-compose.out.log`).
+> - **포트 바인딩 실적용** — 그 기동이 postgres를 재생성해 `0.0.0.0:5432` → **`127.0.0.1:5432`**.
+>   LAN `nc 172.16.11.230 5432` **거부**(계측기 대조군: 루프백 5432는 접속 성공 — 「닫혔다」와
+>   「측정기가 못 본다」를 가른다).
+>
+> **기동 범위는 실측 근거로 좁혔다 — 통째 `docker compose up -d`가 아니다.** `deploy.sh`가 만드는
+> 컨테이너 이름이 compose의 것과 **바이트 동일**(`portfolion-backend-1`·`portfolion-nginx-1`)이라,
+> 통째 기동은 「낡은 것을 올리는」 정도가 아니라 **deploy.sh의 컨테이너를 compose 정의로 재생성**한다
+> (볼륨 마운트·포트가 갈린다). 그래서 스크립트는 compose로 **postgres·certbot만** 올리고
+> backend·nginx는 `bash deploy.sh`에 맡긴다. 그리고 옛 스크립트의 `until docker info; do sleep 2; done`
+> **무한 대기**를 5분 유계 + FATAL 로그 + 비영 종료로 바꿨다 — 그대로 두면 데몬이 안 뜰 때 잡이 영원히
+> running으로 남아 「죽었는데 아무도 모르는」 상태가 된다(이 절이 기록한 바로 그 실패 형태의 재발).
+>
+> 회귀 가드(같은 시점 실측): 컨테이너 **4개** 유지 · 백엔드 `SELECT 1` 성공 · `http://localhost/health` **200** ·
+> 터널 `https://portfolion.taebro.com/health`·`/` 둘 다 **200**.
+>
+> ⚠️ **다음 진단자 주의 — `com.portfolion.docker-compose.err.log`는 append다.** 파일 **상단 4줄**은
+> 옛 죽은 잡의 `No such file or directory`(워크트리 경로)이고 그 아래가 새 실행분이다. 상단만 보고
+> 「아직 죽어 있다」로 읽지 말 것 — 판정은 `launchctl list`의 종료코드와 로그 **말미**의 타임스탬프로 한다.
 
 ### 표시 오류 / 크래시
 
