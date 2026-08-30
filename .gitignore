@@ -61,3 +61,6 @@ scripts/node_modules/
 
 # Docker environment
 backend/.env.docker
+
+# 비밀번호 회전 스크립트가 만드는 env 백업 (크리덴셜 포함 — 절대 커밋 금지)
+.rotate-backup-*/
