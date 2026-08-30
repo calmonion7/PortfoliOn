@@ -126,11 +126,20 @@ def _refresh_fx():
 
 def _refresh_macro_signals():
     from services.market_indicators import _fetch_and_save_macro_signals
-    with job_runs.record("macro_signals_fetch", "auto"):
+    with job_runs.record("macro_signals_fetch", "auto") as run:
         try:
-            _fetch_and_save_macro_signals()
-            logger.info("[Scheduler] Macro signals refreshed")
+            # `or {}` — 이 잡을 스텁하는 기존 테스트가 None을 반환한다(반환 검사 도입 전 형태).
+            data = _fetch_and_save_macro_signals() or {}
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                logger.warning(f"[Scheduler] Macro signals skipped: {data['error']}")
+            elif data.get("_status"):
+                run.set_status(data["_status"])
+                logger.warning(f"[Scheduler] Macro signals {data['_status']} — 직전값 유지")
+            else:
+                logger.info("[Scheduler] Macro signals refreshed")
         except Exception as e:
+            run.set_status("failed", str(e))
             logger.warning(f"[Scheduler] Macro signals refresh failed: {e}")
 
 

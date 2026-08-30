@@ -153,7 +153,25 @@ mapped: 2026-08-22
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| B6 | 키 미설정 배치가 "성공"으로 기록 · **부분(도달조건 축소, 재판정 task#329)**: 원 서술이 지목한 3위치 중 **2곳이 닫혔다** — `econ.py::_fetch_and_save_econ_indicators`는 계열별 소스-폴백 + `_status`(partial/skipped)를 반환하고, `scheduler/jobs.py::_refresh_monthly_us`는 `as run`으로 그것을 받아 `set_status`한다(수동 2레인 `refresh-econ`·`refresh-monthly?market=US`도 함께). **남은 도달 경로는 `macro.py` 하나뿐이다** — `_fetch_and_save_macro_signals`가 키 미설정 시 예외 없이 `{"error": …}`를 반환하는데 `_status`가 없고, 두 레인(`scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals`) **모두 `as run` 미배선**이라 반환값을 아무도 검사하지 않는다. 형제 `econ.py`가 참조 구현이다(§6.1) | `market_indicators/macro.py::_fetch_and_save_macro_signals` → `scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals` | `FRED_API_KEY` 미설정 |
+
+> ✅ **`B6` 해소 (task#341, 2026-08-30)** — 마지막 도달 경로였던 `macro.py`를 닫았다.
+> `_fetch_and_save_macro_signals`가 수집 실패 시 **`_status: "skipped"`**를 반환하고(저장은
+> 생략해 직전값을 보존), auto(`scheduler/jobs.py::_refresh_macro_signals`)·manual
+> (`routers/market_indicators.py::refresh_macro_signals`) **두 레인 모두** `as run`으로 받아
+> `set_status`한다. 수동 응답도 `{ok: false, status: "skipped", error}`로 「갱신됨」과
+> 「생략」을 구분한다 — 전에는 키가 없어도 `{ok: true, yield_curve_points: 0}`이었다.
+> ⚠️ **`partial`은 이 함수에서 발생하지 않는다** — 수집 루프 전체가 하나의 try 안이라
+> all-or-nothing이기 때문이다. 계열별 소스-폴백 도입은 *관측*이 아니라 구조 변경이므로
+> 이 태스크의 비목표로 두었다(형제 `econ.py`는 계열별 폴백이라 `partial`이 있다).
+> 회귀 고정 4축(`test_macro_signals_batch.py`) — auto skipped · manual ok:false+status ·
+> 수집 실패 시 `_mc_save` 미호출(직전값 보존) · **대조군**(정상 성공은 set_status 미호출,
+> 「항상 skipped」 과잉교정을 배제). 앞의 셋은 수정 전 red 확인, 대조군은 회귀 가드라 선통과.
+> 부수로 `services/job_runs.py` docstring이 이 잡을 「예외를 삼켜 success로 기록된다」 목록에
+> 열거하고 있어 **반대 사실을 증언**하게 되므로 배선 목록으로 옮겼다.
+> ⚠️ **형제 ~14개에 같은 결함이 남아 있다**(그 docstring의 수동 열거 자체가 증거다) —
+> 새 배치를 만들 때 템플릿은 `formation.py`·`labor.py`·`inflation.py`·`econ.py`·`macro.py`에서 고를 것.
+> **번호는 재사용하지 않는다.**
+
 
 ### 계약·보안
 

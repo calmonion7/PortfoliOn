@@ -3247,10 +3247,13 @@ FRED 매크로 신호 4종(`T10Y2Y`/`BAMLH0A0HYM2`/`M2SL`/`DFF`) 수동 재수�
 
 **Auth:** admin 권한 필요
 
-**Response `200`**
+`status`: `success`(갱신됨) / `skipped`(`FRED_API_KEY` 미설정 또는 수집 실패 — 저장을 생략하고 직전값을 유지). **`ok`만 보면 실패해도 갱신된 것으로 오인하기 쉬워** 함께 반환한다(task#341, B6): `yield_curve_points`는 실패해도 직전 저장값이 살아 있어 채워져 보이고, 키 미설정이면 `0`이라 「데이터가 없다」와 구별되지 않는다. 같은 이유로 배치 현황(`GET /api/batches`)의 실행이력도 `skipped`로 기록된다 — 배선 전에는 실패해도 매 실행이 `success`였다.
+
+**Response `200`** — 성공
 ```json
 {
   "ok": true,
+  "status": "success",
   "yield_curve_points": 760,
   "signals": {
     "inverted": false,
@@ -3261,7 +3264,16 @@ FRED 매크로 신호 4종(`T10Y2Y`/`BAMLH0A0HYM2`/`M2SL`/`DFF`) 수동 재수�
 }
 ```
 
-> `FRED_API_KEY` 미설정 시 수집은 실패하며 저장값은 변경되지 않는다.
+**Response `200`** — 키 미설정·수집 실패(저장 생략, 직전값 유지)
+```json
+{
+  "ok": false,
+  "status": "skipped",
+  "error": "FRED_API_KEY 환경변수가 필요합니다."
+}
+```
+
+> `partial`은 이 엔드포인트에서 발생하지 않는다 — 수집 루프가 all-or-nothing이라 한 계열의 실패가 전부를 중단시킨다(형제 `POST /api/market/refresh-econ`은 계열별 소스-폴백이라 `partial`이 있다).
 
 ---
 

@@ -139,12 +139,25 @@ def macro_signals(_: str = Depends(get_current_user)):
 
 @router.post("/refresh-macro-signals")
 def refresh_macro_signals(_: str = Depends(require_admin)):
-    """매크로 신호(FRED 4종) 수동 갱신 — macro_signals_fetch로 기록."""
+    """매크로 신호(FRED 4종) 수동 갱신 — macro_signals_fetch로 기록.
+
+    `status`: success(갱신됨)/skipped(FRED_API_KEY 미설정 또는 수집 실패로 저장 생략) —
+    `ok`만 보면 실패해도 갱신된 것으로 오인한다. `yield_curve_points`는 실패 시 직전값이
+    살아 있어 채워져 보이고, 키 미설정이면 0이라 「데이터가 없다」와 구별되지 않는다.
+    형제 `refresh_econ`과 같은 형태다(B6, task#341).
+    """
     try:
-        with job_runs.record("macro_signals_fetch", "manual"):
+        with job_runs.record("macro_signals_fetch", "manual") as run:
             data = _fetch_and_save_macro_signals()
-        return {"ok": True, "yield_curve_points": len(data.get("yield_curve", [])),
-                "signals": data.get("signals", {})}
+            if "error" in data:
+                run.set_status("skipped", data["error"])
+                return {"ok": False, "status": "skipped", "error": data["error"]}
+            status = data.get("_status") or "success"
+            if status != "success":
+                run.set_status(status)
+            return {"ok": status == "success", "status": status,
+                    "yield_curve_points": len(data.get("yield_curve", [])),
+                    "signals": data.get("signals", {})}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

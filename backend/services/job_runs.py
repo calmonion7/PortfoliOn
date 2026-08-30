@@ -46,7 +46,6 @@ def record(job_id: str, trigger: str):
 
     실패 가시성 주의: 상태를 지정하지 않는 잡은 failed가 본문이 예외를 '전파'할 때만 기록된다.
     다수의 스케줄러 잡(_refresh_monthly_kr/
-    _refresh_macro_signals/
     _fetch_leverage/_fetch_lending/_run_digest/_fetch_investor_trend)과
     일부 워커(report._run_*/leverage_service.backfill_with_progress)는 내부 예외를 try/except로
     삼키고 정상 종료하므로, 부분/전체 실패여도 success로 기록된다. 즉 그 잡들의 success를
@@ -62,7 +61,9 @@ def record(job_id: str, trigger: str):
     routers/market_indicators.refresh_trimmed_inflation)·FRED 경제지표 3경로
     (scheduler/jobs._refresh_monthly_us · routers/market_indicators.refresh_econ ·
     routers/market_indicators.refresh_monthly 의 US 분기)·환율 2경로
-    (scheduler/jobs._refresh_fx · routers/market_indicators.refresh_fx)·발굴 추천 2경로
+    (scheduler/jobs._refresh_fx · routers/market_indicators.refresh_fx)·매크로 신호 2경로
+    (scheduler/jobs._refresh_macro_signals · routers/market_indicators.refresh_macro_signals
+    — 키 미설정 `error`와 수집 실패 `_status: skipped`를 둘 다 skipped로, task#341)·발굴 추천 2경로
     (scheduler/jobs._fetch_recommendation_kr|us · routers/recommendations.refresh_recommendations
     — 둘 다 scheduler._recommendation_work(market, run)에 핸들을 넘겨 매핑을 공유한다)·
     랭킹 2경로(scheduler/jobs._fetch_kr_rankings · _fetch_us_rankings, fetch 가드의 예외를

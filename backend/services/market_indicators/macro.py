@@ -56,6 +56,22 @@ def _fetch_series(series_id: str, api_key: str, start: str) -> list:
 
 
 def _fetch_and_save_macro_signals() -> dict:
+    """FRED 4종을 증분 수집해 병합 저장하고, 실패 사실을 반환값에 실어 노출한다.
+
+    반환에는 계열 데이터(`_SERIES` 키) 외에 다음이 실릴 수 있다 —
+    `error`(FRED_API_KEY 미설정) 또는 `_status: "skipped"`(수집 실패, 저장 생략).
+    호출측(scheduler/jobs.py · routers/market_indicators.py)이 이를 job_runs 상태로 반영한다.
+    안 하면 `job_runs.record`가 **본문이 예외를 전파할 때만** failed를 기록하므로, FRED가 며칠
+    죽어도 매 실행이 success로 남고 저장값만 무기한 stale해진다(B6, task#341).
+
+    ⚠️ `partial`은 이 함수에서 발생하지 않는다 — 수집 루프 전체가 하나의 try 안이라 한 계열의
+    실패가 전부를 중단시키는 all-or-nothing이기 때문이다. 형제 `econ.py`는 계열별 소스-폴백이라
+    `partial`이 있다. 계열별 폴백 도입은 *관측*이 아니라 구조 변경이므로 이 태스크의 비목표다.
+
+    `_status`는 배치 레인 전용 메타이므로 `_mc_save`에 넘기는 dict에는 섞지 않는다(여기서는
+    실패 시 저장 자체를 생략하므로 자연히 성립한다). 요청경로 `get_macro_signals`는 저장값만
+    읽으므로 응답 shape도 변하지 않는다.
+    """
     api_key = os.environ.get("FRED_API_KEY")
     if not api_key:
         return {"error": "FRED_API_KEY 환경변수가 필요합니다."}
@@ -72,8 +88,9 @@ def _fetch_and_save_macro_signals() -> dict:
             new_pts = _fetch_series(series_id, api_key, start)
             merged[key] = _merge_history(prev, new_pts)
     except Exception as e:
-        logger.warning(f"[Macro] FRED 시계열 수집 실패, 저장값 반환: {e}")
-        return stored_data or {k: [] for k in _SERIES} | {"signals": {}}
+        logger.warning(f"[Macro] FRED 시계열 수집 실패, 저장 생략·직전값 반환: {e}")
+        fallback = dict(stored_data) if stored_data else {k: [] for k in _SERIES} | {"signals": {}}
+        return {**fallback, "_status": "skipped"}   # 반환용 별도 dict — 저장값을 mutate하지 않는다
 
     merged["signals"] = evaluate_signals(merged)
     _mc_save("macro_signals", merged)
