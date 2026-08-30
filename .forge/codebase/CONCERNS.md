@@ -161,8 +161,37 @@ mapped: 2026-08-22
 |---|---|---|---|
 | B80 | 경로 조각이 SQL `date` 캐스트로 직행해 **500**이 된다 — `GET /api/report/{ticker}/{date_str}`가 `date_str`을 검증하지 않아 `InvalidDatetimeFormat`이 미포착 예외로 올라간다. 400/404여야 하는 입력이 500이므로 ⓐ 외부 소비자가 「서버 장애」로 오독하고 ⓑ 오타 경로가 에러 로그를 오염시킨다. **선재 결함이며 task#330 라이브 스모크에서 발견**됐다 — task#326이 넣은 전역 예외 핸들러가 `[UnhandledError]` 마커로 로그를 남기기 시작해 **비로소 관측 가능해졌다**(그 전엔 로그 없는 raw 500) | `routers/report.py::get_report`(catch-all `/{ticker}/{date_str}`) | 무인증 불가(인증 필요) · 임의 경로 조각 1개 |
 | B81 | `title` 필드에 **두 모집단이 섞여 있고 스키마에 상한이 없다** — 라이브 15종 실측이 「13~24자 이름」(7종: 「태양광 — 셀·모듈 기술」)과 「93~207자 리드 문장」(8종, 전부 2026-08-21 발행: 「중국 링룽 1호의 '2026년 상반기 상업운전' 시한은…」)으로 갈린다. `TechReportIn.title`에 `max_length`·`min_length`가 없어(빈 문자열도 201) **목록 카드 높이의 상한이 발행자 규율에만 의존**하는데 그 규율이 이미 깨졌다. 결과: m390 목록 페이지 높이 **14997px**, PC 카드 높이 275~455px. ⚠️ **B54의 잘림 제거는 옳다**(상세 페이지가 같은 필드에 「ellipsis·line-clamp 금지」를 명시하고 그 근거가 「한국어는 술어가 끝에 와 잘림이 결론부터 먹는다」다) — 잘림을 되살리는 것이 처방이 **아니고**, ⓐ 스키마 상한 ⓑ 발행 루틴이 `title`에 이름을 넣도록 정정 ⓒ 카드에 별도 요약 필드 사용 중 하나다. **task#331 육안 확인에서 발견**(프로브는 「잘리지 않음」을 재므로 통과했다 — 육안이 유일한 포착 수단이었던 7번째 사례) | `routers/tech_reports.py::TechReportIn.title` · `pages/TechReports.jsx` 카드 · 발행 루틴 `scripts/cowork-routine-prompt.md` | 발행자가 `title`에 리드 문장을 넣으면(현재 8/15) |
-| B21 | Postgres가 tracked 폴백 비밀번호로 호스트 5432에 발행 | `docker-compose.yml` (`POSTGRES_PASSWORD`) | 호스트 접근 가능한 누구나 |
 | B82 | **레이트리밋(B20)의 신뢰 전제가 배포 구성으로 강제되지 않는다 — `CF-Connecting-IP`를 위조해 우회할 수 있다.** nginx가 호스트 포트를 `0.0.0.0:80`에 게시하고(`docker-compose.yml`·`deploy.sh`) `/api/` 블록이 `CF-Connecting-IP`를 **한 번도 참조·제거하지 않으므로**, 터널을 우회해 nginx에 직접 닿는 클라이언트가 그 헤더를 요청마다 바꿔 두 임계를 완전히 무력화한다(매 값이 새 버킷 → 항상 허용 → bcrypt 전액 지불). **역방향이 더 나쁘다** — 피해자의 실제 IP를 그 헤더에 넣어 버킷을 소진시키면, 그 사용자의 진짜 Cloudflare 트래픽이 창이 끝날 때까지 429를 받는다(B20 도입이 *새로 만든* 표적 로그인 차단 벡터. 도입 전에는 아무도 남을 잠글 수 없었다). ⚠️ **ADR `260823-085145`의 「공개 경로는 Cloudflare 전용」이 그 전제이고, 그것이 거짓임이 확인됐다** — 기록된 트레이드오프가 아니라 전제 오류다. 후보 처방 3가지: ⓐ 게시를 `127.0.0.1`로 좁힌다(가장 단순. cloudflared가 `http://localhost:80`만 쓰고 nginx 443 블록은 주석 처리돼 비활성이며 ACME는 터널을 경유하므로 기술적으로 안전하나, **LAN 직접 접속 습관을 깬다** — 사용자 결정 필요) ⓑ nginx `/api/` 블록에서 `CF-Connecting-IP`를 신뢰 출처가 아닐 때 제거한다(단 이 스택에서는 터널 트래픽과 LAN 트래픽이 nginx에게 동일하게 보여 구별 수단이 없다) ⓒ Cloudflare 대역 검증(`set_real_ip_from`)을 도입한다(ADR이 대역 갱신 부담으로 배제한 대안) | `docker-compose.yml`(nginx `ports`) · `deploy.sh`(`docker run -p`) · `nginx/nginx.conf`(`location /api/`) · `backend/services/rate_limit.py::client_ip` | LAN·호스트에서 nginx에 직접 도달 가능한 누구나 |
+
+> ✅ **`B21` 해소 (task#334, 2026-08-30)** — Postgres 폴백 비밀번호 + 호스트 5432 발행.
+> 착수 실측이 원 서술보다 나빴다: 루트 `.env`에 `POSTGRES_PASSWORD`가 **없어** compose가
+> tracked 폴백값을 해석하고 있었고, `backend/.env.docker`·`backend/.env`의 `DATABASE_URL`이
+> 그 값으로 접속 중이었으며, 저장소는 **PUBLIC**이고, `172.16.11.230:5432`에 LAN에서
+> **TCP 연결이 실제로 성공**했다. 즉 「폴백이 쓰일 수도 있다」가 아니라 **공개된 값이 곧 실운영
+> 크리덴셜**이었다. 파일에서 지워도 git 이력에 남으므로 **비밀번호 교체가 필수**였다.
+> 조치 3가지 — ⓐ `ALTER USER`로 32자 무작위 값 회전 + 크리덴셜 보유 파일 **3개**
+> (`backend/.env.docker`·`backend/.env`·루트 `.env`) 동시 갱신(`scripts/rotate-postgres-password.sh`,
+> 실패 시 전량 롤백) ⓑ 폴백 제거 → `${POSTGRES_PASSWORD:?}`로 미설정 시 명시적 실패
+> ⓒ 발행을 `127.0.0.1:5432:5432`로 좁힘.
+> 검증: 별도 컨테이너(`scram-sha-256` 경로)에서 **옛 폴백값 거부 · 새 값만 통과 · 빈/틀린 값 거부**,
+> 백엔드 `SELECT 1` 정상, 인증실패 로그 0건, `docker compose config`의 `host_ip: 127.0.0.1`.
+>
+> **기록된 트레이드오프 — 5432 호스트 발행을 없애지 않고 루프백으로 좁혔다.** 백엔드는 도커
+> 네트워크 별칭 `postgres:5432`로 접속하므로 발행을 통째로 지워도 앱은 무영향이지만, 그러면
+> 호스트에서 `psql -h localhost`가 불가능해진다. LAN 노출 제거라는 목적은 루프백 바인딩으로
+> 이미 달성되므로 더 강한 선택지는 채택하지 않았다. **다음 헌트가 이것을 결함으로 재발견하지 말 것**
+> — 단, 「호스트 접근 가능한 누구나」가 여전히 도달 조건인 것은 맞고, 그 대가로 이제
+> **강한 무작위 비밀번호**가 요구된다(공개 이력의 값이 아니다).
+>
+> ⚠️ **잔여 2건(이 태스크 범위 밖, 미해소)**
+> - **포트 바인딩은 postgres 컨테이너 재생성 시점에 적용된다** — 회전 직후 시점의 실행 중
+>   컨테이너는 여전히 `0.0.0.0:5432`다. 비밀번호는 이미 교체됐으므로 남은 노출은
+>   「강한 비밀번호가 걸린 열린 포트」이나, 재생성 전까지 ⓒ는 파일에만 존재한다.
+> - **`com.portfolion.docker-compose` launchd 잡이 죽어 있다** — exit **127**(command not found).
+>   `ProgramArguments`가 삭제된 워크트리 경로
+>   (`.claude/worktrees/docker-infra-migration/scripts/start-docker-compose.sh`)를 가리킨다.
+>   현재 컨테이너가 살아 있는 것은 `restart: unless-stopped` 덕분이고, 컨테이너가 제거되면
+>   **자동 복구되지 않는다.** B21과 무관한 선재 결함이라 고치지 않고 기록만 한다.
 
 ### 표시 오류 / 크래시
 
@@ -980,16 +1009,16 @@ if (err.response?.status === 401) {
 
 유일한 검증이 고정 `sleep 2` 뒤의 `curl -s http://localhost/health && echo " <- /health OK" || echo "WARNING: health check failed"`다 — **구조적으로 비차단**이다. 롤백 경로 없음. §6.6과 겹쳐 기동 백필이 있는 배포마다 이 경고가 뜨지만 배포는 성공으로 보고된다.
 
-### 10.5 시크릿 폴백 — **확인된 버그** (B21) · B19은 해소
+### 10.5 시크릿 폴백 — **해소**(B21 task#334 · B19 · SESSION_SECRET task#326)
 
 | 환경변수 | 파일 | 형태 |
 |---|---|---|
-| `POSTGRES_PASSWORD` | `docker-compose.yml` | `${POSTGRES_PASSWORD:-<리터럴 기본값>}` — 호스트 env가 없으면 tracked 파일에 박힌 약한 비밀번호로 조용히 뜬다 |
+| ~~`POSTGRES_PASSWORD`~~ | `docker-compose.yml` | **해소**(task#334) — `${POSTGRES_PASSWORD:?}`로 교체해 미설정 시 명시적 실패. 폴백값이 실제로 실운영 크리덴셜이었으므로 비밀번호도 회전했다(§0 B21 해소 각주) |
 | ~~`SESSION_SECRET`~~ | `backend/routers/auth.py` | **해소**(task#326) — 모듈 레벨 리터럴 폴백을 `::_hmac_secret`의 호출 시점 해석 + `RuntimeError`로 교체 (§5.5) |
 
-**남은 것은 `POSTGRES_PASSWORD` 하나**이고 저장소에 커밋돼 있다(B21 — task#334로 이월). 그 외 리터럴 시크릿 폴백은 없다. `backend/.env.docker`(실 시크릿 저장소)와 루트 `.env`는 올바르게 gitignored.
+**리터럴 시크릿 폴백은 이제 0건이다**(task#334에서 마지막 하나인 `POSTGRES_PASSWORD`가 닫혔다). `backend/.env.docker`·`backend/.env`(실 시크릿 저장소)와 루트 `.env`는 올바르게 gitignored — 크리덴셜 보유 파일이 **3개**임에 주의(회전 시 셋을 함께 갱신해야 한다).
 
-추가 노출: `docker-compose.yml`이 postgres를 `"5432:5432"`로 **호스트에 발행**한다. self-hosted 러너 머신에서 이는 호스트 인터페이스에 닿는 DB다.
+추가 노출도 좁혔다 — `docker-compose.yml`의 postgres 발행이 `"127.0.0.1:5432:5432"`(루프백 전용)다. 이전 `"5432:5432"`는 LAN 전체에 닿았다(실측 확인). ⚠️ **파일 변경은 컨테이너 재생성 시점에 적용된다** — 재생성 전까지 실행 중 컨테이너는 여전히 `0.0.0.0`이다.
 
 ### 10.6 볼륨 권한 — **잠재 위험**(낮음)
 
@@ -1160,14 +1189,9 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 ## 14. 계획됐지만 미실행인 것
 
-`.forge/backlog/`에 **대기 계획 2건**이 있다(2026-08-22 실측 — 직전 판의 "0건"은 이 증분에서 뒤집혔다). 둘 다 이 드라이브가 **비목표로 명시해 이월한 것**이므로 §0의 잔존 행과 1:1 대응한다:
+`.forge/backlog/`는 **비어 있다**(2026-08-30 실측). 직전 판이 적은 대기 2건은 둘 다 소진됐다 — `resilience-and-hardening-features.md`(**333**)는 task#335~337 3파트로 실행됐고, `postgres-credential-rotation.md`(**334**)는 이 항목의 B21 해소로 완료됐다.
 
-| 슬롯 | task | 내용 | 대응 §0 행 |
-|---|---|---|---|
-| `resilience-and-hardening-features.md` | **333** | 기능급 신설 5건 — 에러 바운더리 · 토큰 갱신 · 레이트리밋 · diag 유출 · 포매터 중복 (그릴링 전 스텁) | `B48`·`B9`·`B20`·`B51`·`B63` |
-| `postgres-credential-rotation.md` | **334** | Postgres tracked 폴백 비밀번호 — **사용자 경유 필수**(프로덕션 크레덴셜 회전) | `B21` |
-
-⚠️ **이 2건이 §0 이월 6건을 흡수한다** — 「§0에 남아 있다」와 「아무도 안 맡았다」는 다르다. 반대로 `B6`(부분, `macro.py` 잔존)·`B80`·`B81`은 **어느 슬롯에도 없다**(무주공산).
+⚠️ **그래서 §0의 잔존 6건은 이제 전부 무주공산이다** — `B6`(부분, `macro.py` 잔존)·`B80`·`B81`·`B82`·`B49`(부분)·`B63` 어느 것도 대기 슬롯이 없다. 「§0에 남아 있다」와 「누군가 맡고 있다」는 다르고, 지금은 **아무도 맡고 있지 않다**.
 
 `.forge/adr/`엔 ADR 파일 **48개**가 활성이다 — 번호 `0001`~`0047`(47건, 직전 판의 `0001`~`0035`에서 12건 증가: `0036` SW API 무캐시 · `0037` 리포트 변경 소유권 · `0038` 주요기술 단일행 · `0039`~`0047` 주요기술·리포트 계열) + 날짜명 1건(`260821-073608-tech-report-backfill-bypasses-routine.md`). `retired/`는 여전히 없다. ⚠️ 날짜명 ADR이 섞여 있으므로 **번호 최대값(47)과 파일 수(48)가 다르다** — `ls | wc -l`로 「ADR N건」을 세면 번호 체계와 어긋난다(`STRUCTURE.md §5`의 카운트 드리프트가 §0 `B59`로 잡혀 있는 이유가 이것이다).
 

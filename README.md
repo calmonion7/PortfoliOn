@@ -44,11 +44,17 @@ cd frontend && npm run dev
 
 ## 환경변수
 
-`backend/.env.docker`에 설정 (루트 `.env`에도 `POSTGRES_PASSWORD`를 두어 docker-compose 보간에 사용):
+크리덴셜은 **파일 3개**에 나뉘어 있고 DB 비밀번호를 바꿀 땐 셋을 함께 갱신해야 한다
+(`scripts/rotate-postgres-password.sh`가 그 절차를 자동화한다):
+
+| 파일 | 담는 것 |
+|---|---|
+| `backend/.env.docker` | 컨테이너 백엔드 — `DATABASE_URL` 및 아래 키 전부 |
+| `backend/.env` | 로컬 venv·pytest·스크립트 — `DATABASE_URL` |
+| `.env` (루트) | `POSTGRES_PASSWORD` — docker-compose 보간 전용. **폴백이 없으므로 미설정이면 `docker compose` 명령이 실패한다** |
 
 ```
 # 필수
-POSTGRES_PASSWORD=...
 JWT_SECRET=...
 SESSION_SECRET=...        # 세션 서명 + OAuth state HMAC — 폴백 없음(미설정이면 기동 실패)
 
