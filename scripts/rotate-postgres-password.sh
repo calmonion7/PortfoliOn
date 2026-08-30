@@ -16,6 +16,9 @@
 #
 # 어느 단계에서 실패하든 위 넷을 전부 원상복구한다(rollback).
 set -euo pipefail
+# `set -e` 는 실패 시 **아무 메시지도 남기지 않는다** — 초판이 비밀번호 생성 파이프라인의
+# SIGPIPE(141)로 조용히 죽어 "실행했는데 아무 일도 안 일어났다" 가 됐다. 그 무음을 없앤다.
+trap 'ec=$?; echo "❌ 예기치 못한 종료: line $LINENO, exit $ec" >&2' ERR
 cd "$(dirname "$0")/.."
 
 PG=portfolion-postgres-1
@@ -26,8 +29,12 @@ BAKDIR=".rotate-backup-$STAMP"
 die() { echo "❌ $*" >&2; exit 1; }
 
 # --- 0. 사전 점검 ------------------------------------------------------------
-docker ps --format '{{.Names}}' | grep -qx "$PG" || die "$PG 가 실행 중이 아니다"
-docker ps --format '{{.Names}}' | grep -qx "$BE" || die "$BE 가 실행 중이 아니다"
+# ⚠️ 파이프를 쓰지 말 것 — `grep -q`가 첫 매치에서 즉시 끝나 좌변이 SIGPIPE(141)를 받고,
+#    `set -o pipefail`이 그 141을 파이프라인 종료코드로 올려 **멀쩡한데 die** 한다.
+#    출력을 먼저 받아 두고 here-string으로 검사한다(파이프라인이 아니라 SIGPIPE가 없다).
+RUNNING=$(docker ps --format '{{.Names}}')
+grep -qx "$PG" <<< "$RUNNING" || die "$PG 가 실행 중이 아니다"
+grep -qx "$BE" <<< "$RUNNING" || die "$BE 가 실행 중이 아니다"
 for f in backend/.env.docker backend/.env; do
   [ -f "$f" ] || die "$f 가 없다"
   grep -q '^DATABASE_URL=' "$f" || die "$f 에 DATABASE_URL 이 없다"
@@ -36,7 +43,10 @@ done
 
 # --- 1. 새 비밀번호 ----------------------------------------------------------
 NEWPW="${1:-}"
-[ -n "$NEWPW" ] || NEWPW=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)
+# ⚠️ `tr -dc ... | head -c 32` 를 쓰지 말 것 — head가 32바이트에서 파이프를 닫아 tr이
+#    SIGPIPE(141)를 받고, `set -o pipefail` + `set -e` 조합이 **에러 메시지 하나 없이**
+#    스크립트를 종료시킨다(실측: exit=141, 백업 생성 전이라 흔적조차 안 남는다).
+[ -n "$NEWPW" ] || NEWPW=$(python3 -c "import secrets,string;print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(32)))")
 # 영숫자로 제한한다 — DATABASE_URL 안에서 퍼센트 인코딩 없이 안전하고,
 # `@ : / ? # % &` 가 섞이면 URL 파싱이 조용히 어긋난다
 case "$NEWPW" in *[!A-Za-z0-9]*) die "비밀번호는 영숫자만 허용한다 (DATABASE_URL 파싱 안전용)";; esac
@@ -155,7 +165,11 @@ for _ in $(seq 1 36); do
 done
 [ "$OK" = 1 ] || { rollback; die "백엔드가 새 비밀번호로 DB에 접속하지 못한다"; }
 
-if docker logs "$BE" --since 5m 2>&1 | grep -qi 'password authentication failed'; then
+# ⚠️ 여기서 파이프를 쓰면 검사가 **뒤집힌다** — 인증 실패가 *발견되면* grep이 먼저 끝나
+#    docker logs가 SIGPIPE(141)를 받고, pipefail이 141을 올려 `if`가 거짓이 된다.
+#    즉 진짜 실패일수록 통과한다. 출력을 먼저 받아 둔다.
+LOGTAIL=$(docker logs "$BE" --since 5m 2>&1 || true)
+if grep -qi 'password authentication failed' <<< "$LOGTAIL"; then
   rollback; die "백엔드 로그에 인증 실패가 있다"
 fi
 
