@@ -6,6 +6,12 @@ export default function useReportList() {
   const [lastScheduledDates, setLastScheduledDates] = useState(null)
   const [listLoading, setListLoading] = useState(true)
   const [hasFetched, setHasFetched] = useState(false)
+  /** 3상태의 세 번째 값 — 「미조회(listLoading)」·「0건(reportList가 비었고 listFailed=false)」과
+   *  구별되는 **조회 실패**. 실패를 빈 결과로 붕괴시키면 화면이 「리포트가 없습니다」라는
+   *  *사실이 아닌 단정*을 하고, 그 아래 「설정에서 지금 생성」이라는 **잘못된 행동을 지시**한다
+   *  (task#307 규율 · 참조 구현 `pages/Ranking.jsx::BasicInfo`의 news/newsFailed).
+   *  실패는 캐시하지 않는다 — `fetchList` 진입마다 false로 되돌리므로 재시도·재마운트가 다시 묻는다. */
+  const [listFailed, setListFailed] = useState(false)
   const [guruMap, setGuruMap] = useState({})
 
   useEffect(() => {
@@ -25,8 +31,13 @@ export default function useReportList() {
 
   const fetchList = useCallback(() => {
     setListLoading(true)
+    setListFailed(false)   // 첫 조회 성공 뒤 ↺ 재조회가 실패해도 드러나도록 진입마다 리셋
     api.get('/api/report/list')
       .then(({ data }) => applyList(data))
+      .catch((e) => {
+        console.warn('[useReportList] 리포트 목록(/api/report/list) 조회 실패', e)
+        setListFailed(true)
+      })
       .finally(() => { setListLoading(false); setHasFetched(true) })
   }, [applyList])
 
@@ -67,7 +78,7 @@ export default function useReportList() {
   const ungeneratedCount = ungeneratedTickers.length
 
   return {
-    reportList, lastScheduledDates, listLoading, hasFetched,
+    reportList, lastScheduledDates, listLoading, hasFetched, listFailed,
     guruMap, fetchList, applyList,
     holdingsCount, watchlistAll, watchlistCount,
     watchlistWarnCount, watchlistLowCount, watchlistHighCount,

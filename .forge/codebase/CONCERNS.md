@@ -826,21 +826,35 @@ if (err.response?.status === 401) {
 
 **부작용이 더 아프다**: 이 401 핸들러는 **전역 하드 내비게이션**이라 백그라운드 폴러에도 발동한다 — `usePortfolioData`(KR 장중 15초마다 `/api/portfolio/prices`)·`useReportGeneration`(1.5초마다 `/api/report/progress`). 도달: `StockModal`을 반쯤 채운 상태에서 토큰이 만료 → 폴러가 401 → **입력 중에 로그인 화면으로 순간이동**, 만료 안내 토스트도 복귀 경로도 없다(`location.replace`가 딥링크를 의도적으로 버린다).
 
-### 7.2 에러 바운더리가 없다 — **확인된 버그** (B48)
+### 7.2 무가드 크래시 사이트 7곳 — **현재 백엔드 계약에서 도달 불가 · 계약 변경 시 재발** (B48은 해소)
 
-`grep -rn "ErrorBoundary|componentDidCatch|getDerivedStateFromError" frontend/src/` → **0건**. 렌더 중 throw가 루트까지 전파되면 React 19가 트리 전체를 언마운트하고 `#root`가 비며, 내비게이션도 새로고침 유도도 없다(`useSwUpdateReload`도 함께 언마운트된다). `index.html`의 테마 부팅 CSS 때문에 사용자는 단색 사각형을 본다.
+> ⚠️ **2026-08-31 재판정(task#343, HEAD `c782f3e`) — 이 절은 두 곳이 거짓이 되어 있었다.**
+>
+> ⓐ **「에러 바운더리가 없다」는 더 이상 사실이 아니다.** 같은 `grep`을 다시 돌리면 **12곳**이
+>    나오고(테스트 제외) 3층으로 배선돼 있다 — `main.jsx` 최외곽 · `App.jsx`의 `InstallPrompt`
+>    전용 · 라우트 `key={location.key}`. 회귀 테스트도 2파일 있다
+>    (`components/ErrorBoundary.test.jsx` · `test/error-boundary-route-reset.test.jsx`).
+>    도입 커밋 `57efe80`(task#335, B48·B51). 따라서 **아래 사이트들이 화면을 통째로 비운다는
+>    옛 전제는 성립하지 않는다** — 경계가 그 라우트만 폴백으로 대체한다.
+> ⓑ **아래 표의 「던지는 조건」 열은 *측정값이 아니라 가정형*이었다.** 7곳 전부를 백엔드
+>    라우터에서 실측한 결과 **현재 계약에서는 어느 것도 도달하지 않는다**(맨 오른쪽 열).
+>
+> **그럼에도 7행을 지우지 않는 이유**: 이것은 「해소」가 아니라 **「현재 계약에 의존한 조건부
+> 안전」**이다. 프론트 코드는 그대로 무가드이므로 백엔드가 응답 형태를 바꾸는 순간 7곳이
+> 동시에 되살아난다. 무조건 해소로 적으면 그때 아무도 이 표면을 다시 보지 않는다
+> (「산 코드를 죽었다고 적으면 기능이 삭제된다」의 문서판, task#332).
+>
+> 남은 실질 과제는 **경계 세분화**(섹션/위젯 단위)이지 경계 신설이 아니다 — §14 우선순위 1 참조.
 
-이 부재가 아래 크래시 사이트들을 전부 **백지**로 증폭한다:
-
-| 심각도 | 파일 · 심볼 | 던지는 조건 |
-|---|---|---|
-| HIGH | `pages/GuruDetail.jsx::GuruDetail` — `splitManagerName(manager.name)` | `setManager(data)`가 null/빈 200 본문을 받으면 `loading=false`·`error=null`로 통과해 `manager.name` 접근 |
-| HIGH | `pages/AnalystReport.jsx::AnalystReport` — `report.data \|\| {}` | `setReport(data)`에 null 가드 없음 |
-| HIGH | `pages/Calendar.jsx` → `MonthGrid` — `setEvents(r.data.events)` 후 `for (const e of events)` | `events` 키 없는 응답 → not iterable |
-| HIGH | `pages/Analytics.jsx::CorrelationHeatmap` — `!data.tickers.length`, `matrix.map(row => row.map(...))` | `tickers` 없는 200, 또는 비정형 matrix |
-| MED | `pages/GuruManagers.jsx::GuruManagers` — `data.managers.filter(...)` | `setData(data)`가 기본값을 통째 교체(형제 `GuruHoldersSection`은 `data.managers \|\| []`로 올바름) |
-| MED | `pages/GuruStats.jsx::StatRow` — `row.score.toFixed(3)` | 같은 파일의 다른 필드는 전부 `?? '-'`인데 여기만 무가드 |
-| MED | `pages/Settings.jsx::BatchHub` — `batches.filter(...)` | `batches.length === 0` 검사가 객체에선 false라 `.filter`까지 도달 |
+| 심각도 | 파일 · 심볼 | 던지는 조건 (*가정형 — 미측정*) | 실측 판정 (2026-08-31) |
+|---|---|---|---|
+| HIGH | `pages/GuruDetail.jsx::GuruDetail` — `splitManagerName(manager.name)` | `setManager(data)`가 null/빈 200 본문을 받으면 `loading=false`·`error=null`로 통과해 `manager.name` 접근 | **도달 불가** — `/api/guru/managers/{id}`는 dict 또는 **404**만 반환한다. 게다가 `splitManagerName`이 `(name \|\| '').trim()`로 이미 null-safe다 |
+| HIGH | `pages/AnalystReport.jsx::AnalystReport` — `report.data \|\| {}` | `setReport(data)`에 null 가드 없음 | **도달 불가** — `loading`·`error` 조기 return이 앞에 있고 엔드포인트가 dict를 반환한다 |
+| HIGH | `pages/Calendar.jsx` → `MonthGrid` — `setEvents(r.data.events)` 후 `for (const e of events)` | `events` 키 없는 응답 → not iterable | **도달 불가** — `routers/calendar.py`가 `{"events": _get_events(...)}`로 키를 고정 반환한다 |
+| HIGH | `pages/Analytics.jsx::CorrelationHeatmap` — `!data.tickers.length`, `matrix.map(row => row.map(...))` | `tickers` 없는 200, 또는 비정형 matrix | **도달 불가** — `routers/analytics.py`가 **모든 분기**에서 `{"tickers": …, "matrix": …}`를 반환한다 |
+| MED | `pages/GuruManagers.jsx::GuruManagers` — `data.managers.filter(...)` | `setData(data)`가 기본값을 통째 교체(형제 `GuruHoldersSection`은 `data.managers \|\| []`로 올바름) | **도달 불가** — `routers/guru.py::get_managers`가 `{**data, "managers": [...]}`로 키를 항상 채운다(실측). ⚠️ task#343이 이 파일에 넣은 것은 **조회 실패 3상태**이고 이 무가드 접근 자체는 그대로다 |
+| MED | `pages/GuruStats.jsx::StatRow` — `row.score.toFixed(3)` | 같은 파일의 다른 필드는 전부 `?? '-'`인데 여기만 무가드 | **도달 불가** — `compute_weighted`가 `score`를 항상 세팅하고 `tab` 분기와 배열이 일치한다 |
+| MED | `pages/Settings.jsx::BatchHub` — `batches.filter(...)` | `batches.length === 0` 검사가 객체에선 false라 `.filter`까지 도달 | **도달 불가** — `routers/batches.py::list_batches`가 **리스트**를 반환한다(실측) |
 
 ### 7.3 비동기 레이스 — **일부 가드됨, 6곳 미가드**(task#331에서 5곳 닫힘)
 
@@ -866,7 +880,7 @@ if (err.response?.status === 401) {
 | MED | `components/StockSearchBox.jsx` 검색 이펙트 | 디바운스(350ms)는 레이스 가드가 아니다 — 느린 1차 응답이 나중 착지해 `삼성전자` 텍스트 아래 `삼성` 결과가 뜨고, 행을 고르면 **틀린 티커**가 관심종목에 들어간다 |
 | ~~MED~~ | ~~`components/reports/HistoryTab.jsx` 3이펙트~~ | **닫힘(task#331)** — `cancelled` 플래그, 히스토리 이펙트는 `.finally`까지 게이트. ⚠️ `.finally` 게이트의 회귀 축은 **새 요청을 in-flight로 붙잡은 채** 낡은 응답을 착지시켜야 이빨이 생긴다 — 새 요청을 먼저 해소하는 픽스처는 두 `.finally`가 같은 값을 써서 관측 차이가 원리적으로 생기지 않는다(주입 실측: 그 순서에서는 `.finally` 게이트를 지워도 8축 전부 초록) |
 | MED | `hooks/usePortfolioData.js::fetchAll`/`fetchDashboard` | 5개 호출 지점(마운트·bounded heal 루프·탭 클릭 2곳·↺ 버튼)이 경쟁하고 `finally`가 무조건 스피너를 끈다 |
-| MED | `hooks/useReportList.js::fetchList` | 가드도 `.catch`도 없다 |
+| MED | `hooks/useReportList.js::fetchList` | **세대 가드는 여전히 없다.** ⚠️ 「`.catch`도 없다」는 2026-08-31(task#343 S2)에 **거짓이 됐다** — `.catch` + `listFailed` 3상태가 들어갔고 `Reports.jsx`가 그것을 실패 배너로 렌더한다. 남은 것은 레이스 가드뿐이다 |
 
 ### 7.4 삼켜진 fetch가 "데이터 없음"으로 위장한다 — **확인된 버그**
 
@@ -1265,7 +1279,7 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 | 우선순위 | 항목 | 절 |
 |---|---|---|
-| 1 | 에러 바운더리 신설 — §7.2의 크래시 7곳이 현재 전부 백지다 · **task#333 스텁으로 큐잉됨** | §7.2 |
+| 1 | **경계 세분화**(섹션/위젯 단위) — 에러 바운더리 *신설*은 **완료됐다**(`57efe80`, task#335, B48: `main.jsx`·`InstallPrompt`·라우트 `key` 3층 + 회귀 테스트 2파일). 이 행의 옛 표기는 §7.2의 무가드 사이트 7곳이 경계 부재로 전부 화면을 비운다고 적었는데 **둘 다 거짓**이었고 2026-08-31(task#343)에 정정했다 — 경계는 존재하고, 그 7곳은 현재 백엔드 계약상 **도달 불가**이기도 하다(§7.2 재판정). 남은 값어치는 「루트가 통째로 날아가는 대신 그 섹션만 폴백」이며 신설과는 **별개 항목**이다 | §7.2 |
 | ~~2~~ | ~~`_fetch_naver_market`의 0페이지 가드(형제 US 경로와 대칭화)~~ → **완료(2026-08)** | §1.1 |
 | ~~3~~ | ~~`fx` 배치 신설~~ → **완료(2026-08, `fx_fetch`)**. 잔존: `_usdkrw_rate`에 **나이 검사·stale 마커는 여전히 없다** | §6.4 |
 | 4 | 로그인 레이트리밋(bcrypt CPU 고갈 DoS) · **task#333 스텁으로 큐잉됨** | §5.6 |

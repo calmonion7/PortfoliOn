@@ -35,7 +35,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
   const touchStyle = isMobile ? { minWidth: 44, minHeight: 44, padding: '0 8px' } : undefined
 
   const {
-    reportList, listLoading,
+    reportList, listLoading, listFailed,
     guruMap, fetchList, applyList,
     holdingsCount, watchlistCount,
     watchlistWarnCount, watchlistLowCount, watchlistHighCount,
@@ -43,7 +43,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
     ungeneratedTickers, ungeneratedCount,
   } = useReportList()
 
-  const { generating, genProgress, generateOne, generateBatch, cleanup } = useReportGeneration({ onApplyList: applyList })
+  const { generating, genProgress, generateOne, generateBatch } = useReportGeneration({ onApplyList: applyList })
 
   const { stocks, watchlist, fetchAll } = usePortfolioData()
 
@@ -75,6 +75,12 @@ export default function Reports({ initialTicker = null, navKey = null }) {
   const [activeTab, setActiveTab] = useState('holdings')
   const [othersData, setOthersData] = useState(null)
   const [othersLoading, setOthersLoading] = useState(false)
+  /** others 탭의 3상태 — `listFailed`(useReportList)와 동형. `othersData === null`은 「미조회」와
+   *  「실패」를 **둘 다** 뜻하므로 실패를 별도 플래그로 들어야 화면이 둘을 구별해 말할 수 있다. */
+  const [othersFailed, setOthersFailed] = useState(false)
+  /** 재시도 트리거. `othersData`는 실패 시에도 `null`로 남으므로 `setOthersData(null)`은
+   *  상태가 안 바뀌어 이펙트를 다시 태우지 못한다 — 그래서 별도 카운터가 필요하다. */
+  const [othersReloadKey, setOthersReloadKey] = useState(0)
   const [view, setView] = useState('list')
   const [detailRefreshKey] = useState(0)
 
@@ -104,9 +110,23 @@ export default function Reports({ initialTicker = null, navKey = null }) {
       .then(({ data }) => {
         const all = data.stocks ?? data
         setOthersData(Object.fromEntries(Object.entries(all).filter(([, v]) => !v.is_mine)))
+        setOthersFailed(false)
+      })
+      .catch((e) => {
+        console.warn('[Reports] 그외 종목 목록(/api/report/list?scope=all) 조회 실패:', e)
+        setOthersFailed(true)   // 실패를 「0건」으로 붕괴시키지 않는다 (task#307)
       })
       .finally(() => setOthersLoading(false))
-  }, [activeTab, isAdmin, othersData])
+  }, [activeTab, isAdmin, othersData, othersReloadKey])
+
+  /** 지금 보고 있는 탭의 조회가 **실패**했는가. 「0건」과 반드시 구별해 렌더해야 한다 —
+   *  실패에 「리포트가 없습니다 / 설정에서 지금 생성」을 띄우면 사실이 아닌 단정 위에
+   *  잘못된 행동까지 지시하게 된다(참조 구현: `pages/GuruStats.jsx` — 에러 분기가 빈 상태보다 **먼저**). */
+  const activeFailed = activeTab === 'others' ? othersFailed : listFailed
+  const retryActive = () => {
+    if (activeTab === 'others') setOthersReloadKey(k => k + 1)
+    else fetchList()
+  }
 
   useEffect(() => {
     api.get('/api/analyst-reports')
@@ -156,7 +176,11 @@ export default function Reports({ initialTicker = null, navKey = null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTicker, listLoading, navKey])
 
-  useEffect(() => cleanup, [cleanup])
+  // ⚠️ 종전의 `useEffect(() => cleanup, [cleanup])`를 제거했다 — `cleanup`이 매 렌더 새로
+  //    만들어져 deps가 매 렌더 바뀌고, React가 직전 destructor(`clearInterval`)를 매 렌더
+  //    실행해 **첫 폴링 틱 뒤 폴러가 죽었다**(task#343 S1 실측: progress 호출 1회).
+  //    언마운트 정리는 이제 `useReportGeneration`이 자체 `useEffect`로 소유한다.
+  //    다시 배선하지 말 것 — 회귀 축: `src/test/report-generation-poll-lifetime.test.jsx`.
 
   useEffect(() => {
     if (activeTab === 'ungenerated' && ungeneratedCount === 0) setActiveTab('holdings')
@@ -208,9 +232,11 @@ export default function Reports({ initialTicker = null, navKey = null }) {
         </div>
         {(activeTab === 'others' ? othersLoading : listLoading)
           ? <Skeleton variant="row" count={8} />
-          : (activeEntries.length === 0)
-            ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>리포트 없음</p>
-            : null
+          : activeFailed
+            ? <p role="alert" data-testid="report-list-error-side" style={{ color: 'var(--color-error)', fontSize: 12 }}>목록을 불러오지 못했습니다</p>
+            : (activeEntries.length === 0)
+              ? <p style={{ color: 'var(--text-3)', fontSize: 12 }}>리포트 없음</p>
+              : null
         }
         <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {!(activeTab === 'others' ? othersLoading : listLoading) && activeEntries.map(([t, info]) => (
@@ -249,7 +275,17 @@ export default function Reports({ initialTicker = null, navKey = null }) {
             </div>
           ) : (
             <>
-              {activeEntries.length === 0 ? (
+              {/* ⚠️ 에러 분기가 빈 상태보다 **먼저**여야 한다 — 순서가 뒤집히면 조회 실패가
+                  「리포트가 없습니다」로 표시되고 그 아래 「지금 생성」이라는 잘못된 행동까지
+                  지시한다(실제 결함이었다). 두 상태를 병존시키지도 않는다: 오지시 제거가 핵심이므로
+                  실패일 때는 빈 상태 블록을 통째로 렌더하지 않는다. */}
+              {activeFailed ? (
+                <div role="alert" data-testid="report-list-error"
+                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', marginTop: 60, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--color-error)', fontSize: 13 }}>
+                  <span>리포트 목록을 불러오지 못했습니다.</span>
+                  <button className="btn" style={{ flexShrink: 0 }} onClick={retryActive}>다시 시도</button>
+                </div>
+              ) : activeEntries.length === 0 ? (
                 <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                   <div className="sketch-draw"><SketchEmpty size={140} /></div>
                   <p style={{ margin: 0 }}>리포트가 없습니다.</p>

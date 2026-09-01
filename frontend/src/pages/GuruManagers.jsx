@@ -5,7 +5,7 @@ import useTrackedStocks from '../hooks/useTrackedStocks'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Input from '../components/ui/Input'
 import useIsMobile from '../hooks/useIsMobile'
-import { SketchEmpty } from '../components/sketches'
+import { SketchEmpty, SketchError } from '../components/sketches'
 import { splitManagerName } from '../utils/guruName'
 import { fmtUsdCompact } from '../utils'
 
@@ -37,6 +37,9 @@ export default function GuruManagers() {
   const navigate = useNavigate()
   const [data, setData]         = useState({ last_updated: null, managers: [] })
   const [loading, setLoading]   = useState(true)
+  // 3상태의 세 번째 값 — 빈 상태와 구분한다. 실패에 "즉시 크롤링에서 가져오세요"를 띄우면
+  // 잘못된 행동을 지시하게 된다(형제 `GuruStats.jsx`의 같은 주석 참조, task#307).
+  const [error, setError]       = useState(null)
   const { stockMap, unknown, pending, toggle } = useTrackedStocks()
   const [sort, setSort]         = useState({ key: SORT_OPTIONS[0].key, dir: SORT_OPTIONS[0].dir })
   const [query, setQuery]       = useState('')
@@ -45,6 +48,10 @@ export default function GuruManagers() {
   useEffect(() => {
     api.get('/api/guru/managers')
       .then(({ data }) => setData(data))
+      .catch(e => {
+        console.error('[GuruManagers] 구루 운용역 조회 실패:', e)
+        setError('구루 운용역 목록을 불러오지 못했습니다.')
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -99,6 +106,14 @@ export default function GuruManagers() {
   })
 
   if (loading) return <LoadingSpinner label="구루 운용역 불러오는 중입니다." />
+  // 에러가 빈 상태보다 먼저다 — 실패에 "즉시 크롤링에서 데이터를 가져오세요"를 띄우면
+  // 사용자에게 잘못된 행동을 지시한다(크롤링은 이 실패를 고치지 못한다).
+  if (error) return (
+    <div className="guru-empty">
+      <div className="sketch-draw"><SketchError size={140} /></div>
+      <p style={{ color: 'var(--color-error)' }}>{error}</p>
+    </div>
+  )
   if (!data.managers.length) return (
     <div className="guru-empty">
       <div className="sketch-draw"><SketchEmpty size={140} /></div>
