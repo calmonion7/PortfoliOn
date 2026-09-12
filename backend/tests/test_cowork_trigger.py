@@ -27,6 +27,37 @@ def test_fire_posts_with_token(monkeypatch):
     assert kwargs["json"] == {"text": "KR 배치 완료"}
 
 
+def test_fire_payload_is_byte_identical_without_extensions(monkeypatch):
+    """기존 호출의 본문이 확장 전과 바이트 동일하다 — 리스너 구버전 무회귀의 근거.
+
+    확장 3키가 None이면 payload에서 **통째로 생략**돼야 한다. `"tickers": null`을 실어
+    보내면 구버전 리스너는 무시하겠지만, 신버전은 그것을 전량 모드로 오독할 수 있다.
+    """
+    monkeypatch.setenv("COWORK_ROUTINE_FIRE_URL", "https://example.com/fire")
+    monkeypatch.setenv("COWORK_ROUTINE_FIRE_TOKEN", "tok")
+    with patch("services.cowork_trigger.requests.post", return_value=MagicMock(status_code=200)) as mock_post:
+        cowork_trigger.fire("manual")
+    assert mock_post.call_args.kwargs["json"] == {"text": "manual"}  # 키 3개 부재
+
+
+def test_fire_payload_carries_extensions_when_given(monkeypatch):
+    """확장 payload 3키가 그대로 실린다(야간 전량 회차의 계약)."""
+    monkeypatch.setenv("COWORK_ROUTINE_FIRE_URL", "https://example.com/fire")
+    monkeypatch.setenv("COWORK_ROUTINE_FIRE_TOKEN", "tok")
+    with patch("services.cowork_trigger.requests.post", return_value=MagicMock(status_code=200)) as mock_post:
+        assert cowork_trigger.fire("야간", tickers=["AAPL", "005930"], model="sonnet", chunk=5) is True
+    assert mock_post.call_args.kwargs["json"] == {
+        "text": "야간", "tickers": ["AAPL", "005930"], "model": "sonnet", "chunk": 5,
+    }
+
+
+def test_nightly_text_names_no_policy(monkeypatch):
+    """야간 본문은 상한·게이트를 열거하지 않는다(task#279 — 트리거가 정본을 이기는 것 차단)."""
+    t = cowork_trigger.nightly_text()
+    assert "enrich" in t
+    assert not any(tok in t for tok in ("5개", "7일", "상한", "애널리스트", "주요기술"))
+
+
 def test_fire_swallows_failures(monkeypatch):
     monkeypatch.setenv("COWORK_ROUTINE_FIRE_URL", "https://example.com/fire")
     monkeypatch.setenv("COWORK_ROUTINE_FIRE_TOKEN", "tok")
@@ -34,6 +65,76 @@ def test_fire_swallows_failures(monkeypatch):
         assert cowork_trigger.fire("t") is False  # 예외 전파 없음(배치 본문 보호)
     with patch("services.cowork_trigger.requests.post", return_value=MagicMock(status_code=500, text="err")):
         assert cowork_trigger.fire("t") is False
+
+
+# ── 야간 전량 enrich 잡 (task#344) ─────────────────────────────────────
+
+class _FakeRun:
+    """job_runs.record가 yield하는 상태 핸들 대역."""
+    def __init__(self):
+        self.status = None
+
+    def set_status(self, status, detail=None):
+        self.status = (status, detail)
+
+
+def _patch_record(run):
+    from contextlib import contextmanager
+
+    @contextmanager
+    def fake(job_id, trigger):
+        fake.seen = (job_id, trigger)
+        yield run
+    return fake
+
+
+def _run_nightly(monkeypatch, *, portfolio, configured=True, fire_ok=True):
+    from scheduler import jobs
+    from services import cowork_trigger
+    run = _FakeRun()
+    rec = _patch_record(run)
+    fired = {}
+
+    def fake_fire(text, **kw):
+        fired["text"] = text
+        fired.update(kw)
+        return fire_ok
+
+    monkeypatch.setattr(jobs.job_runs, "record", rec)
+    monkeypatch.setattr(jobs.storage, "get_global_portfolio", lambda: portfolio)
+    monkeypatch.setattr(cowork_trigger, "configured", lambda: configured)
+    monkeypatch.setattr(cowork_trigger, "fire", fake_fire)
+    jobs._run_nightly_enrich()
+    return run, fired, getattr(rec, "seen", None)
+
+
+def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
+    """보유+관심 합집합을 중복 없이·정렬해 싣고, sonnet·chunk 5로 발사한다."""
+    run, fired, seen = _run_nightly(monkeypatch, portfolio={
+        "stocks": [{"ticker": "AAPL"}, {"ticker": "005930"}],
+        "watchlist": [{"ticker": "AAPL"}, {"ticker": "NVDA"}],  # AAPL 중복
+    })
+    assert seen == ("cowork_enrich_nightly", "auto")
+    assert fired["tickers"] == ["005930", "AAPL", "NVDA"]
+    assert fired["model"] == "sonnet" and fired["chunk"] == 5
+    assert run.status is None  # 성공은 set_status를 부르지 않는다(기본 success)
+
+
+def test_nightly_enrich_marks_failed_when_fire_returns_false(monkeypatch):
+    """fire는 예외가 아니라 False를 반환한다 — 명시하지 않으면 배치현황이 영원히 초록이다."""
+    run, _, _ = _run_nightly(monkeypatch, portfolio={"stocks": [{"ticker": "AAPL"}], "watchlist": []},
+                             fire_ok=False)
+    assert run.status is not None and run.status[0] == "failed"
+
+
+def test_nightly_enrich_skips_when_dormant_or_empty(monkeypatch):
+    """미설정·대상 0은 실패가 아니라 skipped다(둘을 failed로 적으면 진짜 실패가 묻힌다)."""
+    run, fired, _ = _run_nightly(monkeypatch, portfolio={"stocks": [], "watchlist": []},
+                                 configured=False)
+    assert run.status[0] == "skipped" and not fired
+
+    run2, fired2, _ = _run_nightly(monkeypatch, portfolio={"stocks": [], "watchlist": []})
+    assert run2.status[0] == "skipped" and not fired2
 
 
 # ── 스케줄러 훅 — 배치 말미 fire, 실패해도 배치 안 깨짐 ─────────────────

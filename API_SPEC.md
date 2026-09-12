@@ -344,11 +344,21 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 { "text": "005930 enrich 후 애널리스트 리포트 발행" }
 ```
 
+리스너로 전달되는 본문은 3필드를 **선택적으로(additive)** 더 받는다 — 스케줄러의 야간 전량 회차(`cowork_enrich_nightly`)가 쓰는 경로이며, 이 admin 엔드포인트 자체는 `text`만 받는다. 세 키는 **생략 시 payload에서 통째로 빠진다**(구버전 리스너 무회귀).
+
+| 필드 | 타입 | 기본 | 설명 |
+|---|---|---|---|
+| `tickers` | `string[]` | 없음(생략) | 전량 모드 대상 종목. **있으면** 리스너가 `chunk`개씩 잘라 세션을 **순차** 스폰하고, 각 세션 프롬프트에 `[대상 종목]` 블록으로 자기 청크만 싣는다. 없으면 기존대로 1세션 논블로킹 스폰. |
+| `model` | `string` | `"opus"` | 세션의 `claude -p --model` 값. 야간 전량 회차는 `"sonnet"`. |
+| `chunk` | `int` | `5` | 청크당 종목 수. |
+
 **Response `200`**
 ```json
 { "ok": true, "text": "005930 enrich 후 애널리스트 리포트 발행" }
 ```
 (`text` 생략/빈값이면 응답은 `{ "ok": true, "text": "수동 트리거 — 프롬프트에 정의된 전 정책을 순서대로 검토해 수행하라." }`)
+
+리스너의 응답은 모드에 따라 갈린다 — 기존 경로는 `{ "ok": true, "run": "<workdir>" }`, `tickers`가 실린 전량 모드는 `{ "ok": true, "run": "queued", "chunks": <청크 수> }`(청크 수 = ⌈len(tickers)/chunk⌉).
 
 **Error `503`** — `COWORK_ROUTINE_FIRE_URL`/`COWORK_ROUTINE_FIRE_TOKEN` 미설정 (휴면)
 **Error `502`** — fire POST 실패 (서버 로그 확인)

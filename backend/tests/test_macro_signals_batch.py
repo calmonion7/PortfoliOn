@@ -35,7 +35,7 @@ def test_registry_count_grows_by_one():
     #   + recommendation_kr + recommendation_us + agm_fetch + us_supply_fetch
     #   + us_sector_fetch + beta_fetch + kospi_signal_fetch + business_formation_fetch
     #   + labor_surveys_fetch + trimmed_inflation_fetch + fx_fetch = 33
-    assert len(batch_registry.BATCHES) == 33
+    assert len(batch_registry.BATCHES) == 34
 
 
 def test_macro_signals_counts_as_overseas():

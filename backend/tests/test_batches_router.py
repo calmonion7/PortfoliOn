@@ -33,6 +33,7 @@ EXPECTED_IDS = {
     "insider_fetch", "recommendation_kr", "recommendation_us",
     "us_supply_fetch", "beta_fetch", "kospi_signal_fetch", "business_formation_fetch",
     "labor_surveys_fetch", "trimmed_inflation_fetch", "fx_fetch",
+    "cowork_enrich_nightly",
 }
 
 
@@ -44,7 +45,7 @@ def test_lists_sixteen_batches_with_required_fields():
         resp = client.get("/api/batches")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 33
+    assert len(data) == 34
     assert {b["id"] for b in data} == EXPECTED_IDS
     for b in data:
         assert REQUIRED_FIELDS.issubset(b.keys()), b["id"]
@@ -306,7 +307,7 @@ def test_list_batches_survives_legacy_spec_without_type():
 
     assert resp.status_code == 200
     data = {b["id"]: b for b in resp.json()}
-    assert len(data) == 33
+    assert len(data) == 34
     broken = data["leverage_fetch"]
     assert broken["schedule_desc"] == get_batch("leverage_fetch")["schedule_desc"]
     # 저장 스펙 자체는 그대로 노출한다 — 운영자가 무엇이 깨졌는지 보고 PUT으로 고친다.

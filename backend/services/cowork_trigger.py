@@ -36,16 +36,37 @@ def manual_text() -> str:
     return "수동 트리거 — 프롬프트에 정의된 전 정책을 순서대로 검토해 수행하라."
 
 
-def fire(text: str) -> bool:
-    """루틴 트리거 발사. 성공 True / 미설정·실패 False (예외 전파 없음)."""
+def nightly_text() -> str:
+    """야간 전량 enrich 회차 본문 — 상한·게이트는 프롬프트 §1이 정본이다(정책 열거 금지).
+
+    대상 종목은 이 본문이 아니라 payload의 `tickers`로 넘어가고, 리스너가 청크마다
+    `[대상 종목]` 블록으로 붙인다.
+    """
+    return "야간 전량 enrich 회차 — 트리거에 명시된 종목만 enrich·재생성하고 다른 정책은 수행하지 말라."
+
+
+def fire(text: str, *, tickers: list | None = None, model: str | None = None,
+         chunk: int | None = None) -> bool:
+    """루틴 트리거 발사. 성공 True / 미설정·실패 False (예외 전파 없음).
+
+    확장 3키는 **additive**다 — None이면 payload에서 통째로 생략되므로 기존 호출의
+    본문은 `{"text": ...}`로 바이트 동일하다(리스너 구버전 무회귀).
+    """
     if not configured():
         return False
     url = os.environ["COWORK_ROUTINE_FIRE_URL"]
+    payload: dict = {"text": text}
+    if tickers is not None:
+        payload["tickers"] = tickers
+    if model is not None:
+        payload["model"] = model
+    if chunk is not None:
+        payload["chunk"] = chunk
     try:
         r = requests.post(
             url,
             headers={"Authorization": f"Bearer {os.environ['COWORK_ROUTINE_FIRE_TOKEN']}"},
-            json={"text": text},
+            json=payload,
             timeout=_TIMEOUT,
         )
         if r.status_code >= 300:

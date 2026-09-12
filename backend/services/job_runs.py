@@ -70,6 +70,11 @@ def record(job_id: str, trigger: str):
     skipped로)·다음날 코스피 신호(scheduler/jobs._refresh_kospi_signal)·US 섹터 모멘텀
     (scheduler/jobs._fetch_us_sector, all-None 저장 생략을 skipped로)는
     set_status로 배선돼 있어 이 주의의 예외다.
+    ⚠️ cowork_enrich_nightly는 **그 예외 목록에 넣을 수 없다** — set_status가 배선돼 있지만
+    (fire 전송 실패 → failed, 미설정·대상 0 → skipped) 이 잡의 실제 작업은 fire를 받은
+    **다른 프로세스**(로컬 리스너)에서 이 잡이 끝난 뒤 수 시간에 걸쳐 일어나고, 완료를 백엔드로
+    보고하는 통로가 없다. 즉 이 잡의 success는 「본문이 성공」이 아니라 「트리거가 접수됨」이며,
+    그 뒤의 전부(청크 실패·한도 중단·재기동 소실)는 원리적으로 여기 기록될 수 없다.
     """
     try:
         rows = query(
