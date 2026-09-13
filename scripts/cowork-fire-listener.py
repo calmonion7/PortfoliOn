@@ -24,8 +24,10 @@ import subprocess
 import tempfile
 import threading
 import time
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parent.parent
 PROMPT_FILE = REPO / "scripts" / "cowork-routine-prompt.md"
@@ -44,6 +46,20 @@ _LOG_HEAD_BYTES = 4096
 # ~19분이므로 3배 여유를 둔다.
 _CHUNK_TIMEOUT = 3600
 _MAX_CHUNK = 50
+
+
+def _log(msg: str) -> None:
+    """리스너의 **유일한** 로그 방출 지점 — 시각 없는 로그는 상관을 못 짓는다(task#346).
+
+    실측 동기: `POST /fire → 401` 4건이 남았는데 타임스탬프가 없어 그 401이 어느 fire였는지
+    확정할 수 없었다. 토큰 지문 대조·클라이언트 식별로도 좁혀지지 않아 남은 수단이 시각뿐이었다.
+    새 방출 지점을 만들 때 `print`를 쓰지 말 것 — 그 한 줄만 시각을 잃는다.
+    """
+    try:
+        ts = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:  # tzdata 부재 등 — 로그가 리스너를 죽이지는 않게 한다
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] [fire-listener] {msg}", flush=True)
 
 
 def _env_value(key: str) -> str:
@@ -112,18 +128,16 @@ def _run_chunks(text: str, tickers: list, model: str, chunk: int) -> None:
             # 무한 대기는 워커를 영구 정지시킨다 — 이 청크를 포기하고 다음으로 간다.
             proc.kill()
             rc = None
-            print(f"[fire-listener] 청크 {i + 1}/{len(groups)} 타임아웃({_CHUNK_TIMEOUT}s) — 강제 종료",
-                  flush=True)
+            _log(f"청크 {i + 1}/{len(groups)} 타임아웃({_CHUNK_TIMEOUT}s) — 강제 종료")
         if _hit_limit(workdir):
-            print(f"[fire-listener] 한도로 중단, 잔여 {len(groups) - i - 1}청크", flush=True)
+            _log(f"한도로 중단, 잔여 {len(groups) - i - 1}청크")
             return
         # rc를 안 보면 인증 오류·바이너리 부재 같은 **한도 아닌 모든 실패**가 「완료」로 찍힌다
         # (계측 실패를 판정 성공으로 읽는 것). 한 청크 실패로 나머지를 버리지는 않는다.
         if rc == 0:
-            print(f"[fire-listener] 청크 {i + 1}/{len(groups)} 완료 ({len(group)}종목)", flush=True)
+            _log(f"청크 {i + 1}/{len(groups)} 완료 ({len(group)}종목)")
         elif rc is not None:
-            print(f"[fire-listener] 청크 {i + 1}/{len(groups)} 실패 (exit {rc}, {len(group)}종목) — 계속",
-                  flush=True)
+            _log(f"청크 {i + 1}/{len(groups)} 실패 (exit {rc}, {len(group)}종목) — 계속")
 
 
 _QUEUE: "queue.Queue" = queue.Queue()
@@ -137,7 +151,7 @@ def _worker_loop():
         try:
             _run_chunks(*job)
         except Exception as e:  # 한 회차의 실패가 워커를 죽이면 이후 전량 fire가 영영 안 돈다
-            print(f"[fire-listener] 전량 회차 실패: {e}", flush=True)
+            _log(f"전량 회차 실패: {e}")
         finally:
             _QUEUE.task_done()
 
@@ -154,13 +168,38 @@ def _enqueue_chunks(text: str, tickers: list, model: str, chunk: int) -> int:
 
 
 class Handler(BaseHTTPRequestHandler):
+    def _reject(self, code: int) -> None:
+        """바디 없는 거부 응답 — `Content-Length: 0`이 **없으면 간헐 ConnectionReset**이 난다.
+
+        옛 코드는 `send_response(code); end_headers()`만 했다. 길이도 `Connection: close`도 없으니
+        클라이언트가 바디를 읽으려 할 때 서버가 이미 연결을 닫아 버려, 호출측이 상태코드 대신
+        소켓 예외를 받는다(이 테스트에서 6회 중 2회 재현). 즉 **401을 받은 쪽 로그가 「401」이
+        아니라 「연결 끊김」으로 남을 수 있었다** — 진단성이 목적인 이 작업에서 그대로 둘 수 없다.
+        상태코드도 응답 바디 키도 바뀌지 않으므로 백엔드 `cowork_trigger.fire` 계약은 그대로다.
+        """
+        self.send_response(code)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_POST(self):
         if self.path != "/fire":
-            self.send_response(404); self.end_headers(); return
+            self._reject(404); return
         token = _env_value("COWORK_ROUTINE_FIRE_TOKEN")
         auth = self.headers.get("Authorization", "")
-        if not token or auth != f"Bearer {token}":
-            self.send_response(401); self.end_headers(); return
+        # 사유 3종을 가른다 — 옛 코드는 `not token or auth != ...` 로 뭉개서, 401을 봐도 서버
+        # 설정 문제인지 클라이언트 문제인지 알 수 없었다(실측 401 4건이 그래서 미해결로 남았다).
+        # ⚠️ 토큰 값도 Authorization 헤더 값도 로그에 싣지 말 것 — 디버깅용으로 찍고 싶어지는
+        # 자리이고, 그 로그 파일은 평문으로 오래 남는다(테스트 ⑦이 이 가드다).
+        reason = None
+        if not token:
+            reason = "no-server-token — .env.docker에 COWORK_ROUTINE_FIRE_TOKEN이 없다(서버 설정)"
+        elif not auth:
+            reason = "no-auth-header — 요청에 Authorization 헤더가 없다(클라이언트)"
+        elif auth != f"Bearer {token}":
+            reason = "token-mismatch — 헤더 토큰이 .env.docker 값과 다르다(백엔드 컨테이너 env가 stale한가?)"
+        if reason:
+            _log(f"401 {reason}")
+            self._reject(401); return
         text, tickers, model, chunk = "", None, DEFAULT_MODEL, DEFAULT_CHUNK
         try:
             length = int(self.headers.get("Content-Length", 0))
@@ -200,10 +239,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(out)
 
     def log_message(self, fmt, *args):  # 기본 stderr 로그 → launchd 로그 파일로 수집됨
-        print(f"[fire-listener] {self.address_string()} {fmt % args}", flush=True)
+        _log(f"{self.address_string()} {fmt % args}")
 
 
 if __name__ == "__main__":
     RUN_DIR.mkdir(exist_ok=True)
-    print(f"[fire-listener] listening on 127.0.0.1:{PORT}", flush=True)
+    _log(f"listening on 127.0.0.1:{PORT}")
     HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
