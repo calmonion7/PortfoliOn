@@ -126,10 +126,17 @@ def _resolve(ticker: str, ref: str) -> int:
     return int(got)
 
 
-def _row(hid: int) -> dict:
-    raw = _psql(f"SELECT row_to_json(t) FROM (SELECT * FROM enrich_history WHERE id={hid}) t")
+def _row(ticker: str, hid: int) -> dict:
+    """이력 행 1개. **반드시 ticker로 한정한다** — id만으로 읽으면 다른 종목의 행을 조용히
+    가져와 엉뚱한 두 종목을 비교하게 된다(실측: `diff 035420 1 2`의 2가 벌크 seed로 들어간
+    타 종목 행이었고, 건드리지도 않은 필드가 달라 보였다). 틀린 비교는 없는 비교보다 나쁘다.
+    """
+    raw = _psql(
+        "SELECT row_to_json(t) FROM (SELECT * FROM enrich_history "
+        f"WHERE id={hid} AND ticker=upper({_lit(ticker)})) t"
+    )
     if not raw:
-        raise RuntimeError(f"이력 id={hid} 없음")
+        raise RuntimeError(f"{ticker.upper()}: 이력 id={hid} 없음 (다른 종목의 id일 수 있다 — `list`로 확인하라)")
     return json.loads(raw)
 
 
@@ -176,7 +183,7 @@ def restore(ticker: str, ref: str) -> None:
     재생성이 빠지면 복원이 무의미하다 — 루틴이 읽는 것은 컬럼이 아니라 **스냅샷**이다.
     enriched_at은 건드리지 않는다(이 하네스가 「완료」를 판정하는 신호라 되돌리면 다음 대기가 깨진다).
     """
-    row = _row(_resolve(ticker, ref))
+    row = _row(ticker, _resolve(ticker, ref))
     f = row["fields"]
     sets = ", ".join(f"{k} = {_lit(f.get(k))}" for k in FIELDS)
     _psql_stdin(f"UPDATE tickers SET {sets} WHERE ticker = upper({_lit(ticker)});")
@@ -258,7 +265,7 @@ def ab(ticker: str, model_a: str = "sonnet", model_b: str = "opus") -> None:
 
 
 def diff(ticker: str, ref_a: str, ref_b: str) -> None:
-    a, b = _row(_resolve(ticker, ref_a)), _row(_resolve(ticker, ref_b))
+    a, b = _row(ticker, _resolve(ticker, ref_a)), _row(ticker, _resolve(ticker, ref_b))
     na, nb = f"{ref_a}(#{a['id']})", f"{ref_b}(#{b['id']})"
 
     def size(v) -> int:
