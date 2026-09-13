@@ -191,17 +191,31 @@ def restore(ticker: str, ref: str) -> None:
     _regenerate(ticker)
 
 
-def _regenerate(ticker: str) -> None:
+def _regenerate(ticker: str, tries: int = 12) -> None:
+    """리포트 재생성. **409는 유계 재시도한다.**
+
+    루틴이 enrich 직후 스스로 `POST /report/generate`를 부르므로(프롬프트 §1 4단계), 복원의
+    재생성이 그것과 겹쳐 409 `리포트 생성이 이미 진행 중입니다`를 받는다. 실측으로 MSFT
+    마지막 복원이 정확히 그렇게 죽었고, **컬럼은 base인데 스냅샷은 opus판**인 어긋난 상태가
+    남았다 — 화면은 스냅샷을 읽으므로 사용자에게는 복원이 안 된 것으로 보인다.
+    409는 실패가 아니라 「아직 못 받는다」이므로 기다렸다 다시 건다(유계 재시도).
+    """
     req = urllib.request.Request(
         f"{API_BASE}/report/generate?tickers={ticker.upper()}",
         method="POST", headers={"X-API-Key": _env("COWORK_API_KEY"), "Content-Length": "0"},
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            _log(f"리포트 재생성 요청 {ticker}: HTTP {r.status}")
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"리포트 재생성 실패 HTTP {e.code}: {e.read()[:200]!r}")
-    _wait_snapshot(ticker)
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                _log(f"리포트 재생성 요청 {ticker}: HTTP {r.status}")
+            _wait_snapshot(ticker)
+            return
+        except urllib.error.HTTPError as e:
+            if e.code != 409:
+                raise RuntimeError(f"리포트 재생성 실패 HTTP {e.code}: {e.read()[:200]!r}")
+            _log(f"재생성 409(다른 생성 진행 중) — 10초 후 재시도 {i + 1}/{tries}")
+            time.sleep(10)
+    raise RuntimeError(f"리포트 재생성 실패 {ticker}: 409가 {tries}회 지속 — 컬럼과 스냅샷이 어긋난 채로 남았다")
 
 
 def _wait_snapshot(ticker: str, timeout: int = 600) -> None:
