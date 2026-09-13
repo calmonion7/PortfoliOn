@@ -109,14 +109,18 @@ def _run_nightly(monkeypatch, *, portfolio, configured=True, fire_ok=True):
 
 
 def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
-    """보유+관심 합집합을 중복 없이·정렬해 싣고, sonnet·chunk 5로 발사한다."""
+    """보유+관심 합집합을 중복 없이·정렬해 싣고, opus·chunk 5로 발사한다.
+
+    모델은 task#345 A/B 대조로 확정됐다 — sonnet이 검증된 사실오류를 7필드 중 5곳에
+    전파했고(두나무 주식교환 일정), 스냅샷의 정량 데이터를 거의 쓰지 않았다.
+    """
     run, fired, seen = _run_nightly(monkeypatch, portfolio={
         "stocks": [{"ticker": "AAPL"}, {"ticker": "005930"}],
         "watchlist": [{"ticker": "AAPL"}, {"ticker": "NVDA"}],  # AAPL 중복
     })
     assert seen == ("cowork_enrich_nightly", "auto")
     assert fired["tickers"] == ["005930", "AAPL", "NVDA"]
-    assert fired["model"] == "sonnet" and fired["chunk"] == 5
+    assert fired["model"] == "opus" and fired["chunk"] == 5
     assert run.status is None  # 성공은 set_status를 부르지 않는다(기본 success)
 
 
