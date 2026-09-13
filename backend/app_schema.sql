@@ -22,6 +22,19 @@ CREATE TABLE tickers (
   analyst_target      boolean NOT NULL DEFAULT false  -- 애널리스트 리포트 자동 발행 대상 (opt-in, admin 지정 — task#214)
 );
 
+-- enrich 이력 (task#345) — tickers의 enrich 필드는 UPDATE로 덮어써 최신 1판만 남으므로,
+-- 저장할 때마다 쓰기 직후 전체 판을 여기 남긴다. 덮어쓰기가 파괴적이지 않게 되고
+-- 모델·프롬프트 세대 간 대조가 이력 두 행을 읽는 일이 된다. label은 사후 부여(쓰기 시점엔 모델을 모른다).
+CREATE TABLE enrich_history (
+  id          bigserial PRIMARY KEY,
+  ticker      text NOT NULL REFERENCES tickers(ticker) ON DELETE CASCADE,
+  fields      jsonb NOT NULL,
+  changed     jsonb NOT NULL DEFAULT '[]',
+  label       text,
+  created_at  timestamptz NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_enrich_history_ticker ON enrich_history(ticker, created_at DESC);
+
 -- 스냅샷/리포트 (공유, 티커별)
 CREATE TABLE snapshots (
   ticker  text REFERENCES tickers(ticker) ON DELETE CASCADE,

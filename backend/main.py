@@ -71,6 +71,21 @@ def _migrate():
     except Exception as e:
         logger.warning(f"[Migrate] batch_schedules 생성 실패: {e}")
     try:
+        # enrich 이력 (task#345) — 정본은 app_schema.sql, 라이브 DB는 이 쌍으로만 반영된다.
+        from services.db import execute
+        execute(
+            "CREATE TABLE IF NOT EXISTS enrich_history ("
+            "id bigserial PRIMARY KEY, "
+            "ticker text NOT NULL REFERENCES tickers(ticker) ON DELETE CASCADE, "
+            "fields jsonb NOT NULL, "
+            "changed jsonb NOT NULL DEFAULT '[]', "
+            "label text, "
+            "created_at timestamptz NOT NULL DEFAULT NOW())"
+        )
+        execute("CREATE INDEX IF NOT EXISTS idx_enrich_history_ticker ON enrich_history(ticker, created_at DESC)")
+    except Exception as e:
+        logger.warning(f"[Migrate] enrich_history 생성 실패: {e}")
+    try:
         from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS market_short_sell (
             ticker TEXT NOT NULL, base_date DATE NOT NULL,

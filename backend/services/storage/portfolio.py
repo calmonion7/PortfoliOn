@@ -1,9 +1,21 @@
 # backend/services/storage/portfolio.py
 import json
+import logging
+
 from services.db import get_connection, query, execute
+
+logger = logging.getLogger(__name__)
 
 _ANALYST_KEYS = frozenset({"name", "competitors", "moat", "growth_plan", "risks", "recent_disclosures", "insights", "key_resource", "competitor_edge", "market_outlook"})
 _JSON_TEXT_FIELDS = frozenset({"moat", "growth_plan", "risks", "recent_disclosures", "insights", "key_resource", "competitor_edge", "market_outlook"})
+
+# enrich_history에 담는 필드 — 내용은 _JSON_TEXT_FIELDS와 같고 **순서만** 고정한다
+# (row_to_json 키 순서를 결정적으로 만들어 이력 행끼리 비교 가능하게). 두 상수의 동치는
+# test_enrich_history가 단언하므로 한쪽만 늘어나면 테스트가 잡는다.
+_HISTORY_FIELDS = (
+    "moat", "growth_plan", "risks", "recent_disclosures",
+    "insights", "key_resource", "competitor_edge", "market_outlook",
+)
 
 
 def _parse_json_field(val):
@@ -293,4 +305,36 @@ def enrich_stock(ticker: str, fields: dict) -> bool:
     set_clause = ", ".join(f"{k}=%s" for k in fields) + ", enriched_at=NOW()"
     values = [json.dumps(v) if isinstance(v, (list, dict)) else v for v in fields.values()]
     execute(f"UPDATE tickers SET {set_clause} WHERE ticker=%s", (*values, upper))
+    _record_enrich_history(upper, sorted(fields.keys()))
     return True
+
+
+def _record_enrich_history(ticker: str, changed: list) -> None:
+    """쓰기 직후의 enrich 8필드를 이력 1행으로 남긴다 (task#345).
+
+    왜 「보낸 필드」가 아니라 「쓰기 직후 전체」인가 — 단건 PUT은 일부 필드만 보낼 수 있는데
+    보낸 것만 기록하면 그 행 하나로는 복원이 안 된다. 전체를 담으면 어느 행이든 그 자체로
+    완전한 한 판이라 **어느 시점으로든 되돌릴 수 있다**. `changed`는 그 판에서 이번 요청이
+    실제로 건드린 키 목록이다(전량 재작성인지 이름 한 줄 수정인지 구별).
+
+    왜 이 이력이 필요한가 — `tickers`는 UPDATE로 덮어써 종목당 **최신 1판만** 남는다.
+    그래서 야간 전량 갱신이 직전 판을 지워, 모델·프롬프트 세대를 나중에 대조할 방법이
+    없었다(task#345 계획 S1이 「런 전에 수동 스냅샷」을 요구한 이유). 이력이 있으면 덮어쓰기가
+    파괴적이지 않게 되고 대조는 이력 두 행을 읽는 일이 된다.
+
+    실패는 warning으로 삼킨다 — **이력 부재보다 enrich 저장 실패가 나쁘다**. 마커가 grep 앵커다.
+    """
+    cols = ", ".join(_HISTORY_FIELDS)
+    try:
+        rows = query(
+            f"SELECT row_to_json(t) AS f FROM (SELECT {cols} FROM tickers WHERE ticker = %s) t",
+            (ticker,),
+        )
+        if not rows:
+            return
+        execute(
+            "INSERT INTO enrich_history (ticker, fields, changed) VALUES (%s, %s::jsonb, %s::jsonb)",
+            (ticker, json.dumps(rows[0]["f"]), json.dumps(changed)),
+        )
+    except Exception as e:
+        logger.warning(f"[EnrichHistory] 이력 기록 실패 ({ticker}): {e}")

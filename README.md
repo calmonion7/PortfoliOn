@@ -231,6 +231,7 @@ FastAPI (:8000)
  └─ PostgreSQL 16
      ├─ users / refresh_tokens                  (인증)
      ├─ tickers / user_stocks / stock_dividends / stock_supply_score   (종목·배당·수급 스코어)
+     ├─ enrich_history                           (enrich 판 이력 — 덮어쓴 직전 판 보존·세대 대조)
      ├─ snapshots / raw_reports / stock_disclosures / stock_insider_trades   (리포트·공시·내부자)
      ├─ schedules / guru_schedules / guru_managers   (스케줄·구루)
      ├─ digests / consensus_history / daily_consensus_mart

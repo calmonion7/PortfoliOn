@@ -66,7 +66,7 @@ cd backend && .venv/bin/python -m pytest
 - `API_SPEC.md` — full REST API reference (source of truth for endpoints)
 - `CLAUDE_COWORK_API.md` — external API for Claude AI to read/write stock analysis
 - `backend/auth_schema.sql` — Docker PostgreSQL 인증 스키마 (users, refresh_tokens); 반드시 app_schema.sql보다 먼저 실행
-- `backend/app_schema.sql` — Docker PostgreSQL 앱 스키마 (tickers, user_stocks, snapshots, schedules, guru_managers, guru_schedules, digests, consensus_history, calendar_cache, market_cache, user_menu_permissions, user_events, market_leverage_indicators, market_lending_balance)
+- `backend/app_schema.sql` — Docker PostgreSQL 앱 스키마 (tickers, enrich_history, user_stocks, snapshots, schedules, guru_managers, guru_schedules, digests, consensus_history, calendar_cache, market_cache, user_menu_permissions, user_events, market_leverage_indicators, market_lending_balance)
 - `backend/.venv/` — Python virtual environment (macOS: `backend/.venv/bin/python`, Windows: `backend/.venv/Scripts/python`)
 
 ## Data Model

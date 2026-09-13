@@ -45,7 +45,7 @@ def test_enrich_stock_accepts_key_resource_and_json_encodes_dict():
          patch("services.storage.portfolio.execute", return_value=1) as mock_execute:
         result = storage.enrich_stock("AAPL", {"key_resource": key_resource})
     assert result is True
-    sql, params = mock_execute.call_args[0]
+    sql, params = mock_execute.call_args_list[0][0]
     assert "key_resource=%s" in sql
     assert params[0] == json.dumps(key_resource)
 
@@ -60,7 +60,7 @@ def test_enrich_stock_accepts_competitor_edge_and_market_outlook_and_json_encode
          patch("services.storage.portfolio.execute", return_value=1) as mock_execute:
         result = storage.enrich_stock("AAPL", {"competitor_edge": competitor_edge, "market_outlook": market_outlook})
     assert result is True
-    sql, params = mock_execute.call_args[0]
+    sql, params = mock_execute.call_args_list[0][0]
     assert "competitor_edge=%s" in sql
     assert "market_outlook=%s" in sql
     assert params[0] == json.dumps(competitor_edge)
@@ -357,3 +357,67 @@ def test_set_pinned_returns_false_when_not_owned():
     with patch("services.storage.portfolio.execute", return_value=0):
         result = storage.set_pinned("user-123", "AAPL", True)
     assert result is False
+
+
+# ── enrich 이력 (task#345) ──────────────────────────────────────────────────
+# 왜 필요한가: tickers의 enrich 필드는 UPDATE로 덮어써 종목당 최신 1판만 남는다.
+# 야간 전량 갱신이 직전 판을 지우면 모델·프롬프트 세대를 대조할 방법이 사라진다.
+
+def test_history_fields_match_json_text_fields():
+    """순서 고정 튜플과 파싱용 frozenset이 드리프트하면 이력 판이 불완전해진다."""
+    from services.storage import portfolio
+    assert set(portfolio._HISTORY_FIELDS) == set(portfolio._JSON_TEXT_FIELDS)
+    assert len(portfolio._HISTORY_FIELDS) == len(set(portfolio._HISTORY_FIELDS))
+
+
+def _post_write_row():
+    """row_to_json이 돌려줄 쓰기 직후 8필드 — 일부만 보낸 PUT이어도 전체가 담긴다."""
+    from services.storage import portfolio
+    return {f: f"<{f}>" for f in portfolio._HISTORY_FIELDS}
+
+
+def test_enrich_stock_records_full_post_write_history():
+    import json
+    from services import storage
+    post = _post_write_row()
+    with patch("services.storage.portfolio.query",
+               side_effect=[[{"ticker": "AAPL"}], [{"f": post}]]), \
+         patch("services.storage.portfolio.execute", return_value=1) as mock_execute:
+        assert storage.enrich_stock("AAPL", {"moat": "wide"}) is True
+
+    # 2호출: [0] UPDATE tickers, [1] INSERT enrich_history
+    assert mock_execute.call_count == 2, "이력 INSERT가 발행되지 않았다"
+    sql, params = mock_execute.call_args_list[1][0]
+    assert "INSERT INTO enrich_history" in sql
+    assert params[0] == "AAPL"
+    # 보낸 필드는 moat 하나뿐이지만 이력에는 8필드 전체가 담겨야 복원이 가능하다.
+    assert json.loads(params[1]) == post
+    assert json.loads(params[2]) == ["moat"]
+
+
+def test_enrich_stock_history_records_only_changed_keys_sent():
+    import json
+    from services import storage
+    with patch("services.storage.portfolio.query",
+               side_effect=[[{"ticker": "AAPL"}], [{"f": _post_write_row()}]]), \
+         patch("services.storage.portfolio.execute", return_value=1) as mock_execute:
+        storage.enrich_stock("AAPL", {"risks": "r", "moat": "m"})
+    _, params = mock_execute.call_args_list[1][0]
+    assert json.loads(params[2]) == ["moat", "risks"]  # 정렬돼 결정적
+
+
+def test_enrich_stock_survives_history_failure():
+    """이력 부재보다 enrich 저장 실패가 나쁘다 — 이력 INSERT가 터져도 True."""
+    from services import storage
+
+    def _exec(sql, params=None):
+        if "enrich_history" in sql:
+            raise RuntimeError("relation does not exist")
+        return 1
+
+    with patch("services.storage.portfolio.query",
+               side_effect=[[{"ticker": "AAPL"}], [{"f": _post_write_row()}]]), \
+         patch("services.storage.portfolio.execute", side_effect=_exec) as mock_execute:
+        assert storage.enrich_stock("AAPL", {"moat": "wide"}) is True
+    # 이빨 — 이력 경로가 아예 호출되지 않아도 위 단언은 참이므로, 시도했음을 못박는다.
+    assert any("enrich_history" in c[0][0] for c in mock_execute.call_args_list)
