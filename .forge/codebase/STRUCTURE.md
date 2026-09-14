@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: c72a7c9e0a5d11a7cf5ccbe8f6e370220a3d19b5
-mapped: 2026-08-22
+last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
+mapped: 2026-09-14
 ---
 
 # STRUCTURE — PortfoliOn
@@ -116,8 +116,9 @@ backend/
     ├── progress.py         ProgressTracker (try_start 이중실행 거부 + 고착 회수)
     │                       · ProgressRegistry (사용자별 트래커, 상한 64)
     ├── job_runs.py         record() 컨텍스트매니저 + Run.set_status · recent · recent_map
-    ├── batch_registry.py   BATCHES 정적 메타데이터 (배치 정본 목록)
+    ├── batch_registry.py   BATCHES 정적 메타데이터 (배치 정본 목록, 34개)
     ├── schedule_spec.py    스펙 검증 · CronTrigger kwargs 변환 · 사람이 읽는 문구
+    ├── rate_limit.py       IP 슬라이딩 윈도우 레이트리밋 (login/register 전용, task#337)
     │
     ├── storage/            ADR-0017 패키지 분할 — __init__.py가 전 심볼 re-export
     │   ├── portfolio.py    get/save_stocks · get/save_holdings · get_full_portfolio ·
@@ -224,7 +225,7 @@ backend/data/          정적 참조 + 런타임 파일 캐시
 backend/snapshots/     per-ticker/date 스냅샷 JSON (gitignored)
 backend/reports/       레거시 리포트 디렉터리 (read-only 폴백, gitignored)
 backend/.venv/         로컬 가상환경 — Python 3.9.6, lxml 없음
-backend/tests/         175 파일 = `test_*.py` 172 + `conftest.py` + `_routes.py` + `__init__.py`
+backend/tests/         176 파일 = `test_*.py` 173 + `conftest.py` + `_routes.py` + `__init__.py`
                        (`ls backend/tests/*.py | wc -l`)
 ```
 
@@ -280,10 +281,10 @@ frontend/
     │
     ├── components/       ※ 아래 괄호 수치는 **디렉터리 엔트리 수**다(jsx·js·css·`*.test.*`·
     │                     하위 디렉터리 전부 포함). `ls <dir> | wc -l`로 재현된다.
-    │   ├── (루트 19)     Masthead · MobileNav · MobileTopActions · GlobalSearch · StockModal ·
+    │   ├── (루트 21)     Masthead · MobileNav · MobileTopActions · GlobalSearch · StockModal ·
     │   │                 StockSearchBox · PromoteModal · Toast · LoadingSpinner · Glossary ·
     │   │                 InstallPrompt · PermissionManager · PermissionPanel ·
-    │   │                 BatchScheduleEditor · DiagLog
+    │   │                 BatchScheduleEditor · DiagLog · **ErrorBoundary**(task#335, B48)
     │   ├── ui/ (17)      Badge(+MarketBadge·ChangeBadge) · Button · Card · Input · Skeleton ·
     │   │                 Stat · icons · GuruActivityBadge · InsiderBadge · SupplyBadge
     │   │                 └ index.js 배럴
@@ -328,22 +329,28 @@ frontend/
     ├── utils/            analytics(trackEvent) · diag(logDiag 링버퍼) · oauthHistory ·
     │                     marketHours · priceFlash · pwa · guruName
     ├── assets/           hero.png · react.svg · vite.svg
-    └── test/             vitest 횡단 스위트 36 + setup.js (= 37 엔트리)
+    └── test/             vitest 횡단 스위트 41 + setup.js (= 42 엔트리)
                           컴포넌트 옆 `*.test.*`와 병존한다.
-                          **프론트 테스트 파일 총 83** —
+                          **프론트 테스트 파일 총 89** —
                           `find frontend/src -name '*.test.jsx' -o -name '*.test.js' | wc -l`
-                          (분포: test/ 36 · components/tech 15 · pages 10 · components/reports 9 ·
+                          (분포: test/ 41 · components/tech 15 · pages 10 · components/reports 9 ·
                            hooks 5 · components/market 3 · utils 2 · glossary 1 ·
-                           components 루트 1 · src 루트 1)
+                           components 루트 2 · src 루트 1 — task#335/336/343이 더한 6건:
+                           `ErrorBoundary.test.jsx`·`api-token-refresh`·`error-boundary-route-reset`·
+                           `guru-managers-three-state`·`report-generation-poll-lifetime`·
+                           `report-list-three-state`)
 ```
 
 ---
 
 ## 4. `scripts/`
 
-**168 파일** (`find scripts -maxdepth 1 -type f`) — 확장자별 `.mjs` 139 · `.py` 13 · `.js` 8 ·
-`.sh` 4 · `.json` 2 · `.md` 1 · `.txt` 1. 접두사별 `uat*` 130(그중 `uat*.mjs` **124**) ·
+**174 파일** (`find scripts -maxdepth 1 -type f`) — 확장자별 `.mjs` 139 · `.py` 15 · `.js` 8 ·
+`.sh` 6 · `.json` 2 · `.md` 2 · `.txt` 1 · `.plist` 1. 접두사별 `uat*` 130(그중 `uat*.mjs` **124**) ·
 `probe*` 13 · `smoke*` 3 · `loopcheck*` 3 · `capture*` 3 · `check-*` 3.
+(task#334/338/344/345/346이 6건 추가 — `enrich-ab.py`·`test_fire_listener_logging.py`(.py 2) ·
+`rotate-postgres-password.sh`·`apply-docker-autostart.sh`(.sh 2) ·
+`README-docker-autostart.md`(.md 1) · `com.portfolion.docker-compose.plist`(.plist 1, 신규 확장자))
 
 | 패턴 | 용도 | 예 |
 |---|---|---|
@@ -356,8 +363,8 @@ frontend/
 | `capture-<슬러그>.{js,mjs}` | 육안 확인용 스크린샷 캡처 | `capture-tech322-m278.mjs` · `capture-ux.js` |
 | `<슬러그>-baseline-tags.txt` | 프로브 baseline 동결(래칫 비교 대상) | `uat311-baseline-tags.txt` |
 | `audit_*.py` | 정적 감사 | `audit_unauth_endpoints.py` |
-| 운영 | 배포·DDNS·리스너 | `auto-deploy-poll.sh` · `ddns_update.sh` · `start-docker-compose.sh` · `cowork-fire-listener.py` |
-| 데이터 | 일회성 복구·백테스트 | `repair-005930-snapshots.py` · `kospi_signal_backtest.py` |
+| 운영 | 배포·DDNS·리스너·자동기동 | `auto-deploy-poll.sh` · `ddns_update.sh` · `start-docker-compose.sh` · `cowork-fire-listener.py` · `rotate-postgres-password.sh` · `apply-docker-autostart.sh` |
+| 데이터 | 일회성 복구·백테스트·A/B 하네스 | `repair-005930-snapshots.py` · `kospi_signal_backtest.py` · `enrich-ab.py`(ARCHITECTURE.md §4.4 enrich 이력 A/B) |
 | 프롬프트 | 루틴 정의 | `cowork-routine-prompt.md` |
 
 `scripts/package.json`의 유일한 의존성은 `playwright`. 캡처는 프로젝트 루트의
@@ -441,7 +448,7 @@ frontend/
 **DB 테이블** — 소유 축을 접두로: `user_*`(사용자 스코프) · `stock_*`(티커 스코프) ·
 `market_*`(시장 전역) · `guru_*` · 그 외 단수 개념(`tickers` · `snapshots` · `digests` ·
 `schedules` · `job_runs` · `analyst_reports` · `tech_reports` · `raw_reports` ·
-`daily_consensus_mart` · `backlog_history`).
+`daily_consensus_mart` · `backlog_history` · `enrich_history`(task#345, ARCHITECTURE.md §4.4)).
 
 **엔드포인트** — `/api/<리소스>` kebab-case(`/api/analyst-reports` · `/api/tech-reports` ·
 `/api/market/kr-top2-earnings`). 배치 수동 트리거는 `POST …/refresh` 또는 `…/refresh-<대상>`.
@@ -494,6 +501,9 @@ frontend/
 | FOMC 날짜 목록 | `backend/routers/calendar.py` (`_FOMC_DATES`) |
 | 이벤트 화이트리스트 | `backend/routers/events.py` (`VALID_EVENTS`) |
 | 신규 테이블·컬럼 | `backend/app_schema.sql` **+** `backend/main.py:_migrate` (쌍) |
+| 로그인/가입 레이트리밋 | `backend/services/rate_limit.py` |
+| 야간 전량 enrich 배치·청크 스폰 정책 | `backend/scheduler/jobs.py::_run_nightly_enrich` + `scripts/cowork-fire-listener.py` |
+| enrich 이력·A/B 모델 비교 | `backend/services/storage/portfolio.py::_record_enrich_history` + `scripts/enrich-ab.py` |
 | 주요기술 발행 계약(필드·상·하한·교차검증) | `backend/routers/tech_reports.py` (pydantic 모델 22종) |
 | nav 탭 추가·개명·삭제 | `frontend/src/navSections.js` (세 소비처는 파생) |
 | 라우트 추가·리다이렉트 | `frontend/src/App.jsx` `<Routes>` · `frontend/src/routes.js` |

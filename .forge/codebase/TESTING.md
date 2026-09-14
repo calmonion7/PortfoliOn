@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: c72a7c9e0a5d11a7cf5ccbe8f6e370220a3d19b5
-mapped: 2026-08-22
+last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
+mapped: 2026-09-14
 ---
 
 # TESTING — 테스트·검증 지도
@@ -32,17 +32,18 @@ task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `group
 
 | 계층 | 러너 | 설정 | 실행 | 규모 |
 |---|---|---|---|---|
-| 백엔드 | pytest | `backend/pytest.ini` (`testpaths = tests`, `pythonpath = .`) | `cd backend && .venv/bin/python -m pytest` | 172 테스트 파일 · 정적 `def test_*` 2,020개 → **2,259 passed / 0 failed** |
-| 프론트 | vitest 4 + jsdom + @testing-library/react | `frontend/vite.config.js`의 `test` 블록 (ADR-0019) | `cd frontend && npm test`(= `vitest run`) | 83 테스트 파일 · 정적 `it()` 884개 → **929 passed / 0 failed** |
+| 백엔드 | pytest | `backend/pytest.ini` (`testpaths = tests`, `pythonpath = .`) | `cd backend && .venv/bin/python -m pytest` | 176 테스트 파일 · 정적 `def test_*` 2,056개 → **2,302 passed / 0 failed** |
+| 프론트 | vitest 4 + jsdom + @testing-library/react | `frontend/vite.config.js`의 `test` 블록 (ADR-0019) | `cd frontend && npm test`(= `vitest run`) | 89 테스트 파일 · 정적 `it()` 911개 → **956 passed / 0 failed** |
 | 라이브 | Playwright(chromium 위주) + CDP | 없음(스크립트마다 자기 하니스) | `node scripts/uat<NNN>-<slug>.mjs` | `uat*` 130개 · `probe*` 13개 · `loopcheck*` 3개 |
 
 **백엔드**
 - 러너는 pytest 단독 — 플러그인·마커 없음(`pytest.ini`에 마커 정의 0). `@pytest.mark.parametrize`는
-  **16파일**에서 쓴다(옛 3파일 → 이번 드라이브의 경계·enum 표 테스트가 대거 채택:
+  **17파일**에서 쓴다(옛 3파일 → 이번 드라이브의 경계·enum 표 테스트가 대거 채택:
   `test_kst_date_boundaries.py`·`test_table_unit_no_default_fallback.py`·
   `test_unit_caption_compound_and_fallback.py`·`test_ranking_price_none.py`·
-  `test_kiwoom_close_price_none.py`·`test_api_key_bearer_or_eval.py` 등).
-  그래서 정적 `def test_*` 수(2,020)와 실제 통과 건수(2,259)가 **239건** 벌어진다 —
+  `test_kiwoom_close_price_none.py`·`test_api_key_bearer_or_eval.py`·
+  `test_tech_reports_router.py`(title 경계값 40·120 포함 테스트) 등).
+  그래서 정적 `def test_*` 수(2,056)와 실제 통과 건수(2,302)가 **246건** 벌어진다 —
   **"테스트 개수"를 셀 때 정적 grep과 러너 출력이 다름을 전제**할 것.
 - 커버리지 도구(`pytest-cov`)·린터(black/ruff/flake8)·타입 검사기 미도입. 게이트는 **전체 스위트 green**이다.
 - 로컬 `.venv`는 **Python 3.9.6**, 컨테이너는 3.12 → 어노테이션 제약이 사실상 하드 게이트
@@ -54,7 +55,7 @@ task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `group
 - `frontend/src/test/setup.js`는 **한 줄뿐**이다 — `import '@testing-library/jest-dom'`.
   전역 mock·polyfill 없음.
 - `globals: true`이지만 **83개 파일 전부가 `from 'vitest'`를 명시 import**한다(관례).
-- `it.each`/`describe.each`는 15곳 — 정적 `it()` 884개와 실제 929건의 차이가 여기서 온다.
+- `it.each`/`describe.each`는 15곳 — 정적 `it()` 911개와 실제 956건의 차이가 여기서 온다.
 - 커버리지 리포터·jsdom polyfill(ResizeObserver 등) 미설정 → recharts가 렌더되지 않는 원인(§6).
 
 **라이브 프로브**
@@ -114,6 +115,14 @@ task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `group
 `api-cache-purge.test.js` · `tech-visual-guards.test.jsx`(§9의 시각 불변식 중 jsdom이 볼 수
 있는 *선언* 부분만) · `tech-exposure.test.jsx` · `report-family-boundary.test.jsx`.
 **이름이 「무엇을 재는가」가 아니라 「어떤 실패를」로 되어 있는 것이 이 계열의 표식**이다.
+후속 드라이브(task#343·#336)가 같은 계열에 6파일을 더했다 —
+`guru-managers-three-state.test.jsx`·`report-list-three-state.test.jsx`(§9.4의 「미조회·0건·실패」
+3상태 규율을 **훅이 아니라 페이지 컴포넌트**에 적용한 사례 — `GuruManagers`·`Reports`의 fetch에
+`.catch`가 없어 실패가 `[]`/초기값으로 붕괴, 화면이 "데이터 없음 → 크롤링하세요" 같은 **잘못된
+행동 지시**를 렌더했다) · `report-generation-poll-lifetime.test.jsx`(위 "소비처 배선" 항목) ·
+`error-boundary-route-reset.test.jsx`(ErrorBoundary가 라우트 전환 remount에 얹혀 리셋되는지) ·
+`api-token-refresh.test.js`(401 반사적 단일비행 갱신, `CONVENTIONS.md §9.3`) ·
+`auth-bootstrap.test.jsx`에 추가된 B51 블록(diag 로그가 OAuth 인가코드를 원문 기록하지 않음).
 
 ### 라이브 프로브 — `scripts/`
 
@@ -135,6 +144,18 @@ task#301에서 삭제, 그 계약은 `reports/techReportUtils.test.js`의 `group
   ("값이 전부 None이면 측정 실패") ⓒ **옛 로직을 충실히 재구현해 같은 문서에 함께 적용**해
   before/after가 갈리는 지점을 실측(§7.3 ⓔ의 처방-무효화형 대조군을 백엔드에서 하는 방식).
   이것이 §8 ①의 fixture-pass-live-fail에 대한 가장 값싼 대응이다 — 컨테이너도 배포도 필요 없다.
+- **`scripts/test_*.py`는 세 번째 계열이다 — `backend/tests/` 밖에서 독립 프로세스(launchd
+  스크립트 등)를 직접 테스트한다.** `scripts/test_fire_listener_logging.py`(task#346)가 실물 —
+  `backend/tests`가 아니라(`pytest.ini`의 `testpaths = tests`가 배제) `python3
+  scripts/test_fire_listener_logging.py`로 **수동 실행**하며, `.mjs` 프로브와 같은 관용구를
+  쓴다(`check(ok, label)` 리스트 누적 → `단언 총계 N · 통과 · 실패` 출력 → `exit 0/1`).
+  대상이 `scripts/cowork-fire-listener.py`(launchd 상주 프로세스, FastAPI 앱이 아님)라서
+  conftest·TestClient가 닿지 않는다 — 그래서 **임시 포트(0)로 진짜 `HTTPServer`를 띄워 실제
+  HTTP를 친다**(핸들러를 직접 호출하면 `send_response`가 요구하는 소켓 상태를 흉내내야 해
+  "로그가 실제로 방출되는가"라는 판정 대상 자체가 흉내로 바뀐다). 부작용 차단은 `_spawn_claude`·
+  `_enqueue_chunks`를 스텁으로 monkeypatch(모듈 레벨 함수 재대입, 프로덕션 `claude -p`
+  스폰·큐잉을 막는다)로 하고, 스텁이 **호출됐는지를 양성 축으로 단언**한다(§7.3의 "음성만 두면
+  제약이 없어도 초록" 규율 — "전부 거부됐다"만으로는 정상 경로가 살아있는지 알 수 없다).
 - 감사 스크립트는 `scripts/audit_unauth_endpoints.py`(ADR-0029 게이트, 종료코드 0/1).
 
 ---
@@ -416,7 +437,13 @@ peer를 지워 비교 칩이 통째 사라짐, ADR-0030 · `CONVENTIONS.md §1.3
 - 실물 — `backend/tests/test_concurrency_locks.py`(gate 5개: 락 경합엔 `timeout=5.0`, "겹치지
   않아야 정상"인 대조 축엔 `timeout=0.5` + `BrokenBarrierError`를 **기대 결과로 처리**) ·
   `backend/tests/test_progress_per_user.py`(`Barrier(3)`로 두 작업을 동시 in-flight로 붙잡고,
-  `Barrier(8)`로 8스레드 동시 `try_start` 중 **정확히 하나만** 성공함을 단언).
+  `Barrier(8)`로 8스레드 동시 `try_start` 중 **정확히 하나만** 성공함을 단언) ·
+  `backend/tests/test_auth_rate_limit.py`(task#337 — 순차 for-loop 테스트로는 원리적으로
+  재현되지 않는 3결함을 `Barrier(40)`/`Barrier(30)`으로 강제 재현: **과다 허용**(40스레드 동시
+  진입 후 `allowed == limit` 정확히 일치를 단언 — 락 없으면 `len(bucket) >= limit` 판정을
+  여럿이 동시에 통과), **만료 경계 `IndexError`**(30스레드가 같은 만료 대상 타임스탬프 1개를
+  동시에 `popleft` 경합), **신규 키 생성 손실**. 순차 테스트(같은 파일 앞부분)는 이 경합을
+  안 재현하므로 **동시성 축은 순차 축과 별도 파일 절로 분리**하고 그 사실을 주석에 적는다).
 - **`BrokenBarrierError`를 통과 신호로 쓰는 축**이 이 패턴의 핵심 관용구다 — "여기서는 겹칠 수
   없다"를 단언할 때 짧은 timeout의 배리어가 깨지는 것이 곧 상호배제의 증거다.
 - 락 대상이 **프로세스 내** 상호배제임을 테스트에 적어 둘 것(워커 1 배선 전제 —
@@ -484,16 +511,20 @@ def walk_routes(routes):  # routes·original_router를 재귀 하강해 .path를
 
 ### 5.6 배치 레지스트리 count/set 단언 — **4파일 9지점**
 
-`batch_registry.BATCHES`의 개수(**현재 33** — KR 16 · US 11 · 공통 6)와 id 집합을 하드코딩한 지점:
+`batch_registry.BATCHES`의 개수(**현재 34** — KR 16 · US 11 · 공통 7)와 id 집합을 하드코딩한 지점:
 
 | 파일 | 지점 | 단언 |
 |---|---|---|
-| `backend/tests/test_batch_market_split.py` | 3 | `len(batch_registry.BATCHES) == 33` · **`_MARKET_BY_ID`**(id→market 완전 매핑 dict) · **시장별 개수 dict** `{"KR": 16, "US": 11, "공통": 6}` |
-| `backend/tests/test_batches_router.py` | 3 | `len(data) == 33` **2곳**(목록 테스트·필터 테스트) · **`EXPECTED_IDS`** 집합 |
-| `backend/tests/test_macro_signals_batch.py` | 1 | `len(batch_registry.BATCHES) == 33` |
+| `backend/tests/test_batch_market_split.py` | 3 | `len(batch_registry.BATCHES) == 34` · **`_MARKET_BY_ID`**(id→market 완전 매핑 dict) · **시장별 개수 dict** `{"KR": 16, "US": 11, "공통": 7}` |
+| `backend/tests/test_batches_router.py` | 3 | `len(data) == 34` **2곳**(목록 테스트·필터 테스트) · **`EXPECTED_IDS`** 집합 |
+| `backend/tests/test_macro_signals_batch.py` | 1 | `len(batch_registry.BATCHES) == 34` |
 | `backend/tests/test_scheduler_seed.py` | 2 | `test_all_editable_jobs`의 **`set(editable) == {…}`** · `test_seed_only_fills_missing_rows`의 **`expected_seeded` `set(…) ==`** |
 
 배치를 추가·은퇴시키면 **아홉 곳을 함께** 고친다(새 배치의 `market`에 해당하는 개수 값도 +1).
+실측: `cowork_enrich_nightly`(공통) 추가가 이 아홉 곳 전부에서 `33→34`·`공통 6→7`로만
+갈렸다 — id 집합·id→market dict에 항목이 하나씩 늘고 개수 리터럴만 바뀐 것이지 지점 수
+자체는 늘지 않았다(지점 수는 *배치 필드 구조*가 아니라 *배치 개수*의 함수라 새 배치 추가는
+항상 이 아홉 곳의 값만 흔든다).
 같은 파일 안에 같은 리터럴이 **두 번** 나오는 경우가 있으니(`test_batches_router.py`) 파일 단위로
 "고쳤다"고 판단하지 말고 **그 파일에서 그 리터럴을 전부** 셀 것. 가장 최근 추가는 `fx_fetch`이고
 `test_batch_observability.py`가 그 등록·`_JOB_FUNCS` 배선을 별도로 단언한다.
@@ -527,6 +558,12 @@ def walk_routes(routes):  # routes·original_router를 재귀 하강해 .path를
 | `backend/tests/test_job_runs_instrumentation.py` · `test_job_runs.py` | `record` 계측이 본문을 안 깨뜨림 · 상태 어휘 |
 | `backend/tests/test_routine_prompt_scope.py` | 프롬프트 섹션 헤더 sentinel + **그 sentinel의 이빨** |
 | `backend/tests/test_ticker_validation.py` | `is_valid_ticker` 경계(parametrize) |
+| `backend/tests/test_auth_rate_limit.py` | login/register IP 레이트리밋(429+`Retry-After`, IP 버킷 독립성, 윈도우 롤오버) + 동시성 3결함(§4.9) |
+| `backend/tests/test_storage.py`(§ enrich 이력) | 파괴적 UPDATE 뒤 append-only 이력 INSERT(쓰기 직후 전체 8필드 + 변경 키만 별도 기록), 이력 실패에도 본문 성공 유지(`CONVENTIONS.md §7`) |
+| `backend/tests/test_cowork_trigger.py` · `test_cowork_fire_listener.py` · `scripts/test_fire_listener_logging.py` | 야간 전량 enrich 배치(보유+관심 합집합·opus·chunk 5·set_status 3분기) · 리스너 workdir 격리+청크 순차 스폰+한도 감지 · 리스너 로그 타임스탬프·시크릿 비유출(§2) |
+| `backend/tests/test_report_router.py`(§ B80) | 경로 조각 date를 `date.fromisoformat`으로 가드 — malformed·존재불가 날짜가 DB 계층 도달 전 404(`CONVENTIONS.md §6`) |
+| `backend/tests/test_tech_reports_router.py`(§ B81) | `title` 40~120자 경계(하한 미만·상한 초과 422, 경계값 포함 201) + **동명 형제 필드 무회귀**(`Source`/`KeyPoint`/`Challenge`의 `title`은 짧아도 201, `CONVENTIONS.md §5.5`) |
+| `backend/tests/test_security_auth_gaps.py`(§ `test_consume_refresh_token_is_one_time`) | refresh token 폐기가 `DELETE … RETURNING` 단일문임을 SQL 텍스트로 못박음(§6 세 번째 분기 — 뒤집기가 정당해도 유일한 증거였는지 확인) |
 | `frontend/src/test/theme-boot-twin.test.js` · `oauth-splash-twin.test.js` | `index.html` 인라인 사본 ↔ 모듈 정본 **바이트 동일성**. 주석이 못박는다 — "내부 정규화는 절대 하지 않는다, 정규화하면 축이 무디어져 실제 드리프트를 놓친다" |
 | `frontend/src/test/nav-active-matching.test.jsx` | nav 3소비처 × 목록·상세 6케이스 |
 | `frontend/src/test/route-redirects.test.jsx` | `routes.js`의 `REDIRECTS` |
@@ -569,6 +606,35 @@ api.get
 **비동기 규약** — 상태 확정은 `await waitFor(() => expect(...))`, 사용자 액션은
 `await act(async () => { await result.current.toggle(...) })`.
 
+**⚠️ `renderHook`으로 훅만 렌더하면 실제 소비처의 *배선*이 만드는 결함을 못 본다.** 훅이
+계약대로 동작해도, 소비 컴포넌트가 그 반환값을 쓰는 방식(특히 `useEffect` deps)이 별도 결함을
+만들 수 있다. `frontend/src/test/report-generation-poll-lifetime.test.jsx`(task#343)가 이 갈림을
+명시한다 — 형제 `report-generation-conflict.test.jsx`는 `renderHook(() => useReportGeneration(...))`로
+훅만 렌더해 `pages/Reports.jsx`가 실제로 쓰는 `useEffect(() => cleanup, [cleanup])` 배선을 전혀
+태우지 않는다. `cleanup`이 `useCallback` 없이 매 렌더 새로 만들어지면 그 deps가 매 렌더 바뀌고,
+React가 다음 이펙트 전에 직전 destructor(`clearInterval`)를 실행해 **폴링 틱마다 인터벌이 걷혀
+첫 틱 직후 폴링이 죽는다** — 이 결함은 훅 자체가 아니라 실제 페이지가 훅을 감싸는 방식에만
+있으므로 `renderHook`으로는 원리적으로 재현되지 않는다. 처방: 페이지의 실제 배선과 **바이트
+동일한 소비처 래퍼**(`useEffect(() => cleanup, [cleanup])`를 그대로 재현하는 로컬 `Consumer`
+컴포넌트)를 만들어 그것을 렌더한다. ⚠️ 이 축은 **구현과 독립인 성질**(폴링이 N틱 이상 지속되는가)로
+쓰고 "이 배선이 결함이다"를 가정하지 않는다 — 가설이 참이든 거짓이든 그 사실 자체가 산출이다
+(task#313~316의 "예고한 관측이 성립하지 않는 것 자체가 결과다"와 같은 규율).
+
+**`window.location`을 부르는 코드(로그아웃 리다이렉트·OAuth 등)를 테스트할 땐 `vi.stubGlobal`로
+객체 전체를 교체한다 — `vi.spyOn(window.location, 'replace')`는 안 된다.** jsdom의
+`location.replace`/`assign`은 **non-writable**이라 `spyOn`이 던진다. 관용구는
+`vi.stubGlobal('location', { href, origin, pathname, search, replace: vi.fn(), assign: vi.fn(),
+reload: vi.fn() })`이고 `afterEach`에서 `vi.unstubAllGlobals()`로 되돌린다
+(`frontend/src/test/api-token-refresh.test.js`·`back-to-login-guard.test.jsx`가 이 형태를 공유한다).
+
+**React 에러 경계(`ErrorBoundary`) 테스트는 throw 여부를 *props*로만 분기한다 — 부수효과(모듈
+전역 카운터·ref 토글)로 "1회만 던진다"를 흉내내면 안 된다.** React DEV 모드는 렌더 throw를
+잡은 뒤 **그 트리를 동기 재시도로 한 번 더 렌더**한다 — 부수효과로 분기하면 그 2차 렌더에서는
+안 던져 경계가 아예 안 걸리고, 테스트는 "정상 복구"로 오판해 초록이 되면서 **경계가 한 번도
+작동한 적 없는 상태**를 놓친다. `frontend/src/components/ErrorBoundary.test.jsx`가 `shouldThrow`
+prop을 `rerender`로만 갈아 끼워 이 함정을 피한다(자세한 실측·부수 함정은 `frontend/CLAUDE.md`
+task#335 참조 — 이 저장소의 대표 가족인 "계측 실패를 판정 성공으로 읽는" 오류의 jsdom 픽스처판).
+
 **⚠️ jsdom에서 recharts는 렌더되지 않는다**(`ResponsiveContainer`가 0크기) → 축·틱·마커·막대·
 파이 조각이 **전혀** 렌더되지 않는다. 그래서 차트 테스트의 관측점은 SVG가 아니라 **주변 DOM**이다:
 
@@ -597,6 +663,20 @@ api.get
 사람에게), 없으면 부수적 단언(뒤집되 **왜** 뒤집는지 테스트 주석에 남긴다).
 `MarketGrowthChart.test.jsx`의 "sources를 넘겨도 캡션에 출처 제목을 표기하지 않는다"가 실물 사례다
 (주석이 판별 근거와 결론을 함께 적는다).
+
+⚠️ **세 번째 분기 — 뒤집기가 절차상 정당해도 "그 단언이 지키던 성질의 유일한 증거였는지"를
+따로 물어라.** `backend/tests/test_security_auth_gaps.py::test_consume_refresh_token_is_one_time`이
+실물이다(task#336) — `mock_exec.assert_called_once()`를 `assert_not_called()`로 뒤집은 것은 위
+절차로 정당했다(구현이 SELECT+`execute` 2문에서 `query`를 통한 `DELETE … RETURNING` 단일문으로
+바뀌었고, 그 형태를 계획서가 결정한 바 없다). **그런데 그 뒤집기가 "DELETE가 실제로 발행됨"의
+유일한 증거를 함께 지웠다** — `fake_query(sql, params)`가 `sql`을 무시하고 호출 **횟수**만으로
+행을 반환하므로, 구현이 삭제를 전혀 안 하는 평범한 `SELECT`로 퇴행해도 남은 세 단언은 전부
+통과한다. 이름이 `..._is_one_time`인 보안 테스트가 1회용을 더 이상 검증하지 않는 상태가 될
+뻔했다. 처방: 단언을 뒤집을 때 **"이 단언이 없으면 무엇이 검증되지 않는가"를 한 줄 적고, 그
+성질을 지키는 대체 단언을 같은 커밋에 넣는다** — 여기서는 `state["sql"]`에 실제로 전달된 SQL
+텍스트를 캡처해 `"DELETE" in sql.upper()`·`"RETURNING" in sql.upper()`를 단언했다(옛 `SELECT`를
+주입해 실제로 FAIL하는지도 확인). ⚠️ **적대 검토도 이 함정을 못 잡았다** — 검토는 "뒤집어도
+되는가"만 판정했고 "뒤집은 뒤 무엇이 남는가"는 묻지 않았다.
 
 **스위트는 *안 깨지는* 오류를 못 잡는다** — 판정축·계산식을 바꾸면 결과가 같아
 **통과하는 테스트의 주석·docstring이 거짓**이 된다. 전수 확인 대상은 "깨지는 테스트"가 아니라

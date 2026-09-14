@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: c72a7c9e0a5d11a7cf5ccbe8f6e370220a3d19b5
-mapped: 2026-08-22
+last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
+mapped: 2026-09-14
 ---
 
 # ARCHITECTURE — PortfoliOn
@@ -15,7 +15,7 @@ mapped: 2026-08-22
                         Cloudflare Tunnel (launchd, compose 밖)
                                     │  portfolion.taebro.com
                                     ▼
-        ┌──────────────────────── nginx :80/:443 ─────────────────────────┐
+        ┌──────────────── nginx :80 (127.0.0.1 루프백만 게시) ──────────────┐
         │  /api/*, /health  → proxy_pass http://backend:8000              │
         │  그 외            → root /usr/share/nginx/html (frontend/dist)  │
         └──────────────────────────────────────────────────────────────────┘
@@ -28,12 +28,21 @@ mapped: 2026-08-22
                                                · scheduler/ (APScheduler 배치)
                                                         │
                                                         ▼
-                                            postgres:16  (pgdata 볼륨)
+                                    postgres:16 (127.0.0.1 루프백만 게시, pgdata 볼륨)
                                             · 관계 테이블 + market_cache KV
 ```
 
 컨테이너 4개(`docker-compose.yml`): `postgres` · `backend` · `nginx` · `certbot`.
 `cloudflared`는 compose 밖 launchd 프로세스다.
+
+**공개 경로는 Cloudflare Tunnel 하나뿐이다(task#334·#339, B21·B82)** — `nginx`(443 게시 제거,
+`nginx.conf`의 443 서버 블록은 주석 처리라 어차피 no-op이었다)와 `postgres` 모두 호스트 게시를
+`127.0.0.1:<port>:<port>`로 좁혔다. 이 좁힘이 ADR `260823-085145`(레이트리밋은 `CF-Connecting-IP`만
+신뢰)의 전제 — "공개 경로는 Cloudflare 전용" — 를 배포 구성으로 강제해, 위조 헤더로 그 신뢰를
+우회하는 경로를 닫는다(`deploy.sh`의 `docker run -p 127.0.0.1:80:80`도 동일). 루트 `.env`의
+`POSTGRES_PASSWORD`는 폴백 없이 `docker-compose.yml`의 `${POSTGRES_PASSWORD:?...}`로 강제되며
+(미설정이면 `docker compose`가 즉시 실패) — 과거엔 트래킹된 폴백값이 공개 저장소에 커밋된
+실운영 크리덴셜이었다.
 
 핵심 비대칭 — **프론트는 `frontend/dist` 볼륨 마운트라 빌드 즉시 라이브**, 백엔드는 이미지
 재빌드+컨테이너 교체(`deploy.sh`)가 있어야 라이브다. 이 창에서 "새 프론트 ↔ 옛 백엔드"가
@@ -177,6 +186,8 @@ nav를 필터한다. **서버 게이팅이 아니라 표시 제어**다.
 `DELETE...RETURNING` 원자문으로 검증+폐기)는 **회전**한다 — 응답의 새 `access_token`·`refresh_token`
 둘 다 저장해야 하며, 옛 refresh_token은 그 호출로 즉시 폐기된다(1회용, task#108). 갱신 실패 시 기존
 경로(토큰 삭제 + 전체 리로드)로 폴백 — in-place 상태 뒤집기로 바꾸지 않는다(task#283 함정 회피).
+(`services/db.py::query`는 "단일 SELECT"로 문서화돼 있지만 `RETURNING`이 붙은 변형문도 그 경로를
+탄다 — 이 함수를 읽기전용 커넥션·리드 리플리카로 돌리면 회전이 조용히 깨진다.)
 
 **레이트리밋**(task#337, B20 닫힘): `services/rate_limit.py`가 `login`·`register` **두 엔드포인트에만**
 적용되는 IP 슬라이딩 윈도우다(각 라우터 본문 첫 줄, bcrypt 호출 이전에 판정) — login 10회/5분·
@@ -249,7 +260,8 @@ patch 경로가 조용히 깨진다.
 
 ### 3.1 배치 레지스트리 — 정적 메타데이터
 
-`services/batch_registry.py`의 `BATCHES` 리스트가 **배치의 정본 목록**이다(현재 33개 항목 — `market` 기준 KR 16 · US 11 · 공통 6).
+`services/batch_registry.py`의 `BATCHES` 리스트가 **배치의 정본 목록**이다(현재 **34개** 항목 —
+`market` 기준 KR 16 · US 11 · 공통 **7**. task#344가 `cowork_enrich_nightly`를 공통에 추가).
 항목 하나의 필드:
 
 | 필드 | 의미 |
@@ -338,10 +350,17 @@ def _fetch_X():
 `set_status` 배선 현황(`grep -rn 'set_status' backend --include='*.py'`):
 `business_formation_fetch` · `labor_surveys_fetch` · `trimmed_inflation_fetch`(각각 auto+manual
 **참조 구현 3쌍** — `market_indicators/{formation,labor,inflation}.py` + `scheduler/jobs.py` +
-`routers/market_indicators.py`) · `guru_crawl` · `us_sector_fetch` · `monthly_us` · `fx_fetch` ·
-`kospi_signal_fetch` · `earnings_kr/us` · `kr/us_rankings_fetch` · `recommendation_kr/us`.
-**나머지 형제 잡은 미배선 부채다** — 새 배치를 만들 때 템플릿은 위 3쌍 중에서 고를 것
-(미배선 형제를 베끼면 이 결함이 그대로 복제된다).
+`routers/market_indicators.py`) · `macro_signals_fetch`(auto+manual, task#341/B6 — 키 미설정
+`error`와 수집 실패 `_status:skipped`를 둘 다 `skipped`로 수렴) · `guru_crawl` · `us_sector_fetch` ·
+`monthly_us` · `fx_fetch` · `kospi_signal_fetch` · `earnings_kr/us` · `kr/us_rankings_fetch` ·
+`recommendation_kr/us`. **나머지 형제 잡은 미배선 부채다** — 새 배치를 만들 때 템플릿은 위 3쌍
+중에서 고를 것(미배선 형제를 베끼면 이 결함이 그대로 복제된다).
+
+`cowork_enrich_nightly`(task#344)는 이 목록에 있지만 **성격이 다르다** — set_status는 "fire 전송
+자체"만 커버한다(미설정/대상 0 → `skipped`, 전송 실패 → `failed`). 실제 작업(청크별 enrich)은
+이 잡이 끝난 **뒤 다른 프로세스**(로컬 리스너)에서 수 시간에 걸쳐 일어나고 완료를 백엔드로
+보고하는 통로가 없다 — 그래서 이 잡의 `success`는 "전 종목 갱신됨"이 아니라 "트리거가 접수됨"
+만을 뜻한다(§4.3).
 
 `job_runs.record`는 **관측 전용**이라 본문을 절대 깨뜨리지 않는다 — enter INSERT가 실패하면
 `run_id=None` 센티넬로 본문을 그대로 실행하고, 종료 UPDATE 실패도 삼킨다. job_id별 최근 20건
@@ -496,7 +515,58 @@ N행이 아니라 record 1행이 되는 함정이 있어 형태를 테스트가 
 > 0바이트 로그를 실패로 읽고 재fire하면 같은 slug에 중복 발행을 쏜다. 판정은 3분할하라 —
 > 생존은 프로세스(`ps`), 완료는 결과 상태(DB 행·`published_date`), 실패 원인은 로그(끝난 뒤에만).
 
-### 4.4 발행물 리소스 — 스냅샷과 다른 저장 모델
+**야간 전량 enrich(task#344, ADR `260913-013425`)** — `cowork_trigger.fire(text, *, tickers=None,
+model=None, chunk=None)`가 세 키를 **additive**로 받는다(모두 None이면 payload가 `{"text": ...}`로
+기존과 바이트 동일). `scheduler/jobs.py:_run_nightly_enrich`(배치 id `cowork_enrich_nightly`,
+공통·매일 02:00, §3.1)가 대상 종목을 `storage.get_global_portfolio()`의 보유+관심 **합집합**으로
+잡는다 — 이것이 `GET /api/stocks`(API 키 경유)와 **같은 함수**라서, 화면이 보여주는 종목 집합과
+야간이 갱신하는 집합이 갈리지 않는다. `model="opus"`·`chunk=5`로 fire한다.
+
+리스너 쪽 분기 — `tickers` **없는** fire는 기존 계약대로 즉시 논블로킹 1세션 스폰(동시 fire는
+그대로 병행). `tickers`가 있으면 전량 모드로 들어가 **단일 워커 스레드의 큐**에서 청크
+(`_MAX_CHUNK=50` 클램프)를 **순차** 스폰한다 — 동시 세션은 0이고 앞 청크가 끝나야 다음이 뜬다.
+청크마다 최대 `_CHUNK_TIMEOUT=3600s` 대기 후 timeout이면 `kill`하고 다음으로 넘어가며(무한
+대기는 워커 스레드 자체를 영구 정지시킨다 — 그러면 이후 모든 전량 fire가 큐에만 쌓인다),
+`_hit_limit()`이 그 청크 `run.log`의 앞 4KB에서 한도 문구를 찾으면 잔여 청크를 전부 포기한다.
+바디 파싱은 필드별 개별 try/except다 — 하나로 묶으면 `chunk` 파싱 실패가 `tickers`까지 삼켜
+전량 모드가 조용히 단일세션 opus로 강등되는 fail-open이 생긴다.
+
+> ⚠️ **이 배치의 `success`는 "fire가 접수됐다"는 뜻이지 "전 종목이 갱신됐다"는 뜻이 아니다.**
+> 실제 청크 처리는 배치가 끝난 **뒤 다른 프로세스**(로컬 리스너)에서 수 시간에 걸쳐 일어나고,
+> 완료를 백엔드로 보고하는 통로가 없다 — 첫 청크가 한도로 죽어 대부분 미처리여도 배치현황
+> 카드는 초록으로 보인다. 실제 진행은 `~/portfolion-routine-runs/`의 run 디렉터리와
+> `enriched_at` 분포로만 관측된다(§4.4의 A/B 하네스가 이 관측 수단 위에 서 있다).
+
+리스너 로그는 `_log()` 한 지점으로 통일됐다 — KST 타임스탬프가 필수인 이유는, 시각 없이는
+`POST /fire → 401` 이 어느 fire였는지 상관지을 수 없었기 때문(task#346). 바디 없는 401/404
+거부도 `Content-Length: 0`을 명시한다 — 생략하면 클라이언트가 간헐적으로 상태코드 대신
+커넥션 리셋을 본다(6회 중 2회 실측).
+
+### 4.4 Enrich 이력 — 덮어쓰기의 비파괴화 (task#345)
+
+`tickers`의 enrich 8필드(`moat`·`growth_plan`·`risks`·`recent_disclosures`·`insights`·
+`key_resource`·`competitor_edge`·`market_outlook`)는 `storage/portfolio.py::enrich_stock`의
+`UPDATE`로 덮어써 종목당 **최신 1판만** 남는다. 위 §4.3의 야간 전량 갱신이 그 판을 매일
+지우므로, 모델·프롬프트 세대를 나중에 대조할 방법이 없었다 — `enrich_history` 테이블
+(`app_schema.sql` + `main.py::_migrate` 쌍)이 이력화로 해소한다.
+
+배선은 단일 지점이다 — `enrich_stock`이 UPDATE 직후 `_record_enrich_history(ticker, changed_keys)`를
+호출하고, 이 함수가 **보낸 필드가 아니라 쓰기 직후 8필드 전체**를 `row_to_json`으로 다시 읽어
+`fields`(jsonb) 한 행으로 남긴다 — 부분 PUT이어도 그 행 하나로 완전한 한 판이라 언제로든 복원
+가능해야 하기 때문이다. `changed`는 그 요청이 실제로 건드린 키 목록, `label`은 사후 부여(쓰기
+시점엔 모델을 모른다). 호출자는 enrich API 2개(단건·batch)뿐이다. 이력 기록 실패는 warning으로
+삼킨다 — enrich 저장 성공이 이력 완전성보다 우선한다.
+
+`scripts/enrich-ab.py`가 이 이력 위에서 두 모델(A/B)을 비교 운전한다. 핵심은 **두 런 사이에
+base를 복원**하는 것 — 루틴 프롬프트 §1 2단계가 읽는 리포트 스냅샷에 직전 enrich가 이미
+박제돼 있어(`report_generator.py::generate_report`가 스냅샷에 굽는다), 복원 없이 A→B로 그대로 돌리면 B가 A의 답을 보고 써서
+오염이 비대칭이 된다. 두 함정을 겪었다 — ① 이력 행 조회(`_row(hid)`)가 처음엔 id만으로 해
+타 종목의 행을 거부 없이 읽어 엉뚱한 종목을 나란히 비교했다(ticker로 한정해 수정) ② 복원이
+트리거하는 리포트 재생성이 진행 중인 생성과 겹치면 409를 즉시 실패로 처리해, 컬럼은 base인데
+스냅샷은 직전 모델 판으로 남는 어긋난 상태를 만들었다(409는 "실패"가 아니라 "아직 못 받는다"
+이므로 10초 간격 유계 재시도 12회로 수정).
+
+### 4.5 발행물 리소스 — 스냅샷과 다른 저장 모델
 
 스냅샷(§4.1)이 **배치가 날짜별로 박제**하는 것이라면, 발행물은 **외부 Cowork가 쓰기 API로 넣는**
 별도 리소스다. 둘의 카디널리티 모델이 다르다.
@@ -665,8 +735,9 @@ PC는 마스트헤드가 nav를 담당하므로 `children`만 렌더한다(ADR-0
 ### 6.4 데이터 접근과 상태
 
 `frontend/src/api.js` — axios 인스턴스 하나. request 인터셉터가 `localStorage.access_token`을
-Bearer로 붙이고, response 인터셉터가 **401이면 토큰 2개를 지우고 `window.location.replace('/')`**
-(replace라 만료 시점 딥링크 엔트리를 남기지 않는다).
+Bearer로 붙인다. response 인터셉터의 401 처리는 **§2.4 참조**(반사적 단일비행 토큰 갱신 — 옛
+"401이면 토큰 2개를 지우고 즉시 `replace('/')`"는 task#336에서 교체됐다. 갱신이 실패했을 때만
+그 폴백 경로로 떨어진다).
 
 상태는 컨텍스트 2개 + 훅으로 관리한다(전역 스토어 없음):
 - `contexts/AuthContext.jsx` — `/api/auth/me`로 `role`·`menu_permissions` 로드, 실패 시
@@ -847,6 +918,15 @@ HTTPException 문구를 통일한다. 그 밖의 라우터는 대체로 `try/exc
 (백필·컨센서스 등), `routers/guru.py`가 전역 트래커 1개(`extra`로 `result`를 얹음). 즉
 **사용자 스코프 작업만 레지스트리를 쓰고 관리자 전역 배치는 단일 트래커로 남긴다.**
 
+프론트 소비측(`hooks/useReportGeneration.js`)이 이 `peek()`을 1.5초 간격으로 폴링하는데,
+등록 전 degenerate 초기상태(`running:false, total:0`)에 걸리면 완료조건(`!running && total>0
+&& done>=total`)이 영영 불성립해 무한 폴링에 빠질 수 있었다(task#343) — `MAX_FAIL_STREAK`(연속
+조회 실패 5회)·`MAX_IDLE_STREAK`(연속 idle 5회)로 유계화했다. `running:true`인 동안에는 아무리
+오래 걸려도 끊지 않는다(느린 정상 생성을 벽시계 상한으로 오판하지 않기 위해). 이 폴러의
+`cleanup`은 훅 안의 `useEffect`가 소유하며 `useCallback`으로 안정화돼 있다 — 소비처가
+`useEffect(() => cleanup, [cleanup])`로 배선해도 매 렌더 재생성되지 않아야 폴링 틱마다
+destructor가 실행돼 첫 틱 직후 폴러가 죽는 사고를 피한다.
+
 ---
 
 ## 8. 테스트·검증 아키텍처
@@ -925,6 +1005,12 @@ git push origin main
 (기동 배치와 겹치는 경우 실측 ~5분). 라이브 스모크는 포트 바인딩을 폴링한 뒤 실행한다:
 `docker exec <c> python -c "import socket;print(socket.socket().connect_ex(('127.0.0.1',8000)))"`.
 
+**로컬 머신 재부팅 자동기동(task#338)** — `launchd`의 `com.portfolion.docker-compose`가
+`scripts/start-docker-compose.sh`를 부팅 시 실행해 4컨테이너를 올린다. `scripts/apply-docker-autostart.sh`
++ `scripts/com.portfolion.docker-compose.plist`가 그 plist를 정본화하는 적용 스크립트다(백업 →
+배치 → `launchctl` 재적재 → 1회 실행 검증, `--dry-run`/`--rollback` 지원) — 이전 판 plist는 삭제된
+워크트리 경로(`.claude/worktrees/docker-infra-migration/...`)를 가리켜 `exit 127`로 죽어 있었다.
+
 ---
 
 ## 10. 확장 지점 — 무엇을 건드리면 무엇이 따라오는가
@@ -956,7 +1042,7 @@ git push origin main
    `model_validator`를 전부 열거해** 각각 "이 필드에도 필요한가"를 물을 것(중복 이름·교차필드
    정합성은 타입 검증을 통과하므로 어느 자동 게이트도 못 잡는다).
 2. `services/tech_reports.py`의 `_UPDATE_COLUMNS`와 — 보존 대상이면 — `_PRESERVABLE`
-   (§4.4의 보존 계약). 두 상수가 컬럼명의 유일한 출처이므로 여기 빠지면 저장이 조용히 누락된다.
+   (§4.5의 보존 계약). 두 상수가 컬럼명의 유일한 출처이므로 여기 빠지면 저장이 조용히 누락된다.
 3. `app_schema.sql` + `main.py::_migrate` 쌍(위 항목).
 4. 프론트 렌더러(`components/tech/`) + `API_SPEC.md`·`CLAUDE_COWORK_API.md`.
    ⚠️ Cowork 문서는 한 엔드포인트를 **워크플로우 절과 엔드포인트 절 두 곳**에 적는다 —

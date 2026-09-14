@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: c72a7c9e0a5d11a7cf5ccbe8f6e370220a3d19b5
-mapped: 2026-08-22
+last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
+mapped: 2026-09-14
 ---
 
 # CONVENTIONS — 코드 규약 지도
@@ -412,6 +412,15 @@ logger.warning(f"[Component] <무엇> (<ids>): {e}")
 - 사용자 대면 실패는 로그와 별개로 **토스트**를 함께 낸다
   (`frontend/src/components/Toast.jsx`의 `useToast().showToast(msg, 'error')`).
 - **자동 가드 없음** — eslint 설정(`frontend/eslint.config.js`)에 `no-console` 규칙이 없다.
+- **`utils/diag.js`의 `logDiag(ev, fields)`는 `console.*`와 별개의 진단 링버퍼**(50건 상한,
+  `localStorage['diag_log']`)이며 **암호화가 없다** — 그래서 크리덴셜급 값(OAuth 인가코드 등)을
+  실으면 안 된다. `hooks/useAuthBootstrap.js`가 `?oauth=<code>` 진입 시 `url: pathname + search`를
+  그대로 싣던 것을 **쿼리 *값*은 빼고 *키 이름*만** 남기도록 고쳤다(B51, task#343) — 코드는
+  1회용·TTL 120초라 유출 자체보다 "크리덴셜급 값을 진단 로그에 싣는 습관" 자체가 문제였다.
+  `branch` 필드(`oauth-ok`/`oauth-fail`/`error` 등)가 이미 상태를 말하므로 값을 빼도 진단력
+  손실이 없다. 회귀 가드는 값의 *부재*를 직렬화 문자열에서 확인한다
+  (`frontend/src/test/auth-bootstrap.test.jsx`의 B51 블록 — `JSON.stringify(readDiag())`에
+  주입한 시크릿 리터럴이 없음을 단언).
 
 ---
 
@@ -422,6 +431,7 @@ logger.warning(f"[Component] <무엇> (<ids>): {e}")
 - `backend/services/errors.py`가 `not_found(ticker, context)` / `already_exists(ticker, context)`
   두 팩토리를 제공한다(404 / 400). 그 외에는 라우터에서 `HTTPException`을 직접 raise한다.
 - 실사용 상태코드: 201(발행 생성) · 202(비동기 배치 시작) · 400 · 403 · 404 · 409 · 422 ·
+  429(레이트리밋, `Retry-After` 헤더 동반 — `routers/auth.py::_enforce_rate_limit`) ·
   500 · 502 · 503.
 - **`response_model`은 앱 전체에서 0건** — 엔드포인트는 평문 dict를 반환하고, 직렬화 방어는
   §5.2의 `sanitize`로 한다. 응답 스키마의 정본은 코드가 아니라 `API_SPEC.md`다(§10).
@@ -531,6 +541,22 @@ grep -rn  "= Field(None\|= Field(default=None"                       backend/rou
 grep -rnE "List\[.*\] = Field\((default_factory=list|\[\])"          backend/routers/ backend/services/
 ```
 
+### 5.5 길이·범위 제약은 **동명 형제 필드**를 전수 세고 나서 얹는다
+
+한 라우터 파일에 같은 이름의 필드가 여러 중첩 모델에 나뉘어 있을 수 있다. `routers/tech_reports.py`에
+`title`이 **4개**다 — `TechReportIn`(대상) · `Source` · `KeyPoint` · `Challenge`. `TechReportIn.title`에
+`min_length=40, max_length=120`(B81, ADR 260830-212846 — 두 모집단의 실측 분리선)을 얹을 때
+그 제약을 엉뚱한 클래스에 놓으면 `Source.title="NASA"`(4자)처럼 **정상값이 422**가 되어 발행
+전체가 죽는다. `grep 'min_length=40'`은 그 제약이 *존재*하는지만 보고 *어느 클래스*에 있는지는
+보지 못하므로 이 오배치를 못 잡는다.
+
+→ 길이·범위 제약을 추가하기 전에 `grep -n '<필드명>' <파일>`로 동명 형제를 세고 각각에
+"이 제약이 여기도 맞는가"를 묻는다. 회귀 테스트는 대상 필드의 경계(하한 미만·상한 초과 422,
+경계값 포함 201)와 **형제 title들이 여전히 짧은 값으로 201을 받는지**를 같은 파일에서 함께
+단언한다(`backend/tests/test_tech_reports_router.py::test_title_bound_does_not_leak_to_sibling_title_fields_201`).
+경계 테스트 자체는 `_title(n)`처럼 **생성한 문자열의 길이를 그 안에서 `assert`**해 "경계를 재는
+헬퍼가 실제로 그 길이를 만드는지"부터 확정한다 — 세다 틀리면 경계 테스트가 조용히 무의미해진다.
+
 ---
 
 ## §6 라우터·API 규약
@@ -558,10 +584,26 @@ grep -rnE "List\[.*\] = Field\((default_factory=list|\[\])"          backend/rou
   유효한 Bearer를 검사하지도 않고 401로 거부하던 결함이 있었다(키 회전 직후 로그인한 사용자가
   조용히 401). 회귀 축은 4조합이 아니라 **6조합**이다 — 「유효한 한쪽 + 무효한 다른 쪽」 경로를
   지나야 이 결함을 볼 수 있다(`backend/tests/test_api_key_bearer_or_eval.py`).
+- **무인증 bcrypt 엔드포인트(login/register)는 IP 슬라이딩 윈도우 레이트리밋**을 앞단에 둔다
+  (`services/rate_limit.py`, ADR 260823-085145). `routers/auth.py::_enforce_rate_limit`이
+  키를 `f"{scope}:{client_ip(request)}"`(scope=`login`/`register`)로 만들어 임계 초과 시
+  429 + `Retry-After` 헤더를 던지고 **bcrypt 호출 이전에 거른다**(rate limit이 판정을 이겨야
+  검증/해시 비용이 스킵된다). `client_ip`는 `CF-Connecting-IP`만 신뢰한다 — `X-Forwarded-For`는
+  공격자가 임의 값을 넣어 버킷을 무한 생성해 우회할 수 있어 쓰지 않는다(헤더 부재 시
+  `request.client.host`로 폴백, 전 사용자가 한 버킷 = 의도된 페일클로즈). 인메모리 상태이므로
+  **`backend/Dockerfile`이 `--workers` 없이 단일 프로세스로 뜬다는 가정에 의존**한다(워커를
+  늘리면 워커마다 독립 카운터가 생겨 실효 임계가 워커 수만큼 곱해진다). 동시성 규율은 §7.
 - **경로 파라미터 검증** — 열거형은 `Literal` 별칭(`routers/tech_reports.py`의 `SlugPath`),
   날짜는 pydantic `field_validator`로 ISO 강제. `routers/tech_reports.py`의 `_iso_date_only`
   docstring이 이유를 적는다: plain `str`이면 psycopg2 바인딩 시 서버 `DateStyle`(기본 MDY)이
   `"03/08/2026"`을 8월 3일로 해석해 **불변 발행물에 잘못된 날짜가 조용히 저장**된다.
+  ⚠️ **평문 `str` 경로 파라미터(pydantic 모델이 아닌 자리)는 stdlib `date.fromisoformat(v)`를
+  `try/except ValueError: raise HTTPException(404, …)`로 감싼다** — `routers/report.py::get_report`·
+  `routers/analyst_reports.py::get_detail`가 이 형태다(B80). 가드가 없으면 잘못된 문자열이
+  그대로 SQL date 캐스트로 흘러가 500이 된다(실측: `AAPL/notadate` → 500). 회귀 테스트는
+  상태코드뿐 아니라 **`query`/DB mock의 미호출**도 함께 단언한다 — 가드가 DB 계층 *뒤*에
+  있어도 "404가 났다"만으로는 통과해 버리기 때문이다
+  (`backend/tests/test_report_router.py::test_get_report_malformed_date_is_404_and_never_reaches_db`).
 - **모델 간 제약은 `@model_validator(mode="after")`** — 예: `share_pct`가 있으면
   `market.share_basis`가 있어야 그 수치가 해석 가능하다(ADR-0033).
 - **티커 정규화**: 경로 티커는 `.upper()`, 형식 검증은 `services/utils.is_valid_ticker`
@@ -577,6 +619,15 @@ grep -rnE "List\[.*\] = Field\((default_factory=list|\[\])"          backend/rou
 **접근은 `backend/services/db.py` 3함수로만** — `query(sql, params) -> list[dict]`(RealDictCursor),
 `execute(sql, params) -> rowcount`, `execute_many(sql, params_list)`(psycopg2 `execute_batch`,
 빈 리스트는 no-op).
+
+⚠️ **`query`는 SELECT 전용이 아니다 — 행을 돌려주는 변형문(`DELETE … RETURNING` 등)도 이 경로를
+탄다.** `services/auth_service.py::consume_refresh_token`이 `query`로 단일
+`DELETE FROM refresh_tokens WHERE token=%s RETURNING user_id, expires_at`을 실행해 **검증과
+폐기를 한 문장에 묶는다**(task#336) — 예전의 `SELECT` + 별도 `execute(DELETE)` 2문 TOCTOU에서
+동시 로그아웃/중복 refresh가 그 틈에 같은 토큰을 지워도 SELECT 스냅샷만 보고 성공을 반환하던
+결함을 닫는다. `get_connection()`이 정상 종료 시 커밋하므로 이 삭제는 영속된다 — `query`를
+읽기전용 커넥션·리드 리플리카로 돌리면 **refresh token 1회용 회전이 조용히 깨진다**
+(`db.py::query`의 docstring이 이 의존을 명시).
 
 - 커넥션은 `ThreadedConnectionPool(minconn=1, maxconn=20)`. `get_connection()` 컨텍스트매니저가
   성공 시 commit·예외 시 rollback·항상 putconn. **maxconn=20은 최대 ThreadPool 동시성보다 크게**
@@ -596,6 +647,16 @@ grep -rnE "List\[.*\] = Field\((default_factory=list|\[\])"          backend/rou
   `backend/tests/test_tech_reports_service.py`가 이 규약을 `CONVENTIONS §7`로 인용한다.
 - **upsert는 `ON CONFLICT (…) DO UPDATE SET …=EXCLUDED.…`** (services 10여 곳).
   클로버 방지가 필요하면 `CASE WHEN`으로 기존값 보존을 넣는다(`tickers.name` 패턴).
+- **파괴적 UPDATE를 비파괴로 만들려면 append-only 이력 테이블에 "쓰기 직후 전체"를 함께
+  INSERT한다** — `services/storage/portfolio.py::enrich_stock`이 `tickers` UPDATE 직후
+  `_record_enrich_history`로 `enrich_history`에 8필드 전체를 한 행 남긴다(task#345). **보낸
+  필드가 아니라 쓰기 직후 `SELECT row_to_json(...)`로 다시 읽은 전체**를 담는 것이 핵심 —
+  부분 PUT이 보낸 필드만 남기면 그 행 하나로는 복원이 안 되지만, 전체를 담으면 어느 행이든
+  그 자체로 완전한 한 판이라 어느 시점으로든 되돌릴 수 있다. 이력 INSERT 실패는 warning으로
+  삼킨다(§1.4 "이력 부재보다 본문 저장 실패가 나쁘다") — enrich 저장 자체는 이력과 무관하게
+  성공을 반환한다. 필드 순서 고정 튜플(`_HISTORY_FIELDS`)과 파싱용 `_JSON_TEXT_FIELDS`는
+  집합으로 동치해야 하고(`test_history_fields_match_json_text_fields`), 한쪽만 늘어나면 이력
+  판이 불완전해진다.
 - **리스트 조건은 `= ANY(%s)`.** ⚠️ **uuid 컬럼엔 반드시 캐스트** —
   `= ANY(%s::uuid[])`(`routers/admin.py`의 `user_menu_permissions` 조회).
   캐스트 없이 파이썬 `str` 리스트를 넘기면 `text[]`가 돼 `operator does not exist: uuid = text`로
@@ -644,6 +705,18 @@ grep -rnE "List\[.*\] = Field\((default_factory=list|\[\])"          backend/rou
   보고 회수한다. 판정은 경과시간이 아니라 **무활동 시간**이라 오래 걸리는 정상 작업은 영향받지
   않는다(⑷ 대조군). 회수 경로가 없으면 백그라운드가 시작조차 못 한 호출자가 **프로세스 재시작
   전까지 영구 409**가 된다.
+- **판정-후-기록(check-then-act)은 "느린 loader만 락 밖"과 다른 형태다 — 판정 전체를 락으로
+  감싼다.** `services/rate_limit.py::check`(로그인/회원가입 레이트리밋, task#337)가 그 형태다 —
+  버킷 조회·만료 정리(`popleft`)·`len(bucket) >= limit` 판정·신규 항목 append를 **하나의
+  `_lock` 블록**에 넣는다. 위 `TTLCache`(락은 dict 조작만, 느린 fetch는 락 밖)와 달리 여기선
+  판정 자체가 전부 짧은 dict/deque 연산이라 분리할 "느린 부분"이 없다 — bcrypt 검증/해시는
+  이 락 진입 **이전에** 거부되므로 락이 bcrypt를 직렬화하지도 않는다. 락이 없으면 동시 요청이
+  같은 만료 판정을 동시에 통과해 ⓐ `len(bucket) >= limit`을 모두 통과해 임계 초과 허용
+  ⓑ 빈 deque에서 `popleft()`가 `IndexError` ⓒ 신규 키 생성이 서로를 덮어써 기록 1건 소실 —
+  세 결함 모두 `threading.Barrier`로 강제 인터리빙해야 재현된다(순차 for-loop 테스트는
+  원리적으로 못 본다, `TESTING.md §4.9`). **키 개수 상한도 락 안에서** 정리한다(`_evict_excess`,
+  `OrderedDict` LRU — `_MAX_KEYS=10_000` 초과 시 최오래 미사용 키부터 축출, 무제한 IP가
+  버킷을 무한 생성하는 메모리 누수 방지).
 
 **스키마 변경 (ADR-0006)**
 
@@ -662,8 +735,8 @@ DDL은 `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE … ADD COLUMN IF NOT EXISTS`
 
 ## §8 배치·스케줄러 규약
 
-**레지스트리 = `backend/services/batch_registry.py`의 `BATCHES`** — 현재 **33개** 배치의 정적
-메타데이터 리스트.
+**레지스트리 = `backend/services/batch_registry.py`의 `BATCHES`** — 현재 **34개** 배치의 정적
+메타데이터 리스트(KR 16 · US 11 · 공통 7 — 가장 최근 추가는 `cowork_enrich_nightly`, 공통).
 
 각 항목 키: `id` · `label` · `category` · `schedule_desc` · `usage`(소비 UI) · `source`(fetch 출처) ·
 `editable` · `trigger_kinds` · `manual_endpoint` · `scheduler_job_id` · `timezone` ·
@@ -716,6 +789,12 @@ with job_runs.record("daily_report_kr", "auto") as run:
   절사평균물가 · FRED 경제지표 · 환율 · 발굴추천 · 랭킹 · 코스피신호 · US 섹터 모멘텀 —
   **각 계열이 auto(`scheduler/jobs.py`)와 manual(`routers/…`) 두 레인 모두** 배선돼 있다
   (한 레인만 하면 수동 갱신이 계속 초록이다). 새 배치의 템플릿은 이 계열 중에서 고를 것.
+  ⚠️ **예외 — `cowork_enrich_nightly`는 `trigger_kinds: ["auto"]`·`manual_endpoint: None`으로
+  의도적 단일 레인이다**(야간 전량 발사는 관리자 수동 fire와 다른 형태라 동형 manual 엔드포인트가
+  없다). `jobs._run_nightly_enrich`가 `set_status`를 부르는 자리는 둘뿐이다 — 미설정/대상 0건은
+  `skipped`, `cowork_trigger.fire()`가 `False`(예외 아님)를 반환하면 `failed`. 정상 성공은
+  `set_status`를 **호출하지 않는다**(기본 `success`) — 이 대조군이 없으면 "항상 skipped를
+  기록"하는 과잉교정 구현도 앞 두 축을 통과한다(`test_cowork_trigger.py`).
 - ⚠️ **아직 부채인 형태 — `_refresh_earnings_kr`/`_us`는 예외만 배선돼 있다.**
   본문의 저장 생략 4경로(고정집합 불완전·rest 유니버스 공백·rest 커버리지 미달·마감분기 없음)는
   직전 저장값을 그대로 반환하므로 **반환값으로 구별할 수 없고**, 그 절반은 여전히 `success`다.
@@ -764,7 +843,7 @@ React 19 + Vite 8(rolldown) + react-router-dom 7 + recharts 3 + axios. **plain C
 frontend/src/
   api.js               axios 인스턴스(인터셉터 2개)
   apiCachePurge.js     SW 런타임 캐시 퍼지 (ADR-0036 — 인증 API는 캐시하지 않는다)
-  App.jsx              라우팅 + 셸(Masthead·MobileNav·Toast·InstallPrompt·DiagLog)
+  App.jsx              라우팅 + 셸(Masthead·MobileNav·Toast·InstallPrompt·DiagLog·ErrorBoundary)
   navSections.js       nav IA 단일 소스 (§9.5)
   routes.js            구 URL 리다이렉트 맵(REDIRECTS, ADR-0025)
   routes/              라우트 래퍼 컴포넌트(현재 AnalystReportsRoute.jsx 1개)
@@ -785,6 +864,13 @@ frontend/src/
 - 컴포넌트 전용 CSS는 **컴포넌트 옆에 콜로케이트**하고 컴포넌트가 직접 `import './X.css'`한다
   (`ui/Badge.css`, `portfolio/DashboardCard.css`, `tech/TechKpiStrip.css`).
   화면 전역 스타일만 `styles/`에 둔다.
+- **`components/ErrorBoundary.jsx`(B48)** — 클래스 컴포넌트 에러 경계. `App.jsx`가 두 겹으로
+  건다: `InstallPrompt` 전용 경계(배너 렌더 예외가 현재 라우트 화면 전체를 안 가리게) +
+  `<Routes>` 전체를 감싸는 경계. 후자는 **`key={location.key}`**를 받는다(`key={location.pathname}`
+  바깥 div와 다른 값 — 같은 pathname으로 다른 `location.state`를 navigate하는 딥링크 패턴에서도
+  경계가 재마운트돼 이전 화면의 에러 상태가 새지 않게 한다). 리셋은 "다시 시도" 버튼이 경계
+  자체의 에러 상태를 지우는 것과, 라우트 전환이 그 key로 경계를 통째로 remount하는 것 **두
+  경로**가 있다.
 - `components/ui/index.js`가 프리미티브 배럴을 제공한다(`Button`·`Card`/`CardHeader`·`Badge`/
   `MarketBadge`/`ChangeBadge`·`Stat` + `icons` 전량 re-export).
 
@@ -823,9 +909,26 @@ frontend/src/
 - **`frontend/src/api.js`의 axios 인스턴스가 정본.** `baseURL = import.meta.env.VITE_API_BASE_URL || ''`
   (미설정 시 상대경로 → nginx/Vite proxy).
 - 요청 인터셉터: `localStorage.access_token` → `Authorization: Bearer`.
-- 응답 인터셉터: **401이면 토큰 2종 제거 + `window.location.replace('/')`**.
-  `replace`인 이유가 주석에 있다 — 만료 시점 딥링크 엔트리를 히스토리에 남기지 않아
-  재로그인 후 뒤로가기 재진입을 차단한다.
+- 응답 인터셉터: **401이면 반사적 단일비행 토큰 갱신을 먼저 시도하고, 실패해야 로그아웃한다**
+  (B9, task#336 — 이전엔 401 즉시 로그아웃이었다).
+  - `refreshTokens()`가 모듈 레벨 `refreshInFlight` promise로 **동시 401 여러 건에도
+    `/api/auth/refresh`를 1회만** 호출한다(성공·실패 무관 `finally`에서 비운다 — 안 비우면
+    첫 실패가 세션 내내 갱신을 막는다).
+  - 재귀 방지 — 갱신 호출은 `api`가 아니라 **raw `fetch`**로 나간다(`api`로 부르면 그 401이
+    인터셉터를 다시 태운다).
+  - **`AbortController` + 10초 타임아웃**을 쓴다(`AbortSignal.timeout`은 Safari 16+ 전용이라
+    구형 iOS PWA를 지원하는 이 앱에선 쓸 수 없다) — 응답이 무기한 pending이면
+    `refreshInFlight`가 영구히 안 비워져 이후 모든 401이 그 promise를 영원히 기다린다.
+  - **`stillCurrent` 가드** — 응답 도착 시 저장된 refresh 토큰이 보낸 토큰과 다르면(그 사이
+    로그아웃했거나 다른 탭이 먼저 회전) 그 응답으로 저장값을 덮지 않는다. 로그아웃 뒤라면
+    새 토큰을 버리는 게 맞고(안 그러면 로그아웃이 무효화된다), 다른 탭이 먼저 회전했다면
+    그쪽이 쓴 최신값을 그대로 쓰는 게 맞다.
+  - 갱신 성공 시 실패한 원 요청을 새 토큰으로 **1회 재시도**(`config._retried` 플래그로
+    무한 재귀 차단), 갱신이 없거나 실패하면 토큰 2종 제거 + `window.location.replace('/')`로
+    로그아웃한다. `replace`인 이유가 주석에 있다 — 만료 시점 딥링크 엔트리를 히스토리에
+    남기지 않아 재로그인 후 뒤로가기 재진입을 차단한다.
+  - ⚠️ **이 반사적 갱신은 사전(pre-emptive) 갱신이 아니다** — 401을 맞아야만 발동한다
+    (`frontend/src/test/api-token-refresh.test.js`의 헤더 주석이 비목표로 명시).
 - 로그아웃만 `fetch`를 직접 쓴다(`App.jsx`의 `doLogout`, `.catch(() => {})`로 best-effort).
 - **fetch는 훅이 소유하고 컴포넌트는 소비한다** — `useTrackedStocks`·`usePortfolioData`·
   `useReportList`·`useReportGeneration` 등. 실패는 `console.warn` + 토스트(§4.5).
@@ -871,6 +974,11 @@ frontend/src/
   동시 마운트는 `_inflight` promise를 공유한다).
   ⚠️ **자동 게이트가 이 클래스에 원리적으로 블라인드하다**(타입도 맞고 렌더도 정상이다) →
   실패 경로를 테스트로 못박는다(`frontend/src/test/failure-vs-empty.test.jsx`).
+  ⚠️ **이 규율은 훅에서만 지켜지고 페이지 컴포넌트가 직접 부르는 fetch에는 새어나갈 수 있다** —
+  `pages/GuruManagers.jsx`·`pages/Reports.jsx`(`?scope=all` 조회)가 훅을 거치지 않고 직접 부른
+  fetch에 `.catch`가 없어 실패가 초기값(`{managers: []}`/`null`)으로 붕괴했다(task#343).
+  화면은 "데이터 없음 → 즉시 크롤링/재생성하세요"처럼 **잘못된 행동을 지시**하는 문구까지
+  렌더했다 — 훅 계약을 지켰다는 사실이 그 훅을 안 쓰는 소비처의 알리바이가 되지 않는다.
 - 토글 성공 후 재조회가 실패해도 `trusted` ref로 `unknown` 복귀를 막는다 — 방금 사용자가 한
   행동의 결과를 화면에서 잃지 않기 위함.
 - 실패는 **re-throw하지 않고 토스트 + `false` 반환**(호출부 계약).

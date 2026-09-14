@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: c72a7c9e0a5d11a7cf5ccbe8f6e370220a3d19b5
-mapped: 2026-08-22
+last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
+mapped: 2026-09-14
 ---
 
 # CONCERNS — 기술부채·버그·리스크 지도
@@ -683,7 +683,7 @@ finally:
 
 ### 6.1 키 미설정·실패가 "성공"으로 기록된다 — **부분 해소** (B6, task#329)
 
-**실측(2026-08-22): `_JOB_FUNCS` 32개 중 `set_status` 배선 14개 · 미배선 18개.** 미배선 잡은 본문을 `try/except Exception: logger.warning(...)`로 감싼 채 `with job_runs.record(...)` 안에 있어 **항상 `_finish("success")`가 돈다**. `services/job_runs.py`의 docstring이 이 성질과 배선 예외 목록을 스스로 명시한다(그 목록이 정본이다).
+**실측(2026-09-14): `_JOB_FUNCS` 33개 중 `set_status` 배선 15개 · 미배선 18개**(task#344가 추가한 `cowork_enrich_nightly`는 배선돼 있다 — §11.3 참조. 2026-08-22 실측은 32개 중 14개였다). 미배선 잡은 본문을 `try/except Exception: logger.warning(...)`로 감싼 채 `with job_runs.record(...)` 안에 있어 **항상 `_finish("success")`가 돈다**. `services/job_runs.py`의 docstring이 이 성질과 배선 예외 목록을 스스로 명시한다(그 목록이 정본이다).
 
 미배선 18개(job id): `daily_report_kr`·`daily_report_us`·`daily_digest`·`monthly_kr`·**`macro_signals_fetch`**·`leverage_fetch`·`lending_fetch`·`investor_trend_fetch`·`short_sell_fetch`·`supply_score_fetch`·`backlog_fetch`·`kr_sector_fetch`·`disclosure_fetch`·`agm_fetch`·`dividend_fetch`·`beta_fetch`·`insider_fetch`·`us_supply_fetch`.
 
@@ -805,7 +805,7 @@ _scheduler.start()
 
 ### 6.9 배치 레지스트리 정합 — **이미 가드됨 + 테스트 취약**
 
-`batch_registry.BATCHES`는 33개, `_JOB_FUNCS`는 32개로 **의도적으로 하나 어긋나 있다**(`consensus`가 레지스트리에만 있다 — 실측 차집합이 정확히 `{consensus}`이고 `_JOB_FUNCS`에만 있는 id는 0개다). 이 둘을 순진하게 동기화하려는 수정은 실패한다. 테스트 쪽 취약성은 §9.4.
+`batch_registry.BATCHES`는 **34개**, `_JOB_FUNCS`는 **33개**로 **의도적으로 하나 어긋나 있다**(`consensus`가 레지스트리에만 있다 — 실측 차집합이 정확히 `{consensus}`이고 `_JOB_FUNCS`에만 있는 id는 0개다. 2026-09-14 재실측 — task#344의 `cowork_enrich_nightly` 추가로 33/34에서 각각 +1했고 차집합은 그대로 `{consensus}`다). 이 둘을 순진하게 동기화하려는 수정은 실패한다. 테스트 쪽 취약성은 §9.4.
 
 ---
 
@@ -1028,16 +1028,16 @@ if (err.response?.status === 401) {
 
 ### 9.4 정확한 개수 단언이 다음 배치 추가에서 깨진다 — **확인된 버그**(개발 마찰)
 
-`batch_registry.BATCHES`에 **항목 하나를 더하면 4개 파일의 단언 9건이 동시에 깨진다**(2026-08-22 재실측 — 옛 판은 "3파일 3건", 그 앞 판은 "4파일 8지점"이라 적었으나 둘 다 지점 수가 틀렸다. **지점 수는 단조 증가한다** — 새 회귀 테스트가 같은 리터럴을 또 박기 때문이다):
+`batch_registry.BATCHES`에 **항목 하나를 더하면 4개 파일의 단언 9건이 동시에 깨진다**(2026-09-14 재확인 — task#344의 `cowork_enrich_nightly` 추가가 실제로 9지점 **전부**를 건드렸다: 아래 수치는 전부 33→34로 갱신됐고 어느 지점도 누락되지 않았다. 옛 판은 "3파일 3건", 그 앞 판은 "4파일 8지점"이라 적었으나 둘 다 지점 수가 틀렸다. **지점 수는 단조 증가한다** — 새 회귀 테스트가 같은 리터럴을 또 박기 때문이다):
 
-- `tests/test_batch_market_split.py` — **3지점**: `assert len(batch_registry.BATCHES) == 33` · `_MARKET_BY_ID`(id→market 완전 매핑 dict) · 시장별 개수 dict `{"KR": 16, "US": 11, "공통": 6}`
-- `tests/test_batches_router.py` — **3지점**: `assert len(data) == 33` **2곳**(하나는 task#330 적대 검토 수복이 추가한 「깨진 스케줄 행이 배치 현황을 통째로 죽인다」 회귀 축) · `assert {b["id"] for b in data} == EXPECTED_IDS`(33원소 하드코딩 집합)
-- `tests/test_macro_signals_batch.py` — **1지점**: `assert len(batch_registry.BATCHES) == 33`
-- `tests/test_scheduler_seed.py` — **2지점**: `test_all_editable_jobs`의 `set(editable) == {…}` · `test_seed_only_fills_missing_rows`의 `expected_seeded` 집합
+- `tests/test_batch_market_split.py` — **3지점**: `assert len(batch_registry.BATCHES) == 34` · `_MARKET_BY_ID`(id→market 완전 매핑 dict, `cowork_enrich_nightly` → `"공통"`) · 시장별 개수 dict `{"KR": 16, "US": 11, "공통": 7}`
+- `tests/test_batches_router.py` — **3지점**: `assert len(data) == 34` **2곳**(하나는 task#330 적대 검토 수복이 추가한 「깨진 스케줄 행이 배치 현황을 통째로 죽인다」 회귀 축) · `assert {b["id"] for b in data} == EXPECTED_IDS`(34원소 하드코딩 집합, `cowork_enrich_nightly` 포함)
+- `tests/test_macro_signals_batch.py` — **1지점**: `assert len(batch_registry.BATCHES) == 34`
+- `tests/test_scheduler_seed.py` — **2지점**: `test_all_editable_jobs`의 `set(editable) == {…}` · `test_seed_only_fills_missing_rows`의 `expected_seeded` 집합(둘 다 `cowork_enrich_nightly` 포함)
 
-⚠️ **옛 판이 못박은 탐지 grep(`"BATCHES) ==\|len(data) ==\|EXPECTED_IDS"`)은 이 9지점 중 4개를 원리적으로 못 본다** — `set(…) ==` 형태와 dict 리터럴에 블라인드하다. 실제 게이트는 grep이 아니라 **전체 스위트**이고, grep은 "어느 파일을 볼지"만 좁힌다(`TESTING.md §5.6`).
+⚠️ **옛 판이 못박은 탐지 grep(`"BATCHES) ==\|len(data) ==\|EXPECTED_IDS"`)은 이 9지점 중 4개를 원리적으로 못 본다** — `set(…) ==` 형태와 dict 리터럴에 블라인드하다. 실제 게이트는 grep이 아니라 **전체 스위트**이고, grep은 "어느 파일을 볼지"만 좁힌다(`TESTING.md §5.6`). **이번 추가는 그 9지점을 전부 손으로 맞췄다는 뜻이고, 이 절이 경고해 온 "누락되기 쉬운 4지점"이 실제로 안 빠졌다는 것도 이번에 직접 확인했다.**
 
-그 라우터 테스트 함수 이름이 아직 `test_lists_sixteen_batches_with_required_fields`인 채 33을 단언한다 — 이름이 배치 17개만큼 뒤처져 있고, **이 함정이 이미 반복적으로 발동했다는 직접 증거**다. 주의: `EXPECTED_IDS`엔 `consensus`가 들어 있는데 이는 `_JOB_FUNCS`(32개)엔 없다(§6.9) — 둘을 순진하게 동기화하는 수정은 실패한다(실측 차집합이 정확히 `{consensus}`다).
+그 라우터 테스트 함수 이름이 아직 `test_lists_sixteen_batches_with_required_fields`인 채 이제 **34**를 단언한다 — 이름이 배치 18개만큼 뒤처져 있고, **이 함정이 이미 반복적으로 발동했다는 직접 증거**다. 주의: `EXPECTED_IDS`엔 `consensus`가 들어 있는데 이는 `_JOB_FUNCS`(33개)엔 없다(§6.9) — 둘을 순진하게 동기화하는 수정은 실패한다(실측 차집합이 정확히 `{consensus}`다).
 
 ### 9.5 게이트가 **못** 보는 것
 
@@ -1142,11 +1142,28 @@ compose의 postgres 서비스가 `./backend/auth_schema.sql`·`./backend/app_sch
 
 ### 11.1 게이팅·SSRF — **이미 가드됨**
 
-`POST /api/admin/cowork/fire`는 `require_admin_or_api_key`다. `services/cowork_trigger.py`는 **고정 env URL**(`COWORK_ROUTINE_FIRE_URL`)로만 POST하고 목적지가 사용자 입력을 받지 않는다 — **SSRF 없음**. `enabled()`가 `COWORK_ROUTINE_FIRE_URL`+`COWORK_ROUTINE_FIRE_TOKEN` 양쪽을 요구하는 both-required 게이트라 키 미설정 시 휴면이다.
+`POST /api/admin/cowork/fire`는 `require_admin_or_api_key`다. `services/cowork_trigger.py`는 **고정 env URL**(`COWORK_ROUTINE_FIRE_URL`)로만 POST하고 목적지가 사용자 입력을 받지 않는다 — **SSRF 없음**. `configured()`가 `COWORK_ROUTINE_FIRE_URL`+`COWORK_ROUTINE_FIRE_TOKEN` 양쪽을 요구하는 both-required 게이트라 키 미설정 시 휴면이다(이 절이 예전에 `enabled()`로 인용했으나 이 함수는 이 저장소 전 이력에서 `configured()`로만 존재했다 — 명칭만 정정, 게이트 동작은 무변경).
 
 ### 11.2 best-effort 성격 — **설계상 트레이드오프**
 
 fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2와 같다 — 실패가 관측면에 안 나타난다.
+
+### 11.3 야간 전량 enrich 확장 — 청크 순차 스폰 (task#344·346, ADR `260913-013425`)
+
+`fire()`에 `tickers`/`model`/`chunk` 3키가 **additive**로 붙었다(`None`이면 payload에서 통째로 생략 — 기존 `{"text": ...}` 단일 호출은 바이트 동일, 리스너 구버전 무회귀). 배치 `cowork_enrich_nightly`(공통·매일 02:00, `_run_nightly_enrich`)가 `GET /api/stocks`와 **같은 함수**(`storage.get_global_portfolio`)로 대상을 정해 이 경로로 발사한다.
+
+- **관측성은 절반만 닿는다 — 설계상 트레이드오프, 코드 자신이 명시.** `job_runs.py`의 `record()` docstring이 이 잡을 "그 예외 목록에 넣을 수 없다"고 별도로 적어 둔다: `set_status`는 배선돼 있으나(fire 전송 실패→`failed`, 미설정·대상 0건→`skipped`) 실제 청크 처리는 **다른 프로세스**(로컬 리스너)에서 이 잡 종료 후 수 시간에 걸쳐 일어나고 완료를 백엔드로 보고하는 통로가 없다 — 즉 이 잡의 `success`는 "fire가 접수됐다"이지 "전 종목이 갱신됐다"가 아니며, 첫 청크에서 한도로 죽어 대부분이 미처리여도 배치현황 카드는 초록이다.
+- **리스너 큐는 인메모리 — ADR이 명시한 트레이드오프.** `scripts/cowork-fire-listener.py::_QUEUE`(`queue.Queue`)는 프로세스 재기동에 잔여 청크를 잃는다(ADR `260913-013425` §산출물: "재시도·영속화는 없고, 소실은 다음 날 회차가 덮는다(멱등이므로 데이터 손상은 없다)"). 배포 자체가 재기동 1회를 요구하므로 첫 배포일에 특히 그렇다.
+- **리스너 코드 변경은 `git push` 배포 경로 밖이다.** `deploy.sh`는 backend/nginx 컨테이너만 재생성하고 `cowork-fire-listener.py`는 launchd 서비스(`com.portfolion.cowork-fire-listener`)로 별도 상주한다 — 리스너 코드를 고치면 사용자의 수동 `launchctl kickstart`(ADR: "사용자 `!` 실행")가 따로 필요하다. 이걸 잊으면 배포는 성공으로 보이는데 리스너는 옛 코드로 계속 돈다(§10.1의 "두 배포 경로" 클래스와 다른 방향의 "배포됐지만 안 뜬" 사례).
+- **청크 타임아웃은 유계다.** `_run_chunks`가 `proc.wait(timeout=3600)`(실측 5종목 1청크 ~19분의 3배 여유) 후 `TimeoutExpired`면 `proc.kill()`하고 다음 청크로 진행한다 — 무계 대기였다면 세션 하나가 안 끝나는 것만으로 워커 스레드가 영구 정지하고 이후 모든 전량 회차가 큐에 쌓이기만 했을 것(코드 주석이 이 대안을 "영구 정지" 시나리오로 명시).
+- **거부 응답의 진단성 — 이미 가드됨(task#346).** `Handler._reject`가 `Content-Length: 0`을 붙이지 않던 시절엔 클라이언트가 바디를 읽을 때 소켓이 이미 닫혀 간헐 `ConnectionReset`이 났다(실측 6회 중 2회) — 401을 실제로 받았다는 사실이 호출측 로그에서 사라지는 방향이었다. 지금은 헤더가 있고, 401 사유도 3종(`no-server-token`/`no-auth-header`/`token-mismatch`)으로 갈라 로그에 남긴다(토큰 값 자체는 안 남긴다).
+
+### 11.4 `enrich_history` — 덮어쓰기를 비파괴로 (task#345)
+
+`tickers`의 enrich 8필드는 UPDATE로 덮어써 종목당 최신 1판만 남았다. `storage/portfolio.py::enrich_stock`이 UPDATE 직후 `_record_enrich_history`로 **쓰기 직후 8필드 전체**를 `enrich_history`에 한 행 남긴다(신설 테이블, `app_schema.sql`+`main._migrate` 쌍 배선 확인됨 — DoD 충족). 이력 INSERT 실패는 warning으로 삼킨다(이력 부재보다 enrich 저장 실패가 나쁘다는 명시적 우선순위).
+
+- **UPDATE와 이력 INSERT는 별개 트랜잭션이다 — 잠재 위험(낮음).** `enrich_stock`의 `execute(UPDATE ...)`와 `_record_enrich_history`의 `query(SELECT row_to_json...)`+`execute(INSERT...)`는 `services/db.py`의 호출별 신규 커넥션·자동커밋 규약(§4.3)을 그대로 따른다 — 단일 트랜잭션이 아니다. 같은 티커에 동시 쓰기(예: admin 수동 PUT과 루틴 세션이 같은 종목을 겹쳐 건드리는 경우)가 있으면 `_record_enrich_history`의 SELECT가 **이 호출이 방금 쓴 값이 아니라 그 사이 끼어든 다른 쓰기의 값**을 담을 수 있다 — 이력 행이 "이 UPDATE가 실제로 만든 판"과 어긋난다. 도달 조건이 좁다(같은 티커 동시 enrich)는 이유로 아직 회귀 가드는 없다.
+- **`scripts/enrich-ab.py`(신규, 이력 위에서 A/B 운전)에서 이미 발견·수정된 결함 2건**은 코드에 남은 흔적으로 확인했다(둘 다 이 파일 단독 변경 커밋으로 닫힘, 잔존 아님) — ⓐ `_row(hid)`가 `ticker`로 한정하지 않아 다른 종목의 이력 id를 조용히 읽어 엉뚱한 두 판을 비교했다(`bfc5bf5`) ⓑ `restore()`의 리포트 재생성이 루틴 자신의 동시 재생성과 겹치면 409를 받는데 이를 실패로 처리해 "컬럼은 복원됐는데 스냅샷은 이전 판"인 어긋난 상태로 끝났다(`ca85277`, 지금은 10초 간격 유계 재시도 12회). 이 스크립트는 운영자가 로컬에서 직접 실행하는 도구이지 요청 경로가 아니다.
 
 ---
 
@@ -1269,11 +1286,11 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 ## 14. 계획됐지만 미실행인 것
 
-`.forge/backlog/`는 **비어 있다**(2026-08-30 실측). 직전 판이 적은 대기 2건은 둘 다 소진됐다 — `resilience-and-hardening-features.md`(**333**)는 task#335~337 3파트로 실행됐고, `postgres-credential-rotation.md`(**334**)는 이 항목의 B21 해소로 완료됐다.
+`.forge/backlog/`는 **비어 있다**(2026-09-14 재실측 — 2026-08-30에도 비어 있었고 그 사이 채워졌다 비워진 흔적은 `.forge/done/`의 260830~260914 항목들로 남아 있다, 아래). 직전 판이 적은 대기 2건은 둘 다 소진됐다 — `resilience-and-hardening-features.md`(**333**)는 task#335~337 3파트로 실행됐고, `postgres-credential-rotation.md`(**334**)는 그때의 B21 해소로 완료됐다.
 
-⚠️ **그래서 §0의 잔존 6건은 이제 전부 무주공산이다** — `B6`(부분, `macro.py` 잔존)·`B80`·`B81`·`B82`·`B49`(부분)·`B63` 어느 것도 대기 슬롯이 없다. 「§0에 남아 있다」와 「누군가 맡고 있다」는 다르고, 지금은 **아무도 맡고 있지 않다**.
+⚠️ **§0의 잔존 6건 서술은 stale하다 — 그중 3건이 그 뒤 닫혔다.** 이 절이 이전에 열거한 `B6`(부분)·`B80`·`B81`·`B82`·`B49`(부분)·`B63` 중 **`B6`(task#341, macro.py 마지막 경로 닫힘)·`B80`(task#340, 날짜 미검증 404화)·`B82`(task#339, nginx 루프백 게시)는 해소돼 §0 표에서 이미 제거됐다**(각 해소 각주가 §0 안에 그대로 있다). **2026-09-14 기준 §0에 실제로 남은 행은 3개뿐이다 — `B81`(부분, task#342 — title 상한은 닫혔고 기존 발행 15종의 소급 미검증만 잔존) · `B49`(부분, task#331 — 주 인스턴스는 닫혔고 §7.3의 6곳만 잔존) · `B63`(프론트 포매터 중복, 미착수)**. 셋 다 대기 슬롯이 없다 — 「§0에 남아 있다」와 「누군가 맡고 있다」는 다르고, 지금은 아무도 맡고 있지 않다.
 
-`.forge/adr/`엔 ADR 파일 **48개**가 활성이다 — 번호 `0001`~`0047`(47건, 직전 판의 `0001`~`0035`에서 12건 증가: `0036` SW API 무캐시 · `0037` 리포트 변경 소유권 · `0038` 주요기술 단일행 · `0039`~`0047` 주요기술·리포트 계열) + 날짜명 1건(`260821-073608-tech-report-backfill-bypasses-routine.md`). `retired/`는 여전히 없다. ⚠️ 날짜명 ADR이 섞여 있으므로 **번호 최대값(47)과 파일 수(48)가 다르다** — `ls | wc -l`로 「ADR N건」을 세면 번호 체계와 어긋난다(`STRUCTURE.md §5`의 카운트 드리프트가 §0 `B59`로 잡혀 있는 이유가 이것이다).
+`.forge/adr/`엔 ADR 파일 **53개**가 활성이다(2026-09-14 재실측, 직전 판의 48개에서 5건 증가) — 번호 `0001`~`0047`(47건, 무변화) + 날짜명 **6건**(직전 판 1건에서 5건 증가: `260821-073608-tech-report-backfill-bypasses-routine.md`·`260822-173015-probe-slug-scope-hardcoded-vs-derived.md`·`260822-173016-market-outlook-schema-enforcement.md`·`260823-085145-auth-rate-limit-in-process-cf-ip.md`·`260830-212846-tech-report-title-is-bounded-lead.md`·`260913-013425-nightly-full-enrich-chunked-listener.md`). `retired/`는 여전히 없다. ⚠️ 날짜명 ADR이 섞여 있으므로 **번호 최대값(47)과 파일 수(53)가 다르다** — `ls | wc -l`로 「ADR N건」을 세면 번호 체계와 어긋난다(`STRUCTURE.md §5`의 카운트 드리프트가 §0 `B59`로 잡혀 있는 이유가 이것이다).
 
 이 문서가 식별한 **후속 후보**(계획으로 승격되지 않은 것):
 
