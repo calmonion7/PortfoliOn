@@ -35,6 +35,43 @@ def _load(p):
         return None
 
 
+def _body(a):
+    """팔별 본문을 같은 모양으로 맞춘다.
+
+    enrich 레인은 배치 PUT이라 muse/h1이 **1개짜리 리스트**로 오고 opus는 이력의 dict다.
+    모양이 다른 것을 그대로 비교하면 축이 전부 «—»가 되거나 예외로 죽는다(실측: 본 실행 중
+    `'list' object has no attribute 'get'`). `ticker`는 페이로드 주소지이지 내용이 아니므로 뺀다.
+    """
+    b = (a or {}).get("body")
+    if isinstance(b, list):
+        b = b[0] if b else {}
+    if not isinstance(b, dict):
+        return {}
+    return {k: v for k, v in b.items() if k != "ticker"}
+
+
+# 레인마다 「내용」을 이루는 축이 다르다 — 공통 축만 쓰면 무엇이 달라졌는지 안 보인다.
+LANE_ROWS = {
+    "analyst": [
+        ("rating", lambda b: b.get("rating")),
+        ("FV 밴드", lambda b: f"{b.get('fair_value_low')}~{b.get('fair_value_high')}"),
+        ("포인트 수", lambda b: len(b.get("points") or []) or None),
+    ],
+    "tech": [
+        ("주요업체 수", lambda b: len(b.get("players") or []) or None),
+        ("출처 수", lambda b: len(b.get("sources") or []) or None),
+        ("핵심포인트 수", lambda b: len(b.get("key_points") or []) or None),
+        ("과제 수", lambda b: len(b.get("challenges") or []) or None),
+    ],
+    "enrich": [
+        ("채운 필드 수", lambda b: len([k for k, v in b.items() if v]) or None),
+        ("moat(자)", lambda b: len(str(b.get("moat") or "")) or None),
+        ("risks(자)", lambda b: len(str(b.get("risks") or "")) or None),
+        ("insights(자)", lambda b: len(json.dumps(b.get("insights") or "", ensure_ascii=False))),
+    ],
+}
+
+
 def build(lane, sample, outroot="out"):
     d = Path(outroot) / lane / sample
     arms = {}
@@ -45,51 +82,57 @@ def build(lane, sample, outroot="out"):
     skew = _skew(opus.get("baseline_date", ""))
     comparable = skew is not None and skew <= SKEW_UNCOMPARABLE_DAYS
 
-    L = []
-    L.append(f"# {lane} / {sample} — 3팔 비교\n")
+    L = [f"# {lane} / {sample} — 3팔 비교\n"]
     L.append(f"- opus 기준선 생성일: `{str(opus.get('baseline_date'))[:10]}` "
              f"· 실행일 `{RUN_DATE}` · **간격 {skew}일**")
-    L.append(f"- 수치 대조: {'**가능**' if comparable else f'**대조 불가** (간격 {skew}일 > {SKEW_UNCOMPARABLE_DAYS}일 — '
-             '그 사이 주가·실적 변동이 모델 차이로 오독된다)'}")
+    L.append("- 수치 대조: " + ("**가능**" if comparable else
+             f"**대조 불가** (간격 {skew}일 > {SKEW_UNCOMPARABLE_DAYS}일 — "
+             "그 사이 주가·실적 변동이 모델 차이로 오독된다)"))
     L.append("")
     L.append("| | opus (기존 발행물) | muse (무료) | H1 (muse→opus 검수) |")
     L.append("|---|---|---|---|")
 
-    def cell(a, fn):
+    def cell(a, fn, on_body=True):
         if not a or a.get("error"):
-            return f"— ({(a or {}).get('error','없음')[:28]})"
+            return f"— ({(a or {}).get('error', '없음')[:26]})"
         try:
-            v = fn(a)
+            v = fn(_body(a) if on_body else a)
             return "—" if v is None else str(v)
         except Exception:
             return "—"
 
-    def body(a):
-        return (a or {}).get("body") or {}
-
-    rows = [
-        ("세션 비용", lambda a: "0 (수확)" if a.get("fired") is False else f"{a.get('elapsed_sec','?')}초"),
-        ("rating", lambda a: body(a).get("rating")),
-        ("FV 밴드", lambda a: f"{body(a).get('fair_value_low')}~{body(a).get('fair_value_high')}"),
-        ("포인트 수", lambda a: len(body(a).get("points") or []) or None),
-        ("본문 분량(자)", lambda a: len(json.dumps(body(a), ensure_ascii=False))),
-        ("H1 변경 건수", lambda a: a.get("changes_count")),
-    ]
-    for label, fn in rows:
-        L.append(f"| **{label}** | {cell(arms['opus'], fn)} | {cell(arms['muse'], fn)} | {cell(arms['h1'], fn)} |")
-
+    L.append("| **세션 비용** | " + " | ".join(
+        cell(arms[x], lambda a: "0 (수확)" if a.get("fired") is False else f"{a.get('elapsed_sec','?')}초",
+             on_body=False) for x in ("opus", "muse", "h1")) + " |")
+    for label, fn in LANE_ROWS.get(lane, []):
+        L.append(f"| **{label}** | " + " | ".join(cell(arms[x], fn) for x in ("opus", "muse", "h1")) + " |")
+    L.append("| **본문 분량(자)** | " + " | ".join(
+        cell(arms[x], lambda b: len(json.dumps(b, ensure_ascii=False))) for x in ("opus", "muse", "h1")) + " |")
+    L.append("| **H1 변경 건수** | — | — | " +
+             cell(arms["h1"], lambda a: a.get("changes_count"), on_body=False) + " |")
     L.append("")
+
     for arm in ("opus", "muse", "h1"):
         a = arms[arm]
         L.append(f"## {arm}")
         if not a or a.get("error"):
             L.append(f"> 산출 없음 — {(a or {}).get('error', '파일 부재')}\n")
             continue
-        b = body(a)
-        L.append(f"**제목**: {b.get('title','—')}\n")
-        L.append(f"**밸류에이션 근거**: {b.get('valuation_method','—')}\n")
-        for i, pt in enumerate(b.get("points") or []):
-            L.append(f"- **({i+1}) {pt.get('title','')}** {str(pt.get('body',''))[:400]}")
+        b = _body(a)
+        if lane == "analyst":
+            L.append(f"**제목**: {b.get('title','—')}\n")
+            L.append(f"**밸류에이션 근거**: {b.get('valuation_method','—')}\n")
+            for i, pt in enumerate(b.get("points") or []):
+                L.append(f"- **({i+1}) {pt.get('title','')}** {str(pt.get('body',''))[:400]}")
+        elif lane == "tech":
+            L.append(f"**제목**: {b.get('title','—')}\n")
+            L.append(f"**설명**: {str(b.get('description',''))[:400]}\n")
+            for kp in (b.get("key_points") or [])[:4]:
+                L.append(f"- **{kp.get('title','')}** {str(kp.get('body',''))[:300]}")
+        else:
+            for k in ("moat", "key_resource", "competitor_edge", "risks", "growth_plan"):
+                if b.get(k):
+                    L.append(f"**{k}**: {str(b[k])[:400]}\n")
         L.append("")
 
     ch = arms.get("h1") or {}
@@ -98,8 +141,10 @@ def build(lane, sample, outroot="out"):
         L.append("| 심각도 | 필드 | 이유 |")
         L.append("|---|---|---|")
         for c in ch["changes"]:
-            reason = str(c.get("reason", "")).replace("|", "/")[:150]
-            L.append(f"| {c.get('severity','?')} | `{c.get('field','?')}` | {reason} |")
+            if not isinstance(c, dict):
+                continue
+            L.append(f"| {c.get('severity','?')} | `{c.get('field','?')}` | "
+                     f"{str(c.get('reason','')).replace('|','/')[:150]} |")
         L.append("")
 
     L.append("## 사용자 판정\n")
