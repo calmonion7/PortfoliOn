@@ -86,6 +86,13 @@ def build_prompt(routine_text, proxy_url, lane, sample):
         f"\n\n[트리거 지시]\n"
         f"{section}) {LANE_LABEL[lane]} **만** 수행하라. 다른 절은 건너뛴다.\n"
         f"대상은 오직 `{sample}` 하나다. 다른 종목·slug는 다루지 마라.\n"
+        # 발행 게이트 우회 — 파일럿에서 드러난 구조적 충돌의 해소(task#350 S6).
+        # 표본은 「기존 opus 판이 있는 것」으로 골랐는데(기준선이 있어야 비교가 된다) 루틴의
+        # 7일 게이트는 바로 그 최신성 때문에 발행을 거부한다 → 20표본이 전부 빈손이 된다.
+        # ⚠️ 여기서 「어차피 저장되지 않는다」고 알려주지 않는 것이 중요하다 — 알려주면 모델이
+        # 덜 노력할 수 있어 재려던 품질 자체가 오염된다. 게이트 판정만 통과시킨다.
+        f"발행 조건 판정(최신 발행일 경과·변화 유의성 등)은 **이미 통과한 것으로 간주**하라.\n"
+        f"조건을 다시 따지지 말고 반드시 발행 요청까지 수행하라.\n"
     )
     return out
 
@@ -107,18 +114,34 @@ def child_env(real_key, base_env=None):
 
 
 # ── opus 팔: 세션 0개 수확 ───────────────────────────────────────────
+# 발행 본문에 실리는 필드만 — DB 행의 부수 컬럼(id·ticker·created_at·스냅샷 data)은 비교 대상이 아니다.
+PUBLISHABLE_FIELDS = {
+    "analyst": {"rating", "title", "fair_value_low", "fair_value_high",
+                "valuation_method", "points", "risks"},
+    "tech": {"title", "description", "difficulty", "players", "challenges", "related",
+             "market", "sources", "key_points", "milestones", "variants", "watch_items",
+             "composition"},
+    "enrich": {"moat", "risks", "key_resource", "competitor_edge", "market_outlook",
+               "insights", "recent_disclosures", "summary", "thesis"},
+}
 
 def normalize_opus(row, lane):
     """기존 산출물을 팔 산출 형태로 정규화한다. **세션을 띄우지 않는다.**"""
     created = row.get("created_at") or row.get("published_date") or ""
     if isinstance(created, (datetime, date)):
         created = created.isoformat()
+    body = row.get("fields") or row.get("body") or row
+    # DB 행에는 발행 본문에 없는 것들이 붙어 있다(id·ticker·created_at, 특히 스냅샷 `data`
+    # 블롭). 그대로 두면 「분량」 축이 DB 행 vs 요청 본문을 비교해 opus가 4배 길어 보인다
+    # — 같은 것을 재지 않는 축은 비교가 아니다. 발행 스키마 필드로 좁힌다.
+    if isinstance(body, dict):
+        body = {k: v for k, v in body.items() if k in PUBLISHABLE_FIELDS[lane]}
     return {
         "arm": "opus",
         "lane": lane,
         "fired": False,          # 비용 0 — 이 값이 True가 되면 설계 위반이다
         "baseline_date": str(created),
-        "body": row.get("fields") or row.get("body") or row,
+        "body": body,
     }
 
 
@@ -208,4 +231,143 @@ def fire(lane, sample, arm, model, outdir, real_key, prompt_override=None):
         result["body"] = picked["body"]
         (outdir.parent / f"{arm}.json").write_text(
             json.dumps(result, ensure_ascii=False, indent=2))
+    return result
+
+
+# ── S3: opus 팔 수확기 (세션 0개) ────────────────────────────────────
+# 표본 20건 — 그릴링 확정(2026-09-15). enrich는 섹터별 1종목, 발행 표본과 겹치지 않게 골랐다.
+SAMPLES = {
+    "enrich": ["000660", "RKLB", "JPM", "NVO", "CCJ", "TSLA", "035420", "COST", "CEG", "EQIX", "FCX"],
+    "analyst": ["GOOGL", "005380", "CRCL", "LLY", "SPCX", "005930"],
+    "tech": ["ai-datacenter-equipment", "obesity-drugs", "smr"],
+}
+# enrich의 opus 기준선 = 이 라벨. 현재 `tickers` 판은 이미 muse이므로 그것을 쓰면
+# 비교 대상 자신을 기준선으로 삼게 된다(muse 전환 커밋 8a2ef6b = 2026-09-15 03:51 UTC).
+OPUS_ENRICH_LABEL = "nightly-0914"
+PSQL = ["docker", "exec", "portfolion-postgres-1", "psql", "-U", "portfolion", "-d", "portfolion", "-tAc"]
+
+
+def _psql_json(sql):
+    out = subprocess.run(PSQL + [sql], capture_output=True, text=True, timeout=60)
+    if out.returncode != 0:
+        raise RuntimeError(f"psql 실패: {out.stderr.strip()}")
+    s = out.stdout.strip()
+    return json.loads(s) if s else None
+
+
+def harvest_opus(lane, sample):
+    """기존 산출물을 opus 판으로 수확한다. **세션을 띄우지 않으므로 비용 0.**"""
+    if lane == "enrich":
+        row = _psql_json(
+            "select row_to_json(x) from (select fields, created_at from enrich_history "
+            f"where ticker='{sample}' and label='{OPUS_ENRICH_LABEL}' "
+            "order by created_at desc limit 1) x")
+    elif lane == "analyst":
+        row = _psql_json(
+            "select row_to_json(x) from (select to_jsonb(a)-'id' as body, published_date "
+            f"from analyst_reports a where ticker='{sample}' "
+            "order by published_date desc limit 1) x")
+    else:
+        row = _psql_json(
+            "select row_to_json(x) from (select to_jsonb(t)-'id' as body, published_date "
+            f"from tech_reports t where slug='{sample}' limit 1) x")
+    if row is None:
+        return {"arm": "opus", "lane": lane, "sample": sample, "fired": False,
+                "error": "기존 opus 산출물 없음 — 기준선 부재(측정 불가, 발사로 대체하지 말 것)"}
+    out = normalize_opus(row, lane)
+    out["sample"] = sample
+    return out
+
+
+# ── S4: H1 검수 팔 ───────────────────────────────────────────────────
+REVIEW_FILE = REPO / "scripts" / "review-prompt.md"
+DRAFT_MARKER = "{{DRAFT_JSON}}"
+
+
+def build_review_prompt(draft, review_text=None, proxy_url=None):
+    """muse 초안을 검수 프롬프트에 싣는다.
+
+    초안 삽입이 실패하면 검수 세션은 **아무것도 없는 상태로** 검수를 시작해 새로 쓰게 된다 —
+    그러면 이 팔이 재려던 「검수가 초안을 얼마나 개선하는가」가 「opus가 새로 쓰면 어떤가」로
+    바뀌어 측정이 조용히 다른 것을 잰다. 그래서 마커 1건을 강제한다.
+    """
+    text = review_text if review_text is not None else REVIEW_FILE.read_text()
+    n = text.count(DRAFT_MARKER)
+    if n != 1:
+        raise RuntimeError(f"초안 삽입 마커가 {n}건 — 정확히 1건이어야 한다")
+    body = json.dumps(draft, ensure_ascii=False, indent=2)
+    out = text.replace(DRAFT_MARKER, body)
+    if proxy_url:
+        out += f"\n\nBASE URL: {proxy_url}\n"
+    return out
+
+
+def fire_h1(lane, sample, outdir, real_key, draft_path, model="opus"):
+    """H1 = muse 초안을 opus가 검수한다. **muse를 다시 쏘지 않는다**(초안 재사용).
+
+    초안이 없으면 검수할 것이 없으므로 발사하지 않는다 — 빈손 검수를 띄우면 그 세션은
+    사실상 새로 쓰게 되고, 이 팔은 「검수의 개선폭」이 아니라 「opus 신규 작성」을 재게 된다.
+    """
+    import threading
+
+    draft_path = Path(draft_path)
+    if not draft_path.exists():
+        return {"arm": "h1", "lane": lane, "sample": sample, "fired": False,
+                "error": "muse 초안 없음 — 검수할 대상이 없어 발사하지 않는다"}
+    draft = json.loads(draft_path.read_text()).get("body")
+    if not draft:
+        return {"arm": "h1", "lane": lane, "sample": sample, "fired": False,
+                "error": "muse 초안 본문이 비어 있다"}
+
+    proxy = _load_proxy()
+    listener = _load_listener()
+    outdir = Path(outdir); outdir.mkdir(parents=True, exist_ok=True)
+    ctx = proxy.Context(PROD_BASE, real_key, outdir / "capture", outdir / "proxy.log")
+    srv, port = proxy.serve(ctx)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        prompt = build_review_prompt(draft, proxy_url=f"http://127.0.0.1:{port}")
+        log = os.fdopen(os.open(outdir / "run.log", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w")
+        t0 = time.time()
+        proc = subprocess.Popen(
+            listener._runner_argv(model), cwd=outdir, stdout=log, stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE, start_new_session=True, env=child_env(real_key),
+        )
+        proc.stdin.write(prompt.encode()); proc.stdin.close()
+        try:
+            rc = proc.wait(timeout=SESSION_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            proc.kill(); rc = None
+        elapsed = time.time() - t0
+    finally:
+        srv.shutdown()
+
+    result = {"arm": "h1", "lane": lane, "sample": sample, "model": model, "fired": True,
+              "rc": rc, "elapsed_sec": round(elapsed, 1)}
+    # 검수 세션은 발행하지 않고 파일로 출력한다 → 캡처가 아니라 작업 디렉터리에서 찾는다.
+    final = None
+    for name in ("final.json", "out.json", "result.json"):
+        f = outdir / name
+        if f.exists():
+            try:
+                final = json.loads(f.read_text()); break
+            except Exception:
+                pass
+    changes = None
+    cf = outdir / "changes.json"
+    if cf.exists():
+        try:
+            changes = json.loads(cf.read_text())
+        except Exception:
+            pass
+    if final is None:
+        result["error"] = "검수 최종 JSON 없음(final.json) — run.log 확인"
+        (outdir.parent / "h1.error.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        result["body"] = final
+        result["changes"] = changes or []
+        result["changes_count"] = len(changes or [])
+        (outdir.parent / "h1.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
+        (outdir.parent / "h1.changes.json").write_text(
+            json.dumps(changes or [], ensure_ascii=False, indent=2))
     return result

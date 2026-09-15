@@ -136,3 +136,60 @@ def test_no_capture_is_an_error_not_an_empty_success(mod):
     루틴은 조건 미충족 시 발행하지 않는 것이 정상이므로 둘을 구별해 기록해야 한다.
     """
     assert mod.pick_capture([], lane="tech", sample="smr") is None
+
+
+# ── H1 검수 팔 ───────────────────────────────────────────────────────
+
+def test_review_prompt_embeds_the_draft(mod):
+    """⑪ 초안이 검수 프롬프트에 실제로 실린다.
+
+    삽입이 실패하면 검수 세션이 빈손으로 시작해 **새로 쓰게** 되고, 이 팔은
+    「검수의 개선폭」이 아니라 「opus 신규 작성」을 재게 된다 — 조용히 다른 것을 재는 경우다.
+    """
+    out = mod.build_review_prompt({"title": "삼성전자 심층"}, review_text="검수하라\n{{DRAFT_JSON}}\n끝")
+    assert "삼성전자 심층" in out
+    assert "{{DRAFT_JSON}}" not in out
+
+
+def test_review_prompt_aborts_without_marker(mod):
+    """⑫ 삽입 마커가 없으면 중단 — 빈손 검수를 발사하지 않는다."""
+    with pytest.raises(Exception):
+        mod.build_review_prompt({"a": 1}, review_text="마커가 없는 프롬프트")
+
+
+def test_review_prompt_forbids_writes_and_new_claims(mod):
+    """⑬ 실제 검수 프롬프트가 쓰기 금지와 '새 논지 금지'를 담는다(가드레일 회귀 방지)."""
+    text = mod.REVIEW_FILE.read_text()
+    assert "새 논지를 만들지 않는다" in text
+    assert "POST/PUT/DELETE" in text
+    assert "빈 배열" in text, "변경 0건이 유효한 결과임을 말하지 않으면 억지 수정을 유도한다"
+
+
+def test_trigger_bypasses_the_publish_gate(mod):
+    """⑭ 트리거가 발행 게이트를 우회시킨다 — 그러나 '섀도라 저장 안 됨'은 **알리지 않는다**.
+
+    파일럿 실측(2026-09-15): GOOGL이 당일 발행돼 7일 게이트에 걸리자 세션이 「발행하지 않는
+    것이 옳다」고 정확히 판단해 빈손으로 끝났다. 표본은 기존 opus 판이 있는 것으로 골랐으므로
+    (기준선이 있어야 비교가 성립) 이 충돌은 20표본 전부에 구조적으로 발생한다.
+
+    동시에 '어차피 저장 안 된다'를 프롬프트에 넣으면 모델이 덜 노력해 품질 측정이 오염되므로
+    그 문구가 **없어야** 한다 — 이 축은 두 방향을 함께 잠근다.
+    """
+    out = mod.build_prompt(ROUTINE, "http://127.0.0.1:1", lane="analyst", sample="GOOGL")
+    assert "이미 통과한 것으로 간주" in out
+    for leak in ("저장되지 않", "섀도", "실제로 반영되지"):
+        assert leak not in out, f"측정 오염 문구가 프롬프트에 있다: {leak}"
+
+
+def test_opus_body_is_narrowed_to_publishable_fields(mod):
+    """⑮ opus 수확 본문에서 DB 부수 컬럼을 떼어낸다.
+
+    안 떼면 「분량」 축이 DB 행(스냅샷 data 블롭 포함) vs 요청 본문을 비교해 opus가 4배 길어
+    보인다(파일럿 실측 7526자 vs 1807자) — 같은 것을 재지 않는 축은 비교가 아니다.
+    """
+    row = {"body": {"title": "T", "rating": "buy", "points": [], "risks": "r",
+                    "ticker": "GOOGL", "created_at": "x", "data": {"거대한": "블롭"}},
+           "published_date": "2026-09-15"}
+    out = mod.normalize_opus(row, lane="analyst")
+    assert "data" not in out["body"] and "ticker" not in out["body"]
+    assert out["body"]["title"] == "T" and out["body"]["rating"] == "buy"
