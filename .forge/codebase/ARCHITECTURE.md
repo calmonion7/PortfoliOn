@@ -508,8 +508,9 @@ N행이 아니라 record 1행이 되는 함정이 있어 형태를 테스트가 
 
 트리거는 이벤트 구동(ADR-0028): 일일 리포트 배치가 끝나면 `scheduler/jobs.py:_generate_all`이
 `job_runs` 컨텍스트 **밖**에서 `cowork_trigger.fire(cowork_trigger.daily_text(market))`를 쏘고,
-`scripts/cowork-fire-listener.py`(launchd, `127.0.0.1:8787`)가 받아 headless `claude -p`를 실행한다.
-백엔드 컨테이너는 `host.docker.internal:8787`로 도달한다.
+`scripts/cowork-fire-listener.py`(launchd, `127.0.0.1:8787`)가 받아 headless 세션을 실행한다 —
+`_runner_argv`(task#348)가 `model`로 실행기를 가른다: `/` 포함이면 OpenCode(`opencode run -m … --auto`),
+아니면 기존 `claude -p`. 백엔드 컨테이너는 `host.docker.internal:8787`로 도달한다.
 
 > ⚠️ `claude -p`는 **완료 시 1회 출력**하므로 진행 중 `run.log`는 원리적으로 비어 있다.
 > 0바이트 로그를 실패로 읽고 재fire하면 같은 slug에 중복 발행을 쏜다. 판정은 3분할하라 —

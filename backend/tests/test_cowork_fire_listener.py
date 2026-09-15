@@ -113,6 +113,40 @@ def test_api_key_goes_to_stdin_not_argv(listener):
     assert proc.stdin.closed, "stdin을 닫지 않으면 claude가 프롬프트 끝을 못 본다"
 
 
+# ── 실행기 분기: claude -p vs OpenCode (task#348) ──────────────────────
+
+def test_runner_argv_claude_unchanged(listener):
+    """ⓑ `/` 없는 model(예: opus)은 기존 argv와 완전 동일 — 이게 무회귀의 이빨이다."""
+    assert listener._runner_argv("opus") == [
+        "claude", "-p", "--model", "opus",
+        "--allowedTools", "Bash,WebSearch,WebFetch,Read,Write",
+    ]
+
+
+def test_runner_argv_opencode_branch(listener):
+    """ⓐ `/` 포함 model은 `opencode run -m <model> --auto`로 분기한다."""
+    argv = listener._runner_argv("opencode/muse-spark-1.3-contributor-free")
+    assert argv[0].endswith("opencode")
+    assert argv[1:] == ["run", "-m", "opencode/muse-spark-1.3-contributor-free", "--auto"]
+
+
+def test_spawn_proc_stdin_prompt_same_for_both_runners(listener):
+    """ⓒ 두 실행기 모두 프롬프트가 같은 방식(stdin, 닫힘)으로 전달된다."""
+    proc1, _ = listener._spawn_proc("트리거텍스트", "opus")
+    proc2, _ = listener._spawn_proc("트리거텍스트", "opencode/x")
+    for proc in (proc1, proc2):
+        assert proc.stdin.closed
+        assert "트리거텍스트" in proc.stdin.written.decode()
+
+
+def test_no_payment_method_is_treated_as_limit(listener, tmp_path):
+    """ⓓ OpenCode 무료 모델이 결제수단 부재로 즉사하면 한도 취급한다."""
+    workdir = tmp_path / "oc-limit-run"
+    workdir.mkdir()
+    (workdir / "run.log").write_text("Error: No payment method on file\n")
+    assert listener._hit_limit(workdir) is True
+
+
 # ── 전량 모드: 청크 순차 스폰 (task#344) ──────────────────────────────
 
 def _tickers(n):

@@ -149,7 +149,8 @@ def _run_nightly_enrich():
             logger.warning("[Scheduler] Nightly enrich skipped: 대상 종목 0")
             return
         ok = cowork_trigger.fire(
-            cowork_trigger.nightly_text(), tickers=tickers, model="opus", chunk=5,
+            cowork_trigger.nightly_text(),
+            tickers=tickers, model="opencode/muse-spark-1.3-contributor-free", chunk=5,
         )
         if not ok:
             run.set_status("failed", "fire 실패")

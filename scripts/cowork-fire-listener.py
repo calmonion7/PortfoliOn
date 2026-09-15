@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""PortfoliOn 로컬 fire 리스너 (ADR-0028 개정판) — 배치 완료 fire를 받아 headless claude -p 실행.
+"""PortfoliOn 로컬 fire 리스너 (ADR-0028 개정판) — 배치 완료 fire를 받아 세션을 스폰한다.
+
+실행기는 `model`로 갈린다(task#348) — `/` 포함 model(예: `opencode/muse-spark-1.3-contributor-free`)은
+`opencode run -m <model> --auto`, 아니면 기존 `claude -p --model <model>`(무회귀, 바이트 동일).
 
 - POST /fire  헤더 Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>
     body {"text": "..."}                       → 즉시 1세션 논블로킹 스폰(기존 계약)
@@ -20,6 +23,7 @@ eco: `tickers` 없는 fire는 그대로 병행 스폰(중복 enrich 가능하나
 import json
 import os
 import queue
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -38,7 +42,7 @@ DEFAULT_MODEL = "opus"
 DEFAULT_CHUNK = 5
 # 한도 소진은 세션이 즉시 죽으면서 로그 첫 줄에만 남는다 — 남은 청크를 계속 띄우면
 # 같은 실패를 K번 반복해 로그만 늘린다.
-_LIMIT_MARKERS = ("hit your weekly limit", "usage limit", "limit reached")
+_LIMIT_MARKERS = ("hit your weekly limit", "usage limit", "limit reached", "no payment method")
 # 한도 문구가 첫 줄에 온다는 보장이 없다(배너·MCP 로딩 로그가 앞설 수 있다) → 앞부분을 읽는다.
 _LOG_HEAD_BYTES = 4096
 # 세션 하나가 영영 안 끝나면 **워커 스레드가 영구 정지**하고(그 스레드는 is_alive()가 True라
@@ -69,6 +73,19 @@ def _env_value(key: str) -> str:
     return ""
 
 
+def _runner_argv(model: str) -> list:
+    """model로 실행기를 가른다 — `/` 포함이면 OpenCode, 아니면 기존 claude -p.
+
+    `/` 없는 분기는 기존 argv와 **바이트 동일**이어야 한다(무회귀 이빨,
+    `test_runner_argv_claude_unchanged`).
+    """
+    if "/" in model:
+        opencode = shutil.which("opencode") or "/opt/homebrew/bin/opencode"
+        return [opencode, "run", "-m", model, "--auto"]
+    return ["claude", "-p", "--model", model,
+            "--allowedTools", "Bash,WebSearch,WebFetch,Read,Write"]
+
+
 def _spawn_proc(text, model=DEFAULT_MODEL, tickers=None):
     """세션 하나를 띄우고 (proc, workdir)을 돌려준다. 호출측이 wait 여부를 정한다."""
     api_key = _env_value("COWORK_API_KEY")
@@ -82,8 +99,7 @@ def _spawn_proc(text, model=DEFAULT_MODEL, tickers=None):
     workdir = Path(tempfile.mkdtemp(prefix=ts + "-", dir=str(RUN_DIR)))
     log = open(workdir / "run.log", "w")
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", model,
-         "--allowedTools", "Bash,WebSearch,WebFetch,Read,Write"],
+        _runner_argv(model),
         cwd=workdir, stdout=log, stderr=subprocess.STDOUT,
         stdin=subprocess.PIPE, start_new_session=True,
     )

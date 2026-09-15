@@ -109,10 +109,12 @@ def _run_nightly(monkeypatch, *, portfolio, configured=True, fire_ok=True):
 
 
 def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
-    """보유+관심 합집합을 중복 없이·정렬해 싣고, opus·chunk 5로 발사한다.
+    """보유+관심 합집합을 중복 없이·정렬해 싣고, muse-spark(OpenCode 무료)·chunk 5로 발사한다.
 
-    모델은 task#345 A/B 대조로 확정됐다 — sonnet이 검증된 사실오류를 7필드 중 5곳에
-    전파했고(두나무 주식교환 일정), 스냅샷의 정량 데이터를 거의 쓰지 않았다.
+    task#345 A/B로 opus를 확정했었으나(sonnet이 사실오류를 5/7필드에 전파), 2026-09-15
+    야간 레인을 `opencode/muse-spark-1.3-contributor-free`(무료, task#348)로 전환했다 —
+    주간 한도로 opus 8런이 즉사하는 문제 + 무료 모델은 한도가 별개 예산이라서다. 07:05·20:42
+    발행 레인(리스너 DEFAULT_MODEL)은 opus 그대로다. 품질은 후속 A/B로 재판정한다.
     """
     run, fired, seen = _run_nightly(monkeypatch, portfolio={
         "stocks": [{"ticker": "AAPL"}, {"ticker": "005930"}],
@@ -120,7 +122,7 @@ def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
     })
     assert seen == ("cowork_enrich_nightly", "auto")
     assert fired["tickers"] == ["005930", "AAPL", "NVDA"]
-    assert fired["model"] == "opus" and fired["chunk"] == 5
+    assert fired["model"] == "opencode/muse-spark-1.3-contributor-free" and fired["chunk"] == 5
     assert run.status is None  # 성공은 set_status를 부르지 않는다(기본 success)
 
 
