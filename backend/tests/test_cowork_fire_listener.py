@@ -104,13 +104,71 @@ def test_running_run_log_is_not_truncated_by_next_fire(listener):
     assert (first / "run.log").read_text() == "FIRST RUN OUTPUT"
 
 
-def test_api_key_goes_to_stdin_not_argv(listener):
-    """③ API 키가 argv 어느 원소에도 없고 stdin으로 전달된다 (ps 노출 차단)."""
+def test_api_key_never_in_argv_or_prompt(listener):
+    """③ API 키 **값**이 argv에도 stdin 프롬프트에도 없고, env로만 자식에게 간다 (task#349).
+
+    task#254는 argv 노출(L2)만 닫고 키를 stdin 프롬프트에 실었다. 그 판은 `claude -p`가
+    명령을 에코하지 않아 무해했지만, OpenCode `run`은 실행한 bash 명령을 run.log(0644)에
+    에코하므로 프롬프트의 키가 **평문 로그로 샌다**(task#348 실측 — 26청크 로그 전부).
+    그래서 전달 매체를 env로 옮긴다.
+
+    ⚠️ 옛 단언 `FAKE_KEY in stdin`을 뒤집으면서 그것이 증명하던 성질(「키가 실제로 자식에게
+    전달된다」)이 사라지지 않도록 **env 단언을 대체로** 둔다 — 없으면 키를 통째로 빠뜨려도
+    이 테스트가 초록이 된다.
+    """
     listener._spawn_claude("trigger")
     proc = listener._calls[-1]
     assert not any(FAKE_KEY in str(a) for a in proc.args), f"argv에 키 노출: {proc.args}"
-    assert FAKE_KEY in proc.stdin.written.decode(), "키가 stdin으로 전달되지 않았다"
+    assert FAKE_KEY not in proc.stdin.written.decode(), "프롬프트에 키 값이 남아 있다"
+    assert proc.kwargs["env"]["PORTFOLION_API_KEY"] == FAKE_KEY, "키가 자식 env로 전달되지 않았다"
     assert proc.stdin.closed, "stdin을 닫지 않으면 claude가 프롬프트 끝을 못 본다"
+
+
+# ── 시크릿 env 주입 (task#349) ────────────────────────────────────────
+
+def test_env_injection_preserves_parent_environment(listener, monkeypatch):
+    """ⓐ 자식 env는 부모 환경 **위에** 키를 얹은 것이다.
+
+    `env={"PORTFOLION_API_KEY": ...}` 처럼 통째로 갈아끼우면 PATH가 사라져 실행기 자체가
+    뜨지 않는다(무음 고장). 부모 env 보존이 이 축의 본체다.
+    """
+    monkeypatch.setenv("FORGE_PROBE_VAR", "kept")
+    listener._spawn_claude("trigger")
+    env = listener._calls[-1].kwargs["env"]
+    assert env["FORGE_PROBE_VAR"] == "kept", "부모 환경을 갈아끼웠다 — PATH도 함께 사라진다"
+    assert env["PORTFOLION_API_KEY"] == FAKE_KEY
+
+
+def test_prompt_references_env_var_not_literal(listener):
+    """ⓑ 프롬프트의 `{{COWORK_API_KEY}}` 자리는 **값이 아니라 변수 참조**로 남는다.
+
+    치환을 그냥 지우면 자리표시자가 그대로 남아 세션이 literal `{{COWORK_API_KEY}}`를
+    헤더로 보내 401이 된다 — 「키가 없다」와 「키를 못 읽는다」를 가르는 축이다.
+    """
+    listener._spawn_claude("trigger")
+    prompt = listener._calls[-1].stdin.written.decode()
+    assert "{{COWORK_API_KEY}}" not in prompt, "자리표시자가 치환되지 않은 채 남았다"
+    assert "$PORTFOLION_API_KEY" in prompt, "프롬프트가 env 변수를 참조하지 않는다"
+
+
+def test_run_log_is_owner_only(listener):
+    """ⓒ run.log는 0600으로 생성된다 — 실행기가 명령을 에코해도 타 사용자가 못 읽는다."""
+    import stat as _stat
+    workdir = Path(listener._spawn_claude("trigger"))
+    mode = _stat.S_IMODE((workdir / "run.log").stat().st_mode)
+    assert mode == 0o600, f"run.log 모드가 {oct(mode)} — 0600이어야 한다"
+
+
+def test_secret_handling_identical_for_both_runners(listener):
+    """ⓓ 키 은닉은 실행기 분기와 **독립**이다 — OpenCode 경로에서도 동일하다.
+
+    원 결함이 OpenCode에서만 드러났기 때문에 claude 경로만 고치고 끝낼 위험이 있다.
+    """
+    for model in ("opus", "opencode/muse-spark-1.3-contributor-free"):
+        proc, workdir = listener._spawn_proc("트리거", model)
+        assert FAKE_KEY not in proc.stdin.written.decode(), f"{model}: 프롬프트에 키 값"
+        assert proc.kwargs["env"]["PORTFOLION_API_KEY"] == FAKE_KEY, f"{model}: env 미주입"
+        assert not any(FAKE_KEY in str(a) for a in proc.args), f"{model}: argv에 키"
 
 
 # ── 실행기 분기: claude -p vs OpenCode (task#348) ──────────────────────

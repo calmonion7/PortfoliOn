@@ -9,9 +9,11 @@
     body {"text":..., "tickers":[...],          → 전량 모드: chunk개씩 잘라 **순차** 스폰
           "model":"sonnet", "chunk":5}             (task#344 — 한 세션에 전 종목을 맡기면 죽는다)
 - 127.0.0.1:8787 바인드 (백엔드 컨테이너는 host.docker.internal:8787로 도달)
-- 프롬프트 = scripts/cowork-routine-prompt.md ({{COWORK_API_KEY}}는 .env.docker 값으로 치환) + 트리거 text
-  → argv가 아니라 **stdin**으로 넘긴다(ps에 API 키가 보이지 않게). claude -p는 positional
-  prompt가 없으면 stdin에서 읽는다.
+- 프롬프트 = scripts/cowork-routine-prompt.md + 트리거 text → argv가 아니라 **stdin**으로 넘긴다
+  (ps 노출 차단). claude -p는 positional prompt가 없으면 stdin에서 읽는다.
+- API 키는 프롬프트에 **싣지 않고** 자식 env `PORTFOLION_API_KEY`로 주입한다(task#349).
+  프롬프트는 `$PORTFOLION_API_KEY`만 참조한다 — OpenCode `run`이 bash 명령을 run.log에
+  에코하므로 프롬프트에 값이 있으면 그 값이 평문 로그로 샌다. run.log는 0600으로 생성.
 - claude -p는 빈 스크래치 디렉터리에서 실행(레포 컨텍스트/편집 차단), 출력은 런별 로그 파일
   → workdir은 mkdtemp로 **원자 생성**한다. 리스너는 launchd 장수 단일 프로세스라 PID가 늘
   같아서, 초 단위 ts만으로는 같은 초 2회 fire가 cwd를 공유해 앞 run의 run.log를 truncate했다.
@@ -89,7 +91,12 @@ def _runner_argv(model: str) -> list:
 def _spawn_proc(text, model=DEFAULT_MODEL, tickers=None):
     """세션 하나를 띄우고 (proc, workdir)을 돌려준다. 호출측이 wait 여부를 정한다."""
     api_key = _env_value("COWORK_API_KEY")
-    prompt = PROMPT_FILE.read_text().replace("{{COWORK_API_KEY}}", api_key)
+    # 키 **값**은 프롬프트에 싣지 않는다 — env로만 자식에게 준다(task#349).
+    # OpenCode `run`은 실행한 bash 명령을 stdout에 에코하고 그것이 run.log에 남으므로,
+    # 프롬프트에 값이 있으면 그 값이 평문 로그가 된다(task#348 실측: 26청크 전부).
+    # 옛 자리표시자는 지우는 게 아니라 **변수 참조로** 바꾼다 — 그냥 지우면 세션이
+    # literal `{{COWORK_API_KEY}}`를 헤더로 보내 401이 된다(하위호환).
+    prompt = PROMPT_FILE.read_text().replace("{{COWORK_API_KEY}}", "$PORTFOLION_API_KEY")
     if text:
         prompt += f"\n\n[트리거 지시]\n{text}\n"
     if tickers:
@@ -97,11 +104,16 @@ def _spawn_proc(text, model=DEFAULT_MODEL, tickers=None):
     ts = time.strftime("%Y%m%d-%H%M%S")
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     workdir = Path(tempfile.mkdtemp(prefix=ts + "-", dir=str(RUN_DIR)))
-    log = open(workdir / "run.log", "w")
+    # 0600으로 **생성 시점에** 연다 — `open()` 후 chmod는 그 사이 창에서 0644로 읽힌다.
+    log = os.fdopen(
+        os.open(workdir / "run.log", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w"
+    )
     proc = subprocess.Popen(
         _runner_argv(model),
         cwd=workdir, stdout=log, stderr=subprocess.STDOUT,
         stdin=subprocess.PIPE, start_new_session=True,
+        # 부모 환경 **위에** 얹는다 — 통째로 갈아끼우면 PATH가 사라져 실행기가 안 뜬다.
+        env={**os.environ, "PORTFOLION_API_KEY": api_key},
     )
     # 프롬프트 ~33KB < 파이프 버퍼 64KB → 논블로킹(claude를 기다리지 않는다).
     # ⚠️ 이 주석이 코드 경로를 가두고 있다 — 프롬프트가 커져 64KB를 넘으면 이 write가
