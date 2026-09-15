@@ -1,0 +1,62 @@
+[
+  {
+    "field": "recent_disclosures",
+    "action": "removed",
+    "reason": "「9월 들어서는 연준의 0.25%p 인상 전망이 지배적이라 순이자이익에 우호적이나, 금리 수혜는 이미 주가에 상당 부분 반영됐다는 평가가 많다」를 통째로 삭제했다. ⓐ 출처가 전혀 없는 거시 전망이고 ⓑ 같은 초안의 risks ③이 「연준 인하 재개」를 전제하며 ⓒ 라이브 스냅샷의 기존 insights도 「금리 인하가 순이자이익 가이던스를 훼손하는지」를 확인 포인트로 적어, 인상·인하 방향이 정면으로 어긋난다. 「평가가 많다」는 출처 없는 전언이라 함께 뺐다.",
+    "severity": "high"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "corrected",
+    "reason": "「조정 매출 524억달러」→「관리기준 580억달러」. 2Q26 실적 릴리스는 net revenue 573억달러(회계 기준)·580억달러(managed/조정)를 제시하며 524억달러는 어느 기준에도 없다. 스냅샷 API의 revenue 528.5억달러(2026-06)와도 다르다 — 이 문장이 실적 발표를 서술하므로 1차 출처(릴리스)의 조정 기준 값을 썼다.",
+    "severity": "medium"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "removed",
+    "reason": "「컨센서스를 약 0.30달러 상회」·「예상을 20억달러 이상 웃돌았다」를 삭제했다. 조정 EPS 6.14달러와 매출 자체는 릴리스로 확인되지만 컨센서스 값과 상회 폭은 어떤 출처로도 확인되지 않는다(초과분을 지어내면 EPS 본체까지 의심받는다 — wrong < missing).",
+    "severity": "medium"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "removed",
+    "reason": "「일회성을 제외해도 순이익이 전년 대비 13% 늘었다」의 13%를 삭제했다. 릴리스는 회계 기준 순이익 +41%만 명시하고 조정 기준 전년 대비 증가율은 제시하지 않는다. 증가 사실은 유지하되 확인되지 않는 수치만 뺐다.",
+    "severity": "medium"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "added",
+    "reason": "회계 기준 순이익 212억달러·EPS 7.70달러·ROTCE 29%를 한 문장으로 병기했다. 초안의 「조정 순이익 169억달러」는 릴리스로 확인되는 옳은 값인데, 스냅샷 API의 net_income 21,155M(=212억)과 달라 독자·검수자가 오류로 오독할 여지가 있었다. 새 논지가 아니라 초안 수치와 API 수치가 같은 분기의 다른 기준임을 명시하는 보정이다.",
+    "severity": "low"
+  },
+  {
+    "field": "risks",
+    "action": "removed",
+    "reason": "④의 「2027년 EPS 성장 전망이 약 3%에 그쳐」를 삭제했다. 컨센서스 성장률 전망은 스냅샷 API(target_mean·per·forward_per만 제공)에도 릴리스에도 없다. 대신 확인되는 근거(2분기 이익 기저가 자본시장 호조)로 같은 논지를 유지했다.",
+    "severity": "medium"
+  },
+  {
+    "field": "risks",
+    "action": "corrected",
+    "reason": "③의 「2027년 이후 연준 인하 재개 전망이 현실화되면」에서 시점 한정(2027년 이후)을 뺐다. 그 시점을 지목하는 출처가 없고, 삭제한 「9월 인상 전망」 문장과 쌍으로 들어온 서술이었다. 조건부 리스크 자체는 유지한다.",
+    "severity": "low"
+  },
+  {
+    "field": "competitor_edge",
+    "action": "removed",
+    "reason": "「2026년 예상 EPS 성장률 약 21%는 대형은행 중 최상위권」·「2027년 성장 둔화(약 3%)」를 삭제했다. 두 전망치 모두 출처가 없다(위 risks ④와 같은 근거).",
+    "severity": "medium"
+  },
+  {
+    "field": "competitor_edge",
+    "action": "corrected",
+    "reason": "「뱅크오브아메리카·웰스파고·씨티는 수익성이 뒤진다」에 스냅샷 API의 competitors_data로 확인되는 PBR(BAC 1.51·WFC 1.67·C 1.19 vs JPM 2.63)을 근거로 붙였다. 주장은 초안 그대로이고 검증 가능한 수치만 보강했다.",
+    "severity": "low"
+  },
+  {
+    "field": "market_outlook.segments[2].sources",
+    "action": "added",
+    "reason": "AWM 부문 note를 「운용자산 5조달러 돌파·분기 장기 순유입 500억달러」로 서술하는데 출처가 2025 연간보고서뿐이었다. 그 수치는 2Q26 릴리스(AUM 5.1조달러·장기 순유입 500억달러)에서 나오므로 해당 출처를 추가했다.",
+    "severity": "low"
+  }
+]

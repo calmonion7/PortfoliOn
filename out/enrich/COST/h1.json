@@ -1,0 +1,143 @@
+{
+  "arm": "h1",
+  "lane": "enrich",
+  "sample": "COST",
+  "model": "opus",
+  "fired": true,
+  "rc": 0,
+  "elapsed_sec": 354.3,
+  "body": [
+    {
+      "ticker": "COST",
+      "moat": "해자는 회원비가 곧 이익인 구조 자체다. 상품 마진을 의도적으로 낮게 유지해(2026-05 분기 영업이익률 3.99%) 가격 경쟁력을 극단까지 밀어붙이고, 이익은 갱신율 90% 안팎의 연회비에서 확보한다. 경쟁사가 따라 하려면 기존 마진을 포기해야 해서 모방이 사실상 불가능하다. SKU를 3천~4천개로 압축해 품목당 구매량을 키우는 운영과 커클랜드 시그니처 자체 브랜드가 가격 기준점을 회사 손에 쥐여준다. 미국·캐나다 갱신율 92.2%, 전세계 89.7%가 이 구조가 실제로 작동한다는 직접 증거다.",
+      "growth_plan": "성장은 반복적이다. ① 해외 신규 창고 출점(한국·일본·중국·유럽 포함 Other International이 장기 엔진) ② 회원 수 증가와 Executive 등급 전환으로 회원당 회비 확대 ③ 전자상거래·당일배송 — 2026 회계연도 디지털 활성화 비교매출 +20.9%, 8월 +17.9%로 오프라인 빈도 한계를 보완한다. ④ 8월 전사 비교매출 +8.4%(유가·환율 제외 +5.4%)로 기존점 성장도 유지되고 있다. 다음 확인 지점은 9월 24일 2026 회계연도 4분기 실적 발표다.",
+      "risks": "첫째이자 가장 큰 리스크는 밸류에이션이다 — PER 46.2배, 선행 PER 40.6배, PBR 24.7배, EV/EBITDA 29.4배로 순이익률 2.9%대 소매업에 기술주급 배수가 붙어 있다. 둘째, 그 배수는 이미 조정 중이다 — 52주 고점 1094.76달러 대비 16% 하락했고 EMA20·EMA50·EMA200을 모두 하회한다. 셋째, 체감 인플레이션이 회원당 구매 빈도와 객단가에 전이될 수 있다.",
+      "recent_disclosures": "2026년 9월 2일 8월 월간 매출이 기준선이다 — 순매출 237.0억달러(+9.9%), 전사 비교매출 +8.4%(유가·환율 제외 +5.4%), 디지털 활성화 +17.9%, 미국 비교매출 +9.0%, 해외 +9.5%로 실적 자체는 견조하다. 4분기(16주) 순매출 939억달러(+11.3%), 52주 순매출 2973억달러(+10.2%)도 함께 확인됐다. 주가를 누르는 것은 실적이 아니라 소매 업황 뉴스다 — 9월 14일 Kroger의 매장 경쟁력 문제 보도로 오프라인 대형 소매 트래픽 우려가 번졌고, 9월 14~15일 커클랜드 모터오일 가격 인상·구매 제한 보도(Fox Business·Barron’s·USA TODAY)는 단기 체감물가 논란이지만 매출 영향은 제한적이다. 9월 24일 4분기 실적 전까지는 뉴스 공백 구간이다.",
+      "insights": "스탠스는 관망. 사업의 질은 소매업 최상위이고 갱신율 92%대 방어력은 경기 하강기에 더 빛나지만, 선행 PER 40배대는 순이익률 3% 사업에 과한 값이다. 진입 가이드는 EMA20(929달러대) 회복 확인 후 접근하거나 52주 저점 840달러 부근 조정 대기 — 일간 RSI 43.5는 과매도가 아닌 중립 구간이라 반등 신호로 보기엔 이르고, 추격 매수할 자리도 아니다.",
+      "key_resource": "핵심 자원은 유료 회원 기반이다. 회비는 선불·저원가로 그대로 영업이익이 되며, 그 이익이 있기에 상품을 원가에 가깝게 팔 수 있다 — 회원 수가 곧 가격 경쟁력의 재원인 자기강화 구조다. 유지 동력은 ① 갱신율(미국·캐나다 92.2%, 전세계 89.7%) ② SKU 압축과 커클랜드 자체 브랜드로 지키는 체감 가격 우위 ③ 8월 디지털 활성화 비교매출 +17.9%가 보여주는 구매 접점 확장이다.",
+      "competitor_edge": "좁은 창고형 회원제 범주에서는 Sam’s Club·BJ’s를 크게 앞선 1위이고, 넓게는 Walmart·Amazon과 겹친다. Walmart는 시가총액이 2배 이상(8,681억 vs 4,075억달러) 크고 Sam’s Club을 갖고 있으나 회원비 의존도가 낮아 상품 마진을 Costco만큼 포기할 수 없다. Amazon은 배송 편의에서 앞서나 벌크 단위당 가격에서는 Costco를 이기지 못한다. 스냅샷 기준 PER 46.2배·선행 40.6배는 Walmart 39.5배·Target 16.4배·Amazon 20.4배·BJ’s 20.9배 대비 최고 수준이라 쟁점은 사업의 질이 아니라 배수의 정당성이다.",
+      "market_outlook": {
+        "market_name": "북미 창고형 회원제 소매 시장",
+        "position": "1위",
+        "one_liner": "창고형 회원제라는 좁은 포맷에서는 Sam’s Club·BJ’s를 크게 앞선 1위이지만, 성장은 포맷 내 점유율이 아니라 해외 출점과 전자상거래 전환에서 나와야 하는 단계다.",
+        "sources": [
+          "Costco FY2025 10-K",
+          "Costco 2026년 8월 월간 매출 발표 (2026-09-02)"
+        ],
+        "segments": [
+          {
+            "name": "United States",
+            "period": "2025",
+            "revenue_share_pct": 72.7,
+            "prev_period": "2024",
+            "prev_revenue_share_pct": 72.1,
+            "note": "2025 회계연도 매출의 중심축이다. 2026년 8월 미국 비교매출 +9.0%(유가·환율 제외 +5.6%)로 성숙 시장인데도 높은 흐름을 유지한다.",
+            "sources": [
+              "Costco FY2025 10-K",
+              "Costco 2026년 8월 월간 매출 발표 (2026-09-02)"
+            ]
+          },
+          {
+            "name": "Canada",
+            "period": "2025",
+            "revenue_share_pct": 13.4,
+            "prev_period": "2024",
+            "prev_revenue_share_pct": 13.7,
+            "note": "2025 회계연도 매출 369.2억달러로 세 지역 중 성장이 가장 느렸다. 2026년 8월 비교매출도 +4.0%(유가·환율 제외 +2.8%)로 세 지역 중 가장 낮아, 출점보다 기존점 효율에 의존하는 구간이다.",
+            "sources": [
+              "Costco FY2025 10-K",
+              "Costco 2026년 8월 월간 매출 발표 (2026-09-02)"
+            ]
+          },
+          {
+            "name": "Other International",
+            "period": "2025",
+            "revenue_share_pct": 13.9,
+            "prev_period": "2024",
+            "prev_revenue_share_pct": 13.9,
+            "note": "2025 회계연도 매출 382.7억달러로 장기 성장의 실질 엔진이다. 2026년 8월 해외 비교매출 +9.5%(유가·환율 제외 +6.8%)로 가속 조짐을 보인다.",
+            "sources": [
+              "Costco FY2025 10-K",
+              "Costco 2026년 8월 월간 매출 발표 (2026-09-02)"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "changes": [
+    {
+      "field": "recent_disclosures",
+      "action": "removed",
+      "reason": "「9월 12일 Sam’s Club 회원 혜택 강화 보도」가 근거 없음 — 스냅샷 news 10건(09-14~09-15)에 부재하고 초안에 출처도 없다. 주가 하락의 주된 설명으로 쓰인 문장이라 지어낸 근거일 위험이 크다(wrong < missing).",
+      "severity": "high"
+    },
+    {
+      "field": "competitor_edge",
+      "action": "removed",
+      "reason": "같은 근거 없는 「2026년 9월 Sam’s 혜택 강화는 그 격차를 좁히려는 시도다」 절 삭제. 위 항목과 동일 출처 문제.",
+      "severity": "high"
+    },
+    {
+      "field": "growth_plan",
+      "action": "removed",
+      "reason": "「8월 전세계 방문 빈도 +2.5%, 평균 객단가 +5.7%」 삭제 — 인용된 2026-09-02 8월 매출 발표 원문을 확인한 결과 방문 빈도·객단가 지표가 **아예 실려 있지 않다**(월간 릴리스는 순매출·비교매출만 공시). 실존 문서에 없는 수치를 그 문서에 귀속한 형태라 심각. 검증된 8월 전사 비교매출 +8.4%(ex +5.4%)로 대체했다.",
+      "severity": "high"
+    },
+    {
+      "field": "insights",
+      "action": "corrected",
+      "reason": "「일간 RSI 40%대 과매도 구간」 → 스냅샷 daily_rsi.rsi = 43.47은 과매도(통상 ≤30)가 아니라 중립이다. 값은 맞고 해석이 틀렸다. 「43.5는 과매도가 아닌 중립 구간」으로 정정.",
+      "severity": "high"
+    },
+    {
+      "field": "competitor_edge",
+      "action": "corrected",
+      "reason": "피어 PER이 스냅샷 competitors_data와 불일치 — Walmart 38.8→39.5, Target 16.1→16.4, Amazon 20.7→20.4. 초안 값은 전일 스냅샷 텍스트의 stale 수치로 보인다. API 값으로 교체하고 같은 표의 BJ’s 20.9배를 추가.",
+      "severity": "medium"
+    },
+    {
+      "field": "competitor_edge",
+      "action": "corrected",
+      "reason": "「Walmart는 규모가 3배 크고」 → 스냅샷 market_cap 기준 868.1B vs 407.5B = 2.1배다. 「시가총액이 2배 이상(8,681억 vs 4,075억달러)」으로 정정.",
+      "severity": "medium"
+    },
+    {
+      "field": "recent_disclosures",
+      "action": "corrected",
+      "reason": "「9월 12일 … Kroger 고객 이탈 소식」 → 스냅샷 news의 실제 항목은 2026-09-14 TheStreet 「Kroger knows what’s wrong with its stores」(Kroger 자사 매장 경쟁력 문제)다. 날짜와 성격을 실제 기사에 맞춰 정정.",
+      "severity": "medium"
+    },
+    {
+      "field": "recent_disclosures",
+      "action": "added",
+      "reason": "8월 매출 발표 원문 확인 중 4분기(16주) 순매출 939억달러(+11.3%)를 확인 — 초안이 인용한 같은 문서의 같은 표에서 온 값이라 새 논지가 아니라 인용 보강이다. 52주 2973억달러(+10.2%)는 초안 값 그대로 검증 통과.",
+      "severity": "low"
+    },
+    {
+      "field": "recent_disclosures",
+      "action": "corrected",
+      "reason": "「주가를 누르는 것은 경쟁 뉴스다」 → Sam’s Club 건을 지우고 나면 남는 것이 Kroger 업황 보도와 커클랜드 모터오일 보도라 「경쟁 뉴스」가 과한 규정이다. 「실적이 아니라 소매 업황 뉴스」로 완화하고 모터오일 보도의 실제 매체(Fox Business·Barron’s·USA TODAY)를 명시.",
+      "severity": "low"
+    },
+    {
+      "field": "key_resource",
+      "action": "corrected",
+      "reason": "유지 동력 ③이 초안에선 「방문 빈도(8월 전세계 트래픽 +2.5%)」였는데 위와 같은 이유(원문 미수록)로 제거하고, 검증된 8월 디지털 활성화 비교매출 +17.9%로 대체.",
+      "severity": "high"
+    },
+    {
+      "field": "market_outlook.segments[1].note",
+      "action": "corrected",
+      "reason": "캐나다가 「성장이 가장 느렸다」는 주장에 근거가 없어, 원문에서 확인한 8월 캐나다 비교매출 +4.0%(ex +2.8%, 세 지역 중 최저)를 근거로 보강. 초안의 「비중은 완만하게 축소」류 추가 주장은 넣지 않았다.",
+      "severity": "low"
+    },
+    {
+      "field": "market_outlook.segments[*].sources",
+      "action": "added",
+      "reason": "세 부문 note가 모두 8월 월간 매출 발표의 수치를 인용하는데 sources에는 10-K만 있었다. 실제 인용 출처를 sources에 반영.",
+      "severity": "low"
+    }
+  ],
+  "changes_count": 12
+}

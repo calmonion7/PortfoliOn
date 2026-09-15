@@ -1,0 +1,56 @@
+[
+  {
+    "field": "market_outlook.one_liner",
+    "action": "corrected",
+    "reason": "「구리 수요가 2040년까지 약 700만톤 증가」·「2035년 공급이 STEPS 대비 약 25% 부족」 두 수치를 확인하지 못했다. 출처인 IEA Global Critical Minerals Outlook 2026은 실존하나(2026-07-16 발간, 랜딩 페이지 확인) 해당 수치를 담고 있는지 검증 불가이고, 직전 발행판은 같은 출처로 「3,300만톤·30%」라는 다른 수치를 주장한다. 수치를 빼고 정성 서술로 바꿨다.",
+    "severity": "high"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "removed",
+    "reason": "「LME 구리 사상 최고가(톤당 14,779달러)」의 구체 수치는 스냅샷 API에 없고 출처로도 확인되지 않는다. 스냅샷 뉴스가 뒷받침하는 것은 「사상 최고가에서 되밀림」이라는 정성 사실까지다.",
+    "severity": "high"
+  },
+  {
+    "field": "key_resource",
+    "action": "removed",
+    "reason": "「회사 추산 폐석더미 내 구리 약 400억 파운드」는 API에 없고 초안의 어느 출처도 뒷받침하지 않는다.",
+    "severity": "high"
+  },
+  {
+    "field": "competitor_edge",
+    "action": "removed",
+    "reason": "「FCX는 미국 정련 구리 생산의 약 70%를 공급」은 API·출처 어느 쪽으로도 확인되지 않는 수치다. 같은 문단 첫 문장이 이미 미국 내 자산 비중 우위를 말하므로 논지 손실은 없다.",
+    "severity": "high"
+  },
+  {
+    "field": "growth_plan",
+    "action": "removed",
+    "reason": "백대드 확장의 「약 3년 건설」과 「리칭과 합쳐 미국 구리 생산을 3~4년 내 약 60% 증가」는 API에 없고 출처로 뒷받침되지 않는다. 확인 가능한 부분(연내 이사회 결정·인허가 완료·미 2위 규모)만 남겼다.",
+    "severity": "high"
+  },
+  {
+    "field": "competitor_edge",
+    "action": "corrected",
+    "reason": "EV/EBITDA를 12.6배로 적었으나 스냅샷 API는 12.347배(summary.ev_ebitda, competitors_data의 is_self 행 동일)다. 12.3배로 고치고 비교 대상도 API 실측치(BHP 7.709·RIO 7.783)로 명시했다 — 초안의 「광산업 평균」은 근거가 없다.",
+    "severity": "medium"
+  },
+  {
+    "field": "market_outlook.sources[3]",
+    "action": "corrected",
+    "reason": "「LME·COMEX 사상 최고가 및 미국 7월 구리 수입 기록 보도(2026-09-11)」는 그것이 뒷받침하던 수치를 삭제해 근거로 남을 이유가 없고 특정 기사로 확인되지도 않는다. 본문에 남은 급락 서술을 실제로 담고 있는 기사(스냅샷 news에 링크·제목·발행일 존재)로 교체했다.",
+    "severity": "medium"
+  },
+  {
+    "field": "moat / recent_disclosures",
+    "action": "corrected",
+    "reason": "마냐르 제련소 가동 시점을 「2026년 9월 초」·「같은 주」로 특정했으나 그 정밀도를 뒷받침하는 근거가 없다(직전 발행판·스냅샷 모두 연 단위). 「2026년 가동」으로 낮췄다.",
+    "severity": "medium"
+  },
+  {
+    "field": "market_outlook.sources[1]",
+    "action": "corrected",
+    "reason": "출처 실존 확인 결과 IEA Global Critical Minerals Outlook 2026은 실재하므로 유지하되, 확인한 발간일(2026-07-16)을 병기했다.",
+    "severity": "low"
+  }
+]

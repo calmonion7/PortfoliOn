@@ -1,0 +1,86 @@
+[
+  {
+    "field": "published_date",
+    "action": "added",
+    "reason": "필수 필드가 초안에 아예 없었다 — 그대로 POST하면 pydantic이 422로 막아 발행 자체가 불가능하다(로컬 TechReportIn 재현 확인). 2026-09-16(발행 시점)으로 채웠다.",
+    "severity": "high"
+  },
+  {
+    "field": "title",
+    "action": "corrected",
+    "reason": "'허가 신청은 내년 1분기로 미뤄졌다' — 연기 사실이 없다. 직전 판(2026-08-21)이 이미 'BLA를 1분기에 제출 계획'을 planned 마일스톤으로 싣고 있었고, AJMC도 'Planned Q1 2027 submissions'로 같은 시점을 말한다. 어느 출처도 일정 변경을 언급하지 않는다. '내년 1분기로 잡혀 있다'로 수정(57자, 40~120 상한 내).",
+    "severity": "high"
+  },
+  {
+    "field": "description[어디까지 왔나]",
+    "action": "corrected",
+    "reason": "세 가지를 고쳤다. ① '미뤄진 이유가 효력이 아니라 생산·품질 자료 준비라고 밝혀진 점' + 이어지는 '공장이 따라오지 않으면' 문장 — 출처 6건 어디에도 없는 인과 주장이라 삭제(wrong<missing). ② '지난 한 달에 새로 확정된 것은 다음 세대의 일정이다' — 그 일정은 직전 판에 이미 있었으므로 거짓. ③ 인용된 후기 임상 2건은 2026-07-23, 당뇨 40주 임상은 2026-03-20 발표라 '지난 한 달'이 아니다. 시점 표현을 걷어냈다.",
+    "severity": "high"
+  },
+  {
+    "field": "sources",
+    "action": "restored",
+    "reason": "본문 수치의 근거가 통째로 사라질 뻔했다. sources는 보존 필드(_PRESERVABLE)가 아니라 요청이 컬럼을 치환하는데, 초안은 직전 판 12건을 6건으로 갈아치우면서 그 12건이 뒷받침하던 숫자는 전부 유지했다 — 60.1%/39.9%(BioPharma Dive)·2025 매출 229억/186억(Polaris)·중단율 65%와 재증가 2/3(PMC)·제지방 25~30%와 미오스타틴 7%(Cell Reports Medicine)·CDMO 18~24개월(Drug Discovery News)·경구 40%와 460억달러(Goldman)·시장 200억/114억달러 추정(J.P. Morgan·Goldman)·Foundayo 승인과 카그리세마 4분기(DelveInsight)·MariTide 3상 6건(Motley Fool)·에페 허가 신청(한미). GET으로 직전 판에서 그대로 복원해 11건을 되실었다(본문이 더 인용하지 않는 Morgan Stanley 1건은 제외). 새 논지는 더하지 않았다.",
+    "severity": "high"
+  },
+  {
+    "field": "key_points[1].title / body",
+    "action": "corrected",
+    "reason": "'허가 신청이 내년 1분기로 못박히면서 구도가 바뀌는 시점도 함께 미뤄졌다' — title과 같은 거짓 연기 서사. '목표가 유지되면서 그 자리에 남았다'로 수정. 더불어 '사건 감소는 보여주지 못했다'를 '통계적으로 확인되지 않았다'로 정밀화했다 — 실측은 MACE-5 HR 0.82(95% CI 0.55–1.22)·MACE-3 HR 1.12(0.64–1.96)로, 사건 수가 양군 모두 예상보다 적어 결론이 나지 않은 것이지 감소가 부정된 것이 아니다.",
+    "severity": "high"
+  },
+  {
+    "field": "watch_items[1].detail",
+    "action": "corrected",
+    "reason": "'생산·품질 자료 준비가 병목인지 여기서 드러난다' — 삭제한 무출처 인과 주장에 의존하는 문장이라 함께 정정했다. 관측 대상을 '목표 시점이 두 판 연속 유지된 만큼 접수 자체'로 바꿔 그 항목이 재는 것을 사실에 맞췄다.",
+    "severity": "high"
+  },
+  {
+    "field": "sources[0].title",
+    "action": "corrected",
+    "reason": "'및 2027년 1분기 허가 신청 계획'이라고 적었으나 그 릴리스(2026-05-21)에는 신청 시점이 없다(원문 미러 확인). 80주 결과만 담도록 제목을 고치고, 28.3%가 efficacy estimand임을 명시했다(treatment-regimen 기준은 -25.0%).",
+    "severity": "medium"
+  },
+  {
+    "field": "sources[3].title",
+    "action": "corrected",
+    "reason": "'팜뉴스(2026-09)'로 적혀 있으나 실제 기사는 2026-03-20이다(본문 직접 확인 — 당화혈색소 1.7~2.0%, 체중 16.8%는 정확히 일치). 날짜를 정정하고 임상명(TRANSCEND-T2D-1)을 명시했다.",
+    "severity": "medium"
+  },
+  {
+    "field": "sources[+1] (PharmExec)",
+    "action": "added",
+    "reason": "key_points[1]의 20.8%·22.6%와 '심혈관 사건 감소 미확인'을 뒷받침하는 출처가 초안 6건 중에 없었다. 실제로 열어 확인한 문서(2026-07-23, TRIUMPH-2 n=1,152 / TRIUMPH-3 n=1,949)를 근거로 추가했다 — 기존 주장에 근거를 붙인 것이고 새 논지는 아니다.",
+    "severity": "medium"
+  },
+  {
+    "field": "key_points[1].metrics[0].label",
+    "action": "corrected",
+    "reason": "'후보 최고 감량(80주) 28.3%'에 추정 기준이 없었다. 28.3%는 efficacy estimand이고 treatment-regimen 기준은 25.0%로 3.3%p 차이가 난다 — 기준 없이 최댓값만 쓰면 과대 표시가 된다. 라벨에 기준을 명시(40자 상한 내).",
+    "severity": "medium"
+  },
+  {
+    "field": "players[9].note / milestones[8].event",
+    "action": "corrected",
+    "reason": "한미약품 에페글레나타이드의 '신속심사 대상' 표기는 확인한 출처(머니투데이 2026-09-15·직전 판 한미 보도자료)가 뒷받침하지 않는다. 확인되는 사실('국내 품목허가 절차', '이르면 10월 출시')만 남겼다. watch_items[3]의 not_signal에서도 같은 표현을 제거했다.",
+    "severity": "medium"
+  },
+  {
+    "field": "milestones[4..6]",
+    "action": "corrected",
+    "reason": "세 마일스톤이 전부 2026으로만 묶여 발표 순서를 읽을 수 없었다. 확인된 시점(당뇨 40주=3월, pivotal 80주=5월, 후기 2건=7월)을 event 문장에 넣고, 심혈관 사건 미확인은 두 임상 전체가 아니라 심혈관 동반 임상(TRIUMPH-3)에 귀속시켰다 — 당뇨 동반 임상은 MACE를 주 평가변수로 두지 않는다.",
+    "severity": "medium"
+  },
+  {
+    "field": "sources[1].title / sources[2].title",
+    "action": "corrected",
+    "reason": "Healthcare Brew에 '(2026-08)', AJMC에 '(2026-09)' 날짜가 붙어 있었으나 두 문서 모두 봇 차단(403)으로 본문·게재일을 확인할 수 없었다. 확인되지 않은 날짜를 지우고, 검색 스니펫으로 확인된 내용만 제목에 남겼다.",
+    "severity": "low"
+  },
+  {
+    "field": "sources",
+    "action": "kept",
+    "reason": "참고 — 초안 6건 중 3건(Eli Lilly·Healthcare Brew·AJMC)이 WebFetch와 브라우저 UA curl 양쪽에서 403을 냈다. 규정의 '4xx면 지운다'를 문자 그대로 적용하면 삭제 대상이었으나, 검색으로 세 URL 모두 제목이 일치하는 실존 문서임을 확인했다 — 403은 WAF 봇 차단이지 부존재가 아니다. 지어낸 출처는 0건이었다.",
+    "severity": "low"
+  }
+]

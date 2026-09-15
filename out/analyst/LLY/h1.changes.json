@@ -1,0 +1,74 @@
+[
+  {
+    "field": "points[2].title",
+    "action": "corrected",
+    "reason": "초안 '빠진 것은 가격뿐, 컨센서스와 목표가는 그대로다'는 사실과 반대. 9/5 스냅샷 buy=14/hold=0/sell=0·target_mean=1377 vs 9/15 스냅샷 buy=13/hold=0/sell=1·target_mean=1347 — 매수 1인이 매도로 돌아섰고 평균 목표가도 -2.2% 내려갔다",
+    "severity": "high"
+  },
+  {
+    "field": "points[2].body",
+    "action": "corrected",
+    "reason": "'매수 13대 매도 1인의 구도는 9/5 발행 때와 같다'가 거짓. 9/5는 매수 14·보유 0·매도 0이었고 목표가 하단도 1,232→940달러로 -23.7% 내려왔다(두 날짜 모두 GET /api/report/LLY/{date} 스냅샷). 실제 변화를 기술하도록 교체",
+    "severity": "high"
+  },
+  {
+    "field": "points[2].metrics[1].change_pct",
+    "action": "added",
+    "reason": "'그대로'라는 거짓 진술을 대체하려면 이동폭이 보여야 한다 — 1347/1377-1 = -2.18%",
+    "severity": "medium"
+  },
+  {
+    "field": "valuation_method",
+    "action": "corrected",
+    "reason": "초안의 산식이 자기모순. '선행 PER 26~31배 → 1,228~1,465달러를 10달러 단위 반올림'은 1,230~1,470이 되어 선언한 FV 1,250~1,490과 맞지 않는다. 직전 판(9/5) 기록의 26.5~31.5배를 적용하면 47.2428×26.5=1,251.9·×31.5=1,488.1로 FV와 정확히 일치",
+    "severity": "high"
+  },
+  {
+    "field": "valuation_method",
+    "action": "removed",
+    "reason": "'과거 3년 선행 PER 밴드 중상단'은 스냅샷으로 확인 불가(스냅샷의 연도별 PER은 후행값 98.6/65.1/46.6뿐이고 선행 PER 이력이 없다). 9/5 판에 기록된 PEG 0.9~1.1 대응(+28.7% 성장, 36.71→47.24 스냅샷 확인)으로 대체",
+    "severity": "medium"
+  },
+  {
+    "field": "valuation_method",
+    "action": "removed",
+    "reason": "'상단에 GLP-1 점유율 60%·공급상한 해소 프리미엄을 반영했다'는 산식과 무관한 사후 정당화 — 배수는 PEG에서 나온다. 점유율 60.1% 자체는 스냅샷에 있으나 밸류에이션 근거로는 뒷받침되지 않는다",
+    "severity": "low"
+  },
+  {
+    "field": "title",
+    "action": "corrected",
+    "reason": "'9/5에 조정 이유는 지불 경로라며'는 오귀속 — 그 문구는 9/5 리포트가 인용한 8/29 판의 표현이다. 9/5 자신의 논지는 '이익 추정은 그대로고 빠진 것은 가격뿐'(9/5 points[0].title)",
+    "severity": "high"
+  },
+  {
+    "field": "title",
+    "action": "added",
+    "reason": "본문 교정과 일관되도록 컨센서스 이동(매수 14→13·매도 1, 평균 1,377→1,347달러)을 한 절 추가. 원문 title은 그 구간에서 바뀐 것이 가격뿐인 듯 읽힌다",
+    "severity": "medium"
+  },
+  {
+    "field": "points[0].metrics[1]",
+    "action": "removed",
+    "reason": "'ATTAIN-1 감량 -12.4%'가 스냅샷 어디에도 없다(전문 grep: ATTAIN·12.4·27.3 모두 0건). 초안에 sources 배열 자체가 없어 출처로도 뒷받침되지 않는다 — wrong < missing",
+    "severity": "high"
+  },
+  {
+    "field": "points[0].body",
+    "action": "removed",
+    "reason": "'ATTAIN-1 최고용량 -12.4%(27.3파운드)' 문장 삭제. 그 수치에 기댄 '일회성 출시 효과가 아니다'도 함께 빼고, 스냅샷 moat/growth_plan으로 확인되는 승인 시점(2026년 4월)·영국 승인·NICE 일정으로 대체",
+    "severity": "high"
+  },
+  {
+    "field": "points[1].body",
+    "action": "removed",
+    "reason": "'9/28~10/2 EASD에서 TRIUMPH-2·ACHIEVE·eloraTZP 2상 공개' — 스냅샷에 EASD·ACHIEVE·elora 0건, 출처 없음. 대신 스냅샷 growth_plan에 있는 TRIUMPH-1/2/3 수치와 면역·항암·신경 +121%로 대체",
+    "severity": "high"
+  },
+  {
+    "field": "risks",
+    "action": "corrected",
+    "reason": "'2030년대 특허절벽'을 스냅샷 risks 표현인 '2030년대 초 특허 만료'로 맞춤",
+    "severity": "low"
+  }
+]

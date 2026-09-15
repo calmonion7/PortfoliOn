@@ -1,0 +1,74 @@
+[
+  {
+    "field": "growth_plan",
+    "action": "removed",
+    "reason": "atNorth 인수 지분 구조 '약 40억달러, CPP 51%·에퀴닉스 34%·Partners 10%' 삭제 — 지분 합이 95%로 자기모순이고 스냅샷·출처 어느 쪽으로도 뒷받침되지 않는다. 인수 종결 사실만 정성적으로 남겼다.",
+    "severity": "high"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "corrected",
+    "reason": "'시총 1,000억달러를 넘었으나' → '시총은 약 985억달러'. 스냅샷 API competitors_data[EQIX].market_cap = 98,545,385,472으로 1,000억달러 미달 — 마일스톤 돌파는 사실이 아니다.",
+    "severity": "high"
+  },
+  {
+    "field": "market_outlook.cagr_pct",
+    "action": "corrected",
+    "reason": "16.0 → 9.7. 같은 객체의 size_current 104.27B(2025)→size_forecast 165.5B(2030)은 연 9.7%이고, segments 3곳의 시장 CAGR(9.4·9.9·10.0)도 전부 9.4~10.0이다. 16.0만 고립된 outlier라 세 배수 근거가 일치하는 9.7로 맞췄다.",
+    "severity": "high"
+  },
+  {
+    "field": "market_outlook.one_liner",
+    "action": "corrected",
+    "reason": "'연 16% 성장'→'연 9.7% 성장', '매출 기준 약 10%'→'2025년 매출 기준 약 8.8%'. cagr_pct·company_share_pct 정정에 따른 본문 동기화.",
+    "severity": "high"
+  },
+  {
+    "field": "market_outlook.company_share_pct",
+    "action": "corrected",
+    "reason": "10.4 → 8.8. 스냅샷 API financials_annual[2025].revenue = 9,217M달러이고 초안 자신의 시장 규모 104.27B 기준이면 8.84%다.",
+    "severity": "medium"
+  },
+  {
+    "field": "market_outlook.segments[0].share_pct",
+    "action": "corrected",
+    "reason": "15.0 → 8.9. API FY2025 매출 9,217M × Americas 비중 44.6% = 4,111M, 초안의 Americas 시장 46B 대비 8.9%. 15.0은 1.7배 과대.",
+    "severity": "medium"
+  },
+  {
+    "field": "market_outlook.segments[2].share_pct",
+    "action": "corrected",
+    "reason": "5.0 → 7.1. 9,217M × 21.45% = 1,977M ÷ 28B = 7.1%.",
+    "severity": "medium"
+  },
+  {
+    "field": "market_outlook.segments[1].share_pct",
+    "action": "corrected",
+    "reason": "10.0 → 10.4. 9,217M × 33.95% = 3,129M ÷ 30B = 10.4%(반올림 오차 수준이나 형제 두 부문과 산출 기준을 통일).",
+    "severity": "low"
+  },
+  {
+    "field": "risks",
+    "action": "corrected",
+    "reason": "'175억달러 수준 순부채'를 API로 확인 가능한 '부채비율 185.5%(2026년 2분기)'로 교체 — 순부채 금액은 스냅샷에 없고 출처로도 뒷받침되지 않는다.",
+    "severity": "medium"
+  },
+  {
+    "field": "insights",
+    "action": "corrected",
+    "reason": "'하반기 캐비닛 인도(약 2배)' → '하반기 캐비닛 인도 가속'. 2배라는 배수의 근거가 초안 어디에도 없다(growth_plan은 '7,000개 이상 앞당김'만 말한다).",
+    "severity": "medium"
+  },
+  {
+    "field": "competitor_edge",
+    "action": "corrected",
+    "reason": "디지털리얼티 시총 '약 680억달러' → '약 677억달러'. API competitors_data[DLR].market_cap = 67,654,676,480.",
+    "severity": "low"
+  },
+  {
+    "field": "moat",
+    "action": "corrected",
+    "reason": "영업마진 '26.4%' → '26.44%'. API financials[2026-06].operating_margin = 26.44로, 같은 초안의 competitor_edge 표기(26.44%)와도 통일.",
+    "severity": "low"
+  }
+]

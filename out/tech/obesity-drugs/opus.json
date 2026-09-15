@@ -1,0 +1,646 @@
+{
+  "arm": "opus",
+  "lane": "tech",
+  "fired": false,
+  "baseline_date": "2026-08-21",
+  "body": {
+    "title": "승인 제품을 가진 회사가 둘뿐인 시장에서 경쟁축은 이미 감량 폭에서 투여 경로로 넘어갔다 — 남은 불확실성은 약이 얼마나 빼주느냐가 아니라 환자가 얼마나 오래 먹느냐다",
+    "market": {
+      "as_of": "2026-08 (성장곡선 기준: J.P. Morgan Global Research 인크레틴 시장 전망)",
+      "history": [
+        {
+          "size": {
+            "unit": "bn",
+            "value": 98.9,
+            "currency": "USD"
+          },
+          "year": 2024
+        },
+        {
+          "size": {
+            "unit": "bn",
+            "value": 132.0,
+            "currency": "USD"
+          },
+          "year": 2025
+        }
+      ],
+      "cagr_pct": null,
+      "forecast": [
+        {
+          "size": {
+            "unit": "bn",
+            "value": 200.0,
+            "currency": "USD"
+          },
+          "year": 2030
+        }
+      ],
+      "estimates": [
+        {
+          "size": {
+            "unit": "bn",
+            "value": 200.0,
+            "currency": "USD"
+          },
+          "year": 2030,
+          "scope": "당뇨 포함 인크레틴 전체",
+          "is_basis": true,
+          "institution": "J.P. Morgan"
+        },
+        {
+          "size": {
+            "unit": "bn",
+            "value": 114.0,
+            "currency": "USD"
+          },
+          "year": 2030,
+          "scope": "비만 적응증 한정",
+          "is_basis": null,
+          "institution": "Goldman Sachs"
+        }
+      ],
+      "share_basis": "2026년 8월 미국 비만 적응증 브랜드 처방 기준 양강 점유율이며, 승인 제품이 없거나 점유율 출처를 확보하지 못한 업체는 비워 두었다."
+    },
+    "players": [
+      {
+        "name": "Eli Lilly",
+        "note": "티르제파타이드(Zepbound)로 비만 시장 1위이며, 저분자 경구 오포글리프론과 삼중작용 레타트루타이드까지 표적·제형 양축에서 모두 선두에 있다.",
+        "ticker": "LLY",
+        "country": "미국",
+        "category": "GIP 이중작용",
+        "gap_years": null,
+        "share_pct": 60.1,
+        "state_led": false,
+        "tech_level": 5,
+        "leader_name": null
+      },
+      {
+        "name": "Novo Nordisk",
+        "note": "세마글루타이드로 이 계열을 처음 상업화했고 경구 제형도 먼저 냈다. 아밀린 병용 카그리세마가 FDA 심사 중이다.",
+        "ticker": "NVO",
+        "country": "덴마크",
+        "category": "GLP-1 단독",
+        "gap_years": null,
+        "share_pct": 39.9,
+        "state_led": false,
+        "tech_level": 5,
+        "leader_name": null
+      },
+      {
+        "name": "Amgen",
+        "note": "월 1회 투여 MariTide로 투약 빈도 축에서 차별화를 노리며 3상 6건을 동시에 돌리고 있다. 승인 제품은 아직 없다.",
+        "ticker": "AMGN",
+        "country": "미국",
+        "category": "GIP 이중작용",
+        "gap_years": 3,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 3,
+        "leader_name": "Eli Lilly"
+      },
+      {
+        "name": "Boehringer Ingelheim",
+        "note": "글루카곤/GLP-1 이중작용 서보두타이드로 간지방 감소를 함께 겨냥한다. 비상장이라 티커가 없다.",
+        "ticker": null,
+        "country": "독일",
+        "category": "글루카곤 이중작용",
+        "gap_years": 3,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 3,
+        "leader_name": "Eli Lilly"
+      },
+      {
+        "name": "Pfizer",
+        "note": "자체 경구 후보를 접은 뒤 2025년 Metsera 인수로 재진입했다. 임상 자산은 확보했으나 승인 제품이 없다.",
+        "ticker": "PFE",
+        "country": "미국",
+        "category": "GLP-1 단독",
+        "gap_years": 4,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 2,
+        "leader_name": "Eli Lilly"
+      },
+      {
+        "name": "Roche",
+        "note": "2024년 Carmot 인수로 GLP-1/GIP 이중작용 자산을 확보했다. 후기 임상 단계이며 승인 제품은 없다.",
+        "ticker": "RHHBY",
+        "country": "스위스",
+        "category": "GIP 이중작용",
+        "gap_years": 4,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 2,
+        "leader_name": "Eli Lilly"
+      },
+      {
+        "name": "AstraZeneca",
+        "note": "경구 저분자 GLP-1과 아밀린 후보를 병행 개발 중이다. 대사질환 전반의 기존 사업 기반을 지렛대로 쓴다.",
+        "ticker": "AZN",
+        "country": "영국",
+        "category": "GLP-1 단독",
+        "gap_years": 4,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 2,
+        "leader_name": "Eli Lilly"
+      },
+      {
+        "name": "Viking Therapeutics",
+        "note": "VK2735의 주사·경구 두 제형을 함께 개발하는 순수 개발사로, 3상 결과 하나에 기업가치가 좌우된다.",
+        "ticker": "VKTX",
+        "country": "미국",
+        "category": "GIP 이중작용",
+        "gap_years": 4,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 2,
+        "leader_name": "Eli Lilly"
+      },
+      {
+        "name": "Structure Therapeutics",
+        "note": "경구 저분자 GLP-1 작용제에 특화된 개발사로, 저분자 경로에서 대형사와 같은 칸을 놓고 겨룬다.",
+        "ticker": "GPCR",
+        "country": "미국",
+        "category": "GLP-1 단독",
+        "gap_years": 4,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 2,
+        "leader_name": "Eli Lilly"
+      },
+      {
+        "name": "한미약품",
+        "note": "국내 자체 기술로 개발한 에페글레나타이드의 국내 허가 신청을 마치고 하반기 출시를 목표로 한다. 목표 시장이 국내에 한정돼 세계 점유 경쟁과는 무대가 다르다.",
+        "ticker": "128940",
+        "country": "한국",
+        "category": "GLP-1 단독",
+        "gap_years": 5,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 2,
+        "leader_name": "Eli Lilly"
+      }
+    ],
+    "related": {
+      "competitors": [
+        "비만 대사수술",
+        "ADC(항체-약물 접합체)",
+        "세포·유전자 치료",
+        "mRNA 치료제"
+      ],
+      "complements": [
+        "미오스타틴·액티빈 억제 병용요법",
+        "펩타이드 CDMO·무균 충전",
+        "연속혈당측정(CGM)",
+        "디지털 체중관리 서비스"
+      ],
+      "derivatives": [
+        "MASH(대사이상 지방간염) 치료제",
+        "폐쇄성 수면무호흡 치료",
+        "심혈관 사건 예방 적응증",
+        "중독·신경퇴행 적응증 확장"
+      ],
+      "prerequisites": [
+        "펩타이드 고상 합성",
+        "장기 지속형 제형 기술",
+        "경구 흡수 촉진제(SNAC)",
+        "저분자 GPCR 작용제 설계",
+        "자동주사기(오토인젝터) 디바이스"
+      ]
+    },
+    "sources": [
+      {
+        "url": "https://www.jpmorgan.com/insights/global-research/current-events/obesity-drugs",
+        "title": "J.P. Morgan Global Research — 글로벌 인크레틴 시장 2030년 2,000억달러 전망 및 2026년 비만 치료제 수급 전망"
+      },
+      {
+        "url": "https://www.zerohedge.com/medical/goldman-hikes-obesity-drug-market-forecast-oral-glp-1s-go-mass-market",
+        "title": "Goldman Sachs 전망 상향 보도(2026) — 비만 치료제 시장 2030년 1,140억달러(종전 1,010억달러), 경구 비중 약 40%·460억달러"
+      },
+      {
+        "url": "https://www.morganstanley.com/insights/articles/glp1-weight-loss-market-may-double-190-billion-2035",
+        "title": "Morgan Stanley — GLP-1 시장 2035년 1,900억달러 전망(2025년 대비 2배 이상)"
+      },
+      {
+        "url": "https://www.polarismarketresearch.com/blog/glp-drug-market-how-the-obesity-treatment-boom-is-reshaping-global-pharma",
+        "title": "Polaris Market Research — GLP-1 계열 2025년 매출 1,320억달러(전년 대비 +33.5%), Zepbound 229억달러·Wegovy 186억달러. 2024년 989억달러는 이 증가율에서 역산했다"
+      },
+      {
+        "url": "https://www.biopharmadive.com/news/lilly-novo-earnings-2q-2026-wegovy-pill-foundayo-obesity/827027/",
+        "title": "BioPharma Dive(2026Q2 실적) — 미국 비만 시장 점유율 Zepbound 60.1% / Wegovy 39.9%"
+      },
+      {
+        "url": "https://www.fiercepharma.com/pharma/oral-glp-1-tracker-launch-trajectories-lilly-foundayo-novo-wegovy-pill",
+        "title": "Fierce Pharma — 경구 GLP-1 트래커: Foundayo 2026년 8월 처방 38,928건 및 경구 신규 처방 비중 추이"
+      },
+      {
+        "url": "https://www.delveinsight.com/blog/obesity-drugs-launch",
+        "title": "DelveInsight — 2030년까지 출시 예정 비만 치료제: 레타트루타이드 TRIUMPH-1 80주 28.3%, REDEFINE-4에서 카그리세마 20.2% 대 티르제파타이드 23.6%, 오포글리프론 2026-04-01 미국 승인, 카그리세마 4분기 결정 예정"
+      },
+      {
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13031337/",
+        "title": "Weight Regain After GLP-1-Based Therapy Discontinuation(PMC) — 1년 내 중단율 최대 65%, 중단 후 1년 내 감량분 약 3분의 2 재증가"
+      },
+      {
+        "url": "https://www.cell.com/cell-reports-medicine/pdf/S2666-3791(25)00381-7.pdf",
+        "title": "Cell Reports Medicine — 감량분 중 제지방 25~30%, 세마글루타이드+비마그루맙 2상 병용 시 약 7%로 감소"
+      },
+      {
+        "url": "https://www.drugdiscoverynews.com/glp-1-manufacturing-challenges-peptide-synthesis-formulation-and-supply-chain-17288",
+        "title": "Drug Discovery News — GLP-1 제조 병목: 펩타이드 합성·무균 충전 캐파와 주요 CDMO 리드타임 18~24개월"
+      },
+      {
+        "url": "https://www.fool.com/investing/2026/07/29/watch-out-eli-lilly-and-novo-nordisk-amgens-monthl/",
+        "title": "Motley Fool(2026-07) — Amgen MariTide 월 1회 투여 및 3상 6건 동시 진행"
+      },
+      {
+        "url": "https://www.hanmi.co.kr/about/news-media/press/detail-3342.hm",
+        "title": "한미약품 보도자료 — 에페글레나타이드 국내 허가 신청 완료 및 2026년 하반기 출시 목표"
+      }
+    ],
+    "variants": [
+      {
+        "options": [
+          {
+            "name": "GLP-1 단독",
+            "examples": [
+              "세마글루타이드(Wegovy)",
+              "오포글리프론(Foundayo)",
+              "에페글레나타이드"
+            ],
+            "strength": "임상·실사용 데이터가 가장 오래 축적됐고 심혈관 적응증 근거를 함께 갖췄다",
+            "tradeoff": "다중 표적 계열이 보고한 감량 폭에는 미치지 못한다"
+          },
+          {
+            "name": "GIP 이중작용",
+            "examples": [
+              "티르제파타이드(Zepbound)",
+              "MariTide",
+              "VK2735",
+              "CT-388"
+            ],
+            "strength": "GLP-1 단독 대비 큰 감량 폭을 여러 임상에서 반복 확인했다",
+            "tradeoff": "표적이 늘수록 용량 적정과 위장관 부작용 관리가 복잡해진다"
+          },
+          {
+            "name": "글루카곤 이중작용",
+            "examples": [
+              "서보두타이드"
+            ],
+            "strength": "에너지 소비를 늘리는 경로를 더해 간지방 감소에서 별도의 이점을 노린다",
+            "tradeoff": "글루카곤 작용이 혈당을 올리는 방향이라 당뇨 병용에서 조정 부담이 생긴다"
+          },
+          {
+            "name": "아밀린 병용",
+            "examples": [
+              "카그리세마"
+            ],
+            "strength": "포만 신호 경로를 따로 더해 GLP-1 단독보다 감량 폭을 넓힌다",
+            "tradeoff": "REDEFINE-4 직접 비교에서 티르제파타이드보다 낮은 감량률을 보고했다"
+          },
+          {
+            "name": "삼중작용",
+            "examples": [
+              "레타트루타이드"
+            ],
+            "strength": "현재까지 보고된 임상 감량률 가운데 가장 큰 폭을 기록했다",
+            "tradeoff": "아직 승인 제품이 없고 장기 안전성 데이터가 가장 얇다"
+          }
+        ],
+        "axis_label": "표적 계열"
+      },
+      {
+        "options": [
+          {
+            "name": "주 1회 주사",
+            "examples": [
+              "세마글루타이드",
+              "티르제파타이드"
+            ],
+            "strength": "혈중 농도 유지가 쉬워 최상위 감량 데이터가 모두 이 경로에서 나왔다",
+            "tradeoff": "콜드체인과 프리필드 주사기 충전 캐파가 공급 상한을 만든다"
+          },
+          {
+            "name": "월 1회 주사",
+            "examples": [
+              "MariTide"
+            ],
+            "strength": "투약 횟수를 크게 줄여 복약 지속률 개선을 직접 겨냥한다",
+            "tradeoff": "1회 투여량이 커져 초기 위장관 부작용 관리가 어려워진다"
+          },
+          {
+            "name": "경구 펩타이드",
+            "examples": [
+              "경구 세마글루타이드"
+            ],
+            "strength": "기존 펩타이드 자산을 새 분자 개발 없이 알약으로 옮길 수 있다",
+            "tradeoff": "흡수 촉진제에 의존해 원료 소요량이 크고 공복 복용 조건이 붙는다"
+          },
+          {
+            "name": "경구 저분자",
+            "examples": [
+              "오포글리프론(Foundayo)",
+              "aleniglipron"
+            ],
+            "strength": "화학 합성이라 펩타이드 캐파 병목을 우회하고 복용 조건이 없다",
+            "tradeoff": "주사제 최상위와 같은 감량 폭을 아직 보여주지 못했다"
+          }
+        ],
+        "axis_label": "투여 경로"
+      }
+    ],
+    "challenges": [
+      {
+        "body": "치료를 멈추면 1년 안에 감량분의 상당 부분이 돌아오는데, 실사용에서는 그 1년 안에 상당수가 이미 약을 끊는다. 평생 투약을 전제하지 않는 유지 요법을 만들지 못하면 이 계열은 만성질환 약이 아니라 중단할 수 없는 약으로 남는다.",
+        "title": "중단 후 체중 재증가와 높은 이탈률"
+      },
+      {
+        "body": "감량분의 상당 부분이 근육·골량이라 근감소성 비만 위험이 따라온다. 미오스타틴 억제 병용이 이 비율을 낮춘 초기 결과가 있으나, 어떤 지표를 규제 승인의 1차 평가변수로 삼을지가 아직 규제기관과 합의되지 않았다.",
+        "title": "제지방량 손실과 평가변수 부재"
+      },
+      {
+        "body": "분자 설계가 끝나도 원료의약품 합성과 프리필드 주사기 충전 능력이 따라오지 않으면 출시가 막힌다. 연속식 합성·수계 펩타이드 합성 같은 공정 혁신이 시도되고 있으나 인증된 캐파로 전환되는 속도가 수요 증가를 따라가지 못하고 있다.",
+        "title": "펩타이드 대량 합성과 무균 충전 캐파"
+      },
+      {
+        "body": "경구 펩타이드는 흡수 촉진제에 의존해 같은 효과를 내는 데 필요한 원료가 주사 대비 훨씬 많고 복용 조건도 붙는다. 저분자 경구는 그 제약을 없앴지만 수용체 결합 방식이 달라 주사제 최상위와 같은 감량 폭을 아직 보여주지 못했다.",
+        "title": "경구 제형의 생체이용률과 효력 격차"
+      }
+    ],
+    "difficulty": {
+      "score": 3,
+      "rationale": "5점이 아닌 이유는 이 기술이 이미 상업적으로 완성돼 두 회사가 대량 생산·판매하고 있고, 표적(인크레틴 수용체)과 임상 평가지표(체중 감소율)가 명확해 후발주자가 무엇을 만들어야 하는지 모호하지 않기 때문이다. 실제로 여러 회사가 같은 표적으로 3상까지 도달했다는 사실 자체가 진입 난도가 절대적이지 않음을 보여준다. 그럼에도 2점 이하로 내릴 수 없는 것은, 분자 설계와 별개로 펩타이드 대량 합성과 무균 충전이라는 제조 관문이 존재해 설계에 성공해도 공급이 따라오지 않기 때문이다."
+    },
+    "key_points": [
+      {
+        "body": "비만 적응증에서 승인 제품을 가진 회사가 사실상 둘뿐이라, 이 시장의 점유율은 신규 진입이 아니라 두 회사 사이의 이동으로만 움직인다. 3위 후보들이 3상과 심사 단계에 몰려 있어 구도가 바뀌는 시점은 실적이 아니라 허가 일정이 정한다.",
+        "title": "두 회사가 시장의 전부이고, 그 안에서 순위가 갈렸다",
+        "metrics": [
+          {
+            "label": "Zepbound 미국 점유율",
+            "value": "60.1%",
+            "change_pct": null
+          },
+          {
+            "label": "Wegovy 미국 점유율",
+            "value": "39.9%",
+            "change_pct": null
+          },
+          {
+            "label": "2025 Zepbound 매출",
+            "value": "229억달러",
+            "change_pct": null
+          },
+          {
+            "label": "2025 Wegovy 매출",
+            "value": "186억달러",
+            "change_pct": null
+          }
+        ]
+      },
+      {
+        "body": "감량 폭은 표적을 늘리는 방향으로 계속 올라가는데, 실제 처방은 알약이 나온 뒤 그쪽으로 빠르게 옮겨가고 있다. 최대 효력과 최대 처방량이 서로 다른 제형에서 나오는 국면이라 점유율과 파이프라인 순위가 어긋난다.",
+        "title": "경쟁축이 감량 폭에서 투여 경로로 옮겨갔다",
+        "metrics": [
+          {
+            "label": "레타트루타이드(TRIUMPH-1, 80주)",
+            "value": "28.3%",
+            "change_pct": null
+          },
+          {
+            "label": "티르제파타이드(REDEFINE-4)",
+            "value": "23.6%",
+            "change_pct": null
+          },
+          {
+            "label": "카그리세마(REDEFINE-4)",
+            "value": "20.2%",
+            "change_pct": null
+          },
+          {
+            "label": "경구 신규 처방 비중",
+            "value": "40~50%",
+            "change_pct": null
+          }
+        ]
+      },
+      {
+        "body": "약을 끊으면 체중이 돌아오고, 실사용에서는 상당수가 1년 안에 끊는다. 기관별 시장 규모 추정이 두 배 가까이 갈리는 이유의 대부분이 이 두 숫자를 어떻게 가정하느냐의 차이다.",
+        "title": "가장 큰 불확실성은 효력이 아니라 지속이다",
+        "metrics": [
+          {
+            "label": "1년 내 중단율",
+            "value": "최대 65%",
+            "change_pct": null
+          },
+          {
+            "label": "중단 후 1년 재증가",
+            "value": "감량분의 3분의 2",
+            "change_pct": null
+          },
+          {
+            "label": "감량분 중 제지방 비율",
+            "value": "25~30%",
+            "change_pct": null
+          },
+          {
+            "label": "미오스타틴 병용 시(2상)",
+            "value": "약 7%",
+            "change_pct": null
+          }
+        ]
+      },
+      {
+        "body": "펩타이드 원료 합성과 무균 충전 캐파가 수요를 따라가지 못하면서 캐파 확보 자체가 경쟁 요소가 됐다. 저분자 경구가 주목받는 이유의 절반은 효력이 아니라 이 병목을 화학 합성으로 우회한다는 점이다.",
+        "title": "공급 병목이 분자가 아니라 공정에 있다",
+        "metrics": [
+          {
+            "label": "주요 펩타이드 CDMO 리드타임",
+            "value": "18~24개월",
+            "change_pct": null
+          },
+          {
+            "label": "2030F 경구 비중(Goldman)",
+            "value": "약 40%",
+            "change_pct": null
+          },
+          {
+            "label": "2030F 경구 TAM",
+            "value": "460억달러",
+            "change_pct": null
+          }
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "year": 2021,
+        "actor": "Novo Nordisk",
+        "event": "세마글루타이드 2.4mg(Wegovy)이 비만 적응증으로 FDA 승인을 받아 인크레틴 계열이 체중 감량 약으로 처음 정식 진입했다",
+        "status": "done"
+      },
+      {
+        "year": 2023,
+        "actor": "Eli Lilly",
+        "event": "GIP/GLP-1 이중작용 티르제파타이드(Zepbound)가 FDA 승인을 받아 다중 표적 시대가 열렸다",
+        "status": "done"
+      },
+      {
+        "year": 2025,
+        "actor": "Novo Nordisk",
+        "event": "경구 세마글루타이드가 12월 미국에서 비만 적응증 승인을 받아 첫 경구 GLP-1이 나왔다",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "Eli Lilly",
+        "event": "저분자 경구 GLP-1 오포글리프론(Foundayo)이 4월 1일 미국 승인을 받아 식사·물 제한 없는 알약 투약이 가능해졌다",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "Eli Lilly",
+        "event": "삼중작용 레타트루타이드가 TRIUMPH-1 80주 최고 용량에서 평균 28.3% 감량을 보고했다",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "Novo Nordisk",
+        "event": "카그리세마가 임상을 마치고 FDA 심사에 들어가 4분기 미국 허가 결정을 기다리고 있다",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "Amgen",
+        "event": "월 1회 투여 MariTide의 3상 6건이 동시에 진행 중이다",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "한미약품",
+        "event": "에페글레나타이드의 국내 허가 신청을 마치고 하반기 출시를 목표로 하고 있다",
+        "status": "in_progress"
+      },
+      {
+        "year": 2027,
+        "actor": "Eli Lilly",
+        "event": "레타트루타이드의 BLA를 1분기에 제출하는 것을 계획하고 있다",
+        "status": "planned"
+      }
+    ],
+    "composition": {
+      "tech": [
+        {
+          "name": "다중 수용체 작용 펩타이드 설계",
+          "leaders": [
+            "Eli Lilly",
+            "Novo Nordisk"
+          ],
+          "rationale": "감량 폭을 결정하는 것이 결국 어느 수용체를 몇 개 건드리느냐이고, 이 설계를 승인까지 완주해본 곳이 두 회사뿐이라는 사실이 가장 큰 몫의 근거다.",
+          "share_pct": 30.0
+        },
+        {
+          "name": "경구 흡수·저분자 작용제 화학",
+          "leaders": [
+            "Eli Lilly",
+            "Structure Therapeutics"
+          ],
+          "rationale": "제형이 처방량을 좌우하는 국면으로 넘어간 데다 펩타이드 캐파 병목을 우회하는 유일한 경로여서 설계 다음으로 큰 몫을 뒀다.",
+          "share_pct": 25.0
+        },
+        {
+          "name": "펩타이드 대량 합성·무균 충전 공정",
+          "leaders": [
+            "Novo Nordisk",
+            "Eli Lilly"
+          ],
+          "rationale": "분자가 완성돼도 이 공정이 막히면 출시가 미뤄지므로 별도 난제로 계상했고, 주요 위탁생산사의 리드타임이 길어진 사실이 그 크기를 뒷받침한다.",
+          "share_pct": 20.0
+        },
+        {
+          "name": "제지방량 보존 병용 기전",
+          "leaders": [
+            "Eli Lilly"
+          ],
+          "rationale": "감량의 질을 결정하는 축이고 규제 평가변수가 아직 정해지지 않아 난제로 남아 있지만, 이미 2상 수준의 해법 후보가 나와 앞의 세 축보다 작게 잡았다.",
+          "share_pct": 15.0
+        },
+        {
+          "name": "장기 지속형 투여 기술",
+          "leaders": [
+            "Amgen"
+          ],
+          "rationale": "투약 간격을 늘려 복약 지속률에 직접 닿는 기술이지만 표적 설계가 정해진 뒤의 공학 문제에 가까워 몫을 작게 뒀다.",
+          "share_pct": 5.0
+        },
+        {
+          "name": "기타",
+          "leaders": [],
+          "rationale": "바이오마커 기반 환자 선별과 병용 요법 최적화 등 개별로는 작지만 합치면 무시할 수 없는 잔여 항목을 모았다.",
+          "share_pct": 5.0
+        }
+      ],
+      "experts": [
+        {
+          "name": "펩타이드 의약화학 연구자",
+          "rationale": "다중 수용체 작용 분자를 설계하는 핵심 인력이며 이 계열의 성과가 사실상 소수 연구그룹에서 나왔다는 점이 가장 큰 몫의 근거다.",
+          "share_pct": 30.0
+        },
+        {
+          "name": "무균 충전·펩타이드 생산 공정 인력",
+          "rationale": "캐파 병목이 설비가 아니라 인증된 공정을 실제로 돌릴 수 있는 인력에 걸려 있어, 증설 속도보다 인력 확보 속도가 느리다.",
+          "share_pct": 25.0
+        },
+        {
+          "name": "대사내분비 임상시험 전문의",
+          "rationale": "여러 3상이 동시에 도는 국면에서 환자 등록 속도를 결정하는 병목이며 비만 임상 경험을 갖춘 기관 수가 제한적이다.",
+          "share_pct": 20.0
+        },
+        {
+          "name": "규제·약가 협상 전문가",
+          "rationale": "이 계열의 매출은 승인만으로 결정되지 않고 보험 급여 등재 범위에서 갈리므로 지불자 협상 인력이 실질적 병목으로 작동한다.",
+          "share_pct": 15.0
+        },
+        {
+          "name": "기타",
+          "rationale": "약물감시와 실사용데이터 분석 등 개별로는 작지만 합치면 무시할 수 없는 잔여 인력군을 모았다.",
+          "share_pct": 10.0
+        }
+      ],
+      "minerals": null,
+      "minerals_share_basis": null
+    },
+    "description": "[기술 개요]\n비만·대사질환 치료제라 부르지만 이 계열이 실제로 다루는 것은 지방이 아니라 식욕과 포만을 조절하는 호르몬 신호다. 장에서 분비되는 인크레틴 호르몬을 흉내 낸 분자가 뇌의 포만 중추와 위 배출 속도에 동시에 작용해 섭취량을 줄인다. 효력이 대사율을 바꾸는 데서 오는 것이 아니라 환자가 덜 먹게 만드는 데서 온다는 점이, 이 계열의 성패가 왜 약효보다 순응도에 더 크게 걸리는지를 설명한다.\n\n기술 경쟁은 두 축으로만 갈린다. 하나는 어느 수용체를 몇 개 건드리느냐이고, 다른 하나는 그 분자를 어떤 경로로 몸에 넣느냐다. 앞의 축이 감량 폭을 정하고 뒤의 축이 처방량과 공급 능력을 정한다. 이 문서가 대사질환(비만·당뇨) 치료제만 다루고 ADC·세포유전자·mRNA를 밖에 두는 이유도 여기에 있다 — 같은 제약사가 만들더라도 기술 성숙 단계와 시장 구조가 전혀 달라 한 문서에 섞으면 기술수준도 시장 규모도 의미를 잃는다.\n\n세 번째 특징은 이 계열이 아직 만성질환 약의 형태를 갖추지 못했다는 점이다. 고혈압약이나 스타틴은 평생 복용을 전제로 설계됐고 그 전제를 지탱할 가격·순응도 구조까지 함께 만들어졌다. 이 계열은 평생 복용을 전제하되 그 전제를 지탱할 구조를 아직 만들지 못한 상태에서 이미 대량 처방되고 있다.\n\n[어디까지 왔나]\n승인과 상업화라는 관문은 이미 넘었다. 주사제로 시작해 알약까지 시장에 나왔고, 표적을 하나에서 둘·셋으로 늘리는 방향도 임상에서 반복 확인됐다. 지금 남은 것은 세 갈래다 — 다중 표적으로 감량 폭을 얼마나 더 올릴 수 있는지, 알약이 주사를 어디까지 대체하는지, 그리고 끊었을 때 돌아오는 문제를 제형이 아니라 요법으로 풀 수 있는지다.\n\n경쟁 구도의 특이점은 3위가 없다는 것이다. 승인 제품을 가진 회사가 둘뿐인데 3상 단계에는 여러 회사가 몰려 있어, 이 시장의 구도는 점진적으로 바뀌지 않고 허가 결정이 나오는 시점마다 계단식으로 바뀐다. 그래서 이 분야의 관전 포인트는 분기 실적이 아니라 규제 일정이다.\n\n추격자들이 노리는 지점도 감량 폭이 아니다. 월 1회 투여, 경구 저분자, 근손실 억제 병용처럼 선두가 아직 채우지 않은 칸을 먼저 차지하려는 쪽으로 움직이고 있다. 정면에서 더 큰 감량으로 붙는 전략은 선두가 이미 삼중작용까지 밀고 있어 승산이 얇다고 본 결과다.\n\n[시장 규모]\n이 시장의 규모 추정이 기관마다 두 배 가까이 벌어지는 것은 낙관과 비관의 차이가 아니라 무엇을 세느냐의 차이다. 당뇨 적응증을 포함하면 시장은 이미 크고, 비만 적응증만 세면 훨씬 작다. 두 숫자를 같은 표에 놓고 봐야 하는 이유가 그것이며, 어느 한쪽만 인용한 기사는 대체로 이 구분을 흐린다.\n\n성장률을 결정하는 변수도 신약 승인이 아니라 지불 구조다. 미국에서 이 계열이 공적·사적 보험의 급여 대상이 되는 범위가 넓어질 때마다 환자 풀이 계단식으로 늘어나고, 반대로 급여가 좁아지면 승인 제품이 몇 개든 매출은 늘지 않는다. 기술 진보와 시장 확대가 같은 속도로 움직이지 않는 대표적인 분야다.\n\n[투자 관점]\n이 계열에 붙는 밸류에이션의 대부분은 지속률 가정에 실려 있다. 환자가 평생 먹는다고 보면 이 시장은 만성질환 약 시장이고, 1~2년 쓰다 끊는다고 보면 반복 구매가 없는 소비재 시장에 가깝다. 두 가정 사이의 거리가 그대로 기관별 시장 규모 추정의 격차로 나타난다.\n\n노출 경로는 셋이다. 승인 제품을 가진 두 회사, 3상 결과 하나에 기업가치가 갈리는 후발주자, 그리고 누가 이기든 물량이 늘면 돈을 버는 펩타이드 위탁생산·무균 충전 쪽이다. 앞의 둘은 이벤트 리스크가 크고 마지막은 캐파 증설 속도가 수익률을 정한다.\n\n한국 투자자에게 특기할 점은 국내 노출이 완제 개발과 위탁생산 두 갈래로 나뉜다는 것이다. 국내 자체 개발 GLP-1이 허가 절차에 들어갔지만 세계 시장 점유를 다투는 위치는 아니며, 오히려 세계 수요가 만든 생산 병목 쪽이 규모로는 더 큰 노출이다.",
+    "watch_items": [
+      {
+        "label": "카그리세마의 미국 허가 결정이 2026년 4분기 안에 공표되는가",
+        "detail": "노보가 단일 계열 사업자로 남는지 이중 포트폴리오 사업자가 되는지가 여기서 갈리며, 양강 점유율의 방향도 함께 정해진다.",
+        "not_signal": "3상 결과 재발표나 심사 신청 접수 공시는 허가 결정이 아니다."
+      },
+      {
+        "label": "레타트루타이드 BLA가 2027년 1분기에 실제로 접수되는가",
+        "detail": "삼중작용이 임상 데이터에서 승인 트랙으로 넘어가는 첫 분기점이며, 여기서 다중 표적 확장의 상한이 드러난다.",
+        "not_signal": "CMC 패키지 완료 발표나 제출 목표 연도 재확인은 접수가 아니다."
+      },
+      {
+        "label": "경구 제형의 신규 처방 비중이 50%를 넘어 유지되는가",
+        "detail": "제형 전환이 초기 붐인지 구조적 전환인지는 신규 처방 비중이 몇 분기 유지되는지로만 구분된다.",
+        "not_signal": "누적 처방 건수 신기록이나 출시 국가 추가 발표는 전환 신호가 아니다."
+      },
+      {
+        "label": "제지방량 보존을 1차 평가변수로 삼은 3상이 규제기관과 합의되는가",
+        "detail": "근손실이 라벨에 들어갈 문제인지 마케팅 문구로 남을지가 이 합의에서 갈린다.",
+        "not_signal": "병용 2상 결과 발표나 미오스타틴 파이프라인 도입 계약은 규제 합의가 아니다."
+      },
+      {
+        "label": "주요 펩타이드 CDMO 리드타임이 18~24개월 아래로 내려오는가",
+        "detail": "캐파가 수요를 따라잡기 시작했다는 첫 신호이며, 공급이 아니라 수요가 매출을 결정하는 국면으로 넘어간다.",
+        "not_signal": "신규 공장 착공·준공 발표나 캐파 투자 계획 공시는 리드타임 단축이 아니다."
+      }
+    ]
+  },
+  "sample": "obesity-drugs"
+}

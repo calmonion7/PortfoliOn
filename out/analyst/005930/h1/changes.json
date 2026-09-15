@@ -1,0 +1,23 @@
+[
+  {"field": "points[0].body", "action": "corrected",
+   "reason": "'KB증권 9/11 리포트'가 스냅샷 market_outlook.sources(Counterpoint Research 2026-2Q · 삼성전자 2026년 2분기 실적 컨퍼런스콜 · ZDNet Korea 2026-09-07) 어디에도 없어 실존을 확인할 수 없다. 4분기 40% 근접 전망 자체는 스냅샷 one_liner이 담고 있으므로 주장은 남기고 출처 귀속만 실존 출처로 교체했다",
+   "severity": "high"},
+  {"field": "points[0].metrics[2]", "action": "removed",
+   "reason": "'4나노 수율 80% 이상'이 스냅샷(summary.growth_plan·key_resource·moat)과 출처 목록 어디에도 없다. 스냅샷은 '4나노 웨이퍼의 50% 이상을 HBM4 베이스다이에 할당'(수율이 아니라 할당 비중)이라 혼동으로 보이며, 뒷받침 없는 수치라 삭제했다",
+   "severity": "high"},
+  {"field": "points[0].body", "action": "corrected",
+   "reason": "출처 표기 '실적 컨퍼런스콜·KB증권 9/11 리포트'를 스냅샷에 실존하는 '2026년 2분기 실적 컨퍼런스콜·Counterpoint Research'로 교체",
+   "severity": "high"},
+  {"field": "valuation_method", "action": "corrected",
+   "reason": "'PER 6.0~7.3배'가 밴드와 산술로 맞지 않는다. 285,000 / 48,239 = 5.91배이므로 하단은 6.0이 아니라 5.9배다(직전 9/14 판의 표기도 5.9~7.3배)",
+   "severity": "medium"},
+  {"field": "points[1].body", "action": "corrected",
+   "reason": "'선행 PER은 4.4배까지 내려왔다'의 방향이 틀렸다. 스냅샷 forward_per는 전일 4.3 → 금일 4.4로 올랐고(주가 +0.8%), 초안 제목도 주가 반등을 말한다. 수준만 서술하도록 고쳤다",
+   "severity": "medium"},
+  {"field": "valuation_method", "action": "removed",
+   "reason": "'메모리 업사이클 평균 PER'이라는 배수 성격 규정이 스냅샷·출처로 뒷받침되지 않는다(직전 판은 오히려 '과거 호황기 평균보다 낮은 배수'라고 적었다). 적용 배수 사실만 남겼다",
+   "severity": "low"},
+  {"field": "valuation_method", "action": "removed",
+   "reason": "'순현금' 프리미엄 근거가 스냅샷에서 확인되지 않는다(financials_annual의 debt_ratio·quick_ratio 모두 null). 확인 가능한 LTA 묶음 근거만 남겼다",
+   "severity": "low"}
+]

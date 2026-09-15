@@ -64,3 +64,10 @@ backend/.env.docker
 
 # 비밀번호 회전 스크립트가 만드는 env 백업 (크리덴셜 포함 — 절대 커밋 금지)
 .rotate-backup-*/
+
+# A/B 하네스 세션 노이즈 — 산출물(compare.md·summary.md·<arm>.json)만 남긴다
+out/*/*/*/run.log
+out/*/*/*/proxy.log
+out/*/*/*/capture/
+out/run-all.log
+out/finalize.log

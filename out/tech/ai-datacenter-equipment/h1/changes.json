@@ -1,0 +1,20 @@
+[
+  {"field": "sources[3].title", "action": "corrected",
+   "reason": "NVIDIA 블로그(blogs.nvidia.com/blog/vera-rubin/)를 열어 보니 Vera Rubin NVL72 양산·토큰당 처리량 10배는 있으나 800VDC 언급이 전혀 없다 — 출처 제목이 그 문서에 없는 내용을 담고 있었다. 800VDC를 제목에서 제거(주장 자체는 별도 확인으로 참이라 본문은 유지).",
+   "severity": "high"},
+  {"field": "key_points[1].metrics[1].value", "action": "corrected",
+   "reason": "'150~200주'를 뒷받침하는 출처가 5종 어디에도 없다. Reuters는 계통 접속 지연(24개월~8년), Nexi는 가스터빈 리드타임(3년 이상)을 말할 뿐 대형 변압기 제조 리드타임 주수는 없다. 정성 표현 '수년 뒤'로 교체.",
+   "severity": "medium"},
+  {"field": "key_points[3].metrics[1]", "action": "removed",
+   "reason": "'냉각 시장 376억달러' — 기준 연도·집계 범위가 없고 출처 5종·본문 어디에도 근거가 없는 부유 수치.",
+   "severity": "medium"},
+  {"field": "key_points[3].metrics[3]", "action": "removed",
+   "reason": "'에너지 절감 27% 이상' — 출처 무근이고 그 카드의 논지(시공·유지보수망)와도 무관하다.",
+   "severity": "medium"},
+  {"field": "sources[0].title", "action": "corrected",
+   "reason": "Reuters 기사 게재일이 2026-09-01이 아니라 2026-09-02(신디케이션 대조로 확인). URL 자체는 손대지 않았다 — reuters.com은 실존 경로와 고의로 만든 가짜 경로 모두에 401을 반환해(대조군 2건 확인) 401이 실재 여부에 대해 아무 정보도 주지 않기 때문이다. 기사 실재와 인용 수치(HD현대 잔고 85억달러·23%, 액랭 70%/현재 30%)는 신디케이션 전문으로 확인됨.",
+   "severity": "low"},
+  {"field": "milestones", "action": "corrected",
+   "reason": "항목 14개가 2023→2030 뒤에 2026 두 건이 덧붙어 시간순이 깨져 있었다(연도 수열 …2028, 2030, 2026, 2026). 내용 변경 없이 연대순으로 재배열.",
+   "severity": "low"}
+]

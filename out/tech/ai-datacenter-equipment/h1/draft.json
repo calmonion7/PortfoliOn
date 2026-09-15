@@ -1,0 +1,132 @@
+{
+  "published_date": "2026-09-15",
+  "title": "루빈 랙이 양산에 들어가자 경쟁축은 칩에서 변압기·냉각 인도로 옮겨갔다 — 잔고는 사상 최대인데 대형 변압기 인도는 2031년으로 밀렸다",
+  "description": "[기술 개요]\n이 리포트가 다루는 쪽은 준공·납품 시점에 돈이 들어오는 설비다. 같은 건물에서도 운영 사업자는 가동 중 계속 매출을 걷지만 설비 공급자는 물건이 현장에 서고 시운전을 통과해야 매출을 인식한다. 그래서 이 판은 발주 발표가 아니라 준공·인도를 기준으로 읽는다.\n\n일곱 개 섹터가 한 건물 안에서 순차로 물린다. 건축·EPC가 부지를 세우고 전력이 수전에서 랙까지 전기를 끌어오고 냉각이 발열을 빼낸 뒤 가속기·메모리·네트워크·서버랙이 올라간다. 뒤쪽은 앞쪽이 끝나야 설치되므로 전체 일정은 가장 느린 품목이 정한다.\n\n섹터 간 시간 상수가 다르다는 점이 구조를 만든다. 반도체·서버는 분기 단위로 증산되지만 대형 변압기·가스터빈·계통 접속은 연 단위다. 수요가 급증하면 짧은 쪽은 따라오고 긴 쪽은 못 따라오므로 병목은 시간이 갈수록 긴 쪽으로 이동한다. 몇 해 전 패키징에 있던 병목이 지금 전력·냉각에 있는 것은 사고가 아니라 이 구조의 귀결이다.\n\n[어디까지 왔나]\n9월의 관찰은 병목의 이동이 확인 사살됐다는 것이다. 차세대 랙이 양산에 들어가면서 칩 쪽 불확실성은 줄었고, 대신 그 랙을 받아줄 전기·열 쪽이 일정을 정하기 시작했다. 터빈 제조사는 지금 주문하면 2031년에 받는다고 말하고, 전력기기 잔고는 분기마다 사상 최대를 갈아치운다.\n\n발주와 준공의 간격도 그대로다. 자본은 넘치는데 물건이 없어 제조사가 수요를 배급하는 계약 형태가 굳었다. 슬롯 예약이 잔고의 절반을 넘고, 잔고 증가가 곧 매출 증가가 아닌 구조가 이어진다. 볼 것은 잔고가 아니라 출하 전환 속도다.\n\n전력망 쪽에서는 공급망의 국적이 새 변수로 올라왔다. 미국 설비에 들어가는 변압기·스위치기어·배터리의 중국 의존이 수치로 드러나면서, 리드타임이 긴 품목일수록 조달처가 일정 위험으로 직접 연결되는 국면이다. 국산화 증설은 발표됐지만 양산 시점은 이 투자 사이클의 뒤쪽이다.\n\n냉각에서는 전제화가 마무리 단계다. 신형 랙이 공랭으로는 물리적으로 식힐 수 없는 발열에 들어서면서 액랭이 기본값이 됐고, 남은 논점은 냉각 기술 자체가 아니라 그것을 전 세계 현장에 동시에 깔고 유지보수할 시공·서비스망이다.\n\n[시장 규모]\n이 주제는 규모 숫자를 하나로 모을 수 없다. 집계마다 세는 범위가 달라 같은 이름으로 나온 숫자끼리 편차가 크다. 컴퓨트 서버까지 넣는 집계와 시설 인프라만 세는 집계, AI 전용 설비만 좁게 떼는 집계가 섞여 있다.\n\n그래서 총량보다 쪼개짐이 중요하다. 금액의 대부분은 가속기·메모리로 가지만 일정을 지배하지는 못한다. 반대로 전력·냉각은 금액 비중이 작아도 준공 시점을 정하므로 같은 캠퍼스에서 매출 인식 순서가 금액 순서와 반대로 간다.\n\n한국 기업에는 이 구조가 특정 지점에 집중된 기회로 나타난다. 메모리는 세계 공급의 중심이고 초고압 변압기는 북미 증설 속도가 수요를 못 따라가는 몇 안 되는 품목이라 국내 전력기기 업체의 북미 잔고가 빠르게 쌓였다. 반면 건축·EPC는 발주처와의 거리가 가까워야 하는 사업이라 국내 업체의 북미 원청 실적은 아직 초기 단계다.\n\n[투자 관점]\n가장 흔한 오독은 발표된 캠퍼스 용량을 수요로 읽는 것이다. 발표는 토지와 자본이 확보됐다는 뜻일 뿐이고 설비 매출은 착공과 인도에서 발생한다. 계획 용량과 실제 착공·가동 전환율의 간격이 그대로 이 오독의 크기다.\n\n두 번째 오독은 수주잔고를 매출로 환산하는 것이다. 슬롯 예약이 잔고의 큰 몫인 구조에서는 잔고가 늘어도 출하가 늘지 않으면 매출이 늘지 않는다. 생산능력 확대 계획이 실제 출하량으로 확인되는지가 판단 기준이다.\n\n세 번째는 섹터를 하나로 묶어 보는 것이다. 한 주제 안에 일곱 섹터를 담고 있지만 EPC 업체와 메모리 업체는 경기 민감도도 마진 구조도 진입장벽도 다르다. 업체별 기술수준·격차는 반드시 같은 섹터 안에서만 비교해야 한다.\n\n마지막으로 부하 변동과 공급망 국적 문제는 지금 단계에서 호재와 악재가 갈리지 않는다. 규격·조달 요건이 확정되면 개조·국산화 수요가 열리지만 동시에 기존 납품분의 책임 범위도 함께 정해진다. 어느 쪽으로 기울지는 표준·규제 문안의 내용을 보고 판단할 문제이지 지금 미리 정할 문제가 아니다.",
+  "difficulty": {
+    "score": 4,
+    "rationale": "어느 구성요소도 미검증 물리에 걸려 있지 않다는 점이 5점을 배제한다 — 변압기·스위치기어·칠러는 수십 년 상용 기술이고 가속기·HBM·광트랜시버도 양산 단계라 아직 만들어내지 못한 물건은 없다. 그럼에도 3점으로 내려가지 않는 이유는 난이도가 부품이 아니라 결합 조건과 인도 시점에 있기 때문이다: 랙 전력밀도가 설계 전제를 벗어나 사후에 규격이 확정되고, 실질 병목인 제조 처리량은 자본 투입으로 압축되지 않는다."
+  },
+  "players": [
+    {"name":"Turner Construction (ACS그룹)","note":"북미 AI 데이터센터 건축의 사실상 기준점. 2025년 매출 292억달러에 데이터센터 매출을 1년 만에 두 배로 늘렸고 수주잔고는 489억달러로 전년 대비 34% 증가했다. 주문잔고의 40%가 데이터센터이며 2026년 데이터센터 매출만 90억달러를 예상한다. 2026년 1분기까지 10억달러 이상 단일 프로젝트를 10건 확보했고 Meta의 루이지애나 리치랜드패리시 캠퍼스(400만 sq ft·투자 100억달러 이상)를 DPR·Mortenson과 함께 짓는다.","ticker":null,"country":"미국","category":"건축·EPC","gap_years":0,"share_pct":null,"state_led":false,"tech_level":5,"leader_name":"Turner Construction"},
+    {"name":"DPR Construction","note":"하이퍼스케일 전용 시공 역량에서 최상위권이며 Meta 리치랜드패리시 캠퍼스의 공동 시공사다. 기술 수준은 선두와 대등하지만 동시 수행 가능한 메가 프로젝트 수와 잔고 규모에서 Turner에 뒤진다. 비상장사여서 재무 공시가 제한적이라는 점이 투자 접근을 막는 요소다.","ticker":null,"country":"미국","category":"건축·EPC","gap_years":1,"share_pct":null,"state_led":false,"tech_level":4,"leader_name":"Turner Construction"},
+    {"name":"삼성물산 건설부문","note":"반도체 팹 시공에서 쌓은 초정밀 공조·전력 시공 역량이 데이터센터로 전용 가능한 것이 강점이며 데이터센터를 신성장 축으로 공식화했다. 다만 북미 하이퍼스케일 원청 실적은 아직 초기 단계이고, 상사 부문이 부지를 발굴하고 건설 부문이 EPC를 맡는 결합 구조를 만드는 중이다. 발주처와의 물리적·관계적 거리가 이 섹터의 핵심 진입장벽이라 격차 해소에는 시간이 걸린다.","ticker":"028260","country":"한국","category":"건축·EPC","gap_years":3,"share_pct":null,"state_led":false,"tech_level":3,"leader_name":"Turner Construction"},
+    {"name":"Schneider Electric","note":"수전에서 랙 배전까지 전 구간을 단일 포트폴리오로 덮는 유일한 수준의 업체이며, Motivair 경영권 지분 인수로 냉각까지 끌어들여 전력·냉각 통합 레퍼런스 설계를 판다. 엔비디아 GB300 NVL72용 통합 전력관리·액랭 제어 레퍼런스 설계를 공급하고 800VDC 파트너 생태계에도 참여한다. 이 섹터에서 '단품이 아니라 캠퍼스 단위 설계'를 파는 경쟁 축을 만든 당사자다.","ticker":null,"country":"프랑스","category":"전력","gap_years":0,"share_pct":null,"state_led":false,"tech_level":5,"leader_name":"Schneider Electric"},
+    {"name":"GE Vernova","note":"발전과 송배전을 동시에 쥔 업체로 데이터센터 일정을 실제로 지배하는 위치다. 2분기 터빈 잔고·슬롯 예약 116GW에서 연말 125GW 목표를 제시했고, 지금 주문하면 2031년 인도라고 밝혔다. Electrification 잔고도 410억달러로 늘었고 데이터센터향 수주가 상반기에만 50억달러를 넘었다.","ticker":null,"country":"미국","category":"전력","gap_years":0,"share_pct":null,"state_led":false,"tech_level":5,"leader_name":"Schneider Electric"},
+    {"name":"Eaton","note":"전력 포트폴리오에 Boyd Thermal을 95억달러(2025년 11월 계약, 2026년 3월 완료)에 붙여 전력·냉각을 한 번에 파는 구조로 전환했다. Boyd 부문의 2026년 매출 기여는 약 17억달러로 추정된다. 800VDC 파트너 생태계에 참여하며, 전력기기 업체가 냉각을 사서 붙이는 2026년 산업 재편의 대표 사례다.","ticker":null,"country":"미국","category":"전력","gap_years":0,"share_pct":null,"state_led":false,"tech_level":5,"leader_name":"Schneider Electric"},
+    {"name":"Siemens Energy","note":"가스터빈과 계통 설비에서 최상위권이며 Gas Services 부문 분기 수주가 매출의 2.65배(book-to-bill)에 달해 주문이 인도 능력을 크게 앞선다. 미국 내 계통·가스터빈 생산에 10억달러 투자를 약정했다. 랙 단 배전·UPS까지 아우르는 데이터센터 전용 통합 포트폴리오는 Schneider 대비 얕은 것이 격차 요인이다.","ticker":null,"country":"독일","category":"전력","gap_years":1,"share_pct":null,"state_led":false,"tech_level":4,"leader_name":"Schneider Electric"},
+    {"name":"HD현대일렉트릭","note":"초고압 변압기 단일 품목에서는 세계 최상위권이며 북미 리드타임 병목의 직접 수혜처다. 2026년 6월 말 수주잔고 85억달러로 반년 만에 23% 늘었고 2030년 인도분까지 주문 협의가 진행 중이다. 9월 들어 변압기 부족율 약 15%와 중국산 의존이 수치로 드러나면서 국산화 증설 수혜 기대가 커졌다. UPS·배전·DCIM 통합 포트폴리오 부재가 선두와의 격차다.","ticker":"267260","country":"한국","category":"전력","gap_years":1,"share_pct":null,"state_led":false,"tech_level":4,"leader_name":"Schneider Electric"},
+    {"name":"효성중공업","note":"765kV급 초고압 변압기 등 최상단 전압대에서 실적을 쌓았고 2026년 2월 미국 주요 송전망 운영사와 약 7870억원 규모 765kV 변압기 공급 계약을 체결했다. 데이터센터 직납보다 유틸리티향 비중이 커서 수요 경로가 한 단계 간접적이지만, 데이터센터와 유틸리티가 같은 제조 슬롯을 두고 경합하는 구조라 실질 수혜는 동일하다. 국내 전력기기 3사 합산 수주잔고는 2026년 1분기 말 약 37.4조원으로 전년 말 대비 8조원 가까이 늘었다.","ticker":"298040","country":"한국","category":"전력","gap_years":1,"share_pct":null,"state_led":false,"tech_level":4,"leader_name":"Schneider Electric"},
+    {"name":"LS일렉트릭","note":"배전·자동화 중심으로 초고압 변압기 비중이 상대적으로 작아 리드타임 병목의 직접 수혜 강도는 낮으나, 데이터센터 직류 배전을 선점하려는 움직임이 뚜렷하다. GS건설과 협력해 AI 데이터센터 직류 배전 시장에 진입했고 직류 전용 공장을 가동했다. 2026년 1분기 말 수주잔고는 5조6425억원으로 두 자릿수 증가했다. 800VDC 전환이 실제로 일어나면 격차를 좁힐 수 있는 위치다.","ticker":"010120","country":"한국","category":"전력","gap_years":2,"share_pct":null,"state_led":false,"tech_level":3,"leader_name":"Schneider Electric"},
+    {"name":"Vertiv","note":"액랭 시장 1위이자 데이터센터 물리인프라 전반의 선두다. 수주잔고 150억달러를 넘어섰고 액랭이 신규 AI 설비의 기본값이 되면서 CDU·칠러 증설을 이어간다. 9월 전망에서는 2030년 신규 AI 설비의 70%가 액랭이라는 수치가 반복 인용된다.","ticker":null,"country":"미국","category":"냉각","gap_years":0,"share_pct":11.3,"state_led":false,"tech_level":5,"leader_name":"Vertiv"},
+    {"name":"Ecolab (CoolIT Systems)","note":"2026년 3월 순수 액랭 업체 CoolIT Systems를 47.5억달러 현금에 인수하기로 합의했고 3분기 종결 예정이다. CoolIT은 CDU·콜드플레이트·직접칩냉각에서 기술적으로 최상위권이며, 수처리·산업위생 기업이 데이터센터 냉각의 핵심 자산을 사들인 이 거래가 2026년 산업 재편의 상징적 사건이다. 다만 인수 통합과 데이터센터 채널 확보는 아직 검증 전이라는 점이 리스크다.","ticker":null,"country":"미국","category":"냉각","gap_years":0,"share_pct":null,"state_led":false,"tech_level":5,"leader_name":"Vertiv"},
+    {"name":"nVent Electric","note":"액체냉각 인클로저·열교환·전기 연결 부품에서 확립된 지위를 갖고 있으며 액랭 시장의 주요 잔존 독립 공급자 중 하나다. CDU·콜드플레이트 전 계통을 자체 설계해 캠퍼스 단위로 공급하는 역량에서는 선두에 못 미친다.","ticker":null,"country":"영국·미국","category":"냉각","gap_years":1,"share_pct":null,"state_led":false,"tech_level":4,"leader_name":"Vertiv"},
+    {"name":"NVIDIA","note":"차세대 Vera Rubin NVL72가 2026년 하반기 양산에 들어가 랙당 200kW를 넘기면서 800VDC 사이드카 개조 방식을 공개했다. 데이터센터 AI 가속기 매출 점유율은 80% 안팎으로 추정되며 랙 규격을 정의하는 위치가 하드웨어보다 결정적이다.","ticker":null,"country":"미국","category":"가속기","gap_years":0,"share_pct":82.0,"state_led":false,"tech_level":5,"leader_name":"NVIDIA"},
+    {"name":"AMD","note":"2026년 점유율은 기관에 따라 5~10%로 추정되며 CUDA 종속이 약한 추론 워크로드에 성장이 집중된다. Meta와 MI400 계열 대규모 공급 계약을 확보했고 S&P Global Market Intelligence는 MI400 첫해 매출을 72억달러(약 25.8만 대·평균판매가 3만926달러)로 추정한다. 설계가 아니라 CoWoS 패키징 슬롯 확보가 실제 출하량을 제약하는 구조다.","ticker":null,"country":"미국","category":"가속기","gap_years":1,"share_pct":7.0,"state_led":false,"tech_level":4,"leader_name":"NVIDIA"},
+    {"name":"Broadcom","note":"하이퍼스케일러 자체 설계 ASIC(구글 TPU 등)의 실질 제조 파트너로 상용 GPU 바깥의 가속기 수요를 흡수한다. FY2026 1분기 AI 반도체 매출 84억달러를 기록했고, 커스텀 ASIC 출하는 전년 대비 44.6% 늘어 상용 GPU 증가율(16.1%)의 세 배 가까이 성장했다. 범용 시장에서 경쟁하지 않고 고객사 내부 워크로드의 원가 차익만 노린다는 점에서 점유율 개념을 그대로 적용하기 어려워 점유율 칸을 비웠다.","ticker":null,"country":"미국","category":"가속기","gap_years":1,"share_pct":null,"state_led":false,"tech_level":4,"leader_name":"NVIDIA"},
+    {"name":"SK하이닉스","note":"HBM 선두이며 9월 들어 HBM4 16단 양산 출하가 확인됐다. 2026년 연내 HBM4 물량은 3사 모두 완판 상태이며 SK 점유율은 약 50% 안팎으로 추정된다. 생산능력 완판이 곧 출하 증가를 뜻하지 않는다는 점이 이 섹터를 다르게 만든다.","ticker":"000660","country":"한국","category":"메모리","gap_years":0,"share_pct":55.0,"state_led":false,"tech_level":5,"leader_name":"SK하이닉스"},
+    {"name":"삼성전자","note":"HBM4 수율 회복으로 2분기 HBM 점유율 33%까지 올라온 유일한 증가 업체이며 Vera Rubin향 HBM4 공급사로 인증됐다. 다만 4nm 파운드리 캐파의 절반 안팎이 HBM 베이스다이 내부용으로 돌아가 외부 수급과 경합한다. 범용 D램 가격 급등이 설비 투자 여력을 뒷받침한다.","ticker":"005930","country":"한국","category":"메모리","gap_years":0,"share_pct":25.0,"state_led":false,"tech_level":5,"leader_name":"SK하이닉스"},
+    {"name":"Micron Technology","note":"HBM4 배분에서 약 20%를 확보하며 후발에서 실질 3강 구도로 올라섰고 증설에 공격적이다. 미국 내 생산 기반을 갖춘 유일한 HBM 공급자라는 점이 공급망 다변화 요구가 커질수록 유리하게 작용한다. 절대 캐파와 세대 전환 속도에서 상위 2사에 아직 못 미친다.","ticker":null,"country":"미국","category":"메모리","gap_years":1,"share_pct":20.0,"state_led":false,"tech_level":4,"leader_name":"SK하이닉스"},
+    {"name":"Arista Networks","note":"2026년 1분기 데이터센터 이더넷 스위치 매출 22억달러로 점유율 14.6%, 전년 대비 37.3% 성장했다. 특정 가속기에 묶이지 않는 개방형 이더넷을 무기로 삼아 자체 ASIC을 쓰는 하이퍼스케일러 수요를 흡수하지만, GPU·DPU와 묶여 파는 선두의 수직 통합 앞에서 대형 학습 클러스터 표준 지위는 내줬다.","ticker":null,"country":"미국","category":"네트워크","gap_years":1,"share_pct":14.6,"state_led":false,"tech_level":4,"leader_name":"NVIDIA (Spectrum-X)"},
+    {"name":"InnoLight (中际旭创)","note":"광트랜시버 세계 1위로 2025년 세계 출하량 기준 23.4%, 800G 모듈만 보면 2026년 약 35%로 추정된다. 2026년 구글의 800G 초과 모듈 발주 중 약 80%를 가져갈 것으로 관측된다. 다만 엔비디아가 스위치 ASIC에 광부품을 직접 붙이는 CPO를 밀고 있어, 이 지위가 구조적으로 유지될지가 이 섹터 최대 변수다.","ticker":null,"country":"중국","category":"네트워크","gap_years":0,"share_pct":23.4,"state_led":false,"tech_level":5,"leader_name":"InnoLight (광트랜시버)"},
+    {"name":"Coherent","note":"광트랜시버 세계 2위(약 16%)이며 400ZR/800ZR 장거리 모듈에서는 오히려 우위다. 미국 내 생산 기반과 수직 계열화된 광소자 역량이 공급망 분리 요구에 유리하게 작용하지만, AI 클러스터 내부 단거리 대량 물량에서는 1위와 격차가 있다.","ticker":null,"country":"미국","category":"네트워크","gap_years":1,"share_pct":16.0,"state_led":false,"tech_level":4,"leader_name":"InnoLight (광트랜시버)"},
+    {"name":"Foxconn (鴻海)","note":"AI 서버 랙 조립 물량의 약 40%를 쥔 최대 사업자이며 2026년 AI 서버 점유율 목표를 55~60%로 제시했다(2025년 약 52%). 2026년 1분기 매출 666억달러로 전년 대비 29.7% 성장했다. 랙 단위 통합 조립·시운전 능력이 경쟁 축이며, 액랭 배관까지 공장에서 조립해 보내는 방식이 현장 시공 인력 부족을 우회하는 수단이 되고 있다.","ticker":null,"country":"대만","category":"서버·랙","gap_years":0,"share_pct":40.0,"state_led":false,"tech_level":5,"leader_name":"Foxconn (鴻海)"},
+    {"name":"Quanta Computer","note":"AI 서버 2위 ODM으로 엔비디아 AI 서버 발주의 25~30%를 수주한 것으로 추정되며(표에는 중간값 기재) 캐파를 공격적으로 늘리고 있다. 랙 단위 통합 범위와 전 세계 동시 납품 능력에서 선두에 못 미친다.","ticker":null,"country":"대만","category":"서버·랙","gap_years":1,"share_pct":27.5,"state_led":false,"tech_level":4,"leader_name":"Foxconn (鴻海)"},
+    {"name":"Dell Technologies","note":"ODM이 아닌 브랜드 OEM으로 네오클라우드·기업 고객에 랙 단위 시스템을 통합 납품하며 설치·보증·서비스망이 차별 요소다. 대신 조립 물량 자체는 ODM에 위탁하는 구조여서 물량 기준 점유율을 같은 잣대로 매기기 어려워 점유율 칸을 비웠다.","ticker":null,"country":"미국","category":"서버·랙","gap_years":1,"share_pct":null,"state_led":false,"tech_level":4,"leader_name":"Foxconn (鴻海)"}
+  ],
+  "challenges": [
+    {"body":"학습 부하가 밀리초 단위로 설계용량을 크게 넘나드는데 UPS·발전기·배터리는 완만한 부하 변화를 전제로 설계돼 있다. 어떤 과도응답 규격을 요구할지 표준이 확정되지 않아, 지금 발주되는 설비가 규격 확정 뒤 개조 대상이 될지를 발주자도 공급자도 판정할 수 없는 상태다.","title":"AI 부하 변동을 견디는 설비 규격이 아직 존재하지 않는다"},
+    {"body":"랙당 전력이 수백 kW로 올라가면 기존 교류 배전은 구리 단면적과 부스바 중량에서 물리적 한계에 부딪힌다. 고압직류 전환이 대안으로 제시됐지만 직류 차단·보호·접지 설계와 이를 시공할 현장 표준·인력 인증 경로가 아직 정립되지 않았다.","title":"랙 전력밀도 상승을 배전 아키텍처가 따라가지 못한다"},
+    {"body":"초고압 변압기는 대형 단조·권선·건조·시험이 순차로 붙는 다단 공정이고 숙련 인력 양성에만 수년이 걸려, 증설을 발표해도 출하가 그 속도로 늘지 않는다. 가스터빈도 같은 성격이어서 OEM들이 슬롯 예약으로 수요를 배급하는 방식을 택하고 있다.","title":"대형 전력기기 제조 처리량이 자본 투입으로 압축되지 않는다"},
+    {"body":"냉각수 배관·CDU·누액 감지는 서버가 아니라 건물 설비에 가까운데 이를 데이터센터 무중단 조건에서 시공·검증할 표준과 숙련 인력이 모자란다. 인수합병으로 설계 기술은 대형 업체에 모였지만 전 세계 동시 시공 역량은 함께 이전되지 않았다.","title":"액랭의 현장 시공·유지보수 표준과 인력이 부족하다"}
+  ],
+  "related": {
+    "competitors": ["기존 공랭 엔터프라이즈 데이터센터","온디바이스·엣지 추론","모델 경량화·알고리즘 효율화","저전력비 지역으로의 연산 오프쇼어링"],
+    "complements": ["AI 데이터센터 운영","SMR","장주기 에너지저장(BESS)","계통 안정화 설비(FACTS·STATCOM)","폐열 회수·지역난방 연계"],
+    "derivatives": ["800VDC 랙 배전","CPO(광전 공동패키징)","이상(2-phase) 액랭·액침 냉각","모듈러·프리팹 데이터센터","온사이트 발전 결합형 캠퍼스"],
+    "prerequisites": ["초고압 변압기·GIS 제조","TSMC CoWoS 첨단 패키징","HBM TSV·하이브리드 본딩","계통 접속·송전 증설","대형 가스터빈 제조"]
+  },
+  "market": {
+    "as_of": "2026-09 (성장곡선 기준: Grand View Research 2026)",
+    "history": [{"size":{"unit":"bn","value":147.3,"currency":"USD"},"year":2025}],
+    "cagr_pct": 23.9,
+    "forecast": [{"size":{"unit":"bn","value":180.6,"currency":"USD"},"year":2026},{"size":{"unit":"bn","value":810.6,"currency":"USD"},"year":2033}],
+    "estimates": [
+      {"size":{"unit":"bn","value":471.59,"currency":"USD"},"year":2026,"scope":"컴퓨트 서버·전력·냉각·네트워크·DCIM","is_basis":null,"institution":"MarketsandMarkets"},
+      {"size":{"unit":"bn","value":180.6,"currency":"USD"},"year":2026,"scope":"AI 워크로드 전용 설비(하드웨어 53.7%)","is_basis":true,"institution":"Grand View Research"},
+      {"size":{"unit":"bn","value":179.34,"currency":"USD"},"year":2026,"scope":"가속기·서버·스토리지·네트워크·전력냉각","is_basis":null,"institution":"Polaris Market Research"},
+      {"size":{"unit":"bn","value":21.27,"currency":"USD"},"year":2026,"scope":"AI 전용 협의 집계(하드웨어 61.8%)","is_basis":null,"institution":"Fortune Business Insights"}
+    ],
+    "share_basis": "각 섹터 내 점유율이며 섹터마다 집계 기준·기관이 다르다 — 가속기는 2026년 데이터센터 AI 가속기 매출 기준, 메모리는 2026년 HBM4 공급물량 배분 기준, 네트워크는 2026년 1분기 데이터센터 이더넷 스위치 매출 기준(광트랜시버는 2025년 세계 출하량 기준), 서버·랙은 AI 서버 랙 조립 물량 기준, 냉각은 2025년 데이터센터 액랭 시장 매출 기준. 건축·EPC와 전력은 세계 점유율의 확인 가능한 근거를 찾지 못해 비워 두었다."
+  },
+  "sources": [
+    {"url":"https://www.reuters.com/business/energy/not-just-nvidia-these-power-cooling-firms-are-riding-trillion-dollar-data-centre-2026-09-01/","title":"Reuters — 전력·냉각 업체가 수조달러 데이터센터 파도를 탄다 (2026-09-01, 변압기 병목·액랭)"},
+    {"url":"https://www.cnbc.com/2026/09/03/us-ai-data-centers-china-supply-chain.html","title":"CNBC — 미국 AI 데이터센터의 중국 전력기기 의존 (2026-09-03, 변압기·배터리·광트랜시버)"},
+    {"url":"https://nexi.fund/grid-equipment-order-book-ai-power-2026/","title":"Nexi — 그리드 설비 수주잔고: GE버노바 116GW·2031년 인도 (2026-09-14)"},
+    {"url":"https://blogs.nvidia.com/blog/vera-rubin/","title":"NVIDIA — Vera Rubin 양산 랙 가동·800VDC·토큰당 전력 10배 (2026-07-21)"},
+    {"url":"https://siliconanalysts.com/newsletter/qual-watch/2026-09-14","title":"Silicon Analysts — HBM4 양산·CoWoS 78주 (2026-09-14)"}
+  ],
+  "key_points": [
+    {"title":"루빈 양산으로 병목이 칩에서 전기·열로 확정됐다 — HBM은 3사 모두 완판이다","body":"차세대 랙이 양산에 들어가 칩 쪽 불확실성이 줄었고 남은 제약은 패키징 슬롯과 HBM 배분이다. HBM은 연내 물량이 3사 모두 소진돼 배분이 곧 출하를 정한다.","metrics":[{"label":"루빈 랙 양산","value":"2026년 하반기"},{"label":"HBM4 연내 물량","value":"3사 완판"},{"label":"CoWoS 리드타임","value":"최대 78주"},{"label":"SK HBM 점유율","value":"약 50%"}]},
+    {"title":"변압기가 일정을 정한다 — 잔고는 사상 최대인데 인도는 수년 뒤다","body":"전력기기 잔고가 분기마다 사상 최대를 갈아치우지만 대형 변압기 인도는 수년 뒤로 밀려 있다. 잔고 증가가 아니라 출하 전환 속도가 실적을 정한다.","metrics":[{"label":"HD현대일렉 잔고","value":"85억달러"},{"label":"대형 변압기 인도","value":"150~200주"},{"label":"변압기 부족율","value":"약 15%"},{"label":"GE버노바 터빈 인도","value":"2031년"}]},
+    {"title":"800V 직류 배전이 retrofit으로 시작됐다 — 랙당 200kW가 규격을 바꾼다","body":"신형 랙의 전력밀도가 기존 교류 배전의 물리적 한계를 넘으면서 고전압 직류 전환이 사이드카 방식의 개조부터 들어갔다. 전력반도체 수요가 함께 움직인다.","metrics":[{"label":"루빈 랙 전력","value":"200kW 초과"},{"label":"배전 전환","value":"800VDC"},{"label":"전환 방식","value":"사이드카 개조"},{"label":"수혜","value":"SiC 전력반도체"}]},
+    {"title":"액랭이 기본값이 됐다 — 신규 AI 설비의 70%가 액랭으로 간다","body":"신형 랙이 공랭 한계를 넘어 액랭이 선택에서 전제로 전환됐다. 냉각 시장 성장의 중심은 칩 냉각이 아니라 현장 시공·유지보수망이다.","metrics":[{"label":"2030년 액랭 비중","value":"70% 전망"},{"label":"냉각 시장","value":"376억달러"},{"label":"현재 액랭 비중","value":"약 30%"},{"label":"에너지 절감","value":"27% 이상"}]}
+  ],
+  "milestones": [
+    {"year":2023,"actor":"TSMC·엔비디아","event":"CoWoS 첨단 패키징 공급 부족이 AI 설비의 첫 병목으로 부상 — 이 시기 제약은 전력이 아니라 칩이었다","status":"done"},
+    {"year":2024,"actor":"엔비디아","event":"GB200 NVL72 랙 출시로 랙당 전력이 100kW대에 진입 — 공랭이 물리적으로 불가능해지며 액랭이 선택에서 전제로 전환","status":"done"},
+    {"year":2025,"actor":"Eaton","event":"Boyd Thermal 95억달러 인수 계약 체결(11월) — 순수 액랭 업체가 대형 전력기업에 편입되는 흐름의 시작","status":"done"},
+    {"year":2026,"actor":"Trane Technologies·Ecolab","event":"2월 LiquidStack, 3월 CoolIT(47.5억달러) 인수 — 독립 액랭 전문업체가 석 달 사이 대부분 소진","status":"done"},
+    {"year":2026,"actor":"NERC","event":"대형부하 Level 3 'Essential Actions' 경보 발령(5월 4일) — 1,000MW 이상 연산부하가 초 단위로 탈락하는 사건이 반복 확인됨","status":"done"},
+    {"year":2026,"actor":"Dell'Oro Group","event":"2026년 데이터센터 capex 전망을 1조달러 초과로 상향(6월) — 메모리·스토리지 가격 상승이 증액 요인으로 명시","status":"done"},
+    {"year":2026,"actor":"GE Vernova","event":"2분기 가스터빈 수주잔고 116GW 도달, 연말 125GW 목표 제시 — 잔고 중 63GW는 확정 주문이 아닌 생산 슬롯 예약","status":"done"},
+    {"year":2026,"actor":"NERC·사업자","event":"Level 3 경보 33개 문항 응답 시한 종료(8월 3일) — 응답 데이터가 FERC로 이관돼 의무 신뢰도 표준의 범위를 결정","status":"done"},
+    {"year":2026,"actor":"엔비디아·전력기기 파트너","event":"800V 고압직류 랙 배전 생태계 구축 진행 — 2027년 Kyber 세대의 600kW급 랙을 목표로 전력기기 업체들이 규격 대응 중","status":"in_progress"},
+    {"year":2026,"actor":"NERC·FERC","event":"대형부하 의무 신뢰도 표준(Project 2026-02) 초안 작성 — 기 설치 UPS·발전기의 개조 요구 범위가 여기서 확정된다","status":"in_progress"},
+    {"year":2028,"actor":"GE Vernova","event":"가스터빈 생산능력 연 24GW로 확대 계획(2026년 3분기 연 20GW 기준) — 슬롯 예약분의 출하 전환 속도를 정하는 변수","status":"planned"},
+    {"year":2030,"actor":"미국 데이터센터 사업자","event":"미국 데이터센터 설비용량을 24GW에서 100GW로 확대 계획 — 같은 기간 전력기기 수요가 유틸리티 교체 수요와 직접 경합","status":"planned"},
+    {"year":2026,"actor":"엔비디아·Dell·CoreWeave","event":"Vera Rubin NVL72 양산 랙 인도 개시 — 800VDC 사이드카 개조 방식 공개","status":"done"},
+    {"year":2026,"actor":"Reuters·CNBC","event":"HD현대일렉 잔고 85억달러·변압기 부족율 15%·중국산 의존 보도 — 공급망 국적이 일정 변수로 부상","status":"done"}
+  ],
+  "variants": [
+    {"axis_label":"냉각 방식","options":[
+      {"name":"공랭(강제 공기냉각)","examples":["기존 엔터프라이즈 랙","10~30kW급 범용 서버랙"],"strength":"기존 건물 설비를 그대로 쓰고 배관·누액 관리가 없어 시공과 유지보수가 단순하다.","tradeoff":"랙당 30kW 안팎에서 한계에 부딪혀 최신 AI 랙에는 적용 자체가 불가능하다."},
+      {"name":"단상 직접칩냉각(D2C)","examples":["엔비디아 GB300 NVL72","Vertiv CoolChip CDU","CoolIT 콜드플레이트"],"strength":"현재 액랭 용량의 대부분을 차지하며 냉매가 상변화하지 않아 배관과 제어가 비교적 단순하다.","tradeoff":"콜드플레이트가 닿지 않는 광모듈·전원부는 여전히 공랭이라 두 계통을 함께 운용해야 한다."},
+      {"name":"이상(2-phase) 직접냉각","examples":["차세대 고밀도 랙용 개발 단계"],"strength":"냉매 상변화 잠열을 써 같은 유량으로 더 큰 발열을 처리하고 칩 표면 온도 편차가 작다.","tradeoff":"냉매 관리·누설 규제와 재료 호환성 문제가 남아 상용 채택이 아직 제한적이다."},
+      {"name":"액침(immersion)","examples":["LiquidStack(Trane 인수)","Submer"],"strength":"랙 전체를 유전체 액체에 담가 팬을 없애고 발열 부위를 가리지 않고 처리한다.","tradeoff":"건물 구조와 정비 동선을 통째로 바꿔야 해 선별적 채택에 머물러 있다."}
+    ]},
+    {"axis_label":"랙 배전 아키텍처","options":[
+      {"name":"교류(AC) 배전 415/480V","examples":["현행 대다수 데이터센터","GB200·GB300 NVL72 세대"],"strength":"기존 UPS·PDU·차단기 공급망과 시공 인력을 그대로 쓰고 규격·인증 체계가 확립돼 있다.","tradeoff":"랙 전력이 수백 kW로 오르면 구리 단면적과 부스바 중량이 급증해 물리적으로 감당하기 어렵다."},
+      {"name":"800V 고압직류(HVDC) 배전","examples":["엔비디아 Kyber·Rubin Ultra 세대","Delta·Schneider·Vertiv 파트너 생태계"],"strength":"같은 구리로 150% 이상의 전력을 보내 랙당 200kg급 구리 부스바를 없애고 변환 단수를 줄인다.","tradeoff":"직류 차단·보호·접지 설계와 시공 표준이 정립 단계여서 현장 인력과 인증 경로가 미확보다."}
+    ]}
+  ],
+  "watch_items": [
+    {"label":"NERC 대형부하 의무 신뢰도 표준 초안이 공표되는가","detail":"8월 3일 마감 응답이 FERC로 넘어가 표준 범위를 정한다. 초안에 과도응답 요건이 명시되면 기 설치 UPS·발전기 개조 규모가 처음 산정된다.","not_signal":"추가 경보나 자율 가이드라인. 자율 권고는 발주를 만들지 않으며 개조 예산은 의무 표준 확정 뒤에 집행된다."},
+    {"label":"GE버노바 터빈 실제 출하량이 분기 5GW에 도달하는가","detail":"잔고 116GW 중 63GW가 슬롯 예약이라 매출은 출하량이 정한다. 2분기 출하 3GW에서 3분기 연 20GW 목표 도달 여부가 분기점이다.","not_signal":"잔고·예약 GW 증가나 연말 목표 재확인. 예약은 취소 가능하고 매출로 인식되지 않는다."},
+    {"label":"대형 변압기 리드타임이 축소로 돌아서는가","detail":"이 품목이 캠퍼스 준공 시점을 직접 정한다. 절대 연수보다 방향 전환 시점이 중요하며 가격 결정력이 꺾이는 지점이기도 하다.","not_signal":"공장 착공·증설 발표. 대형 권선 라인은 착공에서 양산까지 수년이 걸려 발표와 출하 사이 시차가 크다."},
+    {"label":"중국산 전력기기 의존에 조달 규제가 붙는가","detail":"미국 설비의 변압기·스위치기어·배터리 중국 의존이 9월 수치로 드러났다. 규제·관세가 붙으면 리드타임이 가장 긴 품목부터 일정이 흔들린다.","not_signal":"점유율 보도 자체. 수치가 나와도 조달 요건·관세로 확정되기 전에는 발주·일정에 반영되지 않는다."},
+    {"label":"HBM4가 하반기에도 3사 완판 구조를 유지하는가","detail":"연내 물량 소진 상태에서는 배분이 곧 출하다. 삼성 수율·Micron 인증 진전으로 공급이 풀리면 가격 협상력이 함께 움직인다.","not_signal":"샘플 인증 통과나 캐파 발표. 완판 상태에서는 캐파 발표가 곧 출하 증가를 뜻하지 않는다."}
+  ],
+  "composition": {
+    "tech": [
+      {"name":"대형 전력기기 제조 처리량","leaders":["GE Vernova","HD현대일렉트릭"],"rationale":"초고압 변압기는 대형 단조·권선·건조·시험이 순차로 붙는 다단 공정이고 숙련 양성에만 수년이 걸려 증설을 발표해도 출하가 그 속도로 늘지 않는다. 가스터빈도 같아 OEM이 슬롯 예약으로 수요를 배급한다.","share_pct":30.0},
+      {"name":"AI 부하 변동 설비 규격","leaders":["Schneider Electric","Eaton"],"rationale":"학습 부하가 밀리초 단위로 설계용량을 넘나드는데 UPS·발전기·배터리는 완만한 변화를 전제로 설계됐다. 과도응답 규격이 미확정이라 지금 발주되는 설비가 개조 대상이 될지 발주자도 공급자도 판정할 수 없다.","share_pct":25.0},
+      {"name":"랙 전력밀도·직류 배전 전환","leaders":["Schneider Electric","LS일렉트릭"],"rationale":"랙당 수백 kW에서 교류 배전은 구리 단면적과 부스바 중량에서 물리적 한계에 부딪힌다. 고압직류가 대안이나 직류 차단·보호·접지 설계와 시공 표준·인력 인증 경로가 미정립이다.","share_pct":20.0},
+      {"name":"액랭 현장 시공·유지보수","leaders":["Vertiv","Foxconn (鴻海)"],"rationale":"냉각수 배관·CDU·누액 감지는 서버보다 건물 설비에 가까운데 무중단 조건에서 시공·검증할 표준과 인력이 모자라다. 인수합병으로 설계 기술은 모였지만 동시 시공 역량은 함께 이전되지 않았다.","share_pct":15.0},
+      {"name":"첨단 패키징·HBM 캐파","leaders":["SK하이닉스","NVIDIA"],"rationale":"가속기의 실질 상한이 설계가 아니라 첨단 패키징 슬롯과 HBM 배분에서 결정된다. 다만 이미 양산 중인 공정이라 남은 난제로는 잔여 몫이다.","share_pct":10.0}
+    ],
+    "experts": [
+      {"name":"초고압 변압기 권선·시험","rationale":"최대 병목이 제조 처리량인데 그 처리량은 설비보다 숙련 인력이 정한다. 양성에 수년이 걸려 자본을 넣어도 출하가 그 속도로 늘지 않는 구조의 핵심이다.","share_pct":30.0},
+      {"name":"직류 배전 보호·접지 설계","rationale":"직류 차단과 접지는 교류 설계 경험이 그대로 옮겨지지 않는다. 시공 표준과 인력 인증 경로 자체가 없어 설계자와 시공자를 동시에 새로 길러야 한다.","share_pct":25.0},
+      {"name":"액랭 배관 시공·누액 관리","rationale":"가동 중인 데이터센터에 물을 들이는 작업이라 배관 기능과 무중단 운영을 함께 아는 인력이 필요하다. 전 세계 동시 시공 수요에 비해 공급이 가장 얇은 자리다.","share_pct":25.0},
+      {"name":"계통 과도응답 해석","rationale":"초 단위로 수백 MW가 빠지는 부하를 계통 관점에서 모델링해 본 인력이 드물다. 규격이 사후에 확정되는 국면이라 해석 역량이 곧 개조 위험의 크기를 정한다.","share_pct":20.0}
+    ],
+    "minerals": [
+      {"name":"구리","used_in":["랙 전력밀도·직류 배전 전환","대형 전력기기 제조 처리량"],"producers":[{"name":"BHP","ticker":"BHP","country":"AU","share_pct":6.4},{"name":"Codelco","ticker":null,"country":"CL","share_pct":6.3},{"name":"Freeport-McMoRan","ticker":"FCX","country":"US","share_pct":4.7},{"name":"Southern Copper","ticker":"SCCO","country":"US","share_pct":4.1},{"name":"Zijin Mining","ticker":"601899","country":"CN","share_pct":3.9},{"name":"Glencore","ticker":"GLEN","country":"CH","share_pct":3.7}],"rationale":"변압기 권선·부스바·랙 배전의 주 도체로, 랙 전력밀도가 오를수록 단면적이 함께 커져 설비 원재료비에서 압도적 몫을 차지한다.","share_pct":45.0,"top_source_pct":null,"top_source_country":"칠레"},
+      {"name":"알루미늄","used_in":["랙 전력밀도·직류 배전 전환"],"producers":null,"rationale":"중량과 단가 때문에 부스바·케이블에서 구리를 부분 대체하고 인클로저·히트싱크의 주 재료다.","share_pct":20.0,"top_source_pct":null,"top_source_country":"중국"},
+      {"name":"전기강판 (철·규소)","used_in":["대형 전력기기 제조 처리량"],"producers":null,"rationale":"변압기 철심의 방향성 전기강판은 손실을 좌우해 등급 자체가 성능이다. 압연 설비가 소수라 변압기 리드타임의 숨은 제약이 된다.","share_pct":15.0,"top_source_pct":null,"top_source_country":"호주"},
+      {"name":"은 (접점)","used_in":["랙 전력밀도·직류 배전 전환"],"producers":null,"rationale":"차단기·개폐기 접점의 표준 재료로 직류 차단은 아크 조건이 더 가혹해 접점 요구가 높아진다. 물량은 작지만 단가가 높다.","share_pct":10.0,"top_source_pct":null,"top_source_country":"멕시코"},
+      {"name":"희토류 (영구자석)","used_in":["액랭 현장 시공·유지보수"],"producers":null,"rationale":"칠러·CDU 펌프와 팬 모터의 영구자석에 쓰인다. 설비당 사용량은 작지만 산지 집중이 심해 조달 위험이 물량 대비 크다.","share_pct":10.0,"top_source_pct":70.0,"top_source_country":"중국"}
+    ],
+    "minerals_share_basis": "2025년 각 사 지분환산 광산생산량 ÷ USGS 세계 광산생산 총계"
+  }
+}

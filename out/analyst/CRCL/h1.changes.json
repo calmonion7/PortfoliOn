@@ -1,0 +1,62 @@
+[
+  {
+    "field": "points[2].body",
+    "action": "corrected",
+    "reason": "Tazapay 인수 대가를 '40억달러'로 적었으나 실제는 4억달러 전액 주식(8-K·9월 8일 발표, 다수 매체 일치) — 10배 과대. 인수 규모가 논지(희석·할증 근거)의 크기를 결정하므로 사실관계 오류",
+    "severity": "high"
+  },
+  {
+    "field": "points[1].body",
+    "action": "removed",
+    "reason": "'상반기 평균잔액 +31.7% → +3.48억달러, 수익률 -66bp → -2.2억달러' 분해는 스냅샷 API에 없고 초안에 출처도 없다. 증감 방향(잔액 증가를 수익률 하락이 상쇄)만 정성적으로 남김",
+    "severity": "high"
+  },
+  {
+    "field": "points[1].body / points[1].metrics[0]",
+    "action": "corrected",
+    "reason": "'2분기 준비금 비중 95.2%(6.68억 대 0.34억)' — 매출 구성 분해는 API에 없다. API가 직접 제시하는 값(준비금 이자수익 비중 96%)과 총매출 7.01억달러로 교체",
+    "severity": "medium"
+  },
+  {
+    "field": "points[1].metrics[1].value",
+    "action": "corrected",
+    "reason": "USDC 유통잔액 733억달러 → 스냅샷 key_resource 기준 약 741억달러(Stablecoin Beat 2026-09-14)",
+    "severity": "medium"
+  },
+  {
+    "field": "points[0].body / points[0].metrics[1].value",
+    "action": "corrected",
+    "reason": "테스트넷 누적 '5.02억건'은 어느 출처와도 일치하지 않는다(Circle 공식 표현 'half a billion 이상', 퍼블릭 테스트넷 익스플로러 6.715억건). 확인 가능한 하한 '5억건 이상'으로 완화",
+    "severity": "medium"
+  },
+  {
+    "field": "points[0].metrics[2]",
+    "action": "replaced",
+    "reason": "'CPN 연환산 결제액 $230억'은 API에도 출처에도 없음 — 검증된 '프라이빗 메인넷 파트너 100곳 이상'(Circle 발표)으로 교체. 본문이 이미 말하는 사실이라 새 논지 아님",
+    "severity": "medium"
+  },
+  {
+    "field": "points[0].body",
+    "action": "removed",
+    "reason": "'BlackRock BUIDL 32억달러'·'DTCC 토큰화 연결 2027년 하반기'는 미검증 수치·시점. DTCC·BlackRock의 창립 밸리데이터 참여는 확인됐으므로 그 부분만 유지하고 규모·시점만 정성화",
+    "severity": "medium"
+  },
+  {
+    "field": "points[2].body",
+    "action": "corrected",
+    "reason": "'ARC 프리세일 2.42억달러 중' — 총 프리세일 규모는 미검증. 2026년 인식분 약 1.8억달러만 스냅샷 recent_disclosures로 확인되므로 그것만 유지",
+    "severity": "medium"
+  },
+  {
+    "field": "title",
+    "action": "corrected",
+    "reason": "'15일 CLARITY 표결' — 스냅샷은 '이번 주 상원 CLARITY법 표결'이라고만 기술하고 15일이라는 날짜는 어디에도 없다. '이번 주'로 완화",
+    "severity": "medium"
+  },
+  {
+    "field": "title / valuation_method",
+    "action": "clarified",
+    "reason": "제목은 '오른 것은 선행 PER 64배뿐'이라 하고 밸류에이션은 2026F EPS에 73~90배를 적용해 기준이 엇갈린다(현가는 2026F EPS 기준 약 92배). 64배 < 73배로 읽히면 '싸다'는 정반대 결론이 나오므로 제목에서 배수 인용을 빼고 valuation_method에 기준 차이를 1문장 명시",
+    "severity": "low"
+  }
+]

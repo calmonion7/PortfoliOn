@@ -1,0 +1,98 @@
+[
+  {
+    "field": "competitor_edge",
+    "action": "removed",
+    "reason": "「인도·캐나다에서 제네릭이 70% 낮은 가격에 Mounjaro 물량을 잠식」 — 출처 없음. 인도·캐나다에서 특허가 풀린 것은 릴리 티르제파타이드가 아니라 노보 세마글루타이드 쪽이라 방향이 반대일 가능성이 크다(릴리의 위협이 아니라 노보의 위험). 확정할 근거가 없어 문장 전체 삭제",
+    "severity": "high"
+  },
+  {
+    "field": "key_resource",
+    "action": "corrected",
+    "reason": "「Foundayo 월 $25 출시」 — 릴리 발표 확인 결과 $25는 상업보험 + 세이빙스카드 적용가이고 자비 최저용량은 월 $149다. 출시가로 서술하면 원가 우위를 과장한다 → 조건을 명시",
+    "severity": "high"
+  },
+  {
+    "field": "competitor_edge",
+    "action": "removed",
+    "reason": "「경구 Wegovy 72주 16.6% 대 Foundayo 11.2%」 — 두 수치 모두 출처·API 근거 없음. 릴리 발표로 확인되는 「최고용량 평균 약 27파운드」만 남기고 비교는 정성으로 전환",
+    "severity": "high"
+  },
+  {
+    "field": "competitor_edge",
+    "action": "removed",
+    "reason": "「2026년 2분기 경구 Wegovy DKK 32.2억 대 Foundayo $98M」 — 릴리 측 수치에 출처가 없고, Foundayo는 4월 9일 출시라 분기 전체 비교가 동등하지 않다",
+    "severity": "high"
+  },
+  {
+    "field": "competitor_edge",
+    "action": "removed",
+    "reason": "「영국 출시 후 40여 시장 심사 중(2027년 국제 확대)」 — 출처 없음. 확인되는 것은 4월 9일 미국 출시뿐",
+    "severity": "high"
+  },
+  {
+    "field": "risks",
+    "action": "removed",
+    "reason": "「경구 $149~299」 — 이 가격대는 릴리 Foundayo의 세이빙스카드 상한 구간($149/$199/$299~349)이며 경구 Wegovy 가격으로 귀속할 근거가 없다. 동반된 「처방의 70%가 최저가 용량대」도 출처 없어 정성 서술로 전환",
+    "severity": "high"
+  },
+  {
+    "field": "key_resource / risks",
+    "action": "corrected",
+    "reason": "「조정 총마진 78.2%, 전년 82.7%」 — 출처·API 근거 없음. 같은 논지(마진 잠식)를 스냅샷 API로 확인되는 영업이익률(2025년 41.3% / 2024년 44.19%)로 교체",
+    "severity": "medium"
+  },
+  {
+    "field": "risks / insights / market_outlook.one_liner",
+    "action": "removed",
+    "reason": "「2027년 1월부터 주사 Wegovy -50%·Ozempic -35% 인하」 — 시점·인하폭 모두 출처 없음. 「2027년 자사발 가격 인하 예정」까지만 남김",
+    "severity": "medium"
+  },
+  {
+    "field": "growth_plan",
+    "action": "removed",
+    "reason": "「30주 만에 미국 누적 500만 처방」·「7월 중순 주간 26.5만 처방」 — 출처 없음. 회사가 직접 말한 표현(「미국 GLP-1 최대 볼륨 런치」)만 남김",
+    "severity": "medium"
+  },
+  {
+    "field": "growth_plan",
+    "action": "removed",
+    "reason": "「독일 €170~280」 — 출처 없음. 출시 사실과 비급여라는 성격만 남김",
+    "severity": "medium"
+  },
+  {
+    "field": "growth_plan / risks",
+    "action": "corrected",
+    "reason": "retatrutide 「당뇨 동반 최고용량 20.8%·80주 placebo-조정 26.1%」 — 두 수치 모두 출처 없음 → 「고용량에서 20%대 감량 보고」로 완화. 근거 없는 「KOL 기대 1위」는 삭제",
+    "severity": "medium"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "removed",
+    "reason": "「리베이트 환입 DKK 20억」·「판관비 13% 절감」·「가이던스 상향(고정환율 flat~-6%)」 — 수치 출처 없음. 일회성 요인에 기댄 상향이라는 논지만 유지",
+    "severity": "medium"
+  },
+  {
+    "field": "growth_plan",
+    "action": "corrected",
+    "reason": "「2분기 DKK 31~32.2억」이 competitor_edge의 「32.2억」과 어긋난다 → 32.2억으로 통일",
+    "severity": "low"
+  },
+  {
+    "field": "key_resource",
+    "action": "corrected",
+    "reason": "「흡수를 위해 10배 용량」 — 배수에 출처 없음 → 「훨씬 높은 용량」으로 완화",
+    "severity": "low"
+  },
+  {
+    "field": "insights",
+    "action": "corrected",
+    "reason": "「고용량 용량 믹스가 30%대에 묶여」 — 30%대라는 수치에 출처 없음 → 「낮은 수준에 묶여」로 완화(진입·회피 조건 자체는 유지)",
+    "severity": "low"
+  },
+  {
+    "field": "recent_disclosures / risks / market_outlook",
+    "action": "corrected",
+    "reason": "릴리의 30% 주장을 「가져갔다」는 사실 서술로 쓰던 곳을 「릴리가 주장한다」는 귀속 서술로 통일(초안 자신이 정의 불일치로 액면 비교 불가라고 적고 있다)",
+    "severity": "low"
+  }
+]

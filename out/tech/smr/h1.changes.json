@@ -1,0 +1,56 @@
+[
+  {
+    "field": "published_date",
+    "action": "added",
+    "reason": "필수 필드 누락 — 초안 그대로는 실제 pydantic 모델에서 `Field required`로 422가 나 발행 자체가 불가(로컬 검증기 직독으로 확인)",
+    "severity": "high"
+  },
+  {
+    "field": "sources[6]",
+    "action": "removed",
+    "reason": "실존하지만 초안의 어떤 주장도 담고 있지 않음 — 내용은 NuScale·ENTRA1↔TVA 최대 6GW 비구속 합의인데 초안의 6GW는 영국 Centrica·X-energy 건이다. 같은 숫자가 다른 사건을 가리켜 오귀속 위험만 남는다",
+    "severity": "medium"
+  },
+  {
+    "field": "sources[]",
+    "action": "added",
+    "reason": "`minerals_share_basis`가 'WNA 세계 광산생산량 60,213 tU'를 근거로 명시하는데 정작 WNA 출처가 목록에 없었다. 원문 확인 결과 6개사 생산량(12,463/10,193/6,815/5,829/5,761/4,000 tU)과 총계 60,213 tU가 모두 일치 — 초안 점유율 6건은 전부 정확하므로 수치는 유지하고 출처만 보강",
+    "severity": "medium"
+  },
+  {
+    "field": "sources[10]",
+    "action": "corrected",
+    "reason": "개별 원자로 레코드 딥링크가 302로 사이트 루트에 리다이렉트 — IAEA가 PRIS를 pris-stats.iaea.org로 이전해 `ReactorDetails.aspx?current=1111`이 더는 해석되지 않는다. 레지스트리 자체는 실존하므로 링크만 유효한 진입점으로 교체",
+    "severity": "medium"
+  },
+  {
+    "field": "composition.minerals[0].top_source_pct",
+    "action": "corrected",
+    "reason": "초안 40.0, WNA 원문 '2024년 카자흐스탄이 세계 공급의 39%' — 39.0으로 정정",
+    "severity": "medium"
+  },
+  {
+    "field": "composition.minerals[2].top_source_pct",
+    "action": "removed",
+    "reason": "62.0을 뒷받침하는 출처가 목록에 없고 `minerals_share_basis`는 우라늄 전용 분모(60,213 tU)라 이 수치에 적용되지 않는다. 국가명은 유지 — 나머지 광물 3종도 `top_source_pct: null` + 국가명 형태라 초안 자체의 관례와 일치",
+    "severity": "medium"
+  },
+  {
+    "field": "key_points[0].metrics[2].value",
+    "action": "corrected",
+    "reason": "초안 '2030년대 중반'. 인용된 Reuters 기사 제목·본문이 '2034년'을 명시하므로 지표 칩은 출처의 수치를 그대로 쓴다(산문의 '2030년대 중반' 서술은 거짓이 아니므로 유지)",
+    "severity": "medium"
+  },
+  {
+    "field": "players[11].note",
+    "action": "corrected",
+    "reason": "'들어 Oklo·X-energy·Radiant가'로 주어가 잘린 문장 조각 — 같은 문단 맥락에 맞춰 '9월 들어'로 복원",
+    "severity": "low"
+  },
+  {
+    "field": "watch_items[1].not_signal",
+    "action": "corrected",
+    "reason": "'들어 계약은 셋이 늘었지만'으로 주어가 잘린 문장 조각 — '9월 들어'로 복원",
+    "severity": "low"
+  }
+]

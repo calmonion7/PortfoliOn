@@ -1,0 +1,1026 @@
+{
+  "arm": "opus",
+  "lane": "tech",
+  "fired": false,
+  "baseline_date": "2026-09-15",
+  "body": {
+    "title": "연료 계약이 한 달 새 셋이 더 붙었지만 인도는 전부 2029년 뒤로 몰려 있고, 그동안 미국이 실제로 농축해 낸 양은 누적 1.9톤이다",
+    "market": {
+      "as_of": "2026-09 (성장곡선 기준: Precedence Research 2026-03)",
+      "history": [
+        {
+          "size": {
+            "unit": "bn",
+            "value": 7.49,
+            "currency": "USD"
+          },
+          "year": 2025
+        }
+      ],
+      "cagr_pct": 8.78,
+      "forecast": [
+        {
+          "size": {
+            "unit": "bn",
+            "value": 8.16,
+            "currency": "USD"
+          },
+          "year": 2026
+        },
+        {
+          "size": {
+            "unit": "bn",
+            "value": 17.37,
+            "currency": "USD"
+          },
+          "year": 2035
+        }
+      ],
+      "estimates": [
+        {
+          "size": {
+            "unit": "bn",
+            "value": 8.16,
+            "currency": "USD"
+          },
+          "year": 2026,
+          "scope": null,
+          "is_basis": true,
+          "institution": "Precedence Research"
+        },
+        {
+          "size": {
+            "unit": "bn",
+            "value": 7.06,
+            "currency": "USD"
+          },
+          "year": 2026,
+          "scope": "6개 노형·육상+해상 포함",
+          "is_basis": null,
+          "institution": "Roots Analysis"
+        },
+        {
+          "size": {
+            "unit": "bn",
+            "value": 6.3,
+            "currency": "USD"
+          },
+          "year": 2026,
+          "scope": "HWR·LWR·FNR 노형 기준",
+          "is_basis": null,
+          "institution": "Coherent Market Insights"
+        },
+        {
+          "size": {
+            "unit": "bn",
+            "value": 6.13,
+            "currency": "USD"
+          },
+          "year": 2026,
+          "scope": "수랭·가스냉각형 한정",
+          "is_basis": null,
+          "institution": "Fortune Business Insights"
+        }
+      ],
+      "share_basis": null
+    },
+    "players": [
+      {
+        "name": "CNNC (중국핵공업집단)",
+        "note": "육상 상용 경수형 1호가 될 링룽 1호(ACP100·125MWe). 2021년 7월 첫 콘크리트, 2025년 10월 냉각기능시험·12월 비핵 증기 터빈 시험을 마쳤으나 2026년 9월 현재도 '시운전 전 시험(pre-commissioning)' 단계로 IAEA PRIS에 최초 임계가 미등재다. 같은 창장 부지의 화룽원 3호기(1,100MWe)가 2026년 7월 먼저 임계에 도달하면서, 소형화가 공기를 줄여준다는 전제가 같은 부지 안에서 반증된 형태가 됐다.",
+        "ticker": null,
+        "country": "중국",
+        "category": "경수형",
+        "gap_years": 0,
+        "share_pct": null,
+        "state_led": true,
+        "tech_level": 5,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "China Huaneng·칭화대 (HTR-PM)",
+        "note": "스다오완 HTR-PM(페블베드 고온가스로 2모듈·단일 터빈 200MWe)을 2023년 12월 상업운전에 넣어 세계 첫 4세대 원전을 가동 중이다. 노심당 40만 개 이상의 구형 연료(농축도 8.5%)를 쓰는데, 이 TRISO 연료를 자국 내에서 조달한다는 점이 서방 동종 설계와의 결정적 차이다 — 서방 고온가스로가 농축·피복입자 라인을 새로 세우는 동안 이쪽은 이미 연료주기를 돌리고 있다.",
+        "ticker": null,
+        "country": "중국",
+        "category": "고온가스로",
+        "gap_years": 0,
+        "share_pct": null,
+        "state_led": true,
+        "tech_level": 5,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "Rosatom",
+        "note": "2020년 부유식 원전 아카데믹 로모노소프(KLT-40S 2기·70MWe)를 상업운전에 넣어 세계 최초 상용 SMR을 기록하고 첫 연료주기를 완료했다. 육상 상용기 선두는 중국에 내줬으나 운전 실적은 여전히 최장이며, 2022년 이후 서방 시장에서 배제되면서 그 여파로 서방 HALEU 공급망이 사라진 것이 지금 비경수형 일정 지연의 출발점이다.",
+        "ticker": null,
+        "country": "러시아",
+        "category": "경수형",
+        "gap_years": 0,
+        "share_pct": null,
+        "state_led": true,
+        "tech_level": 5,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "GE Vernova Hitachi Nuclear Energy",
+        "note": "BWRX-300(300MWe 비등수형). 서방 설계 중 실물 진척이 가장 앞선다 — 캐나다 OPG 달링턴 1호기가 2025년 건설허가·착공을 거쳐 2026년 3월 첫 규제 정지점을 해제했고 계통연결 목표는 2030년 말이다. 저농축 연료를 쓰므로 HALEU 병목과 무관하다는 점이 비경수형 대비 구조적 우위이며, 2026년 8월 텍사스 가스+원자력 복합 2.5GW 사업 등 미국 내 파이프라인도 넓히는 중이다. GE버노바와 히타치의 합작사라 단일 상장 티커로 대응되지 않는다.",
+        "ticker": null,
+        "country": "미국·일본",
+        "category": "비등수형",
+        "gap_years": 3,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 4,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "TerraPower",
+        "note": "Natrium(345MW 소듐냉각고속로+용융염 축열). 2026년 3월 40여 년 만의 첫 상용 비경수형 건설허가를 받고 4월 와이오밍 케머러에서 원자로섬 본공사에 들어갔으며, 운전허가는 완공 후 Class 103으로 신청할 예정이다. 원자력섬과 에너지섬을 분리해 축열·발전부를 인허가 대상에서 뺀 것이 규제 부담을 줄인 핵심. 비상장이며 2026년 9월 현재 IPO 계획을 밝힌 바 없다.",
+        "ticker": null,
+        "country": "미국",
+        "category": "소듐냉각고속로",
+        "gap_years": 4,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 4,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "NuScale Power",
+        "note": "US460(77MWe 모듈) 표준설계승인을 2025년 5월 취득해 미국 내 유일한 설계 인가를 보유하지만 착공 호기는 여전히 없다 — 2023년 UAMPS 취소 이후 '인가는 있는데 고객이 없다'는 구도가 이어지고 있다. 현재 축은 2026년 2월 FID를 통과한 루마니아 도이체슈티(77MWe×6)인데 1개 모듈만 먼저 짓고 시험한 뒤 나머지 5기를 결정하는 단계적 구조다.",
+        "ticker": "SMR",
+        "country": "미국",
+        "category": "경수형",
+        "gap_years": 5,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 4,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "X-energy",
+        "note": "Xe-100(페블베드 고온가스로·80MWe 모듈)과 자회사 TRISO-X의 연료 라인을 함께 가진 수직통합형. 2026년 4월 27일 나스닥에 상장해 10억 달러 이상을 조달하며 첫 전통 IPO 사례가 됐고, 8월 6일 Centrus와 LEU·HALEU 공급계약을 맺어 11.5GW 상용 파이프라인의 초기 연료 일부를 확보했다(선불금 제공 구조). Dow와의 텍사스 롱모트 4기는 환경평가를 통과해 최종 안전성평가를 기다리는 단계로 아직 착공 전이다.",
+        "ticker": "XE",
+        "country": "미국",
+        "category": "고온가스로",
+        "gap_years": 5,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 3,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "Oklo",
+        "note": "Aurora(75MWe급 소듐냉각고속로). 2026년 8월 5일 텍사스 록하트의 Groves 아이소토프 시험로가 착공 1년이 안 돼 최초 임계에 도달해, DOE 원자로 파일럿 프로그램 중 민간 부지·민간 자본으로 임계에 이른 첫 사례가 됐다. 다만 이는 동위원소 시험로이지 발전로가 아니며 상업 발전은 Aurora-INL(2028년 가동 목표)의 몫이고, 자체 연료제조시설은 2027년 가동 목표다. 6월 Centrus와 Aurora 최대 5기 분량의 HALEU 공급에 합의했다(인도 개시 2029년).",
+        "ticker": "OKLO",
+        "country": "미국",
+        "category": "소듐냉각고속로",
+        "gap_years": 5,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 3,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "Rolls-Royce SMR",
+        "note": "2026년 4월 영국 GBE-N과 앵글시 윌파 3기(합계 1,400MW 이상) 공급계약과 정부 융자를 확보했고, 5월에는 원자로섬 주기기 공급사로 Škoda JS·두산에너빌리티를 이원 선정했다. 다만 GDA 최종 단계가 2026년 말 종료 예정이고 영국 최종투자결정은 2029년 전망이어서 계통 공급은 2030년대 중반이다. 롤스로이스 홀딩스가 최대주주인 비상장 자회사라 모회사 티커로 대응시키지 않는다.",
+        "ticker": null,
+        "country": "영국",
+        "category": "경수형",
+        "gap_years": 9,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 3,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "한국수력원자력 (i-SMR)",
+        "note": "i-SMR(170MW급 경수형) 표준설계인가를 2026년 2월 원자력안전위원회에 신청해 2028년 인허가·2034년 1호기 상업운전을 목표로 한다. 저농축 연료 기반이라 HALEU 병목과 무관하고 국내 주기기 제작 기반과 붙어 있다는 것이 강점이지만, 설계 인가 전이라 해외 수주 경쟁에서는 실적이 아니라 계획으로 경쟁하는 단계다. 한국전력의 발전자회사로 비상장이다.",
+        "ticker": null,
+        "country": "한국",
+        "category": "경수형",
+        "gap_years": 8,
+        "share_pct": null,
+        "state_led": true,
+        "tech_level": 3,
+        "leader_name": "CNNC (링룽 1호)"
+      },
+      {
+        "name": "두산에너빌리티",
+        "note": "노형 개발사가 아니라 압력용기·상부헤드 등 원자로 주기기를 단조·제작하는 공급자다. 세계에서 이 등급의 대형 단조를 감당하는 업체가 소수여서 어느 설계가 이기든 제작 슬롯을 거쳐야 하는 구조이며, 2026년 5월 Rolls-Royce SMR 주기기 이원 공급사 선정이 그 증거다. 노형 중립적 포지션이라 설계 경쟁의 승패보다 착공 호기 수 자체에 노출된다.",
+        "ticker": "034020",
+        "country": "한국",
+        "category": null,
+        "gap_years": null,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 4,
+        "leader_name": null
+      },
+      {
+        "name": "Centrus Energy",
+        "note": "미국 유일의 NRC 인가 HALEU 농축 사업자로, 오하이오 피케톤에서 1954년 이후 처음으로 미국 기술·미국 자본의 농축을 재개했다. 2026년 6월 DOE 실증계약 물량을 마지막 900kg으로 마무리했고(누적 1,900kg 이상), 7월 9억 달러 고정가 계약으로 상용 전환에 들어갔으며 첫 상용 캐파는 2029년 목표다. 2026년 들어 Oklo·X-energy·Radiant가 차례로 이곳과 공급계약을 맺어 비경수형 진영의 연료 수요가 사실상 한 회사에 집중됐다.",
+        "ticker": "LEU",
+        "country": "미국",
+        "category": null,
+        "gap_years": null,
+        "share_pct": null,
+        "state_led": false,
+        "tech_level": 3,
+        "leader_name": null
+      }
+    ],
+    "related": {
+      "competitors": [
+        "대형 가압경수로(APR1400·EPR)",
+        "가스터빈 복합화력",
+        "태양광·풍력 + ESS",
+        "핵융합",
+        "심부 지열(EGS)"
+      ],
+      "complements": [
+        "용융염 축열(열저장)",
+        "데이터센터 장기 전력구매계약(PPA)",
+        "계통 접속·송전 증설",
+        "지역난방망",
+        "사용후핵연료 건식 저장"
+      ],
+      "derivatives": [
+        "산업용 공정열·고온 증기 공급",
+        "고온 수전해 청정수소 생산",
+        "해수 담수화",
+        "부유식 원자력발전",
+        "선박용 원자력 추진"
+      ],
+      "prerequisites": [
+        "HALEU 우라늄 농축",
+        "TRISO 피복입자 연료 제조",
+        "원자로 압력용기 대형 단조",
+        "성능기반 원자력 인허가 체계",
+        "지르코늄·소듐 등 원자로용 특수소재"
+      ]
+    },
+    "sources": [
+      {
+        "url": "https://www.iaea.org/topics/small-modular-reactors",
+        "title": "IAEA — Small modular reactors (SMR)"
+      },
+      {
+        "url": "https://aris.iaea.org/Publications/SMR_catalogue_2024.pdf",
+        "title": "IAEA ARIS — SMR Technology Catalogue 2024 (활발한 개발 설계 70종)"
+      },
+      {
+        "url": "https://pris.iaea.org/pris/CountryStatistics/ReactorDetails.aspx?current=1111",
+        "title": "IAEA PRIS — LINGLONG-1 (Hainan Changjiang SMR): 최초 임계·계통연결 미등재, '건설 중'"
+      },
+      {
+        "url": "https://www.world-nuclear-news.org/articles/chinese-smr-completes-non-nuclear-steam-start-up-test",
+        "title": "World Nuclear News — Chinese SMR completes non-nuclear steam start up test (링룽 1호 2025-12-23)"
+      },
+      {
+        "url": "https://www.world-nuclear-news.org/articles/chinese-htr-pm-demo-begins-commercial-operation",
+        "title": "World Nuclear News — China's demonstration HTR-PM enters commercial operation (2023-12-06, 세계 첫 4세대 원전)"
+      },
+      {
+        "url": "https://www.world-nuclear-news.org/articles/uprated-nuscale-smr-design-gets-us-approval",
+        "title": "World Nuclear News — Uprated NuScale SMR design gets US approval (US460 77MWe SDA, 2025-05)"
+      },
+      {
+        "url": "https://www.world-nuclear-news.org/articles/opg-gets-go-ahead-to-build-first-smr-in-canada",
+        "title": "World Nuclear News — OPG gets go-ahead to build first SMR in Canada (달링턴 착공·2030년 계통연결 목표)"
+      },
+      {
+        "url": "https://world-nuclear-news.org/articles/what-is-the-budget-for-canadas-first-smr-project",
+        "title": "World Nuclear News — Canada's first SMR project: How is CAD20.9 billion cost calculated? (1호기 61억·2~4호기 41억 캐나다달러, 14.9센트/kWh)"
+      },
+      {
+        "url": "https://www.cnsc-ccsn.gc.ca/eng/reactors/new-reactor-power-plant-projects/new-reactor-power-plant-facilities/darlington-new-nuclear-project/",
+        "title": "CNSC — Darlington New Nuclear Project (2025-04 건설허가, 2026-03-30 첫 규제 정지점 해제)"
+      },
+      {
+        "url": "https://www.world-nuclear-news.org/articles/opg-applies-for-operating-licence-for-bwrx-300-smr",
+        "title": "World Nuclear News — OPG applies for operating licence for BWRX-300 SMR (2026-03)"
+      },
+      {
+        "url": "https://www.terrapower.com/NRC-Approves-Natrium-Reactor-Construction-Permit",
+        "title": "TerraPower — NRC Approves the Natrium Reactor Construction Permit (2026-03-04)"
+      },
+      {
+        "url": "https://www.powermag.com/terrapowers-kemmerer-1-enters-construction-timeline-of-the-natrium-projects-road-to-first-power/",
+        "title": "POWER Magazine — Kemmerer 1 Enters Construction: Timeline to First Power (2026-04-23 착공, 완공 2031-02, 운전허가 미신청)"
+      },
+      {
+        "url": "https://www.ans.org/news/2026-04-24/article-7975/terrapower-begins-construction-on-natrium-power-plant-in-kemmerer/",
+        "title": "ANS Nuclear Newswire — TerraPower begins construction on Natrium power plant in Kemmerer (2026-04)"
+      },
+      {
+        "url": "https://www.world-nuclear-news.org/Articles/HALEU-fuel-availability-delays-Natrium-reactor-pro",
+        "title": "World Nuclear News — HALEU fuel availability delays Natrium reactor project (2022-12, 2년 이상 연기 전례)"
+      },
+      {
+        "url": "https://www.terrapower.com/terrapower-announces-deal-with-meta",
+        "title": "TerraPower — TerraPower and Meta Enter Agreement for 8 Natrium Plants (2026-01-09, 2.8GW·초기 2기 2032년)"
+      },
+      {
+        "url": "https://www.powermag.com/meta-locks-in-up-to-6-6-gw-of-nuclear-power-through-deals-with-vistra-oklo-and-terrapower/",
+        "title": "POWER Magazine — Meta Locks In Up to 6.6 GW of Nuclear Power (Vistra·Oklo·TerraPower)"
+      },
+      {
+        "url": "https://investors.centrusenergy.com/news-releases/news-release-details/centrus-energy-secures-contract-extension-department-energy",
+        "title": "Centrus Energy — DOE HALEU 생산 계약 연장 (피케톤 실증 캐스케이드)"
+      },
+      {
+        "url": "https://www.energy.gov/ne/articles/centrus-reaches-900-kilogram-mark-haleu-production",
+        "title": "US DOE — Centrus Reaches 900 Kilogram Mark for HALEU Production (누적 인도량)"
+      },
+      {
+        "url": "https://www.sec.gov/Archives/edgar/data/0001065059/000162828026053863/leu-20260630.htm",
+        "title": "Centrus Energy 10-Q (2026-06-30) — 9억달러 고정가 HALEU 계약(2026-07-01 서명), 2032-03까지 1톤 인도·2029년 첫 상용 캐파"
+      },
+      {
+        "url": "https://sai.inl.gov/content/uploads/29/2024/11/haleu_requirements_for_net-zero.pdf",
+        "title": "Idaho National Laboratory — Estimated HALEU Requirements for Advanced Reactors (Natrium 첫 노심 15~20톤, 2030년 40톤 이상)"
+      },
+      {
+        "url": "https://x-energy.com/news/nrc-issues-environmental-assessment-with-finding-of-no-significant-impact-for-dow-and-x-energys-propsed-advanced-nuclear-project-in-texas/",
+        "title": "X-energy — NRC Issues Environmental Assessment with FONSI for Long Mott (2026-05, Xe-100 4기·320MWe)"
+      },
+      {
+        "url": "https://x-energy.com/news/nrc-publishes-18-month-review-schedule-for-xe-100-construction-permit-application/",
+        "title": "X-energy — NRC Publishes 18-Month Review Schedule for Xe-100 Construction Permit (최종 안전성평가 2026-11 목표)"
+      },
+      {
+        "url": "https://www.rolls-royce-smr.com/press/rolls-royce-smr-secures-contractual-certainty-to-build-europes-first-smr-fleet",
+        "title": "Rolls-Royce SMR — 윌파 3기 공급계약 체결 (2026-04-13, 합계 1,400MW 이상·GDA 2026-12 종료 예정)"
+      },
+      {
+        "url": "https://www.world-nuclear-news.org/articles/skoda-js-doosan-enerbility-get-key-rolls-royce-smr-work",
+        "title": "World Nuclear News — Škoda JS, Doosan Enerbility get key Rolls-Royce SMR work (2026-05-28, 압력용기·상부헤드·체적보상기 이원 공급)"
+      },
+      {
+        "url": "https://www.ans.org/news/article-8226/industry-updateaugust-2026/",
+        "title": "ANS Nuclear Newswire — Industry Update, August 2026 (Rolls-Royce 공급사 선정·스웨덴 3기 등)"
+      },
+      {
+        "url": "https://www.technologyreview.com/2026/07/09/1140235/nuclear-reactor-milestone-criticality/",
+        "title": "MIT Technology Review — Four nuclear reactors hit a big milestone in the US (DOE 파일럿 4개사 영출력 임계·발전 아님)"
+      },
+      {
+        "url": "https://www.datacenterdynamics.com/en/news/microsoft-backed-smr-firm-aalo-achieves-test-reactor-criticality-first-under-doe-pilot-program/",
+        "title": "DCD — Aalo achieves test reactor criticality under DOE pilot program (2026-07-04, 기한 충족)"
+      },
+      {
+        "url": "https://www.powermag.com/nrc-clears-long-motts-environmental-review-on-a-faster-path-another-milestone-for-commercial-advanced-nuclear/",
+        "title": "POWER Magazine — NRC Clears Long Mott's Environmental Review on a Faster Path"
+      },
+      {
+        "url": "https://www.precedenceresearch.com/small-modular-reactor-market",
+        "title": "Precedence Research — Small Modular Reactor Market (2026년 81.6억달러→2035년 173.7억달러·CAGR 8.78%)"
+      },
+      {
+        "url": "https://www.rootsanalysis.com/small-modular-reactor-market",
+        "title": "Roots Analysis — SMR Market (2026년 70.6억달러, 2040년 187.3억달러·CAGR 7.22%)"
+      },
+      {
+        "url": "https://www.coherentmarketinsights.com/industry-reports/small-modular-reactor-market",
+        "title": "Coherent Market Insights — SMR Market (2026년 63.0억달러, 2033년 80.8억달러·CAGR 3.6%)"
+      },
+      {
+        "url": "https://www.fortunebusinessinsights.com/industry-reports/small-modular-nuclear-reactor-market-101578",
+        "title": "Fortune Business Insights — SMR Market (2026년 61.3억달러, 2034년 87.7억달러·CAGR 4.59%, 수랭·가스냉각형 한정)"
+      },
+      {
+        "url": "https://world-nuclear.org/information-library/nuclear-fuel-cycle/conversion-enrichment-and-fabrication/high-assay-low-enriched-uranium-haleu",
+        "title": "World Nuclear Association — High-Assay Low-Enriched Uranium (HALEU)"
+      },
+      {
+        "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156747206&call_from=rsslink",
+        "title": "원자력안전위원회 — i-SMR 표준설계인가 심사 준비 착수 (2026-02-27 신청)"
+      },
+      {
+        "url": "https://www.todayenergy.kr/news/articleView.html?idxno=288257",
+        "title": "투데이에너지 — 2034년 i-SMR 첫 운전 전망 (총 3,992억원·2028년 인허가 목표)"
+      },
+      {
+        "url": "https://www.centrusenergy.com/news/centrus-energy-signs-leu-and-haleu-supply-agreement-with-x-energy/",
+        "title": "Centrus — Signs LEU and HALEU Supply Agreement with X-energy (2026-08-06, TRISO-X 오크리지 라인 공급)"
+      },
+      {
+        "url": "https://www.sec.gov/Archives/edgar/data/0001065059/000162828026044360/ex991_oklocentrusfinalpr.htm",
+        "title": "Centrus 8-K Ex-99.1 — Oklo·Centrus HALEU 공급 합의 (2026-06-18, Aurora 최대 5기분·인도 2029년 개시)"
+      },
+      {
+        "url": "https://neutronbytes.com/2026/09/12/centrus-and-radiant-partner-for-haleu-fuel/",
+        "title": "Neutron Bytes — Centrus and Radiant Partner for HALEU Fuel (2026-09, Kaleidos용 19.5% HALEU·첫 장전 2028년 필요)"
+      },
+      {
+        "url": "https://www.energy.gov/ne/articles/centrus-reaches-900-kilogram-mark-haleu-production",
+        "title": "US DOE — Centrus Reaches 900 Kilogram Mark for HALEU Production (실증계약 누적 1,900kg 초과)"
+      },
+      {
+        "url": "https://www.powermag.com/centrus-signs-900m-doe-contract-pivots-sole-u-s-haleu-cascade-to-commercial-operation/",
+        "title": "POWER Magazine — Centrus Signs $900M DOE Contract, Pivots Sole U.S. HALEU Cascade to Commercial Operation (120기 캐스케이드 연 6MTU·자금 후 42개월)"
+      },
+      {
+        "url": "https://www.ans.org/news/2026-08-06/article-8277/oklos-isotope-test-reactor-achieves-criticality/",
+        "title": "ANS Nuclear Newswire — Oklo's Isotope Test Reactor achieves criticality (2026-08-05 Groves 최초 임계)"
+      },
+      {
+        "url": "https://www.world-nuclear-news.org/articles/third-reactor-at-changjiang-plant-starts-up",
+        "title": "World Nuclear News — Third reactor at Changjiang plant starts up (화룽원 3호기 2026-07-10 최초 임계, 링룽 1호는 pre-commissioning)"
+      },
+      {
+        "url": "https://www.cnbc.com/2026/04/24/nuclear-reactor-company-x-energy-begins-trading-as-ai-drives-interest-in-the-industry.html",
+        "title": "CNBC — X-energy begins trading on Nasdaq (2026-04, 티커 XE)"
+      },
+      {
+        "url": "https://www.globaltimes.cn/page/202307/1295190.shtml",
+        "title": "Global Times — 링룽 1호 총사업비 50억 위안·공기 목표 (CNNC 수석엔지니어 발언, MW당 단가 비교 근거)"
+      }
+    ],
+    "variants": [
+      {
+        "options": [
+          {
+            "name": "경수형 가압경수로(PWR)",
+            "examples": [
+              "중국 ACP100 125MWe",
+              "NuScale US460 77MWe 모듈",
+              "한국 i-SMR 170MW급",
+              "Rolls-Royce SMR 470MWe급",
+              "러시아 KLT-40S 35MWe"
+            ],
+            "strength": "기존 상용 원전과 동일한 5% 이하 저농축 연료를 쓰므로 연료 조달처와 규제 선례가 이미 존재한다.",
+            "tradeoff": "노심 출구온도가 낮아 산업용 고온 공정열·수소생산 등 발전 외 용도로 확장하기 어렵다."
+          },
+          {
+            "name": "비등수형(BWR)",
+            "examples": [
+              "GE버노바히타치 BWRX-300 300MWe"
+            ],
+            "strength": "증기발생기 없이 노심에서 직접 증기를 만들어 계통 수가 줄고, 기존 ABWR 설계·규제 실적을 물려받는다.",
+            "tradeoff": "증기가 노심을 직접 거쳐 터빈으로 가므로 2차계통까지 방사선 관리 범위가 넓어진다."
+          },
+          {
+            "name": "고온가스로(HTGR)",
+            "examples": [
+              "중국 HTR-PM 200MWe",
+              "X-energy Xe-100 80MWe 모듈"
+            ],
+            "strength": "헬륨 냉각·흑연 감속으로 700도 이상 고온을 뽑아 산업 공정열과 수소생산까지 용도를 넓힐 수 있다.",
+            "tradeoff": "HALEU에 더해 TRISO 피복입자 제조 라인이 선행돼야 하고 노심당 연료구 수십만 개가 필요하다."
+          },
+          {
+            "name": "소듐냉각고속로(SFR)",
+            "examples": [
+              "테라파워 Natrium 345MW",
+              "Oklo Aurora 75MWe"
+            ],
+            "strength": "고속중립자 스펙트럼으로 연료 이용률이 높고 상압 운전이 가능해 대형 압력용기 부담이 작다.",
+            "tradeoff": "소듐이 물·공기와 격렬히 반응해 별도 계통 설계가 필요하고 HALEU 금속연료 공급망이 전제된다."
+          }
+        ],
+        "axis_label": "노형(냉각재·감속재 계열)"
+      },
+      {
+        "options": [
+          {
+            "name": "저농축우라늄(5% 이하, 기존 연료)",
+            "examples": [
+              "경수형·비등수형 전 계열",
+              "ACP100",
+              "BWRX-300",
+              "i-SMR"
+            ],
+            "strength": "기존 상용 원전과 연료 규격이 같아 조달·수송·인허가 경로가 이미 확립돼 있고 별도 설비 투자가 없다.",
+            "tradeoff": "노심 크기와 교체 주기가 기존 방식에 묶여 장주기 운전·소형화로 얻을 이점이 제한된다."
+          },
+          {
+            "name": "HALEU(5~20% 농축)",
+            "examples": [
+              "Natrium 금속연료",
+              "Xe-100 TRISO",
+              "Aurora 금속연료",
+              "다수 마이크로로"
+            ],
+            "strength": "농축도를 올려 노심을 작게 하고 연료 교체 없이 장기 운전하는 설계가 가능해 무인·원격 운용 폭이 넓다.",
+            "tradeoff": "상업적 조달처가 사실상 없어 농축 설비 신설이 선행 조건이며 이것이 배포 일정을 직접 지배한다."
+          }
+        ],
+        "axis_label": "연료 농축도 계열"
+      }
+    ],
+    "challenges": [
+      {
+        "body": "비경수형 진영의 연료 수요가 한 농축 사업자에 집중되는 동안, 실제 가동 중인 설비는 실증용 소형 캐스케이드에 머물러 있고 상용 라인은 아직 가동 전이다. 농축·금속화·피복입자 제조가 순차로 붙어야 하는 다단 공정이라 계약 금액이나 선불금으로 압축되지 않는 것이 이 관문의 성격이다.",
+        "title": "연료 계약은 늘었는데 농축 캐파는 아직 데모 라인 한 줄이다"
+      },
+      {
+        "body": "SMR의 경제성 논리는 같은 부지에 같은 모듈을 여러 기 지어 단가를 깎는다는 학습효과에 걸려 있는데, 아직 2호기 이후를 완주한 사업이 없어 실측된 학습률이 존재하지 않는다. 초호기 단가가 목표치를 크게 웃돈 사례가 이미 여럿이라 이 전제가 깨지면 사업 모델 자체가 성립하지 않는다.",
+        "title": "초호기 비용이 반복 건설로 내려간다는 전제가 미검증"
+      },
+      {
+        "body": "모듈 양산의 전제는 압력용기·상부헤드 같은 대형 단조품을 동시에 여러 벌 찍어내는 능력인데, 이 공정을 감당하는 업체가 세계에 몇 곳뿐이어서 설계 인가가 늘어도 제작 슬롯이 함께 늘지 않는다. 신규 단조 라인은 증설에 수년이 걸려 인허가 속도와 제작 속도가 구조적으로 어긋난다.",
+        "title": "원자로 압력용기급 대형 단조 능력이 세계적으로 소수"
+      },
+      {
+        "body": "미국에서 상용 4세대로의 건설허가는 나왔지만 운전허가(Part 50 Class 103)를 신청·취득한 비경수형이 아직 없어, 연료·계측제어·사고해석을 실제 운전 조건에서 승인받는 절차가 전부 미개척이다. 첫 사례에 몇 년이 걸릴지 자체가 불확실해 완공 일정과 계통연결 일정 사이의 간격을 지금은 추정할 수 없다.",
+        "title": "비경수형의 운전허가 선례가 아직 없다"
+      },
+      {
+        "body": "민간 부지 시험로가 1년 안에 임계에 이른 사례가 나왔지만, 시험로는 발전 계통·터빈·계통연계 설비가 없고 인허가 경로도 상업 발전로와 다르다. 짧아진 것은 '원자로를 세우는 시간'이지 '전기를 파는 데까지 걸리는 시간'이 아니며, 그 둘을 잇는 구간은 아직 아무도 완주하지 않았다.",
+        "title": "시험로의 임계 실적이 발전로 공기로 이전되지 않는다"
+      }
+    ],
+    "difficulty": {
+      "score": 4,
+      "rationale": "원자로 물리 자체에 미검증 영역이 없다는 점이 5점을 배제한다 — 경수형은 60년간 상용 운전된 기술의 축소판이고 고온가스로·소듐냉각고속로도 실증로 운전 실적을 갖고 있으며, 부지·계통 조건은 대형 원전보다 오히려 완화된다. 그럼에도 4점인 이유는 난이도가 물리에서 반복 제조·연료 공급망·초호기 금융으로 옮겨간 형태이기 때문이다: 첫 상용 SMR 가동 이후 6년이 지나도록 가동 사이트는 국가가 비용 위험을 흡수한 두 곳에 머물러 있다. 2026년 하반기에 연료 계약과 시험로 임계가 잇따랐지만 어느 것도 상업 발전로의 남은 구간을 줄이지 않았다는 점에서 3점으로 내릴 근거는 여전히 없다."
+    },
+    "key_points": [
+      {
+        "body": "6월 Oklo, 8월 X-energy, 9월 Radiant가 차례로 같은 농축 사업자와 공급계약을 맺으며 비경수형 진영의 연료 수요가 한 곳에 집중됐다. 세 계약 모두 선불금으로 캐파 증설을 앞당기려는 구조인데, 인도 개시 시점은 하나같이 2029년 이후여서 바뀐 것은 일정이 아니라 줄의 길이다.",
+        "title": "한여름에 연료 계약이 셋 더 붙었지만 인도는 전부 2029년 이후다",
+        "metrics": [
+          {
+            "label": "2026년 체결 HALEU 공급계약",
+            "value": "3건(6·8·9월)",
+            "change_pct": null
+          },
+          {
+            "label": "X-energy 상용 파이프라인",
+            "value": "11.5GW",
+            "change_pct": null
+          },
+          {
+            "label": "인도 개시 목표",
+            "value": "2029년",
+            "change_pct": null
+          },
+          {
+            "label": "Oklo 계약 규모",
+            "value": "Aurora 최대 5기분",
+            "change_pct": null
+          }
+        ]
+      },
+      {
+        "body": "피케톤의 실증 캐스케이드는 원심분리기 16기로 연 900kg 규모이고, 6월 마지막 900kg을 인도하며 실증계약을 끝낸 누적 생산량이 1,900kg이다. 상용 규모인 120기 캐스케이드는 자금 확보 후에도 가동까지 42개월이 걸려, 첫 상용 캐파가 2029년으로 잡힌 것이 낙관이 아니라 공정의 산술이다.",
+        "title": "그동안 미국이 실제로 농축해 낸 HALEU는 누적 1.9톤이다",
+        "metrics": [
+          {
+            "label": "누적 HALEU 생산",
+            "value": "1,900kg",
+            "change_pct": null
+          },
+          {
+            "label": "실증 캐스케이드",
+            "value": "16기·연 900kg",
+            "change_pct": null
+          },
+          {
+            "label": "상용 캐스케이드 1줄",
+            "value": "120기·연 6톤",
+            "change_pct": null
+          },
+          {
+            "label": "자금 확보→가동",
+            "value": "42개월",
+            "change_pct": null
+          }
+        ]
+      },
+      {
+        "body": "8월 5일 텍사스의 민간 시험로가 착공 1년이 안 돼 최초 임계에 도달한 것은 민간 자본·민간 부지로도 원자로를 세울 수 있음을 보인 사건이다. 다만 이는 동위원소 시험로여서 터빈도 계통연계 설비도 없고, 같은 회사의 상업 발전로는 2028년 가동 목표로 3년 뒤에 있다.",
+        "title": "임계 소식이 늘었지만 발전로의 임계는 여전히 한 건도 없다",
+        "metrics": [
+          {
+            "label": "Groves 최초 임계",
+            "value": "2026년 8월 5일",
+            "change_pct": null
+          },
+          {
+            "label": "착공→임계",
+            "value": "12개월 미만",
+            "change_pct": null
+          },
+          {
+            "label": "연료제조시설 가동 목표",
+            "value": "2027년",
+            "change_pct": null
+          },
+          {
+            "label": "상업 발전로 가동 목표",
+            "value": "2028년",
+            "change_pct": null
+          }
+        ]
+      },
+      {
+        "body": "창장 부지의 화룽원 3호기가 7월 최초 임계에 이른 반면, 담장 하나 건너의 링룽 1호는 아직 시운전 전 시험 단계다. 규제·부지·인력 조건이 같은 이 비교는 설계 우열이 아니라 '작게 만들면 빠르고 싸진다'는 전제 자체를 겨눈다 — 공표된 총사업비를 출력으로 나누면 소형로 쪽이 MW당 2.5배 비싸다.",
+        "title": "같은 부지에서 대형로가 소형로를 제치고 먼저 임계에 도달했다",
+        "metrics": [
+          {
+            "label": "화룽원 3호기 임계",
+            "value": "2026년 7월 10일",
+            "change_pct": null
+          },
+          {
+            "label": "화룽원 3호기 출력",
+            "value": "1,100MWe",
+            "change_pct": null
+          },
+          {
+            "label": "링룽 1호 상태",
+            "value": "시운전 전 시험",
+            "change_pct": null
+          },
+          {
+            "label": "MW당 사업비 차이",
+            "value": "소형로 2.5배",
+            "change_pct": 150.0
+          }
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "year": 2020,
+        "actor": "Rosatom",
+        "event": "부유식 원전 아카데믹 로모노소프(KLT-40S 2기·합계 70MWe) 상업운전 개시 — 세계 최초 상용 SMR",
+        "status": "done"
+      },
+      {
+        "year": 2021,
+        "actor": "CNNC",
+        "event": "링룽 1호(ACP100·125MWe) 하이난 창장 부지 첫 콘크리트 타설(7월 13일), 계획 공기 58개월",
+        "status": "done"
+      },
+      {
+        "year": 2022,
+        "actor": "TerraPower",
+        "event": "HALEU 상업 공급망 붕괴로 Natrium 가동 목표를 2028년에서 2년 이상 연기 — 연료가 일정을 지배한 첫 사례",
+        "status": "done"
+      },
+      {
+        "year": 2023,
+        "actor": "화능그룹·칭화대",
+        "event": "스다오완 HTR-PM(고온가스로 2모듈·200MWe) 상업운전 개시(12월 6일) — 세계 첫 4세대 원전",
+        "status": "done"
+      },
+      {
+        "year": 2025,
+        "actor": "NuScale",
+        "event": "US460(77MWe 모듈) 미국 표준설계승인 취득(5월) — 미국 내 유일한 설계 인가",
+        "status": "done"
+      },
+      {
+        "year": 2025,
+        "actor": "OPG·GE버노바히타치",
+        "event": "달링턴 BWRX-300 1호기 착공 — 4월 CNSC 건설허가, 5월 온타리오주 209억 캐나다달러 예산 승인",
+        "status": "done"
+      },
+      {
+        "year": 2025,
+        "actor": "CNNC",
+        "event": "링룽 1호 1차계통 냉각기능시험(10월)·비핵 증기 터빈 시험(12월 23일) 완료 — 이후 새 이정표 발표 없음",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "Meta·테라파워·Oklo·Vistra",
+        "event": "Meta가 최대 6.6GW 원자력 장기계약 체결(1월 9일), 테라파워 몫은 Natrium 최대 8기·2.8GW — 초기 2기 인도 2032년",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "TerraPower·NRC",
+        "event": "Natrium Part 50 건설허가 취득(3월 4일) — 40여 년 만의 첫 상용 비경수형 건설허가",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "OPG",
+        "event": "달링턴 원자로건물 기초 첫 규제 정지점(RHP-1) 해제(3월 30일), 20년 운전허가 신청(3월)",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "미 에너지부(DOE) 원자로 파일럿 프로그램",
+        "event": "Antares(6월 4일)·Valar(6월 22일)·Deployable Energy(7월 2일)·Aalo(7월 4일) 시험로 4기 영출력 임계 달성 — 발전·계통연결은 아님",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "X-energy",
+        "event": "나스닥 상장(4월 27일·티커 XE)으로 10억 달러 이상 조달 — 서방 4세대 노형 개발사 중 첫 전통 IPO",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "Oklo·Centrus",
+        "event": "Aurora 최대 5기 분량 HALEU 공급 합의(6월 18일) — 인도 개시 2029년, 선불금 구조는 본계약에서 확정",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "Centrus·DOE",
+        "event": "실증계약 마지막 900kg 생산 완료(6월 중순, 일정보다 2주 앞당김) — 계약 전 기간 누적 1,900kg 초과",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "CNNC",
+        "event": "같은 창장 부지의 화룽원 3호기(1,100MWe) 최초 임계 달성(7월 10일) — 담장 건너 링룽 1호는 시운전 전 시험 단계 유지",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "Oklo·DOE",
+        "event": "텍사스 록하트 Groves 아이소토프 시험로 최초 임계(8월 5일) — 원자로 파일럿 프로그램 중 민간 부지·민간 자본 첫 사례, 발전로 아님",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "X-energy·Centrus",
+        "event": "LEU·HALEU 공급 본계약 체결(8월 6일) — 피케톤 농축분을 TRISO-X 오크리지 라인에 투입, 11.5GW 파이프라인 초기 연료 일부 확보",
+        "status": "done"
+      },
+      {
+        "year": 2026,
+        "actor": "RoPower(Nuclearelectrica·Nova Power)",
+        "event": "루마니아 도이체슈티 NuScale 462MW(77MWe×6) 최종투자결정(2월 19일) — 1개 모듈만 먼저 건설·시험 후 나머지 5기 결정",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "한수원·i-SMR 사업단",
+        "event": "원자력안전위원회에 i-SMR(170MW급 경수형) 표준설계인가 신청(2월 27일) — 2028년 인허가 목표",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "TerraPower·Bechtel",
+        "event": "와이오밍 케머러 1호기 원자로섬 본공사 착수(4월 23일) — 완공 목표 2031년 2월, 운전허가는 완공 후 신청 예정",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "Rolls-Royce SMR",
+        "event": "원자로섬 주기기 공급사로 Škoda JS·두산에너빌리티 선정(5월 28일) — 압력용기·상부헤드·체적보상기 이원 공급",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "X-energy·Dow",
+        "event": "텍사스 롱모트(Xe-100 4기·320MWe) NRC 환경평가 FONSI 취득(5월), 최종 안전성평가 11월 목표",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "Centrus·DOE",
+        "event": "피케톤 상용 HALEU 농축 확장 9억달러 고정가 계약 서명(7월 1일) — 2032년 3월까지 1톤 인도, 첫 상용 캐파는 2029년 목표",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "CNNC",
+        "event": "링룽 1호 상반기 상업운전 목표 시한 경과 — IAEA PRIS 최초 임계·계통연결 미등재, '건설 중' 유지",
+        "status": "in_progress"
+      },
+      {
+        "year": 2026,
+        "actor": "Centrus·Radiant",
+        "event": "Kaleidos 마이크로로용 19.5% 농축 HALEU 다년 공급계약(9월 3일) — 첫 연료 장전 필요 시점은 2028년, 인도는 '2020년대 말'",
+        "status": "in_progress"
+      },
+      {
+        "year": 2027,
+        "actor": "Oklo",
+        "event": "Aurora 연료제조시설 가동 목표 — 장비 제작 진행 중",
+        "status": "planned"
+      },
+      {
+        "year": 2028,
+        "actor": "Oklo",
+        "event": "Aurora-INL 상업 발전로 가동 목표 — 부지 굴착 마무리 단계",
+        "status": "planned"
+      },
+      {
+        "year": 2029,
+        "actor": "Centrus",
+        "event": "피케톤 첫 상용 HALEU 농축 캐파 가동 목표 — 비경수형 노형 배포의 선행 조건",
+        "status": "planned"
+      },
+      {
+        "year": 2030,
+        "actor": "OPG",
+        "event": "달링턴 BWRX-300 1호기 계통연결 목표 — 북미 첫 상용 SMR(2~4호기는 2034~2036년)",
+        "status": "planned"
+      },
+      {
+        "year": 2031,
+        "actor": "TerraPower",
+        "event": "케머러 Natrium 1호기(345MW) 완공 목표(2월), 이후 Part 50 Class 103 운전허가 신청",
+        "status": "planned"
+      },
+      {
+        "year": 2032,
+        "actor": "TerraPower·Meta",
+        "event": "Meta 계약 초기 2기(듀얼 원자로) 인도 목표 — 나머지 6기는 2035년",
+        "status": "planned"
+      },
+      {
+        "year": 2034,
+        "actor": "한수원",
+        "event": "i-SMR 1호기 상업운전 목표(2028년 인허가 확보가 전제)",
+        "status": "planned"
+      }
+    ],
+    "composition": {
+      "tech": [
+        {
+          "name": "HALEU·TRISO 연료 공급망",
+          "leaders": [
+            "Centrus Energy",
+            "X-energy"
+          ],
+          "rationale": "비경수형이 요구하는 5~20% 농축 우라늄은 수요가 한 사업자에 집중돼 있는데 가동 중인 설비는 실증 캐스케이드뿐이고 상용 라인은 착공 전이다. 농축·금속화·피복입자가 순차 공정이라 계약과 선불금으로 압축되지 않는다.",
+          "share_pct": 35.0
+        },
+        {
+          "name": "반복 건설 학습효과 미검증",
+          "leaders": [
+            "GE Vernova Hitachi Nuclear Energy",
+            "NuScale Power"
+          ],
+          "rationale": "SMR의 경제성은 같은 부지에 같은 모듈을 반복해 단가를 깎는다는 전제에 걸려 있는데 2호기 이후를 완주한 사업이 없어 실측 학습률이 존재하지 않는다. 전제가 깨지면 사업 모델 자체가 성립하지 않는다.",
+          "share_pct": 25.0
+        },
+        {
+          "name": "압력용기급 대형 단조 능력",
+          "leaders": [
+            "두산에너빌리티",
+            "Rolls-Royce SMR"
+          ],
+          "rationale": "모듈 양산의 전제는 압력용기·상부헤드 같은 대형 단조품을 동시에 여러 벌 찍는 능력인데 감당하는 업체가 세계에 몇 곳뿐이다. 신규 라인 증설에 수년이 걸려 설계 인가가 늘어도 제작 슬롯은 함께 늘지 않는다.",
+          "share_pct": 20.0
+        },
+        {
+          "name": "비경수형 운전허가 선례 부재",
+          "leaders": [
+            "TerraPower",
+            "X-energy"
+          ],
+          "rationale": "건설허가는 나왔지만 운전허가를 신청·취득한 비경수형이 아직 없어 연료·계측제어·사고해석을 실제 운전 조건에서 승인받는 절차가 전부 미개척이다. 첫 사례에 몇 년이 걸릴지 자체가 불확실하다.",
+          "share_pct": 20.0
+        }
+      ],
+      "experts": [
+        {
+          "name": "HALEU 농축·연료 제조 공정",
+          "rationale": "최대 난제가 연료인데 농축 캐스케이드와 피복입자 제조를 함께 아는 인력은 서방에서 사실상 한 회사에 몰려 있다. 러시아 공급망이 배제된 뒤 이 역량을 새로 세우는 것이 일정을 지배한다.",
+          "share_pct": 30.0
+        },
+        {
+          "name": "원자로 주기기 단조·제작",
+          "rationale": "대형 단조는 설비만큼 숙련이 성패를 가르는 공정이고, 원자력 품질등급을 아는 제작 인력이 소수 업체에 갇혀 있어 제작 슬롯의 실질 상한을 만든다.",
+          "share_pct": 25.0
+        },
+        {
+          "name": "비경수형 사고해석·인허가",
+          "rationale": "소듐냉각·헬륨냉각의 사고 시나리오를 규제 문서로 번역해 본 인력이 거의 없다. 선례가 없어 심사와 대응이 동시에 학습되는 구조라 인력 병목이 곧 일정 병목이다.",
+          "share_pct": 25.0
+        },
+        {
+          "name": "모듈 양산·건설 공정관리",
+          "rationale": "학습효과를 실현하는 일은 설계가 아니라 공장 제작과 현장 조립의 공정관리다. 원전 건설 경험자가 고령화돼 초호기마다 팀을 새로 꾸리는 상황이 단가 하락을 막는다.",
+          "share_pct": 20.0
+        }
+      ],
+      "minerals": [
+        {
+          "name": "우라늄",
+          "used_in": [
+            "HALEU·TRISO 연료 공급망"
+          ],
+          "producers": [
+            {
+              "name": "Kazatomprom",
+              "ticker": "KAP",
+              "country": "KZ",
+              "share_pct": 20.7
+            },
+            {
+              "name": "Cameco",
+              "ticker": "CCJ",
+              "country": "CA",
+              "share_pct": 16.9
+            },
+            {
+              "name": "Orano",
+              "ticker": null,
+              "country": "FR",
+              "share_pct": 11.3
+            },
+            {
+              "name": "Uranium One",
+              "ticker": null,
+              "country": "RU",
+              "share_pct": 9.7
+            },
+            {
+              "name": "CGN",
+              "ticker": null,
+              "country": "CN",
+              "share_pct": 9.6
+            },
+            {
+              "name": "Navoi Mining",
+              "ticker": null,
+              "country": "UZ",
+              "share_pct": 6.6
+            }
+          ],
+          "rationale": "연료비의 출발점이자 이 기술의 실질 병목이다. 천연우라늄 자체는 부족하지 않으나 비경수형이 요구하는 농축 단계로 넘어가는 설비가 병목이라 원재료비 몫이 가장 크다.",
+          "share_pct": 40.0,
+          "top_source_pct": 40.0,
+          "top_source_country": "카자흐스탄"
+        },
+        {
+          "name": "지르코늄",
+          "used_in": [
+            "HALEU·TRISO 연료 공급망"
+          ],
+          "producers": null,
+          "rationale": "경수형 연료 피복관의 표준 재료로 중성자 흡수가 낮아 대체재가 마땅치 않다. 원자로급 정제는 하프늄 분리를 요구해 일반 지르콘 생산량과 공급 가능량이 다르다.",
+          "share_pct": 20.0,
+          "top_source_pct": null,
+          "top_source_country": "호주"
+        },
+        {
+          "name": "니켈 (내식 합금)",
+          "used_in": [
+            "압력용기급 대형 단조 능력"
+          ],
+          "producers": null,
+          "rationale": "증기발생기 전열관과 소듐·헬륨 계통의 고온 내식 합금에 쓰인다. 계통 수가 많은 노형일수록 이 몫이 커진다.",
+          "share_pct": 15.0,
+          "top_source_pct": 62.0,
+          "top_source_country": "인도네시아"
+        },
+        {
+          "name": "흑연 (감속재)",
+          "used_in": [
+            "HALEU·TRISO 연료 공급망"
+          ],
+          "producers": null,
+          "rationale": "고온가스로 노심은 흑연으로 감속해 노심당 대량이 들어간다. 원자로급 흑연은 별도 정제·소성 공정을 요구해 일반 흑연 생산능력이 곧 공급능력은 아니다.",
+          "share_pct": 15.0,
+          "top_source_pct": null,
+          "top_source_country": "중국"
+        },
+        {
+          "name": "크롬 (스테인리스강)",
+          "used_in": [
+            "압력용기급 대형 단조 능력"
+          ],
+          "producers": null,
+          "rationale": "압력용기·배관·격납 구조의 스테인리스강을 정의하는 합금 원소다. 물량은 크지만 단가가 낮아 원재료비 몫은 잔여로 둔다.",
+          "share_pct": 10.0,
+          "top_source_pct": null,
+          "top_source_country": "남아프리카공화국"
+        }
+      ],
+      "minerals_share_basis": "2024년 각 사 광산생산량 ÷ WNA 세계 광산생산량 60,213 tU"
+    },
+    "description": "[기술 개요]\nSMR은 원자로를 작게 만드는 기술이 아니라, 원자로를 공장에서 반복 제작해 현장 공사를 조립으로 바꾸려는 산업 방식의 전환이다. 그래서 이 기술의 성패는 노심 물리가 아니라 '같은 물건을 여러 벌 만들 수 있는가'에 달려 있고, 평가 축도 출력이나 안전계통 수가 아니라 2호기 이후의 단가 하락률·연료 조달 톤수·운전허가 선례 세 가지로 좁혀진다.\n\n노형은 냉각재와 감속재로 갈리고, 그 선택이 곧 연료 농축도를 결정한다. 경수형·비등수형은 기존 상용 원전과 같은 5% 이하 저농축 연료를 쓰므로 조달 경로가 이미 있고, 고온가스로·소듐냉각고속로는 5~20% 농축의 HALEU를 요구해 연료 공급망을 새로 세워야 한다. 지금 서방에서 진도 차이를 만드는 것은 설계의 우열이 아니라 이 갈림길의 어느 쪽에 서 있는가다.\n\n[어디까지 왔나]\n2026년 하반기에 바뀐 것은 진척의 성격이다. 상반기까지는 규제 관문(건설허가·표준설계승인)이 뚫리는 국면이었다면, 여름 이후에는 연료 계약이 줄줄이 체결되는 국면으로 넘어갔다. 그런데 이 계약들은 모두 같은 한 곳의 농축 설비를 가리키고 있고, 그 설비의 상용 캐파는 아직 착공 단계가 아니다 — 수요가 한 공급자에게 집중되면서 병목의 위치가 '누가 파는가'에서 '언제 나오는가'로 옮겨간 셈이다. 계약이 늘어나는 것 자체는 진척 신호가 아니라 같은 줄에 선 사람이 늘었다는 뜻으로 읽어야 한다.\n\n임계 소식도 늘었지만 종류를 구분해야 한다. 시험로·연구로의 임계는 부지 확보와 인허가 경로가 발전로와 다르고, 계통에 전기를 보내는 일과는 남은 공정이 통째로 다르다. 민간 자본이 짧은 기간에 원자로를 세울 수 있다는 것은 입증됐지만, 그것이 곧 상업 발전로의 공기가 짧아졌다는 뜻은 아니다.\n\n중국 쪽에서는 같은 부지에서 대형로와 소형로가 나란히 진행되는 드문 비교가 성립했다. 소형화가 공기와 단가를 줄여줄 것이라는 기대와 실제 결과가 한 부지 안에서 엇갈린 것인데, 규제·부지·인력 조건이 동일하므로 이 비교는 설계 우열이 아니라 '작게 만들면 싸진다'는 전제 자체를 겨눈다.\n\n[시장 규모]\n기관별 추정치의 편차가 절대값보다 많은 것을 말해준다. 집계 범위에 부유식·해상 노형을 넣는지, 비경수형을 포함하는지에 따라 같은 해 시장이 30% 넘게 벌어지는데, 이는 SMR이 아직 '이미 형성된 시장'이 아니라 '정의에 따라 크기가 달라지는 시장'이라는 뜻이다. 현재 매출의 대부분은 발전이 아니라 설계·기자재·연료 계약에서 나오고, 발전 매출이 실제로 잡히는 시점은 서방 초호기의 계통연결 이후다.\n\n[투자 관점]\n상장 경로로 이 기술에 노출되는 방법은 크게 셋이다 — 연료(농축·TRISO), 주기기(대형 단조·압력용기), 설계·운영사. 이 중 연료와 주기기는 노형 선택과 무관하게 수요가 겹치고 캐파 증설에 수년이 걸려 병목의 가격이 그대로 붙는 자리이고, 설계사는 초호기 자금조달과 운전허가라는 이진 사건에 노출된 자리다. 뉴스 흐름과 현금흐름의 시차가 이 기술만큼 긴 분야도 드물다는 점 — 계약 체결과 인도 사이에 5년 이상이 놓이는 구조 — 이 투자 판단의 출발점이 돼야 한다.",
+    "watch_items": [
+      {
+        "label": "링룽 1호의 최초 임계·계통연결이 IAEA PRIS에 등재되는가",
+        "detail": "PRIS의 최초 임계·최초 계통연결 항목은 사업자 발표와 달리 되돌릴 수 없는 공식 기록이다. 이 두 칸이 채워지는 시점이 '세계 최초 육상 상용 SMR'의 실제 성립 시점이다.",
+        "not_signal": "'상업운전 임박' 발표나 시운전 시험 완료 소식. 이 사업은 마일스톤을 빠짐없이 홍보해 왔으므로 새 이정표 없는 낙관 발표는 일정 유지 주장에 가깝다."
+      },
+      {
+        "label": "피케톤 상용 농축 캐스케이드가 실제 착공·시운전에 들어가는가",
+        "detail": "비경수형 노형 전체의 일정이 이 라인의 실제 가동 시점에 걸려 있다. 자금 확보 시점과 가동 사이에 42개월이 놓이므로 착공 발표 자체가 2029년 목표의 성립 여부를 가른다.",
+        "not_signal": "신규 공급계약 체결·선불금 수령·연 생산 목표 톤수 재확인. 2026년 들어 계약은 셋이 늘었지만 인도 가능 톤수는 늘지 않았다."
+      },
+      {
+        "label": "케머러 Natrium 1호기가 2031년 2월 완공 일정을 유지하는가",
+        "detail": "이 사업은 과거 HALEU 공급망 붕괴로 이미 2년 이상 밀린 전례가 있다. 원자로섬 공정률과 연료 확보 일정이 함께 유지되는지가 핵심이다.",
+        "not_signal": "부지 굴착·타설 진행 사진, 인력 채용, 협력사 추가 선정. 비원자력 구역 공사는 원자로섬 공정과 별개로 진행된다."
+      },
+      {
+        "label": "비경수형 최초의 NRC 운전허가(Class 103)가 신청·발급되는가",
+        "detail": "건설허가와 별개인 마지막 규제 관문이며 비경수형 중 선례가 없다. 첫 신청 접수와 심사 일정 공표 자체가 남은 기간을 처음으로 추정 가능하게 만든다.",
+        "not_signal": "건설허가·표준설계승인의 추가 취득, 환경평가 통과, 시험로의 임계 달성. 모두 운전 관문 이전 단계이거나 규제 경로가 다른 사건이다."
+      },
+      {
+        "label": "도이체슈티가 1개 모듈 시험 후 나머지 5기 건설을 확정하는가",
+        "detail": "1개 모듈만 먼저 짓고 나머지를 유보한 구조여서, 5기 확정이 곧 초호기 비용이 학습효과로 내려간다는 전제의 첫 실측 검증이 된다.",
+        "not_signal": "최종투자결정(FID) 완료 재확인이나 정부 지원 발표. FID는 이미 통과했고 유보된 것은 그 다음 5기다."
+      }
+    ]
+  },
+  "sample": "smr"
+}

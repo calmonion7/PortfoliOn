@@ -1,0 +1,62 @@
+[
+  {
+    "field": "market_outlook.cagr_pct",
+    "action": "corrected",
+    "reason": "초안 12.0. 같은 출처가 제시한 626.4→1010(2025→2034, 9년)은 산술적으로 연 5.45%이고 Novaspace 공식 릴리스도 5.5%다 — 12%는 인용 오류이며 초안 내부에서도 자기모순이었다",
+    "severity": "high"
+  },
+  {
+    "field": "market_outlook.one_liner",
+    "action": "corrected",
+    "reason": "본문의 '연 12%'를 위 cagr_pct 정정과 맞춰 '연 5.5%'로 수정",
+    "severity": "high"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "removed",
+    "reason": "'09-02에는 94호기(Synspective)를 쐈다' — 스냅샷 API·뉴스·인용 출처 어디서도 확인되지 않는 날짜+고객명. 95회 누적이라는 핵심 주장은 유지",
+    "severity": "medium"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "removed",
+    "reason": "'HSR 대기 만료(08-12)·FCC 이전 신청(08-10)'의 날짜 2건 — 절차 진행 자체는 확인되나(SEC S-4/A 제출, SpaceX의 FCC 의견 제출 보도) 개별 날짜는 미확인이라 정성 서술로 낮춤",
+    "severity": "medium"
+  },
+  {
+    "field": "risks",
+    "action": "removed",
+    "reason": "'브릿지 36억달러' — 지분 약 60억·기업가치 약 81억은 딜 공시로 확인되나 브릿지 금액만 어떤 출처로도 확인되지 않아 삭제(자금조달 리스크 논지는 유지)",
+    "severity": "medium"
+  },
+  {
+    "field": "growth_plan",
+    "action": "removed",
+    "reason": "'연간 20%대 증가 궤도' — API에 발사 횟수 시계열이 없고 출처도 없는 파생 성장률. 확인 가능한 '2026년 들어 16회'만 남김",
+    "severity": "medium"
+  },
+  {
+    "field": "moat",
+    "action": "corrected",
+    "reason": "'2026년 4월 완료한 Mynaric 인수' → 완료 시점 미확인이라 날짜 제거, 인수 사실만 유지",
+    "severity": "low"
+  },
+  {
+    "field": "market_outlook.segments[0].note",
+    "action": "corrected",
+    "reason": "위와 동일 — Mynaric 인수 완료 시점 '2026년 4월' 제거",
+    "severity": "low"
+  },
+  {
+    "field": "risks",
+    "action": "corrected",
+    "reason": "Iridium 인수 대금에 '약'을 붙여 근사치임을 명시(딜 공시는 주당 54달러·총 약 80억달러 규모로 보도)",
+    "severity": "low"
+  },
+  {
+    "field": "recent_disclosures",
+    "action": "corrected",
+    "reason": "교환비 0.24~0.40주가 로켓랩 주가 연동 칼라 조건임을 명시(S-4/A: 67.50달러 이하 0.4000 / 112.50달러 이상 0.2400)",
+    "severity": "low"
+  }
+]
