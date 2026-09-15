@@ -453,3 +453,8 @@ Rules:
 - Mark intentional simplifications with a `ponytail:` comment naming the ceiling and upgrade path.
 
 Not lazy about: input validation at trust boundaries, error handling that prevents data loss, security, accessibility, anything explicitly requested.
+## 섀도 모드 (Shadow Mode)
+
+[[루틴]] 회차를 **프로덕션에 아무것도 쓰지 않고** 끝까지 돌리는 실행 방식. 루틴은 평소와 같은 프롬프트·API 읽기로 리포트를 작성하되, 마지막 단계의 발행·저장 호출(POST/PUT) 대신 그 요청 본문을 파일로 남긴다. 발행 API에 dry-run이 없는 이 저장소에서 실행기·모델을 A/B 비교하는 유일한 무쓰기 경로다. 섀도 산출물은 라우터의 요청 스키마로 로컬 검증되지만 발행물이 아니다.
+_Avoid_: "드라이런"(API 차원의 검증 모드가 아니라 루틴 지시 차원의 우회다), "테스트 발행"(발행이 일어나지 않는다)
+
