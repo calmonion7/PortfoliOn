@@ -25,6 +25,8 @@ BATCHES = [
         "timezone": "Asia/Seoul",
         "misfire_grace_time": 82800,
         "market": "KR",
+        "exchange": "XKRX",
+        "session_offset_days": 0,
         "default_schedule": {
             "enabled": False,
             "type": "weekly",
@@ -46,6 +48,8 @@ BATCHES = [
         "timezone": "Asia/Seoul",
         "misfire_grace_time": 82800,
         "market": "US",
+        "exchange": "XNYS",
+        "session_offset_days": -1,
         "default_schedule": {
             "enabled": False,
             "type": "weekly",

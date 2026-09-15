@@ -4,7 +4,7 @@ S3: storage.expected_report_date(market) / expected_report_dates() 시각인지 
 S4: /api/report/list 응답 last_scheduled_date 객체 형태 + 종목 추가 시 market별 기대날짜.
 """
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from unittest.mock import patch
@@ -167,6 +167,58 @@ def test_portfolio_add_kr_uses_kr_expected_date(monkeypatch):
         })
     assert resp.status_code == 201
     assert captured["date"] == "2026-06-12"
+
+
+# ── S4 (task#347): skip_holidays 스위치 — expected_report_date read-side 쌍둥이 ──────
+
+def test_expected_date_skip_holidays_on_falls_back_past_holiday(monkeypatch):
+    """스위치 on + 판정일이 휴장일 → 그 전 스케줄 요일로 폴백.
+
+    실행 시각은 계획서가 든 2026-09-25(금, 21:00 KST) 그대로 쓰되, 휴장 판정은
+    `market_session.is_session_day`를 목킹해 결정한다(실측: 실제 XKRX 캘린더는
+    2026-09-24도 휴장이라 계획서의 '9/25→9/24' 폴백 쌍은 실제 캘린더로는 재현되지
+    않는다 — 이 테스트는 목킹으로 폴백 로직 자체만 검증한다)."""
+    from services import market_session
+    fri_2100 = datetime(2026, 9, 25, 21, 0, tzinfo=_KST)
+    monkeypatch.setattr(storage.dates, "_now_kst", lambda: fri_2100)
+    monkeypatch.setattr(storage.dates, "get_batch_schedule",
+                        lambda jid: {**_sched("20:30", days=_WEEKDAYS), "skip_holidays": True})
+    monkeypatch.setattr(market_session, "exchange_for", lambda jid: "XKRX")
+    monkeypatch.setattr(market_session, "is_session_day",
+                        lambda exchange, d: d != date(2026, 9, 25))
+    assert storage.expected_report_date("KR") == "2026-09-24"
+
+
+def test_expected_date_skip_holidays_off_ignores_session_day(monkeypatch):
+    """대조군 — 스위치 off면 판정일이 휴장이어도 요일 필터만 적용(현행 그대로)."""
+    from services import market_session
+    fri_2100 = datetime(2026, 9, 25, 21, 0, tzinfo=_KST)
+    monkeypatch.setattr(storage.dates, "_now_kst", lambda: fri_2100)
+    monkeypatch.setattr(storage.dates, "get_batch_schedule",
+                        lambda jid: {**_sched("20:30", days=_WEEKDAYS), "skip_holidays": False})
+    monkeypatch.setattr(market_session, "exchange_for", lambda jid: "XKRX")
+    monkeypatch.setattr(market_session, "is_session_day",
+                        lambda exchange, d: d != date(2026, 9, 25))
+    assert storage.expected_report_date("KR") == "2026-09-25"
+
+
+def test_expected_date_no_exchange_ignores_skip_holidays(monkeypatch):
+    """exchange 미등록 job(session 판정 대상 아님)이면 skip_holidays on이어도 요일 필터만."""
+    from services import market_session
+    fri_2100 = datetime(2026, 9, 25, 21, 0, tzinfo=_KST)
+    monkeypatch.setattr(storage.dates, "_now_kst", lambda: fri_2100)
+    monkeypatch.setattr(storage.dates, "get_batch_schedule",
+                        lambda jid: {**_sched("20:30", days=_WEEKDAYS), "skip_holidays": True})
+    monkeypatch.setattr(market_session, "exchange_for", lambda jid: None)
+    called = {"is_session_day": False}
+
+    def _spy(exchange, d):
+        called["is_session_day"] = True
+        return False
+
+    monkeypatch.setattr(market_session, "is_session_day", _spy)
+    assert storage.expected_report_date("KR") == "2026-09-25"
+    assert called["is_session_day"] is False
 
 
 def test_watchlist_add_us_uses_us_expected_date(monkeypatch):

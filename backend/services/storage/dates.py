@@ -1,6 +1,8 @@
 # backend/services/storage/dates.py
 import logging
 
+from services import market_session
+
 from .schedule import get_batch_schedule
 
 logger = logging.getLogger(__name__)
@@ -37,11 +39,16 @@ def expected_report_date(market: str) -> str:
     time_parts = str(cfg.get("time", "00:00")).split(":")
     sched_hour, sched_minute = int(time_parts[0]), int(time_parts[1])
     past_today = (now.hour, now.minute) >= (sched_hour, sched_minute)
+    # skip_holidays 켜짐 + exchange 등록된 배치만 세션-일 필터를 추가로 통과해야 후보다
+    # (exchange 없는 배치는 세션 판정 대상이 아니므로 요일 필터만 — 현행 그대로).
+    exchange = market_session.exchange_for(job_id) if cfg.get("skip_holidays") else None
     for i in range(7):
         d = today - timedelta(days=i)
         if _DAY_ABBR[d.weekday()] not in enabled_days:
             continue
         if i == 0 and not past_today:
+            continue
+        if exchange and not market_session.is_session_day(exchange, d):
             continue
         return d.strftime("%Y-%m-%d")
     return today.strftime("%Y-%m-%d")

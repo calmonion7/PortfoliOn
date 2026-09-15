@@ -14,6 +14,11 @@ const TYPES = [
   { key: 'interval', label: '인터벌' },
 ]
 
+const HOLIDAY_HINT = {
+  XKRX: 'KRX 휴장일이면 건너뜁니다',
+  XNYS: 'NYSE 휴장일이면 건너뜁니다 — 전날 미국 세션 기준',
+}
+
 const numInputStyle = {
   background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
   color: 'var(--text)', fontSize: 14, fontFamily: 'inherit',
@@ -38,7 +43,7 @@ function withDefaults(type, prev) {
   return base
 }
 
-export default function BatchScheduleEditor({ jobId, schedule, timezone, onSaved }) {
+export default function BatchScheduleEditor({ jobId, schedule, timezone, exchange, onSaved }) {
   const [spec, setSpec] = useState(schedule || { enabled: false, type: 'daily', time: '08:00' })
   const [saved, setSaved] = useState(false)
   const [saveErr, setSaveErr] = useState('')
@@ -63,8 +68,12 @@ export default function BatchScheduleEditor({ jobId, schedule, timezone, onSaved
       if ((spec.every_minutes ?? 0) < 5) { setSaveErr('주기는 5분 이상이어야 합니다.'); return }
       if (spec.start_hour > spec.end_hour) { setSaveErr('시작 시각이 종료 시각보다 클 수 없습니다.'); return }
     }
+    // exchange 없는 배치엔 skip_holidays를 아예 안 실어 보낸다(422 방지·하위호환).
+    const payload = { ...spec }
+    if (exchange) payload.skip_holidays = !!spec.skip_holidays
+    else delete payload.skip_holidays
     try {
-      await api.put(`/api/batches/${jobId}/schedule`, spec)
+      await api.put(`/api/batches/${jobId}/schedule`, payload)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       onSaved?.(spec)
@@ -175,6 +184,22 @@ export default function BatchScheduleEditor({ jobId, schedule, timezone, onSaved
               </div>
             </div>
           </>
+        )}
+
+        {exchange && (
+          <div className="s-row" style={dim}>
+            <div>
+              <div className="title">휴장일 건너뛰기</div>
+              <div className="desc">{HOLIDAY_HINT[exchange]}</div>
+            </div>
+            <button
+              type="button"
+              data-testid="skip-holidays-switch"
+              className={`m-switch ${spec.skip_holidays ? 'on' : ''}`}
+              onClick={() => spec.enabled && set({ skip_holidays: !spec.skip_holidays })}
+              disabled={!spec.enabled}
+            />
+          </div>
         )}
 
         {timezone && (

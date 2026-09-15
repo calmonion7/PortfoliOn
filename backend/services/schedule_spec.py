@@ -21,6 +21,8 @@ def validate_schedule_spec(spec: dict) -> None:
         raise ValueError("spec must be a dict")
     if not isinstance(spec.get("enabled"), bool):
         raise ValueError("enabled must be a bool")
+    if "skip_holidays" in spec and not isinstance(spec["skip_holidays"], bool):
+        raise ValueError("skip_holidays must be a bool")
     typ = spec.get("type")
     if typ not in _TYPES:
         raise ValueError(f"invalid type: {typ!r} (expected one of {sorted(_TYPES)})")
@@ -79,15 +81,16 @@ def describe_schedule(spec: dict) -> str:
     if not spec.get("enabled"):
         return "자동실행 꺼짐"
     typ = spec["type"]
+    suffix = " · 휴장일 건너뜀" if spec.get("skip_holidays") else ""
     if typ == "interval":
-        return f"장중 {spec['start_hour']:02d}–{spec['end_hour']:02d}시 {spec['every_minutes']}분마다"
+        return f"장중 {spec['start_hour']:02d}–{spec['end_hour']:02d}시 {spec['every_minutes']}분마다{suffix}"
     time = spec["time"]
     if typ == "daily":
-        return f"매일 {time}"
+        return f"매일 {time}{suffix}"
     if typ == "weekly":
         days = set(spec["days"])
         labels = ",".join(_DAY_LABELS[d] for d in _DAY_ORDER if d in days)
-        return f"매주 {labels} {time}"
+        return f"매주 {labels} {time}{suffix}"
     if typ == "monthly":
-        return f"매월 {spec['day_of_month']}일 {time}"
+        return f"매월 {spec['day_of_month']}일 {time}{suffix}"
     raise ValueError(f"invalid type: {typ!r}")

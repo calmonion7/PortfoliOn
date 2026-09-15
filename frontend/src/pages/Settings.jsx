@@ -181,7 +181,7 @@ function BatchCard({ batch, isAdmin, onSaved }) {
           {showEditor || showExtra ? (
             <>
               {showEditor && (
-                <BatchScheduleEditor jobId={batch.id} schedule={batch.schedule} timezone={batch.timezone} onSaved={onSaved} />
+                <BatchScheduleEditor jobId={batch.id} schedule={batch.schedule} timezone={batch.timezone} exchange={batch.exchange} onSaved={onSaved} />
               )}
               {showExtra && <Extra />}
               {!showExtra && batch.manual_endpoint && (

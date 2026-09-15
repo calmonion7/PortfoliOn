@@ -231,6 +231,37 @@ def test_put_schedule_non_editable_404():
     assert resp.status_code == 404
 
 
+def test_put_schedule_skip_holidays_true_with_exchange_ok():
+    spec = {"enabled": True, "type": "weekly", "days": ["mon"], "time": "20:30", "skip_holidays": True}
+    with patch("routers.batches.storage.save_batch_schedule") as save, \
+         patch("routers.batches.scheduler.reload"):
+        resp = admin_client.put("/api/batches/daily_report_kr/schedule", json=spec)
+    assert resp.status_code == 200
+    save.assert_called_once_with("daily_report_kr", spec)
+
+
+def test_put_schedule_skip_holidays_true_without_exchange_422():
+    spec = {"enabled": True, "type": "daily", "time": "07:00", "skip_holidays": True}
+    with patch("routers.batches.storage.save_batch_schedule") as save, \
+         patch("routers.batches.scheduler.reload") as reload_:
+        resp = admin_client.put("/api/batches/leverage_fetch/schedule", json=spec)
+    assert resp.status_code == 422
+    save.assert_not_called()
+    reload_.assert_not_called()
+
+
+def test_list_batches_exposes_exchange():
+    with patch("routers.batches.job_runs.recent", return_value=[]), \
+         patch("routers.batches.storage.get_batch_schedule", return_value=None), \
+         patch.object(__import__("scheduler"), "_scheduler") as mock_sched:
+        mock_sched.get_job.return_value = None
+        resp = client.get("/api/batches")
+    data = {b["id"]: b for b in resp.json()}
+    assert data["daily_report_kr"]["exchange"] == "XKRX"
+    assert data["daily_report_us"]["exchange"] == "XNYS"
+    assert data["leverage_fetch"]["exchange"] is None
+
+
 def test_put_schedule_blocked_for_non_admin():
     """require_admin 미오버라이드 앱: 비-admin role이면 403."""
     spec = {"enabled": True, "type": "daily", "time": "08:00"}

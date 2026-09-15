@@ -174,6 +174,7 @@ def _parse_hhmm(spec: dict):
 def _check_missed_report_for(job_id: str, market: str):
     from datetime import datetime
     from services.db import query as db_query
+    from services import market_session
     cfg = storage.get_batch_schedule(job_id)
     if not cfg or not cfg.get("enabled"):
         return
@@ -181,6 +182,15 @@ def _check_missed_report_for(job_id: str, market: str):
     day_abbr = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
     if day_abbr not in cfg.get("days", []):
         return
+    if cfg.get("skip_holidays"):
+        session_date = market_session.session_date_for(job_id, now)
+        if session_date is not None:
+            exchange = market_session.exchange_for(job_id)
+            if not market_session.is_session_day(exchange, session_date):
+                logger.info(
+                    f"[Scheduler] {job_id} 휴장일({exchange} {session_date}) — 기동 누락복구 생략"
+                )
+                return
     # `_reschedule_job`의 가드가 이 스펙에 **적용되지 않는다** — 그쪽은 잡 등록만 건너뛰고
     # 이 함수는 같은 행을 독립적으로 다시 읽는다. 여기서 판정하지 않으면 깨진
     # daily_report 행 하나가 기동을 통째로 죽인다(days에 오늘 요일이 없으면 위에서 조기

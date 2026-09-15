@@ -488,3 +488,86 @@ def test_seed_survives_non_value_error_from_validator(monkeypatch):
     sched_mod._seed_batch_schedules()                  # raise하면 red
 
     assert store["monthly_kr"] == batch_registry.get_batch("monthly_kr")["default_schedule"]
+
+
+# ── task#347 S4: `_check_missed_report_for` skip_holidays 기동복구 ────────────────
+# `now`(실행 시각)는 실제 현재 시각을 그대로 쓴다 — `_ALL_DAYS`+`time:"00:00"`로
+# 요일·시각 무관 통과시키는 기존 파일 관례(위 B71 테스트들과 동일)를 그대로 따르고,
+# 세션 판정일 자체는 `market_session.session_date_for`를 목킹해 고정한다(실제
+# `datetime.datetime.now`를 몽키패치하지 않는다 — 전역 stdlib 타입 치환은 이 테스트가
+# 지지 않아도 될 위험을 진다).
+
+
+def test_missed_report_skips_when_session_date_is_holiday(monkeypatch):
+    """skip_holidays on + 판정일 휴장 → generate_report_with_retry 0회·DB 조회도 안 함."""
+    from unittest.mock import patch
+    from services import market_session
+    monkeypatch.setattr(
+        storage, "get_batch_schedule",
+        lambda jid: {"enabled": True, "type": "weekly", "days": _ALL_DAYS, "time": "00:00",
+                     "skip_holidays": True},
+    )
+    monkeypatch.setattr(market_session, "session_date_for",
+                        lambda jid, now: _dt.date(2026, 9, 25))
+    monkeypatch.setattr(market_session, "exchange_for", lambda jid: "XKRX")
+    monkeypatch.setattr(market_session, "is_session_day", lambda exchange, d: False)
+    seen: list = []
+    import services.db as db_mod
+    monkeypatch.setattr(db_mod, "query", lambda *a, **k: seen.append(1) or [])
+
+    with patch("services.report_generator.generate_report_with_retry") as mock_gen:
+        sched_mod._check_missed_report_for("daily_report_kr", "KR")
+
+    assert mock_gen.call_count == 0
+    assert seen == []  # 휴장 판정에서 return — 스냅샷 조회까지 가지 않는다
+
+
+def test_missed_report_runs_when_skip_holidays_off_control(monkeypatch):
+    """대조군 — 스위치 off면 세션 판정일이 휴장이어도 기존대로(스냅샷 조회까지 진행)."""
+    from services import market_session
+    monkeypatch.setattr(
+        storage, "get_batch_schedule",
+        lambda jid: {"enabled": True, "type": "weekly", "days": _ALL_DAYS, "time": "00:00",
+                     "skip_holidays": False},
+    )
+    monkeypatch.setattr(market_session, "session_date_for",
+                        lambda jid, now: _dt.date(2026, 9, 25))
+    monkeypatch.setattr(market_session, "is_session_day", lambda exchange, d: False)
+    seen: list = []
+
+    def fake_query(sql, params=None):
+        seen.append(sql)
+        return []
+
+    import services.db as db_mod
+    monkeypatch.setattr(db_mod, "query", fake_query)
+
+    sched_mod._check_missed_report_for("daily_report_kr", "KR")
+
+    assert seen and "user_stocks" in seen[0]
+
+
+def test_missed_report_no_exchange_job_ignores_skip_holidays(monkeypatch):
+    """exchange 미등록 job(session_date_for None) → skip_holidays on이어도 판정 자체를 안 함."""
+    from services import market_session
+    monkeypatch.setattr(
+        storage, "get_batch_schedule",
+        lambda jid: {"enabled": True, "type": "weekly", "days": _ALL_DAYS, "time": "00:00",
+                     "skip_holidays": True},
+    )
+    monkeypatch.setattr(market_session, "session_date_for", lambda jid, now: None)
+    called = {"is_session_day": False}
+
+    def _spy(exchange, d):
+        called["is_session_day"] = True
+        return False
+
+    monkeypatch.setattr(market_session, "is_session_day", _spy)
+    seen: list = []
+    import services.db as db_mod
+    monkeypatch.setattr(db_mod, "query", lambda sql, params=None: seen.append(sql) or [])
+
+    sched_mod._check_missed_report_for("daily_report_kr", "KR")
+
+    assert called["is_session_day"] is False
+    assert seen and "user_stocks" in seen[0]

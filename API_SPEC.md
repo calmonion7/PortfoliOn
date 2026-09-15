@@ -2632,7 +2632,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(33종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다.
+자동 배치(34종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다. 세션 판정 거래소가 등록된 배치(`daily_report_kr`·`daily_report_us`)는 `exchange` 필드를 가지며, 그 배치의 스케줄 스펙에 `skip_holidays: true`를 설정하면 세션 판정일이 해당 거래소 휴장일일 때 실행을 건너뛴다(아래 PUT 참조).
 
 > 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 내부자·5%지분 공시 신호 수집 `insider_fetch`(매일 07:45 KST, `market="KR"` — DART 출처)는 수동 트리거 `POST /api/report/insider-trades/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다. 환율 수집 `fx_fetch`(매일 06:40 KST, `market="공통"` — 교차통화·다시장 소비)는 수동 트리거 `POST /api/market/refresh-fx`를 가지며, 이 배치가 없으면 `market_cache`의 `fx` 키를 갱신하는 주체가 없어 포트폴리오 KRW 환산이 무기한 stale해진다(요청경로 증분은 시장지표 탭을 열어야 돌고, `get_or_refresh`의 ttl은 저장값에 걸리지 않는다).
 
@@ -2653,9 +2653,31 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     "scheduler_job_id": "daily_digest",
     "manual_endpoint": "/api/digest/generate-all",
     "trigger_kinds": ["auto", "manual"],
+    "exchange": null,
     "next_run": "2026-06-08T08:00:00+09:00",
     "recent_runs": [],
     "schedule": { "enabled": true, "type": "daily", "time": "08:00" }
+  },
+  {
+    "id": "daily_report_kr",
+    "label": "일일 리포트 생성(국내)",
+    "category": "report",
+    "market": "KR",
+    "source": ["키움", "KIS", "Naver", "FnGuide"],
+    "usage": ["리포트 탭"],
+    "editable": true,
+    "timezone": "Asia/Seoul",
+    "scheduler_job_id": "daily_report_kr",
+    "manual_endpoint": null,
+    "trigger_kinds": ["auto", "manual"],
+    "exchange": "XKRX",
+    "next_run": "2026-09-16T20:30:00+09:00",
+    "recent_runs": [],
+    "schedule": {
+      "enabled": true, "type": "weekly",
+      "days": ["mon", "tue", "wed", "thu", "fri"], "time": "20:30",
+      "skip_holidays": true
+    }
   }
 ]
 ```
@@ -2666,9 +2688,10 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `source` | string[] | 배치가 데이터를 fetch하는 출처(예: `["키움", "KIS", "Naver"]`). 소비 UI인 `usage`와 반대 방향(fetch vs. 사용처) |
 | `editable` | boolean | 스케줄 편집 가능 여부 |
 | `timezone` | string | 잡 타임존(편집 불가 고정값). 편집 가능 배치에만 존재 |
-| `schedule` | object \| null | 현재 스케줄 스펙(저장값 없으면 기본 스펙). 편집 불가 배치(`consensus`)는 `null` |
+| `exchange` | string \| null | 세션 판정 거래소(`"XKRX"` \| `"XNYS"`). 등록된 배치(`daily_report_kr`·`daily_report_us`)만 `schedule.skip_holidays`를 켤 수 있다. 없으면 `null` |
+| `schedule` | object \| null | 현재 스케줄 스펙(저장값 없으면 기본 스펙). 편집 불가 배치(`consensus`)는 `null`. 선택 필드 `skip_holidays`(bool)가 켜져 있으면 세션 판정일이 `exchange` 거래소 휴장일일 때 실행을 건너뛴다 |
 
-> 편집 불가 배치 `consensus`에는 `editable`/`timezone`/`schedule` 관련 필드가 없거나 `schedule: null`이다.
+> 편집 불가 배치 `consensus`에는 `editable`/`timezone`/`schedule` 관련 필드가 없거나 `schedule: null`이다. `skip_holidays`가 켜진 배치는 `schedule_desc`에도 "· 휴장일 건너뜀" 접미가 붙는다(예: `"매주 월,화,수,목,금 20:30 · 휴장일 건너뜀"`).
 
 ---
 
@@ -2733,13 +2756,16 @@ FOMC 정책결정일 하드코딩 목록(`calendar._FOMC_DATES`)의 커버리지
 | `day_of_month` | int | monthly: 1~31 |
 | `every_minutes` | int | interval: ≥ 5 |
 | `start_hour` / `end_hour` | int | interval: 0~23, `start_hour ≤ end_hour` |
+| `skip_holidays` | boolean | 선택. `true`면 세션 판정일이 배치의 `exchange` 거래소 휴장일일 때 실행을 건너뛰고 `job_runs`에 `skipped`로 남긴다(루틴 fire도 안 나감). `exchange`가 등록되지 않은 배치에 `true`를 보내면 422 |
 
 > 타임존은 배치별 고정값(편집 불가). `us_rankings_fetch`만 `America/New_York`, 나머지는 `Asia/Seoul`.
+> `skip_holidays`가 유효한 배치는 현재 `daily_report_kr`(`exchange: "XKRX"`)·`daily_report_us`(`exchange: "XNYS"`)뿐이다. 생략하거나 `false`로 보내면 기존과 동일하게 동작(하위호환).
 
 **Response `200`** — 저장된 스케줄 스펙 그대로 반환
 
 **Error `400`** — 스펙 검증 실패(잘못된 `type`/`time`/`days`/`day_of_month`/`every_minutes`/시간 범위 등)
 **Error `404`** — 알 수 없는 `job_id` 또는 편집 불가 배치(`consensus`)
+**Error `422`** — `skip_holidays: true`인데 해당 배치에 등록된 `exchange`가 없음
 
 ---
 

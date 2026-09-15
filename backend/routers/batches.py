@@ -68,6 +68,7 @@ def list_batches(user_id: str = Depends(get_current_user)):
             "next_run": _next_run(b["scheduler_job_id"]),
             "recent_runs": job_runs.recent(b["id"]),
             "schedule": sched,
+            "exchange": b.get("exchange"),
         })
     return out
 
@@ -103,6 +104,11 @@ def update_batch_schedule(
         validate_schedule_spec(schedule)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if schedule.get("skip_holidays") and not entry.get("exchange"):
+        raise HTTPException(
+            status_code=422,
+            detail=f"skip_holidays requires a registered exchange for batch: {job_id}",
+        )
     storage.save_batch_schedule(job_id, schedule)
     scheduler.reload(job_id)
     return schedule

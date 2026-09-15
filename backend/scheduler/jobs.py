@@ -14,9 +14,39 @@ def _in_market(stock: dict, market: str) -> bool:
     return (m == "KR") if market == "KR" else (m != "KR")
 
 
+def _holiday_skip(job_id: str, run) -> bool:
+    """스펙의 `skip_holidays`가 켜져 있고 세션 판정일이 휴장일이면 `run`을 skipped로 남기고 True.
+
+    스펙 조회 실패는 판정을 생략한다(기존대로 실행) — 스케줄 저장 조회 오류로 배치 자체가
+    막히면 안 된다. `exchange`가 없는(registry 미등록) job은 `session_date_for`가 None을
+    주므로 판정 자체를 하지 않는다."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from services import market_session
+    try:
+        spec = storage.get_batch_schedule(job_id)
+    except Exception as e:
+        logger.warning(f"[Scheduler] {job_id} 스케줄 스펙 조회 실패, 휴장일 판정 생략: {e}")
+        return False
+    if not spec or not spec.get("skip_holidays"):
+        return False
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    session_date = market_session.session_date_for(job_id, now)
+    if session_date is None:
+        return False
+    exchange = market_session.exchange_for(job_id)
+    if market_session.is_session_day(exchange, session_date):
+        return False
+    run.set_status("skipped", f"휴장일({exchange} {session_date}) — 건너뜀")
+    logger.info(f"[Scheduler] {job_id} 휴장일({exchange} {session_date}) — 건너뜀")
+    return True
+
+
 def _generate_all(market: str, job_id: str):
     from services.db import query
-    with job_runs.record(job_id, "auto"):
+    with job_runs.record(job_id, "auto") as run:
+        if _holiday_skip(job_id, run):
+            return
         user_ids = list({r["user_id"] for r in query("SELECT DISTINCT user_id FROM user_stocks")})
         all_stocks: dict = {}
         for user_id in user_ids:

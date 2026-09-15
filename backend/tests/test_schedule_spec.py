@@ -45,6 +45,27 @@ def test_enabled_not_bool_rejected():
         validate_schedule_spec({"enabled": "yes", "type": "daily", "time": "08:00"})
 
 
+# ── skip_holidays (선택 bool) ─────────────────────────────────────────────────
+
+def test_skip_holidays_absent_is_valid():
+    validate_schedule_spec({"enabled": True, "type": "daily", "time": "08:00"})
+
+
+def test_skip_holidays_true_valid():
+    validate_schedule_spec({"enabled": True, "type": "daily", "time": "08:00", "skip_holidays": True})
+
+
+def test_skip_holidays_false_valid():
+    validate_schedule_spec({"enabled": True, "type": "daily", "time": "08:00", "skip_holidays": False})
+
+
+def test_skip_holidays_non_bool_rejected():
+    with pytest.raises(ValueError):
+        validate_schedule_spec(
+            {"enabled": True, "type": "daily", "time": "08:00", "skip_holidays": "yes"}
+        )
+
+
 def test_unknown_type_rejected():
     with pytest.raises(ValueError):
         validate_schedule_spec({"enabled": True, "type": "hourly", "time": "08:00"})
@@ -271,6 +292,15 @@ def test_describe_monthly():
     assert describe_schedule(
         {"enabled": True, "type": "monthly", "day_of_month": 5, "time": "08:00"}
     ) == "매월 5일 08:00"
+
+
+def test_describe_suffix_when_skip_holidays_on():
+    assert describe_schedule(
+        {"enabled": True, "type": "daily", "time": "08:00", "skip_holidays": True}
+    ) == "매일 08:00 · 휴장일 건너뜀"
+    assert describe_schedule(
+        {"enabled": True, "type": "weekly", "days": ["mon"], "time": "08:00", "skip_holidays": False}
+    ) == "매주 월 08:00"
 
 
 def test_describe_interval():
