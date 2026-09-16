@@ -46,3 +46,13 @@ decided: 2026-09-16 13:26
 - 야간이 죽은 날의 안전망이던 07:05·20:42 rolling enrich는 그대로 두되, 이제 관심-only 109종목이 그 rolling의 대상으로 다시 잡힐 수 있다(7일 게이트·회당 5종목). 이는 **의도된 잔여 소비**(하루 최대 10종목)이며, 이것까지 끊으려면 rolling §1을 갱신 대상 집합으로 좁히는 후속이 필요하다 — 이번엔 하지 않는다.
 - 야간 배치의 `success`는 여전히 「fire 접수」다(ADR `260913` §결과). 이 ADR은 대상 종목 수·목록을 잡 로그에 남기고, 실제 갱신은 `enrich_history`로 관측한다.
 - 온디맨드 in-flight 가드는 백엔드 프로세스 인메모리(TTL 15분)다 — 재기동에 소실되지만 결과는 중복 fire 1회일 뿐이고 멱등이다.
+
+## 이행 (2026-09-16, fg-loop 드라이브 task#354·#355·#356)
+
+- **구현 커밋**: 백엔드 `b3b75c5`(task#354 — `services/enrich_targets.py` · `_run_nightly_enrich` · `POST /api/stocks/{ticker}/enrich/request` · 명칭 정정) · 프론트 `1d101bd`(task#355 — `hooks/useEnrichOnDemand.js` + `Reports.jsx` 배선).
+- **결정 1 이행 세부**: 열람 종목은 **추적 종목(user_stocks)으로 제한**해 합집합에 넣는다 — enrich는 `tickers` 행에 쓰이고 그 행은 추적으로 생기므로 미추적 종목에 쏘면 저장할 곳이 없다. 라이브 실측(배포 후): 독립 SQL 대조 `MATCH n=17` — 결정문의 17종목과 일치. 대상 수·정렬 목록은 `[Scheduler] Nightly enrich fired (N종목): …` INFO 로그로 남는다.
+- **결정 2 이행 세부**: 응답 `reason`은 5종 — `stale`(=fired) · `fresh` · `in_flight` · `unconfigured` · `fire_failed`(in-flight를 남기지 않아 재시도 가능). in-flight 가드는 sync 핸들러가 스레드풀에서 병렬이라 `threading.Lock`으로 판정-후-기록을 묶었다. 라이브 스모크(부작용 0 — 7일 내 갱신된 종목으로 호출): 무토큰 401 · fresh 200 `{fired:false, reason:'fresh'}` · 없는 종목 404 — 6/6.
+- **결정 3 이행 세부**: 폴링 상한 = 30초 × **30틱(15분)** · 연속 실패 **3회** · 언마운트/종목 변경 시 중단. 완료 판정 baseline은 **첫 폴의 `enriched_at`**(부모 상세 상태는 비동기라 「미조회 null」과 「진짜 null」을 구별 못 한다). `fired:false`와 POST 실패(옛 백엔드 404 포함)는 조용히 끝낸다.
+- **명칭**: 배치 라벨 「야간 사업분석 갱신 (갱신 대상 집합)」 · 루틴 프롬프트의 모드명은 「[대상 지정 모드]」(야간과 온디맨드가 같은 모드로 오므로 「야간」도 부적절) · `nightly_text()` 본문 「대상 지정 enrich 회차 — …」.
+- **첫 야간 런**은 배포(09-16 18시대 KST) 다음 02:00이다 — 그 전에 `job_runs`에 행이 없는 것은 미발화가 아니라 정상(루트 CLAUDE.md task#346).
+- **부수 관측(코드와 무관)**: 09-16 17:47 배포 재기동 뒤 Docker의 `127.0.0.1:80` 포워딩이 `connection reset`을 내 라이브가 502였고, `deploy.sh`의 nginx rm+run 재실행으로는 회복되지 않았으며 `docker stop/start portfolion-nginx-1`로 회복됐다(09-15 12:50 배포 뒤에도 2분간 같은 증상). 회고 승급 후보.
