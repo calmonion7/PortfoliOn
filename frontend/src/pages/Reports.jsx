@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 import useReportFilters from '../hooks/useReportFilters'
 import useStockManagement from '../hooks/useStockManagement'
 import useReportGeneration from '../hooks/useReportGeneration'
+import useEnrichOnDemand from '../hooks/useEnrichOnDemand'
 import usePortfolioData from '../hooks/usePortfolioData'
 import useIsMobile from '../hooks/useIsMobile'
 import { Plus } from '../components/ui/icons'
@@ -82,7 +83,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
    *  상태가 안 바뀌어 이펙트를 다시 태우지 못한다 — 그래서 별도 카운터가 필요하다. */
   const [othersReloadKey, setOthersReloadKey] = useState(0)
   const [view, setView] = useState('list')
-  const [detailRefreshKey] = useState(0)
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
 
   // 필터/정렬 파생 — useReportFilters 훅으로 추출(R4 part 1/2, ADR-0019)
   const {
@@ -160,6 +161,13 @@ export default function Reports({ initialTicker = null, navKey = null }) {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [selected, detailRefreshKey])
+
+  // 온디맨드 갱신 (ADR 260916-132605) — 상세 진입 종목이 묵어 있으면 루틴에 갱신을 요청하고, 완료되면
+  // 토스트 + 상세 재조회(`detailRefreshKey`가 위 이펙트를 다시 태운다). 판정·게이트는 서버 몫.
+  useEnrichOnDemand({
+    ticker: selected.ticker, date: selected.date,
+    onRefreshed: () => setDetailRefreshKey(k => k + 1),
+  })
 
   const openDetail = (ticker, date) => {
     setSelected({ ticker, date })
