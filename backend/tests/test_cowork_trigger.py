@@ -109,12 +109,23 @@ def _run_nightly(monkeypatch, *, portfolio, configured=True, fire_ok=True):
 
 
 def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
-    """보유+관심 합집합을 중복 없이·정렬해 싣고, muse-spark(OpenCode 무료)·chunk 5로 발사한다.
+    """보유+관심 합집합을 중복 없이·정렬해 싣고, **opus**·chunk 5로 발사한다.
 
-    task#345 A/B로 opus를 확정했었으나(sonnet이 사실오류를 5/7필드에 전파), 2026-09-15
-    야간 레인을 `opencode/muse-spark-1.3-contributor-free`(무료, task#348)로 전환했다 —
-    주간 한도로 opus 8런이 즉사하는 문제 + 무료 모델은 한도가 별개 예산이라서다. 07:05·20:42
-    발행 레인(리스너 DEFAULT_MODEL)은 opus 그대로다. 품질은 후속 A/B로 재판정한다.
+    모델 이력: task#345가 A/B로 opus를 확정 → task#348이 무료 모델(muse-spark)로 전환 →
+    **task#350 A/B로 opus 복귀**(2026-09-16, 사용자 결정 「품질이 중요하니」).
+
+    복귀 근거 두 가지:
+    ① 품질 — 20표본 3팔 섀도 A/B에서 muse 산출물에 **20/20 표본 전부 결함**이 있었다
+       (표본당 3~16건, high 63건). 지어낸 출처(존재할 수 없는 「SK하이닉스 20-F」)·반대로
+       말한 사실·자기 산식과 어긋나는 결론이 반복됐고, 무엇보다 muse는 20세션에서
+       **외부 웹 조사를 0회** 했다(같은 과제에서 opus는 63회).
+    ② task#348이 전환 근거로 든 「주간 한도로 opus 8런 즉사」는 **청크 분할 이전(9/8~9/11)의
+       실측**이다. 청크 적용 후 09-14 야간 opus는 27세션으로 126/126 종목을 완주했고
+       한도 마커가 0건이었다 — 기각 사유가 이미 낡아 있었다.
+
+    07:05·20:42 발행 레인(리스너 DEFAULT_MODEL)은 줄곧 opus였고 무변경이다.
+    ⚠️ 한도로 죽으면 배치현황은 초록인 채 95%가 미갱신일 수 있다(ADR 260913-013425 §46) —
+    관측은 `~/portfolion-routine-runs/` 디렉터리 수와 `enriched_at` 분포로 한다.
     """
     run, fired, seen = _run_nightly(monkeypatch, portfolio={
         "stocks": [{"ticker": "AAPL"}, {"ticker": "005930"}],
@@ -122,7 +133,7 @@ def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
     })
     assert seen == ("cowork_enrich_nightly", "auto")
     assert fired["tickers"] == ["005930", "AAPL", "NVDA"]
-    assert fired["model"] == "opencode/muse-spark-1.3-contributor-free" and fired["chunk"] == 5
+    assert fired["model"] == "opus" and fired["chunk"] == 5
     assert run.status is None  # 성공은 set_status를 부르지 않는다(기본 success)
 
 
