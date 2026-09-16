@@ -18,6 +18,10 @@ from services import consensus as consensus_svc
 from services import job_runs
 from services import dividends
 from services import supply_score
+from services import cowork_trigger
+import threading
+import time
+from datetime import datetime, timedelta, timezone
 from services import insider_trades
 from services.market_indicators.cache import _mc_load
 from auth import get_current_user, get_current_user_or_api_key, _API_KEY_USER_ID, require_admin, require_admin_or_api_key
@@ -556,6 +560,50 @@ def enrich_single(ticker: str, body: EnrichBody, user_id: str = Depends(require_
     if not ok:
         raise HTTPException(status_code=404, detail="Ticker not found")
     return {"ticker": ticker.upper(), "updated": list(fields.keys())}
+
+
+# ── 온디맨드 갱신 (ADR 260916-132605 결정 2) ────────────────────────────────
+# 종목당 진행 중 요청 1건 가드 — 프로세스 인메모리(TTL 15분). 재기동에 소실되지만 결과는
+# 중복 fire 1회일 뿐이고 멱등이다. sync `def` 핸들러는 스레드풀에서 병렬 실행되므로
+# 「판정-후-기록」은 락으로 묶는다(루트 CLAUDE.md 동시성 항목, task#336).
+_ENRICH_INFLIGHT: dict = {}
+_ENRICH_INFLIGHT_LOCK = threading.Lock()
+_ENRICH_INFLIGHT_TTL = 15 * 60
+_ENRICH_STALE_DAYS = 7  # rolling enrich §1과 같은 값 — 저장소의 신선도 기준은 하나다
+
+
+@router.post("/{ticker}/enrich/request")
+def request_enrich(ticker: str, user_id: str = Depends(get_current_user)):
+    """사용자가 리포트 상세를 열 때 호출 — 묵은(7일 초과·미분석) 종목만 루틴에 갱신을 요청한다.
+
+    읽기 경로(GET 상세)에서 몰래 fire하지 않고 별도 POST로 분리한 이유: 읽기에 쓰기 부작용을
+    숨기지 않기 위해서다. 응답은 항상 `{fired, reason}` — reason ∈
+    unconfigured · fresh · in_flight · stale(=fired) · fire_failed.
+    """
+    t = ticker.upper()
+    rows = query("SELECT enriched_at FROM tickers WHERE ticker = %s", (t,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Ticker not found")
+    if not cowork_trigger.configured():
+        return {"fired": False, "reason": "unconfigured"}
+    enriched_at = rows[0].get("enriched_at")
+    if enriched_at is not None:
+        if enriched_at.tzinfo is None:
+            enriched_at = enriched_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - enriched_at < timedelta(days=_ENRICH_STALE_DAYS):
+            return {"fired": False, "reason": "fresh"}
+    now = time.time()
+    with _ENRICH_INFLIGHT_LOCK:
+        until = _ENRICH_INFLIGHT.get(t)
+        if until is not None and until > now:
+            return {"fired": False, "reason": "in_flight"}
+        _ENRICH_INFLIGHT[t] = now + _ENRICH_INFLIGHT_TTL
+    ok = cowork_trigger.fire(cowork_trigger.nightly_text(), tickers=[t], model="opus", chunk=1)
+    if not ok:
+        with _ENRICH_INFLIGHT_LOCK:
+            _ENRICH_INFLIGHT.pop(t, None)
+        return {"fired": False, "reason": "fire_failed"}
+    return {"fired": True, "reason": "stale"}
 
 
 @router.delete("/dashboard/cache")

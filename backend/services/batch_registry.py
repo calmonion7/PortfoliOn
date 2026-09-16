@@ -471,7 +471,7 @@ BATCHES = [
     },
     {
         "id": "cowork_enrich_nightly",
-        "label": "야간 전량 사업분석 갱신",
+        "label": "야간 사업분석 갱신 (갱신 대상 집합)",
         "category": "report",
         "schedule_desc": "매일 02:00",
         "usage": ["사업분석 탭"],

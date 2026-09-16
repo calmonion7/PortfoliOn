@@ -344,12 +344,12 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 { "text": "005930 enrich 후 애널리스트 리포트 발행" }
 ```
 
-리스너로 전달되는 본문은 3필드를 **선택적으로(additive)** 더 받는다 — 스케줄러의 야간 전량 회차(`cowork_enrich_nightly`)가 쓰는 경로이며, 이 admin 엔드포인트 자체는 `text`만 받는다. 세 키는 **생략 시 payload에서 통째로 빠진다**(구버전 리스너 무회귀).
+리스너로 전달되는 본문은 3필드를 **선택적으로(additive)** 더 받는다 — 스케줄러의 야간 갱신 회차(`cowork_enrich_nightly`, 대상 = 갱신 대상 집합)와 온디맨드 갱신(`POST /api/stocks/{ticker}/enrich/request`)이 쓰는 경로이며, 이 admin 엔드포인트 자체는 `text`만 받는다. 세 키는 **생략 시 payload에서 통째로 빠진다**(구버전 리스너 무회귀).
 
 | 필드 | 타입 | 기본 | 설명 |
 |---|---|---|---|
 | `tickers` | `string[]` | 없음(생략) | 전량 모드 대상 종목. **있으면** 리스너가 `chunk`개씩 잘라 세션을 **순차** 스폰하고, 각 세션 프롬프트에 `[대상 종목]` 블록으로 자기 청크만 싣는다. 없으면 기존대로 1세션 논블로킹 스폰. |
-| `model` | `string` | `"opus"` | 세션 모델 — `/` 포함이면 리스너가 OpenCode(`opencode run -m <model> --auto`)로, 아니면 기존 `claude -p --model <model>`로 스폰한다(task#348). 07:05·20:42 회차·admin 수동 fire는 `"opus"`(task#345 A/B 대조로 확정), 야간 전량 회차(`cowork_enrich_nightly`)는 `"opencode/muse-spark-1.3-contributor-free"`(무료 모델, task#348). |
+| `model` | `string` | `"opus"` | 세션 모델 — `/` 포함이면 리스너가 OpenCode(`opencode run -m <model> --auto`)로, 아니면 기존 `claude -p --model <model>`로 스폰한다(task#348). 07:05·20:42 회차·admin 수동 fire·야간 갱신 회차(`cowork_enrich_nightly`)·온디맨드 갱신 모두 `"opus"`(task#345 A/B 대조로 확정 → 야간도 task#350에서 opus로 복귀; task#348의 무료 모델 시도는 그때 철회됐다). |
 | `chunk` | `int` | `5` | 청크당 종목 수. |
 
 **Response `200`**
@@ -1174,6 +1174,36 @@ Claude Code 루틴 수동 fire (ADR-0028 이벤트 구동 분석 파이프라인
 | `size_forecast.year` < `size_current.year` | 전망 연도가 현재보다 앞서면 "현재→예상" 대조와 CAGR이 무의미하다 |
 
 > **강제하지 *않는* 것**(기입 지침이지 스키마가 아니다) — `sources` 존재 · 부문 5개 상한 · `Σ revenue_share_pct ≤ 100`(프론트가 금액만 생략하고 graceful 처리) · `size_current`/`size_forecast`의 `unit` 동일성(라이브에 표기가 미세하게 다른 판이 5건 있다). 이 항목들을 강제하면 **기존에 성공하던 발행이 막힌다**.
+
+---
+
+### `POST /api/stocks/{ticker}/enrich/request`
+
+**온디맨드 갱신** 요청 (ADR `260916-132605` 결정 2) — 사용자가 리포트 상세를 열 때 프론트가 부른다. 서버는 그 종목의 사업분석이 **묵어 있을 때만**(`tickers.enriched_at`이 null 또는 7일 초과) 루틴에 `fire(tickers=[ticker], model="opus", chunk=1)`를 쏜다. 야간 갱신 회차(`cowork_enrich_nightly`)의 정의역인 갱신 대상 집합(보유 ∪ 30일 열람) 밖의 종목이 콜드스타트에 갇히지 않게 하는 경로다 — 이 호출로 `report_view_open` 열람 이벤트가 남으므로 그 종목은 다음 날부터 야간 집합에 들어온다.
+
+**Auth:** Bearer token 필요 (`get_current_user` — 로그인 사용자 전원). 비용 상한은 7일 게이트(종목당 최대 주 1회)와 정의역(추적 종목)이 묶는다.
+
+**Path Parameter:** `ticker` — 종목 코드 (대소문자 무관)
+
+**Request Body:** 없음
+
+**Response `200`** — 항상 두 키
+```json
+{ "fired": true, "reason": "stale" }
+```
+
+| `fired` | `reason` | 뜻 |
+|---|---|---|
+| `true` | `stale` | `enriched_at` null 또는 7일 초과 → 루틴에 갱신 요청을 보냈다. 실제 갱신은 수 분 뒤 비동기로 일어나며 완료는 `GET /api/report/{ticker}/{date}`의 `enriched_at` 변화로 관측한다 |
+| `false` | `fresh` | 7일 이내에 갱신됨 — 보내지 않았다 |
+| `false` | `in_flight` | 같은 종목의 요청이 진행 중(15분 TTL, 프로세스 인메모리) — 보내지 않았다 |
+| `false` | `unconfigured` | `COWORK_ROUTINE_FIRE_*` 미설정(휴면) |
+| `false` | `fire_failed` | 리스너 POST 실패 — in-flight를 남기지 않으므로 재시도 가능 |
+
+**Error `401`** — 토큰 없음
+**Error `404`** — `tickers`에 없는 종목
+
+> 왜 `GET /api/report/{ticker}/{date}` 안에서 몰래 쏘지 않는가 — 읽기 경로에 쓰기 부작용을 숨기지 않기 위해 별도 POST로 분리했다(ADR `260916-132605` 「대안과 버린 이유」).
 
 ---
 

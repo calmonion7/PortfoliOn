@@ -37,12 +37,12 @@ def manual_text() -> str:
 
 
 def nightly_text() -> str:
-    """야간 전량 enrich 회차 본문 — 상한·게이트는 프롬프트 §1이 정본이다(정책 열거 금지).
+    """대상 지정 enrich 회차 본문(야간 갱신·온디맨드 갱신 공용) — 상한·게이트는 프롬프트 §1이 정본이다(정책 열거 금지).
 
     대상 종목은 이 본문이 아니라 payload의 `tickers`로 넘어가고, 리스너가 청크마다
-    `[대상 종목]` 블록으로 붙인다.
+    `[대상 종목]` 블록으로 붙인다. 야간 회차의 대상은 갱신 대상 집합이다(ADR 260916-132605).
     """
-    return "야간 전량 enrich 회차 — 트리거에 명시된 종목만 enrich·재생성하고 다른 정책은 수행하지 말라."
+    return "대상 지정 enrich 회차 — 트리거에 명시된 종목만 enrich·재생성하고 다른 정책은 수행하지 말라."
 
 
 def fire(text: str, *, tickers: list | None = None, model: str | None = None,

@@ -121,29 +121,29 @@ def _run_guru_crawl():
 
 
 def _run_nightly_enrich():
-    """야간 전량 사업분석(enrich) — 루틴을 청크 스폰 모드로 깨운다(ADR 260913-013425).
+    """야간 사업분석(enrich) 갱신 — 갱신 대상 집합만 실어 루틴을 청크 스폰 모드로 깨운다.
 
+    대상 = `enrich_targets.compute_enrich_target_set()`(보유 ∪ 30일 열람, ADR 260916-132605).
+    2026-09-16 전에는 추적 종목 전체였다(ADR 260913-013425) — 청크·순차 스폰 설계는 그대로다.
     백엔드는 LLM을 호출하지 않는다(ADR-0028) — 여기서 하는 일은 대상 종목 목록을 실어
     fire 하나를 쏘는 것뿐이고, 청크 분할·순차 세션 스폰은 리스너의 몫이다.
     `job_runs.record`는 예외 전파를 전제하므로 fire의 False 반환은 set_status로 명시한다.
+    대상 수·목록을 INFO 로그에 남긴다 — 배치현황이 못 보는 「무엇을 쐈나」의 유일한 관측선이다.
 
-    ⚠️ **이 잡의 `success`는 「fire가 접수됐다」는 뜻이지 「전 종목이 갱신됐다」는 뜻이 아니다.**
+    ⚠️ **이 잡의 `success`는 「fire가 접수됐다」는 뜻이지 「대상 종목이 갱신됐다」는 뜻이 아니다.**
     실제 청크 처리는 이 함수가 성공을 기록한 뒤 **다른 프로세스**(리스너)에서 수 시간에 걸쳐
     일어나고, 완료를 백엔드로 보고하는 통로가 없다 — 첫 청크에서 한도로 죽어 대부분이
     미처리여도 배치현황 카드는 초록이다. 여기서 set_status로 막을 수 있는 것은 **fire 전송
     실패뿐**이며, 실제 갱신 여부는 `~/portfolion-routine-runs/`의 run 디렉터리와 `enriched_at`
     분포로만 관측된다(ADR 260913-013425 결과 절).
     """
-    from services import cowork_trigger
+    from services import cowork_trigger, enrich_targets
     with job_runs.record("cowork_enrich_nightly", "auto") as run:
         if not cowork_trigger.configured():
             run.set_status("skipped", "COWORK_ROUTINE_FIRE_* 미설정(휴면)")
             logger.warning("[Scheduler] Nightly enrich skipped: fire 미설정")
             return
-        # 정의역은 `GET /api/stocks`(API 키 경유)와 **같은 함수**다 — 다른 집합을 쓰면
-        # 화면이 보는 종목과 야간이 갱신하는 종목이 갈린다.
-        portfolio = storage.get_global_portfolio()
-        tickers = sorted({s["ticker"] for s in portfolio["stocks"] + portfolio["watchlist"]})
+        tickers = enrich_targets.compute_enrich_target_set()
         if not tickers:
             run.set_status("skipped", "대상 종목 0")
             logger.warning("[Scheduler] Nightly enrich skipped: 대상 종목 0")
@@ -156,7 +156,7 @@ def _run_nightly_enrich():
             run.set_status("failed", "fire 실패")
             logger.warning("[Scheduler] Nightly enrich fire 실패")
         else:
-            logger.info(f"[Scheduler] Nightly enrich fired ({len(tickers)}종목)")
+            logger.info(f"[Scheduler] Nightly enrich fired ({len(tickers)}종목): {', '.join(tickers)}")
 
 
 def _refresh_monthly_us():

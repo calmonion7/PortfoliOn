@@ -41,7 +41,7 @@ def test_fire_payload_is_byte_identical_without_extensions(monkeypatch):
 
 
 def test_fire_payload_carries_extensions_when_given(monkeypatch):
-    """확장 payload 3키가 그대로 실린다(야간 전량 회차의 계약)."""
+    """확장 payload 3키가 그대로 실린다(대상 지정 회차 — 야간 갱신·온디맨드 — 의 계약)."""
     monkeypatch.setenv("COWORK_ROUTINE_FIRE_URL", "https://example.com/fire")
     monkeypatch.setenv("COWORK_ROUTINE_FIRE_TOKEN", "tok")
     with patch("services.cowork_trigger.requests.post", return_value=MagicMock(status_code=200)) as mock_post:
@@ -67,7 +67,11 @@ def test_fire_swallows_failures(monkeypatch):
         assert cowork_trigger.fire("t") is False
 
 
-# ── 야간 전량 enrich 잡 (task#344) ─────────────────────────────────────
+# ── 야간 enrich 잡 (task#344 · 정의역은 task#354에서 갱신 대상 집합으로) ────────
+# 2026-09-16 전까지 이 절은 「보유 ∪ 관심 합집합」을 단언했다. ADR 260916-132605가 그 정의역을
+# **명시적으로 뒤집었으므로**(기록된 결정) 여기서는 대상 산출을 `enrich_targets`에 위임하고
+# 배선(정렬 목록을 그대로 싣는가·model/chunk·상태 기록)만 잰다. 집합 판정 자체는
+# tests/test_nightly_enrich_target_set.py가 잰다.
 
 class _FakeRun:
     """job_runs.record가 yield하는 상태 핸들 대역."""
@@ -88,9 +92,9 @@ def _patch_record(run):
     return fake
 
 
-def _run_nightly(monkeypatch, *, portfolio, configured=True, fire_ok=True):
+def _run_nightly(monkeypatch, *, targets, configured=True, fire_ok=True):
     from scheduler import jobs
-    from services import cowork_trigger
+    from services import cowork_trigger, enrich_targets
     run = _FakeRun()
     rec = _patch_record(run)
     fired = {}
@@ -101,15 +105,15 @@ def _run_nightly(monkeypatch, *, portfolio, configured=True, fire_ok=True):
         return fire_ok
 
     monkeypatch.setattr(jobs.job_runs, "record", rec)
-    monkeypatch.setattr(jobs.storage, "get_global_portfolio", lambda: portfolio)
+    monkeypatch.setattr(enrich_targets, "compute_enrich_target_set", lambda: list(targets))
     monkeypatch.setattr(cowork_trigger, "configured", lambda: configured)
     monkeypatch.setattr(cowork_trigger, "fire", fake_fire)
     jobs._run_nightly_enrich()
     return run, fired, getattr(rec, "seen", None)
 
 
-def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
-    """보유+관심 합집합을 중복 없이·정렬해 싣고, **opus**·chunk 5로 발사한다.
+def test_nightly_enrich_fires_target_set_as_given(monkeypatch):
+    """갱신 대상 집합(정렬 목록)을 그대로 싣고, **opus**·chunk 5로 발사한다.
 
     모델 이력: task#345가 A/B로 opus를 확정 → task#348이 무료 모델(muse-spark)로 전환 →
     **task#350 A/B로 opus 복귀**(2026-09-16, 사용자 결정 「품질이 중요하니」).
@@ -127,10 +131,7 @@ def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
     ⚠️ 한도로 죽으면 배치현황은 초록인 채 95%가 미갱신일 수 있다(ADR 260913-013425 §46) —
     관측은 `~/portfolion-routine-runs/` 디렉터리 수와 `enriched_at` 분포로 한다.
     """
-    run, fired, seen = _run_nightly(monkeypatch, portfolio={
-        "stocks": [{"ticker": "AAPL"}, {"ticker": "005930"}],
-        "watchlist": [{"ticker": "AAPL"}, {"ticker": "NVDA"}],  # AAPL 중복
-    })
+    run, fired, seen = _run_nightly(monkeypatch, targets=["005930", "AAPL", "NVDA"])
     assert seen == ("cowork_enrich_nightly", "auto")
     assert fired["tickers"] == ["005930", "AAPL", "NVDA"]
     assert fired["model"] == "opus" and fired["chunk"] == 5
@@ -139,18 +140,16 @@ def test_nightly_enrich_fires_holdings_and_watchlist_union(monkeypatch):
 
 def test_nightly_enrich_marks_failed_when_fire_returns_false(monkeypatch):
     """fire는 예외가 아니라 False를 반환한다 — 명시하지 않으면 배치현황이 영원히 초록이다."""
-    run, _, _ = _run_nightly(monkeypatch, portfolio={"stocks": [{"ticker": "AAPL"}], "watchlist": []},
-                             fire_ok=False)
+    run, _, _ = _run_nightly(monkeypatch, targets=["AAPL"], fire_ok=False)
     assert run.status is not None and run.status[0] == "failed"
 
 
 def test_nightly_enrich_skips_when_dormant_or_empty(monkeypatch):
     """미설정·대상 0은 실패가 아니라 skipped다(둘을 failed로 적으면 진짜 실패가 묻힌다)."""
-    run, fired, _ = _run_nightly(monkeypatch, portfolio={"stocks": [], "watchlist": []},
-                                 configured=False)
+    run, fired, _ = _run_nightly(monkeypatch, targets=[], configured=False)
     assert run.status[0] == "skipped" and not fired
 
-    run2, fired2, _ = _run_nightly(monkeypatch, portfolio={"stocks": [], "watchlist": []})
+    run2, fired2, _ = _run_nightly(monkeypatch, targets=[])
     assert run2.status[0] == "skipped" and not fired2
 
 

@@ -77,7 +77,7 @@ def test_every_batch_has_valid_market():
 def test_market_classification_matches_adr():
     for b in batch_registry.BATCHES:
         assert b["market"] == _MARKET_BY_ID[b["id"]], b["id"]
-    # 분류 카운트: 국내 16 / 해외 11 / 공통 7 (cowork_enrich_nightly 공통 추가 — 전 종목 대상)
+    # 분류 카운트: 국내 16 / 해외 11 / 공통 7 (cowork_enrich_nightly 공통 추가 — 대상은 갱신 대상 집합, ADR 260916-132605)
     counts = {"KR": 0, "US": 0, "공통": 0}
     for b in batch_registry.BATCHES:
         counts[b["market"]] += 1
