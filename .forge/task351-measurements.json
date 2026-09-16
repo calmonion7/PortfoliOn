@@ -1,0 +1,82 @@
+{
+  "active_users_30d": 2,
+  "any_ticker_event_distinct_30d": 9,
+  "distinct_viewed_tickers_30d": 9,
+  "enrich_history_by_day": {
+    "2026-09-13": 260,
+    "2026-09-14": 126,
+    "2026-09-15": 210,
+    "2026-09-16": 16
+  },
+  "enrich_history_rows": 612,
+  "enrich_history_tickers": 129,
+  "enriched": 129,
+  "events_30d": 224,
+  "holders_distribution": {
+    "1": 108,
+    "2": 14,
+    "3": 2,
+    "5": 1,
+    "6": 1
+  },
+  "partial_write_preserving_rows": 130,
+  "partial_write_rows": 131,
+  "report_view_open_30d": 90,
+  "similarity": {
+    "asymmetric_fact_instances": 12,
+    "compared_field_instances": 2143,
+    "day_pairs": 268,
+    "fields": {
+      "competitor_edge": {
+        "fact": 0.443,
+        "n": 268,
+        "text": 0.457
+      },
+      "growth_plan": {
+        "fact": 0.465,
+        "n": 268,
+        "text": 0.39
+      },
+      "insights": {
+        "fact": 0.398,
+        "n": 268,
+        "text": 0.441
+      },
+      "key_resource": {
+        "fact": 0.465,
+        "n": 268,
+        "text": 0.498
+      },
+      "market_outlook": {
+        "fact": 0.789,
+        "n": 267,
+        "text": 0.749
+      },
+      "moat": {
+        "fact": 0.546,
+        "n": 268,
+        "text": 0.514
+      },
+      "recent_disclosures": {
+        "fact": 0.354,
+        "n": 268,
+        "text": 0.291
+      },
+      "risks": {
+        "fact": 0.427,
+        "n": 268,
+        "text": 0.44
+      }
+    },
+    "identity_control": "4270/4270",
+    "no_fact_token_instances": 2,
+    "overall_fact": 0.486,
+    "overall_text": 0.472,
+    "sample_n": 2143
+  },
+  "single_holder_share_pct": 85.7,
+  "tickers": 132,
+  "user_stocks": 153,
+  "users": 9,
+  "view_events_without_ticker_30d": 0
+}
