@@ -81,7 +81,8 @@ def test_consensus_not_editable():
 def test_all_editable_jobs():
     editable = [b["id"] for b in batch_registry.BATCHES if b.get("editable")]
     assert set(editable) == {
-        "daily_report_kr", "daily_report_us", "guru_crawl", "cowork_enrich_nightly", "daily_digest",
+        "daily_report_kr", "daily_report_us", "guru_crawl", "cowork_enrich_nightly",
+        "cowork_enrich_verify", "daily_digest",
         "earnings_kr", "earnings_us", "monthly_kr", "monthly_us", "macro_signals_fetch",
         "leverage_fetch", "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",
@@ -166,7 +167,8 @@ def test_seed_only_fills_missing_rows(monkeypatch):
     assert store["leverage_fetch"]["time"] == "23:00"
     # 나머지 editable 잡은 시드됨 (consensus 제외, leverage는 기존값 유지)
     expected_seeded = {
-        "daily_report_kr", "daily_report_us", "guru_crawl", "cowork_enrich_nightly", "daily_digest",
+        "daily_report_kr", "daily_report_us", "guru_crawl", "cowork_enrich_nightly",
+        "cowork_enrich_verify", "daily_digest",
         "earnings_kr", "earnings_us", "monthly_kr", "monthly_us", "macro_signals_fetch",
         "lending_fetch", "kr_rankings_fetch",
         "us_rankings_fetch", "investor_trend_fetch", "short_sell_fetch", "backlog_fetch",

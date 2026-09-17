@@ -2,6 +2,7 @@
 """배치 실행로그 — job_id별 최근 20건만 보관. 읽기는 graceful degrade."""
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import contextmanager
 
@@ -19,16 +20,22 @@ class Run:
     미지정이면 종래대로 success이고, 본문이 예외를 *전파*하면 failed가 지정을 이긴다.
     """
 
-    __slots__ = ("run_id", "status", "error")
+    __slots__ = ("run_id", "status", "error", "payload")
 
     def __init__(self, run_id):
         self.run_id = run_id
         self.status = None
         self.error = None
+        self.payload = None
 
     def set_status(self, status: str, error: str | None = None) -> None:
         self.status = status
         self.error = error
+
+    def set_payload(self, payload: dict) -> None:
+        """그 실행이 무엇을 대상으로 했는지(예: 대상 ticker 목록) — 종료 UPDATE에 함께 실린다.
+        부르지 않으면 종료 UPDATE는 payload 컬럼을 건드리지 않는다(기존 잡 무회귀)."""
+        self.payload = payload
 
 
 @contextmanager
@@ -70,11 +77,15 @@ def record(job_id: str, trigger: str):
     skipped로)·다음날 코스피 신호(scheduler/jobs._refresh_kospi_signal)·US 섹터 모멘텀
     (scheduler/jobs._fetch_us_sector, all-None 저장 생략을 skipped로)는
     set_status로 배선돼 있어 이 주의의 예외다.
-    ⚠️ cowork_enrich_nightly는 **그 예외 목록에 넣을 수 없다** — set_status가 배선돼 있지만
-    (fire 전송 실패 → failed, 미설정·대상 0 → skipped) 이 잡의 실제 작업은 fire를 받은
-    **다른 프로세스**(로컬 리스너)에서 이 잡이 끝난 뒤 수 시간에 걸쳐 일어나고, 완료를 백엔드로
-    보고하는 통로가 없다. 즉 이 잡의 success는 「본문이 성공」이 아니라 「트리거가 접수됨」이며,
-    그 뒤의 전부(청크 실패·한도 중단·재기동 소실)는 원리적으로 여기 기록될 수 없다.
+    ⚠️ cowork_enrich_nightly는 이 잡 **자신의 본문**만 놓고 보면 여전히 위 주의에 해당한다 —
+    set_status는 배선돼 있지만(fire 전송 실패 → failed, 미설정·대상 0 → skipped) 실제 갱신
+    작업은 fire를 받은 다른 프로세스(로컬 리스너)에서 이 잡이 끝난 뒤 수 시간에 걸쳐 일어나므로,
+    이 잡이 직접 기록하는 success는 그 시점엔 「트리거가 접수됨」 이상을 말하지 않는다.
+    다만 이제 그 간극에 사후 대조가 생겼다: 다음날 08:00 cowork_enrich_verify가 이 잡이
+    남긴 payload(쏜 ticker 목록, `run.set_payload`)를 `tickers.enriched_at`과 대조해 이
+    run 행의 status/error를 실제 갱신 여부(success/partial/failed)로 **직접 다시 쓴다**(자기
+    run에도 같은 상태를 남긴다). 즉 이 잡의 **최종** 상태는 08:00 대조를 거친 값이고, 그 전
+    한동안만(02:00~08:00) 「접수됨」 상태로 보인다.
     """
     try:
         rows = query(
@@ -101,6 +112,26 @@ def record(job_id: str, trigger: str):
     def _finish(status: str, error: "str | None") -> None:
         if run_id is None:
             return
+        # payload가 지정되지 않았으면(기본 None) 그 컬럼을 건드리지 않는다 — 기존 잡의 행동 보존.
+        payload_json = None
+        if run.payload is not None:
+            try:
+                payload_json = json.dumps(run.payload, ensure_ascii=False)
+            except Exception:
+                # 직렬화 실패도 계측 실패와 같은 규율 — payload 없이 종료 기록을 진행한다.
+                log.warning("job_runs.record payload 직렬화 실패 for %s", job_id, exc_info=True)
+        if payload_json is not None:
+            try:
+                execute(
+                    "UPDATE job_runs SET status = %s, error = %s, finished_at = NOW(), "
+                    "payload = %s::jsonb WHERE id = %s",
+                    (status, error, payload_json, run_id),
+                )
+                return
+            except Exception:
+                # payload 쓰기 실패가 상태 확정까지 끌고 내려가면 그 run은 영구히 running으로 남는다
+                # (예: payload 컬럼 마이그레이션 미적용). payload는 부가정보이므로 버리고 상태만 확정한다.
+                log.warning("job_runs.record payload-update failed for %s; 상태만 기록", job_id, exc_info=True)
         try:
             execute(
                 "UPDATE job_runs SET status = %s, error = %s, finished_at = NOW() WHERE id = %s",
@@ -123,7 +154,7 @@ def recent(job_id: str, n: int = 20) -> list[dict]:
     """해당 job_id의 최신 실행로그 n건(최신순). 테이블 부재/예외시 []."""
     try:
         return query(
-            "SELECT id, job_id, trigger, status, started_at, finished_at, error "
+            "SELECT id, job_id, trigger, status, started_at, finished_at, error, payload "
             "FROM job_runs WHERE job_id = %s ORDER BY started_at DESC LIMIT %s",
             (job_id, n),
         )
@@ -139,7 +170,7 @@ def recent_map(job_ids: list[str]) -> dict[str, list[dict]]:
         return out
     try:
         rows = query(
-            "SELECT id, job_id, trigger, status, started_at, finished_at, error FROM ("
+            "SELECT id, job_id, trigger, status, started_at, finished_at, error, payload FROM ("
             "SELECT *, ROW_NUMBER() OVER (PARTITION BY job_id ORDER BY started_at DESC) AS rn "
             "FROM job_runs WHERE job_id = ANY(%s)) t WHERE rn <= 20 ORDER BY started_at DESC",
             (job_ids,),

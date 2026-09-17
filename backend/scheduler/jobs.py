@@ -1,9 +1,23 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 from services import storage, report_generator, consensus_pipeline as _pipeline, job_runs
 from services import batch_registry
+
+# 최신 02:00 run을 「오늘 밤 것」으로 인정하는 최대 나이. 02:00 fire와 08:00 검증의 간극이 6시간이라
+# 24h면 하루를 건너뛴 경우만 걸러낸다(정상 런을 오탐하지 않는 하한).
+_VERIFY_MAX_AGE_HOURS = 24
+
+
+def _as_utc(dt):
+    """DB timestamptz를 aware UTC로 정규화. naive면 UTC로 간주(형제 enrich_targets와 같은 규약)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 logger = logging.getLogger(__name__)
 
@@ -130,12 +144,15 @@ def _run_nightly_enrich():
     `job_runs.record`는 예외 전파를 전제하므로 fire의 False 반환은 set_status로 명시한다.
     대상 수·목록을 INFO 로그에 남긴다 — 배치현황이 못 보는 「무엇을 쐈나」의 유일한 관측선이다.
 
-    ⚠️ **이 잡의 `success`는 「fire가 접수됐다」는 뜻이지 「대상 종목이 갱신됐다」는 뜻이 아니다.**
-    실제 청크 처리는 이 함수가 성공을 기록한 뒤 **다른 프로세스**(리스너)에서 수 시간에 걸쳐
-    일어나고, 완료를 백엔드로 보고하는 통로가 없다 — 첫 청크에서 한도로 죽어 대부분이
-    미처리여도 배치현황 카드는 초록이다. 여기서 set_status로 막을 수 있는 것은 **fire 전송
-    실패뿐**이며, 실제 갱신 여부는 `~/portfolion-routine-runs/`의 run 디렉터리와 `enriched_at`
-    분포로만 관측된다(ADR 260913-013425 결과 절).
+    ⚠️ **이 잡이 종료 시점에 쓰는 `success`는 「fire가 접수됐다」는 뜻이지 「대상 종목이
+    갱신됐다」는 뜻이 아니다.** 실제 청크 처리는 이 함수가 끝난 뒤 **다른 프로세스**(리스너)에서
+    수 시간에 걸쳐 일어나고, 그 완료를 실시간으로 보고하는 통로는 지금도 없다. 여기서
+    set_status로 막을 수 있는 것은 **fire 전송 실패뿐**이다.
+
+    다만 그 간극은 사후에 메워진다 — 08:00 `cowork_enrich_verify`가 아래에서 남기는 payload를
+    근거로 `enriched_at`을 대조해 **이 run 행의 status를 실제 갱신 여부로 다시 쓴다**
+    (task#357). 즉 이 행의 *최종* 상태는 대조를 거친 값이며, 그것이 배치현황 카드가 보는 값이다.
+    원인 추적은 여전히 `~/portfolion-routine-runs/`의 run 로그다.
     """
     from services import cowork_trigger, enrich_targets
     with job_runs.record("cowork_enrich_nightly", "auto") as run:
@@ -156,7 +173,87 @@ def _run_nightly_enrich():
             run.set_status("failed", "fire 실패")
             logger.warning("[Scheduler] Nightly enrich fire 실패")
         else:
+            # 검증 잡(_verify_nightly_enrich)이 다음날 대조할 유일한 근거 — 쏜 목록을 남긴다.
+            run.set_payload({"tickers": tickers, "chunk": 5, "model": "opus"})
             logger.info(f"[Scheduler] Nightly enrich fired ({len(tickers)}종목): {', '.join(tickers)}")
+
+
+def _verify_nightly_enrich():
+    """02:00 fire의 갱신 대조 — 「접수됨」과 「갱신됨」의 간극을 다음날 아침 판정한다(ADR 260916-132605).
+
+    `_run_nightly_enrich`가 남긴 payload(쏜 ticker 목록)를 그 run의 `started_at`을
+    window_start로 삼아 `tickers.enriched_at`과 대조한다(`enrich_verify.judge`). payload가
+    없으면(기록 이전 run·fire 실패·대상 0 skip) 대조할 것이 없어 skipped다. 판정 결과는
+    ⓐ 02:00 run 행의 status/error를 직접 UPDATE하고(거짓 초록을 그 자리에서 고친다)
+    ⓑ 이 잡 자신의 run에도 같은 상태를 남긴다(배치현황 카드가 recent_runs[].error로 노출).
+
+    ⚠️ 알려진 한계 — 08:00은 「아직 처리 중」을 구별하지 못한다. 대상이 늘거나 청크가 느려
+    02:00~08:00(5시간 반)을 넘기면 아직 처리 중인 티커가 미갱신으로 판정되고, 대조는 하루 1회라
+    나중에 완료돼도 그 행은 그대로 남는다. 검증 시각은 2026-09-17 실측(4청크 24분)을 근거로
+    고른 값이라(계획 결정 #6) 여유가 크지만, 소요가 늘면 판정이 아니라 **시각**을 옮겨야 한다.
+    """
+    from services.db import query, execute
+    from services import enrich_verify
+    with job_runs.record("cowork_enrich_verify", "auto") as run:
+        # job_runs.recent()는 DB 예외를 삼키고 []를 준다 — 그것을 쓰면 「조회 실패」가
+        # 「02:00 run 없음」(정상 skip)으로 붕괴해, 이 태스크가 없애려는 침묵이 여기서 재생산된다.
+        # 그래서 직접 조회해 실패를 failed로 구별한다.
+        try:
+            rows = query(
+                "SELECT id, started_at, payload FROM job_runs "
+                "WHERE job_id = 'cowork_enrich_nightly' ORDER BY started_at DESC LIMIT 1",
+            )
+        except Exception as e:
+            run.set_status("failed", f"02:00 run 조회 실패: {e}")
+            logger.warning(f"[Scheduler] Nightly enrich verify: 02:00 run 조회 실패: {e}")
+            return
+        if not rows:
+            run.set_status("skipped", "02:00 run 없음")
+            logger.info("[Scheduler] Nightly enrich verify skipped: 02:00 run 없음")
+            return
+        nightly = rows[0]
+        # 최신 행이 「오늘 밤」인지 확인한다. 야간 잡이 아예 안 돈 날(백엔드 다운 등) 최신 행은
+        # 며칠 전 것이고, 그것을 대조하면 이미 갱신된 티커들 덕에 success가 재기록돼
+        # 「오늘 밤 안 돌았다」는 사실이 사라진다 — 고치려던 거짓 초록 그대로다.
+        started_at = _as_utc(nightly.get("started_at"))
+        if started_at is None or datetime.now(timezone.utc) - started_at > timedelta(hours=_VERIFY_MAX_AGE_HOURS):
+            run.set_status("failed", "오늘 02:00 run 없음 — 야간 갱신이 실행되지 않았다")
+            logger.warning("[Scheduler] Nightly enrich verify: 최신 02:00 run이 오늘 것이 아니다")
+            return
+        payload = nightly.get("payload") or {}
+        tickers = payload.get("tickers")
+        if not tickers:
+            run.set_status("skipped", "payload 없음 — 대조 대상 없음")
+            logger.info("[Scheduler] Nightly enrich verify skipped: payload 없음")
+            return
+        window_start = started_at
+        try:
+            enriched_rows = query(
+                "SELECT ticker, enriched_at FROM tickers WHERE ticker = ANY(%s)",
+                (tickers,),
+            )
+        except Exception as e:
+            run.set_status("failed", str(e))
+            logger.warning(f"[Scheduler] Nightly enrich verify: enriched_at 조회 실패: {e}")
+            return
+        # judge는 tz 정합을 호출측 책임으로 둔다 — 형제(enrich_targets·auth_service·stocks)와
+        # 같은 형태로 여기서 맞춘다. 안 맞추면 naive가 섞이는 순간 전원이 미갱신으로 오판된다.
+        enriched = {r["ticker"]: _as_utc(r.get("enriched_at")) for r in enriched_rows}
+        status, missing = enrich_verify.judge(tickers, enriched, window_start)
+        error = f"미갱신 {len(missing)}종목: {', '.join(missing)}" if missing else None
+        try:
+            execute(
+                "UPDATE job_runs SET status = %s, error = %s WHERE id = %s",
+                (status, error, nightly["id"]),
+            )
+        except Exception as e:
+            # 02:00 행 UPDATE가 실패해도 이 잡 자신의 판정 기록은 그대로 남긴다(관측 전용 계측).
+            logger.warning(f"[Scheduler] Nightly enrich verify: 02:00 run(id={nightly['id']}) UPDATE 실패: {e}")
+        run.set_status(status, error)
+        logger.info(
+            f"[Scheduler] Nightly enrich verify: {status} "
+            f"({len(tickers) - len(missing)}/{len(tickers)}종목 갱신)"
+        )
 
 
 def _refresh_monthly_us():
@@ -701,6 +798,7 @@ _JOB_FUNCS = {
     "daily_report_us": _generate_us,
     "guru_crawl": _run_guru_crawl,
     "cowork_enrich_nightly": _run_nightly_enrich,
+    "cowork_enrich_verify": _verify_nightly_enrich,
     "daily_digest": _run_digest,
     "earnings_kr": _refresh_earnings_kr,
     "earnings_us": _refresh_earnings_us,

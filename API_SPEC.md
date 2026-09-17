@@ -2662,7 +2662,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(34종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다. 세션 판정 거래소가 등록된 배치(`daily_report_kr`·`daily_report_us`)는 `exchange` 필드를 가지며, 그 배치의 스케줄 스펙에 `skip_holidays: true`를 설정하면 세션 판정일이 해당 거래소 휴장일일 때 실행을 건너뛴다(아래 PUT 참조).
+자동 배치(35종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다. 세션 판정 거래소가 등록된 배치(`daily_report_kr`·`daily_report_us`)는 `exchange` 필드를 가지며, 그 배치의 스케줄 스펙에 `skip_holidays: true`를 설정하면 세션 판정일이 해당 거래소 휴장일일 때 실행을 건너뛴다(아래 PUT 참조).
 
 > 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 내부자·5%지분 공시 신호 수집 `insider_fetch`(매일 07:45 KST, `market="KR"` — DART 출처)는 수동 트리거 `POST /api/report/insider-trades/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다. 환율 수집 `fx_fetch`(매일 06:40 KST, `market="공통"` — 교차통화·다시장 소비)는 수동 트리거 `POST /api/market/refresh-fx`를 가지며, 이 배치가 없으면 `market_cache`의 `fx` 키를 갱신하는 주체가 없어 포트폴리오 KRW 환산이 무기한 stale해진다(요청경로 증분은 시장지표 탭을 열어야 돌고, `get_or_refresh`의 ttl은 저장값에 걸리지 않는다).
 
@@ -2720,8 +2720,24 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `timezone` | string | 잡 타임존(편집 불가 고정값). 편집 가능 배치에만 존재 |
 | `exchange` | string \| null | 세션 판정 거래소(`"XKRX"` \| `"XNYS"`). 등록된 배치(`daily_report_kr`·`daily_report_us`)만 `schedule.skip_holidays`를 켤 수 있다. 없으면 `null` |
 | `schedule` | object \| null | 현재 스케줄 스펙(저장값 없으면 기본 스펙). 편집 불가 배치(`consensus`)는 `null`. 선택 필드 `skip_holidays`(bool)가 켜져 있으면 세션 판정일이 `exchange` 거래소 휴장일일 때 실행을 건너뛴다 |
+| `recent_runs` | object[] | 그 배치의 최근 실행 로그(최신순, 최대 20건). 각 항목: `id`·`job_id`·`trigger`(`"auto"` \| `"manual"`)·`status`(`"running"` \| `"success"` \| `"partial"` \| `"skipped"` \| `"failed"`)·`started_at`·`finished_at`(string \| null)·`error`(string \| null)·`payload`(object \| null) |
 
 > 편집 불가 배치 `consensus`에는 `editable`/`timezone`/`schedule` 관련 필드가 없거나 `schedule: null`이다. `skip_holidays`가 켜진 배치는 `schedule_desc`에도 "· 휴장일 건너뜀" 접미가 붙는다(예: `"매주 월,화,수,목,금 20:30 · 휴장일 건너뜀"`).
+
+**`recent_runs[].payload`**: 그 실행이 무엇을 대상으로 했는지(선택, nullable) — 대부분의 배치는 `null`이고, 현재는 `cowork_enrich_nightly`만 쏜 ticker 목록을 채운다:
+```json
+{
+  "id": 1042,
+  "job_id": "cowork_enrich_nightly",
+  "trigger": "auto",
+  "status": "partial",
+  "started_at": "2026-09-17T02:00:03+09:00",
+  "finished_at": "2026-09-17T02:00:04+09:00",
+  "error": "미갱신 1종목: 005930",
+  "payload": { "tickers": ["AAPL", "005930"], "chunk": 5, "model": "opus" }
+}
+```
+`cowork_enrich_nightly`의 `status`/`error`는 **접수 시점 값이 아니라 사후 대조를 거친 최종값**일 수 있다 — 다음날 08:00 배치 `cowork_enrich_verify`가 이 `payload.tickers`를 `tickers.enriched_at`과 대조해 실제 갱신 여부(success/partial/failed)로 이 run 행의 `status`/`error`를 직접 다시 쓴다(02:00~08:00 사이에는 「접수됨」 상태 그대로 보인다).
 
 ---
 

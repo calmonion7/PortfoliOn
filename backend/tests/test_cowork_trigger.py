@@ -77,9 +77,13 @@ class _FakeRun:
     """job_runs.record가 yield하는 상태 핸들 대역."""
     def __init__(self):
         self.status = None
+        self.payload = None
 
     def set_status(self, status, detail=None):
         self.status = (status, detail)
+
+    def set_payload(self, payload):
+        self.payload = payload
 
 
 def _patch_record(run):
@@ -136,6 +140,8 @@ def test_nightly_enrich_fires_target_set_as_given(monkeypatch):
     assert fired["tickers"] == ["005930", "AAPL", "NVDA"]
     assert fired["model"] == "opus" and fired["chunk"] == 5
     assert run.status is None  # 성공은 set_status를 부르지 않는다(기본 success)
+    # S3: 쏜 목록이 payload에 실려야 검증 잡(S5)이 다음날 대조할 근거가 생긴다.
+    assert run.payload == {"tickers": ["005930", "AAPL", "NVDA"], "chunk": 5, "model": "opus"}
 
 
 def test_nightly_enrich_marks_failed_when_fire_returns_false(monkeypatch):

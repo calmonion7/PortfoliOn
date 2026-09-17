@@ -85,7 +85,7 @@ COWORK_ROUTINE_FIRE_TOKEN=... # 루틴 fire bearer 토큰
 FRONTEND_URL=...          # CORS 허용 origin
 ```
 
-> 백엔드에는 **LLM/Anthropic 호출이 없다**. AI 분석 텍스트는 claude.ai **루틴**(일일 리포트 배치 완료 시 백엔드가 fire로 깨우는 클라우드 에이전트, ADR-0028)이 enrich·애널리스트 리포트 발행·주요기술 리포트 발행 API(`CLAUDE_COWORK_API.md`)로 작성하며, 백엔드 리포트 생성은 시장 데이터 스냅샷만 만든다. 수동 트리거는 `POST /api/admin/cowork/fire`. 여기에 더해 배치 `cowork_enrich_nightly`(공통, 매일 02:00 KST)가 **갱신 대상 집합**(어느 사용자든 보유 중인 종목 ∪ 최근 30일 안에 리포트 상세가 열린 종목 — ADR `260916-132605`)을 대상으로 루틴을 깨워, 리스너가 5종목씩 잘라 세션을 순차 스폰한다(야간 갱신). 집합 밖 종목은 사용자가 리포트 상세를 열 때 `POST /api/stocks/{ticker}/enrich/request`로 **온디맨드** 갱신된다(분석이 7일 넘게 묵었을 때만, 종목당 진행 중 요청 1건).
+> 백엔드에는 **LLM/Anthropic 호출이 없다**. AI 분석 텍스트는 claude.ai **루틴**(일일 리포트 배치 완료 시 백엔드가 fire로 깨우는 클라우드 에이전트, ADR-0028)이 enrich·애널리스트 리포트 발행·주요기술 리포트 발행 API(`CLAUDE_COWORK_API.md`)로 작성하며, 백엔드 리포트 생성은 시장 데이터 스냅샷만 만든다. 수동 트리거는 `POST /api/admin/cowork/fire`. 여기에 더해 배치 `cowork_enrich_nightly`(공통, 매일 02:00 KST)가 **갱신 대상 집합**(어느 사용자든 보유 중인 종목 ∪ 최근 30일 안에 리포트 상세가 열린 종목 — ADR `260916-132605`)을 대상으로 루틴을 깨워, 리스너가 5종목씩 잘라 세션을 순차 스폰한다(야간 갱신). 집합 밖 종목은 사용자가 리포트 상세를 열 때 `POST /api/stocks/{ticker}/enrich/request`로 **온디맨드** 갱신된다(분석이 7일 넘게 묵었을 때만, 종목당 진행 중 요청 1건). 그 02:00 fire는 「접수됨」만 기록하고 실제 갱신 여부는 다른 프로세스(리스너)에서 수 시간에 걸쳐 정해지므로, 배치 `cowork_enrich_verify`(공통, 매일 08:00 KST)가 다음날 아침 `tickers.enriched_at`을 대조해 그 02:00 실행의 상태를 실제 갱신 여부로 다시 판정한다.
 
 ## 초기 DB 설정
 

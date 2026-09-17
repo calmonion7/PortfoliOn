@@ -382,7 +382,8 @@ CREATE TABLE IF NOT EXISTS job_runs (
                                                -- (CHECK 제약 없음 — 어휘 추가에 마이그레이션 불필요)
     started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     finished_at TIMESTAMPTZ,
-    error       TEXT
+    error       TEXT,
+    payload     JSONB                          -- 그 실행이 무엇을 대상으로 했는지(선택, nullable)
 );
 CREATE INDEX IF NOT EXISTS idx_job_runs_read ON job_runs(job_id, started_at DESC);
 

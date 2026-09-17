@@ -15,6 +15,7 @@ from .jobs import (
     _generate_us,
     _run_guru_crawl,
     _run_nightly_enrich,
+    _verify_nightly_enrich,
     _refresh_monthly_us,
     _refresh_fx,
     _refresh_macro_signals,

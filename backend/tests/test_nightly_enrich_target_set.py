@@ -103,8 +103,24 @@ def test_nightly_fires_exact_target_set(run_status, caplog):
     assert kw["model"] == "opus"
     assert kw["chunk"] == 5
     run_status.set_status.assert_not_called()
+    # S3: fire 성공 시 쏜 목록이 payload에 실려야 검증 잡(S5)이 대조할 것이 생긴다.
+    run_status.set_payload.assert_called_once_with(
+        {"tickers": ["AAPL", "MSFT"], "chunk": 5, "model": "opus"}
+    )
     text = " ".join(r.getMessage() for r in caplog.records)
     assert "2종목" in text and "AAPL, MSFT" in text
+
+
+def test_nightly_skip_does_not_record_payload(run_status):
+    """fire를 안 쐈으면(대상 0) payload도 기록하지 않는다 — S3는 fire *성공*에만 건다."""
+    from scheduler import jobs
+    from services import cowork_trigger
+    with patch.object(enrich_targets, "compute_enrich_target_set", return_value=[]), \
+         patch.object(cowork_trigger, "configured", return_value=True), \
+         patch.object(cowork_trigger, "fire") as fire:
+        jobs._run_nightly_enrich()
+    fire.assert_not_called()
+    run_status.set_payload.assert_not_called()
 
 
 def test_nightly_skips_when_target_set_empty(run_status):

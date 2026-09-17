@@ -316,6 +316,14 @@ def _migrate():
         logger.info(f"[Migrate] tech_reports: 은퇴 slug data-center 행 {deleted}건 삭제")
     except Exception as e:
         logger.warning(f"[Migrate] tech_reports data-center 은퇴 실패: {e}")
+    try:
+        # job_runs.payload — 그 실행이 무엇을 대상으로 했는지(선택, nullable). app_schema.sql은
+        # 신규 설치용이라 라이브 DB는 이 ALTER만 탄다 — 한쪽만 고치면 배포 직후 payload를 쓰는
+        # UPDATE가 컬럼 부재로 깨진다(CLAUDE.md DoD).
+        from services.db import execute
+        execute("ALTER TABLE job_runs ADD COLUMN IF NOT EXISTS payload JSONB")
+    except Exception as e:
+        logger.warning(f"[Migrate] job_runs payload 컬럼 추가 실패: {e}")
 
 
 @asynccontextmanager
