@@ -32,6 +32,7 @@ vi.mock('../contexts/AuthContext', () => ({
 import api from '../api'
 import ExposureTab, { computeTechExposure, computeTechCandidates } from '../pages/ExposureTab'
 import ReportDetailHeader from '../components/reports/ReportDetailHeader'
+import RelatedTechSection from '../components/reports/RelatedTechSection'
 import { techsForTicker, _resetTechIndexCache } from '../hooks/useTechIndex'
 import { ToastProvider } from '../components/Toast'
 
@@ -142,10 +143,68 @@ function wireApi({ indexFn, watchlist = [{ ticker: 'TSLA' }], exposure = EXPOSUR
 
 const okIndex = () => Promise.resolve({ data: { index: INDEX } })
 
+// 관련 기술 섹션 전용 — `listed`가 **있는** 현행 응답. `INDEX`(listed 없는 옛 형태)를 고치면
+// 「옛 응답에도 죽지 않는다」 축(아래 computeTechCandidates)이 전제를 잃으므로 픽스처를 갈라 둔다.
+const INDEX_LISTED = INDEX.map(t => ({
+  ...t,
+  listed: {
+    'ai-datacenter-equipment': [{ ticker: '000660', tech_level: 4, gap_years: 1 }, { ticker: '005930', tech_level: 3, gap_years: 2 }],
+    robotics: [{ ticker: '005930', tech_level: 2, gap_years: 5 }, { ticker: 'TSLA', tech_level: 5, gap_years: 0 }],
+    smr: [],
+  }[t.slug],
+}))
+const listedIndex = () => Promise.resolve({ data: { index: INDEX_LISTED } })
+
 beforeEach(() => { _resetTechIndexCache(); api.get.mockReset() })
 afterEach(() => { vi.restoreAllMocks(); _resetTechIndexCache() })
 
-describe('ReportDetailHeader 기술 칩 (렌더)', () => {
+describe('RelatedTechSection 관련 기술 (렌더)', () => {
+  const renderSection = (ticker) => render(
+    <MemoryRouter><RelatedTechSection ticker={ticker} /></MemoryRouter>
+  )
+
+  it('ⓐ 2개 기술에 등장하는 티커에 관련 기술 행 2개 + 리포트·해부 링크 4개', async () => {
+    wireApi({ indexFn: listedIndex })
+    renderSection('005930')
+    await waitFor(() => expect(screen.getAllByTestId('related-tech-row')).toHaveLength(2))
+    const rows = screen.getAllByTestId('related-tech-row')
+    expect(rows.map(r => r.getAttribute('data-slug'))).toEqual(['ai-datacenter-equipment', 'robotics'])
+    const links = rows.flatMap(r => Array.from(r.querySelectorAll('a')).map(a => a.getAttribute('href')))
+    expect(links).toEqual([
+      '/tech-report/ai-datacenter-equipment', '/tech-anatomy/ai-datacenter-equipment',
+      '/tech-report/robotics', '/tech-anatomy/robotics',
+    ])
+    // 이빨 — 행 개수만 세면 `listed`에서 이 종목을 못 찾아 단계가 통째로 빠져도 통과한다.
+    // 그래서 **이 종목의** 단계·격차 텍스트를 직접 단언한다(계획 S2의 「통과하면서도 깨질 수 있는 방식」).
+    // tech_level 3 → '실증'(TECH_LEVEL_LABELS), 이웃 기술은 2 → '시제품'이라 행이 섞이면 깨진다.
+    expect(rows[0].textContent).toContain('AI 데이터센터 설비')
+    expect(rows[0].textContent).toContain('이 종목 실증')
+    expect(rows[0].textContent).toContain('선두 격차 2년')
+    expect(rows[0].textContent).toContain('참여 업체 25개')
+    expect(rows[1].textContent).toContain('이 종목 시제품')
+  })
+
+  it('ⓑ 등장 0건이면 섹션이 통째로 미렌더 — 「관련 기술 없음」류 문구도 없다', async () => {
+    wireApi({ indexFn: listedIndex })
+    const { container } = renderSection('NFLX')
+    await waitFor(() => expect(api.get).toHaveBeenCalled())
+    expect(screen.queryAllByTestId('related-tech-row')).toHaveLength(0)
+    expect(container.textContent).toBe('')
+  })
+
+  it('ⓒ 인덱스 조회 실패면 섹션 미렌더 — 0건과 같은 화면이지만 「없다」고 단정하지 않는다', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    wireApi({ indexFn: () => Promise.reject(new Error('boom')) })
+    const { container } = renderSection('005930')
+    await waitFor(() => expect(warn).toHaveBeenCalled())
+    expect(screen.queryAllByTestId('related-tech-row')).toHaveLength(0)
+    // 3상태 규율(task#307): 실패는 「0건」과 화면이 같아야 한다 — 문구가 생기는 순간 거짓 진술이 된다.
+    expect(container.textContent).toBe('')
+    expect(warn.mock.calls[0][0]).toContain('[useTechIndex]')
+  })
+})
+
+describe('ReportDetailHeader 진입 칩 제거 (task#358)', () => {
   const renderHeader = (ticker) => render(
     <MemoryRouter>
       <ReportDetailHeader
@@ -158,33 +217,17 @@ describe('ReportDetailHeader 기술 칩 (렌더)', () => {
     </MemoryRouter>
   )
 
-  it('ⓐ 2개 기술에 등장하는 티커에 칩 2개 + 각 링크가 /tech-report/<slug>', async () => {
+  it('기술 칩·「애널리스트 리포트 →」가 헤더에 없다 — 탭과 본문 섹션이 그 자리를 대신한다', async () => {
     wireApi({ indexFn: okIndex })
     renderHeader('005930')
-    await waitFor(() => expect(screen.getAllByTestId('header-tech-chip')).toHaveLength(2))
-    const chips = screen.getAllByTestId('header-tech-chip')
-    expect(chips.map(c => c.getAttribute('href'))).toEqual([
-      '/tech-report/ai-datacenter-equipment',
-      '/tech-report/robotics',
-    ])
-    expect(chips[0].textContent).toContain('AI 데이터센터 설비')
-  })
-
-  it('ⓑ 등장 0이면 칩이 하나도 없다 — 그래도 헤더 본문은 렌더된다', async () => {
-    wireApi({ indexFn: okIndex })
-    renderHeader('NFLX')
     await waitFor(() => expect(screen.getByText('← 목록으로')).toBeTruthy())
-    expect(screen.queryAllByTestId('header-tech-chip')).toHaveLength(0)
-  })
-
-  it('ⓒ 인덱스 조회가 실패해도 본문 렌더를 막지 않는다(칩만 생략 + console.warn)', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    wireApi({ indexFn: () => Promise.reject(new Error('boom')) })
-    renderHeader('005930')
-    await waitFor(() => expect(screen.getByText('← 목록으로')).toBeTruthy())
-    await waitFor(() => expect(warn).toHaveBeenCalled())
-    expect(screen.queryAllByTestId('header-tech-chip')).toHaveLength(0)
-    expect(warn.mock.calls[0][0]).toContain('[useTechIndex]')
+    // 옛 testid 리터럴로 부재를 재지 않는다 — ⓐ 그 문자열을 감시하는 감사(축 이전 완료 검사)가
+    // 이 *정정* 단언까지 재발로 잡고(task#343), ⓑ 칩이 새 testid로 되살아나면 못 잡는다.
+    // 대신 **행동**으로 잰다: 헤더 안에 기술 리포트로 가는 링크가 하나도 없어야 한다.
+    const header = document.querySelector('.detail-header')
+    expect(header.querySelectorAll('a[href^="/tech-report/"]')).toHaveLength(0)
+    expect(header.querySelectorAll('a[href^="/analyst-report/"]')).toHaveLength(0)
+    expect(screen.queryByText(/애널리스트 리포트/)).toBeNull()
   })
 })
 

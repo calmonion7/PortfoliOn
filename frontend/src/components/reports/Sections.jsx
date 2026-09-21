@@ -182,7 +182,7 @@ export function ReportSectionNews({ disclosures, news }) {
 const _FACTOR_LINE = { paddingLeft: 12, borderLeft: '2px solid var(--border)', marginBottom: 0 }
 const _FACTOR_TITLE = { fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }
 const _FACTOR_DESC = { fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }
-const _CHIP = (color) => ({ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: 'var(--bg-elev-2)', color })
+export const _CHIP = (color) => ({ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: 'var(--bg-elev-2)', color })
 
 // 빈 오브젝트({}) 가드 — 각 섹션이 실제로 렌더하는 필드 기준. ReportDetailTabs 그룹 헤더 조건도 이 헬퍼를 재사용.
 export function hasMoatContent(moat) {
@@ -466,7 +466,9 @@ export function RecentDisclosuresSection({ disclosures, news }) {
   )
 }
 
-const STANCE_CFG = {
+// 결론 단(ReportDetailTabs)이 같은 stance 색·라벨을 재사용한다 — 한 화면에서 같은 stance가
+// 두 색으로 보이면 안 되므로 정의는 여기 한 곳(ADR `260921-091825` 결정 1).
+export const STANCE_CFG = {
   진입: { label: '진입', color: 'var(--semantic-buy)' },
   관망: { label: '관망', color: 'var(--text-3)' },
   회피: { label: '회피', color: 'var(--semantic-sell)' },

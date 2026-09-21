@@ -370,7 +370,10 @@ for (const V of VIEWS) {
   await ctx.close();
 }
 
-// ══ ⓕ 헤더 칩 왕복 — 클릭 → /tech-report/:slug 도달 → 뒤로가기 ═══════════════
+// ══ ⓕ 관련 기술 행 왕복 — 사업분석 탭 → 클릭 → /tech-report/:slug 도달 → 뒤로가기 ══
+//    task#358: 상세 헤더의 기술 칩이 제거되고 같은 연결이 사업분석 탭 「경쟁」 단의
+//    「관련 기술」 섹션으로 옮겨졌다(ADR `260921-091825` 결정 2·3). 축을 *지우지 않고* 옮긴다 —
+//    지우면 이 프로브의 PASS 수가 줄어 커버리지 붕괴가 조용히 통과한다.
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 }, serviceWorkers: 'block' });
   await ctx.addInitScript(([a, r]) => {
@@ -390,13 +393,19 @@ for (const V of VIEWS) {
     : (await cardI.isVisible().catch(() => false)) ? cardI : null;
   if (target) { await target.click().catch(() => {}); await page.waitForTimeout(1800); }
   nav.opened = !!target;
-  const chips = page.locator('[data-testid="header-tech-chip"]');
+  // 관련 기술 섹션은 사업분석 탭 안에 있다 — 상세를 연 뒤 그 탭으로 전환해야 측정 대상에 닿는다.
+  await page.evaluate(() => {
+    Array.from(document.querySelectorAll('.tab-btn'))
+      .filter(t => (t.textContent || '').includes('사업분석')).forEach(t => t.click());
+  });
+  await page.waitForTimeout(1600);
+  const chips = page.locator('[data-testid="related-tech-row"] a[href^="/tech-report/"]');
   nav.chips = await chips.count();
-  // ⚠️ 캡처는 **클릭 전**에 — 왕복 뒤에 찍으면 목록 화면이 찍혀 칩의 육안 증거가 되지 못한다
+  // ⚠️ 캡처는 **클릭 전**에 — 왕복 뒤에 찍으면 목록 화면이 찍혀 행의 육안 증거가 되지 못한다
   //    (첫 판이 그랬다: 단언은 통과했는데 스크린샷엔 칩이 없었다).
   await page.screenshot({ path: `${OUT}/pc1280-chip.png`, fullPage: false });
   if (nav.chips > 0) {
-    const slug = await chips.first().getAttribute('data-slug');
+    const slug = await chips.first().evaluate(a => a.getAttribute('href').split('/').pop());
     await chips.first().click();
     await page.waitForTimeout(1400);
     nav.reached = page.url().includes(`/tech-report/${slug}`);
@@ -404,7 +413,7 @@ for (const V of VIEWS) {
     await page.waitForTimeout(1200);
     nav.back = !page.url().includes('/tech-report/');
   }
-  eq('chip-open-domain', nav.opened === true, true, `상세 진입 대상=${chipTicker} — 못 열면 칩 축은 측정 실패다`);
+  eq('chip-open-domain', nav.opened === true, true, `상세 진입 대상=${chipTicker} — 못 열면 관련 기술 축은 측정 실패다`);
   eq('chip-count', nav.chips, chipTechs.length, `종목=${chipTicker}`);
   eq('chip-roundtrip', { reached: nav.reached, back: nav.back }, { reached: true, back: true });
   bump('chip', 3);

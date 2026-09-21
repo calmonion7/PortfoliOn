@@ -142,11 +142,16 @@ export function ConsensusRangeGauge({ myLow, myHigh, cLow, cHigh, market }) {
 
 // 컨센서스 근거 섹션 (task#260) — 발행 순간 박제된 집계·증권사별 의견 + 현재 대비 델타.
 // data.consensus_detail 없는 구발행물은 섹션 전체 생략(헤더 Stat은 기존 그대로).
-export function ConsensusSection({ report, market }) {
+// `embedded`(리포트 상세 「심층 리포트」 탭)에서는 근거 본문을 **기본 접는다**(ADR `260921-091825` 결정 2) —
+// 사업분석 탭에 이미 컨센서스 하위탭이 있어 같은 근거가 두 번 길게 펼쳐지기 때문이다. 단독 라우트
+// (`/analyst-report/…`)는 그 문서 자체가 목적지이므로 펼친 채 둔다. **데이터·fetch는 무변경**이다 —
+// 접기는 표시만 바꾼다(아래 useEffect는 접힌 상태에서도 그대로 돈다).
+export function ConsensusSection({ report, market, embedded = false }) {
   const d = report.data || {}
   const detail = d.consensus_detail
   const cons = d.consensus || {}
   const [showAll, setShowAll] = useState(false)
+  const [collapsed, setCollapsed] = useState(embedded)
   const [current, setCurrent] = useState(null)   // 현재 컨센서스 최신 행 — 실패·부재 시 델타만 생략
 
   useEffect(() => {
@@ -170,7 +175,18 @@ export function ConsensusSection({ report, market }) {
 
   return (
     <>
-      <SectionTitle>컨센서스</SectionTitle>
+      <SectionTitle right={
+        <button
+          type="button"
+          onClick={() => setCollapsed(v => !v)}
+          aria-expanded={!collapsed}
+          data-testid="consensus-toggle"
+          style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--accent)', fontSize: 11, cursor: 'pointer' }}
+        >
+          {collapsed ? '근거 펼치기' : '근거 접기'}
+        </button>
+      }>컨센서스</SectionTitle>
+      {!collapsed && (
       <Card padding="md" style={{ marginBottom: 30 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
           {/* 캡션이 "집계"가 아니라 "기준"인 이유: base_date의 출처가 두 가지다 — 스냅샷 값을
@@ -218,6 +234,7 @@ export function ConsensusSection({ report, market }) {
         )}
         <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '10px 0 0' }}>발행 시점 박제 — 90일 창 증권사별 최신 의견 · 현재 대비만 라이브</p>
       </Card>
+      )}
     </>
   )
 }
@@ -530,7 +547,7 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
       </Card>
 
       {/* ── 컨센서스 근거 (박제 + 현재 델타, task#260) — 구발행물은 섹션 자체 생략 ── */}
-      <ConsensusSection report={report} market={market} />
+      <ConsensusSection report={report} market={market} embedded={embedded} />
 
       {/* ── 실적 추정 (차트 — 값·YoY 증감% 병기, task#217) ── */}
       {annual.length > 0 && (

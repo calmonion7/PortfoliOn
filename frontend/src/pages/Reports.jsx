@@ -364,7 +364,6 @@ export default function Reports({ initialTicker = null, navKey = null }) {
               generateOne={generateOne}
               guruMap={guruMap}
               reportList={reportList}
-              publications={pubsByTicker[selected.ticker?.toUpperCase()] || []}
             />
             {detailError && (
               <div role="alert" data-testid="report-detail-error"

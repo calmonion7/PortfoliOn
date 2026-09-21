@@ -115,3 +115,57 @@ describe('enrich 탭 개명 — 옛 이름을 「사업분석」으로 (task#324
     expect(onTabChange).toHaveBeenCalledWith('report')
   })
 })
+
+// task#358 (ADR `260921-091825` 결정 1) — 사업분석 탭은 7단 뼈대로 읽는다.
+// 그룹 헤더 이름·순서가 주요기술 리포트와의 **계약**이므로, 존재가 아니라 **순서**를 단언한다.
+describe('사업분석 탭 7단 그룹 헤더 (task#358)', () => {
+  // 7단이 전부 렌더되도록 각 단의 입력을 하나씩 채운 픽스처.
+  const FULL = {
+    ...SUMMARY,
+    insights: { stance: '진입', one_liner: '결론 한 줄' },
+    market_outlook: { size_current: { value: 10, unit: 'bn', currency: 'USD' } },
+    competitors_data: [{ name: '경쟁사A', ticker: '000660' }],
+    moat: '해자 서술',
+    growth_plan: '성장 계획 서술',
+    risks: '리스크 서술',
+  }
+
+  const openAnalysis = (props = {}) => {
+    const r = renderTabs({ summary: FULL, ...props })
+    fireEvent.click(screen.getByText('📝 사업분석'))
+    return r
+  }
+
+  it('그룹 헤더가 「시장 → 경쟁 → 우위 → 전망 → 리스크 → 확인할 것」 순서로 렌더된다', () => {
+    openAnalysis()
+    expect(screen.getAllByTestId('group-header').map(e => e.textContent))
+      .toEqual(['시장', '경쟁', '우위', '전망', '리스크', '확인할 것'])
+  })
+
+  it('결론 단은 그룹 헤더 없이 최상단 — stance 칩 + 한 줄이 첫 헤더보다 앞선다', () => {
+    const { container } = openAnalysis()
+    const body = container.textContent
+    expect(body).toContain('결론 한 줄')
+    // 「결론」이라는 헤더는 없어야 한다(결정 1: 결론 단은 헤더 없이 최상단).
+    expect(screen.getAllByTestId('group-header').map(e => e.textContent)).not.toContain('결론')
+    // 순서 — 결론 한 줄이 첫 그룹 헤더('시장')보다 먼저 나온다.
+    expect(body.indexOf('결론 한 줄')).toBeLessThan(body.indexOf('시장'))
+  })
+
+  it('입력이 없는 단은 헤더도 렌더하지 않는다 — 유령 헤더 금지', () => {
+    // 시장·경쟁·우위·전망·리스크 입력을 모두 비우면 자체 fetch 섹션이 있는 「확인할 것」만 남는다.
+    renderTabs({ summary: { ...SUMMARY } })
+    fireEvent.click(screen.getByText('📝 사업분석'))
+    expect(screen.getAllByTestId('group-header').map(e => e.textContent)).toEqual(['확인할 것'])
+  })
+
+  it('발행물이 있으면 리스크 단에 심층 리포트 탭 전환 줄이 붙고, 없으면 붙지 않는다', () => {
+    openAnalysis({ publications: [PUB] })
+    expect(screen.getByText('발행 시점 리스크 요인은 심층 리포트 탭 →')).toBeTruthy()
+  })
+
+  it('발행물이 없으면 심층 전환 줄이 없다 — 대조군', () => {
+    openAnalysis()
+    expect(screen.queryByText('발행 시점 리스크 요인은 심층 리포트 탭 →')).toBeNull()
+  })
+})

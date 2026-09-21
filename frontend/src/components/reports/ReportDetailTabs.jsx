@@ -5,7 +5,8 @@ import { ConsensusSummary, VolumeRsiSnapshot, BacklogSection, RsiTable, Technica
 import ConsensusChart from './ConsensusChart'
 import FinancialsChart from './FinancialsChart'
 import HistoryTab from './HistoryTab'
-import { ReportSectionCompetitors, MoatSection, KeyResourceSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection, hasMoatContent, hasKeyResourceContent, hasGrowthPlanContent, hasRisksContent } from './Sections'
+import { ReportSectionCompetitors, MoatSection, KeyResourceSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection, hasMoatContent, hasKeyResourceContent, hasGrowthPlanContent, hasRisksContent, STANCE_CFG, _CHIP } from './Sections'
+import RelatedTechSection, { useRelatedTechs } from './RelatedTechSection'
 import InvestorTrendSection from './InvestorTrendSection'
 import ShortSellSection from './ShortSellSection'
 import SupplySection from './SupplySection'
@@ -21,7 +22,7 @@ const noop = () => {}
 
 // 사업분석 탭 그룹 헤더 — SectionTitle(세리프+언더라인, 섹션당)보다 한 단 위의 가벼운 구분선. 하위탭 아님(정적 라벨만).
 const GroupHeader = ({ children }) => (
-  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, marginBottom: 10 }}>
+  <div data-testid="group-header" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, marginBottom: 10 }}>
     {children}
   </div>
 )
@@ -60,6 +61,11 @@ export default function ReportDetailTabs({
   const histMarket = historyMarket ?? summary?.market ?? 'US'
   const hasRsi = [summary?.daily_rsi, summary?.weekly_rsi, summary?.monthly_rsi].some(r => r?.rsi != null)
   const news = liveNews?.length ? liveNews : summary?.news
+  // 「경쟁」 그룹 헤더는 경쟁사 표 또는 관련 기술 행이 하나라도 있을 때만 — 유령 헤더 금지.
+  const { visible: hasRelatedTech } = useRelatedTechs(ticker)
+  // 결론 단 stance 칩 — InsightsSection과 같은 색·라벨을 쓴다(정의는 Sections.jsx 한 곳).
+  const _stance = summary?.insights && typeof summary.insights === 'object' ? summary.insights.stance : null
+  const conclusionStance = _stance ? (STANCE_CFG[_stance] || { label: _stance, color: 'var(--text-3)' }) : null
 
   // 마운트/종목 전환 시 라이브 뉴스 fetch — 실패·빈값이면 news가 자동으로 스냅샷 summary.news 폴백 유지 (Ranking.jsx BasicInfo와 동일 패턴)
   useEffect(() => {
@@ -170,34 +176,68 @@ export default function ReportDetailTabs({
                   <span>⚠</span> AI 분석 미업데이트 (enrich API 미실행)
                 </div>
               )}
-              {(summary.market_outlook || summary.competitors_data?.length > 0) && (
+              {/* 결론 — 그룹 헤더 없이 최상단(ADR `260921-091825` 결정 1). insights가 없으면
+                  블록 자체를 렌더하지 않는다: 「권고 없음」류 문구는 거짓 진술이 된다(task#307). */}
+              {conclusionStance && (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 16 }}>
+                  <span style={_CHIP(conclusionStance.color)}>{conclusionStance.label}</span>
+                  {summary.insights?.one_liner && (
+                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.7, margin: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
+                      {summary.insights.one_liner}
+                    </p>
+                  )}
+                </div>
+              )}
+              {summary.market_outlook && (
                 <>
-                  <GroupHeader>시장 & 경쟁</GroupHeader>
+                  <GroupHeader>시장</GroupHeader>
                   <MarketOutlookSection market_outlook={summary.market_outlook} financialsAnnual={summary.financials_annual} />
+                </>
+              )}
+              {(summary.competitors_data?.length > 0 || hasRelatedTech) && (
+                <>
+                  <GroupHeader>경쟁</GroupHeader>
                   <ReportSectionCompetitors
                     competitors={summary.competitors_data}
                     market={market}
                     ticker={ticker}
                     competitor_edge={summary.competitor_edge}
                   />
+                  <RelatedTechSection ticker={ticker} />
                 </>
               )}
               {(hasMoatContent(summary.moat) || hasKeyResourceContent(summary.key_resource)) && (
                 <>
-                  <GroupHeader>경쟁우위</GroupHeader>
+                  <GroupHeader>우위</GroupHeader>
                   <MoatSection moat={summary.moat} />
                   <KeyResourceSection key_resource={summary.key_resource} />
                 </>
               )}
-              {(hasGrowthPlanContent(summary.growth_plan) || hasRisksContent(summary.risks)) && (
+              {hasGrowthPlanContent(summary.growth_plan) && (
                 <>
-                  <GroupHeader>성장 & 리스크</GroupHeader>
+                  <GroupHeader>전망</GroupHeader>
                   <GrowthPlanSection growth_plan={summary.growth_plan} />
+                </>
+              )}
+              {(hasRisksContent(summary.risks) || hasDeep) && (
+                <>
+                  <GroupHeader>리스크</GroupHeader>
                   <RisksSection risks={summary.risks} />
+                  {/* 발행 시점 리스크와 매일 갱신되는 enrich 리스크는 as-of가 다른 정당한 공존(ADR-0047·결정 5).
+                      라우팅이 아니라 탭 전환이다 — 라우팅하면 이 탭 맥락을 벗어난다. */}
+                  {hasDeep && (
+                    <button
+                      type="button"
+                      onClick={() => setTab('deep')}
+                      style={{ background: 'transparent', border: 'none', padding: 0, marginBottom: 20, color: 'var(--accent)', fontSize: 12, cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      발행 시점 리스크 요인은 심층 리포트 탭 →
+                    </button>
+                  )}
                 </>
               )}
               {/* LatestDisclosuresSection·InsiderTradesSection은 자체 fetch로 항상 렌더 → 그룹 무조건 표시 (eco) */}
-              <GroupHeader>이벤트</GroupHeader>
+              <GroupHeader>확인할 것</GroupHeader>
               <RecentDisclosuresSection
                 disclosures={summary.recent_disclosures}
                 news={news}

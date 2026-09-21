@@ -70,3 +70,41 @@ describe('ConsensusSection (task#260)', () => {
     expect(screen.queryByText(/목표가 평균:/)).toBeNull()   // 델타 줄만 생략
   })
 })
+
+// task#358 (ADR `260921-091825` 결정 2) — 리포트 상세 「심층 리포트」 탭에 임베드될 때는
+// 근거 본문을 기본 접는다(사업분석 탭에 컨센서스 하위탭이 따로 있어 같은 근거가 두 번 길어진다).
+// 단독 라우트는 그 문서 자체가 목적지이므로 펼친 채 둔다. **데이터·fetch는 무변경**이다.
+describe('ConsensusSection 임베드 기본 접힘 (task#358)', () => {
+  it('embedded면 제목·토글은 남고 근거 본문은 렌더되지 않는다', async () => {
+    getMock.mockResolvedValue({ data: [] })
+    render(<ConsensusSection report={mkReport()} market="KR" embedded />)
+    expect(screen.getAllByText('컨센서스').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('consensus-toggle').textContent).toBe('근거 펼치기')
+    // 본문(증권사 행·집계 스탯·게이지)이 없어야 한다 — 제목만 남는 것이 「접힘」이다.
+    expect(screen.queryByText('증권사1')).toBeNull()
+    expect(screen.queryByText('8명')).toBeNull()
+    expect(screen.queryByText('내 판단 밴드')).toBeNull()
+  })
+
+  it('embedded에서 「펼치기」를 누르면 근거 본문이 렌더된다', async () => {
+    getMock.mockResolvedValue({ data: [] })
+    render(<ConsensusSection report={mkReport()} market="KR" embedded />)
+    fireEvent.click(screen.getByTestId('consensus-toggle'))
+    expect(screen.getByText('증권사1')).toBeTruthy()
+    expect(screen.getByText('8명')).toBeTruthy()
+    expect(screen.getByTestId('consensus-toggle').textContent).toBe('근거 접기')
+  })
+
+  it('embedded가 아니면(단독 라우트) 기존대로 펼쳐진 채 렌더된다 — 대조군', async () => {
+    getMock.mockResolvedValue({ data: [] })
+    render(<ConsensusSection report={mkReport()} market="KR" />)
+    expect(screen.getByText('증권사1')).toBeTruthy()
+    expect(screen.getByTestId('consensus-toggle').textContent).toBe('근거 접기')
+  })
+
+  it('접힌 상태에서도 현재 컨센서스 fetch는 그대로 돈다 — 표시만 접는다', async () => {
+    getMock.mockResolvedValue({ data: [{ date: '2026-08-01', target_mean: 218000 }] })
+    render(<ConsensusSection report={mkReport()} market="KR" embedded />)
+    await waitFor(() => expect(getMock).toHaveBeenCalledWith('/api/consensus/TST'))
+  })
+})
