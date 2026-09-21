@@ -110,8 +110,10 @@ const SLUGS = ['ai-datacenter-equipment', 'solid-state-battery', 'reusable-rocke
 // 다만 「어느 장이 렌더돼야 하는가」는 리터럴로 박지 않고 **관측된 표시 섹션에서 유도**한다
 // (판이 달라 섹션 집합이 다르므로 리터럴은 정상 구현을 거짓 FAIL시킨다).
 const CHAPTER_DEF = [
-  { key: 'overview', label: '개요', ids: ['key-points', 'variants', 'related'] },
-  { key: 'market-competition', label: '시장·경쟁', ids: ['market', 'players', 'share'] },
+  // task#359(ADR `260921-091825` 결정 4) — 7단 뼈대 재배치로 계열 비교·구성과 연관이
+  // 「개요」에서 「시장·경쟁」으로 옮겨졌다(장이 단을 포괄한다).
+  { key: 'overview', label: '개요', ids: ['key-points'] },
+  { key: 'market-competition', label: '시장·경쟁', ids: ['market', 'players', 'share', 'related', 'variants'] },
   { key: 'progress-risk', label: '진척·리스크', ids: ['milestones', 'challenges', 'watch-items'] },
   { key: 'evidence', label: '근거', ids: ['prose', 'sources'] },
 ];

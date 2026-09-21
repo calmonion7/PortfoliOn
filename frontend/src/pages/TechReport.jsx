@@ -5,6 +5,7 @@ import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { SectionTitle } from '../components/reports/reportUtils.jsx'
 import { TECH_NAMES, sortPlayers, groupByCategory, TECH_CHAPTERS, chapterNavItems } from '../components/reports/techReportUtils'
+import { GroupHeader } from '../components/reports/reportUtils.jsx'
 import MarketGrowthChart from '../components/tech/MarketGrowthChart'
 import MarketEstimates, { marketEstimatesLayout } from '../components/tech/MarketEstimates'
 import ShareChart from '../components/tech/ShareChart'
@@ -25,21 +26,25 @@ import './TechReport.css'
 // ADR-0038) — 기술 단위 발행물. slug당 1행으로 고정돼 있어(ADR-0038 결정 2) 과거 판이 원천적으로
 // 없다 — 재발행은 그 행을 덮어쓰기만 한다(과거 판 UI는 비목표, 결정 1).
 //
-// 순서(task#280에서 "산문 먼저" → "지표·표 먼저"로, **task#319에서 독자 질문 순서 + 4장 위계**로
-// 재구성. CONTEXT.md 구성 서사도 이 순서다. ADR-0045):
-//   기술명 h1 → 리드 문단 → KPI 스트립 → 해부 링크 → 전역 목차   ← 여기까지 불변(장 밖)
-//   장 1 개요        핵심 포인트 → 계열 비교 → 구성과 연관
-//   장 2 시장·경쟁    시장 규모 → 주요 업체 → 점유율
-//   장 3 진척·리스크  진척 타임라인 → 해결해야 할 난제 → 확인할 지표
-//   장 4 근거        상세 설명(상시 노출) → 출처
-// task#319가 옮긴 것 4건: 연관 기술 ⑨→③ · 계열 비교 ④→② · 시장 규모 ⑧→④ · 진척 타임라인 ②→⑦.
-// 근거는 독자의 질문 순서다 — 전체 파이(시장 규모)를 모른 채 분할(점유율)을 볼 수 없고, 맥락(연관
-// 기술)은 앞쪽 성격인데 9번째였다. 「계열 비교」의 옛 위치 근거(「계보 분류 바로 앞」)는 그 계보 분류가
-// ADR-0041로 업체 표에 흡수돼 **낡았다**.
+// 순서(task#280 "산문 먼저"→"지표·표 먼저" → task#319 독자 질문 순서 + 4장 위계 →
+// **task#359에서 7단 뼈대**로 재구성. CONTEXT.md 「7단 뼈대」가 정본. ADR-0045 · ADR `260921-091825`):
+//   기술명 h1 → 리드 문단 → KPI 스트립 → 해부 링크 → 전역 목차   ← 여기까지 불변(장·단 밖)
+//   [결론]     핵심 포인트                              · 장 1 개요
+//   [시장]     시장 규모                                ┐
+//   [경쟁]     주요 업체 → 점유율 → 구성과 연관           ├ 장 2 시장·경쟁
+//   [우위]     계열 비교                                ┘
+//   [전망] 진척 타임라인 · [리스크] 해결해야 할 난제 · [확인할 것] 확인할 지표  · 장 3 진척·리스크
+//   [근거]     상세 설명(상시 노출) → 출처               · 장 4 근거
+// **2수준이다**(ADR `260921-091825` 결정 4) — 장(4개)은 플로팅 항해 바의 거친 점프 단위이고,
+// 단(7개)은 본문 그룹 헤더의 세밀한 구획이며 장이 단을 포괄한다. 단 이름 7개는 리포트 상세의
+// 사업분석 탭과 **동일**하고(같은 `GroupHeader` 컴포넌트), 그 동일함이 「통일」의 유일한 수단이다.
+// task#359가 옮긴 것 2건: 계열 비교 ②→⑥(개요→우위) · 구성과 연관 ③→⑤(개요→경쟁).
+// ⚠️ task#319의 「계열 비교는 시장 규모보다 앞」·「연관 기술은 앞쪽 성격」은 그 ADR이 **대체**했다 —
+//    7단에서 우위·경쟁은 시장 뒤에 온다. 옛 서술을 근거로 인용하지 말 것.
 // ADR-0041: 「기술수준 비교」 밴드 섹션은 업체 표의 「기술수준」 셀로 흡수돼 별도 섹션이 아니다.
 // task#281(2/2)이 신규 3필드(key_points·milestones·players[].category)로 그 예약 자리를 채웠다.
 // task#297(1/2)이 발행 스키마에 2필드(variants·watch_items)를 추가하고 task#298(2/2)이 그것으로
-// 「계열 비교」(점유율 바로 앞)·「확인할 지표」(난제 바로 뒤)를 렌더한다. 다섯 필드 전부
+// 「계열 비교」(지금은 우위 단)·「확인할 지표」(난제 바로 뒤 — task#298의 기록된 결정, 7단에서도 유지)를 렌더한다. 다섯 필드 전부
 // **선택 필드**이고 구발행물엔 없다(라이브 4종 전부 두 필드 `null`) — 없으면 조용히 생략되어
 // 화면이 이전과 동일해야 하고, 그 사실 자체가 회귀 축이다.
 //
@@ -196,18 +201,22 @@ export default function TechReport() {
   // 앞에 두고, 맥락(연관 기술)을 앞쪽으로 올린다. 이동 4건: 연관 ⑨→③ · 계열 ④→② · 시장 ⑧→④ ·
   // 타임라인 ②→⑦. 뒤집지 않은 것: KPI 스트립 첫 화면 · 목차는 스트립 아래 · 상세 설명은 본문 끝 ·
   // 난제→확인할 지표 인접(장 3 안에서 유지).
+  // 순서는 **7단 뼈대**(ADR `260921-091825` 결정 1)다 — 결론 → 시장 → 경쟁 → 우위 → 전망 →
+  // 리스크 → 확인할 것, 그 뒤에 근거. `stage`는 본문 그룹 헤더(단), `chapter`는 플로팅 항해 바(장)로
+  // **장이 단을 포괄한다**(2수준 — 결정 4). 목차 칩·본문 렌더 순서가 모두 이 배열에서 파생되므로
+  // 여기 순서를 바꾸면 세 곳이 함께 움직인다(그게 의도다).
   const SECTIONS = [
-    { id: 'key-points', label: '핵심 포인트', show: hasKeyPoints, chapter: 'overview' },
-    { id: 'variants', label: '계열 비교', show: hasVariants, chapter: 'overview' },
-    { id: 'related', label: '구성과 연관', show: hasConnections, chapter: 'overview' },
-    { id: 'market', label: '시장 규모', show: true, chapter: 'market-competition' },
-    { id: 'players', label: '주요 업체', show: hasPlayers, chapter: 'market-competition' },
-    { id: 'share', label: '점유율', show: hasShare, chapter: 'market-competition' },
-    { id: 'milestones', label: '진척 타임라인', show: hasMilestones, chapter: 'progress-risk' },
-    { id: 'challenges', label: '해결해야 할 난제', show: hasChallenges, chapter: 'progress-risk' },
-    { id: 'watch-items', label: '확인할 지표', show: hasWatchItems, chapter: 'progress-risk' },
-    { id: 'prose', label: '상세 설명', show: hasProse, chapter: 'evidence' },
-    { id: 'sources', label: '출처', show: hasSources, chapter: 'evidence' },
+    { id: 'key-points', label: '핵심 포인트', show: hasKeyPoints, chapter: 'overview', stage: null },
+    { id: 'market', label: '시장 규모', show: true, chapter: 'market-competition', stage: '시장' },
+    { id: 'players', label: '주요 업체', show: hasPlayers, chapter: 'market-competition', stage: '경쟁' },
+    { id: 'share', label: '점유율', show: hasShare, chapter: 'market-competition', stage: '경쟁' },
+    { id: 'related', label: '구성과 연관', show: hasConnections, chapter: 'market-competition', stage: '경쟁' },
+    { id: 'variants', label: '계열 비교', show: hasVariants, chapter: 'market-competition', stage: '우위' },
+    { id: 'milestones', label: '진척 타임라인', show: hasMilestones, chapter: 'progress-risk', stage: '전망' },
+    { id: 'challenges', label: '해결해야 할 난제', show: hasChallenges, chapter: 'progress-risk', stage: '리스크' },
+    { id: 'watch-items', label: '확인할 지표', show: hasWatchItems, chapter: 'progress-risk', stage: '확인할 것' },
+    { id: 'prose', label: '상세 설명', show: hasProse, chapter: 'evidence', stage: '근거' },
+    { id: 'sources', label: '출처', show: hasSources, chapter: 'evidence', stage: '근거' },
   ]
   const tocItems = SECTIONS.filter((s) => s.show)
   // 플로팅 항해 바가 그릴 4장 칩(task#321). ⚠️ 게이트가 `tocItems.length > 1`과 **다른 식**이다 —
@@ -227,6 +236,12 @@ export default function TechReport() {
   for (const c of TECH_CHAPTERS) {
     const first = SECTIONS.find((s) => s.chapter === c.key && s.show)
     if (first) chapterHeadAt[first.id] = c
+  }
+  // 단(7단 뼈대) 헤더도 같은 방식 — 그 단의 **첫 표시 섹션**에만 놓는다(유령 헤더 금지).
+  // `show`를 무시하면 데이터 없는 판에서 헤더만 남는다(장 라벨과 같은 규율).
+  const stageHeadAt = {}
+  for (const sec of SECTIONS) {
+    if (sec.stage && sec.show && !Object.values(stageHeadAt).includes(sec.stage)) stageHeadAt[sec.id] = sec.stage
   }
   // 섹션 블록마다 앞에 놓인다 — 그 섹션이 자기 장의 첫 표시 섹션일 때만 라벨이 된다(그 외엔 null).
   // 섹션의 게이트 *밖*에 두어도 안전하다: 표시되지 않는 섹션은 chapterHeadAt의 키가 될 수 없다.
@@ -355,34 +370,8 @@ export default function TechReport() {
       <KeyPointCards points={report.key_points} sectionId="key-points" />
 
 
-      <Chap id="variants" />
-      {/* ── 계열 비교 (task#298 S4) ── 점유율 바로 앞. 계열의 *성질*을 담는다(업체의 *소속*을
-          담는 계보 분류와는 다른 사실 — 병존, 흡수하지 않는다). 게이트는 VariantTable 자신의
-          채택 조건과 같은 식(variantTableLayout(...).axes.length > 0). ── */}
-      {hasVariants && (
-        <div id="variants" data-tech-section="variants" style={{ marginBottom: 30 }}>
-          <SectionTitle>계열 비교</SectionTitle>
-          <VariantTable variants={report.variants} />
-        </div>
-      )}
-
-
-      <Chap id="related" />
-      {/* ── 구성과 연관 (task#320 · ADR-0046) — 한 섹션에 소제목 2개.
-          「무엇으로 이뤄졌나」= composition.tech 지분 분해(안쪽) · 「무엇과 이어지나」= related 4분류
-          경계 포인터(바깥, 발행물이면 링크). 두 필드의 **방향이 반대**라 합치지 않고 가른다.
-          게이트는 두 반쪽의 합집합이며 TechGraph 자신의 채택 조건과 같은 식이다. ── */}
-      {hasConnections && (
-        <div id="related" data-tech-section="related" style={{ marginBottom: 30 }}>
-          <SectionTitle>구성과 연관</SectionTitle>
-          <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug}
-                     composition={report.composition} slug={report.slug}
-                     techIndex={techIndex} indexFailed={techIndexFailed} />
-        </div>
-      )}
-
-
       <Chap id="market" />
+      {stageHeadAt['market'] && <GroupHeader flush={!!chapterHeadAt['market']}>{stageHeadAt['market']}</GroupHeader>}
       {/* ── 시장 규모 (task#282 S3 — 텍스트 요약 카드를 제거했다. formatMarketSummary가
           history/forecast에서 파생되므로 차트가 빈 상태면 요약도 항상 null이었다(둘은 항상 같이
           있거나 같이 없다) — 구조적으로 100% 중복. 유일한 고유 정보였던 as_of는 이제
@@ -402,6 +391,7 @@ export default function TechReport() {
 
 
       <Chap id="players" />
+      {stageHeadAt['players'] && <GroupHeader flush={!!chapterHeadAt['players']}>{stageHeadAt['players']}</GroupHeader>}
       {/* ── 주요 업체 (표시 규율은 PlayerTable 단독 소유) ── */}
       {hasPlayers && (
         <div id="players" data-tech-section="players" style={{ marginBottom: 30 }}>
@@ -412,6 +402,7 @@ export default function TechReport() {
 
 
       <Chap id="share" />
+      {stageHeadAt['share'] && <GroupHeader flush={!!chapterHeadAt['share']}>{stageHeadAt['share']}</GroupHeader>}
       {/* ── 점유율 ── 게이트는 ShareChart 자신의 채택 조건(유한·음수 아님)과 같은 식이어야 한다.
           느슨하면(예: isFinite만) 전 업체가 음수인 판에서 제목만 남고 차트가 사라진다(task#277 S2). */}
       {hasShare && (
@@ -422,7 +413,37 @@ export default function TechReport() {
       )}
 
 
+      <Chap id="related" />
+      {stageHeadAt['related'] && <GroupHeader flush={!!chapterHeadAt['related']}>{stageHeadAt['related']}</GroupHeader>}
+      {/* ── 구성과 연관 (task#320 · ADR-0046) — 한 섹션에 소제목 2개.
+          「무엇으로 이뤄졌나」= composition.tech 지분 분해(안쪽) · 「무엇과 이어지나」= related 4분류
+          경계 포인터(바깥, 발행물이면 링크). 두 필드의 **방향이 반대**라 합치지 않고 가른다.
+          게이트는 두 반쪽의 합집합이며 TechGraph 자신의 채택 조건과 같은 식이다. ── */}
+      {hasConnections && (
+        <div id="related" data-tech-section="related" style={{ marginBottom: 30 }}>
+          <SectionTitle>구성과 연관</SectionTitle>
+          <TechGraph related={report.related} target={TECH_NAMES[report.slug] || report.slug}
+                     composition={report.composition} slug={report.slug}
+                     techIndex={techIndex} indexFailed={techIndexFailed} />
+        </div>
+      )}
+
+
+      <Chap id="variants" />
+      {stageHeadAt['variants'] && <GroupHeader flush={!!chapterHeadAt['variants']}>{stageHeadAt['variants']}</GroupHeader>}
+      {/* ── 계열 비교 (task#298 S4 · task#359에서 「우위」 단으로 이동) ── 계열의 *성질*을 담는다(업체의 *소속*을
+          담는 계보 분류와는 다른 사실 — 병존, 흡수하지 않는다). 게이트는 VariantTable 자신의
+          채택 조건과 같은 식(variantTableLayout(...).axes.length > 0). ── */}
+      {hasVariants && (
+        <div id="variants" data-tech-section="variants" style={{ marginBottom: 30 }}>
+          <SectionTitle>계열 비교</SectionTitle>
+          <VariantTable variants={report.variants} />
+        </div>
+      )}
+
+
       <Chap id="milestones" />
+      {stageHeadAt['milestones'] && <GroupHeader flush={!!chapterHeadAt['milestones']}>{stageHeadAt['milestones']}</GroupHeader>}
       {/* ── 진척 타임라인 (task#281 S3) ── */}
       {hasMilestones && (
         <div id="milestones" data-tech-section="milestones" style={{ marginBottom: 30 }}>
@@ -433,6 +454,7 @@ export default function TechReport() {
 
 
       <Chap id="challenges" />
+      {stageHeadAt['challenges'] && <GroupHeader flush={!!chapterHeadAt['challenges']}>{stageHeadAt['challenges']}</GroupHeader>}
       {/* ── 해결해야 할 난제 ─────────────────────────────── */}
       {hasChallenges && (
         <div id="challenges" data-tech-section="challenges" style={{ marginBottom: 30 }}>
@@ -450,6 +472,7 @@ export default function TechReport() {
 
 
       <Chap id="watch-items" />
+      {stageHeadAt['watch-items'] && <GroupHeader flush={!!chapterHeadAt['watch-items']}>{stageHeadAt['watch-items']}</GroupHeader>}
       {/* ── 확인할 지표 (task#298 S4) ── 난제 바로 뒤·시장 규모 앞. 난제(*지금 무엇이 안 풀렸나*)
           → 확인할 지표(*무엇을 지켜보면 풀렸는지 아는가*)가 논리 순서다. 게이트는 WatchItems 자신의
           채택 조건과 같은 식이어야 한다 — 느슨하면 label이 전부 빈 판에서 제목만 남는다. */}
@@ -462,6 +485,7 @@ export default function TechReport() {
 
 
       <Chap id="prose" />
+      {stageHeadAt['prose'] && <GroupHeader flush={!!chapterHeadAt['prose']}>{stageHeadAt['prose']}</GroupHeader>}
       {/* ── 상세 설명 (산문 전문 — 첫 화면이 아니라 본문 끝, 출처 앞. task#296: <details> 접기를
           없애고 스크롤로 전문을 읽는다 — 항해는 위 전역 목차가 대신한다) ──
           가드는 description·rationale 둘 다 봐야 한다 — rationale만 있는 판에서 제목이 dangling
@@ -475,6 +499,7 @@ export default function TechReport() {
 
 
       <Chap id="sources" />
+      {stageHeadAt['sources'] && <GroupHeader flush={!!chapterHeadAt['sources']}>{stageHeadAt['sources']}</GroupHeader>}
       {/* ── 출처 ───────────────────────────────────────────
           ⚠️ 이 컨테이너는 `alignItems`를 지정하지 않으므로 기본 **stretch**다 — 제목이 길어 여러 줄이
           된 칩(2026-08-20 m278 실측 148/114/79px)이 같은 wrap 줄에 있으면 짧은 칩도 그 줄 높이로

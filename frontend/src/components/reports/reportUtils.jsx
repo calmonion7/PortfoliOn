@@ -109,6 +109,22 @@ export const MetricCard = ({ label, value, sub, valueColor }) => (
   </div>
 )
 
+// 7단 뼈대의 **단** 구분선 — SectionTitle(세리프+언더라인, 섹션당)보다 한 단 위의 가벼운 라벨.
+// 하위탭이 아니라 정적 라벨이다. 사업분석 탭(ReportDetailTabs)과 주요기술 리포트(TechReport)가
+// **같은 컴포넌트**를 쓴다 — 두 표면에 같은 단 이름이 같은 모양으로 보이는 것이 「통일」의 수단이므로
+// 정의를 복제하면 한쪽만 바뀌는 재발 경로가 생긴다(ADR `260921-091825` 결정 1).
+// ⚠️ 기술 리포트에서는 위에 **장 라벨**(`data-tech-chapter`, task#319의 기록된 결정)이 올 수 있다.
+//    그때 구분선이 두 줄 겹치므로 `flush`로 윗 테두리·여백을 끈다(2수준 위계 — ADR 결정 4).
+export const GroupHeader = ({ children, flush = false }) => (
+  <div data-testid="group-header" style={{
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)',
+    borderTop: flush ? 'none' : '1px solid var(--border)',
+    paddingTop: flush ? 0 : 14, marginTop: flush ? 0 : 6, marginBottom: 10,
+  }}>
+    {children}
+  </div>
+)
+
 export const SectionTitle = ({ children, weather, right }) => (
   <div className="rpt-title">
     <div className="rpt-title__row">

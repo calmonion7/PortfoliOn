@@ -7,6 +7,7 @@ import FinancialsChart from './FinancialsChart'
 import HistoryTab from './HistoryTab'
 import { ReportSectionCompetitors, MoatSection, KeyResourceSection, GrowthPlanSection, RisksSection, RecentDisclosuresSection, InsightsSection, hasMoatContent, hasKeyResourceContent, hasGrowthPlanContent, hasRisksContent, STANCE_CFG, _CHIP } from './Sections'
 import RelatedTechSection, { useRelatedTechs } from './RelatedTechSection'
+import { GroupHeader } from './reportUtils.jsx'
 import InvestorTrendSection from './InvestorTrendSection'
 import ShortSellSection from './ShortSellSection'
 import SupplySection from './SupplySection'
@@ -19,13 +20,6 @@ import MarketOutlookSection from './MarketOutlookSection'
 import AnalystReport from '../../pages/AnalystReport'
 
 const noop = () => {}
-
-// 사업분석 탭 그룹 헤더 — SectionTitle(세리프+언더라인, 섹션당)보다 한 단 위의 가벼운 구분선. 하위탭 아님(정적 라벨만).
-const GroupHeader = ({ children }) => (
-  <div data-testid="group-header" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, marginBottom: 10 }}>
-    {children}
-  </div>
-)
 
 // 리포트 상세 탭(요약/지표/사업분석/심층 리포트/히스토리) 공통 렌더. Reports.jsx 상세 뷰와 Ranking.jsx 모달이 공유.
 // ETF는 표시 가능한 데이터만: 요약·사업분석 탭과 컨센서스/재무 서브탭 숨김 → 지표(기술·수급)+히스토리.

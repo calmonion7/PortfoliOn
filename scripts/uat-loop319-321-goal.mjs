@@ -59,13 +59,16 @@ for (let i = 1; i <= 3 && !access_token; i++) {
 if (!access_token) { console.error('로그인 3회 실패 — 계측 불가(판정 아님). 종료.'); process.exit(2); }
 
 // ── 목표 계약 상수 ───────────────────────────────────────────────────────────
-const TARGET_ORDER = ['key-points', 'variants', 'related', 'market', 'players', 'share',
+// task#359 — 7단 뼈대(ADR `260921-091825` 결정 1)가 task#319 배열을 **대체**했다.
+// OLD_ORDER는 이빨 대조군이므로 *직전* 배열(task#319)로 갱신한다 — 안 바꾸면 두 배열이
+// 「현행 vs 두 세대 전」을 비교해 이빨 검사가 무의미해진다.
+const TARGET_ORDER = ['key-points', 'market', 'players', 'share', 'related', 'variants',
   'milestones', 'challenges', 'watch-items', 'prose', 'sources'];
-const OLD_ORDER = ['key-points', 'milestones', 'players', 'variants', 'share', 'challenges',
-  'watch-items', 'market', 'related', 'prose', 'sources'];
+const OLD_ORDER = ['key-points', 'variants', 'related', 'market', 'players', 'share',
+  'milestones', 'challenges', 'watch-items', 'prose', 'sources'];
 const CHAPTERS = [
-  { key: 'overview', label: '개요', ids: ['key-points', 'variants', 'related'] },
-  { key: 'market-competition', label: '시장·경쟁', ids: ['market', 'players', 'share'] },
+  { key: 'overview', label: '개요', ids: ['key-points'] },
+  { key: 'market-competition', label: '시장·경쟁', ids: ['market', 'players', 'share', 'related', 'variants'] },
   { key: 'progress-risk', label: '진척·리스크', ids: ['milestones', 'challenges', 'watch-items'] },
   { key: 'evidence', label: '근거', ids: ['prose', 'sources'] },
 ];

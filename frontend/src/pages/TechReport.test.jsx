@@ -498,7 +498,8 @@ describe('주요기술 리포트 상세 — 상호작용 칩 탭 타깃 (task#31
   })
 })
 
-// ── task#298 S4(2/2) — 「계열 비교」(점유율 바로 앞) + 「확인할 지표」(난제 바로 뒤) 배선.
+// ── task#298 S4(2/2) — 「계열 비교」 + 「확인할 지표」(난제 바로 뒤) 배선.
+// ⚠️ 「점유율 바로 앞」은 task#359(7단 뼈대)가 대체했다 — 계열 비교는 이제 「우위」 단이다.
 // ⚠️ 두 섹션은 **같은 SECTIONS 배열**에서 목차 칩과 함께 파생된다 — 배열과 JSX를 한쪽만 고치면
 // 위 task#296 순서 단언(칩 href 순서 == DOM data-tech-section 순서)이 잡는다.
 const VARIANTS = [
@@ -521,22 +522,21 @@ const WATCH_ITEMS = [
 const FULL_WITH_BOTH = { ...FULL_REPORT, variants: VARIANTS, watch_items: WATCH_ITEMS }
 
 describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => {
-  // ⚠️ task#319가 이 섹션을 ④→②(장 1 개요)로 옮겼다. task#298이 「점유율 바로 앞」에 둔 근거는
-  //    「계보 분류 바로 앞」이었는데 **그 계보 분류가 ADR-0041로 업체 표에 흡수돼 더 이상 별도 섹션이
-  //    아니다** — 근거가 낡았다(task#319가 명시적으로 뒤집은 1건). 여전히 참인 것은 「계열 비교가
-  //    시장 규모보다 앞」이며 아래 DOM 단언이 그것을 계속 지킨다.
-  it('계열 비교는 시장 규모보다 앞 — 형제 제목과의 DOM 순서 + 확정 순서 배열', async () => {
+  // ⚠️ 위치가 **또 뒤집혔다**(task#298 ④ → task#319 ② → task#359 ⑥). 7단 뼈대에서 계열 비교는
+  //    「우위」 단이고 우위는 경쟁 뒤에 온다(ADR `260921-091825` 결정 1) — 즉 이제 **시장 규모보다 뒤**다.
+  //    옛 서술(「계열 비교가 시장 규모보다 앞」)은 그 ADR이 대체했으므로 단언 방향도 함께 뒤집는다.
+  it('계열 비교는 시장 규모보다 뒤 — 우위 단(경쟁 다음) · 형제 제목과의 DOM 순서', async () => {
     mockReport(FULL_WITH_VARIANTS)
     const { container } = renderAt('smr')
     await screen.findByTestId('tech-report-kpis')
 
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '계열 비교', '시장 규모', '주요 업체', '진척 타임라인', '상세 설명', '출처'])
+      ['핵심 포인트', '시장 규모', '주요 업체', '계열 비교', '진척 타임라인', '상세 설명', '출처'])
 
     const variantsNode = screen.getByTestId('tech-report-variants')
     const marketNode = container.querySelector('[data-tech-section="market"]')
-    // 4 = Node.DOCUMENT_POSITION_FOLLOWING — variants가 market보다 앞
-    expect(variantsNode.compareDocumentPosition(marketNode) & 4).toBeTruthy()
+    // 4 = Node.DOCUMENT_POSITION_FOLLOWING — market이 variants보다 앞
+    expect(marketNode.compareDocumentPosition(variantsNode) & 4).toBeTruthy()
   })
 
   it('variants가 null/undefined(구발행물)면 섹션·제목·목차 칩이 전부 부재 — 기존 7섹션 목록 무변화', async () => {
@@ -561,7 +561,7 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
 
     // 확정 순서 — 난제 < 확인할 지표 인접이 이 배열 안에서 드러나고, 시장 규모는 장 2에 있다.
     expect(titlesOf(container)).toEqual(
-      ['핵심 포인트', '계열 비교', '시장 규모', '주요 업체', '진척 타임라인',
+      ['핵심 포인트', '시장 규모', '주요 업체', '계열 비교', '진척 타임라인',
        '해결해야 할 난제', '확인할 지표', '상세 설명', '출처'])
 
     // DOM 순서로도 못박는다(제목 배열은 텍스트라 래퍼 배치가 어긋나도 통과할 수 있다).
@@ -620,16 +620,19 @@ describe('주요기술 리포트 상세 — 계열 비교 (task#298 S4)', () => 
   })
 })
 
-// ── task#319 — 섹션 IA 재배열 + 4장 위계 ─────────────────────────────────────
-// 확정된 새 배열(계획서 「확정된 새 배열」):
-//   장 1 개요       ① 핵심 포인트 ② 계열 비교 ③ 연관 기술
-//   장 2 시장·경쟁   ④ 시장 규모   ⑤ 주요 업체 ⑥ 점유율
-//   장 3 진척·리스크 ⑦ 진척 타임라인 ⑧ 해결해야 할 난제 ⑨ 확인할 지표
-//   장 4 근거       ⑩ 상세 설명   ⑪ 출처
-const TARGET_SECTION_ORDER = ['key-points', 'variants', 'related', 'market', 'players', 'share',
+// ── task#359 — 7단 뼈대 재배치(ADR `260921-091825` 결정 1이 task#319 배열을 **대체**한다) ──
+// 단(본문 그룹 헤더) / 장(플로팅 항해 바) 2수준 — 장이 단을 포괄한다(결정 4):
+//   [결론] ① 핵심 포인트                     · 장 1 개요
+//   [시장] ② 시장 규모                        ┐
+//   [경쟁] ③ 주요 업체 ④ 점유율 ⑤ 구성과 연관  ├ 장 2 시장·경쟁
+//   [우위] ⑥ 계열 비교                        ┘
+//   [전망] ⑦ 진척 타임라인 [리스크] ⑧ 난제 [확인할 것] ⑨ 확인할 지표 · 장 3 진척·리스크
+//   [근거] ⑩ 상세 설명 ⑪ 출처                 · 장 4 근거
+// 옛 배열(task#319)은 이빨 대조군으로 남긴다 — 두 배열이 실제로 다름을 ③이 못박는다.
+const TARGET_SECTION_ORDER = ['key-points', 'market', 'players', 'share', 'related', 'variants',
   'milestones', 'challenges', 'watch-items', 'prose', 'sources']
-const OLD_SECTION_ORDER = ['key-points', 'milestones', 'players', 'variants', 'share', 'challenges',
-  'watch-items', 'market', 'related', 'prose', 'sources']
+const OLD_SECTION_ORDER = ['key-points', 'variants', 'related', 'market', 'players', 'share',
+  'milestones', 'challenges', 'watch-items', 'prose', 'sources']
 
 // 11섹션이 **전부** 표시되는 픽스처 — 기존 픽스처(REPORT 6섹션 · FULL_REPORT 6섹션)로는 재배열이
 // 옮기는 4건(연관 ⑨→③ · 계열 ④→② · 시장 ⑧→④ · 타임라인 ②→⑦) 중 일부만 관측된다.
@@ -869,5 +872,58 @@ describe('주요기술 리포트 상세 — 「구성과 연관」 게이트 등
     expect(labels).not.toContain('진척 타임라인')
     expect(labels).not.toContain('핵심 포인트')
     expect(ghostSections(container)).toEqual([])
+  })
+})
+
+// task#359 (ADR `260921-091825` 결정 1·4) — 본문에 7단 그룹 헤더를 표기한다.
+// 사업분석 탭과 **같은 단 이름이 같은 순서로** 보이는 것이 「통일」의 유일한 수단이므로
+// 존재가 아니라 **순서**를 단언한다(사업분석 쪽 대응 축: ReportDetailTabs.test.jsx).
+describe('주요기술 리포트 상세 — 7단 그룹 헤더 (task#359)', () => {
+  const stageHeaders = (container) =>
+    [...container.querySelectorAll('[data-testid="group-header"]')].map((e) => e.textContent)
+
+  it('그룹 헤더가 「시장 → 경쟁 → 우위 → 전망 → 리스크 → 확인할 것 → 근거」 순서로 렌더된다', async () => {
+    mockReport(ALL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(stageHeaders(container)).toEqual(
+      ['시장', '경쟁', '우위', '전망', '리스크', '확인할 것', '근거'])
+  })
+
+  it('결론(핵심 포인트) 단에는 그룹 헤더가 없다 — 헤더 없이 최상단', async () => {
+    mockReport(ALL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(stageHeaders(container)).not.toContain('결론')
+    // 첫 그룹 헤더(「시장」)는 핵심 포인트 섹션보다 **뒤**에 온다.
+    const kp = container.querySelector('[data-tech-section="key-points"]')
+      || screen.getByText('핵심 포인트')
+    const first = container.querySelector('[data-testid="group-header"]')
+    expect(kp.compareDocumentPosition(first) & 4).toBeTruthy()
+  })
+
+  it('단의 섹션이 전부 결측이면 그 그룹 헤더도 렌더되지 않는다 — 유령 헤더 금지', async () => {
+    // 장 3(진척·난제·확인할 지표) 결측 판 → 전망·리스크·확인할 것 세 단이 통째로 사라진다.
+    mockReport(NO_CHAPTER3_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    expect(stageHeaders(container)).toEqual(['시장', '경쟁', '우위', '근거'])
+  })
+
+  it('그룹 헤더 순서가 섹션 DOM 순서와 어긋나지 않는다 — 단↔섹션 정합', async () => {
+    mockReport(ALL_REPORT)
+    const { container } = renderAt('smr')
+    await screen.findByTestId('tech-report-kpis')
+    // 각 그룹 헤더 바로 뒤의 첫 섹션 = 그 단의 첫 섹션이어야 한다.
+    const nodes = [...container.querySelectorAll('[data-tech-section],[data-testid="group-header"]')]
+    const followed = nodes
+      .filter((n) => n.getAttribute('data-testid') === 'group-header')
+      .map((el) => {
+        for (let i = nodes.indexOf(el) + 1; i < nodes.length; i++) {
+          if (nodes[i].hasAttribute('data-tech-section')) return nodes[i].getAttribute('data-tech-section')
+        }
+        return null
+      })
+    expect(followed).toEqual(['market', 'players', 'variants', 'milestones', 'challenges', 'watch-items', 'prose'])
   })
 })
