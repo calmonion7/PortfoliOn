@@ -63,9 +63,14 @@ export default function ReportDetailTabs({
   const news = liveNews?.length ? liveNews : summary?.news
   // 「경쟁」 그룹 헤더는 경쟁사 표 또는 관련 기술 행이 하나라도 있을 때만 — 유령 헤더 금지.
   const { visible: hasRelatedTech } = useRelatedTechs(ticker)
-  // 결론 단 stance 칩 — InsightsSection과 같은 색·라벨을 쓴다(정의는 Sections.jsx 한 곳).
-  const _stance = summary?.insights && typeof summary.insights === 'object' ? summary.insights.stance : null
-  const conclusionStance = _stance ? (STANCE_CFG[_stance] || { label: _stance, color: 'var(--text-3)' }) : null
+  // 결론 단 — 한 줄이 본체이고 stance 칩은 장식이다. 그래서 **둘 중 하나라도 있으면** 렌더한다
+  // (칩 기준으로 게이트하면 stance 없는 발행물에서 한 줄이 통째로 사라진다).
+  // insights가 문자열인 옛 형태는 InsightsSection이 요약 탭에서 처리하므로 여기서는 객체만 본다.
+  const _ins = summary?.insights && typeof summary.insights === 'object' ? summary.insights : null
+  const conclusionLine = _ins?.one_liner || null
+  const conclusionStance = _ins?.stance
+    ? (STANCE_CFG[_ins.stance] || { label: _ins.stance, color: 'var(--text-3)' })
+    : null
 
   // 마운트/종목 전환 시 라이브 뉴스 fetch — 실패·빈값이면 news가 자동으로 스냅샷 summary.news 폴백 유지 (Ranking.jsx BasicInfo와 동일 패턴)
   useEffect(() => {
@@ -178,12 +183,12 @@ export default function ReportDetailTabs({
               )}
               {/* 결론 — 그룹 헤더 없이 최상단(ADR `260921-091825` 결정 1). insights가 없으면
                   블록 자체를 렌더하지 않는다: 「권고 없음」류 문구는 거짓 진술이 된다(task#307). */}
-              {conclusionStance && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 16 }}>
-                  <span style={_CHIP(conclusionStance.color)}>{conclusionStance.label}</span>
-                  {summary.insights?.one_liner && (
+              {(conclusionLine || conclusionStance) && (
+                <div data-testid="conclusion-line" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 16 }}>
+                  {conclusionStance && <span style={_CHIP(conclusionStance.color)}>{conclusionStance.label}</span>}
+                  {conclusionLine && (
                     <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.7, margin: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
-                      {summary.insights.one_liner}
+                      {conclusionLine}
                     </p>
                   )}
                 </div>

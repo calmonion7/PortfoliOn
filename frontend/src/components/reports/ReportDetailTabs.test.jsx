@@ -152,6 +152,24 @@ describe('사업분석 탭 7단 그룹 헤더 (task#358)', () => {
     expect(body.indexOf('결론 한 줄')).toBeLessThan(body.indexOf('시장'))
   })
 
+  // ⚠️ 라이브 실측(005930)이 `insights: null`이라 결론 블록이 안 뜬다 — 그건 정상이다.
+  //    그런데 stance만으로 게이트하면 **one_liner만 있는 발행물에서 한 줄이 통째로 사라진다**.
+  //    픽스처가 stance를 늘 갖고 있어 vitest가 못 보던 구멍이라 세 경우를 갈라 못박는다.
+  it('결론 — stance 없이 한 줄만 있어도 렌더된다(칩은 장식, 한 줄이 본체)', () => {
+    renderTabs({ summary: { ...FULL, insights: { one_liner: '칩 없는 결론' } } })
+    fireEvent.click(screen.getByText('📝 사업분석'))
+    expect(screen.getByTestId('conclusion-line').textContent).toBe('칩 없는 결론')
+  })
+
+  it('결론 — insights가 없으면 결론 블록 자체가 없다(「권고 없음」 문구 금지)', () => {
+    renderTabs({ summary: { ...FULL, insights: null } })
+    fireEvent.click(screen.getByText('📝 사업분석'))
+    expect(screen.queryByTestId('conclusion-line')).toBeNull()
+    // 그래도 나머지 7단은 그대로 — 결론 부재가 탭을 망가뜨리지 않는다.
+    expect(screen.getAllByTestId('group-header').map(e => e.textContent))
+      .toEqual(['시장', '경쟁', '우위', '전망', '리스크', '확인할 것'])
+  })
+
   it('입력이 없는 단은 헤더도 렌더하지 않는다 — 유령 헤더 금지', () => {
     // 시장·경쟁·우위·전망·리스크 입력을 모두 비우면 자체 fetch 섹션이 있는 「확인할 것」만 남는다.
     renderTabs({ summary: { ...SUMMARY } })
