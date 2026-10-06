@@ -54,6 +54,14 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
         overflowX: html.scrollWidth - window.innerWidth,
         gauges: [...document.querySelectorAll('[data-lens-cell] [data-flip-gauge]')].map(g => ({ id: g.closest('[data-lens-cell]').getAttribute('data-lens-cell'), zone: g.getAttribute('data-current-zone') })),
         rowOverflow: cells.map(c => c.scrollWidth - c.clientWidth).filter(v => v > 0).length,
+        labelOverlaps: [...document.querySelectorAll('[data-flip-gauge]')].reduce((n, g) => {
+          const rs = [...g.querySelectorAll('[data-boundary]')].map(e => e.getBoundingClientRect());
+          for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+            const a = rs[i], b = rs[j];
+            if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) n++;
+          }
+          return n;
+        }, 0),
         theme: html.getAttribute('data-theme') || 'light',
       };
     });
@@ -70,10 +78,11 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     ok(`${tag} gauges-count`, m.gauges.length === gaugeLenses.length, `${m.gauges.length} vs api ${gaugeLenses.length}`);
     ok(`${tag} gauge-zone=signal`, gaugeLenses.every(l => m.gauges.find(g => g.id === String(l.id))?.zone === l.signal));
     ok(`${tag} rows-no-overflow`, m.rowOverflow === 0, `n=${m.rowOverflow}`);
+    ok(`${tag} gauge-labels-no-overlap`, m.labelOverlaps === 0, `겹침 ${m.labelOverlaps}쌍`);
     await page.screenshot({ path: `${OUT}/${TICKER}-${tag}.png`, fullPage: true });
     await ctx.close();
   }
 }
 await b.close();
-console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${2 + VIEWPORTS.length * 2 * 12})`);
+console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${2 + VIEWPORTS.length * 2 * 13})`);
 process.exit(fail ? 1 : 0);

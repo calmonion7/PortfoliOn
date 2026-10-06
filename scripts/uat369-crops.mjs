@@ -8,6 +8,7 @@ for (const [tag,vp,mob,scheme] of [['m390-light',{width:390,height:844},true,'li
   await ctx.addInitScript(([a,rr,s])=>{localStorage.setItem('access_token',a);localStorage.setItem('refresh_token',rr);localStorage.setItem('pwa-install-dismissed-at',String(Date.now()));localStorage.setItem('theme',s);},[access_token,refresh_token,scheme]);
   const p=await ctx.newPage(); await p.goto(`${BASE}/analyst-report/CRCL/2026-10-07`,{waitUntil:'networkidle'}); await p.waitForSelector('[data-lens-cell]');
   await p.screenshot({path:`screenshots-uat369/crop-${tag}-top.png`});
+  for (const id of ['3','5']) { await p.evaluate((i)=>{const e=document.querySelector(`[data-lens-cell="${i}"]`); window.scrollTo(0, e.getBoundingClientRect().top + window.scrollY - 70)}, id); await p.waitForTimeout(300); await p.screenshot({path:`screenshots-uat369/crop-${tag}-row${id}.png`}); }
   await p.evaluate(()=>document.getElementById('lens-5').scrollIntoView()); await p.waitForTimeout(300);
   await p.screenshot({path:`screenshots-uat369/crop-${tag}-lens5.png`});
   await p.evaluate(()=>document.getElementById('lens-8').scrollIntoView()); await p.waitForTimeout(300);
