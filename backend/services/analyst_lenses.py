@@ -96,14 +96,29 @@ def _na(variant: str, reason: str, values: Optional[dict] = None) -> dict:
             "flip": None, "flip_value": None, "na_reason": reason}
 
 
-def _result(variant: str, values: dict, signal: str, flip: Optional[str], flip_value) -> dict:
+def _gauge(variable: str, unit: str, current, boundaries: list, zones: list) -> dict:
+    """바뀜 조건 게이지 — 바뀜 조건 문장이 말하는 변수 축 위의 색 구간(낮은 값 → 높은 값 순).
+
+    zones[i]는 boundaries[i-1]~boundaries[i] 구간의 신호. 문턱 상수를 쓰는 곳이 이 파일 하나라서
+    화면이 그리는 구간과 박제된 신호가 어긋날 수 없다(프론트는 그리기만 한다, task#369 UAT 피드백)."""
+    return {"variable": variable, "unit": unit, "current": current,
+            "boundaries": list(boundaries), "zones": list(zones)}
+
+
+def _result(variant: str, values: dict, signal: str, flip: Optional[str], flip_value,
+            gauge: Optional[dict] = None) -> dict:
     vals = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in values.items()}
+    gauge_nums = ([gauge["current"], *gauge["boundaries"]] if gauge else [])
     if any(isinstance(v, float) and not math.isfinite(v) for v in values.values()) or \
-            (flip_value is not None and not _finite(flip_value)):
+            (flip_value is not None and not _finite(flip_value)) or \
+            any(not _finite(v) for v in gauge_nums):
         return _na(variant, "계산 결과가 유한하지 않음", {k: v for k, v in vals.items()
                                                     if not (isinstance(v, float) and not math.isfinite(v))})
+    if gauge:
+        gauge = {**gauge, "current": round(gauge["current"], 4),
+                 "boundaries": [round(b, 4) for b in gauge["boundaries"]]}
     return {"variant": variant, "values": vals, "signal": signal, "flip": flip,
-            "flip_value": round(flip_value, 4) if flip_value is not None else None}
+            "flip_value": round(flip_value, 4) if flip_value is not None else None, "gauge": gauge}
 
 
 def _growth_pct(prev: float, curr: float) -> Optional[float]:
@@ -144,7 +159,8 @@ def lens3(variant: str, inp: dict) -> dict:
         signal = "go" if num_g >= den_g else "stop"
         text = (f"{num_name} 증가율이 비용 증가율({_fmt(den_g, 1)}%) 아래면 빨강" if signal == "go"
                 else f"{num_name} 증가율이 비용 증가율({_fmt(den_g, 1)}%) 이상이면 초록")
-        return _result(variant, values, signal, text, den_g)
+        return _result(variant, values, signal, text, den_g,
+                       _gauge(f"{num_name} 증가율", "%", num_g, [den_g], ["stop", "go"]))
     ratio = num_g / den_g
     values["ratio"] = ratio
     signal = classify_lens3(ratio)
@@ -157,7 +173,9 @@ def lens3(variant: str, inp: dict) -> dict:
     else:
         fv = LENS3_WAIT * den_g
         flip = f"{num_name} 증가율이 {_fmt(fv, 1)}% 이상이면 노랑"
-    return _result(variant, values, signal, flip, fv)
+    return _result(variant, values, signal, flip, fv,
+                   _gauge(f"{num_name} 증가율", "%", num_g,
+                          [LENS3_WAIT * den_g, LENS3_GO * den_g], ["stop", "wait", "go"]))
 
 
 # ── 렌즈 4: 비용의 매출 연동 ─────────────────────────────────────────────
@@ -199,7 +217,9 @@ def lens4(variant: str, inp: dict) -> dict:
             fv = LENS4_FIXED_WAIT * rm
             text = f"약정 증가 배수가 {_fmt(fv)}배 이하로 내려오면 노랑"
         return _result(variant, {"commitment_multiple": cm, "revenue_multiple": rm, "ratio": ratio},
-                       signal, text, fv)
+                       signal, text, fv,
+                       _gauge("약정 증가 배수", "배", cm,
+                              [LENS4_FIXED_GO * rm, LENS4_FIXED_WAIT * rm], ["go", "wait", "stop"]))
     d_rev = inp["revenue_curr"] - inp["revenue_prev"]
     d_cost = inp["linked_cost_curr"] - inp["linked_cost_prev"]
     if d_rev <= 0 or inp["revenue_curr"] <= 0:
@@ -216,7 +236,10 @@ def lens4(variant: str, inp: dict) -> dict:
     else:
         fv = average + LENS4_LINKED_BAND_PP
         text = f"한계 분배율이 {_fmt(fv, 1)}% 이하로 내려오면 노랑"
-    return _result(variant, {"marginal_pct": marginal, "average_pct": average}, signal, text, fv)
+    return _result(variant, {"marginal_pct": marginal, "average_pct": average}, signal, text, fv,
+                   _gauge("한계 분배율", "%", marginal,
+                          [average - LENS4_LINKED_BAND_PP, average + LENS4_LINKED_BAND_PP],
+                          ["go", "wait", "stop"]))
 
 
 # ── 렌즈 5: 자금 원천 ────────────────────────────────────────────────────
@@ -260,15 +283,20 @@ def lens5(variant: str, inp: dict) -> dict:
     """equity: 런웨이 · deposit: 손익분기 금리 여유 · debt: 이자보상."""
     if variant == "equity":
         cash, burn = inp["cash"], inp["annual_burn"]
+        burn_gauge = (_gauge("연 소진", "money", burn,
+                             [cash / RUNWAY_GO_YEARS, cash / RUNWAY_WAIT_YEARS], ["go", "wait", "stop"])
+                      if cash > 0 else None)
         if burn <= 0:
             fv = cash / RUNWAY_GO_YEARS
             return _result(variant, {"runway_years": None, "profitable": True}, "go",
-                           f"연 소진이 {_fmt(fv)}를 넘으면 노랑", fv)
+                           f"연 소진이 {_fmt(fv)}를 넘으면 노랑", fv, burn_gauge)
         if cash <= 0:
             # 현금 없이 소진 중 — 런웨이는 0이고, 노랑으로 가려면 현금이 연 소진 × 1.5년치가 돼야 한다
             fv = burn * RUNWAY_WAIT_YEARS
             return _result(variant, {"runway_years": 0.0, "profitable": False}, "stop",
-                           f"현금이 {_fmt(fv)} 이상이면 노랑", fv)
+                           f"현금이 {_fmt(fv)} 이상이면 노랑", fv,
+                           _gauge("현금", "money", cash,
+                                  [burn * RUNWAY_WAIT_YEARS, burn * RUNWAY_GO_YEARS], ["stop", "wait", "go"]))
         runway = cash / burn
         signal = classify_runway(runway)
         if signal == "go":
@@ -278,7 +306,7 @@ def lens5(variant: str, inp: dict) -> dict:
             fv = cash / RUNWAY_WAIT_YEARS
             text = (f"연 소진이 {_fmt(fv)}를 넘으면 빨강" if signal == "wait"
                     else f"연 소진이 {_fmt(fv)} 이하로 줄면 노랑")
-        return _result(variant, {"runway_years": runway, "profitable": False}, signal, text, fv)
+        return _result(variant, {"runway_years": runway, "profitable": False}, signal, text, fv, burn_gauge)
     if variant == "deposit":
         if inp["rate_sens_revenue"] <= 0 or inp["balance"] <= 0:
             return _na(variant, "금리 민감도 또는 잔고가 0 이하 — 손익분기 정의 불가")
@@ -302,7 +330,10 @@ def lens5(variant: str, inp: dict) -> dict:
             text = f"준비금 수익률 {_fmt(fv)}% 이상이면 노랑"
         return _result(variant, {"breakeven_pct": breakeven, "margin_pp": margin,
                                  "current_profit": profit, "marginal_share_pct": marginal * 100,
-                                 "profit_per_pp": slope}, signal, text, fv)
+                                 "profit_per_pp": slope}, signal, text, fv,
+                       _gauge("준비금 수익률", "%", y,
+                              [breakeven + BREAKEVEN_WAIT_PP, breakeven + BREAKEVEN_GO_PP],
+                              ["stop", "wait", "go"]))
     # debt
     oi, interest = inp["operating_income"], inp["interest_expense"]
     if interest <= 0:
@@ -317,7 +348,9 @@ def lens5(variant: str, inp: dict) -> dict:
         fv = COVERAGE_WAIT * interest
         text = (f"영업이익 {_fmt(fv)} 아래면 빨강" if signal == "wait"
                 else f"영업이익 {_fmt(fv)} 이상이면 노랑")
-    return _result(variant, {"coverage": coverage}, signal, text, fv)
+    return _result(variant, {"coverage": coverage}, signal, text, fv,
+                   _gauge("영업이익", "money", oi,
+                          [COVERAGE_WAIT * interest, COVERAGE_GO * interest], ["stop", "wait", "go"]))
 
 
 # ── 렌즈 8: 밸류에이션 ───────────────────────────────────────────────────
@@ -378,7 +411,10 @@ def lens8(engine: str, inp: dict, unit_scale: float, market_cap: float,
         text_tail = "이상이면 노랑"
     fv = market_cap * pct / 100 / unit_scale
     amount = f"{_fmt(fv)} {unit}".strip()   # 단위 없는 숫자는 바뀜 조건을 읽을 수 없게 만든다
-    return _result(engine, values, signal, f"forward 이익 {amount} {text_tail}", fv)
+    bounds = [market_cap * (risk_free_pct - LENS8_WAIT_BELOW_RF_PP) / 100 / unit_scale,
+              market_cap * risk_free_pct / 100 / unit_scale]
+    return _result(engine, values, signal, f"forward 이익 {amount} {text_tail}", fv,
+                   _gauge("forward 이익", unit or "money", inp["forward_earnings"], bounds, ["stop", "wait", "go"]))
 
 
 # ── 발행 조립 ────────────────────────────────────────────────────────────
@@ -434,6 +470,11 @@ def compute_lens(lens: dict, structure: dict, market_cap: Optional[float],
             out = lens8(variant, inp, UNIT_SCALE[unit][1], market_cap,
                         risk_free[0] if risk_free else None, sens, unit=unit)
             out["risk_free_source"] = risk_free[1] if risk_free else None
+    g = out.get("gauge")
+    if g and g["unit"] == "money":
+        lid_spec = {**required_inputs(lid, variant), **OPTIONAL_SPEC.get(lid, {})}
+        units = [raw[k]["unit"] for k in raw if lid_spec.get(k) == "money"]
+        g["unit"] = units[0] if units else ""
     out["estimate_based"] = estimate_based
     return out
 

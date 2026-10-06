@@ -4,7 +4,7 @@ import { SectionTitle } from './reportUtils.jsx'
 import { GlossaryText } from '../Glossary.jsx'
 
 // 심층 리포트 v2 — 구조 축·9렌즈 틀 (ADR 261006-232406, task#369).
-// 순서: 한줄 논지 → 신호 집계 → 렌즈 9개 신호판(번호 순) → 바뀜 조건 → 구조 축 → 렌즈 상세 → (서버 숫자 블록은 호출측)
+// 순서: 한줄 논지 → 렌즈 신호(집계 + 렌즈별 신호·바뀜 조건 게이지 한 행, 번호 순) → 구조 축 → 렌즈 상세 → (서버 숫자 블록은 호출측)
 // 투자의견·적정주가가 없다 — 판단 근거는 렌즈 신호다. 계산 렌즈(3·4·5·8)의 숫자·색·바뀜 조건은 서버가 박제한 값을
 // 그대로 그린다(프론트가 재계산하지 않는다 — 출처가 하나여야 같은 상황에 같은 색이 나온다).
 
@@ -81,42 +81,96 @@ function Tally({ tally, lenses }) {
   )
 }
 
-function SignalBoard({ lenses }) {
+// 바뀜 조건 게이지 — 서버가 박제한 구간(낮은 값 → 높은 값)·경계·현재값을 그리기만 한다.
+// 문턱을 여기서 다시 정의하지 않는다(정의하면 화면 색 구간과 박제된 신호가 갈라질 수 있다).
+const gfmt = (v, unit) => {
+  const a = Math.abs(v)
+  const s = a >= 1000 ? Math.round(v).toLocaleString() : a >= 100 ? v.toFixed(1) : v.toFixed(2)
+  return unit === '%' ? `${s}%` : unit === '배' ? `${s}배` : unit ? `${s} ${unit}` : s
+}
+// 라벨이 트랙 끝에서 잘리지 않게 — 양 끝 근처는 그쪽 끝에 붙인다
+const anchor = (pct) => (pct < 12 ? 'translateX(0)' : pct > 88 ? 'translateX(-100%)' : 'translateX(-50%)')
+
+export function FlipGauge({ gauge, signal }) {
+  const { variable, unit, current, boundaries = [], zones = [] } = gauge || {}
+  if (!gauge || !Number.isFinite(current) || zones.length !== boundaries.length + 1) return null
+  const vals = [current, ...boundaries]
+  const lo = Math.min(...vals), hi = Math.max(...vals)
+  const span = (hi - lo) || Math.abs(hi) || 1
+  const d0 = lo - span * 0.35, d1 = hi + span * 0.35
+  const pct = (v) => Math.max(0, Math.min(100, ((v - d0) / (d1 - d0)) * 100))
+  const edges = [d0, ...boundaries, d1]
+  const curZone = zones[boundaries.filter(b => current >= b).length]
+  const ranges = zones.map((z, i) => {
+    const from = i === 0 ? null : boundaries[i - 1], to = i === zones.length - 1 ? null : boundaries[i]
+    const r = from == null ? `${gfmt(to, unit)} 미만` : to == null ? `${gfmt(from, unit)} 이상` : `${gfmt(from, unit)}~${gfmt(to, unit)}`
+    return `${sig(z).label} ${r}`
+  })
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, marginBottom: 28 }}>
-      {lenses.map(l => (
-        <a key={l.id} href={`#lens-${l.id}`} data-lens-cell={l.id}
-           style={{ display: 'block', textDecoration: 'none', background: 'var(--bg)', border: '1px solid var(--border)', borderLeft: `3px solid ${sig(l.signal).color}`, borderRadius: 6, padding: '8px 10px', minHeight: 44 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="mono tnum" style={{ ...smallCap, fontWeight: 700 }}>{l.id}</span>
-            <span style={{ color: 'var(--text)', fontSize: 12, fontWeight: 700, minWidth: 0, wordBreak: 'keep-all' }}>{LENS_NAMES[l.id]}</span>
-            <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-2, var(--text))', flexShrink: 0 }}>
-              <SignalDot signal={l.signal} />{sig(l.signal).label}
-            </span>
-          </div>
-          <div style={{ color: 'var(--text-2, var(--text))', fontSize: 12, lineHeight: 1.5, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{l.summary}</div>
-        </a>
-      ))}
+    <div data-flip-gauge="" data-current-zone={curZone} role="img"
+         aria-label={`${variable} 현재 ${gfmt(current, unit)} — ${ranges.join(', ')}`}
+         style={{ margin: '10px 0 2px' }}>
+      <div style={{ ...smallCap, marginBottom: 2 }}>{variable}{unit && unit !== '%' && unit !== '배' ? ` (${unit})` : ''}</div>
+      <div style={{ position: 'relative', height: 44 }}>
+        {/* 현재값 라벨 */}
+        <span className="mono tnum" style={{ position: 'absolute', top: 0, left: `${pct(current)}%`, transform: anchor(pct(current)), fontSize: 11, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>
+          현재 {gfmt(current, unit)}
+        </span>
+        {/* 색 구간 */}
+        {zones.map((z, i) => (
+          <span key={i} data-zone={z} style={{ position: 'absolute', top: 20, height: 8, left: `${pct(edges[i])}%`, width: `${pct(edges[i + 1]) - pct(edges[i])}%`,
+                                               background: sig(z).color, opacity: z === curZone ? 0.9 : 0.35,
+                                               borderRadius: i === 0 ? '4px 0 0 4px' : i === zones.length - 1 ? '0 4px 4px 0' : 0 }} />
+        ))}
+        {/* 경계 눈금 */}
+        {boundaries.map((b, i) => (
+          <span key={i} aria-hidden="true" style={{ position: 'absolute', top: 17, height: 14, width: 1.5, left: `${pct(b)}%`, background: 'var(--text-2, var(--text))' }} />
+        ))}
+        {/* 현재값 마커 */}
+        <span aria-hidden="true" style={{ position: 'absolute', top: 17, left: `calc(${pct(current)}% - 7px)`, width: 14, height: 14, borderRadius: '50%',
+                                          background: sig(signal).color, border: '2.5px solid var(--bg)', boxShadow: `0 0 0 1px ${sig(signal).color}` }} />
+      </div>
+      <div style={{ position: 'relative', height: 16 }}>
+        {boundaries.map((b, i) => (
+          <span key={i} data-boundary="" className="mono tnum" style={{ position: 'absolute', top: 0, left: `${pct(b)}%`, transform: anchor(pct(b)), fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+            {gfmt(b, unit)}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
 
-function FlipList({ lenses }) {
-  const rows = lenses.filter(l => l.signal !== 'na' && l.flip)
-  if (!rows.length) return null
+// 렌즈 신호 + 바뀜 조건을 한 행에(task#369 UAT 피드백): 번호·이름·신호 → 요약 → 게이지(계산 렌즈) 또는 바뀜 조건 문장
+function SignalList({ lenses }) {
   return (
-    <>
-      <SectionTitle>바뀜 조건</SectionTitle>
-      <ul style={{ listStyle: 'none', margin: '0 0 28px', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {rows.map(l => (
-          <li key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 13, lineHeight: 1.6 }}>
-            <SignalDot signal={l.signal} size={8} />
-            <span style={{ ...smallCap, flexShrink: 0, minWidth: 92 }}>{l.id} {LENS_NAMES[l.id]}</span>
-            <span style={{ color: 'var(--text)', minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{l.flip}</span>
-          </li>
-        ))}
-      </ul>
-    </>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
+      {lenses.map(l => {
+        const g = l.computed?.gauge
+        return (
+          <div key={l.id} data-lens-cell={l.id}
+               style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderLeft: `3px solid ${sig(l.signal).color}`, borderRadius: 6, padding: '10px 12px' }}>
+            <a href={`#lens-${l.id}`} style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none', minHeight: 24 }}>
+              <span className="mono tnum" style={{ ...smallCap, fontWeight: 700 }}>{l.id}</span>
+              <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 700, minWidth: 0, wordBreak: 'keep-all' }}>{LENS_NAMES[l.id]}</span>
+              <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-2, var(--text))', flexShrink: 0 }}>
+                <SignalDot signal={l.signal} />{sig(l.signal).label}
+              </span>
+            </a>
+            <div style={{ color: 'var(--text-2, var(--text))', fontSize: 12.5, lineHeight: 1.55, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{l.summary}</div>
+            {l.signal !== 'na' && g && <FlipGauge gauge={g} signal={l.signal} />}
+            {l.signal !== 'na' && l.flip && (
+              <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 6, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
+                <span style={smallCap}>바뀜 조건 </span><span style={{ color: 'var(--text)' }}>{l.flip}</span>
+              </div>
+            )}
+            {l.signal === 'na' && l.na_reason && (
+              <div style={{ ...smallCap, marginTop: 6 }}>미산출 사유: {l.na_reason}</div>
+            )}
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -241,12 +295,6 @@ function LensDetail({ lens }) {
       <div style={{ color: 'var(--text)', fontWeight: 600, fontSize: 13, margin: '8px 0 4px', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{lens.summary}</div>
       <Metrics metrics={lens.metrics} />
       <p style={textStyle}><GlossaryText text={lens.body} /></p>
-      {lens.signal === 'na' && lens.na_reason && (
-        <p style={{ ...textStyle, marginTop: 8, color: 'var(--text-3)' }}>미산출 사유: <span>{lens.na_reason}</span></p>
-      )}
-      {lens.signal !== 'na' && lens.flip && (
-        <p style={{ ...textStyle, marginTop: 8 }}><span style={smallCap}>바뀜 조건 </span><span>{lens.flip}</span></p>
-      )}
       <ComputedBlock lens={lens} />
       <InputsTable inputs={lens.inputs} />
     </Card>
@@ -265,8 +313,7 @@ export default function LensReport({ report }) {
 
       <SectionTitle>렌즈 신호</SectionTitle>
       <Tally tally={report.tally} lenses={lenses} />
-      <SignalBoard lenses={lenses} />
-      <FlipList lenses={lenses} />
+      <SignalList lenses={lenses} />
       <StructureAxes structure={report.structure} />
 
       <SectionTitle>렌즈 상세</SectionTitle>

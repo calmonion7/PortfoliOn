@@ -508,3 +508,73 @@ def test_bad_format_value_is_rejected_with_format_error():
         resp = _publish(body)[0]
         assert resp.status_code == 422
         assert any("format" in [str(x) for x in e["loc"]] for e in resp.json()["detail"])
+
+
+# ── 바뀜 조건 게이지 (task#369 UAT 피드백 — 바뀜 조건을 그래프로) ──────────────
+# 게이지 = 바뀜 조건 문장이 말하는 그 변수 축 위의 색 구간. 문턱 상수를 쓰는 곳이 서버 하나여야
+# 화면 색 구간과 박제된 신호가 어긋나지 않는다 — 프론트는 그리기만 한다.
+
+def _zone_of(g):
+    """현재값이 속한 구간의 신호(경계값 정확히 위는 테스트가 피한다)."""
+    i = sum(1 for b in g["boundaries"] if g["current"] >= b)
+    return g["zones"][i]
+
+
+def test_gauge_crcl_deposit_oracle():
+    g = L.lens5("deposit", CRCL_DEPOSIT)["gauge"]
+    assert g["variable"] == "준비금 수익률" and g["unit"] == "%"
+    assert g["current"] == pytest.approx(3.49)
+    assert g["boundaries"] == pytest.approx([3.15, 4.15], abs=0.01)   # 빨강|노랑 경계 = 바뀜 조건 3.15%
+    assert g["zones"] == ["stop", "wait", "go"]
+
+
+GAUGE_CASES = [
+    lambda: L.lens3("revenue_linked", {"contribution_prev": 251, "contribution_curr": 289,
+                                       "fixed_cost_prev": 119.366, "fixed_cost_curr": 146.380}),
+    lambda: L.lens3("fixed", {"revenue_prev": 100, "revenue_curr": 120, "opex_prev": 50, "opex_curr": 55}),
+    lambda: L.lens3("fixed", {"revenue_prev": 100, "revenue_curr": 109, "opex_prev": 50, "opex_curr": 55}),
+    lambda: L.lens3("fixed", {"revenue_prev": 100, "revenue_curr": 105, "opex_prev": 50, "opex_curr": 49}),
+    lambda: L.lens4("revenue_linked", {"revenue_prev": 658.078, "revenue_curr": 701.315,
+                                       "linked_cost_prev": 406.94, "linked_cost_curr": 412.47}),
+    lambda: L.lens4("revenue_linked", {"revenue_prev": 100, "revenue_curr": 110,
+                                       "linked_cost_prev": 50, "linked_cost_curr": 58}),
+    lambda: L.lens4("fixed", {"commitment_prev": 100, "commitment_curr": 150, "revenue_prev": 100, "revenue_curr": 120}),
+    lambda: L.lens4("fixed", {"commitment_prev": 100, "commitment_curr": 110, "revenue_prev": 100, "revenue_curr": 120}),
+    lambda: L.lens5("deposit", CRCL_DEPOSIT),
+    lambda: L.lens5("equity", {"cash": 300, "annual_burn": 50}),
+    lambda: L.lens5("equity", {"cash": 300, "annual_burn": 150}),
+    lambda: L.lens5("equity", {"cash": 300, "annual_burn": -20}),
+    lambda: L.lens5("equity", {"cash": -5, "annual_burn": 2}),
+    lambda: L.lens5("debt", {"operating_income": 100, "interest_expense": 25}),
+    lambda: L.lens5("debt", {"operating_income": 30, "interest_expense": 25}),
+    lambda: L.lens8("usage", {"forward_earnings": 620}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.0, unit="USD M"),
+    lambda: L.lens8("usage", {"forward_earnings": 620}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.96, unit="USD M"),
+    lambda: L.lens8("usage", {"forward_earnings": 900}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.0, unit="USD M"),
+]
+
+
+@pytest.mark.parametrize("make", GAUGE_CASES)
+def test_gauge_zone_of_current_equals_signal(make):
+    r = make()
+    g = r["gauge"]
+    assert len(g["zones"]) == len(g["boundaries"]) + 1
+    assert g["boundaries"] == sorted(g["boundaries"])
+    assert set(g["zones"]) <= {"go", "wait", "stop"}
+    assert _zone_of(g) == r["signal"], (g, r["signal"])
+    # 바뀜 조건의 경계값이 게이지 경계 중 하나다(문장과 그림이 같은 숫자를 말한다)
+    if r["flip_value"] is not None:
+        assert any(abs(b - r["flip_value"]) < 1e-6 * max(1, abs(b)) for b in g["boundaries"])
+
+
+def test_gauge_absent_when_na():
+    r = L.lens4("revenue_linked", {"revenue_prev": 100, "revenue_curr": 90,
+                                   "linked_cost_prev": 50, "linked_cost_curr": 48})
+    assert r["signal"] == "na" and r.get("gauge") is None
+
+
+def test_gauge_money_unit_filled_from_inputs_on_publish():
+    resp, mock_save, _ = _publish(crcl_body())
+    lr = mock_save.call_args.kwargs["lens_report"]
+    g8 = _lens(lr, 8)["computed"]["gauge"]
+    assert g8["variable"] == "forward 이익" and g8["unit"] == "USD M"
+    assert _lens(lr, 5)["computed"]["gauge"]["unit"] == "%"

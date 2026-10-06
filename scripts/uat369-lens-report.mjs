@@ -25,6 +25,8 @@ const LABEL = { go: '초록', wait: '노랑', stop: '빨강', na: '미산출' };
 const lenses = [...(rep.lenses || [])].sort((a, b) => a.id - b.id);
 const expEstimate = lenses.filter(l => l.computed?.estimate_based).length;
 const expFlips = lenses.filter(l => l.signal !== 'na' && l.flip).length;
+const gaugeLenses = lenses.filter(l => l.signal !== 'na' && l.computed?.gauge);
+ok('api-gauges-present', gaugeLenses.length > 0, `n=${gaugeLenses.length} — 0이면 게이지 축이 공허하게 통과한다`);
 
 const VIEWPORTS = [['m390', { width: 390, height: 844 }, true], ['pc1440', { width: 1440, height: 900 }, false]];
 const b = await chromium.launch();
@@ -50,6 +52,8 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
         estimateTags: [...document.querySelectorAll('.badge')].filter(e => e.textContent.trim() === '추정 기반').length,
         ratingBadges: [...document.querySelectorAll('.badge')].filter(e => ['매수', '중립', '매도'].includes(e.textContent.trim())).length,
         overflowX: html.scrollWidth - window.innerWidth,
+        gauges: [...document.querySelectorAll('[data-lens-cell] [data-flip-gauge]')].map(g => ({ id: g.closest('[data-lens-cell]').getAttribute('data-lens-cell'), zone: g.getAttribute('data-current-zone') })),
+        rowOverflow: cells.map(c => c.scrollWidth - c.clientWidth).filter(v => v > 0).length,
         theme: html.getAttribute('data-theme') || 'light',
       };
     });
@@ -62,10 +66,14 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     ok(`${tag} estimate-tags`, m.estimateTags === expEstimate, `${m.estimateTags} vs api ${expEstimate}`);
     ok(`${tag} flips-shown`, lenses.filter(l => l.signal !== 'na' && l.flip).every(l => m.body.includes(l.flip)), `n=${expFlips}`);
     ok(`${tag} no-h-scroll`, m.overflowX <= 0, `overflow=${m.overflowX}px`);
+    // 바뀜 조건 게이지(task#369 UAT 피드백) — API에 게이지가 있는 렌즈 수만큼, 현재값 구간 = 신호
+    ok(`${tag} gauges-count`, m.gauges.length === gaugeLenses.length, `${m.gauges.length} vs api ${gaugeLenses.length}`);
+    ok(`${tag} gauge-zone=signal`, gaugeLenses.every(l => m.gauges.find(g => g.id === String(l.id))?.zone === l.signal));
+    ok(`${tag} rows-no-overflow`, m.rowOverflow === 0, `n=${m.rowOverflow}`);
     await page.screenshot({ path: `${OUT}/${TICKER}-${tag}.png`, fullPage: true });
     await ctx.close();
   }
 }
 await b.close();
-console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${1 + VIEWPORTS.length * 2 * 9})`);
+console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${2 + VIEWPORTS.length * 2 * 12})`);
 process.exit(fail ? 1 : 0);
