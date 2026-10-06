@@ -337,7 +337,7 @@ def _table_earnings(engine: str, inp: dict, exo: float, endo: float) -> float:
 
 
 def lens8(engine: str, inp: dict, unit_scale: float, market_cap: float,
-          risk_free_pct: Optional[float], sensitivity: Optional[dict] = None) -> dict:
+          risk_free_pct: Optional[float], sensitivity: Optional[dict] = None, unit: str = "") -> dict:
     """시총 ÷ forward 이익 · 이익수익률 vs 무위험 금리. 외생 가격형은 3×3 민감도 표.
 
     시총은 원 단위(스냅샷), 이익은 입력 단위 → unit_scale로 환산한다."""
@@ -377,7 +377,8 @@ def lens8(engine: str, inp: dict, unit_scale: float, market_cap: float,
         pct = risk_free_pct - LENS8_WAIT_BELOW_RF_PP
         text_tail = "이상이면 노랑"
     fv = market_cap * pct / 100 / unit_scale
-    return _result(engine, values, signal, f"forward 이익 {_fmt(fv)} {text_tail}", fv)
+    amount = f"{_fmt(fv)} {unit}".strip()   # 단위 없는 숫자는 바뀜 조건을 읽을 수 없게 만든다
+    return _result(engine, values, signal, f"forward 이익 {amount} {text_tail}", fv)
 
 
 # ── 발행 조립 ────────────────────────────────────────────────────────────
@@ -431,7 +432,7 @@ def compute_lens(lens: dict, structure: dict, market_cap: Optional[float],
         else:
             unit = raw["forward_earnings"]["unit"]
             out = lens8(variant, inp, UNIT_SCALE[unit][1], market_cap,
-                        risk_free[0] if risk_free else None, sens)
+                        risk_free[0] if risk_free else None, sens, unit=unit)
             out["risk_free_source"] = risk_free[1] if risk_free else None
     out["estimate_based"] = estimate_based
     return out

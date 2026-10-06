@@ -295,6 +295,7 @@ def test_v2_publish_crcl_computes_and_stores_signals():
     assert _lens(lr, 3)["computed"]["estimate_based"] is False
     assert _lens(lr, 8)["computed"]["values"]["multiple"] == pytest.approx(33.3, abs=0.05)
     assert _lens(lr, 8)["computed"]["risk_free_source"] == "server_cache"
+    assert _lens(lr, 8)["flip"].startswith("forward 이익 ") and "USD M" in _lens(lr, 8)["flip"]  # 단위 병기
     for i in (3, 4, 5, 8):
         assert _lens(lr, i)["flip"]
     # 판단 렌즈 1 wait·2 go·6 stop·7 wait·9 na + 계산 3 stop·4 go·5 wait·8 wait(3.0 ≥ 4.0−1.5)

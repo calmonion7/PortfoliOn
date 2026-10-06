@@ -163,7 +163,8 @@ function Metrics({ metrics }) {
 function ComputedBlock({ lens }) {
   const c = lens.computed
   if (!c) return null
-  const vals = Object.entries(c.values || {}).filter(([k]) => VALUE_META[k])
+  // 표시 순서는 VALUE_META 순서(핵심값 먼저) — 응답 JSON의 키 순서에 기대지 않는다
+  const vals = Object.keys(VALUE_META).filter(k => k in (c.values || {})).map(k => [k, c.values[k]])
   const sens = c.values?.sensitivity
   return (
     <div style={{ marginTop: 10, padding: '10px 12px', background: 'var(--bg-elev-2)', borderRadius: 6 }}>
@@ -181,7 +182,7 @@ function ComputedBlock({ lens }) {
       {sens?.multiples && (
         <div style={{ marginTop: 10, overflowX: 'auto' }}>
           <div style={{ ...smallCap, marginBottom: 4 }}>
-            민감도 — 시총 ÷ 이익(배): 행 {lens.sensitivity?.exogenous?.label || '외생'}, 열 {lens.sensitivity?.endogenous?.label || '내생'}
+            민감도 — 시총 ÷ 이익(배): 행 {lens.sensitivity?.exogenous?.label || '외생'}{lens.sensitivity?.exogenous?.unit ? ` (${lens.sensitivity.exogenous.unit})` : ''}, 열 {lens.sensitivity?.endogenous?.label || '내생'}{lens.sensitivity?.endogenous?.unit ? ` (${lens.sensitivity.endogenous.unit})` : ''}
           </div>
           <table className="mono tnum" style={{ borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
