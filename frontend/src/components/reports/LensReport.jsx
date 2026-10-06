@@ -101,8 +101,8 @@ export function FlipGauge({ gauge, signal }) {
   const pct = (v) => Math.max(0, Math.min(100, ((v - d0) / (d1 - d0)) * 100))
   const edges = [d0, ...boundaries, d1]
   const curZone = zones[boundaries.filter(b => current >= b).length]
-  // 경계 라벨이 서로 가까우면(트랙 폭의 22% 미만) 다음 라벨을 아랫줄로 — 좁은 폭에서 「53.52%63.52%」처럼 붙는 것을 막는다
-  const rows = boundaries.map((b, i) => (i > 0 && pct(b) - pct(boundaries[i - 1]) < 22 ? 1 : 0))
+  // 경계 라벨이 서로 가까우면(트랙 폭의 28% 미만 — 금액 라벨 「1,100 USD M」이 m390 트랙의 ~23%다) 다음 라벨을 아랫줄로 — 좁은 폭에서 「53.52%63.52%」처럼 붙는 것을 막는다
+  const rows = boundaries.map((b, i) => (i > 0 && pct(b) - pct(boundaries[i - 1]) < 28 ? 1 : 0))
   const staggered = rows.some(r => r === 1)
   const ranges = zones.map((z, i) => {
     const from = i === 0 ? null : boundaries[i - 1], to = i === zones.length - 1 ? null : boundaries[i]
@@ -133,9 +133,9 @@ export function FlipGauge({ gauge, signal }) {
         <span aria-hidden="true" style={{ position: 'absolute', top: 17, left: `calc(${pct(current)}% - 7px)`, width: 14, height: 14, borderRadius: '50%',
                                           background: sig(signal).color, border: '2.5px solid var(--bg)', boxShadow: `0 0 0 1px ${sig(signal).color}` }} />
       </div>
-      <div style={{ position: 'relative', height: staggered ? 30 : 16 }}>
+      <div style={{ position: 'relative', height: staggered ? 32 : 16 }}>
         {boundaries.map((b, i) => (
-          <span key={i} data-boundary="" className="mono tnum" style={{ position: 'absolute', top: rows[i] * 14, left: `${pct(b)}%`, transform: anchor(pct(b)), fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+          <span key={i} data-boundary="" className="mono tnum" style={{ position: 'absolute', top: rows[i] * 16,  /* 줄 상자 15px보다 커야 위아래 라벨이 겹치지 않는다 */ left: `${pct(b)}%`, transform: anchor(pct(b)), fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
             {gfmt(b, unit)}
           </span>
         ))}
