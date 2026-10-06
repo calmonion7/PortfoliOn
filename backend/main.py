@@ -254,6 +254,14 @@ def _migrate():
         logger.warning(f"[Migrate] analyst_reports 생성 실패: {e}")
     try:
         from services.db import execute
+        # v2 심층 리포트(구조 축·9렌즈, ADR 261006-232406) — 투자의견이 없으므로 rating을 nullable로,
+        # 서버 계산 블록은 lens_report에 박제. 옛 컬럼은 지우지 않는다(되돌릴 길을 남긴다).
+        execute("ALTER TABLE analyst_reports ADD COLUMN IF NOT EXISTS lens_report JSONB")
+        execute("ALTER TABLE analyst_reports ALTER COLUMN rating DROP NOT NULL")
+    except Exception as e:
+        logger.warning(f"[Migrate] analyst_reports v2 컬럼 마이그레이션 실패: {e}")
+    try:
+        from services.db import execute
         execute("""CREATE TABLE IF NOT EXISTS tech_reports (
             id               BIGSERIAL PRIMARY KEY,
             slug             TEXT NOT NULL,

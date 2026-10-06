@@ -408,7 +408,7 @@ CREATE TABLE IF NOT EXISTS analyst_reports (
     id               BIGSERIAL PRIMARY KEY,
     ticker           TEXT NOT NULL,
     published_date   DATE NOT NULL,
-    rating           TEXT NOT NULL,              -- buy | neutral | sell
+    rating           TEXT,                       -- buy | neutral | sell (v1 전용 — v2는 NULL, ADR 261006-232406)
     title            TEXT NOT NULL,              -- 한줄 논지
     fair_value_low   NUMERIC,                    -- 적정주가 밴드 하단
     fair_value_high  NUMERIC,                    -- 적정주가 밴드 상단
@@ -416,6 +416,7 @@ CREATE TABLE IF NOT EXISTS analyst_reports (
     points           JSONB NOT NULL DEFAULT '[]'::jsonb, -- 투자포인트 [{title, body}] 2~3개
     risks            TEXT NOT NULL DEFAULT '',   -- 리스크 요인
     data             JSONB NOT NULL DEFAULT '{}'::jsonb, -- 서버 첨부 데이터 블록(시세·추정·피어·PER밴드·컨센서스)
+    lens_report      JSONB,                      -- v2 구조 축·9렌즈 + 서버 계산 블록(ADR 261006-232406). NULL = v1 판
     created_at       TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE (ticker, published_date)
 );

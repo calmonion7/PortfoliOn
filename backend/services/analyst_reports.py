@@ -218,10 +218,30 @@ def save_report(ticker: str, published_date: str, rating: str, title: str,
                rating = EXCLUDED.rating, title = EXCLUDED.title,
                fair_value_low = EXCLUDED.fair_value_low, fair_value_high = EXCLUDED.fair_value_high,
                valuation_method = EXCLUDED.valuation_method, points = EXCLUDED.points,
-               risks = EXCLUDED.risks, data = EXCLUDED.data, created_at = NOW()""",
+               risks = EXCLUDED.risks, data = EXCLUDED.data, lens_report = NULL,
+               created_at = NOW()""",
         (ticker.upper(), published_date, rating, title, fair_value_low, fair_value_high,
          valuation_method, json.dumps(points, ensure_ascii=False), risks,
          json.dumps(data, ensure_ascii=False)),
+    )
+
+
+def save_lens_report(*, ticker: str, published_date: str, title: str, data: dict,
+                     lens_report: dict) -> None:
+    """v2(구조 축·9렌즈) 발행 저장 — 같은 날 upsert. 투자의견·적정주가는 v2에 없으므로 NULL/빈값으로
+    덮는다(같은 날 v1 판을 교체할 때 두 형식의 필드가 한 행에 섞이지 않게, ADR 261006-232406)."""
+    execute(
+        """INSERT INTO analyst_reports
+               (ticker, published_date, rating, title, fair_value_low, fair_value_high,
+                valuation_method, points, risks, data, lens_report)
+           VALUES (%s, %s, NULL, %s, NULL, NULL, '', '[]'::jsonb, '', %s, %s)
+           ON CONFLICT (ticker, published_date) DO UPDATE SET
+               rating = NULL, title = EXCLUDED.title,
+               fair_value_low = NULL, fair_value_high = NULL,
+               valuation_method = '', points = '[]'::jsonb, risks = '',
+               data = EXCLUDED.data, lens_report = EXCLUDED.lens_report, created_at = NOW()""",
+        (ticker.upper(), published_date, title,
+         json.dumps(data, ensure_ascii=False), json.dumps(lens_report, ensure_ascii=False)),
     )
 
 
@@ -236,10 +256,13 @@ def _summary(row: dict) -> dict:
         "fair_value_high": float(row["fair_value_high"]) if row.get("fair_value_high") is not None else None,
         "name": (row.get("data") or {}).get("name"),
         "market": (row.get("data") or {}).get("market"),
+        # 형식 판별 — lens_report가 있으면 v2(구조 축·9렌즈). 목록이 신호 집계를 함께 싣는다.
+        "format": 2 if row.get("lens_report") else 1,
+        "tally": (row.get("lens_report") or {}).get("tally"),
     }
 
 
-_COLS = "ticker, published_date, rating, title, fair_value_low, fair_value_high, data"
+_COLS = "ticker, published_date, rating, title, fair_value_low, fair_value_high, data, lens_report"
 
 
 def list_reports(ticker: Optional[str] = None) -> list:
@@ -283,4 +306,7 @@ def get_report(ticker: str, published_date: str) -> Optional[dict]:
         "risks": row.get("risks") or "",
         "data": row.get("data") or {},
     })
+    lr = row.get("lens_report")
+    if lr:
+        out.update({"structure": lr.get("structure"), "lenses": lr.get("lenses") or []})
     return out

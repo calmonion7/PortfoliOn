@@ -2287,6 +2287,80 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 **Error `409`** — 해당 종목의 스냅샷 없음 (발행 전제조건 미충족)
 **Error `422`** — rating enum 위반 · points 개수(2~3) 위반 · 밴드 역전(low > high) · NaN/Infinity 값 · 필수 필드 누락
 
+#### v2 형식 — 구조 축·9렌즈 (`"format": 2`, ADR 261006-232406, task#368)
+
+본문에 `"format": 2`가 있으면 v2로 검증한다(없으면 위 v1 형식 — task#370에서 v1 제거 예정). v2에는 **투자의견·적정주가 밴드·투자포인트·산정방식·리스크 필드가 없다** — 판단 근거는 렌즈 신호다. 렌즈 **3·4·5·8은 계산 렌즈**로, 루틴은 공시에서 읽은 **원자료**만 보내고 파생 숫자·신호 색·바뀜 조건은 **서버 공식이 계산해 박제**한다. 나머지 렌즈(1·2·6·7·9)는 루틴이 신호와 바뀜 조건을 직접 쓴다.
+
+```json
+{
+  "format": 2,
+  "title": "금리 의존 구조 그대로 — 손익분기까지 여유 1.3%p",
+  "structure": {
+    "revenue_engine": { "value": "balance_rate", "rationale": "준비금 잔고×금리가 매출의 95%" },
+    "cost_nature":    { "value": "revenue_linked", "rationale": "분배비용이 준비금 수익에 연동" },
+    "funding_source": { "value": "deposit", "rationale": "USDC 예치금이 수익 자산의 원천" }
+  },
+  "lenses": [
+    { "id": 1, "summary": "한 줄 요약", "body": "본문", "signal": "wait", "flip": "바뀜 조건 한 줄",
+      "metrics": [ { "label": "USDC 유통량", "value": "742억 달러" } ] },
+    { "id": 5, "summary": "금리 하락에 취약", "body": "본문",
+      "inputs": {
+        "balance":           { "value": 74200, "unit": "USD M", "source": "disclosure", "ref": "10-Q 2026Q2" },
+        "current_yield_pct": { "value": 3.49, "unit": "%", "source": "disclosure", "ref": "10-Q 2026Q2" },
+        "avg_share_pct":     { "value": 38.2, "unit": "%", "source": "estimate", "ref": "10-Q 2026Q2", "rationale": "RLDC ÷ 준비금 수익" },
+        "rate_sens_revenue": { "value": 737, "unit": "USD M", "source": "disclosure", "ref": "10-Q Item 7A" },
+        "rate_sens_cost":    { "value": 360, "unit": "USD M", "source": "disclosure", "ref": "10-Q Item 7A" },
+        "other_revenue":     { "value": 140, "unit": "USD M", "source": "estimate", "ref": "가이던스", "rationale": "연 환산" },
+        "operating_expense": { "value": 620, "unit": "USD M", "source": "disclosure", "ref": "가이던스 상단" }
+      } },
+    { "id": 9, "summary": "원자료 없음", "body": "본문", "signal": "na", "na_reason": "규제 공시 없음" }
+  ]
+}
+```
+(예시는 렌즈 3개만 발췌 — 실제 본문은 `lenses`에 **id 1~9가 정확히 한 번씩** 있어야 한다.)
+
+| 필드 | 필수 | 설명 |
+|------|------|------|
+| `format` | ✅ | `2` |
+| `title` | ✅ | 한줄 논지 (≤120자) — 직전 판 대비 신호 변화를 말한다 |
+| `structure.revenue_engine.value` | ✅ | 수익 엔진 — `usage`(사용량·구독) \| `volume`(판매량) \| `price_exogenous`(외생 가격: 원자재·메모리) \| `balance_rate`(잔고×금리) \| `transaction`(거래×수수료율) |
+| `structure.cost_nature.value` | ✅ | 비용 성격 — `fixed` \| `revenue_linked` |
+| `structure.funding_source.value` | ✅ | 자금 원천 — `equity` \| `deposit` \| `debt` |
+| `structure.*.rationale` | ✅ | 축마다 근거 한 줄 (상태가 아니라 **구조**로 분류할 것) |
+| `lenses[].id` | ✅ | 1~9, 각 정확히 한 번 |
+| `lenses[].summary` · `body` | ✅ | 요약 한 줄(≤200자) · 본문 |
+| `lenses[].metrics` | — | 표시용 지표 칩 `{label, value, change_pct?}` 최대 4개 (v1 칩과 같은 규약) |
+| `lenses[].signal` | 판단 렌즈 ✅ / 계산 렌즈 ❌ | `go` \| `wait` \| `stop` \| `na` — **계산 렌즈(3·4·5·8)에 보내면 422** |
+| `lenses[].flip` | 판단 렌즈(na 제외) ✅ / 계산 렌즈 ❌ | 바뀜 조건 한 줄 — 계산 렌즈에 보내면 422 |
+| `lenses[].na_reason` | `na`면 ✅ | 원자료가 없어 판정하지 않는 사유. 계산 렌즈는 `inputs` 대신 이것만 보내면 서버가 회색(`na`)으로 박제한다 |
+| `lenses[].inputs` | 계산 렌즈 ✅(na_reason 없을 때) | 원자료 `{키: {value, unit, source, ref, rationale?}}` — 아래 표의 키 **전부**(누락·알 수 없는 키 422) |
+| `lenses[].sensitivity` | 렌즈 8 · 수익 엔진 `balance_rate`/`price_exogenous`일 때 ✅ | `{exogenous, endogenous}` 각 `{label, values[3], unit, source, ref, rationale?}` — 3×3 민감도 표의 행(외생)·열(내생) |
+
+**원자료 하나** = `{value(유한수), unit, source: "disclosure"|"estimate", ref(출처·기준일), rationale}` — `source: "estimate"`면 `rationale`(추정 근거) 필수. 같은 렌즈의 금액 원자료는 **단위가 하나**여야 하고, `_pct` 키는 단위 `"%"`.
+
+**변형별 필수 원자료** (변형은 구조 축이 고른다):
+
+| 렌즈 | 변형(축 값) | 키 | 서버 계산 |
+|------|------------|-----|----------|
+| 3 영업 레버리지 | `fixed` | `revenue_prev` `revenue_curr` `opex_prev` `opex_curr` | 매출 증가율 ÷ 영업비용 증가율 |
+| 3 | `revenue_linked` | `contribution_prev` `contribution_curr` `fixed_cost_prev` `fixed_cost_curr` | 기여몫(매출−연동비용) 증가율 ÷ 고정비 증가율 |
+| 4 비용 연동 | `fixed` | `commitment_prev` `commitment_curr` `revenue_prev` `revenue_curr` | 약정(연 환산) 증가 배수 ÷ 매출 증가 배수 |
+| 4 | `revenue_linked` | `revenue_prev` `revenue_curr` `linked_cost_prev` `linked_cost_curr` | 한계 분배율 Δ연동비용 ÷ Δ매출 vs 평균 분배율 |
+| 5 자금 원천 | `equity` | `cash` `annual_burn`(흑자면 0 이하) | 런웨이 = 현금 ÷ 연 소진 |
+| 5 | `deposit` | `balance` `current_yield_pct` `avg_share_pct` `rate_sens_revenue` `rate_sens_cost` `other_revenue` `operating_expense` | 손익분기 금리 = 현재 수익률 − 현재 이익 ÷ (잔고 × 한계 몫 ÷ 100), 한계 몫 = 1 − `rate_sens_cost`/`rate_sens_revenue` (금리 1%p당 공시 민감도) |
+| 5 | `debt` | `operating_income` `interest_expense` | 이자보상 = 영업이익 ÷ 이자비용 |
+| 8 밸류에이션 | 공통 | `forward_earnings`(+ 선택 `risk_free_pct`) | 시총 ÷ forward 이익, 이익수익률 vs 무위험 금리. 시총은 **서버가 스냅샷**(자사 `market_cap`)에서 |
+| 8 | `balance_rate` 추가 | `current_yield_pct` `avg_share_pct` `rate_sens_revenue` `rate_sens_cost` `other_revenue` `operating_expense` + `sensitivity`(외생=금리 %, 내생=잔고) | 표 칸마다 예치금형 이익 모형으로 배수 |
+| 8 | `price_exogenous` 추가 | `unit_cost` `fixed_cost` + `sensitivity`(외생=가격, 내생=판매량) | 이익 = 판매량 × (가격 − 단위원가) − 고정비 |
+
+렌즈 8의 `forward_earnings.unit`은 `USD` \| `USD K` \| `USD M` \| `USD B` \| `KRW` \| `KRW 백만` \| `KRW 억` \| `KRW 조` 중 하나이고 종목 시장 통화(KR=KRW, 그 외 USD)와 같아야 한다. 무위험 금리는 `risk_free_pct` 원자료가 있으면 그 값, 없으면 서버 캐시의 미 10년물 — **KR 종목은 `risk_free_pct`(국고채) 필수**.
+
+**신호 문턱(초기값, 서버 상수 — `services/analyst_lenses.py`)**: 렌즈 3 비율 ≥1.0 초록 · 0.8~1.0 노랑 · <0.8 빨강 / 렌즈 4 연동형 한계 분배율 < 평균−5%p 초록 · ±5%p 노랑 · > 평균+5%p 빨강, 고정형 배수비 ≤1.0 초록 · ≤1.2 노랑 · 초과 빨강 / 렌즈 5 런웨이 ≥3년(또는 흑자) 초록 · ≥1.5년 노랑 · 미만 빨강, 손익분기 여유 ≥2%p 초록 · ≥1%p 노랑 · 미만 빨강, 이자보상 ≥5 초록 · ≥2 노랑 · 미만 빨강 / 렌즈 8 이익수익률 ≥ 무위험 금리 초록 · ≥ 무위험−1.5%p 노랑 · 그 아래 빨강. 서버는 계산 렌즈마다 **현재 색의 경계에 닿는 입력값**을 역산해 `flip`(바뀜 조건)으로 박제한다. 계산이 불가능하면(분모 0·매출 감소 구간의 한계 분배율·비유한 결과·스냅샷 시총 없음·무위험 금리 없음) 추측하지 않고 `na` + `na_reason`.
+
+**Response `201`** — `{ "ok": true, "ticker": "CRCL", "published_date": "2026-10-07", "format": 2 }`
+
+**v2 `422` 조건** — `lenses` id가 1~9 각 1회가 아님 · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함).
+
 ---
 
 ### `GET /api/analyst-reports`
@@ -2307,11 +2381,15 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
       "fair_value_low": 80000,
       "fair_value_high": 95000,
       "name": "삼성전자",
-      "market": "KR"
+      "market": "KR",
+      "format": 1,
+      "tally": null
     }
   ]
 }
 ```
+
+`format` — `1`(투자의견·적정주가 판) \| `2`(구조 축·9렌즈 판). `tally` — v2 판의 렌즈 신호 집계 `{"go": n, "wait": n, "stop": n, "na": n}`(합 9), v1 판은 `null`. v2 판은 `rating`·`fair_value_low`·`fair_value_high`가 `null`이다.
 
 ---
 
@@ -2406,6 +2484,26 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 `data.financials_annual` — 비컨센서스 최근 3개년 + forward 컨센서스 행(`is_consensus: true`), `period` 오름차순. US는 `operating_income`이 `null`일 수 있음(yfinance forward 미제공 — graceful).
 `data.per_band` — 과거 연간 PER(비컨센서스, 최근 최대 6개)의 min/max/avg + 현재/forward PER. 재료 부족(<2개)이면 `null`.
 `data.market_outlook` — 스냅샷 `market_outlook.segments`가 있을 때만 첨부(발행 시점 박제). 없으면 `data`에 이 키 자체가 없음(구발행물 포함 — 프론트는 이때 "사업부문 시장 분석" 섹션을 생략). **수주잔고의 「사업부문 분해」(`GET /api/report/{ticker}/backlog`의 `segments`)와는 별개 개념** — 이쪽은 시장 전망 하위 부문별 매출비중·시장규모·자사 점유율이다. 필드 상세는 위 enrich `market_outlook.segments` 표 참조.
+
+**v2 판(`format: 2`) 상세** — 위 공통 필드(`data` 블록 포함, 서버 첨부 방식 동일)에 더해 `structure`(구조 축 3값과 근거, 발행 본문 그대로)·`lenses`(id 1~9 순)·`tally`가 실린다. `rating`·`fair_value_*`는 `null`, `valuation_method`·`risks`는 `""`, `points`는 `[]`.
+
+```json
+{
+  "format": 2,
+  "tally": { "go": 2, "wait": 4, "stop": 2, "na": 1 },
+  "structure": { "revenue_engine": { "value": "balance_rate", "rationale": "..." }, "cost_nature": { "...": "..." }, "funding_source": { "...": "..." } },
+  "lenses": [
+    { "id": 5, "summary": "금리 하락에 취약", "body": "...", "metrics": [],
+      "signal": "wait", "flip": "준비금 수익률 3.15% 아래면 빨강", "na_reason": null,
+      "inputs": { "balance": { "value": 74200, "unit": "USD M", "source": "disclosure", "ref": "10-Q 2026Q2", "rationale": null } },
+      "sensitivity": null,
+      "computed": { "variant": "deposit", "values": { "breakeven_pct": 2.1484, "margin_pp": 1.3416, "current_profit": 509.2, "marginal_share_pct": 51.15, "profit_per_pp": 379.56 },
+                    "signal": "wait", "flip": "준비금 수익률 3.15% 아래면 빨강", "flip_value": 3.1484, "estimate_based": true } }
+  ]
+}
+```
+
+`lenses[].signal`·`flip` — 판단 렌즈는 발행 본문 값, 계산 렌즈(3·4·5·8)는 **서버 계산값**(`computed`와 같다). `computed` — 계산 렌즈만(`na_reason`으로 발행한 계산 렌즈는 `null`). `computed.values`는 변형별로 다르다: 렌즈 3 `ratio`·`numerator_growth_pct`·`cost_growth_pct` / 렌즈 4 `marginal_pct`·`average_pct`(연동형) 또는 `commitment_multiple`·`revenue_multiple`·`ratio`(고정형) / 렌즈 5 `runway_years`·`profitable`(equity) · `breakeven_pct`·`margin_pp`·…(deposit) · `coverage`(debt) / 렌즈 8 `market_cap`·`forward_earnings`·`multiple`·`earnings_yield_pct`·`risk_free_pct` + 외생 가격형이면 `sensitivity.{exogenous, endogenous, multiples[3][3]}`. 렌즈 8은 `computed.risk_free_source`(`input` \| `server_cache`)도 싣는다. `computed.estimate_based` — 원자료 중 하나라도 `estimate`면 `true`(화면에 「추정 기반」). `flip_value` — 바뀜 조건의 경계 입력값(숫자).
 
 **Error `404`** — 해당 ticker+date 발행물 없음
 

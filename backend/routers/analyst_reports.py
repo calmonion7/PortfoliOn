@@ -5,13 +5,14 @@
 """
 import logging
 from datetime import date, datetime
-from typing import List, Literal, Optional
+from typing import Annotated, Dict, List, Literal, Optional, Union
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, field_validator, model_validator
 
 from auth import get_current_user_or_api_key, require_admin, require_admin_or_api_key
+from services import analyst_lenses as lens_calc
 from services import analyst_reports as svc
 from services.utils import sanitize
 
@@ -37,6 +38,8 @@ class ReportPoint(BaseModel):
 
 
 class PublishBody(BaseModel):
+    # v1 형식 — format 키는 없거나 1. `"2"`(문자열)·3 같은 값이 v1 오류 목록에 묻히지 않고 format 오류로 드러나게.
+    format: Optional[Literal[1]] = None
     rating: Literal["buy", "neutral", "sell"]
     title: str = Field(..., min_length=1)
     # allow_inf_nan=False: raw JSON body의 NaN/Infinity 토큰이 json.loads·NaN 비교(항상 False)를
@@ -56,10 +59,169 @@ class PublishBody(BaseModel):
         return v
 
 
+# ── v2: 구조 축·9렌즈 틀 (ADR 261006-232406, task#368) ─────────────────────
+# v1(위 PublishBody)은 루틴 프롬프트가 v2로 바뀌는 task#369 전까지 그대로 받는다 — `format: 2`가 가른다.
+# 선택 필드는 전부 Optional[...] = Field(None) — 명시적 null이 발행 전체를 422로 막지 않게(task#250·ADR-0034 보정 ③).
+
+class RawInput(BaseModel):
+    """공시에서 옮겨 적은 원자료 하나 — 계산은 서버가 한다(ADR 261006-232406 결정 3)."""
+    value: float = Field(..., allow_inf_nan=False)
+    unit: str = Field(..., min_length=1, max_length=20)
+    source: Literal["disclosure", "estimate"]
+    ref: str = Field(..., min_length=1, max_length=200)      # 출처·기준일
+    rationale: Optional[str] = Field(None, max_length=300)   # estimate면 필수
+
+    @model_validator(mode="after")
+    def _estimate_needs_rationale(self):
+        if self.source == "estimate" and not (self.rationale or "").strip():
+            raise ValueError("source=estimate면 rationale(추정 근거)가 필수")
+        return self
+
+
+class SensitivityAxis(BaseModel):
+    # 모델 단위 가드 — values 배열 원소까지 NaN/Infinity 422(test_nan_input_guards가 이 형태를 감지한다)
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    label: str = Field(..., min_length=1, max_length=40)
+    values: List[float] = Field(..., min_length=3, max_length=3)
+    unit: str = Field(..., min_length=1, max_length=20)
+    source: Literal["disclosure", "estimate"]
+    ref: str = Field(..., min_length=1, max_length=200)
+    rationale: Optional[str] = Field(None, max_length=300)
+
+    @model_validator(mode="after")
+    def _estimate_needs_rationale(self):
+        if self.source == "estimate" and not (self.rationale or "").strip():
+            raise ValueError("source=estimate면 rationale(추정 근거)가 필수")
+        return self
+
+
+class Sensitivity(BaseModel):
+    exogenous: SensitivityAxis    # 외생 변수(금리·원자재 가격) 3단계 — 표의 행
+    endogenous: SensitivityAxis   # 내생 변수(잔고·판매량) 3단계 — 표의 열
+
+
+class AxisChoice(BaseModel):
+    rationale: str = Field(..., min_length=1, max_length=300)
+
+
+class RevenueEngine(AxisChoice):
+    value: Literal["usage", "volume", "price_exogenous", "balance_rate", "transaction"]
+
+
+class CostNature(AxisChoice):
+    value: Literal["fixed", "revenue_linked"]
+
+
+class FundingSource(AxisChoice):
+    value: Literal["equity", "deposit", "debt"]
+
+
+class Structure(BaseModel):
+    revenue_engine: RevenueEngine
+    cost_nature: CostNature
+    funding_source: FundingSource
+
+
+class LensIn(BaseModel):
+    id: int = Field(..., ge=1, le=9)
+    summary: str = Field(..., min_length=1, max_length=200)
+    body: str = Field(..., min_length=1)
+    metrics: Optional[List[PointMetric]] = Field(None, max_length=4)
+    signal: Optional[Literal["go", "wait", "stop", "na"]] = None   # 판단 렌즈만 — 계산 렌즈는 서버가 켠다
+    flip: Optional[str] = Field(None, max_length=200)              # 판단 렌즈만
+    na_reason: Optional[str] = Field(None, max_length=200)
+    inputs: Optional[Dict[str, RawInput]] = None                   # 계산 렌즈만
+    sensitivity: Optional[Sensitivity] = None                      # 렌즈 8 · 외생 가격형 수익 엔진만
+
+    @model_validator(mode="after")
+    def _lens_kind_rules(self):
+        if self.id in lens_calc.COMPUTED_LENSES:
+            # 두 출처를 만들지 않는다 — 무시가 아니라 거부(계산 렌즈의 신호·바뀜 조건은 서버 정본)
+            if self.signal is not None or self.flip is not None:
+                raise ValueError(f"렌즈 {self.id}는 계산 렌즈 — signal·flip은 서버가 채운다(보내지 말 것)")
+            if self.na_reason and (self.inputs or self.sensitivity):
+                raise ValueError(f"렌즈 {self.id}: na_reason과 inputs를 함께 보낼 수 없다")
+            if not self.na_reason and not self.inputs:
+                raise ValueError(f"렌즈 {self.id}: inputs(원자료) 또는 na_reason이 필요")
+            if self.sensitivity is not None and self.id != 8:
+                raise ValueError("sensitivity는 렌즈 8에만")
+        else:
+            if self.inputs is not None or self.sensitivity is not None:
+                raise ValueError(f"렌즈 {self.id}는 판단 렌즈 — inputs·sensitivity 없음")
+            if self.signal is None:
+                raise ValueError(f"렌즈 {self.id}: signal 필수")
+            if self.signal == "na" and not (self.na_reason or "").strip():
+                raise ValueError(f"렌즈 {self.id}: signal=na면 na_reason 필수")
+            if self.signal != "na" and not (self.flip or "").strip():
+                raise ValueError(f"렌즈 {self.id}: 바뀜 조건(flip) 필수")
+        return self
+
+
+class LensPublishBody(BaseModel):
+    format: Literal[2]
+    title: str = Field(..., min_length=1, max_length=120)   # 한줄 논지
+    structure: Structure
+    lenses: List[LensIn] = Field(..., min_length=9, max_length=9)
+
+    @model_validator(mode="after")
+    def _lens_set_and_inputs(self):
+        ids = sorted(l.id for l in self.lenses)
+        if ids != list(range(1, 10)):
+            raise ValueError(f"lenses는 id 1~9가 정확히 한 번씩이어야 한다(받은 id: {ids})")
+        axes = {"revenue_engine": self.structure.revenue_engine.value,
+                "cost_nature": self.structure.cost_nature.value,
+                "funding_source": self.structure.funding_source.value}
+        for l in self.lenses:
+            if l.id not in lens_calc.COMPUTED_LENSES or l.na_reason:
+                continue
+            variant = lens_calc.variant_for(l.id, axes)
+            required = lens_calc.required_inputs(l.id, variant)
+            optional = lens_calc.OPTIONAL_SPEC.get(l.id, {})
+            given = set(l.inputs)
+            missing = set(required) - given
+            unknown = given - set(required) - set(optional)
+            if missing:
+                raise ValueError(f"렌즈 {l.id}({variant}): 원자료 누락 {sorted(missing)} — 없으면 na_reason")
+            if unknown:
+                raise ValueError(f"렌즈 {l.id}({variant}): 알 수 없는 원자료 {sorted(unknown)}")
+            kinds = {**required, **optional}
+            money_units = {l.inputs[k].unit for k in given if kinds[k] == "money"}
+            if len(money_units) > 1:
+                raise ValueError(f"렌즈 {l.id}: 금액 원자료의 단위가 섞임 {sorted(money_units)}")
+            bad_pct = [k for k in given if kinds[k] == "pct" and l.inputs[k].unit != "%"]
+            if bad_pct:
+                raise ValueError(f"렌즈 {l.id}: 비율 원자료는 단위 '%' {sorted(bad_pct)}")
+            if l.id == 8:
+                if l.inputs["forward_earnings"].unit not in lens_calc.UNIT_SCALE:
+                    raise ValueError(f"렌즈 8: forward_earnings 단위는 {sorted(lens_calc.UNIT_SCALE)} 중 하나")
+                if variant == "balance_rate" and l.sensitivity is not None:
+                    if l.sensitivity.exogenous.unit != "%":
+                        raise ValueError("렌즈 8 balance_rate: 외생 축(금리) 단위는 '%'")
+                    if l.sensitivity.endogenous.unit not in money_units:
+                        raise ValueError("렌즈 8 balance_rate: 내생 축(잔고) 단위는 금액 원자료 단위와 같아야 한다")
+                if (variant in lens_calc.TABLE_ENGINES) != (l.sensitivity is not None):
+                    raise ValueError("렌즈 8: 민감도 표(sensitivity)는 수익 엔진이 "
+                                     f"{lens_calc.TABLE_ENGINES}일 때만, 그리고 그때는 필수")
+        return self
+
+
+def _publish_kind(v) -> str:
+    fmt = v.get("format") if isinstance(v, dict) else getattr(v, "format", None)
+    return "v2" if fmt == 2 else "v1"
+
+
+AnyPublishBody = Annotated[
+    Union[Annotated[PublishBody, Tag("v1")], Annotated[LensPublishBody, Tag("v2")]],
+    Discriminator(_publish_kind),
+]
+
+
 @router.post("/{ticker}", status_code=201)
-def publish_report(ticker: str, body: PublishBody, _: str = Depends(require_admin_or_api_key)):
+def publish_report(ticker: str, body: AnyPublishBody, _: str = Depends(require_admin_or_api_key)):
     """발행 — 판단 필드는 요청 본문, 데이터 블록은 서버가 최신 스냅샷에서 자동 첨부.
 
+    `format: 2`(구조 축·9렌즈)면 렌즈 3·4·5·8의 계산·신호·바뀜 조건도 서버가 박제한다.
     스냅샷 부재 시 409(데이터 블록 불가 — ADR-0027 발행 전제조건)."""
     upper = ticker.upper()
     snap = svc.latest_snapshot(upper)
@@ -102,6 +264,23 @@ def publish_report(ticker: str, body: PublishBody, _: str = Depends(require_admi
     if snap_mean is not None:
         data["consensus"]["base_date"] = snapshot_date
     data = sanitize(data)
+    if isinstance(body, LensPublishBody):
+        b = body.model_dump()
+        l8 = next(l for l in b["lenses"] if l["id"] == 8)
+        if l8.get("inputs"):
+            unit = l8["inputs"]["forward_earnings"]["unit"]
+            expect = "KRW" if (snapshot_data or {}).get("market") == "KR" else "USD"
+            if lens_calc.UNIT_SCALE[unit][0] != expect:
+                raise HTTPException(status_code=422, detail=(
+                    f"렌즈 8 forward_earnings 통화({unit})가 종목 시장 통화({expect})와 다름"))
+            if expect == "KRW" and "risk_free_pct" not in l8["inputs"]:
+                # 서버 캐시의 무위험 금리는 미 10년물 — KR 종목에 쓰면 틀린 비교가 된다
+                raise HTTPException(status_code=422, detail="KR 종목의 렌즈 8은 risk_free_pct(국고채) 원자료 필수")
+        lens_report = sanitize(lens_calc.build_lens_report(b["structure"], b["lenses"], snapshot_data or {}))
+        svc.save_lens_report(ticker=upper, published_date=published_date, title=body.title,
+                             data=data, lens_report=lens_report)
+        logger.info(f"[AnalystReport] v2 발행 ({upper} {published_date}): tally={lens_report['tally']}")
+        return {"ok": True, "ticker": upper, "published_date": published_date, "format": 2}
     svc.save_report(
         upper, published_date, body.rating, body.title,
         body.fair_value_low, body.fair_value_high, body.valuation_method,
