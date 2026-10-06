@@ -216,8 +216,10 @@ def _raw(value, unit="USD M", source="disclosure", **kw):
 
 
 def _judgment(i, signal="wait"):
+    # 판단 렌즈의 바뀜 조건은 구조화가 필수다(사람 UAT 피드백 2) — 기본은 비수치형 조건 목록
     return {"id": i, "summary": f"렌즈{i} 요약", "body": f"렌즈{i} 본문", "signal": signal,
-            "flip": f"렌즈{i} 바뀜 조건"}
+            "flip": f"렌즈{i} 바뀜 조건",
+            "conditions": [{"to": "wait" if signal == "stop" else "stop", "when": [f"렌즈{i} 조건 A", f"렌즈{i} 조건 B"], "match": "all"}]}
 
 
 def crcl_body():
@@ -256,7 +258,7 @@ def crcl_body():
                                "source": "estimate", "ref": "시나리오", "rationale": "±0.6%p"},
                  "endogenous": {"label": "USDC 유통량", "values": [70000, 74000, 80000], "unit": "USD M",
                                 "source": "estimate", "ref": "시나리오", "rationale": "현재 ±"}}},
-            _judgment(9, "na") | {"flip": None, "na_reason": "규제 공시 없음"},
+            _judgment(9, "na") | {"flip": None, "na_reason": "규제 공시 없음", "conditions": None},
         ],
     }
 
@@ -578,3 +580,78 @@ def test_gauge_money_unit_filled_from_inputs_on_publish():
     g8 = _lens(lr, 8)["computed"]["gauge"]
     assert g8["variable"] == "forward 이익" and g8["unit"] == "USD M"
     assert _lens(lr, 5)["computed"]["gauge"]["unit"] == "%"
+
+
+
+# ── 판단 렌즈 바뀜 조건 구조화 (사람 UAT 피드백 2 — 수치면 게이지, 아니면 조건 목록) ──────
+
+def _jgauge(current=743, bounds=(700, 800), zones=("stop", "wait", "go")):
+    return {"variable": "USDC 유통량", "unit": "억달러", "current": current, "current_ref": "DefiLlama 2026-10-06",
+            "boundaries": list(bounds), "zones": list(zones)}
+
+
+def _with_lens9(**kw):
+    body = crcl_body()
+    body["lenses"][8] = {"id": 9, "summary": "수요", "body": "본문", "signal": "wait",
+                         "flip": "800억 넘으면 초록, 700억 아래면 빨강", **kw}
+    return body
+
+
+def test_judgment_numeric_gauge_stored_with_routine_origin():
+    resp, mock_save, _ = _publish(_with_lens9(gauge=_jgauge()))
+    assert resp.status_code == 201, resp.text
+    l9 = _lens(mock_save.call_args.kwargs["lens_report"], 9)
+    assert l9["gauge"]["current"] == 743 and l9["gauge"]["zones"] == ["stop", "wait", "go"]
+    assert l9["gauge"]["origin"] == "routine"
+    assert l9.get("conditions") is None
+
+
+def test_judgment_gauge_zone_must_equal_signal():
+    # 현재 743이 노랑 구간인데 신호를 초록으로 켜면 그림과 신호가 모순 → 422
+    body = _with_lens9(gauge=_jgauge())
+    body["lenses"][8]["signal"] = "go"
+    assert _publish(body)[0].status_code == 422
+    assert _publish(_with_lens9(gauge=_jgauge(current=820)) | {})[0].status_code == 422  # 820은 초록 구간인데 신호 노랑
+    assert _publish(_with_lens9(gauge=_jgauge()))[0].status_code == 201
+
+
+def test_judgment_gauge_shape_rules():
+    assert _publish(_with_lens9(gauge=_jgauge(bounds=(800, 700))))[0].status_code == 422          # 경계 오름차순
+    assert _publish(_with_lens9(gauge=_jgauge(zones=("stop", "go"))))[0].status_code == 422        # 구간 수 = 경계 + 1
+    assert _publish(_with_lens9(gauge={**_jgauge(), "current_ref": ""}))[0].status_code == 422     # 현재값 출처 필수
+    assert _publish(_with_lens9(gauge=_jgauge(bounds=(700,), zones=("stop", "wait"))))[0].status_code == 201  # 경계 1개 허용
+
+
+def test_judgment_exactly_one_of_gauge_or_conditions():
+    cond = [{"to": "go", "when": ["유통량 800억 돌파"], "match": "all"}]
+    assert _publish(_with_lens9())[0].status_code == 422                                         # 둘 다 없음
+    assert _publish(_with_lens9(gauge=_jgauge(), conditions=cond))[0].status_code == 422          # 둘 다 있음
+    assert _publish(_with_lens9(conditions=cond))[0].status_code == 201
+    assert _publish(_with_lens9(conditions=cond, gauge=None))[0].status_code == 201               # 명시적 null 허용
+
+
+def test_conditions_rules():
+    assert _publish(_with_lens9(conditions=[{"to": "wait", "when": ["x"]}]))[0].status_code == 422  # 지금 색으로 '바뀜'은 모순
+    assert _publish(_with_lens9(conditions=[{"to": "go", "when": []}]))[0].status_code == 422        # 조건 0개
+    assert _publish(_with_lens9(conditions=[]))[0].status_code == 422
+    resp, mock_save, _ = _publish(_with_lens9(conditions=[{"to": "go", "when": ["a", "b"]}]))
+    assert resp.status_code == 201
+    c = _lens(mock_save.call_args.kwargs["lens_report"], 9)["conditions"][0]
+    assert c["match"] == "all" and c["when"] == ["a", "b"]                                         # match 기본값 all
+
+
+def test_structured_flip_forbidden_on_na_and_on_computed_lenses():
+    body = crcl_body()
+    body["lenses"][8]["conditions"] = [{"to": "go", "when": ["x"]}]                 # 렌즈 9 = na
+    assert _publish(body)[0].status_code == 422
+    body = crcl_body()
+    body["lenses"][2]["gauge"] = _jgauge()                                         # 렌즈 3 = 계산 렌즈(서버가 그린다)
+    assert _publish(body)[0].status_code == 422
+    body = crcl_body()
+    body["lenses"][2]["conditions"] = [{"to": "go", "when": ["x"]}]
+    assert _publish(body)[0].status_code == 422
+
+
+def test_computed_gauge_carries_server_origin():
+    resp, mock_save, _ = _publish(crcl_body())
+    assert _lens(mock_save.call_args.kwargs["lens_report"], 5)["computed"]["gauge"]["origin"] == "server"

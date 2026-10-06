@@ -339,7 +339,8 @@ export const V2_REPORT = {
     funding_source: { value: 'deposit', rationale: 'USDC 예치금' },
   },
   lenses: [
-    judg(1, 'wait'), judg(2, 'go'),
+    judg(1, 'wait'),
+    judg(2, 'go', { gauge: { variable: '분기 매출', unit: '억달러', current: 7.6, current_ref: '10-Q 2026Q2', boundaries: [7.0, 7.5], zones: ['stop', 'wait', 'go'], origin: 'routine' } }),
     { ...judg(3, 'stop'), flip: '기여몫 증가율이 18.1% 이상이면 노랑', inputs: { contribution_prev: raw(251, 'USD M') }, sensitivity: null,
       computed: { variant: 'revenue_linked', values: { ratio: 0.6693, numerator_growth_pct: 15.14, cost_growth_pct: 22.63 }, signal: 'stop', flip: '기여몫 증가율이 18.1% 이상이면 노랑', flip_value: 18.1, estimate_based: false } },
     { ...judg(4, 'go'), flip: '한계 분배율이 53.8% 이상이면 노랑', inputs: {}, sensitivity: null,
@@ -347,8 +348,8 @@ export const V2_REPORT = {
     { ...judg(5, 'wait'), flip: '준비금 수익률 3.15% 아래면 빨강',
       inputs: { balance: raw(74200, 'USD M'), avg_share_pct: raw(38.2, '%', 'estimate', 'RLDC ÷ 준비금 수익') }, sensitivity: null,
       computed: { variant: 'deposit', values: { breakeven_pct: 2.1484, margin_pp: 1.3416, marginal_share_pct: 51.15 }, signal: 'wait', flip: '준비금 수익률 3.15% 아래면 빨강', flip_value: 3.1484, estimate_based: true,
-        gauge: { variable: '준비금 수익률', unit: '%', current: 3.49, boundaries: [3.1484, 4.1484], zones: ['stop', 'wait', 'go'] } } },
-    judg(6, 'stop'), judg(7, 'wait'),
+        gauge: { variable: '준비금 수익률', unit: '%', current: 3.49, boundaries: [3.1484, 4.1484], zones: ['stop', 'wait', 'go'], origin: 'server' } } },
+    judg(6, 'stop', { conditions: [{ to: 'wait', when: ['코인베이스 외 분배처 비중 상승', '협약 조건 불변'], match: 'all' }] }), judg(7, 'wait'),
     { ...judg(8, 'wait'), flip: 'forward 이익 515.75 아래면 빨강', inputs: { forward_earnings: raw(620, 'USD M', 'estimate', '가이던스') },
       sensitivity: { exogenous: { label: '준비금 수익률', values: [3.0, 3.6, 4.2], unit: '%' }, endogenous: { label: 'USDC 유통량', values: [70000, 74000, 80000], unit: 'USD M' } },
       computed: { variant: 'balance_rate', values: { multiple: 33.27, earnings_yield_pct: 3.005, risk_free_pct: 4.0,
@@ -440,9 +441,51 @@ describe('바뀜 조건 게이지 (task#369 UAT 피드백)', () => {
 
   it('게이지가 없는 렌즈(판단 렌즈·게이지 이전 발행물)는 문장만, 미산출은 사유', async () => {
     const { container } = await renderV2()
-    expect(container.querySelectorAll('[data-flip-gauge]').length).toBe(1)
+    expect(container.querySelectorAll('[data-flip-gauge]').length).toBe(2)   // 렌즈 5(서버) + 렌즈 2(루틴)
     expect(container.querySelector('[data-lens-cell="8"]').textContent).toContain('forward 이익 515.75 아래면 빨강')
     expect(container.querySelector('[data-lens-cell="1"]').textContent).toContain('바뀜1')
     expect(container.querySelector('[data-lens-cell="9"]').textContent).toContain('사유9')
+  })
+})
+
+describe('판단 렌즈 바뀜 조건 — 수치면 게이지, 아니면 조건 (사람 UAT 피드백 2)', () => {
+  const renderV2 = async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? V2_REPORT : { reports: [] } }))
+    const r = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    return r
+  }
+
+  it('수치형 판단 렌즈는 게이지 + 「루틴 판단」, 계산 렌즈 게이지는 「서버 계산」', async () => {
+    const { container } = await renderV2()
+    const g2 = container.querySelector('[data-lens-cell="2"] [data-flip-gauge]')
+    expect(g2.getAttribute('data-origin')).toBe('routine')
+    expect(g2.textContent).toContain('루틴 판단')
+    expect(g2.getAttribute('data-current-zone')).toBe('go')
+    const g5 = container.querySelector('[data-lens-cell="5"] [data-flip-gauge]')
+    expect(g5.getAttribute('data-origin')).toBe('server')
+    expect(g5.textContent).toContain('서버 계산')
+  })
+
+  it('비수치형 판단 렌즈는 조건 목록(목표 색·충족 방식·조건들), 같은 내용의 문장은 반복하지 않는다', async () => {
+    const { container } = await renderV2()
+    const row6 = container.querySelector('[data-lens-cell="6"]')
+    const c = row6.querySelector('[data-flip-conditions]')
+    expect(c).toBeTruthy()
+    expect(c.textContent).toContain('노랑')
+    expect(c.textContent).toContain('모두')
+    expect([...c.querySelectorAll('li')].map(li => li.textContent)).toEqual(['코인베이스 외 분배처 비중 상승', '협약 조건 불변'])
+    expect(row6.textContent).not.toContain('바뀜6')
+  })
+
+  it('구조화 이전 데이터(게이지·조건 없음)는 문장으로 폴백', async () => {
+    const { container } = await renderV2()
+    const row1 = container.querySelector('[data-lens-cell="1"]')
+    expect(row1.querySelector('[data-flip-gauge],[data-flip-conditions]')).toBeNull()
+    expect(row1.textContent).toContain('바뀜1')
   })
 })

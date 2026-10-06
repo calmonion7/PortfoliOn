@@ -2334,6 +2334,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `lenses[].flip` | 판단 렌즈(na 제외) ✅ / 계산 렌즈 ❌ | 바뀜 조건 한 줄 — 계산 렌즈에 보내면 422 |
 | `lenses[].na_reason` | `na`면 ✅ | 원자료가 없어 판정하지 않는 사유. 계산 렌즈는 `inputs` 대신 이것만 보내면 서버가 회색(`na`)으로 박제한다 |
 | `lenses[].inputs` | 계산 렌즈 ✅(na_reason 없을 때) | 원자료 `{키: {value, unit, source, ref, rationale?}}` — 아래 표의 키 **전부**(누락·알 수 없는 키 422) |
+| `lenses[].gauge` | 판단 렌즈(na 제외) — `conditions`와 **정확히 하나** | 수치형 바뀜 조건 `{variable, unit, current, current_ref, boundaries[1~2, 오름차순], zones[]}` — `zones`는 낮은 값→높은 값 순 신호(개수 = 경계+1). **현재값이 놓인 구간 = 그 렌즈의 `signal`**이어야 한다(다르면 422). 서버는 계산하지 않고 검증만 하며, 화면은 「루틴 판단」 게이지로 그린다 |
+| `lenses[].conditions` | 판단 렌즈(na 제외) — `gauge`와 **정확히 하나** | 비수치형 바뀜 조건 `[{to, when[1~4], match: all\|any}]`(최대 3개) — `to`는 바뀌어 갈 색(지금 색과 달라야 함), 화면은 조건 목록으로 그린다. 숫자와 사건이 섞이면 이쪽 |
 | `lenses[].sensitivity` | 렌즈 8 · 수익 엔진 `balance_rate`/`price_exogenous`일 때 ✅ | `{exogenous, endogenous}` 각 `{label, values[3], unit, source, ref, rationale?}` — 3×3 민감도 표의 행(외생)·열(내생) |
 
 **원자료 하나** = `{value(유한수), unit, source: "disclosure"|"estimate", ref(출처·기준일), rationale}` — `source: "estimate"`면 `rationale`(추정 근거) 필수. 같은 렌즈의 금액 원자료는 **단위가 하나**여야 하고, `_pct` 키는 단위 `"%"`.
@@ -2359,7 +2361,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **Response `201`** — `{ "ok": true, "ticker": "CRCL", "published_date": "2026-10-07", "format": 2 }`
 
-**v2 `422` 조건** — `lenses` id가 1~9 각 1회가 아님 · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함).
+**v2 `422` 조건** — `lenses` id가 1~9 각 1회가 아님 · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함) · 판단 렌즈(na 제외)에 `gauge`·`conditions`가 둘 다 있거나 둘 다 없음 · `gauge` 현재값 구간 ≠ `signal` · `gauge` 경계가 오름차순이 아니거나 구간 수 ≠ 경계+1 · `conditions.to` == 지금 색 · `na` 렌즈나 계산 렌즈에 `gauge`/`conditions`.
 
 ---
 
@@ -2503,7 +2505,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 }
 ```
 
-`lenses[].signal`·`flip` — 판단 렌즈는 발행 본문 값, 계산 렌즈(3·4·5·8)는 **서버 계산값**(`computed`와 같다). `computed` — 계산 렌즈만(`na_reason`으로 발행한 계산 렌즈는 `null`). `computed.values`는 변형별로 다르다: 렌즈 3 `ratio`·`numerator_growth_pct`·`cost_growth_pct` / 렌즈 4 `marginal_pct`·`average_pct`(연동형) 또는 `commitment_multiple`·`revenue_multiple`·`ratio`(고정형) / 렌즈 5 `runway_years`·`profitable`(equity) · `breakeven_pct`·`margin_pp`·…(deposit) · `coverage`(debt) / 렌즈 8 `market_cap`·`forward_earnings`·`multiple`·`earnings_yield_pct`·`risk_free_pct` + 외생 가격형이면 `sensitivity.{exogenous, endogenous, multiples[3][3]}`. 렌즈 8은 `computed.risk_free_source`(`input` \| `server_cache`)도 싣는다. `computed.estimate_based` — 원자료 중 하나라도 `estimate`면 `true`(화면에 「추정 기반」). `flip_value` — 바뀜 조건의 경계 입력값(숫자). `computed.gauge` — 바뀜 조건 게이지 `{variable, unit, current, boundaries[], zones[]}`: 바뀜 조건 문장이 말하는 변수(예: 준비금 수익률) 축 위에서 `zones[i]`(`go`/`wait`/`stop`)가 `boundaries[i-1]`~`boundaries[i]` 구간의 신호다(낮은 값 → 높은 값). 현재값이 놓인 구간이 곧 그 렌즈의 `signal`이고 `flip_value`는 `boundaries` 중 하나다. 문턱은 서버 상수 하나에서만 나오므로 화면은 그리기만 한다. 계산 불가(`na`)·이자비용 0·현금과 소진이 모두 0 이하인 경우 `null`이고, 게이지 도입(2026-10-07) 이전 발행물에는 키가 없다.
+`lenses[].signal`·`flip` — 판단 렌즈는 발행 본문 값, 계산 렌즈(3·4·5·8)는 **서버 계산값**(`computed`와 같다). `computed` — 계산 렌즈만(`na_reason`으로 발행한 계산 렌즈는 `null`). `computed.values`는 변형별로 다르다: 렌즈 3 `ratio`·`numerator_growth_pct`·`cost_growth_pct` / 렌즈 4 `marginal_pct`·`average_pct`(연동형) 또는 `commitment_multiple`·`revenue_multiple`·`ratio`(고정형) / 렌즈 5 `runway_years`·`profitable`(equity) · `breakeven_pct`·`margin_pp`·…(deposit) · `coverage`(debt) / 렌즈 8 `market_cap`·`forward_earnings`·`multiple`·`earnings_yield_pct`·`risk_free_pct` + 외생 가격형이면 `sensitivity.{exogenous, endogenous, multiples[3][3]}`. 렌즈 8은 `computed.risk_free_source`(`input` \| `server_cache`)도 싣는다. `computed.estimate_based` — 원자료 중 하나라도 `estimate`면 `true`(화면에 「추정 기반」). `flip_value` — 바뀜 조건의 경계 입력값(숫자). `computed.gauge` — 바뀜 조건 게이지 `{variable, unit, current, boundaries[], zones[]}`: 바뀜 조건 문장이 말하는 변수(예: 준비금 수익률) 축 위에서 `zones[i]`(`go`/`wait`/`stop`)가 `boundaries[i-1]`~`boundaries[i]` 구간의 신호다(낮은 값 → 높은 값). 현재값이 놓인 구간이 곧 그 렌즈의 `signal`이고 `flip_value`는 `boundaries` 중 하나다. 문턱은 서버 상수 하나에서만 나오므로 화면은 그리기만 한다. 계산 불가(`na`)·이자비용 0·현금과 소진이 모두 0 이하인 경우 `null`이고, 게이지 도입(2026-10-07) 이전 발행물에는 키가 없다. `computed.gauge.origin`은 `"server"`. 판단 렌즈는 `lenses[].gauge`(발행 본문 그대로 + `origin: "routine"`) 또는 `lenses[].conditions`를 싣는다 — 계산 렌즈의 게이지와 모양은 같지만 경계가 서버 공식이 아니라 루틴 판단이다.
 
 **Error `404`** — 해당 ticker+date 발행물 없음
 

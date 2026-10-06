@@ -101,6 +101,38 @@ class Sensitivity(BaseModel):
     endogenous: SensitivityAxis   # 내생 변수(잔고·판매량) 3단계 — 표의 열
 
 
+class JudgmentGauge(BaseModel):
+    """판단 렌즈의 수치형 바뀜 조건(사람 UAT 피드백 2) — 루틴이 정한 경계. 서버는 계산하지 않고 검증만 한다.
+
+    zones[i]는 boundaries[i-1]~boundaries[i] 구간의 신호(낮은 값 → 높은 값). 계산 렌즈의 서버 게이지와 같은 모양."""
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    variable: str = Field(..., min_length=1, max_length=40)
+    unit: str = Field(..., min_length=1, max_length=20)
+    current: float
+    current_ref: str = Field(..., min_length=1, max_length=200)   # 현재값의 출처·기준일
+    boundaries: List[float] = Field(..., min_length=1, max_length=2)
+    zones: List[Literal["go", "wait", "stop"]] = Field(..., min_length=2, max_length=3)
+
+    @model_validator(mode="after")
+    def _shape(self):
+        if self.boundaries != sorted(self.boundaries) or len(set(self.boundaries)) != len(self.boundaries):
+            raise ValueError("gauge.boundaries는 서로 다른 값의 오름차순")
+        if len(self.zones) != len(self.boundaries) + 1:
+            raise ValueError("gauge.zones 개수 = boundaries 개수 + 1")
+        return self
+
+    def zone_of_current(self) -> str:
+        return self.zones[sum(1 for b in self.boundaries if self.current >= b)]
+
+
+class FlipCondition(BaseModel):
+    """판단 렌즈의 비수치형 바뀜 조건 — 「이 조건(들)이 확인되면 이 색으로」."""
+    to: Literal["go", "wait", "stop"]
+    when: List[Annotated[str, Field(min_length=1, max_length=80)]] = Field(..., min_length=1, max_length=4)
+    match: Literal["all", "any"] = "all"
+
+
 class AxisChoice(BaseModel):
     rationale: str = Field(..., min_length=1, max_length=300)
 
@@ -132,6 +164,8 @@ class LensIn(BaseModel):
     flip: Optional[str] = Field(None, max_length=200)              # 판단 렌즈만
     na_reason: Optional[str] = Field(None, max_length=200)
     inputs: Optional[Dict[str, RawInput]] = None                   # 계산 렌즈만
+    gauge: Optional[JudgmentGauge] = None                          # 판단 렌즈 — 바뀜 조건이 수치로 나오면
+    conditions: Optional[List[FlipCondition]] = Field(None, min_length=1, max_length=3)  # 판단 렌즈 — 수치가 아니면
     sensitivity: Optional[Sensitivity] = None                      # 렌즈 8 · 외생 가격형 수익 엔진만
 
     @model_validator(mode="after")
@@ -146,6 +180,8 @@ class LensIn(BaseModel):
                 raise ValueError(f"렌즈 {self.id}: inputs(원자료) 또는 na_reason이 필요")
             if self.sensitivity is not None and self.id != 8:
                 raise ValueError("sensitivity는 렌즈 8에만")
+            if self.gauge is not None or self.conditions is not None:
+                raise ValueError(f"렌즈 {self.id}는 계산 렌즈 — 바뀜 조건 게이지는 서버가 그린다(gauge·conditions 보내지 말 것)")
         else:
             if self.inputs is not None or self.sensitivity is not None:
                 raise ValueError(f"렌즈 {self.id}는 판단 렌즈 — inputs·sensitivity 없음")
@@ -155,6 +191,18 @@ class LensIn(BaseModel):
                 raise ValueError(f"렌즈 {self.id}: signal=na면 na_reason 필수")
             if self.signal != "na" and not (self.flip or "").strip():
                 raise ValueError(f"렌즈 {self.id}: 바뀜 조건(flip) 필수")
+            # 바뀜 조건 구조화(사람 UAT 피드백 2): 수치로 나오면 gauge, 아니면 conditions — 정확히 하나
+            if self.signal == "na":
+                if self.gauge is not None or self.conditions is not None:
+                    raise ValueError(f"렌즈 {self.id}: signal=na면 gauge·conditions 없음")
+            else:
+                if (self.gauge is None) == (self.conditions is None):
+                    raise ValueError(f"렌즈 {self.id}: 바뀜 조건은 gauge(수치형) 또는 conditions(비수치형) 중 정확히 하나")
+                if self.gauge is not None and self.gauge.zone_of_current() != self.signal:
+                    raise ValueError(f"렌즈 {self.id}: gauge 현재값 {self.gauge.current}의 구간 "
+                                     f"'{self.gauge.zone_of_current()}'이 signal '{self.signal}'과 다르다")
+                if self.conditions and any(c.to == self.signal for c in self.conditions):
+                    raise ValueError(f"렌즈 {self.id}: conditions.to는 지금 색({self.signal})과 달라야 한다")
         return self
 
 

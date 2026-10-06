@@ -91,8 +91,11 @@ const gfmt = (v, unit) => {
 // 라벨이 트랙 끝에서 잘리지 않게 — 양 끝 근처는 그쪽 끝에 붙인다
 const anchor = (pct) => (pct < 12 ? 'translateX(0)' : pct > 88 ? 'translateX(-100%)' : 'translateX(-50%)')
 
-export function FlipGauge({ gauge, signal }) {
-  const { variable, unit, current, boundaries = [], zones = [] } = gauge || {}
+// 게이지 출처 — 계산 렌즈는 서버 공식, 판단 렌즈는 루틴이 정한 경계(같은 모양이어도 무게가 다르다)
+const ORIGIN_LABEL = { server: '서버 계산', routine: '루틴 판단' }
+
+export function FlipGauge({ gauge, signal, origin }) {
+  const { variable, unit, current, boundaries = [], zones = [], current_ref: currentRef } = gauge || {}
   if (!gauge || !Number.isFinite(current) || zones.length !== boundaries.length + 1) return null
   const vals = [current, ...boundaries]
   const lo = Math.min(...vals), hi = Math.max(...vals)
@@ -110,10 +113,13 @@ export function FlipGauge({ gauge, signal }) {
     return `${sig(z).label} ${r}`
   })
   return (
-    <div data-flip-gauge="" data-current-zone={curZone} role="img"
-         aria-label={`${variable} 현재 ${gfmt(current, unit)} — ${ranges.join(', ')}`}
+    <div data-flip-gauge="" data-current-zone={curZone} data-origin={origin} role="img"
+         aria-label={`${variable} 현재 ${gfmt(current, unit)} — ${ranges.join(', ')} (${ORIGIN_LABEL[origin] || ''})`}
          style={{ margin: '10px 0 2px' }}>
-      <div style={{ ...smallCap, marginBottom: 2 }}>{variable}{unit && unit !== '%' && unit !== '배' ? ` (${unit})` : ''}</div>
+      <div style={{ ...smallCap, marginBottom: 2, display: 'flex', gap: 8, alignItems: 'baseline' }}>
+        <span>{variable}{unit && unit !== '%' && unit !== '배' ? ` (${unit})` : ''}</span>
+        {ORIGIN_LABEL[origin] && <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 5px' }}>{ORIGIN_LABEL[origin]}</span>}
+      </div>
       <div style={{ position: 'relative', height: 44 }}>
         {/* 현재값 라벨 */}
         <span className="mono tnum" style={{ position: 'absolute', top: 0, left: `${pct(current)}%`, transform: anchor(pct(current)), fontSize: 11, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>
@@ -140,16 +146,41 @@ export function FlipGauge({ gauge, signal }) {
           </span>
         ))}
       </div>
+      {currentRef && <div style={{ ...smallCap, fontSize: 10 }}>현재값 출처: {currentRef}</div>}
     </div>
   )
 }
 
-// 렌즈 신호 + 바뀜 조건을 한 행에(task#369 UAT 피드백): 번호·이름·신호 → 요약 → 게이지(계산 렌즈) 또는 바뀜 조건 문장
+// 판단 렌즈의 비수치형 바뀜 조건 — 「이 조건(들)이 확인되면 이 색으로」
+function FlipConditions({ conditions }) {
+  return (
+    <div data-flip-conditions="" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+      {conditions.map((c, i) => (
+        <div key={i} style={{ fontSize: 12, lineHeight: 1.5 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <SignalDot signal={c.to} size={8} />
+            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{sig(c.to).label}으로 바뀌는 조건</span>
+            <span style={smallCap}>{c.match === 'any' ? '하나라도 확인되면' : (c.when.length > 1 ? '모두 확인되면' : '확인되면')}</span>
+          </div>
+          <ul style={{ margin: '2px 0 0', paddingLeft: 22, color: 'var(--text-2, var(--text))' }}>
+            {c.when.map((w, j) => <li key={j} style={{ wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{w}</li>)}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// 렌즈 신호 + 바뀜 조건을 한 행에(task#369 UAT 피드백): 번호·이름·신호 → 요약 → 게이지(수치형) 또는 조건 목록(비수치형) 또는 문장(구조화 이전)
 function SignalList({ lenses }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
       {lenses.map(l => {
-        const g = l.computed?.gauge
+        // 바뀜 조건 표시 규칙(사람 UAT 피드백 2): 수치면 게이지(계산 렌즈 = 서버, 판단 렌즈 = 루틴), 아니면 조건 목록,
+        // 둘 다 없는 구조화 이전 데이터는 문장 폴백
+        const g = l.computed?.gauge ?? l.gauge
+        const origin = g?.origin ?? (l.computed?.gauge ? 'server' : 'routine')
+        const conds = !g && l.conditions?.length ? l.conditions : null
         return (
           <div key={l.id} data-lens-cell={l.id}
                style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderLeft: `3px solid ${sig(l.signal).color}`, borderRadius: 6, padding: '10px 12px' }}>
@@ -161,8 +192,9 @@ function SignalList({ lenses }) {
               </span>
             </a>
             <div style={{ color: 'var(--text-2, var(--text))', fontSize: 12.5, lineHeight: 1.55, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{l.summary}</div>
-            {l.signal !== 'na' && g && <FlipGauge gauge={g} signal={l.signal} />}
-            {l.signal !== 'na' && l.flip && (
+            {l.signal !== 'na' && g && <FlipGauge gauge={g} signal={l.signal} origin={origin} />}
+            {l.signal !== 'na' && conds && <FlipConditions conditions={conds} />}
+            {l.signal !== 'na' && l.flip && !conds && (
               <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 6, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
                 <span style={smallCap}>바뀜 조건 </span><span style={{ color: 'var(--text)' }}>{l.flip}</span>
               </div>

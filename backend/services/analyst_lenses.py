@@ -102,7 +102,7 @@ def _gauge(variable: str, unit: str, current, boundaries: list, zones: list) -> 
     zones[i]는 boundaries[i-1]~boundaries[i] 구간의 신호. 문턱 상수를 쓰는 곳이 이 파일 하나라서
     화면이 그리는 구간과 박제된 신호가 어긋날 수 없다(프론트는 그리기만 한다, task#369 UAT 피드백)."""
     return {"variable": variable, "unit": unit, "current": current,
-            "boundaries": list(boundaries), "zones": list(zones)}
+            "boundaries": list(boundaries), "zones": list(zones), "origin": "server"}
 
 
 def _result(variant: str, values: dict, signal: str, flip: Optional[str], flip_value,
@@ -506,7 +506,10 @@ def build_lens_report(structure: dict, lenses: list, snapshot: dict) -> dict:
                 item.update(signal=c["signal"], flip=c["flip"], na_reason=c.get("na_reason"),
                             computed=c)
         else:
-            item.update(signal=lens["signal"], flip=lens.get("flip"), na_reason=lens.get("na_reason"))
+            item.update(signal=lens["signal"], flip=lens.get("flip"), na_reason=lens.get("na_reason"),
+                        # 판단 렌즈의 수치형 바뀜 조건은 루틴 판단 — 서버 계산과 화면에서 구별되게 출처를 단다
+                        gauge={**lens["gauge"], "origin": "routine"} if lens.get("gauge") else None,
+                        conditions=lens.get("conditions"))
         out_lenses.append(item)
     tally = {s: sum(1 for l in out_lenses if l["signal"] == s) for s in SIGNALS}
     return {"structure": structure, "lenses": out_lenses, "tally": tally}
