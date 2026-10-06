@@ -10,9 +10,12 @@ import Skeleton from '../components/ui/Skeleton'
 import { SectionTitle } from '../components/reports/reportUtils.jsx'
 import SegmentAnalysisSection from '../components/reports/SegmentAnalysisSection.jsx'
 import { GlossaryTerm, GlossaryText } from '../components/Glossary.jsx'
+import LensReport, { isLensReport } from '../components/reports/LensReport.jsx'
 
 // 증권사 리포트식 단일 문서 페이지 (task#212, 에디토리얼 재설계 task#216, ADR-0026/0027)
 // 헤더(스탯 스트립+밴드 게이지) → 한줄 논지 → 투자 포인트 → 사업부문 시장 분석(구발행물엔 없음, task#275) → 밸류에이션 → 실적 추정 → 리스크
+// v2(`format: 2`, 구조 축·9렌즈 — ADR 261006-232406, task#369)는 투자의견·밴드·포인트·리스크 대신 LensReport를 그리고,
+// 서버 숫자 블록(사업부문·발행 시점 숫자·컨센서스·실적 추정)은 v1과 같은 컴포넌트를 공유한다. v1 분기는 task#370에서 제거.
 
 export const RATING_META = {
   buy: { label: '매수', variant: 'success' },      // 의미 배지 — 가격색(up/down) 교차 사용 금지(task#194)
@@ -446,7 +449,9 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
   const d = report.data || {}
   const market = d.market || report.market
   const isKR = market === 'KR'
-  const rating = RATING_META[report.rating] || RATING_META.neutral
+  const v2 = isLensReport(report)
+  // v2는 rating이 null — 폴백으로 「중립」을 그리면 없는 투자의견을 말하게 된다
+  const rating = v2 ? null : (RATING_META[report.rating] || RATING_META.neutral)
   const annual = d.financials_annual || []
   const peers = d.competitors || []
   const bandMid = (report.fair_value_low != null && report.fair_value_high != null)
@@ -475,9 +480,11 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
         </span>
         <span className="mono" style={{ color: 'var(--text-3)', fontSize: 14 }}>{report.ticker}</span>
         <MarketBadge market={market || 'US'} />
-        <Badge variant={rating.variant} size="md">{rating.label}</Badge>
+        {rating && <Badge variant={rating.variant} size="md">{rating.label}</Badge>}
       </div>
 
+      {v2 ? <LensReport report={report} /> : (
+        <>
       <Card padding="md">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
           <Stat size="sm" label={<span><GlossaryText text="적정주가 밴드" /></span>}
@@ -535,13 +542,23 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
         ))}
       </div>
 
+        </>
+      )}
+
       {/* ── 사업부문 시장 분석 (구발행물엔 data.market_outlook 없음 → 자연 생략, task#275) ── */}
       <SegmentAnalysisSection market_outlook={d.market_outlook} financialsAnnual={annual} />
 
       {/* ── 밸류에이션 ───────────────────────────────────── */}
-      <SectionTitle>밸류에이션</SectionTitle>
+      <SectionTitle>{v2 ? '발행 시점 숫자' : '밸류에이션'}</SectionTitle>
       <Card padding="md" style={{ marginBottom: 30 }}>
-        <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}><GlossaryText text={report.valuation_method} /></p>
+        {v2 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+            <Stat size="sm" label="발행 시점 현재가" value={fmtPrice(d.price, market)} helperText={d.snapshot_date ? `${d.snapshot_date} 스냅샷` : null} />
+            <Stat size="sm" label={<span><GlossaryText text="컨센서스 목표가" /></span>} value={d.consensus?.target_mean != null ? fmtPrice(d.consensus.target_mean, market) : '—'} />
+          </div>
+        ) : (
+          <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}><GlossaryText text={report.valuation_method} /></p>
+        )}
         <PerBandChart band={d.per_band} />
         <PeerMultiplesChart peers={peers} />
       </Card>
@@ -560,6 +577,8 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
         </>
       )}
 
+      {!v2 && (
+        <>
       {/* ── 리스크 요인 (줄바꿈 → 불릿, task#218) ─────────── */}
       <SectionTitle>리스크 요인</SectionTitle>
       <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--warn)', background: 'var(--warn-soft)', borderRadius: '0 6px 6px 0', marginBottom: 8 }}>
@@ -573,6 +592,8 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
           <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0 }}><GlossaryText text={report.risks} /></p>
         )}
       </div>
+        </>
+      )}
 
       <div style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
         <span style={{ color: 'var(--text-3)', fontSize: 11 }}>본 문서는 발행 시점 데이터로 박제된 판단 문서입니다 · 투자 판단의 책임은 투자자 본인에게 있습니다</span>

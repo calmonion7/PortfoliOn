@@ -7,6 +7,24 @@ import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { useToast } from '../components/Toast'
 import { RATING_META } from './AnalystReport'
+import { SIGNAL_META } from '../components/reports/LensReport'
+
+// 목록 행의 렌즈 신호 집계 — 점 + 개수(색만으로 말하지 않게 aria-label로 라벨을 싣는다)
+function TallyDots({ tally }) {
+  const t = tally || {}
+  const order = ['go', 'wait', 'stop', 'na']
+  const label = order.map(s => `${SIGNAL_META[s].label} ${t[s] || 0}`).join(' · ')
+  return (
+    <span role="img" aria-label={`렌즈 신호 집계: ${label}`} title={label} className="mono tnum"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-2, var(--text))' }}>
+      {order.map(s => (
+        <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: SIGNAL_META[s].color }} />{t[s] || 0}
+        </span>
+      ))}
+    </span>
+  )
+}
 
 // 심층 리포트 탭 (task#215) — 발행물 목록(전 사용자) + 대상 관리(admin: 지정 추가/해제/즉시 발행).
 // 백엔드는 task#214 완비 — GET /api/analyst-reports, GET /api/stocks(analyst_target),
@@ -117,7 +135,10 @@ export default function AnalystReports() {
                 <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'var(--font-serif)', fontSize: 15, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || p.ticker}</span>
                 <span style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.ticker}</span>
-                  <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>
+                  {p.format === 2
+                    // v2(구조 축·9렌즈)는 투자의견이 없다 — rating 폴백(「중립」) 대신 렌즈 신호 집계(task#369)
+                    ? <TallyDots tally={p.tally} />
+                    : <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>

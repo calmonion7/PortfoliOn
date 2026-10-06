@@ -2342,11 +2342,11 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 | 렌즈 | 변형(축 값) | 키 | 서버 계산 |
 |------|------------|-----|----------|
-| 3 영업 레버리지 | `fixed` | `revenue_prev` `revenue_curr` `opex_prev` `opex_curr` | 매출 증가율 ÷ 영업비용 증가율 |
+| 3 비용 구조 | `fixed` | `revenue_prev` `revenue_curr` `opex_prev` `opex_curr` | 매출 증가율 ÷ 영업비용 증가율 |
 | 3 | `revenue_linked` | `contribution_prev` `contribution_curr` `fixed_cost_prev` `fixed_cost_curr` | 기여몫(매출−연동비용) 증가율 ÷ 고정비 증가율 |
-| 4 비용 연동 | `fixed` | `commitment_prev` `commitment_curr` `revenue_prev` `revenue_curr` | 약정(연 환산) 증가 배수 ÷ 매출 증가 배수 |
+| 4 약정 | `fixed` | `commitment_prev` `commitment_curr` `revenue_prev` `revenue_curr` | 약정(연 환산) 증가 배수 ÷ 매출 증가 배수 |
 | 4 | `revenue_linked` | `revenue_prev` `revenue_curr` `linked_cost_prev` `linked_cost_curr` | 한계 분배율 Δ연동비용 ÷ Δ매출 vs 평균 분배율 |
-| 5 자금 원천 | `equity` | `cash` `annual_burn`(흑자면 0 이하) | 런웨이 = 현금 ÷ 연 소진 |
+| 5 생존 위협 경로 | `equity` | `cash` `annual_burn`(흑자면 0 이하) | 런웨이 = 현금 ÷ 연 소진 |
 | 5 | `deposit` | `balance` `current_yield_pct` `avg_share_pct` `rate_sens_revenue` `rate_sens_cost` `other_revenue` `operating_expense` | 손익분기 금리 = 현재 수익률 − 현재 이익 ÷ (잔고 × 한계 몫 ÷ 100), 한계 몫 = 1 − `rate_sens_cost`/`rate_sens_revenue` (금리 1%p당 공시 민감도) |
 | 5 | `debt` | `operating_income` `interest_expense` | 이자보상 = 영업이익 ÷ 이자비용 |
 | 8 밸류에이션 | 공통 | `forward_earnings`(+ 선택 `risk_free_pct`) | 시총 ÷ forward 이익, 이익수익률 vs 무위험 금리. 시총은 **서버가 스냅샷**(자사 `market_cap`)에서 |

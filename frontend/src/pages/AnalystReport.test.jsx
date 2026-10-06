@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import AnalystReport, { PerBandChart, PeerMultiplesChart, RATING_META, assignLabelRows } from './AnalystReport'
+import { isLensReport } from '../components/reports/LensReport'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn() } }))
@@ -319,5 +320,91 @@ describe('RATING_META', () => {
     for (const meta of Object.values(RATING_META)) {
       expect(['success', 'neutral', 'danger']).toContain(meta.variant)
     }
+  })
+})
+
+// ── v2: 구조 축·9렌즈 (ADR 261006-232406, task#369) ─────────────────────
+const judg = (id, signal, extra = {}) => ({ id, summary: `요약${id}`, body: `본문${id}`, metrics: [], signal,
+  flip: signal === 'na' ? null : `바뀜${id}`, na_reason: signal === 'na' ? `사유${id}` : null, ...extra })
+const raw = (value, unit, source = 'disclosure', rationale = null) => ({ value, unit, source, ref: '10-Q 2026Q2', rationale })
+
+export const V2_REPORT = {
+  ticker: 'CRCL', published_date: '2026-10-07', rating: null, title: '금리 의존 구조 그대로',
+  fair_value_low: null, fair_value_high: null, name: 'Circle', market: 'US',
+  valuation_method: '', points: [], risks: '', format: 2,
+  tally: { go: 2, wait: 4, stop: 2, na: 1 },
+  structure: {
+    revenue_engine: { value: 'balance_rate', rationale: '준비금 잔고×금리가 매출의 95%' },
+    cost_nature: { value: 'revenue_linked', rationale: '분배비용이 준비금 수익에 연동' },
+    funding_source: { value: 'deposit', rationale: 'USDC 예치금' },
+  },
+  lenses: [
+    judg(1, 'wait'), judg(2, 'go'),
+    { ...judg(3, 'stop'), flip: '기여몫 증가율이 18.1% 이상이면 노랑', inputs: { contribution_prev: raw(251, 'USD M') }, sensitivity: null,
+      computed: { variant: 'revenue_linked', values: { ratio: 0.6693, numerator_growth_pct: 15.14, cost_growth_pct: 22.63 }, signal: 'stop', flip: '기여몫 증가율이 18.1% 이상이면 노랑', flip_value: 18.1, estimate_based: false } },
+    { ...judg(4, 'go'), flip: '한계 분배율이 53.8% 이상이면 노랑', inputs: {}, sensitivity: null,
+      computed: { variant: 'revenue_linked', values: { marginal_pct: 12.79, average_pct: 58.81 }, signal: 'go', flip: '한계 분배율이 53.8% 이상이면 노랑', flip_value: 53.8, estimate_based: false } },
+    { ...judg(5, 'wait'), flip: '준비금 수익률 3.15% 아래면 빨강',
+      inputs: { balance: raw(74200, 'USD M'), avg_share_pct: raw(38.2, '%', 'estimate', 'RLDC ÷ 준비금 수익') }, sensitivity: null,
+      computed: { variant: 'deposit', values: { breakeven_pct: 2.1484, margin_pp: 1.3416, marginal_share_pct: 51.15 }, signal: 'wait', flip: '준비금 수익률 3.15% 아래면 빨강', flip_value: 3.1484, estimate_based: true } },
+    judg(6, 'stop'), judg(7, 'wait'),
+    { ...judg(8, 'wait'), flip: 'forward 이익 515.75 아래면 빨강', inputs: { forward_earnings: raw(620, 'USD M', 'estimate', '가이던스') },
+      sensitivity: { exogenous: { label: '준비금 수익률', values: [3.0, 3.6, 4.2], unit: '%' }, endogenous: { label: 'USDC 유통량', values: [70000, 74000, 80000], unit: 'USD M' } },
+      computed: { variant: 'balance_rate', values: { multiple: 33.27, earnings_yield_pct: 3.005, risk_free_pct: 4.0,
+        sensitivity: { exogenous: [3.0, 3.6, 4.2], endogenous: [70000, 74000, 80000], multiples: [[60.1, 55.2, 49.3], [40.2, 37.6, 34.1], [30.0, 28.1, 25.9]] } },
+        signal: 'wait', flip: 'forward 이익 515.75 아래면 빨강', flip_value: 515.75, estimate_based: true, risk_free_source: 'server_cache' } },
+    { ...judg(9, 'na'), inputs: null, sensitivity: null, computed: null },
+  ],
+  data: { snapshot_date: '2026-10-06', price: 83.3, market: 'US', name: 'Circle', consensus: { target_mean: 120 },
+          financials_annual: [], competitors: [], per_band: null },
+}
+
+describe('v2 렌즈 판 렌더 (task#369)', () => {
+  it('분기 게이트 — 픽스처가 실제로 v2 분기를 탄다(v1 픽스처는 안 탄다)', () => {
+    expect(isLensReport(V2_REPORT)).toBe(true)
+    expect(isLensReport(REPORT)).toBe(false)
+    expect(isLensReport({ ...V2_REPORT, lenses: [] })).toBe(false)
+  })
+
+  it('논지 → 집계 → 신호판(번호 순) → 바뀜 조건 → 구조 축 → 렌즈 상세 순서, 투자의견·포인트 없음', async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? V2_REPORT : { reports: [] } }))
+    const { container } = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    expect(await screen.findByText('금리 의존 구조 그대로')).toBeTruthy()
+    expect(screen.queryByText('중립')).toBeNull()             // rating=null이 「중립」으로 오표시되지 않는다
+    expect(screen.queryByText('투자 포인트')).toBeNull()
+    const text = container.textContent
+    const order = ['금리 의존 구조 그대로', '렌즈 신호', '바뀜 조건', '구조 축', '렌즈 상세']
+    const idx = order.map(s => text.indexOf(s))
+    expect(idx.every(i => i >= 0)).toBe(true)
+    expect([...idx].sort((a, b) => a - b)).toEqual(idx)
+    // 신호판 9칸, 번호 순
+    const cells = container.querySelectorAll('[data-lens-cell]')
+    expect([...cells].map(c => c.getAttribute('data-lens-cell'))).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
+    // 색만으로 말하지 않는다 — 텍스트 라벨 병기
+    expect(cells[0].textContent).toContain('노랑')
+    expect(cells[8].textContent).toContain('미산출')
+    // 집계
+    expect(screen.getByTestId('lens-tally').textContent).toMatch(/초록\s*2.*노랑\s*4.*빨강\s*2.*미산출\s*1/)
+  })
+
+  it('계산 렌즈는 서버 계산값·원자료 출처·「추정 기반」을, na 렌즈는 사유를 보인다', async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? V2_REPORT : { reports: [] } }))
+    render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    expect(screen.getByText('2.15%')).toBeTruthy()            // 손익분기 금리(서버 계산)
+    expect(screen.getAllByText('준비금 수익률 3.15% 아래면 빨강').length).toBeGreaterThanOrEqual(2)  // 바뀜 조건 목록 + 렌즈 상세
+    expect(screen.getAllByText('추정 기반').length).toBe(2)   // 렌즈 5·8 (렌즈 3·4는 공시만)
+    expect(screen.getByText('RLDC ÷ 준비금 수익')).toBeTruthy() // 추정 근거
+    expect(screen.getByText('사유9')).toBeTruthy()
+    expect(screen.getByText('37.6')).toBeTruthy()             // 렌즈 8 민감도 표 칸
+    expect(screen.getByText('잔고×금리')).toBeTruthy()         // 구조 축 라벨
   })
 })

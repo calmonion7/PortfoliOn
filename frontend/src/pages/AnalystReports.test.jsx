@@ -116,3 +116,17 @@ describe('심층 리포트 탭 (task#215)', () => {
     await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/admin/analyst-targets/005930', { enabled: true }))
   })
 })
+
+describe('v2 렌즈 판 목록 행 (task#369)', () => {
+  it('rating=null인 v2 판은 「중립」이 아니라 신호 집계를 보인다', async () => {
+    mockRole = 'user'
+    api.get.mockImplementation(() => Promise.resolve({ data: { reports: [
+      { ticker: 'CRCL', published_date: '2026-10-07', rating: null, title: '금리 의존 구조', name: 'Circle',
+        format: 2, tally: { go: 2, wait: 4, stop: 2, na: 1 } },
+    ] } }))
+    renderPage()
+    expect(await screen.findByText('금리 의존 구조')).toBeTruthy()
+    expect(screen.queryByText('중립')).toBeNull()
+    expect(screen.getByLabelText('렌즈 신호 집계: 초록 2 · 노랑 4 · 빨강 2 · 미산출 1')).toBeTruthy()
+  })
+})
