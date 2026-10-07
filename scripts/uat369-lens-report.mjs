@@ -29,6 +29,7 @@ const gaugeLenses = lenses.filter(l => l.signal !== 'na' && (l.computed?.gauge |
 const condLenses = lenses.filter(l => l.signal !== 'na' && !(l.computed?.gauge || l.gauge) && l.conditions?.length);
 const JUDG = [1, 2, 6, 7, 9];
 ok('api-judgment-structured', lenses.filter(l => JUDG.includes(l.id) && l.signal !== 'na').every(l => !!l.gauge !== !!l.conditions?.length), '판단 렌즈마다 gauge 또는 conditions 정확히 하나');
+ok('api-three-colors', lenses.every(l => (!l.conditions || l.conditions.map(c => c.color).sort().join() === 'go,stop,wait') && (!l.gauge || l.gauge.zones.length === 3)), '조건·판단 게이지 모두 세 색');
 ok('api-gauges-present', gaugeLenses.length > 0, `n=${gaugeLenses.length} — 0이면 게이지 축이 공허하게 통과한다`);
 
 const VIEWPORTS = [['m390', { width: 390, height: 844 }, true], ['pc1440', { width: 1440, height: 900 }, false]];
@@ -56,7 +57,9 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
         ratingBadges: [...document.querySelectorAll('.badge')].filter(e => ['매수', '중립', '매도'].includes(e.textContent.trim())).length,
         overflowX: html.scrollWidth - window.innerWidth,
         gauges: [...document.querySelectorAll('[data-lens-cell] [data-flip-gauge]')].map(g => ({ id: g.closest('[data-lens-cell]').getAttribute('data-lens-cell'), zone: g.getAttribute('data-current-zone'), origin: g.getAttribute('data-origin') })),
-        conds: [...document.querySelectorAll('[data-lens-cell] [data-flip-conditions]')].map(c => ({ id: c.closest('[data-lens-cell]').getAttribute('data-lens-cell'), items: c.querySelectorAll('li').length })),
+        conds: [...document.querySelectorAll('[data-lens-cell] [data-flip-conditions]')].map(c => ({ id: c.closest('[data-lens-cell]').getAttribute('data-lens-cell'), items: c.querySelectorAll('li').length,
+          colors: [...c.querySelectorAll('[data-condition]')].map(e => e.getAttribute('data-condition')),
+          current: [...c.querySelectorAll('[data-condition][data-current="true"]')].map(e => e.getAttribute('data-condition')) })),
         rowOverflow: cells.map(c => c.scrollWidth - c.clientWidth).filter(v => v > 0).length,
         labelOverlaps: [...document.querySelectorAll('[data-flip-gauge]')].reduce((n, g) => {
           const rs = [...g.querySelectorAll('[data-boundary]')].map(e => e.getBoundingClientRect());
@@ -84,6 +87,8 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     ok(`${tag} gauge-zone=signal`, gaugeLenses.every(l => m.gauges.find(g => g.id === String(l.id))?.zone === l.signal));
     ok(`${tag} gauge-origin`, gaugeLenses.every(l => m.gauges.find(g => g.id === String(l.id))?.origin === (l.computed?.gauge ? 'server' : 'routine')));
     ok(`${tag} conditions-shown`, m.conds.length === condLenses.length && condLenses.every(l => m.conds.find(c => c.id === String(l.id))?.items === l.conditions.reduce((n, c) => n + c.when.length, 0)), `${m.conds.length} vs api ${condLenses.length}`);
+    // 세 색 모두(사람 UAT 피드백 3) — 조건 목록도 게이지처럼 초록·노랑·빨강, 지금 색 하나만 「현재」
+    ok(`${tag} conditions-three-colors`, condLenses.every(l => { const c = m.conds.find(x => x.id === String(l.id)); return c && JSON.stringify(c.colors) === '["go","wait","stop"]' && JSON.stringify(c.current) === JSON.stringify([l.signal]); }));
     ok(`${tag} rows-no-overflow`, m.rowOverflow === 0, `n=${m.rowOverflow}`);
     ok(`${tag} gauge-labels-no-overlap`, m.labelOverlaps === 0, `겹침 ${m.labelOverlaps}쌍`);
     await page.screenshot({ path: `${OUT}/${TICKER}-${tag}.png`, fullPage: true });
@@ -91,5 +96,5 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
   }
 }
 await b.close();
-console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${3 + VIEWPORTS.length * 2 * 15})`);
+console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${4 + VIEWPORTS.length * 2 * 16})`);
 process.exit(fail ? 1 : 0);

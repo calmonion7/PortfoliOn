@@ -111,15 +111,16 @@ class JudgmentGauge(BaseModel):
     unit: str = Field(..., min_length=1, max_length=20)
     current: float
     current_ref: str = Field(..., min_length=1, max_length=200)   # 현재값의 출처·기준일
-    boundaries: List[float] = Field(..., min_length=1, max_length=2)
-    zones: List[Literal["go", "wait", "stop"]] = Field(..., min_length=2, max_length=3)
+    # 세 색 모두(사람 UAT 피드백 3) — 경계 2개·구간 3개, 색은 단조(낮은 값이 나쁘거나 좋거나)
+    boundaries: List[float] = Field(..., min_length=2, max_length=2)
+    zones: List[Literal["go", "wait", "stop"]] = Field(..., min_length=3, max_length=3)
 
     @model_validator(mode="after")
     def _shape(self):
         if self.boundaries != sorted(self.boundaries) or len(set(self.boundaries)) != len(self.boundaries):
             raise ValueError("gauge.boundaries는 서로 다른 값의 오름차순")
-        if len(self.zones) != len(self.boundaries) + 1:
-            raise ValueError("gauge.zones 개수 = boundaries 개수 + 1")
+        if self.zones not in (["stop", "wait", "go"], ["go", "wait", "stop"]):
+            raise ValueError("gauge.zones는 [stop, wait, go] 또는 [go, wait, stop] — 세 색이 단조로 한 번씩")
         return self
 
     def zone_of_current(self) -> str:
@@ -127,8 +128,11 @@ class JudgmentGauge(BaseModel):
 
 
 class FlipCondition(BaseModel):
-    """판단 렌즈의 비수치형 바뀜 조건 — 「이 조건(들)이 확인되면 이 색으로」."""
-    to: Literal["go", "wait", "stop"]
+    """판단 렌즈의 비수치형 바뀜 조건 — 「이 조건(들)이면 이 색」. 렌즈마다 세 색 정확히 하나씩
+    (게이지의 세 구간과 같은 레벨 — 사람 UAT 피드백 3). 지금 색의 항목은 현재 상태를 말한다."""
+    model_config = ConfigDict(extra="forbid")   # 옛 키 `to`를 조용히 무시하지 않는다
+
+    color: Literal["go", "wait", "stop"]
     when: List[Annotated[str, Field(min_length=1, max_length=80)]] = Field(..., min_length=1, max_length=4)
     match: Literal["all", "any"] = "all"
 
@@ -165,7 +169,7 @@ class LensIn(BaseModel):
     na_reason: Optional[str] = Field(None, max_length=200)
     inputs: Optional[Dict[str, RawInput]] = None                   # 계산 렌즈만
     gauge: Optional[JudgmentGauge] = None                          # 판단 렌즈 — 바뀜 조건이 수치로 나오면
-    conditions: Optional[List[FlipCondition]] = Field(None, min_length=1, max_length=3)  # 판단 렌즈 — 수치가 아니면
+    conditions: Optional[List[FlipCondition]] = Field(None, min_length=3, max_length=3)  # 판단 렌즈 — 수치가 아니면(세 색 하나씩)
     sensitivity: Optional[Sensitivity] = None                      # 렌즈 8 · 외생 가격형 수익 엔진만
 
     @model_validator(mode="after")
@@ -201,8 +205,8 @@ class LensIn(BaseModel):
                 if self.gauge is not None and self.gauge.zone_of_current() != self.signal:
                     raise ValueError(f"렌즈 {self.id}: gauge 현재값 {self.gauge.current}의 구간 "
                                      f"'{self.gauge.zone_of_current()}'이 signal '{self.signal}'과 다르다")
-                if self.conditions and any(c.to == self.signal for c in self.conditions):
-                    raise ValueError(f"렌즈 {self.id}: conditions.to는 지금 색({self.signal})과 달라야 한다")
+                if self.conditions is not None and sorted(c.color for c in self.conditions) != ["go", "stop", "wait"]:
+                    raise ValueError(f"렌즈 {self.id}: conditions는 초록·노랑·빨강 각 정확히 하나")
         return self
 
 

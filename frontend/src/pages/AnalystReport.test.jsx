@@ -349,7 +349,11 @@ export const V2_REPORT = {
       inputs: { balance: raw(74200, 'USD M'), avg_share_pct: raw(38.2, '%', 'estimate', 'RLDC ÷ 준비금 수익') }, sensitivity: null,
       computed: { variant: 'deposit', values: { breakeven_pct: 2.1484, margin_pp: 1.3416, marginal_share_pct: 51.15 }, signal: 'wait', flip: '준비금 수익률 3.15% 아래면 빨강', flip_value: 3.1484, estimate_based: true,
         gauge: { variable: '준비금 수익률', unit: '%', current: 3.49, boundaries: [3.1484, 4.1484], zones: ['stop', 'wait', 'go'], origin: 'server' } } },
-    judg(6, 'stop', { conditions: [{ to: 'wait', when: ['코인베이스 외 분배처 비중 상승', '협약 조건 불변'], match: 'all' }] }), judg(7, 'wait'),
+    judg(6, 'stop', { conditions: [
+      { color: 'go', when: ['분배처 다변화 완료'], match: 'all' },
+      { color: 'wait', when: ['코인베이스 외 분배처 비중 상승', '협약 조건 불변'], match: 'all' },
+      { color: 'stop', when: ['코인베이스가 경쟁 코인 공동 창립'], match: 'any' },
+    ] }), judg(7, 'wait'),
     { ...judg(8, 'wait'), flip: 'forward 이익 515.75 아래면 빨강', inputs: { forward_earnings: raw(620, 'USD M', 'estimate', '가이던스') },
       sensitivity: { exogenous: { label: '준비금 수익률', values: [3.0, 3.6, 4.2], unit: '%' }, endogenous: { label: 'USDC 유통량', values: [70000, 74000, 80000], unit: 'USD M' } },
       computed: { variant: 'balance_rate', values: { multiple: 33.27, earnings_yield_pct: 3.005, risk_free_pct: 4.0,
@@ -471,14 +475,16 @@ describe('판단 렌즈 바뀜 조건 — 수치면 게이지, 아니면 조건 
     expect(g5.textContent).toContain('서버 계산')
   })
 
-  it('비수치형 판단 렌즈는 조건 목록(목표 색·충족 방식·조건들), 같은 내용의 문장은 반복하지 않는다', async () => {
+  it('비수치형 판단 렌즈는 세 색 조건(초록→노랑→빨강), 지금 색은 「현재」 강조, 문장 반복 없음(피드백 3)', async () => {
     const { container } = await renderV2()
     const row6 = container.querySelector('[data-lens-cell="6"]')
     const c = row6.querySelector('[data-flip-conditions]')
-    expect(c).toBeTruthy()
-    expect(c.textContent).toContain('노랑')
-    expect(c.textContent).toContain('모두')
-    expect([...c.querySelectorAll('li')].map(li => li.textContent)).toEqual(['코인베이스 외 분배처 비중 상승', '협약 조건 불변'])
+    const items = [...c.querySelectorAll('[data-condition]')]
+    expect(items.map(e => e.getAttribute('data-condition'))).toEqual(['go', 'wait', 'stop'])
+    expect(items.map(e => e.getAttribute('data-current'))).toEqual(['false', 'false', 'true'])   // 렌즈 6 = 빨강
+    expect(items[2].textContent).toContain('현재')
+    expect(items[1].textContent).toContain('모두 확인되면')
+    expect([...items[1].querySelectorAll('li')].map(li => li.textContent)).toEqual(['코인베이스 외 분배처 비중 상승', '협약 조건 불변'])
     expect(row6.textContent).not.toContain('바뀜6')
   })
 

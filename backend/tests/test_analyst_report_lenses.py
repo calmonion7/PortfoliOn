@@ -219,7 +219,14 @@ def _judgment(i, signal="wait"):
     # 판단 렌즈의 바뀜 조건은 구조화가 필수다(사람 UAT 피드백 2) — 기본은 비수치형 조건 목록
     return {"id": i, "summary": f"렌즈{i} 요약", "body": f"렌즈{i} 본문", "signal": signal,
             "flip": f"렌즈{i} 바뀜 조건",
-            "conditions": [{"to": "wait" if signal == "stop" else "stop", "when": [f"렌즈{i} 조건 A", f"렌즈{i} 조건 B"], "match": "all"}]}
+            "conditions": _three(i)}
+
+
+def _three(i=9):
+    """세 색 모두의 조건(사람 UAT 피드백 3 — 게이지와 같은 레벨: 초록·노랑·빨강 정확히 하나씩)."""
+    return [{"color": "go", "when": [f"렌즈{i} 초록 조건"], "match": "all"},
+            {"color": "wait", "when": [f"렌즈{i} 노랑 조건 A", f"렌즈{i} 노랑 조건 B"], "match": "all"},
+            {"color": "stop", "when": [f"렌즈{i} 빨강 조건"], "match": "any"}]
 
 
 def crcl_body():
@@ -619,36 +626,46 @@ def test_judgment_gauge_shape_rules():
     assert _publish(_with_lens9(gauge=_jgauge(bounds=(800, 700))))[0].status_code == 422          # 경계 오름차순
     assert _publish(_with_lens9(gauge=_jgauge(zones=("stop", "go"))))[0].status_code == 422        # 구간 수 = 경계 + 1
     assert _publish(_with_lens9(gauge={**_jgauge(), "current_ref": ""}))[0].status_code == 422     # 현재값 출처 필수
-    assert _publish(_with_lens9(gauge=_jgauge(bounds=(700,), zones=("stop", "wait"))))[0].status_code == 201  # 경계 1개 허용
+    # 세 색 모두(사람 UAT 피드백 3) — 경계 1개·두 색 게이지는 이제 거부, 세 색이라도 단조가 아니면 거부
+    assert _publish(_with_lens9(gauge=_jgauge(bounds=(700,), zones=("stop", "wait"))))[0].status_code == 422
+    assert _publish(_with_lens9(gauge=_jgauge(zones=("wait", "stop", "go"))))[0].status_code == 422
+    desc = _with_lens9(gauge=_jgauge(current=650, zones=("go", "wait", "stop")))   # 낮을수록 좋은 변수(내림차순 색)
+    desc["lenses"][8]["signal"] = "go"
+    assert _publish(desc)[0].status_code == 201
 
 
 def test_judgment_exactly_one_of_gauge_or_conditions():
-    cond = [{"to": "go", "when": ["유통량 800억 돌파"], "match": "all"}]
+    cond = _three()
     assert _publish(_with_lens9())[0].status_code == 422                                         # 둘 다 없음
     assert _publish(_with_lens9(gauge=_jgauge(), conditions=cond))[0].status_code == 422          # 둘 다 있음
     assert _publish(_with_lens9(conditions=cond))[0].status_code == 201
     assert _publish(_with_lens9(conditions=cond, gauge=None))[0].status_code == 201               # 명시적 null 허용
 
 
-def test_conditions_rules():
-    assert _publish(_with_lens9(conditions=[{"to": "wait", "when": ["x"]}]))[0].status_code == 422  # 지금 색으로 '바뀜'은 모순
-    assert _publish(_with_lens9(conditions=[{"to": "go", "when": []}]))[0].status_code == 422        # 조건 0개
-    assert _publish(_with_lens9(conditions=[]))[0].status_code == 422
-    resp, mock_save, _ = _publish(_with_lens9(conditions=[{"to": "go", "when": ["a", "b"]}]))
+def test_conditions_cover_all_three_colors():
+    two = [c for c in _three() if c["color"] != "stop"]
+    assert _publish(_with_lens9(conditions=two))[0].status_code == 422                            # 빨강 누락
+    dup = _three()[:2] + [{"color": "go", "when": ["x"]}]
+    assert _publish(_with_lens9(conditions=dup))[0].status_code == 422                            # 초록 중복·빨강 없음
+    bad = _three(); bad[0] = {"color": "go", "when": []}
+    assert _publish(_with_lens9(conditions=bad))[0].status_code == 422                            # 조건 0개
+    assert _publish(_with_lens9(conditions=[{"to": "go", "when": ["x"]}] + _three()[1:]))[0].status_code == 422  # 옛 키 to
+    resp, mock_save, _ = _publish(_with_lens9(conditions=list(reversed(_three()))))
     assert resp.status_code == 201
-    c = _lens(mock_save.call_args.kwargs["lens_report"], 9)["conditions"][0]
-    assert c["match"] == "all" and c["when"] == ["a", "b"]                                         # match 기본값 all
+    cs = _lens(mock_save.call_args.kwargs["lens_report"], 9)["conditions"]
+    assert [c["color"] for c in cs] == ["go", "wait", "stop"]                                     # 저장은 초록→노랑→빨강 정렬
+    assert cs[1]["match"] == "all" and cs[1]["when"] == ["렌즈9 노랑 조건 A", "렌즈9 노랑 조건 B"]
 
 
 def test_structured_flip_forbidden_on_na_and_on_computed_lenses():
     body = crcl_body()
-    body["lenses"][8]["conditions"] = [{"to": "go", "when": ["x"]}]                 # 렌즈 9 = na
+    body["lenses"][8]["conditions"] = _three()                                     # 렌즈 9 = na
     assert _publish(body)[0].status_code == 422
     body = crcl_body()
     body["lenses"][2]["gauge"] = _jgauge()                                         # 렌즈 3 = 계산 렌즈(서버가 그린다)
     assert _publish(body)[0].status_code == 422
     body = crcl_body()
-    body["lenses"][2]["conditions"] = [{"to": "go", "when": ["x"]}]
+    body["lenses"][2]["conditions"] = _three(3)
     assert _publish(body)[0].status_code == 422
 
 

@@ -509,7 +509,9 @@ def build_lens_report(structure: dict, lenses: list, snapshot: dict) -> dict:
             item.update(signal=lens["signal"], flip=lens.get("flip"), na_reason=lens.get("na_reason"),
                         # 판단 렌즈의 수치형 바뀜 조건은 루틴 판단 — 서버 계산과 화면에서 구별되게 출처를 단다
                         gauge={**lens["gauge"], "origin": "routine"} if lens.get("gauge") else None,
-                        conditions=lens.get("conditions"))
+                        # 저장·표시 순서는 초록 → 노랑 → 빨강으로 고정(본문 순서에 기대지 않는다)
+                        conditions=(sorted(lens["conditions"], key=lambda c: ("go", "wait", "stop").index(c["color"]))
+                                    if lens.get("conditions") else None))
         out_lenses.append(item)
     tally = {s: sum(1 for l in out_lenses if l["signal"] == s) for s in SIGNALS}
     return {"structure": structure, "lenses": out_lenses, "tally": tally}

@@ -151,22 +151,34 @@ export function FlipGauge({ gauge, signal, origin }) {
   )
 }
 
-// 판단 렌즈의 비수치형 바뀜 조건 — 「이 조건(들)이 확인되면 이 색으로」
-function FlipConditions({ conditions }) {
+// 판단 렌즈의 비수치형 바뀜 조건 — 세 색 각각의 조건(게이지의 세 구간과 같은 레벨, 사람 UAT 피드백 3).
+// 지금 색의 항목은 현재 상태를 말하므로 게이지의 현재 구간처럼 강조한다. 옛 키 `to`(세 색 규칙 이전)도 읽는다.
+const COLOR_ORDER = ['go', 'wait', 'stop']
+function FlipConditions({ conditions, signal }) {
+  const items = [...conditions].map(c => ({ ...c, color: c.color ?? c.to }))
+    .sort((a, b) => COLOR_ORDER.indexOf(a.color) - COLOR_ORDER.indexOf(b.color))
   return (
     <div data-flip-conditions="" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-      {conditions.map((c, i) => (
-        <div key={i} style={{ fontSize: 12, lineHeight: 1.5 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <SignalDot signal={c.to} size={8} />
-            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{sig(c.to).label}으로 바뀌는 조건</span>
-            <span style={smallCap}>{c.match === 'any' ? '하나라도 확인되면' : (c.when.length > 1 ? '모두 확인되면' : '확인되면')}</span>
+      {items.map((c, i) => {
+        const cur = c.color === signal
+        return (
+          <div key={i} data-condition={c.color} data-current={String(cur)}
+               style={{ fontSize: 12, lineHeight: 1.5, padding: '6px 8px', borderRadius: 6,
+                        borderLeft: `3px solid ${sig(c.color).color}`,
+                        background: cur ? 'var(--bg-elev-2)' : 'transparent', opacity: cur ? 1 : 0.85 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <SignalDot signal={c.color} size={8} />
+              <span style={{ color: 'var(--text)', fontWeight: 700 }}>
+                {cur ? `현재 ${sig(c.color).label}` : `${sig(c.color).label}으로 바뀌는 조건`}
+              </span>
+              <span style={smallCap}>{c.match === 'any' ? '하나라도 확인되면' : (c.when.length > 1 ? '모두 확인되면' : '확인되면')}</span>
+            </div>
+            <ul style={{ margin: '2px 0 0', paddingLeft: 22, color: 'var(--text-2, var(--text))' }}>
+              {c.when.map((w, j) => <li key={j} style={{ wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{w}</li>)}
+            </ul>
           </div>
-          <ul style={{ margin: '2px 0 0', paddingLeft: 22, color: 'var(--text-2, var(--text))' }}>
-            {c.when.map((w, j) => <li key={j} style={{ wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{w}</li>)}
-          </ul>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -193,7 +205,7 @@ function SignalList({ lenses }) {
             </a>
             <div style={{ color: 'var(--text-2, var(--text))', fontSize: 12.5, lineHeight: 1.55, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{l.summary}</div>
             {l.signal !== 'na' && g && <FlipGauge gauge={g} signal={l.signal} origin={origin} />}
-            {l.signal !== 'na' && conds && <FlipConditions conditions={conds} />}
+            {l.signal !== 'na' && conds && <FlipConditions conditions={conds} signal={l.signal} />}
             {l.signal !== 'na' && l.flip && !conds && (
               <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 6, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
                 <span style={smallCap}>바뀜 조건 </span><span style={{ color: 'var(--text)' }}>{l.flip}</span>
