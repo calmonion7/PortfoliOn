@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import useReportList from '../hooks/useReportList'
@@ -98,7 +98,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
   const {
     modalOpen, setModalOpen,
     editing, setEditing,
-    addMode,
+    addMode, prefill, openAddWatch,
     promoteTarget, setPromoteTarget,
     mutError,
     handleSave, handleDelete, handleGlobalDelete, handlePromote, handlePinToggle, openEdit, openAdd,
@@ -169,20 +169,41 @@ export default function Reports({ initialTicker = null, navKey = null }) {
     onRefreshed: () => setDetailRefreshKey(k => k + 1),
   })
 
+  // 딥링크로 들어왔는데 상세를 열 수 없을 때의 안내 — { ticker, kind: 'pending' | 'untracked' } (task#378, B83)
+  const [deepNotice, setDeepNotice] = useState(null)
+  // 이 내비게이션에서 딥링크 상세를 이미 열었는가 — 목록 재조회가 사용자를 그 종목으로 다시 끌고 가지 않게
+  const deepOpenedRef = useRef(null)
+
   const openDetail = (ticker, date) => {
     setSelected({ ticker, date })
     setView('detail')
+    setDeepNotice(null)
     trackEvent('report_view_open', { ticker })
   }
 
-  // 추천 탭 '분석 보기' 딥링크 — 목록 로드 후 해당 종목 최신 리포트 상세로 자동 진입 (task#131)
+  // 딥링크(추천 「분석 보기」·전역 검색·기술 리포트 업체표 등) — 목록 로드 후 그 종목 최신 리포트 상세로 진입
+  // (task#131). 열 수 없으면 조용히 목록에 멈추지 않고 이유를 [[추적 상태]]대로 말한다(task#378):
+  //  · 목록에 있고 날짜 0 → 미생성 안내 · 목록에 없음 + 조회 성공 → 미추적 안내 + 관심종목 추가
+  //  · 조회 실패(모름) → 「미추적」이라 말하지 않는다 — 기존 실패 UI가 이미 있다.
+  // 한 내비게이션(navKey+ticker)당 한 번만 연다. 아직 못 열었으면 재조회로 날짜가 생길 때 연다.
   useEffect(() => {
-    if (!initialTicker || listLoading) return
+    if (!initialTicker) { setDeepNotice(null); return }
+    if (listLoading) return
     const t = initialTicker.toUpperCase()
+    const navId = `${navKey}|${t}`
+    if (deepOpenedRef.current === navId) return
     const dates = reportList[t]?.dates
-    if (dates?.length) openDetail(t, dates[0])
+    if (dates?.length) {
+      deepOpenedRef.current = navId
+      openDetail(t, dates[0])
+    } else if (listFailed) {
+      setDeepNotice(null)
+    } else {
+      const kind = reportList[t] ? 'pending' : 'untracked'
+      setDeepNotice(prev => (prev?.ticker === t && prev.kind === kind ? prev : { ticker: t, kind }))
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialTicker, listLoading, navKey])
+  }, [initialTicker, listLoading, listFailed, reportList, navKey])
 
   // ⚠️ 종전의 `useEffect(() => cleanup, [cleanup])`를 제거했다 — `cleanup`이 매 렌더 새로
   //    만들어져 deps가 매 렌더 바뀌고, React가 직전 destructor(`clearInterval`)를 매 렌더
@@ -283,6 +304,29 @@ export default function Reports({ initialTicker = null, navKey = null }) {
             </div>
           ) : (
             <>
+              {deepNotice && (
+                <div role="status" data-testid="deeplink-notice" data-kind={deepNotice.kind}
+                     style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, color: 'var(--text-2)', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
+                  <span style={{ flex: '1 1 200px', minWidth: 0 }}>
+                    <strong style={{ color: 'var(--text)' }}>{deepNotice.ticker}</strong>{' '}
+                    {deepNotice.kind === 'pending'
+                      ? '— 아직 리포트가 생성되지 않았습니다. 생성되면 목록에 나타납니다.'
+                      : '— 추적하지 않는 종목이라 리포트가 없습니다. 관심종목에 추가하면 리포트가 생성됩니다.'}
+                  </span>
+                  {deepNotice.kind === 'untracked' && (
+                    <button className="btn" data-testid="deeplink-add-watch" style={{ flexShrink: 0, minHeight: 44 }}
+                            onClick={() => openAddWatch({
+                              ticker: deepNotice.ticker,
+                              // 시장은 티커 모양으로 판별 — 6자리 숫자면 KR. 이름은 티커로 시드한다:
+                              // 회사명 칸이 required이고, 백엔드 resolve_name이 「이름 == 티커」를 실명으로 바꾼다.
+                              market: /^\d{6}$/.test(deepNotice.ticker) ? 'KR' : 'US',
+                              name: deepNotice.ticker,
+                            })}>
+                      관심종목에 추가
+                    </button>
+                  )}
+                </div>
+              )}
               {/* ⚠️ 에러 분기가 빈 상태보다 **먼저**여야 한다 — 순서가 뒤집히면 조회 실패가
                   「리포트가 없습니다」로 표시되고 그 아래 「지금 생성」이라는 잘못된 행동까지
                   지시한다(실제 결함이었다). 두 상태를 병존시키지도 않는다: 오지시 제거가 핵심이므로
@@ -403,6 +447,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
         <StockModal
           stock={editing}
           mode={editing ? (editing.isWatch ? 'watchlist' : 'holding') : addMode}
+          prefill={editing ? null : prefill}
           onSave={handleSave}
           onClose={() => { setModalOpen(false); setEditing(null) }}
         />

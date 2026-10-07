@@ -8,6 +8,7 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)        // { ...stock, isWatch }
   const [addMode, setAddMode] = useState('holding')    // 'holding' | 'watchlist'
+  const [prefill, setPrefill] = useState(null)         // 추가 모달 식별 필드 시드 — { ticker, market, name }
   const [promoteTarget, setPromoteTarget] = useState(null)
   const [mutError, setMutError] = useState('')
   const pollIntervalsRef = useRef(new Set())  // Set: 종목 여러 개 연속 추가 시 동시 폴링을 전부 추적
@@ -23,6 +24,8 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
         const { data } = await api.get(`/api/report/${ticker}/history`)
         if (data && data.length > 0) {
           clearInterval(id); pollIntervalsRef.current.delete(id)
+          // 생성 완료 → 목록 재조회. 딥링크로 들어와 추가한 종목이면 Reports가 새 날짜를 보고 상세를 연다(task#378).
+          fetchList()
         } else if (attempts >= maxAttempts) {
           clearInterval(id); pollIntervalsRef.current.delete(id)
           showToast(`${ticker} 리포트 생성에 실패했습니다.\n다시 시도해주세요.`, 'warning')
@@ -115,14 +118,22 @@ export default function useStockManagement({ holdingMap, watchMap, fetchList, fe
   }
   const openAdd = () => {
     setEditing(null)
+    setPrefill(null)
     setAddMode(activeTab === 'watchlist' ? 'watchlist' : 'holding')
+    setModalOpen(true)
+  }
+  // 미추적 종목을 관심종목으로 추가 — 식별 필드만 시드(GlobalSearch의 미추적 프리필과 같은 계약).
+  const openAddWatch = (seed) => {
+    setEditing(null)
+    setPrefill(seed)
+    setAddMode('watchlist')
     setModalOpen(true)
   }
 
   return {
     modalOpen, setModalOpen,
     editing, setEditing,
-    addMode,
+    addMode, prefill, openAddWatch,
     promoteTarget, setPromoteTarget,
     mutError,
     handleSave, handleDelete, handleGlobalDelete, handlePromote, handlePinToggle, openEdit, openAdd,

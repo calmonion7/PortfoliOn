@@ -23,8 +23,13 @@
 //   ⓖ 비-admin이 `/analyst-reports`에 가면 `/reports`로 리다이렉트된다
 //   ⓗ nav에 「심층 리포트」 항목이 없고, 문서 경로에서 「리포트」가 active다
 //   ⓘ 기술 리포트 업체 표의 상장 티커가 그 종목 리포트를 연다 — 표본은 **내 목록(`/api/report/list`)에
-//      있고 리포트 날짜가 있는** 티커로 고른다. 추적하지 않는 티커는 `/reports`에서 목록에 멈추는데
-//      그건 제품 결함(CONCERNS §0 B83)이고 이 축의 대상이 아니다(task#375).
+//      있고 리포트 날짜가 있는** 티커로 고른다. 「열렸다」는 본문 어딘가의 티커 문자열이 아니라
+//      `.reports-layout[data-view="detail"]` + **상세 영역(.reports-main) 안** 티커로 잰다(task#378 —
+//      본문 전체에서 찾으면 목록 카드·안내 배너의 같은 티커로 거짓 통과한다). 대조군: 배너가 없다.
+//   ⓚ (task#378, B83) 업체 표의 **미추적** 티커(내 목록에 키가 없음)를 누르면 목록에 머물되 조용히 멈추지
+//      않는다 — 안내 배너(그 티커 + 「추적하지 않는」) · 「관심종목에 추가」 버튼 · 버튼이 그 티커로 채워진
+//      관심 모달을 연다 · **닫기만 한다**(POST /api/watchlist 0건 — 프로덕션 쓰기 금지) · 닫은 뒤에도 목록.
+//      표본은 런타임에 고르고 0이면 sentinel FAIL. 배너 넘침(뷰포트 밖·문서 가로 스크롤) 0도 함께 잰다.
 //   ⓙ 콘솔 에러 0
 //
 // 뷰포트 3폭(m278·m390·pc)에서 전부 돌고, 발행물 탭 스크린샷을 screenshots-uat324/에 남긴다
@@ -69,19 +74,29 @@ const LENS_NAMES = ['숫자의 신뢰도', '지금 매출 속도', '벌수록 �
   '고객 이탈 위험', '경영진·대주주', '지금 주가 수준', '앞으로의 수요'];
 const tracked = new Set(mine.filter(([, v]) => (v.dates || []).length > 0).map(([t]) => t));
 
-// 기술 리포트 — 내 목록에 있는(추적 중) 상장 티커가 있는 첫 slug
-let techSlug = null, techTicker = null;
+// 기술 리포트 — 내 목록에 있는(추적 중) 상장 티커가 있는 첫 slug, 그리고 **미추적** 티커(B83 표본)
+// 미추적 = 내 목록에 키 자체가 없음(날짜 0인 추적 종목은 「미생성」이지 미추적이 아니다).
+const myKeys = new Set(mine.map(([t]) => t));
+let techSlug = null, techTicker = null, untrSlug = null, untrTicker = null;
 const techIdx = ((await (await fetch(`${BASE}/api/tech-reports`, { headers: H })).json()).reports || []);
 for (const t of techIdx) {
   const d = await (await fetch(`${BASE}/api/tech-reports/${t.slug}`, { headers: H })).json();
-  const p = ((d.reports || [])[0]?.players || []).find(x => x.ticker && tracked.has(x.ticker));
-  if (p) { techSlug = t.slug; techTicker = p.ticker; break; }
+  const players = (d.reports || [])[0]?.players || [];
+  const p = players.find(x => x.ticker && tracked.has(x.ticker));
+  if (p && !techSlug) { techSlug = t.slug; techTicker = p.ticker; }
+  // 다른 업체 티커의 부분문자열이 아닌 것만 — 링크를 hasText로 고르므로 오클릭을 막는다
+  const all = players.map(x => x.ticker).filter(Boolean);
+  const u = players.find(x => x.ticker && !myKeys.has(x.ticker.toUpperCase())
+    && !all.some(o => o !== x.ticker && o.includes(x.ticker)));
+  if (u && !untrSlug) { untrSlug = t.slug; untrTicker = u.ticker.toUpperCase(); }
+  if (techSlug && untrSlug) break;
 }
 
 // 정의역 sentinel — 표본이 없으면 통과로 위장하지 말고 실패한다(가토: 표본 0은 「미검증」이다)
 ok('표본:발행물-있는-종목', !!withPub, withPub ? `${withPub[0]} (${withPub[1].category}, 발행 ${pubBy.get(withPub[0])})` : '없음');
 ok('표본:발행물-없는-종목', !!noPub, noPub ? `${noPub[0]} (${noPub[1].category})` : '없음');
 ok('표본:기술-업체-티커', !!techSlug, techSlug ? `${techSlug} → ${techTicker}` : '없음');
+ok('표본:미추적-기술-티커', !!untrSlug, untrSlug ? `${untrSlug} → ${untrTicker}` : '없음');
 if (!withPub || !noPub) {
   console.log(lines.join('\n'));
   console.log(`\n단언 총계 ${pass + fail} (PASS ${pass} / FAIL ${fail})`);
@@ -227,9 +242,78 @@ async function run(label, ctxOpts) {
     if (found) {
       await tlink.click(); await settle(page);
       ok(`[${label}] 기술:클릭시-리포트-도달`, new URL(page.url()).pathname === '/reports', page.url());
-      const rBody = await page.evaluate(() => document.body.innerText || '');
-      ok(`[${label}] 기술:그-종목-상세가-열린다`, rBody.includes(techTicker), `${techTicker}`);
+      // task#378 ⓑ — 본문 전체가 아니라 「상세 뷰 + 상세 영역 안 티커」로 좁힌다
+      const st = await page.evaluate((t) => {
+        const main = document.querySelector('.reports-main');
+        return {
+          view: document.querySelector('.reports-layout')?.getAttribute('data-view'),
+          inMain: !!main && (main.innerText || '').includes(t),
+          notice: !!document.querySelector('[data-testid="deeplink-notice"]'),
+        };
+      }, techTicker);
+      ok(`[${label}] 기술:그-종목-상세가-열린다`, st.view === 'detail' && st.inMain, `${techTicker} view=${st.view} 상세영역티커=${st.inMain}`);
+      ok(`[${label}] 기술:추적-대조군-배너-없음`, !st.notice, `배너=${st.notice}`);
     }
+  }
+
+  // ── ⓚ 기술 업체표 **미추적** 티커 → 안내 배너 + 관심 추가 모달(열고 닫기만) — B83 ──────
+  // 축은 조건 없이 전부 기록한다(진입 실패는 각 축의 FAIL로 드러난다 — 규칙 ⓑ).
+  {
+    let ufound = false;
+    if (untrSlug) {
+      await page.goto(`${BASE}/tech-report/${untrSlug}`, { waitUntil: 'domcontentloaded' });
+      await settle(page);
+    }
+    const ulink = page.locator(`a[href="/reports"]`).filter({ hasText: untrTicker || '∅' }).first();
+    ufound = !!untrSlug && await ulink.count() > 0;
+    ok(`[${label}] 기술-미추적:티커가-링크다`, ufound, `${untrSlug}/${untrTicker}`);
+    let posts = 0;
+    const onReq = (r) => { if (r.method() === 'POST' && r.url().includes('/api/watchlist')) posts++; };
+    page.on('request', onReq);
+    if (ufound) { await ulink.click(); await settle(page); }
+    const u = await page.evaluate((t) => {
+      const n = document.querySelector('[data-testid="deeplink-notice"]');
+      const r = n?.getBoundingClientRect();
+      return {
+        view: document.querySelector('.reports-layout')?.getAttribute('data-view') ?? null,
+        notice: !!n, kind: n?.getAttribute('data-kind') ?? null, text: (n?.innerText || '').replace(/\s+/g, ' '),
+        right: r ? Math.round(r.right * 10) / 10 : null, vw: window.innerWidth,
+        docW: document.documentElement.scrollWidth,
+        btn: !!document.querySelector('[data-testid="deeplink-add-watch"]'),
+      };
+    }, untrTicker);
+    ok(`[${label}] 기술-미추적:목록에-머문다`, ufound && u.view === 'list', `view=${u.view}`);
+    ok(`[${label}] 기술-미추적:배너-보임(티커+사유)`,
+      u.notice && u.kind === 'untracked' && u.text.includes(untrTicker) && u.text.includes('추적하지 않는'),
+      `kind=${u.kind} · ${u.text.slice(0, 50)}`);
+    ok(`[${label}] 기술-미추적:배너-넘침없음`, u.notice && u.right <= u.vw + 0.5 && u.docW <= u.vw,
+      `right=${u.right} vw=${u.vw} docW=${u.docW}`);
+    ok(`[${label}] 기술-미추적:추가버튼-보임`, u.btn);
+    await page.screenshot({ path: `${OUT}/${label}-02-untracked-banner.png`, fullPage: false });   // 측정 지점에서 캡처
+    let m = { open: false };
+    if (u.btn) {
+      await page.locator('[data-testid="deeplink-add-watch"]').click();
+      await page.waitForTimeout(400);
+      m = await page.evaluate(() => {
+        const md = document.querySelector('.modal');
+        const tin = md?.querySelector('input[placeholder^="티커"], input[placeholder^="6자리"]');
+        return { open: !!md, title: md?.querySelector('h2')?.textContent?.trim() ?? null, tv: tin?.value ?? null };
+      });
+      await page.screenshot({ path: `${OUT}/${label}-03-untracked-modal.png`, fullPage: false });
+    }
+    ok(`[${label}] 기술-미추적:모달이-그-티커로-열린다`, m.open && m.title === '관심종목 추가' && m.tv === untrTicker,
+      `open=${m.open} title=${m.title} ticker=${m.tv}`);
+    let closed = false, after = null;
+    if (m.open) {
+      await page.locator('.modal button', { hasText: '취소' }).first().click();
+      await page.waitForTimeout(400);
+      closed = await page.locator('.modal').count() === 0;
+      after = await page.evaluate(() => document.querySelector('.reports-layout')?.getAttribute('data-view') ?? null);
+    }
+    page.off('request', onReq);
+    // 「모달을 열었다」를 함께 요구한다 — 안 열렸으면 POST 0은 공허하게 참이다(규칙 ⓩ)
+    ok(`[${label}] 기술-미추적:닫은뒤-저장요청0`, m.open && closed && posts === 0, `closed=${closed} POST=${posts}`);
+    ok(`[${label}] 기술-미추적:닫은뒤-목록유지`, m.open && after === 'list', `view=${after}`);
   }
 
   ok(`[${label}] 콘솔에러 0`, errs.length === 0, errs.slice(0, 2).join(' / '));

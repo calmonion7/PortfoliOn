@@ -85,6 +85,31 @@ describe('useStockManagement — handleSave', () => {
     expect(args.showToast).not.toHaveBeenCalledWith(expect.stringContaining('실패'), 'warning')
     vi.useRealTimers()
   })
+  // task#378 ⑦ — 생성 완료를 감지하면 목록을 다시 불러온다. 그래야 딥링크로 들어와 관심종목을 추가한
+  // 사용자가 그 종목 상세로 이어진다(Reports의 딥링크 이펙트가 새 날짜를 보고 연다).
+  it('⑦ 폴링이 생성 완료(history 1건+)를 보면 fetchList를 다시 부른다', async () => {
+    vi.useFakeTimers()
+    api.post.mockResolvedValue({ data: { report_queued: true } })
+    api.get.mockResolvedValue({ data: [{ date: '2026-10-08' }] })
+    const args = makeArgs({ activeTab: 'watchlist' })
+    const { result } = renderHook(() => useStockManagement(args))
+    await act(async () => { await result.current.handleSave({ ticker: 'QCOM' }) })
+    expect(args.fetchList).toHaveBeenCalledTimes(1)          // 저장 직후 refreshAfterMutation
+    await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
+    expect(args.fetchList).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
+  })
+  it('⑦ 대조군 — 아직 미생성(history 0건)이면 재조회하지 않는다', async () => {
+    vi.useFakeTimers()
+    api.post.mockResolvedValue({ data: { report_queued: true } })
+    api.get.mockResolvedValue({ data: [] })
+    const args = makeArgs({ activeTab: 'watchlist' })
+    const { result } = renderHook(() => useStockManagement(args))
+    await act(async () => { await result.current.handleSave({ ticker: 'QCOM' }) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
+    expect(args.fetchList).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
   it('실패: mutError 세팅·에러 토스트·throw', async () => {
     api.post.mockRejectedValue({ response: { data: { detail: '중복' } } })
     const args = makeArgs({ activeTab: 'holdings' })
