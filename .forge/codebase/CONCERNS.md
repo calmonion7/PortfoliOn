@@ -265,6 +265,7 @@ mapped: 2026-09-14
 |---|---|---|
 | **B49** | **부분(주 인스턴스 닫힘, task#331)** — `pages/Reports.jsx` 상세 fetch에 취소 플래그 + `.catch`를 넣었고(실패는 실패 배너로 표시해 옛 티커 수치를 유지하지 않는다), 형제 4곳도 함께 닫았다: `AnalystReport.jsx` 발행물·이력 이펙트(`ReportDetailTabs`가 `key` 없이 렌더해 **같은 마운트 내** 레이스였다) · `HistoryTab` 3이펙트(`.finally`까지 게이트) · `ConsensusChart::fetchData`(세대 가드 + 티커 전환 시 `null` 리셋) · `DetailTab::BacklogSection`. ⚠️ 세대 가드는 「늦은 착지」만 막고 「보존」은 막지 않는다 — 옛 데이터가 *이미* 착지한 뒤 prop만 갈리면 경합 없이 결정적으로 옛 데이터가 새 화면을 소유하므로, 식별자 변경 시 **상태를 `null`(미조회)로 되돌리는** 것이 쌍으로 필요하다(`[]`로 되돌리면 「0건」이라는 거짓 진술이 된다). **남은 미가드는 §7.3 표** — `Ranking::onRowClick` · `Calendar` 월 이펙트 · `Recommendations::handleChip` · `StockSearchBox` · `usePortfolioData` · `useReportList` 6곳 | `frontend/src/pages/Reports.jsx` 상세 fetch 이펙트(닫힘) · §7.3 표의 6곳(열림) |
 | B63 | 프론트 포매터 중복 — 재계수 완료(§13.2에서 열림 확정, task#292) | `frontend/src/utils.js` 및 산발 포매터 (§7.7·§7.9) |
+| B83 | 기술 리포트 업체표의 티커 링크가 **추적하지 않는 종목에서 목록에 조용히 멈춘다**(task#375 기록, 미수정) — 업체표는 상장 티커 전부를 `/reports`(`state.ticker`)로 링크하는데, 리포트 화면은 `reportList`에 그 티커의 날짜가 있을 때만 상세를 연다. 없으면 아무 안내 없이 목록만 보인다(재현: `on-device-ai` → QCOM). 클릭 가능한 어포던스가 결과 없이 끝나는 형태라, 링크를 추적 종목으로 한정하거나 미추적 시 안내·추가 액션을 보여야 한다 | `components/tech/PlayerTable.jsx` 티커 `Link` · `pages/Reports.jsx::Reports` `initialTicker` 이펙트 |
 
 ### 검증장치·문서
 

@@ -9,14 +9,22 @@
 //
 // 재는 것(ADR-0047 적용 결과):
 //   ⓐ 발행물 있는 종목 리포트 상세 = 탭 5개이고 「🎯 심층 리포트」가 그중 하나
-//   ⓑ 그 탭을 눌러 **투자의견·적정주가 밴드·투자 포인트가 실제로 렌더**된다(빈 탭 통과 차단)
-//   ⓒ 발행물 **없는** 종목 = 탭 4개 (대조군 — 없으면 「항상 5탭」 구현도 통과한다)
+//   ⓑ 그 탭을 눌러 **그 발행물이 실제로 렌더**된다 — ⓘ identity: API가 준 그 발행물의 `title`이
+//      탭 클릭 *전*엔 없고 *후*엔 있다 ⓘⓘ 빈 렌더 차단: 렌즈 표시명 9개 중 1개 이상이 보인다.
+//      (task#375: 옛 v1 본문 축 「투자 포인트·적정주가 밴드·투자의견·리스크 요인」은 렌즈 형식 v2
+//      — ADR `261006-232406` — 이후 영구 FAIL이라 교체. 렌즈 본문 세부는 uat369의 몫이다.
+//      렌즈 이름 축만 두면 다른 종목의 발행물이 떠도 통과하므로 identity와 쌍으로 둔다.)
+//   ⓒ 발행물 **없는** 종목 = 탭 4개 (대조군 — 없으면 「항상 5탭」 구현도 통과한다).
+//      표본은 발행물 있는/없는 쪽 **둘 다 `!is_etf`** — ETF는 요약·사업분석을 숨겨 탭이 2개다
+//      (`ReportDetailTabs.jsx`; task#375 이전엔 대조군이 QQQ로 뽑혀 영구 FAIL이었다).
 //   ⓓ enrich 탭이 「📝 사업분석」이고 「심층분석」은 화면에 없다
 //   ⓔ 목록의 「심층」 배지가 발행물 있는 종목에만 붙는다(대조군 동봉)
-//   ⓕ 문서 단독 라우트가 살아 있고 「← 종목 리포트」로 돌아온다
+//   ⓕ 문서 단독 라우트가 살아 있고(ⓑ와 같은 identity·렌즈 이름 2축) 「← 종목 리포트」로 돌아온다
 //   ⓖ 비-admin이 `/analyst-reports`에 가면 `/reports`로 리다이렉트된다
 //   ⓗ nav에 「심층 리포트」 항목이 없고, 문서 경로에서 「리포트」가 active다
-//   ⓘ 기술 리포트 업체 표의 상장 티커가 그 종목 리포트를 연다
+//   ⓘ 기술 리포트 업체 표의 상장 티커가 그 종목 리포트를 연다 — 표본은 **내 목록(`/api/report/list`)에
+//      있고 리포트 날짜가 있는** 티커로 고른다. 추적하지 않는 티커는 `/reports`에서 목록에 멈추는데
+//      그건 제품 결함(CONCERNS §0 B83)이고 이 축의 대상이 아니다(task#375).
 //   ⓙ 콘솔 에러 0
 //
 // 뷰포트 3폭(m278·m390·pc)에서 전부 돌고, 발행물 탭 스크린샷을 screenshots-uat324/에 남긴다
@@ -53,15 +61,20 @@ const listResp = await (await fetch(`${BASE}/api/report/list`, { headers: H })).
 const mine = Object.entries(listResp.stocks || {});
 // 보유 탭에서 바로 보이는 종목을 우선(탭 전환 없이 클릭할 수 있다)
 const rank = ([, v]) => (v.category === 'holdings' ? 0 : 1);
-const withPub = mine.filter(([t]) => pubBy.has(t)).sort((a, b) => rank(a) - rank(b))[0];
-const noPub = mine.filter(([t, v]) => !pubBy.has(t) && (v.dates || []).length > 0).sort((a, b) => rank(a) - rank(b))[0];
+const withPub = mine.filter(([t, v]) => pubBy.has(t) && !v.is_etf).sort((a, b) => rank(a) - rank(b))[0];
+const noPub = mine.filter(([t, v]) => !pubBy.has(t) && !v.is_etf && (v.dates || []).length > 0).sort((a, b) => rank(a) - rank(b))[0];
+const pubTitle = new Map(pubs.map(p => [p.ticker, p.title]));
+// 렌즈 표시명 — 화면 정본 `frontend/src/components/reports/LensReport.jsx::LENS_INFO`(uat369 `NAMES`와 같은 목록)
+const LENS_NAMES = ['숫자의 신뢰도', '지금 매출 속도', '벌수록 남는 구조', '묶여 있는 비용', '망할 위험',
+  '고객 이탈 위험', '경영진·대주주', '지금 주가 수준', '앞으로의 수요'];
+const tracked = new Set(mine.filter(([, v]) => (v.dates || []).length > 0).map(([t]) => t));
 
-// 기술 리포트 — 상장 티커가 있는 첫 slug
+// 기술 리포트 — 내 목록에 있는(추적 중) 상장 티커가 있는 첫 slug
 let techSlug = null, techTicker = null;
 const techIdx = ((await (await fetch(`${BASE}/api/tech-reports`, { headers: H })).json()).reports || []);
 for (const t of techIdx) {
   const d = await (await fetch(`${BASE}/api/tech-reports/${t.slug}`, { headers: H })).json();
-  const p = ((d.reports || [])[0]?.players || []).find(x => x.ticker);
+  const p = ((d.reports || [])[0]?.players || []).find(x => x.ticker && tracked.has(x.ticker));
   if (p) { techSlug = t.slug; techTicker = p.ticker; break; }
 }
 
@@ -76,6 +89,9 @@ if (!withPub || !noPub) {
 }
 
 const PUB_T = withPub[0], PUB_DATE = pubBy.get(PUB_T), NOPUB_T = noPub[0];
+const PUB_TITLE = (pubTitle.get(PUB_T) || '').replace(/\s+/g, ' ').trim();
+const norm = (s) => s.replace(/\s+/g, ' ');
+const lensShown = (body) => LENS_NAMES.filter(n => body.includes(n));
 
 async function settle(page) {
   await page.waitForFunction(() => document.querySelectorAll('.skeleton-block').length === 0, { timeout: 20000 }).catch(() => {});
@@ -137,19 +153,22 @@ async function run(label, ctxOpts) {
   ok(`[${label}] 심층분석-라벨-부재`, !tabs.some(t => t.includes('심층분석')));
 
   if (tabs.some(t => t.includes('심층 리포트'))) {
+    // identity는 「클릭 전엔 없다」와 쌍이어야 이빨이 있다 — 탭 밖(목록 카드 등)에 같은 제목이 있으면 거짓 통과한다
+    const before = norm(await page.evaluate(() => document.body.innerText || ''));
     await page.locator('button.tab-btn', { hasText: '심층 리포트' }).first().click();
     await settle(page);
-    const body = await page.evaluate(() => document.body.innerText || '');
-    ok(`[${label}] 탭내용:투자포인트`, body.includes('투자 포인트'));
-    ok(`[${label}] 탭내용:적정주가밴드`, body.includes('적정주가 밴드'));
-    ok(`[${label}] 탭내용:투자의견배지`, /매수|중립|매도/.test(body));
-    ok(`[${label}] 탭내용:리스크요인`, body.includes('리스크 요인'));
+    const body = norm(await page.evaluate(() => document.body.innerText || ''));
+    ok(`[${label}] 탭내용:그-발행물-title(identity)`, !!PUB_TITLE && !before.includes(PUB_TITLE) && body.includes(PUB_TITLE),
+      `클릭전=${before.includes(PUB_TITLE)} 클릭후=${body.includes(PUB_TITLE)} · ${PUB_TITLE.slice(0, 30)}…`);
+    const shown = lensShown(body);
+    ok(`[${label}] 탭내용:렌즈이름-1개이상`, shown.length >= 1, `${shown.length}/9`);
     // 탭 안에 머문다 — 라우팅으로 문서 페이지로 튀지 않는다
     ok(`[${label}] 탭안에-머문다`, page.url().includes('/reports'), page.url());
     await page.screenshot({ path: `${OUT324}/${label}-deep-tab.png`, fullPage: false });
     await page.screenshot({ path: `${OUT}/${label}-01-deep-tab.png`, fullPage: false });
   } else {
-    ok(`[${label}] 탭내용:투자포인트`, false, '탭 자체가 없어 측정 불가');
+    ok(`[${label}] 탭내용:그-발행물-title(identity)`, false, '탭 자체가 없어 측정 불가');
+    ok(`[${label}] 탭내용:렌즈이름-1개이상`, false, '탭 자체가 없어 측정 불가');
   }
 
   // ── ⓒ 발행물 없는 종목 = 4탭 (대조군) ───────────────────────────────────
@@ -164,8 +183,10 @@ async function run(label, ctxOpts) {
   // ── ⓕ 문서 단독 라우트 + 복귀 ────────────────────────────────────────────
   await page.goto(`${BASE}/analyst-report/${PUB_T}/${PUB_DATE}`, { waitUntil: 'domcontentloaded' });
   await settle(page);
-  const docBody = await page.evaluate(() => document.body.innerText || '');
-  ok(`[${label}] 문서라우트:본문렌더`, docBody.includes('투자 포인트') && docBody.includes('리스크 요인'));
+  const docBody = norm(await page.evaluate(() => document.body.innerText || ''));
+  ok(`[${label}] 문서라우트:그-발행물-title(identity)`, !!PUB_TITLE && docBody.includes(PUB_TITLE), PUB_TITLE.slice(0, 30));
+  const docShown = lensShown(docBody);
+  ok(`[${label}] 문서라우트:렌즈이름-1개이상`, docShown.length >= 1, `${docShown.length}/9`);
   const pill = page.locator('.list-pill').first();
   const pillTxt = (await pill.count()) ? (await pill.textContent()).trim() : '(없음)';
   ok(`[${label}] 문서라우트:복귀링크`, pillTxt.includes('종목 리포트'), pillTxt);
