@@ -457,7 +457,8 @@ def cached_risk_free_pct() -> Optional[float]:
     """서버 캐시의 미 10년 국채 금리(market_cache `treasury`). 없거나 못 읽으면 None."""
     try:
         from services.market_indicators.cache import _mc_load
-        t = _mc_load("treasury") or {}
+        # _mc_load는 {data, fetched_at} 봉투를 준다 — 봉투째 읽으면 늘 None(task#373 실측: US 렌즈 8 전부 na)
+        t = (_mc_load("treasury") or {}).get("data") or {}
         v = ((t.get("rates") or {}).get("10y") or {}).get("current")
         v = float(v) if v is not None else None
         return v if v is not None and math.isfinite(v) else None

@@ -817,3 +817,15 @@ def test_near_boundary_stamped_on_gauges():
     resp, ms = _publish(_with_lens9(gauge=_jgauge()))
     assert _lens(ms.call_args.kwargs["lens_report"], 9)["gauge"]["near_boundary"] is False
     assert _publish(_with_lens9(gauge={**_jgauge(), "near_boundary": True}))[0].status_code == 422
+
+
+def test_cached_risk_free_reads_market_cache_envelope():
+    """task#373 실측 회귀 — `_mc_load`는 {data, fetched_at} 봉투를 준다. 봉투를 안 벗기면 캐시가 늘 None이라
+    US 렌즈 8이 전부 「무위험 금리 없음」 na로 박제됐다(테스트가 cached_risk_free_pct 자체를 mock해 못 잡았다)."""
+    env = {"data": {"rates": {"10y": {"current": 5.269, "change_bp": -4.2}}}, "fetched_at": "2026-10-07T01:10:40Z"}
+    with patch("services.market_indicators.cache._mc_load", return_value=env):
+        assert L.cached_risk_free_pct() == pytest.approx(5.269)
+    with patch("services.market_indicators.cache._mc_load", return_value=None):
+        assert L.cached_risk_free_pct() is None
+    with patch("services.market_indicators.cache._mc_load", return_value={"data": {"rates": {"10y": {"current": float("nan")}}}}):
+        assert L.cached_risk_free_pct() is None
