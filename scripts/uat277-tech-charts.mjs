@@ -35,7 +35,7 @@
 // task#317 신규 6계열(관계도: graph-groups·graph-items-set·graph-chips-set·graph-labels·
 // color-graph-*·graph-no-clip — 전부 DOM 구조·집합·색이고, 대상이 사라진 SVG 기하·CJK 절단측정은
 // 삭제됨). 신뢰성 규칙(⑧ⓑ 무조건 단언·sentinel FAIL, ⑧ⓐ 커버리지, ⑧ⓘ 대상 identity 우선, ⑧ⓛ
-// 정의역 명시)은 uat275/276과 동형.
+// 정의역 명시)은 uat276과 동형.
 //
 // ── task#317 갱신 ───────────────────────────────────────────────────────────────────────────
 // 「연관 기술」 관계도가 3열 계층 SVG DAG → **세로 흐름 HTML**로 재작성됐다(TechGraph.jsx, ADR-0033

@@ -761,7 +761,7 @@ await ctx.addInitScript(([a, r]) => {
   `process.exit(1)`, 전부 통과면 `ALL PASS` + 전 단언 나열.
 - **스크립트 상단 주석이 계약서**다 — 무엇을 재는지, 왜 이 프로브가 필요한지, 판정축 목록,
   각 축의 정의역, **그리고 "이 프로브가 재지 못하는 것"**(한계)까지 적는다.
-  `scripts/uat288-oauth-boot-timing.mjs`·`uat275-segment.mjs`가 그 형식의 완성형이다.
+  `scripts/uat288-oauth-boot-timing.mjs`가 그 형식의 완성형이다(`uat275-segment.mjs` (삭제됨) — task#374).
 
 ### 7.2 하니스 함정
 
@@ -1013,7 +1013,7 @@ chromium은 CDP로 사유를 물으면 **`BackForwardCacheDisabledForDelegate`**
 막히면 계획을 되돌리지 말고 **대체 3축**으로 실질을 커버한다:
 ⓐ **in-container 실데이터 호출**(라이브 스키마·SQL 정합 확인)
 ⓑ **라이브 번들 + `page.route` 주입 응답**으로 신규 화면 렌더 검증
-(**실발행이 아님을 출력에 라벨**로 명시 — `scripts/uat275-segment.mjs` 헤더가 그 형식)
+(**실발행이 아님을 출력에 라벨**로 명시 — `scripts/uat275-segment.mjs` (삭제됨) 헤더가 그 형식이었다)
 ⓒ **실제 구데이터로 graceful 분기 검증**(신규 필드 부재 시 섹션 생략·에러 0).
 그리고 **미커버로 남는 부분을 이름으로 적는다.**
 
