@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api'
 import RecCard from '../components/recommendations/RecCard'
@@ -117,20 +117,27 @@ export default function Recommendations() {
   }, [showToast])
 
   // 발굴 칩 전환 시 서버 refetch (watchlist/holdings는 갱신 안 함)
+  // 세대 가드(B49, task#379) — 칩 연타 시 옛 칩 응답이 새 칩의 목록·스켈레톤·토스트를 건드리지 않는다.
+  // 칩이 바뀌면 목록을 null(미조회)로 되돌린다 — 실패 시 옛 칩 목록이 새 칩 아래 남지 않게.
+  const chipGenRef = useRef(0)
   const handleChip = (key) => {
-    if (key === marketChip) return
+    if (key === marketChip && items != null) return   // 실패(null)한 칩은 같은 칩 재클릭으로 재시도
+    const myGen = ++chipGenRef.current
     setMarketChip(key)
+    setItems(null)
     const params = { limit: 50 }
     if (key !== 'all') params.market = key
     setDiscoveryLoading(true)
     api.get('/api/recommendations', { params })
       .then(res => {
+        if (myGen !== chipGenRef.current) return
         setItems(res.data?.discovery || [])
       })
       .catch(() => {
+        if (myGen !== chipGenRef.current) return
         showToast('발굴 목록을 불러오지 못했습니다.', 'error')
       })
-      .finally(() => setDiscoveryLoading(false))
+      .finally(() => { if (myGen === chipGenRef.current) setDiscoveryLoading(false) })
   }
 
   // 딥다이브 = 관심종목 추가. pending 중복 가드·실패 토스트는 훅이 담당 — 성공 시에만 여기서 토스트.
@@ -163,7 +170,7 @@ export default function Recommendations() {
     </div>
   )
 
-  if (items.length === 0 && watchlist.length === 0 && holdings.length === 0) return (
+  if (items?.length === 0 && watchlist.length === 0 && holdings.length === 0) return (
     <div style={{ textAlign: 'center', padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
       <div className="sketch-draw" style={{ color: 'var(--text-3)' }}><SketchEmpty size={140} /></div>
       <span style={{ color: 'var(--text-3)', fontSize: 13 }}>추천 종목이 없습니다.</span>
@@ -248,7 +255,7 @@ export default function Recommendations() {
       )}
 
       {/* 발굴 섹션 — 필터 칩 + 딥다이브 버튼 */}
-      {(items.length > 0 || marketChip !== 'all') && (
+      {(items == null || items.length > 0 || marketChip !== 'all') && (
         <div>
           <h3 style={{ color: 'var(--text)', marginBottom: 2 }}>발굴</h3>
           {/* 시장 필터 칩 */}
@@ -265,6 +272,8 @@ export default function Recommendations() {
           </div>
           {discoveryLoading
             ? <Skeleton variant="card" count={3} />
+            : items == null
+            ? <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '16px 0' }}>발굴 목록을 불러오지 못했습니다.</div>
             : (
               <ExpandableGrid
                 key={marketChip}

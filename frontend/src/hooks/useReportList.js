@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../api'
 
 export default function useReportList() {
@@ -29,16 +29,25 @@ export default function useReportList() {
     if (data.last_scheduled_date) setLastScheduledDates(data.last_scheduled_date)
   }, [])
 
+  // 세대 가드(B49, task#379) — 마운트·↺·추가/삭제/핀 후 재조회가 겹치면 마지막으로 발행한
+  // 요청만 목록·로딩·실패 상태를 만진다(옛 응답이 방금 추가한 종목을 지우던 경합).
+  // ⚠️ useReportGeneration의 `/api/report/list` → applyList 경로는 이 세대 밖이다(task#380 N4).
+  const listGenRef = useRef(0)
   const fetchList = useCallback(() => {
+    const myGen = ++listGenRef.current
     setListLoading(true)
     setListFailed(false)   // 첫 조회 성공 뒤 ↺ 재조회가 실패해도 드러나도록 진입마다 리셋
     api.get('/api/report/list')
-      .then(({ data }) => applyList(data))
+      .then(({ data }) => { if (myGen === listGenRef.current) applyList(data) })
       .catch((e) => {
+        if (myGen !== listGenRef.current) return
         console.warn('[useReportList] 리포트 목록(/api/report/list) 조회 실패', e)
         setListFailed(true)
       })
-      .finally(() => { setListLoading(false); setHasFetched(true) })
+      .finally(() => {
+        if (myGen !== listGenRef.current) return
+        setListLoading(false); setHasFetched(true)
+      })
   }, [applyList])
 
   useEffect(() => { fetchList() }, [fetchList])

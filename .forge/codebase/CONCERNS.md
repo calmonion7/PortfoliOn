@@ -264,7 +264,7 @@ mapped: 2026-09-14
 
 | # | 결함 | 위치 (심볼) |
 |---|---|---|
-| **B49** | **부분(주 인스턴스 닫힘, task#331)** — `pages/Reports.jsx` 상세 fetch에 취소 플래그 + `.catch`를 넣었고(실패는 실패 배너로 표시해 옛 티커 수치를 유지하지 않는다), 형제 4곳도 함께 닫았다: `AnalystReport.jsx` 발행물·이력 이펙트(`ReportDetailTabs`가 `key` 없이 렌더해 **같은 마운트 내** 레이스였다) · `HistoryTab` 3이펙트(`.finally`까지 게이트) · `ConsensusChart::fetchData`(세대 가드 + 티커 전환 시 `null` 리셋) · `DetailTab::BacklogSection`. ⚠️ 세대 가드는 「늦은 착지」만 막고 「보존」은 막지 않는다 — 옛 데이터가 *이미* 착지한 뒤 prop만 갈리면 경합 없이 결정적으로 옛 데이터가 새 화면을 소유하므로, 식별자 변경 시 **상태를 `null`(미조회)로 되돌리는** 것이 쌍으로 필요하다(`[]`로 되돌리면 「0건」이라는 거짓 진술이 된다). **남은 미가드는 §7.3 표** — `Ranking::onRowClick` · `Calendar` 월 이펙트 · `Recommendations::handleChip` · `StockSearchBox` · `usePortfolioData` · `useReportList` 6곳 | `frontend/src/pages/Reports.jsx` 상세 fetch 이펙트(닫힘) · §7.3 표의 6곳(열림) |
+| **B49** | **부분(장부 닫힘, task#331·#379)** — task#331이 주 인스턴스(`pages/Reports.jsx` 상세 fetch)와 형제 4곳을, task#379가 §7.3 장부 6곳(`Ranking::onRowClick` · `Calendar` 월 이펙트 · `Recommendations::handleChip` · `StockSearchBox` · `usePortfolioData` · `useReportList`)과 전수 조사(S0) 신규 2곳(`DetailTab::ConsensusSummary.handleRefresh` · `SectorTab` 마켓 이펙트)을 닫았다. 세대 가드는 「늦은 착지」만 막으므로 식별자 변경 시 **`null`(미조회) 리셋**을 쌍으로 둔다(`[]`는 「0건」이라는 거짓 진술). **남은 미가드(2부, task#380)**: `useReportGeneration` 폴링 tick·실패 경로·완료 후 `applyList` · `AdminAnalytics::showUserHistory` · `AnalystReports::firePublish` · `Reports` 그외 탭 목록 · `PermissionPanel` · `BatchScheduleEditor`/`Settings::BatchHub.load` · 진행률 폴링 4페이지 | `frontend/src/pages/Reports.jsx` 상세 fetch·§7.3 닫힘 행(닫힘) · §7.3 표의 task#380 행(열림) |
 | B63 | 프론트 포매터 중복 — 재계수 완료(§13.2에서 열림 확정, task#292) | `frontend/src/utils.js` 및 산발 포매터 (§7.7·§7.9) |
 
 > ✅ **`B83` 해소 (task#378, 2026-10-08)** — 고칠 위치는 도착지 한 곳(`pages/Reports.jsx::Reports`의
@@ -279,6 +279,15 @@ mapped: 2026-09-14
 > ⓑ 업체표 하단에서 넘어오면 스크롤 위치가 남아 배너가 화면 위 밖에 떴다(m390 top −421 → 나타날 때
 > 화면 안으로 스크롤). 둘 다 「DOM에 있다」 축은 통과했으므로 uat215 배너 축을 **「보인다」·「화면 안」**으로
 > 강화했다(115축). **번호는 재사용하지 않는다.**
+
+> ✅ **`B49` 장부 해소 (task#379, 2026-10-08) — 행은 부분으로 유지한다.** 장부 6곳만 고치지 않고 「같은 상태를 쓰는
+> 비동기 호출이 겹칠 수 있다」를 조건으로 비동기 호출 파일 76개를 전수 판정했다(S0). 장부 밖 신규가 계획 한도 8을 넘어
+> 사람이 파트를 나눴다(강도 높은 것만 이번 태스크, 나머지 2부 task#380). 지점마다 **새 요청을 in-flight로 붙잡은 채**
+> 낡은 응답을 착지시키는 재현 테스트를 먼저 FAIL시킨 뒤 고쳤고, `.then`·`.catch`·`.finally` 게이트를 **각각 따로 지워**
+> FAIL을 확인했다. 그 과정에서 이빨 없는 축 3개를 고쳤다(새 요청을 마지막에 착지시킨 A→B 축 · 진행 중 「실패」 문구를
+> 안 보던 칩 축 · 방어가 겹쳐 단독 이빨이 없는 캘린더 `.finally`는 그렇게 기록). S0 표를 보지 않은 리뷰어의 독립 재계수는
+> 이 태스크 범위의 누락 0이었고, 놓친 2건(진행률 폴링 tick 중첩 · `Settings::BatchHub.load`)은 낮은 등급이라 2부에 넣었다.
+> **번호는 재사용하지 않는다.**
 
 ### 검증장치·문서
 
@@ -870,7 +879,7 @@ if (err.response?.status === 401) {
 | MED | `pages/GuruStats.jsx::StatRow` — `row.score.toFixed(3)` | 같은 파일의 다른 필드는 전부 `?? '-'`인데 여기만 무가드 | **도달 불가** — `compute_weighted`가 `score`를 항상 세팅하고 `tab` 분기와 배열이 일치한다 |
 | MED | `pages/Settings.jsx::BatchHub` — `batches.filter(...)` | `batches.length === 0` 검사가 객체에선 false라 `.filter`까지 도달 | **도달 불가** — `routers/batches.py::list_batches`가 **리스트**를 반환한다(실측) |
 
-### 7.3 비동기 레이스 — **일부 가드됨, 6곳 미가드**(task#331에서 5곳 닫힘)
+### 7.3 비동기 레이스 — **장부 6곳 + S0 신규 2곳 닫힘(task#379)** · 남은 미가드는 2부(task#380)
 
 **참조 구현(그대로 둘 것)** — 세대 카운터를 `.then`·`.catch`·**`.finally`까지** 검사하는 올바른 형태:
 
@@ -888,13 +897,18 @@ if (err.response?.status === 401) {
 | ~~MED~~ | ~~`pages/AnalystReport.jsx` 발행물·이력 이펙트~~ | **닫힘(task#331)** — `ReportDetailTabs.jsx`가 `key` 없이 렌더하고 「이전 판」이 부모 `deepDate`만 갈아끼우므로 **같은 마운트 내** 레이스였다(형제 `ConsensusSection`은 이미 가드돼 있었다). 이력 이펙트의 `filter(d => d !== date)`는 낡은 클로저의 `date`를 쓰므로 가드 없이는 **지금 보고 있는 판이 「이전 판」 목록에 남는다** |
 | ~~MED~~ | ~~`components/reports/ConsensusChart.jsx::fetchData`~~ | **닫힘(task#331)** — 세대 가드 3핸들러(낡은 세대의 실패는 auto-retry도 예약하지 않는다 — 그 재시도가 옛 종목을 다시 부른다) + 티커 전환 시 `null` 리셋 |
 | ~~MED~~ | ~~`components/reports/DetailTab.jsx::BacklogSection`~~ | **닫힘(task#331)** — `cancelled` 플래그 + 조회 전 `null` 리셋 |
-| HIGH | `pages/Ranking.jsx::onRowClick` | 세대 카운터 없음. (a) 모달을 닫아도 나중 착지한 응답이 **닫은 모달을 다시 연다**, (b) A→B 연속 클릭 시 B 모달 안에 A 리포트. 60줄 위에 올바른 패턴이 있는데 여기 적용만 빠졌다 |
-| HIGH | `pages/Calendar.jsx` 월 이펙트 | `›`를 두 번 빠르게 → 헤더는 새 달, 셀은 옛 달의 실적·배당일 |
-| MED | `pages/Recommendations.jsx::handleChip` | 마운트 이펙트엔 `cancelled` 가드가 있는데 칩 토글 재fetch엔 없다 |
-| MED | `components/StockSearchBox.jsx` 검색 이펙트 | 디바운스(350ms)는 레이스 가드가 아니다 — 느린 1차 응답이 나중 착지해 `삼성전자` 텍스트 아래 `삼성` 결과가 뜨고, 행을 고르면 **틀린 티커**가 관심종목에 들어간다 |
+| ~~HIGH~~ | ~~`pages/Ranking.jsx::onRowClick`~~ | **닫힘(task#379)** — 모달 세대 카운터(클릭·**닫기**가 세대를 올린다) · `.then`·`.finally` 게이트. 회귀 축 `frontend/src/test/ranking-modal-race.test.jsx` |
+| ~~HIGH~~ | ~~`pages/Calendar.jsx` 월 이펙트~~ | **닫힘(task#379)** — `cancelled` 3핸들러 + 달 변경 시 이벤트 `null` 리셋(null이면 스켈레톤). ⚠️ `.finally` 게이트는 null→스켈레톤 분기와 **방어가 겹쳐** 단독 이빨이 없다(주입 실측 0 FAIL). 회귀 축 `calendar-month-race.test.jsx` |
+| ~~MED~~ | ~~`pages/Recommendations.jsx::handleChip`~~ | **닫힘(task#379)** — 칩 세대 카운터 3핸들러 + 칩 변경 시 목록 `null`(실패면 「불러오지 못했습니다」, 같은 칩 재클릭으로 재시도). 마운트↔칩 경로는 마운트 중 페이지 전체가 스켈레톤이라 도달 불가. 회귀 축 `recommendations-chip-race.test.jsx` |
+| ~~MED~~ | ~~`components/StockSearchBox.jsx` 검색 이펙트~~ | **닫힘(task#379)** — 이펙트 cleanup이 아니라 **응답 검색어 == 최신 입력** 비교(디바운스 대기 창에 착지하는 옛 응답까지 막는다) + 새 검색어 요청이 나갈 때 결과 `null` + 입력을 비우면 로딩 해제. ⚠️ 키 입력마다 비우면 디바운스 창 안에서 직전 검색어로 되돌아갈 때 재조회 없이 빈 채로 남는다(적대 검토가 잡은 회귀). 회귀 축 `stocksearchbox-race.test.jsx` |
 | ~~MED~~ | ~~`components/reports/HistoryTab.jsx` 3이펙트~~ | **닫힘(task#331)** — `cancelled` 플래그, 히스토리 이펙트는 `.finally`까지 게이트. ⚠️ `.finally` 게이트의 회귀 축은 **새 요청을 in-flight로 붙잡은 채** 낡은 응답을 착지시켜야 이빨이 생긴다 — 새 요청을 먼저 해소하는 픽스처는 두 `.finally`가 같은 값을 써서 관측 차이가 원리적으로 생기지 않는다(주입 실측: 그 순서에서는 `.finally` 게이트를 지워도 8축 전부 초록) |
-| MED | `hooks/usePortfolioData.js::fetchAll`/`fetchDashboard` | 5개 호출 지점(마운트·bounded heal 루프·탭 클릭 2곳·↺ 버튼)이 경쟁하고 `finally`가 무조건 스피너를 끈다 |
-| MED | `hooks/useReportList.js::fetchList` | **세대 가드는 여전히 없다.** ⚠️ 「`.catch`도 없다」는 2026-08-31(task#343 S2)에 **거짓이 됐다** — `.catch` + `listFailed` 3상태가 들어갔고 `Reports.jsx`가 그것을 실패 배너로 렌더한다. 남은 것은 레이스 가드뿐이다 |
+| ~~MED~~ | ~~`hooks/usePortfolioData.js::fetchAll`/`fetchDashboard`~~ | **닫힘(task#379)** — 함수별 세대 카운터, 마지막 발행 요청만 상태·스피너를 바꾼다. Portfolio 자가복구(최대 3회)와의 상호작용은 `portfolio-dash-heal-race.test.jsx`가 못박는다(로딩 고착·상한 변경 주입에 FAIL). 15초 시세 폴링 얽힘은 범위 밖(다음 폴링이 자가 해소) |
+| ~~MED~~ | ~~`hooks/useReportList.js::fetchList`~~ | **닫힘(task#379)** — 세대 카운터 3핸들러. ⚠️ `useReportGeneration`의 생성 완료 후 목록 → `applyList`는 이 세대 **밖**이다(세대를 올리면 진행 중인 더 새 `fetchList`의 로딩이 고착된다) — 2부(task#380) |
+| ~~HIGH~~ | ~~`components/reports/DetailTab.jsx::ConsensusSummary.handleRefresh`~~ | **닫힘(task#379, S0 신규)** — 갱신 POST가 in-flight인 채 종목을 바꾸면 옛 응답이 **부모 콜백**으로 새 종목 요약에 병합됐다(`key` 재마운트는 자식 state만 지키고 부모 콜백 쓰기는 못 막는다). 요청 당시 종목 == 현재 종목일 때만 반영 + 종목 변경 시 갱신 표시 리셋. 회귀 축 `consensus-refresh-race.test.jsx` |
+| ~~HIGH~~ | ~~`pages/SectorTab.jsx` 마켓 이펙트~~ | **닫힘(task#379, S0 신규)** — 토글이 로딩 중에도 보여 옛 마켓 응답이 새 마켓 레이아웃(업종↔섹터)을 덮었다. `cancelled` 플래그. 회귀 축 `sector-tab-race.test.jsx` |
+| MED | `hooks/useReportGeneration.js` 폴링 tick · `generateOne` 실패 경로 · 완료 후 목록 → `applyList` | 2부(task#380) — 행 클릭으로 다른 종목 생성을 시작하면 옛 tick·옛 실패가 새 생성의 스피너를 끄고 완료 토스트를 오발 |
+| MED | `pages/AdminAnalytics.jsx::showUserHistory` · `pages/AnalystReports.jsx::firePublish` | 2부(task#380) — admin 표면. A→B 전환 시 A 응답·finally가 B를 덮음 |
+| LOW | `pages/Reports.jsx` 그외 탭 목록 · `components/PermissionPanel.jsx` · `components/BatchScheduleEditor.jsx`+`pages/Settings.jsx::BatchHub.load` · 진행률 폴링 4페이지(`ReportManualGen`·`GuruCrawlNow`·`ConsensusSettings`·`LeverageBackfillSettings`) | 2부(task#380) — 창이 좁거나 표시만. `AdminAnalytics` 기간 탭·`Digest`·`GlobalSearch`·`AuthContext`·`GuruDetail`은 도달 가능성 재판정 대상(task#379 S4 블라인드 재계수가 도달 불가로 반박) |
 
 ### 7.4 삼켜진 fetch가 "데이터 없음"으로 위장한다 — **확인된 버그**
 

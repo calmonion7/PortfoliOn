@@ -177,7 +177,7 @@ export default function Calendar() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [events, setEvents] = useState([])
+  const [events, setEvents] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [fetchKey, setFetchKey] = useState(0)
@@ -192,16 +192,22 @@ export default function Calendar() {
     )
   }
 
+  // 취소 가드(B49, task#379) — `›` 연타 시 옛 달 응답이 늦게 착지해 새 달의 이벤트·스켈레톤·
+  // 에러를 덮지 않게 한다. 달이 바뀌면 이벤트를 null(미조회)로 되돌린다 — []는 「0건」이다.
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setError('')
+    setEvents(null)
     api.get(`/api/calendar?month=${monthStr}`)
       .then(r => {
+        if (cancelled) return
         setEvents(r.data.events)
         adjacentMonths().forEach(m => api.get(`/api/calendar?month=${m}`).catch(() => {}))
       })
-      .catch(() => setError('이벤트 불러오기 실패'))
-      .finally(() => setLoading(false))
+      .catch(() => { if (!cancelled) setError('이벤트 불러오기 실패') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [year, month, fetchKey])
 
   const refresh = () => {
@@ -232,7 +238,7 @@ export default function Calendar() {
         </div>
       </div>
 
-      {loading
+      {loading || (events == null && !error)
         ? <Skeleton variant="calendar" />
         : error
         ? <div style={{ color: 'var(--text-3)', textAlign: 'center', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../api'
 import { isKrMarketOpen, isUsMarketOpen } from '../utils/marketHours'
 
@@ -16,39 +16,50 @@ export default function usePortfolioData() {
   const [lastUpdated, setLastUpdated] = useState(null)  // 시세 마지막 갱신 시각(폴링·초기 fetch)
   const [priceTick, setPriceTick] = useState(0)  // 라이브 폴링 틱 카운터 — 가격 플래시 발화 게이트(폴링에서만 증가)
 
+  // 세대 가드(B49, task#379) — fetchAll·fetchDashboard는 여러 곳에서 겹쳐 불리므로(마운트·추가/삭제 후·
+  // 탭 클릭·↺·자가복구) 마지막으로 발행한 요청만 상태·로딩을 바꾼다. 15초 시세 폴링은 범위 밖.
+  const allGenRef = useRef(0)
+  const dashGenRef = useRef(0)
+
   const fetchAll = useCallback(async () => {
+    const myGen = ++allGenRef.current
     setListLoading(true)
     try {
       const { data } = await api.get('/api/portfolio')
+      if (myGen !== allGenRef.current) return
       setStocks(data.stocks || [])
       setWatchlist(data.watchlist || [])
       setListLoading(false)  // 변경 전 순서 보존(listLoading=false → hasFetched=true); finally의 재호출은 no-op
       setHasFetched(true)
       api.get('/api/portfolio/prices').then(({ data: prices }) => {
+        // eco: 세대 미게이트 — prev 기반 병합이라 목록을 덮지 않고, 옛 시세는 다음 폴링이 덮는다.
         setStocks(prev => prev.map(s => prices[s.ticker] ? { ...s, ...prices[s.ticker] } : s))
         setLastUpdated(new Date())
       }).catch((e) => { console.warn('[usePortfolioData] 초기 시세(/portfolio/prices) 조회 실패', e) })
     } catch (e) {
-      console.warn('[usePortfolioData] 포트폴리오 목록(/portfolio) 조회 실패', e)
+      if (myGen === allGenRef.current) console.warn('[usePortfolioData] 포트폴리오 목록(/portfolio) 조회 실패', e)
     } finally {
-      setListLoading(false)
+      if (myGen === allGenRef.current) setListLoading(false)
     }
   }, [])
 
   const fetchDashboard = useCallback(async ({ invalidate = false } = {}) => {
+    const myGen = ++dashGenRef.current
     setDashboardLoading(true)
     try {
       if (invalidate) await api.delete('/api/stocks/dashboard/cache').catch(() => {})
       const res = await api.get('/api/stocks/dashboard')
+      if (myGen !== dashGenRef.current) return
       // 응답 형태: { holdings: [...], totals: {...} | null }
       setDashboardCards(res.data?.holdings || [])
       setDashboardTotals(res.data?.totals || null)
       setDashboardError(null)
     } catch (e) {
+      if (myGen !== dashGenRef.current) return
       console.warn('[usePortfolioData] dashboard(/stocks/dashboard) 조회 실패', e)
       setDashboardError(e)
     } finally {
-      setDashboardLoading(false)
+      if (myGen === dashGenRef.current) setDashboardLoading(false)
     }
   }, [])
 

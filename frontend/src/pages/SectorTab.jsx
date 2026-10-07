@@ -23,13 +23,16 @@ export default function SectorTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // 취소 가드(B49, task#379) — 토글은 로딩 중에도 보이므로 옛 마켓 응답이 새 마켓 레이아웃을 덮지 않게 한다.
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setError(null)
     setData(null)
     api.get('/api/analysis/sector', { params: { market } })
-      .then(r => { setData(r.data); setLoading(false) })
-      .catch(e => { setError(e.message); setLoading(false) })
+      .then(r => { if (!cancelled) { setData(r.data); setLoading(false) } })
+      .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
+    return () => { cancelled = true }
   }, [market])
 
   const Toggle = (

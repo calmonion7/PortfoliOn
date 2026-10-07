@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { fmtPrice as fmt } from '../../utils'
 import { SectionTitle, _weather } from './reportUtils.jsx'
 import ConsensusChart from './ConsensusChart'
@@ -407,6 +407,15 @@ export function RsiTable({ dailyRsi, weeklyRsi, monthlyRsi, price, vp, target, m
 export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState(null)
+  // 종목 가드(B49, task#379) — 갱신 POST가 in-flight인 채 종목이 바뀌면(key 재마운트 또는 prop 변경)
+  // 옛 응답이 부모 콜백으로 새 종목 요약에 병합되던 경합. 응답은 요청 당시 종목이 지금 종목일 때만 반영한다.
+  const tickerRef = useRef(ticker)
+  useEffect(() => {
+    tickerRef.current = ticker
+    setRefreshing(false)
+    setRefreshError(null)
+    return () => { tickerRef.current = null }   // 언마운트(key 재마운트) 뒤 착지도 버린다
+  }, [ticker])
 
   if (!summary) return null
 
@@ -415,15 +424,16 @@ export function ConsensusSummary({ summary, ticker, onRefreshSuccess }) {
   const needsRefresh = summary.price == null || (summary.target_high == null && summary.target_low == null && total === 0)
 
   const handleRefresh = async () => {
+    const reqTicker = ticker
     setRefreshing(true)
     setRefreshError(null)
     try {
       const { data } = await api.post(`/api/report/${ticker}/refresh-analyst`)
-      onRefreshSuccess?.(data)
+      if (tickerRef.current === reqTicker) onRefreshSuccess?.(data)
     } catch (e) {
-      setRefreshError(e.response?.data?.detail || '갱신 실패')
+      if (tickerRef.current === reqTicker) setRefreshError(e.response?.data?.detail || '갱신 실패')
     } finally {
-      setRefreshing(false)
+      if (tickerRef.current === reqTicker) setRefreshing(false)
     }
   }
   const gap = summary.target_mean != null && summary.price != null

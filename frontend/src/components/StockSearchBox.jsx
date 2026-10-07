@@ -21,22 +21,30 @@ function useDebounce(value, delay) {
 
 export default function StockSearchBox({ onSelect, placeholder = '종목명 또는 티커로 검색...', autoFocus = false }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
+  const [results, setResults] = useState(null)   // null = 현재 검색어로 아직 조회 안 함
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const debouncedQuery = useDebounce(query, 350)
   const boxRef = useRef(null)
   const justSelected = useRef(false)
+  // 검색어 가드(B49, task#379) — 응답은 자기 검색어가 지금 입력된 검색어일 때만 결과·로딩을 만진다.
+  // 디바운스 대기 중(입력은 바뀌었는데 이펙트는 아직)에 착지하는 옛 응답까지 막으려면
+  // 이펙트 cleanup이 아니라 최신 입력과 비교해야 한다.
+  const latestQuery = useRef('')
 
   useEffect(() => {
     if (justSelected.current) { justSelected.current = false; return }
-    if (!debouncedQuery.trim()) { setResults([]); setOpen(false); return }
+    if (!debouncedQuery.trim()) { setResults(null); setOpen(false); setLoading(false); return }
+    const q = debouncedQuery
+    // 새 검색어로 요청이 나갈 때 옛 결과를 비운다(키 입력마다 비우면 디바운스 창 안에서
+    // 직전 검색어로 되돌아갈 때 디바운스 값이 안 바뀌어 재조회 없이 빈 채로 남는다).
+    setResults(null)
     setLoading(true)
     // 항상 ALL로 검색 — 결과 선택 시 market/exchange 자동 설정
-    api.get('/api/stocks/search', { params: { q: debouncedQuery, market: 'ALL' } })
-      .then(r => { setResults(r.data); setOpen(r.data.length > 0) })
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false))
+    api.get('/api/stocks/search', { params: { q, market: 'ALL' } })
+      .then(r => { if (q !== latestQuery.current) return; setResults(r.data); setOpen(r.data.length > 0) })
+      .catch(() => { if (q === latestQuery.current) setResults(null) })
+      .finally(() => { if (q === latestQuery.current) setLoading(false) })
   }, [debouncedQuery])
 
   useEffect(() => {
@@ -47,6 +55,7 @@ export default function StockSearchBox({ onSelect, placeholder = '종목명 또�
 
   const handleSelect = (item) => {
     justSelected.current = true
+    latestQuery.current = item.name
     onSelect(item)
     setQuery(item.name)
     setOpen(false)
@@ -58,8 +67,8 @@ export default function StockSearchBox({ onSelect, placeholder = '종목명 또�
         <input
           type="text"
           value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onChange={e => { latestQuery.current = e.target.value; setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => results?.length > 0 && setOpen(true)}
           placeholder={placeholder}
           style={{ ...INPUT_STYLE, paddingRight: 32 }}
           autoComplete="off"
@@ -69,7 +78,7 @@ export default function StockSearchBox({ onSelect, placeholder = '종목명 또�
           {loading ? '⏳' : '🔍'}
         </span>
       </div>
-      {open && results.length > 0 && (
+      {open && results?.length > 0 && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9999,
           background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 4,

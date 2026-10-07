@@ -160,8 +160,13 @@ export default function Ranking() {
     return () => obs.disconnect()
   }, [hasMore, items.length, offset, fetchPage])
 
+  // 모달 세대(B49, task#379) — 클릭·닫기가 세대를 올리고, 응답은 자기 세대가 최신일 때만
+  // 모달·스피너를 만진다(닫은 모달 재오픈 · A→B 클릭 시 B 모달에 A 리포트 · A의 finally가 B 스피너를 끔).
+  const modalGenRef = useRef(0)
+
   // 클릭 시 스냅샷 가용 여부로 분기: 있으면 리서치 리포트 모달, 없으면 기본정보 모달 + 관심추가 CTA.
   const onRowClick = (row) => {
+    const myGen = ++modalGenRef.current
     trackEvent('ranking_row_click', { ticker: row.ticker, market })
     setModal({ row, mode: 'basic' })
     setModalLoading(true)
@@ -174,16 +179,17 @@ export default function Ranking() {
         return api.get(`/api/report/${row.ticker}/${latest}`).then(({ data }) => ({ data, date: latest }))
       })
       .then((res) => {
+        if (myGen !== modalGenRef.current) return
         if (res && res.data?.summary) {
           setModal({ row, mode: 'detail', summary: res.data.summary, date: res.date, enriched_at: res.data.enriched_at || null })
         }
         // res 없으면 basic 모드 유지
       })
       .catch(() => { /* 404 등 → basic 모드 유지 */ })
-      .finally(() => setModalLoading(false))
+      .finally(() => { if (myGen === modalGenRef.current) setModalLoading(false) })
   }
 
-  const closeModal = () => { setModal(null); setModalLoading(false) }
+  const closeModal = () => { modalGenRef.current += 1; setModal(null); setModalLoading(false) }
 
   // watchlist 추가 payload (모달 추가 · 행 토글 공유) — 행 데이터에서 파생한다(ADR-0032 §결정 3).
   // 컴포넌트 market 상태는 row.exchange가 없을 때(수급 스크리닝 행)만 폴백으로 쓴다 — 컴포넌트
