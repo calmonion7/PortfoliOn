@@ -4,8 +4,9 @@
 # ⚠️ The deploy.sh call below has never succeeded — it collides with the lock this
 #    script takes (B84). In practice the poller only syncs the working tree.
 
-# Whole body in one group so bash parses it before running: the ff below may
-# rewrite this very file mid-execution.
+# Whole body in one group so bash parses it before running — guards against an
+# in-place edit of this file mid-run. (git ff below writes a new inode, so it is
+# already safe on its own — task#377 retro.)
 {
 set -e
 
