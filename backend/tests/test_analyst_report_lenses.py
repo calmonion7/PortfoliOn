@@ -279,10 +279,9 @@ def _publish(body, snapshot=US_SNAPSHOT, rf=4.0):
          patch.object(svc, "consensus_basis", return_value=None), \
          patch.object(svc, "get_report", return_value=None), \
          patch.object(L, "cached_risk_free_pct", return_value=rf), \
-         patch.object(svc, "save_lens_report") as mock_save, \
-         patch.object(svc, "save_report") as mock_v1:
+         patch.object(svc, "save_lens_report") as mock_save:
         resp = client.post("/api/analyst-reports/crcl", json=body)
-    return resp, mock_save, mock_v1
+    return resp, mock_save
 
 
 def _lens(saved_lens_report, i):
@@ -290,9 +289,8 @@ def _lens(saved_lens_report, i):
 
 
 def test_v2_publish_crcl_computes_and_stores_signals():
-    resp, mock_save, mock_v1 = _publish(crcl_body())
+    resp, mock_save = _publish(crcl_body())
     assert resp.status_code == 201, resp.text
-    mock_v1.assert_not_called()
     kw = mock_save.call_args.kwargs
     lr = kw["lens_report"]
     assert kw["ticker"] == "CRCL" and kw["title"].startswith("금리 의존")
@@ -358,7 +356,7 @@ def test_v2_missing_input_is_422_but_na_reason_is_201_grey():
     del body["lenses"][4]["inputs"]["rate_sens_cost"]
     assert _publish(body)[0].status_code == 422
     body["lenses"][4] = {"id": 5, "summary": "원자료 없음", "body": "본문", "na_reason": "Item 7A 미공시"}
-    resp, mock_save, _ = _publish(body)
+    resp, mock_save = _publish(body)
     assert resp.status_code == 201
     l5 = _lens(mock_save.call_args.kwargs["lens_report"], 5)
     assert l5["signal"] == "na" and l5["na_reason"] == "Item 7A 미공시" and l5.get("computed") is None
@@ -394,7 +392,7 @@ def test_v2_lens8_currency_mismatch_422():
 
 def test_v2_lens8_missing_snapshot_market_cap_is_na():
     snap = {**US_SNAPSHOT, "competitors_data": []}
-    resp, mock_save, _ = _publish(crcl_body(), snapshot=snap)
+    resp, mock_save = _publish(crcl_body(), snapshot=snap)
     assert resp.status_code == 201
     l8 = _lens(mock_save.call_args.kwargs["lens_report"], 8)
     assert l8["signal"] == "na" and "시총" in l8["na_reason"]
@@ -423,7 +421,7 @@ def test_v2_nan_raw_value_422_on_main_app():
 # ── 저장·응답 왕복 ───────────────────────────────────────────────────────
 
 def test_v2_roundtrip_post_then_get_returns_stored_lens_report():
-    resp, mock_save, _ = _publish(crcl_body())
+    resp, mock_save = _publish(crcl_body())
     assert resp.status_code == 201
     kw = mock_save.call_args.kwargs
     row = {"ticker": "CRCL", "published_date": kw["published_date"], "rating": None,
@@ -464,12 +462,6 @@ def test_save_lens_report_sql_sets_lens_report_and_nulls_rating():
     assert json.loads(params[-1]) == {"lenses": []}
 
 
-def test_v1_save_report_clears_lens_report_on_same_day_overwrite():
-    with patch.object(svc, "execute") as ex:
-        svc.save_report("TST", "2026-07-25", "buy", "t", 1, 2, "m", [], "r", {})
-    assert "lens_report = NULL" in ex.call_args.args[0]
-
-
 # ── 적대 검토 수정분 (task#368 리뷰) ─────────────────────────────────────
 
 def test_lens8_balance_rate_zero_rate_sensitivity_is_na_not_500():
@@ -481,7 +473,7 @@ def test_lens8_balance_rate_zero_rate_sensitivity_is_na_not_500():
     assert r["signal"] == "na" and r["na_reason"]
     body = crcl_body()
     body["lenses"][7]["inputs"]["rate_sens_revenue"] = _raw(0)
-    resp, mock_save, _ = _publish(body)
+    resp, mock_save = _publish(body)
     assert resp.status_code == 201
     assert _lens(mock_save.call_args.kwargs["lens_report"], 8)["signal"] == "na"
 
@@ -582,7 +574,7 @@ def test_gauge_absent_when_na():
 
 
 def test_gauge_money_unit_filled_from_inputs_on_publish():
-    resp, mock_save, _ = _publish(crcl_body())
+    resp, mock_save = _publish(crcl_body())
     lr = mock_save.call_args.kwargs["lens_report"]
     g8 = _lens(lr, 8)["computed"]["gauge"]
     assert g8["variable"] == "forward 이익" and g8["unit"] == "USD M"
@@ -605,7 +597,7 @@ def _with_lens9(**kw):
 
 
 def test_judgment_numeric_gauge_stored_with_routine_origin():
-    resp, mock_save, _ = _publish(_with_lens9(gauge=_jgauge()))
+    resp, mock_save = _publish(_with_lens9(gauge=_jgauge()))
     assert resp.status_code == 201, resp.text
     l9 = _lens(mock_save.call_args.kwargs["lens_report"], 9)
     assert l9["gauge"]["current"] == 743 and l9["gauge"]["zones"] == ["stop", "wait", "go"]
@@ -650,7 +642,7 @@ def test_conditions_cover_all_three_colors():
     bad = _three(); bad[0] = {"color": "go", "when": []}
     assert _publish(_with_lens9(conditions=bad))[0].status_code == 422                            # 조건 0개
     assert _publish(_with_lens9(conditions=[{"to": "go", "when": ["x"]}] + _three()[1:]))[0].status_code == 422  # 옛 키 to
-    resp, mock_save, _ = _publish(_with_lens9(conditions=list(reversed(_three()))))
+    resp, mock_save = _publish(_with_lens9(conditions=list(reversed(_three()))))
     assert resp.status_code == 201
     cs = _lens(mock_save.call_args.kwargs["lens_report"], 9)["conditions"]
     assert [c["color"] for c in cs] == ["go", "wait", "stop"]                                     # 저장은 초록→노랑→빨강 정렬
@@ -670,5 +662,5 @@ def test_structured_flip_forbidden_on_na_and_on_computed_lenses():
 
 
 def test_computed_gauge_carries_server_origin():
-    resp, mock_save, _ = _publish(crcl_body())
+    resp, mock_save = _publish(crcl_body())
     assert _lens(mock_save.call_args.kwargs["lens_report"], 5)["computed"]["gauge"]["origin"] == "server"

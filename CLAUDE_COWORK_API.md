@@ -43,10 +43,9 @@
 ```
 0. (조건 확인) GET /api/analyst-reports  → **종목당 최신 1건**만 반환 (그 종목의 최신 발행일 판단용, task#222)
 1. (선택) GET /api/report/{ticker}/{date_str}  → 최신 스냅샷 데이터 참조 (분석 재료)
-2. (AI가 심층 분석 수행 — v2: 구조 축 3개 분류 + 렌즈 1~9 작성. 계산 렌즈 3·4·5·8은 공시 원자료만 옮겨 적는다
-   / v1(task#370에서 제거 예정): 투자의견·한줄 논지·적정주가 밴드·산정방식·투자포인트 2~3개·리스크)
-3. POST /api/analyst-reports/{ticker}  → 발행 (숫자 데이터 블록은 서버가 최신 스냅샷에서 자동 첨부.
-   v2 `"format": 2`면 렌즈 3·4·5·8의 계산·신호·바뀜 조건도 서버가 박제 — 아래 POST 절 「v2 형식」)
+2. (AI가 심층 분석 수행 — 구조 축 3개 분류 + 한줄 논지 + 렌즈 1~9 작성. 계산 렌즈 3·4·5·8은 공시 원자료만 옮겨 적는다)
+3. POST /api/analyst-reports/{ticker}  → 발행 (본문에 `"format": 2` 필수 — 생략·`1`이면 422.
+   숫자 데이터 블록은 서버가 최신 스냅샷에서 자동 첨부하고, 렌즈 3·4·5·8의 계산·신호·바뀜 조건도 서버가 박제 — 아래 POST 절)
    - 스냅샷 없는 종목은 409 거부 → 먼저 POST /api/report/generate?tickers={ticker} 후 재시도
      ⚠️ generate도 409를 낼 수 있다(진행상태 트래커가 호출자당 1개 — API 키 레인 공유).
         그 409는 "이미 진행 중"이라 실패가 아니다 → GET /api/report/progress가 완료를
@@ -671,54 +670,9 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 
 **Path Parameter:** `ticker` — 종목 코드
 
-**Request Body** (요구 최소형태 — points는 2~3개·**정량 근거는 metrics 칩으로**, body는 1~2문장, 밴드는 low ≤ high)
-```json
-{
-  "rating": "buy",
-  "title": "HBM 증설이 이끄는 실적 재평가",
-  "fair_value_low": 80000,
-  "fair_value_high": 95000,
-  "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
-  "points": [
-    { "title": "HBM 캐파 2배 증설", "body": "캐파 확대가 컨센서스 증익의 40%를 설명한다(회사 가이던스 기반).",
-      "metrics": [
-        { "label": "2026F 영업이익", "value": "383.2조원", "change_pct": 779.0 },
-        { "label": "forward PER", "value": "5.9배" },
-        { "label": "2Q26E 마진", "value": "48.9%" }
-      ] },
-    { "title": "파운드리 적자 축소", "body": "가동률 회복으로 적자 폭 축소.", "metrics": [ { "label": "가동률", "value": "80%+" } ] }
-  ],
-  "risks": "메모리 수요 둔화 시 ASP 하락\n파운드리 수주 지연\nHBM 인증 실패"
-}
-```
+발행 계약은 **구조 축·9렌즈** 하나뿐이다(ADR 261006-232406, task#368). 본문에 **`"format": 2`가 필수**이고, 생략하거나 `1`이면 422다 — 옛 형식(투자의견·적정주가·투자포인트·산정방식·리스크) 계약은 task#370에서 제거됐으니 그 필드를 보내지 말 것(`format: 2` 본문에 섞여도 422가 아니라 조용히 무시되고 저장되지 않는다). 판단 근거는 렌즈 신호다. 렌즈 **3·4·5·8은 계산 렌즈**로, 루틴은 공시에서 읽은 **원자료**만 보내고 파생 숫자·신호 색·바뀜 조건은 **서버 공식이 계산해 박제**한다. 나머지 렌즈(1·2·6·7·9)는 루틴이 신호와 바뀜 조건을 직접 쓴다.
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `rating` | string | ✅ | 투자의견 — `buy` \| `neutral` \| `sell` (3단계, 다른 값 422) |
-| `title` | string | ✅ | 한줄 논지 (리포트 제목) |
-| `fair_value_low` | number | ✅ | 적정주가 밴드 하단 |
-| `fair_value_high` | number | ✅ | 적정주가 밴드 상단 (low보다 작으면 422) |
-| `valuation_method` | string | ✅ | 적정주가 산정방식 — **1~2문장** |
-| `points` | array | ✅ | 투자포인트 `{title, body, metrics}` — **2~3개**. `body`는 1~2문장, 정량 근거는 `metrics` 칩 `{label, value(표시용 문자열), change_pct?(숫자)}` 2~4개로 분리 |
-| `risks` | string | ✅ | 리스크 요인 — **줄바꿈(`\n`) 구분 불릿 2~3개**, 각 한 문장 |
-
-**Response `201`**
-```json
-{ "ok": true, "ticker": "005930", "published_date": "2026-07-25" }
-```
-
-**Errors**
-
-| 상태 | 설명 |
-|------|------|
-| `401` | API Key 누락/불일치 |
-| `409` | 해당 종목 스냅샷 없음 — `POST /api/report/generate?tickers={ticker}`로 먼저 생성 |
-| `422` | rating enum·points 개수·밴드 역전·필수 필드 누락 |
-
-#### v2 형식 — 구조 축·9렌즈 (`"format": 2`, ADR 261006-232406, task#368)
-
-본문에 `"format": 2`가 있으면 v2로 검증한다(없으면 위 v1 형식 — task#370에서 v1 제거 예정). v2에는 **투자의견·적정주가 밴드·투자포인트·산정방식·리스크 필드가 없다** — 판단 근거는 렌즈 신호다. 렌즈 **3·4·5·8은 계산 렌즈**로, 루틴은 공시에서 읽은 **원자료**만 보내고 파생 숫자·신호 색·바뀜 조건은 **서버 공식이 계산해 박제**한다. 나머지 렌즈(1·2·6·7·9)는 루틴이 신호와 바뀜 조건을 직접 쓴다.
-
+**Request Body**
 ```json
 {
   "format": 2,
@@ -757,7 +711,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `structure.*.rationale` | ✅ | 축마다 근거 한 줄 (상태가 아니라 **구조**로 분류할 것) |
 | `lenses[].id` | ✅ | 1~9, 각 정확히 한 번 |
 | `lenses[].summary` · `body` | ✅ | 요약 한 줄(≤200자) · 본문 |
-| `lenses[].metrics` | — | 표시용 지표 칩 `{label, value, change_pct?}` 최대 4개 (v1 칩과 같은 규약) |
+| `lenses[].metrics` | — | 표시용 지표 칩 `{label: ≤40자, value: ≤40자(표시용 문자열), change_pct?(숫자)}` 최대 4개 — `change_pct`는 생략·`null` 모두 허용, NaN/Infinity는 422 |
 | `lenses[].signal` | 판단 렌즈 ✅ / 계산 렌즈 ❌ | `go` \| `wait` \| `stop` \| `na` — **계산 렌즈(3·4·5·8)에 보내면 422** |
 | `lenses[].flip` | 판단 렌즈(na 제외) ✅ / 계산 렌즈 ❌ | 바뀜 조건 한 줄 — 계산 렌즈에 보내면 422 |
 | `lenses[].na_reason` | `na`면 ✅ | 원자료가 없어 판정하지 않는 사유. 계산 렌즈는 `inputs` 대신 이것만 보내면 서버가 회색(`na`)으로 박제한다 |
@@ -789,7 +743,9 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 
 **Response `201`** — `{ "ok": true, "ticker": "CRCL", "published_date": "2026-10-07", "format": 2 }`
 
-**v2 `422` 조건** — `lenses` id가 1~9 각 1회가 아님 · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함) · 판단 렌즈(na 제외)에 `gauge`·`conditions`가 둘 다 있거나 둘 다 없음 · `gauge` 현재값 구간 ≠ `signal` · `gauge` 경계가 2개 오름차순이 아니거나 구간이 세 색 단조가 아님 · `conditions`가 세 색 각 하나가 아님(옛 키 `to` 포함) · `na` 렌즈나 계산 렌즈에 `gauge`/`conditions`.
+**Errors** — `401` API Key 누락/불일치 · `409` 해당 종목 스냅샷 없음(`POST /api/report/generate?tickers={ticker}`로 먼저 생성)
+
+**`422` 조건** — `lenses` id가 1~9 각 1회가 아님 · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함) · 판단 렌즈(na 제외)에 `gauge`·`conditions`가 둘 다 있거나 둘 다 없음 · `gauge` 현재값 구간 ≠ `signal` · `gauge` 경계가 2개 오름차순이 아니거나 구간이 세 색 단조가 아님 · `conditions`가 세 색 각 하나가 아님(옛 키 `to` 포함) · `na` 렌즈나 계산 렌즈에 `gauge`/`conditions`.
 
 **POST 전 로컬 사전검증 권장**(재시도 예산보다 싸다): 렌즈 id 1~9 완전성 · 계산 렌즈에 `signal`/`flip` 없음 · 변형별 원자료 키 집합 일치 · `estimate`면 `rationale` · 금액 단위 하나 · 모든 `value` 유한수 · 구조 축 enum. `422`는 아무것도 저장하지 않는다.
 
@@ -922,7 +878,7 @@ enrich 완료 후 전체 종목의 리포트 스냅샷을 재생성합니다. �
 | `market.estimates[].scope` | string\|생략 | | 그 기관이 잡은 **집계 범위**를 짧게 적는 표시 문자열("발사 서비스만"·"기체 제조 포함") — 같은 시장인데 숫자가 다른 이유를 설명. `size`와 달리 이 필드만 자유 텍스트 |
 | `market.estimates[].is_basis` | boolean\|생략 | | 성장 곡선(`market.history`/`forecast`)이 **채택한 기관**임을 표시. 배열 내 **최대 1건**만 `true`(2건 이상이면 422) — 어느 기관 추정을 곡선으로 그렸는지 문자열·값 일치로 추론시키지 않는다 |
 | `sources` | array | ✅ | 출처 `{title, url?}` **최소 1개**. 근거를 못 대는 수치는 그 필드를 생략한다(`null`도 `0`도 아님 — **틀린 값 < 누락**) |
-| `key_points` | array\|생략 | | **핵심 포인트 카드** `{title, body, metrics?}` 3~4개 — 이 기술을 처음 보는 사람이 카드만 읽고 결론을 잡을 수 있게. `body`는 **1~2문장**, 정량 근거는 문장에 늘어놓지 말고 `metrics` 칩으로 분리(애널리스트 리포트 `points[]`와 같은 규약) |
+| `key_points` | array\|생략 | | **핵심 포인트 카드** `{title, body, metrics?}` 3~4개 — 이 기술을 처음 보는 사람이 카드만 읽고 결론을 잡을 수 있게. `body`는 **1~2문장**, 정량 근거는 문장에 늘어놓지 말고 `metrics` 칩으로 분리(칩 규약은 애널리스트 리포트 `lenses[].metrics`와 같다) |
 | `key_points[].metrics[]` | array | | 지표 칩 **최대 4개**(초과 시 422). `{label: ≤40자, value: ≤40자, change_pct?}`. `value`는 **표시용 문자열**("1.1조원"·"22%"·"134회") — 단위·통화를 문자열에 그대로 쓴다. `change_pct`만 숫자(양수=상승 색·음수=하락 색), 증감이 없으면 생략 |
 | `milestones` | array\|생략 | | **진척 타임라인** `{year, actor?, event, status}` — "언제 무엇이 가동/착공/실증됐나"를 산문에 묻지 말고 여기에 싣는다. `year`는 정수, `event`는 그 해에 무슨 일이 있었는지 한 구절, `actor`는 주체(국가·기업, 특정 주체가 없으면 생략) |
 | `milestones[].status` | enum | ✅ | `done`(이미 일어남) \| `in_progress`(진행 중) \| `planned`(계획·전망) **3값만** — 그 밖은 422. 구체 단계명("착공"·"계통연결")은 기술마다 다르므로 `event`가 담고, 색·마커는 이 3값이 정한다 |

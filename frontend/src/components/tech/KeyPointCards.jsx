@@ -3,7 +3,8 @@ import { SectionTitle } from '../reports/reportUtils.jsx'
 
 // 주요기술 리포트 핵심 포인트 카드(ADR-0033, task#281 S2) — 지금까지 description 산문에만 있던
 // 결론을 발행 필드 key_points[]{title, metrics[≤4]{label,value,change_pct?}, body}로 받아 렌더한다.
-// AnalystReport.jsx의 「투자 포인트」 블록을 그대로 미러링한다(task#218 "한눈 구조화"의 원형).
+// 원형은 옛 심층 리포트(v1)의 「투자 포인트」 블록이었다(task#218 "한눈 구조화") — 그 블록은 task#370에서 제거돼
+// 이제 이 컴포넌트가 지표 칩 표기의 유일한 구현이다.
 // 순수 표시 컴포넌트 — fetch 0, 산문 요약·추출 0(루틴이 쓴 것만 표시한다, wrong < missing).
 //
 // ⚠️ 구발행물(라이브 smr·reusable-rocket 2건)은 이 컬럼이 SQL NULL이라 응답에 `key_points: null`,
@@ -14,7 +15,7 @@ import { SectionTitle } from '../reports/reportUtils.jsx'
 //    하는데(제목만 남은 유령 섹션 금지), 페이지가 <div style={{marginBottom:30}}>로 감싸면 null을
 //    반환해도 그 래퍼의 여백이 남아 30px 유령 간격이 생긴다 → 페이지에선 래퍼 없이 그대로 둘 것.
 
-// 재사용 인라인 상수 — 색은 항상 토큰 참조(하드코딩 hex 0). AnalystReport의 numeralStyle과 동형.
+// 재사용 인라인 상수 — 색은 항상 토큰 참조(하드코딩 hex 0).
 export const KP_NUMERAL = {
   fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700, lineHeight: 1,
   color: 'var(--accent)', opacity: 0.85, flexShrink: 0, width: 38,
@@ -24,8 +25,6 @@ export const KP_CHIP = { background: 'var(--bg-elev-2)', borderRadius: 6, paddin
 
 // 증감 값 표기 — 부호는 화살표가 대신하므로 값은 항상 |v|다(정본 `ui/Badge.jsx` ChangeBadge와 같은 계약:
 // `▼ 12.5%`). 세 자리 이상만 반올림해 소수 꼬리를 자르고, 그 미만은 정본대로 소수 1자리로 고정한다.
-// ⚠️ AnalystReport.jsx 투자 포인트 칩과 **같은 식**이다(이 컴포넌트가 그 블록의 미러) — 한쪽만 고치면
-//    두 표면 표기가 갈라진다. 양쪽에 같은 케이스의 회귀 테스트가 쌍으로 있다(task#281 F5).
 export const fmtChangePct = (v) =>
   (Math.abs(v) >= 100 ? String(Math.round(Math.abs(v))) : Math.abs(v).toFixed(1))
 

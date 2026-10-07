@@ -9,11 +9,14 @@ import ReportDetailTabs from './ReportDetailTabs'
 
 const PUB = { ticker: '005930', published_date: '2026-07-25', name: '삼성전자' }
 
+// v2(구조 축·9렌즈) 판 — 발행 계약은 v2뿐이다(task#370)
 const REPORT_DOC = {
-  ticker: '005930', published_date: '2026-07-25', rating: 'buy',
-  title: '한줄 논지', fair_value_low: 80000, fair_value_high: 95000,
-  name: '삼성전자', market: 'KR', points: [{ title: '포인트A', body: '근거A' }],
-  risks: '리스크 서술',
+  ticker: '005930', published_date: '2026-07-25', format: 2,
+  title: '한줄 논지', name: '삼성전자', market: 'KR',
+  tally: { go: 0, wait: 9, stop: 0, na: 0 },
+  structure: { revenue_engine: { value: 'volume', rationale: '판매량×가격' } },
+  lenses: Array.from({ length: 9 }, (_, i) => ({ id: i + 1, summary: `요약${i + 1}`, body: `본문${i + 1}`,
+    signal: 'wait', flip: `바뀜${i + 1}` })),
   data: { snapshot_date: '2026-07-25', price: 90000, market: 'KR', name: '삼성전자' },
 }
 
@@ -49,15 +52,15 @@ describe('리포트 상세 탭 — 심층 리포트 흡수 (task#324)', () => {
     expect(labels.some(l => l.includes('심층 리포트'))).toBe(true)
   })
 
-  it('탭을 누르면 발행물 본문이 실제로 렌더된다 — 투자의견 배지 + 적정주가 밴드', async () => {
+  it('탭을 누르면 발행물 본문이 실제로 렌더된다 — 렌즈 신호 + 발행 시점 숫자', async () => {
     // 「탭이 5개다」만 세면 내용이 빈 탭도 통과한다 → 본문 렌더까지 단언한다(계획서의 자기반박 항목).
     const { container } = renderTabs({ publications: [PUB] })
     const deep = [...container.querySelectorAll('button.tab-btn')].find(b => b.textContent.includes('심층 리포트'))
     fireEvent.click(deep)
     expect(await screen.findByText('한줄 논지')).toBeTruthy()
-    expect(screen.getByText('매수')).toBeTruthy()               // 투자의견 배지
-    expect(screen.getByText('적정주가 밴드')).toBeTruthy()       // 밴드 게이지 라벨
-    expect(screen.getByText('리스크 요인')).toBeTruthy()
+    expect(screen.getByText('렌즈 신호')).toBeTruthy()          // 렌즈 본문(LensReport)
+    expect(screen.getByText('발행 시점 숫자')).toBeTruthy()      // 서버 숫자 블록
+    expect(screen.queryByTestId('legacy-format-notice')).toBeNull()   // 옛 형식 안내로 빠지지 않았다
   })
 
   it('탭 안에서 이전 판으로 갈아탄다 — 라우팅으로 탭을 벗어나지 않는다', async () => {

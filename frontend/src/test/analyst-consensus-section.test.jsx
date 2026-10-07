@@ -14,7 +14,7 @@ const brokerage = (i, date = '2026-07-3' + (i % 2)) => ({
 })
 
 const mkReport = (over = {}) => ({
-  ticker: 'TST', fair_value_low: 80000, fair_value_high: 95000,
+  ticker: 'TST',
   data: {
     market: 'KR',
     consensus: {
@@ -30,11 +30,12 @@ const mkReport = (over = {}) => ({
 beforeEach(() => { getMock.mockReset() })
 
 describe('ConsensusSection (task#260)', () => {
-  it('consensus_detail 있으면 섹션·집계 스탯·게이지·증권사 행을 렌더한다', async () => {
+  it('consensus_detail 있으면 섹션·집계 스탯·증권사 행을 렌더한다', async () => {
     getMock.mockResolvedValue({ data: [{ date: '2026-08-01', target_mean: 218000 }] })
     render(<ConsensusSection report={mkReport()} market="KR" />)
-    expect(screen.getAllByText('컨센서스').length).toBeGreaterThan(0)   // 섹션 타이틀 + 게이지 행 라벨
-    expect(screen.getByText('내 판단 밴드')).toBeTruthy()               // 게이지
+    expect(screen.getAllByText('컨센서스').length).toBeGreaterThan(0)   // 섹션 타이틀
+    // 「내 판단 밴드 vs 컨센서스」 게이지는 v1 적정주가 밴드와 함께 제거됐다(task#370)
+    expect(screen.queryByText('내 판단 밴드')).toBeNull()
     expect(screen.getByText('증권사1')).toBeTruthy()
     expect(screen.getByText('증권사2')).toBeTruthy()
     expect(screen.getByText('8명')).toBeTruthy()
@@ -66,7 +67,7 @@ describe('ConsensusSection (task#260)', () => {
     getMock.mockRejectedValue(new Error('down'))
     render(<ConsensusSection report={mkReport()} market="KR" />)
     await waitFor(() => expect(getMock).toHaveBeenCalled())
-    expect(screen.getByText('내 판단 밴드')).toBeTruthy()
+    expect(screen.getByText('증권사1')).toBeTruthy()
     expect(screen.queryByText(/목표가 평균:/)).toBeNull()   // 델타 줄만 생략
   })
 })
@@ -80,10 +81,9 @@ describe('ConsensusSection 임베드 기본 접힘 (task#358)', () => {
     render(<ConsensusSection report={mkReport()} market="KR" embedded />)
     expect(screen.getAllByText('컨센서스').length).toBeGreaterThan(0)
     expect(screen.getByTestId('consensus-toggle').textContent).toBe('근거 펼치기')
-    // 본문(증권사 행·집계 스탯·게이지)이 없어야 한다 — 제목만 남는 것이 「접힘」이다.
+    // 본문(증권사 행·집계 스탯)이 없어야 한다 — 제목만 남는 것이 「접힘」이다.
     expect(screen.queryByText('증권사1')).toBeNull()
     expect(screen.queryByText('8명')).toBeNull()
-    expect(screen.queryByText('내 판단 밴드')).toBeNull()
   })
 
   it('embedded에서 「펼치기」를 누르면 근거 본문이 렌더된다', async () => {

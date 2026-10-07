@@ -6,7 +6,6 @@ import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import { useToast } from '../components/Toast'
-import { RATING_META } from './AnalystReport'
 import { SIGNAL_META } from '../components/reports/LensReport'
 
 // 목록 행의 렌즈 신호 집계 — 점 + 개수(색만으로 말하지 않게 aria-label로 라벨을 싣는다)
@@ -136,9 +135,10 @@ export default function AnalystReports() {
                 <span style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.ticker}</span>
                   {p.format === 2
-                    // v2(구조 축·9렌즈)는 투자의견이 없다 — rating 폴백(「중립」) 대신 렌즈 신호 집계(task#369)
+                    // v2(구조 축·9렌즈)는 투자의견이 없다 — 렌즈 신호 집계(task#369). v1 계약은 task#370에서 제거돼
+                    // 남은 옛 판은 투자의견을 그리지 않고 형식만 표시한다
                     ? <TallyDots tally={p.tally} />
-                    : <Badge variant={(RATING_META[p.rating] || RATING_META.neutral).variant}>{(RATING_META[p.rating] || RATING_META.neutral).label}</Badge>}
+                    : <Badge variant="neutral">옛 형식</Badge>}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>

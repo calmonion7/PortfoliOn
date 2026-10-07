@@ -135,108 +135,98 @@ def test_build_data_block_market_outlook_segments_sanitizes_nan_inf():
 
 
 # ── 발행 API ──────────────────────────────────────────────────────────
+# 발행 계약은 v2(구조 축·9렌즈)만이다(task#370 — v1 투자의견·적정주가 밴드 계약 제거,
+# ADR 261006-232406). 렌즈 계산·검증의 세부는 test_analyst_report_lenses.py가 맡고,
+# 이 파일은 데이터 블록 첨부·조회·삭제·권한·컨센서스 근거처럼 형식과 무관한 계약을 지킨다.
 
+def _three(i):
+    return [{"color": "go", "when": [f"렌즈{i} 초록"], "match": "all"},
+            {"color": "wait", "when": [f"렌즈{i} 노랑"], "match": "all"},
+            {"color": "stop", "when": [f"렌즈{i} 빨강"], "match": "any"}]
+
+
+def _judge(i, signal="wait", **extra):
+    return {"id": i, "summary": f"렌즈{i} 요약", "body": f"렌즈{i} 본문", "signal": signal,
+            "flip": f"렌즈{i} 바뀜 조건", "conditions": _three(i), **extra}
+
+
+def _na(i):
+    return {"id": i, "summary": f"렌즈{i} 요약", "body": f"렌즈{i} 본문", "na_reason": "원자료 미공시"}
+
+
+# 최소 v2 본문 — 계산 렌즈(3·4·5·8)는 na_reason만, 판단 렌즈는 세 색 조건 목록, 9는 회색
 VALID_BODY = {
-    "rating": "buy",
+    "format": 2,
     "title": "HBM 증설이 이끄는 실적 재평가",
-    "fair_value_low": 80000,
-    "fair_value_high": 95000,
-    "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
-    "points": [
-        {"title": "포인트1", "body": "근거1"},
-        {"title": "포인트2", "body": "근거2"},
-    ],
-    "risks": "수요 둔화 리스크",
+    "structure": {
+        "revenue_engine": {"value": "volume", "rationale": "판매량×가격이 매출을 만든다"},
+        "cost_nature": {"value": "fixed", "rationale": "감가상각이 원가의 대부분"},
+        "funding_source": {"value": "equity", "rationale": "영업현금흐름으로 증설"},
+    },
+    "lenses": [_judge(1), _judge(2, "go"), _na(3), _na(4), _na(5), _judge(6, "stop"), _judge(7), _na(8),
+               _judge(9, "na") | {"flip": None, "na_reason": "규제 공시 없음", "conditions": None}],
 }
 
 
 def _publish(body=None):
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
-         patch.object(svc, "save_report") as mock_save:
+         patch.object(svc, "save_lens_report") as mock_save:
         resp = client.post("/api/analyst-reports/tst", json=body or VALID_BODY)
     return resp, mock_save
 
 
 def test_publish_ok_attaches_data_block():
     resp, mock_save = _publish()
-    assert resp.status_code == 201
-    assert resp.json()["ticker"] == "TST"
-    args = mock_save.call_args.args
-    # save_report(ticker, published_date, rating, title, low, high, method, points, risks, data)
-    assert args[0] == "TST"
-    assert args[2] == "buy"
-    data = args[9]
-    assert data["snapshot_date"] == "2026-07-25"
-    assert data["per_band"]["min"] == 10.0
-    assert len(args[7]) == 2  # points
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["ticker"] == "TST" and resp.json()["format"] == 2
+    kw = mock_save.call_args.kwargs
+    assert kw["ticker"] == "TST"
+    assert kw["data"]["snapshot_date"] == "2026-07-25"
+    assert kw["data"]["per_band"]["min"] == 10.0
+    assert [l["id"] for l in kw["lens_report"]["lenses"]] == list(range(1, 10))
 
 
-def test_publish_with_point_metrics():
-    """포인트 지표 칩(metrics, task#218) — additive: 있으면 저장, 없으면(구 payload) 기본 []."""
-    body = {**VALID_BODY, "points": [
-        {"title": "이익 정상화", "body": "요약.", "metrics": [
-            {"label": "2026F 영업이익", "value": "383.2조원", "change_pct": 779.0},
-            {"label": "forward PER", "value": "5.9배"},
-        ]},
-        {"title": "포인트2", "body": "근거2"},
-    ]}
+def test_v1_body_rejected():
+    """v1 형식(투자의견·적정주가 밴드·포인트·리스크)은 더 이상 발행 계약이 아니다(task#370).
+
+    format 키 없는 v1 본문이 422여야 한다 — 판별자가 v1으로 흘려 201을 주면 옛 형식 판이
+    다시 쌓여 화면(v1 렌더러 제거됨)이 그 판을 그리지 못한다. 저장 함수도 호출되지 않아야 한다."""
+    v1 = {"rating": "buy", "title": "옛 형식", "fair_value_low": 80000, "fair_value_high": 95000,
+          "valuation_method": "PER 밴드", "points": [{"title": "p1", "body": "b1"}, {"title": "p2", "body": "b2"}],
+          "risks": "리스크"}
+    for body in (v1, {**v1, "format": 1}):
+        resp, mock_save = _publish(body)
+        assert resp.status_code == 422, resp.text
+        mock_save.assert_not_called()
+
+
+def test_publish_lens_metrics_explicit_null_change_pct_accepted():
+    """명시적 `"change_pct": null`이 발행 요청 전체를 422로 막던 버그(task#250) — v2 렌즈 지표 칩에서도 유지."""
+    body = {**VALID_BODY, "lenses": [_judge(1, metrics=[{"label": "forward PER", "value": "5.9배",
+                                                         "change_pct": None}])] + VALID_BODY["lenses"][1:]}
     resp, mock_save = _publish(body)
-    assert resp.status_code == 201
-    points = mock_save.call_args.args[7]
-    assert points[0]["metrics"][0]["value"] == "383.2조원"
-    assert points[0]["metrics"][1]["change_pct"] is None
-    assert points[1]["metrics"] == []  # 구 형태 호환
-    too_many = {**VALID_BODY, "points": [
-        {"title": "t", "body": "b", "metrics": [{"label": f"l{i}", "value": "v"} for i in range(5)]},
-        {"title": "t2", "body": "b2"},
-    ]}
-    assert client.post("/api/analyst-reports/TST", json=too_many).status_code == 422
+    assert resp.status_code == 201, resp.text
+    l1 = next(l for l in mock_save.call_args.kwargs["lens_report"]["lenses"] if l["id"] == 1)
+    assert l1["metrics"][0]["change_pct"] is None
 
 
-def test_publish_explicit_null_change_pct_accepted():
-    """명시적 `"change_pct": null`이 발행 요청 전체를 422로 막던 버그(task#250).
-
-    pydantic v2는 validate_default=False라 **키 생략은 통과하지만 명시적 null은 타입 검증을 탄다** —
-    `float = Field(None, ...)`이면 null이 float_type 422가 되어, 선택 칩 필드 하나 때문에
-    발행 전체가 죽었다. Optional[float]이 그 비대칭을 없앤다.
-    """
-    body = {**VALID_BODY, "points": [
-        {"title": "포인트1", "body": "근거1", "metrics": [
-            {"label": "forward PER", "value": "5.9배", "change_pct": None},
-        ]},
-        {"title": "포인트2", "body": "근거2"},
-    ]}
-    resp, mock_save = _publish(body)
-    assert resp.status_code == 201
-    points = mock_save.call_args.args[7]
-    assert points[0]["metrics"][0]["change_pct"] is None
-
-
-def test_publish_nan_change_pct_rejected_422():
-    """change_pct의 NaN 차단(allow_inf_nan=False)을 못박는다 — Optional화가 가드를 떨어뜨리지 않도록.
-
-    수정 전에도 통과하므로 red-first가 원리적으로 불가능하다. 목적은 미래 회귀 차단:
-    누가 `Optional[float] = None`으로 '정리'하며 allow_inf_nan=False를 지워도 초록으로
-    통과하는 것을 막는다. raw NaN 토큰은 json.loads를 통과하고 422 detail이 그 NaN을
-    echo해 직렬화 500이 되므로(main.app 커스텀 핸들러가 차단) self-app이 아니라 main.app을 태운다.
-    """
+def test_publish_lens_metrics_nan_change_pct_rejected_422():
+    """change_pct의 NaN 차단(allow_inf_nan=False) — Optional화가 가드를 떨어뜨리지 않도록.
+    raw NaN 토큰의 422 detail echo 직렬화 500까지 보려고 main.app을 태운다."""
     import json as _json
     from main import app as main_app
-    body = {**VALID_BODY, "points": [
-        {"title": "포인트1", "body": "근거1", "metrics": [
-            {"label": "2026F 영업이익", "value": "383.2조원", "change_pct": 779.0},
-        ]},
-        {"title": "포인트2", "body": "근거2"},
-    ]}
+    body = {**VALID_BODY, "lenses": [_judge(1, metrics=[{"label": "영업이익", "value": "383조원",
+                                                         "change_pct": 779.0}])] + VALID_BODY["lenses"][1:]}
     raw = _json.dumps(body).replace('"change_pct": 779.0', '"change_pct": NaN')
     main_app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
     try:
         c = TestClient(main_app)
         with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
-             patch.object(svc, "save_report"):
+             patch.object(svc, "save_lens_report") as ms:
             resp = c.post("/api/analyst-reports/TST", content=raw,
                           headers={"Content-Type": "application/json"})
         assert resp.status_code == 422
+        ms.assert_not_called()
     finally:
         main_app.dependency_overrides.pop(require_admin_or_api_key, None)
 
@@ -248,41 +238,21 @@ def test_publish_no_snapshot_409():
 
 
 def test_publish_validation_422():
-    bad_rating = {**VALID_BODY, "rating": "strong_buy"}
-    assert client.post("/api/analyst-reports/TST", json=bad_rating).status_code == 422
-    one_point = {**VALID_BODY, "points": [{"title": "1", "body": "1"}]}
-    assert client.post("/api/analyst-reports/TST", json=one_point).status_code == 422
-    band_inverted = {**VALID_BODY, "fair_value_low": 95000, "fair_value_high": 80000}
-    assert client.post("/api/analyst-reports/TST", json=band_inverted).status_code == 422
     missing = {k: v for k, v in VALID_BODY.items() if k != "title"}
-    assert client.post("/api/analyst-reports/TST", json=missing).status_code == 422
-
-
-def test_publish_nan_rejected_422():
-    """raw body의 NaN 토큰은 json.loads·NaN 비교(항상 False)를 다 통과하므로
-    allow_inf_nan=False가 차단선 — 불변 문서 오염 방지(적대 리뷰 #1).
-    422 detail의 NaN echo 직렬화 500 방지(main.app 커스텀 핸들러)까지 함께 검증하므로
-    self-app이 아니라 main.app을 태운다."""
-    import json as _json
-    from main import app as main_app
-    main_app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
-    try:
-        c = TestClient(main_app)
-        raw = _json.dumps(VALID_BODY).replace('"fair_value_low": 80000', '"fair_value_low": NaN')
-        resp = c.post("/api/analyst-reports/TST", content=raw,
-                      headers={"Content-Type": "application/json"})
-        assert resp.status_code == 422
-    finally:
-        main_app.dependency_overrides.pop(require_admin_or_api_key, None)
+    assert _publish(missing)[0].status_code == 422
+    eight = {**VALID_BODY, "lenses": VALID_BODY["lenses"][:8]}
+    assert _publish(eight)[0].status_code == 422
 
 
 # ── 조회 API ──────────────────────────────────────────────────────────
 
 ROW = {
-    "ticker": "TST", "published_date": "2026-07-25", "rating": "buy",
-    "title": "한줄 논지", "fair_value_low": 80000, "fair_value_high": 95000,
-    "valuation_method": "PER 밴드", "points": [{"title": "p", "body": "b"}],
-    "risks": "리스크", "data": {"name": "테스트전자", "market": "KR", "price": 70000.0},
+    "ticker": "TST", "published_date": "2026-07-25", "rating": None,
+    "title": "한줄 논지", "fair_value_low": None, "fair_value_high": None,
+    "valuation_method": "", "points": [], "risks": "",
+    "data": {"name": "테스트전자", "market": "KR", "price": 70000.0},
+    "lens_report": {"structure": {"revenue_engine": {"value": "volume"}},
+                    "lenses": [{"id": 1, "signal": "go"}], "tally": {"go": 1}},
 }
 
 
@@ -293,7 +263,10 @@ def test_list_all():
     reports = resp.json()["reports"]
     assert reports[0]["ticker"] == "TST"
     assert reports[0]["name"] == "테스트전자"
+    assert reports[0]["format"] == 2 and reports[0]["tally"] == {"go": 1}
     assert "data" not in reports[0]  # 목록은 요약만
+    # v1 판단 필드는 응답 계약에서 빠졌다(task#370) — 컬럼은 남아도 키는 내보내지 않는다
+    assert not {"rating", "fair_value_low", "fair_value_high"} & reports[0].keys()
 
 
 def test_list_all_dedups_to_latest_per_ticker():
@@ -328,18 +301,11 @@ def test_detail_and_404():
         resp = client.get("/api/analyst-reports/TST/2026-07-25")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["points"] == [{"title": "p", "body": "b"}]
+    assert body["lenses"] == [{"id": 1, "signal": "go"}]
     assert body["data"]["price"] == 70000.0
+    assert not {"rating", "fair_value_low", "fair_value_high", "valuation_method", "points", "risks"} & body.keys()
     with patch.object(svc, "query", return_value=[]):
         assert client.get("/api/analyst-reports/TST/2026-01-01").status_code == 404
-
-
-def test_save_report_upserts():
-    with patch.object(svc, "execute") as mock_exec:
-        svc.save_report("TST", "2026-07-25", "buy", "t", 1, 2, "m",
-                        [{"title": "p", "body": "b"}], "r", {"k": 1})
-    sql = mock_exec.call_args.args[0]
-    assert "ON CONFLICT (ticker, published_date) DO UPDATE" in sql
 
 
 # ── 삭제 (종목 단위 전 판, admin 세션 전용 — task#222) ──
@@ -462,10 +428,10 @@ _BASIS = {
 def test_publish_attaches_consensus_basis_additively():
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
          patch.object(svc, "consensus_basis", return_value=_BASIS), \
-         patch.object(svc, "save_report") as mock_save:
+         patch.object(svc, "save_lens_report") as mock_save:
         resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
     assert resp.status_code == 201
-    data = mock_save.call_args.args[9]
+    data = mock_save.call_args.kwargs["data"]
     assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]   # 스냅샷 값 우선(mart로 안 덮음)
     assert data["consensus"]["target_high"] == 250000.0                  # additive 확장
     assert data["consensus"]["buy"] == SNAPSHOT["buy"]                   # 분포도 스냅샷 우선
@@ -477,10 +443,10 @@ def test_publish_fills_null_target_mean_from_mart():
     snap = {**SNAPSHOT, "target_mean": None, "buy": 0, "hold": 0, "sell": 0}
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", snap)), \
          patch.object(svc, "consensus_basis", return_value=_BASIS), \
-         patch.object(svc, "save_report") as mock_save:
+         patch.object(svc, "save_lens_report") as mock_save:
         resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
     assert resp.status_code == 201
-    data = mock_save.call_args.args[9]
+    data = mock_save.call_args.kwargs["data"]
     assert data["consensus"]["target_mean"] == 215000.0
     assert (data["consensus"]["buy"], data["consensus"]["hold"], data["consensus"]["sell"]) == (6, 2, 0)
 
@@ -489,10 +455,10 @@ def test_publish_without_consensus_basis_keeps_existing_block():
     """파이프라인 미커버 종목 — consensus_detail 부재, 기존 consensus는 스냅샷 값 그대로."""
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
          patch.object(svc, "consensus_basis", return_value=None), \
-         patch.object(svc, "save_report") as mock_save:
+         patch.object(svc, "save_lens_report") as mock_save:
         resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
     assert resp.status_code == 201
-    data = mock_save.call_args.args[9]
+    data = mock_save.call_args.kwargs["data"]
     assert "consensus_detail" not in data
     assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]
 
@@ -500,7 +466,7 @@ def test_publish_without_consensus_basis_keeps_existing_block():
 # ══ 7차 버그헌트 — 발행 경로 계약 3건 (BH7-M1 · BH7-M2 · BH7-L2) ══════════════
 
 def test_republish_preserves_prior_basis_when_read_fails_BH7_M1():
-    """BH7-M1 — 같은 날 재발행 중 consensus_basis read가 실패하면, save_report의
+    """BH7-M1 — 같은 날 재발행 중 consensus_basis read가 실패하면, save_lens_report의
     `data = EXCLUDED.data` 전체 치환이 이미 박제된 근거를 통째로 지운다. ADR-0027이
     '잘못된 판은 새 판 발행으로 덮는다'로 같은 날 재발행을 정정 수단으로 규정하므로
     우연한 경로가 아니다. 같은 (ticker, published_date) 행의 근거만 보존한다."""
@@ -511,10 +477,10 @@ def test_republish_preserves_prior_basis_when_read_fails_BH7_M1():
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
          patch.object(svc, "consensus_basis", return_value=None), \
          patch.object(svc, "get_report", return_value=prior), \
-         patch.object(svc, "save_report") as mock_save:
+         patch.object(svc, "save_lens_report") as mock_save:
         resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
     assert resp.status_code == 201
-    data = mock_save.call_args.args[9]
+    data = mock_save.call_args.kwargs["data"]
     assert data["consensus_detail"]["brokerages"][0]["brokerage"] == "NH투자"
     assert data["consensus"]["target_high"] == 250000.0      # mart 유래 보충 필드도 보존
     assert data["consensus"]["target_mean"] == SNAPSHOT["target_mean"]   # 스냅샷 값은 안 덮음
@@ -527,10 +493,10 @@ def test_new_date_publish_does_not_borrow_old_basis_BH7_M1():
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
          patch.object(svc, "consensus_basis", return_value=None), \
          patch.object(svc, "get_report", return_value=None), \
-         patch.object(svc, "save_report") as mock_save:
+         patch.object(svc, "save_lens_report") as mock_save:
         resp = client.post("/api/analyst-reports/tst", json=VALID_BODY)
     assert resp.status_code == 201
-    data = mock_save.call_args.args[9]
+    data = mock_save.call_args.kwargs["data"]
     assert "consensus_detail" not in data
 
 
@@ -572,14 +538,14 @@ def test_base_date_follows_the_shown_target_mean_BH7_L2():
     base_date도 스냅샷 날짜여야 한다. mart 날짜가 남으면 캡션이 옆 숫자의 기준일이 아니다."""
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", SNAPSHOT)), \
          patch.object(svc, "consensus_basis", return_value=_BASIS), \
-         patch.object(svc, "save_report") as mock_save:
+         patch.object(svc, "save_lens_report") as mock_save:
         client.post("/api/analyst-reports/tst", json=VALID_BODY)
-    assert mock_save.call_args.args[9]["consensus"]["base_date"] == "2026-07-25"
+    assert mock_save.call_args.kwargs["data"]["consensus"]["base_date"] == "2026-07-25"
 
     # 스냅샷이 비어 mart 평균으로 보충한 경우엔 mart 기준일이 맞다.
     snap = {**SNAPSHOT, "target_mean": None}
     with patch.object(svc, "latest_snapshot", return_value=("2026-07-25", snap)), \
          patch.object(svc, "consensus_basis", return_value=_BASIS), \
-         patch.object(svc, "save_report") as mock_save:
+         patch.object(svc, "save_lens_report") as mock_save:
         client.post("/api/analyst-reports/tst", json=VALID_BODY)
-    assert mock_save.call_args.args[9]["consensus"]["base_date"] == "2026-07-31"
+    assert mock_save.call_args.kwargs["data"]["consensus"]["base_date"] == "2026-07-31"

@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ComposedChart, LineChart, Line, LabelList, CartesianGrid, XAxis, YAxis, ReferenceArea, ReferenceLine, ResponsiveContainer } from 'recharts'
 import api from '../api'
 import { fmtPrice } from '../utils'
-import Badge, { MarketBadge } from '../components/ui/Badge'
+import { MarketBadge } from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Stat from '../components/ui/Stat'
 import Skeleton from '../components/ui/Skeleton'
@@ -12,16 +12,9 @@ import SegmentAnalysisSection from '../components/reports/SegmentAnalysisSection
 import { GlossaryTerm, GlossaryText } from '../components/Glossary.jsx'
 import LensReport, { isLensReport } from '../components/reports/LensReport.jsx'
 
-// 증권사 리포트식 단일 문서 페이지 (task#212, 에디토리얼 재설계 task#216, ADR-0026/0027)
-// 헤더(스탯 스트립+밴드 게이지) → 한줄 논지 → 투자 포인트 → 사업부문 시장 분석(구발행물엔 없음, task#275) → 밸류에이션 → 실적 추정 → 리스크
-// v2(`format: 2`, 구조 축·9렌즈 — ADR 261006-232406, task#369)는 투자의견·밴드·포인트·리스크 대신 LensReport를 그리고,
-// 서버 숫자 블록(사업부문·발행 시점 숫자·컨센서스·실적 추정)은 v1과 같은 컴포넌트를 공유한다. v1 분기는 task#370에서 제거.
-
-export const RATING_META = {
-  buy: { label: '매수', variant: 'success' },      // 의미 배지 — 가격색(up/down) 교차 사용 금지(task#194)
-  neutral: { label: '중립', variant: 'neutral' },
-  sell: { label: '매도', variant: 'danger' },
-}
+// 심층 리포트 단일 문서 페이지 (task#212, 에디토리얼 재설계 task#216, ADR-0026/0027)
+// 헤더 → 렌즈 본문(LensReport — 구조 축·9렌즈, ADR 261006-232406) → 사업부문 시장 분석(task#275) → 발행 시점 숫자 → 컨센서스 → 실적 추정
+// 옛 v1(투자의견·적정주가 밴드·포인트·리스크) 렌더러는 task#370에서 제거됐다 — `format: 2`가 아닌 판은 안내만 한다.
 
 const fmtAmount = (v, isKR) => {
   if (v == null) return '—'
@@ -94,55 +87,6 @@ export function PerBandChart({ band }) {
   )
 }
 
-// 적정주가 밴드 대비 현재가 위치 게이지 (task#216) — low~high 음영 + 현재가 마커
-export function BandGauge({ low, high, price, market }) {
-  if (low == null || high == null || price == null || high <= 0) return null
-  const lo = Math.min(low, price) * 0.97
-  const hi = Math.max(high, price) * 1.03
-  const pct = v => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))
-  return (
-    <div style={{ margin: '14px 2px 2px' }}>
-      <div style={{ position: 'relative', height: 26 }}>
-        <div style={{ position: 'absolute', top: 11, left: 0, right: 0, height: 4, background: 'var(--bg-elev-2)', borderRadius: 2 }} />
-        <div style={{ position: 'absolute', top: 11, left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%`, height: 4, background: 'var(--accent)', opacity: 0.35, borderRadius: 2 }} />
-        <div title="발행 시점 현재가" style={{ position: 'absolute', top: 6, left: `calc(${pct(price)}% - 7px)`, width: 14, height: 14, borderRadius: '50%', background: 'var(--up)', border: '2.5px solid var(--bg)', boxShadow: '0 0 0 1px var(--up)' }} />
-      </div>
-      <div className="mono tnum" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-3)' }}>
-        <span>밴드 하단 {fmtPrice(low, market)}</span>
-        <span>상단 {fmtPrice(high, market)}</span>
-      </div>
-    </div>
-  )
-}
-
-// 내 판단 밴드 vs 컨센서스 범위 — 한 축(같은 스케일) 두 줄 오버레이 (task#260).
-// BandGauge 패턴의 custom div — recharts 금지(jsdom 블라인드 가토).
-export function ConsensusRangeGauge({ myLow, myHigh, cLow, cHigh, market }) {
-  if (myLow == null || myHigh == null || cLow == null || cHigh == null) return null
-  const vals = [myLow, myHigh, cLow, cHigh]
-  const lo = Math.min(...vals) * 0.97
-  const hi = Math.max(...vals) * 1.03
-  const pct = v => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))
-  const row = (label, a, b, color) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{ width: 74, flexShrink: 0, fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
-      <div style={{ position: 'relative', flex: 1, height: 16, minWidth: 0 }}>
-        <div style={{ position: 'absolute', top: 6, left: 0, right: 0, height: 4, background: 'var(--bg-elev-2)', borderRadius: 2 }} />
-        <div style={{ position: 'absolute', top: 6, left: `${pct(a)}%`, width: `${Math.max(pct(b) - pct(a), 0.8)}%`, height: 4, background: color, borderRadius: 2 }} />
-      </div>
-      <span className="mono tnum" style={{ flexShrink: 0, fontSize: 11, color: 'var(--text-2, var(--text))' }}>
-        {fmtPrice(a, market)} ~ {fmtPrice(b, market)}
-      </span>
-    </div>
-  )
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '12px 0 4px' }}>
-      {row('내 판단 밴드', myLow, myHigh, 'var(--accent)')}
-      {row('컨센서스', cLow, cHigh, 'var(--text-3)')}
-    </div>
-  )
-}
-
 // 컨센서스 근거 섹션 (task#260) — 발행 순간 박제된 집계·증권사별 의견 + 현재 대비 델타.
 // data.consensus_detail 없는 구발행물은 섹션 전체 생략(헤더 Stat은 기존 그대로).
 // `embedded`(리포트 상세 「심층 리포트」 탭)에서는 근거 본문을 **기본 접는다**(ADR `260921-091825` 결정 2) —
@@ -203,8 +147,6 @@ export function ConsensusSection({ report, market, embedded = false }) {
           <Stat size="sm" label="평균 의견 (5점)" value={cons.opinion_score != null ? cons.opinion_score.toFixed(2) : '—'}
                 helperText={cons.buy != null ? `매수 ${cons.buy} · 보유 ${cons.hold ?? 0} · 매도 ${cons.sell ?? 0}` : null} />
         </div>
-        <ConsensusRangeGauge myLow={report.fair_value_low} myHigh={report.fair_value_high}
-                             cLow={cons.target_low} cHigh={cons.target_high} market={market} />
         {deltaPct != null && (
           <p className="tnum" style={{ color: 'var(--text-2, var(--text))', fontSize: 12, margin: '10px 0 0' }}>
             목표가 평균: 발행 시점 {fmtPrice(cons.target_mean, market)} → 현재 {fmtPrice(current.target_mean, market)}{' '}
@@ -374,19 +316,6 @@ export function PeerMultiplesChart({ peers }) {
   )
 }
 
-const numeralStyle = {
-  fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700, lineHeight: 1,
-  color: 'var(--accent)', opacity: 0.85, flexShrink: 0, width: 38,
-}
-
-// 지표 칩 증감 값 표기 — 부호는 화살표가 대신하므로 값은 항상 |v|다(정본 `ui/Badge.jsx` ChangeBadge와
-// 같은 계약: `▼ 12.5%`). 세 자리 이상만 반올림, 그 미만은 소수 1자리 고정(전엔 `▼-12.5%` 이중 부호 +
-// 소수 자릿수 무제한이었다).
-// ⚠️ components/tech/KeyPointCards.jsx의 fmtChangePct와 **같은 식**이다(그쪽이 이 블록의 미러) —
-//    한쪽만 고치면 두 표면 표기가 갈라진다. 양쪽에 회귀 테스트가 쌍으로 있다(task#281 F5).
-const fmtChangePct = (v) =>
-  (Math.abs(v) >= 100 ? String(Math.round(Math.abs(v))) : Math.abs(v).toFixed(1))
-
 // props가 있으면 그것을, 없으면 URL params를 쓴다 — 같은 본문을 ⓐ 독립 문서 라우트와
 // ⓑ 리포트 상세의 「심층 리포트」 탭(embedded) 두 곳에서 렌더한다 (task#324, ADR-0047).
 // embedded=true면 페이지 전용 크롬(복귀 pill)을 감추고, 이전 판은 라우팅 대신 onSelectDate로 탭 안에서 바꾼다.
@@ -450,13 +379,8 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
   const market = d.market || report.market
   const isKR = market === 'KR'
   const v2 = isLensReport(report)
-  // v2는 rating이 null — 폴백으로 「중립」을 그리면 없는 투자의견을 말하게 된다
-  const rating = v2 ? null : (RATING_META[report.rating] || RATING_META.neutral)
   const annual = d.financials_annual || []
   const peers = d.competitors || []
-  const bandMid = (report.fair_value_low != null && report.fair_value_high != null)
-    ? (report.fair_value_low + report.fair_value_high) / 2 : null
-  const upside = (bandMid != null && d.price) ? (bandMid / d.price - 1) * 100 : null
 
   return (
     <div style={embedded ? { padding: 0 } : { maxWidth: 780, margin: '0 auto', padding: '20px 16px 64px' }}>
@@ -480,85 +404,26 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
         </span>
         <span className="mono" style={{ color: 'var(--text-3)', fontSize: 14 }}>{report.ticker}</span>
         <MarketBadge market={market || 'US'} />
-        {rating && <Badge variant={rating.variant} size="md">{rating.label}</Badge>}
       </div>
 
       {v2 ? <LensReport report={report} /> : (
-        <>
-      <Card padding="md">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
-          <Stat size="sm" label={<span><GlossaryText text="적정주가 밴드" /></span>}
-                value={<span className="tnum">{fmtPrice(report.fair_value_low, market)} ~ {fmtPrice(report.fair_value_high, market)}</span>} />
-          <Stat size="sm" label="발행 시점 현재가" value={fmtPrice(d.price, market)} helperText={d.snapshot_date ? `${d.snapshot_date} 스냅샷` : null} />
-          <Stat size="sm" label={<span><GlossaryText text="컨센서스 목표가" /></span>} value={d.consensus?.target_mean != null ? fmtPrice(d.consensus.target_mean, market) : '—'}
-                helperText={d.consensus?.buy != null ? `매수 ${d.consensus.buy} · 보유 ${d.consensus.hold ?? 0} · 매도 ${d.consensus.sell ?? 0}` : null} />
-          <Stat size="sm" label={<span><GlossaryText text="상승여력 (밴드 중앙)" /></span>} value={upside != null ? `${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%` : '—'}
-                valueColor={upside == null ? null : upside >= 0 ? 'up' : 'down'} />
-        </div>
-        <BandGauge low={report.fair_value_low} high={report.fair_value_high} price={d.price} market={market} />
-      </Card>
-
-      {/* ── 한줄 논지 ────────────────────────────────────── */}
-      <blockquote style={{ margin: '26px 0 30px', padding: '4px 0 4px 16px', borderLeft: '3px solid var(--accent)' }}>
-        <p style={{ fontFamily: 'var(--font-serif)', color: 'var(--text)', fontSize: 22, lineHeight: 1.45, margin: 0, fontWeight: 600 }}>
-          {report.title}
-        </p>
-      </blockquote>
-
-      {/* ── 투자 포인트 (지표 칩 + 1~2문장 — 한눈 구조화, task#218) ── */}
-      <SectionTitle>투자 포인트</SectionTitle>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
-        {(report.points || []).map((p, i) => (
-          <Card key={i} padding="md">
-            {/* 번호를 제목 행에 인라인으로 — 좌측 번호 컬럼(38+gap12=50px)이 카드 전체 높이에 걸쳐
-                칩 그리드 폭을 237px로 좁혀 3열이 불가했다. 접으면 289px 확보 → minmax 84px에서 3열(task#225) */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
-                <span className="tnum" style={numeralStyle}>{String(i + 1).padStart(2, '0')}</span>
-                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, minWidth: 0 }}>{p.title}</div>
-              </div>
-              <div style={{ minWidth: 0 }}>
-                {p.metrics?.length > 0 && (
-                  // 칩 수에 맞춘 열 수 — ≤3개는 1행(3열), 4개는 2열 2행. 높이 동인은 열 수가 아니라 칩 내부
-                  // 텍스트 줄바꿈이라, 4개를 3열(트랙 91px)로 깔면 값이 접혀 칩 45→94px로 오히려 커진다(task#225 실측).
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${p.metrics.length <= 3 ? p.metrics.length : 2}, minmax(0, 1fr))`, gap: 8, marginBottom: 10 }}>
-                    {p.metrics.map((m, j) => (
-                      <div key={j} style={{ background: 'var(--bg-elev-2)', borderRadius: 6, padding: '6px 8px' }}>
-                        <div style={{ color: 'var(--text-3)', fontSize: 10, marginBottom: 3, lineHeight: 1.3 }}><GlossaryText text={m.label} /></div>
-                        <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 15, lineHeight: 1.15 }}>{m.value}</div>
-                        {m.change_pct != null && (
-                          <div className="mono tnum" style={{ fontSize: 11, marginTop: 2, color: m.change_pct >= 0 ? 'var(--up)' : 'var(--down)' }}>
-                            {m.change_pct >= 0 ? '▲+' : '▼'}{fmtChangePct(m.change_pct)}%
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}><GlossaryText text={p.body} /></p>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-        </>
+        // 옛 형식(v1) 판은 task#370에서 전부 v2로 재발행됐다 — 남아 있다면 그리지 않고 안내만 한다
+        // (없는 투자의견·밴드를 빈 칸으로 그리면 화면이 판단을 말하는 것처럼 보인다).
+        <Card padding="md" data-testid="legacy-format-notice">
+          <p style={{ color: 'var(--text-3)', fontSize: 13, margin: 0 }}>옛 형식으로 발행된 판이라 렌즈 본문을 표시하지 않습니다. 최신 판을 확인해 주세요.</p>
+        </Card>
       )}
 
       {/* ── 사업부문 시장 분석 (구발행물엔 data.market_outlook 없음 → 자연 생략, task#275) ── */}
       <SegmentAnalysisSection market_outlook={d.market_outlook} financialsAnnual={annual} />
 
       {/* ── 밸류에이션 ───────────────────────────────────── */}
-      <SectionTitle>{v2 ? '발행 시점 숫자' : '밸류에이션'}</SectionTitle>
+      <SectionTitle>발행 시점 숫자</SectionTitle>
       <Card padding="md" style={{ marginBottom: 30 }}>
-        {v2 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
-            <Stat size="sm" label="발행 시점 현재가" value={fmtPrice(d.price, market)} helperText={d.snapshot_date ? `${d.snapshot_date} 스냅샷` : null} />
-            <Stat size="sm" label={<span><GlossaryText text="컨센서스 목표가" /></span>} value={d.consensus?.target_mean != null ? fmtPrice(d.consensus.target_mean, market) : '—'} />
-          </div>
-        ) : (
-          <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}><GlossaryText text={report.valuation_method} /></p>
-        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+          <Stat size="sm" label="발행 시점 현재가" value={fmtPrice(d.price, market)} helperText={d.snapshot_date ? `${d.snapshot_date} 스냅샷` : null} />
+          <Stat size="sm" label={<span><GlossaryText text="컨센서스 목표가" /></span>} value={d.consensus?.target_mean != null ? fmtPrice(d.consensus.target_mean, market) : '—'} />
+        </div>
         <PerBandChart band={d.per_band} />
         <PeerMultiplesChart peers={peers} />
       </Card>
@@ -574,24 +439,6 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
             <EstimatesChart annual={annual} isKR={isKR} />
             <p style={{ color: 'var(--text-3)', fontSize: 11, margin: '8px 0 0' }}>(E) = 컨센서스 추정 · 증감%는 전년 대비 · 발행 시점 스냅샷 기준</p>
           </Card>
-        </>
-      )}
-
-      {!v2 && (
-        <>
-      {/* ── 리스크 요인 (줄바꿈 → 불릿, task#218) ─────────── */}
-      <SectionTitle>리스크 요인</SectionTitle>
-      <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--warn)', background: 'var(--warn-soft)', borderRadius: '0 6px 6px 0', marginBottom: 8 }}>
-        {(report.risks || '').includes('\n') ? (
-          <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {report.risks.split('\n').map(l => l.trim().replace(/^[-•]\s*/, '')).filter(Boolean).map((line, i) => (
-              <li key={i} style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.6 }}><GlossaryText text={line} /></li>
-            ))}
-          </ul>
-        ) : (
-          <p style={{ color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0 }}><GlossaryText text={report.risks} /></p>
-        )}
-      </div>
         </>
       )}
 

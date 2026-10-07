@@ -160,10 +160,11 @@ describe('Reports 상세 fetch — 옛 종목 응답이 새 종목 화면을 덮
 describe('AnalystReport — 「이전 판」을 빠르게 두 번 바꿀 때', () => {
   const D1 = '2026-08-01'
   const D2 = '2026-08-03'
+  // v2(구조 축·9렌즈) 판 — 논지는 LensReport가 그린다(발행 계약은 v2뿐, task#370)
   const pub = (d) => ({
-    ticker: 'TST', name: '테스트', market: 'US', published_date: d, rating: 'buy',
-    title: `논지-${d}`, valuation_method: 'DCF', risks: '리스크',
-    fair_value_low: 100, fair_value_high: 120, points: [],
+    ticker: 'TST', name: '테스트', market: 'US', published_date: d, format: 2,
+    title: `논지-${d}`, structure: {},
+    lenses: Array.from({ length: 9 }, (_, i) => ({ id: i + 1, summary: `요약${i + 1}`, body: '', signal: 'wait', flip: '' })),
     data: { market: 'US', price: 110 },
   })
   const renderRep = (date) => render(

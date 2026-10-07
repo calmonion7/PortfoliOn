@@ -1,22 +1,58 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import AnalystReport, { PerBandChart, PeerMultiplesChart, RATING_META, assignLabelRows } from './AnalystReport'
+import AnalystReport, { PerBandChart, PeerMultiplesChart, assignLabelRows } from './AnalystReport'
 import { isLensReport } from '../components/reports/LensReport'
 import api from '../api'
 
 vi.mock('../api', () => ({ default: { get: vi.fn() } }))
 
-const REPORT = {
-  ticker: '005930', published_date: '2026-07-25', rating: 'buy',
-  title: '한줄 논지 테스트', fair_value_low: 80000, fair_value_high: 95000,
-  name: '삼성전자', market: 'KR',
-  valuation_method: 'PER 밴드 산정',
-  points: [
-    { title: '포인트A', body: '근거A' },
-    { title: '포인트B', body: '근거B' },
+// ── v2: 구조 축·9렌즈 (ADR 261006-232406, task#369) ─────────────────────
+const judg = (id, signal, extra = {}) => ({ id, summary: `요약${id}`, body: `본문${id}`, metrics: [], signal,
+  flip: signal === 'na' ? null : `바뀜${id}`, na_reason: signal === 'na' ? `사유${id}` : null, ...extra })
+const raw = (value, unit, source = 'disclosure', rationale = null) => ({ value, unit, source, ref: '10-Q 2026Q2', rationale })
+
+export const V2_REPORT = {
+  ticker: 'CRCL', published_date: '2026-10-07', title: '금리 의존 구조 그대로',
+  name: 'Circle', market: 'US', format: 2,
+  tally: { go: 2, wait: 4, stop: 2, na: 1 },
+  structure: {
+    revenue_engine: { value: 'balance_rate', rationale: '준비금 잔고×금리가 매출의 95%' },
+    cost_nature: { value: 'revenue_linked', rationale: '분배비용이 준비금 수익에 연동' },
+    funding_source: { value: 'deposit', rationale: 'USDC 예치금' },
+  },
+  lenses: [
+    judg(1, 'wait'),
+    judg(2, 'go', { gauge: { variable: '분기 매출', unit: '억달러', current: 7.6, current_ref: '10-Q 2026Q2', boundaries: [7.0, 7.5], zones: ['stop', 'wait', 'go'], origin: 'routine' } }),
+    { ...judg(3, 'stop'), flip: '기여몫 증가율이 18.1% 이상이면 노랑', inputs: { contribution_prev: raw(251, 'USD M') }, sensitivity: null,
+      computed: { variant: 'revenue_linked', values: { ratio: 0.6693, numerator_growth_pct: 15.14, cost_growth_pct: 22.63 }, signal: 'stop', flip: '기여몫 증가율이 18.1% 이상이면 노랑', flip_value: 18.1, estimate_based: false } },
+    { ...judg(4, 'go'), flip: '한계 분배율이 53.8% 이상이면 노랑', inputs: {}, sensitivity: null,
+      computed: { variant: 'revenue_linked', values: { marginal_pct: 12.79, average_pct: 58.81 }, signal: 'go', flip: '한계 분배율이 53.8% 이상이면 노랑', flip_value: 53.8, estimate_based: false } },
+    { ...judg(5, 'wait'), flip: '준비금 수익률 3.15% 아래면 빨강',
+      inputs: { balance: raw(74200, 'USD M'), avg_share_pct: raw(38.2, '%', 'estimate', 'RLDC ÷ 준비금 수익') }, sensitivity: null,
+      computed: { variant: 'deposit', values: { breakeven_pct: 2.1484, margin_pp: 1.3416, marginal_share_pct: 51.15 }, signal: 'wait', flip: '준비금 수익률 3.15% 아래면 빨강', flip_value: 3.1484, estimate_based: true,
+        gauge: { variable: '준비금 수익률', unit: '%', current: 3.49, boundaries: [3.1484, 4.1484], zones: ['stop', 'wait', 'go'], origin: 'server' } } },
+    judg(6, 'stop', { conditions: [
+      { color: 'go', when: ['분배처 다변화 완료'], match: 'all' },
+      { color: 'wait', when: ['코인베이스 외 분배처 비중 상승', '협약 조건 불변'], match: 'all' },
+      { color: 'stop', when: ['코인베이스가 경쟁 코인 공동 창립'], match: 'any' },
+    ] }), judg(7, 'wait'),
+    { ...judg(8, 'wait'), flip: 'forward 이익 515.75 아래면 빨강', inputs: { forward_earnings: raw(620, 'USD M', 'estimate', '가이던스') },
+      sensitivity: { exogenous: { label: '준비금 수익률', values: [3.0, 3.6, 4.2], unit: '%' }, endogenous: { label: 'USDC 유통량', values: [70000, 74000, 80000], unit: 'USD M' } },
+      computed: { variant: 'balance_rate', values: { multiple: 33.27, earnings_yield_pct: 3.005, risk_free_pct: 4.0,
+        sensitivity: { exogenous: [3.0, 3.6, 4.2], endogenous: [70000, 74000, 80000], multiples: [[60.1, 55.2, 49.3], [40.2, 37.6, 34.1], [30.0, 28.1, 25.9]] } },
+        signal: 'wait', flip: 'forward 이익 515.75 아래면 빨강', flip_value: 515.75, estimate_based: true, risk_free_source: 'server_cache' } },
+    { ...judg(9, 'na'), inputs: null, sensitivity: null, computed: null },
   ],
-  risks: '리스크 서술',
+  data: { snapshot_date: '2026-10-06', price: 83.3, market: 'US', name: 'Circle', consensus: { target_mean: 120 },
+          financials_annual: [], competitors: [], per_band: null },
+}
+
+// 발행 계약은 v2뿐이다(task#370 — v1 투자의견·적정주가 밴드·포인트·리스크 렌더러 제거).
+// 페이지 공통 섹션(헤더·사업부문·발행 시점 숫자·피어·실적 추정·이력) 테스트는 이 KR 픽스처로 돈다.
+const REPORT = {
+  ...V2_REPORT,
+  ticker: '005930', published_date: '2026-07-25', title: '한줄 논지 테스트', name: '삼성전자', market: 'KR',
   data: {
     snapshot_date: '2026-07-25', price: 249500.0, market: 'KR', name: '삼성전자',
     consensus: { target_mean: 455000.0, buy: 25, hold: 0, sell: 0 },
@@ -32,6 +68,12 @@ const REPORT = {
   },
 }
 
+// 옛 형식(v1) 판 — lens_report가 없어 format 1로 온다. 렌더러가 없으니 안내만 해야 한다.
+const LEGACY = {
+  ticker: '005930', published_date: '2026-07-25', title: '옛 형식 논지', name: '삼성전자', market: 'KR',
+  format: 1, tally: null, data: REPORT.data,
+}
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/analyst-report/005930/2026-07-25']}>
@@ -45,58 +87,31 @@ function renderPage() {
 beforeEach(() => vi.clearAllMocks())
 
 describe('AnalystReport 문서 페이지 (task#212)', () => {
-  it('전 섹션 렌더 — 헤더·논지·포인트·밸류에이션·추정·리스크', async () => {
+  it('전 섹션 렌더 — 헤더·렌즈 본문·발행 시점 숫자·피어·추정, v1 섹션 없음(task#370)', async () => {
     api.get.mockResolvedValue({ data: REPORT })
-    const { container } = renderPage()
+    renderPage()
     expect(await screen.findByText('한줄 논지 테스트')).toBeTruthy()
     expect(screen.getByText('삼성전자')).toBeTruthy()
-    expect(screen.getByText('매수')).toBeTruthy()          // rating 의미 배지
-    expect(screen.getByText('투자 포인트')).toBeTruthy()
-    expect(screen.getByText('포인트A')).toBeTruthy()
-    expect(screen.getByText('밸류에이션')).toBeTruthy()
+    expect(screen.getByText('렌즈 신호')).toBeTruthy()
+    expect(screen.getByText('발행 시점 숫자')).toBeTruthy()
     expect(screen.getAllByText('SK하이닉스').length).toBe(5)  // 피어 차트 — 지표당 1행 (task#220)
-    expect(container.querySelector('table')).toBeNull()    // 피어 표는 차트로 대체됨(task#220)
     expect(screen.getByText('실적 추정')).toBeTruthy()
     // 차트 틱은 jsdom(0크기 컨테이너)에서 미렌더 — 범례·캡션으로 차트화 검증(task#217)
     expect(screen.getByText('매출(원)')).toBeTruthy()
     expect(screen.getByText(/\(E\) = 컨센서스 추정/)).toBeTruthy()
-    expect(screen.getByText('리스크 요인')).toBeTruthy()
-    expect(screen.getByText('리스크 서술')).toBeTruthy()
-  })
-
-  it('칩 열 수는 칩 개수에 맞춤 — ≤3개는 1행, 4개는 2열(task#225)', async () => {
-    const withMetrics = (n) => ({
-      ...REPORT,
-      points: [{ title: '포인트A', body: '근거A', metrics: Array.from({ length: n }, (_, i) => ({ label: `L${i}`, value: `${i}배` })) }],
-    })
-    for (const [n, expected] of [[2, 2], [3, 3], [4, 2]]) {
-      api.get.mockResolvedValue({ data: withMetrics(n) })
-      const { container, unmount } = renderPage()
-      await screen.findByText('한줄 논지 테스트')
-      const grid = [...container.querySelectorAll('div')].find(d => /^repeat\(\d/.test(d.style.gridTemplateColumns || ''))
-      expect(grid.style.gridTemplateColumns).toBe(`repeat(${expected}, minmax(0, 1fr))`)
-      unmount()
+    // v1 섹션·투자의견 배지는 계약과 함께 제거됐다(「밸류에이션」은 렌즈 8 이름이라 여기서 세지 않는다)
+    for (const gone of ['투자 포인트', '적정주가 밴드', '리스크 요인', '매수', '중립', '매도']) {
+      expect(screen.queryByText(gone)).toBeNull()
     }
   })
 
-  it('지표 칩 증감은 이중 부호가 되지 않고 소수 자릿수도 정본을 따른다(task#281 F5)', async () => {
-    // 정본 ChangeBadge = `▼ 12.5%`(화살표가 부호를 대신, toFixed(1)). 전엔 `▼-12.5%`로 음수 두 번.
-    // ⚠️ 주요기술 KeyPointCards.jsx가 이 블록을 미러링한다 — 한쪽만 고치면 두 표면 표기가 갈라진다.
-    //    양쪽에 같은 케이스의 회귀 테스트를 쌍으로 둔다.
-    api.get.mockResolvedValue({ data: { ...REPORT, points: [{
-      title: '포인트A', body: '근거A',
-      metrics: [
-        { label: 'L0', value: 'V0', change_pct: -12.5 },
-        { label: 'L1', value: 'V1', change_pct: -150 },
-        { label: 'L2', value: 'V2', change_pct: 22.123456789 },
-        { label: 'L3', value: 'V3', change_pct: 233.33 },
-      ],
-    }] } })
-    const { container } = renderPage()
-    await screen.findByText('한줄 논지 테스트')
-    const chips = [...container.querySelectorAll('div.mono.tnum')].map(d => d.textContent)
-    for (const want of ['▼12.5%', '▼150%', '▲+22.1%', '▲+233%']) expect(chips).toContain(want)
-    expect(chips.some(t => /[▲▼][+-]?-/.test(t))).toBe(false)   // 이중 부호 0건
+  it('옛 형식(v1) 판은 렌즈 본문 대신 안내만 — 없는 투자의견·밴드를 그리지 않는다(task#370)', async () => {
+    api.get.mockResolvedValue({ data: LEGACY })
+    renderPage()
+    expect(await screen.findByTestId('legacy-format-notice')).toBeTruthy()
+    expect(screen.queryByText('렌즈 신호')).toBeNull()
+    expect(screen.queryByText('옛 형식 논지')).toBeNull()   // 논지는 LensReport가 그린다 — 안내 판은 그리지 않음
+    expect(screen.getByText('발행 시점 숫자')).toBeTruthy()  // 서버 숫자 블록은 형식과 무관하게 남는다
   })
 
   it('문서 하단 복귀 링크 제거 + 플로팅 복귀 pill(task#225 → 목적지 task#324)', async () => {
@@ -121,9 +136,8 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
       </MemoryRouter>
     )
     expect(await screen.findByText('한줄 논지 테스트')).toBeTruthy()
-    expect(screen.getByText('투자 포인트')).toBeTruthy()
-    expect(screen.getByText('적정주가 밴드')).toBeTruthy()
-    expect(screen.getByText('리스크 요인')).toBeTruthy()
+    expect(screen.getByText('렌즈 신호')).toBeTruthy()
+    expect(screen.getByText('발행 시점 숫자')).toBeTruthy()
     // props가 URL params를 대신했다는 증거 — 그 ticker/date로 조회했다
     expect(api.get).toHaveBeenCalledWith('/api/analyst-reports/005930/2026-07-25')
   })
@@ -138,17 +152,16 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     await screen.findByText('한줄 논지 테스트')
     expect(container.querySelector('.list-pill')).toBeNull()
     // 대조군 — 크롬만 사라지고 본문은 그대로다(크롬을 지우려다 본문을 지우면 이 축이 잡는다)
-    expect(screen.getByText('투자 포인트')).toBeTruthy()
+    expect(screen.getByText('렌즈 신호')).toBeTruthy()
   })
 
   it('용어집 배선 — 지표 라벨·본문에 glossary-term 버튼(task#220)', async () => {
     api.get.mockResolvedValue({ data: REPORT })
     const { container } = renderPage()
     await screen.findByText('한줄 논지 테스트')
-    // 피어 차트 지표명(R&D집약도 신규 용어) + Stat 라벨(적정주가 밴드) + 본문(PER 밴드 산정의 PER)
+    // 피어 차트 지표명(R&D집약도 신규 용어) + 발행 시점 숫자 Stat 라벨(컨센서스 목표가)
     expect(screen.getByRole('button', { name: 'R&D집약도' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '적정주가 밴드' })).toBeTruthy()
-    expect(container.querySelectorAll('.glossary-term').length).toBeGreaterThanOrEqual(5)
+    expect(container.querySelectorAll('.glossary-term').length).toBeGreaterThanOrEqual(2)
     // 한줄 논지(제목)는 용어집 제외
     expect(screen.getByText('한줄 논지 테스트').querySelector('.glossary-term')).toBeNull()
   })
@@ -177,7 +190,7 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     expect(screen.queryByText('🧩 사업부문 시장 분석')).toBeNull()
   })
 
-  it('data.market_outlook.segments 있으면 사업부문 시장 분석 섹션이 밸류에이션 앞에 렌더된다(task#275)', async () => {
+  it('data.market_outlook.segments 있으면 사업부문 시장 분석 섹션이 렌즈 본문 뒤·발행 시점 숫자 앞에 렌더된다(task#275)', async () => {
     const withSegments = {
       ...REPORT,
       data: {
@@ -194,11 +207,11 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     const { container } = renderPage()
     await screen.findByText('한줄 논지 테스트')
     expect(screen.getByText('🧩 사업부문 시장 분석')).toBeTruthy()
-    // 투자 포인트 다음 · 밸류에이션 앞 위치 확인
+    // 렌즈 본문(렌즈 상세) 다음 · 발행 시점 숫자 앞 위치 확인
     const titles = [...container.querySelectorAll('.rpt-title__text')].map(el => el.textContent)
-    const pointsIdx = titles.findIndex(t => t.includes('투자 포인트'))
+    const pointsIdx = titles.findIndex(t => t.includes('렌즈 상세'))
     const segIdx = titles.findIndex(t => t.includes('사업부문 시장 분석'))
-    const valIdx = titles.findIndex(t => t.includes('밸류에이션'))
+    const valIdx = titles.findIndex(t => t.includes('발행 시점 숫자'))
     expect(pointsIdx).toBeGreaterThanOrEqual(0)
     expect(segIdx).toBeGreaterThan(pointsIdx)
     expect(valIdx).toBeGreaterThan(segIdx)
@@ -315,60 +328,11 @@ describe('assignLabelRows (task#219 — 마커 라벨 근접 시 2단 스태거)
   })
 })
 
-describe('RATING_META', () => {
-  it('가격색(up/down)이 아닌 의미 배지 variant만 사용(task#194 가토)', () => {
-    for (const meta of Object.values(RATING_META)) {
-      expect(['success', 'neutral', 'danger']).toContain(meta.variant)
-    }
-  })
-})
-
-// ── v2: 구조 축·9렌즈 (ADR 261006-232406, task#369) ─────────────────────
-const judg = (id, signal, extra = {}) => ({ id, summary: `요약${id}`, body: `본문${id}`, metrics: [], signal,
-  flip: signal === 'na' ? null : `바뀜${id}`, na_reason: signal === 'na' ? `사유${id}` : null, ...extra })
-const raw = (value, unit, source = 'disclosure', rationale = null) => ({ value, unit, source, ref: '10-Q 2026Q2', rationale })
-
-export const V2_REPORT = {
-  ticker: 'CRCL', published_date: '2026-10-07', rating: null, title: '금리 의존 구조 그대로',
-  fair_value_low: null, fair_value_high: null, name: 'Circle', market: 'US',
-  valuation_method: '', points: [], risks: '', format: 2,
-  tally: { go: 2, wait: 4, stop: 2, na: 1 },
-  structure: {
-    revenue_engine: { value: 'balance_rate', rationale: '준비금 잔고×금리가 매출의 95%' },
-    cost_nature: { value: 'revenue_linked', rationale: '분배비용이 준비금 수익에 연동' },
-    funding_source: { value: 'deposit', rationale: 'USDC 예치금' },
-  },
-  lenses: [
-    judg(1, 'wait'),
-    judg(2, 'go', { gauge: { variable: '분기 매출', unit: '억달러', current: 7.6, current_ref: '10-Q 2026Q2', boundaries: [7.0, 7.5], zones: ['stop', 'wait', 'go'], origin: 'routine' } }),
-    { ...judg(3, 'stop'), flip: '기여몫 증가율이 18.1% 이상이면 노랑', inputs: { contribution_prev: raw(251, 'USD M') }, sensitivity: null,
-      computed: { variant: 'revenue_linked', values: { ratio: 0.6693, numerator_growth_pct: 15.14, cost_growth_pct: 22.63 }, signal: 'stop', flip: '기여몫 증가율이 18.1% 이상이면 노랑', flip_value: 18.1, estimate_based: false } },
-    { ...judg(4, 'go'), flip: '한계 분배율이 53.8% 이상이면 노랑', inputs: {}, sensitivity: null,
-      computed: { variant: 'revenue_linked', values: { marginal_pct: 12.79, average_pct: 58.81 }, signal: 'go', flip: '한계 분배율이 53.8% 이상이면 노랑', flip_value: 53.8, estimate_based: false } },
-    { ...judg(5, 'wait'), flip: '준비금 수익률 3.15% 아래면 빨강',
-      inputs: { balance: raw(74200, 'USD M'), avg_share_pct: raw(38.2, '%', 'estimate', 'RLDC ÷ 준비금 수익') }, sensitivity: null,
-      computed: { variant: 'deposit', values: { breakeven_pct: 2.1484, margin_pp: 1.3416, marginal_share_pct: 51.15 }, signal: 'wait', flip: '준비금 수익률 3.15% 아래면 빨강', flip_value: 3.1484, estimate_based: true,
-        gauge: { variable: '준비금 수익률', unit: '%', current: 3.49, boundaries: [3.1484, 4.1484], zones: ['stop', 'wait', 'go'], origin: 'server' } } },
-    judg(6, 'stop', { conditions: [
-      { color: 'go', when: ['분배처 다변화 완료'], match: 'all' },
-      { color: 'wait', when: ['코인베이스 외 분배처 비중 상승', '협약 조건 불변'], match: 'all' },
-      { color: 'stop', when: ['코인베이스가 경쟁 코인 공동 창립'], match: 'any' },
-    ] }), judg(7, 'wait'),
-    { ...judg(8, 'wait'), flip: 'forward 이익 515.75 아래면 빨강', inputs: { forward_earnings: raw(620, 'USD M', 'estimate', '가이던스') },
-      sensitivity: { exogenous: { label: '준비금 수익률', values: [3.0, 3.6, 4.2], unit: '%' }, endogenous: { label: 'USDC 유통량', values: [70000, 74000, 80000], unit: 'USD M' } },
-      computed: { variant: 'balance_rate', values: { multiple: 33.27, earnings_yield_pct: 3.005, risk_free_pct: 4.0,
-        sensitivity: { exogenous: [3.0, 3.6, 4.2], endogenous: [70000, 74000, 80000], multiples: [[60.1, 55.2, 49.3], [40.2, 37.6, 34.1], [30.0, 28.1, 25.9]] } },
-        signal: 'wait', flip: 'forward 이익 515.75 아래면 빨강', flip_value: 515.75, estimate_based: true, risk_free_source: 'server_cache' } },
-    { ...judg(9, 'na'), inputs: null, sensitivity: null, computed: null },
-  ],
-  data: { snapshot_date: '2026-10-06', price: 83.3, market: 'US', name: 'Circle', consensus: { target_mean: 120 },
-          financials_annual: [], competitors: [], per_band: null },
-}
-
 describe('v2 렌즈 판 렌더 (task#369)', () => {
-  it('분기 게이트 — 픽스처가 실제로 v2 분기를 탄다(v1 픽스처는 안 탄다)', () => {
+  it('분기 게이트 — 픽스처가 실제로 v2 분기를 탄다(옛 형식 픽스처는 안 탄다)', () => {
     expect(isLensReport(V2_REPORT)).toBe(true)
-    expect(isLensReport(REPORT)).toBe(false)
+    expect(isLensReport(REPORT)).toBe(true)
+    expect(isLensReport(LEGACY)).toBe(false)
     expect(isLensReport({ ...V2_REPORT, lenses: [] })).toBe(false)
   })
 

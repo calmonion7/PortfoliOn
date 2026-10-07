@@ -2238,7 +2238,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ## Analyst Reports (애널리스트 리포트 발행물)
 
-발행물 누적형 애널리스트 리포트 (ADR-0027). 판단·서사(투자의견·논지·적정주가 밴드·산정방식·투자포인트·리스크)는 Cowork가 온디맨드로 제출하고, 숫자 데이터 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 서버가 그 종목의 **최신 스냅샷**에서 발행 순간 자동 첨부해 문서를 자기완결적으로 박제한다. 문서는 발행 후 불변 — 수정이 필요하면 새 판을 발행(같은 날 재발행만 그날 판을 교체).
+발행물 누적형 애널리스트 리포트 (ADR-0027). 판단·서사(한줄 논지·구조 축·9렌즈 — ADR 261006-232406)는 Cowork가 온디맨드로 제출하고, 숫자 데이터 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 서버가 그 종목의 **최신 스냅샷**에서 발행 순간 자동 첨부해 문서를 자기완결적으로 박제한다. 문서는 발행 후 불변 — 수정이 필요하면 새 판을 발행(같은 날 재발행만 그날 판을 교체).
 
 ### `POST /api/analyst-reports/{ticker}`
 
@@ -2248,49 +2248,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **Path Parameter:** `ticker` — 종목 코드
 
+발행 계약은 **구조 축·9렌즈** 하나뿐이다(ADR 261006-232406, task#368). 본문에 **`"format": 2`가 필수**이고, 생략하거나 `1`이면 422다 — 옛 형식(투자의견·적정주가·투자포인트·산정방식·리스크) 계약은 task#370에서 제거됐다. 판단 근거는 렌즈 신호다. 렌즈 **3·4·5·8은 계산 렌즈**로, 루틴은 공시에서 읽은 **원자료**만 보내고 파생 숫자·신호 색·바뀜 조건은 **서버 공식이 계산해 박제**한다. 나머지 렌즈(1·2·6·7·9)는 루틴이 신호와 바뀜 조건을 직접 쓴다.
+
 **Request Body**
-```json
-{
-  "rating": "buy",
-  "title": "HBM 증설이 이끄는 실적 재평가",
-  "fair_value_low": 80000,
-  "fair_value_high": 95000,
-  "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
-  "points": [
-    { "title": "HBM 캐파 2배 증설", "body": "핵심 논리 1~2문장.",
-      "metrics": [
-        { "label": "2026F 영업이익", "value": "383.2조원", "change_pct": 779.0 },
-        { "label": "forward PER", "value": "5.9배" }
-      ] },
-    { "title": "파운드리 적자 축소", "body": "가동률 회복으로 ..." }
-  ],
-  "risks": "리스크1 한 문장\n리스크2 한 문장"
-}
-```
-
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `rating` | string | ✅ | 투자의견 — `buy` \| `neutral` \| `sell` |
-| `title` | string | ✅ | 한줄 논지 (리포트 제목) |
-| `fair_value_low` | number | ✅ | 적정주가 밴드 하단 (≤ high) |
-| `fair_value_high` | number | ✅ | 적정주가 밴드 상단 |
-| `valuation_method` | string | ✅ | 산정방식 서술 (1~2문장) |
-| `points` | array | ✅ | 투자포인트 `{title, body, metrics?}` **2~3개** — `metrics`는 지표 칩 `{label, value, change_pct?}` 최대 4개(additive, 생략 시 `[]`) |
-| `risks` | string | ✅ | 리스크 요인 — 줄바꿈(`\n`) 구분 시 불릿 렌더 |
-
-**Response `201`**
-```json
-{ "ok": true, "ticker": "005930", "published_date": "2026-07-25" }
-```
-
-**Error `403`** — Bearer token 인증됐으나 admin 아님
-**Error `409`** — 해당 종목의 스냅샷 없음 (발행 전제조건 미충족)
-**Error `422`** — rating enum 위반 · points 개수(2~3) 위반 · 밴드 역전(low > high) · NaN/Infinity 값 · 필수 필드 누락
-
-#### v2 형식 — 구조 축·9렌즈 (`"format": 2`, ADR 261006-232406, task#368)
-
-본문에 `"format": 2`가 있으면 v2로 검증한다(없으면 위 v1 형식 — task#370에서 v1 제거 예정). v2에는 **투자의견·적정주가 밴드·투자포인트·산정방식·리스크 필드가 없다** — 판단 근거는 렌즈 신호다. 렌즈 **3·4·5·8은 계산 렌즈**로, 루틴은 공시에서 읽은 **원자료**만 보내고 파생 숫자·신호 색·바뀜 조건은 **서버 공식이 계산해 박제**한다. 나머지 렌즈(1·2·6·7·9)는 루틴이 신호와 바뀜 조건을 직접 쓴다.
-
 ```json
 {
   "format": 2,
@@ -2329,7 +2289,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `structure.*.rationale` | ✅ | 축마다 근거 한 줄 (상태가 아니라 **구조**로 분류할 것) |
 | `lenses[].id` | ✅ | 1~9, 각 정확히 한 번 |
 | `lenses[].summary` · `body` | ✅ | 요약 한 줄(≤200자) · 본문 |
-| `lenses[].metrics` | — | 표시용 지표 칩 `{label, value, change_pct?}` 최대 4개 (v1 칩과 같은 규약) |
+| `lenses[].metrics` | — | 표시용 지표 칩 `{label, value, change_pct?}` 최대 4개 — `change_pct`는 생략·`null` 모두 허용, NaN/Infinity는 422 |
 | `lenses[].signal` | 판단 렌즈 ✅ / 계산 렌즈 ❌ | `go` \| `wait` \| `stop` \| `na` — **계산 렌즈(3·4·5·8)에 보내면 422** |
 | `lenses[].flip` | 판단 렌즈(na 제외) ✅ / 계산 렌즈 ❌ | 바뀜 조건 한 줄 — 계산 렌즈에 보내면 422 |
 | `lenses[].na_reason` | `na`면 ✅ | 원자료가 없어 판정하지 않는 사유. 계산 렌즈는 `inputs` 대신 이것만 보내면 서버가 회색(`na`)으로 박제한다 |
@@ -2361,7 +2321,10 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **Response `201`** — `{ "ok": true, "ticker": "CRCL", "published_date": "2026-10-07", "format": 2 }`
 
-**v2 `422` 조건** — `lenses` id가 1~9 각 1회가 아님 · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함) · 판단 렌즈(na 제외)에 `gauge`·`conditions`가 둘 다 있거나 둘 다 없음 · `gauge` 현재값 구간 ≠ `signal` · `gauge` 경계가 2개 오름차순이 아니거나 구간이 세 색 단조가 아님 · `conditions`가 세 색 각 하나가 아님(옛 키 `to` 포함) · `na` 렌즈나 계산 렌즈에 `gauge`/`conditions`.
+**Error `403`** — Bearer token 인증됐으나 admin 아님
+**Error `409`** — 해당 종목의 스냅샷 없음 (발행 전제조건 미충족)
+
+**Error `422`** — `lenses` id가 1~9 각 1회가 아님 · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함) · 판단 렌즈(na 제외)에 `gauge`·`conditions`가 둘 다 있거나 둘 다 없음 · `gauge` 현재값 구간 ≠ `signal` · `gauge` 경계가 2개 오름차순이 아니거나 구간이 세 색 단조가 아님 · `conditions`가 세 색 각 하나가 아님(옛 키 `to` 포함) · `na` 렌즈나 계산 렌즈에 `gauge`/`conditions`.
 
 ---
 
@@ -2378,20 +2341,17 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
     {
       "ticker": "005930",
       "published_date": "2026-07-25",
-      "rating": "buy",
       "title": "HBM 증설이 이끄는 실적 재평가",
-      "fair_value_low": 80000,
-      "fair_value_high": 95000,
       "name": "삼성전자",
       "market": "KR",
-      "format": 1,
-      "tally": null
+      "format": 2,
+      "tally": { "go": 2, "wait": 4, "stop": 2, "na": 1 }
     }
   ]
 }
 ```
 
-`format` — `1`(투자의견·적정주가 판) \| `2`(구조 축·9렌즈 판). `tally` — v2 판의 렌즈 신호 집계 `{"go": n, "wait": n, "stop": n, "na": n}`(합 9), v1 판은 `null`. v2 판은 `rating`·`fair_value_low`·`fair_value_high`가 `null`이다.
+요약 행의 키는 위 7개뿐이다. `tally` — 렌즈 신호 집계 `{"go": n, "wait": n, "stop": n, "na": n}`(합 9). `format` — 렌즈 본문(`lens_report`)이 저장된 판이면 `2`, 아니면 `1`. 발행 계약이 `format: 2`만 받으므로 새 판은 항상 `2`이고, `1`은 task#370 이전 옛 형식 판이 남아 있을 때만 나온다(그때 `tally`는 `null` — 화면은 렌즈 본문 없이 안내만 표시한다).
 
 ---
 
@@ -2403,8 +2363,10 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **Response `200`**
 ```json
-{ "ticker": "005930", "reports": [ { "published_date": "2026-07-25", "rating": "buy", "...": "..." } ] }
+{ "ticker": "005930", "reports": [ { "published_date": "2026-07-25", "title": "...", "format": 2, "tally": { "...": "..." }, "...": "..." } ] }
 ```
+
+`reports[]` 행은 `GET /api/analyst-reports`의 요약 행과 같은 7개 키다.
 
 ---
 
@@ -2425,7 +2387,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/analyst-reports/{ticker}/{published_date}`
 
-발행물 상세 — Cowork 판단 필드 전체 + 서버 첨부 데이터 블록(`data`).
+발행물 상세 — 요약 7키 + 서버 첨부 데이터 블록(`data`) + (렌즈 판이면) Cowork 판단 본문 `structure`·`lenses`.
 
 **Auth:** Bearer token 또는 `X-API-Key`
 
@@ -2436,15 +2398,13 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 {
   "ticker": "005930",
   "published_date": "2026-07-25",
-  "rating": "buy",
   "title": "HBM 증설이 이끄는 실적 재평가",
-  "fair_value_low": 80000,
-  "fair_value_high": 95000,
-  "valuation_method": "과거 5년 PER 밴드 평균 12배에 2026F EPS 적용",
-  "points": [ { "title": "...", "body": "..." } ],
-  "risks": "...",
   "name": "삼성전자",
   "market": "KR",
+  "format": 2,
+  "tally": { "go": 2, "wait": 4, "stop": 2, "na": 1 },
+  "structure": { "...": "아래 렌즈 판 상세 참조" },
+  "lenses": [ { "...": "아래 렌즈 판 상세 참조" } ],
   "data": {
     "snapshot_date": "2026-07-25",
     "price": 354000.0,
@@ -2487,7 +2447,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 `data.per_band` — 과거 연간 PER(비컨센서스, 최근 최대 6개)의 min/max/avg + 현재/forward PER. 재료 부족(<2개)이면 `null`.
 `data.market_outlook` — 스냅샷 `market_outlook.segments`가 있을 때만 첨부(발행 시점 박제). 없으면 `data`에 이 키 자체가 없음(구발행물 포함 — 프론트는 이때 "사업부문 시장 분석" 섹션을 생략). **수주잔고의 「사업부문 분해」(`GET /api/report/{ticker}/backlog`의 `segments`)와는 별개 개념** — 이쪽은 시장 전망 하위 부문별 매출비중·시장규모·자사 점유율이다. 필드 상세는 위 enrich `market_outlook.segments` 표 참조.
 
-**v2 판(`format: 2`) 상세** — 위 공통 필드(`data` 블록 포함, 서버 첨부 방식 동일)에 더해 `structure`(구조 축 3값과 근거, 발행 본문 그대로)·`lenses`(id 1~9 순)·`tally`가 실린다. `rating`·`fair_value_*`는 `null`, `valuation_method`·`risks`는 `""`, `points`는 `[]`.
+**렌즈 판 상세** — `structure`(구조 축 3값과 근거, 발행 본문 그대로)·`lenses`(id 1~9 순). `format: 1`인 옛 판(task#370 이전 발행이 남은 경우)에는 이 두 키가 없고 요약 7키와 `data`만 실린다.
 
 ```json
 {

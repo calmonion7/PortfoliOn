@@ -5,11 +5,11 @@
 """
 import logging
 from datetime import date, datetime
-from typing import Annotated, Dict, List, Literal, Optional, Union
+from typing import Annotated, Dict, List, Literal, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from auth import get_current_user_or_api_key, require_admin, require_admin_or_api_key
 from services import analyst_lenses as lens_calc
@@ -31,36 +31,8 @@ class PointMetric(BaseModel):
     # 키 생략은 통과하지만 명시적 null은 타입 검증을 타서, float이면 발행 전체가 422로 죽는다(task#250).
     change_pct: Optional[float] = Field(None, allow_inf_nan=False)
 
-class ReportPoint(BaseModel):
-    title: str = Field(..., min_length=1)
-    body: str = Field(..., min_length=1)
-    metrics: List[PointMetric] = Field(default_factory=list, max_length=4)  # additive — 구 판 호환
-
-
-class PublishBody(BaseModel):
-    # v1 형식 — format 키는 없거나 1. `"2"`(문자열)·3 같은 값이 v1 오류 목록에 묻히지 않고 format 오류로 드러나게.
-    format: Optional[Literal[1]] = None
-    rating: Literal["buy", "neutral", "sell"]
-    title: str = Field(..., min_length=1)
-    # allow_inf_nan=False: raw JSON body의 NaN/Infinity 토큰이 json.loads·NaN 비교(항상 False)를
-    # 모두 통과해 불변 문서에 오염 저장되는 것을 422로 차단(적대 리뷰 #1, wrong<missing)
-    fair_value_low: float = Field(..., allow_inf_nan=False)
-    fair_value_high: float = Field(..., allow_inf_nan=False)
-    valuation_method: str = Field(..., min_length=1)
-    points: List[ReportPoint] = Field(..., min_length=2, max_length=3)
-    risks: str = Field(..., min_length=1)
-
-    @field_validator("fair_value_high")
-    @classmethod
-    def _band_order(cls, v, info):
-        low = info.data.get("fair_value_low")
-        if low is not None and v < low:
-            raise ValueError("fair_value_high must be >= fair_value_low")
-        return v
-
-
-# ── v2: 구조 축·9렌즈 틀 (ADR 261006-232406, task#368) ─────────────────────
-# v1(위 PublishBody)은 루틴 프롬프트가 v2로 바뀌는 task#369 전까지 그대로 받는다 — `format: 2`가 가른다.
+# ── 발행 계약: 구조 축·9렌즈 틀 (ADR 261006-232406, task#368) ────────────────
+# 옛 v1(투자의견·적정주가 밴드·포인트·리스크) 계약은 task#370에서 제거됐다 — `format: 2`가 필수다.
 # 선택 필드는 전부 Optional[...] = Field(None) — 명시적 null이 발행 전체를 422로 막지 않게(task#250·ADR-0034 보정 ③).
 
 class RawInput(BaseModel):
@@ -258,22 +230,11 @@ class LensPublishBody(BaseModel):
         return self
 
 
-def _publish_kind(v) -> str:
-    fmt = v.get("format") if isinstance(v, dict) else getattr(v, "format", None)
-    return "v2" if fmt == 2 else "v1"
-
-
-AnyPublishBody = Annotated[
-    Union[Annotated[PublishBody, Tag("v1")], Annotated[LensPublishBody, Tag("v2")]],
-    Discriminator(_publish_kind),
-]
-
-
 @router.post("/{ticker}", status_code=201)
-def publish_report(ticker: str, body: AnyPublishBody, _: str = Depends(require_admin_or_api_key)):
+def publish_report(ticker: str, body: LensPublishBody, _: str = Depends(require_admin_or_api_key)):
     """발행 — 판단 필드는 요청 본문, 데이터 블록은 서버가 최신 스냅샷에서 자동 첨부.
 
-    `format: 2`(구조 축·9렌즈)면 렌즈 3·4·5·8의 계산·신호·바뀜 조건도 서버가 박제한다.
+    본문은 `format: 2`(구조 축·9렌즈)만 받는다(v1은 task#370에서 제거) — 렌즈 3·4·5·8의 계산·신호·바뀜 조건은 서버가 박제한다.
     스냅샷 부재 시 409(데이터 블록 불가 — ADR-0027 발행 전제조건)."""
     upper = ticker.upper()
     snap = svc.latest_snapshot(upper)
@@ -294,7 +255,7 @@ def publish_report(ticker: str, body: AnyPublishBody, _: str = Depends(require_a
             data["consensus"].update(snap_dist)   # 분포도 스냅샷 우선 — 전부 0/None일 때만 mart 보충
         data["consensus_detail"] = basis["consensus_detail"]
     else:
-        # read 실패·미커버로 basis가 None이면, save_report의 `data = EXCLUDED.data` **전체 치환**이
+        # read 실패·미커버로 basis가 None이면, save_lens_report의 `data = EXCLUDED.data` **전체 치환**이
         # 이미 박제돼 있던 근거를 지운다(발행은 201, 경고는 서버 로그에만 — BH7-M1). ADR-0027이
         # "잘못된 판은 새 판 발행으로 덮는다"로 같은 날 재발행을 정정 수단으로 규정하므로 우연이 아니다.
         # ⚠️ 보존은 **같은 (ticker, published_date) 행**에서만 한다 — 새 발행일에 read가 실패했다면
@@ -316,30 +277,22 @@ def publish_report(ticker: str, body: AnyPublishBody, _: str = Depends(require_a
     if snap_mean is not None:
         data["consensus"]["base_date"] = snapshot_date
     data = sanitize(data)
-    if isinstance(body, LensPublishBody):
-        b = body.model_dump()
-        l8 = next(l for l in b["lenses"] if l["id"] == 8)
-        if l8.get("inputs"):
-            unit = l8["inputs"]["forward_earnings"]["unit"]
-            expect = "KRW" if (snapshot_data or {}).get("market") == "KR" else "USD"
-            if lens_calc.UNIT_SCALE[unit][0] != expect:
-                raise HTTPException(status_code=422, detail=(
-                    f"렌즈 8 forward_earnings 통화({unit})가 종목 시장 통화({expect})와 다름"))
-            if expect == "KRW" and "risk_free_pct" not in l8["inputs"]:
-                # 서버 캐시의 무위험 금리는 미 10년물 — KR 종목에 쓰면 틀린 비교가 된다
-                raise HTTPException(status_code=422, detail="KR 종목의 렌즈 8은 risk_free_pct(국고채) 원자료 필수")
-        lens_report = sanitize(lens_calc.build_lens_report(b["structure"], b["lenses"], snapshot_data or {}))
-        svc.save_lens_report(ticker=upper, published_date=published_date, title=body.title,
-                             data=data, lens_report=lens_report)
-        logger.info(f"[AnalystReport] v2 발행 ({upper} {published_date}): tally={lens_report['tally']}")
-        return {"ok": True, "ticker": upper, "published_date": published_date, "format": 2}
-    svc.save_report(
-        upper, published_date, body.rating, body.title,
-        body.fair_value_low, body.fair_value_high, body.valuation_method,
-        [p.model_dump() for p in body.points], body.risks, data,
-    )
-    logger.info(f"[AnalystReport] 발행 ({upper} {published_date}): rating={body.rating}")
-    return {"ok": True, "ticker": upper, "published_date": published_date}
+    b = body.model_dump()
+    l8 = next(l for l in b["lenses"] if l["id"] == 8)
+    if l8.get("inputs"):
+        unit = l8["inputs"]["forward_earnings"]["unit"]
+        expect = "KRW" if (snapshot_data or {}).get("market") == "KR" else "USD"
+        if lens_calc.UNIT_SCALE[unit][0] != expect:
+            raise HTTPException(status_code=422, detail=(
+                f"렌즈 8 forward_earnings 통화({unit})가 종목 시장 통화({expect})와 다름"))
+        if expect == "KRW" and "risk_free_pct" not in l8["inputs"]:
+            # 서버 캐시의 무위험 금리는 미 10년물 — KR 종목에 쓰면 틀린 비교가 된다
+            raise HTTPException(status_code=422, detail="KR 종목의 렌즈 8은 risk_free_pct(국고채) 원자료 필수")
+    lens_report = sanitize(lens_calc.build_lens_report(b["structure"], b["lenses"], snapshot_data or {}))
+    svc.save_lens_report(ticker=upper, published_date=published_date, title=body.title,
+                         data=data, lens_report=lens_report)
+    logger.info(f"[AnalystReport] v2 발행 ({upper} {published_date}): tally={lens_report['tally']}")
+    return {"ok": True, "ticker": upper, "published_date": published_date, "format": 2}
 
 
 @router.get("")

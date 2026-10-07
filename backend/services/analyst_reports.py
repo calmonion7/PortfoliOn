@@ -1,6 +1,6 @@
 """애널리스트 리포트 — 발행물 누적형 판단 문서 (ADR-0027, task#211).
 
-판단·서사(rating·title·적정주가 밴드·산정방식·points·risks)는 Cowork가 제출하고,
+판단·서사(한줄 논지·구조 축·9렌즈 — ADR 261006-232406)는 Cowork가 제출하고,
 숫자 데이터 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은
 서버가 그 종목의 최신 스냅샷에서 발행 순간 발췌·계산해 자기완결적으로 박제한다.
 요청 경로 외부 API 라이브 fetch 없음(스냅샷 발췌만 — 배치-백킹 원칙).
@@ -205,27 +205,6 @@ def latest_snapshot(ticker: str) -> Optional[tuple]:
     return (d.isoformat() if hasattr(d, "isoformat") else str(d), row["data"])
 
 
-def save_report(ticker: str, published_date: str, rating: str, title: str,
-                fair_value_low, fair_value_high, valuation_method: str,
-                points: list, risks: str, data: dict) -> None:
-    """발행 저장 — 같은 (ticker, published_date)는 upsert(그날 판 교체), 다른 날은 누적."""
-    execute(
-        """INSERT INTO analyst_reports
-               (ticker, published_date, rating, title, fair_value_low, fair_value_high,
-                valuation_method, points, risks, data)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-           ON CONFLICT (ticker, published_date) DO UPDATE SET
-               rating = EXCLUDED.rating, title = EXCLUDED.title,
-               fair_value_low = EXCLUDED.fair_value_low, fair_value_high = EXCLUDED.fair_value_high,
-               valuation_method = EXCLUDED.valuation_method, points = EXCLUDED.points,
-               risks = EXCLUDED.risks, data = EXCLUDED.data, lens_report = NULL,
-               created_at = NOW()""",
-        (ticker.upper(), published_date, rating, title, fair_value_low, fair_value_high,
-         valuation_method, json.dumps(points, ensure_ascii=False), risks,
-         json.dumps(data, ensure_ascii=False)),
-    )
-
-
 def save_lens_report(*, ticker: str, published_date: str, title: str, data: dict,
                      lens_report: dict) -> None:
     """v2(구조 축·9렌즈) 발행 저장 — 같은 날 upsert. 투자의견·적정주가는 v2에 없으므로 NULL/빈값으로
@@ -250,19 +229,17 @@ def _summary(row: dict) -> dict:
     return {
         "ticker": row.get("ticker"),
         "published_date": d.isoformat() if hasattr(d, "isoformat") else str(d),
-        "rating": row.get("rating"),
         "title": row.get("title"),
-        "fair_value_low": float(row["fair_value_low"]) if row.get("fair_value_low") is not None else None,
-        "fair_value_high": float(row["fair_value_high"]) if row.get("fair_value_high") is not None else None,
         "name": (row.get("data") or {}).get("name"),
         "market": (row.get("data") or {}).get("market"),
-        # 형식 판별 — lens_report가 있으면 v2(구조 축·9렌즈). 목록이 신호 집계를 함께 싣는다.
+        # 형식 판별 — lens_report가 있으면 v2(구조 축·9렌즈). v1 계약은 task#370에서 제거됐지만
+        # 판정은 남긴다(옛 판이 DB에 남아 있으면 화면이 그 판을 그리지 않고 안내하게). 목록이 신호 집계를 함께 싣는다.
         "format": 2 if row.get("lens_report") else 1,
         "tally": (row.get("lens_report") or {}).get("tally"),
     }
 
 
-_COLS = "ticker, published_date, rating, title, fair_value_low, fair_value_high, data, lens_report"
+_COLS = "ticker, published_date, title, data, lens_report"
 
 
 def list_reports(ticker: Optional[str] = None) -> list:
@@ -300,12 +277,7 @@ def get_report(ticker: str, published_date: str) -> Optional[dict]:
         return None
     row = rows[0]
     out = _summary(row)
-    out.update({
-        "valuation_method": row.get("valuation_method"),
-        "points": row.get("points") or [],
-        "risks": row.get("risks") or "",
-        "data": row.get("data") or {},
-    })
+    out["data"] = row.get("data") or {}
     lr = row.get("lens_report")
     if lr:
         out.update({"structure": lr.get("structure"), "lenses": lr.get("lenses") or []})
