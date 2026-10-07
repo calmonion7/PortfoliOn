@@ -552,7 +552,19 @@ GAUGE_CASES = [
     lambda: L.lens8("usage", {"forward_earnings": 620}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.0, unit="USD M"),
     lambda: L.lens8("usage", {"forward_earnings": 620}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.96, unit="USD M"),
     lambda: L.lens8("usage", {"forward_earnings": 900}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.0, unit="USD M"),
+    # 주가축(task#376) — 신호 세 색 모두
+    lambda: L.lens8("usage", {"forward_earnings": 620}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.0,
+                    unit="USD M", price=84.13, price_date="2026-10-07"),
+    lambda: L.lens8("usage", {"forward_earnings": 620}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.96,
+                    unit="USD M", price=84.13, price_date="2026-10-07"),
+    lambda: L.lens8("usage", {"forward_earnings": 900}, unit_scale=1e6, market_cap=CRCL_MCAP, risk_free_pct=4.0,
+                    unit="USD M", price=84.13, price_date="2026-10-07"),
 ]
+
+
+def _close(a, b):
+    """박제값 비교 — 상대 1e-6, 단 `_result`가 4자리로 반올림하므로 그 양자(1e-4)까지는 같은 값이다."""
+    return abs(a - b) <= max(1e-6 * abs(b), 1e-4)
 
 
 @pytest.mark.parametrize("make", GAUGE_CASES)
@@ -563,9 +575,101 @@ def test_gauge_zone_of_current_equals_signal(make):
     assert g["boundaries"] == sorted(g["boundaries"])
     assert set(g["zones"]) <= {"go", "wait", "stop"}
     assert _zone_of(g) == r["signal"], (g, r["signal"])
-    # 바뀜 조건의 경계값이 게이지 경계 중 하나다(문장과 그림이 같은 숫자를 말한다)
-    if r["flip_value"] is not None:
+    if r["flip_value"] is None:
+        return
+    if g["variable"] == "주가":
+        # 렌즈 8 예외(ADR 보정 task#376): 게이지는 주가축인데 바뀜 조건 문장은 이익축이다. 그래서
+        # flip_value(이익)는 경계에 없다 — 대신 그 이익 경계를 주가로 옮긴 값(주가 × fe ÷ 이익 경계)이 경계다.
+        price_at_flip = g["current"] * r["values"]["forward_earnings"] / r["flip_value"]
+        assert any(_close(b, price_at_flip) for b in g["boundaries"]), (g, price_at_flip)
+    else:
+        # 바뀜 조건의 경계값이 게이지 경계 중 하나다(문장과 그림이 같은 숫자를 말한다) — 렌즈 3·4·5·8(폴백)
         assert any(abs(b - r["flip_value"]) < 1e-6 * max(1, abs(b)) for b in g["boundaries"])
+
+
+# ── 렌즈 8 주가축 게이지 (task#376 — 「색이 바뀌는 주가」) ─────────────────────
+# 주가 경계 = 주가 × 이익수익률 ÷ 기준 수익률(초록 = 무위험 금리, 빨강 = 금리 − 1.5%p).
+# CRCL 실측(10-07): 주가 84.13 · 이익수익률 2.6874% · 금리 5.269% → 42.91 / 59.99.
+CRCL_FE_376 = 0.026874 * CRCL_MCAP / 1e6     # 이익수익률 2.6874%가 되는 forward 이익(USD M)
+
+
+def _l8(fe=CRCL_FE_376, rf=5.269, price=84.13, price_date="2026-10-07", **kw):
+    return L.lens8("usage", {"forward_earnings": fe}, unit_scale=1e6, market_cap=CRCL_MCAP,
+                   risk_free_pct=rf, unit="USD M", price=price, price_date=price_date, **kw)
+
+
+def test_lens8_price_axis_gauge_crcl_oracle():
+    r = _l8()
+    g = r["gauge"]
+    assert g["variable"] == "주가" and g["unit"] == "USD"
+    assert g["current"] == pytest.approx(84.13)
+    assert g["boundaries"] == pytest.approx([42.91, 59.99], abs=0.01)
+    assert g["zones"] == ["go", "wait", "stop"]                     # 왼쪽(싼 쪽) 초록 → 오른쪽 빨강
+    assert g["current_ref"] == "발행 시점 주가 (2026-10-07)"
+    assert r["signal"] == "stop" and _zone_of(g) == r["signal"]
+    # 문장은 이익축 그대로(비목표 — 바뀜 조건 문장 불변)
+    assert r["flip"].startswith("forward 이익") and "USD M" in r["flip"]
+
+
+@pytest.mark.parametrize("rf,fe", [(5.269, CRCL_FE_376), (4.0, 620), (4.96, 620), (4.0, 900), (2.0, 620)])
+def test_lens8_price_boundary_invariant(rf, fe):
+    # 각 주가 경계 == 주가 × fe ÷ 대응 이익 경계(이익 경계는 서버 공식으로 독립 계산)
+    r = _l8(fe=fe, rf=rf)
+    g = r["gauge"]
+    e_go = CRCL_MCAP * rf / 100 / 1e6
+    e_red = CRCL_MCAP * (rf - L.LENS8_WAIT_BELOW_RF_PP) / 100 / 1e6
+    assert _close(g["boundaries"][0], 84.13 * fe / e_go)
+    assert _close(g["boundaries"][1], 84.13 * fe / e_red)
+    assert _zone_of(g) == r["signal"]
+
+
+def test_lens8_non_positive_earnings_keeps_earnings_axis():
+    r = _l8(fe=-50)
+    assert r["signal"] == "stop" and r["gauge"]["variable"] == "forward 이익"
+    r = _l8(fe=0)
+    assert r["gauge"]["variable"] == "forward 이익"
+
+
+def test_lens8_low_rate_price_axis_has_single_boundary():
+    # 금리 ≤ 1.5%면 빨강 경계(금리 − 1.5%p ≤ 0)가 정의되지 않는다 — 경계 1개·두 색
+    r = _l8(rf=1.2)
+    g = r["gauge"]
+    assert g["variable"] == "주가" and g["zones"] == ["go", "wait"]
+    assert len(g["boundaries"]) == 1
+    assert _close(g["boundaries"][0], 84.13 * 2.6874 / 1.2)
+    assert _zone_of(g) == r["signal"] == "go"                       # 이익수익률 2.69% ≥ 금리 1.2%
+    r = _l8(fe=0.01 * CRCL_MCAP / 1e6, rf=1.2)                      # 이익수익률 1.0% < 1.2% → 노랑(빨강은 없다)
+    assert r["gauge"]["zones"] == ["go", "wait"] and _zone_of(r["gauge"]) == r["signal"] == "wait"
+
+
+@pytest.mark.parametrize("price", [None, float("nan"), float("inf"), 0, -3.0, "abc"])
+def test_lens8_missing_price_falls_back_to_earnings_axis(price):
+    r = _l8(price=price)
+    assert r["gauge"]["variable"] == "forward 이익"
+    assert r["signal"] == "stop"
+    # 양성 축과 쌍 — 같은 입력에 유효한 주가를 주면 주가축(폴백 단언이 무조건 통과하지 않게)
+    assert _l8()["gauge"]["variable"] == "주가"
+
+
+def test_lens8_price_axis_on_publish_path_uses_snapshot_price_and_date():
+    """build_lens_report가 스냅샷 주가를 실제로 넘기는지(lens8 단위 테스트만으로는 못 잡는다)."""
+    snap = {**US_SNAPSHOT, "price": 81.25, "date": "2026-10-06"}
+    resp, ms = _publish(crcl_body(), snapshot=snap)
+    assert resp.status_code == 201, resp.text
+    c8 = _lens(ms.call_args.kwargs["lens_report"], 8)["computed"]
+    g = c8["gauge"]
+    assert g["variable"] == "주가" and g["unit"] == "USD"
+    assert g["current"] == pytest.approx(81.25)
+    assert g["current_ref"] == "발행 시점 주가 (2026-10-06)"
+    assert g["zones"] == ["go", "wait", "stop"] and _zone_of(g) == c8["signal"]
+    price_at_flip = 81.25 * c8["values"]["forward_earnings"] / c8["flip_value"]
+    assert any(_close(b, price_at_flip) for b in g["boundaries"])
+    # KR — 통화 KRW
+    body = _kr_body()
+    body["lenses"][7]["inputs"]["risk_free_pct"] = _raw(2.9, unit="%")
+    resp, ms = _publish(body, snapshot={**KR_SNAPSHOT, "price": 273000, "date": "2026-10-06"})
+    assert resp.status_code == 201, resp.text
+    assert _lens(ms.call_args.kwargs["lens_report"], 8)["computed"]["gauge"]["unit"] == "KRW"
 
 
 def test_gauge_absent_when_na():
@@ -575,7 +679,8 @@ def test_gauge_absent_when_na():
 
 
 def test_gauge_money_unit_filled_from_inputs_on_publish():
-    resp, mock_save = _publish(crcl_body())
+    # 렌즈 8의 금액 게이지는 이제 주가가 없을 때의 폴백(이익축)에서만 나온다(task#376)
+    resp, mock_save = _publish(crcl_body(), snapshot={**US_SNAPSHOT, "price": None})
     lr = mock_save.call_args.kwargs["lens_report"]
     g8 = _lens(lr, 8)["computed"]["gauge"]
     assert g8["variable"] == "forward 이익" and g8["unit"] == "USD M"

@@ -403,11 +403,36 @@ def sensitivity_center_gap(engine: str, inp: dict, exo_mid: float, endo_mid: flo
     return center / fe - 1 if _finite(center) else None
 
 
+def _lens8_price_gauge(price, price_date: Optional[str], ey: float, risk_free_pct: float,
+                      currency: str) -> Optional[dict]:
+    """렌즈 8 게이지를 주가축으로(「색이 바뀌는 주가」, ADR 261006-232406 보정 task#376).
+
+    주가 경계 = 주가 × 이익수익률 ÷ 기준 수익률 — 초록 경계 = 무위험 금리, 빨강 경계 = 금리 − 1.5%p.
+    주가가 오를수록 이익수익률이 내려가므로 색은 왼쪽(싼 쪽) 초록 → 오른쪽 빨강. 금리 ≤ 1.5%면 빨강
+    경계가 정의되지 않아 경계 1개. 주가가 없거나 쓸 수 없으면 None(호출측이 이익축으로 폴백 — wrong < missing)."""
+    try:
+        p = float(price)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(p) or p <= 0 or ey <= 0 or risk_free_pct <= 0:
+        return None
+    red_pct = risk_free_pct - LENS8_WAIT_BELOW_RF_PP
+    if red_pct > 0:
+        bounds, zones = [p * ey / risk_free_pct, p * ey / red_pct], ["go", "wait", "stop"]
+    else:
+        bounds, zones = [p * ey / risk_free_pct], ["go", "wait"]
+    g = _gauge("주가", currency, p, bounds, zones)
+    g["current_ref"] = f"발행 시점 주가 ({price_date})" if price_date else "발행 시점 주가"
+    return g
+
+
 def lens8(engine: str, inp: dict, unit_scale: float, market_cap: float,
-          risk_free_pct: Optional[float], sensitivity: Optional[dict] = None, unit: str = "") -> dict:
+          risk_free_pct: Optional[float], sensitivity: Optional[dict] = None, unit: str = "",
+          price=None, price_date: Optional[str] = None) -> dict:
     """시총 ÷ forward 이익 · 이익수익률 vs 무위험 금리. 외생 가격형은 3×3 민감도 표.
 
-    시총은 원 단위(스냅샷), 이익은 입력 단위 → unit_scale로 환산한다."""
+    시총은 원 단위(스냅샷), 이익은 입력 단위 → unit_scale로 환산한다. 게이지는 발행 시점 주가가 있고
+    forward 이익 > 0이면 주가축, 아니면 이익축이다. 바뀜 조건 문장은 어느 쪽이든 이익 기준이다."""
     fe = inp["forward_earnings"] * unit_scale
     values = {"market_cap": market_cap, "forward_earnings": inp["forward_earnings"],
               "multiple": None, "earnings_yield_pct": None, "risk_free_pct": risk_free_pct}
@@ -445,10 +470,13 @@ def lens8(engine: str, inp: dict, unit_scale: float, market_cap: float,
         text_tail = "이상이면 노랑"
     fv = market_cap * pct / 100 / unit_scale
     amount = f"{_fmt(fv)} {unit}".strip()   # 단위 없는 숫자는 바뀜 조건을 읽을 수 없게 만든다
-    bounds = [market_cap * (risk_free_pct - LENS8_WAIT_BELOW_RF_PP) / 100 / unit_scale,
-              market_cap * risk_free_pct / 100 / unit_scale]
-    return _result(engine, values, signal, f"forward 이익 {amount} {text_tail}", fv,
-                   _gauge("forward 이익", unit or "money", inp["forward_earnings"], bounds, ["stop", "wait", "go"]))
+    currency = UNIT_SCALE[unit][0] if unit in UNIT_SCALE else ""
+    gauge = _lens8_price_gauge(price, price_date, ey, risk_free_pct, currency) if currency else None
+    if gauge is None:
+        bounds = [market_cap * (risk_free_pct - LENS8_WAIT_BELOW_RF_PP) / 100 / unit_scale,
+                  market_cap * risk_free_pct / 100 / unit_scale]
+        gauge = _gauge("forward 이익", unit or "money", inp["forward_earnings"], bounds, ["stop", "wait", "go"])
+    return _result(engine, values, signal, f"forward 이익 {amount} {text_tail}", fv, gauge)
 
 
 # ── 발행 조립 ────────────────────────────────────────────────────────────
@@ -479,8 +507,9 @@ def self_market_cap(snapshot: dict) -> Optional[float]:
 
 
 def compute_lens(lens: dict, structure: dict, market_cap: Optional[float],
-                 risk_free: Optional[tuple]) -> dict:
-    """계산 렌즈 하나(본문 dict) → computed 블록. risk_free = (값, 출처) 또는 None."""
+                 risk_free: Optional[tuple], price=None, price_date: Optional[str] = None) -> dict:
+    """계산 렌즈 하나(본문 dict) → computed 블록. risk_free = (값, 출처) 또는 None.
+    price·price_date = 발행 시점 스냅샷 주가·날짜(렌즈 8 주가축 게이지용, task#376)."""
     lid = lens["id"]
     variant = variant_for(lid, structure)
     raw = lens.get("inputs") or {}
@@ -507,7 +536,8 @@ def compute_lens(lens: dict, structure: dict, market_cap: Optional[float],
         else:
             unit = raw["forward_earnings"]["unit"]
             out = lens8(variant, inp, UNIT_SCALE[unit][1], market_cap,
-                        risk_free[0] if risk_free else None, sens, unit=unit)
+                        risk_free[0] if risk_free else None, sens, unit=unit,
+                        price=price, price_date=price_date)
             out["risk_free_source"] = risk_free[1] if risk_free else None
     g = out.get("gauge")
     if g and g["unit"] == "money":
@@ -547,7 +577,8 @@ def build_lens_report(structure: dict, lenses: list, snapshot: dict) -> dict:
             if lens.get("na_reason"):
                 item.update(signal="na", flip=None, na_reason=lens["na_reason"], computed=None)
             else:
-                c = compute_lens(lens, axes, mcap, risk_free)
+                c = compute_lens(lens, axes, mcap, risk_free,
+                                 price=snapshot.get("price"), price_date=snapshot.get("date"))
                 item.update(signal=c["signal"], flip=c["flip"], na_reason=c.get("na_reason"),
                             computed=c)
         else:
