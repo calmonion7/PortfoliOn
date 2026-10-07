@@ -241,7 +241,7 @@ def crcl_body():
         },
         "lenses": [
             _judgment(1), _judgment(2, "go"),
-            {"id": 3, "summary": "고정비가 기여몫보다 빨리 증가", "body": "본문",
+            {"id": 3, "summary": "고정비가 기여몫보다 빨리 증가", "body": "본문", "basis": "yoy_quarter",
              "inputs": {"contribution_prev": _raw(251), "contribution_curr": _raw(289),
                         "fixed_cost_prev": _raw(119.366), "fixed_cost_curr": _raw(146.380)}},
             {"id": 4, "summary": "한계 분배율 하락", "body": "본문",
@@ -263,7 +263,8 @@ def crcl_body():
              "sensitivity": {
                  "exogenous": {"label": "준비금 수익률", "values": [3.0, 3.6, 4.2], "unit": "%",
                                "source": "estimate", "ref": "시나리오", "rationale": "±0.6%p"},
-                 "endogenous": {"label": "USDC 유통량", "values": [70000, 74000, 80000], "unit": "USD M",
+                 # 정중앙(3.6%, 800억) 이익 ≈ 631.6 — forward 620의 ±10% 안(task#371 민감도 정합)
+                 "endogenous": {"label": "USDC 유통량", "values": [74000, 80000, 86000], "unit": "USD M",
                                 "source": "estimate", "ref": "시나리오", "rationale": "현재 ±"}}},
             _judgment(9, "na") | {"flip": None, "na_reason": "규제 공시 없음", "conditions": None},
         ],
@@ -664,3 +665,155 @@ def test_structured_flip_forbidden_on_na_and_on_computed_lenses():
 def test_computed_gauge_carries_server_origin():
     resp, mock_save = _publish(crcl_body())
     assert _lens(mock_save.call_args.kwargs["lens_report"], 5)["computed"]["gauge"]["origin"] == "server"
+
+
+# ── 렌즈 후속 결정 (task#371 — ADR 261006-232406 보정) ─────────────────────
+
+def _kr_body():
+    """KR 종목 본문 — 렌즈 8 금액 단위를 원화로(통화 불일치 422를 피해 무위험 금리 분기만 본다)."""
+    body = crcl_body()
+    l8 = body["lenses"][7]
+    for k, v in l8["inputs"].items():
+        if v["unit"] == "USD M":
+            v["unit"] = "KRW 억"
+    l8["sensitivity"]["endogenous"]["unit"] = "KRW 억"
+    return body
+
+
+KR_SNAPSHOT = {**US_SNAPSHOT, "market": "KR"}
+
+
+def test_lens8_us_prefers_server_cache_over_routine_input():
+    # ⓐ US는 서버 캐시가 먼저 — 루틴 금리를 보내도 캐시가 있으면 캐시를 쓴다(판끼리 비교 가능하게)
+    body = crcl_body()
+    body["lenses"][7]["inputs"]["risk_free_pct"] = _raw(5.0, unit="%")
+    resp, ms = _publish(body, rf=4.0)
+    assert resp.status_code == 201, resp.text
+    c8 = _lens(ms.call_args.kwargs["lens_report"], 8)["computed"]
+    assert c8["risk_free_source"] == "server_cache" and c8["values"]["risk_free_pct"] == 4.0
+    # 캐시가 없을 때만 루틴 원자료
+    resp, ms = _publish(body, rf=None)
+    c8 = _lens(ms.call_args.kwargs["lens_report"], 8)["computed"]
+    assert c8["risk_free_source"] == "input" and c8["values"]["risk_free_pct"] == 5.0
+
+
+def test_lens8_kr_requires_input_and_ignores_us_cache():
+    # ⓑ KR은 국고채 원자료 필수(회귀 가드) — 있으면 캐시(미 10년물)가 있어도 원자료
+    assert _publish(_kr_body(), snapshot=KR_SNAPSHOT)[0].status_code == 422
+    body = _kr_body()
+    body["lenses"][7]["inputs"]["risk_free_pct"] = _raw(2.9, unit="%")
+    resp, ms = _publish(body, snapshot=KR_SNAPSHOT, rf=4.0)
+    assert resp.status_code == 201, resp.text
+    c8 = _lens(ms.call_args.kwargs["lens_report"], 8)["computed"]
+    assert c8["risk_free_source"] == "input" and c8["values"]["risk_free_pct"] == 2.9
+
+
+def test_lens3_basis_required_and_stored():
+    # ⓒ 렌즈 3 비교 기간 basis 필수
+    body = crcl_body()
+    del body["lenses"][2]["basis"]
+    assert _publish(body)[0].status_code == 422
+    resp, ms = _publish(crcl_body())
+    assert resp.status_code == 201
+    assert _lens(ms.call_args.kwargs["lens_report"], 3)["computed"]["basis"] == "yoy_quarter"
+    # 렌즈 3 외에는 보낼 수 없다 · 렌즈 3이 na면 생략 가능
+    body = crcl_body()
+    body["lenses"][3]["basis"] = "forward"
+    assert _publish(body)[0].status_code == 422
+    body = crcl_body()
+    body["lenses"][2] = {"id": 3, "summary": "s", "body": "b", "na_reason": "비용 공시 없음"}
+    assert _publish(body)[0].status_code == 201
+
+
+def test_lens3_forward_basis_rejects_estimate_endpoints():
+    # ⓓ forward = 끝점이 회사 가이던스·애널 컨센서스 — 루틴 자작 미래값(estimate)은 forward가 아니다
+    body = crcl_body()
+    body["lenses"][2]["basis"] = "forward"
+    body["lenses"][2]["inputs"]["contribution_curr"] = _raw(289, source="estimate", rationale="자체 추정")
+    assert _publish(body)[0].status_code == 422
+    body["lenses"][2]["inputs"]["contribution_curr"] = _raw(289, source="consensus")
+    assert _publish(body)[0].status_code == 201
+    # yoy_quarter는 출처 제약 없음(양성 쌍)
+    body["lenses"][2]["basis"] = "yoy_quarter"
+    body["lenses"][2]["inputs"]["contribution_curr"] = _raw(289, source="estimate", rationale="자체 추정")
+    assert _publish(body)[0].status_code == 201
+
+
+def test_consensus_source_flag_separate_from_estimate():
+    # ⓔ 애널 추정치는 consensus — estimate(루틴 자체 추정)와 구별, rationale 불요
+    body = crcl_body()
+    body["lenses"][2]["inputs"]["contribution_curr"] = _raw(289, source="consensus")
+    resp, ms = _publish(body)
+    assert resp.status_code == 201, resp.text
+    c3 = _lens(ms.call_args.kwargs["lens_report"], 3)["computed"]
+    assert c3["consensus_based"] is True and c3["estimate_based"] is False
+    c4 = _lens(ms.call_args.kwargs["lens_report"], 4)["computed"]
+    assert c4["consensus_based"] is False
+    # 민감도 축 출처도 consensus 허용
+    body = crcl_body()
+    body["lenses"][7]["sensitivity"]["exogenous"] |= {"source": "consensus", "rationale": None}
+    resp, ms = _publish(body)
+    assert resp.status_code == 201, resp.text
+    assert _lens(ms.call_args.kwargs["lens_report"], 8)["computed"]["consensus_based"] is True
+
+
+def _center_earnings():
+    inp = {k: v["value"] for k, v in crcl_body()["lenses"][7]["inputs"].items()}
+    return L.deposit_profit(inp, 3.6, 80000)
+
+
+@pytest.mark.parametrize("ratio,status", [(1.09, 201), (1.11, 422), (0.91, 201), (0.89, 422)])
+def test_sensitivity_center_must_match_forward_earnings(ratio, status):
+    # ⓕ 정중앙 칸 이익 ÷ forward 이익 − 1이 ±10% 밖이면 422 (양성·음성 쌍)
+    body = crcl_body()
+    body["lenses"][7]["inputs"]["forward_earnings"]["value"] = _center_earnings() / ratio
+    assert _publish(body)[0].status_code == status
+
+
+def test_sensitivity_center_check_skipped_for_non_positive_forward():
+    body = crcl_body()
+    body["lenses"][7]["inputs"]["forward_earnings"]["value"] = -50
+    assert _publish(body)[0].status_code == 201
+
+
+def test_publish_models_forbid_unknown_keys():
+    # ⓖ 모르는 키는 조용히 무시하지 않는다 — 최상위·중첩(직전 판 응답의 서버 필드 재사용 포함)
+    assert _publish({**crcl_body(), "foo": 1})[0].status_code == 422
+    assert _publish(_with_lens9(gauge={**_jgauge(), "origin": "routine"}))[0].status_code == 422
+    body = crcl_body()
+    body["structure"]["revenue_engine"]["extra"] = "x"
+    assert _publish(body)[0].status_code == 422
+    body = crcl_body()
+    body["lenses"][2]["inputs"]["contribution_prev"]["note"] = "x"
+    assert _publish(body)[0].status_code == 422
+    body = crcl_body()
+    body["lenses"][7]["sensitivity"]["exogenous"]["foo"] = 1
+    assert _publish(body)[0].status_code == 422
+    body = crcl_body()
+    body["lenses"][2]["computed"] = {}
+    assert _publish(body)[0].status_code == 422
+    assert _publish(crcl_body())[0].status_code == 201
+
+
+@pytest.mark.parametrize("current,expected", [(0.804, True), (0.996, True), (0.9, False), (0.7, False), (1.5, False)])
+def test_near_boundary_rule(current, expected):
+    # ⓗ 가까운 경계까지 거리 ÷ 두 경계 폭 ≤ 10% → 경계 근접 (2% 근접 true · 50% false)
+    assert L.near_boundary(current, [0.8, 1.0]) is expected
+
+
+def test_near_boundary_stamped_on_gauges():
+    # 계산 렌즈 게이지(경계 2개) — CRCL 렌즈 5: 3.49 vs [3.15, 4.15] → 거리 0.34 ÷ 폭 1.0 → false
+    g5 = L.lens5("deposit", CRCL_DEPOSIT)["gauge"]
+    assert g5["near_boundary"] is False
+    g = L.lens3("fixed", {"revenue_prev": 100, "revenue_curr": 108.1, "opex_prev": 50, "opex_curr": 55})
+    assert g["gauge"]["near_boundary"] is True    # 8.1 vs [8, 10] → 0.05
+    # 경계 1개 게이지(비용이 줄어든 렌즈 3)는 근접 판정 대상이 아니다
+    one = L.lens3("fixed", {"revenue_prev": 100, "revenue_curr": 105, "opex_prev": 50, "opex_curr": 49})["gauge"]
+    assert len(one["boundaries"]) == 1 and "near_boundary" not in one
+    # 판단 렌즈 게이지 — 서버가 박제 시 덧붙인다(요청 필드가 아니다)
+    resp, ms = _publish(_with_lens9(gauge=_jgauge(current=705)))
+    assert resp.status_code == 201, resp.text
+    assert _lens(ms.call_args.kwargs["lens_report"], 9)["gauge"]["near_boundary"] is True
+    resp, ms = _publish(_with_lens9(gauge=_jgauge()))
+    assert _lens(ms.call_args.kwargs["lens_report"], 9)["gauge"]["near_boundary"] is False
+    assert _publish(_with_lens9(gauge={**_jgauge(), "near_boundary": True}))[0].status_code == 422

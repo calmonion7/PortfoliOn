@@ -31,6 +31,8 @@ BREAKEVEN_WAIT_PP = 1.0
 COVERAGE_GO = 5.0
 COVERAGE_WAIT = 2.0
 LENS8_WAIT_BELOW_RF_PP = 1.5  # 이익수익률이 무위험 금리 −1.5%p 이상이면 노랑
+NEAR_BOUNDARY_RATIO = 0.10    # 가까운 경계까지 거리 ÷ 두 경계 폭 ≤ 10%면 「경계 근접」(task#371)
+SENS_CENTER_TOLERANCE = 0.10  # 민감도 표 정중앙 칸 이익 vs forward 이익 허용 오차(task#371)
 
 # ── 원자료 키 (변형별 필수·선택) — 스키마 검증과 계산이 같은 표를 본다 ─────────
 # kind: money = 같은 렌즈 안에서 단위가 하나여야 하는 금액, pct = 단위 "%"
@@ -96,13 +98,29 @@ def _na(variant: str, reason: str, values: Optional[dict] = None) -> dict:
             "flip": None, "flip_value": None, "na_reason": reason}
 
 
+def near_boundary(current, boundaries: list) -> Optional[bool]:
+    """경계 근접 — 가까운 경계까지 거리 ÷ 두 경계 폭 ≤ NEAR_BOUNDARY_RATIO.
+
+    경계가 2개인 게이지만 대상이다(폭이 있어야 비율이 정의된다). 그 밖·비유한값은 None(판정 없음)."""
+    if len(boundaries) != 2 or not all(_finite(v) for v in (current, *boundaries)):
+        return None
+    b0, b1 = boundaries
+    if b1 <= b0:
+        return None
+    return min(abs(current - b0), abs(current - b1)) / (b1 - b0) <= NEAR_BOUNDARY_RATIO
+
+
 def _gauge(variable: str, unit: str, current, boundaries: list, zones: list) -> dict:
     """바뀜 조건 게이지 — 바뀜 조건 문장이 말하는 변수 축 위의 색 구간(낮은 값 → 높은 값 순).
 
     zones[i]는 boundaries[i-1]~boundaries[i] 구간의 신호. 문턱 상수를 쓰는 곳이 이 파일 하나라서
     화면이 그리는 구간과 박제된 신호가 어긋날 수 없다(프론트는 그리기만 한다, task#369 UAT 피드백)."""
-    return {"variable": variable, "unit": unit, "current": current,
-            "boundaries": list(boundaries), "zones": list(zones), "origin": "server"}
+    g = {"variable": variable, "unit": unit, "current": current,
+         "boundaries": list(boundaries), "zones": list(zones), "origin": "server"}
+    near = near_boundary(current, boundaries)
+    if near is not None:
+        g["near_boundary"] = near
+    return g
 
 
 def _result(variant: str, values: dict, signal: str, flip: Optional[str], flip_value,
@@ -369,6 +387,22 @@ def _table_earnings(engine: str, inp: dict, exo: float, endo: float) -> float:
     return endo * (exo - inp["unit_cost"]) - inp["fixed_cost"]   # 외생 = 가격, 내생 = 판매량
 
 
+def sensitivity_center_gap(engine: str, inp: dict, exo_mid: float, endo_mid: float) -> Optional[float]:
+    """민감도 표 정중앙 칸(기준 외생 × 기준 내생) 이익 ÷ forward 이익 − 1 (task#371).
+
+    forward 이익 ≤ 0이거나 표 이익이 정의되지 않으면(금리 민감도 0 등 — 계산 쪽이 na로 처리) None."""
+    fe = inp.get("forward_earnings")
+    if not _finite(fe) or fe <= 0:
+        return None
+    if engine == "balance_rate" and not inp.get("rate_sens_revenue"):
+        return None
+    try:
+        center = _table_earnings(engine, inp, exo_mid, endo_mid)
+    except (KeyError, ZeroDivisionError):
+        return None
+    return center / fe - 1 if _finite(center) else None
+
+
 def lens8(engine: str, inp: dict, unit_scale: float, market_cap: float,
           risk_free_pct: Optional[float], sensitivity: Optional[dict] = None, unit: str = "") -> dict:
     """시총 ÷ forward 이익 · 이익수익률 vs 무위험 금리. 외생 가격형은 3×3 민감도 표.
@@ -451,6 +485,8 @@ def compute_lens(lens: dict, structure: dict, market_cap: Optional[float],
     raw = lens.get("inputs") or {}
     inp = {k: v["value"] for k, v in raw.items()}
     estimate_based = any(v.get("source") == "estimate" for v in raw.values())
+    # 애널 추정치(task#371) — 루틴 자체 추정(estimate)과 별개 플래그
+    consensus_based = any(v.get("source") == "consensus" for v in raw.values())
     if lid == 3:
         out = lens3(variant, inp)
     elif lid == 4:
@@ -462,6 +498,8 @@ def compute_lens(lens: dict, structure: dict, market_cap: Optional[float],
         if sens:
             estimate_based = estimate_based or any(
                 sens[a].get("source") == "estimate" for a in ("exogenous", "endogenous"))
+            consensus_based = consensus_based or any(
+                sens[a].get("source") == "consensus" for a in ("exogenous", "endogenous"))
             sens = {a: sens[a]["values"] for a in ("exogenous", "endogenous")}
         if market_cap is None:
             out = _na(variant, "스냅샷 시총 없음 — 배수 계산 불가")
@@ -476,6 +514,9 @@ def compute_lens(lens: dict, structure: dict, market_cap: Optional[float],
         units = [raw[k]["unit"] for k in raw if lid_spec.get(k) == "money"]
         g["unit"] = units[0] if units else ""
     out["estimate_based"] = estimate_based
+    out["consensus_based"] = consensus_based
+    if lid == 3:
+        out["basis"] = lens.get("basis")
     return out
 
 
@@ -487,12 +528,15 @@ def build_lens_report(structure: dict, lenses: list, snapshot: dict) -> dict:
     risk_free = None
     l8 = next((l for l in lenses if l["id"] == 8), None)
     if l8 and l8.get("inputs"):
+        # 무위험 금리는 시장으로 갈린다(task#371): KR = 국고채 원자료(필수 — 라우터가 422) ·
+        # US = 서버 캐시(미 10년물) 먼저, 캐시가 없을 때만 루틴 원자료(판끼리 같은 금리로 비교되게)
         rf_in = l8["inputs"].get("risk_free_pct")
-        if rf_in is not None:
-            risk_free = (rf_in["value"], "input")
+        given = (rf_in["value"], "input") if rf_in is not None else None
+        if snapshot.get("market") == "KR":
+            risk_free = given
         else:
             cached = cached_risk_free_pct()
-            risk_free = (cached, "server_cache") if cached is not None else None
+            risk_free = (cached, "server_cache") if cached is not None else given
     for lens in sorted(lenses, key=lambda l: l["id"]):
         item = {k: lens.get(k) for k in ("id", "summary", "body", "metrics")}
         item["metrics"] = item["metrics"] or []
@@ -508,7 +552,10 @@ def build_lens_report(structure: dict, lenses: list, snapshot: dict) -> dict:
         else:
             item.update(signal=lens["signal"], flip=lens.get("flip"), na_reason=lens.get("na_reason"),
                         # 판단 렌즈의 수치형 바뀜 조건은 루틴 판단 — 서버 계산과 화면에서 구별되게 출처를 단다
-                        gauge={**lens["gauge"], "origin": "routine"} if lens.get("gauge") else None,
+                        gauge=({**lens["gauge"], "origin": "routine",
+                                **({"near_boundary": nb} if (nb := near_boundary(
+                                    lens["gauge"]["current"], lens["gauge"]["boundaries"])) is not None else {})}
+                               if lens.get("gauge") else None),
                         # 저장·표시 순서는 초록 → 노랑 → 빨강으로 고정(본문 순서에 기대지 않는다)
                         conditions=(sorted(lens["conditions"], key=lambda c: ("go", "wait", "stop").index(c["color"]))
                                     if lens.get("conditions") else None))

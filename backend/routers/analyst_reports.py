@@ -23,8 +23,15 @@ router = APIRouter(prefix="/api/analyst-reports", tags=["analyst-reports"])
 _KST = ZoneInfo("Asia/Seoul")
 
 
+# 발행 요청 모델은 전부 extra="forbid"(task#371) — 모르는 키·직전 판 응답의 서버 필드(gauge.origin·
+# computed·tally)를 조용히 버리지 않고 422로 알린다. 버리면 루틴은 그 필드가 반영됐다고 믿는다.
+_FORBID = ConfigDict(extra="forbid")
+
+
 class PointMetric(BaseModel):
     """포인트 핵심 지표 칩(한눈 구조화, task#218) — value는 표시용 문자열("383.2조원"·"8.8배")."""
+    model_config = _FORBID
+
     label: str = Field(..., min_length=1, max_length=40)
     value: str = Field(..., min_length=1, max_length=40)
     # 증감%(선택) — 프론트가 up/down 색. Optional 필수: pydantic v2는 validate_default=False라
@@ -36,10 +43,14 @@ class PointMetric(BaseModel):
 # 선택 필드는 전부 Optional[...] = Field(None) — 명시적 null이 발행 전체를 422로 막지 않게(task#250·ADR-0034 보정 ③).
 
 class RawInput(BaseModel):
-    """공시에서 옮겨 적은 원자료 하나 — 계산은 서버가 한다(ADR 261006-232406 결정 3)."""
+    """공시에서 옮겨 적은 원자료 하나 — 계산은 서버가 한다(ADR 261006-232406 결정 3).
+
+    출처 셋(task#371): disclosure(공시) · consensus(애널 추정치) · estimate(루틴 자체 추정 — 근거 필수)."""
+    model_config = _FORBID
+
     value: float = Field(..., allow_inf_nan=False)
     unit: str = Field(..., min_length=1, max_length=20)
-    source: Literal["disclosure", "estimate"]
+    source: Literal["disclosure", "consensus", "estimate"]
     ref: str = Field(..., min_length=1, max_length=200)      # 출처·기준일
     rationale: Optional[str] = Field(None, max_length=300)   # estimate면 필수
 
@@ -52,12 +63,12 @@ class RawInput(BaseModel):
 
 class SensitivityAxis(BaseModel):
     # 모델 단위 가드 — values 배열 원소까지 NaN/Infinity 422(test_nan_input_guards가 이 형태를 감지한다)
-    model_config = ConfigDict(allow_inf_nan=False)
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
 
     label: str = Field(..., min_length=1, max_length=40)
     values: List[float] = Field(..., min_length=3, max_length=3)
     unit: str = Field(..., min_length=1, max_length=20)
-    source: Literal["disclosure", "estimate"]
+    source: Literal["disclosure", "consensus", "estimate"]
     ref: str = Field(..., min_length=1, max_length=200)
     rationale: Optional[str] = Field(None, max_length=300)
 
@@ -69,6 +80,8 @@ class SensitivityAxis(BaseModel):
 
 
 class Sensitivity(BaseModel):
+    model_config = _FORBID
+
     exogenous: SensitivityAxis    # 외생 변수(금리·원자재 가격) 3단계 — 표의 행
     endogenous: SensitivityAxis   # 내생 변수(잔고·판매량) 3단계 — 표의 열
 
@@ -76,8 +89,9 @@ class Sensitivity(BaseModel):
 class JudgmentGauge(BaseModel):
     """판단 렌즈의 수치형 바뀜 조건(사람 UAT 피드백 2) — 루틴이 정한 경계. 서버는 계산하지 않고 검증만 한다.
 
-    zones[i]는 boundaries[i-1]~boundaries[i] 구간의 신호(낮은 값 → 높은 값). 계산 렌즈의 서버 게이지와 같은 모양."""
-    model_config = ConfigDict(allow_inf_nan=False)
+    zones[i]는 boundaries[i-1]~boundaries[i] 구간의 신호(낮은 값 → 높은 값). 계산 렌즈의 서버 게이지와 같은 모양.
+    near_boundary·origin은 서버가 박제 시 덧붙인다 — 요청에 실으면 forbid로 422."""
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
 
     variable: str = Field(..., min_length=1, max_length=40)
     unit: str = Field(..., min_length=1, max_length=20)
@@ -110,6 +124,8 @@ class FlipCondition(BaseModel):
 
 
 class AxisChoice(BaseModel):
+    model_config = _FORBID   # 하위 3종(RevenueEngine·CostNature·FundingSource)이 상속한다
+
     rationale: str = Field(..., min_length=1, max_length=300)
 
 
@@ -126,12 +142,16 @@ class FundingSource(AxisChoice):
 
 
 class Structure(BaseModel):
+    model_config = _FORBID
+
     revenue_engine: RevenueEngine
     cost_nature: CostNature
     funding_source: FundingSource
 
 
 class LensIn(BaseModel):
+    model_config = _FORBID
+
     id: int = Field(..., ge=1, le=9)
     summary: str = Field(..., min_length=1, max_length=200)
     body: str = Field(..., min_length=1)
@@ -143,9 +163,13 @@ class LensIn(BaseModel):
     gauge: Optional[JudgmentGauge] = None                          # 판단 렌즈 — 바뀜 조건이 수치로 나오면
     conditions: Optional[List[FlipCondition]] = Field(None, min_length=3, max_length=3)  # 판단 렌즈 — 수치가 아니면(세 색 하나씩)
     sensitivity: Optional[Sensitivity] = None                      # 렌즈 8 · 외생 가격형 수익 엔진만
+    # 렌즈 3 비교 기간(task#371) — forward(끝점이 가이던스·컨센서스 미래 값) | yoy_quarter(최근 분기 vs 전년 동기)
+    basis: Optional[Literal["forward", "yoy_quarter"]] = None
 
     @model_validator(mode="after")
     def _lens_kind_rules(self):
+        if self.basis is not None and self.id != 3:
+            raise ValueError(f"렌즈 {self.id}: basis는 렌즈 3에만")
         if self.id in lens_calc.COMPUTED_LENSES:
             # 두 출처를 만들지 않는다 — 무시가 아니라 거부(계산 렌즈의 신호·바뀜 조건은 서버 정본)
             if self.signal is not None or self.flip is not None:
@@ -158,6 +182,16 @@ class LensIn(BaseModel):
                 raise ValueError("sensitivity는 렌즈 8에만")
             if self.gauge is not None or self.conditions is not None:
                 raise ValueError(f"렌즈 {self.id}는 계산 렌즈 — 바뀜 조건 게이지는 서버가 그린다(gauge·conditions 보내지 말 것)")
+            if self.id == 3 and not self.na_reason:
+                if self.basis is None:
+                    raise ValueError("렌즈 3: basis(forward | yoy_quarter) 필수 — 비교 기간을 밝힐 것")
+                if self.basis == "forward":
+                    # 루틴 자작 미래값은 forward가 아니다 — 끝점은 회사 가이던스(disclosure)·애널 컨센서스(consensus)
+                    est = sorted(k for k, v in (self.inputs or {}).items()
+                                 if k.endswith("_curr") and v.source == "estimate")
+                    if est:
+                        raise ValueError(f"렌즈 3 basis=forward: 끝점 {est}의 출처가 estimate — "
+                                         "가이던스(disclosure)·컨센서스(consensus)만, 아니면 yoy_quarter")
         else:
             if self.inputs is not None or self.sensitivity is not None:
                 raise ValueError(f"렌즈 {self.id}는 판단 렌즈 — inputs·sensitivity 없음")
@@ -183,6 +217,8 @@ class LensIn(BaseModel):
 
 
 class LensPublishBody(BaseModel):
+    model_config = _FORBID
+
     format: Literal[2]
     title: str = Field(..., min_length=1, max_length=120)   # 한줄 논지
     structure: Structure
@@ -227,6 +263,15 @@ class LensPublishBody(BaseModel):
                 if (variant in lens_calc.TABLE_ENGINES) != (l.sensitivity is not None):
                     raise ValueError("렌즈 8: 민감도 표(sensitivity)는 수익 엔진이 "
                                      f"{lens_calc.TABLE_ENGINES}일 때만, 그리고 그때는 필수")
+                if l.sensitivity is not None:
+                    # 표와 헤드라인이 같은 이익 정의 위에 서야 한다(task#371) — 정중앙 칸 이익 vs forward 이익
+                    gap = lens_calc.sensitivity_center_gap(
+                        variant, {k: v.value for k, v in l.inputs.items()},
+                        l.sensitivity.exogenous.values[1], l.sensitivity.endogenous.values[1])
+                    if gap is not None and abs(gap) > lens_calc.SENS_CENTER_TOLERANCE:
+                        raise ValueError(
+                            f"렌즈 8: 민감도 표 정중앙 칸 이익이 forward 이익과 {gap * 100:+.1f}% 어긋남 — "
+                            f"±{lens_calc.SENS_CENTER_TOLERANCE * 100:.0f}% 안이어야 한다(같은 이익 정의인지 확인)")
         return self
 
 
