@@ -153,6 +153,7 @@ mapped: 2026-09-14
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
+| B84 | 배포 폴러가 **배포에 한 번도 성공한 적이 없다**(task#377 기록, 미수정) — 폴러가 잠금 파일을 만든 뒤 `bash deploy.sh`를 부르는데, `deploy.sh`가 첫머리에서 바로 그 잠금을 보고 「이미 배포 중」으로 끝난다. 폴러 로그 실측 `Deploy complete` **0건** · `Deploy already in progress.` **43건**. 그래서 러너가 offline인 동안 자동 배포 경로가 없다(폴러는 작업트리를 ff로 동기화만 한다). 해소하려면 launchd 최소환경에서 npm·docker·keychain이 도는지 검증이 선행돼야 해 별도 태스크로 미뤘다 | `scripts/auto-deploy-poll.sh` 잠금 블록 · `deploy.sh` 잠금 블록 | 러너 offline 중 push(현재 상시 — 러너가 x86 바이너리, task#369) |
 
 > ✅ **`B6` 해소 (task#341, 2026-08-30)** — 마지막 도달 경로였던 `macro.py`를 닫았다.
 > `_fetch_and_save_macro_signals`가 수집 실패 시 **`_status: "skipped"`**를 반환하고(저장은

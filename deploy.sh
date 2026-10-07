@@ -1,11 +1,38 @@
 #!/bin/bash
+# 본문 전체를 한 그룹으로 묶는다 — 아래 fast-forward 가 실행 중인 이 파일을 바꿀 수 있어서,
+# bash 가 끝까지 미리 읽어 두게 한다(task#377).
+{
 set -e
 cd "$(dirname "$0")"
 
 # Prevent concurrent deploys (poller + Actions runner)
-LOCK="/tmp/portfolion-deploy.lock"
+LOCK="${DEPLOY_LOCK:-/tmp/portfolion-deploy.lock}"
 if [ -f "$LOCK" ]; then echo "Deploy already in progress."; exit 1; fi
 touch "$LOCK"; trap 'rm -f "$LOCK"' EXIT
+
+# 옛 트리 배포 방지 (task#377) — origin/main 과 같은 커밋만 배포한다.
+DIRTY=$(git status --porcelain --untracked-files=no -- frontend backend nginx deploy.sh)
+if [ -n "$DIRTY" ]; then
+  echo "❌ 커밋 안 한 변경이 있다 — 커밋·push 한 뒤 다시 배포할 것:"
+  echo "$DIRTY"
+  exit 1
+fi
+if ! git fetch -q origin main; then
+  echo "❌ git fetch 실패 — origin/main 을 확인할 수 없어 중단한다."
+  exit 1
+fi
+HEAD_SHA=$(git rev-parse HEAD)
+ORIGIN_SHA=$(git rev-parse origin/main)
+if [ "$HEAD_SHA" != "$ORIGIN_SHA" ]; then
+  if git merge-base --is-ancestor "$HEAD_SHA" "$ORIGIN_SHA"; then
+    echo "HEAD 가 origin/main 보다 뒤처져 있다 — fast-forward 한다."
+    git merge --ff-only -q origin/main || { echo "❌ fast-forward 실패"; exit 1; }
+  else
+    echo "❌ HEAD($(git rev-parse --short HEAD)) 가 origin/main 보다 앞서거나 갈라졌다 — push 먼저."
+    exit 1
+  fi
+fi
+START_SHA=$(git rev-parse HEAD)
 
 BACKEND_CONTAINER=portfolion-backend-1
 NGINX_CONTAINER=portfolion-nginx-1
@@ -65,3 +92,13 @@ echo ""
 echo "=== Deploy complete ==="
 sleep 2
 curl -s http://localhost/health && echo " <- /health OK" || echo "WARNING: health check failed"
+
+# 끝 대조 — 빌드 도중 HEAD 가 바뀌었으면 무엇을 배포했는지 말할 수 없다.
+END_SHA=$(git rev-parse HEAD)
+if [ "$END_SHA" != "$START_SHA" ]; then
+  echo "❌ 배포 도중 HEAD 가 바뀌었다 ($(git rev-parse --short "$START_SHA") -> $(git rev-parse --short "$END_SHA")) — push 후 다시 배포할 것."
+  exit 1
+fi
+echo "배포된 커밋: $(git log -1 --format='%h %s' "$START_SHA")"
+exit 0
+}

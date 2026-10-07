@@ -1,12 +1,17 @@
 #!/bin/bash
-# Fallback poller: deploys when GitHub Actions runner misses a push event.
-# Runs every 2 minutes via launchd. Skips if deploy.sh is already running.
+# Poller: runs every 2 minutes via launchd. Catches the checkout up to origin/main
+# only when it is BEHIND (fast-forward); never rewinds local commits (task#377).
+# ⚠️ The deploy.sh call below has never succeeded — it collides with the lock this
+#    script takes (B84). In practice the poller only syncs the working tree.
 
+# Whole body in one group so bash parses it before running: the ff below may
+# rewrite this very file mid-execution.
+{
 set -e
 
-PROJECT_DIR="/Users/calmonion/Project/PortfoliOn"
-LOG="/Users/calmonion/Library/Logs/com.portfolion.auto-deploy-poll.log"
-LOCK="/tmp/portfolion-deploy.lock"
+PROJECT_DIR="${PROJECT_DIR:-/Users/calmonion/Project/PortfoliOn}"
+LOG="${LOG:-/Users/calmonion/Library/Logs/com.portfolion.auto-deploy-poll.log}"
+LOCK="${DEPLOY_LOCK:-/tmp/portfolion-deploy.lock}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 
@@ -28,11 +33,25 @@ if [ "$LOCAL" = "$REMOTE" ]; then
   exit 0  # already up to date, nothing to log
 fi
 
+if ! git merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
+  if git merge-base --is-ancestor "$REMOTE" "$LOCAL"; then
+    exit 0  # local is ahead (unpushed commits) — leave it alone
+  fi
+  log "Local and origin/main diverged ($LOCAL vs $REMOTE), skipping."
+  exit 0
+fi
+
 log "New commit detected: $LOCAL -> $REMOTE. Deploying..."
+if ! git merge --ff-only --quiet origin/main >> "$LOG" 2>&1; then
+  log "Fast-forward failed (overlapping local edits?), skipping."
+  exit 0
+fi
+
 touch "$LOCK"
 trap 'rm -f "$LOCK"' EXIT
 
-git reset --hard origin/main >> "$LOG" 2>&1
 bash deploy.sh >> "$LOG" 2>&1
 
 log "Deploy complete."
+exit 0
+}
