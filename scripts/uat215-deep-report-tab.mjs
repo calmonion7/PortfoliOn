@@ -272,14 +272,17 @@ async function run(label, ctxOpts) {
     page.on('request', onReq);
     if (ufound) { await ulink.click(); await settle(page); }
     const u = await page.evaluate((t) => {
+      // 「있다」가 아니라 「보인다」 — ≤640px 목록 뷰는 `.reports-main`을 display:none으로 숨기므로
+      // DOM 존재만 재면 숨은 배너로 통과한다(task#378 1차 배포 실측: m390·m278에서 배너가 그 안에 갇혔다).
+      const shown = (el) => { if (!el) return false; const b = el.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
       const n = document.querySelector('[data-testid="deeplink-notice"]');
       const r = n?.getBoundingClientRect();
       return {
         view: document.querySelector('.reports-layout')?.getAttribute('data-view') ?? null,
-        notice: !!n, kind: n?.getAttribute('data-kind') ?? null, text: (n?.innerText || '').replace(/\s+/g, ' '),
+        notice: shown(n), kind: n?.getAttribute('data-kind') ?? null, text: (n?.innerText || '').replace(/\s+/g, ' '),
         right: r ? Math.round(r.right * 10) / 10 : null, vw: window.innerWidth,
         docW: document.documentElement.scrollWidth,
-        btn: !!document.querySelector('[data-testid="deeplink-add-watch"]'),
+        btn: shown(document.querySelector('[data-testid="deeplink-add-watch"]')),
       };
     }, untrTicker);
     ok(`[${label}] 기술-미추적:목록에-머문다`, ufound && u.view === 'list', `view=${u.view}`);

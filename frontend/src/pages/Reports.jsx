@@ -246,6 +246,31 @@ export default function Reports({ initialTicker = null, navKey = null }) {
         tabEntries={tabEntries}
       />
     </div>
+    {/* 딥링크 안내(task#378) — 사이드바·우측 패널 **밖**에 둔다. ≤640px 목록 뷰는 `.reports-main`을
+        `display:none`으로 숨기므로(pc.css) 우측 패널 안에 두면 모바일에서 통째로 안 보인다(uat215 실측). */}
+    {view === 'list' && deepNotice && (
+      <div role="status" data-testid="deeplink-notice" data-kind={deepNotice.kind}
+           style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, color: 'var(--text-2)', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
+        <span style={{ flex: '1 1 200px', minWidth: 0 }}>
+          <strong style={{ color: 'var(--text)' }}>{deepNotice.ticker}</strong>{' '}
+          {deepNotice.kind === 'pending'
+            ? '— 아직 리포트가 생성되지 않았습니다. 생성되면 목록에 나타납니다.'
+            : '— 추적하지 않는 종목이라 리포트가 없습니다. 관심종목에 추가하면 리포트가 생성됩니다.'}
+        </span>
+        {deepNotice.kind === 'untracked' && (
+          <button className="btn" data-testid="deeplink-add-watch" style={{ flexShrink: 0, minHeight: 44 }}
+                  onClick={() => openAddWatch({
+                    ticker: deepNotice.ticker,
+                    // 시장은 티커 모양으로 판별 — 6자리 숫자면 KR. 이름은 티커로 시드한다:
+                    // 회사명 칸이 required이고, 백엔드 resolve_name이 「이름 == 티커」를 실명으로 바꾼다.
+                    market: /^\d{6}$/.test(deepNotice.ticker) ? 'KR' : 'US',
+                    name: deepNotice.ticker,
+                  })}>
+            관심종목에 추가
+          </button>
+        )}
+      </div>
+    )}
     <div className="reports-layout" data-view={view}>
       {/* 좌측 사이드바 */}
       <div className="reports-sidebar">
@@ -304,29 +329,6 @@ export default function Reports({ initialTicker = null, navKey = null }) {
             </div>
           ) : (
             <>
-              {deepNotice && (
-                <div role="status" data-testid="deeplink-notice" data-kind={deepNotice.kind}
-                     style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, color: 'var(--text-2)', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
-                  <span style={{ flex: '1 1 200px', minWidth: 0 }}>
-                    <strong style={{ color: 'var(--text)' }}>{deepNotice.ticker}</strong>{' '}
-                    {deepNotice.kind === 'pending'
-                      ? '— 아직 리포트가 생성되지 않았습니다. 생성되면 목록에 나타납니다.'
-                      : '— 추적하지 않는 종목이라 리포트가 없습니다. 관심종목에 추가하면 리포트가 생성됩니다.'}
-                  </span>
-                  {deepNotice.kind === 'untracked' && (
-                    <button className="btn" data-testid="deeplink-add-watch" style={{ flexShrink: 0, minHeight: 44 }}
-                            onClick={() => openAddWatch({
-                              ticker: deepNotice.ticker,
-                              // 시장은 티커 모양으로 판별 — 6자리 숫자면 KR. 이름은 티커로 시드한다:
-                              // 회사명 칸이 required이고, 백엔드 resolve_name이 「이름 == 티커」를 실명으로 바꾼다.
-                              market: /^\d{6}$/.test(deepNotice.ticker) ? 'KR' : 'US',
-                              name: deepNotice.ticker,
-                            })}>
-                      관심종목에 추가
-                    </button>
-                  )}
-                </div>
-              )}
               {/* ⚠️ 에러 분기가 빈 상태보다 **먼저**여야 한다 — 순서가 뒤집히면 조회 실패가
                   「리포트가 없습니다」로 표시되고 그 아래 「지금 생성」이라는 잘못된 행동까지
                   지시한다(실제 결함이었다). 두 상태를 병존시키지도 않는다: 오지시 제거가 핵심이므로
