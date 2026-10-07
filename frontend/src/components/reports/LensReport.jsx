@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import Badge from '../ui/Badge'
 import Card from '../ui/Card'
 import { SectionTitle } from './reportUtils.jsx'
@@ -120,6 +121,20 @@ const anchor = (pct) => (pct < 12 ? 'translateX(0)' : pct > 88 ? 'translateX(-10
 const ORIGIN_LABEL = { server: '서버 계산', routine: '루틴 판단' }
 
 export function FlipGauge({ gauge, signal, origin }) {
+  // 경계 라벨 겹침은 **실측**으로 판정한다(task#373) — 아래 28% 고정 문턱은 m390 기준(라벨 ≈ 트랙 23%)이라,
+  // 트랙이 좁거나(m278: 라벨 67px ÷ 트랙 178px = 37%) 단위가 긴 금액 라벨에서 두 라벨이 그대로 겹쳤다.
+  // 가로 겹침만 보므로 아랫줄로 내린 뒤에도 판정이 유지된다(깜빡임 없음). jsdom은 rect가 0이라 판정하지 않는다.
+  const labelsRef = useRef(null)
+  const [overlapStagger, setOverlapStagger] = useState(false)
+  useLayoutEffect(() => {
+    const measure = () => {
+      const rs = [...(labelsRef.current?.querySelectorAll('[data-boundary]') || [])].map(e => e.getBoundingClientRect())
+      setOverlapStagger(rs.some((a, i) => i > 0 && a.width > 0 && a.left < rs[i - 1].right + 4))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [gauge])
   const { variable, unit, current, boundaries = [], zones = [], current_ref: currentRef } = gauge || {}
   if (!gauge || !Number.isFinite(current) || zones.length !== boundaries.length + 1) return null
   const vals = [current, ...boundaries]
@@ -130,7 +145,7 @@ export function FlipGauge({ gauge, signal, origin }) {
   const edges = [d0, ...boundaries, d1]
   const curZone = zones[boundaries.filter(b => current >= b).length]
   // 경계 라벨이 서로 가까우면(트랙 폭의 28% 미만 — 금액 라벨 「1,100 USD M」이 m390 트랙의 ~23%다) 다음 라벨을 아랫줄로 — 좁은 폭에서 「53.52%63.52%」처럼 붙는 것을 막는다
-  const rows = boundaries.map((b, i) => (i > 0 && pct(b) - pct(boundaries[i - 1]) < 28 ? 1 : 0))
+  const rows = boundaries.map((b, i) => (i > 0 && (overlapStagger || pct(b) - pct(boundaries[i - 1]) < 28) ? 1 : 0))
   const staggered = rows.some(r => r === 1)
   const ranges = zones.map((z, i) => {
     const from = i === 0 ? null : boundaries[i - 1], to = i === zones.length - 1 ? null : boundaries[i]
@@ -166,7 +181,7 @@ export function FlipGauge({ gauge, signal, origin }) {
         <span aria-hidden="true" style={{ position: 'absolute', top: 17, left: `calc(${pct(current)}% - 7px)`, width: 14, height: 14, borderRadius: '50%',
                                           background: sig(signal).color, border: '2.5px solid var(--bg)', boxShadow: `0 0 0 1px ${sig(signal).color}` }} />
       </div>
-      <div style={{ position: 'relative', height: staggered ? 32 : 16 }}>
+      <div ref={labelsRef} style={{ position: 'relative', height: staggered ? 32 : 16 }}>
         {boundaries.map((b, i) => (
           <span key={i} data-boundary="" className="mono tnum" style={{ position: 'absolute', top: rows[i] * 16,  /* 줄 상자 15px보다 커야 위아래 라벨이 겹치지 않는다 */ left: `${pct(b)}%`, transform: anchor(pct(b)), fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
             {gfmt(b, unit)}
