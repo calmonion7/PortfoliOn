@@ -67,6 +67,9 @@ describe('Calendar 월 이펙트 — 취소 가드', () => {
     cur.resolve(ev(CUR))
     await flush()
     expect(document.querySelector('.cal-grid')).toBeNull()   // 새 달은 아직 로딩
+    // 스켈레톤은 events==null 분기도 그리므로 finally 게이트의 이빨이 되지 못한다(방어 중복).
+    // 관측점은 loading만 보는 새로고침 버튼 — 옛 finally가 로딩을 끄면 새 달 로딩 중에 활성화된다.
+    expect(screen.getByTitle('캐시 삭제 후 새로고침')).toBeDisabled()
 
     next.resolve(ev(NEXT))
     await flush()
