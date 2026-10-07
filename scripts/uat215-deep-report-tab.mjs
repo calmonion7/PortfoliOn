@@ -281,6 +281,9 @@ async function run(label, ctxOpts) {
         view: document.querySelector('.reports-layout')?.getAttribute('data-view') ?? null,
         notice: shown(n), kind: n?.getAttribute('data-kind') ?? null, text: (n?.innerText || '').replace(/\s+/g, ' '),
         right: r ? Math.round(r.right * 10) / 10 : null, vw: window.innerWidth,
+        // 업체표 하단에서 누르면 스크롤 위치가 남는다 — 배너가 화면 밖이면 사용자에겐 「조용히 멈춤」과 같다
+        inView: !!r && r.width > 0 && r.top >= 0 && r.bottom <= window.innerHeight,
+        top: r ? Math.round(r.top) : null, vh: window.innerHeight,
         docW: document.documentElement.scrollWidth,
         btn: shown(document.querySelector('[data-testid="deeplink-add-watch"]')),
       };
@@ -291,6 +294,7 @@ async function run(label, ctxOpts) {
       `kind=${u.kind} · ${u.text.slice(0, 50)}`);
     ok(`[${label}] 기술-미추적:배너-넘침없음`, u.notice && u.right <= u.vw + 0.5 && u.docW <= u.vw,
       `right=${u.right} vw=${u.vw} docW=${u.docW}`);
+    ok(`[${label}] 기술-미추적:배너가-화면-안에-있다`, u.inView, `top=${u.top} vh=${u.vh}`);
     ok(`[${label}] 기술-미추적:추가버튼-보임`, u.btn);
     await page.screenshot({ path: `${OUT}/${label}-02-untracked-banner.png`, fullPage: false });   // 측정 지점에서 캡처
     let m = { open: false };

@@ -173,6 +173,13 @@ export default function Reports({ initialTicker = null, navKey = null }) {
   const [deepNotice, setDeepNotice] = useState(null)
   // 이 내비게이션에서 딥링크 상세를 이미 열었는가 — 목록 재조회가 사용자를 그 종목으로 다시 끌고 가지 않게
   const deepOpenedRef = useRef(null)
+  // 업체표 하단 등에서 넘어오면 이전 스크롤 위치가 남아 배너가 화면 밖에 뜬다(uat215 실측: m390 top −421).
+  // 화면 밖 안내는 사용자에게 「조용히 멈춤」과 같으므로 나타날 때 한 번 화면 안으로 가져온다.
+  // center — 상단 고정 헤더 밑에 가리지 않게. jsdom엔 scrollIntoView가 없어 옵셔널 호출.
+  const deepNoticeRef = useRef(null)
+  useEffect(() => {
+    if (deepNotice) deepNoticeRef.current?.scrollIntoView?.({ block: 'center' })
+  }, [deepNotice])
 
   const openDetail = (ticker, date) => {
     setSelected({ ticker, date })
@@ -249,7 +256,7 @@ export default function Reports({ initialTicker = null, navKey = null }) {
     {/* 딥링크 안내(task#378) — 사이드바·우측 패널 **밖**에 둔다. ≤640px 목록 뷰는 `.reports-main`을
         `display:none`으로 숨기므로(pc.css) 우측 패널 안에 두면 모바일에서 통째로 안 보인다(uat215 실측). */}
     {view === 'list' && deepNotice && (
-      <div role="status" data-testid="deeplink-notice" data-kind={deepNotice.kind}
+      <div ref={deepNoticeRef} role="status" data-testid="deeplink-notice" data-kind={deepNotice.kind}
            style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, color: 'var(--text-2)', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
         <span style={{ flex: '1 1 200px', minWidth: 0 }}>
           <strong style={{ color: 'var(--text)' }}>{deepNotice.ticker}</strong>{' '}

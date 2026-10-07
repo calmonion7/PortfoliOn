@@ -99,6 +99,15 @@ describe('리포트 딥링크 — 추적 상태별 도착 (task#378, B83)', () =
     expect(modal.getAttribute('data-name')).toBe('QCOM')
   })
 
+  it('안내가 나타나면 화면 안으로 스크롤한다 (업체표 하단에서 넘어와도 보이게)', () => {
+    const spy = vi.fn()
+    Element.prototype.scrollIntoView = spy
+    render(ui({ initialTicker: 'QCOM', navKey: 'k1' }))
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.contexts[0]).toBe(screen.getByTestId('deeplink-notice'))
+    delete Element.prototype.scrollIntoView
+  })
+
   it('③ 미추적 KR(6자리 숫자) → 시장이 KR로 프리필된다', () => {
     render(ui({ initialTicker: '005930', navKey: 'k1' }))
     fireEvent.click(screen.getByTestId('deeplink-add-watch'))
