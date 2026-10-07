@@ -171,7 +171,8 @@ function FlipConditions({ conditions, signal }) {
               <span style={{ color: 'var(--text)', fontWeight: 700 }}>
                 {cur ? `현재 ${sig(c.color).label}` : `${sig(c.color).label}으로 바뀌는 조건`}
               </span>
-              <span style={smallCap}>{c.match === 'any' ? '하나라도 확인되면' : (c.when.length > 1 ? '모두 확인되면' : '확인되면')}</span>
+              {/* 지금 색 항목은 조건이 아니라 현재 상태의 근거다 */}
+              <span style={smallCap}>{cur ? '근거' : c.match === 'any' ? '하나라도 확인되면' : (c.when.length > 1 ? '모두 확인되면' : '확인되면')}</span>
             </div>
             <ul style={{ margin: '2px 0 0', paddingLeft: 22, color: 'var(--text-2, var(--text))' }}>
               {c.when.map((w, j) => <li key={j} style={{ wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{w}</li>)}

@@ -483,6 +483,7 @@ describe('판단 렌즈 바뀜 조건 — 수치면 게이지, 아니면 조건 
     expect(items.map(e => e.getAttribute('data-condition'))).toEqual(['go', 'wait', 'stop'])
     expect(items.map(e => e.getAttribute('data-current'))).toEqual(['false', 'false', 'true'])   // 렌즈 6 = 빨강
     expect(items[2].textContent).toContain('현재')
+    expect(items[2].textContent).toContain('근거')
     expect(items[1].textContent).toContain('모두 확인되면')
     expect([...items[1].querySelectorAll('li')].map(li => li.textContent)).toEqual(['코인베이스 외 분배처 비중 상승', '협약 조건 불변'])
     expect(row6.textContent).not.toContain('바뀜6')
