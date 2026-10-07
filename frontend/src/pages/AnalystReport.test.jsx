@@ -414,6 +414,53 @@ describe('바뀜 조건 게이지 (task#369 UAT 피드백)', () => {
     expect(container.querySelector('[data-lens-cell="1"]').textContent).toContain('바뀜1')
     expect(container.querySelector('[data-lens-cell="9"]').textContent).toContain('사유9')
   })
+
+  // 렌즈 8은 게이지 축이 「색이 바뀌는 주가」다(task#376) — 서버가 박제한 주가 경계를 그리기만 한다.
+  // 왼쪽(싼 쪽) 초록 → 오른쪽 빨강이고, 문장은 이익 기준 그대로 남는다.
+  const withPriceGauge = (gauge, signal = 'stop') => {
+    const l8 = V2_REPORT.lenses[7]
+    return { ...V2_REPORT, lenses: V2_REPORT.lenses.map(l => (l.id !== 8 ? l : {
+      ...l, signal, flip: 'forward 이익 777.6 이상이면 노랑',
+      computed: { ...l8.computed, signal, flip: 'forward 이익 777.6 이상이면 노랑', flip_value: 777.5947, gauge },
+    })) }
+  }
+  const renderReport = async (report) => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? report : { reports: [] } }))
+    const r = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    return r
+  }
+
+  it('렌즈 8 주가축 게이지 — 세 색의 1주당 가격과 발행 시점 주가 출처를 그린다', async () => {
+    const { container } = await renderReport(withPriceGauge({
+      variable: '주가', unit: 'USD', current: 84.13, boundaries: [42.9123, 59.9879], zones: ['go', 'wait', 'stop'],
+      current_ref: '발행 시점 주가 (2026-10-07)', origin: 'server', near_boundary: false }))
+    const row8 = container.querySelector('[data-lens-cell="8"]')
+    const g = row8.querySelector('[data-flip-gauge]')
+    expect(g).toBeTruthy()
+    expect(g.getAttribute('data-current-zone')).toBe('stop')
+    expect([...g.querySelectorAll('[data-zone]')].map(e => e.getAttribute('data-zone'))).toEqual(['go', 'wait', 'stop'])
+    expect([...g.querySelectorAll('[data-boundary]')].map(e => e.textContent)).toEqual(['42.91 USD', '59.99 USD'])
+    expect(g.getAttribute('aria-label')).toMatch(/주가 현재 84\.13 USD/)
+    expect(g.getAttribute('aria-label')).toMatch(/초록 42\.91 USD 미만/)
+    expect(g.textContent).toContain('현재값 출처: 발행 시점 주가 (2026-10-07)')
+    // 문장은 이익축 그대로(비목표 — 바뀜 조건 문장 불변)
+    expect(row8.textContent).toContain('forward 이익 777.6 이상이면 노랑')
+  })
+
+  it('렌즈 8 주가축 — 금리가 낮아 경계 1개인 두 색 게이지도 그린다', async () => {
+    const { container } = await renderReport(withPriceGauge({
+      variable: '주가', unit: 'KRW', current: 273000, boundaries: [5441042], zones: ['go', 'wait'],
+      current_ref: '발행 시점 주가 (2026-10-07)', origin: 'server' }, 'go'))
+    const g = container.querySelector('[data-lens-cell="8"] [data-flip-gauge]')
+    expect(g.getAttribute('data-current-zone')).toBe('go')
+    expect([...g.querySelectorAll('[data-boundary]')].map(e => e.textContent)).toEqual(['5,441,042 KRW'])
+    expect(g.textContent).toContain('현재값 출처: 발행 시점 주가')
+  })
 })
 
 describe('판단 렌즈 바뀜 조건 — 수치면 게이지, 아니면 조건 (사람 UAT 피드백 2)', () => {
