@@ -1,4 +1,4 @@
-// task#369 라이브 UAT — 심층 리포트 v2(구조 축·9렌즈) 화면. read-only(GET만), 쓰기 0.
+// task#369 라이브 UAT — 심층 리포트 v2(구조 축·9렌즈) 화면. task#372: 렌즈 표시명·「?」 설명·m278 추가. read-only(GET만), 쓰기 0.
 // 대상: 최신 발행물이 format 2인 종목(기본 CRCL, TICKER 환경변수로 변경). 기대값은 전부 API 응답에서 유도한다.
 // 축 순서: ⓐ 대상에 닿았다(reached) → ⓑ identity(제목·신호 라벨이 API와 같다) → ⓒ 판정축.
 // 「FAIL 0」만 보지 말고 단언 총계도 볼 것 — 총계가 기대치(뷰포트×테마×축)보다 작으면 미실행이다.
@@ -32,7 +32,11 @@ ok('api-judgment-structured', lenses.filter(l => JUDG.includes(l.id) && l.signal
 ok('api-three-colors', lenses.every(l => (!l.conditions || l.conditions.map(c => c.color).sort().join() === 'go,stop,wait') && (!l.gauge || l.gauge.zones.length === 3)), '조건·판단 게이지 모두 세 색');
 ok('api-gauges-present', gaugeLenses.length > 0, `n=${gaugeLenses.length} — 0이면 게이지 축이 공허하게 통과한다`);
 
-const VIEWPORTS = [['m390', { width: 390, height: 844 }, true], ['pc1440', { width: 1440, height: 900 }, false]];
+// task#372 — 렌즈 표시명(일반인 말)·「?」 설명. 이름은 API가 주지 않으므로 화면 정본을 여기 고정한다.
+const NAMES = ['숫자의 신뢰도', '지금 매출 속도', '벌수록 남는 구조', '묶여 있는 비용', '망할 위험',
+  '고객 이탈 위험', '경영진·대주주', '지금 주가 수준', '앞으로의 수요'];
+const QUESTION3 = '매출이 늘 때 비용이 덜 느는가';
+const VIEWPORTS = [['m278', { width: 278, height: 640 }, true], ['m390', { width: 390, height: 844 }, true], ['pc1440', { width: 1440, height: 900 }, false]];
 const b = await chromium.launch();
 for (const [vp, viewport, isMobile] of VIEWPORTS) {
   for (const scheme of ['light', 'dark']) {
@@ -70,6 +74,15 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
           return n;
         }, 0),
         theme: html.getAttribute('data-theme') || 'light',
+        rowNames: [...document.querySelectorAll('[data-lens-name]')].map(e => e.textContent.replace(/^\d+/, '')),
+        detailNames: [...document.querySelectorAll('[data-lens-detail-name]')].map(e => e.textContent),
+        helpBtns: [...document.querySelectorAll('button[aria-label$="— 설명 보기"]')].map(e => { const r = e.getBoundingClientRect(); return { w: r.width, h: r.height }; }),
+        // 낱자 세로 적층 감지 — 이름 상자의 폭이 글자 2개 폭보다 좁거나, 줄 수가 2를 넘으면 적층/과도 줄바꿈
+        nameStack: [...document.querySelectorAll('[data-lens-name] > span:last-child, [data-lens-detail-name]')].map(e => {
+          const cs = getComputedStyle(e), fs = parseFloat(cs.fontSize), lh = parseFloat(cs.lineHeight) || fs * 1.5, r = e.getBoundingClientRect();
+          return { name: e.textContent, narrow: r.width < fs * 2, lines: Math.round(r.height / lh) };
+        }).filter(x => x.narrow || x.lines > 2),
+        headerOverflow: [...document.querySelectorAll('[data-lens-cell] > div:first-child')].map(e => e.scrollWidth - e.clientWidth).filter(v => v > 0).length,
       };
     });
     ok(`${tag} theme-applied`, m.theme === scheme, `data-theme=${m.theme}`);
@@ -91,10 +104,24 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     ok(`${tag} conditions-three-colors`, condLenses.every(l => { const c = m.conds.find(x => x.id === String(l.id)); return c && JSON.stringify(c.colors) === '["go","wait","stop"]' && JSON.stringify(c.current) === JSON.stringify([l.signal]); }));
     ok(`${tag} rows-no-overflow`, m.rowOverflow === 0, `n=${m.rowOverflow}`);
     ok(`${tag} gauge-labels-no-overlap`, m.labelOverlaps === 0, `겹침 ${m.labelOverlaps}쌍`);
+    // ── task#372 렌즈 표시명·「?」 ──
+    ok(`${tag} lens-names-row`, JSON.stringify(m.rowNames) === JSON.stringify(NAMES), m.rowNames.join('|'));
+    ok(`${tag} lens-names-detail`, JSON.stringify(m.detailNames) === JSON.stringify(NAMES), m.detailNames.join('|'));
+    // 대상 도달 축 — 0건 클릭이 조용히 통과하지 않게(task#358) 버튼 개수를 먼저 단언한다
+    ok(`${tag} help-buttons-reached`, m.helpBtns.length === 18, `n=${m.helpBtns.length}`);
+    ok(`${tag} help-tap-32`, m.helpBtns.length > 0 && m.helpBtns.every(x => x.h >= 32 && x.w >= 32), `min h=${Math.min(...m.helpBtns.map(x => x.h))} w=${Math.min(...m.helpBtns.map(x => x.w))}`);
+    const helpBtn = page.locator('[data-lens-cell="3"] button[aria-label="벌수록 남는 구조 — 설명 보기"]');
+    const nHelp = await helpBtn.count();
+    let tip = '';
+    if (nHelp === 1) { await helpBtn.click(); tip = (await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 }).catch(() => '')) || ''; }
+    ok(`${tag} help-popover-question`, nHelp === 1 && tip.includes('벌수록 남는 구조') && tip.includes(QUESTION3), `btn=${nHelp} tip="${tip}"`);
+    if (nHelp === 1) await page.keyboard.press('Escape');
+    ok(`${tag} names-no-stacking`, m.nameStack.length === 0, JSON.stringify(m.nameStack));
+    ok(`${tag} lens-header-no-overflow`, m.headerOverflow === 0, `n=${m.headerOverflow}`);
     await page.screenshot({ path: `${OUT}/${TICKER}-${tag}.png`, fullPage: true });
     await ctx.close();
   }
 }
 await b.close();
-console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${4 + VIEWPORTS.length * 2 * 16})`);
+console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${4 + VIEWPORTS.length * 2 * 23})`);
 process.exit(fail ? 1 : 0);

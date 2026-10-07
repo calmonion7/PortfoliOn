@@ -68,7 +68,8 @@ function GlossaryPopover({ anchorEl, entry, onClose }) {
 }
 
 // 단일 용어 클릭 지점. entry 직접 전달 또는 term 키로 조회. 용어집에 없으면 평문 렌더.
-export function GlossaryTerm({ term, entry: entryProp, children }) {
+// className·ariaLabel(선택) — 밑줄 용어가 아닌 다른 모양의 트리거(렌즈 「?」 버튼, task#372)가 같은 팝오버를 쓰게 한다.
+export function GlossaryTerm({ term, entry: entryProp, className, ariaLabel, children }) {
   const entry = entryProp || findTerm(term)
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
@@ -78,8 +79,9 @@ export function GlossaryTerm({ term, entry: entryProp, children }) {
       <button
         ref={btnRef}
         type="button"
-        className="glossary-term"
+        className={className ? `glossary-term ${className}` : 'glossary-term'}
         aria-expanded={open}
+        aria-label={ariaLabel}
         onClick={() => setOpen(o => !o)}
       >
         {children ?? entry.term}

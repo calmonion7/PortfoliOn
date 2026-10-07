@@ -18,6 +18,36 @@
   text-decoration-style: solid;
 }
 
+/* 렌즈 「?」 버튼(task#372) — 같은 팝오버, 밑줄 용어가 아닌 원형 아이콘. 탭 영역 32px, 보이는 원은 18px */
+.glossary-term.lens-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  flex-shrink: 0;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lens-help-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.glossary-term.lens-help:hover .lens-help-dot,
+.glossary-term.lens-help[aria-expanded="true"] .lens-help-dot {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* 모달 오버레이(z:1000) 위. 등장 모션은 opacity 전용 — transform 금지(task#195 fixed 함정) */
 .glossary-popover {
   position: fixed;

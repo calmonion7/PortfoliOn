@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import AnalystReport, { PerBandChart, PeerMultiplesChart, assignLabelRows } from './AnalystReport'
 import { isLensReport } from '../components/reports/LensReport'
@@ -458,5 +458,109 @@ describe('판단 렌즈 바뀜 조건 — 수치면 게이지, 아니면 조건 
     const row1 = container.querySelector('[data-lens-cell="1"]')
     expect(row1.querySelector('[data-flip-gauge],[data-flip-conditions]')).toBeNull()
     expect(row1.textContent).toContain('바뀜1')
+  })
+})
+
+// ── 렌즈 화면 후속 (task#372) — 일반인 이름 + 「?」 · 애널 추정치 · 렌즈 3 기준 · 경계 근접 ────────────
+const NEW_NAMES = ['숫자의 신뢰도', '지금 매출 속도', '벌수록 남는 구조', '묶여 있는 비용', '망할 위험',
+  '고객 이탈 위험', '경영진·대주주', '지금 주가 수준', '앞으로의 수요']
+// 옛 이름은 잇대어 만든다 — 리터럴로 적으면 「옛 이름 잔존 0」 grep 감사가 이 테스트 자신을 잔존으로 센다
+const OLD_NAMES = [['출처', '사슬'], ['런레', '이트'], ['생존 위협', '경로'], ['집중과 전환', '비용'], ['밸류', '에이션']].map(p => p.join(p[0] === '런레' || p[0] === '밸류' ? '' : ' '))
+const withComputed = (l, extra) => ({ ...l, computed: { ...l.computed, ...extra } })
+// 새 필드 픽스처: 렌즈 3 forward · 렌즈 4 애널 추정치만 · 렌즈 5 추정 기반만 + 경계 근접 · 렌즈 8 둘 다 · 렌즈 2(판단) 근접 아님
+const V2_NEW = {
+  ...V2_REPORT,
+  lenses: V2_REPORT.lenses.map(l => {
+    if (l.id === 2) return { ...l, gauge: { ...l.gauge, near_boundary: false } }
+    if (l.id === 3) return withComputed(l, { basis: 'forward', consensus_based: false })
+    if (l.id === 4) return { ...withComputed(l, { consensus_based: true }), inputs: { revenue_curr: { value: 701, unit: 'USD M', source: 'consensus', ref: 'FactSet 2026-10' } } }
+    if (l.id === 5) return withComputed(l, { consensus_based: false, gauge: { ...l.computed.gauge, near_boundary: true } })
+    if (l.id === 8) return withComputed(l, { consensus_based: true })
+    return l
+  }),
+}
+
+describe('렌즈 화면 후속 (task#372)', () => {
+  const renderWith = async (report) => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? report : { reports: [] } }))
+    const r = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    return r
+  }
+  const header = (container, id) => container.querySelector(`#lens-${id}`).firstElementChild
+
+  it('픽스처가 새 분기를 실제로 탄다(게이트) — 옛 픽스처는 새 필드가 전혀 없다', () => {
+    expect(V2_NEW.lenses.some(l => l.computed?.consensus_based)).toBe(true)
+    expect(V2_NEW.lenses.some(l => l.computed?.basis)).toBe(true)
+    expect(V2_NEW.lenses.some(l => (l.computed?.gauge ?? l.gauge)?.near_boundary === true)).toBe(true)
+    const json = JSON.stringify(V2_REPORT)
+    expect(json).not.toMatch(/consensus_based|"basis"|near_boundary/)
+  })
+
+  it('ⓐ 9렌즈 전부 새 이름(신호 행·상세 헤더), 옛 이름 0', async () => {
+    const { container } = await renderWith(V2_NEW)
+    const rowNames = [...container.querySelectorAll('[data-lens-name]')].map(e => e.textContent.replace(/^\d+/, ''))
+    expect(rowNames).toEqual(NEW_NAMES)
+    const detailNames = [...container.querySelectorAll('[data-lens-detail-name]')].map(e => e.textContent)
+    expect(detailNames).toEqual(NEW_NAMES)
+    for (const o of OLD_NAMES) expect(container.textContent).not.toContain(o)
+  })
+
+  it('ⓑ 「?」 클릭 → 그 렌즈가 묻는 것, 두 위치 모두(버튼 18개)', async () => {
+    await renderWith(V2_NEW)
+    expect(screen.getAllByRole('button', { name: /— 설명 보기$/ }).length).toBe(18)
+    const btns = screen.getAllByRole('button', { name: '벌수록 남는 구조 — 설명 보기' })
+    expect(btns.length).toBe(2)
+    for (const b of btns) {
+      fireEvent.click(b)
+      const tip = screen.getByRole('tooltip')
+      expect(tip.textContent).toContain('벌수록 남는 구조')
+      expect(tip.textContent).toContain('매출이 늘 때 비용이 덜 느는가')
+      fireEvent.click(b)   // 토글로 닫기
+      expect(screen.queryByRole('tooltip')).toBeNull()
+    }
+  })
+
+  it('ⓒ 애널 추정치 — consensus_based만이면 「애널 추정치」만, estimate_based만이면 「추정 기반」만, 둘 다면 둘 다', async () => {
+    const { container } = await renderWith(V2_NEW)
+    const h4 = header(container, 4).textContent, h5 = header(container, 5).textContent, h8 = header(container, 8).textContent
+    expect(h4).toContain('애널 추정치'); expect(h4).not.toContain('추정 기반')
+    expect(h5).toContain('추정 기반'); expect(h5).not.toContain('애널 추정치')
+    expect(h8).toContain('애널 추정치'); expect(h8).toContain('추정 기반')
+    // 원자료 출처 consensus는 「공시」로 오표시되지 않는다
+    const li = [...container.querySelectorAll('#lens-4 li')].find(e => e.textContent.includes('FactSet'))
+    expect(li.textContent).toContain('애널 추정치'); expect(li.textContent).not.toContain('공시')
+  })
+
+  it('ⓓ 렌즈 3 비교 기간 — forward·yoy_quarter 각각 표기, 없으면 미표기', async () => {
+    const { container, unmount } = await renderWith(V2_NEW)
+    expect(container.querySelector('#lens-3 [data-lens-basis]').textContent).toContain('향후 기간 vs 전년 동기')
+    unmount()
+    const yoy = { ...V2_NEW, lenses: V2_NEW.lenses.map(l => (l.id === 3 ? withComputed(l, { basis: 'yoy_quarter' }) : l)) }
+    const r2 = await renderWith(yoy)
+    expect(r2.container.querySelector('#lens-3 [data-lens-basis]').textContent).toContain('최근 분기 vs 전년 동기')
+    r2.unmount()
+    const r3 = await renderWith(V2_REPORT)
+    expect(r3.container.querySelector('[data-lens-basis]')).toBeNull()
+  })
+
+  it('ⓔ 경계 근접 — true면 그 게이지에 「경계 근접」, false·부재면 없음', async () => {
+    const { container } = await renderWith(V2_NEW)
+    const near = [...container.querySelectorAll('[data-near-boundary]')]
+    expect(near.map(e => e.closest('[data-lens-cell]').getAttribute('data-lens-cell'))).toEqual(['5'])
+    expect(near[0].textContent).toBe('경계 근접')
+    expect(container.querySelector('[data-lens-cell="2"] [data-flip-gauge]')).toBeTruthy()   // false 게이지는 있다
+  })
+
+  it('ⓕ 새 필드가 전부 없는 옛 판도 오류 없이 렌더(새 표시만 생략)', async () => {
+    const { container } = await renderWith(V2_REPORT)
+    expect(container.querySelectorAll('[data-lens-cell]').length).toBe(9)
+    expect(container.querySelectorAll('[data-near-boundary],[data-lens-basis]').length).toBe(0)
+    expect(screen.queryByText('애널 추정치')).toBeNull()
+    expect([...container.querySelectorAll('[data-lens-name]')].length).toBe(9)
   })
 })

@@ -1,7 +1,7 @@
 import Badge from '../ui/Badge'
 import Card from '../ui/Card'
 import { SectionTitle } from './reportUtils.jsx'
-import { GlossaryText } from '../Glossary.jsx'
+import { GlossaryText, GlossaryTerm } from '../Glossary.jsx'
 
 // 심층 리포트 v2 — 구조 축·9렌즈 틀 (ADR 261006-232406, task#369).
 // 순서: 한줄 논지 → 렌즈 신호(집계 + 렌즈별 신호·바뀜 조건 게이지 한 행, 번호 순) → 구조 축 → 렌즈 상세 → (서버 숫자 블록은 호출측)
@@ -11,10 +11,35 @@ import { GlossaryText } from '../Glossary.jsx'
 // 분기 게이트 — 픽스처가 이 분기를 실제로 타는지 테스트가 직접 단언한다(task#301 교훈).
 export const isLensReport = (r) => r?.format === 2 && Array.isArray(r.lenses) && r.lenses.length > 0
 
-export const LENS_NAMES = {
-  1: '출처 사슬', 2: '런레이트', 3: '비용 구조', 4: '약정', 5: '생존 위협 경로',
-  6: '집중과 전환 비용', 7: '지배구조', 8: '밸류에이션', 9: '수요',
+// 렌즈 화면 표시명(일반인 말) + 「이 렌즈가 묻는 것」 — 두 렌더 위치(신호 행·상세 헤더)가 같은 소스를 읽는다(task#372).
+// 루틴 프롬프트·API 문서는 전문 이름을 유지한다(렌즈는 번호로 식별).
+export const LENS_INFO = {
+  1: { name: '숫자의 신뢰도', question: '이 숫자는 몇 번 가공된 건가, 믿을 만한가' },
+  2: { name: '지금 매출 속도', question: '최근 분기 기준으로 지금 얼마나 버는가' },
+  3: { name: '벌수록 남는 구조', question: '매출이 늘 때 비용이 덜 느는가' },
+  4: { name: '묶여 있는 비용', question: '매출과 함께 떼 주거나 미리 약속한 지출이 얼마나 빨리 느는가' },
+  5: { name: '망할 위험', question: '현금·금리·이자 부담으로 버틸 수 있는가' },
+  6: { name: '고객 이탈 위험', question: '큰 고객에 몰려 있는가, 쉽게 떠날 수 있는가' },
+  7: { name: '경영진·대주주', question: '주주와 이해가 맞는 사람들이 운영하는가' },
+  8: { name: '지금 주가 수준', question: '미래 이익에 비해 비싼가 싼가' },
+  9: { name: '앞으로의 수요', question: '이 제품을 앞으로 얼마나 더 살 것인가' },
 }
+
+// 「?」 — 기존 용어집 팝오버를 재사용(새 팝오버 신설 금지). 제목 = 렌즈 이름, 본문 = 이 렌즈가 묻는 것.
+function LensHelp({ id }) {
+  const info = LENS_INFO[id]
+  if (!info) return null
+  return (
+    <GlossaryTerm entry={{ term: info.name, def: info.question }} className="lens-help" ariaLabel={`${info.name} — 설명 보기`}>
+      <span className="lens-help-dot" aria-hidden="true">?</span>
+    </GlossaryTerm>
+  )
+}
+
+// 렌즈 3 비교 기간(task#371 박제값) — 없으면(옛 판) 표기하지 않는다
+const BASIS_LABEL = { forward: '향후 기간 vs 전년 동기', yoy_quarter: '최근 분기 vs 전년 동기' }
+// 원자료 출처 셋 — 공시 · 애널 추정치 · 루틴 자체 추정
+const SOURCE_META = { disclosure: { label: '공시', variant: 'neutral' }, consensus: { label: '애널 추정치', variant: 'info' }, estimate: { label: '추정', variant: 'warning' } }
 
 // 의미 배지(success/warning/danger) — 가격색(up/down) 교차 사용 금지(frontend/CLAUDE.md). 색만으로 말하지 않게 라벨 병기.
 export const SIGNAL_META = {
@@ -116,8 +141,10 @@ export function FlipGauge({ gauge, signal, origin }) {
     <div data-flip-gauge="" data-current-zone={curZone} data-origin={origin} role="img"
          aria-label={`${variable} 현재 ${gfmt(current, unit)} — ${ranges.join(', ')} (${ORIGIN_LABEL[origin] || ''})`}
          style={{ margin: '10px 0 2px' }}>
-      <div style={{ ...smallCap, marginBottom: 2, display: 'flex', gap: 8, alignItems: 'baseline' }}>
+      <div style={{ ...smallCap, marginBottom: 2, display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <span>{variable}{unit && unit !== '%' && unit !== '배' ? ` (${unit})` : ''}</span>
+        {/* 경계 근접(task#371 서버 박제) — 현재값이 경계 폭의 10% 안: 작은 변화로 색이 바뀔 수 있다 */}
+        {gauge.near_boundary === true && <span data-near-boundary="" style={{ fontSize: 10, fontWeight: 700, color: 'var(--warn)', border: '1px solid var(--warn)', borderRadius: 4, padding: '0 5px' }}>경계 근접</span>}
         {ORIGIN_LABEL[origin] && <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 5px' }}>{ORIGIN_LABEL[origin]}</span>}
       </div>
       <div style={{ position: 'relative', height: 44 }}>
@@ -197,13 +224,17 @@ function SignalList({ lenses }) {
         return (
           <div key={l.id} data-lens-cell={l.id}
                style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderLeft: `3px solid ${sig(l.signal).color}`, borderRadius: 6, padding: '10px 12px' }}>
-            <a href={`#lens-${l.id}`} style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none', minHeight: 24 }}>
-              <span className="mono tnum" style={{ ...smallCap, fontWeight: 700 }}>{l.id}</span>
-              <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 700, minWidth: 0, wordBreak: 'keep-all' }}>{LENS_NAMES[l.id]}</span>
+            {/* 「?」 버튼은 링크 밖에 둔다 — 링크 안의 버튼은 대화형 요소 중첩이고, 탭이 상세로 이동해 버린다 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, minHeight: 32 }}>
+              <a href={`#lens-${l.id}`} data-lens-name={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none', minWidth: 0, minHeight: 32 }}>
+                <span className="mono tnum" style={{ ...smallCap, fontWeight: 700 }}>{l.id}</span>
+                <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 700, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{LENS_INFO[l.id]?.name}</span>
+              </a>
+              <LensHelp id={l.id} />
               <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-2, var(--text))', flexShrink: 0 }}>
                 <SignalDot signal={l.signal} />{sig(l.signal).label}
               </span>
-            </a>
+            </div>
             <div style={{ color: 'var(--text-2, var(--text))', fontSize: 12.5, lineHeight: 1.55, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{l.summary}</div>
             {l.signal !== 'na' && g && <FlipGauge gauge={g} signal={l.signal} origin={origin} />}
             {l.signal !== 'na' && conds && <FlipConditions conditions={conds} signal={l.signal} />}
@@ -271,6 +302,7 @@ function ComputedBlock({ lens }) {
   return (
     <div style={{ marginTop: 10, padding: '10px 12px', background: 'var(--bg-elev-2)', borderRadius: 6 }}>
       <div style={{ ...smallCap, marginBottom: 6 }}>서버 계산 (원자료 → 고정 공식)</div>
+      {BASIS_LABEL[c.basis] && <div data-lens-basis={c.basis} style={{ ...smallCap, marginBottom: 6 }}>비교 기간: <span style={{ color: 'var(--text)', fontWeight: 700 }}>{BASIS_LABEL[c.basis]}</span></div>}
       {vals.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
           {vals.map(([k, v]) => (
@@ -320,7 +352,7 @@ function InputsTable({ inputs }) {
           <li key={k} style={{ fontSize: 12, lineHeight: 1.5 }}>
             <span style={{ color: 'var(--text-2, var(--text))' }}>{INPUT_LABELS[k] || k}</span>{' '}
             <span className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(r.value, 3)} {r.unit}</span>{' '}
-            <Badge variant={r.source === 'estimate' ? 'warning' : 'neutral'}>{r.source === 'estimate' ? '추정' : '공시'}</Badge>{' '}
+            <Badge variant={(SOURCE_META[r.source] || SOURCE_META.disclosure).variant}>{(SOURCE_META[r.source] || SOURCE_META.disclosure).label}</Badge>{' '}
             <span style={smallCap}>{r.ref}</span>
             {r.rationale && <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{r.rationale}</div>}
           </li>
@@ -336,9 +368,14 @@ function LensDetail({ lens }) {
     <Card padding="md" id={`lens-${lens.id}`} style={{ scrollMarginTop: 80, borderLeft: `3px solid ${m.color}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span className="mono tnum" style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>{lens.id}</span>
-        <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14 }}>{LENS_NAMES[lens.id]}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+          <span data-lens-detail-name={lens.id} style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, wordBreak: 'keep-all' }}>{LENS_INFO[lens.id]?.name}</span>
+          <LensHelp id={lens.id} />
+        </span>
         <Badge variant={m.variant}>{m.label}</Badge>
         {lens.computed?.estimate_based && <Badge variant="warning">추정 기반</Badge>}
+        {/* 애널 추정치(task#371) — 루틴 자체 추정과 별개, 둘 다면 둘 다 */}
+        {lens.computed?.consensus_based && <Badge variant="info">애널 추정치</Badge>}
       </div>
       <div style={{ color: 'var(--text)', fontWeight: 600, fontSize: 13, margin: '8px 0 4px', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{lens.summary}</div>
       <Metrics metrics={lens.metrics} />
