@@ -11,7 +11,7 @@ model: opus
 ## 소유 파일
 - `scripts/uat<NNN>-<slug>.mjs`(Playwright), `scripts/probe<NNN>-*.py`·`*.mjs`, `scripts/smoke<NNN>-*.mjs`
 - 캡처 산출물 `screenshots-uat<NNN>/`, 기계 판독용 `result.json`
-- 기준형으로 삼을 것: `scripts/uat254-analyst-upside-color.mjs`(짧고 규약 완비),
+- 기준형으로 삼을 것: `scripts/uat369-lens-report.mjs`(짧고 규약 완비 — 도달 축·단언 총계 기대치·identity·`serviceWorkers` 차단),
   `scripts/uat247-guru-cohort.mjs`(커버리지·다축), `scripts/uat255-guru-alloc-perf.mjs`(성능·대조군),
   `scripts/uat-guru-row-ux.mjs`(간격 축), `scripts/uat252-oauth-history.mjs`(크로스오리진·대조군)
 - **프로덕션 코드는 고치지 않는다.** 프로브가 결함을 잡으면 보고하고, 수정은 해당 역할·메인 세션에 넘긴다.

@@ -25,7 +25,6 @@ m = _load("ab", REPO / "scripts" / "ab-publish.py")
 cmp_mod = _load("abc", REPO / "scripts" / "ab-compare.py")
 REAL = m.env_value("COWORK_API_KEY")
 MUSE = "opencode/muse-spark-1.3-contributor-free"
-SKIP = {("analyst", "GOOGL")}  # 파일럿에서 완료
 
 
 def log(msg):
@@ -33,7 +32,7 @@ def log(msg):
 
 
 def main():
-    todo = [(l, s) for l, ss in m.SAMPLES.items() for s in ss if (l, s) not in SKIP]
+    todo = [(l, s) for l, ss in m.SAMPLES.items() for s in ss]
     log(f"본 실행 시작 — {len(todo)}표본 × 2팔(muse + h1 검수)")
     for i, (lane, sample) in enumerate(todo, 1):
         d = Path("out") / lane / sample

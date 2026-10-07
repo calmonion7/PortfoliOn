@@ -34,12 +34,12 @@ PROD_BASE = "https://portfolion.taebro.com"
 SESSION_TIMEOUT = 2400  # 40분
 
 # 레인 → 루틴 프롬프트의 절 번호. 트리거가 이것을 못박지 않으면 세션이 3절을 전부 돈다.
-LANE_SECTION = {"enrich": 1, "analyst": 2, "tech": 3}
-LANE_LABEL = {"enrich": "종목 리포트 사업분석(enrich)", "analyst": "심층(애널리스트 리포트)",
-              "tech": "주요기술 리포트"}
+# 심층(애널리스트) 레인은 task#374에서 제거했다 — v1 발행 계약 폐지(task#370). v2용은 필요할 때 신설.
+LANE_SECTION = {"enrich": 1, "tech": 3}
+LANE_LABEL = {"enrich": "종목 리포트 사업분석(enrich)", "tech": "주요기술 리포트"}
 # 레인 → 그 레인의 쓰기 경로 조각. 캡처가 여러 개일 때 **그 레인의 것**을 고르는 데 쓴다
 # (루틴은 report/generate 같은 부수 쓰기도 하므로 첫 캡처를 집으면 엉뚱한 것을 산출로 삼는다).
-LANE_PATH = {"enrich": "/enrich", "analyst": "/api/analyst-reports/", "tech": "/api/tech-reports/"}
+LANE_PATH = {"enrich": "/enrich", "tech": "/api/tech-reports/"}
 
 
 def _load_proxy():
@@ -116,8 +116,6 @@ def child_env(real_key, base_env=None):
 # ── opus 팔: 세션 0개 수확 ───────────────────────────────────────────
 # 발행 본문에 실리는 필드만 — DB 행의 부수 컬럼(id·ticker·created_at·스냅샷 data)은 비교 대상이 아니다.
 PUBLISHABLE_FIELDS = {
-    "analyst": {"rating", "title", "fair_value_low", "fair_value_high",
-                "valuation_method", "points", "risks"},
     "tech": {"title", "description", "difficulty", "players", "challenges", "related",
              "market", "sources", "key_points", "milestones", "variants", "watch_items",
              "composition"},
@@ -238,7 +236,6 @@ def fire(lane, sample, arm, model, outdir, real_key, prompt_override=None):
 # 표본 20건 — 그릴링 확정(2026-09-15). enrich는 섹터별 1종목, 발행 표본과 겹치지 않게 골랐다.
 SAMPLES = {
     "enrich": ["000660", "RKLB", "JPM", "NVO", "CCJ", "TSLA", "035420", "COST", "CEG", "EQIX", "FCX"],
-    "analyst": ["GOOGL", "005380", "CRCL", "LLY", "SPCX", "005930"],
     "tech": ["ai-datacenter-equipment", "obesity-drugs", "smr"],
 }
 # enrich의 opus 기준선 = 이 라벨. 현재 `tickers` 판은 이미 muse이므로 그것을 쓰면
@@ -262,11 +259,6 @@ def harvest_opus(lane, sample):
             "select row_to_json(x) from (select fields, created_at from enrich_history "
             f"where ticker='{sample}' and label='{OPUS_ENRICH_LABEL}' "
             "order by created_at desc limit 1) x")
-    elif lane == "analyst":
-        row = _psql_json(
-            "select row_to_json(x) from (select to_jsonb(a)-'id' as body, published_date "
-            f"from analyst_reports a where ticker='{sample}' "
-            "order by published_date desc limit 1) x")
     else:
         row = _psql_json(
             "select row_to_json(x) from (select to_jsonb(t)-'id' as body, published_date "

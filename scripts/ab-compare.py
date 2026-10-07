@@ -52,11 +52,6 @@ def _body(a):
 
 # 레인마다 「내용」을 이루는 축이 다르다 — 공통 축만 쓰면 무엇이 달라졌는지 안 보인다.
 LANE_ROWS = {
-    "analyst": [
-        ("rating", lambda b: b.get("rating")),
-        ("FV 밴드", lambda b: f"{b.get('fair_value_low')}~{b.get('fair_value_high')}"),
-        ("포인트 수", lambda b: len(b.get("points") or []) or None),
-    ],
     "tech": [
         ("주요업체 수", lambda b: len(b.get("players") or []) or None),
         ("출처 수", lambda b: len(b.get("sources") or []) or None),
@@ -119,12 +114,7 @@ def build(lane, sample, outroot="out"):
             L.append(f"> 산출 없음 — {(a or {}).get('error', '파일 부재')}\n")
             continue
         b = _body(a)
-        if lane == "analyst":
-            L.append(f"**제목**: {b.get('title','—')}\n")
-            L.append(f"**밸류에이션 근거**: {b.get('valuation_method','—')}\n")
-            for i, pt in enumerate(b.get("points") or []):
-                L.append(f"- **({i+1}) {pt.get('title','')}** {str(pt.get('body',''))[:400]}")
-        elif lane == "tech":
+        if lane == "tech":
             L.append(f"**제목**: {b.get('title','—')}\n")
             L.append(f"**설명**: {str(b.get('description',''))[:400]}\n")
             for kp in (b.get("key_points") or [])[:4]:

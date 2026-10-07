@@ -131,7 +131,7 @@ FAIL(1 failed | 8 passed)을 확인한 뒤 원복했다. **실천: 이빨은 명
 **㉠ 「프로브」라는 이름이 「게이트」를 뜻하지 않는다 — 단언이 *0개*인 관측 덤프가 `scripts/uat*.mjs`에 실재한다.
 게이트로 쓰기 전에 단언의 *존재*를 세라(task#324).** ⓑ가 「총계가 줄면 측정 실패」, ⓨ가 「기대값이 비어 공허하게
 참」, ⓩ가 「표본 0에서 술어가 공허하게 참」이라면 이것은 그 가족의 **0번째 항**이다 — **총계가 애초에 없다.**
-실측: `uat212-analyst-report.mjs`·`uat215-deep-report-tab.mjs` 두 파일에서
+실측: `uat212-analyst-report.mjs` (삭제됨) (task#374)·`uat215-deep-report-tab.mjs` 두 파일에서
 `grep -n "exit(\|assert\|FAIL\|PASS\|✓\|✗\|throw"` → **0건**. 둘은 관측 결과를 JSON으로 `console.log`하고
 **항상 exit 0**이므로, 무엇이 깨져도 초록이고 「선재 FAIL이 몇 건인가」(task#317)를 물어도 답이 0이라 게이트가
 건강해 *보인다*. 루트 CLAUDE.md의 착수 절차는 「① 지금 FAIL이 몇 건인가(도달 불가 방지) ② 지금 이미 통과하는가

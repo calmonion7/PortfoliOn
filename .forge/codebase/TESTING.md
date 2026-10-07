@@ -1100,7 +1100,7 @@ vitest에선 원리적으로 불가**), jsdom은 스타일시트를 적용하지
 → 라이브 `getComputedStyle(el).color`. 기준값은 하드코딩하지 말고 `:root`에서 토큰을 읽어 임시
 노드에 실어 rgb 정규화해 대조한다(테마별로 다르다). **`--up`/`--down`/`--text`가 서로 다름을
 이빨 단언으로 함께 걸 것** — 안 걸면 토큰이 같아진 경우 프로브가 아무것도 안 보면서 통과한다.
-(`scripts/uat254-analyst-upside-color.mjs`)
+(`scripts/uat254-analyst-upside-color.mjs` (삭제됨) — task#374에서 v1 화면과 함께 제거. 기법은 위 서술이 정본)
 
 **⑤ 좌표계와 화면 픽셀의 괴리** — SVG `width:100%` + 고정 `viewBox`면 넘침·잘림·겹침·CJK-fit 축이
 전부 **viewBox 좌표계**를 재므로 컨테이너 축소와 **무관하게 통과한다**(넘침 0·잘림 0·겹침 0이

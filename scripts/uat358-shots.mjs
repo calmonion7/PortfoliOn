@@ -22,7 +22,7 @@ async function settle(page, ms = 1500) {
   await page.waitForTimeout(ms);
 }
 
-// 상세 진입 — 리포트 목록에서 종목을 클릭해야 상세가 열린다(uat212와 동일 경로).
+// 상세 진입 — 리포트 목록에서 종목을 클릭해야 상세가 열린다(전용 testid 없음).
 async function openDetail(page) {
   await page.goto(`${BASE}/reports`, { waitUntil: 'domcontentloaded' });
   await settle(page);

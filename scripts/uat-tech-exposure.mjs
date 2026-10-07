@@ -385,7 +385,7 @@ for (const V of VIEWS) {
   await page.waitForTimeout(1500);
 
   const nav = { chips: 0, reached: false, back: false };
-  // 리포트 목록의 종목을 클릭해야 상세가 열린다(uat212와 동일 경로) — 전용 testid가 없어
+  // 리포트 목록의 종목을 클릭해야 상세가 열린다 — 전용 testid가 없어
   // 사이드바/카드그리드 두 렌더러를 모두 시도한다.
   const side = page.locator(`.reports-sidebar >> text=${chipTicker}`).first();
   const cardI = page.locator(`.stock-card-grid >> text=${chipTicker}`).first();

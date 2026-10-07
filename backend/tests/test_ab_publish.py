@@ -45,7 +45,7 @@ curl에는 반드시 변수로만 쓴다: -H "X-API-Key: $PORTFOLION_API_KEY"
 
 def test_base_url_is_replaced_exactly_once(mod):
     """① 치환은 **정확히 1건** — 세션이 프로드 주소를 들고 나가지 못한다."""
-    out = mod.build_prompt(ROUTINE, "http://127.0.0.1:9999", lane="analyst", sample="GOOGL")
+    out = mod.build_prompt(ROUTINE, "http://127.0.0.1:9999", lane="tech", sample="smr")
     assert "http://127.0.0.1:9999" in out
     assert PROD not in out, "프로드 주소가 프롬프트에 남았다 — 첫 겹이 뚫렸다"
 
@@ -175,7 +175,7 @@ def test_trigger_bypasses_the_publish_gate(mod):
     동시에 '어차피 저장 안 된다'를 프롬프트에 넣으면 모델이 덜 노력해 품질 측정이 오염되므로
     그 문구가 **없어야** 한다 — 이 축은 두 방향을 함께 잠근다.
     """
-    out = mod.build_prompt(ROUTINE, "http://127.0.0.1:1", lane="analyst", sample="GOOGL")
+    out = mod.build_prompt(ROUTINE, "http://127.0.0.1:1", lane="tech", sample="smr")
     assert "이미 통과한 것으로 간주" in out
     for leak in ("저장되지 않", "섀도", "실제로 반영되지"):
         assert leak not in out, f"측정 오염 문구가 프롬프트에 있다: {leak}"
@@ -187,9 +187,10 @@ def test_opus_body_is_narrowed_to_publishable_fields(mod):
     안 떼면 「분량」 축이 DB 행(스냅샷 data 블롭 포함) vs 요청 본문을 비교해 opus가 4배 길어
     보인다(파일럿 실측 7526자 vs 1807자) — 같은 것을 재지 않는 축은 비교가 아니다.
     """
-    row = {"body": {"title": "T", "rating": "buy", "points": [], "risks": "r",
-                    "ticker": "GOOGL", "created_at": "x", "data": {"거대한": "블롭"}},
+    # task#374: 심층(애널리스트) 레인 제거로 tech 레인으로 옮겼다 — 좁히기 축 자체는 레인 무관.
+    row = {"body": {"title": "T", "players": [{"name": "P"}], "key_points": [],
+                    "slug": "smr", "created_at": "x", "data": {"거대한": "블롭"}},
            "published_date": "2026-09-15"}
-    out = mod.normalize_opus(row, lane="analyst")
-    assert "data" not in out["body"] and "ticker" not in out["body"]
-    assert out["body"]["title"] == "T" and out["body"]["rating"] == "buy"
+    out = mod.normalize_opus(row, lane="tech")
+    assert "data" not in out["body"] and "slug" not in out["body"]
+    assert out["body"]["title"] == "T" and out["body"]["players"] == [{"name": "P"}]
