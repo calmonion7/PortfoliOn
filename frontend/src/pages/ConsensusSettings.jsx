@@ -9,6 +9,7 @@ export default function ConsensusSettings() {
   const [batch, setBatch] = useState({ running: false, done: 0, total: 0, current: '' })
   const [batchErr, setBatchErr] = useState('')
   const pollRef = useRef(null)
+  const inFlight = useRef(false)
 
   useEffect(() => () => clearInterval(pollRef.current), [])
 
@@ -16,16 +17,19 @@ export default function ConsensusSettings() {
     setBatch({ running: true, done: 0, total: 0, current: '' })
     setBatchErr('')
     clearInterval(pollRef.current)
+    inFlight.current = false
     try {
       await api.post(`/api/consensus/batch?days=${days}&force=${force}`)
       pollRef.current = setInterval(async () => {
+        if (inFlight.current) return   // 응답이 간격보다 느리면 틱이 겹쳐 역행한다
+        inFlight.current = true
         try {
           const { data } = await api.get('/api/consensus/batch/progress')
           setBatch({ running: data.running, done: data.done, total: data.total, current: data.current })
           if (!data.running && data.total > 0 && data.done >= data.total) {
             clearInterval(pollRef.current)
           }
-        } catch {}
+        } catch {} finally { inFlight.current = false }
       }, 1500)
     } catch (err) {
       setBatch(p => ({ ...p, running: false }))

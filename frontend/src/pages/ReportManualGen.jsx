@@ -79,7 +79,10 @@ export default function ReportManualGen() {
   }
 
   const startPolling = (onDone) => {
+    let inFlight = false
     pollRef.current = setInterval(async () => {
+      if (inFlight) return // 이전 틱 응답 대기 중 — 겹치면 순서 없이 착지한다
+      inFlight = true
       try {
         const { data } = await api.get('/api/report/progress')
         setProgress({ done: data.done, total: data.total, current: data.current })
@@ -95,7 +98,7 @@ export default function ReportManualGen() {
           }
           onDone?.()
         }
-      } catch {}
+      } catch {} finally { inFlight = false }
     }, 1500)
   }
 
@@ -132,7 +135,10 @@ export default function ReportManualGen() {
     clearInterval(backfillPollRef.current)
     try {
       await api.post(`/api/report/backfill?days=${backfillDays}&force=${backfillForce}`)
+      let inFlight = false
       backfillPollRef.current = setInterval(async () => {
+        if (inFlight) return
+        inFlight = true
         try {
           const { data } = await api.get('/api/report/backfill/progress')
           setBackfillProgress(data)
@@ -141,7 +147,7 @@ export default function ReportManualGen() {
             setBackfilling(false)
             setBackfillMsg(`완료: ${data.created}개 스냅샷 생성`)
           }
-        } catch {}
+        } catch {} finally { inFlight = false }
       }, 1500)
     } catch (err) {
       setBackfillMsg(err.response?.data?.detail || '백필 실패')

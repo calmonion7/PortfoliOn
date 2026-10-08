@@ -8,12 +8,13 @@ export const MENU_LABELS = {
   guru: '구루', settings: '설정',
 }
 
-export function PermChip({ label, on, onClick }) {
+export function PermChip({ label, on, onClick, disabled }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
-        padding: '5px 14px', borderRadius: 20, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+        padding: '5px 14px', borderRadius: 20, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1, fontSize: 12, fontWeight: 600,
         background: on ? 'var(--text)' : 'transparent',
         color: on ? 'var(--bg)' : 'var(--text-3)',
         border: on ? '1px solid var(--text)' : '1px solid var(--border)',
@@ -44,17 +45,22 @@ export function PermBadges({ permissions }) {
 }
 
 export function DefaultPermissionsSection() {
-  const [defaults, setDefaults] = useState(Object.fromEntries(ALL_MENUS.map(m => [m, false])))
+  const [defaults, setDefaults] = useState(null) // null=미로드 — 서버값을 모르면 토글(PUT) 금지
+  const [loadFailed, setLoadFailed] = useState(false)
   const [saved, setSaved] = useState(false)
   const timerRef = useRef(null)
   const savedTimerRef = useRef(null)
   const { showToast } = useToast()
 
   useEffect(() => {
-    api.get('/api/admin/default-permissions').then(r => setDefaults(r.data))
+    api.get('/api/admin/default-permissions').then(r => setDefaults(r.data)).catch(e => {
+      console.error('[PermissionPanel] 기본 권한 조회(/admin/default-permissions) 실패', e)
+      setLoadFailed(true)
+    })
   }, [])
 
   function toggle(menu) {
+    if (!defaults) return
     const next = { ...defaults, [menu]: !defaults[menu] }
     setDefaults(next)
     clearTimeout(timerRef.current)
@@ -86,6 +92,7 @@ export function DefaultPermissionsSection() {
           <div style={{ fontSize: 13, fontWeight: 600 }}>신규 가입 기본 권한</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>새로 가입하는 사용자에게 자동으로 적용됩니다</div>
         </div>
+        {loadFailed && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>불러오지 못했습니다</span>}
         {saved && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>저장됨 ✓</span>}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -93,7 +100,8 @@ export function DefaultPermissionsSection() {
           <PermChip
             key={menu}
             label={MENU_LABELS[menu]}
-            on={defaults[menu]}
+            on={!!defaults?.[menu]}
+            disabled={!defaults}
             onClick={() => toggle(menu)}
           />
         ))}

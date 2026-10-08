@@ -12,6 +12,7 @@ export default function LeverageBackfillSettings() {
   const [progress, setProgress] = useState({ running: false, done: 0, total: 0, current: '', error: '' })
   const [err, setErr] = useState('')
   const pollRef = useRef(null)
+  const inFlight = useRef(false)
 
   const loadCoverage = async () => {
     try {
@@ -32,9 +33,12 @@ export default function LeverageBackfillSettings() {
     setErr('')
     setProgress({ running: true, done: 0, total: 0, current: '', error: '' })
     clearInterval(pollRef.current)
+    inFlight.current = false
     try {
       await api.post(`/api/market/leverage/backfill?start_year=${startYear}&end_year=${endYear}`)
       pollRef.current = setInterval(async () => {
+        if (inFlight.current) return   // 응답이 간격보다 느리면 틱이 겹쳐 역행한다
+        inFlight.current = true
         try {
           const { data } = await api.get('/api/market/leverage/backfill/progress')
           setProgress({ ...data })
@@ -46,7 +50,7 @@ export default function LeverageBackfillSettings() {
           setErr(e?.response?.data?.detail || '진행 상황을 불러오지 못했습니다.')
           clearInterval(pollRef.current)
           setProgress(p => ({ ...p, running: false }))
-        }
+        } finally { inFlight.current = false }
       }, 2000)
     } catch (e) {
       setProgress(p => ({ ...p, running: false }))

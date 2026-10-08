@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Button from '../components/ui/Button'
@@ -54,6 +54,7 @@ export default function AdminAnalytics() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [histLoading, setHistLoading] = useState(false)
+  const histGenRef = useRef(0) // 세대번호 — 늦게 도착한 옛 사용자 응답이 새 화면을 덮지 않게(Ranking.onRowClick 관용구)
 
   useEffect(() => {
     setLoading(true)
@@ -67,12 +68,13 @@ export default function AdminAnalytics() {
   }, [days])
 
   const showUserHistory = (userId) => {
+    const myGen = ++histGenRef.current
     setSelectedUser(userId)
     setHistLoading(true)
     api.get(`/api/admin/analytics/users/${userId}`)
-      .then(r => setHistory(r.data))
-      .catch(() => setHistory([]))
-      .finally(() => setHistLoading(false))
+      .then(r => { if (myGen === histGenRef.current) setHistory(r.data) })
+      .catch(() => { if (myGen === histGenRef.current) setHistory([]) })
+      .finally(() => { if (myGen === histGenRef.current) setHistLoading(false) })
   }
 
   if (loading) return <LoadingSpinner label="로딩 중..." />
@@ -130,7 +132,7 @@ export default function AdminAnalytics() {
       {selectedUser ? (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <Button variant="secondary" size="sm" onClick={() => setSelectedUser(null)}>← 목록</Button>
+            <Button variant="secondary" size="sm" onClick={() => { histGenRef.current += 1; setSelectedUser(null) }}>← 목록</Button>
             <h3 style={{ color: 'var(--text)', margin: 0, fontSize: 14 }}>이벤트 히스토리 (최근 200건)</h3>
           </div>
           {histLoading ? <LoadingSpinner label="로딩 중..." /> : (

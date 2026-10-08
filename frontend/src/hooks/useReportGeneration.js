@@ -20,11 +20,13 @@ export default function useReportGeneration({ onApplyList }) {
   const pollRef = useRef(null)
   const failStreakRef = useRef(0)
   const idleStreakRef = useRef(0)
+  const inFlightRef = useRef(false)
+  const genRef = useRef(0) // 폴링 세대 — 중단·재시작마다 올라, 옛 틱의 착지를 무효화한다
 
   /** 폴링 중단. **`useCallback`으로 안정화한 것이 이 훅의 계약 중 하나다** — 아래 이펙트와
    *  소비처가 이것을 deps에 넣으므로, 매 렌더 새 함수가 되면 React가 직전 destructor를
    *  매 렌더 실행해 폴러를 죽인다(아래 주석 참조). 참조만 건드리므로 deps는 비어 있어도 안전하다. */
-  const _stopPoll = useCallback(() => { clearInterval(pollRef.current); pollRef.current = null }, [])
+  const _stopPoll = useCallback(() => { clearInterval(pollRef.current); pollRef.current = null; genRef.current += 1 }, [])
 
   /** 언마운트 정리를 **훅이 소유한다**.
    *
@@ -40,11 +42,17 @@ export default function useReportGeneration({ onApplyList }) {
     _stopPoll()
     failStreakRef.current = 0
     idleStreakRef.current = 0
+    inFlightRef.current = false
+    const gen = genRef.current
     pollRef.current = setInterval(async () => {
+      if (inFlightRef.current) return // 이전 틱 응답 대기 중 — 겹치면 순서 없이 착지한다
+      inFlightRef.current = true
       let data
       try {
         ({ data } = await api.get('/api/report/progress'))
       } catch (e) {
+        if (gen !== genRef.current) return
+        inFlightRef.current = false
         failStreakRef.current += 1
         console.warn(`[useReportGeneration] 진행률(/api/report/progress) 조회 실패 (${failStreakRef.current}/${MAX_FAIL_STREAK})`, e)
         if (failStreakRef.current >= MAX_FAIL_STREAK) {
@@ -54,6 +62,8 @@ export default function useReportGeneration({ onApplyList }) {
         }
         return
       }
+      if (gen !== genRef.current) return // 폴링이 멈췄거나 새로 시작됐다 — 옛 응답은 버린다
+      inFlightRef.current = false
       failStreakRef.current = 0
       setGenProgress({ done: data.done, total: data.total, failed: data.failed || [] })
       if (!data.running && data.total > 0 && data.done >= data.total) {

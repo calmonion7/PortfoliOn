@@ -10,6 +10,7 @@ export default function GuruCrawlNow() {
   const [progress, setProgress]   = useState({ done: 0, total: 0, current: '' })
   const [lastUpdated, setLastUpdated] = useState(null)
   const pollRef = useRef(null)
+  const inFlight = useRef(false)
 
   useEffect(() => {
     api.get('/api/guru/managers').then(({ data }) => setLastUpdated(data.last_updated))
@@ -17,6 +18,8 @@ export default function GuruCrawlNow() {
 
   const startPolling = () => {
     pollRef.current = setInterval(async () => {
+      if (inFlight.current) return   // 응답이 간격보다 느리면 틱이 겹쳐 역행한다
+      inFlight.current = true
       try {
         const { data } = await api.get('/api/guru/crawl/progress')
         setProgress({ done: data.done, total: data.total, current: data.current })
@@ -45,7 +48,7 @@ export default function GuruCrawlNow() {
           )
           api.get('/api/guru/managers').then(({ data }) => setLastUpdated(data.last_updated))
         }
-      } catch {}
+      } catch {} finally { inFlight.current = false }
     }, 2000)
   }
 

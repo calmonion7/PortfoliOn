@@ -879,7 +879,7 @@ if (err.response?.status === 401) {
 | MED | `pages/GuruStats.jsx::StatRow` — `row.score.toFixed(3)` | 같은 파일의 다른 필드는 전부 `?? '-'`인데 여기만 무가드 | **도달 불가** — `compute_weighted`가 `score`를 항상 세팅하고 `tab` 분기와 배열이 일치한다 |
 | MED | `pages/Settings.jsx::BatchHub` — `batches.filter(...)` | `batches.length === 0` 검사가 객체에선 false라 `.filter`까지 도달 | **도달 불가** — `routers/batches.py::list_batches`가 **리스트**를 반환한다(실측) |
 
-### 7.3 비동기 레이스 — **장부 6곳 + S0 신규 2곳 닫힘(task#379)** · 남은 미가드는 2부(task#380)
+### 7.3 비동기 레이스 — **장부 6곳 + S0 신규 2곳 닫힘(task#379)** · **잔여 가드 4묶음 닫힘 + 7곳 제외(task#380)** · 범위 밖 미가드 2건 남음
 
 **참조 구현(그대로 둘 것)** — 세대 카운터를 `.then`·`.catch`·**`.finally`까지** 검사하는 올바른 형태:
 
@@ -903,12 +903,22 @@ if (err.response?.status === 401) {
 | ~~MED~~ | ~~`components/StockSearchBox.jsx` 검색 이펙트~~ | **닫힘(task#379)** — 이펙트 cleanup이 아니라 **응답 검색어 == 최신 입력** 비교(디바운스 대기 창에 착지하는 옛 응답까지 막는다) + 새 검색어 요청이 나갈 때 결과 `null` + 입력을 비우면 로딩 해제. ⚠️ 키 입력마다 비우면 디바운스 창 안에서 직전 검색어로 되돌아갈 때 재조회 없이 빈 채로 남는다(적대 검토가 잡은 회귀). 회귀 축 `stocksearchbox-race.test.jsx` |
 | ~~MED~~ | ~~`components/reports/HistoryTab.jsx` 3이펙트~~ | **닫힘(task#331)** — `cancelled` 플래그, 히스토리 이펙트는 `.finally`까지 게이트. ⚠️ `.finally` 게이트의 회귀 축은 **새 요청을 in-flight로 붙잡은 채** 낡은 응답을 착지시켜야 이빨이 생긴다 — 새 요청을 먼저 해소하는 픽스처는 두 `.finally`가 같은 값을 써서 관측 차이가 원리적으로 생기지 않는다(주입 실측: 그 순서에서는 `.finally` 게이트를 지워도 8축 전부 초록) |
 | ~~MED~~ | ~~`hooks/usePortfolioData.js::fetchAll`/`fetchDashboard`~~ | **닫힘(task#379)** — 함수별 세대 카운터, 마지막 발행 요청만 상태·스피너를 바꾼다. Portfolio 자가복구(최대 3회)와의 상호작용은 `portfolio-dash-heal-race.test.jsx`가 못박는다(로딩 고착·상한 변경 주입에 FAIL). 15초 시세 폴링 얽힘은 범위 밖(다음 폴링이 자가 해소) |
-| ~~MED~~ | ~~`hooks/useReportList.js::fetchList`~~ | **닫힘(task#379)** — 세대 카운터 3핸들러. ⚠️ `useReportGeneration`의 생성 완료 후 목록 → `applyList`는 이 세대 **밖**이다(세대를 올리면 진행 중인 더 새 `fetchList`의 로딩이 고착된다) — 2부(task#380) |
+| ~~MED~~ | ~~`hooks/useReportList.js::fetchList`~~ | **닫힘(task#379)** — 세대 카운터 3핸들러. ⚠️ `useReportGeneration`의 생성 완료 후 목록 → `applyList`는 이 세대 **밖**이다(세대를 올리면 진행 중인 더 새 `fetchList`의 로딩이 고착된다) — 아래 「범위 밖 미가드」 행 |
 | ~~HIGH~~ | ~~`components/reports/DetailTab.jsx::ConsensusSummary.handleRefresh`~~ | **닫힘(task#379, S0 신규)** — 갱신 POST가 in-flight인 채 종목을 바꾸면 옛 응답이 **부모 콜백**으로 새 종목 요약에 병합됐다(`key` 재마운트는 자식 state만 지키고 부모 콜백 쓰기는 못 막는다). 요청 당시 종목 == 현재 종목일 때만 반영 + 종목 변경 시 갱신 표시 리셋. 회귀 축 `consensus-refresh-race.test.jsx` |
 | ~~HIGH~~ | ~~`pages/SectorTab.jsx` 마켓 이펙트~~ | **닫힘(task#379, S0 신규)** — 토글이 로딩 중에도 보여 옛 마켓 응답이 새 마켓 레이아웃(업종↔섹터)을 덮었다. `cancelled` 플래그. 회귀 축 `sector-tab-race.test.jsx` |
-| MED | `hooks/useReportGeneration.js` 폴링 tick · `generateOne` 실패 경로 · 완료 후 목록 → `applyList` | 2부(task#380) — 행 클릭으로 다른 종목 생성을 시작하면 옛 tick·옛 실패가 새 생성의 스피너를 끄고 완료 토스트를 오발 |
-| MED | `pages/AdminAnalytics.jsx::showUserHistory` · `pages/AnalystReports.jsx::firePublish` | 2부(task#380) — admin 표면. A→B 전환 시 A 응답·finally가 B를 덮음 |
-| LOW | `pages/Reports.jsx` 그외 탭 목록 · `components/PermissionPanel.jsx` · `components/BatchScheduleEditor.jsx`+`pages/Settings.jsx::BatchHub.load` · 진행률 폴링 4페이지(`ReportManualGen`·`GuruCrawlNow`·`ConsensusSettings`·`LeverageBackfillSettings`) | 2부(task#380) — 창이 좁거나 표시만. `AdminAnalytics` 기간 탭·`Digest`·`GlobalSearch`·`AuthContext`·`GuruDetail`은 도달 가능성 재판정 대상(task#379 S4 블라인드 재계수가 도달 불가로 반박) |
+| ~~MED~~ | ~~N4 `hooks/useReportGeneration.js::_startPoll` 폴링 tick~~ | **닫힘(task#380)** — 이전 tick in-flight면 다음 tick 건너뜀(배포 직후 백엔드 수 분 무응답 창에서 tick이 쌓였다 순서 없이 착지해 진행률 역행·완료 2회) + 폴링 세대(`_stopPoll`이 올린다 — 새 폴링 시작 뒤 옛 tick이 성공·실패 어느 쪽으로 착지해도 새 인터벌을 끊거나 옛 `onDone`을 부르거나 새 in-flight 표지를 풀지 못한다). 회귀 축 `report-poll-overlap.test.jsx` |
+| ~~MED~~ | ~~N6 `pages/AdminAnalytics.jsx::showUserHistory`~~ | **닫힘(task#380)** — 세대 카운터 3핸들러 + 「← 목록」도 세대 증가. ⚠️ 「목록」 증가는 주입 0 FAIL — 새 상세 열기가 어차피 세대를 올리고, 목록 화면은 `history`·`histLoading`을 읽지 않으므로 **방어 중복**(소비처 전수 확인 후 판정). 회귀 축 `AdminAnalytics.test.jsx` |
+| ~~MED~~ | ~~N9 `pages/AnalystReports.jsx::firePublish`~~ | **닫힘(task#380)** — `firing`을 진행 중 티커 **Set**으로(서로 다른 종목 동시 지시는 정상, 각 `finally`는 자기 티커만 뺀다). 전엔 A의 `finally`가 `firing=null`로 B 버튼을 다시 켜 B 중복 지시(루틴 2회 발사)가 가능했다. 회귀 축 `AnalystReports.test.jsx` |
+| ~~LOW~~ | ~~N8 `components/PermissionPanel.jsx` 기본권한~~ | **닫힘(task#380)** — 로딩 전 토글이 전부 false 초기값 기준으로 PUT해 서버 기본권한을 지울 수 있었다. `defaults` 초기값 `null`(미조회) · 로딩 중 칩 비활성 · GET 실패 시 비활성 유지 + 「불러오지 못했습니다」(3상태). 회귀 축 `PermissionPanel.test.jsx` |
+| ~~LOW~~ | ~~N14 진행률 폴링 4페이지 `ReportManualGen`(인터벌 2개)·`GuruCrawlNow`·`ConsensusSettings`·`LeverageBackfillSettings`~~ | **닫힘(task#380)** — 각 인터벌에 in-flight skip(`finally`에서 해제). `ReportManualGen`은 진행 중 버튼이 비활성이라 폴링 2개가 겹칠 수 없어 세대는 두지 않았다. 회귀 축 `report-poll-overlap.test.jsx`·`admin-poll-overlap.test.jsx` |
+| — | N5 `pages/AdminAnalytics.jsx` 기간 탭 | **제외(task#380, 도달 불가)** — `if (loading) return <LoadingSpinner/>`가 페이지 전체를 가려 로딩 중 탭을 누를 수 없다 |
+| — | N7 `contexts/AuthContext.jsx` `/me` | **제외(task#380, 비현실)** — 로그인 후 `/me` ~100ms 안에 로그아웃해야 성립. (재로그인 시 `setLoading(true)` 부재는 경합이 아닌 별개 발견) |
+| — | N12 `pages/Digest.jsx` | **제외(task#380, 순서상 비현실)** — 버튼은 로딩 중 보이나 가벼운 GET이 무거운 POST보다 늦게 착지해야 성립(task#379 S4의 「도달 불가」는 부정확) |
+| — | N13 `components/GlobalSearch.jsx` | **제외(task#380, 비현실)** — PC 인라인 검색은 남지만 `/api/stocks` ~100ms 안에 재검색·선택해야 성립 |
+| — | N10 `pages/Reports.jsx` 그외 탭 목록 | **제외(task#380, 도달 불가)** — 재조회 중 목록이 스켈레톤이라 전역삭제 진입점이 없다 |
+| — | N11 `components/BatchScheduleEditor.jsx` + `pages/Settings.jsx::BatchHub.load` | **제외(task#380, 비현실)** — `onSaved={load}`가 spec을 버리고 재조회만 하므로 ~100ms 안 이중 저장이 필요하다 |
+| MED | `hooks/useReportGeneration.js::generateOne`/`generateBatch` POST in-flight · 완료 후 목록 → `applyList` | **범위 밖 미가드(task#380 발견)** — 폴링 tick은 위에서 닫혔지만 POST 자체는 세대 밖이다: A의 POST가 in-flight인 채 B 생성을 시작하면 늦은 A 실패가 `setGenerating(null)`·실패 토스트로 B를 덮고, 늦은 A 성공은 `_startPoll`로 B 폴링을 대체한다(서버가 동시 생성을 409로 거부하므로 창은 POST 왕복 시간). `applyList`는 `useReportList` 세대 밖(위 행) |
+| ? | `pages/GuruDetail.jsx` | **미판정** — task#379 S4가 도달 불가로 반박했으나 task#380은 재판정하지 않았다 |
 
 ### 7.4 삼켜진 fetch가 "데이터 없음"으로 위장한다 — **확인된 버그**
 

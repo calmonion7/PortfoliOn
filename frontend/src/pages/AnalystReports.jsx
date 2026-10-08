@@ -39,7 +39,7 @@ export default function AnalystReports() {
   const [pubs, setPubs] = useState(null)      // null=로딩, []=없음
   const [stocks, setStocks] = useState([])    // 내 보유·관심(후보 드롭다운용) — 세션 스코프
   const [targets, setTargets] = useState([])  // 전역 지정 종목(task#224) — 타 사용자 보유분 포함
-  const [firing, setFiring] = useState(null)  // 발행 지시 중인 ticker
+  const [firing, setFiring] = useState(() => new Set())  // 발행 지시 중인 ticker들 (서로 다른 종목 동시 진행 가능)
   const [addPick, setAddPick] = useState('')
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function AnalystReports() {
   }
 
   const firePublish = async (ticker) => {
-    setFiring(ticker)
+    setFiring((s) => new Set(s).add(ticker))
     try {
       await api.post('/api/admin/cowork/fire', {
         text: `지시: ${ticker} 1종목의 애널리스트 리포트를 발행하라 — 기본 정책의 7일 조건·대상 지정 여부는 이 지시에서 무시한다. enrich는 하지 마라.`,
@@ -105,7 +105,7 @@ export default function AnalystReports() {
       console.error('[AnalystReports] 발행 지시 실패:', e)
       showToast(e.response?.status === 503 ? '루틴 fire 미설정 상태입니다.' : '발행 지시 실패 — 서버 로그를 확인하세요.', 'error')
     } finally {
-      setFiring(null)
+      setFiring((s) => { const n = new Set(s); n.delete(ticker); return n })
     }
   }
 
@@ -183,10 +183,10 @@ export default function AnalystReports() {
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                     <button
                       onClick={() => firePublish(s.ticker)}
-                      disabled={firing === s.ticker}
-                      style={{ background: 'transparent', border: '1px solid var(--border)', color: firing === s.ticker ? 'var(--accent)' : 'var(--text-3)', borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
+                      disabled={firing.has(s.ticker)}
+                      style={{ background: 'transparent', border: '1px solid var(--border)', color: firing.has(s.ticker) ? 'var(--accent)' : 'var(--text-3)', borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
                     >
-                      {firing === s.ticker ? '지시 중…' : '발행'}
+                      {firing.has(s.ticker) ? '지시 중…' : '발행'}
                     </button>
                     <button
                       onClick={() => setTarget(s.ticker, false)}

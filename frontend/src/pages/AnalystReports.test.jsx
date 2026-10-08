@@ -106,6 +106,33 @@ describe('심층 리포트 탭 (task#215)', () => {
     expect(screen.queryByTitle('발행물 삭제 (이력 포함)')).toBeNull()
   })
 
+  it('admin: A 발행 완료가 아직 진행 중인 B의 버튼을 풀지 않는다 (N9)', async () => {
+    mockRole = 'admin'
+    mockGets([
+      { ticker: '035420', name: 'NAVER', market: 'KR' },
+      { ticker: 'LHX', name: 'L3Harris', market: 'US' },
+    ])
+    const pending = {}
+    api.post.mockImplementation((_u, body) => new Promise((res) => {
+      pending[body.text.includes('035420') ? 'A' : 'B'] = res
+    }))
+    renderPage()
+    await screen.findByText('L3Harris')
+    const [btnA, btnB] = screen.getAllByText('발행')
+    fireEvent.click(btnA)
+    fireEvent.click(btnB)
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(2))
+    expect(btnA.disabled).toBe(true)
+    expect(btnB.disabled).toBe(true)
+
+    pending.A({ data: { ok: true } })
+    await waitFor(() => expect(btnA.disabled).toBe(false))
+    expect(btnB.disabled).toBe(true)  // B는 아직 진행 중 — 재발행 방지
+
+    pending.B({ data: { ok: true } })
+    await waitFor(() => expect(btnB.disabled).toBe(false))
+  })
+
   it('admin: 후보 선택 → 추가 호출', async () => {
     mockRole = 'admin'
     api.put.mockResolvedValue({ data: { ok: true } })
