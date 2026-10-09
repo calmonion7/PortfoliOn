@@ -31,7 +31,7 @@ export default function useReportList() {
 
   // 세대 가드(B49, task#379) — 마운트·↺·추가/삭제/핀 후 재조회가 겹치면 마지막으로 발행한
   // 요청만 목록·로딩·실패 상태를 만진다(옛 응답이 방금 추가한 종목을 지우던 경합).
-  // ⚠️ useReportGeneration의 `/api/report/list` → applyList 경로는 이 세대 밖이다(task#380 N4).
+  // 생성 후 재조회는 refreshList가 같은 세대에 편입한다(task#383).
   const listGenRef = useRef(0)
   const fetchList = useCallback(() => {
     const myGen = ++listGenRef.current
@@ -43,6 +43,22 @@ export default function useReportList() {
         if (myGen !== listGenRef.current) return
         console.warn('[useReportList] 리포트 목록(/api/report/list) 조회 실패', e)
         setListFailed(true)
+      })
+      .finally(() => {
+        if (myGen !== listGenRef.current) return
+        setListLoading(false); setHasFetched(true)
+      })
+  }, [applyList])
+
+  /** 생성 완료 뒤 조용한 재조회 — 세대에 편입(진행 중 fetchList를 밀어낸다)하되 `listLoading`은 켜지 않고,
+   *  밀어낸 fetchList의 finally가 게이트되므로 로딩 해제는 이 요청이 소유한다. 실패는 기존 목록 유지(경고만). */
+  const refreshList = useCallback(() => {
+    const myGen = ++listGenRef.current
+    api.get('/api/report/list')
+      .then(({ data }) => { if (myGen === listGenRef.current) applyList(data) })
+      .catch((e) => {
+        if (myGen !== listGenRef.current) return
+        console.warn('[useReportList] 리포트 목록 조용한 재조회 실패', e)
       })
       .finally(() => {
         if (myGen !== listGenRef.current) return
@@ -88,7 +104,7 @@ export default function useReportList() {
 
   return {
     reportList, lastScheduledDates, listLoading, hasFetched, listFailed,
-    guruMap, fetchList, applyList,
+    guruMap, fetchList, applyList, refreshList,
     holdingsCount, watchlistAll, watchlistCount,
     watchlistWarnCount, watchlistLowCount, watchlistHighCount,
     _targetPct, _hasWarning, _isUngenerated,

@@ -42,7 +42,7 @@ describe('useReportGeneration — 틱 겹침', () => {
     const calls = stub({
       '/api/report/progress': (n) => (n === 1 ? d1.p : Promise.resolve({ data: { running: true, done: 5, total: 10, failed: [] } })),
     })
-    const { result } = renderHook(() => useReportGeneration({ onApplyList: vi.fn() }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList: vi.fn() }))
     await act(async () => { await result.current.generateBatch(['A']) })
 
     await tick(1600 * 4) // 틱 4번 분량 동안 tick-1이 안 돌아옴
@@ -61,7 +61,7 @@ describe('useReportGeneration — 틱 겹침', () => {
       '/api/report/progress': (n) => (n === 1 ? d1.p : Promise.resolve({ data: { running: true, done: 1, total: 9, failed: [] } })),
       '/api/report/list': () => Promise.resolve({ data: [] }),
     })
-    const { result } = renderHook(() => useReportGeneration({ onApplyList: vi.fn() }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList: vi.fn() }))
     await act(async () => { await result.current.generateBatch(['A']) })
     await tick(1600) // P1 tick-1 in flight
     await act(async () => { await result.current.generateBatch(['B']) }) // P2 시작
@@ -84,7 +84,7 @@ describe('useReportGeneration — 틱 겹침', () => {
     const calls = stub({
       '/api/report/progress': (n) => (n === 1 ? old : n === 2 ? p2.p : Promise.resolve({ data: { running: true, done: 1, total: 9, failed: [] } })),
     })
-    const { result } = renderHook(() => useReportGeneration({ onApplyList: vi.fn() }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList: vi.fn() }))
     await act(async () => { await result.current.generateBatch(['A']) })
     await tick(1600) // P1 tick-1 in flight
     await act(async () => { await result.current.generateBatch(['B']) }) // P2 시작

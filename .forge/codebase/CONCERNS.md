@@ -140,6 +140,8 @@ mapped: 2026-09-14
 
 > **해소: 2026-08-23 (task#336) — B9 닫힘.** task#333 스텁의 재그릴링 산출물 2/3. `frontend/src/api.js`에 401 반사적 단일비행 갱신을 넣었다 — 모듈 레벨 `refreshInFlight` promise 1개(동시 401 N건이 `/api/auth/refresh`를 정확히 1회만 호출), raw `fetch`(인터셉터 재귀 방지), `_retried` 가드로 1회 한정 재시도, 성공 시 응답의 새 `access_token`·`refresh_token` **둘 다 저장(회전 반영)**, 실패 시 기존 `logoutRedirect()`(토큰 삭제+전체 리로드) 불변. 적대 검토가 백엔드 `consume_refresh_token`의 SELECT/DELETE TOCTOU(로그아웃과 회전이 경합하면 로그아웃이 무효화됨)를 잡아 `DELETE...RETURNING` 단일 원자문으로 교체했고, 프론트에도 「진행 중이던 회전이 로그아웃의 삭제를 되살리는」 대칭 레이스를 막는 `stillCurrent` 가드를 짝으로 넣었다. 회귀축은 `frontend/src/test/api-token-refresh.test.js`(6건, red-first: 원본은 무조건 로그아웃이라 갱신 메커니즘 자체가 없어 4종 FAIL·2종은 우연한 통과였음을 fault-injection으로 확인). **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
 
+> **해소: 2026-10-10 (task#383) — B49·B81 닫힘.** **B49**: 마지막 미가드였던 `useReportGeneration`의 POST·생성 후 목록 경합을 닫았다(§7.3 해당 행). **B81**: 실측(2026-10-09) `tech_reports` 15행 전부 `length(title) BETWEEN 40 AND 120` — 루틴 재발행으로 자연 수렴. **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
+
 > **해소: 2026-08-23 (task#337) — B20 닫힘.** `routers/auth.py::login`/`::register` 본문 첫 줄에 IP 슬라이딩 윈도우 레이트리밋을 배선했다(`services/rate_limit.py` 신설) — login 10회/5분·register 3회/1시간, 키는 `CF-Connecting-IP`만 신뢰(`X-Forwarded-For`는 배제, 헤더 부재 시 `request.client.host`로 페일클로즈). bcrypt(의도적으로 비싼 CPU 연산) 직전에 판정해 초과 시 429+`Retry-After`. 근거: `.forge/adr/260823-085145-auth-rate-limit-in-process-cf-ip.md`(단일 프로세스 인메모리 카운터 — uvicorn `--workers` 미지정 가정에 의존). **적대적 검토가 배포 전 결함 2건을 추가로 잡았다** — ⓐ `check()`의 판정-후-기록이 `_lock` 없이는 경합 창(과다허용·`popleft` IndexError·기록 소실)을 만든다는 것을 스레드 barrier로 강제 재현해 `threading.Lock`으로 전체를 원자화했다 ⓑ ADR이 전제한 「공개 경로는 Cloudflare Tunnel뿐」이 `docker-compose.yml`/`deploy.sh`의 nginx 포트 게시(`0.0.0.0:80`)로는 **강제되지 않아** LAN 직접 접속이 우회로다 → **이것은 닫지 않았고 `B82`로 신규 등록했다**(아래 표). 수복 단계가 게시를 `127.0.0.1`로 좁히는 변경을 만들었으나 **오케스트레이터가 되돌렸다**: 그것은 사용자 머신의 네트워크 노출을 바꾸는 결정이고(LAN에서 직접 접속하는 습관이 있으면 조용히 깨진다) ADR이 계층 선택을 다루면서 인프라는 건드리지 않기로 한 문서라, 무인 드라이브가 단독으로 넘을 문턱이 아니다. 레이트리밋 자체는 **실사용 경로(Cloudflare 경유) 전부를 보호**하므로 부재보다 확실히 낫다. `API_SPEC.md`의 `login`/`register` 두 절에 `429`(+`Retry-After`) 응답을 문서화했다. **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
 >
 > ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B6`(부분)·`B21`·`B49`(부분)·`B63`·`B80`·`B81`은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다. 특히 `B63`(프론트 포매터 중복)은 **task#337에서 명시적 비목표로 확인** — 이 파트가 `routers/auth.py`를 만졌으므로 「인증 정리하며 포매터도 같이 됐겠지」로 오독하기 쉬운데 손대지 않았다. 근거는 task#271/ADR-0031(정본 5종을 세우고 남은 둘은 「소비처가 2곳 이상으로 늘면 재검토」로 의도적 로컬 유지) — 합치면 **기록된 결정을 조용히 되돌린다.**
@@ -194,7 +196,6 @@ mapped: 2026-09-14
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| **B81** | **부분 해소(스키마 닫힘, task#342)** — `TechReportIn.title`에 `min_length=40, max_length=120`을 걸어 **무제한 필드를 닫았고**, 두 모집단을 만든 발생원 셋을 함께 정정했다: 루틴 프롬프트에 `title` 지시 신설(40~120 · 「기술 이름을 넣지 마라」 · POST 전 길이 자가검증) · API 문서 2종의 필드표와 리포트 예시 3곳(전부 17~24자 이름형이라 **문서가 이름형을 가르치고 있었다**) · 「`title`은 150자 헤드라인」이라 적힌 3곳(`routers/tech_reports.py` docstring · `API_SPEC.md` index 필드표 · `test_tech_reports_index.py` docstring)을 120자로. ⚠️ **원 항목의 「m390 14997px」는 오측이다 — 실측 4999px**(정확히 1/3). 나머지 서술(두 모집단·상한 부재·7:8 분할)은 참이었다. ⚠️ **원 처방 ⓑ(루틴이 `title`에 *이름*을 넣도록 정정)는 기각했다** — `title`은 목록 카드(eyebrow가 표시명)와 상세(`<h1>`이 표시명) **양쪽 모두**에서 그 아래 오는 리드 문단이라, ⓑ대로 하면 h1 바로 밑 리드가 h1을 되풀이한다. 채택한 것은 ⓐ(스키마 상한)이고 ⓒ(카드 전용 요약 필드)도 기각했다(eyebrow+`title` 2층이 이미 작동한다). 근거 ADR `260830-212846`. **잔존**: 기존 15종은 소급 검증되지 않아(ADR-0038, slug당 1행) 지금도 이름형 7 · 120자 초과 6이 화면에 남아 있다 — **루틴 재발행으로 자연 수렴**하며, 이는 **의도된 트레이드오프이지 미룬 결함이 아니다**(발행물 즉시 보정은 프로덕션 쓰기이고, 잘못된 리드를 급히 지어내는 비용이 기다리는 비용보다 크다). ⚠️ 그래서 **재발행 시 13/15가 422 대상**이므로 루틴 프롬프트 지시가 이 항목의 실질 게이트다 | `routers/tech_reports.py::TechReportIn.title`(닫힘) · `scripts/cowork-routine-prompt.md`(지시 신설) · `API_SPEC.md`·`CLAUDE_COWORK_API.md`(예시·필드표) · 기존 발행 15종(열림, 자연 수렴 대기) | 루틴이 다음 판을 발행할 때까지 화면의 두 모집단은 유지된다 |
 > ✅ **`B80` 해소 (task#340, 2026-08-30)** — `routers/report.py::get_report`가 `date_str`을
 > `date.fromisoformat`으로 검증한 뒤 **DB 조회 앞에서** 404를 내도록 했다(형제
 > `routers/analyst_reports.py::get_detail`와 동형 — 같은 저장소에 이미 있던 가드다).
@@ -280,7 +281,6 @@ mapped: 2026-09-14
 
 | # | 결함 | 위치 (심볼) |
 |---|---|---|
-| **B49** | **부분(장부 닫힘, task#331·#379)** — task#331이 주 인스턴스(`pages/Reports.jsx` 상세 fetch)와 형제 4곳을, task#379가 §7.3 장부 6곳(`Ranking::onRowClick` · `Calendar` 월 이펙트 · `Recommendations::handleChip` · `StockSearchBox` · `usePortfolioData` · `useReportList`)과 전수 조사(S0) 신규 2곳(`DetailTab::ConsensusSummary.handleRefresh` · `SectorTab` 마켓 이펙트)을 닫았다. 세대 가드는 「늦은 착지」만 막으므로 식별자 변경 시 **`null`(미조회) 리셋**을 쌍으로 둔다(`[]`는 「0건」이라는 거짓 진술). **남은 미가드(2부, task#380)**: `useReportGeneration` 폴링 tick·실패 경로·완료 후 `applyList` · `AdminAnalytics::showUserHistory` · `AnalystReports::firePublish` · `Reports` 그외 탭 목록 · `PermissionPanel` · `BatchScheduleEditor`/`Settings::BatchHub.load` · 진행률 폴링 4페이지 | `frontend/src/pages/Reports.jsx` 상세 fetch·§7.3 닫힘 행(닫힘) · §7.3 표의 task#380 행(열림) |
 | B63 | 프론트 포매터 중복 — 재계수 완료(§13.2에서 열림 확정, task#292) | `frontend/src/utils.js` 및 산발 포매터 (§7.7·§7.9) |
 
 > ✅ **`B83` 해소 (task#378, 2026-10-08)** — 고칠 위치는 도착지 한 곳(`pages/Reports.jsx::Reports`의
@@ -933,7 +933,7 @@ if (err.response?.status === 401) {
 | — | N13 `components/GlobalSearch.jsx` | **제외(task#380, 비현실)** — PC 인라인 검색은 남지만 `/api/stocks` ~100ms 안에 재검색·선택해야 성립 |
 | — | N10 `pages/Reports.jsx` 그외 탭 목록 | **제외(task#380, 도달 불가)** — 재조회 중 목록이 스켈레톤이라 전역삭제 진입점이 없다 |
 | — | N11 `components/BatchScheduleEditor.jsx` + `pages/Settings.jsx::BatchHub.load` | **제외(task#380, 비현실)** — `onSaved={load}`가 spec을 버리고 재조회만 하므로 ~100ms 안 이중 저장이 필요하다 |
-| MED | `hooks/useReportGeneration.js::generateOne`/`generateBatch` POST in-flight · 완료 후 목록 → `applyList` | **범위 밖 미가드(task#380 발견)** — 폴링 tick은 위에서 닫혔지만 POST 자체는 세대 밖이다: A의 POST가 in-flight인 채 B 생성을 시작하면 늦은 A 실패가 `setGenerating(null)`·실패 토스트로 B를 덮고, 늦은 A 성공은 `_startPoll`로 B 폴링을 대체한다(서버가 동시 생성을 409로 거부하므로 창은 POST 왕복 시간). `applyList`는 `useReportList` 세대 밖(위 행) |
+| MED | `hooks/useReportGeneration.js::generateOne`/`generateBatch` POST in-flight · 완료 후 목록 | **닫힘(task#383)** — POST 요청 세대(`reqRef`)로 밀린 요청의 늦은 응답을 규칙화(성공·409 무시, 그 밖의 실패는 종목명 토스트만)하고, 생성 후 목록은 `useReportList.refreshList`(조용한 재조회, 목록 세대 편입)로 바꿨다. 카드 본문 클릭도 `generating`이면 `generateOne`을 부르지 않는다(StockCard·TickerListItem) |
 | ? | `pages/GuruDetail.jsx` | **미판정** — task#379 S4가 도달 불가로 반박했으나 task#380은 재판정하지 않았다 |
 
 ### 7.4 삼켜진 fetch가 "데이터 없음"으로 위장한다 — **확인된 버그**

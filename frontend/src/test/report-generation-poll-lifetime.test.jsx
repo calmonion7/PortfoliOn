@@ -29,8 +29,8 @@ import api from '../api'
 import useReportGeneration from '../hooks/useReportGeneration'
 
 /** `pages/Reports.jsx`와 **같은 배선**으로 훅을 감싼 소비처. 이 래퍼가 이 파일의 존재 이유다. */
-function Consumer({ onApplyList }) {
-  const { genProgress, generateBatch, cleanup } = useReportGeneration({ onApplyList })
+function Consumer({ onRefreshList }) {
+  const { genProgress, generateBatch, cleanup } = useReportGeneration({ onRefreshList })
   useEffect(() => cleanup, [cleanup]) // ← pages/Reports.jsx 의 배선을 그대로 재현
   return (
     <div>
@@ -67,7 +67,7 @@ describe('소비처 배선에서 폴링이 살아 있는다', () => {
     api.post.mockResolvedValue({ data: {} })
     const calls = countingProgress({ running: true, done: 1, total: 20, failed: [] })
 
-    const { getByText } = render(<Consumer onApplyList={vi.fn()} />)
+    const { getByText } = render(<Consumer onRefreshList={vi.fn()} />)
     await act(async () => { getByText('gen').click() })
 
     // 5틱을 굴린다. 폴러가 살아 있으면 progress 호출이 그만큼 쌓인다.
@@ -93,7 +93,7 @@ describe('소비처 배선에서 폴링이 살아 있는다', () => {
 describe('폴링은 유계다 — 그러나 정상 생성은 끊지 않는다', () => {
   /** 폴러를 띄우고 N틱 굴린 뒤, 「멈췄는가」를 *추가 호출이 없다*로 판정한다. */
   async function runTicks(ticks) {
-    const { getByText } = render(<Consumer onApplyList={vi.fn()} />)
+    const { getByText } = render(<Consumer onRefreshList={vi.fn()} />)
     await act(async () => { getByText('gen').click() })
     for (let i = 0; i < ticks; i++) {
       await act(async () => { await vi.advanceTimersByTimeAsync(1600) })
@@ -146,7 +146,7 @@ describe('폴링은 유계다 — 그러나 정상 생성은 끊지 않는다', 
 
   it('ⓓ 정상 완료는 그대로 — 완료 응답에서 폴링을 접고 목록을 갱신한다', async () => {
     api.post.mockResolvedValue({ data: {} })
-    const onApplyList = vi.fn()
+    const onRefreshList = vi.fn()
     let i = 0
     const seq = [
       { running: true, done: 1, total: 2, failed: [] },
@@ -159,13 +159,13 @@ describe('폴링은 유계다 — 그러나 정상 생성은 끊지 않는다', 
       return Promise.resolve({ data: {} })
     })
 
-    const { getByText } = render(<Consumer onApplyList={onApplyList} />)
+    const { getByText } = render(<Consumer onRefreshList={onRefreshList} />)
     await act(async () => { getByText('gen').click() })
     for (let t = 0; t < 3; t++) await act(async () => { await vi.advanceTimersByTimeAsync(1600) })
     const atStop = calls
     await act(async () => { await vi.advanceTimersByTimeAsync(1600 * 4) })
 
     expect(calls).toBe(atStop)          // 완료 후 폴링이 멈춘다
-    expect(onApplyList).toHaveBeenCalled()
+    expect(onRefreshList).toHaveBeenCalled()
   })
 })

@@ -13,7 +13,7 @@ const MAX_FAIL_STREAK = 5
  *  과도 상태도 같은 모양이므로, 한두 틱이 아니라 연속 N회를 요구한다. */
 const MAX_IDLE_STREAK = 5
 
-export default function useReportGeneration({ onApplyList }) {
+export default function useReportGeneration({ onRefreshList }) {
   const { showToast } = useToast()
   const [generating, setGenerating] = useState(null)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0, failed: [] })
@@ -21,6 +21,7 @@ export default function useReportGeneration({ onApplyList }) {
   const failStreakRef = useRef(0)
   const idleStreakRef = useRef(0)
   const inFlightRef = useRef(false)
+  const reqRef = useRef(0) // 생성 요청 세대 — POST 발행 뒤 다른 생성이 시작되면 이 요청은 「밀린」 것이다
   const genRef = useRef(0) // 폴링 세대 — 중단·재시작마다 올라, 옛 틱의 착지를 무효화한다
 
   /** 폴링 중단. **`useCallback`으로 안정화한 것이 이 훅의 계약 중 하나다** — 아래 이펙트와
@@ -70,9 +71,7 @@ export default function useReportGeneration({ onApplyList }) {
         _stopPoll()
         setGenerating(null)
         onDone(data)
-        api.get('/api/report/list')
-          .then(({ data: list }) => onApplyList(list))
-          .catch((e) => console.warn('[useReportGeneration] 생성 후 목록 갱신 실패', e))
+        onRefreshList()   // 목록 세대에 편입된 조용한 재조회 — 사용자 재조회와 엇갈려도 옛 응답이 덮지 않는다
         return
       }
       if (data.running) {
@@ -126,7 +125,12 @@ export default function useReportGeneration({ onApplyList }) {
     })
   }
 
-  const _handleError = (err) => {
+  /** 밀린 요청(stale)의 늦은 실패: 409는 무시, 그 밖은 `generating`·폴링을 건드리지 않고 이름 붙은 토스트만. */
+  const _handleError = (err, stale, label) => {
+    if (stale) {
+      if (err?.response?.status !== 409) showToast(`${label} 실패`, 'error')
+      return
+    }
     if (err?.response?.status === 409) return _handleConflict(err)
     setGenerating(null)
     showToast('리포트 생성 실패', 'error')
@@ -136,8 +140,10 @@ export default function useReportGeneration({ onApplyList }) {
     setGenerating(ticker)
     setGenProgress({ done: 0, total: 0, failed: [] })
     _stopPoll()
+    const myReq = ++reqRef.current
     try {
       await api.post(`/api/report/generate/${ticker}`)
+      if (myReq !== reqRef.current) return
       _startPoll((data) => {
         if (data.failed?.length) {
           const f = data.failed[0]
@@ -150,7 +156,7 @@ export default function useReportGeneration({ onApplyList }) {
         }
       })
     } catch (err) {
-      _handleError(err)
+      _handleError(err, myReq !== reqRef.current, `${ticker} 리포트 생성`)
     }
   }
 
@@ -159,9 +165,11 @@ export default function useReportGeneration({ onApplyList }) {
     setGenerating('__batch__')
     setGenProgress({ done: 0, total: 0, failed: [] })
     _stopPoll()
+    const myReq = ++reqRef.current
     try {
       // date 생략 → 서버가 종목 market별 기대날짜(KR/US)로 분리 생성한다.
       await api.post(`/api/report/generate?tickers=${tickers.join(',')}`)
+      if (myReq !== reqRef.current) return
       _startPoll((data) => {
         if (data.failed?.length) {
           const names = _failedNames(data.failed).join(', ')
@@ -175,7 +183,7 @@ export default function useReportGeneration({ onApplyList }) {
         }
       })
     } catch (err) {
-      _handleError(err)
+      _handleError(err, myReq !== reqRef.current, '일괄 생성 요청')
     }
   }
 

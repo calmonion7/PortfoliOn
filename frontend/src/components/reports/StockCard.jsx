@@ -66,7 +66,7 @@ export default function StockCard({
   return (
     <div
       key={ticker}
-      onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
+      onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : (!generating && generateOne(ticker))}
       className="stock-card anim-fade-up"
       style={{ borderLeft: `3px solid ${weatherAccent}` }}
     >

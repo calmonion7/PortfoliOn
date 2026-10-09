@@ -27,7 +27,7 @@ vi.mock('../hooks/useReportList', () => ({
       AAA: { category: 'holdings', market: 'US', dates: ['2026-07-01'], summary: { market: 'US' } },
       BBB: { category: 'holdings', market: 'US', dates: ['2026-07-02'], summary: { market: 'US' } },
     },
-    listLoading: false, guruMap: {}, fetchList: vi.fn(), applyList: vi.fn(),
+    listLoading: false, guruMap: {}, fetchList: vi.fn(), applyList: vi.fn(), refreshList: vi.fn(),
     holdingsCount: 2, watchlistCount: 0, watchlistWarnCount: 0, watchlistLowCount: 0, watchlistHighCount: 0,
     _targetPct: () => null, _hasWarning: () => false, _isUngenerated: () => false,
     ungeneratedTickers: [], ungeneratedCount: 0,

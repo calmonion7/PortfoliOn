@@ -50,9 +50,9 @@ describe('409(이미 진행 중)을 실패로 표시하지 않는다', () => {
   it('generateOne — 「생성 실패」 대신 서버 detail을 warning으로 알린다', async () => {
     api.post.mockRejectedValue(conflict())
     api.get.mockImplementation(progressSequence([{ running: true, done: 0, total: 1, failed: [] }]))
-    const onApplyList = vi.fn()
+    const onRefreshList = vi.fn()
 
-    const { result } = renderHook(() => useReportGeneration({ onApplyList }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList }))
     await act(async () => { await result.current.generateOne('MSFT') })
 
     const msgs = showToast.mock.calls.map(c => c[0])
@@ -67,7 +67,7 @@ describe('409(이미 진행 중)을 실패로 표시하지 않는다', () => {
     api.post.mockRejectedValue(conflict())
     api.get.mockImplementation(progressSequence([{ running: true, done: 1, total: 5, failed: [] }]))
 
-    const { result } = renderHook(() => useReportGeneration({ onApplyList: vi.fn() }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList: vi.fn() }))
     await act(async () => { await result.current.generateBatch(['AAPL', 'MSFT']) })
 
     const msgs = showToast.mock.calls.map(c => c[0])
@@ -85,9 +85,9 @@ describe('409 뒤에도 진행 중인 생성의 폴링이 이어진다', () => {
       { running: true, done: 1, total: 3, failed: [] },
       { running: false, done: 3, total: 3, failed: [] },
     ]))
-    const onApplyList = vi.fn()
+    const onRefreshList = vi.fn()
 
-    const { result } = renderHook(() => useReportGeneration({ onApplyList }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList }))
     await act(async () => { await result.current.generateOne('MSFT') })
 
     // 1차 폴 — 진행 중인 생성의 진행률이 화면에 실린다(수정 전엔 폴러가 없어 0/0 고정).
@@ -96,7 +96,7 @@ describe('409 뒤에도 진행 중인 생성의 폴링이 이어진다', () => {
 
     // 2차 폴 — 완료 감지 → 완료 토스트 + 목록 갱신
     await act(async () => { await vi.advanceTimersByTimeAsync(1600) })
-    expect(onApplyList).toHaveBeenCalled()
+    expect(onRefreshList).toHaveBeenCalled()
     expect(showToast.mock.calls.map(c => c[0]).join(' ')).toMatch(/완료/)
 
     result.current.cleanup()
@@ -108,7 +108,7 @@ describe('409 뒤에도 진행 중인 생성의 폴링이 이어진다', () => {
       { running: false, done: 3, total: 3, failed: [] },
     ]))
 
-    const { result } = renderHook(() => useReportGeneration({ onApplyList: vi.fn() }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList: vi.fn() }))
     await act(async () => { await result.current.generateOne('MSFT') })
     await act(async () => { await vi.advanceTimersByTimeAsync(1600) })
 
@@ -126,16 +126,16 @@ describe('대조군 — 409가 아닌 실패는 종전대로 「생성 실패」
     err.response = { status: 500, data: {} }
     api.post.mockRejectedValue(err)
     api.get.mockImplementation(progressSequence([{ running: false, done: 9, total: 9, failed: [] }]))
-    const onApplyList = vi.fn()
+    const onRefreshList = vi.fn()
 
-    const { result } = renderHook(() => useReportGeneration({ onApplyList }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList }))
     await act(async () => { await result.current.generateOne('MSFT') })
 
     expect(showToast).toHaveBeenCalledWith('리포트 생성 실패', 'error')
     expect(result.current.generating).toBe(null)
 
     await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
-    expect(onApplyList).not.toHaveBeenCalled()   // 폴러가 서지 않았다
+    expect(onRefreshList).not.toHaveBeenCalled()   // 폴러가 서지 않았다
   })
 
   it('202 성공 경로는 종전대로 폴링·완료 토스트가 종목명을 싣는다', async () => {
@@ -143,14 +143,14 @@ describe('대조군 — 409가 아닌 실패는 종전대로 「생성 실패」
     api.get.mockImplementation(progressSequence([
       { running: false, done: 1, total: 1, failed: [] },
     ]))
-    const onApplyList = vi.fn()
+    const onRefreshList = vi.fn()
 
-    const { result } = renderHook(() => useReportGeneration({ onApplyList }))
+    const { result } = renderHook(() => useReportGeneration({ onRefreshList }))
     await act(async () => { await result.current.generateOne('MSFT') })
     expect(result.current.generating).toBe('MSFT')
 
     await act(async () => { await vi.advanceTimersByTimeAsync(1600) })
-    expect(onApplyList).toHaveBeenCalled()
+    expect(onRefreshList).toHaveBeenCalled()
     expect(showToast).toHaveBeenCalledWith('MSFT 리포트 생성 완료')
   })
 })

@@ -20,7 +20,7 @@ export default function TickerListItem({
   return (
     <div
       key={ticker}
-      onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : generateOne(ticker)}
+      onClick={() => (hasReport && !isBroken) ? openDetail(ticker, info.dates[0]) : (!generating && generateOne(ticker))}
       className="report-item anim-fade-up"
       style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', background: isSelected ? 'var(--surface-hover)' : undefined, outline: isSelected ? '2px solid var(--accent)' : undefined, outlineOffset: -1 }}
     >

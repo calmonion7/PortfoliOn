@@ -19,7 +19,7 @@ vi.mock('../hooks/useReportList', () => ({
     reportList: listState.reportList,
     listLoading: listState.listLoading,
     listFailed: listState.listFailed,
-    guruMap: {}, fetchList, applyList: vi.fn(),
+    guruMap: {}, fetchList, applyList: vi.fn(), refreshList: vi.fn(),
     holdingsCount: 1, watchlistCount: 0, watchlistWarnCount: 0, watchlistLowCount: 0, watchlistHighCount: 0,
     _targetPct: () => null, _hasWarning: () => false, _isUngenerated: () => false,
     ungeneratedTickers: [], ungeneratedCount: 0,

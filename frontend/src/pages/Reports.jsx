@@ -37,14 +37,14 @@ export default function Reports({ initialTicker = null, navKey = null }) {
 
   const {
     reportList, listLoading, listFailed,
-    guruMap, fetchList, applyList,
+    guruMap, fetchList, applyList, refreshList,
     holdingsCount, watchlistCount,
     watchlistWarnCount, watchlistLowCount, watchlistHighCount,
     _targetPct, _hasWarning, _isUngenerated,
     ungeneratedTickers, ungeneratedCount,
   } = useReportList()
 
-  const { generating, genProgress, generateOne, generateBatch } = useReportGeneration({ onApplyList: applyList })
+  const { generating, genProgress, generateOne, generateBatch } = useReportGeneration({ onRefreshList: refreshList })
 
   const { stocks, watchlist, fetchAll } = usePortfolioData()
 
