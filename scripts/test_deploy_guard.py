@@ -20,14 +20,31 @@ REPO = Path(__file__).resolve().parent.parent
 REAL_PROJECT = "/Users/calmonion/Project/PortfoliOn"
 REAL_LOCK = "/tmp/portfolion-deploy.lock"
 REAL_LOG = "/Users/calmonion/Library/Logs/com.portfolion.auto-deploy-poll.log"
+REAL_MARKER = "/Users/calmonion/.portfolion-deployed-sha"
+REAL_FAILED = "/Users/calmonion/.portfolion-deploy-failed-sha"
+# 폴러가 PATH 뒤에 덧붙이는 실 도구 디렉터리(task#382). 복사본에서는 덫 디렉터리로 바꾼다 —
+# PATH 를 앞에 붙이는 회귀가 생겨도 실 npm·docker 대신 덫이 불려 기록만 남고 exit 1 한다.
+REAL_TOOL_DIRS = ("/Users/calmonion/.local/share/fnm/aliases/default/bin", "/usr/local/bin")
 
 STUB = """#!/bin/bash
 echo "$(basename "$0") $*" >> "$STUB_CALLS"
 if [ "$(basename "$0")" = "npm" ] && [ -n "$STUB_NPM_COMMIT" ] && [ "$1" = "run" ]; then
   git commit -q --allow-empty -m "mid-build commit"
 fi
+if [ "$(basename "$0")" = "npm" ] && [ -n "$STUB_NPM_RC" ]; then exit "$STUB_NPM_RC"; fi
 if [ "$(basename "$0")" = "curl" ]; then echo ok; fi
 exit 0
+"""
+
+TRAP = """#!/bin/bash
+echo "TRAP $(basename "$0") $*" >> "$STUB_CALLS"
+exit 1
+"""
+
+# 폴러가 부르는 deploy.sh 를 대신하는 스텁 — 잠금 존재 여부와 종료코드만 다룬다.
+DEPLOY_STUB = """#!/bin/bash
+echo "deploy-stub lock=$([ -e "$DEPLOY_LOCK" ] && echo yes || echo no)" >> "$STUB_CALLS"
+exit {rc}
 """
 
 
@@ -61,11 +78,19 @@ class Env:
         self.lock = tmp / "deploy.lock"
         self.log = tmp / "poll.log"
         self.calls = tmp / "calls.txt"
+        self.marker = tmp / "deployed-sha"
+        self.failed = tmp / "deploy-failed-sha"
         stubs = tmp / "stubs"
         stubs.mkdir()
         for name in ("npm", "docker", "curl", "sleep"):
             s = stubs / name
             s.write_text(STUB)
+            s.chmod(0o755)
+        trap = tmp / "trap"
+        trap.mkdir()
+        for name in ("npm", "docker"):
+            s = trap / name
+            s.write_text(TRAP)
             s.chmod(0o755)
         home = tmp / "home"
         home.mkdir()
@@ -77,6 +102,8 @@ class Env:
             "PROJECT_DIR": str(self.work),
             "LOG": str(self.log),
             "DEPLOY_LOCK": str(self.lock),
+            "DEPLOY_MARKER": str(self.marker),
+            "DEPLOY_FAILED_MARKER": str(self.failed),
         }
 
         _git(tmp, "init", "-q", "--bare", "-b", "main", str(self.origin))
@@ -86,8 +113,13 @@ class Env:
             text = (REPO / rel).read_text()
             text = (text.replace(REAL_PROJECT, str(self.work))
                         .replace(REAL_LOCK, str(self.lock))
-                        .replace(REAL_LOG, str(self.log)))
-            for lit in (REAL_PROJECT, REAL_LOCK, REAL_LOG):
+                        .replace(REAL_LOG, str(self.log))
+                        .replace(REAL_MARKER, str(self.marker))
+                        .replace(REAL_FAILED, str(self.failed)))
+            for d in REAL_TOOL_DIRS:
+                text = text.replace(d, str(trap))
+            for lit in (REAL_PROJECT, REAL_LOCK, REAL_LOG, REAL_MARKER, REAL_FAILED,
+                        *REAL_TOOL_DIRS):
                 assert lit not in text, f"실 경로 리터럴 잔존: {lit}"
             dst = self.work / rel
             dst.parent.mkdir(parents=True, exist_ok=True)
@@ -119,6 +151,24 @@ class Env:
 
     def docker_called(self):
         return self.calls.exists() and "docker " in self.calls.read_text()
+
+    def call_log(self):
+        return self.calls.read_text() if self.calls.exists() else ""
+
+    def poll_log(self):
+        return self.log.read_text() if self.log.exists() else ""
+
+    def read(self, path):
+        return path.read_text().strip() if path.exists() else None
+
+    def stub_deploy(self, rc):
+        """작업트리의 deploy.sh 를 스텁으로 덮는다(커밋하지 않음 — README 만 바뀌는 ff 는 통과)."""
+        p = self.work / "deploy.sh"
+        p.write_text(DEPLOY_STUB.format(rc=rc))
+        p.chmod(0o755)
+
+    def deploy_stub_calls(self):
+        return self.call_log().count("deploy-stub")
 
     def run(self, script, **extra):
         env = {**self.env, **extra}
@@ -236,3 +286,155 @@ def test_poller_diverged_keeps_head(e):
     e.poll()
     assert e.head() == before
     assert not e.docker_called()
+
+
+# ── task#382: 배포 기록 · 사전 거부 exit 2 · 폴러 실배포 ─────────────────────
+# 기록 파일(DEPLOY_MARKER)은 deploy.sh 가 성공 끝에 쓰고, 폴러는 origin/main 과 그것을
+# 대조해 배포한다. 사전 거부(컨테이너를 건드리기 전 종료)는 exit 2 → 폴러가 재시도,
+# 그 밖의 비0 은 실패 → 폴러가 실패 기록에 그 SHA 를 쓰고 같은 커밋을 다시 시도하지 않는다.
+
+def test_deploy_success_writes_marker(e):
+    r = e.deploy()
+    assert r.returncode == 0, _out(r)
+    assert e.read(e.marker) == e.head()
+
+
+def _ahead(e):
+    e.local_commit()
+
+
+def _diverged(e):
+    e.push_from_other()
+    e.local_commit()
+
+
+def _uncommitted(e):
+    (e.work / "frontend/app.js").write_text("dirty\n")
+
+
+def _fetch_fail(e):
+    _git(e.work, "remote", "set-url", "origin", str(e.tmp / "missing.git"))
+
+
+def _locked(e):
+    e.lock.write_text("")
+
+
+@pytest.mark.parametrize("setup", [_ahead, _diverged, _uncommitted, _fetch_fail, _locked],
+                         ids=["ahead", "diverged", "uncommitted", "fetch-fail", "locked"])
+def test_deploy_precheck_refusal_is_exit2_and_keeps_marker(e, setup):
+    e.marker.write_text("previous\n")
+    setup(e)
+    r = e.deploy()
+    assert r.returncode == 2, _out(r)
+    assert not e.docker_called()
+    assert e.read(e.marker) == "previous"
+
+
+def test_deploy_refusal_on_lock_leaves_foreign_lock(e):
+    """잠금을 남이 잡았으면 거부하되, 그 잠금을 지우지 않는다."""
+    e.lock.write_text("")
+    e.deploy()
+    assert e.lock.exists()
+
+
+def test_deploy_build_failure_is_exit1_even_if_tool_exits_2(e):
+    """사전 점검 이후의 실패는 도구의 종료코드와 무관하게 1 — 2 는 사전 거부 전용이다."""
+    e.marker.write_text("previous\n")
+    r = e.deploy(STUB_NPM_RC="2")
+    assert r.returncode == 1, _out(r)
+    assert e.read(e.marker) == "previous"
+
+
+def test_deploy_head_change_is_exit1_and_no_marker(e):
+    r = e.deploy(STUB_NPM_COMMIT="1")
+    assert r.returncode == 1, _out(r)
+    assert e.read(e.marker) is None
+
+
+def test_poller_equal_unrecorded_deploys(e):
+    """ⓐ 이 체크아웃에서 commit+push 한 경우 — HEAD == origin 이지만 배포 기록이 다르다."""
+    e.marker.write_text("stale\n")
+    e.poll()
+    sha = e.origin_head()
+    assert e.docker_called(), e.poll_log()
+    assert f"Deploy complete: {sha}" in e.poll_log()
+    assert e.read(e.marker) == sha
+
+
+def test_poller_equal_recorded_skips(e):
+    """ⓑ 이미 배포된 커밋은 다시 배포하지 않는다."""
+    e.marker.write_text(e.origin_head() + "\n")
+    e.poll()
+    assert not e.docker_called()
+    assert "Deploy" not in e.poll_log()
+
+
+def test_poller_behind_deploys_and_records(e):
+    """ⓒ 다른 곳에서 push → ff 후 배포."""
+    old = e.head()
+    e.marker.write_text(old + "\n")
+    e.push_from_other()
+    new = e.origin_head()
+    e.poll()
+    log = e.poll_log()
+    assert e.head() == new
+    assert f"New commit detected: {old} -> {new}" in log
+    assert f"Deploy complete: {new}" in log
+    assert log.index("New commit detected") < log.index("Deploy complete:")
+    assert e.read(e.marker) == new
+
+
+def test_poller_refused_exit2_retries_next_poll(e):
+    """ⓔ 사전 거부는 실패가 아니다 — 실패 기록 없이 다음 폴에서 재시도."""
+    e.stub_deploy(2)
+    e.poll()
+    assert e.deploy_stub_calls() == 1, e.poll_log()
+    assert "Deploy refused (exit 2)" in e.poll_log()
+    assert e.read(e.failed) is None
+    e.poll()
+    assert e.deploy_stub_calls() == 2
+
+
+def test_poller_failure_records_and_stops_retrying(e):
+    """ⓕ 빌드·기동 실패는 1회로 끝 — 같은 커밋을 2분마다 재기동하지 않는다."""
+    e.stub_deploy(1)
+    e.poll()
+    sha = e.origin_head()
+    assert e.deploy_stub_calls() == 1, e.poll_log()
+    assert f"Deploy FAILED (exit 1) — {sha}" in e.poll_log()
+    assert e.read(e.failed) == sha
+    e.poll()
+    assert e.deploy_stub_calls() == 1
+
+
+def test_poller_failure_retries_on_new_origin_commit(e):
+    """ⓕ 실패 기록은 새 push 가 오면 풀린다."""
+    e.stub_deploy(1)
+    e.poll()
+    e.push_from_other()
+    e.poll()
+    assert e.deploy_stub_calls() == 2, e.poll_log()
+
+
+def test_poller_does_not_take_lock(e):
+    """ⓖ 잠금은 deploy.sh 만 잡는다 — 폴러가 잡으면 deploy.sh 가 자기 잠금을 보고 끝난다(B84)."""
+    e.stub_deploy(0)
+    e.poll()
+    assert "deploy-stub lock=no" in e.call_log(), e.call_log() + e.poll_log()
+
+
+def test_poller_lock_present_skips_and_keeps_lock(e):
+    e.lock.write_text("")
+    e.poll()
+    assert not e.docker_called()
+    assert e.lock.exists()
+
+
+def test_poller_appends_path_so_stubs_win(e):
+    """ⓗ 폴러가 세우는 PATH 는 뒤에 덧붙인다 — 앞에 붙이면 실 npm·docker(여기선 덫)가 먼저 잡힌다."""
+    e.poll()
+    calls = e.call_log()
+    assert "TRAP" not in calls, calls
+    assert "npm run" in calls, calls + e.poll_log()
+    assert e.docker_called()

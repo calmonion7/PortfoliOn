@@ -153,7 +153,21 @@ mapped: 2026-09-14
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
-| B84 | 배포 폴러가 **배포에 한 번도 성공한 적이 없다**(task#377 기록, 미수정) — 폴러가 잠금 파일을 만든 뒤 `bash deploy.sh`를 부르는데, `deploy.sh`가 첫머리에서 바로 그 잠금을 보고 「이미 배포 중」으로 끝난다. 폴러 로그 실측 `Deploy complete` **0건** · `Deploy already in progress.` **43건**. 그래서 러너가 offline인 동안 자동 배포 경로가 없다(폴러는 작업트리를 ff로 동기화만 한다). 해소하려면 launchd 최소환경에서 npm·docker·keychain이 도는지 검증이 선행돼야 해 별도 태스크로 미뤘다 | `scripts/auto-deploy-poll.sh` 잠금 블록 · `deploy.sh` 잠금 블록 | 러너 offline 중 push(현재 상시 — 러너가 x86 바이너리, task#369) |
+
+> ✅ **`B84` 해소 (task#382, 2026-10-09)** — 폴러가 배포를 못 한 원인은 기록된 잠금 충돌 하나가 아니라 **세 겹**이었다:
+> ⓐ 잠금 자기충돌 ⓑ launchd 기본 PATH에 `npm`(fnm)·`docker`(`/usr/local/bin`)가 없음 ⓒ 트리거가 「HEAD 뒤처짐」뿐이라
+> **이 체크아웃에서 commit+push하면 `HEAD == origin`이 되어 폴러가 아무것도 안 함**(ⓐⓑ만 고쳐도 우리 push는 배포되지 않는다).
+> 수정: 트리거를 **배포 기록 SHA 대조**로 바꿨다 — `deploy.sh`가 성공 끝에 배포한 SHA를 저장소 밖
+> `~/.portfolion-deployed-sha`(`DEPLOY_MARKER`)에 쓰고, 폴러는 `origin/main`이 그것과 다르면 배포한다(같음 → 배포 ·
+> 뒤처짐 → ff 후 배포 · 앞섬/갈라짐 → 손대지 않음). 잠금은 `deploy.sh`만 잡고, PATH는 폴러가 **뒤에** 덧붙인다(앞에
+> 붙이면 하니스 스텁보다 실 docker가 먼저 잡혀 테스트가 운영 컨테이너를 내린다). `deploy.sh` 종료코드를 계약으로
+> 못박았다 — **2 = 사전 거부**(컨테이너를 건드리기 전: 잠금·미커밋·fetch 실패·앞섬/갈라짐·ff 실패 → 폴러가 다음 폴에서
+> 재시도) · **1 = 실패**(빌드·기동 중 실패, 배포 도중 HEAD 변경 — 사전 점검 뒤의 실패는 도구 종료코드와 무관하게 1) →
+> 폴러가 그 SHA를 `~/.portfolion-deploy-failed-sha`(`DEPLOY_FAILED_MARKER`)에 쓰고 **같은 커밋을 다시 시도하지 않는다**
+> (2분마다 재기동하면 백엔드가 ~5분씩 내려가는 영구 장애 루프가 된다). 실패 기록은 새 push나 수동 `deploy.sh` 성공으로
+> 풀린다. 회귀 가드는 `scripts/test_deploy_guard.py`(30축)이고, 새 분기마다 주입 8종을 **따로** 돌려 각각 FAIL을 확인했다.
+> 실패 1회 정책의 **라이브** 재현은 고의로 운영을 내리는 일이라 하지 않았다(하니스 축이 영구 가드다).
+> **번호는 재사용하지 않는다.**
 
 > ✅ **`B6` 해소 (task#341, 2026-08-30)** — 마지막 도달 경로였던 `macro.py`를 닫았다.
 > `_fetch_and_save_macro_signals`가 수집 실패 시 **`_status: "skipped"`**를 반환하고(저장은

@@ -5,9 +5,15 @@
 set -e
 cd "$(dirname "$0")"
 
-# Prevent concurrent deploys (poller + Actions runner)
+# 종료코드 계약 (task#382) — 폴러가 이것으로 재시도 여부를 가른다.
+#   0 = 배포 성공(배포 기록 파일에 SHA 를 쓴다)
+#   2 = 사전 거부: 컨테이너를 건드리기 전에 끝났다 → 다음 폴에서 재시도해도 안전
+#   1 = 실패: 빌드·기동 중 실패, 또는 배포 도중 HEAD 가 바뀜 → 폴러는 같은 커밋을 다시 시도하지 않는다
+DEPLOY_MARKER="${DEPLOY_MARKER:-/Users/calmonion/.portfolion-deployed-sha}"
+
+# Prevent concurrent deploys (poller + Actions runner). 잠금은 deploy.sh 만 잡는다.
 LOCK="${DEPLOY_LOCK:-/tmp/portfolion-deploy.lock}"
-if [ -f "$LOCK" ]; then echo "Deploy already in progress."; exit 1; fi
+if [ -f "$LOCK" ]; then echo "Deploy already in progress."; exit 2; fi
 touch "$LOCK"; trap 'rm -f "$LOCK"' EXIT
 
 # 옛 트리 배포 방지 (task#377) — origin/main 과 같은 커밋만 배포한다.
@@ -15,24 +21,26 @@ DIRTY=$(git status --porcelain --untracked-files=no -- frontend backend nginx de
 if [ -n "$DIRTY" ]; then
   echo "❌ 커밋 안 한 변경이 있다 — 커밋·push 한 뒤 다시 배포할 것:"
   echo "$DIRTY"
-  exit 1
+  exit 2
 fi
 if ! git fetch -q origin main; then
   echo "❌ git fetch 실패 — origin/main 을 확인할 수 없어 중단한다."
-  exit 1
+  exit 2
 fi
 HEAD_SHA=$(git rev-parse HEAD)
 ORIGIN_SHA=$(git rev-parse origin/main)
 if [ "$HEAD_SHA" != "$ORIGIN_SHA" ]; then
   if git merge-base --is-ancestor "$HEAD_SHA" "$ORIGIN_SHA"; then
     echo "HEAD 가 origin/main 보다 뒤처져 있다 — fast-forward 한다."
-    git merge --ff-only -q origin/main || { echo "❌ fast-forward 실패"; exit 1; }
+    git merge --ff-only -q origin/main || { echo "❌ fast-forward 실패"; exit 2; }
   else
     echo "❌ HEAD($(git rev-parse --short HEAD)) 가 origin/main 보다 앞서거나 갈라졌다 — push 먼저."
-    exit 1
+    exit 2
   fi
 fi
 START_SHA=$(git rev-parse HEAD)
+# 여기부터의 실패는 도구가 어떤 코드로 죽든 1 이다 — 2 는 위 사전 거부 전용.
+trap 'exit 1' ERR
 
 BACKEND_CONTAINER=portfolion-backend-1
 NGINX_CONTAINER=portfolion-nginx-1
@@ -100,5 +108,6 @@ if [ "$END_SHA" != "$START_SHA" ]; then
   exit 1
 fi
 echo "배포된 커밋: $(git log -1 --format='%h %s' "$START_SHA")"
+echo "$START_SHA" > "$DEPLOY_MARKER"
 exit 0
 }
