@@ -8,9 +8,7 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
-      - name: Pull & Deploy
-        run: |
-          cd /Users/calmonion/Project/PortfoliOn
-          git fetch origin
-          git reset --hard origin/main
-          bash deploy.sh
+      # 배포 기록(~/.portfolion-deployed-sha)을 폴러와 함께 본다 — 이미 배포된 커밋이면 건너뛰고,
+      # 배포 중이면 잠금이 풀릴 때까지 기다린다. 작업트리를 되돌리지 않는다(task#384).
+      - name: Deploy (배포 기록 대조)
+        run: bash /Users/calmonion/Project/PortfoliOn/scripts/runner-deploy.sh

@@ -33,6 +33,11 @@ if [ "$(basename "$0")" = "npm" ] && [ -n "$STUB_NPM_COMMIT" ] && [ "$1" = "run"
 fi
 if [ "$(basename "$0")" = "npm" ] && [ -n "$STUB_NPM_RC" ]; then exit "$STUB_NPM_RC"; fi
 if [ "$(basename "$0")" = "curl" ]; then echo ok; fi
+# runner-deploy.sh 의 잠금 대기 중 sleep 이 불리면 잠금을 풀어 준다(그 사이 배포한 쪽을 흉내).
+if [ "$(basename "$0")" = "sleep" ] && [ -n "$STUB_SLEEP_RELEASE" ]; then
+  rm -f "$DEPLOY_LOCK"
+  if [ -n "$STUB_SLEEP_MARK" ]; then echo "$STUB_SLEEP_MARK" > "$DEPLOY_MARKER"; fi
+fi
 exit 0
 """
 
@@ -109,7 +114,7 @@ class Env:
         _git(tmp, "init", "-q", "--bare", "-b", "main", str(self.origin))
         _git(tmp, "clone", "-q", str(self.origin), str(self.work))
         _git(self.work, "symbolic-ref", "HEAD", "refs/heads/main")
-        for rel in ("deploy.sh", "scripts/auto-deploy-poll.sh"):
+        for rel in ("deploy.sh", "scripts/auto-deploy-poll.sh", "scripts/runner-deploy.sh"):
             text = (REPO / rel).read_text()
             text = (text.replace(REAL_PROJECT, str(self.work))
                         .replace(REAL_LOCK, str(self.lock))
@@ -180,6 +185,9 @@ class Env:
 
     def poll(self):
         return self.run("scripts/auto-deploy-poll.sh")
+
+    def runner(self, **extra):
+        return self.run("scripts/runner-deploy.sh", **extra)
 
 
 @pytest.fixture
@@ -438,3 +446,85 @@ def test_poller_appends_path_so_stubs_win(e):
     assert "TRAP" not in calls, calls
     assert "npm run" in calls, calls + e.poll_log()
     assert e.docker_called()
+
+
+# ── task#384: 러너 잡 = runner-deploy.sh (배포 기록 대조 · 잠금 대기 · reset 없음) ──────
+# 러너가 되살아나도 폴러와 같은 배포 기록을 보게 한다. deploy.yml 의 옛 step
+# (fetch → reset --hard → deploy.sh 무조건)은 미커밋 편집을 지우고 중복 배포를 냈다.
+
+def test_runner_recorded_skips_deploy(e):
+    """ⓐ 기록 == origin/main → deploy.sh 를 부르지 않고 exit 0."""
+    e.marker.write_text(e.origin_head() + "\n")
+    e.stub_deploy(0)
+    r = e.runner()
+    assert r.returncode == 0, _out(r)
+    assert e.deploy_stub_calls() == 0
+    assert "이미 배포됨" in _out(r)
+
+
+@pytest.mark.parametrize("rc", [0, 1, 2])
+def test_runner_unrecorded_calls_deploy_and_passes_rc(e, rc):
+    """ⓑ 기록 ≠ origin → deploy.sh 를 부르고 그 종료코드를 그대로 돌려준다."""
+    e.marker.write_text("stale\n")
+    e.stub_deploy(rc)
+    r = e.runner()
+    assert e.deploy_stub_calls() == 1, _out(r)
+    assert r.returncode == rc, _out(r)
+
+
+def test_runner_waits_lock_then_skips_if_deployed_meanwhile(e):
+    """ⓒ 잠금이 풀릴 때까지 기다린 뒤 기록을 다시 대조 — 그사이 폴러가 배포했으면 끝."""
+    e.marker.write_text("stale\n")
+    e.lock.write_text("")
+    e.stub_deploy(0)
+    r = e.runner(STUB_SLEEP_RELEASE="1", STUB_SLEEP_MARK=e.origin_head())
+    assert r.returncode == 0, _out(r)
+    assert e.deploy_stub_calls() == 0, _out(r)
+    assert "이미 배포됨" in _out(r)
+
+
+def test_runner_waits_lock_then_deploys_if_still_unrecorded(e):
+    """ⓒ 잠금이 풀렸는데 기록이 여전히 다르면 배포한다(대기 뒤 판정이 살아 있음)."""
+    e.marker.write_text("stale\n")
+    e.lock.write_text("")
+    e.stub_deploy(0)
+    r = e.runner(STUB_SLEEP_RELEASE="1")
+    assert r.returncode == 0, _out(r)
+    assert e.deploy_stub_calls() == 1, _out(r)
+    assert "deploy-stub lock=no" in e.call_log()
+
+
+def test_runner_lock_wait_timeout_fails(e):
+    """ⓓ 잠금이 상한을 넘겨 풀리지 않으면 비0 — deploy.sh 는 부르지 않는다."""
+    e.marker.write_text("stale\n")
+    e.lock.write_text("")
+    e.stub_deploy(0)
+    r = e.runner(RUNNER_LOCK_WAIT_SEC="10")
+    assert r.returncode != 0, _out(r)
+    assert e.deploy_stub_calls() == 0
+    assert e.lock.exists()
+
+
+def test_runner_keeps_uncommitted_edit_and_local_commit(e):
+    """ⓔ reset --hard 없음 — 미커밋 tracked 편집도, push 안 한 커밋도 남는다."""
+    e.marker.write_text("stale\n")
+    (e.work / ".forge/notes.md").write_text("wip\n")
+    e.runner()
+    assert (e.work / ".forge/notes.md").read_text() == "wip\n"
+    e.marker.write_text("stale\n")
+    e.local_commit()
+    before = e.head()
+    r = e.runner()
+    assert r.returncode == 2, _out(r)
+    assert e.head() == before
+
+
+def test_runner_appends_path_so_stubs_win(e):
+    """ⓕ PATH 는 뒤에 덧붙인다 — 앞에 붙이면 실 npm·docker(여기선 덫)가 먼저 잡힌다."""
+    e.marker.write_text("stale\n")
+    r = e.runner()
+    calls = e.call_log()
+    assert r.returncode == 0, _out(r)
+    assert "TRAP" not in calls, calls
+    assert "npm run" in calls, calls + _out(r)
+    assert e.read(e.marker) == e.origin_head()
