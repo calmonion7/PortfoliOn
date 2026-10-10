@@ -3,12 +3,12 @@
 #
 # ⚠️ 왜 `docker compose up -d` 를 통째로 돌리지 않는가
 #   이 스택은 관리 주체가 둘로 나뉜다(실측):
-#     compose 소유    : postgres · certbot   (com.docker.compose.service 라벨 있음)
+#     compose 소유    : postgres             (com.docker.compose.service 라벨 있음)
 #     deploy.sh 소유  : backend · nginx      (`docker run`, compose 라벨 없음)
 #   그런데 deploy.sh 가 쓰는 컨테이너 이름이 compose 의 것과 **같다**
 #   (portfolion-backend-1 / portfolion-nginx-1). 그래서 compose 를 통째로 올리면
 #   deploy.sh 가 만든 그 둘을 compose 정의로 재생성해 버린다(볼륨 마운트·포트가 갈린다).
-#   → compose 는 자기 소유 2개만 올리고, backend·nginx 는 deploy.sh 에 맡긴다.
+#   → compose 는 자기 소유 postgres 만 올리고, backend·nginx 는 deploy.sh 에 맡긴다.
 #
 # ⚠️ PATH 를 여기서 직접 세우는 이유
 #   launchd 기본 PATH 는 /usr/bin:/bin:/usr/sbin:/sbin 뿐이라 /usr/local/bin/docker 를 못 찾는다.
@@ -36,8 +36,8 @@ log "docker 준비됨"
 
 cd "$PROJECT_DIR" || { log "FATAL: cd 실패 — $PROJECT_DIR"; exit 1; }
 
-log "compose 소유 서비스 기동 (postgres certbot)"
-if ! docker compose up -d postgres certbot; then
+log "compose 소유 서비스 기동 (postgres)"
+if ! docker compose up -d postgres; then
     log "FATAL: docker compose up 실패"
     exit 1
 fi

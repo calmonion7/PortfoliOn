@@ -87,7 +87,7 @@ if [ "$MODE" = "dryrun" ]; then
   echo "  1) $DST 백업(최초 1회)"
   echo "  2) 정본 plist 배치"
   echo "  3) launchctl bootout/bootstrap 재적재"
-  echo "  4) kickstart 1회 실행 →  docker compose up -d postgres certbot  +  bash deploy.sh"
+  echo "  4) kickstart 1회 실행 →  docker compose up -d postgres  +  bash deploy.sh"
   echo "     · postgres 가 **재생성**되며 127.0.0.1:5432 바인딩이 적용된다"
   echo "       (데이터는 named volume portfolion_pgdata 라 보존된다)"
   echo "     · backend·nginx 가 재기동되어 수십 초 다운타임이 생긴다"

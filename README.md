@@ -4,16 +4,15 @@
 
 ## 인프라
 
-Mac 로컬 Docker 구성 + Cloudflare Tunnel로 외부 접근. `docker compose`는 4개 컨테이너를 띄운다.
+Mac 로컬 Docker 구성 + Cloudflare Tunnel로 외부 접근. `docker compose`는 3개 컨테이너를 띄운다.
 
 | 컨테이너 | 역할 |
 |---------|------|
 | nginx | HTTP(:80) 서빙, `/api/*` → backend:8000 프록시, `frontend/dist` 정적 서빙 |
 | backend | FastAPI(:8000) |
 | postgres | PostgreSQL 16, pgdata 볼륨 |
-| certbot | HTTPS 인증서 자동 갱신 |
 
-**Cloudflare Tunnel**(`portfolion.taebro.com` → `localhost:80`)은 compose 컨테이너가 아니라 **launchd**로 실행한다. launchd는 cloudflared와 자동 배포 폴러(`git push origin main` 시 재배포)도 함께 구동한다.
+HTTPS는 Cloudflare가 종단하므로 인증서 컨테이너가 없다. **Cloudflare Tunnel**(`portfolion.taebro.com` → `localhost:80`)은 compose 컨테이너가 아니라 **launchd**로 실행한다. launchd는 cloudflared와 자동 배포 폴러(`git push origin main` 시 재배포)도 함께 구동한다.
 
 ## 빠른 시작
 

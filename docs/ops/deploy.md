@@ -28,35 +28,16 @@ nano backend/.env.docker
 - `FRONTEND_URL=https://taebro.com`
 - `ANTHROPIC_API_KEY=`
 
-### 3. HTTP 전용으로 먼저 시작 (SSL 발급 전)
+### 3. 스택 기동
 
-`nginx/nginx.conf`에서 443 server 블록을 임시 주석 처리:
-
-```bash
-docker compose up -d postgres backend nginx certbot
-```
-
-### 4. Let's Encrypt SSL 최초 발급
+HTTPS 는 Cloudflare Tunnel 이 종단한다 — nginx 는 루프백 :80 만 받고, 인증서 발급·갱신 컨테이너는 없다(task#384).
 
 ```bash
-docker compose run --rm certbot certonly \
-    --webroot \
-    --webroot-path=/var/www/certbot \
-    --email thkim@anchors-biz.com \
-    --agree-tos \
-    --no-eff-email \
-    -d taebro.com
+docker compose up -d postgres
+bash deploy.sh   # backend·nginx 는 deploy.sh 가 docker run 으로 띄운다
 ```
 
-Expected: `Successfully received certificate`
-
-### 5. nginx.conf HTTPS 블록 주석 해제 후 재시작
-
-```bash
-docker compose restart nginx
-```
-
-### 6. OAuth 앱 등록
+### 4. OAuth 앱 등록
 
 **Google:**
 1. https://console.cloud.google.com → API 및 서비스 → 사용자 인증 정보
@@ -69,20 +50,20 @@ docker compose restart nginx
 2. Authorization callback URL: `https://taebro.com/api/auth/oauth/github/callback`
 3. `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`을 `backend/.env.docker`에 입력
 
-### 7. 전체 재시작
+### 5. 전체 재시작
 
 ```bash
 docker compose down && docker compose up -d
 ```
 
-### 8. 헬스체크
+### 6. 헬스체크
 
 ```bash
 curl https://taebro.com/health
 # Expected: {"status":"ok"}
 ```
 
-### 9. DDNS 스크립트 설정
+### 7. DDNS 스크립트 설정
 
 ```bash
 # scripts/ddns_update.sh에서 ZONE_ID, RECORD_ID, API_TOKEN 입력

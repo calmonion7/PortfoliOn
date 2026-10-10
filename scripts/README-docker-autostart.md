@@ -16,13 +16,13 @@
 
 이 스택은 관리 주체가 둘이다(실측, `com.docker.compose.service` 라벨로 확인):
 
-- **compose 소유**: `postgres` · `certbot`
+- **compose 소유**: `postgres`
 - **`deploy.sh` 소유**: `backend` · `nginx` (`docker run`)
 
 그런데 `deploy.sh` 가 쓰는 컨테이너 이름이 compose 의 것과 **같다**
 (`portfolion-backend-1` / `portfolion-nginx-1`). 그래서 compose 를 통째로 올리면
 `deploy.sh` 가 만든 그 둘을 compose 정의로 재생성해 버린다.
-→ 스크립트는 `docker compose up -d postgres certbot` 후 `bash deploy.sh` 순으로 돈다.
+→ 스크립트는 `docker compose up -d postgres` 후 `bash deploy.sh` 순으로 돈다.
 
 ## 적용 절차 (사용자 실행)
 
@@ -68,8 +68,8 @@ launchctl kickstart -k gui/$(id -u)/com.portfolion.docker-compose
 launchctl list | awk '$3=="com.portfolion.docker-compose"{print "exit="$2}'
 ```
 
-**3) 은 무엇을 하는가** — `docker compose up -d postgres certbot` 이 postgres 를 **재생성**하고
-(`docker compose up --dry-run` 으로 확인: `postgres Recreate`, certbot 은 `Running` 유지),
+**3) 은 무엇을 하는가** — `docker compose up -d postgres` 가 postgres 를 **재생성**하고
+(`docker compose up --dry-run` 으로 확인: `postgres Recreate`),
 이때 `docker-compose.yml` 의 `127.0.0.1:5432:5432` 가 비로소 실행 중 컨테이너에 적용된다.
 이어서 `deploy.sh` 가 backend·nginx 를 재생성한다(수십 초 다운타임).
 
@@ -96,7 +96,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.portfolion.docker-co
 launchctl list | awk '$3=="com.portfolion.docker-compose"{print $2}'   # 0 이어야 함
 docker ps --format '{{.Names}} {{.Ports}}' | grep portfolion-postgres  # 127.0.0.1:5432 여야 함
 nc -z -G 2 172.16.11.230 5432                                          # 거부되어야 함
-docker ps --format '{{.Names}}' | grep -c portfolion                   # 4
+docker ps --format '{{.Names}}' | grep -c portfolion                   # 3
 curl -s -o /dev/null -w '%{http_code}' http://localhost/health          # 200
 tail -20 ~/Library/Logs/com.portfolion.docker-compose.out.log           # 단계별 타임스탬프 로그
 ```
