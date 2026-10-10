@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
-mapped: 2026-09-14
+last_mapped_commit: 7cb0f0de3c1a4b8bf4863af380eebfdb3d7fcbb2
+mapped: 2026-10-10
 ---
 
 # INTEGRATIONS — 외부 API·데이터베이스·인증 제공자·웹훅
@@ -63,7 +63,8 @@ mapped: 2026-09-14
 
 - **Cloudflare Tunnel** — `portfolion.taebro.com` → `localhost:80`. compose 서비스가 아니라 **launchd로 실행되는 `cloudflared`**.
 - **nginx** — `/api/`와 `/health`만 `backend:8000`으로 프록시, 나머지는 `frontend/dist` 정적 서빙(SPA 폴백).
-- **certbot** — compose 4번째 컨테이너, 12시간 루프로 `certbot renew`. nginx의 443 블록은 현재 **주석 처리** 상태이고 TLS 종단은 Cloudflare Tunnel이 맡는다.
+- **TLS** — Cloudflare가 종단한다(터널 → `localhost:80`). certbot 컨테이너·`./certbot` 볼륨·nginx의 acme-challenge location·주석 처리돼 있던 443 블록은 **task#384에서 전부 제거**됐다 — 인증서 갱신 연동은 더 이상 없다.
+- **GitHub Actions(인바운드 트리거)** — push 시 self-hosted 러너가 `scripts/runner-deploy.sh`를 돌린다(배포 기록 대조, `STACK.md` §3.3). 러너는 GitHub로 아웃바운드 롱폴링만 하고 레포 밖 `~/actions-runner-portfolion`에 산다.
 
 ---
 
@@ -80,7 +81,7 @@ mapped: 2026-09-14
 
 `maxconn=20`은 최대 ThreadPool 동시성(calendar 15 · analysis 11)보다 크게 잡은 값이다 — psycopg2 풀은 소진 시 대기하지 않고 **`PoolError`를 던지므로** 워커 수보다 커야 한다.
 
-⚠️ 로컬 `DATABASE_URL`은 호스트에 루프백 노출된 Docker postgres(`127.0.0.1:5432:5432` — B21 대응으로 전 인터페이스 게시에서 좁혀졌다, `STACK.md` §3.1)를 가리킨다 = **로컬 pytest에서 실 DB가 사거리 안**. `backend/tests/conftest.py`의 autouse `_block_real_db`가 `services.db._get_pool`을 raise로 대체해 이를 차단한다.
+⚠️ 로컬 `DATABASE_URL`은 호스트에 루프백 노출된 Docker postgres(`127.0.0.1:5432:5432` — B21 대응으로 전 인터페이스 게시에서 좁혀졌다, `STACK.md` §3.1)를 가리킨다 = **로컬 pytest에서 실 DB가 사거리 안**. `backend/tests/conftest.py`의 autouse `_block_real_db`가 `services.db._get_pool`을 raise로 대체해 이를 차단한다. 호스트 5432 경유 소비처(로컬 `backend/.env`를 읽는 스크립트·`docker exec portfolion-postgres-1 psql` 하드코딩 스크립트·자동기동 점검 등)의 전수 목록은 `docs/ops/postgres-5432-consumers.md`(task#384 조사 — 라이브 상주 클라이언트는 백엔드 컨테이너 하나뿐).
 
 ### 1.2 스키마 정본과 마이그레이션
 
@@ -100,7 +101,7 @@ mapped: 2026-09-14
 
 `auth_schema.sql`이 정의: `users`(role `user|admin`) · `refresh_tokens`. `CREATE EXTENSION IF NOT EXISTS "pgcrypto"`가 선행한다.
 
-`main._migrate()`가 추가로 생성/변경(라이브 반영 경로): `backlog_history.segments`(JSONB) · `batch_schedules` · `market_short_sell`(+idx) · `stock_disclosures`(+idx, +`meeting_date`) · `stock_dividends` · `stock_dividend_schedule`(+idx) · `stock_beta` · `stock_supply_score` · `stock_insider_trades`(+idx) · `stock_recommendations`(+`low_liquidity`/`exchange`/`name`, +idx) · `us_supply_snapshot`(+`insider_transactions`/`insider_net`) · `user_stocks.{target_price,stop_price,target_weight,pinned}` · `tickers.{key_resource,competitor_edge,market_outlook,analyst_target}` · `analyst_reports` · `tech_reports`(+`key_points`/`milestones`/**`variants`**/**`watch_items`**/**`composition`**).
+`main._migrate()`가 추가로 생성/변경(라이브 반영 경로): `backlog_history.segments`(JSONB) · `batch_schedules` · `market_short_sell`(+idx) · `stock_disclosures`(+idx, +`meeting_date`) · `stock_dividends` · `stock_dividend_schedule`(+idx) · `stock_beta` · `stock_supply_score` · `stock_insider_trades`(+idx) · `stock_recommendations`(+`low_liquidity`/`exchange`/`name`, +idx) · `us_supply_snapshot`(+`insider_transactions`/`insider_net`) · `user_stocks.{target_price,stop_price,target_weight,pinned}` · `tickers.{key_resource,competitor_edge,market_outlook,analyst_target}` · `analyst_reports`(+**`lens_report` JSONB**, **`rating` NOT NULL 해제** — v2 심층 리포트, ADR `261006-232406`) · `tech_reports`(+`key_points`/`milestones`/**`variants`**/**`watch_items`**/**`composition`**) · **`job_runs.payload`**(JSONB, nullable — 그 실행의 대상 목록; 야간 enrich 대조가 읽는다). 두 신규 컬럼 모두 `app_schema.sql`과 쌍으로 들어가 있다.
 
 **`tech_reports`만 DDL이 아닌 마이그레이션 2건을 더 탄다**(ADR-0038/0039, 둘 다 idempotent):
 1. **판 누적 폐기** — slug당 최신 1행만 남기고 과거 행을 `DELETE ... USING`으로 지운 뒤 `UNIQUE (slug, published_date)` 제약을 드롭하고 `UNIQUE INDEX tech_reports_slug_key ON (slug)`를 만든다. 이 인덱스가 없으면 라우터의 `ON CONFLICT (slug)`가 **런타임 500**이 되므로 삭제 건수를 `logger.info`로 loud하게 남긴다. → `app_schema.sql`도 `UNIQUE (slug)`로 맞춰져 있다.
@@ -114,7 +115,7 @@ mapped: 2026-09-14
 현재 사용 중인 키 **18종**: `fx` · `vix` · `commodities` · `treasury` · `econ_indicators` · `kr_exports` · `m7_earnings` · `kr_top2_earnings` · `macro_signals` · **`business_formation`** · **`labor_surveys`** · **`trimmed_inflation`** · `kospi_signal` · `kospi_futures` · `indices` · `fear_greed` · `sp500_tickers` · `kospi_tickers`, 그리고 서비스 상수로 잡힌 `kr_sector_momentum`(`services/kr_sector_service.CACHE_KEY`) · `us_sector_momentum`(`services/us_sector_service.CACHE_KEY`).
 
 **로더가 둘이고 실패 처리가 갈린다.**
-- `_mc_load` = **관용판**. 조회 예외를 `logger.warning` 후 `None`으로 접는다(동작 불변) → 「DB 오류」와 「한 번도 저장 안 됨」이 **같은 값**이 된다. 앱 36곳·18모듈이 쓰고 테스트 17파일이 patch한다.
+- `_mc_load` = **관용판**. 조회 예외를 `logger.warning` 후 `None`으로 접는다(동작 불변) → 「DB 오류」와 「한 번도 저장 안 됨」이 **같은 값**이 된다. 앱 36곳·18모듈이 쓰고 테스트 17파일이 patch한다. ⚠️ **반환값은 값이 아니라 `{data, fetched_at}` 봉투다** — 소비처는 `["data"]`를 벗겨야 한다. 신규 소비처 `services/analyst_lenses.py::cached_risk_free_pct`(`treasury`의 `rates.10y.current`, 심층 리포트 렌즈 8의 US 무위험 금리)가 봉투째 읽어 한동안 **항상 None**이었다(task#373에서 교정, 회귀 가드는 `_mc_load`를 실제 봉투 모양으로 mock한다).
 - `_mc_load_strict` = **엄격판(additive)**. 조회 실패를 **전파**하고 행 부재만 `None`이다. **저장값을 읽어 그 위에 누적하는 경로만** 이걸 쓴다 — 그 경로에서 위 붕괴는 곧 이력 파괴다(`kospi_signal`: SELECT 한 번의 실패 + 드라이버 fetch 성공 → 180일 신호·적중률이 오늘 1건으로 치환되고, 그날의 갭·종가 대사에서 파생되므로 재구성 불가). 예외가 전파되면 `_mc_save`에 도달하지 못해 이력이 보존되고 `job_runs.record`가 스스로 `failed`를 기록한다(이 한 건에서는 예외 전파가 `set_status` 배선보다 정확한 신호다).
 
 **`get_or_refresh(key, fetch_fn, ttl, force=False)`의 실제 의미**(이름과 어긋난다):
@@ -515,7 +516,7 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 - 계약 정본: `CLAUDE_COWORK_API.md`(Cowork 스코프 전용) + `API_SPEC.md`(전체). Cowork 소비 대상이 아닌 사용자 대면 read 엔드포인트는 `API_SPEC.md`에만 둔다.
 
 **발행물 저장 계층**
-- `services/analyst_reports.py`(ADR-0027) — 판단·서사(rating·title·적정주가 밴드·산정방식·points·risks)는 Cowork가 제출하고, **숫자 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 서버가 최신 스냅샷에서 발췌·계산해 박제**한다. 요청경로 외부 API fetch 0. 같은 (ticker, published_date) 재발행만 upsert, 다른 날은 누적. `RATINGS = ("buy","neutral","sell")`.
+- `services/analyst_reports.py`(ADR-0027, 본문 형식 개정 ADR `261006-232406`) — 발행 본문은 이제 **v2(한줄 논지 + 구조 축 3종 + 9렌즈)** 하나다: 구조 축(`revenue_engine`·`cost_nature`·`funding_source`, 각 `Literal` + 근거)과 렌즈 9개를 Cowork가 제출하고, 계산 렌즈(`analyst_lenses.COMPUTED_LENSES = (3, 4, 5, 8)`)는 Cowork가 **공시 원자료만**(`RawInput` — `value`/`unit`/`source ∈ disclosure·consensus·estimate`/`ref`, `estimate`면 `rationale` 필수) 옮겨 적고 **신호·게이지는 서버가 계산**한다(`services/analyst_lenses.py::build_lens_report`). 렌즈 8의 무위험 금리는 시장으로 갈린다 — **KR은 국고채 원자료 필수**(없으면 422), **US는 서버 캐시 `market_cache["treasury"]` 10년물이 먼저**고 없을 때만 원자료. 판단 렌즈의 수치 게이지(`JudgmentGauge`)는 서버가 검증만 하고 `origin: "routine"`·`near_boundary`를 덧붙인다. 요청 모델은 전부 `extra="forbid"`. 저장은 `save_lens_report`가 `analyst_reports.lens_report`(JSONB)에 박제하며 v1 컬럼(`rating`·적정주가·`points`·`risks`)은 NULL/빈값으로 덮는다(같은 날 v1 판을 교체할 때 두 형식이 한 행에 섞이지 않게; 옛 컬럼은 삭제하지 않았다). 응답의 `format`(`lens_report` 유무로 2/1)·`tally`(신호 집계)로 옛 v1 판을 판별한다. **숫자 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 여전히 서버가 최신 스냅샷에서 발췌·계산해 `data`에 박제**한다. 요청경로 외부 API fetch 0. 같은 (ticker, published_date) 재발행만 upsert, 다른 날은 누적. (`RATINGS` 상수는 모듈에 남아 있으나 v2 발행 경로는 쓰지 않는다.)
 - `services/tech_reports.py`(ADR-0033/0034, 저장모델 개정 ADR-0038, 대상 개정 ADR-0039/0044) — 종목이 아니라 기술 단위. **`TECH_TOPICS`가 대상 15종의 정본**이고(목록은 그 상수를 읽을 것 — 여기 복제하면 다음 개정마다 드리프트한다) `name`은 프론트 `components/reports/techReportUtils.js::TECH_NAMES`와 **dual-source**다(API가 표시명을 안 줘서 — slug 추가·개명 시 양쪽을 함께 갱신).
   **저장 입도가 세 층이다**: ⓐ **slug당 1행**(`ON CONFLICT (slug) DO UPDATE`, 이력 없음 — `published_date`는 마지막 갱신일) ⓑ `DO UPDATE SET` 컬럼 목록의 정본은 `_UPDATE_COLUMNS` 상수뿐이고 **요청 값이 컬럼명 자리에 닿는 경로가 없다**(동적 SQL은 고정 allowlist에서만 만든다) ⓒ **선택 5필드 `_PRESERVABLE`**(`key_points`·`milestones`·`variants`·`watch_items`·`composition`)은 요청이 키를 **생략**하면 SET 목록에서 빠져 직전 판이 보존되고, 지우려면 **명시적 null**을 보낸다. 본문 4필드(`description`·`players`·`challenges`·`related`)는 여기 없다 — 그쪽 생략은 부분 갱신이 아니라 잘못된 발행이므로 보존해 숨기지 않는다. `INSERT` 컬럼 목록은 full 유지(신규 slug는 보존할 직전 판이 없다).
   `_json_or_null`이 `json.dumps(None)`→문자열 `"null"` 함정을 피한다(jsonb 캐스트 시 SQL NULL이 아니라 **JSON null 스칼라**가 되어 `IS NULL`이 False가 된다).
@@ -535,17 +536,27 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 - `configured()` = `COWORK_ROUTINE_FIRE_URL` **and** `COWORK_ROUTINE_FIRE_TOKEN` 둘 다 존재. 미설정이면 휴면(dormant-safe).
 - `fire(text, *, tickers=None, model=None, chunk=None)` → `requests.post(url, headers={"Authorization": f"Bearer {TOKEN}"}, json=payload, timeout=15)`. HTTP ≥300이면 warning 로그 + False. **예외를 전파하지 않는다**(best-effort — 배치 본문을 깨뜨리지 않음).
   **확장 3키(`tickers`/`model`/`chunk`)는 additive다** — `None`이면 payload에서 통째로 생략되어 기존 호출 본문 `{"text": ...}`은 바이트 동일(구버전 리스너 무회귀).
-- 본문 생성기 3종: `daily_text(market)`(일배치 완료) · `manual_text()`(admin 수동) · **`nightly_text()`**(신규 — 야간 전량 enrich 회차, 대상 종목은 이 본문이 아니라 payload의 `tickers`로 넘어간다). **셋 다 개별 정책·상한값을 열거하지 않는다** — 정책 정본은 루틴 프롬프트이고, 여기에 열거하면 프롬프트와 드리프트해 프롬프트를 이겨버린다.
-- 트리거 시점: 일일 리포트 배치 완료 직후 + admin 수동 + **야간 전량 enrich 배치**(`cowork_enrich_nightly`, 공통, 매일 02:00 KST — `scheduler/jobs.py::_run_nightly_enrich`가 보유·관심 전 종목 티커를 `tickers=`에 실어 `model="opus", chunk=5`로 fire; 대상 정의역은 `GET /api/stocks`와 같은 `storage.get_global_portfolio()`). **백엔드가 하는 LLM 관련 동작은 이 POST 하나뿐**이다 — 청크 분할·순차 세션 스폰은 전부 §9.3 리스너의 몫이고, 이 잡의 `job_runs` 성공은 「fire가 접수됨」이지 「전 종목이 갱신됨」이 아니다(`STACK.md` §1.8·§1.6).
+- 본문 생성기 3종: `daily_text(market)`(일배치 완료) · `manual_text()`(admin 수동) · **`nightly_text()`**(「대상 지정 enrich 회차」 — 야간 갱신과 온디맨드 갱신이 **공용**한다. 대상 종목은 이 본문이 아니라 payload의 `tickers`로 넘어간다). **셋 다 개별 정책·상한값을 열거하지 않는다** — 정책 정본은 루틴 프롬프트이고, 여기에 열거하면 프롬프트와 드리프트해 프롬프트를 이겨버린다.
+- 트리거 시점 4종:
+  1. 일일 리포트 배치 완료 직후.
+  2. admin 수동.
+  3. **야간 enrich 배치**(`cowork_enrich_nightly`, 공통, 매일 02:00 KST — `scheduler/jobs.py::_run_nightly_enrich`가 **갱신 대상 집합**(`services/enrich_targets.py::compute_enrich_target_set` — 보유 ∪ 최근 30일 리포트 열람 이벤트 ∩ 추적 종목, ADR `260916-132605`)을 `tickers=`에 실어 `model="opus", chunk=5`로 fire하고 쏜 목록을 `job_runs.payload`에 남긴다).
+  4. **온디맨드**(신규) — `POST /api/stocks/{ticker}/enrich/request`(`get_current_user`, 프론트 `hooks/useEnrichOnDemand.js`가 리포트 상세 진입 시 호출). `tickers.enriched_at`이 7일 이내면 `fresh`, fire 미설정이면 `unconfigured`, 같은 종목이 15분 내 이미 나갔으면 `in_flight`(프로세스 인메모리 dict + 락 — 재기동에 소실되지만 결과는 멱등한 중복 fire 1회), 아니면 `tickers=[t], model="opus", chunk=1`로 fire. 응답은 항상 `{fired, reason}`. 읽기 경로(GET 상세)에 쓰기 부작용을 숨기지 않으려고 별도 POST로 분리했다.
+
+  **백엔드가 하는 LLM 관련 동작은 이 POST 하나뿐**이다 — 청크 분할·순차 세션 스폰은 전부 §9.3 리스너의 몫이고, 리스너가 완료를 백엔드로 보고하는 통로는 없다. 그 간극은 **사후 대조**로 메운다: `cowork_enrich_verify`(공통, 매일 08:00 KST)가 최신 02:00 run의 payload를 `tickers.enriched_at`(run `started_at` 이상이면 갱신)과 대조해 그 run 행의 status를 `success`/`partial`/`failed`로 **다시 쓴다**(`STACK.md` §1.8·§1.6). 02:00~08:00 사이에는 그 행이 「fire 접수됨」 상태로 보이고, 처리가 08:00을 넘기면 미갱신으로 판정된다(하루 1회 대조).
 
 ### 9.3 수신측 — 로컬 fire 리스너 (`scripts/cowork-fire-listener.py`)
 
 - `127.0.0.1:8787` 바인드(백엔드 컨테이너는 `host.docker.internal:8787`로 도달), 표준 라이브러리 `http.server`.
 - `POST /fire`, `Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>` 검증(`backend/.env.docker`를 직접 파싱해 값을 읽는다). 거부 사유를 **셋으로 구분해 로그에 남긴다**(서버에 토큰 없음 / 요청에 헤더 없음 / 토큰 불일치 — 토큰 값 자체는 로그에 싣지 않는다) — 옛 코드는 하나로 뭉개 401을 봐도 원인을 못 좁혔다.
 - **두 모드로 갈린다**(task#344/#345, ADR `260913-013425`):
-  - **기존(단일 세션)**: `text`만 받으면 그대로 논블로킹 스폰 — 프롬프트 = `scripts/cowork-routine-prompt.md`의 `{{COWORK_API_KEY}}`를 `.env.docker` 값으로 치환 + 트리거 text → **stdin으로** 실행기에 전달(ps에 키가 노출되지 않게). 실행기는 `model`이 가른다(`_runner_argv`, task#348): `/` 없으면 기존 `claude -p --model <model>(기본 opus) --allowedTools Bash,WebSearch,WebFetch,Read,Write`(무회귀), `/` 있으면 OpenCode `opencode run -m <model> --auto`. 응답 `{"ok": true, "run": "<workdir>"}`.
-  - **전량 모드**: 본문에 `tickers[]`(+ 선택 `model` 기본 `opus`, `chunk` 기본 5, 상한 50)가 있으면 `tickers`를 `chunk`개씩 잘라 **단일 워커 스레드의 큐에서 순차 스폰**한다(동시 세션 0) — 각 세션 프롬프트에 그 청크만 `[대상 종목]` 블록으로 싣는다. 응답 `{"ok": true, "run": "queued", "chunks": N}`. 세션이 사용 한도에 걸려 즉사하면(`_hit_limit` — 로그 앞 4096바이트에서 한도 문구 탐지) 잔여 청크를 포기한다. 청크당 타임아웃 `_CHUNK_TIMEOUT=3600s`(초과 시 강제 kill, 워커 영구 정지 방지) — 실측 5종목 1청크 ~19분의 3배 여유.
-- 실행 cwd는 세션마다 `tempfile.mkdtemp(prefix=ts+"-", dir=~/portfolion-routine-runs)`로 **원자 생성**(레포 컨텍스트·편집 차단 + 같은 초 2회 fire의 `run.log` truncate 방지 — 리스너가 launchd 장수 단일 프로세스라 PID가 늘 같다).
+  - **기존(단일 세션)**: `text`만 받으면 그대로 논블로킹 스폰 — 프롬프트 = `scripts/cowork-routine-prompt.md`(`{{COWORK_API_KEY}}` 자리표시자는 값이 아니라 **`$PORTFOLION_API_KEY` 참조**로 치환) + 트리거 text → **stdin으로** 실행기에 전달. 키 값은 자식 프로세스 env `PORTFOLION_API_KEY`로만 주입한다(task#349 — OpenCode `run`이 실행한 bash 명령을 `run.log`에 에코해, 프롬프트에 값을 실으면 평문 로그로 샜다). 실행기는 `model`이 가른다(`_runner_argv`, task#348): `/` 없으면 기존 `claude -p --model <model>(기본 opus) --allowedTools Bash,WebSearch,WebFetch,Read,Write`(무회귀), `/` 있으면 OpenCode `opencode run -m <model> --auto`. 응답 `{"ok": true, "run": "<workdir>"}`.
+  - **전량 모드**: 본문에 `tickers[]`(+ 선택 `model` 기본 `opus`, `chunk` 기본 5, 상한 50)가 있으면 `tickers`를 `chunk`개씩 잘라 **단일 워커 스레드의 큐에서 순차 스폰**한다(동시 세션 0) — 각 세션 프롬프트에 그 청크만 `[대상 종목]` 블록으로 싣는다. 응답 `{"ok": true, "run": "queued", "chunks": N}`. 세션이 사용 한도에 걸려 즉사하면(`_hit_limit` — 로그 앞 4096바이트에서 `_LIMIT_MARKERS` 문구 탐지, `no payment method` 포함) 잔여 청크를 포기한다. 온디맨드 갱신은 이 모드를 `chunk=1`로 탄다. 청크당 타임아웃 `_CHUNK_TIMEOUT=3600s`(초과 시 강제 kill, 워커 영구 정지 방지) — 실측 5종목 1청크 ~19분의 3배 여유.
+- 실행 cwd는 세션마다 `tempfile.mkdtemp(prefix=ts+"-", dir=~/portfolion-routine-runs)`로 **원자 생성**(레포 컨텍스트·편집 차단 + 같은 초 2회 fire의 `run.log` truncate 방지 — 리스너가 launchd 장수 단일 프로세스라 PID가 늘 같다). `run.log`는 `os.open(..., 0o600)`으로 **생성 시점부터** 소유자 전용이다.
+
+### 9.4 A/B 측정 — 쓰기 차단 프록시 (`scripts/ab-proxy.py`, 신규, task#350)
+
+발행 레인 A/B 하네스(`scripts/ab-publish.py` 외, `STACK.md` §3.4)가 띄우는 세션은 prod API를 **읽기만** 할 수 있다. `ab-proxy.py`가 `127.0.0.1`에서 GET/HEAD만 진짜 키로 prod에 중계하고, 그 외 메서드는 **업스트림을 호출하지 않은 채** 요청 본문을 캡처하고 성공 응답을 돌려준다(그 캡처가 곧 측정 산출물). 보장은 독립 2겹이다 — ⓐ 하네스가 프롬프트의 BASE URL을 프록시로 치환(정확히 1건) ⓑ 자식 env `PORTFOLION_API_KEY`는 더미(프롬프트를 무시하고 prod를 직접 때려도 401). 리스너와 루틴 프롬프트 파일은 읽기만 하고 세션은 리스너를 거치지 않는다. 가드 `backend/tests/test_ab_proxy.py`(업스트림 미호출을 mock으로 단언)·`test_ab_publish.py`.
 - 거부 응답(404/401)은 `Content-Length: 0`을 명시(`_reject`) — 없으면 간헐적으로 `ConnectionReset`이 나 호출측 로그에서 401이 통째로 사라질 수 있었다(6회 중 2회 재현).
 - 로그는 전부 `_log()`로 통일(KST 타임스탬프 접두) — 시각 없는 로그는 어느 fire에 대응하는지 상관을 못 짓는다는 실측 동기(4건의 401이 시각 부재로 미해결로 남았었다).
 - launchd 서비스 `com.portfolion.cowork-fire-listener` — `claude -p`가 keychain OAuth를 쓰므로 plist `EnvironmentVariables`에 `HOME`/`USER`/`LOGNAME`이 필요하다.
@@ -602,6 +613,8 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 - `services/utils.py`의 `today_kst()` = `datetime.now(ZoneInfo("Asia/Seoul")).date()`. **컨테이너에 TZ env가 없어 bare `date.today()`는 UTC**이므로 00:00~09:00 KST에 하루가 어긋난다. KR 시장-날짜(영업일·최근월물 판정)는 반드시 `today_kst()`.
 - 별개 문제: 키움 naive ↔ yfinance aware **series 정렬**은 `tz_localize(None)`(§3.1).
 - 스케줄러 트리거 타임존은 배치별 `timezone` 필드(대부분 `Asia/Seoul`).
+- **거래소 영업일**(신규): `services/market_session.py`가 `exchange_calendars`(`XKRX`·`XNYS`, 로컬 라이브러리 데이터 — 네트워크 호출 없음)로 판정한다. 배치 레지스트리의 `session_offset_days`로 「KST 실행일 ↔ 거래소 세션일」 어긋남을 맞춘다(US 리포트 07:00 KST = 전날 NYSE 세션, offset −1). 캘린더 범위 밖·로드 실패는 **fail-open(영업일 취급)** — 휴장 오판으로 정상 배치를 막는 쪽을 피한다.
+- `enrich_verify.judge`처럼 `timestamptz`를 비교하는 신규 경로는 naive 값을 UTC로 간주해 aware로 정규화한 뒤 비교한다(`scheduler/jobs.py::_as_utc`, `enrich_targets`·`routers/stocks.py::request_enrich`도 같은 규약).
 
 ### 10.5 재시도·throttle·타임아웃
 
@@ -636,9 +649,9 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 
 ### 10.8 시크릿 취급
 
-- `backend/.env.docker`와 `certbot/conf/`는 gitignored. 값은 문서·로그·세션에 인용하지 않는다.
+- `backend/.env.docker`는 gitignored(옛 `certbot/conf/` 항목은 certbot 은퇴로 사라졌다). 값은 문서·로그·세션에 인용하지 않는다.
 - 게이팅된 엔드포인트를 라이브 검증할 때는 **컨테이너가 자기 env의 키를 읽어 스스로 호출**하게 한다(`docker exec`에서 `os.environ["COWORK_API_KEY"]`로 `X-API-Key`를 채워 `127.0.0.1:8000` 호출) — 값이 세션에 노출되지 않는다.
-- fire 리스너도 같은 원칙으로 프롬프트를 **stdin**으로 넘긴다(§9.3).
+- fire 리스너도 같은 원칙으로 프롬프트를 **stdin**으로 넘기고, API 키 값은 프롬프트가 아니라 자식 env로만 준다(§9.3). A/B 세션은 더미 키만 받는다(§9.4).
 
 ---
 
@@ -664,11 +677,12 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 | `stock_recommendations` | Naver·키움·yfinance·DART(KR) · yfinance·dataroma(US) | `recommendation_kr`/`recommendation_us` | 추천 탭 |
 | `guru_managers` | dataroma(+Naver US 한글명) | `guru_crawl` | 구루 화면 |
 | `enrich_history` | `services/storage/portfolio.py::enrich_stock`이 저장 직후 자동 기록(신규, task#345) | (enrich API 호출마다) | `scripts/enrich-ab.py` A/B 하네스만 — 화면 소비처 없음. `tickers`의 최신 1판 UPDATE가 지우던 이전 판을 보존 |
-| `analyst_reports` | Cowork 제출(판단·서사) + 서버 스냅샷 발췌(숫자 블록) | (fire 트리거) | 심층 리포트 — 종목 리포트 상세의 탭 + 문서 라우트 |
+| `analyst_reports` | Cowork 제출(논지·구조 축·9렌즈 원자료) + 서버 계산(`lens_report` — 계산 렌즈 신호, US 렌즈 8은 `market_cache["treasury"]`) + 서버 스냅샷 발췌(숫자 블록 `data`) | (fire 트리거) | 심층 리포트 — 종목 리포트 상세의 탭 + 문서 라우트 |
+| `job_runs`(`payload`) | 배치 실행 기록 — `cowork_enrich_nightly`가 쏜 ticker 목록을 payload로 남긴다 | 전 배치 / `cowork_enrich_verify`가 02:00 행을 재기록 | 배치 현황 카드(`GET /api/batches`의 `recent_runs`) |
 | `tech_reports`(**slug당 1행**) | Cowork 제출 전량(서버 자동 첨부 숫자 0 — 전방 시장 데이터 소스 부재) | (fire 트리거) | 주요기술 리포트·기술 해부, 포트폴리오 「기술 노출」(`GET /index` 역인덱스) |
 | `digests` | 보유종목 시세 집계 (+Telegram 발송) | `daily_digest` | 다이제스트 탭 |
 | `calendar_cache` | yfinance + FRED releases + `exchange_calendars` + `stock_disclosures.meeting_date` | (요청 시 빌드·캐시) | 캘린더 |
-| `user_events` | `EventTrackerMiddleware` + `POST /api/events` | — | admin 분석(`/api/admin/analytics`) |
+| `user_events` | `EventTrackerMiddleware` + `POST /api/events` | — | admin 분석(`/api/admin/analytics`), 야간 enrich 대상 집합(`report_view_open`·`ranking_row_click` 30일 창, `services/enrich_targets.py`) |
 
 ⚠️ `POST /api/events`는 `routers/events.py::VALID_EVENTS` **화이트리스트**로 걸러진다 — 목록에 없는 이름은 **요청이 200으로 성공하고 이벤트만 조용히 사라진다**(현재 nav 6종 `nav_{portfolio,research,market,guru,settings,analytics}` + tab 9종 + 상호작용 5종). 그래서 프론트에서 이벤트명을 파생하는 방식을 바꾸면(예: nav 이벤트를 `section.key`에서 파생) 그 순간 이벤트가 탈락하고 화면은 정상으로 보인다. 프론트↔백 드리프트 가드: `backend/tests/test_valid_events_matches_frontend.py`.
 

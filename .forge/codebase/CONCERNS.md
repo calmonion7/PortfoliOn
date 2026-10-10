@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
-mapped: 2026-09-14
+last_mapped_commit: 7cb0f0de3c1a4b8bf4863af380eebfdb3d7fcbb2
+mapped: 2026-10-10
 ---
 
 # CONCERNS — 기술부채·버그·리스크 지도
@@ -20,6 +20,8 @@ mapped: 2026-09-14
 이 판의 본문은 **HEAD `20dd46e` 시점의 코드에서 전면 재작성**한 것이다. 직전 판(`4752112`, 07-31)을 베이스라인으로 쓰지 않았고, `CLAUDE.md`의 Gotchas 산문은 *리드 목록*으로만 썼다 — 각 항목을 코드로 재확인해 확인된 것만 실었고, 확인되지 않은 것은 §13에 "미확인"으로 분리했다.
 
 > **증분 갱신: 2026-08-22 — 베이스라인이 `c72a7c9`로 이동했다**(`20dd46e..HEAD` 112커밋 / 549파일). 10차 버그 헌트 확정분 수정 드라이브 task#326~332가 그 범위이며, **전면 재작성이 아니라 제자리 편집**이다 — `§0`의 원장(해소 각주 + 잔존 행)은 그 드라이브가 갱신한 상태를 **그대로 보존**했고, 이 패스가 손댄 것은 `§0` **밖**에서 변경 파일이 stale하게 만든 서술뿐이다(목록은 아래 절별 각주 참조). ⚠️ 이 패스에서 **선재 오류 2건이 실측으로 반증**됐다 — ⓐ `§7.8`의 「용어집 기능 전체가 도달 불가(importer 0건)」는 **거짓**이다(실측 importer **24**). ⓑ `§7.10`이 `role="img"` 사이트로 든 `components/tech/TechLevelBand.jsx`는 **파일 자체가 삭제**됐다(ADR-0041). 둘 다 「감사·인용 대상이 사라졌거나 패턴이 좁아 통과했다」 클래스다.
+
+> **증분 갱신: 2026-10-10 — 베이스라인이 `01ef5bd` → `7cb0f0d`로 이동했다**(task#345~384). 제자리 편집이며 `§0`은 행을 지우지 않았다(잔존 행 `B63` 유지 + 신규 `B85`). 손댄 절: `§0`(B85 신설·러너 중복배포 해소 각주) · `§6.1`·`§6.9`·`§9.3`·`§9.4`(배치 35개·`cowork_enrich_verify`) · `§7.4`(task#343이 닫은 3상태 항목) · `§10.1`~`§10.6`·`§12.2`·`§12.4`(task#377·#382·#384 — `reset --hard` 제거, certbot 은퇴, 러너 배포 기록 대조) · `§11.3`·`§11.5`(갱신 대상 집합·사후 대조·온디맨드 갱신). ⚠️ `§6.1`의 「B6 나머지 절반 열림」과 `§7.4`의 HIGH 3건은 **이 베이스라인 이전에 이미 닫혀 있었는데**(task#341·#343) 본문이 옛 서술을 유지하고 있었다 — 스탬프가 신선도의 하한일 뿐이라는 위 경고의 또 한 사례다.
 
 > ⚠️ **섹션 번호를 함부로 바꾸지 말 것.** 코드·테스트·프로브 **11곳**과 `API_SPEC.md`가 `CONCERNS §N`을 직접 인용한다(2026-08-22 재실측 = **12건**, 하위번호 `§4.2`·`§5.5`·`§9.2` 포함). 이번 판은 대분류(§0~§14) 번호를 직전 판과 **동일하게 유지**했다. 인용 중 어느 것이 이미 stale한지는 §12.6에 실측으로 정리했다. 항목 추가는 하위번호(§N.M)로.
 
@@ -173,6 +175,15 @@ mapped: 2026-09-14
 > `Deploy complete` · **뒤처짐 분기** — 이 문장을 담은 커밋을 별도 워크트리에서 push해 메인 체크아웃을 뒤처지게 만든 뒤 확인.
 > **번호는 재사용하지 않는다.**
 
+> ✅ **러너 쪽 중복 배포 공백 해소 (task#384, 2026-10-10, 무번호)** — B84 해소 뒤 남은 반쪽이었다: 러너가 arm64로
+> 재설치돼 online이 되자 push 하나에 러너와 폴러가 **둘 다** 배포할 수 있었고, 러너 잡은 배포 기록을 보지 않은 채
+> `git reset --hard`를 했다. 지금 `.github/workflows/deploy.yml`은 단일 스텝 `scripts/runner-deploy.sh`만 돌린다 —
+> 배포 기록(`DEPLOY_MARKER`)이 `origin/main`과 같으면 「이미 배포됨」 exit 0, 다르면 `bash deploy.sh`의 종료코드를
+> 그대로 전달, 잠금이 있으면 `RUNNER_LOCK_WAIT_SEC`(기본 900초) 동안 기다린 뒤 **기록을 다시 대조**(그 사이 폴러가
+> 같은 커밋을 배포했을 수 있다). `reset --hard` 없음, PATH는 뒤에 덧붙임. 두 경로가 같은 기록을 읽으므로 먼저 도착한
+> 쪽이 배포하고 다른 쪽은 no-op이다. 회귀 가드 `scripts/test_deploy_guard.py`가 `deploy.sh`·폴러·`runner-deploy.sh`를
+> 함께 덮는다(**40** 수집). 잔여는 `§10.1`(무staleness 잠금).
+
 > ✅ **`B6` 해소 (task#341, 2026-08-30)** — 마지막 도달 경로였던 `macro.py`를 닫았다.
 > `_fetch_and_save_macro_signals`가 수집 실패 시 **`_status: "skipped"`**를 반환하고(저장은
 > 생략해 직전값을 보존), auto(`scheduler/jobs.py::_refresh_macro_signals`)·manual
@@ -196,6 +207,8 @@ mapped: 2026-09-14
 
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
+| B85 | 호스트 백필 스크립트가 `localhost:5432` 접속 DSN을 **비밀번호를 포함한 리터럴**로 소스에 하드코딩한다 — 공개 저장소에 `955a480`(2026-06-03)부터 tracked. 그 값이 **현 운영 비밀번호와 같은지는 미확인**이다(B21 회전 task#334 이전에 커밋된 값이므로 다를 수 있으나 대조하지 않았다). 같다면 파일 삭제만으로는 부족하고(git 이력에 남는다) 회전이 필요하다. 부수로 이 접속은 `_get_pool`을 거치지 않아 `conftest._block_real_db`를 원리적으로 우회한다(§9.1) | `backend/run_backfill.py::DB_DSN` (사용처 조사: `docs/ops/postgres-5432-consumers.md`) | 값이 현행과 같으면 — 호스트 루프백 5432에 닿는 누구나(발행은 `127.0.0.1` 전용, §10.5). 값이 다르면 크리덴셜 노출은 과거 값에 한정되고 남는 것은 위생 결함(env 미사용)뿐이다 |
+
 > ✅ **`B80` 해소 (task#340, 2026-08-30)** — `routers/report.py::get_report`가 `date_str`을
 > `date.fromisoformat`으로 검증한 뒤 **DB 조회 앞에서** 404를 내도록 했다(형제
 > `routers/analyst_reports.py::get_detail`와 동형 — 같은 저장소에 이미 있던 가드다).
@@ -265,7 +278,7 @@ mapped: 2026-09-14
 > **기동 범위는 실측 근거로 좁혔다 — 통째 `docker compose up -d`가 아니다.** `deploy.sh`가 만드는
 > 컨테이너 이름이 compose의 것과 **바이트 동일**(`portfolion-backend-1`·`portfolion-nginx-1`)이라,
 > 통째 기동은 「낡은 것을 올리는」 정도가 아니라 **deploy.sh의 컨테이너를 compose 정의로 재생성**한다
-> (볼륨 마운트·포트가 갈린다). 그래서 스크립트는 compose로 **postgres·certbot만** 올리고
+> (볼륨 마운트·포트가 갈린다). 그래서 스크립트는 compose로 **postgres·certbot만**(task#384 certbot 은퇴 이후 **postgres만**) 올리고
 > backend·nginx는 `bash deploy.sh`에 맡긴다. 그리고 옛 스크립트의 `until docker info; do sleep 2; done`
 > **무한 대기**를 5분 유계 + FATAL 로그 + 비영 종료로 바꿨다 — 그대로 두면 데몬이 안 뜰 때 잡이 영원히
 > running으로 남아 「죽었는데 아무도 모르는」 상태가 된다(이 절이 기록한 바로 그 실패 형태의 재발).
@@ -722,9 +735,9 @@ finally:
 
 ### 6.1 키 미설정·실패가 "성공"으로 기록된다 — **부분 해소** (B6, task#329)
 
-**실측(2026-09-14): `_JOB_FUNCS` 33개 중 `set_status` 배선 15개 · 미배선 18개**(task#344가 추가한 `cowork_enrich_nightly`는 배선돼 있다 — §11.3 참조. 2026-08-22 실측은 32개 중 14개였다). 미배선 잡은 본문을 `try/except Exception: logger.warning(...)`로 감싼 채 `with job_runs.record(...)` 안에 있어 **항상 `_finish("success")`가 돈다**. `services/job_runs.py`의 docstring이 이 성질과 배선 예외 목록을 스스로 명시한다(그 목록이 정본이다).
+**실측(2026-10-10): `_JOB_FUNCS` 34개 중 `set_status` 배선 17개 · 휴장일 skip만 배선 2개 · 미배선 15개**(2026-09-14 실측은 33개 중 15/18, 2026-08-22는 32개 중 14개였다. 증분은 `macro_signals_fetch`(task#341)와 신설 `cowork_enrich_verify`(task#357) — 둘 다 배선. 배선 판정은 잡 본문 또는 그 본문이 `run`을 넘기는 헬퍼에 `set_status`가 있는지로 했다 — `recommendation_kr/us`는 `_recommendation_work(market, run)`이 배선한다). `daily_report_kr`·`daily_report_us`는 `scheduler/jobs.py::_holiday_skip`(task#347, 스펙 `skip_holidays`)으로 **휴장일만** `skipped`를 남기고 종목별 생성 실패는 여전히 success다. 미배선 잡은 본문을 `try/except Exception: logger.warning(...)`로 감싼 채 `with job_runs.record(...)` 안에 있어 **항상 `_finish("success")`가 돈다**. `services/job_runs.py`의 docstring이 이 성질과 배선 예외 목록을 스스로 명시한다(그 목록이 정본이다).
 
-미배선 18개(job id): `daily_report_kr`·`daily_report_us`·`daily_digest`·`monthly_kr`·**`macro_signals_fetch`**·`leverage_fetch`·`lending_fetch`·`investor_trend_fetch`·`short_sell_fetch`·`supply_score_fetch`·`backlog_fetch`·`kr_sector_fetch`·`disclosure_fetch`·`agm_fetch`·`dividend_fetch`·`beta_fetch`·`insider_fetch`·`us_supply_fetch`.
+미배선 15개(job id): `daily_digest`·`monthly_kr`·`leverage_fetch`·`lending_fetch`·`investor_trend_fetch`·`short_sell_fetch`·`supply_score_fetch`·`backlog_fetch`·`kr_sector_fetch`·`disclosure_fetch`·`agm_fetch`·`dividend_fetch`·`beta_fetch`·`insider_fetch`·`us_supply_fetch`.
 
 옛 판이 인용한 최악 형태(`_refresh_monthly_us`가 키 미설정 `{"error": …}`를 검사하지 않아 "refreshed" 로그까지 찍던 것)는 **해소됐다** — 지금은 auto·manual 3레인이 모두 반환값을 검사해 `run.set_status("skipped", …)`를 기록한다:
 
@@ -736,13 +749,13 @@ with job_runs.record("monthly_us", "auto") as run:          # ← as run 배선
     else:                          logger.info("[Scheduler] Econ indicators refreshed")
 ```
 
-> ⚠️ **B6의 나머지 절반은 열려 있다 — `macro.py::_fetch_and_save_macro_signals`.** 그 함수는 키 미설정 시 여전히 예외 없이 `{"error": …}`를 반환하고 `_status`를 실지 않으며, 두 레인 **모두** 반환값을 검사하지 않는다(`scheduler/jobs.py::_refresh_macro_signals` — `as run` 없음 · `routers/market_indicators.py::refresh_macro_signals` — `as run` 없음). 즉 `FRED_API_KEY`가 없으면 `macro_signals_fetch`는 지금도 **매 실행 success**로 기록된다. 형제 `econ.py`가 같은 wave에서 계열별 소스-폴백 + `_status` 3상태로 고쳐졌으므로 **그 파일이 그대로 참조 구현**이다.
+> ✅ **B6의 나머지 절반도 닫혔다(task#341) — `macro.py::_fetch_and_save_macro_signals`.** 수집 실패 시 `_status: "skipped"`를 반환하고 두 레인(`scheduler/jobs.py::_refresh_macro_signals` · `routers/market_indicators.py::refresh_macro_signals`) **모두** `as run`으로 받아 `set_status`한다(2026-10-10 재확인). 상세는 `§0`의 B6 해소 각주. ⚠️ 이 절이 2026-09-14 매핑 이후에도 「열려 있다」로 남아 있었다 — 해소(08-30)가 그 매핑보다 앞섰는데 본문이 갱신되지 않았다.
 
 키 미설정 → 초록 배치 + 데이터 0의 조합(전수):
 
 | 환경변수 | fetch 심볼 | 잡 |
 |---|---|---|
-| `FRED_API_KEY` | ~~`econ.py::_fetch_and_save_econ_indicators`~~(해소) · `macro.py::_fetch_and_save_macro_signals`(**열림**) | ~~`_refresh_monthly_us`~~(배선됨) · `_refresh_macro_signals`(**미배선**) |
+| `FRED_API_KEY` | ~~`econ.py::_fetch_and_save_econ_indicators`~~(해소) · ~~`macro.py::_fetch_and_save_macro_signals`~~(해소, task#341) | ~~`_refresh_monthly_us`~~(배선됨) · ~~`_refresh_macro_signals`~~(배선됨) |
 | `DART_API_KEY` | `disclosures.py`, `backlog.py::_get_corp_code_map`, `agm.py`, `dividends.py`, `insider_trades.py` | `_fetch_disclosures`·`_fetch_backlog`·`_fetch_agm`·`_fetch_dividends`·`_fetch_insider` |
 | `KOFIA_API_KEY` | `leverage_service.py::_kofia_get`, `lending_service.py::_api_get` | `_fetch_leverage`·`_fetch_lending` |
 | `TELEGRAM_BOT_TOKEN`/`_CHAT_ID` | `digest_service.py::send_telegram`(bare `return`) | `_run_digest` — 다이제스트는 생성·저장되고 **발송만 안 된다** |
@@ -844,7 +857,7 @@ _scheduler.start()
 
 ### 6.9 배치 레지스트리 정합 — **이미 가드됨 + 테스트 취약**
 
-`batch_registry.BATCHES`는 **34개**, `_JOB_FUNCS`는 **33개**로 **의도적으로 하나 어긋나 있다**(`consensus`가 레지스트리에만 있다 — 실측 차집합이 정확히 `{consensus}`이고 `_JOB_FUNCS`에만 있는 id는 0개다. 2026-09-14 재실측 — task#344의 `cowork_enrich_nightly` 추가로 33/34에서 각각 +1했고 차집합은 그대로 `{consensus}`다). 이 둘을 순진하게 동기화하려는 수정은 실패한다. 테스트 쪽 취약성은 §9.4.
+`batch_registry.BATCHES`는 **35개**(KR 16 · US 11 · 공통 8), `_JOB_FUNCS`는 **34개**로 **의도적으로 하나 어긋나 있다**(`consensus`가 레지스트리에만 있다 — 실측 차집합이 정확히 `{consensus}`이고 `_JOB_FUNCS`에만 있는 id는 0개다. 2026-10-10 재실측 — task#357의 `cowork_enrich_verify`(공통·08:00) 추가로 34/33에서 각각 +1했고 차집합은 그대로 `{consensus}`다). 이 둘을 순진하게 동기화하려는 수정은 실패한다. 테스트 쪽 취약성은 §9.4.
 
 ---
 
@@ -940,12 +953,14 @@ if (err.response?.status === 401) {
 
 **`.catch`가 아예 없는 곳**(미처리 rejection + 오류를 빈 상태로 렌더):
 
-- **HIGH `pages/GuruManagers.jsx`** — `api.get('/api/guru/managers').then(...).finally(...)`. 실패 시 `데이터 없음 — 설정 > 구루 탭의 "즉시 크롤링"에서 데이터를 가져오세요.`가 뜬다. **fetch 실패가 사용자에게 크롤을 실행하라고 지시한다.** 형제 `GuruStats.jsx`·`GuruAllocation.jsx`는 둘 다 *"실패를 '크롤링을 먼저'로 위장하지 않는다"* 주석과 함께 올바르게 처리한다 — 이 파일만 놓쳤다.
-- **HIGH `hooks/useReportList.js::fetchList`** — 실패 시 `reportList`가 `{}`로 남아 `리포트가 없습니다. 설정 페이지에서 '지금 생성' 버튼을…`이 뜬다. **앱의 주 화면이 백엔드 blip을 "리포트가 없다"로 표시한다.**
-- **HIGH `hooks/useReportGeneration.js::_startPoll`** — 1.5초 `setInterval` 안의 bare `catch {}`. `/api/report/progress`가 계속 실패하면 인터벌이 영원히 안 걷히고 `generating`이 non-null로 남아 **진행률이 얼어붙은 "생성 중"**이 지속된다. 탈출은 언마운트뿐.
+> ✅ **아래 HIGH 3건 + MED `Reports.jsx ?scope=all`은 닫혔다(task#343, `c023863`, 2026-09-01) — 2026-10-10 코드로 재확인.** `GuruManagers`는 `.catch`에서 오류 문구를 세우고, `useReportList`는 `listFailed`(3상태의 세 번째 값)를, `Reports.jsx`의 '그외' 조회는 `othersFailed`를 노출하며, `useReportGeneration::_startPoll`은 `MAX_FAIL_STREAK`·`MAX_IDLE_STREAK`로 유계화됐다. 이 해소는 2026-09-14 매핑보다 앞섰는데 본문이 옛 서술을 유지하고 있었다. 아래 원문은 기록으로 남긴다. `PermissionManager.jsx`(MED)는 이번에 재확인하지 않았다.
+
+- ~~**HIGH `pages/GuruManagers.jsx`**~~(닫힘) — `api.get('/api/guru/managers').then(...).finally(...)`. 실패 시 `데이터 없음 — 설정 > 구루 탭의 "즉시 크롤링"에서 데이터를 가져오세요.`가 뜬다. **fetch 실패가 사용자에게 크롤을 실행하라고 지시한다.** 형제 `GuruStats.jsx`·`GuruAllocation.jsx`는 둘 다 *"실패를 '크롤링을 먼저'로 위장하지 않는다"* 주석과 함께 올바르게 처리한다 — 이 파일만 놓쳤다.
+- ~~**HIGH `hooks/useReportList.js::fetchList`**~~(닫힘) — 실패 시 `reportList`가 `{}`로 남아 `리포트가 없습니다. 설정 페이지에서 '지금 생성' 버튼을…`이 뜬다. **앱의 주 화면이 백엔드 blip을 "리포트가 없다"로 표시한다.**
+- ~~**HIGH `hooks/useReportGeneration.js::_startPoll`**~~(닫힘) — 1.5초 `setInterval` 안의 bare `catch {}`. `/api/report/progress`가 계속 실패하면 인터벌이 영원히 안 걷히고 `generating`이 non-null로 남아 **진행률이 얼어붙은 "생성 중"**이 지속된다. 탈출은 언마운트뿐.
 - MED: `pages/Reports.jsx`의 `?scope=all`(admin '그외' 탭 공백), `components/PermissionManager.jsx`(권한 관리 화면에 빈 사용자 표).
 
-**삼키는 `.catch`**(오류와 "없음"이 구별 불가): `Ranking.jsx`의 리포트 모달 `.catch(() => {})`(500이 "아직 리포트 없음"으로 보여 사용자가 이미 있는 종목을 또 추가한다), `StockSearchBox`의 `.catch(() => setResults([]))`. 의도적이고 문서화된 것: `ReportDetailTabs`·`DetailTab`(backlog)·`SupplySection`·`GuruHoldersSection`(`// eco: silent`)·`utils/analytics.js`·`utils/pwa.js`·`App.jsx` 로그아웃 비콘·`Calendar.jsx` 인접월 프리페치.
+**삼키는 `.catch`**(오류와 "없음"이 구별 불가): `Ranking.jsx`의 리포트 모달 `.catch(() => {})`(500이 "아직 리포트 없음"으로 보여 사용자가 이미 있는 종목을 또 추가한다), `StockSearchBox`의 `.catch(() => setResults([]))`(⚠️ 2026-10-10 실측: 지금은 최신 검색어일 때만 `setResults(null)` — 빈 결과 `[]`와는 구별된다). 의도적이고 문서화된 것: `ReportDetailTabs`·`DetailTab`(backlog)·`SupplySection`·`GuruHoldersSection`(`// eco: silent`)·`utils/analytics.js`·`utils/pwa.js`·`App.jsx` 로그아웃 비콘·`Calendar.jsx` 인접월 프리페치.
 
 > ✅ **닫힘(task#331) — 같은 절이 지목했던 3곳이 「3상태」로 재작성됐다.** `Ranking::BasicInfo` 뉴스(옛 `.catch(() => setNews([]))` → 「관련 뉴스가 없습니다」 거짓 단정)는 이제 `news=null`(미조회) · `[]`(성공 0건) · `newsFailed`(실패) 셋을 구별해 렌더한다. `ConsensusChart`의 미조회(옛 「아직 수집된 데이터가 없습니다. 수집 버튼을 눌러주세요」 = 거짓 **행동 지시**)와 `useTechIndex`의 실패도 같은 형태로 닫혔다. **규율은 「실패를 `[]`로 붕괴시키지 않는다」이고, 상태가 셋이면 축도 셋 필요하다** — 실패 축만 두면 「아직 안 옴」 창이 사각으로 남는다(그쪽이 매 마운트 발생하는 더 흔한 발현면이다).
 
@@ -1044,7 +1059,7 @@ if (err.response?.status === 401) {
 
 `tests/conftest.py`의 autouse `_block_real_db`가 `db_svc._get_pool`을 raise로 교체한다. 기원은 주석에 있다 — 라이브 DB `generate_report` 테스트가 실 `005930` 스냅샷을 덮은 사고.
 
-**잔여(LOW-MED)**: 가드가 **DSN이 아니라 초크포인트를 막는다**. `backend/run_backfill.py`의 `psycopg2.connect(DB_DSN)`은 `_get_pool`을 거치지 않아 원리적으로 우회다(현재 그 경로를 부르는 테스트는 없다). 또 테스트가 autouse 이후 `_get_pool`을 되돌리는 것을 막는 장치는 없다. 완화: `pytest.ini`의 `testpaths = tests`가 `backend/scripts/`·`run_backfill.py` 수집을 막는다.
+**잔여(LOW-MED)**: 가드가 **DSN이 아니라 초크포인트를 막는다**. `backend/run_backfill.py`의 `psycopg2.connect(DB_DSN)`은 `_get_pool`을 거치지 않아 원리적으로 우회다(현재 그 경로를 부르는 테스트는 없다 — 그 DSN이 크리덴셜을 하드코딩한 것은 별건 §0 B85). 또 테스트가 autouse 이후 `_get_pool`을 되돌리는 것을 막는 장치는 없다. 완화: `pytest.ini`의 `testpaths = tests`가 `backend/scripts/`·`run_backfill.py` 수집을 막는다.
 
 **파일시스템·네트워크는 클린(확인)**: 파일을 쓰는 테스트는 전부 `tmp_path` + 대상 상수 patch를 쓴다(`test_digest_service.py`의 `patch.object(ds, "DIGEST_DIR", tmp_path)` 등) — **tracked 경로에 쓰는 테스트 0건**. `backend/tests/` 어느 파일도 최상위 `import requests`/`import yfinance`를 하지 않으며, mock이 전혀 없는 21개 파일은 전부 순수 함수·메타 테스트라 소켓을 열지 않는다.
 
@@ -1079,19 +1094,21 @@ if (err.response?.status === 401) {
 | `tests/test_table_unit_no_default_fallback.py` · `test_unit_caption_compound_and_fallback.py` · `test_rd_unit_bounded_caption.py` | 단위 캡션 파싱 실패의 「안전한 기본값」 폴백과 접미사 매칭(×100·×1/10 오저장, §2.1) |
 | `tests/test_market_outlook_schema.py` | enrich `market_outlook`의 산문 문자열·별칭 오타 통과(= 조용한 미렌더, §3.1) |
 | `tests/test_holiday_fallback_and_seed_validation.py` | 다일 연휴 폴백 부족 + 기동 스펙 검증이 **정상 등록되던 스펙을 미등록으로 떨어뜨리는** 회귀 |
+| `scripts/test_deploy_guard.py`(task#377·#382·#384, **40** 수집) | `deploy.sh`의 사전 거부(exit 2)·실패(exit 1) 계약, 폴러의 배포 기록 트리거·실패 1회 정책, `runner-deploy.sh`의 기록 대조·잠금 대기 — 임시 bare origin + 클론 + 스텁 PATH 하니스. ⚠️ 위치가 `backend/tests/`가 아니라 `scripts/`라 `pytest.ini`의 `testpaths`에 잡히지 않는다 — 경로를 명시해 돌려야 한다 |
+| `tests/test_nightly_enrich_verify.py` · `test_enrich_verify.py` | 야간 enrich의 「접수됨」을 「갱신됨」으로 읽는 거짓 초록(§11.3) — 사후 대조가 조회 실패를 `failed`로, 오늘 run 부재를 `failed`로 구별하는지 |
 
 ### 9.4 정확한 개수 단언이 다음 배치 추가에서 깨진다 — **확인된 버그**(개발 마찰)
 
-`batch_registry.BATCHES`에 **항목 하나를 더하면 4개 파일의 단언 9건이 동시에 깨진다**(2026-09-14 재확인 — task#344의 `cowork_enrich_nightly` 추가가 실제로 9지점 **전부**를 건드렸다: 아래 수치는 전부 33→34로 갱신됐고 어느 지점도 누락되지 않았다. 옛 판은 "3파일 3건", 그 앞 판은 "4파일 8지점"이라 적었으나 둘 다 지점 수가 틀렸다. **지점 수는 단조 증가한다** — 새 회귀 테스트가 같은 리터럴을 또 박기 때문이다):
+`batch_registry.BATCHES`에 **항목 하나를 더하면 4개 파일의 단언 9건이 동시에 깨진다**(2026-10-10 재확인 — task#357의 `cowork_enrich_verify` 추가로 아래 수치가 전부 34→35, 시장별 dict의 `공통`이 7→8이 됐다. 2026-09-14엔 task#344의 `cowork_enrich_nightly`가 같은 9지점을 33→34로 옮겼다. 옛 판은 "3파일 3건", 그 앞 판은 "4파일 8지점"이라 적었으나 둘 다 지점 수가 틀렸다. **지점 수는 단조 증가한다** — 새 회귀 테스트가 같은 리터럴을 또 박기 때문이다):
 
-- `tests/test_batch_market_split.py` — **3지점**: `assert len(batch_registry.BATCHES) == 34` · `_MARKET_BY_ID`(id→market 완전 매핑 dict, `cowork_enrich_nightly` → `"공통"`) · 시장별 개수 dict `{"KR": 16, "US": 11, "공통": 7}`
-- `tests/test_batches_router.py` — **3지점**: `assert len(data) == 34` **2곳**(하나는 task#330 적대 검토 수복이 추가한 「깨진 스케줄 행이 배치 현황을 통째로 죽인다」 회귀 축) · `assert {b["id"] for b in data} == EXPECTED_IDS`(34원소 하드코딩 집합, `cowork_enrich_nightly` 포함)
-- `tests/test_macro_signals_batch.py` — **1지점**: `assert len(batch_registry.BATCHES) == 34`
-- `tests/test_scheduler_seed.py` — **2지점**: `test_all_editable_jobs`의 `set(editable) == {…}` · `test_seed_only_fills_missing_rows`의 `expected_seeded` 집합(둘 다 `cowork_enrich_nightly` 포함)
+- `tests/test_batch_market_split.py` — **3지점**: `assert len(batch_registry.BATCHES) == 35` · `_MARKET_BY_ID`(id→market 완전 매핑 dict, `cowork_enrich_nightly`·`cowork_enrich_verify` → `"공통"`) · 시장별 개수 dict `{"KR": 16, "US": 11, "공통": 8}`
+- `tests/test_batches_router.py` — **3지점**: `assert len(data) == 35` **2곳**(하나는 task#330 적대 검토 수복이 추가한 「깨진 스케줄 행이 배치 현황을 통째로 죽인다」 회귀 축 — 함수명 `test_list_batches_survives_legacy_spec_without_type`) · `assert {b["id"] for b in data} == EXPECTED_IDS`(35원소 하드코딩 집합)
+- `tests/test_macro_signals_batch.py` — **1지점**: `assert len(batch_registry.BATCHES) == 35`
+- `tests/test_scheduler_seed.py` — **2지점**: `test_all_editable_jobs`의 `set(editable) == {…}` · `test_seed_only_fills_missing_rows`의 `expected_seeded` 집합(둘 다 `cowork_enrich_verify` 포함)
 
 ⚠️ **옛 판이 못박은 탐지 grep(`"BATCHES) ==\|len(data) ==\|EXPECTED_IDS"`)은 이 9지점 중 4개를 원리적으로 못 본다** — `set(…) ==` 형태와 dict 리터럴에 블라인드하다. 실제 게이트는 grep이 아니라 **전체 스위트**이고, grep은 "어느 파일을 볼지"만 좁힌다(`TESTING.md §5.6`). **이번 추가는 그 9지점을 전부 손으로 맞췄다는 뜻이고, 이 절이 경고해 온 "누락되기 쉬운 4지점"이 실제로 안 빠졌다는 것도 이번에 직접 확인했다.**
 
-그 라우터 테스트 함수 이름이 아직 `test_lists_sixteen_batches_with_required_fields`인 채 이제 **34**를 단언한다 — 이름이 배치 18개만큼 뒤처져 있고, **이 함정이 이미 반복적으로 발동했다는 직접 증거**다. 주의: `EXPECTED_IDS`엔 `consensus`가 들어 있는데 이는 `_JOB_FUNCS`(33개)엔 없다(§6.9) — 둘을 순진하게 동기화하는 수정은 실패한다(실측 차집합이 정확히 `{consensus}`다).
+그 라우터 테스트 함수 이름이 아직 `test_lists_sixteen_batches_with_required_fields`인 채 이제 **35**를 단언한다 — 이름이 배치 19개만큼 뒤처져 있고, **이 함정이 이미 반복적으로 발동했다는 직접 증거**다. 주의: `EXPECTED_IDS`엔 `consensus`가 들어 있는데 이는 `_JOB_FUNCS`(34개)엔 없다(§6.9) — 둘을 순진하게 동기화하는 수정은 실패한다(실측 차집합이 정확히 `{consensus}`다).
 
 ### 9.5 게이트가 **못** 보는 것
 
@@ -1115,33 +1132,35 @@ if (err.response?.status === 401) {
 
 ## 10. 배포·인프라·운영
 
-### 10.1 두 개의 비동기화된 `git reset --hard origin/main` — **설계상 트레이드오프**(운영 위험 큼)
+### 10.1 두 개의 비동기화된 `git reset --hard origin/main` — **해소**(task#377·#382·#384) · 잔여: 무staleness 잠금(**잠재 위험**)
 
 - `scripts/auto-deploy-poll.sh` — launchd 2분 주기
-- `.github/workflows/deploy.yml` — self-hosted 러너
+- `.github/workflows/deploy.yml` → `scripts/runner-deploy.sh` — self-hosted 러너(arm64 재설치로 online, task#384)
 
-**둘 다 개발자의 라이브 작업 디렉터리에서 돈다**(이 감사가 도는 바로 그 경로). `/tmp/portfolion-deploy.lock`은 *동시 배포*는 막지만 작업트리를 보호하지 않는다 — 폴러는 lock 이후에 reset하는 반면 **Actions 워크플로우는 lock을 아예 확인하지 않고** `deploy.sh` 호출 전에 reset한다.
+✅ **두 경로 모두 `reset --hard`를 하지 않는다.** 폴러는 task#377부터 뒤처졌을 때만 `--ff-only`(앞섬·갈라짐이면 손대지 않음), 러너 잡은 task#384부터 단일 스텝 `runner-deploy.sh`로 바뀌어 작업트리를 직접 만지지 않는다 — 따라잡기는 `deploy.sh`가 한다(미커밋 tracked 변경·앞섬·갈라짐·fetch 실패면 컨테이너를 건드리기 전에 **exit 2**로 거부). 두 경로는 같은 배포 기록(`~/.portfolion-deployed-sha`)을 대조하므로 같은 커밋을 두 번 배포하지 않는다(§0 B84·러너 해소 각주). **잠금은 `deploy.sh`만 잡는다**(폴러가 잡던 시절의 자기충돌이 B84였다).
 
-부수: 락이 PID도 staleness 검사도 없는 bare `/tmp` 파일이라 **크래시한 배포가 락을 남기면 이후 모든 배포가 영구 정지**한다(`deploy.sh`는 `exit 1`, 폴러는 `exit 0`).
+**잔여: 둘 다 여전히 개발자의 라이브 작업 디렉터리에서 돈다** — `deploy.sh`의 ff는 작업트리를 갱신하고 `frontend/dist`를 다시 빌드하므로, 라이브를 재는 작업이 도는 동안의 push는 배포성 행위다(루트 `CLAUDE.md` Deployment 절). 그리고 **잠금이 PID도 staleness 검사도 없는 bare `/tmp` 파일**이다 — `deploy.sh`는 `trap … EXIT`로 지우지만 SIGKILL·전원 차단이면 남는다. 그때 `deploy.sh`는 매번 exit 2(사전 거부), 폴러는 「Deploy in progress」로 exit 0 스킵, 러너는 `RUNNER_LOCK_WAIT_SEC`(기본 900초)를 기다린 뒤 exit 1 — **수동으로 잠금 파일을 지울 때까지 자동 배포가 영구 정지**한다. 폴러 경로는 로그 한 줄 외에 신호가 없다(러너는 잡 실패로 GitHub에 드러난다).
 
 ### 10.2 컨테이너가 compose 밖에서 돈다 — **잠재 위험**
 
 `deploy.sh`는 `docker compose`를 전혀 쓰지 않고 `portfolion-backend-1`·`portfolion-nginx-1`을 손으로 `docker run`한다 — **compose가 생성할 이름과 정확히 같다**(프로젝트 `portfolion` + 서비스 `backend`). 결과:
 
-- **`postgres`는 `deploy.sh`가 기동·재기동하지 않는다** — 사전 `docker compose up`으로 이미 떠 있어야 한다.
+런타임은 **3컨테이너**다 — compose 소유 `postgres` + `deploy.sh`가 `docker run`하는 `backend`·`nginx`(certbot은 task#384에서 은퇴, TLS는 Cloudflare가 종단). 부팅 시 `scripts/start-docker-compose.sh`가 `docker compose up -d postgres`만 하고 나머지는 `bash deploy.sh`에 맡긴다.
+
+- **`postgres`는 `deploy.sh`가 기동·재기동하지 않는다** — 위 기동 스크립트(또는 손 `docker compose up -d postgres`)로 이미 떠 있어야 한다.
 - compose의 `depends_on: postgres: condition: service_healthy` 게이트가 **배포 경로에서 통째로 우회**된다(백엔드가 DB 없는 상태로 뜰 수 있다).
-- 배포된 nginx가 compose의 **certbot 볼륨 마운트를 누락**한다. 현재는 `nginx/nginx.conf`의 `listen 443 ssl` 블록이 전부 주석이라 치명적이지 않으나, `location /.well-known/acme-challenge/ { root /var/www/certbot; }`는 **살아 있고 마운트 안 된 경로를 가리킨다** → deploy.sh가 띄운 nginx로는 ACME 갱신이 불가하다. 443 블록의 주석을 풀면 그 nginx는 아예 기동에 실패한다.
-- 이후 누군가 `docker compose up -d`를 돌리면 자기가 만들지 않은 컨테이너를 보고 재생성하며, 손으로 띄운 컨테이너가 살아 있는 동안 그것을 돌리면 **같은 network-alias에 스케줄러 프로세스가 2개** 생길 수 있다(§6.7).
+- ~~배포된 nginx가 compose의 certbot 볼륨 마운트를 누락한다 / ACME location이 마운트 안 된 경로를 가리킨다~~ — **해소(task#384)**: `docker-compose.yml`에 certbot 서비스·`./certbot` 볼륨이 없고 `nginx/nginx.conf`에 acme-challenge location도 주석 443 블록도 없다. compose와 `deploy.sh`의 nginx 마운트는 이제 같은 2개(`nginx.conf`·`frontend/dist`, 둘 다 `:ro`)다.
+- 이후 누군가 `docker compose up -d`(서비스 지정 없이)를 돌리면 자기가 만들지 않은 컨테이너를 보고 재생성하며, 손으로 띄운 컨테이너가 살아 있는 동안 그것을 돌리면 **같은 network-alias에 스케줄러 프로세스가 2개** 생길 수 있다(§6.7).
 
 ### 10.3 헬스체크·재시작 정책 — **잠재 위험**
 
 - `docker-compose.yml`에 healthcheck가 있는 서비스는 **`postgres`뿐**(`pg_isready`).
 - **`backend`엔 healthcheck가 없다** — compose에도 `deploy.sh`의 `docker run`에도. `--restart unless-stopped`는 *프로세스 종료*에만 반응하므로 **hang한 uvicorn은 영영 재시작되지 않는다**(§6.6·§6.7의 무타임아웃과 결합).
-- **`certbot`엔 재시작 정책이 없다** — `while :; do certbot renew; sleep 12h; done` 루프가 호스트 재시작·컨테이너 크래시 시 영구 종료되고 인증서 갱신이 조용히 멈춘다.
+- ~~`certbot`엔 재시작 정책이 없다~~ — **해소(task#384, 서비스 자체가 은퇴)**. 인증서는 Cloudflare 쪽이라 이 스택에 갱신 루프가 없다.
 
 ### 10.4 배포 검증이 비차단이고 롤백이 없다 — **잠재 위험**
 
-유일한 검증이 고정 `sleep 2` 뒤의 `curl -s http://localhost/health && echo " <- /health OK" || echo "WARNING: health check failed"`다 — **구조적으로 비차단**이다. 롤백 경로 없음. §6.6과 겹쳐 기동 백필이 있는 배포마다 이 경고가 뜨지만 배포는 성공으로 보고된다.
+유일한 검증이 고정 `sleep 2` 뒤의 `curl -s http://localhost/health && echo " <- /health OK" || echo "WARNING: health check failed"`다 — **구조적으로 비차단**이다. 롤백 경로 없음. §6.6과 겹쳐 기동 백필이 있는 배포마다 이 경고가 뜨지만 배포는 성공으로 보고된다. ⚠️ task#382 이후 그 결과가 한 단계 더 굳는다 — 헬스체크 실패와 무관하게 `deploy.sh`가 `배포된 커밋:`을 찍고 **배포 기록(`DEPLOY_MARKER`)에 SHA를 쓴 뒤 exit 0**하므로, 폴러·러너는 그 커밋을 「이미 배포됨」으로 보고 다시 시도하지 않는다. 즉 「배포 기록 == origin/main」은 *배포 스크립트가 끝까지 돌았다*는 뜻이지 *서비스가 응답한다*는 뜻이 아니다(기동 배치로 수 분 무응답인 창이 정상적으로 있으므로 헬스를 차단 조건으로 바꾸는 것도 단순하지 않다 — 루트 `CLAUDE.md` Deployment 절).
 
 ### 10.5 시크릿 폴백 — **해소**(B21 task#334 · B19 · SESSION_SECRET task#326)
 
@@ -1152,11 +1171,13 @@ if (err.response?.status === 401) {
 
 **리터럴 시크릿 폴백은 이제 0건이다**(task#334에서 마지막 하나인 `POSTGRES_PASSWORD`가 닫혔다). `backend/.env.docker`·`backend/.env`(실 시크릿 저장소)와 루트 `.env`는 올바르게 gitignored — 크리덴셜 보유 파일이 **3개**임에 주의(회전 시 셋을 함께 갱신해야 한다).
 
-추가 노출도 좁혔다 — `docker-compose.yml`의 postgres 발행이 `"127.0.0.1:5432:5432"`(루프백 전용)다. 이전 `"5432:5432"`는 LAN 전체에 닿았다(실측 확인). ⚠️ **파일 변경은 컨테이너 재생성 시점에 적용된다** — 재생성 전까지 실행 중 컨테이너는 여전히 `0.0.0.0`이다.
+추가 노출도 좁혔다 — `docker-compose.yml`의 postgres 발행이 `"127.0.0.1:5432:5432"`(루프백 전용)다. 이전 `"5432:5432"`는 LAN 전체에 닿았다(실측 확인). ⚠️ **파일 변경은 컨테이너 재생성 시점에 적용된다** — 이 바인딩은 task#338의 기동 잡 복구로 실적용됐다(§0 B21 해소 각주의 잔여 2건). 호스트 루프백 5432의 소비처 전수는 `docs/ops/postgres-5432-consumers.md`(task#384 S5)에 있다.
+
+⚠️ **「리터럴 시크릿 폴백 0건」은 *폴백* 이야기다 — 하드코딩 크리덴셜은 1건 남아 있다**: `backend/run_backfill.py::DB_DSN`이 비밀번호를 포함한 접속 문자열을 소스에 박고 있다(§0 **B85**, 현행 값과의 동일 여부 미확인). 환경변수를 읽지 않는 일회성 호스트 스크립트라 위 3파일 회전 절차(`scripts/rotate-postgres-password.sh`)의 대상이 아니다.
 
 ### 10.6 볼륨 권한 — **잠재 위험**(낮음)
 
-compose의 postgres 서비스가 `./backend/auth_schema.sql`·`./backend/app_schema.sql`을 **`:ro` 없이** `/docker-entrypoint-initdb.d/`에 마운트한다. 엔트리포인트는 읽기만 하지만 컨테이너가 tracked 소스 파일 2개에 쓰기 권한을 갖는다(그 파일들은 §10.1의 폴러가 `reset --hard`하는 대상이기도 하다). nginx 마운트는 compose·`deploy.sh` 양쪽에서 올바르게 `:ro`다.
+compose의 postgres 서비스가 `./backend/auth_schema.sql`·`./backend/app_schema.sql`을 **`:ro` 없이** `/docker-entrypoint-initdb.d/`에 마운트한다. 엔트리포인트는 읽기만 하지만 컨테이너가 tracked 소스 파일 2개에 쓰기 권한을 갖는다(그 파일들은 배포 경로가 ff로 갱신하는 작업트리의 일부다 — `reset --hard`는 task#377·#384 이후 없다, §10.1). nginx 마운트는 compose·`deploy.sh` 양쪽에서 올바르게 `:ro`다.
 
 부수(LOW): `deploy.sh`가 `TMP_DOCKER_CONFIG=$(mktemp -d)`를 만들고 지우지 않는다(`trap`은 락만 정리) — 배포마다 `/tmp` 디렉터리 누수.
 
@@ -1204,9 +1225,10 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 ### 11.3 야간 전량 enrich 확장 — 청크 순차 스폰 (task#344·346, ADR `260913-013425`)
 
-`fire()`에 `tickers`/`model`/`chunk` 3키가 **additive**로 붙었다(`None`이면 payload에서 통째로 생략 — 기존 `{"text": ...}` 단일 호출은 바이트 동일, 리스너 구버전 무회귀). 배치 `cowork_enrich_nightly`(공통·매일 02:00, `_run_nightly_enrich`)가 `GET /api/stocks`와 **같은 함수**(`storage.get_global_portfolio`)로 대상을 정해 이 경로로 발사한다.
+`fire()`에 `tickers`/`model`/`chunk` 3키가 **additive**로 붙었다(`None`이면 payload에서 통째로 생략 — 기존 `{"text": ...}` 단일 호출은 바이트 동일, 리스너 구버전 무회귀). 배치 `cowork_enrich_nightly`(공통·매일 02:00, `scheduler/jobs.py::_run_nightly_enrich`)가 **갱신 대상 집합**(`services/enrich_targets.py::compute_enrich_target_set` — 보유 ∪ 30일 열람, ADR `260916-132605`, task#354)으로 대상을 정해 이 경로로 발사하고, 쏜 ticker 목록을 그 run의 `payload`에 남긴다(옛 판: `storage.get_global_portfolio` 전량).
 
-- **관측성은 절반만 닿는다 — 설계상 트레이드오프, 코드 자신이 명시.** `job_runs.py`의 `record()` docstring이 이 잡을 "그 예외 목록에 넣을 수 없다"고 별도로 적어 둔다: `set_status`는 배선돼 있으나(fire 전송 실패→`failed`, 미설정·대상 0건→`skipped`) 실제 청크 처리는 **다른 프로세스**(로컬 리스너)에서 이 잡 종료 후 수 시간에 걸쳐 일어나고 완료를 백엔드로 보고하는 통로가 없다 — 즉 이 잡의 `success`는 "fire가 접수됐다"이지 "전 종목이 갱신됐다"가 아니며, 첫 청크에서 한도로 죽어 대부분이 미처리여도 배치현황 카드는 초록이다.
+- **관측성 간극은 사후 대조로 메워졌다 — 단 하루 1회·시각 고정**(task#357). 이 잡의 `success`는 여전히 「fire가 접수됐다」뿐이지만(청크 처리는 **다른 프로세스**인 로컬 리스너에서 일어나고 완료 보고 통로가 없다), 다음날 08:00 `cowork_enrich_verify`(`scheduler/jobs.py::_verify_nightly_enrich`)가 02:00 run의 `payload` ticker를 그 run의 `started_at` 이후 `tickers.enriched_at`과 대조해(`services/enrich_verify.py::judge`) **02:00 run 행의 status/error를 직접 UPDATE**하고 자기 run에도 같은 상태를 남긴다. 조회는 `job_runs.recent()`(예외→`[]`)가 아니라 **직접 `query`** 하고 예외를 `failed`로 구별하며, 최신 02:00 행이 오늘 것이 아니면(야간 잡 미실행) `failed`다 — 「표시용 graceful read를 판정에 쓰면 그 관용이 거짓 판정이 된다」를 피한 형태다. **잔여(잠재 위험, 코드 docstring이 명시)**: 08:00은 「아직 처리 중」을 구별하지 못한다 — 대상이 늘거나 청크가 느려 02:00~08:00을 넘기면 처리 중인 ticker가 미갱신으로 판정되고, 대조가 하루 1회라 나중에 완료돼도 그 판정이 남는다(처방은 판정이 아니라 **시각** 이동). 또 02:00 행 UPDATE가 실패하면 warning만 남고 그 행은 거짓 초록으로 남는다(verify 자기 run에는 판정이 남는다).
+- **실행기 분기와 키 주입(task#348·#349).** 리스너는 `model`에 `/`가 있으면 `opencode run -m <model> --auto`, 아니면 `claude -p`를 스폰한다(`scripts/cowork-fire-listener.py`). API 키는 프롬프트 리터럴이 아니라 자식 env `PORTFOLION_API_KEY`로 주입되고 프롬프트는 `$PORTFOLION_API_KEY`만 참조한다 — OpenCode `run`이 bash 명령을 run.log에 에코하므로 리터럴이면 평문 로그로 샜다. run.log는 0600으로 생성된다.
 - **리스너 큐는 인메모리 — ADR이 명시한 트레이드오프.** `scripts/cowork-fire-listener.py::_QUEUE`(`queue.Queue`)는 프로세스 재기동에 잔여 청크를 잃는다(ADR `260913-013425` §산출물: "재시도·영속화는 없고, 소실은 다음 날 회차가 덮는다(멱등이므로 데이터 손상은 없다)"). 배포 자체가 재기동 1회를 요구하므로 첫 배포일에 특히 그렇다.
 - **리스너 코드 변경은 `git push` 배포 경로 밖이다.** `deploy.sh`는 backend/nginx 컨테이너만 재생성하고 `cowork-fire-listener.py`는 launchd 서비스(`com.portfolion.cowork-fire-listener`)로 별도 상주한다 — 리스너 코드를 고치면 사용자의 수동 `launchctl kickstart`(ADR: "사용자 `!` 실행")가 따로 필요하다. 이걸 잊으면 배포는 성공으로 보이는데 리스너는 옛 코드로 계속 돈다(§10.1의 "두 배포 경로" 클래스와 다른 방향의 "배포됐지만 안 뜬" 사례).
 - **청크 타임아웃은 유계다.** `_run_chunks`가 `proc.wait(timeout=3600)`(실측 5종목 1청크 ~19분의 3배 여유) 후 `TimeoutExpired`면 `proc.kill()`하고 다음 청크로 진행한다 — 무계 대기였다면 세션 하나가 안 끝나는 것만으로 워커 스레드가 영구 정지하고 이후 모든 전량 회차가 큐에 쌓이기만 했을 것(코드 주석이 이 대안을 "영구 정지" 시나리오로 명시).
@@ -1219,6 +1241,14 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 - **UPDATE와 이력 INSERT는 별개 트랜잭션이다 — 잠재 위험(낮음).** `enrich_stock`의 `execute(UPDATE ...)`와 `_record_enrich_history`의 `query(SELECT row_to_json...)`+`execute(INSERT...)`는 `services/db.py`의 호출별 신규 커넥션·자동커밋 규약(§4.3)을 그대로 따른다 — 단일 트랜잭션이 아니다. 같은 티커에 동시 쓰기(예: admin 수동 PUT과 루틴 세션이 같은 종목을 겹쳐 건드리는 경우)가 있으면 `_record_enrich_history`의 SELECT가 **이 호출이 방금 쓴 값이 아니라 그 사이 끼어든 다른 쓰기의 값**을 담을 수 있다 — 이력 행이 "이 UPDATE가 실제로 만든 판"과 어긋난다. 도달 조건이 좁다(같은 티커 동시 enrich)는 이유로 아직 회귀 가드는 없다.
 - **`scripts/enrich-ab.py`(신규, 이력 위에서 A/B 운전)에서 이미 발견·수정된 결함 2건**은 코드에 남은 흔적으로 확인했다(둘 다 이 파일 단독 변경 커밋으로 닫힘, 잔존 아님) — ⓐ `_row(hid)`가 `ticker`로 한정하지 않아 다른 종목의 이력 id를 조용히 읽어 엉뚱한 두 판을 비교했다(`bfc5bf5`) ⓑ `restore()`의 리포트 재생성이 루틴 자신의 동시 재생성과 겹치면 409를 받는데 이를 실패로 처리해 "컬럼은 복원됐는데 스냅샷은 이전 판"인 어긋난 상태로 끝났다(`ca85277`, 지금은 10초 간격 유계 재시도 12회). 이 스크립트는 운영자가 로컬에서 직접 실행하는 도구이지 요청 경로가 아니다.
 
+### 11.5 온디맨드 갱신 요청 — 인증 사용자가 루틴 세션을 발사한다 (task#354·#355, ADR `260916-132605`) — **잠재 위험**(낮음)
+
+`POST /api/stocks/{ticker}/enrich/request`(`routers/stocks.py::request_enrich`, `get_current_user`)는 리포트 상세 진입 시 프론트(`frontend/src/hooks/useEnrichOnDemand.js`)가 부르고, 묵은 종목(`enriched_at` 7일 초과·미분석)이면 `cowork_trigger.fire(..., tickers=[t], model="opus", chunk=1)`로 **세션 1개를 발사**한다. 응답은 항상 `{fired, reason}`(`unconfigured`·`fresh`·`in_flight`·`stale`·`fire_failed`).
+
+- **이미 가드됨**: 읽기(GET 상세)에 쓰기 부작용을 숨기지 않고 별도 POST로 분리했다 · 종목당 진행 중 1건(`_ENRICH_INFLIGHT`, TTL 15분) 판정-후-기록을 `threading.Lock`으로 묶었다(sync `def` 핸들러는 스레드풀에서 병렬 실행된다) · fire 실패 시 in-flight 표식을 지워 다음 요청이 재시도할 수 있다 · `tickers`에 행이 없으면 404.
+- **잔여 1 — 소유권·역할 검사가 없다.** 판정은 「`tickers`에 행이 있고 묵었는가」뿐이라, 로그인한 누구나 **남의 종목**을 포함해 묵은 종목마다 15분에 1세션씩 발사할 수 있다. 가입이 열려 있으므로(§5.9) 비용(유료 모델 세션) 증폭 표면이다. 도달 조건을 좁히는 사실: 갱신이 성공하면 `enriched_at`이 신선해져 이후 요청은 `fresh`로 끝난다 — 반복 발사는 **루틴이 그 종목을 갱신하지 못하는 경우**(예: 분석 불가 티커)에 15분 주기로 성립한다.
+- **잔여 2 — 진행 중 표식은 프로세스 인메모리다.** 재기동(배포 포함)에 소실돼 같은 종목이 한 번 더 발사될 수 있다 — 코드 주석이 「중복 fire 1회일 뿐이고 멱등」으로 수용한 트레이드오프이며 uvicorn 단일 워커 가정에 의존한다(워커를 늘리면 워커마다 따로 센다).
+
 ---
 
 ## 12. 문서·설정 드리프트
@@ -1229,9 +1259,9 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 **함의**: 이 저장소의 설계 의도는 마커가 아니라 **매우 긴 한국어 docstring**에 실린다. 따라서 실제 부채는 *주석되지 않은 구조적 부채*이며, 그것이 이 문서 §1~§11의 내용이다. 마커 grep으로 부채를 찾으려 하지 말 것.
 
-### 12.2 `deploy.sh` 안의 죽은 TLS 설정 — **잠재 위험**(오판 유발)
+### 12.2 `deploy.sh` 안의 죽은 TLS 설정 — **해소**(task#384)
 
-`nginx/nginx.conf`의 `listen 443 ssl` 블록이 전부 주석 상태인데 ACME challenge location은 살아 있다(§10.2). "HTTPS가 설정돼 있다"는 오독을 유발한다 — 실제 TLS 종단은 Cloudflare Tunnel이다.
+옛 서술: `nginx/nginx.conf`의 `listen 443 ssl` 블록이 전부 주석 상태인데 ACME challenge location은 살아 있어 「HTTPS가 설정돼 있다」는 오독을 유발했다. 지금 `nginx.conf`는 `listen 80` 서버 하나뿐이고(주석 443 블록·acme location 모두 제거), `docker-compose.yml`의 nginx 주석이 「TLS는 Cloudflare가 종단한다 — 443 게시·인증서 갱신 컨테이너는 없다」를 명시한다. ⚠️ `§0` B82 각주의 「nginx 443 블록이 활성화되면 재판정」 조건은 블록이 **추가**되는 경우로 읽을 것.
 
 ### 12.3 스테일 주석 — **잠재 위험**(틀린 불변식을 심는다)
 
@@ -1239,12 +1269,12 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 |---|---|---|
 | ~~`routers/stocks.py::_usdkrw_rate` docstring~~ | ~~"FX 배치(get_fx)가 채운 영구 캐시를 읽는다"~~ | **해소(2026-08)** — 배치 `fx_fetch`가 실재하고 docstring이 배치/요청경로 두 작성자를 구별한다 |
 | `scheduler/jobs.py`(2곳)·`routers/stocks.py` | 풀이 `maxconn=10` | 실제 20(§4.2) |
-| `tests/test_batches_router.py` 함수명 | `test_lists_sixteen_batches...` | 33을 단언(§9.4) |
+| `tests/test_batches_router.py` 함수명 | `test_lists_sixteen_batches...` | 35를 단언(§9.4) |
 | ~~`services/ranking_service.py::_fetch_naver_market` docstring~~ | ~~"한 페이지라도 실패하면 RuntimeError"~~ | **해소(2026-08)** — 0페이지(200+`totalCount:0`)와 커버리지 미달을 실제로 던지고 docstring이 실패 클래스 3종을 명시한다 |
 
 ### 12.4 리포지토리 위생 — **잠재 위험**(악화 중)
 
-루트에 `screenshots-*` 디렉터리가 **104개** 쌓여 있다(2026-08-22 실측, 전부 untracked — 직전 판 "90여 개"에서 계속 증가). `.forge/` 산출물, `.planning/`, `.superpowers/`, `.worktrees/`, `supabase/`(제거된 인프라의 잔재)도 공존한다. `git status`가 사실상 판독 불가라 **§10.1의 폴러가 무엇을 날릴지 눈으로 확인하기 어렵다**.
+루트에 `screenshots-*` 디렉터리가 **104개** 쌓여 있다(2026-08-22 실측, 전부 untracked — 직전 판 "90여 개"에서 계속 증가). `.forge/` 산출물, `.planning/`, `.superpowers/`, `.worktrees/`, `supabase/`(제거된 인프라의 잔재)도 공존한다. `git status`가 사실상 판독 불가라 **어떤 미커밋 변경이 `deploy.sh`의 사전 거부(exit 2)를 일으키는지 눈으로 확인하기 어렵다**(옛 판의 「폴러가 무엇을 날릴지」는 `reset --hard`가 사라져 더는 해당하지 않는다, §10.1). 2026-10-10 실측: `screenshots-*` **111**개 · `scripts/` **188**항목(§9.7).
 
 ### 12.5 `backend/migrations/`가 죽었다 — **확인된 버그**(문서·구조)
 
@@ -1344,6 +1374,8 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 ⚠️ **§0의 잔존 6건 서술은 stale하다 — 그중 3건이 그 뒤 닫혔다.** 이 절이 이전에 열거한 `B6`(부분)·`B80`·`B81`·`B82`·`B49`(부분)·`B63` 중 **`B6`(task#341, macro.py 마지막 경로 닫힘)·`B80`(task#340, 날짜 미검증 404화)·`B82`(task#339, nginx 루프백 게시)는 해소돼 §0 표에서 이미 제거됐다**(각 해소 각주가 §0 안에 그대로 있다). **2026-09-14 기준 §0에 실제로 남은 행은 3개뿐이다 — `B81`(부분, task#342 — title 상한은 닫혔고 기존 발행 15종의 소급 미검증만 잔존) · `B49`(부분, task#331 — 주 인스턴스는 닫혔고 §7.3의 6곳만 잔존) · `B63`(프론트 포매터 중복, 미착수)**. 셋 다 대기 슬롯이 없다 — 「§0에 남아 있다」와 「누군가 맡고 있다」는 다르고, 지금은 아무도 맡고 있지 않다.
 
+> **2026-10-10 재실측** — 그 셋 중 `B49`·`B81`은 task#383에서 닫혔다(§0 해소 각주). **§0 표에 남은 행은 `B63`(미착수)과 신규 `B85`(하드코딩 크리덴셜, 현행 값 동일 여부 미확인) 2개**다. `.forge/backlog/`는 여전히 비어 있다. `.forge/adr/` 활성 파일은 **57개**(번호 `0001`~`0047` + 날짜명 **10건** — 09-14 이후 `260916-132605`·`260921-091825`·`261006-232406`·`261009-105247` 4건 추가).
+
 `.forge/adr/`엔 ADR 파일 **53개**가 활성이다(2026-09-14 재실측, 직전 판의 48개에서 5건 증가) — 번호 `0001`~`0047`(47건, 무변화) + 날짜명 **6건**(직전 판 1건에서 5건 증가: `260821-073608-tech-report-backfill-bypasses-routine.md`·`260822-173015-probe-slug-scope-hardcoded-vs-derived.md`·`260822-173016-market-outlook-schema-enforcement.md`·`260823-085145-auth-rate-limit-in-process-cf-ip.md`·`260830-212846-tech-report-title-is-bounded-lead.md`·`260913-013425-nightly-full-enrich-chunked-listener.md`). `retired/`는 여전히 없다. ⚠️ 날짜명 ADR이 섞여 있으므로 **번호 최대값(47)과 파일 수(53)가 다르다** — `ls | wc -l`로 「ADR N건」을 세면 번호 체계와 어긋난다(`STRUCTURE.md §5`의 카운트 드리프트가 §0 `B59`로 잡혀 있는 이유가 이것이다).
 
 이 문서가 식별한 **후속 후보**(계획으로 승격되지 않은 것):
@@ -1353,13 +1385,15 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 | 1 | **경계 세분화**(섹션/위젯 단위) — 에러 바운더리 *신설*은 **완료됐다**(`57efe80`, task#335, B48: `main.jsx`·`InstallPrompt`·라우트 `key` 3층 + 회귀 테스트 2파일). 이 행의 옛 표기는 §7.2의 무가드 사이트 7곳이 경계 부재로 전부 화면을 비운다고 적었는데 **둘 다 거짓**이었고 2026-08-31(task#343)에 정정했다 — 경계는 존재하고, 그 7곳은 현재 백엔드 계약상 **도달 불가**이기도 하다(§7.2 재판정). 남은 값어치는 「루트가 통째로 날아가는 대신 그 섹션만 폴백」이며 신설과는 **별개 항목**이다 | §7.2 |
 | ~~2~~ | ~~`_fetch_naver_market`의 0페이지 가드(형제 US 경로와 대칭화)~~ → **완료(2026-08)** | §1.1 |
 | ~~3~~ | ~~`fx` 배치 신설~~ → **완료(2026-08, `fx_fetch`)**. 잔존: `_usdkrw_rate`에 **나이 검사·stale 마커는 여전히 없다** | §6.4 |
-| 4 | 로그인 레이트리밋(bcrypt CPU 고갈 DoS) · **task#333 스텁으로 큐잉됨** | §5.6 |
-| 5 | 세대 가드 **잔여 6곳** — `Ranking::onRowClick`·`Calendar` 월 이펙트·`Recommendations::handleChip`·`StockSearchBox`·`usePortfolioData`·`useReportList`(`Reports.jsx`와 형제 4곳은 task#331에서 닫혔다). ⚠️ 가드와 함께 **식별자 변경 시 `null` 리셋**을 쌍으로 넣을 것 — 가드 단독은 「보존」을 막지 못한다 | §7.3 |
-| 6 | **남은 18개 잡**을 `Run.set_status` 패턴으로(키 미설정이 success로 기록되는 문제) — 배선 1→14 진척(task#329). **최우선은 `macro_signals_fetch`**(B6 잔존 절반, `FRED_API_KEY` 미설정이 지금도 초록) | §6.1 |
+| ~~4~~ | ~~로그인 레이트리밋(bcrypt CPU 고갈 DoS)~~ → **완료(task#337, B20)** | §5.6 |
+| ~~5~~ | → **완료(task#379·#380·#383, B49 해소)** — 옛 서술: 세대 가드 **잔여 6곳** — `Ranking::onRowClick`·`Calendar` 월 이펙트·`Recommendations::handleChip`·`StockSearchBox`·`usePortfolioData`·`useReportList`(`Reports.jsx`와 형제 4곳은 task#331에서 닫혔다). ⚠️ 가드와 함께 **식별자 변경 시 `null` 리셋**을 쌍으로 넣을 것 — 가드 단독은 「보존」을 막지 못한다 | §7.3 |
+| 6 | **남은 15개 잡**을 `Run.set_status` 패턴으로(키 미설정이 success로 기록되는 문제) — 배선 1→14(task#329)→17(2026-10-10, `macro_signals_fetch` task#341 · 신설 `cowork_enrich_verify`). `daily_report_kr/us`는 휴장일 skip만 배선 | §6.1 |
 | 7 | `_migrate`에 후발 테이블 4개 + `tickers` 컬럼 3개 추가 | §4.1 |
 | 8 | `test_no_bare_today.py`를 `datetime.now()`까지 확장 | §6.8 |
 | 9 | `BATCHES` 개수·집합 단언 **4파일 9지점**을 구조 단언으로 교체(지점 수는 새 회귀 테스트마다 늘어난다 — `TESTING.md §5.6`) | §9.4 |
 | 10 | §13.2의 미확인 항목 재검증 — **표의 8건은 전부 판정됐고 그중 7건이 이후 해소됐다**(잔존은 `B63` 하나). 이 줄은 "그 다음 미확인"을 위한 자리로만 남긴다 | §13.2 |
 | 11 | **프로브 대상 slug을 리터럴 → 응답 유도 + 표본 하한으로** 교체 — 발행 15종 중 초기 5종만 반복 측정되고 2차 개정 9종의 상세는 사실상 미측정이다(§0 `B81`이 그 사각에서 나왔다). 대상 확대는 「축을 좁히기」와 같은 슬라이스여야 한다(선재 FAIL 수입 방지) | §9.7 |
-| 12 | `macro.py::_fetch_and_save_macro_signals`의 `_status` + 두 레인 `as run` 배선 — **B6 잔존 절반**이고 참조 구현(`econ.py`)이 이미 형제로 있다 | §6.1 |
-| 13 | `GET /api/report/{ticker}/{date_str}`의 경로 조각 검증(현재 500 — §0 `B80`) · `TechReportIn.title` 상한(§0 `B81`). 둘 다 **어느 백로그 슬롯에도 없다** | §0 |
+| ~~12~~ | ~~`macro.py::_fetch_and_save_macro_signals`의 `_status` + 두 레인 `as run` 배선~~ → **완료(task#341, B6)** | §6.1 |
+| ~~13~~ | ~~`GET /api/report/{ticker}/{date_str}`의 경로 조각 검증 · `TechReportIn.title` 상한~~ → **완료(B80 task#340 · B81 task#342/#383)** | §0 |
+| 14 | `backend/run_backfill.py`의 하드코딩 크리덴셜 — 현행 비밀번호와 동일 여부 판정 → 같으면 회전, 어느 쪽이든 env(`DATABASE_URL`) 기반으로 바꾸거나 스크립트 은퇴(`docs/ops/postgres-5432-consumers.md` 체크리스트 6번) | §0 `B85` |
+| 15 | 배포 잠금에 staleness 판정(PID·나이) — 남은 잠금 하나가 자동 배포를 영구 정지시킨다 | §10.1 |

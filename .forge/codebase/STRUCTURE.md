@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
-mapped: 2026-09-14
+last_mapped_commit: 7cb0f0de3c1a4b8bf4863af380eebfdb3d7fcbb2
+mapped: 2026-10-10
 ---
 
 # STRUCTURE — PortfoliOn
@@ -23,16 +23,17 @@ mapped: 2026-09-14
 PortfoliOn/
 ├── backend/              FastAPI 앱 (Python 3.12 컨테이너 / 로컬 .venv는 3.9.6)
 ├── frontend/             React 19 + Vite SPA
-├── nginx/nginx.conf      리버스 프록시 + 정적 서빙 설정
-├── certbot/{conf,www}/   HTTPS 인증서 (conf/는 gitignored)
-├── scripts/              라이브 UAT 프로브 · 배포 폴러 · 운영 스크립트
-│                         (168 파일 = `find scripts -maxdepth 1 -type f`; 아래 §4)
+├── nginx/nginx.conf      리버스 프록시 + 정적 서빙 설정 (listen 80 단일 서버 — 443·acme 블록 없음)
+├── scripts/              라이브 UAT 프로브 · 배포 폴러·러너 잡 · 운영 스크립트
+│                         (184 파일 = `find scripts -maxdepth 1 -type f`; 아래 §4)
 ├── docs/                 사람이 읽는 문서 (아래 §6)
 ├── .forge/               forge 워크플로 상태 · 코드베이스 지도 · ADR · 회고
 ├── .claude/              Claude Code 설정 · 도메인 에이전트 카드 · 스킬
-├── docker-compose.yml    4컨테이너(postgres·backend·nginx·certbot)
-├── deploy.sh             배포 스크립트 (러너·폴러 공용)
-├── .github/workflows/deploy.yml   self-hosted 러너 워크플로
+├── docker-compose.yml    3서비스 정의(postgres·backend·nginx) — 런타임에 compose가 소유하는 건
+│                         postgres뿐이고 backend·nginx는 deploy.sh가 `docker run`으로 소유한다.
+│                         certbot 서비스·`certbot/` 디렉터리는 task#384에서 은퇴(TLS는 Cloudflare 종단)
+├── deploy.sh             배포 스크립트 (러너·폴러·수동 공용 — 잠금·배포 기록·종료코드 0/1/2 계약)
+├── .github/workflows/deploy.yml   self-hosted 러너 워크플로 (단일 step → `scripts/runner-deploy.sh`)
 ├── start.sh / start.bat / stop.sh / stop.bat   로컬 개발 서버 기동·정지
 ├── API_SPEC.md           전체 REST 레퍼런스 (엔드포인트 정본)
 ├── CLAUDE_COWORK_API.md  외부 Cowork 전용 API 명세
@@ -71,13 +72,15 @@ backend/
 │   ├── auth.py             로컬 로그인 · 리프레시 · OAuth(구글/깃허브) · /me · /oauth/token
 │   ├── portfolio.py        보유 CRUD · /prices · /rebalance · /exposure · /dividends · /{t}/pin
 │   ├── watchlist.py        관심 CRUD · /{ticker}/promote
-│   ├── stocks.py           검색 · 비교 · /dashboard · enrich · 이름/배당/베타/수급 백필  (최대 파일)
+│   ├── stocks.py           검색 · 비교 · /dashboard · enrich · 온디맨드 갱신 요청(`request_enrich`) ·
+│   │                       이름/배당/베타/수급 백필  (최대 파일)
 │   │                       — enrich 본문 검증 모델: `MarketSize` · `SegmentMarket` ·
 │   │                         `MarketOutlookSegment` · `MarketOutlook`(+ `EnrichBody` ·
 │   │                         `BatchEnrichItem`)
 │   ├── report.py           스냅샷 목록·상세·히스토리 · 생성/백필 · 컨센서스 · 수주잔고 ·
 │   │                       공시 · 내부자 · US수급 · AGM
-│   ├── analyst_reports.py  심층 리포트 발행/조회 (ADR-0027)
+│   ├── analyst_reports.py  심층 리포트 발행/조회 (ADR-0027) — v2 구조 축·9렌즈 발행 계약
+│   │                       (`LensPublishBody` 등 pydantic 모델, 전부 `extra="forbid"`, ADR `261006-232406`)
 │   ├── tech_reports.py     주요기술 리포트 (ADR-0033/0034/0038/0042/0043/0044/0045)
 │   │                       — pydantic 모델 22종(발행 계약)이 이 파일에 산다.
 │   │                         고정 경로 `/index`(경량 인덱스)가 `/{slug}`보다 먼저 등록됨
@@ -92,7 +95,7 @@ backend/
 │   ├── calendar.py         월별 이벤트 + _FOMC_DATES 하드코딩 목록 + fomc_coverage_status
 │   ├── digest.py           일일 다이제스트
 │   ├── guru.py             매니저 · 통계 3종 · 크롤
-│   ├── batches.py          배치 현황 · 스케줄 편집 · FOMC 커버리지
+│   ├── batches.py          배치 현황(`exchange` 포함) · 스케줄 편집(`skip_holidays` 경계 검증) · FOMC 커버리지
 │   ├── events.py           사용자 행동 이벤트 수집 (VALID_EVENTS 화이트리스트)
 │   └── admin.py            사용자 · 권한(ALL_MENUS) · analytics · 심층리포트 대상 · Cowork fire
 │
@@ -102,7 +105,8 @@ backend/
 ├── scheduler/              APScheduler 배선 **패키지** (단일 scheduler.py 아님)
 │   ├── __init__.py         start()/stop()/reload() + jobs·schedule 심볼 명시 re-export
 │   ├── _state.py           _scheduler · _DIGEST_JOB_ID · _VALID_DAYS (leaf, 순환 회피)
-│   ├── jobs.py             잡 함수 전부 + _JOB_FUNCS(job_id → 함수) 맵
+│   ├── jobs.py             잡 함수 전부 + _JOB_FUNCS(job_id → 함수) 맵 + `_holiday_skip` ·
+│   │                       `_verify_nightly_enrich`(야간 갱신 사후 대조)
 │   └── schedule.py         _build_trigger · _reschedule_job · _seed_spec_for ·
 │                           _seed_batch_schedules · _check_missed_report(_for)
 │
@@ -115,9 +119,10 @@ backend/
     ├── parallel.py         parallel_map(max_workers=10)
     ├── progress.py         ProgressTracker (try_start 이중실행 거부 + 고착 회수)
     │                       · ProgressRegistry (사용자별 트래커, 상한 64)
-    ├── job_runs.py         record() 컨텍스트매니저 + Run.set_status · recent · recent_map
-    ├── batch_registry.py   BATCHES 정적 메타데이터 (배치 정본 목록, 34개)
-    ├── schedule_spec.py    스펙 검증 · CronTrigger kwargs 변환 · 사람이 읽는 문구
+    ├── job_runs.py         record() 컨텍스트매니저 + Run.set_status · Run.set_payload · recent · recent_map
+    ├── batch_registry.py   BATCHES 정적 메타데이터 (배치 정본 목록, 35개)
+    ├── schedule_spec.py    스펙 검증(`skip_holidays` bool 포함) · CronTrigger kwargs 변환 · 사람이 읽는 문구
+    ├── market_session.py   거래소 영업일 판정(`exchange_calendars`) — `skip_holidays`의 정본 (task#347)
     ├── rate_limit.py       IP 슬라이딩 윈도우 레이트리밋 (login/register 전용, task#337)
     │
     ├── storage/            ADR-0017 패키지 분할 — __init__.py가 전 심볼 re-export
@@ -125,7 +130,7 @@ backend/
     │   │                   get_global_portfolio · enrich_stock · set_target_weights · set_pinned
     │   ├── names.py        refresh_snapshot_names · reconcile_snapshot_names · set_ticker_name
     │   ├── schedule.py     batch_schedules CRUD · guru_managers 저장(통계 반환) · 레거시 스케줄
-    │   └── dates.py        expected_report_date(s) — 시장별·시각인지 기대 리포트 날짜
+    │   └── dates.py        expected_report_date(s) — 시장별·시각인지 기대 리포트 날짜(휴장일 제외)
     │
     ├── market/             시세·재무 통합 API
     │   ├── __init__.py     get_quote · get_quotes_batch · get_history_df · get_financials ·
@@ -181,9 +186,14 @@ backend/
     ├── consensus_pipeline.py raw_reports 적재 → _MART_SQL → daily_consensus_mart · run_daily · backfill
     ├── consensus.py        as-of 읽기 정본 (get_asof · apply_asof · get_asof_batch)
     ├── indicators.py       RSI · EMA · 52주 · HV · 매물대
-    ├── analyst_reports.py  발행물 저장/조회 + per_band · build_data_block · consensus_basis
+    ├── analyst_reports.py  발행물 저장/조회(`save_lens_report` — v2 판) + per_band · build_data_block ·
+    │                       consensus_basis
+    ├── analyst_lenses.py   심층 리포트 v2 계산 렌즈 3·4·5·8 공식·신호 문턱·`build_lens_report`
     ├── tech_reports.py     주요기술 발행물 저장/조회 (slug당 1행)
-    ├── cowork_trigger.py   배치 완료 fire (ADR-0028) — daily_text · manual_text · fire
+    ├── cowork_trigger.py   배치 완료 fire (ADR-0028) — daily_text · manual_text · nightly_text(대상 지정
+    │                       회차, 야간·온디맨드 공용) · fire
+    ├── enrich_targets.py   갱신 대상 집합 산출 `compute_enrich_target_set` (ADR `260916-132605`)
+    ├── enrich_verify.py    야간 갱신 대조 판정 `judge` (순수 함수)
     ├── digest_service.py   일일 다이제스트 생성 · 텔레그램 발송
     ├── dividends.py        US yfinance / KR DART 배당 + 배당 스케줄(replace_schedule)
     ├── beta.py             US/KR 베타 산출·저장
@@ -225,7 +235,7 @@ backend/data/          정적 참조 + 런타임 파일 캐시
 backend/snapshots/     per-ticker/date 스냅샷 JSON (gitignored)
 backend/reports/       레거시 리포트 디렉터리 (read-only 폴백, gitignored)
 backend/.venv/         로컬 가상환경 — Python 3.9.6, lxml 없음
-backend/tests/         176 파일 = `test_*.py` 173 + `conftest.py` + `_routes.py` + `__init__.py`
+backend/tests/         187 파일 = `test_*.py` 184 + `conftest.py` + `_routes.py` + `__init__.py`
                        (`ls backend/tests/*.py | wc -l`)
 ```
 
@@ -266,7 +276,7 @@ frontend/
     │
     ├── pages/            라우트 페이지 + 허브 하위 탭
     │                     **34 jsx (테스트 제외)** = 라우트 21 + Portfolio 탭 5 + MarketHub 탭 1
-    │                     + Guru 탭 3 + Settings 패널 4. `*.test.jsx` 10건을 더하면 44.
+    │                     + Guru 탭 3 + Settings 패널 4. `*.test.jsx` 11건을 더하면 45.
     │                     CSS 4(Compare · LoginPage · TechAnatomy · TechReport)는 별도.
     │   ├─ 라우트(21): Portfolio · Reports · Recommendations · Ranking · Compare · Calendar ·
     │   │          Dividends · Digest · AnalystReports(라우트는 `routes/AnalystReportsRoute`가
@@ -281,15 +291,19 @@ frontend/
     │
     ├── components/       ※ 아래 괄호 수치는 **디렉터리 엔트리 수**다(jsx·js·css·`*.test.*`·
     │                     하위 디렉터리 전부 포함). `ls <dir> | wc -l`로 재현된다.
-    │   ├── (루트 21)     Masthead · MobileNav · MobileTopActions · GlobalSearch · StockModal ·
+    │   ├── (루트 29 = 파일 22 + 하위 디렉터리 7)
+    │   │                 Masthead · MobileNav · MobileTopActions · GlobalSearch · StockModal ·
     │   │                 StockSearchBox · PromoteModal · Toast · LoadingSpinner · Glossary ·
     │   │                 InstallPrompt · PermissionManager · PermissionPanel ·
-    │   │                 BatchScheduleEditor · DiagLog · **ErrorBoundary**(task#335, B48)
+    │   │                 BatchScheduleEditor(`skip_holidays` 스위치 — `exchange` 있는 배치만) · DiagLog ·
+    │   │                 **ErrorBoundary**(task#335, B48)   — jsx 16 + CSS 3 + `*.test.jsx` 3 = 22
     │   ├── ui/ (17)      Badge(+MarketBadge·ChangeBadge) · Button · Card · Input · Skeleton ·
     │   │                 Stat · icons · GuruActivityBadge · InsiderBadge · SupplyBadge
     │   │                 └ index.js 배럴
-    │   ├── reports/ (36) StockCard · TickerListItem · StockActions(액션버튼 단일 소스) ·
-    │   │                 ReportDetailHeader · ReportDetailTabs · Sections · DetailTab ·
+    │   ├── reports/ (38) StockCard · TickerListItem · StockActions(액션버튼 단일 소스) ·
+    │   │                 ReportDetailHeader · ReportDetailTabs(사업분석 탭 7단 — ADR `260921-091825`) ·
+    │   │                 Sections · DetailTab · **LensReport**(심층 리포트 v2 렌더러) ·
+    │   │                 **RelatedTechSection**(「경쟁」 단의 관련 기술 — 옛 헤더 기술 칩 대체) ·
     │   │                 HistoryTab · ConsensusChart · FinancialsChart · BacklogChart ·
     │   │                 KeyResourceChart · SegmentAnalysisSection · SupplySection ·
     │   │                 ShortSellSection · InvestorTrendSection · InsiderTradesSection ·
@@ -315,11 +329,12 @@ frontend/
     │   ├── sketches/(13) 손그림 SVG 에셋 + 5섹션 아이콘 (index.js 배럴)
     │   └── recommendations/ RecCard
     │
-    ├── hooks/            (23 엔트리 = 훅 18 + `*.test.js` 5)
+    ├── hooks/            (26 엔트리 = 훅 19 + `*.test.js` 7 — 그중 `*.race.test.js` 2)
     │                     useAuth · useAuthBootstrap · useBfcacheAuthGuard · useSwUpdateReload ·
     │                     useTheme · useIsMobile · useBodyScrollLock · useReveal · useCountUp ·
     │                     usePriceFlash · usePortfolioData · useTrackedStocks · useReportList ·
     │                     useReportFilters · useReportGeneration · useStockManagement ·
+    │                     **useEnrichOnDemand**(상세 진입 시 온디맨드 갱신 요청 + 유계 폴링, task#355) ·
     │                     **useTechIndex**(경량 기술 인덱스 — 모듈 캐시 + `ready`/`failed` 3상태) ·
     │                     **useActiveChapter**(장 scroll-spy — 「상단 경계를 마지막으로 지난
     │                     섹션」 판정 + 히스테리시스)
@@ -329,28 +344,28 @@ frontend/
     ├── utils/            analytics(trackEvent) · diag(logDiag 링버퍼) · oauthHistory ·
     │                     marketHours · priceFlash · pwa · guruName
     ├── assets/           hero.png · react.svg · vite.svg
-    └── test/             vitest 횡단 스위트 41 + setup.js (= 42 엔트리)
+    └── test/             vitest 횡단 스위트 53 + setup.js (= 54 엔트리)
                           컴포넌트 옆 `*.test.*`와 병존한다.
-                          **프론트 테스트 파일 총 89** —
+                          **프론트 테스트 파일 총 105** —
                           `find frontend/src -name '*.test.jsx' -o -name '*.test.js' | wc -l`
-                          (분포: test/ 41 · components/tech 15 · pages 10 · components/reports 9 ·
-                           hooks 5 · components/market 3 · utils 2 · glossary 1 ·
-                           components 루트 2 · src 루트 1 — task#335/336/343이 더한 6건:
-                           `ErrorBoundary.test.jsx`·`api-token-refresh`·`error-boundary-route-reset`·
-                           `guru-managers-three-state`·`report-generation-poll-lifetime`·
-                           `report-list-three-state`)
+                          (분포: test/ 53 · components/tech 15 · pages 11 · components/reports 9 ·
+                           hooks 7 · components/market 3 · components 루트 3 · utils 2 · glossary 1 ·
+                           src 루트 1 = 105. 01ef5bd 이후 추가분 대부분이 경합 가드 회귀 —
+                           `*-race.test.jsx`·`*-poll-overlap.test.jsx`·`*.race.test.js`, task#379·#380·#383)
 ```
 
 ---
 
 ## 4. `scripts/`
 
-**174 파일** (`find scripts -maxdepth 1 -type f`) — 확장자별 `.mjs` 139 · `.py` 15 · `.js` 8 ·
-`.sh` 6 · `.json` 2 · `.md` 2 · `.txt` 1 · `.plist` 1. 접두사별 `uat*` 130(그중 `uat*.mjs` **124**) ·
-`probe*` 13 · `smoke*` 3 · `loopcheck*` 3 · `capture*` 3 · `check-*` 3.
-(task#334/338/344/345/346이 6건 추가 — `enrich-ab.py`·`test_fire_listener_logging.py`(.py 2) ·
-`rotate-postgres-password.sh`·`apply-docker-autostart.sh`(.sh 2) ·
-`README-docker-autostart.md`(.md 1) · `com.portfolion.docker-compose.plist`(.plist 1, 신규 확장자))
+**184 파일** (`find scripts -maxdepth 1 -type f`) — 확장자별 `.mjs` 138 · `.py` 24 · `.js` 8 ·
+`.sh` 7 · `.md` 3 · `.json` 2 · `.txt` 1 · `.plist` 1 (= 184). 접두사별 `uat*` 128(그중 `uat*.mjs` **122**) ·
+`probe*` 13 · `smoke*` 3 · `loopcheck*` 5 · `capture*` 3 · `check-*` 3.
+(01ef5bd 이후 주요 증감 — `.py` +9: `ab-*.py` 6(발행 레인 A/B 하네스, task#350) ·
+`loopcheck-enrich-target-set.py` · `task351_measure.py` · `test_deploy_guard.py`(배포 셸 가드 pytest) /
+`.sh` +1: `runner-deploy.sh`(러너 잡, task#384) / `.md` +1: `review-prompt.md` /
+`.mjs`: 신규 `uat205`·`uat251`·`uat358`·`uat359`·`uat369`×2·`uat373`·`uat379` · `loopcheck-enrich-on-demand-live`,
+삭제 `uat222`·`uat225`·`uat254`·`uat275`(+ task#374의 v1 심층 리포트 프로브 정리))
 
 | 패턴 | 용도 | 예 |
 |---|---|---|
@@ -363,9 +378,10 @@ frontend/
 | `capture-<슬러그>.{js,mjs}` | 육안 확인용 스크린샷 캡처 | `capture-tech322-m278.mjs` · `capture-ux.js` |
 | `<슬러그>-baseline-tags.txt` | 프로브 baseline 동결(래칫 비교 대상) | `uat311-baseline-tags.txt` |
 | `audit_*.py` | 정적 감사 | `audit_unauth_endpoints.py` |
-| 운영 | 배포·DDNS·리스너·자동기동 | `auto-deploy-poll.sh` · `ddns_update.sh` · `start-docker-compose.sh` · `cowork-fire-listener.py` · `rotate-postgres-password.sh` · `apply-docker-autostart.sh` |
-| 데이터 | 일회성 복구·백테스트·A/B 하네스 | `repair-005930-snapshots.py` · `kospi_signal_backtest.py` · `enrich-ab.py`(ARCHITECTURE.md §4.4 enrich 이력 A/B) |
-| 프롬프트 | 루틴 정의 | `cowork-routine-prompt.md` |
+| 운영 | 배포·DDNS·리스너·자동기동 | `auto-deploy-poll.sh` · `runner-deploy.sh` · `ddns_update.sh` · `start-docker-compose.sh` · `cowork-fire-listener.py` · `rotate-postgres-password.sh` · `apply-docker-autostart.sh` |
+| `test_*.py` | 저장소 루트 스크립트의 pytest 가드 (실행은 `backend/.venv`) | `test_deploy_guard.py` · `test_fire_listener_logging.py` |
+| 데이터 | 일회성 복구·백테스트·A/B 하네스 | `repair-005930-snapshots.py` · `kospi_signal_backtest.py` · `enrich-ab.py`(ARCHITECTURE.md §4.4 enrich 이력 A/B) · `ab-*.py`(§4.4 발행 레인 A/B — 쓰기 차단 프록시) |
+| 프롬프트 | 루틴 정의 · A/B 검수 팔 지시 | `cowork-routine-prompt.md` · `review-prompt.md`(task#350 H1 팔) |
 
 `scripts/package.json`의 유일한 의존성은 `playwright`. 캡처는 프로젝트 루트의
 `screenshots-uat<번호>/`에 떨어진다(gitignored) — 다만 `scripts/screenshots-uat194/` ·
@@ -382,15 +398,18 @@ frontend/
 ├── bug-report.md       현재 버그 리포트
 ├── plan.md · loop.md   활성 슬롯의 계획 · fg-loop 정지조건
 ├── handoff-*.md        세션 간 인계 메모
-├── adr/                아키텍처 결정 기록 — **48 md** = 번호 ADR `0001`~`0047` 47건 +
-│                       타임스탬프 명명 1건(`260821-073608-…`). `retired/`는 아직 없음
+├── adr/                아키텍처 결정 기록 — **57 md** = 번호 ADR `0001`~`0047` 47건 +
+│                       타임스탬프 명명 10건(`YYMMDD-HHMMSS-<슬러그>.md`, 최신 `261009-105247-…`).
+│                       `retired/`는 아직 없음 (`ls .forge/adr | grep -c '^[0-9]\{4\}-'`)
 ├── codebase/           **이 지도** — ARCHITECTURE · STRUCTURE · CONCERNS · CONVENTIONS ·
 │                       INTEGRATIONS · STACK · TESTING
-├── retro/              태스크별 회고 (308개, `YYMMDD-HHMMSS-<슬러그>.md`)
-├── done/               봉인된 태스크 (322개)
-├── backlog/ executed/  대기(2) · 실행 슬롯(0)
-├── quick/ dropped/     빠른 레인(1) · 폐기(3)
+├── retro/              태스크별 회고 (360개, `YYMMDD-HHMMSS-<슬러그>.md`)
+├── done/               봉인된 태스크 (373개)
+├── backlog/ executed/  대기(0) · 실행 슬롯(0)
+├── quick/ dropped/     빠른 레인(1) · 폐기(4)
 ├── visual/             fg-visual 산출물(1)
+├── analysis/ · archive-374/   종목 분석 산출물 · task#374가 `scripts/`에서 빼낸 옛 심층 리포트
+│                       프로브 보관분(`uat219`·`uat220`·`uat223`×2) — 둘 다 untracked
 
 .claude/
 ├── settings.json / settings.local.json
@@ -405,15 +424,19 @@ frontend/
 ```
 
 ⚠️ `.forge/`는 **gitignored가 아니다** — `CONTEXT.md` · `adr/` · `retro/` · `codebase/`는 tracked,
-`done/` · `backlog/` · `quick/` · `loop.md` · `config.json`은 untracked다. 배포 폴러의
-`reset --hard`가 tracked 편집을 되돌리므로 코드와 **같은 커밋**에 담아야 한다.
+`done/` · `backlog/` · `quick/` · `loop.md` · `config.json`은 untracked다. 폴러는 task#377 이후
+`reset --hard` 대신 **뒤처졌을 때만 ff**하므로(겹치지 않는 미커밋 편집은 보존) 예전처럼 편집이
+소실되진 않지만, 배포는 origin/main(=push된 것)만 하므로 tracked 편집은 여전히 코드와 **같은 커밋**에
+담는다.
 
 ---
 
 ## 6. `docs/`
 
 `docs/ARCHITECTURE.md` · `API.md` · `TESTING.md` · `DEVELOPMENT.md` · `GETTING-STARTED.md` ·
-`CONFIGURATION.md` · `investment-info-gap-analysis.md` · `ops/deploy.md` — **사람이 읽는** 문서.
+`CONFIGURATION.md` · `investment-info-gap-analysis.md` · `ops/deploy.md` ·
+`ops/postgres-5432-consumers.md`(호스트 `127.0.0.1:5432` 사용처 조사 — 공용 postgres 이전 체크리스트,
+task#384) — **사람이 읽는** 문서.
 에이전트가 읽는 정본 지도는 `.forge/codebase/`이고 둘은 별개 계보다.
 `docs/superpowers/`는 gitignored 도구 잔재.
 
@@ -502,7 +525,14 @@ frontend/
 | 이벤트 화이트리스트 | `backend/routers/events.py` (`VALID_EVENTS`) |
 | 신규 테이블·컬럼 | `backend/app_schema.sql` **+** `backend/main.py:_migrate` (쌍) |
 | 로그인/가입 레이트리밋 | `backend/services/rate_limit.py` |
-| 야간 전량 enrich 배치·청크 스폰 정책 | `backend/scheduler/jobs.py::_run_nightly_enrich` + `scripts/cowork-fire-listener.py` |
+| 배치 휴장일 건너뛰기(`skip_holidays`) | `backend/services/market_session.py` + `batch_registry.py`의 `exchange`/`session_offset_days` + `scheduler/jobs.py::_holiday_skip` |
+| 야간 enrich 배치·청크 스폰 정책 | `backend/scheduler/jobs.py::_run_nightly_enrich` + `scripts/cowork-fire-listener.py` |
+| 야간 enrich 대상 종목(갱신 대상 집합) | `backend/services/enrich_targets.py::compute_enrich_target_set` |
+| 야간 enrich 사후 대조(거짓 초록 교정) | `backend/scheduler/jobs.py::_verify_nightly_enrich` + `services/enrich_verify.py::judge` |
+| 상세 진입 시 온디맨드 갱신 | `backend/routers/stocks.py::request_enrich` + `frontend/src/hooks/useEnrichOnDemand.js` |
+| 배치 실행의 대상 메타 기록 | `backend/services/job_runs.py` (`Run.set_payload` → `job_runs.payload`) |
+| 심층 리포트 v2 렌즈 공식·신호 문턱 | `backend/services/analyst_lenses.py` (발행 계약은 `routers/analyst_reports.py`, 화면은 `components/reports/LensReport.jsx`) |
+| 사업분석 탭·기술 리포트 7단 배치 | `components/reports/ReportDetailTabs.jsx` · `pages/TechReport.jsx`의 `SECTIONS` |
 | enrich 이력·A/B 모델 비교 | `backend/services/storage/portfolio.py::_record_enrich_history` + `scripts/enrich-ab.py` |
 | 주요기술 발행 계약(필드·상·하한·교차검증) | `backend/routers/tech_reports.py` (pydantic 모델 22종) |
 | nav 탭 추가·개명·삭제 | `frontend/src/navSections.js` (세 소비처는 파생) |
@@ -519,7 +549,8 @@ frontend/
 | 차트 단위 포매팅 | `frontend/src/components/market/marketUtils.jsx` (`krFmt`) |
 | PWA·SW 캐싱·번들 청크 | `frontend/vite.config.js` |
 | nginx 캐시 헤더·프록시 | `nginx/nginx.conf` |
-| 배포 절차 | `deploy.sh` · `.github/workflows/deploy.yml` · `scripts/auto-deploy-poll.sh` |
+| 배포 절차 | `deploy.sh` · `.github/workflows/deploy.yml` → `scripts/runner-deploy.sh` · `scripts/auto-deploy-poll.sh` (회귀 가드 `scripts/test_deploy_guard.py`) |
+| 재부팅 자동기동 | `scripts/start-docker-compose.sh`(compose는 postgres만) + `scripts/apply-docker-autostart.sh` |
 | 엔드포인트 명세 | `API_SPEC.md` (+ Cowork 대상이면 `CLAUDE_COWORK_API.md`) |
 
 ---
@@ -535,6 +566,7 @@ frontend/
 | `backend/reports/` | 레거시 리포트 |
 | `backend/data/consensus/` | per-ticker 컨센서스 파일 캐시 |
 | `backend/.env.docker` · `.env` | 시크릿 |
-| `certbot/conf/` | 인증서·계정키 |
+| `~/.portfolion-deployed-sha` · `~/.portfolion-deploy-failed-sha` | 저장소 **밖** 호스트 파일 — 배포 기록(러너·폴러·수동 공용 트리거)과 폴러의 실패 1회 기록 |
+| `/tmp/portfolion-deploy.lock` | `deploy.sh` 단독 소유 배포 잠금 |
 | `screenshots*/` | UAT 캡처 |
 | `.worktrees/` · `.planning/` · `.superpowers/` · `docs/superpowers/` | 도구 잔재 |

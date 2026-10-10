@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
-mapped: 2026-09-14
+last_mapped_commit: 7cb0f0de3c1a4b8bf4863af380eebfdb3d7fcbb2
+mapped: 2026-10-10
 ---
 
 # CONVENTIONS — 코드 규약 지도
@@ -472,10 +472,12 @@ raw JSON 본문의 `NaN`/`Infinity` 토큰은 ⓐ `json.loads`가 허용하고 �
 기본 `allow_inf_nan=True`로 통과시키고 ⓒ `low <= high` 같은 범위 검증이 NaN에서 **항상 False**라
 조건을 뒤집어도 안 걸린다 — 3중으로 새어 불변 문서에 NaN이 저장된다.
 
-현재 명시된 필드: `routers/analyst_reports.py`의 `PublishBody.fair_value_low/high`,
-`PointMetric.change_pct`; `routers/tech_reports.py`의 `MoneyValue.value`, `Market.cagr_pct`,
-`Player.share_pct`, `PointMetric.change_pct`; `routers/watchlist.py`의 `PromotePayload`는
-`model_config = ConfigDict(allow_inf_nan=False)`로 모델 단위 적용.
+현재 명시된 필드: `routers/analyst_reports.py`의 `PointMetric.change_pct`·`RawInput.value`
+(v1 발행 계약 `PublishBody`는 task#370에서 제거됐다 — 심층 리포트는 렌즈 판 `LensPublishBody`만);
+`routers/tech_reports.py`의 `MoneyValue.value`, `Market.cagr_pct`, `Player.share_pct`,
+`PointMetric.change_pct`; 모델 단위 적용은 `model_config = ConfigDict(allow_inf_nan=False)` —
+`routers/watchlist.py`의 `PromotePayload`, `routers/portfolio.py`, `routers/analyst_reports.py`의
+`SensitivityAxis`·`JudgmentGauge`(여기선 `extra="forbid"`와 함께 — §6).
 
 **③ 전역 — 422 detail sanitize**
 
@@ -501,6 +503,11 @@ except Exception as e:
 `job_runs.recent`(→`[]`), `market_indicators/cache._mc_load`(→`None`),
 `_mc_save`/`_mc_delete`(→ 무시) 전부 이 형태다.
 **단, 빈 기본값을 *저장*에 쓰면 §1.3 위반**이 되니 "읽기 실패의 빈값"과 "쓰기 대상의 빈값"을 구분한다.
+⚠️ **같은 이유로 이 관용구의 반환값은 *표시*에는 충분하고 *판정*에는 부족하다** — 그 빈값으로
+분기·상태기록·경보를 하면 「사실로 없음」과 「못 읽음」이 구별되지 않는다. 판정 경로는 헬퍼를
+쓰지 말고 직접 조회해 예외를 `failed`로 분류한다(실물: `scheduler/jobs.py::_verify_nightly_enrich`,
+§8). 헬퍼를 고치지 않는 이유 — `job_runs.recent`의 프로덕션 소비처는 배치현황 카드
+(`routers/batches.py`)이고 거기서는 DB가 흔들려도 화면이 죽지 않는 것이 옳은 설계다.
 
 ### 5.4 선택 필드는 `Optional[X] = Field(None)` — 생략/명시적 null의 비대칭
 
@@ -525,12 +532,12 @@ pydantic v2는 `validate_default=False`가 기본이라 기본값 `None`은 검�
 `key_points`·`milestones`·`variants`·`watch_items`), `Market.estimates` 위 주석이 이유를 못박는다.
 `routers/stocks.py`의 `sources`·`segments`도 같은 형태다.
 
-**남은 위반은 1건이고 dormant다** — `backend/routers/analyst_reports.py`의
-`ReportPoint.metrics`가 `List[PointMetric] = Field(default_factory=list, max_length=4)`로 남아
-있다(주석: "additive — 구 판 호환"). 바로 위 형제 `PointMetric.change_pct`는 이 규약을 인용해
-`Optional`로 고쳐져 있으므로 **한 줄 차이로 갈린 상태**다. 발동 조건은 루틴이 포인트 하나에
-`"metrics": null`을 넣는 것이고, 현재 루틴 프롬프트는 항상 배열을 넣도록 지시하되 「없으면
-생략하라」를 적지 않았다(형제 tech 절은 그것을 명시한다) — 즉 프롬프트 한 줄이 방어의 전부다.
+**남은 위반은 0건이다** — 마지막 1건이던 `analyst_reports.py`의 `ReportPoint.metrics`
+(`List[PointMetric] = Field(default_factory=list, …)`)는 v1 발행 계약과 함께 제거됐고(task#370),
+그 자리를 이은 렌즈 판 `LensIn.metrics`는 `Optional[List[PointMetric]] = Field(None, max_length=4)`
+형태다. 아래 배열형 grep의 현재 히트는 `tech_reports.py`의 **규약 설명 주석 1줄뿐**이다(코드 0).
+⚠️ 단 **필수 배열**(`Field(..., min_length=…)` — `LensPublishBody.lenses`·`JudgmentGauge.boundaries`
+등)은 이 규약의 대상이 아니다 — 생략 자체가 계약 위반이라 명시적 `null`이 422인 것이 옳다.
 
 **⚠️ 탐지 grep을 좁히면 그 감사는 통과해도 무의미하다.** 스칼라 패턴
 `grep -rn "= Field(None\|= Field(default=None" backend/routers/ backend/services/`는 **배열형을
@@ -606,6 +613,19 @@ grep -rnE "List\[.*\] = Field\((default_factory=list|\[\])"          backend/rou
   (`backend/tests/test_report_router.py::test_get_report_malformed_date_is_404_and_never_reaches_db`).
 - **모델 간 제약은 `@model_validator(mode="after")`** — 예: `share_pct`가 있으면
   `market.share_basis`가 있어야 그 수치가 해석 가능하다(ADR-0033).
+- **발행 요청 모델의 미지 키는 `extra="forbid"`로 422** — `routers/analyst_reports.py`의 렌즈 판
+  발행 모델 **전부**가 forbid다(task#371 — 대부분 모듈 상수 `_FORBID = ConfigDict(extra="forbid")`,
+  NaN 차단이 겹치는 `SensitivityAxis`·`JudgmentGauge`는 `ConfigDict(allow_inf_nan=False,
+  extra="forbid")`, `AxisChoice`는 하위 3종이 상속). 이유가 그
+  상수 위 주석에 있다: pydantic 기본(`ignore`)은 모르는 키·**직전 판 응답에서 복사해 온 서버 계산
+  필드**(`gauge.origin`·`computed`·`tally`)를 조용히 버리는데, 그러면 호출측(루틴)은 그 필드가
+  반영됐다고 믿는다 — 무시가 곧 거짓 성공이다. 옛 키 개명(`FlipCondition`의 `to`)도 같은 이유로
+  forbid가 잡는다. ⚠️ **저장소 전역 규약은 아니다** — `routers/tech_reports.py` 등 다른 쓰기
+  모델은 기본값(ignore)이다. 서버가 계산해 응답에 싣는 필드가 있는 계약이면 forbid를 고려할 것.
+- **읽기 경로(GET)에 쓰기 부작용을 숨기지 않는다** — 상세 진입 시의 온디맨드 갱신은 GET 상세가
+  아니라 별도 `POST /api/stocks/{ticker}/enrich/request`(`routers/stocks.py::request_enrich`)이고,
+  응답은 판정 사유를 항상 싣는다(`{fired, reason}`, reason ∈ unconfigured·fresh·in_flight·stale·
+  fire_failed). 종목당 in-flight 가드는 프로세스 인메모리 dict + `threading.Lock`이다(§7 동시성).
 - **티커 정규화**: 경로 티커는 `.upper()`, 형식 검증은 `services/utils.is_valid_ticker`
   (strip·upper 후 `^[A-Za-z0-9.\-]{1,15}$`).
 - **비동기 시작은 202 + progress 폴링** — `services/progress.py`의 `ProgressTracker`
@@ -717,6 +737,13 @@ grep -rnE "List\[.*\] = Field\((default_factory=list|\[\])"          backend/rou
   원리적으로 못 본다, `TESTING.md §4.9`). **키 개수 상한도 락 안에서** 정리한다(`_evict_excess`,
   `OrderedDict` LRU — `_MAX_KEYS=10_000` 초과 시 최오래 미사용 키부터 축출, 무제한 IP가
   버킷을 무한 생성하는 메모리 누수 방지).
+- **sync `def` 핸들러의 프로세스 전역 상태는 락이 기본값이다** — 단일 워커여도 `async def`가 아닌
+  핸들러는 Starlette 스레드풀에서 **실제로 병렬** 실행된다. 두 번째 실물이
+  `routers/stocks.py::request_enrich`의 종목당 in-flight 가드(`_ENRICH_INFLIGHT` dict +
+  `_ENRICH_INFLIGHT_LOCK`, TTL 15분)다 — 조회·만료 판정·기록을 한 락 블록에 넣고, **느린 `fire()`는
+  락 밖**에서 부른 뒤 실패하면 다시 락을 잡아 항목을 지운다(위 `TTLCache`의 "느린 작업은 락 밖"과
+  `rate_limit`의 "판정 전체를 락 안"의 조합). 재기동 시 소실되지만 결과가 중복 fire 1회(멱등)라
+  DB로 올리지 않았다는 판단이 그 상수 위 주석에 있다.
 
 **스키마 변경 (ADR-0006)**
 
@@ -735,12 +762,16 @@ DDL은 `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE … ADD COLUMN IF NOT EXISTS`
 
 ## §8 배치·스케줄러 규약
 
-**레지스트리 = `backend/services/batch_registry.py`의 `BATCHES`** — 현재 **34개** 배치의 정적
-메타데이터 리스트(KR 16 · US 11 · 공통 7 — 가장 최근 추가는 `cowork_enrich_nightly`, 공통).
+**레지스트리 = `backend/services/batch_registry.py`의 `BATCHES`** — 현재 **35개** 배치의 정적
+메타데이터 리스트(KR 16 · US 11 · 공통 8 — 가장 최근 추가는 `cowork_enrich_verify`(공통, 매일
+08:00, task#357), 그 직전이 `cowork_enrich_nightly`).
 
 각 항목 키: `id` · `label` · `category` · `schedule_desc` · `usage`(소비 UI) · `source`(fetch 출처) ·
 `editable` · `trigger_kinds` · `manual_endpoint` · `scheduler_job_id` · `timezone` ·
 `misfire_grace_time` · `market`(`KR`/`US`/`공통`, 출처국 기준 — ADR-0013) · `default_schedule`.
+**선택 키 2개**(현재 `daily_report_kr`/`_us`만): `exchange`(거래소 캘린더 코드 — `XKRX`/`XNYS`) ·
+`session_offset_days`(실행일 → 세션 판정일 보정 — KR `0`, US `-1`: 07:00 KST 실행이 판정하는 것은
+전날 미 세션이다). 둘 다 아래 「휴장일 건너뛰기」 전용이다.
 
 **규약:**
 
@@ -751,10 +782,24 @@ DDL은 `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE … ADD COLUMN IF NOT EXISTS`
   (`schedule_desc`) ③ **`job_runs.record` 모든 lane(auto·manual·backfill)** ④ 그 id를 단언하는 테스트.
   한 곳이라도 옛 id면 배치 현황 실행이력에서 조용히 사라진다.
   단 **옛 id를 읽는 시드 마이그레이션은 정당한 잔존**이다("잔존 0"은 stale *소비* 기준).
-- **id를 추가할 때도** count/set 하드코딩 단언을 전수 확인한다 — 현재 **4파일 9지점**이 `33`과
+- **id를 추가할 때도** count/set 하드코딩 단언을 전수 확인한다 — 현재 **4파일 9지점**이 `35`와
   id 집합·시장별 개수를 박고 있다. 지점 목록과 각 형태(그리고 옛 탐지 grep이 그중 4지점을
-  **원리적으로 못 보는** 이유)는 `TESTING.md §5.6`에 표로 있다. **게이트는 grep이 아니라 전체
-  스위트**이고 grep은 "어느 파일을 볼지"만 좁힌다.
+  **원리적으로 못 보는** 이유, 찾는 단위를 파일이 아니라 *테스트 함수*로 잡는 grep)는
+  `TESTING.md §5.6`에 표로 있다. **게이트는 grep이 아니라 전체 스위트**이고 grep은 "어느 파일을
+  볼지"만 좁힌다.
+- **휴장일 건너뛰기는 배치별 스케줄 스펙의 `skip_holidays`(bool) 스위치다**(task#347).
+  `services/schedule_spec.py::validate_schedule_spec`이 bool만 받고, `describe_schedule`이
+  `" · 휴장일 건너뜀"` 접미사를 붙인다. `routers/batches.py`는 레지스트리에 `exchange`가 없는
+  배치에 이 스위치를 켜면 **422로 거부**한다(켜도 판정할 거래소가 없으면 조용한 no-op이 되기 때문).
+  판정 지점은 **셋이고 같은 함수를 공유**한다 — 잡 본문(`scheduler/jobs.py::_holiday_skip` →
+  `run`을 `skipped`로 남기고 `_generate_all`의 생성·fire를 건너뜀) · 기동 누락복구
+  (`scheduler/schedule.py::_check_missed_report_for`) · 기대 리포트 날짜
+  (`services/storage/dates.py::expected_report_date` — 세션일이 아닌 날을 후보에서 뺀다). 셋 중 하나만
+  고치면 「잡은 건너뛰었는데 미생성 경보가 뜬다」류 불일치가 생긴다.
+  판정 자체는 `services/market_session.py`(`exchange_calendars`)이고 **캘린더 범위 밖·로드 실패는
+  fail-open(영업일 취급)**이다 — 휴장일 오판으로 정상 배치를 막는 쪽이 더 나쁘다는 판단이 모듈
+  docstring에 있다(§1.3의 `wrong < missing`과 같은 방향: 「생성하지 말아야 할 날 생성」은 직전 판
+  하나가 더 생길 뿐이지만, 「생성해야 할 날 건너뜀」은 그날 판이 없다).
 
 **스케줄러 패키지 = `backend/scheduler/`**(단일 파일 아님)
 
@@ -776,25 +821,50 @@ with job_runs.record("daily_report_kr", "auto") as run:
     run.set_status("partial", err)   # 선택 — 미지정이면 success
 ```
 
-- yield 값은 `Run` 핸들(`run_id`·`status`·`error`, `set_status`)이다. 상태 어휘:
-  `running` | `success` | `partial` | `skipped` | `failed`.
+- yield 값은 `Run` 핸들(`run_id`·`status`·`error`·`payload`, `set_status`·`set_payload`)이다.
+  상태 어휘: `running` | `success` | `partial` | `skipped` | `failed`.
+- **`run.set_payload(dict)`는 "그 실행이 무엇을 대상으로 했는가"를 `job_runs.payload`(JSONB,
+  nullable)에 싣는다**(task#357). 부르지 않으면 종료 UPDATE가 payload 컬럼을 **건드리지 않는다**
+  (기존 잡 무회귀). payload 직렬화·UPDATE 실패는 **payload만 버리고 상태 확정은 진행**한다 —
+  부가정보 쓰기 실패가 상태 UPDATE까지 끌고 내려가면 그 run이 영구히 `running`으로 남기 때문이다
+  (`services/job_runs.py::record`의 `_finish`). `recent`·`recent_map`이 이 컬럼을 함께 돌려준다.
+  컬럼은 `app_schema.sql` + `main.py::_migrate`의 `ADD COLUMN IF NOT EXISTS` 쌍(§7)으로 들어왔다.
 - **본문이 예외를 전파하면 `failed`가 지정 상태를 이긴다.**
 - ⚠️ **예외를 삼키고 정상 종료하는 잡은 부분/전체 실패여도 `success`로 기록된다** —
   `record`의 docstring이 그런 잡을 이름으로 나열해 둔다(`_refresh_monthly_kr`·
-  `_refresh_macro_signals`·`_fetch_leverage`·`_fetch_lending`·`_run_digest`·
-  `_fetch_investor_trend` + 워커 `report._run_*`·`leverage_service.backfill_with_progress`).
-  그 잡들의 success를 "내부 오류 없음"으로 읽지 말 것.
+  `_fetch_leverage`·`_fetch_lending`·`_run_digest`·`_fetch_investor_trend` + 워커
+  `report._run_*`·`leverage_service.backfill_with_progress`). 그 잡들의 success를 "내부 오류
+  없음"으로 읽지 말 것. (`_refresh_macro_signals`는 task#341에서 2경로 모두 배선돼 이 목록에서
+  빠졌다 — 키 미설정과 수집 실패를 둘 다 `skipped`로.)
 - **`set_status` 배선은 2경로 예외에서 지배형으로 뒤집혔다** — 현재 `with … as run:` 형태가
-  **25곳**이고 `set_status` 호출은 **41곳**이다. 배선된 계열: 구루 크롤 · 창업신청 · 고용조사 ·
-  절사평균물가 · FRED 경제지표 · 환율 · 발굴추천 · 랭킹 · 코스피신호 · US 섹터 모멘텀 —
+  **28곳**이고 `set_status` 호출은 **55곳**이다(`routers`·`scheduler`·`services`에서 `job_runs.py`
+  자신과 주석 줄 제외, 2026-10-10 실측). 배선된 계열: 구루 크롤 · 창업신청 · 고용조사 ·
+  절사평균물가 · FRED 경제지표 · 매크로 신호 · 환율 · 발굴추천 · 랭킹 · 코스피신호 · US 섹터 모멘텀 —
   **각 계열이 auto(`scheduler/jobs.py`)와 manual(`routers/…`) 두 레인 모두** 배선돼 있다
   (한 레인만 하면 수동 갱신이 계속 초록이다). 새 배치의 템플릿은 이 계열 중에서 고를 것.
-  ⚠️ **예외 — `cowork_enrich_nightly`는 `trigger_kinds: ["auto"]`·`manual_endpoint: None`으로
-  의도적 단일 레인이다**(야간 전량 발사는 관리자 수동 fire와 다른 형태라 동형 manual 엔드포인트가
-  없다). `jobs._run_nightly_enrich`가 `set_status`를 부르는 자리는 둘뿐이다 — 미설정/대상 0건은
+  일일 리포트(`daily_report_kr`/`_us`)는 휴장일 생략을 `skipped`로 말한다(아래 휴장일 항목).
+  ⚠️ **예외 — `cowork_enrich_nightly`·`cowork_enrich_verify`는 `trigger_kinds: ["auto"]`·
+  `manual_endpoint: None`으로 의도적 단일 레인이다**(야간 발사는 관리자 수동 fire와 다른 형태라
+  동형 manual 엔드포인트가 없고, 대조는 야간 run에 딸린 사후 판정이다).
+  `jobs._run_nightly_enrich`가 `set_status`를 부르는 자리는 셋이다 — 미설정·대상 0건은
   `skipped`, `cowork_trigger.fire()`가 `False`(예외 아님)를 반환하면 `failed`. 정상 성공은
-  `set_status`를 **호출하지 않는다**(기본 `success`) — 이 대조군이 없으면 "항상 skipped를
-  기록"하는 과잉교정 구현도 앞 두 축을 통과한다(`test_cowork_trigger.py`).
+  `set_status`를 **호출하지 않고**(기본 `success`) 대신 쏜 목록을 `set_payload`로 남긴다 — 이
+  대조군이 없으면 "항상 skipped를 기록"하는 과잉교정 구현도 앞 축들을 통과한다(`test_cowork_trigger.py`).
+- **「접수됨」과 「완료됨」이 다른 프로세스에서 갈리는 잡은 사후 대조 잡으로 상태를 다시 쓴다** —
+  야간 enrich의 실제 작업은 fire를 받은 로컬 리스너에서 수 시간 뒤 일어나므로 02:00 run의
+  `success`는 「트리거 접수」 이상을 말하지 못한다. `jobs._verify_nightly_enrich`(08:00)가 그 run의
+  payload(쏜 ticker)와 `started_at`을 창으로 `tickers.enriched_at`을 대조하고
+  (`services/enrich_verify.py::judge` — success/partial/failed/skipped + 미갱신 목록을 내는 순수 함수),
+  ⓐ **02:00 run 행의 status/error를 직접 UPDATE**해 거짓 초록을 그 자리에서 고치고 ⓑ 자기 run에도
+  같은 상태를 남긴다. 그 구현에 이 규약의 판정 규율 셋이 박혀 있다:
+  ① **graceful read 헬퍼를 판정에 쓰지 않는다** — `job_runs.recent()`는 DB 예외를 `[]`로 삼키므로
+  「조회 실패」가 「02:00 run 없음」(정상 `skipped`)으로 붕괴한다. 그래서 직접 `query`하고 예외를
+  `failed`로 분류한다(§5.3의 관용구는 **표시용**이고 판정용이 아니다).
+  ② **최신 행이 「오늘 것」인지 신선도를 본다**(`_VERIFY_MAX_AGE_HOURS`) — 야간 잡이 아예 안 돈
+  날 며칠 전 행을 재판정하면 이미 갱신된 티커 덕에 success가 재기록돼 「오늘 밤 안 돌았다」가 사라진다.
+  ③ **tz 정규화는 호출측 책임**(`jobs._as_utc`) — naive가 섞이면 전원이 미갱신으로 오판된다.
+  ⚠️ 알려진 한계(docstring 명시): 08:00은 「아직 처리 중」을 구별하지 못한다 — 소요가 늘면 판정이
+  아니라 **시각**을 옮긴다.
 - ⚠️ **아직 부채인 형태 — `_refresh_earnings_kr`/`_us`는 예외만 배선돼 있다.**
   본문의 저장 생략 4경로(고정집합 불완전·rest 유니버스 공백·rest 커버리지 미달·마감분기 없음)는
   직전 저장값을 그대로 반환하므로 **반환값으로 구별할 수 없고**, 그 절반은 여전히 `success`다.
@@ -853,7 +923,7 @@ frontend/src/
   oauthSplash.js       index.html 스플래시 사본의 정본 (동일)
   pages/               라우트 단위 화면 (PascalCase.jsx)
   components/          ui/ · market/ · reports/ · tech/ · portfolio/ · recommendations/ · sketches/
-  hooks/               use*.js (현재 18개 — 신규 useActiveChapter · useTechIndex)
+  hooks/               use*.js (현재 19개 — 최근 추가 useEnrichOnDemand, 그 전 useActiveChapter · useTechIndex)
   contexts/            AuthContext.jsx
   utils/               analytics · diag · guruName · marketHours · oauthHistory · priceFlash · pwa
   glossary/            terms.js + match.js
@@ -950,6 +1020,26 @@ frontend/src/
     식별자(prop)만 갈리면 경합 없이 **결정적으로** 옛 데이터가 새 화면을 소유한다. 식별자 변경 시
     상태를 **`null`(미조회)로 되돌리는** 것이 쌍으로 필요하다(`[]`로 되돌리면 「0건」이라는 거짓
     진술이 된다 — 아래 3상태 규율).
+  - **가드 형태는 비동기 진입점의 종류로 고른다**(B49 장부 정리, task#379·#380·#383 — 장부 6곳 +
+    전수 조사 신규 지점을 같은 4형태로 닫았다):
+
+    | 진입점 | 형태 | 실물 |
+    |---|---|---|
+    | `useEffect` 안 fetch(식별자 deps) | 이펙트 로컬 `let cancelled = false` + cleanup에서 `true`, `.then`·`.catch`·`.finally` **셋 다** 게이트, 식별자 변경 시 상태 `null` | `pages/Calendar.jsx` 월 이펙트 · `pages/SectorTab.jsx` 마켓 이펙트 |
+    | 이벤트 핸들러·훅 메서드(여러 번 불림) | `useRef` **세대 카운터**, 「닫기」·「목록으로」 같은 취소 동작도 세대를 올린다 | `pages/Ranking.jsx::onRowClick`(모달) · `pages/AdminAnalytics.jsx`(사용자 이력) · `hooks/useReportList.js` · `hooks/usePortfolioData.js` |
+    | 디바운스 입력 | 응답의 검색어 == **최신 입력**(ref) 비교 — 이펙트 cleanup으로는 디바운스 대기 창에 착지하는 옛 응답을 못 막는다 | `components/StockSearchBox.jsx`(`latestQuery`) |
+    | `setInterval` 폴링 | **in-flight 틱이면 이번 틱 skip**(응답이 간격보다 느리면 틱이 겹쳐 순서 없이 착지·역행 — 플래그는 `finally`에서 내린다) + 훅 폴링은 중단·재시작마다 세대 증가 | `hooks/useReportGeneration.js`(`inFlightRef`·`genRef`) · `pages/GuruCrawlNow.jsx`·`ConsensusSettings.jsx`·`LeverageBackfillSettings.jsx`(`useRef`) · `pages/ReportManualGen.jsx`(인터벌 클로저 로컬 `let`) |
+
+    부수 규율 둘: ⓐ **부모 콜백으로 병합되는 응답도 대상이다** — `components/reports/DetailTab.jsx`의
+    컨센서스 새로고침은 옛 종목 응답이 부모 콜백을 통해 새 종목 상세에 병합되던 경로였다.
+    ⓑ **진행 중 표시를 단일 불리언으로 두지 않는다** — 여러 대상에 동시에 걸 수 있는 액션은
+    진행 중 **티커 `Set`**으로(`pages/AnalystReports.jsx`의 발행 지시), 「미조회」가 있는 설정 목록은
+    `null` 초기값 + 로딩·실패 중 컨트롤 비활성 + 실패 문구(`components/PermissionPanel.jsx` 기본권한).
+  - **폴링은 유계다 — 무한 경로를 남기지 않는다.** 상한은 최소 ⓐ 틱 수 또는 무진행 연속
+    (`MAX_TICKS`·`MAX_IDLE_STREAK`) ⓑ 연속 실패(`MAX_FAIL_STREAK`) ⓒ 언마운트/식별자 변경의 셋이고,
+    상수는 훅 상단에 둔다(`hooks/useEnrichOnDemand.js`는 export해 테스트가 직접 읽고 헤더 주석이 셋을
+    열거한다 · `hooks/useReportGeneration.js`는 모듈 로컬 상수). 폴링 완료 판정의 **baseline은 비동기로 채워지는 부모 상태가
+    아니라 첫 폴의 응답값**으로 잡는다(부모 상태는 「미조회 null」과 「진짜 null」을 구별하지 못한다).
   - ⚠️ **뮤텍스·`pending`은 호출부에 노출돼야 가드다** — 삼킨 클릭을 화면이 알리지 않으면
     (배지 비활성화·`aria-busy` 없음 + `onClick`이 반환값을 버림) 사용자에겐 **무음 미동작**이다.
     같은 티커가 여러 카드에 등장하는 화면은 **티커 단위로 잠그고 그 상태를 그 티커의 모든 배지**에
@@ -1144,7 +1234,42 @@ grep -oE '[^0-9a-zA-Z_]:[0-9]+'                 .forge/codebase/*.md   # bare :N
 | 쌍둥이 사본 동일성 | `frontend/src/test/theme-boot-twin.test.js` · `oauth-splash-twin.test.js` | `index.html` 인라인 사본 ↔ 모듈 정본 drift |
 | ADR-0029 감사 스크립트 | `scripts/audit_unauth_endpoints.py` | 라이브 배선 기준 무인증 열거(종료코드 0/1) |
 | 라이브 프로브 회귀 래칫 | `scripts/check-uat311-ratchet.sh` + `scripts/uat311-baseline-tags.txt` | 시각 프로브의 FAIL 0 · 단언 총계 하한 · **baseline 축 태그 생존** (`TESTING.md §10 ⑦`) |
+| 배포 경로 셸 3종 | `scripts/test_deploy_guard.py`(pytest, `testpaths` 밖 — 경로 명시 실행) | `deploy.sh`의 옛 트리 배포·종료코드 계약, 폴러의 배포 기록 트리거·실패 1회 정책·PATH 덧붙임, `runner-deploy.sh`의 기록 대조·잠금 대기, `deploy.yml`이 `runner-deploy.sh`만 부름 (§12, `TESTING.md §2`) |
 
 **자동 가드가 없는 규약**(리뷰·관례 의존): 로그 마커 스펠링(§4.3) · 프론트 `console.*` 마커(§4.5) ·
 `source`/`usage` 갱신(§8) · API 문서의 **스키마·인증 산문**(§10) · README 동기(§10) ·
-레이아웃·색·간격·접근성(§9.7·§9.9 — 라이브 프로브가 유일한 계층, `TESTING.md §7`).
+레이아웃·색·간격·접근성(§9.7·§9.9 — 라이브 프로브가 유일한 계층, `TESTING.md §7`) ·
+프론트 비동기 경합 가드의 **적용 범위**(§9.4 — 지점별 재현 테스트는 있지만 「새 비동기 진입점이
+가드 없이 생겼다」를 잡는 스윕은 없다).
+
+---
+
+## §12 운영 셸 스크립트 규약 (배포 경로)
+
+배포 경로의 셸 — `deploy.sh` · `scripts/auto-deploy-poll.sh`(launchd 폴러) ·
+`scripts/runner-deploy.sh`(self-hosted 러너 잡, task#384) — 은 같은 규약을 공유한다.
+`.github/workflows/deploy.yml`은 단일 step으로 `scripts/runner-deploy.sh`만 부른다.
+
+- **본문 전체를 `{ … }` 그룹으로 감싼다** — bash가 그룹 전체를 먼저 파싱한 뒤 실행하므로, 폴러가
+  2분마다 **작업트리의** 스크립트를 실행하는 동안 그 파일을 편집해도 반쯤 고친 판이 줄 단위로
+  섞여 실행되지 않는다(세 파일 모두 첫 실행 줄이 `{`, 끝이 `}`).
+- **실 경로는 전부 환경변수 오버라이드 기본값으로 둔다** — `PROJECT_DIR`·`DEPLOY_LOCK`·
+  `DEPLOY_MARKER`·`DEPLOY_FAILED_MARKER`·`LOG`·`RUNNER_LOCK_WAIT_SEC`를 `"${VAR:-<실경로>}"` 형태로.
+  그래야 테스트가 임시 클론에서 실제 스크립트를 돌릴 수 있다(`TESTING.md §2`).
+- **PATH는 뒤에 덧붙인다(append), 앞에 붙이지 않는다** — launchd PATH엔 npm(fnm)·docker가 없어
+  보충하되, 앞에 붙이면 테스트가 PATH 앞에 둔 스텁보다 실 docker가 먼저 잡혀 **테스트가 운영
+  컨테이너를 내린다.** 회귀 축이 폴러·러너 각각에 있다(`…_appends_path_so_stubs_win`).
+- **종료코드 계약**(`deploy.sh`): `2` = 사전 거부(컨테이너를 건드리기 전 — 잠금·미커밋 tracked 변경·
+  fetch 실패·앞섬/갈라짐·ff 실패) · `1` = 그 뒤의 모든 실패(`trap 'exit 1' ERR`로 도구 종료코드와
+  무관하게 1로 정규화) · `0` = 성공 + 배포 기록 파일 갱신. 소비자가 이 구분으로 행동한다 — 폴러는
+  `2`면 다음 폴에 재시도, 그 밖의 비0이면 그 SHA를 실패 기록에 남기고 재시도하지 않는다;
+  `runner-deploy.sh`는 `deploy.sh`의 코드를 **그대로** 돌려준다.
+- **배포 판정 근거는 공유 기록 하나다** — 세 스크립트가 모두 `~/.portfolion-deployed-sha`
+  (`DEPLOY_MARKER`)를 `origin/main`과 대조하므로 러너·폴러·수동 중 먼저 온 쪽이 배포하고 나머지는
+  "이미 배포됨"으로 끝난다. 잠금(`DEPLOY_LOCK`)은 **`deploy.sh`만 잡는다**(러너는 잠금이 풀릴 때까지
+  기다린 뒤 기록을 **다시** 대조한다 — 그 사이 폴러가 같은 커밋을 배포했을 수 있다).
+- **작업트리를 되돌리지 않는다** — `reset --hard` 없음. 뒤처졌을 때만 `git merge --ff-only`,
+  앞섬·갈라짐은 손대지 않거나(폴러) 거부한다(`deploy.sh` exit 2).
+- `set -o pipefail`을 거는 스크립트(`scripts/rotate-postgres-password.sh`)는 조기종료 파이프라인
+  (`| head`·`| grep -q`)의 SIGPIPE가 **무음 즉사**를 만든다 — 출력을 변수로 받아 here-string으로
+  검사하고, `trap '… $LINENO …' ERR`로 종료 위치를 남긴다(그 파일 주석이 세 형태를 적는다).

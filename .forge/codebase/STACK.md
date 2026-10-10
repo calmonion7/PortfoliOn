@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
-mapped: 2026-09-14
+last_mapped_commit: 7cb0f0de3c1a4b8bf4863af380eebfdb3d7fcbb2
+mapped: 2026-10-10
 ---
 
 # STACK — 언어·런타임·프레임워크·의존성·설정
@@ -19,13 +19,13 @@ mapped: 2026-09-14
 | 프론트 | React 19 + Vite 8(rolldown) + plain CSS + react-router 7 + recharts 3 | `frontend/package.json`, `frontend/vite.config.js` |
 | DB | PostgreSQL 16 (Docker `postgres:16-alpine`) | `docker-compose.yml`, `backend/app_schema.sql`, `backend/auth_schema.sql` |
 | 웹서버 | nginx:alpine (정적 서빙 + `/api/` 프록시) | `nginx/nginx.conf` |
-| 인증서 | certbot/certbot 컨테이너 (12h 루프 renew) | `docker-compose.yml` |
-| 배포 | GitHub Actions self-hosted 러너(주) + launchd 폴러(폴백) → `deploy.sh` | `.github/workflows/*.yml`, `deploy.sh`, `scripts/auto-deploy-poll.sh` |
-| 백엔드 테스트 | pytest (`backend/tests/`, 테스트 파일 172개) | `backend/pytest.ini`, `backend/tests/conftest.py` |
-| 프론트 테스트 | vitest + jsdom + @testing-library (테스트 파일 83개) | `frontend/vite.config.js`의 `test` 블록, `frontend/src/test/setup.js` |
+| TLS | Cloudflare Tunnel이 종단 — 인증서 컨테이너·443 게시 없음(certbot은 task#384에서 은퇴) | `docker-compose.yml`, `nginx/nginx.conf` |
+| 배포 | GitHub Actions self-hosted 러너(arm64) + launchd 폴러 — 둘 다 배포 기록(`~/.portfolion-deployed-sha`)을 대조해 먼저 온 쪽이 `deploy.sh` | `.github/workflows/deploy.yml`, `scripts/runner-deploy.sh`, `scripts/auto-deploy-poll.sh`, `deploy.sh` |
+| 백엔드 테스트 | pytest (`backend/tests/`, 테스트 파일 184개) | `backend/pytest.ini`, `backend/tests/conftest.py` |
+| 프론트 테스트 | vitest + jsdom + @testing-library (테스트 파일 105개) | `frontend/vite.config.js`의 `test` 블록, `frontend/src/test/setup.js` |
 | 라이브 UAT | Playwright (별도 워크스페이스) | `scripts/package.json`, `scripts/uat*.mjs` |
 
-측정 시점 규모: 백엔드 `services/`+`routers/`+`scheduler/` 약 21,240줄, 프론트 `src/` .jsx/.js 259 파일.
+측정 시점 규모: 백엔드 `services/`+`routers/`+`scheduler/` 약 22,770줄, 프론트 `src/` .jsx/.js 285 파일.
 
 ---
 
@@ -54,7 +54,7 @@ mapped: 2026-09-14
 | `lxml` | `>=4.9.0` | 이미지에만 존재 — 위 제약대로 **코드는 의존하지 않는다** |
 | `httpx` | `>=0.25.0` | **OAuth 토큰 교환 전용** — `backend/routers/auth.py`의 `oauth_google_callback`/`oauth_github_callback`이 `httpx.AsyncClient`를 쓰는 유일한 소비처 |
 | `pytest` | `>=7.4.0` | 테스트 |
-| `exchange_calendars` | `>=4.5` | `backend/routers/calendar.py`가 `import exchange_calendars as xcals`로 휴장일 계산 |
+| `exchange_calendars` | `>=4.5` | `import exchange_calendars as xcals` 소비처 2곳 — `backend/routers/calendar.py`(휴장일 이벤트) · **`backend/services/market_session.py`**(배치 `skip_holidays`의 거래소 영업일 판정, §1.8) |
 | `psycopg2-binary` | `>=2.9.0` | `services/db.py`의 `ThreadedConnectionPool`·`RealDictCursor`·`execute_batch` |
 | `authlib` | `>=1.3.0` | ⚠️ **선언만 되어 있고 임포트 0건** — OAuth는 `httpx` + 수동 state HMAC으로 직접 구현돼 있다(`routers/auth.py`의 `_make_state`/`_verify_state`) |
 | `python-jose[cryptography]` | `>=3.3.0` | JWT — `backend/auth.py`, `services/auth_service.py`, `middleware/event_tracker.py` |
@@ -64,7 +64,7 @@ mapped: 2026-09-14
 
 `anthropic` 패키지는 **없다** — 백엔드에 LLM 호출이 없다(AI 텍스트는 외부 Cowork 클라이언트가 enrich API로 써 넣는다; `INTEGRATIONS.md` §9).
 
-### 1.3 앱 엔트리 (`backend/main.py`, 404줄)
+### 1.3 앱 엔트리 (`backend/main.py`, 435줄)
 
 임포트 순서 자체가 계약이다: `load_dotenv()` → `_configure_logging()` → 그 다음에야 `scheduler`·`routers` 임포트.
 
@@ -93,9 +93,9 @@ backend/
   middleware/
     event_tracker.py     EventTrackerMiddleware
   routers/               20개 (§1.7)
-  scheduler/             패키지 — __init__.py(배선)·jobs.py(534줄)·schedule.py·_state.py
+  scheduler/             패키지 — __init__.py(배선)·jobs.py(831줄)·schedule.py·_state.py
   services/              도메인 서비스 (§1.6)
-  tests/                 pytest 138 파일 + fixtures/ + conftest.py + _routes.py
+  tests/                 pytest 184 파일 + fixtures/ + conftest.py + _routes.py
   data/                  정적 참조 데이터(읽기 전용 시드) + 런타임 JSON 잔재
   snapshots/ reports/    gitignored 런타임 산출물
 ```
@@ -131,15 +131,18 @@ backend/
 | `parallel.py` | `parallel_map(func, items, max_workers=10)` — `ThreadPoolExecutor`, 빈 리스트는 즉시 `[]` |
 | `progress.py` | `ProgressTracker` — `threading.Lock` 보호 dict(`running/done/total/current/failed`), 장기 크롤 진행률. `try_start(total)`은 진행 중이면 **상태를 건드리지 않고 False**(이중 실행 거부; `start()`는 무조건 리셋이라 `done > total`을 만든다)이되 **무활동 `_STALE_AFTER`(15분)** 를 넘긴 트래커는 회수한다(백그라운드가 시작조차 못 한 경우의 영구 409 탈출구). `ProgressRegistry`는 키(=사용자)별 트래커 보관소 — `for_key`(등록)·`peek`(등록 없이 읽기, 없으면 초기 상태), 상한 `_MAX=64`이고 축출은 **유휴 또는 고착** 트래커만 |
 | `errors.py` | `not_found()`/`already_exists()` `HTTPException` 팩토리 |
-| `job_runs.py` | 배치 실행로그. `record(job_id, trigger)` 컨텍스트매니저가 **`Run` 핸들을 yield**(`.run_id` + `.set_status()`). 상태 어휘 `running\|success\|partial\|skipped\|failed`, 본문이 예외를 전파하면 `failed`가 지정을 이긴다. job_id별 최근 `KEEP=20`건 보관. **어느 잡이 `set_status`로 배선됐는지의 정본은 그 모듈 docstring의 수동 목록**이다(여기 복제하지 않는다 — 복제하면 배선이 늘 때마다 드리프트한다). 배선 없는 잡은 실패를 삼키고 정상 종료하면 `success`로 기록되니, 그 잡의 초록을 '내부 오류 없음'으로 읽지 말 것. `cowork_enrich_nightly`는 그 배선 예외 목록에 넣을 수 없다고 docstring이 명시한다 — 이 잡의 `success`는 「fire 트리거가 접수됨」이지 「전 종목이 갱신됨」이 아니다(실제 청크 처리는 로컬 리스너라는 **별 프로세스**에서 일어나고 백엔드로 보고되지 않는다) |
-| `batch_registry.py` | `BATCHES` 정적 리스트 **34개** — `id`/`label`/`category`/`schedule_desc`/`usage`/`source`/`market`/`editable`/`trigger_kinds`/`manual_endpoint`/`scheduler_job_id`/`timezone`/`default_schedule`. `job_id`는 스케줄러 잡 id 및 `job_runs.record` 인자와 반드시 일치 |
+| `job_runs.py` | 배치 실행로그. `record(job_id, trigger)` 컨텍스트매니저가 **`Run` 핸들을 yield**(`.run_id` + `.set_status()`). 상태 어휘 `running\|success\|partial\|skipped\|failed`, 본문이 예외를 전파하면 `failed`가 지정을 이긴다. job_id별 최근 `KEEP=20`건 보관. **어느 잡이 `set_status`로 배선됐는지의 정본은 그 모듈 docstring의 수동 목록**이다(여기 복제하지 않는다 — 복제하면 배선이 늘 때마다 드리프트한다). 배선 없는 잡은 실패를 삼키고 정상 종료하면 `success`로 기록되니, 그 잡의 초록을 '내부 오류 없음'으로 읽지 말 것. **`Run.set_payload(dict)`**(신규) — 그 실행이 무엇을 대상으로 했는지를 종료 UPDATE에 `job_runs.payload`(JSONB, nullable)로 함께 싣는다. 부르지 않으면 payload 컬럼을 건드리지 않고(기존 잡 무회귀), payload 쓰기 실패는 버리고 상태만 확정한다(run이 영구 `running`으로 남지 않게). `recent`/`recent_map`이 `payload`도 돌려준다. `cowork_enrich_nightly`가 02:00에 기록하는 `success`는 그 시점엔 「fire 트리거가 접수됨」이지만, 이제 **08:00 `cowork_enrich_verify`가 그 run의 payload(쏜 ticker 목록)를 `tickers.enriched_at`과 대조해 그 run 행의 status/error를 직접 다시 쓴다**(§1.8) — 즉 이 잡의 *최종* 상태는 대조를 거친 값이다 |
+| `batch_registry.py` | `BATCHES` 정적 리스트 **35개** — `id`/`label`/`category`/`schedule_desc`/`usage`/`source`/`market`/`editable`/`trigger_kinds`/`manual_endpoint`/`scheduler_job_id`/`timezone`/`default_schedule` + 선택 키 **`exchange`**(거래소 캘린더 코드)·**`session_offset_days`**(세션 판정일 = 실행일 + offset) — 현재 `daily_report_kr`(`XKRX`, 0)·`daily_report_us`(`XNYS`, −1)만 가진다. `GET /api/batches` 응답에 `exchange`가 실린다. `job_id`는 스케줄러 잡 id 및 `job_runs.record` 인자와 반드시 일치 |
+| `market_session.py` | 신규 — `exchange_calendars` 래퍼(캘린더 인스턴스 모듈 캐시). `is_session_day(exchange, day)`는 캘린더 범위 밖·로드 실패를 **fail-open(영업일 취급)** 한다. `exchange_for(job_id)`·`session_date_for(job_id, run_dt)`는 레지스트리의 `exchange`/`session_offset_days`를 읽는다(`exchange` 없는 잡은 None = 판정 대상 아님) |
+| `enrich_targets.py` | 신규 — `compute_enrich_target_set(now, window_days=30)`: (어느 사용자든 `holding`인 종목) ∪ (최근 30일 `user_events`의 `report_view_open`·`ranking_row_click` 이벤트 ticker ∩ `user_stocks` 추적 종목). 야간 enrich의 대상 집합(ADR `260916-132605`) |
+| `enrich_verify.py` | 신규 — 순수 함수 `judge(fired, enriched, window_start)` → `(success\|partial\|failed\|skipped, 미갱신 목록)`. `enriched_at >= window_start`면 갱신으로 보고, aware/naive 불일치 비교는 미갱신으로 명시 분기한다(tz 정합은 호출측 책임) |
 | `rate_limit.py` | 무인증 login/register용 IP 슬라이딩 윈도우 레이트리밋(신설, ADR `260823-085145`). `client_ip(request)`는 `CF-Connecting-IP`만 신뢰(`X-Forwarded-For`는 위조 가능이라 미신뢰, 없으면 `request.client.host`로 페일클로즈). `check(key, limit, window_s)`는 프로세스 전역 `OrderedDict[str, deque]`(`_MAX_KEYS=10_000`, LRU 축출)에 판정+기록을 `threading.Lock`으로 원자화한다 — `login`/`register`가 sync `def`라 uvicorn이 스레드풀에서 진짜 병렬 실행하므로 락 없이는 만료 경계 `IndexError`·과다허용·기록 소실이 실제로 재현된다(단일 프로세스 가정 자체는 `backend/Dockerfile` CMD에 `--workers` 없음에 의존 — 워커를 늘리면 워커마다 독립 카운터라 실효 임계가 곱해진다). `backend/routers/auth.py`가 `_enforce_rate_limit`으로 배선: login `10회/5분`, register `3회/1시간`, 초과 시 429 + `Retry-After` 헤더 |
-| `schedule_spec.py` | 스케줄 스펙 dict → APScheduler `CronTrigger` kwargs |
+| `schedule_spec.py` | 스케줄 스펙 dict → APScheduler `CronTrigger` kwargs. 스펙에 선택 bool **`skip_holidays`**(신규)가 있으면 검증하고, `describe_schedule`이 「· 휴장일 건너뜀」 접미를 붙인다. `PUT` 배치 스케줄은 `exchange` 없는 배치에 `skip_holidays`를 켜면 422(`routers/batches.py::update_batch_schedule`) |
 | `storage/` | 포트폴리오·종목명·스케줄·기대일자 (DB 접근) |
 
 도메인/데이터 서비스(외부 연동은 `INTEGRATIONS.md`에서 상세):
 
-`market/`(시세·재무 파사드) · `market_indicators/`(시장지표 14모듈 — `formation`·`labor`·`inflation`이 2026-08 추가분) · `kiwoom/`·`kis/`(증권사 REST) · `report_generator.py`(762줄, 스냅샷 생성) · `consensus.py`·`consensus_pipeline.py` · `indicators.py`(RSI/EMA/베타 등 numpy·pandas) · `analysis_service.py`(섹터 ETF 11종·매크로 4종 상관) · `kr_sector_service.py`·`us_sector_service.py` · `ranking_service.py` · `investor_service.py`·`short_sell_service.py`·`supply_score.py`·`us_supply.py` · `backlog.py`+`backlog_parser.py` · `disclosures.py`·`agm.py`·`insider_trades.py`·`dividends.py`·`beta.py` · `leverage_service.py`·`lending_service.py` · `guru_scraper.py`·`guru_stats.py` · `digest_service.py` · `recommendation/` · `analyst_reports.py`·`tech_reports.py` · `exposure.py`·`rebalance.py` · `scraper.py` · `cowork_trigger.py` · `auth_service.py`.
+`market/`(시세·재무 파사드) · `market_indicators/`(시장지표 14모듈 — `formation`·`labor`·`inflation`이 2026-08 추가분) · `kiwoom/`·`kis/`(증권사 REST) · `report_generator.py`(762줄, 스냅샷 생성) · `consensus.py`·`consensus_pipeline.py` · `indicators.py`(RSI/EMA/베타 등 numpy·pandas) · `analysis_service.py`(섹터 ETF 11종·매크로 4종 상관) · `kr_sector_service.py`·`us_sector_service.py` · `ranking_service.py` · `investor_service.py`·`short_sell_service.py`·`supply_score.py`·`us_supply.py` · `backlog.py`+`backlog_parser.py` · `disclosures.py`·`agm.py`·`insider_trades.py`·`dividends.py`·`beta.py` · `leverage_service.py`·`lending_service.py` · `guru_scraper.py`·`guru_stats.py` · `digest_service.py` · `recommendation/` · `analyst_reports.py`·**`analyst_lenses.py`**(신규 — 심층 리포트 v2의 계산 렌즈 3·4·5·8 순수 계산 + `build_lens_report`, ADR `261006-232406`)·`tech_reports.py` · `exposure.py`·`rebalance.py` · `scraper.py` · `cowork_trigger.py` · `auth_service.py`.
 
 **yfinance를 임포트하는 19개 모듈**: `services/{scraper, beta, consensus_pipeline, report_generator, dividends, us_supply, analysis_service, ranking_service}`, `services/recommendation/funnel.py`, `services/market/{kr, us, __init__}`, `services/market_indicators/{cache, kospi_signal, earnings}`, `routers/{stocks, calendar, analytics, report}`.
 
@@ -150,8 +153,8 @@ backend/
 | `auth.py` | `/api/auth` | 유일하게 인증 없이 여는 표면(ADR-0029) |
 | `portfolio.py` | `/api/portfolio` | |
 | `watchlist.py` | `/api/watchlist` | |
-| `stocks.py` | `/api/stocks` | 675줄. `PUT /enrich/batch`를 `PUT /{ticker}/enrich`보다 **먼저** 등록해야 `enrich`가 티커로 라우팅되지 않는다 |
-| `report.py` | `/api` | 592줄 |
+| `stocks.py` | `/api/stocks` | 882줄. `PUT /enrich/batch`를 `PUT /{ticker}/enrich`보다 **먼저** 등록해야 `enrich`가 티커로 라우팅되지 않는다. 신규 `POST /{ticker}/enrich/request`(온디맨드 갱신 — 7일 초과·미분석이면 `cowork_trigger.fire(..., tickers=[t], chunk=1)`, 종목당 in-flight 가드는 프로세스 인메모리 dict + `threading.Lock`·TTL 15분) |
+| `report.py` | `/api` | 649줄 |
 | `guru.py` | `/api/guru` | |
 | `calendar.py` | `/api` | |
 | `digest.py` | `/api` | |
@@ -164,7 +167,7 @@ backend/
 | `short_sell.py` | `/api` | |
 | `batches.py` | `/api` | |
 | `recommendations.py` | `/api/recommendations` | |
-| `analyst_reports.py` | `/api/analyst-reports` | |
+| `analyst_reports.py` | `/api/analyst-reports` | 발행 본문이 v2(구조 축 3종 + 9렌즈)로 교체 — 요청 모델 전부 `extra="forbid"`(`_FORBID`), 계산 렌즈 원자료 검증은 `services/analyst_lenses.py` 상수(`COMPUTED_LENSES`·`UNIT_SCALE`·`TABLE_ENGINES` 등)를 그대로 쓴다 |
 | `tech_reports.py` | `/api/tech-reports` | `GET /index`를 `GET /{slug}`보다 **먼저** 등록해야 한다 — `slug` 경로 파라미터가 `Literal` 타입이라 `/{slug}`가 먼저 잡으면 `"index"`가 허용값이 아니어서 **그 자리에서 422로 죽고** 인덱스 핸들러에 도달하지 못한다(`stocks.py`의 `enrich/batch` 순서 함정과 같은 계열). 순서 회귀 가드 `tests/test_tech_reports_index.py` |
 | `admin.py` | `/api/admin` | |
 
@@ -177,16 +180,17 @@ backend/
 - 트리거는 `CronTrigger(**build_trigger_kwargs(spec), timezone=entry["timezone"])`, 대부분 `Asia/Seoul`.
 - `misfire_grace_time`은 **명시된 배치에만** 전달한다 — `None`을 넘기면 APScheduler가 '유예 무제한'으로 해석해 거동이 바뀌므로 미지정 시 인자 자체를 뺀다(현재 `daily_report_kr/us`만 `82800`).
 - 스케줄 저장소는 `batch_schedules` 테이블(job_id PK, jsonb) — `_seed_spec_for`가 레거시 `schedules`/`guru_schedules`에서 승계 마이그레이션.
+- **휴장일 건너뜀(`skip_holidays`, 신규)** — 스펙의 `skip_holidays`가 켜져 있고 레지스트리에 `exchange`가 있는 배치만 대상이다. 세 지점이 같은 판정(`services/market_session.py`)을 쓴다: ① `scheduler/jobs.py::_holiday_skip`(`_generate_all` 진입 시 세션 판정일이 휴장이면 run을 `skipped`로 남기고 반환, 스펙 조회 실패는 판정 생략 = 기존대로 실행) ② `scheduler/schedule.py::_check_missed_report_for`(기동 누락복구 생략) ③ `services/storage/dates.py::expected_report_date`(「미생성」 판정의 기대일자 후보에서 휴장일 제외). US 리포트는 `session_offset_days=-1`이라 07:00 KST 실행이 **전날** NYSE 세션으로 판정된다.
 
-**등록 배치 34종**(id | market | 기본 스케줄) — `batch_registry.BATCHES` 순서:
+**등록 배치 35종**(id | market | 기본 스케줄) — `batch_registry.BATCHES` 순서:
 
-`daily_report_kr`|KR|설정 · `daily_report_us`|US|설정 · `consensus`|공통|리포트에 내장(스케줄러 잡 없음 — `scheduler_job_id: None`) · `daily_digest`|공통|매일 08:00 · `backlog_fetch`|KR|일 04:00 · `dividend_fetch`|공통|일 05:00 · `beta_fetch`|공통|일 05:30 · `disclosure_fetch`|KR|매일 07:30 · `agm_fetch`|KR|매일 08:00 · `insider_fetch`|KR|매일 07:45 · `earnings_kr`/`earnings_us`|일 03:00 · `monthly_kr`/`monthly_us`|매월 1일 02:00 · `macro_signals_fetch`|US|매일 06:00 · `business_formation_fetch`|US|매일 06:10 · `labor_surveys_fetch`|US|매일 06:20 · `trimmed_inflation_fetch`|US|매일 06:30 · `fx_fetch`|공통|매일 06:40 · `kospi_signal_fetch`|KR|평일 08:30 · `leverage_fetch`|KR|매일 07:00 · `lending_fetch`|KR|매월 5일 08:00 · `kr_rankings_fetch`|KR|장중 10분 · `us_rankings_fetch`|US|장중 10분 · `investor_trend_fetch`|KR|매일 18:00 · `short_sell_fetch`|KR|매일 18:30 · `supply_score_fetch`|KR|매일 19:00 · `kr_sector_fetch`|KR|매일 16:00 · `us_sector_fetch`|US|매일 07:20 · **`cowork_enrich_nightly`|공통|매일 02:00** · `guru_crawl`|공통|설정 · `recommendation_kr`|KR|매일 20:30 · `recommendation_us`|US|매일 07:00 · `us_supply_fetch`|US|일 06:00.
+`daily_report_kr`|KR|설정 · `daily_report_us`|US|설정 · `consensus`|공통|리포트에 내장(스케줄러 잡 없음 — `scheduler_job_id: None`) · `daily_digest`|공통|매일 08:00 · `backlog_fetch`|KR|일 04:00 · `dividend_fetch`|공통|일 05:00 · `beta_fetch`|공통|일 05:30 · `disclosure_fetch`|KR|매일 07:30 · `agm_fetch`|KR|매일 08:00 · `insider_fetch`|KR|매일 07:45 · `earnings_kr`/`earnings_us`|일 03:00 · `monthly_kr`/`monthly_us`|매월 1일 02:00 · `macro_signals_fetch`|US|매일 06:00 · `business_formation_fetch`|US|매일 06:10 · `labor_surveys_fetch`|US|매일 06:20 · `trimmed_inflation_fetch`|US|매일 06:30 · `fx_fetch`|공통|매일 06:40 · `kospi_signal_fetch`|KR|평일 08:30 · `leverage_fetch`|KR|매일 07:00 · `lending_fetch`|KR|매월 5일 08:00 · `kr_rankings_fetch`|KR|장중 10분 · `us_rankings_fetch`|US|장중 10분 · `investor_trend_fetch`|KR|매일 18:00 · `short_sell_fetch`|KR|매일 18:30 · `supply_score_fetch`|KR|매일 19:00 · `kr_sector_fetch`|KR|매일 16:00 · `us_sector_fetch`|US|매일 07:20 · **`cowork_enrich_nightly`|공통|매일 02:00** · **`cowork_enrich_verify`|공통|매일 08:00** · `guru_crawl`|공통|설정 · `recommendation_kr`|KR|매일 20:30 · `recommendation_us`|US|매일 07:00 · `us_supply_fetch`|US|일 06:00.
 
 2026-08 추가분(`macro_signals_fetch` 이후 4종, `business_formation_fetch`~`fx_fetch`)은 06:10~06:40 KST에 몰려 있다 — 앞선 `macro_signals_fetch`(06:00)와 같은 FRED 창을 10분 간격으로 나눠 쓴다. `fx_fetch`는 신설 이유가 다르다: 환율은 요청경로 증분(`get_fx`)이 이미 있었지만 소비자가 시장지표 탭 **밖**에도 있어(`routers/stocks.py::_usdkrw_rate` · `services/digest_service.py`, 둘 다 나이 검사 없는 raw `_mc_load("fx")`) 아무도 탭을 안 열면 포트폴리오 KRW 환산이 무기한 stale해졌다(`INTEGRATIONS.md` §10.1).
 
-**`cowork_enrich_nightly`(신설, ADR `260913-013425`)는 다른 33종과 성격이 다르다** — 백엔드가 하는 일은 보유·관심 전 종목 티커를 실어 `cowork_trigger.fire(..., tickers=, model="opus", chunk=5)` 하나를 쏘는 것뿐이고, 실제 청크 분할·순차 세션 스폰은 `scripts/cowork-fire-listener.py`라는 **다른 프로세스**가 수 시간에 걸쳐 수행한다(§3.4·`INTEGRATIONS.md` §9.3). 대상 종목 정의역은 `GET /api/stocks`(API 키 경유)와 **같은 함수**(`storage.get_global_portfolio`)를 쓴다 — 다른 집합을 쓰면 화면이 보는 종목과 야간이 갱신하는 종목이 갈린다. `manual_endpoint: None`(수동 트리거 없음), `trigger_kinds: ["auto"]`뿐.
+**`cowork_enrich_nightly`(ADR `260913-013425` → 대상 개정 ADR `260916-132605`)와 `cowork_enrich_verify`는 다른 33종과 성격이 다르다** — 02:00 잡(`scheduler/jobs.py::_run_nightly_enrich`)이 하는 일은 **갱신 대상 집합**(`services/enrich_targets.py::compute_enrich_target_set` — 보유 ∪ 30일 열람, 더는 `storage.get_global_portfolio` 전량이 아니다)을 실어 `cowork_trigger.fire(..., tickers=, model="opus", chunk=5)` 하나를 쏘고 `run.set_payload({"tickers", "chunk", "model"})`로 쏜 목록을 남기는 것뿐이다. 실제 청크 분할·순차 세션 스폰은 `scripts/cowork-fire-listener.py`라는 **다른 프로세스**가 수 시간에 걸쳐 수행한다(§3.4·`INTEGRATIONS.md` §9.3). 08:00 잡(`_verify_nightly_enrich`)은 최신 `cowork_enrich_nightly` run을 **`job_runs.recent()`가 아니라 직접 `query`로** 읽고(`recent()`는 DB 예외를 `[]`로 삼켜 「조회 실패」가 「run 없음」으로 붕괴하므로), 24시간보다 오래된 run이면 `failed`, payload가 없으면 `skipped`, 아니면 `enrich_verify.judge`로 판정해 **그 02:00 run 행을 UPDATE**하고 자기 run에도 같은 상태를 남긴다. 둘 다 `manual_endpoint: None`, `trigger_kinds: ["auto"]`뿐.
 
-배치 id를 추가·은퇴할 때 갱신할 테스트 지점은 **4파일 8곳**이다(`test_scheduler_seed`·`test_batch_market_split`·`test_batches_router`·`test_macro_signals_batch`). 흔한 grep 패턴(`BATCHES) ==`·`len(data) ==`·`EXPECTED_IDS`)이 그중 4곳에 **블라인드**하다 — `test_scheduler_seed.py`의 `set(...) ==` 2곳, `test_batch_market_split.py`의 `_MARKET_BY_ID`(id→market 완전 매핑 dict)와 시장별 개수 dict(현재 `{"KR": 16, "US": 11, "공통": 7}`)다. 실제 게이트는 grep이 아니라 **전체 스위트**이니 네 파일을 직접 열 것.
+배치 id를 추가·은퇴할 때 갱신할 테스트 지점은 **4파일 8곳 이상**이다(`test_scheduler_seed`·`test_batch_market_split`·`test_batches_router`·`test_macro_signals_batch`). 흔한 grep 패턴(`BATCHES) ==`·`len(data) ==`·`EXPECTED_IDS`)이 그중 일부에 **블라인드**하다 — `test_scheduler_seed.py`의 `set(...) ==` 2곳, `test_batch_market_split.py`의 `_MARKET_BY_ID`(id→market 완전 매핑 dict)와 시장별 개수 dict(현재 `{"KR": 16, "US": 11, "공통": 8}`)다. 실제 게이트는 grep이 아니라 **전체 스위트**이니 네 파일을 직접 열 것.
 
 ### 1.9 환경변수 (이름만)
 
@@ -265,13 +269,13 @@ src/
   index.css App.css
   styles/         tokens.css · motion.css · pc.css · mobile.css · guru.css
   contexts/       AuthContext.jsx
-  hooks/          훅 18개 (§2.6) + co-located 테스트 5
-  pages/          48 파일
+  hooks/          훅 19개 (§2.6) + co-located 테스트 7
+  pages/          49 파일
   routes/         AnalystReportsRoute.jsx — admin 게이트(loading이면 null, 비-admin은 /reports로 replace)
   components/     최상위 + market/ portfolio/ reports/ recommendations/ tech/ sketches/ ui/
   utils/          analytics.js diag.js guruName.js marketHours.js oauthHistory.js priceFlash.js pwa.js
   glossary/       terms.js match.js
-  test/           36개 통합/회귀 테스트 + setup.js
+  test/           53개 통합/회귀 테스트 + setup.js
   assets/
 ```
 
@@ -290,10 +294,10 @@ src/
   `refreshTokens()`의 안전장치 셋: ① **10초 타임아웃**(`AbortController` + `setTimeout` — `AbortSignal.timeout`은 Safari 16+ 전용이라 구형 iOS PWA 지원 때문에 안 쓴다; 타임아웃이 없으면 응답이 무기한 pending일 때 in-flight promise가 영영 안 비워져 이후 모든 401이 거기 걸린다) ② **`stillCurrent` 가드**(요청이 나가 있는 동안 로그아웃 또는 다른 탭의 회전이 저장된 `refresh_token`을 이미 바꿔놨으면 이 응답으로 덮지 않는다 — 로그아웃이었다면 새로 발급된 토큰을 버리는 게 맞고, 다른 탭이 먼저 회전했다면 그 최신값을 보존하는 게 맞다) ③ 성공·실패 **무관하게 `finally`에서 `refreshInFlight = null`**(안 비우면 첫 실패가 세션 내내 갱신을 막는다). 원요청 재시도는 `config.headers`를 새 토큰으로 덮은 뒤 `api.request(config)`로.
 - axios를 거치지 않는 fetch도 있다: `App.jsx`의 `doLogout`(`/api/auth/logout`), `utils/analytics.js`의 `trackEvent`(`/api/events`, 토큰 없으면 no-op·실패는 `.catch(() => {})`로 삼킴).
 
-### 2.6 훅 (`frontend/src/hooks/`, 훅 18개 + co-located 테스트 5)
+### 2.6 훅 (`frontend/src/hooks/`, 훅 19개 + co-located 테스트 7)
 
 인증·부팅: `useAuth` · `useAuthBootstrap`(OAuth 코드교환 + `history.replaceState`로 search 제거 + 부팅 구간 계측 `bootTimings()`) · `useBfcacheAuthGuard`(뒤로가기 캐시 복원 시 세션 in-place 뒤집기, ADR-0035) · `useSwUpdateReload`.
-데이터: `usePortfolioData` · `useTrackedStocks` · `useReportList` · `useReportFilters` · `useReportGeneration` · `useStockManagement` · **`useTechIndex`**(`GET /api/tech-reports/index` — 종목↔기술 역인덱스).
+데이터: `usePortfolioData` · `useTrackedStocks` · `useReportList` · `useReportFilters` · `useReportGeneration` · `useStockManagement` · **`useTechIndex`**(`GET /api/tech-reports/index` — 종목↔기술 역인덱스) · **`useEnrichOnDemand`**(신규 — 리포트 상세 진입마다 `POST /api/stocks/{ticker}/enrich/request` 1회, `fired:true`일 때만 `GET /api/report/{ticker}/{date}`를 30초 간격으로 **유계** 폴링(`MAX_TICKS=30`·`MAX_FAIL_STREAK=3`·언마운트) — 완료 판정은 첫 폴의 `enriched_at`을 baseline으로 한 변화. `fired:false`와 404(옛 백엔드)는 조용히 끝낸다).
 UI: `useTheme` · `useIsMobile` · `useBodyScrollLock` · `useCountUp` · `usePriceFlash` · `useReveal` · **`useActiveChapter`**(스크롤 위치 → 현재 장, 주요기술 리포트 목차·플로팅 바).
 
 **`useTechIndex`는 실패를 빈 배열로 붕괴시키지 않는다** — 조회 실패는 `null` 반환 + `failed` 플래그이고, 소비처(포트폴리오 「기술 노출」 카드)는 그때 카드를 아예 숨긴다. 빈 배열의 의미가 셋(아직 안 옴 · 받았는데 0건 · 조회 실패)이라 `ready` 하나로는 「없음」이라는 거짓 진술을 막을 수 없다. 실패는 캐시하지 않아 다음 마운트가 재시도한다.
@@ -303,7 +307,7 @@ UI: `useTheme` · `useIsMobile` · `useBodyScrollLock` · `useCountUp` · `usePr
 ### 2.7 프론트 테스트 스택
 
 - vitest + jsdom + `@testing-library/react`, `setupFiles`는 `@testing-library/jest-dom` 임포트 한 줄.
-- 테스트 파일 83개 — 컴포넌트 옆 co-located 47개(`*.test.jsx`)와 `src/test/` 36개(크로스컷 회귀)로 나뉜다.
+- 테스트 파일 105개 — 컴포넌트·훅 옆 co-located 52개(`*.test.js[x]`)와 `src/test/` 53개(크로스컷 회귀)로 나뉜다. 이번 구간에 늘어난 `src/test/`의 대부분은 비동기 레이스 회귀(`*-race.test.jsx`·`*-poll-overlap.test.jsx`)다.
 - **jsdom 한계가 테스트 설계를 규정한다**: `ResponsiveContainer`가 0크기라 **recharts는 렌더되지 않는다** → 차트 테스트는 SVG가 아니라 주변 DOM(범례 텍스트·캡션·분기)을 단언한다. 레이아웃 수치·색 적용·잘림은 원리적으로 볼 수 없다 → 라이브 Playwright 프로브가 그 축의 게이트(§3.4).
 
 ### 2.8 ESLint (`frontend/eslint.config.js`)
@@ -320,12 +324,13 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 |---|---|---|---|
 | `postgres` | `postgres:16-alpine` | `127.0.0.1:5432:5432`(루프백 전용) | `pgdata` + `auth_schema.sql`→`/docker-entrypoint-initdb.d/01-auth.sql`, `app_schema.sql`→`02-app.sql` |
 | `backend` | `build: ./backend` | (미노출, 내부 8000) | — · `env_file: ./backend/.env.docker` · `depends_on: postgres(service_healthy)` |
-| `nginx` | `nginx:alpine` | `127.0.0.1:80:80`(루프백 전용) | `./frontend/dist`→`/usr/share/nginx/html:ro`, `./nginx/nginx.conf:ro`, `./certbot/conf:ro`, `./certbot/www:ro` |
-| `certbot` | `certbot/certbot` | — | `./certbot/conf`, `./certbot/www` · entrypoint = `certbot renew` + `sleep 12h` 무한 루프 |
+| `nginx` | `nginx:alpine` | `127.0.0.1:80:80`(루프백 전용) | `./frontend/dist`→`/usr/share/nginx/html:ro`, `./nginx/nginx.conf:ro` |
+
+`certbot` 서비스와 `./certbot/*` 볼륨은 **은퇴했다(task#384)** — TLS는 Cloudflare가 종단하고(터널 → `localhost:80`), 443 게시·인증서 갱신 컨테이너는 없다. 그래서 **런타임은 3컨테이너**다: `postgres`(compose 소유) + `backend`·`nginx`(`deploy.sh`가 `docker run`으로 소유, 아래 ⚠️).
 
 `postgres` healthcheck는 `pg_isready -U portfolion`(5s 간격·10회). `postgres`/`backend`/`nginx`는 `restart: unless-stopped`.
 
-⚠️ **포트 게시가 전부 `127.0.0.1`로 좁혀졌다(B82 대응)** — 이전엔 `5432:5432`/`80:80`/`443:443`으로 전 인터페이스에 열려 있어 LAN에서 postgres·nginx에 직접 도달할 수 있었다(`CF-Connecting-IP` 위조로 로그인 레이트리밋을 우회하거나 표적 잠금을 거는 경로). 공개 경로는 Cloudflare Tunnel(`cloudflared` → `http://localhost:80`)뿐이라는 전제(ADR `260823-085145`)를 배포 구성으로 실제 강제한 것. `443` 게시는 제거됐다 — `nginx/nginx.conf`의 443 `server` 블록이 이미 주석 처리라 아무 일도 하지 않고 있었다. `POSTGRES_PASSWORD`는 **폴백이 제거돼 `${POSTGRES_PASSWORD:?...}`로 미설정 시 `docker compose` 자체가 실패**한다 — 옛 폴백값이 공개 저장소 커밋 이력에 남아 실운영 크리덴셜로 쓰이고 있었기 때문(B21). 비밀번호 교체 절차는 `scripts/rotate-postgres-password.sh`(§3.4).
+⚠️ **포트 게시가 전부 `127.0.0.1`로 좁혀졌다(B82 대응)** — 이전엔 `5432:5432`/`80:80`/`443:443`으로 전 인터페이스에 열려 있어 LAN에서 postgres·nginx에 직접 도달할 수 있었다(`CF-Connecting-IP` 위조로 로그인 레이트리밋을 우회하거나 표적 잠금을 거는 경로). 공개 경로는 Cloudflare Tunnel(`cloudflared` → `http://localhost:80`)뿐이라는 전제(ADR `260823-085145`)를 배포 구성으로 실제 강제한 것. 호스트 `127.0.0.1:5432`를 보고 접속하는 곳의 전수 목록(공용 postgres 이전 체크리스트)은 `docs/ops/postgres-5432-consumers.md`. `POSTGRES_PASSWORD`는 **폴백이 제거돼 `${POSTGRES_PASSWORD:?...}`로 미설정 시 `docker compose` 자체가 실패**한다 — 옛 폴백값이 공개 저장소 커밋 이력에 남아 실운영 크리덴셜로 쓰이고 있었기 때문(B21). 비밀번호 교체 절차는 `scripts/rotate-postgres-password.sh`(§3.4).
 
 ⚠️ **compose 정의와 실제 런타임이 갈린다** — `deploy.sh`는 backend/nginx를 compose가 아니라 **`docker run`으로 직접 교체**한다(§3.3). 그래서 `docker compose ps`에 backend가 안 잡히고, uptime 확인은 `docker ps`로 해야 한다.
 
@@ -333,8 +338,7 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 
 ### 3.2 nginx (`nginx/nginx.conf`)
 
-단일 `server { listen 80 }`(443 블록은 통째 주석 처리). location 우선순위 순:
-- `/.well-known/acme-challenge/` → `root /var/www/certbot`
+단일 `server { listen 80 }`뿐이다(acme-challenge location과 주석 처리돼 있던 443 블록은 certbot 은퇴와 함께 제거됐다, task#384). location 우선순위 순:
 - `/health` → `proxy_pass http://backend:8000`
 - `/api/` → `proxy_pass http://backend:8000` + `Host`/`X-Real-IP`/`X-Forwarded-For`/`X-Forwarded-Proto`
 - `= /index.html` → **캐시 금지**(`no-cache, no-store, must-revalidate` + Pragma + Expires 0)
@@ -344,36 +348,41 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 
 ### 3.3 배포 파이프라인
 
-**주 경로** `.github/workflows/deploy.yml`: `on: push: branches: [main]` → `runs-on: self-hosted` → `cd /Users/calmonion/Project/PortfoliOn && git fetch origin && git reset --hard origin/main && bash deploy.sh`.
+**자동 경로는 둘이고 같은 배포 기록을 본다** — `deploy.sh`가 성공 끝에 배포한 SHA를 `DEPLOY_MARKER`(기본 `~/.portfolion-deployed-sha`)에 쓰고, 러너와 폴러는 `origin/main`이 그 기록과 다를 때만 `deploy.sh`를 부른다. 그래서 먼저 도착한 쪽이 배포하고 다른 쪽은 no-op이며, 어느 경로도 `git reset --hard`를 하지 않는다.
 
-**폴백** `scripts/auto-deploy-poll.sh`(launchd, 2분 주기): 락 파일이 있으면 skip → `git fetch origin main` → `LOCAL == REMOTE`면 조용히 exit 0 → **다르면(앞서든 뒤처지든) `git reset --hard origin/main` 후 `deploy.sh`**. → 메인 체크아웃에서 커밋 안 한 tracked 편집과 push 안 한 로컬 커밋은 다음 폴(≤2분)에 날아간다. `.forge/` 등 untracked는 `reset --hard` 대상이 아니라 안전.
+**러너** `.github/workflows/deploy.yml`: `on: push: branches: [main]` → `runs-on: self-hosted`(전용 디렉터리 `~/actions-runner-portfolion`, arm64로 재설치돼 online) → **단일 스텝 `bash <repo>/scripts/runner-deploy.sh`**. `runner-deploy.sh`: `git fetch` 후 기록 == `origin/main`이면 「이미 배포됨」 exit 0 → 잠금(`DEPLOY_LOCK`, 기본 `/tmp/portfolion-deploy.lock`)이 있으면 5초 간격으로 최대 `RUNNER_LOCK_WAIT_SEC`(기본 900초) 대기(초과 시 exit 1) → **기록을 다시 대조**(대기 중 폴러가 같은 커밋을 배포했을 수 있다) → 다르면 `bash deploy.sh`를 돌려 **그 종료코드를 그대로** 반환. fetch 실패는 exit 2.
 
-**`deploy.sh`** (`set -e`, 4단계):
-0. `/tmp/portfolion-deploy.lock` 존재 시 exit 1(러너↔폴러 동시 배포 방지), `trap`으로 해제. `DOCKER_CONFIG`를 임시 dir로 바꿔 macOS keychain 접근을 우회.
+**폴러** `scripts/auto-deploy-poll.sh`(launchd `com.portfolion.auto-deploy-poll`, 2분 주기): 잠금이 있으면 skip → `git fetch` → HEAD가 `origin/main`보다 **뒤처졌을 때만** `git merge --ff-only`(앞섬·갈라짐은 손대지 않음, ff 실패도 skip) → 기록 == `origin/main`이면 exit → `~/.portfolion-deploy-failed-sha`(`DEPLOY_FAILED_MARKER`)가 그 SHA면 exit → `deploy.sh`. **실패 1회 정책**: exit 2(사전 거부)면 다음 폴에서 재시도, 그 밖의 비0이면 그 SHA를 failed 기록에 쓰고 같은 커밋을 다시 시도하지 않는다(새 push나 수동 `deploy.sh` 성공으로 풀린다). 로그 `~/Library/Logs/com.portfolion.auto-deploy-poll.log`의 `Deploy complete: <SHA>`.
+
+러너·폴러 모두 launchd/러너 최소 PATH에 없는 fnm npm·`/usr/local/bin` docker를 **PATH 뒤에 덧붙인다**(앞에 붙이면 `scripts/test_deploy_guard.py`의 스텁보다 실 docker가 먼저 잡힌다). 두 스크립트와 `deploy.sh`는 본문 전체를 `{ … }` 한 그룹으로 감싸 실행 중 제자리 편집에 안전하다. 회귀 가드: **`scripts/test_deploy_guard.py`**(40테스트 — 임시 bare origin + 클론 + 스텁 PATH로 `deploy.sh`·폴러·`runner-deploy.sh` 세 스크립트를 함께 덮는다, `backend/.venv/bin/python -m pytest scripts/test_deploy_guard.py -q`).
+
+**`deploy.sh`** (`set -e`, 사전 거부 → 4단계):
+0. **종료코드 계약** — `0` 성공(기록 갱신) · `2` 사전 거부(컨테이너를 건드리기 전: 잠금 존재 · `frontend`/`backend`/`nginx`/`deploy.sh`에 미커밋 tracked 변경 · `git fetch` 실패 · HEAD가 앞서거나 갈라짐 · ff 실패) · `1` 그 뒤의 모든 실패(`trap 'exit 1' ERR`로 도구 종료코드와 무관하게 1). HEAD가 뒤처졌으면 `--ff-only`로 따라잡는다. 잠금 `DEPLOY_LOCK`은 `deploy.sh`만 잡고 `trap`으로 해제. `DOCKER_CONFIG`를 임시 dir로 바꿔 macOS keychain 접근을 우회.
 1. `cd frontend && npm install --silent && npm run build --silent` → `frontend/dist/`
 2. `docker build -t portfolion-backend ./backend --quiet`
 3. `docker stop/rm portfolion-backend-1` → `docker run -d --name portfolion-backend-1 --network portfolion_default --network-alias backend --restart unless-stopped --env-file ./backend/.env.docker portfolion-backend`
 4. `docker stop/rm portfolion-nginx-1` → `docker run -d ... -p 127.0.0.1:80:80 -v <repo>/nginx/nginx.conf:ro -v <repo>/frontend/dist:/usr/share/nginx/html:ro nginx:alpine`(루프백 전용 게시, B82 — 공개 경로는 Cloudflare Tunnel뿐. ⚠️ 이 `docker run`의 `\` 연속행 안에는 `#` 주석을 넣지 말 것 — 연속행이 주석 해석보다 먼저 줄을 이어 붙여 그 뒤 인자를 통째로 삼킨다(`bash -n`은 통과한다), 실제로 겪은 실수라 `deploy.sh`가 그 경고를 연속행 *앞*에 남겨 뒀다)
-5. `sleep 2 && curl -s http://localhost/health`
+5. `sleep 2 && curl -s http://localhost/health`(실패해도 경고만) → **끝 대조**: HEAD가 시작 시점과 다르면 ❌ exit 1, 같으면 `배포된 커밋: <SHA> <제목>`을 출력하고 SHA를 `DEPLOY_MARKER`에 쓴다. 배포 판정은 exit 0·health가 아니라 이 줄로 한다.
 
-**비대칭이 중요하다**: nginx가 `frontend/dist`를 직접 마운트하므로 **로컬 `npm run build`는 배포 없이도 즉시 라이브**인 반면, 백엔드는 러너/폴러가 재배포해야 반영된다 → 그 사이 "새 프론트 ↔ 옛 백엔드" 창이 실재한다. 같은 이유로 **프론트 빌드는 그 자체가 배포 행위**다.
+**비대칭이 중요하다**: nginx가 `frontend/dist`를 직접 마운트하므로 **로컬 `npm run build`는 배포 없이도 즉시 라이브**인 반면, 백엔드는 러너/폴러가 재배포해야 반영된다 → 그 사이 "새 프론트 ↔ 옛 백엔드" 창이 실재한다. 같은 이유로 **프론트 빌드는 그 자체가 배포 행위**다(그리고 `deploy.sh` 1단계가 빌드하므로 push도 작업트리의 `frontend/dist`를 갱신한다).
 
-### 3.4 도구 워크스페이스 (`scripts/`, 172개 엔트리)
+### 3.4 도구 워크스페이스 (`scripts/`, 188개 엔트리)
 
 - **`scripts/package.json`** = `{ "name": "portfolion-screenshots", "private": true, "dependencies": { "playwright": "^1.50.0" } }`. `scripts/node_modules/`는 gitignored이고 `playwright`/`playwright-core`만 들어 있다. **프론트 워크스페이스에는 Playwright가 없다** — 라이브 UAT는 이 별도 워크스페이스에서 돈다.
-- `uat*.mjs` 라이브 프로브 다수(현재 `uat331-*`까지), `probe*.mjs`/`probe*.py`, `smoke23x-auth.mjs`, `capture-*.js`, `screenshot.js`.
-- **게이트 스크립트**(프로브를 감싸 판정만 내는 얇은 층): `check-uat311-ratchet.sh`가 `uat311-tech15-visual.mjs`를 돌려 **FAIL 0 · 단언 총계 ≥ 49 · `uat311-baseline-tags.txt`의 태그 전부 생존**을 한꺼번에 본다(면제 2건은 `grep -v`로 하한에서 뺀다). 이 3항 형태가 이 저장소의 회귀 가드 관례다 — `exit 0` 단독은 축이 조용히 사라져도(커버리지 붕괴) 통과하므로 쓰지 않는다. `loopcheck-*.mjs`(tech5·tech15·market-sections)·`check-tech15-substance.mjs`는 fg-loop 정지조건용 판정 스크립트다.
+- `uat*.mjs` 라이브 프로브 다수(현재 `uat379-*`까지; `uat222`·`uat225`·`uat254`·`uat275` 4종은 삭제됨), `probe*.mjs`/`probe*.py`, `smoke23x-auth.mjs`, `capture-*.js`, `screenshot.js`.
+- **게이트 스크립트**(프로브를 감싸 판정만 내는 얇은 층): `check-uat311-ratchet.sh`가 `uat311-tech15-visual.mjs`를 돌려 **FAIL 0 · 단언 총계 ≥ 49 · `uat311-baseline-tags.txt`의 태그 전부 생존**을 한꺼번에 본다(면제 2건은 `grep -v`로 하한에서 뺀다). 이 3항 형태가 이 저장소의 회귀 가드 관례다 — `exit 0` 단독은 축이 조용히 사라져도(커버리지 붕괴) 통과하므로 쓰지 않는다. `loopcheck-*`(tech5·tech15·market-sections·**enrich-on-demand-live**(`.mjs`)·**enrich-target-set**(`.py` — `backend/.env`의 `DATABASE_URL`로 psycopg2 직접 연결해 `enrich_targets`를 독립 SQL로 대조))·`check-tech15-substance.mjs`는 fg-loop 정지조건용 판정 스크립트다.
 - 하니스 관례: **컨텍스트를 `serviceWorkers: 'block'`으로** 만든다. ⚠️ 원래 근거(「SW가 `/api/*`를 NetworkFirst로 가로채 `page.route` 응답 주입을 무력화한다」)는 **ADR-0036 이후 더 이상 성립하지 않는다** — `/api/` 런타임 캐시 규칙이 제거돼 SW는 앱 셸·폰트만 캐시하고 `navigateFallback`도 `null`이다. 관례는 남아 있고(무해한 belt-and-braces) 신규 프로브도 그대로 쓰지만, **프로브 헤더 주석에 남은 그 근거 문장은 stale**하니 사실로 인용하지 말 것. 예외는 SW 설치 여부 자체가 측정축인 프로브(`uat288-oauth-boot-timing.mjs`가 `'allow'`를 쓰고 이유를 헤더에 명시).
 - 파이썬 도구: `audit_unauth_endpoints.py`(FastAPI 라우트 재귀 열거), `kospi_signal_backtest.py`, `contrast_probe.py`, `repair-005930-snapshots.py`, `probe32x-*.py`(키움 종가 파서·수주잔고 단위 캡션 전수·랭킹 시세·KST 날짜 경계 — 라이브/실문서 대조로 임계값을 고정한 근거 프로브), **`enrich-ab.py`**(신규 — enrich 8필드 A/B 대조 하네스. `seed`/`list`/`fire`/`restore`/`diff`/`ab` 서브커맨드. `enrich_history` 테이블 위에서 두 모델(기본 sonnet·opus)의 산출물을 같은 base에서 비교한다 — 루틴 프롬프트가 스냅샷의 직전 enrich 7필드를 보고 쓰므로 두 런 사이에 `restore`로 base를 복원해야 대칭 비교가 된다. `restore`의 리포트 재생성은 루틴 자신의 `POST /report/generate`와 겹치는 409를 유계 재시도한다).
+- **발행 레인 A/B 하네스 `ab-*.py`**(신규, task#350) — `ab-publish.py`(3팔: opus 기준선은 세션 없이 현행 산출물 재사용 · muse · muse 초안→opus 검수. 세션은 리스너를 거치지 않고 `_runner_argv`만 재사용해 직접 띄운다) · **`ab-proxy.py`**(쓰기 차단 프록시 — `127.0.0.1`에서 GET/HEAD만 prod로 중계하고 그 외 메서드는 업스트림 미호출·본문 캡처·성공 응답; 판정은 순수 함수 `handle_request()`) · `ab-run-all.py`(순차 본 실행, 실패는 `*.error.json`) · `ab-compare.py`/`ab-summary.py`(판정하지 않는 비교표 — 시점 간격·커버리지·prod 무쓰기 전후값을 함께 싣는다) · `ab-finalize.py`. 무쓰기 보장은 **독립 2겹**: 프롬프트의 BASE URL을 프록시로 치환(정확히 1건이 아니면 발사 안 함) + 자식 env `PORTFOLION_API_KEY`는 더미(진짜 키는 프록시만). 가드 `backend/tests/test_ab_proxy.py`·`test_ab_publish.py`. 세션 노이즈(`out/*/*/*/run.log` 등)는 gitignored.
 - **`scripts/rotate-postgres-password.sh`**(신규, B21 대응) — postgres 비밀번호를 회전하고 `backend/.env.docker`·`backend/.env`·루트 `.env` 3파일의 `DATABASE_URL`/`POSTGRES_PASSWORD` 성분을 함께 갱신한 뒤 `deploy.sh`로 백엔드를 재생성한다. 실패 시 DB `ALTER USER`+3파일+`deploy.sh` 재실행까지 전부 롤백. 새 비밀번호 검증은 **컨테이너 밖에서** 별도 일회용 postgres 컨테이너로 접속해야 한다 — `docker exec <pg> psql -h 127.0.0.1`은 `pg_hba.conf`의 `trust` 규칙에 걸려 아무 비밀번호로나 통과하는 이빨 없는 검사가 된다. `.rotate-backup-*/`(gitignored)에 백업을 남긴다.
-- **`scripts/cowork-fire-listener.py`** — 표준 라이브러리 `http.server`만 쓰는 로컬 리스너. `127.0.0.1:8787` 바인드(컨테이너에서는 `host.docker.internal:8787`), `Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>` 검증, `scripts/cowork-routine-prompt.md`를 읽어 `{{COWORK_API_KEY}}`를 `.env.docker` 값으로 치환한 뒤 **stdin으로** 실행기에 넘긴다(argv에 키가 보이지 않게). 실행기는 `model`로 갈린다(`_runner_argv`, task#348) — `/` 없으면 기존 `claude -p --model <model>(기본 opus) --allowedTools Bash,WebSearch,WebFetch,Read,Write`(무회귀), `/` 있으면 OpenCode `opencode run -m <model> --auto`(야간 전량 회차가 `opencode/muse-spark-1.3-contributor-free`로 이 경로를 탄다). 실행 cwd는 `tempfile.mkdtemp`로 **원자 생성**한 빈 디렉터리(레포 컨텍스트 차단 + 같은 초 2회 fire의 로그 truncate 방지).
-  요청 본문이 `tickers[]`를 실으면 **전량 모드**로 갈린다 — `chunk`(기본 5)개씩 잘라 단일 워커 스레드의 큐에서 **순차** 스폰(동시 세션 0), 한도 초과 문구(`_LIMIT_MARKERS`)가 로그 앞부분에 보이면 잔여 청크를 포기, 청크당 `_CHUNK_TIMEOUT=3600s`. `tickers` 없는 기존 호출은 그대로 병행 논블로킹 스폰(무회귀). 거부 응답(401/404)은 `Content-Length: 0`을 명시(없으면 간헐 `ConnectionReset`으로 호출측 로그에서 401이 통째로 사라질 수 있었다). 로그는 전부 `_log()`(KST 타임스탬프 접두)로 통일. launchd 서비스 `com.portfolion.cowork-fire-listener`.
-- **`scripts/start-docker-compose.sh`** + **`scripts/com.portfolion.docker-compose.plist`**(신규 launchd 잡 `com.portfolion.docker-compose`) — 부팅 시 스택 복구 전용(평시 재기동은 각 컨테이너의 `restart: unless-stopped`가 처리). **compose 소유**(`postgres`·`certbot`)만 `docker compose up -d postgres certbot`으로 올리고 **`deploy.sh` 소유**(`backend`·`nginx`)는 건드리지 않는다 — compose를 통째로 올리면 `deploy.sh`가 `docker run`으로 만든 동명 컨테이너(`portfolion-backend-1`/`portfolion-nginx-1`)를 compose 정의로 재생성해 버리기 때문. docker 데몬 대기는 최대 5분 유계(무한 대기 금지 — 죽었는데 아무도 모르는 상태 방지). 적용 스크립트 `scripts/apply-docker-autostart.sh`(백업→plist 배치→`launchctl` 재적재→1회 실행→C3/C4/C8~C11/C13/C15 정지조건 검증, `--dry-run`/`--rollback`/`--yes`). 절차 문서 `scripts/README-docker-autostart.md`.
-- **launchd 서비스들**(레포 밖 설정, 코드가 전제함): `com.portfolion.auto-deploy-poll`, `actions.runner.calmonion7-PortfoliOn.macbook-portfolion`, cloudflared, `com.portfolion.cowork-fire-listener`, **`com.portfolion.docker-compose`**(신설). `claude -p`처럼 keychain OAuth를 쓰는 서비스는 plist `EnvironmentVariables`에 `HOME`/`USER`/`LOGNAME`이 필요하다.
+- **`scripts/cowork-fire-listener.py`** — 표준 라이브러리 `http.server`만 쓰는 로컬 리스너. `127.0.0.1:8787` 바인드(컨테이너에서는 `host.docker.internal:8787`), `Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>` 검증, `scripts/cowork-routine-prompt.md`를 읽어 **stdin으로** 실행기에 넘긴다(argv에 보이지 않게). API 키 **값은 프롬프트에 싣지 않는다**(task#349) — `{{COWORK_API_KEY}}` 자리표시자를 `$PORTFOLION_API_KEY` 참조로 바꾸고 값은 자식 env `PORTFOLION_API_KEY`(부모 env 위에 얹음)로만 준다. OpenCode `run`이 실행한 bash 명령을 `run.log`에 에코하므로 프롬프트에 값이 있으면 평문 로그로 샜다. `run.log`는 생성 시점부터 0600(`os.open(..., 0o600)`). 실행기는 `model`로 갈린다(`_runner_argv`, task#348) — `/` 없으면 기존 `claude -p --model <model>(기본 opus) --allowedTools Bash,WebSearch,WebFetch,Read,Write`(무회귀), `/` 있으면 OpenCode `opencode run -m <model> --auto`(야간 전량 회차가 `opencode/muse-spark-1.3-contributor-free`로 이 경로를 탄다). 실행 cwd는 `tempfile.mkdtemp`로 **원자 생성**한 빈 디렉터리(레포 컨텍스트 차단 + 같은 초 2회 fire의 로그 truncate 방지).
+  요청 본문이 `tickers[]`를 실으면 **전량 모드**로 갈린다 — `chunk`(기본 5)개씩 잘라 단일 워커 스레드의 큐에서 **순차** 스폰(동시 세션 0), 한도 초과 문구(`_LIMIT_MARKERS` — `no payment method` 추가)가 로그 앞부분에 보이면 잔여 청크를 포기, 청크당 `_CHUNK_TIMEOUT=3600s`. `tickers` 없는 기존 호출은 그대로 병행 논블로킹 스폰(무회귀). 거부 응답(401/404)은 `Content-Length: 0`을 명시(없으면 간헐 `ConnectionReset`으로 호출측 로그에서 401이 통째로 사라질 수 있었다). 로그는 전부 `_log()`(KST 타임스탬프 접두)로 통일. launchd 서비스 `com.portfolion.cowork-fire-listener`.
+- **`scripts/start-docker-compose.sh`** + **`scripts/com.portfolion.docker-compose.plist`**(신규 launchd 잡 `com.portfolion.docker-compose`) — 부팅 시 스택 복구 전용(평시 재기동은 각 컨테이너의 `restart: unless-stopped`가 처리). **compose 소유**(`postgres` 하나 — certbot 은퇴 후)만 `docker compose up -d postgres`로 올리고 **`deploy.sh` 소유**(`backend`·`nginx`)는 건드리지 않는다 — compose를 통째로 올리면 `deploy.sh`가 `docker run`으로 만든 동명 컨테이너(`portfolion-backend-1`/`portfolion-nginx-1`)를 compose 정의로 재생성해 버리기 때문. docker 데몬 대기는 최대 5분 유계(무한 대기 금지 — 죽었는데 아무도 모르는 상태 방지). 적용 스크립트 `scripts/apply-docker-autostart.sh`(백업→plist 배치→`launchctl` 재적재→1회 실행→C3/C4/C8~C11/C13/C15 정지조건 검증, `--dry-run`/`--rollback`/`--yes`). 절차 문서 `scripts/README-docker-autostart.md`.
+- **launchd 서비스들**(레포 밖 설정, 코드가 전제함): `com.portfolion.auto-deploy-poll`, `actions.runner.calmonion7-PortfoliOn.macbook-portfolion`(러너 — `~/actions-runner-portfolion`, arm64 재설치), cloudflared, `com.portfolion.cowork-fire-listener`, `com.portfolion.docker-compose`. `claude -p`처럼 keychain OAuth를 쓰는 서비스는 plist `EnvironmentVariables`에 `HOME`/`USER`/`LOGNAME`이 필요하다.
 
 ### 3.5 `.gitignore`가 규정하는 경계
 
-`backend/.env.docker`·`.env`·`certbot/conf/`(시크릿) · `backend/.venv/`·`frontend/node_modules/`·`scripts/node_modules/` · **`frontend/dist/`**(빌드 산출물이지만 nginx가 서빙하는 실체) · `backend/snapshots/`·`backend/reports/`·`backend/data/calendar/`·`backend/data/consensus/` + `backend/data/{holdings,watchlist,stocks,schedule,guru_managers,guru_schedule,kr_exports}.json`(런타임 산출) · `screenshots/`·`.worktrees/`·`.claude/settings.local.json` · **`.rotate-backup-*/`**(신설 — `scripts/rotate-postgres-password.sh`가 만드는 크리덴셜 백업, 절대 커밋 금지).
+`backend/.env.docker`·`.env`(시크릿 — `certbot/conf/` 항목은 certbot 은퇴와 함께 빠졌다) · `backend/.venv/`·`frontend/node_modules/`·`scripts/node_modules/` · **`frontend/dist/`**(빌드 산출물이지만 nginx가 서빙하는 실체) · `backend/snapshots/`·`backend/reports/`·`backend/data/calendar/`·`backend/data/consensus/` + `backend/data/{holdings,watchlist,stocks,schedule,guru_managers,guru_schedule,kr_exports}.json`(런타임 산출) · `screenshots/`·`.worktrees/`·`.claude/settings.local.json` · **`.rotate-backup-*/`**(`scripts/rotate-postgres-password.sh`가 만드는 크리덴셜 백업, 절대 커밋 금지) · A/B 하네스 세션 노이즈 `out/*/*/*/{run.log,proxy.log,capture/}`·`out/run-all.log`·`out/finalize.log`(산출물 `compare.md`·`summary.md`·`<arm>.json`은 남긴다).
 
 ⚠️ `backend/data/`는 **추적되는 정적 시드**(`sp500_tickers.json`·`kospi_tickers.json`)와 **무시되는 런타임 JSON**이 한 디렉터리에 섞여 있다. 시드 두 개는 read-only이며, 7일 티커 캐시는 파일이 아니라 `market_cache` 테이블(`sp500_tickers`·`kospi_tickers` 키)에 있다.
 
@@ -394,7 +403,9 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 | `frontend/index.html` | 첫 페인트 계약(§2.3) |
 | `frontend/vercel.json` | 과거 Vercel 잔재(현 배포 경로에서 미사용) |
 | `docker-compose.yml` / `nginx/nginx.conf` / `deploy.sh` | 인프라(§3) |
-| `.github/workflows/deploy.yml` | CI 배포 |
+| `.github/workflows/deploy.yml` | CI 배포 — 단일 스텝 `scripts/runner-deploy.sh`(배포 기록 대조) |
+| `scripts/auto-deploy-poll.sh` / `scripts/runner-deploy.sh` / `scripts/test_deploy_guard.py` | 자동 배포 두 경로와 그 회귀 가드(§3.3) |
+| `docs/ops/deploy.md` / `docs/ops/postgres-5432-consumers.md` | 운영 문서 — 배포 절차 / 호스트 5432 사용처 조사(공용 postgres 이전 체크리스트) |
 | `scripts/package.json` | Playwright 워크스페이스 |
 | `start.sh`/`start.bat`/`stop.sh`/`stop.bat` | 로컬 개발 편의(백엔드+프론트 동시 기동) |
 | `API_SPEC.md` / `CLAUDE_COWORK_API.md` / `README.md` | 문서 정본(코드 변경 시 동기 갱신이 DoD) |
@@ -412,7 +423,7 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 4. **jsdom엔 레이아웃·스타일시트·`getComputedTextLength`가 없다** — recharts 미렌더, 색/치수/잘림 미검출. 그 축은 Playwright 라이브 프로브가 유일한 게이트이고, SVG 텍스트 실측을 쓰는 코드는 **추정 폴백을 반드시 남겨야** 단위 테스트가 깨지지 않는다.
 5. **SW는 인증된 `/api/*`를 캐시하지 않는다(ADR-0036)** — Workbox 캐시 키가 URL만이라 사용자 간 응답 누출이 가능했기 때문이다. 남은 SW 표면은 앱 셸 precache + 폰트 CacheFirst뿐이고, 기존 기기의 `api-cache`는 `purgeApiCache()`가 부팅·로그아웃 두 지점에서 지운다. 프로브의 `serviceWorkers: 'block'`은 관례로 남아 있으나 그 헤더 주석의 근거는 stale하다(§3.4).
 6. **nginx가 `frontend/dist` 직마운트** — 프론트 빌드 = 배포. 라이브를 재는 프로브가 도는 동안 빌드하면 그 프로브의 측정 대상이 바뀐다.
-7. **2분 폴러의 `reset --hard`** — tracked 편집·미푸시 커밋이 소실될 수 있으므로 commit과 push를 묶는다.
+7. **자동 배포는 push된 `origin/main`만 배포한다** — 러너·폴러 모두 `reset --hard`를 하지 않고(폴러는 뒤처졌을 때만 ff, 러너는 `deploy.sh`의 ff에 맡긴다), `deploy.sh`는 미커밋 tracked 변경·앞섬·갈라짐을 exit 2로 거부한다. 그러니 commit과 push를 묶는 습관은 그대로 유지한다. 판정은 `배포된 커밋:` 줄과 `~/.portfolion-deployed-sha`.
 8. **psycopg2 풀은 소진 시 블록이 아니라 예외** — ThreadPool 동시성을 `maxconn=20` 아래로 유지해야 한다.
 9. **starlette `allow_nan=False`** — 응답에 NaN/inf가 있으면 500. 입력측은 `main.py`의 검증 핸들러가, 출력측은 `services.utils.sanitize`와 소스 `math.isfinite` 가드가 막는다.
 10. **`backend/Dockerfile`의 CMD에 `--workers`가 없어 uvicorn이 단일 프로세스** — `services/rate_limit.py`(인메모리 IP 버킷)와 `routers/auth.py`의 `_oauth_codes`(인프로세스 dict)가 이 가정에 기대 정확하다. 워커를 늘리면 각각 독립 상태를 가져 레이트리밋 실효 임계가 곱해지고 OAuth 코드 교환이 다른 워커로 가면 깨진다. 단, **단일 프로세스가 스레드 경합까지 없앤다는 뜻은 아니다** — sync `def` 핸들러(`login`/`register`)는 Starlette가 스레드풀에서 진짜 병렬 실행하므로 `rate_limit.check`는 `threading.Lock`으로 판정+기록을 원자화해야 한다(task#337).

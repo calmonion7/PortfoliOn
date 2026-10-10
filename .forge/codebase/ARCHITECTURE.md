@@ -1,6 +1,6 @@
 ---
-last_mapped_commit: 01ef5bd514617afea3aa1391a53323f039f4c008
-mapped: 2026-09-14
+last_mapped_commit: 7cb0f0de3c1a4b8bf4863af380eebfdb3d7fcbb2
+mapped: 2026-10-10
 ---
 
 # ARCHITECTURE — PortfoliOn
@@ -32,12 +32,17 @@ mapped: 2026-09-14
                                             · 관계 테이블 + market_cache KV
 ```
 
-컨테이너 4개(`docker-compose.yml`): `postgres` · `backend` · `nginx` · `certbot`.
-`cloudflared`는 compose 밖 launchd 프로세스다.
+런타임 컨테이너 3개 — `postgres`(compose 소유) + `backend` · `nginx`(`deploy.sh`가 `docker run`으로
+소유). `docker-compose.yml`은 세 서비스를 다 정의하지만 `deploy.sh`가 **같은 컨테이너 이름**
+(`portfolion-backend-1`/`portfolion-nginx-1`)을 쓰므로, compose를 통째로 올리면 그 둘이 compose
+정의로 재생성된다 — 그래서 자동기동(`scripts/start-docker-compose.sh`)은 `docker compose up -d
+postgres`만 하고 나머지를 `deploy.sh`에 맡긴다(§9). `cloudflared`는 compose 밖 launchd 프로세스다.
+**certbot은 은퇴했다(task#384)** — compose 서비스·`./certbot` 볼륨·`nginx.conf`의 acme-challenge
+location·주석 처리된 443 블록이 모두 없다. TLS는 Cloudflare가 종단하고 터널은 `localhost:80`으로 들어온다.
 
-**공개 경로는 Cloudflare Tunnel 하나뿐이다(task#334·#339, B21·B82)** — `nginx`(443 게시 제거,
-`nginx.conf`의 443 서버 블록은 주석 처리라 어차피 no-op이었다)와 `postgres` 모두 호스트 게시를
-`127.0.0.1:<port>:<port>`로 좁혔다. 이 좁힘이 ADR `260823-085145`(레이트리밋은 `CF-Connecting-IP`만
+**공개 경로는 Cloudflare Tunnel 하나뿐이다(task#334·#339, B21·B82)** — `nginx`(80만 게시)와
+`postgres` 모두 호스트 게시를 `127.0.0.1:<port>:<port>`로 좁혔다(호스트 `127.0.0.1:5432`를 실제로
+쓰는 소비자 조사는 `docs/ops/postgres-5432-consumers.md`). 이 좁힘이 ADR `260823-085145`(레이트리밋은 `CF-Connecting-IP`만
 신뢰)의 전제 — "공개 경로는 Cloudflare 전용" — 를 배포 구성으로 강제해, 위조 헤더로 그 신뢰를
 우회하는 경로를 닫는다(`deploy.sh`의 `docker run -p 127.0.0.1:80:80`도 동일). 루트 `.env`의
 `POSTGRES_PASSWORD`는 폴백 없이 `docker-compose.yml`의 `${POSTGRES_PASSWORD:?...}`로 강제되며
@@ -98,7 +103,9 @@ mapped: 2026-09-14
 그리고 `backlog_history.segments` · `user_stocks.{target_price,stop_price,target_weight,pinned}` ·
 `tickers.{key_resource,competitor_edge,market_outlook,analyst_target}` ·
 `stock_disclosures.meeting_date` ·
-`tech_reports.{key_points,milestones,variants,watch_items,composition}` 컬럼.
+`tech_reports.{key_points,milestones,variants,watch_items,composition}` ·
+`analyst_reports.lens_report`(+ `rating` `DROP NOT NULL` — v2 판은 투자의견이 없다, ADR `261006-232406`) ·
+`job_runs.payload`(그 실행의 대상 메타, §3.3) 컬럼.
 
 `_migrate`는 **컬럼 추가만** 하는 자리가 아니다 — `tech_reports`에 두 종류의 파괴적 단계가 함께 있다:
 - **이력 폐기(ADR-0038)** — slug당 최신 1행만 남기고 과거 행을 `DELETE … USING`으로 지운 뒤
@@ -137,9 +144,9 @@ services/db.py        psycopg2 ThreadedConnectionPool (minconn=1, maxconn=20)
 | `routers/auth.py` | `/api/auth` | 로컬 로그인·리프레시·OAuth(구글/깃허브)·`/me`. 유일하게 무인증 표면이 정당하다(ADR-0029) |
 | `routers/portfolio.py` | `/api/portfolio` | 보유 CRUD·라이브 시세·리밸런싱·노출·배당·핀 |
 | `routers/watchlist.py` | `/api/watchlist` | 관심 CRUD·보유 승격 |
-| `routers/stocks.py` | `/api/stocks` | 검색·비교·대시보드·enrich(Cowork)·이름/배당/베타/수급 백필 |
+| `routers/stocks.py` | `/api/stocks` | 검색·비교·대시보드·enrich(Cowork)·온디맨드 갱신 요청(`POST /{ticker}/enrich/request`, §4.3)·이름/배당/베타/수급 백필 |
 | `routers/report.py` | `/api` | 스냅샷 리포트 목록·상세·히스토리, 생성/백필, 컨센서스, 수주잔고·공시·내부자·US수급 |
-| `routers/analyst_reports.py` | `/api/analyst-reports` | 심층 리포트 발행/조회(ADR-0027) |
+| `routers/analyst_reports.py` | `/api/analyst-reports` | 심층 리포트 발행/조회(ADR-0027). 발행 계약은 **v2(구조 축·9렌즈)만** — v1(투자의견·적정주가 밴드)은 task#370에서 제거. 요청 모델 전부 `extra="forbid"`(§4.5) |
 | `routers/tech_reports.py` | `/api/tech-reports` | 주요기술 리포트(비-티커 리소스, ADR-0033/0034/0038/0042~0045). 발행 계약이 pydantic 모델 **22종**으로 이 파일에 있고, 경량 인덱스 `GET /index`는 고정 경로라 `/{slug}`보다 **먼저** 등록된다 |
 | `routers/recommendations.py` | `/api/recommendations` | 추천 점수 read + refresh |
 | `routers/rankings.py` | `/api` | `/rankings`, `/rankings/refresh` |
@@ -211,7 +218,10 @@ register 3회/1시간, 초과 시 429+`Retry-After`. 키는 `CF-Connecting-IP`�
 
 **(b) 도메인 계산** — 외부 호출 없이 입력을 판정·집계한다.
 `indicators.py`(RSI/EMA/HV/매물대) · `supply_score.py` · `recommendation/scoring.py` ·
-`guru_stats.py` · `rebalance.py` · `exposure.py` · `analysis_service.py` · `beta.py`.
+`guru_stats.py` · `rebalance.py` · `exposure.py` · `analysis_service.py` · `beta.py` ·
+`analyst_lenses.py`(심층 리포트 v2 계산 렌즈 3·4·5·8의 고정 공식·신호 문턱, §4.5) ·
+`enrich_verify.py`(야간 갱신 대조 `judge` — 순수 함수, §4.3) ·
+`market_session.py`(거래소 영업일 판정 — `exchange_calendars` 래퍼, §3.2).
 
 **(c) 저장·캐시 계층** — DB 읽기/쓰기와 무효화.
 `db.py` · `storage/`(포트폴리오·이름·스케줄·날짜) · `cache.py`(인메모리) ·
@@ -222,7 +232,8 @@ register 3회/1시간, 초과 시 429+`Retry-After`. 키는 `CF-Connecting-IP`�
 `digest_service.py` · `dividends.py` · `disclosures.py` · `agm.py` · `insider_trades.py` ·
 `us_supply.py` · `backlog.py`(+`backlog_parser.py`) · `ranking_service.py` ·
 `investor_service.py` · `short_sell_service.py` · `kr_sector_service.py` · `us_sector_service.py` ·
-`leverage_service.py` · `lending_service.py`.
+`leverage_service.py` · `lending_service.py` ·
+`enrich_targets.py`(갱신 대상 집합 산출 — `user_stocks` + `user_events` 두 read를 파이썬에서 판정, §4.3).
 
 ### 2.6 패키지 재수출 패턴 (ADR-0017)
 
@@ -260,8 +271,9 @@ patch 경로가 조용히 깨진다.
 
 ### 3.1 배치 레지스트리 — 정적 메타데이터
 
-`services/batch_registry.py`의 `BATCHES` 리스트가 **배치의 정본 목록**이다(현재 **34개** 항목 —
-`market` 기준 KR 16 · US 11 · 공통 **7**. task#344가 `cowork_enrich_nightly`를 공통에 추가).
+`services/batch_registry.py`의 `BATCHES` 리스트가 **배치의 정본 목록**이다(현재 **35개** 항목 —
+`market` 기준 KR 16 · US 11 · 공통 **8**. task#344가 `cowork_enrich_nightly`, task#357이
+`cowork_enrich_verify`(매일 08:00, auto 전용)를 공통에 추가).
 항목 하나의 필드:
 
 | 필드 | 의미 |
@@ -275,6 +287,7 @@ patch 경로가 조용히 깨진다.
 | `timezone` | 배치 고정 속성(편집 불가). `us_rankings_fetch`만 `America/New_York` |
 | `misfire_grace_time` | 미지정이면 APScheduler 기본(1초). `daily_report_kr/us`만 82800 |
 | `market` | `KR`/`US`/`공통` — **출처국 기준** 분류(ADR-0013) |
+| `exchange` / `session_offset_days` | (선택) 휴장일 판정용 거래소와 세션 판정일 오프셋. 현재 `daily_report_kr`(`XKRX`, 0)·`daily_report_us`(`XNYS`, **−1** — 07:00 KST 실행은 전날 미국 세션의 것)만 가진다. `GET /api/batches` 응답에 `exchange`가 실린다 |
 | `default_schedule` | 첫 기동 시드용 스펙 |
 
 `get_batch(job_id)`가 `_BY_ID` 딕셔너리 조회.
@@ -321,6 +334,17 @@ patch 경로가 조용히 깨진다.
 `build_trigger_kwargs`·`describe_schedule`)가 담당한다. 스펙 타입은
 `daily`/`weekly`/`monthly`/`interval` 넷.
 
+**휴장일 건너뛰기(task#347)** — 스펙의 선택 bool `skip_holidays`가 트리거가 아니라 **실행 시점 판정**으로
+붙는다(CronTrigger는 그대로 요일 기준으로 뜬다). 판정 정본은 `services/market_session.py`:
+`session_date_for(job_id, run_dt)` = 실행일 + 레지스트리 `session_offset_days`, `is_session_day(exchange, day)`
+= `exchange_calendars` 조회(인스턴스는 모듈 캐시). 캘린더 범위 밖·로드 실패는 **fail-open**(영업일 취급 —
+휴장일 오판으로 정상 배치를 막는 쪽이 더 나쁘다). 적용 지점이 **셋**이고 셋 다 `exchange`가 없는
+배치에선 판정 자체를 하지 않는다: ⓐ `scheduler/jobs.py::_holiday_skip`(현재 `_generate_all`만 호출 —
+휴장이면 `run.set_status("skipped", …)`로 남기고 반환) ⓑ `scheduler/schedule.py::_check_missed_report_for`
+(기동 누락복구 생략) ⓒ `storage/dates.py::expected_report_date`(「미생성」 판정의 기대 날짜 후보에서
+휴장일 제외). 쓰기 경계는 `routers/batches.py::update_batch_schedule` — `exchange` 없는 배치에
+`skip_holidays: true`를 PUT하면 422. `describe_schedule`은 켜진 스펙에 「· 휴장일 건너뜀」을 덧붙인다.
+
 ### 3.3 잡 함수의 공통 형태
 
 ```python
@@ -353,14 +377,24 @@ def _fetch_X():
 `routers/market_indicators.py`) · `macro_signals_fetch`(auto+manual, task#341/B6 — 키 미설정
 `error`와 수집 실패 `_status:skipped`를 둘 다 `skipped`로 수렴) · `guru_crawl` · `us_sector_fetch` ·
 `monthly_us` · `fx_fetch` · `kospi_signal_fetch` · `earnings_kr/us` · `kr/us_rankings_fetch` ·
-`recommendation_kr/us`. **나머지 형제 잡은 미배선 부채다** — 새 배치를 만들 때 템플릿은 위 3쌍
+`recommendation_kr/us` · `cowork_enrich_verify`(§4.3). **나머지 형제 잡은 미배선 부채다** — 새 배치를 만들 때 템플릿은 위 3쌍
 중에서 고를 것(미배선 형제를 베끼면 이 결함이 그대로 복제된다).
 
-`cowork_enrich_nightly`(task#344)는 이 목록에 있지만 **성격이 다르다** — set_status는 "fire 전송
-자체"만 커버한다(미설정/대상 0 → `skipped`, 전송 실패 → `failed`). 실제 작업(청크별 enrich)은
-이 잡이 끝난 **뒤 다른 프로세스**(로컬 리스너)에서 수 시간에 걸쳐 일어나고 완료를 백엔드로
-보고하는 통로가 없다 — 그래서 이 잡의 `success`는 "전 종목 갱신됨"이 아니라 "트리거가 접수됨"
-만을 뜻한다(§4.3).
+`daily_report_kr/us`도 휴장일 건너뛰기(§3.2)에 한해 `skipped`를 말한다.
+
+`cowork_enrich_nightly`(task#344)는 이 목록에 있지만 **성격이 다르다** — 이 잡 본문의 set_status는
+"fire 전송 자체"만 커버한다(미설정/대상 0 → `skipped`, 전송 실패 → `failed`). 실제 작업(청크별
+enrich)은 이 잡이 끝난 **뒤 다른 프로세스**(로컬 리스너)에서 일어나므로, 종료 시점의 `success`는
+"트리거가 접수됨"만을 뜻한다. 그 간극을 **사후 대조 잡** `cowork_enrich_verify`(08:00, task#357)가
+메운다 — 02:00 run 행의 `status`/`error`를 실제 갱신 여부로 **직접 UPDATE**하므로 그 행의 *최종*
+상태는 대조를 거친 값이다(§4.3).
+
+**`Run.set_payload(dict)`**(task#357) — `record()` 핸들이 상태 외에 「그 실행이 무엇을 대상으로
+했는지」를 `job_runs.payload`(jsonb, nullable)에 싣는다. 부르지 않으면 종료 UPDATE가 그 컬럼을
+**건드리지 않는다**(기존 잡 무회귀). payload 직렬화·쓰기 실패는 payload만 버리고 상태 확정은
+진행한다(컬럼 마이그레이션 미적용이 run을 영구 `running`으로 남기지 않게). `recent`·`recent_map`이
+`payload`를 함께 읽으므로 배치현황 응답의 `recent_runs[]`에도 실린다. 현재 호출자는
+`_run_nightly_enrich` 하나(`{"tickers", "chunk", "model"}`).
 
 `job_runs.record`는 **관측 전용**이라 본문을 절대 깨뜨리지 않는다 — enter INSERT가 실패하면
 `run_id=None` 센티넬로 본문을 그대로 실행하고, 종료 UPDATE 실패도 삼킨다. job_id별 최근 20건
@@ -518,10 +552,34 @@ N행이 아니라 record 1행이 되는 함정이 있어 형태를 테스트가 
 
 **야간 전량 enrich(task#344, ADR `260913-013425`)** — `cowork_trigger.fire(text, *, tickers=None,
 model=None, chunk=None)`가 세 키를 **additive**로 받는다(모두 None이면 payload가 `{"text": ...}`로
-기존과 바이트 동일). `scheduler/jobs.py:_run_nightly_enrich`(배치 id `cowork_enrich_nightly`,
-공통·매일 02:00, §3.1)가 대상 종목을 `storage.get_global_portfolio()`의 보유+관심 **합집합**으로
-잡는다 — 이것이 `GET /api/stocks`(API 키 경유)와 **같은 함수**라서, 화면이 보여주는 종목 집합과
-야간이 갱신하는 집합이 갈리지 않는다. `model="opus"`·`chunk=5`로 fire한다.
+기존과 바이트 동일). `scheduler/jobs.py::_run_nightly_enrich`(배치 id `cowork_enrich_nightly`,
+공통·매일 02:00, §3.1)가 대상 종목을 **갱신 대상 집합**으로 잡는다(ADR `260916-132605`, task#354 —
+그 전엔 보유+관심 전체였다). 산출은 `services/enrich_targets.py::compute_enrich_target_set`:
+`user_stocks`의 `holding` 전체 ∪ (최근 30일 `user_events`의 `report_view_open`·`ranking_row_click`
+이벤트 `properties->>'ticker'` **∩ 추적 종목**) — 추적 밖 종목은 enrich가 쓸 `tickers` 행이 없으므로
+교집합으로 자른다. SQL은 후보 행만 좁히고 판정은 파이썬에서 한다(테스트 가능성). `model="opus"`·
+`chunk=5`로 fire하고, 성공하면 쏜 목록을 `run.set_payload(...)`로 남기며 INFO 로그에 대상 목록을
+찍는다(배치현황이 못 보는 「무엇을 쐈나」의 관측선). `scripts/loopcheck-enrich-target-set.py`가 같은
+집합을 독립 SQL로 라이브 대조한다.
+
+**사후 대조**(task#357) — `scheduler/jobs.py::_verify_nightly_enrich`(`cowork_enrich_verify`, 08:00)가
+최신 `cowork_enrich_nightly` 행을 **`job_runs.recent()`가 아니라 직접 `query`로** 읽는다(`recent()`는 DB
+예외를 `[]`로 삼켜 「조회 실패」가 「02:00 run 없음」 skip으로 붕괴한다). 분기: 조회 예외 → `failed` ·
+행 없음 → `skipped` · 최신 행이 24h(`_VERIFY_MAX_AGE_HOURS`)보다 오래됨 → `failed`(오늘 밤 안 돌았다 —
+옛 행을 대조하면 이미 갱신된 티커 덕에 거짓 초록이 재기록된다) · payload 없음 → `skipped`. 그 외엔
+`tickers.enriched_at`을 읽어 aware UTC로 맞춘 뒤(`_as_utc`) `enrich_verify.judge(fired, enriched,
+window_start=그 run의 started_at)`가 `success|partial|failed|skipped` + 미갱신 목록을 낸다(`>=` 포함,
+tz 혼용 비교 불가는 미갱신으로). 결과를 ⓐ 02:00 행에 UPDATE ⓑ 자기 run에도 같은 상태로 남긴다.
+알려진 한계: 08:00 시점에 「아직 처리 중」을 구별하지 못한다(소요가 늘면 판정이 아니라 시각을 옮긴다).
+
+**온디맨드 갱신**(task#354·#355) — `routers/stocks.py::request_enrich`(`POST /api/stocks/{ticker}/enrich/request`,
+`get_current_user`)가 상세 진입 시 묵은 종목만 단건 fire한다(`tickers=[t]`, `chunk=1`, `opus`). 읽기 경로에
+쓰기 부작용을 숨기지 않으려고 GET 상세와 분리한 별도 POST다. 응답은 항상 `{fired, reason}` — reason ∈
+`unconfigured`·`fresh`(7일 이내 `_ENRICH_STALE_DAYS`)·`in_flight`·`stale`(=fired)·`fire_failed`. 종목당
+진행 중 1건 가드는 **프로세스 인메모리 dict + `threading.Lock`**(TTL 15분; sync `def` 핸들러는 스레드풀에서
+병렬이라 판정-후-기록을 락으로 묶는다, fire 실패 시 그 키를 되돌린다). 재기동에 소실되지만 결과는 멱등
+중복 fire 1회다. 프론트 소비는 `hooks/useEnrichOnDemand.js`(§6.4). `cowork_trigger.nightly_text()`는
+이제 야간·온디맨드 공용 「대상 지정 enrich 회차」 본문이다.
 
 리스너 쪽 분기 — `tickers` **없는** fire는 기존 계약대로 즉시 논블로킹 1세션 스폰(동시 fire는
 그대로 병행). `tickers`가 있으면 전량 모드로 들어가 **단일 워커 스레드의 큐**에서 청크
@@ -532,11 +590,16 @@ model=None, chunk=None)`가 세 키를 **additive**로 받는다(모두 None이�
 바디 파싱은 필드별 개별 try/except다 — 하나로 묶으면 `chunk` 파싱 실패가 `tickers`까지 삼켜
 전량 모드가 조용히 단일세션 opus로 강등되는 fail-open이 생긴다.
 
-> ⚠️ **이 배치의 `success`는 "fire가 접수됐다"는 뜻이지 "전 종목이 갱신됐다"는 뜻이 아니다.**
-> 실제 청크 처리는 배치가 끝난 **뒤 다른 프로세스**(로컬 리스너)에서 수 시간에 걸쳐 일어나고,
-> 완료를 백엔드로 보고하는 통로가 없다 — 첫 청크가 한도로 죽어 대부분 미처리여도 배치현황
-> 카드는 초록으로 보인다. 실제 진행은 `~/portfolion-routine-runs/`의 run 디렉터리와
-> `enriched_at` 분포로만 관측된다(§4.4의 A/B 하네스가 이 관측 수단 위에 서 있다).
+> ⚠️ **이 배치가 종료 시점에 쓰는 `success`는 "fire가 접수됐다"는 뜻이다.** 실제 청크 처리는
+> 배치가 끝난 **뒤 다른 프로세스**(로컬 리스너)에서 일어나고 실시간 완료 보고 통로는 지금도 없다.
+> 02:00~08:00 사이엔 그 「접수됨」 초록이 보이고, 08:00 사후 대조(위)가 그 행을 실제 갱신 여부로
+> 고쳐 쓴다. 원인 추적은 여전히 `~/portfolion-routine-runs/`의 run 디렉터리다.
+
+리스너는 루틴 API 키를 **프롬프트에 싣지 않는다**(task#349) — 프롬프트의 옛 자리표시자를
+`$PORTFOLION_API_KEY` 변수 참조로 치환하고 값은 자식 프로세스 env(`{**os.environ, ...}` — 부모 env
+위에 얹어야 PATH가 산다)로만 준다. OpenCode `run`이 실행한 bash 명령을 stdout에 에코해 `run.log`에
+남기므로 프롬프트에 값이 있으면 평문 로그로 샌다. `run.log`는 `os.open(..., 0o600)`으로 **생성 시점에**
+권한을 건다.
 
 리스너 로그는 `_log()` 한 지점으로 통일됐다 — KST 타임스탬프가 필수인 이유는, 시각 없이는
 `POST /fire → 401` 이 어느 fire였는지 상관지을 수 없었기 때문(task#346). 바디 없는 401/404
@@ -567,6 +630,15 @@ base를 복원**하는 것 — 루틴 프롬프트 §1 2단계가 읽는 리포�
 스냅샷은 직전 모델 판으로 남는 어긋난 상태를 만들었다(409는 "실패"가 아니라 "아직 못 받는다"
 이므로 10초 간격 유계 재시도 12회로 수정).
 
+**발행 레인 A/B 하네스(task#350)** — `scripts/ab-*.py` 6종(`ab-publish`·`ab-proxy`·`ab-run-all`·
+`ab-finalize`·`ab-compare`·`ab-summary`)이 발행 루틴을 여러 모델 팔로 돌려 비교표를 만든다. enrich A/B와
+달리 **prod에 아무것도 쓰지 않는 것을 구조로 보장**한다 — 서로 독립인 2겹: ⓐ `ab-publish`가 루틴
+프롬프트의 prod BASE URL을 로컬 `ab-proxy`로 치환(정확히 1건이 아니면 발사 거부) ⓑ 자식 세션 env의
+`PORTFOLION_API_KEY`는 더미이고 진짜 키는 프록시만 쥔다. 프록시는 GET/HEAD만 업스트림으로 넘기고 그
+밖의 메서드는 본문을 캡처한 뒤 업스트림 미호출로 성공 응답한다(차단 카운트가 산출물에 남는다). 두 겹은
+`backend/tests/test_ab_publish.py`·`test_ab_proxy.py`가 **따로** 검증한다. 심층 리포트(analyst) 레인은
+task#374에서 제거됐다(v1 계약 삭제 뒤 대상이 사라졌다).
+
 ### 4.5 발행물 리소스 — 스냅샷과 다른 저장 모델
 
 스냅샷(§4.1)이 **배치가 날짜별로 박제**하는 것이라면, 발행물은 **외부 Cowork가 쓰기 API로 넣는**
@@ -596,7 +668,33 @@ base를 복원**하는 것 — 루틴 프롬프트 §1 2단계가 읽는 리포�
   컬럼에 두 종류의 NULL 표현이 공존해 `IS NULL` 질의와 문서 서술이 어긋난다.
 
 읽기 표면은 셋이다 — `GET ""`(목록) · `GET /index`(경량 인덱스, 포트폴리오 기술 노출·종목 상세
-칩이 소비) · `GET /{slug}`(본문). `/index`는 고정 경로라 `/{slug}`보다 **먼저** 등록된다.
+사업분석 탭 「관련 기술」 섹션이 소비) · `GET /{slug}`(본문). `/index`는 고정 경로라 `/{slug}`보다
+**먼저** 등록된다.
+
+**`analyst_reports` v2 — 구조 축·9렌즈(ADR `261006-232406`, task#368~#376)**. 저장은 같은 테이블에
+`lens_report` jsonb 컬럼을 더하는 방식이고(옛 컬럼은 되돌릴 길로 남긴다), `services/analyst_reports.py::
+save_lens_report`가 같은 날 upsert 시 v1 필드(`rating`·적정주가·`points`·`risks`)를 NULL/빈값으로 **덮어**
+한 행에 두 형식이 섞이지 않게 한다. 읽기의 `_summary`가 `format`(`lens_report` 유무로 2/1)과 신호
+집계 `tally`를 싣고, 상세는 `structure`·`lenses`를 펼친다 — v1 계약·렌더러는 제거됐지만 형식 판별은
+남아 옛 판이 DB에 있으면 화면이 안내만 한다.
+
+발행 경로(`routers/analyst_reports.py::publish_report` → `services/analyst_lenses.py::build_lens_report`)의
+역할 분리가 핵심이다:
+- 루틴은 **구조 축 3개**(`RevenueEngine`·`CostNature`·`FundingSource`)와 렌즈별 **원자료**만 보낸다.
+  요청 모델은 전부 `extra="forbid"`(task#371) — 직전 판 응답의 서버 필드(`gauge.origin`·`near_boundary` 등)를
+  되실어 보내거나 옛 키를 쓰면 조용히 무시되지 않고 422가 된다.
+- **계산 렌즈 3·4·5·8**(`COMPUTED_LENSES`)은 서버가 고정 공식으로 파생값·신호(`go|wait|stop|na`)·바뀜
+  조건·게이지를 계산해 발행 순간 박제한다(같은 상황이면 같은 색이어야 신호가 판단 근거가 된다).
+  변형은 구조 축이 고르고(`variant_for`), 변형별 필수 원자료 표 `INPUT_SPEC`을 **스키마 검증과 계산이
+  함께** 본다. 신호 문턱은 이 파일 상단 상수 한 곳뿐이다. 계산 불가(분모 0·비유한·재료 부재)는 추측
+  대신 `na` + 사유(`wrong < missing`).
+- **판단 렌즈 1·2·6·7·9**(`JUDGMENT_LENSES`)는 루틴이 신호와 바뀜 조건을 주고, 서버는 게이지에
+  `origin: "routine"`과 경계 근접 여부를 덧붙이며 조건 목록을 초록→노랑→빨강 순으로 정렬해 저장한다.
+- 렌즈 8 무위험 금리는 시장으로 갈린다 — KR은 루틴 원자료(필수, 없으면 라우터 422), US는
+  **서버 캐시(`market_cache` `treasury`의 10년물) 우선, 없을 때만 원자료**. 캐시 리더
+  `cached_risk_free_pct`는 `_mc_load`의 `{data, fetched_at}` **봉투를 벗겨** 읽는다(task#373 — 봉투째 읽어
+  US 렌즈 8이 전부 `na`였던 휴면 결함). 렌즈 8 게이지는 스냅샷 주가·날짜를 받아 주가축으로 그린다(task#376).
+- 데이터 블록(`data`)은 종전대로 서버가 그 종목 최신 스냅샷에서 발췌한다(요청 경로 외부 fetch 0).
 
 ---
 
@@ -746,14 +844,18 @@ Bearer로 붙인다. response 인터셉터의 401 처리는 **§2.4 참조**(반
 - `components/Toast.jsx` — `ToastProvider`.
 - 데이터 훅: `usePortfolioData`(목록 + `/portfolio/prices` 폴링 + 대시보드) ·
   `useTrackedStocks` · `useReportList` · `useReportFilters` · `useReportGeneration` ·
-  `useStockManagement` · `useTechIndex`.
+  `useStockManagement` · `useTechIndex` · `useEnrichOnDemand`.
 - 환경 훅: `useAuth` · `useTheme` · `useIsMobile` · `useBodyScrollLock` · `useReveal` ·
   `useCountUp` · `usePriceFlash` · `useSwUpdateReload` · `useBfcacheAuthGuard` ·
   `useAuthBootstrap` · `useActiveChapter`.
 
 `useTechIndex`(`GET /api/tech-reports/index`, ADR-0043)가 이 저장소의 **실패-vs-빈결과 3상태**
-참조 구현이다. 소비처가 둘(포트폴리오 「기술 노출」 카드 · 종목 상세 헤더 기술 칩)이고 둘 다 같은
-경량 목록만 필요하므로 **모듈 레벨 캐시로 한 번만 받아 공유**하고 in-flight promise를 합친다.
+참조 구현이다. 소비처가 여럿(`pages/ExposureTab.jsx` 「기술 노출」 카드 · 사업분석 탭
+`components/reports/RelatedTechSection.jsx` · `pages/TechReport.jsx` · `components/tech/TechGraph.jsx`)이고
+모두 같은 경량 목록만 필요하므로 **모듈 레벨 캐시로 한 번만 받아 공유**하고 in-flight promise를 합친다.
+(옛 종목 상세 헤더 기술 칩은 task#358에서 사업분석 탭 「경쟁」 단의 `RelatedTechSection`으로 옮겨졌다 —
+제목을 가진 섹션이라 `failed`와 0건을 **둘 다 미렌더**로 처리하고, 부모가 그룹 헤더 표시 여부를 미리
+알도록 판정만 `useRelatedTechs`로 떼어 export한다.)
 ⚠️ 조회 실패를 `[]`로 붕괴시키지 않는다 — 빈 배열의 의미가 셋(**아직 안 옴 / 받았는데 0건 /
 조회 실패**)이라 `ready`·`failed`를 함께 준다. 셋을 합치면 실패가 「기술 노출이 없습니다」라는
 **거짓 진술**로 렌더된다(`wrong < missing` 위반). 실패는 캐시하지 않아 다음 마운트가 재시도한다.
@@ -765,15 +867,45 @@ Bearer로 붙인다. response 인터셉터의 401 처리는 **§2.4 참조**(반
 계산할 때」 트리거로만 쓰고 판정은 매번 **전 섹션 좌표를 한 번에** 읽어 한 섹션의 진동이 활성값을
 바꾸지 않게 한다(잔여 떨림은 히스테리시스가 흡수).
 
+`useEnrichOnDemand`(task#355, 소비처 `pages/Reports.jsx`)는 상세 진입마다 `POST …/enrich/request`를
+1회 쏘고 응답의 `fired`만 본다 — 판정(7일 게이트·in-flight)은 서버 몫이다. `fired:false`와 POST 실패
+(옛 백엔드 404 포함)는 **조용히** 끝낸다(배포 창에서 콘솔 에러를 내지 않기 위해). fired면 토스트 후
+30초 간격으로 유계 폴링한다 — 상한 셋(`MAX_TICKS` 30=15분 · `MAX_FAIL_STREAK` 3 · 언마운트/종목 변경).
+완료 판정의 baseline은 부모의 `detail`이 아니라 **첫 폴의 `enriched_at`**이다(부모 상태는 비동기로
+채워져 「미조회 null」과 「진짜 null」을 구별하지 못한다).
+
+**7단 뼈대(ADR `260921-091825`, task#358·#359)** — 사업분석 탭(`components/reports/ReportDetailTabs.jsx`)과
+주요기술 리포트(`pages/TechReport.jsx`)가 같은 「결론 → 시장 → 경쟁 → 우위 → 전망 → 리스크 → 확인할 것
+(→ 근거)」 단 순서로 섹션을 묶고 단마다 `GroupHeader`(`reportUtils.jsx`)를 단다. 결론 단은 헤더 없이
+최상단이며 한 줄 또는 stance 중 하나만 있어도 렌더한다. `TechReport`는 목차·본문 제목·단 헤더·플로팅
+장 바를 **`SECTIONS` 배열 하나**(`{id, label, show, chapter, stage}`)에서 파생한다 — 단 헤더 글자도
+`stage`에서 오므로 「분기용 값」과 「표시용 리터럴」이 갈라지지 않는다.
+
+심층 리포트 화면(`pages/AnalystReport.jsx`)은 `components/reports/LensReport.jsx`(구조 축·9렌즈 렌더러,
+`isLensReport`로 `format: 2` 판별)만 그리고, 그 외 판은 `legacy-format-notice` 안내만 한다.
+admin 목록 `pages/AnalystReports.jsx`는 `LensReport`의 `SIGNAL_META`로 신호 집계(`tally`)를 표시한다.
+
 레이스 가드 규약(관용구 정본은 `CONVENTIONS.md` §9.4) — 같은 상태를 쓰는 비동기 호출이 2개 이상
-겹칠 수 있으면 낡은 응답의 착지를 막는다. 형태가 **둘**이고 고르는 기준이 있다:
+겹칠 수 있으면 낡은 응답의 착지를 막는다. 형태가 **셋**이고 고르는 기준이 있다:
 
 - **세대번호(`genRef`)** — 같은 마운트 안에서 필터·탭·페이지가 목록을 갈아끼울 때.
-  `pages/Ranking.jsx::fetchPage`(reset이 세대를 올린다) · `pages/ExposureTab.jsx`(마운트 자동 조회
-  ↔ `saveCandidate` 후 재조회) · `hooks/useTrackedStocks.js` · `components/reports/ConsensusChart.jsx`.
-- **`cancelled` 플래그 + cleanup** — 이펙트 의존성(주로 `ticker`·비교 날짜)이 바뀔 때.
+  `pages/Ranking.jsx::fetchPage`(reset이 세대를 올린다, 모달은 별도 `modalGenRef`) · `pages/ExposureTab.jsx`
+  (마운트 자동 조회 ↔ `saveCandidate` 후 재조회) · `hooks/useTrackedStocks.js` ·
+  `components/reports/ConsensusChart.jsx` · task#379·#380·#383이 더한 것 — `hooks/usePortfolioData.js`
+  (`allGenRef`·`dashGenRef`) · `hooks/useReportList.js`(`listGenRef`) · `hooks/useReportGeneration.js` ·
+  `pages/Recommendations.jsx`(`chipGenRef`) · `pages/AdminAnalytics.jsx`(`histGenRef`).
+  같은 원리의 변형으로 `components/StockSearchBox.jsx`는 세대 대신 **질의 문자열 identity**
+  (`latestQuery`)로 `.then`·`.catch`·`.finally`를 모두 게이트한다.
+- **`cancelled` 플래그 + cleanup** — 이펙트 의존성(주로 `ticker`·비교 날짜·월)이 바뀔 때.
   `HistoryTab.jsx` · `DetailTab.jsx::BacklogSection` + 형제 섹션 8종(UsInsider · InsiderTrades ·
-  UsSupply · LatestDisclosures · ShortSell · Supply · InvestorTrend · GuruHolders).
+  UsSupply · LatestDisclosures · ShortSell · Supply · InvestorTrend · GuruHolders) · `pages/Calendar.jsx`
+  (월 이펙트 — `.finally`도 게이트, 새로고침 버튼 `disabled={loading}`이 그 이빨) · `pages/SectorTab.jsx` ·
+  `pages/Reports.jsx`.
+- **폴링 틱 겹침 방지(`inFlight` 스킵)** — `setInterval` 폴러가 응답보다 짧은 간격으로 틱을 쏘면 착지
+  순서가 뒤바뀌어 진행률이 역행한다. 직전 틱 응답 대기 중이면 그 틱을 건너뛴다:
+  `pages/ConsensusSettings.jsx` · `GuruCrawlNow.jsx` · `LeverageBackfillSettings.jsx` · `ReportManualGen.jsx` ·
+  `hooks/useReportGeneration.js`(`inFlightRef`). 아래 ⓐ의 뮤텍스와 겉모양이 같지만 **리셋 의미가 없는
+  주기 틱**이라 건너뛰어도 잃는 것이 없다는 점이 다르다.
 
 세 가지 함정: ⓐ **뮤텍스(`if (loadingRef.current) return`)는 레이스 가드가 아니다** — 리셋 호출을
 no-op시켜 오히려 옛 응답이 화면을 소유하게 만든다 ⓑ `.then`뿐 아니라 **`.finally`도 게이트**해야
@@ -838,7 +970,8 @@ nginx가 `index.html`·`sw.js`·`workbox-*.js`는 no-store, 해시 붙은 정적
 
 > SW는 여전히 등록되고 fetch 핸들러가 모든 요청을 통과시키므로, Playwright `page.route` 응답 주입
 > 기반 UAT는 계속 컨텍스트를 `serviceWorkers: 'block'`으로 만들어야 한다(`/api/*` **캐싱**이
-> 사라진 것과 SW가 요청 경로에 **있는** 것은 별개다 — 현재 프로브 51개가 이 옵션을 쓴다).
+> 사라진 것과 SW가 요청 경로에 **있는** 것은 별개다 — 현재 프로브 55개가 이 옵션을 쓴다 —
+`grep -l "serviceWorkers: *'block'" scripts/*.mjs scripts/*.js | wc -l`).
 
 번들 분할은 `vite.config.js`의 `manualChunks(id)` — Vite 8(rolldown)은 **함수 형식만** 받는다.
 `recharts`/`d3-*`/`victory-vendor` → `charts`, 나머지 node_modules → `vendor`.
@@ -928,6 +1061,13 @@ HTTPException 문구를 통일한다. 그 밖의 라우터는 대체로 `try/exc
 `useEffect(() => cleanup, [cleanup])`로 배선해도 매 렌더 재생성되지 않아야 폴링 틱마다
 destructor가 실행돼 첫 틱 직후 폴러가 죽는 사고를 피한다.
 
+task#383이 같은 훅에 경합 가드 3겹을 더했다 — ⓐ **폴링 세대 `genRef`**(`_stopPoll`이 올린다 — 멈춘·
+재시작된 폴러의 옛 틱 착지 무효화) + 틱 겹침 `inFlightRef` ⓑ **생성 요청 세대 `reqRef`** — POST 뒤 다른
+생성이 시작되면 그 요청은 「밀린」 것이라 늦은 실패가 `generating`·폴링을 건드리지 않고(409는 무시,
+나머지는 이름 붙은 토스트만) ⓒ 완료 후 목록 갱신을 훅이 직접 `GET`해 덮던 것을 소비처의
+`onRefreshList()`(목록 훅의 세대에 편입된 조용한 재조회)로 바꿔, 사용자 재조회와 엇갈려도 옛 응답이
+덮지 않게 했다.
+
 ---
 
 ## 8. 테스트·검증 아키텍처
@@ -936,9 +1076,10 @@ destructor가 실행돼 첫 틱 직후 폴러가 죽는 사고를 피한다.
 
 | 층 | 도구 | 위치 | 보는 것 / 원리적 사각 |
 |---|---|---|---|
-| 백엔드 단위·통합 | pytest | `backend/tests/` — `test_*.py` **172** | 로직·SQL 형태·응답 shape / 라이브 스키마·외부 실데이터 |
-| 프론트 단위 | vitest + jsdom | `frontend/src/**/*.test.{js,jsx}` — **83** | 마크업·분기·유틸 / 레이아웃 수치·색 적용·recharts 렌더 |
-| 라이브 UAT | Playwright + CDP | `scripts/uat*.mjs` **124** + `probe*` 13 · `smoke*` 3 · `loopcheck*` 3 | 실제 배포 화면의 기하·색·성능 / 로컬에서만 도는 것 |
+| 백엔드 단위·통합 | pytest | `backend/tests/` — `test_*.py` **184** | 로직·SQL 형태·응답 shape / 라이브 스키마·외부 실데이터 |
+| 배포 셸 가드 | pytest + 임시 bare origin·클론·스텁 PATH | `scripts/test_deploy_guard.py` (40 테스트) | `deploy.sh`·폴러·`runner-deploy.sh`의 종료코드·배포 기록·잠금 계약 / 실제 컨테이너 기동 |
+| 프론트 단위 | vitest + jsdom | `frontend/src/**/*.test.{js,jsx}` — **105** | 마크업·분기·유틸 / 레이아웃 수치·색 적용·recharts 렌더 |
+| 라이브 UAT | Playwright + CDP | `scripts/uat*.mjs` **122** + `probe*` 13 · `smoke*` 3 · `loopcheck*` 5 | 실제 배포 화면의 기하·색·성능 / 로컬에서만 도는 것 |
 
 **pytest 규약**
 - `tests/conftest.py`가 `app.dependency_overrides[get_current_user]`를 전역 세팅하고,
@@ -963,7 +1104,7 @@ destructor가 실행돼 첫 틱 직후 폴러가 죽는 사고를 피한다.
 그래서 인증 분기를 `useAuthBootstrap` 훅으로 뺐다. jsdom엔 레이아웃이 없어 recharts는
 렌더되지 않고 `getComputedTextLength`도 없다(추정 폴백을 반드시 남긴다).
 
-**라이브 프로브** — `scripts/`에 `uat*.mjs` 124개. `scripts/package.json`의 유일한 의존성이
+**라이브 프로브** — `scripts/`에 `uat*.mjs` 122개. `scripts/package.json`의 유일한 의존성이
 playwright다. 프로브 자체의 신뢰성 규약(커버리지 카운터, 축별 `*-domain` sentinel,
 조건부 단언 금지, 판정 범위 한정, 대조군, 대상 identity 단언)이 이 저장소의 축적된 규율이며,
 **정본은 `.claude/skills/live-uat-probes/` 스킬**로 분리됐다(`CLAUDE.md`에는 핵심 2줄만 남았다).
@@ -971,7 +1112,8 @@ playwright다. 프로브 자체의 신뢰성 규약(커버리지 카운터, 축�
 변경을 검증할 때 **명시적으로 호출**해야 한다. 병렬 실행 오염 사례사는 형제 스킬
 `.claude/skills/subagent-orchestration/`에 있다.
 
-fg-loop 계열 스크립트 3종(`loopcheck-*.mjs`)이 정지조건 체크용으로 따로 있고,
+fg-loop 계열 스크립트 5종(`loopcheck-*` — `.mjs` 4 + `.py` 1, 후자는 갱신 대상 집합 라이브
+identity 대조)이 정지조건 체크용으로 따로 있고,
 `check-uat311-ratchet.sh` + `uat311-baseline-tags.txt`가 **래칫**(단언 총계·PASS 수가 baseline
 이하로 내려가지 않음)을 재는 자리다 — 「exit 0」만 보면 축이 조용히 사라지는 커버리지 붕괴를
 못 잡기 때문에 도입된 층이다.
@@ -982,32 +1124,57 @@ fg-loop 계열 스크립트 3종(`loopcheck-*.mjs`)이 정지조건 체크용으
 
 ```
 git push origin main
-   ├─▶ (주) GitHub Actions self-hosted 러너
-   │     .github/workflows/deploy.yml → fetch + reset --hard origin/main + bash deploy.sh
-   │     러너 디렉터리: ~/actions-runner-portfolion (레포 전용)
-   └─▶ (폴백) launchd com.portfolion.auto-deploy-poll, 2분 주기
-         scripts/auto-deploy-poll.sh → LOCAL != origin/main 이면(양방향)
-                                        reset --hard origin/main + deploy.sh
+   ├─▶ GitHub Actions self-hosted 러너 (~/actions-runner-portfolion, arm64, 레포 전용)
+   │     .github/workflows/deploy.yml — 단일 step: bash scripts/runner-deploy.sh
+   └─▶ launchd com.portfolion.auto-deploy-poll, 2분 주기
+         scripts/auto-deploy-poll.sh
+                 │
+   둘 다 같은 배포 기록 ~/.portfolion-deployed-sha (DEPLOY_MARKER) 를 origin/main 과 대조
+   → 다르면 bash deploy.sh, 같으면 no-op. 먼저 도착한 쪽이 배포하고 다른 쪽은 「이미 배포됨」.
 ```
 
-두 경로 모두 `/tmp/portfolion-deploy.lock` 파일락으로 동시 배포를 막는다.
+**배포 기록 SHA가 단일 트리거다**(task#382 ADR `261009-105247` · task#384). `deploy.sh`가 성공 끝에
+배포한 SHA를 기록 파일에 쓰고, 러너·폴러·수동 실행 모두 그 파일을 읽으므로 어느 경로로 배포됐든 같은
+커밋이 두 번 배포되지 않는다. 두 자동 경로 모두 **`reset --hard`를 하지 않는다**.
+
+- **`scripts/runner-deploy.sh`**(러너 잡) — 기록 == origin/main이면 「이미 배포됨」 exit 0(`deploy.sh` 미호출).
+  다르면 잠금(`/tmp/portfolion-deploy.lock`)이 있는 동안 5초 간격으로 최대 `RUNNER_LOCK_WAIT_SEC`(기본 900)
+  기다린 뒤 **다시 대조**하고(그 사이 폴러가 같은 커밋을 배포했을 수 있다), 여전히 다르면 `bash deploy.sh`를
+  돌려 그 종료코드를 그대로 돌려준다. 잠금이 안 풀리면 exit 1, `git fetch` 실패는 exit 2.
+- **`scripts/auto-deploy-poll.sh`**(폴러) — 잠금이 있으면 그 폴은 건너뛴다. 작업트리가 origin보다
+  **뒤처졌을 때만** `git merge --ff-only`로 따라잡고(task#377) 앞서거나 갈라졌으면 손대지 않는다.
+  기록 == origin이면 no-op, 그 SHA가 **실패 기록**(`~/.portfolion-deploy-failed-sha`)과 같아도 no-op.
+  **실패 1회 정책**: `deploy.sh`가 exit 2(사전 거부)면 다음 폴에서 재시도, 그 밖의 비0이면 SHA를 실패
+  기록에 쓰고 같은 커밋을 다시 시도하지 않는다(새 push나 수동 배포 성공으로 풀린다).
+- 두 스크립트 모두 launchd/러너 최소 PATH에 fnm npm·`/usr/local/bin` docker를 **뒤에 덧붙인다** —
+  앞에 붙이면 `scripts/test_deploy_guard.py`의 스텁보다 실 docker가 먼저 잡혀 테스트가 운영 컨테이너를
+  내린다. 본문 전체를 `{ … }` 한 그룹으로 감싸 bash가 끝까지 미리 읽게 한다(실행 중 제자리 편집 안전).
+
+**`deploy.sh` 종료코드 계약**(task#377·#382) — **2 = 사전 거부**(컨테이너를 건드리기 전: 잠금 존재 ·
+`frontend`/`backend`/`nginx`/`deploy.sh`의 커밋 안 한 tracked 변경 · `git fetch` 실패 · HEAD가 앞섬/갈라짐 ·
+ff 실패) · **1 = 실패**(그 뒤의 모든 실패 — `trap 'exit 1' ERR`로 도구 종료코드와 무관하게 정규화, 배포 도중
+HEAD 변경 포함) · **0 = 성공 + 배포 기록 갱신**. 잠금은 `deploy.sh`만 잡는다. 뒤처진 HEAD는 스스로
+ff로 따라잡으므로 origin/main과 같은 커밋만 배포된다. 성공 판정은 exit 0·`/health`가 아니라 출력의
+**`배포된 커밋: <SHA> <제목>`** 줄이다.
 
 `deploy.sh` 4단계: ① `frontend` npm install + build → `frontend/dist`
 ② `docker build -t portfolion-backend ./backend` ③ backend 컨테이너 stop/rm/run
 (`--env-file ./backend/.env.docker`, `--network portfolion_default --network-alias backend`)
-④ nginx 컨테이너 stop/rm/run(`nginx.conf` + `frontend/dist` 마운트) → `curl /health`.
+④ nginx 컨테이너 stop/rm/run(`-p 127.0.0.1:80:80` + `nginx.conf` + `frontend/dist` 마운트) → `curl /health`.
 
 > backend·nginx는 `docker run`으로 교체되므로 `docker compose ps`에 안 잡힌다(`docker ps`로 봐야 한다).
 
-**폴러의 부작용** — `reset --hard`는 커밋 안 한 tracked 편집뿐 아니라 push 안 한 로컬 커밋도
-되돌린다. `.forge/` 등 untracked는 안전하다.
+**푸시 하나로 프론트도 라이브다** — ①이 `frontend/dist`를 다시 빌드하므로 push → 배포가 곧 새 번들
+서빙이다. 라이브를 재는 작업이 도는 동안의 push도 배포성 행위다.
 
 **배포 후 창** — 컨테이너가 `Up`이고 로그도 활발한데 포트 8000이 수 분간 열리지 않을 수 있다
 (기동 배치와 겹치는 경우 실측 ~5분). 라이브 스모크는 포트 바인딩을 폴링한 뒤 실행한다:
 `docker exec <c> python -c "import socket;print(socket.socket().connect_ex(('127.0.0.1',8000)))"`.
 
 **로컬 머신 재부팅 자동기동(task#338)** — `launchd`의 `com.portfolion.docker-compose`가
-`scripts/start-docker-compose.sh`를 부팅 시 실행해 4컨테이너를 올린다. `scripts/apply-docker-autostart.sh`
+`scripts/start-docker-compose.sh`를 부팅 시 실행한다 — docker 데몬을 최대 5분 유계 대기한 뒤
+`docker compose up -d postgres`(compose 소유분만) → `bash deploy.sh`(backend·nginx)로 3컨테이너를 올린다
+(§1의 소유권 분할 때문에 compose를 통째로 올리지 않는다). `scripts/apply-docker-autostart.sh`
 + `scripts/com.portfolion.docker-compose.plist`가 그 plist를 정본화하는 적용 스크립트다(백업 →
 배치 → `launchctl` 재적재 → 1회 실행 검증, `--dry-run`/`--rollback` 지원) — 이전 판 plist는 삭제된
 워크트리 경로(`.claude/worktrees/docker-infra-migration/...`)를 가리켜 `exit 127`로 죽어 있었다.
@@ -1022,11 +1189,15 @@ git push origin main
 3. `scheduler/jobs.py`에 잡 함수 + `_JOB_FUNCS` 등록 + `scheduler/__init__.py` re-export 목록
 4. 수동 트리거가 필요하면 라우터에 `manual_endpoint` + 같은 id로 `job_runs.record(id, "manual")`
    — **auto·manual 두 레인 모두** `as run:`으로 받아 `run.set_status(...)`를 명시할 것(§3.3)
-5. 배치 id count/set을 하드코딩하는 테스트가 **4파일 안 8지점**이다
-   (`test_scheduler_seed`·`test_batch_market_split`·`test_batches_router`·`test_macro_signals_batch`).
+5. 배치 id count/set을 하드코딩하는 테스트가 **4파일 안 최소 9지점**이다
+   (`test_scheduler_seed`·`test_batch_market_split`·`test_batches_router`·`test_macro_signals_batch` —
+   `cowork_enrich_verify` 추가 때도 이 4파일이 바뀌었다).
    ⚠️ grep으로 다 찾지 못한다 — `set(...) ==` 형태 2곳과 `test_batch_market_split`의
-   `_MARKET_BY_ID` 매핑 dict·시장별 개수 dict가 리터럴 패턴에 걸리지 않는다.
+   `_MARKET_BY_ID` 매핑 dict·시장별 개수 dict가 리터럴 패턴에 걸리지 않고, 이름이 무관해 보이는 함수
+   (`test_batches_router::test_list_batches_survives_legacy_spec_without_type`)도 개수를 단언한다.
    **그 4파일은 열어서 직접 읽고, 게이트는 전체 스위트로 삼는다.**
+6. 휴장일 건너뛰기가 필요하면 레지스트리 항목에 `exchange`(+ 필요 시 `session_offset_days`)를 주고
+   잡 본문 첫 줄에서 `_holiday_skip(job_id, run)`을 부른다(§3.2).
 
 **새 엔드포인트 추가**
 1. 라우터 함수 + 인증 `Depends`
