@@ -528,3 +528,12 @@ def test_runner_appends_path_so_stubs_win(e):
     assert "TRAP" not in calls, calls
     assert "npm run" in calls, calls + _out(r)
     assert e.read(e.marker) == e.origin_head()
+
+
+def test_workflow_delegates_to_runner_deploy_only():
+    """러너 잡은 runner-deploy.sh 하나만 부른다 — 옛 step(작업트리 강제 되돌림 + deploy.sh
+    무조건 실행)으로 되돌리면 기록 대조가 사라져 중복 배포·미커밋 편집 소실이 돌아온다(task#384)."""
+    wf = (REPO / ".github/workflows/deploy.yml").read_text()
+    assert "scripts/runner-deploy.sh" in wf
+    assert "reset --hard" not in wf
+    assert "bash deploy.sh" not in wf
