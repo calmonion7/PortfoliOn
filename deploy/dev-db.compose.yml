@@ -1,0 +1,13 @@
+# dev 스택 전용 덧붙임 — backend 를 공용 postgres 네트워크 taebro-db 에 붙인다(task#387).
+# 실행 자리 ~/runtime/portfolion/dev/.env 의 COMPOSE_FILE=docker-compose.yml:deploy/dev-db.compose.yml 로만 읽힌다.
+# prod .env 에는 COMPOSE_FILE 이 없어 prod 는 이 파일을 보지 않는다 — prod backend 를 taebro-db 에 붙이면
+# 그 네트워크에서 taebro-postgres-1 이 별칭 postgres 를 가져, prod DATABASE_URL 의 호스트 postgres 가 모호해진다(⑥-2 범위).
+services:
+  backend:
+    networks:
+      - default
+      - taebro-db
+
+networks:
+  taebro-db:
+    external: true
