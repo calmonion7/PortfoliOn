@@ -63,9 +63,8 @@ backend/
 ├── auth_schema.sql         users · refresh_tokens        ← app_schema.sql보다 먼저 실행
 ├── app_schema.sql          앱 테이블 전부 (신규 설치용)
 ├── supabase_schema.sql     레거시(Supabase 시절)
-├── .env.docker             런타임 시크릿 (gitignored)
+├── .env.docker             런타임 시크릿 — ~/runtime/portfolion/prod/.env 를 가리키는 심링크 (gitignored, task#386)
 ├── .env.docker.example     키 목록 템플릿
-├── run_backfill.py         일회성 백필 스크립트
 ├── Procfile                레거시(PaaS 시절)
 │
 ├── routers/                HTTP 표면 (20 모듈, `__init__.py`는 빈 파일)

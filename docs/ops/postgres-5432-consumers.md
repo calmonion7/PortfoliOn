@@ -12,7 +12,7 @@
 | 로컬 venv·pytest·스크립트 DSN | `backend/.env` (`DATABASE_URL`) | `postgresql://portfolion@localhost:5432/portfolion` (호스트 포트 경유, 비밀번호 포함은 파일에만) | 이전 시 고칠 것 | 호스트 5432 직접 사용. 새 호스트/포트로 갱신 필요 |
 | 테스트 DB 차단 가드 | `backend/tests/conftest.py` `_block_real_db` | 로컬 `DATABASE_URL`이 라이브 DB를 가리킨다는 전제로 DB 접근을 raise로 차단 (URL 하드코딩 없음) | 그대로 | URL 무관하게 `services.db`를 막는다. 이전 후에도 유효 |
 | 컨테이너 백엔드 DSN | `backend/.env.docker` | 도커 네트워크 별칭 `postgres:5432` (컨테이너↔컨테이너, 호스트 5432 아님) | 이전 시 고칠 것 | 호스트 포트는 안 쓰지만 공용 postgres로 가면 호스트명·네트워크 변경 필요 |
-| 일회성 백필 | `backend/run_backfill.py` | `host=localhost port=5432` DSN을 소스에 하드코딩 (비밀번호도 소스에 박혀 있음) | 은퇴 | 일회성 호스트 스크립트. 이전 전에 삭제하거나 `DATABASE_URL` 환경변수로 교체 권장(하드코딩 크리덴셜 별건) |
+| 일회성 백필 | ~~`backend/run_backfill.py`~~ | (`host=localhost port=5432` DSN 하드코딩이었음) | **삭제됨(task#385)** | B85 해소. 같은 기능은 앱의 `POST /api/market/leverage/backfill` |
 | enrich 대상 집합 루프체크 | `scripts/loopcheck-enrich-target-set.py` | `backend/.env`의 `DATABASE_URL`을 읽어 psycopg2 직접 연결 | 이전 시 고칠 것 | `.env`만 고치면 따라옴 |
 | 측정 스크립트 | `scripts/task351_measure.py` | `backend/.env`의 `DATABASE_URL`을 읽음 | 이전 시 고칠 것 | 동일 |
 | OAuth 핸들러 벤치 | `scripts/uat289-oauth-handler-bench.py` | 환경변수 `DATABASE_URL` | 이전 시 고칠 것 | 호출자가 주는 값. 일회성 UAT라 은퇴 후보 |
@@ -54,5 +54,5 @@
 3. `docker exec portfolion-postgres-1 …` 하드코딩 스크립트(A/B·UAT·loopcheck)는 컨테이너명이 바뀌면 깨지므로 은퇴하거나 대상 컨테이너·DB명을 갱신.
 4. `scripts/rotate-postgres-password.sh`의 컨테이너명·별칭·env 경로 갱신.
 5. `scripts/apply-docker-autostart.sh` C9·C10과 `scripts/README-docker-autostart.md`, `docker-compose.yml`의 5432 게시·주석 정리.
-6. `backend/run_backfill.py` 은퇴(또는 env 기반으로). 소스에 박힌 크리덴셜은 별건으로 정리.
+6. ~~`backend/run_backfill.py` 은퇴(또는 env 기반으로)~~ — **삭제됨(task#385)**, B85 해소.
 7. 이전 후 `lsof -nP -iTCP:5432`·`pg_stat_activity`로 호스트 경유 접속 0건 재확인, 5432 게시 제거.

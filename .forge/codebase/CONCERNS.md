@@ -208,9 +208,12 @@ mapped: 2026-10-10
 
 ### 계약·보안
 
-| # | 결함 | 위치 (심볼) | 도달 조건 |
-|---|---|---|---|
-| B85 | 호스트 백필 스크립트가 `localhost:5432` 접속 DSN을 **비밀번호를 포함한 리터럴**로 소스에 하드코딩한다 — 공개 저장소에 `955a480`(2026-06-03)부터 tracked. 그 값이 **현 운영 비밀번호와 같은지는 미확인**이다(B21 회전 task#334 이전에 커밋된 값이므로 다를 수 있으나 대조하지 않았다). 같다면 파일 삭제만으로는 부족하고(git 이력에 남는다) 회전이 필요하다. 부수로 이 접속은 `_get_pool`을 거치지 않아 `conftest._block_real_db`를 원리적으로 우회한다(§9.1) | `backend/run_backfill.py::DB_DSN` (사용처 조사: `docs/ops/postgres-5432-consumers.md`) | 값이 현행과 같으면 — 호스트 루프백 5432에 닿는 누구나(발행은 `127.0.0.1` 전용, §10.5). 값이 다르면 크리덴셜 노출은 과거 값에 한정되고 남는 것은 위생 결함(env 미사용)뿐이다 |
+잔존 행 없음.
+
+> ✅ **`B85` 해소 (task#385, 2026-10-11)** — 하드코딩 크리덴셜을 담던 일회성 호스트 스크립트 `backend/run_backfill.py`를 **삭제**했다.
+> 레포 안에서 import·실행하는 곳은 0건이었고(`routers/report.py::_run_backfill`은 이름만 비슷한 별개 함수다), 같은 기능은 앱의
+> `POST /api/market/leverage/backfill`(설정 탭)이 대체한다. git 이력에 남은 옛 DSN 값(`portfolion`)은 B21의 옛 compose 폴백값과 같고
+> task#334 회전 뒤 scram 경로로 「옛 값 거부」가 실측됐으므로 이미 무효다 — 이력 재작성은 하지 않았다.
 
 > ✅ **`B80` 해소 (task#340, 2026-08-30)** — `routers/report.py::get_report`가 `date_str`을
 > `date.fromisoformat`으로 검증한 뒤 **DB 조회 앞에서** 404를 내도록 했다(형제
@@ -1062,7 +1065,7 @@ if (err.response?.status === 401) {
 
 `tests/conftest.py`의 autouse `_block_real_db`가 `db_svc._get_pool`을 raise로 교체한다. 기원은 주석에 있다 — 라이브 DB `generate_report` 테스트가 실 `005930` 스냅샷을 덮은 사고.
 
-**잔여(LOW-MED)**: 가드가 **DSN이 아니라 초크포인트를 막는다**. `backend/run_backfill.py`의 `psycopg2.connect(DB_DSN)`은 `_get_pool`을 거치지 않아 원리적으로 우회다(현재 그 경로를 부르는 테스트는 없다 — 그 DSN이 크리덴셜을 하드코딩한 것은 별건 §0 B85). 또 테스트가 autouse 이후 `_get_pool`을 되돌리는 것을 막는 장치는 없다. 완화: `pytest.ini`의 `testpaths = tests`가 `backend/scripts/`·`run_backfill.py` 수집을 막는다.
+**잔여(LOW-MED)**: 가드가 **DSN이 아니라 초크포인트를 막는다**. `_get_pool`을 거치지 않고 `psycopg2.connect`를 직접 부르는 경로는 원리적으로 우회다(옛 예였던 `backend/run_backfill.py`는 task#385에서 삭제됨 — B85 해소. 지금 레포에 그런 경로를 부르는 테스트는 없다). 또 테스트가 autouse 이후 `_get_pool`을 되돌리는 것을 막는 장치는 없다. 완화: `pytest.ini`의 `testpaths = tests`가 `backend/scripts/`·`run_backfill.py` 수집을 막는다.
 
 **파일시스템·네트워크는 클린(확인)**: 파일을 쓰는 테스트는 전부 `tmp_path` + 대상 상수 patch를 쓴다(`test_digest_service.py`의 `patch.object(ds, "DIGEST_DIR", tmp_path)` 등) — **tracked 경로에 쓰는 테스트 0건**. `backend/tests/` 어느 파일도 최상위 `import requests`/`import yfinance`를 하지 않으며, mock이 전혀 없는 21개 파일은 전부 순수 함수·메타 테스트라 소켓을 열지 않는다.
 
@@ -1179,7 +1182,7 @@ if (err.response?.status === 401) {
 
 추가 노출도 좁혔다 — `docker-compose.yml`의 postgres 발행이 `"127.0.0.1:5432:5432"`(루프백 전용)다. 이전 `"5432:5432"`는 LAN 전체에 닿았다(실측 확인). ⚠️ **파일 변경은 컨테이너 재생성 시점에 적용된다** — 이 바인딩은 task#338의 기동 잡 복구로 실적용됐다(§0 B21 해소 각주의 잔여 2건). 호스트 루프백 5432의 소비처 전수는 `docs/ops/postgres-5432-consumers.md`(task#384 S5)에 있다.
 
-⚠️ **「리터럴 시크릿 폴백 0건」은 *폴백* 이야기다 — 하드코딩 크리덴셜은 1건 남아 있다**: `backend/run_backfill.py::DB_DSN`이 비밀번호를 포함한 접속 문자열을 소스에 박고 있다(§0 **B85**, 현행 값과의 동일 여부 미확인). 환경변수를 읽지 않는 일회성 호스트 스크립트라 위 3파일 회전 절차(`scripts/rotate-postgres-password.sh`)의 대상이 아니다.
+✅ **하드코딩 크리덴셜도 0건이 됐다(task#385)**: 「리터럴 시크릿 폴백 0건」 뒤에 남아 있던 유일한 하드코딩 크리덴셜 — `backend/run_backfill.py::DB_DSN`(비밀번호를 포함한 접속 문자열, 환경변수를 읽지 않는 일회성 호스트 스크립트) — 은 파일째 삭제됐다(§0 **B85** 해소). git 이력의 옛 값은 B21 회전 뒤 무효로 실측된 값이다.
 
 ### 10.6 볼륨 권한 — **잠재 위험**(낮음)
 
@@ -1401,5 +1404,5 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 | 11 | **프로브 대상 slug을 리터럴 → 응답 유도 + 표본 하한으로** 교체 — 발행 15종 중 초기 5종만 반복 측정되고 2차 개정 9종의 상세는 사실상 미측정이다(§0 `B81`이 그 사각에서 나왔다). 대상 확대는 「축을 좁히기」와 같은 슬라이스여야 한다(선재 FAIL 수입 방지) | §9.7 |
 | ~~12~~ | ~~`macro.py::_fetch_and_save_macro_signals`의 `_status` + 두 레인 `as run` 배선~~ → **완료(task#341, B6)** | §6.1 |
 | ~~13~~ | ~~`GET /api/report/{ticker}/{date_str}`의 경로 조각 검증 · `TechReportIn.title` 상한~~ → **완료(B80 task#340 · B81 task#342/#383)** | §0 |
-| 14 | `backend/run_backfill.py`의 하드코딩 크리덴셜 — 현행 비밀번호와 동일 여부 판정 → 같으면 회전, 어느 쪽이든 env(`DATABASE_URL`) 기반으로 바꾸거나 스크립트 은퇴(`docs/ops/postgres-5432-consumers.md` 체크리스트 6번) | §0 `B85` |
+| 14 | ~~`backend/run_backfill.py`의 하드코딩 크리덴셜~~ — **해소(task#385): 스크립트 삭제됨** | §0 `B85` |
 | 15 | 배포 잠금에 staleness 판정(PID·나이) — 남은 잠금 하나가 자동 배포를 영구 정지시킨다 | §10.1 |
