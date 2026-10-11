@@ -18,11 +18,13 @@
   - **명령 치환을 함수 인자로 넘길 땐 항상 따옴표**(`f "$(…)" "…"`) — 비면 인자가 밀린다.
   - **메커니즘을 바꾸는 변경의 문서 감사 문자열에는 그 메커니즘의 이름(파일·잡 이름)만이 아니라 그 메커니즘이 만들어 낸 성질의 서술도 넣을 것** — 이번엔 `npm run build`·`frontend/dist`·`즉시 라이브`·`폴러`. task#324 「감사 단위는 그 문자열」의 확장: 옛 이름이 사라져도 「그래서 X하면 된다」는 결과 문장은 남는다. 특히 에이전트 카드·스킬 같은 **지시 문서**는 다음 세션이 그대로 따르므로 의미 단위로 읽을 것.
   - **서브에이전트에게 금지 범위를 줄 땐 줄 번호나 정규식으로 못박는다** — 「그 파일의 X 관련 줄」 같은 자연어 범위는 넓게 읽힌다.
-- 승급 후보(사람 확인 대기 — 이번 회고에서 답을 받지 못해 **미승급**):
-  - eval: `scripts/**/*.sh`에서 `$이름` 바로 뒤 비ASCII 0건을 단언하는 pytest 1개(기계 검사 가능 · 재발 그럴듯 · 실행 저렴 — 3조건 충족).
-  - `.claude/skills/verification-gates`에 「감사 문자열 = 이름 + 결과 성질」 항목.
-  - `.claude/skills/subagent-orchestration`에 「금지 범위는 줄 번호·정규식으로」 한 줄.
+- 승급(일괄 승급 2026-10-11, 사용자 지시):
+  - eval `backend/tests/test_shell_multibyte_vars.py` — tracked `*.sh`에서 `$이름` 바로 뒤 비ASCII 0건 + 패턴 이빨 대조군. fault injection(`$HOME·`)으로 FAIL 확인 후 원복.
+  - `.claude/skills/verification-gates` — 「감사 문자열 = 이름 + 메커니즘의 성질 어휘」 항목.
+  - `.claude/skills/subagent-orchestration` — 「금지 범위는 줄 번호·정규식으로」 항목.
 
 ## Doc updates
 - CONTEXT.md promotion: none
 - ADR added: none (결정은 실행 전 ADR `261011-074335`에 기록됨, `261009-105247`은 superseded 표시)
+- eval added: `backend/tests/test_shell_multibyte_vars.py`(스위트 2548 → 2550)
+- 스킬 전파: verification-gates · subagent-orchestration
