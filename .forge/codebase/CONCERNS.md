@@ -144,7 +144,7 @@ mapped: 2026-10-10
 
 > **해소: 2026-10-10 (task#383) — B49·B81 닫힘.** **B49**: 마지막 미가드였던 `useReportGeneration`의 POST·생성 후 목록 경합을 닫았다(§7.3 해당 행). **B81**: 실측(2026-10-09) `tech_reports` 15행 전부 `length(title) BETWEEN 40 AND 120` — 루틴 재발행으로 자연 수렴. **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
 
-> **해소: 2026-08-23 (task#337) — B20 닫힘.** `routers/auth.py::login`/`::register` 본문 첫 줄에 IP 슬라이딩 윈도우 레이트리밋을 배선했다(`services/rate_limit.py` 신설) — login 10회/5분·register 3회/1시간, 키는 `CF-Connecting-IP`만 신뢰(`X-Forwarded-For`는 배제, 헤더 부재 시 `request.client.host`로 페일클로즈). bcrypt(의도적으로 비싼 CPU 연산) 직전에 판정해 초과 시 429+`Retry-After`. 근거: `.forge/adr/260823-085145-auth-rate-limit-in-process-cf-ip.md`(단일 프로세스 인메모리 카운터 — uvicorn `--workers` 미지정 가정에 의존). **적대적 검토가 배포 전 결함 2건을 추가로 잡았다** — ⓐ `check()`의 판정-후-기록이 `_lock` 없이는 경합 창(과다허용·`popleft` IndexError·기록 소실)을 만든다는 것을 스레드 barrier로 강제 재현해 `threading.Lock`으로 전체를 원자화했다 ⓑ ADR이 전제한 「공개 경로는 Cloudflare Tunnel뿐」이 `docker-compose.yml`/`deploy.sh`의 nginx 포트 게시(`0.0.0.0:80`)로는 **강제되지 않아** LAN 직접 접속이 우회로다 → **이것은 닫지 않았고 `B82`로 신규 등록했다**(아래 표). 수복 단계가 게시를 `127.0.0.1`로 좁히는 변경을 만들었으나 **오케스트레이터가 되돌렸다**: 그것은 사용자 머신의 네트워크 노출을 바꾸는 결정이고(LAN에서 직접 접속하는 습관이 있으면 조용히 깨진다) ADR이 계층 선택을 다루면서 인프라는 건드리지 않기로 한 문서라, 무인 드라이브가 단독으로 넘을 문턱이 아니다. 레이트리밋 자체는 **실사용 경로(Cloudflare 경유) 전부를 보호**하므로 부재보다 확실히 낫다. `API_SPEC.md`의 `login`/`register` 두 절에 `429`(+`Retry-After`) 응답을 문서화했다. **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
+> **해소: 2026-08-23 (task#337) — B20 닫힘.** `routers/auth.py::login`/`::register` 본문 첫 줄에 IP 슬라이딩 윈도우 레이트리밋을 배선했다(`services/rate_limit.py` 신설) — login 10회/5분·register 3회/1시간, 키는 `CF-Connecting-IP`만 신뢰(`X-Forwarded-For`는 배제, 헤더 부재 시 `request.client.host`로 페일클로즈). bcrypt(의도적으로 비싼 CPU 연산) 직전에 판정해 초과 시 429+`Retry-After`. 근거: `.forge/adr/260823-085145-auth-rate-limit-in-process-cf-ip.md`(단일 프로세스 인메모리 카운터 — uvicorn `--workers` 미지정 가정에 의존). **적대적 검토가 배포 전 결함 2건을 추가로 잡았다** — ⓐ `check()`의 판정-후-기록이 `_lock` 없이는 경합 창(과다허용·`popleft` IndexError·기록 소실)을 만든다는 것을 스레드 barrier로 강제 재현해 `threading.Lock`으로 전체를 원자화했다 ⓑ ADR이 전제한 「공개 경로는 Cloudflare Tunnel뿐」이 `docker-compose.yml`/옛 `deploy.sh`의 nginx 포트 게시(`0.0.0.0:80`)로는 **강제되지 않아** LAN 직접 접속이 우회로다 → **이것은 닫지 않았고 `B82`로 신규 등록했다**(아래 표). 수복 단계가 게시를 `127.0.0.1`로 좁히는 변경을 만들었으나 **오케스트레이터가 되돌렸다**: 그것은 사용자 머신의 네트워크 노출을 바꾸는 결정이고(LAN에서 직접 접속하는 습관이 있으면 조용히 깨진다) ADR이 계층 선택을 다루면서 인프라는 건드리지 않기로 한 문서라, 무인 드라이브가 단독으로 넘을 문턱이 아니다. 레이트리밋 자체는 **실사용 경로(Cloudflare 경유) 전부를 보호**하므로 부재보다 확실히 낫다. `API_SPEC.md`의 `login`/`register` 두 절에 `429`(+`Retry-After`) 응답을 문서화했다. **번호는 재사용하지 않는다** — 위 표에서 행만 제거했다.
 >
 > ⚠️ **이 절의 규율 재확인 — 사라졌다고 해소된 것이 아니다.** 이월 6건 `B6`(부분)·`B21`·`B49`(부분)·`B63`·`B80`·`B81`은 **행을 그대로 유지**했고 이 파트가 하나도 건드리지 않았다. 특히 `B63`(프론트 포매터 중복)은 **task#337에서 명시적 비목표로 확인** — 이 파트가 `routers/auth.py`를 만졌으므로 「인증 정리하며 포매터도 같이 됐겠지」로 오독하기 쉬운데 손대지 않았다. 근거는 task#271/ADR-0031(정본 5종을 세우고 남은 둘은 「소비처가 2곳 이상으로 늘면 재검토」로 의도적 로컬 유지) — 합치면 **기록된 결정을 조용히 되돌린다.**
 
@@ -158,30 +158,33 @@ mapped: 2026-10-10
 | # | 결함 | 위치 (심볼) | 도달 조건 |
 |---|---|---|---|
 
+> ⚠️ **옛 경로(task#386 은퇴)** — 아래 `B84`·러너 중복 배포·`B82`·`B21` 각주 중 `deploy.sh`·폴러·`runner-deploy.sh`·launchd 기동 잡을 말하는 문장은 **당시의 이력**이다.
+> 그 경로 전부가 task#386에서 은퇴했고(ADR `261011-074335`) 현재 배포는 `bin/deploy portfolion prod` 하나다(§10.1). 이력 서술은 그 시점의 사실로 읽을 것.
+
 > ✅ **`B84` 해소 (task#382, 2026-10-09)** — 폴러가 배포를 못 한 원인은 기록된 잠금 충돌 하나가 아니라 **세 겹**이었다:
 > ⓐ 잠금 자기충돌 ⓑ launchd 기본 PATH에 `npm`(fnm)·`docker`(`/usr/local/bin`)가 없음 ⓒ 트리거가 「HEAD 뒤처짐」뿐이라
 > **이 체크아웃에서 commit+push하면 `HEAD == origin`이 되어 폴러가 아무것도 안 함**(ⓐⓑ만 고쳐도 우리 push는 배포되지 않는다).
-> 수정: 트리거를 **배포 기록 SHA 대조**로 바꿨다 — `deploy.sh`가 성공 끝에 배포한 SHA를 저장소 밖
-> `~/.portfolion-deployed-sha`(`DEPLOY_MARKER`)에 쓰고, 폴러는 `origin/main`이 그것과 다르면 배포한다(같음 → 배포 ·
-> 뒤처짐 → ff 후 배포 · 앞섬/갈라짐 → 손대지 않음). 잠금은 `deploy.sh`만 잡고, PATH는 폴러가 **뒤에** 덧붙인다(앞에
-> 붙이면 하니스 스텁보다 실 docker가 먼저 잡혀 테스트가 운영 컨테이너를 내린다). `deploy.sh` 종료코드를 계약으로
+> 수정: 트리거를 **배포 기록 SHA 대조**로 바꿨다 — 옛 `deploy.sh`가 성공 끝에 배포한 SHA를 저장소 밖
+> 옛 `~/.portfolion-deployed-sha`(`DEPLOY_MARKER`)에 쓰고, 폴러는 `origin/main`이 그것과 다르면 배포한다(같음 → 배포 ·
+> 뒤처짐 → ff 후 배포 · 앞섬/갈라짐 → 손대지 않음). 잠금은 옛 `deploy.sh`만 잡고, PATH는 폴러가 **뒤에** 덧붙인다(앞에
+> 붙이면 하니스 스텁보다 실 docker가 먼저 잡혀 테스트가 운영 컨테이너를 내린다). 옛 `deploy.sh` 종료코드를 계약으로
 > 못박았다 — **2 = 사전 거부**(컨테이너를 건드리기 전: 잠금·미커밋·fetch 실패·앞섬/갈라짐·ff 실패 → 폴러가 다음 폴에서
 > 재시도) · **1 = 실패**(빌드·기동 중 실패, 배포 도중 HEAD 변경 — 사전 점검 뒤의 실패는 도구 종료코드와 무관하게 1) →
 > 폴러가 그 SHA를 `~/.portfolion-deploy-failed-sha`(`DEPLOY_FAILED_MARKER`)에 쓰고 **같은 커밋을 다시 시도하지 않는다**
-> (2분마다 재기동하면 백엔드가 ~5분씩 내려가는 영구 장애 루프가 된다). 실패 기록은 새 push나 수동 `deploy.sh` 성공으로
+> (2분마다 재기동하면 백엔드가 ~5분씩 내려가는 영구 장애 루프가 된다). 실패 기록은 새 push나 수동 옛 `deploy.sh` 성공으로
 > 풀린다. 회귀 가드는 `scripts/test_deploy_guard.py`(30축)이고, 새 분기마다 주입 8종을 **따로** 돌려 각각 FAIL을 확인했다.
 > 실패 1회 정책의 **라이브** 재현은 고의로 운영을 내리는 일이라 하지 않았다(하니스 축이 영구 가드다).
-> 라이브 확인(launchd 실행, 수동 `deploy.sh` 없음): **같음 분기** — `91a2ece` push 62초 뒤 폴러가 배포 시작, 10초 뒤
+> 라이브 확인(launchd 실행, 수동 옛 `deploy.sh` 없음): **같음 분기** — `91a2ece` push 62초 뒤 폴러가 배포 시작, 10초 뒤
 > `Deploy complete` · **뒤처짐 분기** — 이 문장을 담은 커밋을 별도 워크트리에서 push해 메인 체크아웃을 뒤처지게 만든 뒤 확인.
 > **번호는 재사용하지 않는다.**
 
 > ✅ **러너 쪽 중복 배포 공백 해소 (task#384, 2026-10-10, 무번호)** — B84 해소 뒤 남은 반쪽이었다: 러너가 arm64로
 > 재설치돼 online이 되자 push 하나에 러너와 폴러가 **둘 다** 배포할 수 있었고, 러너 잡은 배포 기록을 보지 않은 채
-> `git reset --hard`를 했다. 지금 `.github/workflows/deploy.yml`은 단일 스텝 `scripts/runner-deploy.sh`만 돌린다 —
-> 배포 기록(`DEPLOY_MARKER`)이 `origin/main`과 같으면 「이미 배포됨」 exit 0, 다르면 `bash deploy.sh`의 종료코드를
+> `git reset --hard`를 했다. 지금 `.github/workflows/deploy.yml`은 단일 스텝 옛 `scripts/runner-deploy.sh`만 돌린다 —
+> 배포 기록(`DEPLOY_MARKER`)이 `origin/main`과 같으면 「이미 배포됨」 exit 0, 다르면 옛 `bash deploy.sh`의 종료코드를
 > 그대로 전달, 잠금이 있으면 `RUNNER_LOCK_WAIT_SEC`(기본 900초) 동안 기다린 뒤 **기록을 다시 대조**(그 사이 폴러가
 > 같은 커밋을 배포했을 수 있다). `reset --hard` 없음, PATH는 뒤에 덧붙임. 두 경로가 같은 기록을 읽으므로 먼저 도착한
-> 쪽이 배포하고 다른 쪽은 no-op이다. 회귀 가드 `scripts/test_deploy_guard.py`가 `deploy.sh`·폴러·`runner-deploy.sh`를
+> 쪽이 배포하고 다른 쪽은 no-op이다. 회귀 가드 `scripts/test_deploy_guard.py`가 옛 `deploy.sh`·폴러·`runner-deploy.sh`를
 > 함께 덮는다(**40** 수집). 잔여는 `§10.1`(무staleness 잠금).
 
 > ✅ **`B6` 해소 (task#341, 2026-08-30)** — 마지막 도달 경로였던 `macro.py`를 닫았다.
@@ -224,8 +227,8 @@ mapped: 2026-10-10
 
 > ✅ **`B82` 해소 (task#339, 2026-08-30)** — nginx 게시를 루프백으로 좁혀
 > `CF-Connecting-IP` 위조 경로를 닫았다. 처방 후보 ⓐ 채택: `0.0.0.0:80`·`0.0.0.0:443` →
-> **`127.0.0.1:80` 하나**. **두 파일 모두** 고쳤다(`docker-compose.yml` + `deploy.sh`) —
-> 라이브 nginx 는 compose 가 아니라 `deploy.sh` 의 `docker run` 이 만들므로 한쪽만 고치면 무효다.
+> **`127.0.0.1:80` 하나**. **두 파일 모두** 고쳤다(`docker-compose.yml` + 옛 `deploy.sh`) —
+> 라이브 nginx 는 compose 가 아니라 옛 `deploy.sh` 의 `docker run` 이 만들므로 한쪽만 고치면 무효다.
 > 443 게시는 제거(`nginx.conf` 의 443 `server` 블록이 주석 처리돼 무동작이었다).
 > 이로써 ADR `260823-085145` 의 「공개 경로는 Cloudflare 전용」이 가정이 아니라 **배포 구성**이 됐고,
 > 레이트리밋 우회(헤더를 매 요청 바꿔 무한 버킷)와 역방향 표적 잠금이 함께 닫힌다.
@@ -238,11 +241,11 @@ mapped: 2026-10-10
 > **다음 헌트가 이것을 결함으로 재발견하지 말 것 — 단 그 전제가 거짓이 되면 결함이다**:
 > cloudflared 가 `http://localhost:80` 을 쓰지 않게 되거나 nginx 443 블록이 활성화되면 재판정 대상.
 >
-> ⚠️ **부수 기록(이 태스크가 만들 뻔한 결함)** — `deploy.sh` 의 `docker run` **연속행(`\`) 안에**
+> ⚠️ **부수 기록(이 태스크가 만들 뻔한 결함)** — 옛 `deploy.sh` 의 `docker run` **연속행(`\`) 안에**
 > 설명 주석을 넣었다가 되돌렸다. 백슬래시 연속은 주석 해석보다 먼저 줄을 잇기 때문에 `#` 이
 > **나머지 인자를 통째로 삼켜** nginx 가 포트·볼륨 없이 뜬다. `bash -n` 은 구문만 보므로 **통과한다**.
 > 푸시 전 인자 스텁 재생(`docker` 를 echo 로 치환)으로 15개 인자가 온전함을 확인해 잡았다.
-> 같은 취지의 경고 주석을 `deploy.sh` 에 남겼다.
+> 같은 취지의 경고 주석을 옛 `deploy.sh` 에 남겼다.
 
 > ✅ **`B21` 해소 (task#334, 2026-08-30)** — Postgres 폴백 비밀번호 + 호스트 5432 발행.
 > 착수 실측이 원 서술보다 나빴다: 루트 `.env`에 `POSTGRES_PASSWORD`가 **없어** compose가
@@ -268,16 +271,16 @@ mapped: 2026-10-10
 > 남긴 둘은 **같은 원인의 앞뒤**였다: 자동기동 잡이 죽어 있어 컨테이너가 재생성되지 않았고,
 > 재생성되지 않아 ⓒ(루프백 발행)가 파일에만 존재했다. 잡을 되살리자 **한 번의 기동으로 둘 다 전환**됐다.
 > - **launchd 잡 복구** — `ProgramArguments`를 삭제된 워크트리 경로에서 메인 체크아웃
->   `scripts/start-docker-compose.sh`로 교체하고 plist에 `HOME`·`USER`·`LOGNAME`·`PATH`를 명시했다
+>   옛 `scripts/start-docker-compose.sh`로 교체하고 plist에 `HOME`·`USER`·`LOGNAME`·`PATH`를 명시했다
 >   (launchd 최소환경에 `/usr/local/bin/docker`가 없다). 재적재 후 `launchctl list` 종료코드가
 >   **127 → 0**. 실행 기록: `19:11:22` 기동 → `19:11:29` 완료(`~/Library/Logs/com.portfolion.docker-compose.out.log`).
 > - **포트 바인딩 실적용** — 그 기동이 postgres를 재생성해 `0.0.0.0:5432` → **`127.0.0.1:5432`**.
 >   LAN `nc 172.16.11.230 5432` **거부**(계측기 대조군: 루프백 5432는 접속 성공 — 「닫혔다」와
 >   「측정기가 못 본다」를 가른다).
 >
-> **기동 범위는 실측 근거로 좁혔다 — 통째 `docker compose up -d`가 아니다.** `deploy.sh`가 만드는
+> **기동 범위는 실측 근거로 좁혔다 — 통째 `docker compose up -d`가 아니다.** 옛 `deploy.sh`가 만드는
 > 컨테이너 이름이 compose의 것과 **바이트 동일**(`portfolion-backend-1`·`portfolion-nginx-1`)이라,
-> 통째 기동은 「낡은 것을 올리는」 정도가 아니라 **deploy.sh의 컨테이너를 compose 정의로 재생성**한다
+> 통째 기동은 「낡은 것을 올리는」 정도가 아니라 옛 **deploy.sh의 컨테이너를 compose 정의로 재생성**한다
 > (볼륨 마운트·포트가 갈린다). 그래서 스크립트는 compose로 **postgres·certbot만**(task#384 certbot 은퇴 이후 **postgres만**) 올리고
 > backend·nginx는 `bash deploy.sh`에 맡긴다. 그리고 옛 스크립트의 `until docker info; do sleep 2; done`
 > **무한 대기**를 5분 유계 + FATAL 로그 + 비영 종료로 바꿨다 — 그대로 두면 데몬이 안 뜰 때 잡이 영원히
@@ -760,7 +763,7 @@ with job_runs.record("monthly_us", "auto") as run:          # ← as run 배선
 | `KOFIA_API_KEY` | `leverage_service.py::_kofia_get`, `lending_service.py::_api_get` | `_fetch_leverage`·`_fetch_lending` |
 | `TELEGRAM_BOT_TOKEN`/`_CHAT_ID` | `digest_service.py::send_telegram`(bare `return`) | `_run_digest` — 다이제스트는 생성·저장되고 **발송만 안 된다** |
 
-도달: `backend/.env.docker`가 재생성·절단되는 모든 배포. `.env.docker`가 gitignored이므로 **새 클론 + `deploy.sh`가 정확히 이 상태를 만든다** — 전 배치 초록, 데이터 0. 이번 판에서 가장 가치 높은 운영 발견이다.
+도달: `backend/.env.docker`가 재생성·절단되는 모든 배포. `.env.docker`가 gitignored이므로 **새 클론 + 첫 배포가 정확히 이 상태를 만든다**(옛 `deploy.sh` 시절의 표현을 현행으로 옮김 — 비밀 정본은 이제 `~/runtime/portfolion/prod/.env`이고 `backend/.env.docker`는 그것을 가리키는 심링크다) — 전 배치 초록, 데이터 0. 이번 판에서 가장 가치 높은 운영 발견이다.
 
 ### 6.2 `job_runs`에 "스킵" 상태가 없다 — **설계상 트레이드오프**(관측 공백)
 
@@ -830,7 +833,7 @@ _seed_us_sector_if_empty()  # 라이브 yfinance
 _scheduler.start()
 ```
 
-전부 이벤트 루프 스레드에서 돈다 → 그동안 `/health`가 응답하지 못한다. `deploy.sh`의 배포 후 `curl -s http://localhost/health`(고정 `sleep 2` 뒤)는 리포트 백필이 밀려 있는 배포마다 **"WARNING: health check failed"**를 찍지만, 그 curl이 `|| echo`라 배포는 그대로 완료로 보고된다(§10.5).
+전부 이벤트 루프 스레드에서 돈다 → 그동안 `/health`가 응답하지 못한다. 옛 `deploy.sh`의 고정 `sleep 2` 헬스 curl은 이 블로킹 때문에 매번 경고만 찍고 통과했다(은퇴). 지금 `bin/deploy`는 `/health`를 최대 600초 기다리고 실패하면 롤백하므로(§10.4) 이 무응답 창이 길면 정상 기동이 롤백될 수 있다.
 
 ⚠️ **원인 귀속 주의**: CLAUDE.md에 기록된 "배포 후 API 5분+ 무응답"의 정확한 메커니즘은 **미확정**으로 남아 있다(lifespan 자체는 0.6초로 실측됐고 배치는 스케줄러 스레드다). 위 `sched.start()` 블로킹은 **코드로 확인된 별개 경로**이며, 그 5분 현상의 확정 원인이라고 단정하지 말 것.
 
@@ -838,8 +841,8 @@ _scheduler.start()
 
 - **중복 실행은 불가능하나 스킵이 안 보인다**: `schedule.py`가 `coalesce=True, replace_existing=True`를 주고 `max_instances`를 생략해 APScheduler 기본 `max_instances=1`이 적용된다. 초과 실행은 *거부*되는데 APScheduler 내부 WARNING만 남고 **`job_runs` 행이 아예 안 생긴다** — 운영자는 직전 success만 보고 다음 발화가 드롭된 증거를 못 본다.
 - **잡 타임아웃 없음**: `_investor_trend_work`·`_short_sell_work`가 `ThreadPoolExecutor(max_workers=8)`의 `future.result()`를 **`timeout=` 없이** 부른다. §2.5(yfinance 무타임아웃)와 겹치면 멈춘 HTTP 하나가 잡 전체를 무기한 잡는다. `AsyncIOScheduler`가 sync 잡을 `run_in_executor(None, …)`로 던지므로 기본 스레드풀을 점유한다.
-- **종료**: `_scheduler.shutdown(wait=False)`. 진행 중 배치가 쓰기 도중 버려지고, `deploy.sh`의 `docker stop`(SIGTERM 10s)과 겹치면 `job_runs`에 **영구 `running` 행**이 남는다(`_finish`가 영영 안 돈다).
-- **다중 스케줄러**: uvicorn 워커에서 오는 위험은 없다(`Dockerfile` CMD에 `--workers` 없음, compose에도 `command` 없음 → 단일 프로세스). 진짜 위험은 **컨테이너 이름 충돌**이다 — §10.3.
+- **종료**: `_scheduler.shutdown(wait=False)`. 진행 중 배치가 쓰기 도중 버려지고, 배포의 컨테이너 교체(`--force-recreate`, 옛 `deploy.sh` 시절엔 `docker stop`; SIGTERM 10s)와 겹치면 `job_runs`에 **영구 `running` 행**이 남는다(`_finish`가 영영 안 돈다).
+- **다중 스케줄러**: uvicorn 워커에서 오는 위험은 없다(`Dockerfile` CMD에 `--workers` 없음, compose에도 `command` 없음 → 단일 프로세스). 옛 경로(은퇴)에서는 진짜 위험이 **컨테이너 이름 충돌**이었다(§10.2); backend가 compose 소유가 된 지금은 그 경로가 없다.
 
 ### 6.8 KST vs 컨테이너 UTC — **부분 가드** (B7·B8·B42 해소, task#330)
 
@@ -1094,7 +1097,7 @@ if (err.response?.status === 401) {
 | `tests/test_table_unit_no_default_fallback.py` · `test_unit_caption_compound_and_fallback.py` · `test_rd_unit_bounded_caption.py` | 단위 캡션 파싱 실패의 「안전한 기본값」 폴백과 접미사 매칭(×100·×1/10 오저장, §2.1) |
 | `tests/test_market_outlook_schema.py` | enrich `market_outlook`의 산문 문자열·별칭 오타 통과(= 조용한 미렌더, §3.1) |
 | `tests/test_holiday_fallback_and_seed_validation.py` | 다일 연휴 폴백 부족 + 기동 스펙 검증이 **정상 등록되던 스펙을 미등록으로 떨어뜨리는** 회귀 |
-| `scripts/test_deploy_guard.py`(task#377·#382·#384, **40** 수집) | `deploy.sh`의 사전 거부(exit 2)·실패(exit 1) 계약, 폴러의 배포 기록 트리거·실패 1회 정책, `runner-deploy.sh`의 기록 대조·잠금 대기 — 임시 bare origin + 클론 + 스텁 PATH 하니스. ⚠️ 위치가 `backend/tests/`가 아니라 `scripts/`라 `pytest.ini`의 `testpaths`에 잡히지 않는다 — 경로를 명시해 돌려야 한다 |
+| ~~`scripts/test_deploy_guard.py`~~(task#377·#382·#384) | **은퇴(task#386)** — 옛 `deploy.sh`·폴러·`runner-deploy.sh`의 종료코드·기록 대조·잠금 계약을 덮던 40축 하니스였고 대상 스크립트와 함께 삭제됐다. 현재 배포 계약(롤백·헬스)은 레포 밖 `taebro-infra`가 소유한다 |
 | `tests/test_nightly_enrich_verify.py` · `test_enrich_verify.py` | 야간 enrich의 「접수됨」을 「갱신됨」으로 읽는 거짓 초록(§11.3) — 사후 대조가 조회 실패를 `failed`로, 오늘 run 부재를 `failed`로 구별하는지 |
 
 ### 9.4 정확한 개수 단언이 다음 배치 추가에서 깨진다 — **확인된 버그**(개발 마찰)
@@ -1132,35 +1135,38 @@ if (err.response?.status === 401) {
 
 ## 10. 배포·인프라·운영
 
-### 10.1 두 개의 비동기화된 `git reset --hard origin/main` — **해소**(task#377·#382·#384) · 잔여: 무staleness 잠금(**잠재 위험**)
+### 10.1 두 개의 비동기화된 `git reset --hard origin/main` — **해소**(task#377·#382·#384) · **경로 자체 은퇴**(task#386)
 
-- `scripts/auto-deploy-poll.sh` — launchd 2분 주기
-- `.github/workflows/deploy.yml` → `scripts/runner-deploy.sh` — self-hosted 러너(arm64 재설치로 online, task#384)
+옛 경로(task#386 은퇴): 폴러 `scripts/auto-deploy-poll.sh`(launchd 2분 주기)와 `.github/workflows/deploy.yml` → `scripts/runner-deploy.sh`가 같은 옛 `deploy.sh`를 부르고, 둘이 `~/.portfolion-deployed-sha` 기록을 대조해 먼저 온 쪽이 배포했다. 이 절의 원래 결함(두 경로의 `reset --hard` 경합)은 task#377·#382·#384에서 닫혔고, 그 경로 전체가 task#386에서 삭제됐다.
 
-✅ **두 경로 모두 `reset --hard`를 하지 않는다.** 폴러는 task#377부터 뒤처졌을 때만 `--ff-only`(앞섬·갈라짐이면 손대지 않음), 러너 잡은 task#384부터 단일 스텝 `runner-deploy.sh`로 바뀌어 작업트리를 직접 만지지 않는다 — 따라잡기는 `deploy.sh`가 한다(미커밋 tracked 변경·앞섬·갈라짐·fetch 실패면 컨테이너를 건드리기 전에 **exit 2**로 거부). 두 경로는 같은 배포 기록(`~/.portfolion-deployed-sha`)을 대조하므로 같은 커밋을 두 번 배포하지 않는다(§0 B84·러너 해소 각주). **잠금은 `deploy.sh`만 잡는다**(폴러가 잡던 시절의 자기충돌이 B84였다).
+✅ **현재 배포 경로는 하나다**: `git push origin main` → self-hosted 러너(arm64) → `.github/workflows/deploy.yml` → `~/runtime/taebro-infra/bin/deploy portfolion prod`(`dev` 브랜치는 dev 스택). 폴러·기록 SHA 대조·`reset --hard`·ff 따라잡기는 없다 — 빌드는 러너 체크아웃에서 하고, 실행 자리 `~/runtime/portfolion/prod/`에는 `docker-compose.yml`과 `.env`만 둔다. `.md`·`.forge/**`만 바뀐 push는 `paths-ignore`로 배포하지 않는다. 계약 정본은 `~/runtime/taebro-infra/docs/CONTRACT.md`(v5).
 
-**잔여: 둘 다 여전히 개발자의 라이브 작업 디렉터리에서 돈다** — `deploy.sh`의 ff는 작업트리를 갱신하고 `frontend/dist`를 다시 빌드하므로, 라이브를 재는 작업이 도는 동안의 push는 배포성 행위다(루트 `CLAUDE.md` Deployment 절). 그리고 **잠금이 PID도 staleness 검사도 없는 bare `/tmp` 파일**이다 — `deploy.sh`는 `trap … EXIT`로 지우지만 SIGKILL·전원 차단이면 남는다. 그때 `deploy.sh`는 매번 exit 2(사전 거부), 폴러는 「Deploy in progress」로 exit 0 스킵, 러너는 `RUNNER_LOCK_WAIT_SEC`(기본 900초)를 기다린 뒤 exit 1 — **수동으로 잠금 파일을 지울 때까지 자동 배포가 영구 정지**한다. 폴러 경로는 로그 한 줄 외에 신호가 없다(러너는 잡 실패로 GitHub에 드러난다).
+**옛 잔여(무staleness `/tmp` 잠금, 은퇴)**: 옛 `deploy.sh`의 `/tmp/portfolion-deploy.lock`은 PID·staleness 검사가 없어 SIGKILL 뒤 자동 배포가 영구 정지할 수 있었다. 그 파일은 은퇴했다. 현재 잠금은 실행 자리의 `.taebro-deploy.lock`(infra 소유)이고, 그 staleness 동작은 이 문서가 검증하지 않았다 — 필요하면 CONTRACT.md를 볼 것.
 
-### 10.2 컨테이너가 compose 밖에서 돈다 — **잠재 위험**
+### 10.2 컨테이너가 compose 밖에서 돈다 — **해소**(task#386)
 
-`deploy.sh`는 `docker compose`를 전혀 쓰지 않고 `portfolion-backend-1`·`portfolion-nginx-1`을 손으로 `docker run`한다 — **compose가 생성할 이름과 정확히 같다**(프로젝트 `portfolion` + 서비스 `backend`). 결과:
+옛 서술(은퇴): 옛 `deploy.sh`가 `docker compose`를 쓰지 않고 `portfolion-backend-1`·`portfolion-nginx-1`을 손으로 `docker run`해, compose 정의와 실제 런타임이 갈렸다(부팅 시 옛 `scripts/start-docker-compose.sh`가 `postgres`만 올렸다).
 
-런타임은 **3컨테이너**다 — compose 소유 `postgres` + `deploy.sh`가 `docker run`하는 `backend`·`nginx`(certbot은 task#384에서 은퇴, TLS는 Cloudflare가 종단). 부팅 시 `scripts/start-docker-compose.sh`가 `docker compose up -d postgres`만 하고 나머지는 `bash deploy.sh`에 맡긴다.
+지금은 `backend`·`nginx`가 **compose 소유**(프로젝트 `portfolion`)다 — `bin/deploy`가 실행 자리에서 `compose up -d --no-build --force-recreate`로 올리므로 `docker compose ps`에 잡힌다. 이미지는 `portfolion-backend`·`portfolion-nginx`이고 직전 이미지는 `:prev`로 남는다. 런타임은 여전히 **3컨테이너**다:
 
-- **`postgres`는 `deploy.sh`가 기동·재기동하지 않는다** — 위 기동 스크립트(또는 손 `docker compose up -d postgres`)로 이미 떠 있어야 한다.
-- compose의 `depends_on: postgres: condition: service_healthy` 게이트가 **배포 경로에서 통째로 우회**된다(백엔드가 DB 없는 상태로 뜰 수 있다).
-- ~~배포된 nginx가 compose의 certbot 볼륨 마운트를 누락한다 / ACME location이 마운트 안 된 경로를 가리킨다~~ — **해소(task#384)**: `docker-compose.yml`에 certbot 서비스·`./certbot` 볼륨이 없고 `nginx/nginx.conf`에 acme-challenge location도 주석 443 블록도 없다. compose와 `deploy.sh`의 nginx 마운트는 이제 같은 2개(`nginx.conf`·`frontend/dist`, 둘 다 `:ro`)다.
-- 이후 누군가 `docker compose up -d`(서비스 지정 없이)를 돌리면 자기가 만들지 않은 컨테이너를 보고 재생성하며, 손으로 띄운 컨테이너가 살아 있는 동안 그것을 돌리면 **같은 network-alias에 스케줄러 프로세스가 2개** 생길 수 있다(§6.7).
+- **`postgres`는 배포 compose에 없다**(ADR `261011-074335` 결정 1) — 배포가 매번 `--force-recreate`라 넣으면 유일한 prod DB 컨테이너가 재생성되기 때문이다. 컨테이너 `portfolion-postgres-1`(볼륨 `portfolion_pgdata`)은 그대로 두고(compose orphan), backend가 `portfolion_default` 네트워크의 `postgres:5432`로 붙는다. 정의는 `deploy/legacy-postgres.compose.yml`에 보존(⑥-2 공용 DB 이전까지). **배포는 postgres를 기동·재기동하지 않는다.**
+- 재부팅 복구는 Docker Desktop 자동 시작 + 각 서비스의 `restart: unless-stopped`다(옛 launchd 부팅 잡 `com.portfolion.docker-compose`는 은퇴).
+- ~~배포된 nginx가 compose의 certbot 볼륨 마운트를 누락한다 / ACME location이 마운트 안 된 경로를 가리킨다~~ — **해소(task#384)**, 이후 task#386에서 nginx는 `frontend/dist`·`nginx.conf`를 마운트하지 않고 이미지에 굽는다.
+- 옛 위험(은퇴): 손 `docker run` 컨테이너가 살아 있는 동안 `docker compose up -d`를 돌리면 같은 network-alias에 스케줄러 프로세스가 2개 생길 수 있었다(§6.7). backend가 compose 소유가 된 지금은 그 경로가 없다.
 
 ### 10.3 헬스체크·재시작 정책 — **잠재 위험**
 
 - `docker-compose.yml`에 healthcheck가 있는 서비스는 **`postgres`뿐**(`pg_isready`).
-- **`backend`엔 healthcheck가 없다** — compose에도 `deploy.sh`의 `docker run`에도. `--restart unless-stopped`는 *프로세스 종료*에만 반응하므로 **hang한 uvicorn은 영영 재시작되지 않는다**(§6.6·§6.7의 무타임아웃과 결합).
+- **`backend`엔 compose healthcheck가 없다**(옛 `docker run`에도 없었다 — 은퇴). `restart: unless-stopped`는 *프로세스 종료*에만 반응하므로 **hang한 uvicorn은 영영 재시작되지 않는다**(§6.6·§6.7의 무타임아웃과 결합).
 - ~~`certbot`엔 재시작 정책이 없다~~ — **해소(task#384, 서비스 자체가 은퇴)**. 인증서는 Cloudflare 쪽이라 이 스택에 갱신 루프가 없다.
 
-### 10.4 배포 검증이 비차단이고 롤백이 없다 — **잠재 위험**
+### 10.4 배포 검증이 비차단이고 롤백이 없다 — **해소**(task#386)
 
-유일한 검증이 고정 `sleep 2` 뒤의 `curl -s http://localhost/health && echo " <- /health OK" || echo "WARNING: health check failed"`다 — **구조적으로 비차단**이다. 롤백 경로 없음. §6.6과 겹쳐 기동 백필이 있는 배포마다 이 경고가 뜨지만 배포는 성공으로 보고된다. ⚠️ task#382 이후 그 결과가 한 단계 더 굳는다 — 헬스체크 실패와 무관하게 `deploy.sh`가 `배포된 커밋:`을 찍고 **배포 기록(`DEPLOY_MARKER`)에 SHA를 쓴 뒤 exit 0**하므로, 폴러·러너는 그 커밋을 「이미 배포됨」으로 보고 다시 시도하지 않는다. 즉 「배포 기록 == origin/main」은 *배포 스크립트가 끝까지 돌았다*는 뜻이지 *서비스가 응답한다*는 뜻이 아니다(기동 배치로 수 분 무응답인 창이 정상적으로 있으므로 헬스를 차단 조건으로 바꾸는 것도 단순하지 않다 — 루트 `CLAUDE.md` Deployment 절).
+옛 서술(은퇴): 옛 `deploy.sh`의 유일한 검증은 고정 `sleep 2` 뒤 `curl … || echo "WARNING: health check failed"`로 구조적으로 비차단이었고, 헬스 실패와 무관하게 배포 기록 SHA를 쓰고 exit 0해 「기록 == origin/main」이 *서비스가 응답한다*는 뜻이 아니었다. 롤백도 없었다.
+
+지금은 `bin/deploy`가 `/health` 본문에 `portfolion`이 보일 때까지 기다린다(`deploy/taebro.env`: `HEALTH_EXPECT=portfolion`, `HEALTH_TIMEOUT=600` — 기동 배치로 포트가 수 분 안 열리는 창을 정상 기동으로 보려는 값이다). 실패하면 `:prev` 이미지로 **자동 롤백**한다. 종료코드: 0 성공 · 1 실패+롤백 성공 · 2 실패+롤백 실패(다운 가능) · 3 시작 전 거부(변경 없음). 첫 배포는 롤백 대상이 없다. 성공하면 `~/runtime/portfolion/prod/.taebro-deploy`에 `generation=<YYMMDD-HHMMSS>-<커밋7자>`를 쓰고, 수동 롤백은 `~/runtime/taebro-infra/bin/deploy --rollback portfolion prod <세대>`다.
+
+⚠️ 남는 한계: 헬스 판정은 `/health`가 `{"status":"ok","service":"portfolion"}`를 내는지뿐이라(`main.py`), 기동은 됐으나 배치·특정 라우트가 깨진 상태는 못 잡는다. 판정은 GitHub Deploy run success(headSha) + 세대 기록으로 한다.
 
 ### 10.5 시크릿 폴백 — **해소**(B21 task#334 · B19 · SESSION_SECRET task#326)
 
@@ -1177,15 +1183,15 @@ if (err.response?.status === 401) {
 
 ### 10.6 볼륨 권한 — **잠재 위험**(낮음)
 
-compose의 postgres 서비스가 `./backend/auth_schema.sql`·`./backend/app_schema.sql`을 **`:ro` 없이** `/docker-entrypoint-initdb.d/`에 마운트한다. 엔트리포인트는 읽기만 하지만 컨테이너가 tracked 소스 파일 2개에 쓰기 권한을 갖는다(그 파일들은 배포 경로가 ff로 갱신하는 작업트리의 일부다 — `reset --hard`는 task#377·#384 이후 없다, §10.1). nginx 마운트는 compose·`deploy.sh` 양쪽에서 올바르게 `:ro`다.
+compose의 postgres 서비스가 `./backend/auth_schema.sql`·`./backend/app_schema.sql`을 **`:ro` 없이** `/docker-entrypoint-initdb.d/`에 마운트한다. 엔트리포인트는 읽기만 하지만 컨테이너가 tracked 소스 파일 2개에 쓰기 권한을 갖는다(task#386 이후 이 마운트는 배포 compose가 아니라 postgres 정의 보존본 `deploy/legacy-postgres.compose.yml`에만 있다, §10.2). nginx는 이제 아무것도 마운트하지 않고 이미지에 굽는다.
 
-부수(LOW): `deploy.sh`가 `TMP_DOCKER_CONFIG=$(mktemp -d)`를 만들고 지우지 않는다(`trap`은 락만 정리) — 배포마다 `/tmp` 디렉터리 누수.
+옛 부수(LOW, 은퇴): 옛 `deploy.sh`의 `TMP_DOCKER_CONFIG=$(mktemp -d)` 누수는 그 스크립트와 함께 사라졌다.
 
 ### 10.7 의존성이 고정되지 않았다 — **잠재 위험**
 
-`backend/requirements.txt` 18줄 전부 `>=` 또는 제약 없음(`python-dotenv`는 무제약), **락파일 없음**. `Dockerfile`이 `pip install -r requirements.txt`를 매 빌드 실행하고 `deploy.sh`가 매 배포 재빌드한다 → **같은 커밋의 두 배포가 서로 다른 `yfinance`·`pandas`·`fastapi`를 설치할 수 있다**. `yfinance>=0.2.40`은 `.info`/`.history` 형태 변경과 Yahoo 엔드포인트 이동 이력이 있는 라이브러리라, "어제는 됐는데" 클래스 장애의 가장 유력한 출처다.
+`backend/requirements.txt` 18줄 전부 `>=` 또는 제약 없음(`python-dotenv`는 무제약), **락파일 없음**. `Dockerfile`이 `pip install -r requirements.txt`를 매 빌드 실행하고 `bin/deploy`가 매 배포 재빌드한다 → **같은 커밋의 두 배포가 서로 다른 `yfinance`·`pandas`·`fastapi`를 설치할 수 있다**. `yfinance>=0.2.40`은 `.info`/`.history` 형태 변경과 Yahoo 엔드포인트 이동 이력이 있는 라이브러리라, "어제는 됐는데" 클래스 장애의 가장 유력한 출처다.
 
-프론트: `package.json`은 caret이지만 `package-lock.json`이 tracked다. 다만 `deploy.sh`가 `npm ci`가 아니라 **`npm install`**을 돌려 배포 중 락파일이 재작성될 수 있다.
+프론트: `package.json`은 caret이지만 `package-lock.json`이 tracked다. 옛 `deploy.sh`는 `npm install`을 돌려 락파일이 재작성될 수 있었으나(은퇴), 지금은 `nginx/Dockerfile`이 `npm ci`로 설치한다.
 
 ### 10.8 로컬 `.venv`(3.9.6) ≠ Docker(3.12) — **설계상 트레이드오프**(사실상 하드 제약)
 
@@ -1230,7 +1236,7 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 - **관측성 간극은 사후 대조로 메워졌다 — 단 하루 1회·시각 고정**(task#357). 이 잡의 `success`는 여전히 「fire가 접수됐다」뿐이지만(청크 처리는 **다른 프로세스**인 로컬 리스너에서 일어나고 완료 보고 통로가 없다), 다음날 08:00 `cowork_enrich_verify`(`scheduler/jobs.py::_verify_nightly_enrich`)가 02:00 run의 `payload` ticker를 그 run의 `started_at` 이후 `tickers.enriched_at`과 대조해(`services/enrich_verify.py::judge`) **02:00 run 행의 status/error를 직접 UPDATE**하고 자기 run에도 같은 상태를 남긴다. 조회는 `job_runs.recent()`(예외→`[]`)가 아니라 **직접 `query`** 하고 예외를 `failed`로 구별하며, 최신 02:00 행이 오늘 것이 아니면(야간 잡 미실행) `failed`다 — 「표시용 graceful read를 판정에 쓰면 그 관용이 거짓 판정이 된다」를 피한 형태다. **잔여(잠재 위험, 코드 docstring이 명시)**: 08:00은 「아직 처리 중」을 구별하지 못한다 — 대상이 늘거나 청크가 느려 02:00~08:00을 넘기면 처리 중인 ticker가 미갱신으로 판정되고, 대조가 하루 1회라 나중에 완료돼도 그 판정이 남는다(처방은 판정이 아니라 **시각** 이동). 또 02:00 행 UPDATE가 실패하면 warning만 남고 그 행은 거짓 초록으로 남는다(verify 자기 run에는 판정이 남는다).
 - **실행기 분기와 키 주입(task#348·#349).** 리스너는 `model`에 `/`가 있으면 `opencode run -m <model> --auto`, 아니면 `claude -p`를 스폰한다(`scripts/cowork-fire-listener.py`). API 키는 프롬프트 리터럴이 아니라 자식 env `PORTFOLION_API_KEY`로 주입되고 프롬프트는 `$PORTFOLION_API_KEY`만 참조한다 — OpenCode `run`이 bash 명령을 run.log에 에코하므로 리터럴이면 평문 로그로 샜다. run.log는 0600으로 생성된다.
 - **리스너 큐는 인메모리 — ADR이 명시한 트레이드오프.** `scripts/cowork-fire-listener.py::_QUEUE`(`queue.Queue`)는 프로세스 재기동에 잔여 청크를 잃는다(ADR `260913-013425` §산출물: "재시도·영속화는 없고, 소실은 다음 날 회차가 덮는다(멱등이므로 데이터 손상은 없다)"). 배포 자체가 재기동 1회를 요구하므로 첫 배포일에 특히 그렇다.
-- **리스너 코드 변경은 `git push` 배포 경로 밖이다.** `deploy.sh`는 backend/nginx 컨테이너만 재생성하고 `cowork-fire-listener.py`는 launchd 서비스(`com.portfolion.cowork-fire-listener`)로 별도 상주한다 — 리스너 코드를 고치면 사용자의 수동 `launchctl kickstart`(ADR: "사용자 `!` 실행")가 따로 필요하다. 이걸 잊으면 배포는 성공으로 보이는데 리스너는 옛 코드로 계속 돈다(§10.1의 "두 배포 경로" 클래스와 다른 방향의 "배포됐지만 안 뜬" 사례).
+- **리스너 코드 변경은 `git push` 배포 경로 밖이다.** 배포(`bin/deploy`)는 backend/nginx 컨테이너만 재생성하고 `cowork-fire-listener.py`는 launchd 서비스(`com.portfolion.cowork-fire-listener`)로 별도 상주한다 — 리스너 코드를 고치면 사용자의 수동 `launchctl kickstart`(ADR: "사용자 `!` 실행")가 따로 필요하다. 이걸 잊으면 배포는 성공으로 보이는데 리스너는 옛 코드로 계속 돈다(옛 §10.1의 "두 배포 경로" 클래스와 다른 방향의 "배포됐지만 안 뜬" 사례 — 그 두 경로는 task#386에서 은퇴).
 - **청크 타임아웃은 유계다.** `_run_chunks`가 `proc.wait(timeout=3600)`(실측 5종목 1청크 ~19분의 3배 여유) 후 `TimeoutExpired`면 `proc.kill()`하고 다음 청크로 진행한다 — 무계 대기였다면 세션 하나가 안 끝나는 것만으로 워커 스레드가 영구 정지하고 이후 모든 전량 회차가 큐에 쌓이기만 했을 것(코드 주석이 이 대안을 "영구 정지" 시나리오로 명시).
 - **거부 응답의 진단성 — 이미 가드됨(task#346).** `Handler._reject`가 `Content-Length: 0`을 붙이지 않던 시절엔 클라이언트가 바디를 읽을 때 소켓이 이미 닫혀 간헐 `ConnectionReset`이 났다(실측 6회 중 2회) — 401을 실제로 받았다는 사실이 호출측 로그에서 사라지는 방향이었다. 지금은 헤더가 있고, 401 사유도 3종(`no-server-token`/`no-auth-header`/`token-mismatch`)으로 갈라 로그에 남긴다(토큰 값 자체는 안 남긴다).
 
@@ -1259,7 +1265,7 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 **함의**: 이 저장소의 설계 의도는 마커가 아니라 **매우 긴 한국어 docstring**에 실린다. 따라서 실제 부채는 *주석되지 않은 구조적 부채*이며, 그것이 이 문서 §1~§11의 내용이다. 마커 grep으로 부채를 찾으려 하지 말 것.
 
-### 12.2 `deploy.sh` 안의 죽은 TLS 설정 — **해소**(task#384)
+### 12.2 옛 `deploy.sh` 안의 죽은 TLS 설정 — **해소**(task#384, 해당 스크립트는 task#386에서 은퇴)
 
 옛 서술: `nginx/nginx.conf`의 `listen 443 ssl` 블록이 전부 주석 상태인데 ACME challenge location은 살아 있어 「HTTPS가 설정돼 있다」는 오독을 유발했다. 지금 `nginx.conf`는 `listen 80` 서버 하나뿐이고(주석 443 블록·acme location 모두 제거), `docker-compose.yml`의 nginx 주석이 「TLS는 Cloudflare가 종단한다 — 443 게시·인증서 갱신 컨테이너는 없다」를 명시한다. ⚠️ `§0` B82 각주의 「nginx 443 블록이 활성화되면 재판정」 조건은 블록이 **추가**되는 경우로 읽을 것.
 
@@ -1274,7 +1280,7 @@ fire 훅은 실패해도 본 요청을 막지 않는다(의도). 잔여는 §6.2
 
 ### 12.4 리포지토리 위생 — **잠재 위험**(악화 중)
 
-루트에 `screenshots-*` 디렉터리가 **104개** 쌓여 있다(2026-08-22 실측, 전부 untracked — 직전 판 "90여 개"에서 계속 증가). `.forge/` 산출물, `.planning/`, `.superpowers/`, `.worktrees/`, `supabase/`(제거된 인프라의 잔재)도 공존한다. `git status`가 사실상 판독 불가라 **어떤 미커밋 변경이 `deploy.sh`의 사전 거부(exit 2)를 일으키는지 눈으로 확인하기 어렵다**(옛 판의 「폴러가 무엇을 날릴지」는 `reset --hard`가 사라져 더는 해당하지 않는다, §10.1). 2026-10-10 실측: `screenshots-*` **111**개 · `scripts/` **188**항목(§9.7).
+루트에 `screenshots-*` 디렉터리가 **104개** 쌓여 있다(2026-08-22 실측, 전부 untracked — 직전 판 "90여 개"에서 계속 증가). `.forge/` 산출물, `.planning/`, `.superpowers/`, `.worktrees/`, `supabase/`(제거된 인프라의 잔재)도 공존한다. `git status`가 사실상 판독 불가라 **어떤 미커밋 변경이 옛 `deploy.sh`의 사전 거부(exit 2, 은퇴)를 일으키는지 눈으로 확인하기 어렵다**(옛 판의 「폴러가 무엇을 날릴지」는 `reset --hard`가 사라져 더는 해당하지 않는다, §10.1). 2026-10-10 실측: `screenshots-*` **111**개 · `scripts/` **188**항목(§9.7).
 
 ### 12.5 `backend/migrations/`가 죽었다 — **확인된 버그**(문서·구조)
 

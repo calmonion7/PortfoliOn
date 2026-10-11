@@ -73,6 +73,22 @@ cp backend/.env        "$BAKDIR/backend.env"
 cp .env                "$BAKDIR/root.env"
 echo "백업: $BAKDIR/"
 
+# 표준 배포로 재배포한다(task#386) — compose up --force-recreate 가 실행 자리 .env 를 다시 읽는다.
+# backend/.env.docker 는 ~/runtime/portfolion/prod/.env 를 가리키는 심링크라 위의 파일 쓰기(cp·write_text)가
+# 정본을 고친다 — 둘 다 심링크를 따라가 쓴다(mv·원자적 교체를 쓰면 심링크가 일반 파일로 바뀌니 쓰지 말 것).
+redeploy() {
+  local before id
+  before=$(gh run list --workflow deploy.yml --event workflow_dispatch -L1 --json databaseId --jq '.[0].databaseId // 0')
+  gh workflow run deploy.yml --ref main || return 1
+  for _ in $(seq 1 30); do
+    id=$(gh run list --workflow deploy.yml --event workflow_dispatch -L1 --json databaseId --jq '.[0].databaseId // 0')
+    [ "$id" != "$before" ] && break
+    sleep 2
+  done
+  [ "$id" != "$before" ] || return 1
+  gh run watch "$id" --exit-status >/dev/null
+}
+
 rollback() {
   echo "↩️  롤백 중..." >&2
   docker exec -i "$PG" psql -U portfolion -d portfolion -q >/dev/null 2>&1 <<SQL || true
@@ -81,7 +97,7 @@ SQL
   cp "$BAKDIR/backend.env.docker" backend/.env.docker
   cp "$BAKDIR/backend.env"        backend/.env
   cp "$BAKDIR/root.env"           .env
-  bash deploy.sh >/dev/null 2>&1 || true
+  redeploy >/dev/null 2>&1 || true
   echo "↩️  롤백 완료 — 옛 비밀번호로 되돌렸다. 백업은 $BAKDIR/ 에 남겨 둔다." >&2
 }
 
@@ -157,9 +173,9 @@ PY
 then rollback; die "env 파일 검증 실패"; fi
 
 # --- 5. 백엔드 재생성 --------------------------------------------------------
-# ⚠️ docker restart 는 --env-file 을 다시 읽지 않는다 → stop/rm/run 하는 deploy.sh 가 필요하다
-echo "[3/4] 백엔드 재생성 (deploy.sh — 프론트 빌드 포함, 1~2분)..."
-bash deploy.sh || { rollback; die "deploy.sh 실패"; }
+# ⚠️ docker restart 는 env_file 을 다시 읽지 않는다 → 컨테이너를 재생성하는 표준 배포가 필요하다
+echo "[3/4] 백엔드 재생성 (gh workflow run deploy.yml — 빌드 포함, 수 분)..."
+redeploy || { rollback; die "재배포(Deploy run) 실패"; }
 
 # --- 6. 검증 ----------------------------------------------------------------
 # 기동 배치가 도는 동안 포트가 늦게 열릴 수 있어 최대 ~3분 폴링한다 (CLAUDE.md task#250)

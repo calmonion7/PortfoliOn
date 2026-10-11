@@ -57,14 +57,14 @@ mapped: 2026-10-10
 | 브라우저 SPA | JWT Bearer(`Authorization`) | 전 라우터 |
 | 외부 Cowork 클라이언트 | `X-API-Key: <COWORK_API_KEY>` | `get_current_user_or_api_key` / `require_admin_or_api_key`가 걸린 엔드포인트 |
 | OAuth 제공자 리다이렉트 | HMAC `state` 검증 | `GET /api/auth/oauth/{google,github}/callback` |
-| 헬스체크(nginx·deploy.sh) | 없음 | `GET|HEAD /health` |
+| 헬스체크(nginx·`bin/deploy`; 옛 `deploy.sh`는 은퇴) | 없음 | `GET|HEAD /health` — 본문 `{"status":"ok","service":"portfolion"}`, `bin/deploy`는 `portfolion` 문자열을 기다린다 |
 
 ### 0.4 인프라 경유
 
 - **Cloudflare Tunnel** — `portfolion.taebro.com` → `localhost:80`. compose 서비스가 아니라 **launchd로 실행되는 `cloudflared`**.
-- **nginx** — `/api/`와 `/health`만 `backend:8000`으로 프록시, 나머지는 `frontend/dist` 정적 서빙(SPA 폴백).
+- **nginx** — `/api/`와 `/health`만 `backend:8000`으로 프록시, 나머지는 이미지에 구워진 프론트 dist 정적 서빙(SPA 폴백, task#386 — 옛 `frontend/dist` 마운트는 은퇴).
 - **TLS** — Cloudflare가 종단한다(터널 → `localhost:80`). certbot 컨테이너·`./certbot` 볼륨·nginx의 acme-challenge location·주석 처리돼 있던 443 블록은 **task#384에서 전부 제거**됐다 — 인증서 갱신 연동은 더 이상 없다.
-- **GitHub Actions(인바운드 트리거)** — push 시 self-hosted 러너가 `scripts/runner-deploy.sh`를 돌린다(배포 기록 대조, `STACK.md` §3.3). 러너는 GitHub로 아웃바운드 롱폴링만 하고 레포 밖 `~/actions-runner-portfolion`에 산다.
+- **GitHub Actions(인바운드 트리거)** — push 시 self-hosted 러너가 `.github/workflows/deploy.yml`로 `~/runtime/taebro-infra/bin/deploy portfolion prod`를 돌린다(`STACK.md` §3.3; 옛 `scripts/runner-deploy.sh`·폴러는 task#386에서 은퇴). 러너는 GitHub로 아웃바운드 롱폴링만 하고 레포 밖 `~/actions-runner-portfolion`에 산다.
 
 ---
 

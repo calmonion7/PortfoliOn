@@ -92,8 +92,8 @@ description: React 19 + plain CSS 프론트엔드의 시각·레이아웃·디�
 - **jsdom이 원리적으로 못 보는 것**: recharts 렌더 자체, 레이아웃 수치, 색 적용, `getComputedTextLength`.
   문자폭 실측 코드에는 **추정 폴백을 반드시 남긴다**(지우면 기존 단위테스트가 통째 깨진다).
 - **시각·레이아웃을 바꾸는 변경은 라이브 프로브 + 스크린샷 1장 육안 확인이 게이트다.**
-  프로브 작성은 live-uat-prober에게 넘기고, 네가 직접 돌릴 때는 **`npm run build` 이후**에 돌린다
-  (nginx가 `frontend/dist`를 직접 서빙 — 빌드 전엔 옛 번들을 잰다).
+  프로브 작성은 live-uat-prober에게 넘기고, 네가 직접 돌릴 때는 **push → Deploy run success(headSha) 이후**에 돌린다
+  (프론트는 nginx 이미지에 구워져 배포로만 라이브가 된다 — 로컬 `npm run build`는 라이브에 닿지 않는다, task#386).
 - **육안으로 잡은 결함은 반드시 축으로 승격**시켜 다음번엔 육안에 기대지 않는다.
 
 ## 반환 형식

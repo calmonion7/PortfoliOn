@@ -114,7 +114,7 @@ KIS는 PortfoliOn에서 **현재가 조회의 백업 소스**로만 쓴다. [[�
    # 모의투자 쓸 때만: KIS_BASE_URL=https://openapivts.koreainvestment.com:29443
    ```
 3. 코드는 `kis.client.configured()` 가드로 읽음 — **키 미설정이면 KIS 휴면**(기존 동작 무변화), 키 주입 후 폴백 활성화.
-4. 적용: 다음 `git push origin main` → `deploy.sh`가 `--env-file ./backend/.env.docker`로 백엔드 컨테이너 재생성하며 새 env 로딩(수동 docker 명령 불요).
+4. 적용: 다음 `git push origin main` → 러너가 `~/runtime/taebro-infra/bin/deploy portfolion prod`로 백엔드 컨테이너를 재생성하며 새 env 로딩(비밀 정본은 `~/runtime/portfolion/prod/.env`, `backend/.env.docker`는 그 심링크 — 수동 docker 명령 불요. 옛 `deploy.sh`는 task#386 은퇴).
 
 ## 오류코드
 

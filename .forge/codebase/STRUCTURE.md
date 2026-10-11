@@ -24,16 +24,16 @@ PortfoliOn/
 ├── backend/              FastAPI 앱 (Python 3.12 컨테이너 / 로컬 .venv는 3.9.6)
 ├── frontend/             React 19 + Vite SPA
 ├── nginx/nginx.conf      리버스 프록시 + 정적 서빙 설정 (listen 80 단일 서버 — 443·acme 블록 없음)
-├── scripts/              라이브 UAT 프로브 · 배포 폴러·러너 잡 · 운영 스크립트
+├── scripts/              라이브 UAT 프로브 · 운영 스크립트 (옛 배포 폴러·러너 잡은 task#386에서 은퇴)
 │                         (184 파일 = `find scripts -maxdepth 1 -type f`; 아래 §4)
 ├── docs/                 사람이 읽는 문서 (아래 §6)
 ├── .forge/               forge 워크플로 상태 · 코드베이스 지도 · ADR · 회고
 ├── .claude/              Claude Code 설정 · 도메인 에이전트 카드 · 스킬
-├── docker-compose.yml    3서비스 정의(postgres·backend·nginx) — 런타임에 compose가 소유하는 건
-│                         postgres뿐이고 backend·nginx는 deploy.sh가 `docker run`으로 소유한다.
+├── docker-compose.yml    배포 compose(backend·nginx) — 두 컨테이너를 compose(프로젝트 `portfolion`)가 소유한다.
+│                         postgres는 compose 밖(컨테이너 `portfolion-postgres-1`, 정의는 `deploy/legacy-postgres.compose.yml`).
 │                         certbot 서비스·`certbot/` 디렉터리는 task#384에서 은퇴(TLS는 Cloudflare 종단)
-├── deploy.sh             배포 스크립트 (러너·폴러·수동 공용 — 잠금·배포 기록·종료코드 0/1/2 계약)
-├── .github/workflows/deploy.yml   self-hosted 러너 워크플로 (단일 step → `scripts/runner-deploy.sh`)
+├── deploy/taebro.env     taebro-infra 배포 계약 설정 (옛 `deploy.sh`는 task#386에서 은퇴)
+├── .github/workflows/deploy.yml   self-hosted 러너 워크플로 (→ `~/runtime/taebro-infra/bin/deploy portfolion prod`)
 ├── start.sh / start.bat / stop.sh / stop.bat   로컬 개발 서버 기동·정지
 ├── API_SPEC.md           전체 REST 레퍼런스 (엔드포인트 정본)
 ├── CLAUDE_COWORK_API.md  외부 Cowork 전용 API 명세
@@ -362,8 +362,8 @@ frontend/
 `.sh` 7 · `.md` 3 · `.json` 2 · `.txt` 1 · `.plist` 1 (= 184). 접두사별 `uat*` 128(그중 `uat*.mjs` **122**) ·
 `probe*` 13 · `smoke*` 3 · `loopcheck*` 5 · `capture*` 3 · `check-*` 3.
 (01ef5bd 이후 주요 증감 — `.py` +9: `ab-*.py` 6(발행 레인 A/B 하네스, task#350) ·
-`loopcheck-enrich-target-set.py` · `task351_measure.py` · `test_deploy_guard.py`(배포 셸 가드 pytest) /
-`.sh` +1: `runner-deploy.sh`(러너 잡, task#384) / `.md` +1: `review-prompt.md` /
+`loopcheck-enrich-target-set.py` · `task351_measure.py` · `test_deploy_guard.py`(옛 배포 셸 가드 pytest — 은퇴) /
+`.sh` +1: `runner-deploy.sh`(옛 러너 잡, task#384 — task#386에서 은퇴) / `.md` +1: `review-prompt.md` /
 `.mjs`: 신규 `uat205`·`uat251`·`uat358`·`uat359`·`uat369`×2·`uat373`·`uat379` · `loopcheck-enrich-on-demand-live`,
 삭제 `uat222`·`uat225`·`uat254`·`uat275`(+ task#374의 v1 심층 리포트 프로브 정리))
 
@@ -378,8 +378,8 @@ frontend/
 | `capture-<슬러그>.{js,mjs}` | 육안 확인용 스크린샷 캡처 | `capture-tech322-m278.mjs` · `capture-ux.js` |
 | `<슬러그>-baseline-tags.txt` | 프로브 baseline 동결(래칫 비교 대상) | `uat311-baseline-tags.txt` |
 | `audit_*.py` | 정적 감사 | `audit_unauth_endpoints.py` |
-| 운영 | 배포·DDNS·리스너·자동기동 | `auto-deploy-poll.sh` · `runner-deploy.sh` · `ddns_update.sh` · `start-docker-compose.sh` · `cowork-fire-listener.py` · `rotate-postgres-password.sh` · `apply-docker-autostart.sh` |
-| `test_*.py` | 저장소 루트 스크립트의 pytest 가드 (실행은 `backend/.venv`) | `test_deploy_guard.py` · `test_fire_listener_logging.py` |
+| 운영 | DDNS·리스너·비밀 회전 (옛 배포·자동기동 스크립트 `auto-deploy-poll.sh`·`runner-deploy.sh`·`start-docker-compose.sh`·`apply-docker-autostart.sh`는 task#386에서 은퇴·삭제) | `ddns_update.sh` · `cowork-fire-listener.py` · `rotate-postgres-password.sh` · 1회성 `cutover/01-retire-launchd.sh`·`cutover/02-prod-cutover.sh` |
+| `test_*.py` | 저장소 루트 스크립트의 pytest 가드 (실행은 `backend/.venv`) | `test_fire_listener_logging.py` (옛 `test_deploy_guard.py`는 task#386 은퇴) |
 | 데이터 | 일회성 복구·백테스트·A/B 하네스 | `repair-005930-snapshots.py` · `kospi_signal_backtest.py` · `enrich-ab.py`(ARCHITECTURE.md §4.4 enrich 이력 A/B) · `ab-*.py`(§4.4 발행 레인 A/B — 쓰기 차단 프록시) |
 | 프롬프트 | 루틴 정의 · A/B 검수 팔 지시 | `cowork-routine-prompt.md` · `review-prompt.md`(task#350 H1 팔) |
 
@@ -549,8 +549,8 @@ task#384) — **사람이 읽는** 문서.
 | 차트 단위 포매팅 | `frontend/src/components/market/marketUtils.jsx` (`krFmt`) |
 | PWA·SW 캐싱·번들 청크 | `frontend/vite.config.js` |
 | nginx 캐시 헤더·프록시 | `nginx/nginx.conf` |
-| 배포 절차 | `deploy.sh` · `.github/workflows/deploy.yml` → `scripts/runner-deploy.sh` · `scripts/auto-deploy-poll.sh` (회귀 가드 `scripts/test_deploy_guard.py`) |
-| 재부팅 자동기동 | `scripts/start-docker-compose.sh`(compose는 postgres만) + `scripts/apply-docker-autostart.sh` |
+| 배포 절차 | `.github/workflows/deploy.yml` → `~/runtime/taebro-infra/bin/deploy portfolion prod` · `deploy/taebro.env` (옛 `deploy.sh`·`runner-deploy.sh`·`auto-deploy-poll.sh`·`test_deploy_guard.py`는 task#386 은퇴) |
+| 재부팅 자동기동 | Docker Desktop 자동 시작 + 컨테이너 `restart: unless-stopped` (옛 `scripts/start-docker-compose.sh`·`apply-docker-autostart.sh`는 task#386 은퇴) |
 | 엔드포인트 명세 | `API_SPEC.md` (+ Cowork 대상이면 `CLAUDE_COWORK_API.md`) |
 
 ---
@@ -559,14 +559,13 @@ task#384) — **사람이 읽는** 문서.
 
 | 경로 | 내용 |
 |---|---|
-| `frontend/dist/` | **nginx가 서빙하는 실체.** 로컬 빌드가 곧 라이브 |
+| `frontend/dist/` | 로컬 빌드 산출물 (task#386 이후 라이브는 nginx 이미지에 구워진 사본 — 로컬 빌드는 라이브와 무관) |
 | `frontend/node_modules/` · `scripts/node_modules/` | 의존성 |
 | `backend/.venv/` | 로컬 Python 3.9.6 (컨테이너는 3.12 — 버전차가 API 형태를 가른다) |
 | `backend/snapshots/` | per-ticker/date 스냅샷 파일 폴백 |
 | `backend/reports/` | 레거시 리포트 |
 | `backend/data/consensus/` | per-ticker 컨센서스 파일 캐시 |
 | `backend/.env.docker` · `.env` | 시크릿 |
-| `~/.portfolion-deployed-sha` · `~/.portfolion-deploy-failed-sha` | 저장소 **밖** 호스트 파일 — 배포 기록(러너·폴러·수동 공용 트리거)과 폴러의 실패 1회 기록 |
-| `/tmp/portfolion-deploy.lock` | `deploy.sh` 단독 소유 배포 잠금 |
+| `~/runtime/portfolion/prod/.taebro-deploy` · `.taebro-deploy.lock` | 저장소 **밖** 호스트 파일 — 세대 기록(`generation=<YYMMDD-HHMMSS>-<커밋7자>`)과 infra 소유 배포 잠금 (옛 `~/.portfolion-deployed-sha`·`~/.portfolion-deploy-failed-sha`·`/tmp/portfolion-deploy.lock`은 은퇴) |
 | `screenshots*/` | UAT 캡처 |
 | `.worktrees/` · `.planning/` · `.superpowers/` · `docs/superpowers/` | 도구 잔재 |

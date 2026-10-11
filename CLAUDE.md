@@ -10,7 +10,7 @@
 > | `.claude/skills/live-uat-probes/` | 라이브 UAT 프로브 결함 9클래스·판정축·신뢰성 20규칙 | 프로브 저작·시각 검증 시 **호출** |
 > | `.claude/skills/subagent-orchestration/` | 병렬 서브에이전트 오염 6방향 사례사 | 워크플로우 설계 시 **호출** |
 > | `.claude/skills/verification-gates/` | 정지조건·감사·baseline·fault injection 설계 규율 | 게이트 설계·검증 시 **호출** |
-> | `.claude/skills/deploy-ops/` | 배포 메커니즘·라이브 장애 진단 런북 | 배포·502·러너/폴러 진단 시 **호출** |
+> | `.claude/skills/deploy-ops/` | 배포 메커니즘·라이브 장애 진단 런북 | 배포·502·러너 진단 시 **호출** |
 > | `backend/services/` · `routers/` · `tests/` 의 `CLAUDE.md` | 외부소스·저장 가드 / Pydantic·응답 계약 / 테스트 함정 | 해당 폴더 작업 시 자동 |
 >
 > 코드 리뷰·구현 태도(가정 명시·최소 구현·수술적 변경·검증 가능한 완료기준)는 **조직 정책으로 매 세션 주입되므로**
@@ -37,21 +37,21 @@ cd backend && .venv/bin/python -m pytest
 
 ## Deployment
 
-- **인프라**: Mac 로컬 Docker 3-컨테이너 — postgres(compose)·backend·nginx(`deploy.sh`의 `docker run`) (Render/Vercel/Supabase 제거)
-- **nginx**: HTTP(80) 서빙, /api/* → backend:8000 프록시
+- **인프라**: Mac 로컬 Docker 3-컨테이너 — backend·nginx(표준 배포 compose, 프로젝트 `portfolion`)·postgres(`portfolion-postgres-1` — 배포 compose 밖, 아래) (Render/Vercel/Supabase 제거)
+- **nginx**: HTTP(80) 서빙, /api/* → backend:8000 프록시. 프론트 `dist`와 `nginx.conf`는 **이미지에 굽는다**(`nginx/Dockerfile` 멀티스테이지) — 로컬 `npm run build`는 라이브에 닿지 않는다.
 - **TLS**: Cloudflare 터널이 종단한다 — nginx는 루프백 :80만 받고 인증서 컨테이너는 없다(task#384에서 은퇴).
 - **Cloudflare Tunnel**: portfolion.taebro.com → localhost:80 (cloudflared는 compose 컨테이너가 아니라 launchd로 실행)
-- **launchd 자동실행**: cloudflared + docker compose
-- **환경변수**: `backend/.env.docker` (DATABASE_URL, JWT_SECRET, SESSION_SECRET, OAuth, FRED_API_KEY, KOFIA_API_KEY) · `backend/.env` (로컬 venv·pytest용 DATABASE_URL) · `.env` (루트 — **`POSTGRES_PASSWORD`**, docker-compose 보간 전용). ⚠️ **DB 비밀번호를 바꾸면 이 3개를 함께 갱신해야 한다**(`scripts/rotate-postgres-password.sh`). `POSTGRES_PASSWORD`는 `backend/.env.docker`가 아니라 **루트 `.env`**에 있고, task#334에서 폴백을 제거해 **미설정이면 `docker compose`가 실패**한다(전엔 tracked 폴백값으로 조용히 떴고 그 값이 공개 저장소에 커밋돼 실운영 크리덴셜이었다 — B21).
+- **재부팅 복구**: Docker Desktop 자동 시작 + 컨테이너 `restart: unless-stopped`. launchd는 cloudflared만 맡는다(부팅 compose 잡은 task#386에서 은퇴).
+- **환경변수**: `~/runtime/portfolion/prod/.env`(600 — **prod 비밀 정본**: DATABASE_URL, JWT_SECRET, SESSION_SECRET, OAuth, FRED_API_KEY, KOFIA_API_KEY …; `backend/.env.docker`는 이 파일을 가리키는 **심링크**라 보조 스크립트는 그 경로로 읽는다) · `backend/.env` (로컬 venv·pytest용 DATABASE_URL) · `.env` (루트 — **`POSTGRES_PASSWORD`**, `deploy/legacy-postgres.compose.yml` 보간 전용). ⚠️ **DB 비밀번호를 바꾸면 이 3개를 함께 갱신해야 한다**(`scripts/rotate-postgres-password.sh` — 심링크를 따라 정본을 고친다. 비밀 파일을 `mv`·원자적 교체로 쓰면 심링크가 일반 파일로 바뀌니 금지). `POSTGRES_PASSWORD`는 비밀 정본이 아니라 **루트 `.env`**에 있고, task#334에서 폴백을 제거해 **미설정이면 그 compose가 실패**한다(전엔 tracked 폴백값으로 조용히 떴고 그 값이 공개 저장소에 커밋돼 실운영 크리덴셜이었다 — B21).
+- **postgres는 배포 compose 밖이다**(ADR `261011-074335` 결정 1): `bin/deploy`가 매 배포 `up --force-recreate`라 넣으면 배포마다 prod DB가 재생성된다. 컨테이너 `portfolion-postgres-1`(볼륨 `portfolion_pgdata`)은 compose orphan으로 그대로 두고, backend는 `portfolion_default` 네트워크의 `postgres:5432`로 붙는다. 수동 재생성 정의는 `deploy/legacy-postgres.compose.yml`(⑥-2 공용 DB 이전까지).
 - **배포 핵심 규칙 — 상세 런북·증상별 진단은 `.claude/skills/deploy-ops`(배포·라이브 장애를 다룰 땐 먼저 호출)**:
-  - `git push origin main`이 곧 배포다 — self-hosted 러너(`~/actions-runner-portfolion`, arm64)와 launchd 폴러(2분 주기) 중 먼저 온 쪽이 배포하고 다른 쪽은 배포 기록을 보고 건너뛴다. 둘 다 **origin/main(=push된 것)만** 배포하므로 **commit과 push를 묶을 것**. 수동 `bash deploy.sh`는 선택(기록과 무관한 강제 재배포, 겹치면 잠금 exit 2로 거부).
-  - `docker compose build` / `docker compose up` 같은 **ad-hoc 재빌드 금지**. 백엔드 컨테이너 재생성이 필요하면 정식 스크립트 `bash deploy.sh` 1회.
-  - 배포 판정은 exit 0·`/health` ok가 아니라 **`배포된 커밋: <SHA> <제목>` 줄**, 폴러 로그 `~/Library/Logs/com.portfolion.auto-deploy-poll.log`의 `Deploy complete: <SHA>`, `~/.portfolion-deployed-sha`로 한다.
-  - `deploy.sh`가 `npm run build`까지 돌리므로 **push 하나로 프론트도 ~20초 뒤 라이브**다 — 라이브를 재는 에이전트가 도는 동안에는 push·빌드·`deploy.sh`·컨테이너 재기동이 전부 배포성 행위라 하지 말 것. 라이브 red-first가 필요하면 push **전에** 돌린다.
+  - `git push origin main`이 곧 배포다 — self-hosted 러너(`~/actions-runner-portfolion`, arm64)가 `.github/workflows/deploy.yml` → **`~/runtime/taebro-infra/bin/deploy portfolion prod`**(taebro-infra 계약 v5, 정본 `~/runtime/taebro-infra/docs/CONTRACT.md`)를 돌린다: 러너 체크아웃에서 빌드 → 돌던 이미지를 `:prev`로 태그 → `docker-compose.yml`만 실행 자리 `~/runtime/portfolion/prod/`로 복사 → 거기서 `up --no-build --force-recreate` → 헬스(`deploy/taebro.env`: `/health` 본문에 `portfolion`, 최대 600초) → 세대 기록 → 실패하면 `:prev`로 자동 롤백. **push된 커밋만** 배포되므로 **commit과 push를 묶을 것**. `.forge/**`·`**/*.md`만 바뀐 push는 배포하지 않는다(`paths-ignore`). `dev` 브랜치 push는 dev 스택(127.0.0.1:8084, task#387).
+  - 수동 재배포 = `gh workflow run deploy.yml --ref main`. 롤백 = `~/runtime/taebro-infra/bin/deploy --rollback portfolion prod <세대>`(현재 세대가 그 값일 때만 되돌린다). `docker compose build` / `up` 같은 **ad-hoc 재빌드·기동 금지** — 실행 자리 밖에서 띄우면 라벨·`.env`가 어긋난다.
+  - 배포 판정은 exit 0·`/health` ok가 아니라 **Deploy run의 `headSha` + `conclusion=success`**(브랜치명만 보면 옛 run이 섞인다), run 로그의 `완료 — portfolion 세대 <세대>`, 그리고 `~/runtime/portfolion/prod/.taebro-deploy`의 `generation=<YYMMDD-HHMMSS>-<커밋7자>`로 한다. `bin/deploy` 종료코드: 0 성공 · 1 실패·롤백 성공 · 2 실패·롤백 실패 또는 첫 배포(다운 가능, 사람 필요) · 3 시작 전 거부(변경 없음).
+  - push 하나로 프론트·백엔드가 **함께** 라이브가 된다(빌드 포함 수 분) — 라이브를 재는 에이전트가 도는 동안에는 push·`gh workflow run`·컨테이너 재기동이 전부 배포성 행위라 하지 말 것. 라이브 red-first가 필요하면 push **전에** 돌린다.
   - 러너 재설치·등록(`config.sh`·`svc.sh`)은 에이전트 하드 차단 — 사람 몫이다(`!`로 실행할 스크립트로 넘길 것).
-  - 폴러는 **작업트리의** `scripts/auto-deploy-poll.sh`를 그대로 실행한다 — 그 파일을 고치기 전에 `~/.portfolion-deployed-sha` == origin/main(no-op 상태)인지 확인할 것.
   - **`.forge/CONTEXT.md`·`.forge/adr/`·`.forge/retro/`는 tracked다**(forge 스킬들의 「gitignored」 전제와 다르다) — 코드와 같은 커밋에 담을 것. `.forge/done/`·`backlog/`·`loop.md` 등은 untracked.
-  - 배포가 안 된 것 같으면 폴러 footgun을 단정하기 전에 `gh run list`(시각은 **UTC**)·러너 상태·폴러 로그부터 볼 것.
+  - 배포가 안 된 것 같으면 `gh run list --workflow deploy.yml`(시각은 **UTC** — 잡이 `queued`/`cancelled(24h)`면 러너 부재)·러너 상태(`gh api repos/calmonion7/PortfoliOn/actions/runners`)·run 로그의 `거부:`/`실패:` 줄부터 볼 것. 옛 launchd 폴러·`deploy.sh` 경로(배포 기록 SHA 대조)는 task#386에서 은퇴했다.
 
 ## Key Files
 
@@ -75,7 +75,7 @@ Docker PostgreSQL이 기본 저장소. 로컬 JSON 파일은 런타임 캐시 �
 
 - **⭐ LLM 세션에 「프로덕션에 쓰지 마라」는 가드가 아니다 — 무부작용 실험은 *구조적으로* 불가능하게 만들고, 그 가드의 차단 카운트를 산출로 남길 것(task#350 실측 36건)**: A/B 섀도 하네스의 원안은 「섀도 프롬프트(저장하지 마라) + 사후 prod 행 카운트」였다. 착수 전 **쓰기 차단 프록시 + 더미 API 키 2겹**으로 바꿨더니 본 실행 20표본에서 프록시가 **쓰기 36건을 실제로 차단**했다 — 원안대로였으면 그만큼이 prod에 들어갔고, 기술 리포트는 `slug` upsert라 복구 불가였다. 사후 카운트는 사고를 *발견*하지 *방지*하지 못하고, 프롬프트 지시는 모델이 따를 때만 작동한다. 실천 3가지: ⓐ 외부 세션(루틴·OpenCode·`claude -p`)이 prod API를 볼 수 있는 실험은 **쓰기 메서드를 물리적으로 막는 계층**(프록시·읽기전용 키·별도 DB)을 먼저 세울 것 ⓑ 그 계층의 **차단 카운트를 산출물에 포함**할 것 — 0이면 「무해했다」가 아니라 「가드를 안 탔다」일 수 있다(대조군: 진짜 키 GET 200·더미 키 POST 401을 쌍으로) ⓒ 우회 지시(발행 게이트 무시 등)는 트리거에 넣되 **「어차피 저장되지 않는다」는 모델에게 알리지 말 것** — 알면 덜 노력해 품질 측정이 오염된다. 부수: 본 실행 전 **파일럿 1건은 필수**다 — 표본 선정과 대상 시스템의 게이트(7일 발행 게이트)가 충돌해 첫 발사가 38초 빈손 종료했고, 「분량」 축이 DB 블롭 vs 요청 본문을 비교해 4배 오표기했던 것을 파일럿만이 잡았다.
 
-- **⭐ 병렬 서브에이전트에게 `git stash`·`checkout`·`restore`·`reset`과 프론트 빌드(`npm run build`·`vite build`)를 금지할 것 — 작업트리 전역 변형은 형제의 *측정 대상*을 바꾸고, 그 오염은 "재현 불가 flake"로 오귀속된다.** 프론트 빌드는 nginx가 `frontend/dist`를 직접 서빙하므로 이름이 "문법 확인"이어도 **배포 행위**다. **그리고 오케스트레이터 자신도 같은 규칙의 적용 대상이다** — 라이브를 재는 에이전트가 도는 동안 메인 세션도 배포성 행위(빌드·`deploy.sh`·컨테이너 재기동)를 하지 말 것. 나머지 4대 원칙: ① 파일 내 fault-injection은 **파일당 주입자가 1명일 때만** 안전하다 ② 병렬 wave의 완료기준은 **자기 소유 파일의 표적 테스트**로 좁힐 것(전체 스위트는 파일이 안 겹쳐도 형제의 미완 상태를 본다) ③ **문서·프로브 갱신 슬라이스는 코드 wave와 적대 검토가 끝난 뒤 직렬 단계**로 둘 것(형제의 미완 상태가 박제되고, 리뷰가 계약을 바꾸면 프로브가 통째로 스테일해진다) ④ 프롬프트에 코드 예시를 인용할 땐 `${`를 `\${`로 이스케이프할 것(평가되면 thunk가 죽고 **`agents_error: 0`으로 조용히** 보고된다 — 완료 시 `<failures>`와 결과 키의 null을 반드시 확인). **6가지 오염 방향의 실측 사례사와 처방 근거는 `.claude/skills/subagent-orchestration` 스킬에 있다.**
+- **⭐ 병렬 서브에이전트에게 `git stash`·`checkout`·`restore`·`reset`과 프론트 빌드(`npm run build`·`vite build`)를 금지할 것 — 작업트리 전역 변형은 형제의 *측정 대상*을 바꾸고, 그 오염은 "재현 불가 flake"로 오귀속된다.** 프론트 빌드는 형제가 보는 `frontend/dist`를 바꾼다(옛 경로에선 nginx가 그 폴더를 직접 서빙해 곧 배포 행위였다 — task#386 이후 프론트는 nginx 이미지에 구워져 로컬 빌드는 라이브에 닿지 않는다). **그리고 오케스트레이터 자신도 같은 규칙의 적용 대상이다** — 라이브를 재는 에이전트가 도는 동안 메인 세션도 배포성 행위(push·`gh workflow run`·컨테이너 재기동)를 하지 말 것. 나머지 4대 원칙: ① 파일 내 fault-injection은 **파일당 주입자가 1명일 때만** 안전하다 ② 병렬 wave의 완료기준은 **자기 소유 파일의 표적 테스트**로 좁힐 것(전체 스위트는 파일이 안 겹쳐도 형제의 미완 상태를 본다) ③ **문서·프로브 갱신 슬라이스는 코드 wave와 적대 검토가 끝난 뒤 직렬 단계**로 둘 것(형제의 미완 상태가 박제되고, 리뷰가 계약을 바꾸면 프로브가 통째로 스테일해진다) ④ 프롬프트에 코드 예시를 인용할 땐 `${`를 `\${`로 이스케이프할 것(평가되면 thunk가 죽고 **`agents_error: 0`으로 조용히** 보고된다 — 완료 시 `<failures>`와 결과 키의 null을 반드시 확인). **6가지 오염 방향의 실측 사례사와 처방 근거는 `.claude/skills/subagent-orchestration` 스킬에 있다.**
 
 - **백엔드 모듈·외부 데이터소스 인벤토리는 `backend/CLAUDE.md`로 분리됐다** (키움·KIS·DART·FRED·KOFIA·관세청·yfinance 연동, `market_indicators/` 패키지, 캐시 6종, 라우터·서비스 지도 — 21항목). `backend/` 아래 파일을 만질 때 자동 로드된다. **외부 소스의 파싱 규약이 필요하면 그 파일을 먼저 읽을 것** — 응답 봉투·필드 스케일·필수 파라미터 함정이 거기 있다.
 

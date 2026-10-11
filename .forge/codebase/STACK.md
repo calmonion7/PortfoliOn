@@ -20,7 +20,7 @@ mapped: 2026-10-10
 | DB | PostgreSQL 16 (Docker `postgres:16-alpine`) | `docker-compose.yml`, `backend/app_schema.sql`, `backend/auth_schema.sql` |
 | 웹서버 | nginx:alpine (정적 서빙 + `/api/` 프록시) | `nginx/nginx.conf` |
 | TLS | Cloudflare Tunnel이 종단 — 인증서 컨테이너·443 게시 없음(certbot은 task#384에서 은퇴) | `docker-compose.yml`, `nginx/nginx.conf` |
-| 배포 | GitHub Actions self-hosted 러너(arm64) + launchd 폴러 — 둘 다 배포 기록(`~/.portfolion-deployed-sha`)을 대조해 먼저 온 쪽이 `deploy.sh` | `.github/workflows/deploy.yml`, `scripts/runner-deploy.sh`, `scripts/auto-deploy-poll.sh`, `deploy.sh` |
+| 배포 | GitHub Actions self-hosted 러너(arm64) → `~/runtime/taebro-infra/bin/deploy portfolion prod`(task#386; 옛 launchd 폴러·`deploy.sh`는 은퇴) | `.github/workflows/deploy.yml`, `deploy/taebro.env`, `docker-compose.yml`, `nginx/Dockerfile` |
 | 백엔드 테스트 | pytest (`backend/tests/`, 테스트 파일 184개) | `backend/pytest.ini`, `backend/tests/conftest.py` |
 | 프론트 테스트 | vitest + jsdom + @testing-library (테스트 파일 105개) | `frontend/vite.config.js`의 `test` 블록, `frontend/src/test/setup.js` |
 | 라이브 UAT | Playwright (별도 워크스페이스) | `scripts/package.json`, `scripts/uat*.mjs` |
@@ -37,7 +37,7 @@ mapped: 2026-10-10
 - **로컬 개발/테스트**: `backend/.venv/` = **Python 3.9.6**. 이 비대칭이 하드 제약 두 개를 만든다.
   - **PEP604 union(`X | None`)을 런타임 평가 어노테이션에 쓰면 로컬에서 `TypeError`** — Pydantic 모델·FastAPI 시그니처는 `Optional[X]`를 쓴다. (모듈 상단 `from __future__ import annotations`가 있는 파일은 *함수 어노테이션*이 지연 평가되므로 `int | None`이 통과하지만, Pydantic 필드처럼 실제로 평가되는 자리에서는 여전히 깨진다. 실제로 `services/db.py`·`services/kiwoom/client.py` 등은 `from __future__ import annotations` 아래에서 `X | None`을 쓰고 있다.)
   - **`lxml`은 `requirements.txt`에 있고 이미지엔 설치되지만 로컬 venv엔 없다** — 로컬 pytest가 게이트이므로 HTML 파싱은 `BeautifulSoup(html, "html.parser")`로 통일돼 있다(`services/market_indicators/indices.py`의 `_parse_multpl_cape`, `services/market/kr.py`).
-- **`backend/Procfile`** (`web: uvicorn main:app --host 0.0.0.0 --port $PORT`)은 과거 PaaS 배포 잔재 — 현재 배포 경로(`deploy.sh` → `docker run`)에서 쓰이지 않는다.
+- **`backend/Procfile`** (`web: uvicorn main:app --host 0.0.0.0 --port $PORT`)은 과거 PaaS 배포 잔재 — 현재 배포 경로(`bin/deploy` → compose, 옛 `deploy.sh` → `docker run`은 은퇴)에서 쓰이지 않는다.
 
 ### 1.2 의존성 (`backend/requirements.txt`)
 
@@ -318,21 +318,21 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 
 ## 3. 인프라 · 배포
 
-### 3.1 컨테이너 (`docker-compose.yml`, version "3.9")
+### 3.1 컨테이너 (`docker-compose.yml` — `backend`·`nginx`만 정의, task#386)
 
 | 서비스 | 이미지/빌드 | 포트 | 볼륨 |
 |---|---|---|---|
-| `postgres` | `postgres:16-alpine` | `127.0.0.1:5432:5432`(루프백 전용) | `pgdata` + `auth_schema.sql`→`/docker-entrypoint-initdb.d/01-auth.sql`, `app_schema.sql`→`02-app.sql` |
-| `backend` | `build: ./backend` | (미노출, 내부 8000) | — · `env_file: ./backend/.env.docker` · `depends_on: postgres(service_healthy)` |
-| `nginx` | `nginx:alpine` | `127.0.0.1:80:80`(루프백 전용) | `./frontend/dist`→`/usr/share/nginx/html:ro`, `./nginx/nginx.conf:ro` |
+| `backend` | `build: ./backend` · `env_file: .env`(실행 자리 `~/runtime/portfolion/prod/.env`) · `mem_limit: 1g` | (미노출, 내부 8000) | — |
+| `nginx` | `build: nginx/Dockerfile`(프론트 dist를 이미지에 굽는다) · `depends_on: backend` · `mem_limit: 64m` | `127.0.0.1:${TAEBRO_HTTP_PORT}:80`(루프백 전용 — prod 80·dev 8084, `bin/deploy`가 주입) | — (마운트 없음) |
+| `postgres` — **배포 compose 밖** | `postgres:16-alpine`, 정의는 `deploy/legacy-postgres.compose.yml`에 보존 | `127.0.0.1:5432:5432`(루프백 전용) | `pgdata`(볼륨 `portfolion_pgdata`) + `auth_schema.sql`→`01-auth.sql`, `app_schema.sql`→`02-app.sql` |
 
-`certbot` 서비스와 `./certbot/*` 볼륨은 **은퇴했다(task#384)** — TLS는 Cloudflare가 종단하고(터널 → `localhost:80`), 443 게시·인증서 갱신 컨테이너는 없다. 그래서 **런타임은 3컨테이너**다: `postgres`(compose 소유) + `backend`·`nginx`(`deploy.sh`가 `docker run`으로 소유, 아래 ⚠️).
+`certbot` 서비스와 `./certbot/*` 볼륨은 **은퇴했다(task#384)** — TLS는 Cloudflare가 종단하고(터널 → `localhost:80`), 443 게시·인증서 갱신 컨테이너는 없다. 그래서 **런타임은 3컨테이너**다: `backend`·`nginx`(compose 소유, 프로젝트 `portfolion`) + `postgres`(컨테이너 `portfolion-postgres-1`, 배포 compose 밖 — 아래 ⚠️).
 
-`postgres` healthcheck는 `pg_isready -U portfolion`(5s 간격·10회). `postgres`/`backend`/`nginx`는 `restart: unless-stopped`.
+`postgres` healthcheck는 `pg_isready -U portfolion`(5s 간격·10회, 보존 정의 `deploy/legacy-postgres.compose.yml`에 있다). `backend`/`nginx`는 compose에서 `restart: unless-stopped`, `backend`에 compose healthcheck는 없다(헬스는 `bin/deploy`가 `/health`로 본다, §3.3).
 
-⚠️ **포트 게시가 전부 `127.0.0.1`로 좁혀졌다(B82 대응)** — 이전엔 `5432:5432`/`80:80`/`443:443`으로 전 인터페이스에 열려 있어 LAN에서 postgres·nginx에 직접 도달할 수 있었다(`CF-Connecting-IP` 위조로 로그인 레이트리밋을 우회하거나 표적 잠금을 거는 경로). 공개 경로는 Cloudflare Tunnel(`cloudflared` → `http://localhost:80`)뿐이라는 전제(ADR `260823-085145`)를 배포 구성으로 실제 강제한 것. 호스트 `127.0.0.1:5432`를 보고 접속하는 곳의 전수 목록(공용 postgres 이전 체크리스트)은 `docs/ops/postgres-5432-consumers.md`. `POSTGRES_PASSWORD`는 **폴백이 제거돼 `${POSTGRES_PASSWORD:?...}`로 미설정 시 `docker compose` 자체가 실패**한다 — 옛 폴백값이 공개 저장소 커밋 이력에 남아 실운영 크리덴셜로 쓰이고 있었기 때문(B21). 비밀번호 교체 절차는 `scripts/rotate-postgres-password.sh`(§3.4).
+⚠️ **포트 게시가 전부 `127.0.0.1`로 좁혀졌다(B82 대응)** — 이전엔 `5432:5432`/`80:80`/`443:443`으로 전 인터페이스에 열려 있어 LAN에서 postgres·nginx에 직접 도달할 수 있었다(`CF-Connecting-IP` 위조로 로그인 레이트리밋을 우회하거나 표적 잠금을 거는 경로). 공개 경로는 Cloudflare Tunnel(`cloudflared` → `http://localhost:80`)뿐이라는 전제(ADR `260823-085145`)를 배포 구성으로 실제 강제한 것. 호스트 `127.0.0.1:5432`를 보고 접속하는 곳의 전수 목록(공용 postgres 이전 체크리스트)은 `docs/ops/postgres-5432-consumers.md`. `POSTGRES_PASSWORD`는 **폴백이 제거돼 `${POSTGRES_PASSWORD:?...}`로 미설정 시 `docker compose` 자체가 실패**한다(task#386 이후 이 보간은 보존 정의 `deploy/legacy-postgres.compose.yml`에 남아 있고, 비밀 정본은 `~/runtime/portfolion/prod/.env`(600) — `backend/.env.docker`는 그것을 가리키는 심링크) — 옛 폴백값이 공개 저장소 커밋 이력에 남아 실운영 크리덴셜로 쓰이고 있었기 때문(B21). 비밀번호 교체 절차는 `scripts/rotate-postgres-password.sh`(§3.4).
 
-⚠️ **compose 정의와 실제 런타임이 갈린다** — `deploy.sh`는 backend/nginx를 compose가 아니라 **`docker run`으로 직접 교체**한다(§3.3). 그래서 `docker compose ps`에 backend가 안 잡히고, uptime 확인은 `docker ps`로 해야 한다.
+⚠️ **postgres는 배포 compose에 없다**(ADR `261011-074335` 결정 1) — `bin/deploy`가 매번 `up --force-recreate`라 넣으면 유일한 prod DB 컨테이너가 배포마다 재생성된다. 컨테이너는 그대로 두고(compose orphan 경고만) backend가 `portfolion_default` 네트워크의 `postgres:5432`로 붙는다. backend·nginx는 이제 compose 소유라 `docker compose ps`에 잡힌다(옛 「`docker run`이라 안 잡힌다」는 `deploy.sh` 은퇴와 함께 사라졌다). ⑥-2(공용 DB 이전)까지 이 상태다.
 
 **Cloudflare Tunnel**(`portfolion.taebro.com` → localhost:80)은 compose 서비스가 아니라 launchd로 돈다.
 
@@ -348,23 +348,26 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 
 ### 3.3 배포 파이프라인
 
-**자동 경로는 둘이고 같은 배포 기록을 본다** — `deploy.sh`가 성공 끝에 배포한 SHA를 `DEPLOY_MARKER`(기본 `~/.portfolion-deployed-sha`)에 쓰고, 러너와 폴러는 `origin/main`이 그 기록과 다를 때만 `deploy.sh`를 부른다. 그래서 먼저 도착한 쪽이 배포하고 다른 쪽은 no-op이며, 어느 경로도 `git reset --hard`를 하지 않는다.
+**단일 경로다**(task#386, ADR `261011-074335`가 `261009-105247`을 대체; 계약 정본 `~/runtime/taebro-infra/docs/CONTRACT.md` v5) — `git push origin main` → self-hosted 러너(`~/actions-runner-portfolion`, arm64, `runs-on: [self-hosted, ARM64]`) → `.github/workflows/deploy.yml` → `~/runtime/taebro-infra/bin/deploy portfolion prod`. `dev` 브랜치 push는 dev 스택(127.0.0.1:8084, task#387). 트리거는 `push: [main, dev]` + `workflow_dispatch`이고 `.forge/**`·`**/*.md`만 바뀐 push는 `paths-ignore`로 배포하지 않으며, PR 트리거는 없다(공개 레포라 포크 PR이 호스트 러너에서 코드를 실행하는 구멍이 된다). `concurrency: deploy-<ref>`.
 
-**러너** `.github/workflows/deploy.yml`: `on: push: branches: [main]` → `runs-on: self-hosted`(전용 디렉터리 `~/actions-runner-portfolion`, arm64로 재설치돼 online) → **단일 스텝 `bash <repo>/scripts/runner-deploy.sh`**. `runner-deploy.sh`: `git fetch` 후 기록 == `origin/main`이면 「이미 배포됨」 exit 0 → 잠금(`DEPLOY_LOCK`, 기본 `/tmp/portfolion-deploy.lock`)이 있으면 5초 간격으로 최대 `RUNNER_LOCK_WAIT_SEC`(기본 900초) 대기(초과 시 exit 1) → **기록을 다시 대조**(대기 중 폴러가 같은 커밋을 배포했을 수 있다) → 다르면 `bash deploy.sh`를 돌려 **그 종료코드를 그대로** 반환. fetch 실패는 exit 2.
+옛 경로(task#386 은퇴): 러너 잡 `scripts/runner-deploy.sh` + launchd 폴러 `scripts/auto-deploy-poll.sh`(2분 주기)가 배포 기록 `~/.portfolion-deployed-sha`(`DEPLOY_MARKER`)를 `origin/main`과 대조해 옛 `deploy.sh`(`docker run` 4단계)를 부르던 이중 경로였다. 실패 기록 `~/.portfolion-deploy-failed-sha`·`/tmp/portfolion-deploy.lock`·폴러 로그·회귀 가드 `scripts/test_deploy_guard.py`(40테스트)와 함께 모두 삭제됐다. 옛 부팅 잡 `com.portfolion.docker-compose`(`scripts/start-docker-compose.sh`·`apply-docker-autostart.sh`·plist)도 은퇴했고 재부팅 복구는 Docker Desktop 자동 시작 + `restart: unless-stopped`다. 은퇴 작업은 1회성 `scripts/cutover/01-retire-launchd.sh`·`02-prod-cutover.sh`가 했다.
 
-**폴러** `scripts/auto-deploy-poll.sh`(launchd `com.portfolion.auto-deploy-poll`, 2분 주기): 잠금이 있으면 skip → `git fetch` → HEAD가 `origin/main`보다 **뒤처졌을 때만** `git merge --ff-only`(앞섬·갈라짐은 손대지 않음, ff 실패도 skip) → 기록 == `origin/main`이면 exit → `~/.portfolion-deploy-failed-sha`(`DEPLOY_FAILED_MARKER`)가 그 SHA면 exit → `deploy.sh`. **실패 1회 정책**: exit 2(사전 거부)면 다음 폴에서 재시도, 그 밖의 비0이면 그 SHA를 failed 기록에 쓰고 같은 커밋을 다시 시도하지 않는다(새 push나 수동 `deploy.sh` 성공으로 풀린다). 로그 `~/Library/Logs/com.portfolion.auto-deploy-poll.log`의 `Deploy complete: <SHA>`.
+**`bin/deploy portfolion prod`** 순서:
+1. 러너 체크아웃에서 이미지 빌드 — `portfolion-backend`(`./backend`)·`portfolion-nginx`(`nginx/Dockerfile` 멀티스테이지: `node:24-alpine`에서 `npm ci` + `npm run build` → `nginx:alpine`에 `nginx.conf`와 dist를 COPY, 루트 `.dockerignore`가 frontend·nginx.conf만 들인다).
+2. 돌던 이미지를 `:prev`로 태그.
+3. `docker-compose.yml`만 실행 자리 `~/runtime/portfolion/prod/`로 복사 — 거기엔 이 파일과 `.env`(비밀 정본, 600)만 있다.
+4. 거기서 `compose up -d --no-build --force-recreate`.
+5. 헬스 — `/health` 본문에 `portfolion`(`deploy/taebro.env`: `HEALTH_PATH=/health`·`HEALTH_EXPECT=portfolion`·`HEALTH_TIMEOUT=600` — 기동 배치로 포트가 수 분 안 열리는 창을 정상 기동으로 보려는 값이다). `/health`는 `{"status":"ok","service":"portfolion"}`.
+6. 세대 기록 `~/runtime/portfolion/prod/.taebro-deploy`(`generation=<YYMMDD-HHMMSS>-<커밋7자>`).
+7. 실패 시 `:prev`로 자동 롤백(첫 배포는 롤백 대상 없음). 잠금은 실행 자리의 `.taebro-deploy.lock`(infra 소유).
 
-러너·폴러 모두 launchd/러너 최소 PATH에 없는 fnm npm·`/usr/local/bin` docker를 **PATH 뒤에 덧붙인다**(앞에 붙이면 `scripts/test_deploy_guard.py`의 스텁보다 실 docker가 먼저 잡힌다). 두 스크립트와 `deploy.sh`는 본문 전체를 `{ … }` 한 그룹으로 감싸 실행 중 제자리 편집에 안전하다. 회귀 가드: **`scripts/test_deploy_guard.py`**(40테스트 — 임시 bare origin + 클론 + 스텁 PATH로 `deploy.sh`·폴러·`runner-deploy.sh` 세 스크립트를 함께 덮는다, `backend/.venv/bin/python -m pytest scripts/test_deploy_guard.py -q`).
+**종료코드**: 0 성공 · 1 실패+롤백 성공 · 2 실패+롤백 실패(다운 가능) · 3 시작 전 거부(변경 없음). 옛 `deploy.sh`의 「2 = 사전 거부 · 1 = 실패」(은퇴)와 의미가 다르다.
 
-**`deploy.sh`** (`set -e`, 사전 거부 → 4단계):
-0. **종료코드 계약** — `0` 성공(기록 갱신) · `2` 사전 거부(컨테이너를 건드리기 전: 잠금 존재 · `frontend`/`backend`/`nginx`/`deploy.sh`에 미커밋 tracked 변경 · `git fetch` 실패 · HEAD가 앞서거나 갈라짐 · ff 실패) · `1` 그 뒤의 모든 실패(`trap 'exit 1' ERR`로 도구 종료코드와 무관하게 1). HEAD가 뒤처졌으면 `--ff-only`로 따라잡는다. 잠금 `DEPLOY_LOCK`은 `deploy.sh`만 잡고 `trap`으로 해제. `DOCKER_CONFIG`를 임시 dir로 바꿔 macOS keychain 접근을 우회.
-1. `cd frontend && npm install --silent && npm run build --silent` → `frontend/dist/`
-2. `docker build -t portfolion-backend ./backend --quiet`
-3. `docker stop/rm portfolion-backend-1` → `docker run -d --name portfolion-backend-1 --network portfolion_default --network-alias backend --restart unless-stopped --env-file ./backend/.env.docker portfolion-backend`
-4. `docker stop/rm portfolion-nginx-1` → `docker run -d ... -p 127.0.0.1:80:80 -v <repo>/nginx/nginx.conf:ro -v <repo>/frontend/dist:/usr/share/nginx/html:ro nginx:alpine`(루프백 전용 게시, B82 — 공개 경로는 Cloudflare Tunnel뿐. ⚠️ 이 `docker run`의 `\` 연속행 안에는 `#` 주석을 넣지 말 것 — 연속행이 주석 해석보다 먼저 줄을 이어 붙여 그 뒤 인자를 통째로 삼킨다(`bash -n`은 통과한다), 실제로 겪은 실수라 `deploy.sh`가 그 경고를 연속행 *앞*에 남겨 뒀다)
-5. `sleep 2 && curl -s http://localhost/health`(실패해도 경고만) → **끝 대조**: HEAD가 시작 시점과 다르면 ❌ exit 1, 같으면 `배포된 커밋: <SHA> <제목>`을 출력하고 SHA를 `DEPLOY_MARKER`에 쓴다. 배포 판정은 exit 0·health가 아니라 이 줄로 한다.
+**판정·운영**: 배포 판정은 Deploy run success(`headSha`로) + 세대 기록이다(옛 `배포된 커밋:` 줄·기록 SHA·폴러 로그 `Deploy complete`는 은퇴한 판정). 수동 재배포 `gh workflow run deploy.yml --ref main`, 롤백 `~/runtime/taebro-infra/bin/deploy --rollback portfolion prod <세대>`. 러너 등록·재설치(`config.sh`·`svc.sh`)는 에이전트 하드 차단이라 사람 몫이다.
 
-**비대칭이 중요하다**: nginx가 `frontend/dist`를 직접 마운트하므로 **로컬 `npm run build`는 배포 없이도 즉시 라이브**인 반면, 백엔드는 러너/폴러가 재배포해야 반영된다 → 그 사이 "새 프론트 ↔ 옛 백엔드" 창이 실재한다. 같은 이유로 **프론트 빌드는 그 자체가 배포 행위**다(그리고 `deploy.sh` 1단계가 빌드하므로 push도 작업트리의 `frontend/dist`를 갱신한다).
+**프론트도 같은 배포로 나간다** — nginx가 `frontend/dist`를 마운트하지 않고 이미지에 굽는다. 옛 「로컬 `npm run build`는 배포 없이 즉시 라이브 ↔ 백엔드는 지연 → 새 프론트 ↔ 옛 백엔드 창」 비대칭은 은퇴했다. 로컬 빌드는 라이브에 영향이 없고, 라이브를 재는 프로브가 도는 동안의 push·`gh workflow run`이 배포성 행위다.
+
+**`SCHEDULER_ENABLED=false`**면 `main.py` lifespan이 스케줄러를 건너뛴다(dev 스택용 — prod DB 복사본에서 배치가 돌지 않게; 미설정=켜짐, ADR 결정 3).
 
 ### 3.4 도구 워크스페이스 (`scripts/`, 188개 엔트리)
 
@@ -374,15 +377,15 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 - 하니스 관례: **컨텍스트를 `serviceWorkers: 'block'`으로** 만든다. ⚠️ 원래 근거(「SW가 `/api/*`를 NetworkFirst로 가로채 `page.route` 응답 주입을 무력화한다」)는 **ADR-0036 이후 더 이상 성립하지 않는다** — `/api/` 런타임 캐시 규칙이 제거돼 SW는 앱 셸·폰트만 캐시하고 `navigateFallback`도 `null`이다. 관례는 남아 있고(무해한 belt-and-braces) 신규 프로브도 그대로 쓰지만, **프로브 헤더 주석에 남은 그 근거 문장은 stale**하니 사실로 인용하지 말 것. 예외는 SW 설치 여부 자체가 측정축인 프로브(`uat288-oauth-boot-timing.mjs`가 `'allow'`를 쓰고 이유를 헤더에 명시).
 - 파이썬 도구: `audit_unauth_endpoints.py`(FastAPI 라우트 재귀 열거), `kospi_signal_backtest.py`, `contrast_probe.py`, `repair-005930-snapshots.py`, `probe32x-*.py`(키움 종가 파서·수주잔고 단위 캡션 전수·랭킹 시세·KST 날짜 경계 — 라이브/실문서 대조로 임계값을 고정한 근거 프로브), **`enrich-ab.py`**(신규 — enrich 8필드 A/B 대조 하네스. `seed`/`list`/`fire`/`restore`/`diff`/`ab` 서브커맨드. `enrich_history` 테이블 위에서 두 모델(기본 sonnet·opus)의 산출물을 같은 base에서 비교한다 — 루틴 프롬프트가 스냅샷의 직전 enrich 7필드를 보고 쓰므로 두 런 사이에 `restore`로 base를 복원해야 대칭 비교가 된다. `restore`의 리포트 재생성은 루틴 자신의 `POST /report/generate`와 겹치는 409를 유계 재시도한다).
 - **발행 레인 A/B 하네스 `ab-*.py`**(신규, task#350) — `ab-publish.py`(3팔: opus 기준선은 세션 없이 현행 산출물 재사용 · muse · muse 초안→opus 검수. 세션은 리스너를 거치지 않고 `_runner_argv`만 재사용해 직접 띄운다) · **`ab-proxy.py`**(쓰기 차단 프록시 — `127.0.0.1`에서 GET/HEAD만 prod로 중계하고 그 외 메서드는 업스트림 미호출·본문 캡처·성공 응답; 판정은 순수 함수 `handle_request()`) · `ab-run-all.py`(순차 본 실행, 실패는 `*.error.json`) · `ab-compare.py`/`ab-summary.py`(판정하지 않는 비교표 — 시점 간격·커버리지·prod 무쓰기 전후값을 함께 싣는다) · `ab-finalize.py`. 무쓰기 보장은 **독립 2겹**: 프롬프트의 BASE URL을 프록시로 치환(정확히 1건이 아니면 발사 안 함) + 자식 env `PORTFOLION_API_KEY`는 더미(진짜 키는 프록시만). 가드 `backend/tests/test_ab_proxy.py`·`test_ab_publish.py`. 세션 노이즈(`out/*/*/*/run.log` 등)는 gitignored.
-- **`scripts/rotate-postgres-password.sh`**(신규, B21 대응) — postgres 비밀번호를 회전하고 `backend/.env.docker`·`backend/.env`·루트 `.env` 3파일의 `DATABASE_URL`/`POSTGRES_PASSWORD` 성분을 함께 갱신한 뒤 `deploy.sh`로 백엔드를 재생성한다. 실패 시 DB `ALTER USER`+3파일+`deploy.sh` 재실행까지 전부 롤백. 새 비밀번호 검증은 **컨테이너 밖에서** 별도 일회용 postgres 컨테이너로 접속해야 한다 — `docker exec <pg> psql -h 127.0.0.1`은 `pg_hba.conf`의 `trust` 규칙에 걸려 아무 비밀번호로나 통과하는 이빨 없는 검사가 된다. `.rotate-backup-*/`(gitignored)에 백업을 남긴다.
+- **`scripts/rotate-postgres-password.sh`**(신규, B21 대응) — postgres 비밀번호를 회전하고 `backend/.env.docker`·`backend/.env`·루트 `.env` 3파일의 `DATABASE_URL`/`POSTGRES_PASSWORD` 성분을 함께 갱신한 뒤 `gh workflow run deploy.yml --ref main`(표준 배포, task#386)으로 백엔드를 재생성한다 — 옛 `deploy.sh` 호출은 은퇴. 실패 시 DB `ALTER USER`+3파일+재배포까지 전부 롤백. `backend/.env.docker`는 실행 자리 `.env`를 가리키는 심링크다. 새 비밀번호 검증은 **컨테이너 밖에서** 별도 일회용 postgres 컨테이너로 접속해야 한다 — `docker exec <pg> psql -h 127.0.0.1`은 `pg_hba.conf`의 `trust` 규칙에 걸려 아무 비밀번호로나 통과하는 이빨 없는 검사가 된다. `.rotate-backup-*/`(gitignored)에 백업을 남긴다.
 - **`scripts/cowork-fire-listener.py`** — 표준 라이브러리 `http.server`만 쓰는 로컬 리스너. `127.0.0.1:8787` 바인드(컨테이너에서는 `host.docker.internal:8787`), `Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>` 검증, `scripts/cowork-routine-prompt.md`를 읽어 **stdin으로** 실행기에 넘긴다(argv에 보이지 않게). API 키 **값은 프롬프트에 싣지 않는다**(task#349) — `{{COWORK_API_KEY}}` 자리표시자를 `$PORTFOLION_API_KEY` 참조로 바꾸고 값은 자식 env `PORTFOLION_API_KEY`(부모 env 위에 얹음)로만 준다. OpenCode `run`이 실행한 bash 명령을 `run.log`에 에코하므로 프롬프트에 값이 있으면 평문 로그로 샜다. `run.log`는 생성 시점부터 0600(`os.open(..., 0o600)`). 실행기는 `model`로 갈린다(`_runner_argv`, task#348) — `/` 없으면 기존 `claude -p --model <model>(기본 opus) --allowedTools Bash,WebSearch,WebFetch,Read,Write`(무회귀), `/` 있으면 OpenCode `opencode run -m <model> --auto`(야간 전량 회차가 `opencode/muse-spark-1.3-contributor-free`로 이 경로를 탄다). 실행 cwd는 `tempfile.mkdtemp`로 **원자 생성**한 빈 디렉터리(레포 컨텍스트 차단 + 같은 초 2회 fire의 로그 truncate 방지).
   요청 본문이 `tickers[]`를 실으면 **전량 모드**로 갈린다 — `chunk`(기본 5)개씩 잘라 단일 워커 스레드의 큐에서 **순차** 스폰(동시 세션 0), 한도 초과 문구(`_LIMIT_MARKERS` — `no payment method` 추가)가 로그 앞부분에 보이면 잔여 청크를 포기, 청크당 `_CHUNK_TIMEOUT=3600s`. `tickers` 없는 기존 호출은 그대로 병행 논블로킹 스폰(무회귀). 거부 응답(401/404)은 `Content-Length: 0`을 명시(없으면 간헐 `ConnectionReset`으로 호출측 로그에서 401이 통째로 사라질 수 있었다). 로그는 전부 `_log()`(KST 타임스탬프 접두)로 통일. launchd 서비스 `com.portfolion.cowork-fire-listener`.
-- **`scripts/start-docker-compose.sh`** + **`scripts/com.portfolion.docker-compose.plist`**(신규 launchd 잡 `com.portfolion.docker-compose`) — 부팅 시 스택 복구 전용(평시 재기동은 각 컨테이너의 `restart: unless-stopped`가 처리). **compose 소유**(`postgres` 하나 — certbot 은퇴 후)만 `docker compose up -d postgres`로 올리고 **`deploy.sh` 소유**(`backend`·`nginx`)는 건드리지 않는다 — compose를 통째로 올리면 `deploy.sh`가 `docker run`으로 만든 동명 컨테이너(`portfolion-backend-1`/`portfolion-nginx-1`)를 compose 정의로 재생성해 버리기 때문. docker 데몬 대기는 최대 5분 유계(무한 대기 금지 — 죽었는데 아무도 모르는 상태 방지). 적용 스크립트 `scripts/apply-docker-autostart.sh`(백업→plist 배치→`launchctl` 재적재→1회 실행→C3/C4/C8~C11/C13/C15 정지조건 검증, `--dry-run`/`--rollback`/`--yes`). 절차 문서 `scripts/README-docker-autostart.md`.
-- **launchd 서비스들**(레포 밖 설정, 코드가 전제함): `com.portfolion.auto-deploy-poll`, `actions.runner.calmonion7-PortfoliOn.macbook-portfolion`(러너 — `~/actions-runner-portfolion`, arm64 재설치), cloudflared, `com.portfolion.cowork-fire-listener`, `com.portfolion.docker-compose`. `claude -p`처럼 keychain OAuth를 쓰는 서비스는 plist `EnvironmentVariables`에 `HOME`/`USER`/`LOGNAME`이 필요하다.
+- ~~`scripts/start-docker-compose.sh` + `scripts/com.portfolion.docker-compose.plist`(launchd 잡 `com.portfolion.docker-compose`)·`apply-docker-autostart.sh`·`README-docker-autostart.md`~~ — **은퇴(task#386)**: 옛 부팅 스택 복구 잡(compose 소유 postgres만 올리고 옛 `deploy.sh` 소유 컨테이너는 건드리지 않았다)은 삭제됐다. 재부팅 복구는 Docker Desktop 자동 시작 + 서비스별 `restart: unless-stopped`다(§3.3).
+- **launchd 서비스들**(레포 밖 설정, 코드가 전제함): `actions.runner.calmonion7-PortfoliOn.macbook-portfolion`(러너 — `~/actions-runner-portfolion`, arm64 재설치), cloudflared, `com.portfolion.cowork-fire-listener`(옛 `com.portfolion.auto-deploy-poll`·`com.portfolion.docker-compose`는 task#386에서 은퇴). `claude -p`처럼 keychain OAuth를 쓰는 서비스는 plist `EnvironmentVariables`에 `HOME`/`USER`/`LOGNAME`이 필요하다.
 
 ### 3.5 `.gitignore`가 규정하는 경계
 
-`backend/.env.docker`·`.env`(시크릿 — `certbot/conf/` 항목은 certbot 은퇴와 함께 빠졌다) · `backend/.venv/`·`frontend/node_modules/`·`scripts/node_modules/` · **`frontend/dist/`**(빌드 산출물이지만 nginx가 서빙하는 실체) · `backend/snapshots/`·`backend/reports/`·`backend/data/calendar/`·`backend/data/consensus/` + `backend/data/{holdings,watchlist,stocks,schedule,guru_managers,guru_schedule,kr_exports}.json`(런타임 산출) · `screenshots/`·`.worktrees/`·`.claude/settings.local.json` · **`.rotate-backup-*/`**(`scripts/rotate-postgres-password.sh`가 만드는 크리덴셜 백업, 절대 커밋 금지) · A/B 하네스 세션 노이즈 `out/*/*/*/{run.log,proxy.log,capture/}`·`out/run-all.log`·`out/finalize.log`(산출물 `compare.md`·`summary.md`·`<arm>.json`은 남긴다).
+`backend/.env.docker`·`.env`(시크릿 — `certbot/conf/` 항목은 certbot 은퇴와 함께 빠졌다) · `backend/.venv/`·`frontend/node_modules/`·`scripts/node_modules/` · **`frontend/dist/`**(로컬 빌드 산출물 — task#386부터 nginx는 이걸 마운트하지 않고 이미지에 굽는다) · `backend/snapshots/`·`backend/reports/`·`backend/data/calendar/`·`backend/data/consensus/` + `backend/data/{holdings,watchlist,stocks,schedule,guru_managers,guru_schedule,kr_exports}.json`(런타임 산출) · `screenshots/`·`.worktrees/`·`.claude/settings.local.json` · **`.rotate-backup-*/`**(`scripts/rotate-postgres-password.sh`가 만드는 크리덴셜 백업, 절대 커밋 금지) · A/B 하네스 세션 노이즈 `out/*/*/*/{run.log,proxy.log,capture/}`·`out/run-all.log`·`out/finalize.log`(산출물 `compare.md`·`summary.md`·`<arm>.json`은 남긴다).
 
 ⚠️ `backend/data/`는 **추적되는 정적 시드**(`sp500_tickers.json`·`kospi_tickers.json`)와 **무시되는 런타임 JSON**이 한 디렉터리에 섞여 있다. 시드 두 개는 read-only이며, 7일 티커 캐시는 파일이 아니라 `market_cache` 테이블(`sp500_tickers`·`kospi_tickers` 키)에 있다.
 
@@ -402,9 +405,9 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 | `frontend/eslint.config.js` | lint |
 | `frontend/index.html` | 첫 페인트 계약(§2.3) |
 | `frontend/vercel.json` | 과거 Vercel 잔재(현 배포 경로에서 미사용) |
-| `docker-compose.yml` / `nginx/nginx.conf` / `deploy.sh` | 인프라(§3) |
-| `.github/workflows/deploy.yml` | CI 배포 — 단일 스텝 `scripts/runner-deploy.sh`(배포 기록 대조) |
-| `scripts/auto-deploy-poll.sh` / `scripts/runner-deploy.sh` / `scripts/test_deploy_guard.py` | 자동 배포 두 경로와 그 회귀 가드(§3.3) |
+| `docker-compose.yml` / `nginx/Dockerfile` / `nginx/nginx.conf` / `deploy/taebro.env` / `deploy/legacy-postgres.compose.yml` | 인프라(§3) — 옛 `deploy.sh`는 은퇴 |
+| `.github/workflows/deploy.yml` | CI 배포 — `bin/deploy portfolion prod`(`dev` 브랜치는 dev 스택) |
+| `scripts/cutover/01-retire-launchd.sh` / `02-prod-cutover.sh` | task#386 1회성 컷오버(옛 폴러·부팅 잡 은퇴, §3.3) |
 | `docs/ops/deploy.md` / `docs/ops/postgres-5432-consumers.md` | 운영 문서 — 배포 절차 / 호스트 5432 사용처 조사(공용 postgres 이전 체크리스트) |
 | `scripts/package.json` | Playwright 워크스페이스 |
 | `start.sh`/`start.bat`/`stop.sh`/`stop.bat` | 로컬 개발 편의(백엔드+프론트 동시 기동) |
@@ -422,8 +425,8 @@ flat config. `globalIgnores(['dist'])` + `**/*.{js,jsx}`에 `js.configs.recommen
 3. **Vite 8 = rolldown** — `manualChunks`는 함수만.
 4. **jsdom엔 레이아웃·스타일시트·`getComputedTextLength`가 없다** — recharts 미렌더, 색/치수/잘림 미검출. 그 축은 Playwright 라이브 프로브가 유일한 게이트이고, SVG 텍스트 실측을 쓰는 코드는 **추정 폴백을 반드시 남겨야** 단위 테스트가 깨지지 않는다.
 5. **SW는 인증된 `/api/*`를 캐시하지 않는다(ADR-0036)** — Workbox 캐시 키가 URL만이라 사용자 간 응답 누출이 가능했기 때문이다. 남은 SW 표면은 앱 셸 precache + 폰트 CacheFirst뿐이고, 기존 기기의 `api-cache`는 `purgeApiCache()`가 부팅·로그아웃 두 지점에서 지운다. 프로브의 `serviceWorkers: 'block'`은 관례로 남아 있으나 그 헤더 주석의 근거는 stale하다(§3.4).
-6. **nginx가 `frontend/dist` 직마운트** — 프론트 빌드 = 배포. 라이브를 재는 프로브가 도는 동안 빌드하면 그 프로브의 측정 대상이 바뀐다.
-7. **자동 배포는 push된 `origin/main`만 배포한다** — 러너·폴러 모두 `reset --hard`를 하지 않고(폴러는 뒤처졌을 때만 ff, 러너는 `deploy.sh`의 ff에 맡긴다), `deploy.sh`는 미커밋 tracked 변경·앞섬·갈라짐을 exit 2로 거부한다. 그러니 commit과 push를 묶는 습관은 그대로 유지한다. 판정은 `배포된 커밋:` 줄과 `~/.portfolion-deployed-sha`.
+6. **프론트는 nginx 이미지에 구워진다**(task#386) — 로컬 빌드는 라이브에 영향이 없고, 프론트·백엔드가 같은 배포로 함께 나간다. 라이브를 재는 프로브가 도는 동안의 push·`gh workflow run`은 측정 대상을 바꾸는 배포 행위다(옛 「`frontend/dist` 직마운트 — 빌드 = 배포」는 은퇴).
+7. **배포는 push된 `origin/main`(러너 체크아웃)만 빌드한다** — 로컬 작업트리의 미커밋 변경은 배포되지 않는다(옛 `deploy.sh`는 작업트리를 ff하고 미커밋 변경을 exit 2로 거부했다 — 은퇴). 그러니 commit과 push를 묶는 습관은 그대로 유지한다. 판정은 Deploy run success(`headSha`) + 세대 기록 `.taebro-deploy`(옛 `배포된 커밋:` 줄·`~/.portfolion-deployed-sha`는 은퇴).
 8. **psycopg2 풀은 소진 시 블록이 아니라 예외** — ThreadPool 동시성을 `maxconn=20` 아래로 유지해야 한다.
 9. **starlette `allow_nan=False`** — 응답에 NaN/inf가 있으면 500. 입력측은 `main.py`의 검증 핸들러가, 출력측은 `services.utils.sanitize`와 소스 `math.isfinite` 가드가 막는다.
 10. **`backend/Dockerfile`의 CMD에 `--workers`가 없어 uvicorn이 단일 프로세스** — `services/rate_limit.py`(인메모리 IP 버킷)와 `routers/auth.py`의 `_oauth_codes`(인프로세스 dict)가 이 가정에 기대 정확하다. 워커를 늘리면 각각 독립 상태를 가져 레이트리밋 실효 임계가 곱해지고 OAuth 코드 교환이 다른 워커로 가면 깨진다. 단, **단일 프로세스가 스레드 경합까지 없앤다는 뜻은 아니다** — sync `def` 핸들러(`login`/`register`)는 Starlette가 스레드풀에서 진짜 병렬 실행하므로 `rate_limit.check`는 `threading.Lock`으로 판정+기록을 원자화해야 한다(task#337).

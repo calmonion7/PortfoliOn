@@ -8,16 +8,19 @@
 
 ### 1. 프론트엔드 빌드
 
-```bash
-cd frontend && npm run build
-```
+별도 빌드 단계는 없다 — 프론트는 `nginx/Dockerfile` 멀티스테이지로 nginx 이미지에 구워져 백엔드와 같은 배포로 나간다(task#386).
 
 ### 2. 환경변수 파일 준비
 
+비밀 정본은 `~/runtime/portfolion/prod/.env`(권한 600)이고 `backend/.env.docker`는 그 파일을 가리키는 심링크다.
+최초 설치라면 예시 파일을 정본 자리로 복사해 값을 채운다.
+
 ```bash
-cp backend/.env.docker.example backend/.env.docker
+mkdir -p ~/runtime/portfolion/prod
+cp backend/.env.docker.example ~/runtime/portfolion/prod/.env && chmod 600 ~/runtime/portfolion/prod/.env
+ln -s ~/runtime/portfolion/prod/.env backend/.env.docker   # 보조 스크립트가 이 경로로 읽는다
 # 실제 값으로 편집
-nano backend/.env.docker
+nano ~/runtime/portfolion/prod/.env
 ```
 
 필수 설정:
@@ -32,10 +35,17 @@ nano backend/.env.docker
 
 HTTPS 는 Cloudflare Tunnel 이 종단한다 — nginx 는 루프백 :80 만 받고, 인증서 발급·갱신 컨테이너는 없다(task#384).
 
+postgres 는 배포 compose 에 없다 — 컨테이너 `portfolion-postgres-1`(볼륨 `portfolion_pgdata`)을 `deploy/legacy-postgres.compose.yml` 로 먼저 띄운다.
+backend·nginx 는 배포 계약(`~/runtime/taebro-infra/bin/deploy portfolion prod`)이 compose 로 띄운다.
+옛 `deploy.sh`(`docker run` 방식)는 task#386 에서 은퇴했다.
+
 ```bash
-docker compose up -d postgres
-bash deploy.sh   # backend·nginx 는 deploy.sh 가 docker run 으로 띄운다
+docker compose -p portfolion --env-file .env -f deploy/legacy-postgres.compose.yml up -d postgres   # -p·--env-file 필수 — 파일 헤더 참조
+git push origin main   # 또는 수동: gh workflow run deploy.yml --ref main
 ```
+
+판정은 Deploy run success(`headSha` 대조) + `~/runtime/portfolion/prod/.taebro-deploy` 의 `generation=…-<커밋7자>` 이다.
+롤백: `~/runtime/taebro-infra/bin/deploy --rollback portfolion prod <세대>`.
 
 ### 4. OAuth 앱 등록
 
@@ -50,17 +60,19 @@ bash deploy.sh   # backend·nginx 는 deploy.sh 가 docker run 으로 띄운다
 2. Authorization callback URL: `https://taebro.com/api/auth/oauth/github/callback`
 3. `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`을 `backend/.env.docker`에 입력
 
-### 5. 전체 재시작
+### 5. 재배포
+
+OAuth 키를 `~/runtime/portfolion/prod/.env` 에 넣은 뒤에는 ad-hoc `docker compose down/up` 대신 배포를 다시 돌린다.
 
 ```bash
-docker compose down && docker compose up -d
+gh workflow run deploy.yml --ref main
 ```
 
 ### 6. 헬스체크
 
 ```bash
 curl https://taebro.com/health
-# Expected: {"status":"ok"}
+# Expected: {"status":"ok","service":"portfolion"}
 ```
 
 ### 7. DDNS 스크립트 설정

@@ -38,12 +38,14 @@
 
 ### `GET /health`
 
-서버 상태 확인.
+서버 상태 확인. `HEAD`도 받는다.
 
 **Response `200`**
 ```json
-{ "status": "ok" }
+{ "status": "ok", "service": "portfolion" }
 ```
+
+`service`는 표준 배포(taebro-infra `bin/deploy`)의 헬스 확인이 본문에서 찾는 문자열이다(`deploy/taebro.env`의 `HEALTH_EXPECT`). 포트가 다른 앱에 붙어 200이 나는 거짓 통과를 거른다 — 지우면 배포가 헬스 실패로 롤백된다.
 
 ---
 

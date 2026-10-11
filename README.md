@@ -4,23 +4,27 @@
 
 ## 인프라
 
-Mac 로컬 Docker 구성 + Cloudflare Tunnel로 외부 접근. `docker compose`는 3개 컨테이너를 띄운다.
+Mac 로컬 Docker 구성 + Cloudflare Tunnel로 외부 접근. 배포는 taebro-infra 표준 배포(`~/runtime/taebro-infra/bin/deploy`, 계약 v5)가 `docker-compose.yml`로 backend·nginx를 띄우고, postgres는 그 compose 밖의 기존 컨테이너다.
 
 | 컨테이너 | 역할 |
 |---------|------|
-| nginx | HTTP(:80) 서빙, `/api/*` → backend:8000 프록시, `frontend/dist` 정적 서빙 |
+| nginx | HTTP(:80) 서빙, `/api/*` → backend:8000 프록시, 프론트 정적 서빙(`dist`를 이미지에 굽는다 — `nginx/Dockerfile`) |
 | backend | FastAPI(:8000) |
-| postgres | PostgreSQL 16, pgdata 볼륨 |
+| postgres | PostgreSQL 16, `portfolion_pgdata` 볼륨 — 배포 compose 밖(`deploy/legacy-postgres.compose.yml`에 정의 보존) |
 
-HTTPS는 Cloudflare가 종단하므로 인증서 컨테이너가 없다. **Cloudflare Tunnel**(`portfolion.taebro.com` → `localhost:80`)은 compose 컨테이너가 아니라 **launchd**로 실행한다. launchd는 cloudflared와 자동 배포 폴러(`git push origin main` 시 재배포)도 함께 구동한다.
+HTTPS는 Cloudflare가 종단하므로 인증서 컨테이너가 없다. **Cloudflare Tunnel**(`portfolion.taebro.com` → `localhost:80`)은 compose 컨테이너가 아니라 **launchd**로 실행한다. 재부팅 복구는 Docker Desktop 자동 시작 + `restart: unless-stopped`가 맡는다.
 
-## 빠른 시작
+## 배포
+
+`git push origin main`이 곧 배포다 — self-hosted 러너가 `.github/workflows/deploy.yml` → `bin/deploy portfolion prod`를 돌려 빌드 → 실행 자리 `~/runtime/portfolion/prod/`에서 기동 → 헬스(`deploy/taebro.env`) → 실패 시 직전 이미지로 자동 롤백한다. `.forge/**`·`*.md`만 바뀐 push는 배포하지 않는다. `dev` 브랜치는 dev 스택(127.0.0.1:8084)으로 간다.
 
 ```bash
-docker compose up -d
+gh workflow run deploy.yml --ref main                                      # 수동 재배포
+~/runtime/taebro-infra/bin/deploy --rollback portfolion prod <세대>        # 늦은 롤백
+cat ~/runtime/portfolion/prod/.taebro-deploy                               # 현재 세대
 ```
 
-> 배포는 `git push origin main`으로 자동화돼 있다. 수동 `docker compose build` / `up` 재빌드는 하지 않는다 — 폴러가 origin/main을 따라 재배포한다.
+> 수동 `docker compose build` / `up`은 하지 않는다 — 실행 자리 밖에서 띄우면 라벨·`.env`가 어긋난다.
 
 ### 로컬 개발 (Docker 없이)
 
@@ -48,9 +52,9 @@ cd frontend && npm run dev
 
 | 파일 | 담는 것 |
 |---|---|
-| `backend/.env.docker` | 컨테이너 백엔드 — `DATABASE_URL` 및 아래 키 전부 |
+| `~/runtime/portfolion/prod/.env` | 컨테이너 백엔드(prod 비밀 정본, 600) — `DATABASE_URL` 및 아래 키 전부. `backend/.env.docker`는 이 파일을 가리키는 심링크 |
 | `backend/.env` | 로컬 venv·pytest·스크립트 — `DATABASE_URL` |
-| `.env` (루트) | `POSTGRES_PASSWORD` — docker-compose 보간 전용. **폴백이 없으므로 미설정이면 `docker compose` 명령이 실패한다** |
+| `.env` (루트) | `POSTGRES_PASSWORD` — `deploy/legacy-postgres.compose.yml` 보간 전용. **폴백이 없으므로 미설정이면 그 compose 명령이 실패한다** |
 
 ```
 # 필수
@@ -82,6 +86,7 @@ COWORK_API_KEY=...        # 외부 AI(루틴/Cowork) enrich·발행 API 인증
 COWORK_ROUTINE_FIRE_URL=...   # Claude Code 루틴 API 트리거 fire URL (미설정 시 휴면)
 COWORK_ROUTINE_FIRE_TOKEN=... # 루틴 fire bearer 토큰
 FRONTEND_URL=...          # CORS 허용 origin
+SCHEDULER_ENABLED=false   # dev 스택 전용 — 배치 스케줄러를 끈다(prod는 두지 않는다 = 켜짐)
 ```
 
 > 백엔드에는 **LLM/Anthropic 호출이 없다**. AI 분석 텍스트는 claude.ai **루틴**(일일 리포트 배치 완료 시 백엔드가 fire로 깨우는 클라우드 에이전트, ADR-0028)이 enrich·애널리스트 리포트 발행·주요기술 리포트 발행 API(`CLAUDE_COWORK_API.md`)로 작성하며, 백엔드 리포트 생성은 시장 데이터 스냅샷만 만든다. 수동 트리거는 `POST /api/admin/cowork/fire`. 여기에 더해 배치 `cowork_enrich_nightly`(공통, 매일 02:00 KST)가 **갱신 대상 집합**(어느 사용자든 보유 중인 종목 ∪ 최근 30일 안에 리포트 상세가 열린 종목 — ADR `260916-132605`)을 대상으로 루틴을 깨워, 리스너가 5종목씩 잘라 세션을 순차 스폰한다(야간 갱신). 집합 밖 종목은 사용자가 리포트 상세를 열 때 `POST /api/stocks/{ticker}/enrich/request`로 **온디맨드** 갱신된다(분석이 7일 넘게 묵었을 때만, 종목당 진행 중 요청 1건). 그 02:00 fire는 「접수됨」만 기록하고 실제 갱신 여부는 다른 프로세스(리스너)에서 수 시간에 걸쳐 정해지므로, 배치 `cowork_enrich_verify`(공통, 매일 08:00 KST)가 다음날 아침 `tickers.enriched_at`을 대조해 그 02:00 실행의 상태를 실제 갱신 여부로 다시 판정한다.
@@ -209,7 +214,7 @@ PC는 **좌측 사이드바** 5섹션(리서치·포트폴리오·시장·일정
 Browser (React 19 / Vite 8 :5173)
         │  REST API
         ▼
-    nginx (:80)   ─ /api/* proxy + frontend/dist 정적 서빙
+    nginx (:80)   ─ /api/* proxy + 프론트 정적 서빙(이미지에 구운 dist)
         ▼
 FastAPI (:8000)
  ├─ routers/    portfolio, watchlist, stocks, report, guru, calendar,
@@ -247,7 +252,9 @@ FastAPI (:8000)
 
 ```
 PortfoliOn/
-├── docker-compose.yml
+├── docker-compose.yml         # 표준 배포 compose(backend·nginx)
+├── deploy/                    # taebro.env(배포 선언), legacy-postgres.compose.yml(postgres 정의 보존)
+├── nginx/                     # nginx.conf + Dockerfile(프론트를 이미지에 굽는다)
 ├── backend/
 │   ├── main.py
 │   ├── scheduler.py

@@ -44,7 +44,7 @@ decided: 2026-08-23 08:51
 
 - `nginx/nginx.conf`의 `location /api/` 블록은 `X-Real-IP`·`X-Forwarded-For`·`X-Forwarded-Proto`만 재설정하고
   **`CF-Connecting-IP`를 한 번도 참조·제거하지 않는다** → 클라이언트가 보낸 값이 그대로 백엔드에 도달한다.
-- `docker-compose.yml`·`deploy.sh`는 nginx 포트를 `0.0.0.0:80`·`0.0.0.0:443`에 게시한다(호스트 IP 미명시)
+- `docker-compose.yml`·`deploy.sh`(옛 경로 — task#386 은퇴)는 당시 nginx 포트를 `0.0.0.0:80`·`0.0.0.0:443`에 게시했다(호스트 IP 미명시)
   → **터널을 우회해 호스트·LAN에서 직접 도달할 수 있다.**
 
 따라서 그 경로의 클라이언트는 요청마다 `CF-Connecting-IP`를 바꿔 **두 임계를 완전히 무력화**할 수 있고(매 값이 새 버킷),
@@ -65,8 +65,8 @@ task#337은 그중 ⓐ(게시를 `127.0.0.1`로 축소)를 구현했다가 **되
 그것은 「전제가 거짓이었다」는 사실의 기록이고, 이 절은 「그 전제를 이제 강제한다」는 별개의 사실이다.
 
 `B82`의 처방 후보 ⓐ를 채택했다 — nginx 호스트 게시를 `0.0.0.0:80`·`0.0.0.0:443`에서
-**`127.0.0.1:80` 하나로** 좁혔다(`docker-compose.yml` + `deploy.sh` **두 파일 모두**;
-라이브 nginx 는 compose 가 아니라 `deploy.sh` 의 `docker run` 이 만들므로 한쪽만 고치면 무효다).
+**`127.0.0.1:80` 하나로** 좁혔다(`docker-compose.yml` + 옛 `deploy.sh` **두 파일 모두**;
+당시 라이브 nginx 는 compose 가 아니라 옛 `deploy.sh` 의 `docker run` 이 만들었으므로 한쪽만 고치면 무효였다 — 보정 3 참조).
 443 게시는 제거했다 — `nginx.conf` 의 443 `server` 블록이 주석 처리돼 있어 아무 일도 하지 않았다.
 
 **task#337 이 되돌린 이유는 기술적 불안이 아니라 문턱이었고, 그 문턱은 사용자 결정으로 넘었다.**
@@ -76,6 +76,8 @@ task#337은 그중 ⓐ(게시를 `127.0.0.1`로 축소)를 구현했다가 **되
 ⓒ(`set_real_ip_from`)는 이 ADR 이 대역 갱신 부담으로 이미 배제했다 — ⓐ 가 전제를 강제하므로 불필요하다.
 
 **`services/rate_limit.py` 의 키 설계는 바꾸지 않았다** — ⓐ 가 그 설계의 전제를 참으로 만든다.
+
+> 보정 3 (2026-10-11, task#386): 위 두 절의 `deploy.sh`는 옛 경로다(task#386 은퇴). 지금 nginx 는 표준 배포(taebro-infra `bin/deploy`)가 `docker-compose.yml` 하나로 띄우고, 게시는 그 파일의 `"127.0.0.1:${TAEBRO_HTTP_PORT}:80"`(prod 80) 한 곳뿐이다 — 「두 파일 모두 고쳐야 한다」는 더 이상 성립하지 않는다. 전제(공개 경로는 Cloudflare 전용)는 그대로 강제된다.
 
 배포 후 실측: nginx 게시 `127.0.0.1:80->80/tcp`(443 없음) · LAN `172.16.11.230:80` **거부** ·
 `http://localhost/health` **200** · `https://portfolion.taebro.com/health` **200** · 사이트 본체 **200**.

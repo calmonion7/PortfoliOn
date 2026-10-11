@@ -1,0 +1,8 @@
+# 레포 루트를 컨텍스트로 쓰는 빌드는 nginx/Dockerfile 하나뿐이다 — 필요한 것만 들인다(허용 목록).
+# backend 이미지는 컨텍스트가 ./backend 라 backend/.dockerignore 를 따른다.
+*
+!frontend/
+!nginx/nginx.conf
+frontend/node_modules
+frontend/dist
+frontend/.env*

@@ -34,19 +34,19 @@ model: opus
   나오는지** 확인해야 게이트다(0/빈 결과를 성공으로 읽는 게이트는 게이트가 아니다).
 
 ## 이 프로젝트의 확정된 오진 함정
-- **배포가 안 된 것처럼 보이면 폴러 footgun을 단정하기 전에 러너부터 의심한다** —
+- **배포가 안 된 것처럼 보이면 러너부터 의심한다**(옛 폴러는 task#386 은퇴 — 이제 러너가 유일한 배포 경로다) —
   `gh run list`(잡이 `queued`/`cancelled(24h)`면 러너 부재) +
   `gh api repos/calmonion7/PortfoliOn/actions/runners --jq '.runners[]|{name,status}'`.
   PortfoliOn 전용 러너는 `~/actions-runner-portfolion`이며, 타 프로젝트 세팅이 이걸 재등록해
   5일간 무음 미배포가 된 실사례가 있다.
 - **배포 직후 백엔드가 `Up`이고 로그도 활발한데 API가 수 분간 무응답일 수 있다**(실측 ~5분 15초).
-  완전히 건강해 보여서 "배포 깨졌다"로 오진하고 `deploy.sh`를 재실행하기 쉽다. 라이브 스모크는
+  완전히 건강해 보여서 "배포 깨졌다"로 오진하고 재배포(`gh workflow run deploy.yml --ref main`)를 돌리기 쉽다. 라이브 스모크는
   포트 바인딩을 폴링한 뒤 실행한다 —
   `docker exec <c> python -c "import socket;print(socket.socket().connect_ex(('127.0.0.1',8000)))"`가
   `0`이 될 때까지(111=refused). 정확한 메커니즘은 **미확정**이며 그렇게 남겨져 있다(lifespan은 0.6초).
-- **커밋 소실을 `git log -1`로 판정하지 말 것**(2연속 오판) — 2분 폴러가 낡은 `origin/main`으로 reset해
-  잠깐 되돌아 보였다가 다음 폴에서 자기복구된다. 판정은 **`git rev-parse HEAD` vs `origin/main` +
-  `gh run list`**로 한다.
+- **커밋 소실을 `git log -1`로 판정하지 말 것**(2연속 오판) — 옛 2분 폴러(task#386 은퇴)가 낡은 `origin/main`으로 reset해
+  잠깐 되돌아 보였다가 다음 폴에서 자기복구된 사례다. 지금은 폴러가 없지만 판정법은 같다 —
+  **`git rev-parse HEAD` vs `origin/main` + `gh run list`**로 한다.
 - **라운드한 값(정확히 70000.0, 정확히 400조)은 피드 글리치보다 *테스트 오염*을 먼저 의심한다** —
   로컬 pytest가 prod DB에 fixture를 쓴 사례가 있었다(현재는 `conftest._block_real_db`가 차단).
 - **헤더는 N인데 그리드가 빈** 증상은 dashboard 빌드 throw + 프론트 silent catch를 의심한다.
@@ -65,7 +65,8 @@ model: opus
 - 라이브 API를 때리는 프로브는 read + 자기 계정 토글 수준으로 유지한다(실데이터를 바꿀 수 있다).
 - 게이팅된 엔드포인트를 확인해야 하면 **in-container 자체 호출 + 무쓰기 게이트**(422/409로 갈리는
   경로)를 쓰고, 검증 후 대상 테이블 count로 무쓰기를 단언한다.
-- `docker compose build`/`up` 같은 ad-hoc 재빌드는 하지 않는다. 필요하면 정식 `bash deploy.sh` 1회를
+- `docker compose build`/`up` 같은 ad-hoc 재빌드는 하지 않는다(옛 `bash deploy.sh`는 task#386에서 은퇴). 필요하면
+  정식 경로 `gh workflow run deploy.yml --ref main`(롤백은 `~/runtime/taebro-infra/bin/deploy --rollback portfolion prod <세대>`)을
   **사용자에게 제안**한다.
 - **타 프로젝트의 자원(러너·컨테이너·볼륨·`.env`)은 읽기전용으로 다룬다.**
 

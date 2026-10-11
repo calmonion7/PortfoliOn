@@ -1234,7 +1234,7 @@ grep -oE '[^0-9a-zA-Z_]:[0-9]+'                 .forge/codebase/*.md   # bare :N
 | 쌍둥이 사본 동일성 | `frontend/src/test/theme-boot-twin.test.js` · `oauth-splash-twin.test.js` | `index.html` 인라인 사본 ↔ 모듈 정본 drift |
 | ADR-0029 감사 스크립트 | `scripts/audit_unauth_endpoints.py` | 라이브 배선 기준 무인증 열거(종료코드 0/1) |
 | 라이브 프로브 회귀 래칫 | `scripts/check-uat311-ratchet.sh` + `scripts/uat311-baseline-tags.txt` | 시각 프로브의 FAIL 0 · 단언 총계 하한 · **baseline 축 태그 생존** (`TESTING.md §10 ⑦`) |
-| 배포 경로 셸 3종 | `scripts/test_deploy_guard.py`(pytest, `testpaths` 밖 — 경로 명시 실행) | `deploy.sh`의 옛 트리 배포·종료코드 계약, 폴러의 배포 기록 트리거·실패 1회 정책·PATH 덧붙임, `runner-deploy.sh`의 기록 대조·잠금 대기, `deploy.yml`이 `runner-deploy.sh`만 부름 (§12, `TESTING.md §2`) |
+| (은퇴) 옛 배포 경로 셸 3종 | 옛 `scripts/test_deploy_guard.py` — task#386에서 셸 3종과 함께 삭제됐다. 현재 배포 셸 가드는 이 저장소에 없고 계약은 `~/runtime/taebro-infra/docs/CONTRACT.md`(v5)가 정본 | 옛 `deploy.sh`·폴러·`runner-deploy.sh`의 계약을 지켰던 가드 (§12, `TESTING.md §2`) |
 
 **자동 가드가 없는 규약**(리뷰·관례 의존): 로그 마커 스펠링(§4.3) · 프론트 `console.*` 마커(§4.5) ·
 `source`/`usage` 갱신(§8) · API 문서의 **스키마·인증 산문**(§10) · README 동기(§10) ·
@@ -1246,30 +1246,31 @@ grep -oE '[^0-9a-zA-Z_]:[0-9]+'                 .forge/codebase/*.md   # bare :N
 
 ## §12 운영 셸 스크립트 규약 (배포 경로)
 
-배포 경로의 셸 — `deploy.sh` · `scripts/auto-deploy-poll.sh`(launchd 폴러) ·
-`scripts/runner-deploy.sh`(self-hosted 러너 잡, task#384) — 은 같은 규약을 공유한다.
-`.github/workflows/deploy.yml`은 단일 step으로 `scripts/runner-deploy.sh`만 부른다.
+**현재 배포 경로(task#386)**: `.github/workflows/deploy.yml`이 self-hosted 러너에서
+`~/runtime/taebro-infra/bin/deploy portfolion prod`를 부른다. 빌드·세대 기록·헬스·롤백·잠금(`.taebro-deploy.lock`)은
+infra 소유(계약 정본 `~/runtime/taebro-infra/docs/CONTRACT.md` v5)이고 이 저장소에는 배포 셸이 없다.
+종료코드는 `0` 성공 · `1` 실패+롤백 성공 · `2` 실패+롤백 실패 · `3` 시작 전 거부. 아래 규약 목록 중
+`set -o pipefail` 항목만 현재형이고, 나머지는 은퇴한 옛 경로의 기록이다.
 
-- **본문 전체를 `{ … }` 그룹으로 감싼다** — bash가 그룹 전체를 먼저 파싱한 뒤 실행하므로, 폴러가
+**옛 경로(task#386 은퇴) 규약 기록** — 옛 `deploy.sh` · 옛 `scripts/auto-deploy-poll.sh`(launchd 폴러) ·
+옛 `scripts/runner-deploy.sh`(러너 잡, task#384)는 같은 규약을 공유했고, 옛 `deploy.yml`은 단일 step으로 옛 `runner-deploy.sh`만 불렀다.
+
+- **(옛 규약) 본문 전체를 `{ … }` 그룹으로 감쌌다** — bash가 그룹 전체를 먼저 파싱한 뒤 실행하므로, 폴러가
   2분마다 **작업트리의** 스크립트를 실행하는 동안 그 파일을 편집해도 반쯤 고친 판이 줄 단위로
-  섞여 실행되지 않는다(세 파일 모두 첫 실행 줄이 `{`, 끝이 `}`).
-- **실 경로는 전부 환경변수 오버라이드 기본값으로 둔다** — `PROJECT_DIR`·`DEPLOY_LOCK`·
+  섞여 실행되지 않았다(세 파일 모두 첫 실행 줄이 `{`, 끝이 `}`).
+- **(옛 규약) 실 경로는 전부 환경변수 오버라이드 기본값** — `PROJECT_DIR`·`DEPLOY_LOCK`·
   `DEPLOY_MARKER`·`DEPLOY_FAILED_MARKER`·`LOG`·`RUNNER_LOCK_WAIT_SEC`를 `"${VAR:-<실경로>}"` 형태로.
-  그래야 테스트가 임시 클론에서 실제 스크립트를 돌릴 수 있다(`TESTING.md §2`).
-- **PATH는 뒤에 덧붙인다(append), 앞에 붙이지 않는다** — launchd PATH엔 npm(fnm)·docker가 없어
+  그래야 테스트가 임시 클론에서 실제 스크립트를 돌릴 수 있었다(`TESTING.md §2`).
+- **(옛 규약) PATH는 뒤에 덧붙인다(append), 앞에 붙이지 않는다** — launchd PATH엔 npm(fnm)·docker가 없어
   보충하되, 앞에 붙이면 테스트가 PATH 앞에 둔 스텁보다 실 docker가 먼저 잡혀 **테스트가 운영
-  컨테이너를 내린다.** 회귀 축이 폴러·러너 각각에 있다(`…_appends_path_so_stubs_win`).
-- **종료코드 계약**(`deploy.sh`): `2` = 사전 거부(컨테이너를 건드리기 전 — 잠금·미커밋 tracked 변경·
-  fetch 실패·앞섬/갈라짐·ff 실패) · `1` = 그 뒤의 모든 실패(`trap 'exit 1' ERR`로 도구 종료코드와
-  무관하게 1로 정규화) · `0` = 성공 + 배포 기록 파일 갱신. 소비자가 이 구분으로 행동한다 — 폴러는
-  `2`면 다음 폴에 재시도, 그 밖의 비0이면 그 SHA를 실패 기록에 남기고 재시도하지 않는다;
-  `runner-deploy.sh`는 `deploy.sh`의 코드를 **그대로** 돌려준다.
-- **배포 판정 근거는 공유 기록 하나다** — 세 스크립트가 모두 `~/.portfolion-deployed-sha`
-  (`DEPLOY_MARKER`)를 `origin/main`과 대조하므로 러너·폴러·수동 중 먼저 온 쪽이 배포하고 나머지는
-  "이미 배포됨"으로 끝난다. 잠금(`DEPLOY_LOCK`)은 **`deploy.sh`만 잡는다**(러너는 잠금이 풀릴 때까지
-  기다린 뒤 기록을 **다시** 대조한다 — 그 사이 폴러가 같은 커밋을 배포했을 수 있다).
-- **작업트리를 되돌리지 않는다** — `reset --hard` 없음. 뒤처졌을 때만 `git merge --ff-only`,
-  앞섬·갈라짐은 손대지 않거나(폴러) 거부한다(`deploy.sh` exit 2).
+  컨테이너를 내린다.** (교훈 자체는 새 스크립트에도 유효하다.)
+- **(옛 규약) 종료코드 계약**(옛 `deploy.sh`): `2` = 사전 거부 · `1` = 그 뒤의 모든 실패 · `0` = 성공 + 배포 기록 파일 갱신.
+  옛 폴러는 `2`면 다음 폴에 재시도, 그 밖의 비0이면 그 SHA를 실패 기록에 남기고 재시도하지 않았고,
+  옛 `runner-deploy.sh`는 옛 `deploy.sh`의 코드를 **그대로** 돌려줬다. (현재 코드 의미는 위 현재 경로 문단.)
+- **(옛 규약) 배포 판정 근거는 공유 기록 하나였다** — 세 스크립트가 모두 옛 `~/.portfolion-deployed-sha`
+  (`DEPLOY_MARKER`)를 `origin/main`과 대조해 먼저 온 쪽이 배포했다. 현재 판정은 Deploy run success(`headSha`)와
+  `~/runtime/portfolion/prod/.taebro-deploy`의 세대 기록이다.
+- **(옛 규약) 작업트리를 되돌리지 않았다** — `reset --hard` 없음, 뒤처졌을 때만 `git merge --ff-only`.
 - `set -o pipefail`을 거는 스크립트(`scripts/rotate-postgres-password.sh`)는 조기종료 파이프라인
   (`| head`·`| grep -q`)의 SIGPIPE가 **무음 즉사**를 만든다 — 출력을 변수로 받아 here-string으로
   검사하고, `trap '… $LINENO …' ERR`로 종료 위치를 남긴다(그 파일 주석이 세 형태를 적는다).

@@ -19,14 +19,14 @@
 | 비밀번호 회전 | `scripts/rotate-postgres-password.sh` | `docker exec portfolion-postgres-1 psql`(컨테이너 내부) + 별칭 `postgres` 경유 검증, `.env`·`.env.docker` 갱신 | 이전 시 고칠 것 | 컨테이너명·별칭·두 env 파일 경로가 이전 후 달라진다 |
 | `docker exec portfolion-postgres-1 psql` 계열 | `scripts/ab-publish.py` · `scripts/ab-summary.py` · `scripts/enrich-ab.py` · `scripts/loopcheck-enrich-on-demand-live.mjs` · `scripts/uat291-mutation-ownership.mjs` · `scripts/uat289-oauth-callback-latency.mjs` · `scripts/uat347-holiday-skip.mjs`(출력 안내문) | 호스트 5432가 아니라 컨테이너 이름으로 exec | 이전 시 고칠 것 | 5432 포트 무관, 컨테이너명 `portfolion-postgres-1`·DB명 하드코딩. 이전 후 컨테이너가 사라지면 깨짐 (A/B·UAT 일회성은 은퇴 후보) |
 | 도커 자동기동 점검 | `scripts/apply-docker-autostart.sh` (C9·C10), `scripts/README-docker-autostart.md` | 게시 포트가 `127.0.0.1:5432`인지, LAN IP의 5432가 거부되는지 검사 | 이전 시 고칠 것 | 포트 게시가 없어지면 C9가 FAIL. 검사 항목 자체를 수정·삭제 |
-| 배포 스크립트 | `deploy.sh` · `scripts/auto-deploy-poll.sh` · `scripts/runner-deploy.sh` | 5432·DATABASE_URL 참조 없음(grep 0건) | 그대로 | 해당 없음 |
+| 배포 스크립트 | 옛 `deploy.sh` · `scripts/auto-deploy-poll.sh` · `scripts/runner-deploy.sh` — task#386에서 은퇴(지금은 taebro-infra `bin/deploy` + `docker-compose.yml`, 비밀은 `~/runtime/portfolion/prod/.env`) | 5432·DATABASE_URL 참조 없음(grep 0건) | 그대로 | 해당 없음 |
 | 문서 | `docs/*.md`·`README.md` | 5432 안내 0건. `docker-compose.yml:13-15` 주석만 5432 서술 | 이전 시 고칠 것 | compose 포트 게시·주석은 이전 시 같이 정리 |
 
 ## ② 레포 밖
 
 | 항목 | 위치 | 연결 방식 | 분류 | 근거 |
 |---|---|---|---|---|
-| launchd plist 4종 | `~/Library/LaunchAgents/` (`com.portfolion.auto-deploy-poll`·`com.portfolion.docker-compose`·`com.portfolion.cowork-fire-listener`·`actions.runner.calmonion7-PortfoliOn.macbook-portfolion`) | 5432·postgres·DATABASE 문자열 없음(grep 0건) | 그대로 | DB에 직접 접속하지 않는다. `/Library/LaunchAgents`·`/Library/LaunchDaemons`에는 해당 plist 없음 |
+| launchd plist 4종(그중 옛 `com.portfolion.auto-deploy-poll`·`com.portfolion.docker-compose`는 task#386에서 은퇴 — 남은 것 2종) | `~/Library/LaunchAgents/` (`com.portfolion.auto-deploy-poll`·`com.portfolion.docker-compose`·`com.portfolion.cowork-fire-listener`·`actions.runner.calmonion7-PortfoliOn.macbook-portfolion`) | 5432·postgres·DATABASE 문자열 없음(grep 0건) | 그대로 | DB에 직접 접속하지 않는다. `/Library/LaunchAgents`·`/Library/LaunchDaemons`에는 해당 plist 없음 |
 | `~/portfolion-backups/` | `analyst_reports-20261007-before-v1-purge.sql` | 덤프 파일(접속 아님) | 그대로 | 정적 백업 |
 | `~/portfolion-ab/`, `~/portfolion-routine-runs/` | 데이터·로그 산출물 | 스크립트 없음, 접속 없음(루틴 로그의 문자열 일치뿐) | 그대로 | 산출물 |
 | `~/bin`, `~/scripts` | 존재하지 않음 | - | 그대로 | - |

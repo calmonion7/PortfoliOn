@@ -1,51 +1,35 @@
-version: "3.9"
-
+# 표준 배포(taebro-infra `bin/deploy`, 계약 v5)가 읽는 compose — prod·dev 겸용 하나.
+# compose 프로젝트명(portfolion / portfolion-dev)은 bin/deploy 가 -p 로 정하므로 name·container_name·image 를
+# 적지 않는다(이미지는 <compose 프로젝트>-<service> — :prev 롤백이 이 이름을 쓴다).
+# 기동은 실행 자리 ~/runtime/portfolion/<env>/ 에서 한다 — 거기엔 이 파일과 .env(비밀 정본)만 있다.
+#
+# prod postgres 는 여기 없다(ADR 261011-074335 결정 1): bin/deploy 는 매 배포 up --force-recreate 라
+# 넣으면 배포마다 유일한 prod DB 컨테이너가 재생성된다. 지금 컨테이너 portfolion-postgres-1 은 그대로 두고
+# (compose 는 orphan 경고만 하고 건드리지 않는다) backend 가 같은 기본 네트워크 portfolion_default 에서
+# postgres:5432 로 붙는다. 정의는 deploy/legacy-postgres.compose.yml 에 보존(⑥-2 공용 DB 이전까지).
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: portfolion
-      POSTGRES_USER: portfolion
-      # 폴백 금지 — 미설정 시 조용히 약한 기본값을 쓰는 대신 명시적으로 실패한다.
-      # 폴백값이 공개 저장소에 커밋돼 실운영 크리덴셜이 됐던 것이 B21 이다.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env 에 POSTGRES_PASSWORD 를 설정할 것 (B21)}
-    ports:
-      # 루프백 전용 — 백엔드는 도커 네트워크 별칭 postgres:5432 로 접속하므로
-      # 호스트 발행은 사람이 psql 로 붙을 때만 쓰인다. 0.0.0.0 이면 LAN 전체에 열린다.
-      - "127.0.0.1:5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./backend/auth_schema.sql:/docker-entrypoint-initdb.d/01-auth.sql
-      - ./backend/app_schema.sql:/docker-entrypoint-initdb.d/02-app.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U portfolion"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
   backend:
     build: ./backend
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file: ./backend/.env.docker
+    env_file:
+      # 빌드는 .env 가 없는 러너 체크아웃에서, 기동은 실행 자리에서(.env 필수 — bin/deploy 가 확인)
+      - path: .env
+        required: false
+    mem_limit: 1g      # 1주 관측 최대×2 원칙 — 실측 최대 452.9MB(표본 112개 ≈ 18시간), 1주 뒤 bin/mem-report 로 재조정
     restart: unless-stopped
 
   nginx:
-    image: nginx:alpine
+    # 프론트 dist 와 nginx.conf 를 이미지에 굽는다 — 롤백은 이미지만 되돌리므로 마운트한 정적 파일은 되돌아가지 않는다.
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
     # 게시는 루프백 전용 — 공개 경로는 Cloudflare 터널뿐이다(cloudflared → http://localhost:80).
     # 이 좁힘이 ADR 260823-085145 의 「공개 경로는 Cloudflare 전용」 전제를 배포 구성으로 강제해
     # CF-Connecting-IP 위조에 의한 레이트리밋 우회·표적 잠금(B82)을 닫는다.
     # TLS 는 Cloudflare 가 종단한다 — 443 게시·인증서 갱신 컨테이너는 없다(task#384).
+    # 호스트 포트는 bin/deploy 가 계약 2절 표에서 주입한다(prod 80 · dev 8084). 하드코딩 금지.
     ports:
-      - "127.0.0.1:80:80"
-    volumes:
-      - ./frontend/dist:/usr/share/nginx/html:ro
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - "127.0.0.1:${TAEBRO_HTTP_PORT}:80"
     depends_on:
       - backend
+    mem_limit: 64m     # 실측 최대 3.6MB — 계약의 최소값 64MB
     restart: unless-stopped
-
-volumes:
-  pgdata:

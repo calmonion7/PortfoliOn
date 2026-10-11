@@ -1,14 +1,19 @@
-name: Deploy to Production
-
+# 표준 배포 — taebro-infra 계약 v5 4절 그대로(~/runtime/taebro-infra/docs/CONTRACT.md).
+# main → prod, dev → dev 스택. 빌드·:prev 태그·실행 자리 기동·헬스·자동 롤백은 bin/deploy 가 맡는다.
+# 수동 재배포: gh workflow run deploy.yml --ref main
+name: Deploy
 on:
   push:
-    branches: [main]
-
+    branches: [main, dev]
+    # 문서·forge 상태만 바뀐 push 는 배포하지 않는다(런타임에 읽는 .md 는 없다 — 백엔드가 읽는 파일은 json 뿐)
+    paths-ignore: ['.forge/**', '**/*.md']
+  workflow_dispatch:
+# PR 트리거 금지 — 공개 레포라 포크 PR 이 호스트 러너에서 코드를 실행하는 구멍이 된다.
+concurrency: deploy-${{ github.ref_name }}
 jobs:
   deploy:
-    runs-on: self-hosted
+    # 모든 러너에 자동으로 붙는 라벨만. 없는 라벨을 요구하면 잡이 queued 로 머물다 24h 뒤 취소된다(무음 미배포).
+    runs-on: [self-hosted, ARM64]
     steps:
-      # 배포 기록(~/.portfolion-deployed-sha)을 폴러와 함께 본다 — 이미 배포된 커밋이면 건너뛰고,
-      # 배포 중이면 잠금이 풀릴 때까지 기다린다. 작업트리를 되돌리지 않는다(task#384).
-      - name: Deploy (배포 기록 대조)
-        run: bash /Users/calmonion/Project/PortfoliOn/scripts/runner-deploy.sh
+      - uses: actions/checkout@v4
+      - run: ~/runtime/taebro-infra/bin/deploy portfolion ${{ github.ref_name == 'main' && 'prod' || 'dev' }}

@@ -4,7 +4,7 @@ decided: 2026-10-09 10:52
 ---
 # 자동 배포 트리거 = 배포 기록 SHA 대조, 실패는 1회로 끝 — `deploy.sh` 종료코드 2/1 계약
 
-- 상태: 채택 (Accepted)
+- 상태: **대체됨 (Superseded) by `261011-074335`** — task#386이 배포 경로를 taebro-infra 표준 배포(`bin/deploy`)로 옮기며 launchd 폴러·`deploy.sh`·`runner-deploy.sh`·배포 기록 파일을 은퇴시켰다. 아래 본문은 옛 경로의 기록이다(현재 사실로 인용하지 말 것).
 - 관련: task#382(B84 해소), task#377(옛 트리 배포 거부·폴러 ff 전용), task#369(러너 x86 offline), 루트 `CLAUDE.md` Deployment 절
 
 ## 맥락

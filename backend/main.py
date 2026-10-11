@@ -334,13 +334,24 @@ def _migrate():
         logger.warning(f"[Migrate] job_runs payload 컬럼 추가 실패: {e}")
 
 
+def _scheduler_enabled() -> bool:
+    # dev 스택(prod DB 복사본)은 SCHEDULER_ENABLED=false 로 배치 스케줄을 끈다(ADR 261011-074335 결정 3).
+    # 미설정 = 켜짐 — prod 는 이 키를 두지 않는다.
+    return os.environ.get("SCHEDULER_ENABLED", "").strip().lower() not in ("false", "0", "no", "off")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _migrate()
-    sched.start()
+    scheduler_on = _scheduler_enabled()
+    if scheduler_on:
+        sched.start()
+    else:
+        logger.info("[Scheduler] SCHEDULER_ENABLED=false — 스케줄러 기동 건너뜀")
     threading.Thread(target=_warm_market_cache, daemon=True).start()
     yield
-    sched.stop()
+    if scheduler_on:
+        sched.stop()
 
 
 app = FastAPI(title="Stock Portfolio Manager", lifespan=lifespan)
@@ -432,4 +443,5 @@ app.include_router(admin_router)
 
 @app.api_route("/health", methods=["GET", "HEAD"])
 def health():
-    return {"status": "ok"}
+    # service 는 표준 배포의 HEALTH_EXPECT 가 찾는 문자열 — 포트가 엉뚱한 앱에 붙은 200 을 거른다
+    return {"status": "ok", "service": "portfolion"}
