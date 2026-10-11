@@ -52,7 +52,7 @@ wait_health() { # <초> — 로컬 /health 에 "portfolion" 이 나올 때까지
 
 # ── --remove-legacy ──
 if [ "$MODE" = cleanup ]; then
-  echo "== 컷오버 ② 정리: 새 스택이 건강하면 $BE_L·$NG_L 삭제"
+  echo "== 컷오버 ② 정리: 새 스택이 건강하면 ${BE_L}·$NG_L 삭제"
   [ "$(label $BE)" = portfolion ] && [ "$(label $NG)" = portfolion ] || die "새 컨테이너가 compose(portfolion) 소유가 아니다 — 정리하지 않는다"
   case "$(local_health)" in *portfolion*) ;; *) die "로컬 /health 에 portfolion 이 없다 — 정리하지 않는다" ;; esac
   case "$(curl -s -m 10 https://portfolion.taebro.com/health || true)" in *portfolion*) ;; *) die "공개 /health 에 portfolion 이 없다 — 정리하지 않는다" ;; esac
