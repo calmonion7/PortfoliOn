@@ -30,6 +30,7 @@ def _configure_logging():
 _configure_logging()
 
 import scheduler as sched
+from services import job_runs
 from routers import portfolio, report, watchlist, stocks, guru, calendar, digest, analytics
 from routers.market_indicators import router as market_indicators_router
 from routers.analysis import router as analysis_router
@@ -343,6 +344,10 @@ def _scheduler_enabled() -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _migrate()
+    # 스케줄러 start 전에 — 이전 프로세스가 남긴 running 행을 닫는다(job_runs.reap_orphans).
+    reaped = job_runs.reap_orphans()
+    if reaped:
+        logger.warning(f"[Startup] 재기동으로 중단된 job_runs {reaped}건을 failed로 닫음")
     scheduler_on = _scheduler_enabled()
     if scheduler_on:
         sched.start()

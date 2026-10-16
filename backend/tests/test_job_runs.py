@@ -267,3 +267,39 @@ def test_record_status_update_failure_swallowed_T274():
             ran.append("body-finished")
 
     assert ran == ["body-finished"]
+
+
+# ── 기동 시 고아 running 정리 ─────────────────────────────────────────
+
+def test_reap_orphans_closes_running_rows_as_failed():
+    from services import job_runs
+    with patch.object(job_runs, "execute", return_value=12) as ex:
+        assert job_runs.reap_orphans() == 12
+    sql = ex.call_args[0][0]
+    assert "status = 'failed'" in sql and "WHERE status = 'running'" in sql
+    assert "재기동" in sql
+
+
+def test_reap_orphans_swallows_db_failure():
+    """정리 실패가 기동을 막으면 안 된다 — 0을 돌려주고 끝."""
+    from services import job_runs
+    with patch.object(job_runs, "execute", side_effect=Exception("db down")):
+        assert job_runs.reap_orphans() == 0
+
+
+def test_lifespan_reaps_before_scheduler_starts():
+    """스케줄러 start 뒤에 정리하면 이번 프로세스의 정당한 running을 죽인다 — 순서가 본체다."""
+    import asyncio
+    import main
+    order = []
+    with patch.object(main, "_migrate"), \
+         patch.object(main.job_runs, "reap_orphans", side_effect=lambda: order.append("reap") or 0), \
+         patch.object(main.sched, "start", side_effect=lambda: order.append("start")), \
+         patch.object(main.sched, "stop"), \
+         patch.object(main, "_scheduler_enabled", return_value=True), \
+         patch.object(main, "_warm_market_cache"):
+        async def run():
+            async with main.lifespan(main.app):
+                pass
+        asyncio.run(run())
+    assert order == ["reap", "start"], order
