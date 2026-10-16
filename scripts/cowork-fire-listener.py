@@ -37,8 +37,10 @@ from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parent.parent
 PROMPT_FILE = REPO / "scripts" / "cowork-routine-prompt.md"
-ENV_FILE = REPO / "backend" / ".env.docker"
-RUN_DIR = Path.home() / "portfolion-routine-runs"
+# 리스너는 실행 자리(~/runtime/portfolion/prod/scripts/)에서 돈다(배포 RUNTIME_FILES 가 복사).
+# 거기엔 backend/.env.docker 가 없으므로 그 심링크의 정본인 prod 실행 자리 .env 를 직접 읽는다.
+ENV_FILE = Path.home() / "runtime" / "portfolion" / "prod" / ".env"
+RUN_DIR = Path.home() / "runtime" / "portfolion" / "routine-runs"  # 프로젝트 산출물 자리(taebro-infra 계약 v9)
 PORT = 8787
 DEFAULT_MODEL = "opus"
 DEFAULT_CHUNK = 5
@@ -271,6 +273,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    RUN_DIR.mkdir(exist_ok=True)
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
     _log(f"listening on 127.0.0.1:{PORT}")
     HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

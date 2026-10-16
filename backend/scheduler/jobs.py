@@ -152,7 +152,7 @@ def _run_nightly_enrich():
     다만 그 간극은 사후에 메워진다 — 08:00 `cowork_enrich_verify`가 아래에서 남기는 payload를
     근거로 `enriched_at`을 대조해 **이 run 행의 status를 실제 갱신 여부로 다시 쓴다**
     (task#357). 즉 이 행의 *최종* 상태는 대조를 거친 값이며, 그것이 배치현황 카드가 보는 값이다.
-    원인 추적은 여전히 `~/portfolion-routine-runs/`의 run 로그다.
+    원인 추적은 여전히 `~/runtime/portfolion/routine-runs/`의 run 로그다.
     """
     from services import cowork_trigger, enrich_targets
     with job_runs.record("cowork_enrich_nightly", "auto") as run:
