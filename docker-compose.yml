@@ -13,7 +13,9 @@ services:
       # 빌드는 .env 가 없는 러너 체크아웃에서, 기동은 실행 자리에서(.env 필수 — bin/deploy 가 확인)
       - path: .env
         required: false
-    mem_limit: 1g      # 1주 관측 최대×2 원칙 — 실측 최대 452.9MB(표본 112개 ≈ 18시간), 1주 뒤 bin/mem-report 로 재조정
+    # 상한(taebro-infra 계약 v10 4절): prod 2048m 은 산식 예외 — 1024 에 붙어 스왑 570~844MiB, 산식이면 3737m 이라
+    # 7일 최대(상주+스왑) ~1868MiB 에 여유를 둔 값. 원인 진단은 후속. dev 324m(산식, dev 실행 자리 .env 의 BACKEND_MEM). 키가 없으면 prod 값.
+    mem_limit: ${BACKEND_MEM:-2048m}
     environment:
       # DB = 공용 postgres 발급 DB. 값은 실행 자리 .env 의 PORTFOLION_DATABASE_URL(= taebro-infra 발급 파일 내용)이고,
       # backend 는 DATABASE_URL 을 읽는다. 실행 자리 .env 의 옛 DATABASE_URL 키(옛 컨테이너 주소)는 2026-10-16 지웠다.
