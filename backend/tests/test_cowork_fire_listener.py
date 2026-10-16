@@ -43,6 +43,8 @@ class _FakeStdin:
 class _FakeProc:
     rc = 0          # 클래스 속성 — 테스트가 갈아끼워 종료 코드를 흉내낸다
     hang = False    # True면 wait가 TimeoutExpired를 던진다
+    pid = 4242
+    wait_hook = None  # wait 시점의 상태를 엿보는 테스트용
 
     def __init__(self, args, **kwargs):
         self.args = args
@@ -54,6 +56,8 @@ class _FakeProc:
     def wait(self, timeout=None):
         self.waited = True
         _EVENTS.append(("wait", self))
+        if type(self).wait_hook:
+            type(self).wait_hook()
         if type(self).hang:
             import subprocess as _sp
             raise _sp.TimeoutExpired(self.args, timeout)
@@ -74,6 +78,7 @@ def listener(monkeypatch, tmp_path):
     _EVENTS.clear()
     _FakeProc.rc = 0
     _FakeProc.hang = False
+    _FakeProc.wait_hook = None
 
     def fake_popen(args, **kwargs):
         p = _FakeProc(args, **kwargs)
@@ -357,6 +362,95 @@ def test_worker_survives_a_failing_job(listener):
     listener._enqueue_chunks("t", _tickers(1), "sonnet", 5)
     assert done.wait(5), f"첫 작업의 예외가 워커를 죽였다 (처리된 것: {seen})"
     assert seen == ["boom", "fine"]
+
+
+# ── 재기동 이어받기: 상태 파일 (task#390) ──────────────────────────────
+
+def _write_state(listener, done, pid=None, n=6, chunk=2):
+    """리스너가 쓰는 것과 같은 형태의 상태 파일을 직접 심는다(재기동 직후 상태 흉내)."""
+    listener._save_state("야간", _tickers(n), "sonnet", chunk, done, pid)
+
+
+def test_state_file_tracks_done_chunks_and_child_pid(listener):
+    """ⓐ 청크가 끝날 때마다 done이 갱신되고, 실행 중엔 자식 pid가 기록된다."""
+    seen_at_spawn, seen_at_wait = [], []
+    real = listener._spawn_proc
+
+    def spy_spawn(text, model=listener.DEFAULT_MODEL, tickers=None):
+        seen_at_spawn.append(listener._load_state()["done"])
+        return real(text, model, tickers)
+
+    listener._spawn_proc = spy_spawn
+    _FakeProc.wait_hook = lambda: seen_at_wait.append(listener._load_state()["pid"])
+    listener._run_chunks("야간", _tickers(6), "sonnet", 2)
+    assert seen_at_spawn == [0, 1, 2], seen_at_spawn
+    assert seen_at_wait == [4242, 4242, 4242], "spawn 직후 pid가 기록되지 않았다"
+
+
+def test_restart_resumes_only_remaining_chunks(listener):
+    """ⓑ 상태 파일(done=1)을 둔 채 새 프로세스로 기동하면 남은 2청크만 돈다."""
+    _write_state(listener, done=1)
+    job = listener._load_resume_job()
+    assert job is not None
+    listener._run_chunks(*job)
+    assert len(listener._calls) == 2
+    body0 = listener._calls[0].stdin.written.decode()
+    assert "T02" in body0 and "T00" not in body0, "이미 끝난 청크를 다시 돌렸다"
+
+
+def test_no_state_file_means_nothing_to_resume(listener):
+    """ⓑ 대조군 — 상태 파일이 없으면 이어받을 것이 없다(상태 파일을 쓴 쪽만 이어진다)."""
+    assert listener._load_resume_job() is None
+
+
+def test_resume_waits_for_live_child_before_rerunning_chunk(listener, monkeypatch):
+    """ⓒ 기록된 pid가 살아 있으면 끝날 때까지 기다린 뒤에야 끊긴 청크를 다시 띄운다."""
+    _write_state(listener, done=2, pid=9999)
+    alive = iter([True, True, False])
+    monkeypatch.setattr(listener, "_pid_alive", lambda pid: (_EVENTS.append(("alive?", pid)), next(alive))[1])
+    monkeypatch.setattr(listener.time, "sleep", lambda s: _EVENTS.append(("sleep", s)))
+    listener._run_chunks(*listener._load_resume_job())
+    kinds = [k for k, _ in _EVENTS]
+    assert kinds.index("spawn") > max(i for i, k in enumerate(kinds) if k == "sleep"), kinds
+    assert kinds.count("sleep") == 2, "살아 있는 동안만 기다려야 한다"
+    assert len(listener._calls) == 1  # 6종목·chunk 2·done 2 → 마지막 청크 하나
+
+
+def test_resume_does_not_wait_when_child_is_dead(listener, monkeypatch):
+    """ⓒ 대조군 — pid가 이미 죽었으면 기다리지 않는다."""
+    _write_state(listener, done=2, pid=9999)
+    monkeypatch.setattr(listener, "_pid_alive", lambda pid: False)
+    monkeypatch.setattr(listener.time, "sleep", lambda s: _EVENTS.append(("sleep", s)))
+    listener._run_chunks(*listener._load_resume_job())
+    assert "sleep" not in [k for k, _ in _EVENTS]
+
+
+def test_pid_alive_detects_self_and_none(listener):
+    import os
+    assert listener._pid_alive(os.getpid()) is True
+    assert listener._pid_alive(None) is False
+
+
+def test_state_file_removed_on_completion_and_on_limit(listener):
+    """ⓓ 회차가 끝나도, 한도로 중단돼도 상태 파일이 남지 않는다 — 남으면 다음 기동이 유령 회차를 이어받는다."""
+    listener._run_chunks("야간", _tickers(4), "sonnet", 2)
+    assert listener._load_state() is None
+    real = listener._spawn_proc
+
+    def spawn_then_limit(text, model=listener.DEFAULT_MODEL, tickers=None):
+        proc, workdir = real(text, model, tickers)
+        (workdir / "run.log").write_text("You've hit your weekly limit\n")
+        return proc, workdir
+
+    listener._spawn_proc = spawn_then_limit
+    listener._run_chunks("야간", _tickers(12), "sonnet", 5)
+    assert listener._load_state() is None
+
+
+def test_plain_fire_writes_no_state_file(listener):
+    """단일 모드는 이어받기 대상이 아니다 — 상태 파일을 만들지 않는다."""
+    listener._spawn_claude("평범한 트리거")
+    assert listener._load_state() is None
 
 
 # ── fire마다 실행기 사전 점검 (task#389) ─────────────────────────────

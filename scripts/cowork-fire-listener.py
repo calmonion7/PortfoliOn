@@ -20,6 +20,15 @@ fire마다 실행기를 `--version`으로 먼저 띄워 보고, 못 뜨면 큐 �
   같아서, 초 단위 ts만으로는 같은 초 2회 fire가 cwd를 공유해 앞 run의 run.log를 truncate했다.
 - launchd 서비스: com.portfolion.cowork-fire-listener (HOME/USER/LOGNAME 필수 — keychain footgun)
 
+재기동 이어받기(task#390): 전량 회차는 `RUN_DIR/fullrun-state.json`에 text·tickers·model·chunk·
+done(완료 청크 수)·pid(실행 중 자식)를 기록한다. 기동 시 이 파일이 있으면 pid가 살아 있는 동안
+(`_CHUNK_TIMEOUT` 상한) 기다린 뒤 끊긴 청크(done)부터 다시 돈다 — 세션 자식이
+`start_new_session=True`라 리스너 재기동에도 살아남기 때문이다. pid는 spawn **직후** 기록하므로
+그 사이 창에서 끊기면 그 청크가 한 번 더 돈다: 리스너가 DB에 접근하지 않는다는 경계를 지키려고
+이미 갱신된 종목 건너뛰기는 하지 않고 **청크 하나의 중복 실행을 감수**한다(enrich는 멱등 덮어쓰기).
+회차가 끝나거나 한도로 중단되면 파일을 지운다. 상태 파일은 하나라 **큐에서 대기 중인 뒤 회차는
+이어받기 대상이 아니다**(실행 중인 회차 하나만). 단일 모드(`tickers` 없음)도 대상이 아니다.
+
 eco: `tickers` 없는 fire는 그대로 병행 스폰(중복 enrich 가능하나 무해). 전량 모드만 단일
 워커 스레드의 큐를 타므로 동시 세션이 0이고, 큐가 도는 중 들어온 전량 fire는 뒤에 붙는다.
 """
@@ -55,6 +64,7 @@ _LOG_HEAD_BYTES = 4096
 # ~19분이므로 3배 여유를 둔다.
 _CHUNK_TIMEOUT = 3600
 _MAX_CHUNK = 50
+_PID_POLL = 5  # 이어받기 시 살아 있는 자식을 기다리며 확인하는 간격(초)
 CLAUDE_BIN = str(Path.home() / ".local" / "bin" / "claude")  # 네이티브 설치(npm 전역 아님)
 _PREFLIGHT_TIMEOUT = 15
 
@@ -155,6 +165,60 @@ def _spawn_claude(text: str, model: str = DEFAULT_MODEL) -> str:
     return str(workdir)
 
 
+def _state_path() -> Path:
+    return RUN_DIR / "fullrun-state.json"
+
+
+def _save_state(text, tickers, model, chunk, done, pid) -> None:
+    """원자적 교체 — 쓰다 죽어도 반쪽 JSON이 남지 않는다. 0600(종목 목록·트리거 문구)."""
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = _state_path().with_suffix(".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump({"text": text, "tickers": tickers, "model": model,
+                   "chunk": chunk, "done": done, "pid": pid}, f)
+    os.replace(tmp, _state_path())
+
+
+def _load_state():
+    try:
+        return json.loads(_state_path().read_text())
+    except Exception:  # 없거나 깨졌으면 이어받을 것이 없다
+        return None
+
+
+def _clear_state() -> None:
+    try:
+        _state_path().unlink()
+    except FileNotFoundError:
+        pass
+
+
+def _pid_alive(pid) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # 남의 프로세스라도 살아 있다
+        return True
+    return True
+
+
+def _load_resume_job():
+    """기동 시 호출 — 상태 파일이 있으면 `_run_chunks`에 넘길 인자를, 없으면 None."""
+    st = _load_state()
+    if not st:
+        return None
+    try:
+        return (st["text"], list(st["tickers"]), st["model"], int(st["chunk"]),
+                int(st["done"]), st.get("pid"))
+    except Exception as e:
+        _log(f"상태 파일을 읽지 못해 이어받기 생략: {e}")
+        return None
+
+
 def _hit_limit(workdir) -> bool:
     """세션이 한도로 즉사했는가.
 
@@ -170,11 +234,23 @@ def _hit_limit(workdir) -> bool:
     return any(m in head for m in _LIMIT_MARKERS)
 
 
-def _run_chunks(text: str, tickers: list, model: str, chunk: int) -> None:
-    """청크를 **순차** 실행한다 — 앞 세션이 끝나야 다음이 뜬다(동시 세션 0)."""
+def _run_chunks(text: str, tickers: list, model: str, chunk: int,
+                start: int = 0, wait_pid=None) -> None:
+    """청크를 **순차** 실행한다 — 앞 세션이 끝나야 다음이 뜬다(동시 세션 0).
+
+    `start`·`wait_pid`는 재기동 이어받기용이다: 끊긴 청크(start)부터 돌되, 그 청크를 돌던
+    자식(wait_pid)이 아직 살아 있으면 끝날 때까지 먼저 기다린다.
+    """
     groups = [tickers[i:i + chunk] for i in range(0, len(tickers), chunk)]
-    for i, group in enumerate(groups):
+    if wait_pid:
+        deadline = time.monotonic() + _CHUNK_TIMEOUT
+        while _pid_alive(wait_pid) and time.monotonic() < deadline:
+            time.sleep(_PID_POLL)
+    for i in range(start, len(groups)):
+        group = groups[i]
+        _save_state(text, tickers, model, chunk, i, None)
         proc, workdir = _spawn_proc(text, model, group)
+        _save_state(text, tickers, model, chunk, i, proc.pid)
         try:
             rc = proc.wait(timeout=_CHUNK_TIMEOUT)
         except subprocess.TimeoutExpired:
@@ -184,6 +260,7 @@ def _run_chunks(text: str, tickers: list, model: str, chunk: int) -> None:
             _log(f"청크 {i + 1}/{len(groups)} 타임아웃({_CHUNK_TIMEOUT}s) — 강제 종료")
         if _hit_limit(workdir):
             _log(f"한도로 중단, 잔여 {len(groups) - i - 1}청크")
+            _clear_state()
             return
         # rc를 안 보면 인증 오류·바이너리 부재 같은 **한도 아닌 모든 실패**가 「완료」로 찍힌다
         # (계측 실패를 판정 성공으로 읽는 것). 한 청크 실패로 나머지를 버리지는 않는다.
@@ -191,6 +268,7 @@ def _run_chunks(text: str, tickers: list, model: str, chunk: int) -> None:
             _log(f"청크 {i + 1}/{len(groups)} 완료 ({len(group)}종목)")
         elif rc is not None:
             _log(f"청크 {i + 1}/{len(groups)} 실패 (exit {rc}, {len(group)}종목) — 계속")
+    _clear_state()
 
 
 _QUEUE: "queue.Queue" = queue.Queue()
@@ -209,13 +287,17 @@ def _worker_loop():
             _QUEUE.task_done()
 
 
-def _enqueue_chunks(text: str, tickers: list, model: str, chunk: int) -> int:
-    """전량 회차를 큐에 넣고 청크 수를 돌려준다(워커는 최초 1회만 뜬다)."""
+def _ensure_worker() -> None:
     global _WORKER
     with _WORKER_LOCK:
         if _WORKER is None or not _WORKER.is_alive():
             _WORKER = threading.Thread(target=_worker_loop, daemon=True)
             _WORKER.start()
+
+
+def _enqueue_chunks(text: str, tickers: list, model: str, chunk: int) -> int:
+    """전량 회차를 큐에 넣고 청크 수를 돌려준다(워커는 최초 1회만 뜬다)."""
+    _ensure_worker()
     _QUEUE.put((text, tickers, model, chunk))
     return (len(tickers) + chunk - 1) // chunk
 
@@ -307,5 +389,10 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     RUN_DIR.mkdir(parents=True, exist_ok=True)
+    _resume = _load_resume_job()
+    if _resume:
+        _log(f"이어받기: {_resume[4]}/{(len(_resume[1]) + _resume[3] - 1) // _resume[3]}청크 완료 상태에서 재개")
+        _ensure_worker()
+        _QUEUE.put(_resume)
     _log(f"listening on 127.0.0.1:{PORT}")
     HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
