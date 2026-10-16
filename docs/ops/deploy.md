@@ -35,12 +35,11 @@ nano ~/runtime/portfolion/prod/.env
 
 HTTPS 는 Cloudflare Tunnel 이 종단한다 — nginx 는 루프백 :80 만 받고, 인증서 발급·갱신 컨테이너는 없다(task#384).
 
-postgres 는 배포 compose 에 없다 — 컨테이너 `portfolion-postgres-1`(볼륨 `portfolion_pgdata`)을 `deploy/legacy-postgres.compose.yml` 로 먼저 띄운다.
+postgres 는 배포 compose 에 없다 — DB 는 taebro-infra 공용 postgres 의 발급 DB 라 이 레포에서 띄울 것이 없다.
 backend·nginx 는 배포 계약(`~/runtime/taebro-infra/bin/deploy portfolion prod`)이 compose 로 띄운다.
 옛 `deploy.sh`(`docker run` 방식)는 task#386 에서 은퇴했다.
 
 ```bash
-docker compose -p portfolion --env-file .env -f deploy/legacy-postgres.compose.yml up -d postgres   # -p·--env-file 필수 — 파일 헤더 참조
 git push origin main   # 또는 수동: gh workflow run deploy.yml --ref main
 ```
 

@@ -5,8 +5,7 @@
 #
 # prod postgres 는 여기 없다(ADR 261011-074335 결정 1). ⑥-2(task#388)부터 DB 는 taebro-infra 공용 postgres 의 발급 DB
 # (prod `portfolion` · dev `portfolion_dev`, 호스트 taebro-postgres:5432) — backend 가 외부 네트워크 taebro-db 에 붙는다.
-# 옛 portfolion-postgres-1 은 orphan 으로 계속 돈다(bin/deploy 에 --remove-orphans 없음) = 롤백 경로. 정리는 taebro-infra G6.
-# 정의는 deploy/legacy-postgres.compose.yml 에 보존.
+# 옛 portfolion-postgres-1(볼륨 portfolion_pgdata)과 그 정의 파일은 2026-10-16 지웠다 — 이전 뒤 쓰기 0 을 행 수 대조로 확인한 뒤.
 services:
   backend:
     build: ./backend
@@ -17,9 +16,8 @@ services:
     mem_limit: 1g      # 1주 관측 최대×2 원칙 — 실측 최대 452.9MB(표본 112개 ≈ 18시간), 1주 뒤 bin/mem-report 로 재조정
     environment:
       # DB = 공용 postgres 발급 DB. 값은 실행 자리 .env 의 PORTFOLION_DATABASE_URL(= taebro-infra 발급 파일 내용)이고,
-      # 같은 .env 의 옛 DATABASE_URL(호스트 postgres = 옛 컨테이너)을 여기서 덮는다. 옛 키를 고치지 않는 이유: 헬스 실패
-      # 롤백은 옛 compose·이미지만 되돌리고 실행 자리 .env 는 그대로라, 옛 키를 바꾸면 롤백된 옛 backend(taebro-db 없음)가
-      # 새 주소를 못 찾아 롤백까지 실패한다(taebro-infra docs/DB-MIGRATION.md 1-3). 별칭 `postgres` 는 taebro-db 에서 모호하다.
+      # backend 는 DATABASE_URL 을 읽는다. 실행 자리 .env 의 옛 DATABASE_URL 키(옛 컨테이너 주소)는 2026-10-16 지웠다.
+      # 변수 이름을 하나로 합치는 건 별도 작업 — 직전 이미지 롤백이 이 이름으로 받는다. 별칭 `postgres` 는 taebro-db 에서 모호하다.
       # 기본값 빈 문자열(계약 v7 — 러너 빌드엔 .env 가 없어 `:?` 금지). eval: backend/tests/test_compose_dev_network.py
       DATABASE_URL: ${PORTFOLION_DATABASE_URL:-}
     networks: [default, taebro-db]

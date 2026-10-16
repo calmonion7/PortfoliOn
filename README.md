@@ -10,7 +10,7 @@ Mac 로컬 Docker 구성 + Cloudflare Tunnel로 외부 접근. 배포는 taebro-
 |---------|------|
 | nginx | HTTP(:80) 서빙, `/api/*` → backend:8000 프록시, 프론트 정적 서빙(`dist`를 이미지에 굽는다 — `nginx/Dockerfile`) |
 | backend | FastAPI(:8000) |
-| postgres | PostgreSQL 16, `portfolion_pgdata` 볼륨 — 배포 compose 밖(`deploy/legacy-postgres.compose.yml`에 정의 보존) |
+| postgres | taebro-infra 공용 postgres(`taebro-postgres:5432`)의 발급 DB(prod `portfolion` · dev `portfolion_dev`) — 이 레포 compose 밖 |
 
 HTTPS는 Cloudflare가 종단하므로 인증서 컨테이너가 없다. **Cloudflare Tunnel**(`portfolion.taebro.com` → `localhost:80`)은 compose 컨테이너가 아니라 **launchd**로 실행한다. 재부팅 복구는 Docker Desktop 자동 시작 + `restart: unless-stopped`가 맡는다.
 
@@ -54,7 +54,7 @@ cd frontend && npm run dev
 |---|---|
 | `~/runtime/portfolion/prod/.env` | 컨테이너 백엔드(prod 비밀 정본, 600) — `DATABASE_URL` 및 아래 키 전부. `backend/.env.docker`는 이 파일을 가리키는 심링크 |
 | `backend/.env` | 로컬 venv·pytest·스크립트 — `DATABASE_URL` |
-| `.env` (루트) | `POSTGRES_PASSWORD` — `deploy/legacy-postgres.compose.yml` 보간 전용. **폴백이 없으므로 미설정이면 그 compose 명령이 실패한다** |
+| `.env` (루트) | 쓰지 않는다 — 옛 `POSTGRES_PASSWORD` 는 옛 postgres 정리(2026-10-16)로 소비자가 없다 |
 
 ```
 # 필수
@@ -253,7 +253,7 @@ FastAPI (:8000)
 ```
 PortfoliOn/
 ├── docker-compose.yml         # 표준 배포 compose(backend·nginx)
-├── deploy/                    # taebro.env(배포 선언), legacy-postgres.compose.yml(postgres 정의 보존)
+├── deploy/                    # taebro.env(배포 선언)
 ├── nginx/                     # nginx.conf + Dockerfile(프론트를 이미지에 굽는다)
 ├── backend/
 │   ├── main.py
