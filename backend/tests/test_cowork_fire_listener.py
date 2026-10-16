@@ -6,9 +6,12 @@
 실 키·홈 디렉터리는 건드리지 않는다(`_env_value`·`RUN_DIR`·`Popen` 전부 monkeypatch).
 """
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
+
+_REAL_POPEN = subprocess.Popen  # fixture가 갈아끼우기 전 원본 — 사전 점검 테스트가 되돌린다
 
 REPO = Path(__file__).resolve().parent.parent.parent
 LISTENER = REPO / "scripts" / "cowork-fire-listener.py"
@@ -173,10 +176,15 @@ def test_secret_handling_identical_for_both_runners(listener):
 
 # ── 실행기 분기: claude -p vs OpenCode (task#348) ──────────────────────
 
-def test_runner_argv_claude_unchanged(listener):
-    """ⓑ `/` 없는 model(예: opus)은 기존 argv와 완전 동일 — 이게 무회귀의 이빨이다."""
+def test_runner_argv_claude_is_native_absolute_path(listener):
+    """ⓑ `/` 없는 model(예: opus)의 argv[0]은 네이티브 `~/.local/bin/claude` **절대경로**다 (task#389).
+
+    옛 단언은 bare `"claude"`(PATH 해석)였다. 리스너 plist PATH 맨 앞이 fnm npm 전역이라,
+    npm `claude-code` 업그레이드가 postinstall을 건너뛰자 shebang 없는 스크립트가 실행돼
+    이틀간 전 회차가 `Exec format error`로 죽었다 — PATH 의존 자체가 결함이었다.
+    """
     assert listener._runner_argv("opus") == [
-        "claude", "-p", "--model", "opus",
+        str(Path.home() / ".local" / "bin" / "claude"), "-p", "--model", "opus",
         "--allowedTools", "Bash,WebSearch,WebFetch,Read,Write",
     ]
 
@@ -349,6 +357,98 @@ def test_worker_survives_a_failing_job(listener):
     listener._enqueue_chunks("t", _tickers(1), "sonnet", 5)
     assert done.wait(5), f"첫 작업의 예외가 워커를 죽였다 (처리된 것: {seen})"
     assert seen == ["boom", "fine"]
+
+
+# ── fire마다 실행기 사전 점검 (task#389) ─────────────────────────────
+# 실제 고장 모양 그대로: npm postinstall이 안 돌아 `bin/claude.exe`가 **shebang 없는 셸 스크립트**로
+# 남았고, 이를 exec하면 `OSError errno 8 (Exec format error)`. 전량 모드는 큐에 넣고 `200 queued`를
+# 먼저 응답해 backend가 성공으로 기록했다(거짓 200). 점검은 실제로 exec해야 의미가 있으므로
+# 이 절의 테스트는 fixture가 갈아끼운 Popen을 **진짜로 되돌린다**(대상은 tmp 스크립트뿐).
+
+def _broken_runner(tmp_path):
+    p = tmp_path / "claude-broken"
+    p.write_text("echo 'Error: claude native binary not installed.'\nexit 1\n")  # shebang 없음
+    p.chmod(0o755)
+    return p
+
+
+def _healthy_runner(tmp_path):
+    p = tmp_path / "claude-ok"
+    p.write_text("#!/bin/sh\nexit 0\n")
+    p.chmod(0o755)
+    return p
+
+
+def _post_fire(listener, body):
+    import json as _json
+    import threading as _th
+    import urllib.error
+    import urllib.request
+    from http.server import HTTPServer
+    srv = HTTPServer(("127.0.0.1", 0), listener.Handler)
+    t = _th.Thread(target=srv.handle_request, daemon=True)
+    t.start()
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{srv.server_address[1]}/fire",
+        data=_json.dumps(body).encode(),
+        headers={"Authorization": "Bearer tok", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            code, raw = r.status, r.read()
+    except urllib.error.HTTPError as e:
+        code, raw = e.code, e.read()
+    t.join(5)
+    srv.server_close()
+    return code, _json.loads(raw)
+
+
+@pytest.fixture
+def real_exec(listener, monkeypatch):
+    """사전 점검이 실제로 exec하도록 Popen을 되돌리고, 전량 큐 적재를 기록한다."""
+    monkeypatch.setattr(listener.subprocess, "Popen", _REAL_POPEN)
+    enqueued = []
+    monkeypatch.setattr(listener, "_enqueue_chunks", lambda *a: enqueued.append(a) or 1)
+    listener._enqueued = enqueued
+    return listener
+
+
+def _point_runner_at(listener, monkeypatch, path):
+    monkeypatch.setattr(listener, "_runner_argv", lambda model: [str(path), "-p", "--model", model])
+
+
+def test_broken_runner_fails_bulk_fire_with_500_and_empty_queue(real_exec, monkeypatch, tmp_path):
+    """ⓐ 전량 모드 — 깨진 실행기면 fire 시점에 500 + 실행기 경로·사유, 큐는 비어 있다."""
+    broken = _broken_runner(tmp_path)
+    _point_runner_at(real_exec, monkeypatch, broken)
+    code, body = _post_fire(real_exec, {"text": "야간", "tickers": ["A", "B"], "model": "sonnet"})
+    assert code == 500, f"깨진 실행기인데 {code} {body} — 거짓 200 queued"
+    assert body["ok"] is False
+    assert str(broken) in body["error"], body
+    assert "Exec format error" in body["error"] or "errno 8" in body["error"].lower(), body
+    assert real_exec._enqueued == [], "점검 실패인데 큐에 적재됐다"
+
+
+def test_broken_runner_fails_single_fire_with_500_before_workdir(real_exec, monkeypatch, tmp_path):
+    """ⓑ 단일 모드 — 같은 조건에서 500이고, 점검이 스폰 **전**이라 run workdir도 생기지 않는다."""
+    broken = _broken_runner(tmp_path)
+    _point_runner_at(real_exec, monkeypatch, broken)
+    code, body = _post_fire(real_exec, {"text": "ASML 발행"})
+    assert code == 500, body
+    assert str(broken) in body["error"], body
+    runs = real_exec.RUN_DIR
+    assert not runs.exists() or not any(runs.iterdir()), "점검 전에 workdir을 만들었다"
+
+
+def test_healthy_runner_keeps_200_paths(real_exec, monkeypatch, tmp_path):
+    """ⓓ 정상 실행기(`--version` exit 0)면 기존 200 경로 그대로 — 단일·전량 모두."""
+    _point_runner_at(real_exec, monkeypatch, _healthy_runner(tmp_path))
+    code, body = _post_fire(real_exec, {"text": "평범한 트리거"})
+    assert code == 200 and body["ok"] is True, body
+    code, body = _post_fire(real_exec, {"text": "야간", "tickers": ["A"], "model": "sonnet"})
+    assert code == 200 and body == {"ok": True, "run": "queued", "chunks": 1}, body
+    assert len(real_exec._enqueued) == 1
 
 
 def test_paths_live_under_the_runtime_place():

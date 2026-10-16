@@ -2,7 +2,8 @@
 """PortfoliOn 로컬 fire 리스너 (ADR-0028 개정판) — 배치 완료 fire를 받아 세션을 스폰한다.
 
 실행기는 `model`로 갈린다(task#348) — `/` 포함 model(예: `opencode/muse-spark-1.3-contributor-free`)은
-`opencode run -m <model> --auto`, 아니면 기존 `claude -p --model <model>`(무회귀, 바이트 동일).
+`opencode run -m <model> --auto`, 아니면 `~/.local/bin/claude -p --model <model>`(네이티브 절대경로, task#389).
+fire마다 실행기를 `--version`으로 먼저 띄워 보고, 못 뜨면 큐 적재·스폰 전에 500과 사유를 응답한다.
 
 - POST /fire  헤더 Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>
     body {"text": "..."}                       → 즉시 1세션 논블로킹 스폰(기존 계약)
@@ -54,6 +55,8 @@ _LOG_HEAD_BYTES = 4096
 # ~19분이므로 3배 여유를 둔다.
 _CHUNK_TIMEOUT = 3600
 _MAX_CHUNK = 50
+CLAUDE_BIN = str(Path.home() / ".local" / "bin" / "claude")  # 네이티브 설치(npm 전역 아님)
+_PREFLIGHT_TIMEOUT = 15
 
 
 def _log(msg: str) -> None:
@@ -78,16 +81,36 @@ def _env_value(key: str) -> str:
 
 
 def _runner_argv(model: str) -> list:
-    """model로 실행기를 가른다 — `/` 포함이면 OpenCode, 아니면 기존 claude -p.
+    """model로 실행기를 가른다 — `/` 포함이면 OpenCode, 아니면 claude -p.
 
-    `/` 없는 분기는 기존 argv와 **바이트 동일**이어야 한다(무회귀 이빨,
-    `test_runner_argv_claude_unchanged`).
+    claude는 PATH가 아니라 네이티브 설치의 **절대경로**로 띄운다(task#389,
+    `test_runner_argv_claude_is_native_absolute_path`). plist PATH 맨 앞이 fnm npm 전역이라
+    npm `claude-code`가 postinstall 없이 올라가자 shebang 없는 스크립트가 실행돼 전 회차가 죽었다.
     """
     if "/" in model:
         opencode = shutil.which("opencode") or "/opt/homebrew/bin/opencode"
         return [opencode, "run", "-m", model, "--auto"]
-    return ["claude", "-p", "--model", model,
+    return [CLAUDE_BIN, "-p", "--model", model,
             "--allowedTools", "Bash,WebSearch,WebFetch,Read,Write"]
+
+
+def _runner_problem(argv0: str):
+    """실행기를 `--version`으로 한 번 띄워 본다 — 못 뜨면 사유 문자열, 정상이면 None.
+
+    fire를 받는 **시점에** 거부해야 한다. 전량 모드는 큐에 넣고 `200 queued`를 먼저 응답하므로,
+    실행기가 깨져 있으면 backend는 성공으로 기록하고 실패는 이 로그에만 남는다(task#389 실측).
+    """
+    try:
+        r = subprocess.run([argv0, "--version"], stdin=subprocess.DEVNULL,
+                           capture_output=True, timeout=_PREFLIGHT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return f"--version 응답 없음({_PREFLIGHT_TIMEOUT}s)"
+    except OSError as e:
+        return str(e)
+    if r.returncode != 0:
+        tail = (r.stdout + r.stderr).decode(errors="replace").strip()[:200]
+        return f"--version exit {r.returncode}: {tail}"
+    return None
 
 
 def _spawn_proc(text, model=DEFAULT_MODEL, tickers=None):
@@ -254,6 +277,16 @@ class Handler(BaseHTTPRequestHandler):
             chunk = min(_MAX_CHUNK, max(1, int(body.get("chunk") or DEFAULT_CHUNK)))
         except Exception:
             pass
+        argv0 = _runner_argv(model)[0]
+        problem = _runner_problem(argv0)
+        if problem:
+            _log(f"실행기 사전 점검 실패 — {argv0}: {problem}")
+            out = json.dumps({"ok": False, "error": f"{argv0}: {problem}"}).encode()
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(out)
+            return
         try:
             if tickers:
                 chunks = _enqueue_chunks(text, tickers, model, chunk)
