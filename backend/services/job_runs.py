@@ -150,6 +150,23 @@ def record(job_id: str, trigger: str):
         _finish(run.status or "success", run.error)
 
 
+def reap_orphans() -> int:
+    """기동 시 호출 — 남아 있는 `running` 행을 `failed`로 닫는다. 닫은 행 수를 돌려준다.
+
+    백엔드는 단일 프로세스라 **기동 시점의 running은 정의상 이전 프로세스가 남긴 것**이다(재배포·
+    크래시로 `_finish`가 못 돌았다). 안 닫으면 배치현황에 영원히 running으로 보인다.
+    ⚠️ 스케줄러 start **전에** 불러야 한다 — 그 뒤엔 이번 프로세스의 정당한 running을 죽인다.
+    실패해도 기동을 막지 않는다(계측 실패 규율)."""
+    try:
+        return execute(
+            "UPDATE job_runs SET status = 'failed', finished_at = NOW(), "
+            "error = '프로세스 재기동으로 중단' WHERE status = 'running'"
+        )
+    except Exception:
+        log.warning("job_runs.reap_orphans failed", exc_info=True)
+        return 0
+
+
 def recent(job_id: str, n: int = 20) -> list[dict]:
     """해당 job_id의 최신 실행로그 n건(최신순). 테이블 부재/예외시 []."""
     try:
