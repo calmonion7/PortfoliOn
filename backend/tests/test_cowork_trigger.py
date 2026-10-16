@@ -133,7 +133,7 @@ def test_nightly_enrich_fires_target_set_as_given(monkeypatch):
 
     07:05·20:42 발행 레인(리스너 DEFAULT_MODEL)은 줄곧 opus였고 무변경이다.
     ⚠️ 한도로 죽으면 배치현황은 초록인 채 95%가 미갱신일 수 있다(ADR 260913-013425 §46) —
-    관측은 `~/portfolion-routine-runs/` 디렉터리 수와 `enriched_at` 분포로 한다.
+    관측은 `~/runtime/portfolion/routine-runs/` 디렉터리 수와 `enriched_at` 분포로 한다.
     """
     run, fired, seen = _run_nightly(monkeypatch, targets=["005930", "AAPL", "NVDA"])
     assert seen == ("cowork_enrich_nightly", "auto")

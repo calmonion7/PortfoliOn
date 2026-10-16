@@ -349,3 +349,12 @@ def test_worker_survives_a_failing_job(listener):
     listener._enqueue_chunks("t", _tickers(1), "sonnet", 5)
     assert done.wait(5), f"첫 작업의 예외가 워커를 죽였다 (처리된 것: {seen})"
     assert seen == ["boom", "fine"]
+
+
+def test_paths_live_under_the_runtime_place():
+    """리스너는 작업 폴더가 아니라 실행 자리(`~/runtime/portfolion/prod/scripts/`)에서 돈다 —
+    `REPO/backend/.env.docker` 는 거기 없으므로 실행 자리 `.env` 를 직접 읽고, 실행 기록은
+    홈 최상단이 아니라 프로젝트 산출물 자리에 쌓는다(taebro-infra 계약 v9)."""
+    mod = _load()
+    assert mod.ENV_FILE == Path.home() / "runtime" / "portfolion" / "prod" / ".env"
+    assert mod.RUN_DIR == Path.home() / "runtime" / "portfolion" / "routine-runs"

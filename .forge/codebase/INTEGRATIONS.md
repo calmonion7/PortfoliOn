@@ -548,18 +548,18 @@ CNN은 차단이 잦아 **브라우저 유사 헤더 전체 세트**(`sec-ch-ua`
 ### 9.3 수신측 — 로컬 fire 리스너 (`scripts/cowork-fire-listener.py`)
 
 - `127.0.0.1:8787` 바인드(백엔드 컨테이너는 `host.docker.internal:8787`로 도달), 표준 라이브러리 `http.server`.
-- `POST /fire`, `Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>` 검증(`backend/.env.docker`를 직접 파싱해 값을 읽는다). 거부 사유를 **셋으로 구분해 로그에 남긴다**(서버에 토큰 없음 / 요청에 헤더 없음 / 토큰 불일치 — 토큰 값 자체는 로그에 싣지 않는다) — 옛 코드는 하나로 뭉개 401을 봐도 원인을 못 좁혔다.
+- `POST /fire`, `Authorization: Bearer <COWORK_ROUTINE_FIRE_TOKEN>` 검증(prod 실행 자리 `.env` — `~/runtime/portfolion/prod/.env`, 작업 폴더 `backend/.env.docker` 심링크의 정본 — 를 직접 파싱해 값을 읽는다). 거부 사유를 **셋으로 구분해 로그에 남긴다**(서버에 토큰 없음 / 요청에 헤더 없음 / 토큰 불일치 — 토큰 값 자체는 로그에 싣지 않는다) — 옛 코드는 하나로 뭉개 401을 봐도 원인을 못 좁혔다.
 - **두 모드로 갈린다**(task#344/#345, ADR `260913-013425`):
   - **기존(단일 세션)**: `text`만 받으면 그대로 논블로킹 스폰 — 프롬프트 = `scripts/cowork-routine-prompt.md`(`{{COWORK_API_KEY}}` 자리표시자는 값이 아니라 **`$PORTFOLION_API_KEY` 참조**로 치환) + 트리거 text → **stdin으로** 실행기에 전달. 키 값은 자식 프로세스 env `PORTFOLION_API_KEY`로만 주입한다(task#349 — OpenCode `run`이 실행한 bash 명령을 `run.log`에 에코해, 프롬프트에 값을 실으면 평문 로그로 샜다). 실행기는 `model`이 가른다(`_runner_argv`, task#348): `/` 없으면 기존 `claude -p --model <model>(기본 opus) --allowedTools Bash,WebSearch,WebFetch,Read,Write`(무회귀), `/` 있으면 OpenCode `opencode run -m <model> --auto`. 응답 `{"ok": true, "run": "<workdir>"}`.
   - **전량 모드**: 본문에 `tickers[]`(+ 선택 `model` 기본 `opus`, `chunk` 기본 5, 상한 50)가 있으면 `tickers`를 `chunk`개씩 잘라 **단일 워커 스레드의 큐에서 순차 스폰**한다(동시 세션 0) — 각 세션 프롬프트에 그 청크만 `[대상 종목]` 블록으로 싣는다. 응답 `{"ok": true, "run": "queued", "chunks": N}`. 세션이 사용 한도에 걸려 즉사하면(`_hit_limit` — 로그 앞 4096바이트에서 `_LIMIT_MARKERS` 문구 탐지, `no payment method` 포함) 잔여 청크를 포기한다. 온디맨드 갱신은 이 모드를 `chunk=1`로 탄다. 청크당 타임아웃 `_CHUNK_TIMEOUT=3600s`(초과 시 강제 kill, 워커 영구 정지 방지) — 실측 5종목 1청크 ~19분의 3배 여유.
-- 실행 cwd는 세션마다 `tempfile.mkdtemp(prefix=ts+"-", dir=~/portfolion-routine-runs)`로 **원자 생성**(레포 컨텍스트·편집 차단 + 같은 초 2회 fire의 `run.log` truncate 방지 — 리스너가 launchd 장수 단일 프로세스라 PID가 늘 같다). `run.log`는 `os.open(..., 0o600)`으로 **생성 시점부터** 소유자 전용이다.
+- 실행 cwd는 세션마다 `tempfile.mkdtemp(prefix=ts+"-", dir=~/runtime/portfolion/routine-runs)`로 **원자 생성**(레포 컨텍스트·편집 차단 + 같은 초 2회 fire의 `run.log` truncate 방지 — 리스너가 launchd 장수 단일 프로세스라 PID가 늘 같다). `run.log`는 `os.open(..., 0o600)`으로 **생성 시점부터** 소유자 전용이다.
 
 ### 9.4 A/B 측정 — 쓰기 차단 프록시 (`scripts/ab-proxy.py`, 신규, task#350)
 
 발행 레인 A/B 하네스(`scripts/ab-publish.py` 외, `STACK.md` §3.4)가 띄우는 세션은 prod API를 **읽기만** 할 수 있다. `ab-proxy.py`가 `127.0.0.1`에서 GET/HEAD만 진짜 키로 prod에 중계하고, 그 외 메서드는 **업스트림을 호출하지 않은 채** 요청 본문을 캡처하고 성공 응답을 돌려준다(그 캡처가 곧 측정 산출물). 보장은 독립 2겹이다 — ⓐ 하네스가 프롬프트의 BASE URL을 프록시로 치환(정확히 1건) ⓑ 자식 env `PORTFOLION_API_KEY`는 더미(프롬프트를 무시하고 prod를 직접 때려도 401). 리스너와 루틴 프롬프트 파일은 읽기만 하고 세션은 리스너를 거치지 않는다. 가드 `backend/tests/test_ab_proxy.py`(업스트림 미호출을 mock으로 단언)·`test_ab_publish.py`.
 - 거부 응답(404/401)은 `Content-Length: 0`을 명시(`_reject`) — 없으면 간헐적으로 `ConnectionReset`이 나 호출측 로그에서 401이 통째로 사라질 수 있었다(6회 중 2회 재현).
 - 로그는 전부 `_log()`로 통일(KST 타임스탬프 접두) — 시각 없는 로그는 어느 fire에 대응하는지 상관을 못 짓는다는 실측 동기(4건의 401이 시각 부재로 미해결로 남았었다).
-- launchd 서비스 `com.portfolion.cowork-fire-listener` — `claude -p`가 keychain OAuth를 쓰므로 plist `EnvironmentVariables`에 `HOME`/`USER`/`LOGNAME`이 필요하다.
+- launchd 서비스 `com.portfolion.cowork-fire-listener` — 작업 폴더가 아니라 prod 실행 자리 사본 `~/runtime/portfolion/prod/scripts/cowork-fire-listener.py`를 돌린다(배포 `RUNTIME_FILES`가 리스너·프롬프트를 복사). `claude -p`가 keychain OAuth를 쓰므로 plist `EnvironmentVariables`에 `HOME`/`USER`/`LOGNAME`이 필요하다.
 
 ---
 
