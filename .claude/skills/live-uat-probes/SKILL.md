@@ -186,3 +186,24 @@ uat369 `no-h-scroll`은 `scrollWidth − innerWidth`라 둘이 같이 커져 **0
 ⓒ 클릭 실패가 프로브를 **죽이지 않게** — 예외는 축 FAIL 한 줄로 바꾼다(죽으면 나머지 축 전부가 미측정이다).
 진단 도구: `pointerdown`/`click`/`scroll`/`resize` 캡처 리스너 + `[role=tooltip]` MutationObserver로 시간축을 찍으면
 「열렸다 닫혔나」와 「애초에 안 눌렸나」가 갈린다(`Glossary.jsx`는 열린 지 400ms 뒤 scroll·resize에 닫힌다).
+
+## task#395 추가 — dev 스택에 라이브 표본 만들기 · 넘침 축이 못 보는 「행 모양」
+
+**㉤ dev 스택(8084)은 prod 복사본이라 *새 기능의 표본이 없을 때가 많다* — 표본 0이면 그 축은 미검증이다(㉡). 심층
+리포트 판은 `scripts/dev-seed-analyst-report.py`로 prod에서 복사한다(task#395).** 사용법은 그 파일 docstring
+(`docker exec -i portfolion-dev-backend-1 python - <TICKER[:DATE]> … < scripts/dev-seed-analyst-report.py`). 손으로
+하면 막히는 자리가 넷이라 스크립트로 박았다: ⓐ dev에는 `COWORK_API_KEY`가 없고 테스트 계정은 `user`라 발행(admin)이
+403 → 스크립트가 **dev 컨테이너 안에서** dev `JWT_SECRET`으로 10분짜리 admin 토큰을 만들어 쓰고 출력하지 않는다 ⓑ 조회
+응답 ≠ 발행 본문 — 서버 필드를 빼고(`LensIn.model_fields`만 남김) 계산 렌즈의 `signal`·`flip`·`gauge`·`conditions`를
+빼야 하며, **렌즈 3 `basis`는 응답 최상위가 아니라 `computed.basis`에 있어** 되살리지 않으면 422 ⓒ prod를 python 기본
+UA로 부르면 Cloudflare가 비 JSON 응답을 준다(`User-Agent` 지정) ⓓ **발행일은 원본 날짜가 아니라 dev 서버의 오늘(KST)** 이고
+같은 날 재실행은 그 판을 덮으며, dev에 그 종목 스냅샷이 없으면 409다. prod에는 GET만 한다. 표본은 **분기마다 하나씩**
+고를 것 — task#395는 note 표지가 있는 판(000660)과 없는 판(LHX)을 함께 넣어 분리·폴백 두 경로를 다 쟀다.
+**push 전 red-first를 그 표본으로 돌릴 것**: 옛 프론트가 떠 있는 dev에 새 축을 먼저 돌려 「새 축만 FAIL, 기존 축 무회귀」
+(task#395: 246 PASS / 16 FAIL = 새 2축 × 8컨텍스트)를 확인하면 축의 이빨과 무회귀가 한 번에 증명된다.
+
+**㉥ 행 목록의 「모든 행이 같은 모양인가」는 넘침 축 세 벌(㉢)로 원리적으로 안 보인다 — 구조 표지를 달고 상자 관계로
+재라(task#395).** 행 머리를 `[data-precedent-head]`·`[data-precedent-meta]`로 나누고 **모든 행에서** meta top ≥ head
+bottom, 제목 폭 ≥ 글자 4개(낱자 압축), 배지가 meta 안을 단언한다(`uat369 lens10-row-shape`). 펼친 내용의 분리는
+API 원문의 표지(`같은 점:`/`다른 점:`)와 DOM 칸 유무를 **쌍으로** 대조한다(`lens10-note-split`) — 화면만 보면
+「분리 안 됨」이 결함인지 표지 없는 원문인지 갈리지 않는다.
