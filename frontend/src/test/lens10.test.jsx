@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import LensReport, { isLensReport } from '../components/reports/LensReport'
+import LensReport, { isLensReport, LENS_INFO } from '../components/reports/LensReport'
 
 // 렌즈 10 「위험의 전례」(위험 기저율, task#391) — 1부: 렌즈 10은 선택. 10렌즈 판과 9렌즈(옛) 판이 공존한다.
 const judg = (id, signal = 'wait', extra = {}) => ({ id, summary: `요약${id}`, body: `본문${id}`, metrics: [], signal,
@@ -26,6 +26,11 @@ const NA10 = { ...TEN, lenses: [...nine(), judg(10, 'na', { na_reason: '비슷�
 const cellIds = (c) => [...c.querySelectorAll('[data-lens-cell]')].map(e => e.getAttribute('data-lens-cell'))
 
 describe('렌즈 10 「위험의 전례」 (task#391)', () => {
+  it('LENS_INFO는 발행 계약의 렌즈 id 1~10을 빠짐없이 덮는다(task#391 회고 — 렌즈 수를 바꾸면 여기와 백엔드 LensIn.id 상한을 함께)', () => {
+    expect(Object.keys(LENS_INFO).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    expect(Object.values(LENS_INFO).every(v => v.name && v.question)).toBe(true)
+  })
+
   it('분기 게이트 — 세 픽스처 모두 v2 렌더러를 탄다', () => {
     expect([TEN, NINE, NA10].every(isLensReport)).toBe(true)
   })

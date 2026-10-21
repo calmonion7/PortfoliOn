@@ -41,8 +41,10 @@ for (const t of TICKERS) {
     basis: document.querySelector('#lens-3 [data-lens-basis]')?.textContent || null,
     near: [...document.querySelectorAll('[data-lens-cell]')].map(c => ({ id: c.getAttribute('data-lens-cell'), near: !!c.querySelector('[data-near-boundary]') })),
   }));
-  ok(`${t} reached`, m.cells === 9 && m.consensus.length === 9, `cells=${m.cells} details=${m.consensus.length}`);
   const lenses = rep.lenses || [];
+  // 렌즈 10은 task#391부터 선택 — 9렌즈(옛) 판과 10렌즈 판이 공존하므로 개수는 API에서 유도한다(task#393)
+  const n = lenses.length;
+  ok(`${t} reached`, (n === 9 || n === 10) && m.cells === n && m.consensus.length === n, `cells=${m.cells} details=${m.consensus.length} api=${n}`);
   // ⓐ 애널 추정치 — 박제 consensus_based와 상세 헤더 배지가 렌즈별로 일치(양·음 모두)
   const cMismatch = lenses.filter(l => {
     const want = !!l.computed?.consensus_based, got = !!m.consensus.find(x => x.id === String(l.id))?.badge;

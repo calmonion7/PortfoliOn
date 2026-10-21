@@ -17,7 +17,7 @@ const H = { Authorization: `Bearer ${access_token}` };
 const latest = (await (await fetch(`${BASE}/api/analyst-reports/${TICKER}`, { headers: H })).json()).reports[0];
 const rep = await (await fetch(`${BASE}/api/analyst-reports/${TICKER}/${latest.published_date}`, { headers: H })).json();
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, samples10 = 0;
 const ok = (name, cond, detail = '') => { if (cond) pass++; else fail++; console.log(`${cond ? '✓' : '✗'} ${name}${detail ? ' — ' + detail : ''}`); };
 
 ok('api-format-2', rep.format === 2, `format=${rep.format} date=${rep.published_date}`);
@@ -27,16 +27,25 @@ const expEstimate = lenses.filter(l => l.computed?.estimate_based).length;
 const expFlips = lenses.filter(l => l.signal !== 'na' && l.flip).length;
 const gaugeLenses = lenses.filter(l => l.signal !== 'na' && (l.computed?.gauge || l.gauge));
 const condLenses = lenses.filter(l => l.signal !== 'na' && !(l.computed?.gauge || l.gauge) && l.conditions?.length);
-const JUDG = [1, 2, 6, 7, 9];
+const JUDG = [1, 2, 6, 7, 9, 10];
+// task#393 — 렌즈 10은 task#391부터 선택이라 9렌즈(옛) 판과 10렌즈 판이 공존한다. 개수는 API에서 유도한다.
+const N = lenses.length;
+ok('api-lens-ids', (N === 9 || N === 10) && lenses.every((l, i) => l.id === i + 1), `ids=${lenses.map(l => l.id)}`);
+const L10 = lenses.find(l => l.id === 10 && l.signal !== 'na' && l.precedents?.length);
+const OUTC = ['realized', 'partial', 'not_realized'];
+const OUT_LABEL = { realized: '현실화', partial: '부분 현실화', not_realized: '비현실화' };
+ok('api-lens10-base-rate', !L10 || (L10.precedents.length >= 2 && L10.precedents.length <= 5 && L10.base_rate?.total === L10.precedents.length
+  && OUTC.every(o => (L10.base_rate[o] || 0) === L10.precedents.filter(p => p.outcome === o).length)),
+  L10 ? `precedents=${L10.precedents.length} base_rate=${JSON.stringify(L10.base_rate)}` : '표본 0 — 렌즈 10 사례 없는 판');
 ok('api-judgment-structured', lenses.filter(l => JUDG.includes(l.id) && l.signal !== 'na').every(l => !!l.gauge !== !!l.conditions?.length), '판단 렌즈마다 gauge 또는 conditions 정확히 하나');
 ok('api-three-colors', lenses.every(l => (!l.conditions || l.conditions.map(c => c.color).sort().join() === 'go,stop,wait') && (!l.gauge || l.gauge.zones.length === 3)), '조건·판단 게이지 모두 세 색');
 ok('api-gauges-present', gaugeLenses.length > 0, `n=${gaugeLenses.length} — 0이면 게이지 축이 공허하게 통과한다`);
 
 // task#372 — 렌즈 표시명(일반인 말)·「?」 설명. 이름은 API가 주지 않으므로 화면 정본을 여기 고정한다.
 const NAMES = ['숫자의 신뢰도', '지금 매출 속도', '벌수록 남는 구조', '묶여 있는 비용', '망할 위험',
-  '고객 이탈 위험', '경영진·대주주', '지금 주가 수준', '앞으로의 수요'];
+  '고객 이탈 위험', '경영진·대주주', '지금 주가 수준', '앞으로의 수요', '위험의 전례'].slice(0, N);
 const QUESTION3 = '매출이 늘 때 비용이 덜 느는가';
-const VIEWPORTS = [['m278', { width: 278, height: 640 }, true], ['m390', { width: 390, height: 844 }, true], ['pc1440', { width: 1440, height: 900 }, false]];
+const VIEWPORTS = [['m278', { width: 278, height: 640 }, true], ['m350', { width: 350, height: 760 }, true], ['m390', { width: 390, height: 844 }, true], ['pc1440', { width: 1440, height: 900 }, false]];
 const b = await chromium.launch();
 for (const [vp, viewport, isMobile] of VIEWPORTS) {
   for (const scheme of ['light', 'dark']) {
@@ -83,10 +92,19 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
           return { name: e.textContent, narrow: r.width < fs * 2, lines: Math.round(r.height / lh) };
         }).filter(x => x.narrow || x.lines > 2),
         headerOverflow: [...document.querySelectorAll('[data-lens-cell] > div:first-child')].map(e => e.scrollWidth - e.clientWidth).filter(v => v > 0).length,
+        // task#393 렌즈 10 표면
+        absent10: document.querySelectorAll('[data-lens10-absent]').length,
+        detail10: !!document.querySelector('#lens-10'),
+        bars: document.querySelectorAll('[data-base-rate-bar]').length,
+        segs: [...document.querySelectorAll('[data-base-rate-bar] [data-outcome-seg]')].map(e => e.getAttribute('data-outcome-seg')),
+        caption: document.querySelector('[data-base-rate-caption]')?.textContent || '',
+        risk10: document.querySelector('[data-lens10-risk]')?.textContent || '',
+        precRows: document.querySelectorAll('[data-precedent]').length,
+        lens10Overflow: [...document.querySelectorAll('#lens-10, #lens-10 *')].filter(e => e.scrollWidth - e.clientWidth > 1 && getComputedStyle(e).display !== 'inline').length,
       };
     });
     ok(`${tag} theme-applied`, m.theme === scheme, `data-theme=${m.theme}`);
-    ok(`${tag} reached`, m.cellIds.length === 9, `cells=${m.cellIds.length}`);
+    ok(`${tag} reached`, m.cellIds.length === N, `cells=${m.cellIds.length} vs api ${N}`);
     ok(`${tag} board-order`, JSON.stringify(m.cellIds) === JSON.stringify(lenses.map(l => String(l.id))));
     ok(`${tag} title-identity`, m.body.includes(rep.title));
     ok(`${tag} signal-labels`, lenses.every((l, i) => (m.cellText[i] || '').includes(LABEL[l.signal])));
@@ -108,7 +126,7 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     ok(`${tag} lens-names-row`, JSON.stringify(m.rowNames) === JSON.stringify(NAMES), m.rowNames.join('|'));
     ok(`${tag} lens-names-detail`, JSON.stringify(m.detailNames) === JSON.stringify(NAMES), m.detailNames.join('|'));
     // 대상 도달 축 — 0건 클릭이 조용히 통과하지 않게(task#358) 버튼 개수를 먼저 단언한다
-    ok(`${tag} help-buttons-reached`, m.helpBtns.length === 18, `n=${m.helpBtns.length}`);
+    ok(`${tag} help-buttons-reached`, m.helpBtns.length === N * 2, `n=${m.helpBtns.length} vs ${N * 2}`);
     ok(`${tag} help-tap-32`, m.helpBtns.length > 0 && m.helpBtns.every(x => x.h >= 32 && x.w >= 32), `min h=${Math.min(...m.helpBtns.map(x => x.h))} w=${Math.min(...m.helpBtns.map(x => x.w))}`);
     const helpBtn = page.locator('[data-lens-cell="3"] button[aria-label="벌수록 남는 구조 — 설명 보기"]');
     const nHelp = await helpBtn.count();
@@ -118,10 +136,26 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     if (nHelp === 1) await page.keyboard.press('Escape');
     ok(`${tag} names-no-stacking`, m.nameStack.length === 0, JSON.stringify(m.nameStack));
     ok(`${tag} lens-header-no-overflow`, m.headerOverflow === 0, `n=${m.headerOverflow}`);
+    // ── task#393 렌즈 10 — 9렌즈 판은 안내 한 줄, 10렌즈 판은 상세 카드. 사례 있는 판은 막대·캡션·행이 API 집계와 같다 ──
+    ok(`${tag} lens10-presence`, N === 10 ? (m.absent10 === 0 && m.detail10) : (m.absent10 === 1 && !m.detail10), `N=${N} absent=${m.absent10} detail=${m.detail10}`);
+    const br = L10?.base_rate;
+    ok(`${tag} lens10-base-rate`, L10
+      ? m.bars === 1 && JSON.stringify(m.segs) === JSON.stringify(OUTC.filter(o => br[o] > 0))
+        && m.caption.includes(`전례 ${br.total}건`) && OUTC.every(o => m.caption.includes(`${OUT_LABEL[o]} ${br[o] || 0}`)) && m.risk10.includes(L10.risk)
+      : m.bars === 0, `bars=${m.bars} segs=${m.segs} caption="${m.caption}"`);
+    ok(`${tag} lens10-precedent-rows`, m.precRows === (L10?.precedents.length || 0), `${m.precRows} vs api ${L10?.precedents.length || 0}`);
+    let expanded = '';
+    const row0 = page.locator('[data-precedent="0"] button');
+    if (L10 && await row0.count() === 1) { await row0.click(); expanded = (await page.locator('[data-precedent="0"]').textContent()) || ''; }
+    ok(`${tag} lens10-expand-ref`, !L10 || (expanded.includes(L10.precedents[0].ref) && (await row0.getAttribute('aria-expanded')) === 'true'), L10 ? `ref 표시=${expanded.includes(L10.precedents[0].ref)}` : '표본 0');
+    ok(`${tag} lens10-no-overflow`, m.lens10Overflow === 0, `n=${m.lens10Overflow}`);
+    if (L10) samples10++;
     await page.screenshot({ path: `${OUT}/${TICKER}-${tag}.png`, fullPage: true });
     await ctx.close();
   }
 }
 await b.close();
-console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${4 + VIEWPORTS.length * 2 * 23})`);
+// 표본 0이면 렌즈 10 축은 통과가 아니라 미검증이다(task#318)
+console.log(`표본 lens10(사례 있는 판 × 컨텍스트)=${samples10}${samples10 === 0 ? ' — 미검증' : ''} · 렌즈 수 N=${N}`);
+console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${6 + VIEWPORTS.length * 2 * 28})`);
 process.exit(fail ? 1 : 0);

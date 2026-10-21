@@ -1074,3 +1074,11 @@ def test_lens10_risk_precedents_only_on_lens10_422():
     body = crcl_body()
     body["lenses"][0]["precedents"] = [_prec(), _prec(case="B")]
     assert _publish(body)[0].status_code == 422
+
+
+def test_lens_kind_sets_cover_publish_id_range():
+    # 렌즈 수를 바꿀 때 한쪽만 고치는 것을 막는다(task#391 회고 — JUDGMENT_LENSES는 런타임에서 읽히지 않아
+    # 10을 빠뜨려도 아무 테스트가 깨지지 않았다): 계산 렌즈 ∪ 판단 렌즈 == 발행 계약의 id 범위, 겹침 없음
+    from routers.analyst_reports import LensIn
+    le = next(m.le for m in LensIn.model_fields["id"].metadata if hasattr(m, "le"))
+    assert sorted(L.COMPUTED_LENSES + L.JUDGMENT_LENSES) == list(range(1, le + 1))
