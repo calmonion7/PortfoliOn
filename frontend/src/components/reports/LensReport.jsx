@@ -4,7 +4,7 @@ import Card from '../ui/Card'
 import { SectionTitle } from './reportUtils.jsx'
 import { GlossaryText, GlossaryTerm } from '../Glossary.jsx'
 
-// 심층 리포트 v2 — 구조 축·9렌즈 틀 (ADR 261006-232406, task#369).
+// 심층 리포트 v2 — 구조 축·렌즈 틀 (ADR 261006-232406, task#369). 렌즈 10은 task#391에 추가(그 전 판은 9개).
 // 순서: 한줄 논지 → 렌즈 신호(집계 + 렌즈별 신호·바뀜 조건 게이지 한 행, 번호 순) → 구조 축 → 렌즈 상세 → (서버 숫자 블록은 호출측)
 // 투자의견·적정주가가 없다 — 판단 근거는 렌즈 신호다. 계산 렌즈(3·4·5·8)의 숫자·색·바뀜 조건은 서버가 박제한 값을
 // 그대로 그린다(프론트가 재계산하지 않는다 — 출처가 하나여야 같은 상황에 같은 색이 나온다).
@@ -24,6 +24,7 @@ export const LENS_INFO = {
   7: { name: '경영진·대주주', question: '주주와 이해가 맞는 사람들이 운영하는가' },
   8: { name: '지금 주가 수준', question: '미래 이익에 비해 비싼가 싼가' },
   9: { name: '앞으로의 수요', question: '이 제품을 앞으로 얼마나 더 살 것인가' },
+  10: { name: '위험의 전례', question: '이 위험은 비슷한 과거에 몇 번 현실이 됐나' },
 }
 
 // 「?」 — 기존 용어집 팝오버를 재사용(새 팝오버 신설 금지). 제목 = 렌즈 이름, 본문 = 이 렌즈가 묻는 것.
@@ -88,6 +89,15 @@ const INPUT_LABELS = {
   other_revenue: '기타 매출', operating_expense: '영업비용', forward_earnings: 'forward 이익',
   risk_free_pct: '무위험 금리', unit_cost: '단위원가', fixed_cost: '고정비',
 }
+
+// 렌즈 10 전례 결과(task#391) — 위험이 현실이 된 쪽이 나쁜 쪽이다. 색만으로 말하지 않게 라벨 병기.
+// 건수는 서버가 센 base_rate를 그대로 그린다(여기서 다시 세지 않는다).
+const OUTCOME_META = {
+  realized: { label: '현실화', variant: 'danger', color: 'var(--color-error)' },
+  partial: { label: '부분 현실화', variant: 'warning', color: 'var(--warn)' },
+  not_realized: { label: '비현실화', variant: 'success', color: 'var(--color-success)' },
+}
+const OUTCOMES = ['realized', 'partial', 'not_realized']
 
 const textStyle = { color: 'var(--text-2, var(--text))', fontSize: 13, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'break-word' }
 const smallCap = { color: 'var(--text-3)', fontSize: 11 }
@@ -264,6 +274,10 @@ function SignalList({ lenses }) {
           </div>
         )
       })}
+      {/* 렌즈 10은 나중에 붙었다(task#391) — 그 전 판은 불변이라 렌즈 10 없이 그대로 그린다 */}
+      {!lenses.some(l => l.id === 10) && (
+        <p data-lens10-absent="" style={{ ...smallCap, margin: 0, lineHeight: 1.5 }}>이 판은 렌즈 10 도입 전에 발행됐다 — 「위험의 전례」가 없다.</p>
+      )}
     </div>
   )
 }
@@ -377,6 +391,59 @@ function InputsTable({ inputs }) {
   )
 }
 
+// 렌즈 10 상세 — 대상 위험 → 기저율 비율 막대 + 건수 캡션 → 사례 목록(행을 누르면 같은 점·다른 점·출처)
+function PrecedentRow({ p, i }) {
+  const [open, setOpen] = useState(false)
+  const o = OUTCOME_META[p.outcome] || OUTCOME_META.partial
+  return (
+    <li data-precedent={i} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', width: '100%', minHeight: 44, padding: '6px 0',
+                       background: 'none', border: 'none', color: 'inherit', font: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+        <span style={{ flex: '1 1 160px', minWidth: 0, color: 'var(--text)', fontSize: 13, fontWeight: 600, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{p.case}</span>
+        <span className="mono tnum" style={{ ...smallCap, whiteSpace: 'nowrap' }}>{p.period}</span>
+        <Badge variant={o.variant}>{o.label}</Badge>
+        <span aria-hidden="true" style={{ ...smallCap, width: 12, textAlign: 'center' }}>{open ? '−' : '+'}</span>
+      </button>
+      {open && (
+        <div style={{ padding: '0 0 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {p.note && <div style={{ ...textStyle, fontSize: 12 }}><span style={smallCap}>같은 점·다른 점 </span>{p.note}</div>}
+          <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>출처: {p.ref}</div>
+        </div>
+      )}
+    </li>
+  )
+}
+
+function BaseRate({ lens }) {
+  const br = lens.base_rate
+  const counts = OUTCOMES.map(k => [k, br?.[k] || 0]).filter(([, n]) => n > 0)
+  return (
+    <div data-base-rate="" style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '10px 0' }}>
+      {lens.risk && (
+        <div data-lens10-risk="" style={{ padding: '8px 10px', background: 'var(--bg-elev-2)', borderRadius: 6 }}>
+          <div style={smallCap}>대상 위험</div>
+          <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13, lineHeight: 1.5, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{lens.risk}</div>
+        </div>
+      )}
+      {br?.total > 0 && (
+        <div>
+          <div data-base-rate-bar="" role="img" aria-label={`전례 ${br.total}건 중 ${OUTCOMES.map(k => `${OUTCOME_META[k].label} ${br[k] || 0}`).join(', ')}`}
+               style={{ display: 'flex', gap: 2, height: 10, borderRadius: 5, overflow: 'hidden' }}>
+            {counts.map(([k, n]) => <span key={k} data-outcome-seg={k} style={{ flexGrow: n, flexBasis: 0, background: OUTCOME_META[k].color }} />)}
+          </div>
+          <div data-base-rate-caption="" className="tnum" style={{ ...smallCap, marginTop: 4 }}>
+            전례 {br.total}건 중 {OUTCOMES.map(k => `${OUTCOME_META[k].label} ${br[k] || 0}`).join(' · ')}
+          </div>
+        </div>
+      )}
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {lens.precedents.map((p, i) => <PrecedentRow key={i} p={p} i={i} />)}
+      </ul>
+    </div>
+  )
+}
+
 function LensDetail({ lens }) {
   const m = sig(lens.signal)
   return (
@@ -394,6 +461,7 @@ function LensDetail({ lens }) {
       </div>
       <div style={{ color: 'var(--text)', fontWeight: 600, fontSize: 13, margin: '8px 0 4px', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{lens.summary}</div>
       <Metrics metrics={lens.metrics} />
+      {lens.id === 10 && lens.precedents?.length > 0 && <BaseRate lens={lens} />}
       <p style={textStyle}><GlossaryText text={lens.body} /></p>
       <ComputedBlock lens={lens} />
       <InputsTable inputs={lens.inputs} />

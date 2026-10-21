@@ -2240,7 +2240,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ## Analyst Reports (애널리스트 리포트 발행물)
 
-발행물 누적형 애널리스트 리포트 (ADR-0027). 판단·서사(한줄 논지·구조 축·9렌즈 — ADR 261006-232406)는 Cowork가 온디맨드로 제출하고, 숫자 데이터 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 서버가 그 종목의 **최신 스냅샷**에서 발행 순간 자동 첨부해 문서를 자기완결적으로 박제한다. 문서는 발행 후 불변 — 수정이 필요하면 새 판을 발행(같은 날 재발행만 그날 판을 교체).
+발행물 누적형 애널리스트 리포트 (ADR-0027). 판단·서사(한줄 논지·구조 축·렌즈 1~9 + 선택 렌즈 10 — ADR 261006-232406)는 Cowork가 온디맨드로 제출하고, 숫자 데이터 블록(발행 시점 시세·forward 추정·피어 멀티플·PER 밴드·컨센서스 목표가)은 서버가 그 종목의 **최신 스냅샷**에서 발행 순간 자동 첨부해 문서를 자기완결적으로 박제한다. 문서는 발행 후 불변 — 수정이 필요하면 새 판을 발행(같은 날 재발행만 그날 판을 교체).
 
 ### `POST /api/analyst-reports/{ticker}`
 
@@ -2250,7 +2250,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **Path Parameter:** `ticker` — 종목 코드
 
-발행 계약은 **구조 축·9렌즈** 하나뿐이다(ADR 261006-232406, task#368). 본문에 **`"format": 2`가 필수**이고, 생략하거나 `1`이면 422다 — 옛 형식(투자의견·적정주가·투자포인트·산정방식·리스크) 계약은 task#370에서 제거됐다. 판단 근거는 렌즈 신호다. 렌즈 **3·4·5·8은 계산 렌즈**로, 루틴은 공시에서 읽은 **원자료**만 보내고 파생 숫자·신호 색·바뀜 조건은 **서버 공식이 계산해 박제**한다. 나머지 렌즈(1·2·6·7·9)는 루틴이 신호와 바뀜 조건을 직접 쓴다.
+발행 계약은 **구조 축·렌즈 틀** 하나뿐이다(ADR 261006-232406, task#368) — 렌즈 **1~9는 필수, 렌즈 10 「위험의 전례」는 선택**(task#391 1부 — 9개·10개 둘 다 201). 본문에 **`"format": 2`가 필수**이고, 생략하거나 `1`이면 422다 — 옛 형식(투자의견·적정주가·투자포인트·산정방식·리스크) 계약은 task#370에서 제거됐다. 판단 근거는 렌즈 신호다. 렌즈 **3·4·5·8은 계산 렌즈**로, 루틴은 공시에서 읽은 **원자료**만 보내고 파생 숫자·신호 색·바뀜 조건은 **서버 공식이 계산해 박제**한다. 나머지 렌즈(1·2·6·7·9, 그리고 렌즈 10)는 루틴이 신호와 바뀜 조건을 직접 쓴다. 렌즈 10은 판단 렌즈 규칙(`signal`·`flip`·`gauge`/`conditions`) 위에 대상 위험 `risk`와 전례 `precedents`를 더 받고, 서버는 색을 켜지 않고 결과별 건수(`base_rate`)만 센다.
 
 **Request Body**
 ```json
@@ -2279,7 +2279,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   ]
 }
 ```
-(예시는 렌즈 3개만 발췌 — 실제 본문은 `lenses`에 **id 1~9가 정확히 한 번씩** 있어야 한다.)
+(예시는 렌즈 3개만 발췌 — 실제 본문은 `lenses`에 **id 1~9가 정확히 한 번씩** 있어야 하고, 렌즈 10은 선택(넣으면 한 번).)
 
 | 필드 | 필수 | 설명 |
 |------|------|------|
@@ -2289,7 +2289,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `structure.cost_nature.value` | ✅ | 비용 성격 — `fixed` \| `revenue_linked` |
 | `structure.funding_source.value` | ✅ | 자금 원천 — `equity` \| `deposit` \| `debt` |
 | `structure.*.rationale` | ✅ | 축마다 근거 한 줄 (상태가 아니라 **구조**로 분류할 것) |
-| `lenses[].id` | ✅ | 1~9, 각 정확히 한 번 |
+| `lenses[].id` | ✅ | 1~9 각 정확히 한 번 필수 · 10은 선택(최대 한 번) — 렌즈 10 필수화는 task#392 |
 | `lenses[].summary` · `body` | ✅ | 요약 한 줄(≤200자) · 본문 |
 | `lenses[].metrics` | — | 표시용 지표 칩 `{label, value, change_pct?}` 최대 4개 — `change_pct`는 생략·`null` 모두 허용, NaN/Infinity는 422 |
 | `lenses[].signal` | 판단 렌즈 ✅ / 계산 렌즈 ❌ | `go` \| `wait` \| `stop` \| `na` — **계산 렌즈(3·4·5·8)에 보내면 422** |
@@ -2300,6 +2300,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `lenses[].conditions` | 판단 렌즈(na 제외) — `gauge`와 **정확히 하나** | 비수치형 바뀜 조건 `[{color, when[1~4], match: all\|any}]` — **초록·노랑·빨강 정확히 하나씩**(게이지 세 구간과 같은 레벨). 지금 색의 항목은 현재 상태, 나머지는 그 색으로 바뀌는 조건. 화면은 세 색 블록으로 그리고 지금 색을 「현재」로 강조한다. 응답은 초록→노랑→빨강 순으로 정렬돼 나온다. 숫자와 사건이 섞이면 이쪽 |
 | `lenses[].sensitivity` | 렌즈 8 · 수익 엔진 `balance_rate`/`price_exogenous`일 때 ✅ | `{exogenous, endogenous}` 각 `{label, values[3], unit, source, ref, rationale?}` — 3×3 민감도 표의 행(외생)·열(내생) · **정중앙 칸**(외생 `values[1]` × 내생 `values[1]`)의 이익이 `forward_earnings`의 **±10% 안**이어야 한다(밖이면 422 — 표와 헤드라인이 같은 이익 정의 위에 서게, task#371. `forward_earnings` ≤ 0이면 검증 생략) |
 | `lenses[].basis` | 렌즈 3(na 제외) ✅ / 그 밖 ❌ | 렌즈 3 비교 기간 — `forward`(끝점 `*_curr`가 회사 가이던스·애널 컨센서스의 미래 값 — 그 원자료 `source`는 `disclosure`·`consensus`만, `estimate`면 422) \| `yoy_quarter`(최근 실적 분기 vs 전년 동기). 우선순위 ① 회사 가이던스 ② 애널 컨센서스 ③ 최근 분기 전년 동기. 가이던스가 범위면 중간값을 쓰고 `ref`에 범위 원문. 렌즈 3 외 렌즈에 보내면 422 |
+| `lenses[].risk` | 렌즈 10(na 제외) ✅ / 그 밖 ❌ | 대상 위험 한 줄(≤200자) — 이 종목의 논지를 가장 크게 깰 수 있는 위험 **하나**(어느 렌즈에서 나와도 된다). 렌즈 10 외 렌즈나 `na`인 렌즈 10에 보내면 422 |
+| `lenses[].precedents` | 렌즈 10(na 제외) ✅ / 그 밖 ❌ | 전례 **2~5건** `[{case(≤120자), period(≤40자), outcome, note?(≤300자), ref(≤200자)}]` — 비슷한 일이 벌어졌던 **다른 시점·회사·나라**의 사례(그 회사의 과거 재무가 아니다). `outcome`은 `realized`(현실화) \| `partial`(부분 현실화) \| `not_realized`(비현실화), `note`는 같은 점·다른 점, `ref`(출처) 필수. 결과별 건수는 **서버가 센다**(`base_rate` — 보내면 422). 확률(%)은 만들지 않는다 |
 
 **원자료 하나** = `{value(유한수), unit, source: "disclosure"|"consensus"|"estimate", ref(출처·기준일), rationale}` — 출처 셋(task#371): `disclosure`(공시·회사 가이던스) · `consensus`(애널 추정치 — 근거 불요, 계산 블록에 `consensus_based: true`) · `estimate`(루틴 자체 추정 — `rationale`(추정 근거) 필수). 민감도 축(`sensitivity.*.source`)도 같은 셋. 같은 렌즈의 금액 원자료는 **단위가 하나**여야 하고, `_pct` 키는 단위 `"%"`.
 
@@ -2320,7 +2322,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 렌즈 8의 `forward_earnings.unit`은 `USD` \| `USD K` \| `USD M` \| `USD B` \| `KRW` \| `KRW 백만` \| `KRW 억` \| `KRW 조` 중 하나이고 종목 시장 통화(KR=KRW, 그 외 USD)와 같아야 한다. 무위험 금리는 **시장으로 갈린다**(task#371): **US 종목은 서버 캐시(미 10년물)가 먼저**이고 캐시가 없을 때만 `risk_free_pct` 원자료를 쓴다(보내도 캐시가 있으면 쓰이지 않는다 — 판끼리 같은 금리로 비교되게) · **KR 종목은 `risk_free_pct`(국고채) 필수**. 무엇을 썼는지는 `computed.risk_free_source`(`server_cache` \| `input`)에 박제된다.
 
-**모르는 키는 422다**(task#371) — 최상위·중첩 모든 요청 객체가 정의되지 않은 키를 거부한다. 직전 판 GET 응답을 재사용하면 서버가 붙인 필드(`computed`·`tally`·`gauge.origin`·`gauge.near_boundary`)를 지우고 보낼 것.
+**모르는 키는 422다**(task#371) — 최상위·중첩 모든 요청 객체가 정의되지 않은 키를 거부한다. 직전 판 GET 응답을 재사용하면 서버가 붙인 필드(`computed`·`tally`·`gauge.origin`·`gauge.near_boundary`·렌즈 10 `base_rate`)를 지우고 보낼 것.
 
 **신호 문턱(초기값, 서버 상수 — `services/analyst_lenses.py`)**: 렌즈 3 비율 ≥1.0 초록 · 0.8~1.0 노랑 · <0.8 빨강 / 렌즈 4 연동형 한계 분배율 < 평균−5%p 초록 · ±5%p 노랑 · > 평균+5%p 빨강, 고정형 배수비 ≤1.0 초록 · ≤1.2 노랑 · 초과 빨강 / 렌즈 5 런웨이 ≥3년(또는 흑자) 초록 · ≥1.5년 노랑 · 미만 빨강, 손익분기 여유 ≥2%p 초록 · ≥1%p 노랑 · 미만 빨강, 이자보상 ≥5 초록 · ≥2 노랑 · 미만 빨강 / 렌즈 8 이익수익률 ≥ 무위험 금리 초록 · ≥ 무위험−1.5%p 노랑 · 그 아래 빨강. 서버는 계산 렌즈마다 **현재 색의 경계에 닿는 입력값**을 역산해 `flip`(바뀜 조건)으로 박제한다. 계산이 불가능하면(분모 0·매출 감소 구간의 한계 분배율·비유한 결과·스냅샷 시총 없음·무위험 금리 없음) 추측하지 않고 `na` + `na_reason`.
 
@@ -2329,7 +2331,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 **Error `403`** — Bearer token 인증됐으나 admin 아님
 **Error `409`** — 해당 종목의 스냅샷 없음 (발행 전제조건 미충족)
 
-**Error `422`** — `lenses` id가 1~9 각 1회가 아님 · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함) · 판단 렌즈(na 제외)에 `gauge`·`conditions`가 둘 다 있거나 둘 다 없음 · `gauge` 현재값 구간 ≠ `signal` · `gauge` 경계가 2개 오름차순이 아니거나 구간이 세 색 단조가 아님 · `conditions`가 세 색 각 하나가 아님(옛 키 `to` 포함) · `na` 렌즈나 계산 렌즈에 `gauge`/`conditions` · 모르는 키(최상위·중첩 — 서버 필드 `computed`·`tally`·`gauge.origin`·`gauge.near_boundary` 포함) · 렌즈 3(na 제외) `basis` 누락 또는 렌즈 3 외 렌즈에 `basis` · `basis: forward`인데 `*_curr` 원자료 출처가 `estimate` · 민감도 표 정중앙 칸 이익이 `forward_earnings`의 ±10% 밖.
+**Error `422`** — `lenses` id가 「1~9 각 1회」도 「1~10 각 1회」도 아님(id 11·중복 10 포함) · 계산 렌즈에 `signal`/`flip` 동봉 · 판단 렌즈 `signal` 누락 · `na`인데 `na_reason` 없음 · `na`가 아닌데 `flip` 없음 · 변형별 원자료 누락 또는 알 수 없는 키 · `estimate`인데 `rationale` 없음 · 금액 단위 혼재 · `_pct`가 `%`가 아님 · 구조 축 enum 위반 · NaN/Infinity · 렌즈 8 통화 불일치 · KR 렌즈 8 `risk_free_pct` 누락 · 민감도 표 유무가 수익 엔진과 어긋남 · `balance_rate` 민감도 축 단위 불일치(외생 = `%`, 내생 = 금액 원자료 단위) · `format`이 생략·`1`·`2`가 아님(문자열 `"2"` 포함) · 판단 렌즈(na 제외)에 `gauge`·`conditions`가 둘 다 있거나 둘 다 없음 · `gauge` 현재값 구간 ≠ `signal` · `gauge` 경계가 2개 오름차순이 아니거나 구간이 세 색 단조가 아님 · `conditions`가 세 색 각 하나가 아님(옛 키 `to` 포함) · `na` 렌즈나 계산 렌즈에 `gauge`/`conditions` · 모르는 키(최상위·중첩 — 서버 필드 `computed`·`tally`·`gauge.origin`·`gauge.near_boundary` 포함) · 렌즈 3(na 제외) `basis` 누락 또는 렌즈 3 외 렌즈에 `basis` · `basis: forward`인데 `*_curr` 원자료 출처가 `estimate` · 민감도 표 정중앙 칸 이익이 `forward_earnings`의 ±10% 밖 · 렌즈 10(na 제외)에 `risk`·`precedents` 누락 · `na`인 렌즈 10에 `risk`/`precedents` 동봉 · `precedents`가 2건 미만·5건 초과 · `outcome`이 `realized`·`partial`·`not_realized` 밖 · 전례 `ref` 누락 · 렌즈 10 외 렌즈에 `risk`/`precedents` · 서버 필드 `base_rate` 동봉.
 
 ---
 
@@ -2356,7 +2358,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 }
 ```
 
-요약 행의 키는 위 7개뿐이다. `tally` — 렌즈 신호 집계 `{"go": n, "wait": n, "stop": n, "na": n}`(합 9). `format` — 렌즈 본문(`lens_report`)이 저장된 판이면 `2`, 아니면 `1`. 발행 계약이 `format: 2`만 받으므로 새 판은 항상 `2`이고, `1`은 task#370 이전 옛 형식 판이 남아 있을 때만 나온다(그때 `tally`는 `null` — 화면은 렌즈 본문 없이 안내만 표시한다).
+요약 행의 키는 위 7개뿐이다. `tally` — 렌즈 신호 집계 `{"go": n, "wait": n, "stop": n, "na": n}`(합 = 그 판의 렌즈 수 — 9 또는 10, 렌즈 10이 있으면 그 신호도 센다). `format` — 렌즈 본문(`lens_report`)이 저장된 판이면 `2`, 아니면 `1`. 발행 계약이 `format: 2`만 받으므로 새 판은 항상 `2`이고, `1`은 task#370 이전 옛 형식 판이 남아 있을 때만 나온다(그때 `tally`는 `null` — 화면은 렌즈 본문 없이 안내만 표시한다).
 
 ---
 
@@ -2452,7 +2454,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 `data.per_band` — 과거 연간 PER(비컨센서스, 최근 최대 6개)의 min/max/avg + 현재/forward PER. 재료 부족(<2개)이면 `null`.
 `data.market_outlook` — 스냅샷 `market_outlook.segments`가 있을 때만 첨부(발행 시점 박제). 없으면 `data`에 이 키 자체가 없음(구발행물 포함 — 프론트는 이때 "사업부문 시장 분석" 섹션을 생략). **수주잔고의 「사업부문 분해」(`GET /api/report/{ticker}/backlog`의 `segments`)와는 별개 개념** — 이쪽은 시장 전망 하위 부문별 매출비중·시장규모·자사 점유율이다. 필드 상세는 위 enrich `market_outlook.segments` 표 참조.
 
-**렌즈 판 상세** — `structure`(구조 축 3값과 근거, 발행 본문 그대로)·`lenses`(id 1~9 순). `format: 1`인 옛 판(task#370 이전 발행이 남은 경우)에는 이 두 키가 없고 요약 7키와 `data`만 실린다.
+**렌즈 판 상세** — `structure`(구조 축 3값과 근거, 발행 본문 그대로)·`lenses`(id 순 — 1~9, 렌즈 10이 있는 판은 1~10. task#391 이전 판에는 렌즈 10이 없다). `format: 1`인 옛 판(task#370 이전 발행이 남은 경우)에는 이 두 키가 없고 요약 7키와 `data`만 실린다.
 
 ```json
 {
@@ -2471,6 +2473,8 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 ```
 
 `lenses[].signal`·`flip` — 판단 렌즈는 발행 본문 값, 계산 렌즈(3·4·5·8)는 **서버 계산값**(`computed`와 같다). `computed` — 계산 렌즈만(`na_reason`으로 발행한 계산 렌즈는 `null`). `computed.values`는 변형별로 다르다: 렌즈 3 `ratio`·`numerator_growth_pct`·`cost_growth_pct` / 렌즈 4 `marginal_pct`·`average_pct`(연동형) 또는 `commitment_multiple`·`revenue_multiple`·`ratio`(고정형) / 렌즈 5 `runway_years`·`profitable`(equity) · `breakeven_pct`·`margin_pp`·…(deposit) · `coverage`(debt) / 렌즈 8 `market_cap`·`forward_earnings`·`multiple`·`earnings_yield_pct`·`risk_free_pct` + 외생 가격형이면 `sensitivity.{exogenous, endogenous, multiples[3][3]}`. 렌즈 8은 `computed.risk_free_source`(`input` \| `server_cache`)도 싣는다. `computed.estimate_based` — 원자료 중 하나라도 `estimate`면 `true`(화면에 「추정 기반」). `computed.consensus_based` — 원자료(렌즈 8은 민감도 축 포함) 중 하나라도 `consensus`(애널 추정치)면 `true`(화면에 「애널 추정치」 — `estimate_based`와 별개 플래그, 둘 다 참일 수 있다). 렌즈 3은 `computed.basis`(`forward` \| `yoy_quarter`, 발행 본문 그대로)도 싣는다. 두 키 모두 task#371 이전 발행물에는 없다. `flip_value` — 바뀜 조건의 경계 입력값(숫자). `computed.gauge` — 바뀜 조건 게이지 `{variable, unit, current, boundaries[], zones[]}`: 바뀜 조건 문장이 말하는 변수(예: 준비금 수익률) 축 위에서 `zones[i]`(`go`/`wait`/`stop`)가 `boundaries[i-1]`~`boundaries[i]` 구간의 신호다(낮은 값 → 높은 값). 현재값이 놓인 구간이 곧 그 렌즈의 `signal`이고 `flip_value`는 `boundaries` 중 하나다. 문턱은 서버 상수 하나에서만 나오므로 화면은 그리기만 한다. **렌즈 8만 예외다 — 게이지 축이 「색이 바뀌는 주가」다**(task#376): 발행 시점 스냅샷 주가가 있고 `forward_earnings` > 0이면 `variable: "주가"` · `unit`: 시장 통화(`USD`/`KRW`) · `current`: 발행 시점 스냅샷 주가 · `boundaries`: `[초록 경계, 빨강 경계]`(주가 경계 = 주가 × 이익수익률 ÷ 기준 수익률 — 초록 = 무위험 금리, 빨강 = 무위험 금리 − 1.5%p) · `zones: ["go", "wait", "stop"]`(왼쪽 싼 쪽 초록 → 오른쪽 빨강) · `current_ref: "발행 시점 주가 (YYYY-MM-DD)"`. 무위험 금리 ≤ 1.5%면 빨강 경계가 없어 `[초록 경계]` · `zones: ["go", "wait"]`. 바뀜 조건 **문장**(`flip`)은 이익 기준 그대로라 이 게이지에서는 `flip_value`(이익)가 `boundaries`에 **없다** — 대신 `주가 × forward_earnings ÷ flip_value`가 경계 중 하나다. 폴백 2종: `forward_earnings` ≤ 0이거나 스냅샷 주가가 없거나 유한·양수가 아니면 옛 이익축 게이지(`variable: "forward 이익"`, `unit`: 이익 원자료 단위, `zones: [stop, wait, go]`, `flip_value` ∈ `boundaries`)를 그대로 싣는다. task#376 이전 렌즈 8 발행물은 전부 이익축이다(재발행해야 바뀐다). 계산 불가(`na`)·이자비용 0·현금과 소진이 모두 0 이하인 경우 `null`이고, 게이지 도입(2026-10-07) 이전 발행물에는 키가 없다. `computed.gauge.origin`은 `"server"`. 경계가 2개인 게이지에는 `near_boundary`(가까운 경계까지 거리 ÷ 두 경계 폭 ≤ 10%면 `true` — 「경계 근접」)를 서버가 박제한다 — 계산 렌즈 게이지와 판단 렌즈 `lenses[].gauge` 모두. 경계 1개 게이지(비용이 줄어든 렌즈 3)와 task#371 이전 발행물엔 키가 없다. 판단 렌즈는 `lenses[].gauge`(발행 본문 그대로 + `origin: "routine"`) 또는 `lenses[].conditions`를 싣는다 — 계산 렌즈의 게이지와 모양은 같지만 경계가 서버 공식이 아니라 루틴 판단이다.
+
+렌즈 10 「위험의 전례」(task#391) — `risk`·`precedents`(발행 본문 그대로)와 서버 집계 `base_rate` `{"realized": n, "partial": n, "not_realized": n, "total": n}`(결과별 건수·총 건수 — 확률은 없다)를 싣는다. `signal: na`인 렌즈 10과 렌즈 10이 없는 판에는 세 키가 없다.
 
 **Error `404`** — 해당 ticker+date 발행물 없음
 

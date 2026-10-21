@@ -934,3 +934,143 @@ def test_cached_risk_free_reads_market_cache_envelope():
         assert L.cached_risk_free_pct() is None
     with patch("services.market_indicators.cache._mc_load", return_value={"data": {"rates": {"10y": {"current": float("nan")}}}}):
         assert L.cached_risk_free_pct() is None
+
+
+# ── 렌즈 10 「위험의 전례」(위험 기저율, task#391) — 선택 렌즈: 1~9 필수, 10 선택 ────────
+
+def _prec(outcome="realized", case="2001 닷컴 붕괴", **kw):
+    return {"case": case, "period": "2000~2002", "outcome": outcome,
+            "ref": "Fed 보고서 2003", **kw}
+
+
+def _lens10(signal="wait", **kw):
+    base = {"id": 10, "summary": "공급 과잉 위험의 전례", "body": "세 사례의 공통점",
+            "signal": signal, "flip": "전례가 비현실화 쪽으로 기울면", "conditions": _three(10),
+            "risk": "증설 경쟁으로 단가가 무너진다",
+            "precedents": [_prec("realized"), _prec("partial", case="2011 DRAM 치킨게임", note="수요가 받쳤다"),
+                           _prec("not_realized", case="2017 낸드 증설")]}
+    return {**base, **kw}
+
+
+def _with_lens10(**kw):
+    body = crcl_body()
+    body["lenses"].append(_lens10(**kw))
+    return body
+
+
+def test_lens10_nine_lens_publish_still_201():
+    # ⓐ 렌즈 10은 선택 — 9개 판은 그대로 발행된다(1부 계약)
+    resp, mock_save = _publish(crcl_body())
+    assert resp.status_code == 201, resp.text
+    lr = mock_save.call_args.kwargs["lens_report"]
+    assert [l["id"] for l in lr["lenses"]] == list(range(1, 10))
+
+
+def test_lens10_ten_lens_publish_stores_server_base_rate():
+    # ⓑ 10개 판 201 + 서버 집계(결과별 건수·총 건수)가 precedents 결과 수와 같다
+    resp, mock_save = _publish(_with_lens10())
+    assert resp.status_code == 201, resp.text
+    lr = mock_save.call_args.kwargs["lens_report"]
+    l10 = _lens(lr, 10)
+    assert [l["id"] for l in lr["lenses"]] == list(range(1, 11))
+    assert l10["risk"] == "증설 경쟁으로 단가가 무너진다"
+    assert len(l10["precedents"]) == 3 and l10["precedents"][1]["note"] == "수요가 받쳤다"
+    assert l10["base_rate"] == {"realized": 1, "partial": 1, "not_realized": 1, "total": 3}
+    # 판단 렌즈 — 신호는 루틴 값 그대로, 집계(tally)에 포함된다
+    assert l10["signal"] == "wait"
+    assert lr["tally"] == {"go": 2, "wait": 5, "stop": 2, "na": 1}
+    # 렌즈 10이 없는 판에는 base_rate 필드 자체가 없다
+    nine = _publish(crcl_body())[1].call_args.kwargs["lens_report"]
+    assert all("base_rate" not in l for l in nine["lenses"])
+
+
+def test_lens10_base_rate_counts_skewed_outcomes():
+    body = _with_lens10(precedents=[_prec("realized"), _prec("realized", case="B"), _prec("partial", case="C"),
+                                    _prec("realized", case="D")])
+    resp, mock_save = _publish(body)
+    assert resp.status_code == 201, resp.text
+    assert _lens(mock_save.call_args.kwargs["lens_report"], 10)["base_rate"] == \
+        {"realized": 3, "partial": 1, "not_realized": 0, "total": 4}
+
+
+def test_lens10_id_set_rules_422():
+    # ⓒ id 11 · 중복 10 · 10만 있고 1~9 중 하나 빠짐 → 422
+    assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
+    assert _publish(_with_lens10(id=11))[0].status_code == 422
+    body = _with_lens10()
+    body["lenses"].append(_lens10())
+    assert _publish(body)[0].status_code == 422
+    body = _with_lens10()
+    body["lenses"] = [l for l in body["lenses"] if l["id"] != 9]
+    assert _publish(body)[0].status_code == 422
+
+
+def test_lens10_precedent_count_bounds_422():
+    # ⓓ 사례 1건·6건 → 422, 2건·5건 → 201(경계 쌍)
+    one = [_prec()]
+    six = [_prec(case=f"사례{i}") for i in range(6)]
+    assert _publish(_with_lens10(precedents=one))[0].status_code == 422
+    assert _publish(_with_lens10(precedents=six))[0].status_code == 422
+    assert _publish(_with_lens10(precedents=six[:2]))[0].status_code == 201
+    assert _publish(_with_lens10(precedents=six[:5]))[0].status_code == 201
+
+
+def test_lens10_outcome_enum_422():
+    # ⓔ outcome은 realized · partial · not_realized 세 값만
+    assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
+    assert _publish(_with_lens10(precedents=[_prec("yes"), _prec("partial", case="B")]))[0].status_code == 422
+    assert _publish(_with_lens10(precedents=[_prec("현실화"), _prec("partial", case="B")]))[0].status_code == 422
+
+
+def test_lens10_risk_and_ref_required_422():
+    # ⓕ risk 누락·빈 문자열, 사례 ref 누락 → 422
+    assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
+    body = _with_lens10()
+    del body["lenses"][-1]["risk"]
+    assert _publish(body)[0].status_code == 422
+    assert _publish(_with_lens10(risk="  "))[0].status_code == 422
+    no_ref = _prec()
+    del no_ref["ref"]
+    assert _publish(_with_lens10(precedents=[no_ref, _prec(case="B")]))[0].status_code == 422
+    body = _with_lens10()
+    del body["lenses"][-1]["precedents"]
+    assert _publish(body)[0].status_code == 422
+
+
+def test_lens10_na_forbids_risk_and_precedents_422():
+    # ⓖ signal=na면 na_reason만 — risk·precedents 동봉은 422, 없으면 201(기존 판단 렌즈 규칙과 동형)
+    na = dict(signal="na", flip=None, conditions=None, na_reason="비슷한 전례를 찾지 못함")
+    assert _publish(_with_lens10(**na))[0].status_code == 422
+    resp, mock_save = _publish(_with_lens10(**na, risk=None, precedents=None))
+    assert resp.status_code == 201, resp.text
+    l10 = _lens(mock_save.call_args.kwargs["lens_report"], 10)
+    assert l10["signal"] == "na" and l10["na_reason"] == "비슷한 전례를 찾지 못함"
+    assert l10.get("base_rate") is None and not l10.get("precedents")
+
+
+def test_lens10_server_aggregate_field_from_routine_422():
+    # ⓗ 집계는 서버 몫 — 루틴이 base_rate를 보내면 모르는 키로 422(computed·tally와 같은 규율)
+    assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
+    assert _publish(_with_lens10(base_rate={"realized": 1, "partial": 1, "not_realized": 1, "total": 3}))[0].status_code == 422
+    body = _with_lens10()
+    body["lenses"][-1]["precedents"][0]["weight"] = 0.5
+    assert _publish(body)[0].status_code == 422
+
+
+def test_lens10_computed_lens_fields_422():
+    # ⓘ 렌즈 10은 판단 렌즈 — inputs·sensitivity·basis를 실으면 422
+    assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
+    assert _publish(_with_lens10(inputs={"x": _raw(1)}))[0].status_code == 422
+    assert _publish(_with_lens10(sensitivity=crcl_body()["lenses"][7]["sensitivity"]))[0].status_code == 422
+    assert _publish(_with_lens10(basis="forward"))[0].status_code == 422
+
+
+def test_lens10_risk_precedents_only_on_lens10_422():
+    # 다른 렌즈에 risk·precedents가 오면 422(이름이 같은 형제 필드로 새지 않게)
+    assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
+    body = crcl_body()
+    body["lenses"][0]["risk"] = "x"
+    assert _publish(body)[0].status_code == 422
+    body = crcl_body()
+    body["lenses"][0]["precedents"] = [_prec(), _prec(case="B")]
+    assert _publish(body)[0].status_code == 422
