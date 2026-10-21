@@ -160,10 +160,12 @@ export function ConsensusSection({ report, market, embedded = false }) {
           <div style={{ marginTop: 14, borderTop: '1px solid var(--border)' }}>
             {shown.map((b, i) => (
               // 줄어드는 건 증권사명만(ellipsis) — 수치·날짜는 flex-shrink:0(잘림이 수치부터 먹는 가토, task#241)
-              // 그래도 한 줄에 안 들어가는 폭(m278 가용 172)에선 날짜가 다음 줄 오른쪽으로 내려간다(task#394)
+              // 좁은 폭(<360)에선 .broker-row__break 가 「이름·의견 / 수치·날짜」 2줄로 끊는다(mobile.css, task#394).
+              // flexWrap 은 그 사이 폭에서 넘치지 않게 하는 안전망 — 날짜가 다음 줄 오른쪽으로 내려간다
               <div key={i} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 10px', padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>{b.brokerage}</span>
                 <span style={{ flexShrink: 0, color: 'var(--text-2, var(--text))' }}>{b.opinion || '—'}</span>
+                <span className="broker-row__break" aria-hidden="true" />
                 <span className="mono tnum" style={{ flexShrink: 0, minWidth: 76, textAlign: 'right', color: 'var(--text)' }}>
                   {b.target_price != null ? fmtPrice(b.target_price, market) : '—'}
                 </span>

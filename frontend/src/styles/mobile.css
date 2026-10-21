@@ -386,3 +386,10 @@ thead .col-sticky { background: var(--bg-elev-2); }
 .install-prompt-close {
   min-width: 44px; min-height: 44px;
 }
+
+/* 심층 리포트 증권사 행(task#394) — 360 미만에선 한 줄(가용 ~244 미만)에 이름·의견·수치·날짜가 다 못 들어가
+   이름이 한두 글자로 눌리고 행마다 줄바꿈 위치가 갈렸다 → 모든 행을 「이름·의견 / 수치·날짜」 2줄로 고정 */
+.broker-row__break { display: none; }
+@media (max-width: 359px) {
+  .broker-row__break { display: block; flex-basis: 100%; height: 0; }
+}
