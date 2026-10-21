@@ -128,10 +128,11 @@ export default function AnalystReports() {
               padding="sm"
               style={{ textDecoration: 'none', display: 'block' }}
             >
-              {/* 2행 고정 구조(task#225) — 1행: 이름 좌 / 티커·뱃지 우, 2행: 논지 좌 / 날짜·삭제 우.
-                  wrap 없음(긴 이름은 말줄임)이라 뱃지·삭제가 카드마다 같은 우측 열에 정렬된다. */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'var(--font-serif)', fontSize: 15, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || p.ticker}</span>
+              {/* 3행 고정 구조(task#397) — 1행: 이름 좌 / 티커·뱃지 우(위쪽 정렬), 2행: 논지 전체 폭, 3행: 날짜·삭제 우.
+                  이름·논지는 자르지 않는다(B54 — 한국어는 결론이 끝에 와서 말줄임이 결론부터 먹는다). 어절 단위로
+                  흐르게 하고(keep-all + break-word), 우측 열은 flexShrink:0이라 카드마다 같은 오른쪽 선에 선다. */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'var(--font-serif)', fontSize: 15, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{p.name || p.ticker}</span>
                 <span style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.ticker}</span>
                   {p.format === 2
@@ -141,20 +142,18 @@ export default function AnalystReports() {
                     : <Badge variant="neutral">옛 형식</Badge>}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                <span style={{ color: 'var(--text-2, var(--text))', fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
-                <span style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.published_date}</span>
-                  {isAdmin && (
-                    <button
-                      onClick={(e) => deletePub(e, p)}
-                      title="발행물 삭제 (이력 포함)"
-                      style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
-                    >
-                      삭제
-                    </button>
-                  )}
-                </span>
+              <div style={{ color: 'var(--text-2, var(--text))', fontSize: 13, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{p.title}</div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <span className="mono" style={{ color: 'var(--text-3)', fontSize: 11 }}>{p.published_date}</span>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => deletePub(e, p)}
+                    title="발행물 삭제 (이력 포함)"
+                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
+                  >
+                    삭제
+                  </button>
+                )}
               </div>
             </Card>
           ))}

@@ -144,6 +144,34 @@ describe('심층 리포트 탭 (task#215)', () => {
   })
 })
 
+describe('목록 카드 3행 구조 — 종목명·한줄 논지를 자르지 않는다 (task#397, B54)', () => {
+  const expectFlows = (el) => {
+    expect(el.style.textOverflow).not.toBe('ellipsis')
+    expect(el.style.whiteSpace).not.toBe('nowrap')
+    expect(el.style.wordBreak).toBe('keep-all')
+    expect(el.style.overflowWrap).toBe('break-word')
+  }
+
+  it('이름·제목은 말줄임 없이 어절 단위로 흐르고, 날짜는 제목과 다른 행이다', async () => {
+    mockRole = 'user'
+    renderPage()
+    const title = await screen.findByText('AI 검색 수익화')
+    expectFlows(screen.getByText('NAVER'))
+    expectFlows(title)
+    const dateRow = screen.getByText('2026-07-25').closest('div')
+    expect(dateRow.contains(title)).toBe(false)
+  })
+
+  it('admin: 삭제 버튼은 날짜와 같은 행이고 제목 행과 분리된다', async () => {
+    mockRole = 'admin'
+    renderPage()
+    const title = await screen.findByText('AI 검색 수익화')
+    const delRow = screen.getByTitle('발행물 삭제 (이력 포함)').closest('div')
+    expect(delRow.contains(screen.getByText('2026-07-25'))).toBe(true)
+    expect(delRow.contains(title)).toBe(false)
+  })
+})
+
 describe('v2 렌즈 판 목록 행 (task#369)', () => {
   it('rating=null인 v2 판은 「중립」이 아니라 신호 집계를 보인다', async () => {
     mockRole = 'user'
