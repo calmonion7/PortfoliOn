@@ -235,7 +235,8 @@ export default function SegmentAnalysisSection({ market_outlook, financialsAnnua
     <div style={{ marginBottom: 20 }}>
       <SectionTitle>🧩 사업부문 시장 분석</SectionTitle>
       <DistributionBars distribution={distribution} colorMap={colorMap} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+      {/* 트랙 최소폭은 컨테이너를 넘지 않는다 — 260 고정이면 m278(가용 206)에서 페이지가 넘친다(task#394) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px, 100%), 1fr))', gap: 10 }}>
         {rows.map((row, i) => (
           <SegmentCard key={row.name ?? i} row={row} color={DATA_COLORS[i % DATA_COLORS.length]} />
         ))}

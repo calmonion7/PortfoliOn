@@ -5,7 +5,8 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
-const BASE = 'https://portfolion.taebro.com';
+// BASE 로 dev 스택(http://127.0.0.1:8084)도 잴 수 있다(task#394)
+const BASE = process.env.BASE || 'https://portfolion.taebro.com';
 const TICKER = process.env.TICKER || 'CRCL';
 const OUT = 'screenshots-uat369';
 fs.mkdirSync(OUT, { recursive: true });
@@ -45,7 +46,9 @@ ok('api-gauges-present', gaugeLenses.length > 0, `n=${gaugeLenses.length} — 0�
 const NAMES = ['숫자의 신뢰도', '지금 매출 속도', '벌수록 남는 구조', '묶여 있는 비용', '망할 위험',
   '고객 이탈 위험', '경영진·대주주', '지금 주가 수준', '앞으로의 수요', '위험의 전례'].slice(0, N);
 const QUESTION3 = '매출이 늘 때 비용이 덜 느는가';
-const VIEWPORTS = [['m278', { width: 278, height: 640 }, true], ['m350', { width: 350, height: 760 }, true], ['m390', { width: 390, height: 844 }, true], ['pc1440', { width: 1440, height: 900 }, false]];
+// pc1440을 먼저 잰다 — content-preserved 축이 모바일을 그 값과 대조한다(task#394)
+const VIEWPORTS = [['pc1440', { width: 1440, height: 900 }, false], ['m278', { width: 278, height: 640 }, true], ['m350', { width: 350, height: 760 }, true], ['m390', { width: 390, height: 844 }, true]];
+let pcContent = null;
 const b = await chromium.launch();
 for (const [vp, viewport, isMobile] of VIEWPORTS) {
   for (const scheme of ['light', 'dark']) {
@@ -59,16 +62,27 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     const page = await ctx.newPage();
     await page.goto(`${BASE}/analyst-report/${TICKER}/${rep.published_date}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-lens-cell]', { timeout: 20000 }).catch(() => {});
-    const m = await page.evaluate(() => {
+    const m = await page.evaluate((W) => {
       const cells = [...document.querySelectorAll('[data-lens-cell]')];
       const html = document.documentElement;
+      // 가로 스크롤 컨테이너 안은 넘쳐도 정상(의도된 스크롤)
+      const inScroller = e => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowX)) return true; return false; };
       return {
+        innerWidth: window.innerWidth,
+        scrollWidth: html.scrollWidth,
+        // overflow:hidden 으로 잘라 숨겨도 요소 상자는 남는다 — 상자 자체를 본다
+        beyond: [...document.querySelectorAll('body *')].filter(e => {
+          const r = e.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && r.right > W + 0.5 && getComputedStyle(e).visibility !== 'hidden' && !inScroller(e);
+        }).map(e => `${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''} r=${Math.round(e.getBoundingClientRect().right)}`),
+        // display:none 으로 숨기면 innerText 에서 빠진다 — pc 대비 내용 보존 확인용
+        segShare: (document.body.innerText.match(/매출 비중/g) || []).length,
+        dates: [...new Set(document.body.innerText.match(/\d{4}-\d{2}-\d{2}/g) || [])].sort().join(','),
         cellIds: cells.map(c => c.getAttribute('data-lens-cell')),
         cellText: cells.map(c => c.textContent),
         body: document.body.innerText,
         estimateTags: [...document.querySelectorAll('.badge')].filter(e => e.textContent.trim() === '추정 기반').length,
         ratingBadges: [...document.querySelectorAll('.badge')].filter(e => ['매수', '중립', '매도'].includes(e.textContent.trim())).length,
-        overflowX: html.scrollWidth - window.innerWidth,
         gauges: [...document.querySelectorAll('[data-lens-cell] [data-flip-gauge]')].map(g => ({ id: g.closest('[data-lens-cell]').getAttribute('data-lens-cell'), zone: g.getAttribute('data-current-zone'), origin: g.getAttribute('data-origin') })),
         conds: [...document.querySelectorAll('[data-lens-cell] [data-flip-conditions]')].map(c => ({ id: c.closest('[data-lens-cell]').getAttribute('data-lens-cell'), items: c.querySelectorAll('li').length,
           colors: [...c.querySelectorAll('[data-condition]')].map(e => e.getAttribute('data-condition')),
@@ -102,7 +116,7 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
         precRows: document.querySelectorAll('[data-precedent]').length,
         lens10Overflow: [...document.querySelectorAll('#lens-10, #lens-10 *')].filter(e => e.scrollWidth - e.clientWidth > 1 && getComputedStyle(e).display !== 'inline').length,
       };
-    });
+    }, viewport.width);
     ok(`${tag} theme-applied`, m.theme === scheme, `data-theme=${m.theme}`);
     ok(`${tag} reached`, m.cellIds.length === N, `cells=${m.cellIds.length} vs api ${N}`);
     ok(`${tag} board-order`, JSON.stringify(m.cellIds) === JSON.stringify(lenses.map(l => String(l.id))));
@@ -112,7 +126,13 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     ok(`${tag} estimate-tags`, m.estimateTags === expEstimate, `${m.estimateTags} vs api ${expEstimate}`);
     // 조건 목록으로 그리는 렌즈는 같은 내용의 문장을 반복하지 않는다(화면 규칙과 같은 정의역)
     ok(`${tag} flips-shown`, lenses.filter(l => l.signal !== 'na' && l.flip && !condLenses.includes(l)).every(l => m.body.includes(l.flip)), `n=${expFlips - condLenses.length}`);
-    ok(`${tag} no-h-scroll`, m.overflowX <= 0, `overflow=${m.overflowX}px`);
+    // 설정 폭과 비교한다 — 모바일 에뮬레이션은 넘치는 콘텐츠에 맞춰 레이아웃 뷰포트(innerWidth)를 넓히므로
+    // innerWidth 기준 비교는 그 넘침에 블라인드다(task#393 실측 m278 → innerWidth 296·314, task#394 정정)
+    ok(`${tag} no-h-scroll`, m.innerWidth === viewport.width && m.scrollWidth <= viewport.width, `innerWidth=${m.innerWidth} scrollWidth=${m.scrollWidth} vs ${viewport.width}`);
+    ok(`${tag} no-element-beyond-viewport`, m.beyond.length === 0, `n=${m.beyond.length} ${m.beyond.slice(0, 3).join(' | ')}`);
+    if (!isMobile) pcContent = { segShare: m.segShare, dates: m.dates };
+    ok(`${tag} content-preserved`, !!pcContent && m.segShare === pcContent.segShare && m.dates === pcContent.dates,
+      `매출 비중 ${m.segShare} vs pc ${pcContent?.segShare} · 날짜 ${m.dates.split(',').length} vs pc ${pcContent?.dates.split(',').length}`);
     // 바뀜 조건 게이지(task#369 UAT 피드백) — API에 게이지가 있는 렌즈 수만큼, 현재값 구간 = 신호
     ok(`${tag} gauges-count`, m.gauges.length === gaugeLenses.length, `${m.gauges.length} vs api ${gaugeLenses.length}`);
     ok(`${tag} gauge-zone=signal`, gaugeLenses.every(l => m.gauges.find(g => g.id === String(l.id))?.zone === l.signal));
@@ -136,7 +156,7 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     // 기본은 Playwright click. 실패하면(000660 m278 — 이웃 셀·탭바가 가로챔) 가운데로 스크롤 → 정착 대기 → hit-test가
     // 대상 자신일 때만 좌표로 탭한다(가려져 있으면 false → 축 FAIL). ⚠️ m278에서 이 폴백까지 실패하면 먼저 레이아웃 폭을 볼 것:
     // 콘텐츠가 278보다 넓으면 모바일 에뮬레이션이 레이아웃 뷰포트를 넓혀(innerWidth 296·314) 터치 좌표가 어긋난다(task#393 실측 —
-    // 사업부문 카드·날짜 span이 밀어낸다, 렌즈 10 무관). 아래 no-h-scroll은 innerWidth 기준이라 그 넘침에 블라인드다.
+    // 사업부문 카드·날짜 span이 밀어낸다, 렌즈 10 무관 — task#394에서 수정). no-h-scroll은 설정 폭 기준이라 그 넘침을 잡는다.
     const click = async (loc) => {
       if (await loc.click({ timeout: 5000 }).then(() => true, () => false)) return true;
       await loc.evaluate(e => e.scrollIntoView({ block: 'center' }));
@@ -175,5 +195,5 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
 await b.close();
 // 표본 0이면 렌즈 10 축은 통과가 아니라 미검증이다(task#318)
 console.log(`표본 lens10(사례 있는 판 × 컨텍스트)=${samples10}${samples10 === 0 ? ' — 미검증' : ''} · 렌즈 수 N=${N}`);
-console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${6 + VIEWPORTS.length * 2 * 28})`);
+console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${6 + VIEWPORTS.length * 2 * 30})`);
 process.exit(fail ? 1 : 0);
