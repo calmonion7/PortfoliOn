@@ -31,9 +31,12 @@
 //      않는다 — 안내 배너(그 티커 + 「추적하지 않는」) · 「관심종목에 추가」 버튼 · 버튼이 그 티커로 채워진
 //      관심 모달을 연다 · **닫기만 한다**(POST /api/watchlist 0건 — 프로덕션 쓰기 금지) · 닫은 뒤에도 목록.
 //      표본은 런타임에 고르고 0이면 sentinel FAIL. 배너 넘침(뷰포트 밖·문서 가로 스크롤) 0도 함께 잰다.
+//   ⓖ' (task#397, B54) 목록 카드의 이름·한줄 논지가 잘리지 않는다 — 커버리지(잰 카드 == 카드 수 > 0) ·
+//      scrollWidth ≤ clientWidth + text-overflow≠ellipsis · 문서 가로 넘침 0 · 우측 묶음·날짜 right가 카드 간
+//      ±0.5px(+ marginRight 주입 대조군 FAIL) · 이름 높이 ≤ 2줄(낱자 적층 sentinel). m350·m390·pc만(m278 제외).
 //   ⓙ 콘솔 에러 0
 //
-// 뷰포트 3폭(m278·m390·pc)에서 전부 돌고, 발행물 탭 스크린샷을 screenshots-uat324/에 남긴다
+// 뷰포트 4폭(m278·m350·m390·pc)에서 전부 돌고, 발행물 탭 스크린샷을 screenshots-uat324/에 남긴다
 // (시각을 바꾸는 변경은 프로브 PASS 후에도 육안 1장이 필요하다 — 가토 ⓐ).
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
@@ -235,6 +238,54 @@ async function run(label, ctxOpts) {
   ok(`[${label}] 비-admin:첫-발행물-identity`, !!(firstPub.name || firstPub.ticker) && afterBody.includes(firstPub.name || firstPub.ticker), firstPub.name || firstPub.ticker || '(발행물 0 — 미검증)');
   ok(`[${label}] 비-admin:관리수단-미노출`, !afterBody.includes('자동 발행 대상 관리'));
 
+  // ── ⓖ' 목록 카드가 이름·한줄 논지를 자르지 않는다(task#397, B54) — m278은 계획 범위 밖이라 재지 않는다 ──
+  // 요소는 구조가 아니라 텍스트로 찾는다(옛 2행 구조에서도 같은 축이 돌아 red-first가 가능하다).
+  if (label !== 'm278') {
+    const c = await page.evaluate((pubs) => {
+      const byT = new Map(pubs.map(p => [p.ticker, p]));
+      const cards = [...document.querySelectorAll('a[href^="/analyst-report/"]')];
+      const leaf = (root, txt) => [...root.querySelectorAll('span,div')].find(e => e.children.length === 0 && e.textContent === txt);
+      const cut = (e) => !e || e.scrollWidth > e.clientWidth || getComputedStyle(e).textOverflow === 'ellipsis';
+      const rows = cards.map(a => {
+        const p = byT.get(a.getAttribute('href').split('/')[2]) || {};
+        const name = leaf(a, p.name || p.ticker), title = leaf(a, p.title), date = leaf(a, p.published_date);
+        const meta = a.firstElementChild?.lastElementChild;   // 1행 우측 묶음(티커·신호점)
+        const lh = name ? (parseFloat(getComputedStyle(name).lineHeight) || parseFloat(getComputedStyle(name).fontSize) * 1.5) : 0;
+        return {
+          t: p.ticker, measured: !!(name && title && date && meta),
+          nameCut: cut(name), titleCut: cut(title),
+          metaR: meta?.getBoundingClientRect().right, dateR: date?.getBoundingClientRect().right,
+          nameH: name ? Math.round(name.getBoundingClientRect().height * 10) / 10 : null, lh,
+        };
+      });
+      const spread = (k) => { const v = rows.map(r => r[k]).filter(x => x != null); return v.length ? Math.max(...v) - Math.min(...v) : Infinity; };
+      // what-if 대조군(task#396 회고 ⓤ) — 한 장의 우측 묶음을 10px 밀면 정렬 축이 FAIL해야 이빨이 있다
+      let ctl = null;
+      const m0 = cards[0]?.firstElementChild?.lastElementChild;
+      if (m0 && cards.length >= 2) {
+        const keep = m0.style.marginRight; m0.style.marginRight = '10px';
+        const v = cards.map(a => a.firstElementChild?.lastElementChild?.getBoundingClientRect().right);
+        ctl = Math.max(...v) - Math.min(...v);
+        m0.style.marginRight = keep;
+      }
+      return { n: cards.length, rows, metaSpread: spread('metaR'), dateSpread: spread('dateR'), ctl,
+        docW: document.documentElement.scrollWidth, vw: window.innerWidth };
+    }, pubs);
+    const measured = c.rows.filter(r => r.measured).length;
+    ok(`[${label}] 심층목록:커버리지`, c.n > 0 && measured === c.n, `잰 카드 ${measured}/${c.n}`);
+    const cutN = c.rows.filter(r => r.nameCut || r.titleCut);
+    ok(`[${label}] 심층목록:이름·제목-잘림0`, c.n > 0 && cutN.length === 0,
+      `잘림 ${cutN.length}장 (이름 ${c.rows.filter(r => r.nameCut).length} · 제목 ${c.rows.filter(r => r.titleCut).length})`);
+    ok(`[${label}] 심층목록:가로넘침0`, c.docW <= c.vw, `docW=${c.docW} vw=${c.vw}`);
+    ok(`[${label}] 심층목록:우측묶음·날짜-같은선`, c.metaSpread <= 0.5 && c.dateSpread <= 0.5,
+      `티커묶음 편차 ${c.metaSpread.toFixed(1)} · 날짜 편차 ${c.dateSpread.toFixed(1)}`);
+    ok(`[${label}] 심층목록:정렬축-대조군-FAIL`, c.ctl != null && c.ctl > 0.5, `marginRight 10px 주입 시 편차 ${c.ctl}`);
+    const tall = c.rows.filter(r => r.nameH == null || r.nameH > r.lh * 2 + 1);
+    ok(`[${label}] 심층목록:이름-2줄이하(낱자적층-sentinel)`, c.n > 0 && tall.length === 0,
+      tall.length ? tall.map(r => `${r.t}:${r.nameH}/${r.lh}`).join(' ') : `최대 ${Math.max(...c.rows.map(r => r.nameH))}px`);
+    await page.screenshot({ path: `${OUT}/${label}-04-deep-list.png`, fullPage: true });
+  }
+
   // ── ⓘ 기술 업체표 티커 → 종목 리포트 ────────────────────────────────────
   if (techSlug) {
     await page.goto(`${BASE}/tech-report/${techSlug}`, { waitUntil: 'domcontentloaded' });
@@ -335,6 +386,7 @@ async function run(label, ctxOpts) {
 
 await run('pc', { viewport: { width: 1440, height: 1000 } });
 await run('m390', { ...devices['iPhone 13'] });
+await run('m350', { viewport: { width: 350, height: 720 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: devices['iPhone 13'].userAgent });
 await run('m278', { viewport: { width: 278, height: 664 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: devices['iPhone 13'].userAgent });
 
 console.log(lines.join('\n'));
