@@ -157,7 +157,7 @@ class Precedent(BaseModel):
     case: str = Field(..., min_length=1, max_length=120)
     period: str = Field(..., min_length=1, max_length=40)
     outcome: Literal["realized", "partial", "not_realized"]    # 현실화 · 부분 현실화 · 비현실화
-    note: Optional[str] = Field(None, max_length=300)           # 같은 점·다른 점
+    note: Optional[str] = Field(None, max_length=300)           # "같은 점: …. 다른 점: …." (프론트가 표지로 나눈다, 형식 미검증)
     ref: str = Field(..., min_length=1, max_length=200)         # 출처
 
 

@@ -187,6 +187,27 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     if (L10 && await row0.count() === 1 && await click(row0)) { expanded = (await page.locator('[data-precedent="0"]').textContent()) || ''; }
     ok(`${tag} lens10-expand-ref`, !L10 || (expanded.includes(L10.precedents[0].ref) && (await row0.getAttribute('aria-expanded')) === 'true'), L10 ? `ref 표시=${expanded.includes(L10.precedents[0].ref)}` : '표본 0');
     ok(`${tag} lens10-no-overflow`, m.lens10Overflow === 0, `n=${m.lens10Overflow}`);
+    // ── task#395 사례 행 모양 — 넘침 축이 못 보는 「행마다 줄바꿈이 갈림」. 모든 행이 [제목+화살표] / [배지+기간] 2줄이고
+    //    제목이 낱자로 눌리지 않는다. 행 1도 펼쳐 2행 펼침 스크린샷을 남기고, 펼친 행의 note 분리를 API note 표지와 대조한다 ──
+    const row1 = page.locator('[data-precedent="1"] button');
+    if (L10 && await row1.count() === 1) await click(row1);
+    const shape = await page.evaluate(() => [...document.querySelectorAll('[data-precedent]')].map(li => {
+      const h = li.querySelectorAll('[data-precedent-head]'), mt = li.querySelectorAll('[data-precedent-meta]');
+      if (h.length !== 1 || mt.length !== 1) return { i: li.dataset.precedent, bad: `head=${h.length} meta=${mt.length}` };
+      const hr = h[0].getBoundingClientRect(), mr = mt[0].getBoundingClientRect(), t = h[0].firstElementChild, fs = parseFloat(getComputedStyle(t).fontSize);
+      return { i: li.dataset.precedent, metaBelow: mr.top >= hr.bottom - 0.5, titleW: Math.round(t.getBoundingClientRect().width), narrow: t.getBoundingClientRect().width < fs * 4,
+        badgeInMeta: !!mt[0].querySelector('.badge'), open: li.querySelector('button').getAttribute('aria-expanded') === 'true',
+        same: li.querySelector('[data-precedent-same]')?.textContent ?? null, diff: li.querySelector('[data-precedent-diff]')?.textContent ?? null,
+        oldLabel: li.textContent.includes('같은 점·다른 점'), overflow: [...li.querySelectorAll('*')].filter(e => e.scrollWidth - e.clientWidth > 1 && getComputedStyle(e).display !== 'inline').length };
+    }));
+    const badShape = shape.filter(s => s.bad || !s.metaBelow || s.narrow || !s.badgeInMeta);
+    ok(`${tag} lens10-row-shape`, shape.length === (L10?.precedents.length || 0) && badShape.length === 0,
+      `rows=${shape.length} bad=${JSON.stringify(badShape)} titleW=${shape.map(s => s.titleW).join(',')}`);
+    const opened = shape.filter(s => s.open);
+    const splitOk = s => { const note = L10.precedents[+s.i].note || ''; return !s.oldLabel && s.overflow === 0
+      && (s.same !== null) === note.includes('같은 점:') && (s.diff !== null) === note.includes('다른 점:'); };
+    ok(`${tag} lens10-note-split`, !L10 || (opened.length >= Math.min(2, L10.precedents.length) && opened.every(splitOk)),
+      L10 ? `opened=${opened.length} ${JSON.stringify(opened.map(s => ({ i: s.i, same: !!s.same, diff: !!s.diff, old: s.oldLabel, ov: s.overflow })))}` : '표본 0');
     if (L10) samples10++;
     await page.screenshot({ path: `${OUT}/${TICKER}-${tag}.png`, fullPage: true });
     await ctx.close();
@@ -195,5 +216,5 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
 await b.close();
 // 표본 0이면 렌즈 10 축은 통과가 아니라 미검증이다(task#318)
 console.log(`표본 lens10(사례 있는 판 × 컨텍스트)=${samples10}${samples10 === 0 ? ' — 미검증' : ''} · 렌즈 수 N=${N}`);
-console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${6 + VIEWPORTS.length * 2 * 30})`);
+console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${6 + VIEWPORTS.length * 2 * 32})`);
 process.exit(fail ? 1 : 0);

@@ -69,6 +69,51 @@ describe('렌즈 10 「위험의 전례」 (task#391)', () => {
     expect(row2.textContent).toContain('TrendForce 2019')
   })
 
+  it('ⓔ 사례 행 머리는 모든 행에서 2줄 — head(제목) 1개 · meta(배지+기간) 1개, 배지·기간은 head에 없다(task#395)', () => {
+    const { container } = render(<LensReport report={TEN} />)
+    const rows = [...container.querySelectorAll('#lens-10 [data-precedent]')]
+    expect(rows.length).toBe(PRECEDENTS.length)
+    rows.forEach((row, i) => {
+      const heads = row.querySelectorAll('[data-precedent-head]')
+      const metas = row.querySelectorAll('[data-precedent-meta]')
+      expect([heads.length, metas.length]).toEqual([1, 1])
+      const label = { realized: '현실화', partial: '부분 현실화', not_realized: '비현실화' }[PRECEDENTS[i].outcome]
+      expect(heads[0].textContent).toContain(PRECEDENTS[i].case)
+      expect(heads[0].textContent).not.toContain(PRECEDENTS[i].period)
+      expect(heads[0].textContent).not.toContain(label)
+      expect(metas[0].querySelector('.badge')?.textContent).toBe(label)
+      expect(metas[0].textContent).toContain(PRECEDENTS[i].period)
+      // 기간은 mono가 아니다(자간 벌어짐 제거)
+      expect([...metas[0].querySelectorAll('.mono')].length).toBe(0)
+    })
+  })
+
+  it('ⓕ 펼침 — 「같은 점: A. 다른 점: B.」는 라벨 열로 나뉘고, 표지 없는 note는 라벨 없이 원문 그대로(task#395)', () => {
+    const split = { case: '분리 사례', period: '2019~2020', outcome: 'partial', note: '같은 점: 증설이 수요를 앞질렀다. 다른 점: 이번엔 장기 계약이 있다.', ref: '출처 S' }
+    const diffOnly = { case: '다른 점만', period: '2015', outcome: 'realized', note: '다른 점: 금리 환경이 반대였다', ref: '출처 D' }
+    const rep = { ...TEN, lenses: [...nine(), judg(10, 'wait', { risk: 'r', precedents: [split, PRECEDENTS[0], diffOnly, PRECEDENTS[3]], base_rate: { realized: 3, partial: 1, not_realized: 0, total: 4 } })] }
+    const { container } = render(<LensReport report={rep} />)
+    const rows = [...container.querySelectorAll('#lens-10 [data-precedent]')]
+    rows.forEach(r => fireEvent.click(r.querySelector('button')))
+    // ⓐ 두 표지 → 같은 점·다른 점이 각각 제 칸에, 마침표·공백 정리
+    expect(rows[0].querySelector('[data-precedent-same]').textContent).toBe('증설이 수요를 앞질렀다')
+    expect(rows[0].querySelector('[data-precedent-diff]').textContent).toBe('이번엔 장기 계약이 있다')
+    expect(rows[0].textContent).toContain('출처 S')
+    // ⓑ 표지 없는 note → 원문 그대로, 「같은 점」 라벨 0회
+    expect(rows[1].querySelector('[data-precedent-note]').textContent).toBe('수요 예측이 같은 방식으로 빗나갔다')
+    expect(rows[1].querySelector('[data-precedent-same]')).toBeNull()
+    expect(rows[1].textContent).not.toContain('같은 점')
+    expect(rows[1].textContent).not.toContain('다른 점')
+    // 한쪽 표지만 → 그쪽만 라벨
+    expect(rows[2].querySelector('[data-precedent-diff]').textContent).toBe('금리 환경이 반대였다')
+    expect(rows[2].querySelector('[data-precedent-same]')).toBeNull()
+    expect(rows[2].textContent).not.toContain('같은 점')
+    expect(rows[3].querySelector('[data-precedent-same]').textContent).toBe('증설 직후')
+    expect(rows[3].querySelector('[data-precedent-diff]')).toBeNull()
+    // ⓒ 어떤 경우에도 옛 바깥 라벨 「같은 점·다른 점」 0회
+    expect(container.querySelector('#lens-10').textContent).not.toContain('같은 점·다른 점')
+  })
+
   it('ⓒ 9렌즈 판: 렌즈 10 행·카드 없음 + 「렌즈 10 도입 전」 안내 1줄', () => {
     const { container } = render(<LensReport report={NINE} />)
     expect(cellIds(container)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
