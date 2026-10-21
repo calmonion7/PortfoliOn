@@ -117,6 +117,11 @@
   white-space: nowrap; text-decoration: none;
 }
 .seg > button.is-active, .seg > a.is-active { background: var(--bg-elev); color: var(--text); box-shadow: var(--shadow-sm); }
+/* 리서치 seg 6탭(task#396) — 278에서 가용 ~232px에 라벨 13자(~156) + 탭 좌우 여백 6px×2×6(72)이 빠듯해
+   300 미만에서만 여백을 3px로 줄인다(라벨은 nowrap이라 넘치면 잘리지 않고 가로 스크롤이 된다) */
+@media (max-width: 299px) {
+  .seg > button, .seg > a { padding-left: 3px; padding-right: 3px; }
+}
 .seg-pad { padding: 0 20px; margin-bottom: 14px; }
 .seg .count { color: var(--text-faint); font-size: 11px; }
 /* task#175 F24 회귀수정: 콘텐츠폭 필 세그먼트 — 항목이 적은 필터(국내/해외/공통 등)가 PC에서 전폭으로 늘어나지 않게. */
