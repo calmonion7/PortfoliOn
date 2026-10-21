@@ -391,24 +391,47 @@ function InputsTable({ inputs }) {
   )
 }
 
+// note의 「같은 점: …」「다른 점: …」 표지를 찾아 나눈다(task#395). 표지가 없으면 rest에 원문 그대로 — 오분해하지 않는다.
+const NOTE_MARKS = [['same', '같은 점:'], ['diff', '다른 점:']]
+const trimNote = s => s.replace(/^[\s.·]+|[\s.]+$/g, '')
+function splitNote(note) {
+  const marks = NOTE_MARKS.map(([k, m]) => [k, note.indexOf(m), m.length]).filter(([, at]) => at >= 0).sort((a, b) => a[1] - b[1])
+  if (!marks.length) return { rest: note }
+  const out = {}
+  const head = trimNote(note.slice(0, marks[0][1]))
+  if (head) out.rest = head
+  marks.forEach(([k, at, len], j) => { out[k] = trimNote(note.slice(at + len, j + 1 < marks.length ? marks[j + 1][1] : undefined)) })
+  return out
+}
+
 // 렌즈 10 상세 — 대상 위험 → 기저율 비율 막대 + 건수 캡션 → 사례 목록(행을 누르면 같은 점·다른 점·출처)
+// 행 머리는 폭과 무관하게 2줄 고정: [제목 + 펼침 화살표] / [결과 배지 + 기간] — 줄바꿈 위치를 flex-wrap에 맡기지 않는다(task#395)
 function PrecedentRow({ p, i }) {
   const [open, setOpen] = useState(false)
   const o = OUTCOME_META[p.outcome] || OUTCOME_META.partial
+  const note = p.note ? splitNote(p.note) : {}
+  const body = { ...textStyle, fontSize: 12, lineHeight: 1.6 }
   return (
     <li data-precedent={i} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
       <button type="button" aria-expanded={open} onClick={() => setOpen(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', width: '100%', minHeight: 44, padding: '6px 0',
+              style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', minHeight: 44, padding: '8px 0',
                        background: 'none', border: 'none', color: 'inherit', font: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
-        <span style={{ flex: '1 1 160px', minWidth: 0, color: 'var(--text)', fontSize: 13, fontWeight: 600, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{p.case}</span>
-        <span className="mono tnum" style={{ ...smallCap, whiteSpace: 'nowrap' }}>{p.period}</span>
-        <Badge variant={o.variant}>{o.label}</Badge>
-        <span aria-hidden="true" style={{ ...smallCap, width: 12, textAlign: 'center' }}>{open ? '−' : '+'}</span>
+        <span data-precedent-head="" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%' }}>
+          <span style={{ flex: 1, minWidth: 0, color: 'var(--text)', fontSize: 13, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{p.case}</span>
+          <span aria-hidden="true" style={{ ...smallCap, fontSize: 13, lineHeight: 1.5, flexShrink: 0 }}>{open ? '⌃' : '⌄'}</span>
+        </span>
+        <span data-precedent-meta="" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px' }}>
+          <Badge variant={o.variant}>{o.label}</Badge>
+          <span className="tnum" style={{ ...smallCap, wordBreak: 'keep-all' }}>{p.period}</span>
+        </span>
       </button>
       {open && (
-        <div style={{ padding: '0 0 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {p.note && <div style={{ ...textStyle, fontSize: 12 }}><span style={smallCap}>같은 점·다른 점 </span>{p.note}</div>}
-          <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>출처: {p.ref}</div>
+        <div style={{ padding: '0 0 10px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', alignItems: 'baseline' }}>
+          {note.rest && <div data-precedent-note="" style={{ ...body, gridColumn: '1 / -1' }}>{note.rest}</div>}
+          {note.same && <><span style={smallCap}>같은 점</span><div data-precedent-same="" style={body}>{note.same}</div></>}
+          {note.diff && <><span style={smallCap}>다른 점</span><div data-precedent-diff="" style={body}>{note.diff}</div></>}
+          <span style={smallCap}>출처</span>
+          <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{p.ref}</div>
         </div>
       )}
     </li>
