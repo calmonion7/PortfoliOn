@@ -3,50 +3,53 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 // task#324 (ADR-0047) — 리포트 계열의 경계가 화면에 반영됐는지.
-// ⓒ `/analyst-reports`의 성격 전환(admin 관리 화면 / 비-admin 리다이렉트)
-// ⓓ 리포트 목록의 admin 전용 발행 관리 링크
+// ⓒ `/analyst-reports` — task#396(결정 5 개정)에서 비-admin 리다이렉트를 없애고 목록을 전 사용자에게 다시 열었다.
+//    관리 수단 3종(대상 지정·즉시 발행·종목 단위 삭제)은 같은 화면 안에서 admin에게만 보인다(ADR-0027 ② 유지).
 // ⓔ 리포트 목록의 「심층」 배지
-// 각 축은 반드시 **대조군과 쌍**으로 둔다 — 한쪽만 재면 「누구나 리다이렉트」·「모두에게 링크 노출」도 통과한다.
+// 각 축은 반드시 **대조군과 쌍**으로 둔다 — 한쪽만 재면 「누구나 리다이렉트」·「모두에게 도구 노출」도 통과한다.
 
 const authMock = vi.fn(() => ({ role: 'user', loading: false }))
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => authMock() }))
-vi.mock('../pages/AnalystReports', () => ({ default: () => <div>ADMIN_MGMT_SCREEN</div> }))
+vi.mock('../api', () => ({ default: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
+vi.mock('../components/Toast', () => ({ useToast: () => ({ showToast: vi.fn() }) }))
 
-import AnalystReportsRoute from '../routes/AnalystReportsRoute'
+import api from '../api'
+import AnalystReports from '../pages/AnalystReports'
 import TickerListItem from '../components/reports/TickerListItem'
 import StockCard from '../components/reports/StockCard'
 
+const PUBS = [{ ticker: '000660', name: 'SK하이닉스', published_date: '2026-10-21', title: '판', tally: { go: 1 } }]
+
+// App.jsx와 같은 배선(`/analyst-reports` → AnalystReports)에 `/reports` 착지점을 둔다. 이 축은 페이지가 스스로
+// 튕기지 않는지만 본다 — App.jsx 배선 자체(옛 AnalystReportsRoute 게이트 제거)는 라이브 프로브 uat215가 비-admin URL 유지로 잰다.
 const renderRoute = () => render(
   <MemoryRouter initialEntries={['/analyst-reports']}>
     <Routes>
-      <Route path="/analyst-reports" element={<AnalystReportsRoute />} />
+      <Route path="/analyst-reports" element={<AnalystReports />} />
       <Route path="/reports" element={<div>STOCK_REPORTS_PAGE</div>} />
     </Routes>
   </MemoryRouter>
 )
 
-beforeEach(() => { vi.clearAllMocks(); authMock.mockReturnValue({ role: 'user', loading: false }) })
+beforeEach(() => {
+  vi.clearAllMocks()
+  authMock.mockReturnValue({ role: 'user', loading: false })
+  api.get.mockImplementation((url) => Promise.resolve({ data: url === '/api/analyst-reports' ? { reports: PUBS } : [] }))
+})
 
-describe('/analyst-reports 성격 전환 (task#324 S4ⓒ)', () => {
-  it('비-admin은 종목 리포트로 리다이렉트된다', () => {
+describe('/analyst-reports 전 사용자 재개방 (task#396)', () => {
+  it('비-admin은 리다이렉트되지 않고 발행물 목록을 보며, 관리 도구는 없다', async () => {
     renderRoute()
-    expect(screen.getByText('STOCK_REPORTS_PAGE')).toBeTruthy()
-    expect(screen.queryByText('ADMIN_MGMT_SCREEN')).toBeNull()
+    expect(await screen.findByText('SK하이닉스')).toBeTruthy()
+    expect(screen.queryByText('STOCK_REPORTS_PAGE')).toBeNull()
+    expect(screen.queryByText('자동 발행 대상 관리')).toBeNull()
   })
 
-  it('대조군 — admin은 리다이렉트되지 않고 관리 화면을 본다', () => {
+  it('대조군 — admin은 같은 화면에서 관리 도구까지 본다', async () => {
     authMock.mockReturnValue({ role: 'admin', loading: false })
     renderRoute()
-    expect(screen.getByText('ADMIN_MGMT_SCREEN')).toBeTruthy()
+    expect(await screen.findByText('자동 발행 대상 관리')).toBeTruthy()
     expect(screen.queryByText('STOCK_REPORTS_PAGE')).toBeNull()
-  })
-
-  it('대조군 — 권한 확정 전(loading)에는 어느 쪽으로도 보내지 않는다', () => {
-    // loading 중 리다이렉트하면 admin이 자기 화면에 못 들어간다(새로고침 시 재현되는 결함).
-    authMock.mockReturnValue({ role: undefined, loading: true })
-    renderRoute()
-    expect(screen.queryByText('STOCK_REPORTS_PAGE')).toBeNull()
-    expect(screen.queryByText('ADMIN_MGMT_SCREEN')).toBeNull()
   })
 })
 

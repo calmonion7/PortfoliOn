@@ -295,7 +295,8 @@ for (const V of VIEWS) {
     const allNavTexts = [...nav.subbar, ...nav.seg];
     eq(`nav-label-domain:${tag}`, allNavTexts.length > 0 ? 'OK' : `DOMAIN_EMPTY(subbar=${nav.subbar.length},seg=${nav.seg.length})`, 'OK',
       `subbar=${JSON.stringify(nav.subbar)} seg=${JSON.stringify(nav.seg)}`);
-    eq(`nav-label-present:${tag}`, allNavTexts.includes('주요기술'), true, '두 나브 표면 중 하나에 「주요기술」 존재');
+    // task#396: nav 라벨이 「기술」로 줄었다(문서 명칭 「주요기술 리포트」는 그대로 — 아래 h3 축이 잰다)
+    eq(`nav-label-present:${tag}`, allNavTexts.includes('기술'), true, '두 나브 표면 중 하나에 「기술」 존재');
     eq(`nav-label-absent:${tag}`, allNavTexts.filter((t) => t === '선도기술'), [], '두 나브 표면 어디에도 「선도기술」 없음');
     eq(`nav-label-stale-body:${tag}`, nav.bodyStale, 0, 'document 전체(마스트헤드+모바일 하단 탭바 포함) 안전망 — 「선도기술」 0건');
     bump('nav-label', 4);

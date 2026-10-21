@@ -80,19 +80,13 @@ describe('리포트 딥링크 재진입 — navKey 변경 시 상세 갱신 (tas
   })
 })
 
-// task#324 S4ⓓ — nav에서 「심층 리포트」가 빠진 대신 admin이 발행 관리 화면에 도달하는 경로.
-// 「보인다」만 재면 도달을 증명하지 못하므로 href까지 단언하고, 비-admin 부재를 대조군으로 둔다.
-describe('리포트 목록 — admin 발행 관리 링크 (task#324)', () => {
-  it('admin에게는 /analyst-reports로 가는 링크가 있다', () => {
-    authMock.mockReturnValue({ role: 'admin', loading: false })
-    renderReports({ initialTicker: null, navKey: 'k' })
-    const link = screen.getByRole('link', { name: /심층 발행 관리/ })
-    expect(link.getAttribute('href')).toBe('/analyst-reports')
-  })
-
-  it('대조군 — 비-admin에게는 그 링크가 없다', () => {
-    authMock.mockReturnValue({ role: 'user', loading: false })
-    renderReports({ initialTicker: null, navKey: 'k' })
+// task#324 S4ⓓ에서 admin 전용 「심층 발행 관리 →」 링크를 뒀다가, task#396에서 「심층」 nav 탭이 생기며 없앴다.
+// 진입점은 탭 하나다 — admin에게도 링크가 남아 있으면 같은 목적지가 두 군데서 다른 이름으로 불린다.
+describe('리포트 목록 — 심층 발행 관리 링크 제거 (task#396)', () => {
+  it.each(['admin', 'user'])('%s에게 /analyst-reports 링크가 없다', (role) => {
+    authMock.mockReturnValue({ role, loading: false })
+    const { container } = renderReports({ initialTicker: null, navKey: 'k' })
     expect(screen.queryByRole('link', { name: /심층 발행 관리/ })).toBeNull()
+    expect(container.querySelector('a[href="/analyst-reports"]')).toBeNull()
   })
 })

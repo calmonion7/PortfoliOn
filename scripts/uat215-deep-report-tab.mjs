@@ -20,8 +20,9 @@
 //   ⓓ enrich 탭이 「📝 사업분석」이고 「심층분석」은 화면에 없다
 //   ⓔ 목록의 「심층」 배지가 발행물 있는 종목에만 붙는다(대조군 동봉)
 //   ⓕ 문서 단독 라우트가 살아 있고(ⓑ와 같은 identity·렌즈 이름 2축) 「← 종목 리포트」로 돌아온다
-//   ⓖ 비-admin이 `/analyst-reports`에 가면 `/reports`로 리다이렉트된다
-//   ⓗ nav에 「심층 리포트」 항목이 없고, 문서 경로에서 「리포트」가 active다
+//   ⓖ 비-admin이 `/analyst-reports`에 가면 **머문다**(task#396 — 리다이렉트 폐지, 목록 전 사용자 재개방):
+//      URL 유지 · 발행물 링크 ≥ 1 · 목록 API 첫 발행물의 이름/티커가 보임(identity) · 관리 수단 미노출
+//   ⓗ nav에 「심층 리포트」 항목이 없고, 문서 경로에서 「심층」이 active다(「리포트」·「기술」은 아님 — 대조군, task#396)
 //   ⓘ 기술 리포트 업체 표의 상장 티커가 그 종목 리포트를 연다 — 표본은 **내 목록(`/api/report/list`)에
 //      있고 리포트 날짜가 있는** 티커로 고른다. 「열렸다」는 본문 어딘가의 티커 문자열이 아니라
 //      `.reports-layout[data-view="detail"]` + **상세 영역(.reports-main) 안** 티커로 잰다(task#378 —
@@ -37,7 +38,7 @@
 import { chromium, devices } from 'playwright';
 import fs from 'fs';
 
-const BASE = 'https://portfolion.taebro.com';
+const BASE = process.env.BASE || 'https://portfolion.taebro.com';
 const OUT = '/Users/calmonion/Project/PortfoliOn/screenshots-uat215';
 const OUT324 = '/Users/calmonion/Project/PortfoliOn/screenshots-uat324';
 fs.mkdirSync(OUT, { recursive: true });
@@ -210,11 +211,12 @@ async function run(label, ctxOpts) {
     const links = [...document.querySelectorAll('a')];
     const named = (n) => links.filter(a => a.textContent.trim() === n);
     const activeOf = (n) => named(n).some(a => a.className.includes('is-active'));
-    return { deepItem: named('심층 리포트').length, reportActive: activeOf('리포트'), techActive: activeOf('주요기술') };
+    return { deepItem: named('심층 리포트').length, deepActive: activeOf('심층'), reportActive: activeOf('리포트'), techActive: activeOf('기술') };
   });
   ok(`[${label}] nav:심층리포트-항목-없음`, navState.deepItem === 0, `${navState.deepItem}개`);
-  ok(`[${label}] nav:문서경로에서-리포트-active`, navState.reportActive === true);
-  ok(`[${label}] nav:주요기술은-active-아님(대조군)`, navState.techActive === false);
+  ok(`[${label}] nav:문서경로에서-심층-active`, navState.deepActive === true);
+  ok(`[${label}] nav:리포트는-active-아님(대조군)`, navState.reportActive === false);
+  ok(`[${label}] nav:기술은-active-아님(대조군)`, navState.techActive === false);
   if (pillTxt.includes('종목 리포트')) {
     await pill.click(); await settle(page);
     ok(`[${label}] 복귀:리포트로-도달`, new URL(page.url()).pathname === '/reports', page.url());
@@ -222,11 +224,15 @@ async function run(label, ctxOpts) {
     ok(`[${label}] 복귀:리포트로-도달`, false, '복귀 링크 없음');
   }
 
-  // ── ⓖ 비-admin 리다이렉트 ────────────────────────────────────────────────
+  // ── ⓖ 비-admin 목록 열람(task#396 — 리다이렉트 폐지) ────────────────────────
   await page.goto(`${BASE}/analyst-reports`, { waitUntil: 'domcontentloaded' });
   await settle(page);
-  ok(`[${label}] 비-admin:목록→리포트-리다이렉트`, new URL(page.url()).pathname === '/reports', page.url());
+  ok(`[${label}] 비-admin:목록-URL-유지`, new URL(page.url()).pathname === '/analyst-reports', page.url());
+  const pubLinks = await page.locator('a[href^="/analyst-report/"]').count();
+  ok(`[${label}] 비-admin:발행물-링크-1개이상`, pubLinks >= 1, `${pubLinks}개 (API ${pubs.length}건)`);
   const afterBody = await page.evaluate(() => document.body.innerText || '');
+  const firstPub = pubs[0] || {};
+  ok(`[${label}] 비-admin:첫-발행물-identity`, !!(firstPub.name || firstPub.ticker) && afterBody.includes(firstPub.name || firstPub.ticker), firstPub.name || firstPub.ticker || '(발행물 0 — 미검증)');
   ok(`[${label}] 비-admin:관리수단-미노출`, !afterBody.includes('자동 발행 대상 관리'));
 
   // ── ⓘ 기술 업체표 티커 → 종목 리포트 ────────────────────────────────────
