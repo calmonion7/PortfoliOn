@@ -4,5 +4,5 @@ status: done
 executed: 2026-10-21
 completed: 2026-10-21
 verified: yes (dev 스택 uat369 CRCL·000660 246/246 FAIL 0 — 수정 전 red 4·6 FAIL; vitest 1090 passed; m278 스크린샷 육안 확인)
-retro: skipped (fg-loop 자동 드라이브 — 교훈은 run.md에 남고, 승급은 이후 fg-learn으로 미룸)
-docs updated: none
+retro: .forge/branch/dev/retro/261021-192500-analyst-report-m278-overflow.md (일괄 승급 2026-10-21)
+docs updated: .claude/skills/live-uat-probes ㉢ 보강 · frontend/CLAUDE.md 가토(flexWrap 행별 줄바꿈 불일치)

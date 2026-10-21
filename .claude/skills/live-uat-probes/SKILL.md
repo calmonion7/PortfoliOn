@@ -155,3 +155,34 @@ FAIL(1 failed | 8 passed)을 확인한 뒤 원복했다. **실천: 이빨은 명
 DOM엔 둘 다 있다 → `.first()`가 숨은 쪽을 집어 30초 타임아웃으로 죽는다. **가시 요소를 골라 클릭할 것**
 (`isVisible()` 순회). 같은 이유로 DOM 기반 축(배지 유무)은 **양쪽 렌더러를 함께** 봐야 폭에 따라 다른 것을
 재지 않는다.
+
+## task#393 추가 — 모바일 에뮬레이션의 레이아웃 폭 확장 · 스크롤 직후 좌표 탭
+
+**㉢ `isMobile: true` 컨텍스트에서 콘텐츠가 뷰포트보다 넓으면 Chromium이 *레이아웃 뷰포트를 넓힌다* — 그러면
+`innerWidth` 기준 넘침 축은 원리적으로 블라인드하고, 터치 좌표도 어긋난다(task#393 실측).** m278로 띄운
+`/analyst-report/000660/…`의 `innerWidth`가 **296**(CRCL은 **314**), `innerHeight`도 640이 아니라 682였다.
+uat369 `no-h-scroll`은 `scrollWidth − innerWidth`라 둘이 같이 커져 **0 = PASS**를 냈다 — 화면은 18~36px 가로로
+흔들리는데. 밀어낸 것은 렌즈 표면이 아니라 사업부문 카드(폭 260, 오른쪽 끝 296)와 날짜 `span.mono`였고(m350은 0),
+**발견 경로는 넘침 축이 아니라 「?」 팝오버 탭이 m278에서만 빗나간 것**이었다. 실천: 모바일 넘침은
+`documentElement.scrollWidth`를 **컨텍스트에 설정한 `viewport.width`**와 비교할 것(`innerWidth` 아님). 판정 전에
+`innerWidth === viewport.width`를 한 번 찍어 두면 이 클래스가 바로 드러난다. 폭을 밀어낸 원소는 「자신은
+`right > W`인데 부모는 아닌」 원소를 훑어 찾는다.
+**task#394 정정·보강** — uat369는 이제 넘침을 **세 축 한 벌**로 잰다: ① `no-h-scroll` = `innerWidth === viewport.width
+&& scrollWidth <= viewport.width` ② `no-element-beyond-viewport` = 보이는 요소의 **상자** `right > W+0.5` 개수
+(가로 스크롤 조상 내부 제외) — `overflow:hidden`으로 잘라 폭을 맞추는 꼼수를 막는다(잘려도 상자는 남는다)
+③ `content-preserved` = 같은 실행의 pc1440 대비 `innerText`의 내용(「매출 비중」 개수·날짜 집합)이 같다 —
+`display:none`으로 숨기는 꼼수를 막는다(그래서 VIEWPORTS 순서를 pc 먼저로 바꿨다). ①만 두면 ②③의 꼼수가
+초록이 된다. 원인 추적 시 **`position:fixed` 요소(하단 탭바·「← 종목 리포트」 pill)는 원인이 아니라 증상**이다 —
+넓어진 레이아웃 뷰포트를 따라 함께 넓어지므로 「부모는 안 넘는」 필터에 걸려도 고칠 대상에서 뺄 것. `BASE`
+환경변수로 dev 스택(`http://127.0.0.1:8084`)을 잴 수 있어 **머지 전 red→green**이 된다.
+
+**㉣ 클릭이 실패하면 *앱 동작*으로 귀속하기 전에 이벤트를 추적하라 — `scrollIntoView` 직후 즉시 좌표를 찍으면
+레이아웃이 한 번 더 움직인 뒤라 엉뚱한 요소를 찍는다(task#393).** Playwright `click()`이 「이웃 셀·탭바가 포인터를
+가로챈다」로 30초 타임아웃 → 프로브 전체가 죽었다. 「가운데로 스크롤 → 즉시 `mouse.click`/`touchscreen.tap`」으로
+우회했더니 팝오버가 안 열려 **「m278에선 마우스 클릭이 팝오버를 못 연다」로 한 번 잘못 귀속**했다. `pointerdown`
+캡처 리스너로 대상을 찍어 보니 **버튼이 아닌 요소**가 눌리고 있었다(㉢의 확장 폭이 겹쳐 좌표가 더 어긋났다).
+처방: ⓐ 기본은 Playwright `click()`(액션 가능성 검사 포함) ⓑ 실패 시에만 가운데 스크롤 → **정착 대기(600ms)** →
+`elementFromPoint`가 **대상 자신**일 때만 좌표 탭, 아니면 축 FAIL(가림은 결함일 수 있으니 숨기지 않는다)
+ⓒ 클릭 실패가 프로브를 **죽이지 않게** — 예외는 축 FAIL 한 줄로 바꾼다(죽으면 나머지 축 전부가 미측정이다).
+진단 도구: `pointerdown`/`click`/`scroll`/`resize` 캡처 리스너 + `[role=tooltip]` MutationObserver로 시간축을 찍으면
+「열렸다 닫혔나」와 「애초에 안 눌렸나」가 갈린다(`Glossary.jsx`는 열린 지 400ms 뒤 scroll·resize에 닫힌다).
