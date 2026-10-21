@@ -149,10 +149,22 @@ class Structure(BaseModel):
     funding_source: FundingSource
 
 
+class Precedent(BaseModel):
+    """렌즈 10 전례 하나(task#391) — 비슷한 일이 벌어졌던 다른 시점·회사·나라의 사례.
+    결과별 건수는 서버가 센다(base_rate) — 확률(%)은 만들지 않는다."""
+    model_config = _FORBID
+
+    case: str = Field(..., min_length=1, max_length=120)
+    period: str = Field(..., min_length=1, max_length=40)
+    outcome: Literal["realized", "partial", "not_realized"]    # 현실화 · 부분 현실화 · 비현실화
+    note: Optional[str] = Field(None, max_length=300)           # 같은 점·다른 점
+    ref: str = Field(..., min_length=1, max_length=200)         # 출처
+
+
 class LensIn(BaseModel):
     model_config = _FORBID
 
-    id: int = Field(..., ge=1, le=9)
+    id: int = Field(..., ge=1, le=10)
     summary: str = Field(..., min_length=1, max_length=200)
     body: str = Field(..., min_length=1)
     metrics: Optional[List[PointMetric]] = Field(None, max_length=4)
@@ -165,11 +177,22 @@ class LensIn(BaseModel):
     sensitivity: Optional[Sensitivity] = None                      # 렌즈 8 · 외생 가격형 수익 엔진만
     # 렌즈 3 비교 기간(task#371) — forward(끝점이 가이던스·컨센서스 미래 값) | yoy_quarter(최근 분기 vs 전년 동기)
     basis: Optional[Literal["forward", "yoy_quarter"]] = None
+    # 렌즈 10 「위험의 전례」(task#391) — 대상 위험 하나 + 전례 2~5건
+    risk: Optional[str] = Field(None, max_length=200)
+    precedents: Optional[List[Precedent]] = Field(None, min_length=2, max_length=5)
 
     @model_validator(mode="after")
     def _lens_kind_rules(self):
         if self.basis is not None and self.id != 3:
             raise ValueError(f"렌즈 {self.id}: basis는 렌즈 3에만")
+        if self.id != 10 and (self.risk is not None or self.precedents is not None):
+            raise ValueError(f"렌즈 {self.id}: risk·precedents는 렌즈 10에만")
+        if self.id == 10:
+            if self.signal == "na":
+                if self.risk is not None or self.precedents is not None:
+                    raise ValueError("렌즈 10: signal=na면 risk·precedents 없음(na_reason만)")
+            elif not (self.risk or "").strip() or self.precedents is None:
+                raise ValueError("렌즈 10: risk(대상 위험)와 precedents(전례 2~5건) 필수")
         if self.id in lens_calc.COMPUTED_LENSES:
             # 두 출처를 만들지 않는다 — 무시가 아니라 거부(계산 렌즈의 신호·바뀜 조건은 서버 정본)
             if self.signal is not None or self.flip is not None:
@@ -222,13 +245,14 @@ class LensPublishBody(BaseModel):
     format: Literal[2]
     title: str = Field(..., min_length=1, max_length=120)   # 한줄 논지
     structure: Structure
-    lenses: List[LensIn] = Field(..., min_length=9, max_length=9)
+    # 렌즈 1~9 필수, 렌즈 10 선택(task#391 1부 — 2부에서 필수화)
+    lenses: List[LensIn] = Field(..., min_length=9, max_length=10)
 
     @model_validator(mode="after")
     def _lens_set_and_inputs(self):
         ids = sorted(l.id for l in self.lenses)
-        if ids != list(range(1, 10)):
-            raise ValueError(f"lenses는 id 1~9가 정확히 한 번씩이어야 한다(받은 id: {ids})")
+        if ids not in (list(range(1, 10)), list(range(1, 11))):
+            raise ValueError(f"lenses는 id 1~9가 정확히 한 번씩(10은 선택, 한 번)이어야 한다(받은 id: {ids})")
         axes = {"revenue_engine": self.structure.revenue_engine.value,
                 "cost_nature": self.structure.cost_nature.value,
                 "funding_source": self.structure.funding_source.value}

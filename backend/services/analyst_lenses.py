@@ -60,7 +60,8 @@ INPUT_SPEC = {
 OPTIONAL_SPEC = {8: {"risk_free_pct": "pct"}}
 TABLE_ENGINES = ("balance_rate", "price_exogenous")
 COMPUTED_LENSES = (3, 4, 5, 8)
-JUDGMENT_LENSES = (1, 2, 6, 7, 9)
+JUDGMENT_LENSES = (1, 2, 6, 7, 9, 10)
+OUTCOMES = ("realized", "partial", "not_realized")   # 렌즈 10 전례 결과
 
 # 렌즈 8 금액 단위 → 통화·배수 (시총은 스냅샷의 원 단위 금액이라 환산이 필요하다)
 UNIT_SCALE = {
@@ -591,6 +592,12 @@ def build_lens_report(structure: dict, lenses: list, snapshot: dict) -> dict:
                         # 저장·표시 순서는 초록 → 노랑 → 빨강으로 고정(본문 순서에 기대지 않는다)
                         conditions=(sorted(lens["conditions"], key=lambda c: ("go", "wait", "stop").index(c["color"]))
                                     if lens.get("conditions") else None))
+            if lens["id"] == 10 and lens.get("precedents"):
+                # 위험 기저율(task#391) — 결과별 건수는 서버가 센다(루틴이 보내면 forbid로 422)
+                item.update(risk=lens["risk"], precedents=lens["precedents"],
+                            base_rate={**{o: sum(1 for p in lens["precedents"] if p["outcome"] == o)
+                                          for o in OUTCOMES},
+                                       "total": len(lens["precedents"])})
         out_lenses.append(item)
     tally = {s: sum(1 for l in out_lenses if l["signal"] == s) for s in SIGNALS}
     return {"structure": structure, "lenses": out_lenses, "tally": tally}
