@@ -38,7 +38,7 @@ class PointMetric(BaseModel):
     # 키 생략은 통과하지만 명시적 null은 타입 검증을 타서, float이면 발행 전체가 422로 죽는다(task#250).
     change_pct: Optional[float] = Field(None, allow_inf_nan=False)
 
-# ── 발행 계약: 구조 축·9렌즈 틀 (ADR 261006-232406, task#368) ────────────────
+# ── 발행 계약: 구조 축·렌즈 틀 (ADR 261006-232406, task#368 — 렌즈 10 필수화 task#392) ──────
 # 옛 v1(투자의견·적정주가 밴드·포인트·리스크) 계약은 task#370에서 제거됐다 — `format: 2`가 필수다.
 # 선택 필드는 전부 Optional[...] = Field(None) — 명시적 null이 발행 전체를 422로 막지 않게(task#250·ADR-0034 보정 ③).
 
@@ -245,14 +245,14 @@ class LensPublishBody(BaseModel):
     format: Literal[2]
     title: str = Field(..., min_length=1, max_length=120)   # 한줄 논지
     structure: Structure
-    # 렌즈 1~9 필수, 렌즈 10 선택(task#391 1부 — 2부에서 필수화)
-    lenses: List[LensIn] = Field(..., min_length=9, max_length=10)
+    # 렌즈 1~10 각 정확히 한 번(task#392 — 렌즈 10 필수화). 렌즈 10 이전의 9렌즈 옛 판은 조회 경로가 그대로 읽는다
+    lenses: List[LensIn] = Field(..., min_length=10, max_length=10)
 
     @model_validator(mode="after")
     def _lens_set_and_inputs(self):
         ids = sorted(l.id for l in self.lenses)
-        if ids not in (list(range(1, 10)), list(range(1, 11))):
-            raise ValueError(f"lenses는 id 1~9가 정확히 한 번씩(10은 선택, 한 번)이어야 한다(받은 id: {ids})")
+        if ids != list(range(1, 11)):
+            raise ValueError(f"lenses는 id 1~10이 정확히 한 번씩이어야 한다(받은 id: {ids})")
         axes = {"revenue_engine": self.structure.revenue_engine.value,
                 "cost_nature": self.structure.cost_nature.value,
                 "funding_source": self.structure.funding_source.value}
@@ -303,7 +303,7 @@ class LensPublishBody(BaseModel):
 def publish_report(ticker: str, body: LensPublishBody, _: str = Depends(require_admin_or_api_key)):
     """발행 — 판단 필드는 요청 본문, 데이터 블록은 서버가 최신 스냅샷에서 자동 첨부.
 
-    본문은 `format: 2`(구조 축·9렌즈)만 받는다(v1은 task#370에서 제거) — 렌즈 3·4·5·8의 계산·신호·바뀜 조건은 서버가 박제한다.
+    본문은 `format: 2`(구조 축·렌즈 1~10)만 받는다(v1은 task#370에서 제거) — 렌즈 3·4·5·8의 계산·신호·바뀜 조건은 서버가 박제한다.
     스냅샷 부재 시 409(데이터 블록 불가 — ADR-0027 발행 전제조건)."""
     upper = ticker.upper()
     snap = svc.latest_snapshot(upper)

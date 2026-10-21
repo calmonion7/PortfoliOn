@@ -28,7 +28,7 @@ const expFlips = lenses.filter(l => l.signal !== 'na' && l.flip).length;
 const gaugeLenses = lenses.filter(l => l.signal !== 'na' && (l.computed?.gauge || l.gauge));
 const condLenses = lenses.filter(l => l.signal !== 'na' && !(l.computed?.gauge || l.gauge) && l.conditions?.length);
 const JUDG = [1, 2, 6, 7, 9, 10];
-// task#393 — 렌즈 10은 task#391부터 선택이라 9렌즈(옛) 판과 10렌즈 판이 공존한다. 개수는 API에서 유도한다.
+// task#393 — 렌즈 10은 task#391에 붙고 task#392부터 새 판에 필수다. 그 이전의 9렌즈(옛) 판과 10렌즈 판이 공존한다. 개수는 API에서 유도한다.
 const N = lenses.length;
 ok('api-lens-ids', (N === 9 || N === 10) && lenses.every((l, i) => l.id === i + 1), `ids=${lenses.map(l => l.id)}`);
 const L10 = lenses.find(l => l.id === 10 && l.signal !== 'na' && l.precedents?.length);

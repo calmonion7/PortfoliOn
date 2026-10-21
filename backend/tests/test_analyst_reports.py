@@ -154,7 +154,8 @@ def _na(i):
     return {"id": i, "summary": f"렌즈{i} 요약", "body": f"렌즈{i} 본문", "na_reason": "원자료 미공시"}
 
 
-# 최소 v2 본문 — 계산 렌즈(3·4·5·8)는 na_reason만, 판단 렌즈는 세 색 조건 목록, 9는 회색
+# 최소 v2 본문 — 계산 렌즈(3·4·5·8)는 na_reason만, 판단 렌즈는 세 색 조건 목록, 9·10은 회색
+# (렌즈 10은 새 발행에 필수 — task#392)
 VALID_BODY = {
     "format": 2,
     "title": "HBM 증설이 이끄는 실적 재평가",
@@ -164,7 +165,8 @@ VALID_BODY = {
         "funding_source": {"value": "equity", "rationale": "영업현금흐름으로 증설"},
     },
     "lenses": [_judge(1), _judge(2, "go"), _na(3), _na(4), _na(5), _judge(6, "stop"), _judge(7), _na(8),
-               _judge(9, "na") | {"flip": None, "na_reason": "규제 공시 없음", "conditions": None}],
+               _judge(9, "na") | {"flip": None, "na_reason": "규제 공시 없음", "conditions": None},
+               _judge(10, "na") | {"flip": None, "na_reason": "비슷한 전례를 찾지 못함", "conditions": None}],
 }
 
 
@@ -183,7 +185,7 @@ def test_publish_ok_attaches_data_block():
     assert kw["ticker"] == "TST"
     assert kw["data"]["snapshot_date"] == "2026-07-25"
     assert kw["data"]["per_band"]["min"] == 10.0
-    assert [l["id"] for l in kw["lens_report"]["lenses"]] == list(range(1, 10))
+    assert [l["id"] for l in kw["lens_report"]["lenses"]] == list(range(1, 11))
 
 
 def test_v1_body_rejected():
@@ -240,8 +242,8 @@ def test_publish_no_snapshot_409():
 def test_publish_validation_422():
     missing = {k: v for k, v in VALID_BODY.items() if k != "title"}
     assert _publish(missing)[0].status_code == 422
-    eight = {**VALID_BODY, "lenses": VALID_BODY["lenses"][:8]}
-    assert _publish(eight)[0].status_code == 422
+    nine = {**VALID_BODY, "lenses": VALID_BODY["lenses"][:9]}
+    assert _publish(nine)[0].status_code == 422
 
 
 # ── 조회 API ──────────────────────────────────────────────────────────
