@@ -74,3 +74,26 @@ def test_common_rules_ask_reason_for_skipped_policies():
     common_section = text.split("공통 규칙", 1)[1]
     assert "수행하지 않은 정책" in common_section or "건너뛴 정책" in common_section
     assert "이유" in common_section
+
+
+def _analyst_section(text: str) -> str:
+    """'== 2) 애널리스트 리포트 …' 절 본문(다음 '== N)' 헤더 직전까지)."""
+    start = text.index("== 2) 애널리스트 리포트")
+    nxt = _SECTION_HEADER_RE.search(text, start + 1)
+    return text[start:nxt.start() if nxt else len(text)]
+
+
+def test_analyst_section_requires_lens10_with_precedents():
+    """(task#392) 심층 리포트 절이 렌즈 10을 필수로 지시한다 — 서버가 1~10을 요구하는데
+    프롬프트가 1~9를 지시하면 야간 발행이 전부 422가 된다(같은 배포로 묶는 이유)."""
+    sec = _analyst_section(_read_prompt())
+    assert "1~9" not in sec, "심층 리포트 절에 옛 렌즈 범위 1~9가 남아 있다"
+    assert "id 1~10 각 한 번씩" in sec              # ② 작성 지시
+    assert "id가 1~10 각 정확히 한 번" in sec        # 사전검증 ⓐ
+    assert "렌즈 10" in sec and "`precedents`" in sec and "`risk`" in sec
+    # 그릴링 합의 지침 — 반례 유지(할당 금지)·건수(확률 금지)·집계는 서버·na 처리
+    assert "반례" in sec and "할당" in sec
+    assert "확률(%)" in sec and "`base_rate`" in sec
+    assert "`na_reason`" in sec
+    # 본문 예시에 렌즈 10 객체가 있다
+    assert '{"id": 10,' in sec

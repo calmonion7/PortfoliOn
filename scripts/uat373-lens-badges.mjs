@@ -42,7 +42,7 @@ for (const t of TICKERS) {
     near: [...document.querySelectorAll('[data-lens-cell]')].map(c => ({ id: c.getAttribute('data-lens-cell'), near: !!c.querySelector('[data-near-boundary]') })),
   }));
   const lenses = rep.lenses || [];
-  // 렌즈 10은 task#391부터 선택 — 9렌즈(옛) 판과 10렌즈 판이 공존하므로 개수는 API에서 유도한다(task#393)
+  // 렌즈 10은 task#392부터 새 판에 필수 — 그 이전의 9렌즈(옛) 판과 10렌즈 판이 공존하므로 개수는 API에서 유도한다(task#393)
   const n = lenses.length;
   ok(`${t} reached`, (n === 9 || n === 10) && m.cells === n && m.consensus.length === n, `cells=${m.cells} details=${m.consensus.length} api=${n}`);
   // ⓐ 애널 추정치 — 박제 consensus_based와 상세 헤더 배지가 렌즈별로 일치(양·음 모두)

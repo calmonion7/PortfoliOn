@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import LensReport, { isLensReport, LENS_INFO } from '../components/reports/LensReport'
 
-// 렌즈 10 「위험의 전례」(위험 기저율, task#391) — 1부: 렌즈 10은 선택. 10렌즈 판과 9렌즈(옛) 판이 공존한다.
+// 렌즈 10 「위험의 전례」(위험 기저율, task#391) — task#392부터 새 판에 필수. 10렌즈 판과 그 이전의 9렌즈(옛) 판이 공존한다.
 const judg = (id, signal = 'wait', extra = {}) => ({ id, summary: `요약${id}`, body: `본문${id}`, metrics: [], signal,
   flip: signal === 'na' ? null : `바뀜${id}`, na_reason: signal === 'na' ? `사유${id}` : null, ...extra })
 

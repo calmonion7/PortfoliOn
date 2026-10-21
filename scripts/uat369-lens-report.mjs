@@ -28,7 +28,7 @@ const expFlips = lenses.filter(l => l.signal !== 'na' && l.flip).length;
 const gaugeLenses = lenses.filter(l => l.signal !== 'na' && (l.computed?.gauge || l.gauge));
 const condLenses = lenses.filter(l => l.signal !== 'na' && !(l.computed?.gauge || l.gauge) && l.conditions?.length);
 const JUDG = [1, 2, 6, 7, 9, 10];
-// task#393 — 렌즈 10은 task#391부터 선택이라 9렌즈(옛) 판과 10렌즈 판이 공존한다. 개수는 API에서 유도한다.
+// task#393 — 렌즈 10은 task#391에 붙고 task#392부터 새 판에 필수다. 그 이전의 9렌즈(옛) 판과 10렌즈 판이 공존한다. 개수는 API에서 유도한다.
 const N = lenses.length;
 ok('api-lens-ids', (N === 9 || N === 10) && lenses.every((l, i) => l.id === i + 1), `ids=${lenses.map(l => l.id)}`);
 const L10 = lenses.find(l => l.id === 10 && l.signal !== 'na' && l.precedents?.length);
@@ -131,7 +131,25 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     const helpBtn = page.locator('[data-lens-cell="3"] button[aria-label="벌수록 남는 구조 — 설명 보기"]');
     const nHelp = await helpBtn.count();
     let tip = '';
-    if (nHelp === 1) { await helpBtn.click(); tip = (await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 }).catch(() => '')) || ''; }
+    // 스크롤 중 레이아웃 이동으로 이웃 셀·탭바가 클릭을 순간 가로챌 수 있다(task#393 실측 — 겹침 아님, elementFromPoint는 버튼 자신)
+    // → 1회 재시도, 그래도 안 되면 프로브를 죽이지 말고 축 FAIL로 남긴다
+    // 기본은 Playwright click. 실패하면(000660 m278 — 이웃 셀·탭바가 가로챔) 가운데로 스크롤 → 정착 대기 → hit-test가
+    // 대상 자신일 때만 좌표로 탭한다(가려져 있으면 false → 축 FAIL). ⚠️ m278에서 이 폴백까지 실패하면 먼저 레이아웃 폭을 볼 것:
+    // 콘텐츠가 278보다 넓으면 모바일 에뮬레이션이 레이아웃 뷰포트를 넓혀(innerWidth 296·314) 터치 좌표가 어긋난다(task#393 실측 —
+    // 사업부문 카드·날짜 span이 밀어낸다, 렌즈 10 무관). 아래 no-h-scroll은 innerWidth 기준이라 그 넘침에 블라인드다.
+    const click = async (loc) => {
+      if (await loc.click({ timeout: 5000 }).then(() => true, () => false)) return true;
+      await loc.evaluate(e => e.scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(600);
+      const pt = await loc.evaluate(e => {
+        const r = e.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+        return e.contains(document.elementFromPoint(x, y)) ? { x, y } : null;
+      });
+      if (!pt) return false;
+      if (isMobile) await page.touchscreen.tap(pt.x, pt.y); else await page.mouse.click(pt.x, pt.y);
+      return true;
+    };
+    if (nHelp === 1 && await click(helpBtn)) { tip = (await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 }).catch(() => '')) || ''; }
     ok(`${tag} help-popover-question`, nHelp === 1 && tip.includes('벌수록 남는 구조') && tip.includes(QUESTION3), `btn=${nHelp} tip="${tip}"`);
     if (nHelp === 1) await page.keyboard.press('Escape');
     ok(`${tag} names-no-stacking`, m.nameStack.length === 0, JSON.stringify(m.nameStack));
@@ -146,7 +164,7 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     ok(`${tag} lens10-precedent-rows`, m.precRows === (L10?.precedents.length || 0), `${m.precRows} vs api ${L10?.precedents.length || 0}`);
     let expanded = '';
     const row0 = page.locator('[data-precedent="0"] button');
-    if (L10 && await row0.count() === 1) { await row0.click(); expanded = (await page.locator('[data-precedent="0"]').textContent()) || ''; }
+    if (L10 && await row0.count() === 1 && await click(row0)) { expanded = (await page.locator('[data-precedent="0"]').textContent()) || ''; }
     ok(`${tag} lens10-expand-ref`, !L10 || (expanded.includes(L10.precedents[0].ref) && (await row0.getAttribute('aria-expanded')) === 'true'), L10 ? `ref 표시=${expanded.includes(L10.precedents[0].ref)}` : '표본 0');
     ok(`${tag} lens10-no-overflow`, m.lens10Overflow === 0, `n=${m.lens10Overflow}`);
     if (L10) samples10++;

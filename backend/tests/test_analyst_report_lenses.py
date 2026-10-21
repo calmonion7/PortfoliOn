@@ -267,6 +267,7 @@ def crcl_body():
                  "endogenous": {"label": "USDC 유통량", "values": [74000, 80000, 86000], "unit": "USD M",
                                 "source": "estimate", "ref": "시나리오", "rationale": "현재 ±"}}},
             _judgment(9, "na") | {"flip": None, "na_reason": "규제 공시 없음", "conditions": None},
+            _lens10(),   # 렌즈 10은 새 발행에 필수(task#392) — 헬퍼는 아래 렌즈 10 절
         ],
     }
 
@@ -306,9 +307,9 @@ def test_v2_publish_crcl_computes_and_stores_signals():
     assert _lens(lr, 8)["flip"].startswith("forward 이익 ") and "USD M" in _lens(lr, 8)["flip"]  # 단위 병기
     for i in (3, 4, 5, 8):
         assert _lens(lr, i)["flip"]
-    # 판단 렌즈 1 wait·2 go·6 stop·7 wait·9 na + 계산 3 stop·4 go·5 wait·8 wait(3.0 ≥ 4.0−1.5)
+    # 판단 렌즈 1 wait·2 go·6 stop·7 wait·9 na·10 wait + 계산 3 stop·4 go·5 wait·8 wait(3.0 ≥ 4.0−1.5)
     assert _lens(lr, 8)["signal"] == "wait"
-    assert lr["tally"] == {"go": 2, "wait": 4, "stop": 2, "na": 1}
+    assert lr["tally"] == {"go": 2, "wait": 5, "stop": 2, "na": 1}
     assert lr["structure"]["funding_source"]["value"] == "deposit"
     assert kw["data"]["snapshot_date"] == "2026-10-06"
 
@@ -323,12 +324,12 @@ def test_v2_computed_lens_with_signal_is_422_and_without_is_201():
     assert _publish(crcl_body())[0].status_code == 201
 
 
-def test_v2_lens_ids_must_be_1_to_9_exactly_once():
+def test_v2_lens_ids_must_be_1_to_10_exactly_once():
     body = crcl_body()
-    body["lenses"] = body["lenses"][:-1]
+    body["lenses"] = [l for l in body["lenses"] if l["id"] != 9]
     assert _publish(body)[0].status_code == 422
     body = crcl_body()
-    body["lenses"][-1] = _judgment(1)
+    body["lenses"][8] = _judgment(1)                     # 렌즈 9 자리에 1 중복
     assert _publish(body)[0].status_code == 422
 
 
@@ -433,7 +434,7 @@ def test_v2_roundtrip_post_then_get_returns_stored_lens_report():
         detail = client.get(f"/api/analyst-reports/CRCL/{kw['published_date']}").json()
         listing = client.get("/api/analyst-reports/CRCL").json()
     assert detail["format"] == 2
-    assert [l["id"] for l in detail["lenses"]] == list(range(1, 10))
+    assert [l["id"] for l in detail["lenses"]] == list(range(1, 11))
     assert detail["lenses"] == kw["lens_report"]["lenses"]
     assert detail["structure"] == kw["lens_report"]["structure"]
     assert detail["tally"] == kw["lens_report"]["tally"]
@@ -936,7 +937,7 @@ def test_cached_risk_free_reads_market_cache_envelope():
         assert L.cached_risk_free_pct() is None
 
 
-# ── 렌즈 10 「위험의 전례」(위험 기저율, task#391) — 선택 렌즈: 1~9 필수, 10 선택 ────────
+# ── 렌즈 10 「위험의 전례」(위험 기저율, task#391) — 새 발행은 1~10 각 정확히 한 번(task#392 필수화) ──
 
 def _prec(outcome="realized", case="2001 닷컴 붕괴", **kw):
     return {"case": case, "period": "2000~2002", "outcome": outcome,
@@ -954,16 +955,42 @@ def _lens10(signal="wait", **kw):
 
 def _with_lens10(**kw):
     body = crcl_body()
-    body["lenses"].append(_lens10(**kw))
+    body["lenses"][-1] = _lens10(**kw)   # crcl_body의 렌즈 10을 갈아끼운다
     return body
 
 
-def test_lens10_nine_lens_publish_still_201():
-    # ⓐ 렌즈 10은 선택 — 9개 판은 그대로 발행된다(1부 계약)
+def test_lens10_required_nine_lens_publish_is_422():
+    # ⓐ 2부 계약(task#392) — 렌즈 1~9만 보낸 새 발행은 422이고 아무것도 저장하지 않는다
+    nine = crcl_body()
+    nine["lenses"] = [l for l in nine["lenses"] if l["id"] != 10]
+    resp, mock_save = _publish(nine)
+    assert resp.status_code == 422, resp.text
+    mock_save.assert_not_called()
+
+
+def test_lens10_required_ten_lens_publish_is_201():
+    # ⓑ 대조군 — 같은 본문에 렌즈 10이 있으면 201(음성만 두면 제약이 없어도 통과한다)
     resp, mock_save = _publish(crcl_body())
     assert resp.status_code == 201, resp.text
-    lr = mock_save.call_args.kwargs["lens_report"]
-    assert [l["id"] for l in lr["lenses"]] == list(range(1, 10))
+    assert [l["id"] for l in mock_save.call_args.kwargs["lens_report"]["lenses"]] == list(range(1, 11))
+
+
+def test_lens10_required_old_nine_lens_version_still_readable():
+    # ⓒ 필수화는 발행 검증에서만 — 렌즈 10 이전에 저장된 9렌즈 판은 조회가 그대로 200(옛 판 읽기 무회귀)
+    lr = _publish(crcl_body())[1].call_args.kwargs["lens_report"]
+    old = {**lr, "lenses": [l for l in lr["lenses"] if l["id"] != 10],
+           "tally": {"go": 2, "wait": 4, "stop": 2, "na": 1}}
+    row = {"ticker": "CRCL", "published_date": "2026-10-01", "rating": None, "title": "옛 9렌즈 판",
+           "fair_value_low": None, "fair_value_high": None, "valuation_method": "", "points": [],
+           "risks": "", "data": {}, "lens_report": old}
+    with patch.object(svc, "query", return_value=[row]):
+        detail = client.get("/api/analyst-reports/CRCL/2026-10-01")
+        listing = client.get("/api/analyst-reports/CRCL")
+    assert detail.status_code == 200 and listing.status_code == 200
+    d = detail.json()
+    assert [l["id"] for l in d["lenses"]] == list(range(1, 10))
+    assert all("base_rate" not in l for l in d["lenses"])
+    assert listing.json()["reports"][0]["tally"] == {"go": 2, "wait": 4, "stop": 2, "na": 1}
 
 
 def test_lens10_ten_lens_publish_stores_server_base_rate():
@@ -979,9 +1006,8 @@ def test_lens10_ten_lens_publish_stores_server_base_rate():
     # 판단 렌즈 — 신호는 루틴 값 그대로, 집계(tally)에 포함된다
     assert l10["signal"] == "wait"
     assert lr["tally"] == {"go": 2, "wait": 5, "stop": 2, "na": 1}
-    # 렌즈 10이 없는 판에는 base_rate 필드 자체가 없다
-    nine = _publish(crcl_body())[1].call_args.kwargs["lens_report"]
-    assert all("base_rate" not in l for l in nine["lenses"])
+    # 렌즈 10 외 렌즈에는 base_rate 필드 자체가 없다(렌즈 10이 없는 옛 판은 ⓒ 조회 테스트)
+    assert all("base_rate" not in l for l in lr["lenses"] if l["id"] != 10)
 
 
 def test_lens10_base_rate_counts_skewed_outcomes():
