@@ -5,14 +5,14 @@ import { SectionTitle } from './reportUtils.jsx'
 import { GlossaryText, GlossaryTerm } from '../Glossary.jsx'
 
 // 심층 리포트 v2 — 구조 축·렌즈 틀 (ADR 261006-232406, task#369). 렌즈 10은 task#391에 추가(그 전 판은 9개).
-// 순서: 한줄 논지 → 렌즈 신호(집계 + 렌즈별 신호·바뀜 조건 게이지 한 행, 번호 순) → 구조 축 → 렌즈 상세 → (서버 숫자 블록은 호출측)
+// 순서: 한줄 논지 → 렌즈 신호(집계 + 렌즈별 신호·바뀜 조건 게이지 한 행, 번호 순 — 상세는 그 행 안에서 펼친다, task#398) → 구조 축 → (서버 숫자 블록은 호출측)
 // 투자의견·적정주가가 없다 — 판단 근거는 렌즈 신호다. 계산 렌즈(3·4·5·8)의 숫자·색·바뀜 조건은 서버가 박제한 값을
 // 그대로 그린다(프론트가 재계산하지 않는다 — 출처가 하나여야 같은 상황에 같은 색이 나온다).
 
 // 분기 게이트 — 픽스처가 이 분기를 실제로 타는지 테스트가 직접 단언한다(task#301 교훈).
 export const isLensReport = (r) => r?.format === 2 && Array.isArray(r.lenses) && r.lenses.length > 0
 
-// 렌즈 화면 표시명(일반인 말) + 「이 렌즈가 묻는 것」 — 두 렌더 위치(신호 행·상세 헤더)가 같은 소스를 읽는다(task#372).
+// 렌즈 화면 표시명(일반인 말) + 「이 렌즈가 묻는 것」 — 신호 행이 읽는다(task#372. 상세 헤더는 task#398에 신호 행으로 합쳐졌다).
 // 루틴 프롬프트·API 문서는 전문 이름을 유지한다(렌즈는 번호로 식별).
 export const LENS_INFO = {
   1: { name: '숫자의 신뢰도', question: '이 숫자는 몇 번 가공된 건가, 믿을 만한가' },
@@ -236,8 +236,12 @@ function FlipConditions({ conditions, signal }) {
   )
 }
 
-// 렌즈 신호 + 바뀜 조건을 한 행에(task#369 UAT 피드백): 번호·이름·신호 → 요약 → 게이지(수치형) 또는 조건 목록(비수치형) 또는 문장(구조화 이전)
-function SignalList({ lenses }) {
+// 렌즈 신호 + 바뀜 조건 + 상세를 한 행에(task#369 UAT 피드백 → task#398): 머리[번호·이름·?·신호 / 배지] → 요약 →
+// 렌즈 10 위험·막대 또는 게이지(수치형) 또는 조건 목록(비수치형) 또는 문장(구조화 이전) → 「상세」 → (펼치면) 수치·사례·본문·서버 계산·원자료
+// 펼칠 내용이 있는지 — 없으면(미산출 렌즈 등) 「상세」 버튼을 그리지 않는다
+const hasDetail = (l) => !!(l.metrics?.length || l.body || l.computed || Object.keys(l.inputs || {}).length || (l.id === 10 && l.precedents?.length))
+
+function SignalList({ lenses, open, onToggle }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
       {lenses.map(l => {
@@ -246,21 +250,36 @@ function SignalList({ lenses }) {
         const g = l.computed?.gauge ?? l.gauge
         const origin = g?.origin ?? (l.computed?.gauge ? 'server' : 'routine')
         const conds = !g && l.conditions?.length ? l.conditions : null
+        const isOpen = open.has(l.id)
+        const detailId = `lensdetail-${l.id}`
+        // 배지는 신호 색이 어디서 왔는지 알려 주는 단서라 접힌 상태에서도 보인다 — 신호 옆이 아니라 머리 둘째 줄에 둔다:
+        // 한 줄에 넣으면 좁은 폭에서 배지 수·이름 길이에 따라 행마다 줄바꿈 위치가 갈린다(frontend/CLAUDE.md task#394)
+        const est = l.computed?.estimate_based, cons = l.computed?.consensus_based
         return (
           <div key={l.id} data-lens-cell={l.id}
-               style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderLeft: `3px solid ${sig(l.signal).color}`, borderRadius: 6, padding: '10px 12px' }}>
-            {/* 「?」 버튼은 링크 밖에 둔다 — 링크 안의 버튼은 대화형 요소 중첩이고, 탭이 상세로 이동해 버린다 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, minHeight: 32 }}>
-              <a href={`#lens-${l.id}`} data-lens-name={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none', minWidth: 0, minHeight: 32 }}>
-                <span className="mono tnum" style={{ ...smallCap, fontWeight: 700 }}>{l.id}</span>
-                <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 700, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{LENS_INFO[l.id]?.name}</span>
-              </a>
-              <LensHelp id={l.id} />
-              <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-2, var(--text))', flexShrink: 0 }}>
-                <SignalDot signal={l.signal} />{sig(l.signal).label}
-              </span>
+               style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderLeft: `3px solid ${sig(l.signal).color}`, borderRadius: 6, padding: '10px 12px 0' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2, minHeight: 32 }}>
+                <span data-lens-name={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, minHeight: 32 }}>
+                  <span className="mono tnum" style={{ ...smallCap, fontWeight: 700 }}>{l.id}</span>
+                  <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 700, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{LENS_INFO[l.id]?.name}</span>
+                </span>
+                <LensHelp id={l.id} />
+                <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-2, var(--text))', flexShrink: 0 }}>
+                  <SignalDot signal={l.signal} />{sig(l.signal).label}
+                </span>
+              </div>
+              {(est || cons) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, wordBreak: 'keep-all', marginBottom: 2 }}>
+                  {est && <Badge variant="warning">추정 기반</Badge>}
+                  {/* 애널 추정치(task#371) — 루틴 자체 추정과 별개, 둘 다면 둘 다 */}
+                  {cons && <Badge variant="info">애널 추정치</Badge>}
+                </div>
+              )}
             </div>
             <div style={{ color: 'var(--text-2, var(--text))', fontSize: 12.5, lineHeight: 1.55, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{l.summary}</div>
+            {/* 렌즈 10의 대상 위험·기저율 막대는 다른 렌즈의 게이지와 같은 역할이라 접힘에서도 보인다(사례 목록만 펼침) */}
+            {l.id === 10 && l.precedents?.length > 0 && <BaseRateHead lens={l} />}
             {l.signal !== 'na' && g && <FlipGauge gauge={g} signal={l.signal} origin={origin} />}
             {l.signal !== 'na' && conds && <FlipConditions conditions={conds} signal={l.signal} />}
             {l.signal !== 'na' && l.flip && !conds && (
@@ -271,6 +290,16 @@ function SignalList({ lenses }) {
             {l.signal === 'na' && l.na_reason && (
               <div style={{ ...smallCap, marginTop: 6 }}>미산출 사유: {l.na_reason}</div>
             )}
+            {hasDetail(l) ? (
+              <>
+                <button type="button" data-lens-detail-toggle={l.id} aria-expanded={isOpen} aria-controls={detailId} onClick={() => onToggle(l.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', minHeight: 44, padding: 0, marginTop: 2,
+                                 background: 'none', border: 'none', color: 'var(--text-2, var(--text))', font: 'inherit', fontSize: 12, fontWeight: 600, textAlign: 'left', cursor: 'pointer' }}>
+                  상세 <span aria-hidden="true" style={{ fontSize: 13 }}>{isOpen ? '⌃' : '⌄'}</span>
+                </button>
+                {isOpen && <ExpandedDetail lens={l} id={detailId} />}
+              </>
+            ) : <div style={{ height: 10 }} />}
           </div>
         )
       })}
@@ -404,7 +433,7 @@ function splitNote(note) {
   return out
 }
 
-// 렌즈 10 상세 — 대상 위험 → 기저율 비율 막대 + 건수 캡션 → 사례 목록(행을 누르면 같은 점·다른 점·출처)
+// 렌즈 10 사례 행 — 신호 행을 펼치면 보이는 사례 목록의 한 줄(행을 누르면 같은 점·다른 점·출처)
 // 행 머리는 폭과 무관하게 2줄 고정: [제목 + 펼침 화살표] / [결과 배지 + 기간] — 줄바꿈 위치를 flex-wrap에 맡기지 않는다(task#395)
 function PrecedentRow({ p, i }) {
   const [open, setOpen] = useState(false)
@@ -438,11 +467,12 @@ function PrecedentRow({ p, i }) {
   )
 }
 
-function BaseRate({ lens }) {
+// 렌즈 10 위험·기저율 — 신호 행의 접힌 부분(대상 위험 + 비율 막대·건수 캡션). 사례 목록은 펼침 안(PrecedentList)
+function BaseRateHead({ lens }) {
   const br = lens.base_rate
   const counts = OUTCOMES.map(k => [k, br?.[k] || 0]).filter(([, n]) => n > 0)
   return (
-    <div data-base-rate="" style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '10px 0' }}>
+    <div data-base-rate="" style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '10px 0 2px' }}>
       {lens.risk && (
         <div data-lens10-risk="" style={{ padding: '8px 10px', background: 'var(--bg-elev-2)', borderRadius: 6 }}>
           <div style={smallCap}>대상 위험</div>
@@ -460,40 +490,34 @@ function BaseRate({ lens }) {
           </div>
         </div>
       )}
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {lens.precedents.map((p, i) => <PrecedentRow key={i} p={p} i={i} />)}
-      </ul>
     </div>
   )
 }
 
-function LensDetail({ lens }) {
-  const m = sig(lens.signal)
+// 신호 행의 펼침 영역 — 요약은 행 머리에 이미 있으므로 다시 그리지 않는다(task#398)
+function ExpandedDetail({ lens, id }) {
   return (
-    <Card padding="md" id={`lens-${lens.id}`} style={{ scrollMarginTop: 80, borderLeft: `3px solid ${m.color}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span className="mono tnum" style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>{lens.id}</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-          <span data-lens-detail-name={lens.id} style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, wordBreak: 'keep-all' }}>{LENS_INFO[lens.id]?.name}</span>
-          <LensHelp id={lens.id} />
-        </span>
-        <Badge variant={m.variant}>{m.label}</Badge>
-        {lens.computed?.estimate_based && <Badge variant="warning">추정 기반</Badge>}
-        {/* 애널 추정치(task#371) — 루틴 자체 추정과 별개, 둘 다면 둘 다 */}
-        {lens.computed?.consensus_based && <Badge variant="info">애널 추정치</Badge>}
-      </div>
-      <div style={{ color: 'var(--text)', fontWeight: 600, fontSize: 13, margin: '8px 0 4px', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{lens.summary}</div>
+    <div id={id} data-lens-detail={lens.id} style={{ borderTop: '1px solid var(--border)', padding: '6px 0 12px' }}>
       <Metrics metrics={lens.metrics} />
-      {lens.id === 10 && lens.precedents?.length > 0 && <BaseRate lens={lens} />}
-      <p style={textStyle}><GlossaryText text={lens.body} /></p>
+      {lens.id === 10 && lens.precedents?.length > 0 && (
+        <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0 }}>
+          {lens.precedents.map((p, i) => <PrecedentRow key={i} p={p} i={i} />)}
+        </ul>
+      )}
+      {lens.body && <p style={textStyle}><GlossaryText text={lens.body} /></p>}
       <ComputedBlock lens={lens} />
       <InputsTable inputs={lens.inputs} />
-    </Card>
+    </div>
   )
 }
 
 export default function LensReport({ report }) {
   const lenses = [...report.lenses].sort((a, b) => a.id - b.id)
+  // 펼친 렌즈 id 집합 — 행 토글과 「모두 펼치기」가 같은 상태를 쓴다. 기억하지 않는다(새로 들어오면 전부 접힘)
+  const [open, setOpen] = useState(() => new Set())
+  const expandable = lenses.filter(hasDetail).map(l => l.id)
+  const allOpen = expandable.length > 0 && expandable.every(id => open.has(id))
+  const toggle = (id) => setOpen(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   return (
     <>
       <blockquote style={{ margin: '18px 0 22px', padding: '4px 0 4px 16px', borderLeft: '3px solid var(--accent)' }}>
@@ -502,15 +526,16 @@ export default function LensReport({ report }) {
         </p>
       </blockquote>
 
-      <SectionTitle>렌즈 신호</SectionTitle>
+      <SectionTitle right={expandable.length > 0 && (
+        <button type="button" data-lens-expand-all="" onClick={() => setOpen(allOpen ? new Set() : new Set(expandable))}
+                style={{ marginLeft: 'auto', minHeight: 44, padding: '0 4px', background: 'none', border: 'none', color: 'var(--text-2, var(--text))',
+                         font: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {allOpen ? '모두 접기' : '모두 펼치기'}
+        </button>
+      )}>렌즈 신호</SectionTitle>
       <Tally tally={report.tally} lenses={lenses} />
-      <SignalList lenses={lenses} />
+      <SignalList lenses={lenses} open={open} onToggle={toggle} />
       <StructureAxes structure={report.structure} />
-
-      <SectionTitle>렌즈 상세</SectionTitle>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
-        {lenses.map(l => <LensDetail key={l.id} lens={l} />)}
-      </div>
     </>
   )
 }
