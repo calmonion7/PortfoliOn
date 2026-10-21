@@ -1,4 +1,5 @@
 // task#369 라이브 UAT — 심층 리포트 v2(구조 축·9렌즈) 화면. task#372: 렌즈 표시명·「?」 설명·m278 추가. read-only(GET만), 쓰기 0.
+// task#398: 「렌즈 상세」 절이 없어지고 상세는 신호 행 안에서 펼친다 — 접힘 기본을 먼저 재고, 「모두 펼치기」 뒤 펼침 소속·넘침을 잰다.
 // 대상: 최신 발행물이 format 2인 종목(기본 CRCL, TICKER 환경변수로 변경). 기대값은 전부 API 응답에서 유도한다.
 // 축 순서: ⓐ 대상에 닿았다(reached) → ⓑ identity(제목·신호 라벨이 API와 같다) → ⓒ 판정축.
 // 「FAIL 0」만 보지 말고 단언 총계도 볼 것 — 총계가 기대치(뷰포트×테마×축)보다 작으면 미실행이다.
@@ -34,6 +35,11 @@ const N = lenses.length;
 ok('api-lens-ids', (N === 9 || N === 10) && lenses.every((l, i) => l.id === i + 1), `ids=${lenses.map(l => l.id)}`);
 const L10 = lenses.find(l => l.id === 10 && l.signal !== 'na' && l.precedents?.length);
 const OUTC = ['realized', 'partial', 'not_realized'];
+// task#398 — 「상세」 버튼은 펼칠 내용이 있는 렌즈에만 있다(화면 hasDetail과 같은 정의)
+const hasDetail = l => !!(l.metrics?.length || l.body || l.computed || Object.keys(l.inputs || {}).length || (l.id === 10 && l.precedents?.length));
+const expToggles = lenses.filter(hasDetail).map(l => String(l.id));
+const expBadges = { est: lenses.filter(l => l.computed?.estimate_based).length, cons: lenses.filter(l => l.computed?.consensus_based).length };
+const squash = t => (t || '').replace(/\s+/g, '');
 const OUT_LABEL = { realized: '현실화', partial: '부분 현실화', not_realized: '비현실화' };
 ok('api-lens10-base-rate', !L10 || (L10.precedents.length >= 2 && L10.precedents.length <= 5 && L10.base_rate?.total === L10.precedents.length
   && OUTC.every(o => (L10.base_rate[o] || 0) === L10.precedents.filter(p => p.outcome === o).length)),
@@ -98,23 +104,30 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
         }, 0),
         theme: html.getAttribute('data-theme') || 'light',
         rowNames: [...document.querySelectorAll('[data-lens-name]')].map(e => e.textContent.replace(/^\d+/, '')),
-        detailNames: [...document.querySelectorAll('[data-lens-detail-name]')].map(e => e.textContent),
         helpBtns: [...document.querySelectorAll('button[aria-label$="— 설명 보기"]')].map(e => { const r = e.getBoundingClientRect(); return { w: r.width, h: r.height }; }),
         // 낱자 세로 적층 감지 — 이름 상자의 폭이 글자 2개 폭보다 좁거나, 줄 수가 2를 넘으면 적층/과도 줄바꿈
-        nameStack: [...document.querySelectorAll('[data-lens-name] > span:last-child, [data-lens-detail-name]')].map(e => {
+        nameStack: [...document.querySelectorAll('[data-lens-name] > span:last-child')].map(e => {
           const cs = getComputedStyle(e), fs = parseFloat(cs.fontSize), lh = parseFloat(cs.lineHeight) || fs * 1.5, r = e.getBoundingClientRect();
           return { name: e.textContent, narrow: r.width < fs * 2, lines: Math.round(r.height / lh) };
         }).filter(x => x.narrow || x.lines > 2),
         headerOverflow: [...document.querySelectorAll('[data-lens-cell] > div:first-child')].map(e => e.scrollWidth - e.clientWidth).filter(v => v > 0).length,
         // task#393 렌즈 10 표면
         absent10: document.querySelectorAll('[data-lens10-absent]').length,
-        detail10: !!document.querySelector('#lens-10'),
+        detail10: !!document.querySelector('[data-lens-cell="10"]'),
         bars: document.querySelectorAll('[data-base-rate-bar]').length,
         segs: [...document.querySelectorAll('[data-base-rate-bar] [data-outcome-seg]')].map(e => e.getAttribute('data-outcome-seg')),
         caption: document.querySelector('[data-base-rate-caption]')?.textContent || '',
         risk10: document.querySelector('[data-lens10-risk]')?.textContent || '',
         precRows: document.querySelectorAll('[data-precedent]').length,
-        lens10Overflow: [...document.querySelectorAll('#lens-10, #lens-10 *')].filter(e => e.scrollWidth - e.clientWidth > 1 && getComputedStyle(e).display !== 'inline').length,
+        // ── task#398 접힘 기본 ──
+        toggles: [...document.querySelectorAll('[data-lens-detail-toggle]')].map(t => ({ id: t.getAttribute('data-lens-detail-toggle'), tag: t.tagName,
+          exp: t.getAttribute('aria-expanded'), h: t.getBoundingClientRect().height, owner: t.closest('[data-lens-cell]')?.getAttribute('data-lens-cell') })),
+        expandAll: (() => { const t = document.querySelector('[data-lens-expand-all]'); return t ? { text: t.textContent.trim(), h: t.getBoundingClientRect().height } : null; })(),
+        details: document.querySelectorAll('[data-lens-detail]').length,
+        headBadges: cells.map(c => { const bs = [...(c.firstElementChild?.querySelectorAll('.badge') || [])].map(e => e.textContent.trim());
+          return { id: c.getAttribute('data-lens-cell'), est: bs.filter(x => x === '추정 기반').length, cons: bs.filter(x => x === '애널 추정치').length }; }),
+        lensAnchors: document.querySelectorAll('a[href^="#lens-"], [id^="lens-"]').length,
+        oldDetailTitle: [...document.querySelectorAll('.rpt-title__text')].filter(e => e.textContent.includes('렌즈 상세')).length,
       };
     }, viewport.width);
     ok(`${tag} theme-applied`, m.theme === scheme, `data-theme=${m.theme}`);
@@ -144,9 +157,8 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     ok(`${tag} gauge-labels-no-overlap`, m.labelOverlaps === 0, `겹침 ${m.labelOverlaps}쌍`);
     // ── task#372 렌즈 표시명·「?」 ──
     ok(`${tag} lens-names-row`, JSON.stringify(m.rowNames) === JSON.stringify(NAMES), m.rowNames.join('|'));
-    ok(`${tag} lens-names-detail`, JSON.stringify(m.detailNames) === JSON.stringify(NAMES), m.detailNames.join('|'));
-    // 대상 도달 축 — 0건 클릭이 조용히 통과하지 않게(task#358) 버튼 개수를 먼저 단언한다
-    ok(`${tag} help-buttons-reached`, m.helpBtns.length === N * 2, `n=${m.helpBtns.length} vs ${N * 2}`);
+    // 대상 도달 축 — 0건 클릭이 조용히 통과하지 않게(task#358) 버튼 개수를 먼저 단언한다. 상세 헤더가 없어져 신호 행 한 곳뿐(task#398)
+    ok(`${tag} help-buttons-reached`, m.helpBtns.length === N, `n=${m.helpBtns.length} vs ${N}`);
     ok(`${tag} help-tap-32`, m.helpBtns.length > 0 && m.helpBtns.every(x => x.h >= 32 && x.w >= 32), `min h=${Math.min(...m.helpBtns.map(x => x.h))} w=${Math.min(...m.helpBtns.map(x => x.w))}`);
     const helpBtn = page.locator('[data-lens-cell="3"] button[aria-label="벌수록 남는 구조 — 설명 보기"]');
     const nHelp = await helpBtn.count();
@@ -174,19 +186,66 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
     if (nHelp === 1) await page.keyboard.press('Escape');
     ok(`${tag} names-no-stacking`, m.nameStack.length === 0, JSON.stringify(m.nameStack));
     ok(`${tag} lens-header-no-overflow`, m.headerOverflow === 0, `n=${m.headerOverflow}`);
-    // ── task#393 렌즈 10 — 9렌즈 판은 안내 한 줄, 10렌즈 판은 상세 카드. 사례 있는 판은 막대·캡션·행이 API 집계와 같다 ──
+    // ── task#398 ① 접힘 기본 · ③ 배지 위치 · ④ 탭 높이 — 「렌즈 상세」 절·앵커가 없고, 상세 버튼은 제 행 안에 전부 접힌 채 ──
+    ok(`${tag} no-detail-section`, m.oldDetailTitle === 0 && m.lensAnchors === 0, `title=${m.oldDetailTitle} anchors=${m.lensAnchors}`);
+    ok(`${tag} collapsed-default`, expToggles.length > 0 && JSON.stringify(m.toggles.map(t => t.id)) === JSON.stringify(expToggles)
+      && m.toggles.every(t => t.tag === 'BUTTON' && t.exp === 'false' && t.owner === t.id) && m.details === 0,
+      `toggles=${m.toggles.map(t => `${t.id}:${t.exp}`).join(',')} vs api ${expToggles} details=${m.details}`);
+    ok(`${tag} toggle-tap-44`, m.toggles.length > 0 && m.toggles.every(t => t.h >= 44) && (m.expandAll?.h || 0) >= 44,
+      `min toggle h=${Math.min(...m.toggles.map(t => t.h))} expandAll h=${m.expandAll?.h}`);
+    const badgeBad = lenses.filter(l => { const hb = m.headBadges.find(x => x.id === String(l.id)); return !hb || hb.est !== (l.computed?.estimate_based ? 1 : 0) || hb.cons !== (l.computed?.consensus_based ? 1 : 0); }).map(l => l.id);
+    ok(`${tag} badges-in-head`, badgeBad.length === 0, `불일치 ${badgeBad.join(',') || '없음'} · 표본 추정 기반 ${expBadges.est} · 애널 추정치 ${expBadges.cons}${expBadges.est + expBadges.cons === 0 ? ' — 표본 없음(미검증)' : ''}`);
+    // ── 「모두 펼치기」 → ② 펼침 소속(내용이 제 행의 자손 + 상자 ⊂ 행 상자) · ⑤ 펼친 상태 넘침 0 ──
+    const expBtn = page.locator('[data-lens-expand-all]');
+    const expClicked = await expBtn.count() === 1 && await click(expBtn);
+    await page.waitForTimeout(300);
+    const e = await page.evaluate((W) => {
+      const inScroller = el => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowX)) return true; return false; };
+      return {
+        expandAllText: document.querySelector('[data-lens-expand-all]')?.textContent.trim(),
+        open: [...document.querySelectorAll('[data-lens-detail-toggle]')].filter(t => t.getAttribute('aria-expanded') === 'true').map(t => t.getAttribute('data-lens-detail-toggle')),
+        dets: [...document.querySelectorAll('[data-lens-detail]')].map(d => {
+          const c = d.closest('[data-lens-cell]'), cr = c?.getBoundingClientRect(), dr = d.getBoundingClientRect();
+          return { id: d.getAttribute('data-lens-detail'), owner: c?.getAttribute('data-lens-cell') || null, h: dr.height, text: d.textContent,
+            inside: !!c && dr.left >= cr.left - 0.5 && dr.right <= cr.right + 0.5 && dr.top >= cr.top - 0.5 && dr.bottom <= cr.bottom + 0.5 };
+        }),
+        summaryCounts: [...document.querySelectorAll('[data-lens-cell]')].map(c => ({ id: c.getAttribute('data-lens-cell'), text: c.textContent })),
+        innerWidth: window.innerWidth, scrollWidth: document.documentElement.scrollWidth,
+        beyond: [...document.querySelectorAll('body *')].filter(el => { const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && r.right > W + 0.5 && getComputedStyle(el).visibility !== 'hidden' && !inScroller(el); }).length,
+        rowOverflow: [...document.querySelectorAll('[data-lens-cell]')].map(c => c.scrollWidth - c.clientWidth).filter(v => v > 0).length,
+        headerOverflow: [...document.querySelectorAll('[data-lens-cell] > div:first-child')].map(el => el.scrollWidth - el.clientWidth).filter(v => v > 0).length,
+      };
+    }, viewport.width);
+    ok(`${tag} expand-all`, expClicked && JSON.stringify(e.open) === JSON.stringify(expToggles) && e.expandAllText === '모두 접기', `clicked=${expClicked} open=${e.open} label=${e.expandAllText}`);
+    const detBad = e.dets.filter(d => d.owner !== d.id || !d.inside || d.h <= 0).map(d => `${d.id}:owner=${d.owner},inside=${d.inside},h=${Math.round(d.h)}`);
+    ok(`${tag} expanded-in-own-row`, e.dets.length === expToggles.length && detBad.length === 0, `dets=${e.dets.length} bad=${detBad.join('|') || '없음'}`);
+    // 본문이 그 행의 펼침 영역 안에 있다(identity — 빈 상자가 소속만 맞고 통과하지 않게)
+    const bodyBad = lenses.filter(l => l.body && !squash(e.dets.find(d => d.id === String(l.id))?.text).includes(squash(l.body).slice(0, 40))).map(l => l.id);
+    ok(`${tag} expanded-body-identity`, bodyBad.length === 0, `본문 불일치 ${bodyBad.join(',') || '없음'} (본문 있는 렌즈 ${lenses.filter(l => l.body).length})`);
+    // 요약은 행마다 한 번(상세 머리의 중복 제거)
+    const sumBad = lenses.filter(l => l.summary && (e.summaryCounts.find(c => c.id === String(l.id))?.text.split(l.summary).length - 1) !== 1).map(l => l.id);
+    ok(`${tag} summary-once`, sumBad.length === 0, `중복·누락 ${sumBad.join(',') || '없음'}`);
+    ok(`${tag} expanded-no-overflow`, e.innerWidth === viewport.width && e.scrollWidth <= viewport.width && e.beyond === 0 && e.rowOverflow === 0 && e.headerOverflow === 0,
+      `innerWidth=${e.innerWidth} scrollWidth=${e.scrollWidth} beyond=${e.beyond} row=${e.rowOverflow} head=${e.headerOverflow}`);
+    if (scheme === 'light') await page.screenshot({ path: `${OUT}/${TICKER}-${tag}-expanded.png`, fullPage: true });
+    // ── task#393 렌즈 10 — 9렌즈 판은 안내 한 줄, 10렌즈 판은 렌즈 10 행. 사례 있는 판은 막대·캡션·행이 API 집계와 같다 ──
     ok(`${tag} lens10-presence`, N === 10 ? (m.absent10 === 0 && m.detail10) : (m.absent10 === 1 && !m.detail10), `N=${N} absent=${m.absent10} detail=${m.detail10}`);
     const br = L10?.base_rate;
     ok(`${tag} lens10-base-rate`, L10
       ? m.bars === 1 && JSON.stringify(m.segs) === JSON.stringify(OUTC.filter(o => br[o] > 0))
         && m.caption.includes(`전례 ${br.total}건`) && OUTC.every(o => m.caption.includes(`${OUT_LABEL[o]} ${br[o] || 0}`)) && m.risk10.includes(L10.risk)
       : m.bars === 0, `bars=${m.bars} segs=${m.segs} caption="${m.caption}"`);
-    ok(`${tag} lens10-precedent-rows`, m.precRows === (L10?.precedents.length || 0), `${m.precRows} vs api ${L10?.precedents.length || 0}`);
+    // 사례 목록은 펼침 안(task#398) — 접힘에선 0, 펼친 뒤엔 API 수와 같고 전부 렌즈 10 행의 자손
+    const precOpen = await page.evaluate(() => ({ n: document.querySelectorAll('[data-precedent]').length, in10: document.querySelectorAll('[data-lens-cell="10"] [data-precedent]').length }));
+    ok(`${tag} lens10-precedent-rows`, m.precRows === 0 && precOpen.n === (L10?.precedents.length || 0) && precOpen.in10 === precOpen.n,
+      `접힘 ${m.precRows} · 펼침 ${precOpen.n}(렌즈 10 행 안 ${precOpen.in10}) vs api ${L10?.precedents.length || 0}`);
     let expanded = '';
     const row0 = page.locator('[data-precedent="0"] button');
     if (L10 && await row0.count() === 1 && await click(row0)) { expanded = (await page.locator('[data-precedent="0"]').textContent()) || ''; }
     ok(`${tag} lens10-expand-ref`, !L10 || (expanded.includes(L10.precedents[0].ref) && (await row0.getAttribute('aria-expanded')) === 'true'), L10 ? `ref 표시=${expanded.includes(L10.precedents[0].ref)}` : '표본 0');
-    ok(`${tag} lens10-no-overflow`, m.lens10Overflow === 0, `n=${m.lens10Overflow}`);
+    const lens10Overflow = await page.evaluate(() => [...document.querySelectorAll('[data-lens-cell="10"], [data-lens-cell="10"] *')].filter(el => el.scrollWidth - el.clientWidth > 1 && getComputedStyle(el).display !== 'inline').length);
+    ok(`${tag} lens10-no-overflow`, lens10Overflow === 0, `n=${lens10Overflow}`);
     // ── task#395 사례 행 모양 — 넘침 축이 못 보는 「행마다 줄바꿈이 갈림」. 모든 행이 [제목+화살표] / [배지+기간] 2줄이고
     //    제목이 낱자로 눌리지 않는다. 행 1도 펼쳐 2행 펼침 스크린샷을 남기고, 펼친 행의 note 분리를 API note 표지와 대조한다 ──
     const row1 = page.locator('[data-precedent="1"] button');
@@ -216,5 +275,5 @@ for (const [vp, viewport, isMobile] of VIEWPORTS) {
 await b.close();
 // 표본 0이면 렌즈 10 축은 통과가 아니라 미검증이다(task#318)
 console.log(`표본 lens10(사례 있는 판 × 컨텍스트)=${samples10}${samples10 === 0 ? ' — 미검증' : ''} · 렌즈 수 N=${N}`);
-console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${6 + VIEWPORTS.length * 2 * 32})`);
+console.log(`단언 총계 ${pass + fail} · PASS ${pass} · FAIL ${fail} (기대 총계 ${6 + VIEWPORTS.length * 2 * 40})`);
 process.exit(fail ? 1 : 0);

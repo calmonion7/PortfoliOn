@@ -207,9 +207,9 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     const { container } = renderPage()
     await screen.findByText('한줄 논지 테스트')
     expect(screen.getByText('🧩 사업부문 시장 분석')).toBeTruthy()
-    // 렌즈 본문(렌즈 상세) 다음 · 발행 시점 숫자 앞 위치 확인
+    // 렌즈 블록(렌즈 신호 — 상세는 그 행 안, task#398) 다음 · 발행 시점 숫자 앞 위치 확인
     const titles = [...container.querySelectorAll('.rpt-title__text')].map(el => el.textContent)
-    const pointsIdx = titles.findIndex(t => t.includes('렌즈 상세'))
+    const pointsIdx = titles.findIndex(t => t.includes('렌즈 신호'))
     const segIdx = titles.findIndex(t => t.includes('사업부문 시장 분석'))
     const valIdx = titles.findIndex(t => t.includes('발행 시점 숫자'))
     expect(pointsIdx).toBeGreaterThanOrEqual(0)
@@ -336,7 +336,7 @@ describe('v2 렌즈 판 렌더 (task#369)', () => {
     expect(isLensReport({ ...V2_REPORT, lenses: [] })).toBe(false)
   })
 
-  it('논지 → 렌즈 신호(집계 + 렌즈별 신호·바뀜 조건 한 행) → 구조 축 → 렌즈 상세 순서, 투자의견·포인트 없음', async () => {
+  it('논지 → 렌즈 신호(집계 + 렌즈별 신호·바뀜 조건 한 행) → 구조 축 순서, 「렌즈 상세」 절 없음(task#398), 투자의견·포인트 없음', async () => {
     api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? V2_REPORT : { reports: [] } }))
     const { container } = render(
       <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
@@ -347,7 +347,8 @@ describe('v2 렌즈 판 렌더 (task#369)', () => {
     expect(screen.queryByText('중립')).toBeNull()             // rating=null이 「중립」으로 오표시되지 않는다
     expect(screen.queryByText('투자 포인트')).toBeNull()
     const text = container.textContent
-    const order = ['금리 의존 구조 그대로', '렌즈 신호', '구조 축', '렌즈 상세']
+    const order = ['금리 의존 구조 그대로', '렌즈 신호', '구조 축']
+    expect(text).not.toContain('렌즈 상세')   // 상세는 신호 행 안에서 펼친다(task#398)
     expect(screen.queryByText('바뀜 조건', { selector: 'h2,h3' })).toBeNull()   // 별도 절 없음(렌즈 신호에 합침)
     const idx = order.map(s => text.indexOf(s))
     expect(idx.every(i => i >= 0)).toBe(true)
@@ -370,6 +371,7 @@ describe('v2 렌즈 판 렌더 (task#369)', () => {
       </MemoryRouter>
     )
     await screen.findByText('금리 의존 구조 그대로')
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))   // 서버 계산·원자료는 펼친 행 안에 있다(task#398)
     expect(screen.getByText('2.15%')).toBeTruthy()            // 손익분기 금리(서버 계산)
     expect(screen.getAllByText('준비금 수익률 3.15% 아래면 빨강').length).toBe(1)  // 바뀜 조건은 신호 행에 한 번만
     expect(screen.getAllByText('추정 기반').length).toBe(2)   // 렌즈 5·8 (렌즈 3·4는 공시만)
@@ -538,7 +540,9 @@ describe('렌즈 화면 후속 (task#372)', () => {
     await screen.findByText('금리 의존 구조 그대로')
     return r
   }
-  const header = (container, id) => container.querySelector(`#lens-${id}`).firstElementChild
+  // 행 머리 = 신호 행의 첫 자식(task#398 — 배지가 상세 카드 머리에서 여기로 올라왔다)
+  const header = (container, id) => container.querySelector(`[data-lens-cell="${id}"]`).firstElementChild
+  const expand = (container, id) => fireEvent.click(container.querySelector(`[data-lens-cell="${id}"] [data-lens-detail-toggle]`))
 
   it('픽스처가 새 분기를 실제로 탄다(게이트) — 옛 픽스처는 새 필드가 전혀 없다', () => {
     expect(V2_NEW.lenses.some(l => l.computed?.consensus_based)).toBe(true)
@@ -548,20 +552,22 @@ describe('렌즈 화면 후속 (task#372)', () => {
     expect(json).not.toMatch(/consensus_based|"basis"|near_boundary/)
   })
 
-  it('ⓐ 9렌즈 전부 새 이름(신호 행·상세 헤더), 옛 이름 0', async () => {
+  it('ⓐ 9렌즈 전부 새 이름(신호 행 — 상세 헤더는 없어졌다, task#398), 옛 이름 0', async () => {
     const { container } = await renderWith(V2_NEW)
     const rowNames = [...container.querySelectorAll('[data-lens-name]')].map(e => e.textContent.replace(/^\d+/, ''))
     expect(rowNames).toEqual(NEW_NAMES)
-    const detailNames = [...container.querySelectorAll('[data-lens-detail-name]')].map(e => e.textContent)
-    expect(detailNames).toEqual(NEW_NAMES)
+    // 상세 헤더가 없어졌으므로 펼쳐도 이름은 렌즈마다 한 번(신호 행)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    for (const n of NEW_NAMES) expect(screen.getAllByText(n).length).toBe(1)
     for (const o of OLD_NAMES) expect(container.textContent).not.toContain(o)
   })
 
-  it('ⓑ 「?」 클릭 → 그 렌즈가 묻는 것, 두 위치 모두(버튼 18개)', async () => {
+  it('ⓑ 「?」 클릭 → 그 렌즈가 묻는 것, 신호 행 한 곳(버튼 9개 — 펼쳐도 늘지 않는다, task#398)', async () => {
     await renderWith(V2_NEW)
-    expect(screen.getAllByRole('button', { name: /— 설명 보기$/ }).length).toBe(18)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    expect(screen.getAllByRole('button', { name: /— 설명 보기$/ }).length).toBe(9)
     const btns = screen.getAllByRole('button', { name: '벌수록 남는 구조 — 설명 보기' })
-    expect(btns.length).toBe(2)
+    expect(btns.length).toBe(1)
     for (const b of btns) {
       fireEvent.click(b)
       const tip = screen.getByRole('tooltip')
@@ -578,20 +584,24 @@ describe('렌즈 화면 후속 (task#372)', () => {
     expect(h4).toContain('애널 추정치'); expect(h4).not.toContain('추정 기반')
     expect(h5).toContain('추정 기반'); expect(h5).not.toContain('애널 추정치')
     expect(h8).toContain('애널 추정치'); expect(h8).toContain('추정 기반')
-    // 원자료 출처 consensus는 「공시」로 오표시되지 않는다
-    const li = [...container.querySelectorAll('#lens-4 li')].find(e => e.textContent.includes('FactSet'))
+    // 원자료 출처 consensus는 「공시」로 오표시되지 않는다(원자료는 펼친 행 안)
+    expand(container, 4)
+    const li = [...container.querySelectorAll('[data-lens-cell="4"] li')].find(e => e.textContent.includes('FactSet'))
     expect(li.textContent).toContain('애널 추정치'); expect(li.textContent).not.toContain('공시')
   })
 
   it('ⓓ 렌즈 3 비교 기간 — forward·yoy_quarter 각각 표기, 없으면 미표기', async () => {
     const { container, unmount } = await renderWith(V2_NEW)
-    expect(container.querySelector('#lens-3 [data-lens-basis]').textContent).toContain('향후 기간 vs 전년 동기')
+    expand(container, 3)
+    expect(container.querySelector('[data-lens-cell="3"] [data-lens-basis]').textContent).toContain('향후 기간 vs 전년 동기')
     unmount()
     const yoy = { ...V2_NEW, lenses: V2_NEW.lenses.map(l => (l.id === 3 ? withComputed(l, { basis: 'yoy_quarter' }) : l)) }
     const r2 = await renderWith(yoy)
-    expect(r2.container.querySelector('#lens-3 [data-lens-basis]').textContent).toContain('최근 분기 vs 전년 동기')
+    expand(r2.container, 3)
+    expect(r2.container.querySelector('[data-lens-cell="3"] [data-lens-basis]').textContent).toContain('최근 분기 vs 전년 동기')
     r2.unmount()
     const r3 = await renderWith(V2_REPORT)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
     expect(r3.container.querySelector('[data-lens-basis]')).toBeNull()
   })
 
@@ -609,5 +619,89 @@ describe('렌즈 화면 후속 (task#372)', () => {
     expect(container.querySelectorAll('[data-near-boundary],[data-lens-basis]').length).toBe(0)
     expect(screen.queryByText('애널 추정치')).toBeNull()
     expect([...container.querySelectorAll('[data-lens-name]')].length).toBe(9)
+  })
+})
+
+// ── 렌즈 신호·상세 한 행 (task#398) — 신호 행 안에서 상세를 펼친다. 기본 전부 접힘 ────────────
+describe('렌즈 신호 행 펼침 (task#398)', () => {
+  const renderWith = async (report) => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? report : { reports: [] } }))
+    const r = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    return r
+  }
+  const cell = (c, id) => c.querySelector(`[data-lens-cell="${id}"]`)
+  const toggles = (c) => [...c.querySelectorAll('[data-lens-detail-toggle]')]
+  const IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+  it('기본은 전부 접힘 — 본문·서버 계산·원자료가 DOM에 없고, 상세 버튼은 전부 aria-expanded=false', async () => {
+    const { container } = await renderWith(V2_NEW)
+    expect(toggles(container).length).toBe(9)
+    expect(toggles(container).every(b => b.tagName === 'BUTTON' && b.getAttribute('aria-expanded') === 'false')).toBe(true)
+    for (const id of IDS) expect(screen.queryByText(`본문${id}`)).toBeNull()
+    expect(screen.queryByText(/서버 계산 \(원자료/)).toBeNull()
+    expect(container.querySelector('[data-lens-detail]')).toBeNull()
+    // 이름은 앵커가 아니다(아래 절로 점프할 곳이 없다)
+    expect(container.querySelector('a[href^="#lens-"]')).toBeNull()
+    expect(container.querySelector('[id^="lens-"]')).toBeNull()
+  })
+
+  it('「상세」를 누르면 그 행 안에서만 펼쳐진다 — 내용은 그 행의 자손, 다른 행은 접힌 채, 다시 누르면 접힌다', async () => {
+    const { container } = await renderWith(V2_NEW)
+    const btn = cell(container, 3).querySelector('[data-lens-detail-toggle]')
+    fireEvent.click(btn)
+    expect(btn.getAttribute('aria-expanded')).toBe('true')
+    const body = screen.getByText('본문3')
+    expect(cell(container, 3).contains(body)).toBe(true)
+    expect(cell(container, 3).contains(screen.getByText(/서버 계산 \(원자료/))).toBe(true)
+    expect(screen.queryByText('본문4')).toBeNull()
+    expect(cell(container, 4).querySelector('[data-lens-detail-toggle]').getAttribute('aria-expanded')).toBe('false')
+    // aria-controls가 펼친 영역을 가리킨다
+    expect(container.querySelector(`#${btn.getAttribute('aria-controls')}`)?.contains(body)).toBe(true)
+    fireEvent.click(btn)
+    expect(btn.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('본문3')).toBeNull()
+  })
+
+  it('「모두 펼치기」 → 상세 버튼이 있는 행 전부 펼침, 「모두 접기」 → 전부 접힘', async () => {
+    const { container } = await renderWith(V2_NEW)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    expect(toggles(container).every(b => b.getAttribute('aria-expanded') === 'true')).toBe(true)
+    for (const id of IDS) expect(cell(container, id).contains(screen.getByText(`본문${id}`))).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '모두 접기' }))
+    expect(toggles(container).every(b => b.getAttribute('aria-expanded') === 'false')).toBe(true)
+    expect(container.querySelector('[data-lens-detail]')).toBeNull()
+    expect(screen.getByRole('button', { name: '모두 펼치기' })).toBeTruthy()
+  })
+
+  it('「추정 기반」·「애널 추정치」 배지는 접힌 행 머리에 있다(렌즈별로 박제값과 일치)', async () => {
+    const { container } = await renderWith(V2_NEW)
+    const headBadges = (id, label) => [...cell(container, id).firstElementChild.querySelectorAll('.badge')].filter(e => e.textContent.trim() === label).length
+    for (const l of V2_NEW.lenses) {
+      expect(headBadges(l.id, '추정 기반')).toBe(l.computed?.estimate_based ? 1 : 0)
+      expect(headBadges(l.id, '애널 추정치')).toBe(l.computed?.consensus_based ? 1 : 0)
+    }
+    // 펼쳐도 머리 배지가 다른 곳에 한 번 더 생기지 않는다(「추정 기반」은 원자료 배지 라벨과 겹치지 않는다)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    expect(screen.getAllByText('추정 기반').length).toBe(2)
+  })
+
+  it('요약 문장은 행마다 한 번 — 접힘·펼침 모두', async () => {
+    await renderWith(V2_NEW)
+    for (const id of IDS) expect(screen.getAllByText(`요약${id}`).length).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    for (const id of IDS) expect(screen.getAllByText(`요약${id}`).length).toBe(1)
+  })
+
+  it('펼칠 내용이 없는 행에는 상세 버튼이 없다', async () => {
+    const bare = { ...V2_NEW, lenses: V2_NEW.lenses.map(l => (l.id === 9 ? { ...l, body: null, metrics: [], inputs: null, computed: null } : l)) }
+    const { container } = await renderWith(bare)
+    expect(cell(container, 9).querySelector('[data-lens-detail-toggle]')).toBeNull()
+    expect(cell(container, 9).textContent).toContain('미산출 사유: 사유9')
+    expect(toggles(container).length).toBe(8)
   })
 })

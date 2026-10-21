@@ -3,9 +3,11 @@
 // 기대값은 전부 API 응답에서 유도한다. 축마다 **표본 카운터**를 두고, 양성 표본 0이면 PASS가 아니라 「미검증」으로
 // 보고한다(task#318 — 새 필드가 0건이면 축이 공허하게 통과한다). 음성(false·부재 → 표시 없음)도 쌍으로 단언한다.
 // 「FAIL 0」만 보지 말고 도달 축(reached)과 단언 총계도 볼 것.
+// task#398: 「렌즈 상세」 카드가 없어졌다 — 배지는 신호 행 머리(`[data-lens-cell] > div:first-child`), 렌즈 3 비교 기간은 그 행을 펼친 뒤 잰다.
 import { chromium } from 'playwright';
 
-const BASE = 'https://portfolion.taebro.com';
+// BASE 로 dev 스택(http://127.0.0.1:8084)도 잴 수 있다(task#398)
+const BASE = process.env.BASE || 'https://portfolion.taebro.com';
 const TICKERS = (process.env.TICKERS || 'CRCL,LHX,MRVL,LLY,GOOGL,SPCX,MU,005930,005380,000660').split(',');
 const BASIS_LABEL = { forward: '향후 기간 vs 전년 동기', yoy_quarter: '최근 분기 vs 전년 동기' };
 
@@ -16,7 +18,7 @@ const H = { Authorization: `Bearer ${access_token}` };
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => { if (cond) pass++; else fail++; console.log(`${cond ? '✓' : '✗'} ${name}${detail ? ' — ' + detail : ''}`); };
-const samples = { consensus_pos: 0, consensus_neg: 0, basis: 0, near_pos: 0, near_neg: 0 };
+const samples = { consensus_pos: 0, consensus_neg: 0, estimate_pos: 0, basis: 0, near_pos: 0, near_neg: 0 };
 
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
@@ -32,24 +34,29 @@ for (const t of TICKERS) {
   if (!rep || rep.format !== 2) { ok(`${t} api-format-2`, false, `format=${rep?.format}`); continue; }
   await page.goto(`${BASE}/analyst-report/${t}/${rep.published_date}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-lens-cell]', { timeout: 20000 }).catch(() => {});
+  // 렌즈 3 비교 기간은 서버 계산 블록(펼침 안)에 있다 — 그 행만 펼친다. 버튼이 없으면(na 등) 미표기가 기대값이다
+  const t3 = page.locator('[data-lens-cell="3"] [data-lens-detail-toggle]');
+  if (await t3.count() === 1) { await t3.scrollIntoViewIfNeeded(); await t3.click({ timeout: 5000 }).catch(() => {}); }
   const m = await page.evaluate(() => ({
     cells: document.querySelectorAll('[data-lens-cell]').length,
-    consensus: [...document.querySelectorAll('[id^="lens-"]')].map(c => ({
-      id: c.id.replace('lens-', ''),
-      badge: [...c.firstElementChild.querySelectorAll('.badge')].some(e => e.textContent.trim() === '애널 추정치'),
-    })),
-    basis: document.querySelector('#lens-3 [data-lens-basis]')?.textContent || null,
+    consensus: [...document.querySelectorAll('[data-lens-cell]')].map(c => {
+      const bs = [...c.firstElementChild.querySelectorAll('.badge')].map(e => e.textContent.trim());
+      return { id: c.getAttribute('data-lens-cell'), badge: bs.includes('애널 추정치'), est: bs.includes('추정 기반') };
+    }),
+    detailCards: document.querySelectorAll('[id^="lens-"]').length,
+    basis: document.querySelector('[data-lens-cell="3"] [data-lens-basis]')?.textContent || null,
     near: [...document.querySelectorAll('[data-lens-cell]')].map(c => ({ id: c.getAttribute('data-lens-cell'), near: !!c.querySelector('[data-near-boundary]') })),
   }));
   const lenses = rep.lenses || [];
   // 렌즈 10은 task#392부터 새 판에 필수 — 그 이전의 9렌즈(옛) 판과 10렌즈 판이 공존하므로 개수는 API에서 유도한다(task#393)
   const n = lenses.length;
-  ok(`${t} reached`, (n === 9 || n === 10) && m.cells === n && m.consensus.length === n, `cells=${m.cells} details=${m.consensus.length} api=${n}`);
-  // ⓐ 애널 추정치 — 박제 consensus_based와 상세 헤더 배지가 렌즈별로 일치(양·음 모두)
+  ok(`${t} reached`, (n === 9 || n === 10) && m.cells === n && m.consensus.length === n && m.detailCards === 0, `cells=${m.cells} heads=${m.consensus.length} 옛 상세 카드=${m.detailCards} api=${n}`);
+  // ⓐ 애널 추정치·추정 기반 — 박제 consensus_based·estimate_based와 신호 행 머리 배지가 렌즈별로 일치(양·음 모두, task#398)
   const cMismatch = lenses.filter(l => {
-    const want = !!l.computed?.consensus_based, got = !!m.consensus.find(x => x.id === String(l.id))?.badge;
+    const want = !!l.computed?.consensus_based, wantE = !!l.computed?.estimate_based, h = m.consensus.find(x => x.id === String(l.id));
     if (want) samples.consensus_pos++; else samples.consensus_neg++;
-    return want !== got;
+    if (wantE) samples.estimate_pos++;
+    return want !== !!h?.badge || wantE !== !!h?.est;
   }).map(l => l.id);
   ok(`${t} consensus-badge`, cMismatch.length === 0, cMismatch.length ? `불일치 렌즈 ${cMismatch}` : '');
   // ⓑ 렌즈 3 비교 기간 — 박제 basis의 표기, 없으면(na) 미표기

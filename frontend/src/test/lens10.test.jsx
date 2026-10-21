@@ -24,6 +24,9 @@ const NINE = { format: 2, title: '옛 판', tally: { go: 0, wait: 8, stop: 0, na
 const NA10 = { ...TEN, lenses: [...nine(), judg(10, 'na', { na_reason: '비슷한 전례를 찾지 못함' })] }
 
 const cellIds = (c) => [...c.querySelectorAll('[data-lens-cell]')].map(e => e.getAttribute('data-lens-cell'))
+// 상세는 신호 행 안에서 펼친다(task#398) — 렌즈 10 행 = 상세가 사는 곳
+const cell10 = (c) => c.querySelector('[data-lens-cell="10"]')
+const expand10 = (c) => fireEvent.click(cell10(c).querySelector('[data-lens-detail-toggle]'))
 
 describe('렌즈 10 「위험의 전례」 (task#391)', () => {
   it('LENS_INFO는 발행 계약의 렌즈 id 1~10을 빠짐없이 덮는다(task#391 회고 — 렌즈 수를 바꾸면 여기와 백엔드 LensIn.id 상한을 함께)', () => {
@@ -35,18 +38,24 @@ describe('렌즈 10 「위험의 전례」 (task#391)', () => {
     expect([TEN, NINE, NA10].every(isLensReport)).toBe(true)
   })
 
-  it('ⓐ 10렌즈 판: 신호판 10행 · 상세 카드에 이름·대상 위험·서버 집계 캡션·사례 행 수 == precedents', () => {
+  it('ⓐ 10렌즈 판: 신호판 10행 · 렌즈 10 행에 이름·대상 위험·서버 집계 캡션(접힘에서도) · 펼치면 사례 행 수 == precedents', () => {
     const { container } = render(<LensReport report={TEN} />)
     expect(cellIds(container)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'])
-    const card = container.querySelector('#lens-10')
-    expect(card.querySelector('[data-lens-detail-name="10"]').textContent).toBe('위험의 전례')
+    const card = cell10(container)
+    expect(card.querySelector('[data-lens-name="10"]').textContent.replace(/^\d+/, '')).toBe('위험의 전례')
+    // 대상 위험·막대·캡션은 다른 렌즈의 게이지와 같은 역할 — 접힌 상태에서도 그 행 안에 보인다(task#398)
     expect(card.querySelector('[data-lens10-risk]').textContent).toContain('증설 경쟁으로 단가가 무너진다')
+    expect(card.querySelector('[data-base-rate-bar]')).not.toBeNull()
     expect(card.querySelector('[data-base-rate-caption]').textContent)
       .toBe('전례 4건 중 현실화 2 · 부분 현실화 1 · 비현실화 1')
     // 비율 막대 — 결과별 칸이 서버 건수 비율로(0건 결과는 칸이 없다)
     const segs = [...card.querySelectorAll('[data-outcome-seg]')].map(s => [s.getAttribute('data-outcome-seg'), s.style.flexGrow])
     expect(segs).toEqual([['realized', '2'], ['partial', '1'], ['not_realized', '1']])
+    // 사례 목록은 펼침 안 — 접힘에선 없고, 펼치면 그 행의 자손으로 나타난다
+    expect(container.querySelectorAll('[data-precedent]').length).toBe(0)
+    expand10(container)
     expect(card.querySelectorAll('[data-precedent]').length).toBe(PRECEDENTS.length)
+    expect(container.querySelectorAll('[data-precedent]').length).toBe(PRECEDENTS.length)
     // 결과 배지는 라벨로도 말한다(색만으로 말하지 않는다)
     expect(card.querySelector('[data-precedent="1"]').textContent).toContain('부분 현실화')
     // 9렌즈 안내는 10렌즈 판에 없다
@@ -55,6 +64,7 @@ describe('렌즈 10 「위험의 전례」 (task#391)', () => {
 
   it('ⓑ 사례 행을 누르면 같은 점·다른 점(note)과 출처(ref)가 보인다', () => {
     const { container } = render(<LensReport report={TEN} />)
+    expand10(container)
     const row = container.querySelector('[data-precedent="0"]')
     expect(row.textContent).not.toContain('Fed 보고서 2003')
     const btn = row.querySelector('button')
@@ -71,7 +81,8 @@ describe('렌즈 10 「위험의 전례」 (task#391)', () => {
 
   it('ⓔ 사례 행 머리는 모든 행에서 2줄 — head(제목) 1개 · meta(배지+기간) 1개, 배지·기간은 head에 없다(task#395)', () => {
     const { container } = render(<LensReport report={TEN} />)
-    const rows = [...container.querySelectorAll('#lens-10 [data-precedent]')]
+    expand10(container)
+    const rows = [...container.querySelectorAll('[data-lens-cell="10"] [data-precedent]')]
     expect(rows.length).toBe(PRECEDENTS.length)
     rows.forEach((row, i) => {
       const heads = row.querySelectorAll('[data-precedent-head]')
@@ -93,7 +104,8 @@ describe('렌즈 10 「위험의 전례」 (task#391)', () => {
     const diffOnly = { case: '다른 점만', period: '2015', outcome: 'realized', note: '다른 점: 금리 환경이 반대였다', ref: '출처 D' }
     const rep = { ...TEN, lenses: [...nine(), judg(10, 'wait', { risk: 'r', precedents: [split, PRECEDENTS[0], diffOnly, PRECEDENTS[3]], base_rate: { realized: 3, partial: 1, not_realized: 0, total: 4 } })] }
     const { container } = render(<LensReport report={rep} />)
-    const rows = [...container.querySelectorAll('#lens-10 [data-precedent]')]
+    expand10(container)
+    const rows = [...container.querySelectorAll('[data-lens-cell="10"] [data-precedent]')]
     rows.forEach(r => fireEvent.click(r.querySelector('button')))
     // ⓐ 두 표지 → 같은 점·다른 점이 각각 제 칸에, 마침표·공백 정리
     expect(rows[0].querySelector('[data-precedent-same]').textContent).toBe('증설이 수요를 앞질렀다')
@@ -111,13 +123,13 @@ describe('렌즈 10 「위험의 전례」 (task#391)', () => {
     expect(rows[3].querySelector('[data-precedent-same]').textContent).toBe('증설 직후')
     expect(rows[3].querySelector('[data-precedent-diff]')).toBeNull()
     // ⓒ 어떤 경우에도 옛 바깥 라벨 「같은 점·다른 점」 0회
-    expect(container.querySelector('#lens-10').textContent).not.toContain('같은 점·다른 점')
+    expect(cell10(container).textContent).not.toContain('같은 점·다른 점')
   })
 
-  it('ⓒ 9렌즈 판: 렌즈 10 행·카드 없음 + 「렌즈 10 도입 전」 안내 1줄', () => {
+  it('ⓒ 9렌즈 판: 렌즈 10 행 없음 + 「렌즈 10 도입 전」 안내 1줄', () => {
     const { container } = render(<LensReport report={NINE} />)
     expect(cellIds(container)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
-    expect(container.querySelector('#lens-10')).toBeNull()
+    expect(cell10(container)).toBeNull()
     const notes = container.querySelectorAll('[data-lens10-absent]')
     expect(notes.length).toBe(1)
     expect(notes[0].textContent).toContain('렌즈 10 도입 전')
@@ -128,8 +140,9 @@ describe('렌즈 10 「위험의 전례」 (task#391)', () => {
     const { container } = render(<LensReport report={NA10} />)
     expect(cellIds(container)).toContain('10')
     expect(container.querySelector('[data-lens-cell="10"]').textContent).toContain('미산출 사유: 비슷한 전례를 찾지 못함')
-    const card = container.querySelector('#lens-10')
-    expect(card).not.toBeNull()
+    const card = cell10(container)
+    expect(card.querySelector('[data-base-rate-caption]')).toBeNull()
+    expand10(container)   // 본문은 있으니 펼칠 수 있다 — 펼쳐도 막대·사례는 없다
     expect(card.querySelector('[data-base-rate-caption]')).toBeNull()
     expect(card.querySelectorAll('[data-precedent]').length).toBe(0)
     expect(container.querySelector('[data-lens10-absent]')).toBeNull()
