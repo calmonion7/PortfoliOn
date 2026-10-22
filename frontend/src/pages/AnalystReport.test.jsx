@@ -705,3 +705,71 @@ describe('렌즈 신호 행 펼침 (task#398)', () => {
     expect(toggles(container).length).toBe(8)
   })
 })
+
+// ── 용어 링크 확대 1/2 (task#399) — 자유 서술 필드 8종에 용어집 자동 매칭 ────────────
+// 필드마다 「영업이익」(기존 용어)을 하나씩 심고, 그 필드가 그려지는 자리에서만 버튼을 센다.
+describe('심층 리포트 용어 링크 — 미연결 필드 배선 (task#399)', () => {
+  const T = '영업이익'
+  const GL = {
+    ...V2_REPORT,
+    structure: { ...V2_REPORT.structure, cost_nature: { value: 'revenue_linked', rationale: `분배비용이 ${T}에 연동` } },
+    lenses: [
+      ...V2_REPORT.lenses.map(l => {
+        if (l.id === 1) return { ...l, summary: `${T}이 늘었다` }
+        if (l.id === 7) return { ...l, flip: `${T}이 줄면 빨강` }
+        if (l.id === 6) return { ...l, conditions: l.conditions.map(c => (c.color === 'go' ? { ...c, when: [`${T} 흑자 전환`] } : c)) }
+        if (l.id === 5) return { ...l, inputs: { ...l.inputs, avg_share_pct: raw(38.2, '%', 'estimate', `${T} 대비 분배 비중`) } }
+        if (l.id === 9) return { ...l, na_reason: `${T} 미공시` }
+        return l
+      }),
+      judg(10, 'wait', { risk: `${T}이 급감한다`, base_rate: { realized: 1, partial: 0, not_realized: 0, total: 1 },
+        precedents: [{ case: '사례 A', period: '2019', outcome: 'realized', ref: '공시', note: `${T} 서두. 같은 점: ${T} 둔화. 다른 점: ${T} 반등` }] }),
+    ],
+  }
+  const renderGL = async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? GL : { reports: [] } }))
+    const r = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    return r
+  }
+  const cell = (c, id) => c.querySelector(`[data-lens-cell="${id}"]`)
+  const terms = (el) => (el ? el.querySelectorAll('.glossary-term:not(.lens-help)').length : -1)
+
+  it('접힌 행 — 요약·바뀜 조건·조건 목록·대상 위험·미산출 사유에 용어 버튼', async () => {
+    const { container } = await renderGL()
+    expect(terms(cell(container, 1))).toBe(1) // 요약
+    expect(terms(cell(container, 7))).toBe(1) // 바뀜 조건(문장)
+    expect(terms(cell(container, 6).querySelector('[data-flip-conditions]'))).toBe(1) // 조건 목록
+    expect(terms(cell(container, 10).querySelector('[data-lens10-risk]'))).toBe(1) // 대상 위험
+    expect(terms(cell(container, 9))).toBe(1) // 미산출 사유
+  })
+
+  it('펼침 — 사례 note 세 갈래·원자료 근거에 용어 버튼', async () => {
+    const { container } = await renderGL()
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    fireEvent.click(cell(container, 10).querySelector('[data-precedent] button'))
+    for (const k of ['note', 'same', 'diff']) expect(terms(cell(container, 10).querySelector(`[data-precedent-${k}]`))).toBe(1)
+    const li = [...cell(container, 5).querySelectorAll('details li')].find(e => e.textContent.includes('평균 몫'))
+    expect(terms(li)).toBe(1) // 원자료 근거
+  })
+
+  it('하단 — 구조 축 근거에 용어 버튼, 제목·사례 제목은 걸지 않는다', async () => {
+    const { container } = await renderGL()
+    expect(terms(screen.getByText('비용 성격').parentElement)).toBe(1)
+    expect(terms(screen.getByText('금리 의존 구조 그대로'))).toBe(0)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    expect(terms(cell(container, 10).querySelector('[data-precedent-head]'))).toBe(0)
+  })
+
+  it('요약 용어 클릭 — 팝오버가 뜨고 행의 「상세」는 펼쳐지지 않는다', async () => {
+    const { container } = await renderGL()
+    const btn = cell(container, 1).querySelector('.glossary-term:not(.lens-help)')
+    fireEvent.click(btn)
+    expect(document.querySelector('.glossary-popover')).not.toBeNull()
+    expect(cell(container, 1).querySelector('[data-lens-detail-toggle]').getAttribute('aria-expanded')).toBe('false')
+  })
+})

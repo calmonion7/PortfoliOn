@@ -227,7 +227,7 @@ function FlipConditions({ conditions, signal }) {
               <span style={smallCap}>{cur ? '근거' : c.match === 'any' ? '하나라도 확인되면' : (c.when.length > 1 ? '모두 확인되면' : '확인되면')}</span>
             </div>
             <ul style={{ margin: '2px 0 0', paddingLeft: 22, color: 'var(--text-2, var(--text))' }}>
-              {c.when.map((w, j) => <li key={j} style={{ wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{w}</li>)}
+              {c.when.map((w, j) => <li key={j} style={{ wordBreak: 'keep-all', overflowWrap: 'break-word' }}><GlossaryText text={w} /></li>)}
             </ul>
           </div>
         )
@@ -277,18 +277,18 @@ function SignalList({ lenses, open, onToggle }) {
                 </div>
               )}
             </div>
-            <div style={{ color: 'var(--text-2, var(--text))', fontSize: 12.5, lineHeight: 1.55, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{l.summary}</div>
+            <div style={{ color: 'var(--text-2, var(--text))', fontSize: 12.5, lineHeight: 1.55, marginTop: 4, wordBreak: 'keep-all', overflowWrap: 'break-word' }}><GlossaryText text={l.summary} /></div>
             {/* 렌즈 10의 대상 위험·기저율 막대는 다른 렌즈의 게이지와 같은 역할이라 접힘에서도 보인다(사례 목록만 펼침) */}
             {l.id === 10 && l.precedents?.length > 0 && <BaseRateHead lens={l} />}
             {l.signal !== 'na' && g && <FlipGauge gauge={g} signal={l.signal} origin={origin} />}
             {l.signal !== 'na' && conds && <FlipConditions conditions={conds} signal={l.signal} />}
             {l.signal !== 'na' && l.flip && !conds && (
               <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 6, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
-                <span style={smallCap}>바뀜 조건 </span><span style={{ color: 'var(--text)' }}>{l.flip}</span>
+                <span style={smallCap}>바뀜 조건 </span><span style={{ color: 'var(--text)' }}><GlossaryText text={l.flip} /></span>
               </div>
             )}
             {l.signal === 'na' && l.na_reason && (
-              <div style={{ ...smallCap, marginTop: 6 }}>미산출 사유: {l.na_reason}</div>
+              <div style={{ ...smallCap, marginTop: 6 }}>미산출 사유: <GlossaryText text={l.na_reason} /></div>
             )}
             {hasDetail(l) ? (
               <>
@@ -326,7 +326,7 @@ function StructureAxes({ structure }) {
                 <span style={smallCap}>{meta.title}</span>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14 }}>{meta.values[ax.value] || ax.value}</div>
-                  <div style={{ ...textStyle, fontSize: 12, color: 'var(--text-3)' }}>{ax.rationale}</div>
+                  <div style={{ ...textStyle, fontSize: 12, color: 'var(--text-3)' }}><GlossaryText text={ax.rationale} /></div>
                 </div>
               </div>
             )
@@ -412,7 +412,7 @@ function InputsTable({ inputs }) {
             <span className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(r.value, 3)} {r.unit}</span>{' '}
             <Badge variant={(SOURCE_META[r.source] || SOURCE_META.disclosure).variant}>{(SOURCE_META[r.source] || SOURCE_META.disclosure).label}</Badge>{' '}
             <span style={smallCap}>{r.ref}</span>
-            {r.rationale && <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{r.rationale}</div>}
+            {r.rationale && <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}><GlossaryText text={r.rationale} /></div>}
           </li>
         ))}
       </ul>
@@ -456,9 +456,9 @@ function PrecedentRow({ p, i }) {
       </button>
       {open && (
         <div style={{ padding: '0 0 10px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', alignItems: 'baseline' }}>
-          {note.rest && <div data-precedent-note="" style={{ ...body, gridColumn: '1 / -1' }}>{note.rest}</div>}
-          {note.same && <><span style={smallCap}>같은 점</span><div data-precedent-same="" style={body}>{note.same}</div></>}
-          {note.diff && <><span style={smallCap}>다른 점</span><div data-precedent-diff="" style={body}>{note.diff}</div></>}
+          {note.rest && <div data-precedent-note="" style={{ ...body, gridColumn: '1 / -1' }}><GlossaryText text={note.rest} /></div>}
+          {note.same && <><span style={smallCap}>같은 점</span><div data-precedent-same="" style={body}><GlossaryText text={note.same} /></div></>}
+          {note.diff && <><span style={smallCap}>다른 점</span><div data-precedent-diff="" style={body}><GlossaryText text={note.diff} /></div></>}
           <span style={smallCap}>출처</span>
           <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{p.ref}</div>
         </div>
@@ -476,7 +476,7 @@ function BaseRateHead({ lens }) {
       {lens.risk && (
         <div data-lens10-risk="" style={{ padding: '8px 10px', background: 'var(--bg-elev-2)', borderRadius: 6 }}>
           <div style={smallCap}>대상 위험</div>
-          <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13, lineHeight: 1.5, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{lens.risk}</div>
+          <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13, lineHeight: 1.5, wordBreak: 'keep-all', overflowWrap: 'break-word' }}><GlossaryText text={lens.risk} /></div>
         </div>
       )}
       {br?.total > 0 && (
