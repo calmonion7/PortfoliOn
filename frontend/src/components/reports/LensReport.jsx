@@ -163,15 +163,15 @@ export function FlipGauge({ gauge, signal, origin }) {
     return `${sig(z).label} ${r}`
   })
   return (
-    <div data-flip-gauge="" data-current-zone={curZone} data-origin={origin} role="img"
-         aria-label={`${variable} 현재 ${gfmt(current, unit)} — ${ranges.join(', ')} (${ORIGIN_LABEL[origin] || ''})`}
-         style={{ margin: '10px 0 2px' }}>
+    <div data-flip-gauge="" data-current-zone={curZone} data-origin={origin} style={{ margin: '10px 0 2px' }}>
       <div style={{ ...smallCap, marginBottom: 2, display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <span>{variable}{unit && unit !== '%' && unit !== '배' ? ` (${unit})` : ''}</span>
+        <span><GlossaryText text={variable} />{unit && unit !== '%' && unit !== '배' ? ` (${unit})` : ''}</span>
         {/* 경계 근접(task#371 서버 박제) — 현재값이 경계 폭의 10% 안: 작은 변화로 색이 바뀔 수 있다 */}
         {gauge.near_boundary === true && <span data-near-boundary="" style={{ fontSize: 10, fontWeight: 700, color: 'var(--warn)', border: '1px solid var(--warn)', borderRadius: 4, padding: '0 5px' }}>경계 근접</span>}
         {ORIGIN_LABEL[origin] && <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 5px' }}>{ORIGIN_LABEL[origin]}</span>}
       </div>
+      {/* role="img"는 트랙·경계 라벨만 — 그 안의 버튼은 접근성 트리에서 지워지므로 머리 줄(변수명 용어)은 밖에 둔다(task#400) */}
+      <div role="img" aria-label={`${variable} 현재 ${gfmt(current, unit)} — ${ranges.join(', ')} (${ORIGIN_LABEL[origin] || ''})`}>
       <div style={{ position: 'relative', height: 44 }}>
         {/* 현재값 라벨 */}
         <span className="mono tnum" style={{ position: 'absolute', top: 0, left: `${pct(current)}%`, transform: anchor(pct(current)), fontSize: 11, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>
@@ -197,6 +197,7 @@ export function FlipGauge({ gauge, signal, origin }) {
             {gfmt(b, unit)}
           </span>
         ))}
+      </div>
       </div>
       {currentRef && <div style={{ ...smallCap, fontSize: 10 }}>현재값 출처: {currentRef}</div>}
     </div>
@@ -365,7 +366,7 @@ function ComputedBlock({ lens }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
           {vals.map(([k, v]) => (
             <div key={k}>
-              <div style={smallCap}>{VALUE_META[k].label}</div>
+              <div style={smallCap}><GlossaryText text={VALUE_META[k].label} /></div>
               <div className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 15 }}>{VALUE_META[k].f(v)}</div>
             </div>
           ))}

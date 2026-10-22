@@ -400,8 +400,8 @@ describe('바뀜 조건 게이지 (task#369 UAT 피드백)', () => {
     const g = row5.querySelector('[data-flip-gauge]')
     expect(g).toBeTruthy()
     expect(g.getAttribute('data-current-zone')).toBe('wait')
-    expect(g.getAttribute('aria-label')).toMatch(/준비금 수익률.*3\.49%/)
-    expect(g.getAttribute('aria-label')).toMatch(/빨강.*3\.15%/)
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/준비금 수익률.*3\.49%/)
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/빨강.*3\.15%/)
     // 구간 3개 + 경계 라벨 2개
     expect(g.querySelectorAll('[data-zone]').length).toBe(3)
     expect([...g.querySelectorAll('[data-boundary]')].map(e => e.textContent)).toEqual(['3.15%', '4.15%'])
@@ -447,8 +447,8 @@ describe('바뀜 조건 게이지 (task#369 UAT 피드백)', () => {
     expect(g.getAttribute('data-current-zone')).toBe('stop')
     expect([...g.querySelectorAll('[data-zone]')].map(e => e.getAttribute('data-zone'))).toEqual(['go', 'wait', 'stop'])
     expect([...g.querySelectorAll('[data-boundary]')].map(e => e.textContent)).toEqual(['42.91 USD', '59.99 USD'])
-    expect(g.getAttribute('aria-label')).toMatch(/주가 현재 84\.13 USD/)
-    expect(g.getAttribute('aria-label')).toMatch(/초록 42\.91 USD 미만/)
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/주가 현재 84\.13 USD/)
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/초록 42\.91 USD 미만/)
     expect(g.textContent).toContain('현재값 출처: 발행 시점 주가 (2026-10-07)')
     // 문장은 이익축 그대로(비목표 — 바뀜 조건 문장 불변)
     expect(row8.textContent).toContain('forward 이익 777.6 이상이면 노랑')
@@ -763,6 +763,33 @@ describe('심층 리포트 용어 링크 — 미연결 필드 배선 (task#399)'
     expect(terms(screen.getByText('금리 의존 구조 그대로'))).toBe(0)
     fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
     expect(terms(cell(container, 10).querySelector('[data-precedent-head]'))).toBe(0)
+  })
+
+  // task#400 — 서버 계산 라벨·게이지 변수명. 게이지 변수명 버튼은 role="img" 밖에 있어야 접근성 트리에 남는다
+  it('서버 계산 라벨에 용어 버튼(task#400)', async () => {
+    const { container } = await renderGL()
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    const labelBtn = (id, label) => [...cell(container, id).querySelectorAll('.glossary-term')].find(b => b.textContent === label)
+    for (const [id, label] of [[3, '배수비'], [4, '한계 분배율'], [4, '평균 분배율'], [5, '손익분기 금리'], [8, '이익수익률'], [8, '무위험 금리']]) {
+      expect(labelBtn(id, label), `${id} ${label}`).toBeTruthy()
+    }
+  })
+
+  it('게이지 변수명 용어 버튼은 role="img" 밖 — aria-label은 트랙에 남는다(task#400)', async () => {
+    const withGauge = { ...GL, lenses: GL.lenses.map(l => (l.id === 4 ? { ...l, computed: { ...l.computed,
+      gauge: { variable: '한계 분배율', unit: '%', current: 12.79, boundaries: [53.81, 63.81], zones: ['go', 'wait', 'stop'], origin: 'server' } } } : l)) }
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? withGauge : { reports: [] } }))
+    const { container } = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    const g = cell(container, 4).querySelector('[data-flip-gauge]')
+    const btn = [...g.querySelectorAll('.glossary-term')].find(b => b.textContent === '한계 분배율')
+    expect(btn).toBeTruthy()
+    expect(btn.closest('[role="img"]')).toBeNull()
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/한계 분배율 현재 12\.79%/)
   })
 
   it('요약 용어 클릭 — 팝오버가 뜨고 행의 「상세」는 펼쳐지지 않는다', async () => {
