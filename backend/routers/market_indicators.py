@@ -267,6 +267,7 @@ def _run_memory_backfill():
         with job_runs.record("memory_spot_fetch", "manual") as run:
             run.set_payload({"backfill": True})
             res = run_backfill()
+            run.set_payload({"backfill": True, "snapshots": res.get("snapshots"), "skipped": res.get("skipped")})
             if res["status"] != "success":
                 run.set_status(res["status"], res.get("error"))
     except Exception as e:

@@ -374,6 +374,8 @@ def wayback(monkeypatch, store):
             return _Resp(js=st["cdx"])
         ts = url.split("/web/")[1].split("id_/")[0]
         v = st["snaps"][ts]
+        if isinstance(v, list):  # 호출마다 하나씩 소비(일시 실패 → 성공)
+            v = v.pop(0) if len(v) > 1 else v[0]
         if isinstance(v, Exception):
             raise v
         return _Resp(text=ts)
@@ -381,7 +383,7 @@ def wayback(monkeypatch, store):
     monkeypatch.setattr(sc.requests, "get", get)
     monkeypatch.setattr(sc.time, "sleep", lambda s: st["sleeps"].append(s))
     monkeypatch.setattr(sc, "parse_dramexchange",
-                        lambda html, ref_date=None: st["snaps"][html])
+                        lambda html, ref_date=None: (lambda v: v[-1] if isinstance(v, list) else v)(st["snaps"][html]))
     return st
 
 
@@ -430,6 +432,18 @@ def test_backfill_failing_snapshot_skipped_and_counted(wayback, store):
     assert r["status"] == "partial" and r["snapshots"] == 1 and r["skipped"] == 2
     dram = next(c for c in store["data"]["categories"] if c["key"] == "dram_spot")["items"][0]
     assert "2026-01-02" in [p["date"] for p in dram["history"]]
+
+
+def test_backfill_paces_under_wayback_rate_limit_and_retries_refused(wayback, store):
+    """task#403 실측: 1초 간격은 IA 레이트리밋(분당 ~15회)을 넘겨 134건 중 116건이 Connection refused.
+    간격은 분당 12회 이하, 연결 거부는 쿨다운 후 1회 재시도해 병합한다."""
+    wayback["cdx"] = _cdx("20260102000000", "20260103000000")
+    wayback["snaps"] = {"20260102000000": _snap("2026-01-02", 2.0),
+                        "20260103000000": [sc.requests.ConnectionError("refused"), _snap("2026-01-03", 3.0)]}
+    r = sc.run_backfill()
+    assert r["status"] == "success" and r["snapshots"] == 2 and r["skipped"] == 0
+    assert all(s >= 5 for s in wayback["sleeps"]) and sc._BACKFILL_GAP >= 5
+    assert sc._BACKFILL_COOLDOWN in wayback["sleeps"]
 
 
 def test_backfill_all_fail_or_cdx_fail_is_failed_and_no_save(wayback, store):

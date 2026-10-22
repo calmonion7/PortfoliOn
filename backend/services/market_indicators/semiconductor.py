@@ -181,7 +181,9 @@ def get_memory_spot() -> dict:
 _CDX_URL = "https://web.archive.org/cdx/search/cdx"
 _WAYBACK_URL = "https://web.archive.org/web/{ts}id_/https://www.dramexchange.com/"
 _BACKFILL_DAYS = 365
-_BACKFILL_GAP = 1.0  # 요청 간 최소 간격(초)
+# Wayback 레이트리밋(분당 ~15회) 아래로 — 1초 간격은 134건 중 116건이 Connection refused(task#403 실측)
+_BACKFILL_GAP = 5.0  # 요청 간 최소 간격(초) — 분당 12회, 1년치 ~134건이면 ~11분
+_BACKFILL_COOLDOWN = 60.0  # 연결 거부·HTTP 오류 시 쉬었다가 1회 재시도
 _backfill_lock = threading.Lock()
 _backfill_running = False
 
@@ -212,6 +214,19 @@ def _list_snapshots(today: date) -> list:
     return sorted({row[0] for row in rows if row and row[0] != "timestamp"})
 
 
+def _get_snapshot(ts: str) -> str:
+    for attempt in (0, 1):
+        try:
+            r = requests.get(_WAYBACK_URL.format(ts=ts), headers={"User-Agent": "Mozilla/5.0"},
+                             timeout=60, allow_redirects=True)
+            r.raise_for_status()
+            return r.text
+        except requests.RequestException:
+            if attempt:
+                raise
+            time.sleep(_BACKFILL_COOLDOWN)
+
+
 def run_backfill() -> dict:
     """최근 1년 Wayback 스냅샷을 병합. 스냅샷 단위 실패는 건너뛰고 카운트.
 
@@ -228,11 +243,8 @@ def run_backfill() -> dict:
             if i:
                 time.sleep(_BACKFILL_GAP)
             try:
-                r = requests.get(_WAYBACK_URL.format(ts=ts), headers={"User-Agent": "Mozilla/5.0"},
-                                 timeout=60, allow_redirects=True)
-                r.raise_for_status()
                 d = f"{ts[:4]}-{ts[4:6]}-{ts[6:8]}"
-                parsed = parse_dramexchange(r.text, ref_date=date.fromisoformat(d))
+                parsed = parse_dramexchange(_get_snapshot(ts), ref_date=date.fromisoformat(d))
                 if not parsed["categories"]:
                     raise ValueError("파싱 가능한 분류 0건")
                 merge_and_save_memory_spot(parsed)

@@ -3391,7 +3391,7 @@ DRAMeXchange 메모리 현물가(6분류) 저장값 + 품목별 이력. `market_
 
 ### `POST /api/market/backfill-memory-spot`
 
-메모리 현물가 최근 1년 이력 백필. 인터넷 아카이브(Wayback) CDX에서 일 단위 스냅샷을 나열해 요청 간 1초 이상 간격으로 받아 같은 파서·병합 경로로 저장값에 합친다. 수 분 걸리므로 `BackgroundTasks`로 돌리고 즉시 응답한다(Cloudflare 100초 제한 회피). 같은 날짜는 덮어써 재실행해도 이력이 늘지 않는다(멱등). 단일 비행 — 이미 돌고 있으면 새로 시작하지 않는다. 결과는 `job_runs`(`memory_spot_fetch`, payload `backfill: true`)에 `success`/`partial`(일부 스냅샷 건너뜀)/`failed`(CDX 실패·스냅샷 0건·전부 실패)로 기록되며 이 응답에는 실리지 않는다.
+메모리 현물가 최근 1년 이력 백필. 인터넷 아카이브(Wayback) CDX에서 일 단위 스냅샷을 나열해 요청 간 5초 간격(인터넷 아카이브 레이트리밋 아래)으로 받고 연결 실패는 60초 뒤 1회 재시도해 같은 파서·병합 경로로 저장값에 합친다. 1년치(~134건)에 10분 남짓 걸리므로 `BackgroundTasks`로 돌리고 즉시 응답한다(Cloudflare 100초 제한 회피). 같은 날짜는 덮어써 재실행해도 이력이 늘지 않는다(멱등). 단일 비행 — 이미 돌고 있으면 새로 시작하지 않는다. 결과는 `job_runs`(`memory_spot_fetch`, payload `{backfill: true, snapshots: 병합 수, skipped: 건너뛴 수}`)에 `success`/`partial`(일부 스냅샷 건너뜀)/`failed`(CDX 실패·스냅샷 0건·전부 실패)로 기록되며 이 응답에는 실리지 않는다.
 
 **Auth:** admin 권한 필요
 
