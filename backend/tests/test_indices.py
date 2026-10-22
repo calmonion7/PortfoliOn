@@ -55,7 +55,7 @@ def test_get_indices_shape():
 
     assert "indices" in result
     assert "valuation" in result
-    for key in ("gspc", "ks11", "kq11"):
+    for key in ("gspc", "ks11", "kq11", "sox"):
         idx = result["indices"][key]
         assert "current" in idx
         assert "change_pct" in idx

@@ -12,6 +12,7 @@ _INDEX_SYMBOLS = {
     "gspc": "^GSPC",
     "ks11": "^KS11",
     "kq11": "^KQ11",
+    "sox": "^SOX",
 }
 
 

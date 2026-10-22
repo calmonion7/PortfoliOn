@@ -51,13 +51,14 @@ _MARKET_BY_ID = {
     "kospi_signal_fetch": "KR",
     "business_formation_fetch": "US",
     "labor_surveys_fetch": "US",
+    "memory_spot_fetch": "공통",
     "trimmed_inflation_fetch": "US",
     "fx_fetch": "공통",
 }
 
 
 def test_registry_has_sixteen_batches():
-    assert len(batch_registry.BATCHES) == 35
+    assert len(batch_registry.BATCHES) == 36
 
 
 def test_old_split_ids_absent():
@@ -82,7 +83,7 @@ def test_market_classification_matches_adr():
     counts = {"KR": 0, "US": 0, "공통": 0}
     for b in batch_registry.BATCHES:
         counts[b["market"]] += 1
-    assert counts == {"KR": 16, "US": 11, "공통": 8}
+    assert counts == {"KR": 16, "US": 11, "공통": 9}
 
 
 def test_new_earnings_entries_inherit_weekly_schedule():

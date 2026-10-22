@@ -1,4 +1,5 @@
 import IndexSection from '../components/market/IndexSection'
+import SemiconductorSection from '../components/market/SemiconductorSection'
 import KospiFuturesSection from '../components/market/KospiFuturesSection'
 import TreasurySection from '../components/market/TreasurySection'
 import FxSection from '../components/market/FxSection'
@@ -24,6 +25,7 @@ export default function Market({ tab = 'indicators' }) {
       {tab === 'indicators' && (
         <>
           <IndexSection />
+          <SemiconductorSection />
           <KospiFuturesSection />
           <TreasurySection />
           <FxSection />
