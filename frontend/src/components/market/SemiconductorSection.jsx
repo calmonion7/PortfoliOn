@@ -18,13 +18,13 @@ const dirArrow = v => (v > 0 ? '▲' : v < 0 ? '▼' : '─')
 
 function LineBox({ title, data, color }) {
   return (
-    <div className="chartbox" style={{ marginBottom: 16 }}>
+    <div className="chartbox" data-testid="semi-linebox" style={{ marginBottom: 16 }}>
       <div className="sub">{title}</div>
       <ResponsiveContainer width="100%" height={180}>
         <LineChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickFormatter={v => v.slice(5)}
-                 interval={Math.max(0, Math.floor(data.length / 6))} />
+                 interval="preserveStartEnd" minTickGap={16} />
           <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} domain={['auto', 'auto']} width={52} />
           <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: 'var(--text-3)' }} />
           <Line type="monotone" dataKey="value" name={title} stroke={color} dot={false} strokeWidth={1.5} />

@@ -44,7 +44,7 @@ const VIEWPORTS = [
   ['m390', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }],
   ['pc1440', { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 }],
 ];
-const EXPECT_PER_VP = 13; // reached·identity-labels·updated-at-labels·rows-count·card-adjacent·no-h-scroll·no-char-stack·name-not-clipped·row-spacing·default-selected·tap-changes-chart·tap-selected-style·no-pageerror
+const EXPECT_PER_VP = 14; // reached·identity-labels·updated-at-labels·rows-count·card-adjacent·no-h-scroll·no-char-stack·name-not-clipped·row-spacing·default-selected·tap-changes-chart·tap-selected-style·x-ticks-no-overlap·no-pageerror
 const b = await chromium.launch();
 const perVp = {};
 for (const [vp, opts] of VIEWPORTS) {
@@ -145,9 +145,26 @@ for (const [vp, opts] of VIEWPORTS) {
   ok(`${vp}/tap-selected-style`, sel1.tap?.pressed === 'true' && sel1.def?.pressed === 'false' && !transparent(sel1.tap?.bl) && transparent(sel1.def?.bl) && sel1.tap?.bl !== sel0.tap?.bl,
     `tap.pressed=${sel1.tap?.pressed} tap.borderLeft=${sel1.tap?.bl} (before ${sel0.tap?.bl}) def.pressed=${sel1.def?.pressed} def.borderLeft=${sel1.def?.bl}`);
 
+  // X축 틱 라벨 겹침 — 넘침·잘림 축에 안 잡히는 「요소 간 간격」 클래스(m360 육안 포착, task#403).
+  // 틱은 클래스가 아니라 기하로 고른다: 플롯 surface(부모 .recharts-wrapper)의 text 중 가장 아래 y 행.
+  const ticks = await page.evaluate(() => [...document.querySelectorAll('[data-testid="semi-linebox"]')].map((box) => {
+    const svg = [...box.querySelectorAll('.recharts-surface')].find((x) => x.parentElement?.classList.contains('recharts-wrapper'));
+    const rs = [...(svg?.querySelectorAll('text') || [])].map((t) => t.getBoundingClientRect()).filter((r) => r.width > 0);
+    const maxY = Math.max(...rs.map((r) => Math.round(r.top)));
+    const row = rs.filter((r) => Math.abs(Math.round(r.top) - maxY) <= 2).sort((a, b) => a.left - b.left);
+    const gaps = row.slice(1).map((r, i) => +(r.left - row[i].right).toFixed(1));
+    return { title: box.querySelector('.sub')?.textContent, n: row.length, minGap: gaps.length ? Math.min(...gaps) : null };
+  }));
+  ok(`${vp}/x-ticks-no-overlap`, ticks.length === 2 && ticks.every((t) => t.n >= 2 && t.minGap >= 2),
+    ticks.map((t) => `${t.title}: ticks=${t.n} minGap=${t.minGap}`).join(' | ') || 'LINEBOX_MISSING');
+
   ok(`${vp}/no-pageerror`, errs.length === 0, errs.join(' | ') || '0');
 
   // 육안 캡처 — 탭한 행·차트가 화면에 있는 순간(측정 지점에서 찍는다)
+  await page.locator('[data-testid="semi-linebox"]').first().scrollIntoViewIfNeeded().catch(() => {});
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/${vp}-top.png` });
+  console.log(`  capture: ${OUT}/${vp}-top.png`);
   await page.locator('[data-testid="semi-chart"]').scrollIntoViewIfNeeded().catch(() => {});
   await page.waitForTimeout(500);
   await page.screenshot({ path: `${OUT}/${vp}.png` });
