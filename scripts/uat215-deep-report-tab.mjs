@@ -317,8 +317,14 @@ async function run(label, ctxOpts) {
     // 대조군 — 비상장 업체(티커 없는 행)는 링크가 아니다: 업체 표의 링크 수 == 티커 있는 업체 수 이하
     const linkCnt = await page.locator('table a[href="/reports"]').count();
     ok(`[${label}] 기술:링크는-티커있는-행만`, linkCnt > 0 && linkCnt <= await page.locator('table tr').count(), `${linkCnt}개`);
-    if (found) {
-      await tlink.click(); await settle(page);
+    // task#402 후속 — 업체 표가 360 미만에서 문서를 가로로 밀어냈다(m278 ai-datacenter-ops 298>278). 넘치면
+    // 레이아웃 뷰포트가 넓어져 클릭 좌표가 어긋나 아래 클릭이 헤더·이웃 칸에 막혔다(30초 크래시).
+    const hs = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    ok(`[${label}] 기술:페이지-가로넘침-0`, hs[0] <= hs[1] + 1, `${techSlug} ${hs[0]}/${hs[1]}`);
+    // 클릭 실패는 크래시가 아니라 이 축의 FAIL이다(나머지 축이 계속 기록되도록)
+    const clicked = found && await tlink.click({ timeout: 10000 }).then(() => true, (e) => { ok(`[${label}] 기술:티커-클릭`, false, e.message.split('\n')[0]); return false; });
+    if (clicked) {
+      await settle(page);
       ok(`[${label}] 기술:클릭시-리포트-도달`, new URL(page.url()).pathname === '/reports', page.url());
       // task#378 ⓑ — 본문 전체가 아니라 「상세 뷰 + 상세 영역 안 티커」로 좁힌다
       const st = await page.evaluate((t) => {
@@ -348,7 +354,11 @@ async function run(label, ctxOpts) {
     let posts = 0;
     const onReq = (r) => { if (r.method() === 'POST' && r.url().includes('/api/watchlist')) posts++; };
     page.on('request', onReq);
-    if (ufound) { await ulink.click(); await settle(page); }
+    if (ufound) {
+      const hs2 = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+      ok(`[${label}] 기술-미추적:페이지-가로넘침-0`, hs2[0] <= hs2[1] + 1, `${untrSlug} ${hs2[0]}/${hs2[1]}`);
+      await ulink.click({ timeout: 10000 }).then(() => settle(page), (e) => ok(`[${label}] 기술-미추적:티커-클릭`, false, e.message.split('\n')[0]));
+    }
     const u = await page.evaluate((t) => {
       // 「있다」가 아니라 「보인다」 — ≤640px 목록 뷰는 `.reports-main`을 display:none으로 숨기므로
       // DOM 존재만 재면 숨은 배너로 통과한다(task#378 1차 배포 실측: m390·m278에서 배너가 그 안에 갇혔다).

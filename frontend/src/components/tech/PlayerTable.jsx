@@ -46,25 +46,28 @@ const CAPTION = {
   fontSize: 'var(--font-size-xs)', color: 'var(--text-3)',
 }
 
+// 좌우 패딩·줄바꿈은 360 미만에서 mobile.css `.player-table`이 변수로 조인다(task#402 후속 — 278 폭 넘침).
+// 변수 미설정(360 이상)이면 폴백값 그대로라 기존 렌더와 같다. wordBreak keep-all은 nowrap일 땐 효과가 없고,
+// 접힐 때 「현재 선두」를 어절 경계에서만 끊게 한다(낱자 분해 금지).
 const TH = {
-  padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap',
+  padding: '8px var(--pt-px, 10px)', textAlign: 'left', whiteSpace: 'var(--pt-ws, nowrap)', wordBreak: 'keep-all',
   fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)',
   color: 'var(--text-3)', borderBottom: '1px solid var(--border)',
 }
 const TH_NUM = { ...TH, textAlign: 'right' }
 
 const TD = {
-  padding: '8px 10px', whiteSpace: 'nowrap', verticalAlign: 'middle',
+  padding: '8px var(--pt-px, 10px)', whiteSpace: 'var(--pt-ws, nowrap)', wordBreak: 'keep-all', verticalAlign: 'middle',
   fontSize: 'var(--font-size-sm)', color: 'var(--text)',
   borderBottom: '1px solid var(--border)',
 }
 const TD_MUTED = { ...TD, color: 'var(--text-3)' }
 // 업체명만 접힐 수 있어야 한다 — 나머지 열은 원칙적으로 nowrap(수치는 접히면 안 된다)
-const TD_NAME = { ...TD, whiteSpace: 'normal' }
+const TD_NAME = { ...TD, whiteSpace: 'normal', wordBreak: 'normal' }  // 업체명 줄바꿈은 기존 그대로(keep-all 미적용)
 // 기술수준은 이제 5칸 밴드다(ADR-0041) — 밴드는 flex-shrink:0 고정 요소라 접히지 않으므로 nowrap을
 // 그대로 쓴다(TD와 동일값). 폭 예산은 task#304 S0 실측(reusable-rocket m350 여유 8.3px)에서 역산했다
 // — 아래 .tech-level-band__cells 사용부·CSS 파일(첫 줄 import) 주석 참조.
-const TD_LEVEL = TD
+const TD_LEVEL = { ...TD, whiteSpace: 'nowrap' }  // 360 미만 접힘 변수(task#402 후속)를 받지 않는다 — 밴드는 접히지 않는다
 // 단계 숫자는 CSS 클래스(.tech-level-band__digit)로 옮겼다 — 인라인 marginLeft로 두면 flex gap과
 // 합쳐진 실제 min-content를 코드에서 읽어낼 수 없고, 글리프 폭 추정에 의존하게 된다(적대 검토 MED).
 // 수치 열은 tnum 고정폭 — 행 간 자릿수 비교가 목적이다
@@ -247,7 +250,7 @@ export default function PlayerTable({ players = [], holdings = {} }) {
           <span key={lv} className="tech-level-band__legend-item">{lv} {TECH_LEVEL_LABELS[lv]}</span>
         ))}
       </div>
-      <table style={TABLE} data-testid="tech-report-players">
+      <table className="player-table" style={TABLE} data-testid="tech-report-players">
         <thead>
           <tr>
             {cols.map((c) => (

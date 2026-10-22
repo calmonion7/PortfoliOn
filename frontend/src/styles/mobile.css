@@ -393,3 +393,11 @@ thead .col-sticky { background: var(--bg-elev-2); }
 @media (max-width: 359px) {
   .broker-row__break { display: block; flex-basis: 100%; height: 0; }
 }
+
+/* 기술 리포트 업체 표(PlayerTable.jsx) — 360 미만에선 4열 최소폭 합(라이브 232~277px)이 본문 폭(m278 206px)을
+   넘어 표 4종이 문서를 18~35px 가로 스크롤시켰다(task#402 후속). 열·글자 크기는 그대로 두고 셀 좌우 패딩을
+   10→4px로 줄이고, 「현재 선두」·「선두 대비」처럼 공백 있는 값은 어절 경계에서만 2줄로 접는다(keep-all —
+   낱자 분해 금지). 인라인 스타일이 이 변수를 읽는다(인라인은 미디어쿼리를 못 쓴다). */
+@media (max-width: 359px) {
+  .player-table { --pt-px: 4px; --pt-ws: normal; }
+}
