@@ -775,9 +775,27 @@ describe('심층 리포트 용어 링크 — 미연결 필드 배선 (task#399)'
     }
   })
 
+  const withGauge = { ...GL, lenses: GL.lenses.map(l => (l.id === 4 ? { ...l, computed: { ...l.computed,
+    gauge: { variable: '한계 분배율', unit: '%', current: 12.79, boundaries: [53.81, 63.81], zones: ['go', 'wait', 'stop'], origin: 'server' } } } : l)) }
+
+  // eval(task#400 회고) — role="img" 자손은 Safari·VoiceOver에서 프루닝되는데 Playwright·Chromium AX로는 관측되지 않는다
+  // (live-uat-probes ⑭). 그래서 구조로 못박는다: 모두 펼친 렌즈 리포트에서 img 안 인터랙티브 0. img가 실제로 그려졌는지도 센다.
+  it('role="img" 안에 버튼·링크가 없다 — 게이지·기저율 막대 전부(eval)', async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? withGauge : { reports: [] } }))
+    const { container } = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    fireEvent.click(cell(container, 10).querySelector('[data-precedent] button'))
+    // 정의역: 게이지 3(렌즈 2·4·5) + 기저율 막대 1
+    expect(container.querySelectorAll('[role="img"]').length).toBeGreaterThanOrEqual(4)
+    expect([...container.querySelectorAll('[role="img"] button, [role="img"] a, [role="img"] [tabindex]')].map(e => e.textContent)).toEqual([])
+  })
+
   it('게이지 변수명 용어 버튼은 role="img" 밖 — aria-label은 트랙에 남는다(task#400)', async () => {
-    const withGauge = { ...GL, lenses: GL.lenses.map(l => (l.id === 4 ? { ...l, computed: { ...l.computed,
-      gauge: { variable: '한계 분배율', unit: '%', current: 12.79, boundaries: [53.81, 63.81], zones: ['go', 'wait', 'stop'], origin: 'server' } } } : l)) }
     api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? withGauge : { reports: [] } }))
     const { container } = render(
       <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
