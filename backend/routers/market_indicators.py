@@ -256,7 +256,7 @@ def refresh_memory_spot(_: str = Depends(require_admin)):
                 run.set_status(detail)
             return {"status": "skipped" if detail == "skipped" else "updated", "detail": detail,
                     "categories": len(data.get("categories", [])),
-                    "items": sum(len(c["items"]) for c in data.get("categories", []))}
+                    "items": sum(1 for c in data.get("categories", []) for i in c["items"] if not i.get("stale"))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

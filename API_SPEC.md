@@ -3327,7 +3327,7 @@ FRED 신규 창업 신청(Business Formation Statistics) 2개 부문(정보·전
 
 ### `GET /api/market/semiconductor`
 
-DRAMeXchange 메모리 현물가(6분류) 저장값 + 품목별 이력. `market_cache`(키 `memory_spot`)에 저장된 값만 반환하며 요청 경로에서 외부 호출은 없다(`memory_spot_fetch` 일배치와 백필이 채운다). 저장값이 없으면 `{"categories": [], "fetched_at": null}`.
+DRAMeXchange 메모리 현물가(6분류) 저장값 + 품목별 이력. `market_cache`(키 `memory_spot`)에 저장된 값만 반환하며 요청 경로에서 외부 호출은 없다(`memory_spot_fetch` 일배치와 백필이 채운다). 저장값이 없으면 `{"categories": [], "fetched_at": null}`. `items`는 각 분류의 **가장 최신 소스 목록에 있는 품목만** 싣는다 — 소스에서 빠진 단종 품목과 옛 아카이브 스냅샷에만 있던 품목은 이력만 저장하고 응답에서 제외한다(다시 목록에 오르면 이력이 이어진 채 노출).
 
 **Auth:** Bearer token 필요
 
@@ -3385,7 +3385,7 @@ DRAMeXchange 메모리 현물가(6분류) 저장값 + 품목별 이력. `market_
 | `status` | string | `updated`(저장됨) \| `skipped`(예외·빈 응답으로 저장 생략, 직전값 유지) |
 | `detail` | string | `success`(6분류 전부 갱신) \| `partial`(일부 분류 누락, 그 분류는 직전값 유지) \| `skipped` |
 | `categories` | integer | 응답 시점 저장값의 분류 수(`skipped`면 직전 저장값 기준) |
-| `items` | integer | 같은 저장값의 품목 수 합 |
+| `items` | integer | 같은 저장값에서 현재 목록에 있는 품목 수 합(이력만 보존된 단종 품목 제외) |
 
 ---
 

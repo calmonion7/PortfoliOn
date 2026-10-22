@@ -189,6 +189,39 @@ def test_older_snapshot_only_adds_history(monkeypatch, store):
     assert [p["date"] for p in dram["items"][0]["history"]] == ["2026-10-01", "2026-10-20", "2026-10-21"]
 
 
+def _get_ids(store):
+    import services.market_indicators.semiconductor as m
+    out = m.get_memory_spot()
+    return {c["key"]: [i["id"] for i in c["items"]] for c in out["categories"]}
+
+
+def test_item_dropped_by_newer_snapshot_is_hidden_but_history_kept(monkeypatch, store):
+    """소스 목록에서 빠진 품목(단종)은 현재 표에서 숨긴다 — 이력은 보존(다시 오르면 이어 붙는다)."""
+    p = _parsed(day_dram="2026-10-22")
+    p["categories"][0]["items"] = [{"id": "dram:2", "name": "n2", "avg": 3.0, "high": 4.0, "low": 2.0,
+                                    "change_pct": 0.0}]
+    sc.merge_and_save_memory_spot(p)
+    assert _get_ids(store)["dram_spot"] == ["dram:2"]
+    kept = next(i for c in store["data"]["categories"] for i in c["items"] if i["id"] == "dram:1")
+    assert [h["date"] for h in kept["history"]] == ["2026-10-20", "2026-10-21"]
+    # 다음 날 다시 목록에 오르면 이력이 이어진 채 노출
+    sc.merge_and_save_memory_spot(_parsed(day_dram="2026-10-23", avg=11.0))
+    ids = _get_ids(store)["dram_spot"]
+    assert "dram:1" in ids
+
+
+def test_backfill_only_item_never_listed_in_current_table(monkeypatch, store):
+    """옛 스냅샷에만 있는 품목(현재 소스에 없음)은 이력만 쌓이고 현재 표에 오르지 않는다(task#403 C5 실측)."""
+    p = _parsed(day_dram="2025-11-07")
+    p["categories"][0]["items"].append({"id": "dram:472", "name": "old", "avg": 24.5, "high": 25.0,
+                                        "low": 24.0, "change_pct": 0.0})
+    sc.merge_and_save_memory_spot(p)
+    assert _get_ids(store)["dram_spot"] == ["dram:1"]
+    # 백필 뒤 오늘 갱신이 같아도 부활하지 않는다
+    sc.merge_and_save_memory_spot(_parsed(day_dram="2026-10-21", avg=10.0))
+    assert _get_ids(store)["dram_spot"] == ["dram:1"]
+
+
 def test_none_avg_does_not_clobber(monkeypatch, store):
     p = _parsed()
     p["categories"][0]["items"][0]["avg"] = None
@@ -276,10 +309,12 @@ def test_refresh_route_distinguishes_updated_and_skipped(monkeypatch, status, ex
 
     monkeypatch.setattr(mi.job_runs, "record", rec)
     monkeypatch.setattr(mi, "fetch_and_save_memory_spot",
-                        lambda: {"categories": [{"items": [1, 2]}], "_status": status})
+                        lambda: {"categories": [{"items": [{"id": "a"}, {"id": "b"}, {"id": "c", "stale": True}]}],
+                                 "_status": status})
     r = _client("admin").post("/api/market/refresh-memory-spot")
     assert r.status_code == 200
     assert r.json()["status"] == expected
+    assert r.json()["items"] == 2  # stale(이력만 보존된 단종) 제외
     if status == "success":
         run.set_status.assert_not_called()
     else:

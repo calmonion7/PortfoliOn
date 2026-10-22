@@ -116,16 +116,20 @@ def _merge_item(prev: Optional[dict], new: dict, day: str, newer: bool) -> dict:
 def _merge_category(prev: Optional[dict], new: dict) -> dict:
     newer = not prev or new["updated_at"] >= prev["updated_at"]
     prev_items = {i["id"]: i for i in (prev or {}).get("items", [])}
-    items = dict(prev_items)  # 이번 페이로드에 없는 품목은 직전값 유지
+    # 현재 목록 = 가장 최신 페이로드의 품목. 거기서 빠진 품목(단종)·옛 스냅샷에만 있는 품목은
+    # stale로 이력만 보존하고 현재 표(get_memory_spot)에선 숨긴다(task#403 — 백필이 1년 전 품목을 부활시켰다).
+    items = {k: {**v, "stale": True} if newer else v for k, v in prev_items.items()}
     for it in new["items"]:
-        items[it["id"]] = _merge_item(prev_items.get(it["id"]), it, new["updated_at"], newer)
+        m = _merge_item(prev_items.get(it["id"]), it, new["updated_at"], newer)
+        stale = False if newer else prev_items.get(it["id"], {"stale": True}).get("stale", False)
+        items[it["id"]] = {**m, "stale": stale}
     head = new if newer else prev
     return {"key": head["key"], "label": head["label"], "updated_at": head["updated_at"],
             "items": list(items.values())}
 
 
 def merge_and_save_memory_spot(parsed: dict) -> dict:
-    """파싱 결과를 저장값에 병합·저장(분류 단위 — 빠진 분류·품목은 직전값 보존). S3 백필도 이 경로를 쓴다.
+    """파싱 결과를 저장값에 병합·저장(빠진 분류는 직전값 보존, 최신 목록에서 빠진 품목은 stale — 이력만 보존). S3 백필도 이 경로를 쓴다.
 
     `_mc_load_strict`라 조회 실패는 전파된다(저장값 위에 누적하므로 실패를 빈 이력으로 접으면 이력 파괴).
     반환: 병합된 {"categories": [...]} (저장된 dict와 별개 사본)."""
@@ -166,10 +170,9 @@ def get_memory_spot() -> dict:
     stored = _mc_load_strict(_KEY)
     if not stored or not stored.get("data"):
         return {"categories": [], "fetched_at": None}
-    cats = stored["data"].get("categories", [])
-    for c in cats:
-        for it in c["items"]:
-            it.setdefault("history", [])
+    cats = [{**c, "items": [{"history": [], **{k: v for k, v in it.items() if k != "stale"}}
+                            for it in c["items"] if not it.get("stale")]}
+            for c in stored["data"].get("categories", [])]
     fa = stored.get("fetched_at")
     return {"categories": cats, "fetched_at": fa.isoformat() if hasattr(fa, "isoformat") else fa}
 
