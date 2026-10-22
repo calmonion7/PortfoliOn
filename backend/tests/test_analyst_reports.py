@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from routers.analyst_reports import router
 from auth import get_current_user, get_current_user_or_api_key, require_admin, require_admin_or_api_key
 from services import analyst_reports as svc
+from tests._reject import assert_rejected
 
 app = FastAPI()
 app.include_router(router)
@@ -196,9 +197,9 @@ def test_v1_body_rejected():
     v1 = {"rating": "buy", "title": "옛 형식", "fair_value_low": 80000, "fair_value_high": 95000,
           "valuation_method": "PER 밴드", "points": [{"title": "p1", "body": "b1"}, {"title": "p2", "body": "b2"}],
           "risks": "리스크"}
-    for body in (v1, {**v1, "format": 1}):
+    for body, why in ((v1, "missing"), ({**v1, "format": 1}, "literal_error")):
         resp, mock_save = _publish(body)
-        assert resp.status_code == 422, resp.text
+        assert_rejected(resp, loc=("body", "format"), type=why)
         mock_save.assert_not_called()
 
 
@@ -227,7 +228,7 @@ def test_publish_lens_metrics_nan_change_pct_rejected_422():
              patch.object(svc, "save_lens_report") as ms:
             resp = c.post("/api/analyst-reports/TST", content=raw,
                           headers={"Content-Type": "application/json"})
-        assert resp.status_code == 422
+        assert_rejected(resp, loc=("body", "lenses", 0, "metrics", 0, "change_pct"), type="finite_number")
         ms.assert_not_called()
     finally:
         main_app.dependency_overrides.pop(require_admin_or_api_key, None)
@@ -241,9 +242,9 @@ def test_publish_no_snapshot_409():
 
 def test_publish_validation_422():
     missing = {k: v for k, v in VALID_BODY.items() if k != "title"}
-    assert _publish(missing)[0].status_code == 422
+    assert_rejected(_publish(missing)[0], loc=("body", "title"), type="missing")
     nine = {**VALID_BODY, "lenses": VALID_BODY["lenses"][:9]}
-    assert _publish(nine)[0].status_code == 422
+    assert_rejected(_publish(nine)[0], loc=("body", "lenses"), type="too_short")
 
 
 # ── 조회 API ──────────────────────────────────────────────────────────
