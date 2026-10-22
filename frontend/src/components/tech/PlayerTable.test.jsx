@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import PlayerTable, { NAME_TEXT, NOTE_BODY } from './PlayerTable'
@@ -245,9 +247,10 @@ describe('PlayerTable (task#280 S3 → task#296 S3)', () => {
     // 업체 열 181px → 4열 360px > 가용 278px → doc 396px). jsdom엔 레이아웃이 없어 이 차이를
     // 원리적으로 볼 수 없으므로, 여기서는 **선언값을 못박고** 실제 폭은 uat296 page-h-scroll이 잰다.
     expect(NAME_TEXT.overflowWrap).toBe('anywhere')
-    // 접히려면 이름 셀이 nowrap이 아니어야 한다. 수치 열(선두 대비, cells[2])은 nowrap 유지.
+    // 접히려면 이름 셀이 nowrap이 아니어야 한다. 선두 대비(cells[2])는 360 이상 nowrap — 360 미만에서만
+    // mobile.css 변수로 어절 경계 접힘(task#402 후속, 「현재 선두」 → 2줄). 폴백이 곧 360 이상의 값이다.
     expect(rowOf('Rolls-Royce SMR').cells[0].style.whiteSpace).toBe('normal')
-    expect(rowOf('Rolls-Royce SMR').cells[2].style.whiteSpace).toBe('nowrap')
+    expect(rowOf('Rolls-Royce SMR').cells[2].getAttribute('style')).toContain('white-space: var(--pt-ws, nowrap)')
     // 이름 문자열 자체는 온전하고 title 앵커도 유지된다
     const nameEl = within(rowOf('Rolls-Royce SMR')).getByTestId('tech-report-player-name')
     expect(nameEl.textContent).toBe('Rolls-Royce SMR')
@@ -528,5 +531,33 @@ describe('업체 표 티커 → 종목 리포트 딥링크 (task#324)', () => {
     }
     expect(screen.getByText('보유')).toBeTruthy()                   // 배지 자체는 살아 있다
     expect(screen.getByText('관심')).toBeTruthy()
+  })
+})
+
+// task#402 후속 — 360 미만에서 4열 최소폭 합이 본문 폭(m278 206px)을 넘어 문서가 가로 스크롤했다.
+// jsdom은 레이아웃·스타일시트가 없어 넘침 자체는 못 잰다(게이트는 라이브 프로브 uat215 「기술:페이지-가로넘침」).
+// 여기선 배선만 못박는다: ⓐ 표가 변수를 받는 클래스를 달고 ⓑ 셀이 변수를 읽되 폴백이 옛 값(10px·nowrap)이라
+// 360 이상은 무변경이며 ⓒ 360 미만 규칙이 실제로 변수를 정의한다(규칙이 없으면 ⓐⓑ만으론 아무 일도 안 일어난다).
+describe('좁은 폭 셀 조임 배선 (task#402 후속)', () => {
+  const CSS = readFileSync(join(import.meta.dirname, '../../styles/mobile.css'), 'utf8')
+
+  it('표에 player-table 클래스 · 머리글·셀이 변수를 읽고 폴백은 옛 값', () => {
+    render(<MemoryRouter><PlayerTable players={PLAYERS} /></MemoryRouter>)
+    const table = screen.getByTestId('tech-report-players')
+    expect(table.classList.contains('player-table')).toBe(true)
+    const th = table.querySelector('th')
+    const td = table.querySelector('tr[data-testid="tech-report-player-row"] > td:nth-child(3)')  // 선두 대비
+    for (const el of [th, td]) {
+      expect(el.getAttribute('style')).toContain('var(--pt-px, 10px)')
+      expect(el.getAttribute('style')).toContain('var(--pt-ws, nowrap)')
+      expect(el.style.wordBreak).toBe('keep-all')
+    }
+  })
+
+  it('mobile.css 359px 이하 블록이 .player-table 변수를 정의한다', () => {
+    const m = CSS.match(/@media \(max-width: 359px\) \{\s*\.player-table \{([^}]*)\}/)
+    expect(m).not.toBeNull()
+    expect(m[1]).toMatch(/--pt-px:\s*4px/)
+    expect(m[1]).toMatch(/--pt-ws:\s*normal/)
   })
 })
