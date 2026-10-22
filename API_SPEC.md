@@ -2731,9 +2731,9 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 ### `GET /api/batches`
 
-자동 배치(35종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다. 세션 판정 거래소가 등록된 배치(`daily_report_kr`·`daily_report_us`)는 `exchange` 필드를 가지며, 그 배치의 스케줄 스펙에 `skip_holidays: true`를 설정하면 세션 판정일이 해당 거래소 휴장일일 때 실행을 건너뛴다(아래 PUT 참조).
+자동 배치(36종) 현황 조회. 각 배치의 메타데이터 + 다음 실행 시각 + 최근 실행 로그를 반환하며, 편집 가능한 배치에는 현재 스케줄 스펙도 포함한다. 세션 판정 거래소가 등록된 배치(`daily_report_kr`·`daily_report_us`)는 `exchange` 필드를 가지며, 그 배치의 스케줄 스펙에 `skip_holidays: true`를 설정하면 세션 판정일이 해당 거래소 휴장일일 때 실행을 건너뛴다(아래 PUT 참조).
 
-> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 내부자·5%지분 공시 신호 수집 `insider_fetch`(매일 07:45 KST, `market="KR"` — DART 출처)는 수동 트리거 `POST /api/report/insider-trades/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다. 환율 수집 `fx_fetch`(매일 06:40 KST, `market="공통"` — 교차통화·다시장 소비)는 수동 트리거 `POST /api/market/refresh-fx`를 가지며, 이 배치가 없으면 `market_cache`의 `fx` 키를 갱신하는 주체가 없어 포트폴리오 KRW 환산이 무기한 stale해진다(요청경로 증분은 시장지표 탭을 열어야 돌고, `get_or_refresh`의 ttl은 저장값에 걸리지 않는다).
+> 일일 리포트는 시장별로 `daily_report_kr`(기본 20:30 KST, KR 종목)·`daily_report_us`(기본 07:00 KST, US 종목) 2종으로 분리되어 있다(단일 `daily_report`는 더 이상 존재하지 않음). 실적·월간 지표도 같은 방식으로 시장별 분리됨: 실적은 `earnings_kr`(KR Top2)·`earnings_us`(M7), 월간 지표는 `monthly_kr`(KR 수출)·`monthly_us`(FRED 경제지표). 단일 `earnings_refresh`/`monthly_refresh`는 더 이상 존재하지 않는다. 매크로 신호 수집 `macro_signals_fetch`(매일 06:00 KST, `market="US"` — FRED 출처)는 수동 트리거 `POST /api/market/refresh-macro-signals`를 갖는다. KR 업종 모멘텀 수집 `kr_sector_fetch`(매일 16:00 KST, `market="KR"`)는 수동 트리거 `POST /api/analysis/sector/refresh-kr`를 갖는다. DART 공시 피드 수집 `disclosure_fetch`(매일 07:30 KST, `market="KR"`)는 수동 트리거 `POST /api/report/disclosures/refresh`를 갖는다. 내부자·5%지분 공시 신호 수집 `insider_fetch`(매일 07:45 KST, `market="KR"` — DART 출처)는 수동 트리거 `POST /api/report/insider-trades/refresh`를 갖는다. 배당 수집 `dividend_fetch`(`market="공통"`, 매주 일 05:00 KST, US=yfinance/KR=DART alotMatter)는 수동 트리거 `POST /api/stocks/dividends/refresh`를 갖는다. 환율 수집 `fx_fetch`(매일 06:40 KST, `market="공통"` — 교차통화·다시장 소비)는 수동 트리거 `POST /api/market/refresh-fx`를 가지며, 이 배치가 없으면 `market_cache`의 `fx` 키를 갱신하는 주체가 없어 포트폴리오 KRW 환산이 무기한 stale해진다(요청경로 증분은 시장지표 탭을 열어야 돌고, `get_or_refresh`의 ttl은 저장값에 걸리지 않는다). 메모리 현물가 수집 `memory_spot_fetch`(매일 19:40 KST, `market="공통"`, 출처 DRAMeXchange)는 수동 트리거 `POST /api/market/refresh-memory-spot`을 가지며, 1년 이력 백필 `POST /api/market/backfill-memory-spot`의 실행도 같은 id로 기록한다(payload `backfill: true`).
 
 **Auth:** Bearer token 필요
 
@@ -3298,7 +3298,8 @@ FRED 신규 창업 신청(Business Formation Statistics) 2개 부문(정보·전
   "indices": {
     "gspc":  { "current": 7354.02, "change_pct": -0.05, "history": [{ "date": "2026-06-26", "value": 7354.02 }] },
     "ks11":  { "current": 2780.5,  "change_pct":  0.12, "history": [{ "date": "2026-06-26", "value": 2780.5  }] },
-    "kq11":  { "current":  910.3,  "change_pct": -0.30, "history": [{ "date": "2026-06-26", "value":  910.3  }] }
+    "kq11":  { "current":  910.3,  "change_pct": -0.30, "history": [{ "date": "2026-06-26", "value":  910.3  }] },
+    "sox":   { "current": 11044.97, "change_pct": -3.99, "history": [{ "date": "2026-10-22", "value": 11044.97 }] }
   },
   "valuation": {
     "sp500_cape": { "current": 40.7, "mean": 17.39, "median": 16.1, "min": 4.78, "max": 44.19 }
@@ -3311,6 +3312,7 @@ FRED 신규 창업 신청(Business Formation Statistics) 2개 부문(정보·전
 | `indices.gspc` | object | S&P 500 (`^GSPC`, yfinance) |
 | `indices.ks11` | object | KOSPI (`^KS11`, yfinance) |
 | `indices.kq11` | object | KOSDAQ (`^KQ11`, yfinance) |
+| `indices.sox` | object | 필라델피아 반도체지수 (`^SOX`, yfinance) — 시장지표 탭 「반도체」 카드에서만 쓰고 「주요 지수」 카드는 `gspc`·`ks11`·`kq11`만 표시한다 |
 | `indices.*.current` | number \| null | 최신 종가 |
 | `indices.*.change_pct` | number \| null | 전일 대비 등락률(%) |
 | `indices.*.history` | object[] | 최근 90일 종가 시계열(`{ "date": "YYYY-MM-DD", "value": number }`) |
@@ -3320,6 +3322,87 @@ FRED 신규 창업 신청(Business Formation Statistics) 2개 부문(정보·전
 | `valuation.sp500_cape.median` | number | 장기 중앙값 |
 | `valuation.sp500_cape.min` | number | 역사적 최솟값 |
 | `valuation.sp500_cape.max` | number | 역사적 최댓값 |
+
+---
+
+### `GET /api/market/semiconductor`
+
+DRAMeXchange 메모리 현물가(6분류) 저장값 + 품목별 이력. `market_cache`(키 `memory_spot`)에 저장된 값만 반환하며 요청 경로에서 외부 호출은 없다(`memory_spot_fetch` 일배치와 백필이 채운다). 저장값이 없으면 `{"categories": [], "fetched_at": null}`. `items`는 각 분류의 **가장 최신 소스 목록에 있는 품목만** 싣는다 — 소스에서 빠진 단종 품목과 옛 아카이브 스냅샷에만 있던 품목은 이력만 저장하고 응답에서 제외한다(다시 목록에 오르면 이력이 이어진 채 노출).
+
+**Auth:** Bearer token 필요
+
+**Response `200`**
+```json
+{
+  "categories": [
+    {
+      "key": "dram_spot",
+      "label": "DRAM 현물",
+      "updated_at": "2026-10-22",
+      "items": [
+        {
+          "id": "dram:475",
+          "name": "DDR5 16Gb (2Gx8) 4800/5600",
+          "avg": 6.12,
+          "high": 7.2,
+          "low": 5.0,
+          "change_pct": 0.33,
+          "history": [{ "date": "2026-10-21", "value": 6.1 }, { "date": "2026-10-22", "value": 6.12 }]
+        }
+      ]
+    }
+  ],
+  "fetched_at": "2026-10-22T10:40:03+00:00"
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `categories` | object[] | 가격이 있는 분류만, 고정 순서: `dram_spot`(DRAM 현물)·`module`(모듈)·`flash`(Flash)·`gddr`(GDDR)·`wafer`(웨이퍼)·`memory_card`(메모리카드) |
+| `categories[].updated_at` | string | 그 분류의 **소스 갱신일**(`YYYY-MM-DD`). 분류마다 다르다 — DRAM 현물만 매일 갱신되고 나머지는 며칠 전 날짜일 수 있다 |
+| `categories[].items[].id` | string | `<item>:<type>` 복합키(DRAMeXchange History 링크의 `item`·`type`). `type` 단독은 분류 간 충돌하므로 복합키가 정본이다 |
+| `categories[].items[].name` | string | 소스 표기 품목명. 시기마다 표기가 달라질 수 있어(`DDR5 16G`↔`DDR5 16Gb`) 식별은 `id`로 한다 |
+| `categories[].items[].avg` · `high` · `low` | number \| null | 세션 평균·최고·최저가(USD, 소스 표기 그대로). 비유한값은 `null` |
+| `categories[].items[].change_pct` | number \| null | 소스가 주는 등락률(%) |
+| `categories[].items[].history` | object[] | `{ "date": "YYYY-MM-DD", "value": number }` 날짜 오름차순·날짜 중복 없음. 값은 `avg`이고 날짜는 **소스 갱신일** 기준(조회일이 아니다). 백필 전·신규 품목은 짧거나 `[]` |
+| `fetched_at` | string \| null | 마지막 저장 시각(ISO). 저장값이 없으면 `null` |
+
+---
+
+### `POST /api/market/refresh-memory-spot`
+
+메모리 현물가 수동 갱신(DRAMeXchange 홈 fetch → 파싱 → 저장값에 병합). 분류 단위로 직전값을 보존한다 — fetch 예외·빈 응답이면 저장을 생략하고, 일부 분류만 파싱되면 그 분류만 갱신한다. 실행이력은 일배치와 동일한 `memory_spot_fetch` id로 기록한다(`partial`/`skipped`는 비-success로 기록).
+
+**Auth:** admin 권한 필요
+
+**Response `200`**
+```json
+{ "status": "updated", "detail": "success", "categories": 6, "items": 23 }
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `status` | string | `updated`(저장됨) \| `skipped`(예외·빈 응답으로 저장 생략, 직전값 유지) |
+| `detail` | string | `success`(6분류 전부 갱신) \| `partial`(일부 분류 누락, 그 분류는 직전값 유지) \| `skipped` |
+| `categories` | integer | 응답 시점 저장값의 분류 수(`skipped`면 직전 저장값 기준) |
+| `items` | integer | 같은 저장값에서 현재 목록에 있는 품목 수 합(이력만 보존된 단종 품목 제외) |
+
+---
+
+### `POST /api/market/backfill-memory-spot`
+
+메모리 현물가 최근 1년 이력 백필. 인터넷 아카이브(Wayback) CDX에서 일 단위 스냅샷을 나열해 요청 간 5초 간격(인터넷 아카이브 레이트리밋 아래)으로 받고 연결 실패는 60초 뒤 1회 재시도해 같은 파서·병합 경로로 저장값에 합친다. 1년치(~134건)에 10분 남짓 걸리므로 `BackgroundTasks`로 돌리고 즉시 응답한다(Cloudflare 100초 제한 회피). 같은 날짜는 덮어써 재실행해도 이력이 늘지 않는다(멱등). 단일 비행 — 이미 돌고 있으면 새로 시작하지 않는다. 결과는 `job_runs`(`memory_spot_fetch`, payload `{backfill: true, snapshots: 병합 수, skipped: 건너뛴 수}`)에 `success`/`partial`(일부 스냅샷 건너뜀)/`failed`(CDX 실패·스냅샷 0건·전부 실패)로 기록되며 이 응답에는 실리지 않는다.
+
+**Auth:** admin 권한 필요
+
+**Response `200`**
+```json
+{ "status": "started" }
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `status` | string | `started`(백그라운드 시작) \| `already_running`(이미 실행 중) |
 
 ---
 

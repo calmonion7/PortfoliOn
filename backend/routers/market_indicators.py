@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Query
 from services.leverage_service import get_leverage_data, get_coverage, backfill_with_progress, _backfill_progress
 from services.lending_service import get_lending_data, fetch_and_store as lending_fetch_and_store
@@ -32,10 +33,14 @@ from services.market_indicators import (
     _mc_delete,
     _cache,
 )
+from services.market_indicators.semiconductor import (
+    get_memory_spot, fetch_and_save_memory_spot, run_backfill, try_start_backfill, _set_backfill_idle,
+)
 # 배치용 강제 갱신은 패키지 재수출을 거치지 않고 서브모듈에서 직접 가져온다
 # (jobs.py가 `from services.market_indicators import kospi_signal`을 쓰는 것과 같은 관용구).
 from services.market_indicators.fx import _fetch_and_save_fx
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/market", tags=["market"])
 
 
@@ -226,6 +231,60 @@ def refresh_labor_surveys(_: str = Depends(require_admin)):
                     "household_points": len(data.get("household", []))}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/semiconductor")
+def semiconductor(_: str = Depends(get_current_user)):
+    """DRAMeXchange 메모리 현물가 6분류 저장값+품목별 history. 요청경로 외부 호출 0."""
+    try:
+        return get_memory_spot()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/refresh-memory-spot")
+def refresh_memory_spot(_: str = Depends(require_admin)):
+    """메모리 현물가 수동 갱신 — memory_spot_fetch로 기록.
+
+    `status`: updated(저장됨 — `detail`이 success/partial로 전부/일부 분류 갱신을 구분)/
+    skipped(예외·빈응답으로 저장 생략, 직전값 유지)."""
+    try:
+        with job_runs.record("memory_spot_fetch", "manual") as run:
+            data = fetch_and_save_memory_spot()
+            detail = data.get("_status") or "success"
+            if detail != "success":
+                run.set_status(detail)
+            return {"status": "skipped" if detail == "skipped" else "updated", "detail": detail,
+                    "categories": len(data.get("categories", [])),
+                    "items": sum(1 for c in data.get("categories", []) for i in c["items"] if not i.get("stale"))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _run_memory_backfill():
+    """BackgroundTasks 본문 — run_backfill이 플래그를 풀고, 예외로 새도 여기서 푼다."""
+    try:
+        with job_runs.record("memory_spot_fetch", "manual") as run:
+            run.set_payload({"backfill": True})
+            res = run_backfill()
+            run.set_payload({"backfill": True, "snapshots": res.get("snapshots"), "skipped": res.get("skipped")})
+            if res["status"] != "success":
+                run.set_status(res["status"], res.get("error"))
+    except Exception as e:
+        logger.warning(f"[Semiconductor] 백필 실패: {e}")
+    finally:
+        _set_backfill_idle()
+
+
+@router.post("/backfill-memory-spot")
+def backfill_memory_spot(background_tasks: BackgroundTasks, _: str = Depends(require_admin)):
+    """메모리 현물가 1년 이력 백필(Wayback) — 수 분 걸려 BackgroundTasks로 돌린다(Cloudflare 100s).
+
+    `status`: started / already_running. 결과는 job_runs(memory_spot_fetch, payload.backfill)에 기록."""
+    if not try_start_backfill():
+        return {"status": "already_running"}
+    background_tasks.add_task(_run_memory_backfill)
+    return {"status": "started"}
 
 
 @router.get("/trimmed-inflation")

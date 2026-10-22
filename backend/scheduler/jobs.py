@@ -345,6 +345,21 @@ def _refresh_labor_surveys():
             logger.warning(f"[Scheduler] Labor surveys refresh failed: {e}")
 
 
+def _refresh_memory_spot():
+    from services.market_indicators import semiconductor
+    with job_runs.record("memory_spot_fetch", "auto") as run:
+        try:
+            data = semiconductor.fetch_and_save_memory_spot()
+            if data.get("_status") and data["_status"] != "success":
+                run.set_status(data["_status"])
+                logger.warning(f"[Scheduler] Memory spot {data['_status']}")
+            else:
+                logger.info("[Scheduler] Memory spot refreshed")
+        except Exception as e:
+            run.set_status("failed", str(e))
+            logger.warning(f"[Scheduler] Memory spot refresh failed: {e}")
+
+
 def _refresh_trimmed_inflation():
     from services.market_indicators import _fetch_and_save_trimmed_inflation
     with job_runs.record("trimmed_inflation_fetch", "auto") as run:
@@ -808,6 +823,7 @@ _JOB_FUNCS = {
     "macro_signals_fetch": _refresh_macro_signals,
     "business_formation_fetch": _refresh_business_formation,
     "labor_surveys_fetch": _refresh_labor_surveys,
+    "memory_spot_fetch": _refresh_memory_spot,
     "trimmed_inflation_fetch": _refresh_trimmed_inflation,
     "kospi_signal_fetch": _refresh_kospi_signal,
     "leverage_fetch": _fetch_leverage,
