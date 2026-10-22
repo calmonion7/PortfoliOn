@@ -214,3 +214,7 @@ API 원문의 표지(`같은 점:`/`다른 점:`)와 DOM 칸 유무를 **쌍으�
 
 **㉧ 같은 recharts `interval` 고정값이라도 카드 안에 한 겹 더 중첩되면 플롯이 좁아져 X축 틱 라벨이 겹친다 — 틱 행은 기하로 골라 간격을 재라(task#403, 육안이 프로브를 이긴 7번째).** `IndexSection`과 같은 `interval={floor(n/6)}`를 쓴 반도체 카드 차트가 m360에서 `11-1301-0203-24…`로 붙었다(옛 DOM 실측 minGap **−2.2px**, m390 **2.9px** 아슬아슬, pc 95px). 넘침·잘림·접힘 축은 전부 통과했다(⑩ 요소 간 간격 클래스). 축: 플롯 surface(부모 `.recharts-wrapper`)의 `text` 중 **가장 아래 top 행**을 틱으로 보고 left 정렬 후 `next.left − prev.right ≥ 2`, 정의역 sentinel로 차트 수·틱 ≥2를 함께 단언(`uat403 x-ticks-no-overlap`). 처방은 `interval="preserveStartEnd" minTickGap={16}`(폭에 맞춰 솎는다 — m360 15.1px). 새 차트가 기존 차트의 축 설정을 복사할 때 **컨테이너 중첩 깊이가 다르면 그 설정의 안전 여유가 사라진다**는 점을 기억할 것.
 
+## task#404 추가 — 측정 기준점을 놓는 스크롤이 대상을 가린다
+
+**㉨ 「한 화면 안」을 재려고 `scrollIntoView({block:'start'})`로 기준 요소를 맨 위에 붙이면, 이 앱의 sticky 헤더(마스트헤드) 밑에 *그 요소가 가려진다* — 위치만 재는 축은 PASS한다(task#404, 육안이 프로브를 이긴 8번째).** uat403 `tap-chart-in-view`는 분류 select를 맨 위에 붙이고 마지막 행을 탭한 뒤 「스크롤 없음 · 차트 top < innerHeight」만 봤고, m360 캡처에 **select가 아예 없었다**(헤더 밑). ㉣은 *탭 직전* `elementFromPoint`로 가림을 보라는 규칙이고, 이건 **측정 기준점을 놓는 스크롤 자체**가 가림을 만든 경우라 ㉣이 덮지 못한다. 처방: ⓐ 맨 위에 붙인 뒤 기준 요소 중심의 `elementFromPoint`가 **자기 자신**이 될 때까지 16px씩 되돌려 「사용자가 보는 위치」를 만든다(`scrollIntoView`의 `block` 옵션이나 `scroll-margin-top` 추정 대신 hit-test로 닫는다 — 헤더 높이를 상수로 박으면 헤더가 바뀔 때 조용히 틀린다) ⓑ 그 가시성(`selVisible`)을 **축 조건에 넣는다** — 캡처로만 남기면 다음 변경에서 다시 눈이 먼다. 부수: 새 컨트롤을 찾는 Playwright 호출(`selectOption`·`locator().tap`)은 **옛 배포에서 기본 30초씩** 기다려 red-first 실행이 분 단위로 늘어난다 → 순회 루프 안의 호출엔 `{ timeout: 5000 }`을 명시할 것.
+

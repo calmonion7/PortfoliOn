@@ -12,6 +12,11 @@ const ROW_BASE = {
 }
 const NAME_STYLE = { flex: 1, minWidth: 0, fontSize: 13, color: 'var(--text)', wordBreak: 'keep-all', overflowWrap: 'break-word' }
 const NUM_STYLE = { flexShrink: 0, fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'var(--text-2)' }
+// 네이티브 select — appearance는 건드리지 않는다(iOS 피커 렌더는 Chromium 프로브가 못 본다). 탭 타깃은 ROW_BASE와 같은 44.
+const SELECT_STYLE = {
+  minHeight: 44, background: 'var(--bg-elev-2)', border: '1px solid var(--border)', color: 'var(--text)',
+  borderRadius: 4, padding: '0 8px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+}
 
 const dirColor = v => (v > 0 ? 'var(--up)' : v < 0 ? 'var(--down)' : 'var(--text-3)')
 const dirArrow = v => (v > 0 ? '▲' : v < 0 ? '▼' : '─')
@@ -36,11 +41,13 @@ function LineBox({ title, data, color }) {
 
 // 반도체: SOX 지수 + DRAMeXchange 메모리 현물가 (task#403 S5).
 // 두 조회는 독립 — 한쪽 실패가 다른 쪽을 지우지 않는다. 메모리는 3상태(null=미조회 · categories=[]=0건 · failed=실패).
+// 분류 콤보 → 그 분류 표 → 바로 아래 차트(task#404). 표와 차트는 항상 같은 분류를 본다.
 export default function SemiconductorSection() {
   const [open, setOpen] = useState(true)
   const [sox, setSox] = useState(null)
   const [semi, setSemi] = useState(null)
   const [failed, setFailed] = useState(false)
+  const [catKey, setCatKey] = useState(null)
   const [selected, setSelected] = useState(DEFAULT_ITEM)
 
   useEffect(() => {
@@ -53,12 +60,19 @@ export default function SemiconductorSection() {
 
   const categories = semi?.categories || []
   const items = categories.flatMap(c => c.items)
-  const sel = items.find(i => i.id === selected)
+  // 초기 분류 = DEFAULT_ITEM이 든 분류, 없으면 첫 분류. 선택 품목이 분류 밖이면 그 분류의 첫 품목.
+  const cat = categories.find(c => c.key === catKey)
+    || categories.find(c => c.items.some(i => i.id === DEFAULT_ITEM)) || categories[0]
+  const sel = cat?.items.find(i => i.id === selected) || cat?.items[0]
+  const pickCat = key => {
+    setCatKey(key)
+    setSelected(categories.find(c => c.key === key)?.items[0]?.id ?? null)
+  }
   const soxHist = sox?.history?.slice(-252) || []
 
   return (
     <SectionCard title="반도체" summary={sox ? fmt(sox.current) : ''} change={sox?.change_pct ?? null} changeSuffix="%" open={open} onToggle={() => setOpen(o => !o)}>
-      <p style={DESC_STYLE}>필라델피아 반도체지수(SOX)와 DRAMeXchange 메모리 현물가입니다. 행을 누르면 아래 차트가 해당 품목으로 바뀝니다.</p>
+      <p style={DESC_STYLE}>필라델피아 반도체지수(SOX)와 DRAMeXchange 메모리 현물가입니다. 분류를 고르고 행을 누르면 바로 아래 차트가 해당 품목으로 바뀝니다.</p>
 
       {sox && (
         <div className="metric-tile" style={{ marginBottom: 16 }}>
@@ -73,14 +87,18 @@ export default function SemiconductorSection() {
       {!failed && !semi && <p style={DESC_STYLE}>메모리 현물가를 불러오는 중…</p>}
       {semi && items.length === 0 && <p style={DESC_STYLE}>수집된 메모리 현물가가 아직 없습니다.</p>}
 
-      {categories.map(c => (
-        <div key={c.key} data-testid={`semi-cat-${c.key}`} style={{ marginBottom: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '8px 12px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-            <strong style={{ fontSize: 13, color: 'var(--text)' }}>{c.label}</strong>
-            <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{c.updated_at}</span>
-          </div>
-          {c.items.map(it => {
-            const on = it.id === selected
+      {cat && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+          <select data-testid="semi-cat-select" aria-label="메모리 분류" value={cat.key} onChange={e => pickCat(e.target.value)} style={SELECT_STYLE}>
+            {categories.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+          <span data-testid="semi-cat-updated" style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{cat.updated_at}</span>
+        </div>
+      )}
+      {cat && (
+        <div key={cat.key} data-testid={`semi-cat-${cat.key}`} style={{ marginBottom: 8, border: '1px solid var(--border)', borderRadius: 8 }}>
+          {cat.items.map(it => {
+            const on = it.id === sel?.id
             return (
               <button key={it.id} type="button" data-testid={`semi-row-${it.id}`} aria-pressed={on} onClick={() => setSelected(it.id)}
                       style={{ ...ROW_BASE, borderLeftColor: on ? 'var(--text)' : 'transparent', background: on ? 'var(--bg)' : 'none' }}>
@@ -93,7 +111,7 @@ export default function SemiconductorSection() {
             )
           })}
         </div>
-      ))}
+      )}
 
       {sel && sel.history?.length > 0 && (
         <div data-testid="semi-chart" data-item={sel.id}>

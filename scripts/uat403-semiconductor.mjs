@@ -1,14 +1,18 @@
-// task#403 라이브 UAT — 시장지표 탭의 「반도체」 카드(SOX + DRAMeXchange 메모리 현물가). read-only(GET) + 화면 내 행 탭뿐, 쓰기 0.
+// task#403 라이브 UAT — 시장지표 탭의 「반도체」 카드(SOX + DRAMeXchange 메모리 현물가). read-only(GET) + 화면 내 행 탭·분류 선택뿐, 쓰기 0.
+// task#404: 메모리 현물가가 「분류 콤보(select) → 그 분류 표 → 바로 아래 차트」로 바뀌어, 분류별 축은 select로 전 분류를 순회하며 잰다.
 // 대상: BASE(기본 dev 스택 http://127.0.0.1:8084). 기능 배포 전에는 도달 축에서 FAIL/exit한다(red-first).
 // 응답 봉투는 계약(S3)에서 가져왔다: GET /api/market/semiconductor -> {categories:[{key,label,updated_at,items:[{id,name,avg,high,low,change_pct,history}]}],fetched_at}.
-// 축 순서: ⓐ 도달·identity(API 카테고리 라벨 == 화면 라벨) → ⓑ 판정축. 뷰포트당 단언 총계는 고정(EXPECT_PER_VP) — 줄면 측정 실패.
-// 판정 한계: 색(--up/--down)·SOX 차트 실제 픽셀은 육안 캡처(screenshots-uat403/<viewport>.png)로 확인한다.
+// 축 순서: ⓐ 도달·identity(API 카테고리 라벨 == select 옵션) → ⓑ 판정축. 뷰포트당 단언 총계는 고정(EXPECT_PER_VP) — 줄면 측정 실패.
+// 판정 한계: 색(--up/--down)·SOX 차트 실제 픽셀은 육안 캡처(screenshots-uat403/<viewport>.png)로 확인한다. 네이티브 select의 iOS 피커 렌더는 Chromium이 못 본다.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8084';
 const OUT = 'screenshots-uat403';
 const DEFAULT_ITEM = 'dram:475';
+// 소스 독립 리터럴(task#403 회고) — 화면↔API 대조는 API 자체의 결함(단종 품목 부활 등)에 블라인드하다. 소스 품목 목록이 바뀌면 의도적으로 갱신할 것.
+const EXPECT_CATS = 6, EXPECT_TOTAL = 23;
+const CHART_GAP_MAX = 24;
 fs.mkdirSync(OUT, { recursive: true });
 
 const results = [];
@@ -31,20 +35,49 @@ if (!cats || cats.length === 0 || !cats.every(c => c.updated_at && c.items?.leng
   process.exit(1);
 }
 const allItems = cats.flatMap(c => c.items);
-const nonDefault = allItems.find(i => i.id !== DEFAULT_ITEM && i.history?.length > 0);
-const hasDefault = allItems.some(i => i.id === DEFAULT_ITEM);
-if (!nonDefault || !hasDefault) { console.log(`TARGET_MISSING nonDefault=${nonDefault?.id} hasDefault=${hasDefault}`); process.exit(1); }
+const defCat = cats.find(c => c.items.some(i => i.id === DEFAULT_ITEM));
+// 탭 대상은 초기 표(기본 분류) 안의 비기본 품목 — 분류 콤보 뒤로는 다른 분류 행이 DOM에 없다
+const nonDefault = defCat?.items.find(i => i.id !== DEFAULT_ITEM && i.history?.length > 0);
+if (!defCat || !nonDefault) { console.log(`TARGET_MISSING defCat=${defCat?.key} nonDefault=${nonDefault?.id}`); process.exit(1); }
 // 이빨: 기본 품목과 탭 대상의 이름·id가 서로 달라야 「차트 품목 변경」이 관측 가능하다
-const defaultItem = allItems.find(i => i.id === DEFAULT_ITEM);
+const defaultItem = defCat.items.find(i => i.id === DEFAULT_ITEM);
 if (new Set([defaultItem.id, nonDefault.id]).size !== 2 || defaultItem.name === nonDefault.name) { console.log('TEETH_FAIL default/tap 품목이 구별되지 않는다'); process.exit(1); }
 console.log(`target: cats=${cats.map(c => c.key + ':' + c.items.length).join(',')} default=${defaultItem.name} tap=${nonDefault.id}(${nonDefault.name})`);
+ok('api-total-literal', cats.length === EXPECT_CATS && allItems.length === EXPECT_TOTAL, `cats=${cats.length}/${EXPECT_CATS} items=${allItems.length}/${EXPECT_TOTAL}`);
 
 const VIEWPORTS = [
   ['m360', { viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }],
   ['m390', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }],
   ['pc1440', { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 }],
 ];
-const EXPECT_PER_VP = 14; // reached·identity-labels·updated-at-labels·rows-count·card-adjacent·no-h-scroll·no-char-stack·name-not-clipped·row-spacing·default-selected·tap-changes-chart·tap-selected-style·x-ticks-no-overlap·no-pageerror
+const EXPECT_PER_VP = 17; // reached·identity-labels·card-adjacent·no-h-scroll·default-selected·tap-changes-chart·tap-selected-style·x-ticks-no-overlap·updated-at-labels·rows-count·cat-switch-chart·no-char-stack·name-not-clipped·row-spacing·chart-follows-table·tap-chart-in-view·no-pageerror
+const SEL = '[data-testid="semi-cat-select"]';
+
+// 현재 선택된 분류 1개의 표·행·차트 측정(표는 div[data-testid=semi-cat-<key>] — select·updated span과 구별)
+const measure = page => page.evaluate(() => {
+  const tables = [...document.querySelectorAll('div[data-testid^="semi-cat-"]')];
+  const t = tables[0];
+  const rows = t ? [...t.querySelectorAll('button[data-testid^="semi-row-"]')] : [];
+  const names = rows.map(btn => {
+    const el = btn.firstElementChild; const cs = getComputedStyle(el);
+    let lh = parseFloat(cs.lineHeight); if (!(lh > 0)) lh = parseFloat(cs.fontSize) * 1.5;
+    const r = el.getBoundingClientRect();
+    return { text: el.textContent, h: r.height, w: r.width, lh, fs: parseFloat(cs.fontSize), scrollOK: el.scrollWidth <= el.clientWidth + 1 };
+  });
+  const gaps = rows.map(btn => {
+    const [n, a, c] = btn.children; const rn = n.getBoundingClientRect(), ra = a.getBoundingClientRect(), rc = c.getBoundingClientRect(), rb = btn.getBoundingClientRect();
+    return { nameAvg: ra.left - rn.right, avgChg: rc.left - ra.right, inRow: rc.right <= rb.right + 0.5, h: rb.height };
+  });
+  const chart = document.querySelector('[data-testid="semi-chart"]');
+  const sel = document.querySelector('[data-testid="semi-cat-select"]');
+  return {
+    tables: tables.length, key: t?.dataset.testid.replace('semi-cat-', '') || 'TABLE_MISSING',
+    selLabel: sel?.selectedOptions[0]?.textContent || '', updated: document.querySelector('[data-testid="semi-cat-updated"]')?.textContent || '',
+    rows: rows.length, names, gaps, chart: chart?.dataset.item || 'CHART_MISSING',
+    chartGap: chart && t ? chart.getBoundingClientRect().top - t.getBoundingClientRect().bottom : null,
+  };
+});
+
 const b = await chromium.launch();
 const perVp = {};
 for (const [vp, opts] of VIEWPORTS) {
@@ -58,30 +91,16 @@ for (const [vp, opts] of VIEWPORTS) {
   const errs = [];
   page.on('pageerror', e => errs.push(String(e).slice(0, 120)));
   await page.goto(`${BASE}/market/indicators`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('[data-testid^="semi-cat-"]', { timeout: 20000 }).catch(() => {});
+  await page.waitForSelector(SEL, { timeout: 20000 }).catch(() => {});
   await page.waitForFunction(() => document.querySelectorAll('.skeleton-block').length === 0).catch(() => {});
   await page.waitForTimeout(800);
 
-  // ⓐ 도달·identity — 카테고리 라벨/updated_at 이 API와 같다(순서 포함)
-  const dom = await page.evaluate(() => {
-    const catEls = [...document.querySelectorAll('[data-testid^="semi-cat-"]')];
-    return catEls.map(el => ({
-      key: el.dataset.testid.replace('semi-cat-', ''),
-      label: el.querySelector('strong')?.textContent || '',
-      updated: el.querySelector('strong')?.nextElementSibling?.textContent || '',
-      rows: el.querySelectorAll('button[data-testid^="semi-row-"]').length,
-    }));
-  });
-  bump('cats', dom.length);
-  ok(`${vp}/reached`, dom.length === cats.length && dom.length > 0, `dom=${dom.length} api=${cats.length}`);
-  ok(`${vp}/identity-labels`, JSON.stringify(dom.map(d => [d.key, d.label])) === JSON.stringify(cats.map(c => [c.key, c.label])),
-    `dom=${dom.map(d => d.label)} api=${cats.map(c => c.label)}`);
-  ok(`${vp}/updated-at-labels`, dom.length > 0 && dom.every((d, i) => /^\d{4}-\d{2}-\d{2}$/.test(d.updated) && d.updated === cats[i]?.updated_at),
-    dom.map(d => `${d.key}=${d.updated || 'MISSING'}`).join(' '));
-  bump('updated-label', dom.length);
-  const rowTotal = dom.reduce((s, d) => s + d.rows, 0);
-  bump('rows', rowTotal);
-  ok(`${vp}/rows-count`, rowTotal === allItems.length && rowTotal > 1, `dom=${rowTotal} api=${allItems.length}`);
+  // ⓐ 도달·identity — select 옵션(value·라벨)이 API 카테고리와 같다(순서 포함)
+  const opt = await page.evaluate(s => [...(document.querySelector(s)?.options || [])].map(o => [o.value, o.textContent]), SEL);
+  bump('cats', opt.length);
+  ok(`${vp}/reached`, opt.length === cats.length && opt.length > 0, `options=${opt.length} api=${cats.length}`);
+  ok(`${vp}/identity-labels`, JSON.stringify(opt) === JSON.stringify(cats.map(c => [c.key, c.label])),
+    `dom=${opt.map(o => o[1])} api=${cats.map(c => c.label)}`);
 
   // 인접성 — 반도체 카드가 「주요 지수」 카드 바로 다음 형제
   const adj = await page.evaluate(() => {
@@ -95,36 +114,13 @@ for (const [vp, opts] of VIEWPORTS) {
   const ov = await page.evaluate(() => ({ iw: innerWidth, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
   ok(`${vp}/no-h-scroll`, ov.iw === opts.viewport.width && ov.sw <= ov.cw, `innerWidth=${ov.iw} scrollWidth=${ov.sw} clientWidth=${ov.cw}`);
 
-  // 낱자 적층 — 품목명 셀: 줄 수(세로로 안 겹치는 rect 묶음)와 높이/line-height, 폭
-  const names = await page.evaluate(() => [...document.querySelectorAll('button[data-testid^="semi-row-"] > span:first-child')].map(el => {
-    const cs = getComputedStyle(el);
-    let lh = parseFloat(cs.lineHeight); if (!(lh > 0)) lh = parseFloat(cs.fontSize) * 1.5;
-    const r = el.getBoundingClientRect();
-    const rg = document.createRange(); rg.selectNodeContents(el);
-    const rects = [...rg.getClientRects()].filter(x => x.height > 0).sort((a, b) => a.top - b.top);
-    const lines = []; for (const x of rects) { const l = lines[lines.length - 1]; if (l && x.top < l.bottom - x.height * 0.3) { l.bottom = Math.max(l.bottom, x.bottom); } else lines.push({ top: x.top, bottom: x.bottom }); }
-    return { text: el.textContent, h: r.height, w: r.width, lh, fs: parseFloat(cs.fontSize), lines: lines.length, scrollOK: el.scrollWidth <= el.clientWidth + 1 };
-  }));
-  bump('name-cells', names.length);
-  const badNames = names.filter(n => n.h / n.lh > 3.2 || n.w < n.fs * 3);
-  ok(`${vp}/no-char-stack`, names.length === allItems.length && badNames.length === 0,
-    `cells=${names.length}/${allItems.length} maxLines=${Math.max(0, ...names.map(n => n.lines))} maxH/lh=${Math.max(0, ...names.map(n => n.h / n.lh)).toFixed(2)} minW=${Math.min(...names.map(n => n.w)).toFixed(0)} bad=${badNames.map(n => `${n.text}(h${n.h.toFixed(0)}/lh${n.lh.toFixed(0)} w${n.w.toFixed(0)})`).join('|') || '-'}`);
-  ok(`${vp}/name-not-clipped`, names.length > 0 && names.every(n => n.scrollOK), `clipped=${names.filter(n => !n.scrollOK).map(n => n.text).join('|') || '-'}`);
-
-  // 간격 — 이름과 평균가 사이 최소 거리(붙어 보이지 않음), 행 안에서 수치가 이름 위로 겹치지 않음
-  const gaps = await page.evaluate(() => [...document.querySelectorAll('button[data-testid^="semi-row-"]')].map(btn => {
-    const [n, a, c] = btn.children; const rn = n.getBoundingClientRect(), ra = a.getBoundingClientRect(), rc = c.getBoundingClientRect(), rb = btn.getBoundingClientRect();
-    return { nameAvg: ra.left - rn.right, avgChg: rc.left - ra.right, inRow: rc.right <= rb.right + 0.5, h: rb.height };
-  }));
-  ok(`${vp}/row-spacing`, gaps.length === allItems.length && gaps.every(g => g.nameAvg >= 4 && g.avgChg >= 4 && g.inRow && g.h >= 44),
-    `rows=${gaps.length} minNameAvg=${Math.min(...gaps.map(g => g.nameAvg)).toFixed(1)} minAvgChg=${Math.min(...gaps.map(g => g.avgChg)).toFixed(1)} minH=${Math.min(...gaps.map(g => g.h)).toFixed(0)}`);
-
-  // 기본 선택 상태(탭 전)
-  const sel0 = await page.evaluate(([d, t]) => {
+  // 기본 선택 상태(탭 전) — 기본 분류가 선택되고 DEFAULT_ITEM이 차트에
+  const sel0 = await page.evaluate(([d, t, s]) => {
     const get = id => { const el = document.querySelector(`[data-testid="semi-row-${id}"]`); return el ? { pressed: el.getAttribute('aria-pressed'), bl: getComputedStyle(el).borderLeftColor } : null; };
-    return { def: get(d), tap: get(t), chart: document.querySelector('[data-testid="semi-chart"]')?.dataset.item || 'CHART_MISSING' };
-  }, [DEFAULT_ITEM, nonDefault.id]);
-  ok(`${vp}/default-selected`, sel0.def?.pressed === 'true' && sel0.tap?.pressed === 'false' && sel0.chart === DEFAULT_ITEM, `chart=${sel0.chart} def=${sel0.def?.pressed} tap=${sel0.tap?.pressed}`);
+    return { cat: document.querySelector(s)?.value, def: get(d), tap: get(t), chart: document.querySelector('[data-testid="semi-chart"]')?.dataset.item || 'CHART_MISSING' };
+  }, [DEFAULT_ITEM, nonDefault.id, SEL]);
+  ok(`${vp}/default-selected`, sel0.cat === defCat.key && sel0.def?.pressed === 'true' && sel0.tap?.pressed === 'false' && sel0.chart === DEFAULT_ITEM,
+    `cat=${sel0.cat} chart=${sel0.chart} def=${sel0.def?.pressed} tap=${sel0.tap?.pressed}`);
 
   // 행 탭 — 비기본 행: 차트 품목 변경 + 선택 스타일(aria-pressed + 왼쪽 띠 색이 투명이 아님·이전과 다름)
   const rowSel = `[data-testid="semi-row-${nonDefault.id}"]`;
@@ -158,17 +154,73 @@ for (const [vp, opts] of VIEWPORTS) {
   ok(`${vp}/x-ticks-no-overlap`, ticks.length === 2 && ticks.every((t) => t.n >= 2 && t.minGap >= 2),
     ticks.map((t) => `${t.title}: ticks=${t.n} minGap=${t.minGap}`).join(' | ') || 'LINEBOX_MISSING');
 
+  // ⓑ 분류 순회 — select로 전 분류를 고르며 분류별로 잰다(DOM에는 한 번에 표 1개)
+  const per = [];
+  for (const c of cats) {
+    await page.selectOption(SEL, c.key, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    per.push({ c, m: await measure(page) });
+  }
+  bump('cat-visits', per.length);
+  ok(`${vp}/updated-at-labels`, per.every(({ c, m }) => /^\d{4}-\d{2}-\d{2}$/.test(m.updated) && m.updated === c.updated_at && m.selLabel === c.label),
+    per.map(({ c, m }) => `${c.key}=${m.updated || 'MISSING'}`).join(' '));
+  bump('updated-label', per.length);
+  const rowSum = per.reduce((s, { m }) => s + m.rows, 0);
+  bump('rows', rowSum);
+  ok(`${vp}/rows-count`, per.every(({ c, m }) => m.tables === 1 && m.key === c.key && m.rows === c.items.length) && rowSum === allItems.length,
+    `sum=${rowSum}/${allItems.length} ${per.map(({ c, m }) => `${c.key}:${m.rows}/${c.items.length}${m.tables !== 1 ? `(tables=${m.tables})` : ''}`).join(' ')}`);
+  // 분류 전환 → 그 분류 첫 품목이 차트(첫 품목에 이력이 없으면 차트 없음이 정상)
+  ok(`${vp}/cat-switch-chart`, per.every(({ c, m }) => m.chart === (c.items[0].history?.length ? c.items[0].id : 'CHART_MISSING')),
+    per.map(({ c, m }) => `${c.key}->${m.chart}`).join(' '));
+  const names = per.flatMap(({ m }) => m.names), gaps = per.flatMap(({ m }) => m.gaps);
+  bump('name-cells', names.length);
+  const badNames = names.filter(n => n.h / n.lh > 3.2 || n.w < n.fs * 3);
+  ok(`${vp}/no-char-stack`, names.length === allItems.length && badNames.length === 0,
+    `cells=${names.length}/${allItems.length} maxH/lh=${Math.max(0, ...names.map(n => n.h / n.lh)).toFixed(2)} minW=${Math.min(...names.map(n => n.w)).toFixed(0)} bad=${badNames.map(n => `${n.text}(h${n.h.toFixed(0)}/lh${n.lh.toFixed(0)} w${n.w.toFixed(0)})`).join('|') || '-'}`);
+  ok(`${vp}/name-not-clipped`, names.length > 0 && names.every(n => n.scrollOK), `clipped=${names.filter(n => !n.scrollOK).map(n => n.text).join('|') || '-'}`);
+  ok(`${vp}/row-spacing`, gaps.length === allItems.length && gaps.every(g => g.nameAvg >= 4 && g.avgChg >= 4 && g.inRow && g.h >= 44),
+    `rows=${gaps.length} minNameAvg=${Math.min(...gaps.map(g => g.nameAvg)).toFixed(1)} minAvgChg=${Math.min(...gaps.map(g => g.avgChg)).toFixed(1)} minH=${Math.min(...gaps.map(g => g.h)).toFixed(0)}`);
+  // 차트가 표 바로 뒤 — 이력 있는 분류마다 차트 top − 표 bottom ∈ [0, CHART_GAP_MAX]
+  const withChart = per.filter(({ m }) => m.chartGap != null);
+  ok(`${vp}/chart-follows-table`, withChart.length > 0 && withChart.every(({ m }) => m.chartGap >= 0 && m.chartGap <= CHART_GAP_MAX),
+    `${withChart.length}/${per.length} ${withChart.map(({ c, m }) => `${c.key}=${m.chartGap.toFixed(1)}`).join(' ')} max=${CHART_GAP_MAX}`);
+
+  // 한 화면 — 행이 가장 많은 분류에서 select를 화면 맨 위에 두고 표 마지막 행을 탭 → 스크롤 없이 차트 상단이 뷰포트 안
+  const big = cats.reduce((a, c) => (c.items.length > a.items.length ? c : a), cats[0]);
+  await page.selectOption(SEL, big.key, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  // 맨 위로 붙이면 고정 헤더 밑에 가려진다 — select 중심이 hit-test로 자기 자신이 될 때까지 조금씩 되돌린다(사용자가 보는 위치)
+  await page.evaluate(async s => {
+    const el = document.querySelector(s); if (!el) return;
+    el.scrollIntoView({ block: 'start' });
+    const hit = () => { const r = el.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el; };
+    for (let k = 0; k < 20 && !hit(); k++) { scrollBy(0, -16); await new Promise(r => requestAnimationFrame(r)); }
+  }, SEL);
+  await page.waitForTimeout(400);
+  const last = big.items[big.items.length - 1];
+  const y0 = await page.evaluate(() => scrollY);
+  let lastErr = '';
+  try { const l = page.locator(`[data-testid="semi-row-${last.id}"]`); if (opts.hasTouch) await l.tap({ timeout: 8000 }); else await l.click({ timeout: 8000 }); }
+  catch (e) { lastErr = String(e).split('\n')[0].slice(0, 100); }
+  await page.waitForTimeout(500);
+  const inv = await page.evaluate(s => {
+    const ch = document.querySelector('[data-testid="semi-chart"]'), el = document.querySelector(s);
+    const r = el?.getBoundingClientRect();
+    const selVisible = !!r && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el;
+    return { y: scrollY, ih: innerHeight, top: ch ? ch.getBoundingClientRect().top : null, item: ch?.dataset.item || 'CHART_MISSING', selVisible };
+  }, SEL);
+  ok(`${vp}/tap-chart-in-view`, !lastErr && inv.selVisible && Math.abs(inv.y - y0) < 2 && inv.item === last.id && inv.top != null && inv.top >= 0 && inv.top < inv.ih,
+    `err=${lastErr || '-'} selVisible=${inv.selVisible} cat=${big.key}(${big.items.length}) scroll ${y0}->${inv.y} chartTop=${inv.top?.toFixed(0)} vh=${inv.ih} item=${inv.item}/${last.id}`);
+
   ok(`${vp}/no-pageerror`, errs.length === 0, errs.join(' | ') || '0');
 
-  // 육안 캡처 — 탭한 행·차트가 화면에 있는 순간(측정 지점에서 찍는다)
+  // 육안 캡처 — ① SOX 영역 ② select를 맨 위에 둔 채 마지막 행을 탭한 순간(select·표·차트가 한 화면인지)
+  await page.screenshot({ path: `${OUT}/${vp}.png` });
+  console.log(`  capture: ${OUT}/${vp}.png`);
   await page.locator('[data-testid="semi-linebox"]').first().scrollIntoViewIfNeeded().catch(() => {});
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${OUT}/${vp}-top.png` });
   console.log(`  capture: ${OUT}/${vp}-top.png`);
-  await page.locator('[data-testid="semi-chart"]').scrollIntoViewIfNeeded().catch(() => {});
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: `${OUT}/${vp}.png` });
-  console.log(`  capture: ${OUT}/${vp}.png`);
   await ctx.close();
   perVp[vp] = results.length - before;
 }
