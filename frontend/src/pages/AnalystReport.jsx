@@ -374,7 +374,7 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
   if (error) return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '48px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
       <p>{error}</p>
-      {!embedded && <Link to="/reports" state={{ ticker }} style={{ color: 'var(--accent)' }}>← 종목 리포트</Link>}
+      {!embedded && <Link to="/analyst-reports" style={{ color: 'var(--accent)' }}>← 심층 목록</Link>}
     </div>
   )
 
@@ -450,9 +450,10 @@ export default function AnalystReport({ ticker: tickerProp, date: dateProp, embe
       </div>
 
       {/* 복귀 — 우하단 플로팅 pill(task#225). fixed이므로 조상에 transform 금지(task#195).
-          목적지는 admin 발행 관리 목록이 아니라 그 종목의 리포트 상세다(task#324 — nav에서 「심층 리포트」가 빠졌다).
-          `/reports` 딥링크 관례는 쿼리파라미터가 아니라 location.state.ticker다(task#131). */}
-      {!embedded && <Link to="/reports" state={{ ticker }} className="list-pill">← 종목 리포트</Link>}
+          목적지는 심층 목록이다(task#402 — task#396이 목록을 전 사용자에게 재개방했고, 내 보유·관심 밖 종목은
+          그 목록이 유일한 도달 경로라 `/reports`로 보내면 「미추적」 안내로 떨어진다). 뒤로가기(-1)가 아니라
+          고정 경로라 딥링크·「이전 판」 경유에도 결정적으로 목록에 간다. */}
+      {!embedded && <Link to="/analyst-reports" className="list-pill">← 심층 목록</Link>}
     </div>
   )
 }
