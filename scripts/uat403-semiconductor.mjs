@@ -189,7 +189,13 @@ for (const [vp, opts] of VIEWPORTS) {
   const big = cats.reduce((a, c) => (c.items.length > a.items.length ? c : a), cats[0]);
   await page.selectOption(SEL, big.key, { timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(300);
-  await page.evaluate(s => document.querySelector(s)?.scrollIntoView({ block: 'start' }), SEL);
+  // 맨 위로 붙이면 고정 헤더 밑에 가려진다 — select 중심이 hit-test로 자기 자신이 될 때까지 조금씩 되돌린다(사용자가 보는 위치)
+  await page.evaluate(async s => {
+    const el = document.querySelector(s); if (!el) return;
+    el.scrollIntoView({ block: 'start' });
+    const hit = () => { const r = el.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el; };
+    for (let k = 0; k < 20 && !hit(); k++) { scrollBy(0, -16); await new Promise(r => requestAnimationFrame(r)); }
+  }, SEL);
   await page.waitForTimeout(400);
   const last = big.items[big.items.length - 1];
   const y0 = await page.evaluate(() => scrollY);
@@ -197,12 +203,14 @@ for (const [vp, opts] of VIEWPORTS) {
   try { const l = page.locator(`[data-testid="semi-row-${last.id}"]`); if (opts.hasTouch) await l.tap({ timeout: 8000 }); else await l.click({ timeout: 8000 }); }
   catch (e) { lastErr = String(e).split('\n')[0].slice(0, 100); }
   await page.waitForTimeout(500);
-  const inv = await page.evaluate(() => {
-    const ch = document.querySelector('[data-testid="semi-chart"]');
-    return { y: scrollY, ih: innerHeight, top: ch ? ch.getBoundingClientRect().top : null, item: ch?.dataset.item || 'CHART_MISSING' };
-  });
-  ok(`${vp}/tap-chart-in-view`, !lastErr && Math.abs(inv.y - y0) < 2 && inv.item === last.id && inv.top != null && inv.top >= 0 && inv.top < inv.ih,
-    `err=${lastErr || '-'} cat=${big.key}(${big.items.length}) scroll ${y0}->${inv.y} chartTop=${inv.top?.toFixed(0)} vh=${inv.ih} item=${inv.item}/${last.id}`);
+  const inv = await page.evaluate(s => {
+    const ch = document.querySelector('[data-testid="semi-chart"]'), el = document.querySelector(s);
+    const r = el?.getBoundingClientRect();
+    const selVisible = !!r && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el;
+    return { y: scrollY, ih: innerHeight, top: ch ? ch.getBoundingClientRect().top : null, item: ch?.dataset.item || 'CHART_MISSING', selVisible };
+  }, SEL);
+  ok(`${vp}/tap-chart-in-view`, !lastErr && inv.selVisible && Math.abs(inv.y - y0) < 2 && inv.item === last.id && inv.top != null && inv.top >= 0 && inv.top < inv.ih,
+    `err=${lastErr || '-'} selVisible=${inv.selVisible} cat=${big.key}(${big.items.length}) scroll ${y0}->${inv.y} chartTop=${inv.top?.toFixed(0)} vh=${inv.ih} item=${inv.item}/${last.id}`);
 
   ok(`${vp}/no-pageerror`, errs.length === 0, errs.join(' | ') || '0');
 
