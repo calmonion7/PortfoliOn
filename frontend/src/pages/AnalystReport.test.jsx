@@ -400,8 +400,8 @@ describe('바뀜 조건 게이지 (task#369 UAT 피드백)', () => {
     const g = row5.querySelector('[data-flip-gauge]')
     expect(g).toBeTruthy()
     expect(g.getAttribute('data-current-zone')).toBe('wait')
-    expect(g.getAttribute('aria-label')).toMatch(/준비금 수익률.*3\.49%/)
-    expect(g.getAttribute('aria-label')).toMatch(/빨강.*3\.15%/)
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/준비금 수익률.*3\.49%/)
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/빨강.*3\.15%/)
     // 구간 3개 + 경계 라벨 2개
     expect(g.querySelectorAll('[data-zone]').length).toBe(3)
     expect([...g.querySelectorAll('[data-boundary]')].map(e => e.textContent)).toEqual(['3.15%', '4.15%'])
@@ -447,8 +447,8 @@ describe('바뀜 조건 게이지 (task#369 UAT 피드백)', () => {
     expect(g.getAttribute('data-current-zone')).toBe('stop')
     expect([...g.querySelectorAll('[data-zone]')].map(e => e.getAttribute('data-zone'))).toEqual(['go', 'wait', 'stop'])
     expect([...g.querySelectorAll('[data-boundary]')].map(e => e.textContent)).toEqual(['42.91 USD', '59.99 USD'])
-    expect(g.getAttribute('aria-label')).toMatch(/주가 현재 84\.13 USD/)
-    expect(g.getAttribute('aria-label')).toMatch(/초록 42\.91 USD 미만/)
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/주가 현재 84\.13 USD/)
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/초록 42\.91 USD 미만/)
     expect(g.textContent).toContain('현재값 출처: 발행 시점 주가 (2026-10-07)')
     // 문장은 이익축 그대로(비목표 — 바뀜 조건 문장 불변)
     expect(row8.textContent).toContain('forward 이익 777.6 이상이면 노랑')
@@ -703,5 +703,118 @@ describe('렌즈 신호 행 펼침 (task#398)', () => {
     expect(cell(container, 9).querySelector('[data-lens-detail-toggle]')).toBeNull()
     expect(cell(container, 9).textContent).toContain('미산출 사유: 사유9')
     expect(toggles(container).length).toBe(8)
+  })
+})
+
+// ── 용어 링크 확대 1/2 (task#399) — 자유 서술 필드 8종에 용어집 자동 매칭 ────────────
+// 필드마다 「영업이익」(기존 용어)을 하나씩 심고, 그 필드가 그려지는 자리에서만 버튼을 센다.
+describe('심층 리포트 용어 링크 — 미연결 필드 배선 (task#399)', () => {
+  const T = '영업이익'
+  const GL = {
+    ...V2_REPORT,
+    structure: { ...V2_REPORT.structure, cost_nature: { value: 'revenue_linked', rationale: `분배비용이 ${T}에 연동` } },
+    lenses: [
+      ...V2_REPORT.lenses.map(l => {
+        if (l.id === 1) return { ...l, summary: `${T}이 늘었다` }
+        if (l.id === 7) return { ...l, flip: `${T}이 줄면 빨강` }
+        if (l.id === 6) return { ...l, conditions: l.conditions.map(c => (c.color === 'go' ? { ...c, when: [`${T} 흑자 전환`] } : c)) }
+        if (l.id === 5) return { ...l, inputs: { ...l.inputs, avg_share_pct: raw(38.2, '%', 'estimate', `${T} 대비 분배 비중`) } }
+        if (l.id === 9) return { ...l, na_reason: `${T} 미공시` }
+        return l
+      }),
+      judg(10, 'wait', { risk: `${T}이 급감한다`, base_rate: { realized: 1, partial: 0, not_realized: 0, total: 1 },
+        precedents: [{ case: '사례 A', period: '2019', outcome: 'realized', ref: '공시', note: `${T} 서두. 같은 점: ${T} 둔화. 다른 점: ${T} 반등` }] }),
+    ],
+  }
+  const renderGL = async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? GL : { reports: [] } }))
+    const r = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    return r
+  }
+  const cell = (c, id) => c.querySelector(`[data-lens-cell="${id}"]`)
+  const terms = (el) => (el ? el.querySelectorAll('.glossary-term:not(.lens-help)').length : -1)
+
+  it('접힌 행 — 요약·바뀜 조건·조건 목록·대상 위험·미산출 사유에 용어 버튼', async () => {
+    const { container } = await renderGL()
+    expect(terms(cell(container, 1))).toBe(1) // 요약
+    expect(terms(cell(container, 7))).toBe(1) // 바뀜 조건(문장)
+    expect(terms(cell(container, 6).querySelector('[data-flip-conditions]'))).toBe(1) // 조건 목록
+    expect(terms(cell(container, 10).querySelector('[data-lens10-risk]'))).toBe(1) // 대상 위험
+    expect(terms(cell(container, 9))).toBe(1) // 미산출 사유
+  })
+
+  it('펼침 — 사례 note 세 갈래·원자료 근거에 용어 버튼', async () => {
+    const { container } = await renderGL()
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    fireEvent.click(cell(container, 10).querySelector('[data-precedent] button'))
+    for (const k of ['note', 'same', 'diff']) expect(terms(cell(container, 10).querySelector(`[data-precedent-${k}]`))).toBe(1)
+    const li = [...cell(container, 5).querySelectorAll('details li')].find(e => e.textContent.includes('평균 몫'))
+    expect(terms(li)).toBe(1) // 원자료 근거
+  })
+
+  it('하단 — 구조 축 근거에 용어 버튼, 제목·사례 제목은 걸지 않는다', async () => {
+    const { container } = await renderGL()
+    expect(terms(screen.getByText('비용 성격').parentElement)).toBe(1)
+    expect(terms(screen.getByText('금리 의존 구조 그대로'))).toBe(0)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    expect(terms(cell(container, 10).querySelector('[data-precedent-head]'))).toBe(0)
+  })
+
+  // task#400 — 서버 계산 라벨·게이지 변수명. 게이지 변수명 버튼은 role="img" 밖에 있어야 접근성 트리에 남는다
+  it('서버 계산 라벨에 용어 버튼(task#400)', async () => {
+    const { container } = await renderGL()
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    const labelBtn = (id, label) => [...cell(container, id).querySelectorAll('.glossary-term')].find(b => b.textContent === label)
+    for (const [id, label] of [[3, '배수비'], [4, '한계 분배율'], [4, '평균 분배율'], [5, '손익분기 금리'], [8, '이익수익률'], [8, '무위험 금리']]) {
+      expect(labelBtn(id, label), `${id} ${label}`).toBeTruthy()
+    }
+  })
+
+  const withGauge = { ...GL, lenses: GL.lenses.map(l => (l.id === 4 ? { ...l, computed: { ...l.computed,
+    gauge: { variable: '한계 분배율', unit: '%', current: 12.79, boundaries: [53.81, 63.81], zones: ['go', 'wait', 'stop'], origin: 'server' } } } : l)) }
+
+  // eval(task#400 회고) — role="img" 자손은 Safari·VoiceOver에서 프루닝되는데 Playwright·Chromium AX로는 관측되지 않는다
+  // (live-uat-probes ⑭). 그래서 구조로 못박는다: 모두 펼친 렌즈 리포트에서 img 안 인터랙티브 0. img가 실제로 그려졌는지도 센다.
+  it('role="img" 안에 버튼·링크가 없다 — 게이지·기저율 막대 전부(eval)', async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? withGauge : { reports: [] } }))
+    const { container } = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    fireEvent.click(cell(container, 10).querySelector('[data-precedent] button'))
+    // 정의역: 게이지 3(렌즈 2·4·5) + 기저율 막대 1
+    expect(container.querySelectorAll('[role="img"]').length).toBeGreaterThanOrEqual(4)
+    expect([...container.querySelectorAll('[role="img"] button, [role="img"] a, [role="img"] [tabindex]')].map(e => e.textContent)).toEqual([])
+  })
+
+  it('게이지 변수명 용어 버튼은 role="img" 밖 — aria-label은 트랙에 남는다(task#400)', async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/2026-10-07') ? withGauge : { reports: [] } }))
+    const { container } = render(
+      <MemoryRouter initialEntries={['/analyst-report/CRCL/2026-10-07']}>
+        <Routes><Route path="/analyst-report/:ticker/:date" element={<AnalystReport />} /></Routes>
+      </MemoryRouter>
+    )
+    await screen.findByText('금리 의존 구조 그대로')
+    const g = cell(container, 4).querySelector('[data-flip-gauge]')
+    const btn = [...g.querySelectorAll('.glossary-term')].find(b => b.textContent === '한계 분배율')
+    expect(btn).toBeTruthy()
+    expect(btn.closest('[role="img"]')).toBeNull()
+    expect(g.querySelector('[role="img"]').getAttribute('aria-label')).toMatch(/한계 분배율 현재 12\.79%/)
+  })
+
+  it('요약 용어 클릭 — 팝오버가 뜨고 행의 「상세」는 펼쳐지지 않는다', async () => {
+    const { container } = await renderGL()
+    const btn = cell(container, 1).querySelector('.glossary-term:not(.lens-help)')
+    fireEvent.click(btn)
+    expect(document.querySelector('.glossary-popover')).not.toBeNull()
+    expect(cell(container, 1).querySelector('[data-lens-detail-toggle]').getAttribute('aria-expanded')).toBe('false')
   })
 })

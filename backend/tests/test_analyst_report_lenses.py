@@ -19,6 +19,7 @@ from auth import get_current_user_or_api_key, require_admin, require_admin_or_ap
 from routers.analyst_reports import router
 from services import analyst_lenses as L
 from services import analyst_reports as svc
+from tests._reject import assert_rejected
 
 app = FastAPI()
 app.include_router(router)
@@ -317,38 +318,38 @@ def test_v2_publish_crcl_computes_and_stores_signals():
 def test_v2_computed_lens_with_signal_is_422_and_without_is_201():
     body = crcl_body()
     body["lenses"][2]["signal"] = "go"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2), msg='signal·flip은 서버가 채운다')
     body = crcl_body()
     body["lenses"][2]["flip"] = "x"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2), msg='signal·flip은 서버가 채운다')
     assert _publish(crcl_body())[0].status_code == 201
 
 
 def test_v2_lens_ids_must_be_1_to_10_exactly_once():
     body = crcl_body()
     body["lenses"] = [l for l in body["lenses"] if l["id"] != 9]
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses'), type='too_short')
     body = crcl_body()
     body["lenses"][8] = _judgment(1)                     # 렌즈 9 자리에 1 중복
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body',), msg='id 1~10이 정확히 한 번씩')
 
 
 def test_v2_judgment_lens_rules():
     body = crcl_body()
     del body["lenses"][0]["signal"]
-    assert _publish(body)[0].status_code == 422          # 판단 렌즈 신호 필수
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 0), msg='렌즈 1: signal 필수')          # 판단 렌즈 신호 필수
     body = crcl_body()
     body["lenses"][0]["flip"] = None
-    assert _publish(body)[0].status_code == 422          # na가 아니면 바뀜 조건 필수
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 0), msg='렌즈 1: 바뀜 조건(flip) 필수')          # na가 아니면 바뀜 조건 필수
     body = crcl_body()
     body["lenses"][8]["na_reason"] = None
-    assert _publish(body)[0].status_code == 422          # na면 사유 필수
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 8), msg='렌즈 9: signal=na면 na_reason 필수')          # na면 사유 필수
 
 
 def test_v2_estimate_requires_rationale_pair():
     body = crcl_body()
     body["lenses"][2]["inputs"]["contribution_prev"] = _raw(251, source="estimate")
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2, 'inputs', 'contribution_prev'), msg='rationale(추정 근거)가 필수')
     body["lenses"][2]["inputs"]["contribution_prev"] = _raw(251, source="estimate", rationale="분기 추정")
     assert _publish(body)[0].status_code == 201
 
@@ -356,7 +357,7 @@ def test_v2_estimate_requires_rationale_pair():
 def test_v2_missing_input_is_422_but_na_reason_is_201_grey():
     body = crcl_body()
     del body["lenses"][4]["inputs"]["rate_sens_cost"]
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body',), msg="원자료 누락 ['rate_sens_cost']")
     body["lenses"][4] = {"id": 5, "summary": "원자료 없음", "body": "본문", "na_reason": "Item 7A 미공시"}
     resp, mock_save = _publish(body)
     assert resp.status_code == 201
@@ -367,16 +368,16 @@ def test_v2_missing_input_is_422_but_na_reason_is_201_grey():
 def test_v2_unknown_input_key_and_bad_enum_422():
     body = crcl_body()
     body["lenses"][2]["inputs"]["typo_key"] = _raw(1)
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body',), msg="알 수 없는 원자료 ['typo_key']")
     body = crcl_body()
     body["structure"]["revenue_engine"]["value"] = "subscription"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'structure', 'revenue_engine', 'value'), type='literal_error')
 
 
 def test_v2_mixed_money_units_422():
     body = crcl_body()
     body["lenses"][2]["inputs"]["contribution_prev"] = _raw(251, unit="USD B")
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body',), msg='금액 원자료의 단위가 섞임')
 
 
 def test_v2_explicit_null_optionals_accepted():
@@ -389,7 +390,7 @@ def test_v2_explicit_null_optionals_accepted():
 
 def test_v2_lens8_currency_mismatch_422():
     snap = {**US_SNAPSHOT, "market": "KR"}
-    assert _publish(crcl_body(), snapshot=snap)[0].status_code == 422
+    assert_rejected(_publish(crcl_body(), snapshot=snap)[0], msg='통화(USD M)가 종목 시장 통화(KRW)와 다름')
 
 
 def test_v2_lens8_missing_snapshot_market_cap_is_na():
@@ -405,16 +406,18 @@ def test_v2_nan_raw_value_422_on_main_app():
     good = json.dumps(crcl_body())
     raws = [good.replace('"value": 251', '"value": NaN', 1),          # 원자료 값
             good.replace("[3.0, 3.6, 4.2]", "[3.0, Infinity, 4.2]", 1)]  # 민감도 축 원소
+    locs = [("body", "lenses", 2, "inputs", "contribution_prev", "value"),
+            ("body", "lenses", 7, "sensitivity", "exogenous", "values", 1)]
     assert all(r != good for r in raws)
     main_app.dependency_overrides[require_admin_or_api_key] = lambda: "test-admin-id"
     try:
         c = TestClient(main_app)
-        for raw in raws:
+        for raw, loc in zip(raws, locs):
             with patch.object(svc, "latest_snapshot", return_value=("2026-10-06", US_SNAPSHOT)), \
                  patch.object(svc, "save_lens_report") as ms:
                 resp = c.post("/api/analyst-reports/CRCL", content=raw,
                               headers={"Content-Type": "application/json"})
-            assert resp.status_code == 422
+            assert_rejected(resp, loc=loc, type="finite_number")
             ms.assert_not_called()
     finally:
         main_app.dependency_overrides.pop(require_admin_or_api_key, None)
@@ -498,10 +501,10 @@ def test_lens3_falling_cost_flip_names_the_boundary_colour():
 def test_lens8_balance_rate_axis_units_pair():
     body = crcl_body()
     body["lenses"][7]["sensitivity"]["exogenous"]["unit"] = "bp"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body',), msg="외생 축(금리) 단위는 '%'")
     body = crcl_body()
     body["lenses"][7]["sensitivity"]["endogenous"]["unit"] = "USD B"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body',), msg='내생 축(잔고) 단위는 금액 원자료 단위와 같아야')
     assert _publish(crcl_body())[0].status_code == 201
 
 
@@ -509,7 +512,7 @@ def test_bad_format_value_is_rejected_with_format_error():
     for fmt in ("2", 3):
         body = {**crcl_body(), "format": fmt}
         resp = _publish(body)[0]
-        assert resp.status_code == 422
+        assert_rejected(resp, loc=('body', 'format'), type='literal_error')
         assert any("format" in [str(x) for x in e["loc"]] for e in resp.json()["detail"])
 
 
@@ -716,18 +719,18 @@ def test_judgment_gauge_zone_must_equal_signal():
     # 현재 743이 노랑 구간인데 신호를 초록으로 켜면 그림과 신호가 모순 → 422
     body = _with_lens9(gauge=_jgauge())
     body["lenses"][8]["signal"] = "go"
-    assert _publish(body)[0].status_code == 422
-    assert _publish(_with_lens9(gauge=_jgauge(current=820)) | {})[0].status_code == 422  # 820은 초록 구간인데 신호 노랑
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 8), msg="구간 'wait'이 signal 'go'과 다르다")
+    assert_rejected(_publish(_with_lens9(gauge=_jgauge(current=820)) | {})[0], loc=('body', 'lenses', 8), msg="구간 'go'이 signal 'wait'과 다르다")  # 820은 초록 구간인데 신호 노랑
     assert _publish(_with_lens9(gauge=_jgauge()))[0].status_code == 201
 
 
 def test_judgment_gauge_shape_rules():
-    assert _publish(_with_lens9(gauge=_jgauge(bounds=(800, 700))))[0].status_code == 422          # 경계 오름차순
-    assert _publish(_with_lens9(gauge=_jgauge(zones=("stop", "go"))))[0].status_code == 422        # 구간 수 = 경계 + 1
-    assert _publish(_with_lens9(gauge={**_jgauge(), "current_ref": ""}))[0].status_code == 422     # 현재값 출처 필수
+    assert_rejected(_publish(_with_lens9(gauge=_jgauge(bounds=(800, 700))))[0], loc=('body', 'lenses', 8, 'gauge'), msg='gauge.boundaries는 서로 다른 값의 오름차순')          # 경계 오름차순
+    assert_rejected(_publish(_with_lens9(gauge=_jgauge(zones=("stop", "go"))))[0], loc=('body', 'lenses', 8, 'gauge', 'zones'), type='too_short')        # 구간 수 = 경계 + 1
+    assert_rejected(_publish(_with_lens9(gauge={**_jgauge(), "current_ref": ""}))[0], loc=('body', 'lenses', 8, 'gauge', 'current_ref'), type='string_too_short')     # 현재값 출처 필수
     # 세 색 모두(사람 UAT 피드백 3) — 경계 1개·두 색 게이지는 이제 거부, 세 색이라도 단조가 아니면 거부
-    assert _publish(_with_lens9(gauge=_jgauge(bounds=(700,), zones=("stop", "wait"))))[0].status_code == 422
-    assert _publish(_with_lens9(gauge=_jgauge(zones=("wait", "stop", "go"))))[0].status_code == 422
+    assert_rejected(_publish(_with_lens9(gauge=_jgauge(bounds=(700,), zones=("stop", "wait"))))[0], loc=('body', 'lenses', 8, 'gauge', 'zones'), type='too_short')
+    assert_rejected(_publish(_with_lens9(gauge=_jgauge(zones=("wait", "stop", "go"))))[0], loc=('body', 'lenses', 8, 'gauge'), msg='세 색이 단조로 한 번씩')
     desc = _with_lens9(gauge=_jgauge(current=650, zones=("go", "wait", "stop")))   # 낮을수록 좋은 변수(내림차순 색)
     desc["lenses"][8]["signal"] = "go"
     assert _publish(desc)[0].status_code == 201
@@ -735,20 +738,20 @@ def test_judgment_gauge_shape_rules():
 
 def test_judgment_exactly_one_of_gauge_or_conditions():
     cond = _three()
-    assert _publish(_with_lens9())[0].status_code == 422                                         # 둘 다 없음
-    assert _publish(_with_lens9(gauge=_jgauge(), conditions=cond))[0].status_code == 422          # 둘 다 있음
+    assert_rejected(_publish(_with_lens9())[0], loc=('body', 'lenses', 8), msg='gauge(수치형) 또는 conditions(비수치형) 중 정확히 하나')                                         # 둘 다 없음
+    assert_rejected(_publish(_with_lens9(gauge=_jgauge(), conditions=cond))[0], loc=('body', 'lenses', 8), msg='gauge(수치형) 또는 conditions(비수치형) 중 정확히 하나')          # 둘 다 있음
     assert _publish(_with_lens9(conditions=cond))[0].status_code == 201
     assert _publish(_with_lens9(conditions=cond, gauge=None))[0].status_code == 201               # 명시적 null 허용
 
 
 def test_conditions_cover_all_three_colors():
     two = [c for c in _three() if c["color"] != "stop"]
-    assert _publish(_with_lens9(conditions=two))[0].status_code == 422                            # 빨강 누락
+    assert_rejected(_publish(_with_lens9(conditions=two))[0], loc=('body', 'lenses', 8, 'conditions'), type='too_short')                            # 빨강 누락
     dup = _three()[:2] + [{"color": "go", "when": ["x"]}]
-    assert _publish(_with_lens9(conditions=dup))[0].status_code == 422                            # 초록 중복·빨강 없음
+    assert_rejected(_publish(_with_lens9(conditions=dup))[0], loc=('body', 'lenses', 8), msg='conditions는 초록·노랑·빨강 각 정확히 하나')                            # 초록 중복·빨강 없음
     bad = _three(); bad[0] = {"color": "go", "when": []}
-    assert _publish(_with_lens9(conditions=bad))[0].status_code == 422                            # 조건 0개
-    assert _publish(_with_lens9(conditions=[{"to": "go", "when": ["x"]}] + _three()[1:]))[0].status_code == 422  # 옛 키 to
+    assert_rejected(_publish(_with_lens9(conditions=bad))[0], loc=('body', 'lenses', 8, 'conditions', 0, 'when'), type='too_short')                            # 조건 0개
+    assert_rejected(_publish(_with_lens9(conditions=[{"to": "go", "when": ["x"]}] + _three()[1:]))[0], loc=('body', 'lenses', 8, 'conditions', 0, 'to'), type='extra_forbidden')  # 옛 키 to
     resp, mock_save = _publish(_with_lens9(conditions=list(reversed(_three()))))
     assert resp.status_code == 201
     cs = _lens(mock_save.call_args.kwargs["lens_report"], 9)["conditions"]
@@ -759,13 +762,13 @@ def test_conditions_cover_all_three_colors():
 def test_structured_flip_forbidden_on_na_and_on_computed_lenses():
     body = crcl_body()
     body["lenses"][8]["conditions"] = _three()                                     # 렌즈 9 = na
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 8), msg='signal=na면 gauge·conditions 없음')
     body = crcl_body()
     body["lenses"][2]["gauge"] = _jgauge()                                         # 렌즈 3 = 계산 렌즈(서버가 그린다)
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2), msg='바뀜 조건 게이지는 서버가 그린다')
     body = crcl_body()
     body["lenses"][2]["conditions"] = _three(3)
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2), msg='바뀜 조건 게이지는 서버가 그린다')
 
 
 def test_computed_gauge_carries_server_origin():
@@ -805,7 +808,7 @@ def test_lens8_us_prefers_server_cache_over_routine_input():
 
 def test_lens8_kr_requires_input_and_ignores_us_cache():
     # ⓑ KR은 국고채 원자료 필수(회귀 가드) — 있으면 캐시(미 10년물)가 있어도 원자료
-    assert _publish(_kr_body(), snapshot=KR_SNAPSHOT)[0].status_code == 422
+    assert_rejected(_publish(_kr_body(), snapshot=KR_SNAPSHOT)[0], msg='risk_free_pct(국고채) 원자료 필수')
     body = _kr_body()
     body["lenses"][7]["inputs"]["risk_free_pct"] = _raw(2.9, unit="%")
     resp, ms = _publish(body, snapshot=KR_SNAPSHOT, rf=4.0)
@@ -818,14 +821,14 @@ def test_lens3_basis_required_and_stored():
     # ⓒ 렌즈 3 비교 기간 basis 필수
     body = crcl_body()
     del body["lenses"][2]["basis"]
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2), msg='basis(forward | yoy_quarter) 필수')
     resp, ms = _publish(crcl_body())
     assert resp.status_code == 201
     assert _lens(ms.call_args.kwargs["lens_report"], 3)["computed"]["basis"] == "yoy_quarter"
     # 렌즈 3 외에는 보낼 수 없다 · 렌즈 3이 na면 생략 가능
     body = crcl_body()
     body["lenses"][3]["basis"] = "forward"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 3), msg='렌즈 4: basis는 렌즈 3에만')
     body = crcl_body()
     body["lenses"][2] = {"id": 3, "summary": "s", "body": "b", "na_reason": "비용 공시 없음"}
     assert _publish(body)[0].status_code == 201
@@ -836,7 +839,7 @@ def test_lens3_forward_basis_rejects_estimate_endpoints():
     body = crcl_body()
     body["lenses"][2]["basis"] = "forward"
     body["lenses"][2]["inputs"]["contribution_curr"] = _raw(289, source="estimate", rationale="자체 추정")
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2), msg='출처가 estimate')
     body["lenses"][2]["inputs"]["contribution_curr"] = _raw(289, source="consensus")
     assert _publish(body)[0].status_code == 201
     # yoy_quarter는 출처 제약 없음(양성 쌍)
@@ -873,7 +876,11 @@ def test_sensitivity_center_must_match_forward_earnings(ratio, status):
     # ⓕ 정중앙 칸 이익 ÷ forward 이익 − 1이 ±10% 밖이면 422 (양성·음성 쌍)
     body = crcl_body()
     body["lenses"][7]["inputs"]["forward_earnings"]["value"] = _center_earnings() / ratio
-    assert _publish(body)[0].status_code == status
+    resp = _publish(body)[0]
+    if status == 422:
+        assert_rejected(resp, loc=("body",), msg="민감도 표 정중앙 칸 이익이 forward 이익과")
+    else:
+        assert resp.status_code == 201
 
 
 def test_sensitivity_center_check_skipped_for_non_positive_forward():
@@ -884,20 +891,20 @@ def test_sensitivity_center_check_skipped_for_non_positive_forward():
 
 def test_publish_models_forbid_unknown_keys():
     # ⓖ 모르는 키는 조용히 무시하지 않는다 — 최상위·중첩(직전 판 응답의 서버 필드 재사용 포함)
-    assert _publish({**crcl_body(), "foo": 1})[0].status_code == 422
-    assert _publish(_with_lens9(gauge={**_jgauge(), "origin": "routine"}))[0].status_code == 422
+    assert_rejected(_publish({**crcl_body(), "foo": 1})[0], loc=('body', 'foo'), type='extra_forbidden')
+    assert_rejected(_publish(_with_lens9(gauge={**_jgauge(), "origin": "routine"}))[0], loc=('body', 'lenses', 8, 'gauge', 'origin'), type='extra_forbidden')
     body = crcl_body()
     body["structure"]["revenue_engine"]["extra"] = "x"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'structure', 'revenue_engine', 'extra'), type='extra_forbidden')
     body = crcl_body()
     body["lenses"][2]["inputs"]["contribution_prev"]["note"] = "x"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2, 'inputs', 'contribution_prev', 'note'), type='extra_forbidden')
     body = crcl_body()
     body["lenses"][7]["sensitivity"]["exogenous"]["foo"] = 1
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 7, 'sensitivity', 'exogenous', 'foo'), type='extra_forbidden')
     body = crcl_body()
     body["lenses"][2]["computed"] = {}
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 2, 'computed'), type='extra_forbidden')
     assert _publish(crcl_body())[0].status_code == 201
 
 
@@ -922,7 +929,7 @@ def test_near_boundary_stamped_on_gauges():
     assert _lens(ms.call_args.kwargs["lens_report"], 9)["gauge"]["near_boundary"] is True
     resp, ms = _publish(_with_lens9(gauge=_jgauge()))
     assert _lens(ms.call_args.kwargs["lens_report"], 9)["gauge"]["near_boundary"] is False
-    assert _publish(_with_lens9(gauge={**_jgauge(), "near_boundary": True}))[0].status_code == 422
+    assert_rejected(_publish(_with_lens9(gauge={**_jgauge(), "near_boundary": True}))[0], loc=('body', 'lenses', 8, 'gauge', 'near_boundary'), type='extra_forbidden')
 
 
 def test_cached_risk_free_reads_market_cache_envelope():
@@ -964,7 +971,7 @@ def test_lens10_required_nine_lens_publish_is_422():
     nine = crcl_body()
     nine["lenses"] = [l for l in nine["lenses"] if l["id"] != 10]
     resp, mock_save = _publish(nine)
-    assert resp.status_code == 422, resp.text
+    assert_rejected(resp, loc=('body', 'lenses'), type='too_short')
     mock_save.assert_not_called()
 
 
@@ -1022,21 +1029,21 @@ def test_lens10_base_rate_counts_skewed_outcomes():
 def test_lens10_id_set_rules_422():
     # ⓒ id 11 · 중복 10 · 10만 있고 1~9 중 하나 빠짐 → 422
     assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
-    assert _publish(_with_lens10(id=11))[0].status_code == 422
+    assert_rejected(_publish(_with_lens10(id=11))[0], loc=('body', 'lenses', 9, 'id'), type='less_than_equal')
     body = _with_lens10()
     body["lenses"].append(_lens10())
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses'), type='too_long')
     body = _with_lens10()
     body["lenses"] = [l for l in body["lenses"] if l["id"] != 9]
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses'), type='too_short')
 
 
 def test_lens10_precedent_count_bounds_422():
     # ⓓ 사례 1건·6건 → 422, 2건·5건 → 201(경계 쌍)
     one = [_prec()]
     six = [_prec(case=f"사례{i}") for i in range(6)]
-    assert _publish(_with_lens10(precedents=one))[0].status_code == 422
-    assert _publish(_with_lens10(precedents=six))[0].status_code == 422
+    assert_rejected(_publish(_with_lens10(precedents=one))[0], loc=('body', 'lenses', 9, 'precedents'), type='too_short')
+    assert_rejected(_publish(_with_lens10(precedents=six))[0], loc=('body', 'lenses', 9, 'precedents'), type='too_long')
     assert _publish(_with_lens10(precedents=six[:2]))[0].status_code == 201
     assert _publish(_with_lens10(precedents=six[:5]))[0].status_code == 201
 
@@ -1044,8 +1051,8 @@ def test_lens10_precedent_count_bounds_422():
 def test_lens10_outcome_enum_422():
     # ⓔ outcome은 realized · partial · not_realized 세 값만
     assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
-    assert _publish(_with_lens10(precedents=[_prec("yes"), _prec("partial", case="B")]))[0].status_code == 422
-    assert _publish(_with_lens10(precedents=[_prec("현실화"), _prec("partial", case="B")]))[0].status_code == 422
+    assert_rejected(_publish(_with_lens10(precedents=[_prec("yes"), _prec("partial", case="B")]))[0], loc=('body', 'lenses', 9, 'precedents', 0, 'outcome'), type='literal_error')
+    assert_rejected(_publish(_with_lens10(precedents=[_prec("현실화"), _prec("partial", case="B")]))[0], loc=('body', 'lenses', 9, 'precedents', 0, 'outcome'), type='literal_error')
 
 
 def test_lens10_risk_and_ref_required_422():
@@ -1053,20 +1060,20 @@ def test_lens10_risk_and_ref_required_422():
     assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
     body = _with_lens10()
     del body["lenses"][-1]["risk"]
-    assert _publish(body)[0].status_code == 422
-    assert _publish(_with_lens10(risk="  "))[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 9), msg='risk(대상 위험)와 precedents(전례 2~5건) 필수')
+    assert_rejected(_publish(_with_lens10(risk="  "))[0], loc=('body', 'lenses', 9), msg='risk(대상 위험)와 precedents(전례 2~5건) 필수')
     no_ref = _prec()
     del no_ref["ref"]
-    assert _publish(_with_lens10(precedents=[no_ref, _prec(case="B")]))[0].status_code == 422
+    assert_rejected(_publish(_with_lens10(precedents=[no_ref, _prec(case="B")]))[0], loc=('body', 'lenses', 9, 'precedents', 0, 'ref'), type='missing')
     body = _with_lens10()
     del body["lenses"][-1]["precedents"]
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 9), msg='risk(대상 위험)와 precedents(전례 2~5건) 필수')
 
 
 def test_lens10_na_forbids_risk_and_precedents_422():
     # ⓖ signal=na면 na_reason만 — risk·precedents 동봉은 422, 없으면 201(기존 판단 렌즈 규칙과 동형)
     na = dict(signal="na", flip=None, conditions=None, na_reason="비슷한 전례를 찾지 못함")
-    assert _publish(_with_lens10(**na))[0].status_code == 422
+    assert_rejected(_publish(_with_lens10(**na))[0], loc=('body', 'lenses', 9), msg='signal=na면 risk·precedents 없음')
     resp, mock_save = _publish(_with_lens10(**na, risk=None, precedents=None))
     assert resp.status_code == 201, resp.text
     l10 = _lens(mock_save.call_args.kwargs["lens_report"], 10)
@@ -1077,18 +1084,18 @@ def test_lens10_na_forbids_risk_and_precedents_422():
 def test_lens10_server_aggregate_field_from_routine_422():
     # ⓗ 집계는 서버 몫 — 루틴이 base_rate를 보내면 모르는 키로 422(computed·tally와 같은 규율)
     assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
-    assert _publish(_with_lens10(base_rate={"realized": 1, "partial": 1, "not_realized": 1, "total": 3}))[0].status_code == 422
+    assert_rejected(_publish(_with_lens10(base_rate={"realized": 1, "partial": 1, "not_realized": 1, "total": 3}))[0], loc=('body', 'lenses', 9, 'base_rate'), type='extra_forbidden')
     body = _with_lens10()
     body["lenses"][-1]["precedents"][0]["weight"] = 0.5
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 9, 'precedents', 0, 'weight'), type='extra_forbidden')
 
 
 def test_lens10_computed_lens_fields_422():
     # ⓘ 렌즈 10은 판단 렌즈 — inputs·sensitivity·basis를 실으면 422
     assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
-    assert _publish(_with_lens10(inputs={"x": _raw(1)}))[0].status_code == 422
-    assert _publish(_with_lens10(sensitivity=crcl_body()["lenses"][7]["sensitivity"]))[0].status_code == 422
-    assert _publish(_with_lens10(basis="forward"))[0].status_code == 422
+    assert_rejected(_publish(_with_lens10(inputs={"x": _raw(1)}))[0], loc=('body', 'lenses', 9), msg='렌즈 10는 판단 렌즈 — inputs·sensitivity 없음')
+    assert_rejected(_publish(_with_lens10(sensitivity=crcl_body()["lenses"][7]["sensitivity"]))[0], loc=('body', 'lenses', 9), msg='렌즈 10는 판단 렌즈 — inputs·sensitivity 없음')
+    assert_rejected(_publish(_with_lens10(basis="forward"))[0], loc=('body', 'lenses', 9), msg='렌즈 10: basis는 렌즈 3에만')
 
 
 def test_lens10_risk_precedents_only_on_lens10_422():
@@ -1096,10 +1103,10 @@ def test_lens10_risk_precedents_only_on_lens10_422():
     assert _publish(_with_lens10())[0].status_code == 201   # 대조군 — 음성만 두면 제약이 없어도 통과한다
     body = crcl_body()
     body["lenses"][0]["risk"] = "x"
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 0), msg='렌즈 1: risk·precedents는 렌즈 10에만')
     body = crcl_body()
     body["lenses"][0]["precedents"] = [_prec(), _prec(case="B")]
-    assert _publish(body)[0].status_code == 422
+    assert_rejected(_publish(body)[0], loc=('body', 'lenses', 0), msg='렌즈 1: risk·precedents는 렌즈 10에만')
 
 
 def test_lens_kind_sets_cover_publish_id_range():
