@@ -19,7 +19,9 @@
 //      (`ReportDetailTabs.jsx`; task#375 이전엔 대조군이 QQQ로 뽑혀 영구 FAIL이었다).
 //   ⓓ enrich 탭이 「📝 사업분석」이고 「심층분석」은 화면에 없다
 //   ⓔ 목록의 「심층」 배지가 발행물 있는 종목에만 붙는다(대조군 동봉)
-//   ⓕ 문서 단독 라우트가 살아 있고(ⓑ와 같은 identity·렌즈 이름 2축) 「← 종목 리포트」로 돌아온다
+//   ⓕ 문서 단독 라우트가 살아 있고(ⓑ와 같은 identity·렌즈 이름 2축) 「← 심층 목록」으로 `/analyst-reports`에 돌아온다
+//      (task#402 — 옛 목적지 「← 종목 리포트」는 task#396 목록 재개방으로 근거가 사라졌다).
+//      ⓕ' 내 목록 밖 발행물: 심층 목록 카드 → 문서 → pill → 다시 `/analyst-reports`(표본 0이면 sentinel FAIL)
 //   ⓖ 비-admin이 `/analyst-reports`에 가면 **머문다**(task#396 — 리다이렉트 폐지, 목록 전 사용자 재개방):
 //      URL 유지 · 발행물 링크 ≥ 1 · 목록 API 첫 발행물의 이름/티커가 보임(identity) · 관리 수단 미노출
 //   ⓗ nav에 「심층 리포트」 항목이 없고, 문서 경로에서 「심층」이 active다(「리포트」·「기술」은 아님 — 대조군, task#396)
@@ -77,6 +79,9 @@ const pubTitle = new Map(pubs.map(p => [p.ticker, p.title]));
 const LENS_NAMES = ['숫자의 신뢰도', '지금 매출 속도', '벌수록 남는 구조', '묶여 있는 비용', '망할 위험',
   '고객 이탈 위험', '경영진·대주주', '지금 주가 수준', '앞으로의 수요'];
 const tracked = new Set(mine.filter(([, v]) => (v.dates || []).length > 0).map(([t]) => t));
+// ⓕ' 표본 — 발행물은 있는데 내 목록(키)에 없는 종목(task#402: 이 종목들의 도달 경로는 심층 목록뿐이다)
+const outPub = pubs.find(p => !mine.some(([t]) => t === p.ticker));
+const OUT_T = outPub?.ticker, OUT_DATE = outPub?.published_date;
 
 // 기술 리포트 — 내 목록에 있는(추적 중) 상장 티커가 있는 첫 slug, 그리고 **미추적** 티커(B83 표본)
 // 미추적 = 내 목록에 키 자체가 없음(날짜 0인 추적 종목은 「미생성」이지 미추적이 아니다).
@@ -99,6 +104,7 @@ for (const t of techIdx) {
 // 정의역 sentinel — 표본이 없으면 통과로 위장하지 말고 실패한다(가토: 표본 0은 「미검증」이다)
 ok('표본:발행물-있는-종목', !!withPub, withPub ? `${withPub[0]} (${withPub[1].category}, 발행 ${pubBy.get(withPub[0])})` : '없음');
 ok('표본:발행물-없는-종목', !!noPub, noPub ? `${noPub[0]} (${noPub[1].category})` : '없음');
+ok('표본:내-목록-밖-발행물(task#402)', !!OUT_T, OUT_T ? `${OUT_T} (발행 ${OUT_DATE})` : '없음');
 ok('표본:기술-업체-티커', !!techSlug, techSlug ? `${techSlug} → ${techTicker}` : '없음');
 ok('표본:미추적-기술-티커', !!untrSlug, untrSlug ? `${untrSlug} → ${untrTicker}` : '없음');
 if (!withPub || !noPub) {
@@ -208,7 +214,7 @@ async function run(label, ctxOpts) {
   ok(`[${label}] 문서라우트:렌즈이름-1개이상`, docShown.length >= 1, `${docShown.length}/9`);
   const pill = page.locator('.list-pill').first();
   const pillTxt = (await pill.count()) ? (await pill.textContent()).trim() : '(없음)';
-  ok(`[${label}] 문서라우트:복귀링크`, pillTxt.includes('종목 리포트'), pillTxt);
+  ok(`[${label}] 문서라우트:복귀링크`, pillTxt === '← 심층 목록', pillTxt);
   // ⓗ 문서 경로에서 nav 상태
   const navState = await page.evaluate(() => {
     const links = [...document.querySelectorAll('a')];
@@ -220,11 +226,26 @@ async function run(label, ctxOpts) {
   ok(`[${label}] nav:문서경로에서-심층-active`, navState.deepActive === true);
   ok(`[${label}] nav:리포트는-active-아님(대조군)`, navState.reportActive === false);
   ok(`[${label}] nav:기술은-active-아님(대조군)`, navState.techActive === false);
-  if (pillTxt.includes('종목 리포트')) {
+  if (pillTxt === '← 심층 목록') {
     await pill.click(); await settle(page);
-    ok(`[${label}] 복귀:리포트로-도달`, new URL(page.url()).pathname === '/reports', page.url());
+    ok(`[${label}] 복귀:심층목록-도달`, new URL(page.url()).pathname === '/analyst-reports', page.url());
   } else {
-    ok(`[${label}] 복귀:리포트로-도달`, false, '복귀 링크 없음');
+    ok(`[${label}] 복귀:심층목록-도달`, false, '복귀 링크 없음');
+  }
+  // ⓕ' (task#402) 내 목록 밖 종목 — 목록 카드로 들어가 pill로 돌아오면 목록이다(옛 목적지 /reports는 「미추적」 안내로 떨어졌다)
+  if (OUT_T) {
+    await page.goto(`${BASE}/analyst-reports`, { waitUntil: 'domcontentloaded' });
+    await settle(page);
+    const card = page.locator(`a[href="/analyst-report/${OUT_T}/${OUT_DATE}"]`).first();
+    if (await card.count()) {
+      await card.click(); await settle(page);
+      ok(`[${label}] 미추적:카드→문서`, new URL(page.url()).pathname === `/analyst-report/${OUT_T}/${OUT_DATE}`, page.url());
+      const p2 = page.locator('.list-pill').first();
+      if (await p2.count()) {
+        await p2.click(); await settle(page);
+        ok(`[${label}] 미추적:복귀→심층목록`, new URL(page.url()).pathname === '/analyst-reports', page.url());
+      } else ok(`[${label}] 미추적:복귀→심층목록`, false, 'pill 없음');
+    } else ok(`[${label}] 미추적:카드→문서`, false, `카드 링크 없음 ${OUT_T}`);
   }
 
   // ── ⓖ 비-admin 목록 열람(task#396 — 리다이렉트 폐지) ────────────────────────

@@ -114,17 +114,17 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     expect(screen.getByText('발행 시점 숫자')).toBeTruthy()  // 서버 숫자 블록은 형식과 무관하게 남는다
   })
 
-  it('문서 하단 복귀 링크 제거 + 플로팅 복귀 pill(task#225 → 목적지 task#324)', async () => {
+  it('문서 하단 복귀 링크 제거 + 플로팅 복귀 pill(task#225 → 목적지 task#324 → task#402)', async () => {
     api.get.mockResolvedValue({ data: REPORT })
     const { container } = renderPage()
     await screen.findByText('한줄 논지 테스트')
     expect([...container.querySelectorAll('a')].some(a => a.textContent.trim() === '← 심층 리포트')).toBe(false)
     const pill = container.querySelector('.list-pill')
     // task#225의 결정(하단 링크 제거·플로팅 pill 유지)은 그대로다. 바뀐 것은 *목적지*뿐 —
-    // nav에서 「심층 리포트」가 빠지고 /analyst-reports가 admin 발행 관리 화면이 되었으므로
-    // 일반 사용자의 복귀 지점은 그 종목의 리포트 상세다(task#324, ADR-0047).
-    expect(pill?.getAttribute('href')).toBe('/reports')
-    expect(pill?.textContent.trim()).toBe('← 종목 리포트')
+    // task#396이 /analyst-reports를 전 사용자에게 재개방했고, 내 보유·관심 밖 종목은
+    // 그 목록이 유일한 도달 경로라 복귀 지점은 심층 목록이다(task#402, ADR-0047 개정 노트 1).
+    expect(pill?.getAttribute('href')).toBe('/analyst-reports')
+    expect(pill?.textContent.trim()).toBe('← 심층 목록')
   })
 
   // ── task#324 S1 — 같은 본문을 탭 안에서도 렌더한다 ────────────────────────────
@@ -221,6 +221,15 @@ describe('AnalystReport 문서 페이지 (task#212)', () => {
     api.get.mockRejectedValue({ response: { status: 404 } })
     renderPage()
     expect(await screen.findByText('발행물을 찾을 수 없습니다.')).toBeTruthy()
+  })
+
+  it('404 에러 화면의 복귀 링크도 심층 목록으로(task#402)', async () => {
+    api.get.mockRejectedValue({ response: { status: 404 } })
+    const { container } = renderPage()
+    await screen.findByText('발행물을 찾을 수 없습니다.')
+    const back = [...container.querySelectorAll('a')].find(a => a.textContent.trim().startsWith('←'))
+    expect(back?.getAttribute('href')).toBe('/analyst-reports')
+    expect(back?.textContent.trim()).toBe('← 심층 목록')
   })
 })
 
