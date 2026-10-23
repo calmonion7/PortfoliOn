@@ -72,7 +72,7 @@ export default function SemiconductorSection() {
 
   return (
     <SectionCard title="반도체" summary={sox ? fmt(sox.current) : ''} change={sox?.change_pct ?? null} changeSuffix="%" open={open} onToggle={() => setOpen(o => !o)}>
-      <p style={DESC_STYLE}>필라델피아 반도체지수(SOX)와 DRAMeXchange 메모리 현물가입니다. 분류를 고르고 행을 누르면 바로 아래 차트가 해당 품목으로 바뀝니다.</p>
+      <p style={DESC_STYLE}>SOX(필라델피아 반도체지수)는 미국 상장 반도체 대형주 30개로 만든 업종 지수로, 업황 기대를 먼저 반영하고 코스피와 함께 움직이는 경향이 있습니다. 메모리 현물가는 DRAMeXchange에서 실제 거래되는 칩 가격(현재 수급)입니다. 분류를 고르고 행을 누르면 바로 아래 차트가 해당 품목으로 바뀝니다.</p>
 
       {sox && (
         <div className="metric-tile" style={{ marginBottom: 16 }}>
