@@ -7,6 +7,7 @@
 라우터 테스트는 self-app + dependency override, DB는 services.analyst_reports를 mock
 (conftest _block_real_db 가드).
 """
+import copy
 import json
 import math
 from unittest.mock import patch
@@ -191,9 +192,15 @@ def test_lens8_price_exogenous_sensitivity_hand_calc():
     assert r["values"]["sensitivity"]["multiples"][1][1] == pytest.approx(10.0)
 
 
-def test_lens8_negative_earnings_is_stop_and_missing_rf_is_na():
+def test_lens8_loss_making_and_missing_rf_are_na():
+    # 적자면 이익수익률 공식이 성립하지 않는다 — 빨강이 아니라 미산출(task#405). 계산값은 남긴다
     r = L.lens8("usage", {"forward_earnings": -50}, unit_scale=1, market_cap=1000, risk_free_pct=4.0)
-    assert r["signal"] == "stop" and r["values"]["multiple"] is None
+    assert r["signal"] == "na" and "적자" in r["na_reason"]
+    assert r["values"]["multiple"] is None and r["values"]["earnings_yield_pct"] == pytest.approx(-5.0)
+    assert r["values"]["risk_free_pct"] == 4.0 and r["values"]["market_cap"] == 1000
+    # 금리도 없고 적자이기도 하면 더 근본적인 적자 사유
+    r = L.lens8("usage", {"forward_earnings": -50}, unit_scale=1, market_cap=1000, risk_free_pct=None)
+    assert r["signal"] == "na" and "적자" in r["na_reason"]
     r = L.lens8("usage", {"forward_earnings": 50}, unit_scale=1, market_cap=1000, risk_free_pct=None)
     assert r["signal"] == "na" and r["values"]["multiple"] == pytest.approx(20.0)
 
@@ -627,11 +634,15 @@ def test_lens8_price_boundary_invariant(rf, fe):
     assert _zone_of(g) == r["signal"]
 
 
-def test_lens8_non_positive_earnings_keeps_earnings_axis():
-    r = _l8(fe=-50)
-    assert r["signal"] == "stop" and r["gauge"]["variable"] == "forward 이익"
-    r = _l8(fe=0)
-    assert r["gauge"]["variable"] == "forward 이익"
+@pytest.mark.parametrize("fe", [-50, 0])
+def test_lens8_non_positive_earnings_is_na_without_gauge_or_flip(fe):
+    # 적자면 늘 빨강이라 정보가 없었다(PLUG, task#405) — 게이지·바뀜 조건 없이 미산출
+    r = _l8(fe=fe)
+    assert r["signal"] == "na" and r["na_reason"]
+    assert r.get("gauge") is None and r["flip"] is None and r["flip_value"] is None
+    assert r["values"]["forward_earnings"] == fe and r["values"]["multiple"] is None
+    # 대조 — 같은 입력에 흑자 이익을 주면 판정·주가축 게이지가 나온다(na 단언이 무조건 통과하지 않게)
+    assert _l8()["signal"] != "na" and _l8()["gauge"]["variable"] == "주가"
 
 
 def test_lens8_low_rate_price_axis_has_single_boundary():
@@ -889,6 +900,21 @@ def test_sensitivity_center_check_skipped_for_non_positive_forward():
     assert _publish(body)[0].status_code == 201
 
 
+def test_publish_loss_making_lens8_is_na_in_tally():
+    # PLUG 모양(USD M, forward 이익 < 0) — 발행 경로에서도 렌즈 8이 na이고 tally na에 들어간다(task#405)
+    body = crcl_body()
+    body["lenses"][7]["inputs"]["forward_earnings"]["value"] = -377.0
+    resp, ms = _publish(body)
+    assert resp.status_code == 201, resp.text
+    lr = ms.call_args.kwargs["lens_report"]
+    l8 = _lens(lr, 8)
+    assert l8["signal"] == "na" and l8["flip"] is None and "적자" in l8["na_reason"]
+    assert l8["computed"]["signal"] == "na" and l8["computed"].get("gauge") is None
+    assert l8["computed"]["values"]["earnings_yield_pct"] < 0
+    assert lr["tally"]["na"] == sum(1 for l in lr["lenses"] if l["signal"] == "na")
+    assert lr["tally"]["na"] == 2                                    # 렌즈 9(판단 na) + 렌즈 8
+
+
 def test_publish_models_forbid_unknown_keys():
     # ⓖ 모르는 키는 조용히 무시하지 않는다 — 최상위·중첩(직전 판 응답의 서버 필드 재사용 포함)
     assert_rejected(_publish({**crcl_body(), "foo": 1})[0], loc=('body', 'foo'), type='extra_forbidden')
@@ -1115,3 +1141,71 @@ def test_lens_kind_sets_cover_publish_id_range():
     from routers.analyst_reports import LensIn
     le = next(m.le for m in LensIn.model_fields["id"].metadata if hasattr(m, "le"))
     assert sorted(L.COMPUTED_LENSES + L.JUDGMENT_LENSES) == list(range(1, le + 1))
+
+
+# ── 적자 렌즈 8 소급 재계산 (task#405 — 발행물 불변의 좁은 예외) ─────────────────────────
+
+def _stored_loss_report(fe=-377.0, signal="stop", rf_source="server_cache"):
+    """정정 전 서버가 박제한 판 모양 — 발행 경로로 만든 뒤 렌즈 8만 옛 규칙(빨강·이익축)으로 되돌린다."""
+    body = crcl_body()
+    body["lenses"][7]["inputs"]["forward_earnings"]["value"] = fe
+    lr = _publish(body)[1].call_args.kwargs["lens_report"]
+    if signal != "na":
+        l8 = _lens(lr, 8)
+        c = l8["computed"]
+        c.update(signal=signal, flip="forward 이익 71.42 USD M 이상이면 노랑", flip_value=71.42,
+                 gauge={"variable": "forward 이익", "unit": "USD M", "current": fe,
+                        "boundaries": [28.71, 76.56], "zones": ["stop", "wait", "go"], "origin": "server"},
+                 risk_free_source=rf_source)
+        c.pop("na_reason", None)
+        l8.update(signal=signal, flip=c["flip"], na_reason=None)
+        lr["tally"] = {s: sum(1 for l in lr["lenses"] if l["signal"] == s) for s in L.SIGNALS}
+    return lr
+
+
+def test_recompute_loss_lens8_turns_stop_into_na_and_moves_tally():
+    old = _stored_loss_report()
+    snap = copy.deepcopy(old)
+    new, changed = L.recompute_loss_lens8(old)
+    assert changed is True and old == snap                          # 입력은 바꾸지 않는다
+    l8 = _lens(new, 8)
+    assert l8["signal"] == "na" and l8["flip"] is None and "적자" in l8["na_reason"]
+    c = l8["computed"]
+    assert c["signal"] == "na" and c.get("gauge") is None
+    assert c["values"]["market_cap"] == _lens(snap, 8)["computed"]["values"]["market_cap"]
+    assert c["values"]["risk_free_pct"] == _lens(snap, 8)["computed"]["values"]["risk_free_pct"]
+    assert c["risk_free_source"] == "server_cache"
+    # ⓓ 플래그 보존(원자료 estimate → estimate_based)
+    assert c["estimate_based"] is True and c["consensus_based"] is False
+    assert new["tally"]["na"] == snap["tally"]["na"] + 1 and new["tally"]["stop"] == snap["tally"]["stop"] - 1
+    # ⓐ 다른 렌즈·structure·렌즈 8의 원자료는 바이트 동일
+    dump = lambda x: json.dumps(x, sort_keys=True, ensure_ascii=False)
+    assert dump([l for l in new["lenses"] if l["id"] != 8]) == dump([l for l in snap["lenses"] if l["id"] != 8])
+    assert dump(new["structure"]) == dump(snap["structure"])
+    o8 = _lens(snap, 8)
+    assert all(dump(l8.get(k)) == dump(o8.get(k)) for k in ("inputs", "sensitivity", "summary", "body", "metrics"))
+
+
+def test_recompute_loss_lens8_is_idempotent():
+    new, _ = L.recompute_loss_lens8(_stored_loss_report())
+    again, changed = L.recompute_loss_lens8(new)
+    assert changed is False and again == new                         # ⓑ
+
+
+@pytest.mark.parametrize("make", [
+    lambda: _publish(crcl_body())[1].call_args.kwargs["lens_report"],   # 흑자 판
+    lambda: _stored_loss_report(signal="na"),                           # 이미 na인 적자 판
+])
+def test_recompute_loss_lens8_leaves_other_reports_untouched(make):
+    lr = make()
+    snap = copy.deepcopy(lr)
+    new, changed = L.recompute_loss_lens8(lr)
+    assert changed is False and new == snap                          # ⓒ
+
+
+def test_recompute_loss_lens8_skips_report_without_computed_lens8():
+    lr = _stored_loss_report()
+    l8 = _lens(lr, 8)
+    l8.update(signal="na", na_reason="루틴 원자료 없음", computed=None)
+    snap = copy.deepcopy(lr)
+    assert L.recompute_loss_lens8(lr) == (snap, False)

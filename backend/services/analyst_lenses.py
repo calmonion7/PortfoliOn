@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import copy
 import logging
 import math
 from typing import Optional
@@ -410,7 +411,8 @@ def _lens8_price_gauge(price, price_date: Optional[str], ey: float, risk_free_pc
 
     주가 경계 = 주가 × 이익수익률 ÷ 기준 수익률 — 초록 경계 = 무위험 금리, 빨강 경계 = 금리 − 1.5%p.
     주가가 오를수록 이익수익률이 내려가므로 색은 왼쪽(싼 쪽) 초록 → 오른쪽 빨강. 금리 ≤ 1.5%면 빨강
-    경계가 정의되지 않아 경계 1개. 주가가 없거나 쓸 수 없으면 None(호출측이 이익축으로 폴백 — wrong < missing)."""
+    경계가 정의되지 않아 경계 1개. 주가가 없거나 쓸 수 없으면 None(호출측이 이익축으로 폴백 — wrong < missing).
+    적자(ey ≤ 0)는 호출측 `lens8`이 먼저 미산출로 돌려보내 여기 오지 않는다(task#405) — ey 가드는 방어용."""
     try:
         p = float(price)
     except (TypeError, ValueError):
@@ -432,8 +434,9 @@ def lens8(engine: str, inp: dict, unit_scale: float, market_cap: float,
           price=None, price_date: Optional[str] = None) -> dict:
     """시총 ÷ forward 이익 · 이익수익률 vs 무위험 금리. 외생 가격형은 3×3 민감도 표.
 
-    시총은 원 단위(스냅샷), 이익은 입력 단위 → unit_scale로 환산한다. 게이지는 발행 시점 주가가 있고
-    forward 이익 > 0이면 주가축, 아니면 이익축이다. 바뀜 조건 문장은 어느 쪽이든 이익 기준이다."""
+    시총은 원 단위(스냅샷), 이익은 입력 단위 → unit_scale로 환산한다. forward 이익 ≤ 0이면 미산출(na —
+    게이지·바뀜 조건 없음, 계산값만 남김, task#405). 게이지는 발행 시점 주가가 있으면 주가축, 없거나 쓸 수
+    없으면 이익축이다. 바뀜 조건 문장은 어느 쪽이든 이익 기준이다."""
     fe = inp["forward_earnings"] * unit_scale
     values = {"market_cap": market_cap, "forward_earnings": inp["forward_earnings"],
               "multiple": None, "earnings_yield_pct": None, "risk_free_pct": risk_free_pct}
@@ -455,10 +458,12 @@ def lens8(engine: str, inp: dict, unit_scale: float, market_cap: float,
             rows.append(row)
         values["sensitivity"] = {"exogenous": list(sensitivity["exogenous"]),
                                  "endogenous": list(sensitivity["endogenous"]), "multiples": rows}
-    if risk_free_pct is None:
-        out = _na(engine, "무위험 금리 없음 — 이익수익률 비교 불가", values)
-        out["values"] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in values.items()}
-        return out
+    # 적자면 이익수익률로 주가 수준을 판단할 수 없다 — 늘 빨강이던 것을 미산출로(task#405).
+    # 금리 없음보다 근본적인 사유라 먼저 본다. 계산값은 상세에 남긴다
+    reason = ("선행 이익 적자(0 이하) — 이익수익률로 주가 수준을 판단할 수 없음" if fe <= 0 else
+              "무위험 금리 없음 — 이익수익률 비교 불가" if risk_free_pct is None else None)
+    if reason:
+        return _na(engine, reason, {k: (round(v, 4) if isinstance(v, float) else v) for k, v in values.items()})
     signal = classify_lens8(ey, risk_free_pct)
     if signal == "go":
         pct = risk_free_pct
@@ -550,6 +555,29 @@ def compute_lens(lens: dict, structure: dict, market_cap: Optional[float],
     if lid == 3:
         out["basis"] = lens.get("basis")
     return out
+
+
+def recompute_loss_lens8(lens_report: dict) -> tuple:
+    """정정 전에 박제된 적자 렌즈 8 판 → (새 lens_report, 바뀌었나). 발행물 불변의 좁은 예외(task#405).
+
+    렌즈 8이 서버 계산(computed)을 갖고, forward 이익 ≤ 0이며, 아직 na가 아닐 때만 저장된 원자료·구조·
+    발행 시점 시총·금리로 `compute_lens`를 그대로 다시 부른다. 그 렌즈의 signal·flip·na_reason·computed와
+    tally만 바꾸고 나머지는 건드리지 않는다. 입력은 변형하지 않는다."""
+    l8 = next((l for l in lens_report.get("lenses") or [] if l.get("id") == 8), None)
+    c = (l8 or {}).get("computed")
+    fe = (((l8 or {}).get("inputs") or {}).get("forward_earnings") or {}).get("value")
+    if not c or l8.get("signal") == "na" or fe is None or fe > 0:
+        return lens_report, False
+    vals = c.get("values") or {}
+    rf = vals.get("risk_free_pct")
+    axes = {k: v["value"] for k, v in lens_report["structure"].items()}
+    out = compute_lens(l8, axes, vals.get("market_cap"),
+                       (rf, c.get("risk_free_source")) if rf is not None else None)
+    new = copy.deepcopy(lens_report)
+    n8 = next(l for l in new["lenses"] if l.get("id") == 8)
+    n8.update(signal=out["signal"], flip=out["flip"], na_reason=out.get("na_reason"), computed=out)
+    new["tally"] = {s: sum(1 for l in new["lenses"] if l["signal"] == s) for s in SIGNALS}
+    return new, True
 
 
 def build_lens_report(structure: dict, lenses: list, snapshot: dict) -> dict:
