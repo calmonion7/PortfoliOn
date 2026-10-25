@@ -659,6 +659,17 @@ describe('렌즈 신호 행 펼침 (task#398)', () => {
     expect(container.querySelector('[id^="lens-"]')).toBeNull()
   })
 
+  it('원자료 접힘은 「출처 보기 · 원자료 N건 ⌄」로 눌러지는 것임을 보이고, 열리면 ⌃로 바뀐다 (task#407)', async () => {
+    const { container } = await renderWith(V2_NEW)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    const summary = container.querySelector('details > summary')
+    expect(summary.textContent).toMatch(/^출처 보기 · 원자료 \d+건\s*⌄$/)
+    const details = summary.parentElement
+    details.open = true
+    fireEvent(details, new Event('toggle'))
+    expect(summary.textContent).toMatch(/⌃$/)
+  })
+
   it('「상세」를 누르면 그 행 안에서만 펼쳐진다 — 내용은 그 행의 자손, 다른 행은 접힌 채, 다시 누르면 접힌다', async () => {
     const { container } = await renderWith(V2_NEW)
     const btn = cell(container, 3).querySelector('[data-lens-detail-toggle]')
