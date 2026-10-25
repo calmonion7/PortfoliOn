@@ -401,11 +401,16 @@ function ComputedBlock({ lens }) {
 }
 
 function InputsTable({ inputs }) {
+  const [open, setOpen] = useState(false)
   const rows = Object.entries(inputs || {})
   if (!rows.length) return null
+  // 「상세」 버튼과 같은 모양 — display:flex가 기본 ▸를 지우므로 화살표를 직접 그린다(task#407)
   return (
-    <details style={{ marginTop: 8 }}>
-      <summary style={{ ...smallCap, cursor: 'pointer', minHeight: 32, display: 'flex', alignItems: 'center' }}>원자료 {rows.length}건 — 출처</summary>
+    <details style={{ marginTop: 8 }} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 44, cursor: 'pointer',
+                        color: 'var(--text-2, var(--text))', fontSize: 12, fontWeight: 600 }}>
+        출처 보기 · 원자료 {rows.length}건 <span aria-hidden="true" style={{ fontSize: 13 }}>{open ? '⌃' : '⌄'}</span>
+      </summary>
       <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
         {rows.map(([k, r]) => (
           <li key={k} style={{ fontSize: 12, lineHeight: 1.5 }}>
