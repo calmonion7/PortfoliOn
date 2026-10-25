@@ -697,6 +697,23 @@ describe('렌즈 신호 행 펼침 (task#398)', () => {
     expect(cell(container, 3).querySelector('details > summary').textContent).toMatch(/원자료 6건/)
   })
 
+  it('원자료의 url은 https일 때만 「원문 ↗」 새 탭 링크로 보인다 (task#409)', async () => {
+    const inputs = {
+      cash: { ...raw(900, 'USD M'), url: 'https://www.sec.gov/Archives/a.htm' },
+      opex_prev: { ...raw(77, 'USD M'), url: null },
+      opex_curr: { ...raw(80, 'USD M'), url: 'http://insecure.example.com/x' },
+      fixed_cost_prev: { ...raw(1, 'USD M'), url: 'javascript:alert(1)' },
+    }
+    const rep = { ...V2_NEW, lenses: V2_NEW.lenses.map(l => (l.id === 3 ? { ...l, inputs } : l)) }
+    const { container } = await renderWith(rep)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    const links = [...cell(container, 3).querySelectorAll('details a')]
+    expect(links.map(a => a.getAttribute('href'))).toEqual(['https://www.sec.gov/Archives/a.htm'])
+    expect(links[0].textContent).toBe('원문 ↗')
+    expect(links[0].getAttribute('target')).toBe('_blank')
+    expect(links[0].getAttribute('rel')).toMatch(/noopener/)
+  })
+
   it('「상세」를 누르면 그 행 안에서만 펼쳐진다 — 내용은 그 행의 자손, 다른 행은 접힌 채, 다시 누르면 접힌다', async () => {
     const { container } = await renderWith(V2_NEW)
     const btn = cell(container, 3).querySelector('[data-lens-detail-toggle]')

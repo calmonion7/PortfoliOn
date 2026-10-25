@@ -427,6 +427,11 @@ function InputRow({ label, r, indent }) {
       <span className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(r.value, 3)} {r.unit}</span>{' '}
       <Badge variant={(SOURCE_META[r.source] || SOURCE_META.disclosure).variant}>{(SOURCE_META[r.source] || SOURCE_META.disclosure).label}</Badge>{' '}
       <span style={smallCap}>{r.ref}</span>
+      {/* 원문 링크 — 서버가 발행 때 확인한 https 주소만. 이중 방어로 https가 아니면 그리지 않는다(task#409) */}
+      {typeof r.url === 'string' && r.url.startsWith('https://') && (
+        <>{' '}<a href={r.url} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: 'var(--text-2, var(--text))', fontSize: 11, fontWeight: 600 }}>원문 ↗</a></>
+      )}
       {r.rationale && <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}><GlossaryText text={r.rationale} /></div>}
     </li>
   )

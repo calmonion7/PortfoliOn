@@ -2267,7 +2267,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
       "metrics": [ { "label": "USDC 유통량", "value": "742억 달러" } ] },
     { "id": 5, "summary": "금리 하락에 취약", "body": "본문",
       "inputs": {
-        "balance":           { "value": 74200, "unit": "USD M", "source": "disclosure", "ref": "10-Q 2026Q2" },
+        "balance":           { "value": 74200, "unit": "USD M", "source": "disclosure", "ref": "10-Q 2026Q2", "url": "https://www.sec.gov/Archives/edgar/data/…/crcl-20250630.htm" },
         "current_yield_pct": { "value": 3.49, "unit": "%", "source": "disclosure", "ref": "10-Q 2026Q2" },
         "avg_share_pct":     { "value": 38.2, "unit": "%", "source": "estimate", "ref": "10-Q 2026Q2", "rationale": "RLDC ÷ 준비금 수익" },
         "rate_sens_revenue": { "value": 737, "unit": "USD M", "source": "disclosure", "ref": "10-Q Item 7A" },
@@ -2295,7 +2295,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `lenses[].signal` | 판단 렌즈 ✅ / 계산 렌즈 ❌ | `go` \| `wait` \| `stop` \| `na` — **계산 렌즈(3·4·5·8)에 보내면 422** |
 | `lenses[].flip` | 판단 렌즈(na 제외) ✅ / 계산 렌즈 ❌ | 바뀜 조건 한 줄 — 계산 렌즈에 보내면 422 |
 | `lenses[].na_reason` | `na`면 ✅ | 원자료가 없어 판정하지 않는 사유. 계산 렌즈는 `inputs` 대신 이것만 보내면 서버가 회색(`na`)으로 박제한다 |
-| `lenses[].inputs` | 계산 렌즈 ✅(na_reason 없을 때) | 원자료 `{키: {value, unit, source, ref, rationale?}}` — 아래 표의 키 **전부**(누락·알 수 없는 키 422) |
+| `lenses[].inputs` | 계산 렌즈 ✅(na_reason 없을 때) | 원자료 `{키: {value, unit, source, ref, rationale?, url?}}` — 아래 표의 키 **전부**(누락·알 수 없는 키 422) |
 | `lenses[].gauge` | 판단 렌즈(na 제외) — `conditions`와 **정확히 하나** | 수치형 바뀜 조건 `{variable, unit, current, current_ref, boundaries[2, 오름차순], zones[3]}` — **세 색 모두**: `zones`는 `[stop, wait, go]` 또는 `[go, wait, stop]`(낮은 값→높은 값 순 신호). **현재값이 놓인 구간 = 그 렌즈의 `signal`**이어야 한다(다르면 422). 서버는 계산하지 않고 검증만 하며, 화면은 「루틴 판단」 게이지로 그린다 |
 | `lenses[].conditions` | 판단 렌즈(na 제외) — `gauge`와 **정확히 하나** | 비수치형 바뀜 조건 `[{color, when[1~4], match: all\|any}]` — **초록·노랑·빨강 정확히 하나씩**(게이지 세 구간과 같은 레벨). 지금 색의 항목은 현재 상태, 나머지는 그 색으로 바뀌는 조건. 화면은 세 색 블록으로 그리고 지금 색을 「현재」로 강조한다. 응답은 초록→노랑→빨강 순으로 정렬돼 나온다. 숫자와 사건이 섞이면 이쪽 |
 | `lenses[].sensitivity` | 렌즈 8 · 수익 엔진 `balance_rate`/`price_exogenous`일 때 ✅ | `{exogenous, endogenous}` 각 `{label, values[3], unit, source, ref, rationale?}` — 3×3 민감도 표의 행(외생)·열(내생) · **정중앙 칸**(외생 `values[1]` × 내생 `values[1]`)의 이익이 `forward_earnings`의 **±10% 안**이어야 한다(밖이면 422 — 표와 헤드라인이 같은 이익 정의 위에 서게, task#371. `forward_earnings` ≤ 0이면 검증 생략) |
@@ -2304,6 +2304,19 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 | `lenses[].precedents` | 렌즈 10(na 제외) ✅ / 그 밖 ❌ | 전례 **2~5건** `[{case(≤120자), period(≤40자), outcome, note?(≤300자), ref(≤200자)}]` — 비슷한 일이 벌어졌던 **다른 시점·회사·나라**의 사례(그 회사의 과거 재무가 아니다). `outcome`은 `realized`(현실화) \| `partial`(부분 현실화) \| `not_realized`(비현실화), `note`는 같은 점·다른 점을 `"같은 점: …. 다른 점: …."` 형식으로(화면이 두 표지로 나눠 라벨 열에 그린다 — 표지가 없으면 원문 한 문단, 서버는 형식을 검증하지 않는다), `ref`(출처) 필수. 결과별 건수는 **서버가 센다**(`base_rate` — 보내면 422). 확률(%)은 만들지 않는다 |
 
 **원자료 하나** = `{value(유한수), unit, source: "disclosure"|"consensus"|"estimate", ref(출처·기준일), rationale}` — 출처 셋(task#371): `disclosure`(공시·회사 가이던스) · `consensus`(애널 추정치 — 근거 불요, 계산 블록에 `consensus_based: true`) · `estimate`(루틴 자체 추정 — `rationale`(추정 근거) 필수). 민감도 축(`sensitivity.*.source`)도 같은 셋. 같은 렌즈의 금액 원자료는 **단위가 하나**여야 하고, `_pct` 키는 단위 `"%"`.
+
+**원문 링크 `url`(선택, task#409)** — 값을 옮겨 온 원문 문서의 `https://` 주소(≤500자). 앞으로 발행하는 판부터 실린다(기존 판은 링크 없이 그대로). 서버가 **발행 때 URL을 열어 확인**하고 확실히 없는 것은 그 원자료의 `url`만 `null`로 비운다 — 발행은 실패시키지 않으며 응답 `dropped_urls`에 담는다. `https://`가 아니면(`http:`·`javascript:` 등)·500자 초과는 422. 리다이렉트는 따라가지 않는다.
+
+| 확인 결과 | 처리 |
+|---|---|
+| 404·410 | 버림(`reason: "not_found"`) |
+| 도메인 조회 실패 | 버림(`reason: "dns"`) |
+| 연결 거부 | 버림(`reason: "refused"`) |
+| 사설·루프백·링크로컬·예약 IP | 버림(`reason: "private"`) |
+| 200 · 3xx · 403 · 429 · 5xx · 타임아웃 | 유지 |
+
+알려진 한계: 200으로 「찾을 수 없음」 페이지를 주는 소프트 404는 잡지 못한다.
+
 
 **변형별 필수 원자료** (변형은 구조 축이 고른다):
 
@@ -2326,7 +2339,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 
 **신호 문턱(초기값, 서버 상수 — `services/analyst_lenses.py`)**: 렌즈 3 비율 ≥1.0 초록 · 0.8~1.0 노랑 · <0.8 빨강 / 렌즈 4 연동형 한계 분배율 < 평균−5%p 초록 · ±5%p 노랑 · > 평균+5%p 빨강, 고정형 배수비 ≤1.0 초록 · ≤1.2 노랑 · 초과 빨강 / 렌즈 5 런웨이 ≥3년(또는 흑자) 초록 · ≥1.5년 노랑 · 미만 빨강, 손익분기 여유 ≥2%p 초록 · ≥1%p 노랑 · 미만 빨강, 이자보상 ≥5 초록 · ≥2 노랑 · 미만 빨강 / 렌즈 8 이익수익률 ≥ 무위험 금리 초록 · ≥ 무위험−1.5%p 노랑 · 그 아래 빨강. 서버는 계산 렌즈마다 **현재 색의 경계에 닿는 입력값**을 역산해 `flip`(바뀜 조건)으로 박제한다. 계산이 불가능하면(분모 0·매출 감소 구간의 한계 분배율·비유한 결과·스냅샷 시총 없음·무위험 금리 없음·렌즈 8 forward 이익 0 이하 — 적자면 이익수익률로 주가 수준을 판단할 수 없다, task#405) 추측하지 않고 `na` + `na_reason`.
 
-**Response `201`** — `{ "ok": true, "ticker": "CRCL", "published_date": "2026-10-07", "format": 2 }`
+**Response `201`** — `{ "ok": true, "ticker": "CRCL", "published_date": "2026-10-07", "format": 2, "dropped_urls": [] }` — `dropped_urls`는 항상 있다(없으면 빈 배열). 버려진 원문 링크는 `[{"lens": 3, "key": "fixed_cost_prev", "url": "https://…", "reason": "not_found"}]` 형태로 담기니 루틴 로그에서 확인할 것.
 
 **Error `403`** — Bearer token 인증됐으나 admin 아님
 **Error `409`** — 해당 종목의 스냅샷 없음 (발행 전제조건 미충족)
@@ -2454,7 +2467,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
 `data.per_band` — 과거 연간 PER(비컨센서스, 최근 최대 6개)의 min/max/avg + 현재/forward PER. 재료 부족(<2개)이면 `null`.
 `data.market_outlook` — 스냅샷 `market_outlook.segments`가 있을 때만 첨부(발행 시점 박제). 없으면 `data`에 이 키 자체가 없음(구발행물 포함 — 프론트는 이때 "사업부문 시장 분석" 섹션을 생략). **수주잔고의 「사업부문 분해」(`GET /api/report/{ticker}/backlog`의 `segments`)와는 별개 개념** — 이쪽은 시장 전망 하위 부문별 매출비중·시장규모·자사 점유율이다. 필드 상세는 위 enrich `market_outlook.segments` 표 참조.
 
-**렌즈 판 상세** — `structure`(구조 축 3값과 근거, 발행 본문 그대로)·`lenses`(id 순 — 1~10. 렌즈 10 필수화(task#392) 이전 판에는 렌즈 10이 없을 수 있어 1~9다). `format: 1`인 옛 판(task#370 이전 발행이 남은 경우)에는 이 두 키가 없고 요약 7키와 `data`만 실린다.
+**렌즈 판 상세** — `structure`(구조 축 3값과 근거, 발행 본문 그대로)·`lenses`(id 순 — 1~10. 렌즈 10 필수화(task#392) 이전 판에는 렌즈 10이 없을 수 있어 1~9다). `format: 1`인 옛 판(task#370 이전 발행이 남은 경우)에는 이 두 키가 없고 요약 7키와 `data`만 실린다. 계산 렌즈의 원자료는 `url`(원문 링크, https — 없으면 `null`·키 없음)을 실을 수 있다(task#409 이후 발행 판부터).
 
 ```json
 {
@@ -2464,7 +2477,7 @@ Cowork가 추출한 수주잔고 수치를 저장. `source`가 `'pending'`/`'llm
   "lenses": [
     { "id": 5, "summary": "금리 하락에 취약", "body": "...", "metrics": [],
       "signal": "wait", "flip": "준비금 수익률 3.15% 아래면 빨강", "na_reason": null,
-      "inputs": { "balance": { "value": 74200, "unit": "USD M", "source": "disclosure", "ref": "10-Q 2026Q2", "rationale": null } },
+      "inputs": { "balance": { "value": 74200, "unit": "USD M", "source": "disclosure", "ref": "10-Q 2026Q2", "rationale": null, "url": null } },
       "sensitivity": null,
       "computed": { "variant": "deposit", "values": { "breakeven_pct": 2.1484, "margin_pp": 1.3416, "current_profit": 509.2, "marginal_share_pct": 51.15, "profit_per_pp": 379.56 },
                     "signal": "wait", "flip": "준비금 수익률 3.15% 아래면 빨강", "flip_value": 3.1484, "estimate_based": true } }
