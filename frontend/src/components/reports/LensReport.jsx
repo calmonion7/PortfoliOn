@@ -400,27 +400,60 @@ function ComputedBlock({ lens }) {
   )
 }
 
+// 원자료는 jsonb로 저장돼 키가 글자 수 순으로 재정렬된다 — 서버 순서에 기대지 않고 INPUT_LABELS 순서로 다시 세운다(task#408).
+// `_prev`/`_curr` 짝은 항목 하나로 묶어 「직전 → 현재」로 보이고, 짝 없는 키는 한 줄 그대로다.
+const PAIR_RE = /^(.*)_(prev|curr)$/
+const PAIR_SUB = { prev: '직전', curr: '현재' }
+function groupInputs(inputs) {
+  const order = Object.keys(INPUT_LABELS)
+  const rank = k => { const i = order.indexOf(k); return i < 0 ? order.length : i }
+  const keys = Object.keys(inputs || {}).sort((a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0))
+  const groups = []
+  const byBase = {}
+  keys.forEach(k => {
+    const m = PAIR_RE.exec(k)
+    if (!m) { groups.push({ id: k, rows: [[k, inputs[k]]] }); return }
+    if (!byBase[m[1]]) { byBase[m[1]] = { id: `${m[1]}:pair`, pair: true, title: (INPUT_LABELS[k] || m[1]).replace(/\((직전|현재)\)$/, ''), rows: [] }; groups.push(byBase[m[1]]) }
+    byBase[m[1]].rows.push([k, inputs[k]])
+  })
+  groups.forEach(g => { if (g.pair) g.rows.sort((a, b) => (a[0].endsWith('_prev') ? 0 : 1) - (b[0].endsWith('_prev') ? 0 : 1)) })
+  return groups
+}
+
+function InputRow({ label, r, indent }) {
+  return (
+    <li style={{ fontSize: 12, lineHeight: 1.5, paddingLeft: indent ? 8 : 0 }}>
+      <span style={{ color: 'var(--text-2, var(--text))' }}>{label}</span>{' '}
+      <span className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(r.value, 3)} {r.unit}</span>{' '}
+      <Badge variant={(SOURCE_META[r.source] || SOURCE_META.disclosure).variant}>{(SOURCE_META[r.source] || SOURCE_META.disclosure).label}</Badge>{' '}
+      <span style={smallCap}>{r.ref}</span>
+      {r.rationale && <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}><GlossaryText text={r.rationale} /></div>}
+    </li>
+  )
+}
+
 function InputsTable({ inputs }) {
   const [open, setOpen] = useState(false)
-  const rows = Object.entries(inputs || {})
-  if (!rows.length) return null
+  const groups = groupInputs(inputs)
+  const count = groups.reduce((n, g) => n + g.rows.length, 0)
+  if (!count) return null
+  const listStyle = { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }
   // 「상세」 버튼과 같은 모양 — display:flex가 기본 ▸를 지우므로 화살표를 직접 그린다(task#407)
   return (
     <details style={{ marginTop: 8 }} onToggle={e => setOpen(e.currentTarget.open)}>
       <summary style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 44, cursor: 'pointer',
                         color: 'var(--text-2, var(--text))', fontSize: 12, fontWeight: 600 }}>
-        출처 보기 · 원자료 {rows.length}건 <span aria-hidden="true" style={{ fontSize: 13 }}>{open ? '⌃' : '⌄'}</span>
+        출처 보기 · 원자료 {count}건 <span aria-hidden="true" style={{ fontSize: 13 }}>{open ? '⌃' : '⌄'}</span>
       </summary>
-      <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {rows.map(([k, r]) => (
-          <li key={k} style={{ fontSize: 12, lineHeight: 1.5 }}>
-            <span style={{ color: 'var(--text-2, var(--text))' }}>{INPUT_LABELS[k] || k}</span>{' '}
-            <span className="mono tnum" style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(r.value, 3)} {r.unit}</span>{' '}
-            <Badge variant={(SOURCE_META[r.source] || SOURCE_META.disclosure).variant}>{(SOURCE_META[r.source] || SOURCE_META.disclosure).label}</Badge>{' '}
-            <span style={smallCap}>{r.ref}</span>
-            {r.rationale && <div style={{ ...smallCap, wordBreak: 'keep-all', overflowWrap: 'break-word' }}><GlossaryText text={r.rationale} /></div>}
+      <ul style={{ ...listStyle, margin: '6px 0 0' }}>
+        {groups.map(g => g.pair ? (
+          <li key={g.id} style={{ fontSize: 12, lineHeight: 1.5 }}>
+            <div style={{ color: 'var(--text-2, var(--text))', fontWeight: 600 }}>{g.title}</div>
+            <ul style={{ ...listStyle, marginTop: 4 }}>
+              {g.rows.map(([k, r]) => <InputRow key={k} label={PAIR_SUB[PAIR_RE.exec(k)[2]]} r={r} indent />)}
+            </ul>
           </li>
-        ))}
+        ) : <InputRow key={g.id} label={INPUT_LABELS[g.rows[0][0]] || g.rows[0][0]} r={g.rows[0][1]} />)}
       </ul>
     </details>
   )

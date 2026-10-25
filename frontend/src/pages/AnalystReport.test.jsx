@@ -670,6 +670,33 @@ describe('렌즈 신호 행 펼침 (task#398)', () => {
     expect(summary.textContent).toMatch(/⌃$/)
   })
 
+  it('원자료는 항목별 「직전 → 현재」로 묶이고 순서는 jsonb 키 순서와 무관하게 고정이다 (task#408)', async () => {
+    // jsonb가 돌려주는 순서(짧은 키 먼저 · 현재가 직전보다 먼저)를 일부러 흉내 낸다
+    const inputs = {
+      cash: raw(900, 'USD M'),
+      fixed_cost_curr: raw(40, 'USD M'), fixed_cost_prev: raw(30, 'USD M'),
+      contribution_curr: raw(300, 'USD M'), contribution_prev: raw(251, 'USD M'),
+      opex_prev: raw(77, 'USD M'),
+    }
+    const rep = { ...V2_NEW, lenses: V2_NEW.lenses.map(l => (l.id === 3 ? { ...l, inputs } : l)) }
+    const { container } = await renderWith(rep)
+    fireEvent.click(screen.getByRole('button', { name: '모두 펼치기' }))
+    const top = [...cell(container, 3).querySelectorAll('details > ul > li')]
+    const label = li => (li.querySelector(':scope > div')?.textContent ?? li.querySelector(':scope > span').textContent)
+    // ① 묶음·한 줄 순서는 INPUT_LABELS 순
+    expect(top.map(label)).toEqual(['영업비용', '기여몫', '고정비', '현금'])
+    const subs = li => [...li.querySelectorAll('ul > li')].map(e => e.querySelector('span').textContent)
+    // ② 묶음 안에서 직전이 현재보다 앞
+    expect(subs(top[1])).toEqual(['직전', '현재'])
+    expect(subs(top[2])).toEqual(['직전', '현재'])
+    // ③ 짝 없는 항목은 하위 라벨 없이 한 줄
+    expect(top[3].querySelector('ul')).toBeNull()
+    // ④ 한쪽만 있는 짝은 그 하위 행 하나만
+    expect(subs(top[0])).toEqual(['직전'])
+    // 요약 N은 값 개수다
+    expect(cell(container, 3).querySelector('details > summary').textContent).toMatch(/원자료 6건/)
+  })
+
   it('「상세」를 누르면 그 행 안에서만 펼쳐진다 — 내용은 그 행의 자손, 다른 행은 접힌 채, 다시 누르면 접힌다', async () => {
     const { container } = await renderWith(V2_NEW)
     const btn = cell(container, 3).querySelector('[data-lens-detail-toggle]')
