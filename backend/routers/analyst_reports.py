@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from auth import get_current_user_or_api_key, require_admin, require_admin_or_api_key
 from services import analyst_lenses as lens_calc
 from services import analyst_reports as svc
+from services import link_check
 from services.utils import sanitize
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class RawInput(BaseModel):
     source: Literal["disclosure", "consensus", "estimate"]
     ref: str = Field(..., min_length=1, max_length=200)      # 출처·기준일
     rationale: Optional[str] = Field(None, max_length=300)   # estimate면 필수
+    url: Optional[str] = Field(None, max_length=500, pattern=r"^https://")   # 원문 링크 — 서버가 발행 때 열어 확인(task#409)
 
     @model_validator(mode="after")
     def _estimate_needs_rationale(self):
@@ -357,11 +359,13 @@ def publish_report(ticker: str, body: LensPublishBody, _: str = Depends(require_
         if expect == "KRW" and "risk_free_pct" not in l8["inputs"]:
             # 서버 캐시의 무위험 금리는 미 10년물 — KR 종목에 쓰면 틀린 비교가 된다
             raise HTTPException(status_code=422, detail="KR 종목의 렌즈 8은 risk_free_pct(국고채) 원자료 필수")
+    dropped_urls = link_check.sanitize_input_urls(b["lenses"])   # 확실히 없는 원문 링크만 비운다(발행은 막지 않는다)
     lens_report = sanitize(lens_calc.build_lens_report(b["structure"], b["lenses"], snapshot_data or {}))
     svc.save_lens_report(ticker=upper, published_date=published_date, title=body.title,
                          data=data, lens_report=lens_report)
     logger.info(f"[AnalystReport] v2 발행 ({upper} {published_date}): tally={lens_report['tally']}")
-    return {"ok": True, "ticker": upper, "published_date": published_date, "format": 2}
+    return {"ok": True, "ticker": upper, "published_date": published_date, "format": 2,
+            "dropped_urls": dropped_urls}
 
 
 @router.get("")
