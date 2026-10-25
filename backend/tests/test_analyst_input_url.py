@@ -95,6 +95,7 @@ def test_check_never_follows_redirects_and_does_not_read_body():
     kw = get.call_args.kwargs
     assert kw["allow_redirects"] is False and kw["stream"] is True and kw["timeout"] == 5
     assert "PortfoliOn link-check" in kw["headers"]["User-Agent"]
+    assert "@" in kw["headers"]["User-Agent"]   # SEC는 연락처 없는 UA에 403
 
 
 # ── ⓒ 발행 ──────────────────────────────────────────────────────────────

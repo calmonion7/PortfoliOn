@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT = 5
 _MAX_WORKERS = 8
-_HEADERS = {"User-Agent": "PortfoliOn link-check (+https://portfolion.taebro.com)"}
+# SEC(sec.gov)는 연락처가 든 UA가 아니면 없는 경로에도 403을 줘서 링크를 못 거른다 — 연락처를 UA에 싣는다(task#409 후속)
+_HEADERS = {"User-Agent": "PortfoliOn link-check (+https://portfolion.taebro.com) taebro80@gmail.com"}
 
 
 def _is_private(ip: str) -> bool:
